@@ -270,7 +270,7 @@ namespace strumpack {
       auto sep_begin = local_sep_tree->sizes()[sep];
       auto sep_end = local_sep_tree->sizes()[sep+1];
       auto dim_sep = sep_end - sep_begin;
-      if (dim_sep < opts.HSS_min_front_size()) return; // this front (and its descendants) are not HSS
+      if (dim_sep < opts.HSS_min_sep_size()) return; // this front (and its descendants) are not HSS
       HSS::HSSPartitionTree tree(dim_sep);
       if (dim_sep > 2 * opts.HSS_options().leaf_size()) {
 	std::function<void(HSS::HSSPartitionTree&, integer_t&, integer_t, integer_t)> split =

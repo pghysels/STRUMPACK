@@ -573,12 +573,6 @@ namespace strumpack {
     std::vector<MPI_Request> sreq;
     int dest0 = std::min(P0, P0_sibling);
     int dest1 = std::max(P0+P, P0_sibling+P_sibling);
-
-    // std::cout << "rank=" << rank << "/" << mpi_rank()
-    // 	      << " dsep=" << dsep << " dsep_begin=" << dsep_begin << " owner=" << owner
-    // 	      << " P0=" << P0 << " P=" << P << " P0_sib=" << P0_sibling << " P_sib=" << P_sibling << " use_hss=" << use_hss << std::endl; 
-
-
     if (rank == owner) {
       sbuf = new integer_t[2+dist_upd.size()];
       sbuf[0] = _nd->dist_sep_range.first;
