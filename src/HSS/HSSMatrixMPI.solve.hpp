@@ -1,0 +1,170 @@
+#ifndef HSS_MATRIX_MPI_SOLVE_HPP
+#define HSS_MATRIX_MPI_SOLVE_HPP
+
+namespace strumpack {
+  namespace HSS {
+
+    template<typename scalar_t> void HSSMatrixMPI<scalar_t>::solve
+    (const HSSFactorsMPI<scalar_t>& ULV, DistM_t& b) const {
+      assert(b.rows() == this->rows());
+      // TODO assert that the ULV factorization has been performed and
+      // is a valid one
+      // assert(ULV._D.rows() == _U.rows());
+      WorkSolveMPI<scalar_t> w;
+      DistSubLeaf<scalar_t> B(b.cols(), this, ctxt_loc(), b);
+      solve_fwd(ULV, B, w, false, true);
+      solve_bwd(ULV, B, w, true);
+      B.from_block_row(b);
+    }
+
+    // TODO do not pass work, just return the reduced_rhs, and w.x at the root
+    template<typename scalar_t> void HSSMatrixMPI<scalar_t>::forward_solve
+    (const HSSFactorsMPI<scalar_t>& ULV, WorkSolveMPI<scalar_t>& w, const DistM_t& b, bool partial) const {
+      DistSubLeaf<scalar_t> B(b.cols(), this, ctxt_loc(), b);
+      solve_fwd(ULV, B, w, partial, true);
+    }
+
+    template<typename scalar_t> void HSSMatrixMPI<scalar_t>::backward_solve
+    (const HSSFactorsMPI<scalar_t>& ULV, WorkSolveMPI<scalar_t>& w, DistM_t& x) const {
+      DistSubLeaf<scalar_t> X(x.cols(), this, ctxt_loc());
+      solve_bwd(ULV, X, w, true);
+      X.from_block_row(x);
+    }
+
+    // have this routine return ft1, or x at the root!!!
+    // then ft1 and x do not need to be stored in WorkSolve!!
+    template<typename scalar_t> void HSSMatrixMPI<scalar_t>::solve_fwd
+    (const HSSFactorsMPI<scalar_t>& ULV, const DistSubLeaf<scalar_t>& b,
+     WorkSolveMPI<scalar_t>& w, bool partial, bool isroot) const {
+      if (!this->active()) return;
+      auto n = b.cols();
+      DistM_t f, z;
+      if (this->leaf()) {
+	f = DistM_t(_ctxt, this->rows(), n);
+	copy(this->rows(), n, b.leaf, 0, 0, f, 0, 0, _ctxt_all);
+      } else {
+	w.c.resize(2);
+	this->_ch[0]->solve_fwd(ULV._ch[0], b, w.c[0], partial, false);
+	this->_ch[1]->solve_fwd(ULV._ch[1], b, w.c[1], partial, false);
+	auto c0urank = this->_ch[0]->U_rank();  auto c1urank = this->_ch[1]->U_rank();
+	auto c0vrank = this->_ch[0]->V_rank();  auto c1vrank = this->_ch[1]->V_rank();
+	auto c0urows = this->_ch[0]->U_rows();  auto c1urows = this->_ch[1]->U_rows();
+	auto urows = c0urank + c1urank;
+	auto vrows = c0vrank + c1vrank;
+	f = DistM_t(_ctxt, urows, n);
+	DistMW_t f0(c0urank, n, f, 0, 0);
+	DistMW_t f1(c1urank, n, f, c0urank, 0);
+	copy(c0urank, n, w.c[0].ft1, 0, 0, f0, 0, 0, _ctxt_all);
+	copy(c1urank, n, w.c[1].ft1, 0, 0, f1, 0, 0, _ctxt_all);
+	w.c[0].ft1.clear();
+	w.c[1].ft1.clear();
+	z = DistM_t(_ctxt, vrows, n);
+        DistMW_t z0(c0vrank, n, z, 0, 0);
+	DistMW_t z1(c1vrank, n, z, c0vrank, 0);
+	copy(c0vrank, n, w.c[0].z, 0, 0, z0, 0, 0, _ctxt_all);
+	copy(c1vrank, n, w.c[1].z, 0, 0, z1, 0, 0, _ctxt_all);
+	w.c[0].z.clear();
+	w.c[1].z.clear();
+	DistM_t y0(_ctxt, c0urows-c0urank, n);
+	DistM_t y1(_ctxt, c1urows-c1urank, n);
+	// TODO as extra optimization, combine these pgemr2d's?
+	copy(y0.rows(), n, w.c[0].y, 0, 0, y0, 0, 0, _ctxt_all);
+	copy(y1.rows(), n, w.c[1].y, 0, 0, y1, 0, 0, _ctxt_all);
+	gemm(Trans::N, Trans::N, scalar_t(-1.), _B01, z1, scalar_t(1.), f0);
+	gemm(Trans::N, Trans::N, scalar_t(-1.), _B10, z0, scalar_t(1.), f1);
+	if (c0urows > c0urank) {
+	  DistM_t Q00(_ctxt, c0urows - c0urank, c0urows);
+	  copy(Q00.rows(), Q00.cols(), ULV._ch[0]._Q, 0, 0, Q00, 0, 0, _ctxt_all);
+	  DistM_t tmp0(_ctxt, c0urows, n);
+	  DistM_t c0W1(_ctxt, c0urank, c0urows);
+	  copy(c0W1.rows(), c0W1.cols(), ULV._ch[0]._W1, 0, 0, c0W1, 0, 0, _ctxt_all);
+	  gemm(Trans::C, Trans::N, scalar_t(1.), Q00, y0, scalar_t(0.), tmp0);
+	  gemm(Trans::N, Trans::N, scalar_t(-1.), c0W1, tmp0, scalar_t(1.), f0);
+	}
+	if (c1urows > c1urank) {
+	  DistM_t Q10(_ctxt, c1urows - c1urank, c1urows);
+	  copy(c1urows - c1urank, c1urows, ULV._ch[1]._Q, 0, 0, Q10, 0, 0, _ctxt_all);
+	  DistM_t tmp1(_ctxt, Q10.cols(), n);
+	  DistM_t c1W1(_ctxt, c1urank, c1urows);
+	  copy(c1W1.rows(), c1W1.cols(), ULV._ch[1]._W1, 0, 0, c1W1, 0, 0, _ctxt_all);
+	  gemm(Trans::C, Trans::N, scalar_t(1.), Q10, y1, scalar_t(0.), tmp1);
+	  gemm(Trans::N, Trans::N, scalar_t(-1.), c1W1, tmp1, scalar_t(1.), f1);
+	}
+      }
+      if (isroot) {
+	w.x = ULV._D.solve(f, ULV._piv);
+	if (partial) {
+	  // compute reduced_rhs = \hat{V}^* y_0 + V^* [z_0; z_1]
+	  w.reduced_rhs = DistM_t(_ctxt, this->V_rank(), w.x.cols());
+	  gemm(Trans::C, Trans::N, scalar_t(1.), ULV._Vt0, w.x, scalar_t(0.), w.reduced_rhs);
+	  if (!this->leaf()) w.reduced_rhs.add(_V.applyC(z));
+	}
+      } else {
+	f.permute_rows_fwd(_U.P());
+	if (this->U_rows() > this->U_rank()) {
+	  w.ft1 = DistM_t(_ctxt, this->U_rank(), n);
+	  copy(w.ft1.rows(), n, f, 0, 0, w.ft1, 0, 0, _ctxt_all);
+	  w.y = DistM_t(_ctxt, this->U_rows()-this->U_rank(), n);
+	  copy(w.y.rows(), n, f, this->U_rank(), 0, w.y, 0, 0, _ctxt_all); // put ft0 in w.y
+	  gemm(Trans::N, Trans::N, scalar_t(-1.), _U.E(), w.ft1, scalar_t(1.), w.y);
+	  trsm(Side::L, UpLo::L, Trans::N, Diag::N, scalar_t(1.), ULV._L, w.y);
+	  if (!this->leaf()) {
+	    w.z = _V.applyC(z); // TODO do the concat first, create wrappers for z0 and z1
+	    gemm(Trans::C, Trans::N, scalar_t(1.), ULV._Vt0, w.y, scalar_t(1.), w.z);
+	  } else {
+	    w.z = DistM_t(_ctxt, this->V_rank(), n);
+	    gemm(Trans::C, Trans::N, scalar_t(1.), ULV._Vt0, w.y, scalar_t(0.), w.z);
+	  }
+	} else {
+	  w.ft1 = DistM_t(_ctxt, this->U_rank(), n);
+	  w.y = DistM_t(_ctxt, 0, n);
+	  copy(this->U_rank(), n, f, 0, 0, w.ft1, 0, 0, _ctxt_all);
+	  if (!this->leaf()) w.z = _V.applyC(z);
+	  else {
+	    w.z = DistM_t(_ctxt, this->V_rank(), n);
+	    w.z.zero(); // TODO can this be avoided?
+	  }
+	}
+      }
+    }
+
+    template<typename scalar_t> void HSSMatrixMPI<scalar_t>::solve_bwd
+    (const HSSFactorsMPI<scalar_t>& ULV, DistSubLeaf<scalar_t>& x,
+     WorkSolveMPI<scalar_t>& w, bool isroot) const {
+      if (!this->active()) return;
+      auto n = x.cols();
+      if (this->leaf()) copy(this->rows(), n, w.x, 0, 0, x.leaf, 0, 0, _ctxt_all);
+      else {
+	auto c0urank = this->_ch[0]->U_rank(); auto c1urank = this->_ch[1]->U_rank();
+	auto c0urows = this->_ch[0]->U_rows(); auto c1urows = this->_ch[1]->U_rows();
+	{
+	  w.c[0].x = DistM_t(w.c[0].y.ctxt(), c0urows, n);
+	  if (c0urows > c0urank) {
+	    DistM_t tmp(w.c[0].y.ctxt(), c0urows, n);
+	    // TODO this first one is on the same context, should not need communication!!
+	    copy(c0urows-c0urank, n, w.c[0].y, 0, 0, tmp, 0, 0, _ctxt_all);
+	    copy(c0urank, n, w.x, 0, 0, tmp, c0urows-c0urank, 0, _ctxt_all);
+	    gemm(Trans::C, Trans::N, scalar_t(1.), ULV._ch[0]._Q, tmp, scalar_t(0.), w.c[0].x);
+	  } else copy(c0urank, n, w.x, 0, 0, w.c[0].x, 0, 0, _ctxt_all);
+	} {
+	  w.c[1].x = DistM_t(w.c[1].y.ctxt(), c1urows, n);
+	  if (c1urows > c1urank) {
+	    // TODO this first one is on the same context, should not need communication!!
+	    DistM_t tmp(w.c[1].y.ctxt(), c1urows, n);
+	    copy(c1urows-c1urank, n, w.c[1].y, 0, 0, tmp, 0, 0, _ctxt_all);
+	    copy(c1urank, n, w.x, c0urank, 0, tmp, c1urows-c1urank, 0, _ctxt_all);
+	    gemm(Trans::C, Trans::N, scalar_t(1.), ULV._ch[1]._Q, tmp, scalar_t(0.), w.c[1].x);
+	  } else copy(c1urank, n, w.x, c0urank, 0, w.c[1].x, 0, 0, _ctxt_all);
+	}
+	w.x.clear();
+	w.c[0].y.clear();
+	w.c[1].y.clear();
+	this->_ch[0]->solve_bwd(ULV._ch[0], x, w.c[0], false);
+	this->_ch[1]->solve_bwd(ULV._ch[1], x, w.c[1], false);
+      }
+    }
+
+  } // end namespace HSS
+} // end namespace strumpack
+
+#endif // HSS_MATRIX_MPI_SOLVE_HPP

@@ -1,0 +1,8 @@
+if (NOT (METIS_INCLUDES AND METIS_LIBRARIES))
+  find_path(METIS_INCLUDES NAMES metis.h PATHS $ENV{METISDIR} PATH_SUFFIXES include)
+  find_library(METIS_LIBRARY metis PATHS $ENV{METISDIR} PATH_SUFFIXES lib)
+  set(METIS_LIBRARIES ${METIS_LIBRARY})
+endif()
+
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(METIS DEFAULT_MSG METIS_INCLUDES METIS_LIBRARIES)
