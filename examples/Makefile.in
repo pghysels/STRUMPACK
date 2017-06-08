@@ -1,0 +1,93 @@
+all: sexample dexample cexample zexample \
+	testPoisson2d testPoisson3d testPoisson2dMPI testPoisson2dMPIDist \
+	testMMdouble testMMdoubleMPI testMMdoubleMPIDist \
+	testMMdouble64 testMMdoubleMPIDist64 \
+	testMMfloat mtx2bin bin2mtx
+
+CC=@MPI_C_COMPILER@
+CXX=@MPI_CXX_COMPILER@
+CPPFLAGS=-I@CMAKE_INSTALL_PREFIX@/include \
+	-I@METIS_INCLUDES@ -I@PARMETIS_INCLUDES@ -I@SCOTCH_INCLUDES@
+CFLAGS=@STRUMPACK_ALL_C_FLAGS@
+CXXFLAGS=@STRUMPACK_ALL_CXX_FLAGS@
+LIBS=-L@CMAKE_INSTALL_PREFIX@/lib/ -lstrumpack @STRUMPACK_ALL_LIBS@
+LDFLAGS=-Wl,-rpath,@CMAKE_INSTALL_RPATH@ @OpenMP_CXX_FLAGS@ @CMAKE_EXE_LINKER_FLAGS@
+
+sexample: sexample.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o sexample.o
+	$(CXX) $(LDFLAGS) sexample.o -o $@ $(LIBS)
+	$(RM) sexample.o
+dexample: dexample.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o dexample.o
+	$(CXX) $(LDFLAGS) dexample.o -o $@ $(LIBS)
+	$(RM) dexample.o
+cexample: cexample.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o cexample.o
+	$(CXX) $(LDFLAGS) cexample.o -o $@ $(LIBS)
+	$(RM) cexample.o
+zexample: zexample.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o zexample.o
+	$(CXX) $(LDFLAGS) zexample.o -o $@ $(LIBS)
+	$(RM) zexample.o
+
+testPoisson2d: testPoisson2d.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testPoisson2d.o
+	$(CXX) $(LDFLAGS) testPoisson2d.o -o $@ $(LIBS)
+	$(RM) testPoisson2d.o
+testPoisson3d: testPoisson3d.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testPoisson3d.o
+	$(CXX) $(LDFLAGS) testPoisson3d.o -o $@ $(LIBS)
+	$(RM) testPoisson3d.o
+testPoisson2dMPI: testPoisson2dMPI.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testPoisson2dMPI.o
+	$(CXX) $(LDFLAGS) testPoisson2dMPI.o -o $@ $(LIBS)
+	$(RM) testPoisson2dMPI.o
+testPoisson2dMPIDist: testPoisson2dMPIDist.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testPoisson2dMPIDist.o
+	$(CXX) $(LDFLAGS) testPoisson2dMPIDist.o -o $@ $(LIBS)
+	$(RM) testPoisson2dMPIDist.o
+
+testMMdouble: testMMdouble.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMdouble.o
+	$(CXX) $(LDFLAGS) testMMdouble.o -o $@ $(LIBS)
+	$(RM) testMMdouble.o
+testMMdoubleMPI: testMMdoubleMPI.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMdoubleMPI.o
+	$(CXX) $(LDFLAGS) testMMdoubleMPI.o -o $@ $(LIBS)
+	$(RM) testMMdoubleMPI.o
+testMMdoubleMPIDist: testMMdoubleMPIDist.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMdoubleMPIDist.o
+	$(CXX) $(LDFLAGS) testMMdoubleMPIDist.o -o $@ $(LIBS)
+	$(RM) testMMdoubleMPIDist.o
+
+testMMdouble64: testMMdouble64.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMdouble64.o
+	$(CXX) $(LDFLAGS) testMMdouble64.o -o $@ $(LIBS)
+	$(RM) testMMdouble64.o
+testMMdoubleMPIDist64: testMMdoubleMPIDist64.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMdoubleMPIDist64.o
+	$(CXX) $(LDFLAGS) testMMdoubleMPIDist64.o -o $@ $(LIBS)
+	$(RM) testMMdoubleMPIDist64.o
+
+testMMfloat: testMMfloat.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMfloat.o
+	$(CXX) $(LDFLAGS) testMMfloat.o -o $@ $(LIBS)
+	$(RM) testMMfloat.o
+
+mtx2bin: mtx2bin.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o mtx2bin.o
+	$(CXX) $(LDFLAGS) mtx2bin.o -o $@ $(LIBS)
+	$(RM) mtx2bin.o
+
+bin2mtx: bin2mtx.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o bin2mtx.o
+	$(CXX) $(LDFLAGS) bin2mtx.o -o $@ $(LIBS)
+	$(RM) bin2mtx.o
+
+clean:
+	rm -f *~ *o sexample dexample cexample zexample \
+		testPoisson2d testPoisson3d testPoisson2dMPI testPoisson2dMPIDist \
+		testMMdouble testMMdoubleMPI testMMdoubleMPIDist \
+		testMMdouble64 testMMdoubleMPIDist64 testMMfloat mtx2bin bin2mtx
+
+

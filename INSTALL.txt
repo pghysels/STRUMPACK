@@ -14,7 +14,7 @@ following steps:
 > export METISDIR=/path/to/metis
 > export PARMETISDIR=/path/to/parmetis
 > export SCOTCHDIR=/path/to/scotch
-> cmake ../strumpack-sparse -DCMAKE_BUILD_TYPE=Release \
+> cmake ../STRUMPACK-x.y.z -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/path/to/install \
     -DCMAKE_CXX_COMPILER=<C++ (MPI) compiler> \
     -DCMAKE_C_COMPILER=<C (MPI) compiler> \
@@ -48,7 +48,7 @@ build to succeed. These are:
 
 
 The (C++/C/Fortran) compiler can be specified as follows:
-> cmake ../STRUMPACK-sparse-x.y.z -DCMAKE_BUILD_TYPE=Release
+> cmake ../STRUMPACK-x.y.z -DCMAKE_BUILD_TYPE=Release
     -DCMAKE_CXX_COMPILER=mpic++ -DCMAKE_C_COMPILER=mpicc
     -DCMAKE_Fortran_COMPILER=mpif90
 
@@ -65,7 +65,7 @@ If BLACS/SCALAPACK are not installed in a standard location, you
 can also specify the libraries for instance using
 -DSCALAPACK_LIBRARIES=".." or directly via the linker flags as
 follows:
-> cmake ../STRUMPACK-sparse-x.y.z -DCMAKE_BUILD_TYPE=Release
+> cmake ../STRUMPACK-x.y.z -DCMAKE_BUILD_TYPE=Release
      -DCMAKE_EXE_LINKER_FLAGS="-L/usr/lib64/mpich/lib/ -lscalapack -lmpiblacs"
 
 
@@ -87,7 +87,7 @@ libscotch, libscotcherr, libptscotch, libptscotcherr.
 
 Alternatively, one can specify the paths directly when calling CMake
 as follows:
-> cmake ../STRUMPACK-sparse-x.y.z -DCMAKE_BUILD_TYPE=Release
+> cmake ../STRUMPACK-x.y.z -DCMAKE_BUILD_TYPE=Release
     -DMETIS_INCLUDES=/usr/local/metis/include \
     -DMETIS_LIBRARIES=/usr/local/metis/lib/libmetis.a
 
