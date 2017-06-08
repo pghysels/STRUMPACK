@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 2.8)
-project(STRUMPACK-sparse CXX C Fortran)
+project(STRUMPACK CXX C Fortran)
 
 set(STRUMPACK_VERSION_MAJOR 1)
-set(STRUMPACK_VERSION_MINOR 1)
-set(STRUMPACK_VERSION_PATCH 0)
+set(STRUMPACK_VERSION_MINOR 9)
+set(STRUMPACK_VERSION_PATCH 9)
 set(STRUMPACK_VERSION_FULL "${STRUMPACK_VERSION_MAJOR}.${STRUMPACK_VERSION_MINOR}")
 
 set(CMAKE_CXX_STANDARD 11)
@@ -161,10 +161,10 @@ set(LIBSRC src/blas_lapack_omp_task.cpp src/strumpack_mc64ad.c
   src/lapack/pcgeqpfmod.f src/lapack/pdgeqpfmod.f src/lapack/psgeqpfmod.f src/lapack/pzgeqpfmod.f
   src/lapack/cgeqp3mod.f  src/lapack/dgeqp3mod.f  src/lapack/sgeqp3mod.f  src/lapack/zgeqp3mod.f
   src/rcm/rcm.f src/rcm/degree.f src/rcm/fnroot.f src/rcm/genrcm.f src/rcm/rootls.f src/MUMPS/ana_orderings.F)
-add_library(strumpack_sparse ${LIBSRC})
-target_link_libraries(strumpack_sparse ${LIBS})
+add_library(strumpack ${LIBSRC})
+target_link_libraries(strumpack ${LIBS})
 
-install(TARGETS strumpack_sparse LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+install(TARGETS strumpack LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 install(FILES ${PROJECT_BINARY_DIR}/strumpack_config.h src/StrumpackSparseSolver.h src/BiCGStab.hpp
   src/BiCGStabMPI.hpp src/CSCMatrix.hpp src/CSRGraph.hpp src/CSRMatrix.hpp src/CSRMatrixMPI.hpp
   src/CompressedSparseMatrix.hpp src/DistributedMatrix.hpp src/ETree.hpp
