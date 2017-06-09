@@ -11,7 +11,7 @@ namespace strumpack {
       // TODO this stores a copy of the global matrix on every
       // process! avoid this!!
       DistElemMult(const DistM_t& A, int ctxt_all, MPI_Comm comm)
-	: _A(A), _Ag(A.allgather(ctxt_all)), _ctxt(A.ctxt()), _ctxt_all(ctxt_all), _comm(comm) { }
+	: _A(A), _Ag(A.all_gather(ctxt_all)), _ctxt(A.ctxt()), _ctxt_all(ctxt_all), _comm(comm) { }
       const DistM_t& _A;
       const DenseM_t _Ag;
       const int _ctxt, _ctxt_all;

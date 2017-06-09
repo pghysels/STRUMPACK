@@ -207,6 +207,7 @@ if(DOXYGEN_FOUND)
     )
 endif(DOXYGEN_FOUND)
 
+
 # build an example makefile
 configure_file(${CMAKE_SOURCE_DIR}/examples/Makefile.in ${CMAKE_SOURCE_DIR}/examples/Makefile)
 
@@ -231,3 +232,14 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPIDist64.cpp ${CMAKE_BI
 configure_file(${CMAKE_SOURCE_DIR}/examples/testMMfloat.cpp ${CMAKE_BINARY_DIR}/examples/testMMfloat.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/mtx2bin.cpp ${CMAKE_BINARY_DIR}/examples/mtx2bin.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/bin2mtx.cpp ${CMAKE_BINARY_DIR}/examples/bin2mtx.cpp COPYONLY)
+
+
+include(CTest)
+
+if(BUILD_TESTING)
+  add_executable(test_HSS_seq test/test_HSS_seq)
+  add_executable(test_HSS_mpi test/test_HSS_mpi)
+  target_link_libraries(test_HSS_seq strumpack ${LIB})
+  target_link_libraries(test_HSS_mpi strumpack ${LIB})
+endif()
+
