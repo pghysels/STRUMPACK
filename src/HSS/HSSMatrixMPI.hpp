@@ -565,7 +565,7 @@ namespace strumpack {
 	delete[] buf;
       }
 
-      if (rank >= root1 && rank <= root1+P1active) {
+      if (rank >= root1 && rank < root1+P1active) {
 	if ((rank-root1) < (P-P1active)) {
 	  // I'm one of the first P-P1active processes that are active
 	  // on child1, so I need to send to one or more others which
