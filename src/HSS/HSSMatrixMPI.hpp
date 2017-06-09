@@ -672,27 +672,6 @@ namespace strumpack {
       if (!this->active()) return;
       assert(dist.rows()==this->cols());
       BC2BR::block_cyclic_to_block_row(_ranges, dist, sub, leaf, ctxt_loc(), _comm);
-
-      // auto rank = mpi_rank(_comm);
-      // auto d = dist.cols();
-      // for (int p=0; p<_nprocs; p++) { // TODO this calls pgemr2d P times!!
-      // 	auto m = _ranges.chi(p) - _ranges.clo(p);
-      // 	if (_ranges.leaf_procs(p) == 1) {
-      // 	  if (p == rank) sub = DenseM_t(m, d);
-      // 	  copy(m, d, dist, _ranges.clo(p) - _ranges.clo(0), 0, sub, p, _ctxt_all);
-      // 	} else {
-      // 	  if (p <= rank && rank < p+_ranges.leaf_procs(p)) {
-      // 	    leaf = DistM_t(ctxt_loc(), m, d);
-      // 	    copy(m, d, dist, _ranges.clo(p) - _ranges.clo(0), 0, leaf, 0, 0, _ctxt_all);
-      // 	  } else {
-      // 	    int desc_leaf[9];
-      // 	    scalapack::descset(desc_leaf, m, d, DistM_t::default_MB, DistM_t::default_NB, 0, 0, -1, 0);
-      // 	    DistM_t dummy(desc_leaf);
-      // 	    copy(m, d, dist, _ranges.clo(p) - _ranges.clo(0), 0, dummy, 0, 0, _ctxt_all);
-      // 	  }
-      // 	  p += _ranges.leaf_procs(p)-1;
-      // 	}
-      // }
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::allocate_block_row
@@ -716,26 +695,6 @@ namespace strumpack {
       if (!this->active()) return;
       assert(dist.rows()==this->cols());
       BC2BR::block_row_to_block_cyclic(_ranges, dist, sub, leaf, _comm);
-
-      // assert(dist.rows()==this->cols());
-      // auto rank = mpi_rank(_comm);
-      // auto d = dist.cols();
-      // for (int p=0; p<_nprocs; p++) { // TODO this calls pgemr2d P times!!
-      // 	auto m = _ranges.chi(p) - _ranges.clo(p);
-      // 	if (_ranges.leaf_procs(p) == 1)
-      // 	  copy(m, d, sub, p, dist, _ranges.clo(p) - _ranges.clo(0), 0, _ctxt_all);
-      // 	else {
-      // 	  if (p <= rank && rank < p+_ranges.leaf_procs(p)) {
-      // 	    copy(m, d, leaf, 0, 0, dist, _ranges.clo(p) - _ranges.clo(0), 0, _ctxt_all);
-      // 	  } else {
-      // 	    int desc_leaf[9];
-      // 	    scalapack::descset(desc_leaf, m, d, DistM_t::default_MB, DistM_t::default_NB, 0, 0, -1, 0);
-      // 	    DistM_t dummy(desc_leaf);
-      // 	    copy(m, d, dummy, 0, 0, dist, _ranges.clo(p) - _ranges.clo(0), 0, _ctxt_all);
-      // 	  }
-      // 	  p += _ranges.leaf_procs(p)-1;
-      // 	}
-      // }
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::print_info
