@@ -51,7 +51,7 @@ namespace strumpack {
     NONE,                         /*!< Don't do anything                                             */
     MAX_CARDINALITY,              /*!< Maximum cardinality                                           */
     MAX_SMALLEST_DIAGONAL,        /*!< Maximum smallest diagonal value                               */
-    MAX_SMALLEST_DIAGONAL_2,      /*!< Same as MAX_SMALLES_DIAGONAL, but different algorithm         */
+    MAX_SMALLEST_DIAGONAL_2,      /*!< Same as MAX_SMALLEST_DIAGONAL, but different algorithm         */
     MAX_DIAGONAL_SUM,             /*!< Maximum sum of diagonal values                                */
     MAX_DIAGONAL_PRODUCT_SCALING  /*!< Maximum product of diagonal values and row and column scaling */
   };
