@@ -36,6 +36,7 @@ namespace strumpack {
       }
       const HSSMatrixMPI<scalar_t>& HSS() const { return _hss; }
       void add_columns(int d, const opts_t& opts) {
+	if (!R.active()) return;
 	auto n = R.rows();
 	auto d_old = R.cols();
 	auto dd = d-d_old;
