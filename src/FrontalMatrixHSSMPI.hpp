@@ -492,8 +492,14 @@ namespace strumpack {
     std::vector<std::size_t> gI, gJ;
     gI.reserve(I.size());
     gJ.reserve(J.size());
-    for (auto i : I) gI.push_back((i < this->dim_sep) ? i+this->sep_begin : this->upd[i-this->dim_sep]);
-    for (auto j : J) gJ.push_back((j < this->dim_sep) ? j+this->sep_begin : this->upd[j-this->dim_sep]);
+    for (auto i : I) {
+      assert(i >= 0 && i < this->dim_blk);
+      gI.push_back((i < this->dim_sep) ? i+this->sep_begin : this->upd[i-this->dim_sep]);
+    }
+    for (auto j : J) {
+      assert(j >= 0 && j < this->dim_blk);
+      gJ.push_back((j < this->dim_sep) ? j+this->sep_begin : this->upd[j-this->dim_sep]);
+    }
     TIMER_TIME(EXTRACT_2D, 1, t_ex);
     this->extract_2d(gI, gJ, B);
     TIMER_STOP(t_ex);
