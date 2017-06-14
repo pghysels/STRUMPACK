@@ -111,11 +111,11 @@ namespace strumpack {
       	this->_V_rank = _V.cols();
 	this->_V_rows = _V.rows();
       	w.Ic.reserve(_V.cols());
-      	if (this->leaf()) for (auto j : w.Jc) w.Ic.push_back(w.offset.second + j);
+	if (this->leaf()) for (auto j : w.Jc) w.Ic.push_back(w.offset.second + j);
       	else {
       	  auto r0 = w.c[0].Ic.size();
-      	  for (auto j : w.Jc) w.Ic.push_back((j < r0) ? w.c[0].Ic[j] : w.c[1].Ic[j-r0]);
-      	}
+	  for (auto j : w.Jc) w.Ic.push_back((j < r0) ? w.c[0].Ic[j] : w.c[1].Ic[j-r0]);
+	}
       	this->_V_state = State::COMPRESSED;
       } else this->_V_state = State::PARTIALLY_COMPRESSED;
     }

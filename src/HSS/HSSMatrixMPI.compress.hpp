@@ -112,6 +112,7 @@ namespace strumpack {
 	  return;
 	}
 	communicate_child_data(w);
+	if (!this->_ch[0]->is_compressed() || !this->_ch[1]->is_compressed()) return;
 	if (this->is_untouched()) {
 	  self += 2;
 	  if (mpi_rank(_comm)==0) {
@@ -189,6 +190,7 @@ namespace strumpack {
 	  this->_ch[1]->extract_D_B(Aelem, lctxt, opts, w.c[1], lvl);
 	  return;
 	}
+	if (!this->_ch[0]->is_compressed() || !this->_ch[1]->is_compressed()) return;
 	if (this->is_untouched()) {
 	  _B01 = DistM_t(_ctxt, w.c[0].Ir.size(), w.c[1].Ic.size());
 	  _B10 = DistM_t(_ctxt, w.c[1].Ir.size(), w.c[0].Ic.size());
