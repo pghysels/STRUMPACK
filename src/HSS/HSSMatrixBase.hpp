@@ -222,7 +222,7 @@ namespace strumpack {
       if (w.lvl == 0) w.offset = w_mpi.offset;
       std::swap(w.Ir, w_mpi.Ir); std::swap(w.Ic, w_mpi.Ic);
       std::swap(w.Jr, w_mpi.Jr); std::swap(w.Jc, w_mpi.Jc);
-      bool was_untouched = is_untouched();
+      bool was_not_compressed = !is_compressed();
       // TODO openmp parallel region, set _openmp_task_depth?
       compress_recursive_original(RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
 				  lAelem, opts, w, dd, _openmp_task_depth);
@@ -233,7 +233,7 @@ namespace strumpack {
       w_mpi.Sc = DistM_t(lctxt, DenseMW_t(V_rows(), d, RS.sub_Sc, w.offset.second, 0));
       std::swap(w.Ir, w_mpi.Ir); std::swap(w.Ic, w_mpi.Ic);
       std::swap(w.Jr, w_mpi.Jr); std::swap(w.Jc, w_mpi.Jc);
-      if (w.lvl != 0 && was_untouched && is_compressed()) {
+      if (w.lvl != 0 && was_not_compressed && is_compressed()) {
 	for (auto& i : w_mpi.Ir) i += w_mpi.offset.first;
 	for (auto& j : w_mpi.Ic) j += w_mpi.offset.second;
       }
@@ -252,7 +252,7 @@ namespace strumpack {
 	std::swap(w.Ir, w_mpi.Ir); std::swap(w.Ic, w_mpi.Ic);
 	std::swap(w.Jr, w_mpi.Jr); std::swap(w.Jc, w_mpi.Jc);
       }
-      bool was_untouched = is_untouched();
+      bool was_not_compressed = !is_compressed();
       // TODO openmp parallel region, set _openmp_task_depth?
       compress_level_original(RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
 			      opts, w, dd, lvl, _openmp_task_depth);
@@ -265,7 +265,7 @@ namespace strumpack {
 	w_mpi.Sc = DistM_t(lctxt, DenseMW_t(V_rows(), d, RS.sub_Sc, w.offset.second, 0));
 	std::swap(w.Ir, w_mpi.Ir); std::swap(w.Ic, w_mpi.Ic);
 	std::swap(w.Jr, w_mpi.Jr); std::swap(w.Jc, w_mpi.Jc);
-	if (w.lvl != 0 && was_untouched && is_compressed()) {
+	if (w.lvl != 0 && was_not_compressed && is_compressed()) {
 	  for (auto& i : w_mpi.Ir) i += w_mpi.offset.first;
 	  for (auto& j : w_mpi.Ic) j += w_mpi.offset.second;
 	}
@@ -288,7 +288,7 @@ namespace strumpack {
 	std::swap(w.Ir, w_mpi.Ir); std::swap(w.Ic, w_mpi.Ic);
 	std::swap(w.Jr, w_mpi.Jr); std::swap(w.Jc, w_mpi.Jc);
       }
-      bool was_untouched = is_untouched();
+      bool was_not_compressed = !is_compressed();
       // TODO openmp parallel region, set _openmp_task_depth?
       compress_level_stable(RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc, opts, w, d, dd, lvl, _openmp_task_depth);
       if (w.lvl == lvl) {
@@ -304,7 +304,7 @@ namespace strumpack {
 
 	std::swap(w.Ir, w_mpi.Ir); std::swap(w.Ic, w_mpi.Ic);
 	std::swap(w.Jr, w_mpi.Jr); std::swap(w.Jc, w_mpi.Jc);
-	if (w.lvl != 0 && was_untouched && is_compressed()) {
+	if (w.lvl != 0 && was_not_compressed && is_compressed()) {
 	  for (auto& i : w_mpi.Ir) i += w_mpi.offset.first;
 	  for (auto& j : w_mpi.Ic) j += w_mpi.offset.second;
 	}
