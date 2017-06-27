@@ -535,7 +535,7 @@ namespace strumpack {
     auto ssizes = rsizes+P;
     std::vector<integer_t> _spmv_rind;
     _spmv_rind.reserve(nr_offdiag_nnz);
-    for (integer_t r=0, l=0; r<local_rows(); r++)
+    for (integer_t r=0; r<local_rows(); r++)
       for (auto j=_offdiag_start[r]; j<this->_ptr[r+1]; j++)
     	_spmv_rind.push_back(this->_ind[j]);
     std::sort(_spmv_rind.begin(), _spmv_rind.end());

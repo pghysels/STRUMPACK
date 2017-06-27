@@ -22,10 +22,10 @@ namespace strumpack {
       }
       void operator()(const std::vector<size_t>& I, const std::vector<size_t>& J, DistM_t& B) {
 	if (!B.active()) return;
-	assert(I.size() == B.rows() && J.size() == B.cols());
+	assert(int(I.size()) == B.rows() && int(J.size()) == B.cols());
 	for (std::size_t j=0; j<J.size(); j++)
 	  for (std::size_t i=0; i<I.size(); i++) {
-	    assert(I[i] >= 0 && I[i] < _A.rows() && J[j] >= 0 && J[j] < _A.cols());
+	    assert(I[i] >= 0 && int(I[i]) < _A.rows() && J[j] >= 0 && int(J[j]) < _A.cols());
 	    B.global(i, j, _Ag(I[i], J[j]));
 	  }
 	// TODO just to make sure everyone calls this! test!!

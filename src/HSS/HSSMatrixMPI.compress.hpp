@@ -87,7 +87,7 @@ namespace strumpack {
       DistM_t dummy;
       for (int i=0; i<before; i++) Aelem(I[i], J[i], dummy);
       extract_D_B(Aelem, ctxt_loc(), opts, w, lvl);
-      for (int i=I.size()-after; i<I.size(); i++) Aelem(I[i], J[i], dummy);
+      for (int i=I.size()-after; i<int(I.size()); i++) Aelem(I[i], J[i], dummy);
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::get_extraction_indices
@@ -140,7 +140,7 @@ namespace strumpack {
       auto sbuf = new std::size_t[std::accumulate(rsize, rsize+P, 0)];
       auto ptr = sbuf + displs[rank];
       *ptr++ = lI.size();
-      for (int i=0; i<lI.size(); i++) {
+      for (std::size_t i=0; i<lI.size(); i++) {
 	*ptr++ = lI[i].size();
 	std::copy(lI[i].begin(), lI[i].end(), ptr);
 	ptr += lI[i].size();
@@ -157,9 +157,9 @@ namespace strumpack {
       I.resize(total);
       J.resize(total);
       ptr = sbuf;
-      for (int p=0, i=0; p<P; p++) {
+      for (std::size_t p=0, i=0; p<std::size_t(P); p++) {
 	auto fromp = *ptr++;
-	for (int ii=i; ii<i+fromp; ii++) {
+	for (std::size_t ii=i; ii<i+fromp; ii++) {
 	  I[ii].resize(*ptr++); std::copy(ptr, ptr+I[ii].size(), I[ii].data()); ptr += I[ii].size();
 	  J[ii].resize(*ptr++); std::copy(ptr, ptr+J[ii].size(), J[ii].data()); ptr += J[ii].size();
 	}

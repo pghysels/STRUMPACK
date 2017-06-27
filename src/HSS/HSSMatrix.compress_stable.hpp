@@ -146,10 +146,10 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrix<scalar_t>::compute_U_basis_stable
     (DenseM_t& Sr, const opts_t& opts, WorkCompress<scalar_t>& w, int d, int dd, int depth) {
       if (this->_U_state == State::COMPRESSED) return;
-      auto u_rows = this->leaf() ? this->rows() : this->_ch[0]->U_rank()+this->_ch[1]->U_rank();
+      int u_rows = this->leaf() ? this->rows() : this->_ch[0]->U_rank()+this->_ch[1]->U_rank();
       DenseMW_t lSr(u_rows, d+dd, Sr, w.offset.second, 0);
       constexpr double c = 1.25331413731550e-01; //1.0 / (10.0 * std::sqrt(2. / M_PI));
-      if (d+dd >= opts.max_rank() || d+dd >= u_rows ||
+      if (d+dd >= opts.max_rank() || d+dd >= int(u_rows) ||
 	  update_orthogonal_basis(lSr, w.Qr, d, dd, this->_U_state == State::UNTOUCHED, depth)
 	  < opts.rel_tol() * c) {
 	w.Qr.clear();
@@ -176,7 +176,7 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrix<scalar_t>::compute_V_basis_stable
     (DenseM_t& Sc, const opts_t& opts, WorkCompress<scalar_t>& w, int d, int dd, int depth) {
       if (this->_V_state == State::COMPRESSED) return;
-      auto v_rows = this->leaf() ? this->rows() : this->_ch[0]->V_rank()+this->_ch[1]->V_rank();
+      int v_rows = this->leaf() ? this->rows() : this->_ch[0]->V_rank()+this->_ch[1]->V_rank();
       DenseMW_t lSc(v_rows, d+dd, Sc, w.offset.second, 0);
       constexpr double c = 1.25331413731550e-01; //1.0 / (10.0 * std::sqrt(2. / M_PI));
       if (d+dd >= opts.max_rank() || d+dd >= v_rows ||

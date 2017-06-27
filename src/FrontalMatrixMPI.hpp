@@ -399,10 +399,10 @@ namespace strumpack {
 	MPI_Recv(rbuf[status.MPI_SOURCE].data(), msg_size, mpi_type<scalar_t>(), status.MPI_SOURCE, 0, front_comm, &status);
       }
       std::vector<scalar_t*> pbuf(rbuf.size());
-      for (size_t p=0; p<rbuf.size(); p++) pbuf[p] = rbuf[p].data();
+      for (std::size_t p=0; p<rbuf.size(); p++) pbuf[p] = rbuf[p].data();
       for (integer_t r=0; r<ch->dim_upd; r++) {
-	auto pa_r = I[r];
-	auto rank = (pa_r < this->dim_sep) ? find_rank(pa_r, 0, b_sep)
+	integer_t pa_r = I[r];
+	integer_t rank = (pa_r < this->dim_sep) ? find_rank(pa_r, 0, b_sep)
 	  : find_rank(pa_r-this->dim_sep, 0, b_upd);
 	ch_b_upd[r] = *(pbuf[rank]);
 	pbuf[rank]++;

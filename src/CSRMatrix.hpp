@@ -330,15 +330,15 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::extract_separator
   (integer_t sep_end, const std::vector<std::size_t>& I, const std::vector<std::size_t>& J, DenseM_t& B, int depth) const {
-    auto m = I.size();
-    auto n = J.size();
+    integer_t m = I.size();
+    integer_t n = J.size();
     if (m == 0 || n == 0) return;
-    for (std::size_t i=0; i<m; i++) {
-      auto r = I[i];
+    for (integer_t i=0; i<m; i++) {
+      integer_t r = I[i];
       auto cmin = this->_ind[this->_ptr[r]]; // indices sorted in increasing order
       auto cmax = this->_ind[this->_ptr[r+1]-1];
-      for (std::size_t k=0; k<n; k++) {
-	auto c = J[k];
+      for (integer_t k=0; k<n; k++) {
+	integer_t c = J[k];
 	if (c >= cmin && c <= cmax && (r < sep_end || c < sep_end)) {
 	  auto a_pos = this->_ptr[r];
 	  auto a_max = this->_ptr[r+1];
@@ -354,16 +354,16 @@ namespace strumpack {
   (integer_t sep_end, const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
    DistM_t& B, MPI_Comm comm) const {
     if (!B.active()) return;
-    auto m = I.size();
-    auto n = J.size();
+    integer_t m = I.size();
+    integer_t n = J.size();
     if (m == 0 || n == 0) return;
     B.zero();
-    for (std::size_t i=0; i<m; i++) {
-      auto r = I[i];
+    for (integer_t i=0; i<m; i++) {
+      integer_t r = I[i];
       auto cmin = this->_ind[this->_ptr[r]]; // indices sorted in increasing order
       auto cmax = this->_ind[this->_ptr[r+1]-1];
-      for (std::size_t k=0; k<n; k++) {
-	std::size_t c = J[k];
+      for (integer_t k=0; k<n; k++) {
+	integer_t c = J[k];
 	if (c >= cmin && c <= cmax && (r < sep_end || c < sep_end)) {
 	  auto a_pos = this->_ptr[r];
 	  auto a_max = this->_ptr[r+1]-1;
@@ -477,15 +477,15 @@ namespace strumpack {
   (integer_t slo, integer_t shi, integer_t* upd, integer_t dupd,
    const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc) const {
     long long int local_flops = 0;
-    auto nbvec = R.cols();
-    auto ds = shi - slo;
+    const integer_t nbvec = R.cols();
+    const integer_t ds = shi - slo;
     for (auto row=slo; row<shi; row++) { // separator rows
-      std::size_t upd_ptr = 0;
+      integer_t upd_ptr = 0;
       for (auto j=this->_ptr[row]; j<this->_ptr[row+1]; j++) {
 	auto col = this->_ind[j];
 	if (col >= slo) {
 	  if (col < shi) {
-	    for (std::size_t c=0; c<nbvec; c++) {
+	    for (integer_t c=0; c<nbvec; c++) {
 	      Sr(row-slo, c) += this->_val[j] * R(col-slo, c);
 	      Sc(col-slo, c) += this->_val[j] * R(row-slo, c);
 	    }
@@ -494,7 +494,7 @@ namespace strumpack {
 	    while (upd_ptr<dupd && upd[upd_ptr]<col) upd_ptr++;
 	    if (upd_ptr == dupd) break;
 	    if (upd[upd_ptr] == col) {
-	      for (std::size_t c=0; c<nbvec; c++) {
+	      for (integer_t c=0; c<nbvec; c++) {
 		Sr(row-slo, c) += this->_val[j] * R(ds+upd_ptr, c);
 		Sc(ds+upd_ptr, c) += this->_val[j] * R(row-slo, c);
 	      }
@@ -510,7 +510,7 @@ namespace strumpack {
 	auto col = this->_ind[j];
 	if (col >= slo) {
 	  if (col < shi) {
-	    for (std::size_t c=0; c<nbvec; c++) {
+	    for (integer_t c=0; c<nbvec; c++) {
 	      Sr(ds+i, c) += this->_val[j] * R(col-slo, c);
 	      Sc(col-slo, c) += this->_val[j] * R(ds+i, c);
 	    }

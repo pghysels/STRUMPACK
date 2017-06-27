@@ -86,7 +86,8 @@ namespace strumpack {
     DistM_t _Theta;
     DistM_t _Phi;
     DistM_t _Vhat;
-    DistM_t _ThetaVhatC_or_VhatCPhiC;
+    DistM_t _ThetaVhatC;
+    DistM_t _VhatCPhiC;
     DistM_t _DUB01;
 
     /** these are saved during/after randomized compression and are
@@ -109,7 +110,8 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSSMPI<scalar_t,integer_t>::release_work_memory() {
-    _ThetaVhatC_or_VhatCPhiC.clear();
+    _ThetaVhatC.clear();
+    _VhatCPhiC.clear();
     _Vhat.clear();
     if (_H) _H->delete_trailing_block();
     R1.clear();
@@ -152,7 +154,7 @@ namespace strumpack {
     Sr = DistM_t(this->ctxt, this->dim_upd, b);
     Sc = DistM_t(this->ctxt, this->dim_upd, b);
     TIMER_TIME(HSS_SCHUR_PRODUCT, 2, t_sprod);
-    _H->Schur_product_direct(_Theta, _Vhat, _DUB01, _Phi, _ThetaVhatC_or_VhatCPhiC, R, Sr, Sc);
+    _H->Schur_product_direct(_Theta, _Vhat, _DUB01, _Phi, _ThetaVhatC, _VhatCPhiC, R, Sr, Sc);
     TIMER_STOP(t_sprod);
   }
 
@@ -190,18 +192,17 @@ namespace strumpack {
     if (ch_mpi) ch_seq = (ch_mpi == this->lchild) ? this->rchild : this->lchild;
     else ch_seq = this->lchild ? this->lchild : this->rchild;
     DenseM_t Rseq, Srseq, Scseq;
-    int m, n, desc[9];
+    int m, n;
     auto pch = this->child_master(ch_seq);
     if (ch_seq) {
       m = R.rows(), n = R.cols();
-      auto N = m*n;
       auto p = mpi_rank(this->front_comm);
       if (p == pch) {
-	Rseq = DenseM_t(m, n);
-	Srseq = DenseM_t(m, n);
-	Scseq = DenseM_t(m, n);
-	Srseq.zero();
-	Scseq.zero();
+    	Rseq = DenseM_t(m, n);
+    	Srseq = DenseM_t(m, n);
+    	Scseq = DenseM_t(m, n);
+    	Srseq.zero();
+    	Scseq.zero();
       }
       strumpack::copy(m, n, R, 0, 0, Rseq, pch, this->ctxt_all);
       if (p == pch) ch_seq->sample_CB(opts, Rseq, Srseq, Scseq, this);
@@ -373,8 +374,6 @@ namespace strumpack {
     //   exit(1);
     // }
 
-    //if (etree_level <= 1) _H->dense(this->ctxt).print("_H");
-
     if (this->lchild) this->lchild->release_work_memory();
     if (this->rchild) this->rchild->release_work_memory();
 
@@ -389,11 +388,14 @@ namespace strumpack {
 	TIMER_TIME(HSS_COMPUTE_SCHUR, 0, t_comp_schur);
 	_H->Schur_update(_ULV, _Theta, _Vhat, _DUB01, _Phi);
 	if (_Theta.cols() < _Phi.cols()) {
-	  _ThetaVhatC_or_VhatCPhiC = DistM_t(_Phi.ctxt(), _Vhat.cols(), _Phi.rows());
-	  gemm(Trans::C, Trans::C, scalar_t(1.), _Vhat, _Phi, scalar_t(0.), _ThetaVhatC_or_VhatCPhiC);
+	  _VhatCPhiC = DistM_t(_Phi.ctxt(), _Vhat.cols(), _Phi.rows());
+	  // TODO do not transpose, but use Trans::C in gemm
+	  // Why does that not work??????
+	  auto VhatC = _Vhat.transpose();
+	  gemm(Trans::N, Trans::C, scalar_t(1.), VhatC, _Phi, scalar_t(0.), _VhatCPhiC);
 	} else {
-	  _ThetaVhatC_or_VhatCPhiC = DistM_t(_Theta.ctxt(), _Theta.rows(), _Vhat.rows());
-	  gemm(Trans::N, Trans::C, scalar_t(1.), _Theta, _Vhat, scalar_t(0.), _ThetaVhatC_or_VhatCPhiC);
+	  _ThetaVhatC = DistM_t(_Theta.ctxt(), _Theta.rows(), _Vhat.rows());
+	  gemm(Trans::N, Trans::C, scalar_t(1.), _Theta, _Vhat, scalar_t(0.), _ThetaVhatC);
 	}
 	TIMER_STOP(t_comp_schur);
 	params::schur_flops += params::flops - f1;
@@ -493,12 +495,12 @@ namespace strumpack {
     gI.reserve(I.size());
     gJ.reserve(J.size());
     for (auto i : I) {
-      assert(i >= 0 && i < this->dim_blk);
-      gI.push_back((i < this->dim_sep) ? i+this->sep_begin : this->upd[i-this->dim_sep]);
+      assert(i < std::size_t(this->dim_blk));
+      gI.push_back((i < std::size_t(this->dim_sep)) ? i+this->sep_begin : this->upd[i-this->dim_sep]);
     }
     for (auto j : J) {
-      assert(j >= 0 && j < this->dim_blk);
-      gJ.push_back((j < this->dim_sep) ? j+this->sep_begin : this->upd[j-this->dim_sep]);
+      assert(j < std::size_t(this->dim_blk));
+      gJ.push_back((j < std::size_t(this->dim_sep)) ? j+this->sep_begin : this->upd[j-this->dim_sep]);
     }
     TIMER_TIME(EXTRACT_2D, 1, t_ex);
     this->extract_2d(gI, gJ, B);
@@ -506,7 +508,7 @@ namespace strumpack {
   }
 
   /**
-   * Extract from (HSS - theta Vhat^* phi).
+   * Extract from (HSS - theta Vhat^* phi*^).
    *
    * Note that B has the same context as this front, otherwise the
    * communication pattern would be hard to figure out.
@@ -528,11 +530,10 @@ namespace strumpack {
 
     if (_Theta.cols() < _Phi.cols()) {
       auto tr = _Theta.extract_rows(lI, this->ctxt, this->ctxt_all);
-      // TODO can this transpose be avoided??
-      auto tc = _ThetaVhatC_or_VhatCPhiC.transpose().extract_rows(lJ, this->ctxt, this->ctxt_all);
-      gemm(Trans::N, Trans::C, scalar_t(-1), tr, tc, scalar_t(1.), e);
+      auto tc = _VhatCPhiC.extract_cols(lJ, this->ctxt, this->ctxt_all);
+      gemm(Trans::N, Trans::N, scalar_t(-1), tr, tc, scalar_t(1.), e);
     } else {
-      auto tr = _ThetaVhatC_or_VhatCPhiC.extract_rows(lI, this->ctxt, this->ctxt_all);
+      auto tr = _ThetaVhatC.extract_rows(lI, this->ctxt, this->ctxt_all);
       auto tc = _Phi.extract_rows(lJ, this->ctxt, this->ctxt_all);
       gemm(Trans::N, Trans::C, scalar_t(-1), tr, tc, scalar_t(1.), e);
     }

@@ -849,10 +849,10 @@ namespace strumpack {
     { int info; pcgeqrf_(&m, &n, A, &ia, &ja, descA, tau, work, &lwork, &info); return info; }
     template<typename T> inline int pgeqrf(int m, int n, T* A, int ia, int ja, int *descA, T* tau) {
       T lwork;
-      int info = pgeqrf(m, n, A, ia, ja, descA, tau, &lwork, -1);
+      pgeqrf(m, n, A, ia, ja, descA, tau, &lwork, -1);
       int ilwork = int(std::real(lwork));
       auto work = new T[ilwork];
-      info = pgeqrf(m, n, A, ia, ja, descA, tau, work, ilwork);
+      int info = pgeqrf(m, n, A, ia, ja, descA, tau, work, ilwork);
       delete[] work;
       STRUMPACK_FLOPS((is_complex<T>()?4:1)*
 		      static_cast<long long int>(((m>n) ? (double(n)*(double(n)*(.5-(1./3.)*double(n)+double(m)) + double(m) + 23./6.)) : (double(m)*(double(m)*(-.5-(1./3.)*double(m)+double(n)) + 2.*double(n) + 23./6.)))
@@ -873,12 +873,13 @@ namespace strumpack {
 
     template<typename T> inline int pxxgqr(int m, int n, int k, T* A, int ia, int ja, int* descA, T* tau) {
       T lwork;
-      int info = pxxgqr(m, n, k, A, ia, ja, descA, tau, &lwork, -1);
+      pxxgqr(m, n, k, A, ia, ja, descA, tau, &lwork, -1);
       int ilwork = int(std::real(lwork));
       auto work = new T[ilwork];
-      info = pxxgqr(m, n, k, A, ia, ja, descA, tau, work, ilwork);
+      int info = pxxgqr(m, n, k, A, ia, ja, descA, tau, work, ilwork);
       STRUMPACK_FLOPS((is_complex<T>()?4:1)*static_cast<long long int>((n==k) ? ((2./3.)*double(n)*double(n)*(3.*double(m) - double(n))) : (4.*double(m)*double(n)*double(k) - 2.*(double(m) + double(n))*double(k)*double(k) + (4./3.)*double(k)*double(k)*double(k))));
       delete[] work;
+      return info;
     }
 
   } // end namespace scalapack

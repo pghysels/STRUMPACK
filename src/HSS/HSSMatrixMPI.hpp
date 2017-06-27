@@ -73,7 +73,7 @@ namespace strumpack {
       void Schur_update(const HSSFactorsMPI<scalar_t>& f, DistM_t& Theta, DistM_t& Vhat,
 			DistM_t& DUB01, DistM_t& Phi) const;
       void Schur_product_direct(const DistM_t& Theta, const DistM_t& Vhat, const DistM_t& DUB01,
-				const DistM_t& Phi, const DistM_t&_ThetaVhatC_or_VhatCPhiC,
+				const DistM_t& Phi, const DistM_t&_ThetaVhatC, const DistM_t& VhatCPhiC,
 				const DistM_t& R, DistM_t& Sr, DistM_t& Sc) const;
 
       std::size_t max_rank() const;        // collective on comm()
@@ -401,8 +401,6 @@ namespace strumpack {
     // TODO this only works with 1 tree, so all blocks are square!!
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::setup_hierarchy
     (const HSSPartitionTree& t, const opts_t& opts, MPI_Comm c, int P, bool dup_comm, std::size_t roff, std::size_t coff) {
-      auto m = this->rows();
-      auto n = this->cols();
       if (c == MPI_COMM_NULL || !dup_comm) _comm = c;
       else MPI_Comm_dup(c, &_comm);
       if (!t.c.empty()) {
@@ -503,7 +501,7 @@ namespace strumpack {
       w.c[0].dS = w.c[0].Sr.cols();
       w.c[1].dR = w.c[1].Rr.cols();
       w.c[1].dS = w.c[1].Sr.cols();
-      int rank = mpi_rank(_comm), P = mpi_nprocs(_comm), root0 = 0, root1 = Pl(P);
+      int rank = mpi_rank(_comm), P = mpi_nprocs(_comm), root1 = Pl(P);
       int P0total = root1, P1total = P - root1;
       int pcols = std::floor(std::sqrt((float)P0total));
       int prows = P0total / pcols;
@@ -558,10 +556,10 @@ namespace strumpack {
 	w.c[0].Ic.resize(this->_ch[0]->_V_rank);
 	w.c[0].Jr.resize(this->_ch[0]->_U_rank);
 	w.c[0].Jc.resize(this->_ch[0]->_V_rank);
-	for (std::size_t i=0; i<this->_ch[0]->_U_rank; i++) w.c[0].Ir[i] = *ptr++;
-	for (std::size_t i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Ic[i] = *ptr++;
-	for (std::size_t i=0; i<this->_ch[0]->_U_rank; i++) w.c[0].Jr[i] = *ptr++;
-	for (std::size_t i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Jc[i] = *ptr++;
+	for (int i=0; i<this->_ch[0]->_U_rank; i++) w.c[0].Ir[i] = *ptr++;
+	for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Ic[i] = *ptr++;
+	for (int i=0; i<this->_ch[0]->_U_rank; i++) w.c[0].Jr[i] = *ptr++;
+	for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Jc[i] = *ptr++;
 	delete[] buf;
       }
 
@@ -618,10 +616,10 @@ namespace strumpack {
 	w.c[1].Ic.resize(this->_ch[1]->_V_rank);
 	w.c[1].Jr.resize(this->_ch[1]->_U_rank);
 	w.c[1].Jc.resize(this->_ch[1]->_V_rank);
-	for (std::size_t i=0; i<this->_ch[1]->_U_rank; i++) w.c[1].Ir[i] = *ptr++;
-	for (std::size_t i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Ic[i] = *ptr++;
-	for (std::size_t i=0; i<this->_ch[1]->_U_rank; i++) w.c[1].Jr[i] = *ptr++;
-	for (std::size_t i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Jc[i] = *ptr++;
+	for (int i=0; i<this->_ch[1]->_U_rank; i++) w.c[1].Ir[i] = *ptr++;
+	for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Ic[i] = *ptr++;
+	for (int i=0; i<this->_ch[1]->_U_rank; i++) w.c[1].Jr[i] = *ptr++;
+	for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Jc[i] = *ptr++;
 	delete[] buf;
       }
     }
@@ -670,7 +668,7 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::to_block_row
     (const DistM_t& dist, DenseM_t& sub, DistM_t& leaf) const {
       if (!this->active()) return;
-      assert(dist.rows()==this->cols());
+      assert(std::size_t(dist.rows())==this->cols());
       BC2BR::block_cyclic_to_block_row(_ranges, dist, sub, leaf, ctxt_loc(), _comm);
     }
 
@@ -693,7 +691,7 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::from_block_row
     (DistM_t& dist, const DenseM_t& sub, const DistM_t& leaf, int lctxt) const {
       if (!this->active()) return;
-      assert(dist.rows()==this->cols());
+      assert(std::size_t(dist.rows())==this->cols());
       BC2BR::block_row_to_block_cyclic(_ranges, dist, sub, leaf, _comm);
     }
 

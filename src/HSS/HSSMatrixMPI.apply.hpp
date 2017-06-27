@@ -6,7 +6,7 @@ namespace strumpack {
 
     template<typename scalar_t> DistributedMatrix<scalar_t>
     HSSMatrixMPI<scalar_t>::apply(const DistM_t& b) const {
-      assert(this->cols() == b.rows());
+      assert(this->cols() == std::size_t(b.rows()));
       DistM_t c(b.ctxt(), this->rows(), b.cols());
 #if !defined(NDEBUG)
       c.zero(); // silence valgrind
@@ -17,7 +17,7 @@ namespace strumpack {
 
     template<typename scalar_t> DistributedMatrix<scalar_t>
     HSSMatrixMPI<scalar_t>::applyC(const DistM_t& b) const {
-      assert(this->rows() == b.rows());
+      assert(this->rows() == std::size_t(b.rows()));
       DistM_t c(b.ctxt(), this->cols(), b.cols());
 #if !defined(NDEBUG)
       c.zero(); // silence valgrind

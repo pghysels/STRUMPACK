@@ -90,14 +90,14 @@ namespace strumpack {
      FrontalMatrixMPI<scalar_t,integer_t>* pa, std::vector<std::size_t>& I) {
       if (Bchild.fixed()) {
 	for (int r=0; r<Bchild.lrows(); r++) {
-	  auto pa_row = I[Bchild.rowl2g_fixed(r)];
+	  integer_t pa_row = I[Bchild.rowl2g_fixed(r)];
 	  if (pa_row < pa->dim_sep)
 	    sbuf[pa->find_rank_fixed(pa_row, 0, Bsep)].push_back(Bchild(r,0));
 	  else sbuf[pa->find_rank_fixed(pa_row-pa->dim_sep, 0, Bupd)].push_back(Bchild(r,0));
 	}
       } else {
 	for (int r=0; r<Bchild.lrows(); r++) {
-	  auto pa_row = I[Bchild.rowl2g(r)];
+	  integer_t pa_row = I[Bchild.rowl2g(r)];
 	  if (pa_row < pa->dim_sep)
 	    sbuf[pa->find_rank(pa_row, 0, Bsep)].push_back(Bchild(r,0));
 	  else sbuf[pa->find_rank(pa_row-pa->dim_sep, 0, Bupd)].push_back(Bchild(r,0));
@@ -108,11 +108,11 @@ namespace strumpack {
     static void extract_b_copy_to_buffers
     (DistM_t& Bsep, DistM_t& Bupd, std::vector<std::vector<scalar_t>>& sbuf,
      std::function<int(integer_t)> ch_rank, std::vector<std::size_t>& I, int ch_proc_rows) {
-      integer_t pa_dim_sep = Bsep.rows();
+      std::size_t pa_dim_sep = Bsep.rows();
       integer_t ch_dim_upd = I.size();
       integer_t ind_ptr = 0;
       for (int r=0; r<Bsep.lrows(); r++) {
-	auto gr = Bsep.rowl2g(r);
+	std::size_t gr = Bsep.rowl2g(r);
 	while (ind_ptr < ch_dim_upd && I[ind_ptr] < gr) ind_ptr++;
 	if (ind_ptr == ch_dim_upd) return;
 	if (I[ind_ptr] >= pa_dim_sep) break;
@@ -120,7 +120,7 @@ namespace strumpack {
 	sbuf[ch_rank(ind_ptr)].push_back(Bsep(r,0));
       }
       for (int r=0; r<Bupd.lrows(); r++) {
-	auto gr = Bupd.rowl2g(r) + pa_dim_sep;
+	std::size_t gr = Bupd.rowl2g(r) + pa_dim_sep;
 	while (ind_ptr < ch_dim_upd && I[ind_ptr] < gr) ind_ptr++;
 	if (ind_ptr == ch_dim_upd) break;
 	if (I[ind_ptr] != gr) continue;
@@ -163,15 +163,15 @@ namespace strumpack {
      const DistM_t& B, std::vector<std::vector<scalar_t>>& sbuf) {
       if (!F.active()) return;
       if (F.fixed()) {
-	for (std::size_t c=0; c<F.lcols(); c++) {
+	for (int c=0; c<F.lcols(); c++) {
 	  auto pcol = J[F.coll2g_fixed(c)];
-	  for (std::size_t r=0; r<F.lrows(); r++)
+	  for (int r=0; r<F.lrows(); r++)
 	    sbuf[B.rank_fixed(I[F.rowl2g_fixed(r)],pcol)].push_back(F(r,c));
 	}
       } else {
-	for (std::size_t c=0; c<F.lcols(); c++) {
+	for (int c=0; c<F.lcols(); c++) {
 	  auto pcol = J[F.coll2g(c)];
-	  for (std::size_t r=0; r<F.lrows(); r++)
+	  for (int r=0; r<F.lrows(); r++)
 	    sbuf[B.rank(I[F.rowl2g(r)],pcol)].push_back(F(r,c));
 	}
       }

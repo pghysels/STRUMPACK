@@ -68,7 +68,7 @@ namespace strumpack {
      */
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::Schur_product_direct
     (const DistM_t& Theta, const DistM_t& Vhat, const DistM_t& DUB01, const DistM_t& Phi,
-     const DistM_t& ThetaVhatC_or_VhatCPhiC, const DistM_t& R, DistM_t& Sr, DistM_t& Sc) const {
+     const DistM_t& ThetaVhatC, const DistM_t& VhatCPhiC, const DistM_t& R, DistM_t& Sr, DistM_t& Sc) const {
       auto ch1 = child(1);
       auto n = R.cols();
       DistM_t RS_ch1(ch1->ctxt(ctxt_loc()), ch1->rows(), R.cols());
@@ -100,7 +100,7 @@ namespace strumpack {
 
 	Sc_br.from_block_row(RS_ch1);
 	copy(ch1->rows(), Sc.cols(), RS_ch1, 0, 0, Sloc, 0, 0, _ctxt_all);
-	gemm(Trans::C, Trans::N, scalar_t(-1.), ThetaVhatC_or_VhatCPhiC, tmpc, scalar_t(1.), Sloc);
+	gemm(Trans::C, Trans::N, scalar_t(-1.), VhatCPhiC, tmpc, scalar_t(1.), Sloc);
 	copy(ch1->rows(), Sc.cols(), Sloc, 0, 0, Sc, 0, 0, _ctxt_all);
       } else {
 	DistM_t tmpr(ctxt(), DUB01.rows(), n);
@@ -115,7 +115,7 @@ namespace strumpack {
 	Sr_br.from_block_row(RS_ch1);
 	DistM_t Sloc(ctxt(), Sr.rows(), Sr.cols());
 	copy(ch1->rows(), Sr.cols(), RS_ch1, 0, 0, Sloc, 0, 0, _ctxt_all);
-	gemm(Trans::N, Trans::N, scalar_t(-1.), ThetaVhatC_or_VhatCPhiC, tmpr, scalar_t(1.), Sloc);
+	gemm(Trans::N, Trans::N, scalar_t(-1.), ThetaVhatC, tmpr, scalar_t(1.), Sloc);
 	copy(ch1->rows(), Sr.cols(), Sloc, 0, 0, Sr, 0, 0, _ctxt_all);
 
 	Sc_br.from_block_row(RS_ch1);

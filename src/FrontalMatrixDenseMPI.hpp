@@ -126,17 +126,17 @@ namespace strumpack {
       auto I = ch->upd_to_parent(this, u2s);
       std::size_t du = ch->dim_upd;
       std::size_t ds = this->dim_sep;
-      for (int c=0; c<u2s; c++) // F11
-	for (int r=0; r<u2s; r++)
+      for (std::size_t c=0; c<u2s; c++) // F11
+	for (std::size_t r=0; r<u2s; r++)
 	  sbuf[this->find_rank_fixed(I[r],I[c],F11)].push_back(ch->F22(r,c));
-      for (int c=u2s; c<du; c++) // F12
-	for (int r=0; r<u2s; r++)
+      for (std::size_t c=u2s; c<du; c++) // F12
+	for (std::size_t r=0; r<u2s; r++)
 	  sbuf[this->find_rank_fixed(I[r],I[c]-ds,F12)].push_back(ch->F22(r,c));
-      for (int c=0; c<u2s; c++) // F21
-	for (int r=u2s; r<du; r++)
+      for (std::size_t c=0; c<u2s; c++) // F21
+	for (std::size_t r=u2s; r<du; r++)
 	  sbuf[this->find_rank_fixed(I[r]-ds,I[c],F21)].push_back(ch->F22(r,c));
-      for (int c=u2s; c<du; c++) // F22
-	for (int r=u2s; r<du; r++)
+      for (std::size_t c=u2s; c<du; c++) // F22
+	for (std::size_t r=u2s; r<du; r++)
 	  sbuf[this->find_rank_fixed(I[r]-ds,I[c]-ds,F22)].push_back(ch->F22(r,c));
     }
   }

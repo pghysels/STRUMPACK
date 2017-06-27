@@ -171,7 +171,7 @@ namespace strumpack {
     oI.reserve(n);
     for (std::size_t i=0; i<n; i++) {
       auto l = std::lower_bound(upd, upd+dim_upd, I[i]);
-      if (l != upd+dim_upd && *l == I[i]) {
+      if (l != upd+dim_upd && *l == int(I[i])) {
 	lI.push_back(l-upd);
 	oI.push_back(i);
       }
@@ -188,14 +188,14 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> std::vector<std::size_t>
   FrontalMatrix<scalar_t,integer_t>::upd_to_parent(const F_t* pa, std::size_t& upd2sep) const {
     std::vector<std::size_t> I(dim_upd);
-    std::size_t r = 0;
+    integer_t r = 0;
     for (; r<dim_upd; r++) {
       auto up = upd[r];
       if (up >= pa->sep_end) break;
       I[r] = up - pa->sep_begin;
     }
     upd2sep = r;
-    for (std::size_t t=0; r<dim_upd; r++) {
+    for (integer_t t=0; r<dim_upd; r++) {
       auto up = upd[r];
       while (pa->upd[t] < up) t++;
       I[r] = t + pa->dim_sep;

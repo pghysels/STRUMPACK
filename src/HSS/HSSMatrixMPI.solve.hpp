@@ -6,7 +6,7 @@ namespace strumpack {
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::solve
     (const HSSFactorsMPI<scalar_t>& ULV, DistM_t& b) const {
-      assert(b.rows() == this->rows());
+      assert(std::size_t(b.rows()) == this->rows());
       // TODO assert that the ULV factorization has been performed and
       // is a valid one
       // assert(ULV._D.rows() == _U.rows());

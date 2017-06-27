@@ -27,17 +27,17 @@ namespace strumpack {
 	    if (p == rank) {
 	      sub = DenseMatrix<scalar_t>(m, d);
 	      if (dist.active()) {
-		for (std::size_t c=clo; c<chi; c++) {
+		for (int c=clo; c<chi; c++) {
 		  auto gc = dist.coll2g_fixed(c);
-		  for (std::size_t r=rlo; r<rhi; r++)
+		  for (int r=rlo; r<rhi; r++)
 		    sub(dist.rowl2g_fixed(r) - rbegin, gc) = dist(r,c);
 		}
 	      }
 	    } else {
 	      if (dist.active()) {
-		for (std::size_t c=clo; c<chi; c++) {
+		for (int c=clo; c<chi; c++) {
 		  auto gc = dist.coll2g_fixed(c);
-		  for (std::size_t r=rlo; r<rhi; r++)
+		  for (int r=rlo; r<rhi; r++)
 		    sbuf[p].emplace_back(dist.rowl2g_fixed(r) - rbegin, gc, dist(r,c));
 		}
 	      }
@@ -47,9 +47,9 @@ namespace strumpack {
 	    if (dist.active()) {
 	      const int leaf_pcols = std::floor(std::sqrt((float)leaf_procs));
 	      const int leaf_prows = leaf_procs / leaf_pcols;
-	      for (std::size_t c=clo; c<chi; c++) {
+	      for (int c=clo; c<chi; c++) {
 		auto gc = dist.coll2g_fixed(c);
-		for (std::size_t r=rlo; r<rhi; r++) {
+		for (int r=rlo; r<rhi; r++) {
 		  auto gr = dist.rowl2g_fixed(r) - rbegin;
 		  std::size_t dest = p + ((gr / MB) % leaf_prows) + ((gc / MB) % leaf_pcols) * leaf_prows;
 		  sbuf[dest].emplace_back(gr, gc, dist(r,c));
@@ -84,7 +84,6 @@ namespace strumpack {
 	const int MB = DistributedMatrix<scalar_t>::default_MB;
 	const int dist_pcols = std::floor(std::sqrt((float)P));
 	const int dist_prows = P / dist_pcols;
-	const auto d = dist.cols();
 	const auto leaf_procs = ranges.leaf_procs(rank);
 	auto rbegin = ranges.clo(rank) - ranges.clo(0);
 	std::vector<std::vector<Triplet<scalar_t>>> sbuf(P);
@@ -97,9 +96,9 @@ namespace strumpack {
 	    }
 	} else { // leaf
 	  if (leaf.active())
-	    for (std::size_t c=0; c<leaf.lcols(); c++) {
+	    for (int c=0; c<leaf.lcols(); c++) {
 	      auto gc = leaf.coll2g_fixed(c);
-	      for (std::size_t r=0; r<leaf.lrows(); r++) {
+	      for (int r=0; r<leaf.lrows(); r++) {
 		auto gr = leaf.rowl2g_fixed(r) + rbegin;
 		std::size_t dest = ((gr / MB) % dist_prows) + ((gc / MB) % dist_pcols) * dist_prows;
 		sbuf[dest].emplace_back(gr, gc, leaf(r, c));

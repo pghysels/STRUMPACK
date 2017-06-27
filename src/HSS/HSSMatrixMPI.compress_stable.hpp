@@ -18,7 +18,6 @@ namespace strumpack {
       auto d = opts.d0();
       auto dd = opts.dd();
       assert(dd <= d);
-      auto n = this->cols();
       std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen;
       WorkCompressMPI<scalar_t> w;
       DistSamples<scalar_t> RS(d+dd, (Actxt!=-1) ? Actxt : _ctxt, *this, Amult, opts);
@@ -73,7 +72,7 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compute_U_basis_stable
     (const opts_t& opts, WorkCompressMPI<scalar_t>& w, int d, int dd) {
       if (this->_U_state == State::COMPRESSED) return;
-      auto u_rows = this->leaf() ? this->rows() : this->_ch[0]->U_rank()+this->_ch[1]->U_rank();
+      int u_rows = this->leaf() ? this->rows() : this->_ch[0]->U_rank()+this->_ch[1]->U_rank();
       constexpr double c = 1.25331413731550e-01; //1.0 / (10.0 * std::sqrt(2. / M_PI));
       if (d+dd >= opts.max_rank() || d+dd >= u_rows ||
        	  update_orthogonal_basis(w.Sr, w.Qr, d, dd, this->_U_state == State::UNTOUCHED)
@@ -98,7 +97,7 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compute_V_basis_stable
     (const opts_t& opts, WorkCompressMPI<scalar_t>& w, int d, int dd) {
       if (this->_V_state == State::COMPRESSED) return;
-      auto v_rows = this->leaf() ? this->rows() : this->_ch[0]->V_rank()+this->_ch[1]->V_rank();
+      int v_rows = this->leaf() ? this->rows() : this->_ch[0]->V_rank()+this->_ch[1]->V_rank();
       constexpr double c = 1.25331413731550e-01; //1.0 / (10.0 * std::sqrt(2. / M_PI));
       if (d+dd >= opts.max_rank() || d+dd >= v_rows ||
       	  update_orthogonal_basis(w.Sc, w.Qc, d, dd, this->_V_state == State::UNTOUCHED)

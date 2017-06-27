@@ -283,23 +283,23 @@ namespace strumpack {
 	(opts.HSS_options().random_engine(), opts.HSS_options().random_distribution());
       auto dd = opts.HSS_options().dd();
       auto d0 = opts.HSS_options().d0();
-      auto d = Rr.cols();
-      auto m = Rr.rows();
+      integer_t d = Rr.cols();
+      integer_t m = Rr.rows();
       if (d0 % dd == 0) {
-	for (std::uint32_t c=0; c<d; c+=dd) {
-	  std::uint32_t r = 0, cs = c + _sampled_columns;
+	for (integer_t c=0; c<d; c+=dd) {
+	  integer_t r = 0, cs = c + _sampled_columns;
 	  for (; r<this->dim_sep; r++) {
-	    rgen->seed(std::uint32_t(r+this->sep_begin), cs);
-	    for (std::uint32_t cc=c; cc<c+dd; cc++) Rr(r,cc) = Rc(r,cc) = rgen->get();
+	    rgen->seed(std::uint32_t(r+this->sep_begin), std::uint32_t(cs));
+	    for (integer_t cc=c; cc<c+dd; cc++) Rr(r,cc) = Rc(r,cc) = rgen->get();
 	  }
 	  for (; r<m; r++) {
-	    rgen->seed(std::uint32_t(this->upd[r-this->dim_sep]), cs);
-	    for (std::uint32_t cc=c; cc<c+dd; cc++) Rr(r,cc) = Rc(r,cc) = rgen->get();
+	    rgen->seed(std::uint32_t(this->upd[r-this->dim_sep]), std::uint32_t(cs));
+	    for (integer_t cc=c; cc<c+dd; cc++) Rr(r,cc) = Rc(r,cc) = rgen->get();
 	  }
 	}
       } else {
-	for (std::uint32_t c=0; c<d; c++) {
-	  std::uint32_t r = 0, cs = c + _sampled_columns;
+	for (integer_t c=0; c<d; c++) {
+	  integer_t r = 0, cs = c + _sampled_columns;
 	  for (; r<this->dim_sep; r++) Rr(r,c) = Rc(r,c) = rgen->get(r+this->sep_begin, cs);
 	  for (; r<m; r++) Rr(r,c) = Rc(r,c) = rgen->get(this->upd[r-this->dim_sep], cs);
 	}
@@ -335,8 +335,8 @@ namespace strumpack {
     std::vector<std::size_t> gI, gJ;
     gI.reserve(I.size());
     gJ.reserve(J.size());
-    for (auto i : I) gI.push_back((i < this->dim_sep) ? i+this->sep_begin : this->upd[i-this->dim_sep]);
-    for (auto j : J) gJ.push_back((j < this->dim_sep) ? j+this->sep_begin : this->upd[j-this->dim_sep]);
+    for (auto i : I) gI.push_back((integer_t(i) < this->dim_sep) ? i+this->sep_begin : this->upd[i-this->dim_sep]);
+    for (auto j : J) gJ.push_back((integer_t(j) < this->dim_sep) ? j+this->sep_begin : this->upd[j-this->dim_sep]);
     this->A->extract_separator(this->sep_end, gI, gJ, B, task_depth);
     if (this->lchild) this->lchild->extract_CB_sub_matrix(gI, gJ, B, task_depth);
     if (this->rchild) this->rchild->extract_CB_sub_matrix(gI, gJ, B, task_depth);

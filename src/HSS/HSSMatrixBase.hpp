@@ -190,7 +190,7 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::to_block_row
     (const DistM_t& dist, DenseM_t& sub, DistM_t& leaf) const {
       if (!this->active()) return;
-      assert(dist.rows()==this->cols());
+      assert(std::size_t(dist.rows())==this->cols());
       sub = dist.gather();
     }
 

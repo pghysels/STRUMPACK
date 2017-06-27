@@ -169,7 +169,7 @@ namespace strumpack {
       fronts++;
     }
     std::fill(count.begin(), count.end(), 0);
-    for (size_t f=0, ft=fronts; f<fronts; f++) {
+    for (int f=0, ft=fronts; f<fronts; f++) {
       auto p = sep_tree->pa()[f];
       if (p != -1) {
     	count[p]++;

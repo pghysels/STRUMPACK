@@ -163,7 +163,6 @@ namespace strumpack {
 	}
       }
       void communicate_child_ycols(MPI_Comm comm, int rch1) {
-	auto rank = mpi_rank(comm);
 	auto rch0 = 0;
 	std::size_t c0ycols = c[0].ycols.size();
 	MPI_Bcast(&c0ycols, 1, mpi_type<std::size_t>(), rch0, comm);
@@ -204,6 +203,7 @@ namespace strumpack {
       sizeofentry = MPI_Aint_diff(sizeofentry, base);
       MPI_Type_create_resized(triplet_struct, 0, sizeofentry, triplet_type);
       MPI_Type_commit(triplet_type);
+      MPI_Type_free(&triplet_struct);
     }
 
   } // end namespace HSS

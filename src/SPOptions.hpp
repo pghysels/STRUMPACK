@@ -65,6 +65,7 @@ namespace strumpack {
     case MC64Job::MAX_DIAGONAL_SUM: return 4;
     case MC64Job::MAX_DIAGONAL_PRODUCT_SCALING: return 5;
     }
+    return -1;
   }
 
   inline std::string get_name(ReorderingStrategy method) {
@@ -76,6 +77,7 @@ namespace strumpack {
     case ReorderingStrategy::PTSCOTCH: return "PTScotch"; break;
     case ReorderingStrategy::RCM: return "RCM"; break;
     }
+    return "UNKNOWN";
   }
 
   inline bool is_parallel(ReorderingStrategy method) {
@@ -87,6 +89,7 @@ namespace strumpack {
     case ReorderingStrategy::PTSCOTCH: return true; break;
     case ReorderingStrategy::RCM: return false; break;
     }
+    return false;
   }
   /*! \brief Type of Gram-Schmidt orthogonalization used in GMRes.
    * \ingroup Enumerations */

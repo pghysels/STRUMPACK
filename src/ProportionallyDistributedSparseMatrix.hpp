@@ -219,19 +219,19 @@ namespace strumpack {
   ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::extract_separator
   (integer_t sep_end, const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
    DenseM_t& B, int depth) const {
-    auto m = I.size();
-    auto n = J.size();
+    integer_t m = I.size();
+    integer_t n = J.size();
     if (m == 0 || n == 0) return;
-    for (std::size_t j=0; j<n; j++) {
-      auto c = std::lower_bound(_global_col, _global_col+_local_cols, J[j]) - _global_col;
-      if (c == _local_cols || _global_col[c] != J[j]) {
+    for (integer_t j=0; j<n; j++) {
+      integer_t c = std::lower_bound(_global_col, _global_col+_local_cols, J[j]) - _global_col;
+      if (c == _local_cols || _global_col[c] != integer_t(J[j])) {
 	std::fill(B.ptr(0,j), B.ptr(m, j), scalar_t(0.));
 	continue;
       }
       auto rmin = this->_ind[this->_ptr[c]];
       auto rmax = this->_ind[this->_ptr[c+1]-1];
-      for (std::size_t i=0; i<m; i++) {
-    	auto r = I[i];
+      for (integer_t i=0; i<m; i++) {
+    	integer_t r = I[i];
 	if (r >= rmin && r <= rmax && (_global_col[c] < sep_end || r < sep_end)) {
 	  auto a_pos = this->_ptr[c];
 	  auto a_max = this->_ptr[c+1];
@@ -391,17 +391,19 @@ namespace strumpack {
   (integer_t sep_end, const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
    DistM_t& B, MPI_Comm comm) const {
     if (!B.active()) return;
-    auto m = B.rows();
-    auto n = B.cols();
+    integer_t m = B.rows();
+    integer_t n = B.cols();
     if (m == 0 || n == 0) return;
     B.zero();
-    for (std::size_t j=0; j<n; j++) {
-      auto c = std::lower_bound(_global_col, _global_col+_local_cols, J[j]) - _global_col;
-      if (c == _local_cols || _global_col[c] != J[j]) continue;
-      for (std::size_t i=0; i<m; i++) {
-    	if (J[j] >= sep_end && I[i] >= sep_end) break;
+    for (integer_t j=0; j<n; j++) {
+      integer_t jj = J[j];
+      integer_t c = std::lower_bound(_global_col, _global_col+_local_cols, jj) - _global_col;
+      if (c == _local_cols || _global_col[c] != jj) continue;
+      for (integer_t i=0; i<m; i++) {
+	integer_t ii = I[i];
+    	if (jj >= sep_end && ii >= sep_end) break;
 	for (integer_t k=this->_ptr[c]; k<this->_ptr[c+1]; k++) {
-    	  if (this->_ind[k] == I[i]) {
+    	  if (this->_ind[k] == ii) {
     	    B.global(i, j, this->_val[k]);
     	    break;
     	  }

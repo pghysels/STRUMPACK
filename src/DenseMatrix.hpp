@@ -404,10 +404,12 @@ namespace strumpack {
 
   template<typename scalar_t> DenseMatrix<scalar_t>& DenseMatrix<scalar_t>::scatter_rows_add
   (const std::vector<std::size_t>& I, const DenseMatrix<scalar_t>& B) {
+    assert(I.size() == B.rows());
+    assert(B.cols() == cols());
     //#pragma omp taskloop default(none) firstprivate(c,r,l,d) shared(I,B) //grainsize(128) //collapse(2)
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<I.size(); i++) {
-	assert(I[i] >= 0 && I[i] < rows());
+	assert(I[i] < rows());
 	operator()(I[i], j) += B(i, j);
       }
     STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*cols()*rows());
@@ -555,6 +557,7 @@ namespace strumpack {
     delete[] tau;
     for (int i=1; i<=n; i++) {
       int j = iind[i-1];
+      assert(j-1 >= 0 && j-1 < int(iind.size()));
       while (j < i) j = iind[j-1];
       piv[i-1] = j;
     }
