@@ -205,6 +205,7 @@ namespace strumpack {
 #pragma omp task firstprivate(sep) default(shared)
 	separator_reordering_recursive(opts, A, is_hss, sep_tree->rch()[sep], sorder);
       }
+#pragma omp taskwait
       HSS::HSSPartitionTree hss_tree(dim_sep);
       if (dim_sep > 2 * opts.HSS_min_sep_size()) {
 	integer_t nr_parts = 0;
