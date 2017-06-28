@@ -25,11 +25,19 @@
 #include <iostream>
 #include <sstream>
 #include <getopt.h>
+
+#define STRUMPACK_PBLAS_BLOCKSIZE 3
+
 #include "StrumpackSparseSolverMPIDist.hpp"
 #include "CSRMatrix.hpp"
 #include "CSRMatrixMPI.hpp"
 
 using namespace strumpack;
+
+void abort_MPI(MPI_Comm *c, int *error, ...) {
+  std::cout << "rank = " << mpi_rank() << " ABORTING!!!!!" << std::endl;
+  abort();
+}
 
 template<typename scalar,typename integer> void
 test(int argc, char* argv[], CSRMatrixMPI<scalar,integer>* Adist) {
@@ -90,6 +98,10 @@ int main(int argc, char* argv[]) {
 		<< "or with 'b filename' if the matrix is in binary." << std::endl;
     return 1;
   }
+
+  MPI_Errhandler eh;
+  MPI_Comm_create_errhandler(abort_MPI, &eh);
+  MPI_Comm_set_errhandler(MPI_COMM_WORLD, eh);
 
   bool binary_input = false;
   std::string format(argv[1]);
