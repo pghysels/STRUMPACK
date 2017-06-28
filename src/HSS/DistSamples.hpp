@@ -45,21 +45,21 @@ namespace strumpack {
 	DistM_t Srnew(Sr.ctxt(), n, dd);
 	DistM_t Scnew(Sc.ctxt(), n, dd);
 	_Amult(Rnew, Srnew, Scnew);
-	R = hconcat(n, d_old, dd, R, Rnew, R.ctxt(), R.ctxt());
-	Sr = hconcat(n, d_old, dd, Sr, Srnew, R.ctxt(), R.ctxt());
-	Sc = hconcat(n, d_old, dd, Sc, Scnew, R.ctxt(), R.ctxt());
+	R.hconcat(Rnew);
+	Sr.hconcat(Srnew);
+	Sc.hconcat(Scnew);
 	DenseM_t subRnew, subSrnew, subScnew;
 	DistM_t leafRnew, leafSrnew, leafScnew;
 	_hss.to_block_row(Rnew,  subRnew, leafRnew);
 	_hss.to_block_row(Srnew, subSrnew, leafSrnew);
 	_hss.to_block_row(Scnew, subScnew, leafScnew);
-	sub_Rr = hconcat(sub_Rr, subRnew);
-	sub_Rc = hconcat(sub_Rc, subRnew);
-	sub_Sr = hconcat(sub_Sr, subSrnew);
-	sub_Sc = hconcat(sub_Sc, subScnew);
-	leaf_R = hconcat(leaf_R.rows(), leaf_R.cols(), leafRnew.cols(), leaf_R, leafRnew, leaf_R.ctxt(), leaf_R.ctxt());
-	leaf_Sr = hconcat(leaf_Sr.rows(), leaf_Sr.cols(), leafSrnew.cols(), leaf_Sr, leafSrnew, leaf_Sr.ctxt(), leaf_Sr.ctxt());
-	leaf_Sc = hconcat(leaf_Sc.rows(), leaf_Sc.cols(), leafScnew.cols(), leaf_Sc, leafScnew, leaf_Sc.ctxt(), leaf_Sc.ctxt());
+	sub_Rr.hconcat(subRnew);
+	sub_Rc.hconcat(subRnew);
+	sub_Sr.hconcat(subSrnew);
+	sub_Sc.hconcat(subScnew);
+	leaf_R.hconcat(leafRnew);
+	leaf_Sr.hconcat(leafSrnew);
+	leaf_Sc.hconcat(leafScnew);
       }
     };
 

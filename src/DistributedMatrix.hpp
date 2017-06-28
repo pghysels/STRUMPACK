@@ -111,6 +111,7 @@ namespace strumpack {
     void eye();
     void clear();
     virtual void resize(std::size_t m, std::size_t n);
+    virtual void hconcat(const DistributedMatrix<scalar_t>& b);
     void copy(const DistributedMatrix<scalar_t>& B, std::size_t i, std::size_t j, int ctxt_all);
     void copy(const DistributedMatrix<scalar_t>& B, int ctxt_all) { copy(B, 0, 0, ctxt_all); }
     DistributedMatrix<scalar_t> transpose() const;
@@ -166,6 +167,7 @@ namespace strumpack {
   template<typename scalar_t> void copy
   (std::size_t m, std::size_t n, const DistributedMatrix<scalar_t>& a, std::size_t ia, std::size_t ja,
    DenseMatrix<scalar_t>& b, int dest, int ctxt_all) {
+    if (!m || !n) return;
     int b_desc[9];
     scalapack::descset(b_desc, m, n, m, n, 0, dest, ctxt_all, m);
     scalapack::pgemr2d(m, n, const_cast<scalar_t*>(a.data()), a.I()+ia, a.J()+ja, const_cast<int*>(a.desc()),
@@ -175,10 +177,9 @@ namespace strumpack {
   template<typename scalar_t> void copy
   (std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& a, int src,
    DistributedMatrix<scalar_t>& b, std::size_t ib, std::size_t jb, int ctxt_all) {
+    if (!m || !n) return;
     int a_desc[9];
     scalapack::descset(a_desc, m, n, m, n, 0, src, ctxt_all, std::max(m, a.ld()));
-    assert(!b.active() || int(m+ib) <= b.rows());
-    assert(!b.active() || int(n+jb) <= b.cols());
     scalapack::pgemr2d(m, n, const_cast<scalar_t*>(a.data()), 1, 1, a_desc, b.data(), b.I()+ib, b.J()+jb, b.desc(), ctxt_all);
   }
 
@@ -186,10 +187,7 @@ namespace strumpack {
   template<typename scalar_t> void copy
   (std::size_t m, std::size_t n, const DistributedMatrix<scalar_t>& a, std::size_t ia, std::size_t ja,
    DistributedMatrix<scalar_t>& b, std::size_t ib, std::size_t jb, int ctxt_all) {
-    assert(!a.active() || int(m+ia) <= a.rows());
-    assert(!a.active() || int(n+ja) <= a.cols());
-    assert(!b.active() || int(m+ib) <= b.rows());
-    assert(!b.active() || int(n+jb) <= b.cols());
+    if (!m || !n) return;
     scalapack::pgemr2d(m, n, const_cast<scalar_t*>(a.data()), a.I()+ia, a.J()+ja, const_cast<int*>(a.desc()),
 		       b.data(), b.I()+ib, b.J()+jb, b.desc(), ctxt_all);
   }
@@ -220,6 +218,7 @@ namespace strumpack {
     void lranges(int& rlo, int& rhi, int& clo, int& chi) const;
 
     void resize(std::size_t m, std::size_t n) { assert(1); }
+    void hconcat(const DistributedMatrix<scalar_t>& b) { assert(1); }
     void clear() { this->_data = nullptr; DistributedMatrix<scalar_t>::clear(); }
     std::size_t memory() const { return 0; }
     std::size_t total_memory() const { return 0; }
@@ -435,6 +434,16 @@ namespace strumpack {
     *this = std::move(tmp);
   }
 
+  template<typename scalar_t> void DistributedMatrix<scalar_t>::hconcat
+  (const DistributedMatrix<scalar_t>& b) {
+    if (!active()) return;
+    assert(rows() == b.rows());
+    assert(ctxt() == b.ctxt());
+    auto my_cols = cols();
+    resize(rows(), my_cols+b.cols());
+    strumpack::copy(rows(), b.cols(), b, 0, 0, *this, 0, my_cols, ctxt());
+  }
+
   template<typename scalar_t> void DistributedMatrix<scalar_t>::zero() {
     if (!active()) return;
     int rlo, rhi, clo, chi;
@@ -535,20 +544,15 @@ namespace strumpack {
 		      const_cast<int*>(P.data()), 1, 1, descip, NULL);
   }
 
+
   template<typename scalar_t> void DistributedMatrix<scalar_t>::extract_rows
   (const std::vector<std::size_t>& Ir, const DistributedMatrix<scalar_t>& B, int ctxt_all) {
-    // assert(!active() || (rows() == Ir.size()));
-    // assert(!active() || !B.active() || (cols() == B.cols()));
-    // TODO optimize this with a single communication step, only
-    // communicating in the grid column
     for (std::size_t r=0; r<Ir.size(); r++)
       strumpack::copy(1, cols(), B, Ir[r], 0, *this, r, 0, ctxt_all);
   }
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::extract_cols
   (const std::vector<std::size_t>& Jc, const DistributedMatrix<scalar_t>& B, int ctxt_all) {
-    // TODO optimize this with a single communication step, only
-    // communicating in the grid column
     for (std::size_t c=0; c<Jc.size(); c++)
       strumpack::copy(rows(), 1, B, 0, Jc[c], *this, 0, c, ctxt_all);
   }
@@ -703,7 +707,7 @@ namespace strumpack {
     int info = scalapack::pgetrf(rows(), cols(), data(), I(), J(), desc(), ipiv.data());
     if (info) {
       std::cerr << "ERROR: LU factorization of DistributedMatrix failed with info = " << info << std::endl;
-      abort();
+      exit(1);
     }
     return ipiv;
   }
@@ -873,15 +877,6 @@ namespace strumpack {
     DistributedMatrix<scalar_t> tmp(ctxt_new, arows+brows, cols);
     copy(arows, cols, a, 0, 0, tmp, 0, 0, ctxt_all);
     copy(brows, cols, b, 0, 0, tmp, arows, 0, ctxt_all);
-    return tmp;
-  }
-
-  template<typename scalar_t> DistributedMatrix<scalar_t> hconcat
-  (int rows, int acols, int bcols, const DistributedMatrix<scalar_t>& a,
-   const DistributedMatrix<scalar_t>& b, int ctxt_new, int ctxt_all) {
-    DistributedMatrix<scalar_t> tmp(ctxt_new, rows, acols+bcols);
-    copy(rows, acols, a, 0, 0, tmp, 0, 0, ctxt_all);
-    copy(rows, bcols, b, 0, 0, tmp, 0, acols, ctxt_all);
     return tmp;
   }
 

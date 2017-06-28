@@ -99,17 +99,19 @@ namespace strumpack {
      int lctxt, WorkExtractMPI<scalar_t>& w) const {
       if (!this->active() || w.I.empty()) return;
       if (this->leaf()) {
-	for (std::size_t c=0; c<w.J.size(); c++)
-	  for (std::size_t r=0; r<w.I.size(); r++)
-	    if (_D.is_local(w.I[r], w.J[c]))
-	      triplets.emplace_back(w.rl2g[r], w.cl2g[c], _D.global(w.I[r],w.J[c]));
+	if (_D.active())
+	  for (std::size_t c=0; c<w.J.size(); c++)
+	    for (std::size_t r=0; r<w.I.size(); r++)
+	      if (_D.is_local(w.I[r], w.J[c]))
+		triplets.emplace_back(w.rl2g[r], w.cl2g[c], _D.global(w.I[r],w.J[c]));
 	if (w.z.cols() && _U.cols()) {
 	  DistM_t tmp(_ctxt, w.I.size(), w.z.cols());
 	  gemm(Trans::N, Trans::N, scalar_t(1), _U.extract_rows(w.I, _ctxt_all), w.z, scalar_t(0.), tmp);
-	  for (int c=0; c<w.z.cols(); c++)
-	    for (std::size_t r=0; r<w.I.size(); r++)
-	      if (tmp.is_local(r, c))
-		triplets.emplace_back(w.rl2g[r], w.zcols[c], tmp.global(r,c));
+	  if (tmp.active())
+	    for (int c=0; c<w.z.cols(); c++)
+	      for (std::size_t r=0; r<w.I.size(); r++)
+		if (tmp.is_local(r, c))
+		  triplets.emplace_back(w.rl2g[r], w.zcols[c], tmp.global(r,c));
 	}
       } else {
 	w.split_extraction_sets(this->_ch[0]->dims());

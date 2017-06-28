@@ -64,6 +64,7 @@ namespace strumpack {
     void eye();
     virtual void clear();
     void resize(std::size_t m, std::size_t n);
+    void hconcat(const DenseMatrix<scalar_t>& b);
     void copy(const DenseMatrix<scalar_t>& B, std::size_t i=0, std::size_t j=0);
     void copy(const scalar_t* B, std::size_t ldb);
     DenseMatrix<scalar_t> transpose() const;
@@ -163,8 +164,8 @@ namespace strumpack {
 	b[i+j*ldb] = a(i, j);
   }
 
-  template<typename scalar_t>
-  DenseMatrix<scalar_t> vconcat(const DenseMatrix<scalar_t>& a, const DenseMatrix<scalar_t>& b) {
+  template<typename scalar_t> DenseMatrix<scalar_t>
+  vconcat(const DenseMatrix<scalar_t>& a, const DenseMatrix<scalar_t>& b) {
     assert(a.cols() == b.cols());
     DenseMatrix<scalar_t> tmp(a.rows()+b.rows(), a.cols());
     copy(a, tmp, 0, 0);
@@ -172,8 +173,8 @@ namespace strumpack {
     return tmp;
   }
 
-  template<typename scalar_t>
-  DenseMatrix<scalar_t> hconcat(const DenseMatrix<scalar_t>& a, const DenseMatrix<scalar_t>& b) {
+  template<typename scalar_t> DenseMatrix<scalar_t>
+  hconcat(const DenseMatrix<scalar_t>& a, const DenseMatrix<scalar_t>& b) {
     assert(a.rows() == b.rows());
     DenseMatrix<scalar_t> tmp(a.rows(), a.cols()+b.cols());
     copy(a, tmp, 0, 0);
@@ -337,6 +338,13 @@ namespace strumpack {
     _ld = std::max(std::size_t(1), m);
     _rows = m;
     _cols = n;
+  }
+
+  template<typename scalar_t> void DenseMatrix<scalar_t>::hconcat(const DenseMatrix<scalar_t>& b) {
+    assert(rows() == b.rows());
+    auto my_cols = cols();
+    resize(rows(), my_cols + b.cols());
+    strumpack::copy(rows(), b.cols(), b, 0, 0, *this, 0, my_cols);
   }
 
   template<typename scalar_t> void DenseMatrix<scalar_t>::copy(const DenseMatrix<scalar_t>& B, std::size_t i, std::size_t j) {
