@@ -16,7 +16,7 @@ namespace strumpack {
     (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts) {
       auto d = opts.d0();
       auto dd = opts.dd();
-      assert(dd <= d);
+      // assert(dd <= d);
       auto n = this->cols();
       DenseM_t Rr(n, d+dd), Rc(n, d+dd), Sr(n, d+dd), Sc(n, d+dd);
       std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen;

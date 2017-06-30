@@ -235,11 +235,5 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/bin2mtx.cpp ${CMAKE_BINARY_DIR}/exam
 
 
 include(CTest)
-
-if(BUILD_TESTING)
-  add_executable(test_HSS_seq test/test_HSS_seq)
-  add_executable(test_HSS_mpi test/test_HSS_mpi)
-  target_link_libraries(test_HSS_seq strumpack ${LIB})
-  target_link_libraries(test_HSS_mpi strumpack ${LIB})
-endif()
+add_subdirectory(test)
 

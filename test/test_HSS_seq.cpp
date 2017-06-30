@@ -11,13 +11,16 @@ int run(int argc, char* argv[]) {
   int m = 100, n = 1;
 
   HSSOptions<double> hss_opts;
+  hss_opts.set_verbose(false);
 
   auto usage = [&]() {
-    std::cout << "# Usage:\n"
+    cout << "# Usage:\n"
     << "#     OMP_NUM_THREADS=4 ./test1 problem options [HSS Options]\n"
     << "# where:\n"
     << "#  - problem: a char that can be\n"
     << "#      'T': solve a Toeplitz problem\n"
+    << "#            options: m (matrix dimension)\n"
+    << "#      'U': solve an upper triangular Toeplitz problem\n"
     << "#            options: m (matrix dimension)\n"
     << "#      'f': read matrix from file (binary)\n"
     << "#            options: filename\n";
@@ -32,9 +35,20 @@ int run(int argc, char* argv[]) {
   else usage();
   switch (test_problem) {
   case 'T': { // Toeplitz
-    if (argc > 2) m = std::stoi(argv[2]);
+    if (argc > 2) m = stoi(argv[2]);
     if (argc <= 2 || m < 0) {
-      std::cout << "# matrix dimension should be positive integer" << std::endl;
+      cout << "# matrix dimension should be positive integer" << endl;
+      usage();
+    }
+    A = DenseMatrix<double>(m, m);
+    for (int j=0; j<m; j++)
+      for (int i=0; i<m; i++)
+	A(i,j) = (i==j) ? 1. : 1./(1+abs(i-j));
+  } break;
+  case 'U': { // upper triangular Toeplitz
+    if (argc > 2) m = stoi(argv[2]);
+    if (argc <= 2 || m < 0) {
+      cout << "# matrix dimension should be positive integer" << endl;
       usage();
     }
     A = DenseMatrix<double>(m, m);
@@ -44,14 +58,14 @@ int run(int argc, char* argv[]) {
 	else A(i,j) = (i==j) ? 1. : 1./(1+abs(i-j));
   } break;
   case 'f': { // matrix from a file
-    std::string filename;
+    string filename;
     if (argc > 2) filename = argv[2];
     else {
-      std::cout << "# specify a filename" << std::endl;
+      cout << "# specify a filename" << endl;
       usage();
     }
-    std::cout << "Opening file " << filename << std::endl;
-    std::ifstream file(filename, std::ifstream::binary);
+    cout << "Opening file " << filename << endl;
+    ifstream file(filename, ifstream::binary);
     file.read(reinterpret_cast<char*>(&m), sizeof(int));
     A = DenseMatrix<double>(m, m);
     file.read(reinterpret_cast<char*>(A.data()), sizeof(double)*m*m);
@@ -62,7 +76,7 @@ int run(int argc, char* argv[]) {
   }
   hss_opts.set_from_command_line(argc, argv);
 
-  A.print("A");
+  if (hss_opts.verbose()) A.print("A");
   cout << "# tol = " << hss_opts.rel_tol() << endl;
 
   HSSMatrix<double> H(A, hss_opts);
@@ -82,6 +96,10 @@ int run(int argc, char* argv[]) {
   auto Hdense = H.dense();
   Hdense.scaled_add(-1., A);
   cout << "# relative error = ||A-H*I||_F/||A||_F = " << Hdense.normF() / A.normF() << endl;
+  if (Hdense.normF() / A.normF() > 1e1*max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
+    cout << "ERROR: compression error too big!!" << endl;
+    return 1;
+  }
 
   if (!H.leaf()) {
     double beta = 0.;
@@ -119,37 +137,47 @@ int run(int argc, char* argv[]) {
   }
 
   default_random_engine gen;
-  uniform_int_distribution<std::size_t> random_idx(0,m-1);
+  uniform_int_distribution<size_t> random_idx(0,m-1);
   cout << "# extracting individual elements, avg error = ";
   double ex_err = 0;
   int iex = 5;
   for (int i=0; i<iex; i++) {
     auto r = random_idx(gen);
     auto c = random_idx(gen);
-    ex_err += std::abs(H.get(r,c) - A(r,c));
+    ex_err += abs(H.get(r,c) - A(r,c));
   }
-  cout << ex_err/iex << std::endl;
+  cout << ex_err/iex << endl;
+  if (ex_err / iex > 1e1*max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
+    cout << "ERROR: extraction error too big!!" << endl;
+    return 1;
+  }
 
-  std::vector<std::size_t> I, J;
+  vector<size_t> I, J;
   auto nI = 8; //random_idx(gen);
   auto nJ = 8; //random_idx(gen);
   for (int i=0; i<nI; i++) I.push_back(random_idx(gen));
   for (int j=0; j<nJ; j++) J.push_back(random_idx(gen));
-  cout << "# extracting I=[";
-  for (auto i : I) { std::cout << i << " "; } cout << "];\n#            J=[";
-  for (auto j : J) { std::cout << j << " "; } cout << "];" << endl;
+  if (hss_opts.verbose()) {
+    cout << "# extracting I=[";
+    for (auto i : I) { cout << i << " "; } cout << "];\n#            J=[";
+    for (auto j : J) { cout << j << " "; } cout << "];" << endl;
+  }
   auto sub = H.extract(I, J);
   auto sub_dense = A.extract(I, J);
   // sub.print_to_file("sub", "sub.m");
   // sub_dense.print_to_file("sub_dense", "sub_dens.m");
-  sub.print("sub");
+  if (hss_opts.verbose()) sub.print("sub");
   sub.scaled_add(-1., sub_dense);
   // sub.print("sub_error");
   cout << "# sub-matrix extraction error = " << sub.normF() / sub_dense.normF() << endl;
+  if (sub.normF() / sub_dense.normF() > 1e2*max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
+    cout << "ERROR: extraction error too big!!" << endl;
+    return 1;
+  }
 
-  cout << "# computing ULV factorization of HSS matrix .. " << endl;
+  cout << "# computing ULV factorization of HSS matrix .." << endl;
   auto ULV = H.factor();
-  cout << "# solving linear system .. " << endl;
+  cout << "# solving linear system .." << endl;
 
   DenseMatrix<double> B(m, n);
   B.random();
@@ -158,10 +186,14 @@ int run(int argc, char* argv[]) {
   auto Bcheck = H.apply(C);
   Bcheck.scaled_add(-1., B);
   cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = " << Bcheck.normF() / B.normF() << endl;
+  if (Bcheck.normF() / B.normF() > 1e-12) {
+    cout << "ERROR: ULV solve relative error too big!!" << endl;
+    return 1;
+  }
 
   if (!H.leaf()) {
     auto partialULV = H.partial_factor();
-    cout << "# Computing Schur update .. " << endl;
+    cout << "# Computing Schur update .." << endl;
     DenseMatrix<double> Theta, Phi, DUB01;
     H.Schur_update(partialULV, Theta, DUB01, Phi);
     // Theta.print("Theta");
@@ -175,7 +207,14 @@ int run(int argc, char* argv[]) {
 
 
 int main(int argc, char* argv[]) {
+#if defined(_OPENMP)
+  int num_threads = omp_get_max_threads();
+  cout << "# running with " << num_threads << " threads" << endl;
+#endif
+
+  int ierr;
 #pragma omp parallel
 #pragma omp single nowait
-  run(argc, argv);
+  ierr = run(argc, argv);
+  return ierr;
 }
