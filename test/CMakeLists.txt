@@ -8,7 +8,7 @@ target_link_libraries(test_HSS_seq strumpack ${LIB})
 target_link_libraries(test_HSS_mpi strumpack ${LIB})
 
 set(THREADS 1 3 8)
-set(PROCS   1 2 4)
+set(PROCS   1 2 4 9 13 17)
 set(MATRIX  T U)
 set(SIZES   1 10 200)
 set(LEAF    1 3 16 128)
