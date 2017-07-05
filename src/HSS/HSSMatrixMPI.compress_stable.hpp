@@ -10,7 +10,22 @@ namespace strumpack {
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compress_stable_nosync
     (const dmult_t& Amult, const delem_t& Aelem, const opts_t& opts, int Actxt) {
-      std::cout << "TODO: HSSMatrixMPI<scalar_t>::compress_stable_nosync" << std::endl;
+      // TODO compare with sequential compression, start with d0+dd
+      int d = opts.d0();
+      int dd = opts.dd();
+      DistSamples<scalar_t> RS(d+dd, (Actxt!=-1) ? Actxt : _ctxt, *this, Amult, opts);
+      WorkCompressMPI<scalar_t> w;
+      if (opts.verbose() && !mpi_rank(_comm))
+	std::cout << "# compressing with d = " << d << ", tol = " << opts.rel_tol() << std::endl;
+      while (!this->is_compressed()) {
+	if (d != opts.d0()) RS.add_columns(d, opts);
+	if (opts.verbose() && !mpi_rank(_comm))
+	  std::cout << "# compressing with d+dd = " << d << "+" << dd
+		    << " (stable)" << std::endl;
+	compress_recursive_stable(RS, Aelem, opts, w, d, dd);
+	d += dd;
+	dd = std::min(dd, opts.max_rank()-d);
+      }
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compress_stable_sync
@@ -22,7 +37,7 @@ namespace strumpack {
       WorkCompressMPI<scalar_t> w;
       DistSamples<scalar_t> RS(d+dd, (Actxt!=-1) ? Actxt : _ctxt, *this, Amult, opts);
       const auto nr_lvls = this->max_levels();
-      while (!this->is_compressed() && d < opts.max_rank()) {
+      while (!this->is_compressed()) {
 	if (d != opts.d0())
 	  RS.add_columns(d+dd, opts);
 	if (opts.verbose() && !mpi_rank(_comm))
@@ -38,7 +53,43 @@ namespace strumpack {
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compress_recursive_stable
     (DistSamples<scalar_t>& RS, const delem_t& Aelem, const opts_t& opts, WorkCompressMPI<scalar_t>& w, int d, int dd) {
-      std::cout << "TODO HSSMatrixMPI<scalar_t>::compress_recursive_stable" << std::endl;
+      if (!this->active()) return;
+      if (this->leaf()) {
+	if (this->is_untouched()) {
+	  std::vector<std::size_t> I, J;
+	  I.reserve(this->rows());
+	  J.reserve(this->cols());
+	  for (std::size_t i=0; i<this->rows(); i++) I.push_back(i+w.offset.first);
+	  for (std::size_t j=0; j<this->cols(); j++) J.push_back(j+w.offset.second);
+	  _D = DistM_t(_ctxt, this->rows(), this->cols());
+	  Aelem(I, J, _D);
+	}
+      } else {
+	w.split(this->_ch[0]->dims());
+	this->_ch[0]->compress_recursive_stable(RS, Aelem, opts, w.c[0], d, dd);
+	this->_ch[1]->compress_recursive_stable(RS, Aelem, opts, w.c[1], d, dd);
+	communicate_child_data(w);
+	if (!this->_ch[0]->is_compressed() || !this->_ch[1]->is_compressed()) return;
+	if (this->is_untouched()) {
+	  _B01 = DistM_t(_ctxt, w.c[0].Ir.size(), w.c[1].Ic.size());
+	  _B10 = DistM_t(_ctxt, w.c[1].Ir.size(), w.c[0].Ic.size());
+	  Aelem(w.c[0].Ir, w.c[1].Ic, _B01);
+	  Aelem(w.c[1].Ir, w.c[0].Ic, _B10);
+	}
+      }
+      if (w.lvl == 0) this->_U_state = this->_V_state = State::COMPRESSED;
+      else {
+	if (this->is_untouched())
+	  compute_local_samples(RS, w, d+dd);
+	else compute_local_samples(RS, w, dd);
+	if (!this->is_compressed()) {
+	  compute_U_basis_stable(opts, w, d, dd);
+	  compute_V_basis_stable(opts, w, d, dd);
+	  notify_inactives(w);
+	  if (this->is_compressed())
+	    reduce_local_samples(RS, w, d+dd);
+	} else reduce_local_samples(RS, w, d);
+      }
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compress_level_stable

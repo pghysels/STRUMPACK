@@ -276,7 +276,32 @@ namespace strumpack {
     (DistSamples<scalar_t>& RS, const delem_t& Aelem, const opts_t& opts,
      WorkCompressMPI<scalar_t>& w_mpi, int d, int dd) {
       if (!active()) return;
-      std::cout << "TODO HSSMatrixBase<scalar_t>::compress_recursive_stable" << std::endl;
+      auto lctxt = RS.HSS().ctxt_loc();
+      std::pair<std::size_t,std::size_t> offset;
+      auto lAelem = LocalElemMult<scalar_t>(Aelem, (w_mpi.lvl==0) ? offset : w_mpi.offset, lctxt);
+      w_mpi.create_sequential();
+      WorkCompress<scalar_t>& w = *(w_mpi.w_seq);
+      if (w.lvl == 0) w.offset = w_mpi.offset;
+      std::swap(w.Ir, w_mpi.Ir); std::swap(w.Ic, w_mpi.Ic);
+      std::swap(w.Jr, w_mpi.Jr); std::swap(w.Jc, w_mpi.Jc);
+      bool was_not_compressed = !is_compressed();
+      // TODO openmp parallel region, set _openmp_task_depth?
+      compress_recursive_stable(RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
+				lAelem, opts, w, d, dd, _openmp_task_depth);
+      w_mpi.Rr = DistM_t(lctxt, DenseMW_t(V_rows(), d, RS.sub_Rr, w.offset.second, 0));
+      w_mpi.Rc = DistM_t(lctxt, DenseMW_t(U_rows(), d, RS.sub_Rc, w.offset.second, 0));
+      w_mpi.Sr = DistM_t(lctxt, DenseMW_t(U_rows(), d, RS.sub_Sr, w.offset.second, 0));
+      w_mpi.Sc = DistM_t(lctxt, DenseMW_t(V_rows(), d, RS.sub_Sc, w.offset.second, 0));
+
+      w_mpi.Qr = DistM_t(lctxt, w.Qr);
+      w_mpi.Qc = DistM_t(lctxt, w.Qc);
+
+      std::swap(w.Ir, w_mpi.Ir); std::swap(w.Ic, w_mpi.Ic);
+      std::swap(w.Jr, w_mpi.Jr); std::swap(w.Jc, w_mpi.Jc);
+      if (w.lvl != 0 && was_not_compressed && is_compressed()) {
+	for (auto& i : w_mpi.Ir) i += w_mpi.offset.first;
+	for (auto& j : w_mpi.Ic) j += w_mpi.offset.second;
+      }
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::compress_level_stable
@@ -292,12 +317,12 @@ namespace strumpack {
       // TODO openmp parallel region, set _openmp_task_depth?
       compress_level_stable(RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc, opts, w, d, dd, lvl, _openmp_task_depth);
       if (w.lvl == lvl) {
-	auto d = RS.sub_Rr.cols();
+	auto c = RS.sub_Rr.cols();
 	auto lctxt = RS.HSS().ctxt_loc();
-	w_mpi.Rr = DistM_t(lctxt, DenseMW_t(V_rows(), d, RS.sub_Rr, w.offset.second, 0));
-	w_mpi.Rc = DistM_t(lctxt, DenseMW_t(U_rows(), d, RS.sub_Rc, w.offset.second, 0));
-	w_mpi.Sr = DistM_t(lctxt, DenseMW_t(U_rows(), d, RS.sub_Sr, w.offset.second, 0));
-	w_mpi.Sc = DistM_t(lctxt, DenseMW_t(V_rows(), d, RS.sub_Sc, w.offset.second, 0));
+	w_mpi.Rr = DistM_t(lctxt, DenseMW_t(V_rows(), c, RS.sub_Rr, w.offset.second, 0));
+	w_mpi.Rc = DistM_t(lctxt, DenseMW_t(U_rows(), c, RS.sub_Rc, w.offset.second, 0));
+	w_mpi.Sr = DistM_t(lctxt, DenseMW_t(U_rows(), c, RS.sub_Sr, w.offset.second, 0));
+	w_mpi.Sc = DistM_t(lctxt, DenseMW_t(V_rows(), c, RS.sub_Sc, w.offset.second, 0));
 
 	w_mpi.Qr = DistM_t(lctxt, w.Qr);
 	w_mpi.Qc = DistM_t(lctxt, w.Qc);

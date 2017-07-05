@@ -41,19 +41,19 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compress_original_nosync
     (const dmult_t& Amult, const delem_t& Aelem, const opts_t& opts, int Actxt) {
       // TODO compare with sequential compression, start with d0+dd
-      int d_old = 0, d = opts.d0();
+      int d_old = 0, d = opts.d0() + opts.dd();
       DistSamples<scalar_t> RS(d, (Actxt!=-1) ? Actxt : _ctxt, *this, Amult, opts);
       WorkCompressMPI<scalar_t> w;
       if (opts.verbose() && !mpi_rank(_comm))
 	std::cout << "# compressing with d = " << d << ", tol = " << opts.rel_tol() << std::endl;
-      compress_recursive_original(RS, Aelem, opts, w, d);
       while (!this->is_compressed() && d < opts.max_rank()) {
-      	d_old = d;
-      	d = std::min(2*d, opts.max_rank());
-	RS.add_columns(d, opts);
-      	if (opts.verbose() && !mpi_rank(_comm))
-      	  std::cout << "# compressing with d = " << d << ", d_old = " << d_old << ", tol = " << opts.rel_tol() << std::endl;
-      	compress_recursive_original(RS, Aelem, opts, w, d-d_old);
+	if (d != opts.d0()) RS.add_columns(d, opts);
+	if (opts.verbose() && !mpi_rank(_comm))
+	  std::cout << "# compressing with d = " << d-opts.dd()
+		    << " + " << opts.dd() << " (original)" << std::endl;
+	compress_recursive_original(RS, Aelem, opts, w, d-d_old);
+	d_old = d;
+	d = 2 * (d_old - opts.dd()) + opts.dd();
       }
     }
 
