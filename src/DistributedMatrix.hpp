@@ -508,7 +508,7 @@ namespace strumpack {
   template<typename scalar_t> void DistributedMatrix<scalar_t>::print(std::string name, int precision) const {
     if (!active()) return;
     auto tmp = gather();
-    if (is_master()) tmp.print(name, true);
+    if (is_master()) tmp.print(name);
   }
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::copy
