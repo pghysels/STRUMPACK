@@ -35,8 +35,8 @@ int run(int argc, char* argv[]) {
   };
 
   // initialize the BLACS grid
-  int nprow = floor(sqrt((float)P));
-  int npcol = P / nprow;
+  int npcol = floor(sqrt((float)P));
+  int nprow = P / npcol;
   int ctxt, prow, pcol, ctxt_all;
   Cblacs_get(0, 0, &ctxt);
   Cblacs_gridinit(&ctxt, "C", nprow, npcol);
