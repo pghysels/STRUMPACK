@@ -7,6 +7,10 @@ using namespace std;
 using namespace strumpack;
 using namespace strumpack::HSS;
 
+#define ERROR_TOLERANCE 1e2
+#define SOLVE_TOLERANCE 1e-12
+
+
 int run(int argc, char* argv[]) {
   int m = 100, n = 1;
 
@@ -96,7 +100,7 @@ int run(int argc, char* argv[]) {
   auto Hdense = H.dense();
   Hdense.scaled_add(-1., A);
   cout << "# relative error = ||A-H*I||_F/||A||_F = " << Hdense.normF() / A.normF() << endl;
-  if (Hdense.normF() / A.normF() > 1e1*max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
+  if (Hdense.normF() / A.normF() > ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
     cout << "ERROR: compression error too big!!" << endl;
     return 1;
   }
@@ -147,7 +151,7 @@ int run(int argc, char* argv[]) {
     ex_err += abs(H.get(r,c) - A(r,c));
   }
   cout << ex_err/iex << endl;
-  if (ex_err / iex > 1e1*max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
+  if (ex_err / iex > ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
     cout << "ERROR: extraction error too big!!" << endl;
     return 1;
   }
@@ -186,7 +190,7 @@ int run(int argc, char* argv[]) {
   auto Bcheck = H.apply(C);
   Bcheck.scaled_add(-1., B);
   cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = " << Bcheck.normF() / B.normF() << endl;
-  if (Bcheck.normF() / B.normF() > 1e-12) {
+  if (Bcheck.normF() / B.normF() > SOLVE_TOLERANCE) {
     cout << "ERROR: ULV solve relative error too big!!" << endl;
     return 1;
   }
@@ -207,10 +211,12 @@ int run(int argc, char* argv[]) {
 
 
 int main(int argc, char* argv[]) {
+  cout << "# Running with:\n# ";
 #if defined(_OPENMP)
-  int num_threads = omp_get_max_threads();
-  cout << "# running with " << num_threads << " threads" << endl;
+  cout << "OMP_NUM_THREADS=" << omp_get_max_threads() << " ";
 #endif
+  for (int i=0; i<argc; i++) cout << argv[i] << " ";
+  cout << endl;
 
   int ierr;
 #pragma omp parallel

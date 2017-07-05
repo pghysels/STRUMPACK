@@ -2,11 +2,14 @@
 #include <iostream>
 using namespace std;
 
-#define STRUMPACK_PBLAS_BLOCKSIZE 1
+#define STRUMPACK_PBLAS_BLOCKSIZE 3
 #include "DistributedMatrix.hpp"
 #include "HSS/HSSMatrixMPI.hpp"
 using namespace strumpack;
 using namespace strumpack::HSS;
+
+#define ERROR_TOLERANCE 1e2
+#define SOLVE_TOLERANCE 1e-12
 
 int run(int argc, char* argv[]) {
   int m = 150;
@@ -14,23 +17,25 @@ int run(int argc, char* argv[]) {
   auto P = mpi_nprocs(MPI_COMM_WORLD);
 
   HSSOptions<double> hss_opts;
+  hss_opts.set_verbose(false);
+
   auto usage = [&]() {
     if (!mpi_rank()) {
-      std::cout << "# Usage:\n"
-		<< "#     OMP_NUM_THREADS=4 ./test1 problem options [HSS Options]\n"
-		<< "# where:\n"
-		<< "#  - problem: a char that can be\n"
-		<< "#      'T': solve a Toeplitz problem\n"
-		<< "#            options: m (matrix dimension)\n"
-		<< "#      'f': read matrix from file (binary)\n"
-		<< "#            options: filename\n";
+      cout << "# Usage:\n"
+      << "#     OMP_NUM_THREADS=4 ./test1 problem options [HSS Options]\n"
+      << "# where:\n"
+      << "#  - problem: a char that can be\n"
+      << "#      'T': solve a Toeplitz problem\n"
+      << "#            options: m (matrix dimension)\n"
+      << "#      'f': read matrix from file (binary)\n"
+      << "#            options: filename\n";
       hss_opts.describe_options();
     }
     exit(1);
   };
 
   // initialize the BLACS grid
-  int nprow = std::floor(sqrt((float)P));
+  int nprow = floor(sqrt((float)P));
   int npcol = P / nprow;
   int ctxt, prow, pcol, ctxt_all;
   Cblacs_get(0, 0, &ctxt);
@@ -46,9 +51,21 @@ int run(int argc, char* argv[]) {
   else usage();
   switch (test_problem) {
   case 'T': { // Toeplitz
-    if (argc > 2) m = std::stoi(argv[2]);
+    if (argc > 2) m = stoi(argv[2]);
     if (argc <= 2 || m < 0) {
-      std::cout << "# matrix dimension should be positive integer" << std::endl;
+      cout << "# matrix dimension should be positive integer" << endl;
+      usage();
+    }
+    A = DistributedMatrix<double>(ctxt, m, m);
+    // TODO only loop over local rows and columns, get the global coordinate..
+    for (int j=0; j<m; j++)
+      for (int i=0; i<m; i++)
+	A.global(i, j, (i==j) ? 1. : 1./(1+abs(i-j)));
+  } break;
+  case 'U': { // upper triangular Toeplitz
+    if (argc > 2) m = stoi(argv[2]);
+    if (argc <= 2 || m < 0) {
+      cout << "# matrix dimension should be positive integer" << endl;
       usage();
     }
     A = DistributedMatrix<double>(ctxt, m, m);
@@ -56,19 +73,19 @@ int run(int argc, char* argv[]) {
     for (int j=0; j<m; j++)
       for (int i=0; i<m; i++)
 	if (i > j) A.global(i, j, 0.);
-	else A.global(i, j, (i==j) ? 1. : 1./(1+std::abs(i-j)));
+	else A.global(i, j, (i==j) ? 1. : 1./(1+abs(i-j)));
   } break;
   case 'f': { // matrix from a file
     DenseMatrix<double> Aseq;
     if (!mpi_rank()) {
-      std::string filename;
+      string filename;
       if (argc > 2) filename = argv[2];
       else {
-	std::cout << "# specify a filename" << std::endl;
+	cout << "# specify a filename" << endl;
 	usage();
       }
-      std::cout << "Opening file " << filename << std::endl;
-      std::ifstream file(filename, std::ifstream::binary);
+      cout << "Opening file " << filename << endl;
+      ifstream file(filename, ifstream::binary);
       file.read(reinterpret_cast<char*>(&m), sizeof(int));
       Aseq = DenseMatrix<double>(m, m);
       file.read(reinterpret_cast<char*>(Aseq.data()), sizeof(double)*m*m);
@@ -83,7 +100,7 @@ int run(int argc, char* argv[]) {
   }
   hss_opts.set_from_command_line(argc, argv);
 
-  A.print("A");
+  if (hss_opts.verbose()) A.print("A");
   if (!mpi_rank()) cout << "# tol = " << hss_opts.rel_tol() << endl;
 
   HSSMatrixMPI<double> H(A, hss_opts, MPI_COMM_WORLD);
@@ -104,12 +121,12 @@ int run(int argc, char* argv[]) {
   if (!mpi_rank()) {
     cout << "# rank(H) = " << Hrank << endl;
     cout << "# memory(H) = " << Hmem/1e6 << " MB, "
-	 << 100. * Hmem / Amem << "% of dense" << endl << endl;
+	 << 100. * Hmem / Amem << "% of dense" << endl;
   }
 
   auto Hdense = H.dense(A.ctxt());
   MPI_Barrier(MPI_COMM_WORLD);
-  Hdense.print("H");
+  if (hss_opts.verbose()) Hdense.print("H");
 
   MPI_Barrier(MPI_COMM_WORLD);
 
@@ -117,12 +134,16 @@ int run(int argc, char* argv[]) {
   auto HnormF = Hdense.normF();
   auto AnormF = A.normF();
   if (!mpi_rank()) cout << "# relative error = ||A-H*I||_F/||A||_F = " << HnormF / AnormF << endl;
+  if (HnormF / AnormF > ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
+    if (!mpi_rank()) cout << "ERROR: compression error too big!!" << endl;
+    return 1;
+  }
 
   {
     if (!mpi_rank())
-      std::cout << "# matrix-free compression!!" << std::endl;
+      cout << "# matrix-free compression!!" << endl;
     DistElemMult<double> mat(A, ctxt_all, MPI_COMM_WORLD);
-    hss_opts.set_synchronized_compression(true);
+    hss_opts.set_synchronized_compression(false);
     HSSMatrixMPI<double> HMF(A.rows(), A.cols(), mat, A.ctxt(), mat, hss_opts, MPI_COMM_WORLD);
     auto HMFdense = HMF.dense(A.ctxt());
     HMFdense.scaled_add(-1., A);
@@ -158,7 +179,7 @@ int run(int argc, char* argv[]) {
 
   MPI_Barrier(MPI_COMM_WORLD);
   default_random_engine gen;
-  uniform_int_distribution<std::size_t> random_idx(0,m-1);
+  uniform_int_distribution<size_t> random_idx(0,m-1);
   if (!mpi_rank()) cout << "# extracting individual elements, avg error = ";
   double ex_err = 0;
   int iex = 5;
@@ -166,19 +187,23 @@ int run(int argc, char* argv[]) {
     auto r = random_idx(gen);
     auto c = random_idx(gen);
     if (r > c) continue;
-    ex_err += std::abs(H.get(r, c) - A.all_global(r, c));
+    ex_err += abs(H.get(r, c) - A.all_global(r, c));
   }
-  if (!mpi_rank()) cout << ex_err/iex << std::endl;
+  if (!mpi_rank()) cout << ex_err/iex << endl;
+  if (ex_err / iex > ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
+    if (!mpi_rank()) cout << "ERROR: extraction error too big!!" << endl;
+    return 1;
+  }
 
-  std::vector<std::size_t> I, J;
+  vector<size_t> I, J;
   auto nI = 8; //random_idx(gen);
   auto nJ = 8; //random_idx(gen);
   for (int i=0; i<nI; i++) I.push_back(random_idx(gen));
   for (int j=0; j<nJ; j++) J.push_back(random_idx(gen));
-  if (!mpi_rank()) {
+  if (!mpi_rank() && hss_opts.verbose()) {
     cout << "# extracting I=[";
-    for (auto i : I) { std::cout << i << " "; } cout << "];\n#            J=[";
-    for (auto j : J) { std::cout << j << " "; } cout << "];" << endl;
+    for (auto i : I) { cout << i << " "; } cout << "];\n#            J=[";
+    for (auto j : J) { cout << j << " "; } cout << "];" << endl;
   }
   auto sub = H.extract(I, J, A.ctxt(), nprow, npcol);
   auto sub_dense = A.extract(I, J);
@@ -188,13 +213,17 @@ int run(int argc, char* argv[]) {
   // sub.print("sub_error");
   auto relsubnorm = sub.normF() / sub_dense.normF();
   if (!mpi_rank()) cout << "# sub-matrix extraction errror = " << relsubnorm << endl;
+  if (relsubnorm > ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
+    if (!mpi_rank()) cout << "ERROR: extraction error too big!!" << endl;
+    return 1;
+  }
 
   MPI_Barrier(MPI_COMM_WORLD);
   if (!mpi_rank()) cout << "# computing ULV factorization of HSS matrix .. ";
   auto ULV = H.factor();
   if (!mpi_rank()) cout << "Done!" << endl;
 
-  if (!mpi_rank()) cout << "# solving linear system .. " << endl;
+  if (!mpi_rank()) cout << "# solving linear system .." << endl;
   DistributedMatrix<double> B(ctxt, m, n);
   B.random();
   DistributedMatrix<double> C(B);
@@ -206,6 +235,10 @@ int run(int argc, char* argv[]) {
   auto Bchecknorm = Bcheck.normF();
   auto Bnorm = B.normF();
   if (!mpi_rank()) cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = " << Bchecknorm / Bnorm << endl;
+  if (Bchecknorm / Bnorm > SOLVE_TOLERANCE) {
+    if (!mpi_rank()) cout << "ERROR: ULV solve relative error too big!!" << endl;
+    return 1;
+  }
 
   if (!mpi_rank()) cout << "# exiting" << endl;
   return 0;
@@ -214,9 +247,23 @@ int run(int argc, char* argv[]) {
 
 int main(int argc, char* argv[]) {
   MPI_Init(&argc, &argv);
+  if (!mpi_rank()) {
+    cout << "# Running with:\n# ";
+#if defined(_OPENMP)
+    cout << "OMP_NUM_THREADS=" << omp_get_max_threads() << " mpirun -n " << mpi_nprocs() << " ";
+#else
+    cout << "mpirun -n " << mpi_nprocs() << " ";
+#endif
+    for (int i=0; i<argc; i++) cout << argv[i] << " ";
+    cout << endl;
+  }
 
-  run(argc, argv);
+  int ierr;
+#pragma omp parallel
+#pragma omp single nowait
+  ierr = run(argc, argv);
 
   Cblacs_exit(1);
   MPI_Finalize();
+  return ierr;
 }
