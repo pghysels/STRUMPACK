@@ -8,7 +8,7 @@ using namespace std;
 using namespace strumpack;
 using namespace strumpack::HSS;
 
-#define ERROR_TOLERANCE 1e2
+#define ERROR_TOLERANCE 1e1
 #define SOLVE_TOLERANCE 1e-12
 
 int run(int argc, char* argv[]) {
@@ -37,11 +37,11 @@ int run(int argc, char* argv[]) {
   // initialize the BLACS grid
   int npcol = floor(sqrt((float)P));
   int nprow = P / npcol;
-  int ctxt, prow, pcol, ctxt_all;
+  int ctxt, dummy, prow, pcol;
   Cblacs_get(0, 0, &ctxt);
   Cblacs_gridinit(&ctxt, "C", nprow, npcol);
-  Cblacs_gridinfo(ctxt, &nprow, &npcol, &prow, &pcol);
-  ctxt_all = Csys2blacs_handle(MPI_COMM_WORLD);
+  Cblacs_gridinfo(ctxt, &dummy, &dummy, &prow, &pcol);
+  int ctxt_all = Csys2blacs_handle(MPI_COMM_WORLD);
   Cblacs_gridinit(&ctxt_all, "R", 1, P);
 
   DistributedMatrix<double> A;
@@ -134,14 +134,13 @@ int run(int argc, char* argv[]) {
   auto HnormF = Hdense.normF();
   auto AnormF = A.normF();
   if (!mpi_rank()) cout << "# relative error = ||A-H*I||_F/||A||_F = " << HnormF / AnormF << endl;
-  if (HnormF / AnormF > ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
+  if (A.active() && HnormF / AnormF > ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
     if (!mpi_rank()) cout << "ERROR: compression error too big!!" << endl;
     return 1;
   }
 
   {
-    if (!mpi_rank())
-      cout << "# matrix-free compression!!" << endl;
+    if (!mpi_rank()) cout << "# matrix-free compression!!" << endl;
     DistElemMult<double> mat(A, ctxt_all, MPI_COMM_WORLD);
     hss_opts.set_synchronized_compression(false);
     HSSMatrixMPI<double> HMF(A.rows(), A.cols(), mat, A.ctxt(), mat, hss_opts, MPI_COMM_WORLD);
@@ -190,7 +189,7 @@ int run(int argc, char* argv[]) {
     ex_err += abs(H.get(r, c) - A.all_global(r, c));
   }
   if (!mpi_rank()) cout << ex_err/iex << endl;
-  if (ex_err / iex > ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
+  if (A.active() && ex_err / iex > ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
     if (!mpi_rank()) cout << "ERROR: extraction error too big!!" << endl;
     return 1;
   }
@@ -212,8 +211,8 @@ int run(int argc, char* argv[]) {
   sub.scaled_add(-1., sub_dense);
   // sub.print("sub_error");
   auto relsubnorm = sub.normF() / sub_dense.normF();
-  if (!mpi_rank()) cout << "# sub-matrix extraction errror = " << relsubnorm << endl;
-  if (relsubnorm > ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
+  if (!mpi_rank()) cout << "# sub-matrix extraction error = " << relsubnorm << endl;
+  if (sub.active() && relsubnorm > ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
     if (!mpi_rank()) cout << "ERROR: extraction error too big!!" << endl;
     return 1;
   }
@@ -235,7 +234,7 @@ int run(int argc, char* argv[]) {
   auto Bchecknorm = Bcheck.normF();
   auto Bnorm = B.normF();
   if (!mpi_rank()) cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = " << Bchecknorm / Bnorm << endl;
-  if (Bchecknorm / Bnorm > SOLVE_TOLERANCE) {
+  if (B.active() && Bchecknorm / Bnorm > SOLVE_TOLERANCE) {
     if (!mpi_rank()) cout << "ERROR: ULV solve relative error too big!!" << endl;
     return 1;
   }
