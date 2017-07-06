@@ -6,27 +6,29 @@ National Laboratory (subject to receipt of any required approvals from
 the U.S. Dept. of Energy).  All rights reserved.
 
 
-## Installation instructions:
+## Installation instructions
 
     See INSTALL.txt
 
 
-## Website:
+## Website
 
     http://portal.nersc.gov/project/sparse/strumpack/
 
 
-## Current developers:
+## Current developers
 
  - Pieter Ghysels -- pghysels@lbl.gov (Lawrence Berkeley National Laboratory)
  - Xiaoye S. Li -- xsli@lbl.gov (Lawrence Berkeley National Laboratory)
  - Christopher Gorman (UC Santa Barbara)
 
-## Other contributors:
+## Other contributors
 
  - Francois-Henry Rouet -- fhrouet@lbl.gov,fhrouet@lstc.com (Livermore
    Software Technology Corp., Lawrence Berkeley National Laboratory)
 
+
+## Overview
 
 STRUMPACK -- STRUctured Matrices PACKage - is a package for
 computations with sparse and dense structured matrices, i.e., matrices
@@ -40,7 +42,7 @@ matrix computations. STRUMPACK has two main components: a
 distributed-memory dense matrix computations package and a distributed
 memory sparse solver/preconditioner.
 
-##  Components:
+##  Components
 
  - The sparse solver is documented in doc/manual.pdf. STRUMPACK-sparse
    can be used as a direct solver for sparse linear systems or as a
@@ -64,7 +66,9 @@ If you have questions about your rights to use or distribute this
 software, please contact Berkeley Lab's Technology Transfer Department
 at TTD@lbl.gov.
 
-NOTICE.  This software is owned by the U.S. Department of Energy.  As
+## NOTICE
+
+This software is owned by the U.S. Department of Energy.  As
 such, the U.S. Government has been granted for itself and others
 acting on its behalf a paid-up, nonexclusive, irrevocable, worldwide
 license in the Software to reproduce, prepare derivative works, and
