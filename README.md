@@ -1,33 +1,34 @@
+# STRUMPACK
+
 STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014-2017, The
 Regents of the University of California, through Lawrence Berkeley
 National Laboratory (subject to receipt of any required approvals from
 the U.S. Dept. of Energy).  All rights reserved.
 
 
-Installation instructions:
+## Installation instructions:
 
     See INSTALL.txt
 
 
-Website:
+## Website:
 
     http://portal.nersc.gov/project/sparse/strumpack/
 
 
-Current developers:
+## Current developers:
 
  - Pieter Ghysels -- pghysels@lbl.gov (Lawrence Berkeley National Laboratory)
  - Xiaoye S. Li -- xsli@lbl.gov (Lawrence Berkeley National Laboratory)
+ - Christopher Gorman (UC Santa Barbara)
 
-Other contributors:
+## Other contributors:
 
  - Francois-Henry Rouet -- fhrouet@lbl.gov,fhrouet@lstc.com (Livermore
    Software Technology Corp., Lawrence Berkeley National Laboratory)
- - Christopher Gorman (UC Santa Barbara)
 
 
-
-STRUMPACK - STRUctured Matrices PACKage - is a package for
+STRUMPACK -- STRUctured Matrices PACKage - is a package for
 computations with sparse and dense structured matrices, i.e., matrices
 that exhibit some kind of low-rank property, in particular
 Hierarchically Semi-Separable matrices (HSS).  Such matrices appear in
@@ -39,7 +40,7 @@ matrix computations. STRUMPACK has two main components: a
 distributed-memory dense matrix computations package and a distributed
 memory sparse solver/preconditioner.
 
-Components:
+##  Components:
 
  - The sparse solver is documented in doc/manual.pdf. STRUMPACK-sparse
    can be used as a direct solver for sparse linear systems or as a
