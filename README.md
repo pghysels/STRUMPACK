@@ -1,5 +1,4 @@
 # STRUMPACK
-
 STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014-2017, The
 Regents of the University of California, through Lawrence Berkeley
 National Laboratory (subject to receipt of any required approvals from
@@ -7,29 +6,24 @@ the U.S. Dept. of Energy).  All rights reserved.
 
 
 ## Installation instructions
-
-    See INSTALL.txt
+   See INSTALL.txt
 
 
 ## Website
-
     http://portal.nersc.gov/project/sparse/strumpack/
 
 
 ## Current developers
-
  - Pieter Ghysels -- pghysels@lbl.gov (Lawrence Berkeley National Laboratory)
  - Xiaoye S. Li -- xsli@lbl.gov (Lawrence Berkeley National Laboratory)
  - Christopher Gorman (UC Santa Barbara)
 
 ## Other contributors
-
  - Francois-Henry Rouet -- fhrouet@lbl.gov,fhrouet@lstc.com (Livermore
    Software Technology Corp., Lawrence Berkeley National Laboratory)
 
 
 ## Overview
-
 STRUMPACK -- STRUctured Matrices PACKage - is a package for
 computations with sparse and dense structured matrices, i.e., matrices
 that exhibit some kind of low-rank property, in particular
@@ -43,7 +37,6 @@ distributed-memory dense matrix computations package and a distributed
 memory sparse solver/preconditioner.
 
 ##  Components
-
  - The sparse solver is documented in doc/manual.pdf. STRUMPACK-sparse
    can be used as a direct solver for sparse linear systems or as a
    preconditioner. It also includes GMRes and BiCGStab iterative
@@ -52,7 +45,6 @@ memory sparse solver/preconditioner.
    fill-in of a sparse multifrontal LU factorization.  The code uses
    MPI+OpenMP for hybrid distributed and shared memory parallelism.
    Main point of contact: Pieter Ghysels (pghysels@lbl.gov).
-
  - The dense distributed-memory package can be found in the src/HSS
    directory. This is currently not well documented. An older version
    of the dense package is available at:
@@ -67,7 +59,6 @@ software, please contact Berkeley Lab's Technology Transfer Department
 at TTD@lbl.gov.
 
 ## NOTICE
-
 This software is owned by the U.S. Department of Energy.  As
 such, the U.S. Government has been granted for itself and others
 acting on its behalf a paid-up, nonexclusive, irrevocable, worldwide
