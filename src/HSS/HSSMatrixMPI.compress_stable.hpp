@@ -11,8 +11,8 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compress_stable_nosync
     (const dmult_t& Amult, const delem_t& Aelem, const opts_t& opts, int Actxt) {
       // TODO compare with sequential compression, start with d0+dd
-      int d = opts.d0();
-      int dd = opts.dd();
+      auto d = opts.d0();
+      auto dd = opts.dd();
       DistSamples<scalar_t> RS(d+dd, (Actxt!=-1) ? Actxt : _ctxt, *this, Amult, opts);
       WorkCompressMPI<scalar_t> w;
       if (opts.verbose() && !mpi_rank(_comm))

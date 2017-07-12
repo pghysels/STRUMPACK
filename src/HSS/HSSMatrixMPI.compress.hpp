@@ -44,10 +44,8 @@ namespace strumpack {
       int d_old = 0, d = opts.d0() + opts.dd();
       DistSamples<scalar_t> RS(d, (Actxt!=-1) ? Actxt : _ctxt, *this, Amult, opts);
       WorkCompressMPI<scalar_t> w;
-      if (opts.verbose() && !mpi_rank(_comm))
-	std::cout << "# compressing with d = " << d << ", tol = " << opts.rel_tol() << std::endl;
-      while (!this->is_compressed() && d < opts.max_rank()) {
-	if (d != opts.d0()) RS.add_columns(d, opts);
+      while (!this->is_compressed()) {
+	if (d != opts.d0() + opts.dd()) RS.add_columns(d, opts);
 	if (opts.verbose() && !mpi_rank(_comm))
 	  std::cout << "# compressing with d = " << d-opts.dd()
 		    << " + " << opts.dd() << " (original)" << std::endl;
@@ -334,7 +332,7 @@ namespace strumpack {
       w.Sr.ID_row(_U.E(), _U.P(), w.Jr, opts.rel_tol(), opts.abs_tol(), _ctxt_T);
       w.Sc.ID_row(_V.E(), _V.P(), w.Jc, opts.rel_tol(), opts.abs_tol(), _ctxt_T);
       notify_inactives(w);
-      if (d >= opts.max_rank() ||
+      if (d-opts.dd() >= opts.max_rank() ||
 	  (int(w.Jr.size()) <= d - opts.dd() && int(w.Jc.size()) <= d - opts.dd())) {
 	this->_U_rank = _U.cols();  this->_U_rows = _U.rows();
 	this->_V_rank = _V.cols();  this->_V_rows = _V.rows();

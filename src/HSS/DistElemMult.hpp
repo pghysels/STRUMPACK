@@ -28,8 +28,6 @@ namespace strumpack {
 	    assert(I[i] >= 0 && int(I[i]) < _A.rows() && J[j] >= 0 && int(J[j]) < _A.cols());
 	    B.global(i, j, _Ag(I[i], J[j]));
 	  }
-	// TODO just to make sure everyone calls this! test!!
-	//MPI_Barrier(_comm);
       }
     };
 
