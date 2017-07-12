@@ -536,9 +536,10 @@ namespace strumpack {
       } else {
 	// I'm not active on child0, so I need to receive
 	MPI_Status stat;
-	int dest, msgsize;
+	int dest=-1, msgsize;
 	for (int p=0; p<P0active; p++)
 	  if (p == (rank - P0active) % P0active) { dest = p; break; }
+	assert(dest >= 0);
 	MPI_Probe(dest, /*tag*/0, _comm, &stat);
 	MPI_Get_count(&stat, mpi_type<std::size_t>(), &msgsize);
 	auto buf = new std::size_t[msgsize];
@@ -593,12 +594,13 @@ namespace strumpack {
       } else {
 	// I'm not active on child1, so I need to receive
 	MPI_Status stat;
-	int dest, msgsize;
+	int dest=-1, msgsize;
 	for (int p=root1; p<root1+P1active; p++) {
 	  if (rank < root1) {
 	    if (p - root1 == rank % P1active) { dest = p; break; }
 	  } else if (p - root1 == (rank - P1active) % P1active) { dest = p; break; }
 	}
+	assert(dest >= 0);
 	MPI_Probe(dest, /*tag*/1, _comm, &stat);
 	MPI_Get_count(&stat, mpi_type<std::size_t>(), &msgsize);
 	auto buf = new std::size_t[msgsize];
