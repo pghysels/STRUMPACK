@@ -61,6 +61,20 @@ int run(int argc, char* argv[]) {
 	if (i > j) A(i,j) = 0.;
 	else A(i,j) = (i==j) ? 1. : 1./(1+abs(i-j));
   } break;
+  case 'L': {
+    if (argc > 2) m = stoi(argv[2]);
+    if (argc <= 2 || m < 0) {
+      cout << "# matrix dimension should be positive integer" << endl;
+      usage();
+    }
+    A = DenseMatrix<double>(m, m);
+    A.eye();
+    DenseMatrix<double> U(m, max(1, int(0.3*m)));
+    DenseMatrix<double> V(m, max(1, int(0.3*m)));
+    U.random();
+    V.random();
+    gemm(Trans::N, Trans::C, 1./m, U, V, 1., A);
+  } break;
   case 'f': { // matrix from a file
     string filename;
     if (argc > 2) filename = argv[2];

@@ -9,7 +9,7 @@ target_link_libraries(test_HSS_mpi strumpack ${LIB})
 
 set(THREADS 1 3 8)
 set(PROCS   2 4 9 13 17)
-set(MATRIX  T U)
+set(MATRIX  T U L)
 set(SIZES   1 10 200)
 set(LEAF    1 3 16 128)
 set(RTOL    1 1e-1 1e-5 1e-13)
@@ -19,8 +19,8 @@ set(COMP    original stable)
 
 ## TODO try smaller values as well
 #set(D0      1 2 4 8 64 128)
-set(D0      32 64 128)
-set(DD      4 8 16)
+set(D0      16 32 64 128)
+set(DD      4 8)
 
 function(random_element list element)
   list(LENGTH ${list} len)
