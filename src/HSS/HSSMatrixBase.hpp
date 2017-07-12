@@ -288,10 +288,10 @@ namespace strumpack {
       // TODO openmp parallel region, set _openmp_task_depth?
       compress_recursive_stable(RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
 				lAelem, opts, w, d, dd, _openmp_task_depth);
-      w_mpi.Rr = DistM_t(lctxt, DenseMW_t(V_rows(), d, RS.sub_Rr, w.offset.second, 0));
-      w_mpi.Rc = DistM_t(lctxt, DenseMW_t(U_rows(), d, RS.sub_Rc, w.offset.second, 0));
-      w_mpi.Sr = DistM_t(lctxt, DenseMW_t(U_rows(), d, RS.sub_Sr, w.offset.second, 0));
-      w_mpi.Sc = DistM_t(lctxt, DenseMW_t(V_rows(), d, RS.sub_Sc, w.offset.second, 0));
+      w_mpi.Rr = DistM_t(lctxt, DenseMW_t(V_rows(), d+dd, RS.sub_Rr, w.offset.second, 0));
+      w_mpi.Rc = DistM_t(lctxt, DenseMW_t(U_rows(), d+dd, RS.sub_Rc, w.offset.second, 0));
+      w_mpi.Sr = DistM_t(lctxt, DenseMW_t(U_rows(), d+dd, RS.sub_Sr, w.offset.second, 0));
+      w_mpi.Sc = DistM_t(lctxt, DenseMW_t(V_rows(), d+dd, RS.sub_Sc, w.offset.second, 0));
 
       w_mpi.Qr = DistM_t(lctxt, w.Qr);
       w_mpi.Qc = DistM_t(lctxt, w.Qc);
@@ -317,7 +317,7 @@ namespace strumpack {
       // TODO openmp parallel region, set _openmp_task_depth?
       compress_level_stable(RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc, opts, w, d, dd, lvl, _openmp_task_depth);
       if (w.lvl == lvl) {
-	auto c = RS.sub_Rr.cols();
+	auto c = RS.sub_Rr.cols(); // this is d+dd??
 	auto lctxt = RS.HSS().ctxt_loc();
 	w_mpi.Rr = DistM_t(lctxt, DenseMW_t(V_rows(), c, RS.sub_Rr, w.offset.second, 0));
 	w_mpi.Rc = DistM_t(lctxt, DenseMW_t(U_rows(), c, RS.sub_Rc, w.offset.second, 0));
