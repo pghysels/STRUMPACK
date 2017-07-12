@@ -15,10 +15,8 @@ namespace strumpack {
       auto dd = opts.dd();
       DistSamples<scalar_t> RS(d+dd, (Actxt!=-1) ? Actxt : _ctxt, *this, Amult, opts);
       WorkCompressMPI<scalar_t> w;
-      if (opts.verbose() && !mpi_rank(_comm))
-	std::cout << "# compressing with d = " << d << ", tol = " << opts.rel_tol() << std::endl;
       while (!this->is_compressed()) {
-	if (d != opts.d0()) RS.add_columns(d, opts);
+	if (d != opts.d0()) RS.add_columns(d+dd, opts);
 	if (opts.verbose() && !mpi_rank(_comm))
 	  std::cout << "# compressing with d+dd = " << d << "+" << dd
 		    << " (stable)" << std::endl;
@@ -38,8 +36,7 @@ namespace strumpack {
       DistSamples<scalar_t> RS(d+dd, (Actxt!=-1) ? Actxt : _ctxt, *this, Amult, opts);
       const auto nr_lvls = this->max_levels();
       while (!this->is_compressed()) {
-	if (d != opts.d0())
-	  RS.add_columns(d+dd, opts);
+	if (d != opts.d0()) RS.add_columns(d+dd, opts);
 	if (opts.verbose() && !mpi_rank(_comm))
 	  std::cout << "# compressing with d+dd = " << d << "+" << dd << " (stable)" << std::endl;
 	for (int lvl=nr_lvls-1; lvl>=0; lvl--) {
