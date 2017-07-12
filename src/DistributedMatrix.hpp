@@ -122,6 +122,8 @@ namespace strumpack {
     void extract_cols(const std::vector<std::size_t>& Jc, const DistributedMatrix<scalar_t>& B, int ctxt_all);
     DistributedMatrix<scalar_t> extract_rows(const std::vector<std::size_t>& Ir, int ctxt, int ctxt_all) const;
     DistributedMatrix<scalar_t> extract_cols(const std::vector<std::size_t>& Jc, int ctxt, int ctxt_all) const;
+    DistributedMatrix<scalar_t> extract_rows(const std::vector<std::size_t>& Ir) const;
+    DistributedMatrix<scalar_t> extract_cols(const std::vector<std::size_t>& Ic) const;
 
     DistributedMatrix<scalar_t> extract(const std::vector<std::size_t>& I,
 					const std::vector<std::size_t>& J) const;
@@ -557,8 +559,26 @@ namespace strumpack {
       strumpack::copy(rows(), 1, B, 0, Jc[c], *this, 0, c, ctxt_all);
   }
 
-  template<typename scalar_t> DistributedMatrix<scalar_t> DistributedMatrix<scalar_t>::extract_rows
-  (const std::vector<std::size_t>& Ir, int ctxt, int ctxt_all) const {
+  template<typename scalar_t> DistributedMatrix<scalar_t>
+  DistributedMatrix<scalar_t>::extract_rows(const std::vector<std::size_t>& Ir) const {
+    DistributedMatrix<scalar_t> tmp(ctxt(), Ir.size(), cols());
+    if (!active()) return tmp;
+    for (std::size_t r=0; r<Ir.size(); r++)
+      strumpack::copy(1, cols(), *this, Ir[r], 0, tmp, r, 0, ctxt());
+    return tmp;
+  }
+
+  template<typename scalar_t> DistributedMatrix<scalar_t>
+  DistributedMatrix<scalar_t>::extract_cols(const std::vector<std::size_t>& Jc) const {
+    DistributedMatrix<scalar_t> tmp(ctxt(), rows(), Jc.size());
+    if (!active()) return tmp;
+    for (std::size_t c=0; c<Jc.size(); c++)
+      strumpack::copy(rows(), 1, *this, 0, Jc[c], tmp, 0, c, ctxt());
+    return tmp;
+  }
+
+  template<typename scalar_t> DistributedMatrix<scalar_t>
+  DistributedMatrix<scalar_t>::extract_rows(const std::vector<std::size_t>& Ir, int ctxt, int ctxt_all) const {
     DistributedMatrix<scalar_t> tmp(ctxt, Ir.size(), cols());
     for (std::size_t r=0; r<Ir.size(); r++)
       strumpack::copy(1, cols(), *this, Ir[r], 0, tmp, r, 0, ctxt_all);

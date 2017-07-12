@@ -106,7 +106,7 @@ namespace strumpack {
     template<typename scalar_t> DistributedMatrix<scalar_t> HSSBasisIDMPI<scalar_t>::extract_rows
     (const std::vector<std::size_t>& I, int ctxt_all) const {
       // TODO implement this without explicitly forming the dense basis matrix
-      return dense().extract_rows(I, E().ctxt(), ctxt_all);
+      return dense().extract_rows(I);
     }
 
   } // end namespace HSS
