@@ -30,6 +30,8 @@ namespace strumpack {
       std::size_t memory() const { return E().memory()+sizeof(int)*P().size(); }
       std::size_t nonzeros() const { return E().nonzeros()+P().size(); }
 
+      // TODO: remove these, the procs that are not active, will not
+      // get the correct sized matrix back
       DistM_t apply(const DistM_t& b) const;
       DistM_t applyC(const DistM_t& b) const;
       void apply(const DistM_t& b, DistM_t& c) const;
@@ -86,7 +88,7 @@ namespace strumpack {
       PtB.permute_rows_fwd(P());
       if (!E().rows()) return PtB;
       DistM_t c(b.ctxt(), cols(), b.cols());
-      c.copy(PtB, c.ctxt()); // TODO know that this does not require comm!!??, what to use for ctxt_all??
+      copy(cols(), b.cols(), PtB, 0, 0, c, 0, 0, b.ctxt());
       auto tmpPtB = ConstDistributedMatrixWrapperPtr(E().rows(), b.cols(), PtB, cols(), 0);
       gemm(Trans::C, Trans::N, scalar_t(1.), E(), *tmpPtB, scalar_t(1.), c);
       return c;
@@ -95,12 +97,17 @@ namespace strumpack {
     template<typename scalar_t> void HSSBasisIDMPI<scalar_t>::applyC(const DistM_t& b, DistM_t& c) const {
       assert(E().ctxt()==b.ctxt());
       if (!b.active() || !cols() || !b.cols()) return;
-      DistM_t PtB(b);
-      PtB.permute_rows_fwd(P());
-      if (!E().rows()) return PtB;
-      c.copy(PtB, c.ctxt()); // TODO know that this does not require comm!!??, what to use for ctxt_all??
-      auto tmpPtB = ConstDistributedMatrixWrapperPtr(E().rows(), b.cols(), PtB, cols(), 0);
-      gemm(Trans::C, Trans::N, scalar_t(1.), E(), *tmpPtB, scalar_t(1.), c);
+      if (!E().rows()) {
+	copy(b.rows(), b.cols(), b, 0, 0, c, 0, 0, b.ctxt());
+	c.permute_rows_fwd(P());
+      } else {
+	DistM_t PtB(b);
+	PtB.permute_rows_fwd(P());
+	copy(cols(), b.cols(), PtB, 0, 0, c, 0, 0, b.ctxt());
+	if (!E().rows()) return;
+	auto tmpPtB = ConstDistributedMatrixWrapperPtr(E().rows(), b.cols(), PtB, cols(), 0);
+	gemm(Trans::C, Trans::N, scalar_t(1.), E(), *tmpPtB, scalar_t(1.), c);
+      }
     }
 
     template<typename scalar_t> DistributedMatrix<scalar_t> HSSBasisIDMPI<scalar_t>::extract_rows

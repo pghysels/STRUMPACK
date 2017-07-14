@@ -29,6 +29,17 @@
 #include "blas_lapack_wrapper.hpp"
 #include "blacs.h"
 
+#define BLACSCTXTSIZE 9
+#define BLACSdtype 0
+#define BLACSctxt  1
+#define BLACSm     2
+#define BLACSn     3
+#define BLACSmb    4
+#define BLACSnb    5
+#define BLACSrsrc  6
+#define BLACScsrc  7
+#define BLACSlld   8
+
 namespace strumpack {
   namespace scalapack {
 
@@ -521,6 +532,10 @@ namespace strumpack {
     /* pxGEMR2D */
     template<typename T> inline void pgemr2d(int, int, T *, int, int, int *, T *, int, int, int *, int);
     template<> inline void pgemr2d<  double>(int m, int n,   double *A, int ia, int ja, int *descA,   double *B, int ib, int jb, int *descB, int ctxt) {
+      assert(descA[BLACSctxt]==-1 || m+ia-1 <= descA[BLACSm]);
+      assert(descB[BLACSctxt]==-1 || m+ib-1 <= descB[BLACSm]);
+      assert(descA[BLACSctxt]==-1 || n+ja-1 <= descA[BLACSn]);
+      assert(descB[BLACSctxt]==-1 || n+jb-1 <= descB[BLACSn]);
       pdgemr2d_(&m,&n,A,&ia,&ja,descA,B,&ib,&jb,descB,&ctxt);
     }
     template<> inline void pgemr2d<   float>(int m, int n,    float *A, int ia, int ja, int *descA,    float *B, int ib, int jb, int *descB, int ctxt) {

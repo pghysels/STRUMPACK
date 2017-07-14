@@ -25,7 +25,7 @@ namespace strumpack {
       DistSamples(int d, int Actxt, HSSMatrixMPI<scalar_t>& hss, const dmult_t& Amult, const opts_t& opts)
 	: _Amult(Amult), _hss(hss),
 	  _rgen(random::make_random_generator<real_t>
-		(mpi_rank(hss.comm()), opts.random_engine(), opts.random_distribution())),
+		(mpi_rank(hss.comm())+1, opts.random_engine(), opts.random_distribution())),
 	  R(Actxt, _hss.cols(), d), Sr(Actxt, _hss.cols(), d), Sc(Actxt, _hss.cols(), d) {
 	R.random(*_rgen);
 	_Amult(R, Sr, Sc);

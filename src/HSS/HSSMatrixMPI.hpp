@@ -511,118 +511,120 @@ namespace strumpack {
       int P1active = prows * pcols;
       // TODO start both sends first, make sure it cannot deadlock
       if (rank < P0active) {
-	if (rank < (P-P0active)) {
-	  // I'm one of the first P-P0active processes that are active
-	  // on child0, so I need to send to one or more others which
-	  // are not active on child0, ie the ones in [P0active,P)
-	  std::vector<std::size_t> buf;
-	  buf.reserve(8+w.c[0].Ir.size()+w.c[0].Ic.size()+w.c[0].Jr.size()+w.c[0].Jc.size());
-	  buf.push_back(std::size_t(this->_ch[0]->_U_state));
-	  buf.push_back(std::size_t(this->_ch[0]->_V_state));
-	  buf.push_back(this->_ch[0]->_U_rank);
-	  buf.push_back(this->_ch[0]->_V_rank);
-	  buf.push_back(this->_ch[0]->_U_rows);
-	  buf.push_back(this->_ch[0]->_V_rows);
-	  buf.push_back(w.c[0].Rr.cols());
-	  buf.push_back(w.c[0].Sr.cols());
-	  for (auto i : w.c[0].Ir) buf.push_back(i);
-	  for (auto i : w.c[0].Ic) buf.push_back(i);
-	  for (auto i : w.c[0].Jr) buf.push_back(i);
-	  for (auto i : w.c[0].Jc) buf.push_back(i);
-	  for (int p=P0active; p<P; p++)
-	    if (rank == (p - P0active) % P0active)
-	      MPI_Send(buf.data(), buf.size(), mpi_type<std::size_t>(), p, /*tag*/0, _comm);
-	}
+      	if (rank < (P-P0active)) {
+      	  // I'm one of the first P-P0active processes that are active
+      	  // on child0, so I need to send to one or more others which
+      	  // are not active on child0, ie the ones in [P0active,P)
+      	  std::vector<std::size_t> buf;
+      	  buf.reserve(8+w.c[0].Ir.size()+w.c[0].Ic.size()+w.c[0].Jr.size()+w.c[0].Jc.size());
+      	  buf.push_back(std::size_t(this->_ch[0]->_U_state));
+      	  buf.push_back(std::size_t(this->_ch[0]->_V_state));
+      	  buf.push_back(this->_ch[0]->_U_rank);
+      	  buf.push_back(this->_ch[0]->_V_rank);
+      	  buf.push_back(this->_ch[0]->_U_rows);
+      	  buf.push_back(this->_ch[0]->_V_rows);
+      	  buf.push_back(w.c[0].Rr.cols());
+      	  buf.push_back(w.c[0].Sr.cols());
+      	  for (auto i : w.c[0].Ir) buf.push_back(i);
+      	  for (auto i : w.c[0].Ic) buf.push_back(i);
+      	  for (auto i : w.c[0].Jr) buf.push_back(i);
+      	  for (auto i : w.c[0].Jc) buf.push_back(i);
+      	  for (int p=P0active; p<P; p++)
+      	    if (rank == (p - P0active) % P0active)
+      	      MPI_Send(buf.data(), buf.size(), mpi_type<std::size_t>(), p, /*tag*/0, _comm);
+      	}
       } else {
-	// I'm not active on child0, so I need to receive
-	MPI_Status stat;
-	int dest=-1, msgsize;
-	for (int p=0; p<P0active; p++)
-	  if (p == (rank - P0active) % P0active) { dest = p; break; }
-	assert(dest >= 0);
-	MPI_Probe(dest, /*tag*/0, _comm, &stat);
-	MPI_Get_count(&stat, mpi_type<std::size_t>(), &msgsize);
-	auto buf = new std::size_t[msgsize];
-	MPI_Recv(buf, msgsize, mpi_type<std::size_t>(), dest, /*tag*/0, _comm, MPI_STATUS_IGNORE);
-	auto ptr = buf;
-	this->_ch[0]->_U_state = State(*ptr++);
-	this->_ch[0]->_V_state = State(*ptr++);
-	this->_ch[0]->_U_rank = *ptr++;
-	this->_ch[0]->_V_rank = *ptr++;
-	this->_ch[0]->_U_rows = *ptr++;
-	this->_ch[0]->_V_rows = *ptr++;
-	w.c[0].dR = *ptr++;
-	w.c[0].dS = *ptr++;
-	w.c[0].Ir.resize(this->_ch[0]->_U_rank);
-	w.c[0].Ic.resize(this->_ch[0]->_V_rank);
-	w.c[0].Jr.resize(this->_ch[0]->_U_rank);
-	w.c[0].Jc.resize(this->_ch[0]->_V_rank);
-	for (int i=0; i<this->_ch[0]->_U_rank; i++) w.c[0].Ir[i] = *ptr++;
-	for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Ic[i] = *ptr++;
-	for (int i=0; i<this->_ch[0]->_U_rank; i++) w.c[0].Jr[i] = *ptr++;
-	for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Jc[i] = *ptr++;
-	delete[] buf;
+      	// I'm not active on child0, so I need to receive
+      	MPI_Status stat;
+      	int dest=-1, msgsize;
+      	for (int p=0; p<P0active; p++)
+      	  if (p == (rank - P0active) % P0active) { dest = p; break; }
+      	assert(dest >= 0);
+      	MPI_Probe(dest, /*tag*/0, _comm, &stat);
+      	MPI_Get_count(&stat, mpi_type<std::size_t>(), &msgsize);
+      	auto buf = new std::size_t[msgsize];
+      	MPI_Recv(buf, msgsize, mpi_type<std::size_t>(), dest, /*tag*/0, _comm, MPI_STATUS_IGNORE);
+      	auto ptr = buf;
+      	this->_ch[0]->_U_state = State(*ptr++);
+      	this->_ch[0]->_V_state = State(*ptr++);
+      	this->_ch[0]->_U_rank = *ptr++;
+      	this->_ch[0]->_V_rank = *ptr++;
+      	this->_ch[0]->_U_rows = *ptr++;
+      	this->_ch[0]->_V_rows = *ptr++;
+      	w.c[0].dR = *ptr++;
+      	w.c[0].dS = *ptr++;
+      	w.c[0].Ir.resize(this->_ch[0]->_U_rank);
+      	w.c[0].Ic.resize(this->_ch[0]->_V_rank);
+      	w.c[0].Jr.resize(this->_ch[0]->_U_rank);
+      	w.c[0].Jc.resize(this->_ch[0]->_V_rank);
+      	for (int i=0; i<this->_ch[0]->_U_rank; i++) w.c[0].Ir[i] = *ptr++;
+      	for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Ic[i] = *ptr++;
+      	for (int i=0; i<this->_ch[0]->_U_rank; i++) w.c[0].Jr[i] = *ptr++;
+      	for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Jc[i] = *ptr++;
+	assert(msgsize == ptr-buf);
+      	delete[] buf;
       }
 
       if (rank >= root1 && rank < root1+P1active) {
-	if ((rank-root1) < (P-P1active)) {
-	  // I'm one of the first P-P1active processes that are active
-	  // on child1, so I need to send to one or more others which
-	  // are not active on child1, ie the ones in [0,root1) union
-	  // [root1+P1active,P)
-	  std::vector<std::size_t> buf;
-	  buf.reserve(8+w.c[1].Ir.size()+w.c[1].Ic.size()+w.c[1].Jr.size()+w.c[1].Jc.size());
-	  buf.push_back(std::size_t(this->_ch[1]->_U_state));
-	  buf.push_back(std::size_t(this->_ch[1]->_V_state));
-	  buf.push_back(this->_ch[1]->_U_rank);
-	  buf.push_back(this->_ch[1]->_V_rank);
-	  buf.push_back(this->_ch[1]->_U_rows);
-	  buf.push_back(this->_ch[1]->_V_rows);
-	  buf.push_back(w.c[1].Rr.cols());
-	  buf.push_back(w.c[1].Sr.cols());
+      	if ((rank-root1) < (P-P1active)) {
+      	  // I'm one of the first P-P1active processes that are active
+      	  // on child1, so I need to send to one or more others which
+      	  // are not active on child1, ie the ones in [0,root1) union
+      	  // [root1+P1active,P)
+      	  std::vector<std::size_t> buf;
+      	  buf.reserve(8+w.c[1].Ir.size()+w.c[1].Ic.size()+w.c[1].Jr.size()+w.c[1].Jc.size());
+      	  buf.push_back(std::size_t(this->_ch[1]->_U_state));
+      	  buf.push_back(std::size_t(this->_ch[1]->_V_state));
+      	  buf.push_back(this->_ch[1]->_U_rank);
+      	  buf.push_back(this->_ch[1]->_V_rank);
+      	  buf.push_back(this->_ch[1]->_U_rows);
+      	  buf.push_back(this->_ch[1]->_V_rows);
+      	  buf.push_back(w.c[1].Rr.cols());
+      	  buf.push_back(w.c[1].Sr.cols());
 	  for (auto i : w.c[1].Ir) buf.push_back(i);
-	  for (auto i : w.c[1].Ic) buf.push_back(i);
-	  for (auto i : w.c[1].Jr) buf.push_back(i);
-	  for (auto i : w.c[1].Jc) buf.push_back(i);
-	  for (int p=0; p<root1; p++)
-	    if (rank - root1 == p % P1active)
-	      MPI_Send(buf.data(), buf.size(), mpi_type<std::size_t>(), p, /*tag*/1, _comm);
-	  for (int p=root1+P1active; p<P; p++)
-	    if (rank - root1 == (p - P1active) % P1active)
-	      MPI_Send(buf.data(), buf.size(), mpi_type<std::size_t>(), p, /*tag*/1, _comm);
-	}
+      	  for (auto i : w.c[1].Ic) buf.push_back(i);
+      	  for (auto i : w.c[1].Jr) buf.push_back(i);
+      	  for (auto i : w.c[1].Jc) buf.push_back(i);
+      	  for (int p=0; p<root1; p++)
+      	    if (rank - root1 == p % P1active)
+      	      MPI_Send(buf.data(), buf.size(), mpi_type<std::size_t>(), p, /*tag*/1, _comm);
+      	  for (int p=root1+P1active; p<P; p++)
+      	    if (rank - root1 == (p - P1active) % P1active)
+      	      MPI_Send(buf.data(), buf.size(), mpi_type<std::size_t>(), p, /*tag*/1, _comm);
+      	}
       } else {
-	// I'm not active on child1, so I need to receive
-	MPI_Status stat;
-	int dest=-1, msgsize;
-	for (int p=root1; p<root1+P1active; p++) {
-	  if (rank < root1) {
-	    if (p - root1 == rank % P1active) { dest = p; break; }
-	  } else if (p - root1 == (rank - P1active) % P1active) { dest = p; break; }
-	}
-	assert(dest >= 0);
-	MPI_Probe(dest, /*tag*/1, _comm, &stat);
-	MPI_Get_count(&stat, mpi_type<std::size_t>(), &msgsize);
-	auto buf = new std::size_t[msgsize];
-	MPI_Recv(buf, msgsize, mpi_type<std::size_t>(), dest, /*tag*/1, _comm, MPI_STATUS_IGNORE);
-	auto ptr = buf;
-	this->_ch[1]->_U_state = State(*ptr++);
-	this->_ch[1]->_V_state = State(*ptr++);
-	this->_ch[1]->_U_rank = *ptr++;
-	this->_ch[1]->_V_rank = *ptr++;
-	this->_ch[1]->_U_rows = *ptr++;
-	this->_ch[1]->_V_rows = *ptr++;
-	w.c[1].dR = *ptr++;
-	w.c[1].dS = *ptr++;
-	w.c[1].Ir.resize(this->_ch[1]->_U_rank);
-	w.c[1].Ic.resize(this->_ch[1]->_V_rank);
-	w.c[1].Jr.resize(this->_ch[1]->_U_rank);
-	w.c[1].Jc.resize(this->_ch[1]->_V_rank);
-	for (int i=0; i<this->_ch[1]->_U_rank; i++) w.c[1].Ir[i] = *ptr++;
-	for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Ic[i] = *ptr++;
-	for (int i=0; i<this->_ch[1]->_U_rank; i++) w.c[1].Jr[i] = *ptr++;
-	for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Jc[i] = *ptr++;
-	delete[] buf;
+      	// I'm not active on child1, so I need to receive
+      	MPI_Status stat;
+      	int dest=-1, msgsize;
+      	for (int p=root1; p<root1+P1active; p++) {
+      	  if (rank < root1) {
+      	    if (p - root1 == rank % P1active) { dest = p; break; }
+      	  } else if (p - root1 == (rank - P1active) % P1active) { dest = p; break; }
+      	}
+      	assert(dest >= 0);
+      	MPI_Probe(dest, /*tag*/1, _comm, &stat);
+      	MPI_Get_count(&stat, mpi_type<std::size_t>(), &msgsize);
+      	auto buf = new std::size_t[msgsize];
+      	MPI_Recv(buf, msgsize, mpi_type<std::size_t>(), dest, /*tag*/1, _comm, MPI_STATUS_IGNORE);
+      	auto ptr = buf;
+      	this->_ch[1]->_U_state = State(*ptr++);
+      	this->_ch[1]->_V_state = State(*ptr++);
+      	this->_ch[1]->_U_rank = *ptr++;
+      	this->_ch[1]->_V_rank = *ptr++;
+      	this->_ch[1]->_U_rows = *ptr++;
+      	this->_ch[1]->_V_rows = *ptr++;
+      	w.c[1].dR = *ptr++;
+      	w.c[1].dS = *ptr++;
+      	w.c[1].Ir.resize(this->_ch[1]->_U_rank);
+      	w.c[1].Ic.resize(this->_ch[1]->_V_rank);
+      	w.c[1].Jr.resize(this->_ch[1]->_U_rank);
+      	w.c[1].Jc.resize(this->_ch[1]->_V_rank);
+      	for (int i=0; i<this->_ch[1]->_U_rank; i++) w.c[1].Ir[i] = *ptr++;
+      	for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Ic[i] = *ptr++;
+      	for (int i=0; i<this->_ch[1]->_U_rank; i++) w.c[1].Jr[i] = *ptr++;
+      	for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Jc[i] = *ptr++;
+	assert(msgsize == ptr-buf);
+      	delete[] buf;
       }
     }
 
@@ -638,7 +640,7 @@ namespace strumpack {
       	for (auto i : w.Jc) sbuf.push_back(i);
       	MPI_Send(sbuf.data(), sbuf.size(), mpi_type<std::size_t>(), actives + rank, 0, _comm);
       }
-      if (rank > actives) {
+      if (rank >= actives) {
       	MPI_Status stat;
       	MPI_Probe(rank - actives, 0, _comm, &stat);
       	int msgsize;
@@ -652,11 +654,6 @@ namespace strumpack {
       	for (std::size_t i=0; i<w.Jc.size(); i++) w.Jc[i] = *ptr++;
       	delete[] buf;
       }
-
-      this->_U_rank = w.Jr.size();
-      this->_V_rank = w.Jc.size();
-      this->_U_rows = w.Sr.rows();
-      this->_V_rows = w.Sc.rows();
     }
 
     /**

@@ -253,7 +253,7 @@ int run(int argc, char* argv[]) {
     return 1;
   }
 
-  if (!mpi_rank()) cout << "# exiting" << endl;
+  if (!mpi_rank()) cout << "# test succeeded, exiting" << endl;
   return 0;
 }
 

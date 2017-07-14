@@ -83,6 +83,8 @@ namespace strumpack {
     (std::vector<Triplet<scalar_t>>& triplets, WorkExtract<scalar_t>& w, int depth) const {
       if (w.I.empty()) return;
       if (this->leaf()) {
+#pragma omp critical
+	{
 	for (std::size_t c=0; c<w.J.size(); c++)
 	  for (std::size_t r=0; r<w.I.size(); r++)
 	    triplets.emplace_back(w.rl2g[r], w.cl2g[c], _D(w.I[r],w.J[c]));
@@ -92,6 +94,7 @@ namespace strumpack {
 	  for (std::size_t c=0; c<w.z.cols(); c++)
 	    for (std::size_t r=0; r<w.I.size(); r++)
 	      triplets.emplace_back(w.rl2g[r], w.zcols[c], tmp(r,c));
+	}
 	}
       } else {
 	extract_bwd_internal(w, depth);

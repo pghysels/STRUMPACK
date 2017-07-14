@@ -112,19 +112,12 @@ namespace strumpack {
     void clear();
     virtual void resize(std::size_t m, std::size_t n);
     virtual void hconcat(const DistributedMatrix<scalar_t>& b);
-    void copy(const DistributedMatrix<scalar_t>& B, std::size_t i, std::size_t j, int ctxt_all);
-    void copy(const DistributedMatrix<scalar_t>& B, int ctxt_all) { copy(B, 0, 0, ctxt_all); }
     DistributedMatrix<scalar_t> transpose() const;
     void permute_rows_fwd(const std::vector<int>& P);
     void permute_rows_bwd(const std::vector<int>& P);
 
-    void extract_rows(const std::vector<std::size_t>& Ir, const DistributedMatrix<scalar_t>& B, int ctxt_all);
-    void extract_cols(const std::vector<std::size_t>& Jc, const DistributedMatrix<scalar_t>& B, int ctxt_all);
-    DistributedMatrix<scalar_t> extract_rows(const std::vector<std::size_t>& Ir, int ctxt, int ctxt_all) const;
-    DistributedMatrix<scalar_t> extract_cols(const std::vector<std::size_t>& Jc, int ctxt, int ctxt_all) const;
     DistributedMatrix<scalar_t> extract_rows(const std::vector<std::size_t>& Ir) const;
     DistributedMatrix<scalar_t> extract_cols(const std::vector<std::size_t>& Ic) const;
-
     DistributedMatrix<scalar_t> extract(const std::vector<std::size_t>& I,
 					const std::vector<std::size_t>& J) const;
     DistributedMatrix<scalar_t>& add(const DistributedMatrix<scalar_t>& B);
@@ -323,7 +316,7 @@ namespace strumpack {
   template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix
   (int ctxt, int M, int N, const DistributedMatrix<scalar_t>& m, int ctxt_all)
     : DistributedMatrix(ctxt, M, N, default_MB, default_NB) {
-    copy(m, ctxt_all);
+    strumpack::copy(M, N, m, 0, 0, *this, 0, 0, ctxt_all);
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix
@@ -438,11 +431,11 @@ namespace strumpack {
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::hconcat
   (const DistributedMatrix<scalar_t>& b) {
-    if (!active()) return;
     assert(rows() == b.rows());
     assert(ctxt() == b.ctxt());
     auto my_cols = cols();
     resize(rows(), my_cols+b.cols());
+    if (!active()) return;
     strumpack::copy(rows(), b.cols(), b, 0, 0, *this, 0, my_cols, ctxt());
   }
 
@@ -513,12 +506,6 @@ namespace strumpack {
     if (is_master()) tmp.print(name);
   }
 
-  template<typename scalar_t> void DistributedMatrix<scalar_t>::copy
-  (const DistributedMatrix<scalar_t>& B, std::size_t i, std::size_t j, int ctxt_all) {
-    // TODO use p*lacpy if on the same context!!! will the local storage be the same??
-    strumpack::copy(rows(), cols(), B, i, j, *this, 0, 0, ctxt_all);
-  }
-
   template<typename scalar_t> DistributedMatrix<scalar_t> DistributedMatrix<scalar_t>::transpose() const {
     DistributedMatrix<scalar_t> tmp(ctxt(), cols(), rows());
     if (!active()) return tmp;
@@ -546,19 +533,6 @@ namespace strumpack {
 		      const_cast<int*>(P.data()), 1, 1, descip, NULL);
   }
 
-
-  template<typename scalar_t> void DistributedMatrix<scalar_t>::extract_rows
-  (const std::vector<std::size_t>& Ir, const DistributedMatrix<scalar_t>& B, int ctxt_all) {
-    for (std::size_t r=0; r<Ir.size(); r++)
-      strumpack::copy(1, cols(), B, Ir[r], 0, *this, r, 0, ctxt_all);
-  }
-
-  template<typename scalar_t> void DistributedMatrix<scalar_t>::extract_cols
-  (const std::vector<std::size_t>& Jc, const DistributedMatrix<scalar_t>& B, int ctxt_all) {
-    for (std::size_t c=0; c<Jc.size(); c++)
-      strumpack::copy(rows(), 1, B, 0, Jc[c], *this, 0, c, ctxt_all);
-  }
-
   template<typename scalar_t> DistributedMatrix<scalar_t>
   DistributedMatrix<scalar_t>::extract_rows(const std::vector<std::size_t>& Ir) const {
     DistributedMatrix<scalar_t> tmp(ctxt(), Ir.size(), cols());
@@ -574,22 +548,6 @@ namespace strumpack {
     if (!active()) return tmp;
     for (std::size_t c=0; c<Jc.size(); c++)
       strumpack::copy(rows(), 1, *this, 0, Jc[c], tmp, 0, c, ctxt());
-    return tmp;
-  }
-
-  template<typename scalar_t> DistributedMatrix<scalar_t>
-  DistributedMatrix<scalar_t>::extract_rows(const std::vector<std::size_t>& Ir, int ctxt, int ctxt_all) const {
-    DistributedMatrix<scalar_t> tmp(ctxt, Ir.size(), cols());
-    for (std::size_t r=0; r<Ir.size(); r++)
-      strumpack::copy(1, cols(), *this, Ir[r], 0, tmp, r, 0, ctxt_all);
-    return tmp;
-  }
-
-  template<typename scalar_t> DistributedMatrix<scalar_t> DistributedMatrix<scalar_t>::extract_cols
-  (const std::vector<std::size_t>& Jc, int ctxt, int ctxt_all) const {
-    DistributedMatrix<scalar_t> tmp(ctxt, rows(), Jc.size());
-    for (std::size_t c=0; c<Jc.size(); c++)
-      strumpack::copy(rows(), 1, *this, 0, Jc[c], tmp, 0, c, ctxt_all);
     return tmp;
   }
 
@@ -831,7 +789,7 @@ namespace strumpack {
     // Step 2: TRSM and permutation: R1^-1 R = [I R1^-1 R2] = [I X] with R = [R1 R2], R1 r x r
     DistributedMatrixWrapper<scalar_t> R1(rank, rank, *this, 0, 0);
     X = DistributedMatrix<scalar_t>(ctxt(), rank, cols()-rank);
-    X.copy(*this, 0, rank, ctxt());
+    copy(rank, cols()-rank, *this, 0, rank, X, 0, 0, ctxt());
     trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), R1, X);
   }
 

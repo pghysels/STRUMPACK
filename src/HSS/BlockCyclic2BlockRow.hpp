@@ -11,6 +11,7 @@ namespace strumpack {
        MPI_Comm comm) {
 	assert(dist.fixed());
 	const auto P = mpi_nprocs(comm);
+	// TODO if P == 1 create 1 leaf???
 	const auto rank = mpi_rank(comm);
 	std::vector<std::vector<Triplet<scalar_t>>> sbuf(P);
 
@@ -82,6 +83,8 @@ namespace strumpack {
 	const auto P = mpi_nprocs(comm);
 	const auto rank = mpi_rank(comm);
 	const int MB = DistributedMatrix<scalar_t>::default_MB;
+	// TODO how to ensure that this is always the correct proc
+	// grid for dist???
 	const int dist_pcols = std::floor(std::sqrt((float)P));
 	const int dist_prows = P / dist_pcols;
 	const auto leaf_procs = ranges.leaf_procs(rank);

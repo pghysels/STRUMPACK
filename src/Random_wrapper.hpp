@@ -63,7 +63,7 @@ namespace strumpack {
 
     template<typename real_t> class RandomGeneratorBase {
     public:
-      virtual void seed(size_t s) = 0;
+      virtual void seed(std::size_t s) = 0;
       virtual void seed(std::seed_seq& s) = 0;
       virtual void seed(std::uint32_t i, std::uint32_t j) = 0;
       virtual real_t get() = 0;
@@ -75,8 +75,8 @@ namespace strumpack {
     class RandomGenerator : public RandomGeneratorBase<real_t> {
     public:
       RandomGenerator() : e(0) {}
-      RandomGenerator(size_t s) : e(s) {}
-      void seed(size_t s) { e.seed(s); d.reset(); }
+      RandomGenerator(std::size_t s) : e(s) {}
+      void seed(std::size_t s) { e.seed(s); d.reset(); }
       void seed(std::seed_seq& s) { e.seed(s); d.reset(); }
       void seed(std::uint32_t i, std::uint32_t j) {
 	std::seed_seq seq{i,j};
@@ -95,12 +95,12 @@ namespace strumpack {
 	return 0;
       }
     private:
-      D d;
       E e;
+      D d;
     };
 
     template<typename real_t> std::unique_ptr<RandomGeneratorBase<real_t>>
-    make_random_generator(size_t seed, RandomEngine e, RandomDistribution d) {
+    make_random_generator(std::size_t seed, RandomEngine e, RandomDistribution d) {
       if (e == RandomEngine::LINEAR) {
 	if (d == RandomDistribution::NORMAL)
 	  return std::unique_ptr<RandomGeneratorBase<real_t>>
@@ -125,7 +125,7 @@ namespace strumpack {
     }
 
     template<typename real_t> std::unique_ptr<RandomGeneratorBase<real_t>>
-    make_default_random_generator(size_t seed=0) {
+    make_default_random_generator(std::size_t seed=0) {
       return make_random_generator<real_t>(0, RandomEngine::LINEAR, RandomDistribution::NORMAL);
     }
 

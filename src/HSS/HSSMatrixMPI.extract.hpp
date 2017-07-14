@@ -51,6 +51,7 @@ namespace strumpack {
       const int MB = DistM_t::default_MB;
       for (auto& t : triplets) {
 	auto dest = (t._r / MB) % Bprows + ((t._c / MB) % Bpcols) * Bprows;
+	assert(dest >= 0 && dest < P);
 	sbuf[dest].push_back(t);
       }
       MPI_Datatype triplet_type;

@@ -12,10 +12,18 @@ namespace strumpack {
       auto afunc = DistElemMult<scalar_t>(A, _ctxt_all, _comm);
       switch (opts.compression_algorithm()) {
       case CompressionAlgorithm::ORIGINAL: {
-	compress_original_nosync(afunc, afunc, opts, A.ctxt());
+    	if (opts.synchronized_compression())
+    	  compress_original_sync(afunc, afunc, opts, A.ctxt());
+    	else compress_original_nosync(afunc, afunc, opts, A.ctxt());
+	// TODO sync should not be necessary in this case
+	// compress_original_nosync(afunc, afunc, opts, A.ctxt());
       } break;
       case CompressionAlgorithm::STABLE: {
-	compress_stable_nosync(afunc, afunc, opts, A.ctxt());
+	if (opts.synchronized_compression())
+    	  compress_stable_sync(afunc, afunc, opts, A.ctxt());
+    	else compress_stable_nosync(afunc, afunc, opts, A.ctxt());
+	// TODO sync should not be necessary in this case
+	// compress_stable_nosync(afunc, afunc, opts, A.ctxt());
       } break;
       default: std::cout << "Compression algorithm not recognized!" << std::endl;
       }
@@ -302,23 +310,27 @@ namespace strumpack {
 	}
 	DistMW_t wSr_new0(w.c[0].Jr.size(), c_new, w.Sr, 0, c_lo);
 	DistMW_t wSr_new1(w.c[1].Jr.size(), c_new, w.Sr, w.c[0].Jr.size(), c_lo);
-	wSr_new0.extract_rows(w.c[0].Jr, w.c[0].Sr, _ctxt_all);
-	wSr_new1.extract_rows(w.c[1].Jr, w.c[1].Sr, _ctxt_all);
+	for (std::size_t r=0; r<w.c[0].Jr.size(); r++)
+	  copy(1, c_new, w.c[0].Sr, w.c[0].Jr[r], w.c[0].dS-c_new, wSr_new0, r, 0, _ctxt_all);
+	for (std::size_t r=0; r<w.c[1].Jr.size(); r++)
+	  copy(1, c_new, w.c[1].Sr, w.c[1].Jr[r], w.c[1].dS-c_new, wSr_new1, r, 0, _ctxt_all);
 	DistM_t wc1Rr(_ctxt, _B01.cols(), c_new);
 	DistM_t wc0Rr(_ctxt, _B10.cols(), c_new);
-	wc1Rr.copy(w.c[1].Rr, 0, w.c[1].dR-c_new, _ctxt_all);
-	wc0Rr.copy(w.c[0].Rr, 0, w.c[0].dR-c_new, _ctxt_all);
+	copy(_B01.cols(), c_new, w.c[1].Rr, 0, w.c[1].dR-c_new, wc1Rr, 0, 0, _ctxt_all);
+	copy(_B10.cols(), c_new, w.c[0].Rr, 0, w.c[0].dR-c_new, wc0Rr, 0, 0, _ctxt_all);
 	gemm(Trans::N, Trans::N, scalar_t(-1.), _B01, wc1Rr, scalar_t(1.), wSr_new0);
 	gemm(Trans::N, Trans::N, scalar_t(-1.), _B10, wc0Rr, scalar_t(1.), wSr_new1);
 
 	DistMW_t wSc_new0(w.c[0].Jc.size(), c_new, w.Sc, 0, c_lo);
 	DistMW_t wSc_new1(w.c[1].Jc.size(), c_new, w.Sc, w.c[0].Jc.size(), c_lo);
-	wSc_new0.extract_rows(w.c[0].Jc, w.c[0].Sc, _ctxt_all);
-	wSc_new1.extract_rows(w.c[1].Jc, w.c[1].Sc, _ctxt_all);
+	for (std::size_t r=0; r<w.c[0].Jc.size(); r++)
+	  copy(1, c_new, w.c[0].Sc, w.c[0].Jc[r], w.c[0].dS-c_new, wSc_new0, r, 0, _ctxt_all);
+	for (std::size_t r=0; r<w.c[1].Jc.size(); r++)
+	  copy(1, c_new, w.c[1].Sc, w.c[1].Jc[r], w.c[1].dS-c_new, wSc_new1, r, 0, _ctxt_all);
 	DistM_t wc1Rc(_ctxt, _B10.rows(), c_new);
 	DistM_t wc0Rc(_ctxt, _B01.rows(), c_new);
-	wc1Rc.copy(w.c[1].Rc, 0, w.c[1].dR-c_new, _ctxt_all);
-	wc0Rc.copy(w.c[0].Rc, 0, w.c[0].dR-c_new, _ctxt_all);
+	copy(_B10.rows(), c_new, w.c[1].Rc, 0, w.c[1].dR-c_new, wc1Rc, 0, 0, _ctxt_all);
+	copy(_B01.rows(), c_new, w.c[0].Rc, 0, w.c[0].dR-c_new, wc0Rc, 0, 0, _ctxt_all);
 	gemm(Trans::C, Trans::N, scalar_t(-1.), _B10, wc1Rc, scalar_t(1.), wSc_new0);
 	gemm(Trans::C, Trans::N, scalar_t(-1.), _B01, wc0Rc, scalar_t(1.), wSc_new1);
 
@@ -334,8 +346,8 @@ namespace strumpack {
       notify_inactives(w);
       if (d-opts.dd() >= opts.max_rank() ||
 	  (int(w.Jr.size()) <= d - opts.dd() && int(w.Jc.size()) <= d - opts.dd())) {
-	this->_U_rank = _U.cols();  this->_U_rows = _U.rows();
-	this->_V_rank = _V.cols();  this->_V_rows = _V.rows();
+	this->_U_rank = w.Jr.size();  this->_U_rows = w.Sr.rows();
+	this->_V_rank = w.Jc.size();  this->_V_rows = w.Sc.rows();
 	w.Ir.reserve(w.Jr.size());
 	w.Ic.reserve(w.Jc.size());
 	if (this->leaf()) {
@@ -349,7 +361,11 @@ namespace strumpack {
 	}
 	// TODO clear w.c[0].Ir, w.c[1].Ir, w.c[0].Ic, w.c[1].Ic
 	return true;
-      } else return false;
+      } else {
+	w.Jr.clear();
+	w.Jc.clear();
+	return false;
+      }
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::reduce_local_samples
@@ -361,32 +377,43 @@ namespace strumpack {
 	if (!c_old) {
 	  auto c_new = (!this->is_compressed()) ? d : dd;
 	  auto tmpR = ConstDistributedMatrixWrapperPtr(this->rows(), c_new, RS.leaf_R, 0, d-c_new);
-	  w.Rr = _V.applyC(*tmpR);
-	  w.Rc = _U.applyC(*tmpR);
+	  w.Rr = DistM_t(_ctxt, this->V_rank(), c_new);
+	  w.Rc = DistM_t(_ctxt, this->U_rank(), c_new);
+	  _V.applyC(*tmpR, w.Rr);
+	  _U.applyC(*tmpR, w.Rc);
 	} else {
 	  auto tmpR = ConstDistributedMatrixWrapperPtr(this->rows(), dd, RS.leaf_R, 0, d_old);
-	  w.Rr.resize(w.Rr.rows(), c_old+dd);
-	  w.Rc.resize(w.Rc.rows(), c_old+dd);
-	  DistMW_t wRr_new(w.Rr.rows(), dd, w.Rr, 0, c_old);
-	  DistMW_t wRc_new(w.Rc.rows(), dd, w.Rc, 0, c_old);
-	  wRr_new.copy(_V.applyC(*tmpR), _ctxt_all);
-	  wRc_new.copy(_U.applyC(*tmpR), _ctxt_all);
+	  DistM_t wRr_new(_ctxt, w.Rr.rows(), dd);
+	  DistM_t wRc_new(_ctxt, w.Rc.rows(), dd);
+	  _V.applyC(*tmpR, wRr_new);
+	  _U.applyC(*tmpR, wRc_new);
+	  w.Rr.hconcat(wRr_new);
+	  w.Rc.hconcat(wRc_new);
 	}
       } else {
-	auto wRr = vconcat(w.c[0].dR, w.c[0].Ic.size(), w.c[1].Ic.size(),
-			   w.c[0].Rr, w.c[1].Rr, _ctxt, _ctxt_all);
-	auto wRc = vconcat(w.c[0].dR, w.c[0].Ir.size(), w.c[1].Ir.size(),
-			   w.c[0].Rc, w.c[1].Rc, _ctxt, _ctxt_all);
 	if (!c_old) {
-	  w.Rr = _V.applyC(wRr);
-	  w.Rc = _U.applyC(wRc);
+	  auto wRr = vconcat(w.c[0].dR, w.c[0].Ic.size(), w.c[1].Ic.size(),
+			     w.c[0].Rr, w.c[1].Rr, _ctxt, _ctxt_all);
+	  auto wRc = vconcat(w.c[0].dR, w.c[0].Ir.size(), w.c[1].Ir.size(),
+			     w.c[0].Rc, w.c[1].Rc, _ctxt, _ctxt_all);
+	  w.Rr = DistM_t(_ctxt, this->V_rank(), w.c[0].dR);
+	  w.Rc = DistM_t(_ctxt, this->U_rank(), w.c[0].dR);
+	  _V.applyC(wRr, w.Rr);
+	  _U.applyC(wRc, w.Rc);
 	} else {
-	  w.Rr.resize(w.Rr.rows(), c_old+dd);
-	  w.Rc.resize(w.Rc.rows(), c_old+dd);
-	  DistMW_t wRr_new(w.Rr.rows(), dd, w.Rr, 0, c_old);
-	  DistMW_t wRc_new(w.Rc.rows(), dd, w.Rc, 0, c_old);
-	  wRr_new.copy(_V.applyC(wRr), _ctxt_all);
-	  wRc_new.copy(_U.applyC(wRc), _ctxt_all);
+	  DistM_t wRr(_ctxt, this->V_rows(), dd);
+	  copy(w.c[0].Ic.size(), dd, w.c[0].Rr, 0, w.c[0].dR - dd, wRr, 0, 0, _ctxt_all);
+	  copy(w.c[1].Ic.size(), dd, w.c[1].Rr, 0, w.c[1].dR - dd, wRr, w.c[0].Ic.size(), 0, _ctxt_all);
+	  DistM_t wRc(_ctxt, this->U_rows(), dd);
+	  copy(w.c[0].Ir.size(), dd, w.c[0].Rc, 0, w.c[0].dR - dd, wRc, 0, 0, _ctxt_all);
+	  copy(w.c[1].Ir.size(), dd, w.c[1].Rc, 0, w.c[1].dR - dd, wRc, w.c[0].Ir.size(), 0, _ctxt_all);
+
+	  DistM_t wRr_new(_ctxt, w.Rr.rows(), dd);
+	  DistM_t wRc_new(_ctxt, w.Rc.rows(), dd);
+	  _V.applyC(wRr, wRr_new);
+	  _U.applyC(wRc, wRc_new);
+	  w.Rr.hconcat(wRr_new);
+	  w.Rc.hconcat(wRc_new);
 	}
 	w.c[0].Rr.clear(); w.c[0].Rc.clear(); w.c[0].dR = 0;
 	w.c[1].Rr.clear(); w.c[1].Rc.clear(); w.c[1].dR = 0;

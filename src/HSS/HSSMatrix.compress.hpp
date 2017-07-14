@@ -281,7 +281,11 @@ namespace strumpack {
 	  for (auto j : w.Jc) w.Ic.push_back((j < r0) ? w.c[0].Ic[j] : w.c[1].Ic[j-r0]);
 	}
 	return true;
-      } else return false;
+      } else {
+	w.Jr.clear();
+	w.Jc.clear();
+	return false;
+      }
     }
 
     template<typename scalar_t> void HSSMatrix<scalar_t>::reduce_local_samples
