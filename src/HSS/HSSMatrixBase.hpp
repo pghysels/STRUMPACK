@@ -238,11 +238,11 @@ namespace strumpack {
 	  auto d_old = w_mpi.Rr.cols();
 	  w_mpi.Rr.resize(V_rank(), d_old+dd);
 	  w_mpi.Rc.resize(U_rank(), d_old+dd);
+	  copy(V_rank(), dd, DenseMW_t(V_rank(), dd, RS.sub_Rr, w.offset.second, d-dd), 0, w_mpi.Rr, 0, d_old, lctxt);
+	  copy(U_rank(), dd, DenseMW_t(U_rank(), dd, RS.sub_Rc, w.offset.second, d-dd), 0, w_mpi.Rc, 0, d_old, lctxt);
 	  d_old = w_mpi.Sr.cols();
 	  w_mpi.Sr.resize(U_rows(), d_old+dd);
 	  w_mpi.Sc.resize(V_rows(), d_old+dd);
-	  copy(V_rank(), dd, DenseMW_t(V_rank(), dd, RS.sub_Rr, w.offset.second, d-dd), 0, w_mpi.Rr, 0, d_old, lctxt);
-	  copy(U_rank(), dd, DenseMW_t(U_rank(), dd, RS.sub_Rc, w.offset.second, d-dd), 0, w_mpi.Rc, 0, d_old, lctxt);
 	  copy(U_rows(), dd, DenseMW_t(U_rows(), dd, RS.sub_Sr, w.offset.second, d-dd), 0, w_mpi.Sr, 0, d_old, lctxt);
 	  copy(V_rows(), dd, DenseMW_t(V_rows(), dd, RS.sub_Sc, w.offset.second, d-dd), 0, w_mpi.Sc, 0, d_old, lctxt);
 	}
@@ -285,11 +285,11 @@ namespace strumpack {
 	    auto d_old = w_mpi.Rr.cols();
 	    w_mpi.Rr.resize(V_rank(), d_old+dd);
 	    w_mpi.Rc.resize(U_rank(), d_old+dd);
+	    copy(V_rank(), dd, DenseMW_t(V_rank(), dd, RS.sub_Rr, w.offset.second, d-dd), 0, w_mpi.Rr, 0, d_old, lctxt);
+	    copy(U_rank(), dd, DenseMW_t(U_rank(), dd, RS.sub_Rc, w.offset.second, d-dd), 0, w_mpi.Rc, 0, d_old, lctxt);
 	    d_old = w_mpi.Sr.cols();
 	    w_mpi.Sr.resize(U_rows(), d_old+dd);
 	    w_mpi.Sc.resize(V_rows(), d_old+dd);
-	    copy(V_rank(), dd, DenseMW_t(V_rank(), dd, RS.sub_Rr, w.offset.second, d-dd), 0, w_mpi.Rr, 0, d_old, lctxt);
-	    copy(U_rank(), dd, DenseMW_t(U_rank(), dd, RS.sub_Rc, w.offset.second, d-dd), 0, w_mpi.Rc, 0, d_old, lctxt);
 	    copy(U_rows(), dd, DenseMW_t(U_rows(), dd, RS.sub_Sr, w.offset.second, d-dd), 0, w_mpi.Sr, 0, d_old, lctxt);
 	    copy(V_rows(), dd, DenseMW_t(V_rows(), dd, RS.sub_Sc, w.offset.second, d-dd), 0, w_mpi.Sc, 0, d_old, lctxt);
 	  }
@@ -319,19 +319,28 @@ namespace strumpack {
       // TODO openmp parallel region, set _openmp_task_depth?
       compress_recursive_stable(RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
 				lAelem, opts, w, d, dd, _openmp_task_depth);
-
-      // std::cout << " TODO like the original algo, only copy the new part!!!!!" << std::endl;
       // Also threading issues here??!!
-
-      w_mpi.Rr = DistM_t(lctxt, DenseMW_t(V_rows(), d+dd, RS.sub_Rr, w.offset.second, 0));
-      w_mpi.Rc = DistM_t(lctxt, DenseMW_t(U_rows(), d+dd, RS.sub_Rc, w.offset.second, 0));
-      w_mpi.Sr = DistM_t(lctxt, DenseMW_t(U_rows(), d+dd, RS.sub_Sr, w.offset.second, 0));
-      w_mpi.Sc = DistM_t(lctxt, DenseMW_t(V_rows(), d+dd, RS.sub_Sc, w.offset.second, 0));
-
-      // TODO remove this, not needed at the next level???
-      w_mpi.Qr = DistM_t(lctxt, w.Qr);
-      w_mpi.Qc = DistM_t(lctxt, w.Qc);
-
+      if (is_compressed()) {
+	auto lctxt = RS.HSS().ctxt_loc();
+	auto c = RS.sub_Rr.cols();
+	if (was_not_compressed) {
+	  w_mpi.Rr = DistM_t(lctxt, DenseMW_t(V_rank(), c, RS.sub_Rr, w.offset.second, 0));
+	  w_mpi.Rc = DistM_t(lctxt, DenseMW_t(U_rank(), c, RS.sub_Rc, w.offset.second, 0));
+	  w_mpi.Sr = DistM_t(lctxt, DenseMW_t(U_rows(), c, RS.sub_Sr, w.offset.second, 0));
+	  w_mpi.Sc = DistM_t(lctxt, DenseMW_t(V_rows(), c, RS.sub_Sc, w.offset.second, 0));
+	} else {
+	  auto d_old = w_mpi.Rr.cols();
+	  w_mpi.Rr.resize(V_rank(), d_old+dd);
+	  w_mpi.Rc.resize(U_rank(), d_old+dd);
+	  copy(V_rank(), dd, DenseMW_t(V_rank(), dd, RS.sub_Rr, w.offset.second, c-dd), 0, w_mpi.Rr, 0, d_old, lctxt);
+	  copy(U_rank(), dd, DenseMW_t(U_rank(), dd, RS.sub_Rc, w.offset.second, c-dd), 0, w_mpi.Rc, 0, d_old, lctxt);
+	  d_old = w_mpi.Sr.cols();
+	  w_mpi.Sr.resize(U_rows(), d_old+dd);
+	  w_mpi.Sc.resize(V_rows(), d_old+dd);
+	  copy(U_rows(), dd, DenseMW_t(U_rows(), dd, RS.sub_Sr, w.offset.second, c-dd), 0, w_mpi.Sr, 0, d_old, lctxt);
+	  copy(V_rows(), dd, DenseMW_t(V_rows(), dd, RS.sub_Sc, w.offset.second, c-dd), 0, w_mpi.Sc, 0, d_old, lctxt);
+	}
+      }
       std::swap(w.Ir, w_mpi.Ir); std::swap(w.Ic, w_mpi.Ic);
       std::swap(w.Jr, w_mpi.Jr); std::swap(w.Jc, w_mpi.Jc);
       if (w.lvl != 0 && was_not_compressed && is_compressed()) {
@@ -353,21 +362,27 @@ namespace strumpack {
       // TODO openmp parallel region, set _openmp_task_depth?
       compress_level_stable(RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc, opts, w, d, dd, lvl, _openmp_task_depth);
       if (w.lvl == lvl) {
-
-	// std::cout << " TODO like the original algo, only copy the new part!!!!!" << std::endl;
-	// Also threading issues here??!!
-
-	auto c = RS.sub_Rr.cols(); // this is d+dd??
-	auto lctxt = RS.HSS().ctxt_loc();
-	w_mpi.Rr = DistM_t(lctxt, DenseMW_t(V_rows(), c, RS.sub_Rr, w.offset.second, 0));
-	w_mpi.Rc = DistM_t(lctxt, DenseMW_t(U_rows(), c, RS.sub_Rc, w.offset.second, 0));
-	w_mpi.Sr = DistM_t(lctxt, DenseMW_t(U_rows(), c, RS.sub_Sr, w.offset.second, 0));
-	w_mpi.Sc = DistM_t(lctxt, DenseMW_t(V_rows(), c, RS.sub_Sc, w.offset.second, 0));
-
-	// TODO remove this, not needed at the next level???
-	w_mpi.Qr = DistM_t(lctxt, w.Qr);
-	w_mpi.Qc = DistM_t(lctxt, w.Qc);
-
+	if (is_compressed()) {
+	  auto lctxt = RS.HSS().ctxt_loc();
+	  auto c = RS.sub_Rr.cols();
+	  if (was_not_compressed) {
+	    w_mpi.Rr = DistM_t(lctxt, DenseMW_t(V_rank(), c, RS.sub_Rr, w.offset.second, 0));
+	    w_mpi.Rc = DistM_t(lctxt, DenseMW_t(U_rank(), c, RS.sub_Rc, w.offset.second, 0));
+	    w_mpi.Sr = DistM_t(lctxt, DenseMW_t(U_rows(), c, RS.sub_Sr, w.offset.second, 0));
+	    w_mpi.Sc = DistM_t(lctxt, DenseMW_t(V_rows(), c, RS.sub_Sc, w.offset.second, 0));
+	  } else {
+	    auto d_old = w_mpi.Rr.cols();
+	    w_mpi.Rr.resize(V_rank(), d_old+dd);
+	    w_mpi.Rc.resize(U_rank(), d_old+dd);
+	    copy(V_rank(), dd, DenseMW_t(V_rank(), dd, RS.sub_Rr, w.offset.second, c-dd), 0, w_mpi.Rr, 0, d_old, lctxt);
+	    copy(U_rank(), dd, DenseMW_t(U_rank(), dd, RS.sub_Rc, w.offset.second, c-dd), 0, w_mpi.Rc, 0, d_old, lctxt);
+	    d_old = w_mpi.Sr.cols();
+	    w_mpi.Sr.resize(U_rows(), d_old+dd);
+	    w_mpi.Sc.resize(V_rows(), d_old+dd);
+	    copy(U_rows(), dd, DenseMW_t(U_rows(), dd, RS.sub_Sr, w.offset.second, c-dd), 0, w_mpi.Sr, 0, d_old, lctxt);
+	    copy(V_rows(), dd, DenseMW_t(V_rows(), dd, RS.sub_Sc, w.offset.second, c-dd), 0, w_mpi.Sc, 0, d_old, lctxt);
+	  }
+	}
 	std::swap(w.Ir, w_mpi.Ir); std::swap(w.Ic, w_mpi.Ic);
 	std::swap(w.Jr, w_mpi.Jr); std::swap(w.Jc, w_mpi.Jc);
 	if (w.lvl != 0 && was_not_compressed && is_compressed()) {

@@ -183,6 +183,8 @@ namespace strumpack {
   (std::size_t m, std::size_t n, const DistributedMatrix<scalar_t>& a, std::size_t ia, std::size_t ja,
    DistributedMatrix<scalar_t>& b, std::size_t ib, std::size_t jb, int ctxt_all) {
     if (!m || !n) return;
+    assert(!a.active() || (m+ia <= std::size_t(a.rows()) && n+ja <= std::size_t(a.cols())));
+    assert(!b.active() || (m+ib <= std::size_t(b.rows()) && n+jb <= std::size_t(b.cols())));
     scalapack::pgemr2d(m, n, const_cast<scalar_t*>(a.data()), a.I()+ia, a.J()+ja, const_cast<int*>(a.desc()),
 		       b.data(), b.I()+ib, b.J()+jb, b.desc(), ctxt_all);
   }
@@ -235,12 +237,16 @@ namespace strumpack {
 
   template<typename scalar_t> std::unique_ptr<const DistributedMatrixWrapper<scalar_t>>
   ConstDistributedMatrixWrapperPtr(std::size_t m, std::size_t n, const DistributedMatrix<scalar_t>& D, std::size_t i, std::size_t j) {
-    return std::unique_ptr<const DistributedMatrixWrapper<scalar_t>>(new DistributedMatrixWrapper<scalar_t>(m, n, const_cast<DistributedMatrix<scalar_t>&>(D), i, j));
+    return std::unique_ptr<const DistributedMatrixWrapper<scalar_t>>
+      (new DistributedMatrixWrapper<scalar_t>(m, n, const_cast<DistributedMatrix<scalar_t>&>(D), i, j));
   }
 
   template<typename scalar_t> DistributedMatrixWrapper<scalar_t>::DistributedMatrixWrapper
   (std::size_t m, std::size_t n, DistributedMatrix<scalar_t>& A, std::size_t i, std::size_t j)
     : _rows(m), _cols(n), _i(i), _j(j) {
+    assert(!A.active() || m+i <= std::size_t(A.rows()));
+    assert(!A.active() || n+j <= std::size_t(A.cols()));
+    assert(m >= 0 && n >= 0 && i >=0 && j >= 0);
     this->_data = A.data();
     std::copy(A.desc(), A.desc()+9, this->_desc);
     this->_lrows = A.lrows();   this->_lcols = A.lcols();
@@ -345,6 +351,7 @@ namespace strumpack {
 
   template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix
   (int ctxt, int M, int N, int MB, int NB) {
+    assert(M >= 0 && N >= 0 && MB >= 0 && NB >= 0);
     MB = std::max(1, MB);
     NB = std::max(1, NB);
     Cblacs_gridinfo(ctxt, &_prows, &_pcols, &_prow, &_pcol);
@@ -418,6 +425,7 @@ namespace strumpack {
     _data = nullptr;
     _prow = _pcol = _prows = _pcols = -1;
     _lrows = _lcols = 0;
+    scalapack::descset(_desc, 0, 0, MB(), NB(), 0, 0, ctxt(), 1);
   }
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::resize
@@ -460,7 +468,8 @@ namespace strumpack {
   template<typename scalar_t> void DistributedMatrix<scalar_t>::random() {
     if (!active()) return;
     TIMER_TIME(RANDOM_GENERATE, 1, t_gen);
-    auto rgen = random::make_default_random_generator<real_t>(_prow+_prows*_pcol);
+    auto rgen = random::make_default_random_generator<real_t>();
+    rgen->seed(_prow, _pcol);
     int rlo, rhi, clo, chi;
     lranges(rlo, rhi, clo, chi);
     for (int c=clo; c<chi; ++c)
@@ -476,7 +485,7 @@ namespace strumpack {
     lranges(rlo, rhi, clo, chi);
     for (int c=clo; c<chi; ++c)
       for (int r=rlo; r<rhi; ++r)
-	operator()(r,c) = rgen.get();
+    	operator()(r,c) = rgen.get();
   }
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::eye() {
@@ -707,23 +716,36 @@ namespace strumpack {
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::orthogonalize() {
     if (!active()) return;
-    auto tau = new scalar_t[scalapack::numroc(J()+std::min(rows(),cols())-1, NB(), pcol(), 0, pcols())];
-    auto info = scalapack::pgeqrf(rows(), cols(), data(), I(), J(), desc(), tau);
-    info = scalapack::pxxgqr(rows(), std::min(rows(), cols()), std::min(rows(), cols()), data(), I(), J(), desc(), tau);
-    if (info) {
-      std::cerr << "ERROR: Orthogonalization (pxxgqr) failed with info = " << info << std::endl;
-      abort();
-    }
-    if (cols() > rows()) {
-      DistributedMatrixWrapper<scalar_t> tmp(rows(), cols()-rows(), *this, 0, rows());
-      tmp.zero();
-    }
-    delete[] tau;
+
+    auto Xt = transpose();
+    DistributedMatrix<scalar_t> L, Qt;
+    Xt.LQ(L, Qt);
+    auto Q = Qt.transpose();
+    copy(rows(), cols(), Q, 0, 0, *this, 0, 0, ctxt());
+
+    // // WTF is wrong here??!!!
+    // auto N = J()+std::min(rows(),cols())-1;
+    // // auto ltau = scalapack::numroc(N, NB(), pcol(), 0, pcols());
+    // std::size_t ltau_upper = std::ceil(std::ceil(float(N)/NB())/float(pcols()))*NB();
+    // auto tau = new scalar_t[ltau_upper];
+    // auto info = scalapack::pgeqrf(rows(), std::min(rows(), cols()), data(), I(), J(), desc(), tau);
+    // info = scalapack::pxxgqr(rows(), std::min(rows(), cols()), std::min(rows(), cols()),
+    // 			     data(), I(), J(), desc(), tau);
+    // if (info) {
+    //   std::cerr << "ERROR: Orthogonalization (pxxgqr) failed with info = " << info << std::endl;
+    //   abort();
+    // }
+    // if (cols() > rows()) {
+    //   DistributedMatrixWrapper<scalar_t> tmp(rows(), cols()-rows(), *this, 0, rows());
+    //   tmp.zero();
+    // }
+    // delete[] tau;
   }
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::LQ
   (DistributedMatrix<scalar_t>& L, DistributedMatrix<scalar_t>& Q) const {
     if (!active()) return;
+    assert(I()==1 && J()==1);
     DistributedMatrix<scalar_t> tmp(ctxt(), std::max(rows(), cols()), cols());
     // TODO this is not a pgemr2d, this does not require communication!!
     strumpack::copy(rows(), cols(), *this, 0, 0, tmp, 0, 0, ctxt());

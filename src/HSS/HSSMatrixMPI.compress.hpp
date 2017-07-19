@@ -238,10 +238,10 @@ namespace strumpack {
 	compute_local_samples(RS, w, dd);
 	if (!this->is_compressed()) {
 	  if (compute_U_V_bases(RS.R.cols(), opts, w)) {
-	    reduce_local_samples(RS, w, dd);
+	    reduce_local_samples(RS, w, dd, false);
 	    this->_U_state = this->_V_state = State::COMPRESSED;
 	  } else this->_U_state = this->_V_state = State::PARTIALLY_COMPRESSED;
-	} else reduce_local_samples(RS, w, dd);
+	} else reduce_local_samples(RS, w, dd, true);
       }
     }
 
@@ -264,10 +264,10 @@ namespace strumpack {
 	compute_local_samples(RS, w, dd);
 	if (!this->is_compressed()) {
 	  if (compute_U_V_bases(RS.R.cols(), opts, w)) {
-	    reduce_local_samples(RS, w, dd);
+	    reduce_local_samples(RS, w, dd, false);
 	    this->_U_state = this->_V_state = State::COMPRESSED;
 	  } else this->_U_state = this->_V_state = State::PARTIALLY_COMPRESSED;
-	} else reduce_local_samples(RS, w, dd);
+	} else reduce_local_samples(RS, w, dd, true);
       }
     }
 
@@ -276,6 +276,8 @@ namespace strumpack {
       auto d = RS.R.cols();
       auto d_old = d - dd;
       auto c_old = w.Sr.cols();
+      assert(d_old >= 0);
+      assert(c_old <= d);
       if (this->leaf()) {
 	auto wR = ConstDistributedMatrixWrapperPtr(this->rows(), dd, RS.leaf_R, 0, d_old);
 	if (!c_old) {
@@ -343,7 +345,7 @@ namespace strumpack {
     (int d, const opts_t& opts, WorkCompressMPI<scalar_t>& w) {
       w.Sr.ID_row(_U.E(), _U.P(), w.Jr, opts.rel_tol(), opts.abs_tol(), _ctxt_T);
       w.Sc.ID_row(_V.E(), _V.P(), w.Jc, opts.rel_tol(), opts.abs_tol(), _ctxt_T);
-      notify_inactives(w);
+      notify_inactives_J(w);
       if (d-opts.dd() >= opts.max_rank() ||
 	  (int(w.Jr.size()) <= d - opts.dd() && int(w.Jc.size()) <= d - opts.dd())) {
 	this->_U_rank = w.Jr.size();  this->_U_rows = w.Sr.rows();
@@ -369,13 +371,15 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::reduce_local_samples
-    (const DistSamples<scalar_t>& RS, WorkCompressMPI<scalar_t>& w, int dd) {
+    (const DistSamples<scalar_t>& RS, WorkCompressMPI<scalar_t>& w, int dd, bool was_compressed) {
       auto d = RS.R.cols();
       auto d_old = d - dd;
       auto c_old = w.Rr.cols();
+      assert(d_old >= 0);
+      assert(c_old <= d);
       if (this->leaf()) {
 	if (!c_old) {
-	  auto c_new = (!this->is_compressed()) ? d : dd;
+	  auto c_new = (was_compressed) ? dd : d;
 	  auto tmpR = ConstDistributedMatrixWrapperPtr(this->rows(), c_new, RS.leaf_R, 0, d-c_new);
 	  w.Rr = DistM_t(_ctxt, this->V_rank(), c_new);
 	  w.Rc = DistM_t(_ctxt, this->U_rank(), c_new);
@@ -392,9 +396,9 @@ namespace strumpack {
 	}
       } else {
 	if (!c_old) {
-	  auto wRr = vconcat(w.c[0].dR, w.c[0].Ic.size(), w.c[1].Ic.size(),
+	  auto wRr = vconcat(w.c[0].dR, this->_ch[0]->V_rank(), this->_ch[1]->V_rank(),
 			     w.c[0].Rr, w.c[1].Rr, _ctxt, _ctxt_all);
-	  auto wRc = vconcat(w.c[0].dR, w.c[0].Ir.size(), w.c[1].Ir.size(),
+	  auto wRc = vconcat(w.c[0].dR, this->_ch[0]->U_rank(), this->_ch[1]->U_rank(),
 			     w.c[0].Rc, w.c[1].Rc, _ctxt, _ctxt_all);
 	  w.Rr = DistM_t(_ctxt, this->V_rank(), w.c[0].dR);
 	  w.Rc = DistM_t(_ctxt, this->U_rank(), w.c[0].dR);

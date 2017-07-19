@@ -10,7 +10,7 @@ target_link_libraries(test_HSS_mpi strumpack ${LIB})
 set(THREADS 1 3 8)
 set(PROCS   2 4 9 13 17)
 set(MATRIX  T U L)
-set(SIZES   1 10 200)
+set(SIZES   1 10 200 500)
 set(LEAF    1 3 16 128)
 set(RTOL    1 1e-1 1e-5 1e-10)
 set(ATOL    1e-10 1e-13)
@@ -73,6 +73,36 @@ endforeach()
 ## Distributed HSS test
 set(test_output ${CMAKE_BINARY_DIR}/test/HSS_mpi.out)
 set(test_names "test")
+
+foreach(c ${COMP})
+  foreach(s ${SYNC})
+    set(th 1)
+    set(mpi 13)
+    set(m L)
+    set(n 500)
+    set(l 8)
+    set(t 1e-4)
+    set(a 1e-10)
+    set(d 16)
+    set(deltad 8)
+    set(test_name "HSS_mpi_P${mpi}_Th${th}_M${m}_N${n}_L${l}_T${t}_A${a}_S${s}_C${c}_D0${d}_DD${deltad}")
+    list(APPEND ${test_names} ${test_name})
+    add_test(
+      NAME ${test_name}
+      COMMAND "${CMAKE_COMMAND}"
+      -DTEST=${CMAKE_CURRENT_BINARY_DIR}/test_HSS_mpi
+      -DARG1=${m} -DARG2=${n} -DARG3=--hss_leaf_size -DARG4=${l}
+      -DARG5=--hss_rel_tol   -DARG6=${t} -DARG7=--hss_abs_tol   -DARG8=${a}
+      -DARG9=--hss_${s}_sync -DARG10=--hss_compression_algo -DARG11=${c}
+      -DARG12=--hss_d0 -DARG13=${d} -DARG14=--hss_dd -DARG15=${deltad}
+      -DTH=${th} -DMPIPROCS=${mpi} -DOUTPUT=${single_output} -DALL_OUTPUT=${test_output}
+      -DHEADING=Dense\ matrix\ --\ procs=${mpi},\ threads=${th},\ matrix=${m},\ size=${n},\ leaf=${l},\ rtol=${t},\ atol=${a},\ sync=${s},\ comp=${c},\ d0=${d},\ dd=${deltad}
+      -P "${CMAKE_SOURCE_DIR}/test/run_mpi.cmake"
+      )
+  endforeach()
+endforeach()
+
+
 foreach(ntests RANGE 50)
   #random_element(THREADS th)
   set(th 1)
@@ -91,7 +121,6 @@ foreach(ntests RANGE 50)
   if ("${tindex}" STREQUAL "-1")
     list(APPEND ${test_names} ${test_name})
     set(single_output "${CMAKE_BINARY_DIR}/test/${test_name}.out")
-    set(cmd_params T 100 --hss_leaf_size 10)
     add_test(
       NAME ${test_name}
       COMMAND "${CMAKE_COMMAND}"

@@ -10,7 +10,6 @@ namespace strumpack {
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compress_stable_nosync
     (const dmult_t& Amult, const delem_t& Aelem, const opts_t& opts, int Actxt) {
-      // TODO compare with sequential compression, start with d0+dd
       auto d = opts.d0();
       auto dd = opts.dd();
       DistSamples<scalar_t> RS(d+dd, (Actxt!=-1) ? Actxt : _ctxt, *this, Amult, opts);
@@ -38,7 +37,8 @@ namespace strumpack {
       while (!this->is_compressed()) {
 	if (d != opts.d0()) RS.add_columns(d+dd, opts);
 	if (opts.verbose() && !mpi_rank(_comm))
-	  std::cout << "# compressing with d+dd = " << d << "+" << dd << " (stable)" << std::endl;
+	  std::cout << "# compressing with d+dd = " << d << "+" << dd
+		    << " (stable)" << std::endl;
 	for (int lvl=nr_lvls-1; lvl>=0; lvl--) {
 	  extract_level(Aelem, opts, w, lvl);
 	  compress_level_stable(RS, opts, w, d, dd, lvl);
@@ -49,7 +49,8 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compress_recursive_stable
-    (DistSamples<scalar_t>& RS, const delem_t& Aelem, const opts_t& opts, WorkCompressMPI<scalar_t>& w, int d, int dd) {
+    (DistSamples<scalar_t>& RS, const delem_t& Aelem, const opts_t& opts,
+     WorkCompressMPI<scalar_t>& w, int d, int dd) {
       if (!this->active()) return;
       if (this->leaf()) {
 	if (this->is_untouched()) {
@@ -76,16 +77,15 @@ namespace strumpack {
       }
       if (w.lvl == 0) this->_U_state = this->_V_state = State::COMPRESSED;
       else {
-	if (this->is_untouched())
-	  compute_local_samples(RS, w, d+dd);
+	if (this->is_untouched()) compute_local_samples(RS, w, d+dd);
 	else compute_local_samples(RS, w, dd);
 	if (!this->is_compressed()) {
 	  compute_U_basis_stable(opts, w, d, dd);
 	  compute_V_basis_stable(opts, w, d, dd);
-	  notify_inactives(w);
+	  notify_inactives_states(w);
 	  if (this->is_compressed())
-	    reduce_local_samples(RS, w, d+dd);
-	} else reduce_local_samples(RS, w, d);
+	    reduce_local_samples(RS, w, d+dd, false);
+	} else reduce_local_samples(RS, w, dd, true);
       }
     }
 
@@ -104,16 +104,15 @@ namespace strumpack {
       }
       if (w.lvl==0) this->_U_state = this->_V_state = State::COMPRESSED;
       else {
-	if (this->is_untouched())
-	  compute_local_samples(RS, w, d+dd);
+	if (this->is_untouched()) compute_local_samples(RS, w, d+dd);
 	else compute_local_samples(RS, w, dd);
 	if (!this->is_compressed()) {
 	  compute_U_basis_stable(opts, w, d, dd);
 	  compute_V_basis_stable(opts, w, d, dd);
-	  notify_inactives(w);
+	  notify_inactives_states(w);
 	  if (this->is_compressed())
-	    reduce_local_samples(RS, w, d+dd);
-	} else reduce_local_samples(RS, w, dd);
+	    reduce_local_samples(RS, w, d+dd, false);
+	} else reduce_local_samples(RS, w, dd, true);
       }
     }
 
@@ -122,6 +121,7 @@ namespace strumpack {
       if (this->_U_state == State::COMPRESSED) return;
       int u_rows = this->leaf() ? this->rows() : this->_ch[0]->U_rank()+this->_ch[1]->U_rank();
       constexpr double c = 1.25331413731550e-01; //1.0 / (10.0 * std::sqrt(2. / M_PI));
+      if (!w.Sr.active()) return;
       if (d+dd >= opts.max_rank() || d+dd >= u_rows ||
        	  update_orthogonal_basis(w.Sr, w.Qr, d, dd, this->_U_state == State::UNTOUCHED)
 	  < opts.rel_tol() * c) {
@@ -147,6 +147,7 @@ namespace strumpack {
       if (this->_V_state == State::COMPRESSED) return;
       int v_rows = this->leaf() ? this->rows() : this->_ch[0]->V_rank()+this->_ch[1]->V_rank();
       constexpr double c = 1.25331413731550e-01; //1.0 / (10.0 * std::sqrt(2. / M_PI));
+      if (!w.Sc.active()) return;
       if (d+dd >= opts.max_rank() || d+dd >= v_rows ||
       	  update_orthogonal_basis(w.Sc, w.Qc, d, dd, this->_V_state == State::UNTOUCHED)
       	  < opts.rel_tol() * c) {
@@ -173,12 +174,12 @@ namespace strumpack {
       if (d >= m) return real_t(0.);
       if (Q.cols() == 0) Q = DistM_t(_ctxt, m, d+dd);
       else Q.resize(m, d+dd);
-      copy(m, dd, S, 0, d, Q, 0, d, _ctxt_all);
+      copy(m, dd, S, 0, d, Q, 0, d, _ctxt);
       DistMW_t Q2, Q12;
       if (untouched) {
 	Q2 = DistMW_t(m, std::min(d, m), Q, 0, 0);
 	Q12 = DistMW_t(m, std::min(d, m), Q, 0, 0);
-	copy(m, d, S, 0, 0, Q, 0, 0, _ctxt_all);
+	copy(m, d, S, 0, 0, Q, 0, 0, _ctxt);
       } else {
 	Q2 = DistMW_t(m, std::min(dd, m-(d-dd)), Q, 0, d-dd);
 	Q12 = DistMW_t(m, std::min(d, m), Q, 0, 0);
