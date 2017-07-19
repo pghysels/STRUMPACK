@@ -3,9 +3,11 @@ include_directories(${CMAKE_SOURCE_DIR}/test)
 
 add_executable(test_HSS_seq test_HSS_seq)
 add_executable(test_HSS_mpi test_HSS_mpi)
+add_executable(test_sparse_seq test_sparse_seq)
 
 target_link_libraries(test_HSS_seq strumpack ${LIB})
 target_link_libraries(test_HSS_mpi strumpack ${LIB})
+target_link_libraries(test_sparse_seq strumpack ${LIB})
 
 set(THREADS 1 3 8)
 set(PROCS   2 4 9 13 17)
@@ -142,8 +144,44 @@ endforeach()
 
 
 
+add_test(
+  NAME "Download_sparse_test_matrices"
+  COMMAND /bin/sh ${CMAKE_SOURCE_DIR}/test/download_mtx.sh
+  )
+
 ## Sequential sparse test
-# TODO
+set(test_output ${CMAKE_BINARY_DIR}/test/SPARSE_seq.out)
+set(MTX utm300 mesh3e1 lnsp3937 t2dal bcsstk28 cavity16)
+set(NESTEDDISSECTION metis scotch)
+foreach(nd ${NESTEDDISSECTION})
+  foreach(m ${MTX})
+    set(th 1)
+    set(c enable)
+    set(t 1e-3)
+    set(a 1e-10)
+    set(d 16)
+    set(deltad 8)
+    set(sep 25)
+    set(l 4)
+    set(test_name "SPARSE_seq_Th${th}_M${m}_ND${nd}_C${c}_L${l}_T${t}_A${a}_D0${d}_DD${deltad}_SEP${sep}")
+    add_test(
+      NAME ${test_name}
+      COMMAND "${CMAKE_COMMAND}"
+      -DTEST=${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq
+      -DARG1=${m}/${m}.mtx -DARG2=--sp_${c}_hss
+      -DARG3=--hss_leaf_size -DARG4=${l}
+      -DARG5=--hss_rel_tol   -DARG6=${t}
+      -DARG7=--hss_abs_tol   -DARG8=${a}
+      -DARG9=--hss_d0 -DARG10=${d}
+      -DARG11=--hss_dd -DARG12=${deltad}
+      -DARG13=--sp_reordering_method -DARG14=${nd}
+      -DARG15=--sp_hss_min_sep_size -DARG16=${sep}
+      -DTH=${th} -DMPIPROCS=${mpi} -DOUTPUT=${single_output} -DALL_OUTPUT=${test_output}
+      -DHEADING=Dense\ matrix\ --\ threads=${th},\ matrix=${m},\ nd=${nd},\ leaf=${l},\ hssrtol=${t},\ hssatol=${a},\ comp=${c},\ d0=${d},\ dd=${deltad}
+      -P "${CMAKE_SOURCE_DIR}/test/run_seq.cmake"
+      )
+  endforeach()
+endforeach()
 
 
 ## Distributed sparse test
