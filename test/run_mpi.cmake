@@ -1,5 +1,4 @@
 # execute the test command that was added earlier.
-
 set(ENV{OMP_NUM_THREADS} ${TH})
 execute_process(
   COMMAND mpirun -n ${MPIPROCS} ${TEST}

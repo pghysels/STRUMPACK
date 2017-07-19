@@ -536,6 +536,7 @@ namespace strumpack {
       assert(descB[BLACSctxt]==-1 || m+ib-1 <= descB[BLACSm]);
       assert(descA[BLACSctxt]==-1 || n+ja-1 <= descA[BLACSn]);
       assert(descB[BLACSctxt]==-1 || n+jb-1 <= descB[BLACSn]);
+      assert(ia >= 0 && ja >= 0 && ib >= 0 && jb >= 0);
       pdgemr2d_(&m,&n,A,&ia,&ja,descA,B,&ib,&jb,descB,&ctxt);
     }
     template<> inline void pgemr2d<   float>(int m, int n,    float *A, int ia, int ja, int *descA,    float *B, int ib, int jb, int *descB, int ctxt) {
@@ -870,14 +871,15 @@ namespace strumpack {
       int info = pgeqrf(m, n, A, ia, ja, descA, tau, work, ilwork);
       delete[] work;
       STRUMPACK_FLOPS((is_complex<T>()?4:1)*
-		      static_cast<long long int>(((m>n) ? (double(n)*(double(n)*(.5-(1./3.)*double(n)+double(m)) + double(m) + 23./6.)) : (double(m)*(double(m)*(-.5-(1./3.)*double(m)+double(n)) + 2.*double(n) + 23./6.)))
-						 + ((m>n) ? (double(n)*(double(n)*(.5-(1./3.)*double(n)+double(m)) + 5./6.)) : (double(m)*(double(m)*(-.5-(1./3.)*double(m)+double(n)) + double(n) + 5./6.)))));
+    		      static_cast<long long int>(((m>n) ? (double(n)*(double(n)*(.5-(1./3.)*double(n)+double(m)) + double(m) + 23./6.)) : (double(m)*(double(m)*(-.5-(1./3.)*double(m)+double(n)) + 2.*double(n) + 23./6.)))
+    						 + ((m>n) ? (double(n)*(double(n)*(.5-(1./3.)*double(n)+double(m)) + 5./6.)) : (double(m)*(double(m)*(-.5-(1./3.)*double(m)+double(n)) + double(n) + 5./6.)))));
       return info;
     }
 
 
     template<typename T> inline int pxxgqr(int m, int n, int k, T* A, int ia, int ja, int* descA, T* tau, T* work, int lwork);
-    template<> inline int pxxgqr(int m, int n, int k, double* A, int ia, int ja, int* descA, double* tau, double* work, int lwork)
+    template<> inline int pxxgqr(int m, int n, int k, double* A, int ia, int ja, int* descA, double* tau,
+    				 double* work, int lwork)
     { int info; pdorgqr_(&m, &n, &k, A, &ia, &ja, descA, tau, work, &lwork, &info); return info; }
     template<> inline int pxxgqr(int m, int n, int k, float* A, int ia, int ja, int* descA, float* tau, float* work, int lwork)
     { int info; psorgqr_(&m, &n, &k, A, &ia, &ja, descA, tau, work, &lwork, &info); return info; }
@@ -888,10 +890,10 @@ namespace strumpack {
 
     template<typename T> inline int pxxgqr(int m, int n, int k, T* A, int ia, int ja, int* descA, T* tau) {
       T lwork;
-      pxxgqr(m, n, k, A, ia, ja, descA, tau, &lwork, -1);
+      int info = pxxgqr(m, n, k, A, ia, ja, descA, tau, &lwork, -1);
       int ilwork = int(std::real(lwork));
       auto work = new T[ilwork];
-      int info = pxxgqr(m, n, k, A, ia, ja, descA, tau, work, ilwork);
+      info = pxxgqr(m, n, k, A, ia, ja, descA, tau, work, ilwork);
       STRUMPACK_FLOPS((is_complex<T>()?4:1)*static_cast<long long int>((n==k) ? ((2./3.)*double(n)*double(n)*(3.*double(m) - double(n))) : (4.*double(m)*double(n)*double(k) - 2.*(double(m) + double(n))*double(k)*double(k) + (4./3.)*double(k)*double(k)*double(k))));
       delete[] work;
       return info;

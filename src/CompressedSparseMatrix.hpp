@@ -324,7 +324,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t>
   std::vector<std::tuple<integer_t,integer_t,scalar_t>>
   CompressedSparseMatrix<scalar_t,integer_t>::read_matrix_market_entries(std::string filename) {
-    if (is_mpi_root()) std::cout << "# opening file \"" << filename << "\'" << std::endl;
+    if (is_mpi_root()) std::cout << "# opening file \'" << filename << "\'" << std::endl;
     FILE *fp = fopen(filename.c_str(), "r");
     if (fp == NULL) {
       if (is_mpi_root()) std::cerr << "ERROR: could not read file";

@@ -131,9 +131,10 @@ namespace strumpack {
       void compute_U_basis_stable(const opts_t& opts, WorkCompressMPI<scalar_t>& w, int d, int dd);
       void compute_V_basis_stable(const opts_t& opts, WorkCompressMPI<scalar_t>& w, int d, int dd);
       real_t update_orthogonal_basis(DistM_t& S, DistM_t& Q, int d, int dd, bool untouched);
-      void reduce_local_samples(const DistSamples<scalar_t>& RS, WorkCompressMPI<scalar_t>& w, int dd);
+      void reduce_local_samples(const DistSamples<scalar_t>& RS, WorkCompressMPI<scalar_t>& w, int dd, bool was_compressed);
       void communicate_child_data(WorkCompressMPI<scalar_t>& w);
-      void notify_inactives(WorkCompressMPI<scalar_t>& w);
+      void notify_inactives_J(WorkCompressMPI<scalar_t>& w);
+      void notify_inactives_states(WorkCompressMPI<scalar_t>& w);
 
       void compress_level_original(DistSamples<scalar_t>& RS, const opts_t& opts, WorkCompressMPI<scalar_t>& w, int dd, int lvl);
       void compress_level_stable(DistSamples<scalar_t>& RS, const opts_t& opts, WorkCompressMPI<scalar_t>& w, int d, int dd, int lvl);
@@ -434,7 +435,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> std::size_t HSSMatrixMPI<scalar_t>::max_rank() const {
-      std::size_t rmax, r=rank();
+      std::size_t rmax, r=this->rank();
       MPI_Allreduce(&r, &rmax, 1, mpi_type<std::size_t>(), MPI_MAX, _comm);
       return rmax;
     }
@@ -628,7 +629,7 @@ namespace strumpack {
       }
     }
 
-    template<typename scalar_t> void HSSMatrixMPI<scalar_t>::notify_inactives(WorkCompressMPI<scalar_t>& w) {
+    template<typename scalar_t> void HSSMatrixMPI<scalar_t>::notify_inactives_J(WorkCompressMPI<scalar_t>& w) {
       int rank = mpi_rank(_comm), P = _nprocs, actives = _active_procs;
       int inactives = P - actives;
       if (rank < inactives) {
@@ -652,6 +653,55 @@ namespace strumpack {
       	w.Jc.resize(*ptr++);
       	for (std::size_t i=0; i<w.Jr.size(); i++) w.Jr[i] = *ptr++;
       	for (std::size_t i=0; i<w.Jc.size(); i++) w.Jc[i] = *ptr++;
+      	delete[] buf;
+      }
+    }
+
+    template<typename scalar_t> void HSSMatrixMPI<scalar_t>::notify_inactives_states
+    (WorkCompressMPI<scalar_t>& w) {
+      int rank = mpi_rank(_comm), P = _nprocs, actives = _active_procs;
+      int inactives = P - actives;
+      if (rank < inactives) {
+      	std::vector<std::size_t> sbuf;
+	sbuf.reserve(8+w.Ir.size()+w.Ic.size()+w.Jr.size()+w.Jc.size());
+	sbuf.push_back(std::size_t(this->_U_state));
+	sbuf.push_back(std::size_t(this->_V_state));
+	sbuf.push_back(this->_U_rank);
+	sbuf.push_back(this->_V_rank);
+	sbuf.push_back(this->_U_rows);
+	sbuf.push_back(this->_V_rows);
+	sbuf.push_back(w.Rr.cols());
+	sbuf.push_back(w.Sr.cols());
+	for (auto i : w.Ir) sbuf.push_back(i);
+	for (auto i : w.Ic) sbuf.push_back(i);
+	for (auto i : w.Jr) sbuf.push_back(i);
+	for (auto i : w.Jc) sbuf.push_back(i);
+      	MPI_Send(sbuf.data(), sbuf.size(), mpi_type<std::size_t>(), actives + rank, 0, _comm);
+      }
+      if (rank >= actives) {
+      	MPI_Status stat;
+      	MPI_Probe(rank - actives, 0, _comm, &stat);
+      	int msgsize;
+      	MPI_Get_count(&stat, mpi_type<std::size_t>(), &msgsize);
+      	auto buf = new std::size_t[msgsize];
+      	MPI_Recv(buf, msgsize, mpi_type<std::size_t>(), rank - actives, 0, _comm, MPI_STATUS_IGNORE);
+      	auto ptr = buf;
+      	this->_U_state = State(*ptr++);
+      	this->_V_state = State(*ptr++);
+      	this->_U_rank = *ptr++;
+      	this->_V_rank = *ptr++;
+      	this->_U_rows = *ptr++;
+      	this->_V_rows = *ptr++;
+      	w.dR = *ptr++;
+      	w.dS = *ptr++;
+      	w.Ir.resize(this->_U_rank);
+      	w.Ic.resize(this->_V_rank);
+      	w.Jr.resize(this->_U_rank);
+      	w.Jc.resize(this->_V_rank);
+      	for (int i=0; i<this->_U_rank; i++) w.Ir[i] = *ptr++;
+      	for (int i=0; i<this->_V_rank; i++) w.Ic[i] = *ptr++;
+      	for (int i=0; i<this->_U_rank; i++) w.Jr[i] = *ptr++;
+      	for (int i=0; i<this->_V_rank; i++) w.Jc[i] = *ptr++;
       	delete[] buf;
       }
     }

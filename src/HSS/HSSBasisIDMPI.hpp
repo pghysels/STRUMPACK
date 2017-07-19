@@ -84,6 +84,7 @@ namespace strumpack {
     template<typename scalar_t> DistributedMatrix<scalar_t> HSSBasisIDMPI<scalar_t>::applyC(const DistM_t& b) const {
       assert(E().ctxt()==b.ctxt());
       if (!b.active() || !cols() || !b.cols()) return DistM_t(b.ctxt(), E().cols(), b.cols());
+      assert(b.rows() == int(rows()));
       DistM_t PtB(b);
       PtB.permute_rows_fwd(P());
       if (!E().rows()) return PtB;
@@ -97,6 +98,9 @@ namespace strumpack {
     template<typename scalar_t> void HSSBasisIDMPI<scalar_t>::applyC(const DistM_t& b, DistM_t& c) const {
       assert(E().ctxt()==b.ctxt());
       if (!b.active() || !cols() || !b.cols()) return;
+      assert(b.cols() == c.cols());
+      assert(b.rows() == int(rows()));
+      assert(c.rows() == int(cols()));
       if (!E().rows()) {
 	copy(b.rows(), b.cols(), b, 0, 0, c, 0, 0, b.ctxt());
 	c.permute_rows_fwd(P());

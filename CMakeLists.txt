@@ -141,8 +141,8 @@ else()
   set(STRUMPACK_ALL_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_DEBUG}")
 endif()
 
-# src/StrumpackSparseSolver.cpp
-set(LIBSRC src/blas_lapack_omp_task.cpp src/strumpack_mc64ad.c
+
+set(LIBSRC src/blas_lapack_omp_task.cpp src/strumpack_mc64ad.c src/StrumpackSparseSolver.cpp
   src/strumpack_parameters.cpp src/TaskTimer.cpp
   src/lapack/sgeqp3tol.f src/lapack/dgeqp3tol.f src/lapack/cgeqp3tol.f src/lapack/zgeqp3tol.f
   src/lapack/sgeqrfmod.f src/lapack/dgeqrfmod.f src/lapack/cgeqrfmod.f src/lapack/zgeqrfmod.f
