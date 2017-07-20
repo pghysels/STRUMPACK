@@ -3,7 +3,7 @@ set(ENV{OMP_NUM_THREADS} ${TH})
 execute_process(
   COMMAND ${TEST} ${ARG1} ${ARG2} ${ARG3} ${ARG4}
   ${ARG5} ${ARG6} ${ARG7} ${ARG8} ${ARG9} ${ARG10}
-  ${ARG11} ${ARG12} ${ARG13} ${ARG14} ${ARG15}
+  ${ARG11} ${ARG12} ${ARG13} ${ARG14} ${ARG15} ${ARG16}
   OUTPUT_FILE ${OUTPUT}
   RESULT_VARIABLE RET
   )
