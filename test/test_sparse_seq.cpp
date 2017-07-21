@@ -29,6 +29,7 @@
 
 using namespace strumpack;
 
+#define ERROR_TOLERANCE 1e2
 #define SOLVE_TOLERANCE 1e-12
 
 template<typename scalar_t,typename integer_t> int
@@ -61,7 +62,7 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
   auto nrm_x_exact = blas::nrm2(N, x_exact.data(), 1);
   std::cout << "# RELATIVE ERROR = " << (nrm_error/nrm_x_exact) << std::endl;
 
-  if (comp_scal_res > SOLVE_TOLERANCE) return 1;
+  if (comp_scal_res > ERROR_TOLERANCE*spss.options().rel_tol()) return 1;
   else return 0;
 }
 
