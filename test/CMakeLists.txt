@@ -154,7 +154,7 @@ add_test(
 
 ## Sequential sparse test
 set(test_output ${CMAKE_BINARY_DIR}/test/SPARSE_seq.out)
-set(MTX utm300 mesh3e1 lnsp3937 t2dal bcsstk28 cavity16)
+set(MTX utm300 mesh3e1 lnsp3937 t2dal bcsstk28 cavity16 bcsstm08 sherman4 rdb968)
 set(NESTEDDISSECTION metis scotch)
 foreach(m ${MTX})
   foreach(nd ${NESTEDDISSECTION})
@@ -193,7 +193,7 @@ set(test_output ${CMAKE_BINARY_DIR}/test/SPARSE_mpi.out)
 set(NESTEDDISSECTIONMPI metis scotch parmetis ptscotch)
 foreach(ntests RANGE 50)
   set(th 1)
-  random_element(NESTEDDISSECTIONMPI mpi)
+  random_element(NESTEDDISSECTIONMPI nd)
   random_element(MTX m)
   random_element(PROCS mpi)
   set(c enable)
