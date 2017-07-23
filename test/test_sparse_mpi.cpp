@@ -84,8 +84,17 @@ int main(int argc, char* argv[]) {
   int thread_level;
   //MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_level);
   MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &thread_level);
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  int rank = mpi_rank();
+  if (!rank) {
+    std::cout << "# Running with:\n# ";
+#if defined(_OPENMP)
+    std::cout << "OMP_NUM_THREADS=" << omp_get_max_threads() << " mpirun -n " << mpi_nprocs() << " ";
+#else
+    std::cout << "mpirun -n " << mpi_nprocs() << " ";
+#endif
+    for (int i=0; i<argc; i++) std::cout << argv[i] << " ";
+    std::cout << std::endl;
+  }
   if (thread_level != MPI_THREAD_FUNNELED && rank == 0)
     std::cout << "MPI implementation does not support MPI_THREAD_FUNNELED" << std::endl;
   // if (thread_level != MPI_THREAD_MULTIPLE && rank == 0)
