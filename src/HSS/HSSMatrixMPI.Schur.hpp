@@ -40,9 +40,9 @@ namespace strumpack {
 
       DistSubLeaf<scalar_t> Theta_br(_theta.cols(), ch1, ctxt_loc()),
 	Phi_br(_phi.cols(), ch1, ctxt_loc());
-      ch1->apply_UV_big(Theta_br, _theta, Phi_br, _phi);
       DistM_t Theta_ch(ch1->ctxt(ctxt_loc()), ch1->rows(), _theta.cols());
       DistM_t Phi_ch(ch1->ctxt(ctxt_loc()), ch1->cols(), _phi.cols());
+      ch1->apply_UV_big(Theta_br, _theta, Phi_br, _phi);
       Theta_br.from_block_row(Theta_ch);
       Phi_br.from_block_row(Phi_ch);
       Theta = DistM_t(ctxt(), Theta_ch.rows(), Theta_ch.cols());
