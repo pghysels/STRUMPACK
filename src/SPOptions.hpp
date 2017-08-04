@@ -153,7 +153,7 @@ namespace strumpack {
     void set_verbose(bool verbose) { _verbose = verbose; }
     void set_maxit(int maxit) { assert(maxit >= 1); _maxit = maxit; }
     void set_rel_tol(real_t rel_tol) { assert(rel_tol <= real_t(1.) && rel_tol >= real_t(0.)); _rel_tol = rel_tol; }
-    void set_abs_tol(real_t abs_tol) { assert(abs_tol >= real_t(0.)); _abs_tol = _abs_tol; }
+    void set_abs_tol(real_t abs_tol) { assert(abs_tol >= real_t(0.)); _abs_tol = abs_tol; }
     void set_Krylov_solver(KrylovSolver s) { _Krylov_solver = s; }
     void set_gmres_restart(int m) { assert(m >= 1); _gmres_restart = m; }
     void set_GramSchmidt_type(GramSchmidtType t) { _Gram_Schmidt_type = t; }
