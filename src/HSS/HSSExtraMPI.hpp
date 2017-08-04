@@ -183,27 +183,8 @@ namespace strumpack {
     };
 
     template<typename scalar_t> void create_triplet_mpi_type(MPI_Datatype* triplet_type) {
-      const int blocklengths[3] = {1, 1, 1};
-      MPI_Aint displacements[3];
-      Triplet<scalar_t> t[2];
-      MPI_Get_address(t, displacements);
-      MPI_Get_address(&(t[0]._c), displacements+1);
-      MPI_Get_address(&(t[0]._v), displacements+2);
-      MPI_Aint base = displacements[0];
-      displacements[0] = MPI_Aint_diff(displacements[0], base);
-      displacements[1] = MPI_Aint_diff(displacements[1], base);
-      displacements[2] = MPI_Aint_diff(displacements[2], base);
-
-      const MPI_Datatype types[3] = {mpi_type<int>(), mpi_type<int>(), mpi_type<scalar_t>()};
-      MPI_Datatype triplet_struct;
-      MPI_Type_create_struct(3, blocklengths, displacements, types, &triplet_struct);
-
-      MPI_Aint sizeofentry;
-      MPI_Get_address(t+1, &sizeofentry);
-      sizeofentry = MPI_Aint_diff(sizeofentry, base);
-      MPI_Type_create_resized(triplet_struct, 0, sizeofentry, triplet_type);
+      MPI_Type_contiguous(sizeof(Triplet<scalar_t>), MPI_BYTE, triplet_type);
       MPI_Type_commit(triplet_type);
-      MPI_Type_free(&triplet_struct);
     }
 
   } // end namespace HSS
