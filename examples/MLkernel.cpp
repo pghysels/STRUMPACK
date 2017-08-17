@@ -132,6 +132,7 @@ void recursive_2_means(double* p, int n, int d, int cluster_size, HSSPartitionTr
   if (n < cluster_size) return;
   auto nc = new int[2];
   k_means(2, p, n, d, nc);
+  if (nc[0] == 0 || nc[1] == 0) return;
   tree.c.resize(2);
   tree.c[0].size = nc[0];
   tree.c[1].size = nc[1];
