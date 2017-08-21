@@ -247,13 +247,13 @@ namespace strumpack {
         Q12 = DenseMW_t(m, std::min(d, m), Q, 0, 0);
       }
       auto f0 = params::flops;
-      auto a_L = Q3.norm();
       Q2.orthogonalize(depth);
       Q2.orthogonalize(depth);
       // TODO: these orthogonalizations need to be changed
       params::QR_flops += params::flops - f0;
       DenseMW_t Q3(m, dd, Q, 0, d);
       DenseM_t Q12tQ3(Q12.cols(), Q3.cols());
+      auto a_L = Q3.norm();
       f0 = params::flops;
       gemm(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.), Q12tQ3, depth);
       gemm(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.), Q3, depth);
