@@ -123,30 +123,22 @@ namespace strumpack {
     template<typename scalar_t> class AFunctor {
       using DenseM_t = DenseMatrix<scalar_t>;
     public:
-      AFunctor(const DenseM_t& A, int q) : _A(A), _q(q) {}
+      AFunctor(const DenseM_t& A) : _A(A) {}
       const DenseM_t& _A;
-      const int _q;
-      void operator()(DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
-	gemm(Trans::N, Trans::N, scalar_t(1.), _A, Rr, scalar_t(0.), Sr);
-	gemm(Trans::C, Trans::N, scalar_t(1.), _A, Rc, scalar_t(0.), Sc);
-	for (int i=0; i<_q; i++) {
-	  Sr.orthogonalize(0);
-	  Sc.orthogonalize(0);
-	  gemm(Trans::C, Trans::N, scalar_t(1.), _A, Sr, scalar_t(0.), Rr);
-	  gemm(Trans::N, Trans::N, scalar_t(1.), _A, Sc, scalar_t(0.), Rc);
-	  Rr.orthogonalize(0);
-	  Rc.orthogonalize(0);
-	  gemm(Trans::N, Trans::N, scalar_t(1.), _A, Rr, scalar_t(0.), Sr);
-	  gemm(Trans::C, Trans::N, scalar_t(1.), _A, Rc, scalar_t(0.), Sc);
-	}
+      void operator()
+      (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
+        gemm(Trans::N, Trans::N, scalar_t(1.), _A, Rr, scalar_t(0.), Sr);
+        gemm(Trans::C, Trans::N, scalar_t(1.), _A, Rc, scalar_t(0.), Sc);
       }
-      void operator()(const std::vector<size_t>& I, const std::vector<size_t>& J, DenseM_t& B) {
-	assert(I.size() == B.rows() && J.size() == B.cols());
-	for (std::size_t j=0; j<J.size(); j++)
-	  for (std::size_t i=0; i<I.size(); i++) {
-	    assert(I[i] >= 0 && I[i] < _A.rows() && J[j] >= 0 && J[j] < _A.cols());
-	    B(i,j) = _A(I[i], J[j]);
-	  }
+      void operator()(const std::vector<size_t>& I,
+                      const std::vector<size_t>& J, DenseM_t& B) {
+        assert(I.size() == B.rows() && J.size() == B.cols());
+        for (std::size_t j=0; j<J.size(); j++)
+          for (std::size_t i=0; i<I.size(); i++) {
+            assert(I[i] >= 0 && I[i] < _A.rows() &&
+                   J[j] >= 0 && J[j] < _A.cols());
+            B(i,j) = _A(I[i], J[j]);
+          }
       }
     };
 

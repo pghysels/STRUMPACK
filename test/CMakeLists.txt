@@ -12,7 +12,7 @@ target_link_libraries(test_sparse_seq strumpack ${LIB})
 target_link_libraries(test_sparse_mpi strumpack ${LIB})
 
 set(THREADS 1 3 8)
-set(PROCS   2 4 9 13 17)
+set(PROCS   2 4 9 13 16 17 19)
 set(MATRIX  T U L)
 set(SIZES   1 10 200 500)
 set(LEAF    1 3 16 128)

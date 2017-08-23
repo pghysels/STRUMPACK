@@ -8,7 +8,7 @@ namespace strumpack {
 
     template<typename scalar_t> void HSSMatrix<scalar_t>::compress_original
     (const DenseM_t& A, const opts_t& opts) {
-      AFunctor<scalar_t> afunc(A, opts.q());
+      AFunctor<scalar_t> afunc(A);
       compress(afunc, afunc, opts);
     }
 
@@ -19,7 +19,8 @@ namespace strumpack {
       DenseM_t Rr, Rc, Sr, Sc;
       std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen;
       if (!opts.user_defined_random())
-	rgen = random::make_random_generator<real_t>(opts.random_engine(), opts.random_distribution());
+	rgen = random::make_random_generator<real_t>
+          (opts.random_engine(), opts.random_distribution());
       WorkCompress<scalar_t> w;
       while (!this->is_compressed()) {
 	Rr.resize(n, d);
