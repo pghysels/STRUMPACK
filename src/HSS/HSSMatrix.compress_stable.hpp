@@ -284,14 +284,6 @@ namespace strumpack {
       }
       auto f0 = params::flops;
       Q2.orthogonalize(opts.abs_tol(), depth);
-
-      // DenseM_t Q2tQ2(Q2.cols(), Q2.cols());
-      // gemm(Trans::C, Trans::N, scalar_t(1.), Q2, Q2,
-      //      scalar_t(0.), Q2tQ2, depth);
-      // for (int i=0; i<Q2.cols(); i++)
-      //   Q2tQ2(i, i) = scalar_t(0.);
-      // std::cout << "||Q2'Q2 - I||=" << Q2tQ2.norm() << std::endl;
-
       params::QR_flops += params::flops - f0;
       DenseMW_t Q3(m, dd, Q, 0, d);
       DenseM_t Q12tQ3(Q12.cols(), Q3.cols());
@@ -312,6 +304,24 @@ namespace strumpack {
       constexpr double c = 1.25331413731550e-01;
       return (Q3norm < opts.abs_tol() * c)
         || (Q3norm / S3norm < opts.rel_tol());
+=======
+      Q2.orthogonalize(depth);
+      Q2.orthogonalize(depth);
+      // TODO: these orthogonalizations need to be changed
+      params::QR_flops += params::flops - f0;
+      DenseMW_t Q3(m, dd, Q, 0, d);
+      DenseM_t Q12tQ3(Q12.cols(), Q3.cols());
+      auto a_L = Q3.norm();
+      f0 = params::flops;
+      gemm(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.), Q12tQ3, depth);
+      gemm(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.), Q3, depth);
+      gemm(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.), Q12tQ3, depth);
+      gemm(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.), Q3, depth);
+      // TODO: these orthogonalizations need to be changed
+      params::ortho_flops += params::flops - f0;
+      return Q3.norm() / a_L;
+      // This is the new relative error test.
+>>>>>>> c981fd139c64e8ce966bed5e1dc9c6f78007625e
     }
 
   } // end namespace HSS
