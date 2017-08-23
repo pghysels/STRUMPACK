@@ -1,0 +1,59 @@
+High priority:
+- Provide an example of factor once, solve multiple times.
+- Example for reuse of sparsity structure!
+- Example for a single precision preconditioner in a double precision
+  GMRES solve?
+- profiling, memory leak fixes
+- multiple right-hand sides
+
+
+- Keep track of peak memory usage
+- Print memory usage (estimate) before starting factorization
+
+- For HSS compression, store random matrix in block row distribution
+  instead of 2D block cyclic. This avoids data layout
+  transformation. Some for the HSS-times-vector product and the HSS
+  ULV solve!! We can let Chris Gorman work on this.
+
+- check RCM reordering. Are perm, iperm switched??
+
+- to decide which fronts are HSS, look at front size, not just
+  separator size. This requires that symbolic factorization is already
+  done.
+
+
+Medium:
+- matrix equilibration: see SuperLU_dist pdgsequ and pdlaqgs
+- Use more scalable dense linear algebra, based on tiled algorithms,
+  mainly for dense LU and triangular solve. (requires OpenMP 4.0)
+- check ordering, merge small leaves created by PTScotch/ParMetis
+- MC64 licensing issue, allow compilation without MC64
+
+- optimize communication in symbolic factorization and redistribution
+  into ProportionallyMappedSparseMatrix
+
+
+Low priority:
+- The library is not completely thread safe at the moment.  explain in
+  the manual what is not safe! and fix
+- Use mt-metis, for multithreaded nested-dissection.
+- Currently the elements in the sparse matrix are stored sorted
+  (internally). Check whether it might be faster not to sort them.
+- Perhaps the original matrix should not be explicitly
+  permuted. Instead access the original matrix always through the
+  permutation. This avoids making a copy of the original matrix.
+- Do not explicitly add zeros in the sparse matrix, work on the graph
+  only.
+- The identity block of the U and V interpolative bases is still
+  stored explicitly. Change this.
+- distributed MC64: Jason's code?
+- Think about proportional mapping: perhaps we can instead use the
+  mapping as computed by PTScotch/Parmetis. This would avoid an extra
+  redistribution!! But it might cause some load imbalance. Need to
+  set the PTScotch strategy to make sure the subdomains are well
+  balanced (PTscotch will also try to minimize the size of the
+  separator). However, the size of the subdomains does not exactly
+  correspond to the number of flops required for factorization of the
+  corresponding subtree in the elimination tree.
+- add Fortran interface
+
