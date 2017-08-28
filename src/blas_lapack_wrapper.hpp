@@ -308,6 +308,15 @@ namespace strumpack {
       double dlange_(char* norm, int* m, int* n, double* a,int* lda, double* work);
       float clange_(char* norm, int* m, int* n, c_float* a, int* lda, float* work);
       double zlange_(char* norm, int* m, int* n, c_double* a, int* lda, double* work);
+
+      void sgesvd_(char* JOBU, char* JOBVT, int* M, int* N,
+                   float* A, int* LDA, float* S, float* U, int* LDU,
+                   float* VT, int* LDVT, float* WORK, int* LWORK,
+                   int* INFO);
+      void dgesvd_(char* JOBU, char* JOBVT, int* M, int* N,
+                   double* A, int* LDA, double* S, double* U, int* LDU,
+                   double* VT, int* LDVT, double* WORK, int* LWORK,
+                   int* INFO);
     }
 
     inline int ilaenv(int ispec, char name[], char opts[], int n1, int n2, int n3, int n4) {
@@ -922,6 +931,49 @@ namespace strumpack {
 	return ret;
       } else return zlange_(&norm, &m, &n, a, &lda, nullptr);
     }
+
+
+    inline int
+    gesvd(char JOBU, char JOBVT, int M, int N, float* A, int LDA,
+          float* S, float* U, int LDU, float* VT, int LDVT) {
+      int INFO;
+      int LWORK = -1;
+      float SWORK;
+      sgesvd_(&JOBU, &JOBVT, &M, &N, A, &LDA, S, U, &LDU, VT, &LDVT,
+              &SWORK, &LWORK, &INFO);
+      LWORK = int(SWORK);
+      auto WORK = new float[LWORK];
+      sgesvd_(&JOBU, &JOBVT, &M, &N, A, &LDA, S, U, &LDU, VT, &LDVT,
+              WORK, &LWORK, &INFO);
+      delete[] WORK;
+      return INFO;
+    }
+    inline int
+    gesvd(char JOBU, char JOBVT, int M, int N, double* A, int LDA,
+          double* S, double* U, int LDU, double* VT, int LDVT) {
+      int INFO;
+      int LWORK = -1;
+      double DWORK;
+      dgesvd_(&JOBU, &JOBVT, &M, &N, A, &LDA, S, U, &LDU, VT, &LDVT,
+              &DWORK, &LWORK, &INFO);
+      LWORK = int(DWORK);
+      auto WORK = new double[LWORK];
+      dgesvd_(&JOBU, &JOBVT, &M, &N, A, &LDA, S, U, &LDU, VT, &LDVT,
+              WORK, &LWORK, &INFO);
+      delete[] WORK;
+      return INFO;
+    }
+    inline int
+    gesvd(char JOBU, char JOBVT, int M, int N, c_float* A, int LDA,
+          c_float* S, c_float* U, int LDU, c_float* VT, int LDVT) {
+      std::cout << "TODO gesvd for c_float" << std::endl;
+    }
+    inline int
+    gesvd(char JOBU, char JOBVT, int M, int N, c_double* A, int LDA,
+          c_double* S, c_double* U, int LDU, c_double* VT, int LDVT) {
+      std::cout << "TODO gesvd for c_double" << std::endl;
+    }
+
 
   } //end namespace blas
 } // end namespace strumpack
