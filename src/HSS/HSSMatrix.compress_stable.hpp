@@ -87,16 +87,14 @@ namespace strumpack {
           this->_ch[1]->compress_recursive_stable
             (Rr, Rc, Sr, Sc, Aelem, opts, w.c[1], d, dd, depth+1);
 #pragma omp taskwait
-          if (!this->_ch[0]->is_compressed() ||
-              !this->_ch[1]->is_compressed()) return;
         } else {
           this->_ch[0]->compress_recursive_stable
             (Rr, Rc, Sr, Sc, Aelem, opts, w.c[0], d, dd, depth+1);
-          if (!this->_ch[0]->is_compressed()) return;
           this->_ch[1]->compress_recursive_stable
             (Rr, Rc, Sr, Sc, Aelem, opts, w.c[1], d, dd, depth+1);
-          if (!this->_ch[1]->is_compressed()) return;
         }
+        if (!this->_ch[0]->is_compressed() ||
+            !this->_ch[1]->is_compressed()) return;
         if (this->is_untouched()) {
 #pragma omp task default(shared) if(tasked) final(isfinal) mergeable
           {
