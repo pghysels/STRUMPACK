@@ -865,36 +865,26 @@ namespace strumpack {
   template<typename scalar_t> void
   DistributedMatrix<scalar_t>::orthogonalize() {
     if (!active()) return;
-
-    auto Xt = transpose();
-    DistributedMatrix<scalar_t> L, Qt;
-    Xt.LQ(L, Qt);
-    auto Q = Qt.transpose();
-    copy(rows(), cols(), Q, 0, 0, *this, 0, 0, ctxt());
-
-    // // WTF is wrong here??!!!
-    // auto minmn = std::min(rows(), cols());
-    // auto N = J() + minmn - 1;
-    // auto ltau = scalapack::numroc(N, NB(), pcol(), 0, pcols());
-    // auto tau = new scalar_t[ltau];
-    // // std::size_t ltau_upper =
-    // //   std::ceil(std::ceil(float(N)/NB())/float(pcols()))*NB();
-    // // auto tau = new scalar_t[ltau_upper];
-    // auto info = scalapack::pgeqrf
-    //   (rows(), minmn, data(), I(), J(), desc(), tau);
-    // info = scalapack::pxxgqr
-    //   (rows(), minmn, minmn, data(), I(), J(), desc(), tau);
-    // if (info) {
-    //   std::cerr << "ERROR: Orthogonalization (pxxgqr) failed with info = "
-    //             << info << std::endl;
-    //   abort();
-    // }
-    // if (cols() > rows()) {
-    //   DistributedMatrixWrapper<scalar_t>
-    //     tmp(rows(), cols()-rows(), *this, 0, rows());
-    //   tmp.zero();
-    // }
-    // delete[] tau;
+    auto minmn = std::min(rows(), cols());
+    auto N = J() + minmn - 1;
+    auto ltau = scalapack::numroc(N, NB(), pcol(), 0, pcols());
+    auto tau = new scalar_t[ltau];
+    auto info = scalapack::pgeqrf
+      (rows(), minmn, data(), I(), J(), desc(), tau);
+    // TODO check diagonal elements of R
+    info = scalapack::pxxgqr
+      (rows(), minmn, minmn, data(), I(), J(), desc(), tau);
+    if (info) {
+      std::cerr << "ERROR: Orthogonalization (pxxgqr) failed with info = "
+                << info << std::endl;
+      abort();
+    }
+    if (cols() > rows()) {
+      DistributedMatrixWrapper<scalar_t>
+        tmp(rows(), cols()-rows(), *this, 0, rows());
+      tmp.zero();
+    }
+    delete[] tau;
   }
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::LQ

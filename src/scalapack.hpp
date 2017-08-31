@@ -55,6 +55,9 @@ namespace strumpack {
       void infog2l_(int *, int *, const int *, int *, int *, int *, int *, int *, int *, int *, int *);
       void igamn2d_(int *, const char *, const char *, int *, int *, int *, int *, int *, int *, int *, int *, int *);
 
+      void pb_topget_(int*, char*, char*, char*);
+      void pb_topset_(int*, char*, char*, char*);
+
       /* xGEBS2D */
       void igebs2d_(int *, const char *, const char *, int *, int *,      int *, int *);
       void dgebs2d_(int *, const char *, const char *, int *, int *,   double *, int *);
@@ -225,6 +228,10 @@ namespace strumpack {
       void pcgeqrf_(int *, int *,  c_float *, int *, int *, int *,  c_float *,  c_float *, int *, int *);
 
       void pdorgqr_(int *, int *, int *,   double *, int *, int *, int *,   double *,   double *, int *, int *);
+
+      void pdorgqrmy_(int *, int *, int *,   double *, int *, int *, int *,   double *,   double *, int *, int *);
+
+
       void psorgqr_(int *, int *, int *,    float *, int *, int *, int *,    float *,    float *, int *, int *);
       void pzungqr_(int *, int *, int *, c_double *, int *, int *, int *, c_double *, c_double *, int *, int *);
       void pcungqr_(int *, int *, int *,  c_float *, int *, int *, int *,  c_float *,  c_float *, int *, int *);
@@ -854,41 +861,92 @@ namespace strumpack {
     }
 
 
-    template<typename T> inline int pgeqrf(int, int, T*, int, int, int *, T*, T*, int);
-    template<> inline int pgeqrf<double>(int m, int n, double *A, int ia, int ja, int *descA, double *tau, double* work, int lwork)
-    { int info; pdgeqrf_(&m, &n, A, &ia, &ja, descA, tau, work, &lwork, &info); return info; }
-    template<> inline int pgeqrf<float>(int m, int n, float *A, int ia, int ja, int *descA, float *tau, float* work, int lwork)
-    { int info; psgeqrf_(&m, &n, A, &ia, &ja, descA, tau, work, &lwork, &info); return info; }
-    template<> inline int pgeqrf<c_double>(int m, int n, c_double *A, int ia, int ja, int *descA, c_double *tau, c_double* work, int lwork)
-    { int info; pzgeqrf_(&m, &n, A, &ia, &ja, descA, tau, work, &lwork, &info); return info; }
-    template<> inline int pgeqrf<c_float>(int m, int n, c_float *A, int ia, int ja, int *descA, c_float *tau, c_float* work, int lwork)
-    { int info; pcgeqrf_(&m, &n, A, &ia, &ja, descA, tau, work, &lwork, &info); return info; }
-    template<typename T> inline int pgeqrf(int m, int n, T* A, int ia, int ja, int *descA, T* tau) {
+    inline int pgeqrf(int m, int n, double *A, int ia, int ja, int *descA,
+                      double *tau, double* work, int lwork) {
+      int info;
+      pdgeqrf_(&m, &n, A, &ia, &ja, descA, tau, work, &lwork, &info);
+      return info;
+    }
+    inline int pgeqrf(int m, int n, float *A, int ia, int ja, int *descA,
+                      float *tau, float* work, int lwork) {
+      int info;
+      psgeqrf_(&m, &n, A, &ia, &ja, descA, tau, work, &lwork, &info);
+      return info;
+    }
+    inline int pgeqrf(int m, int n, c_double *A, int ia, int ja, int *descA,
+                      c_double *tau, c_double* work, int lwork) {
+      int info;
+      pzgeqrf_(&m, &n, A, &ia, &ja, descA, tau, work, &lwork, &info);
+      return info;
+    }
+    inline int pgeqrf(int m, int n, c_float *A, int ia, int ja, int *descA,
+                      c_float *tau, c_float* work, int lwork) {
+      int info;
+      pcgeqrf_(&m, &n, A, &ia, &ja, descA, tau, work, &lwork, &info);
+      return info;
+    }
+    template<typename T> inline int
+    pgeqrf(int m, int n, T* A, int ia, int ja, int *descA, T* tau) {
       T lwork;
       pgeqrf(m, n, A, ia, ja, descA, tau, &lwork, -1);
       int ilwork = int(std::real(lwork));
       auto work = new T[ilwork];
       int info = pgeqrf(m, n, A, ia, ja, descA, tau, work, ilwork);
       delete[] work;
-      STRUMPACK_FLOPS((is_complex<T>()?4:1)*
-    		      static_cast<long long int>(((m>n) ? (double(n)*(double(n)*(.5-(1./3.)*double(n)+double(m)) + double(m) + 23./6.)) : (double(m)*(double(m)*(-.5-(1./3.)*double(m)+double(n)) + 2.*double(n) + 23./6.)))
-    						 + ((m>n) ? (double(n)*(double(n)*(.5-(1./3.)*double(n)+double(m)) + 5./6.)) : (double(m)*(double(m)*(-.5-(1./3.)*double(m)+double(n)) + double(n) + 5./6.)))));
+      STRUMPACK_FLOPS((is_complex<T>()?4:1)*static_cast<long long int>(((m>n) ? (double(n)*(double(n)*(.5-(1./3.)*double(n)+double(m)) + double(m) + 23./6.)) : (double(m)*(double(m)*(-.5-(1./3.)*double(m)+double(n)) + 2.*double(n) + 23./6.))) + ((m>n) ? (double(n)*(double(n)*(.5-(1./3.)*double(n)+double(m)) + 5./6.)) : (double(m)*(double(m)*(-.5-(1./3.)*double(m)+double(n)) + double(n) + 5./6.)))));
       return info;
     }
 
 
-    template<typename T> inline int pxxgqr(int m, int n, int k, T* A, int ia, int ja, int* descA, T* tau, T* work, int lwork);
-    template<> inline int pxxgqr(int m, int n, int k, double* A, int ia, int ja, int* descA, double* tau,
-    				 double* work, int lwork)
-    { int info; pdorgqr_(&m, &n, &k, A, &ia, &ja, descA, tau, work, &lwork, &info); return info; }
-    template<> inline int pxxgqr(int m, int n, int k, float* A, int ia, int ja, int* descA, float* tau, float* work, int lwork)
-    { int info; psorgqr_(&m, &n, &k, A, &ia, &ja, descA, tau, work, &lwork, &info); return info; }
-    template<> inline int pxxgqr(int m, int n, int k, c_double* A, int ia, int ja, int* descA, c_double* tau, c_double* work, int lwork)
-    { int info; pzungqr_(&m, &n, &k, A, &ia, &ja, descA, tau, work, &lwork, &info); return info; }
-    template<> inline int pxxgqr(int m, int n, int k, c_float* A, int ia, int ja, int* descA, c_float* tau, c_float* work, int lwork)
-    { int info; pcungqr_(&m, &n, &k, A, &ia, &ja, descA, tau, work, &lwork, &info); return info; }
+    inline int pxxgqr(int m, int n, int k, double* A, int ia, int ja,
+                      int* descA, double* tau, double* work, int lwork) {
+      int info;
+      // workaround for ScaLAPACK bug:
+      //   http://icl.cs.utk.edu/lapack-forum/viewtopic.php?f=2&t=4510
+      char R = 'R', C = 'C', B = 'B', rowbtop, colbtop;
+      pb_topget_(&descA[BLACSctxt], &B, &R, &rowbtop);
+      pb_topget_(&descA[BLACSctxt], &B, &C, &colbtop);
+      pdorgqr_(&m, &n, &k, A, &ia, &ja, descA, tau, work, &lwork, &info);
+      pb_topset_(&descA[BLACSctxt], &B, &R, &rowbtop);
+      pb_topset_(&descA[BLACSctxt], &B, &C, &colbtop);
+      return info;
+    }
+    inline int pxxgqr(int m, int n, int k, float* A, int ia, int ja,
+                      int* descA, float* tau, float* work, int lwork) {
+      int info;
+      char R = 'R', C = 'C', B = 'B', rowbtop, colbtop;
+      pb_topget_(&descA[BLACSctxt], &B, &R, &rowbtop);
+      pb_topget_(&descA[BLACSctxt], &B, &C, &colbtop);
+      psorgqr_(&m, &n, &k, A, &ia, &ja, descA, tau, work, &lwork, &info);
+      pb_topset_(&descA[BLACSctxt], &B, &R, &rowbtop);
+      pb_topset_(&descA[BLACSctxt], &B, &C, &colbtop);
+      return info;
+    }
+    inline int pxxgqr(int m, int n, int k, c_double* A, int ia, int ja,
+                      int* descA, c_double* tau, c_double* work, int lwork) {
+      int info;
+      char R = 'R', C = 'C', B = 'B', rowbtop, colbtop;
+      pb_topget_(&descA[BLACSctxt], &B, &R, &rowbtop);
+      pb_topget_(&descA[BLACSctxt], &B, &C, &colbtop);
+      pzungqr_(&m, &n, &k, A, &ia, &ja, descA, tau, work, &lwork, &info);
+      pb_topset_(&descA[BLACSctxt], &B, &R, &rowbtop);
+      pb_topset_(&descA[BLACSctxt], &B, &C, &colbtop);
+      return info;
+    }
+    inline int pxxgqr(int m, int n, int k, c_float* A, int ia, int ja,
+                      int* descA, c_float* tau, c_float* work, int lwork) {
+      int info;
+      char R = 'R', C = 'C', B = 'B', rowbtop, colbtop;
+      pb_topget_(&descA[BLACSctxt], &B, &R, &rowbtop);
+      pb_topget_(&descA[BLACSctxt], &B, &C, &colbtop);
+      pcungqr_(&m, &n, &k, A, &ia, &ja, descA, tau, work, &lwork, &info);
+      pb_topset_(&descA[BLACSctxt], &B, &R, &rowbtop);
+      pb_topset_(&descA[BLACSctxt], &B, &C, &colbtop);
+      return info;
+    }
 
-    template<typename T> inline int pxxgqr(int m, int n, int k, T* A, int ia, int ja, int* descA, T* tau) {
+    template<typename T> inline int
+    pxxgqr(int m, int n, int k, T* A, int ia, int ja, int* descA, T* tau) {
       T lwork;
       int info = pxxgqr(m, n, k, A, ia, ja, descA, tau, &lwork, -1);
       int ilwork = int(std::real(lwork));
