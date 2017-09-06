@@ -47,7 +47,7 @@ int run(int argc, char* argv[]) {
     A = DenseMatrix<double>(m, m);
     for (int j=0; j<m; j++)
       for (int i=0; i<m; i++)
-	A(i,j) = (i==j) ? 1. : 1./(1+abs(i-j));
+        A(i,j) = (i==j) ? 1. : 1./(1+abs(i-j));
   } break;
   case 'U': { // upper triangular Toeplitz
     if (argc > 2) m = stoi(argv[2]);
@@ -58,8 +58,8 @@ int run(int argc, char* argv[]) {
     A = DenseMatrix<double>(m, m);
     for (int j=0; j<m; j++)
       for (int i=0; i<m; i++)
-	if (i > j) A(i,j) = 0.;
-	else A(i,j) = (i==j) ? 1. : 1./(1+abs(i-j));
+        if (i > j) A(i,j) = 0.;
+        else A(i,j) = (i==j) ? 1. : 1./(1+abs(i-j));
   } break;
   case 'L': {
     if (argc > 2) m = stoi(argv[2]);
@@ -99,8 +99,9 @@ int run(int argc, char* argv[]) {
 
   HSSMatrix<double> H(A, hss_opts);
   if (H.is_compressed()) {
-    cout << "# created H matrix of dimension " << H.rows() << " x " << H.cols()
-	 << " with " << H.levels() << " levels" << endl;
+    cout << "# created H matrix of dimension "
+         << H.rows() << " x " << H.cols()
+         << " with " << H.levels() << " levels" << endl;
     cout << "# compression succeeded!" << endl;
   } else {
     cout << "# compression failed!!!!!!!!" << endl;
@@ -113,8 +114,11 @@ int run(int argc, char* argv[]) {
   // H.print_info();
   auto Hdense = H.dense();
   Hdense.scaled_add(-1., A);
-  cout << "# relative error = ||A-H*I||_F/||A||_F = " << Hdense.normF() / A.normF() << endl;
-  if (Hdense.normF() / A.normF() > ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
+  cout << "# relative error = ||A-H*I||_F/||A||_F = "
+       << Hdense.normF() / A.normF() << endl;
+  cout << "# absolute error = ||A-H*I||_F = " << Hdense.normF() << endl;
+  if (Hdense.normF() / A.normF() > ERROR_TOLERANCE
+      * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
     cout << "ERROR: compression error too big!!" << endl;
     return 1;
   }
@@ -130,11 +134,13 @@ int run(int argc, char* argv[]) {
     auto C0 = H0->apply(B0);
     gemm(Trans::N, Trans::N, 1., A0, B0, beta, C0_check);
     C0.scaled_add(-1., C0_check);
-    cout << "# relative error = ||H0*B0-A0*B0||_F/||A0*B0||_F = " << C0.normF() / C0_check.normF() << endl;
+    cout << "# relative error = ||H0*B0-A0*B0||_F/||A0*B0||_F = "
+         << C0.normF() / C0_check.normF() << endl;
     apply_HSS(Trans::C, *H0, B0, beta, C0);
     gemm(Trans::C, Trans::N, 1., A0, B0, beta, C0_check);
     C0.scaled_add(-1., C0_check);
-    cout << "# relative error = ||H0'*B0-A0'*B0||_F/||A0'*B0||_F = " << C0.normF() / C0_check.normF() << endl;
+    cout << "# relative error = ||H0'*B0-A0'*B0||_F/||A0'*B0||_F = "
+         << C0.normF() / C0_check.normF() << endl;
   }
   if (!H.leaf()) {
     double beta = 0.;
@@ -147,11 +153,13 @@ int run(int argc, char* argv[]) {
     auto C1 = H1->apply(B1);
     gemm(Trans::N, Trans::N, 1., A1, B1, beta, C1_check);
     C1.scaled_add(-1., C1_check);
-    cout << "# relative error = ||H1*B1-A1*B1||_F/||A1*B1||_F = " << C1.normF() / C1_check.normF() << endl;
+    cout << "# relative error = ||H1*B1-A1*B1||_F/||A1*B1||_F = "
+         << C1.normF() / C1_check.normF() << endl;
     apply_HSS(Trans::C, *H1, B1, beta, C1);
     gemm(Trans::C, Trans::N, 1., A1, B1, beta, C1_check);
     C1.scaled_add(-1., C1_check);
-    cout << "# relative error = ||H1'*B1-A1'*B1||_F/||A1'*B1||_F = " << C1.normF() / C1_check.normF() << endl;
+    cout << "# relative error = ||H1'*B1-A1'*B1||_F/||A1'*B1||_F = "
+         << C1.normF() / C1_check.normF() << endl;
   }
 
   default_random_engine gen;
@@ -165,7 +173,8 @@ int run(int argc, char* argv[]) {
     ex_err += abs(H.get(r,c) - A(r,c));
   }
   cout << ex_err/iex << endl;
-  if (ex_err / iex > ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
+  if (ex_err / iex > ERROR_TOLERANCE
+      * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
     cout << "ERROR: extraction error too big!!" << endl;
     return 1;
   }
@@ -187,8 +196,10 @@ int run(int argc, char* argv[]) {
   if (hss_opts.verbose()) sub.print("sub");
   sub.scaled_add(-1., sub_dense);
   // sub.print("sub_error");
-  cout << "# sub-matrix extraction error = " << sub.normF() / sub_dense.normF() << endl;
-  if (sub.normF() / sub_dense.normF() > 1e2*max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
+  cout << "# sub-matrix extraction error = "
+       << sub.normF() / sub_dense.normF() << endl;
+  if (sub.normF() / sub_dense.normF() >
+      1e2*max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
     cout << "ERROR: extraction error too big!!" << endl;
     return 1;
   }
@@ -203,7 +214,8 @@ int run(int argc, char* argv[]) {
   H.solve(ULV, C);
   auto Bcheck = H.apply(C);
   Bcheck.scaled_add(-1., B);
-  cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = " << Bcheck.normF() / B.normF() << endl;
+  cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
+       << Bcheck.normF() / B.normF() << endl;
   if (Bcheck.normF() / B.normF() > SOLVE_TOLERANCE) {
     cout << "ERROR: ULV solve relative error too big!!" << endl;
     return 1;

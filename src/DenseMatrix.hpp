@@ -101,6 +101,7 @@ namespace strumpack {
     void LQ(DenseMatrix<scalar_t>& L, DenseMatrix<scalar_t>& Q,
             int depth) const;
     void orthogonalize(real_t abs_tol, int depth);
+    void orthogonalize(scalar_t& r_max, scalar_t& r_min, int depth);
     void ID_column(DenseMatrix<scalar_t>& X, std::vector<int>& piv,
                    std::vector<std::size_t>& ind, real_t rel_tol,
                    real_t abs_tol, int max_rank, int depth);
@@ -624,6 +625,24 @@ namespace strumpack {
     }
     delete[] tau;
     delete[] Rii;
+  }
+
+  template<typename scalar_t> void
+  DenseMatrix<scalar_t>::orthogonalize
+  (scalar_t& r_max, scalar_t& r_min, int depth) {
+    if (!cols() || !rows()) return;
+    int info;
+    int minmn = std::min(rows(), cols());
+    auto tau = new scalar_t[minmn];
+    blas::geqrfmod(rows(), cols(), data(), ld(), tau, &info, depth);
+    // TODO threading!!
+    blas::xxgqr(rows(), minmn, minmn, data(), ld(), tau, &info);
+    if (cols() > rows()) {
+      DenseMatrixWrapper<scalar_t> tmp
+        (rows(), cols()-rows(), *this, 0, rows());
+      tmp.zero();
+    }
+    delete[] tau;
   }
 
   template<typename scalar_t> void DenseMatrix<scalar_t>::ID_row

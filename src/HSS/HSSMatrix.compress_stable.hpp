@@ -166,7 +166,8 @@ namespace strumpack {
         this->_ch[0]->U_rank()+this->_ch[1]->U_rank();
       DenseMW_t lSr(u_rows, d+dd, Sr, w.offset.second, 0);
       bool check_basis = update_orthogonal_basis
-        (opts, lSr, w.Qr, d, dd, this->_U_state == State::UNTOUCHED, depth);
+        (opts, w.U_r_max, lSr, w.Qr, d, dd,
+         this->_U_state == State::UNTOUCHED, depth);
       if (d+dd >= opts.max_rank() || d+dd >= int(u_rows) || check_basis) {
         w.Qr.clear();
         auto f0 = params::flops;
@@ -199,7 +200,8 @@ namespace strumpack {
         this->_ch[0]->V_rank()+this->_ch[1]->V_rank();
       DenseMW_t lSc(v_rows, d+dd, Sc, w.offset.second, 0);
       bool check_basis = update_orthogonal_basis
-        (opts, lSc, w.Qc, d, dd, this->_V_state == State::UNTOUCHED, depth);
+        (opts, w.V_r_max, lSc, w.Qc, d, dd,
+         this->_V_state == State::UNTOUCHED, depth);
       if (d+dd >= opts.max_rank() || d+dd >= v_rows || check_basis) {
         w.Qc.clear();
         auto f0 = params::flops;
@@ -265,7 +267,8 @@ namespace strumpack {
 
     template<typename scalar_t> bool
     HSSMatrix<scalar_t>::update_orthogonal_basis
-    (const opts_t& opts, DenseM_t& S, DenseM_t& Q, int d, int dd,
+    (const opts_t& opts, scalar_t& r_max_0,
+     DenseM_t& S, DenseM_t& Q, int d, int dd,
      bool untouched, int depth) {
       int m = S.rows();
       if (d >= m) return real_t(0.);
@@ -281,7 +284,12 @@ namespace strumpack {
         Q12 = DenseMW_t(m, std::min(d, m), Q, 0, 0);
       }
       auto f0 = params::flops;
-      Q2.orthogonalize(opts.abs_tol(), depth);
+      scalar_t r_min, r_max;
+      Q2.orthogonalize(r_max, r_min, depth);
+      if (untouched) r_max_0 = r_max;
+      if (std::abs(r_min) < opts.abs_tol() ||
+          std::abs(r_min / r_max_0) < opts.rel_tol())
+        return true;
       params::QR_flops += params::flops - f0;
       DenseMW_t Q3(m, dd, Q, 0, d);
       DenseM_t Q12tQ3(Q12.cols(), Q3.cols());

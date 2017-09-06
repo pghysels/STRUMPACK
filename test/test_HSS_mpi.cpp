@@ -139,6 +139,7 @@ int run(int argc, char* argv[]) {
          << 100. * Hmem / Amem << "% of dense" << endl;
   }
 
+  MPI_Barrier(MPI_COMM_WORLD);
   auto Hdense = H.dense(A.ctxt());
   MPI_Barrier(MPI_COMM_WORLD);
   if (hss_opts.verbose()) Hdense.print("H");

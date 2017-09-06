@@ -23,6 +23,7 @@ namespace strumpack {
       std::pair<std::size_t,std::size_t> offset;
       int lvl = 0;
       int dR = 0, dS = 0; // TODO do we need this??
+      scalar_t U_r_max, V_r_max;
     };
 
     template<typename scalar_t> class WorkCompress : public WorkCompressBase<scalar_t>  {
