@@ -1,25 +1,29 @@
 /*
- * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The Regents of
- * the University of California, through Lawrence Berkeley National Laboratory
- * (subject to receipt of any required approvals from the U.S. Dept. of Energy).
- * All rights reserved.
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
  *
- * If you have questions about your rights to use or distribute this software,
- * please contact Berkeley Lab's Technology Transfer Department at TTD@lbl.gov.
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
  *
- * NOTICE. This software is owned by the U.S. Department of Energy. As such, the
- * U.S. Government has been granted for itself and others acting on its behalf a
- * paid-up, nonexclusive, irrevocable, worldwide license in the Software to
- * reproduce, prepare derivative works, and perform publicly and display publicly.
- * Beginning five (5) years after the date permission to assert copyright is
- * obtained from the U.S. Department of Energy, and subject to any subsequent five
- * (5) year renewals, the U.S. Government is granted for itself and others acting
- * on its behalf a paid-up, nonexclusive, irrevocable, worldwide license in the
- * Software to reproduce, prepare derivative works, distribute copies to the
- * public, perform publicly and display publicly, and to permit others to do so.
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly.  Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government is granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
  *
  * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
- *             (Lawrence Berkeley National Lab, Computational Research Division).
+ *             (Lawrence Berkeley National Lab, Computational Research
+ *             Division).
  *
  */
 #ifndef TASK_TIMER_HPP
@@ -44,50 +48,37 @@
   typedef timer::time_point tpoint;
 #endif
 
-enum TaskType {EXPLICITLY_NAMED_TASK,
-	       RANDOM_SAMPLING,
-	       RANDOM_GENERATE,
-	       FRONT_MULTIPLY_2D,
-	       UUTXR,
-	       HSS_SCHUR_PRODUCT,
-	       HSS_PRODUCT,
-	       SKINNY_EXTEND_ADD_SEQSEQ,
-	       SKINNY_EXTEND_ADD_SEQ1,
-	       SKINNY_EXTEND_ADD_MPIMPI,
-	       SKINNY_EXTEND_ADD_MPI1,
-	       HSS_COMPRESS,
-	       HSS_PARHQRINTERPOL,
-	       HSS_SEQHQRINTERPOL,
-	       EXTRACT_2D,
-	       EXTRACT_SEP_2D,
-	       GET_SUBMATRIX_2D,
-	       HSS_EXTRACT_SCHUR,
-	       HSS_EXTRACT_FULL,
-	       GET_SUBMATRIX,
-	       HSS_PARTIALLY_FACTOR,
-	       HSS_COMPUTE_SCHUR,
-	       HSS_FACTOR,
-	       FORWARD_SOLVE,
-	       LOOK_LEFT,
-	       SOLVE_LOWER,
-	       SOLVE_LOWER_ROOT,
-	       BACKWARD_SOLVE,
-	       SOLVE_UPPER,
-	       LOOK_RIGHT,
-               PGEMR2D,
-               EXCHANGEINDICES,
-	       EXCHANGEINTEGER,
-	       PAREXTRACTSUBMATRIX,
-	       MERGEVECTOR,
-	       SPLITVECTOR,
-	       UPDATECOLUMNS,
-	       GENERATESAMPLES,
-	       DISTVECTORTREE,
-	       UNDISTVECTORTREE,
-	       EXTRACTROWVECTORTREE,
-	       EXTRACTLOCALSUBTREE,
-	       RESTART,
-	       DISTMATRIXTREE};
+enum TaskType {RANDOM_SAMPLING = 0,
+               RANDOM_GENERATE,
+               FRONT_MULTIPLY_2D,
+               UUTXR,
+               HSS_SCHUR_PRODUCT,
+               SKINNY_EXTEND_ADD_SEQSEQ,
+               SKINNY_EXTEND_ADD_SEQ1,
+               SKINNY_EXTEND_ADD_MPIMPI,
+               SKINNY_EXTEND_ADD_MPI1,
+               HSS_COMPRESS,
+               HSS_PARHQRINTERPOL,
+               HSS_SEQHQRINTERPOL,
+               EXTRACT_2D,
+               EXTRACT_SEP_2D,
+               GET_SUBMATRIX_2D,
+               HSS_EXTRACT_SCHUR,
+               GET_SUBMATRIX,
+               HSS_PARTIALLY_FACTOR,
+               HSS_COMPUTE_SCHUR,
+               HSS_FACTOR,
+               FORWARD_SOLVE,
+               LOOK_LEFT,
+               SOLVE_LOWER,
+               SOLVE_LOWER_ROOT,
+               BACKWARD_SOLVE,
+               SOLVE_UPPER,
+               LOOK_RIGHT,
+               DISTMAT_EXTRACT_ROWS,
+               DISTMAT_EXTRACT_COLS,
+               DISTMAT_EXTRACT,
+               EXPLICITLY_NAMED_TASK}; // leave this one last
 
 class TimerList;
 
@@ -142,10 +133,10 @@ public:
 
 #else // USE_TASK_TIMER
 
-#define TIMER_TIME(type, depth, timer)		\
-  TaskTimer timer(type, depth);			\
+#define TIMER_TIME(type, depth, timer) \
+  TaskTimer timer(type, depth);        \
   timer.start();
-#define TIMER_DEFINE(type, depth, timer)	\
+#define TIMER_DEFINE(type, depth, timer)        \
   TaskTimer timer(type, depth);
 #define TIMER_START(timer) timer.start();
 #define TIMER_STOP(timer) timer.stop();
