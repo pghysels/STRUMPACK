@@ -139,14 +139,14 @@ namespace strumpack {
   (const std::vector<std::size_t>& I, std::vector<std::size_t>& J, DistM_t& B) const {
     auto m = I.size();
     auto n = J.size();
-    TIMER_TIME(EXTRACT_SEP_2D, 2, t_ex_sep);
+    TIMER_TIME(TaskType::EXTRACT_SEP_2D, 2, t_ex_sep);
     {
       DistM_t tmp(ctxt, m, n);
       this->A->extract_separator_2d(this->sep_end, I, J, tmp, front_comm);
       strumpack::copy(m, n, tmp, 0, 0, B, 0, 0, ctxt_all); // TODO why this copy???
     }
     TIMER_STOP(t_ex_sep);
-    TIMER_TIME(GET_SUBMATRIX_2D, 2, t_getsub);
+    TIMER_TIME(TaskType::GET_SUBMATRIX_2D, 2, t_getsub);
     DistM_t Bl, Br;
     get_child_submatrix_2d(this->lchild, I, J, Bl);
     get_child_submatrix_2d(this->rchild, I, J, Br);
@@ -173,7 +173,7 @@ namespace strumpack {
       B.zero();
       mpi_child->extract_CB_sub_matrix_2d(I, J, B);
     } else {
-      TIMER_TIME(GET_SUBMATRIX, 2, t_getsub);
+      TIMER_TIME(TaskType::GET_SUBMATRIX, 2, t_getsub);
       auto pch = child_master(ch);
       B = DistM_t(ctxt, m, n);
       DenseM_t lB;

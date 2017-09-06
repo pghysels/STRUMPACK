@@ -133,11 +133,11 @@ namespace strumpack {
     Sr.zero();
     Sc.zero();
     auto f0 = params::flops;
-    TIMER_TIME(FRONT_MULTIPLY_2D, 1, t_fmult);
+    TIMER_TIME(TaskType::FRONT_MULTIPLY_2D, 1, t_fmult);
     this->A->front_multiply_2d(this->sep_begin, this->sep_end, this->upd, this->dim_upd,
 			       R, Sr, Sc, this->ctxt_all, this->front_comm, 0);
     TIMER_STOP(t_fmult);
-    TIMER_TIME(UUTXR, 1, t_UUtxR);
+    TIMER_TIME(TaskType::UUTXR, 1, t_UUtxR);
     params::sparse_sample_flops += params::flops - f0;
     auto f1 = params::flops;
     sample_children_CB(opts, R, Sr, Sc);
@@ -153,7 +153,7 @@ namespace strumpack {
     auto b = R.cols();
     Sr = DistM_t(this->ctxt, this->dim_upd, b);
     Sc = DistM_t(this->ctxt, this->dim_upd, b);
-    TIMER_TIME(HSS_SCHUR_PRODUCT, 2, t_sprod);
+    TIMER_TIME(TaskType::HSS_SCHUR_PRODUCT, 2, t_sprod);
     _H->Schur_product_direct(_Theta, _Vhat, _DUB01, _Phi, _ThetaVhatC, _VhatCPhiC, R, Sr, Sc);
     TIMER_STOP(t_sprod);
   }
@@ -180,7 +180,7 @@ namespace strumpack {
       DistM_t cRr(rch->ctxt, I.size(), R.cols(), R.extract_rows(I), this->ctxt_all);
       lch->sample_CB(opts, cRl, cSrl, cScl, this);
       rch->sample_CB(opts, cRr, cSrr, cScr, this);
-      TIMER_TIME(SKINNY_EXTEND_ADD_MPIMPI, 2, t_sea);
+      TIMER_TIME(TaskType::SKINNY_EXTEND_ADD_MPIMPI, 2, t_sea);
       skinny_extend_add(cSrl, cScl, cSrr, cScr, Sr, Sc);
       TIMER_STOP(t_sea);
       return;
@@ -212,13 +212,13 @@ namespace strumpack {
       auto I = ch_mpi->upd_to_parent(this);
       DistM_t cR(ch_mpi->ctxt, I.size(), R.cols(), R.extract_rows(I), this->ctxt_all);
       ch_mpi->sample_CB(opts, cR, cSr, cSc, this);
-      TIMER_TIME(SKINNY_EXTEND_ADD_MPI1, 2, t_sea);
+      TIMER_TIME(TaskType::SKINNY_EXTEND_ADD_MPI1, 2, t_sea);
       if (ch_mpi == this->lchild) skinny_extend_add(cSr, cSc, S_dummy, S_dummy, Sr, Sc);
       else skinny_extend_add(S_dummy, S_dummy, cSr, cSc, Sr, Sc);
       TIMER_STOP(t_sea);
     }
     if (ch_seq) {
-      TIMER_TIME(SKINNY_EXTEND_ADD_SEQ1, 2, t_sea);
+      TIMER_TIME(TaskType::SKINNY_EXTEND_ADD_SEQ1, 2, t_sea);
       DistM_t Stmp(this->ctxt, m, n);
       strumpack::copy(m, n, Srseq, pch, Stmp, 0, 0, this->ctxt_all);
       Sr.add(Stmp);
@@ -254,7 +254,7 @@ namespace strumpack {
     strumpack::copy(m, n, R, 0, 0, Rseq, pr, this->ctxt_all);
     if (rank == pl) this->lchild->sample_CB(opts, Rseq, Srseq, Scseq, this);
     if (rank == pr) this->rchild->sample_CB(opts, Rseq, Srseq, Scseq, this);
-    TIMER_TIME(SKINNY_EXTEND_ADD_SEQSEQ, 2, t_sea);
+    TIMER_TIME(TaskType::SKINNY_EXTEND_ADD_SEQSEQ, 2, t_sea);
     DistM_t Stmp(this->ctxt, m, n);
     strumpack::copy(m, n, Srseq, pl, Stmp, 0, 0, this->ctxt_all);
     Sr.add(Stmp);
@@ -311,7 +311,7 @@ namespace strumpack {
 
     auto mult = [&](DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
       auto f0 = params::flops;
-      TIMER_TIME(RANDOM_SAMPLING, 0, t_sampling);
+      TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
       random_sampling(opts, R, Sr, Sc, etree_level);
       params::sample_flops += params::flops - f0;
       if (_sampled_columns == 0) params::initial_sample_flops += params::flops - f0;
@@ -358,7 +358,7 @@ namespace strumpack {
     // if (opts.indirect_sampling()) HSSopts.set_user_defined_random(true);
     // _H->compress(mult, elem, HSSopts);
 
-    TIMER_TIME(HSS_COMPRESS, 0, t_compress);
+    TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_compress);
     _H->compress(mult, elem, opts.HSS_options());
     params::compression_flops += params::flops - f0;
     TIMER_STOP(t_compress);
@@ -380,12 +380,12 @@ namespace strumpack {
     if (this->dim_sep) {
       if (etree_level > 0) {
 	auto f0 = params::flops;
-	TIMER_TIME(HSS_PARTIALLY_FACTOR, 0, t_pfact);
+	TIMER_TIME(TaskType::HSS_PARTIALLY_FACTOR, 0, t_pfact);
 	_ULV = _H->partial_factor();
 	TIMER_STOP(t_pfact);
 	params::ULV_factor_flops += params::flops - f0;
 	auto f1 = params::flops;
-	TIMER_TIME(HSS_COMPUTE_SCHUR, 0, t_comp_schur);
+	TIMER_TIME(TaskType::HSS_COMPUTE_SCHUR, 0, t_comp_schur);
 	_H->Schur_update(_ULV, _Theta, _Vhat, _DUB01, _Phi);
 	if (_Theta.cols() < _Phi.cols()) {
 	  _VhatCPhiC = DistM_t(_Phi.ctxt(), _Vhat.cols(), _Phi.rows());
@@ -401,7 +401,7 @@ namespace strumpack {
 	params::schur_flops += params::flops - f1;
       } else {
 	auto f0 = params::flops;
-	TIMER_TIME(HSS_FACTOR, 0, t_fact);
+	TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
 	_ULV = _H->factor();
 	TIMER_STOP(t_fact);
 	params::ULV_factor_flops += params::flops - f0;
@@ -432,7 +432,7 @@ namespace strumpack {
     this->look_left(Bsep, wmem);
     if (etree_level) {
       if (_Theta.cols() && _Phi.cols()) {
-	TIMER_TIME(SOLVE_LOWER, 0, t_reduce);
+	TIMER_TIME(TaskType::SOLVE_LOWER, 0, t_reduce);
 	_ULVwork = std::unique_ptr<HSS::WorkSolveMPI<scalar_t>>(new HSS::WorkSolveMPI<scalar_t>());
 	DistM_t lBsep(_H->child(0)->ctxt(_H->ctxt_loc()), Bsep.rows(), Bsep.cols());
 	copy(Bsep.rows(), Bsep.cols(), Bsep, 0, 0, lBsep, 0, 0, this->ctxt_all);
@@ -446,7 +446,7 @@ namespace strumpack {
 	TIMER_STOP(t_reduce);
       }
     } else {
-      TIMER_TIME(SOLVE_LOWER_ROOT, 0, t_solve);
+      TIMER_TIME(TaskType::SOLVE_LOWER_ROOT, 0, t_solve);
       DistM_t lBsep(_H->ctxt(), Bsep.rows(), Bsep.cols());
       copy(Bsep.rows(), Bsep.cols(), Bsep, 0, 0, lBsep, 0, 0, this->ctxt_all);
       _ULVwork = std::unique_ptr<HSS::WorkSolveMPI<scalar_t>>(new HSS::WorkSolveMPI<scalar_t>());
@@ -460,7 +460,7 @@ namespace strumpack {
   (scalar_t* y_loc, DistM_t* y_dist, scalar_t* wmem, int etree_level, int task_depth) {
     DistM_t& Ysep = y_dist[this->sep];
     DistMW_t Yupd(_H->ctxt(), this->dim_upd, 1, wmem+this->p_wmem);
-    TIMER_TIME(SOLVE_UPPER, 0, t_expand);
+    TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_expand);
     if (etree_level) {
       if (_Phi.cols() && _Theta.cols()) {
 	DistM_t lYsep(_H->child(0)->ctxt(_H->ctxt_loc()), Ysep.rows(), Ysep.cols());
@@ -502,7 +502,7 @@ namespace strumpack {
       assert(j < std::size_t(this->dim_blk));
       gJ.push_back((j < std::size_t(this->dim_sep)) ? j+this->sep_begin : this->upd[j-this->dim_sep]);
     }
-    TIMER_TIME(EXTRACT_2D, 1, t_ex);
+    TIMER_TIME(TaskType::EXTRACT_2D, 1, t_ex);
     this->extract_2d(gI, gJ, B);
     TIMER_STOP(t_ex);
   }
@@ -517,7 +517,7 @@ namespace strumpack {
   FrontalMatrixHSSMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
   (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J, DistM_t& B) const {
     if (this->front_comm == MPI_COMM_NULL || !this->dim_upd) return;
-    TIMER_TIME(HSS_EXTRACT_SCHUR, 3, t_ex_schur);
+    TIMER_TIME(TaskType::HSS_EXTRACT_SCHUR, 3, t_ex_schur);
     std::vector<std::size_t> lI, lJ, oI, oJ;
     this->find_upd_indices(J, lJ, oJ);
     this->find_upd_indices(I, lI, oI);

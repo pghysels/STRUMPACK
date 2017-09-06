@@ -567,7 +567,7 @@ namespace strumpack {
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::random() {
     if (!active()) return;
-    TIMER_TIME(RANDOM_GENERATE, 1, t_gen);
+    TIMER_TIME(TaskType::RANDOM_GENERATE, 1, t_gen);
     auto rgen = random::make_default_random_generator<real_t>();
     rgen->seed(_prow, _pcol);
     int rlo, rhi, clo, chi;
@@ -581,7 +581,7 @@ namespace strumpack {
   (random::RandomGeneratorBase<typename RealType<scalar_t>::
    value_type>& rgen) {
     if (!active()) return;
-    TIMER_TIME(RANDOM_GENERATE, 1, t_gen);
+    TIMER_TIME(TaskType::RANDOM_GENERATE, 1, t_gen);
     int rlo, rhi, clo, chi;
     lranges(rlo, rhi, clo, chi);
     for (int c=clo; c<chi; ++c)
@@ -656,7 +656,7 @@ namespace strumpack {
   template<typename scalar_t> DistributedMatrix<scalar_t>
   DistributedMatrix<scalar_t>::extract_rows
   (const std::vector<std::size_t>& Ir) const {
-    TIMER_TIME(DISTMAT_EXTRACT_ROWS, 1, t_dist_mat_extract_rows);
+    TIMER_TIME(TaskType::DISTMAT_EXTRACT_ROWS, 1, t_dist_mat_extract_rows);
     DistributedMatrix<scalar_t> tmp(ctxt(), Ir.size(), cols());
     if (!active()) return tmp;
     for (std::size_t r=0; r<Ir.size(); r++)
@@ -667,7 +667,7 @@ namespace strumpack {
   template<typename scalar_t> DistributedMatrix<scalar_t>
   DistributedMatrix<scalar_t>::extract_cols
   (const std::vector<std::size_t>& Jc) const {
-    TIMER_TIME(DISTMAT_EXTRACT_COLS, 1, t_dist_mat_extract_cols);
+    TIMER_TIME(TaskType::DISTMAT_EXTRACT_COLS, 1, t_dist_mat_extract_cols);
     DistributedMatrix<scalar_t> tmp(ctxt(), rows(), Jc.size());
     if (!active()) return tmp;
     for (std::size_t c=0; c<Jc.size(); c++)
@@ -679,7 +679,7 @@ namespace strumpack {
   DistributedMatrix<scalar_t>::extract
   (const std::vector<std::size_t>& I,
    const std::vector<std::size_t>& J) const {
-    TIMER_TIME(DISTMAT_EXTRACT, 1, t_dist_mat_extract);
+    TIMER_TIME(TaskType::DISTMAT_EXTRACT, 1, t_dist_mat_extract);
     // TODO optimize this!??
     DistributedMatrix<scalar_t> B(ctxt(), I.size(), J.size());
     auto tmp = gather();
@@ -933,7 +933,7 @@ namespace strumpack {
     // ID_column, then do local transpose of output X_T to get back in
     // the original blacs grid
     if (!active()) return;
-    TIMER_TIME(HSS_PARHQRINTERPOL, 1, t_hss_par_hqr);
+    TIMER_TIME(TaskType::HSS_PARHQRINTERPOL, 1, t_hss_par_hqr);
     assert(I()==1 && J()==1);
     DistributedMatrix<scalar_t> this_T(ctxt_T, cols(), rows());
     blas::omatcopy('T', lrows(), lcols(), data(), ld(),

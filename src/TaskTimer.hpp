@@ -48,37 +48,17 @@
   typedef timer::time_point tpoint;
 #endif
 
-enum TaskType {RANDOM_SAMPLING = 0,
-               RANDOM_GENERATE,
-               FRONT_MULTIPLY_2D,
-               UUTXR,
-               HSS_SCHUR_PRODUCT,
-               SKINNY_EXTEND_ADD_SEQSEQ,
-               SKINNY_EXTEND_ADD_SEQ1,
-               SKINNY_EXTEND_ADD_MPIMPI,
-               SKINNY_EXTEND_ADD_MPI1,
-               HSS_COMPRESS,
-               HSS_PARHQRINTERPOL,
-               HSS_SEQHQRINTERPOL,
-               EXTRACT_2D,
-               EXTRACT_SEP_2D,
-               GET_SUBMATRIX_2D,
-               HSS_EXTRACT_SCHUR,
-               GET_SUBMATRIX,
-               HSS_PARTIALLY_FACTOR,
-               HSS_COMPUTE_SCHUR,
-               HSS_FACTOR,
-               FORWARD_SOLVE,
-               LOOK_LEFT,
-               SOLVE_LOWER,
-               SOLVE_LOWER_ROOT,
-               BACKWARD_SOLVE,
-               SOLVE_UPPER,
-               LOOK_RIGHT,
-               DISTMAT_EXTRACT_ROWS,
-               DISTMAT_EXTRACT_COLS,
-               DISTMAT_EXTRACT,
-               EXPLICITLY_NAMED_TASK}; // leave this one last
+enum class TaskType : int {
+  RANDOM_SAMPLING=0, RANDOM_GENERATE, FRONT_MULTIPLY_2D, UUTXR,
+  HSS_SCHUR_PRODUCT, SKINNY_EXTEND_ADD_SEQSEQ, SKINNY_EXTEND_ADD_SEQ1,
+  SKINNY_EXTEND_ADD_MPIMPI, SKINNY_EXTEND_ADD_MPI1, HSS_COMPRESS,
+  HSS_PARHQRINTERPOL, HSS_SEQHQRINTERPOL, EXTRACT_2D,
+  EXTRACT_SEP_2D, GET_SUBMATRIX_2D,  HSS_EXTRACT_SCHUR, GET_SUBMATRIX,
+  HSS_PARTIALLY_FACTOR, HSS_COMPUTE_SCHUR, HSS_FACTOR,
+  FORWARD_SOLVE, LOOK_LEFT, SOLVE_LOWER, SOLVE_LOWER_ROOT,
+  BACKWARD_SOLVE, SOLVE_UPPER, LOOK_RIGHT, DISTMAT_EXTRACT_ROWS,
+  DISTMAT_EXTRACT_COLS, DISTMAT_EXTRACT,
+  EXPLICITLY_NAMED_TASK}; // leave this one last
 
 class TimerList;
 

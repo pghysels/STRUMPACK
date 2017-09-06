@@ -236,7 +236,7 @@ namespace strumpack {
     Bupd.zero();
     this->look_left(b_dist[this->sep], wmem);
     if (this->dim_sep) {
-      TIMER_TIME(SOLVE_LOWER, 0, t_s);
+      TIMER_TIME(TaskType::SOLVE_LOWER, 0, t_s);
       b_dist[this->sep].permute_rows_fwd(piv);
       trsv(UpLo::L, Trans::N, Diag::U, F11, b_dist[this->sep]);
       if (this->dim_upd)
@@ -249,7 +249,7 @@ namespace strumpack {
   FrontalMatrixDenseMPI<scalar_t,integer_t>::backward_multifrontal_solve
   (scalar_t* y_loc, DistM_t* y_dist, scalar_t* wmem, int etree_level, int task_depth) {
     if (this->dim_sep) {
-      TIMER_TIME(SOLVE_UPPER, 0, t_s);
+      TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_s);
       if (this->dim_upd) {
 	DistMW_t Yupd(this->ctxt, this->dim_upd, 1, wmem+this->p_wmem);
 	gemv(Trans::N, scalar_t(-1.), F12, Yupd, scalar_t(1.), y_dist[this->sep]);

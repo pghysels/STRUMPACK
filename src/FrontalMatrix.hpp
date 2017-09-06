@@ -275,34 +275,34 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::look_left(DistM_t& b_sep, scalar_t* wmem) {
-    TIMER_TIME(LOOK_LEFT, 0, t_look);
+    TIMER_TIME(TaskType::LOOK_LEFT, 0, t_look);
     if (lchild) extend_add_b(lchild, b_sep, wmem, 0);
     if (rchild) extend_add_b(rchild, b_sep, wmem, 1);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::look_right(DistM_t& y_sep, scalar_t* wmem) {
-    TIMER_TIME(LOOK_RIGHT, 0, t_look);
+    TIMER_TIME(TaskType::LOOK_RIGHT, 0, t_look);
     if (lchild) extract_b(lchild, y_sep, wmem);
     if (rchild) extract_b(rchild, y_sep, wmem);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::multifrontal_solve(scalar_t* b, scalar_t* wmem) {
-    TIMER_TIME(FORWARD_SOLVE, 0, t_fwd);
+    TIMER_TIME(TaskType::FORWARD_SOLVE, 0, t_fwd);
     forward_multifrontal_solve(b, wmem);
     TIMER_STOP(t_fwd);
-    TIMER_TIME(BACKWARD_SOLVE, 0, t_bwd);
+    TIMER_TIME(TaskType::BACKWARD_SOLVE, 0, t_bwd);
     backward_multifrontal_solve(b, wmem);
     TIMER_STOP(t_bwd);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::multifrontal_solve(scalar_t* b_loc, DistM_t* b_dist, scalar_t* wmem) {
-    TIMER_TIME(FORWARD_SOLVE, 0, t_fwd);
+    TIMER_TIME(TaskType::FORWARD_SOLVE, 0, t_fwd);
     forward_multifrontal_solve(b_loc, b_dist, wmem);
     TIMER_STOP(t_fwd);
-    TIMER_TIME(BACKWARD_SOLVE, 0, t_bwd);
+    TIMER_TIME(TaskType::BACKWARD_SOLVE, 0, t_bwd);
     backward_multifrontal_solve(b_loc, b_dist, wmem);
     TIMER_STOP(t_bwd);
   }

@@ -42,7 +42,7 @@ TimerList TaskTimer::time_log_list = TimerList();
 
 TaskTimer::TaskTimer(std::string name, int depth)
   : t_name(name), started(false), stopped(false),
-    type(EXPLICITLY_NAMED_TASK), number(depth) {
+    type(TaskType::EXPLICITLY_NAMED_TASK), number(depth) {
 #if defined(_OPENMP)
   tid = omp_get_thread_num();
 #else
@@ -52,7 +52,7 @@ TaskTimer::TaskTimer(std::string name, int depth)
 
 TaskTimer::TaskTimer(std::string name, std::function<void()> f, int depth)
   : t_name(name), started(false), stopped(false),
-    type(EXPLICITLY_NAMED_TASK), number(depth) {
+    type(TaskType::EXPLICITLY_NAMED_TASK), number(depth) {
 #if defined(_OPENMP)
   tid = omp_get_thread_num();
 #else
@@ -101,39 +101,44 @@ double TaskTimer::elapsed() {
 }
 
 void TaskTimer::print_name(std::ostream& os) {
-  if (type == EXPLICITLY_NAMED_TASK) {
+  if (type == TaskType::EXPLICITLY_NAMED_TASK) {
     os << t_name;
   } else {
     switch (type) {
-    case RANDOM_SAMPLING:           os << "RANDOM_SAMPLING"; break;
-    case RANDOM_GENERATE:           os << "RANDOM_GENERATE"; break;
-    case FRONT_MULTIPLY_2D:         os << "FRONT_MULTIPLY_2D"; break;
-    case UUTXR:                     os << "UUTXR"; break;
-    case HSS_SCHUR_PRODUCT:         os << "HSS_SCHUR_PRODUCT"; break;
-    case SKINNY_EXTEND_ADD_SEQSEQ:  os << "SKINNY_EXTEND_ADD_SEQSEQ"; break;
-    case SKINNY_EXTEND_ADD_SEQ1:    os << "SKINNY_EXTEND_ADD_SEQ1"; break;
-    case SKINNY_EXTEND_ADD_MPIMPI:  os << "SKINNY_EXTEND_ADD_MPIMPI"; break;
-    case SKINNY_EXTEND_ADD_MPI1:    os << "SKINNY_EXTEND_ADD_MPI1"; break;
-    case HSS_COMPRESS:              os << "HSS_COMPRESS"; break;
-    case HSS_PARHQRINTERPOL:        os << "HSS_PARHQRINTERPOL"; break;
-    case HSS_SEQHQRINTERPOL:        os << "HSS_SEQHQRINTERPOL"; break;
-    case EXTRACT_2D:                os << "EXTRACT_2D"; break;
-    case EXTRACT_SEP_2D:            os << "EXTRACT_SEP_2D"; break;
-    case GET_SUBMATRIX_2D:          os << "GET_SUBMATRIX_2D"; break;
-    case HSS_EXTRACT_SCHUR:         os << "HSS_EXTRACT_SCHUR"; break;
-    case HSS_PARTIALLY_FACTOR:      os << "HSS_PARTIALLY_FACTOR"; break;
-    case HSS_COMPUTE_SCHUR:         os << "HSS_COMPUTE_SCHUR"; break;
-    case HSS_FACTOR:                os << "HSS_FACTOR"; break;
-    case FORWARD_SOLVE:             os << "FORWARD_SOLVE"; break;
-    case LOOK_LEFT:                 os << "LOOK_LEFT"; break;
-    case SOLVE_LOWER:               os << "SOLVE_LOWER"; break;
-    case SOLVE_LOWER_ROOT:          os << "SOLVE_LOWER_ROOT"; break;
-    case BACKWARD_SOLVE:            os << "BACKWARD_SOLVE"; break;
-    case SOLVE_UPPER:               os << "SOLVE_UPPER"; break;
-    case LOOK_RIGHT:                os << "LOOK_RIGHT"; break;
-    case DISTMAT_EXTRACT_ROWS:      os << "DISTMAT_EXTRACT_ROWS"; break;
-    case DISTMAT_EXTRACT_COLS:      os << "DISTMAT_EXTRACT_COLS"; break;
-    case DISTMAT_EXTRACT:           os << "DISTMAT_EXTRACT"; break;
+    case TaskType::RANDOM_SAMPLING:       os << "RANDOM_SAMPLING"; break;
+    case TaskType::RANDOM_GENERATE:       os << "RANDOM_GENERATE"; break;
+    case TaskType::FRONT_MULTIPLY_2D:     os << "FRONT_MULTIPLY_2D"; break;
+    case TaskType::UUTXR:                 os << "UUTXR"; break;
+    case TaskType::HSS_SCHUR_PRODUCT:
+      os << "HSS_SCHUR_PRODUCT"; break;
+    case TaskType::SKINNY_EXTEND_ADD_SEQSEQ:
+      os << "SKINNY_EXTEND_ADD_SEQSEQ"; break;
+    case TaskType::SKINNY_EXTEND_ADD_SEQ1:
+      os << "SKINNY_EXTEND_ADD_SEQ1"; break;
+    case TaskType::SKINNY_EXTEND_ADD_MPIMPI:
+      os << "SKINNY_EXTEND_ADD_MPIMPI"; break;
+    case TaskType::SKINNY_EXTEND_ADD_MPI1:
+      os << "SKINNY_EXTEND_ADD_MPI1"; break;
+    case TaskType::HSS_COMPRESS:          os << "HSS_COMPRESS"; break;
+    case TaskType::HSS_PARHQRINTERPOL:    os << "HSS_PARHQRINTERPOL"; break;
+    case TaskType::HSS_SEQHQRINTERPOL:    os << "HSS_SEQHQRINTERPOL"; break;
+    case TaskType::EXTRACT_2D:            os << "EXTRACT_2D"; break;
+    case TaskType::EXTRACT_SEP_2D:        os << "EXTRACT_SEP_2D"; break;
+    case TaskType::GET_SUBMATRIX_2D:      os << "GET_SUBMATRIX_2D"; break;
+    case TaskType::HSS_EXTRACT_SCHUR:     os << "HSS_EXTRACT_SCHUR"; break;
+    case TaskType::HSS_PARTIALLY_FACTOR:  os << "HSS_PARTIALLY_FACTOR"; break;
+    case TaskType::HSS_COMPUTE_SCHUR:     os << "HSS_COMPUTE_SCHUR"; break;
+    case TaskType::HSS_FACTOR:            os << "HSS_FACTOR"; break;
+    case TaskType::FORWARD_SOLVE:         os << "FORWARD_SOLVE"; break;
+    case TaskType::LOOK_LEFT:             os << "LOOK_LEFT"; break;
+    case TaskType::SOLVE_LOWER:           os << "SOLVE_LOWER"; break;
+    case TaskType::SOLVE_LOWER_ROOT:      os << "SOLVE_LOWER_ROOT"; break;
+    case TaskType::BACKWARD_SOLVE:        os << "BACKWARD_SOLVE"; break;
+    case TaskType::SOLVE_UPPER:           os << "SOLVE_UPPER"; break;
+    case TaskType::LOOK_RIGHT:            os << "LOOK_RIGHT"; break;
+    case TaskType::DISTMAT_EXTRACT_ROWS:  os << "DISTMAT_EXTRACT_ROWS"; break;
+    case TaskType::DISTMAT_EXTRACT_COLS:  os << "DISTMAT_EXTRACT_COLS"; break;
+    case TaskType::DISTMAT_EXTRACT:       os << "DISTMAT_EXTRACT"; break;
     default: os << "SOMEOTHERTAKSNOTNAMED";
     }
   }
@@ -226,7 +231,7 @@ void TimerList::finalize() {
   }
   for (int p=mpi_rank(); p<=mpi_nprocs(); p++) MPI_Barrier(MPI_COMM_WORLD);
 
-  int timers = EXPLICITLY_NAMED_TASK;
+  int timers = int(TaskType::EXPLICITLY_NAMED_TASK);
   auto t = new double[4*timers];
   auto t_sum = t+timers;
   auto t_min = t+2*timers;
@@ -235,19 +240,18 @@ void TimerList::finalize() {
   int i=0;
   for (unsigned int thread=0; thread<list.size(); thread++)
     for (auto timing : list[thread])
-      t[timing.type] += timing.elapsed();
+      t[int(timing.type)] += timing.elapsed();
   MPI_Reduce(t, t_sum, timers, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   MPI_Reduce(t, t_min, timers, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
   MPI_Reduce(t, t_max, timers, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
   if (!mpi_rank()) {
-    i=0;
     auto P = mpi_nprocs();
-    auto print_line = [&](const std::string& op) {
+    auto print_line = [&](const std::string& op, TaskType idx) {
       std::cout << "|" << op << "| "
-      << std::setw(10) << t_sum[i] << " | "
-      << std::setw(10) << t_min[i] << " | "
-      << std::setw(10) << t_max[i] << " | "
-      << std::setw(10) << t_sum[i]/P << " |"
+      << std::setw(10) << t_sum[int(idx)] << " | "
+      << std::setw(10) << t_min[int(idx)] << " | "
+      << std::setw(10) << t_max[int(idx)] << " | "
+      << std::setw(10) << t_sum[int(idx)]/P << " |"
       << std::endl;
       i++;
     };
@@ -260,40 +264,47 @@ void TimerList::finalize() {
     std::cout << "| Op                         |    total   |     min    |"
               << "     max    |     avg    |\n";
     std::cout << hline;
-    print_line(" random_sampling            ");
-    print_line("    random_generate         ");
-    print_line("    front_multiply_2d       ");
-    print_line("    UUtxR                   ");
-    print_line("       HSS_Schur_product    ");
-    print_line("       skinny_extend_add_ss ");
-    print_line("       skinny_extend_add_s  ");
-    print_line("       skinny_extend_add_mm ");
-    print_line("       skinny_extend_add_m  ");
+    print_line(" random_sampling            ", TaskType::RANDOM_SAMPLING);
+    print_line("    random_generate         ", TaskType::RANDOM_GENERATE);
+    print_line("    front_multiply_2d       ", TaskType::FRONT_MULTIPLY_2D);
+    print_line("    UUtxR                   ", TaskType::UUTXR);
+    print_line("       HSS_Schur_product    ", TaskType::HSS_SCHUR_PRODUCT);
+    print_line("       skinny_extend_add_ss ",
+               TaskType::SKINNY_EXTEND_ADD_SEQSEQ);
+    print_line("       skinny_extend_add_s  ",
+               TaskType::SKINNY_EXTEND_ADD_SEQ1);
+    print_line("       skinny_extend_add_mm ",
+               TaskType::SKINNY_EXTEND_ADD_MPIMPI);
+    print_line("       skinny_extend_add_m  ",
+               TaskType::SKINNY_EXTEND_ADD_MPI1);
     std::cout << hline;
-    print_line(" HSS_compress               ");
-    print_line("    HSS_parHQRInterpol      ");
-    print_line("    HSS_seqHQRInterpol      ");
-    print_line("    extract_2d              ");
-    print_line("       extract_sep_2d       ");
-    print_line("       get_submatrix_2d     ");
-    print_line("          HSS_extract_Schur ");
-    print_line("       get_submatrix        ");
+    print_line(" HSS_compress               ", TaskType::HSS_COMPRESS);
+    print_line("    HSS_parHQRInterpol      ", TaskType::HSS_PARHQRINTERPOL);
+    print_line("    HSS_seqHQRInterpol      ", TaskType::HSS_SEQHQRINTERPOL);
+    print_line("    extract_2d              ", TaskType::EXTRACT_2D);
+    print_line("       extract_sep_2d       ", TaskType::EXTRACT_SEP_2D);
+    print_line("       get_submatrix_2d     ", TaskType::GET_SUBMATRIX_2D);
+    print_line("          HSS_extract_Schur ", TaskType::HSS_EXTRACT_SCHUR);
+    print_line("       get_submatrix        ", TaskType::GET_SUBMATRIX);
     std::cout << hline;
-    print_line(" HSS_partially_factor       ");
-    print_line(" HSS_compute_Schur          ");
-    print_line(" HSS_factor                 ");
+    print_line(" HSS_partially_factor       ",
+               TaskType::HSS_PARTIALLY_FACTOR);
+    print_line(" HSS_compute_Schur          ", TaskType::HSS_COMPUTE_SCHUR);
+    print_line(" HSS_factor                 ", TaskType::HSS_FACTOR);
     std::cout << hline;
-    print_line(" Forward_solve              ");
-    print_line("    look_left               ");
-    print_line("    solve_lower             ");
-    print_line("    solve_lower_root        ");
-    print_line(" Backward_solve             ");
-    print_line("    solve_upper             ");
-    print_line("    look_right              ");
+    print_line(" Forward_solve              ", TaskType::FORWARD_SOLVE);
+    print_line("    look_left               ", TaskType::LOOK_LEFT);
+    print_line("    solve_lower             ", TaskType::SOLVE_LOWER);
+    print_line("    solve_lower_root        ", TaskType::SOLVE_LOWER_ROOT);
+    print_line(" Backward_solve             ", TaskType::BACKWARD_SOLVE);
+    print_line("    solve_upper             ", TaskType::SOLVE_UPPER);
+    print_line("    look_right              ", TaskType::LOOK_RIGHT);
     std::cout << hline;
-    print_line(" DISTMAT_EXTRACT_ROWS       ");
-    print_line(" DISTMAT_EXTRACT_COLS       ");
-    print_line(" DISTMAT_EXTRACT            ");
+    print_line(" DISTMAT_EXTRACT_ROWS       ",
+               TaskType::DISTMAT_EXTRACT_ROWS);
+    print_line(" DISTMAT_EXTRACT_COLS       ",
+               TaskType::DISTMAT_EXTRACT_COLS);
+    print_line(" DISTMAT_EXTRACT            ", TaskType::DISTMAT_EXTRACT);
     std::cout << "+=========================================================="
               << "======================+";
     std::cout << std::endl;

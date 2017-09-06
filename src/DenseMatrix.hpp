@@ -334,7 +334,7 @@ namespace strumpack {
   DenseMatrix<scalar_t>::random
   (random::RandomGeneratorBase<typename RealType<scalar_t>::
    value_type>& rgen) {
-    TIMER_TIME(RANDOM_GENERATE, 1, t_gen);
+    TIMER_TIME(TaskType::RANDOM_GENERATE, 1, t_gen);
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
         operator()(i,j) = rgen.get();
@@ -342,7 +342,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t> void DenseMatrix<scalar_t>::random() {
-    TIMER_TIME(RANDOM_GENERATE, 1, t_gen);
+    TIMER_TIME(TaskType::RANDOM_GENERATE, 1, t_gen);
     auto rgen = random::make_default_random_generator<real_t>();
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
@@ -650,7 +650,7 @@ namespace strumpack {
    std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
    int max_rank, int depth) const {
     // TODO optimize by implementing by row directly, avoiding transposes
-    TIMER_TIME(HSS_SEQHQRINTERPOL, 1, t_hss_seq_hqr);
+    TIMER_TIME(TaskType::HSS_SEQHQRINTERPOL, 1, t_hss_seq_hqr);
     DenseMatrix<scalar_t> Xt;
     transpose().ID_column(Xt, piv, ind, rel_tol, abs_tol, max_rank, depth);
     X = Xt.transpose();
