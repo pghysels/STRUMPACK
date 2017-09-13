@@ -60,11 +60,11 @@ test(int argc, char* argv[], CSRMatrixMPI<scalar,integer>* Adist) {
 				  Adist->get_val(), Adist->get_dist().data(), Adist->has_symmetric_sparsity());
   if (spss.reorder() != ReturnCode::SUCCESS) {
     if (!rank) std::cout << "problem with reordering of the matrix." << std::endl;
-    return 1;
+    MPI_Abort(MPI_COMM_WORLD, 1);
   }
   if (spss.factor() != ReturnCode::SUCCESS) {
     if (!rank) std::cout << "problem during factorization of the matrix." << std::endl;
-    return 1;
+    MPI_Abort(MPI_COMM_WORLD, 1);
   }
   spss.solve(b.data(), x.data());
 
@@ -76,8 +76,9 @@ test(int argc, char* argv[], CSRMatrixMPI<scalar,integer>* Adist) {
   auto nrm_x_exact = nrm2_omp_mpi(n_local, x_exact.data(), 1, MPI_COMM_WORLD);
   if (!rank) std::cout << "# RELATIVE ERROR = " << (nrm_error/nrm_x_exact) << std::endl;
 
-  if (scaled_res > ERROR_TOLERANCE*spss.options().rel_tol()) return 1;
-  else return 0;
+  if (scaled_res > ERROR_TOLERANCE*spss.options().rel_tol())
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  return 0;
 }
 
 int main(int argc, char* argv[]) {
@@ -110,7 +111,7 @@ int main(int argc, char* argv[]) {
 		<< "or\n\tmpirun -n 4 ./testMMdoubleMPIDist b pde900.bin" << std::endl
 		<< "Specify the matrix input file with 'm filename' if the matrix is in matrix-market format," << std::endl
 		<< "or with 'b filename' if the matrix is in binary." << std::endl;
-    return 1;
+    MPI_Abort(MPI_COMM_WORLD, 1);
   }
 
   MPI_Errhandler eh;
@@ -149,8 +150,8 @@ int main(int argc, char* argv[]) {
       if (binary_input) ierr = A_c->read_binary(f);
       else ierr = A_c->read_matrix_market(f);
       if (ierr) {
-	std::cerr << "Could not read matrix from file." << std::endl;
-	return 1;
+        std::cerr << "Could not read matrix from file." << std::endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
       }
       std::vector<int> perm;
       std::vector<std::complex<double>> Dr;

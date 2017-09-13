@@ -127,7 +127,7 @@ int run(int argc, char* argv[]) {
     }
   } else {
     if (!mpi_rank()) cout << "# compression failed!!!!!!!!" << endl;
-    return 1;
+    MPI_Abort(MPI_COMM_WORLD, 1);
   }
 
   auto Hrank = H.max_rank();
@@ -155,7 +155,7 @@ int run(int argc, char* argv[]) {
   if (A.active() && HnormF / AnormF >
       ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
     if (!mpi_rank()) cout << "ERROR: compression error too big!!" << endl;
-    return 1;
+    MPI_Abort(MPI_COMM_WORLD, 1);
   }
 
   {
@@ -220,7 +220,7 @@ int run(int argc, char* argv[]) {
   if (A.active() && ex_err / iex >
       ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
     if (!mpi_rank()) cout << "ERROR: extraction error too big!!" << endl;
-    return 1;
+    MPI_Abort(MPI_COMM_WORLD, 1);
   }
 
   vector<size_t> I, J;
@@ -245,7 +245,7 @@ int run(int argc, char* argv[]) {
   if (sub.active() && relsubnorm >
       ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
     if (!mpi_rank()) cout << "ERROR: extraction error too big!!" << endl;
-    return 1;
+    MPI_Abort(MPI_COMM_WORLD, 1);
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
@@ -270,7 +270,7 @@ int run(int argc, char* argv[]) {
   if (B.active() && Bchecknorm / Bnorm > SOLVE_TOLERANCE) {
     if (!mpi_rank())
       cout << "ERROR: ULV solve relative error too big!!" << endl;
-    return 1;
+    MPI_Abort(MPI_COMM_WORLD, 1);
   }
 
   if (!mpi_rank()) cout << "# test succeeded, exiting" << endl;
