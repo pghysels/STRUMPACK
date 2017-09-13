@@ -636,6 +636,15 @@ namespace strumpack {
     auto tau = new scalar_t[minmn];
     blas::geqrfmod(rows(), cols(), data(), ld(), tau, &info, depth);
     // TODO threading!!
+    real_t Rmax = std::abs(operator()(0, 0));
+    real_t Rmin = Rmax;
+    for (int i=0; i<minmn; i++) {
+      auto Rii = std::abs(operator()(i, i));
+      Rmax = std::max(Rmax, Rii);
+      Rmin = std::min(Rmin, Rii);
+    }
+    r_max = Rmax;
+    r_min = Rmin;
     blas::xxgqr(rows(), minmn, minmn, data(), ld(), tau, &info);
     if (cols() > rows()) {
       DenseMatrixWrapper<scalar_t> tmp
