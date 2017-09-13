@@ -138,9 +138,9 @@ namespace strumpack {
       int u_rows = this->leaf() ? this->rows() :
         this->_ch[0]->U_rank()+this->_ch[1]->U_rank();
       if (!w.Sr.active()) return;
-      bool check_basis = update_orthogonal_basis
-        (opts, w.Sr, w.Qr, d, dd, this->_U_state == State::UNTOUCHED);
-      if (d+dd >= opts.max_rank() || d+dd >= u_rows || check_basis) {
+      if (d+dd >= opts.max_rank() || d+dd >= u_rows ||
+          update_orthogonal_basis
+          (opts, w.Sr, w.Qr, d, dd, this->_U_state == State::UNTOUCHED)) {
         w.Qr.clear();
         auto f0 = params::flops;
         // TODO pass max_rank to ID in DistributedMatrix
@@ -168,9 +168,9 @@ namespace strumpack {
       int v_rows = this->leaf() ? this->rows() :
         this->_ch[0]->V_rank()+this->_ch[1]->V_rank();
       if (!w.Sc.active()) return;
-      bool check_basis = update_orthogonal_basis
-        (opts, w.Sc, w.Qc, d, dd, this->_V_state == State::UNTOUCHED);
-      if (d+dd >= opts.max_rank() || d+dd >= v_rows || check_basis) {
+      if (d+dd >= opts.max_rank() || d+dd >= v_rows ||
+          update_orthogonal_basis
+          (opts, w.Sc, w.Qc, d, dd, this->_V_state == State::UNTOUCHED)) {
         w.Qc.clear();
         auto f0 = params::flops;
         // TODO pass max_rank to ID in DistributedMatrix

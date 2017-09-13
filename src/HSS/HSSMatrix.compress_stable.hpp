@@ -165,10 +165,10 @@ namespace strumpack {
       int u_rows = this->leaf() ? this->rows() :
         this->_ch[0]->U_rank()+this->_ch[1]->U_rank();
       DenseMW_t lSr(u_rows, d+dd, Sr, w.offset.second, 0);
-      bool check_basis = update_orthogonal_basis
-        (opts, w.U_r_max, lSr, w.Qr, d, dd,
-         this->_U_state == State::UNTOUCHED, depth);
-      if (d+dd >= opts.max_rank() || d+dd >= int(u_rows) || check_basis) {
+      if (d+dd >= opts.max_rank() || d+dd >= int(u_rows) ||
+          update_orthogonal_basis
+          (opts, w.U_r_max, lSr, w.Qr, d, dd,
+           this->_U_state == State::UNTOUCHED, depth)) {
         w.Qr.clear();
         auto f0 = params::flops;
         lSr.ID_row(_U.E(), _U.P(), w.Jr, opts.rel_tol(), opts.abs_tol(),
@@ -199,10 +199,10 @@ namespace strumpack {
       int v_rows = this->leaf() ? this->rows() :
         this->_ch[0]->V_rank()+this->_ch[1]->V_rank();
       DenseMW_t lSc(v_rows, d+dd, Sc, w.offset.second, 0);
-      bool check_basis = update_orthogonal_basis
-        (opts, w.V_r_max, lSc, w.Qc, d, dd,
-         this->_V_state == State::UNTOUCHED, depth);
-      if (d+dd >= opts.max_rank() || d+dd >= v_rows || check_basis) {
+      if (d+dd >= opts.max_rank() || d+dd >= v_rows ||
+          update_orthogonal_basis
+          (opts, w.V_r_max, lSc, w.Qc, d, dd,
+           this->_V_state == State::UNTOUCHED, depth)) {
         w.Qc.clear();
         auto f0 = params::flops;
         lSc.ID_row(_V.E(), _V.P(), w.Jc, opts.rel_tol(), opts.abs_tol(),
