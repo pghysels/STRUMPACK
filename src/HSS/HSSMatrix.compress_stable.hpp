@@ -271,7 +271,7 @@ namespace strumpack {
      DenseM_t& S, DenseM_t& Q, int d, int dd,
      bool untouched, int depth) {
       int m = S.rows();
-      if (d >= m) return real_t(0.);
+      if (d >= m) return true;
       Q.resize(m, d+dd);
       copy(m, dd, S, 0, d, Q, 0, d);
       DenseMW_t Q2, Q12;

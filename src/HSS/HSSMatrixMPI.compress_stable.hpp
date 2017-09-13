@@ -196,7 +196,7 @@ namespace strumpack {
     (const opts_t& opts, DistM_t& S, DistM_t& Q,
      int d, int dd, bool untouched) {
       int m = S.rows();
-      if (d >= m) return real_t(0.);
+      if (d >= m) return true;
       if (Q.cols() == 0) Q = DistM_t(_ctxt, m, d+dd);
       else Q.resize(m, d+dd);
       copy(m, dd, S, 0, d, Q, 0, d, _ctxt);
