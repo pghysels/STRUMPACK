@@ -94,8 +94,8 @@ namespace strumpack {
       void compute_V_basis_stable(DenseM_t& Sc, const opts_t& opts, WorkCompress<scalar_t>& w, int d, int dd, int depth);
       void reduce_local_samples(DenseM_t& Rr, DenseM_t& Rc, WorkCompress<scalar_t>& w, int d0, int d, int depth);
       bool update_orthogonal_basis(const opts_t& opts, scalar_t& r_max_0,
-                                   DenseM_t& S, DenseM_t& Q, int d, int dd,
-                                   bool untouched, int depth);
+                                   const DenseM_t& S, DenseM_t& Q,
+                                   int d, int dd, bool untouched, int depth);
       void set_U_full_rank(WorkCompress<scalar_t>& w);
       void set_V_full_rank(WorkCompress<scalar_t>& w);
 

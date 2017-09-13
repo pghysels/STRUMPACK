@@ -268,7 +268,7 @@ namespace strumpack {
     template<typename scalar_t> bool
     HSSMatrix<scalar_t>::update_orthogonal_basis
     (const opts_t& opts, scalar_t& r_max_0,
-     DenseM_t& S, DenseM_t& Q, int d, int dd,
+     const DenseM_t& S, DenseM_t& Q, int d, int dd,
      bool untouched, int depth) {
       int m = S.rows();
       if (d >= m) return true;

@@ -193,7 +193,7 @@ namespace strumpack {
 
     template<typename scalar_t> bool
     HSSMatrixMPI<scalar_t>::update_orthogonal_basis
-    (const opts_t& opts, DistM_t& S, DistM_t& Q,
+    (const opts_t& opts, const DistM_t& S, DistM_t& Q,
      int d, int dd, bool untouched) {
       int m = S.rows();
       if (d >= m) return true;
