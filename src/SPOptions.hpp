@@ -43,6 +43,7 @@ namespace strumpack {
 
   // TODO move this to MatrixReordering class
   enum class ReorderingStrategy {
+    NATURAL,    /*!< Do not reorder the system                      */
     METIS,      /*!< Use Metis nested-dissection reordering         */
     PARMETIS,   /*!< Use ParMetis nested-dissection reordering      */
     SCOTCH,     /*!< Use Scotch nested-dissection reordering        */
@@ -77,6 +78,7 @@ namespace strumpack {
 
   inline std::string get_name(ReorderingStrategy method) {
     switch (method) {
+    case ReorderingStrategy::NATURAL: return "Natural"; break;
     case ReorderingStrategy::METIS: return "Metis"; break;
     case ReorderingStrategy::SCOTCH: return "Scotch"; break;
     case ReorderingStrategy::GEOMETRIC: return "Geometric"; break;
@@ -89,6 +91,7 @@ namespace strumpack {
 
   inline bool is_parallel(ReorderingStrategy method) {
     switch (method) {
+    case ReorderingStrategy::NATURAL: return false; break;
     case ReorderingStrategy::METIS: return false; break;
     case ReorderingStrategy::SCOTCH: return false; break;
     case ReorderingStrategy::GEOMETRIC: return true; break;
@@ -325,7 +328,9 @@ namespace strumpack {
         } break;
         case 7: {
           std::string s; std::istringstream iss(optarg); iss >> s;
-          if (s.compare("metis") == 0)
+          if (s.compare("natural") == 0)
+            set_reordering_method(ReorderingStrategy::NATURAL);
+          else if (s.compare("metis") == 0)
             set_reordering_method(ReorderingStrategy::METIS);
           else if (s.compare("parmetis") == 0)
             set_reordering_method(ReorderingStrategy::PARMETIS);
@@ -417,7 +422,7 @@ namespace strumpack {
       std::cout << "#   --sp_GramSchmidt_type [modified|classical]"
                 << std::endl;
       std::cout << "#          Gram-Schmidt type for GMRES" << std::endl;
-      std::cout << "#   --sp_reordering_method metis|scotch|parmetis|"
+      std::cout << "#   --sp_reordering_method natural|metis|scotch|parmetis|"
                 << "ptscotch|rcm|geometric" << std::endl;
       std::cout << "#          Code for nested dissection." << std::endl;
       std::cout << "#          Geometric only works on regular meshes and you"

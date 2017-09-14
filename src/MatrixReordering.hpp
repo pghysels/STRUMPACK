@@ -116,6 +116,12 @@ namespace strumpack {
   (SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
    int nx, int ny, int nz) {
     switch (opts.reordering_method()) {
+    case ReorderingStrategy::NATURAL: {
+      for (integer_t i=0; i<A->size(); i++) perm[i] = i;
+      sep_tree = build_sep_tree_from_perm
+        (A->size(), A->get_ptr(), A->get_ind(), perm, iperm);
+      break;
+    }
     case ReorderingStrategy::METIS: {
       sep_tree = metis_nested_dissection(A, perm, iperm, opts);
       break;
@@ -160,6 +166,12 @@ namespace strumpack {
       auto rank = mpi_rank(comm);
       if (!rank) {
         switch (opts.reordering_method()) {
+        case ReorderingStrategy::NATURAL: {
+          for (integer_t i=0; i<A->size(); i++) perm[i] = i;
+          sep_tree = build_sep_tree_from_perm
+            (A->size(), A->get_ptr(), A->get_ind(), perm, iperm);
+          break;
+        }
         case ReorderingStrategy::METIS: {
           sep_tree = metis_nested_dissection(A, perm, iperm, opts);
           break;

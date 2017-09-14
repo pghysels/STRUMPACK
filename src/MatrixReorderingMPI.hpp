@@ -176,15 +176,28 @@ namespace strumpack {
       std::unique_ptr<SeparatorTree<integer_t>> global_sep_tree;
       if (Aseq) { // only root
         switch (opts.reordering_method()) {
+        case ReorderingStrategy::NATURAL: {
+          for (integer_t i=0; i<A->size(); i++) this->perm[i] = i;
+          global_sep_tree = build_sep_tree_from_perm
+            (Aseq->size(), Aseq->get_ptr(), Aseq->get_ind(),
+             this->perm, this->iperm);
+          break;
+        }
         case ReorderingStrategy::METIS: {
           global_sep_tree = metis_nested_dissection
-            (Aseq.get(), this->perm, this->iperm, opts); break; }
+            (Aseq.get(), this->perm, this->iperm, opts);
+          break;
+        }
         case ReorderingStrategy::SCOTCH: {
           global_sep_tree = scotch_nested_dissection
-            (Aseq.get(), this->perm, this->iperm, opts); break; }
+            (Aseq.get(), this->perm, this->iperm, opts);
+          break;
+        }
         case ReorderingStrategy::RCM: {
           global_sep_tree = rcm_reordering
-            (Aseq.get(), this->perm, this->iperm); break; }
+            (Aseq.get(), this->perm, this->iperm);
+          break;
+        }
         default: assert(true);
         }
         Aseq.reset();
@@ -192,7 +205,10 @@ namespace strumpack {
       }
       MPI_Bcast(this->perm, 2*this->n, mpi_type<integer_t>(), 0, _comm);
       integer_t nbsep;
-      if (!rank) nbsep = global_sep_tree->separators();
+      if (!rank) {
+        nbsep = global_sep_tree->separators();
+        global_sep_tree->print();
+      }
       MPI_Bcast(&nbsep, 1, mpi_type<integer_t>(), 0, _comm);
       if (rank)
         global_sep_tree = std::unique_ptr<SeparatorTree<integer_t>>
@@ -218,13 +234,19 @@ namespace strumpack {
         std::tie(this->sep_tree, local_sep_tree) =
           geometric_nested_dissection_dist
           (nx, ny, nz, A->begin_row(), A->end_row(), _comm,
-           this->perm, this->iperm, opts.nd_param()); break; }
+           this->perm, this->iperm, opts.nd_param());
+        break;
+      }
       case ReorderingStrategy::PARMETIS: {
         this->sep_tree = parmetis_nested_dissection
-          (A, _comm, true, this->perm, opts); break; }
+          (A, _comm, true, this->perm, opts);
+        break;
+      }
       case ReorderingStrategy::PTSCOTCH: {
         this->sep_tree = ptscotch_nested_dissection
-          (A, _comm, true, this->perm, opts); break; }
+          (A, _comm, true, this->perm, opts);
+        break;
+      }
       default: assert(true);
       }
       this->sep_tree->check();
