@@ -462,10 +462,6 @@ namespace strumpack {
     integer_t top_nodes = std::min(std::max(integer_t(0), 2*P-1), _nbsep);
     auto top = std::unique_ptr<SeparatorTree<integer_t>>
       (new SeparatorTree<integer_t>(top_nodes));
-    std::function<integer_t(integer_t)> sep_subtree = [&](integer_t node) {
-      if (_lch[node] != -1) return sep_subtree(_lch[node]);
-      else return _sizes[node];
-    };
     auto mark = new bool[_nbsep];
     std::fill(mark, mark+_nbsep, false);
     mark[root()] = true;
@@ -483,7 +479,13 @@ namespace strumpack {
         }
       }
     };
-    while (nr_leafs < P && nr_leafs < _nbsep) mark_top_tree(root());
+    while (nr_leafs < P && nr_leafs < _nbsep)
+      mark_top_tree(root());
+
+    std::function<integer_t(integer_t)> sep_subtree = [&](integer_t node) {
+      return (_lch[node] != -1) ? sep_subtree(_lch[node])
+        : _sizes[node];
+    };
 
     std::function<void(integer_t,integer_t&)> fill_top =
       [&](integer_t node, integer_t& tid) {
@@ -499,10 +501,13 @@ namespace strumpack {
         top->_pa[top->_lch[mytid]] = mytid;
         fill_top(_lch[node], tid);
       } else top->_lch[mytid] = -1;
-      if (top->_rch[mytid] == -1) top->_sizes[mytid] = sep_subtree(node);
+      if (top->_rch[mytid] == -1) {
+        top->_sizes[mytid] = sep_subtree(node);
+        top->_sizes[mytid+1] = _sizes[node+1];
+      }
       else
-        // TODO this might be wrong, see how this is done in this->subtree
-        top->_sizes[mytid] = _sizes[node];
+        top->_sizes[mytid+1] = top->_sizes[mytid]
+          + _sizes[node+1] - _sizes[node];
     };
     integer_t tid = top_nodes-1;
     fill_top(root(), tid);
