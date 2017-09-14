@@ -10,11 +10,6 @@ if [ ! -d "mesh3e1" ]; then
     tar -xvzf mesh3e1.tar.gz
     rm mesh3e1.tar.gz
 fi
-if [ ! -d "lnsp3937" ]; then
-    wget https://www.cise.ufl.edu/research/sparse/MM/HB/lnsp3937.tar.gz
-    tar -xvzf lnsp3937.tar.gz
-    rm lnsp3937.tar.gz
-fi
 if [ ! -d "t2dal" ]; then
     wget https://www.cise.ufl.edu/research/sparse/MM/Oberwolfach/t2dal.tar.gz
     tar -xvzf t2dal.tar.gz
@@ -44,4 +39,19 @@ if [ ! -d "rdb968" ]; then
     wget https://www.cise.ufl.edu/research/sparse/MM/Bai/rdb968.tar.gz
     tar -xvzf rdb968.tar.gz
     rm rdb968.tar.gz
+fi
+if [ ! -d "cz10228" ]; then
+    wget https://www.cise.ufl.edu/research/sparse/MM/CPM/cz10228.tar.gz
+    tar -xvzf cz10228.tar.gz
+    rm cz10228.tar.gz
+fi
+if [ ! -d "k3plates" ]; then
+    wget https://www.cise.ufl.edu/research/sparse/MM/Cunningham/k3plates.tar.gz
+    tar -xvzf k3plates.tar.gz
+    rm k3plates.tar.gz
+fi
+if [ ! -d "cbuckle" ]; then
+    wget https://www.cise.ufl.edu/research/sparse/MM/TKK/cbuckle.tar.gz
+    tar -xvzf cbuckle.tar.gz
+    rm cbuckle.tar.gz
 fi
