@@ -165,8 +165,9 @@ namespace strumpack {
       void compute_V_basis_stable(const opts_t& opts,
                                   WorkCompressMPI<scalar_t>& w,
                                   int d, int dd);
-      bool update_orthogonal_basis(const opts_t& opts, const DistM_t& S,
-                                   DistM_t& Q, int d, int dd, bool untouched);
+      bool update_orthogonal_basis(const opts_t& opts, scalar_t& r_max_0,
+                                   const DistM_t& S, DistM_t& Q,
+                                   int d, int dd, bool untouched);
       void reduce_local_samples(const DistSamples<scalar_t>& RS,
                                 WorkCompressMPI<scalar_t>& w, int dd,
                                 bool was_compressed);
