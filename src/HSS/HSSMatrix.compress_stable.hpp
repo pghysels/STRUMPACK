@@ -306,9 +306,7 @@ namespace strumpack {
            scalar_t(1.), Q3, depth);
       params::ortho_flops += params::flops - f0;
       auto Q3norm = Q3.norm();
-      // c = 1.0 / (10.0 * std::sqrt(2. / M_PI));
-      constexpr double c = 1.25331413731550e-01;
-      return (Q3norm < opts.abs_tol() * c)
+      return (Q3norm < opts.abs_tol())
         || (Q3norm / S3norm < opts.rel_tol());
     }
 
