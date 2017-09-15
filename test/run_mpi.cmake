@@ -6,7 +6,7 @@ execute_process(
   ${ARG5} ${ARG6} ${ARG7} ${ARG8} ${ARG9} ${ARG10}
   ${ARG11} ${ARG12} ${ARG13} ${ARG14} ${ARG15}
   ${ARG16} ${ARG17}
-  TIMEOUT 60
+  TIMEOUT 120
   OUTPUT_FILE ${OUTPUT}
   RESULT_VARIABLE RET
   )
