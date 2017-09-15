@@ -157,6 +157,7 @@ namespace strumpack {
     int _hss_min_sep_size = 256;
     int _sep_order_level = 1;
     bool _indirect_sampling = false;
+    bool _replace_tiny_pivots = true;
     HSS::HSSOptions<scalar_t> _hss_opts;
 
     int _argc = 0;
@@ -206,6 +207,8 @@ namespace strumpack {
     { assert(l >= 0); _sep_order_level = l; }
     void enable_indirect_sampling() { _indirect_sampling = true; }
     void disable_indirect_sampling() { _indirect_sampling = false; }
+    void enable_replace_tiny_pivots() { _replace_tiny_pivots = true; }
+    void disable_replace_tiny_pivots() { _replace_tiny_pivots = false; }
 
     bool verbose() const { return _verbose; }
     int maxit() const { return _maxit; }
@@ -228,6 +231,8 @@ namespace strumpack {
     int HSS_min_sep_size() const { return _hss_min_sep_size; }
     int separator_ordering_level() const { return _sep_order_level; }
     bool indirect_sampling() const { return _indirect_sampling; }
+    bool replace_tiny_pivots() const { return _replace_tiny_pivots; }
+
     const HSS::HSSOptions<scalar_t>& HSS_options() const { return _hss_opts; }
     HSS::HSSOptions<scalar_t>& HSS_options() { return _hss_opts; }
 
@@ -265,6 +270,8 @@ namespace strumpack {
         {"sp_separator_ordering_level",  required_argument, 0, 24},
         {"sp_enable_indirect_sampling",  no_argument, 0, 25},
         {"sp_disable_indirect_sampling", no_argument, 0, 26},
+        {"sp_enable_replace_tiny_pivots", no_argument, 0, 27},
+        {"sp_disable_replace_tiny_pivots", no_argument, 0, 28},
         {"sp_verbose",                   no_argument, 0, 'v'},
         {"sp_quiet",                     no_argument, 0, 'q'},
         {"help",                         no_argument, 0, 'h'},
@@ -386,6 +393,8 @@ namespace strumpack {
         } break;
         case 25: { enable_indirect_sampling(); } break;
         case 26: { disable_indirect_sampling(); } break;
+        case 27: { enable_replace_tiny_pivots(); } break;
+        case 28: { disable_replace_tiny_pivots(); } break;
         case 'h': { describe_options(); } break;
         case 'v': set_verbose(true); break;
         case 'q': set_verbose(false); break;
@@ -472,6 +481,8 @@ namespace strumpack {
                 << separator_ordering_level() << ")" << std::endl;
       std::cout << "#   --sp_enable_indirect_sampling" << std::endl;
       std::cout << "#   --sp_disable_indirect_sampling" << std::endl;
+      std::cout << "#   --sp_enable_replace_tiny_pivots" << std::endl;
+      std::cout << "#   --sp_disable_replace_tiny_pivots" << std::endl;
       std::cout << "#   --sp_verbose or -v (default " << verbose() << ")"
                 << std::endl;
       std::cout << "#   --sp_quiet or -q (default " << !verbose() << ")"

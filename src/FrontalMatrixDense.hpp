@@ -77,7 +77,8 @@ namespace strumpack {
     FrontalMatrixDense& operator=(FrontalMatrixDense const&) = delete;
     void factor_phase1(const SPOptions<scalar_t>& opts,
                        int etree_level, int task_depth);
-    void factor_phase2(int etree_level, int task_depth);
+    void factor_phase2(const SPOptions<scalar_t>& opts,
+                       int etree_level, int task_depth);
     void fwd_solve_phase1(scalar_t* b, scalar_t* wmem,
                           int etree_level, int task_depth);
     void fwd_solve_phase2(scalar_t* b, scalar_t* wmem,
@@ -147,10 +148,10 @@ namespace strumpack {
       factor_phase1(opts, etree_level, task_depth);
       // do not use tasking for blas/lapack parallelism (use system
       // blas threading!)
-      factor_phase2(etree_level, params::task_recursion_cutoff_level);
+      factor_phase2(opts, etree_level, params::task_recursion_cutoff_level);
     } else {
       factor_phase1(opts, etree_level, task_depth);
-      factor_phase2(etree_level, task_depth);
+      factor_phase2(opts, etree_level, task_depth);
     }
   }
 
@@ -196,10 +197,18 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::factor_phase2
-  (int etree_level, int task_depth) {
+  (const SPOptions<scalar_t>& opts, int etree_level, int task_depth) {
     auto f0 = params::flops;
     if (this->dim_sep) {
       piv = F11.LU(task_depth);
+      if (opts.replace_tiny_pivots()) {
+        // TODO consider other values for thresh
+        //  - sqrt(eps)*|A|_1 as in SuperLU ?
+        auto thresh = blas::lamch<real_t>('E') * this->A->size();
+        for (int i=0; i<F11.rows(); i++)
+          if (std::abs(F11(i,i)) < thresh)
+            F11(i,i) = (std::real(F11(i,i)) < 0) ? -thresh : thresh;
+      }
       if (this->dim_upd) {
         F12.permute_rows_fwd(piv);
         trsm(Side::L, UpLo::L, Trans::N, Diag::U,
