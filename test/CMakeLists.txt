@@ -155,7 +155,7 @@ add_test(
 ## Sequential sparse test
 set(test_output ${CMAKE_BINARY_DIR}/test/SPARSE_seq.out)
 set(MTX utm300 mesh3e1 t2dal bcsstk28 cavity16 bcsstm08
-  sherman4 rdb968 cz10228 k3plates cbuckle)
+  sherman4 rdb968 cz10228 cbuckle)
 set(NESTEDDISSECTION metis scotch)
 foreach(m ${MTX})
   foreach(nd ${NESTEDDISSECTION})

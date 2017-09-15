@@ -45,11 +45,6 @@ if [ ! -d "cz10228" ]; then
     tar -xvzf cz10228.tar.gz
     rm cz10228.tar.gz
 fi
-if [ ! -d "k3plates" ]; then
-    wget https://www.cise.ufl.edu/research/sparse/MM/Cunningham/k3plates.tar.gz
-    tar -xvzf k3plates.tar.gz
-    rm k3plates.tar.gz
-fi
 if [ ! -d "cbuckle" ]; then
     wget https://www.cise.ufl.edu/research/sparse/MM/TKK/cbuckle.tar.gz
     tar -xvzf cbuckle.tar.gz
