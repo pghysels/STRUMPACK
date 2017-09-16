@@ -154,6 +154,7 @@ namespace strumpack {
         " StrumpackSparseSolverMPIDist instead." << std::endl;
       return 1;
     }
+    sep_tree->check();
     nested_dissection_print(opts, n, A->nnz(), opts.verbose());
     return 0;
   }
