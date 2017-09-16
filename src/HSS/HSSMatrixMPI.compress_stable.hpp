@@ -140,7 +140,8 @@ namespace strumpack {
       if (!w.Sr.active()) return;
       if (d+dd >= opts.max_rank() || d+dd >= u_rows ||
           update_orthogonal_basis
-          (opts, w.Sr, w.Qr, d, dd, this->_U_state == State::UNTOUCHED)) {
+          (opts, w.U_r_max, w.Sr, w.Qr, d, dd,
+           this->_U_state == State::UNTOUCHED)) {
         w.Qr.clear();
         auto f0 = params::flops;
         // TODO pass max_rank to ID in DistributedMatrix
@@ -170,7 +171,8 @@ namespace strumpack {
       if (!w.Sc.active()) return;
       if (d+dd >= opts.max_rank() || d+dd >= v_rows ||
           update_orthogonal_basis
-          (opts, w.Sc, w.Qc, d, dd, this->_V_state == State::UNTOUCHED)) {
+          (opts, w.V_r_max, w.Sc, w.Qc, d, dd,
+           this->_V_state == State::UNTOUCHED)) {
         w.Qc.clear();
         auto f0 = params::flops;
         // TODO pass max_rank to ID in DistributedMatrix
@@ -193,8 +195,8 @@ namespace strumpack {
 
     template<typename scalar_t> bool
     HSSMatrixMPI<scalar_t>::update_orthogonal_basis
-    (const opts_t& opts, const DistM_t& S, DistM_t& Q,
-     int d, int dd, bool untouched) {
+    (const opts_t& opts, scalar_t& r_max_0, const DistM_t& S,
+     DistM_t& Q, int d, int dd, bool untouched) {
       int m = S.rows();
       if (d >= m) return true;
       if (Q.cols() == 0) Q = DistM_t(_ctxt, m, d+dd);
@@ -210,7 +212,12 @@ namespace strumpack {
         Q12 = DistMW_t(m, std::min(d, m), Q, 0, 0);
       }
       auto f0 = params::flops;
-      Q2.orthogonalize();
+      scalar_t r_min, r_max;
+      Q2.orthogonalize(r_max, r_min);
+      if (untouched) r_max_0 = r_max;
+      if (std::abs(r_min) < opts.abs_tol() ||
+          std::abs(r_min / r_max_0) < opts.rel_tol())
+        return true;
       params::QR_flops += params::flops - f0;
       DistMW_t Q3(m, dd, Q, 0, d);
       DistM_t Q12tQ3(_ctxt, Q12.cols(), Q3.cols());
@@ -223,9 +230,7 @@ namespace strumpack {
       gemm(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.), Q3);
       params::ortho_flops += params::flops - f0;
       auto Q3norm = Q3.norm();
-      // c = 1.0 / (10.0 * std::sqrt(2. / M_PI));
-      constexpr double c = 1.25331413731550e-01;
-      return (Q3norm < opts.abs_tol() * c)
+      return (Q3norm < opts.abs_tol())
         || (Q3norm / S3norm < opts.rel_tol());
     }
 

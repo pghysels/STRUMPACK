@@ -77,8 +77,16 @@ namespace strumpack {
       void sgsum2d_(int *, char *, char *, int *, int *,  float *, int *, int *, int *);
 
       /* xGAMX2D */
-      void dgamx2d_(int *, char *, char *, int *, int *, double *, int *, int *, int *, int *, int *, int *);
-      void sgamx2d_(int *, char *, char *, int *, int *,  float *, int *, int *, int *, int *, int *, int *);
+      void dgamx2d_(int *, char *, char *, int *, int *,   double *, int *, int *, int *, int *, int *, int *);
+      void sgamx2d_(int *, char *, char *, int *, int *,    float *, int *, int *, int *, int *, int *, int *);
+      void zgamx2d_(int *, char *, char *, int *, int *, c_double *, int *, int *, int *, int *, int *, int *);
+      void cgamx2d_(int *, char *, char *, int *, int *,  c_float *, int *, int *, int *, int *, int *, int *);
+
+      /* xGAMN2D */
+      void dgamn2d_(int *, char *, char *, int *, int *,   double *, int *, int *, int *, int *, int *, int *);
+      void sgamn2d_(int *, char *, char *, int *, int *,    float *, int *, int *, int *, int *, int *, int *);
+      void zgamn2d_(int *, char *, char *, int *, int *, c_double *, int *, int *, int *, int *, int *, int *);
+      void cgamn2d_(int *, char *, char *, int *, int *,  c_float *, int *, int *, int *, int *, int *, int *);
 
       /* PxAMAX */
       void pdamax_(int *,   double *, int *,   double *, int *, int *, int *, int *);
@@ -324,6 +332,27 @@ namespace strumpack {
     }
     template<> inline void gamx2d< float>(int ctxt, char scope, char top, int m, int n,  float *A, int lda, int *ra, int *ca, int ldia, int rdest, int cdest) {
       sgamx2d_(&ctxt,&scope,&top,&m,&n,A,&lda,ra,ca,&ldia,&rdest,&cdest);
+    }
+    template<> inline void gamx2d<c_double>(int ctxt, char scope, char top, int m, int n, c_double *A, int lda, int *ra, int *ca, int ldia, int rdest, int cdest) {
+      zgamx2d_(&ctxt,&scope,&top,&m,&n,A,&lda,ra,ca,&ldia,&rdest,&cdest);
+    }
+    template<> inline void gamx2d<c_float>(int ctxt, char scope, char top, int m, int n, c_float *A, int lda, int *ra, int *ca, int ldia, int rdest, int cdest) {
+      cgamx2d_(&ctxt,&scope,&top,&m,&n,A,&lda,ra,ca,&ldia,&rdest,&cdest);
+    }
+
+    /* xGAMN2D */
+    template<typename S> inline void gamn2d(int, char, char, int, int, S *, int, int *, int *, int, int, int);
+    template<> inline void gamn2d<double>(int ctxt, char scope, char top, int m, int n, double *A, int lda, int *ra, int *ca, int ldia, int rdest, int cdest) {
+      dgamn2d_(&ctxt,&scope,&top,&m,&n,A,&lda,ra,ca,&ldia,&rdest,&cdest);
+    }
+    template<> inline void gamn2d< float>(int ctxt, char scope, char top, int m, int n,  float *A, int lda, int *ra, int *ca, int ldia, int rdest, int cdest) {
+      sgamn2d_(&ctxt,&scope,&top,&m,&n,A,&lda,ra,ca,&ldia,&rdest,&cdest);
+    }
+    template<> inline void gamn2d<c_double>(int ctxt, char scope, char top, int m, int n, c_double *A, int lda, int *ra, int *ca, int ldia, int rdest, int cdest) {
+      zgamn2d_(&ctxt,&scope,&top,&m,&n,A,&lda,ra,ca,&ldia,&rdest,&cdest);
+    }
+    template<> inline void gamn2d<c_float>(int ctxt, char scope, char top, int m, int n, c_float *A, int lda, int *ra, int *ca, int ldia, int rdest, int cdest) {
+      cgamn2d_(&ctxt,&scope,&top,&m,&n,A,&lda,ra,ca,&ldia,&rdest,&cdest);
     }
 
     /* PxAMAX */

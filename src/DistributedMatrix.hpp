@@ -184,7 +184,7 @@ namespace strumpack {
                                       const std::vector<int>& piv) const;
     void LQ(DistributedMatrix<scalar_t>& L,
             DistributedMatrix<scalar_t>& Q) const;
-    void orthogonalize();
+    void orthogonalize(scalar_t& r_max, scalar_t& r_min);
     void ID_column(DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
                    std::vector<std::size_t>& ind,
                    real_t rel_tol, real_t abs_tol);
@@ -863,7 +863,8 @@ namespace strumpack {
   }
 
   template<typename scalar_t> void
-  DistributedMatrix<scalar_t>::orthogonalize() {
+  DistributedMatrix<scalar_t>::orthogonalize
+  (scalar_t& r_max, scalar_t& r_min) {
     if (!active()) return;
     auto minmn = std::min(rows(), cols());
     auto N = J() + minmn - 1;
@@ -871,7 +872,21 @@ namespace strumpack {
     auto tau = new scalar_t[ltau];
     auto info = scalapack::pgeqrf
       (rows(), minmn, data(), I(), J(), desc(), tau);
-    // TODO check diagonal elements of R
+    if (lrows() && lcols()) {
+      real_t Rmax = std::abs(operator()(0, 0));
+      real_t Rmin = Rmax;
+      for (int i=0; i<std::min(lrows(), lcols()); i++) {
+        auto Rii = std::abs(operator()(i, i));
+        Rmax = std::max(Rmax, Rii);
+        Rmin = std::min(Rmin, Rii);
+      }
+      r_max = Rmax;
+      r_min = Rmin;
+    }
+    scalapack::gamx2d(ctxt(), 'A', ' ', 1, 1, &r_max, 1,
+                      NULL, NULL, -1, -1, -1);
+    scalapack::gamn2d(ctxt(), 'A', ' ', 1, 1, &r_min, 1,
+                      NULL, NULL, -1, -1, -1);
     info = scalapack::pxxgqr
       (rows(), minmn, minmn, data(), I(), J(), desc(), tau);
     if (info) {
