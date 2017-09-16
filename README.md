@@ -16,6 +16,7 @@ the U.S. Dept. of Energy).  All rights reserved.
 ## Current developers
  - Pieter Ghysels -- pghysels@lbl.gov (Lawrence Berkeley National Laboratory)
  - Xiaoye S. Li -- xsli@lbl.gov (Lawrence Berkeley National Laboratory)
+ - Gustavo Chavez -- gichavez@lbl.gov (Lawrence Berkeley National Laboratory)
  - Christopher Gorman (UC Santa Barbara)
 
 ## Other contributors
