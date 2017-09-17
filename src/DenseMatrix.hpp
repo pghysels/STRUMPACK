@@ -608,7 +608,7 @@ namespace strumpack {
     int info;
     int minmn = std::min(rows(), cols());
     auto tau = new scalar_t[minmn];
-    blas::geqrfmod(rows(), cols(), data(), ld(), tau, &info, depth);
+    blas::geqrfmod(rows(), minmn, data(), ld(), tau, &info, depth);
     // TODO threading!!
     real_t Rmax = std::abs(operator()(0, 0));
     real_t Rmin = Rmax;

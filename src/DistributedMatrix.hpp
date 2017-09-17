@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <random>
 #include <functional>
+#include <limits>
 
 #include "Random_wrapper.hpp"
 #include "MPI_wrapper.hpp"
@@ -81,43 +82,46 @@ namespace strumpack {
     inline int procs() const { return (prows() == -1) ? 0 : prows()*pcols(); }
     inline bool is_master() const { return prow() == 0 && pcol() == 0; }
     inline int rowl2g(int row) const { assert(_prow != -1);
-      return indxl2g(row+1, MB(), prow(), 0, prows()) - 1; }
+      return indxl2g(row+1, MB(), prow(), 0, prows()) - I(); }
     inline int coll2g(int col) const { assert(_pcol != -1);
-      return indxl2g(col+1, NB(), pcol(), 0, pcols()) - 1; }
+      return indxl2g(col+1, NB(), pcol(), 0, pcols()) - J(); }
     inline int rowg2l(int row) const { assert(_prow != -1);
-      return indxg2l(row+1, MB(), prow(), 0, prows()) - 1; }
+      return indxg2l(row+I(), MB(), prow(), 0, prows()) - 1; }
     inline int colg2l(int col) const { assert(_pcol != -1);
-      return indxg2l(col+1, NB(), pcol(), 0, pcols()) - 1; }
+      return indxg2l(col+J(), NB(), pcol(), 0, pcols()) - 1; }
     inline int rowg2p(int row) const { assert(_prow != -1);
-      return indxg2p(row+1, MB(), prow(), 0, prows()); }
+      return indxg2p(row+I(), MB(), prow(), 0, prows()); }
     inline int colg2p(int col) const { assert(_pcol != -1);
-      return indxg2p(col+1, NB(), pcol(), 0, pcols()); }
-    inline int rank(int r, int c) const
-    { return rowg2p(r) + colg2p(c) * prows(); }
+      return indxg2p(col+J(), NB(), pcol(), 0, pcols()); }
+    inline int rank(int r, int c) const {
+      return rowg2p(r) + colg2p(c) * prows(); }
     inline bool is_local(int r, int c) const { assert(_prow != -1);
       return rowg2p(r) == prow() && colg2p(c) == pcol(); }
 
     inline bool fixed() const { return MB()==default_MB && NB()==default_NB; }
     inline int rowl2g_fixed(int row) const {
       assert(_prow != -1); assert(fixed());
-      return indxl2g(row+1, default_MB, prow(), 0, prows()) - 1; }
+      return indxl2g(row+1, default_MB, prow(), 0, prows()) - I(); }
     inline int coll2g_fixed(int col) const {
       assert(_pcol != -1); assert(fixed());
-      return indxl2g(col+1, default_NB, pcol(), 0, pcols()) - 1; }
+      return indxl2g(col+1, default_NB, pcol(), 0, pcols()) - J(); }
     inline int rowg2l_fixed(int row) const {
       assert(_prow != -1); assert(fixed());
-      return indxg2l(row+1, default_MB, prow(), 0, prows()) - 1; }
+      return indxg2l(row+I(), default_MB, prow(), 0, prows()) - 1; }
     inline int colg2l_fixed(int col) const {
       assert(_pcol != -1); assert(fixed());
-      return indxg2l(col+1, default_NB, pcol(), 0, pcols()) - 1; }
+      return indxg2l(col+J(), default_NB, pcol(), 0, pcols()) - 1; }
     inline int rowg2p_fixed(int row) const {
       assert(_prow != -1); assert(fixed());
-      return indxg2p(row+1, default_MB, prow(), 0, prows()); }
+      return indxg2p(row+I(), default_MB, prow(), 0, prows()); }
     inline int colg2p_fixed(int col) const {
       assert(_pcol != -1); assert(fixed());
-      return indxg2p(col+1, default_NB, pcol(), 0, pcols()); }
+      return indxg2p(col+J(), default_NB, pcol(), 0, pcols()); }
     inline int rank_fixed(int r, int c) const {
       assert(fixed()); return rowg2p_fixed(r) + colg2p_fixed(c) * prows(); }
+    inline bool is_local_fixed(int r, int c) const {
+      assert(_prow != -1); assert(fixed());
+      return rowg2p_fixed(r) == prow() && colg2p_fixed(c) == pcol(); }
 
     inline const int* desc() const { return _desc; }
     inline int* desc() { return _desc; }
@@ -873,12 +877,24 @@ namespace strumpack {
     auto info = scalapack::pgeqrf
       (rows(), minmn, data(), I(), J(), desc(), tau);
     if (lrows() && lcols()) {
-      real_t Rmax = std::abs(operator()(0, 0));
-      real_t Rmin = Rmax;
-      for (int i=0; i<std::min(lrows(), lcols()); i++) {
-        auto Rii = std::abs(operator()(i, i));
-        Rmax = std::max(Rmax, Rii);
-        Rmin = std::min(Rmin, Rii);
+      real_t Rmax(std::numeric_limits<real_t>::min());
+      real_t Rmin(std::numeric_limits<real_t>::max());
+      if (fixed()) {
+        for (int gi=0; gi<minmn; gi++) {
+          if (is_local_fixed(gi, gi)) {
+            auto Rii = std::abs(global_fixed(gi,gi));
+            Rmax = std::max(Rmax, Rii);
+            Rmin = std::min(Rmin, Rii);
+          }
+        }
+      } else {
+        for (int gi=0; gi<minmn; gi++) {
+          if (is_local(gi, gi)) {
+            auto Rii = std::abs(global(gi,gi));
+            Rmax = std::max(Rmax, Rii);
+            Rmin = std::min(Rmin, Rii);
+          }
+        }
       }
       r_max = Rmax;
       r_min = Rmin;
