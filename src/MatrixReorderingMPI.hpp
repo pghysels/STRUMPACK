@@ -205,10 +205,7 @@ namespace strumpack {
       }
       MPI_Bcast(this->perm, 2*this->n, mpi_type<integer_t>(), 0, _comm);
       integer_t nbsep;
-      if (!rank) {
-        nbsep = global_sep_tree->separators();
-        global_sep_tree->print();
-      }
+      if (!rank) nbsep = global_sep_tree->separators();
       MPI_Bcast(&nbsep, 1, mpi_type<integer_t>(), 0, _comm);
       if (rank)
         global_sep_tree = std::unique_ptr<SeparatorTree<integer_t>>
