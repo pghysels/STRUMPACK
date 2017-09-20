@@ -116,11 +116,13 @@ namespace strumpack {
 #pragma omp parallel for
     for (integer_t r=0; r<Ampi->local_rows(); r++) {
       auto r_perm = nd->perm[r+Ampi->begin_row()];
-      for (integer_t j=Ampi->get_ptr()[r]-Ampi->get_ptr()[0]; j<Ampi->get_ptr()[r+1]-Ampi->get_ptr()[0]; j++) {
+      auto hij = Ampi->get_ptr()[r+1]-Ampi->get_ptr()[0];
+      for (integer_t j=Ampi->get_ptr()[r]-Ampi->get_ptr()[0]; j<hij; j++) {
 	if (std::abs(Ampi->get_val()[j]) > eps) {
 	  auto c_perm = nd->perm[Ampi->get_ind()[j]];
 	  auto d = dest[j] = et->get_sparse_mapped_destination(r_perm, c_perm, duplicate_fronts);
-	  for (int p=std::get<0>(d); p<std::get<0>(d)+std::get<1>(d); p+=std::get<2>(d))
+          auto hip = std::get<0>(d)+std::get<1>(d)
+	  for (int p=std::get<0>(d); p<hip; p+=std::get<2>(d))
 #pragma omp atomic
 	    scnts[p]++;
 	}
@@ -133,12 +135,14 @@ namespace strumpack {
     for (int p=1; p<P; p++) pp[p] = pp[p-1] + scnts[p-1];
     for (integer_t r=0; r<Ampi->local_rows(); r++) {
       auto r_perm = nd->perm[r+Ampi->begin_row()];
-      for (integer_t j=Ampi->get_ptr()[r]-Ampi->get_ptr()[0]; j<Ampi->get_ptr()[r+1]-Ampi->get_ptr()[0]; j++) {
+      auto hij = Ampi->get_ptr()[r+1]-Ampi->get_ptr()[0];
+      for (integer_t j=Ampi->get_ptr()[r]-Ampi->get_ptr()[0]; j<hij; j++) {
 	auto a = Ampi->get_val()[j];
 	if (std::abs(a) > eps) {
 	  Triplet t = {r_perm, nd->perm[Ampi->get_ind()[j]], a};
 	  auto d = dest[j];
-	  for (int p=std::get<0>(d); p<std::get<0>(d)+std::get<1>(d); p+=std::get<2>(d)) {
+          auto hip = std::get<0>(d)+std::get<1>(d);
+	  for (int p=std::get<0>(d); p<hip; p+=std::get<2>(d)) {
 	    *(pp[p]) = t;
 	    pp[p]++;
 	  }
@@ -160,8 +164,9 @@ namespace strumpack {
     delete[] scnts;
     delete[] sbuf;
 
-    // TODO this sort can be avoided:
-    // first make the CSR/CSC representation, then sort that row per row (in openmp parallel for)!!
+    // TODO this sort can be avoided: first make the CSR/CSC
+    // representation, then sort that row per row (in openmp parallel
+    // for)!!
 
 #if 0 // TODO check for compiler support, use C++17? std::experimental::parallel?
     __gnu_parallel::sort(triplets.begin(), triplets.end(), [](const Triplet& a, const Triplet& b) {
