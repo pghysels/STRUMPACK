@@ -158,7 +158,8 @@ namespace strumpack {
                                bool verbose) :
     StrumpackSparseSolverMPI<scalar_t,integer_t>
     (mpi_comm, argc, argv, verbose) {
-    this->_opts.set_reordering_method(ReorderingStrategy::PARMETIS);
+    // Set the default reordering to PARMETIS?
+    //this->_opts.set_reordering_method(ReorderingStrategy::PARMETIS);
   }
 
   template<typename scalar_t,typename integer_t>
