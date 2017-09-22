@@ -329,7 +329,8 @@ namespace strumpack {
     if (lch) { // unpack left child contribution
       std::function<int(integer_t,integer_t)> Sl_upd_rank =
         [&](integer_t r, integer_t c) {
-        return lch->find_rank(r, c, cSrl); };
+        return lch->find_rank(r, c, cSrl);
+      };
       ExtAdd::skinny_extend_add_copy_from_buffers
         (Sr, pbuf, this->sep_begin, this->dim_sep, this->upd,
          lch->upd, lch->dim_upd, Sl_upd_rank);

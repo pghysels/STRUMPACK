@@ -1,25 +1,29 @@
 /*
- * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The Regents of
- * the University of California, through Lawrence Berkeley National Laboratory
- * (subject to receipt of any required approvals from the U.S. Dept. of Energy).
- * All rights reserved.
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
  *
- * If you have questions about your rights to use or distribute this software,
- * please contact Berkeley Lab's Technology Transfer Department at TTD@lbl.gov.
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
  *
- * NOTICE. This software is owned by the U.S. Department of Energy. As such, the
- * U.S. Government has been granted for itself and others acting on its behalf a
- * paid-up, nonexclusive, irrevocable, worldwide license in the Software to
- * reproduce, prepare derivative works, and perform publicly and display publicly.
- * Beginning five (5) years after the date permission to assert copyright is
- * obtained from the U.S. Department of Energy, and subject to any subsequent five
- * (5) year renewals, the U.S. Government igs granted for itself and others acting
- * on its behalf a paid-up, nonexclusive, irrevocable, worldwide license in the
- * Software to reproduce, prepare derivative works, distribute copies to the
- * public, perform publicly and display publicly, and to permit others to do so.
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly.  Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government igs granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
  *
  * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
- *             (Lawrence Berkeley National Lab, Computational Research Division).
+ *             (Lawrence Berkeley National Lab, Computational Research
+ *             Division).
  *
  */
 #ifndef FRONTAL_MATRIX_DENSE_MPI_HPP
@@ -46,36 +50,46 @@ namespace strumpack {
     using DistMW_t = DistributedMatrixWrapper<scalar_t>;
     using FDMPI_t = FrontalMatrixDenseMPI<scalar_t,integer_t>;
     using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
+    using F_t = FrontalMatrix<scalar_t,integer_t>;
     using ExtAdd = ExtendAdd<scalar_t,integer_t>;
+
   public:
     FrontalMatrixDenseMPI(CompressedSparseMatrix<scalar_t,integer_t>* _A,
-			  integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-			  integer_t _dim_upd, integer_t* _upd, MPI_Comm _front_comm,
-			  int _total_procs);
+                          integer_t _sep, integer_t _sep_begin,
+                          integer_t _sep_end, integer_t _dim_upd,
+                          integer_t* _upd, MPI_Comm _front_comm,
+                          int _total_procs);
     FrontalMatrixDenseMPI(const FrontalMatrixDenseMPI&) = delete;
     FrontalMatrixDenseMPI& operator=(FrontalMatrixDenseMPI const&) = delete;
     ~FrontalMatrixDenseMPI();
     void release_work_memory();
     void build_front();
     void partial_factorization();
+
     void extend_add();
-    void extend_add_mpi_fill_buffers(FrontalMatrixDenseMPI<scalar_t,integer_t>* ch,
-				     std::vector<std::vector<scalar_t>>& sbuf);
-    void extend_add_mpi_recv_buffers(FrontalMatrixDenseMPI<scalar_t,integer_t>* ch, scalar_t** pbuf);
-    void extend_add_seq_fill_buffers(FrontalMatrixDense<scalar_t,integer_t>* ch,
-				     std::vector<std::vector<scalar_t>>& sbuf);
-    void extend_add_seq_recv_buffers(FrontalMatrixDense<scalar_t,integer_t>* ch, scalar_t** rbuf);
+    void extend_add_mpi_fill_buffers
+    (FDMPI_t* ch, std::vector<std::vector<scalar_t>>& sbuf);
+    void extend_add_mpi_recv_buffers(FDMPI_t* ch, scalar_t** pbuf);
+    void extend_add_seq_fill_buffers
+    (FD_t* ch, std::vector<std::vector<scalar_t>>& sbuf);
+    void extend_add_seq_recv_buffers(FD_t* ch, scalar_t** rbuf);
 
-    void sample_CB(const SPOptions<scalar_t>& opts, const DistM_t& R, DistM_t& Sr, DistM_t& Sc,
-		   FrontalMatrix<scalar_t,integer_t>* pa) const;
+    void sample_CB(const SPOptions<scalar_t>& opts,
+                   const DistM_t& R, DistM_t& Sr, DistM_t& Sc,
+                   F_t* pa) const;
 
-    void multifrontal_factorization(const SPOptions<scalar_t>& opts, int etree_level=0, int task_depth=0);
+    void multifrontal_factorization(const SPOptions<scalar_t>& opts,
+                                    int etree_level=0, int task_depth=0);
     void forward_multifrontal_solve(scalar_t* b_loc, DistM_t* b_dist,
-				    scalar_t* wmem, int etree_level=0, int task_depth=0);
+                                    scalar_t* wmem, int etree_level=0,
+                                    int task_depth=0);
     void backward_multifrontal_solve(scalar_t* y_loc, DistM_t* b_dist,
-				     scalar_t* wmem, int etree_level=0, int task_depth=0);
+                                     scalar_t* wmem, int etree_level=0,
+                                     int task_depth=0);
 
-    void extract_CB_sub_matrix_2d(const std::vector<std::size_t>& I, const std::vector<std::size_t>& J, DistM_t& B) const;
+    void extract_CB_sub_matrix_2d(const std::vector<std::size_t>& I,
+                                  const std::vector<std::size_t>& J,
+                                  DistM_t& B) const;
 
     long long factor_nonzeros(int task_depth=0) const;
     std::string type() const { return "FrontalMatrixDenseMPI"; }
@@ -87,10 +101,13 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   FrontalMatrixDenseMPI<scalar_t,integer_t>::FrontalMatrixDenseMPI
-  (CompressedSparseMatrix<scalar_t,integer_t>* _A, integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-   integer_t _dim_upd, integer_t* _upd, MPI_Comm _front_comm, int _total_procs)
-    : FrontalMatrixMPI<scalar_t,integer_t>(_A, _sep, _sep_begin, _sep_end,
-						  _dim_upd, _upd, _front_comm, _total_procs) {}
+  (CompressedSparseMatrix<scalar_t,integer_t>* _A,
+   integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
+   integer_t _dim_upd, integer_t* _upd,
+   MPI_Comm _front_comm, int _total_procs)
+    : FrontalMatrixMPI<scalar_t,integer_t>
+    (_A, _sep, _sep_begin, _sep_end, _dim_upd, _upd,
+     _front_comm, _total_procs) {}
 
   template<typename scalar_t,typename integer_t>
   FrontalMatrixDenseMPI<scalar_t,integer_t>::~FrontalMatrixDenseMPI() {
@@ -103,41 +120,49 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::extend_add_mpi_fill_buffers
-  (FrontalMatrixDenseMPI<scalar_t,integer_t>* ch, std::vector<std::vector<scalar_t>>& sbuf) {
+  (FDMPI_t* ch, std::vector<std::vector<scalar_t>>& sbuf) {
     if (ch->F22.active()) {
       auto I = ch->upd_to_parent(this);
-      ExtAdd::extend_add_copy_to_buffers(ch->F22, F11, F12, F21, F22, sbuf, this, I);
+      ExtAdd::extend_add_copy_to_buffers
+        (ch->F22, F11, F12, F21, F22, sbuf, this, I);
     }
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::extend_add_mpi_recv_buffers
   (FrontalMatrixDenseMPI<scalar_t,integer_t>* ch, scalar_t** pbuf) {
-    auto F22rank = [&](integer_t r, integer_t c){ return ch->find_rank(r,c,ch->F22); };
+    auto F22rank = [&](integer_t r, integer_t c){
+      return ch->find_rank(r,c,ch->F22);
+    };
     ExtAdd::extend_add_copy_from_buffers
-      (F11, F12, F21, F22, pbuf, this->sep_begin, this->upd, ch->upd, ch->dim_upd, F22rank);
+      (F11, F12, F21, F22, pbuf, this->sep_begin,
+       this->upd, ch->upd, ch->dim_upd, F22rank);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::extend_add_seq_fill_buffers
-  (FrontalMatrixDense<scalar_t,integer_t>* ch, std::vector<std::vector<scalar_t>>& sbuf) {
+  (FD_t* ch, std::vector<std::vector<scalar_t>>& sbuf) {
     if (mpi_rank(this->front_comm) == this->child_master(ch)) {
       std::size_t u2s;
       auto I = ch->upd_to_parent(this, u2s);
       std::size_t du = ch->dim_upd;
       std::size_t ds = this->dim_sep;
       for (std::size_t c=0; c<u2s; c++) // F11
-	for (std::size_t r=0; r<u2s; r++)
-	  sbuf[this->find_rank_fixed(I[r],I[c],F11)].push_back(ch->F22(r,c));
+        for (std::size_t r=0; r<u2s; r++)
+          sbuf[this->find_rank_fixed(I[r],I[c],F11)].
+            push_back(ch->F22(r,c));
       for (std::size_t c=u2s; c<du; c++) // F12
-	for (std::size_t r=0; r<u2s; r++)
-	  sbuf[this->find_rank_fixed(I[r],I[c]-ds,F12)].push_back(ch->F22(r,c));
+        for (std::size_t r=0; r<u2s; r++)
+          sbuf[this->find_rank_fixed(I[r],I[c]-ds,F12)].
+            push_back(ch->F22(r,c));
       for (std::size_t c=0; c<u2s; c++) // F21
-	for (std::size_t r=u2s; r<du; r++)
-	  sbuf[this->find_rank_fixed(I[r]-ds,I[c],F21)].push_back(ch->F22(r,c));
+        for (std::size_t r=u2s; r<du; r++)
+          sbuf[this->find_rank_fixed(I[r]-ds,I[c],F21)].
+            push_back(ch->F22(r,c));
       for (std::size_t c=u2s; c<du; c++) // F22
-	for (std::size_t r=u2s; r<du; r++)
-	  sbuf[this->find_rank_fixed(I[r]-ds,I[c]-ds,F22)].push_back(ch->F22(r,c));
+        for (std::size_t r=u2s; r<du; r++)
+          sbuf[this->find_rank_fixed(I[r]-ds,I[c]-ds,F22)].
+            push_back(ch->F22(r,c));
     }
   }
 
@@ -146,30 +171,34 @@ namespace strumpack {
   (FrontalMatrixDense<scalar_t,integer_t>* ch, scalar_t** pbuf) {
     if (F11.active() || F22.active())
       ExtAdd::extend_add_copy_from_buffers
-	(F11, F12, F21, F22, pbuf, this->sep_begin, this->upd, ch->upd, ch->dim_upd,
-	 [](integer_t,integer_t){ return 0; });
+        (F11, F12, F21, F22, pbuf, this->sep_begin,
+         this->upd, ch->upd, ch->dim_upd,
+         [](integer_t,integer_t){ return 0; });
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::extend_add() {
-    if (this->lchild == NULL && this->rchild == NULL) return;
+    if (!this->lchild && !this->rchild) return;
     auto P = mpi_nprocs(this->front_comm);
     std::vector<std::vector<scalar_t>> sbuf(P);
     for (auto ch : {this->lchild, this->rchild}) {
-      if (ch && mpi_rank(this->front_comm) == 0)
-	{ STRUMPACK_FLOPS(static_cast<long long int>(ch->dim_upd)*ch->dim_upd); }
+      if (ch && mpi_rank(this->front_comm) == 0) {
+        STRUMPACK_FLOPS(static_cast<long long int>(ch->dim_upd)*ch->dim_upd);
+      }
       if (FDMPI_t* dense_mpi_child = dynamic_cast<FDMPI_t*>(ch))
-	extend_add_mpi_fill_buffers(dense_mpi_child, sbuf);
+        extend_add_mpi_fill_buffers(dense_mpi_child, sbuf);
       else if (FD_t* dense_child = dynamic_cast<FD_t*>(ch))
-	extend_add_seq_fill_buffers(dense_child, sbuf);
+        extend_add_seq_fill_buffers(dense_child, sbuf);
     }
-    scalar_t *rbuf=NULL, **pbuf=NULL;
+    scalar_t *rbuf = nullptr, **pbuf = nullptr;
     all_to_all_v(sbuf, rbuf, pbuf, this->front_comm);
     for (auto ch : {this->lchild, this->rchild})
       if (FDMPI_t* dense_mpi_child = dynamic_cast<FDMPI_t*>(ch))
-	extend_add_mpi_recv_buffers(dense_mpi_child, pbuf+this->child_master(ch));
+        extend_add_mpi_recv_buffers
+          (dense_mpi_child, pbuf+this->child_master(ch));
       else if (FD_t* dense_child = dynamic_cast<FD_t*>(ch))
-	extend_add_seq_recv_buffers(dense_child, pbuf+this->child_master(ch));
+        extend_add_seq_recv_buffers
+          (dense_child, pbuf+this->child_master(ch));
     delete[] pbuf;
     delete[] rbuf;
   }
@@ -181,10 +210,14 @@ namespace strumpack {
       using ExtractFront = ExtractFront<scalar_t,integer_t>;
       ExtractFront::extract_F11(F11, this->A, this->sep_begin, this->dim_sep);
       if (this->dim_upd) {
-	F12 = DistM_t(this->ctxt, this->dim_sep, this->dim_upd);
-	ExtractFront::extract_F12(F12, this->A, this->sep_begin, this->sep_end, this->dim_upd, this->upd);
-	F21 = DistM_t(this->ctxt, this->dim_upd, this->dim_sep);
-	ExtractFront::extract_F21(F21, this->A, this->sep_end, this->sep_begin, this->dim_upd, this->upd);
+        F12 = DistM_t(this->ctxt, this->dim_sep, this->dim_upd);
+        ExtractFront::extract_F12
+          (F12, this->A, this->sep_begin, this->sep_end,
+           this->dim_upd, this->upd);
+        F21 = DistM_t(this->ctxt, this->dim_upd, this->dim_sep);
+        ExtractFront::extract_F21
+          (F21, this->A, this->sep_end, this->sep_begin,
+           this->dim_upd, this->upd);
       }
     }
     if (this->dim_upd) {
@@ -199,19 +232,21 @@ namespace strumpack {
     if (this->dim_sep && F11.active()) {
 #if defined(WRITE_ROOT)
       if (etree_level == 0) {
-	if (!mpi_rank(this->front_comm)) std::cout << "Writing root node to file..." << std::endl;
-	F11.MPI_binary_write();
-	if (!mpi_rank(this->front_comm)) std::cout << "Done. Early abort." << std::endl;
-	MPI_Finalize();
-	exit(0);
+        if (!mpi_rank(this->front_comm))
+          std::cout << "Writing root node to file..." << std::endl;
+        F11.MPI_binary_write();
+        if (!mpi_rank(this->front_comm))
+          std::cout << "Done. Early abort." << std::endl;
+        MPI_Finalize();
+        exit(0);
       }
 #endif
       piv = F11.LU();
       if (this->dim_upd) {
-	F12.permute_rows_fwd(piv);
-	trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11, F12);
-	trsm(Side::R, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11, F21);
-	gemm(Trans::N, Trans::N, scalar_t(-1.), F21, F12, scalar_t(1.), F22);
+        F12.permute_rows_fwd(piv);
+        trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11, F12);
+        trsm(Side::R, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11, F21);
+        gemm(Trans::N, Trans::N, scalar_t(-1.), F21, F12, scalar_t(1.), F22);
       }
     }
   }
@@ -219,8 +254,12 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::multifrontal_factorization
   (const SPOptions<scalar_t>& opts, int etree_level, int task_depth) {
-    if (this->visit(this->lchild)) this->lchild->multifrontal_factorization(opts, etree_level+1, task_depth);
-    if (this->visit(this->rchild)) this->rchild->multifrontal_factorization(opts, etree_level+1, task_depth);
+    if (this->visit(this->lchild))
+      this->lchild->multifrontal_factorization
+        (opts, etree_level+1, task_depth);
+    if (this->visit(this->rchild))
+      this->rchild->multifrontal_factorization
+        (opts, etree_level+1, task_depth);
     build_front();
     if (this->lchild) this->lchild->release_work_memory();
     if (this->rchild) this->rchild->release_work_memory();
@@ -229,9 +268,14 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::forward_multifrontal_solve
-  (scalar_t* b_loc, DistM_t* b_dist, scalar_t* wmem, int etree_level, int task_depth) {
-    if (this->visit(this->lchild)) this->lchild->forward_multifrontal_solve(b_loc, b_dist, wmem, etree_level, task_depth);
-    if (this->visit(this->rchild)) this->rchild->forward_multifrontal_solve(b_loc, b_dist, wmem, etree_level, task_depth);
+  (scalar_t* b_loc, DistM_t* b_dist, scalar_t* wmem,
+   int etree_level, int task_depth) {
+    if (this->visit(this->lchild))
+      this->lchild->forward_multifrontal_solve
+        (b_loc, b_dist, wmem, etree_level, task_depth);
+    if (this->visit(this->rchild))
+      this->rchild->forward_multifrontal_solve
+        (b_loc, b_dist, wmem, etree_level, task_depth);
     DistMW_t Bupd(this->ctxt, this->dim_upd, 1, wmem+this->p_wmem);
     Bupd.zero();
     this->look_left(b_dist[this->sep], wmem);
@@ -240,26 +284,33 @@ namespace strumpack {
       b_dist[this->sep].permute_rows_fwd(piv);
       trsv(UpLo::L, Trans::N, Diag::U, F11, b_dist[this->sep]);
       if (this->dim_upd)
-	gemv(Trans::N, scalar_t(-1.), F21, b_dist[this->sep], scalar_t(1.), Bupd);
+        gemv(Trans::N, scalar_t(-1.), F21, b_dist[this->sep],
+             scalar_t(1.), Bupd);
       TIMER_STOP(t_s);
     }
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::backward_multifrontal_solve
-  (scalar_t* y_loc, DistM_t* y_dist, scalar_t* wmem, int etree_level, int task_depth) {
+  (scalar_t* y_loc, DistM_t* y_dist, scalar_t* wmem,
+   int etree_level, int task_depth) {
     if (this->dim_sep) {
       TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_s);
       if (this->dim_upd) {
-	DistMW_t Yupd(this->ctxt, this->dim_upd, 1, wmem+this->p_wmem);
-	gemv(Trans::N, scalar_t(-1.), F12, Yupd, scalar_t(1.), y_dist[this->sep]);
+        DistMW_t Yupd(this->ctxt, this->dim_upd, 1, wmem+this->p_wmem);
+        gemv(Trans::N, scalar_t(-1.), F12, Yupd,
+             scalar_t(1.), y_dist[this->sep]);
       }
       trsv(UpLo::U, Trans::N, Diag::N, F11, y_dist[this->sep]);
       TIMER_STOP(t_s);
     }
     this->look_right(y_dist[this->sep], wmem);
-    if (this->visit(this->lchild)) this->lchild->backward_multifrontal_solve(y_loc, y_dist, wmem, etree_level, task_depth);
-    if (this->visit(this->rchild)) this->rchild->backward_multifrontal_solve(y_loc, y_dist, wmem, etree_level, task_depth);
+    if (this->visit(this->lchild))
+      this->lchild->backward_multifrontal_solve
+        (y_loc, y_dist, wmem, etree_level, task_depth);
+    if (this->visit(this->rchild))
+      this->rchild->backward_multifrontal_solve
+        (y_loc, y_dist, wmem, etree_level, task_depth);
   }
 
   /**
@@ -268,7 +319,8 @@ namespace strumpack {
    */
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
-  (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J, DistM_t& B) const {
+  (const std::vector<std::size_t>& I,
+   const std::vector<std::size_t>& J, DistM_t& B) const {
     if (this->front_comm == MPI_COMM_NULL) return;
     std::vector<std::size_t> lJ, oJ, lI, oI;
     this->find_upd_indices(J, lJ, oJ);
@@ -301,7 +353,8 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> long long
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::factor_nonzeros(int task_depth) const {
+  FrontalMatrixDenseMPI<scalar_t,integer_t>::factor_nonzeros
+  (int task_depth) const {
     return this->dense_factor_nonzeros(task_depth);
   }
 
