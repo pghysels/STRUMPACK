@@ -68,12 +68,6 @@ namespace strumpack {
     void partial_factorization();
 
     void extend_add();
-    void extend_add_mpi_fill_buffers
-    (FDMPI_t* ch, std::vector<std::vector<scalar_t>>& sbuf);
-    void extend_add_mpi_recv_buffers(FDMPI_t* ch, scalar_t** pbuf);
-    void extend_add_seq_fill_buffers
-    (FD_t* ch, std::vector<std::vector<scalar_t>>& sbuf);
-    void extend_add_seq_recv_buffers(FD_t* ch, scalar_t** rbuf);
 
     void sample_CB(const SPOptions<scalar_t>& opts,
                    const DistM_t& R, DistM_t& Sr, DistM_t& Sc,
@@ -120,70 +114,6 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::extend_add_mpi_fill_buffers
-  (FDMPI_t* ch, std::vector<std::vector<scalar_t>>& sbuf) {
-    if (ch->F22.active()) {
-      auto I = ch->upd_to_parent(this);
-      ExtAdd::extend_add_copy_to_buffers
-        (ch->F22, F11, F12, F21, F22, sbuf, this, I);
-    }
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::extend_add_mpi_recv_buffers
-  (FrontalMatrixDenseMPI<scalar_t,integer_t>* ch, scalar_t** pbuf) {
-#if 0
-    auto F22rank = [&](integer_t r, integer_t c){
-      return ch->find_rank_fixed(r,c,ch->F22);
-    };
-    ExtAdd::extend_add_copy_from_buffers
-      (F11, F12, F21, F22, pbuf, this->sep_begin,
-       this->upd, ch->upd, ch->dim_upd, F22rank);
-#else
-    ExtAdd::extend_add_copy_from_buffers_opt
-      (F11, F12, F21, F22, pbuf, this, ch);
-#endif
-  }
-
-  // TODO move to the child class? optimize! Put in ExtendAdd!!
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::extend_add_seq_fill_buffers
-  (FD_t* ch, std::vector<std::vector<scalar_t>>& sbuf) {
-    if (mpi_rank(this->front_comm) == this->child_master(ch)) {
-      std::size_t u2s;
-      auto I = ch->upd_to_parent(this, u2s);
-      std::size_t du = ch->dim_upd;
-      std::size_t ds = this->dim_sep;
-      for (std::size_t c=0; c<u2s; c++) // F11
-        for (std::size_t r=0; r<u2s; r++)
-          sbuf[this->find_rank_fixed(I[r],I[c],F11)].
-            push_back(ch->F22(r,c));
-      for (std::size_t c=u2s; c<du; c++) // F12
-        for (std::size_t r=0; r<u2s; r++)
-          sbuf[this->find_rank_fixed(I[r],I[c]-ds,F12)].
-            push_back(ch->F22(r,c));
-      for (std::size_t c=0; c<u2s; c++) // F21
-        for (std::size_t r=u2s; r<du; r++)
-          sbuf[this->find_rank_fixed(I[r]-ds,I[c],F21)].
-            push_back(ch->F22(r,c));
-      for (std::size_t c=u2s; c<du; c++) // F22
-        for (std::size_t r=u2s; r<du; r++)
-          sbuf[this->find_rank_fixed(I[r]-ds,I[c]-ds,F22)].
-            push_back(ch->F22(r,c));
-    }
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::extend_add_seq_recv_buffers
-  (FrontalMatrixDense<scalar_t,integer_t>* ch, scalar_t** pbuf) {
-    if (F11.active() || F22.active())
-      ExtAdd::extend_add_copy_from_buffers
-        (F11, F12, F21, F22, pbuf, this->sep_begin,
-         this->upd, ch->upd, ch->dim_upd,
-         [](integer_t,integer_t){ return 0; });
-  }
-
-  template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::extend_add() {
     if (!this->lchild && !this->rchild) return;
     auto P = mpi_nprocs(this->front_comm);
@@ -192,20 +122,29 @@ namespace strumpack {
       if (ch && mpi_rank(this->front_comm) == 0) {
         STRUMPACK_FLOPS(static_cast<long long int>(ch->dim_upd)*ch->dim_upd);
       }
-      if (FDMPI_t* dense_mpi_child = dynamic_cast<FDMPI_t*>(ch))
-        extend_add_mpi_fill_buffers(dense_mpi_child, sbuf);
-      else if (FD_t* dense_child = dynamic_cast<FD_t*>(ch))
-        extend_add_seq_fill_buffers(dense_child, sbuf);
+      if (FDMPI_t* ch_mpi = dynamic_cast<FDMPI_t*>(ch)) {
+        ExtAdd::extend_add_copy_to_buffers
+          (ch_mpi->F22, F11, F12, F21, F22, sbuf, this,
+           ch_mpi->upd_to_parent(this));
+      } else if (FD_t* ch_seq = dynamic_cast<FD_t*>(ch)) {
+        if (mpi_rank(this->front_comm) == this->child_master(ch))
+          ExtAdd::extend_add_seq_copy_to_buffers
+            (ch_seq->F22, F11, F12, F21, F22, sbuf, this, ch_seq);
+      }
     }
     scalar_t *rbuf = nullptr, **pbuf = nullptr;
     all_to_all_v(sbuf, rbuf, pbuf, this->front_comm);
-    for (auto ch : {this->lchild, this->rchild})
-      if (FDMPI_t* dense_mpi_child = dynamic_cast<FDMPI_t*>(ch))
-        extend_add_mpi_recv_buffers
-          (dense_mpi_child, pbuf+this->child_master(ch));
-      else if (FD_t* dense_child = dynamic_cast<FD_t*>(ch))
-        extend_add_seq_recv_buffers
-          (dense_child, pbuf+this->child_master(ch));
+    for (auto ch : {this->lchild, this->rchild}) {
+      if (FDMPI_t* ch_mpi = dynamic_cast<FDMPI_t*>(ch)) {
+        ExtAdd::extend_add_copy_from_buffers
+          (F11, F12, F21, F22, pbuf+this->child_master(ch),
+           this, ch_mpi);
+      } else if (FD_t* ch_seq = dynamic_cast<FD_t*>(ch)) {
+        ExtAdd::extend_add_seq_copy_from_buffers
+          (F11, F12, F21, F22, pbuf[this->child_master(ch_seq)],
+           this, ch_seq);
+      }
+    }
     delete[] pbuf;
     delete[] rbuf;
   }

@@ -38,14 +38,18 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> class FrontalMatrixDenseMPI;
 
   template<typename scalar_t,typename integer_t> class ExtendAdd {
+    using DenseM_t = DenseMatrix<scalar_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
+
   public:
+
     static void extend_add_copy_to_buffers
     (const DistM_t& CB, const DistM_t& F11, const DistM_t& F12,
      const DistM_t& F21, const DistM_t& F22,
      std::vector<std::vector<scalar_t>>& sbuf,
      const FrontalMatrixDenseMPI<scalar_t,integer_t>* pa,
      const std::vector<std::size_t>& I) {
+      if (!CB.active()) return;
       assert(CB.fixed());
       auto pr = new int[CB.lrows()+CB.lcols()];
       auto pc = pr + CB.lrows();
@@ -57,6 +61,7 @@ namespace strumpack {
       auto B = DistM_t::default_MB;
       // destination rank is:
       //  ((r / B) % prows) + ((c / B) % pcols) * prows
+      //  = pr[r] + pc[c]
       int r_upd, c_upd;
       for (r_upd=0; r_upd<lrows; r_upd++) {
         auto t = I[CB.rowl2g_fixed(r_upd)];
@@ -94,6 +99,59 @@ namespace strumpack {
           sbuf[pr[r]+pc[c]].push_back(CB(r,c));
       delete[] pr;
     }
+
+    static void extend_add_seq_copy_to_buffers
+    (const DenseM_t& CB, const DistM_t& F11, const DistM_t& F12,
+     const DistM_t& F21, const DistM_t& F22,
+     std::vector<std::vector<scalar_t>>& sbuf,
+     const FrontalMatrixDenseMPI<scalar_t,integer_t>* pa,
+     const FrontalMatrixDense<scalar_t,integer_t>* ch) {
+     //const std::vector<std::size_t>& I, integer_t u2s) {
+      std::size_t u2s;
+      auto I = ch->upd_to_parent(pa, u2s);
+      std::size_t du = ch->dim_upd;
+      std::size_t ds = pa->dim_sep;
+      auto pr = new int[CB.rows()+CB.cols()];
+      auto pc = pr + CB.rows();
+      auto prows = pa->proc_rows;
+      auto pcols = pa->proc_cols;
+      auto B = DistM_t::default_MB;
+      // destination rank is:
+      //  ((r / B) % prows) + ((c / B) % pcols) * prows
+      //  = pr[r] + pc[c]
+      for (int i=0; i<u2s; i++) {
+        auto Ii = I[i];
+        pr[i] = (Ii / B) % prows;
+        pc[i] = ((Ii / B) % pcols) * prows;
+      }
+      for (int i=u2s; i<du; i++) {
+        auto Ii = I[i] - ds;
+        pr[i] = (Ii / B) % prows;
+        pc[i] = ((Ii / B) % pcols) * prows;
+      }
+      { // reserve space for the send buffers
+        std::vector<std::size_t> cnt(sbuf.size());
+        for (int c=0; c<du; c++)
+          for (int r=0; r<du; r++)
+            cnt[pr[r]+pc[c]]++;
+        for (std::size_t i=0; i<sbuf.size(); i++)
+          sbuf[i].reserve(cnt[i]);
+      }
+      for (std::size_t c=0; c<u2s; c++) // F11
+        for (std::size_t r=0; r<u2s; r++)
+          sbuf[pr[r]+pc[c]].push_back(CB(r,c));
+      for (std::size_t c=u2s; c<du; c++) // F12
+        for (std::size_t r=0; r<u2s; r++)
+          sbuf[pr[r]+pc[c]].push_back(CB(r,c));
+      for (std::size_t c=0; c<u2s; c++) // F21
+        for (std::size_t r=u2s; r<du; r++)
+          sbuf[pr[r]+pc[c]].push_back(CB(r,c));
+      for (std::size_t c=u2s; c<du; c++) // F22
+        for (std::size_t r=u2s; r<du; r++)
+          sbuf[pr[r]+pc[c]].push_back(CB(r,c));
+      delete[] pr;
+    }
+
 
     // TODO use skinny-extend-add
     static void extend_add_column_copy_to_buffers
@@ -200,32 +258,70 @@ namespace strumpack {
       }
     }
 
-    // TODO remove
-    static void extend_add_copy_from_buffers
-    (DistM_t& F11, DistM_t& F12, DistM_t& F21, DistM_t& F22, scalar_t** pbuf,
-     integer_t sep_begin, integer_t* pa_upd,
-     integer_t* ch_upd, integer_t ch_dim_upd,
-     std::function<int(integer_t,integer_t)> F22rank) {
-      std::function<integer_t(integer_t)> sep_map =
-        [&](integer_t i) { return i + sep_begin;
-      };
-      std::function<integer_t(integer_t)> upd_map =
-        [&](integer_t i) { return pa_upd[i];
-      };
-      copy_from_buffer(F11, pbuf, ch_upd, ch_dim_upd, F22rank,
-                       sep_map, sep_map);
-      copy_from_buffer(F12, pbuf, ch_upd, ch_dim_upd, F22rank,
-                       sep_map, upd_map);
-      copy_from_buffer(F21, pbuf, ch_upd, ch_dim_upd, F22rank,
-                       upd_map, sep_map);
-      copy_from_buffer(F22, pbuf, ch_upd, ch_dim_upd, F22rank,
-                       upd_map, upd_map);
+    static void extend_add_seq_copy_from_buffers
+    (DistM_t& F11, DistM_t& F12, DistM_t& F21, DistM_t& F22,
+     scalar_t*& pbuf, const FrontalMatrixDenseMPI<scalar_t,integer_t>* pa,
+     const FrontalMatrixDense<scalar_t,integer_t>* ch) {
+      if (!(F11.active() || F22.active())) return;
+      auto ch_dim_upd = ch->dim_upd;
+      auto ch_upd = ch->upd;
+      auto pa_upd = pa->upd;
+      auto pa_sep = pa->sep_begin;
+      auto r_1 = new int[F11.lrows()+F11.lcols()+
+                         F22.lrows()+F22.lcols()];
+      auto c_1 = r_1 + F11.lrows(); // new int[F11.lcols()];
+      auto r_2 = c_1 + F11.lcols(); // new int[F22.lrows()];
+      auto c_2 = r_2 + F22.lrows(); // new int[F22.lcols()];
+      integer_t r_max_1 = 0, r_max_2 = 0;
+      integer_t c_max_1 = 0, c_max_2 = 0;
+      for (int r=0, ur=0; r<F11.lrows(); r++) {
+        auto fgr = F11.rowl2g_fixed(r) + pa_sep;
+        while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
+        if (ur == ch_dim_upd) break;
+        if (ch_upd[ur] != fgr) continue;
+        r_1[r_max_1++] = r;
+      }
+      for (int c=0, uc=0; c<F11.lcols(); c++) {
+        auto fgc = F11.coll2g_fixed(c) + pa_sep;
+        while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
+        if (uc == ch_dim_upd) break;
+        if (ch_upd[uc] != fgc) continue;
+        c_1[c_max_1++] = c;
+      }
+      for (int r=0, ur=0; r<F22.lrows(); r++) {
+        auto fgr = pa_upd[F22.rowl2g_fixed(r)];
+        while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
+        if (ur == ch_dim_upd) break;
+        if (ch_upd[ur] != fgr) continue;
+        r_2[r_max_2++] = r;
+      }
+      for (int c=0, uc=0; c<F22.lcols(); c++) {
+        auto fgc = pa_upd[F22.coll2g_fixed(c)];
+        while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
+        if (uc == ch_dim_upd) break;
+        if (ch_upd[uc] != fgc) continue;
+        c_2[c_max_2++] = c;
+      }
+      for (int c=0; c<c_max_1; c++)
+        for (int r=0; r<r_max_1; r++)
+          F11(r_1[r],c_1[c]) += *(pbuf++);
+      for (int c=0; c<c_max_2; c++)
+        for (int r=0; r<r_max_1; r++)
+          F12(r_1[r],c_2[c]) += *(pbuf++);
+      for (int c=0; c<c_max_1; c++)
+        for (int r=0; r<r_max_2; r++)
+          F21(r_2[r],c_1[c]) += *(pbuf++);
+      for (int c=0; c<c_max_2; c++)
+        for (int r=0; r<r_max_2; r++)
+          F22(r_2[r],c_2[c]) += *(pbuf++);
+      delete[] r_1;
     }
 
-    static void extend_add_copy_from_buffers_opt
+    static void extend_add_copy_from_buffers
     (DistM_t& F11, DistM_t& F12, DistM_t& F21, DistM_t& F22,
      scalar_t** pbuf, const FrontalMatrixDenseMPI<scalar_t,integer_t>* pa,
      const FrontalMatrixDenseMPI<scalar_t,integer_t>* ch) {
+      if (!(F11.active() || F22.active())) return;
       auto ch_dim_upd = ch->dim_upd;
       auto ch_upd = ch->upd;
       auto pa_upd = pa->upd;
@@ -239,13 +335,13 @@ namespace strumpack {
       auto upd_r_1 =
         new int[2*F11.lrows()+2*F11.lcols()+
                 2*F22.lrows()+2*F22.lcols()];
-      auto upd_c_1 = upd_r_1 + F11.lrows(); // new int[F11.lcols()];
-      auto upd_r_2 = upd_c_1 + F11.lcols(); // new int[F22.lrows()];
-      auto upd_c_2 = upd_r_2 + F22.lrows(); // new int[F22.lcols()];
-      auto r_1 = upd_c_2 + F22.lcols(); // new int[F11.lrows()];
-      auto c_1 = r_1 + F11.lrows(); // new int[F11.lcols()];
-      auto r_2 = c_1 + F11.lcols(); // new int[F22.lrows()];
-      auto c_2 = r_2 + F22.lrows(); // new int[F22.lcols()];
+      auto upd_c_1 = upd_r_1 + F11.lrows();
+      auto upd_r_2 = upd_c_1 + F11.lcols();
+      auto upd_c_2 = upd_r_2 + F22.lrows();
+      auto r_1 = upd_c_2 + F22.lcols();
+      auto c_1 = r_1 + F11.lrows();
+      auto r_2 = c_1 + F11.lcols();
+      auto c_2 = r_2 + F22.lrows();
       integer_t r_max_1 = 0, r_max_2 = 0;
       integer_t c_max_1 = 0, c_max_2 = 0;
       for (int r=0, ur=0; r<F11.lrows(); r++) {
@@ -384,53 +480,6 @@ namespace strumpack {
       else
         for (int r=0; r<F.lrows(); r++)
           F(r,0) = *(pbuf[src_rank(I[F.rowl2g(r)])]++);
-    }
-
-    // TODO remove this, rewrite code that calls this
-    static void copy_from_buffer
-    (DistM_t& F, scalar_t** pbuf, integer_t* ch_upd, integer_t ch_dim_upd,
-     std::function<int(integer_t,integer_t)> F22rank,
-     std::function<integer_t(integer_t)> fr2g,
-     std::function<integer_t(integer_t)> fc2g) {
-      if (!F.active()) return;
-      // TODO precompute indices??
-      //   list of local rows/col that have corresponding global index
-      // in front and corresponding child row similar to
-      // compute_parent_indices and pass as input because this
-      // function is called 4 times
-      if (F.fixed()) {
-        integer_t upd_c = 0;
-        for (int c=0; c<F.lcols(); c++) {
-          auto fgc = fc2g(F.coll2g_fixed(c));
-          while (upd_c < ch_dim_upd && ch_upd[upd_c] < fgc) upd_c++;
-          if (upd_c == ch_dim_upd) break;
-          if (ch_upd[upd_c] != fgc) continue;
-          integer_t upd_r = 0;
-          for (int r=0; r<F.lrows(); r++) {
-            auto fgr = fr2g(F.rowl2g_fixed(r));
-            while (upd_r < ch_dim_upd && ch_upd[upd_r] < fgr) upd_r++;
-            if (upd_r == ch_dim_upd) break;
-            if (ch_upd[upd_r] != fgr) continue;
-            F(r,c) += *(pbuf[F22rank(upd_r,upd_c)]++);
-          }
-        }
-      } else {
-        integer_t upd_c = 0;
-        for (int c=0; c<F.lcols(); c++) {
-          auto fgc = fc2g(F.coll2g(c));
-          while (upd_c < ch_dim_upd && ch_upd[upd_c] < fgc) upd_c++;
-          if (upd_c == ch_dim_upd) break;
-          if (ch_upd[upd_c] != fgc) continue;
-          integer_t upd_r = 0;
-          for (int r=0; r<F.lrows(); r++) {
-            auto fgr = fr2g(F.rowl2g(r));
-            while (upd_r < ch_dim_upd && ch_upd[upd_r] < fgr) upd_r++;
-            if (upd_r == ch_dim_upd) break;
-            if (ch_upd[upd_r] != fgr) continue;
-            F(r,c) += *(pbuf[F22rank(upd_r,upd_c)]++);
-          }
-        }
-      }
     }
 
     static void copy_column_from_buffer
