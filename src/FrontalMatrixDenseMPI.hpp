@@ -52,6 +52,7 @@ namespace strumpack {
     using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using ExtAdd = ExtendAdd<scalar_t,integer_t>;
+    template<typename _scalar_t,typename _integer_t> friend class ExtendAdd;
 
   public:
     FrontalMatrixDenseMPI(CompressedSparseMatrix<scalar_t,integer_t>* _A,
@@ -131,14 +132,20 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::extend_add_mpi_recv_buffers
   (FrontalMatrixDenseMPI<scalar_t,integer_t>* ch, scalar_t** pbuf) {
+#if 0
     auto F22rank = [&](integer_t r, integer_t c){
-      return ch->find_rank(r,c,ch->F22);
+      return ch->find_rank_fixed(r,c,ch->F22);
     };
     ExtAdd::extend_add_copy_from_buffers
       (F11, F12, F21, F22, pbuf, this->sep_begin,
        this->upd, ch->upd, ch->dim_upd, F22rank);
+#else
+    ExtAdd::extend_add_copy_from_buffers_opt
+      (F11, F12, F21, F22, pbuf, this, ch);
+#endif
   }
 
+  // TODO move to the child class? optimize! Put in ExtendAdd!!
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::extend_add_seq_fill_buffers
   (FD_t* ch, std::vector<std::vector<scalar_t>>& sbuf) {

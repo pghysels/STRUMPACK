@@ -199,6 +199,7 @@ foreach(ntests RANGE 50)
   random_element(PROCS mpi)
   set(c enable)
   random_element(RTOL t)
+  ## TODO pick these at random!!
   set(a 1e-10)
   set(d 16)
   set(deltad 8)
