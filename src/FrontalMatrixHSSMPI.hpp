@@ -50,6 +50,8 @@ namespace strumpack {
     using DistM_t = DistributedMatrix<scalar_t>;
     using DistMW_t = DistributedMatrixWrapper<scalar_t>;
     using ExtAdd = ExtendAdd<scalar_t,integer_t>;
+    template<typename _scalar_t,typename _integer_t> friend class ExtendAdd;
+
   public:
     FrontalMatrixHSSMPI(CompressedSparseMatrix<scalar_t,integer_t>* _A,
                         integer_t _sep, integer_t _sep_begin,
@@ -295,6 +297,7 @@ namespace strumpack {
     if (rank == pr) this->rchild->sample_CB(opts, Rseq, Srseq, Scseq, this);
     TIMER_TIME(TaskType::SKINNY_EXTEND_ADD_SEQSEQ, 2, t_sea);
     DistM_t Stmp(this->ctxt, m, n);
+    // TODO combine these 4 copies into 1 all-to-all?
     strumpack::copy(m, n, Srseq, pl, Stmp, 0, 0, this->ctxt_all);
     Sr.add(Stmp);
     strumpack::copy(m, n, Scseq, pl, Stmp, 0, 0, this->ctxt_all);
@@ -310,45 +313,23 @@ namespace strumpack {
   FrontalMatrixHSSMPI<scalar_t,integer_t>::skinny_extend_add
   (DistM_t& cSrl, DistM_t& cScl, DistM_t& cSrr, DistM_t& cScr,
    DistM_t& Sr, DistM_t& Sc) {
-    auto P = mpi_nprocs(this->comm());
-    std::vector<std::vector<scalar_t>> sbuf(P);
+    std::vector<std::vector<scalar_t>> sbuf(mpi_nprocs(this->comm()));
     auto lch = dynamic_cast<FMPI_t*>(this->lchild);
     auto rch = dynamic_cast<FMPI_t*>(this->rchild);
-    if (cSrl.active()) {
-      auto I = lch->upd_to_parent(this);
-      ExtAdd::skinny_extend_add_copy_to_buffers(cSrl, Sr, sbuf, this, I);
-      ExtAdd::skinny_extend_add_copy_to_buffers(cScl, Sc, sbuf, this, I);
-    }
-    if (cSrr.active()) {
-      auto I = rch->upd_to_parent(this);
-      ExtAdd::skinny_extend_add_copy_to_buffers(cSrr, Sr, sbuf, this, I);
-      ExtAdd::skinny_extend_add_copy_to_buffers(cScr, Sc, sbuf, this, I);
-    }
+    if (cSrl.active())
+      ExtAdd::skinny_extend_add_copy_to_buffers
+        (cSrl, cScl, sbuf, this, lch->upd_to_parent(this));
+    if (cSrr.active())
+      ExtAdd::skinny_extend_add_copy_to_buffers
+        (cSrr, cScr, sbuf, this, rch->upd_to_parent(this));
     scalar_t *rbuf = nullptr, **pbuf = nullptr;
     all_to_all_v(sbuf, rbuf, pbuf, this->comm());
-    if (lch) { // unpack left child contribution
-      std::function<int(integer_t,integer_t)> Sl_upd_rank =
-        [&](integer_t r, integer_t c) {
-        return lch->find_rank(r, c, cSrl);
-      };
+    if (lch) // unpack left child contribution
       ExtAdd::skinny_extend_add_copy_from_buffers
-        (Sr, pbuf, this->sep_begin, this->dim_sep, this->upd,
-         lch->upd, lch->dim_upd, Sl_upd_rank);
+        (Sr, Sc, pbuf, this, lch);
+    if (rch) // unpack right child contribution
       ExtAdd::skinny_extend_add_copy_from_buffers
-        (Sc, pbuf, this->sep_begin, this->dim_sep, this->upd,
-         lch->upd, lch->dim_upd, Sl_upd_rank);
-    }
-    if (rch) { // unpack right child contribution
-      std::function<int(integer_t,integer_t)> Sr_upd_rank =
-        [&](integer_t r, integer_t c) {
-        return this->child_master(rch) + rch->find_rank(r, c, cSrr); };
-      ExtAdd::skinny_extend_add_copy_from_buffers
-        (Sr, pbuf, this->sep_begin, this->dim_sep, this->upd,
-         rch->upd, rch->dim_upd, Sr_upd_rank);
-      ExtAdd::skinny_extend_add_copy_from_buffers
-        (Sc, pbuf, this->sep_begin, this->dim_sep, this->upd,
-         rch->upd, rch->dim_upd, Sr_upd_rank);
-    }
+        (Sr, Sc, pbuf+this->child_master(rch), this, rch);
     delete[] pbuf;
     delete[] rbuf;
   }

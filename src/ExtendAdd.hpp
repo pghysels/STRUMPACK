@@ -82,8 +82,8 @@ namespace strumpack {
         for (int c=0; c<lcols; c++)
           for (int r=0; r<lrows; r++)
             cnt[pr[r]+pc[c]]++;
-        for (std::size_t i=0; i<sbuf.size(); i++)
-          sbuf[i].reserve(cnt[i]);
+        for (std::size_t p=0; p<sbuf.size(); p++)
+          sbuf[p].reserve(sbuf[p].size()+cnt[p]);
       }
       for (int c=0; c<c_upd; c++) // F11
         for (int r=0; r<r_upd; r++)
@@ -134,8 +134,8 @@ namespace strumpack {
         for (int c=0; c<du; c++)
           for (int r=0; r<du; r++)
             cnt[pr[r]+pc[c]]++;
-        for (std::size_t i=0; i<sbuf.size(); i++)
-          sbuf[i].reserve(cnt[i]);
+        for (std::size_t p=0; p<sbuf.size(); p++)
+          sbuf[p].reserve(sbuf[p].size()+cnt[p]);
       }
       for (std::size_t c=0; c<u2s; c++) // F11
         for (std::size_t r=0; r<u2s; r++)
@@ -238,6 +238,7 @@ namespace strumpack {
       }
     }
 
+    // TODO optimize these loops
     static void extend_copy_to_buffers
     (const DistM_t& F, const std::vector<std::size_t>& I,
      const std::vector<std::size_t>& J, const DistM_t& B,
@@ -350,7 +351,7 @@ namespace strumpack {
         if (ur == ch_dim_upd) break;
         if (ch_upd[ur] != fgr) continue;
         r_1[r_max_1] = r;
-        upd_r_1[r_max_1++] = ((ur / B) % prows);
+        upd_r_1[r_max_1++] = (ur / B) % prows;
       }
       for (int c=0, uc=0; c<F11.lcols(); c++) {
         auto fgc = F11.coll2g_fixed(c) + pa_sep;
@@ -366,7 +367,7 @@ namespace strumpack {
         if (ur == ch_dim_upd) break;
         if (ch_upd[ur] != fgr) continue;
         r_2[r_max_2] = r;
-        upd_r_2[r_max_2++] = ((ur / B) % prows);
+        upd_r_2[r_max_2++] = (ur / B) % prows;
       }
       for (int c=0, uc=0; c<F22.lcols(); c++) {
         auto fgc = pa_upd[F22.coll2g_fixed(c)];
@@ -391,61 +392,80 @@ namespace strumpack {
       delete[] upd_r_1;
     }
 
-    // TODO optimize this!
+
     static void skinny_extend_add_copy_to_buffers
-    (DistM_t& Schild, DistM_t& S, std::vector<std::vector<scalar_t>>& sbuf,
-     FrontalMatrixHSSMPI<scalar_t,integer_t>* pa,
-     std::vector<std::size_t>& I) {
-      if (Schild.fixed()) {
-        for (int c=0; c<Schild.lcols(); c++) {
-          auto gc = Schild.coll2g_fixed(c);
-          for (int r=0; r<Schild.lrows(); r++)
-            sbuf[pa->find_rank_fixed(I[Schild.rowl2g_fixed(r)],gc,S)].
-              push_back(Schild(r,c));
-        }
-      } else {
-        for (int c=0; c<Schild.lcols(); c++) {
-          auto gc = Schild.coll2g(c);
-          for (int r=0; r<Schild.lrows(); r++)
-            sbuf[pa->find_rank(I[Schild.rowl2g(r)],gc,S)].
-              push_back(Schild(r,c));
-        }
+    (const DistM_t& cSr, const DistM_t& cSc,
+     std::vector<std::vector<scalar_t>>& sbuf,
+     const FrontalMatrixHSSMPI<scalar_t,integer_t>* pa,
+     const std::vector<std::size_t>& I) {
+      if (!cSr.active()) return;
+      assert(cSr.fixed() && cSc.fixed());
+      const auto prows = pa->proc_rows;
+      const auto pcols = pa->proc_cols;
+      const auto B = DistM_t::default_MB;
+      const auto lrows = cSr.lrows();
+      const auto lcols = cSr.lcols();
+      auto destr = new int[lrows+lcols];
+      auto destc = destr + lrows;
+      for (int r=0; r<lrows; r++)
+        destr[r] = (I[cSr.rowl2g_fixed(r)] / B) % prows;
+      for (int c=0; c<lcols; c++)
+        destc[c] = ((cSr.coll2g_fixed(c) / B) % pcols) * prows;
+      {
+        std::vector<std::size_t> cnt(sbuf.size());
+        for (int c=0; c<lcols; c++)
+          for (int r=0; r<lrows; r++)
+            cnt[destr[r]+destc[c]]++;
+        for (int p=0; p<sbuf.size(); p++)
+          sbuf[p].reserve(sbuf[p].size()+cnt[p]);
       }
+      for (int c=0; c<lcols; c++)
+        for (int r=0; r<lrows; r++)
+          sbuf[destr[r]+destc[c]].push_back(cSr(r,c));
+      for (int c=0; c<lcols; c++)
+        for (int r=0; r<lrows; r++)
+          sbuf[destr[r]+destc[c]].push_back(cSc(r,c));
+      delete[] destr;
     }
 
     static void skinny_extend_add_copy_from_buffers
-    (DistM_t& F, scalar_t** pbuf, integer_t sep_begin, integer_t dim_sep,
-     integer_t* pa_upd, integer_t* ch_upd, integer_t ch_dim_upd,
-     std::function<int(integer_t,integer_t)> chSrank) {
-      if (!F.active()) return;
-      auto rowf2g = [&](integer_t r) {
-        return (r < dim_sep) ? r+sep_begin : pa_upd[r-dim_sep];
-      };
-      if (F.fixed()) {
-        for (int c=0; c<F.lcols(); c++) {
-          auto gc = F.coll2g_fixed(c);
-          integer_t upd_r = 0;
-          for (int r=0; r<F.lrows(); r++) {
-            auto fgr = rowf2g(F.rowl2g_fixed(r));
-            while (upd_r < ch_dim_upd && ch_upd[upd_r] < fgr) upd_r++;
-            if (upd_r == ch_dim_upd) break;
-            if (ch_upd[upd_r] != fgr) continue;
-            F(r,c) += *(pbuf[chSrank(upd_r, gc)]++);
-          }
-        }
-      } else {
-        for (int c=0; c<F.lcols(); c++) {
-          auto gc = F.coll2g(c);
-          integer_t upd_r = 0;
-          for (int r=0; r<F.lrows(); r++) {
-            auto fgr = rowf2g(F.rowl2g(r));
-            while (upd_r < ch_dim_upd && ch_upd[upd_r] < fgr) upd_r++;
-            if (upd_r == ch_dim_upd) break;
-            if (ch_upd[upd_r] != fgr) continue;
-            F(r,c) += *(pbuf[chSrank(upd_r,gc)]++);
-          }
-        }
+    (DistM_t& Sr, DistM_t& Sc, scalar_t** pbuf,
+     const FrontalMatrixMPI<scalar_t,integer_t>* pa,
+     const FrontalMatrixMPI<scalar_t,integer_t>* ch) {
+      if (!Sr.active()) return;
+      assert(Sr.fixed());
+      const auto lrows = Sr.lrows();
+      const auto lcols = Sc.lcols();
+      const auto sep_begin = pa->sep_begin;
+      const auto dim_sep = pa->dim_sep;
+      const auto pa_upd = pa->upd;
+      const auto ch_upd = ch->upd;
+      const auto ch_dim_upd = ch->dim_upd;
+      const auto prows = ch->proc_rows;
+      const auto pcols = ch->proc_cols;
+      const auto B = DistM_t::default_MB;
+      auto lr = new int[2*lrows+lcols];
+      auto srcr = lr + Sr.lrows();
+      auto srcc = srcr + Sr.lrows();
+      for (int c=0; c<lcols; c++)
+        srcc[c] = ((Sr.coll2g_fixed(c) / B) % pcols) * prows;
+      integer_t rmax = 0;
+      for (int r=0, ur=0; r<lrows; r++) {
+        auto t = Sr.rowl2g_fixed(r);
+        auto fgr = (t < dim_sep) ? t+sep_begin : pa_upd[t-dim_sep];
+        while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
+        if (ur == ch_dim_upd) break;
+        if (ch_upd[ur] != fgr) continue;
+        lr[rmax] = r;
+        srcr[rmax++] = (ur / B) % prows;
       }
+      for (int c=0; c<lcols; c++)
+        for (int r=0; r<rmax; r++)
+          Sr(lr[r],c) += *(pbuf[srcr[r]+srcc[c]]++);
+      for (int c=0; c<lcols; c++)
+        for (int r=0; r<rmax; r++)
+          Sc(lr[r],c) += *(pbuf[srcr[r]+srcc[c]]++);
+      delete[] lr;
     }
 
     // TODO use skinny-extend-add
@@ -527,6 +547,7 @@ namespace strumpack {
       }
     }
 
+    // TODO optimize these loops!!
     static void extend_copy_from_buffers
     (DistM_t& F, const std::vector<std::size_t>& oI,
      const std::vector<std::size_t>& oJ, const DistM_t& B, scalar_t** pbuf) {

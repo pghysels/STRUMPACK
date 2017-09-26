@@ -50,6 +50,8 @@ namespace strumpack {
     using DistM_t = DistributedMatrix<scalar_t>;
     using DistMW_t = DistributedMatrixWrapper<scalar_t>;
     using ExtAdd = ExtendAdd<scalar_t,integer_t>;
+    template<typename _scalar_t,typename _integer_t> friend class ExtendAdd;
+
   public:
     FrontalMatrixMPI(CompressedSparseMatrix<scalar_t,integer_t>* _A,
                      integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
