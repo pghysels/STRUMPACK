@@ -83,8 +83,8 @@ test(int argc, char* argv[], CSRMatrixMPI<scalar,integer>* Adist) {
 
 int main(int argc, char* argv[]) {
   int thread_level;
-  //MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_level);
-  MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &thread_level);
+  MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_level);
+  //MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &thread_level);
   int rank = mpi_rank();
   if (!rank) {
     std::cout << "# Running with:\n# ";
@@ -96,11 +96,11 @@ int main(int argc, char* argv[]) {
     for (int i=0; i<argc; i++) std::cout << argv[i] << " ";
     std::cout << std::endl;
   }
-  if (thread_level != MPI_THREAD_FUNNELED && rank == 0)
-    std::cout << "MPI implementation does not support MPI_THREAD_FUNNELED" << std::endl;
-  // if (thread_level != MPI_THREAD_MULTIPLE && rank == 0)
-  //   std::cout << "MPI implementation does not support MPI_THREAD_MULTIPLE, "
-  //     "which might be needed for pt-scotch!" << std::endl;
+  // if (thread_level != MPI_THREAD_FUNNELED && rank == 0)
+  //   std::cout << "MPI implementation does not support MPI_THREAD_FUNNELED" << std::endl;
+  if (thread_level != MPI_THREAD_MULTIPLE && rank == 0)
+    std::cout << "MPI implementation does not support MPI_THREAD_MULTIPLE, "
+      "which might be needed for pt-scotch!" << std::endl;
 
   if (argc < 3) {
     if (!rank)
