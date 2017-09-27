@@ -121,5 +121,6 @@ install:
   - make install VERBOSE=1
   - printf "${BLUE} GC; Done installing STRUMPACK from source\n"
 
-script: 
+script:
+  - cd $TRAVIS_BUILD_DIR
   - ./travis_tests.sh
