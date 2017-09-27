@@ -1,0 +1,369 @@
+language: cpp
+
+compiler: gcc
+
+os: linux
+
+sudo: required
+
+branches:
+  only:
+    - master
+
+env:
+  matrix:
+  - TEST_NUMBER=1 FILE="test_HSS_seq"
+  - TEST_NUMBER=2 FILE="test_HSS_mpi"
+  - TEST_NUMBER=3 FILE="test_sparse_seq"
+  - TEST_NUMBER=4 FILE="test_sparse_mpi"
+
+git:
+  depth: 1
+
+before_install:
+  - export BLUE="\033[34;1m"
+  - mkdir installDir
+  - printf "${BLUE} GC; Installing gcc-6 via apt\n"
+  - sudo apt-get update
+  - sudo apt-get install build-essential software-properties-common -y
+  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+  - sudo apt-get update
+  - sudo apt-get install gcc-6 g++-6 -y
+  - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-6 60 --slave /usr/bin/g++ g++ /usr/bin/g++-6
+  - export CXX="g++-6"
+  - export CC="gcc-6"
+  - printf "${BLUE} GC; Done installing gcc-6 via apt\n"
+
+  - printf "${BLUE} GC; Installing gfortran via apt\n"
+  - sudo apt-get install gfortran-6 -y
+  - sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-6 60
+  - printf "${BLUE} GC; Done installing gfortran via apt\n"
+
+  - printf "${BLUE} GC; Installing OpenMPI-1 via apt\n"
+  - sudo apt-get update
+  - sudo apt-get install openmpi-bin libopenmpi-dev
+  - printf "${BLUE} GC; Done installing OpenMPI-1 via apt\n"
+
+install:
+  - BLUE="\033[34;1m"
+
+  - printf "${BLUE} GC; Installing BLAS and LAPACK from apt\n"
+  - sudo apt-get install libblas-dev liblapack-dev
+  - export BLAS_LIB=/usr/lib/libblas/libblas.so
+  - export LAPACK_LIB=/usr/lib/lapack/liblapack.so
+  - printf $BLAS_LIB
+  - printf "${BLUE} GC; Done installing BLAS and LAPACK from apt\n"
+
+  - printf "${BLUE} GC; Installing ScaLAPACK from source\n"
+  - cd $TRAVIS_BUILD_DIR/installDir
+  - wget http://www.netlib.org/scalapack/scalapack-2.0.2.tgz
+  - tar -xf scalapack-2.0.2.tgz
+  - cd scalapack-2.0.2
+  - cp SLmake.inc.example SLmake.inc
+  - sed -i "s/BLASLIB/#BLASLIB/" SLmake.inc
+  - sed -i "s/LAPACKLIB/#LAPACKLIB/" SLmake.inc
+  - sed -i "s/LIBS/#LIBS/" SLmake.inc
+  - printf "BLASLIB=$BLAS_LIB\n" >> SLmake.inc
+  - printf "LAPACKLIB=$LAPACK_LIB\n" >> SLmake.inc
+  - printf "LIBS=$BLAS_LIB $LAPACK_LIB\n" >> SLmake.inc
+  - sed -i "s/SCA#LAPACKLIB/#SCA#LAPACKLIB/" SLmake.inc
+  - printf "SCALAPACKLIB=libscalapack.a\n" >> SLmake.inc
+  - make lib
+  - export SCALAPACK_LIB=$TRAVIS_BUILD_DIR/installDir/scalapack-2.0.2/libscalapack.a
+  - printf "${BLUE} GC; Done installing ScaLAPACK from source\n"
+
+  - printf "${BLUE} GC; Installing Scotch-6.0 from source\n"
+  - cd $TRAVIS_BUILD_DIR/installDir
+  - wget https://gforge.inria.fr/frs/download.php/file/34618/scotch_6.0.4.tar.gz
+  - tar -xf scotch_6.0.4.tar.gz
+  - cd ./scotch_6.0.4
+  - mkdir build
+  - cd ./src
+  - cp ./Make.inc/Makefile.inc.x86-64_pc_linux2 Makefile.inc
+  - sed -i "s/CCD/#CCD/" Makefile.inc
+  - printf "CCD = mpicc\n" >> Makefile.inc
+  - cat Makefile.inc
+  - make ptscotch > make_scotch.log 2>&1
+  - make prefix=../build install > make_scotch_install.log 2>&1
+  - printf "${BLUE} GC; DONE installing Scotch-6.0 from source\n"
+
+  - printf "${BLUE} GC; Installing ParMetis-4.0 from source\n"
+  - cd $TRAVIS_BUILD_DIR/installDir
+  - wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/parmetis/parmetis-4.0.3.tar.gz
+  - tar -xf parmetis-4.0.3.tar.gz
+  - cd parmetis-4.0.3/
+  - mkdir install
+  - make config shared=1 cc=mpicc cxx=mpic++ prefix=$PWD/install
+  - make install > make_parmetis_install.log 2>&1
+  - printf "${BLUE} GC; Done installing ParMetis-4.0 from source\n"
+  
+  - printf "${BLUE} GC; Installing STRUMPACK from source\n"
+  - cd $TRAVIS_BUILD_DIR
+  - mkdir build
+  - cd build
+  - |
+    cmake .. -DCMAKE_BUILD_TYPE=Debug \
+    -DCMAKE_INSTALL_PREFIX=. \
+    -DCMAKE_C_COMPILER=/usr/bin/mpicc.openmpi \
+    -DCMAKE_CXX_COMPILER=/usr/bin/mpic++.openmpi \
+    -DCMAKE_Fortran_COMPILER=/usr/bin/mpif90.openmpi \
+    -DBLAS_LIBRARIES=$BLAS_LIB \
+    -DLAPACK_LIBRARIES=$LAPACK_LIB \
+    -DSCALAPACK_LIBRARIES=$SCALAPACK_LIB \
+    -DCMAKE_CXX_FLAGS="-lstdc++ -DCOUNT_FLOPS=1" \
+    -DMETIS_INCLUDES=$TRAVIS_BUILD_DIR/installDir/parmetis-4.0.3/metis/include \
+    -DMETIS_LIBRARIES=$TRAVIS_BUILD_DIR/installDir/parmetis-4.0.3/install/lib/libparmetis.so \
+    -DPARMETIS_INCLUDES=$TRAVIS_BUILD_DIR/installDir/parmetis-4.0.3/install/include \
+    -DPARMETIS_LIBRARIES=$TRAVIS_BUILD_DIR/installDir/parmetis-4.0.3/install/lib/libparmetis.so \
+    -DSCOTCH_INCLUDES=$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/include \
+    -DSCOTCH_LIBRARIES="$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libscotch.a;$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libscotcherr.a;$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libptscotch.a;$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libptscotcherr.a"
+  
+  - make install VERBOSE=1
+  - printf "${BLUE} GC; Done installing STRUMPACK from source\n"
+
+script: 
+  - GREEN="\033[32;1m"
+  - export TESTS_FOLDER=$TRAVIS_BUILD_DIR/build/test
+  - cd $TESTS_FOLDER
+
+  - |
+    if [ $TEST_NUMBER -eq 3 ] || [ $TEST_NUMBER -eq 4 ]; then
+      printf "${GREEN} GC: Downloading sparse test matrices\n\n"
+
+      wget https://www.cise.ufl.edu/research/sparse/MM/TOKAMAK/utm300.tar.gz
+      tar -xvzf utm300.tar.gz
+      rm utm300.tar.gz
+
+      wget https://www.cise.ufl.edu/research/sparse/MM/Pothen/mesh3e1.tar.gz
+      tar -xvzf mesh3e1.tar.gz
+      rm mesh3e1.tar.gz
+
+      wget https://www.cise.ufl.edu/research/sparse/MM/HB/lnsp3937.tar.gz
+      tar -xvzf lnsp3937.tar.gz
+      rm lnsp3937.tar.gz
+
+      wget https://www.cise.ufl.edu/research/sparse/MM/Oberwolfach/t2dal.tar.gz
+      tar -xvzf t2dal.tar.gz
+      rm t2dal.tar.gz
+
+      wget https://www.cise.ufl.edu/research/sparse/MM/HB/bcsstk28.tar.gz
+      tar -xvzf bcsstk28.tar.gz
+      rm bcsstk28.tar.gz
+
+      wget https://www.cise.ufl.edu/research/sparse/MM/DRIVCAV/cavity16.tar.gz
+      tar -xvzf cavity16.tar.gz
+      rm cavity16.tar.gz
+
+      wget https://www.cise.ufl.edu/research/sparse/MM/HB/bcsstm08.tar.gz
+      tar -xvzf bcsstm08.tar.gz
+      rm bcsstm08.tar.gz
+
+      wget https://www.cise.ufl.edu/research/sparse/MM/HB/sherman4.tar.gz
+      tar -xvzf sherman4.tar.gz
+      rm sherman4.tar.gz
+
+      wget https://www.cise.ufl.edu/research/sparse/MM/Bai/rdb968.tar.gz
+      tar -xvzf rdb968.tar.gz
+      rm rdb968.tar.gz
+    fi
+
+  - |
+    if [ $TEST_NUMBER -eq 1 ]; then
+      printf "${GREEN} Running: test_HSS_seq\n"
+      OMP_NUM_THREADS=3 ./test_HSS_seq L 10 --hss_leaf_size 3 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_disable_sync --hss_compression_algo stable --hss_d0 32 --hss_dd 4 
+      OMP_NUM_THREADS=3 ./test_HSS_seq L 200 --hss_leaf_size 128 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo original --hss_d0 128 --hss_dd 8 
+      OMP_NUM_THREADS=8 ./test_HSS_seq L 1 --hss_leaf_size 128 --hss_rel_tol 1 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo original --hss_d0 16 --hss_dd 4 
+      OMP_NUM_THREADS=3 ./test_HSS_seq T 200 --hss_leaf_size 1 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_disable_sync --hss_compression_algo stable --hss_d0 64 --hss_dd 4 
+      OMP_NUM_THREADS=8 ./test_HSS_seq T 500 --hss_leaf_size 128 --hss_rel_tol 1e-10 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo stable --hss_d0 16 --hss_dd 4 
+      OMP_NUM_THREADS=1 ./test_HSS_seq U 1 --hss_leaf_size 1 --hss_rel_tol 1e-10 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo original --hss_d0 32 --hss_dd 4 
+      OMP_NUM_THREADS=8 ./test_HSS_seq U 500 --hss_leaf_size 1 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_disable_sync --hss_compression_algo stable --hss_d0 64 --hss_dd 8 
+      OMP_NUM_THREADS=3 ./test_HSS_seq T 200 --hss_leaf_size 128 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_disable_sync --hss_compression_algo stable --hss_d0 128 --hss_dd 8 
+      OMP_NUM_THREADS=1 ./test_HSS_seq L 10 --hss_leaf_size 16 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo stable --hss_d0 64 --hss_dd 4 
+      OMP_NUM_THREADS=3 ./test_HSS_seq L 1 --hss_leaf_size 1 --hss_rel_tol 1 --hss_abs_tol 1e-13 --hss_enable_sync --hss_compression_algo original --hss_d0 64 --hss_dd 4 
+      OMP_NUM_THREADS=8 ./test_HSS_seq U 200 --hss_leaf_size 16 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_disable_sync --hss_compression_algo stable --hss_d0 128 --hss_dd 4 
+      OMP_NUM_THREADS=8 ./test_HSS_seq L 500 --hss_leaf_size 16 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_disable_sync --hss_compression_algo original --hss_d0 128 --hss_dd 8 
+      OMP_NUM_THREADS=3 ./test_HSS_seq U 500 --hss_leaf_size 128 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo stable --hss_d0 32 --hss_dd 4 
+      OMP_NUM_THREADS=1 ./test_HSS_seq U 200 --hss_leaf_size 16 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_disable_sync --hss_compression_algo stable --hss_d0 128 --hss_dd 8 
+      OMP_NUM_THREADS=8 ./test_HSS_seq U 1 --hss_leaf_size 16 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo stable --hss_d0 128 --hss_dd 4 
+      OMP_NUM_THREADS=3 ./test_HSS_seq T 500 --hss_leaf_size 16 --hss_rel_tol 1 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo original --hss_d0 64 --hss_dd 8 
+      OMP_NUM_THREADS=3 ./test_HSS_seq T 10 --hss_leaf_size 16 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo original --hss_d0 128 --hss_dd 4 
+      OMP_NUM_THREADS=1 ./test_HSS_seq L 200 --hss_leaf_size 1 --hss_rel_tol 1e-5 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo original --hss_d0 32 --hss_dd 8 
+      OMP_NUM_THREADS=3 ./test_HSS_seq T 500 --hss_leaf_size 1 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo original --hss_d0 32 --hss_dd 4 
+      OMP_NUM_THREADS=1 ./test_HSS_seq U 200 --hss_leaf_size 16 --hss_rel_tol 1 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo stable --hss_d0 16 --hss_dd 8 
+      OMP_NUM_THREADS=3 ./test_HSS_seq T 500 --hss_leaf_size 1 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo stable --hss_d0 64 --hss_dd 4 
+    fi
+
+  - |
+    if [ $TEST_NUMBER -eq 2 ]; then
+      printf "${GREEN} Running: test_HSS_mpi\n"
+      OMP_NUM_THREADS=1 mpirun -n 13 ./test_HSS_mpi L 500 --hss_leaf_size 8 --hss_rel_tol 1e-4 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo original --hss_d0 16 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 13 ./test_HSS_mpi L 500 --hss_leaf_size 8 --hss_rel_tol 1e-4 --hss_abs_tol 1e-10 --hss_disable_sync --hss_compression_algo original --hss_d0 16 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 13 ./test_HSS_mpi L 500 --hss_leaf_size 8 --hss_rel_tol 1e-4 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo stable --hss_d0 16 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 13 ./test_HSS_mpi L 500 --hss_leaf_size 8 --hss_rel_tol 1e-4 --hss_abs_tol 1e-10 --hss_disable_sync --hss_compression_algo stable --hss_d0 16 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_HSS_mpi L 10 --hss_leaf_size 3 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_disable_sync --hss_compression_algo original --hss_d0 32 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 16 ./test_HSS_mpi T 200 --hss_leaf_size 1 --hss_rel_tol 1e-5 --hss_abs_tol 1e-13 --hss_enable_sync --hss_compression_algo stable --hss_d0 16 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 2 ./test_HSS_mpi U 1 --hss_leaf_size 128 --hss_rel_tol 1e-1 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo stable --hss_d0 64 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 17 ./test_HSS_mpi T 500 --hss_leaf_size 128 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo original --hss_d0 128 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_HSS_mpi U 10 --hss_leaf_size 3 --hss_rel_tol 1e-1 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo stable --hss_d0 16 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 2 ./test_HSS_mpi L 1 --hss_leaf_size 16 --hss_rel_tol 1 --hss_abs_tol 1e-13 --hss_enable_sync --hss_compression_algo original --hss_d0 16 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 13 ./test_HSS_mpi T 200 --hss_leaf_size 128 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_disable_sync --hss_compression_algo stable --hss_d0 64 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 17 ./test_HSS_mpi T 1 --hss_leaf_size 3 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo stable --hss_d0 64 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_HSS_mpi T 10 --hss_leaf_size 128 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo original --hss_d0 64 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 9 ./test_HSS_mpi T 10 --hss_leaf_size 128 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo stable --hss_d0 64 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 13 ./test_HSS_mpi T 200 --hss_leaf_size 1 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo stable --hss_d0 64 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 13 ./test_HSS_mpi U 200 --hss_leaf_size 1 --hss_rel_tol 1e-10 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo original --hss_d0 16 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 13 ./test_HSS_mpi T 1 --hss_leaf_size 128 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo stable --hss_d0 16 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 13 ./test_HSS_mpi T 1 --hss_leaf_size 16 --hss_rel_tol 1e-1 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo stable --hss_d0 64 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 16 ./test_HSS_mpi L 10 --hss_leaf_size 16 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo stable --hss_d0 16 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 2 ./test_HSS_mpi U 200 --hss_leaf_size 16 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_disable_sync --hss_compression_algo stable --hss_d0 16 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 9 ./test_HSS_mpi T 1 --hss_leaf_size 128 --hss_rel_tol 1e-5 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo original --hss_d0 128 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 16 ./test_HSS_mpi L 500 --hss_leaf_size 128 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo original --hss_d0 16 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 4 ./test_HSS_mpi L 500 --hss_leaf_size 3 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo stable --hss_d0 128 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 16 ./test_HSS_mpi L 1 --hss_leaf_size 16 --hss_rel_tol 1e-10 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo original --hss_d0 16 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 13 ./test_HSS_mpi T 200 --hss_leaf_size 3 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo stable --hss_d0 32 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 4 ./test_HSS_mpi T 1 --hss_leaf_size 3 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo original --hss_d0 16 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 4 ./test_HSS_mpi T 200 --hss_leaf_size 3 --hss_rel_tol 1 --hss_abs_tol 1e-13 --hss_enable_sync --hss_compression_algo stable --hss_d0 16 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 16 ./test_HSS_mpi T 200 --hss_leaf_size 16 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo stable --hss_d0 128 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 9 ./test_HSS_mpi L 10 --hss_leaf_size 1 --hss_rel_tol 1e-1 --hss_abs_tol 1e-13 --hss_enable_sync --hss_compression_algo stable --hss_d0 32 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 16 ./test_HSS_mpi T 10 --hss_leaf_size 3 --hss_rel_tol 1e-5 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo original --hss_d0 128 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 13 ./test_HSS_mpi L 10 --hss_leaf_size 128 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_disable_sync --hss_compression_algo original --hss_d0 16 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 4 ./test_HSS_mpi L 500 --hss_leaf_size 128 --hss_rel_tol 1e-10 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo original --hss_d0 64 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 4 ./test_HSS_mpi T 500 --hss_leaf_size 3 --hss_rel_tol 1e-1 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo original --hss_d0 64 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 2 ./test_HSS_mpi L 200 --hss_leaf_size 3 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo stable --hss_d0 32 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 9 ./test_HSS_mpi L 500 --hss_leaf_size 16 --hss_rel_tol 1e-10 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo stable --hss_d0 128 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 9 ./test_HSS_mpi T 500 --hss_leaf_size 16 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo stable --hss_d0 64 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_HSS_mpi T 1 --hss_leaf_size 128 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo original --hss_d0 128 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 2 ./test_HSS_mpi T 200 --hss_leaf_size 1 --hss_rel_tol 1e-1 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo original --hss_d0 128 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 4 ./test_HSS_mpi L 500 --hss_leaf_size 3 --hss_rel_tol 1e-1 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo original --hss_d0 16 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_HSS_mpi U 1 --hss_leaf_size 128 --hss_rel_tol 1e-1 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo stable --hss_d0 128 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 9 ./test_HSS_mpi L 10 --hss_leaf_size 3 --hss_rel_tol 1e-5 --hss_abs_tol 1e-13 --hss_enable_sync --hss_compression_algo original --hss_d0 16 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 17 ./test_HSS_mpi U 1 --hss_leaf_size 3 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo stable --hss_d0 16 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 2 ./test_HSS_mpi U 500 --hss_leaf_size 1 --hss_rel_tol 1e-5 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo original --hss_d0 16 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 4 ./test_HSS_mpi T 500 --hss_leaf_size 16 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_disable_sync --hss_compression_algo stable --hss_d0 128 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_HSS_mpi L 1 --hss_leaf_size 1 --hss_rel_tol 1 --hss_abs_tol 1e-13 --hss_enable_sync --hss_compression_algo stable --hss_d0 32 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 17 ./test_HSS_mpi T 10 --hss_leaf_size 16 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo original --hss_d0 16 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 17 ./test_HSS_mpi T 200 --hss_leaf_size 16 --hss_rel_tol 1e-1 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo original --hss_d0 32 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 4 ./test_HSS_mpi L 500 --hss_leaf_size 3 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_disable_sync --hss_compression_algo stable --hss_d0 32 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_HSS_mpi U 500 --hss_leaf_size 16 --hss_rel_tol 1e-5 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo original --hss_d0 16 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 17 ./test_HSS_mpi T 1 --hss_leaf_size 16 --hss_rel_tol 1e-5 --hss_abs_tol 1e-13 --hss_enable_sync --hss_compression_algo original --hss_d0 128 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 4 ./test_HSS_mpi L 500 --hss_leaf_size 128 --hss_rel_tol 1 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algo original --hss_d0 128 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 17 ./test_HSS_mpi U 10 --hss_leaf_size 1 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_disable_sync --hss_compression_algo original --hss_d0 128 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 9 ./test_HSS_mpi U 500 --hss_leaf_size 3 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo stable --hss_d0 64 --hss_dd 8 
+      OMP_NUM_THREADS=1 mpirun -n 4 ./test_HSS_mpi L 1 --hss_leaf_size 1 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algo original --hss_d0 128 --hss_dd 4 
+      OMP_NUM_THREADS=1 mpirun -n 2 ./test_HSS_mpi T 200 --hss_leaf_size 3 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_disable_sync --hss_compression_algo original --hss_d0 16 --hss_dd 8 
+    fi
+
+  - |
+    if [ $TEST_NUMBER -eq 3 ]; then
+      printf "${GREEN} Running: test_sparse_seq\n"
+      OMP_NUM_THREADS=1 ./test_sparse_seq utm300/utm300.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=3 ./test_sparse_seq utm300/utm300.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=8 ./test_sparse_seq utm300/utm300.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=1 ./test_sparse_seq utm300/utm300.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=3 ./test_sparse_seq utm300/utm300.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=8 ./test_sparse_seq utm300/utm300.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=1 ./test_sparse_seq mesh3e1/mesh3e1.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=3 ./test_sparse_seq mesh3e1/mesh3e1.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=8 ./test_sparse_seq mesh3e1/mesh3e1.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=1 ./test_sparse_seq mesh3e1/mesh3e1.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=3 ./test_sparse_seq mesh3e1/mesh3e1.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=8 ./test_sparse_seq mesh3e1/mesh3e1.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=1 ./test_sparse_seq lnsp3937/lnsp3937.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=3 ./test_sparse_seq lnsp3937/lnsp3937.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=8 ./test_sparse_seq lnsp3937/lnsp3937.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=1 ./test_sparse_seq lnsp3937/lnsp3937.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=3 ./test_sparse_seq lnsp3937/lnsp3937.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=8 ./test_sparse_seq lnsp3937/lnsp3937.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=1 ./test_sparse_seq t2dal/t2dal.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=3 ./test_sparse_seq t2dal/t2dal.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=8 ./test_sparse_seq t2dal/t2dal.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=1 ./test_sparse_seq t2dal/t2dal.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=3 ./test_sparse_seq t2dal/t2dal.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=8 ./test_sparse_seq t2dal/t2dal.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=1 ./test_sparse_seq bcsstk28/bcsstk28.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=3 ./test_sparse_seq bcsstk28/bcsstk28.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=8 ./test_sparse_seq bcsstk28/bcsstk28.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=1 ./test_sparse_seq bcsstk28/bcsstk28.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=3 ./test_sparse_seq bcsstk28/bcsstk28.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=8 ./test_sparse_seq bcsstk28/bcsstk28.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=1 ./test_sparse_seq cavity16/cavity16.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=3 ./test_sparse_seq cavity16/cavity16.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=8 ./test_sparse_seq cavity16/cavity16.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=1 ./test_sparse_seq cavity16/cavity16.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=3 ./test_sparse_seq cavity16/cavity16.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=8 ./test_sparse_seq cavity16/cavity16.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=1 ./test_sparse_seq bcsstm08/bcsstm08.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=3 ./test_sparse_seq bcsstm08/bcsstm08.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=8 ./test_sparse_seq bcsstm08/bcsstm08.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=1 ./test_sparse_seq bcsstm08/bcsstm08.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=3 ./test_sparse_seq bcsstm08/bcsstm08.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=8 ./test_sparse_seq bcsstm08/bcsstm08.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=1 ./test_sparse_seq sherman4/sherman4.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=3 ./test_sparse_seq sherman4/sherman4.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=8 ./test_sparse_seq sherman4/sherman4.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=1 ./test_sparse_seq sherman4/sherman4.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=3 ./test_sparse_seq sherman4/sherman4.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=8 ./test_sparse_seq sherman4/sherman4.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=1 ./test_sparse_seq rdb968/rdb968.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=3 ./test_sparse_seq rdb968/rdb968.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=8 ./test_sparse_seq rdb968/rdb968.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=1 ./test_sparse_seq rdb968/rdb968.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=3 ./test_sparse_seq rdb968/rdb968.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+      OMP_NUM_THREADS=8 ./test_sparse_seq rdb968/rdb968.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
+    fi
+
+  - |
+    if [ $TEST_NUMBER -eq 4 ]; then
+      printf "${GREEN} Running: test_sparse_mpi\n"
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_sparse_mpi m cavity16/cavity16.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-2 --hss_abs_tol 1e-2 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_sparse_mpi m cavity16/cavity16.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_sparse_mpi m bcsstk28/bcsstk28.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 16 ./test_sparse_mpi m mesh3e1/mesh3e1.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_sparse_mpi m utm300/utm300.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method ptscotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_sparse_mpi m cavity16/cavity16.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method ptscotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 16 ./test_sparse_mpi m cavity16/cavity16.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method ptscotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 2 ./test_sparse_mpi m t2dal/t2dal.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 16 ./test_sparse_mpi m cavity16/cavity16.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 2 ./test_sparse_mpi m rdb968/rdb968.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 4 ./test_sparse_mpi m bcsstm08/bcsstm08.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 16 ./test_sparse_mpi m t2dal/t2dal.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method ptscotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 13 ./test_sparse_mpi m utm300/utm300.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method ptscotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 2 ./test_sparse_mpi m bcsstk28/bcsstk28.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 2 ./test_sparse_mpi m sherman4/sherman4.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 4 ./test_sparse_mpi m rdb968/rdb968.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 16 ./test_sparse_mpi m sherman4/sherman4.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 9 ./test_sparse_mpi m cavity16/cavity16.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_sparse_mpi m mesh3e1/mesh3e1.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 13 ./test_sparse_mpi m bcsstk28/bcsstk28.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 9 ./test_sparse_mpi m bcsstk28/bcsstk28.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 4 ./test_sparse_mpi m bcsstk28/bcsstk28.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_sparse_mpi m mesh3e1/mesh3e1.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 2 ./test_sparse_mpi m t2dal/t2dal.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 4 ./test_sparse_mpi m utm300/utm300.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 2 ./test_sparse_mpi m sherman4/sherman4.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_sparse_mpi m rdb968/rdb968.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 4 ./test_sparse_mpi m bcsstk28/bcsstk28.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_sparse_mpi m bcsstk28/bcsstk28.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method ptscotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_sparse_mpi m cavity16/cavity16.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method ptscotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 4 ./test_sparse_mpi m rdb968/rdb968.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 9 ./test_sparse_mpi m cavity16/cavity16.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 13 ./test_sparse_mpi m bcsstk28/bcsstk28.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 17 ./test_sparse_mpi m utm300/utm300.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 13 ./test_sparse_mpi m lnsp3937/lnsp3937.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 9 ./test_sparse_mpi m sherman4/sherman4.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_sparse_mpi m lnsp3937/lnsp3937.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 4 ./test_sparse_mpi m mesh3e1/mesh3e1.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_sparse_mpi m rdb968/rdb968.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method ptscotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 9 ./test_sparse_mpi m mesh3e1/mesh3e1.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 4 ./test_sparse_mpi m t2dal/t2dal.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method ptscotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_sparse_mpi m bcsstk28/bcsstk28.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 2 ./test_sparse_mpi m utm300/utm300.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 16 ./test_sparse_mpi m utm300/utm300.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 2 ./test_sparse_mpi m t2dal/t2dal.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method ptscotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 9 ./test_sparse_mpi m bcsstk28/bcsstk28.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_sparse_mpi m cavity16/cavity16.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 4 ./test_sparse_mpi m cavity16/cavity16.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 16 ./test_sparse_mpi m t2dal/t2dal.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_sparse_mpi m bcsstk28/bcsstk28.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method ptscotch --sp_hss_min_sep_size 25 
+      OMP_NUM_THREADS=1 mpirun -n 19 ./test_sparse_mpi m rdb968/rdb968.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
+    fi
