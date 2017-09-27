@@ -18,10 +18,6 @@ then
 	tar -xvzf mesh3e1.tar.gz
 	rm mesh3e1.tar.gz
 
-	wget https://www.cise.ufl.edu/research/sparse/MM/HB/lnsp3937.tar.gz
-	tar -xvzf lnsp3937.tar.gz
-	rm lnsp3937.tar.gz
-
 	wget https://www.cise.ufl.edu/research/sparse/MM/Oberwolfach/t2dal.tar.gz
 	tar -xvzf t2dal.tar.gz
 	rm t2dal.tar.gz
@@ -151,12 +147,6 @@ then
 	OMP_NUM_THREADS=1 ./test_sparse_seq mesh3e1/mesh3e1.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
 	OMP_NUM_THREADS=3 ./test_sparse_seq mesh3e1/mesh3e1.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
 	OMP_NUM_THREADS=8 ./test_sparse_seq mesh3e1/mesh3e1.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
-	OMP_NUM_THREADS=1 ./test_sparse_seq lnsp3937/lnsp3937.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
-	OMP_NUM_THREADS=3 ./test_sparse_seq lnsp3937/lnsp3937.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
-	OMP_NUM_THREADS=8 ./test_sparse_seq lnsp3937/lnsp3937.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
-	OMP_NUM_THREADS=1 ./test_sparse_seq lnsp3937/lnsp3937.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
-	OMP_NUM_THREADS=3 ./test_sparse_seq lnsp3937/lnsp3937.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
-	OMP_NUM_THREADS=8 ./test_sparse_seq lnsp3937/lnsp3937.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25
 	OMP_NUM_THREADS=1 ./test_sparse_seq t2dal/t2dal.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
 	OMP_NUM_THREADS=3 ./test_sparse_seq t2dal/t2dal.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
 	OMP_NUM_THREADS=8 ./test_sparse_seq t2dal/t2dal.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25
@@ -233,9 +223,7 @@ then
 	OMP_NUM_THREADS=1 mpirun -n 9 ./test_sparse_mpi m cavity16/cavity16.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25 
 	OMP_NUM_THREADS=1 mpirun -n 13 ./test_sparse_mpi m bcsstk28/bcsstk28.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
 	OMP_NUM_THREADS=1 mpirun -n 17 ./test_sparse_mpi m utm300/utm300.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
-	OMP_NUM_THREADS=1 mpirun -n 13 ./test_sparse_mpi m lnsp3937/lnsp3937.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25 
 	OMP_NUM_THREADS=1 mpirun -n 9 ./test_sparse_mpi m sherman4/sherman4.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25 
-	OMP_NUM_THREADS=1 mpirun -n 19 ./test_sparse_mpi m lnsp3937/lnsp3937.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_hss_min_sep_size 25 
 	OMP_NUM_THREADS=1 mpirun -n 4 ./test_sparse_mpi m mesh3e1/mesh3e1.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_hss_min_sep_size 25 
 	OMP_NUM_THREADS=1 mpirun -n 19 ./test_sparse_mpi m rdb968/rdb968.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method ptscotch --sp_hss_min_sep_size 25 
 	OMP_NUM_THREADS=1 mpirun -n 9 ./test_sparse_mpi m mesh3e1/mesh3e1.mtx --sp_enable_hss --hss_leaf_size 4 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_hss_min_sep_size 25 
