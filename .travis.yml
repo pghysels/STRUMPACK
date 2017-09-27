@@ -10,6 +10,9 @@ branches:
   only:
     - master
 
+notifications:
+  slack: ecpsparsesolvers:nBWC0jcAd7B1j9whHUYcaVJO
+
 env:
   matrix:
   - TEST_NUMBER=1 FILE="test_HSS_seq"
@@ -96,7 +99,7 @@ install:
   - make config shared=1 cc=mpicc cxx=mpic++ prefix=$PWD/install
   - make install > make_parmetis_install.log 2>&1
   - printf "${BLUE} GC; Done installing ParMetis-4.0 from source\n"
-  
+
   - printf "${BLUE} GC; Installing STRUMPACK from source\n"
   - cd $TRAVIS_BUILD_DIR
   - mkdir build
@@ -117,10 +120,10 @@ install:
     -DPARMETIS_LIBRARIES=$TRAVIS_BUILD_DIR/installDir/parmetis-4.0.3/install/lib/libparmetis.so \
     -DSCOTCH_INCLUDES=$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/include \
     -DSCOTCH_LIBRARIES="$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libscotch.a;$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libscotcherr.a;$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libptscotch.a;$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libptscotcherr.a"
-  
+
   - make install VERBOSE=1
   - printf "${BLUE} GC; Done installing STRUMPACK from source\n"
 
 script:
   - cd $TRAVIS_BUILD_DIR
-  - ./travis_tests.sh
+  - ./.travis_tests.sh
