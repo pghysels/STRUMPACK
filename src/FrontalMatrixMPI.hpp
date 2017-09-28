@@ -102,8 +102,9 @@ namespace strumpack {
     }
     inline int np_rows() const { return proc_rows; }
     inline int np_cols() const { return proc_cols; }
-    inline int find_rank(integer_t r, integer_t c, DistM_t& F) const;
-    inline int find_rank_fixed(integer_t r, integer_t c, DistM_t& F) const;
+    inline int find_rank(integer_t r, integer_t c, const DistM_t& F) const;
+    inline int find_rank_fixed(integer_t r, integer_t c,
+                               const DistM_t& F) const;
     virtual void solve_workspace_query(integer_t& mem_size);
     virtual long long dense_factor_nonzeros(int task_depth=0) const;
     virtual std::string type() const { return "FrontalMatrixMPI"; }
@@ -227,7 +228,7 @@ namespace strumpack {
       located */
   template<typename scalar_t,typename integer_t> inline int
   FrontalMatrixMPI<scalar_t,integer_t>::find_rank
-  (integer_t r, integer_t c, DistM_t& F) const {
+  (integer_t r, integer_t c, const DistM_t& F) const {
     // the blacs grid is column major
     return ((r / F.MB()) % proc_rows) + ((c / F.NB()) % proc_cols)
       * proc_rows;
@@ -235,7 +236,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> inline int
   FrontalMatrixMPI<scalar_t,integer_t>::find_rank_fixed
-  (integer_t r, integer_t c, DistM_t& F) const {
+  (integer_t r, integer_t c, const DistM_t& F) const {
     assert(F.fixed());
     return ((r / DistM_t::default_MB) % proc_rows)
       + ((c / DistM_t::default_NB) % proc_cols) * proc_rows;
@@ -347,6 +348,8 @@ namespace strumpack {
       auto I = ch->upd_to_parent(this);
       sbuf.resize(proc_rows);
       for (auto& buf : sbuf) buf.reserve(ch->dim_upd / proc_rows);
+
+      // TODO optimize loop?
       for (integer_t r=0; r<ch->dim_upd; r++) {
         integer_t pa_row = I[r];
         if (pa_row < this->dim_sep)
