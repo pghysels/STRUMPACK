@@ -373,7 +373,8 @@ namespace strumpack {
     assert(2*nr_leafs - 1 == _nbsep);
     for (integer_t i=0; i<_nbsep; i++) {
       if (_sizes[i+1] < _sizes[i]) {
-        std::cout << i << std::endl;
+        std::cout << "_sizes[" << i+1 << "]=" << _sizes[i+1]
+                  << " >= _sizes[" << i << "]=" << _sizes[i] << std::endl;
         assert(false);
       };
     }
@@ -390,33 +391,38 @@ namespace strumpack {
     std::fill(mark, mark+_nbsep, false);
     mark[root()] = true;
     integer_t nr_subtrees = 1;
-    std::function<void(integer_t)> find_subtree_roots = [&](integer_t node) {
-      if (mark[node]) {
-        if (nr_subtrees < P && _lch[node]!=-1 && _rch[node]!=-1) {
-          mark[_lch[node]] = true;
-          mark[_rch[node]] = true;
-          mark[node] = false;
+    std::function<void(integer_t)> find_roots = [&](integer_t i) {
+      if (mark[i]) {
+        if (nr_subtrees < P && _lch[i]!=-1 && _rch[i]!=-1) {
+          mark[_lch[i]] = true;
+          mark[_rch[i]] = true;
+          mark[i] = false;
           nr_subtrees++;
         }
       } else {
-        if (_lch[node]!=-1) find_subtree_roots(_lch[node]);
-        if (_rch[node]!=-1) find_subtree_roots(_rch[node]);
+        if (_lch[i]!=-1) find_roots(_lch[i]);
+        if (_rch[i]!=-1) find_roots(_rch[i]);
       }
     };
     while (nr_subtrees < P && nr_subtrees < _nbsep)
-      find_subtree_roots(root());
+      find_roots(root());
+
     integer_t sub_root = -1;
-    nr_subtrees = 0;
-    for (integer_t i=0; i<_nbsep; i++) {
+    std::function<void(integer_t,integer_t&)> find_my_root =
+                         [&](integer_t i, integer_t& r) {
       if (mark[i]) {
-        if (nr_subtrees == p) {
-          sub_root = i;
-          break;
-        }
-        nr_subtrees++;
+        if (r++ == p) sub_root = i;
+        return;
       }
-    }
+      if (_lch[i]!=-1 && _rch[i]!=-1) {
+        find_my_root(_lch[i], r);
+        find_my_root(_rch[i], r);
+      }
+    };
+    integer_t temp = 0;
+    find_my_root(root(), temp);
     delete[] mark;
+
     if (sub_root == -1)
       return std::unique_ptr<SeparatorTree<integer_t>>
         (new SeparatorTree<integer_t>(0));
@@ -482,11 +488,14 @@ namespace strumpack {
     while (nr_leafs < P && nr_leafs < _nbsep)
       mark_top_tree(root());
 
-    std::function<integer_t(integer_t)> sep_subtree = [&](integer_t node) {
-      return (_lch[node] != -1) ? sep_subtree(_lch[node])
-        : _sizes[node];
+    std::function<integer_t(integer_t)> subtree_size = [&](integer_t i) {
+      integer_t s = _sizes[i+1] - _sizes[i];
+      if (_lch[i] != -1) s += subtree_size(_lch[i]);
+      if (_rch[i] != -1) s += subtree_size(_rch[i]);
+      return s;
     };
 
+    // traverse the tree in reverse postorder!!
     std::function<void(integer_t,integer_t&)> fill_top =
       [&](integer_t node, integer_t& tid) {
       auto mytid = tid;
@@ -501,18 +510,17 @@ namespace strumpack {
         top->_pa[top->_lch[mytid]] = mytid;
         fill_top(_lch[node], tid);
       } else top->_lch[mytid] = -1;
-      if (top->_rch[mytid] == -1) {
-        top->_sizes[mytid] = sep_subtree(node);
-        top->_sizes[mytid+1] = _sizes[node+1];
-      }
+      if (top->_rch[mytid] == -1)
+        top->_sizes[mytid+1] = subtree_size(node);
       else
-        top->_sizes[mytid+1] = top->_sizes[mytid]
-          + _sizes[node+1] - _sizes[node];
+        top->_sizes[mytid+1] = _sizes[node+1] - _sizes[node];
     };
     integer_t tid = top_nodes-1;
+    top->_sizes[0] = 0;
     fill_top(root(), tid);
     top->_pa[top_nodes-1] = -1;
-    top->_sizes[top_nodes] = _sizes[root()+1];
+    for (integer_t i=0; i<top_nodes; i++)
+      top->_sizes[i+1] = top->_sizes[i] + top->_sizes[i+1];
     delete[] mark;
     return top;
   }
