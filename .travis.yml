@@ -11,7 +11,9 @@ branches:
     - master
 
 notifications:
-  slack: ecpsparsesolvers:nBWC0jcAd7B1j9whHUYcaVJO
+  slack: 
+    rooms:
+      - ecpsparsesolvers:nBWC0jcAd7B1j9whHUYcaVJO
     on_failure: always
 
 env:
