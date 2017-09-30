@@ -184,6 +184,7 @@ namespace strumpack {
         }
       }
       void communicate_child_ycols(MPI_Comm comm, int rch1) {
+        // TODO optimize these 4 Bcasts!!
         auto rch0 = 0;
         std::size_t c0ycols = c[0].ycols.size();
         MPI_Bcast(&c0ycols, 1, mpi_type<std::size_t>(), rch0, comm);

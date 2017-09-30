@@ -50,7 +50,8 @@ int run(int argc, char* argv[]) {
   auto usage = [&]() {
     if (!mpi_rank()) {
       cout << "# Usage:\n"
-      << "#     OMP_NUM_THREADS=4 ./test1 problem options [HSS Options]\n"
+      << "#     OMP_NUM_THREADS=4 ./test_HSS_mpi"
+      << " problem options [HSS Options]\n"
       << "# where:\n"
       << "#  - problem: a char that can be\n"
       << "#      'T': solve a Toeplitz problem\n"
