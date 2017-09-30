@@ -476,8 +476,7 @@ namespace strumpack {
   (const std::vector<std::size_t>& I, const DenseMatrix<scalar_t>& B) {
     assert(I.size() == B.rows());
     assert(B.cols() == cols());
-    //#pragma omp taskloop default(none) firstprivate(c,r,l,d) shared(I,B) \
-    //grainsize(128) //collapse(2)
+    //#pragma omp taskloop default(none) firstprivate(c,r,l,d) shared(I,B) //grainsize(128) //collapse(2)
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<I.size(); i++) {
         assert(I[i] < rows());
@@ -670,14 +669,6 @@ namespace strumpack {
     }
     ind.resize(rank);
     for (int i=0; i<rank; i++) ind[i] = iind[i]-1;
-
-    ///////////////////////////////////////////////////////////////////
-    // std::cout << "Rii/R00 = [";
-    // for (int i=0; i<rank; i++)
-    //   std::cout << std::abs(operator()(i,i) / operator()(0,0)) << " ";
-    // std::cout << "];" << std::endl;
-    ///////////////////////////////////////////////////////////////////
-
     trsm_omp_task('L', 'U', 'N', 'N', rank, n-rank, scalar_t(1.),
                   data(), ld(), ptr(0, rank), ld(), depth);
     X = DenseMatrix<scalar_t>(rank, n-rank, ptr(0, rank), ld());
@@ -692,9 +683,9 @@ namespace strumpack {
     ind.resize(n);
     DenseMatrix<scalar_t> R(m, n);
     auto cnrms = new real_t[n];
-    //#pragma omp taskloop grainsize(32) default(shared) \
-    if(depth < params::task_recursion_cutoff_level) \
-    final(depth >= params::task_recursion_cutoff_level-1) mergeable
+    //#pragma omp taskloop grainsize(32) default(shared)
+    //if(depth < params::task_recursion_cutoff_level)
+    //final(depth >= params::task_recursion_cutoff_level-1) mergeable
     for (std::size_t i=0; i<n; i++) {
       cnrms[i] = blas::nrm2<scalar_t,real_t>(m, ptr(0, i), 1);
       cnrms[i] *= cnrms[i];

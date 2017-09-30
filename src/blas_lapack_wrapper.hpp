@@ -967,11 +967,13 @@ namespace strumpack {
     gesvd(char JOBU, char JOBVT, int M, int N, c_float* A, int LDA,
           c_float* S, c_float* U, int LDU, c_float* VT, int LDVT) {
       std::cout << "TODO gesvd for c_float" << std::endl;
+      return 0;
     }
     inline int
     gesvd(char JOBU, char JOBVT, int M, int N, c_double* A, int LDA,
           c_double* S, c_double* U, int LDU, c_double* VT, int LDVT) {
       std::cout << "TODO gesvd for c_double" << std::endl;
+      return 0;
     }
 
 

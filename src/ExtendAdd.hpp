@@ -65,14 +65,14 @@ namespace strumpack {
       int r_upd, c_upd;
       for (r_upd=0; r_upd<lrows; r_upd++) {
         auto t = I[CB.rowl2g_fixed(r_upd)];
-        if (t >= pa_sep) break;
+        if (t >= std::size_t(pa_sep)) break;
         pr[r_upd] = (t / B) % prows;
       }
       for (int r=r_upd; r<lrows; r++)
         pr[r] = ((I[CB.rowl2g_fixed(r)]-pa_sep) / B) % prows;
       for (c_upd=0; c_upd<lcols; c_upd++) {
         auto t = I[CB.coll2g_fixed(c_upd)];
-        if (t >= pa_sep) break;
+        if (t >= std::size_t(pa_sep)) break;
         pc[c_upd] = ((t / B) % pcols) * prows;
       }
       for (int c=c_upd; c<lcols; c++)
@@ -106,7 +106,6 @@ namespace strumpack {
      std::vector<std::vector<scalar_t>>& sbuf,
      const FrontalMatrixDenseMPI<scalar_t,integer_t>* pa,
      const FrontalMatrixDense<scalar_t,integer_t>* ch) {
-     //const std::vector<std::size_t>& I, integer_t u2s) {
       std::size_t u2s;
       const auto I = ch->upd_to_parent(pa, u2s);
       const std::size_t du = ch->dim_upd;
@@ -119,12 +118,12 @@ namespace strumpack {
       // destination rank is:
       //  ((r / B) % prows) + ((c / B) % pcols) * prows
       //  = pr[r] + pc[c]
-      for (int i=0; i<u2s; i++) {
+      for (std::size_t i=0; i<u2s; i++) {
         auto Ii = I[i];
         pr[i] = (Ii / B) % prows;
         pc[i] = ((Ii / B) % pcols) * prows;
       }
-      for (int i=u2s; i<du; i++) {
+      for (std::size_t i=u2s; i<du; i++) {
         auto Ii = I[i] - ds;
         pr[i] = (Ii / B) % prows;
         pc[i] = ((Ii / B) % pcols) * prows;

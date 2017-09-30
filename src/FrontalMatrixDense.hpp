@@ -205,7 +205,7 @@ namespace strumpack {
         // TODO consider other values for thresh
         //  - sqrt(eps)*|A|_1 as in SuperLU ?
         auto thresh = blas::lamch<real_t>('E') * this->A->size();
-        for (int i=0; i<F11.rows(); i++)
+        for (std::size_t i=0; i<F11.rows(); i++)
           if (std::abs(F11(i,i)) < thresh)
             F11(i,i) = (std::real(F11(i,i)) < 0) ? -thresh : thresh;
       }

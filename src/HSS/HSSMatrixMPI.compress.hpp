@@ -360,6 +360,7 @@ namespace strumpack {
         DistMW_t wSr_new0(w.c[0].Jr.size(), c_new, w.Sr, 0, c_lo);
         DistMW_t wSr_new1(w.c[1].Jr.size(), c_new, w.Sr,
                           w.c[0].Jr.size(), c_lo);
+        // TODO optimize this!! use DistM_t::extract_rows!!
         for (std::size_t r=0; r<w.c[0].Jr.size(); r++)
           copy(1, c_new, w.c[0].Sr, w.c[0].Jr[r], w.c[0].dS-c_new,
                wSr_new0, r, 0, _ctxt_all);
@@ -380,6 +381,7 @@ namespace strumpack {
         DistMW_t wSc_new0(w.c[0].Jc.size(), c_new, w.Sc, 0, c_lo);
         DistMW_t wSc_new1(w.c[1].Jc.size(), c_new, w.Sc,
                           w.c[0].Jc.size(), c_lo);
+        // TODO optimize this!! use DistM_t::extract_rows!!
         for (std::size_t r=0; r<w.c[0].Jc.size(); r++)
           copy(1, c_new, w.c[0].Sc, w.c[0].Jc[r], w.c[0].dS-c_new,
                wSc_new0, r, 0, _ctxt_all);
