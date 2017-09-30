@@ -74,7 +74,7 @@ namespace strumpack {
     (WorkExtractMPI<scalar_t>& w, int lctxt, bool odiag) const {
       if (!this->active() || w.J.empty()) return;
       if (this->leaf()) {
-        if (odiag) w.y = _V.extract_rows(w.J, _ctxt_all).transpose();
+        if (odiag) w.y = _V.extract_rows(w.J, _comm).transpose();
         else w.ycols.clear();
       } else {
         w.split_extraction_sets(this->_ch[0]->dims());
@@ -115,7 +115,7 @@ namespace strumpack {
         if (w.z.cols() && _U.cols()) {
           DistM_t tmp(_ctxt, w.I.size(), w.z.cols());
           gemm(Trans::N, Trans::N, scalar_t(1),
-               _U.extract_rows(w.I, _ctxt_all), w.z, scalar_t(0.), tmp);
+               _U.extract_rows(w.I, _comm), w.z, scalar_t(0.), tmp);
           if (tmp.active())
             for (int c=0; c<w.z.cols(); c++)
               for (std::size_t r=0; r<w.I.size(); r++)

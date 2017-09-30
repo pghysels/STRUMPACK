@@ -160,6 +160,8 @@ namespace strumpack {
     DistributedMatrix<scalar_t>
     extract_rows(const std::vector<std::size_t>& Ir) const;
     DistributedMatrix<scalar_t>
+    extract_rows(const std::vector<std::size_t>& Ir, MPI_Comm comm) const;
+    DistributedMatrix<scalar_t>
     extract_cols(const std::vector<std::size_t>& Ic) const;
     DistributedMatrix<scalar_t>
     extract(const std::vector<std::size_t>& I,
@@ -669,8 +671,64 @@ namespace strumpack {
 
   template<typename scalar_t> DistributedMatrix<scalar_t>
   DistributedMatrix<scalar_t>::extract_rows
+  (const std::vector<std::size_t>& Ir, MPI_Comm comm) const {
+    TIMER_TIME(TaskType::DISTMAT_EXTRACT_ROWS, 1, t_dist_mat_extract_rows);
+    DistributedMatrix<scalar_t> tmp(ctxt(), Ir.size(), cols());
+    if (!active()) return tmp;
+    std::vector<std::vector<scalar_t>> sbuf(_prows);
+    std::vector<std::vector<scalar_t>> rbuf(_prows);
+    for (std::size_t r=0; r<Ir.size(); r++) {
+      auto gr = Ir[r];
+      auto owner = rowg2p(gr);
+      if (owner != _prow)
+        rbuf[owner].resize(rbuf[owner].size()+_lcols);
+      else {
+        auto lr = rowg2l(gr);
+        auto dest = rowg2p(r);
+        if (dest == _prow) { // just copy to tmp
+          auto tmpr = tmp.rowg2l(r);
+          for (int c=0; c<_lcols; c++)
+            tmp(tmpr, c) = operator()(lr, c);
+        } else {
+          sbuf[dest].reserve(sbuf[dest].size()+_lcols);
+          for (int c=0; c<_lcols; c++)
+            sbuf[dest].push_back(operator()(lr, c));
+        }
+      }
+    }
+    auto sreq = new MPI_Request[2*(_prows-1)];
+    auto rreq = sreq + _prows;
+    for (int p=0; p<_prows; p++)
+      if (p != _prow) {
+        MPI_Isend(sbuf[p].data(), sbuf[p].size(), mpi_type<scalar_t>(),
+                  p+_pcol*_prows, 0, comm, (p < _prow) ? sreq+p : sreq+p-1);
+        MPI_Irecv(rbuf[p].data(), rbuf[p].size(), mpi_type<scalar_t>(),
+                  p+_pcol*_prows, 0, comm, (p < _prow) ? rreq+p : rreq+p-1);
+      }
+    MPI_Waitall(_prows-1, rreq, MPI_STATUSES_IGNORE);
+    std::vector<scalar_t*> prbuf(_prows);
+    for (int p=0; p<_prows; p++) prbuf[p] = rbuf[p].data();
+    for (std::size_t r=0; r<Ir.size(); r++) {
+      auto gr = Ir[r];
+      auto owner = rowg2p(gr);
+      if (owner == _prow) continue;
+      auto dest = rowg2p(r);
+      if (dest != _prow) continue;
+      auto tmpr = tmp.rowg2l(r);
+      for (int c=0; c<_lcols; c++)
+        tmp(tmpr, c) = *(prbuf[owner]++);
+    }
+    MPI_Waitall(_prows-1, sreq, MPI_STATUSES_IGNORE);
+    delete[] sreq;
+    return tmp;
+  }
+
+  template<typename scalar_t> DistributedMatrix<scalar_t>
+  DistributedMatrix<scalar_t>::extract_rows
   (const std::vector<std::size_t>& Ir) const {
     TIMER_TIME(TaskType::DISTMAT_EXTRACT_ROWS, 1, t_dist_mat_extract_rows);
+    std::cout << "TODO: replace this call to extract_rows(Ir)"
+              << " with extract_rows(Ir, comm)" << std::endl;
     DistributedMatrix<scalar_t> tmp(ctxt(), Ir.size(), cols());
     if (!active()) return tmp;
     for (std::size_t r=0; r<Ir.size(); r++)
@@ -678,6 +736,7 @@ namespace strumpack {
     return tmp;
   }
 
+  // TODO optimize this
   template<typename scalar_t> DistributedMatrix<scalar_t>
   DistributedMatrix<scalar_t>::extract_cols
   (const std::vector<std::size_t>& Jc) const {

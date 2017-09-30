@@ -211,10 +211,10 @@ namespace strumpack {
       // the sampling for left/right can be done concurrently
       auto I = lch->upd_to_parent(this);
       DistM_t cRl(lch->ctxt, I.size(), R.cols(),
-                  R.extract_rows(I), this->ctxt_all);
+                  R.extract_rows(I, this->front_comm), this->ctxt_all);
       I = rch->upd_to_parent(this);
       DistM_t cRr(rch->ctxt, I.size(), R.cols(),
-                  R.extract_rows(I), this->ctxt_all);
+                  R.extract_rows(I, this->front_comm), this->ctxt_all);
       lch->sample_CB(opts, cRl, cSrl, cScl, this);
       rch->sample_CB(opts, cRr, cSrr, cScr, this);
       TIMER_TIME(TaskType::SKINNY_EXTEND_ADD_MPIMPI, 2, t_sea);
@@ -250,7 +250,7 @@ namespace strumpack {
       DistM_t cSr, cSc, S_dummy;
       auto I = ch_mpi->upd_to_parent(this);
       DistM_t cR(ch_mpi->ctxt, I.size(), R.cols(),
-                 R.extract_rows(I), this->ctxt_all);
+                 R.extract_rows(I, this->front_comm), this->ctxt_all);
       ch_mpi->sample_CB(opts, cR, cSr, cSc, this);
       TIMER_TIME(TaskType::SKINNY_EXTEND_ADD_MPI1, 2, t_sea);
       if (ch_mpi == this->lchild)
@@ -431,9 +431,6 @@ namespace strumpack {
         _H->Schur_update(_ULV, _Theta, _Vhat, _DUB01, _Phi);
         if (_Theta.cols() < _Phi.cols()) {
           _VhatCPhiC = DistM_t(_Phi.ctxt(), _Vhat.cols(), _Phi.rows());
-          // TODO do not transpose, but use Trans::C in gemm
-          // Why does that not work??????
-          //auto VhatC = _Vhat.transpose();
           gemm(Trans::C, Trans::C, scalar_t(1.), _Vhat, _Phi,
                scalar_t(0.), _VhatCPhiC);
         } else {
@@ -605,7 +602,7 @@ namespace strumpack {
       // auto tr = _Theta.extract_rows(lI, this->ctxt, this->ctxt_all);
       // auto tc = _VhatCPhiC.extract_cols(lJ, this->ctxt, this->ctxt_all);
       DistM_t tr(this->ctxt, lI.size(), _Theta.cols(),
-                 _Theta.extract_rows(lI), this->ctxt_all);
+                 _Theta.extract_rows(lI, this->front_comm), this->ctxt_all);
       DistM_t tc(this->ctxt, _VhatCPhiC.rows(), lJ.size(),
                  _VhatCPhiC.extract_cols(lJ), this->ctxt_all);
       gemm(Trans::N, Trans::N, scalar_t(-1), tr, tc, scalar_t(1.), e);
@@ -613,9 +610,9 @@ namespace strumpack {
       // auto tr = _ThetaVhatC.extract_rows(lI, this->ctxt, this->ctxt_all);
       // auto tc = _Phi.extract_rows(lJ, this->ctxt, this->ctxt_all);
       DistM_t tr(this->ctxt, lI.size(), _ThetaVhatC.cols(),
-                 _ThetaVhatC.extract_rows(lI), this->ctxt_all);
+                 _ThetaVhatC.extract_rows(lI, this->front_comm), this->ctxt_all);
       DistM_t tc(this->ctxt, lJ.size(), _Phi.cols(),
-                 _Phi.extract_rows(lJ), this->ctxt_all);
+                 _Phi.extract_rows(lJ, this->front_comm), this->ctxt_all);
       gemm(Trans::N, Trans::C, scalar_t(-1), tr, tc, scalar_t(1.), e);
     }
 

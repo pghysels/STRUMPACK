@@ -37,7 +37,7 @@ namespace strumpack {
       void apply(const DistM_t& b, DistM_t& c) const;
       void applyC(const DistM_t& b, DistM_t& c) const;
 
-      DistM_t extract_rows(const std::vector<std::size_t>& I, int ctxt_all) const;
+      DistM_t extract_rows(const std::vector<std::size_t>& I, MPI_Comm comm) const;
     };
 
     template<typename scalar_t> void HSSBasisIDMPI<scalar_t>::clear() {
@@ -114,10 +114,11 @@ namespace strumpack {
       }
     }
 
-    template<typename scalar_t> DistributedMatrix<scalar_t> HSSBasisIDMPI<scalar_t>::extract_rows
-    (const std::vector<std::size_t>& I, int ctxt_all) const {
+    template<typename scalar_t> DistributedMatrix<scalar_t>
+    HSSBasisIDMPI<scalar_t>::extract_rows
+    (const std::vector<std::size_t>& I, MPI_Comm comm) const {
       // TODO implement this without explicitly forming the dense basis matrix
-      return dense().extract_rows(I);
+      return dense().extract_rows(I, comm);
     }
 
   } // end namespace HSS
