@@ -675,20 +675,34 @@ namespace strumpack {
     if (!active()) return tmp;
     std::vector<std::vector<scalar_t>> sbuf(_prows);
     std::vector<std::vector<scalar_t>> rbuf(_prows);
+    {
+      std::vector<std::size_t> rsizes(_prows);
+      std::vector<std::size_t> ssizes(_prows);
+      for (std::size_t r=0; r<Ir.size(); r++) {
+        auto gr = Ir[r];
+        auto owner = rowg2p(gr);
+        if (owner != _prow) rsizes[owner] += _lcols;
+        else {
+          auto dest = rowg2p(r);
+          if (dest == _prow) // just copy to tmp
+            for (int c=0, tmpr=tmp.rowg2l(r), lr=rowg2l(gr);
+                 c<_lcols; c++)
+              tmp(tmpr, c) = operator()(lr, c);
+          else ssizes[dest] += _lcols;
+        }
+      }
+      for (int p=0; p<_prows; p++) {
+        rbuf[p].resize(rsizes[p]);
+        sbuf[p].reserve(ssizes[p]);
+      }
+    }
     for (std::size_t r=0; r<Ir.size(); r++) {
       auto gr = Ir[r];
       auto owner = rowg2p(gr);
-      if (owner != _prow)
-        rbuf[owner].resize(rbuf[owner].size()+_lcols);
-      else {
+      if (owner == _prow) {
         auto lr = rowg2l(gr);
         auto dest = rowg2p(r);
-        if (dest == _prow) { // just copy to tmp
-          auto tmpr = tmp.rowg2l(r);
-          for (int c=0; c<_lcols; c++)
-            tmp(tmpr, c) = operator()(lr, c);
-        } else {
-          sbuf[dest].reserve(sbuf[dest].size()+_lcols);
+        if (dest != _prow) {
           for (int c=0; c<_lcols; c++)
             sbuf[dest].push_back(operator()(lr, c));
         }
@@ -727,25 +741,38 @@ namespace strumpack {
     TIMER_TIME(TaskType::DISTMAT_EXTRACT_COLS, 1, t_dist_mat_extract_cols);
     DistributedMatrix<scalar_t> tmp(ctxt(), rows(), Jc.size());
     if (!active()) return tmp;
-    std::vector<std::vector<scalar_t>> sbuf(_prows);
-    std::vector<std::vector<scalar_t>> rbuf(_prows);
+    std::vector<std::vector<scalar_t>> sbuf(_pcols);
+    std::vector<std::vector<scalar_t>> rbuf(_pcols);
+    {
+      std::vector<std::size_t> rsizes(_pcols);
+      std::vector<std::size_t> ssizes(_pcols);
+      for (std::size_t c=0; c<Jc.size(); c++) {
+        auto gc = Jc[c];
+        auto owner = colg2p(gc);
+        if (owner != _pcol) rsizes[owner] += _lrows;
+        else {
+          auto lc = colg2l(gc);
+          auto dest = colg2p(c);
+          if (dest == _pcol) { // just copy to tmp
+            auto tmpc = tmp.colg2l(c);
+            for (int r=0; r<_lrows; r++)
+              tmp(r, tmpc) = operator()(r, lc);
+          } else ssizes[dest] += _lrows;
+        }
+      }
+      for (int p=0; p<_pcols; p++) {
+        rbuf[p].resize(rsizes[p]);
+        sbuf[p].reserve(ssizes[p]);
+      }
+    }
     for (std::size_t c=0; c<Jc.size(); c++) {
       auto gc = Jc[c];
       auto owner = colg2p(gc);
-      if (owner != _pcol)
-        rbuf[owner].resize(rbuf[owner].size()+_lrows);
-      else {
-        auto lc = colg2l(gc);
+      if (owner == _pcol) {
         auto dest = colg2p(c);
-        if (dest == _pcol) { // just copy to tmp
-          auto tmpc = tmp.colg2l(c);
-          for (int r=0; r<_lrows; r++)
-            tmp(r, tmpc) = operator()(r, lc);
-        } else {
-          sbuf[dest].reserve(sbuf[dest].size()+_lrows);
-          for (int r=0; r<_lrows; r++)
+        if (dest != _pcol)
+          for (int r=0, lc=colg2l(gc); r<_lrows; r++)
             sbuf[dest].push_back(operator()(r, lc));
-        }
       }
     }
     auto sreq = new MPI_Request[2*(_pcols-1)];
@@ -758,7 +785,7 @@ namespace strumpack {
                   _prow+p*_prows, 0, comm, (p < _pcol) ? rreq+p : rreq+p-1);
       }
     MPI_Waitall(_pcols-1, rreq, MPI_STATUSES_IGNORE);
-    std::vector<scalar_t*> prbuf(_prows);
+    std::vector<scalar_t*> prbuf(_pcols);
     for (int p=0; p<_pcols; p++) prbuf[p] = rbuf[p].data();
     for (std::size_t c=0; c<Jc.size(); c++) {
       auto gc = Jc[c];
