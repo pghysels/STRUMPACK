@@ -11,10 +11,11 @@ branches:
     - master
 
 notifications:
-  slack: 
+  slack:
     rooms:
       - ecpsparsesolvers:nBWC0jcAd7B1j9whHUYcaVJO
     on_failure: always
+    on_success: change
 
 env:
   matrix:
