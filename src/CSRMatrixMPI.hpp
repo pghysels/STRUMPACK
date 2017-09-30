@@ -1,25 +1,29 @@
 /*
- * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The Regents of
- * the University of California, through Lawrence Berkeley National Laboratory
- * (subject to receipt of any required approvals from the U.S. Dept. of Energy).
- * All rights reserved.
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
  *
- * If you have questions about your rights to use or distribute this software,
- * please contact Berkeley Lab's Technology Transfer Department at TTD@lbl.gov.
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
  *
- * NOTICE. This software is owned by the U.S. Department of Energy. As such, the
- * U.S. Government has been granted for itself and others acting on its behalf a
- * paid-up, nonexclusive, irrevocable, worldwide license in the Software to
- * reproduce, prepare derivative works, and perform publicly and display publicly.
- * Beginning five (5) years after the date permission to assert copyright is
- * obtained from the U.S. Department of Energy, and subject to any subsequent five
- * (5) year renewals, the U.S. Government is granted for itself and others acting
- * on its behalf a paid-up, nonexclusive, irrevocable, worldwide license in the
- * Software to reproduce, prepare derivative works, distribute copies to the
- * public, perform publicly and display publicly, and to permit others to do so.
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly.  Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government is granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
  *
  * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
- *             (Lawrence Berkeley National Lab, Computational Research Division).
+ *             (Lawrence Berkeley National Lab, Computational Research
+ *             Division).
  *
  */
 #ifndef CSRMATRIXMPI_HPP
@@ -42,13 +46,18 @@ namespace strumpack {
     using real_t = typename RealType<scalar_t>::value_type;
   public:
     CSRMatrixMPI();
-    CSRMatrixMPI(integer_t local_rows, integer_t* row_ptr, integer_t* col_ind,
-		 scalar_t* values, integer_t* dist, MPI_Comm comm, bool symmetric_sparsity);
-    CSRMatrixMPI(integer_t local_rows, integer_t* d_ptr, integer_t* d_ind, scalar_t* d_val, integer_t* o_ptr,
-		 integer_t* o_ind, scalar_t* o_val, integer_t* garray, MPI_Comm comm, bool symmetric_sparsity=false);
+    CSRMatrixMPI(integer_t local_rows, integer_t* row_ptr,
+                 integer_t* col_ind, scalar_t* values, integer_t* dist,
+                 MPI_Comm comm, bool symmetric_sparsity);
+    CSRMatrixMPI(integer_t local_rows, integer_t* d_ptr, integer_t* d_ind,
+                 scalar_t* d_val, integer_t* o_ptr, integer_t* o_ind,
+                 scalar_t* o_val, integer_t* garray, MPI_Comm comm,
+                 bool symmetric_sparsity=false);
     CSRMatrixMPI(CSRMatrixMPI<scalar_t,integer_t>& A);
-    CSRMatrixMPI(CSRMatrix<scalar_t,integer_t>* A, MPI_Comm c, bool only_at_root);
-    CSRMatrixMPI<scalar_t,integer_t>& operator=(const CSRMatrixMPI<scalar_t,integer_t>& A);
+    CSRMatrixMPI(CSRMatrix<scalar_t,integer_t>* A,
+                 MPI_Comm c, bool only_at_root);
+    CSRMatrixMPI<scalar_t,integer_t>& operator=
+    (const CSRMatrixMPI<scalar_t,integer_t>& A);
     CSRMatrixMPI<scalar_t,integer_t>* clone();
     inline std::vector<integer_t>& get_dist() { return _dist; }
     inline integer_t local_rows() { return _end_row - _begin_row; }
@@ -63,23 +72,34 @@ namespace strumpack {
     void apply_scaling(std::vector<scalar_t>& Dr, std::vector<scalar_t>& Dc);
     void permute(integer_t* iorder, integer_t* order);
     std::unique_ptr<CSRMatrix<scalar_t,integer_t>> gather();
-    int permute_and_scale(int job, std::vector<integer_t>& perm, std::vector<scalar_t>& Dr,
-			  std::vector<scalar_t>& Dc, bool apply=true);
+    int permute_and_scale(int job, std::vector<integer_t>& perm,
+                          std::vector<scalar_t>& Dr,
+                          std::vector<scalar_t>& Dc, bool apply=true);
     void apply_column_permutation(std::vector<integer_t>& perm);
     void symmetrize_sparsity();
     int read_matrix_market(std::string filename);
     real_t max_scaled_residual(scalar_t* x, scalar_t* b);
-    CSRGraph<integer_t>* get_sub_graph(integer_t* perm, std::pair<integer_t,integer_t>* graph_ranges);
-    void extract_separator(integer_t, const std::vector<std::size_t>&, const std::vector<std::size_t>&, DenseM_t&, int) const {}
-    void front_multiply(integer_t, integer_t, integer_t*, integer_t, const DenseM_t&, DenseM_t&, DenseM_t&) const {}
-    void extract_separator_2d(integer_t, const std::vector<std::size_t>&, const std::vector<std::size_t>&, DistM_t&, MPI_Comm) const {}
-    void front_multiply_2d(integer_t, integer_t, integer_t*, integer_t, DistM_t&,
-			   DistM_t&, DistM_t&, int, MPI_Comm, int) {}
+    CSRGraph<integer_t>* get_sub_graph
+    (integer_t* perm, std::pair<integer_t,integer_t>* graph_ranges);
+    void extract_separator(integer_t, const std::vector<std::size_t>&,
+                           const std::vector<std::size_t>&,
+                           DenseM_t&, int) const {}
+    void front_multiply(integer_t, integer_t, integer_t*, integer_t,
+                        const DenseM_t&, DenseM_t&, DenseM_t&) const {}
+    void extract_separator_2d(integer_t, const std::vector<std::size_t>&,
+                              const std::vector<std::size_t>&,
+                              DistM_t&, MPI_Comm) const {}
+    void front_multiply_2d(integer_t, integer_t, integer_t*, integer_t,
+                           DistM_t&, DistM_t&, DistM_t&, int,
+                           MPI_Comm, int) {}
     void extract_front(scalar_t*, scalar_t*, scalar_t*, integer_t, integer_t,
-		       integer_t, integer_t, integer_t*, int) {}
-    void extract_F11_block(scalar_t*, integer_t, integer_t, integer_t, integer_t, integer_t) {}
-    void extract_F12_block(scalar_t*, integer_t, integer_t, integer_t, integer_t, integer_t, integer_t*) {}
-    void extract_F21_block(scalar_t*, integer_t, integer_t, integer_t, integer_t, integer_t, integer_t*) {}
+                       integer_t, integer_t, integer_t*, int) {}
+    void extract_F11_block(scalar_t*, integer_t, integer_t,
+                           integer_t, integer_t, integer_t) {}
+    void extract_F12_block(scalar_t*, integer_t, integer_t,
+                           integer_t, integer_t, integer_t, integer_t*) {}
+    void extract_F21_block(scalar_t*, integer_t, integer_t,
+                           integer_t, integer_t, integer_t, integer_t*) {}
     void print();
     void print_dense(std::string name);
     void print_MM(std::string filename);
@@ -95,14 +115,14 @@ namespace strumpack {
 
     /**
      * _dist is the same as the vtxdist array defined by parmetis, it
-     *	is the same for each process processor p holds rows
-     *	[_dist[p],_dist[p+1]-1]
+     *  is the same for each process processor p holds rows
+     *  [_dist[p],_dist[p+1]-1]
      */
     std::vector<integer_t> _dist;
 
     /**
      * _odiag_ptr points to the start of the off-(block)-diagonal
-     *	elements.
+     *  elements.
      */
     std::vector<integer_t> _offdiag_start;
 
@@ -112,14 +132,19 @@ namespace strumpack {
     integer_t _end_row;    // = _dist[rank+1]
 
     bool _spmv_setup = false;
-    std::vector<integer_t> _spmv_sranks;   // ranks of the process to whom I need to send something
-    std::vector<integer_t> _spmv_rranks;   // ranks of the process from which I need to receive something
+    // ranks of the process to whom I need to send something
+    std::vector<integer_t> _spmv_sranks;
+    // ranks of the process from which I need to receive something
+    std::vector<integer_t> _spmv_rranks;
     std::vector<integer_t> _spmv_soff;
     std::vector<integer_t> _spmv_roffs;
-    std::vector<integer_t> _spmv_sind;     // indices to receive from each rank from which I need to receive
-    std::vector<scalar_t> _spmv_sbuf;      // indices to receive from each rank from which I need to receive
+    // indices to receive from each rank from which I need to receive
+    std::vector<integer_t> _spmv_sind;
+    // indices to receive from each rank from which I need to receive
+    std::vector<scalar_t> _spmv_sbuf;
     std::vector<scalar_t> _spmv_rbuf;
-    // for each off-diagonal entry _spmv_prbuf stores the corresponding index in the receive buffer
+    // for each off-diagonal entry _spmv_prbuf stores the
+    // corresponding index in the receive buffer
     std::vector<integer_t> _spmv_prbuf;
   };
 
@@ -148,7 +173,8 @@ namespace strumpack {
     std::copy(col_ind, col_ind+_local_nnz, this->_ind);
     std::copy(values, values+_local_nnz, this->_val);
     this->_n = dist[P];
-    MPI_Allreduce(&_local_nnz, &this->_nnz, 1, mpi_type<integer_t>(), MPI_SUM, _comm);
+    MPI_Allreduce(&_local_nnz, &this->_nnz, 1,
+                  mpi_type<integer_t>(), MPI_SUM, _comm);
     this->symmetric_sparsity = symmetric_sparsity;
     for (integer_t r=_local_rows; r>=0; r--) this->_ptr[r] -= this->_ptr[0];
     split_diag_offdiag();
@@ -157,22 +183,27 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   CSRMatrixMPI<scalar_t,integer_t>::CSRMatrixMPI
-  (integer_t local_rows, integer_t* d_ptr, integer_t* d_ind, scalar_t* d_val, integer_t* o_ptr,
-   integer_t* o_ind, scalar_t* o_val, integer_t* garray, MPI_Comm comm, bool symmetric_sparsity)
+  (integer_t local_rows, integer_t* d_ptr, integer_t* d_ind,
+   scalar_t* d_val, integer_t* o_ptr, integer_t* o_ind, scalar_t* o_val,
+   integer_t* garray, MPI_Comm comm, bool symmetric_sparsity)
     : CompressedSparseMatrix<scalar_t,integer_t>(), _comm(comm) {
     auto P = mpi_nprocs(_comm);
     auto rank = mpi_rank(_comm);
     _local_rows = local_rows;
     _local_nnz = 0;
-    if (d_ptr) _local_nnz += d_ptr[local_rows] - d_ptr[0]; /* diagonal block can be empty (NULL) */
-    if (o_ptr) _local_nnz += o_ptr[local_rows] - o_ptr[0]; /* off-diagonal block can be empty (NULL) */
+    if (d_ptr) // diagonal block can be empty (NULL)
+      _local_nnz += d_ptr[local_rows] - d_ptr[0];
+    if (o_ptr) // off-diagonal block can be empty (NULL)
+      _local_nnz += o_ptr[local_rows] - o_ptr[0];
     this->symmetric_sparsity = symmetric_sparsity;
     _dist.resize(P+1);
-    MPI_Allgather(&local_rows, 1, mpi_type<integer_t>(), &_dist[1], 1, mpi_type<integer_t>(), _comm);
+    MPI_Allgather(&local_rows, 1, mpi_type<integer_t>(),
+                  &_dist[1], 1, mpi_type<integer_t>(), _comm);
     for (int p=1; p<=P; p++) _dist[p] = _dist[p-1] + _dist[p];
     _begin_row = _dist[rank];
     _end_row = _dist[rank+1];
-    MPI_Allreduce(&_local_nnz, &this->_nnz, 1, mpi_type<integer_t>(), MPI_SUM, _comm);
+    MPI_Allreduce(&_local_nnz, &this->_nnz, 1,
+                  mpi_type<integer_t>(), MPI_SUM, _comm);
     this->_n = _dist[P];
     this->_ptr = new integer_t[_local_rows+1];
     this->_ind = new integer_t[_local_nnz];
@@ -182,24 +213,25 @@ namespace strumpack {
     for (integer_t r=0, nz=0; r<local_rows; r++) {
       this->_ptr[r+1] = this->_ptr[r];
       if (d_ptr)
-	for (integer_t j=d_ptr[r]-d_ptr[0]; j<d_ptr[r+1]-d_ptr[0]; j++) {
-	  this->_ind[nz] = d_ind[j] + _begin_row;
-	  this->_val[nz++] = d_val[j];
-	  this->_ptr[r+1]++;
-	}
+        for (integer_t j=d_ptr[r]-d_ptr[0]; j<d_ptr[r+1]-d_ptr[0]; j++) {
+          this->_ind[nz] = d_ind[j] + _begin_row;
+          this->_val[nz++] = d_val[j];
+          this->_ptr[r+1]++;
+        }
       _offdiag_start[r] = this->_ptr[r+1];
       if (o_ptr)
-	for (integer_t j=o_ptr[r]-o_ptr[0]; j<o_ptr[r+1]-o_ptr[0]; j++) {
-	  this->_ind[nz] = garray[o_ind[j]];
-	  this->_val[nz++] = o_val[j];
-	  this->_ptr[r+1]++;
-	}
+        for (integer_t j=o_ptr[r]-o_ptr[0]; j<o_ptr[r+1]-o_ptr[0]; j++) {
+          this->_ind[nz] = garray[o_ind[j]];
+          this->_val[nz++] = o_val[j];
+          this->_ptr[r+1]++;
+        }
     }
     check();
   }
 
   template<typename scalar_t,typename integer_t>
-  CSRMatrixMPI<scalar_t,integer_t>::CSRMatrixMPI(CSRMatrixMPI<scalar_t,integer_t>& A)
+  CSRMatrixMPI<scalar_t,integer_t>::CSRMatrixMPI
+  (CSRMatrixMPI<scalar_t,integer_t>& A)
     : CompressedSparseMatrix<scalar_t,integer_t>() {
     clone_data(A);
     check();
@@ -220,20 +252,20 @@ namespace strumpack {
     std::cout << "ind=[";
     for (integer_t i=0; i<local_rows(); i++) {
       for (integer_t j=this->_ptr[i]; j<_offdiag_start[i]; j++)
-	std::cout << this->_ind[j] << " ";
+        std::cout << this->_ind[j] << " ";
       std::cout << "| ";
       for (integer_t j=_offdiag_start[i]; j<this->_ptr[i+1]; j++)
-	std::cout << this->_ind[j] << " ";
+        std::cout << this->_ind[j] << " ";
       std::cout << ", ";
     }
     std::cout << "];" << std::endl << std::flush;
     std::cout << "val=[";
     for (integer_t i=0; i<local_rows(); i++) {
       for (integer_t j=this->_ptr[i]; j<_offdiag_start[i]; j++)
-	std::cout << this->_val[j] << " ";
+        std::cout << this->_val[j] << " ";
       std::cout << "| ";
       for (integer_t j=_offdiag_start[i]; j<this->_ptr[i+1]; j++)
-	std::cout << this->_val[j] << " ";
+        std::cout << this->_val[j] << " ";
       std::cout << ", ";
     }
     std::cout << "];" << std::endl << std::flush;
@@ -256,15 +288,16 @@ namespace strumpack {
   CSRMatrixMPI<scalar_t,integer_t>::check() {
 #if !defined(NDEBUG)
     auto rank = mpi_rank(_comm);
-    //if (!rank) std::cout << "# Sanity check on CSRMatrixMPI, disable by defining NDEBUG." << std::endl;
     assert(_local_rows >= 0);
     assert(_end_row - _begin_row == _local_rows);
     integer_t total_rows = _local_rows;
-    MPI_Allreduce(MPI_IN_PLACE, &total_rows, 1, mpi_type<integer_t>(), MPI_SUM, _comm);
+    MPI_Allreduce(MPI_IN_PLACE, &total_rows, 1,
+                  mpi_type<integer_t>(), MPI_SUM, _comm);
     assert(total_rows == this->_n);
     assert(_local_nnz == this->_ptr[_local_rows]);
     integer_t total_nnz = _local_nnz;
-    MPI_Allreduce(MPI_IN_PLACE, &total_nnz, 1, mpi_type<integer_t>(), MPI_SUM, _comm);
+    MPI_Allreduce(MPI_IN_PLACE, &total_nnz, 1,
+                  mpi_type<integer_t>(), MPI_SUM, _comm);
     assert(total_nnz == this->_nnz);
     assert(_end_row >= _begin_row);
     if (rank == mpi_nprocs(_comm)-1) { assert(_end_row == this->_n); }
@@ -272,24 +305,26 @@ namespace strumpack {
     assert(_begin_row == _dist[rank]);
     assert(_end_row == _dist[rank+1]);
     assert(this->_ptr[0] == 0);
-    for (integer_t r=1; r<=_local_rows; r++) { assert(this->_ptr[r] >= this->_ptr[r-1]); }
+    for (integer_t r=1; r<=_local_rows; r++) {
+      assert(this->_ptr[r] >= this->_ptr[r-1]);
+    }
     for (integer_t r=0; r<_local_rows; r++) {
       assert(_offdiag_start[r] >= this->_ptr[r]);
       assert(this->_ptr[r+1] >= _offdiag_start[r]);
     }
     for (integer_t r=0; r<_local_rows; r++) {
       for (integer_t j=this->_ptr[r]; j<this->_ptr[r+1]; j++) {
-	assert(this->_ind[j] >= 0);
-	assert(this->_ind[j] < this->_n);
+        assert(this->_ind[j] >= 0);
+        assert(this->_ind[j] < this->_n);
       }
     }
     for (integer_t r=0; r<_local_rows; r++) {
       for (integer_t j=this->_ptr[r]; j<_offdiag_start[r]; j++) {
-	assert(this->_ind[j] >= _begin_row);
-	assert(this->_ind[j] < _end_row);
+        assert(this->_ind[j] >= _begin_row);
+        assert(this->_ind[j] < _end_row);
       }
       for (integer_t j=_offdiag_start[r]; j<this->_ptr[r+1]; j++) {
-	assert(this->_ind[j] < _begin_row || this->_ind[j] >= _end_row);
+        assert(this->_ind[j] < _begin_row || this->_ind[j] >= _end_row);
       }
     }
 #endif
@@ -319,12 +354,16 @@ namespace strumpack {
     _dist.resize(P+1);
     _comm = c;
     if (!only_at_root || (only_at_root && rank==0)) {
-      // divide rows over processes, try to give equal number of nnz to each process
+      // divide rows over processes, try to give equal number of nnz
+      // to each process
       _dist[0] = 0;
       for (int p=1; p<P; p++) {
-	integer_t t = p * float(A->nnz()) / P;
-      	auto hi = std::distance(A->get_ptr(), std::upper_bound(A->get_ptr()+_dist[p-1], A->get_ptr()+A->size(), t));
-	_dist[p] = ((hi-1 >= _dist[p-1]) && (t-A->get_ptr()[hi-1] < A->get_ptr()[hi]-t)) ? hi-1 : hi;
+        integer_t t = p * float(A->nnz()) / P;
+        auto hi = std::distance
+          (A->get_ptr(), std::upper_bound(A->get_ptr()+_dist[p-1],
+                                          A->get_ptr()+A->size(), t));
+        _dist[p] = ((hi-1 >= _dist[p-1]) &&
+                    (t-A->get_ptr()[hi-1] < A->get_ptr()[hi]-t)) ? hi-1 : hi;
       }
       _dist[P] = this->_n;
     }
@@ -340,32 +379,40 @@ namespace strumpack {
       this->_val = new scalar_t[_local_nnz];
       auto i0 = A->get_ptr()[_begin_row];
       auto i1 = A->get_ptr()[_end_row];
-      std::copy(A->get_ptr() + _begin_row, A->get_ptr() + _end_row + 1, this->_ptr);
+      std::copy(A->get_ptr() + _begin_row,
+                A->get_ptr() + _end_row + 1, this->_ptr);
       std::copy(A->get_ind() + i0, A->get_ind() + i1, this->_ind);
       std::copy(A->get_val() + i0, A->get_val() + i1, this->_val);
     } else {
       auto scnts = new int[2*P];
       auto sdisp = scnts + P;
       if (rank == 0)
-	for (int p=0; p<P; p++)
-	  scnts[p] = A->get_ptr()[_dist[p+1]] - A->get_ptr()[_dist[p]];
-      MPI_Scatter(scnts, 1, mpi_type<int>(), &_local_nnz, 1, mpi_type<int>(), 0, c);
+        for (int p=0; p<P; p++)
+          scnts[p] = A->get_ptr()[_dist[p+1]] - A->get_ptr()[_dist[p]];
+      MPI_Scatter(scnts, 1, mpi_type<int>(), &_local_nnz,
+                  1, mpi_type<int>(), 0, c);
       this->_ptr = new integer_t[_local_rows+1];
       this->_ind = new integer_t[_local_nnz];
       this->_val = new scalar_t[_local_nnz];
       if (rank == 0)
-	for (int p=0; p<P; p++) {
-	  scnts[p] = _dist[p+1] - _dist[p] + 1;
-	  sdisp[p] = _dist[p];
-	}
-      MPI_Scatterv(rank ? NULL : A->get_ptr(), scnts, sdisp, mpi_type<integer_t>(), this->_ptr, _local_rows+1, mpi_type<integer_t>(), 0, c);
+        for (int p=0; p<P; p++) {
+          scnts[p] = _dist[p+1] - _dist[p] + 1;
+          sdisp[p] = _dist[p];
+        }
+      MPI_Scatterv(rank ? NULL : A->get_ptr(), scnts, sdisp,
+                   mpi_type<integer_t>(), this->_ptr, _local_rows+1,
+                   mpi_type<integer_t>(), 0, c);
       if (rank == 0)
-	for (int p=0; p<P; p++) {
-	  scnts[p] = A->get_ptr()[_dist[p+1]] - A->get_ptr()[_dist[p]];
-	  sdisp[p] = A->get_ptr()[_dist[p]];
-	}
-      MPI_Scatterv(rank ? NULL : A->get_ind(), scnts, sdisp, mpi_type<integer_t>(), this->_ind, _local_nnz, mpi_type<integer_t>(), 0, c);
-      MPI_Scatterv(rank ? NULL : A->get_val(), scnts, sdisp, mpi_type<scalar_t>(),  this->_val, _local_nnz, mpi_type<scalar_t>(), 0, c);
+        for (int p=0; p<P; p++) {
+          scnts[p] = A->get_ptr()[_dist[p+1]] - A->get_ptr()[_dist[p]];
+          sdisp[p] = A->get_ptr()[_dist[p]];
+        }
+      MPI_Scatterv(rank ? NULL : A->get_ind(), scnts, sdisp,
+                   mpi_type<integer_t>(), this->_ind, _local_nnz,
+                   mpi_type<integer_t>(), 0, c);
+      MPI_Scatterv(rank ? NULL : A->get_val(), scnts, sdisp,
+                   mpi_type<scalar_t>(),  this->_val, _local_nnz,
+                   mpi_type<scalar_t>(), 0, c);
       delete[] scnts;
     }
     for (integer_t r=_local_rows; r>=0; r--) this->_ptr[r] -= this->_ptr[0];
@@ -374,29 +421,33 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  CSRMatrixMPI<scalar_t,integer_t>::local_nnz_diag_odiag(int* d_nnz, int* o_nnz) {
+  CSRMatrixMPI<scalar_t,integer_t>::local_nnz_diag_odiag
+  (int* d_nnz, int* o_nnz) {
     for (integer_t r=0; r<local_rows(); r++) {
       d_nnz[r] = _offdiag_start[r] - this->_ptr[r];
       o_nnz[r] = this->_ptr[r+1] - _offdiag_start[r];
     }
   }
 
-  template<typename scalar_t,typename integer_t> CSRMatrixMPI<scalar_t,integer_t>*
+  template<typename scalar_t,typename integer_t>
+  CSRMatrixMPI<scalar_t,integer_t>*
   CSRMatrixMPI<scalar_t,integer_t>::clone() {
-    CSRMatrixMPI<scalar_t,integer_t>* t = new CSRMatrixMPI<scalar_t,integer_t>();
+    auto t = new CSRMatrixMPI<scalar_t,integer_t>();
     t->clone_data(*this);
     return t;
   }
 
   template<typename scalar_t,typename integer_t>
-  CSRMatrixMPI<scalar_t,integer_t>& CSRMatrixMPI<scalar_t,integer_t>::operator=
+  CSRMatrixMPI<scalar_t,integer_t>&
+  CSRMatrixMPI<scalar_t,integer_t>::operator=
   (const CSRMatrixMPI<scalar_t,integer_t>& A) {
     clone_data(A);
     return *this;
   }
 
   template<typename scalar_t,typename integer_t> void
-  CSRMatrixMPI<scalar_t,integer_t>::clone_data(CSRMatrixMPI<scalar_t,integer_t>& A) {
+  CSRMatrixMPI<scalar_t,integer_t>::clone_data
+  (CSRMatrixMPI<scalar_t,integer_t>& A) {
     this->_n = A.size();
     this->_nnz = A.nnz();
     this->symmetric_sparsity = A.symmetric_sparsity;
@@ -409,9 +460,12 @@ namespace strumpack {
     this->_ptr = new integer_t[_local_rows+1];
     this->_ind = new integer_t[_local_nnz];
     this->_val = new scalar_t[_local_nnz];
-    if (A.get_ptr()) std::copy(A.get_ptr(), A.get_ptr()+_local_rows+1, this->_ptr);
-    if (A.get_ind()) std::copy(A.get_ind(), A.get_ind()+_local_nnz, this->_ind);
-    if (A.get_val()) std::copy(A.get_val(), A.get_val()+_local_nnz, this->_val);
+    if (A.get_ptr())
+      std::copy(A.get_ptr(), A.get_ptr()+_local_rows+1, this->_ptr);
+    if (A.get_ind())
+      std::copy(A.get_ind(), A.get_ind()+_local_nnz, this->_ind);
+    if (A.get_val())
+      std::copy(A.get_val(), A.get_val()+_local_nnz, this->_val);
     split_diag_offdiag();
   }
 
@@ -435,11 +489,12 @@ namespace strumpack {
     for (integer_t row=0; row<local_rows(); row++) {
       auto perm_row = perm[row+begin_row()];
       for (int p=0; p<P; p++)
-	if (graph_ranges[p].first <= perm_row && perm_row < graph_ranges[p].second) {
-	  dest[row] = p;
-	  scnts[p] += 2 + this->_ptr[row+1]-this->_ptr[row];
-	  break;
-	}
+        if (graph_ranges[p].first <= perm_row &&
+            perm_row < graph_ranges[p].second) {
+          dest[row] = p;
+          scnts[p] += 2 + this->_ptr[row+1]-this->_ptr[row];
+          break;
+        }
     }
     MPI_Alltoall(scnts, 1, mpi_type<int>(), rcnts, 1, mpi_type<int>(), _comm);
     auto sbuf = new integer_t[std::accumulate(scnts, scnts+P, integer_t(0))];
@@ -455,17 +510,20 @@ namespace strumpack {
     for (integer_t row=0; row<local_rows(); row++) {
       auto d = dest[row];
       if (d == -1) continue;
-      *pp[d] = perm[row+begin_row()];  pp[d]++;                   // send the number of the permuted row (vertex)
-      *pp[d] = this->_ptr[row+1] - this->_ptr[row];  pp[d]++;     // send the number of edges for this vertex
+      // send the number of the permuted row (vertex)
+      *pp[d] = perm[row+begin_row()];  pp[d]++;
+      // send the number of edges for this vertex
+      *pp[d] = this->_ptr[row+1] - this->_ptr[row];  pp[d]++;
       for (auto j=this->_ptr[row]; j<this->_ptr[row+1]; j++) {
-	*pp[d] = perm[this->_ind[j]];  pp[d]++;                   // send the actual edges
+        // send the actual edges
+        *pp[d] = perm[this->_ind[j]];  pp[d]++;
       }
     }
     delete[] pp;
     auto rsize = std::accumulate(rcnts, rcnts+P, size_t(0));
     auto rbuf = new integer_t[rsize];
     MPI_Alltoallv(sbuf, scnts, sdispls, mpi_type<integer_t>(),
-		  rbuf, rcnts, rdispls, mpi_type<integer_t>(), _comm);
+                  rbuf, rcnts, rdispls, mpi_type<integer_t>(), _comm);
     delete[] sbuf;
     delete[] scnts;
 
@@ -487,7 +545,8 @@ namespace strumpack {
     prbuf = 0;
     while (prbuf < rsize) {
       auto my_row = rbuf[prbuf] - graph_ranges[rank].first;
-      std::copy(rbuf+prbuf+2, rbuf+prbuf+2+rbuf[prbuf+1], g->get_ind()+g->get_ptr()[my_row]);
+      std::copy(rbuf+prbuf+2, rbuf+prbuf+2+rbuf[prbuf+1],
+                g->get_ind()+g->get_ptr()[my_row]);
       prbuf += 2 + rbuf[prbuf+1];
     }
     delete[] rbuf;
@@ -497,7 +556,9 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   CSRMatrixMPI<scalar_t,integer_t>::split_diag_offdiag() {
     _offdiag_start.resize(local_rows());
-    auto is_diag = [this](const integer_t& e){ return e >= begin_row() && e < end_row(); };
+    auto is_diag = [this](const integer_t& e){
+      return e >= begin_row() && e < end_row();
+    };
     // partition in diagonal and off-diagonal blocks
 #pragma omp parallel for
     for (integer_t row=0; row<local_rows(); row++) {
@@ -509,13 +570,17 @@ namespace strumpack {
       auto first_val = &this->_val[lo];
       auto last_val = &this->_val[hi];
       while (1) {
-      	while ((first_ind != last_ind) && is_diag(*first_ind)) { ++first_ind; ++first_val; }
-	if (first_ind == last_ind) { last_val--; last_ind--; break; }
-	last_val--; last_ind--;
-      	while ((first_ind != last_ind) && !is_diag(*last_ind)) { --last_ind; --last_val; }
-      	if (first_ind == last_ind) break;
-      	std::iter_swap(first_ind++, last_ind);
-      	std::iter_swap(first_val++, last_val);
+        while ((first_ind != last_ind) && is_diag(*first_ind)) {
+          ++first_ind; ++first_val;
+        }
+        if (first_ind == last_ind) { last_val--; last_ind--; break; }
+        last_val--; last_ind--;
+        while ((first_ind != last_ind) && !is_diag(*last_ind)) {
+          --last_ind; --last_val;
+        }
+        if (first_ind == last_ind) break;
+        std::iter_swap(first_ind++, last_ind);
+        std::iter_swap(first_val++, last_val);
       }
       _offdiag_start[row] = lo + std::distance(&this->_ind[lo], first_ind);
     }
@@ -537,21 +602,31 @@ namespace strumpack {
     _spmv_rind.reserve(nr_offdiag_nnz);
     for (integer_t r=0; r<local_rows(); r++)
       for (auto j=_offdiag_start[r]; j<this->_ptr[r+1]; j++)
-    	_spmv_rind.push_back(this->_ind[j]);
+        _spmv_rind.push_back(this->_ind[j]);
     std::sort(_spmv_rind.begin(), _spmv_rind.end());
-    _spmv_rind.erase(std::unique(_spmv_rind.begin(), _spmv_rind.end()), _spmv_rind.end());
+    _spmv_rind.erase(std::unique(_spmv_rind.begin(), _spmv_rind.end()),
+                     _spmv_rind.end());
 
     _spmv_prbuf.reserve(nr_offdiag_nnz);
     for (integer_t r=0; r<_local_rows; r++)
       for (integer_t j=_offdiag_start[r]; j<this->_ptr[r+1]; j++)
-	_spmv_prbuf.push_back(std::distance(_spmv_rind.begin(), std::lower_bound(_spmv_rind.begin(), _spmv_rind.end(), this->_ind[j])));
+        _spmv_prbuf.push_back
+          (std::distance(_spmv_rind.begin(),
+                         std::lower_bound(_spmv_rind.begin(),
+                                          _spmv_rind.end(), this->_ind[j])));
 
-    for (size_t p=0, j=0; p<size_t(P); p++) // how much to receive from each proc
-      while (j < _spmv_rind.size() && _spmv_rind[j] < _dist[p+1]) { j++; rsizes[p]++; }
-    MPI_Alltoall(rsizes, 1, mpi_type<int>(), ssizes, 1, mpi_type<int>(), _comm);
+    // how much to receive from each proc
+    for (size_t p=0, j=0; p<size_t(P); p++)
+      while (j < _spmv_rind.size() && _spmv_rind[j] < _dist[p+1]) {
+        j++; rsizes[p]++;
+      }
+    MPI_Alltoall(rsizes, 1, mpi_type<int>(), ssizes, 1,
+                 mpi_type<int>(), _comm);
 
-    auto nr_recv_procs = std::count_if(rsizes, rsizes+P, [](int s){ return s > 0;});
-    auto nr_send_procs = std::count_if(ssizes, ssizes+P, [](int s){ return s > 0;});
+    auto nr_recv_procs = std::count_if
+                 (rsizes, rsizes+P, [](int s){ return s > 0;});
+    auto nr_send_procs =
+      std::count_if(ssizes, ssizes+P, [](int s){ return s > 0;});
     _spmv_sranks.reserve(nr_send_procs);
     _spmv_soff.reserve(nr_send_procs+1);
     _spmv_rranks.reserve(nr_recv_procs);
@@ -559,14 +634,14 @@ namespace strumpack {
     int oset_recv = 0, oset_send = 0;
     for (int p=0; p<P; p++) {
       if (ssizes[p] > 0) {
-	_spmv_sranks.push_back(p);
-	_spmv_soff.push_back(oset_send);
-	oset_send += ssizes[p];
+        _spmv_sranks.push_back(p);
+        _spmv_soff.push_back(oset_send);
+        oset_send += ssizes[p];
       }
       if (rsizes[p] > 0) {
-	_spmv_rranks.push_back(p);
-	_spmv_roffs.push_back(oset_recv);
-	oset_recv += rsizes[p];
+        _spmv_rranks.push_back(p);
+        _spmv_roffs.push_back(oset_recv);
+        oset_recv += rsizes[p];
       }
     }
     delete[] rsizes;
@@ -576,11 +651,15 @@ namespace strumpack {
 
     std::vector<MPI_Request> req(nr_recv_procs + nr_send_procs);
     for (int p=0; p<nr_recv_procs; p++)
-      MPI_Isend(_spmv_rind.data() + _spmv_roffs[p],_spmv_roffs[p+1] - _spmv_roffs[p],
-		mpi_type<integer_t>(), _spmv_rranks[p], 0, _comm, &req[p]);
+      MPI_Isend(_spmv_rind.data() + _spmv_roffs[p],
+                _spmv_roffs[p+1] - _spmv_roffs[p],
+                mpi_type<integer_t>(), _spmv_rranks[p],
+                0, _comm, &req[p]);
     for (int p=0; p<nr_send_procs; p++)
-      MPI_Irecv(_spmv_sind.data() + _spmv_soff[p], _spmv_soff[p+1] - _spmv_soff[p],
-		mpi_type<integer_t>(), _spmv_sranks[p], 0, _comm, &req[nr_recv_procs+p]);
+      MPI_Irecv(_spmv_sind.data() + _spmv_soff[p],
+                _spmv_soff[p+1] - _spmv_soff[p],
+                mpi_type<integer_t>(), _spmv_sranks[p],
+                0, _comm, &req[nr_recv_procs+p]);
     MPI_Waitall(req.size(), req.data(), MPI_STATUSES_IGNORE);
 
     _spmv_rbuf.resize(_spmv_rind.size());
@@ -599,22 +678,27 @@ namespace strumpack {
     for (size_t i=0; i<_spmv_sind.size(); i++)
       _spmv_sbuf[i] = x[_spmv_sind[i]-_begin_row];
 
-    MPI_Request* sreq = new MPI_Request[_spmv_sranks.size() + _spmv_rranks.size()];
+    MPI_Request* sreq = new MPI_Request[_spmv_sranks.size() +
+                                        _spmv_rranks.size()];
     MPI_Request* rreq = sreq + _spmv_sranks.size();
     for (size_t p=0; p<_spmv_sranks.size(); p++)
-      MPI_Isend(_spmv_sbuf.data() + _spmv_soff[p], _spmv_soff[p+1] - _spmv_soff[p],
-		mpi_type<scalar_t>(), _spmv_sranks[p], 0, _comm, &sreq[p]);
+      MPI_Isend(_spmv_sbuf.data() + _spmv_soff[p],
+                _spmv_soff[p+1] - _spmv_soff[p],
+                mpi_type<scalar_t>(), _spmv_sranks[p],
+                0, _comm, &sreq[p]);
 
     for (size_t p=0; p<_spmv_rranks.size(); p++)
-      MPI_Irecv(_spmv_rbuf.data() + _spmv_roffs[p], _spmv_roffs[p+1] - _spmv_roffs[p],
-		mpi_type<scalar_t>(), _spmv_rranks[p], 0, _comm, &rreq[p]);
+      MPI_Irecv(_spmv_rbuf.data() + _spmv_roffs[p],
+                _spmv_roffs[p+1] - _spmv_roffs[p],
+                mpi_type<scalar_t>(), _spmv_rranks[p],
+                0, _comm, &rreq[p]);
 
     // first do the block diagonal part, while the communication is going on
 #pragma omp parallel for
     for (integer_t r=0; r<local_rows(); r++) {
       auto yrow = scalar_t(0.);
       for (auto j=this->_ptr[r]; j<_offdiag_start[r]; j++)
-      	yrow += this->_val[j] * x[this->_ind[j] - begin_row()];
+        yrow += this->_val[j] * x[this->_ind[j] - begin_row()];
       y[r] = yrow;
     }
     // wait for incoming messages
@@ -625,7 +709,7 @@ namespace strumpack {
     auto pbuf = _spmv_prbuf.begin();
     for (integer_t r=0; r<local_rows(); r++)
       for (integer_t j=_offdiag_start[r]; j<this->_ptr[r+1]; j++)
-	y[r] += this->_val[j] * _spmv_rbuf[*pbuf++];
+        y[r] += this->_val[j] * _spmv_rbuf[*pbuf++];
 
     // wait for all send messages to finish
     MPI_Waitall(_spmv_sranks.size(), sreq, MPI_STATUSES_IGNORE);
@@ -633,13 +717,15 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  CSRMatrixMPI<scalar_t,integer_t>::permute(integer_t* iorder, integer_t* order) {
+  CSRMatrixMPI<scalar_t,integer_t>::permute
+  (integer_t* iorder, integer_t* order) {
     // This is called, but it does not actually permute the matrix.
     // Instead, we permute the right hand side and solution vectors
   }
 
   template<typename scalar_t,typename integer_t>
-  std::unique_ptr<CSRMatrix<scalar_t,integer_t>> CSRMatrixMPI<scalar_t,integer_t>::gather() {
+  std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
+  CSRMatrixMPI<scalar_t,integer_t>::gather() {
     auto rank = mpi_rank(_comm);
     auto P = mpi_nprocs(_comm);
     std::unique_ptr<CSRMatrix<scalar_t,integer_t>> Aseq;
@@ -647,34 +733,37 @@ namespace strumpack {
     int* displs = NULL;
     if (rank==0) {
       Aseq = std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
-	(new CSRMatrix<scalar_t,integer_t>(this->size(), this->nnz()));
+        (new CSRMatrix<scalar_t,integer_t>(this->size(), this->nnz()));
       rcnts = new int[2*P];
       displs = rcnts + P;
       for (int p=0; p<P; p++) {
-	rcnts[p] = _dist[p+1]-_dist[p];
-	displs[p] = _dist[p]+1;
+        rcnts[p] = _dist[p+1]-_dist[p];
+        displs[p] = _dist[p]+1;
       }
     }
     MPI_Gatherv(this->_ptr+1, _local_rows, mpi_type<integer_t>(),
-		rank ? NULL : Aseq->get_ptr(), rcnts, displs, mpi_type<integer_t>(), 0, _comm);
+                rank ? NULL : Aseq->get_ptr(), rcnts, displs,
+                mpi_type<integer_t>(), 0, _comm);
     if (rank==0) {
       Aseq->get_ptr()[0] = 0;
       for (int p=1; p<P; p++) {
-	if (_dist[p] > 0) {
-	  integer_t p_start = Aseq->get_ptr()[_dist[p]];
-	  for (int r=_dist[p]; r<_dist[p+1]; r++)
-	    Aseq->get_ptr()[r+1] += p_start;
-	}
+        if (_dist[p] > 0) {
+          integer_t p_start = Aseq->get_ptr()[_dist[p]];
+          for (int r=_dist[p]; r<_dist[p+1]; r++)
+            Aseq->get_ptr()[r+1] += p_start;
+        }
       }
       for (int p=0; p<P; p++) {
-	rcnts[p] = Aseq->get_ptr()[_dist[p+1]]-Aseq->get_ptr()[_dist[p]];
-	displs[p] = Aseq->get_ptr()[_dist[p]];
+        rcnts[p] = Aseq->get_ptr()[_dist[p+1]]-Aseq->get_ptr()[_dist[p]];
+        displs[p] = Aseq->get_ptr()[_dist[p]];
       }
     }
     MPI_Gatherv(this->_ind, _local_nnz, mpi_type<integer_t>(),
-		rank ? NULL : Aseq->get_ind(), rcnts, displs, mpi_type<integer_t>(), 0, _comm);
+                rank ? NULL : Aseq->get_ind(), rcnts, displs,
+                mpi_type<integer_t>(), 0, _comm);
     MPI_Gatherv(this->_val, _local_nnz, mpi_type<scalar_t>(),
-		rank ? NULL : Aseq->get_val(), rcnts, displs, mpi_type<scalar_t>(), 0, _comm);
+                rank ? NULL : Aseq->get_val(), rcnts, displs,
+                mpi_type<scalar_t>(), 0, _comm);
     delete[] rcnts;
     return Aseq;
   }
@@ -691,11 +780,14 @@ namespace strumpack {
    */
   template<typename scalar_t,typename integer_t> int
   CSRMatrixMPI<scalar_t,integer_t>::permute_and_scale
-  (int job, std::vector<integer_t>& perm, std::vector<scalar_t>& Dr, std::vector<scalar_t>& Dc, bool apply) {
+  (int job, std::vector<integer_t>& perm, std::vector<scalar_t>& Dr,
+   std::vector<scalar_t>& Dc, bool apply) {
     if (job == 0) return 0;
     if (job > 5 || job < 0 || job == 1) {
       if (mpi_rank()==0)
-	std::cout << "# WARNING mc64 job " << job << " not supported, I'm not doing any column permutation or matrix scaling!" << std::endl;
+        std::cout << "# WARNING mc64 job " << job
+                  << " not supported, I'm not doing any column permutation"
+                  << " or matrix scaling!" << std::endl;
       return 1;
     }
     auto Aseq = gather();
@@ -703,7 +795,8 @@ namespace strumpack {
     std::vector<scalar_t> Dc_global;
     int ierr = 0;
     if (Aseq) {
-      ierr = Aseq->permute_and_scale(job, perm, Dr_global, Dc_global, false/*do not apply perm/scaling*/);
+      ierr = Aseq->permute_and_scale(job, perm, Dr_global, Dc_global,
+                                     false/*do not apply perm/scaling*/);
       Aseq.reset(nullptr);
     } else {
       perm.resize(this->size());
@@ -718,18 +811,20 @@ namespace strumpack {
       auto scnts = new int[2*P];
       auto sdispls = scnts+P;
       for (int p=0; p<P; p++) {
-	scnts[p] = _dist[p+1]-_dist[p];
-	sdispls[p] = _dist[p];
+        scnts[p] = _dist[p+1]-_dist[p];
+        sdispls[p] = _dist[p];
       }
       Dr.resize(_local_rows);
       MPI_Scatterv(rank ? NULL : Dr_global.data(), scnts, sdispls, mpi_type<scalar_t>(),
-		   Dr.data(), _local_rows, mpi_type<scalar_t>(), 0, _comm);
+                   Dr.data(), _local_rows, mpi_type<scalar_t>(), 0, _comm);
       delete[] scnts;
       Dr_global.clear();
-      MPI_Bcast(Dc_global.data(), Dc_global.size(), mpi_type<scalar_t>(), 0, _comm);
+      MPI_Bcast(Dc_global.data(), Dc_global.size(),
+                mpi_type<scalar_t>(), 0, _comm);
       apply_scaling(Dr, Dc_global);
       Dc.resize(_local_rows);
-      std::copy(Dc_global.data()+_begin_row, Dc_global.data()+_end_row, Dc.data());
+      std::copy(Dc_global.data()+_begin_row, Dc_global.data()+_end_row,
+                Dc.data());
       Dc_global.clear();
     }
     apply_column_permutation(perm);
@@ -738,13 +833,14 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  CSRMatrixMPI<scalar_t,integer_t>::apply_column_permutation(std::vector<integer_t>& perm) {
+  CSRMatrixMPI<scalar_t,integer_t>::apply_column_permutation
+  (std::vector<integer_t>& perm) {
     integer_t* iperm = new integer_t[this->size()];
     for (integer_t i=0; i<this->size(); i++) iperm[perm[i]] = i;
 #pragma omp parallel for
     for (integer_t r=0; r<this->_local_rows; r++)
       for (integer_t j=this->_ptr[r]; j<this->_ptr[r+1]; j++)
-	this->_ind[j] = iperm[this->_ind[j]];
+        this->_ind[j] = iperm[this->_ind[j]];
     delete[] iperm;
     split_diag_offdiag();
   }
@@ -756,7 +852,7 @@ namespace strumpack {
 #pragma omp parallel for
     for (integer_t r=0; r<_local_rows; r++)
       for (integer_t j=this->_ptr[r]; j<this->_ptr[r+1]; j++)
-	this->_val[j] = this->_val[j] * Dr[r] * Dc[this->_ind[j]];
+        this->_val[j] = this->_val[j] * Dr[r] * Dc[this->_ind[j]];
     STRUMPACK_FLOPS((is_complex<scalar_t>()?6:1)*static_cast<long long int>(2.*double(_local_nnz)));
   }
 
@@ -769,10 +865,11 @@ namespace strumpack {
     std::vector<std::vector<Idxij>> sbuf(P);
     for (integer_t r=0; r<local_rows(); r++)
       for (integer_t j=_offdiag_start[r]; j<this->_ptr[r+1]; j++) {
-	auto col = this->_ind[j];
-	auto row = r+_begin_row;
-	auto dest = std::upper_bound(_dist.begin(), _dist.end(), col) - _dist.begin() - 1;
-	sbuf[dest].emplace_back(Idxij{col, row});
+        auto col = this->_ind[j];
+        auto row = r+_begin_row;
+        auto dest = std::upper_bound
+          (_dist.begin(), _dist.end(), col) - _dist.begin() - 1;
+        sbuf[dest].emplace_back(Idxij{col, row});
       }
     auto ssizes = new int[4*P];
     auto rsizes = ssizes + P;
@@ -789,43 +886,49 @@ namespace strumpack {
       sdispl[p] = sdispl[p-1] + ssizes[p-1];
       rdispl[p] = rdispl[p-1] + rsizes[p-1];
     }
-    for (int p=0; p<P; p++) std::copy(sbuf[p].begin(), sbuf[p].end(), sendbuf+sdispl[p]/idxij_byte_size);
+    for (int p=0; p<P; p++)
+      std::copy(sbuf[p].begin(), sbuf[p].end(),
+                sendbuf+sdispl[p]/idxij_byte_size);
     sbuf.clear();
     std::vector<Idxij> edges(totrsize/idxij_byte_size);
-    MPI_Alltoallv(sendbuf, ssizes, sdispl, MPI_BYTE, edges.data(), rsizes, rdispl, MPI_BYTE, _comm);
+    MPI_Alltoallv(sendbuf, ssizes, sdispl, MPI_BYTE, edges.data(),
+                  rsizes, rdispl, MPI_BYTE, _comm);
     delete[] ssizes;
     delete[] sendbuf;
 
     std::sort(edges.begin(), edges.end(), [](const Idxij& a, const Idxij& b) {
-	if (a.i != b.i) return (a.i < b.i);  // sort according to rows, then columns
-	return (a.j < b.j);
+        // sort according to rows, then columns
+        if (a.i != b.i) return (a.i < b.i);
+        return (a.j < b.j);
       });
     // count how many of the received values are not already here
     auto row_sums = new integer_t[local_rows()];
-    for (integer_t r=0; r<local_rows(); r++) row_sums[r] = this->_ptr[r+1]-this->_ptr[r];
+    for (integer_t r=0; r<local_rows(); r++)
+      row_sums[r] = this->_ptr[r+1]-this->_ptr[r];
     auto new_nnz = _local_nnz;
     auto ep = edges.begin();
     for (integer_t r=0; r<local_rows(); r++) {
       while (ep != edges.end() && ep->i < r+_begin_row) ep++;
       if (ep == edges.end()) break;
       while (ep != edges.end() && ep->i == r+_begin_row) {
-	integer_t kb = _offdiag_start[r], ke = this->_ptr[r+1];
-	if (std::find(this->_ind+kb, this->_ind+ke, ep->j) == this->_ind+ke) {
-	  new_nnz++;
-	  row_sums[r]++;
-	}
-	ep++;
+        integer_t kb = _offdiag_start[r], ke = this->_ptr[r+1];
+        if (std::find(this->_ind+kb, this->_ind+ke, ep->j) == this->_ind+ke) {
+          new_nnz++;
+          row_sums[r]++;
+        }
+        ep++;
       }
     }
     // same for the diagonal block
     for (integer_t r=0; r<local_rows(); r++)
       for (integer_t j=this->_ptr[r]; j<_offdiag_start[r]; j++) {
-	auto lc = this->_ind[j]-_begin_row;
-	integer_t kb = this->_ptr[lc], ke = _offdiag_start[lc];
-	if (std::find(this->_ind+kb, this->_ind+ke, r+_begin_row) == this->_ind+ke) {
-	  row_sums[lc]++;
-	  new_nnz++;
-	}
+        auto lc = this->_ind[j]-_begin_row;
+        integer_t kb = this->_ptr[lc], ke = _offdiag_start[lc];
+        if (std::find(this->_ind+kb, this->_ind+ke, r+_begin_row)
+            == this->_ind+ke) {
+          row_sums[lc]++;
+          new_nnz++;
+        }
       }
     if (new_nnz != _local_nnz) {
       _local_nnz = new_nnz;
@@ -833,42 +936,45 @@ namespace strumpack {
       auto new_ptr = new integer_t[local_rows()+1];
       new_ptr[0] = 0;
       for (integer_t r=0; r<local_rows(); r++)
-	new_ptr[r+1] = new_ptr[r] + row_sums[r];
+        new_ptr[r+1] = new_ptr[r] + row_sums[r];
       auto new_ind = new integer_t[new_nnz];
       auto new_val = new scalar_t[new_nnz];
       // copy old nonzeros to new arrays
       for (integer_t r=0; r<local_rows(); r++) {
-	row_sums[r] = new_ptr[r] + this->_ptr[r+1] - this->_ptr[r];
-	for (integer_t j=this->_ptr[r], k=new_ptr[r]; j<this->_ptr[r+1]; j++) {
-	  new_ind[k  ] = this->_ind[j];
-	  new_val[k++] = this->_val[j];
-	}
+        row_sums[r] = new_ptr[r] + this->_ptr[r+1] - this->_ptr[r];
+        for (integer_t j=this->_ptr[r], k=new_ptr[r];
+             j<this->_ptr[r+1]; j++) {
+          new_ind[k  ] = this->_ind[j];
+          new_val[k++] = this->_val[j];
+        }
       }
       // diagonal block
       for (integer_t r=0; r<local_rows(); r++)
-	for (integer_t j=this->_ptr[r]; j<_offdiag_start[r]; j++) {
-	  auto lc = this->_ind[j]-_begin_row;
-	  integer_t kb = this->_ptr[lc], ke = _offdiag_start[lc];
-	  if (std::find(this->_ind+kb, this->_ind+ke, r+_begin_row) == this->_ind+ke) {
-	    new_ind[row_sums[lc]] = r+_begin_row;
-	    new_val[row_sums[lc]] = scalar_t(0.);
-	    row_sums[lc]++;
-	  }
-	}
+        for (integer_t j=this->_ptr[r]; j<_offdiag_start[r]; j++) {
+          auto lc = this->_ind[j]-_begin_row;
+          integer_t kb = this->_ptr[lc], ke = _offdiag_start[lc];
+          if (std::find(this->_ind+kb, this->_ind+ke, r+_begin_row)
+              == this->_ind+ke) {
+            new_ind[row_sums[lc]] = r+_begin_row;
+            new_val[row_sums[lc]] = scalar_t(0.);
+            row_sums[lc]++;
+          }
+        }
       // off-diagonal entries
       ep = edges.begin();
       for (integer_t r=0; r<local_rows(); r++) {
-	while (ep != edges.end() && ep->i < r+_begin_row) ep++;
-	if (ep == edges.end()) break;
-	while (ep != edges.end() && ep->i == r+_begin_row) {
-	  integer_t kb = _offdiag_start[r], ke = this->_ptr[r+1];
-	  if (std::find(this->_ind+kb, this->_ind+ke, ep->j) == this->_ind+ke) {
-	    new_ind[row_sums[r]] = ep->j;
-	    new_val[row_sums[r]] = scalar_t(0.);
-	    row_sums[r]++;
-	  }
-	  ep++;
-	}
+        while (ep != edges.end() && ep->i < r+_begin_row) ep++;
+        if (ep == edges.end()) break;
+        while (ep != edges.end() && ep->i == r+_begin_row) {
+          integer_t kb = _offdiag_start[r], ke = this->_ptr[r+1];
+          if (std::find(this->_ind+kb, this->_ind+ke, ep->j)
+              == this->_ind+ke) {
+            new_ind[row_sums[r]] = ep->j;
+            new_val[row_sums[r]] = scalar_t(0.);
+            row_sums[r]++;
+          }
+          ep++;
+        }
       }
       this->set_ptr(new_ptr);
       this->set_ind(new_ind);
@@ -877,7 +983,8 @@ namespace strumpack {
     delete[] row_sums;
 
     integer_t total_new_nnz = 0;
-    MPI_Allreduce(&new_nnz, &total_new_nnz, 1, mpi_type<integer_t>(), MPI_SUM, _comm);
+    MPI_Allreduce(&new_nnz, &total_new_nnz, 1,
+                  mpi_type<integer_t>(), MPI_SUM, _comm);
     if (total_new_nnz != this->nnz()) {
       split_diag_offdiag();
       this->_nnz = total_new_nnz;
@@ -887,7 +994,8 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> int
   CSRMatrixMPI<scalar_t,integer_t>::read_matrix_market(std::string filename) {
-    std::cout << "ERROR: reading a distributed matrix from file is not supported." << std::endl;
+    std::cout << "ERROR: reading a distributed matrix"
+              << " from file is not supported." << std::endl;
     abort();
     // TODO: first read the matrix as a sequential matrix
     // then make a Distributed matrix from the sequential one
@@ -895,8 +1003,10 @@ namespace strumpack {
     return 0;
   }
 
-  template<typename scalar_t,typename integer_t> typename RealType<scalar_t>::value_type
-  CSRMatrixMPI<scalar_t,integer_t>::max_scaled_residual(scalar_t* x, scalar_t* b) {
+  template<typename scalar_t,typename integer_t>
+  typename RealType<scalar_t>::value_type
+  CSRMatrixMPI<scalar_t,integer_t>::max_scaled_residual
+  (scalar_t* x, scalar_t* b) {
     if (!_spmv_setup) setup_spmv_buffers();
 
     for (size_t i=0; i<_spmv_sind.size(); i++)
@@ -904,13 +1014,17 @@ namespace strumpack {
 
     std::vector<MPI_Request> sreq(_spmv_sranks.size());
     for (size_t p=0; p<_spmv_sranks.size(); p++)
-      MPI_Isend(_spmv_sbuf.data() + _spmv_soff[p], _spmv_soff[p+1] - _spmv_soff[p],
-		mpi_type<scalar_t>(), _spmv_sranks[p], 0, _comm, &sreq[p]);
+      MPI_Isend(_spmv_sbuf.data() + _spmv_soff[p],
+                _spmv_soff[p+1] - _spmv_soff[p],
+                mpi_type<scalar_t>(), _spmv_sranks[p],
+                0, _comm, &sreq[p]);
 
     std::vector<MPI_Request> rreq(_spmv_rranks.size());
     for (size_t p=0; p<_spmv_rranks.size(); p++)
-      MPI_Irecv(_spmv_rbuf.data() + _spmv_roffs[p], _spmv_roffs[p+1] - _spmv_roffs[p],
-		mpi_type<scalar_t>(), _spmv_rranks[p], 0, _comm, &rreq[p]);
+      MPI_Irecv(_spmv_rbuf.data() + _spmv_roffs[p],
+                _spmv_roffs[p+1] - _spmv_roffs[p],
+                mpi_type<scalar_t>(), _spmv_rranks[p],
+                0, _comm, &rreq[p]);
 
     MPI_Waitall(rreq.size(), rreq.data(), MPI_STATUSES_IGNORE);
 
@@ -921,14 +1035,14 @@ namespace strumpack {
       auto true_res = b[r];
       auto abs_res = std::abs(b[r]);
       for (auto j=this->_ptr[r]; j<_offdiag_start[r]; j++) {
-	auto c = this->_ind[j];
-	true_res -= this->_val[j] * x[c-_begin_row];
-	abs_res += std::abs(this->_val[j]) * std::abs(x[c-_begin_row]);
+        auto c = this->_ind[j];
+        true_res -= this->_val[j] * x[c-_begin_row];
+        abs_res += std::abs(this->_val[j]) * std::abs(x[c-_begin_row]);
       }
       for (auto j=_offdiag_start[r]; j<this->_ptr[r+1]; j++) {
-	true_res -= this->_val[j] * _spmv_rbuf[*pbuf];
-	abs_res += std::abs(this->_val[j]) * std::abs(_spmv_rbuf[*pbuf]);
-	pbuf++;
+        true_res -= this->_val[j] * _spmv_rbuf[*pbuf];
+        abs_res += std::abs(this->_val[j]) * std::abs(_spmv_rbuf[*pbuf]);
+        pbuf++;
       }
       m = std::max(m, std::abs(true_res) / std::abs(abs_res));
     }
