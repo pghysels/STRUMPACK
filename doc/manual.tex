@@ -9,12 +9,19 @@
 \usepackage{listings}
 \usepackage{color}
 \usepackage[scaled=0.8]{DejaVuSansMono}
+\usepackage{xcolor}
+\usepackage[]{hyperref}
 \usepackage{spverbatim}
-\usepackage{hyperref}
 \usepackage{todonotes}
 \usepackage{amsmath}
 \usepackage{tikz}
 \usetikzlibrary{calc,shapes}
+\lstset{escapeinside={<@}{@>}}
+
+\DeclareUrlCommand{\url}{%
+    \def\UrlFont{\color{blue}\normalfont}%      Adding a little color 
+    \def\UrlLeft##1\UrlRight{\underline{##1}}%  Underlining the url
+}
 
 \newcommand{\tikzmark}[1]{\tikz[overlay,remember picture] \node (#1) {};}
 
@@ -63,21 +70,21 @@ STRUMPACK -- STRUctured Matrices PACKage -- is a C\texttt{++} library
 % for computations with sparse and dense matrices. It uses so-called
 for computations with dense and sparse matrices. It uses so-called
 \emph{structured matrices}, i.e., matrices that exhibit some kind of
-% low-rank property, in particular Hierarchically Semi-Separable
-low-rank property, for example, Hierarchically Semi-Separable
-matrices (HSS), to speedup linear algebra operations. STRUMPACK has
-two main components: a package for dense matrix computations
+% low-rank property, in particular, Hierarchically Semi-Separable
+low-rank property, in this case with Hierarchically Semi-Separable
+matrices (HSS), to speed up linear algebra operations. 
+This version of STRUMPACK unifies two main components that were separate in previous versions:
+a package for dense matrix computations
 (\textbf{STRUMPACK-dense}) and a package (\textbf{STRUMPACK-sparse})
-for sparse linear systems. The dense package is described in detail
-in~\cite{rouet2014distributed} while the sparse package is presented
-in~\cite{ghysels2015sparse}. This Users' Guide describes the sparse
-component of STRUMPACK. STRUMPACK-sparse can be used as a general
+for sparse linear systems. The algorithms for solving dense linear systems are described 
+in~\cite{rouet2014distributed} while the algorithms for solving sparse linear systems are described
+in~\cite{ghysels2015sparse,ghysels2017sparse}. STRUMPACK can be used as a general
 algebraic sparse direct solver (based on the multifrontal
 factorization method), or as an efficient preconditioner for sparse
 matrices obtained by discretization of partial differential
-equations. Included in the STRUMPACK-sparse package are also the GMRES
+equations. Included in STRUMPACK are also the GMRES
 and BiCGStab iterative Krylov solvers, that use the approximate,
-HSS-accelerated, sparse solver as a preconditioner for efficient
+HSS-accelerated, sparse solver as a preconditioner for the efficient
 solution of sparse linear systems.
 
 The STRUMPACK project started at the Lawrence Berkeley National
@@ -92,25 +99,24 @@ latest code:
 
 
 \section{Installation and Requirements}\label{sec::installation}
-The STRUMPACK-sparse package uses the \textbf{CMake} build system. You
-need CMake >= 2.8. The recommended way of building the
-STRUMPACK-sparse library is as follows:
-\begin{lstlisting}[style=Bash]
-  > tar -xvzf STRUMPACK-sparse-x.y.z.tar.gz
-  > mkdir STRUMPACK-sparse-build
-  > cd STRUMPACK-sparse-build
-  > cmake ../strumpack-sparse -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_INSTALL_PREFIX=/path/to/install \
-      -DCMAKE_CXX_COMPILER=<C++ (MPI) compiler> \                             # this and below are optional,
-      -DCMAKE_C_COMPILER=<C (MPI) compiler> \                                 # CMake will try to autodetect
-      -DCMAKE_Fortran_COMPILER=<Fortran77 (MPI) compiler> \
-      -DSCALAPACK_LIBRARIES="/path/to/scalapack/libscalapack.a;/path/to/blacs/libblacs.a" \
-      -DMETIS_INCLUDES=/path/to/metis/incluce \
-      -DMETIS_LIBRARIES=/path/to/metis/libmetis.a \
-      -DPARMETIS_INCLUDES=/path/to/parmetis/include \
-      -DPARMETIS_LIBRARIES=/path/to/parmetis/libparmetis.a \
-      -DSCOTCH_INCLUDES=/path/to/scotch/include \
-      -DSCOTCH_LIBRARIES="/path/to/ptscotch/libscotch.a;...libscotcherr.a;...libptscotch.a;...libptscotcherr.a"
+The STRUMPACK package uses the \textbf{CMake} build system (CMake version >= 2.8). The recommended way of building the
+STRUMPACK library is as follows:
+\begin{lstlisting}[style=bash]
+  > tar -xvzf STRUMPACK-x.y.z.tar.gz
+  > mkdir STRUMPACK-build
+  > cd STRUMPACK-build
+    > cmake <@\textcolor{blue}{../STRUMPACK-x.y.z}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@> \
+      -DCMAKE_INSTALL_PREFIX=<@\textcolor{blue}{.}@> \
+      -DCMAKE_CXX_COMPILER=<@\textcolor{blue}{<C++ (MPI) compiler>}@> \                           # this and below are optional,
+      -DCMAKE_C_COMPILER=<@\textcolor{blue}{<C (MPI) compiler>}@> \                               # CMake will try to autodetect
+      -DCMAKE_Fortran_COMPILER=<@\textcolor{blue}{<Fortran77 (MPI) compiler>}@> \
+      -DSCALAPACK_LIBRARIES=<@\textcolor{blue}{"/path/to/scalapack/libscalapack.a;/path/to/blacs/libblacs.a"}@> \
+      -DMETIS_INCLUDES=<@\textcolor{blue}{/path/to/metis/incluce}@> \
+      -DMETIS_LIBRARIES=<@\textcolor{blue}{/path/to/metis/libmetis.a}@> \
+      -DPARMETIS_INCLUDES=<@\textcolor{blue}{/path/to/parmetis/include}@> \
+      -DPARMETIS_LIBRARIES=<@\textcolor{blue}{/path/to/parmetis/libparmetis.a}@> \
+      -DSCOTCH_INCLUDES=<@\textcolor{blue}{/path/to/scotch/include}@> \
+      -DSCOTCH_LIBRARIES=<@\textcolor{blue}{"/path/to/ptscotch/libscotch.a;...libscotcherr.a;...libptscotch.a;...libptscotcherr.a"}@>
   > make
   > make examples   # optional
   > make doc        # optional, needs doxygen
@@ -124,9 +130,9 @@ CMake can find them:
   locations, if they are installed elsewhere, you can specify them as
   follows:
   \begin{lstlisting}[style=Bash]
-    > cmake ../STRUMPACK-sparse-x.y.z -DCMAKE_BUILD_TYPE=Release
-                     -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
-                     -DCMAKE_Fortran_COMPILER=gfortran
+    > cmake <@\textcolor{blue}{../STRUMPACK-x.y.z}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@>
+                     -DCMAKE_CXX_COMPILER=<@\textcolor{blue}{g++}@> -DCMAKE_C_COMPILER=<@\textcolor{blue}{gcc}@>
+                     -DCMAKE_Fortran_COMPILER=<@\textcolor{blue}{gfortran}@>
   \end{lstlisting}
 \item \textbf{MPI} (Message Passing Interface) library.  You should
   not need to manually specify the MPI compiler wrappers.  CMake will
@@ -152,14 +158,14 @@ CMake can find them:
   \lstinline[style=Bash]!$SCALAPACKDIR! or by specifying the libraries
   manually:
   \begin{lstlisting}[style=Bash]
-    > cmake ../STRUMPACK-sparse-x.y.z -DCMAKE_BUILD_TYPE=Release
-       -DSCALAPACK_LIBRARIES="/path/to/scalapack/libscalapack.a;/path/to/blacs/libblacs.a"
+    > cmake <@\textcolor{blue}{../STRUMPACK-x.y.z}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@>
+       -DSCALAPACK_LIBRARIES=<@\textcolor{blue}{"/path/to/scalapack/libscalapack.a;/path/to/blacs/libblacs.a"}@>
   \end{lstlisting}
   Or one can also directly modify the linker flags to add the
   ScaLAPACK and BLACS libraries:
   \begin{lstlisting}[style=Bash]
-    > cmake ../STRUMPACK-sparse-x.y.z -DCMAKE_BUILD_TYPE=Release
-       -DCMAKE_EXE_LINKER_FLAGS="-L/usr/lib64/mpich/lib/ -lscalapack -lmpiblacs"
+    > cmake <@\textcolor{blue}{.../STRUMPACK-x.y.z}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@>
+       -DCMAKE_EXE_LINKER_FLAGS=<@\textcolor{blue}{."-L/usr/lib64/mpich/lib/ -lscalapack -lmpiblacs"}@>
   \end{lstlisting}
 \item \textbf{METIS} ($\geq$ 5.1.0) for the nested dissection matrix
   reordering. Metis can be obtained from:
@@ -175,9 +181,9 @@ CMake can find them:
   Alternatively, you can specify the
   location of the header and library as follows:
   \begin{lstlisting}[style=Bash]
-    > cmake ../STRUMPACK-sparse-x.y.z -DCMAKE_BUILD_TYPE=Release
-        -DMETIS_INCLUDES=/usr/local/metis/include \
-	-DMETIS_LIBRARIES=/usr/local/metis/lib/libmetis.a
+    > cmake <@\textcolor{blue}{.../STRUMPACK-x.y.z}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@>
+      -DMETIS_INCLUDES=<@\textcolor{blue}{./usr/local/metis/include}@> \
+      -DMETIS_LIBRARIES=<@\textcolor{blue}{./usr/local/metis/lib/libmetis.a}@>
   \end{lstlisting}
 
 \item \textbf{PARMETIS} for parallel nested dissection. ParMetis can
@@ -212,8 +218,10 @@ CMake can find them:
   This is \textbf{optional}, but \textbf{recommended}, as it can lead
   to dramatic performance improvements for multithreaded code that
   performs frequent memory allocations. Link with the one of these
-  libraries
-  (e.g.~\lstinline[style=Bash]!-DCMAKE_EXE_LINKER_FLAGS="-ltcmalloc"!)
+  libraries, e.g.:
+  \begin{lstlisting}[style=Bash]
+  -DCMAKE_EXE_LINKER_FLAGS=<@\textcolor{blue}{"-ltcmalloc"}@>
+  \end{lstlisting}
   to replace the default memory allocator (C\texttt{++} \texttt{new})
   with a more scalable implementation. See also
   Section~\ref{sec:tips}.
@@ -222,12 +230,11 @@ The code was tested on GNU/Linux with the GNU and Intel\tm{} compilers
 and the OpenBLAS, Intel\tm{} MKL\tm{} and Cray\tm{} LibSci\tm{}
 numerical libraries. If you encounter issues on other platforms or
 with other BLAS/LAPACK implementations, please let us know.
-Successful compilation will create a library
-\lstinline[style=Bash]{libstrumpack_sparse.a}.
+Successful compilation will create a \textcolor{green}{\texttt{libstrumpack\_sparse.a}} file.
 
 
 \section{Algorithm}\label{sec:algo}
-The algorithm used in STRUMPACK-sparse is described in detail
+The algorithm used in STRUMPACK is described in detail
 in~\cite{ghysels2015sparse}, and is based on the work by Jianlin
 Xia~\cite{xia2013randomized}. Here we summarize the main algorithm
 features. Section~\ref{sec:tune_prec} has some more information on the
@@ -280,12 +287,12 @@ in the algorithm: matrix reordering, factorization and solve.
 
 \section{Usage}\label{sec:usage}
 This section gives an overview on the basic usage of
-STRUMPACK-sparse. Additionally, we refer to the online automatically
+STRUMPACK. Additionally, we refer to the online automatically
 generated Doxygen pages at
 \begin{quote}
   \url{http://portal.nersc.gov/project/sparse/strumpack/doxygen}
 \end{quote}
-for a complete and up-to-date documentation of the STRUMPACK-sparse
+for a complete and up-to-date documentation of the STRUMPACK
 API. Also, always pass command line options to the solver and run with
 \lstinline[style=Bash]!--help! or \lstinline[style=Bash]!-h! to get a
 list of options.
@@ -296,7 +303,7 @@ An example \lstinline[style=Bash]!Makefile! is available in the
 \lstinline[style=Bash]!cmake! command, see
 Section~\ref{sec::installation}.
 
-The STRUMPACK-sparse package is written in C\texttt{++}, and offers
+The STRUMPACK package is written in C\texttt{++}, and offers
 a simple C\texttt{++} interface. See Section~\ref{sec:Cinterface} if
 you prefer a C interface. STRUMPACK-sparse has three different solver
 classes, all interaction happens through objects of these classes:
@@ -1258,87 +1265,98 @@ such enhancements or derivative works thereof, in binary and source
 code form.
 
 
-\bibliography{\jobname}
+% \bibliography{\jobname}
 
-\begin{filecontents}{\jobname.bib}
-@book{blackford1997scalapack,
-  title={ScaLAPACK users' guide},
-  author={Blackford, L Susan and Choi, Jaeyoung and Cleary, Andy and D'Azevedo, Eduardo and Demmel, James W and Dhillon, Inderjit and Dongarra, Jack J and Hammarling, Sven and Henry, Greg and Petitet, Antoine and Stanley, Ken and Walker, David and Whaley, R Clinton},
-  volume={4},
-  year={1997},
-  publisher={SIAM},
-  url={http://www.netlib.org/scalapack/slug/}
-}
-@article{martinsson2011fast,
-  title={A fast randomized algorithm for computing a hierarchically semiseparable representation of a matrix},
-  author={Martinsson, Per-Gunnar},
-  journal={SIAM Journal on Matrix Analysis and Applications},
-  volume={32},
-  number={4},
-  pages={1251--1274},
-  year={2011},
-  publisher={SIAM}
-}
-@article{rouet2014distributed,
-  title={A distributed-memory package for dense Hierarchically Semi-Separable matrix computations using randomization},
-  author={Rouet, Fran\c{c}ois-Henry and Li, Xiaoye S. and Ghysels, Pieter},
-  journal={ACM Transactions on Mathematical Software},
-  year={2016},
-  note={to appear}
-}
-@article{xia2013randomized,
-  title={Randomized sparse direct solvers},
-  author={Xia, Jianlin},
-  journal={SIAM Journal on Matrix Analysis and Applications},
-  volume={34},
-  number={1},
-  pages={197--227},
-  year={2013},
-  publisher={SIAM}
-}
-@article{ghysels2015sparse,
-  title={An efficient multi-core implementation of a novel {HSS}-structured multifrontal solver using randomized sampling},
-  author={Ghysels, Pieter and Li, Xiaoye S. and Rouet, Fran\c{c}ois-Henry and Williams, Samuel and Napov, Artem},
-  journal={Submitted to SIAM SISC},
-  year={2015}
-}
-@article{park1993remarks,
-  title={Remarks on choosing and implementing random number generators, response (technical correspondence)},
-  author={Park, Stephen K and Miller, Keith W and Stockmeyer, Paul K},
-  journal={Communications of the ACM},
-  volume={36},
-  number={7},
-  pages={108--110},
-  year={1993}
-}
-@article{matsumoto1998mersenne,
-  title={Mersenne twister: a 623-dimensionally equidistributed uniform pseudo-random number generator},
-  author={Matsumoto, Makoto and Nishimura, Takuji},
-  journal={ACM Transactions on Modeling and Computer Simulation (TOMACS)},
-  volume={8},
-  number={1},
-  pages={3--30},
-  year={1998},
-  publisher={ACM}
-}
-@book{saad2003iterative,
-  title={{Iterative methods for sparse linear systems}},
-  author={Saad, Y.},
-  isbn={0898715342},
-  year={2003},
-  publisher={Society for Industrial Mathematics}
-}
-@article{duff1999design,
-  title={The design and use of algorithms for permuting large entries to the diagonal of sparse matrices},
-  author={Duff, Iain S and Koster, Jacko},
-  journal={SIAM Journal on Matrix Analysis and Applications},
-  volume={20},
-  number={4},
-  pages={889--901},
-  year={1999},
-  publisher={SIAM}
-}
-\end{filecontents}
+% \begin{filecontents}{\jobname.bib}
+% @book{blackford1997scalapack,
+%   title={ScaLAPACK users' guide},
+%   author={Blackford, L Susan and Choi, Jaeyoung and Cleary, Andy and D'Azevedo, Eduardo and Demmel, James W and Dhillon, Inderjit and Dongarra, Jack J and Hammarling, Sven and Henry, Greg and Petitet, Antoine and Stanley, Ken and Walker, David and Whaley, R Clinton},
+%   volume={4},
+%   year={1997},
+%   publisher={SIAM},
+%   url={http://www.netlib.org/scalapack/slug/}
+% }
+% @article{martinsson2011fast,
+%   title={A fast randomized algorithm for computing a hierarchically semiseparable representation of a matrix},
+%   author={Martinsson, Per-Gunnar},
+%   journal={SIAM Journal on Matrix Analysis and Applications},
+%   volume={32},
+%   number={4},
+%   pages={1251--1274},
+%   year={2011},
+%   publisher={SIAM}
+% }
+% @article{rouet2014distributed,
+%   title={A distributed-memory package for dense Hierarchically Semi-Separable matrix computations using randomization},
+%   author={Rouet, Fran\c{c}ois-Henry and Li, Xiaoye S. and Ghysels, Pieter},
+%   journal={ACM Transactions on Mathematical Software},
+%   year={2016},
+%   note={to appear}
+% }
+% @article{xia2013randomized,
+%   title={Randomized sparse direct solvers},
+%   author={Xia, Jianlin},
+%   journal={SIAM Journal on Matrix Analysis and Applications},
+%   volume={34},
+%   number={1},
+%   pages={197--227},
+%   year={2013},
+%   publisher={SIAM}
+% }
+% @article{ghysels2015sparse,
+%   title={An efficient multi-core implementation of a novel {HSS}-structured multifrontal solver using randomized sampling},
+%   author={Ghysels, Pieter and Li, Xiaoye S. and Rouet, Fran\c{c}ois-Henry and Williams, Samuel and Napov, Artem},
+%   journal={Submitted to SIAM SISC},
+%   year={2015}
+% }
+% @article{park1993remarks,
+%   title={Remarks on choosing and implementing random number generators, response (technical correspondence)},
+%   author={Park, Stephen K and Miller, Keith W and Stockmeyer, Paul K},
+%   journal={Communications of the ACM},
+%   volume={36},
+%   number={7},
+%   pages={108--110},
+%   year={1993}
+% }
+% @article{matsumoto1998mersenne,
+%   title={Mersenne twister: a 623-dimensionally equidistributed uniform pseudo-random number generator},
+%   author={Matsumoto, Makoto and Nishimura, Takuji},
+%   journal={ACM Transactions on Modeling and Computer Simulation (TOMACS)},
+%   volume={8},
+%   number={1},
+%   pages={3--30},
+%   year={1998},
+%   publisher={ACM}
+% }
+% @book{saad2003iterative,
+%   title={{Iterative methods for sparse linear systems}},
+%   author={Saad, Y.},
+%   isbn={0898715342},
+%   year={2003},
+%   publisher={Society for Industrial Mathematics}
+% }
+% @article{duff1999design,
+%   title={The design and use of algorithms for permuting large entries to the diagonal of sparse matrices},
+%   author={Duff, Iain S and Koster, Jacko},
+%   journal={SIAM Journal on Matrix Analysis and Applications},
+%   volume={20},
+%   number={4},
+%   pages={889--901},
+%   year={1999},
+%   publisher={SIAM}
+% }
+
+% @INPROCEEDINGS{ghysels2017sparse, 
+% title={A Robust Parallel Preconditioner for Indefinite Systems Using Hierarchical Matrices and Randomized Sampling}, 
+% author={P. Ghysels and X. S. Li and C. Gorman and F. H. Rouet}, 
+% journal={2017 IEEE International Parallel and Distributed Processing Symposium (IPDPS)}, 
+% pages={897-906}, 
+% doi={10.1109/IPDPS.2017.21}, 
+% year={2017}, 
+% month={May},
+% }
+
+% \end{filecontents}
 
 \end{document}
 
