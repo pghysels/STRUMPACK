@@ -67,6 +67,7 @@ namespace strumpack {
         for (auto t=rbuf; t!=rbuf+totrsize; t++)
           B.global_fixed(t->_r, t->_c) = t->_v;
       delete[] rbuf;
+      MPI_Type_free(&triplet_type);
     }
 
     // TODO lctxt is not used here
