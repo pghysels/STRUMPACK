@@ -596,19 +596,14 @@ namespace strumpack {
     auto gJ = lJ;  for (auto& j : gJ) j += this->dim_sep;
     DistM_t e = _H->extract(gI, gJ, this->ctxt, this->np_rows(),
                             this->np_cols());
-    //DistM_t e = _H->child(1)->extract(gI, gJ, this->ctxt);
 
     if (_Theta.cols() < _Phi.cols()) {
-      // auto tr = _Theta.extract_rows(lI, this->ctxt, this->ctxt_all);
-      // auto tc = _VhatCPhiC.extract_cols(lJ, this->ctxt, this->ctxt_all);
       DistM_t tr(this->ctxt, lI.size(), _Theta.cols(),
                  _Theta.extract_rows(lI, this->front_comm), this->ctxt_all);
       DistM_t tc(this->ctxt, _VhatCPhiC.rows(), lJ.size(),
-                 _VhatCPhiC.extract_cols(lJ), this->ctxt_all);
+                 _VhatCPhiC.extract_cols(lJ, this->front_comm), this->ctxt_all);
       gemm(Trans::N, Trans::N, scalar_t(-1), tr, tc, scalar_t(1.), e);
     } else {
-      // auto tr = _ThetaVhatC.extract_rows(lI, this->ctxt, this->ctxt_all);
-      // auto tc = _Phi.extract_rows(lJ, this->ctxt, this->ctxt_all);
       DistM_t tr(this->ctxt, lI.size(), _ThetaVhatC.cols(),
                  _ThetaVhatC.extract_rows(lI, this->front_comm), this->ctxt_all);
       DistM_t tc(this->ctxt, lJ.size(), _Phi.cols(),
