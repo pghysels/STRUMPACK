@@ -142,6 +142,8 @@ namespace strumpack {
 
     void print() const { print("A"); }
     void print(std::string name, int precision=15) const;
+    void print_to_file(std::string name, std::string filename,
+                       int width=8) const;
     void random();
     void random(random::RandomGeneratorBase<typename RealType<scalar_t>::
                 value_type>& rgen);
@@ -622,6 +624,14 @@ namespace strumpack {
     if (!active()) return;
     auto tmp = gather();
     if (is_master()) tmp.print(name);
+  }
+
+  template<typename scalar_t> void
+  DistributedMatrix<scalar_t>::print_to_file
+  (std::string name, std::string filename, int width) const {
+    if (!active()) return;
+    auto tmp = gather();
+    if (is_master()) tmp.print_to_file(name, filename, width);
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>
