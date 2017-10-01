@@ -741,6 +741,7 @@ namespace strumpack {
     TIMER_TIME(TaskType::DISTMAT_EXTRACT_COLS, 1, t_dist_mat_extract_cols);
     DistributedMatrix<scalar_t> tmp(ctxt(), rows(), Jc.size());
     if (!active()) return tmp;
+    assert(I() == 1 && J() == 1);
     std::vector<std::vector<scalar_t>> sbuf(_pcols);
     std::vector<std::vector<scalar_t>> rbuf(_pcols);
     {

@@ -360,13 +360,27 @@ namespace strumpack {
         DistMW_t wSr_new0(w.c[0].Jr.size(), c_new, w.Sr, 0, c_lo);
         DistMW_t wSr_new1(w.c[1].Jr.size(), c_new, w.Sr,
                           w.c[0].Jr.size(), c_lo);
-        // TODO optimize this!! use DistM_t::extract_rows!!
-        for (std::size_t r=0; r<w.c[0].Jr.size(); r++)
-          copy(1, c_new, w.c[0].Sr, w.c[0].Jr[r], w.c[0].dS-c_new,
-               wSr_new0, r, 0, _ctxt_all);
-        for (std::size_t r=0; r<w.c[1].Jr.size(); r++)
-          copy(1, c_new, w.c[1].Sr, w.c[1].Jr[r], w.c[1].dS-c_new,
-               wSr_new1, r, 0, _ctxt_all);
+        {
+          // we don't know the number of rows in w.c[0].Sr, but we
+          // know the indices of the rows to extract
+          int c0Srows = (w.c[0].Jr.empty()) ? 0 :
+            1 + *std::max_element(w.c[0].Jr.begin(), w.c[0].Jr.end());
+          int c1Srows = (w.c[1].Jr.empty()) ? 0 :
+            1 + *std::max_element(w.c[1].Jr.begin(), w.c[1].Jr.end());
+          DistM_t wc0Sr_new(_ctxt, c0Srows, c_new);
+          DistM_t wc1Sr_new(_ctxt, c1Srows, c_new);
+          copy(c0Srows, c_new, w.c[0].Sr, 0, w.c[0].dS-c_new,
+               wc0Sr_new, 0, 0, _ctxt_all);
+          copy(c1Srows, c_new, w.c[1].Sr, 0, w.c[1].dS-c_new,
+               wc1Sr_new, 0, 0, _ctxt_all);
+          auto tmpr0 = wc0Sr_new.extract_rows(w.c[0].Jr, comm());
+          auto tmpr1 = wc1Sr_new.extract_rows(w.c[1].Jr, comm());
+          copy(w.c[0].Jr.size(), c_new, tmpr0, 0, 0,
+               wSr_new0, 0, 0, _ctxt_all);
+          copy(w.c[1].Jr.size(), c_new, tmpr1, 0, 0,
+               wSr_new1, 0, 0, _ctxt_all);
+        }
+
         DistM_t wc1Rr(_ctxt, _B01.cols(), c_new);
         DistM_t wc0Rr(_ctxt, _B10.cols(), c_new);
         copy(_B01.cols(), c_new, w.c[1].Rr, 0, w.c[1].dR-c_new,
@@ -381,13 +395,25 @@ namespace strumpack {
         DistMW_t wSc_new0(w.c[0].Jc.size(), c_new, w.Sc, 0, c_lo);
         DistMW_t wSc_new1(w.c[1].Jc.size(), c_new, w.Sc,
                           w.c[0].Jc.size(), c_lo);
-        // TODO optimize this!! use DistM_t::extract_rows!!
-        for (std::size_t r=0; r<w.c[0].Jc.size(); r++)
-          copy(1, c_new, w.c[0].Sc, w.c[0].Jc[r], w.c[0].dS-c_new,
-               wSc_new0, r, 0, _ctxt_all);
-        for (std::size_t r=0; r<w.c[1].Jc.size(); r++)
-          copy(1, c_new, w.c[1].Sc, w.c[1].Jc[r], w.c[1].dS-c_new,
-               wSc_new1, r, 0, _ctxt_all);
+        {
+          int c0Srows = (w.c[0].Jc.empty()) ? 0 :
+            1 + *std::max_element(w.c[0].Jc.begin(), w.c[0].Jc.end());
+          int c1Srows = (w.c[1].Jc.empty()) ? 0 :
+            1 + *std::max_element(w.c[1].Jc.begin(), w.c[1].Jc.end());
+          DistM_t wc0Sc_new(_ctxt, c0Srows, c_new);
+          DistM_t wc1Sc_new(_ctxt, c1Srows, c_new);
+          copy(c0Srows, c_new, w.c[0].Sc, 0, w.c[0].dS-c_new,
+               wc0Sc_new, 0, 0, _ctxt_all);
+          copy(c1Srows, c_new, w.c[1].Sc, 0, w.c[1].dS-c_new,
+               wc1Sc_new, 0, 0, _ctxt_all);
+          auto tmpr0 = wc0Sc_new.extract_rows(w.c[0].Jc, comm());
+          auto tmpr1 = wc1Sc_new.extract_rows(w.c[1].Jc, comm());
+          copy(w.c[0].Jc.size(), c_new, tmpr0, 0, 0,
+               wSc_new0, 0, 0, _ctxt_all);
+          copy(w.c[1].Jc.size(), c_new, tmpr1, 0, 0,
+               wSc_new1, 0, 0, _ctxt_all);
+        }
+
         DistM_t wc1Rc(_ctxt, _B10.rows(), c_new);
         DistM_t wc0Rc(_ctxt, _B01.rows(), c_new);
         copy(_B10.rows(), c_new, w.c[1].Rc, 0, w.c[1].dR-c_new,
