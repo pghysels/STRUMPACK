@@ -6,7 +6,9 @@
 namespace strumpack {
   namespace HSS {
 
-    enum class State : char {UNTOUCHED='U', PARTIALLY_COMPRESSED='P', COMPRESSED='C'};
+    enum class State : char {UNTOUCHED='U',
+                             PARTIALLY_COMPRESSED='P',
+                             COMPRESSED='C'};
 
     template<typename T> std::pair<T,T>
     operator+(const std::pair<T,T>& l, const std::pair<T,T>& r) {
@@ -22,21 +24,22 @@ namespace strumpack {
       std::vector<std::size_t> Ir, Ic, Jr, Jc;
       std::pair<std::size_t,std::size_t> offset;
       int lvl = 0;
-      int dR = 0, dS = 0; // TODO do we need this??
       scalar_t U_r_max, V_r_max;
     };
 
-    template<typename scalar_t> class WorkCompress : public WorkCompressBase<scalar_t>  {
+    template<typename scalar_t> class WorkCompress :
+      public WorkCompressBase<scalar_t>  {
     public:
       std::vector<WorkCompress<scalar_t>> c;
-      DenseMatrix<scalar_t> Qr, Qc; // only needed in the new compression algorithm
+      // only needed in the new compression algorithm
+      DenseMatrix<scalar_t> Qr, Qc;
       void split(const std::pair<std::size_t,std::size_t>& dim) {
-	if (c.empty()) {
-	  c.resize(2);
-	  c[0].offset = this->offset;
-	  c[1].offset = this->offset + dim;
-	  c[0].lvl = c[1].lvl = this->lvl + 1;
-	}
+        if (c.empty()) {
+          c.resize(2);
+          c[0].offset = this->offset;
+          c[1].offset = this->offset + dim;
+          c[0].lvl = c[1].lvl = this->lvl + 1;
+        }
       }
     };
 
@@ -52,20 +55,21 @@ namespace strumpack {
       std::vector<WorkExtract<scalar_t>> c;
       DenseMatrix<scalar_t> y, z;
       std::vector<std::size_t> I, J, rl2g, cl2g, ycols, zcols;
-      void split_extraction_sets(const std::pair<std::size_t,std::size_t>& dim) {
-	if (c.empty()) {
-	  c.resize(2);
-	  c[0].I.reserve(I.size());
-	  c[1].I.reserve(I.size());
-	  for (auto i : I)
-	    if (i < dim.first) c[0].I.push_back(i);
-	    else c[1].I.push_back(i - dim.first);
-	  c[0].J.reserve(J.size());
-	  c[1].J.reserve(J.size());
-	  for (auto j : J)
-	    if (j < dim.second) c[0].J.push_back(j);
-	    else c[1].J.push_back(j - dim.second);
-	}
+      void split_extraction_sets
+      (const std::pair<std::size_t,std::size_t>& dim) {
+        if (c.empty()) {
+          c.resize(2);
+          c[0].I.reserve(I.size());
+          c[1].I.reserve(I.size());
+          for (auto i : I)
+            if (i < dim.first) c[0].I.push_back(i);
+            else c[1].I.push_back(i - dim.first);
+          c[0].J.reserve(J.size());
+          c[1].J.reserve(J.size());
+          for (auto j : J)
+            if (j < dim.second) c[0].J.push_back(j);
+            else c[1].J.push_back(j - dim.second);
+        }
       }
     };
 
@@ -83,26 +87,31 @@ namespace strumpack {
       DenseMatrix<scalar_t>& Vhat() { return _Vt0; }
       const DenseMatrix<scalar_t>& Vhat() const { return _Vt0; }
       std::size_t memory() {
-	std::size_t mem = sizeof(*this) + _L.memory() + _Vt0.memory() + _W1.memory()
-	  + _Q.memory() + _D.memory() + sizeof(int)*_piv.size();
-	for (auto& c : _ch) mem += c.memory();
-	return memory;
+        std::size_t mem = sizeof(*this) + _L.memory() + _Vt0.memory() + _W1.memory()
+          + _Q.memory() + _D.memory() + sizeof(int)*_piv.size();
+        for (auto& c : _ch) mem += c.memory();
+        return memory;
       }
       std::size_t nonzeros() const {
-	std::size_t nnz = _L.nonzeros() + _Vt0.nonzeros() + _W1.nonzeros() + _Q.nonzeros() + _D.nonzeros();
-	for (auto& c : _ch) nnz += c.nonzeros();
-	return nnz;
+        std::size_t nnz = _L.nonzeros() + _Vt0.nonzeros() + _W1.nonzeros()
+          + _Q.nonzeros() + _D.nonzeros();
+        for (auto& c : _ch) nnz += c.nonzeros();
+        return nnz;
       }
     private:
       std::vector<HSSFactors<scalar_t>> _ch;
-      DenseMatrix<scalar_t> _L;   // (U.rows-U.cols x U.rows-U.cols), empty at the root
+      DenseMatrix<scalar_t> _L;   // (U.rows-U.cols x U.rows-U.cols),
+                                  //  empty at the root
       DenseMatrix<scalar_t> _Vt0; // (U.rows-U.cols x V.cols)
                                   // at the root, _Vt0 stored Vhat
       DenseMatrix<scalar_t> _W1;  // (U.cols x U.rows) bottom part of W
-                                  // if (U.rows == U.cols) then W == I and is not stored!
+                                  // if (U.rows == U.cols)
+                                  // then W == I and is not stored!
       DenseMatrix<scalar_t> _Q;   // (U.rows x U.rows) Q from LQ(W0)
-                                  // if (U.rows == U.cols) then Q == I and is not stored!
-      DenseMatrix<scalar_t> _D;   // (U.rows x U.rows) at the root holds LU(D), else empty
+                                  // if (U.rows == U.cols)
+                                  // then Q == I and is not stored!
+      DenseMatrix<scalar_t> _D;   // (U.rows x U.rows) at the root holds LU(D)
+                                  // else empty
       std::vector<int> _piv;      // hold permutation from LU(D) at root
     };
 

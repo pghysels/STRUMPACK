@@ -31,8 +31,8 @@ namespace strumpack {
       using elem_t = typename std::function
         <void(const std::vector<std::size_t>& I,
               const std::vector<std::size_t>& J, DenseM_t& B)>;
-      using dmult_t = typename std::function<void(DistM_t& R,
-                                                  DistM_t& Sr, DistM_t& Sc)>;
+      using dmult_t = typename std::function
+        <void(DistM_t& R, DistM_t& Sr, DistM_t& Sc)>;
       using opts_t = HSSOptions<scalar_t>;
 
     public:
@@ -625,8 +625,8 @@ namespace strumpack {
           buf.push_back(this->_ch[0]->_V_rank);
           buf.push_back(this->_ch[0]->_U_rows);
           buf.push_back(this->_ch[0]->_V_rows);
-          buf.push_back(w.c[0].Rr.cols());
-          buf.push_back(w.c[0].Sr.cols());
+          buf.push_back(w.c[0].dR);
+          buf.push_back(w.c[0].dS);
           for (auto i : w.c[0].Ir) buf.push_back(i);
           for (auto i : w.c[0].Ic) buf.push_back(i);
           for (auto i : w.c[0].Jr) buf.push_back(i);
@@ -684,8 +684,8 @@ namespace strumpack {
           buf.push_back(this->_ch[1]->_V_rank);
           buf.push_back(this->_ch[1]->_U_rows);
           buf.push_back(this->_ch[1]->_V_rows);
-          buf.push_back(w.c[1].Rr.cols());
-          buf.push_back(w.c[1].Sr.cols());
+          buf.push_back(w.c[1].dR);
+          buf.push_back(w.c[1].dS);
           for (auto i : w.c[1].Ir) buf.push_back(i);
           for (auto i : w.c[1].Ic) buf.push_back(i);
           for (auto i : w.c[1].Jr) buf.push_back(i);

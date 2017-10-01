@@ -13,6 +13,7 @@ namespace strumpack {
       std::vector<WorkCompressMPI<scalar_t>> c;
       DistributedMatrix<scalar_t> Rr, Rc, Sr, Sc;
       DistributedMatrix<scalar_t> Qr, Qc;
+      int dR = 0, dS = 0;
       std::unique_ptr<WorkCompress<scalar_t>> w_seq;
       void split(const std::pair<std::size_t,std::size_t>& dim) {
         if (c.empty()) {
