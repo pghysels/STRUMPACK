@@ -52,24 +52,14 @@ foreach(ntests RANGE 20)
   list(FIND ${test_names} ${test_name} tindex)
   if ("${tindex}" STREQUAL "-1")
     list(APPEND ${test_names} ${test_name})
-    set(single_output "${CMAKE_BINARY_DIR}/test/${test_name}.out")
-    add_test(
-      NAME ${test_name}
-      COMMAND "${CMAKE_COMMAND}"
-      -DTEST=${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq -DARG1=${m} -DARG2=${n}
-      -DARG3=--hss_leaf_size -DARG4=${l}
-      -DARG5=--hss_rel_tol   -DARG6=${t}
-      -DARG7=--hss_abs_tol   -DARG8=${a}
-      -DARG9=--hss_${s}_sync
-      -DARG10=--hss_compression_algo -DARG11=${c}
-      -DARG12=--hss_d0 -DARG13=${d}
-      -DARG14=--hss_dd -DARG15=${deltad}
-      -DTH=${th}
-      -DOUTPUT=${single_output}
-      -DALL_OUTPUT=${test_output}
-      -DHEADING=Dense\ matrix\ --\ threads=${th},\ matrix=${m},\ size=${n},\ leaf=${l},\ rtol=${t},\ atol=${a},\ sync=${s},\ comp=${c},\ d0=${d},\ dd=${deltad}
-      -P "${CMAKE_SOURCE_DIR}/test/run_seq.cmake"
-      )
+    set(CTEST_ENVIRONMENT "OMP_NUM_THREADS=${th}")
+    add_test(${test_name}
+      ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq ${m} ${n}
+      --hss_leaf_size ${l} --hss_rel_tol ${t} --hss_abs_tol ${a}
+      --hss_${s}_sync --hss_compression_algorithm ${c} --hss_d0 ${d}
+      --hss_dd ${deltad})
+    set_property(TEST ${test_name} PROPERTY
+      ENVIRONMENT "OMP_NUM_THREADS=${th}")
   endif()
 endforeach()
 
@@ -91,19 +81,15 @@ foreach(c ${COMP})
     set(deltad 8)
     set(test_name "HSS_mpi_P${mpi}_Th${th}_M${m}_N${n}_L${l}_T${t}_A${a}_S${s}_C${c}_D0${d}_DD${deltad}")
     list(APPEND ${test_names} ${test_name})
-    set(single_output "${CMAKE_BINARY_DIR}/test/${test_name}.out")
-    add_test(
-      NAME ${test_name}
-      COMMAND "${CMAKE_COMMAND}"
-      -DTEST=${CMAKE_CURRENT_BINARY_DIR}/test_HSS_mpi
-      -DARG1=${m} -DARG2=${n} -DARG3=--hss_leaf_size -DARG4=${l}
-      -DARG5=--hss_rel_tol   -DARG6=${t} -DARG7=--hss_abs_tol   -DARG8=${a}
-      -DARG9=--hss_${s}_sync -DARG10=--hss_compression_algo -DARG11=${c}
-      -DARG12=--hss_d0 -DARG13=${d} -DARG14=--hss_dd -DARG15=${deltad}
-      -DTH=${th} -DMPIPROCS=${mpi} -DOUTPUT=${single_output} -DALL_OUTPUT=${test_output}
-      -DHEADING=Dense\ matrix\ --\ procs=${mpi},\ threads=${th},\ matrix=${m},\ size=${n},\ leaf=${l},\ rtol=${t},\ atol=${a},\ sync=${s},\ comp=${c},\ d0=${d},\ dd=${deltad}
-      -P "${CMAKE_SOURCE_DIR}/test/run_mpi.cmake"
-      )
+    add_test(${test_name}
+      ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} ${mpi}
+      ${MPIEXEC_PREFLAGS} ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_mpi
+      ${MPIEXEC_POSTFLAGS} ${m} ${n} --hss_leaf_size ${l}
+      --hss_rel_tol ${t} --hss_abs_tol ${a}
+      --hss_${s}_sync --hss_compression_algorithm ${c}
+      --hss_d0 ${d} --hss_dd ${deltad})
+    set_property(TEST ${test_name} PROPERTY
+      ENVIRONMENT "OMP_NUM_THREADS=${th}")
   endforeach()
 endforeach()
 
@@ -125,32 +111,21 @@ foreach(ntests RANGE 50)
   list(FIND ${test_names} ${test_name} tindex)
   if ("${tindex}" STREQUAL "-1")
     list(APPEND ${test_names} ${test_name})
-    set(single_output "${CMAKE_BINARY_DIR}/test/${test_name}.out")
-    add_test(
-      NAME ${test_name}
-      COMMAND "${CMAKE_COMMAND}"
-      -DTEST=${CMAKE_CURRENT_BINARY_DIR}/test_HSS_mpi
-      -DARG1=${m} -DARG2=${n}
-      -DARG3=--hss_leaf_size -DARG4=${l}
-      -DARG5=--hss_rel_tol   -DARG6=${t}
-      -DARG7=--hss_abs_tol   -DARG8=${a}
-      -DARG9=--hss_${s}_sync
-      -DARG10=--hss_compression_algo -DARG11=${c}
-      -DARG12=--hss_d0 -DARG13=${d}
-      -DARG14=--hss_dd -DARG15=${deltad}
-      -DTH=${th} -DMPIPROCS=${mpi} -DOUTPUT=${single_output} -DALL_OUTPUT=${test_output}
-      -DHEADING=Dense\ matrix\ --\ procs=${mpi},\ threads=${th},\ matrix=${m},\ size=${n},\ leaf=${l},\ rtol=${t},\ atol=${a},\ sync=${s},\ comp=${c},\ d0=${d},\ dd=${deltad}
-      -P "${CMAKE_SOURCE_DIR}/test/run_mpi.cmake"
-      )
+    add_test(${test_name}
+      ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} ${mpi}
+      ${MPIEXEC_PREFLAGS} ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_mpi
+      ${MPIEXEC_POSTFLAGS} ${m} ${n} --hss_leaf_size ${l}
+      --hss_rel_tol ${t} --hss_abs_tol ${a} --hss_${s}_sync
+      --hss_compression_algorithm ${c} --hss_d0 ${d}
+      --hss_dd ${deltad})
+    set_property(TEST ${test_name} PROPERTY
+      ENVIRONMENT "OMP_NUM_THREADS=${th}")
   endif()
 endforeach()
 
 
-
-add_test(
-  NAME "Download_sparse_test_matrices"
-  COMMAND /bin/sh ${CMAKE_SOURCE_DIR}/test/download_mtx.sh
-  )
+add_test(NAME "Download_sparse_test_matrices"
+  COMMAND /bin/sh ${CMAKE_SOURCE_DIR}/test/download_mtx.sh)
 
 ## Sequential sparse test
 set(test_output ${CMAKE_BINARY_DIR}/test/SPARSE_seq.out)
@@ -168,23 +143,14 @@ foreach(m ${MTX})
       set(sep 25)
       set(l 8)
       set(test_name "SPARSE_seq_Th${th}_M${m}_ND${nd}_C${c}_L${l}_T${t}_A${a}_D0${d}_DD${deltad}_SEP${sep}")
-      set(single_output "${CMAKE_BINARY_DIR}/test/${test_name}.out")
-      add_test(
-        NAME ${test_name}
-        COMMAND "${CMAKE_COMMAND}"
-        -DTEST=${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq
-        -DARG1=${m}/${m}.mtx -DARG2=--sp_${c}_hss
-        -DARG3=--hss_leaf_size -DARG4=${l}
-        -DARG5=--hss_rel_tol   -DARG6=${t}
-        -DARG7=--hss_abs_tol   -DARG8=${a}
-        -DARG9=--hss_d0 -DARG10=${d}
-        -DARG11=--hss_dd -DARG12=${deltad}
-        -DARG13=--sp_reordering_method -DARG14=${nd}
-        -DARG15=--sp_hss_min_sep_size -DARG16=${sep}
-        -DTH=${th} -DMPIPROCS=${mpi} -DOUTPUT=${single_output} -DALL_OUTPUT=${test_output}
-        -DHEADING=Sparse\ matrix\ --\ threads=${th},\ matrix=${m},\ nd=${nd},\ leaf=${l},\ hssrtol=${t},\ hssatol=${a},\ comp=${c},\ d0=${d},\ dd=${deltad}
-        -P "${CMAKE_SOURCE_DIR}/test/run_seq.cmake"
-        )
+      add_test(${test_name}
+        ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq
+        ${m}/${m}.mtx --sp_${c}_hss --hss_leaf_size ${l}
+        --hss_rel_tol ${t} --hss_abs_tol ${a} --hss_d0 ${d}
+        --hss_dd ${deltad} --sp_reordering_method ${nd}
+        --sp_hss_min_sep_size ${sep})
+      set_property(TEST ${test_name} PROPERTY
+        ENVIRONMENT "OMP_NUM_THREADS=${th}")
     endforeach()
   endforeach()
 endforeach()
@@ -209,23 +175,14 @@ foreach(ntests RANGE 50)
   list(FIND ${test_names} ${test_name} tindex)
   if ("${tindex}" STREQUAL "-1")
     list(APPEND ${test_names} ${test_name})
-    set(single_output "${CMAKE_BINARY_DIR}/test/${test_name}.out")
-    set(single_output "${CMAKE_BINARY_DIR}/test/${test_name}.out")
-    add_test(
-      NAME ${test_name}
-      COMMAND "${CMAKE_COMMAND}"
-      -DTEST=${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
-      -DARG1=m -DARG2=${m}/${m}.mtx -DARG3=--sp_${c}_hss
-      -DARG4=--hss_leaf_size -DARG5=${l}
-      -DARG6=--hss_rel_tol   -DARG7=${t}
-      -DARG8=--hss_abs_tol   -DARG9=${a}
-      -DARG10=--hss_d0 -DARG11=${d}
-      -DARG12=--hss_dd -DARG13=${deltad}
-      -DARG14=--sp_reordering_method -DARG15=${nd}
-      -DARG16=--sp_hss_min_sep_size -DARG17=${sep}
-      -DTH=${th} -DMPIPROCS=${mpi} -DOUTPUT=${single_output} -DALL_OUTPUT=${test_output}
-      -DHEADING=Sparse\ matrix\ --\ threads=${th},\ matrix=${m},\ nd=${nd},\ leaf=${l},\ hssrtol=${t},\ hssatol=${a},\ comp=${c},\ d0=${d},\ dd=${deltad}
-      -P "${CMAKE_SOURCE_DIR}/test/run_mpi.cmake"
-      )
+    add_test(${test_name}
+      ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} ${mpi}
+      ${MPIEXEC_PREFLAGS} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
+      ${MPIEXEC_POSTFLAGS} m ${m}/${m}.mtx --sp_${c}_hss
+      --hss_leaf_size ${l} --hss_rel_tol ${t} --hss_abs_tol ${a}
+      --hss_d0 ${d} --hss_dd ${deltad} --sp_reordering_method ${nd}
+      --sp_hss_min_sep_size ${sep})
+    set_property(TEST ${test_name} PROPERTY
+      ENVIRONMENT "OMP_NUM_THREADS=${th}")
   endif()
 endforeach()
