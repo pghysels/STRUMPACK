@@ -19,8 +19,8 @@
 \lstset{escapeinside={<@}{@>}}
 
 \DeclareUrlCommand{\url}{%
-    \def\UrlFont{\color{blue}\normalfont}%      Adding a little color 
-    \def\UrlLeft##1\UrlRight{\underline{##1}}%  Underlining the url
+  \def\UrlFont{\color{blue}\normalfont}%      Adding a little color
+  \def\UrlLeft##1\UrlRight{\underline{##1}}%  Underlining the url
 }
 
 \newcommand{\tikzmark}[1]{\tikz[overlay,remember picture] \node (#1) {};}
@@ -46,11 +46,13 @@
 
 \newcommand{\tm}{\textsuperscript{\textregistered}}
 
-\title{\vspace{-3\baselineskip}STRuctured Matrices PACKage Users' Guide\\
---\\
-Sparse Package}
-\author{Pieter Ghysels\footnotemark[1] , Xiaoye S. Li\footnotemark[1] , Fran\c{c}ois-Henry Rouet\footnotemark[1]}
-\date{Version 1.1, November 2016}
+\title{\textbf{STRUMPACK Users' Guide}}
+\author{Pieter Ghysels\footnotemark[1] \\
+  Xiaoye S. Li\footnotemark[1] \\
+  Christopher Gorman\footnotemark[2] \\
+  Gustavo Ch\'{a}vez\footnotemark[1] \\
+  Fran\c{c}ois-Henry Rouet\footnotemark[3]}
+\date{Version \textbf{2.0.0}, September 2017}
 
 \begin{document}
 
@@ -58,11 +60,16 @@ Sparse Package}
 
 \vfill
 
-\tableofcontents
-
 \footnotetext[1]{Lawrence Berkeley National Laboratory, Computational
   Research Division, MS 50F-1650, One Cyclotron Road, Berkeley
-  CA94720. \texttt{\{pghysels,xsli,fhrouet\}@lbl.gov}}
+  CA94720. \texttt{\{pghysels,xsli,gichavez\}@lbl.gov}}
+\footnotetext[2]{UC Santa Barbara. \texttt{gorman@math.ucsb.edu}}
+\footnotetext[3]{Livermore Software Technology
+  Corporation. \texttt{fhrouet@lstc.com}}
+
+\pagebreak
+
+\tableofcontents
 
 \pagebreak
 \section{STRUMPACK Overview}
@@ -72,20 +79,21 @@ for computations with dense and sparse matrices. It uses so-called
 \emph{structured matrices}, i.e., matrices that exhibit some kind of
 % low-rank property, in particular, Hierarchically Semi-Separable
 low-rank property, in this case with Hierarchically Semi-Separable
-matrices (HSS), to speed up linear algebra operations. 
-This version of STRUMPACK unifies two main components that were separate in previous versions:
-a package for dense matrix computations
+matrices (HSS), to speed up linear algebra operations.  This version
+of STRUMPACK unifies two main components that were separate in
+previous versions: a package for dense matrix computations
 (\textbf{STRUMPACK-dense}) and a package (\textbf{STRUMPACK-sparse})
-for sparse linear systems. The algorithms for solving dense linear systems are described 
-in~\cite{rouet2014distributed} while the algorithms for solving sparse linear systems are described
-in~\cite{ghysels2015sparse,ghysels2017sparse}. STRUMPACK can be used as a general
-algebraic sparse direct solver (based on the multifrontal
+for sparse linear systems. The algorithms for solving dense linear
+systems are described in~\cite{rouet2014distributed} while the
+algorithms for solving sparse linear systems are described
+in~\cite{ghysels2015sparse,ghysels2017sparse}. STRUMPACK can be used
+as a general algebraic sparse direct solver (based on the multifrontal
 factorization method), or as an efficient preconditioner for sparse
 matrices obtained by discretization of partial differential
-equations. Included in STRUMPACK are also the GMRES
-and BiCGStab iterative Krylov solvers, that use the approximate,
-HSS-accelerated, sparse solver as a preconditioner for the efficient
-solution of sparse linear systems.
+equations. Included in STRUMPACK are also the GMRES and BiCGStab
+iterative Krylov solvers, that use the approximate, HSS-accelerated,
+sparse solver as a preconditioner for the efficient solution of sparse
+linear systems.
 
 The STRUMPACK project started at the Lawrence Berkeley National
 Laboratory in 2014 and is supported by the FASTMath SciDAC Institute
@@ -99,8 +107,9 @@ latest code:
 
 
 \section{Installation and Requirements}\label{sec::installation}
-The STRUMPACK package uses the \textbf{CMake} build system (CMake version >= 2.8). The recommended way of building the
-STRUMPACK library is as follows:
+The STRUMPACK package uses the \textbf{CMake} build system (CMake
+version >= 2.8). The recommended way of building the STRUMPACK library
+is as follows:
 \begin{lstlisting}[style=bash]
   > tar -xvzf STRUMPACK-x.y.z.tar.gz
   > mkdir STRUMPACK-build
@@ -153,8 +162,10 @@ CMake can find them:
   achieve good performance when running in MPI+OpenMP hybrid
   mode. ScaLAPACK depends on the BLACS communication library and on
   PBLAS (parallel BLAS), both of which are typically included with the
-  ScaLAPACK installation. If CMake cannot locate these libraries, you
-  can specify their path by setting the environment variable
+  ScaLAPACK installation (from ScaLAPACK 2.0.2, the blacs library is
+  included in the ScaLAPACK library file). If CMake cannot locate
+  these libraries, you can specify their path by setting the
+  environment variable
   \lstinline[style=Bash]!$SCALAPACKDIR! or by specifying the libraries
   manually:
   \begin{lstlisting}[style=Bash]
@@ -237,10 +248,10 @@ Successful compilation will create a \textcolor{green}{\texttt{libstrumpack\_spa
 The algorithm used in STRUMPACK is described in detail
 in~\cite{ghysels2015sparse}, and is based on the work by Jianlin
 Xia~\cite{xia2013randomized}. Here we summarize the main algorithm
-features. Section~\ref{sec:tune_prec} has some more information on the
-low-rank compression strategy and how to tune this to get a good
-preconditioner for your specific problem. There are three main steps
-in the algorithm: matrix reordering, factorization and solve.
+features. Section~\ref{sec:HSS} has more information on the low-rank
+compression strategy and how to tune this to get a good preconditioner
+for your specific problem. There are three main steps in the
+algorithm: matrix reordering, factorization and solve.
 
 \begin{description}
 \item[Matrix reordering:] There are three distinct matrix reordering
@@ -273,29 +284,30 @@ in the algorithm: matrix reordering, factorization and solve.
   solver. HSS approximations are constructed using a randomized
   sampling algorithm.
 
-\item[Solve:] Once the matrix is factorized, the factors can be used to
-  efficiently solve a linear system of equations by doing a forward
-  and a backward solve sweeps. When no HSS compression is used, this is
-  a direct solver. The multifrontal solve procedure is then used
+\item[Solve:] Once the matrix is factorized, the factors can be used
+  to efficiently solve a linear system of equations by doing a forward
+  and a backward solve sweeps. When no HSS compression is used, this
+  is a direct solver. The multifrontal solve procedure is then used
   within an iterative refinement loop, with typically only 1 or very
   few iterations. However, when the factors are compressed using HSS,
   a single multifrontal solve is only approximate and the solve is by
-  default used as a preconditioner for GMRes($30$). The required
-  number of GMRes iterations will depend strongly on the quality of
+  default used as a preconditioner for GMRES($30$). The required
+  number of GMRES iterations will depend strongly on the quality of
   the HSS approximation.
 \end{description}
 
-\section{Usage}\label{sec:usage}
-This section gives an overview on the basic usage of
-STRUMPACK. Additionally, we refer to the online automatically
-generated Doxygen pages at
-\begin{quote}
-  \url{http://portal.nersc.gov/project/sparse/strumpack/doxygen}
-\end{quote}
-for a complete and up-to-date documentation of the STRUMPACK
-API. Also, always pass command line options to the solver and run with
-\lstinline[style=Bash]!--help! or \lstinline[style=Bash]!-h! to get a
-list of options.
+\section{Using STRUMPACK-Sparse}\label{sec:usage}
+This section gives an overview on the basic usage of the sparse
+solvers in STRUMPACK.
+% Additionally, we refer to the online automatically
+% generated Doxygen pages at
+% \begin{quote}
+%   \url{http://portal.nersc.gov/project/sparse/strumpack/doxygen}
+% \end{quote}
+% for a complete and up-to-date documentation of the STRUMPACK API.
+Many STRUMPACK options can be set from the command line. Running with
+\lstinline[style=Bash]!--help! or \lstinline[style=Bash]!-h!, will
+give you a list of supported run-time options.
 
 An example \lstinline[style=Bash]!Makefile! is available in the
 \lstinline[style=Bash]!examples/! directory. This
@@ -303,21 +315,21 @@ An example \lstinline[style=Bash]!Makefile! is available in the
 \lstinline[style=Bash]!cmake! command, see
 Section~\ref{sec::installation}.
 
-The STRUMPACK package is written in C\texttt{++}, and offers
-a simple C\texttt{++} interface. See Section~\ref{sec:Cinterface} if
-you prefer a C interface. STRUMPACK-sparse has three different solver
-classes, all interaction happens through objects of these classes:
+The STRUMPACK package is written in C\texttt{++}, and offers a simple
+C\texttt{++} interface. See Section~\ref{sec:Cinterface} if you prefer
+a C interface. STRUMPACK-sparse has three different solver classes,
+all interaction happens through objects of these classes:
 \begin{itemize}
-\item \textbf{\lstinline[style=C]!StrumpackSparseSolver<scalar,real,integer>!}\\
+\item \textbf{\lstinline[style=C]!StrumpackSparseSolver<scalar,integer=int>!}\\
   This class represents the sparse solver for a single computational
   node, optionally using OpenMP parallelism. Use this if you are
   running the code sequentially, on a (multicore) laptop or desktop or
   on a single node of a larger cluster. This class is defined in
   \lstinline[style=Bash]!StrumpackSparseSolver.hpp!, so include this
   header if you intend to use it.
-\item \textbf{\lstinline[style=C]!StrumpackSparseSolverMPI<scalar,real,integer>!}\\
+\item \textbf{\lstinline[style=C]!StrumpackSparseSolverMPI<scalar,integer=int>!}\\
   This solver has (mostly) the same interface as
-  \lstinline[style=C]!StrumpackSparseSolver<scalar,real,integer>!  but
+  \lstinline[style=C]!StrumpackSparseSolver<scalar,integer>!  but
   the numerical factorization and multifrontal solve phases run in
   parallel using MPI and ScaLAPACK. However, the inputs (sparse
   matrix, right-hand side vector) need to be available completely on
@@ -329,9 +341,11 @@ classes, all interaction happens through objects of these classes:
 %  \lstinline[style=C]!MPI_Init(_thread)!  before instantiating an
   \lstinline[style=C]!MPI_Init[_thread]!  before instantiating an
   object of this class and include the header file
-  \lstinline[style=Bash]!StrumpackSparseSolverMPI.hpp!.
+  \lstinline[style=Bash]!StrumpackSparseSolverMPI.hpp!. We do not
+  recommend this solver, instead, use
+  \lstinline[style=C]!StrumpackSparseSolverMPIDist! whenever possible.
 \item
-  \textbf{\lstinline[style=C]!StrumpackSparseSolverMPIDist<scalar,real,integer>!}\\
+  \textbf{\lstinline[style=C]!StrumpackSparseSolverMPIDist<scalar,integer=int>!}\\
   This solver is fully distributed. The numerical factorization and
   solve as well as the symbolic factorization are distributed. The
   input is now a block-row distributed sparse matrix and a
@@ -348,19 +362,16 @@ classes, all interaction happens through objects of these classes:
 
 The three solver classes \lstinline[style=C]!StrumpackSparseSolver!,
 \lstinline[style=C]!StrumpackSparseSolverMPI! and\\
-\lstinline[style=C]!StrumpackSparseSolverMPIDist! depend on three
-template parameters \lstinline[style=C]!<scalar,real,integer>!: the
-type of a scalar, the type of the corresponding real number and an
-integer type. It is recommended to first try to simply use the default
-\lstinline[style=C]!int! type for this last template parameter, unless
-you run into 32 bit integer overflow problems. In that case one can
-switch to for instance \lstinline[style=C]!int64_t!. The supported
-combinations of \lstinline[style=C]!<scalar,real>! are:
-\lstinline[style=C]!<float,float>!,
-\lstinline[style=C]!<double,double>!,
-\lstinline[style=C]!<std::complex<float>, float>! and
-\lstinline[style=C]!<std::complex<double>, double>!.
-
+\lstinline[style=C]!StrumpackSparseSolverMPIDist! depend on two
+template parameters \lstinline[style=C]!<scalar,integer>!: the type of
+a scalar and an integer type. The scalar type can be
+\lstinline[style=C]!float!, \lstinline[style=C]!double!,
+\lstinline[style=C]!std::complex<float>! or
+\lstinline[style=C]!std::complex<double>!. It is recommended to first
+try to simply use the default \lstinline[style=C]!integer=int! type,
+unless you run into 32 bit integer overflow problems. In that case one
+can switch to for instance \lstinline[style=C]!int64_t! (a signed
+integer type).
 
 \subsection{StrumpackSparseSolver Example}
 The following shows the typical way to use a (sequential or
@@ -368,39 +379,37 @@ multithreaded) STRUMPACK-sparse solver:
 \begin{lstlisting}[style=C]
 #include "StrumpackSparseSolver.hpp"
 using namespace strumpack;  // all strumpack code is in the strumpack namespace,
-      // some additional constants are defined in the strumpack::params namespace
-typedef double scalar;
-typedef double real;
 
 int main(int argc, char* argv[]) {
   int N = ...;                // construct an NxN CSR matrix with nnz nonzeros
   int* row_ptr = ...;         // N+1 integers
   int* col_ind = ...;         // nnz integers
-  scalar* val = ...;          // nnz scalars
-  scalar* x = new scalar[N];  // will hold the solution vector
-  scalar* b = ...;            // set a right-hand side b
+  double* val = ...;          // nnz scalars
+  double* x = new double[N];  // will hold the solution vector
+  double* b = ...;            // set a right-hand side b
 
-  StrumpackSparseSolver<scalar,real,int> sp(argc, argv);  // create solver object
-  sp.set_relative_Krylov_tolerance(1e-10);                // set options
-  sp.set_gmres_restart(10);                               // ...
-  sp.set_from_options();                                  // parse command line options
-  sp.set_csr_matrix(N, row_ptr, col_ind, val);            // set the matrix (copy)
-  sp.reorder();                                           // reorder matrix
-  sp.factor();                                            // numerical factorization
-  sp.solve(b, x);                                         // solve Ax=b
+  StrumpackSparseSolver<double> sp;               // create solver object
+  sp.options().set_rel_tol(1e-10);                // set options
+  sp.options().set_gmres_restart(10);             // ...
+  sp.options().enable_HSS();
+  sp.options().set_from_command_line(argc, argv); // parse command line options
+  sp.set_csr_matrix(N, row_ptr, col_ind, val);    // set the matrix (copy)
+  sp.reorder();                                   // reorder matrix
+  sp.factor();                                    // numerical factorization
+  sp.solve(b, x);                                 // solve Ax=b
   ... // check residual/error and cleanup
 }
 \end{lstlisting}
-The main steps are: create solver object, set options and parse
-options from the command line, set matrix, reorder, factor and finally
+The main steps are: create solver object, set options (parse options
+from the command line), set matrix, reorder, factor and finally
 solve. The matrix should be in the Compressed Sparse Row (CSR) format,
 also called Yale format, with $0$ based indices. Figure~\ref{fig::csr}
-illustrates the CSR format. In the basic scenario, it is not really
-necessary to explicitly call \lstinline[style=C]!reorder!  and
+illustrates the CSR format. In the basic scenario, it is not necessary
+to explicitly call \lstinline[style=C]!reorder!  and
 \lstinline[style=C]!factor!, since trying to solve with a
-\lstinline[style=C]!StrumpackSparseSolver!  object that is not
-factored yet, will internally call the \lstinline[style=C]!factor!
-routine, which will call \lstinline[style=C]!reorder! if necessary.
+\lstinline[style=C]!StrumpackSparseSolver! object that is not factored
+yet, will internally call the \lstinline[style=C]!factor! routine,
+which will call \lstinline[style=C]!reorder! if necessary.
 
 \begin{figure}
   \begin{center}
@@ -452,19 +461,16 @@ routine, which will call \lstinline[style=C]!reorder! if necessary.
 
 
 The above code should be linked with
-\lstinline[style=Bash]!-lstrumpack_sparse! and with the Metis,
-ParMetis, Scotch, PT-Scotch, BLAS, LAPACK, ScaLAPACK and BLACS
-libraries.\\
+\lstinline[style=Bash]!-lstrumpack! and with the Metis,
+ParMetis, Scotch, PT-Scotch, BLAS, LAPACK, and ScaLAPACK libraries.\\
 
 \subsection{StrumpackSparseSolverMPI Example}
 Usage of the
-\lstinline[style=C]!StrumpackSparseSolverMPI<scalar,real,integer>!
+\lstinline[style=C]!StrumpackSparseSolverMPI<scalar,integer=int>!
 solver is very similar:
 \begin{lstlisting}[style=C]
 #include "StrumpackSparseSolverMPI.hpp"
 using namespace strumpack;
-typedef double scalar;
-typedef double real;
 
 int main(int argc, char* argv[]) {
   int thread_level, rank;
@@ -479,14 +485,15 @@ int main(int argc, char* argv[]) {
     int N = ...;                // construct an NxN CSR matrix with nnz nonzeros
     int* row_ptr = ...;         // N+1 integers
     int* col_ind = ...;         // nnz integers
-    scalar* val = ...;          // nnz scalars
+    double* val = ...;          // nnz scalars
     // allocate entire solution and right-hand side vectors on each MPI process
-    scalar* x = new scalar[N];  // will hold the solution vector
-    scalar* b = ...;            // set a right-hand side b
+    double* x = new double[N];  // will hold the solution vector
+    double* b = ...;            // set a right-hand side b
 
     // construct solver and specify the MPI communicator
-    StrumpackSparseSolverMPI<scalar,real,int> sp(MPI_COMM_WORLD, argc, argv);
-    sp.set_from_options();
+    StrumpackSparseSolverMPI<double> sp(MPI_COMM_WORLD);
+    sp.options().set_mc64job(0);
+    sp.options().set_from_command_line(argc, argv);
     sp.set_csr_matrix(N, row_ptr, col_ind, val);
     sp.solve(b, x);
     ... // check residual/error, cleanup
@@ -504,16 +511,13 @@ and \lstinline[style=C]!MPI_Finalize!.\\
 
 \subsection{StrumpackSparseSolverMPIDist Example}
 Finally, we illustrate the usage of
-\lstinline[style=C]!StrumpackSparseSolverMPIDist<scalar,real,integer>!
+\lstinline[style=C]!StrumpackSparseSolverMPIDist<scalar,integer=int>!
 solver. This interface takes a block-row distributed compressed sparse
-row matrix as input, this matrix format is illustrated in
+row matrix as input. This matrix format is illustrated in
 Figure~\ref{fig::block-row-csr}.
 \begin{lstlisting}[style=C]
 #include "StrumpackSparseSolverMPI.hpp"
 using namespace strumpack;
-typedef double scalar;
-typedef double real;
-typedef int integer;
 
 int main(int argc, char* argv[]) {
   int thread_level, rank, P;
@@ -522,23 +526,25 @@ int main(int argc, char* argv[]) {
   MPI_Comm_size(MPI_COMM_WORLD, &P);
   {
     // define a block-row distributed CSR matrix
-    integer* dist = new int[P];
+    int* dist     = new int[P];
     // set dist such that processor p owns rows [dist[p], dist[p+1]) of the sparse matrix
-    for (int p=0; p<P; p++) dist[p] = ..;
-    integer local_n = dist[rank+1] - dist[rank];  // number of rows of the input matrix assigned to me
-    integer* row_ptr = new integer[local_n+1];
+    for (int p=0; p<P; p++) dist[p] = .. ;
+    // local_n is the number of rows of the input matrix assigned to me
+    int local_n   = dist[rank+1] - dist[rank];
+    int* row_ptr  = new int[local_n+1];
     .. // set the sparse matrix row pointers in row_ptr
-    integer local_nnz = row_ptr[local_n+1] - row_ptr[0];
-    integer* col_ind = new integer[local_nnz];
+    int local_nnz = row_ptr[local_n+1] - row_ptr[0];
+    int* col_ind  = new int[local_nnz];
     .. // set the sparse matrix column indices in col_ind
-    scalar* val = new scalar[local_nnz];
+    double* val   = new double[local_nnz];
     .. // set the matrix nonzero value in val
-    scalar* x = new scalar[local_n];              // local part of solution
-    scalar* b = new scalar[local_n];              // local part of rhs
-    for (int i=0; i<local_n; i++) b[i] = ..;      // set the rhs
+    double* x     = new double[local_n];        // local part of solution
+    double* b     = new double[local_n];        // local part of rhs
+    for (int i=0; i<local_n; i++) b[i] = ..;    // set the rhs
 
-    StrumpackSparseSolverMPIDist<scalar,real,integer> sp(MPI_COMM_WORLD, argc, argv);
-    sp.set_from_options();
+    StrumpackSparseSolverMPIDist<double> sp(MPI_COMM_WORLD);
+    sp.options().set_reordering_method(ReorderingStrategy::PARMETIS);
+    sp.options().set_from_command_line(argc, argv);
     sp.set_distributed_csr_matrix(local_n, row_ptr, col_ind, val, dist);
     sp.solve(b, x);
     ... // check residual/error, cleanup
@@ -605,32 +611,33 @@ int main(int argc, char* argv[]) {
   \label{fig::block-row-csr}
 \end{figure}
 
-\subsection{Initialization and Command Line Option Parsing}\label{sec:initsolver}
+\subsection{Initializing the Solver Object}\label{sec:initsolver}
 Let
 \begin{lstlisting}[style=C]
-  typedef strumpack::StrumpackSparseSolver<scalar,real,integer> Sp;
-  typedef strumpack::StrumpackSparseSolverMPI<scalar,real,integer> SpMPI;
-  typedef strumpack::StrumpackSparseSolverMPIDist<scalar,real,integer> SpMPIDist;
+  typedef strumpack::StrumpackSparseSolver<scalar,integer> Sp;
+  typedef strumpack::StrumpackSparseSolverMPI<scalar,integer> SpMPI;
+  typedef strumpack::StrumpackSparseSolverMPIDist<scalar,integer> SpMPIDist;
 \end{lstlisting}
-Each of the solver classes has a single constructor:
+Each of the solver classes has two constructors:
 \begin{lstlisting}[style=C]
-  Sp::StrumpackSparseSolver(int argc, char* argv[], bool quiet=false);
-  SpMPI::StrumpackSparseSolverMPIDist(MPI_Comm mpi_comm, int argc, char* argv[], bool quiet=false);
-  SpMPIDist::StrumpackSparseSolverMPIDist(MPI_Comm mpi_comm, int argc, char* argv[], bool quiet=false);
+  Sp::StrumpackSparseSolver(bool verbose=true, bool root=true);
+  Sp::StrumpackSparseSolver(int argc, char* argv[], bool verbose=true, bool root=true);
+\end{lstlisting}
+
+\begin{lstlisting}[style=C]
+  SpMPI::StrumpackSparseSolverMPIDist(MPI_Comm comm, bool verbose=true);
+  SpMPI::StrumpackSparseSolverMPIDist(MPI_Comm comm, int argc, char* argv[], bool verbose=true);
+\end{lstlisting}
+
+\begin{lstlisting}[style=C]
+  SpMPIDist::StrumpackSparseSolverMPIDist(MPI_Comm comm, bool verbose=true);
+  SpMPIDist::StrumpackSparseSolverMPIDist(MPI_Comm comm, int argc, char* argv[], bool verbose=true);
 \end{lstlisting}
 where \lstinline[style=C]!argc! and \lstinline[style=C]!argv! contain
-the command line options and the \lstinline[style=C]!quiet! option can
-be set to \lstinline[style=C]!true! to suppress output of the
-solver. Once this object is created, options can be set on it, as
-discussed in the next few subsections. Then, calling the function
-\lstinline[style=C]!StrumpackSparseSolver::set_from_options()!  will
-parse the command line options from \lstinline[style=C]!argv!,
-possibly overwriting any options defined on the
-\lstinline[style=C]!StrumpackSparseSolver! before this point. When one
-of the options is \lstinline[style=Bash]!--help! or
-\lstinline[style=Bash]!-h!, a list of all possible options is printed
-and the code exits. Note that since \lstinline[style=C]!SpMPIDist! is
-a subclass of \lstinline[style=C]!SpMPI!, which is a subclass of
+the command line options and the \lstinline[style=C]!verbose! option
+can be set to \lstinline[style=C]!false! to suppress output of the
+solver. Note that since \lstinline[style=C]!SpMPIDist! is a subclass
+of \lstinline[style=C]!SpMPI!, which is a subclass of
 \lstinline[style=C]!Sp!, all public members of Sp are also members of
 \lstinline[style=C]!SpMPI! and \lstinline[style=C]!SpMPIDist!. The
 public interface to the \lstinline[style=C]!SpMPI! class is exactly
@@ -673,20 +680,45 @@ scattered over the different processes. The
 takes a block-row distributed CSR matrix as input as illustrated in
 the example above. Input of distributed CSC is not supported.
 
+\subsection{Setting and Parsing Options}
+The solver class has an object of type
+\lstinline[style=C]!SPOptions<scalar>!, which can be accessed through:
+\begin{lstlisting}[style=C]
+  SPOptions<scalar>& Sp::options();
+\end{lstlisting}
+The \lstinline[style=C]!SPOptions<scalar>! class is defined in
+\lstinline[style=Bash]!SPOptions.hpp!. The complete public interface
+for the \lstinline[style=C]!SPOptions<scalar>! class is given in
+Section~\ref{sec:SPOptions}. The following subsections describe some
+of the options available from \lstinline[style=C]!SPOptions<scalar>!
+in more detail.
+
+% Once the solver object is created, options can be set on
+% it.  Then, calling the function
+% \lstinline[style=C]!StrumpackSparseSolver::set_from_options()!  will
+% parse the command line options from \lstinline[style=C]!argv!,
+% possibly overwriting any options defined on the
+% \lstinline[style=C]!StrumpackSparseSolver! before this point. When one
+% of the options is \lstinline[style=Bash]!--help! or
+% \lstinline[style=Bash]!-h!, a list of all possible options is printed
+% and the code exits.
+
 \subsection{Reordering}
 There are three types of matrix reordering: for numerical stability,
 to reduce fill-in and to reduce the HSS-ranks. These reorderings are
-all done by calling
+all performed when calling
 \begin{lstlisting}[style=C]
-  params::returnCode Sp::reorder();
+  ReturnCode Sp::reorder();
 \end{lstlisting}
-The return value is of type \lstinline[style=C]!returnCode!  (defined
+The return value is of type \lstinline[style=C]!ReturnCode!  (defined
 in \lstinline[style=Bash]!strumpack_parameters.hpp!) and can be
-{\small \begin{itemize}
-\item \lstinline[style=C]!params::SUCCESS! success
-\item \lstinline[style=C]!params::MATRIX_NOT_SET! the matrix was not set
-\item \lstinline[style=C]!params::REORDERING_ERROR! problem with nested dissection or matrix reordering.
-\end{itemize}}
+\begin{lstlisting}[style=C]
+  enum class ReturnCode {
+    SUCCESS,          /*!< Operation completed successfully. */
+    MATRIX_NOT_SET,   /*!< The input matrix was not set.     */
+    REORDERING_ERROR  /*!< The matrix reordering failed.     */
+  };
+\end{lstlisting}
 
 \subsubsection{Reordering for numerical stability}\label{sec::mc64}
 The reordering for numerical stability is performed using the MC64
@@ -702,12 +734,25 @@ safely be disabled! MC64 supports 5 different modes
 \end{itemize}}
 which can be selected via
 \begin{lstlisting}[style=C]
-  void Sp::set_mc64job(int job);
-  int Sp::get_mc64job();
+  void SPOptions::set_mc64job(int job);
+  void SPOptions::set_mc64job(MC64Job job);
+  int SPOptions::mc64job() const;
 \end{lstlisting}
-where \lstinline[style=C]!get_mc64()! queries the currently selected
+where \lstinline[style=C]!mc64()! queries the currently selected
 strategy (the default is \textbf{5:} maximum product of diagonal
-values plus row and column scaling). The command line option
+values plus row and column scaling). Instead of entering a number, you
+can specify on of the enumerations in \lstinline[style=C]!MC64Job!:
+\begin{lstlisting}[style=C]
+  enum class MC64Job {
+    NONE,                         /*!< Don't do anything                                              */
+    MAX_CARDINALITY,              /*!< Maximum cardinality                                            */
+    MAX_SMALLEST_DIAGONAL,        /*!< Maximum smallest diagonal value                                */
+    MAX_SMALLEST_DIAGONAL_2,      /*!< Same as MAX_SMALLEST_DIAGONAL, different algorithm             */
+    MAX_DIAGONAL_SUM,             /*!< Maximum sum of diagonal values                                 */
+    MAX_DIAGONAL_PRODUCT_SCALING  /*!< Maximum product of diagonal values and row and column scaling  */
+  };
+\end{lstlisting}
+The command line option
 \begin{lstlisting}[style=Bash]
   --sp_mc64job [0-5]
 \end{lstlisting}
@@ -718,188 +763,251 @@ The STRUMPACK-sparse solver supports both (Par)Metis and (PT-)Scotch
 for the matrix reordering. The following functions can set the
 preferred method or check the currently selected method:
 \begin{lstlisting}[style=C]
-  void Sp::set_matrix_reordering_method(params::MatrixReorderingStrategy m);
-  params::MatrixReorderingStrategy Sp::get_matrix_reordering_method();
+  void SPOptions::set_reordering_method(ReorderingStrategy m);
+  ReorderingStrategy SPOptions::reordering_method() const;
 \end{lstlisting}
 The options for
 \lstinline[style=C]!MatrixReorderingStrategy! are
-{\small \begin{itemize}
-\item \lstinline[style=C]!params::METIS!
-\item \lstinline[style=C]!params::PARMETIS!
-\item \lstinline[style=C]!params::SCOTCH!
-\item \lstinline[style=C]!params::PTSCOTCH!
-\item \lstinline[style=C]!params::GEOMETRIC!
-\end{itemize}} When the solver is an object of
-\lstinline[style=C]!Sp!, \lstinline[style=C]!PARMETIS! or
-\lstinline[style=C]!PTSCOTCH! are not supported.  When the solver is
-parallel, either an \lstinline[style=C]!SpMPI! or
-\lstinline[style=C]!SpMPIDist! object, and \lstinline[style=C]!METIS!
-or \lstinline[style=C]!SCOTCH! are chosen, then the graph of the
-complete matrix will be gathered onto the root process and the root
-process will call the (sequential) Metis or Scotch reordering
+\begin{lstlisting}[style=C]
+  enum class ReorderingStrategy {
+    NATURAL,    /*!< Do not reorder the system                      */
+    METIS,      /*!< Use Metis nested-dissection reordering         */
+    PARMETIS,   /*!< Use ParMetis nested-dissection reordering      */
+    SCOTCH,     /*!< Use Scotch nested-dissection reordering        */
+    PTSCOTCH,   /*!< Use PT-Scotch nested-dissection reordering     */
+    RCM,        /*!< Use RCM reordering                             */
+    GEOMETRIC   /*!< A simple geometric nested dissection code that
+                  only works for regular meshes. (see Sp::reorder)  */
+  };
+\end{lstlisting}
+When the solver is an object of \lstinline[style=C]!Sp!,
+\lstinline[style=C]!PARMETIS! or \lstinline[style=C]!PTSCOTCH! are not
+supported.  When the solver is parallel, either an
+\lstinline[style=C]!SpMPI! or \lstinline[style=C]!SpMPIDist! object,
+and \lstinline[style=C]!METIS!, \lstinline[style=C]!SCOTCH! or
+\lstinline[style=C]!RCM! are chosen, then the graph of the complete
+matrix will be gathered onto the root process and the root process
+will call the (sequential) Metis, Scotch or RCM reordering
 routine. For large graphs this might fail due to insufficient memory.
 
 The \lstinline[style=C]!GEOMETRIC! option is only allowed for regular
 grids. In this case, the dimensions of the grid should be specified in
 the function
 \begin{lstlisting}[style=C]
-  params::returnCode Sp::reorder(int nx=1, int ny=1, int nz=1);
+  ReturnCode Sp::reorder(int nx=1, int ny=1, int nz=1);
 \end{lstlisting}
 For instance for a regular 2d $2000 \times 4000$ grid, you can call
 this as \lstinline[style=C]!sp.reorder(2000, 4000)!. In the general
 algebraic case, the grid dimensions don't have to be provided. The
 reordering method can also be specified via the command line option
 \begin{lstlisting}[style=Bash]
-  --sp_reordering_method [metis|parmetis|scotch|ptscotch|geometric]
+  --sp_reordering_method [metis|parmetis|scotch|ptscotch|geometric|rcm]
 \end{lstlisting}
 
 
 \subsection{Factorization}
 Compute the factorization by calling
 \begin{lstlisting}[style=C]
-  params::returnCode Sp::factor();
+  ReturnCode Sp::factor();
 \end{lstlisting}
-where the return value are the same as for
+where the possible return values are the same as for
 \lstinline[style=C]!Sp::reorder()!.  If
 \lstinline[style=C]!Sp::reorder()! was not called already, it is
-called automatically.
-
+called automatically. When HSS compression is not enabled, this will
+compute an exact LU factorization of the (permuted) sparse input
+matrix. If HSS compression is enabled (with
+\lstinline[style=C]!SPOptions::enable_HSS()! or
+\lstinline[style=Bash]!--sp_enable_HSS!, see Section~\ref{sec:HSS}),
+the factorization is only approximate.
 
 \subsection{Solve}\label{subsec:use_solve}
 Solve the linear system $Ax=b$ by calling
 \begin{lstlisting}[style=C]
-  params::returnCode Sp::solve(scalar* b, scalar* x, bool use_initial_guess=false);
+  ReturnCode Sp::solve(scalar* b, scalar* x, bool use_initial_guess=false);
 \end{lstlisting}
 By default (\lstinline[style=C]!bool use_initial_guess=false!) the
 input in \lstinline[style=C]!x! is ignored. If
 \lstinline[style=C]!bool use_initial_guess=true!,
 \lstinline[style=C]!x! is used as initial guess for the iterative
 solver (if an iterative solver is used, for instance iterative
-refinement or GMRes). If the \lstinline[style=C]!Sp::factor()! was not
+refinement or GMRES). If the \lstinline[style=C]!Sp::factor()! was not
 called, it is called automatically. The return values are the same as
 for \lstinline[style=C]!Sp::reorder()!.
 
-When \lstinline[style=C]!Sp::solve! is called on a
+The iterative solver can be chosen through:
+\begin{lstlisting}[style=C]
+  void SPOptions::set_Krylov_solver(KrylovSolver s);
+\end{lstlisting}
+where \lstinline[style=C]!KrylovSolver! can take the following values:
+\begin{lstlisting}[style=C]
+  enum class KrylovSolver {
+    AUTO,          /*!< Use iterative refinement if no HSS compression is used, otherwise PGMRES.        */
+    DIRECT,        /*!< No outer iterative solver, just a single application of the multifrontal solver. */
+    REFINE,        /*!< Iterative refinement.                                                            */
+    PREC_GMRES,    /*!< Preconditioned GMRES. The preconditioner is the (approx) multifrontal solver.    */
+    GMRES,         /*!< UN-preconditioned GMRES. (for testing mainly)                                    */
+    PREC_BICGSTAB, /*!< Preconditioned BiCGStab. The preconditioner is the (approx) multifrontal solver. */
+    BICGSTAB       /*!< UN-preconditioned BiCGStab. (for testing mainly)                                 */
+  };
+\end{lstlisting}
+with \lstinline[style=C]!KrylovSolver::AUTO! being the default value.
+The \lstinline[style=C]!KrylovSolver::AUTO! setting will use iterative
+refinement when HSS compression is not enabled, and preconditioned
+GMRES when HSS compression is enabled, see Section~\ref{sec:HSS}.  To
+use the solver as a preconditioner, or a single (approximate) solve,
+set the solver to \lstinline[style=C]!KrylovSolver::DIRECT!. When
+\lstinline[style=C]!Sp::solve! is called on a
 \lstinline[style=C]!SpMPIDist! solver object, the right-hand side and
 solution vectors should only point to the local parts!
 
 
-\subsection{Command Line Options}
+\subsection{All Options}
+The HSS specific options are stored in an object of type
+\lstinline[style=C]!HSSOptions<scalar>!, inside the
+\lstinline[style=C]!SPOptions! object. These options are described in
+Section~\ref{sec:HSS}.
+
+\subsubsection{\lstinline[style=C]!SPOptions<scalar>! Interface}
+\label{sec:SPOptions}
+The complete public interface to the options class is as follows, wher
+the \lstinline[style=C]!real! type is the real part of a scalar, i.e.,
+\lstinline[style=C]!decltype(std::real(scalar(0)))!.
+\begin{lstlisting}[style=C]
+  template<typename scalar> class SPOptions {
+  public:
+    SPOptions();
+    SPOptions(int argc, char* argv[]);
+
+    /* print statistics?                                             */
+    void set_verbose(bool verbose);                       bool verbose() const;
+    /* maximum iterations in iterative solver                        */
+    void set_maxit(int maxit);                            int maxit() const;
+    /* relative residual stopping criterion for iterative solver     */
+    void set_rel_tol(real rel_tol);                       real rel_tol() const;
+    /* absolute residual stopping criterion for iterative solver     */
+    void set_abs_tol(real abs_tol);                       real abs_tol() const;
+    /* type of iterative solver to use, see section 4.9              */
+    void set_Krylov_solver(KrylovSolver s);               KrylovSolver Krylov_solver() const;
+    /* GMRES restart                                                 */
+    void set_gmres_restart(int m);                        int gmres_restart() const;
+    /* type of Gram-Schmidt used in GMRES                            */
+    void set_GramSchmidt_type(GramSchmidtType t);         GramSchmidtType GramSchmidt_type() const;
+    /* nested-dissection code, see section 4.7.2                     */
+    void set_reordering_method(ReorderingStrategy m);     ReorderingStrategy reordering_method() const;
+    /* stop nested-dissection when domains are smaller than nd_param */
+    void set_nd_param(int nd_param);                      int nd_param() const;
+    /* use the internal (undocumented) metis routine METIS_NodeNDP   */
+    void enable_METIS_NodeNDP();                          bool use_METIS_NodeNDP() const;
+    /* do not use METIS_NodeNDP, use METIS_NodeND instead            */
+    void disable_METIS_NodeNDP();
+    /* use METIS_NodeND instead of METIS_NodeDNP                     */
+    void enable_METIS_NodeND();                           bool use_METIS_NodeND() const;
+    /* do not use METIS_NodeND, use METIS_NodeNDP instead            */
+    void disable_METIS_NodeND();
+    /* build the supernodal tree using the MUMPS_SYMQAMD code        */
+    void enable_MUMPS_SYMQAMD();                          bool use_MUMPS_SYMQAMD() const;
+    /* do not use MUMPS_SYMQAMD, use fundamental supernodes          */
+    void disable_MUMPS_SYMQAMD();
+    /* when using MUMPS_SYMQAMS, enable aggressive amalgamation      */
+    void enable_agg_amalg();                              bool use_agg_amalg() const;
+    /* when using MUMPS_SYMQAMS, disable aggressive amalgamation      */
+    void disable_agg_amalg();
+    /* set the job to be used for static pivotin, see section 4.7.1   */
+    void set_mc64job(int job);                            int mc64job() const;
+    void set_mc64job(MC64Job job);
+    /* not used at the moment                                         */
+    void enable_assembly_tree_log();                      bool log_assembly_tree() const;
+    void disable_assembly_tree_log();
+
+    /* enable HSS compression, see section 5                          */
+    void enable_HSS();                                    bool use_HSS() const;
+    /* disable HSS compression                                        */
+    void disable_HSS();
+    /* set the minimum size of a front for HSS compression            */
+    void set_HSS_min_front_size(int s);                   int HSS_min_front_size() const;
+    /* set the minimum size of a separator for HSS compression        */
+    void set_HSS_min_sep_size(int s);                     int HSS_min_sep_size() const;
+
+    /* set level to 1 to enable length 2 connections in the separator
+     * before computing separator reordering to reduce HSS ranks.
+     * Set to to disable length 2 connections.                        */
+    void set_separator_ordering_level(int l);             int separator_ordering_level() const;
+
+    /* best not to touch this                                         */
+    void enable_indirect_sampling();
+    void disable_indirect_sampling();                     bool indirect_sampling() const;
+
+    void enable_replace_tiny_pivots();                    bool replace_tiny_pivots() const;
+    void disable_replace_tiny_pivots(;
+
+    /* get the HSS specific options, see section 5.                   */
+    const HSS::HSSOptions<scalar>& HSS_options() const;
+    HSS::HSSOptions<scalar>& HSS_options();
+
+    /* parse the options in argc/argv set in the constructor          */
+    void set_from_command_line();
+    /* parse the options in argc/argv                                 */
+    void set_from_command_line(int argc, char* argv[]);
+    /* print out message listing all command line options             */
+    void describe_options() const;
+  };
+\end{lstlisting}
+This uses the following (scoped) enumeration for the Gram-Schmidt type
+used in GMRES:
+\begin{lstlisting}[style=C]
+  enum class GramSchmidtType {
+    CLASSICAL,   /*!< Classical Gram-Schmidt is faster, more scalable.   */
+    MODIFIED     /*!< Modified Gram-Schmidt is slower, but stable.       */
+  };
+\end{lstlisting}
+
+\subsubsection{Command Line Options}
 To get a list of all available options, make sure to pass
-``\verb!int argc, char* argv[]!'' when initializing the
-StrumpackSparseSolver and run the application with
-\lstinline[style=Bash]!--help! or \lstinline[style=Bash]!-h!. Some
-default values listed here are for double precision and might be
-different when running in single precision.
-\begin{description}
-\item[\texttt{---sp\_gstype modified|classical}]
-  Gram-Schmidt type for GMRES
-\item[\texttt{---sp\_Krylov\_solver
-    auto|direct|refinement|pgmres|gmres|pbicgstab|bicgstab}] default:
-  auto (refinement when no HSS, pgmres (preconditioned) with HSS
-  compression).  The gmres and bicgstab methods are NOT
-  preconditioned. Use pgmres and pbicgstab to use the multifrontal+HSS
-  preconditioner inside gmres/bicgstab.
-\item[\texttt{---sp\_reordering\_method
-    metis|parmetis|scotch|ptscotch|geometric}] Code for nested
-  dissection. Geometric only works on regular meshes and you need to
-  provide the sizes. When using the sequential interface,
-  \lstinline[style=Bash]!parmetis!  and
-  \lstinline[style=Bash]!ptscotch! are not supported.
-\item[\texttt{---sp\_atol real\_t}] (default 1e-10)
-  Krylov absolute (preconditioned) residual stopping tolerance.
-\item[\texttt{---sp\_rtol real\_t}] (default 1e-06)
-  Krylov relative (preconditioned) residual stopping tolerance.
-\item[\texttt{---sp\_rctol real\_t}] (default 0.01) See
-  Section~\ref{sec:tune_prec}.  HSS relative compression tolerance.
-\item[\texttt{---sp\_actol real\_t}] (default 1e-10) See
-  Section~\ref{sec:tune_prec}. HSS absolute compression tolerance
-\item[\texttt{---sp\_maxit int}] (default 500)
-  Maximum Krylov iterations.
-\item[\texttt{---sp\_restart int}] (default 30)
-  GMRES(m) restart length.
-\item[\texttt{---sp\_hss\_front\_size int}] (default 2500) Minimum size
-  of front for HSS compression, see Section~\ref{sec:tune_prec}.
-\item[\texttt{---sp\_nd\_param int}] (default 8) Stop nested
-  dissection recursion when separators become smaller than this value.
-\item[\texttt{---sp\_rank\_offset int}] (default 128) See
-  Section~\ref{sec:tune_prec}.
-\item[\texttt{---sp\_max\_rank int}] (default 2000) See
-  Section~\ref{sec:tune_prec}.
-\item[\texttt{---sp\_mc64job int [0-5]}] (default 5) See
-  Section~\ref{sec::mc64}.
-\item[\texttt{---sp\_print\_ranks filename}] (default no) Print out
-  some info about the ranks encountered in the HSS matrices, only for
-  sequential fronts.
-\item[\texttt{---sp\_q\_power int}] (default 0) Not supported yet.
-\item[\texttt{---sp\_separator\_ordering\_level}] (default 1) Only $0$
-  and $1$ are supported. When set to $1$, the separator graph will be
-  augmented with extra length-$2$ connections before being passed to
-  the graph partitioner in order to determine the HSS
-  partitioning. When set to $0$, these extra connections are not
-  added. Adding the connections can lead to much smaller ranks.
-\item[\texttt{---sp\_hss}] (default no) Use HSS compression of fronts,
-  see Section~\ref{sec:tune_prec}.
-\item[\texttt{---sp\_rank\_pattern
-    adaptive|constant|sqrtN|sqrtNlogN|bisectcut}] default:
-  \lstinline[style=Bash]!adaptive! See Section~\ref{sec:tune_prec}.
-\item[\texttt{---sp\_rank\_factor float}] (default 1) See
-  Section~\ref{sec::mc64}.
-% \item[\texttt{---sp\_log\_etree}] (default no) Print out the nested
-%   dissection tree.
-\item[\texttt{---sp\_log\_ranks}] (default no) Print out info about
-  HSS front sizes, nr of random vectors and HSS ranks.
-\item[\texttt{--sp\_use\_METIS\_NodeNDP}] (default true) Use
-  undocumented Metis routine METIS\_NodeNDP instead of METIS\_NodeND.
-\item[\texttt{--sp\_use\_METIS\_NodeND}] (default false) Use Metis
-  routine METIS\_NodeND instead of the undocumented METIS\_NodeNDP.
-\item[\texttt{---help}] or \lstinline[style=Bash]!-h!. Print info
-  about the available command line options.
-\item[\texttt{---sp\_verbose}] or \lstinline[style=Bash]!-v! Print
-  some output about the different steps in the algorithm.
-\item[\texttt{---sp\_quiet}] or \lstinline[style=Bash]!-q!. Suppress
-  output.
-\item[\texttt{---sp\_task\_level integer}] The number of recursion
-  levels on which new OpenMP tasks are generated. The default option
-  is $\log_2(\#\textrm{threads}) +3$, which seems to give a reasonable
-  level of task granularity on a range of number of threads.
-\item[\texttt{---sp\_random\_blocksize integer}] The initial number of random
-  vectors, is set to $128$. The number of random vectors is adapted
-  automatically, but if you have a good idea of the maximum HSS-rank
-  for your application, for instance it is around $400$, then you can
-  set \lstinline[style=Bash]!--sp_random_blocksize 500!, where $500 =
-  400 + 100$ is somewhat larger than the actual HSS-rank $400$ in
-  order to get a better randomized sampling.
-\item[\texttt{---sp\_rank\_offset integer}] The oversampling parameter $p$,
-  default value is $p = 64$. This means that if the rank-revealing
-  factorization detects a rank $r$, such that $r + p > d$, with $d$
-  the number of random vector, the compression is rejected and new
-  random vectors are added. To get good quality HSS compression, this
-  parameter should not be too small. This parameter is also closely
-  related to \lstinline[style=Bash]!--sp_random_blocksize!.
-\item[\texttt{---sp\_random\_distribution uniform|normal}] The random number
-  distribution. Default is to use a normal $\mathcal{N}(0,1)$
-  distribution (mean $0$ and standard-deviation $1$). The other option
-  is the uniform $[0,1)$ distribution:
-  \lstinline[style=Bash]!--sp_random_distribution uniform!. Uniform
-  distribution requires approximately $7$ floating point operations
-  per random number, compared to $23$ for the normal
-  distribution. However, convergence results are generally better when
-  using normal distribution.
-\item[\texttt{---sp\_random\_engine linear|mersenne}] Default value is
-  to use \verb$minstd_rand$, the linear congruential
-  engine~\cite{park1993remarks}. Alternatively, the Mersenne twister
-  \verb$mt19937$~\cite{matsumoto1998mersenne} higher quality random
-  number, but it has a much larger internal state, making it more
-  expensive to seed. In our algorithm, we need to seed it frequently.
-\item[\texttt{---sp\_minpart integer}] The minimal size of a partition
-  in the HSS tree. Default value is $128$. Smaller values might lead
-  to more parallelism but less efficient dense matrix operations. The
-  value can also impact the HSS-rank.
-\end{description}
+``\lstinline[style=C]!int argc, char* argv[]!'' when initializing the
+\lstinline[style=C]!StrumpackSparseSolver! or when calling
+\lstinline[style=C]!SPOptions::set_from_command_line! and run the
+application with \lstinline[style=Bash]!--help! or
+\lstinline[style=Bash]!-h!. Some default values listed here are for
+double precision and might be different when running in single
+precision.
+\begin{lstlisting}[style=Bash]
+ STRUMPACK options:
+   --sp_maxit int (default 5000)
+   --sp_rel_tol real (default 1e-06)
+   --sp_abs_tol real (default 1e-10)
+   --sp_Krylov_solver auto|direct|refinement|pgmres|gmres|pbicgstab|bicgstab
+   --sp_gmres_restart int (default 30)
+   --sp_GramSchmidt_type modified|classical
+   --sp_reordering_method natural|metis|scotch|parmetis|ptscotch|rcm|geometric
+   --sp_nd_param int (default 8)
+   --sp_enable_METIS_NodeNDP (default true)
+   --sp_disable_METIS_NodeNDP (default false)
+   --sp_enable_METIS_NodeND (default false)
+   --sp_disable_METIS_NodeND (default true)
+   --sp_enable_MUMPS_SYMQAMD (default false)
+   --sp_disable_MUMPS_SYMQAMD (default true)
+   --sp_enable_agg_amalg (default false)
+   --sp_disable_agg_amalg (default true)
+   --sp_mc64job 0-5 (default 0)
+   --sp_enable_hss (default false)
+   --sp_disable_hss (default true)
+   --sp_hss_min_front_size int (default 1000)
+   --sp_hss_min_sep_size int (default 256)
+   --sp_separator_ordering_level (default 1)
+   --sp_enable_indirect_sampling
+   --sp_disable_indirect_sampling
+   --sp_enable_replace_tiny_pivots
+   --sp_disable_replace_tiny_pivots
+   --sp_verbose or -v (default true)
+   --sp_quiet or -q (default false)
+   --help or -h
+\end{lstlisting}
 
 
-\section{Tuning the Preconditioning Strategy}\label{sec:tune_prec}
+\section{HSS Preconditioning}\label{sec:HSS}
+
+\todo[inline]{rewrite this section!!}
+\todo[inline]{describe HSSOptions, and command line options!!}
 
 The sparse matrix factorization algorithm used in STRUMPACK relies on
 a nested dissection reordering of the matrix in order to reduce
@@ -1087,13 +1195,88 @@ approximation might still be used as a preconditioner.
 The RRQR factorization in STRUMPACK takes both a relative and an
 absolute tolerance, which can be set via:
 \begin{lstlisting}[style=Bash]
-  --sp_rctol real_t (default 0.01)
-  --sp_actol real_t (default 1e-10)
+  --sp_rctol real (default 0.01)
+  --sp_actol real (default 1e-10)
 \end{lstlisting}
 or via the C\texttt{++} API
 \begin{lstlisting}[style=C]
-  void Sp::set_relative_compression_tolerance(real_t rctol);
-  void Sp::set_absolute_compression_tolerance(real_t actol);
+  void Sp::set_relative_compression_tolerance(real rctol);
+  void Sp::set_absolute_compression_tolerance(real actol);
+\end{lstlisting}
+
+
+
+
+
+The public interface for the \lstinline[style=C]!HSSOptions<scalar>!
+object is:
+\begin{lstlisting}[style=C]
+  template<typename scalar> class HSSOptions {
+  public:
+    /* relative compression tolerance                       */
+    void set_rel_tol(real rel_tol);           real rel_tol() const;
+    /* absolute compression tolerance                       */
+    void set_abs_tol(real abs_tol);           real abs_tol() const;
+    /* size of the smallest blocks in the HSS hierarchy     */
+    void set_leaf_size(int leaf_size);        int leaf_size() const;
+    /* initial number of random vectors used in the
+       adaptive randomized compression algorithm            */
+    void set_d0(int d0);                      int d0() const;
+    /* number of random vectors added in each step of the
+       adaptive randomized HSS compression algorithm        */
+    void set_dd(int dd);                      int dd() const;
+    /* currently not used                                   */
+    void set_q(int q);                        int q() const;
+    /* maximum rank in the HSS representation               */
+    void set_max_rank(int max_rank);          int max_rank() const;
+    /* random engine/generator to use, see below            */
+    void set_random_engine(random::RandomEngine random_engine);
+    random::RandomEngine random_engine() const;
+    /* the random number distribution, see below            */
+    void set_random_distribution
+    (random::RandomDistribution random_distribution);
+    random::RandomDistribution random_distribution() const;
+    /* the compression algorithm to use                     */
+    void set_compression_algorithm(CompressionAlgorithm a);
+    CompressionAlgorithm compression_algorithm() const;
+    /* for expert users                                     */
+    void set_user_defined_random(bool user_defined_random);
+    bool user_defined_random() const;
+    /* for expert users                                     */
+    void set_synchronized_compression(bool sync);
+    bool synchronized_compression() const;
+    /* currently not used                                   */
+    void set_log_ranks(bool log_ranks);       bool log_ranks() const;
+    /* print statistics?                                    */
+    void set_verbose(bool verbose);           bool verbose() const;
+
+    /* parse options in argc/argv                           */
+    void set_from_command_line(int argc, char* argv[]);
+    /* print description of command line options            */
+    void describe_options() const;
+  };
+\end{lstlisting}
+
+The HSS specific command line options are:
+\begin{lstlisting}[style=Bash]
+ HSS Options:
+   --hss_rel_tol real (default 0.01)
+   --hss_abs_tol real (default 1e-08)
+   --hss_leaf_size int (default 128)
+   --hss_d0 int (default 128)
+   --hss_dd int (default 32)
+   --hss_q int (default 0)
+   --hss_max_rank int (default 5000)
+   --hss_random_distribution normal|uniform (default normal(0,1))
+   --hss_random_engine linear|mersenne (default minstd_rand)
+   --hss_compression_algorithm original|stable (default stable)
+   --hss_user_defined_random (default false)
+   --hss_enable_sync (default true)
+   --hss_disable_sync (default false)
+   --hss_log_ranks (default false)
+   --hss_verbose or -v (default false)
+   --hss_quiet or -q (default true)
+   --help or -h
 \end{lstlisting}
 
 
@@ -1112,13 +1295,13 @@ defined in the header file
 the C\texttt{++} interface. For example usage see the programs
 \lstinline[style=C]!sexample.c!, \lstinline[style=C]!dexample.c!,
 \lstinline[style=C]!cexample.c! and \lstinline[style=C]!zexample.c!
-in the test directory, for simple single and double precision real and
-complex test programs. Note that since the strumpack code is written
-in C\texttt{++} even when using the C interface you should link with a
-C\texttt{++} aware linker or link with the standard C\texttt{++}
-library. For instance when using the GNU toolchain, link with
-\texttt{g++} instead of \texttt{gcc} or link with \texttt{gcc} and
-include \texttt{-lstdc++}.
+in the examples directory, for simple single and double precision real
+and complex example programs. Note that since the STRUMPACK code is
+written in C\texttt{++} even when using the C interface you should
+link with a C\texttt{++} aware linker or link with the standard
+C\texttt{++} library. For instance when using the GNU toolchain, link
+with \texttt{g++} instead of \texttt{gcc} or link with \texttt{gcc}
+and include \texttt{-lstdc++}.
 
 
 \section{Advanced Usage Tips}\label{sec:tips}
@@ -1155,7 +1338,7 @@ include \texttt{-lstdc++}.
   call solve on the same \lstinline[style=C]!StrumpackSparseSolve!
   object from different threads simultaneously.
 \item For comments, feature requests or bug reports:
-  \texttt{\{pghysels,xsli,fhrouet\}@lbl.gov}
+  \texttt{\{pghysels,xsli,gichavez\}@lbl.gov}
 \end{itemize}
 
 
@@ -1173,7 +1356,17 @@ include \texttt{-lstdc++}.
   C\texttt{++}11 standard, but the GCC 4.4 headers do not implement
   the C\texttt{++}11 standard library. You should install/load a newer
   GCC version (or just the headers). On cray machines, this can be
-  done with \lstinline[style=Bash]!module unload gcc; module load gcc/4.9.3! for instance.
+  done with \lstinline[style=Bash]!module unload gcc; module load
+  gcc/4.9.3! for instance.
+
+\item When running \lstinline[style=Bash]!make test!, many of the
+  tests fail!
+
+  The parallel execution in ctest is invoked by the
+  \lstinline[style=Bash]!MPIEXEC! command as discovered by CMake. On
+  many clusters, this does not run unless it is executed from within a
+  batch script. In this case all parallel tests will fail. Apart from
+  that, all tests should succeed. If they do not, please contact us.
 \end{itemize}
 
 
@@ -1265,98 +1458,98 @@ such enhancements or derivative works thereof, in binary and source
 code form.
 
 
-% \bibliography{\jobname}
+\bibliography{\jobname}
 
-% \begin{filecontents}{\jobname.bib}
-% @book{blackford1997scalapack,
-%   title={ScaLAPACK users' guide},
-%   author={Blackford, L Susan and Choi, Jaeyoung and Cleary, Andy and D'Azevedo, Eduardo and Demmel, James W and Dhillon, Inderjit and Dongarra, Jack J and Hammarling, Sven and Henry, Greg and Petitet, Antoine and Stanley, Ken and Walker, David and Whaley, R Clinton},
-%   volume={4},
-%   year={1997},
-%   publisher={SIAM},
-%   url={http://www.netlib.org/scalapack/slug/}
-% }
-% @article{martinsson2011fast,
-%   title={A fast randomized algorithm for computing a hierarchically semiseparable representation of a matrix},
-%   author={Martinsson, Per-Gunnar},
-%   journal={SIAM Journal on Matrix Analysis and Applications},
-%   volume={32},
-%   number={4},
-%   pages={1251--1274},
-%   year={2011},
-%   publisher={SIAM}
-% }
-% @article{rouet2014distributed,
-%   title={A distributed-memory package for dense Hierarchically Semi-Separable matrix computations using randomization},
-%   author={Rouet, Fran\c{c}ois-Henry and Li, Xiaoye S. and Ghysels, Pieter},
-%   journal={ACM Transactions on Mathematical Software},
-%   year={2016},
-%   note={to appear}
-% }
-% @article{xia2013randomized,
-%   title={Randomized sparse direct solvers},
-%   author={Xia, Jianlin},
-%   journal={SIAM Journal on Matrix Analysis and Applications},
-%   volume={34},
-%   number={1},
-%   pages={197--227},
-%   year={2013},
-%   publisher={SIAM}
-% }
-% @article{ghysels2015sparse,
-%   title={An efficient multi-core implementation of a novel {HSS}-structured multifrontal solver using randomized sampling},
-%   author={Ghysels, Pieter and Li, Xiaoye S. and Rouet, Fran\c{c}ois-Henry and Williams, Samuel and Napov, Artem},
-%   journal={Submitted to SIAM SISC},
-%   year={2015}
-% }
-% @article{park1993remarks,
-%   title={Remarks on choosing and implementing random number generators, response (technical correspondence)},
-%   author={Park, Stephen K and Miller, Keith W and Stockmeyer, Paul K},
-%   journal={Communications of the ACM},
-%   volume={36},
-%   number={7},
-%   pages={108--110},
-%   year={1993}
-% }
-% @article{matsumoto1998mersenne,
-%   title={Mersenne twister: a 623-dimensionally equidistributed uniform pseudo-random number generator},
-%   author={Matsumoto, Makoto and Nishimura, Takuji},
-%   journal={ACM Transactions on Modeling and Computer Simulation (TOMACS)},
-%   volume={8},
-%   number={1},
-%   pages={3--30},
-%   year={1998},
-%   publisher={ACM}
-% }
-% @book{saad2003iterative,
-%   title={{Iterative methods for sparse linear systems}},
-%   author={Saad, Y.},
-%   isbn={0898715342},
-%   year={2003},
-%   publisher={Society for Industrial Mathematics}
-% }
-% @article{duff1999design,
-%   title={The design and use of algorithms for permuting large entries to the diagonal of sparse matrices},
-%   author={Duff, Iain S and Koster, Jacko},
-%   journal={SIAM Journal on Matrix Analysis and Applications},
-%   volume={20},
-%   number={4},
-%   pages={889--901},
-%   year={1999},
-%   publisher={SIAM}
-% }
+\begin{filecontents}{\jobname.bib}
+@book{blackford1997scalapack,
+  title={ScaLAPACK users' guide},
+  author={Blackford, L Susan and Choi, Jaeyoung and Cleary, Andy and D'Azevedo, Eduardo and Demmel, James W and Dhillon, Inderjit and Dongarra, Jack J and Hammarling, Sven and Henry, Greg and Petitet, Antoine and Stanley, Ken and Walker, David and Whaley, R Clinton},
+  volume={4},
+  year={1997},
+  publisher={SIAM},
+  url={http://www.netlib.org/scalapack/slug/}
+}
+@article{martinsson2011fast,
+  title={A fast randomized algorithm for computing a hierarchically semiseparable representation of a matrix},
+  author={Martinsson, Per-Gunnar},
+  journal={SIAM Journal on Matrix Analysis and Applications},
+  volume={32},
+  number={4},
+  pages={1251--1274},
+  year={2011},
+  publisher={SIAM}
+}
+@article{rouet2014distributed,
+  title={A distributed-memory package for dense Hierarchically Semi-Separable matrix computations using randomization},
+  author={Rouet, Fran\c{c}ois-Henry and Li, Xiaoye S. and Ghysels, Pieter},
+  journal={ACM Transactions on Mathematical Software},
+  year={2016},
+  note={to appear}
+}
+@article{xia2013randomized,
+  title={Randomized sparse direct solvers},
+  author={Xia, Jianlin},
+  journal={SIAM Journal on Matrix Analysis and Applications},
+  volume={34},
+  number={1},
+  pages={197--227},
+  year={2013},
+  publisher={SIAM}
+}
+@article{ghysels2015sparse,
+  title={An efficient multi-core implementation of a novel {HSS}-structured multifrontal solver using randomized sampling},
+  author={Ghysels, Pieter and Li, Xiaoye S. and Rouet, Fran\c{c}ois-Henry and Williams, Samuel and Napov, Artem},
+  journal={Submitted to SIAM SISC},
+  year={2015}
+}
+@article{park1993remarks,
+  title={Remarks on choosing and implementing random number generators, response (technical correspondence)},
+  author={Park, Stephen K and Miller, Keith W and Stockmeyer, Paul K},
+  journal={Communications of the ACM},
+  volume={36},
+  number={7},
+  pages={108--110},
+  year={1993}
+}
+@article{matsumoto1998mersenne,
+  title={Mersenne twister: a 623-dimensionally equidistributed uniform pseudo-random number generator},
+  author={Matsumoto, Makoto and Nishimura, Takuji},
+  journal={ACM Transactions on Modeling and Computer Simulation (TOMACS)},
+  volume={8},
+  number={1},
+  pages={3--30},
+  year={1998},
+  publisher={ACM}
+}
+@book{saad2003iterative,
+  title={{Iterative methods for sparse linear systems}},
+  author={Saad, Y.},
+  isbn={0898715342},
+  year={2003},
+  publisher={Society for Industrial Mathematics}
+}
+@article{duff1999design,
+  title={The design and use of algorithms for permuting large entries to the diagonal of sparse matrices},
+  author={Duff, Iain S and Koster, Jacko},
+  journal={SIAM Journal on Matrix Analysis and Applications},
+  volume={20},
+  number={4},
+  pages={889--901},
+  year={1999},
+  publisher={SIAM}
+}
 
-% @INPROCEEDINGS{ghysels2017sparse, 
-% title={A Robust Parallel Preconditioner for Indefinite Systems Using Hierarchical Matrices and Randomized Sampling}, 
-% author={P. Ghysels and X. S. Li and C. Gorman and F. H. Rouet}, 
-% journal={2017 IEEE International Parallel and Distributed Processing Symposium (IPDPS)}, 
-% pages={897-906}, 
-% doi={10.1109/IPDPS.2017.21}, 
-% year={2017}, 
-% month={May},
-% }
+@INPROCEEDINGS{ghysels2017sparse,
+  title={A Robust Parallel Preconditioner for Indefinite Systems Using Hierarchical Matrices and Randomized Sampling},
+  author={P. Ghysels and X. S. Li and C. Gorman and F. H. Rouet},
+  journal={2017 IEEE International Parallel and Distributed Processing Symposium (IPDPS)},
+  pages={897-906},
+  doi={10.1109/IPDPS.2017.21},
+  year={2017},
+  month={May},
+}
 
-% \end{filecontents}
+\end{filecontents}
 
 \end{document}
 
