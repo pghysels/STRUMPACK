@@ -1262,6 +1262,22 @@ The HSS specific command line options are:
    --help or -h
 \end{lstlisting}
 
+\section{HSS Approximation of Dense Matrices}
+The HSS code can be found in the \lstinline[style=Bash]!src/HSS/!
+subdirectory. All HSS code is in a namespace called
+\lstinline[style=C]!HSS!. The class for a sequential/multithreaded HSS
+matrix is \lstinline[style=C]!HSSMatrix<scalar>!, while the
+distributed memory HSS class is
+\lstinline[style=C]!HSSMatrix<scalar>!. For examples of the usage of
+these classes, see the test code in
+\lstinline[style=Bash]!test/test_HSS_seq.cpp! and
+\lstinline[style=Bash]!test/test_HSS_mpi.cpp! respectively. There is
+also one sequential example in
+\lstinline[style=Bash]!examples/MLkernel.cpp!, which uses HSS
+compression for kernel matrices as used in certain machine learning
+applications, see for instance~\cite{BirosNlogN}. This part of the
+code will be better documented in future STRUMPACK releases.
+
 
 \section{Examples}\label{sec:examples}
 A number of examples are available in the
@@ -1548,11 +1564,23 @@ code form.
 @INPROCEEDINGS{ghysels2017sparse,
   title={A Robust Parallel Preconditioner for Indefinite Systems Using Hierarchical Matrices and Randomized Sampling},
   author={P. Ghysels and X. S. Li and C. Gorman and F. H. Rouet},
-  journal={2017 IEEE International Parallel and Distributed Processing Symposium (IPDPS)},
+  booktitle={2017 IEEE International Parallel and Distributed Processing Symposium (IPDPS)},
   pages={897-906},
   doi={10.1109/IPDPS.2017.21},
   year={2017},
   month={May},
+  publisher={IEEE},
+}
+
+@INPROCEEDINGS{BirosNlogN,
+  title={{An N log N Parallel Fast Direct Solver for Kernel Matrices}},
+  author={D Yu Chenhan, William B March, George Biros},
+  booktitle={2017 IEEE International Parallel and Distributed Processing Symposium (IPDPS)},
+  pages={886-896},
+  doi={10.1109/IPDPS.2017.10},
+  year={2017},
+  month={May},
+  publisher={IEEE},
 }
 
 \end{filecontents}
