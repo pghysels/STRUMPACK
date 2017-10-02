@@ -73,7 +73,7 @@
 
 \pagebreak
 \section{STRUMPACK Overview}
-STRUMPACK -- STRUctured Matrices PACKage -- is a C\texttt{++} library
+STRUMPACK -- STRUctured Matrix PACKage -- is a C\texttt{++} library
 % for computations with sparse and dense matrices. It uses so-called
 for computations with dense and sparse matrices. It uses so-called
 \emph{structured matrices}, i.e., matrices that exhibit some kind of
@@ -144,9 +144,9 @@ CMake can find them:
   locations, if they are installed elsewhere, you can specify them as
   follows:
   \begin{lstlisting}[style=Bash]
-    > cmake <@\textcolor{blue}{../}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@> \
-           -DCMAKE_CXX_COMPILER=<@\textcolor{blue}{g++}@>                       \
-           -DCMAKE_C_COMPILER=<@\textcolor{blue}{gcc}@>                         \
+    > cmake <@\textcolor{blue}{../}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@>     \
+           -DCMAKE_CXX_COMPILER=<@\textcolor{blue}{g++}@>            \
+           -DCMAKE_C_COMPILER=<@\textcolor{blue}{gcc}@>              \
            -DCMAKE_Fortran_COMPILER=<@\textcolor{blue}{gfortran}@>
   \end{lstlisting}
 \item \textbf{MPI} (Message Passing Interface) library.  You should
@@ -175,13 +175,13 @@ CMake can find them:
   \lstinline[style=Bash]!$SCALAPACKDIR! or by specifying the libraries
   manually:
   \begin{lstlisting}[style=Bash]
-    > cmake <@\textcolor{blue}{../STRUMPACK-x.y.z}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@>
+    > cmake <@\textcolor{blue}{../}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@> \
        -DSCALAPACK_LIBRARIES=<@\textcolor{blue}{"/path/to/scalapack/libscalapack.a;/path/to/blacs/libblacs.a"}@>
   \end{lstlisting}
   Or one can also directly modify the linker flags to add the
   ScaLAPACK and BLACS libraries:
   \begin{lstlisting}[style=Bash]
-    > cmake <@\textcolor{blue}{../STRUMPACK-x.y.z}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@>
+    > cmake <@\textcolor{blue}{../}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@> \
        -DCMAKE_EXE_LINKER_FLAGS=<@\textcolor{blue}{"-L/usr/lib64/mpich/lib/ -lscalapack -lmpiblacs"}@>
   \end{lstlisting}
 \item \textbf{METIS} ($\geq$ 5.1.0) for the nested dissection matrix
@@ -198,7 +198,7 @@ CMake can find them:
   Alternatively, you can specify the
   location of the header and library as follows:
   \begin{lstlisting}[style=Bash]
-    > cmake <@\textcolor{blue}{../STRUMPACK-x.y.z}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@>
+    > cmake <@\textcolor{blue}{../}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@> \
       -DMETIS_INCLUDES=<@\textcolor{blue}{/usr/local/metis/include}@> \
       -DMETIS_LIBRARIES=<@\textcolor{blue}{/usr/local/metis/lib/libmetis.a}@>
   \end{lstlisting}
@@ -303,7 +303,7 @@ algorithm: matrix reordering, factorization and solve.
   the HSS approximation.
 \end{description}
 
-\section{Using STRUMPACK-Sparse}\label{sec:usage}
+\section{Using STRUMPACK Sparse}\label{sec:usage}
 This section gives an overview on the basic usage of the sparse
 solvers in STRUMPACK.
 % Additionally, we refer to the online automatically
@@ -382,7 +382,7 @@ integer type).
 
 \subsection{StrumpackSparseSolver Example}
 The following shows the typical way to use a (sequential or
-multithreaded) STRUMPACK-sparse solver:
+multithreaded) STRUMPACK sparse solver:
 \begin{lstlisting}[style=C]
 #include "StrumpackSparseSolver.hpp"
 using namespace strumpack;  // all strumpack code is in the strumpack namespace,
@@ -764,7 +764,7 @@ The command line option
 can also be used.
 
 \subsubsection{Nested dissection reordering}\label{sec:ND}
-The STRUMPACK-sparse solver supports both (Par)Metis and (PT-)Scotch
+The STRUMPACK sparse solver supports both (Par)Metis and (PT-)Scotch
 for the matrix reordering. The following functions can set the
 preferred method or check the currently selected method:
 \begin{lstlisting}[style=C]
