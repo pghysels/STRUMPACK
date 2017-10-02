@@ -1,0 +1,117 @@
+Version 2.0.0 Released October 1, 2017
+======================================
+This is a major revision. From now on STRUMPACK is released as a
+single library, including both the sparse and the dense
+components. Unfortunately, the dense code is not documented yet.
+Additionally, the development version of the code is now available
+from the public github repository
+  https://github.com/pghysels/STRUMPACK
+
+The main changes since release 1.1.1 are:
+ - The options for StrumpackSparseSolver are now set through an object
+   of type SPOptions, stored in the StrumpackSparseSolver class.
+ - The template parameter for the real type has been removed. It is
+   now derived from the scalar type.
+ - The HSS code has been completely rewritten, performance is much
+   improved, memory leaks and valgrind errors have been fixed.
+ - A new, more robust adaptive HSS compression algorithm has been
+   implemented. This was developed in collaboration with Theo Mary
+   from Université Toulouse.
+ - We have automated testing of the code.
+ - Many bugs have been fixed. However, some bugs probably still
+   remain. If you happen to encounter any problems while running
+   STRUMPACK, please do not hesitate to contact us.
+
+
+Version 1.1.1 Released July 16, 2017
+====================================
+- Add function STRUMPACK_set_from_options_no_warning_unrecognized(..)
+  suppress warning
+
+
+Version 1.1: Released November 8, 2016
+======================================
+ - Rewrite reordering code, can now use sequential METIS and SCOTCH
+   from distributed interface.
+ - Change default minimum HSS front size to 2500 (as used in ipdps17 paper).
+ - Performance improvements in HSS code, mainly HSS compression.
+ - Add RCM ordering.
+ - Adaptive HSS compression in MPI code. This changes the default
+   HSS preconditioning strategy to ADAPTIVE.
+ - Add option to choose between METIS_NodeND and METIS_NodeNDP.
+ - Add a program to read matrix market file and print out binary file.
+ - Several other bug fixes.
+
+
+Version 1.0.4: Released August 4, 2016
+======================================
+ - Moved examples to the exmples/ folder, deleted test folder.
+ - Add pde900.mtx test matrix market file.
+ - Add README to examples.
+ - Fixes for memory leaks!
+ - Fix bug in separator reordering and another fix in distributed
+   separator reordering.
+ - Print message if LU fails, tell user to try to enable MC64 if not
+   already enabled.
+ - Include missing stdlib.h.
+ - Small performance enhancements in extend-add.
+ - Small improvement in proportional mapping.
+ - Various performance improvements throughout the code:
+   Several HSS algorithms were done serially, first one child, then the other.
+ - Added some timers for profiling, enable with -DUSE_TASK_TIMER.
+ - Performance improvements in front_multiply_2d (for random sampling
+   of front).
+ - Add a faq in the manual.
+ - Describe all command line options in the manual.
+ - Avoid recursion in the e-tree.
+ - Change the default relative compression tolerance.
+
+
+Version 1.0.3: Released June 6, 2016
+====================================
+ - Fix for building a shared library (thanks to Barry Smith)
+ - Fix for complex numbers (thanks to Barry Smith)
+ - Add an example folder with an example simple Makefile
+
+
+Version 1.0.2: Released June 2, 2016
+====================================
+ - Explain how to tune the preconditioner in the manual.
+ - Suppress output from DenseMPI.
+ - Print warnings/errors to cerr iso cout.
+ - Allow compilation without OpenMP.
+ - Fix some compiler warnings.
+ - Fizes for (Apple)Clang.
+ - Improve CMake detection of ScaLAPACK.
+
+
+Version 1.0.1: Released May 23, 2016
+====================================
+ - Small fix for GCC 6.1
+ - Update TODO
+ - FIX: set min_rand_HSS equal to number of columns in R.
+ - Code to print some stats about front size and nr random vectors and ranks.
+ - Change to the default rank pattern strategy.
+ - Check fgets return code.
+ - Update build script, check for ScaLAPACK.
+ - Print clear warning if BLAS/LAPACK not found.
+ - Update STRUMPACK README.
+ - Print correct Metis error code.
+ - Micro optimizations.
+ - Fix MPI communicator bug.
+ - Fix memory leaks.
+ - Fix very slow separator reordering for MPIDist interface.
+ - Add description of block-distributed CSR to the manual.
+ - Use CSR iso triplets in prop dist sparse matrix.
+ - Missing return statements.
+ - Do not use __gnu_parallel.
+ - Fix bug in Redistribute (integer_t -> float).
+ - Add 64 bit MPIDist test/example.
+ - Add 64 integer test.
+ - Check PETSc input for NULL.
+
+
+Version 1.0.0: Released May 4, 2016
+===================================
+ - Initial release of the STRUMPACK-sparse code with support for MPI+OpenMP
+
