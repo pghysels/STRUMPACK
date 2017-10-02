@@ -3,20 +3,13 @@ High priority:
 - Example for reuse of sparsity structure!
 - Example for a single precision preconditioner in a double precision
   GMRES solve?
-- profiling, memory leak fixes
 - multiple right-hand sides
-
-
 - Keep track of peak memory usage
 - Print memory usage (estimate) before starting factorization
-
 - For HSS compression, store random matrix in block row distribution
   instead of 2D block cyclic. This avoids data layout
   transformation. Some for the HSS-times-vector product and the HSS
   ULV solve!! We can let Chris Gorman work on this.
-
-- check RCM reordering. Are perm, iperm switched??
-
 - to decide which fronts are HSS, look at front size, not just
   separator size. This requires that symbolic factorization is already
   done.
@@ -28,7 +21,6 @@ Medium:
   mainly for dense LU and triangular solve. (requires OpenMP 4.0)
 - check ordering, merge small leaves created by PTScotch/ParMetis
 - MC64 licensing issue, allow compilation without MC64
-
 - optimize communication in symbolic factorization and redistribution
   into ProportionallyMappedSparseMatrix
 
@@ -44,8 +36,6 @@ Low priority:
   permutation. This avoids making a copy of the original matrix.
 - Do not explicitly add zeros in the sparse matrix, work on the graph
   only.
-- The identity block of the U and V interpolative bases is still
-  stored explicitly. Change this.
 - distributed MC64: Jason's code?
 - Think about proportional mapping: perhaps we can instead use the
   mapping as computed by PTScotch/Parmetis. This would avoid an extra
