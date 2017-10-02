@@ -83,4 +83,3 @@ make install VERBOSE=1
 cd examples
 make -k
 cd ../
-make doc VERBOSE=1
