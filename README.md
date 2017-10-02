@@ -21,22 +21,31 @@ the U.S. Dept. of Energy).  All rights reserved.
  - Christopher Gorman (UC Santa Barbara)
 
 ## Other contributors
- - Francois-Henry Rouet -- fhrouet@lbl.gov,fhrouet@lstc.com (Livermore
+ - François-Henry Rouet -- fhrouet@lbl.gov,fhrouet@lstc.com (Livermore
    Software Technology Corp., Lawrence Berkeley National Laboratory)
-
+ - Theo Mary (Université de Toulouse)
 
 ## Overview
-STRUMPACK -- STRUctured Matrices PACKage - is a package for
-computations with sparse and dense structured matrices, i.e., matrices
-that exhibit some kind of low-rank property, in particular
-Hierarchically Semi-Separable matrices (HSS).  Such matrices appear in
-many applications, e.g., Finite Element Methods, Boundary Element
-Methods... Exploiting this structure using a compression algorithm
+STRUMPACK -- STRUctured Matrix PACKage - is a software library
+providing linear algebra routines for sparse matrices and for dense
+rank-structured matrices, i.e., matrices that exhibit some kind of
+low-rank property. In particular, STRUMPACK uses the Hierarchically
+Semi-Separable matrix format (HSS).  Such matrices appear in many
+applications, e.g., Finite Element Methods, Boundary Element Methods
+... In sparse matrix factorization, the fill-in in the triangular
+factors often has a low-rank structures. Hence, the sparse linear
+solve in STRUMPACK exploits the HSS matrix format to compress the
+fill-in. Exploiting this structure using a compression algorithm
 allows for fast solution of linear systems and/or fast computation of
-matrix-vector products, which are the two main building blocks of
+matrix-vector products, which are two of the main building blocks of
 matrix computations. STRUMPACK has two main components: a
-distributed-memory dense matrix computations package and a distributed
-memory sparse solver/preconditioner.
+distributed-memory dense matrix computations package (for dense
+matrices that have the HSS structure) and a distributed memory fully
+algebraic sparse general solver and preconditioner. The preconditioner
+is mostly aimed at large sparse linear systems which result from the
+discretization of a partial differential equation, but is not limited
+to any particular type of problem. STRUMPACK also provides
+preconditioned GMRES and BiCGStab iterative solvers.
 
 ##  Components
  - The sparse solver is documented in doc/manual.pdf. STRUMPACK-sparse
@@ -48,13 +57,7 @@ memory sparse solver/preconditioner.
    MPI+OpenMP for hybrid distributed and shared memory parallelism.
    Main point of contact: Pieter Ghysels (pghysels@lbl.gov).
  - The dense distributed-memory package can be found in the src/HSS
-   directory. This is currently not well documented. An older version
-   of the dense package is available at:
-   http://portal.nersc.gov/project/sparse/strumpack/ as
-   STRUMPACK-Dense 1.1.1. We refer to the documentation included there
-   for more information on installation and usage. The main point of
-   contact for STRUMPACK-Dense is Francois-Henry Rouet
-   (fhrouet@lbl.gov).
+   directory. This is currently not well documented.
 
 If you have questions about your rights to use or distribute this
 software, please contact Berkeley Lab's Technology Transfer Department
