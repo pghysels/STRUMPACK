@@ -110,18 +110,19 @@ latest code:
 
 
 \section{Installation and Requirements}\label{sec::installation}
-The STRUMPACK package uses the \textbf{CMake} build system (CMake
-version >= 2.8). The recommended way of building the STRUMPACK library
-is as follows:
+The STRUMPACK package uses the CMake build system (CMake version >=
+2.8). The recommended way of building the STRUMPACK library is as
+follows:
 \begin{lstlisting}[style=bash]
-  > tar -xvzf STRUMPACK-x.y.z.tar.gz
-  > mkdir STRUMPACK-build
-  > cd STRUMPACK-build
-    > cmake <@\textcolor{blue}{../STRUMPACK-x.y.z}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@> \
+  > tar -xvzf strumpack-x.y.z.tar.gz
+  > cd strumpack-x.y.x
+  > mkdir build
+  > cd build
+  > cmake <@\textcolor{blue}{../}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@> \
       -DCMAKE_INSTALL_PREFIX=<@\textcolor{blue}{/path/to/install}@> \
-      -DCMAKE_CXX_COMPILER=<@\textcolor{blue}{<C++ (MPI) compiler>}@> \                           # this and below are optional,
-      -DCMAKE_C_COMPILER=<@\textcolor{blue}{<C (MPI) compiler>}@> \                               # CMake will try to autodetect
-      -DCMAKE_Fortran_COMPILER=<@\textcolor{blue}{<Fortran77 (MPI) compiler>}@> \
+      -DCMAKE_CXX_COMPILER=<@\textcolor{blue}{<C++ compiler>}@> \                           # this and below are optional,
+      -DCMAKE_C_COMPILER=<@\textcolor{blue}{<C compiler>}@> \                               # CMake will try to autodetect
+      -DCMAKE_Fortran_COMPILER=<@\textcolor{blue}{<Fortran77 compiler>}@> \
       -DSCALAPACK_LIBRARIES=<@\textcolor{blue}{"/path/to/scalapack/libscalapack.a;/path/to/blacs/libblacs.a"}@> \
       -DMETIS_INCLUDES=<@\textcolor{blue}{/path/to/metis/incluce}@> \
       -DMETIS_LIBRARIES=<@\textcolor{blue}{/path/to/metis/libmetis.a}@> \
@@ -143,7 +144,7 @@ CMake can find them:
   locations, if they are installed elsewhere, you can specify them as
   follows:
   \begin{lstlisting}[style=Bash]
-    > cmake <@\textcolor{blue}{../STRUMPACK-x.y.z}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@> \
+    > cmake <@\textcolor{blue}{../}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@> \
            -DCMAKE_CXX_COMPILER=<@\textcolor{blue}{g++}@>                       \
            -DCMAKE_C_COMPILER=<@\textcolor{blue}{gcc}@>                         \
            -DCMAKE_Fortran_COMPILER=<@\textcolor{blue}{gfortran}@>
@@ -860,8 +861,7 @@ refinement when HSS compression is not enabled, and preconditioned
 GMRES when HSS compression is enabled, see Section~\ref{sec:HSS}.  To
 use the solver as a preconditioner, or a single (approximate) solve,
 set the solver to \lstinline[style=C]!KrylovSolver::DIRECT!. When
-\lstinline[style=C]!Sp::solve! is called on a
-\lstinline[style=C]!SpMPIDist! solver object, the right-hand side and
+calling \lstinline[style=C]!SpMPIDist::solve!, the right-hand side and
 solution vectors should only point to the local parts!
 
 
