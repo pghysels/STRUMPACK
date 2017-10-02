@@ -1,25 +1,29 @@
 /*
- * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The Regents of
- * the University of California, through Lawrence Berkeley National Laboratory
- * (subject to receipt of any required approvals from the U.S. Dept. of Energy).
- * All rights reserved.
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
  *
- * If you have questions about your rights to use or distribute this software,
- * please contact Berkeley Lab's Technology Transfer Department at TTD@lbl.gov.
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
  *
- * NOTICE. This software is owned by the U.S. Department of Energy. As such, the
- * U.S. Government has been granted for itself and others acting on its behalf a
- * paid-up, nonexclusive, irrevocable, worldwide license in the Software to
- * reproduce, prepare derivative works, and perform publicly and display publicly.
- * Beginning five (5) years after the date permission to assert copyright is
- * obtained from the U.S. Department of Energy, and subject to any subsequent five
- * (5) year renewals, the U.S. Government is granted for itself and others acting
- * on its behalf a paid-up, nonexclusive, irrevocable, worldwide license in the
- * Software to reproduce, prepare derivative works, distribute copies to the
- * public, perform publicly and display publicly, and to permit others to do so.
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly.  Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government is granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
  *
  * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
- *             (Lawrence Berkeley National Lab, Computational Research Division).
+ *             (Lawrence Berkeley National Lab, Computational Research
+ *             Division).
  *
  */
 #include <iostream>
@@ -84,11 +88,11 @@ void k_means(int k, double* p, int n, int d, int* nc) {
       double min_dist = dist2(&p[i*d], center[0], d);
       cluster[i] = 0;
       for (int c=1; c<k; c++) {
-	double dd = dist2(&p[i*d], center[c], d);
-	if (dd < min_dist) {
-	  min_dist = dd;
-	  cluster[i] = c;
-	}
+        double dd = dist2(&p[i*d], center[c], d);
+        if (dd < min_dist) {
+          min_dist = dd;
+          cluster[i] = c;
+        }
       }
     }
     // update cluster centers
@@ -114,7 +118,7 @@ void k_means(int k, double* p, int n, int d, int* nc) {
     for (int j=0; j<nc[c]; j++) {
       while (cluster[ci[c]] != c) ci[c]++;
       for (int l=0; l<d; l++)
-	p_perm[l+row*d] = p[l+ci[c]*d];
+        p_perm[l+row*d] = p[l+ci[c]*d];
       ci[c]++;
       row++;
     }
@@ -128,7 +132,8 @@ void k_means(int k, double* p, int n, int d, int* nc) {
   delete[] cluster;
 }
 
-void recursive_2_means(double* p, int n, int d, int cluster_size, HSSPartitionTree& tree) {
+void recursive_2_means(double* p, int n, int d,
+                       int cluster_size, HSSPartitionTree& tree) {
   if (n < cluster_size) return;
   auto nc = new int[2];
   k_means(2, p, n, d, nc);
@@ -149,7 +154,8 @@ int main(int argc, char* argv[]) {
   double h = 3.;
   int kernel = 1; // Gaussian=1, Laplace=2
 
-  cout << "# usage: ./ML_kernel file d h kernel(1=Gauss,2=Laplace) reorder(0=natural,1=recursive 2-means)" << endl;
+  cout << "# usage: ./MLkernel file dimension h kernel(1=Gauss,2=Laplace)"
+       << " reorder(0=natural,1=recursive 2-means)\n" << endl;
   if (argc > 1) filename = string(argv[1]);
   if (argc > 2) d = stoi(argv[2]);
   if (argc > 3) h = stof(argv[3]);
@@ -158,7 +164,8 @@ int main(int argc, char* argv[]) {
   cout << "# data dimension = " << d << endl;
   cout << "# kernel h = " << h << endl;
   cout << "# kernel type = " << ((kernel == 1) ? "Gauss" : "Laplace") << endl;
-  cout << "# reordering/clustering = " << (reorder ? "recursive 2-means" : "natural") << endl;
+  cout << "# reordering/clustering = "
+       << (reorder ? "recursive 2-means" : "natural") << endl;
 
   HSSOptions<double> hss_opts;
   hss_opts.set_verbose(true);
@@ -185,25 +192,24 @@ int main(int argc, char* argv[]) {
   if (reorder)
     recursive_2_means(data.data(), n, d, cluster_size, cluster_tree);
 
-  cout << "constructing Kdense .. " << endl;
+  cout << "# constructing Kdense .. " << endl;
 
   DenseMatrix<double> Kdense(n, n);
   if (kernel == 1) {
 #pragma omp parallel for collapse(2)
     for (int c=0; c<n; c++)
       for (int r=0; r<n; r++)
-	Kdense(r, c) = Gauss_kernel(&data[r*d], &data[c*d], d, h);
+        Kdense(r, c) = Gauss_kernel(&data[r*d], &data[c*d], d, h);
   } else {
 #pragma omp parallel for collapse(2)
     for (int c=0; c<n; c++)
       for (int r=0; r<n; r++)
-	Kdense(r, c) = Laplace_kernel(&data[r*d], &data[c*d], d, h);
+        Kdense(r, c) = Laplace_kernel(&data[r*d], &data[c*d], d, h);
   }
 
   vector<double>().swap(data); // clear data
 
-  cout << "starting HSS compression .. " << endl;
-
+  cout << "# starting HSS compression .. " << endl;
 
   HSSMatrix<double> K;
   if (reorder) K = HSSMatrix<double>(cluster_tree, hss_opts);
@@ -217,7 +223,7 @@ int main(int argc, char* argv[]) {
 
   if (K.is_compressed()) {
     cout << "# created K matrix of dimension " << K.rows() << " x " << K.cols()
-	 << " with " << K.levels() << " levels" << endl;
+         << " with " << K.levels() << " levels" << endl;
     cout << "# compression succeeded!" << endl;
   } else {
     cout << "# compression failed!!!!!!!!" << endl;
@@ -230,8 +236,10 @@ int main(int argc, char* argv[]) {
   // K.print_info();
   auto Ktest = K.dense();
   Ktest.scaled_add(-1., Kdense);
-  cout << "# relative error = ||Kdense-K*I||_F/||Kdense||_F = " << Ktest.normF() / Kdense.normF() << endl;
-  if (Ktest.normF() / Kdense.normF() > ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
+  cout << "# relative error = ||Kdense-K*I||_F/||Kdense||_F = "
+       << Ktest.normF() / Kdense.normF() << endl;
+  if (Ktest.normF() / Kdense.normF() >
+      ERROR_TOLERANCE * max(hss_opts.rel_tol(), hss_opts.abs_tol())) {
     cout << "ERROR: compression error too big!!" << endl;
     return 1;
   }

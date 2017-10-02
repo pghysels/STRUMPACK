@@ -86,6 +86,21 @@ The examples (for now) include:
       mpirun -n 4 ./testMMdoubleMPIDist64 pde900.mtx
 
 
+- mtx2bin: Read a matrix in matrix market format, and print it out
+   again in binary format. Run as
+
+      ./mtx2bin pde900.mtx pde900.bin
+
+   Run as ./mtx2bin (without arguments) to see a description of the
+   binary output format.
+
+- bin2mtx: opposite of mtx2bin
+
+
+- MLkernel: an example on how to use HSS for kernel matrices as used
+    in certain machine learning applications.
+
+
 - sexample:
 - dexample:
 - cexample:
@@ -97,13 +112,3 @@ The examples (for now) include:
     with the sequential/multithreaded interface.
 
       ./sexample 1000
-
-
-- mtx2bin: Read a matrix in matrix market format (), and print it out
-   again in binary format. Run as 
-      
-      ./mtx2bin pde900.mtx pde900.bin
-
-   Run as ./mtx2bin (without arguments) to see a description of the
-   binary output format.
-
