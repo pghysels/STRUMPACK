@@ -118,7 +118,7 @@ is as follows:
   > mkdir STRUMPACK-build
   > cd STRUMPACK-build
     > cmake <@\textcolor{blue}{../STRUMPACK-x.y.z}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@> \
-      -DCMAKE_INSTALL_PREFIX=<@\textcolor{blue}{.}@> \
+      -DCMAKE_INSTALL_PREFIX=<@\textcolor{blue}{/path/to/install}@> \
       -DCMAKE_CXX_COMPILER=<@\textcolor{blue}{<C++ (MPI) compiler>}@> \                           # this and below are optional,
       -DCMAKE_C_COMPILER=<@\textcolor{blue}{<C (MPI) compiler>}@> \                               # CMake will try to autodetect
       -DCMAKE_Fortran_COMPILER=<@\textcolor{blue}{<Fortran77 (MPI) compiler>}@> \
@@ -143,9 +143,10 @@ CMake can find them:
   locations, if they are installed elsewhere, you can specify them as
   follows:
   \begin{lstlisting}[style=Bash]
-    > cmake <@\textcolor{blue}{../STRUMPACK-x.y.z}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@>
-                     -DCMAKE_CXX_COMPILER=<@\textcolor{blue}{g++}@> -DCMAKE_C_COMPILER=<@\textcolor{blue}{gcc}@>
-                     -DCMAKE_Fortran_COMPILER=<@\textcolor{blue}{gfortran}@>
+    > cmake <@\textcolor{blue}{../STRUMPACK-x.y.z}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@> \
+           -DCMAKE_CXX_COMPILER=<@\textcolor{blue}{g++}@>                       \
+           -DCMAKE_C_COMPILER=<@\textcolor{blue}{gcc}@>                         \
+           -DCMAKE_Fortran_COMPILER=<@\textcolor{blue}{gfortran}@>
   \end{lstlisting}
 \item \textbf{MPI} (Message Passing Interface) library.  You should
   not need to manually specify the MPI compiler wrappers.  CMake will
@@ -179,8 +180,8 @@ CMake can find them:
   Or one can also directly modify the linker flags to add the
   ScaLAPACK and BLACS libraries:
   \begin{lstlisting}[style=Bash]
-    > cmake <@\textcolor{blue}{.../STRUMPACK-x.y.z}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@>
-       -DCMAKE_EXE_LINKER_FLAGS=<@\textcolor{blue}{."-L/usr/lib64/mpich/lib/ -lscalapack -lmpiblacs"}@>
+    > cmake <@\textcolor{blue}{../STRUMPACK-x.y.z}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@>
+       -DCMAKE_EXE_LINKER_FLAGS=<@\textcolor{blue}{"-L/usr/lib64/mpich/lib/ -lscalapack -lmpiblacs"}@>
   \end{lstlisting}
 \item \textbf{METIS} ($\geq$ 5.1.0) for the nested dissection matrix
   reordering. Metis can be obtained from:
@@ -196,9 +197,9 @@ CMake can find them:
   Alternatively, you can specify the
   location of the header and library as follows:
   \begin{lstlisting}[style=Bash]
-    > cmake <@\textcolor{blue}{.../STRUMPACK-x.y.z}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@>
-      -DMETIS_INCLUDES=<@\textcolor{blue}{./usr/local/metis/include}@> \
-      -DMETIS_LIBRARIES=<@\textcolor{blue}{./usr/local/metis/lib/libmetis.a}@>
+    > cmake <@\textcolor{blue}{../STRUMPACK-x.y.z}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@>
+      -DMETIS_INCLUDES=<@\textcolor{blue}{/usr/local/metis/include}@> \
+      -DMETIS_LIBRARIES=<@\textcolor{blue}{/usr/local/metis/lib/libmetis.a}@>
   \end{lstlisting}
 
 \item \textbf{PARMETIS} for parallel nested dissection. ParMetis can
@@ -245,7 +246,8 @@ The code was tested on GNU/Linux with the GNU and Intel\tm{} compilers
 and the OpenBLAS, Intel\tm{} MKL\tm{} and Cray\tm{} LibSci\tm{}
 numerical libraries. If you encounter issues on other platforms or
 with other BLAS/LAPACK implementations, please let us know.
-Successful compilation will create a \textcolor{green}{\texttt{libstrumpack\_sparse.a}} file.
+Successful compilation will create a
+\textcolor{green}{\texttt{libstrumpack.a}} file.
 
 
 \section{Algorithm}\label{sec:algo}
@@ -395,7 +397,7 @@ int main(int argc, char* argv[]) {
   StrumpackSparseSolver<double> sp;               // create solver object
   sp.options().set_rel_tol(1e-10);                // set options
   sp.options().set_gmres_restart(10);             // ...
-  sp.options().enable_HSS();
+  sp.options().enable_HSS();                      // enable HSS compression, see section <@\ref{sec:HSS}@>
   sp.options().set_from_command_line(argc, argv); // parse command line options
   sp.set_csr_matrix(N, row_ptr, col_ind, val);    // set the matrix (copy)
   sp.reorder();                                   // reorder matrix
@@ -648,41 +650,39 @@ public interface to the \lstinline[style=C]!SpMPI! class is exactly
 the same as that for the \lstinline[style=C]!Sp! class.
 
 \subsection{Sparse Matrix Format}
-The sparse matrix can be given in either compressed sparse row or
-compressed sparse column format~\cite{saad2003iterative}:
+The sparse matrix should be specified in compressed sparse row
+format~\cite{saad2003iterative}:
 \begin{lstlisting}[style=C]
   void Sp::set_csr_matrix(int N, int* row_ptr, int* col_ind, scalar* values,
                           bool symmetric_pattern=false);
-  void Sp::set_csc_matrix(int N, int* col_ptr, int* row_ind, scalar* values,
-                          bool symmetric_pattern=false);
 \end{lstlisting}
-Internally, the matrix is copied, so it will not be modified.  The CSR
-format is generally somewhat faster in the iterative solver, since the
-CSR sparse matrix-vector product (SpMV) performs better in parallel
-than the CSC SpMV. However, CSC might be slightly faster in the
-factorization because it is column based storage and the dense
-matrices in the factors are also stored column major. If the sparsity
-pattern of the matrix is symmetric (the values do not have to be
-symmetric), then you can set
+% void Sp::set_csc_matrix(int N, int* col_ptr, int* row_ind, scalar* values,
+% bool symmetric_pattern=false);
+Internally, the matrix is copied, so it will not be modified. Previous
+versions of STRUMPACK also supported the CSC format, but this is now
+deprecated. If the sparsity pattern of the matrix is symmetric (the
+values do not have to be symmetric), then you can set
 \lstinline[style=C]!symmetric_pattern=true!. This saves some work in
 the setup phase of the solver.
 
-For the \lstinline[style=C]!SpMPIDist! solver the input is as follows:
+For the \lstinline[style=C]!SpMPIDist! solver the input is a block-row
+distributed compressed sparse row matrix (as illustrated in the
+example above):
 \begin{lstlisting}[style=C]
-  void SpMPIDist::set_csr_matrix(integer_t N, integer_t* row_ptr, integer_t* col_ind,
-                                 scalar_t* values, bool symmetric_pattern=false);
-  void SpMPIDist::set_csc_matrix(integer_t N, integer_t* col_ptr, integer_t* row_ind,
-                                 scalar_t* values, bool symmetric_pattern=false);
-  void SpMPIDist::set_distributed_csr_matrix(integer_t local_rows, integer_t* row_ptr, integer_t* col_ind,
-                                          scalar_t* values, integer_t* dist, bool symmetric_pattern=false);
+  void SpMPIDist::set_distributed_csr_matrix
+         (integer local_rows, integer* row_ptr, integer* col_ind,
+          scalar* values, integer* dist, bool symmetric_pattern=false);
 \end{lstlisting}
-The \lstinline[style=C]!SpMPIDist::set_csr_matrix! and
-\lstinline[style=C]!SpMPIDist::set_csc_matrix! routines take as input
-a sequential CSR or CSC matrix, but this matrix will internally be
-scattered over the different processes. The
-\lstinline[style=C]!set_distributed_csr_matrix! routine
-takes a block-row distributed CSR matrix as input as illustrated in
-the example above. Input of distributed CSC is not supported.
+Alternatively, you can also specify a sequential CSR matrix to the
+\lstinline[style=C]!SpMPIDist! solver:
+\begin{lstlisting}[style=C]
+  void SpMPIDist::set_csr_matrix
+         (integer N, integer* row_ptr, integer* col_ind,
+          scalar* values, bool symmetric_pattern=false);
+\end{lstlisting}
+For this routine, the matrix only needs to be specified completely on
+the root process. Other processes can pass \lstinline[style=C]!NULL!
+for the arrays.
 
 \subsection{Setting and Parsing Options}
 The solver class has an object of type
@@ -745,7 +745,7 @@ which can be selected via
 where \lstinline[style=C]!mc64()! queries the currently selected
 strategy (the default is \textbf{5:} maximum product of diagonal
 values plus row and column scaling). Instead of entering a number, you
-can specify on of the enumerations in \lstinline[style=C]!MC64Job!:
+can specify one of the enumerations in \lstinline[style=C]!MC64Job!:
 \begin{lstlisting}[style=C]
   enum class MC64Job {
     NONE,                         /*!< Don't do anything                                              */
@@ -762,7 +762,7 @@ The command line option
 \end{lstlisting}
 can also be used.
 
-\subsubsection{Nested dissection reordering}
+\subsubsection{Nested dissection reordering}\label{sec:ND}
 The STRUMPACK-sparse solver supports both (Par)Metis and (PT-)Scotch
 for the matrix reordering. The following functions can set the
 preferred method or check the currently selected method:
@@ -865,7 +865,7 @@ set the solver to \lstinline[style=C]!KrylovSolver::DIRECT!. When
 solution vectors should only point to the local parts!
 
 
-\subsection{All Options}
+\subsection{All Options for the Sparse Solver}
 The HSS specific options are stored in an object of type
 \lstinline[style=C]!HSSOptions<scalar>!, inside the
 \lstinline[style=C]!SPOptions! object. These options are described in
@@ -890,13 +890,13 @@ the \lstinline[style=C]!real! type is the real part of a scalar, i.e.,
     void set_rel_tol(real rel_tol);                       real rel_tol() const;
     /* absolute residual stopping criterion for iterative solver     */
     void set_abs_tol(real abs_tol);                       real abs_tol() const;
-    /* type of iterative solver to use, see section 4.9              */
+    /* type of iterative solver to use, see section <@\ref{subsec:use_solve}@>              */
     void set_Krylov_solver(KrylovSolver s);               KrylovSolver Krylov_solver() const;
     /* GMRES restart                                                 */
     void set_gmres_restart(int m);                        int gmres_restart() const;
     /* type of Gram-Schmidt used in GMRES                            */
     void set_GramSchmidt_type(GramSchmidtType t);         GramSchmidtType GramSchmidt_type() const;
-    /* nested-dissection code, see section 4.7.2                     */
+    /* nested-dissection code, see section <@\ref{sec:ND}@>                     */
     void set_reordering_method(ReorderingStrategy m);     ReorderingStrategy reordering_method() const;
     /* stop nested-dissection when domains are smaller than nd_param */
     void set_nd_param(int nd_param);                      int nd_param() const;
@@ -916,14 +916,14 @@ the \lstinline[style=C]!real! type is the real part of a scalar, i.e.,
     void enable_agg_amalg();                              bool use_agg_amalg() const;
     /* when using MUMPS_SYMQAMS, disable aggressive amalgamation      */
     void disable_agg_amalg();
-    /* set the job to be used for static pivotin, see section 4.7.1   */
+    /* set the job to be used for static pivoting, see section <@\ref{sec::mc64}@>  */
     void set_mc64job(int job);                            int mc64job() const;
     void set_mc64job(MC64Job job);
     /* not used at the moment                                         */
     void enable_assembly_tree_log();                      bool log_assembly_tree() const;
     void disable_assembly_tree_log();
 
-    /* enable HSS compression, see section 5                          */
+    /* enable HSS compression, see section <@\ref{sec:HSS}@>                          */
     void enable_HSS();                                    bool use_HSS() const;
     /* disable HSS compression                                        */
     void disable_HSS();
@@ -944,7 +944,7 @@ the \lstinline[style=C]!real! type is the real part of a scalar, i.e.,
     void enable_replace_tiny_pivots();                    bool replace_tiny_pivots() const;
     void disable_replace_tiny_pivots(;
 
-    /* get the HSS specific options, see section 5.                   */
+    /* get the HSS specific options, see section <@\ref{sec:HSS}@>.                   */
     const HSS::HSSOptions<scalar>& HSS_options() const;
     HSS::HSSOptions<scalar>& HSS_options();
 
@@ -1009,60 +1009,6 @@ precision.
 
 
 \section{HSS Preconditioning}\label{sec:HSS}
-
-\todo[inline]{rewrite this section!!}
-\todo[inline]{describe HSSOptions, and command line options!!}
-
-The sparse matrix factorization algorithm used in STRUMPACK relies on
-a nested dissection reordering of the matrix in order to reduce
-fill-in in the LU factorization. Nested dissection recursively
-computes vertex separators from the graph of the sparse matrix. A
-vertex separator is a set of nodes, which, when removed from the graph
-split the graph into two unconnected components. Nested dissection is
-applied recursively to each of these components and this recursion
-defines a tree (typically binary) of separators. The first separator
-is called the root separator as it corresponds to the root node of the
-separator tree. In practice, the separators close to the root of the
-separator tree are the larger ones and separators become smaller as
-the recursion depth increases.
-
-With each separator, a dense matrix, a so-called frontal matrix, is
-associated. The STRUMPACK sparse preconditioner will use low-rank
-compression (using structured matrices, specifically HSS
-matrices). Figure~\ref{fig:hss_matrix} illustrates the HSS matrix
-format. This low-rank technique asymptotically reduces memory usage
-and floating point operations, while introducing approximation
-errors. HSS compression is not used by default (the default is to
-perform exact LU factorization), but can be turned on via the command
-line:
-\begin{lstlisting}[style=Bash]
-  --sp_hss   (no argument)
-\end{lstlisting}
-or via the C\texttt{++} API as follows
-\begin{lstlisting}[style=C]
-  void Sp::use_HSS(bool h);   // enable HSS if h == true
-  bool Sp::use_HSS();         // check whether HSS compression is enabled
-\end{lstlisting}
-When HSS compression is enabled, the default STRUMPACK behavior is to
-use the HSS enabled approximate LU factorization as a preconditioner
-within GMRES. This behavior can also be changed, see
-Section~\ref{subsec:use_solve}.
-
-However, HSS compression has a considerable overhead and only pays off
-for sufficiently large matrices. Therefore STRUMPACK has a tuning
-parameter to specify the minimum size a dense matrix needs to be to be
-considered a candidate for HSS compression. Moreover, a frontal matrix
-will only be compressed using low-rank if its parent in the separator
-tree is also compressed using low-rank.  The minimum dense matrix size
-for HSS compression is set via the command line via
-\begin{lstlisting}[style=Bash]
-  --sp_hss_front_size int (default 2500)
-\end{lstlisting}
-or via the C\texttt{++} API as follows
-\begin{lstlisting}[style=C]
-  void Sp::set_minimum_HSS_size(int s);   // set minimum frontal matrix size for HSS compression
-  int  Sp::get_minimum_HSS_size();        // get minimum frontal matrix size for HSS compression
-\end{lstlisting}
 
 \begin{figure}
   \begin{center}
@@ -1141,79 +1087,111 @@ or via the C\texttt{++} API as follows
   \label{fig:hss_matrix}
 \end{figure}
 
+The sparse multifrontal solver can optionally use Hierarchically
+Semi-Separable, rank-structured matrices to compress the fill-in. In
+the multifrontal method, computations are performed on dense matrices
+called frontal matrices. A frontal matrix can be approximated as an
+HSS matrix, but this will only be beneficial (compared to storing the
+frontal as a standard dense matrix and operating on it with
+BLAS/LAPACK routines) if the frontal matrix is large enough.
+
+Figure~\ref{fig:hss_matrix} illustrates the HSS matrix format. The
+matrix is partitioned as a 2 $\times$ 2 block matrix, with the
+partitioning recursively applied on the diagonal blocks, until
+diagonal blocks are smaller than a specified \emph{leaf size}. The
+off-diagonal block on each level of the hierarchy are approximated by
+a low-rank product. This low-rank storage format asymptotically
+reduces memory usage and floating point operations, while introducing
+approximation errors. HSS compression is not used by default in the
+STRUMPACK sparse solver (the default is to perform exact LU
+factorization), but can be turned on/off via the command line:
+\begin{lstlisting}[style=Bash]
+  --sp_enable_hss   (no argument)
+  --sp_disable_hss   (no argument)
+\end{lstlisting}
+or via the C\texttt{++} API as follows
+\begin{lstlisting}[style=C]
+  void SPOptions<scalar>::enable_HSS();
+  void SPOptions<scalar>::disable_HSS();
+  bool SPOptions<scalar>::use_HSS();    // check whether HSS compression is enabled
+\end{lstlisting}
+When HSS compression is enabled, the default STRUMPACK behavior is to
+use the HSS enabled approximate LU factorization as a preconditioner
+within GMRES. This behavior can also be changed, see
+Section~\ref{subsec:use_solve}.
+
+However, HSS compression has a considerable overhead and only pays off
+for sufficiently large matrices. Therefore STRUMPACK has a tuning
+parameter to specify the minimum size a dense matrix needs to be to be
+considered a candidate for HSS compression. The minimum dense matrix
+size for HSS compression is set via the command line via
+\begin{lstlisting}[style=Bash]
+  --sp_hss_min_front_size int (default 1000)
+  --sp_hss_min_sep_size int (default 256)
+\end{lstlisting}
+or via the C\texttt{++} API as follows
+\begin{lstlisting}[style=C]
+  void SPOptions<scalar>::set_HSS_min_front_size(int s);
+  void SPOptions<scalar>::set_HSS_min_sep_size(int s);
+  int SPOptions<scalar>::HSS_min_front_size() const;  // get the current value
+  int SPOptions<scalar>::HSS_min_sep_size() const;
+\end{lstlisting}
+The routine \lstinline[style=C]!set_HSS_min_front_size(int s)! sets
+the minimum size of the entire front, while
+\lstinline[style=C]!set_HSS_min_sep_size(int s)! refers to the size of
+the top-left block of the front only. This top-left block is the part
+that corresponds to a separator, as given by the nested dissection
+reordering algorithm. This top-left block is also referred to as the
+block containing the fully-summed variable. Factorization (LU in the
+dense case, ULV in the HSS case) is only applied to this top-left
+block. \emph{\textbf{Tuning the values for the minimum front and
+    separator sizes can have a big impact on performance and memory
+    usage!}}
+
+The above options affect the use of HSS within the multifrontal
+solver. There are more, HSS specific, options which are stored in an
+object of type \lstinline[style=C]!HSS::HSSOptions<scalar>!. An object
+of this type is stored in the \lstinline[style=C]!SPOptions<scalar>!
+object stored in the \lstinline[style=C]!StrumpackSparseSolver!. It
+can be accessed via the \lstinline[style=C]!HSS_options()! routine as
+follows:
+\begin{lstlisting}[style=C]
+  StrumpackSparseSolver<double> sp;               // create solver object
+  sp.options().enable_HSS();                      // enable HSS compression in the multifrontal solver
+  sp.options().HSS_options().set_leaf_size(256);  // set the HSS leaf size
+\end{lstlisting}
+
 In STRUMPACK, HSS matrices are constructed using a randomized sampling
 algorithm~\cite{martinsson2011fast}. To construct an HSS approximation
 for a matrix $A$, sampling of the rows and columns of $A$ is computed
 by multiplication with a tall and skinny random matrix $R$ as follows:
-$S^r = A R$ and $S^c = A^T R$. Ideally, the number of columns the
+$S^r = A R$ and $S^c = A^* R$. Ideally, the number of columns in the
 matrix $R$ is $d = r + p$, with $r$ the maximum off-diagonal block
 rank in the HSS matrix and $p$ a small oversampling
-parameter. Unfortunately, the HSS rank is not known a-priori, so this
-needs to be estimated or computed. Finding a good estimate for the
-number of random vectors (i.e., the number of columns in $R$) is
-crucial for performance. STRUMPACK provides a few strategies to guess
-the number of random vectors:
-\begin{itemize}
-\item \textsc{adaptive}: (this is the default) Adaptive determination
-  of the rank: $d_0 = \beta$, $d_{k+1} = 2 d_{k}$ or
-  $d_{k+1} = d_{k}+ \Delta d$. More random vectors are added until a
-  certain accuracy is reached, see below.
-\item \textsc{sqrtNlogN}: Set
-  $d = \alpha \sqrt{N} \log{\sqrt{N}} + \beta$, where $N$ is the size
-  of the separator. This is inspired by the idea that for a
-  3-dimensional $k \times k \times k$ mesh, the separator is
-  $N = k \times k$, and there is some theory stating that for certain
-  PDEs, the off-diagonal ranks grow as $\mathcal{O}(k)$.
-\item \textsc{sqrtN}: $d = \alpha \sqrt{N} + \beta$, same as above but
-  without the logarithmic term.
-\item \textsc{constant}: $d = \beta$, take the number of random
-  vectors constant, the same for all frontal matrices/separators.
-\item \textsc{bisectcut}: Not implemented yet.
-\end{itemize}
-The rank strategy can be selected from the command line via:
+parameter. Unfortunately, the HSS rank is not known a-priori, so it
+needs to determined adaptively. The adaptive sampling scheme used in
+STRUMPACK starts with an initial number of random vector $d_0$, and
+increases this in steps of $\Delta d$, until the compression quality
+reaches the desired user specified tolerance, or until the maximum
+rank is reached. \emph{\textbf{The compression tolerances can greatly
+    impact performance.}} They can be set using:
 \begin{lstlisting}[style=Bash]
-  --sp_rank_pattern adaptive|constant|sqrtN|sqrtNlogN|bisectcut (default: adaptive)
-\end{lstlisting}
-\begin{lstlisting}[style=C]
-  void Sp::set_rank_pattern(params::RankPattern p);
-\end{lstlisting}
-with \lstinline[style=C]!enum RankPattern {ADAPTIVE, CONSTANT, SQRTN, SQRTNLOGN, BISECTIONCUT}!.\\
-
-\todo[inline]{How to set $\alpha$ and $\beta$?}
-
-After randomized sampling, a rank-revealing factorization is applied
-to subblocks of $S^r$ and $S^c$ to determine the actual off-diagonal
-block ranks and to build low-rank representations. The code currently
-uses QR with column pivoting as a rank-revealing QR (RRQR)
-factorization to determine the numerical or $\epsilon$ rank. So, the
-parameter $\epsilon$, which determines the stopping criterion for the
-RRQR factorization is very important for both performance and quality
-of the preconditioner. However, $\epsilon$ is also closely linked to
-the number of random vectors. If the estimate for the number of random
-vectors is too high, the RRQR can still terminate early if $\epsilon$
-is not too small. If the number of random vectors is too small, the
-computations are cheaper but RRQR will not reach it's desired accuracy
-$\epsilon$. However, in this latter case, the resulting HSS
-approximation might still be used as a preconditioner.
-
-The RRQR factorization in STRUMPACK takes both a relative and an
-absolute tolerance, which can be set via:
-\begin{lstlisting}[style=Bash]
-  --sp_rctol real (default 0.01)
-  --sp_actol real (default 1e-10)
+  --hss_rel_tol real (default 0.01)
+  --hss_abs_tol real (default 1e-08)
 \end{lstlisting}
 or via the C\texttt{++} API
 \begin{lstlisting}[style=C]
-  void Sp::set_relative_compression_tolerance(real rctol);
-  void Sp::set_absolute_compression_tolerance(real actol);
+  void HSSOptions<scalar>::set_rel_tol(real rel_tol);
+  void HSSOptions<scalar>::set_abs_tol(real abs_tol);
+  real HSSOptions<scalar>::rel_tol() const;    // get the current value
+  real HSSOptions<scalar>::abs_tol() const;
 \end{lstlisting}
 
-
-
-
-
-The public interface for the \lstinline[style=C]!HSSOptions<scalar>!
-object is:
+\subsection{\lstinline[style=C]!HSSOptions<scalar>! Interface}
+Other options are available to tune for instance the initial number of
+random vectors $d_0$, the increment $\Delta d$, the random number
+generator or the random number distribution. The complete public
+interface for the \lstinline[style=C]!HSSOptions<scalar>! class is:
 \begin{lstlisting}[style=C]
   template<typename scalar> class HSSOptions {
   public:
@@ -1261,6 +1239,7 @@ object is:
   };
 \end{lstlisting}
 
+\subsection{HSS Command Line Options}
 The HSS specific command line options are:
 \begin{lstlisting}[style=Bash]
  HSS Options:
@@ -1285,16 +1264,28 @@ The HSS specific command line options are:
 
 
 \section{Examples}\label{sec:examples}
-\todo[inline]{TODO refer to examples folder with examples of:}
+A number of examples are available in the
+\lstinline[style=Bash]!examples/! folder. This folder, with the
+sources, is copied to the build directory when running
+\lstinline[style=Bash]!cmake!. However, the examples are not part of
+the CMake build system, so they will not be compiled and linked when
+running \lstinline[style=Bash]!make!. A simple
+\lstinline[style=Bash]!Makefile! is generated in the
+\lstinline[style=Bash]!examples/! folder in the build directory, with
+the compiler setting based on what CMake has discovered. However, this
+Makefile is rather simplistic and in certain cases it might need some
+manual edits. However, it can serve as an example for how to compile
+code using STRUMPACK. Check the README file in the
+\lstinline[style=Bash]!examples/! directory for more details.
 
-\todo[inline]{Explain how to build the examples!!!}
-
-\begin{itemize}
-\item Factor once, solve multiple times
-\item Reorder, factor solve, change matrix values but reuse reordering!
-\item A complex arithmetic example
-\item A single precision factorization and a double precision solve??
-\end{itemize}
+% \todo[inline]{TODO refer to examples folder with examples of:}
+% \todo[inline]{Explain how to build the examples!!!}
+% \begin{itemize}
+% \item Factor once, solve multiple times
+% \item Reorder, factor solve, change matrix values but reuse reordering!
+% \item A complex arithmetic example
+% \item A single precision factorization and a double precision solve??
+% \end{itemize}
 
 \section{C Interface} \label{sec:Cinterface} The C interface is
 defined in the header file
@@ -1302,13 +1293,13 @@ defined in the header file
 the C\texttt{++} interface. For example usage see the programs
 \lstinline[style=C]!sexample.c!, \lstinline[style=C]!dexample.c!,
 \lstinline[style=C]!cexample.c! and \lstinline[style=C]!zexample.c!
-in the examples directory, for simple single and double precision real
-and complex example programs. Note that since the STRUMPACK code is
-written in C\texttt{++} even when using the C interface you should
-link with a C\texttt{++} aware linker or link with the standard
-C\texttt{++} library. For instance when using the GNU toolchain, link
-with \texttt{g++} instead of \texttt{gcc} or link with \texttt{gcc}
-and include \texttt{-lstdc++}.
+in the \lstinline[style=C]!examples/! directory, for simple single and
+double precision real and complex example programs. Note that since
+the STRUMPACK code is written in C\texttt{++}, even when using the C
+interface you should link with a C\texttt{++} aware linker or link
+with the standard C\texttt{++} library. For instance when using the
+GNU toolchain, link with \texttt{g++} instead of \texttt{gcc} or link
+with \texttt{gcc} and include \texttt{-lstdc++}.
 
 
 \section{Advanced Usage Tips}\label{sec:tips}
@@ -1371,9 +1362,10 @@ and include \texttt{-lstdc++}.
 
   The parallel execution in ctest is invoked by the
   \lstinline[style=Bash]!MPIEXEC! command as discovered by CMake. On
-  many clusters, this does not run unless it is executed from within a
-  batch script. In this case all parallel tests will fail. Apart from
-  that, all tests should succeed. If they do not, please contact us.
+  many HPC clusters, this does not run unless it is executed from
+  within a batch script. In this case all parallel tests will fail. At
+  the moment, a small number of tests still fail. This is normal
+  behavior.
 \end{itemize}
 
 
@@ -1392,11 +1384,10 @@ Discovery through Advanced Computing (SciDAC) program funded by
 U.S. Department of Energy, Office of Science, Advanced Scientific
 Computing Research (and Basic Energy Sciences/Biological and
 Environmental Research/High Energy Physics/Fusion Energy
-Sciences/Nuclear Physics).
-
-This research was supported by the Exascale Computing Project
-(17-SC-20-SC), a collaborative effort of the U.S. Department of Energy
-Office of Science and the National Nuclear Security Administration.
+Sciences/Nuclear Physics). This research was supported by the Exascale
+Computing Project (17-SC-20-SC), a collaborative effort of the
+U.S. Department of Energy Office of Science and the National Nuclear
+Security Administration.
 
 
 \section{Copyright notice}
