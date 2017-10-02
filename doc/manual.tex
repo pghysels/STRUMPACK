@@ -97,7 +97,10 @@ linear systems.
 
 The STRUMPACK project started at the Lawrence Berkeley National
 Laboratory in 2014 and is supported by the FASTMath SciDAC Institute
-funded by the Department of Energy.
+funded by the Department of Energy and by the Exascale Computing
+Project (17-SC-20-SC), a collaborative effort of the U.S. Department
+of Energy Office of Science and the National Nuclear Security
+Administration.
 
 \noindent Check the STRUMPACK website for more information and for the
 latest code:
@@ -127,7 +130,7 @@ is as follows:
       -DSCOTCH_INCLUDES=<@\textcolor{blue}{/path/to/scotch/include}@> \
       -DSCOTCH_LIBRARIES=<@\textcolor{blue}{"/path/to/ptscotch/libscotch.a;...libscotcherr.a;...libptscotch.a;...libptscotcherr.a"}@>
   > make
-  > make examples   # optional
+  > make test   # optional, takes a while
   > make install
 \end{lstlisting}
 %% doxygen is not up to date!
@@ -1283,6 +1286,9 @@ The HSS specific command line options are:
 
 \section{Examples}\label{sec:examples}
 \todo[inline]{TODO refer to examples folder with examples of:}
+
+\todo[inline]{Explain how to build the examples!!!}
+
 \begin{itemize}
 \item Factor once, solve multiple times
 \item Reorder, factor solve, change matrix values but reuse reordering!
@@ -1357,8 +1363,8 @@ and include \texttt{-lstdc++}.
   C\texttt{++}11 standard, but the GCC 4.4 headers do not implement
   the C\texttt{++}11 standard library. You should install/load a newer
   GCC version (or just the headers). On cray machines, this can be
-  done with \lstinline[style=Bash]!module unload gcc; module load
-  gcc/4.9.3! for instance.
+  done with \lstinline[style=Bash]!module unload gcc; module load gcc/4.9.3!
+  for instance.
 
 \item When running \lstinline[style=Bash]!make test!, many of the
   tests fail!
@@ -1372,6 +1378,10 @@ and include \texttt{-lstdc++}.
 
 
 \section{Acknowledgements}
+The new, more robust version of the adaptive randomized HSS
+compression algorithm was developed in collaboration with Theo Mary
+from the Universit\'e de Toulouse.
+
 The code for the STRUMPACK-sparse is based on the sequential code
 StruMF, originally developed by Artem Napov. We wish to thank people
 who sent us test problems and helped testing the code: Alex Druinsky,
@@ -1383,6 +1393,10 @@ U.S. Department of Energy, Office of Science, Advanced Scientific
 Computing Research (and Basic Energy Sciences/Biological and
 Environmental Research/High Energy Physics/Fusion Energy
 Sciences/Nuclear Physics).
+
+This research was supported by the Exascale Computing Project
+(17-SC-20-SC), a collaborative effort of the U.S. Department of Energy
+Office of Science and the National Nuclear Security Administration.
 
 
 \section{Copyright notice}
