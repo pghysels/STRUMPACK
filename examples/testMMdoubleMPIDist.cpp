@@ -1,25 +1,29 @@
 /*
- * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The Regents of
- * the University of California, through Lawrence Berkeley National Laboratory
- * (subject to receipt of any required approvals from the U.S. Dept. of Energy).
- * All rights reserved.
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
  *
- * If you have questions about your rights to use or distribute this software,
- * please contact Berkeley Lab's Technology Transfer Department at TTD@lbl.gov.
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
  *
- * NOTICE. This software is owned by the U.S. Department of Energy. As such, the
- * U.S. Government has been granted for itself and others acting on its behalf a
- * paid-up, nonexclusive, irrevocable, worldwide license in the Software to
- * reproduce, prepare derivative works, and perform publicly and display publicly.
- * Beginning five (5) years after the date permission to assert copyright is
- * obtained from the U.S. Department of Energy, and subject to any subsequent five
- * (5) year renewals, the U.S. Government is granted for itself and others acting
- * on its behalf a paid-up, nonexclusive, irrevocable, worldwide license in the
- * Software to reproduce, prepare derivative works, distribute copies to the
- * public, perform publicly and display publicly, and to permit others to do so.
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly.  Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government is granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
  *
  * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li,.
- *             (Lawrence Berkeley National Lab, Computational Research Division).
+ *             (Lawrence Berkeley National Lab, Computational Research
+ *             Division).
  *
  */
 #include <iostream>
@@ -51,28 +55,38 @@ test(int argc, char* argv[], CSRMatrixMPI<scalar,integer>* Adist) {
 
   auto N = Adist->size();
   auto n_local = Adist->local_rows();
-  std::vector<scalar> b(n_local), x(n_local), x_exact(n_local, scalar(1.)/std::sqrt(N));
+  std::vector<scalar> b(n_local), x(n_local),
+    x_exact(n_local, scalar(1.)/std::sqrt(N));
   Adist->omp_spmv(x_exact.data(), b.data());
 
-  spss.set_distributed_csr_matrix(Adist->local_rows(), Adist->get_ptr(), Adist->get_ind(),
-				  Adist->get_val(), Adist->get_dist().data(), Adist->has_symmetric_sparsity());
+  spss.set_distributed_csr_matrix
+    (Adist->local_rows(), Adist->get_ptr(), Adist->get_ind(),
+     Adist->get_val(), Adist->get_dist().data(),
+     Adist->has_symmetric_sparsity());
   if (spss.reorder() != ReturnCode::SUCCESS) {
-    if (!rank) std::cout << "problem with reordering of the matrix." << std::endl;
+    if (!rank)
+      std::cout << "problem with reordering of the matrix." << std::endl;
     return;
   }
   if (spss.factor() != ReturnCode::SUCCESS) {
-    if (!rank) std::cout << "problem during factorization of the matrix." << std::endl;
+    if (!rank)
+      std::cout << "problem during factorization of the matrix."
+                << std::endl;
     return;
   }
   spss.solve(b.data(), x.data());
 
   auto scaled_res = Adist->max_scaled_residual(x.data(), b.data());
-  if (!rank) std::cout << "# COMPONENTWISE SCALED RESIDUAL = " << scaled_res << std::endl;
+  if (!rank)
+    std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
+              << scaled_res << std::endl;
 
   blas::axpy(n_local, scalar(-1.), x_exact.data(), 1, x.data(), 1);
   auto nrm_error = nrm2_omp_mpi(n_local, x.data(), 1, MPI_COMM_WORLD);
   auto nrm_x_exact = nrm2_omp_mpi(n_local, x_exact.data(), 1, MPI_COMM_WORLD);
-  if (!rank) std::cout << "# RELATIVE ERROR = " << (nrm_error/nrm_x_exact) << std::endl;
+  if (!rank)
+    std::cout << "# RELATIVE ERROR = " << (nrm_error/nrm_x_exact)
+              << std::endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -82,20 +96,26 @@ int main(int argc, char* argv[]) {
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   if (thread_level != MPI_THREAD_FUNNELED && rank == 0)
-    std::cout << "MPI implementation does not support MPI_THREAD_FUNNELED" << std::endl;
+    std::cout << "MPI implementation does not support MPI_THREAD_FUNNELED"
+              << std::endl;
   // if (thread_level != MPI_THREAD_MULTIPLE && rank == 0)
-  //   std::cout << "MPI implementation does not support MPI_THREAD_MULTIPLE, "
-  //     "which might be needed for pt-scotch!" << std::endl;
+  //   std::cout << "MPI implementation does not support MPI_THREAD_MULTIPLE,"
+  //     " which might be needed for pt-scotch!" << std::endl;
 
   if (argc < 3) {
     if (!rank)
-      std::cout << "Solve a linear system with a matrix given in matrix market format" << std::endl
-		<< "using the MPI fully distributed C++ STRUMPACK interface."
-		<< std::endl << std::endl
-		<< "Usage: \n\tmpirun -n 4 ./testMMdoubleMPIDist m pde900.mtx" << std::endl
-		<< "or\n\tmpirun -n 4 ./testMMdoubleMPIDist b pde900.bin" << std::endl
-		<< "Specify the matrix input file with 'm filename' if the matrix is in matrix-market format," << std::endl
-		<< "or with 'b filename' if the matrix is in binary." << std::endl;
+      std::cout
+        << "Solve a linear system with a matrix given in"
+        << " matrix market format" << std::endl
+        << "using the MPI fully distributed C++ STRUMPACK interface."
+        << std::endl << std::endl
+        << "Usage: \n\tmpirun -n 4 ./testMMdoubleMPIDist m pde900.mtx"
+        << std::endl
+        << "or\n\tmpirun -n 4 ./testMMdoubleMPIDist b pde900.bin"
+        << std::endl
+        << "Specify the matrix input file with 'm filename' if the matrix is"
+        << " in matrix-market format," << std::endl
+        << "or with 'b filename' if the matrix is in binary." << std::endl;
     return 1;
   }
 
@@ -106,8 +126,11 @@ int main(int argc, char* argv[]) {
   bool binary_input = false;
   std::string format(argv[1]);
   if (format.compare("b") == 0) binary_input = true;
-  else if (format.compare("m") == 0) binary_input = false;
-  else std::cerr << "Error format is eiter b (binary) or m (matrix market)." << std::endl;
+  else if (format.compare("m") == 0)
+    binary_input = false;
+  else
+    std::cerr << "Error format is eiter b (binary) or m (matrix market)."
+              << std::endl;
 
   std::string f(argv[2]);
 
@@ -135,8 +158,8 @@ int main(int argc, char* argv[]) {
       if (binary_input) ierr = A_c->read_binary(f);
       else ierr = A_c->read_matrix_market(f);
       if (ierr) {
-	std::cerr << "Could not read matrix from file." << std::endl;
-	return 1;
+        std::cerr << "Could not read matrix from file." << std::endl;
+        return 1;
       }
       std::vector<int> perm;
       std::vector<std::complex<double>> Dr;
@@ -154,11 +177,14 @@ int main(int argc, char* argv[]) {
     test(argc, argv, Adist);
     delete Adist;
   } else {
-    auto Adist_c = new CSRMatrixMPI<std::complex<double>,int>(A_c, MPI_COMM_WORLD, true);
+    auto Adist_c = new CSRMatrixMPI<std::complex<double>,int>
+      (A_c, MPI_COMM_WORLD, true);
     delete A_c;
     test(argc, argv, Adist_c);
     delete Adist_c;
   }
+
+  MPI_Errhandler_free(&eh);
   TimerList::Finalize();
   Cblacs_exit(1);
   MPI_Finalize();

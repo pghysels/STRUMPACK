@@ -196,6 +196,8 @@ int main(int argc, char* argv[]) {
     ierr = test(argc, argv, Adist_c);
     delete Adist_c;
   }
+
+  MPI_Errhandler_free(&eh);
   TimerList::Finalize();
   Cblacs_exit(1);
   MPI_Finalize();
