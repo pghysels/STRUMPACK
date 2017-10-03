@@ -336,7 +336,10 @@ namespace strumpack {
     if (is_mpi_root()) printf("# %s", cline);
     if (strstr(cline, "pattern"))  { if (is_mpi_root()) std::cerr << "ERROR: This is not a matrix, but just a sparsity pattern" << std::endl; exit(1); }
     else if (strstr(cline, "complex")) {
-      if (!is_complex<scalar_t>()) throw "ERROR: Complex matrix";
+      if (!is_complex<scalar_t>()) {
+        fclose(fp);
+        throw "ERROR: Complex matrix";
+      }
     }
     MMsym s = GENERAL;
     if (strstr(cline, "skew-symmetric")) { s = SKEWSYMMETRIC; symmetric_sparsity = true; }
