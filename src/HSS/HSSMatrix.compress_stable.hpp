@@ -78,12 +78,13 @@ namespace strumpack {
       } else {
         w.split(this->_ch[0]->dims());
         bool tasked = depth < params::task_recursion_cutoff_level;
-        bool isfinal = depth >= params::task_recursion_cutoff_level-1;
         if (tasked) {
-#pragma omp task default(shared) final(isfinal) mergeable
+#pragma omp task default(shared)                                        \
+  final(depth >= params::task_recursion_cutoff_level-1) mergeable
           this->_ch[0]->compress_recursive_stable
             (Rr, Rc, Sr, Sc, Aelem, opts, w.c[0], d, dd, depth+1);
-#pragma omp task default(shared) final(isfinal) mergeable
+#pragma omp task default(shared)                                        \
+  final(depth >= params::task_recursion_cutoff_level-1) mergeable
           this->_ch[1]->compress_recursive_stable
             (Rr, Rc, Sr, Sc, Aelem, opts, w.c[1], d, dd, depth+1);
 #pragma omp taskwait
@@ -96,12 +97,14 @@ namespace strumpack {
         if (!this->_ch[0]->is_compressed() ||
             !this->_ch[1]->is_compressed()) return;
         if (this->is_untouched()) {
-#pragma omp task default(shared) if(tasked) final(isfinal) mergeable
+#pragma omp task default(shared) if(tasked)                             \
+  final(depth >= params::task_recursion_cutoff_level-1) mergeable
           {
             _B01 = DenseM_t(this->_ch[0]->U_rank(), this->_ch[1]->V_rank());
             Aelem(w.c[0].Ir, w.c[1].Ic, _B01);
           }
-#pragma omp task default(shared) if(tasked) final(isfinal) mergeable
+#pragma omp task default(shared) if(tasked)                             \
+  final(depth >= params::task_recursion_cutoff_level-1) mergeable
           {
             _B10 = DenseM_t(this->_ch[1]->U_rank(), this->_ch[0]->V_rank());
             Aelem(w.c[1].Ir, w.c[0].Ic, _B10);
