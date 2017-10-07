@@ -123,9 +123,9 @@ namespace strumpack {
     int ctxt;
     // this is a blacs context with all process for this front
     int ctxt_all;
-    // number of processes per row in the blacs ctxt
+    // number of process rows in the blacs ctxt
     int proc_rows;
-    // number of processes per col in the blacs ctxt
+    // number of process columns in the blacs ctxt
     int proc_cols;
     // number of processes that work on the subtree belonging to this front,
     int total_procs;
