@@ -1,3 +1,11 @@
+Version 2.0.1 Released October 7, 2017
+======================================
+ - Critical bug fix in HSS Schur complement update.
+ - Some minor performance improvements.
+ - Valgrind fixes, compiler warning fixes (when not compiling with
+   OpenMP).
+
+
 Version 2.0.0 Released October 1, 2017
 ======================================
 This is a major revision. From now on STRUMPACK is released as a
