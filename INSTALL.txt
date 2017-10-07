@@ -7,16 +7,17 @@ Or see example_build.sh for examples on how to call CMake.
 STRUMPACK uses the CMake build system. To build use the
 following steps:
 
-> tar -xvzf STRUMPACK-x.y.z.tar.gz
-> mkdir STRUMPACK-build
-> cd STRUMPACK-build
+> tar -xvzf strumpack-x.y.z.tar.gz
+> cd strumpack-x.y.z
+> mkdir build
+> cd build
 > #see below or in the manual for extra options for CMake
 > export METISDIR=/path/to/metis
 > export PARMETISDIR=/path/to/parmetis
 > export SCOTCHDIR=/path/to/scotch
-> cmake ../STRUMPACK-x.y.z -DCMAKE_BUILD_TYPE=Release \
+> cmake ../ -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/path/to/install \
-    -DCMAKE_CXX_COMPILER=<C++ (MPI) compiler> \
+    -DCMAKE_CXX_COMPILER=<C++ (MPI) compiler> \        # optional, should be detected
     -DCMAKE_C_COMPILER=<C (MPI) compiler> \
     -DCMAKE_Fortran_COMPILER=<Fortran77 (MPI) compiler> \
     -DSCALAPACK_LIBRARIES="/path/to/scalapack/libscalapack.a;/path/to/blacs/libblacs.a" \
@@ -26,15 +27,14 @@ following steps:
     -DPARMETIS_LIBRARIES=/path/to/parmetis/libparmetis.a \
     -DSCOTCH_INCLUDES=/path/to/scotch/include \
     -DSCOTCH_LIBRARIES="/path/to/ptscotch/libscotch.a;...libscotcherr.a;...libptscotch.a;...libptscotcherr.a"
-> make install VERBOSE=1
-> make doc VERBOSE=1  # optional
-> cd examples         # optional
-> make                # optional
+> make
+> make install
+> make test     # optional
 
 
 This will build STRUMPACK in a folder separate from the source
 directory, which is the recommended way of building. This also
-generates an example Makefile in the folder STRUMPACK-build/examples.
+generates an example Makefile in the folder build/examples.
 
 There are a number of dependencies which must be met in order for the
 build to succeed. These are:
@@ -48,7 +48,7 @@ build to succeed. These are:
 
 
 The (C++/C/Fortran) compiler can be specified as follows:
-> cmake ../STRUMPACK-x.y.z -DCMAKE_BUILD_TYPE=Release
+> cmake ../ -DCMAKE_BUILD_TYPE=Release
     -DCMAKE_CXX_COMPILER=mpic++ -DCMAKE_C_COMPILER=mpicc
     -DCMAKE_Fortran_COMPILER=mpif90
 
@@ -65,7 +65,7 @@ If BLACS/SCALAPACK are not installed in a standard location, you
 can also specify the libraries for instance using
 -DSCALAPACK_LIBRARIES=".." or directly via the linker flags as
 follows:
-> cmake ../STRUMPACK-x.y.z -DCMAKE_BUILD_TYPE=Release
+> cmake ../ -DCMAKE_BUILD_TYPE=Release
      -DCMAKE_EXE_LINKER_FLAGS="-L/usr/lib64/mpich/lib/ -lscalapack -lmpiblacs"
 
 
@@ -87,7 +87,7 @@ libscotch, libscotcherr, libptscotch, libptscotcherr.
 
 Alternatively, one can specify the paths directly when calling CMake
 as follows:
-> cmake ../STRUMPACK-x.y.z -DCMAKE_BUILD_TYPE=Release
+> cmake ../ -DCMAKE_BUILD_TYPE=Release
     -DMETIS_INCLUDES=/usr/local/metis/include \
     -DMETIS_LIBRARIES=/usr/local/metis/lib/libmetis.a
 
