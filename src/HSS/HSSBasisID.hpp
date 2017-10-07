@@ -104,7 +104,9 @@ namespace strumpack {
 
     template<typename scalar_t> void HSSBasisID<scalar_t>::apply
     (const DenseMatrix<scalar_t>& b, DenseMatrix<scalar_t>& c, int depth) const {
-      c.copy(apply(b, depth)); // TODO avoid copy!!
+      copy(cols(), b.cols(), b, 0, 0, c, 0, 0);
+      if (E().rows()) gemm(Trans::N, Trans::N, scalar_t(1), E(), b, scalar_t(0.), c.ptr(cols(), 0), c.ld());
+      c.permute_rows_bwd(P());
     }
 
 
