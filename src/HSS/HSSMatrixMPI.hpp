@@ -833,8 +833,8 @@ namespace strumpack {
     (const DistM_t& dist, DenseM_t& sub, DistM_t& leaf) const {
       if (!this->active()) return;
       assert(std::size_t(dist.rows())==this->cols());
-      BC2BR::block_cyclic_to_block_row(_ranges, dist, sub, leaf,
-                                       ctxt_loc(), _comm);
+      BC2BR::block_cyclic_to_block_row
+        (_ranges, dist, sub, leaf, ctxt_loc(), _comm);
     }
 
     template<typename scalar_t> void
