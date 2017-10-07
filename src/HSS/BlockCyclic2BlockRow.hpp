@@ -57,8 +57,6 @@ namespace strumpack {
             if (dist.active()) {
               const int leaf_pcols = std::floor(std::sqrt((float)leaf_procs));
               const int leaf_prows = leaf_procs / leaf_pcols;
-              assert(!leaf.active() || (leaf_prows == leaf.prows()));
-              assert(!leaf.active() || (leaf_pcols == leaf.pcols()));
               for (int r=rlo; r<rhi; r++)
                 destr[r-rlo] = p
                   + (((dist.rowl2g_fixed(r) - rbegin) / MB) % leaf_prows);
