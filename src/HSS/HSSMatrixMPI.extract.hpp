@@ -50,24 +50,48 @@ namespace strumpack {
     (std::vector<Triplet<scalar_t>>& triplets, DistM_t& B,
      int Bprows, int Bpcols) const {
       auto P = mpi_nprocs(_comm);
-      std::vector<std::vector<Triplet<scalar_t>>> sbuf(P);
       const int MB = DistM_t::default_MB;
-      // TODO optimize this loop
+      auto destr = new int[B.rows()+B.cols()+P];
+      auto destc = destr + B.rows();
+      auto ssize = destc + B.cols();
+      std::fill(destr, destr+B.rows()+B.cols(), -1);
+      std::fill(ssize, ssize+P, 0);
       for (auto& t : triplets) {
-        auto dest = (t._r / MB) % Bprows + ((t._c / MB) % Bpcols) * Bprows;
-        assert(dest >= 0 && dest < P);
-        sbuf[dest].push_back(t);
+        assert(t._r >= 0);
+        assert(t._c >= 0);
+        assert(t._r < B.rows());
+        assert(t._c < B.cols());
+        auto dr = destr[t._r];
+        if (dr == -1) dr = destr[t._r] = (t._r / MB) % Bprows;
+        auto dc = destc[t._c];
+        if (dc == -1) dc = destc[t._c] = ((t._c / MB) % Bpcols) * Bprows;
+        assert(dr+dc >= 0 && dr+dc < P);
+        ssize[dr+dc]++;
       }
+      std::vector<std::vector<Triplet<scalar_t>>> sbuf(P);
+      for (int p=0; p<P; p++)
+        sbuf[p].reserve(ssize[p]);
+      for (auto& t : triplets)
+        sbuf[destr[t._r]+destc[t._c]].emplace_back(t);
+      Triplet<scalar_t>* rbuf = nullptr;
+      std::size_t totrsize = 0;
       MPI_Datatype triplet_type;
       create_triplet_mpi_type<scalar_t>(&triplet_type);
-      Triplet<scalar_t>* rbuf;
-      std::size_t totrsize;
       all_to_all_v(sbuf, rbuf, totrsize, _comm, triplet_type);
-      if (B.active())
-        for (auto t=rbuf; t!=rbuf+totrsize; t++)
-          B.global_fixed(t->_r, t->_c) = t->_v;
+      if (B.active()) {
+        std::fill(destr, destr+B.rows()+B.cols(), -1);
+        auto lr = destr;
+        auto lc = destc;
+        for (auto t=rbuf; t!=rbuf+totrsize; t++) {
+          int locr = lr[t->_r];
+          if (locr == -1) locr = lr[t->_r] = B.rowg2l_fixed(t->_r);
+          int locc = lc[t->_c];
+          if (locc == -1) locc = lc[t->_c] = B.colg2l_fixed(t->_c);
+          B(locr, locc) = t->_v;
+        }
+      }
       delete[] rbuf;
-      MPI_Type_free(&triplet_type);
+      delete[] destr;
     }
 
     // TODO lctxt is not used here
