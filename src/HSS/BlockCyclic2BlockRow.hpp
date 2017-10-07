@@ -94,14 +94,12 @@ namespace strumpack {
                   sbuf[p].emplace_back(gr[r-rlo], gc, dist(r,c));
             }
           } else {
-            if (p <= rank && rank < p+leaf_procs)
-              leaf = DistributedMatrix<scalar_t>(lctxt, m, d);
             if (dist.active()) {
               const int leaf_pcols = std::floor(std::sqrt((float)leaf_procs));
               const int leaf_prows = leaf_procs / leaf_pcols;
               for (int r=rlo; r<rhi; r++) {
                 gr[r-rlo] = dist.rowl2g_fixed(r) - rbegin;
-                destr[r-rlo] = p + ((gr[r] / MB) % leaf_prows);
+                destr[r-rlo] = p + ((gr[r-rlo] / MB) % leaf_prows);
               }
               for (int c=clo; c<chi; c++) {
                 const auto gc = dist.coll2g_fixed(c);
@@ -189,6 +187,7 @@ namespace strumpack {
             auto destc = gr + lrows;
             auto gc    = destc + lcols;
             auto ssize = gc + lcols;
+            std::fill(ssize, ssize+P, 0);
             for (int r=0; r<lrows; r++) {
               gr[r] = leaf.rowl2g_fixed(r) + rbegin;
               destr[r] = ((gr[r] / MB) % dist_prows);
@@ -229,6 +228,7 @@ namespace strumpack {
             if (locc == -1) locc = lc[t->_c] = dist.colg2l_fixed(t->_c);
             dist(locr, locc) = t->_v;
           }
+          delete[] lr;
         }
         delete[] rbuf;
       }
