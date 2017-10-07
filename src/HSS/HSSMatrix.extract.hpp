@@ -49,7 +49,7 @@ namespace strumpack {
       if (this->leaf()) {
         if (odiag) w.y = _V.extract_rows(w.J).transpose();
         else w.ycols.clear();
-      }         else {
+      } else {
         w.split_extraction_sets(this->_ch[0]->dims());
         for (std::size_t c=0; c<w.J.size(); c++) {
           if (w.J[c] < this->_ch[0]->cols())
@@ -98,6 +98,12 @@ namespace strumpack {
       if (this->leaf()) {
 #pragma omp critical
         {
+          if (w.z.cols() && _U.cols())
+            triplets.reserve
+              (triplets.size() + w.I.size()*(w.J.size()+ w.z.cols()));
+          else triplets.reserve(triplets.size() + w.I.size()*w.J.size());
+          assert(w.cl2g.size() >= w.J.size());
+          assert(w.rl2g.size() >= w.I.size());
           for (std::size_t c=0; c<w.J.size(); c++)
             for (std::size_t r=0; r<w.I.size(); r++)
               triplets.emplace_back(w.rl2g[r], w.cl2g[c], _D(w.I[r],w.J[c]));
@@ -105,6 +111,7 @@ namespace strumpack {
             DenseM_t tmp(w.I.size(), w.z.cols());
             gemm(Trans::N, Trans::N, scalar_t(1), _U.extract_rows(w.I),
                  w.z, scalar_t(0.), tmp, depth);
+            assert(w.rl2g.size() >= w.I.size());
             for (std::size_t c=0; c<w.z.cols(); c++)
               for (std::size_t r=0; r<w.I.size(); r++)
                 triplets.emplace_back(w.rl2g[r], w.zcols[c], tmp(r,c));
