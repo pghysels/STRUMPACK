@@ -78,6 +78,7 @@ namespace strumpack {
       MPI_Datatype triplet_type;
       create_triplet_mpi_type<scalar_t>(&triplet_type);
       all_to_all_v(sbuf, rbuf, totrsize, _comm, triplet_type);
+      MPI_Type_free(&triplet_type);
       if (B.active()) {
         std::fill(destr, destr+B.rows()+B.cols(), -1);
         auto lr = destr;
