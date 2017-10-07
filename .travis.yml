@@ -30,6 +30,7 @@ git:
 before_install:
   - export BLUE="\033[34;1m"
   - mkdir installDir
+
   - printf "${BLUE} GC; Installing gcc-6 via apt\n"
   - sudo apt-get update
   - sudo apt-get install build-essential software-properties-common -y
@@ -50,10 +51,10 @@ before_install:
   - sudo apt-get update
   - sudo apt-get install openmpi-bin libopenmpi-dev
   - printf "${BLUE} GC; Done installing OpenMPI-1 via apt\n"
-
+  
 install:
-  - BLUE="\033[34;1m"
-
+  - export BLUE="\033[34;1m"
+  
   - printf "${BLUE} GC; Installing BLAS and LAPACK from apt\n"
   - sudo apt-get install libblas-dev liblapack-dev
   - export BLAS_LIB=/usr/lib/libblas/libblas.so
@@ -75,7 +76,7 @@ install:
   - printf "LIBS=$BLAS_LIB $LAPACK_LIB\n" >> SLmake.inc
   - sed -i "s/SCA#LAPACKLIB/#SCA#LAPACKLIB/" SLmake.inc
   - printf "SCALAPACKLIB=libscalapack.a\n" >> SLmake.inc
-  - make lib
+  - make lib  > tempMakeOutput.txt 2>&1
   - export SCALAPACK_LIB=$TRAVIS_BUILD_DIR/installDir/scalapack-2.0.2/libscalapack.a
   - printf "${BLUE} GC; Done installing ScaLAPACK from source\n"
 
@@ -87,6 +88,7 @@ install:
   - mkdir build
   - cd ./src
   - cp ./Make.inc/Makefile.inc.x86-64_pc_linux2 Makefile.inc
+  - sed -i "s/-DSCOTCH_PTHREAD//" Makefile.inc
   - sed -i "s/CCD/#CCD/" Makefile.inc
   - printf "CCD = mpicc\n" >> Makefile.inc
   - cat Makefile.inc
@@ -111,9 +113,9 @@ install:
   - |
     cmake .. -DCMAKE_BUILD_TYPE=Debug \
     -DCMAKE_INSTALL_PREFIX=. \
-    -DCMAKE_C_COMPILER=/usr/bin/mpicc.openmpi \
-    -DCMAKE_CXX_COMPILER=/usr/bin/mpic++.openmpi \
-    -DCMAKE_Fortran_COMPILER=/usr/bin/mpif90.openmpi \
+    -DCMAKE_C_COMPILER=mpicc \
+    -DCMAKE_CXX_COMPILER=mpic++ \
+    -DCMAKE_Fortran_COMPILER=mpif90 \
     -DBLAS_LIBRARIES=$BLAS_LIB \
     -DLAPACK_LIBRARIES=$LAPACK_LIB \
     -DSCALAPACK_LIBRARIES=$SCALAPACK_LIB \
@@ -124,7 +126,6 @@ install:
     -DPARMETIS_LIBRARIES=$TRAVIS_BUILD_DIR/installDir/parmetis-4.0.3/install/lib/libparmetis.so \
     -DSCOTCH_INCLUDES=$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/include \
     -DSCOTCH_LIBRARIES="$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libscotch.a;$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libscotcherr.a;$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libptscotch.a;$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libptscotcherr.a"
-
   - make install VERBOSE=1
   - printf "${BLUE} GC; Done installing STRUMPACK from source\n"
 
