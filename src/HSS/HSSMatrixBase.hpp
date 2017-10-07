@@ -528,6 +528,8 @@ namespace strumpack {
       auto sUop = Uop.gather(); // dense_and_clear
       auto sVop = Vop.gather(); // dense_and_clear();
       const std::pair<std::size_t, std::size_t> offset;
+      Uop.clear();
+      Vop.clear();
       apply_UV_big(Theta.sub, sUop, Phi.sub, sVop, offset, _openmp_task_depth);
     }
 
