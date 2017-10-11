@@ -231,7 +231,7 @@ namespace strumpack {
       ch_seq = (ch_mpi == this->lchild) ? this->rchild : this->lchild;
     else ch_seq = this->lchild ? this->lchild : this->rchild;
     DenseM_t Rseq, Srseq, Scseq;
-    int m, n;
+    int m = 0, n = 0;
     auto pch = this->child_master(ch_seq);
     if (ch_seq) {
       m = R.rows(), n = R.cols();

@@ -41,7 +41,7 @@ namespace strumpack {
   (integer_t n, SCOTCH_Graph* graph, SCOTCH_Strat* strat,
    integer_t* permtab, integer_t* peritab,
    integer_t* cblkptr, SCOTCH_Num* rangtab, SCOTCH_Num* treetab) {
-    SCOTCH_Num  scotch_cblkptr;
+    SCOTCH_Num scotch_cblkptr = *cblkptr;
     auto scotch_permtab = new SCOTCH_Num[2*n];
     auto scotch_peritab = scotch_permtab + n;
     int ierr = SCOTCH_graphOrder
@@ -194,7 +194,7 @@ namespace strumpack {
 
     std::vector<SCOTCH_Num> scotch_sizes(n+1);
     std::vector<SCOTCH_Num> scotch_tree(n);
-    integer_t nbsep;
+    integer_t nbsep = 0;
     ierr = WRAPPER_SCOTCH_graphOrder<integer_t>
       (n, &graph, &strategy, perm, iperm,
        &nbsep, scotch_sizes.data(), scotch_tree.data());
