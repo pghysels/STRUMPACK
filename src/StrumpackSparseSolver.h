@@ -147,9 +147,10 @@ extern "C" {
   void STRUMPACK_disable_HSS(STRUMPACK_SparseSolver S);
   void STRUMPACK_set_HSS_min_front_size(STRUMPACK_SparseSolver S, int size);
   void STRUMPACK_set_HSS_min_sep_size(STRUMPACK_SparseSolver S, int size);
-  void STRUMPACK_set_max_rank(STRUMPACK_SparseSolver S, int max_rank);
-  void STRUMPACK_set_hss_rel_tol(STRUMPACK_SparseSolver S, double rctol);
-  void STRUMPACK_set_hss_abs_tol(STRUMPACK_SparseSolver S, double actol);
+  void STRUMPACK_set_HSS_max_rank(STRUMPACK_SparseSolver S, int max_rank);
+  void STRUMPACK_set_HSS_leaf_size(STRUMPACK_SparseSolver S, int leaf_size);
+  void STRUMPACK_set_HSS_rel_tol(STRUMPACK_SparseSolver S, double rctol);
+  void STRUMPACK_set_HSS_abs_tol(STRUMPACK_SparseSolver S, double actol);
 
 
   /*************************************************************
@@ -172,9 +173,10 @@ extern "C" {
   int use_HSS(STRUMPACK_SparseSolver S);
   int STRUMPACK_HSS_min_front_size(STRUMPACK_SparseSolver S);
   int STRUMPACK_HSS_min_sep_size(STRUMPACK_SparseSolver S);
-  int STRUMPACK_max_rank(STRUMPACK_SparseSolver S);
-  double STRUMPACK_hss_rel_tol(STRUMPACK_SparseSolver S);
-  double STRUMPACK_hss_abs_tol(STRUMPACK_SparseSolver S);
+  int STRUMPACK_HSS_max_rank(STRUMPACK_SparseSolver S);
+  int STRUMPACK_HSS_leaf_size(STRUMPACK_SparseSolver S);
+  double STRUMPACK_HSS_rel_tol(STRUMPACK_SparseSolver S);
+  double STRUMPACK_HSS_abs_tol(STRUMPACK_SparseSolver S);
 
 
   /*************************************************************

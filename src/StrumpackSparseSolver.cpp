@@ -441,11 +441,13 @@ extern "C" {
   { switch_precision(options().set_HSS_min_front_size(size)); }
   void STRUMPACK_set_HSS_min_sep_size(STRUMPACK_SparseSolver S, int size)
   { switch_precision(options().set_HSS_min_sep_size(size)); }
-  void STRUMPACK_set_max_rank(STRUMPACK_SparseSolver S, int max_rank)
+  void STRUMPACK_set_HSS_max_rank(STRUMPACK_SparseSolver S, int max_rank)
   { switch_precision(options().HSS_options().set_max_rank(max_rank)); }
-  void STRUMPACK_set_hss_rel_tol(STRUMPACK_SparseSolver S, double rctol)
+  void STRUMPACK_set_HSS_leaf_size(STRUMPACK_SparseSolver S, int leaf_size)
+  { switch_precision(options().HSS_options().set_leaf_size(leaf_size)); }
+  void STRUMPACK_set_HSS_rel_tol(STRUMPACK_SparseSolver S, double rctol)
   { switch_precision(options().HSS_options().set_rel_tol(rctol)); }
-  void STRUMPACK_set_hss_abs_tol(STRUMPACK_SparseSolver S, double actol)
+  void STRUMPACK_set_HSS_abs_tol(STRUMPACK_SparseSolver S, double actol)
   { switch_precision(options().HSS_options().set_abs_tol(actol)); }
 
 
@@ -521,17 +523,22 @@ extern "C" {
     switch_precision_return(options().HSS_min_sep_size(), size);
     return size;
   }
-  int STRUMPACK_max_rank(STRUMPACK_SparseSolver S) {
+  int STRUMPACK_HSS_max_rank(STRUMPACK_SparseSolver S) {
     int rank = 0;
     switch_precision_return(options().HSS_options().max_rank(), rank);
     return rank;
   }
-  double STRUMPACK_hss_rel_tol(STRUMPACK_SparseSolver S) {
+  int STRUMPACK_HSS_leaf_size(STRUMPACK_SparseSolver S) {
+    int l = 0;
+    switch_precision_return(options().HSS_options().leaf_size(), l);
+    return l;
+  }
+  double STRUMPACK_HSS_rel_tol(STRUMPACK_SparseSolver S) {
     double rctol = 0;
     switch_precision_return(options().HSS_options().rel_tol(), rctol);
     return rctol;
   }
-  double STRUMPACK_hss_abs_tol(STRUMPACK_SparseSolver S) {
+  double STRUMPACK_HSS_abs_tol(STRUMPACK_SparseSolver S) {
     double actol = 0.;
     switch_precision_return(options().HSS_options().abs_tol(), actol);
     return actol;
