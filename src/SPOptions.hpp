@@ -157,7 +157,7 @@ namespace strumpack {
     int _hss_min_sep_size = 256;
     int _sep_order_level = 1;
     bool _indirect_sampling = false;
-    bool _replace_tiny_pivots = true;
+    bool _replace_tiny_pivots = false;
     HSS::HSSOptions<scalar_t> _hss_opts;
 
     int _argc = 0;

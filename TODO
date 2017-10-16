@@ -13,7 +13,8 @@ High priority:
 - to decide which fronts are HSS, look at front size, not just
   separator size. This requires that symbolic factorization is already
   done.
-
+- Study behavior of replacement of tiny pivots. Look at different
+  matrices (including large ones!). Implement for distributed fronts!!
 
 Medium:
 - matrix equilibration: see SuperLU_dist pdgsequ and pdlaqgs
