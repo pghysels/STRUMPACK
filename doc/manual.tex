@@ -52,7 +52,7 @@
   Christopher Gorman\footnotemark[2] \\
   Gustavo Ch\'{a}vez\footnotemark[1] \\
   Fran\c{c}ois-Henry Rouet\footnotemark[3]}
-\date{Version \textbf{2.0.1}, October 2017}
+\date{Version \textbf{2.1.0}, October 2017}
 
 \begin{document}
 
@@ -927,8 +927,6 @@ the \lstinline[style=C]!real! type is the real part of a scalar, i.e.,
     void enable_HSS();                                    bool use_HSS() const;
     /* disable HSS compression                                        */
     void disable_HSS();
-    /* set the minimum size of a front for HSS compression            */
-    void set_HSS_min_front_size(int s);                   int HSS_min_front_size() const;
     /* set the minimum size of a separator for HSS compression        */
     void set_HSS_min_sep_size(int s);                     int HSS_min_sep_size() const;
 
@@ -956,6 +954,8 @@ the \lstinline[style=C]!real! type is the real part of a scalar, i.e.,
     void describe_options() const;
   };
 \end{lstlisting}
+% /* set the minimum size of a front for HSS compression            */
+% void set_HSS_min_front_size(int s);                   int HSS_min_front_size() const;
 This uses the following (scoped) enumeration for the Gram-Schmidt type
 used in GMRES:
 \begin{lstlisting}[style=C]
@@ -995,7 +995,6 @@ precision.
    --sp_mc64job 0-5 (default 0)
    --sp_enable_hss (default false)
    --sp_disable_hss (default true)
-   --sp_hss_min_front_size int (default 1000)
    --sp_hss_min_sep_size int (default 256)
    --sp_separator_ordering_level (default 1)
    --sp_enable_indirect_sampling
@@ -1006,7 +1005,7 @@ precision.
    --sp_quiet or -q (default false)
    --help or -h
 \end{lstlisting}
-
+%   --sp_hss_min_front_size int (default 1000)
 
 \section{HSS Preconditioning}\label{sec:HSS}
 
@@ -1126,27 +1125,29 @@ parameter to specify the minimum size a dense matrix needs to be to be
 considered a candidate for HSS compression. The minimum dense matrix
 size for HSS compression is set via the command line via
 \begin{lstlisting}[style=Bash]
-  --sp_hss_min_front_size int (default 1000)
   --sp_hss_min_sep_size int (default 256)
 \end{lstlisting}
+% --sp_hss_min_front_size int (default 1000)
 or via the C\texttt{++} API as follows
 \begin{lstlisting}[style=C]
-  void SPOptions<scalar>::set_HSS_min_front_size(int s);
   void SPOptions<scalar>::set_HSS_min_sep_size(int s);
-  int SPOptions<scalar>::HSS_min_front_size() const;  // get the current value
-  int SPOptions<scalar>::HSS_min_sep_size() const;
+  int SPOptions<scalar>::HSS_min_sep_size() const;   // get the current value
 \end{lstlisting}
-The routine \lstinline[style=C]!set_HSS_min_front_size(int s)! sets
-the minimum size of the entire front, while
+%  void SPOptions<scalar>::set_HSS_min_front_size(int s);
+%  int SPOptions<scalar>::HSS_min_front_size() const;
+The routine % \lstinline[style=C]!set_HSS_min_front_size(int s)! sets
+% the minimum size of the entire front, while
 \lstinline[style=C]!set_HSS_min_sep_size(int s)! refers to the size of
 the top-left block of the front only. This top-left block is the part
 that corresponds to a separator, as given by the nested dissection
 reordering algorithm. This top-left block is also referred to as the
 block containing the fully-summed variable. Factorization (LU in the
 dense case, ULV in the HSS case) is only applied to this top-left
-block. \emph{\textbf{Tuning the values for the minimum front and
-    separator sizes can have a big impact on performance and memory
-    usage!}}
+block.
+% \emph{\textbf{Tuning the values for the minimum front and separator
+% sizes can have a big impact on performance and memory usage!}}
+\emph{\textbf{Tuning the value for the minimum separator size can have
+    a big impact on performance and memory usage!}}
 
 The above options affect the use of HSS within the multifrontal
 solver. There are more, HSS specific, options which are stored in an

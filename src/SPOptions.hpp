@@ -469,10 +469,10 @@ namespace strumpack {
                 << use_HSS() << ")" << std::endl;
       std::cout << "#   --sp_disable_hss (default " << std::boolalpha
                 << !use_HSS() << ")" << std::endl;
-      std::cout << "#   --sp_hss_min_front_size int (default "
-                << HSS_min_front_size() << ")" << std::endl;
-      std::cout << "#          minimum size of front for HSS compression"
-                << std::endl;
+      // std::cout << "#   --sp_hss_min_front_size int (default "
+      //           << HSS_min_front_size() << ")" << std::endl;
+      // std::cout << "#          minimum size of front for HSS compression"
+      //           << std::endl;
       std::cout << "#   --sp_hss_min_sep_size int (default "
                 << HSS_min_sep_size() << ")" << std::endl;
       std::cout << "#          minimum size of the separator for HSS"
