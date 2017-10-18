@@ -1,7 +1,8 @@
 all: sexample dexample cexample zexample testPoisson2d testPoisson3d	\
 	testPoisson2dMPI testPoisson2dMPIDist testMMdouble		\
 	testMMdoubleMPI testMMdoubleMPIDist testMMdouble64		\
-	testMMdoubleMPIDist64 testMMfloat mtx2bin bin2mtx MLkernel
+	testMMdoubleMPIDist64 testMMfloat testMMfloatMPIDist		\
+	mtx2bin bin2mtx MLkernel
 
 CC=@MPI_C_COMPILER@
 CXX=@MPI_CXX_COMPILER@
@@ -73,6 +74,11 @@ testMMfloat: testMMfloat.cpp
 	$(CXX) $(LDFLAGS) testMMfloat.o -o $@ $(LIBS)
 	$(RM) testMMfloat.o
 
+testMMfloatMPIDist: testMMfloatMPIDist.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMfloatMPIDist.o
+	$(CXX) $(LDFLAGS) testMMfloatMPIDist.o -o $@ $(LIBS)
+	$(RM) testMMfloatMPIDist.o
+
 mtx2bin: mtx2bin.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o mtx2bin.o
 	$(CXX) $(LDFLAGS) mtx2bin.o -o $@ $(LIBS)
@@ -92,7 +98,8 @@ clean:
 	rm -f *~ *o sexample dexample cexample zexample testPoisson2d	\
 		testPoisson3d testPoisson2dMPI testPoisson2dMPIDist	\
 		testMMdouble testMMdoubleMPI testMMdoubleMPIDist	\
-		testMMdouble64 testMMdoubleMPIDist64 testMMfloat	\
+		testMMdouble64 testMMdoubleMPIDist64			\
+		testMMfloat testMMfloatMPIDist				\
 		mtx2bin bin2mtx MLkernel
 
 

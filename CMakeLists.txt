@@ -288,6 +288,8 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPIDist64.cpp
   ${CMAKE_BINARY_DIR}/examples/testMMdoubleMPIDist64.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/testMMfloat.cpp
   ${CMAKE_BINARY_DIR}/examples/testMMfloat.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/testMMfloatMPIDist.cpp
+  ${CMAKE_BINARY_DIR}/examples/testMMfloatMPIDist.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/mtx2bin.cpp
   ${CMAKE_BINARY_DIR}/examples/mtx2bin.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/bin2mtx.cpp
