@@ -30,8 +30,6 @@
 #include <sstream>
 #include <getopt.h>
 
-#define STRUMPACK_PBLAS_BLOCKSIZE 3
-
 #include "StrumpackSparseSolverMPIDist.hpp"
 #include "CSRMatrix.hpp"
 #include "CSRMatrixMPI.hpp"

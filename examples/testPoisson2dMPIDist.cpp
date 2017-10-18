@@ -26,9 +26,6 @@
  *             Division).
  *
  */
-
-#define STRUMPACK_PBLAS_BLOCKSIZE 2;
-
 #include <iostream>
 #include "StrumpackSparseSolverMPIDist.hpp"
 #include "CSRMatrix.hpp"
