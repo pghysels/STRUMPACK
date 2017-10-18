@@ -1,3 +1,10 @@
+Version 2.1.0 Released October 18, 2017
+======================================
+ - Cleanup in the C interface.
+ - Removed (set_)HSS_min_front_size and --sp_hss_min_front_size from
+   the manual, it is not supported (yet)
+
+
 Version 2.0.1 Released October 7, 2017
 ======================================
  - Critical bug fix in HSS Schur complement update.
