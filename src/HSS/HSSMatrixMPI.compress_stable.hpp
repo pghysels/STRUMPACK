@@ -230,7 +230,7 @@ namespace strumpack {
       gemm(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.), Q3);
       params::ortho_flops += params::flops - f0;
       auto Q3norm = Q3.norm();
-      return (Q3norm / std::sqrt(double(d)) < opts.abs_tol())
+      return (Q3norm / std::sqrt(double(dd)) < opts.abs_tol())
         || (Q3norm / S3norm < opts.rel_tol());
     }
 
