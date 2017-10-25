@@ -1,25 +1,29 @@
 /*
- * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The Regents of
- * the University of California, through Lawrence Berkeley National Laboratory
- * (subject to receipt of any required approvals from the U.S. Dept. of Energy).
- * All rights reserved.
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
  *
- * If you have questions about your rights to use or distribute this software,
- * please contact Berkeley Lab's Technology Transfer Department at TTD@lbl.gov.
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
  *
- * NOTICE. This software is owned by the U.S. Department of Energy. As such, the
- * U.S. Government has been granted for itself and others acting on its behalf a
- * paid-up, nonexclusive, irrevocable, worldwide license in the Software to
- * reproduce, prepare derivative works, and perform publicly and display publicly.
- * Beginning five (5) years after the date permission to assert copyright is
- * obtained from the U.S. Department of Energy, and subject to any subsequent five
- * (5) year renewals, the U.S. Government is granted for itself and others acting
- * on its behalf a paid-up, nonexclusive, irrevocable, worldwide license in the
- * Software to reproduce, prepare derivative works, distribute copies to the
- * public, perform publicly and display publicly, and to permit others to do so.
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly.  Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government is granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
  *
  * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
- *             (Lawrence Berkeley National Lab, Computational Research Division).
+ *             (Lawrence Berkeley National Lab, Computational Research
+ *             Division).
  *
  */
 #ifndef MPI_WRAPPER_HPP
@@ -83,8 +87,10 @@ inline void mpi_free_comm(MPI_Comm* comm) {
   }
 }
 
-template<class T> struct MPIRealType { typedef T value_type; };
-template<class T> struct MPIRealType<std::complex<T>> { typedef T value_type; };
+template<class T> struct
+MPIRealType { typedef T value_type; };
+template<class T> struct
+MPIRealType<std::complex<T>>{ typedef T value_type; };
 
 template<typename scalar_t> typename MPIRealType<scalar_t>::value_type
 nrm2_omp_mpi(int N, scalar_t* X, int incx, MPI_Comm comm) {
@@ -95,15 +101,17 @@ nrm2_omp_mpi(int N, scalar_t* X, int incx, MPI_Comm comm) {
     for (int i=0; i<N; i++) local_nrm += std::real(std::conj(X[i])*X[i]);
   } else {
 #pragma omp parallel for reduction(+:local_nrm)
-    for (int i=0; i<N; i++) local_nrm += std::real(std::conj(X[i*incx])*X[i*incx]);
+    for (int i=0; i<N; i++)
+      local_nrm += std::real(std::conj(X[i*incx])*X[i*incx]);
   }
   MPI_Allreduce(&local_nrm, &nrm, 1, mpi_type<real_t>(), MPI_SUM, comm);
   STRUMPACK_FLOPS(static_cast<long long int>(N)*2);
   return std::sqrt(nrm);
 }
 
-template<typename T> inline void all_to_all_v
-(std::vector<std::vector<T>>& sbuf, T*& recvbuf, T**& pbuf, MPI_Comm comm, MPI_Datatype Ttype) {
+template<typename T> inline void
+all_to_all_v(std::vector<std::vector<T>>& sbuf, T*& recvbuf, T**& pbuf,
+             MPI_Comm comm, MPI_Datatype Ttype) {
   int P = sbuf.size();
   auto ssizes = new int[4*P];
   auto rsizes = ssizes + P;
@@ -119,23 +127,27 @@ template<typename T> inline void all_to_all_v
     sdispl[p] = sdispl[p-1] + ssizes[p-1];
     rdispl[p] = rdispl[p-1] + rsizes[p-1];
   }
-  for (int p=0; p<P; p++) std::copy(sbuf[p].begin(), sbuf[p].end(), sendbuf+sdispl[p]);
+  for (int p=0; p<P; p++)
+    std::copy(sbuf[p].begin(), sbuf[p].end(), sendbuf+sdispl[p]);
   std::vector<std::vector<T>>().swap(sbuf);
   recvbuf = new T[totrsize];
-  MPI_Alltoallv(sendbuf, ssizes, sdispl, Ttype, recvbuf, rsizes, rdispl, Ttype, comm);
+  MPI_Alltoallv(sendbuf, ssizes, sdispl, Ttype,
+                recvbuf, rsizes, rdispl, Ttype, comm);
   pbuf = new T*[P];
   for (int p=0; p<P; p++) pbuf[p] = recvbuf + rdispl[p];
   delete[] ssizes;
   delete[] sendbuf;
 }
 
-template<typename T> inline void all_to_all_v
-(std::vector<std::vector<T>>& sbuf, T*& recvbuf, T**& pbuf, MPI_Comm comm) {
+template<typename T> inline void
+all_to_all_v(std::vector<std::vector<T>>& sbuf, T*& recvbuf,
+             T**& pbuf, MPI_Comm comm) {
   all_to_all_v(sbuf, recvbuf, pbuf, comm, mpi_type<T>());
 }
 
-template<typename T> inline void all_to_all_v
-(std::vector<std::vector<T>>& sbuf, T*& recvbuf, std::size_t& totrsize, MPI_Comm comm, MPI_Datatype Ttype) {
+template<typename T> inline void
+all_to_all_v(std::vector<std::vector<T>>& sbuf, T*& recvbuf,
+             std::size_t& totrsize, MPI_Comm comm, MPI_Datatype Ttype) {
   int P = sbuf.size();
   auto ssizes = new int[4*P];
   auto rsizes = ssizes + P;
@@ -151,16 +163,19 @@ template<typename T> inline void all_to_all_v
     sdispl[p] = sdispl[p-1] + ssizes[p-1];
     rdispl[p] = rdispl[p-1] + rsizes[p-1];
   }
-  for (int p=0; p<P; p++) std::copy(sbuf[p].begin(), sbuf[p].end(), sendbuf+sdispl[p]);
+  for (int p=0; p<P; p++)
+    std::copy(sbuf[p].begin(), sbuf[p].end(), sendbuf+sdispl[p]);
   std::vector<std::vector<T>>().swap(sbuf);
   recvbuf = new T[totrsize];
-  MPI_Alltoallv(sendbuf, ssizes, sdispl, Ttype, recvbuf, rsizes, rdispl, Ttype, comm);
+  MPI_Alltoallv(sendbuf, ssizes, sdispl, Ttype, recvbuf, rsizes,
+                rdispl, Ttype, comm);
   delete[] ssizes;
   delete[] sendbuf;
 }
 
-template<typename T> inline void all_to_all_v
-(std::vector<std::vector<T>>& sbuf, T*& recvbuf, std::size_t& totrsize, MPI_Comm comm) {
+template<typename T> inline void
+all_to_all_v(std::vector<std::vector<T>>& sbuf, T*& recvbuf,
+             std::size_t& totrsize, MPI_Comm comm) {
   all_to_all_v(sbuf, recvbuf, totrsize, comm, mpi_type<T>());
 }
 
