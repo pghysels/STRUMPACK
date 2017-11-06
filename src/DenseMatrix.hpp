@@ -107,6 +107,9 @@ namespace strumpack {
     void ID_row(DenseMatrix<scalar_t>& X, std::vector<int>& piv,
                 std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
                 int max_rank, int depth) const;
+    void low_rank(DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& Vt,
+                  real_t rel_tol, real_t abs_tol,
+                  int max_rank, int depth) const;
     std::vector<scalar_t> singular_values() const;
 
   private:
@@ -179,8 +182,8 @@ namespace strumpack {
   /** copy submatrix of a at ia,ja of size m,n into b at position ib,jb */
   template<typename scalar_t> void
   copy(std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& a,
-       std::size_t ia, std::size_t ja,
-   DenseMatrix<scalar_t>& b, std::size_t ib, std::size_t jb) {
+       std::size_t ia, std::size_t ja, DenseMatrix<scalar_t>& b,
+       std::size_t ib, std::size_t jb) {
     for (std::size_t j=0; j<n; j++)
       for (std::size_t i=0; i<m; i++)
         b(ib+i, jb+j) = a(ia+i, ja+j);
@@ -738,9 +741,39 @@ namespace strumpack {
               << " note that this routine is not stable!" << std::endl;
   }
 
+  template<typename scalar_t> void
+  DenseMatrix<scalar_t>::low_rank
+  (DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
+   real_t rel_tol, real_t abs_tol, int max_rank, int depth) const {
+    DenseMatrix<scalar_t> tmp(*this);
+    int m = rows(), n = cols();
+    int minmn = std::min(m, n);
+    auto tau = new scalar_t[minmn];
+    std::vector<int> ind(n);
+    int rank, info;
+    blas::geqp3tol(m, n, tmp.data(), tmp.ld(), ind.data(),
+                   tau, &info, rank, rel_tol, abs_tol, depth);
+    std::vector<int> piv(n);
+    for (int i=1; i<=n; i++) {
+      int j = ind[i-1];
+      assert(j-1 >= 0 && j-1 < int(ind.size()));
+      while (j < i) j = ind[j-1];
+      piv[i-1] = j;
+    }
+    DenseMatrix<scalar_t> Vt(rank, cols(), tmp.ptr(0, 0), tmp.ld());
+    for (int c=0; c<rank; c++)
+      for (int r=c+1; r<rank; r++)
+        Vt(r, c) = scalar_t(0.);
+    V = Vt.transpose();
+    V.permute_rows_bwd(piv);
+    blas::xxgqr(rows(), rank, rank, tmp.data(), tmp.ld(), tau, &info);
+    U = DenseMatrix<scalar_t>(rows(), rank, tmp.ptr(0, 0), tmp.ld());
+    delete[] tau;
+  }
+
   template<typename scalar_t> std::vector<scalar_t>
   DenseMatrix<scalar_t>::singular_values() const {
-    DenseMatrix tmp(*this);
+    DenseMatrix<scalar_t> tmp(*this);
     auto minmn = std::min(rows(), cols());
     std::vector<scalar_t> S(minmn);
     int info = blas::gesvd('N', 'N', rows(), cols(), tmp.data(), tmp.ld(),

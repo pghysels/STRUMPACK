@@ -63,23 +63,24 @@ namespace strumpack {
           c[1].refine(leaf_size);
         }
       }
-      void print() {
+      void print() const {
         for (auto& ch : c) ch.print();
         std::cout << size << " ";
       }
-      int nodes() {
+      int nodes() const {
         int nr_nodes = 1;
         for (auto& ch : c) nr_nodes += ch.nodes();
         return nr_nodes;
       }
-      std::vector<int> serialize() {
+      std::vector<int> serialize() const {
         int n = nodes(), pid = 0;
         std::vector<int> buf(3*n);
         serialize_rec(buf.data(), buf.data()+n, buf.data()+2*n, pid);
         return buf;
       }
     private:
-      void serialize_rec(int* sizes, int* lchild, int* rchild, int& pid) {
+      void serialize_rec(int* sizes, int* lchild,
+                         int* rchild, int& pid) const {
         if (!c.empty()) {
           c[0].serialize_rec(sizes, lchild, rchild, pid);
           auto lroot = pid;
