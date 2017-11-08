@@ -11,7 +11,7 @@ the U.S. Dept. of Energy).  All rights reserved.
 
 
 ## Website
-    http://portal.nersc.gov/project/sparse/strumpack/
+   [http://portal.nersc.gov/project/sparse/strumpack/](http://portal.nersc.gov/project/sparse/strumpack/)
 
 
 ## Current developers
