@@ -231,6 +231,10 @@ install(FILES src/HSS/HSSMatrix.hpp src/HSS/HSSMatrix.factor.hpp
   src/HSS/HSSMatrixMPI.Schur.hpp src/HSS/BlockCyclic2BlockRow.hpp
   DESTINATION include/HSS)
 
+install(FILES src/H/HMatrixBase.hpp src/H/HMatrix.hpp
+  src/H/HMatrixLR.hpp src/H/HMatrixDense.hpp
+  src/H/HMatrix.gemm.hpp DESTINATION include/H)
+
 set(CPACK_GENERATOR "TGZ")
 set(CPACK_PACKAGE_VERSION_MAJOR ${STRUMPACK_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${STRUMPACK_VERSION_MINOR})

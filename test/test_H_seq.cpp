@@ -31,7 +31,7 @@
 using namespace std;
 
 #include "DenseMatrix.hpp"
-#include "H/HMatrix.hpp"
+#include "H/HMatrixBase.hpp"
 using namespace strumpack;
 using namespace strumpack::H;
 
@@ -186,21 +186,23 @@ int run(int argc, char* argv[]) {
   }
 
 
-  DenseMatrix<double> X(m, n), Y(m, n);
-  X.random();
-  // Compute Y = H*X
-  gemm(Trans::N, Trans::N, 1., *Hstrong, X, 0., Y);
-  DenseMatrix<double> Ytest(m, n);
-  gemm(Trans::N, Trans::N, 1., Hstrong_dense, X, 0., Ytest);
-  Ytest.scaled_add(-1., Y);
-  cout << "# H*X relative error = ||Y-H*X||_F/||Y||_F = "
-       << Ytest.normF() / Y.normF() << endl;
+  // DenseMatrix<double> X(m, n), Y(m, n);
+  // X.random();
+  // // Compute Y = H*X
+  // gemm(Trans::N, Trans::N, 1., *Hstrong, X, 0., Y);
+  // DenseMatrix<double> Ytest(m, n);
+  // gemm(Trans::N, Trans::N, 1., Hstrong_dense, X, 0., Ytest);
+  // Ytest.scaled_add(-1., Y);
+  // cout << "# H*X relative error = ||Y-H*X||_F/||Y||_F = "
+  //      << Ytest.normF() / Y.normF() << endl;
 
-  // auto piv = LU(Hstrong);
+  auto piv_weak = LU(Hweak);
   // auto Xsolve = solve(Hstrong, piv, Y);
   // Xsolve.scaled_add(-1., X);
   // cout << "# LU relative error = ||X-(H\Y)||_F/||X||_F = "
   //      << Xsolve.normF() / X.normF() << endl;
+
+  auto piv_strong = LU(Hstrong);
 
   cout << "# exiting" << endl;
   return 0;

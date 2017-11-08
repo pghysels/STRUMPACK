@@ -26,8 +26,8 @@
  *             Division).
  *
  */
-#ifndef HSS_MATRIX_HPP
-#define HSS_MATRIX_HPP
+#ifndef HSS_MATRIX_LR_HPP
+#define HSS_MATRIX_LR_HPP
 
 #include <cassert>
 #include <utility>
@@ -37,7 +37,7 @@
 namespace strumpack {
   namespace H {
 
-    template<typename scalar_t> class HMatrix
+    template<typename scalar_t> class HMatrixLR
       : public HMatrixBase<scalar_t> {
       using opts_t = HOptions<scalar_t>;
       using real_t = typename RealType<scalar_t>::value_type;
@@ -49,29 +49,22 @@ namespace strumpack {
       using H_t = HMatrix<scalar_t>;
 
     public:
-      HMatrix(std::unique_ptr<HMatrixBase<scalar_t>> H00,
-              std::unique_ptr<HMatrixBase<scalar_t>> H01,
-              std::unique_ptr<HMatrixBase<scalar_t>> H10,
-              std::unique_ptr<HMatrixBase<scalar_t>> H11)
-        : _H00(std::move(H00)), _H01(std::move(H01)),
-          _H10(std::move(H10)), _H11(std::move(H11)) {}
+      HMatrixLR(const D_t& A, const opts_t& opts);
 
-      std::size_t rows() const { return H00().rows() + H10().rows(); }
-      std::size_t cols() const { return H00().cols() + H01().cols(); }
-      std::size_t rank() const;
-      std::size_t memory() const;
-      std::size_t levels() const;
+      std::size_t rows() const { return _U.rows(); }
+      std::size_t cols() const { return _V.rows(); }
+      std::size_t rank() const { return _U.cols(); }
+      std::size_t memory() const { return _U.memory() + _V.memory(); }
+      std::size_t levels() const { return 1; }
       D_t dense() const;
-      std::string name() const { return "HMatrix"; }
+      std::string name() const { return "HMatrixLR"; }
 
-      HMatrixBase<scalar_t>& H00() { return *_H00; }
-      HMatrixBase<scalar_t>& H01() { return *_H01; }
-      HMatrixBase<scalar_t>& H10() { return *_H10; }
-      HMatrixBase<scalar_t>& H11() { return *_H11; }
-      const HMatrixBase<scalar_t>& H00() const { return *_H00; }
-      const HMatrixBase<scalar_t>& H01() const { return *_H01; }
-      const HMatrixBase<scalar_t>& H10() const { return *_H10; }
-      const HMatrixBase<scalar_t>& H11() const { return *_H11; }
+      D_t& U() { return _U; }
+      D_t& V() { return _V; }
+      const D_t& U() const { return _U; }
+      const D_t& V() const { return _V; }
+
+      const opts_t& options() const { return _opts; }
 
       void AGEMM(Trans ta, Trans tb, scalar_t alpha, const HB_t& b,
                  scalar_t beta, HB_t& c, int depth=0) const {
@@ -164,82 +157,58 @@ namespace strumpack {
       }
 
     protected:
-      std::unique_ptr<HMatrixBase<scalar_t>> _H00;
-      std::unique_ptr<HMatrixBase<scalar_t>> _H01;
-      std::unique_ptr<HMatrixBase<scalar_t>> _H10;
-      std::unique_ptr<HMatrixBase<scalar_t>> _H11;
+      D_t _U;
+      D_t _V;
+      opts_t _opts;
       void draw(std::ostream& of, std::size_t rlo=0, std::size_t clo=0) const;
       std::vector<int> LU(int task_depth);
       void permute_rows_fwd(const std::vector<int>& piv);
-      template<typename T>
-      friend void draw(std::unique_ptr<HMatrixBase<T>> const&,
-                       const std::string&);
+
+      template<typename T> friend
+      void draw(std::unique_ptr<HMatrixBase<T>> const&, const std::string&);
     };
-    template<typename scalar_t> std::size_t
-    HMatrix<scalar_t>::rank() const {
-      return std::max(std::max(H00().rank(), H01().rank()),
-                      std::max(H10().rank(), H11().rank()));
-    }
-    template<typename scalar_t> std::size_t
-    HMatrix<scalar_t>::memory() const {
-      return H00().memory() + H01().memory() +
-        H10().memory() + H11().memory();
-      }
-    template<typename scalar_t> std::size_t
-    HMatrix<scalar_t>::levels() const {
-      return 1 + std::max(std::max(H00().levels(), H01().levels()),
-                          std::max(H10().levels(), H11().levels()));
+
+    template<typename scalar_t>
+    HMatrixLR<scalar_t>::HMatrixLR(const D_t& A, const opts_t& opts)
+      : _opts(opts) {
+      A.low_rank(_U, _V, opts.rel_tol(), opts.abs_tol(), opts.max_rank(), 0);
     }
     template<typename scalar_t> DenseMatrix<scalar_t>
-    HMatrix<scalar_t>::dense() const {
+    HMatrixLR<scalar_t>::dense() const {
       D_t out(rows(), cols());
-      DW_t out00(H00().rows(), H00().cols(), out, 0, 0);
-      DW_t out01(H01().rows(), H01().cols(), out, 0, H00().cols());
-      DW_t out10(H10().rows(), H10().cols(), out, H00().rows(), 0);
-      DW_t out11(H11().rows(), H11().cols(), out,
-                 H00().rows(), H00().cols());
-      out00 = H00().dense();
-      out01 = H01().dense();
-      out10 = H10().dense();
-      out11 = H11().dense();
+      gemm(Trans::N, Trans::C, scalar_t(1.), _U, _V, scalar_t(0.), out);
       return out;
     }
     template<typename scalar_t> void
-    HMatrix<scalar_t>::draw(std::ostream& of,
-                            std::size_t rlo, std::size_t clo) const {
-      H00().draw(of, rlo, clo);
-      H01().draw(of, rlo, clo+H00().cols());
-      H10().draw(of, rlo+H00().rows(), clo);
-      H11().draw(of, rlo+H00().rows(), clo+H00().cols());
+    HMatrixLR<scalar_t>::draw(std::ostream& of,
+                              std::size_t rlo, std::size_t clo) const {
+      int minmn = std::min(rows(), cols());
+      int red = std::floor(255.0 * rank() / minmn);
+      assert(red < 256 && red >= 0);
+      int blue = 255 - red;
+      assert(blue < 256 && blue >= 0);
+      char prev = std::cout.fill('0');
+      of << "set obj rect from "
+         << rlo << ", " << clo << " to "
+         << rlo+rows() << ", " << clo+cols()
+         << " fc rgb '#"
+         << std::hex << std::setw(2) << std::setfill('0') << red
+         << "00" << std::setw(2)  << std::setfill('0') << blue
+         << "'" << std::dec << std::endl;
+      std::cout.fill(prev);
     }
     template<typename scalar_t> std::vector<int>
-    HMatrix<scalar_t>::LU(int task_depth) {
-      auto piv0 = H00().LU(task_depth);
-      H01().permute_rows_fwd(piv0);
-      // trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-      //      scalar_t(1.), H00(), H01(), task_depth);
-      // trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-      //      scalar_t(1.), H00(), H10(), task_depth);
-      gemm(Trans::N, Trans::N, scalar_t(-1.), H10(), H01(),
-           scalar_t(1.), H11(), task_depth);
-      auto piv1 = H11().LU(task_depth);
-      piv1.reserve(piv0.size() + piv1.size());
-      auto m0 = H00().rows();
-      for (auto i : piv1) piv0.push_back(i + m0);
-      return piv0;
+    HMatrixLR<scalar_t>::LU(int task_depth) {
+      assert(false);
+      return std::vector<int>();
     }
     template<typename scalar_t> void
-    HMatrix<scalar_t>::permute_rows_fwd(const std::vector<int>& piv) {
+    HMatrixLR<scalar_t>::permute_rows_fwd(const std::vector<int>& piv) {
       assert(piv.size() == rows());
-      std::vector<int> piv0(piv.begin(), piv.begin()+H00().rows());
-      std::vector<int> piv1(piv.begin()+H00().rows(), piv.end());
-      auto m0 = H00().rows();
-      for (auto& i : piv1) i -= m0;
-      H00().permute_rows_fwd(piv0);  H01().permute_rows_fwd(piv0);
-      H10().permute_rows_fwd(piv1);  H11().permute_rows_fwd(piv1);
+      _U.permute_rows_fwd(piv);
     }
 
   } // end namespace H
 } // end namespace strumpack
 
-#endif // H_MATRIX_HPP
+#endif // H_MATRIX_LR_HPP
