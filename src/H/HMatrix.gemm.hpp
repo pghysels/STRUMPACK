@@ -34,6 +34,8 @@
 #include <fstream>
 #include <string>
 
+#define DEBUG_GEMM
+
 namespace strumpack {
   namespace H {
 
@@ -206,7 +208,7 @@ namespace strumpack {
          scalar_t beta, HMatrix<scalar_t>& c, int depth=0) {
       using D_t = DenseMatrix<scalar_t>;
       using DW_t = DenseMatrixWrapper<scalar_t>;
-#if !defined(NDEBUG)
+#if defined(DEBUG_GEMM)
       auto cdense = c.dense();
 #endif
       if (ta == Trans::N && tb == Trans::N) {
@@ -249,7 +251,7 @@ namespace strumpack {
       } else {
         assert(false);
       }
-#if !defined(NDEBUG)
+#if defined(DEBUG_GEMM)
       gemm(ta, tb, alpha, a.dense(), b.dense(), beta, cdense, depth);
       auto cnorm = cdense.normF();
       cdense.scaled_add(scalar_t(-1.), c.dense());
@@ -271,7 +273,7 @@ namespace strumpack {
     gemm(Trans ta, Trans tb, scalar_t alpha,
          const HMatrixLR<scalar_t>& a, const HMatrixLR<scalar_t>& b,
          scalar_t beta, HMatrixDense<scalar_t>& c, int depth=0) {
-#if !defined(NDEBUG)
+#if defined(DEBUG_GEMM)
       auto cdense = c.dense();
 #endif
       if (ta == Trans::N && tb == Trans::N) {
@@ -292,7 +294,7 @@ namespace strumpack {
       } else {
         assert(false);
       }
-#if !defined(NDEBUG)
+#if defined(DEBUG_GEMM)
       gemm(ta, tb, alpha, a.dense(), b.dense(), beta, cdense, depth);
       auto cnorm = cdense.normF();
       cdense.scaled_add(scalar_t(-1.), c.dense());
@@ -355,8 +357,32 @@ namespace strumpack {
     gemm(Trans ta, Trans tb, scalar_t alpha,
          const HMatrixLR<scalar_t>& a, const DenseMatrix<scalar_t>& b,
          scalar_t beta, DenseMatrix<scalar_t>& c, int depth=0) {
-      std::cout << "TODO GEMM(" << a.name() << ", Dense"
-                << ", Dense);" << std::endl;
+#if defined(DEBUG_GEMM)
+      auto cdense = c;
+#endif
+      DenseMatrix<scalar_t> tmp
+        (a.rank(), (tb == Trans::N) ? b.cols() : b.rows());
+      if (ta == Trans::N) {
+        gemm(Trans::C, tb, scalar_t(1.), a.V(), b,
+             scalar_t(0.), tmp, depth);
+        gemm(Trans::N, Trans::N, alpha, a.U(), tmp,
+             beta, c, depth);
+      } else {
+        gemm(Trans::C, tb, scalar_t(1.), a.U(), b,
+             scalar_t(0.), tmp, depth);
+        gemm(Trans::N, Trans::N, alpha, a.V(), tmp,
+             beta, c, depth);
+      }
+#if defined(DEBUG_GEMM)
+      gemm(ta, tb, alpha, a.dense(), b, beta, cdense, depth);
+      auto cnorm = cdense.normF();
+      cdense.scaled_add(scalar_t(-1.), c);
+      auto cdensenorm = cdense.normF();
+      std::cout << "LR*D+D:   ||Cdense-C||/||Cdense|| = "
+                << cdensenorm / cnorm << std::endl;
+      // using real_t = typename RealType<scalar_t>::value_type;
+      // assert(cdensenorm / cnorm < blas::lamch<real_t>('P'));
+#endif
     }
 
 
@@ -412,9 +438,33 @@ namespace strumpack {
     gemm(Trans ta, Trans tb, scalar_t alpha,
          const DenseMatrix<scalar_t>& a, const HMatrixLR<scalar_t>& b,
          scalar_t beta, DenseMatrix<scalar_t>& c, int depth=0) {
-      std::cout << "TODO GEMM(Dense, " << b.name()
-                << ", Dense);" << std::endl;
-    }
+#if defined(DEBUG_GEMM)
+      auto cdense = c;
+#endif
+      DenseMatrix<scalar_t> tmp
+        ((ta == Trans::N) ? a.rows() : a.cols(), b.rank());
+      if (tb == Trans::N) {
+        gemm(ta, Trans::N, scalar_t(1.), a, b.U(),
+             scalar_t(0.), tmp, depth);
+        gemm(Trans::N, Trans::C, alpha, tmp, b.V(),
+             beta, c, depth);
+      } else {
+        gemm(ta, Trans::N, scalar_t(1.), a, b.V(),
+             scalar_t(0.), tmp, depth);
+        gemm(Trans::N, Trans::C, alpha, tmp, b.U(),
+             beta, c, depth);
+      }
+#if defined(DEBUG_GEMM)
+      gemm(ta, tb, alpha, a, b.dense(), beta, cdense, depth);
+      auto cnorm = cdense.normF();
+      cdense.scaled_add(scalar_t(-1.), c);
+      auto cdensenorm = cdense.normF();
+      std::cout << "D*LR+D:   ||Cdense-C||/||Cdense|| = "
+                << cdensenorm / cnorm << std::endl;
+      // using real_t = typename RealType<scalar_t>::value_type;
+      // assert(cdensenorm / cnorm < blas::lamch<real_t>('P'));
+#endif
+   }
 
     template<typename scalar_t> void
     gemm(Trans ta, Trans tb, scalar_t alpha,
@@ -422,7 +472,7 @@ namespace strumpack {
          scalar_t beta, HMatrix<scalar_t>& c, int depth=0) {
       using D_t = DenseMatrix<scalar_t>;
       using DW_t = DenseMatrixWrapper<scalar_t>;
-#if !defined(NDEBUG)
+#if defined(DEBUG_GEMM)
       auto cdense = c.dense();
 #endif
       auto m0 = c.H00().rows();  auto n0 = c.H00().cols();
@@ -446,7 +496,7 @@ namespace strumpack {
       c.H01().ABCGEMM(ta, tb, alpha, a0, b1, beta, depth);
       c.H10().ABCGEMM(ta, tb, alpha, a1, b0, beta, depth);
       c.H11().ABCGEMM(ta, tb, alpha, a1, b1, beta, depth);
-#if !defined(NDEBUG)
+#if defined(DEBUG_GEMM)
       gemm(ta, tb, alpha, a, b, beta, cdense, depth);
       auto cnorm = cdense.normF();
       cdense.scaled_add(scalar_t(-1.), c.dense());
@@ -462,7 +512,7 @@ namespace strumpack {
     gemm(Trans ta, Trans tb, scalar_t alpha,
          const DenseMatrix<scalar_t>& a, const DenseMatrix<scalar_t>& b,
          scalar_t beta, HMatrixLR<scalar_t>& c, int depth=0) {
-#if !defined(NDEBUG)
+#if defined(DEBUG_GEMM)
       auto cdense = c.dense();
 #endif
       auto abc = c.dense();
@@ -470,7 +520,7 @@ namespace strumpack {
       auto opts = c.options();
       abc.low_rank(c.U(), c.V(), opts.rel_tol(), opts.abs_tol(),
                    opts.max_rank(), 0);
-#if !defined(NDEBUG)
+#if defined(DEBUG_GEMM)
       gemm(ta, tb, alpha, a, b, beta, cdense, depth);
       auto cnorm = cdense.normF();
       cdense.scaled_add(scalar_t(-1.), c.dense());
