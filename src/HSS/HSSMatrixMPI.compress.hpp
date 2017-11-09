@@ -1,7 +1,7 @@
 #ifndef HSS_MATRIX_MPI_COMPRESS_HPP
 #define HSS_MATRIX_MPI_COMPRESS_HPP
 
-#include "Random_wrapper.hpp"
+#include "misc/RandomWrapper.hpp"
 #include "DistSamples.hpp"
 #include "DistElemMult.hpp"
 

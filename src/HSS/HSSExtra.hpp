@@ -1,7 +1,7 @@
 #ifndef HSS_EXTRA_HPP
 #define HSS_EXTRA_HPP
 
-#include "DenseMatrix.hpp"
+#include "dense/DenseMatrix.hpp"
 
 namespace strumpack {
   namespace HSS {

@@ -31,7 +31,7 @@
 using namespace std;
 
 #define STRUMPACK_PBLAS_BLOCKSIZE 3
-#include "DistributedMatrix.hpp"
+#include "dense/DistributedMatrix.hpp"
 #include "HSS/HSSMatrixMPI.hpp"
 using namespace strumpack;
 using namespace strumpack::HSS;

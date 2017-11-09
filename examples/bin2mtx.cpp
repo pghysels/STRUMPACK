@@ -23,7 +23,7 @@
  *
  */
 #include <iostream>
-#include "CSRMatrix.hpp"
+#include "sparse/CSRMatrix.hpp"
 
 using namespace strumpack;
 

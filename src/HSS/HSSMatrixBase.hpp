@@ -4,8 +4,8 @@
 #include <cassert>
 #include <iostream>
 
-#include "DenseMatrix.hpp"
-#include "DistributedMatrix.hpp"
+#include "dense/DenseMatrix.hpp"
+#include "dense/DistributedMatrix.hpp"
 #include "HSSOptions.hpp"
 #include "HSSExtraMPI.hpp"
 #include "DistSamples.hpp"

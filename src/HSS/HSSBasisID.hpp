@@ -3,7 +3,7 @@
 
 #include <cassert>
 
-#include "DenseMatrix.hpp"
+#include "dense/DenseMatrix.hpp"
 
 namespace strumpack {
   namespace HSS {

@@ -2,7 +2,7 @@
 #define HSS_EXTRA_MPI_HPP
 
 #include "HSSExtra.hpp"
-#include "DistributedMatrix.hpp"
+#include "dense/DistributedMatrix.hpp"
 
 namespace strumpack {
   namespace HSS {

@@ -31,8 +31,8 @@
 #include <getopt.h>
 
 #include "StrumpackSparseSolverMPIDist.hpp"
-#include "CSRMatrix.hpp"
-#include "CSRMatrixMPI.hpp"
+#include "sparse/CSRMatrix.hpp"
+#include "sparse/CSRMatrixMPI.hpp"
 
 using namespace strumpack;
 
