@@ -1,25 +1,29 @@
 /*
- * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The Regents of
- * the University of California, through Lawrence Berkeley National Laboratory
- * (subject to receipt of any required approvals from the U.S. Dept. of Energy).
- * All rights reserved.
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
  *
- * If you have questions about your rights to use or distribute this software,
- * please contact Berkeley Lab's Technology Transfer Department at TTD@lbl.gov.
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
  *
- * NOTICE. This software is owned by the U.S. Department of Energy. As such, the
- * U.S. Government has been granted for itself and others acting on its behalf a
- * paid-up, nonexclusive, irrevocable, worldwide license in the Software to
- * reproduce, prepare derivative works, and perform publicly and display publicly.
- * Beginning five (5) years after the date permission to assert copyright is
- * obtained from the U.S. Department of Energy, and subject to any subsequent five
- * (5) year renewals, the U.S. Government is granted for itself and others acting
- * on its behalf a paid-up, nonexclusive, irrevocable, worldwide license in the
- * Software to reproduce, prepare derivative works, distribute copies to the
- * public, perform publicly and display publicly, and to permit others to do so.
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly.  Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government is granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
  *
  * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
- *             (Lawrence Berkeley National Lab, Computational Research Division).
+ *             (Lawrence Berkeley National Lab, Computational Research
+ *             Division).
  *
  */
 #ifndef BLASLAPACKWRAPPER_H
@@ -29,953 +33,1966 @@
 #include <complex>
 #include <iostream>
 #include <cassert>
-// TODO avoid this include!, this file should be standalone
 #include "StrumpackParameters.hpp"
-// TODO make wrappers const correct
+#include "strumpack_config.h"
 
 namespace strumpack {
 
-  typedef std::complex<float> c_float;
-  typedef std::complex<double> c_double;
+  template<typename scalar> inline bool is_complex() {
+    return false;
+  }
+  template<> inline bool is_complex<std::complex<float>>() {
+    return true;
+  }
+  template<> inline bool is_complex<std::complex<double>>() {
+    return true;
+  }
 
-  template<typename scalar> inline bool is_complex() { return false; }
-  template<> inline bool is_complex<c_float>() { return true; }
-  template<> inline bool is_complex<c_double>() { return true; }
-
-  template<class T> struct RealType { typedef T value_type; };
-  template<class T> struct RealType<std::complex<T>> { typedef T value_type; };
+  template<class T> struct RealType {
+    typedef T value_type;
+  };
+  template<class T> struct RealType<std::complex<T>> {
+    typedef T value_type;
+  };
 
   namespace blas {
 
-    template<typename scalar> inline void axpby(int N, scalar alpha, scalar* X, int incx, scalar beta, scalar* Y, int incy) {
-      if (incx==1 && incy==1) {
-#pragma omp parallel for
-	for (int i=0; i<N; i++) Y[i] = alpha*X[i] + beta*Y[i];
-      } else {
-#pragma omp parallel for
-	for (int i=0; i<N; i++) Y[i*incy] = alpha*X[i*incx] + beta*Y[i*incy];
-      }
-      STRUMPACK_FLOPS(static_cast<long long int>((alpha!=scalar(0))*double(N)*(is_complex<scalar>()?2:1)
-						 + (alpha!=scalar(0) && alpha!=scalar(1) && alpha!=scalar(-1))*double(N)*(is_complex<scalar>()?6:1)
-						 + (beta!=scalar(0) && beta!=scalar(1) && beta!=scalar(-1))*double(N)*(is_complex<scalar>()?6:1)));
-      STRUMPACK_BYTES(sizeof(scalar)*static_cast<long long int>(N)*3);
+    inline float my_conj(float a) { return a; }
+    inline double my_conj(double a) { return a; }
+    inline std::complex<float> my_conj(std::complex<float> a) {
+      return std::conj(a);
+    }
+    inline std::complex<double> my_conj(std::complex<double> a) {
+      return std::conj(a);
     }
 
-    template<typename scalar> inline scalar my_conj(scalar a);
-    template<> inline float my_conj<float>(float a) { return a; }
-    template<> inline double my_conj<double>(double a) { return a; }
-    template<> inline c_float my_conj<c_float>(c_float a) { return std::conj(a); }
-    template<> inline c_double my_conj<c_double>(c_double a) { return std::conj(a); }
+    template<typename scalar_t> inline long long axpby_flops
+    (long long n, scalar_t alpha, scalar_t beta) {
+      return (alpha != scalar_t(0)) * n * (is_complex<scalar_t>() ? 2 : 1)
+        + (alpha != scalar_t(0) && alpha != scalar_t(1) &&
+           alpha != scalar_t(-1)) * n * (is_complex<scalar_t>() ? 6 : 1)
+        + (beta != scalar_t(0) && beta != scalar_t(1) &&
+           beta != scalar_t(-1)) * n * (is_complex<scalar_t>() ? 6 : 1);
+    }
+    template<typename scalar> inline void
+    axpby(int n, scalar alpha, scalar* x, int incx,
+          scalar beta, scalar* y, int incy) {
+      if (incx==1 && incy==1) {
+#pragma omp parallel for
+        for (int i=0; i<n; i++)
+          y[i] = alpha * x[i] + beta * y[i];
+      } else {
+#pragma omp parallel for
+        for (int i=0; i<n; i++)
+          y[i*incy] = alpha * x[i*incx] + beta * y[i*incy];
+      }
+      STRUMPACK_FLOPS(axpby_flops(n, alpha, beta));
+      STRUMPACK_BYTES(sizeof(scalar) * static_cast<long long>(n)*3);
+    }
 
-    template<typename scalar> inline void omatcopy(char opA, int m, int n, scalar* a, int lda, scalar* b, int ldb) {
+    template<typename scalar> inline void omatcopy
+    (char opA, int m, int n, const scalar* a, int lda, scalar* b, int ldb) {
       // TODO do this in blocks??
-      if      (opA=='T'||opA=='t') for (int c=0; c<n; c++) for (int r=0; r<m; r++) b[c+r*ldb] = a[r+c*lda];
-      else if (opA=='C'||opA=='c') for (int c=0; c<n; c++) for (int r=0; r<m; r++) b[c+r*ldb] = my_conj(a[r+c*lda]);
-      else if (opA=='R'||opA=='r') for (int c=0; c<n; c++) for (int r=0; r<m; r++) b[r+c*ldb] = my_conj(a[r+c*lda]);
-      else if (opA=='N'||opA=='n') for (int c=0; c<n; c++) for (int r=0; r<m; r++) b[r+c*ldb] = a[r+c*lda];
+      if (opA=='T' || opA=='t')
+        for (int c=0; c<n; c++)
+          for (int r=0; r<m; r++)
+            b[c+r*ldb] = a[r+c*lda];
+      else if (opA=='C' || opA=='c')
+        for (int c=0; c<n; c++)
+          for (int r=0; r<m; r++)
+            b[c+r*ldb] = my_conj(a[r+c*lda]);
+      else if (opA=='R' || opA=='r')
+        for (int c=0; c<n; c++)
+          for (int r=0; r<m; r++)
+            b[r+c*ldb] = my_conj(a[r+c*lda]);
+      else if (opA=='N' || opA=='n')
+        for (int c=0; c<n; c++)
+          for (int r=0; r<m; r++)
+            b[r+c*ldb] = a[r+c*lda];
     }
 
 #if defined(__HAVE_MKL)
+#define MKL_Complex8 std::complex<float>
+#define MKL_Complex16 std::complex<double>
 #include "mkl_trans.h"
-    template<> inline void omatcopy<float>(char opA, int m, int n, float* a, int lda, float* b, int ldb)
-    {  if (m && n) mkl_somatcopy('C', opA, m, n, 1., a, lda, b, ldb); }
-    template<> inline void omatcopy<double>(char opA, int m, int n, double* a, int lda, double* b, int ldb)
-    {  if (m && n) mkl_domatcopy('C', opA, m, n, 1., a, lda, b, ldb); }
-    template<> inline void omatcopy<c_float>(char opA, int m, int n, c_float* a, int lda, c_float* b, int ldb)
-    { MKL_Complex8 cone = {1.,0.};  if (m && n) mkl_comatcopy('C', opA, m, n, cone, reinterpret_cast<MKL_Complex8*>(a), lda, reinterpret_cast<MKL_Complex8*>(b), ldb); }
-    template<> inline void omatcopy<c_double>(char opA, int m, int n, c_double* a, int lda, c_double* b, int ldb)
-    { MKL_Complex16 zone = {1.,0.};  if (m && n) mkl_zomatcopy('C', opA, m, n, zone, reinterpret_cast<MKL_Complex16*>(a), lda, reinterpret_cast<MKL_Complex16*>(b), ldb); }
+    template<> inline void omatcopy<float>
+    (char opa, int m, int n, const float* a, int lda, float* b, int ldb) {
+      if (m && n)
+        mkl_somatcopy('C', opa, m, n, 1., a, lda, b, ldb);
+    }
+    template<> inline void omatcopy<double>
+    (char opa, int m, int n, const double* a, int lda, double* b, int ldb) {
+      if (m && n)
+        mkl_domatcopy('C', opa, m, n, 1., a, lda, b, ldb);
+    }
+    template<> inline void omatcopy<std::complex<float>>
+    (char opa, int m, int n, const std::complex<float>* a, int lda,
+     std::complex<float>* b, int ldb) {
+      MKL_Complex8 cone = {1.,0.};
+      if (m && n)
+        mkl_comatcopy('C', opa, m, n, cone, a, lda, b, ldb);
+    }
+    template<> inline void omatcopy<std::complex<double>>
+    (char opa, int m, int n, const std::complex<double>* a, int lda,
+     std::complex<double>* b, int ldb) {
+      MKL_Complex16 zone = {1.,0.};
+      if (m && n)
+        mkl_zomatcopy('C', opa, m, n, zone, a, lda, b, ldb);
+    }
 #elif defined(__HAVE_OPENBLAS)
     extern "C" {
       // TODO this does not work on FH's laptop with openblas
-      void somatcopy_(char*, char*, int*, int*, float*, float*, int*, float*, int*);
-      void domatcopy_(char*, char*, int*, int*, double*, double*, int*, double*, int*);
-      void comatcopy_(char*, char*, int*, int*, c_float*, c_float*, int*, c_float*, int*);
-      void zomatcopy_(char*, char*, int*, int*, c_double*, c_double*, int*, c_double*, int*);
+      void somatcopy_
+      (char* order, char* opa, int* m, int* n, float* alpha,
+       const float* a, int* lda, float* b, int* ldb);
+      void domatcopy_
+      (char* order, char* opa, int* m, int* n, double* alpha,
+       const double* a, int* lda, double* b, int* ldb);
+      void comatcopy_
+      (char* order, char* opa, int* m, int* n,
+       std::complex<float>* alpha, const std::complex<float>* a, int* lda,
+       std::complex<float>* b, int* ldb);
+      void zomatcopy_
+      (char* order, char* opa, int* m, int* n,
+       std::complex<double>* alpha, const std::complex<double>* a, int* lda,
+       std::complex<double>* b, int* ldb);
     }
-    template<> inline void omatcopy<float>(char opA, int m, int n, float* a, int lda, float* b, int ldb)
-    { char c='C'; float o=1.; if (m && n) somatcopy_(&c, &opA, &m, &n, &o, a, &lda, b, &ldb); }
-    template<> inline void omatcopy<double>(char opA, int m, int n, double* a, int lda, double* b, int ldb)
-    { char c='C'; double o=1.; if (m && n) domatcopy_(&c, &opA, &m, &n, &o, a, &lda, b, &ldb); }
-    template<> inline void omatcopy<c_float>(char opA, int m, int n, c_float* a, int lda, c_float* b, int ldb)
-    { char c='C'; c_float o(1.); if (m && n) comatcopy_(&c, &opA, &m, &n, &o, a, &lda, b, &ldb); }
-    template<> inline void omatcopy<c_double>(char opA, int m, int n, c_double* a, int lda, c_double* b, int ldb)
-    { char c='C'; c_double o(1.); if (m && n) zomatcopy_(&c, &opA, &m, &n, &o, a, &lda, b, &ldb); }
+    template<> inline void omatcopy<float>
+    (char opa, int m, int n, const float* a, int lda, float* b, int ldb) {
+      char c = 'C';
+      float o = 1.;
+      if (m && n)
+        somatcopy_(&c, &opa, &m, &n, &o, a, &lda, b, &ldb);
+    }
+    template<> inline void omatcopy<double>
+    (char opa, int m, int n, const double* a, int lda, double* b, int ldb) {
+      char c = 'C';
+      double o = 1.;
+      if (m && n)
+        domatcopy_(&c, &opa, &m, &n, &o, a, &lda, b, &ldb);
+    }
+    template<> inline void omatcopy<std::complex<float>>
+    (char opa, int m, int n, const std::complex<float>* a, int lda,
+     std::complex<float>* b, int ldb) {
+      char c = 'C';
+      std::complex<float> o(1.);
+      if (m && n)
+        comatcopy_(&c, &opa, &m, &n, &o, a, &lda, b, &ldb);
+    }
+    template<> inline void omatcopy<std::complex<double>>
+    (char opa, int m, int n, const std::complex<double>* a, int lda,
+     std::complex<double>* b, int ldb) {
+      char c = 'C';
+      std::complex<double> o(1.);
+      if (m && n)
+        zomatcopy_(&c, &opa, &m, &n, &o, a, &lda, b, &ldb);
+    }
 #endif
 
     // sparse blas 1 routines
-    template<typename scalar> inline void axpyi(int nz, scalar a, scalar* x, int* indx, scalar* y) {
+    template<typename scalar> inline void axpyi
+    (std::size_t nz, scalar a, const scalar* x, const int* indx, scalar* y) {
       if (a == scalar(-1)) {
-	for (int i=0; i<nz; i++) y[indx[i]] -= x[i];
-	STRUMPACK_FLOPS((is_complex<scalar>()?2:1) * static_cast<long long int>(nz));
+        for (int i=0; i<nz; i++) y[indx[i]] -= x[i];
+        STRUMPACK_FLOPS((is_complex<scalar>() ? 2 : 1) * nz);
       } else {
-	if (a == scalar(1)) {
-	  for (int i=0; i<nz; i++) y[indx[i]] += x[i];
-	  STRUMPACK_FLOPS((is_complex<scalar>()?2:1) * static_cast<long long int>(nz));
-	} else {
-	  for (int i=0; i<nz; i++) y[indx[i]] += a * x[i];
-	  STRUMPACK_FLOPS((is_complex<scalar>()?4:1) * static_cast<long long int>(nz)*2);
-	}
+        if (a == scalar(1)) {
+          for (int i=0; i<nz; i++) y[indx[i]] += x[i];
+          STRUMPACK_FLOPS((is_complex<scalar>() ? 2 : 1) * nz);
+        } else {
+          for (int i=0; i<nz; i++) y[indx[i]] += a * x[i];
+          STRUMPACK_FLOPS((is_complex<scalar>() ? 4 : 1) * nz * 2);
+        }
       }
-      STRUMPACK_BYTES(sizeof(scalar)*static_cast<long long int>(nz*3)+sizeof(int)*nz);
+      STRUMPACK_BYTES(sizeof(scalar) * nz * 3 + sizeof(int) * nz);
     }
 
-    template<typename scalar_t,typename integer_t> inline void
-    gthr(integer_t nz, scalar_t* y, scalar_t* x, integer_t* indx)
-    { for (integer_t i=0; i<nz; i++) x[i] = y[indx[i]];
-      STRUMPACK_BYTES(sizeof(scalar_t)*static_cast<long long int>(nz*3)+sizeof(integer_t)*nz); }
+    template<typename scalar_t,typename integer_t> inline void gthr
+    (std::size_t nz, const scalar_t* y, scalar_t* x, const integer_t* indx) {
+      for (integer_t i=0; i<nz; i++)
+        x[i] = y[indx[i]];
+      STRUMPACK_BYTES(sizeof(scalar_t) * nz * 3 + sizeof(integer_t) * nz);
+    }
 
+
+    ///////////////////////////////////////////////////////////
+    ///////// BLAS1 ///////////////////////////////////////////
+    ///////////////////////////////////////////////////////////
     extern "C" {
-      float slamch_(char* cmach);
-      double dlamch_(char* cmach);
+      void FC_GLOBAL(scopy,SCOPY)
+        (int* n, const float* x, int* incx, float* y, int* incy);
+      void FC_GLOBAL(dcopy,DCOPY)
+        (int* n, const double* x, int* incx, double* y, int* incy);
+      void FC_GLOBAL(ccopy,CCOPY)
+        (int* n, const std::complex<float>* x, int* incx,
+         std::complex<float>* y, int* incy);
+      void FC_GLOBAL(zcopy,ZCOPY)
+        (int* n, const std::complex<double>* x, int* incx,
+         std::complex<double>* y, int* incy);
 
-      int ilaenv_(int* ispec, char* name, char* opts, int* n1, int* n2, int* n3, int* n4);
+      void FC_GLOBAL(sscal,SSCAL)
+        (int* n, float* alpha, float* x, int* incx);
+      void FC_GLOBAL(dscal,DSCAL)
+        (int* n, double* alpha, double* x, int* incx);
+      void FC_GLOBAL(cscal,CSCAL)
+        (int* n, std::complex<float>* alpha,
+         std::complex<float>* x, int* incx);
+      void FC_GLOBAL(zscal,ZSCAL)
+        (int* n, std::complex<double>* alpha,
+         std::complex<double>* x, int* incx);
 
-      void sgemv_(char* trans, int* M, int* N, float* alpha, float *A, int* lda, float* X, int* incx, float* beta, float* Y, int* incy);
-      void dgemv_(char* trans, int* M, int* N, double* alpha, double *A, int* lda, double* X, int* incx, double* beta, double* Y, int* incy);
-      void cgemv_(char* trans, int* M, int* N, c_float* alpha, c_float *A, int* lda, c_float* X, int* incx, c_float* beta, c_float* Y, int* incy);
-      void zgemv_(char* trans, int* M, int* N, c_double* alpha, c_double *A, int* lda, c_double* X, int* incx, c_double* beta, c_double* Y, int* incy);
+      int FC_GLOBAL(isamax,ISAMAX)
+        (int* n, const float* dx, int* incx);
+      int FC_GLOBAL(idamax,IDAMAX)
+        (int* n, const double* dx, int* incx);
+      int FC_GLOBAL(icamax,ICAMAX)
+        (int* n, const std::complex<float>* dx, int* incx);
+      int FC_GLOBAL(izamax,IZAMAX)
+        (int* n, const std::complex<double>* dx, int* incx);
 
-      void sger_(int* M, int* N, float* alpha, float* X, int* incx, float* Y, int* incy, float *A, int* lda);
-      void dger_(int* M, int* N, double* alpha, double* X, int* incx, double* Y, int* incy, double *A, int* lda);
-      void cgeru_(int* M, int* N, c_float* alpha, c_float* X, int* incx, c_float* Y, int* incy, c_float *A, int* lda);
-      void zgeru_(int* M, int* N, c_double* alpha, c_double* X, int* incx, c_double* Y, int* incy, c_double *A, int* lda);
-      void cgerc_(int* M, int* N, c_float* alpha, c_float* X, int* incx, c_float* Y, int* incy, c_float *A, int* lda);
-      void zgerc_(int* M, int* N, c_double* alpha, c_double* X, int* incx, c_double* Y, int* incy, c_double *A, int* lda);
+      float FC_GLOBAL(snrm2,SNRM2)
+        (int* n, const float* x, int* incx);
+      double FC_GLOBAL(dnrm2,DNRM2)
+        (int* n, const double* x, int* incx);
+      float FC_GLOBAL(scnrm2,SCNRM2)
+        (int* n, const std::complex<float>* x, int* incx);
+      double FC_GLOBAL(dznrm2,DZNRM2)
+        (int* n, const std::complex<double>* x, int* incx);
 
-      void clacgv_(int* n, c_float* x, int* incx);
-      void zlacgv_(int* n, c_double* x, int* incx);
+      void FC_GLOBAL(saxpy,SAXPY)
+        (int* n, float* alpha, const float* x, int* incx,
+         float* y, int* incy);
+      void FC_GLOBAL(daxpy,DAXPY)
+        (int* n, double* alpha, const double* x, int* incx,
+         double* y, int* incy);
+      void FC_GLOBAL(caxpy,CAXPY)
+        (int* n, std::complex<float>* alpha,
+         const std::complex<float>* x, int* incx,
+         std::complex<float>* y, int* incy);
+      void FC_GLOBAL(zaxpy,ZAXPY)
+        (int* n, std::complex<double>* alpha,
+         const std::complex<double>* x, int* incx,
+         std::complex<double>* y, int* incy);
 
-      int slacpy_(char* uplo, int* m, int* n, float* a, int* lda, float* b, int* ldb);
-      int dlacpy_(char* uplo, int* m, int* n, double* a, int* lda, double* b, int* ldb);
-      int clacpy_(char* uplo, int* m, int* n, c_float* a, int* lda, c_float* b, int* ldb);
-      int zlacpy_(char* uplo, int* m, int* n, c_double* a, int* lda, c_double* b, int* ldb);
+      void FC_GLOBAL(sswap,SSWAP)
+        (int* n, float* x, int* ldx, float* y, int* ldy);
+      void FC_GLOBAL(dswap,DSWAP)
+        (int* n, double* x, int* ldx, double* y, int* ldy);
+      void FC_GLOBAL(cswap,CSWAP)
+        (int* n, std::complex<float>* x, int* ldx,
+         std::complex<float>* y, int* ldy);
+      void FC_GLOBAL(zswap,ZSWAP)
+        (int* n, std::complex<double>* x, int* ldx,
+         std::complex<double>* y, int* ldy);
 
-      void sgemm_(char* TransA, char* TransB, int* M, int* N, int* K, float* alpha, float* A, int* lda, float* B, int* ldb, float* beta, float* C, int* ldc);
-      void dgemm_(char* TransA, char* TransB, int* M, int* N, int* K, double* alpha, double* A, int* lda, double* B, int* ldb, double* beta, double* C, int* ldc);
-      void cgemm_(char* TransA, char* TransB, int* M, int* N, int* K, c_float* alpha, c_float* A, int* lda, c_float* B, int* ldb, c_float* beta, c_float* C, int* ldc);
-      void zgemm_(char* TransA, char* TransB, int* M, int* N, int* K, c_double* alpha, c_double* A, int* lda, c_double* B, int* ldb, c_double* beta, c_double* C, int* ldc);
+      float FC_GLOBAL(sdot,SDOT)
+        (int* n, const float* x, int* incx, const float* y, int* incy);
+      double FC_GLOBAL(ddot,DDOT)
+        (int* n, const double* x, int* incx, const double* y, int* incy);
 
-      void slaswp_(int* N, float* A, int* lda, int* k1, int* k2, int* ipiv, int* incx);
-      void dlaswp_(int* N, double* A, int* lda, int* k1, int* k2, int* ipiv, int* incx);
-      void claswp_(int* N, c_float* A, int* lda, int* k1, int* k2, int* ipiv, int* incx);
-      void zlaswp_(int* N, c_double* A, int* lda, int* k1, int* k2, int* ipiv, int* incx);
 
-      void scopy_(int* N, float* X, int* incx, float* Y, int* incy);
-      void dcopy_(int* N, double* X, int* incx, double* Y, int* incy);
-      void ccopy_(int* N, c_float* X, int* incx, c_float* Y, int* incy);
-      void zcopy_(int* N, c_double* X, int* incx, c_double* Y, int* incy);
+      ///////////////////////////////////////////////////////////
+      ///////// BLAS2 ///////////////////////////////////////////
+      ///////////////////////////////////////////////////////////
+      void FC_GLOBAL(sgemv,SGEMV)
+        (char* t, int* m, int* n, float* alpha, const float *a, int* lda,
+         const float* x, int* incx, float* beta, float* y, int* incy);
+      void FC_GLOBAL(dgemv,DGEMV)
+        (char* t, int* m, int* n, double* alpha, const double *a, int* lda,
+         const double* x, int* incx, double* beta, double* y, int* incy);
+      void FC_GLOBAL(cgemv,CGEMV)
+        (char* t, int* m, int* n, std::complex<float>* alpha,
+         const std::complex<float> *a, int* lda,
+         const std::complex<float>* x, int* incx, std::complex<float>* beta,
+         std::complex<float>* y, int* incy);
+      void FC_GLOBAL(zgemv,ZGEMV)
+        (char* t, int* m, int* n, std::complex<double>* alpha,
+         const std::complex<double> *a, int* lda,
+         const std::complex<double>* x, int* incx, std::complex<double>* beta,
+         std::complex<double>* y, int* incy);
 
-      void sscal_(int* N, float* alpha, float* X, int* incx);
-      void dscal_(int* N, double* alpha, double* X, int* incx);
-      void cscal_(int* N, c_float* alpha, c_float* X, int* incx);
-      void zscal_(int* N, c_double* alpha, c_double* X, int* incx);
+      void FC_GLOBAL(sger,SGER)
+        (int* m, int* n, float* alpha, const float* x, int* incx,
+         const float* y, int* incy, float* a, int* lda);
+      void FC_GLOBAL(dger,DGER)
+        (int* m, int* n, double* alpha, const double* x, int* incx,
+         const double* y, int* incy, double* a, int* lda);
+      void FC_GLOBAL(cgeru,CGERU)
+        (int* m, int* n, std::complex<float>* alpha,
+         const std::complex<float>* x, int* incx,
+         const std::complex<float>* y, int* incy,
+         std::complex<float>* a, int* lda);
+      void FC_GLOBAL(zgeru,ZGERU)
+        (int* m, int* n, std::complex<double>* alpha,
+         const std::complex<double>* x, int* incx,
+         const std::complex<double>* y, int* incy,
+         std::complex<double>* a, int* lda);
+      void FC_GLOBAL(cgerc,CGERC)
+        (int* m, int* n, std::complex<float>* alpha,
+         const std::complex<float>* x, int* incx,
+         const std::complex<float>* y, int* incy,
+         std::complex<float>* a, int* lda);
+      void FC_GLOBAL(zgerc,ZGERC)
+        (int* m, int* n, std::complex<double>* alpha,
+         const std::complex<double>* x, int* incx,
+         const std::complex<double>* y, int* incy,
+         std::complex<double>* a, int* lda);
 
-      int isamax_(int* N, float* dx, int* incx);
-      int idamax_(int* N, double* dx, int* incx);
-      int icamax_(int* N, c_float* dx, int* incx);
-      int izamax_(int* N, c_double* dx, int* incx);
+      void FC_GLOBAL(strmv,STRMV)
+        (char* ul, char* t, char* d, int* n,
+         const float* a, int* lda, float* x, int* incx);
+      void FC_GLOBAL(dtrmv,DTRMV)
+        (char* ul, char* t, char* d, int* n,
+         const double* a, int* lda, double* x, int* incx);
+      void FC_GLOBAL(ctrmv,CTRMV)
+        (char* ul, char* t, char* d, int* n,
+         const std::complex<float>* a, int* lda,
+         std::complex<float>* x, int* incx);
+      void FC_GLOBAL(ztrmv,ZTRMV)
+        (char* ul, char* t, char* d, int* n,
+         const std::complex<double>* a, int* lda,
+         std::complex<double>* x, int* incx);
 
-      float snrm2_(int* N, float* X, int* incx);
-      double dnrm2_(int* N, double* X, int* incx);
-      float scnrm2_(int* N, c_float* X, int* incx);
-      double dznrm2_(int* N, c_double* X, int* incx);
+      void FC_GLOBAL(strsv,STRSV)
+        (char* ul, char* t, char* d, int* m, const float* a, int* lda,
+         float* b, int* incb);
+      void FC_GLOBAL(dtrsv,DTRSV)
+        (char* ul, char* t, char* d, int* m, const double* a, int* lda,
+         double* b, int* incb);
+      void FC_GLOBAL(ctrsv,CTRSV)
+        (char* ul, char* t, char* d, int* m,
+         const std::complex<float>* a, int* lda,
+         std::complex<float>* b, int* incb);
+      void FC_GLOBAL(ztrsv,ZTRSV)
+        (char* ul, char* t, char* d, int* m,
+         const std::complex<double>* a, int* lda,
+         std::complex<double>* b, int* incb);
 
-      void saxpy_(int* N, float* alpha, float* X, int* incx, float* Y, int* incy);
-      void daxpy_(int* N, double* alpha, double* X, int* incx, double* Y, int* incy);
-      void caxpy_(int* N, c_float* alpha, c_float* X, int* incx, c_float* Y, int* incy);
-      void zaxpy_(int* N, c_double* alpha, c_double* X, int* incx, c_double* Y, int* incy);
 
-      void sswap_(int* N, float* X, int* ldX, float* Y, int* ldY);
-      void dswap_(int* N, double* X, int* ldX, double* Y, int* ldY);
-      void cswap_(int* N, c_float* X, int* ldX, c_float* Y, int* ldY);
-      void zswap_(int* N, c_double* X, int* ldX, c_double* Y, int* ldY);
+      ///////////////////////////////////////////////////////////
+      ///////// BLAS3 ///////////////////////////////////////////
+      ///////////////////////////////////////////////////////////
+      void FC_GLOBAL(sgemm,SGEMM)
+        (char* ta, char* tb, int* m, int* n, int* k,
+         float* alpha, const float* a, int* lda, const float* b, int* ldb,
+         float* beta, float* c, int* ldc);
+      void FC_GLOBAL(dgemm,DGEMM)
+        (char* ta, char* tb, int* m, int* n, int* k,
+         double* alpha, const double* A, int* lda, const double* b, int* ldb,
+         double* beta, double* c, int* ldc);
+      void FC_GLOBAL(cgemm,CGEMM)
+        (char* ta, char* tb, int* m, int* n, int* k,
+         std::complex<float>* alpha, const std::complex<float>* a, int* lda,
+         const std::complex<float>* b, int* ldb, std::complex<float>* beta,
+         std::complex<float>* c, int* ldc);
+      void FC_GLOBAL(zgemm,ZGEMM)
+        (char* ta, char* tb, int* m, int* n, int* k,
+         std::complex<double>* alpha, const std::complex<double>* a, int* lda,
+         const std::complex<double>* b, int* ldb, std::complex<double>* beta,
+         std::complex<double>* c, int* ldc);
 
-      float sdot_(int* N, float* X, int* incx, float* Y, int* incy);
-      double ddot_(int* N, double* X, int* incx, double* Y, int* incy);
+      void FC_GLOBAL(strsm,STRSM)
+        (char* s, char* ul, char* t, char* d, int* m, int* n,
+         float* alpha, const float* a, int* lda, float* b, int* ldb);
+      void FC_GLOBAL(dtrsm,DTRSM)
+        (char* s, char* ul, char* t, char* d, int* m, int* n,
+         double* alpha, const double* a, int* lda, double* b, int* ldb);
+      void FC_GLOBAL(ctrsm,CTRSM)
+        (char* s, char* ul, char* t, char* d, int* m, int* n,
+         std::complex<float>* alpha, const std::complex<float>* a, int* lda,
+         std::complex<float>* b, int* ldb);
+      void FC_GLOBAL(ztrsm,ZTRSM)
+        (char* s, char* ul, char* t, char* d, int* m, int* n,
+         std::complex<double>* alpha, const std::complex<double>* a, int* lda,
+         std::complex<double>* b, int* ldb);
 
-      void slaset_(char* side, int* M, int* N, float* alpha, float* beta, float* X, int* ldX);
-      void dlaset_(char* side, int* M, int* N, double* alpha, double* beta, double* X, int* ldX);
-      void claset_(char* side, int* M, int* N, c_float* alpha, c_float* beta, c_float* X, int* ldX);
-      void zlaset_(char* side, int* M, int* N, c_double* alpha, c_double* beta, c_double* X, int* ldX);
+      void FC_GLOBAL(strmm,STRMM)
+        (char* s, char* ul, char* t, char* d, int* m, int* n, float* alpha,
+         const float* a, int* lda, float* b, int* ldb);
+      void FC_GLOBAL(dtrmm,DTRMM)
+        (char* s, char* ul, char* t, char* d, int* m, int* n, double* alpha,
+         const double* a, int* lda, double* b, int* ldb);
+      void FC_GLOBAL(ctrmm,CTRMM)
+        (char* s, char* ul, char* t, char* d, int* m, int* n,
+         std::complex<float>* alpha, const std::complex<float>* a, int* lda,
+         std::complex<float>* b, int* ldb);
+      void FC_GLOBAL(ztrmm,ZTRMM)
+        (char* s, char* ul, char* t, char* d, int* m, int* n,
+         std::complex<double>* alpha, const std::complex<double>* a, int* lda,
+         std::complex<double>* b, int* ldb);
 
-      void strsm_(char* side, char* uplo, char* transa, char* diag, int* M, int* N, float* alpha, float* A, int* lda, float* B, int* ldb);
-      void dtrsm_(char* side, char* uplo, char* transa, char* diag, int* M, int* N, double* alpha, double* A, int* lda, double* B, int* ldb);
-      void ctrsm_(char* side, char* uplo, char* transa, char* diag, int* M, int* N, c_float* alpha, c_float* A, int* lda, c_float* B, int* ldb);
-      void ztrsm_(char* side, char* uplo, char* transa, char* diag, int* M, int* N, c_double* alpha, c_double* A, int* lda, c_double* B, int* ldb);
 
-      void strmm_(char* side, char* uplo, char* transa, char* diag, int* M, int* N, float* alpha, float* A, int* lda, float* B, int* ldb);
-      void dtrmm_(char* side, char* uplo, char* transa, char* diag, int* M, int* N, double* alpha, double* A, int* lda, double* B, int* ldb);
-      void ctrmm_(char* side, char* uplo, char* transa, char* diag, int* M, int* N, c_float* alpha, c_float* A, int* lda, c_float* B, int* ldb);
-      void ztrmm_(char* side, char* uplo, char* transa, char* diag, int* M, int* N, c_double* alpha, c_double* A, int* lda, c_double* B, int* ldb);
+      ///////////////////////////////////////////////////////////
+      ///////// LAPACK //////////////////////////////////////////
+      ///////////////////////////////////////////////////////////
+      float FC_GLOBAL(slamch,SLAMCH)(char* cmach);
+      double FC_GLOBAL(dlamch,DLAMCH)(char* cmach);
 
-      void strmv_(char* uplo, char* transa, char* diag, int* N, float* A, int* lda, float* X, int* incx);
-      void dtrmv_(char* uplo, char* transa, char* diag, int* N, double* A, int* lda, double* X, int* incx);
-      void ctrmv_(char* uplo, char* transa, char* diag, int* N, c_float* A, int* lda, c_float* X, int* incx);
-      void ztrmv_(char* uplo, char* transa, char* diag, int* N, c_double* A, int* lda, c_double* X, int* incx);
+      int FC_GLOBAL(ilaenv,ILAENV)
+        (int* ispec, char* name, char* opts,
+         int* n1, int* n2, int* n3, int* n4);
 
-      void strsv_(char* uplo, char* transa, char* diag, int* M, float* A, int* lda, float* B, int* incb);
-      void dtrsv_(char* uplo, char* transa, char* diag, int* M, double* A, int* lda, double* B, int* incb);
-      void ctrsv_(char* uplo, char* transa, char* diag, int* M, c_float* A, int* lda, c_float* B, int* incb);
-      void ztrsv_(char* uplo, char* transa, char* diag, int* M, c_double* A, int* lda, c_double* B, int* incb);
+      void FC_GLOBAL(clacgv,CLACGV)
+        (int* n, std::complex<float>* x, int* incx);
+      void FC_GLOBAL(zlacgv,ZLACGV)
+        (int* n, std::complex<double>* x, int* incx);
 
-      void sgeqp3_(int* M, int* N, float* a, int* lda, int* jpvt, float* tau, float* work, int* lwork, int* info);
-      void dgeqp3_(int* M, int* N, double* a, int* lda, int* jpvt, double* tau, double* work, int* lwork, int* info);
-      void cgeqp3_(int* M, int* N, c_float* a, int* lda, int* jpvt, c_float* tau, c_float* work, int* lwork, c_float* rwork, int* info);
-      void zgeqp3_(int* M, int* N, c_double* a, int* lda, int* jpvt, c_double* tau, c_double* work, int* lwork, c_double* rwork, int* info);
+      int FC_GLOBAL(slacpy,SLACPY)
+        (char* uplo, int* m, int* n, const float* a, int* lda,
+         float* b, int* ldb);
+      int FC_GLOBAL(dlacpy,DLACPY)
+        (char* uplo, int* m, int* n, const double* a, int* lda,
+         double* b, int* ldb);
+      int FC_GLOBAL(clacpy,CLACPY)
+        (char* uplo, int* m, int* n, const std::complex<float>* a, int* lda,
+         std::complex<float>* b, int* ldb);
+      int FC_GLOBAL(zlacpy,ZLACPY)
+        (char* uplo, int* m, int* n, const std::complex<double>* a, int* lda,
+         std::complex<double>* b, int* ldb);
 
-      void sgeqp3tol_(int* M, int* N, float* a, int* lda, int* jpvt, float* tau, float* work, int* lwork, int* info, int* rank, float* rtol, float* atol, int* depth);
-      void dgeqp3tol_(int* M, int* N, double* a, int* lda, int* jpvt, double* tau, double* work, int* lwork, int* info, int* rank, double* rtol, double* atol, int* depth);
-      void cgeqp3tol_(int* M, int* N, c_float* a, int* lda, int* jpvt, c_float* tau, c_float* work, int* lwork, float* rwork, int* info, int* rank, float* rtol, float* atol, int* depth);
-      void zgeqp3tol_(int* M, int* N, c_double* a, int* lda, int* jpvt, c_double* tau, c_double* work, int* lwork, double* rwork, int* info, int* rank, double* rtol, double* atol, int* depth);
+      void FC_GLOBAL(slaswp,SLASWP)
+        (int* n, float* a, int* lda, int* k1, int* k2,
+         const int* ipiv, int* incx);
+      void FC_GLOBAL(dlaswp,DLASWP)
+        (int* n, double* a, int* lda, int* k1, int* k2,
+         const int* ipiv, int* incx);
+      void FC_GLOBAL(claswp,CLASWP)
+        (int* n, std::complex<float>* a, int* lda, int* k1, int* k2,
+         const int* ipiv, int* incx);
+      void FC_GLOBAL(zlaswp,ZLASWP)
+        (int* n, std::complex<double>* a, int* lda, int* k1, int* k2,
+         const int* ipiv, int* incx);
 
-      void sgeqrf_(int* M, int* N, float* a, int* lda, float* tau, float* work, int* lwork, int* info);
-      void dgeqrf_(int* M, int* N, double* a, int* lda, double* tau, double* work, int* lwork, int* info);
-      void cgeqrf_(int* M, int* N, c_float* a, int* lda, c_float* tau, c_float* work, int* lwork, int* info);
-      void zgeqrf_(int* M, int* N, c_double* a, int* lda, c_double* tau, c_double* work, int* lwork, int* info);
+      void FC_GLOBAL(slaset,SLASET)
+        (char* s, int* m, int* n, float* alpha,
+         float* beta, float* a, int* lda);
+      void FC_GLOBAL(dlaset,DLASET)
+        (char* s, int* m, int* n, double* alpha,
+         double* beta, double* a, int* lda);
+      void FC_GLOBAL(claset,CLASET)
+        (char* s, int* m, int* n, std::complex<float>* alpha,
+         std::complex<float>* beta, std::complex<float>* a, int* lda);
+      void FC_GLOBAL(zlaset,ZLASET)
+        (char* s, int* m, int* n, std::complex<double>* alpha,
+         std::complex<double>* beta, std::complex<double>* a, int* lda);
 
-      void sgeqrfmod_(int* M, int* N, float* a, int* lda, float* tau, float* work, int* lwork, int* info, int* depth);
-      void dgeqrfmod_(int* M, int* N, double* a, int* lda, double* tau, double* work, int* lwork, int* info, int* depth);
-      void cgeqrfmod_(int* M, int* N, c_float* a, int* lda, c_float* tau, c_float* work, int* lwork, int* info, int* depth);
-      void zgeqrfmod_(int* M, int* N, c_double* a, int* lda, c_double* tau, c_double* work, int* lwork, int* info, int* depth);
+      void FC_GLOBAL(sgeqp3,SGEQP3)
+        (int* m, int* n, float* a, int* lda, int* jpvt,
+         float* tau, float* work, int* lwork, int* info);
+      void FC_GLOBAL(dgeqp3,DGEQP3)
+        (int* m, int* n, double* a, int* lda, int* jpvt,
+         double* tau, double* work, int* lwork, int* info);
+      void FC_GLOBAL(cgeqp3,CGEQP3)
+        (int* m, int* n, std::complex<float>* a, int* lda, int* jpvt,
+         std::complex<float>* tau, std::complex<float>* work, int* lwork,
+         std::complex<float>* rwork, int* info);
+      void FC_GLOBAL(zgeqp3,ZGEQP3)
+        (int* m, int* n, std::complex<double>* a, int* lda, int* jpvt,
+         std::complex<double>* tau, std::complex<double>* work, int* lwork,
+         std::complex<double>* rwork, int* info);
 
-      void sgelqf_(int* M, int* N, float* a, int* lda, float* tau, float* work, int* lwork, int* info);
-      void dgelqf_(int* M, int* N, double* a, int* lda, double* tau, double* work, int* lwork, int* info);
-      void cgelqf_(int* M, int* N, c_float* a, int* lda, c_float* tau, c_float* work, int* lwork, int* info);
-      void zgelqf_(int* M, int* N, c_double* a, int* lda, c_double* tau, c_double* work, int* lwork, int* info);
+      void FC_GLOBAL(sgeqp3tol,SGEQP3TOL)
+        (int* m, int* n, float* a, int* lda, int* jpvt,
+         float* tau, float* work, int* lwork, int* info,
+         int* rank, float* rtol, float* atol, int* depth);
+      void FC_GLOBAL(dgeqp3tol,DGEQP3TOL)
+        (int* m, int* n, double* a, int* lda, int* jpvt,
+         double* tau, double* work, int* lwork, int* info,
+         int* rank, double* rtol, double* atol, int* depth);
+      void FC_GLOBAL(cgeqp3tol,CGEQP3TOL)
+        (int* m, int* n, std::complex<float>* a, int* lda, int* jpvt,
+         std::complex<float>* tau, std::complex<float>* work, int* lwork,
+         float* rwork, int* info, int* rank,
+         float* rtol, float* atol, int* depth);
+      void FC_GLOBAL(zgeqp3tol,ZGEQP3TOL)
+        (int* m, int* n, std::complex<double>* a, int* lda, int* jpvt,
+         std::complex<double>* tau, std::complex<double>* work, int* lwork,
+         double* rwork, int* info, int* rank,
+         double* rtol, double* atol, int* depth);
 
-      void sgelqfmod_(int* M, int* N, float* a, int* lda, float* tau, float* work, int* lwork, int* info, int* depth);
-      void dgelqfmod_(int* M, int* N, double* a, int* lda, double* tau, double* work, int* lwork, int* info, int* depth);
-      void cgelqfmod_(int* M, int* N, c_float* a, int* lda, c_float* tau, c_float* work, int* lwork, int* info, int* depth);
-      void zgelqfmod_(int* M, int* N, c_double* a, int* lda, c_double* tau, c_double* work, int* lwork, int* info, int* depth);
+      void FC_GLOBAL(sgeqrf,SGEQRF)
+        (int* m, int* n, float* a, int* lda, float* tau,
+         float* work, int* lwork, int* info);
+      void FC_GLOBAL(dgeqrf,DGEQRF)
+        (int* m, int* n, double* a, int* lda, double* tau,
+         double* work, int* lwork, int* info);
+      void FC_GLOBAL(cgeqrf,CGEQRF)
+        (int* m, int* n, std::complex<float>* a, int* lda,
+         std::complex<float>* tau, std::complex<float>* work,
+         int* lwork, int* info);
+      void FC_GLOBAL(zgeqrf,ZGEQRF)
+        (int* m, int* n, std::complex<double>* a, int* lda,
+         std::complex<double>* tau, std::complex<double>* work,
+         int* lwork, int* info);
 
-      void sgetrf_(int* M, int* N, float* a, int* lda, int* ipiv, int* info);
-      void dgetrf_(int* M, int* N, double* a, int* lda, int* ipiv, int* info);
-      void cgetrf_(int* M, int* N, c_float* a, int* lda, int* ipiv, int* info);
-      void zgetrf_(int* M, int* N, c_double* a, int* lda, int* ipiv, int* info);
+      void FC_GLOBAL(sgeqrfmod,SGEQRFMOD)
+        (int* m, int* n, float* a, int* lda, float* tau,
+         float* work, int* lwork, int* info, int* depth);
+      void FC_GLOBAL(dgeqrfmod,DGEQRFMOD)
+        (int* m, int* n, double* a, int* lda, double* tau,
+         double* work, int* lwork, int* info, int* depth);
+      void FC_GLOBAL(cgeqrfmod,CGEQRFMOD)
+        (int* m, int* n, std::complex<float>* a, int* lda,
+         std::complex<float>* tau, std::complex<float>* work, int* lwork,
+         int* info, int* depth);
+      void FC_GLOBAL(zgeqrfmod,ZGEQRFMOD)
+        (int* m, int* n, std::complex<double>* a, int* lda,
+         std::complex<double>* tau, std::complex<double>* work, int* lwork,
+         int* info, int* depth);
 
-      void sgetrfmod_(int* M, int* N, float* a, int* lda, int* ipiv, int* info, int* depth);
-      void dgetrfmod_(int* M, int* N, double* a, int* lda, int* ipiv, int* info, int* depth);
-      void cgetrfmod_(int* M, int* N, c_float* a, int* lda, int* ipiv, int* info, int* depth);
-      void zgetrfmod_(int* M, int* N, c_double* a, int* lda, int* ipiv, int* info, int* depth);
+      void FC_GLOBAL(sgelqf,SGELQF)
+        (int* m, int* n, float* a, int* lda, float* tau,
+         float* work, int* lwork, int* info);
+      void FC_GLOBAL(dgelqf,DGELQF)
+        (int* m, int* n, double* a, int* lda, double* tau,
+         double* work, int* lwork, int* info);
+      void FC_GLOBAL(cgelqf,CGELQF)
+        (int* m, int* n, std::complex<float>* a, int* lda,
+         std::complex<float>* tau, std::complex<float>* work,
+         int* lwork, int* info);
+      void FC_GLOBAL(zgelqf,ZGELQF)
+        (int* m, int* n, std::complex<double>* a, int* lda,
+         std::complex<double>* tau, std::complex<double>* work,
+         int* lwork, int* info);
 
-      void sgetf2_(int* M, int* N, float* a, int* lda, int* ipiv, int* info);
-      void dgetf2_(int* M, int* N, double* a, int* lda, int* ipiv, int* info);
-      void cgetf2_(int* M, int* N, c_float* a, int* lda, int* ipiv, int* info);
-      void zgetf2_(int* M, int* N, c_double* a, int* lda, int* ipiv, int* info);
+      void FC_GLOBAL(sgelqfmod,SGELQFMOD)
+        (int* m, int* n, float* a, int* lda, float* tau,
+         float* work, int* lwork, int* info, int* depth);
+      void FC_GLOBAL(dgelqfmod,DGELQFMOD)
+        (int* m, int* n, double* a, int* lda, double* tau,
+         double* work, int* lwork, int* info, int* depth);
+      void FC_GLOBAL(cgelqfmod,CGELQFMOD)
+        (int* m, int* n, std::complex<float>* a, int* lda,
+         std::complex<float>* tau, std::complex<float>* work, int* lwork,
+         int* info, int* depth);
+      void FC_GLOBAL(zgelqfmod,ZGELQFMOD)
+        (int* m, int* n, std::complex<double>* a, int* lda,
+         std::complex<double>* tau, std::complex<double>* work, int* lwork,
+         int* info, int* depth);
 
-      void sgetrs_(char* trans, int* N, int* nrhs, float* a, int* lda, int* ipiv, float* b, int* ldb, int* info);
-      void dgetrs_(char* trans, int* N, int* nrhs, double* a, int* lda, int* ipiv, double* b, int* ldb, int* info);
-      void cgetrs_(char* trans, int* N, int* nrhs, c_float* a, int* lda, int* ipiv, c_float* b, int* ldb, int* info);
-      void zgetrs_(char* trans, int* N, int* nrhs, c_double* a, int* lda, int* ipiv, c_double* b, int* ldb, int* info);
+      void FC_GLOBAL(sgetrf,SGETRF)
+        (int* m, int* n, float* a, int* lda, int* ipiv, int* info);
+      void FC_GLOBAL(dgetrf,DGETRF)
+        (int* m, int* n, double* a, int* lda, int* ipiv, int* info);
+      void FC_GLOBAL(cgetrf,CGETRF)
+        (int* m, int* n, std::complex<float>* a, int* lda,
+         int* ipiv, int* info);
+      void FC_GLOBAL(zgetrf,ZGETRF)
+        (int* m, int* n, std::complex<double>* a, int* lda,
+         int* ipiv, int* info);
 
-      void spotrf_(char* uplo, int* n, float* a, int* lda, int* info);
-      void dpotrf_(char* uplo, int* n, double* a, int* lda, int* info);
-      void cpotrf_(char* uplo, int* n, c_float* a, int* lda, int* info);
-      void zpotrf_(char* uplo, int* n, c_double* a, int* lda, int* info);
+      void FC_GLOBAL(sgetrfmod,SGETRFMOD)
+        (int* m, int* n, float* a, int* lda,
+         int* ipiv, int* info, int* depth);
+      void FC_GLOBAL(dgetrfmod,DGETRFMOD)
+        (int* m, int* n, double* a, int* lda,
+         int* ipiv, int* info, int* depth);
+      void FC_GLOBAL(cgetrfmod,CGETRFMOD)
+        (int* m, int* n, std::complex<float>* a, int* lda,
+         int* ipiv, int* info, int* depth);
+      void FC_GLOBAL(zgetrfmod,ZGETRFMOD)
+        (int* m, int* n, std::complex<double>* a, int* lda,
+         int* ipiv, int* info, int* depth);
 
-      void sgetri_(int* N, float* a, int* lda, int* ipiv, float* work, int* lwork, int* info);
-      void dgetri_(int* N, double* a, int* lda, int* ipiv, double* work, int* lwork, int* info);
-      void cgetri_(int* N, c_float* a, int* lda, int* ipiv, c_float* work, int* lwork, int* info);
-      void zgetri_(int* N, c_double* a, int* lda, int* ipiv, c_double* work, int* lwork, int* info);
+      void FC_GLOBAL(sgetf2,SGETF2)
+        (int* m, int* n, float* a, int* lda, int* ipiv, int* info);
+      void FC_GLOBAL(dgetf2,DGETF2)
+        (int* m, int* n, double* a, int* lda, int* ipiv, int* info);
+      void FC_GLOBAL(cgetf2,CGETF2)
+        (int* m, int* n, std::complex<float>* a, int* lda,
+         int* ipiv, int* info);
+      void FC_GLOBAL(zgetf2,ZGETF2)
+        (int* m, int* n, std::complex<double>* a, int* lda,
+         int* ipiv, int* info);
 
-      void sorglq_(int* M, int* N, int* K, float* a, int* lda, float* tau, float* work, int* lwork, int* info);
-      void dorglq_(int* M, int* N, int* K, double* a, int* lda, double* tau, double* work, int* lwork, int* info);
-      void cunglq_(int* M, int* N, int* K, c_float* a, int* lda, c_float* tau, c_float* work, int* lwork, int* info);
-      void zunglq_(int* M, int* N, int* K, c_double* a, int* lda, c_double* tau, c_double* work, int* lwork, int* info);
+      void FC_GLOBAL(sgetrs,SGETRS)
+        (char* t, int* n, int* nrhs, const float* a, int* lda,
+         const int* ipiv, float* b, int* ldb, int* info);
+      void FC_GLOBAL(dgetrs,dgetrs)
+        (char* t, int* n, int* nrhs, const double* a, int* lda,
+         const int* ipiv, double* b, int* ldb, int* info);
+      void FC_GLOBAL(cgetrs,cgetrs)
+        (char* t, int* n, int* nrhs, const std::complex<float>* a, int* lda,
+         const int* ipiv, std::complex<float>* b, int* ldb, int* info);
+      void FC_GLOBAL(zgetrs,ZGETRS)
+        (char* t, int* n, int* nrhs, const std::complex<double>* a, int* lda,
+         const int* ipiv, std::complex<double>* b, int* ldb, int* info);
 
-      void sorglqmod_(int* M, int* N, int* K, float* a, int* lda, float* tau, float* work, int* lwork, int* info, int* depth);
-      void dorglqmod_(int* M, int* N, int* K, double* a, int* lda, double* tau, double* work, int* lwork, int* info, int* depth);
-      void cunglqmod_(int* M, int* N, int* K, c_float* a, int* lda, c_float* tau, c_float* work, int* lwork, int* info, int* depth);
-      void zunglqmod_(int* M, int* N, int* K, c_double* a, int* lda, c_double* tau, c_double* work, int* lwork, int* info, int* depth);
+      void FC_GLOBAL(spotrf,SPOTRF)
+        (char* ul, int* n, float* a, int* lda, int* info);
+      void FC_GLOBAL(dpotrf,DPOTRF)
+        (char* ul, int* n, double* a, int* lda, int* info);
+      void FC_GLOBAL(cpotrf,CPOTRF)
+        (char* ul, int* n, std::complex<float>* a, int* lda, int* info);
+      void FC_GLOBAL(zpotrf,ZPOTRF)
+        (char* ul, int* n, std::complex<double>* a,
+         int* lda, int* info);
 
-      void sorgqr_(int* M, int* N, int* K, float* a, int* lda, float* tau, float* work, int* lwork, int* info);
-      void dorgqr_(int* M, int* N, int* K, double* a, int* lda, double* tau, double* work, int* lwork, int* info);
-      void cungqr_(int* M, int* N, int* K, c_float* a, int* lda, c_float* tau, c_float* work, int* lwork, int* info);
-      void zungqr_(int* M, int* N, int* K, c_double* a, int* lda, c_double* tau, c_double* work, int* lwork, int* info);
+      void FC_GLOBAL(sgetri,SGETRI)
+        (int* n, float* a, int* lda, int* ipiv,
+         float* work, int* lwork, int* info);
+      void FC_GLOBAL(dgetri,DGETRI)
+        (int* n, double* a, int* lda, int* ipiv,
+         double* work, int* lwork, int* info);
+      void FC_GLOBAL(cgetri,CGETRI)
+        (int* n, std::complex<float>* a, int* lda, int* ipiv,
+         std::complex<float>* work, int* lwork, int* info);
+      void FC_GLOBAL(zgetri,ZGETRI)
+        (int* n, std::complex<double>* a, int* lda, int* ipiv,
+         std::complex<double>* work, int* lwork, int* info);
 
-      void sgesv_(int* N, int* NRHS, float* A, int* LDA, int* IPIV, float* B, int* LDB, int* info);
-      void dgesv_(int* N, int* NRHS, double* A, int* LDA, int* IPIV, double* B, int* LDB, int* info);
-      void cgesv_(int* N, int* NRHS, c_float* A, int* LDA, int* IPIV, c_float* B, int* LDB, int* info);
-      void zgesv_(int* N, int* NRHS, c_double* A, int* LDA, int* IPIV, c_double* B, int* LDB, int* info);
+      void FC_GLOBAL(sorglq,SORGLQ)
+        (int* m, int* n, int* k, float* a, int* lda, const float* tau,
+         float* work, int* lwork, int* info);
+      void FC_GLOBAL(dorglq,DORGLQ)
+        (int* m, int* n, int* k, double* a, int* lda, const double* tau,
+         double* work, int* lwork, int* info);
+      void FC_GLOBAL(cunglq,CORGLQ)
+        (int* m, int* n, int* k, std::complex<float>* a, int* lda,
+         const std::complex<float>* tau, std::complex<float>* work,
+         int* lwork, int* info);
+      void FC_GLOBAL(zunglq,ZORGLQ)
+        (int* m, int* n, int* k, std::complex<double>* a, int* lda,
+         const std::complex<double>* tau, std::complex<double>* work,
+         int* lwork, int* info);
 
-      void slarnv_(int* idist, int* iseed, int* n, float* x);
-      void dlarnv_(int* idist, int* iseed, int* n, double* x);
-      void clarnv_(int* idist, int* iseed, int* n, c_float* x);
-      void zlarnv_(int* idist, int* iseed, int* n, c_double* x);
+      void FC_GLOBAL(sorglqmod,SORQLQMOD)
+        (int* m, int* n, int* k, float* a, int* lda, const float* tau,
+         float* work, int* lwork, int* info, int* depth);
+      void FC_GLOBAL(dorglqmod,DORQLQMOD)
+        (int* m, int* n, int* k, double* a, int* lda, const double* tau,
+         double* work, int* lwork, int* info, int* depth);
+      void FC_GLOBAL(cunglqmod,CORQLQMOD)
+        (int* m, int* n, int* k, std::complex<float>* a, int* lda,
+         const std::complex<float>* tau, std::complex<float>* work,
+         int* lwork, int* info, int* depth);
+      void FC_GLOBAL(zunglqmod,ZORQLQMOD)
+        (int* m, int* n, int* k, std::complex<double>* a, int* lda,
+         const std::complex<double>* tau, std::complex<double>* work,
+         int* lwork, int* info, int* depth);
 
-      float slange_(char* norm, int* m, int* n, float* a, int* lda, float* work);
-      double dlange_(char* norm, int* m, int* n, double* a,int* lda, double* work);
-      float clange_(char* norm, int* m, int* n, c_float* a, int* lda, float* work);
-      double zlange_(char* norm, int* m, int* n, c_double* a, int* lda, double* work);
+      void FC_GLOBAL(sorgqr,SORGQR)
+        (int* m, int* n, int* k, float* a, int* lda, const float* tau,
+         float* work, int* lwork, int* info);
+      void FC_GLOBAL(dorgqr,DORGQR)
+        (int* m, int* n, int* k, double* a, int* lda, const double* tau,
+         double* work, int* lwork, int* info);
+      void FC_GLOBAL(cungqr,CORGQR)
+        (int* m, int* n, int* k, std::complex<float>* a, int* lda,
+         const std::complex<float>* tau, std::complex<float>* work,
+         int* lwork, int* info);
+      void FC_GLOBAL(zungqr,ZORGQR)
+        (int* m, int* n, int* k, std::complex<double>* a, int* lda,
+         const std::complex<double>* tau, std::complex<double>* work,
+         int* lwork, int* info);
 
-      void sgesvd_(char* JOBU, char* JOBVT, int* M, int* N,
-                   float* A, int* LDA, float* S, float* U, int* LDU,
-                   float* VT, int* LDVT, float* WORK, int* LWORK,
-                   int* INFO);
-      void dgesvd_(char* JOBU, char* JOBVT, int* M, int* N,
-                   double* A, int* LDA, double* S, double* U, int* LDU,
-                   double* VT, int* LDVT, double* WORK, int* LWORK,
-                   int* INFO);
+      void FC_GLOBAL(sgesv,SGESV)
+        (int* n, int* nrhs, float* a, int* lda, int* ipiv,
+         float* b, int* ldb, int* info);
+      void FC_GLOBAL(dgesv,DGESV)
+        (int* n, int* nrhs, double* a, int* lda, int* ipiv,
+         double* b, int* ldb, int* info);
+      void FC_GLOBAL(cgesv,CGESV)
+        (int* n, int* nrhs, std::complex<float>* a, int* lda, int* ipiv,
+         std::complex<float>* b, int* ldb, int* info);
+      void FC_GLOBAL(zgesv,ZGESV)
+        (int* n, int* nrhs, std::complex<double>* a, int* lda, int* ipiv,
+         std::complex<double>* b, int* ldb, int* info);
+
+      void FC_GLOBAL(slarnv,SLARNV)
+        (int* idist, int* iseed, int* n, float* x);
+      void FC_GLOBAL(dlarnv,DLARNV)
+        (int* idist, int* iseed, int* n, double* x);
+      void FC_GLOBAL(clarnv,CLARNV)
+        (int* idist, int* iseed, int* n, std::complex<float>* x);
+      void FC_GLOBAL(zlarnv,ZLARNV)
+        (int* idist, int* iseed, int* n, std::complex<double>* x);
+
+      float FC_GLOBAL(slange,SLANGE)
+        (char* norm, int* m, int* n, const float* a, int* lda, float* work);
+      double FC_GLOBAL(dlange,DLANGE)
+        (char* norm, int* m, int* n, const double* a,int* lda, double* work);
+      float FC_GLOBAL(clange,CLANGE)
+        (char* norm, int* m, int* n,
+         const std::complex<float>* a, int* lda, float* work);
+      double FC_GLOBAL(zlange,ZLANGE)
+        (char* norm, int* m, int* n,
+         const std::complex<double>* a, int* lda, double* work);
+
+      void FC_GLOBAL(sgesvd,SGESVD)
+        (char* jobu, char* jobvt, int* m, int* n, float* a, int* lda,
+         float* s, float* u, int* ldu, float* vt, int* ldvt,
+         float* work, int* lwork, int* info);
+      void FC_GLOBAL(dgesvd,DGESVD)
+        (char* jobu, char* jobvt, int* m, int* n, double* a, int* lda,
+         double* s, double* u, int* ldu, double* vt, int* ldvt,
+         double* work, int* lwork, int* info);
     }
 
-    inline int ilaenv(int ispec, char name[], char opts[], int n1, int n2, int n3, int n4) {
-      return ilaenv_(&ispec, name, opts, &n1, &n2, &n3, &n4);
+    inline int ilaenv
+    (int ispec, char name[], char opts[], int n1, int n2, int n3, int n4) {
+      return FC_GLOBAL(ilaenv,ILAENV)(&ispec, name, opts, &n1, &n2, &n3, &n4);
     }
 
     template<typename real> inline real lamch(char cmach);
-    template<> inline float lamch<float>(char cmach)
-    { return slamch_(&cmach); }
-    template<> inline double lamch<double>(char cmach)
-    { return dlamch_(&cmach); }
-
-    template<typename scalar> inline void gemm(char TransA, char TransB, int M, int N, int K, scalar alpha, scalar *A, int lda, scalar *B, int ldb, scalar beta, scalar *C, int ldc);
-    template<> inline void gemm<float>(char TransA, char TransB, int M, int N, int K, float alpha, float *A, int lda, float *B, int ldb, float beta, float *C, int ldc)
-    { lda = std::max(lda, 1);
-      sgemm_(&TransA, &TransB, &M, &N, &K, &alpha, A, &lda, B, &ldb, &beta, C, &ldc);
-      STRUMPACK_FLOPS(static_cast<long long int>((alpha!=0)*double(M)*double(N)*(double(K)*2.-1.) + (alpha!=0 && beta!=0)*double(M)*double(N)
-						 + (alpha!=0 && alpha!=1)*double(M)*double(N) + (beta!=0 && beta!=1)*double(M)*double(N)));
-      STRUMPACK_BYTES(4*static_cast<long long int>(2.*double(M)*double(N)+double(M)*double(K)+double(K)*double(N)));
+    template<> inline float lamch<float>(char cmach) {
+      return FC_GLOBAL(slamch,SLAMCH)(&cmach);
     }
-    template<> inline void gemm<double>(char TransA, char TransB, int M, int N, int K, double alpha, double *A, int lda, double *B, int ldb, double beta, double *C, int ldc)
-    { lda = std::max(lda, 1);
-      dgemm_(&TransA, &TransB, &M, &N, &K, &alpha, A, &lda, B, &ldb, &beta, C, &ldc);
-      STRUMPACK_FLOPS(static_cast<long long int>((alpha!=0)*double(M)*double(N)*(double(K)*2.-1.) + (alpha!=0 && beta!=0)*double(M)*double(N)
-						 + (alpha!=0 && alpha!=1)*double(M)*double(N) + (beta!=0 && beta!=1)*double(M)*double(N)));
-      STRUMPACK_BYTES(8*static_cast<long long int>(2.*double(M)*double(N)+double(M)*double(K)+double(K)*double(N)));
+    template<> inline double lamch<double>(char cmach) {
+      return FC_GLOBAL(dlamch,DLAMCH)(&cmach);
     }
-    template<> inline void gemm<c_float>(char TransA, char TransB, int M, int N, int K, c_float alpha, c_float *A, int lda, c_float *B, int ldb, c_float beta, c_float *C, int ldc)
-    { lda = std::max(lda, 1);
-      cgemm_(&TransA, &TransB, &M, &N, &K, &alpha, A, &lda, B, &ldb, &beta, C, &ldc);
-      STRUMPACK_FLOPS(4*static_cast<long long int>((alpha!=c_float(0))*double(M)*double(N)*(double(K)*2.-1.) + (alpha!=c_float(0) && beta!=c_float(0))*double(M)*double(N)
-						   + (alpha!=c_float(0) && alpha!=c_float(1))*double(M)*double(N) + (beta!=c_float(0) && beta!=c_float(1))*double(M)*double(N)));
-      STRUMPACK_BYTES(2*4*static_cast<long long int>(2.*double(M)*double(N)+double(M)*double(K)+double(K)*double(N))); }
-    template<> inline void gemm<c_double>(char TransA, char TransB, int M, int N, int K, c_double alpha, c_double *A, int lda, c_double *B, int ldb, c_double beta, c_double *C, int ldc)
-    { lda = std::max(lda, 1);
-      zgemm_(&TransA, &TransB, &M, &N, &K, &alpha, A, &lda, B, &ldb, &beta, C, &ldc);
-      STRUMPACK_FLOPS(4*static_cast<long long int>((alpha!=c_double(0))*double(M)*double(N)*(double(K)*2.-1.) + (alpha!=c_double(0) && beta!=c_double(0))*double(M)*double(N)
-						   + (alpha!=c_double(0) && alpha!=c_double(1))*double(M)*double(N) + (beta!=c_double(0) && beta!=c_double(1))*double(M)*double(N)));
-      STRUMPACK_BYTES(2*8*static_cast<long long int>(2.*double(M)*double(N)+double(M)*double(K)+double(K)*double(N))); }
-
-    template<typename scalar> inline void gemv(char trans, int M, int N, scalar alpha, scalar *A, int lda, scalar *X, int incx, scalar beta, scalar *Y, int incy);
-    template<> inline void gemv<float>(char trans, int M, int N, float alpha, float *A, int lda, float *X, int incx, float beta, float *Y, int incy)
-    { sgemv_(&trans, &M, &N, &alpha, A, &lda, X, &incx, &beta, Y, &incy);
-      STRUMPACK_FLOPS(static_cast<long long int>((alpha!=0)*double(M)*(double(N)*2.-1.) + (alpha!=1 && alpha!=0)*double(M) + (beta!=0 && beta!=1)*double(M) + (alpha!=0 && beta!=0)*double(M)));
-      STRUMPACK_BYTES(4*static_cast<long long int>(2.*double(M)+double(M)*double(N)+double(N))); }
-    template<> inline void gemv<double>(char trans, int M, int N, double alpha, double *A, int lda, double *X, int incx, double beta, double *Y, int incy)
-    { dgemv_(&trans, &M, &N, &alpha, A, &lda, X, &incx, &beta, Y, &incy);
-      STRUMPACK_FLOPS(static_cast<long long int>((alpha!=0)*double(M)*(double(N)*2.-1.) + (alpha!=1 && alpha!=0)*double(M) + (beta!=0 && beta!=1)*double(M) + (alpha!=0 && beta!=0)*double(M)));
-      STRUMPACK_BYTES(8*static_cast<long long int>(2.*double(M)+double(M)*double(N)+double(N))); }
-    template<> inline void gemv<c_float>(char trans, int M, int N, c_float alpha, c_float *A, int lda, c_float *X, int incx, c_float beta, c_float *Y, int incy)
-    { cgemv_(&trans, &M, &N, &alpha, A, &lda, X, &incx, &beta, Y, &incy);
-      STRUMPACK_FLOPS(4*static_cast<long long int>((alpha!=c_float(0))*double(M)*(double(N)*2.-1.) + (alpha!=c_float(1) && alpha!=c_float(0))*double(M) + (beta!=c_float(0) && beta!=c_float(1))*double(M) + (alpha!=c_float(0) && beta!=c_float(0))*double(M)));
-      STRUMPACK_BYTES(2*4*static_cast<long long int>(2.*double(M)+double(M)*double(N)+double(N))); }
-    template<> inline void gemv<c_double>(char trans, int M, int N, c_double alpha, c_double *A, int lda, c_double *X, int incx, c_double beta, c_double *Y, int incy)
-    { zgemv_(&trans, &M, &N, &alpha, A, &lda, X, &incx, &beta, Y, &incy);
-      STRUMPACK_FLOPS(4*static_cast<long long int>((alpha!=c_double(0))*double(M)*(double(N)*2.-1.) + (alpha!=c_double(1) && alpha!=c_double(0))*double(M) + (beta!=c_double(0) && beta!=c_double(1))*double(M) + (alpha!=c_double(0) && beta!=c_double(0))*double(M)));
-      STRUMPACK_BYTES(2*8*static_cast<long long int>(2.*double(M)+double(M)*double(N)+double(N))); }
-
-    template<typename scalar> inline void geru(int M, int N, scalar alpha, scalar* X, int incx, scalar* Y, int incy, scalar* A, int lda);
-    template<> inline void geru<float>(int M, int N, float alpha, float* X, int incx, float* Y, int incy, float* A, int lda)
-    { sger_(&M, &N, &alpha, X, &incx, Y, &incy, A, &lda);
-      STRUMPACK_FLOPS(static_cast<long long int>((alpha!=0)*double(M)*double(N) + (alpha!=0 && alpha!=1)*double(M)*double(N) + (alpha!=0)*double(M)*double(N))); }
-    template<> inline void geru<double>(int M, int N, double alpha, double* X, int incx, double* Y, int incy, double* A, int lda)
-    { dger_(&M, &N, &alpha, X, &incx, Y, &incy, A, &lda);
-      STRUMPACK_FLOPS(static_cast<long long int>((alpha!=0)*double(M)*double(N) + (alpha!=0 && alpha!=1)*double(M)*double(N) + (alpha!=0)*double(M)*double(N))); }
-    template<> inline void geru<c_float>(int M, int N, c_float alpha, c_float* X, int incx, c_float* Y, int incy, c_float* A, int lda)
-    { cgeru_(&M, &N, &alpha, X, &incx, Y, &incy, A, &lda);
-      STRUMPACK_FLOPS(4*static_cast<long long int>((alpha!=c_float(0))*double(M)*double(N) + (alpha!=c_float(0) && alpha!=c_float(1))*double(M)*double(N) + (alpha!=c_float(0))*double(M)*double(N))); }
-    template<> inline void geru<c_double>(int M, int N, c_double alpha, c_double* X, int incx, c_double* Y, int incy, c_double* A, int lda)
-    { zgeru_(&M, &N, &alpha, X, &incx, Y, &incy, A, &lda);
-      STRUMPACK_FLOPS(4*static_cast<long long int>((alpha!=c_double(0))*double(M)*double(N) + (alpha!=c_double(0) && alpha!=c_double(1))*double(M)*double(N) + (alpha!=c_double(0))*double(M)*double(N))); }
-
-    template<typename scalar> inline void gerc(int M, int N, scalar alpha, scalar* X, int incx, scalar* Y, int incy, scalar* A, int lda);
-    template<> inline void gerc<float>(int M, int N, float alpha, float* X, int incx, float* Y, int incy, float* A, int lda)
-    { sger_(&M, &N, &alpha, X, &incx, Y, &incy, A, &lda);
-      STRUMPACK_FLOPS(static_cast<long long int>((alpha!=0)*double(M)*double(N) + (alpha!=0 && alpha!=1)*double(M)*double(N) + (alpha!=0)*double(M)*double(N))); }
-    template<> inline void gerc<double>(int M, int N, double alpha, double* X, int incx, double* Y, int incy, double* A, int lda)
-    { dger_(&M, &N, &alpha, X, &incx, Y, &incy, A, &lda);
-      STRUMPACK_FLOPS(static_cast<long long int>((alpha!=0)*double(M)*double(N) + (alpha!=0 && alpha!=1)*double(M)*double(N) + (alpha!=0)*double(M)*double(N))); }
-    template<> inline void gerc<c_float>(int M, int N, c_float alpha, c_float* X, int incx, c_float* Y, int incy, c_float* A, int lda)
-    { cgerc_(&M, &N, &alpha, X, &incx, Y, &incy, A, &lda);
-      STRUMPACK_FLOPS(4*static_cast<long long int>((alpha!=c_float(0))*double(M)*double(N) + (alpha!=c_float(0) && alpha!=c_float(1))*double(M)*double(N) + (alpha!=c_float(0))*double(M)*double(N))); }
-    template<> inline void gerc<c_double>(int M, int N, c_double alpha, c_double* X, int incx, c_double* Y, int incy, c_double* A, int lda)
-    { zgerc_(&M, &N, &alpha, X, &incx, Y, &incy, A, &lda);
-      STRUMPACK_FLOPS(4*static_cast<long long int>((alpha!=c_double(0))*double(M)*double(N) + (alpha!=c_double(0) && alpha!=c_double(1))*double(M)*double(N) + (alpha!=c_double(0))*double(M)*double(N))); }
-
-    template<typename scalar> inline void lacgv(int n, scalar* x, int incx);
-    template<> inline void lacgv<float>(int, float *, int ) { }
-    template<> inline void lacgv<double>(int, double *, int ) { } //Nothing to do.
-    template<> inline void lacgv<c_float>(int n, c_float *x, int incx) { clacgv_(&n, x, &incx); }
-    template<> inline void lacgv<c_double>(int n, c_double *x, int incx) { zlacgv_(&n, x, &incx); }
-
-    template<typename scalar> inline void lacpy(char uplo, int m, int n, scalar* a, int lda, scalar* b, int ldb);
-    template<> inline void lacpy<float>(char uplo, int m, int n, float* a, int lda, float* b, int ldb)
-    { slacpy_(&uplo, &m, &n, a, &lda, b, &ldb); }
-    template<> inline void lacpy<double>(char uplo, int m, int n, double* a, int lda, double* b, int ldb)
-    { dlacpy_(&uplo, &m, &n, a, &lda, b, &ldb); }
-    template<> inline void lacpy<c_float>(char uplo, int m, int n, c_float* a, int lda, c_float* b, int ldb)
-    { clacpy_(&uplo, &m, &n, a, &lda, b, &ldb); }
-    template<> inline void lacpy<c_double>(char uplo, int m, int n, c_double* a, int lda, c_double* b, int ldb)
-    { zlacpy_(&uplo, &m, &n, a, &lda, b, &ldb); }
-
-    template<typename scalar> inline void axpy(int N, scalar alpha, scalar* X, int incx, scalar* Y, int incy);
-    template<> inline void axpy<float>(int N, float alpha, float* X, int incx, float* Y, int incy)
-    { saxpy_(&N, &alpha, X, &incx, Y, &incy);
-      STRUMPACK_FLOPS(static_cast<long long int>((alpha!=0 && alpha!=1)*double(N) + (alpha!=0)*double(N))); }
-    template<> inline void axpy<double>(int N, double alpha, double* X, int incx, double* Y, int incy)
-    { daxpy_(&N, &alpha, X, &incx, Y, &incy);
-      STRUMPACK_FLOPS(static_cast<long long int>((alpha!=0 && alpha!=1)*double(N) + (alpha!=0)*double(N))); }
-    template<> inline void axpy<c_float>(int N, c_float alpha, c_float* X, int incx, c_float* Y, int incy)
-    { caxpy_(&N, &alpha, X, &incx, Y, &incy); }
-    template<> inline void axpy<c_double>(int N, c_double alpha, c_double* X, int incx, c_double* Y, int incy)
-    { zaxpy_(&N, &alpha, X, &incx, Y, &incy); }
-
-    template<typename scalar> inline void copy(int N, scalar* X, int incx, scalar* Y, int incy);
-    template<> inline void copy<float>(int N, float* X, int incx, float* Y, int incy)
-    { scopy_(&N, X, &incx, Y, &incy); }
-    template<> inline void copy<double>(int N, double* X, int incx, double* Y, int incy)
-    { dcopy_(&N, X, &incx, Y, &incy); }
-    template<> inline void copy<c_float>(int N, c_float* X, int incx, c_float* Y, int incy)
-    { ccopy_(&N, X, &incx, Y, &incy); }
-    template<> inline void copy<c_double>(int N, c_double* X, int incx, c_double* Y, int incy)
-    { zcopy_(&N, X, &incx, Y, &incy); }
-
-    template<typename scalar> inline void scal(int N, scalar alpha, scalar* X, int incx);
-    template<> inline void scal<float>(int N, float alpha, float* X, int incx)
-    { sscal_(&N, &alpha, X, &incx);
-      STRUMPACK_FLOPS((alpha==1) ? 0 : static_cast<long long int>(N)); }
-    template<> inline void scal<double>(int N, double alpha, double* X, int incx)
-    { dscal_(&N, &alpha, X, &incx);
-      STRUMPACK_FLOPS((alpha==1) ? 0 : static_cast<long long int>(N)); }
-    template<> inline void scal<c_float>(int N, c_float alpha, c_float* X, int incx)
-    { cscal_(&N, &alpha, X, &incx);
-      STRUMPACK_FLOPS(4*((alpha==c_float(1)) ? 0 : static_cast<long long int>(N))); }
-    template<> inline void scal<c_double>(int N, c_double alpha, c_double* X, int incx)
-    { zscal_(&N, &alpha, X, &incx);
-      STRUMPACK_FLOPS(4*((alpha==c_double(1)) ? 0 : static_cast<long long int>(N))); }
-
-    template<typename scalar> inline int iamax(int N, scalar* dx, int incx);
-    template<> inline int iamax(int N, float* dx, int incx) { return isamax_(&N, dx, &incx); }
-    template<> inline int iamax(int N, double* dx, int incx) { return idamax_(&N, dx, &incx); }
-    template<> inline int iamax(int N, c_float* dx, int incx) { return icamax_(&N, dx, &incx); }
-    template<> inline int iamax(int N, c_double* dx, int incx) { return izamax_(&N, dx, &incx); }
-
-    template<typename scalar> inline void swap(int N, scalar* X, int incx, scalar* Y, int incy);
-    template<> inline void swap<float>(int N, float* X, int incx, float* Y, int incy)
-    { sswap_(&N, X, &incx, Y, &incy); }
-    template<> inline void swap<double>(int N, double* X, int incx, double* Y, int incy)
-    { dswap_(&N, X, &incx, Y, &incy); }
-    template<> inline void swap<c_float>(int N, c_float* X, int incx, c_float* Y, int incy)
-    { cswap_(&N, X, &incx, Y, &incy); }
-    template<> inline void swap<c_double>(int N, c_double* X, int incx, c_double* Y, int incy)
-    { zswap_(&N, X, &incx, Y, &incy); }
-
-    template<typename scalar> inline typename RealType<scalar>::value_type nrm2(int N, scalar* X, int incx);
-    template<> inline float nrm2<float>(int N, float* X, int incx)
-    { STRUMPACK_FLOPS(static_cast<long long int>(N)*2); return snrm2_(&N, X, &incx); }
-    template<> inline double nrm2<double>(int N, double* X, int incx)
-    { STRUMPACK_FLOPS(static_cast<long long int>(N)*2); return dnrm2_(&N, X, &incx); }
-    template<> inline float nrm2<c_float>(int N, c_float* X, int incx)
-    { STRUMPACK_FLOPS(static_cast<long long int>(N)*2*4); return scnrm2_(&N, X, &incx); }
-    template<> inline double nrm2<c_double>(int N, c_double* X, int incx)
-    { STRUMPACK_FLOPS(static_cast<long long int>(N)*2*4); return dznrm2_(&N, X, &incx); }
 
 
-    template<typename scalar> inline scalar dotu(int N, scalar* X, int incx, scalar* Y, int incy);
-    template<> inline float dotu<float>(int N, float* X, int incx, float* Y, int incy)
-    { STRUMPACK_FLOPS(static_cast<long long int>(N)*2); return sdot_(&N, X, &incx, Y, &incy);}
-    template<> inline double dotu<double>(int N, double* X, int incx, double* Y, int incy)
-    { STRUMPACK_FLOPS(static_cast<long long int>(N)*2); return ddot_(&N, X, &incx, Y, &incy);}
+    template<typename scalar> inline long long gemm_flops
+    (long long m, long long n, long long k, scalar alpha, scalar beta) {
+      return (alpha != scalar(0.)) * m * n * (k * 2 - 1) +
+        (alpha != scalar(0.) && beta != scalar(0.)) * m * n +
+        (alpha != scalar(0.) && alpha != scalar(1.)) * m* n +
+        (beta != scalar(0.) && beta != scalar(1.)) * m * n;
+    }
+    inline long long gemm_moves(long long m, long long n, long long k) {
+      return 2 * m * n + m * k + k * n;
+    }
+    inline void gemm
+    (char ta, char tb, int m, int n, int k, float alpha,
+     const float *a, int lda, const float *b, int ldb,
+     float beta, float *c, int ldc) {
+      lda = std::max(lda, 1);
+      FC_GLOBAL(sgemm,SGEMM)
+        (&ta, &tb, &m, &n, &k, &alpha, a, &lda, b, &ldb, &beta, c, &ldc);
+      STRUMPACK_FLOPS(gemm_flops(m,n,k,alpha,beta));
+      STRUMPACK_BYTES(4*gemm_moves(m,n,k));
+    }
+    inline void gemm
+    (char ta, char tb, int m, int n, int k, double alpha,
+     const double *a, int lda, const double *b, int ldb,
+     double beta, double *c, int ldc) {
+      lda = std::max(lda, 1);
+      FC_GLOBAL(dgemm,DGEMM)
+        (&ta, &tb, &m, &n, &k, &alpha, a, &lda, b, &ldb, &beta, c, &ldc);
+      STRUMPACK_FLOPS(gemm_flops(m,n,k,alpha,beta));
+      STRUMPACK_BYTES(8*gemm_moves(m,n,k));
+    }
+    inline void gemm
+    (char ta, char tb, int m, int n, int k, std::complex<float> alpha,
+     const std::complex<float>* a, int lda,
+     const std::complex<float>* b, int ldb, std::complex<float> beta,
+     std::complex<float>* c, int ldc) {
+      lda = std::max(lda, 1);
+      FC_GLOBAL(cgemm,CGEMM)
+        (&ta, &tb, &m, &n, &k, &alpha, a, &lda, b, &ldb, &beta, c, &ldc);
+      STRUMPACK_FLOPS(4*gemm_flops(m,n,k,alpha,beta));
+      STRUMPACK_BYTES(2*4*gemm_moves(m,n,k));
+    }
+    inline void gemm
+    (char ta, char tb, int m, int n, int k, std::complex<double> alpha,
+     const std::complex<double>* a, int lda,
+     const std::complex<double>* b, int ldb, std::complex<double> beta,
+     std::complex<double>* c, int ldc) {
+      lda = std::max(lda, 1);
+      FC_GLOBAL(zgemm,ZGEMM)
+        (&ta, &tb, &m, &n, &k, &alpha, a, &lda, b, &ldb, &beta, c, &ldc);
+      STRUMPACK_FLOPS(4*gemm_flops(m,n,k,alpha,beta));
+      STRUMPACK_BYTES(2*8*gemm_moves(m,n,k));
+    }
 
-    template<typename scalar> inline scalar dotc(int N, scalar* X, int incx, scalar* Y, int incy);
-    template<> inline float dotc<float>(int N, float* X, int incx, float* Y, int incy)
-    { STRUMPACK_FLOPS(static_cast<long long int>(N)*2); return sdot_(&N, X, &incx, Y, &incy); }
-    template<> inline double dotc<double>(int N, double* X, int incx, double* Y, int incy)
-    { STRUMPACK_FLOPS(static_cast<long long int>(N)*2); return ddot_(&N, X, &incx, Y, &incy); }
 
-    // MKL does not follow the fortran conventions regarding calling fortran from C.
-    // Calling MKL fortran functions that return complex numbers from C/C++ seems impossible.
-    // See: http://www.hpc.ut.ee/dokumendid/ics_2013/composer_xe/Documentation/en_US/mkl/Release_Notes.htm
-    //   "Linux* OS only: The Intel MKL single dynamic library libmkl_rt.so does not conform to the gfortran calling convention for functions returning COMPLEX values. An application compiled with gfortran and linked with libmkl_rt.so might crash if it calls the following functions:
+    template<typename scalar> inline long long gemv_flops
+    (long long m, long long n, scalar alpha, scalar beta) {
+      return (alpha != scalar(0.)) * m * (n * 2 - 1) +
+        (alpha != scalar(1.) && alpha != scalar(0.)) * m +
+        (beta != scalar(0.) && beta != scalar(1.)) * m +
+        (alpha != scalar(0.) && beta != scalar(0.)) * m;
+    }
+    inline long long gemv_moves(long long m, long long n) {
+      return 2 * m + m * n + n;
+    }
+    inline void gemv
+    (char t, int m, int n, float alpha, const float *a, int lda,
+     const float *x, int incx, float beta, float *y, int incy) {
+      FC_GLOBAL(sgemv,SGEMV)
+        (&t, &m, &n, &alpha, a, &lda, x, &incx, &beta, y, &incy);
+      STRUMPACK_FLOPS(gemv_flops(m,n,alpha,beta));
+      STRUMPACK_BYTES(4*gemv_moves(m,n));
+    }
+    inline void gemv
+    (char t, int m, int n, double alpha, const double *a, int lda,
+     const double *x, int incx, double beta, double *y, int incy) {
+      FC_GLOBAL(dgemv,DGEMV)
+        (&t, &m, &n, &alpha, a, &lda, x, &incx, &beta, y, &incy);
+      STRUMPACK_FLOPS(gemv_flops(m,n,alpha,beta));
+      STRUMPACK_BYTES(8*gemv_moves(m,n));
+    }
+    inline void gemv
+    (char t, int m, int n, std::complex<float> alpha,
+     const std::complex<float> *a, int lda,
+     const std::complex<float> *x, int incx, std::complex<float> beta,
+     std::complex<float> *y, int incy) {
+      FC_GLOBAL(cgemv,CGEMV)
+        (&t, &m, &n, &alpha, a, &lda, x, &incx, &beta, y, &incy);
+      STRUMPACK_FLOPS(4*gemv_flops(m,n,alpha,beta));
+      STRUMPACK_BYTES(2*4*gemv_moves(m,n));
+    }
+    inline void gemv
+    (char t, int m, int n, std::complex<double> alpha,
+     const std::complex<double> *a, int lda,
+     const std::complex<double> *x, int incx, std::complex<double> beta,
+     std::complex<double> *y, int incy) {
+      FC_GLOBAL(zgemv,ZGEMV)
+        (&t, &m, &n, &alpha, a, &lda, x, &incx, &beta, y, &incy);
+      STRUMPACK_FLOPS(4*gemv_flops(m,n,alpha,beta));
+      STRUMPACK_BYTES(2*8*gemv_moves(m,n));
+    }
+
+
+    template<typename scalar_t> inline long long ger_flops
+    (long long m, long long n, scalar_t alpha) {
+      // TODO check this?
+      return (alpha != scalar_t(0)) * m * n +
+        (alpha != scalar_t(0) && alpha != scalar_t(1)) * m * n +
+        (alpha != scalar_t(0)) * m * n;
+    }
+    inline void geru
+    (int m, int n, float alpha, const float* x, int incx,
+     const float* y, int incy, float* a, int lda) {
+      FC_GLOBAL(sger,SGER)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
+      STRUMPACK_FLOPS(ger_flops(m,n,alpha));
+    }
+    inline void geru
+    (int m, int n, double alpha, const double* x, int incx,
+     const double* y, int incy, double* a, int lda) {
+      FC_GLOBAL(dger,DGER)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
+      STRUMPACK_FLOPS(ger_flops(m,n,alpha));
+    }
+    inline void geru
+    (int m, int n, std::complex<float> alpha,
+     const std::complex<float>* x, int incx,
+     const std::complex<float>* y, int incy,
+     std::complex<float>* a, int lda) {
+      FC_GLOBAL(cgeru,CGERU)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
+      STRUMPACK_FLOPS(4*ger_flops(m,n,alpha));
+    }
+    inline void geru
+    (int m, int n, std::complex<double> alpha,
+     const std::complex<double>* x, int incx,
+     const std::complex<double>* y, int incy,
+     std::complex<double>* a, int lda) {
+      FC_GLOBAL(zgeru,ZGERU)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
+      STRUMPACK_FLOPS(4*ger_flops(m,n,alpha));
+    }
+
+
+    inline void gerc
+    (int m, int n, float alpha, const float* x, int incx,
+     const float* y, int incy, float* a, int lda) {
+      FC_GLOBAL(sger,SGER)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
+      STRUMPACK_FLOPS(ger_flops(m,n,alpha));
+    }
+    inline void gerc
+    (int m, int n, double alpha, const double* x, int incx,
+     const double* y, int incy, double* a, int lda) {
+      FC_GLOBAL(dger,DGER)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
+      STRUMPACK_FLOPS(ger_flops(m,n,alpha));
+    }
+    inline void gerc
+    (int m, int n, std::complex<float> alpha,
+     const std::complex<float>* x, int incx,
+     const std::complex<float>* y, int incy,
+     std::complex<float>* a, int lda) {
+      FC_GLOBAL(cgerc,CGERC)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
+      STRUMPACK_FLOPS(4*ger_flops(m,n,alpha));
+    }
+    inline void gerc
+    (int m, int n, std::complex<double> alpha,
+     const std::complex<double>* x, int incx,
+     const std::complex<double>* y, int incy,
+     std::complex<double>* a, int lda) {
+      FC_GLOBAL(zgerc,ZGERC)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
+      STRUMPACK_FLOPS(4*ger_flops(m,n,alpha));
+    }
+
+
+    inline void lacgv(int, float *, int ) { }
+    inline void lacgv(int, double *, int ) { } //Nothing to do.
+    inline void lacgv(int n, std::complex<float> *x, int incx) {
+      FC_GLOBAL(clacgv,CLACGV)(&n, x, &incx);
+    }
+    inline void lacgv(int n, std::complex<double> *x, int incx) {
+      FC_GLOBAL(zlacgv,ZLACGV)(&n, x, &incx);
+    }
+
+
+    inline void lacpy
+    (char ul, int m, int n, float* a, int lda, float* b, int ldb) {
+      FC_GLOBAL(slacpy,SLACPY)(&ul, &m, &n, a, &lda, b, &ldb);
+    }
+    inline void lacpy
+    (char ul, int m, int n, double* a, int lda, double* b, int ldb) {
+      FC_GLOBAL(dlacpy,DLACPY)(&ul, &m, &n, a, &lda, b, &ldb);
+    }
+    inline void lacpy
+    (char ul, int m, int n, std::complex<float>* a, int lda,
+     std::complex<float>* b, int ldb) {
+      FC_GLOBAL(clacpy,CLACPY)(&ul, &m, &n, a, &lda, b, &ldb);
+    }
+    inline void lacpy
+    (char ul, int m, int n, std::complex<double>* a, int lda,
+     std::complex<double>* b, int ldb) {
+      FC_GLOBAL(zlacpy,ZLACPY)(&ul, &m, &n, a, &lda, b, &ldb);
+    }
+
+
+    template<typename scalar_t> inline long long axpy_flops
+    (long long n, scalar_t alpha) {
+      return (alpha != scalar_t(0) && alpha != scalar_t(1)) * n +
+        (alpha != scalar_t(0)) * n;
+    }
+
+    inline void axpy
+    (int n, float alpha, float* x, int incx, float* y, int incy) {
+      FC_GLOBAL(saxpy,SAXPY)(&n, &alpha, x, &incx, y, &incy);
+      STRUMPACK_FLOPS(axpy_flops(n,alpha));
+    }
+    inline void axpy
+    (int n, double alpha, double* x, int incx, double* y, int incy) {
+      FC_GLOBAL(daxpy,DAXPY)(&n, &alpha, x, &incx, y, &incy);
+      STRUMPACK_FLOPS(axpy_flops(n,alpha));
+    }
+    inline void axpy
+    (int n, std::complex<float> alpha,
+     const std::complex<float>* x, int incx,
+     std::complex<float>* y, int incy) {
+      FC_GLOBAL(caxpy,CAXPY)(&n, &alpha, x, &incx, y, &incy);
+      STRUMPACK_FLOPS(4*axpy_flops(n,alpha));
+    }
+    inline void axpy
+    (int n, std::complex<double> alpha,
+     const std::complex<double>* x, int incx,
+     std::complex<double>* y, int incy) {
+      FC_GLOBAL(zaxpy,ZAXPY)(&n, &alpha, x, &incx, y, &incy);
+      STRUMPACK_FLOPS(4*axpy_flops(n,alpha));
+    }
+
+
+
+    inline void copy
+    (int n, const float* x, int incx, float* y, int incy) {
+      FC_GLOBAL(scopy,SCOPY)(&n, x, &incx, y, &incy);
+    }
+    inline void copy
+    (int n, const double* x, int incx, double* y, int incy) {
+      FC_GLOBAL(dcopy,DCOPY)(&n, x, &incx, y, &incy);
+    }
+    inline void copy
+    (int n, const std::complex<float>* x, int incx,
+     std::complex<float>* y, int incy) {
+      FC_GLOBAL(ccopy,CCOPY)(&n, x, &incx, y, &incy);
+    }
+    inline void copy
+    (int n, const std::complex<double>* x, int incx,
+     std::complex<double>* y, int incy) {
+      FC_GLOBAL(zcopy,ZCOPY)(&n, x, &incx, y, &incy);
+    }
+
+    template<typename scalar_t> inline long long scal_flops
+    (long long n, scalar_t alpha) {
+      if (alpha == scalar_t(1)) return 0;
+      else return n;
+    }
+    template<typename scalar_t> inline long long scal_moves
+    (long long n, scalar_t alpha) {
+      if (alpha == scalar_t(1)) return 0;
+      else return 2 * n;
+    }
+    inline void scal(int n, float alpha, float* x, int incx) {
+      FC_GLOBAL(sscal,SSCAL)(&n, &alpha, x, &incx);
+      STRUMPACK_FLOPS(scal_flops(n,alpha));
+    }
+    inline void scal(int n, double alpha, double* x, int incx) {
+      FC_GLOBAL(dscal,DSCAL)(&n, &alpha, x, &incx);
+      STRUMPACK_FLOPS(scal_flops(n,alpha));
+    }
+    inline void scal
+    (int n, std::complex<float> alpha, std::complex<float>* x, int incx) {
+      FC_GLOBAL(cscal,CSCAL)(&n, &alpha, x, &incx);
+      STRUMPACK_FLOPS(4*scal_flops(n,alpha));
+    }
+    inline void scal
+    (int n, std::complex<double> alpha, std::complex<double>* x, int incx) {
+      FC_GLOBAL(zscal,ZSCAL)(&n, &alpha, x, &incx);
+      STRUMPACK_FLOPS(4*scal_flops(n,alpha));
+    }
+
+
+    inline int iamax
+    (int n, const float* x, int incx) {
+      return FC_GLOBAL(isamax,ISAMAX)(&n, x, &incx);
+    }
+    inline int iamax
+    (int n, const double* x, int incx) {
+      return FC_GLOBAL(idamax,IDAMAX)(&n, x, &incx);
+    }
+    inline int iamax
+    (int n, const std::complex<float>* x, int incx) {
+      return FC_GLOBAL(icamax,ICAMAX)(&n, x, &incx);
+    }
+    inline int iamax
+    (int n, const std::complex<double>* x, int incx) {
+      return FC_GLOBAL(izamax,IZAMAX)(&n, x, &incx);
+    }
+
+
+    inline void swap
+    (int n, float* x, int incx, float* y, int incy) {
+      FC_GLOBAL(sswap,SSWAP)(&n, x, &incx, y, &incy);
+    }
+    inline void swap
+    (int n, double* x, int incx, double* y, int incy) {
+      FC_GLOBAL(dswap,DSWAP)(&n, x, &incx, y, &incy);
+    }
+    inline void swap
+    (int n, std::complex<float>* x, int incx,
+     std::complex<float>* y, int incy) {
+      FC_GLOBAL(cswap,CSWAP)(&n, x, &incx, y, &incy);
+    }
+    inline void swap
+    (int n, std::complex<double>* x, int incx,
+     std::complex<double>* y, int incy) {
+      FC_GLOBAL(zswap,ZSWAP)(&n, x, &incx, y, &incy);
+    }
+
+
+    inline long long nrm2_flops(long long n) {
+      return n * 2;
+    }
+    inline float nrm2(int n, float* x, int incx) {
+      STRUMPACK_FLOPS(nrm2_flops(n));
+      return FC_GLOBAL(snrm2,SNRM2)(&n, x, &incx);
+    }
+    inline double nrm2(int n, double* x, int incx) {
+      STRUMPACK_FLOPS(nrm2_flops(n));
+      return FC_GLOBAL(dnrm2,DNRM2)(&n, x, &incx);
+    }
+    inline float nrm2(int n, std::complex<float>* x, int incx) {
+      STRUMPACK_FLOPS(4*nrm2_flops(n));
+      return FC_GLOBAL(scnrm2,SCNRM2)(&n, x, &incx);
+    }
+    inline double nrm2(int n, std::complex<double>* x, int incx) {
+      STRUMPACK_FLOPS(4*nrm2_flops(n));
+      return FC_GLOBAL(dznrm2,DZNRM2)(&n, x, &incx);
+    }
+
+
+    inline long long dot_flops(long long n) {
+      return 2 * n;
+    }
+    inline float dotu
+    (int n, const float* x, int incx, const float* y, int incy) {
+      STRUMPACK_FLOPS(dot_flops(n))
+      return FC_GLOBAL(sdot,SDOTU)(&n, x, &incx, y, &incy);
+    }
+    inline double dotu
+    (int n, const double* x, int incx, const double* y, int incy) {
+      STRUMPACK_FLOPS(dot_flops(n));
+      return FC_GLOBAL(ddot,DDOT)(&n, x, &incx, y, &incy);
+    }
+    inline float dotc
+    (int n, const float* x, int incx, const float* y, int incy) {
+      STRUMPACK_FLOPS(dot_flops(n));
+      return FC_GLOBAL(sdot,SDOT)(&n, x, &incx, y, &incy);
+    }
+    inline double dotc
+    (int n, const double* x, int incx, const double* y, int incy) {
+      STRUMPACK_FLOPS(dot_flops(n));
+      return FC_GLOBAL(ddot,DDOT)(&n, x, &incx, y, &incy);
+    }
+
+    // MKL does not follow the fortran conventions regarding calling
+    // fortran from C.  Calling MKL fortran functions that return
+    // complex numbers from C/C++ seems impossible.
+    // See:
+    // http://www.hpc.ut.ee/dokumendid/ics_2013/composer_xe/Documentation/en_US/mkl/Release_Notes.htm
+    //   "Linux* OS only: The Intel MKL single dynamic library
+    //   libmkl_rt.so does not conform to the gfortran calling
+    //   convention for functions returning COMPLEX values. An
+    //   application compiled with gfortran and linked with
+    //   libmkl_rt.so might crash if it calls the following functions:
     //              BLAS: CDOTC, CDOTU, CDOTCI, CDOTUI, ZDOTC, ZDOTU
     //              LAPACK: CLADIV, ZLADIV  "
     // But the problem is not only there with gfortran.
     // https://software.intel.com/en-us/articles/intel-math-kernel-library-intel-mkl-blas-cblas-and-lapack-compilinglinking-functions-fortran-and-cc-calls#1
     // The following code should always work:
-    template<> inline c_float dotu<c_float>(int N, c_float* X, int incx, c_float* Y, int incy)
-    { STRUMPACK_FLOPS(static_cast<long long int>(N)*2*4); c_float r(0.); for (int i=0; i<N; i++) r += X[i*incx]*Y[i*incy]; return r; }
-    template<> inline c_double dotu<c_double>(int N, c_double* X, int incx, c_double* Y, int incy)
-    { STRUMPACK_FLOPS(static_cast<long long int>(N)*2*4); c_double r(0.); for (int i=0; i<N; i++) r += X[i*incx]*Y[i*incy]; return r; }
-    template<> inline c_float dotc<c_float>(int N, c_float* X, int incx, c_float* Y, int incy)
-    { STRUMPACK_FLOPS(static_cast<long long int>(N)*2*4); c_float r(0.); for (int i=0; i<N; i++) r += std::conj(X[i*incx])*Y[i*incy]; return r; }
-    template<> inline c_double dotc<c_double>(int N, c_double* X, int incx, c_double* Y, int incy)
-    { STRUMPACK_FLOPS(static_cast<long long int>(N)*2*4); c_double r(0.); for (int i=0; i<N; i++) r += std::conj(X[i*incx])*Y[i*incy]; return r; }
-
-    template<typename scalar> inline void laswp(int N, scalar* A, int lda, int k1, int k2, int* ipiv, int incx);
-    template<> inline void laswp(int N, float* A, int lda, int k1, int k2, int* ipiv, int incx)
-    { slaswp_(&N, A, &lda, &k1, &k2, ipiv, &incx);
-      STRUMPACK_BYTES(4*static_cast<long long int>(2.*double(k2-k1)*double(N))); }
-    template<> inline void laswp(int N, double* A, int lda, int k1, int k2, int* ipiv, int incx)
-    { dlaswp_(&N, A, &lda, &k1, &k2, ipiv, &incx);
-      STRUMPACK_BYTES(8*static_cast<long long int>(2.*double(k2-k1)*double(N))); }
-    template<> inline void laswp(int N, c_float* A, int lda, int k1, int k2, int* ipiv, int incx)
-    { claswp_(&N, A, &lda, &k1, &k2, ipiv, &incx);
-      STRUMPACK_BYTES(2*4*static_cast<long long int>(2.*double(k2-k1)*double(N))); }
-    template<> inline void laswp(int N, c_double* A, int lda, int k1, int k2, int* ipiv, int incx)
-    { zlaswp_(&N, A, &lda, &k1, &k2, ipiv, &incx);
-      STRUMPACK_BYTES(2*8*static_cast<long long int>(2.*double(k2-k1)*double(N))); }
-
-    template<typename scalar> inline void trsm(char side, char uplo, char transa, char diag, int M, int N, scalar alpha, scalar* A, int lda, scalar* B, int ldb);
-    template<> inline void trsm<float>(char side, char uplo, char transa, char diag, int M, int N, float alpha, float* A, int lda, float* B, int ldb)
-    { strsm_(&side, &uplo, &transa, &diag, &M, &N, &alpha, A, &lda, B, &ldb);
-      STRUMPACK_FLOPS(static_cast<long long int>((side=='L'||side=='l') ?
-						 (alpha!=0)*double(N)*double(M)*(double(M)+1.) + (alpha!=1 && alpha!=0)*double(N)*double(M) :
-						 (alpha!=0)*double(M)*double(N)*(double(N)+1.) + (alpha!=1 && alpha!=0)*double(N)*double(M) ));
-      STRUMPACK_BYTES(4*static_cast<long long int>(double(N)*double(N)*.5+2.*double(M)*double(N))); }
-    template<> inline void trsm<double>(char side, char uplo, char transa, char diag, int M, int N, double alpha, double* A, int lda, double* B, int ldb)
-    { dtrsm_(&side, &uplo, &transa, &diag, &M, &N, &alpha, A, &lda, B, &ldb);
-      STRUMPACK_FLOPS(static_cast<long long int>((side=='L'||side=='l') ?
-						 (alpha!=0)*double(N)*double(M)*(double(M)+1.) + (alpha!=1 && alpha!=0)*double(N)*double(M) :
-						 (alpha!=0)*double(M)*double(N)*(double(N)+1.) + (alpha!=1 && alpha!=0)*double(N)*double(M) ));
-      STRUMPACK_BYTES(8*static_cast<long long int>(double(N)*double(N)*.5+2.*double(M)*double(N))); }
-    template<> inline void trsm<c_float>(char side, char uplo, char transa, char diag, int M, int N, c_float alpha, c_float* A, int lda, c_float* B, int ldb)
-    { ctrsm_(&side, &uplo, &transa, &diag, &M, &N, &alpha, A, &lda, B, &ldb);
-      STRUMPACK_FLOPS(4*static_cast<long long int>((side=='L'||side=='l') ?
-						   (alpha!=c_float(0))*double(N)*double(M)*(double(M)+1.) + (alpha!=c_float(1) && alpha!=c_float(0))*double(N)*double(M) :
-						   (alpha!=c_float(0))*double(M)*double(N)*(double(N)+1.) + (alpha!=c_float(1) && alpha!=c_float(0))*double(N)*double(M) ));
-      STRUMPACK_BYTES(2*4*static_cast<long long int>(double(N)*double(N)*.5+2.*double(M)*double(N))); }
-    template<> inline void trsm<c_double>(char side, char uplo, char transa, char diag, int M, int N, c_double alpha, c_double* A, int lda, c_double* B, int ldb)
-    { ztrsm_(&side, &uplo, &transa, &diag, &M, &N, &alpha, A, &lda, B, &ldb);
-      STRUMPACK_FLOPS(4*static_cast<long long int>((side=='L'||side=='l') ?
-						   (alpha!=c_double(0))*double(N)*double(M)*(double(M)+1.) + (alpha!=c_double(1) && alpha!=c_double(0))*double(N)*double(M) :
-						   (alpha!=c_double(0))*double(M)*double(N)*(double(N)+1.) + (alpha!=c_double(1) && alpha!=c_double(0))*double(N)*double(M) ));
-      STRUMPACK_BYTES(2*8*static_cast<long long int>(double(N)*double(N)*.5+2.*double(M)*double(N))); }
-
-    template<typename scalar> inline void trmm(char side, char uplo, char transa, char diag, int M, int N, scalar alpha, scalar* A, int lda, scalar* B, int ldb);
-    template<> inline void trmm<float>(char side, char uplo, char transa, char diag, int M, int N, float alpha, float* A, int lda, float* B, int ldb)
-    { strmm_(&side, &uplo, &transa, &diag, &M, &N, &alpha, A, &lda, B, &ldb);
-      STRUMPACK_FLOPS(static_cast<long long int>((side=='L'||side=='l') ?
-						 (alpha!=0)*double(N)*double(M)*(double(M)+1.) + (alpha!=1 && alpha!=0)*double(N)*double(M) :
-						 (alpha!=0)*double(M)*double(N)*(double(N)+1.) + (alpha!=1 && alpha!=0)*double(N)*double(M) ));
-      STRUMPACK_BYTES(4*static_cast<long long int>(double(M)*double(M)*.5+2.*double(M)*double(N))); }
-    template<> inline void trmm<double>(char side, char uplo, char transa, char diag, int M, int N, double alpha, double* A, int lda, double* B, int ldb)
-    { dtrmm_(&side, &uplo, &transa, &diag, &M, &N, &alpha, A, &lda, B, &ldb);
-      STRUMPACK_FLOPS(static_cast<long long int>((side=='L'||side=='l') ?
-						 (alpha!=0)*double(N)*double(M)*(double(M)+1.) + (alpha!=1 && alpha!=0)*double(N)*double(M) :
-						 (alpha!=0)*double(M)*double(N)*(double(N)+1.) + (alpha!=1 && alpha!=0)*double(N)*double(M) ));
-      STRUMPACK_BYTES(8*static_cast<long long int>(double(M)*double(M)*.5+2.*double(M)*double(N))); }
-    template<> inline void trmm<c_float>(char side, char uplo, char transa, char diag, int M, int N, c_float alpha, c_float* A, int lda, c_float* B, int ldb)
-    { ctrmm_(&side, &uplo, &transa, &diag, &M, &N, &alpha, A, &lda, B, &ldb);
-      STRUMPACK_FLOPS(4*static_cast<long long int>((side=='L'||side=='l') ?
-						   (alpha!=c_float(0))*double(N)*double(M)*(double(M)+1.) + (alpha!=c_float(1) && alpha!=c_float(0))*double(N)*double(M) :
-						   (alpha!=c_float(0))*double(M)*double(N)*(double(N)+1.) + (alpha!=c_float(1) && alpha!=c_float(0))*double(N)*double(M) ));
-      STRUMPACK_BYTES(2*4*static_cast<long long int>(double(M)*double(M)*.5+2.*double(M)*double(N))); }
-    template<> inline void trmm<c_double>(char side, char uplo, char transa, char diag, int M, int N, c_double alpha, c_double* A, int lda, c_double* B, int ldb)
-    { ztrmm_(&side, &uplo, &transa, &diag, &M, &N, &alpha, A, &lda, B, &ldb);
-      STRUMPACK_FLOPS(4*static_cast<long long int>((side=='L'||side=='l') ?
-						   (alpha!=c_double(0))*double(N)*double(M)*(double(M)+1.) + (alpha!=c_double(1) && alpha!=c_double(0))*double(N)*double(M) :
-						   (alpha!=c_double(0))*double(M)*double(N)*(double(N)+1.) + (alpha!=c_double(1) && alpha!=c_double(0))*double(N)*double(M) ));
-      STRUMPACK_BYTES(2*8*static_cast<long long int>(double(M)*double(M)*.5+2.*double(M)*double(N))); }
-
-    template<typename scalar> inline void trmv(char uplo, char transa, char diag, int N, scalar* A, int lda, scalar* X, int incx);
-    template<> inline void trmv<float>(char uplo, char transa, char diag, int N, float* A, int lda, float* X, int incx)
-    { strmv_(&uplo, &transa, &diag, &N, A, &lda, X, &incx);
-      STRUMPACK_FLOPS(static_cast<long long int>(double(N)*(double(N)+1.)));
-      STRUMPACK_BYTES(4*static_cast<long long int>(double(N)*double(N)*.5+2.*double(N))); }
-    template<> inline void trmv<double>(char uplo, char transa, char diag, int N, double* A, int lda, double* X, int incx)
-    { dtrmv_(&uplo, &transa, &diag, &N, A, &lda, X, &incx);
-      STRUMPACK_FLOPS(static_cast<long long int>(double(N)*(double(N)+1.)));
-      STRUMPACK_BYTES(8*static_cast<long long int>(double(N)*double(N)*.5+2.*double(N))); }
-    template<> inline void trmv<c_float>(char uplo, char transa, char diag, int N, c_float* A, int lda, c_float* X, int incx)
-    { ctrmv_(&uplo, &transa, &diag, &N, A, &lda, X, &incx);
-      STRUMPACK_FLOPS(4*static_cast<long long int>(double(N)*(double(N)+1.)));
-      STRUMPACK_BYTES(2*4*static_cast<long long int>(double(N)*double(N)*.5+2.*double(N))); }
-    template<> inline void trmv<c_double>(char uplo, char transa, char diag, int N, c_double* A, int lda, c_double* X, int incx)
-    { ztrmv_(&uplo, &transa, &diag, &N, A, &lda, X, &incx);
-      STRUMPACK_FLOPS(4*static_cast<long long int>(double(N)*(double(N)+1.)));
-      STRUMPACK_BYTES(2*8*static_cast<long long int>(double(N)*double(N)*.5+2.*double(N))); }
-
-    template<typename scalar> inline void trsv(char uplo, char transa, char diag, int M, scalar* A, int lda, scalar* B, int incb);
-    template<> inline void trsv<float>(char uplo, char transa, char diag, int M, float* A, int lda, float* B, int incb)
-    { strsv_(&uplo, &transa, &diag, &M, A, &lda, B, &incb);
-      STRUMPACK_FLOPS(static_cast<long long int>(double(M)*(double(M)+1.)));
-      STRUMPACK_BYTES(4*static_cast<long long int>(double(M)*double(M)*.5+2.*double(M))); }
-    template<> inline void trsv<double>(char uplo, char transa, char diag, int M, double* A, int lda, double* B, int incb)
-    { dtrsv_(&uplo, &transa, &diag, &M, A, &lda, B, &incb);
-      STRUMPACK_FLOPS(static_cast<long long int>(double(M)*(double(M)+1.)));
-      STRUMPACK_BYTES(8*static_cast<long long int>(double(M)*double(M)*.5+2.*double(M))); }
-    template<> inline void trsv<c_float>(char uplo, char transa, char diag, int M, c_float* A, int lda, c_float* B, int incb)
-    { ctrsv_(&uplo, &transa, &diag, &M, A, &lda, B, &incb);
-      STRUMPACK_FLOPS(4*static_cast<long long int>(double(M)*(double(M)+1.)));
-      STRUMPACK_BYTES(2*4*static_cast<long long int>(double(M)*double(M)*.5+2.*double(M))); }
-    template<> inline void trsv<c_double>(char uplo, char transa, char diag, int M, c_double* A, int lda, c_double* B, int incb)
-    { ztrsv_(&uplo, &transa, &diag, &M, A, &lda, B, &incb);
-      STRUMPACK_FLOPS(4*static_cast<long long int>(double(M)*(double(M)+1.)));
-      STRUMPACK_BYTES(2*8*static_cast<long long int>(double(M)*double(M)*.5+2.*double(M))); }
-
-    template<typename scalar> inline void laset(char side, int M, int N, scalar alpha, scalar beta, scalar* X, int ldX);
-    template<> inline void laset(char side, int M, int N, float alpha, float beta, float* X, int ldX)
-    { slaset_(&side, &M, &N, &alpha, &beta, X, &ldX); }
-    template<> inline void laset(char side, int M, int N, double alpha, double beta, double* X, int ldX)
-    { dlaset_(&side, &M, &N, &alpha, &beta, X, &ldX); }
-    template<> inline void laset(char side, int M, int N, c_float alpha, c_float beta, c_float* X, int ldX)
-    { claset_(&side, &M, &N, &alpha, &beta, X, &ldX); }
-    template<> inline void laset(char side, int M, int N, c_double alpha, c_double beta, c_double* X, int ldX)
-    { zlaset_(&side, &M, &N, &alpha, &beta, X, &ldX); }
-
-    template<typename scalar> inline void geqp3(int M, int N, scalar* a, int lda, int* jpvt, scalar* tau, scalar* work, int lwork, int* info);
-    template<> inline void geqp3(int M, int N, float* a, int lda, int* jpvt, float* tau, float* work, int lwork, int* info)
-    { sgeqp3_(&M, &N, a, &lda, jpvt, tau, work, &lwork, info); }
-    template<> inline void geqp3(int M, int N, double* a, int lda, int* jpvt, double* tau, double* work, int lwork, int* info)
-    { dgeqp3_(&M, &N, a, &lda, jpvt, tau, work, &lwork, info); }
-    template<> inline void geqp3(int M, int N, c_float* a, int lda, int* jpvt, c_float* tau, c_float* work, int lwork, int* info)
-    { c_float* rwork = new c_float[std::max(1, 2*N)];
-      cgeqp3_(&M, &N, a, &lda, jpvt, tau, work, &lwork, rwork, info);
-      delete[] rwork; }
-    template<> inline void geqp3(int M, int N, c_double* a, int lda, int* jpvt, c_double* tau, c_double* work, int lwork, int* info)
-    { c_double* rwork = new c_double[std::max(1, 2*N)];
-      zgeqp3_(&M, &N, a, &lda, jpvt, tau, work, &lwork, rwork, info);
-      delete[] rwork; }
-
-    template<typename scalar> inline void geqp3(int M, int N, scalar* a, int lda, int* jpvt, scalar* tau, int* info) {
-      scalar lwork;
-      geqp3(M, N, a, lda, jpvt, tau, &lwork, -1, info);
-      int ilwork = int(lwork);
-      scalar* work = new scalar[ilwork];
-      geqp3(M, N, a, lda, jpvt, tau, work, ilwork, info);
-      STRUMPACK_FLOPS((is_complex<scalar>()?4:1) * static_cast<long long int>(((M==N) ? double(N)*double(N)*double(N)*4./3. : ((M>N) ? double(N)*double(N)*2./3.*(3.*double(M)-double(N)) : double(M)*double(M)*2./3.*(3.*double(N)-double(M))))));
-      delete[] work;
+    inline std::complex<float> dotu
+    (int n, const std::complex<float>* x, int incx,
+     const std::complex<float>* y, int incy) {
+      STRUMPACK_FLOPS(4*dot_flops(n));
+      std::complex<float> r(0.);
+      for (int i=0; i<n; i++)
+        r += x[i*incx]*y[i*incy];
+      return r;
+    }
+    inline std::complex<double> dotu
+    (int n, const std::complex<double>* x, int incx,
+     const std::complex<double>* y, int incy) {
+      STRUMPACK_FLOPS(4*dot_flops(n));
+      std::complex<double> r(0.);
+      for (int i=0; i<n; i++)
+        r += x[i*incx]*y[i*incy];
+      return r;
+    }
+    inline std::complex<float> dotc
+    (int n, const std::complex<float>* x, int incx,
+     const std::complex<float>* y, int incy) {
+      STRUMPACK_FLOPS(4*dot_flops(n));
+      std::complex<float> r(0.);
+      for (int i=0; i<n; i++)
+        r += std::conj(x[i*incx])*y[i*incy];
+      return r;
+    }
+    inline std::complex<double> dotc
+    (int n, const std::complex<double>* x, int incx,
+     const std::complex<double>* y, int incy) {
+      STRUMPACK_FLOPS(4*dot_flops(n));
+      std::complex<double> r(0.);
+      for (int i=0; i<n; i++)
+        r += std::conj(x[i*incx])*y[i*incy];
+      return r;
     }
 
-    template<typename scalar, typename real> inline void geqp3tol(int M, int N, scalar* a, int lda, int* jpvt, scalar* tau, scalar* work, int lwork, int* info, int& rank, real rtol, real atol, int depth);
-    template<> inline void geqp3tol<float,float>(int M, int N, float* a, int lda, int* jpvt, float* tau, float* work, int lwork, int* info, int& rank, float rtol, float atol, int depth)
-    { sgeqp3tol_(&M, &N, a, &lda, jpvt, tau, work, &lwork, info, &rank, &rtol, &atol, &depth); }
-    template<> inline void geqp3tol<double,double>(int M, int N, double* a, int lda, int* jpvt, double* tau, double* work, int lwork, int* info, int& rank, double rtol, double atol, int depth)
-    { dgeqp3tol_(&M, &N, a, &lda, jpvt, tau, work, &lwork, info, &rank, &rtol, &atol, &depth); }
-    template<> inline void geqp3tol<c_float,float>(int M, int N, c_float* a, int lda, int* jpvt, c_float* tau, c_float* work, int lwork, int* info, int& rank, float rtol, float atol, int depth) {
-      float* rwork = new float[std::max(1, 2*N)];
-      bool tasked = depth<params::task_recursion_cutoff_level;
-      if (tasked) {
-	int loop_tasks = std::max(params::num_threads / (depth+1), 1);
-	int B = std::max(N / loop_tasks, 1);
-	for (int task=0; task<std::ceil(N/float(B)); task++) {
-#pragma omp task default(shared) firstprivate(task)
-	  for (int i=task*B; i<std::min((task+1)*B,N); i++)
-	    rwork[i] = nrm2(M, &a[i*lda], 1);
-	}
-#pragma omp taskwait
-      } else for (int i=0; i<N; i++) rwork[i] = nrm2(M, &a[i*lda], 1);
-      cgeqp3tol_(&M, &N, a, &lda, jpvt, tau, work, &lwork, rwork, info, &rank, &rtol, &atol, &depth);
-      delete[] rwork;
+
+    inline long long laswp_moves(long long n, long long k1, long long k2) {
+      return 2 * (k2 - k1) * n;
     }
-    template<> inline void geqp3tol<c_double,double>(int M, int N, c_double* a, int lda, int* jpvt, c_double* tau, c_double* work, int lwork, int* info, int& rank, double rtol, double atol, int depth)
-    { double* rwork = new double[std::max(1, 2*N)];
-      bool tasked = depth<params::task_recursion_cutoff_level;
-      if (tasked) {
-	int loop_tasks = std::max(params::num_threads / (depth+1), 1);
-	int B = std::max(N / loop_tasks, 1);
-	for (int task=0; task<std::ceil(N/float(B)); task++) {
-#pragma omp task default(shared) firstprivate(task)
-	  for (int i=task*B; i<std::min((task+1)*B,N); i++)
-	    rwork[i] = nrm2(M, &a[i*lda], 1);
-	}
-#pragma omp taskwait
-      } else for (int i=0; i<N; i++) rwork[i] = nrm2(M, &a[i*lda], 1);
-      zgeqp3tol_(&M, &N, a, &lda, jpvt, tau, work, &lwork, rwork, info, &rank, &rtol, &atol, &depth);
-      delete[] rwork;
+    inline void laswp
+    (int n, float* a, int lda, int k1, int k2, const int* ipiv, int incx) {
+      FC_GLOBAL(slaswp,SLASWP)(&n, a, &lda, &k1, &k2, ipiv, &incx);
+      STRUMPACK_BYTES(4*laswp_moves(n,k1,k2));
+    }
+    inline void laswp
+    (int n, double* a, int lda, int k1, int k2, const int* ipiv, int incx) {
+      FC_GLOBAL(dlaswp,DLASWP)(&n, a, &lda, &k1, &k2, ipiv, &incx);
+      STRUMPACK_BYTES(8*laswp_moves(n,k1,k2));
+    }
+    inline void laswp
+    (int n, std::complex<float>* a, int lda, int k1, int k2,
+     const int* ipiv, int incx) {
+      FC_GLOBAL(claswp,CLASWP)(&n, a, &lda, &k1, &k2, ipiv, &incx);
+      STRUMPACK_BYTES(2*4*laswp_moves(n,k1,k2));
+    }
+    inline void laswp
+    (int n, std::complex<double>* a, int lda, int k1, int k2,
+     const int* ipiv, int incx) {
+      FC_GLOBAL(zlaswp,ZLASWP)(&n, a, &lda, &k1, &k2, ipiv, &incx);
+      STRUMPACK_BYTES(2*8*laswp_moves(n,k1,k2));
     }
 
-    template<typename scalar, typename real> inline void geqp3tol(int M, int N, scalar* a, int lda, int* jpvt, scalar* tau, int* info, int& rank, real rtol, real atol, int depth) {
-      scalar lwork;
-      geqp3tol(M, N, a, lda, jpvt, tau, &lwork, -1, info, rank, rtol, atol, depth);
-      int ilwork = int(std::real(lwork));
-      scalar* work = new scalar[ilwork];
-      if (! is_complex<scalar>()) {
-	bool tasked = depth<params::task_recursion_cutoff_level;
-	if (tasked) {
-	  int loop_tasks = std::max(params::num_threads / (depth+1), 1);
-	  int B = std::max(N / loop_tasks, 1);
-	  for (int task=0; task<std::ceil(N/float(B)); task++) {
-#pragma omp task default(shared) firstprivate(task)
-	    for (int i=task*B; i<std::min((task+1)*B,N); i++)
-	      work[i] = nrm2(M, &a[i*lda], 1);
-	  }
-#pragma omp taskwait
-	} else for (int i=0; i<N; i++) work[i] = nrm2(M, &a[i*lda], 1);
+
+    template<typename scalar_t> inline long long trsm_flops
+    (long long m, long long n, scalar_t alpha, char s) {
+      if (s=='L' || s=='l')
+        return (alpha != scalar_t(0)) * n * m *(m + 1) +
+          (alpha != scalar_t(1) && alpha != scalar_t(0)) * n * m;
+      else return (alpha != scalar_t(0)) * m * n * (n + 1) +
+             (alpha != scalar_t(1) && alpha != scalar_t(0)) * n * m;
+    }
+    inline long long trsm_moves(long long m, long long n) {
+      return n * n / 2 + 2 * m * n;
+    }
+    inline void trsm
+    (char s, char ul, char t, char d, int m, int n, float alpha,
+     const float* a, int lda, float* b, int ldb) {
+      FC_GLOBAL(strsm,STRSM)
+        (&s, &ul, &t, &d, &m, &n, &alpha, a, &lda, b, &ldb);
+      STRUMPACK_FLOPS(trsm_flops(m, n, alpha, s));
+      STRUMPACK_BYTES(4*trsm_moves(m, n));
+    }
+    inline void trsm
+      (char s, char ul, char t, char d, int m, int n, double alpha,
+       const double* a, int lda, double* b, int ldb) {
+      FC_GLOBAL(dtrsm,DTRSM)
+        (&s, &ul, &t, &d, &m, &n, &alpha, a, &lda, b, &ldb);
+      STRUMPACK_FLOPS(trsm_flops(m, n, alpha, s));
+      STRUMPACK_BYTES(8*trsm_moves(m, n));
+    }
+    inline void trsm
+      (char s, char ul, char t, char d, int m, int n,
+       std::complex<float> alpha, const std::complex<float>* a, int lda,
+       std::complex<float>* b, int ldb) {
+      FC_GLOBAL(ctrsm,CTRSM)
+        (&s, &ul, &t, &d, &m, &n, &alpha, a, &lda, b, &ldb);
+      STRUMPACK_FLOPS(4*trsm_flops(m, n, alpha, s));
+      STRUMPACK_BYTES(2*4*trsm_moves(m, n));
+    }
+    inline void trsm
+      (char s, char ul, char t, char d, int m, int n,
+       std::complex<double> alpha, const std::complex<double>* a, int lda,
+       std::complex<double>* b, int ldb) {
+      FC_GLOBAL(ztrsm,ZTRSM)
+        (&s, &ul, &t, &d, &m, &n, &alpha, a, &lda, b, &ldb);
+      STRUMPACK_FLOPS(4*trsm_flops(m, n, alpha, s));
+      STRUMPACK_BYTES(2*8*trsm_moves(m, n));
+    }
+
+
+    template<typename scalar_t> inline long long trmm_flops
+    (long long m, long long n, scalar_t alpha, char s) {
+      if (s=='L' || s=='l')
+        return (alpha != scalar_t(0)) * n * m * (m + 1) +
+          (alpha != scalar_t(1) && alpha != scalar_t(0)) * n * m;
+      else return (alpha != scalar_t(0)) * m * n * (n + 1) +
+             (alpha != scalar_t(1) && alpha != scalar_t(0)) * n * m;
+    }
+    inline long long trmm_moves(long long m, long long n) {
+      return m * m / 2 + 2 * m * n;
+    }
+    inline void trmm
+    (char s, char ul, char t, char d, int m, int n, float alpha,
+     const float* a, int lda, float* b, int ldb) {
+      FC_GLOBAL(strmm,STRMM)
+        (&s, &ul, &t, &d, &m, &n, &alpha, a, &lda, b, &ldb);
+      STRUMPACK_FLOPS(trmm_flops(m,n,alpha,s));
+      STRUMPACK_BYTES(4*trmm_moves(m,n));
+    }
+    inline void trmm
+    (char s, char ul, char t, char d, int m, int n, double alpha,
+     const double* a, int lda, double* b, int ldb) {
+      FC_GLOBAL(dtrmm,DTRMM)
+        (&s, &ul, &t, &d, &m, &n, &alpha, a, &lda, b, &ldb);
+      STRUMPACK_FLOPS(trmm_flops(m,n,alpha,s));
+      STRUMPACK_BYTES(8*trmm_moves(m,n));
+    }
+    inline void trmm
+    (char s, char ul, char t, char d, int m, int n, std::complex<float> alpha,
+     const std::complex<float>* a, int lda, std::complex<float>* b, int ldb) {
+      FC_GLOBAL(ctrmm,CTRMM)
+        (&s, &ul, &t, &d, &m, &n, &alpha, a, &lda, b, &ldb);
+      STRUMPACK_FLOPS(4*trmm_flops(m,n,alpha,s));
+      STRUMPACK_BYTES(2*4*trmm_moves(m,n));
+    }
+    inline void trmm
+    (char s, char ul, char t, char d, int m, int n,
+     std::complex<double> alpha, const std::complex<double>* a, int lda,
+     std::complex<double>* b, int ldb) {
+      FC_GLOBAL(ztrmm,ZTRMM)
+        (&s, &ul, &t, &d, &m, &n, &alpha, a, &lda, b, &ldb);
+      STRUMPACK_FLOPS(4*trmm_flops(m,n,alpha,s));
+      STRUMPACK_BYTES(2*8*trmm_moves(m,n));
+    }
+
+
+    inline long long trmv_flops(long long n) {
+      return n * (n + 1);
+    }
+    inline long long trmv_moves(long long n) {
+      return n * n / 2 + 2 * n;
+    }
+    inline void trmv
+    (char ul, char t, char d, int n, const float* a, int lda,
+     float* x, int incx) {
+      FC_GLOBAL(strmv,STRMV)(&ul, &t, &d, &n, a, &lda, x, &incx);
+      STRUMPACK_FLOPS(trmv_flops(n));
+      STRUMPACK_BYTES(4*trmv_moves(n));
+    }
+    inline void trmv
+    (char ul, char t, char d, int n, const double* a, int lda,
+     double* x, int incx) {
+      FC_GLOBAL(dtrmv,DTRMV)(&ul, &t, &d, &n, a, &lda, x, &incx);
+      STRUMPACK_FLOPS(trmv_flops(n));
+      STRUMPACK_BYTES(8*trmv_moves(n));
+    }
+    inline void trmv
+    (char ul, char t, char d, int n, const std::complex<float>* a, int lda,
+     std::complex<float>* x, int incx) {
+      FC_GLOBAL(ctrmv,CTRMV)(&ul, &t, &d, &n, a, &lda, x, &incx);
+      STRUMPACK_FLOPS(4*trmv_flops(n));
+      STRUMPACK_BYTES(2*4*trmv_moves(n));
+    }
+    inline void trmv
+    (char ul, char t, char d, int n, const std::complex<double>* a, int lda,
+     std::complex<double>* x, int incx) {
+      FC_GLOBAL(ztrmv,ZTRMV)(&ul, &t, &d, &n, a, &lda, x, &incx);
+      STRUMPACK_FLOPS(4*trmv_flops(n));
+      STRUMPACK_BYTES(2*8*trmv_moves(n));
+    }
+
+
+
+    inline long long trsv_flops(long long m) {
+      return m * (m + 1);
+    }
+    inline long long trsv_moves(long long m) {
+      return m * m / 2 + 2 * m;
+    }
+    inline void trsv
+    (char ul, char t, char d, int m, const float* a, int lda,
+     float* b, int incb) {
+      FC_GLOBAL(strsv,STRSV)(&ul, &t, &d, &m, a, &lda, b, &incb);
+      STRUMPACK_FLOPS(trsv_flops(m));
+      STRUMPACK_BYTES(4*trsv_moves(m));
+    }
+    inline void trsv
+    (char ul, char t, char d, int m, const double* a, int lda,
+     double* b, int incb) {
+      FC_GLOBAL(dtrsv,DTRSV)(&ul, &t, &d, &m, a, &lda, b, &incb);
+      STRUMPACK_FLOPS(trsv_flops(m));
+      STRUMPACK_BYTES(8*trsv_moves(m));
+    }
+    inline void trsv
+    (char ul, char t, char d, int m, const std::complex<float>* a, int lda,
+     std::complex<float>* b, int incb) {
+      FC_GLOBAL(ctrsv,CTRSV)(&ul, &t, &d, &m, a, &lda, b, &incb);
+      STRUMPACK_FLOPS(4*trsv_flops(m));
+      STRUMPACK_BYTES(2*4*trsv_moves(m));
+    }
+    inline void trsv
+    (char ul, char t, char d, int m, const std::complex<double>* a, int lda,
+     std::complex<double>* b, int incb) {
+      FC_GLOBAL(ztrsv,ZTRSV)(&ul, &t, &d, &m, a, &lda, b, &incb);
+      STRUMPACK_FLOPS(4*trsv_flops(m));
+      STRUMPACK_BYTES(2*8*trsv_moves(m));
+    }
+
+
+    inline void laset
+    (char s, int m, int n, float alpha, float beta, float* x, int ldx) {
+      FC_GLOBAL(slaset,SLASET)(&s, &m, &n, &alpha, &beta, x, &ldx);
+    }
+    inline void laset
+    (char s, int m, int n, double alpha, double beta, double* x, int ldx) {
+      FC_GLOBAL(dlaset,DLASET)(&s, &m, &n, &alpha, &beta, x, &ldx);
+    }
+    inline void laset
+    (char s, int m, int n, std::complex<float> alpha,
+     std::complex<float> beta, std::complex<float>* x, int ldx) {
+      FC_GLOBAL(claset,CLASET)(&s, &m, &n, &alpha, &beta, x, &ldx);
+    }
+    inline void laset
+    (char s, int m, int n, std::complex<double> alpha,
+     std::complex<double> beta, std::complex<double>* x, int ldx) {
+      FC_GLOBAL(zlaset,ZLASET)(&s, &m, &n, &alpha, &beta, x, &ldx);
+    }
+
+
+    inline long long geqp3_flops(long long m, long long n) {
+      if (m == n) return n * n * n * 4 / 3;
+      else {
+        if (m > n) return n * n * 2 / 3 * (3 * m - n);
+        else return m * m * 2 / 3 * (3 * n - m);
       }
-      geqp3tol(M, N, a, lda, jpvt, tau, work, ilwork, info, rank, rtol, atol, depth);
+    }
+    inline void geqp3
+    (int m, int n, float* a, int lda, int* jpvt, float* tau,
+     float* work, int lwork, int* info) {
+      FC_GLOBAL(sgeqp3,SGEQP3)
+        (&m, &n, a, &lda, jpvt, tau, work, &lwork, info);
+      STRUMPACK_FLOPS(geqp3_flops(m,n));
+    }
+    inline void geqp3
+    (int m, int n, double* a, int lda, int* jpvt, double* tau,
+     double* work, int lwork, int* info) {
+      dgeqp3_(&m, &n, a, &lda, jpvt, tau, work, &lwork, info);
+      STRUMPACK_FLOPS(geqp3_flops(m,n));
+    }
+    inline void geqp3
+    (int m, int n, std::complex<float>* a, int lda, int* jpvt,
+     std::complex<float>* tau, std::complex<float>* work,
+     int lwork, int* info) {
+      auto rwork = new std::complex<float>[std::max(1, 2*n)];
+      cgeqp3_(&m, &n, a, &lda, jpvt, tau, work, &lwork, rwork, info);
+      delete[] rwork;
+      STRUMPACK_FLOPS(4*geqp3_flops(m,n));
+    }
+    inline void geqp3
+    (int m, int n, std::complex<double>* a, int lda, int* jpvt,
+     std::complex<double>* tau, std::complex<double>* work,
+     int lwork, int* info) {
+      auto rwork = new std::complex<double>[std::max(1, 2*n)];
+      zgeqp3_(&m, &n, a, &lda, jpvt, tau, work, &lwork, rwork, info);
+      delete[] rwork;
+      STRUMPACK_FLOPS(4*geqp3_flops(m,n));
+    }
+    template<typename scalar> inline void geqp3
+    (int m, int n, scalar* a, int lda, int* jpvt, scalar* tau, int* info) {
+      scalar lwork;
+      geqp3(m, n, a, lda, jpvt, tau, &lwork, -1, info);
+      int ilwork = int(lwork);
+      auto work = new scalar[ilwork];
+      geqp3(m, n, a, lda, jpvt, tau, work, ilwork, info);
       delete[] work;
     }
 
-    template<typename scalar> inline void geqrf(int M, int N, scalar* a, int lda, scalar* tau, scalar* work, int lwork, int* info);
-    template<> inline void geqrf(int M, int N, float* a, int lda, float* tau, float* work, int lwork, int* info)
-    { sgeqrf_(&M, &N, a, &lda, tau, work, &lwork, info); }
-    template<> inline void geqrf(int M, int N, double* a, int lda, double* tau, double* work, int lwork, int* info)
-    { dgeqrf_(&M, &N, a, &lda, tau, work, &lwork, info); }
-    template<> inline void geqrf(int M, int N, c_float* a, int lda, c_float* tau, c_float* work, int lwork, int* info)
-    { cgeqrf_(&M, &N, a, &lda, tau, work, &lwork, info); }
-    template<> inline void geqrf(int M, int N, c_double* a, int lda, c_double* tau, c_double* work, int lwork, int* info)
-    { zgeqrf_(&M, &N, a, &lda, tau, work, &lwork, info); }
-    template<typename scalar> inline void geqrf(int M, int N, scalar* a, int lda, scalar* tau, int* info) {
+
+    inline void geqp3tol
+    (int m, int n, float* a, int lda, int* jpvt, float* tau, float* work,
+     int lwork, int* info, int& rank, float rtol, float atol, int depth) {
+      FC_GLOBAL(sgeqp3tol,SGEQP3TOL)
+        (&m, &n, a, &lda, jpvt, tau, work, &lwork, info,
+         &rank, &rtol, &atol, &depth);
+    }
+    inline void geqp3tol
+    (int m, int n, double* a, int lda, int* jpvt, double* tau, double* work,
+     int lwork, int* info, int& rank, double rtol, double atol, int depth) {
+      FC_GLOBAL(dgeqp3tol,DGEQP3TOL)
+        (&m, &n, a, &lda, jpvt, tau, work, &lwork, info,
+         &rank, &rtol, &atol, &depth);
+    }
+    inline void geqp3tol
+    (int m, int n, std::complex<float>* a, int lda, int* jpvt,
+     std::complex<float>* tau, std::complex<float>* work, int lwork,
+     int* info, int& rank, float rtol, float atol, int depth) {
+      auto rwork = new float[std::max(1, 2*n)];
+      bool tasked = depth < params::task_recursion_cutoff_level;
+      if (tasked) {
+        int loop_tasks = std::max(params::num_threads / (depth+1), 1);
+        int B = std::max(n / loop_tasks, 1);
+        for (int task=0; task<std::ceil(n/float(B)); task++) {
+#pragma omp task default(shared) firstprivate(task)
+          for (int i=task*B; i<std::min((task+1)*B,n); i++)
+            rwork[i] = nrm2(m, &a[i*lda], 1);
+        }
+#pragma omp taskwait
+      } else
+        for (int i=0; i<n; i++)
+          rwork[i] = nrm2(m, &a[i*lda], 1);
+      FC_GLOBAL(cgeqp3tol,CGEQP3TOL)
+        (&m, &n, a, &lda, jpvt, tau, work, &lwork, rwork, info,
+         &rank, &rtol, &atol, &depth);
+      delete[] rwork;
+    }
+    inline void geqp3tol
+    (int m, int n, std::complex<double>* a, int lda, int* jpvt,
+     std::complex<double>* tau, std::complex<double>* work, int lwork,
+     int* info, int& rank, double rtol, double atol, int depth) {
+      auto rwork = new double[std::max(1, 2*n)];
+      bool tasked = depth < params::task_recursion_cutoff_level;
+      if (tasked) {
+        int loop_tasks = std::max(params::num_threads / (depth+1), 1);
+        int B = std::max(n / loop_tasks, 1);
+        for (int task=0; task<std::ceil(n/float(B)); task++) {
+#pragma omp task default(shared) firstprivate(task)
+          for (int i=task*B; i<std::min((task+1)*B,n); i++)
+            rwork[i] = nrm2(m, &a[i*lda], 1);
+        }
+#pragma omp taskwait
+      } else
+        for (int i=0; i<n; i++)
+          rwork[i] = nrm2(m, &a[i*lda], 1);
+      FC_GLOBAL(zgeqp3tol,ZGEQP3TOL)
+        (&m, &n, a, &lda, jpvt, tau, work, &lwork, rwork, info,
+         &rank, &rtol, &atol, &depth);
+      delete[] rwork;
+    }
+
+    template<typename scalar, typename real> inline void geqp3tol
+    (int m, int n, scalar* a, int lda, int* jpvt, scalar* tau, int* info,
+     int& rank, real rtol, real atol, int depth) {
       scalar lwork;
-      geqrf(M, N, a, lda, tau, &lwork, -1, info);
+      geqp3tol
+        (m, n, a, lda, jpvt, tau, &lwork, -1, info, rank, rtol, atol, depth);
       int ilwork = int(std::real(lwork));
       auto work = new scalar[ilwork];
-      geqrf(M, N, a, lda, tau, work, ilwork, info);
-      STRUMPACK_FLOPS((is_complex<scalar>()?4:1)*
-		      static_cast<long long int>(((M>N) ? (double(N)*(double(N)*(.5-(1./3.)*double(N)+double(M)) + double(M) + 23./6.)) : (double(M)*(double(M)*(-.5-(1./3.)*double(M)+double(N)) + 2.*double(N) + 23./6.)))
-						 + ((M>N) ? (double(N)*(double(N)*(.5-(1./3.)*double(N)+double(M)) + 5./6.)) : (double(M)*(double(M)*(-.5-(1./3.)*double(M)+double(N)) + double(N) + 5./6.)))));
+      if (! is_complex<scalar>()) {
+        bool tasked = depth < params::task_recursion_cutoff_level;
+        if (tasked) {
+          int loop_tasks = std::max(params::num_threads / (depth+1), 1);
+          int B = std::max(n / loop_tasks, 1);
+          for (int task=0; task<std::ceil(n/float(B)); task++) {
+#pragma omp task default(shared) firstprivate(task)
+            for (int i=task*B; i<std::min((task+1)*B,n); i++)
+              work[i] = nrm2(m, &a[i*lda], 1);
+          }
+#pragma omp taskwait
+        } else
+          for (int i=0; i<n; i++)
+            work[i] = nrm2(m, &a[i*lda], 1);
+      }
+      geqp3tol
+        (m, n, a, lda, jpvt, tau, work, ilwork,
+         info, rank, rtol, atol, depth);
       delete[] work;
     }
 
-    template<typename scalar> inline void geqrfmod(int M, int N, scalar* a, int lda, scalar* tau, scalar* work, int lwork, int* info, int depth);
-    template<> inline void geqrfmod(int M, int N, float* a, int lda, float* tau, float* work, int lwork, int* info, int depth)
-    { sgeqrfmod_(&M, &N, a, &lda, tau, work, &lwork, info, &depth); }
-    template<> inline void geqrfmod(int M, int N, double* a, int lda, double* tau, double* work, int lwork, int* info, int depth)
-    { dgeqrfmod_(&M, &N, a, &lda, tau, work, &lwork, info, &depth); }
-    template<> inline void geqrfmod(int M, int N, c_float* a, int lda, c_float* tau, c_float* work, int lwork, int* info, int depth)
-    { cgeqrfmod_(&M, &N, a, &lda, tau, work, &lwork, info, &depth); }
-    template<> inline void geqrfmod(int M, int N, c_double* a, int lda, c_double* tau, c_double* work, int lwork, int* info, int depth)
-    { zgeqrfmod_(&M, &N, a, &lda, tau, work, &lwork, info, &depth); }
-    template<typename scalar> inline void geqrfmod(int M, int N, scalar* a, int lda, scalar* tau, int* info, int depth) {
+
+    inline long long geqrf_flops(long long m, long long n) {
+      if (m > n)
+        return n * (n * (.5-(1./3.)*n+m) + m + 23./6.) +
+          n * (n * (.5-(1./3.) * n + m) + 5./6.);
+      else
+        return m * (m * (-.5 - (1./3.) * m + n) + 2 * n + 23./6.) +
+          m * (m * (-.5 - (1./3.) * m + n) + n + 5./6.);
+    }
+    inline void geqrf
+    (int m, int n, float* a, int lda, float* tau,
+     float* work, int lwork, int* info) {
+      FC_GLOBAL(sgeqrf,SGEQRF)(&m, &n, a, &lda, tau, work, &lwork, info);
+      STRUMPACK_FLOPS(geqrf_flops(m,n));
+    }
+    inline void geqrf
+    (int m, int n, double* a, int lda, double* tau,
+     double* work, int lwork, int* info) {
+      FC_GLOBAL(dgeqrf,DGEQRF)(&m, &n, a, &lda, tau, work, &lwork, info);
+      STRUMPACK_FLOPS(geqrf_flops(m,n));
+    }
+    inline void geqrf
+    (int m, int n, std::complex<float>* a, int lda, std::complex<float>* tau,
+     std::complex<float>* work, int lwork, int* info) {
+      FC_GLOBAL(cgeqrf,CGEQRF)(&m, &n, a, &lda, tau, work, &lwork, info);
+      STRUMPACK_FLOPS(4*geqrf_flops(m,n));
+    }
+    inline void geqrf
+    (int m, int n, std::complex<double>* a, int lda,
+     std::complex<double>* tau, std::complex<double>* work,
+     int lwork, int* info) {
+      FC_GLOBAL(zgeqrf,ZGEQRF)(&m, &n, a, &lda, tau, work, &lwork, info);
+      STRUMPACK_FLOPS(4*geqrf_flops(m,n));
+    }
+    template<typename scalar> inline void geqrf
+    (int m, int n, scalar* a, int lda, scalar* tau, int* info) {
       scalar lwork;
-      geqrfmod(M, N, a, lda, tau, &lwork, -1, info, depth);
+      geqrf(m, n, a, lda, tau, &lwork, -1, info);
       int ilwork = int(std::real(lwork));
       auto work = new scalar[ilwork];
-      geqrfmod(M, N, a, lda, tau, work, ilwork, info, depth);
+      geqrf(m, n, a, lda, tau, work, ilwork, info);
       delete[] work;
     }
 
-    template<typename scalar> inline void gelqf(int M, int N, scalar* a, int lda, scalar* tau, scalar* work, int lwork, int* info);
-    template<> inline void gelqf(int M, int N, float* a, int lda, float* tau, float* work, int lwork, int* info)
-    { sgelqf_(&M, &N, a, &lda, tau, work, &lwork, info); }
-    template<> inline void gelqf(int M, int N, double* a, int lda, double* tau, double* work, int lwork, int* info)
-    { dgelqf_(&M, &N, a, &lda, tau, work, &lwork, info); }
-    template<> inline void gelqf(int M, int N, c_float* a, int lda, c_float* tau, c_float* work, int lwork, int* info)
-    { cgelqf_(&M, &N, a, &lda, tau, work, &lwork, info); }
-    template<> inline void gelqf(int M, int N, c_double* a, int lda, c_double* tau, c_double* work, int lwork, int* info)
-    { zgelqf_(&M, &N, a, &lda, tau, work, &lwork, info); }
 
-    template<typename scalar> inline void gelqf(int M, int N, scalar* a, int lda, scalar* tau, int* info) {
+    inline void geqrfmod
+    (int m, int n, float* a, int lda,
+     float* tau, float* work, int lwork, int* info, int depth) {
+      FC_GLOBAL(sgeqrfmod,SGEQRFMOD)
+        (&m, &n, a, &lda, tau, work, &lwork, info, &depth);
+    }
+    inline void geqrfmod
+    (int m, int n, double* a, int lda, double* tau,
+     double* work, int lwork, int* info, int depth) {
+      FC_GLOBAL(dgeqrfmod,DGEQRFMOD)
+        (&m, &n, a, &lda, tau, work, &lwork, info, &depth);
+    }
+    inline void geqrfmod
+    (int m, int n, std::complex<float>* a, int lda, std::complex<float>* tau,
+     std::complex<float>* work, int lwork, int* info, int depth) {
+      FC_GLOBAL(cgeqrfmod,CGEQRFMOD)
+        (&m, &n, a, &lda, tau, work, &lwork, info, &depth);
+    }
+    inline void geqrfmod
+    (int m, int n, std::complex<double>* a, int lda,
+     std::complex<double>* tau, std::complex<double>* work,
+     int lwork, int* info, int depth) {
+      FC_GLOBAL(zgeqrfmod,ZGEQRFMOD)
+        (&m, &n, a, &lda, tau, work, &lwork, info, &depth);
+    }
+    template<typename scalar> inline void geqrfmod
+    (int m, int n, scalar* a, int lda, scalar* tau, int* info, int depth) {
       scalar lwork;
-      gelqf(M, N, a, lda, tau, &lwork, -1, info);
+      geqrfmod(m, n, a, lda, tau, &lwork, -1, info, depth);
       int ilwork = int(std::real(lwork));
-      scalar* work = new scalar[ilwork];
-      gelqf(M, N, a, lda, tau, work, ilwork, info);
-      STRUMPACK_FLOPS((is_complex<scalar>()?4:1) * static_cast<long long int>(((M>N) ? (double(N)*(double(N)*(.5-(1./3.)*double(N)+double(M)) + double(M) + 29./6.)) : (double(M)*(double(M)*(-.5-(1./3.)*double(M)+double(N)) + 2.*double(N) + 29./6.)))
-									      + ((M>N) ? (double(N)*(double(N)*(-.5-(1./3.)*double(N)+double(M)) + double(M) + 5./6.)) : (double(M)*(double(M)*(.5-(1./3.)*double(M)+double(N)) + 5./6.)))));
+      auto work = new scalar[ilwork];
+      geqrfmod(m, n, a, lda, tau, work, ilwork, info, depth);
       delete[] work;
     }
 
-    template<typename scalar> inline void gelqfmod(int M, int N, scalar* a, int lda, scalar* tau, scalar* work, int lwork, int* info, int depth);
-    template<> inline void gelqfmod(int M, int N, float* a, int lda, float* tau, float* work, int lwork, int* info, int depth)
-    { sgelqfmod_(&M, &N, a, &lda, tau, work, &lwork, info, &depth); }
-    template<> inline void gelqfmod(int M, int N, double* a, int lda, double* tau, double* work, int lwork, int* info, int depth)
-    { dgelqfmod_(&M, &N, a, &lda, tau, work, &lwork, info, &depth); }
-    template<> inline void gelqfmod(int M, int N, c_float* a, int lda, c_float* tau, c_float* work, int lwork, int* info, int depth)
-    { cgelqfmod_(&M, &N, a, &lda, tau, work, &lwork, info, &depth); }
-    template<> inline void gelqfmod(int M, int N, c_double* a, int lda, c_double* tau, c_double* work, int lwork, int* info, int depth)
-    { zgelqfmod_(&M, &N, a, &lda, tau, work, &lwork, info, &depth); }
 
-    template<typename scalar> inline void gelqfmod(int M, int N, scalar* a, int lda, scalar* tau, int* info, int depth) {
+    inline long long gelqf_flops(long long m, long long n) {
+      if (m > n)
+        return n * (n * (.5 - (1./3.) * n + m) + m + 29./6.) +
+                              n * (n * (-.5 - (1./3.) * n + m) + m + 5./6.);
+      else
+        return m * (m * (-.5 - (1./3.) * m + n) + 2 * n + 29./6.) +
+                              m * (m * (.5 - (1./3.) * m + n) + 5./6.);
+    }
+    inline void gelqf
+    (int m, int n, float* a, int lda, float* tau,
+     float* work, int lwork, int* info) {
+      FC_GLOBAL(sgelqf,SGELQF)(&m, &n, a, &lda, tau, work, &lwork, info);
+      STRUMPACK_FLOPS(gelqf_flops(m,n));
+    }
+    inline void gelqf
+    (int m, int n, double* a, int lda, double* tau,
+     double* work, int lwork, int* info) {
+      FC_GLOBAL(dgelqf,DGELQF)(&m, &n, a, &lda, tau, work, &lwork, info);
+      STRUMPACK_FLOPS(gelqf_flops(m,n));
+    }
+    inline void gelqf
+    (int m, int n, std::complex<float>* a, int lda, std::complex<float>* tau,
+     std::complex<float>* work, int lwork, int* info) {
+      FC_GLOBAL(cgelqf,CGELQF)(&m, &n, a, &lda, tau, work, &lwork, info);
+      STRUMPACK_FLOPS(4*gelqf_flops(m,n));
+    }
+    inline void gelqf
+    (int m, int n, std::complex<double>* a, int lda,
+     std::complex<double>* tau, std::complex<double>* work,
+     int lwork, int* info) {
+      FC_GLOBAL(zgelqf,ZGELQF)(&m, &n, a, &lda, tau, work, &lwork, info);
+      STRUMPACK_FLOPS(4*gelqf_flops(m,n));
+    }
+    template<typename scalar> inline void gelqf
+    (int m, int n, scalar* a, int lda, scalar* tau, int* info) {
       scalar lwork;
-      gelqfmod(M, N, a, lda, tau, &lwork, -1, info, depth);
+      gelqf(m, n, a, lda, tau, &lwork, -1, info);
       int ilwork = int(std::real(lwork));
-      scalar* work = new scalar[ilwork];
-      gelqfmod(M, N, a, lda, tau, work, ilwork, info, depth);
+      auto work = new scalar[ilwork];
+      gelqf(m, n, a, lda, tau, work, ilwork, info);
       delete[] work;
     }
 
-    template<typename scalar> inline void getrf(int M, int N, scalar* a, int lda, int* ipiv, int* info);
-    template<> inline void getrf(int M, int N, float* a, int lda, int* ipiv, int* info)
-    { sgetrf_(&M, &N, a, &lda, ipiv, info);
-      STRUMPACK_FLOPS(static_cast<long long int>(((M<N) ? (.5*double(M)*(double(M)*(double(N)-(1./3.)*double(M)-1.) + double(N)) + (2./3.) * double(M)) : (.5*double(N)*(double(N)*(double(M)-(1./3.)*double(N)-1.) + double(M)) + (2./3.) * double(N)))
-						 + ((M<N) ? (.5*double(M)*(double(M)*(double(N)-(1./3.)*double(M)) - double(N)) + (1./6.) * double(M)) : (.5*double(N)*(double(N)*(double(M)-(1./3.)*double(N)-1.) - double(M)) + (1./6.) * double(N))))); }
-    template<> inline void getrf(int M, int N, double* a, int lda, int* ipiv, int* info)
-    { dgetrf_(&M, &N, a, &lda, ipiv, info);
-      STRUMPACK_FLOPS(static_cast<long long int>(((M<N) ? (.5*double(M)*(double(M)*(double(N)-(1./3.)*double(M)-1.) + double(N)) + (2./3.) * double(M)) : (.5*double(N)*(double(N)*(double(M)-(1./3.)*double(N)-1.) + double(M)) + (2./3.) * double(N)))
-						 + ((M<N) ? (.5*double(M)*(double(M)*(double(N)-(1./3.)*double(M)) - double(N)) + (1./6.) * double(M)) : (.5*double(N)*(double(N)*(double(M)-(1./3.)*double(N)-1.) - double(M)) + (1./6.) * double(N))))); }
-    template<> inline void getrf(int M, int N, c_float* a, int lda, int* ipiv, int* info)
-    { cgetrf_(&M, &N, a, &lda, ipiv, info);
-      STRUMPACK_FLOPS(4*static_cast<long long int>(((M<N) ? (.5*double(M)*(double(M)*(double(N)-(1./3.)*double(M)-1.) + double(N)) + (2./3.) * double(M)) : (.5*double(N)*(double(N)*(double(M)-(1./3.)*double(N)-1.) + double(M)) + (2./3.) * double(N)))
-						   + ((M<N) ? (.5*double(M)*(double(M)*(double(N)-(1./3.)*double(M)) - double(N)) + (1./6.) * double(M)) : (.5*double(N)*(double(N)*(double(M)-(1./3.)*double(N)-1.) - double(M)) + (1./6.) * double(N))))); }
-    template<> inline void getrf(int M, int N, c_double* a, int lda, int* ipiv, int* info)
-    { zgetrf_(&M, &N, a, &lda, ipiv, info);
-      STRUMPACK_FLOPS(4*static_cast<long long int>(((M<N) ? (.5*double(M)*(double(M)*(double(N)-(1./3.)*double(M)-1.) + double(N)) + (2./3.) * double(M)) : (.5*double(N)*(double(N)*(double(M)-(1./3.)*double(N)-1.) + double(M)) + (2./3.) * double(N)))
-						   + ((M<N) ? (.5*double(M)*(double(M)*(double(N)-(1./3.)*double(M)) - double(N)) + (1./6.) * double(M)) : (.5*double(N)*(double(N)*(double(M)-(1./3.)*double(N)-1.) - double(M)) + (1./6.) * double(N))))); }
 
-    template<typename scalar> inline void getrfmod(int M, int N, scalar* a, int lda, int* ipiv, int* info, int depth);
-    template<> inline void getrfmod(int M, int N, float* a, int lda, int* ipiv, int* info, int depth)
-    { sgetrfmod_(&M, &N, a, &lda, ipiv, info, &depth); }
-    template<> inline void getrfmod(int M, int N, double* a, int lda, int* ipiv, int* info, int depth)
-    { dgetrfmod_(&M, &N, a, &lda, ipiv, info, &depth); }
-    template<> inline void getrfmod(int M, int N, c_float* a, int lda, int* ipiv, int* info, int depth)
-    { cgetrfmod_(&M, &N, a, &lda, ipiv, info, &depth); }
-    template<> inline void getrfmod(int M, int N, c_double* a, int lda, int* ipiv, int* info, int depth)
-    { zgetrfmod_(&M, &N, a, &lda, ipiv, info, &depth); }
-
-    template<typename scalar> inline void getrs(char trans, int N, int nrhs, scalar* a, int lda, int* ipiv, scalar* b, int ldb, int* info);
-    template<> inline void getrs(char trans, int N, int nrhs, float* a, int lda, int* ipiv, float* b, int ldb, int* info)
-    { sgetrs_(&trans, &N, &nrhs, a, &lda, ipiv, b, &ldb, info);
-      STRUMPACK_FLOPS(static_cast<long long int>(2.*double(N)*double(N)*double(nrhs))); }
-    template<> inline void getrs(char trans, int N, int nrhs, double* a, int lda, int* ipiv, double* b, int ldb, int* info)
-    { dgetrs_(&trans, &N, &nrhs, a, &lda, ipiv, b, &ldb, info);
-      STRUMPACK_FLOPS(static_cast<long long int>(2.*double(N)*double(N)*double(nrhs))); }
-    template<> inline void getrs(char trans, int N, int nrhs, c_float* a, int lda, int* ipiv, c_float* b, int ldb, int* info)
-    { cgetrs_(&trans, &N, &nrhs, a, &lda, ipiv, b, &ldb, info);
-      STRUMPACK_FLOPS(4*static_cast<long long int>(2.*double(N)*double(N)*double(nrhs))); }
-    template<> inline void getrs(char trans, int N, int nrhs, c_double* a, int lda, int* ipiv, c_double* b, int ldb, int* info)
-    { zgetrs_(&trans, &N, &nrhs, a, &lda, ipiv, b, &ldb, info);
-      STRUMPACK_FLOPS(4*static_cast<long long int>(2.*double(N)*double(N)*double(nrhs))); }
-
-    template<typename scalar> inline void potrf(char uplo, int N, scalar* a, int lda, int* info);
-    template<> inline void potrf(char uplo, int N, float* a, int lda, int* info)
-    { spotrf_(&uplo, &N, a, &lda, info); std::cout << "TODO count flops for spotrf" << std::endl; }
-    template<> inline void potrf(char uplo, int N, double* a, int lda, int* info)
-    { dpotrf_(&uplo, &N, a, &lda, info); std::cout << "TODO count flops for dpotrf" << std::endl; }
-    template<> inline void potrf(char uplo, int N, c_float* a, int lda, int* info)
-    { cpotrf_(&uplo, &N, a, &lda, info); std::cout << "TODO count flops for cpotrf" << std::endl; }
-    template<> inline void potrf(char uplo, int N, c_double* a, int lda, int* info)
-    { zpotrf_(&uplo, &N, a, &lda, info); std::cout << "TODO count flops for zpotrf" << std::endl; }
-
-    template<typename scalar> inline void xxglq(int M, int N, int K, scalar* a, int lda, scalar* tau, scalar* work, int lwork, int* info);
-    template<> inline void xxglq(int M, int N, int K, float* a, int lda, float* tau, float* work, int lwork, int* info)
-    { sorglq_(&M, &N, &K, a, &lda, tau, work, &lwork, info); }
-    template<> inline void xxglq(int M, int N, int K, double* a, int lda, double* tau, double* work, int lwork, int* info)
-    { dorglq_(&M, &N, &K, a, &lda, tau, work, &lwork, info); }
-    template<> inline void xxglq(int M, int N, int K, c_float* a, int lda, c_float* tau, c_float* work, int lwork, int* info)
-    { cunglq_(&M, &N, &K, a, &lda, tau, work, &lwork, info); }
-    template<> inline void xxglq(int M, int N, int K, c_double* a, int lda, c_double* tau, c_double* work, int lwork, int* info)
-    { zunglq_(&M, &N, &K, a, &lda, tau, work, &lwork, info); }
-
-    template<typename scalar> inline void xxglq(int M, int N, int K, scalar* a, int lda, scalar* tau, int* info) {
+    inline void gelqfmod
+    (int m, int n, float* a, int lda, float* tau,
+     float* work, int lwork, int* info, int depth) {
+      FC_GLOBAL(sgelqfmod,SGELQFMOD)
+        (&m, &n, a, &lda, tau, work, &lwork, info, &depth);
+    }
+    inline void gelqfmod
+    (int m, int n, double* a, int lda, double* tau,
+     double* work, int lwork, int* info, int depth) {
+      FC_GLOBAL(dgelqfmod,DGELQFMOD)
+        (&m, &n, a, &lda, tau, work, &lwork, info, &depth);
+    }
+    inline void gelqfmod
+    (int m, int n, std::complex<float>* a, int lda, std::complex<float>* tau,
+     std::complex<float>* work, int lwork, int* info, int depth) {
+      FC_GLOBAL(cgelqfmod,CGELQFMOD)
+        (&m, &n, a, &lda, tau, work, &lwork, info, &depth);
+    }
+    inline void gelqfmod
+    (int m, int n, std::complex<double>* a, int lda,
+     std::complex<double>* tau, std::complex<double>* work,
+     int lwork, int* info, int depth) {
+      FC_GLOBAL(zgelqfmod,ZGELQFMOD)
+        (&m, &n, a, &lda, tau, work, &lwork, info, &depth);
+    }
+    template<typename scalar> inline void gelqfmod
+    (int m, int n, scalar* a, int lda, scalar* tau, int* info, int depth) {
       scalar lwork;
-      xxglq(M, N, K, a, lda, tau, &lwork, -1, info);
+      gelqfmod(m, n, a, lda, tau, &lwork, -1, info, depth);
       int ilwork = int(std::real(lwork));
-      scalar* work = new scalar[ilwork];
-      xxglq(M, N, K, a, lda, tau, work, ilwork, info);
-      STRUMPACK_FLOPS((is_complex<scalar>()?4:1) * static_cast<long long int>((M==K) ? ((2./3.)*double(M)*double(M)*(3.*double(N) - double(M))) : 4.*double(M)*double(N)*double(K) - 2.*(double(M) + double(N))*double(K)*double(K)+ (4./3.)*double(K)*double(K)*double(K)));
+      auto work = new scalar[ilwork];
+      gelqfmod(m, n, a, lda, tau, work, ilwork, info, depth);
       delete[] work;
     }
 
-    template<typename scalar> inline void xxglqmod(int M, int N, int K, scalar* a, int lda, scalar* tau, scalar* work, int lwork, int* info, int depth);
-    template<> inline void xxglqmod(int M, int N, int K, float* a, int lda, float* tau, float* work, int lwork, int* info, int depth)
-    { sorglqmod_(&M, &N, &K, a, &lda, tau, work, &lwork, info, &depth); }
-    template<> inline void xxglqmod(int M, int N, int K, double* a, int lda, double* tau, double* work, int lwork, int* info, int depth)
-    { dorglqmod_(&M, &N, &K, a, &lda, tau, work, &lwork, info, &depth); }
-    template<> inline void xxglqmod(int M, int N, int K, c_float* a, int lda, c_float* tau, c_float* work, int lwork, int* info, int depth)
-    { cunglqmod_(&M, &N, &K, a, &lda, tau, work, &lwork, info, &depth); }
-    template<> inline void xxglqmod(int M, int N, int K, c_double* a, int lda, c_double* tau, c_double* work, int lwork, int* info, int depth)
-    { zunglqmod_(&M, &N, &K, a, &lda, tau, work, &lwork, info, &depth); }
 
-    template<typename scalar> inline void xxglqmod(int M, int N, int K, scalar* a, int lda, scalar* tau, int* info, int depth) {
-      scalar lwork;
-      xxglqmod(M, N, K, a, lda, tau, &lwork, -1, info, depth);
-      int ilwork = int(std::real(lwork));
-      scalar* work = new scalar[ilwork];
-      xxglqmod(M, N, K, a, lda, tau, work, ilwork, info, depth);
-      delete[] work;
+    inline long long getrf_flops(long long m, long long n) {
+      // TODO check this
+      if (m < n) return (m / 2 * (m * (n - m / 3 - 1) + n) + 2 * m / 3) +
+                   (m / 2 * (m * (n - m / 3) - n) + m / 6);
+      else return n * n * (m - n/3 - 1) / 2 + m + 2 * n / 3 +
+             n * (n * (m - (1./3.) * n - 1) / 2 - m) + n / 6;
     }
-
-    template<typename scalar> inline void xxgqr(int M, int N, int K, scalar* a, int lda, scalar* tau, scalar* work, int lwork, int* info);
-    template<> inline void xxgqr(int M, int N, int K, float* a, int lda, float* tau, float* work, int lwork, int* info)
-    { sorgqr_(&M, &N, &K, a, &lda, tau, work, &lwork, info); }
-    template<> inline void xxgqr(int M, int N, int K, double* a, int lda, double* tau, double* work, int lwork, int* info)
-    { dorgqr_(&M, &N, &K, a, &lda, tau, work, &lwork, info); }
-    template<> inline void xxgqr(int M, int N, int K, c_float* a, int lda, c_float* tau, c_float* work, int lwork, int* info)
-    { cungqr_(&M, &N, &K, a, &lda, tau, work, &lwork, info); }
-    template<> inline void xxgqr(int M, int N, int K, c_double* a, int lda, c_double* tau, c_double* work, int lwork, int* info)
-    { zungqr_(&M, &N, &K, a, &lda, tau, work, &lwork, info); }
-
-    template<typename scalar> inline void xxgqr(int M, int N, int K, scalar* a, int lda, scalar* tau, int* info) {
-      scalar lwork;
-      xxgqr(M, N, K, a, lda, tau, &lwork, -1, info);
-      int ilwork = int(std::real(lwork));
-      scalar* work = new scalar[ilwork];
-      xxgqr(M, N, K, a, lda, tau, work, ilwork, info);
-      STRUMPACK_FLOPS((is_complex<scalar>()?4:1)*static_cast<long long int>((N==K) ? ((2./3.)*double(N)*double(N)*(3.*double(M) - double(N))) : (4.*double(M)*double(N)*double(K) - 2.*(double(M) + double(N))*double(K)*double(K) + (4./3.)*double(K)*double(K)*double(K))));
-      delete[] work;
+    inline void getrf
+    (int m, int n, float* a, int lda, int* ipiv, int* info) {
+      FC_GLOBAL(sgetrf,SGETRF)(&m, &n, a, &lda, ipiv, info);
+      STRUMPACK_FLOPS(getrf_flops(m,n));
     }
-
-    template<typename scalar, typename real> inline real lange(char norm, int m, int n, scalar *a, int lda);
-    template<> inline float lange<float, float>(char norm, int m, int n, float *a, int lda) {
-      if (norm == 'I' || norm == 'i') {
-	float* work = new float[m];
-	auto ret = slange_(&norm, &m, &n, a, &lda, work);
-	delete[] work;
-	return ret;
-      } else return slange_(&norm, &m, &n, a, &lda, nullptr);
+    inline void getrf
+    (int m, int n, double* a, int lda, int* ipiv, int* info) {
+      FC_GLOBAL(dgetrf,DGETRF)(&m, &n, a, &lda, ipiv, info);
+      STRUMPACK_FLOPS(getrf_flops(m,n));
     }
-    template<> inline double lange<double,double>(char norm, int m, int n, double *a, int lda) {
-      if (norm == 'I' || norm == 'i') {
-	double* work = new double[m];
-	auto ret = dlange_(&norm, &m, &n, a, &lda, work);
-	delete[] work;
-	return ret;
-      } else return dlange_(&norm, &m, &n, a, &lda, nullptr);
+    inline void getrf
+    (int m, int n, std::complex<float>* a, int lda, int* ipiv, int* info) {
+      FC_GLOBAL(cgetrf,CGETRF)(&m, &n, a, &lda, ipiv, info);
+      STRUMPACK_FLOPS(4*getrf_flops(m,n));
     }
-    template<> inline  float lange<c_float, float>(char norm, int m, int n, c_float *a, int lda) {
-      if (norm == 'I' || norm == 'i') {
-	float* work = new float[m];
-	auto ret = clange_(&norm, &m, &n, a, &lda, work);
-	delete[] work;
-	return ret;
-      } else return clange_(&norm, &m, &n, a, &lda, nullptr);
-    }
-    template<> inline double lange<c_double, double>(char norm, int m, int n, c_double *a, int lda) {
-      if (norm == 'I' || norm == 'i') {
-	double* work = new double[m];
-	auto ret = zlange_(&norm, &m, &n, a, &lda, work);
-	delete[] work;
-	return ret;
-      } else return zlange_(&norm, &m, &n, a, &lda, nullptr);
+    inline void getrf
+    (int m, int n, std::complex<double>* a, int lda, int* ipiv, int* info) {
+      FC_GLOBAL(zgetrf,ZGETRF)(&m, &n, a, &lda, ipiv, info);
+      STRUMPACK_FLOPS(4*getrf_flops(m,n));
     }
 
 
-    inline int
-    gesvd(char JOBU, char JOBVT, int M, int N, float* A, int LDA,
-          float* S, float* U, int LDU, float* VT, int LDVT) {
-      int INFO;
-      int LWORK = -1;
-      float SWORK;
-      sgesvd_(&JOBU, &JOBVT, &M, &N, A, &LDA, S, U, &LDU, VT, &LDVT,
-              &SWORK, &LWORK, &INFO);
-      LWORK = int(SWORK);
-      auto WORK = new float[LWORK];
-      sgesvd_(&JOBU, &JOBVT, &M, &N, A, &LDA, S, U, &LDU, VT, &LDVT,
-              WORK, &LWORK, &INFO);
-      delete[] WORK;
-      return INFO;
+    inline void getrfmod
+    (int m, int n, float* a, int lda, int* ipiv, int* info, int depth) {
+      FC_GLOBAL(sgetrfmod,SGETRFMOD)(&m, &n, a, &lda, ipiv, info, &depth);
     }
-    inline int
-    gesvd(char JOBU, char JOBVT, int M, int N, double* A, int LDA,
-          double* S, double* U, int LDU, double* VT, int LDVT) {
-      int INFO;
-      int LWORK = -1;
-      double DWORK;
-      dgesvd_(&JOBU, &JOBVT, &M, &N, A, &LDA, S, U, &LDU, VT, &LDVT,
-              &DWORK, &LWORK, &INFO);
-      LWORK = int(DWORK);
-      auto WORK = new double[LWORK];
-      dgesvd_(&JOBU, &JOBVT, &M, &N, A, &LDA, S, U, &LDU, VT, &LDVT,
-              WORK, &LWORK, &INFO);
-      delete[] WORK;
-      return INFO;
+    inline void getrfmod
+    (int m, int n, double* a, int lda, int* ipiv, int* info, int depth) {
+      FC_GLOBAL(dgetrfmod,DGETRFMOD)(&m, &n, a, &lda, ipiv, info, &depth);
     }
-    inline int
-    gesvd(char JOBU, char JOBVT, int M, int N, c_float* A, int LDA,
-          c_float* S, c_float* U, int LDU, c_float* VT, int LDVT) {
-      std::cout << "TODO gesvd for c_float" << std::endl;
+    inline void getrfmod
+    (int m, int n, std::complex<float>* a, int lda,
+     int* ipiv, int* info, int depth) {
+      FC_GLOBAL(cgetrfmod,CGETRFMOD)(&m, &n, a, &lda, ipiv, info, &depth);
+    }
+    inline void getrfmod
+    (int m, int n, std::complex<double>* a, int lda,
+     int* ipiv, int* info, int depth) {
+      FC_GLOBAL(zgetrfmod,ZGETRFMOD)(&m, &n, a, &lda, ipiv, info, &depth);
+    }
+
+
+    inline long long getrs_flops(long long n, long long nrhs) {
+      return 2 * n * n * nrhs;
+    }
+    inline void getrs
+    (char t, int n, int nrhs, const float* a, int lda,
+     const int* ipiv, float* b, int ldb, int* info) {
+      FC_GLOBAL(sgetrs,SGETRS)(&t, &n, &nrhs, a, &lda, ipiv, b, &ldb, info);
+      STRUMPACK_FLOPS(getrs_flops(n, nrhs));
+    }
+    inline void getrs
+    (char t, int n, int nrhs, const double* a, int lda,
+     const int* ipiv, double* b, int ldb, int* info) {
+      FC_GLOBAL(dgetrs,DGETRS)(&t, &n, &nrhs, a, &lda, ipiv, b, &ldb, info);
+      STRUMPACK_FLOPS(getrs_flops(n, nrhs));
+    }
+    inline void getrs
+    (char t, int n, int nrhs, const std::complex<float>* a, int lda,
+     const int* ipiv, std::complex<float>* b, int ldb, int* info) {
+      FC_GLOBAL(cgetrs,CGETRS)(&t, &n, &nrhs, a, &lda, ipiv, b, &ldb, info);
+      STRUMPACK_FLOPS(4*getrs_flops(n, nrhs));
+    }
+    inline void getrs
+    (char t, int n, int nrhs, const std::complex<double>* a, int lda,
+     const int* ipiv, std::complex<double>* b, int ldb, int* info) {
+      zgetrs_(&t, &n, &nrhs, a, &lda, ipiv, b, &ldb, info);
+      STRUMPACK_FLOPS(4*getrs_flops(n, nrhs));
+    }
+
+
+    inline long long potrf_flops(long long n) {
+      std::cout << "TODO count flops for spotrf" << std::endl;
       return 0;
     }
-    inline int
-    gesvd(char JOBU, char JOBVT, int M, int N, c_double* A, int LDA,
-          c_double* S, c_double* U, int LDU, c_double* VT, int LDVT) {
-      std::cout << "TODO gesvd for c_double" << std::endl;
-      return 0;
+    inline void potrf
+    (char ul, int n, float* a, int lda, int* info) {
+      FC_GLOBAL(spotrf,SPOTRF)
+        (&ul, &n, a, &lda, info);
+      STRUMPACK_FLOPS(potrf_flops(n));
+    }
+    inline void potrf
+    (char ul, int n, double* a, int lda, int* info) {
+      FC_GLOBAL(dpotrf,DPOTRF)
+        (&ul, &n, a, &lda, info);
+      STRUMPACK_FLOPS(potrf_flops(n));
+    }
+    inline void potrf
+    (char ul, int n, std::complex<float>* a, int lda, int* info) {
+      FC_GLOBAL(cpotrf,CPOTRF)
+        (&ul, &n, a, &lda, info);
+      STRUMPACK_FLOPS(4*potrf_flops(n));
+    }
+    inline void potrf
+    (char ul, int n, std::complex<double>* a, int lda, int* info) {
+      FC_GLOBAL(zpotrf,ZPOTRF)
+        (&ul, &n, a, &lda, info);
+      STRUMPACK_FLOPS(4*potrf_flops(n));
     }
 
+
+    inline long long xxglq_flops(long long m, long long n, long long k) {
+      if (m == k) return 2 * m * m *(3 * n - m) / 3;
+      else return 4 * m * n * k - 2 * (m + n) * k * k + 4 * k * k * k / 3;
+    }
+    inline void xxglq
+    (int m, int n, int k, float* a, int lda, const float* tau,
+     float* work, int lwork, int* info) {
+      FC_GLOBAL(sorglq,FC_GLOBAL)
+        (&m, &n, &k, a, &lda, tau, work, &lwork, info);
+      STRUMPACK_FLOPS(xxglq_flops(m,n,k));
+    }
+    inline void xxglq
+    (int m, int n, int k, double* a, int lda, const double* tau,
+     double* work, int lwork, int* info) {
+      FC_GLOBAL(dorglq,DORGLQ)
+        (&m, &n, &k, a, &lda, tau, work, &lwork, info);
+      STRUMPACK_FLOPS(xxglq_flops(m,n,k));
+    }
+    inline void xxglq
+    (int m, int n, int k, std::complex<float>* a, int lda,
+     const std::complex<float>* tau, std::complex<float>* work,
+     int lwork, int* info) {
+      FC_GLOBAL(cunglq,CUNGLQ)
+        (&m, &n, &k, a, &lda, tau, work, &lwork, info);
+      STRUMPACK_FLOPS(4*xxglq_flops(m,n,k));
+    }
+    inline void xxglq
+    (int m, int n, int k, std::complex<double>* a, int lda,
+     const std::complex<double>* tau, std::complex<double>* work,
+     int lwork, int* info) {
+      FC_GLOBAL(zunglq,ZUNGLQ)
+        (&m, &n, &k, a, &lda, tau, work, &lwork, info);
+      STRUMPACK_FLOPS(4*xxglq_flops(m,n,k));
+    }
+    template<typename scalar> inline void xxglq
+    (int m, int n, int k, scalar* a, int lda, const scalar* tau, int* info) {
+      scalar lwork;
+      xxglq(m, n, k, a, lda, tau, &lwork, -1, info);
+      int ilwork = int(std::real(lwork));
+      scalar* work = new scalar[ilwork];
+      xxglq(m, n, k, a, lda, tau, work, ilwork, info);
+      delete[] work;
+    }
+
+    // do not count flops here, they are counted in the blas routines
+    inline void xxglqmod
+    (int m, int n, int k, float* a, int lda, const float* tau,
+     float* work, int lwork, int* info, int depth) {
+      FC_GLOBAL(sorglqmod,SORGLQMOD)
+        (&m, &n, &k, a, &lda, tau, work, &lwork, info, &depth);
+    }
+    inline void xxglqmod
+    (int m, int n, int k, double* a, int lda, const double* tau,
+     double* work, int lwork, int* info, int depth) {
+      FC_GLOBAL(dorglqmod,DORGLQMOD)
+        (&m, &n, &k, a, &lda, tau, work, &lwork, info, &depth);
+    }
+    inline void xxglqmod
+    (int m, int n, int k, std::complex<float>* a, int lda,
+     const std::complex<float>* tau, std::complex<float>* work,
+     int lwork, int* info, int depth) {
+      FC_GLOBAL(cunglqmod,CUNGLQMOD)
+        (&m, &n, &k, a, &lda, tau, work, &lwork, info, &depth);
+    }
+    inline void xxglqmod
+    (int m, int n, int k, std::complex<double>* a, int lda,
+     const std::complex<double>* tau, std::complex<double>* work,
+     int lwork, int* info, int depth) {
+      FC_GLOBAL(zunglqmod,ZUNGLQMOD)
+        (&m, &n, &k, a, &lda, tau, work, &lwork, info, &depth);
+    }
+    template<typename scalar> inline void xxglqmod
+    (int m, int n, int k, scalar* a, int lda,
+     const scalar* tau, int* info, int depth) {
+      scalar lwork;
+      xxglqmod(m, n, k, a, lda, tau, &lwork, -1, info, depth);
+      int ilwork = int(std::real(lwork));
+      scalar* work = new scalar[ilwork];
+      xxglqmod(m, n, k, a, lda, tau, work, ilwork, info, depth);
+      delete[] work;
+    }
+
+
+    inline long long xxgqr_flops(long long m, long long n, long long k) {
+      if (n == k) return 2 * n * n * (3 * m - n) / 3;
+      else return 4 * m * n * k - 2 * (m + n) * k * k + 4 * k * k * k / 3;
+    }
+    inline void xxgqr
+    (int m, int n, int k, float* a, int lda, const float* tau,
+     float* work, int lwork, int* info) {
+      FC_GLOBAL(sorgqr,SORGQR)
+        (&m, &n, &k, a, &lda, tau, work, &lwork, info);
+      STRUMPACK_FLOPS(xxgqr_flops(m,n,k));
+    }
+    inline void xxgqr
+    (int m, int n, int k, double* a, int lda, const double* tau,
+     double* work, int lwork, int* info) {
+      FC_GLOBAL(dorgqr,DORGQR)
+        (&m, &n, &k, a, &lda, tau, work, &lwork, info);
+      STRUMPACK_FLOPS(xxgqr_flops(m,n,k));
+    }
+    inline void xxgqr
+    (int m, int n, int k, std::complex<float>* a, int lda,
+     const std::complex<float>* tau, std::complex<float>* work,
+     int lwork, int* info) {
+      FC_GLOBAL(cungqr,FC_GLOBAL)
+        (&m, &n, &k, a, &lda, tau, work, &lwork, info);
+      STRUMPACK_FLOPS(4*xxgqr_flops(m,n,k));
+    }
+    inline void xxgqr
+    (int m, int n, int k, std::complex<double>* a, int lda,
+     const std::complex<double>* tau, std::complex<double>* work,
+     int lwork, int* info) {
+      FC_GLOBAL(zungqr,ZUNGQR)
+        (&m, &n, &k, a, &lda, tau, work, &lwork, info);
+      STRUMPACK_FLOPS(4*xxgqr_flops(m,n,k));
+    }
+    template<typename scalar> inline void xxgqr
+    (int m, int n, int k, scalar* a, int lda, const scalar* tau, int* info) {
+      scalar lwork;
+      xxgqr(m, n, k, a, lda, tau, &lwork, -1, info);
+      int ilwork = int(std::real(lwork));
+      auto work = new scalar[ilwork];
+      xxgqr(m, n, k, a, lda, tau, work, ilwork, info);
+      delete[] work;
+    }
+
+
+    inline float lange(char norm, int m, int n, const float *a, int lda) {
+      if (norm == 'I' || norm == 'i') {
+        auto work = new float[m];
+        auto ret = FC_GLOBAL(slange,SLANGE)(&norm, &m, &n, a, &lda, work);
+        delete[] work;
+        return ret;
+      } else return FC_GLOBAL(slange,SLANGE)(&norm, &m, &n, a, &lda, nullptr);
+    }
+    inline double lange(char norm, int m, int n, const double *a, int lda) {
+      if (norm == 'I' || norm == 'i') {
+        double* work = new double[m];
+        auto ret = FC_GLOBAL(dlange,DLANGE)(&norm, &m, &n, a, &lda, work);
+        delete[] work;
+        return ret;
+      } else return FC_GLOBAL(dlange,DLANGE)(&norm, &m, &n, a, &lda, nullptr);
+    }
+    inline float lange
+      (char norm, int m, int n, const std::complex<float> *a, int lda) {
+      if (norm == 'I' || norm == 'i') {
+        auto work = new float[m];
+        auto ret = FC_GLOBAL(clange,CLANGE)(&norm, &m, &n, a, &lda, work);
+        delete[] work;
+        return ret;
+      } else return FC_GLOBAL(clange,CLANGE)(&norm, &m, &n, a, &lda, nullptr);
+    }
+    inline double lange
+      (char norm, int m, int n, const std::complex<double> *a, int lda) {
+      if (norm == 'I' || norm == 'i') {
+        auto work = new double[m];
+        auto ret = FC_GLOBAL(zlange,ZLANGE)(&norm, &m, &n, a, &lda, work);
+        delete[] work;
+        return ret;
+      } else return FC_GLOBAL(zlange,ZLANGE)(&norm, &m, &n, a, &lda, nullptr);
+    }
+
+
+    inline int gesvd
+      (char jobu, char jobvt, int m, int n, float* a, int lda,
+       float* s, float* u, int ldu, float* vt, int ldvt) {
+      int info;
+      int lwork = -1;
+      float swork;
+      FC_GLOBAL(sgesvd,SGESVD)
+        (&jobu, &jobvt, &m, &n, a, &lda, s, u, &ldu, vt, &ldvt,
+         &swork, &lwork, &info);
+      lwork = int(swork);
+      auto work = new float[lwork];
+      FC_GLOBAL(sgesvd,SGESVD)
+        (&jobu, &jobvt, &m, &n, a, &lda, s, u, &ldu, vt, &ldvt,
+         work, &lwork, &info);
+      delete[] work;
+      return info;
+    }
+    inline int gesvd
+      (char jobu, char jobvt, int m, int n, double* a, int lda,
+       double* s, double* u, int ldu, double* vt, int ldvt) {
+      int info;
+      int lwork = -1;
+      double dwork;
+      FC_GLOBAL(dgesvd,DGESVD)
+        (&jobu, &jobvt, &m, &n, a, &lda, s, u, &ldu, vt, &ldvt,
+         &dwork, &lwork, &info);
+      lwork = int(dwork);
+      auto work = new double[lwork];
+      FC_GLOBAL(dgesvd,DGESVD)
+        (&jobu, &jobvt, &m, &n, a, &lda, s, u, &ldu, vt, &ldvt,
+         work, &lwork, &info);
+      delete[] work;
+      return info;
+    }
+    inline int gesvd
+      (char jobu, char jobvt, int m, int n, std::complex<float>* a, int lda,
+       std::complex<float>* s, std::complex<float>* u, int ldu,
+       std::complex<float>* vt, int ldvt) {
+      std::cout << "TODO gesvd for std::complex<float>" << std::endl;
+      return 0;
+    }
+    inline int gesvd
+      (char jobu, char jobvt, int m, int n, std::complex<double>* a, int lda,
+       std::complex<double>* s, std::complex<double>* u, int ldu,
+       std::complex<double>* vt, int ldvt) {
+      std::cout << "TODO gesvd for std::complex<double>" << std::endl;
+      return 0;
+    }
 
   } //end namespace blas
 } // end namespace strumpack

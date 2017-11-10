@@ -419,21 +419,21 @@ namespace strumpack {
   template<typename scalar_t> DenseMatrix<scalar_t>
   DenseMatrix<scalar_t>::transpose() const {
     DenseMatrix<scalar_t> tmp(cols(), rows());
-    blas::omatcopy('C', rows(), cols(), const_cast<scalar_t*>(data()),
-                   ld(), tmp.data(), tmp.ld());
+    blas::omatcopy
+      ('C', rows(), cols(), data(), ld(), tmp.data(), tmp.ld());
     return tmp;
   }
 
   template<typename scalar_t> void
   DenseMatrix<scalar_t>::permute_rows_bwd(const std::vector<int>& P) {
-    blas::laswp(cols(), data(), ld(), 1, P.size(),
-                const_cast<int*>(P.data()), -1);
+    blas::laswp
+      (cols(), data(), ld(), 1, P.size(), P.data(), -1);
   }
 
   template<typename scalar_t> void
   DenseMatrix<scalar_t>::permute_rows_fwd(const std::vector<int>& P) {
-    blas::laswp(cols(), data(), ld(), 1, P.size(),
-                const_cast<int*>(P.data()), 1);
+    blas::laswp
+      (cols(), data(), ld(), 1, P.size(), P.data(), 1);
   }
 
   template<typename scalar_t> void DenseMatrix<scalar_t>::extract_rows
@@ -525,20 +525,20 @@ namespace strumpack {
 
   template<typename scalar_t> typename RealType<scalar_t>::value_type
   DenseMatrix<scalar_t>::norm1() const {
-    return blas::lange<scalar_t,real_t>
-      ('1', rows(), cols(), const_cast<scalar_t*>(data()), ld());
+    return blas::lange
+      ('1', rows(), cols(), data(), ld());
   }
 
   template<typename scalar_t> typename RealType<scalar_t>::value_type
   DenseMatrix<scalar_t>::normI() const {
-    return blas::lange<scalar_t,real_t>
-      ('I', rows(), cols(), const_cast<scalar_t*>(data()), ld());
+    return blas::lange
+      ('I', rows(), cols(), data(), ld());
   }
 
   template<typename scalar_t> typename RealType<scalar_t>::value_type
   DenseMatrix<scalar_t>::normF() const {
-    return blas::lange<scalar_t,real_t>
-      ('F', rows(), cols(), const_cast<scalar_t*>(data()), ld());
+    return blas::lange
+      ('F', rows(), cols(), data(), ld());
   }
 
   template<typename scalar_t> std::vector<int>
@@ -560,10 +560,9 @@ namespace strumpack {
                                const std::vector<int>& piv, int depth) const {
     int info = 0;
     DenseMatrix<scalar_t> x(b);
-    getrs_omp_task(char(Trans::N), rows(), b.cols(),
-                   const_cast<scalar_t*>(data()), ld(),
-                   const_cast<int*>(piv.data()),
-                   x.data(), x.ld(), &info, depth);
+    getrs_omp_task
+      (char(Trans::N), rows(), b.cols(), data(), ld(), piv.data(),
+       x.data(), x.ld(), &info, depth);
     if (info) {
       std::cerr << "ERROR: LU solve failed with info=" << info << std::endl;
       exit(1);
@@ -688,7 +687,7 @@ namespace strumpack {
     //if(depth < params::task_recursion_cutoff_level)
     //final(depth >= params::task_recursion_cutoff_level-1) mergeable
     for (std::size_t i=0; i<n; i++) {
-      cnrms[i] = blas::nrm2<scalar_t,real_t>(m, ptr(0, i), 1);
+      cnrms[i] = blas::nrm2(m, ptr(0, i), 1);
       cnrms[i] *= cnrms[i];
       ind[i] = i;
       piv[i] = i+1;
@@ -708,7 +707,7 @@ namespace strumpack {
         }
         gemv_omp_task('N', m, i-j, scalar_t(-1.), ptr(0, j), ld(),
                       R.ptr(j, i), 1, scalar_t(1.), ptr(0, i), 1, depth);
-        auto Rii = blas::nrm2<scalar_t,real_t>(m, ptr(0, i), 1);
+        auto Rii = blas::nrm2(m, ptr(0, i), 1);
         if (i == 0) R00 = Rii;
         if (Rii/R00 <= rel_tol || Rii <= abs_tol || i == max_rank) {
           conv = true;
@@ -763,11 +762,10 @@ namespace strumpack {
            (ta!=Trans::N && tb==Trans::N && a.rows()==b.rows()) ||
            (ta==Trans::N && tb!=Trans::N && a.cols()==b.cols()) ||
            (ta!=Trans::N && tb!=Trans::N && a.rows()==b.cols()));
-    gemm_omp_task(char(ta), char(tb), c.rows(), c.cols(),
-                  (ta==Trans::N) ? a.cols() : a.rows(),
-                  alpha, const_cast<scalar_t*>(a.data()), a.ld(),
-                  const_cast<scalar_t*>(b.data()), b.ld(),
-                  beta, c.data(), c.ld(), depth);
+    gemm_omp_task
+      (char(ta), char(tb), c.rows(), c.cols(),
+       (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
+       b.data(), b.ld(), beta, c.data(), c.ld(), depth);
   }
 
   template<typename scalar_t> void
@@ -776,11 +774,10 @@ namespace strumpack {
        DenseMatrix<scalar_t>& c, int depth=0) {
     assert((ta==Trans::N && a.rows()==c.rows()) ||
            (ta!=Trans::N && a.cols()==c.rows()));
-    gemm_omp_task(char(ta), char(tb), c.rows(), c.cols(),
-                  (ta==Trans::N) ? a.cols() : a.rows(),
-                  alpha, const_cast<scalar_t*>(a.data()), a.ld(),
-                  const_cast<scalar_t*>(b), ldb, beta,
-                  c.data(), c.ld(), depth);
+    gemm_omp_task
+      (char(ta), char(tb), c.rows(), c.cols(),
+       (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(),
+       a.ld(), b, ldb, beta, c.data(), c.ld(), depth);
   }
 
   template<typename scalar_t> void
@@ -791,12 +788,11 @@ namespace strumpack {
            (ta!=Trans::N && tb==Trans::N && a.rows()==b.rows()) ||
            (ta==Trans::N && tb!=Trans::N && a.cols()==b.cols()) ||
            (ta!=Trans::N && tb!=Trans::N && a.rows()==b.cols()));
-    gemm_omp_task(char(ta), char(tb), (ta==Trans::N) ? a.rows() : a.cols(),
-                  (tb==Trans::N) ? b.cols() : b.rows(),
-                  (ta==Trans::N) ? a.cols() : a.rows(), alpha,
-                  const_cast<scalar_t*>(a.data()), a.ld(),
-                  const_cast<scalar_t*>(b.data()), b.ld(),
-                  beta, c, ldc, depth);
+    gemm_omp_task
+      (char(ta), char(tb), (ta==Trans::N) ? a.rows() : a.cols(),
+       (tb==Trans::N) ? b.cols() : b.rows(),
+       (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
+       b.data(), b.ld(), beta, c, ldc, depth);
   }
 
   /**
@@ -811,9 +807,9 @@ namespace strumpack {
   template<typename scalar_t> void
   trmm(Side s, UpLo ul, Trans ta, Diag d, scalar_t alpha,
        const DenseMatrix<scalar_t>& a, DenseMatrix<scalar_t>& b, int depth) {
-    trmm_omp_task(char(s), char(ul), char(ta), char(d), b.rows(), b.cols(),
-                  alpha, const_cast<scalar_t*>(a.data()), a.ld(),
-                  b.data(), b.ld(), depth);
+    trmm_omp_task
+      (char(s), char(ul), char(ta), char(d), b.rows(), b.cols(),
+       alpha, a.data(), a.ld(), b.data(), b.ld(), depth);
   }
 
   /**
@@ -833,9 +829,9 @@ namespace strumpack {
   trsm(Side s, UpLo ul, Trans ta, Diag d, scalar_t alpha,
        const DenseMatrix<scalar_t>& a, DenseMatrix<scalar_t>& b, int depth) {
     // TODO assertions
-    trsm_omp_task(char(s), char(ul), char(ta), char(d), b.rows(), b.cols(),
-                  alpha, const_cast<scalar_t*>(a.data()), a.ld(),
-                  b.data(), b.ld(), depth);
+    trsm_omp_task
+      (char(s), char(ul), char(ta), char(d), b.rows(), b.cols(),
+       alpha, a.data(), a.ld(), b.data(), b.ld(), depth);
   }
 
   template<typename scalar_t> void
@@ -843,9 +839,9 @@ namespace strumpack {
        DenseMatrix<scalar_t>& b, int depth) {
     assert(b.cols() == 1);
     assert(a.rows() == a.cols() && a.cols() == b.rows());
-    trsv_omp_task(char(ul), char(ta), char(d), a.rows(),
-                  const_cast<scalar_t*>(a.data()), a.ld(),
-                  b.data(), 1, depth);
+    trsv_omp_task
+      (char(ul), char(ta), char(d), a.rows(),
+       a.data(), a.ld(), b.data(), 1, depth);
   }
 
   template<typename scalar_t> void
@@ -856,10 +852,9 @@ namespace strumpack {
     assert(y.cols() == 1);
     assert(ta != Trans::N || (a.rows() == y.rows() && a.cols() == x.rows()));
     assert(ta == Trans::N || (a.cols() == y.rows() && a.rows() == x.rows()));
-    gemv_omp_task(char(ta), a.rows(), a.cols(), alpha,
-                  const_cast<scalar_t*>(a.data()), a.ld(),
-                  const_cast<scalar_t*>(x.data()), 1, beta,
-                  y.data(), 1, depth);
+    gemv_omp_task
+      (char(ta), a.rows(), a.cols(), alpha, a.data(), a.ld(),
+       x.data(), 1, beta, y.data(), 1, depth);
   }
 
 } // end namespace strumpack

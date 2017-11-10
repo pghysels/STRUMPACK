@@ -314,11 +314,11 @@ namespace strumpack {
   template<typename scalar_t> scalar_t get_scalar(double vr, double vi) {
     return scalar_t(vr);
   }
-  template<> inline c_double get_scalar(double vr, double vi) {
-    return c_double(vr, vi);
+  template<> inline std::complex<double> get_scalar(double vr, double vi) {
+    return std::complex<double>(vr, vi);
   }
-  template<> inline c_float get_scalar(double vr, double vi) {
-    return c_float(vr, vi);
+  template<> inline std::complex<float> get_scalar(double vr, double vi) {
+    return std::complex<float>(vr, vi);
   }
 
   template<typename scalar_t,typename integer_t>
