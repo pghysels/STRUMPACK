@@ -28,7 +28,7 @@
  */
 #include <iostream>
 #include "StrumpackSparseSolverMPIDist.hpp"
-#include "CSRMatrix.hpp"
+#include "sparse/CSRMatrix.hpp"
 
 typedef double scalar;
 //typedef int64_t integer;

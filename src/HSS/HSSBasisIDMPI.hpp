@@ -3,7 +3,7 @@
 
 #include <cassert>
 
-#include "DistributedMatrix.hpp"
+#include "dense/DistributedMatrix.hpp"
 
 namespace strumpack {
   namespace HSS {

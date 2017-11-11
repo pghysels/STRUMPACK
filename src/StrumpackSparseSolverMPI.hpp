@@ -34,8 +34,8 @@
 #define STRUMPACK_SPARSE_SOLVER_MPI_H
 
 #include "StrumpackSparseSolver.hpp"
-#include "EliminationTreeMPI.hpp"
-#include "MatrixReorderingMPI.hpp"
+#include "sparse/EliminationTreeMPI.hpp"
+#include "sparse/MatrixReorderingMPI.hpp"
 #include "mpi.h"
 
 namespace strumpack {

@@ -24,8 +24,8 @@
  */
 #include <iostream>
 #include "StrumpackSparseSolver.hpp"
-#include "CSCMatrix.hpp"
-#include "CSRMatrix.hpp"
+#include "sparse/CSCMatrix.hpp"
+#include "sparse/CSRMatrix.hpp"
 
 typedef double scalar;
 typedef int64_t integer;

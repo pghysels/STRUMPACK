@@ -46,15 +46,15 @@
 #ifdef HAVE_PAPI
 #include <papi.h>
 #endif
-#include "SPOptions.hpp"
-#include "CompressedSparseMatrix.hpp"
-#include "CSRMatrix.hpp"
-#include "MatrixReordering.hpp"
-#include "EliminationTree.hpp"
-#include "tools.hpp"
-#include "GMRes.hpp"
-#include "BiCGStab.hpp"
-#include "IterativeRefinement.hpp"
+#include "misc/Tools.hpp"
+#include "StrumpackOptions.hpp"
+#include "sparse/CompressedSparseMatrix.hpp"
+#include "sparse/CSRMatrix.hpp"
+#include "sparse/MatrixReordering.hpp"
+#include "sparse/EliminationTree.hpp"
+#include "sparse/GMRes.hpp"
+#include "sparse/BiCGStab.hpp"
+#include "sparse/IterativeRefinement.hpp"
 
 #ifdef USE_TBB_MALLOC
 void* operator new(std::size_t sz) throw(std::bad_alloc) {

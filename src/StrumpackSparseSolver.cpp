@@ -30,7 +30,7 @@
 #include "StrumpackSparseSolver.hpp"
 #include "StrumpackSparseSolverMPI.hpp"
 #include "StrumpackSparseSolverMPIDist.hpp"
-#include "CSRMatrix.hpp"
+#include "sparse/CSRMatrix.hpp"
 
 using namespace strumpack;
 

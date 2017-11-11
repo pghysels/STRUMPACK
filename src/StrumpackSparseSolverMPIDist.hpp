@@ -32,11 +32,11 @@
 #define STRUMPACK_SPARSE_SOLVER_MPI_DIST_H
 
 #include "StrumpackSparseSolverMPI.hpp"
-#include "EliminationTreeMPIDist.hpp"
-#include "MatrixReorderingMPI.hpp"
-#include "GMResMPI.hpp"
-#include "IterativeRefinementMPI.hpp"
-#include "BiCGStabMPI.hpp"
+#include "sparse/EliminationTreeMPIDist.hpp"
+#include "sparse/MatrixReorderingMPI.hpp"
+#include "sparse/GMResMPI.hpp"
+#include "sparse/IterativeRefinementMPI.hpp"
+#include "sparse/BiCGStabMPI.hpp"
 #include "mpi.h"
 
 namespace strumpack {

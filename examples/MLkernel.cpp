@@ -34,7 +34,7 @@
 #include <cmath>
 #include <random>
 #include "HSS/HSSMatrix.hpp"
-#include "TaskTimer.hpp"
+#include "misc/TaskTimer.hpp"
 
 using namespace std;
 using namespace strumpack;

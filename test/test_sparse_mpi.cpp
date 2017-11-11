@@ -37,8 +37,8 @@ using namespace std;
 #define SOLVE_TOLERANCE 1e-12
 
 #include "StrumpackSparseSolverMPIDist.hpp"
-#include "CSRMatrix.hpp"
-#include "CSRMatrixMPI.hpp"
+#include "sparse/CSRMatrix.hpp"
+#include "sparse/CSRMatrixMPI.hpp"
 
 using namespace strumpack;
 

@@ -3,13 +3,13 @@
 
 #include <cassert>
 
+#include "misc/MPIWrapper.hpp"
 #include "HSSExtraMPI.hpp"
 #include "DistSamples.hpp"
 #include "HSSMatrixBase.hpp"
 #include "HSSMatrix.hpp"
 #include "HSSPartitionTree.hpp"
 #include "HSSBasisIDMPI.hpp"
-#include "MPI_wrapper.hpp"
 #include "BlockCyclic2BlockRow.hpp"
 
 namespace strumpack {

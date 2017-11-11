@@ -158,77 +158,150 @@ else()
   set(STRUMPACK_ALL_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_DEBUG}")
 endif()
 
-set(LIBSRC src/StrumpackSparseSolver.cpp src/blas_lapack_omp_task.cpp
-  src/strumpack_mc64ad.c src/strumpack_parameters.cpp
-  src/TaskTimer.cpp src/lapack/sgeqp3tol.f src/lapack/dgeqp3tol.f
-  src/lapack/cgeqp3tol.f src/lapack/zgeqp3tol.f src/lapack/sgeqrfmod.f
-  src/lapack/dgeqrfmod.f src/lapack/cgeqrfmod.f src/lapack/zgeqrfmod.f
-  src/lapack/sgeqr2mod.f src/lapack/dgeqr2mod.f src/lapack/cgeqr2mod.f
-  src/lapack/zgeqr2mod.f src/lapack/slaqpsmod.f src/lapack/dlaqpsmod.f
-  src/lapack/claqpsmod.f src/lapack/zlaqpsmod.f src/lapack/slaqp2mod.f
-  src/lapack/dlaqp2mod.f src/lapack/claqp2mod.f src/lapack/zlaqp2mod.f
-  src/lapack/sgetrfmod.f src/lapack/dgetrfmod.f src/lapack/cgetrfmod.f
-  src/lapack/zgetrfmod.f src/lapack/sgetf2mod.f src/lapack/dgetf2mod.f
-  src/lapack/cgetf2mod.f src/lapack/zgetf2mod.f src/lapack/sorglqmod.f
-  src/lapack/dorglqmod.f src/lapack/cunglqmod.f src/lapack/zunglqmod.f
-  src/lapack/sorgl2mod.f src/lapack/dorgl2mod.f src/lapack/cungl2mod.f
-  src/lapack/zungl2mod.f src/lapack/slarfbmod.f src/lapack/dlarfbmod.f
-  src/lapack/clarfbmod.f src/lapack/zlarfbmod.f src/lapack/slarftmod.f
-  src/lapack/dlarftmod.f src/lapack/clarftmod.f src/lapack/zlarftmod.f
-  src/lapack/slarfmod.f src/lapack/dlarfmod.f src/lapack/clarfmod.f
-  src/lapack/zlarfmod.f src/lapack/sgelqfmod.f src/lapack/dgelqfmod.f
-  src/lapack/cgelqfmod.f src/lapack/zgelqfmod.f src/lapack/sgelq2mod.f
-  src/lapack/dgelq2mod.f src/lapack/cgelq2mod.f src/lapack/zgelq2mod.f
-  src/lapack/pcgeqpfmod.f src/lapack/pdgeqpfmod.f
-  src/lapack/psgeqpfmod.f src/lapack/pzgeqpfmod.f
-  src/lapack/cgeqp3mod.f src/lapack/dgeqp3mod.f src/lapack/sgeqp3mod.f
-  src/lapack/zgeqp3mod.f src/rcm/rcm.f src/rcm/degree.f
-  src/rcm/fnroot.f src/rcm/genrcm.f src/rcm/rootls.f
-  src/MUMPS/ana_orderings.F)
+set(LIBSRC
+  src/StrumpackSparseSolver.cpp
+  src/StrumpackParameters.cpp
+  src/misc/TaskTimer.cpp)
 
-add_library(strumpack ${LIBSRC})
+set(LIBSRCDENSE
+  src/dense/BLASLAPACKOpenMPTask.cpp
+  src/dense/lapack/sgeqp3tol.f src/dense/lapack/dgeqp3tol.f
+  src/dense/lapack/cgeqp3tol.f src/dense/lapack/zgeqp3tol.f
+  src/dense/lapack/sgeqrfmod.f src/dense/lapack/dgeqrfmod.f
+  src/dense/lapack/cgeqrfmod.f src/dense/lapack/zgeqrfmod.f
+  src/dense/lapack/sgeqr2mod.f src/dense/lapack/dgeqr2mod.f
+  src/dense/lapack/cgeqr2mod.f src/dense/lapack/zgeqr2mod.f
+  src/dense/lapack/slaqpsmod.f src/dense/lapack/dlaqpsmod.f
+  src/dense/lapack/claqpsmod.f src/dense/lapack/zlaqpsmod.f
+  src/dense/lapack/slaqp2mod.f src/dense/lapack/dlaqp2mod.f
+  src/dense/lapack/claqp2mod.f src/dense/lapack/zlaqp2mod.f
+  src/dense/lapack/sgetrfmod.f src/dense/lapack/dgetrfmod.f
+  src/dense/lapack/cgetrfmod.f src/dense/lapack/zgetrfmod.f
+  src/dense/lapack/sgetf2mod.f src/dense/lapack/dgetf2mod.f
+  src/dense/lapack/cgetf2mod.f src/dense/lapack/zgetf2mod.f
+  src/dense/lapack/sorglqmod.f src/dense/lapack/dorglqmod.f
+  src/dense/lapack/cunglqmod.f src/dense/lapack/zunglqmod.f
+  src/dense/lapack/sorgl2mod.f src/dense/lapack/dorgl2mod.f
+  src/dense/lapack/cungl2mod.f src/dense/lapack/zungl2mod.f
+  src/dense/lapack/slarfbmod.f src/dense/lapack/dlarfbmod.f
+  src/dense/lapack/clarfbmod.f src/dense/lapack/zlarfbmod.f
+  src/dense/lapack/slarftmod.f src/dense/lapack/dlarftmod.f
+  src/dense/lapack/clarftmod.f src/dense/lapack/zlarftmod.f
+  src/dense/lapack/slarfmod.f src/dense/lapack/dlarfmod.f
+  src/dense/lapack/clarfmod.f src/dense/lapack/zlarfmod.f
+  src/dense/lapack/sgelqfmod.f src/dense/lapack/dgelqfmod.f
+  src/dense/lapack/cgelqfmod.f src/dense/lapack/zgelqfmod.f
+  src/dense/lapack/sgelq2mod.f src/dense/lapack/dgelq2mod.f
+  src/dense/lapack/cgelq2mod.f src/dense/lapack/zgelq2mod.f
+  src/dense/lapack/pcgeqpfmod.f src/dense/lapack/pdgeqpfmod.f
+  src/dense/lapack/psgeqpfmod.f src/dense/lapack/pzgeqpfmod.f
+  src/dense/lapack/cgeqp3mod.f src/dense/lapack/dgeqp3mod.f
+  src/dense/lapack/sgeqp3mod.f src/dense/lapack/zgeqp3mod.f)
+
+set(LIBSRCSPARSE
+  src/sparse/rcm/rcm.f
+  src/sparse/rcm/degree.f
+  src/sparse/rcm/fnroot.f
+  src/sparse/rcm/genrcm.f
+  src/sparse/rcm/rootls.f
+  src/sparse/MUMPS/ana_orderings.F
+  src/sparse/strumpack_mc64ad.c)
+
+add_library(strumpack ${LIBSRC} ${LIBSRCSPARSE} ${LIBSRCDENSE})
 target_link_libraries(strumpack ${LIBS})
 
 install(TARGETS strumpack LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
-install(FILES ${PROJECT_BINARY_DIR}/strumpack_config.h
-  src/StrumpackSparseSolver.h src/BiCGStab.hpp src/BiCGStabMPI.hpp
-  src/CSCMatrix.hpp src/CSRGraph.hpp src/CSRMatrix.hpp
-  src/CSRMatrixMPI.hpp src/CompressedSparseMatrix.hpp
-  src/DistributedMatrix.hpp src/ETree.hpp src/EliminationTree.hpp
-  src/EliminationTreeMPI.hpp src/EliminationTreeMPIDist.hpp
-  src/FrontalMatrix.hpp src/FrontalMatrixDense.hpp
-  src/FrontalMatrixDenseMPI.hpp src/FrontalMatrixHSS.hpp
-  src/FrontalMatrixHSSMPI.hpp src/FrontalMatrixMPI.hpp src/GMRes.hpp
-  src/GMResMPI.hpp src/GeometricReordering.hpp
-  src/GeometricReorderingMPI.hpp src/IterativeRefinement.hpp
-  src/IterativeRefinementMPI.hpp src/DenseMatrix.hpp
-  src/MPI_wrapper.hpp src/MatrixReordering.hpp
-  src/MatrixReorderingMPI.hpp src/MetisReordering.hpp
-  src/PTScotchReordering.hpp src/ParMetisReordering.hpp
-  src/ProportionallyDistributedSparseMatrix.hpp src/Random_wrapper.hpp
-  src/Redistribute.hpp src/ScotchReordering.hpp
-  src/StrumpackSparseSolver.hpp src/StrumpackSparseSolverMPI.hpp
-  src/StrumpackSparseSolverMPIDist.hpp src/TaskTimer.hpp
-  src/blas_lapack_omp_task.hpp src/blas_lapack_wrapper.hpp
-  src/SPOptions.hpp src/ExtendAdd.hpp src/SeparatorTree.hpp
-  src/strumpack_parameters.hpp src/tools.hpp src/RCMReordering.hpp
-  src/mumps_symqamd.hpp src/scalapack.hpp src/blacs.h DESTINATION
-  include)
+install(FILES
+  ${PROJECT_BINARY_DIR}/strumpack_config.h
+  src/StrumpackSparseSolver.h
+  src/StrumpackSparseSolver.hpp
+  src/StrumpackSparseSolverMPI.hpp
+  src/StrumpackSparseSolverMPIDist.hpp
+  src/StrumpackOptions.hpp
+  src/StrumpackParameters.hpp
+  DESTINATION include)
 
-install(FILES src/HSS/HSSMatrix.hpp src/HSS/HSSMatrix.factor.hpp
-  src/HSS/HSSMatrix.compress.hpp src/HSS/HSSMatrix.compress_stable.hpp
-  src/HSS/HSSMatrix.extract.hpp src/HSS/HSSBasisID.hpp
-  src/HSS/HSSMatrix.Schur.hpp src/HSS/HSSMatrix.apply.hpp
-  src/HSS/HSSMatrix.solve.hpp src/HSS/HSSExtra.hpp
-  src/HSS/HSSMatrixBase.hpp src/HSS/HSSPartitionTree.hpp
-  src/HSS/HSSOptions.hpp src/HSS/HSSMatrixMPI.hpp
-  src/HSS/HSSMatrixMPI.apply.hpp src/HSS/HSSMatrixMPI.compress.hpp
-  src/HSS/HSSMatrixMPI.factor.hpp src/HSS/HSSMatrixMPI.extract.hpp
-  src/HSS/HSSMatrixMPI.solve.hpp src/HSS/HSSExtraMPI.hpp
-  src/HSS/HSSBasisIDMPI.hpp src/HSS/DistSamples.hpp
-  src/HSS/DistElemMult.hpp src/HSS/HSSMatrixMPI.compress_stable.hpp
-  src/HSS/HSSMatrixMPI.Schur.hpp src/HSS/BlockCyclic2BlockRow.hpp
+install(FILES
+  src/misc/TaskTimer.hpp
+  src/misc/MPIWrapper.hpp
+  src/misc/RandomWrapper.hpp
+  src/misc/Tools.hpp
+  DESTINATION include/misc)
+
+install(FILES
+  src/dense/DistributedMatrix.hpp
+  src/dense/DenseMatrix.hpp
+  src/dense/BLASLAPACKOpenMPTask.hpp
+  src/dense/BLASLAPACKWrapper.hpp
+  src/dense/ScaLAPACKWrapper.hpp
+  src/dense/BLACSWrapper.h
+  DESTINATION include/dense)
+
+install(FILES
+  src/sparse/BiCGStab.hpp
+  src/sparse/BiCGStabMPI.hpp
+  src/sparse/CSCMatrix.hpp
+  src/sparse/CSRGraph.hpp
+  src/sparse/CSRMatrix.hpp
+  src/sparse/CSRMatrixMPI.hpp
+  src/sparse/CompressedSparseMatrix.hpp
+  src/sparse/ETree.hpp
+  src/sparse/EliminationTree.hpp
+  src/sparse/EliminationTreeMPI.hpp
+  src/sparse/EliminationTreeMPIDist.hpp
+  src/sparse/FrontalMatrix.hpp
+  src/sparse/FrontalMatrixDense.hpp
+  src/sparse/FrontalMatrixDenseMPI.hpp
+  src/sparse/FrontalMatrixHSS.hpp
+  src/sparse/FrontalMatrixHSSMPI.hpp
+  src/sparse/FrontalMatrixMPI.hpp
+  src/sparse/GMRes.hpp
+  src/sparse/GMResMPI.hpp
+  src/sparse/GeometricReordering.hpp
+  src/sparse/GeometricReorderingMPI.hpp
+  src/sparse/IterativeRefinement.hpp
+  src/sparse/IterativeRefinementMPI.hpp
+  src/sparse/MatrixReordering.hpp
+  src/sparse/MatrixReorderingMPI.hpp
+  src/sparse/MetisReordering.hpp
+  src/sparse/PTScotchReordering.hpp
+  src/sparse/ParMetisReordering.hpp
+  src/sparse/ProportionallyDistributedSparseMatrix.hpp
+  src/sparse/Redistribute.hpp
+  src/sparse/ScotchReordering.hpp
+  src/sparse/RCMReordering.hpp
+  src/sparse/ExtendAdd.hpp
+  src/sparse/SeparatorTree.hpp
+  src/sparse/mumps_symqamd.hpp
+  DESTINATION include/sparse)
+
+install(FILES src/HSS/HSSMatrix.hpp
+  src/HSS/HSSMatrix.factor.hpp
+  src/HSS/HSSMatrix.compress.hpp
+  src/HSS/HSSMatrix.compress_stable.hpp
+  src/HSS/HSSMatrix.extract.hpp
+  src/HSS/HSSBasisID.hpp
+  src/HSS/HSSMatrix.Schur.hpp
+  src/HSS/HSSMatrix.apply.hpp
+  src/HSS/HSSMatrix.solve.hpp
+  src/HSS/HSSExtra.hpp
+  src/HSS/HSSMatrixBase.hpp
+  src/HSS/HSSPartitionTree.hpp
+  src/HSS/HSSOptions.hpp
+  src/HSS/HSSMatrixMPI.hpp
+  src/HSS/HSSMatrixMPI.apply.hpp
+  src/HSS/HSSMatrixMPI.compress.hpp
+  src/HSS/HSSMatrixMPI.factor.hpp
+  src/HSS/HSSMatrixMPI.extract.hpp
+  src/HSS/HSSMatrixMPI.solve.hpp
+  src/HSS/HSSExtraMPI.hpp
+  src/HSS/HSSBasisIDMPI.hpp
+  src/HSS/DistSamples.hpp
+  src/HSS/DistElemMult.hpp
+  src/HSS/HSSMatrixMPI.compress_stable.hpp
+  src/HSS/HSSMatrixMPI.Schur.hpp
+  src/HSS/BlockCyclic2BlockRow.hpp
   DESTINATION include/HSS)
 
 set(CPACK_GENERATOR "TGZ")
