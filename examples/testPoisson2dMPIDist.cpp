@@ -102,7 +102,7 @@ int main(int argc, char* argv[]) {
                 << scaled_res << std::endl;
   }
   TimerList::Finalize();
-  Cblacs_exit(1);
+  scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return 0;
 }

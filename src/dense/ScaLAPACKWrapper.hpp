@@ -31,963 +31,1511 @@
 #define SCALAPACK_HPP
 
 #include "BLASLAPACKWrapper.hpp"
-#include "BLACSWrapper.h"
+//#include "BLACSWrapper.h"
 
 #define BLACSCTXTSIZE 9
-#define BLACSdtype 0
-#define BLACSctxt  1
-#define BLACSm     2
-#define BLACSn     3
-#define BLACSmb    4
-#define BLACSnb    5
-#define BLACSrsrc  6
-#define BLACScsrc  7
-#define BLACSlld   8
+#define BLACSdtype    0
+#define BLACSctxt     1
+#define BLACSm        2
+#define BLACSn        3
+#define BLACSmb       4
+#define BLACSnb       5
+#define BLACSrsrc     6
+#define BLACScsrc     7
+#define BLACSlld      8
 
 namespace strumpack {
   namespace scalapack {
 
-    typedef std::complex<float> c_float;
-    typedef std::complex<double> c_double;
-
     extern "C" {
-      /* Arithmetic-independent routines */
-      int numroc_(int *, int *, int *, int *, int *);
-      void descinit_(int *, int *, int *, int *, int *, int *, int *, int *, int *, int *);
-      void descset_(int *, int *, int *, int *, int *, int *, int *, int *, int *);
-      // int indxg2p_(int *, int *, int *, int *, int *);
-      // int indxg2l_(int *, int *, int *, int *, int *);
-      // int indxl2g_(int *, int *, int *, int *, int *);
-      void infog1l_(int *, int *, int *, int *, int *, int *, int *);
-      void infog2l_(int *, int *, const int *, int *, int *, int *, int *, int *, int *, int *, int *);
-      void igamn2d_(int *, const char *, const char *, int *, int *, int *, int *, int *, int *, int *, int *, int *);
-
-      void pb_topget_(int*, char*, char*, char*);
-      void pb_topset_(int*, char*, char*, char*);
-
-      /* xGEBS2D */
-      void igebs2d_(int *, const char *, const char *, int *, int *,      int *, int *);
-      void dgebs2d_(int *, const char *, const char *, int *, int *,   double *, int *);
-      void sgebs2d_(int *, const char *, const char *, int *, int *,    float *, int *);
-      void zgebs2d_(int *, const char *, const char *, int *, int *, c_double *, int *);
-      void cgebs2d_(int *, const char *, const char *, int *, int *, c_float *, int *);
-
-      /* xGEBR2D */
-      void igebr2d_(int *, const char *, const char *, int *, int *,      int *, int *, int *, int *);
-      void dgebr2d_(int *, const char *, const char *, int *, int *,   double *, int *, int *, int *);
-      void sgebr2d_(int *, const char *, const char *, int *, int *,    float *, int *, int *, int *);
-      void zgebr2d_(int *, const char *, const char *, int *, int *, c_double *, int *, int *, int *);
-      void cgebr2d_(int *, const char *, const char *, int *, int *, c_float *, int *, int *, int *);
-
-      /* xGSUM2D */
-      void dgsum2d_(int *, char *, char *, int *, int *, double *, int *, int *, int *);
-      void sgsum2d_(int *, char *, char *, int *, int *,  float *, int *, int *, int *);
-
-      /* xGAMX2D */
-      void dgamx2d_(int *, char *, char *, int *, int *,   double *, int *, int *, int *, int *, int *, int *);
-      void sgamx2d_(int *, char *, char *, int *, int *,    float *, int *, int *, int *, int *, int *, int *);
-      void zgamx2d_(int *, char *, char *, int *, int *, c_double *, int *, int *, int *, int *, int *, int *);
-      void cgamx2d_(int *, char *, char *, int *, int *,  c_float *, int *, int *, int *, int *, int *, int *);
-
-      /* xGAMN2D */
-      void dgamn2d_(int *, char *, char *, int *, int *,   double *, int *, int *, int *, int *, int *, int *);
-      void sgamn2d_(int *, char *, char *, int *, int *,    float *, int *, int *, int *, int *, int *, int *);
-      void zgamn2d_(int *, char *, char *, int *, int *, c_double *, int *, int *, int *, int *, int *, int *);
-      void cgamn2d_(int *, char *, char *, int *, int *,  c_float *, int *, int *, int *, int *, int *, int *);
-
-      /* PxAMAX */
-      void pdamax_(int *,   double *, int *,   double *, int *, int *, int *, int *);
-      void psamax_(int *,    float *, int *,    float *, int *, int *, int *, int *);
-      void pzamax_(int *, c_double *, int *, c_double *, int *, int *, int *, int *);
-      void pcamax_(int *, c_float *, int *, c_float *, int *, int *, int *, int *);
-
-      /* PxSWAP */
-      void pdswap_ (int *,   double *, int *, int *, int *, int *,   double *, int *, int *, int *, int *);
-      void psswap_ (int *,    float *, int *, int *, int *, int *,    float *, int *, int *, int *, int *);
-      void pzswap_ (int *, c_double *, int *, int *, int *, int *, c_double *, int *, int *, int *, int *);
-      void pcswap_ (int *, c_float *, int *, int *, int *, int *, c_float *, int *, int *, int *, int *);
-
-      /* PxSCAL */
-      void pdscal_(int *,   double *,   double *, int *, int *, int *, int *);
-      void psscal_(int *,    float *,    float *, int *, int *, int *, int *);
-      void pzscal_(int *, c_double *, c_double *, int *, int *, int *, int *);
-      void pcscal_(int *, c_float *, c_float *, int *, int *, int *, int *);
-
-      /* PxGEMV */
-      void pdgemv_(char *, int *, int *,   double *,   double *, int *, int *, int *,   double *, int *, int *, int *, int *,   double *,   double *, int *, int *, int *, int *);
-      void psgemv_(char *, int *, int *,    float *,    float *, int *, int *, int *,    float *, int *, int *, int *, int *,    float *,    float *, int *, int *, int *, int *);
-      void pzgemv_(char *, int *, int *, c_double *, c_double *, int *, int *, int *, c_double *, int *, int *, int *, int *, c_double *, c_double *, int *, int *, int *, int *);
-      void pcgemv_(char *, int *, int *, c_float *, c_float *, int *, int *, int *, c_float *, int *, int *, int *, int *, c_float *, c_float *, int *, int *, int *, int *);
-
-      /* PxGEMM */
-      void pdgemm_(char *, char *, int *, int *, int *,   double *,   double *, int *, int *, int *,   double *, int *, int *, int *,   double *,   double *, int *, int *, int *);
-      void psgemm_(char *, char *, int *, int *, int *,    float *,    float *, int *, int *, int *,    float *, int *, int *, int *,    float *,    float *, int *, int *, int *);
-      void pzgemm_(char *, char *, int *, int *, int *, c_double *, c_double *, int *, int *, int *, c_double *, int *, int *, int *, c_double *, c_double *, int *, int *, int *);
-      void pcgemm_(char *, char *, int *, int *, int *, c_float *, c_float *, int *, int *, int *, c_float *, int *, int *, int *, c_float *, c_float *, int *, int *, int *);
-
-      /* PxLACGV */
-      void pzlacgv_(int*, c_double *X, int *, int *, int *, int *);
-      void pclacgv_(int*, c_float *X, int *, int *, int *, int *);
-
-      /* PxGER */
-      void pdger_ (int *, int *,   double *,   double *, int *, int *, int *, int *,     double *, int *, int *, int *, int *, double *, int *, int *, int *);
-      void psger_ (int *, int *,    float *,    float *, int *, int *, int *, int *,    float *, int *, int *, int *, int *,    float *, int *, int *, int *);
-      void pzgeru_(int *, int *, c_double *, c_double *, int *, int *, int *, int *, c_double *, int *, int *, int *, int *, c_double *, int *, int *, int *);
-      void pcgeru_(int *, int *, c_float *, c_float *, int *, int *, int *, int *, c_float *, int *, int *, int *, int *, c_float *, int *, int *, int *);
-
-      /* PxLASWP */
-      void pdlaswp_(char *, char *, int *,   double *, int *, int *, int *, int *, int *, int *);
-      void pslaswp_(char *, char *, int *,    float *, int *, int *, int *, int *, int *, int *);
-      void pzlaswp_(char *, char *, int *, c_double *, int *, int *, int *, int *, int *, int *);
-      void pclaswp_(char *, char *, int *, c_float *, int *, int *, int *, int *, int *, int *);
-
-      /* PxLAPIV */
-      void pdlapiv_(char *, char *, char *, int *, int *,   double *, int *, int *, int *, int *, int *, int *, int *, int *);
-      void pslapiv_(char *, char *, char *, int *, int *,    float *, int *, int *, int *, int *, int *, int *, int *, int *);
-      void pzlapiv_(char *, char *, char *, int *, int *, c_double *, int *, int *, int *, int *, int *, int *, int *, int *);
-      void pclapiv_(char *, char *, char *, int *, int *, c_float *, int *, int *, int *, int *, int *, int *, int *, int *);
-
-      /* PxTRSM */
-      void pdtrsm_(char *, char *, char *, char *, int *, int *,   double *,   double *, int *, int *, int *,   double *, int *, int *, int *);
-      void pstrsm_(char *, char *, char *, char *, int *, int *,    float *,    float *, int *, int *, int *,    float *, int *, int *, int *);
-      void pztrsm_(char *, char *, char *, char *, int *, int *, c_double *, c_double *, int *, int *, int *, c_double *, int *, int *, int *);
-      void pctrsm_(char *, char *, char *, char *, int *, int *, c_float *, c_float *, int *, int *, int *, c_float *, int *, int *, int *);
-
-      /* PxTRSV */
-      void pdtrsv_(char *, char *, char *, int *,   double *, int *, int *, int *,   double *, int *, int *, int *, int *);
-      void pstrsv_(char *, char *, char *, int *,    float *, int *, int *, int *,    float *, int *, int *, int *, int *);
-      void pztrsv_(char *, char *, char *, int *, c_double *, int *, int *, int *, c_double *, int *, int *, int *, int *);
-      void pctrsv_(char *, char *, char *, int *, c_float *, int *, int *, int *, c_float *, int *, int *, int *, int *);
-
-      /* PxLANGE */
-      double pdlange_(char*, int*, int*,   double*, int*, int*, int*, double*);
-      float pslange_(char*, int*, int*,    float*, int*, int*, int*,  float*);
-      double pzlange_(char*, int*, int*, c_double*, int*, int*, int*, double*);
-      float pclange_(char*, int*, int*, c_float*, int*, int*, int*,  float*);
-
-      /* PxGEADD */
-      void pdgeadd_(char *, int *, int *,   double *,   double *, int *, int *, int *,   double *,   double *, int *, int *, int *);
-      void psgeadd_(char *, int *, int *,    float *,    float *, int *, int *, int *,    float *,    float *, int *, int *, int *);
-      void pzgeadd_(char *, int *, int *, c_double *, c_double *, int *, int *, int *, c_double *, c_double *, int *, int *, int *);
-      void pcgeadd_(char *, int *, int *, c_float *, c_float *, int *, int *, int *, c_float *, c_float *, int *, int *, int *);
-
-      /* PxLACPY */
-      void pdlacpy_(char *, int *, int *,   double *, int *, int *, int *,   double *, int *, int *, int *);
-      void pslacpy_(char *, int *, int *,    float *, int *, int *, int *,    float *, int *, int *, int *);
-      void pzlacpy_(char *, int *, int *, c_double *, int *, int *, int *, c_double *, int *, int *, int *);
-      void pclacpy_(char *, int *, int *, c_float *, int *, int *, int *, c_float *, int *, int *, int *);
-
-      /* pxGEMR2D */
-      void pdgemr2d_(int *, int *,   double *, int *, int *, int *,   double *, int *, int *, int *, int *);
-      void psgemr2d_(int *, int *,    float *, int *, int *, int *,    float *, int *, int *, int *, int *);
-      void pzgemr2d_(int *, int *, c_double *, int *, int *, int *, c_double *, int *, int *, int *, int *);
-      void pcgemr2d_(int *, int *, c_float *, int *, int *, int *, c_float *, int *, int *, int *, int *);
-
-      /* PxTRAN */
-      void pdtran_(int *, int *,   double *,   double *, int *, int *, int *,   double *,   double *, int *, int *, int *);
-      void pstran_(int *, int *,    float *,    float *, int *, int *, int *,    float *,    float *, int *, int *, int *);
-      void pztranc_(int *, int *, c_double *, c_double *, int *, int *, int *, c_double *, c_double *, int *, int *, int *);
-      void pctranc_(int *, int *, c_float *, c_float *, int *, int *, int *, c_float *, c_float *, int *, int *, int *);
-
-      /* PxGEQPF; this one is used only in the examples */
-      void pdgeqpf_(int *, int *,   double *, int *, int *, int *, int *,   double *,   double *, int *, int *);
-      void psgeqpf_(int *, int *,    float *, int *, int *, int *, int *,    float *,    float *, int *, int *);
-      void pzgeqpf_(int *, int *, c_double *, int *, int *, int *, int *, c_double *, c_double *, int *, double *, int *, int *);
-      void pcgeqpf_(int *, int *, c_float *, int *, int *, int *, int *, c_float *, c_float *, int *,  float *, int *, int *);
-
-      /* PxGEQPFmod */
-      void pdgeqpfmod_(int *, int *,   double *, int *, int *, int *, int *,   double *,   double *, int *, int *, int *, int *, int *, double *);
-      void psgeqpfmod_(int *, int *,    float *, int *, int *, int *, int *,    float *,    float *, int *, int *, int *, int *, int *,  float *);
-      void pzgeqpfmod_(int *, int *, c_double *, int *, int *, int *, int *, c_double *, c_double *, int *, double *, int *, int *, int *, int *, int *, double *);
-      void pcgeqpfmod_(int *, int *, c_float *, int *, int *, int *, int *, c_float *, c_float *, int *,  float *, int *, int *, int *, int *, int *,  float *);
-
-      /* PxGETRF */
-      void pdgetrf_(int *, int *,   double *, int *, int *, int *, int *, int *);
-      void psgetrf_(int *, int *,    float *, int *, int *, int *, int *, int *);
-      void pzgetrf_(int *, int *, c_double *, int *, int *, int *, int *, int *);
-      void pcgetrf_(int *, int *, c_float *, int *, int *, int *, int *, int *);
-
-      /* PxGETRS */
-      void pdgetrs_(char *, int *, int *,   double *, int *, int *, int *, int *,   double *, int *, int *, int *, int *);
-      void psgetrs_(char *, int *, int *,    float *, int *, int *, int *, int *,    float *, int *, int *, int *, int *);
-      void pzgetrs_(char *, int *, int *, c_double *, int *, int *, int *, int *, c_double *, int *, int *, int *, int *);
-      void pcgetrs_(char *, int *, int *, c_float *, int *, int *, int *, int *, c_float *, int *, int *, int *, int *);
-
-      /* PxGELQF */
-      void pdgelqf_(int *, int *,   double *, int *, int *, int *,   double *,   double *, int *, int *);
-      void psgelqf_(int *, int *,    float *, int *, int *, int *,    float *,    float *, int *, int *);
-      void pzgelqf_(int *, int *, c_double *, int *, int *, int *, c_double *, c_double *, int *, int *);
-      void pcgelqf_(int *, int *, c_float *, int *, int *, int *, c_float *, c_float *, int *, int *);
-
-      /* PxxxGLQ */
-      void pdorglq_(int *, int *, int *,   double *, int *, int *, int *,   double *,   double *, int *, int *);
-      void psorglq_(int *, int *, int *,    float *, int *, int *, int *,    float *,    float *, int *, int *);
-      void pzunglq_(int *, int *, int *, c_double *, int *, int *, int *, c_double *, c_double *, int *, int *);
-      void pcunglq_(int *, int *, int *, c_float *, int *, int *, int *, c_float *, c_float *, int *, int *);
-
-      /* PxNRM2; this one is used only in the examples */
-      void pdnrm2_(int *,  double *,   double *, int *, int *, int *, int *);
-      void psnrm2_(int *,   float *,    float *, int *, int *, int *, int *);
-      void pdznrm2_(int *, double *, c_double *, int *, int *, int *, int *);
-      void pscnrm2_(int *,  float *, c_float *, int *, int *, int *, int *);
-
-      /* PxDOT; this is used only in the examples */
-      void pddot_(int *,   double *,   double *, int *, int *, int *, int *,   double *, int *, int *, int *, int *);
-      void psdot_(int *,    float *,    float *, int *, int *, int *, int *,    float *, int *, int *, int *, int *);
-      void pzdot_(int *, c_double *, c_double *, int *, int *, int *, int *, c_double *, int *, int *, int *, int *);
-      void pcdot_(int *, c_float *, c_float *, int *, int *, int *, int *, c_float *, int *, int *, int *, int *);
-
-      void pdgeqrf_(int *, int *,   double *, int *, int *, int *,   double *,   double *, int *, int *);
-      void psgeqrf_(int *, int *,    float *, int *, int *, int *,    float *,    float *, int *, int *);
-      void pzgeqrf_(int *, int *, c_double *, int *, int *, int *, c_double *, c_double *, int *, int *);
-      void pcgeqrf_(int *, int *,  c_float *, int *, int *, int *,  c_float *,  c_float *, int *, int *);
-
-      void pdorgqr_(int *, int *, int *,   double *, int *, int *, int *,   double *,   double *, int *, int *);
-
-      void pdorgqrmy_(int *, int *, int *,   double *, int *, int *, int *,   double *,   double *, int *, int *);
+      ///////////////////////////////////////////////
+      ////// BLACS //////////////////////////////////
+      ///////////////////////////////////////////////
+      void Cblacs_get(int, int, int *);
+      void Cblacs_gridinit(int *, const char *, int, int);
+      void Cblacs_gridmap(int *, int *, int, int, int);
+      void Cblacs_gridinfo(int, int *, int *, int *, int *);
+      void Cblacs_gridexit(int);
+      void Cblacs_exit(int);
+      int Csys2blacs_handle(MPI_Comm);
+      MPI_Comm Cblacs2sys_handle(int);
 
 
-      void psorgqr_(int *, int *, int *,    float *, int *, int *, int *,    float *,    float *, int *, int *);
-      void pzungqr_(int *, int *, int *, c_double *, int *, int *, int *, c_double *, c_double *, int *, int *);
-      void pcungqr_(int *, int *, int *,  c_float *, int *, int *, int *,  c_float *,  c_float *, int *, int *);
+      ///////////////////////////////////////////////
+      ////// ScaLAPACK //////////////////////////////
+      ///////////////////////////////////////////////
+      int FC_GLOBAL(numroc,NUMROC)
+        (int*, int*, int* , int *, int *);
+      void FC_GLOBAL(descinit,DESCINIT)
+        (int *, int *, int *, int *, int *, int *,
+         int *, int *, int *, int *);
+      void FC_GLOBAL(descset,DESCSET)
+        (int *, int *, int *, int *, int *, int *,
+         int *, int *, int *);
+      void FC_GLOBAL(infog1l,INFOG1L)
+        (int *, int *, int *, int *, int *, int *, int *);
+      void FC_GLOBAL(infog2l,INFOG2L)
+        (int *, int *, const int *, int *, int *, int *,
+         int *, int *, int *, int *, int *);
+      void FC_GLOBAL(igamn2d,IGAMN2D)
+        (int *, const char *, const char *, int *, int *,
+         int *, int *, int *, int *, int *, int *, int *);
+      void FC_GLOBAL_(pb_topget,PB_TOPGET)
+        (const int*, const char*, const char*, char*);
+      void FC_GLOBAL_(pb_topset,PB_TOPSET)
+        (const int*, const char*, const char*, const char*);
+
+      void FC_GLOBAL(igebs2d,IGEBS2D)
+        (int *, const char *, const char *, int *, int *, int *, int *);
+      void FC_GLOBAL(sgebs2d,SGEBS2D)
+        (int *, const char *, const char *, int *, int *, float *, int *);
+      void FC_GLOBAL(dgebs2d,DGEBS2D)
+        (int *, const char *, const char *, int *, int *, double *, int *);
+      void FC_GLOBAL(cgebs2d,CGEBS2D)
+        (int *, const char *, const char *, int *, int *,
+         std::complex<float> *, int *);
+      void FC_GLOBAL(zgebs2d,ZGEBS2D)
+        (int *, const char *, const char *, int *, int *,
+         std::complex<double> *, int *);
+
+      void FC_GLOBAL(igebr2d,IGEBR2D)
+        (int *, const char *, const char *, int *, int *,
+         int *, int *, int *, int *);
+      void FC_GLOBAL(sgebr2d,SGEBR2D)
+        (int *, const char *, const char *, int *, int *,
+         float *, int *, int *, int *);
+      void FC_GLOBAL(dgebr2d,DGEBR2D)
+        (int *, const char *, const char *, int *, int *,
+         double *, int *, int *, int *);
+      void FC_GLOBAL(cgebr2d,CGEBR2D)
+        (int *, const char *, const char *, int *, int *,
+         std::complex<float> *, int *, int *, int *);
+      void FC_GLOBAL(zgebr2d,ZGEBR2D)
+        (int *, const char *, const char *, int *, int *,
+         std::complex<double> *, int *, int *, int *);
+
+      void FC_GLOBAL(sgsum2d,SGSUM2D)
+        (int *, char *, char *, int *, int *,  float *, int *, int *, int *);
+      void FC_GLOBAL(dgsum2d,DGSUM2D)
+        (int *, char *, char *, int *, int *, double *, int *, int *, int *);
+
+      void FC_GLOBAL(sgamx2d,SGAMX2D)
+        (int *, char *, char *, int *, int *, float *, int *,
+         int *, int *, int *, int *, int *);
+      void FC_GLOBAL(dgamx2d,DGAMX2D)
+        (int *, char *, char *, int *, int *, double *, int *,
+         int *, int *, int *, int *, int *);
+      void FC_GLOBAL(cgamx2d,CGAMX2D)
+        (int *, char *, char *, int *, int *,  std::complex<float> *,
+         int *, int *, int *, int *, int *, int *);
+      void FC_GLOBAL(zgamx2d,ZGAMX2D)
+        (int *, char *, char *, int *, int *, std::complex<double> *,
+         int *, int *, int *, int *, int *, int *);
+
+      void FC_GLOBAL(sgamn2d,SGAMN2D)
+        (int *, char *, char *, int *, int *, float *, int *,
+         int *, int *, int *, int *, int *);
+      void FC_GLOBAL(dgamn2d,DGAMN2D)
+        (int *, char *, char *, int *, int *, double *, int *,
+         int *, int *, int *, int *, int *);
+      void FC_GLOBAL(cgamn2d,CGAMN2D)
+        (int *, char *, char *, int *, int *, std::complex<float> *, int *,
+         int *, int *, int *, int *, int *);
+      void FC_GLOBAL(zgamn2d,ZGAMN2D)
+        (int *, char *, char *, int *, int *, std::complex<double> *, int *,
+         int *, int *, int *, int *, int *);
+
+      void FC_GLOBAL(psamax,PSAMAX)
+        (int *, float *, int *, float *, int *, int *, int *, int *);
+      void FC_GLOBAL(pdamax,PDAMAX)
+        (int *, double *, int *, double *, int *, int *, int *, int *);
+      void FC_GLOBAL(pcamax,PCAMAX)
+        (int *, std::complex<float> *, int *, std::complex<float> *,
+         int *, int *, int *, int *);
+      void FC_GLOBAL(pzamax,PZAMAX)
+        (int *, std::complex<double> *, int *, std::complex<double> *,
+         int *, int *, int *, int *);
+
+      void FC_GLOBAL(psswap,PSSWAP)
+        (int *, float *, int *, int *, int *, int *,
+         float *, int *, int *, int *, int *);
+      void FC_GLOBAL(pdswap,PDSWAP)
+        (int *, double *, int *, int *, int *, int *,
+         double *, int *, int *, int *, int *);
+      void FC_GLOBAL(pcswap,PCSWAP)
+        (int *, std::complex<float> *, int *, int *, int *, int *,
+         std::complex<float> *, int *, int *, int *, int *);
+      void FC_GLOBAL(pzswap,PZSWAP)
+        (int *, std::complex<double> *, int *, int *, int *, int *,
+         std::complex<double> *, int *, int *, int *, int *);
+
+      void FC_GLOBAL(psscal,PSSCAL)
+        (int *, float *, float *, int *, int *, int *, int *);
+      void FC_GLOBAL(pdscal,PDSCAL)
+        (int *, double *, double *, int *, int *, int *, int *);
+      void FC_GLOBAL(pcscal,PCSCAL)
+        (int *, std::complex<float> *, std::complex<float> *,
+         int *, int *, int *, int *);
+      void FC_GLOBAL(pzscal,PZSCAL)
+        (int *, std::complex<double> *, std::complex<double> *,
+         int *, int *, int *, int *);
+
+      void FC_GLOBAL(psgemv,PSGEMV)
+        (char *, int *, int *, float *,
+         const float *, int *, int *, const int *,
+         const float *, int *, int *, const int *, int *,
+         float *, float *, int *,  int *, const int *, int *);
+      void FC_GLOBAL(pdgemv,PDGEMV)
+        (char *, int *, int *, double *,
+         const double *, int *, int *, const int *,
+         const double *, int *, int *, const int *, int *,
+         double *, double *, int *, int *, const int *, int *);
+      void FC_GLOBAL(pcgemv,PCGEMV)
+        (char *, int *, int *, std::complex<float> *,
+         const std::complex<float> *, int *, int *, const int *,
+         const std::complex<float> *, int *, int *, const int *,
+         int *, std::complex<float> *, std::complex<float> *,
+         int *, int *, const int *, int *);
+      void FC_GLOBAL(pzgemv,PZGEMV)
+        (char *, int *, int *, std::complex<double> *,
+         const std::complex<double> *, int *, int *, const int *,
+         const std::complex<double> *, int *, int *, const int *,
+         int *, std::complex<double> *, std::complex<double> *,
+         int *, int *, const int *, int *);
+
+      void FC_GLOBAL(psgemm,PSGEMM)
+        (char *, char *, int *, int *, int *, float *, const float *,
+         int *, int *, const int *, const float *, int *, int *, const int *,
+         float *, float *, int *, int *, const int *);
+      void FC_GLOBAL(pdgemm,PDGEMM)
+        (char *, char *, int *, int *, int *, double *, const double *,
+         int *, int *, const int *, const double *, int *, int *, const int *,
+         double *, double *, int *, int *, const int *);
+      void FC_GLOBAL(pcgemm,PCGEMM)
+        (char *, char *, int *, int *, int *, std::complex<float> *,
+         const std::complex<float> *, int *, int *, const int *,
+         const std::complex<float> *, int *, int *, const int *,
+         std::complex<float> *, std::complex<float> *,
+         int *, int *, const int *);
+      void FC_GLOBAL(pzgemm,PZGEMM)
+        (char *, char *, int *, int *, int *, std::complex<double> *,
+         const std::complex<double> *, int *, int *, const int *,
+         const std::complex<double> *, int *, int *, const int *,
+         std::complex<double> *, std::complex<double> *,
+         int *, int *, const int *);
+
+      void FC_GLOBAL(pclacgv,PCLACGV)
+        (int*, std::complex<float>* x, int *, int *, const int *, int *);
+      void FC_GLOBAL(pzlacgv,PZLACGV)
+        (int*, std::complex<double>* x, int *, int *, const int *, int *);
+
+      void FC_GLOBAL(psger,PSGER)
+        (int *, int *, float *,
+         const float *, int *, int *, const int *, int *,
+         const float *, int *, int *, const int *, int *,
+         float *, int *, int *, const int *);
+      void FC_GLOBAL(pdger,PDGER)
+        (int *, int *, double *,
+         const double *, int *, int *, const int *, int *,
+         const double *, int *, int *, const int *, int *,
+         double *, int *, int *, const int *);
+      void FC_GLOBAL(pcgeru,PCGERU)
+        (int *, int *, std::complex<float> *,
+         const std::complex<float> *, int *, int *, const int *, int *,
+         const std::complex<float> *, int *, int *, const int *, int *,
+         std::complex<float> *, int *, int *, const int *);
+      void FC_GLOBAL(pzgeru,PZGERU)
+        (int *, int *, std::complex<double> *,
+         const std::complex<double> *, int *, int *, const int *, int *,
+         const std::complex<double> *, int *, int *, const int *, int *,
+         std::complex<double> *, int *, int *, const int *);
+
+      void FC_GLOBAL(pslaswp,PSLASWP)
+        (char *, char *, int *,
+         float *, int *, int *, const int *,
+         int *, int *, const int *);
+      void FC_GLOBAL(pdlaswp,PDLASWP)
+        (char *, char *, int *,
+         double *, int *, int *, const int *,
+         int *, int *, const int *);
+      void FC_GLOBAL(pclaswp,PCLASWP)
+        (char *, char *, int *,
+         std::complex<float> *, int *, int *, const int *,
+         int *, int *, const int *);
+      void FC_GLOBAL(pzlaswp,PZLASWP)
+        (char *, char *, int *,
+         std::complex<double> *, int *, int *, const int *,
+         int *, int *, const int *);
+
+      void FC_GLOBAL(pslapiv,PSLAPIV)
+        (char *, char *, char *, int *, int *,
+         float *, int *, int *, const int *,
+         const int *, int *, int *, const int *, int *);
+      void FC_GLOBAL(pdlapiv,PDLAPIV)
+        (char *, char *, char *, int *, int *,
+         double *, int *, int *, const int *,
+         const int *, int *, int *, const int *, int *);
+      void FC_GLOBAL(pclapiv,PCLAPIV)
+        (char *, char *, char *, int *, int *,
+         std::complex<float> *, int *, int *, const int *,
+         const int *, int *, int *, const int *, int *);
+      void FC_GLOBAL(pzlapiv,PZLAPIV)
+        (char *, char *, char *, int *, int *,
+         std::complex<double> *, int *, int *, const int *,
+         const int *, int *, int *, const int *, int *);
+
+      void FC_GLOBAL(pstrsm,PSTRSM)
+        (char *, char *, char *, char *, int *, int *, float *,
+         const float *, int *, int *, const int *,
+         float *, int *, int *, const int *);
+      void FC_GLOBAL(pdtrsm,PDTRSM)
+        (char *, char *, char *, char *, int *, int *, double *,
+         const double *, int *, int *, const int *,
+         double *, int *, int *, const int *);
+      void FC_GLOBAL(pctrsm,PCTRSM)
+        (char *, char *, char *, char *, int *, int *, std::complex<float> *,
+         const std::complex<float> *, int *, int *, const int *,
+         std::complex<float> *, int *, int *, const int *);
+      void FC_GLOBAL(pztrsm,PZTRSM)
+        (char *, char *, char *, char *, int *, int *, std::complex<double> *,
+         const std::complex<double> *, int *, int *, const int *,
+         std::complex<double> *, int *, int *, const int *);
+
+      void FC_GLOBAL(pstrsv,PSTRSV)
+        (char *, char *, char *, int *,
+         const float *, int *, int *, const int *,
+         float *, int *, int *, const int *, int *);
+      void FC_GLOBAL(pdtrsv,PDTRSV)
+        (char *, char *, char *, int *,
+         const double *, int *, int *, const int *,
+         double *, int *, int *, const int *, int *);
+      void FC_GLOBAL(pctrsv,PCTRSV)
+        (char *, char *, char *, int *,
+         const std::complex<float> *, int *, int *, const int *,
+         std::complex<float> *, int *, int *, const int *, int *);
+      void FC_GLOBAL(pztrsv,PZTRSV)
+        (char *, char *, char *, int *,
+         const std::complex<double> *, int *, int *, const int *,
+         std::complex<double> *, int *, int *, const int *, int *);
+
+      float FC_GLOBAL(pslange,PSLANGE)
+        (char*, int*, int*, const float*, int*, int*, const int*, float*);
+      double FC_GLOBAL(pdlange,PDLANGE)
+        (char*, int*, int*, const double*, int*, int*, const int*, double*);
+      float FC_GLOBAL(pclange,PCLANGE)
+        (char*, int*, int*, const std::complex<float>*, int*, int*,
+         const int*, float*);
+      double FC_GLOBAL(pzlange,PZLANGE)
+        (char*, int*, int*, const std::complex<double>*, int*, int*,
+         const int*, double*);
+
+      void FC_GLOBAL(psgeadd,PSGEADD)
+        (char *, int *, int *, float *,
+         const float *, int *, int *, const int *,
+         float *, float *, int *, int *, const int *);
+      void FC_GLOBAL(pdgeadd,PDGEADD)
+        (char *, int *, int *, double *,
+         const double *, int *, int *, const int *,
+         double *, double *, int *, int *, const int *);
+      void FC_GLOBAL(pcgeadd,PCGEADD)
+        (char *, int *, int *, std::complex<float> *,
+         const std::complex<float> *, int *, int *, const int *,
+         std::complex<float> *,
+         std::complex<float> *, int *, int *, const int *);
+      void FC_GLOBAL(pzgeadd,PZGEADD)
+        (char *, int *, int *, std::complex<double> *,
+         const std::complex<double> *, int *, int *, const int *,
+         std::complex<double> *,
+         std::complex<double> *, int *, int *, const int *);
+
+      void FC_GLOBAL(pslacpy,PSLACPY)
+        (char *, int *, int *,
+         const float *, int *, int *, const int *,
+         float *, int *, int *, const int *);
+      void FC_GLOBAL(pdlacpy,PDLACPY)
+        (char *, int *, int *,
+         const double *, int *, int *, const int *,
+         double *, int *, int *, const int *);
+      void FC_GLOBAL(pclacpy,PCLACPY)
+        (char *, int *, int *,
+         const std::complex<float> *, int *, int *, const int *,
+         std::complex<float> *, int *, int *, const int *);
+      void FC_GLOBAL(pzlacpy,PZLACPY)
+        (char *, int *, int *,
+         const std::complex<double> *, int *, int *, const int *,
+         std::complex<double> *, int *, int *, const int *);
+
+      void FC_GLOBAL(psgemr2d,PSGEMR2D)
+        (int *, int *, const float *, int *, int *, const int *,
+         float *, int *, int *, const int *, int *);
+      void FC_GLOBAL(pdgemr2d,PDGEMR2D)
+        (int *, int *, const double *, int *, int *, const int *,
+         double *, int *, int *, const int *, int *);
+      void FC_GLOBAL(pcgemr2d,PCGEMR2D)
+        (int *, int *, const std::complex<float> *, int *, int *, const int *,
+         std::complex<float> *, int *, int *, const int *, int *);
+      void FC_GLOBAL(pzgemr2d,PZGEMR2D)
+        (int *, int *,
+         const std::complex<double> *, int *, int *, const int *,
+         std::complex<double> *, int *, int *, const int *, int *);
+
+      void FC_GLOBAL(pstran,PSTRAN)
+        (int *, int *, float *,
+         const float *, int *, int *, const int *,
+         float *, float *, int *, int *, const int *);
+      void FC_GLOBAL(pdtran,PDTRAN)
+        (int *, int *, double *,
+         const double *, int *, int *, const int *,
+         double *, double *, int *, int *, const int *);
+      void FC_GLOBAL(pctranc,PCTRANC)
+        (int *, int *, std::complex<float> *,
+         const std::complex<float> *, int *, int *, const int *,
+         std::complex<float> *, std::complex<float> *,
+         int *, int *, const int *);
+      void FC_GLOBAL(pztranc,PZTRANC)
+        (int *, int *, std::complex<double> *,
+         const std::complex<double> *, int *, int *, const int *,
+         std::complex<double> *, std::complex<double> *,
+         int *, int *, const int *);
+
+      void FC_GLOBAL(psgeqpfmod,PSGEQPFMOD)
+        (int *, int *, float *, int *, int *, const int *, int *,
+         float *, float *, int *, int *, int *, int *, int *, float *);
+      void FC_GLOBAL(pdgeqpfmod,PDGEQPFMOD)
+        (int *, int *, double *, int *, int *, const int *, int *,
+         double *, double *, int *, int *, int *, int *, int *, double *);
+      void FC_GLOBAL(pcgeqpfmod,PCGEQPFMOD)
+        (int *, int *, std::complex<float> *, int *, int *, const int *,
+         int *, std::complex<float> *, std::complex<float> *, int *, float *,
+         int *, int *, int *, int *, int *,  float *);
+      void FC_GLOBAL(pzgeqpfmod,PZGEQPFMOD)
+        (int *, int *, std::complex<double> *, int *, int *, const int *,
+         int *, std::complex<double> *, std::complex<double> *, int *,
+         double *, int *, int *, int *, int *, int *, double *);
+
+      void FC_GLOBAL(psgetrf,PSGETRF)
+        (int *, int *, float *, int *, int *, const int *, int *, int *);
+      void FC_GLOBAL(pdgetrf,PDGETRF)
+        (int *, int *, double *, int *, int *, const int *, int *, int *);
+      void FC_GLOBAL(pcgetrf,PCGETRF)
+        (int *, int *, std::complex<float> *, int *, int *, const int *,
+         int *, int *);
+      void FC_GLOBAL(pzgetrf,PZGETRF)
+        (int *, int *, std::complex<double> *, int *, int *, const int *,
+         int *, int *);
+
+      void FC_GLOBAL(psgetrs,PSGETRS)
+        (char *, int *, int *, const float *, int *, int *, const int *,
+         const int *, float *, int *, int *, const int *, int *);
+      void FC_GLOBAL(pdgetrs,PDGETRS)
+        (char *, int *, int *, const double *, int *, int *, const int *,
+         const int *, double *, int *, int *, const int *, int *);
+      void FC_GLOBAL(pcgetrs,PCGETRS)
+        (char *, int *, int *,
+         const std::complex<float> *, int *, int *, const int *, const  int *,
+         std::complex<float> *, int *, int *, const int *, int *);
+      void FC_GLOBAL(pzgetrs,PZGETRS)
+        (char *, int *, int *,
+         const std::complex<double> *, int *, int *, const int *, const int *,
+         std::complex<double> *, int *, int *, const int *, int *);
+
+      void FC_GLOBAL(psgelqf,PSGELQF)
+        (int *, int *, float *, int *, int *, const int *,
+         float *, float *, int *, int *);
+      void FC_GLOBAL(pdgelqf,PDGELQF)
+        (int *, int *, double *, int *, int *, const int *,
+         double *, double *, int *, int *);
+      void FC_GLOBAL(pcgelqf,PCGELQF)
+        (int *, int *, std::complex<float> *, int *, int *, const int *,
+         std::complex<float> *, std::complex<float> *, int *, int *);
+      void FC_GLOBAL(pzgelqf,PZGELQF)
+        (int *, int *, std::complex<double> *, int *, int *, const int *,
+         std::complex<double> *, std::complex<double> *, int *, int *);
+
+      void FC_GLOBAL(psorglq,PSORGLQ)
+        (int *, int *, int *, float *, int *, int *, const int *,
+         const float *, float *, int *, int *);
+      void FC_GLOBAL(pdorglq,PDORGLQ)
+        (int *, int *, int *, double *, int *, int *, const int *,
+         const double *, double *, int *, int *);
+      void FC_GLOBAL(pcunglq,PCUNGLQ)
+        (int *, int *, int *,
+         std::complex<float> *, int *, int *, const int *,
+         const std::complex<float> *, std::complex<float> *, int *, int *);
+      void FC_GLOBAL(pzunglq,PZUNGLQ)
+        (int *, int *, int *,
+         std::complex<double> *, int *, int *, const int *,
+         const std::complex<double> *, std::complex<double> *, int *, int *);
+
+      void FC_GLOBAL(psgeqrf,PSGEQRF)
+        (int *, int *, float *, int *, int *, const int *,
+         float *, float *, int *, int *);
+      void FC_GLOBAL(pdgeqrf,PDGEQRF)
+        (int *, int *, double *, int *, int *, const int *,
+         double *, double *, int *, int *);
+      void FC_GLOBAL(pcgeqrf,PCGEQRF)
+        (int *, int *, std::complex<float> *, int *, int *, const int *,
+         std::complex<float> *, std::complex<float> *, int *, int *);
+      void FC_GLOBAL(pzgeqrf,PZGEQRF)
+        (int *, int *, std::complex<double> *, int *, int *, const int *,
+         std::complex<double> *, std::complex<double> *, int *, int *);
+
+      void FC_GLOBAL(psorgqr,PSORGQR)
+        (int *, int *, int *, float *, int *, int *, const int *,
+         const float *, float *, int *, int *);
+      void FC_GLOBAL(pdorgqr,PDORGQR)
+        (int *, int *, int *, double *, int *, int *, const int *,
+         const double *, double *, int *, int *);
+      void FC_GLOBAL(pcungqr,PCUNGQR)
+        (int *, int *, int *,
+         std::complex<float> *, int *, int *, const int *,
+         const std::complex<float> *, std::complex<float> *, int *, int *);
+      void FC_GLOBAL(pzungqr,PZUNGQR)
+        (int *, int *, int *,
+         std::complex<double> *, int *, int *, const int *,
+         const std::complex<double> *, std::complex<double> *, int *, int *);
     }
 
-    /* ScaLAPACK routines */
-    /* Arithmetic-independent routines */
-    inline int descinit(int* desc, int m, int n, int mb, int nb, int rsrc, int csrc, int ictxt, int mxllda) {
+    inline int descinit
+    (int* desc, int m, int n, int mb, int nb,
+     int rsrc, int csrc, int ictxt, int mxllda) {
       int info;
-      descinit_(desc, &m, &n, &mb, &nb, &rsrc, &csrc, &ictxt, &mxllda, &info);
+      FC_GLOBAL(descinit,DESCINIT)
+        (desc, &m, &n, &mb, &nb, &rsrc, &csrc, &ictxt, &mxllda, &info);
       return info;
     }
-    inline void descset(int* desc, int m, int n, int mb, int nb, int rsrc, int csrc, int ictxt, int mxllda) {
-      descset_(desc, &m, &n, &mb, &nb, &rsrc, &csrc, &ictxt, &mxllda);
+
+    inline void descset
+    (int* desc, int m, int n, int mb, int nb,
+     int rsrc, int csrc, int ictxt, int mxllda) {
+      FC_GLOBAL(descset,DESCSET)
+        (desc, &m, &n, &mb, &nb, &rsrc, &csrc, &ictxt, &mxllda);
     }
 
-    inline int numroc(int n, int nb, int iproc, int isrcproc, int nprocs) {
-      return numroc_(&n, &nb, &iproc, &isrcproc, &nprocs);
+    inline int numroc
+    (int n, int nb, int iproc, int isrcproc, int nprocs) {
+      return FC_GLOBAL(numroc,NUMROC)
+        (&n, &nb, &iproc, &isrcproc, &nprocs);
     }
 
-    inline int infog1l(int GINDX, int NB, int NPROCS, int MYROC, int ISRCPROC, int& ROCSRC) {
+    inline int infog1l
+    (int GINDX, int NB, int NPROCS, int MYROC, int ISRCPROC, int& ROCSRC) {
       int LINDX;
-      infog1l_(&GINDX, &NB, &NPROCS, &MYROC, &ISRCPROC, &LINDX, &ROCSRC);
+      FC_GLOBAL(infog1l,INFOG1L)
+        (&GINDX, &NB, &NPROCS, &MYROC, &ISRCPROC, &LINDX, &ROCSRC);
       return LINDX;
     }
-    inline int infog1l(int GINDX, int NB, int NPROCS, int MYROC, int ISRCPROC) {
+
+    inline int infog1l
+    (int GINDX, int NB, int NPROCS, int MYROC, int ISRCPROC) {
       int LINDX, ROCSRC;
-      infog1l_(&GINDX, &NB, &NPROCS, &MYROC, &ISRCPROC, &LINDX, &ROCSRC);
+      FC_GLOBAL(infog1l,INFOG1L)
+        (&GINDX, &NB, &NPROCS, &MYROC, &ISRCPROC, &LINDX, &ROCSRC);
       return LINDX;
     }
-    inline void infog2l(int GRINDX, int GCINDX, const int* DESC, int NPROW, int NPCOL, int MYROW,
-			int MYCOL, int& LRINDX, int& LCINDX, int& RSRC, int& CSRC) {
-      infog2l_(&GRINDX, &GCINDX, DESC, &NPROW, &NPCOL, &MYROW, &MYCOL, &LRINDX, &LCINDX, &RSRC, &CSRC);
+
+    inline void infog2l
+    (int GRINDX, int GCINDX, const int* DESC, int NPROW, int NPCOL, int MYROW,
+     int MYCOL, int& LRINDX, int& LCINDX, int& RSRC, int& CSRC) {
+      FC_GLOBAL(infog2l,INFOG2L)
+        (&GRINDX, &GCINDX, DESC, &NPROW, &NPCOL, &MYROW, &MYCOL,
+         &LRINDX, &LCINDX, &RSRC, &CSRC);
     }
-    inline void infog2l(int GRINDX, int GCINDX, const int* DESC, int NPROW, int NPCOL, int MYROW,
-			int MYCOL, int& LRINDX, int& LCINDX) {
+    inline void infog2l
+    (int GRINDX, int GCINDX, const int* DESC, int NPROW, int NPCOL, int MYROW,
+     int MYCOL, int& LRINDX, int& LCINDX) {
       int RSRC, CSRC;
-      infog2l_(&GRINDX, &GCINDX, DESC, &NPROW, &NPCOL, &MYROW, &MYCOL, &LRINDX, &LCINDX, &RSRC, &CSRC);
+      FC_GLOBAL(infog2l,INFOG2L)
+        (&GRINDX, &GCINDX, DESC, &NPROW, &NPCOL, &MYROW, &MYCOL,
+         &LRINDX, &LCINDX, &RSRC, &CSRC);
     }
 
-    /* xGEBS2D */
-    template<typename S> inline void gebs2d(int, char, char, int, int, S *, int);
-    template<> inline void gebs2d<int>(int ctxt, char scope, char top, int m, int n, int *A, int lda) {
-      igebs2d_(&ctxt,&scope,&top,&m,&n,A,&lda);
+    inline void gebs2d
+    (int ctxt, char scope, char top, int m, int n, int* a, int lda) {
+      FC_GLOBAL(igebs2d,IGEBS2D)(&ctxt, &scope, &top, &m, &n, a, &lda);
     }
-    template<> inline void gebs2d<double>(int ctxt, char scope, char top, int m, int n, double *A, int lda) {
-      dgebs2d_(&ctxt,&scope,&top,&m,&n,A,&lda);
+    inline void gebs2d
+    (int ctxt, char scope, char top, int m, int n, float* a, int lda) {
+      FC_GLOBAL(sgebs2d,SGEBS2D)(&ctxt, &scope, &top, &m, &n, a, &lda);
     }
-    template<> inline void gebs2d< float>(int ctxt, char scope, char top, int m, int n, float *A, int lda) {
-      sgebs2d_(&ctxt,&scope,&top,&m,&n,A,&lda);
+    inline void gebs2d
+    (int ctxt, char scope, char top, int m, int n, double* a, int lda) {
+      FC_GLOBAL(dgebs2d,DGEBS2D)(&ctxt, &scope, &top, &m, &n, a, &lda);
     }
-    template<> inline void gebs2d<c_double>(int ctxt, char scope, char top, int m, int n, c_double *A, int lda) {
-      zgebs2d_(&ctxt,&scope,&top,&m,&n,A,&lda);
+    inline void gebs2d
+    (int ctxt, char scope, char top, int m, int n,
+     std::complex<float>* a, int lda) {
+      FC_GLOBAL(cgebs2d,CGEBS2D)(&ctxt, &scope, &top, &m, &n, a, &lda);
     }
-    template<> inline void gebs2d<c_float>(int ctxt, char scope, char top, int m, int n, c_float *A, int lda) {
-      cgebs2d_(&ctxt,&scope,&top,&m,&n,A,&lda);
-    }
-
-    /* xGEBR2D */
-    template<typename S> inline void gebr2d(int, char, char, int, int, S *, int, int, int);
-    template<> inline void gebr2d<  int>(int ctxt, char scope, char top, int m, int n, int *A, int lda, int rsrc, int csrc) {
-      igebr2d_(&ctxt,&scope,&top,&m,&n,A,&lda,&rsrc,&csrc);
-    }
-    template<> inline void gebr2d<double>(int ctxt, char scope, char top, int m, int n, double *A, int lda, int rsrc, int csrc) {
-      dgebr2d_(&ctxt,&scope,&top,&m,&n,A,&lda,&rsrc,&csrc);
-    }
-    template<> inline void gebr2d< float>(int ctxt, char scope, char top, int m, int n, float *A, int lda, int rsrc, int csrc) {
-      sgebr2d_(&ctxt,&scope,&top,&m,&n,A,&lda,&rsrc,&csrc);
-    }
-    template<> inline void gebr2d<c_double>(int ctxt, char scope, char top, int m, int n, c_double *A, int lda, int rsrc, int csrc) {
-      zgebr2d_(&ctxt,&scope,&top,&m,&n,A,&lda,&rsrc,&csrc);
-    }
-    template<> inline void gebr2d<c_float>(int ctxt, char scope, char top, int m, int n, c_float *A, int lda, int rsrc, int csrc) {
-      cgebr2d_(&ctxt,&scope,&top,&m,&n,A,&lda,&rsrc,&csrc);
+    inline void gebs2d
+    (int ctxt, char scope, char top, int m, int n,
+     std::complex<double>* a, int lda) {
+      FC_GLOBAL(zgebs2d,ZGEBS2D)(&ctxt, &scope, &top, &m, &n, a, &lda);
     }
 
-    /* xGSUM2D */
-    template<typename S> inline void gsum2d(int, char, char, int, int, S *, int, int, int);
-    template<> inline void gsum2d<double>(int ctxt, char scope, char top, int m, int n, double *A, int lda, int rdest, int cdest) {
-      dgsum2d_(&ctxt,&scope,&top,&m,&n,A,&lda,&rdest,&cdest);
+
+    inline void gebr2d
+    (int ctxt, char scope, char top, int m, int n,
+     int* a, int lda, int rsrc, int csrc) {
+      FC_GLOBAL(igebr2d,IGEBR2D)
+        (&ctxt, &scope, &top, &m, &n, a, &lda, &rsrc, &csrc);
     }
-    template<> inline void gsum2d< float>(int ctxt, char scope, char top, int m, int n,  float *A, int lda, int rdest, int cdest) {
-      sgsum2d_(&ctxt,&scope,&top,&m,&n,A,&lda,&rdest,&cdest);
+    inline void gebr2d
+    (int ctxt, char scope, char top, int m, int n,
+     float* a, int lda, int rsrc, int csrc) {
+      FC_GLOBAL(sgebr2d,SGEBR2D)
+        (&ctxt, &scope, &top, &m, &n, a, &lda, &rsrc, &csrc);
+    }
+    inline void gebr2d
+    (int ctxt, char scope, char top, int m, int n,
+     double* a, int lda, int rsrc, int csrc) {
+      FC_GLOBAL(dgebr2d,DGEBR2D)
+        (&ctxt, &scope, &top, &m, &n, a, &lda, &rsrc, &csrc);
+    }
+    inline void gebr2d
+    (int ctxt, char scope, char top, int m, int n,
+     std::complex<float>* a, int lda, int rsrc, int csrc) {
+      FC_GLOBAL(cgebr2d,CGEBR2D)
+        (&ctxt, &scope, &top, &m, &n, a, &lda, &rsrc, &csrc);
+    }
+    inline void gebr2d
+    (int ctxt, char scope, char top, int m, int n,
+     std::complex<double>* a, int lda, int rsrc, int csrc) {
+      FC_GLOBAL(zgebr2d,ZGEBR2D)
+        (&ctxt, &scope, &top, &m, &n, a, &lda, &rsrc, &csrc);
     }
 
-    /* xGAMX2D */
-    template<typename S> inline void gamx2d(int, char, char, int, int, S *, int, int *, int *, int, int, int);
-    template<> inline void gamx2d<double>(int ctxt, char scope, char top, int m, int n, double *A, int lda, int *ra, int *ca, int ldia, int rdest, int cdest) {
-      dgamx2d_(&ctxt,&scope,&top,&m,&n,A,&lda,ra,ca,&ldia,&rdest,&cdest);
+
+    inline void gsum2d
+    (int ctxt, char scope, char top, int m, int n,
+     float* a, int lda, int rdest, int cdest) {
+      FC_GLOBAL(sgsum2d,SGSUM2D)
+        (&ctxt, &scope, &top, &m, &n, a, &lda, &rdest, &cdest);
     }
-    template<> inline void gamx2d< float>(int ctxt, char scope, char top, int m, int n,  float *A, int lda, int *ra, int *ca, int ldia, int rdest, int cdest) {
-      sgamx2d_(&ctxt,&scope,&top,&m,&n,A,&lda,ra,ca,&ldia,&rdest,&cdest);
-    }
-    template<> inline void gamx2d<c_double>(int ctxt, char scope, char top, int m, int n, c_double *A, int lda, int *ra, int *ca, int ldia, int rdest, int cdest) {
-      zgamx2d_(&ctxt,&scope,&top,&m,&n,A,&lda,ra,ca,&ldia,&rdest,&cdest);
-    }
-    template<> inline void gamx2d<c_float>(int ctxt, char scope, char top, int m, int n, c_float *A, int lda, int *ra, int *ca, int ldia, int rdest, int cdest) {
-      cgamx2d_(&ctxt,&scope,&top,&m,&n,A,&lda,ra,ca,&ldia,&rdest,&cdest);
+    inline void gsum2d
+    (int ctxt, char scope, char top, int m, int n,
+     double* a, int lda, int rdest, int cdest) {
+      FC_GLOBAL(dgsum2d,DGSUM2D)
+        (&ctxt, &scope, &top, &m, &n, a, &lda, &rdest, &cdest);
     }
 
-    /* xGAMN2D */
-    template<typename S> inline void gamn2d(int, char, char, int, int, S *, int, int *, int *, int, int, int);
-    template<> inline void gamn2d<double>(int ctxt, char scope, char top, int m, int n, double *A, int lda, int *ra, int *ca, int ldia, int rdest, int cdest) {
-      dgamn2d_(&ctxt,&scope,&top,&m,&n,A,&lda,ra,ca,&ldia,&rdest,&cdest);
+
+    inline void gamx2d
+    (int ctxt, char scope, char top, int m, int n, float* a, int lda,
+     int *ra, int *ca, int ldia, int rdest, int cdest) {
+      FC_GLOBAL(sgamx2d,SGAMX2D)
+        (&ctxt, &scope, &top, &m, &n, a, &lda,ra,ca, &ldia, &rdest, &cdest);
     }
-    template<> inline void gamn2d< float>(int ctxt, char scope, char top, int m, int n,  float *A, int lda, int *ra, int *ca, int ldia, int rdest, int cdest) {
-      sgamn2d_(&ctxt,&scope,&top,&m,&n,A,&lda,ra,ca,&ldia,&rdest,&cdest);
+    inline void gamx2d
+    (int ctxt, char scope, char top, int m, int n, double* a, int lda,
+     int *ra, int *ca, int ldia, int rdest, int cdest) {
+      FC_GLOBAL(dgamx2d,DGAMX2D)
+        (&ctxt, &scope, &top, &m, &n, a, &lda,ra,ca, &ldia, &rdest, &cdest);
     }
-    template<> inline void gamn2d<c_double>(int ctxt, char scope, char top, int m, int n, c_double *A, int lda, int *ra, int *ca, int ldia, int rdest, int cdest) {
-      zgamn2d_(&ctxt,&scope,&top,&m,&n,A,&lda,ra,ca,&ldia,&rdest,&cdest);
+    inline void gamx2d
+    (int ctxt, char scope, char top, int m, int n,
+     std::complex<float>* a, int lda, int *ra, int *ca,
+     int ldia, int rdest, int cdest) {
+      FC_GLOBAL(cgamx2d,CGAMX2D)
+        (&ctxt, &scope, &top, &m, &n, a, &lda,ra,ca, &ldia, &rdest, &cdest);
     }
-    template<> inline void gamn2d<c_float>(int ctxt, char scope, char top, int m, int n, c_float *A, int lda, int *ra, int *ca, int ldia, int rdest, int cdest) {
-      cgamn2d_(&ctxt,&scope,&top,&m,&n,A,&lda,ra,ca,&ldia,&rdest,&cdest);
+    inline void gamx2d
+    (int ctxt, char scope, char top, int m, int n,
+     std::complex<double>* a, int lda, int *ra, int *ca,
+     int ldia, int rdest, int cdest) {
+      FC_GLOBAL(zgamx2d,ZGAMX2D)
+        (&ctxt, &scope, &top, &m, &n, a, &lda,ra,ca, &ldia, &rdest, &cdest);
     }
 
-    /* PxAMAX */
-    template<typename T> inline void pamax(int, T *, int *, T *, int, int, int *, int);
-    template<> inline void pamax<  double>(int n,   double *amax, int *indx,   double *X, int ix, int jx, int *descX, int incx) {
-      pdamax_(&n,amax,indx,X,&ix,&jx,descX,&incx);
+    inline void gamn2d
+    (int ctxt, char scope, char top, int m, int n,  float* a, int lda,
+     int *ra, int *ca, int ldia, int rdest, int cdest) {
+      FC_GLOBAL(sgamn2d,SGAMN2D)
+        (&ctxt, &scope, &top, &m, &n, a, &lda,ra,ca, &ldia, &rdest, &cdest);
     }
-    template<> inline void pamax<   float>(int n,    float *amax, int *indx,    float *X, int ix, int jx, int *descX, int incx) {
-      psamax_(&n,amax,indx,X,&ix,&jx,descX,&incx);
+    inline void gamn2d
+    (int ctxt, char scope, char top, int m, int n, double* a, int lda,
+     int *ra, int *ca, int ldia, int rdest, int cdest) {
+      FC_GLOBAL(dgamn2d,DGAMN2D)
+        (&ctxt, &scope, &top, &m, &n, a, &lda,ra,ca, &ldia, &rdest, &cdest);
     }
-    template<> inline void pamax<c_double>(int n, c_double *amax, int *indx, c_double *X, int ix, int jx, int *descX, int incx) {
-      pzamax_(&n,amax,indx,X,&ix,&jx,descX,&incx);
+    inline void gamn2d
+    (int ctxt, char scope, char top, int m, int n,
+     std::complex<float>* a, int lda, int *ra, int *ca,
+     int ldia, int rdest, int cdest) {
+      FC_GLOBAL(cgamn2d,CGAMN2D)
+        (&ctxt, &scope, &top, &m, &n, a, &lda,ra,ca, &ldia, &rdest, &cdest);
     }
-    template<> inline void pamax<c_float>(int n, c_float *amax, int *indx, c_float *X, int ix, int jx, int *descX, int incx) {
-      pcamax_(&n,amax,indx,X,&ix,&jx,descX,&incx);
-    }
-
-    /* PxSWAP */
-    template<typename T> inline void pswap(int, T *, int, int, int *, int, T *, int, int, int *, int);
-    template<> inline void pswap<  double>(int n,   double *X, int ix, int jx, int *descX, int incx,   double *Y, int iy, int jy, int *descY, int incy) {
-      pdswap_(&n,X,&ix,&jx,descX,&incx,Y,&iy,&jy,descY,&incy);
-    }
-    template<> inline void pswap<   float>(int n,    float *X, int ix, int jx, int *descX, int incx,    float *Y, int iy, int jy, int *descY, int incy) {
-      psswap_(&n,X,&ix,&jx,descX,&incx,Y,&iy,&jy,descY,&incy);
-    }
-    template<> inline void pswap<c_double>(int n, c_double *X, int ix, int jx, int *descX, int incx, c_double *Y, int iy, int jy, int *descY, int incy) {
-      pzswap_(&n,X,&ix,&jx,descX,&incx,Y,&iy,&jy,descY,&incy);
-    }
-    template<> inline void pswap<c_float>(int n, c_float *X, int ix, int jx, int *descX, int incx, c_float *Y, int iy, int jy, int *descY, int incy) {
-      pcswap_(&n,X,&ix,&jx,descX,&incx,Y,&iy,&jy,descY,&incy);
+    inline void gamn2d
+    (int ctxt, char scope, char top, int m, int n,
+     std::complex<double>* a, int lda, int *ra, int *ca,
+     int ldia, int rdest, int cdest) {
+      FC_GLOBAL(zgamn2d,ZGAMN2D)
+        (&ctxt, &scope, &top, &m, &n, a, &lda,ra,ca, &ldia, &rdest, &cdest);
     }
 
-    /* PxSCAL */
-    template<typename T> inline void pscal(int, T, T *, int, int, int *, int);
-    template<> inline void pscal<  double>(int n,   double a,   double *X, int ix, int jx, int *descX, int incx) {
-      pdscal_(&n,&a,X,&ix,&jx,descX,&incx);
+    inline void pamax
+    (int n, float *amax, int *indx, float* x, int ix,
+     int jx, int *descx, int incx) {
+      FC_GLOBAL(psamax,PSAMAX)
+        (&n,amax,indx, x, &ix, &jx, descx, &incx);
     }
-    template<> inline void pscal<   float>(int n,    float a,    float *X, int ix, int jx, int *descX, int incx) {
-      psscal_(&n,&a,X,&ix,&jx,descX,&incx);
+    inline void pamax
+    (int n, double *amax, int *indx, double* x,
+     int ix, int jx, int *descx, int incx) {
+      FC_GLOBAL(pdamax,PDAMAX)
+        (&n,amax,indx, x, &ix, &jx, descx, &incx);
     }
-    template<> inline void pscal<c_double>(int n, c_double a, c_double *X, int ix, int jx, int *descX, int incx) {
-      pzscal_(&n,&a,X,&ix,&jx,descX,&incx);
+    inline void pamax
+    (int n, std::complex<float> *amax, int *indx, std::complex<float>* x,
+     int ix, int jx, int *descx, int incx) {
+      FC_GLOBAL(pcamax,PCAMAX)
+        (&n,amax,indx, x, &ix, &jx, descx, &incx);
     }
-    template<> inline void pscal<c_float>(int n, c_float a, c_float *X, int ix, int jx, int *descX, int incx) {
-      pcscal_(&n,&a,X,&ix,&jx,descX,&incx);
-    }
-
-    /* PxGEMV */
-    template<typename T> inline void pgemv(char, int, int, T, T *, int, int, int *, T *, int, int, int*, int, T, T *, int, int, int *, int);
-    template<> inline void pgemv<  double>(char transA, int m, int n,   double alpha,   double *A, int ia, int ja, int *descA,   double *X, int ix, int jx, int *descX, int incx,   double beta,   double *Y, int iy, int jy, int *descY, int incy) {
-      pdgemv_(&transA,&m,&n,&alpha,A,&ia,&ja,descA,X,&ix,&jx,descX,&incx,&beta,Y,&iy,&jy,descY,&incy);
-    }
-    template<> inline void pgemv<   float>(char transA, int m, int n,    float alpha,    float *A, int ia, int ja, int *descA,    float *X, int ix, int jx, int *descX, int incx,    float beta,    float *Y, int iy, int jy, int *descY, int incy) {
-      psgemv_(&transA,&m,&n,&alpha,A,&ia,&ja,descA,X,&ix,&jx,descX,&incx,&beta,Y,&iy,&jy,descY,&incy);
-    }
-    template<> inline void pgemv<c_double>(char transA, int m, int n, c_double alpha, c_double *A, int ia, int ja, int *descA, c_double *X, int ix, int jx, int *descX, int incx, c_double beta, c_double *Y, int iy, int jy, int *descY, int incy) {
-      pzgemv_(&transA,&m,&n,&alpha,A,&ia,&ja,descA,X,&ix,&jx,descX,&incx,&beta,Y,&iy,&jy,descY,&incy);
-    }
-    template<> inline void pgemv<c_float>(char transA, int m, int n, c_float alpha, c_float *A, int ia, int ja, int *descA, c_float *X, int ix, int jx, int *descX, int incx, c_float beta, c_float *Y, int iy, int jy, int *descY, int incy) {
-      pcgemv_(&transA,&m,&n,&alpha,A,&ia,&ja,descA,X,&ix,&jx,descX,&incx,&beta,Y,&iy,&jy,descY,&incy);
+    inline void pamax
+    (int n, std::complex<double> *amax, int *indx, std::complex<double>* x,
+     int ix, int jx, int *descx, int incx) {
+      FC_GLOBAL(pzamax,PZAMAX)
+        (&n,amax,indx, x, &ix, &jx, descx, &incx);
     }
 
-    /* PxGEMM */
-    template<typename T> inline void pgemm(char, char, int, int, int, T, T*, int, int, int*, T*, int, int, int*, T, T*, int, int, int*);
-    template<> inline void pgemm<double> (char transA, char transB, int m, int n, int k,    double alpha,   double *A, int ia, int ja, int *descA,   double *B, int ib, int jb, int *descB,   double beta, double *C, int ic, int jc, int *descC) {
-      pdgemm_(&transA,&transB,&m,&n,&k,&alpha,A,&ia,&ja,descA,B,&ib,&jb,descB,&beta,C,&ic,&jc,descC);
+    inline void pswap
+    (int n, float* x, int ix, int jx, int *descx, int incx,
+     float* y, int iy, int jy, int *descy, int incy) {
+      FC_GLOBAL(psswap,PSSWAP)
+        (&n, x, &ix, &jx, descx, &incx, y, &iy, &jy, descy, &incy);
     }
-    template<> inline void pgemm<float>  (char transA, char transB, int m, int n, int k,     float alpha,    float *A, int ia, int ja, int *descA,    float *B, int ib, int jb, int *descB,    float beta,   float *C, int ic, int jc, int *descC) {
-      psgemm_(&transA,&transB,&m,&n,&k,&alpha,A,&ia,&ja,descA,B,&ib,&jb,descB,&beta,C,&ic,&jc,descC);
+    inline void pswap
+    (int n, double* x, int ix, int jx, int *descx, int incx,
+     double* y, int iy, int jy, int *descy, int incy) {
+      FC_GLOBAL(pdswap,PDSWAP)
+        (&n, x, &ix, &jx, descx, &incx, y, &iy, &jy, descy, &incy);
     }
-    template<> inline void pgemm<c_double>(char transA, char transB, int m, int n, int k, c_double alpha, c_double *A, int ia, int ja, int *descA, c_double *B, int ib, int jb, int *descB, c_double beta, c_double *C, int ic, int jc, int *descC) {
-      pzgemm_(&transA,&transB,&m,&n,&k,&alpha,A,&ia,&ja,descA,B,&ib,&jb,descB,&beta,C,&ic,&jc,descC);
+    inline void pswap
+    (int n, std::complex<float>* x, int ix, int jx, int *descx, int incx,
+     std::complex<float>* y, int iy, int jy, int *descy, int incy) {
+      FC_GLOBAL(pcswap,PCSWAP)
+        (&n, x, &ix, &jx, descx, &incx, y, &iy, &jy, descy, &incy);
     }
-    template<> inline void pgemm<c_float>(char transA, char transB, int m, int n, int k, c_float alpha, c_float *A, int ia, int ja, int *descA, c_float *B, int ib, int jb, int *descB, c_float beta, c_float *C, int ic, int jc, int *descC) {
-      pcgemm_(&transA,&transB,&m,&n,&k,&alpha,A,&ia,&ja,descA,B,&ib,&jb,descB,&beta,C,&ic,&jc,descC);
+    inline void pswap
+    (int n, std::complex<double>* x, int ix, int jx, int *descx, int incx,
+     std::complex<double>* y, int iy, int jy, int *descy, int incy) {
+      FC_GLOBAL(pzswap,PZSWAP)
+        (&n, x, &ix, &jx, descx, &incx, y, &iy, &jy, descy, &incy);
     }
 
-    /* PxLACGV */
-    template<typename T> inline void placgv(int, T *, int, int, int *, int);
-    template<> inline void placgv<  double>(int n,   double *X, int ix, int jx, int *descX, int incx) {
+    inline void pscal
+    (int n, float a, float* x, int ix, int jx, int *descx, int incx) {
+      FC_GLOBAL(psscal,PSSCAL)
+        (&n, &a, x, &ix, &jx, descx, &incx);
+    }
+    inline void pscal
+    (int n, double a, double* x, int ix, int jx, int *descx, int incx) {
+      FC_GLOBAL(pdscal,PDSCAL)
+        (&n, &a, x, &ix, &jx, descx, &incx);
+    }
+    inline void pscal
+    (int n, std::complex<float> a, std::complex<float>* x,
+     int ix, int jx, int *descx, int incx) {
+      FC_GLOBAL
+        (pcscal,PCSCAL)(&n, &a, x, &ix, &jx, descx, &incx);
+    }
+    inline void pscal
+    (int n, std::complex<double> a, std::complex<double>* x,
+     int ix, int jx, int *descx, int incx) {
+      FC_GLOBAL(pzscal,PZSCAL)
+        (&n, &a, x, &ix, &jx, descx, &incx);
+    }
+
+
+    inline void pgemv
+    (char ta, int m, int n, float alpha,
+     const float* a, int ia, int ja, const int *desca,
+     const float* x, int ix, int jx, const int *descx, int incx, float beta,
+     float* y, int iy, int jy, const int *descy, int incy) {
+      FC_GLOBAL(psgemv,PSGEMV)
+        (&ta, &m, &n, &alpha, a, &ia, &ja, desca,
+         x, &ix, &jx, descx, &incx, &beta, y, &iy, &jy, descy, &incy);
+    }
+    inline void pgemv
+    (char ta, int m, int n, double alpha,
+     const double* a, int ia, int ja, const int *desca,
+     const double* x, int ix, int jx, const int *descx, int incx, double beta,
+     double* y, int iy, int jy, const int *descy, int incy) {
+      FC_GLOBAL(pdgemv,PDGEMV)
+        (&ta, &m, &n, &alpha, a, &ia, &ja, desca,
+         x, &ix, &jx, descx, &incx, &beta, y, &iy, &jy, descy, &incy);
+    }
+    inline void pgemv
+    (char ta, int m, int n, std::complex<float> alpha,
+     const std::complex<float>* a, int ia, int ja, const int *desca,
+     const std::complex<float>* x, int ix, int jx, const int *descx, int incx,
+     std::complex<float> beta,
+     std::complex<float>* y, int iy, int jy, const int *descy, int incy) {
+      FC_GLOBAL(pcgemv,PCGEMV)
+        (&ta, &m, &n, &alpha, a, &ia, &ja, desca,
+         x, &ix, &jx, descx, &incx, &beta, y, &iy, &jy, descy, &incy);
+    }
+    inline void pgemv
+    (char ta, int m, int n, std::complex<double> alpha,
+     const std::complex<double>* a, int ia, int ja, const int *desca,
+     const std::complex<double>* x, int ix, int jx, const int *descx, int incx,
+     std::complex<double> beta,
+     std::complex<double>* y, int iy, int jy, const int *descy, int incy) {
+      FC_GLOBAL(pzgemv,PZGEMV)
+        (&ta, &m, &n, &alpha, a, &ia, &ja, desca,
+         x, &ix, &jx, descx, &incx, &beta, y, &iy, &jy, descy, &incy);
+    }
+
+    inline void pgemm
+    (char ta, char tb, int m, int n, int k, float alpha,
+     const float* a, int ia, int ja, const int *desca,
+     const float* b, int ib, int jb, const int *descb, float beta,
+     float *c, int ic, int jc, const int *descC) {
+      FC_GLOBAL(psgemm,PSGEMM)
+        (&ta, &tb, &m, &n, &k, &alpha, a, &ia, &ja, desca,
+         b, &ib, &jb, descb, &beta, c, &ic, &jc, descC);
+    }
+    inline void pgemm
+    (char ta, char tb, int m, int n, int k, double alpha,
+     const double* a, int ia, int ja, const int *desca,
+     const double* b, int ib, int jb, const int *descb, double beta,
+     double *c, int ic, int jc, const int *descC) {
+      FC_GLOBAL(pdgemm,PDGEMM)
+        (&ta, &tb, &m, &n, &k, &alpha, a, &ia, &ja, desca,
+         b, &ib, &jb, descb, &beta, c, &ic, &jc, descC);
+    }
+    inline void pgemm
+    (char ta, char tb, int m, int n, int k, std::complex<float> alpha,
+     const std::complex<float>* a, int ia, int ja, const int *desca,
+     const std::complex<float>* b, int ib, int jb, const int *descb,
+     std::complex<float> beta, std::complex<float> *c,
+     int ic, int jc, const int *descC) {
+      FC_GLOBAL(pcgemm,PCGEMM)
+        (&ta, &tb, &m, &n, &k, &alpha, a, &ia, &ja, desca,
+         b, &ib, &jb, descb, &beta, c, &ic, &jc, descC);
+    }
+    inline void pgemm
+    (char ta, char tb, int m, int n, int k, std::complex<double> alpha,
+     const std::complex<double>* a, int ia, int ja, const int *desca,
+     const std::complex<double>* b, int ib, int jb, const int *descb,
+     std::complex<double> beta, std::complex<double> *c,
+     int ic, int jc, const int *descC) {
+      FC_GLOBAL(pzgemm,PZGEMM)
+        (&ta, &tb, &m, &n, &k, &alpha, a, &ia, &ja, desca,
+         b, &ib, &jb, descb, &beta, c, &ic, &jc, descC);
+    }
+
+    inline void placgv
+    (int n, float* x, int ix, int jx, const int *descx, int incx) {
       // Nothing to do
     }
-    template<> inline void placgv<   float>(int n,    float *X, int ix, int jx, int *descX, int incx) {
+    inline void placgv
+    (int n, double* x, int ix, int jx, const int *descx, int incx) {
       // Nothing to do
     }
-    template<> inline void placgv<c_double>(int n, c_double *X, int ix, int jx, int *descX, int incx) {
-      pzlacgv_(&n,X,&ix,&jx,descX,&incx);
+    inline void placgv
+    (int n, std::complex<double>* x, int ix, int jx,
+     const int *descx, int incx) {
+      FC_GLOBAL(pzlacgv,PZLACGV)
+        (&n, x, &ix, &jx, descx, &incx);
     }
-    template<> inline void placgv<c_float>(int n, c_float *X, int ix, int jx, int *descX, int incx) {
-      pclacgv_(&n,X,&ix,&jx,descX,&incx);
-    }
-
-    /* PxGER */
-    template<typename T> inline void pgeru(int, int, T, T*, int, int, int*, int, T*, int, int, int *, int, T*, int, int, int*);
-    template<> inline void pgeru<  double>(int m, int n,   double alpha,   double *X, int ix, int jx, int *descX, int incx,   double *Y, int iy, int jy, int *descY, int incy,   double *A, int ia, int ja, int *descA) {
-      pdger_ (&m,&n,&alpha,X,&ix,&jx,descX,&incx,Y,&iy,&jy,descY,&incy,A,&ia,&ja,descA);
-    }
-    template<> inline void pgeru<   float>(int m, int n,    float alpha,    float *X, int ix, int jx, int *descX, int incx,    float *Y, int iy, int jy, int *descY, int incy,    float *A, int ia, int ja, int *descA) {
-      psger_ (&m,&n,&alpha,X,&ix,&jx,descX,&incx,Y,&iy,&jy,descY,&incy,A,&ia,&ja,descA);
-    }
-    template<> inline void pgeru<c_double>(int m, int n, c_double alpha, c_double *X, int ix, int jx, int *descX, int incx, c_double *Y, int iy, int jy, int *descY, int incy, c_double *A, int ia, int ja, int *descA) {
-      pzgeru_(&m,&n,&alpha,X,&ix,&jx,descX,&incx,Y,&iy,&jy,descY,&incy,A,&ia,&ja,descA);
-    }
-    template<> inline void pgeru<c_float>(int m, int n, c_float alpha, c_float *X, int ix, int jx, int *descX, int incx, c_float *Y, int iy, int jy, int *descY, int incy, c_float *A, int ia, int ja, int *descA) {
-      pcgeru_(&m,&n,&alpha,X,&ix,&jx,descX,&incx,Y,&iy,&jy,descY,&incy,A,&ia,&ja,descA);
+    inline void placgv
+    (int n, std::complex<float>* x, int ix, int jx,
+     const int *descx, int incx) {
+      FC_GLOBAL(pclacgv,PCLACGV)
+        (&n, x, &ix, &jx, descx, &incx);
     }
 
-    /* PxLASWP */
-    template<typename scalar> inline void plaswp(char direc, char rowcol, int n, scalar* a, int ia, int ja, int* desca, int k1, int k2, int* ipiv);
-    template<> inline void plaswp(char direc, char rowcol, int n, double* a, int ia, int ja, int* desca, int k1, int k2, int* ipiv) {
-      pdlaswp_(&direc,&rowcol,&n,a,&ia,&ja,desca,&k1,&k2,ipiv);
+    inline void pgeru
+    (int m, int n, float alpha,
+     const float* x, int ix, int jx, const int *descx, int incx,
+     const float* y, int iy, int jy, const int *descy, int incy,
+     float* a, int ia, int ja, const int *desca) {
+      FC_GLOBAL(psger,PSGER)
+        (&m, &n, &alpha, x, &ix, &jx, descx, &incx,
+         y, &iy, &jy, descy, &incy, a, &ia, &ja, desca);
     }
-    template<> inline void plaswp(char direc, char rowcol, int n, float* a, int ia, int ja, int* desca, int k1, int k2, int* ipiv) {
-      pslaswp_(&direc,&rowcol,&n,a,&ia,&ja,desca,&k1,&k2,ipiv);
+    inline void pgeru
+    (int m, int n, double alpha,
+     const double* x, int ix, int jx, const int *descx, int incx,
+     const double* y, int iy, int jy, const int *descy, int incy,
+     double* a, int ia, int ja, const int *desca) {
+      FC_GLOBAL(pdger,PDGER)
+        (&m, &n, &alpha, x, &ix, &jx, descx, &incx,
+         y, &iy, &jy, descy, &incy, a, &ia, &ja, desca);
     }
-    template<> inline void plaswp(char direc, char rowcol, int n, c_double* a, int ia, int ja, int* desca, int k1, int k2, int* ipiv) {
-      pzlaswp_(&direc,&rowcol,&n,a,&ia,&ja,desca,&k1,&k2,ipiv);
+    inline void pgeru
+    (int m, int n, std::complex<float> alpha,
+     const std::complex<float>* x, int ix, int jx, const int *descx, int incx,
+     const std::complex<float>* y, int iy, int jy, const int *descy, int incy,
+     std::complex<float>* a, int ia, int ja, const int *desca) {
+      FC_GLOBAL(pcgeru,PCGERU)
+        (&m, &n, &alpha, x, &ix, &jx, descx, &incx,
+         y, &iy, &jy, descy, &incy, a, &ia, &ja, desca);
     }
-    template<> inline void plaswp(char direc, char rowcol, int n, c_float* a, int ia, int ja, int* desca, int k1, int k2, int* ipiv) {
-      pclaswp_(&direc,&rowcol,&n,a,&ia,&ja,desca,&k1,&k2,ipiv);
-    }
-
-    /* PxLAPIV */
-    template<typename scalar> inline void plapiv(char direc, char rowcol, char pivroc, int m, int n, scalar* a, int ia, int ja, int* desca, int* ipiv, int ip, int jp, int* descip, int* iwork);
-    template<> inline void plapiv(char direc, char rowcol, char pivroc, int m, int n, double* a, int ia, int ja, int* desca, int* ipiv, int ip, int jp, int* descip, int* iwork) {
-      pdlapiv_(&direc,&rowcol,&pivroc,&m,&n,a,&ia,&ja,desca,ipiv,&ip,&jp,descip,iwork);
-    }
-    template<> inline void plapiv(char direc, char rowcol, char pivroc, int m, int n, float* a, int ia, int ja, int* desca, int* ipiv, int ip, int jp, int* descip, int* iwork) {
-      pslapiv_(&direc,&rowcol,&pivroc,&m,&n,a,&ia,&ja,desca,ipiv,&ip,&jp,descip,iwork);
-    }
-    template<> inline void plapiv(char direc, char rowcol, char pivroc, int m, int n, c_double* a, int ia, int ja, int* desca, int* ipiv, int ip, int jp, int* descip, int* iwork) {
-      pzlapiv_(&direc,&rowcol,&pivroc,&m,&n,a,&ia,&ja,desca,ipiv,&ip,&jp,descip,iwork);
-    }
-    template<> inline void plapiv(char direc, char rowcol, char pivroc, int m, int n, c_float* a, int ia, int ja, int* desca, int* ipiv, int ip, int jp, int* descip, int* iwork) {
-      pclapiv_(&direc,&rowcol,&pivroc,&m,&n,a,&ia,&ja,desca,ipiv,&ip,&jp,descip,iwork);
-    }
-
-    /* PxTRSM */
-    template<typename T> inline void ptrsm(char, char, char, char, int, int, T, T *, int, int , int *, T *, int ,int, int *);
-    template<> inline void ptrsm<  double>(char side, char uplo, char trans, char diag, int m, int n,   double alpha,   double *A, int ia, int ja, int *descA,   double *B, int ib, int jb, int *descB) {
-      pdtrsm_(&side,&uplo,&trans,&diag,&m,&n,&alpha,A,&ia,&ja,descA,B,&ib,&jb,descB);
-    }
-    template<> inline void ptrsm<   float>(char side, char uplo, char trans, char diag, int m, int n,    float alpha,    float *A, int ia, int ja, int *descA,    float *B, int ib, int jb, int *descB) {
-      pstrsm_(&side,&uplo,&trans,&diag,&m,&n,&alpha,A,&ia,&ja,descA,B,&ib,&jb,descB);
-    }
-    template<> inline void ptrsm<c_double>(char side, char uplo, char trans, char diag, int m, int n, c_double alpha, c_double *A, int ia, int ja, int *descA, c_double *B, int ib, int jb, int *descB) {
-      pztrsm_(&side,&uplo,&trans,&diag,&m,&n,&alpha,A,&ia,&ja,descA,B,&ib,&jb,descB);
-    }
-    template<> inline void ptrsm<c_float>(char side, char uplo, char trans, char diag, int m, int n, c_float alpha, c_float *A, int ia, int ja, int *descA, c_float *B, int ib, int jb, int *descB) {
-      pctrsm_(&side,&uplo,&trans,&diag,&m,&n,&alpha,A,&ia,&ja,descA,B,&ib,&jb,descB);
+    inline void pgeru
+    (int m, int n, std::complex<double> alpha,
+     const std::complex<double>* x, int ix, int jx, const int *descx, int incx,
+     const std::complex<double>* y, int iy, int jy, const int *descy, int incy,
+     std::complex<double>* a, int ia, int ja, const int *desca) {
+      FC_GLOBAL(pzgeru,PZGERU)
+        (&m, &n, &alpha, x, &ix, &jx, descx, &incx,
+         y, &iy, &jy, descy, &incy, a, &ia, &ja, desca);
     }
 
-    /* PxTRSV */
-    template<typename T> inline void ptrsv(char, char, char, int, T *, int, int , int *, T *, int ,int, int *, int);
-    template<> inline void ptrsv<  double>(char uplo, char trans, char diag, int m, double *A, int ia, int ja, int *descA,   double *B, int ib, int jb, int *descB, int incB) {
-      pdtrsv_(&uplo,&trans,&diag,&m,A,&ia,&ja,descA,B,&ib,&jb,descB,&incB);
+    inline void plaswp
+    (char direc, char rowcol, int n,
+     float* a, int ia, int ja, const int* desca,
+     int k1, int k2, const int* ipiv) {
+      FC_GLOBAL(pslaswp,PSLASWP)
+        (&direc, &rowcol, &n,a, &ia, &ja, desca, &k1, &k2, ipiv);
     }
-    template<> inline void ptrsv<   float>(char uplo, char trans, char diag, int m, float *A, int ia, int ja, int *descA,    float *B, int ib, int jb, int *descB, int incB) {
-      pstrsv_(&uplo,&trans,&diag,&m,A,&ia,&ja,descA,B,&ib,&jb,descB,&incB);
+    inline void plaswp
+    (char direc, char rowcol, int n,
+     double* a, int ia, int ja, const int* desca,
+     int k1, int k2, const int* ipiv) {
+      FC_GLOBAL(pdlaswp,PDLASWP)
+        (&direc, &rowcol, &n,a, &ia, &ja, desca, &k1, &k2, ipiv);
     }
-    template<> inline void ptrsv<c_double>(char uplo, char trans, char diag, int m, c_double *A, int ia, int ja, int *descA, c_double *B, int ib, int jb, int *descB, int incB) {
-      pztrsv_(&uplo,&trans,&diag,&m,A,&ia,&ja,descA,B,&ib,&jb,descB,&incB);
+    inline void plaswp
+    (char direc, char rowcol, int n,
+     std::complex<float>* a, int ia, int ja, const int* desca,
+     int k1, int k2, const int* ipiv) {
+      FC_GLOBAL(pclaswp,PCLASWP)
+        (&direc, &rowcol, &n,a, &ia, &ja, desca, &k1, &k2, ipiv);
     }
-    template<> inline void ptrsv<c_float>(char uplo, char trans, char diag, int m, c_float *A, int ia, int ja, int *descA, c_float *B, int ib, int jb, int *descB, int incB) {
-      pctrsv_(&uplo,&trans,&diag,&m,A,&ia,&ja,descA,B,&ib,&jb,descB,&incB);
-    }
-
-    /* PxLANGE */
-    template<typename T, typename S> inline S plange(char , int , int , T *, int, int, int *, S *);
-    template<> inline double plange<  double,double>(char norm, int m, int n,   double *A, int ia, int ja, int *descA, double *work) {
-      return pdlange_(&norm,&m,&n,A,&ia,&ja,descA,work);
-    }
-    template<> inline  float plange<   float, float>(char norm, int m, int n,    float *A, int ia, int ja, int *descA,  float *work) {
-      return pslange_(&norm,&m,&n,A,&ia,&ja,descA,work);
-    }
-    template<> inline double plange<c_double,double>(char norm, int m, int n, c_double *A, int ia, int ja, int *descA, double *work) {
-      return pzlange_(&norm,&m,&n,A,&ia,&ja,descA,work);
-    }
-    template<> inline  float plange<c_float, float>(char norm, int m, int n, c_float *A, int ia, int ja, int *descA,  float *work) {
-      return pclange_(&norm,&m,&n,A,&ia,&ja,descA,work);
-    }
-
-    /* PxGEADD */
-    template<typename T> inline void pgeadd(char, int, int, T, T *, int, int, int *, T, T *, int, int, int *);
-    template<> inline void pgeadd<  double>(char trans, int m, int n,   double alpha,   double *A, int ia, int ja, int *descA,   double beta,   double *C, int ic, int jc, int *descC) {
-      pdgeadd_(&trans,&m,&n,&alpha,A,&ia,&ja,descA,&beta,C,&ic,&jc,descC);
-    }
-    template<> inline void pgeadd<   float>(char trans, int m, int n,    float alpha,    float *A, int ia, int ja, int *descA,    float beta,    float *C, int ic, int jc, int *descC) {
-      psgeadd_(&trans,&m,&n,&alpha,A,&ia,&ja,descA,&beta,C,&ic,&jc,descC);
-    }
-    template<> inline void pgeadd<c_double>(char trans, int m, int n, c_double alpha, c_double *A, int ia, int ja, int *descA, c_double beta, c_double *C, int ic, int jc, int *descC) {
-      pzgeadd_(&trans,&m,&n,&alpha,A,&ia,&ja,descA,&beta,C,&ic,&jc,descC);
-    }
-    template<> inline void pgeadd<c_float>(char trans, int m, int n, c_float alpha, c_float *A, int ia, int ja, int *descA, c_float beta, c_float *C, int ic, int jc, int *descC) {
-      pcgeadd_(&trans,&m,&n,&alpha,A,&ia,&ja,descA,&beta,C,&ic,&jc,descC);
+    inline void plaswp
+    (char direc, char rowcol, int n,
+     std::complex<double>* a, int ia, int ja, const int* desca,
+     int k1, int k2, const int* ipiv) {
+      FC_GLOBAL(pzlaswp,PZLASWP)
+        (&direc, &rowcol, &n,a, &ia, &ja, desca, &k1, &k2, ipiv);
     }
 
-    /* PxLACPY */
-    template<typename T> inline void placpy(char, int, int, T *, int, int, int *, T *, int, int, int *);
-    template<> inline void placpy<  double>(char trans, int m, int n,   double *A, int ia, int ja, int *descA,   double *C, int ic, int jc, int *descC) {
-      pdlacpy_(&trans,&m,&n,A,&ia,&ja,descA,C,&ic,&jc,descC);
+    inline void plapiv
+    (char direc, char rowcol, char pivroc, int m, int n,
+     float* a, int ia, int ja, const int* desca,
+     const int* ipiv, int ip, int jp, const int* descip, int* iwork) {
+      FC_GLOBAL(pslapiv,PSLAPIV)
+        (&direc, &rowcol, &pivroc, &m, &n,
+         a, &ia, &ja, desca, ipiv, &ip, &jp, descip, iwork);
     }
-    template<> inline void placpy<   float>(char trans, int m, int n,    float *A, int ia, int ja, int *descA,    float *C, int ic, int jc, int *descC) {
-      pslacpy_(&trans,&m,&n,A,&ia,&ja,descA,C,&ic,&jc,descC);
+    inline void plapiv
+    (char direc, char rowcol, char pivroc, int m, int n,
+     double* a, int ia, int ja, const int* desca,
+     const int* ipiv, int ip, int jp, const int* descip, int* iwork) {
+      FC_GLOBAL(pdlapiv,PDLAPIV)
+        (&direc, &rowcol, &pivroc, &m, &n,
+         a, &ia, &ja, desca, ipiv, &ip, &jp, descip, iwork);
     }
-    template<> inline void placpy<c_double>(char trans, int m, int n, c_double *A, int ia, int ja, int *descA, c_double *C, int ic, int jc, int *descC) {
-      pzlacpy_(&trans,&m,&n,A,&ia,&ja,descA,C,&ic,&jc,descC);
+    inline void plapiv
+    (char direc, char rowcol, char pivroc, int m, int n,
+     std::complex<float>* a, int ia, int ja, const int* desca,
+     const int* ipiv, int ip, int jp, const int* descip, int* iwork) {
+      FC_GLOBAL(pclapiv,PCLAPIV)
+        (&direc, &rowcol, &pivroc, &m, &n,
+         a, &ia, &ja, desca, ipiv, &ip, &jp, descip, iwork);
     }
-    template<> inline void placpy<c_float>(char trans, int m, int n, c_float *A, int ia, int ja, int *descA, c_float *C, int ic, int jc, int *descC) {
-      pclacpy_(&trans,&m,&n,A,&ia,&ja,descA,C,&ic,&jc,descC);
+    inline void plapiv
+    (char direc, char rowcol, char pivroc, int m, int n,
+     std::complex<double>* a, int ia, int ja, int* desca,
+     const int* ipiv, int ip, int jp, const int* descip, int* iwork) {
+      FC_GLOBAL(pzlapiv,PZLAPIV)
+        (&direc, &rowcol, &pivroc, &m, &n,
+         a, &ia, &ja, desca, ipiv, &ip, &jp, descip, iwork);
     }
 
-    /* pxGEMR2D */
-    template<typename T> inline void pgemr2d(int, int, T *, int, int, int *, T *, int, int, int *, int);
-    template<> inline void pgemr2d<  double>(int m, int n,   double *A, int ia, int ja, int *descA,   double *B, int ib, int jb, int *descB, int ctxt) {
-      assert(descA[BLACSctxt]==-1 || m+ia-1 <= descA[BLACSm]);
-      assert(descB[BLACSctxt]==-1 || m+ib-1 <= descB[BLACSm]);
-      assert(descA[BLACSctxt]==-1 || n+ja-1 <= descA[BLACSn]);
-      assert(descB[BLACSctxt]==-1 || n+jb-1 <= descB[BLACSn]);
+    inline void ptrsm
+    (char side, char uplo, char trans, char diag, int m, int n,
+     float alpha, const float* a, int ia, int ja, const int *desca,
+     float* b, int ib, int jb, const int *descb) {
+      FC_GLOBAL(pstrsm,PSTRSM)
+        (&side, &uplo, &trans, &diag, &m, &n, &alpha,
+         a, &ia, &ja, desca, b, &ib, &jb, descb);
+    }
+    inline void ptrsm
+    (char side, char uplo, char trans, char diag, int m, int n,
+     double alpha, const double* a, int ia, int ja, const int *desca,
+     double* b, int ib, int jb, const int *descb) {
+      FC_GLOBAL(pdtrsm,PDTRSM)
+        (&side, &uplo, &trans, &diag, &m, &n, &alpha,
+         a, &ia, &ja, desca, b, &ib, &jb, descb);
+    }
+    inline void ptrsm
+    (char side, char uplo, char trans, char diag, int m, int n,
+     std::complex<float> alpha,
+     const std::complex<float>* a, int ia, int ja, const int *desca,
+     std::complex<float>* b, int ib, int jb, const int *descb) {
+      FC_GLOBAL(pctrsm,PCTRSM)
+        (&side, &uplo, &trans, &diag, &m, &n, &alpha,
+         a, &ia, &ja, desca, b, &ib, &jb, descb);
+    }
+    inline void ptrsm
+    (char side, char uplo, char trans, char diag, int m, int n,
+     std::complex<double> alpha,
+     const std::complex<double>* a, int ia, int ja, const int *desca,
+     std::complex<double>* b, int ib, int jb, const int *descb) {
+      FC_GLOBAL(pztrsm,PZTRSM)
+        (&side, &uplo, &trans, &diag, &m, &n, &alpha,
+         a, &ia, &ja, desca, b, &ib, &jb, descb);
+    }
+
+    inline void ptrsv
+    (char uplo, char trans, char diag, int m,
+     const float* a, int ia, int ja, const int *desca,
+     float* b, int ib, int jb, const int *descb, int incb) {
+      FC_GLOBAL(pstrsv,PSTRSV)
+        (&uplo, &trans, &diag, &m, a, &ia, &ja, desca,
+         b, &ib, &jb, descb, &incb);
+    }
+    inline void ptrsv
+    (char uplo, char trans, char diag, int m,
+     const double* a, int ia, int ja, const int *desca,
+     double* b, int ib, int jb, int const *descb, int incb) {
+      FC_GLOBAL(pdtrsv,PDTRSV)
+        (&uplo, &trans, &diag, &m, a, &ia, &ja, desca,
+         b, &ib, &jb, descb, &incb);
+    }
+    inline void ptrsv
+    (char uplo, char trans, char diag, int m,
+     const std::complex<float>* a, int ia, int ja, const int *desca,
+     std::complex<float>* b, int ib, int jb, const int *descb, int incb) {
+      FC_GLOBAL(pctrsv,PCTRSV)
+        (&uplo, &trans, &diag, &m, a, &ia, &ja, desca,
+         b, &ib, &jb, descb, &incb);
+    }
+    inline void ptrsv
+    (char uplo, char trans, char diag, int m,
+     const std::complex<double>* a, int ia, int ja, const int *desca,
+     std::complex<double>* b, int ib, int jb, const int *descb, int incb) {
+      FC_GLOBAL(pztrsv,PZTRSV)
+        (&uplo, &trans, &diag, &m, a, &ia, &ja, desca,
+         b, &ib, &jb, descb, &incb);
+    }
+
+    inline float plange
+    (char norm, int m, int n, const float* a, int ia, int ja,
+     const int *desca, float *work) {
+      return FC_GLOBAL(pslange,PSLANGE)
+        (&norm, &m, &n, a, &ia, &ja, desca, work);
+    }
+    inline double plange
+    (char norm, int m, int n, const double* a, int ia, int ja,
+     const int *desca, double *work) {
+      return FC_GLOBAL(pdlange,PDLANGE)
+        (&norm, &m, &n, a, &ia, &ja, desca, work);
+    }
+    inline float plange
+    (char norm, int m, int n, const std::complex<float>* a, int ia, int ja,
+     const int *desca, float *work) {
+      return FC_GLOBAL(pclange,PCLANGE)
+        (&norm, &m, &n, a, &ia, &ja, desca, work);
+    }
+    inline double plange
+    (char norm, int m, int n, const std::complex<double>* a, int ia, int ja,
+     const int *desca, double *work) {
+      return FC_GLOBAL(pzlange,PZLANGE)
+        (&norm, &m, &n, a, &ia, &ja, desca, work);
+    }
+
+    inline void pgeadd
+    (char trans, int m, int n, float alpha,
+     const float* a, int ia, int ja, int *desca, float beta,
+     float *c, int ic, int jc, const int *descc) {
+      FC_GLOBAL(psgeadd,PSGEADD)
+        (&trans, &m, &n, &alpha, a, &ia, &ja, desca,
+         &beta, c, &ic, &jc, descc);
+    }
+    inline void pgeadd
+    (char trans, int m, int n, double alpha,
+     const double* a, int ia, int ja, int *desca, double beta,
+     double *c, int ic, int jc, const int *descC) {
+      FC_GLOBAL(pdgeadd,PDGEADD)
+        (&trans, &m, &n, &alpha, a, &ia, &ja, desca,
+         &beta, c, &ic, &jc, descC);
+    }
+    inline void pgeadd
+    (char trans, int m, int n, std::complex<float> alpha,
+     const std::complex<float>* a, int ia, int ja, int *desca,
+     std::complex<float> beta,
+     std::complex<float> *c, int ic, int jc, const int *descC) {
+      FC_GLOBAL(pcgeadd,PCGEADD)
+        (&trans, &m, &n, &alpha, a, &ia, &ja, desca,
+         &beta, c, &ic, &jc, descC);
+    }
+    inline void pgeadd
+    (char trans, int m, int n, std::complex<double> alpha,
+     const std::complex<double>* a, int ia, int ja, int *desca,
+     std::complex<double> beta,
+     std::complex<double> *c, int ic, int jc, const int *descC) {
+      FC_GLOBAL(pzgeadd,PZGEADD)
+        (&trans, &m, &n, &alpha, a, &ia, &ja, desca,
+         &beta, c, &ic, &jc, descC);
+    }
+
+    inline void placpy
+    (char trans, int m, int n,
+     const float* a, int ia, int ja, const int *desca,
+     float *c, int ic, int jc, const int *descc) {
+      FC_GLOBAL(pslacpy,PSLACPY)
+        (&trans, &m, &n, a, &ia, &ja, desca, c, &ic, &jc, descc);
+    }
+    inline void placpy
+    (char trans, int m, int n,
+     const double* a, int ia, int ja, const int *desca,
+     double *c, int ic, int jc, const int *descc) {
+      FC_GLOBAL(pdlacpy,PDLACPY)
+        (&trans, &m, &n, a, &ia, &ja, desca, c, &ic, &jc, descc);
+    }
+    inline void placpy
+    (char trans, int m, int n,
+     const std::complex<float>* a, int ia, int ja, const int *desca,
+     std::complex<float> *c, int ic, int jc, const int *descc) {
+      FC_GLOBAL(pclacpy,PCLACPY)
+        (&trans, &m, &n, a, &ia, &ja, desca, c, &ic, &jc, descc);
+    }
+    inline void placpy
+    (char trans, int m, int n,
+     const std::complex<double>* a, int ia, int ja, const int *desca,
+     std::complex<double> *c, int ic, int jc, const int *descc) {
+      FC_GLOBAL(pzlacpy,PZLACPY)
+        (&trans, &m, &n, a, &ia, &ja, desca, c, &ic, &jc, descc);
+    }
+
+    inline void pgemr2d
+    (int m, int n, const float* a, int ia, int ja, const int *desca,
+     float* b, int ib, int jb, const int *descb, int ctxt) {
+      FC_GLOBAL(psgemr2d,PSGEMR2D)
+        (&m, &n, a, &ia, &ja, desca, b, &ib, &jb, descb, &ctxt);
+    }
+    inline void pgemr2d
+    (int m, int n, const double* a, int ia, int ja, const int *desca,
+     double* b, int ib, int jb, const int *descb, int ctxt) {
+      assert(desca[BLACSctxt]==-1 || m+ia-1 <= desca[BLACSm]);
+      assert(descb[BLACSctxt]==-1 || m+ib-1 <= descb[BLACSm]);
+      assert(desca[BLACSctxt]==-1 || n+ja-1 <= desca[BLACSn]);
+      assert(descb[BLACSctxt]==-1 || n+jb-1 <= descb[BLACSn]);
       assert(ia >= 0 && ja >= 0 && ib >= 0 && jb >= 0);
-      pdgemr2d_(&m,&n,A,&ia,&ja,descA,B,&ib,&jb,descB,&ctxt);
+      FC_GLOBAL(pdgemr2d,PDGEMR2D)
+        (&m, &n, a, &ia, &ja, desca, b, &ib, &jb, descb, &ctxt);
     }
-    template<> inline void pgemr2d<   float>(int m, int n,    float *A, int ia, int ja, int *descA,    float *B, int ib, int jb, int *descB, int ctxt) {
-      psgemr2d_(&m,&n,A,&ia,&ja,descA,B,&ib,&jb,descB,&ctxt);
+    inline void pgemr2d
+    (int m, int n,
+     const std::complex<float>* a, int ia, int ja, const int *desca,
+     std::complex<float>* b, int ib, int jb, const int *descb, int ctxt) {
+      FC_GLOBAL(pcgemr2d,PCGEMR2D)
+        (&m, &n, a, &ia, &ja, desca, b, &ib, &jb, descb, &ctxt);
     }
-    template<> inline void pgemr2d<c_double>(int m, int n, c_double *A, int ia, int ja, int *descA, c_double *B, int ib, int jb, int *descB, int ctxt) {
-      pzgemr2d_(&m,&n,A,&ia,&ja,descA,B,&ib,&jb,descB,&ctxt);
-    }
-    template<> inline void pgemr2d<c_float>(int m, int n, c_float *A, int ia, int ja, int *descA, c_float *B, int ib, int jb, int *descB, int ctxt) {
-      pcgemr2d_(&m,&n,A,&ia,&ja,descA,B,&ib,&jb,descB,&ctxt);
-    }
-
-    /* PxTRAN */
-    template<typename T> inline void ptranc(int, int, T, T*, int, int, int *, T, T*, int, int, int *);
-    template<> inline void ptranc<  double>(int m, int n,   double alpha,   double *A, int ia, int ja, int *descA,   double beta,   double *C, int ic, int jc, int *descC) {
-      pdtran_(&m,&n,&alpha,A,&ia,&ja,descA,&beta,C,&ic,&jc,descC);
-    }
-    template<> inline void ptranc<   float>(int m, int n,    float alpha,    float *A, int ia, int ja, int *descA,    float beta,    float *C, int ic, int jc, int *descC) {
-      pstran_(&m,&n,&alpha,A,&ia,&ja,descA,&beta,C,&ic,&jc,descC);
-    }
-    template<> inline void ptranc<c_double>(int m, int n, c_double alpha, c_double *A, int ia, int ja, int *descA, c_double beta, c_double *C, int ic, int jc, int *descC) {
-      pztranc_(&m,&n,&alpha,A,&ia,&ja,descA,&beta,C,&ic,&jc,descC);
-    }
-    template<> inline void ptranc<c_float>(int m, int n, c_float alpha, c_float *A, int ia, int ja, int *descA, c_float beta, c_float *C, int ic, int jc, int *descC) {
-      pctranc_(&m,&n,&alpha,A,&ia,&ja,descA,&beta,C,&ic,&jc,descC);
+    inline void pgemr2d
+    (int m, int n,
+     const std::complex<double>* a, int ia, int ja, const int *desca,
+     std::complex<double>* b, int ib, int jb, const int *descb, int ctxt) {
+      FC_GLOBAL(pzgemr2d,PZGEMR2D)
+        (&m, &n, a, &ia, &ja, desca, b, &ib, &jb, descb, &ctxt);
     }
 
-    /* PxGEQPF; this one is used only in the examples */
-    template<typename T> inline void pgeqpf (int, int, T *A, int, int , int *, int, int, int, int, int, int);
-    template<> inline void pgeqpf< double>(int m, int n,   double *A, int ia, int ja, int *descA, int mb, int nb, int myrow, int mycol, int nprow, int npcol) {
-      int ierr;
-      int locrA = numroc(m, mb, myrow, 0, nprow);
-      int loccA = numroc(n, nb, mycol, 0, npcol);
-      auto ipiv = new int[loccA];
-      auto tau = new double[loccA];
-      int lwork = 3*(1+locrA+loccA);
-      auto work = new double[lwork];
-      pdgeqpf_(&m, &n, A, &ia, &ja, descA, ipiv, tau, work, &lwork, &ierr);
-      delete[] tau;
-      delete[] work;
+    inline void ptranc
+    (int m, int n, float alpha,
+     const float* a, int ia, int ja, const int *desca,
+     float beta, float *c, int ic, int jc, const int *descc) {
+      FC_GLOBAL(pstran,PSTRAN)
+        (&m, &n, &alpha, a, &ia, &ja, desca, &beta, c, &ic, &jc, descc);
+    }
+    inline void ptranc
+    (int m, int n, double alpha,
+     const double* a, int ia, int ja, const int *desca,
+     double beta, double *c, int ic, int jc, const int *descc) {
+      FC_GLOBAL(pdtran,PDTRAN)
+        (&m, &n, &alpha, a, &ia, &ja, desca, &beta, c, &ic, &jc, descc);
+    }
+    inline void ptranc
+    (int m, int n, std::complex<float> alpha,
+     const std::complex<float>* a, int ia, int ja, const int *desca,
+     std::complex<float> beta,
+     std::complex<float> *c, int ic, int jc, const int *descc) {
+      FC_GLOBAL(pctranc,PCTRANC)
+        (&m, &n, &alpha, a, &ia, &ja, desca, &beta, c, &ic, &jc, descc);
+    }
+    inline void ptranc
+    (int m, int n, std::complex<double> alpha,
+     const std::complex<double>* a, int ia, int ja, const int *desca,
+     std::complex<double> beta,
+     std::complex<double> *c, int ic, int jc, const int *descc) {
+      FC_GLOBAL(pztranc,PZTRANC)
+        (&m, &n, &alpha, a, &ia, &ja, desca, &beta, c, &ic, &jc, descc);
+    }
+
+    inline void pgeqpfmod
+    (int m, int n, float* a, int ia, int ja, const int *desca,
+     int *J, int *piv, int *r,  float tol) {
+      int mb = desca[BLACSmb], nb = desca[BLACSnb];
+      int info, prow, pcol, nprow, npcol;
+      Cblacs_gridinfo(desca[BLACSctxt], &nprow, &npcol, &prow, &pcol);
+      int locra = numroc(m, mb, prow, 0, nprow);
+      int locca = numroc(n, nb, pcol, 0, npcol);
+      int lwork = 3*(1+locra+locca);
+      auto twork = new float[lwork+locca];
+      auto tau = twork + lwork;
+      auto ipiv = new int[n];
+      int IONE = 1;
+      FC_GLOBAL(psgeqpfmod,PSGEQPFMOD)
+        (&m, &n, a, &IONE, &IONE, desca, ipiv, tau,
+         twork, &lwork, &info, J, piv, r, &tol);
+      delete[] twork;
       delete[] ipiv;
     }
-    template<> inline void pgeqpf<  float>(int m, int n,    float *A, int ia, int ja, int *descA, int mb, int nb, int myrow, int mycol, int nprow, int npcol) {
-      int ierr;
-      int locrA = numroc(m, mb, myrow, 0, nprow);
-      int loccA = numroc(n, nb, mycol, 0, npcol);
-      auto ipiv = new int[loccA];
-      auto tau = new float[loccA];
-      int lwork = 3*(1+locrA+loccA);
-      auto work = new float[lwork];
-      psgeqpf_(&m, &n, A, &ia, &ja, descA, ipiv, tau, work, &lwork, &ierr);
-      delete[] tau;
-      delete[] work;
+    inline void pgeqpfmod
+    (int m, int n, double* a, int ia, int ja, const int *desca,
+     int *J, int *piv, int *r, double tol) {
+      int mb = desca[BLACSmb], nb = desca[BLACSnb];
+      int info, prow, pcol, nprow, npcol;
+      Cblacs_gridinfo(desca[BLACSctxt], &nprow, &npcol, &prow, &pcol);
+      int locra = numroc(m, mb, prow, 0, nprow);
+      int locca = numroc(n, nb, pcol, 0, npcol);
+      int lwork = 3*(1+locra+locca);
+      auto twork = new double[lwork+locca];
+      auto tau = twork + lwork;
+      auto ipiv = new int[n];
+      int IONE = 1;
+      FC_GLOBAL(pdgeqpfmod,PDGEQPFMOD)
+        (&m, &n, a, &IONE, &IONE, desca, ipiv, tau,
+         twork, &lwork, &info, J, piv, r, &tol);
+      delete[] twork;
       delete[] ipiv;
     }
-    template<> inline void pgeqpf<c_double>(int m, int n, c_double *A, int ia, int ja, int *descA, int mb, int nb, int myrow, int mycol, int nprow, int npcol) {
-      int ierr;
-      int locrA = numroc(m, mb, myrow, 0, nprow);
-      int loccA = numroc(n, nb, mycol, 0, npcol);
-      auto ipiv = new int[loccA];
-      auto tau = new c_double[loccA];
-      int lwork = 3*(1+locrA+loccA);
-      auto work = new c_double[lwork];
-      int lrwork = 2*(1+loccA);
-      auto rwork = new double[lrwork];
-      pzgeqpf_(&m, &n, A, &ia, &ja, descA, ipiv, tau, work, &lwork, rwork, &lrwork, &ierr);
-      delete[] tau;
-      delete[] work;
-      delete[] ipiv;
-      delete[] rwork;
-    }
-    template<> inline void pgeqpf<c_float>(int m, int n, c_float *A, int ia, int ja, int *descA, int mb, int nb, int myrow, int mycol, int nprow, int npcol) {
-      int ierr;
-      int locrA = numroc(m, mb, myrow, 0, nprow);
-      int loccA = numroc(n, nb, mycol, 0, npcol);
-      auto ipiv = new int[loccA];
-      auto tau = new c_float[loccA];
-      int lwork = 3*(1+locrA+loccA);
-      auto work = new c_float[lwork];
-      int lrwork = 2*(1+loccA);
+    inline void pgeqpfmod
+    (int m, int n, std::complex<float>* a, int ia, int ja, const int *desca,
+     int *J, int *piv, int *r, float tol) {
+      int mb = desca[BLACSmb], nb = desca[BLACSnb];
+      int info, prow, pcol, nprow, npcol;
+      Cblacs_gridinfo(desca[BLACSctxt], &nprow, &npcol, &prow, &pcol);
+      int locra = numroc(m, mb, prow, 0, nprow);
+      int locca = numroc(n, nb, pcol, 0, npcol);
+      int lwork = 3*(1+locra+locca);
+      auto twork = new std::complex<float>[lwork+locca];
+      auto tau = twork + lwork;
+      int lrwork = 2*(1+locca);
       auto rwork = new float[lrwork];
-      pcgeqpf_(&m, &n, A, &ia, &ja, descA, ipiv, tau, work, &lwork, rwork, &lrwork, &ierr);
-      delete[] tau;
-      delete[] work;
-      delete[] ipiv;
+      auto ipiv = new int[n];
+      int IONE = 1;
+      FC_GLOBAL(pcgeqpfmod,PCGEQPFMOD)
+        (&m, &n, a, &IONE, &IONE, desca, ipiv, tau,
+         twork, &lwork, rwork, &lrwork, &info, J, piv, r, &tol);
+      delete[] twork;
       delete[] rwork;
-    }
-
-    /* PxGEQPFmod */
-    template<typename T, typename S> inline void pgeqpfmod(int, int, T *, int, int , int *, int *, int *, int *, S, int, int, int, int, int, int);
-    template<> inline void pgeqpfmod(int m, int n, double *A, int ia, int ja, int *descA, int *J, int *piv, int *r, double tol, int mb, int nb, int myrow, int mycol, int nprow, int npcol) {
-      int info;
-      int locrA = numroc(m, mb, myrow, 0, nprow);
-      int loccA = numroc(n, nb, mycol, 0, npcol);
-      int lwork = 3*(1+locrA+loccA);
-      auto twork = new double[lwork];
-      auto tau = new double[loccA];
-      auto ipiv = new int[n];
-      int IONE = 1;
-      pdgeqpfmod_(&m, &n, A, &IONE, &IONE, descA, ipiv, tau, twork, &lwork, &info, J, piv, r, &tol);
-      delete[] tau;
-      delete[] twork;
       delete[] ipiv;
     }
-    template<> inline void pgeqpfmod(int m, int n,  float *A, int ia, int ja, int *descA, int *J, int *piv, int *r,  float tol, int mb, int nb, int myrow, int mycol, int nprow, int npcol) {
-      int info;
-      int locrA = numroc(m, mb, myrow, 0, nprow);
-      int loccA = numroc(n, nb, mycol, 0, npcol);
-      int lwork=3*(1+locrA+loccA);
-      auto twork = new float[lwork];
-      auto tau = new float[loccA];
-      auto ipiv = new int[n];
-      int IONE = 1;
-      psgeqpfmod_(&m, &n, A, &IONE, &IONE, descA, ipiv, tau, twork, &lwork, &info, J, piv, r, &tol);
-      delete[] tau;
-      delete[] twork;
-      delete[] ipiv;
-    }
-    template<> inline void pgeqpfmod(int m, int n, c_double *A, int ia, int ja, int *descA, int *J, int *piv, int *r, double tol, int mb, int nb, int myrow, int mycol, int nprow, int npcol) {
-      int info;
-      int locrA = numroc(m, mb, myrow, 0, nprow);
-      int loccA = numroc(n, nb, mycol, 0, npcol);
-      int lwork = 3*(1+locrA+loccA);
-      auto twork = new c_double[lwork];
-      int lrwork = 2*(1+loccA);
+    inline void pgeqpfmod
+    (int m, int n, std::complex<double>* a, int ia, int ja, const int *desca,
+     int *J, int *piv, int *r, double tol) {
+      int mb = desca[BLACSmb], nb = desca[BLACSnb];
+      int info, prow, pcol, nprow, npcol;
+      Cblacs_gridinfo(desca[BLACSctxt], &nprow, &npcol, &prow, &pcol);
+      int locra = numroc(m, mb, prow, 0, nprow);
+      int locca = numroc(n, nb, pcol, 0, npcol);
+      int lwork = 3*(1+locra+locca);
+      auto twork = new std::complex<double>[lwork+locca];
+      auto tau = twork + lwork;
+      int lrwork = 2*(1+locca);
       auto rwork = new double[lrwork];
-      auto tau = new c_double[loccA];
       auto ipiv = new int[n];
       int IONE = 1;
-      pzgeqpfmod_(&m, &n, A, &IONE, &IONE, descA, ipiv, tau, twork, &lwork, rwork, &lrwork, &info, J, piv, r, &tol);
-      delete[] tau;
-      delete[] twork;
-      delete[] rwork;
-      delete[] ipiv;
-    }
-    template<> inline void pgeqpfmod(int m, int n, c_float *A, int ia, int ja, int *descA, int *J, int *piv, int *r,  float tol, int mb, int nb, int myrow, int mycol, int nprow, int npcol) {
-      int info;
-      int locrA = numroc(m, mb, myrow, 0, nprow);
-      int loccA = numroc(n, nb, mycol, 0, npcol);
-      int lwork = 3*(1+locrA+loccA);
-      auto twork = new c_float[lwork];
-      int lrwork = 2*(1+loccA);
-      auto rwork = new float[lrwork];
-      auto tau = new c_float[loccA];
-      auto ipiv = new int[n];
-      int IONE = 1;
-      pcgeqpfmod_(&m, &n, A, &IONE, &IONE, descA, ipiv, tau, twork, &lwork, rwork, &lrwork, &info, J, piv, r, &tol);
-      delete[] tau;
+      FC_GLOBAL(pzgeqpfmod,PZGEQPFMOD)
+        (&m, &n, a, &IONE, &IONE, desca, ipiv, tau,
+         twork, &lwork, rwork, &lrwork, &info, J, piv, r, &tol);
       delete[] twork;
       delete[] rwork;
       delete[] ipiv;
     }
 
-    /* PxGETRF */
-    template<typename T> inline int pgetrf(int, int, T *, int, int, int *, int *);
-    template<> inline int pgetrf(int m, int n,   double *A, int ia, int ja, int *descA, int *ipiv) {
+    inline int pgetrf
+    (int m, int n, float* a, int ia, int ja, const int *desca, int *ipiv) {
       int info;
-      pdgetrf_(&m,&n,A,&ia,&ja,descA,ipiv,&info);
+      FC_GLOBAL(psgetrf,PSGETRF)(&m, &n, a, &ia, &ja, desca, ipiv, &info);
       return info;
     }
-    template<> inline int pgetrf(int m, int n,    float *A, int ia, int ja, int *descA, int *ipiv) {
+    inline int pgetrf
+    (int m, int n, double* a, int ia, int ja, const int *desca, int *ipiv) {
       int info;
-      psgetrf_(&m,&n,A,&ia,&ja,descA,ipiv,&info);
+      FC_GLOBAL(pdgetrf,PDGETRF)(&m, &n, a, &ia, &ja, desca, ipiv, &info);
       return info;
     }
-    template<> inline int pgetrf(int m, int n, c_double *A, int ia, int ja, int *descA, int *ipiv) {
+    inline int pgetrf
+    (int m, int n, std::complex<float>* a, int ia, int ja,
+     const int *desca, int *ipiv) {
       int info;
-      pzgetrf_(&m,&n,A,&ia,&ja,descA,ipiv,&info);
+      FC_GLOBAL(pcgetrf,PCGETRF)(&m, &n, a, &ia, &ja, desca, ipiv, &info);
       return info;
     }
-    template<> inline int pgetrf(int m, int n, c_float *A, int ia, int ja, int *descA, int *ipiv) {
+    inline int pgetrf
+    (int m, int n, std::complex<double>* a, int ia, int ja,
+     const int *desca, int *ipiv) {
       int info;
-      pcgetrf_(&m,&n,A,&ia,&ja,descA,ipiv,&info);
-      return info;
-    }
-
-    /* PxGETRS */
-    template<typename T> inline int pgetrs(char, int, int, T *, int, int, int *, int *, T *, int, int, int *);
-    template<> inline int pgetrs(char trans, int m, int n,   double *A, int ia, int ja, int *descA, int *ipiv, double *B, int ib, int jb, int *descB) {
-      int info;
-      pdgetrs_(&trans,&m,&n,A,&ia,&ja,descA,ipiv,B,&ib,&jb,descB,&info);
-      return info;
-    }
-    template<> inline int pgetrs(char trans, int m, int n,    float *A, int ia, int ja, int *descA, int *ipiv, float *B, int ib, int jb, int *descB) {
-      int info;
-      psgetrs_(&trans,&m,&n,A,&ia,&ja,descA,ipiv,B,&ib,&jb,descB,&info);
-      return info;
-    }
-    template<> inline int pgetrs(char trans, int m, int n, c_double *A, int ia, int ja, int *descA, int *ipiv, c_double *B, int ib, int jb, int *descB) {
-      int info;
-      pzgetrs_(&trans,&m,&n,A,&ia,&ja,descA,ipiv,B,&ib,&jb,descB,&info);
-      return info;
-    }
-    template<> inline int pgetrs(char trans, int m, int n, c_float *A, int ia, int ja, int *descA, int *ipiv, c_float *B, int ib, int jb, int *descB) {
-      int info;
-      pcgetrs_(&trans,&m,&n,A,&ia,&ja,descA,ipiv,B,&ib,&jb,descB,&info);
+      FC_GLOBAL(pzgetrf,PZGETRF)(&m, &n, a, &ia, &ja, desca, ipiv, &info);
       return info;
     }
 
-    /* PxGELQF */
-    template<typename T> inline void pgelqf (int, int, T *A, int, int , int *, T *, int, int, int, int, int, int);
-    template<> inline void pgelqf< double>(int m, int n,   double *A, int ia, int ja, int *descA, double * tau, int mb, int nb, int myrow, int mycol, int nprow, int npcol) {
-      int ierr;
-      int locrA = numroc(m, mb, myrow, 0, nprow);
-      int loccA = numroc(n, nb, mycol, 0, npcol);
-      int lwork = mb*(mb+locrA+loccA);
-      auto work = new double[lwork];
-      pdgelqf_(&m, &n, A, &ia, &ja, descA, tau, work, &lwork, &ierr);
-      delete[] work;
+    inline int pgetrs
+    (char trans, int m, int n,
+     const float* a, int ia, int ja, const int *desca, const int *ipiv,
+     float* b, int ib, int jb, const int *descb) {
+      int info;
+      FC_GLOBAL(psgetrs,PSGETRS)
+        (&trans, &m, &n, a, &ia, &ja, desca, ipiv,
+         b, &ib, &jb, descb, &info);
+      return info;
     }
-    template<> inline void pgelqf<  float>(int m, int n,    float *A, int ia, int ja, int *descA, float *tau, int mb, int nb, int myrow, int mycol, int nprow, int npcol) {
-      int ierr;
-      int locrA = numroc(m, mb, myrow, 0, nprow);
-      int loccA = numroc(n, nb, mycol, 0, npcol);
-      int lwork = mb*(mb+locrA+loccA);
+    inline int pgetrs
+    (char trans, int m, int n,
+     const double* a, int ia, int ja, const int *desca,
+     const int *ipiv, double* b, int ib, int jb, const int *descb) {
+      int info;
+      FC_GLOBAL(pdgetrs,PDGETRS)
+        (&trans, &m, &n, a, &ia, &ja, desca, ipiv,
+         b, &ib, &jb, descb, &info);
+      return info;
+    }
+    inline int pgetrs
+    (char trans, int m, int n, const std::complex<float>* a,
+     int ia, int ja, const int *desca, const int *ipiv,
+     std::complex<float>* b, int ib, int jb, const int *descb) {
+      int info;
+      FC_GLOBAL(pcgetrs,PCGETRS)
+        (&trans, &m, &n, a, &ia, &ja, desca, ipiv, b, &ib, &jb, descb, &info);
+      return info;
+    }
+    inline int pgetrs
+    (char trans, int m, int n, const std::complex<double>* a,
+     int ia, int ja, const int *desca, const int *ipiv,
+     std::complex<double>* b, int ib, int jb, const int *descb) {
+      int info;
+      FC_GLOBAL(pzgetrs,PZGETRS)
+        (&trans, &m, &n, a, &ia, &ja, desca, ipiv, b, &ib, &jb, descb, &info);
+      return info;
+    }
+
+    inline void pgelqf
+    (int m, int n, float* a, int ia, int ja, const int *desca, float *tau) {
+      int mb = desca[BLACSmb], nb = desca[BLACSnb];
+      int info, prow, pcol, nprow, npcol;
+      Cblacs_gridinfo(desca[BLACSctxt], &nprow, &npcol, &prow, &pcol);
+      int locra = numroc(m, mb, prow, 0, nprow);
+      int locca = numroc(n, nb, pcol, 0, npcol);
+      int lwork = mb*(mb+locra+locca);
       auto work = new float[lwork];
-      psgelqf_(&m, &n, A, &ia, &ja, descA, tau, work, &lwork, &ierr);
+      FC_GLOBAL(psgelqf,PSGELQF)
+        (&m, &n, a, &ia, &ja, desca, tau, work, &lwork, &info);
       delete[] work;
     }
-    template<> inline void pgelqf<c_double>(int m, int n, c_double *A, int ia, int ja, int *descA, c_double *tau, int mb, int nb, int myrow, int mycol, int nprow, int npcol) {
-      int ierr;
-      int locrA = numroc(m, mb, myrow, 0, nprow);
-      int loccA = numroc(n, nb, mycol, 0, npcol);
-      int lwork = mb*(mb+locrA+loccA);
-      auto work = new c_double[lwork];
-      pzgelqf_(&m, &n, A, &ia, &ja, descA, tau, work, &lwork, &ierr);
-      delete[] work;
-    }
-    template<> inline void pgelqf<c_float>(int m, int n, c_float *A, int ia, int ja, int *descA, c_float *tau, int mb, int nb, int myrow, int mycol, int nprow, int npcol) {
-      int ierr;
-      int locrA = numroc(m, mb, myrow, 0, nprow);
-      int loccA = numroc(n, nb, mycol, 0, npcol);
-      int lwork = mb*(mb+locrA+loccA);
-      auto work = new c_float[lwork];
-      pcgelqf_(&m, &n, A, &ia, &ja, descA, tau, work, &lwork, &ierr);
-      delete[] work;
-    }
-
-    /* PxxxGLQ */
-    template<typename T> inline void pxxglq(int, int, int, T *, int, int, int *, T *, int, int, int, int, int, int);
-    template<> inline void pxxglq<double>(int m, int n, int k, double *A, int ia, int ja, int *descA, double *tau, int mb, int nb, int myrow, int mycol, int nprow, int npcol) {
-      int ierr;
-      int locrA = numroc(m, mb, myrow, 0, nprow);
-      int loccA = numroc(n, nb, mycol, 0, npcol);
-      int lwork=mb*(mb+locrA+loccA);
+    inline void pgelqf
+    (int m, int n, double* a, int ia, int ja, const int *desca, double *tau) {
+      int mb = desca[BLACSmb], nb = desca[BLACSnb];
+      int info, prow, pcol, nprow, npcol;
+      Cblacs_gridinfo(desca[BLACSctxt], &nprow, &npcol, &prow, &pcol);
+      int locra = numroc(m, mb, prow, 0, nprow);
+      int locca = numroc(n, nb, pcol, 0, npcol);
+      int lwork = mb*(mb+locra+locca);
       auto work = new double[lwork];
-      pdorglq_(&m, &n, &k, A, &ia, &ja, descA, tau, work, &lwork, &ierr);
+      FC_GLOBAL(pdgelqf,PDGELQF)
+        (&m, &n, a, &ia, &ja, desca, tau, work, &lwork, &info);
       delete[] work;
     }
-    template<> inline void pxxglq<  float>(int m, int n, int k, float *A, int ia, int ja, int *descA, float *tau, int mb, int nb, int myrow, int mycol, int nprow, int npcol) {
-      int ierr;
-      int locrA = numroc(m, mb, myrow, 0, nprow);
-      int loccA = numroc(n, nb, mycol, 0, npcol);
-      int lwork = mb*(mb+locrA+loccA);
+    inline void pgelqf
+    (int m, int n, std::complex<float>* a, int ia, int ja, const int *desca,
+     std::complex<float> *tau) {
+      int mb = desca[BLACSmb], nb = desca[BLACSnb];
+      int info, prow, pcol, nprow, npcol;
+      Cblacs_gridinfo(desca[BLACSctxt], &nprow, &npcol, &prow, &pcol);
+      int locra = numroc(m, mb, prow, 0, nprow);
+      int locca = numroc(n, nb, pcol, 0, npcol);
+      int lwork = mb*(mb+locra+locca);
+      auto work = new std::complex<float>[lwork];
+      FC_GLOBAL(pcgelqf,PCGELQF)
+        (&m, &n, a, &ia, &ja, desca, tau, work, &lwork, &info);
+      delete[] work;
+    }
+    inline void pgelqf
+    (int m, int n, std::complex<double>* a, int ia, int ja, const int *desca,
+     std::complex<double> *tau) {
+      int mb = desca[BLACSmb], nb = desca[BLACSnb];
+      int info, prow, pcol, nprow, npcol;
+      Cblacs_gridinfo(desca[BLACSctxt], &nprow, &npcol, &prow, &pcol);
+      int locra = numroc(m, mb, prow, 0, nprow);
+      int locca = numroc(n, nb, pcol, 0, npcol);
+      int lwork = mb*(mb+locra+locca);
+      auto work = new std::complex<double>[lwork];
+      FC_GLOBAL(pzgelqf,PZGELQF)
+        (&m, &n, a, &ia, &ja, desca, tau, work, &lwork, &info);
+      delete[] work;
+    }
+
+    inline void pxxglq
+    (int m, int n, int k, float* a, int ia, int ja, const int *desca,
+     const float *tau) {
+      int mb = desca[BLACSmb], nb = desca[BLACSnb];
+      int info, prow, pcol, nprow, npcol;
+      Cblacs_gridinfo(desca[BLACSctxt], &nprow, &npcol, &prow, &pcol);
+      int locra = numroc(m, mb, prow, 0, nprow);
+      int locca = numroc(n, nb, pcol, 0, npcol);
+      int lwork = mb*(mb+locra+locca);
       auto work = new float[lwork];
-      psorglq_(&m, &n, &k, A, &ia, &ja, descA, tau, work, &lwork, &ierr);
+      FC_GLOBAL(psorglq,PSORGLQ)
+        (&m, &n, &k, a, &ia, &ja, desca, tau, work, &lwork, &info);
       delete[] work;
     }
-    template<> inline void pxxglq<c_double>(int m, int n, int k, c_double *A, int ia, int ja, int *descA, c_double *tau, int mb, int nb, int myrow, int mycol, int nprow, int npcol) {
-      int ierr;
-      int locrA = numroc(m, mb, myrow, 0, nprow);
-      int loccA = numroc(n, nb, mycol, 0, npcol);
-      int lwork = mb*(mb+locrA+loccA);
-      auto work = new c_double[lwork];
-      pzunglq_(&m, &n, &k, A, &ia, &ja, descA, tau, work, &lwork, &ierr);
+    inline void pxxglq
+    (int m, int n, int k, double* a, int ia, int ja, const int *desca,
+     const double *tau) {
+      int mb = desca[BLACSmb], nb = desca[BLACSnb];
+      int info, prow, pcol, nprow, npcol;
+      Cblacs_gridinfo(desca[BLACSctxt], &nprow, &npcol, &prow, &pcol);
+      int locra = numroc(m, mb, prow, 0, nprow);
+      int locca = numroc(n, nb, pcol, 0, npcol);
+      int lwork = mb*(mb+locra+locca);
+      auto work = new double[lwork];
+      FC_GLOBAL(pdorglq,PDORGLQ)
+        (&m, &n, &k, a, &ia, &ja, desca, tau, work, &lwork, &info);
       delete[] work;
     }
-    template<> inline void pxxglq<c_float>(int m, int n, int k, c_float *A, int ia, int ja, int *descA, c_float *tau, int mb, int nb, int myrow, int mycol, int nprow, int npcol) {
-      int ierr;
-      int locrA = numroc(m, mb, myrow, 0, nprow);
-      int loccA = numroc(n, nb, mycol, 0, npcol);
-      int lwork = mb*(mb+locrA+loccA);
-      auto work = new c_float[lwork];
-      pcunglq_(&m, &n, &k, A, &ia, &ja, descA, tau, work, &lwork, &ierr);
+    inline void pxxglq
+    (int m, int n, int k,
+     std::complex<float>* a, int ia, int ja, const int *desca,
+     const std::complex<float> *tau) {
+      int mb = desca[BLACSmb], nb = desca[BLACSnb];
+      int info, prow, pcol, nprow, npcol;
+      Cblacs_gridinfo(desca[BLACSctxt], &nprow, &npcol, &prow, &pcol);
+      int locra = numroc(m, mb, prow, 0, nprow);
+      int locca = numroc(n, nb, pcol, 0, npcol);
+      int lwork = mb*(mb+locra+locca);
+      auto work = new std::complex<float>[lwork];
+      FC_GLOBAL(pcunglq,PCUNGLQ)
+        (&m, &n, &k, a, &ia, &ja, desca, tau, work, &lwork, &info);
+      delete[] work;
+    }
+    inline void pxxglq
+    (int m, int n, int k,
+     std::complex<double>* a, int ia, int ja, const int *desca,
+     const std::complex<double> *tau) {
+      int mb = desca[BLACSmb], nb = desca[BLACSnb];
+      int info, prow, pcol, nprow, npcol;
+      Cblacs_gridinfo(desca[BLACSctxt], &nprow, &npcol, &prow, &pcol);
+      int locra = numroc(m, mb, prow, 0, nprow);
+      int locca = numroc(n, nb, pcol, 0, npcol);
+      int lwork = mb*(mb+locra+locca);
+      auto work = new std::complex<double>[lwork];
+      FC_GLOBAL(pzunglq,PZUNGLQ)
+        (&m, &n, &k, a, &ia, &ja, desca, tau, work, &lwork, &info);
       delete[] work;
     }
 
-    /* PxNRM2; this one is used only in the examples */
-    template<typename T, typename S> inline S pnrm2(int, T *, int, int, int *, int);
-    template<> inline double pnrm2<double, double>(int n, double *X, int ix, int jx, int *descX, int incx) {
-      double nrm;
-      pdnrm2_(&n,&nrm,X,&ix,&jx,descX,&incx);
-      return nrm;
-    }
-    template<> inline float pnrm2<float, float>(int n, float *X, int ix, int jx, int *descX, int incx) {
-      float nrm;
-      psnrm2_(&n,&nrm,X,&ix,&jx,descX,&incx);
-      return nrm;
-    }
-    template<> inline double pnrm2<c_double, double>(int n, c_double *X, int ix, int jx, int *descX, int incx) {
-      double nrm;
-      pdznrm2_(&n,&nrm,X,&ix,&jx,descX,&incx);
-      return nrm;
-    }
-    template<> inline float pnrm2<c_float, float>(int n, c_float *X, int ix, int jx, int *descX, int incx) {
-      float nrm;
-      pscnrm2_(&n,&nrm,X,&ix,&jx,descX,&incx);
-      return nrm;
-    }
-
-    // New
-    /* PxDOT; this one is used only in the examples */
-    template<typename T> inline void pdot(int, T *, T *, int, int, int *, int, T *, int, int, int *, int);
-    template<> inline void pdot<double>(int n, double *dot, double *X, int iX, int jX, int *descX, int incX, double *Y, int iY, int jY, int *descY, int incY) {
-      pddot_(&n,dot,X,&iX,&jX,descX,&incX,Y,&iY,&jY,descY,&incY);
-    }
-    template<> inline void pdot<float>(int n, float *dot, float *X, int iX, int jX, int *descX, int incX, float *Y, int iY, int jY, int *descY, int incY) {
-      psdot_(&n,dot,X,&iX,&jX,descX,&incX,Y,&iY,&jY,descY,&incY);
-    }
-    template<> inline void pdot<c_double>(int n, c_double *dot, c_double *X, int iX, int jX, int *descX, int incX, c_double *Y, int iY, int jY, int *descY, int incY) {
-      pzdot_(&n,dot,X,&iX,&jX,descX,&incX,Y,&iY,&jY,descY,&incY);
-    }
-    template<> inline void pdot<c_float>(int n, c_float *dot, c_float *X, int iX, int jX, int *descX, int incX, c_float *Y, int iY, int jY, int *descY, int incY) {
-      pcdot_(&n,dot,X,&iX,&jX,descX,&incX,Y,&iY,&jY,descY,&incY);
-    }
-
-
-    inline int pgeqrf(int m, int n, double *A, int ia, int ja, int *descA,
-                      double *tau, double* work, int lwork) {
+    inline int pgeqrf
+    (int m, int n, float* a, int ia, int ja, const int *desca,
+     float *tau, float* work, int lwork) {
       int info;
-      pdgeqrf_(&m, &n, A, &ia, &ja, descA, tau, work, &lwork, &info);
+      FC_GLOBAL(psgeqrf,PSGEQRF)
+        (&m, &n, a, &ia, &ja, desca, tau, work, &lwork, &info);
       return info;
     }
-    inline int pgeqrf(int m, int n, float *A, int ia, int ja, int *descA,
-                      float *tau, float* work, int lwork) {
+    inline int pgeqrf
+    (int m, int n, double* a, int ia, int ja, const int *desca,
+     double *tau, double* work, int lwork) {
       int info;
-      psgeqrf_(&m, &n, A, &ia, &ja, descA, tau, work, &lwork, &info);
+      FC_GLOBAL(pdgeqrf,PDGEQRF)
+        (&m, &n, a, &ia, &ja, desca, tau, work, &lwork, &info);
       return info;
     }
-    inline int pgeqrf(int m, int n, c_double *A, int ia, int ja, int *descA,
-                      c_double *tau, c_double* work, int lwork) {
+    inline int pgeqrf
+    (int m, int n, std::complex<float>* a, int ia, int ja, const int *desca,
+     std::complex<float> *tau, std::complex<float>* work, int lwork) {
       int info;
-      pzgeqrf_(&m, &n, A, &ia, &ja, descA, tau, work, &lwork, &info);
+      FC_GLOBAL(pcgeqrf,PCGEQRF)
+        (&m, &n, a, &ia, &ja, desca, tau, work, &lwork, &info);
       return info;
     }
-    inline int pgeqrf(int m, int n, c_float *A, int ia, int ja, int *descA,
-                      c_float *tau, c_float* work, int lwork) {
+    inline int pgeqrf
+    (int m, int n, std::complex<double>* a, int ia, int ja, const int *desca,
+     std::complex<double> *tau, std::complex<double>* work, int lwork) {
       int info;
-      pcgeqrf_(&m, &n, A, &ia, &ja, descA, tau, work, &lwork, &info);
+      FC_GLOBAL(pzgeqrf,PZGEQRF)
+        (&m, &n, a, &ia, &ja, desca, tau, work, &lwork, &info);
       return info;
     }
-    template<typename T> inline int
-    pgeqrf(int m, int n, T* A, int ia, int ja, int *descA, T* tau) {
+    template<typename T> inline int pgeqrf
+    (int m, int n, T* a, int ia, int ja, const int *desca, T* tau) {
       T lwork;
-      pgeqrf(m, n, A, ia, ja, descA, tau, &lwork, -1);
+      pgeqrf(m, n, a, ia, ja, desca, tau, &lwork, -1);
       int ilwork = int(std::real(lwork));
       auto work = new T[ilwork];
-      int info = pgeqrf(m, n, A, ia, ja, descA, tau, work, ilwork);
+      int info = pgeqrf(m, n, a, ia, ja, desca, tau, work, ilwork);
       delete[] work;
       STRUMPACK_FLOPS((is_complex<T>()?4:1)*static_cast<long long int>(((m>n) ? (double(n)*(double(n)*(.5-(1./3.)*double(n)+double(m)) + double(m) + 23./6.)) : (double(m)*(double(m)*(-.5-(1./3.)*double(m)+double(n)) + 2.*double(n) + 23./6.))) + ((m>n) ? (double(n)*(double(n)*(.5-(1./3.)*double(n)+double(m)) + 5./6.)) : (double(m)*(double(m)*(-.5-(1./3.)*double(m)+double(n)) + double(n) + 5./6.)))));
       return info;
     }
 
-
-    inline int pxxgqr(int m, int n, int k, double* A, int ia, int ja,
-                      int* descA, double* tau, double* work, int lwork) {
+    inline int pxxgqr
+    (int m, int n, int k, float* a, int ia, int ja,
+     const int* desca, const float* tau, float* work, int lwork) {
+      int info;
+      char R = 'R', C = 'C', B = 'B', rowbtop, colbtop;
+      FC_GLOBAL(pb_topget,PB_TOPGET)(&desca[BLACSctxt], &B, &R, &rowbtop);
+      FC_GLOBAL(pb_topget,PB_TOPGET)(&desca[BLACSctxt], &B, &C, &colbtop);
+      FC_GLOBAL(psorgqr,PSORGQR)
+        (&m, &n, &k, a, &ia, &ja, desca, tau, work, &lwork, &info);
+      FC_GLOBAL(pb_topset,PB_TOPSET)(&desca[BLACSctxt], &B, &R, &rowbtop);
+      FC_GLOBAL(pb_topset,PB_TOPSET)(&desca[BLACSctxt], &B, &C, &colbtop);
+      return info;
+    }
+    inline int pxxgqr
+    (int m, int n, int k, double* a, int ia, int ja,
+     const int* desca, const double* tau, double* work, int lwork) {
       int info;
       // workaround for ScaLAPACK bug:
       //   http://icl.cs.utk.edu/lapack-forum/viewtopic.php?f=2&t=4510
       char R = 'R', C = 'C', B = 'B', rowbtop, colbtop;
-      pb_topget_(&descA[BLACSctxt], &B, &R, &rowbtop);
-      pb_topget_(&descA[BLACSctxt], &B, &C, &colbtop);
-      pdorgqr_(&m, &n, &k, A, &ia, &ja, descA, tau, work, &lwork, &info);
-      pb_topset_(&descA[BLACSctxt], &B, &R, &rowbtop);
-      pb_topset_(&descA[BLACSctxt], &B, &C, &colbtop);
+      FC_GLOBAL(pb_topget,PB_TOPGET)(&desca[BLACSctxt], &B, &R, &rowbtop);
+      FC_GLOBAL(pb_topget,PB_TOPGET)(&desca[BLACSctxt], &B, &C, &colbtop);
+      FC_GLOBAL(pdorgqr,PDORGQR)
+        (&m, &n, &k, a, &ia, &ja, desca, tau, work, &lwork, &info);
+      FC_GLOBAL(pb_topset,PB_TOPSET)(&desca[BLACSctxt], &B, &R, &rowbtop);
+      FC_GLOBAL(pb_topset,PB_TOPSET)(&desca[BLACSctxt], &B, &C, &colbtop);
       return info;
     }
-    inline int pxxgqr(int m, int n, int k, float* A, int ia, int ja,
-                      int* descA, float* tau, float* work, int lwork) {
+    inline int pxxgqr
+    (int m, int n, int k, std::complex<float>* a, int ia, int ja,
+     const int* desca, const std::complex<float>* tau,
+     std::complex<float>* work, int lwork) {
       int info;
       char R = 'R', C = 'C', B = 'B', rowbtop, colbtop;
-      pb_topget_(&descA[BLACSctxt], &B, &R, &rowbtop);
-      pb_topget_(&descA[BLACSctxt], &B, &C, &colbtop);
-      psorgqr_(&m, &n, &k, A, &ia, &ja, descA, tau, work, &lwork, &info);
-      pb_topset_(&descA[BLACSctxt], &B, &R, &rowbtop);
-      pb_topset_(&descA[BLACSctxt], &B, &C, &colbtop);
+      FC_GLOBAL(pb_topget,PB_TOPGET)(&desca[BLACSctxt], &B, &R, &rowbtop);
+      FC_GLOBAL(pb_topget,PB_TOPGET)(&desca[BLACSctxt], &B, &C, &colbtop);
+      FC_GLOBAL(pcungqr,PCUNGQR)
+        (&m, &n, &k, a, &ia, &ja, desca, tau, work, &lwork, &info);
+      FC_GLOBAL(pb_topset,PB_TOPSET)(&desca[BLACSctxt], &B, &R, &rowbtop);
+      FC_GLOBAL(pb_topset,PB_TOPSET)(&desca[BLACSctxt], &B, &C, &colbtop);
       return info;
     }
-    inline int pxxgqr(int m, int n, int k, c_double* A, int ia, int ja,
-                      int* descA, c_double* tau, c_double* work, int lwork) {
+    inline int pxxgqr
+    (int m, int n, int k, std::complex<double>* a, int ia, int ja,
+     const int* desca, const std::complex<double>* tau,
+     std::complex<double>* work, int lwork) {
       int info;
       char R = 'R', C = 'C', B = 'B', rowbtop, colbtop;
-      pb_topget_(&descA[BLACSctxt], &B, &R, &rowbtop);
-      pb_topget_(&descA[BLACSctxt], &B, &C, &colbtop);
-      pzungqr_(&m, &n, &k, A, &ia, &ja, descA, tau, work, &lwork, &info);
-      pb_topset_(&descA[BLACSctxt], &B, &R, &rowbtop);
-      pb_topset_(&descA[BLACSctxt], &B, &C, &colbtop);
+      FC_GLOBAL(pb_topget,PB_TOPGET)(&desca[BLACSctxt], &B, &R, &rowbtop);
+      FC_GLOBAL(pb_topget,PB_TOPGET)(&desca[BLACSctxt], &B, &C, &colbtop);
+      FC_GLOBAL(pzungqr,PZUNGQR)
+        (&m, &n, &k, a, &ia, &ja, desca, tau, work, &lwork, &info);
+      FC_GLOBAL(pb_topset,PB_TOPSET)(&desca[BLACSctxt], &B, &R, &rowbtop);
+      FC_GLOBAL(pb_topset,PB_TOPSET)(&desca[BLACSctxt], &B, &C, &colbtop);
       return info;
     }
-    inline int pxxgqr(int m, int n, int k, c_float* A, int ia, int ja,
-                      int* descA, c_float* tau, c_float* work, int lwork) {
-      int info;
-      char R = 'R', C = 'C', B = 'B', rowbtop, colbtop;
-      pb_topget_(&descA[BLACSctxt], &B, &R, &rowbtop);
-      pb_topget_(&descA[BLACSctxt], &B, &C, &colbtop);
-      pcungqr_(&m, &n, &k, A, &ia, &ja, descA, tau, work, &lwork, &info);
-      pb_topset_(&descA[BLACSctxt], &B, &R, &rowbtop);
-      pb_topset_(&descA[BLACSctxt], &B, &C, &colbtop);
-      return info;
-    }
-
-    template<typename T> inline int
-    pxxgqr(int m, int n, int k, T* A, int ia, int ja, int* descA, T* tau) {
+    template<typename T> inline int pxxgqr
+    (int m, int n, int k, T* a, int ia, int ja, int* desca, T* tau) {
       T lwork;
-      int info = pxxgqr(m, n, k, A, ia, ja, descA, tau, &lwork, -1);
+      int info = pxxgqr(m, n, k, a, ia, ja, desca, tau, &lwork, -1);
       int ilwork = int(std::real(lwork));
       auto work = new T[ilwork];
-      info = pxxgqr(m, n, k, A, ia, ja, descA, tau, work, ilwork);
+      info = pxxgqr(m, n, k, a, ia, ja, desca, tau, work, ilwork);
       STRUMPACK_FLOPS((is_complex<T>()?4:1)*static_cast<long long int>((n==k) ? ((2./3.)*double(n)*double(n)*(3.*double(m) - double(n))) : (4.*double(m)*double(n)*double(k) - 2.*(double(m) + double(n))*double(k)*double(k) + (4./3.)*double(k)*double(k)*double(k))));
       delete[] work;
       return info;

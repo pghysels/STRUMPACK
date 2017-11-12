@@ -199,7 +199,7 @@ int main(int argc, char* argv[]) {
 
   MPI_Errhandler_free(&eh);
   TimerList::Finalize();
-  Cblacs_exit(1);
+  scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return ierr;
 }

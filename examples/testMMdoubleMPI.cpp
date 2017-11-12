@@ -116,7 +116,7 @@ int main(int argc, char* argv[]) {
     delete A;
   }
   TimerList::Finalize();
-  Cblacs_exit(1);
+  scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return 0;
 }

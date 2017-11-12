@@ -149,23 +149,23 @@ namespace strumpack {
       if (active_procs < total_procs) {
         auto active_front_comm = mpi_sub_comm(front_comm, 0, active_procs);
         if (mpi_rank(front_comm) < active_procs) {
-          ctxt = Csys2blacs_handle(active_front_comm);
-          Cblacs_gridinit(&ctxt, "C", proc_rows, proc_cols);
+          ctxt = scalapack::Csys2blacs_handle(active_front_comm);
+          scalapack::Cblacs_gridinit(&ctxt, "C", proc_rows, proc_cols);
         } else ctxt = -1;
         mpi_free_comm(&active_front_comm);
       } else {
-        ctxt = Csys2blacs_handle(front_comm);
-        Cblacs_gridinit(&ctxt, "C", proc_rows, proc_cols);
+        ctxt = scalapack::Csys2blacs_handle(front_comm);
+        scalapack::Cblacs_gridinit(&ctxt, "C", proc_rows, proc_cols);
       }
-      ctxt_all = Csys2blacs_handle(front_comm);
-      Cblacs_gridinit(&ctxt_all, "R", 1, total_procs);
+      ctxt_all = scalapack::Csys2blacs_handle(front_comm);
+      scalapack::Cblacs_gridinit(&ctxt_all, "R", 1, total_procs);
     } else ctxt = ctxt_all = -1;
   }
 
   template<typename scalar_t,typename integer_t>
   FrontalMatrixMPI<scalar_t,integer_t>::~FrontalMatrixMPI() {
-    if (ctxt != -1) Cblacs_gridexit(ctxt);
-    if (ctxt_all != -1) Cblacs_gridexit(ctxt_all);
+    if (ctxt != -1) scalapack::Cblacs_gridexit(ctxt);
+    if (ctxt_all != -1) scalapack::Cblacs_gridexit(ctxt_all);
     mpi_free_comm(&front_comm);
   }
 
@@ -391,7 +391,7 @@ namespace strumpack {
     this->p_wmem = mem_size;
     if (ctxt != -1) {
       int np_rows, np_cols, p_row, p_col;
-      Cblacs_gridinfo(ctxt, &np_rows, &np_cols, &p_row, &p_col);
+      scalapack::Cblacs_gridinfo(ctxt, &np_rows, &np_cols, &p_row, &p_col);
       mem_size += scalapack::numroc(this->dim_upd, DistM_t::default_NB,
                                     p_row, 0, np_rows);
     }

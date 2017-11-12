@@ -458,7 +458,8 @@ namespace strumpack {
     this->p_wmem = mem_size;
     if (_H && _H->ctxt() != -1) {
       int np_rows, np_cols, p_row, p_col;
-      Cblacs_gridinfo(_H->ctxt(), &np_rows, &np_cols, &p_row, &p_col);
+      scalapack::Cblacs_gridinfo
+        (_H->ctxt(), &np_rows, &np_cols, &p_row, &p_col);
       mem_size += scalapack::numroc
         (this->dim_upd, DistM_t::default_NB, p_row, 0, np_rows);
     }

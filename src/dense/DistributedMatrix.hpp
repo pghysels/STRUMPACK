@@ -217,9 +217,9 @@ namespace strumpack {
     if (!m || !n) return;
     int b_desc[9];
     scalapack::descset(b_desc, m, n, m, n, 0, dest, ctxt_all, m);
-    scalapack::pgemr2d(m, n, const_cast<scalar_t*>(a.data()),
-                       a.I()+ia, a.J()+ja, const_cast<int*>(a.desc()),
-                       b.data(), 1, 1, b_desc, ctxt_all);
+    scalapack::pgemr2d
+      (m, n, a.data(), a.I()+ia, a.J()+ja, a.desc(),
+       b.data(), 1, 1, b_desc, ctxt_all);
   }
 
   template<typename scalar_t> void
@@ -228,10 +228,11 @@ namespace strumpack {
        std::size_t ib, std::size_t jb, int ctxt_all) {
     if (!m || !n) return;
     int a_desc[9];
-    scalapack::descset(a_desc, m, n, m, n, 0, src, ctxt_all,
-                       std::max(m, a.ld()));
-    scalapack::pgemr2d(m, n, const_cast<scalar_t*>(a.data()), 1, 1, a_desc,
-                       b.data(), b.I()+ib, b.J()+jb, b.desc(), ctxt_all);
+    scalapack::descset
+      (a_desc, m, n, m, n, 0, src, ctxt_all, std::max(m, a.ld()));
+    scalapack::pgemr2d
+      (m, n, a.data(), 1, 1, a_desc, b.data(), b.I()+ib, b.J()+jb, b.desc(),
+       ctxt_all);
   }
 
   /** copy submatrix of a at ia,ja of size m,n into b at position ib,jb */
@@ -244,9 +245,9 @@ namespace strumpack {
            (m+ia <= std::size_t(a.rows()) && n+ja <= std::size_t(a.cols())));
     assert(!b.active() ||
            (m+ib <= std::size_t(b.rows()) && n+jb <= std::size_t(b.cols())));
-    scalapack::pgemr2d(m, n, const_cast<scalar_t*>(a.data()),
-                       a.I()+ia, a.J()+ja, const_cast<int*>(a.desc()),
-                       b.data(), b.I()+ib, b.J()+jb, b.desc(), ctxt_all);
+    scalapack::pgemr2d
+      (m, n, a.data(), a.I()+ia, a.J()+ja, a.desc(),
+       b.data(), b.I()+ib, b.J()+jb, b.desc(), ctxt_all);
   }
 
   /**
@@ -343,8 +344,9 @@ namespace strumpack {
   DistributedMatrixWrapper<scalar_t>::DistributedMatrixWrapper
   (int ctxt, std::size_t m, std::size_t n, int MB, int NB, scalar_t* A)
     : _rows(m), _cols(n), _i(0), _j(0) {
-    Cblacs_gridinfo(ctxt, &this->_prows, &this->_pcols,
-                    &this->_prow, &this->_pcol);
+    scalapack::Cblacs_gridinfo
+      (ctxt, &this->_prows, &this->_pcols,
+       &this->_prow, &this->_pcol);
     if (this->active()) {
       this->_data = A;
       if (scalapack::descinit(this->_desc, _rows, _cols, MB, NB,
@@ -373,14 +375,16 @@ namespace strumpack {
     : _rows(m), _cols(n), _i(0), _j(0) {
     int MB = std::max(1, _rows);
     int NB = std::max(1, _cols);
-    Cblacs_gridinfo(ctxt, &this->_prows, &this->_pcols,
-                    &this->_prow, &this->_pcol);
+    scalapack::Cblacs_gridinfo
+      (ctxt, &this->_prows, &this->_pcols,
+       &this->_prow, &this->_pcol);
     if (this->_prow == rsrc && this->_pcol == csrc) {
       this->_lrows = _rows;
       this->_lcols = _cols;
       this->_data = A.data();
-      if (scalapack::descinit(this->_desc, _rows, _cols, MB, NB,
-                              rsrc, csrc, ctxt, std::max(_rows, 1))) {
+      if (scalapack::descinit
+          (this->_desc, _rows, _cols, MB, NB,
+           rsrc, csrc, ctxt, std::max(_rows, 1))) {
         std::cerr << "ERROR: Could not create DistributedMatrixWrapper"
                   << " descriptor!" << std::endl;
         abort();
@@ -388,18 +392,21 @@ namespace strumpack {
     } else {
       this->_lrows = this->_lcols = 0;
       this->_data = nullptr;
-      scalapack::descset(this->_desc, _rows, _cols, MB, NB,
-                         rsrc, csrc, ctxt, 1);
+      scalapack::descset
+        (this->_desc, _rows, _cols, MB, NB,
+         rsrc, csrc, ctxt, 1);
     }
   }
 
   template<typename scalar_t> void DistributedMatrixWrapper<scalar_t>::lranges
   (int& rlo, int& rhi, int& clo, int& chi) const {
-    scalapack::infog2l(I(), J(), this->desc(), this->prows(), this->pcols(),
-                       this->prow(), this->pcol(), rlo, clo);
-    scalapack::infog2l(I()+this->rows(), J()+this->cols(), this->desc(),
-                       this->prows(), this->pcols(),
-                       this->prow(), this->pcol(), rhi, chi);
+    scalapack::infog2l
+      (I(), J(), this->desc(), this->prows(), this->pcols(),
+       this->prow(), this->pcol(), rlo, clo);
+    scalapack::infog2l
+      (I()+this->rows(), J()+this->cols(), this->desc(),
+       this->prows(), this->pcols(),
+       this->prow(), this->pcol(), rhi, chi);
     rlo--; rhi--; clo--; chi--;
   }
 
@@ -454,7 +461,7 @@ namespace strumpack {
     assert(M >= 0 && N >= 0 && MB >= 0 && NB >= 0);
     MB = std::max(1, MB);
     NB = std::max(1, NB);
-    Cblacs_gridinfo(ctxt, &_prows, &_pcols, &_prow, &_pcol);
+    scalapack::Cblacs_gridinfo(ctxt, &_prows, &_pcols, &_prow, &_pcol);
     if (_prow == -1 || _pcol == -1) {
       _lrows = _lcols = 0;
       _data = nullptr;
@@ -463,8 +470,9 @@ namespace strumpack {
       _lrows = scalapack::numroc(M, MB, _prow, 0, _prows);
       _lcols = scalapack::numroc(N, NB, _pcol, 0, _pcols);
       _data = new scalar_t[_lrows*_lcols];
-      if (scalapack::descinit(_desc, M, N, MB, NB, 0, 0,
-                              ctxt, std::max(_lrows,1))) {
+      if (scalapack::descinit
+          (_desc, M, N, MB, NB, 0, 0,
+           ctxt, std::max(_lrows,1))) {
         std::cerr << "ERROR: Could not create DistributedMatrix descriptor!"
                   << std::endl;
         abort();
@@ -475,7 +483,7 @@ namespace strumpack {
   template<typename scalar_t>
   DistributedMatrix<scalar_t>::DistributedMatrix(int desc[9]) {
     std::copy(desc, desc+9, _desc);
-    Cblacs_gridinfo(_desc[1], &_prows, &_pcols, &_prow, &_pcol);
+    scalapack::Cblacs_gridinfo(_desc[1], &_prows, &_pcols, &_prow, &_pcol);
     if (_prow == -1 || _pcol == -1) {
       _lrows = _lcols = 0;
       _data = nullptr;
@@ -638,10 +646,10 @@ namespace strumpack {
   DistributedMatrix<scalar_t>::transpose() const {
     DistributedMatrix<scalar_t> tmp(ctxt(), cols(), rows());
     if (!active()) return tmp;
-    scalapack::ptranc(cols(), rows(), scalar_t(1.),
-                      const_cast<scalar_t*>(data()), I(), J(),
-                      const_cast<int*>(desc()), scalar_t(0.), tmp.data(),
-                      tmp.I(), tmp.J(), tmp.desc());
+    scalapack::ptranc
+      (cols(), rows(), scalar_t(1.), data(), I(), J(),
+      desc(), scalar_t(0.), tmp.data(),
+      tmp.I(), tmp.J(), tmp.desc());
     return tmp;
   }
 
@@ -649,22 +657,26 @@ namespace strumpack {
   DistributedMatrix<scalar_t>::permute_rows_bwd(const std::vector<int>& P) {
     if (!active()) return;
     int descip[9];
-    scalapack::descset(descip, rows() + MB()*prows(), 1, MB(), 1, 0, pcol(),
-                       ctxt(), MB() + scalapack::numroc
-                       (rows(), MB(), prow(), 0, prows()));
-    scalapack::plapiv('B', 'R', 'C', rows(), cols(), data(), I(), J(), desc(),
-                      const_cast<int*>(P.data()), 1, 1, descip, NULL);
+    scalapack::descset
+      (descip, rows() + MB()*prows(), 1, MB(), 1, 0, pcol(),
+       ctxt(), MB() + scalapack::numroc
+       (rows(), MB(), prow(), 0, prows()));
+    scalapack::plapiv
+      ('B', 'R', 'C', rows(), cols(), data(), I(), J(), desc(),
+       P.data(), 1, 1, descip, NULL);
   }
 
   template<typename scalar_t> void
   DistributedMatrix<scalar_t>::permute_rows_fwd(const std::vector<int>& P) {
     if (!active()) return;
     int descip[9];
-    scalapack::descset(descip, rows() + MB()*prows(), 1, MB(), 1, 0, pcol(),
-                       ctxt(), MB() + scalapack::numroc
-                       (rows(), MB(), prow(), 0, prows()));
-    scalapack::plapiv('F', 'R', 'C', rows(), cols(), data(), I(), J(), desc(),
-                      const_cast<int*>(P.data()), 1, 1, descip, NULL);
+    scalapack::descset
+      (descip, rows() + MB()*prows(), 1, MB(), 1, 0, pcol(),
+       ctxt(), MB() + scalapack::numroc
+       (rows(), MB(), prow(), 0, prows()));
+    scalapack::plapiv
+      ('F', 'R', 'C', rows(), cols(), data(), I(), J(), desc(),
+       P.data(), 1, 1, descip, NULL);
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>
@@ -862,12 +874,11 @@ namespace strumpack {
   DistributedMatrix<scalar_t>::norm1() const {
     if (!active()) return real_t(-1.);
     int IACOL = indxg2p(J(), NB(), pcol(), 0, pcols());
-    int Nq0 = scalapack::numroc(cols()+ ((J()-1)%NB()), NB(),
-                                pcol(), IACOL, pcols());
+    int Nq0 = scalapack::numroc
+      (cols()+ ((J()-1)%NB()), NB(), pcol(), IACOL, pcols());
     real_t* work = new real_t[Nq0];
-    auto norm = scalapack::plange('1', rows(), cols(),
-                                  const_cast<scalar_t*>(data()),
-                                  I(), J(), const_cast<int*>(desc()), work);
+    auto norm = scalapack::plange
+      ('1', rows(), cols(), data(), I(), J(), desc(), work);
     delete[] work;
     return norm;
   }
@@ -876,12 +887,11 @@ namespace strumpack {
   DistributedMatrix<scalar_t>::normI() const {
     if (!active()) return real_t(-1.);
     int IAROW = indxg2p(I(), MB(), prow(), 0, prows());
-    int Mp0 = scalapack::numroc(rows()+ ((I()-1)%MB()), MB(),
-                                prow(), IAROW, prows());
+    int Mp0 = scalapack::numroc
+      (rows()+ ((I()-1)%MB()), MB(), prow(), IAROW, prows());
     real_t* work = new real_t[Mp0];
-    auto norm = scalapack::plange('I', rows(), cols(),
-                                  const_cast<scalar_t*>(data()),
-                                  I(), J(), const_cast<int*>(desc()), work);
+    auto norm = scalapack::plange
+      ('I', rows(), cols(), data(), I(), J(), desc(), work);
     delete[] work;
     return norm;
   }
@@ -890,19 +900,20 @@ namespace strumpack {
   DistributedMatrix<scalar_t>::normF() const {
     if (!active()) return real_t(-1.);
     real_t* work = nullptr;
-    return scalapack::plange('F', rows(), cols(),
-                             const_cast<scalar_t*>(data()),
-                             I(), J(), const_cast<int*>(desc()), work);
+    return scalapack::plange
+      ('F', rows(), cols(), data(), I(), J(), desc(), work);
   }
 
   template<typename scalar_t> void
   DistributedMatrix<scalar_t>::scatter(const DenseMatrix<scalar_t>& a) {
     if (!active()) return;
     int a_desc[9];
-    scalapack::descset(a_desc, rows(), cols(), rows(), cols(), 0, 0, ctxt(),
-                       std::max(std::size_t(rows()), a.ld()));
-    scalapack::pgemr2d(rows(), cols(), const_cast<scalar_t*>(a.data()), 1, 1,
-                       a_desc, this->data(), I(), J(), this->desc(), ctxt());
+    scalapack::descset
+      (a_desc, rows(), cols(), rows(), cols(), 0, 0, ctxt(),
+       std::max(std::size_t(rows()), a.ld()));
+    scalapack::pgemr2d
+      (rows(), cols(), a.data(), 1, 1,
+       a_desc, data(), I(), J(), desc(), ctxt());
   }
 
   /** gather to proc 0,0 in ctxt */
@@ -912,11 +923,12 @@ namespace strumpack {
     if (!active()) return a;
     if (is_master()) a = DenseMatrix<scalar_t>(rows(), cols());
     int a_desc[9];
-    scalapack::descset(a_desc, rows(), cols(), rows(), cols(),
-                       0, 0, ctxt(), rows());
-    scalapack::pgemr2d(rows(), cols(), const_cast<scalar_t*>(this->data()),
-                       I(), J(), const_cast<int*>(this->desc()),
-                       a.data(), 1, 1, a_desc, ctxt());
+    scalapack::descset
+      (a_desc, rows(), cols(), rows(), cols(),
+       0, 0, ctxt(), rows());
+    scalapack::pgemr2d
+      (rows(), cols(), data(), I(), J(), desc(),
+       a.data(), 1, 1, a_desc, ctxt());
     return a;
   }
 
@@ -925,17 +937,19 @@ namespace strumpack {
   DistributedMatrix<scalar_t>::all_gather(int ctxt_all) const {
     DenseMatrix<scalar_t> a(rows(), cols());
     int a_desc[9];
-    scalapack::descset(a_desc, rows(), cols(), rows(), cols(),
-                       0, 0, ctxt_all, rows());
-    scalapack::pgemr2d(rows(), cols(), const_cast<scalar_t*>(this->data()),
-                       I(), J(), const_cast<int*>(this->desc()),
-                       a.data(), 1, 1, a_desc, ctxt_all);
+    scalapack::descset
+      (a_desc, rows(), cols(), rows(), cols(),
+       0, 0, ctxt_all, rows());
+    scalapack::pgemr2d
+      (rows(), cols(), data(), I(), J(), desc(),
+       a.data(), 1, 1, a_desc, ctxt_all);
     int all_prows, all_pcols, all_prow, all_pcol;
-    Cblacs_gridinfo(ctxt_all, &all_prows, &all_pcols, &all_prow, &all_pcol);
+    scalapack::Cblacs_gridinfo
+      (ctxt_all, &all_prows, &all_pcols, &all_prow, &all_pcol);
     if (all_prow==0 && all_pcol==0)
       scalapack::gebs2d(ctxt_all, 'A', ' ', rows(), cols(), a.data(), a.ld());
-    else scalapack::gebr2d(ctxt_all, 'A', ' ', rows(), cols(),
-                           a.data(), a.ld(), 0, 0);
+    else scalapack::gebr2d
+           (ctxt_all, 'A', ' ', rows(), cols(), a.data(), a.ld(), 0, 0);
     return a;
   }
 
@@ -963,8 +977,8 @@ namespace strumpack {
   DistributedMatrix<scalar_t>::LU() {
     if (!active()) return std::vector<int>();
     std::vector<int> ipiv(lrows()+MB());
-    int info = scalapack::pgetrf(rows(), cols(), data(),
-                                 I(), J(), desc(), ipiv.data());
+    int info = scalapack::pgetrf
+      (rows(), cols(), data(), I(), J(), desc(), ipiv.data());
     if (info) {
       std::cerr << "ERROR: LU factorization of DistributedMatrix failed"
                 << " with info = " << info << std::endl;
@@ -983,8 +997,8 @@ namespace strumpack {
     DistributedMatrix<scalar_t> c(b);
     // TODO in place??, add assertions, check dimensions!!
     if (scalapack::pgetrs
-        (char(Trans::N), c.rows(), c.cols(), const_cast<scalar_t*>(data()),
-         I(), J(), const_cast<int*>(desc()), const_cast<int*>(piv.data()),
+        (char(Trans::N), c.rows(), c.cols(), data(),
+         I(), J(), desc(), piv.data(),
          c.data(), c.I(), c.J(), c.desc())) {
       std::cerr << "# ERROR: Failure in PGETRS :(" << std::endl; abort();
     }
@@ -1054,9 +1068,9 @@ namespace strumpack {
     auto tau = new scalar_t
       [scalapack::numroc(I()+std::min(rows(),cols())-1, MB(),
                          prow(), 0, prows())];
-    scalapack::pgelqf(rows(), tmp.cols(), tmp.data(), tmp.I(), tmp.J(),
-                      tmp.desc(), tau, tmp.MB(), tmp.NB(),
-                      prow(), pcol(), prows(), pcols());
+    scalapack::pgelqf
+      (rows(), tmp.cols(), tmp.data(), tmp.I(), tmp.J(),
+       tmp.desc(), tau);
     L = DistributedMatrix<scalar_t>(ctxt(), rows(), rows());
     // TODO this is not a pgemr2d, this does not require communication!!
     strumpack::copy(rows(), rows(), tmp, 0, 0, L, 0, 0, ctxt());
@@ -1067,10 +1081,9 @@ namespace strumpack {
     //     std::cerr << "WARNING: small diagonal on L from LQ" << std::endl;
     //     break;
     //   }
-    scalapack::pxxglq(cols(), cols(), std::min(rows(), cols()),
-                      tmp.data(), tmp.I(), tmp.J(), tmp.desc(), tau,
-                      tmp.MB(), tmp.NB(), tmp.prow(), tmp.pcol(),
-                      tmp.prows(), tmp.pcols());
+    scalapack::pxxglq
+      (cols(), cols(), std::min(rows(), cols()),
+       tmp.data(), tmp.I(), tmp.J(), tmp.desc(), tau);
     delete[] tau;
     if (tmp.rows() == cols()) Q = std::move(tmp);
     else {
@@ -1114,9 +1127,9 @@ namespace strumpack {
     int rank = 0;
     // Step 1: RRQR
     // TODO also use abs_tol!!
-    scalapack::pgeqpfmod(rows(), cols(), data(), I(), J(), desc(),
-                         _J.data(), gpiv.data(), &rank, rel_tol,
-                         MB(), NB(), prow(), pcol(), prows(), pcols());
+    scalapack::pgeqpfmod
+      (rows(), cols(), data(), I(), J(), desc(),
+       _J.data(), gpiv.data(), &rank, rel_tol);
     piv.resize(lcols()+NB());
     ind.resize(rank);
     for (int c=0; c<lcols(); c++) piv[c] = gpiv[coll2g(c)];
@@ -1145,13 +1158,12 @@ namespace strumpack {
     assert(A.I()>=1 && A.J()>=1 && B.I()>=1 &&
            B.J()>=1 && C.I()>=1 && C.J()>=1);
     assert(A.ctxt()==B.ctxt() && A.ctxt()==C.ctxt());
-    scalapack::pgemm(char(ta), char(tb), C.rows(), C.cols(),
-                     (ta==Trans::N) ? A.cols() : A.rows(), alpha,
-                     const_cast<scalar_t*>(A.data()),
-                     A.I(), A.J(), const_cast<int*>(A.desc()),
-                     const_cast<scalar_t*>(B.data()),
-                     B.I(), B.J(), const_cast<int*>(B.desc()),
-                     beta, C.data(), C.I(), C.J(), C.desc());
+    scalapack::pgemm
+      (char(ta), char(tb), C.rows(), C.cols(),
+       (ta==Trans::N) ? A.cols() : A.rows(), alpha,
+       A.data(), A.I(), A.J(), A.desc(),
+       B.data(), B.I(), B.J(), B.desc(),
+       beta, C.data(), C.I(), C.J(), C.desc());
   }
 
   template<typename scalar_t> void trsm
@@ -1163,10 +1175,10 @@ namespace strumpack {
     assert(s!=Side::L || ta==Trans::N || A.rows()==B.rows());
     assert(s!=Side::R || ta!=Trans::N || A.rows()==B.cols());
     assert(s!=Side::R || ta==Trans::N || A.cols()==B.cols());
-    scalapack::ptrsm(char(s), char(u), char(ta), char(d), B.rows(), B.cols(),
-                     alpha, const_cast<scalar_t*>(A.data()),
-                     A.I(), A.J(), const_cast<int*>(A.desc()),
-                     B.data(), B.I(), B.J(), B.desc());
+    scalapack::ptrsm
+      (char(s), char(u), char(ta), char(d), B.rows(), B.cols(),
+       alpha, A.data(), A.I(), A.J(), A.desc(),
+       B.data(), B.I(), B.J(), B.desc());
   }
 
   template<typename scalar_t> void trsv
@@ -1174,10 +1186,10 @@ namespace strumpack {
    DistributedMatrix<scalar_t>& B) {
     if (!A.active()) return;
     assert(B.cols() == 1 && A.rows() == A.cols() && A.cols() == A.rows());
-    scalapack::ptrsv(char(ul), char(ta), char(d), A.rows(),
-                     const_cast<scalar_t*>(A.data()),
-                     A.I(), A.J(), const_cast<int*>(A.desc()),
-                     B.data(), B.I(), B.J(), B.desc(), 1);
+    scalapack::ptrsv
+      (char(ul), char(ta), char(d), A.rows(),
+       A.data(), A.I(), A.J(), A.desc(),
+       B.data(), B.I(), B.J(), B.desc(), 1);
     // TODO also support row vectors by passing different incb?
   }
 
@@ -1189,12 +1201,11 @@ namespace strumpack {
     assert(X.cols() == 1 && Y.cols() == 1);
     assert(ta != Trans::N || (A.rows() == Y.rows() && A.cols() == X.rows()));
     assert(ta == Trans::N || (A.cols() == Y.rows() && A.rows() == X.rows()));
-    scalapack::pgemv(char(ta), A.rows(), A.cols(), alpha,
-                     const_cast<scalar_t*>(A.data()),
-                     A.I(), A.J(), const_cast<int*>(A.desc()),
-                     const_cast<scalar_t*>(X.data()),
-                     X.I(), X.J(), const_cast<int*>(X.desc()), 1,
-                     beta, Y.data(), Y.I(), Y.J(), Y.desc(), 1);
+    scalapack::pgemv
+      (char(ta), A.rows(), A.cols(), alpha,
+       A.data(), A.I(), A.J(), A.desc(),
+       X.data(), X.I(), X.J(), X.desc(), 1,
+       beta, Y.data(), Y.I(), Y.J(), Y.desc(), 1);
     // TODO also support row vectors by passing different incb?
   }
 

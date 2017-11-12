@@ -94,7 +94,7 @@ int main(int argc, char* argv[]) {
                 << A.max_scaled_residual(x.data(), b.data()) << std::endl;
   }
   TimerList::Finalize();
-  Cblacs_exit(1);
+  scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return 0;
 }

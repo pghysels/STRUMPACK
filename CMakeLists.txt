@@ -235,7 +235,6 @@ install(FILES
   src/dense/BLASLAPACKOpenMPTask.hpp
   src/dense/BLASLAPACKWrapper.hpp
   src/dense/ScaLAPACKWrapper.hpp
-  src/dense/BLACSWrapper.h
   DESTINATION include/dense)
 
 install(FILES
