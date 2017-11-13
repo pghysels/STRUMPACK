@@ -440,27 +440,28 @@ namespace strumpack {
     // TODO use skinny-extend-add
     static void extend_add_column_copy_from_buffers
     (DistM_t& Bsep, DistM_t& Bupd, std::vector<std::vector<scalar_t>>& buf,
-     integer_t sep_begin, integer_t* pa_upd, integer_t* ch_upd,
-     integer_t ch_dim_upd, std::function<int(integer_t,integer_t)> b_rank) {
+     integer_t sep_begin, const std::vector<integer_t>& pa_upd,
+     const std::vector<integer_t>& ch_upd,
+     std::function<int(integer_t,integer_t)> b_rank) {
       std::vector<scalar_t*> pbuf(buf.size());
-      for (size_t p=0; p<buf.size(); p++) pbuf[p] = buf[p].data();
-
+      for (size_t p=0; p<buf.size(); p++)
+        pbuf[p] = buf[p].data();
       std::function<integer_t(integer_t)> sep_map =
-        [&](integer_t i) { return i + sep_begin;
-      };
+        [&](integer_t i) { return i + sep_begin; };
       std::function<integer_t(integer_t)> upd_map =
-        [&](integer_t i) { return pa_upd[i];
-      };
-      copy_column_from_buffer(Bsep, pbuf, ch_upd, ch_dim_upd,
-                              b_rank, sep_map);
-      copy_column_from_buffer(Bupd, pbuf, ch_upd, ch_dim_upd,
-                              b_rank, upd_map);
+        [&](integer_t i) { return pa_upd[i]; };
+      copy_column_from_buffer
+        (Bsep, pbuf, ch_upd, b_rank, sep_map);
+      copy_column_from_buffer
+        (Bupd, pbuf, ch_upd, b_rank, upd_map);
     }
     static void copy_column_from_buffer
-    (DistM_t& F, std::vector<scalar_t*>& pbuf, integer_t* ch_upd,
-     integer_t ch_dim_upd, std::function<int(integer_t,integer_t)>
+    (DistM_t& F, std::vector<scalar_t*>& pbuf,
+     const std::vector<integer_t>& ch_upd,
+     std::function<int(integer_t,integer_t)>
      b_child_rank, std::function<integer_t(integer_t)> f2g) {
       if (!F.active()) return;
+      integer_t ch_dim_upd = ch_upd.size();
       integer_t upd_r = 0;
       for (int r=0; r<F.lrows(); r++) {
         auto fgr = f2g(F.rowl2g(r));
@@ -580,9 +581,10 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> class ExtractFront {
     using CSM = CompressedSparseMatrix<scalar_t,integer_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
+
   public:
-    static void extract_F11(DistM_t& F, CSM* A, integer_t sep_begin,
-                            integer_t dim_sep) {
+    static void extract_F11
+    (DistM_t& F, const CSM& A, integer_t sep_begin, integer_t dim_sep) {
       if (!F.active()) return;
       F.zero();
       const auto CB = F.colblocks();
@@ -594,16 +596,16 @@ namespace strumpack {
           auto row = (F.prow()+rb*F.prows())*F.MB();
           auto block = F.data() + cb*F.NB()*F.ld() + rb*F.MB();
           auto nr_cols = std::min(F.NB(), F.cols()-col);
-          A->extract_F11_block(block, F.ld(), row+sep_begin,
-                               std::min(F.MB(),F.rows()-row),
-                               col+sep_begin, nr_cols);
+          A.extract_F11_block
+            (block, F.ld(), row+sep_begin, std::min(F.MB(),F.rows()-row),
+             col+sep_begin, nr_cols);
         }
       }
     }
 
-    static void extract_F12(DistM_t& F, CSM* A, integer_t upd_row_begin,
-                            integer_t upd_col_begin,
-                            integer_t dim_upd, integer_t* upd) {
+    static void extract_F12
+    (DistM_t& F, const CSM& A, integer_t upd_row_begin,
+     integer_t upd_col_begin, const std::vector<integer_t>& upd) {
       if (!F.active()) return;
       F.zero();
       const auto CB = F.colblocks();
@@ -613,19 +615,19 @@ namespace strumpack {
         for (int rb=0; rb<RB; rb++) {
           auto col = (F.pcol()+cb*F.pcols())*F.NB();
           auto row = (F.prow()+rb*F.prows())*F.MB();
-          auto block_upd = upd + (F.pcol()+cb*F.pcols())*F.NB();
+          auto block_upd = upd.data() + (F.pcol()+cb*F.pcols())*F.NB();
           auto nr_cols = std::min(F.NB(), F.cols()-col);
           auto block = F.data() + cb*F.NB()*F.ld() + rb*F.MB();
-          A->extract_F12_block(block, F.ld(), row+upd_row_begin,
-                               std::min(F.MB(), F.rows()-row),
-                               col+upd_col_begin, nr_cols, block_upd);
+          A.extract_F12_block
+            (block, F.ld(), row+upd_row_begin, std::min(F.MB(), F.rows()-row),
+             col+upd_col_begin, nr_cols, block_upd);
         }
       }
     }
 
-    static void extract_F21(DistM_t& F, CSM* A, integer_t upd_row_begin,
-                            integer_t upd_col_begin,
-                            integer_t dim_upd, integer_t* upd) {
+    static void extract_F21
+    (DistM_t& F, const CSM& A, integer_t upd_row_begin,
+     integer_t upd_col_begin, const std::vector<integer_t>& upd) {
       if (!F.active()) return;
       F.zero();
       const auto CB = F.colblocks();
@@ -637,10 +639,10 @@ namespace strumpack {
           auto row = (F.prow()+rb*F.prows())*F.MB();
           auto nr_cols = std::min(F.NB(), F.cols()-col);
           auto block = F.data() + cb*F.NB()*F.ld() + rb*F.MB();
-          auto block_upd = upd + F.prow()*F.MB() + rb*F.prows()*F.MB();
-          A->extract_F21_block(block, F.ld(), row+upd_row_begin,
-                               std::min(F.MB(), F.rows()-row),
-                               col+upd_col_begin, nr_cols, block_upd);
+          auto block_upd = upd.data() + F.prow()*F.MB() + rb*F.prows()*F.MB();
+          A.extract_F21_block
+            (block, F.ld(), row+upd_row_begin, std::min(F.MB(), F.rows()-row),
+             col+upd_col_begin, nr_cols, block_upd);
         }
       }
     }

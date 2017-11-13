@@ -52,75 +52,74 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> class FrontalMatrix {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
+    using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
+
   public:
     integer_t sep;
     integer_t sep_begin;
     integer_t sep_end;
-    integer_t dim_sep;
-    integer_t dim_upd;
-    integer_t dim_blk; // = dim_sep + dim_upd
-    integer_t* upd;   // TODO store as a vector
+    integer_t dim_sep; // TODO remove?
+    integer_t dim_upd; // TODO remove?
+    integer_t dim_blk; // = dim_sep + dim_upd   // TODO remove?
+    std::vector<integer_t> upd;
 
     F_t* lchild;
     F_t* rchild;
 
-    // TODO this pointer should not be stored in every front,
-    // instead just pass it around whenever needed?
-    CompressedSparseMatrix<scalar_t,integer_t>* A;
+    // TODO get rid of this!!
     integer_t p_wmem;
 
-    FrontalMatrix(integer_t separator,
-                  CompressedSparseMatrix<scalar_t,integer_t>* _A,
-                  F_t* left_child, F_t* right_child);
-    FrontalMatrix(CompressedSparseMatrix<scalar_t,integer_t>* _A,
-                  F_t* _lchild, F_t* _rchild,
-                  integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-                  integer_t _dim_upd, integer_t* _upd);
+    FrontalMatrix
+    (F_t* _lchild, F_t* _rchild, integer_t _sep, integer_t _sep_begin,
+     integer_t _sep_end, std::vector<integer_t>& _upd);
     virtual ~FrontalMatrix();
 
-    void find_upd_indices(const std::vector<std::size_t>& I,
-                          std::vector<std::size_t>& lI,
-                          std::vector<std::size_t>& oI) const;
-    std::vector<std::size_t> upd_to_parent(const F_t* pa,
-                                           std::size_t& upd2sep) const;
+    void find_upd_indices
+    (const std::vector<std::size_t>& I, std::vector<std::size_t>& lI,
+     std::vector<std::size_t>& oI) const;
+    std::vector<std::size_t> upd_to_parent
+    (const F_t* pa, std::size_t& upd2sep) const;
     std::vector<std::size_t> upd_to_parent(const F_t* pa) const;
 
     virtual void release_work_memory() = 0;
 
-    virtual void sample_CB(const SPOptions<scalar_t>& opts,
-                           DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc,
-                           F_t* parent, int task_depth=0) = 0;
-    virtual void extract_CB_sub_matrix(const std::vector<std::size_t>& I,
-                                       const std::vector<std::size_t>& J,
-                                       DenseM_t& B, int task_depth) const = 0;
+    virtual void sample_CB
+    (const SPOptions<scalar_t>& opts, const DenseM_t& R,
+     DenseM_t& Sr, DenseM_t& Sc, F_t* parent, int task_depth=0) = 0;
+    virtual void extract_CB_sub_matrix
+    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+     DenseM_t& B, int task_depth) const = 0;
 
     virtual void extend_add_to_dense
     (FrontalMatrixDense<scalar_t,integer_t>* p, int task_depth) {}
 
     virtual void multifrontal_factorization
-    (const SPOptions<scalar_t>& opts, int etree_level=0,
-     int task_depth=0) = 0;
+    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+     int etree_level=0, int task_depth=0) = 0;
     virtual void solve_workspace_query(integer_t& mem_size);
-    void extend_add_b(F_t* ch, scalar_t* b, scalar_t* wmem);
-    void extract_b(F_t* ch, scalar_t* b, scalar_t* wmem);
+    void extend_add_b(F_t* ch, DenseM_t& b, scalar_t* wmem);
+    void extract_b(F_t* ch, DenseM_t& b, scalar_t* wmem);
     virtual void extend_add_b(F_t* ch, DistM_t& b, scalar_t* wmem, int tag) {}
     virtual void extract_b(F_t* ch, DistM_t& b, scalar_t* wmem) {}
-    void look_left(scalar_t* b, scalar_t* wmem);
+    void look_left(DenseM_t& b, scalar_t* wmem);
     void look_left(DistM_t& b_sep, scalar_t* wmem);
-    void look_right(scalar_t* y, scalar_t* wmem);
+    void look_right(DenseM_t& y, scalar_t* wmem);
     void look_right(DistM_t& y_sep, scalar_t* wmem);
-    void multifrontal_solve(scalar_t* b, scalar_t* wmem);
-    void multifrontal_solve(scalar_t* b_loc, DistM_t* b_dist, scalar_t* wmem);
+    void multifrontal_solve(DenseM_t& b, scalar_t* wmem);
+    void multifrontal_solve
+    (DenseM_t& b_loc, DistM_t* b_dist, scalar_t* wmem);
     virtual void forward_multifrontal_solve
-    (scalar_t* b, scalar_t* wmem, int etree_level=0, int task_depth=0) {};
+    (DenseM_t& b, scalar_t* wmem,
+     int etree_level=0, int task_depth=0) {};
+    virtual void backward_multifrontal_solve
+    (DenseM_t& y, scalar_t* wmem,
+     int etree_level=0, int task_depth=0) {};
     virtual void forward_multifrontal_solve
-    (scalar_t* b_loc, DistM_t* b_dist,
+    (DenseM_t& b_loc, DistM_t* b_dist,
      scalar_t* wmem, int etree_level=0, int task_depth=0);
     virtual void backward_multifrontal_solve
-    (scalar_t* y, scalar_t* wmem, int etree_level=0, int task_depth=0) {};
-    virtual void backward_multifrontal_solve
-    (scalar_t* y_loc, DistM_t* b_dist, scalar_t* wmem,
+    (DenseM_t& y_loc, DistM_t* y_dist, scalar_t* wmem,
      int etree_level=0, int task_depth=0);
 
     virtual integer_t maximum_rank(int task_depth=0) const { return 0; }
@@ -136,44 +135,35 @@ namespace strumpack {
      bool isroot=true, int task_depth=0);
     void permute_upd_indices(integer_t* perm, int task_depth=0);
 
-    virtual void set_HSS_partitioning(const SPOptions<scalar_t>& opts,
-                                      const HSS::HSSPartitionTree& sep_tree,
-                                      bool is_root) {}
+    virtual void set_HSS_partitioning
+    (const SPOptions<scalar_t>& opts,
+     const HSS::HSSPartitionTree& sep_tree,
+     bool is_root) {}
 
   protected:
     FrontalMatrix(const FrontalMatrix&) = delete;
     FrontalMatrix& operator=(FrontalMatrix const&) = delete;
-    virtual long long node_factor_nonzeros() const
-    { return dim_blk*dim_blk-dim_upd*dim_upd; }
-    virtual long long dense_node_factor_nonzeros() const
-    { return node_factor_nonzeros(); }
+
+    virtual long long node_factor_nonzeros() const {
+      return dim_blk*dim_blk-dim_upd*dim_upd;
+    }
+    virtual long long dense_node_factor_nonzeros() const {
+      return node_factor_nonzeros();
+    }
   };
 
   template<typename scalar_t,typename integer_t>
   FrontalMatrix<scalar_t,integer_t>::FrontalMatrix
-  (integer_t separator, CompressedSparseMatrix<scalar_t,integer_t>* _A,
-   F_t* left_child, F_t* right_child) :
-    sep(separator), sep_begin(0), sep_end(0), dim_sep(0),
-    dim_upd(0), dim_blk(0), upd(NULL),
-    lchild(left_child), rchild(right_child), A(_A), p_wmem(0) {
-  }
-
-  template<typename scalar_t,typename integer_t>
-  FrontalMatrix<scalar_t,integer_t>::FrontalMatrix
-  (CompressedSparseMatrix<scalar_t,integer_t>* _A, F_t* _lchild, F_t* _rchild,
-   integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-   integer_t _dim_upd, integer_t* _upd)
+  (F_t* _lchild, F_t* _rchild, integer_t _sep, integer_t _sep_begin,
+   integer_t _sep_end, std::vector<integer_t>& _upd)
     : sep(_sep), sep_begin(_sep_begin), sep_end(_sep_end),
-      dim_sep(_sep_end - _sep_begin), dim_upd(_dim_upd),
-      dim_blk(_sep_end - _sep_begin + _dim_upd),
-      lchild(_lchild), rchild(_rchild), A(_A), p_wmem(0) {
-    upd = new integer_t[dim_upd];
-    std::copy(_upd, _upd+dim_upd, upd);
+      dim_sep(sep_end - sep_begin), dim_upd(_upd.size()),
+      dim_blk(dim_sep + dim_upd), upd(std::move(_upd)),
+      lchild(_lchild), rchild(_rchild), p_wmem(0) {
   }
 
   template<typename scalar_t,typename integer_t>
   FrontalMatrix<scalar_t,integer_t>::~FrontalMatrix() {
-    delete[] upd;
     delete lchild;
     delete rchild;
   }
@@ -194,9 +184,9 @@ namespace strumpack {
     lI.reserve(n);
     oI.reserve(n);
     for (std::size_t i=0; i<n; i++) {
-      auto l = std::lower_bound(upd, upd+dim_upd, I[i]);
-      if (l != upd+dim_upd && *l == int(I[i])) {
-        lI.push_back(l-upd);
+      auto l = std::lower_bound(upd.begin(), upd.end(), I[i]);
+      if (l != upd.end() && *l == int(I[i])) {
+        lI.push_back(std::distance(upd.begin(), l));
         oI.push_back(i);
       }
     }
@@ -240,23 +230,30 @@ namespace strumpack {
   // TODO remove this once the rhs is a DenseMatrix object?!
   template<typename scalar_t,typename integer_t> inline void
   FrontalMatrix<scalar_t,integer_t>::extend_add_b
-  (F_t* ch, scalar_t* b, scalar_t* wmem) {
+  (F_t* ch, DenseM_t& bd, scalar_t* wmem) {
+    // TODO implement for multiple columns??
+    auto b = bd.data();
     integer_t r = 0, upd_pos = 0;
-    scalar_t* ch_wmem = wmem + ch->p_wmem;
-    scalar_t* pa_wmem = wmem + p_wmem;
+    auto ch_wmem = wmem + ch->p_wmem;
+    auto pa_wmem = wmem + p_wmem;
     for (; r<ch->dim_upd; r++) { // to parent separator
       upd_pos = ch->upd[r];
       if (upd_pos >= sep_end) break;
       b[upd_pos] += ch_wmem[r];
     }
-    upd_pos = std::lower_bound(upd, upd+dim_upd, upd_pos) - upd;
+    upd_pos = std::distance
+      (upd.begin(), std::lower_bound(upd.begin(), upd.end(), upd_pos));
     for (; r<ch->dim_upd; r++) { // to parent update matrix
       integer_t t = ch->upd[r];
       while (upd[upd_pos] < t) upd_pos++;
       pa_wmem[upd_pos] += ch_wmem[r];
     }
-    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*static_cast<long long int>(ch->dim_upd));
-    STRUMPACK_BYTES(sizeof(scalar_t)*static_cast<long long int>(3*ch->dim_upd)+sizeof(integer_t)*(ch->dim_upd+dim_upd));
+    STRUMPACK_FLOPS
+      ((is_complex<scalar_t>()?2:1)*
+       static_cast<long long int>(ch->dim_upd));
+    STRUMPACK_BYTES
+      (sizeof(scalar_t)*static_cast<long long int>
+       (3*ch->dim_upd)+sizeof(integer_t)*(ch->dim_upd+dim_upd));
   }
 
 
@@ -267,7 +264,8 @@ namespace strumpack {
    */
   template<typename scalar_t,typename integer_t> inline void
   FrontalMatrix<scalar_t,integer_t>::extract_b
-  (F_t* ch, scalar_t* b, scalar_t* wmem) {
+  (F_t* ch, DenseM_t& bd, scalar_t* wmem) {
+    auto b = bd.data();
     integer_t r = 0, upd_pos = 0;
     scalar_t* ch_b_upd = wmem+ch->p_wmem;
     scalar_t* b_upd = wmem+p_wmem;
@@ -276,19 +274,24 @@ namespace strumpack {
       if (upd_pos >= sep_end) break;
       ch_b_upd[r] = b[upd_pos];
     }
-    upd_pos = std::lower_bound(upd, upd+dim_upd, upd_pos) - upd;
+    upd_pos = std::distance
+      (upd.begin(), std::lower_bound(upd.begin(), upd.end(), upd_pos));
     for (; r<ch->dim_upd; r++) { // to parent update matrix
       integer_t t = ch->upd[r];
       while (upd[upd_pos] < t) upd_pos++;
       ch_b_upd[r] = b_upd[upd_pos];
     }
-    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*static_cast<long long int>(ch->dim_upd));
-    STRUMPACK_BYTES(sizeof(scalar_t)*static_cast<long long int>(3*ch->dim_upd)+sizeof(integer_t)*(ch->dim_upd+dim_upd));
+    STRUMPACK_FLOPS
+      ((is_complex<scalar_t>()?2:1)*
+       static_cast<long long int>(ch->dim_upd));
+    STRUMPACK_BYTES
+      (sizeof(scalar_t)*static_cast<long long int>
+       (3*ch->dim_upd)+sizeof(integer_t)*(ch->dim_upd+dim_upd));
   }
 
   template<typename scalar_t,typename integer_t> inline void
   FrontalMatrix<scalar_t,integer_t>::look_left
-  (scalar_t* b, scalar_t* wmem) {
+  (DenseM_t& b, scalar_t* wmem) {
     scalar_t* tmp = wmem + this->p_wmem;
     std::fill(tmp, tmp+dim_upd, scalar_t(0.));
     STRUMPACK_BYTES(sizeof(scalar_t)*static_cast<long long int>(dim_upd));
@@ -298,7 +301,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::look_right
-  (scalar_t* y, scalar_t* wmem) {
+  (DenseM_t& y, scalar_t* wmem) {
     if (lchild) extract_b(lchild, y, wmem);
     if (rchild) extract_b(rchild, y, wmem);
   }
@@ -321,7 +324,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::multifrontal_solve
-  (scalar_t* b, scalar_t* wmem) {
+  (DenseM_t& b, scalar_t* wmem) {
     TIMER_TIME(TaskType::FORWARD_SOLVE, 0, t_fwd);
     forward_multifrontal_solve(b, wmem);
     TIMER_STOP(t_fwd);
@@ -332,7 +335,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::multifrontal_solve
-  (scalar_t* b_loc, DistM_t* b_dist, scalar_t* wmem) {
+  (DenseM_t& b_loc, DistM_t* b_dist, scalar_t* wmem) {
     TIMER_TIME(TaskType::FORWARD_SOLVE, 0, t_fwd);
     forward_multifrontal_solve(b_loc, b_dist, wmem);
     TIMER_STOP(t_fwd);
@@ -342,13 +345,13 @@ namespace strumpack {
   }
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::forward_multifrontal_solve
-  (scalar_t* b_loc, DistM_t* b_dist, scalar_t* wmem,
+  (DenseM_t& b_loc, DistM_t* b_dist, scalar_t* wmem,
    int etree_level, int task_depth) {
     forward_multifrontal_solve(b_loc, wmem, etree_level, task_depth);
   }
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::backward_multifrontal_solve
-  (scalar_t* y_loc, DistM_t* b_dist, scalar_t* wmem,
+  (DenseM_t& y_loc, DistM_t* b_dist, scalar_t* wmem,
    int etree_level, int task_depth) {
     backward_multifrontal_solve(y_loc, wmem, etree_level, task_depth);
   }
@@ -418,8 +421,9 @@ namespace strumpack {
   if(task_depth < params::task_recursion_cutoff_level)
       rch->permute_upd_indices(perm, task_depth+1);
 
-    for (integer_t i=0; i<dim_upd; i++) upd[i] = perm[upd[i]];
-    std::sort(upd, upd+dim_upd);
+    for (integer_t i=0; i<dim_upd; i++)
+      upd[i] = perm[upd[i]];
+    std::sort(upd.begin(), upd.end());
 #pragma omp taskwait
   }
 

@@ -44,6 +44,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   class FrontalMatrixMPI : public FrontalMatrix<scalar_t,integer_t> {
+    using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
@@ -53,38 +54,38 @@ namespace strumpack {
     template<typename _scalar_t,typename _integer_t> friend class ExtendAdd;
 
   public:
-    FrontalMatrixMPI(CompressedSparseMatrix<scalar_t,integer_t>* _A,
-                     integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-                     integer_t _dim_upd, integer_t* _upd, MPI_Comm _front_comm,
-                     int _total_procs);
+    FrontalMatrixMPI
+    (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
+     std::vector<integer_t>& _upd, MPI_Comm _front_comm, int _total_procs);
     FrontalMatrixMPI(const FrontalMatrixMPI&) = delete;
     FrontalMatrixMPI& operator=(FrontalMatrixMPI const&) = delete;
     virtual ~FrontalMatrixMPI();
-    void sample_CB(const SPOptions<scalar_t>& opts,
-                   DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc,
-                   F_t* parent, int task_depth=0) {};
-    virtual
-    void sample_CB(const SPOptions<scalar_t>& opts,
-                   const DistM_t& R, DistM_t& Sr, DistM_t& Sc,
-                   F_t* pa) const = 0;
-    void extract_2d(const std::vector<std::size_t>& I,
-                    const std::vector<std::size_t>& J, DistM_t& B) const;
-    void get_child_submatrix_2d(const F_t* ch,
-                                const std::vector<std::size_t>& I,
-                                const std::vector<std::size_t>& J,
-                                DistM_t& B) const;
-    void extract_CB_sub_matrix(const std::vector<std::size_t>& I,
-                               const std::vector<std::size_t>& J,
-                               DenseM_t& B, int task_depth) const {};
-    virtual
-    void extract_CB_sub_matrix_2d(const std::vector<std::size_t>& I,
-                                  const std::vector<std::size_t>& J,
-                                  DistM_t& B) const = 0;
+
+    void sample_CB
+    (const SPOptions<scalar_t>& opts, const DenseM_t& R, DenseM_t& Sr,
+     DenseM_t& Sc, F_t* parent, int task_depth=0) override {};
+    virtual void sample_CB
+    (const SPOptions<scalar_t>& opts, const DistM_t& R, DistM_t& Sr,
+     DistM_t& Sc, F_t* pa) const = 0;
+
+    void extract_2d
+    (const SpMat_t& A, const std::vector<std::size_t>& I,
+     const std::vector<std::size_t>& J, DistM_t& B) const;
+    void get_child_submatrix_2d
+    (const F_t* ch, const std::vector<std::size_t>& I,
+     const std::vector<std::size_t>& J,
+     DistM_t& B) const;
+    void extract_CB_sub_matrix
+    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+     DenseM_t& B, int task_depth) const {};
+    virtual void extract_CB_sub_matrix_2d
+    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+     DistM_t& B) const = 0;
     void extend_add_b(F_t* ch, DistM_t& b_sep, scalar_t* wmem, int tag);
-    void extend_add_b_mpi_to_mpi(FMPI_t* ch, DistM_t& b_sep,
-                                 scalar_t* wmem, int tag);
-    void extend_add_b_seq_to_mpi(F_t* ch, DistM_t& b_sep,
-                                 scalar_t* wmem, int tag);
+    void extend_add_b_mpi_to_mpi
+    (FMPI_t* ch, DistM_t& b_sep, scalar_t* wmem, int tag);
+    void extend_add_b_seq_to_mpi
+    (F_t* ch, DistM_t& b_sep, scalar_t* wmem, int tag);
     void extract_b(F_t* ch, DistM_t& b_sep, scalar_t* wmem);
     void extract_b_mpi_to_mpi(FMPI_t* ch, DistM_t& b_sep, scalar_t* wmem);
     void extract_b_seq_to_mpi(F_t* ch, DistM_t& b_sep, scalar_t* wmem);
@@ -94,26 +95,26 @@ namespace strumpack {
     inline int blacs_context_all() const { return ctxt_all; }
     inline bool active() const {
       return front_comm != MPI_COMM_NULL &&
-        mpi_rank(front_comm) < proc_rows*proc_cols; }
-    static inline
-    void processor_grid(int np_procs, int& np_rows, int& np_cols) {
+        mpi_rank(front_comm) < proc_rows*proc_cols;
+    }
+    static inline void processor_grid
+    (int np_procs, int& np_rows, int& np_cols) {
       np_cols = std::floor(std::sqrt((float)np_procs));
       np_rows = np_procs / np_cols;
     }
     inline int np_rows() const { return proc_rows; }
     inline int np_cols() const { return proc_cols; }
     inline int find_rank(integer_t r, integer_t c, const DistM_t& F) const;
-    inline int find_rank_fixed(integer_t r, integer_t c,
-                               const DistM_t& F) const;
+    inline int find_rank_fixed
+    (integer_t r, integer_t c, const DistM_t& F) const;
     virtual void solve_workspace_query(integer_t& mem_size);
     virtual long long dense_factor_nonzeros(int task_depth=0) const;
     virtual std::string type() const { return "FrontalMatrixMPI"; }
     virtual bool isMPI() const { return true; }
     MPI_Comm comm() const { return front_comm; }
-    virtual
-    void bisection_partitioning(const SPOptions<scalar_t>& opts,
-                                integer_t* sorder,
-                                bool isroot=true, int task_depth=0);
+    virtual void bisection_partitioning
+    (const SPOptions<scalar_t>& opts, integer_t* sorder,
+     bool isroot=true, int task_depth=0);
 
     friend class FrontalMatrixDenseMPI<scalar_t,integer_t>;
     friend class FrontalMatrixHSSMPI<scalar_t,integer_t>;
@@ -138,10 +139,9 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   FrontalMatrixMPI<scalar_t,integer_t>::FrontalMatrixMPI
-  (CompressedSparseMatrix<scalar_t,integer_t>* _A, integer_t _sep,
-   integer_t _sep_begin, integer_t _sep_end, integer_t _dim_upd,
-   integer_t* _upd, MPI_Comm _front_comm, int _total_procs)
-    : F_t(_A, NULL, NULL,_sep, _sep_begin, _sep_end, _dim_upd, _upd),
+  (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
+   std::vector<integer_t>& _upd, MPI_Comm _front_comm, int _total_procs)
+    : F_t(NULL, NULL,_sep, _sep_begin, _sep_end, _upd),
     total_procs(_total_procs), front_comm(_front_comm) {
     processor_grid(total_procs, proc_rows, proc_cols);
     if (front_comm != MPI_COMM_NULL) {
@@ -171,14 +171,14 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMPI<scalar_t,integer_t>::extract_2d
-  (const std::vector<std::size_t>& I,
+  (const SpMat_t& A, const std::vector<std::size_t>& I,
    const std::vector<std::size_t>& J, DistM_t& B) const {
     auto m = I.size();
     auto n = J.size();
     TIMER_TIME(TaskType::EXTRACT_SEP_2D, 2, t_ex_sep);
     {
       DistM_t tmp(ctxt, m, n);
-      this->A->extract_separator_2d(this->sep_end, I, J, tmp, front_comm);
+      A.extract_separator_2d(this->sep_end, I, J, tmp, front_comm);
       // TODO why this copy???
       strumpack::copy(m, n, tmp, 0, 0, B, 0, 0, ctxt_all);
     }
@@ -327,8 +327,7 @@ namespace strumpack {
       auto b_rank = [&](integer_t r, integer_t c) -> int {
         return ch->find_rank(r, 0, ch_b_upd); };
       ExtAdd::extend_add_column_copy_from_buffers
-        (b_sep, b_upd, rbuf, this->sep_begin, this->upd,
-         ch->upd, ch->dim_upd, b_rank);
+        (b_sep, b_upd, rbuf, this->sep_begin, this->upd, ch->upd, b_rank);
     }
     if (ch_b_upd.pcol() == 0)
       MPI_Waitall(sreq.size(), sreq.data(), MPI_STATUSES_IGNORE);
@@ -376,7 +375,7 @@ namespace strumpack {
       MPI_Recv(rbuf[0].data(), msg_size, mpi_type<scalar_t>(), child_rank,
                tag, front_comm, &status);
       ExtAdd::extend_add_column_copy_from_buffers
-        (b_sep, b_upd, rbuf, this->sep_begin, this->upd, ch->upd, ch->dim_upd,
+        (b_sep, b_upd, rbuf, this->sep_begin, this->upd, ch->upd,
          [](integer_t,integer_t) -> int { return 0; });
     }
     if (mpi_rank(front_comm) == child_rank)
@@ -392,8 +391,8 @@ namespace strumpack {
     if (ctxt != -1) {
       int np_rows, np_cols, p_row, p_col;
       scalapack::Cblacs_gridinfo(ctxt, &np_rows, &np_cols, &p_row, &p_col);
-      mem_size += scalapack::numroc(this->dim_upd, DistM_t::default_NB,
-                                    p_row, 0, np_rows);
+      mem_size += scalapack::numroc
+        (this->dim_upd, DistM_t::default_NB, p_row, 0, np_rows);
     }
   }
 

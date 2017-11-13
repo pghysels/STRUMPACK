@@ -53,56 +53,65 @@ namespace strumpack {
     using DistM_t = DistributedMatrix<scalar_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using real_t = typename RealType<scalar_t>::value_type;
+
   public:
     ProportionallyDistributedSparseMatrix();
     virtual ~ProportionallyDistributedSparseMatrix();
 
-    void setup(CSRMatrixMPI<scalar_t,integer_t>* Ampi,
-               MatrixReorderingMPI<scalar_t,integer_t>* nd,
-               EliminationTreeMPIDist<scalar_t,integer_t>* et,
-               bool duplicate_fronts);
-    void print_dense();
+    void setup
+    (const CSRMatrixMPI<scalar_t,integer_t>& Ampi,
+     const MatrixReorderingMPI<scalar_t,integer_t>& nd,
+     const EliminationTreeMPIDist<scalar_t,integer_t>& et,
+     bool duplicate_fronts);
 
-    void extract_separator(integer_t sep_end,
-                           const std::vector<std::size_t>& I,
-                           const std::vector<std::size_t>& J,
-                           DenseM_t& B, int depth) const;
-    void front_multiply(integer_t slo, integer_t shi,
-                        integer_t* upd, integer_t dupd,
-                        const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc) const;
-    void extract_front(scalar_t* F11, scalar_t* F12, scalar_t* F21,
-                       integer_t dim_sep, integer_t dim_upd,
-                       integer_t sep_begin, integer_t sep_end,
-                       integer_t* upd, int depth);
-    void extract_F11_block(scalar_t* F, integer_t ldF,
-                           integer_t row, integer_t nr_rows,
-                           integer_t col, integer_t nr_cols);
-    void extract_F12_block(scalar_t* F, integer_t ldF,
-                           integer_t row, integer_t nr_rows,
-                           integer_t col, integer_t nr_cols, integer_t* upd);
-    void extract_F21_block(scalar_t* F, integer_t ldF,
-                           integer_t row, integer_t nr_rows,
-                           integer_t col, integer_t nr_cols, integer_t* upd);
+    void print_dense(const std::string& name) const override;
 
-    void extract_separator_2d(integer_t sep_end,
-                              const std::vector<std::size_t>& I,
-                              const std::vector<std::size_t>& J,
-                              DistM_t& B, MPI_Comm comm) const;
-    void front_multiply_2d(integer_t sep_begin, integer_t sep_end,
-                           integer_t* upd, integer_t dim_upd,
-                           DistM_t& R, DistM_t& Srow, DistM_t& Scol,
-                           int ctxt_all, MPI_Comm R_comm, int depth);
+    void extract_separator
+    (integer_t sep_end, const std::vector<std::size_t>& I,
+     const std::vector<std::size_t>& J,
+     DenseM_t& B, int depth) const override;
+    void extract_front
+    (DenseM_t& F11, DenseM_t& F12, DenseM_t& F21,
+     integer_t sep_begin, integer_t sep_end,
+     const std::vector<integer_t>& upd, int depth) const override;
+    void extract_F11_block
+    (scalar_t* F, integer_t ldF, integer_t row, integer_t nr_rows,
+     integer_t col, integer_t nr_cols) const override;
+    void extract_F12_block
+    (scalar_t* F, integer_t ldF, integer_t row,
+     integer_t nr_rows, integer_t col, integer_t nr_cols,
+     const integer_t* upd) const override;
+    void extract_F21_block
+    (scalar_t* F, integer_t ldF, integer_t row,
+     integer_t nr_rows, integer_t col, integer_t nr_cols,
+     const integer_t* upd) const override;
+    void extract_separator_2d
+    (integer_t sep_end, const std::vector<std::size_t>& I,
+     const std::vector<std::size_t>& J, DistM_t& B,
+     MPI_Comm comm) const override ;
 
-    ProportionallyDistributedSparseMatrix<scalar_t,integer_t>* clone()
-    { return NULL; }
-    void spmv(scalar_t* x, scalar_t* y) {};
-    void omp_spmv(scalar_t* x, scalar_t* y) {};
-    void apply_scaling(std::vector<scalar_t>& Dr,
-                       std::vector<scalar_t>& Dc) {};
-    void apply_column_permutation(std::vector<integer_t>& perm) {};
-    int read_matrix_market(std::string filename) { return 1; };
-    real_t max_scaled_residual(scalar_t* x, scalar_t* b)
-    { return real_t(1.); };
+    void front_multiply
+    (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+     const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc) const override;
+    void front_multiply_2d
+    (integer_t sep_begin, integer_t sep_end,
+     const std::vector<integer_t>& upd, const DistM_t& R,
+     DistM_t& Srow, DistM_t& Scol, int ctxt_all, MPI_Comm R_comm,
+     int depth) const override;
+
+    void spmv(const scalar_t* x, scalar_t* y) const override {};
+    void omp_spmv(const scalar_t* x, scalar_t* y) const override {};
+    void apply_scaling
+    (const std::vector<scalar_t>& Dr,
+     const std::vector<scalar_t>& Dc) override {};
+    void apply_column_permutation
+    (const std::vector<integer_t>& perm) override {};
+    int read_matrix_market(const std::string& filename) override {
+      return 1;
+    };
+    real_t max_scaled_residual(const scalar_t* x, const scalar_t* b) const {
+      return real_t(1.);
+    };
 
   protected:
     integer_t _local_cols;  // number of columns stored on this proces
@@ -123,30 +132,30 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::setup
-  (CSRMatrixMPI<scalar_t,integer_t>* Ampi,
-   MatrixReorderingMPI<scalar_t,integer_t>* nd,
-   EliminationTreeMPIDist<scalar_t,integer_t>* et,
+  (const CSRMatrixMPI<scalar_t,integer_t>& Ampi,
+   const MatrixReorderingMPI<scalar_t,integer_t>& nd,
+   const EliminationTreeMPIDist<scalar_t,integer_t>& et,
    bool duplicate_fronts) {
-    this->_n = Ampi->size();
-    this->_nnz = Ampi->nnz();
-    auto comm = Ampi->comm();
+    this->_n = Ampi.size();
+    this->_nnz = Ampi.nnz();
+    auto comm = Ampi.comm();
     auto P = mpi_nprocs(comm);
     auto eps = blas::lamch<real_t>('E');
 
-    auto dest = new std::tuple<int,int,int>[Ampi->local_nnz()];
+    auto dest = new std::tuple<int,int,int>[Ampi.local_nnz()];
     auto scnts = new int[4*P];
     auto rcnts = scnts + P;
     auto sdisp = scnts + 2*P;
     auto rdisp = scnts + 3*P;
     std::fill(scnts, scnts+P, 0);
 #pragma omp parallel for
-    for (integer_t r=0; r<Ampi->local_rows(); r++) {
-      auto r_perm = nd->perm[r+Ampi->begin_row()];
-      auto hij = Ampi->get_ptr()[r+1]-Ampi->get_ptr()[0];
-      for (integer_t j=Ampi->get_ptr()[r]-Ampi->get_ptr()[0]; j<hij; j++) {
-        if (std::abs(Ampi->get_val()[j]) > eps) {
-          auto c_perm = nd->perm[Ampi->get_ind()[j]];
-          auto d = dest[j] = et->get_sparse_mapped_destination
+    for (integer_t r=0; r<Ampi.local_rows(); r++) {
+      auto r_perm = nd.perm[r+Ampi.begin_row()];
+      auto hij = Ampi.get_ptr()[r+1]-Ampi.get_ptr()[0];
+      for (integer_t j=Ampi.get_ptr()[r]-Ampi.get_ptr()[0]; j<hij; j++) {
+        if (std::abs(Ampi.get_val()[j]) > eps) {
+          auto c_perm = nd.perm[Ampi.get_ind()[j]];
+          auto d = dest[j] = et.get_sparse_mapped_destination
             (r_perm, c_perm, duplicate_fronts);
           auto hip = std::get<0>(d)+std::get<1>(d);
           for (int p=std::get<0>(d); p<hip; p+=std::get<2>(d))
@@ -160,13 +169,13 @@ namespace strumpack {
     auto pp = new Triplet*[P];
     pp[0] = sbuf;
     for (int p=1; p<P; p++) pp[p] = pp[p-1] + scnts[p-1];
-    for (integer_t r=0; r<Ampi->local_rows(); r++) {
-      auto r_perm = nd->perm[r+Ampi->begin_row()];
-      auto hij = Ampi->get_ptr()[r+1]-Ampi->get_ptr()[0];
-      for (integer_t j=Ampi->get_ptr()[r]-Ampi->get_ptr()[0]; j<hij; j++) {
-        auto a = Ampi->get_val()[j];
+    for (integer_t r=0; r<Ampi.local_rows(); r++) {
+      auto r_perm = nd.perm[r+Ampi.begin_row()];
+      auto hij = Ampi.get_ptr()[r+1]-Ampi.get_ptr()[0];
+      for (integer_t j=Ampi.get_ptr()[r]-Ampi.get_ptr()[0]; j<hij; j++) {
+        auto a = Ampi.get_val()[j];
         if (std::abs(a) > eps) {
-          Triplet t = {r_perm, nd->perm[Ampi->get_ind()[j]], a};
+          Triplet t = {r_perm, nd.perm[Ampi.get_ind()[j]], a};
           auto d = dest[j];
           auto hip = std::get<0>(d)+std::get<1>(d);
           for (int p=std::get<0>(d); p<hip; p+=std::get<2>(d)) {
@@ -185,10 +194,14 @@ namespace strumpack {
       sdisp[p] = sdisp[p-1] + scnts[p-1];
       rdisp[p] = rdisp[p-1] + rcnts[p-1];
     }
-    std::vector<Triplet> triplets(std::accumulate(rcnts, rcnts+P, 0) /
-                                  sizeof(Triplet));
-    MPI_Alltoallv(sbuf, scnts, sdisp, MPI_BYTE, triplets.data(),
-                  rcnts, rdisp, MPI_BYTE, comm);
+    std::vector<Triplet> triplets
+      (std::accumulate(rcnts, rcnts+P, 0) / sizeof(Triplet));
+
+    std::cout << "receiving " << triplets.size() << " triplets" << std::endl;
+
+    MPI_Alltoallv
+      (sbuf, scnts, sdisp, MPI_BYTE, triplets.data(),
+       rcnts, rdisp, MPI_BYTE, comm);
 
     delete[] scnts;
     delete[] sbuf;
@@ -240,19 +253,21 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::print_dense() {
-    scalar_t* M = new scalar_t[this->_n * this->_n];
+  ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::
+  print_dense(const std::string& name) const {
+    std::fstream fs(name, std::fstream::out);
+    auto M = new scalar_t[this->_n * this->_n];
     std::fill(M, M+(this->_n*this->_n), scalar_t(0.));
     for (integer_t c=0; c<_local_cols; c++)
       for (integer_t j=this->_ptr[c]; j<this->_ptr[c+1]; j++)
         M[this->_ind[j] + _global_col[c]*this->_n] = this->_val[j];
-    std::cout << "A = [\n";
+    fs << "A = [\n";
     for (integer_t row=0; row<this->_n; row++) {
       for (integer_t col=0; col<this->_n; col++)
-        std::cout << M[row + this->_n * col] << " ";
-      std::cout << ";" << std::endl;
+        fs << M[row + this->_n * col] << " ";
+      fs << ";" << std::endl;
     }
-    std::cout << "];" << std::endl;
+    fs << "];" << std::endl;
     delete[] M;
   }
 
@@ -288,8 +303,9 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::front_multiply
-  (integer_t slo, integer_t shi, integer_t* upd, integer_t dupd,
+  (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
    const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc) const {
+    integer_t dupd = upd.size();
     auto ds = shi - slo;
     auto nbvec = R.cols();
     auto c = std::lower_bound
@@ -344,10 +360,9 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::extract_front
-  (scalar_t* F11, scalar_t* F12, scalar_t* F21,
-   integer_t dim_sep, integer_t dim_upd,
-   integer_t sep_begin, integer_t sep_end,
-   integer_t* upd, int depth) {
+  (DenseM_t& F11, DenseM_t& F12, DenseM_t& F21, integer_t sep_begin,
+   integer_t sep_end, const std::vector<integer_t>& upd, int depth) const {
+    integer_t dim_upd = upd.size();
     auto c = std::lower_bound
       (_global_col, _global_col+_local_cols, sep_begin) - _global_col;
     auto chi = std::lower_bound
@@ -355,16 +370,18 @@ namespace strumpack {
     for (; c<chi; c++) {
       auto col = _global_col[c];
       integer_t row_ptr = 0;
-      for (integer_t j=this->_ptr[c]; j<this->_ptr[c+1]; j++) {
+      auto hij = this->_ptr[c+1];
+      for (integer_t j=this->_ptr[c]; j<hij; j++) {
         auto row = this->_ind[j];
         if (row >= sep_begin) {
           if (row < sep_end)
-            F11[row-sep_begin + (col-sep_begin)*dim_sep] = this->_val[j];
+            F11(row-sep_begin, col-sep_begin) = this->_val[j];
           else {
-            while (row_ptr<dim_upd && upd[row_ptr]<row) row_ptr++;
+            while (row_ptr<dim_upd && upd[row_ptr]<row)
+              row_ptr++;
             if (row_ptr == dim_upd) break;
             if (upd[row_ptr] == row)
-              F21[row_ptr + (col-sep_begin)*dim_upd] = this->_val[j];
+              F21(row_ptr, col-sep_begin) = this->_val[j];
           }
         }
       }
@@ -377,7 +394,8 @@ namespace strumpack {
       for (integer_t j=this->_ptr[c]; j<this->_ptr[c+1]; j++) {
         auto row = this->_ind[j];
         if (row >= sep_begin) {
-          if (row < sep_end) F12[row-sep_begin + i*dim_sep] = this->_val[j];
+          if (row < sep_end)
+            F12(row-sep_begin, i) = this->_val[j];
           else break;
         }
       }
@@ -387,7 +405,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::extract_F11_block
   (scalar_t* F, integer_t ldF, integer_t row, integer_t nr_rows,
-   integer_t col, integer_t nr_cols) {
+   integer_t col, integer_t nr_cols) const {
     auto c = std::lower_bound
       (_global_col, _global_col+_local_cols, col) - _global_col;
     auto chi = std::lower_bound
@@ -407,7 +425,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::extract_F12_block
   (scalar_t* F, integer_t ldF, integer_t row, integer_t nr_rows,
-   integer_t col, integer_t nr_cols, integer_t* upd) {
+   integer_t col, integer_t nr_cols, const integer_t* upd) const {
     if (nr_cols == 0 || nr_rows == 0) return;
     auto c = std::lower_bound
       (_global_col, _global_col+_local_cols, upd[0]) - _global_col;
@@ -430,7 +448,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::extract_F21_block
   (scalar_t* F, integer_t ldF, integer_t row, integer_t nr_rows,
-   integer_t col, integer_t nr_cols, integer_t* upd) {
+   integer_t col, integer_t nr_cols, const integer_t* upd) const{
     if (nr_rows == 0 || nr_cols == 0) return;
     auto c = std::lower_bound
       (_global_col, _global_col+_local_cols, col) - _global_col;
@@ -451,9 +469,9 @@ namespace strumpack {
   /** mat should be defined on the same communicator as F11 */
   template<typename scalar_t,typename integer_t> void
   ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::
-  extract_separator_2d(integer_t sep_end, const std::vector<std::size_t>& I,
-                       const std::vector<std::size_t>& J,
-                       DistM_t& B, MPI_Comm comm) const {
+  extract_separator_2d
+  (integer_t sep_end, const std::vector<std::size_t>& I,
+   const std::vector<std::size_t>& J, DistM_t& B, MPI_Comm comm) const {
     if (!B.active()) return;
     integer_t m = B.rows();
     integer_t n = B.cols();
@@ -524,15 +542,16 @@ namespace strumpack {
    */
   template<typename scalar_t,typename integer_t> void
   ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::front_multiply_2d
-  (integer_t sep_begin, integer_t sep_end, integer_t* upd, integer_t dim_upd,
-   DistM_t& R, DistM_t& Srow, DistM_t& Scol, int ctxt_all,
-   MPI_Comm R_comm, int depth) {
+  (integer_t sep_begin, integer_t sep_end, const std::vector<integer_t>& upd,
+   const DistM_t& R, DistM_t& Srow, DistM_t& Scol, int ctxt_all,
+   MPI_Comm R_comm, int depth) const {
 
     assert(R.fixed());
     assert(Srow.fixed());
     assert(Scol.fixed());
 
     if (!R.active()) return;
+    integer_t dim_upd = upd.size();
     long long int local_flops = 0;
     auto dim_sep = sep_end - sep_begin;
     auto lcols = R.lcols();

@@ -50,7 +50,65 @@ namespace strumpack {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
+    using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
+
   public:
+    FrontalMatrixHSS
+    (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
+     std::vector<integer_t>& _upd);
+    ~FrontalMatrixHSS() {}
+
+    void extend_add_to_dense
+    (FrontalMatrixDense<scalar_t,integer_t>* p, int task_depth) override;
+
+    void sample_CB
+    (const SPOptions<scalar_t>& opts, const DenseM_t& R, DenseM_t& Sr,
+     DenseM_t& Sc, F_t* pa, int task_depth) override;
+    void sample_CB_direct
+    (const DenseM_t& cR, DenseM_t& Sr, DenseM_t& Sc,
+     const std::vector<std::size_t>& I, int task_depth);
+
+    void release_work_memory() override;
+    void random_sampling
+    (const SpMat_t& A, const SPOptions<scalar_t>& opts, DenseM_t& Rr,
+     DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc, int etree_level,
+     int task_depth); // TODO const?
+    void element_extraction
+    (const SpMat_t& A, const std::vector<std::size_t>& I,
+     const std::vector<std::size_t>& J, DenseM_t& B, int task_depth);
+    void extract_CB_sub_matrix
+    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+     DenseM_t& B, int task_depth) const;
+
+    void multifrontal_factorization
+    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+     int etree_level=0, int task_depth=0) override;
+
+    void forward_multifrontal_solve
+    (DenseM_t& b, scalar_t* wmem,
+     int etree_level=0, int task_depth=0) override;
+    void backward_multifrontal_solve
+    (DenseM_t& y, scalar_t* wmem,
+     int etree_level=0, int task_depth=0) override;
+
+
+    integer_t maximum_rank(int task_depth=0) const override;
+    void print_rank_statistics(std::ostream &out) const override;
+    bool isHSS() const override { return true; };
+    std::string type() const override { return "FrontalMatrixHSS"; }
+
+    int random_samples() const { return R1.cols(); };
+    void bisection_partitioning
+    (const SPOptions<scalar_t>& opts, integer_t* sorder,
+     bool isroot=true, int task_depth=0);
+
+    void set_HSS_partitioning
+    (const SPOptions<scalar_t>& opts,
+     const HSS::HSSPartitionTree& sep_tree, bool is_root);
+
+
+
+    // TODO make private?
     HSS::HSSMatrix<scalar_t> _H;
     HSS::HSSFactors<scalar_t> _ULV;
     // TODO do not store this here: makes solve not thread safe!!
@@ -73,81 +131,38 @@ namespace strumpack {
                            construct HSS matrix of this front */
     std::uint32_t _sampled_columns = 0;
 
-    FrontalMatrixHSS(CompressedSparseMatrix<scalar_t,integer_t>* _A,
-                     integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-                     integer_t _dim_upd, integer_t* _upd);
-    ~FrontalMatrixHSS() {}
-    void extend_add_to_dense(FrontalMatrixDense<scalar_t,integer_t>* p,
-                             int task_depth);
-
-    void sample_CB(const SPOptions<scalar_t>& opts,
-                   DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc,
-                   F_t* pa, int task_depth);
-    void sample_CB_direct(const DenseM_t& cR, DenseM_t& Sr, DenseM_t& Sc,
-                          const std::vector<std::size_t>& I, int task_depth);
-    void release_work_memory();
-    void random_sampling(const SPOptions<scalar_t>& opts,
-                         DenseM_t& Rr, DenseM_t& Rc,
-                         DenseM_t& Sr, DenseM_t& Sc,
-                         int etree_level, int task_depth);
-    void element_extraction(const std::vector<std::size_t>& I,
-                            const std::vector<std::size_t>& J,
-                            DenseM_t& B, int task_depth);
-    void extract_CB_sub_matrix(const std::vector<std::size_t>& I,
-                               const std::vector<std::size_t>& J,
-                               DenseM_t& B, int task_depth) const;
-
-    void multifrontal_factorization(const SPOptions<scalar_t>& opts,
-                                    int etree_level=0, int task_depth=0);
-    void forward_multifrontal_solve(scalar_t* b, scalar_t* wmem,
-                                    int etree_level=0, int task_depth=0);
-    void backward_multifrontal_solve(scalar_t* y, scalar_t* wmem,
-                                     int etree_level=0, int task_depth=0);
-
-
-    integer_t maximum_rank(int task_depth=0) const;
-    void print_rank_statistics(std::ostream &out) const;
-    bool isHSS() const { return true; };
-    std::string type() const { return "FrontalMatrixHSS"; }
-
-    int random_samples() const { return R1.cols(); };
-    void bisection_partitioning(const SPOptions<scalar_t>& opts,
-                                integer_t* sorder,
-                                bool isroot=true, int task_depth=0);
-
-    void set_HSS_partitioning(const SPOptions<scalar_t>& opts,
-                              const HSS::HSSPartitionTree& sep_tree,
-                              bool is_root);
-
   private:
     FrontalMatrixHSS(const FrontalMatrixHSS&) = delete;
     FrontalMatrixHSS& operator=(FrontalMatrixHSS const&) = delete;
-    void multifrontal_factorization_node(const SPOptions<scalar_t>& opts,
-                                         int etree_level, int task_depth);
-    void forward_multifrontal_solve_node(scalar_t* b, scalar_t* wmem,
-                                         int etree_level, int task_depth);
-    void backward_multifrontal_solve_node(scalar_t* y, scalar_t* wmem,
-                                          int etree_level, int task_depth);
-    long long node_factor_nonzeros() const;
-    long long dense_node_factor_nonzeros() const;
 
-    void split_separator(const SPOptions<scalar_t>& opts,
-                         HSS::HSSPartitionTree& hss_tree,
-                         integer_t& nr_parts, integer_t part,
-                         integer_t count, integer_t* sorder);
-    void extract_separator(const SPOptions<scalar_t>& opts, integer_t part,
-                           std::vector<idx_t>& xadj,
-                           std::vector<idx_t>& adjncy,
-                           integer_t* sorder);
+    void multifrontal_factorization_node
+    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+     int etree_level, int task_depth);
+
+    void forward_multifrontal_solve_node
+    (DenseM_t& b, scalar_t* wmem, int etree_level, int task_depth);
+    void backward_multifrontal_solve_node
+    (DenseM_t& y, scalar_t* wmem, int etree_level, int task_depth);
+
+    long long node_factor_nonzeros() const override;
+    long long dense_node_factor_nonzeros() const override;
+
+    void split_separator
+    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+     HSS::HSSPartitionTree& hss_tree, integer_t& nr_parts, integer_t part,
+     integer_t count, integer_t* sorder);
+    void extract_separator
+    (const SpMat_t& A, const SPOptions<scalar_t>& opts, integer_t part,
+     std::vector<idx_t>& xadj, std::vector<idx_t>& adjncy,
+     integer_t* sorder);
   };
 
   template<typename scalar_t,typename integer_t>
   FrontalMatrixHSS<scalar_t,integer_t>::FrontalMatrixHSS
-  (CompressedSparseMatrix<scalar_t,integer_t>* _A, integer_t _sep,
-   integer_t _sep_begin, integer_t _sep_end,
-   integer_t _dim_upd, integer_t* _upd)
+  (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
+   std::vector<integer_t>& _upd)
     : FrontalMatrix<scalar_t,integer_t>
-    (_A, NULL, NULL, _sep, _sep_begin, _sep_end, _dim_upd, _upd) {
+    (NULL, NULL, _sep, _sep_begin, _sep_end, _upd) {
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -248,8 +263,8 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::sample_CB
-  (const SPOptions<scalar_t>& opts, DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc,
-   F_t* pa, int task_depth) {
+  (const SPOptions<scalar_t>& opts, const DenseM_t& R,
+   DenseM_t& Sr, DenseM_t& Sc, F_t* pa, int task_depth) {
     if (!this->dim_upd) return;
     auto I = this->upd_to_parent(pa);
     auto cR = R.extract_rows(I);
@@ -317,18 +332,20 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::multifrontal_factorization
-  (const SPOptions<scalar_t>& opts, int etree_level, int task_depth) {
+  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+   int etree_level, int task_depth) {
     if (task_depth == 0)
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single
-      multifrontal_factorization_node(opts, etree_level, task_depth);
-    else multifrontal_factorization_node(opts, etree_level, task_depth);
+      multifrontal_factorization_node(A, opts, etree_level, task_depth);
+    else multifrontal_factorization_node(A, opts, etree_level, task_depth);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::random_sampling
-  (const SPOptions<scalar_t>& opts, DenseM_t& Rr, DenseM_t& Rc,
-   DenseM_t& Sr, DenseM_t& Sc, int etree_level, int task_depth) {
+  (const SpMat_t& A, const SPOptions<scalar_t>& opts, DenseM_t& Rr,
+   DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc, int etree_level,
+   int task_depth) {
     auto f0 = params::flops;
     Sr.zero();
     Sc.zero();
@@ -370,8 +387,8 @@ namespace strumpack {
     }
 
     f0 = params::flops;
-    this->A->front_multiply(this->sep_begin, this->sep_end,
-                            this->upd, this->dim_upd, Rr, Sr, Sc);
+    A.front_multiply
+      (this->sep_begin, this->sep_end, this->upd, Rr, Sr, Sc);
     params::sparse_sample_flops += params::flops - f0;
     auto f1 = params::flops;
     if (this->lchild)
@@ -395,8 +412,8 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::element_extraction
-  (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-   DenseM_t& B, int task_depth) {
+  (const SpMat_t& A, const std::vector<std::size_t>& I,
+   const std::vector<std::size_t>& J, DenseM_t& B, int task_depth) {
     std::vector<std::size_t> gI, gJ;
     gI.reserve(I.size());
     gJ.reserve(J.size());
@@ -406,7 +423,7 @@ namespace strumpack {
     for (auto j : J)
       gJ.push_back((integer_t(j) < this->dim_sep) ? j+this->sep_begin :
                    this->upd[j-this->dim_sep]);
-    this->A->extract_separator(this->sep_end, gI, gJ, B, task_depth);
+    A.extract_separator(this->sep_end, gI, gJ, B, task_depth);
     if (this->lchild)
       this->lchild->extract_CB_sub_matrix(gI, gJ, B, task_depth);
     if (this->rchild)
@@ -415,32 +432,33 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::multifrontal_factorization_node
-  (const SPOptions<scalar_t>& opts, int etree_level, int task_depth) {
+  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+   int etree_level, int task_depth) {
     bool tasked = task_depth < params::task_recursion_cutoff_level;
     if (tasked) {
       if (this->lchild)
 #pragma omp task default(shared)                                        \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
         this->lchild->multifrontal_factorization
-          (opts, etree_level+1, task_depth+1);
+          (A, opts, etree_level+1, task_depth+1);
       if (this->rchild)
 #pragma omp task default(shared)                                        \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
         this->rchild->multifrontal_factorization
-          (opts, etree_level+1, task_depth+1);
+          (A, opts, etree_level+1, task_depth+1);
 #pragma omp taskwait
     } else {
       if (this->lchild)
         this->lchild->multifrontal_factorization
-          (opts, etree_level+1, task_depth);
+          (A, opts, etree_level+1, task_depth);
       if (this->rchild)
         this->rchild->multifrontal_factorization
-          (opts, etree_level+1, task_depth);
+          (A, opts, etree_level+1, task_depth);
     }
     _H.set_openmp_task_depth(task_depth);
     auto mult = [&](DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
       auto f0 = params::flops;
-      random_sampling(opts, Rr, Rc, Sr, Sc, etree_level, task_depth);
+      random_sampling(A, opts, Rr, Rc, Sr, Sc, etree_level, task_depth);
       params::sample_flops += params::flops - f0;
       if (_sampled_columns == 0)
         params::initial_sample_flops += params::flops - f0;
@@ -449,7 +467,7 @@ namespace strumpack {
     auto elem = [&](const std::vector<std::size_t>& I,
                     const std::vector<std::size_t>& J, DenseM_t& B) {
       auto f0 = params::flops;
-      element_extraction(I, J, B, task_depth);
+      element_extraction(A, I, J, B, task_depth);
       params::extraction_flops += params::flops - f0;
     };
     auto f0 = params::flops;
@@ -494,17 +512,19 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::forward_multifrontal_solve
-  (scalar_t* b, scalar_t* wmem, int etree_level, int task_depth) {
+  (DenseM_t& b, scalar_t* wmem, int etree_level, int task_depth) {
     if (task_depth == 0)
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single
-      forward_multifrontal_solve_node(b, wmem, etree_level, task_depth);
-    else forward_multifrontal_solve_node(b, wmem, etree_level, task_depth);
+      forward_multifrontal_solve_node
+        (b, wmem, etree_level, task_depth);
+    else forward_multifrontal_solve_node
+           (b, wmem, etree_level, task_depth);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::forward_multifrontal_solve_node
-  (scalar_t* b, scalar_t* wmem, int etree_level, int task_depth) {
+  (DenseM_t& b, scalar_t* wmem, int etree_level, int task_depth) {
     bool tasked = task_depth<params::task_recursion_cutoff_level;
     if (tasked) {
       if (this->lchild)
@@ -529,20 +549,21 @@ namespace strumpack {
     this->look_left(b, wmem);
     if (etree_level) {
       if (_Theta.cols() && _Phi.cols()) {
-        DenseMW_t rhs(this->dim_sep, 1, b+this->sep_begin, this->A->size());
+        DenseMW_t rhs(this->dim_sep, b.cols(), b, this->sep_begin, 0);
         _ULVwork = std::unique_ptr<HSS::WorkSolve<scalar_t>>
           (new HSS::WorkSolve<scalar_t>());
         _H.child(0)->forward_solve(_ULV, *_ULVwork, rhs, true);
         if (this->dim_upd) {
-          DenseMW_t tmp(_Theta.rows(), _ULVwork->reduced_rhs.cols(),
-                        wmem+this->p_wmem, this->dim_upd);
+          DenseMW_t tmp
+            (_Theta.rows(), _ULVwork->reduced_rhs.cols(),
+             wmem+this->p_wmem, this->dim_upd);
           gemm(Trans::N, Trans::N, scalar_t(-1.), _Theta,
                _ULVwork->reduced_rhs, scalar_t(1.), tmp, task_depth);
         }
         _ULVwork->reduced_rhs.clear();
       }
     } else {
-      DenseMW_t rhs(this->dim_sep, 1, b+this->sep_begin, this->A->size());
+      DenseMW_t rhs(this->dim_sep, b.cols(), b, this->sep_begin, 0);
       _ULVwork = std::unique_ptr<HSS::WorkSolve<scalar_t>>
         (new HSS::WorkSolve<scalar_t>());
       _H.forward_solve(_ULV, *_ULVwork, rhs, false);
@@ -551,17 +572,19 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::backward_multifrontal_solve
-  (scalar_t* b, scalar_t* wmem, int etree_level, int task_depth) {
+  (DenseM_t& b, scalar_t* wmem, int etree_level, int task_depth) {
     if (task_depth == 0)
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single
-      backward_multifrontal_solve_node(b, wmem, etree_level, task_depth);
-    else backward_multifrontal_solve_node(b, wmem, etree_level, task_depth);
+      backward_multifrontal_solve_node
+        (b, wmem, etree_level, task_depth);
+    else backward_multifrontal_solve_node
+           (b, wmem, etree_level, task_depth);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::backward_multifrontal_solve_node
-  (scalar_t* y, scalar_t* wmem, int etree_level, int task_depth) {
+  (DenseM_t& y, scalar_t* wmem, int etree_level, int task_depth) {
     bool tasked = task_depth<params::task_recursion_cutoff_level;
     if (etree_level) {
       if (_Phi.cols() && _Theta.cols()) {
@@ -570,12 +593,12 @@ namespace strumpack {
           gemm(Trans::C, Trans::N, scalar_t(-1.), _Phi, tmp,
                scalar_t(1.), _ULVwork->x, task_depth);
         }
-        DenseMW_t rhs(this->dim_sep, 1, y+this->sep_begin, this->A->size());
+        DenseMW_t rhs(this->dim_sep, y.cols(), y, this->sep_begin, 0);
         _H.child(0)->backward_solve(_ULV, *_ULVwork, rhs);
         _ULVwork.reset();
       }
     } else {
-      DenseMW_t rhs(this->dim_sep, 1, y+this->sep_begin, this->A->size());
+      DenseMW_t rhs(this->dim_sep, y.cols(), y, this->sep_begin, 0);
       _H.backward_solve(_ULV, *_ULVwork, rhs);
     }
     this->look_right(y, wmem);
@@ -669,7 +692,8 @@ namespace strumpack {
 
     std::cout << "TODO FrontalMatrixHSS::bisection_partitioning" << std::endl;
 
-    for (integer_t i=this->sep_begin; i<this->sep_end; i++) sorder[i] = -i;
+    for (integer_t i=this->sep_begin; i<this->sep_end; i++)
+      sorder[i] = -i;
     HSS::HSSPartitionTree sep_tree(this->dim_sep);
     sep_tree.refine(opts.HSS_options().leaf_size());
 
@@ -699,10 +723,11 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::split_separator
-  (const SPOptions<scalar_t>& opts, HSS::HSSPartitionTree& hss_tree,
-   integer_t& nr_parts, integer_t part, integer_t count, integer_t* sorder) {
+  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+   HSS::HSSPartitionTree& hss_tree, integer_t& nr_parts, integer_t part,
+   integer_t count, integer_t* sorder) {
     std::vector<idx_t> xadj, adjncy;
-    extract_separator(opts, part, xadj, adjncy, sorder);
+    extract_separator(A, opts, part, xadj, adjncy, sorder);
     idx_t ncon = 1, edge_cut = 0, two = 2, nvtxs=xadj.size()-1;
     auto partitioning = new idx_t[nvtxs];
     int info = METIS_PartGraphRecursive
@@ -723,16 +748,17 @@ namespace strumpack {
     delete[] partitioning;
     for (integer_t p=0; p<2; p++)
       if (hss_tree.c[p].size >= 2 * opts.HSS_options().leaf_size())
-        split_separator(opts, hss_tree.c[p], nr_parts,
-                        -count-p, count+2, sorder);
-      else std::replace(sorder+this->sep_begin, sorder+this->sep_end,
-                        -count-p, nr_parts++);
+        split_separator
+          (A, opts, hss_tree.c[p], nr_parts, -count-p, count+2, sorder);
+      else std::replace
+             (sorder+this->sep_begin, sorder+this->sep_end,
+              -count-p, nr_parts++);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::extract_separator
-  (const SPOptions<scalar_t>& opts, integer_t part, std::vector<idx_t>& xadj,
-   std::vector<idx_t>& adjncy, integer_t* sorder) {
+  (const SpMat_t& A, const SPOptions<scalar_t>& opts, integer_t part,
+   std::vector<idx_t>& xadj, std::vector<idx_t>& adjncy, integer_t* sorder) {
     assert(opts.separator_ordering_level() == 0 ||
            opts.separator_ordering_level() == 1);
     auto mark = new bool[this->dim_sep];
@@ -746,9 +772,9 @@ namespace strumpack {
       if (sorder[i] == part) {
         xadj.push_back(e);
         std::fill(mark, mark+this->dim_sep, false);
-        for (integer_t j=this->A->get_ptr()[i];
-             j<this->A->get_ptr()[i+1]; j++) {
-          auto c = this->A->get_ind()[j];
+        for (integer_t j=A.get_ptr()[i];
+             j<A.get_ptr()[i+1]; j++) {
+          auto c = A.get_ind()[j];
           if (c == i) continue;
           auto lc = c - this->sep_begin;
           if (lc >= 0 && lc < this->dim_sep && sorder[c]==part && !mark[lc]) {
@@ -757,9 +783,9 @@ namespace strumpack {
             e++;
           } else {
             if (opts.separator_ordering_level() > 0) {
-              for (integer_t k=this->A->get_ptr()[c];
-                   k<this->A->get_ptr()[c+1]; k++) {
-                auto cc = this->A->get_ind()[k];
+              for (integer_t k=A.get_ptr()[c];
+                   k<A.get_ptr()[c+1]; k++) {
+                auto cc = A.get_ind()[k];
                 auto lcc = cc - this->sep_begin;
                 if (cc!=i && lcc >= 0 && lcc < this->dim_sep &&
                     sorder[cc]==part && !mark[lcc]) {

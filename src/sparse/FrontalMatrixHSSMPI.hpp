@@ -44,6 +44,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   class FrontalMatrixHSSMPI : public FrontalMatrixMPI<scalar_t,integer_t> {
+    using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
@@ -53,55 +54,58 @@ namespace strumpack {
     template<typename _scalar_t,typename _integer_t> friend class ExtendAdd;
 
   public:
-    FrontalMatrixHSSMPI(CompressedSparseMatrix<scalar_t,integer_t>* _A,
-                        integer_t _sep, integer_t _sep_begin,
-                        integer_t _sep_end, integer_t _dim_upd,
-                        integer_t* _upd, MPI_Comm _front_comm,
-                        int _total_procs);
+    FrontalMatrixHSSMPI
+    (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
+     std::vector<integer_t>& _upd, MPI_Comm _front_comm, int _total_procs);
     FrontalMatrixHSSMPI(const FrontalMatrixHSSMPI&) = delete;
     FrontalMatrixHSSMPI& operator=(FrontalMatrixHSSMPI const&) = delete;
     ~FrontalMatrixHSSMPI() {}
-    void release_work_memory();
+
+    void release_work_memory() override;
     void extend_add(int task_depth) {}
-    void random_sampling(const SPOptions<scalar_t>& opts,
-                         DistM_t& R, DistM_t& Sr, DistM_t& Sc,
-                         int etree_level);
-    void sample_CB(const SPOptions<scalar_t>& opts,
-                   const DistM_t& R, DistM_t& Sr, DistM_t& Sc,
-                   F_t* pa) const;
-    void sample_children_CB(const SPOptions<scalar_t>& opts,
-                            DistM_t& R, DistM_t& Sr, DistM_t& Sc);
-    void sample_children_CB_seqseq(const SPOptions<scalar_t>& opts,
-                                   DistM_t& R, DistM_t& Sr, DistM_t& Sc);
-    void skinny_extend_add(DistM_t& cSrl, DistM_t& cScl,
-                           DistM_t& cSrr, DistM_t& cScr,
-                           DistM_t& Sr, DistM_t& Sc);
-    void multifrontal_factorization(const SPOptions<scalar_t>& opts,
-                                    int etree_level=0, int task_depth=0);
-    void forward_multifrontal_solve(scalar_t* b_loc, DistM_t* b_dist,
-                                    scalar_t* wmem, int etree_level=0,
-                                    int task_depth=0);
-    void backward_multifrontal_solve(scalar_t* y_loc, DistM_t* b_dist,
-                                     scalar_t* wmem, int etree_level=0,
-                                     int task_depth=0);
-    void element_extraction(const std::vector<std::size_t>& I,
-                            const std::vector<std::size_t>& J, DistM_t& B);
-    void extract_CB_sub_matrix_2d(const std::vector<std::size_t>& I,
-                                  const std::vector<std::size_t>& J,
-                                  DistM_t& B) const;
-    void solve_workspace_query(integer_t& mem_size);
+    void random_sampling
+    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+     DistM_t& R, DistM_t& Sr, DistM_t& Sc, int etree_level);
+    void sample_CB
+    (const SPOptions<scalar_t>& opts, const DistM_t& R, DistM_t& Sr,
+     DistM_t& Sc, F_t* pa) const override;
+    void sample_children_CB
+    (const SPOptions<scalar_t>& opts,
+     DistM_t& R, DistM_t& Sr, DistM_t& Sc);
+    void sample_children_CB_seqseq
+    (const SPOptions<scalar_t>& opts, const DistM_t& R,
+     DistM_t& Sr, DistM_t& Sc);
+    void skinny_extend_add
+    (DistM_t& cSrl, DistM_t& cScl, DistM_t& cSrr, DistM_t& cScr,
+     DistM_t& Sr, DistM_t& Sc);
+    void multifrontal_factorization
+    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+     int etree_level=0, int task_depth=0) override;
+    void forward_multifrontal_solve
+    (DenseM_t& b_loc, DistM_t* b_dist, scalar_t* wmem,
+     int etree_level=0, int task_depth=0) override;
+    void backward_multifrontal_solve
+    (DenseM_t& y_loc, DistM_t* b_dist, scalar_t* wmem,
+     int etree_level=0, int task_depth=0) override;
+    void element_extraction
+    (const SpMat_t& A, const std::vector<std::size_t>& I,
+     const std::vector<std::size_t>& J, DistM_t& B);
+    void extract_CB_sub_matrix_2d
+    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+     DistM_t& B) const override;
+    void solve_workspace_query(integer_t& mem_size) override;
 
     long long node_factor_nonzeros() const;
     integer_t maximum_rank(int task_depth) const;
-    bool isHSS() const { return true; };
-    std::string type() const { return "FrontalMatrixHSSMPI"; }
+    bool isHSS() const override { return true; };
+    std::string type() const override { return "FrontalMatrixHSSMPI"; }
 
-    void bisection_partitioning(const SPOptions<scalar_t>& opts,
-                                integer_t* sorder, bool isroot=true,
-                                int task_depth=0);
-    void set_HSS_partitioning(const SPOptions<scalar_t>& opts,
-                              const HSS::HSSPartitionTree& sep_tree,
-                              bool is_root);
+    void bisection_partitioning
+    (const SPOptions<scalar_t>& opts, integer_t* sorder, bool isroot=true,
+     int task_depth=0) override;
+    void set_HSS_partitioning
+    (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
+     bool is_root) override;
 
     std::unique_ptr<HSS::HSSMatrixMPI<scalar_t>> _H;
     HSS::HSSFactorsMPI<scalar_t> _ULV;
@@ -129,13 +133,10 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   FrontalMatrixHSSMPI<scalar_t,integer_t>::FrontalMatrixHSSMPI
-  (CompressedSparseMatrix<scalar_t,integer_t>* _A,
-   integer_t _sep, integer_t _sep_begin,
-   integer_t _sep_end, integer_t _dim_upd,
-   integer_t* _upd, MPI_Comm _front_comm, int _total_procs)
+  (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
+   std::vector<integer_t>& _upd, MPI_Comm _front_comm, int _total_procs)
     : FrontalMatrixMPI<scalar_t,integer_t>
-    (_A, _sep, _sep_begin, _sep_end, _dim_upd, _upd,
-     _front_comm, _total_procs) {
+    (_sep, _sep_begin, _sep_end, _upd, _front_comm, _total_procs) {
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -159,15 +160,15 @@ namespace strumpack {
    */
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSSMPI<scalar_t,integer_t>::random_sampling
-  (const SPOptions<scalar_t>& opts, DistM_t& R,
+  (const SpMat_t& A, const SPOptions<scalar_t>& opts, DistM_t& R,
    DistM_t& Sr, DistM_t& Sc, int etree_level) {
     Sr.zero();
     Sc.zero();
     auto f0 = params::flops;
     TIMER_TIME(TaskType::FRONT_MULTIPLY_2D, 1, t_fmult);
-    this->A->front_multiply_2d
-      (this->sep_begin, this->sep_end, this->upd, this->dim_upd,
-       R, Sr, Sc, this->ctxt_all, this->front_comm, 0);
+    A.front_multiply_2d
+      (this->sep_begin, this->sep_end, this->upd, R, Sr, Sc,
+       this->ctxt_all, this->front_comm, 0);
     TIMER_STOP(t_fmult);
     TIMER_TIME(TaskType::UUTXR, 1, t_UUtxR);
     params::sparse_sample_flops += params::flops - f0;
@@ -282,7 +283,7 @@ namespace strumpack {
    */
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSSMPI<scalar_t,integer_t>::sample_children_CB_seqseq
-  (const SPOptions<scalar_t>& opts, DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
+  (const SPOptions<scalar_t>& opts, const DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
     auto m = R.rows();
     auto n = R.cols();
     auto rank = mpi_rank(this->front_comm);
@@ -336,19 +337,20 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSSMPI<scalar_t,integer_t>::multifrontal_factorization
-  (const SPOptions<scalar_t>& opts, int etree_level, int task_depth) {
+  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+   int etree_level, int task_depth) {
     if (this->visit(this->lchild))
       this->lchild->multifrontal_factorization
-        (opts, etree_level+1, task_depth);
+        (A, opts, etree_level+1, task_depth);
     if (this->visit(this->rchild))
       this->rchild->multifrontal_factorization
-        (opts, etree_level+1, task_depth);
+        (A, opts, etree_level+1, task_depth);
     if (!this->dim_blk) return;
 
     auto mult = [&](DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
       auto f0 = params::flops;
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-      random_sampling(opts, R, Sr, Sc, etree_level);
+      random_sampling(A, opts, R, Sr, Sc, etree_level);
       params::sample_flops += params::flops - f0;
       if (_sampled_columns == 0)
         params::initial_sample_flops += params::flops - f0;
@@ -358,7 +360,7 @@ namespace strumpack {
     auto elem = [&](const std::vector<std::size_t>& I,
                     const std::vector<std::size_t>& J, DistM_t& B) {
       auto f0 = params::flops;
-      element_extraction(I, J, B);
+      element_extraction(A, I, J, B);
       params::extraction_flops += params::flops - f0;
     };
 
@@ -467,7 +469,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSSMPI<scalar_t,integer_t>::forward_multifrontal_solve
-  (scalar_t* b_loc, DistM_t* b_dist, scalar_t* wmem,
+  (DenseM_t& b_loc, DistM_t* b_dist, scalar_t* wmem,
    int etree_level, int task_depth) {
     if (this->visit(this->lchild))
       this->lchild->forward_multifrontal_solve
@@ -512,7 +514,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSSMPI<scalar_t,integer_t>::backward_multifrontal_solve
-  (scalar_t* y_loc, DistM_t* y_dist, scalar_t* wmem,
+  (DenseM_t& y_loc, DistM_t* y_dist, scalar_t* wmem,
    int etree_level, int task_depth) {
     DistM_t& Ysep = y_dist[this->sep];
     DistMW_t Yupd(_H->ctxt(), this->dim_upd, 1, wmem+this->p_wmem);
@@ -555,7 +557,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSSMPI<scalar_t,integer_t>::element_extraction
-  (const std::vector<std::size_t>& I,
+  (const SpMat_t& A, const std::vector<std::size_t>& I,
    const std::vector<std::size_t>& J, DistM_t& B) {
     if (I.empty() || J.empty()) return;
     std::vector<std::size_t> gI, gJ;
@@ -572,7 +574,7 @@ namespace strumpack {
                    j+this->sep_begin : this->upd[j-this->dim_sep]);
     }
     TIMER_TIME(TaskType::EXTRACT_2D, 1, t_ex);
-    this->extract_2d(gI, gJ, B);
+    this->extract_2d(A, gI, gJ, B);
     TIMER_STOP(t_ex);
   }
 
@@ -584,8 +586,8 @@ namespace strumpack {
    */
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSSMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
-  (const std::vector<std::size_t>& I,
-   const std::vector<std::size_t>& J, DistM_t& B) const {
+  (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+   DistM_t& B) const {
     if (this->front_comm == MPI_COMM_NULL || !this->dim_upd) return;
     TIMER_TIME(TaskType::HSS_EXTRACT_SCHUR, 3, t_ex_schur);
     std::vector<std::size_t> lI, lJ, oI, oJ;

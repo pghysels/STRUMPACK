@@ -525,20 +525,17 @@ namespace strumpack {
 
   template<typename scalar_t> typename RealType<scalar_t>::value_type
   DenseMatrix<scalar_t>::norm1() const {
-    return blas::lange
-      ('1', rows(), cols(), data(), ld());
+    return blas::lange('1', rows(), cols(), data(), ld());
   }
 
   template<typename scalar_t> typename RealType<scalar_t>::value_type
   DenseMatrix<scalar_t>::normI() const {
-    return blas::lange
-      ('I', rows(), cols(), data(), ld());
+    return blas::lange('I', rows(), cols(), data(), ld());
   }
 
   template<typename scalar_t> typename RealType<scalar_t>::value_type
   DenseMatrix<scalar_t>::normF() const {
-    return blas::lange
-      ('F', rows(), cols(), data(), ld());
+    return blas::lange('F', rows(), cols(), data(), ld());
   }
 
   template<typename scalar_t> std::vector<int>

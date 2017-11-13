@@ -46,6 +46,8 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   class FrontalMatrixDenseMPI : public FrontalMatrixMPI<scalar_t,integer_t> {
+    using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
+    using DenseM_t = DenseMatrix<scalar_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
     using DistMW_t = DistributedMatrixWrapper<scalar_t>;
     using FDMPI_t = FrontalMatrixDenseMPI<scalar_t,integer_t>;
@@ -55,39 +57,39 @@ namespace strumpack {
     template<typename _scalar_t,typename _integer_t> friend class ExtendAdd;
 
   public:
-    FrontalMatrixDenseMPI(CompressedSparseMatrix<scalar_t,integer_t>* _A,
-                          integer_t _sep, integer_t _sep_begin,
-                          integer_t _sep_end, integer_t _dim_upd,
-                          integer_t* _upd, MPI_Comm _front_comm,
-                          int _total_procs);
+    FrontalMatrixDenseMPI
+    (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
+     std::vector<integer_t>& _upd, MPI_Comm _front_comm, int _total_procs);
     FrontalMatrixDenseMPI(const FrontalMatrixDenseMPI&) = delete;
     FrontalMatrixDenseMPI& operator=(FrontalMatrixDenseMPI const&) = delete;
     ~FrontalMatrixDenseMPI();
-    void release_work_memory();
-    void build_front();
+
+    void release_work_memory() override;
+    void build_front(const SpMat_t& A);
     void partial_factorization();
 
     void extend_add();
 
-    void sample_CB(const SPOptions<scalar_t>& opts,
-                   const DistM_t& R, DistM_t& Sr, DistM_t& Sc,
-                   F_t* pa) const;
+    void sample_CB
+    (const SPOptions<scalar_t>& opts, const DistM_t& R, DistM_t& Sr,
+     DistM_t& Sc, F_t* pa) const;
 
-    void multifrontal_factorization(const SPOptions<scalar_t>& opts,
-                                    int etree_level=0, int task_depth=0);
-    void forward_multifrontal_solve(scalar_t* b_loc, DistM_t* b_dist,
-                                    scalar_t* wmem, int etree_level=0,
-                                    int task_depth=0);
-    void backward_multifrontal_solve(scalar_t* y_loc, DistM_t* b_dist,
-                                     scalar_t* wmem, int etree_level=0,
-                                     int task_depth=0);
+    void multifrontal_factorization
+    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+     int etree_level=0, int task_depth=0) override;
+    void forward_multifrontal_solve
+    (DenseM_t& b_loc, DistM_t* b_dist, scalar_t* wmem,
+     int etree_level=0, int task_depth=0) override;
+    void backward_multifrontal_solve
+    (DenseM_t& y_loc, DistM_t* b_dist, scalar_t* wmem,
+     int etree_level=0, int task_depth=0) override;
 
-    void extract_CB_sub_matrix_2d(const std::vector<std::size_t>& I,
-                                  const std::vector<std::size_t>& J,
-                                  DistM_t& B) const;
+    void extract_CB_sub_matrix_2d
+    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+     DistM_t& B) const override;
 
-    long long factor_nonzeros(int task_depth=0) const;
-    std::string type() const { return "FrontalMatrixDenseMPI"; }
+    long long factor_nonzeros(int task_depth=0) const override;
+    std::string type() const override { return "FrontalMatrixDenseMPI"; }
 
   private:
     DistM_t F11, F12, F21, F22;
@@ -96,13 +98,10 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   FrontalMatrixDenseMPI<scalar_t,integer_t>::FrontalMatrixDenseMPI
-  (CompressedSparseMatrix<scalar_t,integer_t>* _A,
-   integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-   integer_t _dim_upd, integer_t* _upd,
-   MPI_Comm _front_comm, int _total_procs)
+  (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
+   std::vector<integer_t>& _upd, MPI_Comm _front_comm, int _total_procs)
     : FrontalMatrixMPI<scalar_t,integer_t>
-    (_A, _sep, _sep_begin, _sep_end, _dim_upd, _upd,
-     _front_comm, _total_procs) {}
+    (_sep, _sep_begin, _sep_end, _upd, _front_comm, _total_procs) {}
 
   template<typename scalar_t,typename integer_t>
   FrontalMatrixDenseMPI<scalar_t,integer_t>::~FrontalMatrixDenseMPI() {
@@ -150,20 +149,19 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::build_front() {
+  FrontalMatrixDenseMPI<scalar_t,integer_t>::build_front
+  (const SpMat_t& A) {
     if (this->dim_sep) {
       F11 = DistM_t(this->ctxt, this->dim_sep, this->dim_sep);
       using ExtractFront = ExtractFront<scalar_t,integer_t>;
-      ExtractFront::extract_F11(F11, this->A, this->sep_begin, this->dim_sep);
+      ExtractFront::extract_F11(F11, A, this->sep_begin, this->dim_sep);
       if (this->dim_upd) {
         F12 = DistM_t(this->ctxt, this->dim_sep, this->dim_upd);
         ExtractFront::extract_F12
-          (F12, this->A, this->sep_begin, this->sep_end,
-           this->dim_upd, this->upd);
+          (F12, A, this->sep_begin, this->sep_end, this->upd);
         F21 = DistM_t(this->ctxt, this->dim_upd, this->dim_sep);
         ExtractFront::extract_F21
-          (F21, this->A, this->sep_end, this->sep_begin,
-           this->dim_upd, this->upd);
+          (F21, A, this->sep_end, this->sep_begin, this->upd);
       }
     }
     if (this->dim_upd) {
@@ -199,14 +197,15 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::multifrontal_factorization
-  (const SPOptions<scalar_t>& opts, int etree_level, int task_depth) {
+  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+   int etree_level, int task_depth) {
     if (this->visit(this->lchild))
       this->lchild->multifrontal_factorization
-        (opts, etree_level+1, task_depth);
+        (A, opts, etree_level+1, task_depth);
     if (this->visit(this->rchild))
       this->rchild->multifrontal_factorization
-        (opts, etree_level+1, task_depth);
-    build_front();
+        (A, opts, etree_level+1, task_depth);
+    build_front(A);
     if (this->lchild) this->lchild->release_work_memory();
     if (this->rchild) this->rchild->release_work_memory();
     partial_factorization();
@@ -214,7 +213,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::forward_multifrontal_solve
-  (scalar_t* b_loc, DistM_t* b_dist, scalar_t* wmem,
+  (DenseM_t& b_loc, DistM_t* b_dist, scalar_t* wmem,
    int etree_level, int task_depth) {
     if (this->visit(this->lchild))
       this->lchild->forward_multifrontal_solve
@@ -238,7 +237,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::backward_multifrontal_solve
-  (scalar_t* y_loc, DistM_t* y_dist, scalar_t* wmem,
+  (DenseM_t& y_loc, DistM_t* y_dist, scalar_t* wmem,
    int etree_level, int task_depth) {
     if (this->dim_sep) {
       TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_s);
