@@ -109,8 +109,8 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_dense
   (FrontalMatrixDense<scalar_t,integer_t>* p, int task_depth) {
-    const std::size_t pdsep = p->dim_sep;
-    const std::size_t dupd = this->dim_upd;
+    const std::size_t pdsep = p->dim_sep();
+    const std::size_t dupd = this->dim_upd();
     std::size_t upd2sep;
     auto I = this->upd_to_parent(p, upd2sep);
 #pragma omp taskloop default(shared) grainsize(64)      \
@@ -140,7 +140,7 @@ namespace strumpack {
    DenseM_t& Sc, FrontalMatrix<scalar_t,integer_t>* pa, int task_depth) {
     auto I = this->upd_to_parent(pa);
     auto cR = R.extract_rows(I);
-    DenseM_t cS(this->dim_upd, R.cols());
+    DenseM_t cS(this->dim_upd(), R.cols());
     gemm(Trans::N, Trans::N, scalar_t(1.), F22, cR,
          scalar_t(0.), cS, task_depth);
     Sr.scatter_rows_add(I, cS);
@@ -193,13 +193,15 @@ namespace strumpack {
     }
     auto f0 = params::flops;
     // TODO can we allocate the memory in one go??
-    F11 = DenseM_t(this->dim_sep, this->dim_sep); F11.zero();
-    F12 = DenseM_t(this->dim_sep, this->dim_upd); F12.zero();
-    F21 = DenseM_t(this->dim_upd, this->dim_sep); F21.zero();
+    const auto dsep = this->dim_sep();
+    const auto dupd = this->dim_upd();
+    F11 = DenseM_t(dsep, dsep); F11.zero();
+    F12 = DenseM_t(dsep, dupd); F12.zero();
+    F21 = DenseM_t(dupd, dsep); F21.zero();
     A.extract_front
       (F11, F12, F21, this->sep_begin, this->sep_end, this->upd, task_depth);
-    if (this->dim_upd) {
-      F22 = DenseM_t(this->dim_upd, this->dim_upd);
+    if (dupd) {
+      F22 = DenseM_t(dupd, dupd);
       F22.zero();
     }
     if (this->lchild) this->lchild->extend_add_to_dense(this, task_depth);
@@ -212,7 +214,7 @@ namespace strumpack {
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
     auto f0 = params::flops;
-    if (this->dim_sep) {
+    if (this->dim_sep()) {
       piv = F11.LU(task_depth);
       if (opts.replace_tiny_pivots()) {
         // TODO consider other values for thresh
@@ -222,7 +224,7 @@ namespace strumpack {
           if (std::abs(F11(i,i)) < thresh)
             F11(i,i) = (std::real(F11(i,i)) < 0) ? -thresh : thresh;
       }
-      if (this->dim_upd) {
+      if (this->dim_upd()) {
         F12.permute_rows_fwd(piv);
         trsm
           (Side::L, UpLo::L, Trans::N, Diag::U,
@@ -284,12 +286,12 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::fwd_solve_phase2
   (DenseM_t& b, scalar_t* wmem, int etree_level, int task_depth) {
-    if (this->dim_sep) {
-      DenseMW_t rhs(this->dim_sep, b.cols(), b, this->sep_begin, 0);
+    if (this->dim_sep()) {
+      DenseMW_t rhs(this->dim_sep(), b.cols(), b, this->sep_begin, 0);
       rhs.permute_rows_fwd(piv);
       trsv(UpLo::L, Trans::N, Diag::U, F11, rhs, task_depth);
-      if (this->dim_upd) {
-        DenseMW_t tmp(this->dim_upd, 1, wmem+this->p_wmem, b.ld());
+      if (this->dim_upd()) {
+        DenseMW_t tmp(this->dim_upd(), 1, wmem+this->p_wmem, b.ld());
         gemv(Trans::N, scalar_t(-1.), F21, rhs,
              scalar_t(1.), tmp, task_depth);
       }
@@ -316,12 +318,10 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::bwd_solve_phase1
   (DenseM_t& y, scalar_t* wmem, int etree_level, int task_depth) {
-    if (this->dim_sep) {
-      DenseMW_t rhs(this->dim_sep, y.cols(), y, this->sep_begin, 0);
-      //DenseMW_t rhs(this->dim_sep, 1, y+this->sep_begin, y.ld());
-      if (this->dim_upd) {
-        //DenseMW_t tmp(this->dim_upd, 1, wmem+this->p_wmem, y.ld());
-        DenseMW_t tmp(this->dim_upd, y.cols(), wmem+this->p_wmem, y.ld());
+    if (this->dim_sep()) {
+      DenseMW_t rhs(this->dim_sep(), y.cols(), y, this->sep_begin, 0);
+      if (this->dim_upd()) {
+        DenseMW_t tmp(this->dim_upd(), y.cols(), wmem+this->p_wmem, y.ld());
         gemv
           (Trans::N, scalar_t(-1.), F12, tmp, scalar_t(1.), rhs, task_depth);
       }

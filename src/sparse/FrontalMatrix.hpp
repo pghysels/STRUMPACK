@@ -56,24 +56,14 @@ namespace strumpack {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
 
   public:
-    integer_t sep;
-    integer_t sep_begin;
-    integer_t sep_end;
-    integer_t dim_sep; // TODO remove?
-    integer_t dim_upd; // TODO remove?
-    integer_t dim_blk; // = dim_sep + dim_upd   // TODO remove?
-    std::vector<integer_t> upd;
-
-    F_t* lchild;
-    F_t* rchild;
-
-    // TODO get rid of this!!
-    integer_t p_wmem;
-
     FrontalMatrix
     (F_t* _lchild, F_t* _rchild, integer_t _sep, integer_t _sep_begin,
      integer_t _sep_end, std::vector<integer_t>& _upd);
     virtual ~FrontalMatrix();
+
+    inline integer_t dim_sep() const { return sep_end - sep_begin; }
+    inline integer_t dim_upd() const { return upd.size(); }
+    inline integer_t dim_blk() const { return dim_sep() + dim_upd(); }
 
     void find_upd_indices
     (const std::vector<std::size_t>& I, std::vector<std::size_t>& lI,
@@ -140,12 +130,26 @@ namespace strumpack {
      const HSS::HSSPartitionTree& sep_tree,
      bool is_root) {}
 
+
+    integer_t sep;
+    integer_t sep_begin;
+    integer_t sep_end;
+    std::vector<integer_t> upd;
+
+    F_t* lchild;
+    F_t* rchild;
+
+    // TODO get rid of this!!
+    integer_t p_wmem;
+
   protected:
     FrontalMatrix(const FrontalMatrix&) = delete;
     FrontalMatrix& operator=(FrontalMatrix const&) = delete;
 
     virtual long long node_factor_nonzeros() const {
-      return dim_blk*dim_blk-dim_upd*dim_upd;
+      auto dsep = dim_sep();
+      auto dupd = dim_upd();
+      return dsep * ( dsep + 2 * dupd);
     }
     virtual long long dense_node_factor_nonzeros() const {
       return node_factor_nonzeros();
@@ -157,9 +161,7 @@ namespace strumpack {
   (F_t* _lchild, F_t* _rchild, integer_t _sep, integer_t _sep_begin,
    integer_t _sep_end, std::vector<integer_t>& _upd)
     : sep(_sep), sep_begin(_sep_begin), sep_end(_sep_end),
-      dim_sep(sep_end - sep_begin), dim_upd(_upd.size()),
-      dim_blk(dim_sep + dim_upd), upd(std::move(_upd)),
-      lchild(_lchild), rchild(_rchild), p_wmem(0) {
+      upd(std::move(_upd)), lchild(_lchild), rchild(_rchild), p_wmem(0) {
   }
 
   template<typename scalar_t,typename integer_t>
@@ -202,18 +204,20 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> std::vector<std::size_t>
   FrontalMatrix<scalar_t,integer_t>::upd_to_parent
   (const F_t* pa, std::size_t& upd2sep) const {
-    std::vector<std::size_t> I(dim_upd);
     integer_t r = 0;
-    for (; r<dim_upd; r++) {
+    integer_t dupd = dim_upd();
+    integer_t pa_dsep = pa->dim_sep();
+    std::vector<std::size_t> I(dupd);
+    for (; r<dupd; r++) {
       auto up = upd[r];
       if (up >= pa->sep_end) break;
       I[r] = up - pa->sep_begin;
     }
     upd2sep = r;
-    for (integer_t t=0; r<dim_upd; r++) {
+    for (integer_t t=0; r<dupd; r++) {
       auto up = upd[r];
       while (pa->upd[t] < up) t++;
-      I[r] = t + pa->dim_sep;
+      I[r] = t + pa_dsep;
     }
     return I;
   }
@@ -224,7 +228,7 @@ namespace strumpack {
     if (lchild) lchild->solve_workspace_query(mem_size);
     if (rchild) rchild->solve_workspace_query(mem_size);
     p_wmem = mem_size;
-    mem_size += dim_upd;
+    mem_size += dim_upd();
   }
 
   // TODO remove this once the rhs is a DenseMatrix object?!
@@ -234,26 +238,27 @@ namespace strumpack {
     // TODO implement for multiple columns??
     auto b = bd.data();
     integer_t r = 0, upd_pos = 0;
+    auto ch_dupd = ch->dim_upd();
     auto ch_wmem = wmem + ch->p_wmem;
     auto pa_wmem = wmem + p_wmem;
-    for (; r<ch->dim_upd; r++) { // to parent separator
+    for (; r<ch_dupd; r++) { // to parent separator
       upd_pos = ch->upd[r];
       if (upd_pos >= sep_end) break;
       b[upd_pos] += ch_wmem[r];
     }
     upd_pos = std::distance
       (upd.begin(), std::lower_bound(upd.begin(), upd.end(), upd_pos));
-    for (; r<ch->dim_upd; r++) { // to parent update matrix
+    for (; r<ch_dupd; r++) { // to parent update matrix
       integer_t t = ch->upd[r];
       while (upd[upd_pos] < t) upd_pos++;
       pa_wmem[upd_pos] += ch_wmem[r];
     }
     STRUMPACK_FLOPS
       ((is_complex<scalar_t>()?2:1)*
-       static_cast<long long int>(ch->dim_upd));
+       static_cast<long long int>(ch_dupd));
     STRUMPACK_BYTES
       (sizeof(scalar_t)*static_cast<long long int>
-       (3*ch->dim_upd)+sizeof(integer_t)*(ch->dim_upd+dim_upd));
+       (3*ch_dupd)+sizeof(integer_t)*(ch_dupd+dim_upd()));
   }
 
 
@@ -267,34 +272,35 @@ namespace strumpack {
   (F_t* ch, DenseM_t& bd, scalar_t* wmem) {
     auto b = bd.data();
     integer_t r = 0, upd_pos = 0;
+    auto ch_dupd = ch->dim_upd();
     scalar_t* ch_b_upd = wmem+ch->p_wmem;
     scalar_t* b_upd = wmem+p_wmem;
-    for (; r<ch->dim_upd; r++) { // to parent separator
+    for (; r<ch_dupd; r++) { // to parent separator
       upd_pos = ch->upd[r];
       if (upd_pos >= sep_end) break;
       ch_b_upd[r] = b[upd_pos];
     }
     upd_pos = std::distance
       (upd.begin(), std::lower_bound(upd.begin(), upd.end(), upd_pos));
-    for (; r<ch->dim_upd; r++) { // to parent update matrix
+    for (; r<ch_dupd; r++) { // to parent update matrix
       integer_t t = ch->upd[r];
       while (upd[upd_pos] < t) upd_pos++;
       ch_b_upd[r] = b_upd[upd_pos];
     }
     STRUMPACK_FLOPS
       ((is_complex<scalar_t>()?2:1)*
-       static_cast<long long int>(ch->dim_upd));
+       static_cast<long long int>(ch_dupd));
     STRUMPACK_BYTES
       (sizeof(scalar_t)*static_cast<long long int>
-       (3*ch->dim_upd)+sizeof(integer_t)*(ch->dim_upd+dim_upd));
+       (3*ch_dupd)+sizeof(integer_t)*(ch_dupd+dim_upd()));
   }
 
   template<typename scalar_t,typename integer_t> inline void
   FrontalMatrix<scalar_t,integer_t>::look_left
   (DenseM_t& b, scalar_t* wmem) {
     scalar_t* tmp = wmem + this->p_wmem;
-    std::fill(tmp, tmp+dim_upd, scalar_t(0.));
-    STRUMPACK_BYTES(sizeof(scalar_t)*static_cast<long long int>(dim_upd));
+    std::fill(tmp, tmp+dim_upd(), scalar_t(0.));
+    STRUMPACK_BYTES(sizeof(scalar_t)*static_cast<long long int>(dim_upd()));
     if (lchild) extend_add_b(lchild, b, wmem);
     if (rchild) extend_add_b(rchild, b, wmem);
   }
@@ -421,7 +427,7 @@ namespace strumpack {
   if(task_depth < params::task_recursion_cutoff_level)
       rch->permute_upd_indices(perm, task_depth+1);
 
-    for (integer_t i=0; i<dim_upd; i++)
+    for (integer_t i=0; i<dim_upd(); i++)
       upd[i] = perm[upd[i]];
     std::sort(upd.begin(), upd.end());
 #pragma omp taskwait

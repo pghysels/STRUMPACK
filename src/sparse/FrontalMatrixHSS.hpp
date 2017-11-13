@@ -178,8 +178,8 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::extend_add_to_dense
   (FrontalMatrixDense<scalar_t,integer_t>* p, int task_depth) {
-    const std::size_t pdsep = p->dim_sep;
-    const std::size_t dupd = this->dim_upd;
+    const std::size_t pdsep = p->dim_sep();
+    const std::size_t dupd = this->dim_upd();
     std::size_t upd2sep;
     auto I = this->upd_to_parent(p, upd2sep);
 
@@ -265,7 +265,7 @@ namespace strumpack {
   FrontalMatrixHSS<scalar_t,integer_t>::sample_CB
   (const SPOptions<scalar_t>& opts, const DenseM_t& R,
    DenseM_t& Sr, DenseM_t& Sc, F_t* pa, int task_depth) {
-    if (!this->dim_upd) return;
+    if (!this->dim_upd()) return;
     auto I = this->upd_to_parent(pa);
     auto cR = R.extract_rows(I);
     auto dchild = R1.cols();
@@ -349,7 +349,8 @@ namespace strumpack {
     auto f0 = params::flops;
     Sr.zero();
     Sc.zero();
-
+    const auto dsep = this->dim_sep();
+    const auto dupd = this->dim_upd();
     if (opts.indirect_sampling()) {
       auto rgen = random::make_random_generator<real_t>
         (opts.HSS_options().random_engine(),
@@ -361,13 +362,13 @@ namespace strumpack {
       if (d0 % dd == 0) {
         for (integer_t c=0; c<d; c+=dd) {
           integer_t r = 0, cs = c + _sampled_columns;
-          for (; r<this->dim_sep; r++) {
+          for (; r<dsep; r++) {
             rgen->seed(std::uint32_t(r+this->sep_begin), std::uint32_t(cs));
             for (integer_t cc=c; cc<c+dd; cc++)
               Rr(r,cc) = Rc(r,cc) = rgen->get();
           }
           for (; r<m; r++) {
-            rgen->seed(std::uint32_t(this->upd[r-this->dim_sep]),
+            rgen->seed(std::uint32_t(this->upd[r-dsep]),
                        std::uint32_t(cs));
             for (integer_t cc=c; cc<c+dd; cc++)
               Rr(r,cc) = Rc(r,cc) = rgen->get();
@@ -376,10 +377,10 @@ namespace strumpack {
       } else {
         for (integer_t c=0; c<d; c++) {
           integer_t r = 0, cs = c + _sampled_columns;
-          for (; r<this->dim_sep; r++)
+          for (; r<dsep; r++)
             Rr(r,c) = Rc(r,c) = rgen->get(r+this->sep_begin, cs);
           for (; r<m; r++)
-            Rr(r,c) = Rc(r,c) = rgen->get(this->upd[r-this->dim_sep], cs);
+            Rr(r,c) = Rc(r,c) = rgen->get(this->upd[r-dsep], cs);
         }
       }
       STRUMPACK_FLOPS(rgen->flops_per_prng()*d*m);
@@ -401,12 +402,12 @@ namespace strumpack {
       auto dold = R1.cols();
       auto dd = Rr.cols();
       auto dnew = dold + dd;
-      R1.resize(this->dim_sep, dnew);
-      Sr2.resize(this->dim_upd, dnew);
-      Sc2.resize(this->dim_upd, dnew);
-      copy(this->dim_sep, dd, Rr, 0, 0, R1, 0, dold);
-      copy(this->dim_upd, dd, Sr, this->dim_sep, 0, Sr2, 0, dold);
-      copy(this->dim_upd, dd, Sc, this->dim_sep, 0, Sc2, 0, dold);
+      R1.resize(dsep, dnew);
+      Sr2.resize(dupd, dnew);
+      Sc2.resize(dupd, dnew);
+      copy(dsep, dd, Rr, 0, 0, R1, 0, dold);
+      copy(dupd, dd, Sr, dsep, 0, Sr2, 0, dold);
+      copy(dupd, dd, Sc, dsep, 0, Sc2, 0, dold);
     }
   }
 
@@ -417,12 +418,13 @@ namespace strumpack {
     std::vector<std::size_t> gI, gJ;
     gI.reserve(I.size());
     gJ.reserve(J.size());
+    const auto dsep = this->dim_sep();
     for (auto i : I)
-      gI.push_back((integer_t(i) < this->dim_sep) ? i+this->sep_begin :
-                   this->upd[i-this->dim_sep]);
+      gI.push_back
+        ((integer_t(i) < dsep) ? i+this->sep_begin : this->upd[i-dsep]);
     for (auto j : J)
-      gJ.push_back((integer_t(j) < this->dim_sep) ? j+this->sep_begin :
-                   this->upd[j-this->dim_sep]);
+      gJ.push_back
+        ((integer_t(j) < dsep) ? j+this->sep_begin : this->upd[j-dsep]);
     A.extract_separator(this->sep_end, gI, gJ, B, task_depth);
     if (this->lchild)
       this->lchild->extract_CB_sub_matrix(gI, gJ, B, task_depth);
@@ -484,7 +486,7 @@ namespace strumpack {
     params::compression_flops += params::flops - f0;
     if (this->lchild) this->lchild->release_work_memory();
     if (this->rchild) this->rchild->release_work_memory();
-    if (this->dim_sep) {
+    if (this->dim_sep()) {
       if (etree_level > 0) {
         auto f0 = params::flops;
         _ULV = _H.partial_factor();
@@ -549,21 +551,21 @@ namespace strumpack {
     this->look_left(b, wmem);
     if (etree_level) {
       if (_Theta.cols() && _Phi.cols()) {
-        DenseMW_t rhs(this->dim_sep, b.cols(), b, this->sep_begin, 0);
+        DenseMW_t rhs(this->dim_sep(), b.cols(), b, this->sep_begin, 0);
         _ULVwork = std::unique_ptr<HSS::WorkSolve<scalar_t>>
           (new HSS::WorkSolve<scalar_t>());
         _H.child(0)->forward_solve(_ULV, *_ULVwork, rhs, true);
-        if (this->dim_upd) {
+        if (this->dim_upd()) {
           DenseMW_t tmp
             (_Theta.rows(), _ULVwork->reduced_rhs.cols(),
-             wmem+this->p_wmem, this->dim_upd);
+             wmem+this->p_wmem, this->dim_upd());
           gemm(Trans::N, Trans::N, scalar_t(-1.), _Theta,
                _ULVwork->reduced_rhs, scalar_t(1.), tmp, task_depth);
         }
         _ULVwork->reduced_rhs.clear();
       }
     } else {
-      DenseMW_t rhs(this->dim_sep, b.cols(), b, this->sep_begin, 0);
+      DenseMW_t rhs(this->dim_sep(), b.cols(), b, this->sep_begin, 0);
       _ULVwork = std::unique_ptr<HSS::WorkSolve<scalar_t>>
         (new HSS::WorkSolve<scalar_t>());
       _H.forward_solve(_ULV, *_ULVwork, rhs, false);
@@ -588,17 +590,17 @@ namespace strumpack {
     bool tasked = task_depth<params::task_recursion_cutoff_level;
     if (etree_level) {
       if (_Phi.cols() && _Theta.cols()) {
-        if (this->dim_upd) {
+        if (this->dim_upd()) {
           DenseMW_t tmp(_Phi.rows(), 1, wmem+this->p_wmem, _Phi.rows());
           gemm(Trans::C, Trans::N, scalar_t(-1.), _Phi, tmp,
                scalar_t(1.), _ULVwork->x, task_depth);
         }
-        DenseMW_t rhs(this->dim_sep, y.cols(), y, this->sep_begin, 0);
+        DenseMW_t rhs(this->dim_sep(), y.cols(), y, this->sep_begin, 0);
         _H.child(0)->backward_solve(_ULV, *_ULVwork, rhs);
         _ULVwork.reset();
       }
     } else {
-      DenseMW_t rhs(this->dim_sep, y.cols(), y, this->sep_begin, 0);
+      DenseMW_t rhs(this->dim_sep(), y.cols(), y, this->sep_begin, 0);
       _H.backward_solve(_ULV, *_ULVwork, rhs);
     }
     this->look_right(y, wmem);
@@ -656,21 +658,23 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> long long
   FrontalMatrixHSS<scalar_t,integer_t>::dense_node_factor_nonzeros() const {
-    return this->dim_blk*this->dim_blk-this->dim_upd*this->dim_upd;
+    auto dsep = this->dim_sep();
+    auto dupd = this->dim_upd();
+    return dsep * (dsep + 2 * dupd);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::set_HSS_partitioning
   (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
    bool is_root) {
-    assert(sep_tree.size == this->dim_sep);
+    assert(sep_tree.size == this->dim_sep());
     if (is_root)
       _H = HSS::HSSMatrix<scalar_t>(sep_tree, opts.HSS_options());
     else {
-      HSS::HSSPartitionTree hss_tree(this->dim_blk);
+      HSS::HSSPartitionTree hss_tree(this->dim_blk());
       hss_tree.c.reserve(2);
       hss_tree.c.push_back(sep_tree);
-      hss_tree.c.emplace_back(this->dim_upd);
+      hss_tree.c.emplace_back(this->dim_upd());
       hss_tree.c.back().refine(opts.HSS_options().leaf_size());
       _H = HSS::HSSMatrix<scalar_t>(hss_tree, opts.HSS_options());
     }
@@ -694,7 +698,7 @@ namespace strumpack {
 
     for (integer_t i=this->sep_begin; i<this->sep_end; i++)
       sorder[i] = -i;
-    HSS::HSSPartitionTree sep_tree(this->dim_sep);
+    HSS::HSSPartitionTree sep_tree(this->dim_sep());
     sep_tree.refine(opts.HSS_options().leaf_size());
 
     // TODO this still needs to work when the sparse matrix is a
@@ -711,10 +715,10 @@ namespace strumpack {
     if (isroot)
       _H = HSS::HSSMatrix<scalar_t>(sep_tree, opts.HSS_options());
     else {
-      HSS::HSSPartitionTree hss_tree(this->dim_blk);
+      HSS::HSSPartitionTree hss_tree(this->dim_blk());
       hss_tree.c.reserve(2);
       hss_tree.c.push_back(sep_tree);
-      hss_tree.c.emplace_back(this->dim_upd);
+      hss_tree.c.emplace_back(this->dim_upd());
       hss_tree.c.back().refine(opts.HSS_options().leaf_size());
       _H = HSS::HSSMatrix<scalar_t>(hss_tree, opts.HSS_options());
     }
@@ -761,23 +765,24 @@ namespace strumpack {
    std::vector<idx_t>& xadj, std::vector<idx_t>& adjncy, integer_t* sorder) {
     assert(opts.separator_ordering_level() == 0 ||
            opts.separator_ordering_level() == 1);
-    auto mark = new bool[this->dim_sep];
-    auto ind_to_part = new integer_t[this->dim_sep];
+    auto dsep = this->dim_sep();
+    auto mark = new bool[dsep];
+    auto ind_to_part = new integer_t[dsep];
     integer_t nvtxs = 0;
-    for (integer_t r=0; r<this->dim_sep; r++)
+    for (integer_t r=0; r<dsep; r++)
       ind_to_part[r] = (sorder[r+this->sep_begin] == part) ? nvtxs++ : -1;
     xadj.reserve(nvtxs+1);
     adjncy.reserve(5*nvtxs);
     for (integer_t i=this->sep_begin, e=0; i<this->sep_end; i++) {
       if (sorder[i] == part) {
         xadj.push_back(e);
-        std::fill(mark, mark+this->dim_sep, false);
+        std::fill(mark, mark+dsep, false);
         for (integer_t j=A.get_ptr()[i];
              j<A.get_ptr()[i+1]; j++) {
           auto c = A.get_ind()[j];
           if (c == i) continue;
           auto lc = c - this->sep_begin;
-          if (lc >= 0 && lc < this->dim_sep && sorder[c]==part && !mark[lc]) {
+          if (lc >= 0 && lc < dsep && sorder[c]==part && !mark[lc]) {
             mark[lc] = true;
             adjncy.push_back(ind_to_part[lc]);
             e++;
@@ -787,7 +792,7 @@ namespace strumpack {
                    k<A.get_ptr()[c+1]; k++) {
                 auto cc = A.get_ind()[k];
                 auto lcc = cc - this->sep_begin;
-                if (cc!=i && lcc >= 0 && lcc < this->dim_sep &&
+                if (cc!=i && lcc >= 0 && lcc < dsep &&
                     sorder[cc]==part && !mark[lcc]) {
                   mark[lcc] = true;
                   adjncy.push_back(ind_to_part[lcc]);

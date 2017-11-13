@@ -270,7 +270,8 @@ namespace strumpack {
   FrontalMatrixMPI<scalar_t,integer_t>::extend_add_b
   (F_t* ch, DistM_t& b_sep, scalar_t* wmem, int tag) {
     if (mpi_rank(front_comm) == 0) {
-      STRUMPACK_FLOPS(static_cast<long long int>(ch->dim_upd)*ch->dim_upd);
+      STRUMPACK_FLOPS
+        (static_cast<long long int>(ch->dim_upd())*ch->dim_upd());
     }
     if (FMPI_t* mpi_child = dynamic_cast<FMPI_t*>(ch)) // child is MPI
       extend_add_b_mpi_to_mpi(mpi_child, b_sep, wmem, tag);
@@ -282,7 +283,8 @@ namespace strumpack {
   FrontalMatrixMPI<scalar_t,integer_t>::extract_b
   (F_t* ch, DistM_t& b_sep, scalar_t* wmem) {
     if (mpi_rank(front_comm) == 0) {
-      STRUMPACK_FLOPS(static_cast<long long int>(ch->dim_upd)*ch->dim_upd);
+      STRUMPACK_FLOPS
+        (static_cast<long long int>(ch->dim_upd())*ch->dim_upd());
     }
     if (FMPI_t* mpi_child = dynamic_cast<FMPI_t*>(ch))
       extract_b_mpi_to_mpi(mpi_child, b_sep, wmem); // child is MPI
@@ -294,9 +296,9 @@ namespace strumpack {
   (FMPI_t* ch, DistM_t& b_sep, scalar_t* wmem, int tag) {
     DistMW_t ch_b_upd, b_upd;
     if (visit(ch))
-      ch_b_upd = DistMW_t(ch->ctxt, ch->dim_upd, 1, wmem+ch->p_wmem);
+      ch_b_upd = DistMW_t(ch->ctxt, ch->dim_upd(), 1, wmem+ch->p_wmem);
     if (front_comm != MPI_COMM_NULL)
-      b_upd = DistMW_t(ctxt, this->dim_upd, 1, wmem+this->p_wmem);
+      b_upd = DistMW_t(ctxt, this->dim_upd(), 1, wmem+this->p_wmem);
     std::vector<std::vector<scalar_t>> sbuf;
     std::vector<MPI_Request> sreq;
     if (ch_b_upd.pcol() == 0) {
@@ -340,22 +342,22 @@ namespace strumpack {
     scalar_t* ch_b_upd = wmem+ch->p_wmem;
     DistMW_t b_upd;
     if (front_comm != MPI_COMM_NULL)
-      b_upd = DistMW_t(ctxt, this->dim_upd, 1, wmem+this->p_wmem);
+      b_upd = DistMW_t(ctxt, this->dim_upd(), 1, wmem+this->p_wmem);
     std::vector<MPI_Request> sreq;
     std::vector<std::vector<scalar_t>> sbuf;
     if (mpi_rank(front_comm) == child_rank) {
       auto I = ch->upd_to_parent(this);
       sbuf.resize(proc_rows);
-      for (auto& buf : sbuf) buf.reserve(ch->dim_upd / proc_rows);
+      for (auto& buf : sbuf) buf.reserve(ch->dim_upd() / proc_rows);
 
       // TODO optimize loop?
-      for (integer_t r=0; r<ch->dim_upd; r++) {
+      for (integer_t r=0; r<ch->dim_upd(); r++) {
         integer_t pa_row = I[r];
-        if (pa_row < this->dim_sep)
+        if (pa_row < this->dim_sep())
           sbuf[find_rank(pa_row, 0, b_sep)].
             push_back(ch_b_upd[r]);
         else
-          sbuf[find_rank(pa_row-this->dim_sep, 0, b_upd)].
+          sbuf[find_rank(pa_row-this->dim_sep(), 0, b_upd)].
             push_back(ch_b_upd[r]);
       }
       // send to all active processes in the parent (1 column)
@@ -392,7 +394,7 @@ namespace strumpack {
       int np_rows, np_cols, p_row, p_col;
       scalapack::Cblacs_gridinfo(ctxt, &np_rows, &np_cols, &p_row, &p_col);
       mem_size += scalapack::numroc
-        (this->dim_upd, DistM_t::default_NB, p_row, 0, np_rows);
+        (this->dim_upd(), DistM_t::default_NB, p_row, 0, np_rows);
     }
   }
 
@@ -401,9 +403,9 @@ namespace strumpack {
   (FMPI_t* ch, DistM_t& b_sep, scalar_t* wmem) {
     DistMW_t ch_b_upd, b_upd;
     if (visit(ch))
-      ch_b_upd = DistMW_t(ch->ctxt, ch->dim_upd, 1, wmem+ch->p_wmem);
+      ch_b_upd = DistMW_t(ch->ctxt, ch->dim_upd(), 1, wmem+ch->p_wmem);
     if (front_comm != MPI_COMM_NULL)
-      b_upd = DistMW_t(ctxt, this->dim_upd, 1, wmem+this->p_wmem);
+      b_upd = DistMW_t(ctxt, this->dim_upd(), 1, wmem+this->p_wmem);
     std::vector<MPI_Request> sreq;
     std::vector<std::vector<scalar_t>> sbuf;
     auto I = ch->upd_to_parent(this);
@@ -434,8 +436,8 @@ namespace strumpack {
                  front_comm, &status);
       }
       std::function<int(integer_t)> src_rank = [&](integer_t r) {
-        return (r < this->dim_sep) ? find_rank(r, 0, b_sep) :
-        find_rank(r-this->dim_sep, 0, b_upd);
+        return (r < this->dim_sep()) ? find_rank(r, 0, b_sep) :
+        find_rank(r-this->dim_sep(), 0, b_upd);
       };
       ExtAdd::extract_b_copy_from_buffers(ch_b_upd, rbuf, I, src_rank);
     }
@@ -450,7 +452,7 @@ namespace strumpack {
     scalar_t* ch_b_upd = wmem+ch->p_wmem;
     DistMW_t b_upd;
     if (front_comm != MPI_COMM_NULL)
-      b_upd = DistMW_t(ctxt, this->dim_upd, 1, wmem+this->p_wmem);
+      b_upd = DistMW_t(ctxt, this->dim_upd(), 1, wmem+this->p_wmem);
     MPI_Request sreq;
     std::vector<std::vector<scalar_t>> sbuf(1);
     auto I = ch->upd_to_parent(this);
@@ -475,11 +477,12 @@ namespace strumpack {
                  front_comm, &status);
       }
       std::vector<scalar_t*> pbuf(rbuf.size());
-      for (std::size_t p=0; p<rbuf.size(); p++) pbuf[p] = rbuf[p].data();
-      for (integer_t r=0; r<ch->dim_upd; r++) {
+      for (std::size_t p=0; p<rbuf.size(); p++)
+        pbuf[p] = rbuf[p].data();
+      for (integer_t r=0; r<ch->dim_upd(); r++) {
         integer_t pa_r = I[r];
-        integer_t rank = (pa_r < this->dim_sep) ? find_rank(pa_r, 0, b_sep)
-          : find_rank(pa_r-this->dim_sep, 0, b_upd);
+        integer_t rank = (pa_r < this->dim_sep()) ? find_rank(pa_r, 0, b_sep)
+          : find_rank(pa_r-this->dim_sep(), 0, b_upd);
         ch_b_upd[r] = *(pbuf[rank]);
         pbuf[rank]++;
       }
@@ -490,10 +493,13 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> long long
   FrontalMatrixMPI<scalar_t,integer_t>::dense_factor_nonzeros
   (int task_depth) const {
-    long long nnz =
-      (this->front_comm != MPI_COMM_NULL &&
-       mpi_rank(this->front_comm) == 0) ?
-      this->dim_blk*this->dim_blk-this->dim_upd*this->dim_upd : 0;
+    long long nnz = 0;
+    if (this->front_comm != MPI_COMM_NULL &&
+        mpi_rank(this->front_comm) == 0) {
+      auto dsep = this->dim_sep();
+      auto dupd = this->dim_upd();
+      nnz = dsep * (dsep + 2 * dupd);
+    }
     if (visit(this->lchild))
       nnz += this->lchild->dense_factor_nonzeros(task_depth);
     if (visit(this->rchild))

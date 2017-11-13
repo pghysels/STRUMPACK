@@ -419,7 +419,7 @@ namespace strumpack {
     for (size_t f=0; f<_local_pfronts.size(); f++)
       x_dist[f] = DistM_t
         (_local_pfronts[f].f->blacs_context(),
-         _local_pfronts[f].f->dim_sep, 1);
+         _local_pfronts[f].f->dim_sep(), 1);
 #pragma omp parallel for
     for (size_t i=0; i<rsize; i++) {
       auto r = rbuf[i].idx;

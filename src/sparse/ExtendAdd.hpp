@@ -53,7 +53,7 @@ namespace strumpack {
       assert(CB.fixed());
       const auto lrows = CB.lrows();
       const auto lcols = CB.lcols();
-      const auto pa_sep = pa->dim_sep;
+      const auto pa_sep = pa->dim_sep();
       const auto prows = pa->proc_rows;
       const auto pcols = pa->proc_cols;
       const auto B = DistM_t::default_MB;
@@ -108,8 +108,8 @@ namespace strumpack {
      const FrontalMatrixDense<scalar_t,integer_t>* ch) {
       std::size_t u2s;
       const auto I = ch->upd_to_parent(pa, u2s);
-      const std::size_t du = ch->dim_upd;
-      const std::size_t ds = pa->dim_sep;
+      const std::size_t du = ch->dim_upd();
+      const std::size_t ds = pa->dim_sep();
       const auto pr = new int[CB.rows()+CB.cols()];
       const auto pc = pr + CB.rows();
       const auto prows = pa->proc_rows;
@@ -157,7 +157,7 @@ namespace strumpack {
      scalar_t*& pbuf, const FrontalMatrixDenseMPI<scalar_t,integer_t>* pa,
      const FrontalMatrixDense<scalar_t,integer_t>* ch) {
       if (!(F11.active() || F22.active())) return;
-      const auto ch_dim_upd = ch->dim_upd;
+      const auto ch_dim_upd = ch->dim_upd();
       const auto ch_upd = ch->upd;
       const auto pa_upd = pa->upd;
       const auto pa_sep = pa->sep_begin;
@@ -216,7 +216,7 @@ namespace strumpack {
      scalar_t** pbuf, const FrontalMatrixDenseMPI<scalar_t,integer_t>* pa,
      const FrontalMatrixDenseMPI<scalar_t,integer_t>* ch) {
       if (!(F11.active() || F22.active())) return;
-      const auto ch_dim_upd = ch->dim_upd;
+      const auto ch_dim_upd = ch->dim_upd();
       const auto ch_upd = ch->upd;
       const auto pa_upd = pa->upd;
       const auto pa_sep = pa->sep_begin;
@@ -329,10 +329,10 @@ namespace strumpack {
       const auto lrows = Sr.lrows();
       const auto lcols = Sc.lcols();
       const auto sep_begin = pa->sep_begin;
-      const auto dim_sep = pa->dim_sep;
+      const auto dim_sep = pa->dim_sep();
       const auto pa_upd = pa->upd;
       const auto ch_upd = ch->upd;
-      const auto ch_dim_upd = ch->dim_upd;
+      const auto ch_dim_upd = ch->dim_upd();
       const auto prows = ch->proc_rows;
       const auto pcols = ch->proc_cols;
       const auto B = DistM_t::default_MB;
@@ -426,13 +426,14 @@ namespace strumpack {
      const FrontalMatrixMPI<scalar_t,integer_t>* pa,
      const std::vector<std::size_t>& I) {
       assert(Bch.fixed());
+      auto pa_dsep = pa->dim_sep();
       for (int r=0; r<Bch.lrows(); r++) {
         integer_t pa_row = I[Bch.rowl2g_fixed(r)];
-        if (pa_row < pa->dim_sep)
+        if (pa_row < pa_dsep)
           sbuf[pa->find_rank_fixed(pa_row, 0, Bsep)].
             push_back(Bch(r,0));
         else
-          sbuf[pa->find_rank_fixed(pa_row-pa->dim_sep, 0, Bupd)].
+          sbuf[pa->find_rank_fixed(pa_row-pa_dsep, 0, Bupd)].
             push_back(Bch(r,0));
       }
     }

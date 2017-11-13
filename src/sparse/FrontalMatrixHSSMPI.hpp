@@ -182,11 +182,11 @@ namespace strumpack {
   FrontalMatrixHSSMPI<scalar_t,integer_t>::sample_CB
   (const SPOptions<scalar_t>& opts, const DistM_t& R,
    DistM_t& Sr, DistM_t& Sc, F_t* pa) const {
-    if (!this->dim_upd) return;
+    if (!this->dim_upd()) return;
     if (this->comm() == MPI_COMM_NULL) return;
     auto b = R.cols();
-    Sr = DistM_t(this->ctxt, this->dim_upd, b);
-    Sc = DistM_t(this->ctxt, this->dim_upd, b);
+    Sr = DistM_t(this->ctxt, this->dim_upd(), b);
+    Sc = DistM_t(this->ctxt, this->dim_upd(), b);
     TIMER_TIME(TaskType::HSS_SCHUR_PRODUCT, 2, t_sprod);
     _H->Schur_product_direct
       (_Theta, _Vhat, _DUB01, _Phi, _ThetaVhatC, _VhatCPhiC, R, Sr, Sc);
@@ -345,7 +345,7 @@ namespace strumpack {
     if (this->visit(this->rchild))
       this->rchild->multifrontal_factorization
         (A, opts, etree_level+1, task_depth);
-    if (!this->dim_blk) return;
+    if (!this->dim_blk()) return;
 
     auto mult = [&](DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
       auto f0 = params::flops;
@@ -364,7 +364,7 @@ namespace strumpack {
       params::extraction_flops += params::flops - f0;
     };
 
-    // auto N = this->dim_blk;
+    // auto N = this->dim_blk();
     // DistM_t eye(this->ctxt, N, N), FI(this->ctxt, N, N),
     //   FtI(this->ctxt, N, N);
     // eye.eye();
@@ -421,7 +421,7 @@ namespace strumpack {
     if (this->lchild) this->lchild->release_work_memory();
     if (this->rchild) this->rchild->release_work_memory();
 
-    if (this->dim_sep) {
+    if (this->dim_sep()) {
       if (etree_level > 0) {
         auto f0 = params::flops;
         TIMER_TIME(TaskType::HSS_PARTIALLY_FACTOR, 0, t_pfact);
@@ -463,7 +463,7 @@ namespace strumpack {
       scalapack::Cblacs_gridinfo
         (_H->ctxt(), &np_rows, &np_cols, &p_row, &p_col);
       mem_size += scalapack::numroc
-        (this->dim_upd, DistM_t::default_NB, p_row, 0, np_rows);
+        (this->dim_upd(), DistM_t::default_NB, p_row, 0, np_rows);
     }
   }
 
@@ -477,7 +477,7 @@ namespace strumpack {
     if (this->visit(this->rchild))
       this->rchild->forward_multifrontal_solve
         (b_loc, b_dist, wmem, etree_level+1, task_depth);
-    DistMW_t Bupd(_H->ctxt(), this->dim_upd, 1, wmem+this->p_wmem);
+    DistMW_t Bupd(_H->ctxt(), this->dim_upd(), 1, wmem+this->p_wmem);
     Bupd.zero();
     DistM_t& Bsep = b_dist[this->sep];
     this->look_left(Bsep, wmem);
@@ -495,7 +495,7 @@ namespace strumpack {
         copy(rhs.rows(), rhs.cols(), _ULVwork->reduced_rhs, 0, 0,
              rhs, 0, 0, this->ctxt_all);
         _ULVwork->reduced_rhs.clear();
-        if (this->dim_upd)
+        if (this->dim_upd())
           gemm(Trans::N, Trans::N, scalar_t(-1.), _Theta, rhs,
                scalar_t(1.), Bupd);
         rhs.clear();
@@ -517,7 +517,7 @@ namespace strumpack {
   (DenseM_t& y_loc, DistM_t* y_dist, scalar_t* wmem,
    int etree_level, int task_depth) {
     DistM_t& Ysep = y_dist[this->sep];
-    DistMW_t Yupd(_H->ctxt(), this->dim_upd, 1, wmem+this->p_wmem);
+    DistMW_t Yupd(_H->ctxt(), this->dim_upd(), 1, wmem+this->p_wmem);
     TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_expand);
     if (etree_level) {
       if (_Phi.cols() && _Theta.cols()) {
@@ -525,7 +525,7 @@ namespace strumpack {
                       Ysep.rows(), Ysep.cols());
         copy(Ysep.rows(), Ysep.cols(), Ysep, 0, 0,
              lYsep, 0, 0, this->ctxt_all);
-        if (this->dim_upd) {
+        if (this->dim_upd()) {
           DistM_t wx(_H->ctxt(), _Phi.cols(), Yupd.cols());
           copy(wx.rows(), wx.cols(), _ULVwork->x, 0, 0,
                wx, 0, 0, this->ctxt_all);
@@ -563,15 +563,14 @@ namespace strumpack {
     std::vector<std::size_t> gI, gJ;
     gI.reserve(I.size());
     gJ.reserve(J.size());
+    const std::size_t dsep = this->dim_sep();
     for (auto i : I) {
-      assert(i < std::size_t(this->dim_blk));
-      gI.push_back((i < std::size_t(this->dim_sep)) ?
-                   i+this->sep_begin : this->upd[i-this->dim_sep]);
+      assert(i < std::size_t(this->dim_blk()));
+      gI.push_back((i < dsep) ? i+this->sep_begin : this->upd[i-dsep]);
     }
     for (auto j : J) {
-      assert(j < std::size_t(this->dim_blk));
-      gJ.push_back((j < std::size_t(this->dim_sep)) ?
-                   j+this->sep_begin : this->upd[j-this->dim_sep]);
+      assert(j < std::size_t(this->dim_blk()));
+      gJ.push_back((j < dsep) ? j+this->sep_begin : this->upd[j-dsep]);
     }
     TIMER_TIME(TaskType::EXTRACT_2D, 1, t_ex);
     this->extract_2d(A, gI, gJ, B);
@@ -588,15 +587,15 @@ namespace strumpack {
   FrontalMatrixHSSMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
   (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
    DistM_t& B) const {
-    if (this->front_comm == MPI_COMM_NULL || !this->dim_upd) return;
+    if (this->front_comm == MPI_COMM_NULL || !this->dim_upd()) return;
     TIMER_TIME(TaskType::HSS_EXTRACT_SCHUR, 3, t_ex_schur);
     std::vector<std::size_t> lI, lJ, oI, oJ;
     this->find_upd_indices(J, lJ, oJ);
     this->find_upd_indices(I, lI, oI);
 
     // TODO extract from child(1) directly
-    auto gI = lI;  for (auto& i : gI) i += this->dim_sep;
-    auto gJ = lJ;  for (auto& j : gJ) j += this->dim_sep;
+    auto gI = lI;  for (auto& i : gI) i += this->dim_sep();
+    auto gJ = lJ;  for (auto& j : gJ) j += this->dim_sep();
     DistM_t e = _H->extract(gI, gJ, this->ctxt, this->np_rows(),
                             this->np_cols());
 
@@ -648,16 +647,16 @@ namespace strumpack {
    bool is_root) {
     //if (!this->active()) return;
     if (this->front_comm == MPI_COMM_NULL) return;
-    assert(sep_tree.size == this->dim_sep);
+    assert(sep_tree.size == this->dim_sep());
     if (is_root)
       _H = std::unique_ptr<HSS::HSSMatrixMPI<scalar_t>>
         (new HSS::HSSMatrixMPI<scalar_t>
          (sep_tree, opts.HSS_options(), this->comm()));
     else {
-      HSS::HSSPartitionTree hss_tree(this->dim_blk);
+      HSS::HSSPartitionTree hss_tree(this->dim_blk());
       hss_tree.c.reserve(2);
       hss_tree.c.push_back(sep_tree);
-      hss_tree.c.emplace_back(this->dim_upd);
+      hss_tree.c.emplace_back(this->dim_upd());
       hss_tree.c.back().refine(opts.HSS_options().leaf_size());
       _H = std::unique_ptr<HSS::HSSMatrixMPI<scalar_t>>
         (new HSS::HSSMatrixMPI<scalar_t>
@@ -674,7 +673,7 @@ namespace strumpack {
     if (this->visit(this->rchild))
       this->rchild->bisection_partitioning(opts, sorder, false, task_depth);
 
-    HSS::HSSPartitionTree sep_tree(this->dim_sep);
+    HSS::HSSPartitionTree sep_tree(this->dim_sep());
     sep_tree.refine(opts.HSS_options().leaf_size());
 
     std::cout << "TODO FrontalMatrixHSSMPI::bisection_partitioning"
@@ -689,10 +688,10 @@ namespace strumpack {
         (new HSS::HSSMatrixMPI<scalar_t>
          (sep_tree, opts.HSS_options(), this->comm()));
     else {
-      HSS::HSSPartitionTree hss_tree(this->dim_blk);
+      HSS::HSSPartitionTree hss_tree(this->dim_blk());
       hss_tree.c.reserve(2);
       hss_tree.c.push_back(sep_tree);
-      hss_tree.c.emplace_back(this->dim_upd);
+      hss_tree.c.emplace_back(this->dim_upd());
       hss_tree.c.back().refine(opts.HSS_options().leaf_size());
       _H = std::unique_ptr<HSS::HSSMatrixMPI<scalar_t>>
         (new HSS::HSSMatrixMPI<scalar_t>

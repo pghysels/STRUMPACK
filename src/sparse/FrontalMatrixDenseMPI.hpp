@@ -119,7 +119,8 @@ namespace strumpack {
     std::vector<std::vector<scalar_t>> sbuf(P);
     for (auto ch : {this->lchild, this->rchild}) {
       if (ch && mpi_rank(this->front_comm) == 0) {
-        STRUMPACK_FLOPS(static_cast<long long int>(ch->dim_upd)*ch->dim_upd);
+        STRUMPACK_FLOPS
+          (static_cast<long long int>(ch->dim_upd())*ch->dim_upd());
       }
       if (FDMPI_t* ch_mpi = dynamic_cast<FDMPI_t*>(ch)) {
         ExtAdd::extend_add_copy_to_buffers
@@ -151,21 +152,23 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::build_front
   (const SpMat_t& A) {
-    if (this->dim_sep) {
-      F11 = DistM_t(this->ctxt, this->dim_sep, this->dim_sep);
+    const auto dupd = this->dim_upd();
+    const auto dsep = this->dim_sep();
+    if (dsep) {
+      F11 = DistM_t(this->ctxt, dsep, dsep);
       using ExtractFront = ExtractFront<scalar_t,integer_t>;
-      ExtractFront::extract_F11(F11, A, this->sep_begin, this->dim_sep);
-      if (this->dim_upd) {
-        F12 = DistM_t(this->ctxt, this->dim_sep, this->dim_upd);
+      ExtractFront::extract_F11(F11, A, this->sep_begin, dsep);
+      if (this->dim_upd()) {
+        F12 = DistM_t(this->ctxt, dsep, dupd);
         ExtractFront::extract_F12
           (F12, A, this->sep_begin, this->sep_end, this->upd);
-        F21 = DistM_t(this->ctxt, this->dim_upd, this->dim_sep);
+        F21 = DistM_t(this->ctxt, dupd, dsep);
         ExtractFront::extract_F21
           (F21, A, this->sep_end, this->sep_begin, this->upd);
       }
     }
-    if (this->dim_upd) {
-      F22 = DistM_t(this->ctxt, this->dim_upd, this->dim_upd);
+    if (dupd) {
+      F22 = DistM_t(this->ctxt, dupd, dupd);
       F22.zero();
     }
     extend_add();
@@ -173,7 +176,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::partial_factorization() {
-    if (this->dim_sep && F11.active()) {
+    if (this->dim_sep() && F11.active()) {
 #if defined(WRITE_ROOT)
       if (etree_level == 0) {
         if (!mpi_rank(this->front_comm))
@@ -186,7 +189,7 @@ namespace strumpack {
       }
 #endif
       piv = F11.LU();
-      if (this->dim_upd) {
+      if (this->dim_upd()) {
         F12.permute_rows_fwd(piv);
         trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11, F12);
         trsm(Side::R, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11, F21);
@@ -221,14 +224,14 @@ namespace strumpack {
     if (this->visit(this->rchild))
       this->rchild->forward_multifrontal_solve
         (b_loc, b_dist, wmem, etree_level, task_depth);
-    DistMW_t Bupd(this->ctxt, this->dim_upd, 1, wmem+this->p_wmem);
+    DistMW_t Bupd(this->ctxt, this->dim_upd(), 1, wmem+this->p_wmem);
     Bupd.zero();
     this->look_left(b_dist[this->sep], wmem);
-    if (this->dim_sep) {
+    if (this->dim_sep()) {
       TIMER_TIME(TaskType::SOLVE_LOWER, 0, t_s);
       b_dist[this->sep].permute_rows_fwd(piv);
       trsv(UpLo::L, Trans::N, Diag::U, F11, b_dist[this->sep]);
-      if (this->dim_upd)
+      if (this->dim_upd())
         gemv(Trans::N, scalar_t(-1.), F21, b_dist[this->sep],
              scalar_t(1.), Bupd);
       TIMER_STOP(t_s);
@@ -239,10 +242,10 @@ namespace strumpack {
   FrontalMatrixDenseMPI<scalar_t,integer_t>::backward_multifrontal_solve
   (DenseM_t& y_loc, DistM_t* y_dist, scalar_t* wmem,
    int etree_level, int task_depth) {
-    if (this->dim_sep) {
+    if (this->dim_sep()) {
       TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_s);
-      if (this->dim_upd) {
-        DistMW_t Yupd(this->ctxt, this->dim_upd, 1, wmem+this->p_wmem);
+      if (this->dim_upd()) {
+        DistMW_t Yupd(this->ctxt, this->dim_upd(), 1, wmem+this->p_wmem);
         gemv(Trans::N, scalar_t(-1.), F12, Yupd,
              scalar_t(1.), y_dist[this->sep]);
       }
@@ -290,8 +293,8 @@ namespace strumpack {
    FrontalMatrix<scalar_t,integer_t>* pa) const {
     if (F11.active() || F22.active()) {
       auto b = R.cols();
-      Sr = DistM_t(this->ctxt, this->dim_upd, b);
-      Sc = DistM_t(this->ctxt, this->dim_upd, b);
+      Sr = DistM_t(this->ctxt, this->dim_upd(), b);
+      Sc = DistM_t(this->ctxt, this->dim_upd(), b);
       gemm(Trans::N, Trans::N, scalar_t(1.), F22, R, scalar_t(0.), Sr);
       gemm(Trans::C, Trans::N, scalar_t(1.), F22, R, scalar_t(0.), Sc);
     }
