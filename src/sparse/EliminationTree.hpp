@@ -49,47 +49,40 @@ namespace strumpack {
     EliminationTree
     (const SPOptions<scalar_t>& opts, const SpMat_t& A,
      const SeparatorTree<integer_t>& sep_tree);
-    virtual ~EliminationTree();
+    virtual ~EliminationTree() {}
     virtual void multifrontal_factorization
     (const SpMat_t& A, const SPOptions<scalar_t>& opts);
-    virtual void allocate_solve_work_memory();
-    inline void delete_solve_work_memory();
-    virtual void multifrontal_solve(DenseM_t& x); // TODO const
+    virtual void multifrontal_solve(DenseM_t& x) const;
     virtual void multifrontal_solve_dist
     (DenseM_t& x, const std::vector<integer_t>& dist) {} // TODO const
     virtual integer_t maximum_rank() const;
     virtual long long factor_nonzeros() const;
     virtual long long dense_factor_nonzeros() const;
     void print_rank_statistics(std::ostream &out) const {
-      _etree_root->print_rank_statistics(out);
+      _root->print_rank_statistics(out);
     }
     virtual int nr_HSS_fronts() const { return _nr_HSS_fronts; }
     virtual int nr_dense_fronts() const { return _nr_dense_fronts; }
-    virtual FrontalMatrix<scalar_t,integer_t>* root_front() {
-      return _etree_root;
-    }
 
   protected:
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
     using FHSS_t = FrontalMatrixHSS<scalar_t,integer_t>;
+
     int _nr_HSS_fronts = 0;
     int _nr_dense_fronts = 0;
-
-    // TODO store unique_ptr's
-    scalar_t* _wmem = nullptr;
-    FrontalMatrix<scalar_t,integer_t>* _etree_root = nullptr;
+    std::unique_ptr<F_t> _root;
 
   private:
     F_t* setup_tree
     (const SPOptions<scalar_t>& opts, const SpMat_t& A,
      const SeparatorTree<integer_t>& sep_tree,
-     std::vector<integer_t>* upd,
-     integer_t sep, bool hss_parent, int level);
+     std::vector<integer_t>* upd, integer_t sep,
+     bool hss_parent, int level);
 
     void symbolic_factorization
     (const SpMat_t& A, const SeparatorTree<integer_t>& sep_tree,
-     integer_t sep, std::vector<integer_t>* upd, int depth=0);
+     integer_t sep, std::vector<integer_t>* upd, int depth=0) const;
   };
 
   template<typename scalar_t,typename integer_t>
@@ -105,21 +98,15 @@ namespace strumpack {
 #pragma omp single
     symbolic_factorization(A, sep_tree, sep_tree.root(), upd);
 
-    _etree_root = setup_tree
-      (opts, A, sep_tree, upd, sep_tree.root(), true, 0);
+    _root = std::unique_ptr<F_t>
+      (setup_tree(opts, A, sep_tree, upd, sep_tree.root(), true, 0));
     delete[] upd;
-  }
-
-  template<typename scalar_t,typename integer_t>
-  EliminationTree<scalar_t,integer_t>::~EliminationTree() {
-    delete _etree_root;
-    delete _wmem;
   }
 
   template<typename scalar_t,typename integer_t> void
   EliminationTree<scalar_t,integer_t>::symbolic_factorization
   (const SpMat_t& A, const SeparatorTree<integer_t>& sep_tree,
-   integer_t sep, std::vector<integer_t>* upd, int depth) {
+   integer_t sep, std::vector<integer_t>* upd, int depth) const {
     auto chl = sep_tree.lch()[sep];
     auto chr = sep_tree.rch()[sep];
     if (depth < params::task_recursion_cutoff_level) {
@@ -219,27 +206,13 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   EliminationTree<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const SPOptions<scalar_t>& opts) {
-    _etree_root->multifrontal_factorization(A, opts);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  EliminationTree<scalar_t,integer_t>::allocate_solve_work_memory() {
-    if (!_wmem) {
-      integer_t mem_size = 0;
-      _etree_root->solve_workspace_query(mem_size);
-      _wmem = new scalar_t[mem_size];
-    }
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  EliminationTree<scalar_t,integer_t>::delete_solve_work_memory() {
-    delete[] _wmem; _wmem = nullptr;
+    _root->multifrontal_factorization(A, opts);
   }
 
   template<typename scalar_t,typename integer_t> void
   EliminationTree<scalar_t,integer_t>::multifrontal_solve
-  (DenseM_t& x) {
-    _etree_root->multifrontal_solve(x, _wmem);
+  (DenseM_t& x) const {
+    _root->multifrontal_solve(x);
   }
 
   template<typename scalar_t,typename integer_t> integer_t
@@ -247,7 +220,7 @@ namespace strumpack {
     integer_t max_rank;
 #pragma omp parallel
 #pragma omp single nowait
-    max_rank = _etree_root->maximum_rank();
+    max_rank = _root->maximum_rank();
     return max_rank;
   }
 
@@ -256,7 +229,7 @@ namespace strumpack {
     long long nonzeros;
 #pragma omp parallel
 #pragma omp single nowait
-    nonzeros =  _etree_root->factor_nonzeros();
+    nonzeros = _root->factor_nonzeros();
     return nonzeros;
   }
 
@@ -265,7 +238,7 @@ namespace strumpack {
     long long nonzeros;
 #pragma omp parallel
 #pragma omp single nowait
-    nonzeros = _etree_root->dense_factor_nonzeros();
+    nonzeros = _root->dense_factor_nonzeros();
     return nonzeros;
   }
 

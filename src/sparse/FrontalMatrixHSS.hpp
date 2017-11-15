@@ -85,12 +85,11 @@ namespace strumpack {
      int etree_level=0, int task_depth=0) override;
 
     void forward_multifrontal_solve
-    (DenseM_t& b, scalar_t* wmem,
-     int etree_level=0, int task_depth=0) override;
+    (DenseM_t& b, DenseM_t& bupd, int etree_level=0,
+     int task_depth=0) const override;
     void backward_multifrontal_solve
-    (DenseM_t& y, scalar_t* wmem,
-     int etree_level=0, int task_depth=0) override;
-
+    (DenseM_t& y, DenseM_t& yupd, int etree_level=0,
+     int task_depth=0) const override;
 
     integer_t maximum_rank(int task_depth=0) const override;
     void print_rank_statistics(std::ostream &out) const override;
@@ -107,12 +106,12 @@ namespace strumpack {
      const HSS::HSSPartitionTree& sep_tree, bool is_root);
 
 
-
     // TODO make private?
     HSS::HSSMatrix<scalar_t> _H;
     HSS::HSSFactors<scalar_t> _ULV;
+
     // TODO do not store this here: makes solve not thread safe!!
-    std::unique_ptr<HSS::WorkSolve<scalar_t>> _ULVwork;
+    mutable std::unique_ptr<HSS::WorkSolve<scalar_t>> _ULVwork;
 
     /** Schur complement update:
      *    S = F22 - _Theta * Vhat^C * _Phi^C
@@ -139,10 +138,10 @@ namespace strumpack {
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,
      int etree_level, int task_depth);
 
-    void forward_multifrontal_solve_node
-    (DenseM_t& b, scalar_t* wmem, int etree_level, int task_depth);
-    void backward_multifrontal_solve_node
-    (DenseM_t& y, scalar_t* wmem, int etree_level, int task_depth);
+    void fwd_solve_node
+    (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const;
+    void bwd_solve_node
+    (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const;
 
     long long node_factor_nonzeros() const override;
     long long dense_node_factor_nonzeros() const override;
@@ -514,115 +513,135 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::forward_multifrontal_solve
-  (DenseM_t& b, scalar_t* wmem, int etree_level, int task_depth) {
+  (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
     if (task_depth == 0)
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single
-      forward_multifrontal_solve_node
-        (b, wmem, etree_level, task_depth);
-    else forward_multifrontal_solve_node
-           (b, wmem, etree_level, task_depth);
+      fwd_solve_node(b, bupd, etree_level, task_depth);
+    else fwd_solve_node(b, bupd, etree_level, task_depth);
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSS<scalar_t,integer_t>::forward_multifrontal_solve_node
-  (DenseM_t& b, scalar_t* wmem, int etree_level, int task_depth) {
+  FrontalMatrixHSS<scalar_t,integer_t>::fwd_solve_node
+  (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
     bool tasked = task_depth<params::task_recursion_cutoff_level;
     if (tasked) {
+      DenseM_t CBchl, CBchr;
       if (this->lchild)
 #pragma omp task untied default(shared)                                 \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
         this->lchild->forward_multifrontal_solve
-          (b, wmem, etree_level+1, task_depth+1);
+          (b, CBchl, etree_level+1, task_depth+1);
       if (this->rchild)
 #pragma omp task untied default(shared)                                 \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
         this->rchild->forward_multifrontal_solve
-          (b, wmem, etree_level+1, task_depth+1);
+          (b, CBchr, etree_level+1, task_depth+1);
 #pragma omp taskwait
-    } else {
+      bupd = DenseM_t(this->dim_upd(), b.cols());
+      bupd.zero();
       if (this->lchild)
-        this->lchild->forward_multifrontal_solve
-          (b, wmem, etree_level+1, task_depth);
+        this->extend_add_b(this->lchild, b, bupd, CBchl);
       if (this->rchild)
+        this->extend_add_b(this->rchild, b, bupd, CBchr);
+    } else {
+      bupd = DenseM_t(this->dim_upd(), b.cols());
+      bupd.zero();
+      DenseM_t CBch;
+      if (this->lchild) {
+        this->lchild->forward_multifrontal_solve
+          (b, CBch, etree_level+1, task_depth);
+        this->extend_add_b(this->lchild, b, bupd, CBch);
+      }
+      if (this->rchild) {
         this->rchild->forward_multifrontal_solve
-          (b, wmem, etree_level+1, task_depth);
+          (b, CBch, etree_level+1, task_depth);
+        this->extend_add_b(this->rchild, b, bupd, CBch);
+      }
     }
-    this->look_left(b, wmem);
     if (etree_level) {
       if (_Theta.cols() && _Phi.cols()) {
-        DenseMW_t rhs(this->dim_sep(), b.cols(), b, this->sep_begin, 0);
+        DenseMW_t bloc(this->dim_sep(), b.cols(), b, this->sep_begin, 0);
+        // TODO get rid of this!!!
         _ULVwork = std::unique_ptr<HSS::WorkSolve<scalar_t>>
           (new HSS::WorkSolve<scalar_t>());
-        _H.child(0)->forward_solve(_ULV, *_ULVwork, rhs, true);
-        if (this->dim_upd()) {
-          DenseMW_t tmp
-            (_Theta.rows(), _ULVwork->reduced_rhs.cols(),
-             wmem+this->p_wmem, this->dim_upd());
+        _H.child(0)->forward_solve(_ULV, *_ULVwork, bloc, true);
+        if (this->dim_upd())
           gemm(Trans::N, Trans::N, scalar_t(-1.), _Theta,
-               _ULVwork->reduced_rhs, scalar_t(1.), tmp, task_depth);
-        }
+               _ULVwork->reduced_rhs, scalar_t(1.), bupd, task_depth);
         _ULVwork->reduced_rhs.clear();
       }
     } else {
-      DenseMW_t rhs(this->dim_sep(), b.cols(), b, this->sep_begin, 0);
+      DenseMW_t bloc(this->dim_sep(), b.cols(), b, this->sep_begin, 0);
       _ULVwork = std::unique_ptr<HSS::WorkSolve<scalar_t>>
         (new HSS::WorkSolve<scalar_t>());
-      _H.forward_solve(_ULV, *_ULVwork, rhs, false);
+      _H.forward_solve(_ULV, *_ULVwork, bloc, false);
     }
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::backward_multifrontal_solve
-  (DenseM_t& b, scalar_t* wmem, int etree_level, int task_depth) {
+  (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const {
     if (task_depth == 0)
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single
-      backward_multifrontal_solve_node
-        (b, wmem, etree_level, task_depth);
-    else backward_multifrontal_solve_node
-           (b, wmem, etree_level, task_depth);
+      bwd_solve_node(y, yupd, etree_level, task_depth);
+    else bwd_solve_node(y, yupd, etree_level, task_depth);
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSS<scalar_t,integer_t>::backward_multifrontal_solve_node
-  (DenseM_t& y, scalar_t* wmem, int etree_level, int task_depth) {
+  FrontalMatrixHSS<scalar_t,integer_t>::bwd_solve_node
+  (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const {
     bool tasked = task_depth<params::task_recursion_cutoff_level;
     if (etree_level) {
       if (_Phi.cols() && _Theta.cols()) {
         if (this->dim_upd()) {
-          DenseMW_t tmp(_Phi.rows(), 1, wmem+this->p_wmem, _Phi.rows());
-          gemm(Trans::C, Trans::N, scalar_t(-1.), _Phi, tmp,
+          gemm(Trans::C, Trans::N, scalar_t(-1.), _Phi, yupd,
                scalar_t(1.), _ULVwork->x, task_depth);
         }
-        DenseMW_t rhs(this->dim_sep(), y.cols(), y, this->sep_begin, 0);
-        _H.child(0)->backward_solve(_ULV, *_ULVwork, rhs);
+        DenseMW_t yloc(this->dim_sep(), y.cols(), y, this->sep_begin, 0);
+        _H.child(0)->backward_solve(_ULV, *_ULVwork, yloc);
         _ULVwork.reset();
       }
     } else {
-      DenseMW_t rhs(this->dim_sep(), y.cols(), y, this->sep_begin, 0);
-      _H.backward_solve(_ULV, *_ULVwork, rhs);
+      DenseMW_t yloc(this->dim_sep(), y.cols(), y, this->sep_begin, 0);
+      _H.backward_solve(_ULV, *_ULVwork, yloc);
     }
-    this->look_right(y, wmem);
     if (tasked) {
-      if (this->lchild)
+      if (this->lchild) {
 #pragma omp task untied default(shared)                                 \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->lchild->backward_multifrontal_solve
-          (y, wmem, etree_level+1, task_depth+1);
-      if (this->rchild)
+        {
+          DenseM_t CB(this->lchild->dim_upd(), y.cols());
+          this->extract_b(this->lchild, y, yupd, CB);
+          this->lchild->backward_multifrontal_solve
+            (y, CB, etree_level+1, task_depth+1);
+        }
+      }
+      if (this->rchild) {
 #pragma omp task untied default(shared)                                 \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->rchild->backward_multifrontal_solve
-          (y, wmem, etree_level+1, task_depth+1);
+        {
+          DenseM_t CB(this->rchild->dim_upd(), y.cols());
+          this->extract_b(this->rchild, y, yupd, CB);
+          this->rchild->backward_multifrontal_solve
+            (y, CB, etree_level+1, task_depth+1);
+        }
+      }
 #pragma omp taskwait
     } else {
-      if (this->lchild)
+      if (this->lchild) {
+        DenseM_t CB(this->lchild->dim_upd(), y.cols());
+        this->extract_b(this->lchild, y, yupd, CB);
         this->lchild->backward_multifrontal_solve
-          (y, wmem, etree_level+1, task_depth);
-      if (this->rchild)
+          (y, CB, etree_level+1, task_depth);
+      }
+      if (this->rchild) {
+        DenseM_t CB(this->rchild->dim_upd(), y.cols());
+        this->extract_b(this->rchild, y, yupd, CB);
         this->rchild->backward_multifrontal_solve
-          (y, wmem, etree_level+1, task_depth);
+          (y, CB, etree_level+1, task_depth);
+      }
     }
   }
 

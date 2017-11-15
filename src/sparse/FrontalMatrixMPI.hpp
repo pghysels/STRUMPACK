@@ -107,7 +107,6 @@ namespace strumpack {
     inline int find_rank(integer_t r, integer_t c, const DistM_t& F) const;
     inline int find_rank_fixed
     (integer_t r, integer_t c, const DistM_t& F) const;
-    virtual void solve_workspace_query(integer_t& mem_size);
     virtual long long dense_factor_nonzeros(int task_depth=0) const;
     virtual std::string type() const { return "FrontalMatrixMPI"; }
     virtual bool isMPI() const { return true; }
@@ -382,20 +381,6 @@ namespace strumpack {
     }
     if (mpi_rank(front_comm) == child_rank)
       MPI_Waitall(sreq.size(), sreq.data(), MPI_STATUSES_IGNORE);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMPI<scalar_t,integer_t>::solve_workspace_query
-  (integer_t& mem_size) {
-    if (this->lchild) this->lchild->solve_workspace_query(mem_size);
-    if (this->rchild) this->rchild->solve_workspace_query(mem_size);
-    this->p_wmem = mem_size;
-    if (ctxt != -1) {
-      int np_rows, np_cols, p_row, p_col;
-      scalapack::Cblacs_gridinfo(ctxt, &np_rows, &np_cols, &p_row, &p_col);
-      mem_size += scalapack::numroc
-        (this->dim_upd(), DistM_t::default_NB, p_row, 0, np_rows);
-    }
   }
 
   template<typename scalar_t,typename integer_t> void

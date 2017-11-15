@@ -68,7 +68,7 @@ namespace strumpack {
      Reord_t& nd, MPI_Comm comm);
     virtual ~EliminationTreeMPI() { mpi_free_comm(&_comm); }
 
-    void multifrontal_solve(DenseM_t& x) override;
+    void multifrontal_solve(DenseM_t& x) const override;
     integer_t maximum_rank() const override;
     long long factor_nonzeros() const override;
     long long dense_factor_nonzeros() const override;
@@ -78,15 +78,17 @@ namespace strumpack {
     MPI_Comm _comm;
     int _rank;
 
-    virtual int nr_HSS_fronts() {
+    virtual int nr_HSS_fronts() const override {
+      int f = this->_nr_HSS_fronts;
       MPI_Allreduce
-        (MPI_IN_PLACE, &this->_nr_HSS_fronts, 1, MPI_INT, MPI_SUM, _comm);
-      return this->_nr_HSS_fronts;
+        (MPI_IN_PLACE, &f, 1, MPI_INT, MPI_SUM, _comm);
+      return f;
     }
-    virtual int nr_dense_fronts() {
+    virtual int nr_dense_fronts() const override {
+      int f = this->_nr_dense_fronts;
       MPI_Allreduce
-        (MPI_IN_PLACE, &this->_nr_dense_fronts, 1, MPI_INT, MPI_SUM, _comm);
-      return this->_nr_dense_fronts;
+        (MPI_IN_PLACE, &f, 1, MPI_INT, MPI_SUM, _comm);
+      return f;
     }
 
   private:
@@ -105,7 +107,7 @@ namespace strumpack {
 
     void symbolic_factorization
     (const SpMat_t& A, const Tree_t& tree, integer_t sep,
-     std::vector<integer_t>* upd, float* subtree_work, int depth=0);
+     std::vector<integer_t>* upd, float* subtree_work, int depth=0) const;
 
     F_t* proportional_mapping
     (const SpMat_t& A, const Tree_t& tree, const SPOptions<scalar_t>& opts,
@@ -113,8 +115,8 @@ namespace strumpack {
      integer_t sep, int P0, int P, MPI_Comm front_comm,
      bool keep, bool is_hss, int level=0);
 
-    void sequential_to_block_cyclic(DenseM_t& x, DistM_t*& x_dist);
-    void block_cyclic_to_sequential(DenseM_t& x, DistM_t*& x_dist);
+    void sequential_to_block_cyclic(DenseM_t& x, DistM_t*& x_dist) const;
+    void block_cyclic_to_sequential(DenseM_t& x, DistM_t*& x_dist) const;
   };
 
   template<typename scalar_t,typename integer_t>
@@ -145,9 +147,10 @@ namespace strumpack {
     if (P>1) MPI_Comm_dup(_comm, &tree_comm);
     else tree_comm = _comm;
 
-    this->_etree_root = proportional_mapping
-      (A, tree, opts, upd, subtree_work, local_range, tree.root(),
-       0, P, tree_comm, true, true, 0);
+    this->_root = std::unique_ptr<F_t>
+      (proportional_mapping
+       (A, tree, opts, upd, subtree_work, local_range, tree.root(),
+        0, P, tree_comm, true, true, 0));
 
     subtree_ranges.resize(P);
     MPI_Allgather
@@ -160,7 +163,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPI<scalar_t,integer_t>::sequential_to_block_cyclic
-  (DenseM_t& x, DistM_t*& x_dist) {
+  (DenseM_t& x, DistM_t*& x_dist) const {
     size_t pos = 0;
     for (auto& pf : _parallel_fronts)
       if (_rank >= pf.P0 && _rank < pf.P0+pf.P) pos++;
@@ -177,7 +180,7 @@ namespace strumpack {
   // TODO: rewrite this with a single alltoallv/allgatherv
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPI<scalar_t,integer_t>::block_cyclic_to_sequential
-  (DenseM_t& x, DistM_t*& x_dist) {
+  (DenseM_t& x, DistM_t*& x_dist) const {
     auto P = mpi_nprocs(_comm);
     auto cnts = new int[2*P];
     auto disp = cnts + P;
@@ -203,10 +206,15 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  EliminationTreeMPI<scalar_t,integer_t>::multifrontal_solve(DenseM_t& x) {
+  EliminationTreeMPI<scalar_t,integer_t>::multifrontal_solve
+  (DenseM_t& x) const {
     DistM_t* x_dist;
     sequential_to_block_cyclic(x, x_dist);
-    this->_etree_root->multifrontal_solve(x, x_dist, this->_wmem);
+
+    std::cout << "TODO remove this nullptr!!!, rewrite the dist solve!!"
+              << std::endl;
+    scalar_t* wmem = nullptr;
+    this->_root->multifrontal_solve(x, x_dist, wmem);
     block_cyclic_to_sequential(x, x_dist);
     delete[] x_dist;
   }
@@ -214,7 +222,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPI<scalar_t,integer_t>::symbolic_factorization
   (const SpMat_t& A, const Tree_t& tree, const integer_t sep,
-   std::vector<integer_t>* upd, float* subtree_work, int depth) {
+   std::vector<integer_t>* upd, float* subtree_work, int depth) const {
     auto chl = tree.lch()[sep];
     auto chr = tree.rch()[sep];
     if (depth < params::task_recursion_cutoff_level) {

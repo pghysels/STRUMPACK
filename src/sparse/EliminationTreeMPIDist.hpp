@@ -196,9 +196,10 @@ namespace strumpack {
     MPI_Comm tree_comm;
     if (_P>1) MPI_Comm_dup(this->_comm, &tree_comm);
     else tree_comm = this->_comm;
-    this->_etree_root = proportional_mapping
-      (opts, local_upd, dist_upd, local_subtree_work, dist_subtree_work,
-       _nd.sep_tree->root(), 0, _P, 0, 0, tree_comm, true, 0);
+    this->_root = std::unique_ptr<F_t>
+      (proportional_mapping
+       (opts, local_upd, dist_upd, local_subtree_work, dist_subtree_work,
+        _nd.sep_tree->root(), 0, _P, 0, 0, tree_comm, true, 0));
     MPI_Pcontrol(-1, "proportional_mapping");
 
     MPI_Pcontrol(1, "block_row_A_to_prop_A");
@@ -360,7 +361,7 @@ namespace strumpack {
   EliminationTreeMPIDist<scalar_t,integer_t>::multifrontal_factorization
   (const CompressedSparseMatrix<scalar_t,integer_t>& A,
    const SPOptions<scalar_t>& opts) {
-    this->_etree_root->multifrontal_factorization(_Aprop, opts);
+    this->_root->multifrontal_factorization(_Aprop, opts);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -439,8 +440,11 @@ namespace strumpack {
     DenseMW_t Xloc
       (_Aprop.size(), 1, x_loc-_local_range.first,
        _local_range.second - _local_range.first);
-    this->_etree_root->multifrontal_solve
-      (Xloc, x_dist, this->_wmem);
+
+    std::cout << "TODO remove this nullptr!!!, rewrite the dist solve!!"
+              << std::endl;
+    scalar_t* wmem = nullptr;
+    this->_root->multifrontal_solve(Xloc, x_dist, wmem);
 
     std::swap(rbuf, sbuf);
     rcnts = ibuf;

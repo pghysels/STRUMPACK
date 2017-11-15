@@ -190,7 +190,7 @@ namespace strumpack {
 #endif
       piv = F11.LU();
       if (this->dim_upd()) {
-        F12.permute_rows_fwd(piv);
+        F12.laswp(piv, true); //permute_rows_fwd(piv);
         trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11, F12);
         trsm(Side::R, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11, F21);
         gemm(Trans::N, Trans::N, scalar_t(-1.), F21, F12, scalar_t(1.), F22);
@@ -229,7 +229,7 @@ namespace strumpack {
     this->look_left(b_dist[this->sep], wmem);
     if (this->dim_sep()) {
       TIMER_TIME(TaskType::SOLVE_LOWER, 0, t_s);
-      b_dist[this->sep].permute_rows_fwd(piv);
+      b_dist[this->sep].laswp(piv, true); //permute_rows_fwd(piv);
       trsv(UpLo::L, Trans::N, Diag::U, F11, b_dist[this->sep]);
       if (this->dim_upd())
         gemv(Trans::N, scalar_t(-1.), F21, b_dist[this->sep],

@@ -46,6 +46,7 @@ namespace strumpack {
     : public CompressedSparseMatrix<scalar_t,integer_t> {
     using DistM_t = DistributedMatrix<scalar_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
+    using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using real_t = typename RealType<scalar_t>::value_type;
 
   public:
@@ -59,8 +60,11 @@ namespace strumpack {
     CSRMatrix<scalar_t,integer_t>& operator=
     (CSRMatrix<scalar_t,integer_t> A);
 
+    void spmv(const DenseM_t& x, DenseM_t& y) const override;
+    void omp_spmv(const DenseM_t& x, DenseM_t& y) const override;
     void spmv(const scalar_t* x, scalar_t* y) const override;
     void omp_spmv(const scalar_t* x, scalar_t* y) const override;
+
     void apply_scaling
     (const std::vector<scalar_t>& Dr,
      const std::vector<scalar_t>& Dc) override;
@@ -68,6 +72,8 @@ namespace strumpack {
     (const std::vector<integer_t>& perm) override;
     real_t max_scaled_residual
     (const scalar_t* x, const scalar_t* b) const override;
+    real_t max_scaled_residual
+    (const DenseM_t& x, const DenseM_t& b) const override;
     void strumpack_mc64
     (int_t job, int_t* num, integer_t* perm, int_t liw, int_t* iw, int_t ldw,
      double* dw, int_t* icntl, int_t* info) override;
@@ -300,64 +306,91 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::spmv
   (const scalar_t* x, scalar_t* y) const {
-    for (integer_t row=0; row<this->_n; row++) {
-      scalar_t yrow = scalar_t(0.);
-      for (integer_t j=this->_ptr[row]; j<this->_ptr[row+1]; j++)
-        yrow += this->_val[j] * x[this->_ind[j]];
-      y[row] = yrow;
+    auto X = ConstDenseMatrixWrapperPtr(this->_n, 1, x, this->_n);
+    DenseMW_t Y(this->_n, 1, y, this->_n);
+    spmv(*X, Y);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  CSRMatrix<scalar_t,integer_t>::spmv
+  (const DenseM_t& x, DenseM_t& y) const {
+    assert(x.cols() == y.cols());
+    assert(x.rows() == std::size_t(this->_n));
+    assert(y.rows() == std::size_t(this->_n));
+    const integer_t m = this->_n;
+    const integer_t n = x.cols();
+    y.zero();
+    for (integer_t r=0; r<m; r++) {
+      const auto hij = this->_ptr[r+1];
+      for (integer_t j=this->_ptr[r]; j<hij; j++) {
+        const auto v = this->_val[j];
+        const auto rj = this->_ind[j];
+        for (integer_t c=0; c<n; c++)
+          y(r,c) += v * x(rj,c);
+      }
     }
-    STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*
-                    static_cast<long long int>
-                    (2.*double(this->nnz())-double(this->size())));
-    STRUMPACK_BYTES((sizeof(scalar_t)*4+sizeof(integer_t))*
-                    static_cast<long long int>(this->nnz())
-                    + sizeof(integer_t)*static_cast<long long int>(this->_n));
+    STRUMPACK_FLOPS(this->spmv_flops() * x.cols());
+    STRUMPACK_BYTES(this->spmv_bytes() * x.cols());
   }
 
 #if defined(__INTEL_MKL__)
   template<> void CSRMatrix<float>::spmv(const float* x, float* y) const {
     char trans = 'N';
     mkl_cspblas_scsrgemv(&no, &n, this->_val, this->_ptr, this->_ind, x, y);
-    STRUMPACK_FLOPS(static_cast<long long int>
-                    (2.*double(this->nnz())-double(this->size())));
+    STRUMPACK_FLOPS(this->spmv_flops());
+    STRUMPACK_BYTES(this->spmv_bytes());
   }
   template<> void CSRMatrix<double>::spmv(const double* x, double* y) const {
     char trans = 'N';
     mkl_cspblas_dcsrgemv(&no, &n, this->_val, this->_ptr, this->_ind, x, y);
-    STRUMPACK_FLOPS(static_cast<long long int>
-                    (2.*double(this->nnz())-double(this->size())));
+    STRUMPACK_FLOPS(this->spmv_flops());
+    STRUMPACK_BYTES(this->spmv_bytes());
   }
   template<> void CSRMatrix<std::complex<float>>::spmv
   (const std::complex<float>* x, std::complex<float>* y) const {
     char trans = 'N';
     mkl_cspblas_ccsrgemv(&no, &n, this->_val, this->_ptr, this->_ind, x, y);
-    STRUMPACK_FLOPS(4*static_cast<long long int>
-                    (2.*double(this->nnz())-double(this->size())));
+    STRUMPACK_FLOPS(this->spmv_flops());
+    STRUMPACK_BYTES(this->spmv_bytes());
   }
   template<> void CSRMatrix<std::complex<double>>::spmv
-  (const std::complex<double>* x, c_double* y) const {
+  (const std::complex<double>* x, std::complex<double>* y) const {
     char trans = 'N';
     mkl_cspblas_zcsrgemv(&no, &n, this->_val, this->_ptr, this->_ind, x, y);
-    STRUMPACK_FLOPS(4*static_cast<long long int>
-                    (2.*double(this->nnz())-double(this->size())));
+    STRUMPACK_FLOPS(this->spmv_flops());
+    STRUMPACK_BYTES(this->spmv_bytes());
   }
 #endif
 
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::omp_spmv
   (const scalar_t* x, scalar_t* y) const {
+    auto X = ConstDenseMatrixWrapperPtr(this->_n, 1, x, this->_n);
+    DenseMW_t Y(this->_n, 1, y, this->_n);
+    omp_spmv(*X, Y);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  CSRMatrix<scalar_t,integer_t>::omp_spmv
+  (const DenseM_t& x, DenseM_t& y) const {
+    assert(x.cols() == y.cols());
+    assert(x.rows() == std::size_t(this->_n));
+    assert(y.rows() == std::size_t(this->_n));
+    const integer_t m = this->_n;
+    const integer_t n = x.cols();
+    y.zero();
 #pragma omp parallel for
-    for (integer_t row=0; row<this->_n; ++row) {
-      scalar_t yrow = scalar_t(0.);
-      for (integer_t j=this->_ptr[row]; j<this->_ptr[row+1]; ++j)
-        yrow += this->_val[j] * x[this->_ind[j]];
-      y[row] = yrow;
+    for (integer_t r=0; r<m; r++) {
+      const auto hij = this->_ptr[r+1];
+      for (integer_t j=this->_ptr[r]; j<hij; j++) {
+        const auto v = this->_val[j];
+        const auto rj = this->_ind[j];
+        for (integer_t c=0; c<n; c++)
+          y(r,c) += v * x(rj,c);
+      }
     }
-    STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*static_cast<long long int>
-                    (2.*double(this->nnz())-double(this->size())));
-    STRUMPACK_BYTES((sizeof(scalar_t)*4+sizeof(integer_t))*
-                    static_cast<long long int>(this->nnz())
-                    + sizeof(integer_t)*static_cast<long long int>(this->_n));
+    STRUMPACK_FLOPS(this->spmv_flops() * x.cols());
+    STRUMPACK_BYTES(this->spmv_bytes() * x.cols());
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -401,8 +434,8 @@ namespace strumpack {
   CSRMatrix<scalar_t,integer_t>::extract_separator
   (integer_t sep_end, const std::vector<std::size_t>& I,
    const std::vector<std::size_t>& J, DenseM_t& B, int depth) const {
-    integer_t m = I.size();
-    integer_t n = J.size();
+    const integer_t m = I.size();
+    const integer_t n = J.size();
     if (m == 0 || n == 0) return;
     for (integer_t i=0; i<m; i++) {
       integer_t r = I[i];
@@ -427,8 +460,8 @@ namespace strumpack {
   (integer_t sep_end, const std::vector<std::size_t>& I,
    const std::vector<std::size_t>& J, DistM_t& B, MPI_Comm comm) const {
     if (!B.active()) return;
-    integer_t m = I.size();
-    integer_t n = J.size();
+    const integer_t m = I.size();
+    const integer_t n = J.size();
     if (m == 0 || n == 0) return;
     B.zero();
     for (integer_t i=0; i<m; i++) {
@@ -638,8 +671,9 @@ namespace strumpack {
     for (integer_t j=0; j<this->_n; j++)
       for (integer_t i=this->_ptr[j]; i<this->_ptr[j+1]; i++)
         this->_val[i] = this->_val[i] * Dr[j] * Dc[this->_ind[i]];
-    STRUMPACK_FLOPS((is_complex<scalar_t>()?6:1)*
-                    static_cast<long long int>(2.*double(this->nnz())));
+    STRUMPACK_FLOPS
+      ((is_complex<scalar_t>()?6:1)*
+       static_cast<long long int>(2.*double(this->nnz())));
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -697,11 +731,13 @@ namespace strumpack {
    integer_t col, integer_t nr_cols) const {
     const auto rhi = std::min(row+nr_rows, this->_n);
     for (integer_t r=row; r<rhi; r++) {
-      integer_t j = this->_ptr[r];
-      while (j<this->_ptr[r+1] && this->_ind[j] < col) j++;
-      for ( ; j<this->_ptr[r+1]; j++) {
+      auto j = this->_ptr[r];
+      const auto hij = this->_ptr[r+1];
+      while (j<hij && this->_ind[j] < col) j++;
+      for ( ; j<hij; j++) {
         integer_t c = this->_ind[j];
-        if (c < col+nr_cols) F[r-row + (c-col)*ldF] = this->_val[j];
+        if (c < col+nr_cols)
+          F[r-row + (c-col)*ldF] = this->_val[j];
         else break;
       }
     }
@@ -714,12 +750,14 @@ namespace strumpack {
    const integer_t* upd) const {
     for (integer_t r=row; r<std::min(row+nr_rows, this->_n); r++) {
       integer_t upd_pos = 0;
-      for (integer_t j=this->_ptr[r]; j<this->_ptr[r+1]; j++) {
-        integer_t c = this->_ind[j];
+      const auto hij = this->_ptr[r+1];
+      for (integer_t j=this->_ptr[r]; j<hij; j++) {
+        auto c = this->_ind[j];
         if (c >= col) {
           while (upd_pos<nr_cols && upd[upd_pos]<c) upd_pos++;
           if (upd_pos == nr_cols) break;
-          if (upd[upd_pos] == c) F[r-row + upd_pos*ldF] = this->_val[j];
+          if (upd[upd_pos] == c)
+            F[r-row + upd_pos*ldF] = this->_val[j];
         }
       }
     }
@@ -732,12 +770,14 @@ namespace strumpack {
    const integer_t* upd) const {
     auto rhi = std::min(row+nr_rows, this->_n);
     for (integer_t i=row; i<rhi; i++) {
-      integer_t r = upd[i-row];
-      integer_t j = this->_ptr[r];
-      while (j<this->_ptr[r+1] && this->_ind[j] < col) j++;
-      for ( ; j<this->_ptr[r+1]; j++) {
-        integer_t c = this->_ind[j];
-        if (c < col+nr_cols) F[i-row + (c-col)*ldF] = this->_val[j];
+      const auto r = upd[i-row];
+      auto j = this->_ptr[r];
+      const auto hij = this->_ptr[r+1];
+      while (j<hij && this->_ind[j] < col) j++;
+      for ( ; j<hij; j++) {
+        auto c = this->_ind[j];
+        if (c < col+nr_cols)
+          F[i-row + (c-col)*ldF] = this->_val[j];
         else break;
       }
     }
@@ -746,19 +786,35 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> typename
   RealType<scalar_t>::value_type
   CSRMatrix<scalar_t,integer_t>::max_scaled_residual
-  (const scalar_t* x, const scalar_t* b) const {
-    real_t m = real_t(0.);
-#pragma omp parallel for reduction(max:m)
-    for (integer_t i=0; i<this->_n; i++) {
-      auto true_res = b[i];
-      auto abs_res = std::abs(b[i]);
-      for (integer_t j=this->_ptr[i]; j<this->_ptr[i+1]; ++j) {
-        true_res -= this->_val[j] * x[this->_ind[j]];
-        abs_res += std::abs(this->_val[j]) * std::abs(x[this->_ind[j]]);
+  (const DenseM_t& x, const DenseM_t& b) const {
+    real_t res = real_t(0.);
+    const integer_t m = this->_n;
+    const integer_t n = x.cols();
+    for (integer_t c=0; c<n; c++) {
+#pragma omp parallel for reduction(max:res)
+      for (integer_t r=0; r<m; r++) {
+        auto true_res = b(r, c);
+        auto abs_res = std::abs(b(r, c));
+        const auto hij = this->_ptr[r+1];
+        for (integer_t j=this->_ptr[r]; j<hij; ++j) {
+          const auto v = this->_val[j];
+          const auto rj = this->_ind[j];
+          true_res -= v * x(rj, c);
+          abs_res += std::abs(v) * std::abs(x(rj,c));
+        }
+        res = std::max(res, std::abs(true_res) / std::abs(abs_res));
       }
-      m = std::max(m, std::abs(true_res) / std::abs(abs_res));
     }
-    return m;
+    return res;
+  }
+
+  template<typename scalar_t,typename integer_t> typename
+  RealType<scalar_t>::value_type
+  CSRMatrix<scalar_t,integer_t>::max_scaled_residual
+  (const scalar_t* x, const scalar_t* b) const {
+    auto X = ConstDenseMatrixWrapperPtr(this->_n, 1, x, this->_n);
+    auto B = ConstDenseMatrixWrapperPtr(this->_n, 1, b, this->_n);
+    return max_scaled_residual(*X, *B);
   }
 
 } // end namespace strumpack

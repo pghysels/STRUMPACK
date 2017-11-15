@@ -282,7 +282,6 @@ namespace strumpack {
     this->perf_counters_start();
     t.start();
     auto n_local = _mat_mpi->local_rows();
-    tree()->allocate_solve_work_memory();
     this->_Krylov_its = 0;
 
     auto bcopy = new scalar_t[n_local];
@@ -341,7 +340,6 @@ namespace strumpack {
     if (this->_opts.mc64job() == 5)
       x_mult_y(n_local, x, this->_mc64_Dc.data());
 
-    tree()->delete_solve_work_memory();
     t.stop();
     this->perf_counters_stop("DIRECT/GMRES solve");
     this->print_solve_stats(t);

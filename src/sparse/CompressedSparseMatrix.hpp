@@ -88,8 +88,12 @@ namespace strumpack {
     inline void set_symm_sparse(bool symm_sparse=true) {
       _symm_sparse = symm_sparse;
     }
+
+    virtual void spmv(const DenseM_t& x, DenseM_t& y) const = 0;
+    virtual void omp_spmv(const DenseM_t& x, DenseM_t& y) const = 0;
     virtual void spmv(const scalar_t* x, scalar_t* y) const = 0;
     virtual void omp_spmv(const scalar_t* x, scalar_t* y) const = 0;
+
     virtual void permute(const integer_t* iorder, const integer_t* order);
     virtual void permute
     (const std::vector<integer_t>& iorder, std::vector<integer_t>& order) {
@@ -115,6 +119,8 @@ namespace strumpack {
     virtual int read_matrix_market(const std::string& filename) = 0;
     virtual real_t max_scaled_residual
     (const scalar_t* x, const scalar_t* b) const = 0;
+    virtual real_t max_scaled_residual
+    (const DenseM_t& x, const DenseM_t& b) const = 0;
     virtual void strumpack_mc64
     (int_t job, int_t* num, integer_t* perm, int_t liw, int_t* iw, int_t ldw,
      double* dw, int_t* icntl, int_t* info) {}
@@ -167,6 +173,21 @@ namespace strumpack {
     inline void set_ind(integer_t* new_ind) { delete[] _ind; _ind = new_ind; }
     inline void set_val(scalar_t* new_val) { delete[] _val; _val = new_val; }
     virtual bool is_mpi_root() const { return mpi_root(); }
+
+    long long spmv_flops() const {
+      return (is_complex<scalar_t>() ? 4 : 1 ) *
+        (2ll * this->_nnz - this->_n);
+    }
+    long long spmv_bytes() const {
+      // read   ind  nnz  integer_t
+      //        val  nnz  scalar_t
+      //        ptr  n    integer_t
+      //        x    n    scalar_t
+      //        y    n    scalar_t
+      // write  y    n    scalar_t
+      return (sizeof(scalar_t) * 3 + sizeof(integer_t)) * this->_n
+        + (sizeof(scalar_t) + sizeof(integer_t)) * this->_nnz;
+    }
   };
 
   template<typename scalar_t,typename integer_t>
@@ -174,20 +195,6 @@ namespace strumpack {
     : _n(0), _nnz(0), _ptr(NULL), _ind(NULL), _val(NULL),
       _symm_sparse(false) {
   }
-
-  // template<typename scalar_t,typename integer_t> void
-  // CompressedSparseMatrix<scalar_t,integer_t>::clone_data
-  // (const CompressedSparseMatrix<scalar_t,integer_t>& A) const {
-  //   _n = A.size();
-  //   _nnz = A.nnz();
-  //   _symm_sparse = A.symm_sparse();
-  //   _ptr = new integer_t[_n+1];
-  //   _ind = new integer_t[_nnz];
-  //   _val = new scalar_t[_nnz];
-  //   if (A.get_ptr()) std::copy(A.get_ptr(), A.get_ptr()+_n+1, _ptr);
-  //   if (A.get_ind()) std::copy(A.get_ind(), A.get_ind()+_nnz, _ind);
-  //   if (A.get_val()) std::copy(A.get_val(), A.get_val()+_nnz, _val);
-  // }
 
   template<typename scalar_t,typename integer_t>
   CompressedSparseMatrix<scalar_t,integer_t>::CompressedSparseMatrix
@@ -433,7 +440,7 @@ namespace strumpack {
       if (is_mpi_root()) std::cerr << "ERROR: could not read file";
       exit(1);
     }
-    int max_cline = 256;
+    const int max_cline = 256;
     char cline[max_cline];
     if (fgets(cline, max_cline, fp) == NULL) {
       if (is_mpi_root())

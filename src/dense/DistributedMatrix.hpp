@@ -157,8 +157,8 @@ namespace strumpack {
     virtual void resize(std::size_t m, std::size_t n);
     virtual void hconcat(const DistributedMatrix<scalar_t>& b);
     DistributedMatrix<scalar_t> transpose() const;
-    void permute_rows_fwd(const std::vector<int>& P);
-    void permute_rows_bwd(const std::vector<int>& P);
+
+    void laswp(const std::vector<int>& P, bool fwd);
 
     DistributedMatrix<scalar_t>
     extract_rows(const std::vector<std::size_t>& Ir, MPI_Comm comm) const;
@@ -659,7 +659,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t> void
-  DistributedMatrix<scalar_t>::permute_rows_bwd(const std::vector<int>& P) {
+  DistributedMatrix<scalar_t>::laswp(const std::vector<int>& P, bool fwd) {
     if (!active()) return;
     int descip[9];
     scalapack::descset
@@ -667,20 +667,7 @@ namespace strumpack {
        ctxt(), MB() + scalapack::numroc
        (rows(), MB(), prow(), 0, prows()));
     scalapack::plapiv
-      ('B', 'R', 'C', rows(), cols(), data(), I(), J(), desc(),
-       P.data(), 1, 1, descip, NULL);
-  }
-
-  template<typename scalar_t> void
-  DistributedMatrix<scalar_t>::permute_rows_fwd(const std::vector<int>& P) {
-    if (!active()) return;
-    int descip[9];
-    scalapack::descset
-      (descip, rows() + MB()*prows(), 1, MB(), 1, 0, pcol(),
-       ctxt(), MB() + scalapack::numroc
-       (rows(), MB(), prow(), 0, prows()));
-    scalapack::plapiv
-      ('F', 'R', 'C', rows(), cols(), data(), I(), J(), desc(),
+      (fwd ? 'F' : 'B', 'R', 'C', rows(), cols(), data(), I(), J(), desc(),
        P.data(), 1, 1, descip, NULL);
   }
 

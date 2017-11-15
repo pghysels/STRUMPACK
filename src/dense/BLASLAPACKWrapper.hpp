@@ -74,9 +74,9 @@ namespace strumpack {
         + (beta != scalar_t(0) && beta != scalar_t(1) &&
            beta != scalar_t(-1)) * n * (is_complex<scalar_t>() ? 6 : 1);
     }
-    template<typename scalar> inline void
-    axpby(int n, scalar alpha, scalar* x, int incx,
-          scalar beta, scalar* y, int incy) {
+    template<typename scalar> inline void axpby
+    (int n, scalar alpha, const scalar* x, int incx,
+     scalar beta, scalar* y, int incy) {
       if (incx==1 && incy==1) {
 #pragma omp parallel for
         for (int i=0; i<n; i++)
@@ -462,6 +462,17 @@ namespace strumpack {
       void FC_GLOBAL(zlaswp,ZLASWP)
         (int* n, std::complex<double>* a, int* lda, int* k1, int* k2,
          const int* ipiv, int* incx);
+
+      void FC_GLOBAL(slapmr,SLAPMR)
+        (int* fwd, int* m, int* n, float* a, int* lda, const int* ipiv);
+      void FC_GLOBAL(dlapmr,DLAPMR)
+        (int* fwd, int* m, int* n, double* a, int* lda, const int* ipiv);
+      void FC_GLOBAL(clapmr,CLAPMR)
+        (int* fwd, int* m, int* n, std::complex<float>* a, int* lda,
+         const int* ipiv);
+      void FC_GLOBAL(zlapmr,ZLAPMR)
+        (int* fwd, int* m, int* n, std::complex<double>* a, int* lda,
+         const int* ipiv);
 
       void FC_GLOBAL(slaset,SLASET)
         (char* s, int* m, int* n, float* alpha,
@@ -1065,19 +1076,19 @@ namespace strumpack {
     inline long long nrm2_flops(long long n) {
       return n * 2;
     }
-    inline float nrm2(int n, float* x, int incx) {
+    inline float nrm2(int n, const float* x, int incx) {
       STRUMPACK_FLOPS(nrm2_flops(n));
       return FC_GLOBAL(snrm2,SNRM2)(&n, x, &incx);
     }
-    inline double nrm2(int n, double* x, int incx) {
+    inline double nrm2(int n, const double* x, int incx) {
       STRUMPACK_FLOPS(nrm2_flops(n));
       return FC_GLOBAL(dnrm2,DNRM2)(&n, x, &incx);
     }
-    inline float nrm2(int n, std::complex<float>* x, int incx) {
+    inline float nrm2(int n, const std::complex<float>* x, int incx) {
       STRUMPACK_FLOPS(4*nrm2_flops(n));
       return FC_GLOBAL(scnrm2,SCNRM2)(&n, x, &incx);
     }
-    inline double nrm2(int n, std::complex<double>* x, int incx) {
+    inline double nrm2(int n, const std::complex<double>* x, int incx) {
       STRUMPACK_FLOPS(4*nrm2_flops(n));
       return FC_GLOBAL(dznrm2,DZNRM2)(&n, x, &incx);
     }
@@ -1184,6 +1195,37 @@ namespace strumpack {
      const int* ipiv, int incx) {
       FC_GLOBAL(zlaswp,ZLASWP)(&n, a, &lda, &k1, &k2, ipiv, &incx);
       STRUMPACK_BYTES(2*8*laswp_moves(n,k1,k2));
+    }
+
+
+    inline long long lapmr_moves(long long n, long long m) {
+      return 2 * m * n;
+    }
+    inline void lapmr
+    (bool fwd, int m, int n, float* a, int lda, const int* ipiv) {
+      int forward = fwd ? 1 : 0;
+      FC_GLOBAL(slapmr,SLAPMR)(&forward, &m, &n, a, &lda, ipiv);
+      STRUMPACK_BYTES(4*lapmr_moves(n,m));
+    }
+    inline void lapmr
+    (bool fwd, int m, int n, double* a, int lda, const int* ipiv) {
+      int forward = fwd ? 1 : 0;
+      FC_GLOBAL(dlapmr,DLAPMR)(&forward, &m, &n, a, &lda, ipiv);
+      STRUMPACK_BYTES(8*lapmr_moves(n,m));
+    }
+    inline void lapmr
+    (bool fwd, int m, int n, std::complex<float>* a, int lda,
+     const int* ipiv) {
+      int forward = fwd ? 1 : 0;
+      FC_GLOBAL(clapmr,CLAPMR)(&forward, &m, &n, a, &lda, ipiv);
+      STRUMPACK_BYTES(2*4*lapmr_moves(n,m));
+    }
+    inline void lapmr
+    (bool fwd, int m, int n, std::complex<double>* a, int lda,
+     const int* ipiv) {
+      int forward = fwd ? 1 : 0;
+      FC_GLOBAL(zlapmr,ZLAPMR)(&forward, &m, &n, a, &lda, ipiv);
+      STRUMPACK_BYTES(2*8*lapmr_moves(n,m));
     }
 
 

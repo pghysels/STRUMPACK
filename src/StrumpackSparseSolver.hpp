@@ -204,6 +204,9 @@ namespace strumpack {
     virtual ReturnCode solve
     (const scalar_t* b, scalar_t* x, bool use_initial_guess=false);
 
+    virtual ReturnCode solve
+    (const DenseM_t& b, DenseM_t& x, bool use_initial_guess=false);
+
     SPOptions<scalar_t>& options() { return _opts; }
     const SPOptions<scalar_t>& options() const { return _opts; }
     void set_from_options() { _opts.set_from_command_line(); }
@@ -249,7 +252,7 @@ namespace strumpack {
     }
     void print_solve_stats(TaskTimer& t) const;
     virtual void perf_counters_start();
-    virtual void perf_counters_stop(std::string s);
+    virtual void perf_counters_stop(const std::string& s);
     virtual void synchronize() {}
     virtual void communicate_ordering() {}
 
@@ -406,7 +409,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::perf_counters_stop
-  (std::string s) {
+  (const std::string& s) {
 #if defined(HAVE_PAPI)
     float mflops = 0., rtime = 0., ptime = 0.;
     long_long flpops = 0;
@@ -718,6 +721,19 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> ReturnCode
   StrumpackSparseSolver<scalar_t,integer_t>::solve
   (const scalar_t* b, scalar_t* x, bool use_initial_guess) {
+    auto N = matrix()->size();
+    auto B = ConstDenseMatrixWrapperPtr(N, 1, b, N);
+    DenseMW_t X(N, 1, x, N);
+    return solve(*B, X, use_initial_guess);
+  }
+
+  // TODO make this const
+  //  Krylov its and flops, bytes, time are modified!!
+  // pass those as a pointer to a struct ??
+  // this can also call factor if not already factored!!
+  template<typename scalar_t,typename integer_t> ReturnCode
+  StrumpackSparseSolver<scalar_t,integer_t>::solve
+  (const DenseM_t& b, DenseM_t& x, bool use_initial_guess) {
     if (!_factored) {
       ReturnCode ierr = factor();
       if (ierr != ReturnCode::SUCCESS) return ierr;
@@ -725,64 +741,67 @@ namespace strumpack {
     TaskTimer t("solve");
     perf_counters_start();
     t.start();
-    auto N = matrix()->size();
 
-    auto b_loc = new scalar_t[N];
+    integer_t N = matrix()->size();
+    assert(N < std::numeric_limits<int>::max());
+    std::vector<int> intIP(N);
+    for (integer_t i=0; i<N; i++)
+      intIP[i] = reordering()->iperm[i] + 1;
+    std::vector<int> int_mc64_cperm;
+    if (_opts.mc64job() != 0) {
+      int_mc64_cperm.resize(N);
+      for (integer_t i=0; i<N; i++)
+        int_mc64_cperm[i] = _mc64_cperm[i] + 1;
+    }
+
+    auto b_loc = b;
     if (_opts.mc64job() == 5)
-      x_mult_y(N, b, _mc64_Dr.data(), b_loc);
-    else {
-      std::copy(b, b+N, b_loc);
-      STRUMPACK_BYTES(sizeof(scalar_t)*static_cast<long long int>(N)*3);
-    }
-    permute_vector(N, b_loc, reordering()->iperm, 1);
+      b_loc.scale_rows(_mc64_Dr);
+    b_loc.lapmr(intIP, true);
 
-    if (!use_initial_guess) {
-      std::fill(x, x+N, scalar_t(0.));
-      STRUMPACK_BYTES(sizeof(scalar_t)*static_cast<long long int>(N)*2);
-    } else {
-      if (_opts.mc64job() == 5) x_div_y(N, x, _mc64_Dc.data());
-      if (_opts.mc64job() != 0) permute_vector(N, x, _mc64_cperm, 1);
-      permute_vector(N, x, reordering()->iperm, 1);
+    if (use_initial_guess &&
+        _opts.Krylov_solver() != KrylovSolver::DIRECT) {
+      if (_opts.mc64job() == 5)
+        x.div_rows(_mc64_Dc);
+      if (_opts.mc64job() != 0)
+        x.lapmr(int_mc64_cperm, true);
+      x.lapmr(intIP, true);
     }
+
     _Krylov_its = 0;
-    tree()->allocate_solve_work_memory(); // for 1 vector
 
     auto gmres_solve = [&](std::function<void(scalar_t*)> preconditioner) {
       GMRes<scalar_t,integer_t>
-      (matrix(), preconditioner, N, x, b_loc,
+      (*matrix(), preconditioner, x.rows(), x.data(), b_loc.data(),
        _opts.rel_tol(), _opts.abs_tol(), _Krylov_its, _opts.maxit(),
        _opts.gmres_restart(), _opts.GramSchmidt_type(),
        use_initial_guess, _opts.verbose() && _is_root);
     };
     auto bicgstab_solve = [&](std::function<void(scalar_t*)> preconditioner) {
       BiCGStab<scalar_t,integer_t>
-      (matrix(), preconditioner, N, x, b_loc,
-       _opts.rel_tol(), _opts.abs_tol(),
-       _Krylov_its, _opts.maxit(), use_initial_guess,
-       _opts.verbose() && _is_root);
+      (*matrix(), preconditioner, x.rows(), x.data(), b_loc.data(),
+       _opts.rel_tol(), _opts.abs_tol(), _Krylov_its, _opts.maxit(),
+       use_initial_guess, _opts.verbose() && _is_root);
     };
-    auto loc_tree = tree();
-
-    auto MFsolve = [loc_tree,N](scalar_t* x) {
-      DenseMW_t X(N, 1, x, N);
-      loc_tree->multifrontal_solve(X);
+    auto MFsolve = [&](scalar_t* w) {
+      DenseMW_t X(x.rows(), x.cols(), w, x.rows());
+      tree()->multifrontal_solve(X);
     };
     auto refine = [&]() {
       IterativeRefinement<scalar_t,integer_t>
-      (matrix(), MFsolve, N, x, b_loc, _opts.rel_tol(), _opts.abs_tol(),
-       _Krylov_its, _opts.maxit(), use_initial_guess,
-       _opts.verbose() && _is_root);
+      (*matrix(), MFsolve, x.rows(), x.data(), b_loc.data(),
+       _opts.rel_tol(), _opts.abs_tol(), _Krylov_its, _opts.maxit(),
+       use_initial_guess, _opts.verbose() && _is_root);
     };
+
     switch (_opts.Krylov_solver()) {
     case KrylovSolver::AUTO: {
       if (_opts.use_HSS()) gmres_solve(MFsolve);
       else refine();
     }; break;
     case KrylovSolver::DIRECT: {
-      std::copy(b_loc, b_loc+N, x);
-      // tree()->multifrontal_solve(x);
-      MFsolve(x);
-      STRUMPACK_BYTES(sizeof(scalar_t)*static_cast<long long int>(N)*3);
+      x = b_loc;
+      tree()->multifrontal_solve(x);
     }; break;
     case KrylovSolver::REFINE: {
       refine();
@@ -801,12 +820,11 @@ namespace strumpack {
     }; break;
     }
 
-    delete[] b_loc;
-    tree()->delete_solve_work_memory();
-
-    permute_vector(N, x, reordering()->perm, 1);
-    if (_opts.mc64job() != 0) permute_vector(N, x, _mc64_cperm, 0);
-    if (_opts.mc64job() == 5) x_mult_y(N, x, _mc64_Dc.data());
+    x.lapmr(intIP, false);
+    if (_opts.mc64job() != 0)
+      x.lapmr(int_mc64_cperm, false);
+    if (_opts.mc64job() == 5)
+      x.scale_rows(_mc64_Dc);
 
     t.stop();
     perf_counters_stop("DIRECT/GMRES solve");

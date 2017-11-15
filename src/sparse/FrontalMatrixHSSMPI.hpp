@@ -93,7 +93,6 @@ namespace strumpack {
     void extract_CB_sub_matrix_2d
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
      DistM_t& B) const override;
-    void solve_workspace_query(integer_t& mem_size) override;
 
     long long node_factor_nonzeros() const;
     integer_t maximum_rank(int task_depth) const;
@@ -449,21 +448,6 @@ namespace strumpack {
         TIMER_STOP(t_fact);
         params::ULV_factor_flops += params::flops - f0;
       }
-    }
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSSMPI<scalar_t,integer_t>::solve_workspace_query
-  (integer_t& mem_size) {
-    if (this->lchild) this->lchild->solve_workspace_query(mem_size);
-    if (this->rchild) this->rchild->solve_workspace_query(mem_size);
-    this->p_wmem = mem_size;
-    if (_H && _H->ctxt() != -1) {
-      int np_rows, np_cols, p_row, p_col;
-      scalapack::Cblacs_gridinfo
-        (_H->ctxt(), &np_rows, &np_cols, &p_row, &p_col);
-      mem_size += scalapack::numroc
-        (this->dim_upd(), DistM_t::default_NB, p_row, 0, np_rows);
     }
   }
 

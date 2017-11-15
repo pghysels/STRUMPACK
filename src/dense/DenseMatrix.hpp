@@ -1,3 +1,31 @@
+/*
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
+ *
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
+ *
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly.  Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government is granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
+ *
+ * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
+ *             (Lawrence Berkeley National Lab, Computational Research
+ *             Division).
+ *
+ */
 #ifndef DENSE_MATRIX_HPP
 #define DENSE_MATRIX_HPP
 
@@ -32,10 +60,11 @@ namespace strumpack {
   public:
     DenseMatrix();
     DenseMatrix(std::size_t m, std::size_t n);
-    DenseMatrix(std::size_t m, std::size_t n, const scalar_t* D,
-                std::size_t ld);
-    DenseMatrix(std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& D,
-                std::size_t i, std::size_t j);
+    DenseMatrix
+    (std::size_t m, std::size_t n, const scalar_t* D, std::size_t ld);
+    DenseMatrix
+    (std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& D,
+     std::size_t i, std::size_t j);
     DenseMatrix(const DenseMatrix<scalar_t>& D);
     DenseMatrix(DenseMatrix<scalar_t>&& D);
     virtual ~DenseMatrix();
@@ -59,64 +88,78 @@ namespace strumpack {
 
     void print() const { print("A"); }
     void print(std::string name, bool all=false, int width=8) const;
-    void print_to_file(std::string name, std::string filename,
-                       int width=8) const;
+    void print_to_file
+    (std::string name, std::string filename, int width=8) const;
     void random();
-    void random(random::RandomGeneratorBase<typename RealType<scalar_t>::
-                value_type>& rgen);
+    void random
+    (random::RandomGeneratorBase<typename RealType<scalar_t>::
+     value_type>& rgen);
     void fill(scalar_t v);
     void zero();
     void eye();
     virtual void clear();
     void resize(std::size_t m, std::size_t n);
     void hconcat(const DenseMatrix<scalar_t>& b);
-    void copy(const DenseMatrix<scalar_t>& B, std::size_t i=0,
-              std::size_t j=0);
+    void copy
+    (const DenseMatrix<scalar_t>& B, std::size_t i=0, std::size_t j=0);
     void copy(const scalar_t* B, std::size_t ldb);
     DenseMatrix<scalar_t> transpose() const;
-    void permute_rows_fwd(const std::vector<int>& P);
-    void permute_rows_bwd(const std::vector<int>& P);
-    void extract_rows(const std::vector<std::size_t>& I,
-                      const DenseMatrix<scalar_t>& B);
+
+    void laswp(const std::vector<int>& P, bool fwd);
+    void lapmr(const std::vector<int>& P, bool fwd);
+
+    void extract_rows
+    (const std::vector<std::size_t>& I, const DenseMatrix<scalar_t>& B);
     DenseMatrix<scalar_t> extract_rows
     (const std::vector<std::size_t>& I) const;
-    DenseMatrix<scalar_t> extract(const std::vector<std::size_t>& I,
-                                  const std::vector<std::size_t>& J) const;
-    DenseMatrix<scalar_t>& scatter_rows_add(const std::vector<std::size_t>& I,
-                                            const DenseMatrix<scalar_t>& B);
+    DenseMatrix<scalar_t> extract
+    (const std::vector<std::size_t>& I,
+     const std::vector<std::size_t>& J) const;
+    DenseMatrix<scalar_t>& scatter_rows_add
+    (const std::vector<std::size_t>& I, const DenseMatrix<scalar_t>& B);
     DenseMatrix<scalar_t>& add(const DenseMatrix<scalar_t>& B);
     DenseMatrix<scalar_t>& sub(const DenseMatrix<scalar_t>& B);
-    DenseMatrix<scalar_t>& scaled_add(scalar_t alpha,
-                                      const DenseMatrix<scalar_t>& B);
+    DenseMatrix<scalar_t>& scaled_add
+    (scalar_t alpha, const DenseMatrix<scalar_t>& B);
+    DenseMatrix<scalar_t>& scale_rows(const std::vector<scalar_t>& D);
+    DenseMatrix<scalar_t>& div_rows(const std::vector<scalar_t>& D);
     real_t norm() const;
     real_t normF() const;
     real_t norm1() const;
     real_t normI() const;
-    virtual std::size_t memory() const
-    { return sizeof(scalar_t)*rows()*cols(); }
-    virtual std::size_t nonzeros() const { return rows()*cols(); }
+    virtual std::size_t memory() const {
+      return sizeof(scalar_t) * rows() * cols();
+    }
+    virtual std::size_t nonzeros() const {
+      return rows()*cols();
+    }
 
     std::vector<int> LU(int depth);
-    DenseMatrix<scalar_t> solve(const DenseMatrix<scalar_t>& b,
-                                const std::vector<int>& piv, int depth) const;
-    void LQ(DenseMatrix<scalar_t>& L, DenseMatrix<scalar_t>& Q,
-            int depth) const;
+    DenseMatrix<scalar_t> solve
+    (const DenseMatrix<scalar_t>& b,
+     const std::vector<int>& piv, int depth) const;
+    void LQ
+    (DenseMatrix<scalar_t>& L, DenseMatrix<scalar_t>& Q, int depth) const;
     void orthogonalize(scalar_t& r_max, scalar_t& r_min, int depth);
-    void ID_column(DenseMatrix<scalar_t>& X, std::vector<int>& piv,
-                   std::vector<std::size_t>& ind, real_t rel_tol,
-                   real_t abs_tol, int max_rank, int depth);
-    void ID_row(DenseMatrix<scalar_t>& X, std::vector<int>& piv,
-                std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
-                int max_rank, int depth) const;
+    void ID_column
+    (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
+     std::vector<std::size_t>& ind, real_t rel_tol,
+     real_t abs_tol, int max_rank, int depth);
+    void ID_row
+    (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
+     std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
+     int max_rank, int depth) const;
     std::vector<scalar_t> singular_values() const;
 
   private:
-    void ID_column_MGS(DenseMatrix<scalar_t>& X, std::vector<int>& piv,
-                       std::vector<std::size_t>& ind, real_t rel_tol,
-                       real_t abs_tol, int max_rank, int depth);
-    void ID_column_GEQP3(DenseMatrix<scalar_t>& X, std::vector<int>& piv,
-                         std::vector<std::size_t>& ind, real_t rel_tol,
-                         real_t abs_tol, int max_rank, int depth);
+    void ID_column_MGS
+    (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
+     std::vector<std::size_t>& ind, real_t rel_tol,
+     real_t abs_tol, int max_rank, int depth);
+    void ID_column_GEQP3
+    (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
+     std::vector<std::size_t>& ind, real_t rel_tol,
+     real_t abs_tol, int max_rank, int depth);
     template<typename T> friend class DistributedMatrix;
   };
 
@@ -124,17 +167,21 @@ namespace strumpack {
   class DenseMatrixWrapper : public DenseMatrix<scalar_t> {
   public:
     DenseMatrixWrapper() : DenseMatrix<scalar_t>() {}
-    DenseMatrixWrapper(std::size_t m, std::size_t n,
-                       scalar_t* D, std::size_t ld)
-    { this->_data = D; this->_rows = m; this->_cols = n;
-      this->_ld = std::max(std::size_t(1), ld); }
-    DenseMatrixWrapper(std::size_t m, std::size_t n,
-                       DenseMatrix<scalar_t>& D, std::size_t i, std::size_t j)
+    DenseMatrixWrapper
+    (std::size_t m, std::size_t n, scalar_t* D, std::size_t ld) {
+      this->_data = D; this->_rows = m; this->_cols = n;
+      this->_ld = std::max(std::size_t(1), ld);
+    }
+    DenseMatrixWrapper
+    (std::size_t m, std::size_t n, DenseMatrix<scalar_t>& D,
+     std::size_t i, std::size_t j)
       : DenseMatrixWrapper<scalar_t>(m, n, &D(i, j), D.ld()) {}
     virtual ~DenseMatrixWrapper() { this->_data = nullptr; }
 
-    void clear() { this->_rows = 0; this->_cols = 0;
-      this->_ld = 1; this->_data = nullptr; }
+    void clear() {
+      this->_rows = 0; this->_cols = 0;
+      this->_ld = 1; this->_data = nullptr;
+    }
     std::size_t memory() const { return 0; }
     std::size_t nonzeros() const { return 0; }
 
@@ -161,16 +208,16 @@ namespace strumpack {
 
   template<typename scalar_t>
   std::unique_ptr<const DenseMatrixWrapper<scalar_t>>
-  ConstDenseMatrixWrapperPtr(std::size_t m, std::size_t n,
-                             const scalar_t* D, std::size_t ld) {
+  ConstDenseMatrixWrapperPtr
+  (std::size_t m, std::size_t n, const scalar_t* D, std::size_t ld) {
     return std::unique_ptr<const DenseMatrixWrapper<scalar_t>>
       (new DenseMatrixWrapper<scalar_t>(m, n, const_cast<scalar_t*>(D), ld));
   }
   template<typename scalar_t>
   std::unique_ptr<const DenseMatrixWrapper<scalar_t>>
-  ConstDenseMatrixWrapperPtr(std::size_t m, std::size_t n,
-                             const DenseMatrix<scalar_t>& D,
-                             std::size_t i, std::size_t j) {
+  ConstDenseMatrixWrapperPtr
+  (std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& D,
+   std::size_t i, std::size_t j) {
     return std::unique_ptr<const DenseMatrixWrapper<scalar_t>>
       (new DenseMatrixWrapper<scalar_t>
        (m, n, const_cast<DenseMatrix<scalar_t>&>(D), i, j));
@@ -424,16 +471,15 @@ namespace strumpack {
     return tmp;
   }
 
+
   template<typename scalar_t> void
-  DenseMatrix<scalar_t>::permute_rows_bwd(const std::vector<int>& P) {
-    blas::laswp
-      (cols(), data(), ld(), 1, P.size(), P.data(), -1);
+  DenseMatrix<scalar_t>::laswp(const std::vector<int>& P, bool fwd) {
+    blas::laswp(cols(), data(), ld(), 1, rows(), P.data(), fwd ? 1 : -1);
   }
 
   template<typename scalar_t> void
-  DenseMatrix<scalar_t>::permute_rows_fwd(const std::vector<int>& P) {
-    blas::laswp
-      (cols(), data(), ld(), 1, P.size(), P.data(), 1);
+  DenseMatrix<scalar_t>::lapmr(const std::vector<int>& P, bool fwd) {
+    blas::lapmr(fwd, rows(), cols(), data(), ld(), P.data());
   }
 
   template<typename scalar_t> void DenseMatrix<scalar_t>::extract_rows
@@ -515,6 +561,24 @@ namespace strumpack {
       for (std::size_t i=0; i<rows(); i++)
         operator()(i, j) += alpha * B(i, j);
     STRUMPACK_FLOPS((is_complex<scalar_t>()?8:2)*cols()*rows());
+    return *this;
+  }
+
+  template<typename scalar_t> DenseMatrix<scalar_t>&
+  DenseMatrix<scalar_t>::scale_rows(const std::vector<scalar_t>& D) {
+    for (std::size_t j=0; j<cols(); j++)
+      for (std::size_t i=0; i<rows(); i++)
+        operator()(i, j) *= D[i];
+    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*cols()*rows());
+    return *this;
+  }
+
+  template<typename scalar_t> DenseMatrix<scalar_t>&
+  DenseMatrix<scalar_t>::div_rows(const std::vector<scalar_t>& D) {
+    for (std::size_t j=0; j<cols(); j++)
+      for (std::size_t i=0; i<rows(); i++)
+        operator()(i, j) /= D[i];
+    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*cols()*rows());
     return *this;
   }
 
@@ -831,6 +895,14 @@ namespace strumpack {
        alpha, a.data(), a.ld(), b.data(), b.ld(), depth);
   }
 
+  /**
+   * DTRSV  solves one of the systems of equations
+   *
+   *    A*x = b,   or   A**T*x = b,
+   *
+   *  where b and x are n element vectors and A is an n by n unit, or
+   *  non-unit, upper or lower triangular matrix.
+   */
   template<typename scalar_t> void
   trsv(UpLo ul, Trans ta, Diag d, const DenseMatrix<scalar_t>& a,
        DenseMatrix<scalar_t>& b, int depth) {

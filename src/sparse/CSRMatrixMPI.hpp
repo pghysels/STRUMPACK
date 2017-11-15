@@ -88,8 +88,11 @@ namespace strumpack {
     inline MPI_Comm comm() const { return _comm; }
     inline integer_t local_nnz() const { return _local_nnz; }
 
+    void spmv(const DenseM_t& x, DenseM_t& y) const override;
+    void omp_spmv(const DenseM_t& x, DenseM_t& y) const override;
     void spmv(const scalar_t* x, scalar_t* y) const override;
     void omp_spmv(const scalar_t* x, scalar_t* y) const override;
+
     void apply_scaling
     (const std::vector<scalar_t>& Dr,
      const std::vector<scalar_t>& Dc) override;
@@ -687,6 +690,20 @@ namespace strumpack {
   CSRMatrixMPI<scalar_t,integer_t>::spmv
   (const scalar_t* x, scalar_t* y) const {
     omp_spmv(x, y);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  CSRMatrixMPI<scalar_t,integer_t>::spmv
+  (const DenseM_t& x, DenseM_t& y) const {
+    assert(x.cols() == 1);
+    omp_spmv(x.data(), y.data());
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  CSRMatrixMPI<scalar_t,integer_t>::omp_spmv
+  (const DenseM_t& x, DenseM_t& y) const {
+    assert(x.cols() == 1);
+    omp_spmv(x.data(), y.data());
   }
 
   template<typename scalar_t,typename integer_t> void
