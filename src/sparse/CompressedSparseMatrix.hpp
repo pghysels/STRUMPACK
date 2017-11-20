@@ -75,10 +75,6 @@ namespace strumpack {
     CompressedSparseMatrix<scalar_t,integer_t>& operator=
     (const CompressedSparseMatrix<scalar_t,integer_t>& A);
 
-    // TODO should this return by value instead, or a unique_ptr?
-    // remove this??
-    //virtual CompressedSparseMatrix<scalar_t,integer_t>* clone() const = 0;
-
     inline integer_t size() const { return _n; }
     inline integer_t nnz() const { return _nnz; }
     inline integer_t* get_ptr() const { return _ptr; }

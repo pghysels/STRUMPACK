@@ -186,7 +186,7 @@ namespace strumpack {
     DenseMatrix<scalar_t> all_gather(int ctxt_all) const;
 
     DenseMatrix<scalar_t> dense_and_clear();
-    DenseMatrixWrapper<scalar_t> dense_wrapper() const;
+    DenseMatrixWrapper<scalar_t> dense_wrapper();
 
     std::vector<int> LU();
     DistributedMatrix<scalar_t> solve
@@ -958,11 +958,8 @@ namespace strumpack {
   }
 
   template<typename scalar_t> DenseMatrixWrapper<scalar_t>
-  DistributedMatrix<scalar_t>::dense_wrapper() const {
-    return
-      DenseMatrixWrapper<scalar_t>
-      (lrows(), lcols(), const_cast<DistributedMatrix<scalar_t>*>
-       (this)->data(), ld());
+  DistributedMatrix<scalar_t>::dense_wrapper() {
+    return DenseMatrixWrapper<scalar_t>(lrows(), lcols(), data(), ld());
   }
 
   template<typename scalar_t> std::vector<int>

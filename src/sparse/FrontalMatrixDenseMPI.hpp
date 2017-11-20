@@ -77,12 +77,13 @@ namespace strumpack {
     void multifrontal_factorization
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,
      int etree_level=0, int task_depth=0) override;
+
     void forward_multifrontal_solve
-    (DenseM_t& b_loc, DistM_t* b_dist, scalar_t* wmem,
-     int etree_level=0, int task_depth=0) override;
+    (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
+     int etree_level=0) const override;
     void backward_multifrontal_solve
-    (DenseM_t& y_loc, DistM_t* b_dist, scalar_t* wmem,
-     int etree_level=0, int task_depth=0) override;
+    (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
+     int etree_level=0) const override;
 
     void extract_CB_sub_matrix_2d
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
@@ -122,24 +123,24 @@ namespace strumpack {
         STRUMPACK_FLOPS
           (static_cast<long long int>(ch->dim_upd())*ch->dim_upd());
       }
-      if (FDMPI_t* ch_mpi = dynamic_cast<FDMPI_t*>(ch)) {
+      if (!this->visit(ch)) continue;
+      if (auto ch_mpi = dynamic_cast<FDMPI_t*>(ch)) {
         ExtAdd::extend_add_copy_to_buffers
-          (ch_mpi->F22, F11, F12, F21, F22, sbuf, this,
-           ch_mpi->upd_to_parent(this));
-      } else if (FD_t* ch_seq = dynamic_cast<FD_t*>(ch)) {
+          (ch_mpi->F22, sbuf, this, ch_mpi->upd_to_parent(this));
+      } else if (auto ch_seq = dynamic_cast<FD_t*>(ch)) {
         if (mpi_rank(this->front_comm) == this->child_master(ch))
           ExtAdd::extend_add_seq_copy_to_buffers
-            (ch_seq->F22, F11, F12, F21, F22, sbuf, this, ch_seq);
+            (ch_seq->F22, sbuf, this, ch_seq);
       }
     }
     scalar_t *rbuf = nullptr, **pbuf = nullptr;
     all_to_all_v(sbuf, rbuf, pbuf, this->front_comm);
     for (auto ch : {this->lchild, this->rchild}) {
-      if (FDMPI_t* ch_mpi = dynamic_cast<FDMPI_t*>(ch)) {
+      if (auto ch_mpi = dynamic_cast<FDMPI_t*>(ch)) {
         ExtAdd::extend_add_copy_from_buffers
           (F11, F12, F21, F22, pbuf+this->child_master(ch),
            this, ch_mpi);
-      } else if (FD_t* ch_seq = dynamic_cast<FD_t*>(ch)) {
+      } else if (auto ch_seq = dynamic_cast<FD_t*>(ch)) {
         ExtAdd::extend_add_seq_copy_from_buffers
           (F11, F12, F21, F22, pbuf[this->child_master(ch_seq)],
            this, ch_seq);
@@ -216,49 +217,63 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::forward_multifrontal_solve
-  (DenseM_t& b_loc, DistM_t* b_dist, scalar_t* wmem,
-   int etree_level, int task_depth) {
+  (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
+   int etree_level) const {
+    DistM_t CBl, CBr;
+    DenseM_t seqCBl, seqCBr;
     if (this->visit(this->lchild))
       this->lchild->forward_multifrontal_solve
-        (b_loc, b_dist, wmem, etree_level, task_depth);
+        (bloc, bdist, CBl, seqCBl, etree_level);
     if (this->visit(this->rchild))
       this->rchild->forward_multifrontal_solve
-        (b_loc, b_dist, wmem, etree_level, task_depth);
-    DistMW_t Bupd(this->ctxt, this->dim_upd(), 1, wmem+this->p_wmem);
-    Bupd.zero();
-    this->look_left(b_dist[this->sep], wmem);
+        (bloc, bdist, CBr, seqCBr, etree_level);
+    DistM_t& b = bdist[this->sep];
+    bupd = DistM_t(this->ctxt, this->dim_upd(), b.cols());
+    bupd.zero();
+    this->extend_add_b(b, bupd, CBl, CBr, seqCBl, seqCBr);
     if (this->dim_sep()) {
       TIMER_TIME(TaskType::SOLVE_LOWER, 0, t_s);
-      b_dist[this->sep].laswp(piv, true); //permute_rows_fwd(piv);
-      trsv(UpLo::L, Trans::N, Diag::U, F11, b_dist[this->sep]);
-      if (this->dim_upd())
-        gemv(Trans::N, scalar_t(-1.), F21, b_dist[this->sep],
-             scalar_t(1.), Bupd);
+      b.laswp(piv, true);
+      if (b.cols() == 1) {
+        trsv(UpLo::L, Trans::N, Diag::U, F11, b);
+        if (this->dim_upd())
+          gemv(Trans::N, scalar_t(-1.), F21, b, scalar_t(1.), bupd);
+      } else {
+        trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11, b);
+        if (this->dim_upd())
+          gemm(Trans::N, Trans::N, scalar_t(-1.), F21, b, scalar_t(1.), bupd);
+      }
       TIMER_STOP(t_s);
     }
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::backward_multifrontal_solve
-  (DenseM_t& y_loc, DistM_t* y_dist, scalar_t* wmem,
-   int etree_level, int task_depth) {
+  (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
+   int etree_level) const {
+    DistM_t& y = ydist[this->sep];
     if (this->dim_sep()) {
       TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_s);
-      if (this->dim_upd()) {
-        DistMW_t Yupd(this->ctxt, this->dim_upd(), 1, wmem+this->p_wmem);
-        gemv(Trans::N, scalar_t(-1.), F12, Yupd,
-             scalar_t(1.), y_dist[this->sep]);
+      if (y.cols() == 1) {
+        if (this->dim_upd())
+          gemv(Trans::N, scalar_t(-1.), F12, yupd, scalar_t(1.), y);
+        trsv(UpLo::U, Trans::N, Diag::N, F11, y);
+      } else {
+        if (this->dim_upd())
+          gemm(Trans::N, Trans::N, scalar_t(-1.), F12, yupd, scalar_t(1.), y);
+        trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11, y);
       }
-      trsv(UpLo::U, Trans::N, Diag::N, F11, y_dist[this->sep]);
       TIMER_STOP(t_s);
     }
-    this->look_right(y_dist[this->sep], wmem);
+    DistM_t CBl, CBr;
+    DenseM_t seqCBl, seqCBr;
+    this->extract_b(y, yupd, CBl, CBr, seqCBl, seqCBr);
     if (this->visit(this->lchild))
       this->lchild->backward_multifrontal_solve
-        (y_loc, y_dist, wmem, etree_level, task_depth);
+        (yloc, ydist, CBl, seqCBl, etree_level);
     if (this->visit(this->rchild))
       this->rchild->backward_multifrontal_solve
-        (y_loc, y_dist, wmem, etree_level, task_depth);
+        (yloc, ydist, CBr, seqCBr, etree_level);
   }
 
   /**

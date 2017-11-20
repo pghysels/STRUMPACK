@@ -372,6 +372,6 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/MLkernel.cpp
   ${CMAKE_BINARY_DIR}/examples/MLkernel.cpp COPYONLY)
 
 
-#include(CTest)
-#add_subdirectory(test)
+include(CTest)
+add_subdirectory(test)
 

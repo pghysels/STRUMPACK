@@ -59,7 +59,7 @@ namespace strumpack {
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
     using FDMPI_t = FrontalMatrixDenseMPI<scalar_t,integer_t>;
     using FHSSMPI_t = FrontalMatrixHSSMPI<scalar_t,integer_t>;
-    using SepRange = std::pair<integer_t,integer_t>;
+    using SepRange = std::pair<std::size_t,std::size_t>;
 
   public:
     EliminationTreeMPI(MPI_Comm comm);
@@ -186,7 +186,7 @@ namespace strumpack {
     auto disp = cnts + P;
     for (int p=0; p<P; p++) {
       cnts[p] = std::max
-        (integer_t(0), subtree_ranges[p].second - subtree_ranges[p].first);
+        (std::size_t(0), subtree_ranges[p].second - subtree_ranges[p].first);
       disp[p] = subtree_ranges[p].first;
     }
     MPI_Allgatherv
@@ -210,11 +210,7 @@ namespace strumpack {
   (DenseM_t& x) const {
     DistM_t* x_dist;
     sequential_to_block_cyclic(x, x_dist);
-
-    std::cout << "TODO remove this nullptr!!!, rewrite the dist solve!!"
-              << std::endl;
-    scalar_t* wmem = nullptr;
-    this->_root->multifrontal_solve(x, x_dist, wmem);
+    this->_root->multifrontal_solve(x, x_dist);
     block_cyclic_to_sequential(x, x_dist);
     delete[] x_dist;
   }
@@ -309,8 +305,10 @@ namespace strumpack {
         else front = new FD_t(sep, sep_begin, sep_end, upd[sep]);
       }
       if (P0 == _rank) {
-        local_range.first  = std::min(local_range.first,  sep_begin);
-        local_range.second = std::max(local_range.second, sep_end);
+        local_range.first  = std::min
+          (local_range.first, std::size_t(sep_begin));
+        local_range.second = std::max
+          (local_range.second, std::size_t(sep_end));
       }
     } else {
       if (keep) {

@@ -78,15 +78,18 @@ namespace strumpack {
     void skinny_extend_add
     (DistM_t& cSrl, DistM_t& cScl, DistM_t& cSrr, DistM_t& cScr,
      DistM_t& Sr, DistM_t& Sc);
+
     void multifrontal_factorization
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,
      int etree_level=0, int task_depth=0) override;
+
     void forward_multifrontal_solve
-    (DenseM_t& b_loc, DistM_t* b_dist, scalar_t* wmem,
-     int etree_level=0, int task_depth=0) override;
+    (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
+     int etree_level=0) const override;
     void backward_multifrontal_solve
-    (DenseM_t& y_loc, DistM_t* b_dist, scalar_t* wmem,
-     int etree_level=0, int task_depth=0) override;
+    (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
+     int etree_level=0) const override;
+
     void element_extraction
     (const SpMat_t& A, const std::vector<std::size_t>& I,
      const std::vector<std::size_t>& J, DistM_t& B);
@@ -106,9 +109,12 @@ namespace strumpack {
     (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
      bool is_root) override;
 
+  private:
     std::unique_ptr<HSS::HSSMatrixMPI<scalar_t>> _H;
     HSS::HSSFactorsMPI<scalar_t> _ULV;
-    std::unique_ptr<HSS::WorkSolveMPI<scalar_t>> _ULVwork;
+
+    // TODO get rid of this!!!
+    mutable std::unique_ptr<HSS::WorkSolveMPI<scalar_t>> _ULVwork;
 
     /** Schur complement update:
      *    S = F22 - _Theta * Vhat^C * _Phi^C
@@ -453,90 +459,88 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSSMPI<scalar_t,integer_t>::forward_multifrontal_solve
-  (DenseM_t& b_loc, DistM_t* b_dist, scalar_t* wmem,
-   int etree_level, int task_depth) {
+  (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
+   int etree_level) const {
+    DistM_t CBl, CBr;
+    DenseM_t seqCBl, seqCBr;
     if (this->visit(this->lchild))
       this->lchild->forward_multifrontal_solve
-        (b_loc, b_dist, wmem, etree_level+1, task_depth);
+        (bloc, bdist, CBl, seqCBl, etree_level+1);
     if (this->visit(this->rchild))
       this->rchild->forward_multifrontal_solve
-        (b_loc, b_dist, wmem, etree_level+1, task_depth);
-    DistMW_t Bupd(_H->ctxt(), this->dim_upd(), 1, wmem+this->p_wmem);
-    Bupd.zero();
-    DistM_t& Bsep = b_dist[this->sep];
-    this->look_left(Bsep, wmem);
+        (bloc, bdist, CBr, seqCBr, etree_level+1);
+    bupd.zero();
+    DistM_t& b = bdist[this->sep];
+    this->extend_add_b(b, bupd, CBl, CBr, seqCBl, seqCBr);
     if (etree_level) {
       if (_Theta.cols() && _Phi.cols()) {
         TIMER_TIME(TaskType::SOLVE_LOWER, 0, t_reduce);
         _ULVwork = std::unique_ptr<HSS::WorkSolveMPI<scalar_t>>
           (new HSS::WorkSolveMPI<scalar_t>());
-        DistM_t lBsep(_H->child(0)->ctxt(_H->ctxt_loc()),
-                      Bsep.rows(), Bsep.cols());
-        copy(Bsep.rows(), Bsep.cols(), Bsep, 0, 0,
-             lBsep, 0, 0, this->ctxt_all);
-        _H->child(0)->forward_solve(_ULV, *_ULVwork, lBsep, true);
-        DistM_t rhs(_H->ctxt(), _Theta.cols(), Bupd.cols());
+        DistM_t lb(_H->child(0)->ctxt(_H->ctxt_loc()), b.rows(), b.cols());
+        copy(b.rows(), b.cols(), b, 0, 0, lb, 0, 0, this->ctxt_all);
+        _H->child(0)->forward_solve(_ULV, *_ULVwork, lb, true);
+        DistM_t rhs(_H->ctxt(), _Theta.cols(), bupd.cols());
         copy(rhs.rows(), rhs.cols(), _ULVwork->reduced_rhs, 0, 0,
              rhs, 0, 0, this->ctxt_all);
         _ULVwork->reduced_rhs.clear();
         if (this->dim_upd())
           gemm(Trans::N, Trans::N, scalar_t(-1.), _Theta, rhs,
-               scalar_t(1.), Bupd);
+               scalar_t(1.), bupd);
         rhs.clear();
         TIMER_STOP(t_reduce);
       }
     } else {
       TIMER_TIME(TaskType::SOLVE_LOWER_ROOT, 0, t_solve);
-      DistM_t lBsep(_H->ctxt(), Bsep.rows(), Bsep.cols());
-      copy(Bsep.rows(), Bsep.cols(), Bsep, 0, 0, lBsep, 0, 0, this->ctxt_all);
+      DistM_t lb(_H->ctxt(), b.rows(), b.cols());
+      copy(b.rows(), b.cols(), b, 0, 0, lb, 0, 0, this->ctxt_all);
       _ULVwork = std::unique_ptr<HSS::WorkSolveMPI<scalar_t>>
         (new HSS::WorkSolveMPI<scalar_t>());
-      _H->forward_solve(_ULV, *_ULVwork, lBsep, false);
+      _H->forward_solve(_ULV, *_ULVwork, lb, false);
       TIMER_STOP(t_solve);
     }
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSSMPI<scalar_t,integer_t>::backward_multifrontal_solve
-  (DenseM_t& y_loc, DistM_t* y_dist, scalar_t* wmem,
-   int etree_level, int task_depth) {
-    DistM_t& Ysep = y_dist[this->sep];
-    DistMW_t Yupd(_H->ctxt(), this->dim_upd(), 1, wmem+this->p_wmem);
+  (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
+   int etree_level) const {
+    DistM_t& y = ydist[this->sep];
     TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_expand);
     if (etree_level) {
       if (_Phi.cols() && _Theta.cols()) {
-        DistM_t lYsep(_H->child(0)->ctxt(_H->ctxt_loc()),
-                      Ysep.rows(), Ysep.cols());
-        copy(Ysep.rows(), Ysep.cols(), Ysep, 0, 0,
-             lYsep, 0, 0, this->ctxt_all);
+        DistM_t ly
+          (_H->child(0)->ctxt(_H->ctxt_loc()), y.rows(), y.cols());
+        copy(y.rows(), y.cols(), y, 0, 0, ly, 0, 0, this->ctxt_all);
         if (this->dim_upd()) {
-          DistM_t wx(_H->ctxt(), _Phi.cols(), Yupd.cols());
+          DistM_t wx(_H->ctxt(), _Phi.cols(), yupd.cols());
           copy(wx.rows(), wx.cols(), _ULVwork->x, 0, 0,
                wx, 0, 0, this->ctxt_all);
-          gemm(Trans::C, Trans::N, scalar_t(-1.), _Phi, Yupd,
+          gemm(Trans::C, Trans::N, scalar_t(-1.), _Phi, yupd,
                scalar_t(1.), wx);
           copy(wx.rows(), wx.cols(), wx, 0, 0,
                _ULVwork->x, 0, 0, this->ctxt_all);
         }
-        _H->child(0)->backward_solve(_ULV, *_ULVwork, lYsep);
-        copy(Ysep.rows(), Ysep.cols(), lYsep, 0, 0,
-             Ysep, 0, 0, this->ctxt_all);
+        _H->child(0)->backward_solve(_ULV, *_ULVwork, ly);
+        copy(y.rows(), y.cols(), ly, 0, 0, y, 0, 0, this->ctxt_all);
         _ULVwork.reset();
       }
     } else {
-      DistM_t lYsep(_H->ctxt(), Ysep.rows(), Ysep.cols());
-      copy(Ysep.rows(), Ysep.cols(), Ysep, 0, 0, lYsep, 0, 0, this->ctxt_all);
-      _H->backward_solve(_ULV, *_ULVwork, lYsep);
-      copy(Ysep.rows(), Ysep.cols(), lYsep, 0, 0, Ysep, 0, 0, this->ctxt_all);
+      DistM_t ly(_H->ctxt(), y.rows(), y.cols());
+      copy(y.rows(), y.cols(), y, 0, 0, ly, 0, 0, this->ctxt_all);
+      _H->backward_solve(_ULV, *_ULVwork, ly);
+      copy(y.rows(), y.cols(), ly, 0, 0, y, 0, 0, this->ctxt_all);
     }
     TIMER_STOP(t_expand);
-    this->look_right(Ysep, wmem);
+    DistM_t CBl, CBr;
+    DenseM_t seqCBl, seqCBr;
+    this->extract_b(y, yupd, CBl, CBr, seqCBl, seqCBr);
     if (this->visit(this->lchild))
       this->lchild->backward_multifrontal_solve
-        (y_loc, y_dist, wmem, etree_level+1, task_depth);
+        (yloc, ydist, CBl, seqCBl, etree_level+1);
     if (this->visit(this->rchild))
       this->rchild->backward_multifrontal_solve
-        (y_loc, y_dist, wmem, etree_level+1, task_depth);
+        (yloc, ydist, CBr, seqCBr, etree_level+1);
   }
 
   template<typename scalar_t,typename integer_t> void

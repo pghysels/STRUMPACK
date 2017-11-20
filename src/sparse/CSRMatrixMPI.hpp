@@ -106,8 +106,15 @@ namespace strumpack {
     (const std::vector<integer_t>& perm) override;
     void symmetrize_sparsity() override;
     int read_matrix_market(const std::string& filename) override;
+
+    real_t max_scaled_residual
+    (const DenseM_t& x, const DenseM_t& b) const override {
+      std::cout << "TODO, CSRMatrixMPI::max_scaled_residual" << std::endl;
+      return real_t(1.);
+    }
     real_t max_scaled_residual
     (const scalar_t* x, const scalar_t* b) const override;
+
     // TODO return by value? return a unique_ptr?
     CSRGraph<integer_t>* get_sub_graph
     (const integer_t* perm,

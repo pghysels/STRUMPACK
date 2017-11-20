@@ -99,6 +99,8 @@ namespace strumpack {
      DistM_t& Srow, DistM_t& Scol, int ctxt_all, MPI_Comm R_comm,
      int depth) const override;
 
+    void spmv(const DenseM_t& x, DenseM_t& y) const override {};
+    void omp_spmv(const DenseM_t& x, DenseM_t& y) const override {};
     void spmv(const scalar_t* x, scalar_t* y) const override {};
     void omp_spmv(const scalar_t* x, scalar_t* y) const override {};
     void apply_scaling
@@ -110,6 +112,9 @@ namespace strumpack {
       return 1;
     };
     real_t max_scaled_residual(const scalar_t* x, const scalar_t* b) const {
+      return real_t(1.);
+    };
+    real_t max_scaled_residual(const DenseM_t& x, const DenseM_t& b) const {
       return real_t(1.);
     };
 
@@ -156,7 +161,7 @@ namespace strumpack {
         if (std::abs(Ampi.get_val()[j]) > eps) {
           auto c_perm = nd.perm[Ampi.get_ind()[j]];
           auto d = dest[j] = et.get_sparse_mapped_destination
-            (r_perm, c_perm, duplicate_fronts);
+            (Ampi, r_perm, c_perm, duplicate_fronts);
           auto hip = std::get<0>(d)+std::get<1>(d);
           for (int p=std::get<0>(d); p<hip; p+=std::get<2>(d))
 #pragma omp atomic
@@ -196,20 +201,15 @@ namespace strumpack {
     }
     std::vector<Triplet> triplets
       (std::accumulate(rcnts, rcnts+P, 0) / sizeof(Triplet));
-
-    std::cout << "receiving " << triplets.size() << " triplets" << std::endl;
-
     MPI_Alltoallv
       (sbuf, scnts, sdisp, MPI_BYTE, triplets.data(),
        rcnts, rdisp, MPI_BYTE, comm);
-
     delete[] scnts;
     delete[] sbuf;
 
     // TODO this sort can be avoided: first make the CSR/CSC
     // representation, then sort that row per row (in openmp parallel
     // for)!!
-
 #if 0 // TODO check for compiler support, use C++17?
       // std::experimental::parallel?
     __gnu_parallel::sort
@@ -238,8 +238,10 @@ namespace strumpack {
     this->_val = new scalar_t[_local_nnz];
     integer_t col = 0;
     this->_ptr[col] = 0;
-    if (_local_cols) this->_ptr[1] = 0;
-    _global_col[col] = triplets[0].c;
+    if (_local_cols) {
+      this->_ptr[1] = 0;
+      _global_col[col] = triplets[0].c;
+    }
     for (integer_t j=0; j<_local_nnz; j++) {
       this->_ind[j] = triplets[j].r;
       this->_val[j] = triplets[j].a;

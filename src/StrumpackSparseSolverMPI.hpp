@@ -105,7 +105,7 @@ namespace strumpack {
     virtual void setup_reordering() override;
     virtual int compute_reordering(int nx, int ny, int nz) override;
     virtual void compute_separator_reordering() override;
-    void perf_counters_stop(const std::string& s); override
+    void perf_counters_stop(const std::string& s) override;
     virtual void synchronize() override { MPI_Barrier(_comm); }
 
   private:
@@ -188,7 +188,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPI<scalar_t,integer_t>::perf_counters_stop
-  (const std::string& s) override {
+  (const std::string& s) {
     if (this->_opts.verbose()) {
 #if defined(HAVE_PAPI)
       float rtime1=0., ptime1=0., mflops=0.;

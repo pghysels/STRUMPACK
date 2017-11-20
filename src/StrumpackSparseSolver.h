@@ -98,31 +98,32 @@ typedef enum {
 extern "C" {
 #endif
 
-  void STRUMPACK_init(STRUMPACK_SparseSolver* S, MPI_Comm comm,
-                      STRUMPACK_PRECISION precision,
-                      STRUMPACK_INTERFACE interface,
-                      int argc, char* argv[], int verbose);
+  void STRUMPACK_init
+  (STRUMPACK_SparseSolver* S, MPI_Comm comm, STRUMPACK_PRECISION precision,
+   STRUMPACK_INTERFACE interface, int argc, char* argv[], int verbose);
   void STRUMPACK_destroy(STRUMPACK_SparseSolver* S);
 
   void STRUMPACK_set_csr_matrix
-  (STRUMPACK_SparseSolver S, void* N, void* row_ptr, void* col_ind,
-   void* values, int symmetric_pattern);
+  (STRUMPACK_SparseSolver S, const void* N, const void* row_ptr,
+   const void* col_ind, const void* values, int symmetric_pattern);
   void STRUMPACK_set_distributed_csr_matrix
-  (STRUMPACK_SparseSolver S, void* local_rows, void* row_ptr, void* col_ind,
-   void* values, void* dist, int symmetric_pattern);
+  (STRUMPACK_SparseSolver S, const void* local_rows, const void* row_ptr,
+   const void* col_ind, const void* values, const void* dist,
+   int symmetric_pattern);
   void STRUMPACK_set_MPIAIJ_matrix
-  (STRUMPACK_SparseSolver S, void* n, void* d_ptr, void* d_ind, void* d_val,
-   void* o_ptr, void* o_ind, void* o_val, void* garray);
+  (STRUMPACK_SparseSolver S, const void* n, const void* d_ptr,
+   const void* d_ind, const void* d_val, const void* o_ptr,
+   const void* o_ind, const void* o_val, const void* garray);
 
   STRUMPACK_RETURN_CODE STRUMPACK_solve
-  (STRUMPACK_SparseSolver S, void* b, void* x, int use_initial_guess);
+  (STRUMPACK_SparseSolver S, const void* b, void* x, int use_initial_guess);
 
   void STRUMPACK_set_from_options(STRUMPACK_SparseSolver S);
 
   STRUMPACK_RETURN_CODE STRUMPACK_reorder(STRUMPACK_SparseSolver S);
 
-  STRUMPACK_RETURN_CODE STRUMPACK_reorder_regular(STRUMPACK_SparseSolver S,
-                                                  int nx, int ny, int nz);
+  STRUMPACK_RETURN_CODE STRUMPACK_reorder_regular
+  (STRUMPACK_SparseSolver S, int nx, int ny, int nz);
 
   STRUMPACK_RETURN_CODE STRUMPACK_factor(STRUMPACK_SparseSolver S);
 
@@ -135,13 +136,13 @@ extern "C" {
   void STRUMPACK_set_rel_tol(STRUMPACK_SparseSolver S, double tol);
   void STRUMPACK_set_abs_tol(STRUMPACK_SparseSolver S, double tol);
   void STRUMPACK_set_nd_param(STRUMPACK_SparseSolver S, int nd_param);
-  void STRUMPACK_set_reordering_method(STRUMPACK_SparseSolver S,
-                                       STRUMPACK_REORDERING_STRATEGY m);
-  void STRUMPACK_set_GramSchmidt_type(STRUMPACK_SparseSolver S,
-                                      STRUMPACK_GRAM_SCHMIDT_TYPE t);
+  void STRUMPACK_set_reordering_method
+  (STRUMPACK_SparseSolver S, STRUMPACK_REORDERING_STRATEGY m);
+  void STRUMPACK_set_GramSchmidt_type
+  (STRUMPACK_SparseSolver S, STRUMPACK_GRAM_SCHMIDT_TYPE t);
   void STRUMPACK_set_mc64job(STRUMPACK_SparseSolver S, int job);
-  void STRUMPACK_set_Krylov_solver(STRUMPACK_SparseSolver S,
-                                   STRUMPACK_KRYLOV_SOLVER solver_type);
+  void STRUMPACK_set_Krylov_solver
+  (STRUMPACK_SparseSolver S, STRUMPACK_KRYLOV_SOLVER solver_type);
   /* set HSS specific options */
   void STRUMPACK_enable_HSS(STRUMPACK_SparseSolver S);
   void STRUMPACK_disable_HSS(STRUMPACK_SparseSolver S);

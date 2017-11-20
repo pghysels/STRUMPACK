@@ -91,7 +91,6 @@ namespace strumpack {
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
      DenseM_t& B, int task_depth) const = 0;
 
-
     void multifrontal_solve(DenseM_t& b) const;
     virtual void forward_multifrontal_solve
     (DenseM_t& b, DenseM_t& bupd, int etree_level=0,
@@ -105,13 +104,14 @@ namespace strumpack {
     (const F_t* ch, const DenseM_t& y, const DenseM_t& yupd,
      DenseM_t& CB) const;
 
-    void multifrontal_solve(DenseM_t& b_loc, DistM_t* b_dist, scalar_t* wmem);
+    void multifrontal_solve(DenseM_t& bloc, DistM_t* bdist) const;
     virtual void forward_multifrontal_solve
-    (DenseM_t& b_loc, DistM_t* b_dist, scalar_t* wmem,
-     int etree_level=0, int task_depth=0);  // TODO why pass task_depth here??
+    (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
+     int etree_level=0) const;
     virtual void backward_multifrontal_solve
-    (DenseM_t& y_loc, DistM_t* y_dist, scalar_t* wmem,
-     int etree_level=0, int task_depth=0);
+    (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
+     int etree_level=0) const;
+
     virtual void extend_add_b(F_t* ch, DistM_t& b, scalar_t* wmem, int tag) {}
     virtual void extract_b(F_t* ch, DistM_t& b, scalar_t* wmem) {}
     void look_left(DistM_t& b_sep, scalar_t* wmem);
@@ -141,9 +141,6 @@ namespace strumpack {
 
     F_t* lchild;
     F_t* rchild;
-
-    // TODO remove this
-    integer_t p_wmem = 0;
 
   protected:
     FrontalMatrix(const FrontalMatrix&) = delete;
@@ -220,8 +217,7 @@ namespace strumpack {
 
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::multifrontal_solve
-  (DenseM_t& b) const {
+  FrontalMatrix<scalar_t,integer_t>::multifrontal_solve(DenseM_t& b) const {
     DenseM_t CB;
     TIMER_TIME(TaskType::FORWARD_SOLVE, 0, t_fwd);
     forward_multifrontal_solve(b, CB);
@@ -310,27 +306,27 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::multifrontal_solve
-  (DenseM_t& b_loc, DistM_t* b_dist, scalar_t* wmem) {
+  (DenseM_t& bloc, DistM_t* bdist) const {
+    DistM_t CB;
+    DenseM_t seqCB;
     TIMER_TIME(TaskType::FORWARD_SOLVE, 0, t_fwd);
-    forward_multifrontal_solve(b_loc, b_dist, wmem);
+    forward_multifrontal_solve(bloc, bdist, CB, seqCB);
     TIMER_STOP(t_fwd);
     TIMER_TIME(TaskType::BACKWARD_SOLVE, 0, t_bwd);
-    backward_multifrontal_solve(b_loc, b_dist, wmem);
+    backward_multifrontal_solve(bloc, bdist, CB, seqCB);
     TIMER_STOP(t_bwd);
   }
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::forward_multifrontal_solve
-  (DenseM_t& b_loc, DistM_t* b_dist, scalar_t* wmem,
-   int etree_level, int task_depth) {
-    DenseM_t bupd;
-    forward_multifrontal_solve(b_loc, bupd, etree_level, task_depth);
+  (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
+   int etree_level) const {
+    forward_multifrontal_solve(bloc, seqbupd, etree_level, 0);
   }
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::backward_multifrontal_solve
-  (DenseM_t& y_loc, DistM_t* b_dist, scalar_t* wmem,
-   int etree_level, int task_depth) {
-    DenseM_t yupd;
-    backward_multifrontal_solve(y_loc, yupd, etree_level, task_depth);
+  (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
+   int etree_level) const {
+    backward_multifrontal_solve(yloc, seqyupd, etree_level, 0);
   }
 
   template<typename scalar_t,typename integer_t> long long

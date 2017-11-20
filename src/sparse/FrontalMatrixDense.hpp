@@ -226,7 +226,7 @@ namespace strumpack {
             F11(i,i) = (std::real(F11(i,i)) < 0) ? -thresh : thresh;
       }
       if (this->dim_upd()) {
-        F12.laswp(piv, true); //permute_rows_fwd(piv);
+        F12.laswp(piv, true);
         trsm
           (Side::L, UpLo::L, Trans::N, Diag::U,
            scalar_t(1.), F11, F12, task_depth);
