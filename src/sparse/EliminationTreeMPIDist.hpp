@@ -246,7 +246,9 @@ namespace strumpack {
     auto fj = _row_pfront[j];
     if (fj < 0) return std::make_tuple(-fj-1, 1, 1);
     constexpr auto B = DistM_t::default_MB;
-    auto& f = _all_pfronts[std::min(fi, fj)];
+    int pfront =
+      (_all_pfronts[fi].sep_begin < _all_pfronts[fj].sep_begin) ? fi : fj;
+    auto& f = _all_pfronts[pfront];
     if (i < f.sep_end) {
       if (j < f.sep_end) { // F11
         if (duplicate_fronts)
