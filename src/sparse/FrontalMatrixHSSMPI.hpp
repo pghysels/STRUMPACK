@@ -469,8 +469,9 @@ namespace strumpack {
     if (this->visit(this->rchild))
       this->rchild->forward_multifrontal_solve
         (bloc, bdist, CBr, seqCBr, etree_level+1);
-    bupd.zero();
     DistM_t& b = bdist[this->sep];
+    bupd = DistM_t(_H->ctxt(), this->dim_upd(), b.cols());
+    bupd.zero();
     this->extend_add_b(b, bupd, CBl, CBr, seqCBl, seqCBr);
     if (etree_level) {
       if (_Theta.cols() && _Phi.cols()) {
@@ -487,7 +488,6 @@ namespace strumpack {
         if (this->dim_upd())
           gemm(Trans::N, Trans::N, scalar_t(-1.), _Theta, rhs,
                scalar_t(1.), bupd);
-        rhs.clear();
         TIMER_STOP(t_reduce);
       }
     } else {
@@ -516,7 +516,9 @@ namespace strumpack {
           DistM_t wx(_H->ctxt(), _Phi.cols(), yupd.cols());
           copy(wx.rows(), wx.cols(), _ULVwork->x, 0, 0,
                wx, 0, 0, this->ctxt_all);
-          gemm(Trans::C, Trans::N, scalar_t(-1.), _Phi, yupd,
+          DistMW_t yupdHctxt
+            (_H->ctxt(), this->dim_upd(), y.cols(), yupd.data());
+          gemm(Trans::C, Trans::N, scalar_t(-1.), _Phi, yupdHctxt,
                scalar_t(1.), wx);
           copy(wx.rows(), wx.cols(), wx, 0, 0,
                _ULVwork->x, 0, 0, this->ctxt_all);
