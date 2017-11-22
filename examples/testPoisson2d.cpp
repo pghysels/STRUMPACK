@@ -69,7 +69,7 @@ int main(int argc, char* argv[]) {
   }
   A.set_symm_sparse();
 
-  int nrhs = 300;
+  int nrhs = 50;
   DenseMatrix<scalar> b(N, nrhs), x(N, nrhs), x_exact(N, nrhs);
   x_exact.random();
   A.omp_spmv(x_exact, b);
@@ -82,12 +82,8 @@ int main(int argc, char* argv[]) {
 
   // just a check, system is already solved, so solving again
   // with the solution as initial guess should stop immediately
-  //spss.solve(b.data(), x.data(), true);
+  spss.solve(b, x, true);
 
-  // real max_res = 0.;
-  // for (int c=0; c<nrhs; c++)
-  //   max_res = std::max
-  //     (max_res, A.max_scaled_residual(x.ptr(0,c), b.ptr(0,c)));
   std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
             << A.max_scaled_residual(x, b) << std::endl;
   x.scaled_add(-1., x_exact);

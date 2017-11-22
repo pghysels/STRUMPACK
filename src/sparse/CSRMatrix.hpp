@@ -56,9 +56,12 @@ namespace strumpack {
     (integer_t n, const integer_t* ptr, const integer_t* ind,
      const scalar_t* values, bool symm_sparsity=false);
     CSRMatrix(const CSRMatrix<scalar_t,integer_t>& A);
+    CSRMatrix(CSRMatrix<scalar_t,integer_t>&& A);
     CSRMatrix(const CSCMatrix<scalar_t,integer_t>& A);
     CSRMatrix<scalar_t,integer_t>& operator=
-    (CSRMatrix<scalar_t,integer_t> A);
+    (const CSRMatrix<scalar_t,integer_t>& A);
+    CSRMatrix<scalar_t,integer_t>& operator=
+    (CSRMatrix<scalar_t,integer_t>&& A);
 
     void spmv(const DenseM_t& x, DenseM_t& y) const override;
     void omp_spmv(const DenseM_t& x, DenseM_t& y) const override;
@@ -140,6 +143,12 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   CSRMatrix<scalar_t,integer_t>::CSRMatrix
+  (CSRMatrix<scalar_t,integer_t>&& A)
+    : CompressedSparseMatrix<scalar_t,integer_t>(std::move(A)) {
+  }
+
+  template<typename scalar_t,typename integer_t>
+  CSRMatrix<scalar_t,integer_t>::CSRMatrix
   (const CSCMatrix<scalar_t,integer_t>& A)
     : CompressedSparseMatrix<scalar_t,integer_t>
     (A.size(), A.nnz(), A.symm_sparse()) {
@@ -163,18 +172,17 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   CSRMatrix<scalar_t,integer_t>& CSRMatrix<scalar_t,integer_t>::operator=
-  (CSRMatrix<scalar_t,integer_t> A) {
-    A.swap(*this);
+  (const CSRMatrix<scalar_t,integer_t>& A) {
+    CompressedSparseMatrix<scalar_t,integer_t>::operator=(A);
     return *this;
   }
 
-  // template<typename scalar_t,typename integer_t>
-  // CSRMatrix<scalar_t,integer_t>*
-  // CSRMatrix<scalar_t,integer_t>::clone() const {
-  //   CSRMatrix<scalar_t,integer_t>* t = new CSRMatrix<scalar_t,integer_t>();
-  //   t->clone_data(*this);
-  //   return t;
-  // }
+  template<typename scalar_t,typename integer_t>
+  CSRMatrix<scalar_t,integer_t>& CSRMatrix<scalar_t,integer_t>::operator=
+  (CSRMatrix<scalar_t,integer_t>&& A) {
+    CompressedSparseMatrix<scalar_t,integer_t>::operator=(std::move(A));
+    return *this;
+  }
 
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::print_dense(const std::string& name) const {
@@ -306,31 +314,13 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::spmv
   (const scalar_t* x, scalar_t* y) const {
-    auto X = ConstDenseMatrixWrapperPtr(this->_n, 1, x, this->_n);
-    DenseMW_t Y(this->_n, 1, y, this->_n);
-    spmv(*X, Y);
+    omp_spmv(x, y);
   }
 
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::spmv
   (const DenseM_t& x, DenseM_t& y) const {
-    assert(x.cols() == y.cols());
-    assert(x.rows() == std::size_t(this->_n));
-    assert(y.rows() == std::size_t(this->_n));
-    const integer_t m = this->_n;
-    const integer_t n = x.cols();
-    y.zero();
-    for (integer_t r=0; r<m; r++) {
-      const auto hij = this->_ptr[r+1];
-      for (integer_t j=this->_ptr[r]; j<hij; j++) {
-        const auto v = this->_val[j];
-        const auto rj = this->_ind[j];
-        for (integer_t c=0; c<n; c++)
-          y(r,c) += v * x(rj,c);
-      }
-    }
-    STRUMPACK_FLOPS(this->spmv_flops() * x.cols());
-    STRUMPACK_BYTES(this->spmv_bytes() * x.cols());
+    omp_spmv(x, y);
   }
 
 #if defined(__INTEL_MKL__)
@@ -365,9 +355,16 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::omp_spmv
   (const scalar_t* x, scalar_t* y) const {
-    auto X = ConstDenseMatrixWrapperPtr(this->_n, 1, x, this->_n);
-    DenseMW_t Y(this->_n, 1, y, this->_n);
-    omp_spmv(*X, Y);
+#pragma omp parallel for
+    for (integer_t r=0; r<this->_n; r++) {
+      const auto hij = this->_ptr[r+1];
+      scalar_t yr(0);
+      for (integer_t j=this->_ptr[r]; j<hij; j++)
+        yr += this->_val[j] * x[this->_ind[j]];
+      y[r] = yr;
+    }
+    STRUMPACK_FLOPS(this->spmv_flops());
+    STRUMPACK_BYTES(this->spmv_bytes());
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -376,21 +373,8 @@ namespace strumpack {
     assert(x.cols() == y.cols());
     assert(x.rows() == std::size_t(this->_n));
     assert(y.rows() == std::size_t(this->_n));
-    const integer_t m = this->_n;
-    const integer_t n = x.cols();
-    y.zero();
-#pragma omp parallel for
-    for (integer_t r=0; r<m; r++) {
-      const auto hij = this->_ptr[r+1];
-      for (integer_t j=this->_ptr[r]; j<hij; j++) {
-        const auto v = this->_val[j];
-        const auto rj = this->_ind[j];
-        for (integer_t c=0; c<n; c++)
-          y(r,c) += v * x(rj,c);
-      }
-    }
-    STRUMPACK_FLOPS(this->spmv_flops() * x.cols());
-    STRUMPACK_BYTES(this->spmv_bytes() * x.cols());
+    for (std::size_t c=0; c<x.cols(); c++)
+      omp_spmv(x.ptr(0,c), y.ptr(0,c));
   }
 
   template<typename scalar_t,typename integer_t> void

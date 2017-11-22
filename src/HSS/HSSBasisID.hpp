@@ -123,7 +123,7 @@ namespace strumpack {
       DenseMatrix<scalar_t> ret(rows(), cols());
       ret.eye();
       copy(E(), ret, cols(), 0);
-      ret.laswp(P(), false); //permute_rows_bwd(P());
+      ret.laswp(P(), false);
       return ret;
     }
 
@@ -139,7 +139,7 @@ namespace strumpack {
       if (E().rows())
         gemm(Trans::N, Trans::N, scalar_t(1), E(), b,
              scalar_t(0.), c.ptr(cols(), 0), c.ld());
-      c.laswp(P(), false); //permute_rows_bwd(P());
+      c.laswp(P(), false);
       return c;
     }
 
@@ -157,7 +157,7 @@ namespace strumpack {
       if (E().rows())
         gemm(Trans::N, Trans::N, scalar_t(1), E(), b,
              scalar_t(0.), c.ptr(cols(), 0), c.ld());
-      c.laswp(P(), false); //permute_rows_bwd(P());
+      c.laswp(P(), false);
     }
 
 
@@ -169,7 +169,7 @@ namespace strumpack {
       if (!cols() || !b.cols())
         return DenseMatrix<scalar_t>(E().cols(), b.cols());
       DenseMatrix<scalar_t> PtB(b);
-      PtB.laswp(P(), true); //permute_rows_fwd(P());
+      PtB.laswp(P(), true);
       if (!E().rows()) return PtB;
       DenseMatrix<scalar_t> c(cols(), b.cols(), PtB.ptr(0, 0), PtB.ld());
       gemm(Trans::C, Trans::N, scalar_t(1.),

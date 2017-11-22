@@ -69,11 +69,15 @@ namespace strumpack {
      const scalar_t* val, bool symm_sparsity);
     CompressedSparseMatrix
     (const CompressedSparseMatrix<scalar_t,integer_t>& A);
+    CompressedSparseMatrix
+    (CompressedSparseMatrix<scalar_t,integer_t>&& A);
 
     virtual ~CompressedSparseMatrix();
 
     CompressedSparseMatrix<scalar_t,integer_t>& operator=
     (const CompressedSparseMatrix<scalar_t,integer_t>& A);
+    CompressedSparseMatrix<scalar_t,integer_t>& operator=
+    (CompressedSparseMatrix<scalar_t,integer_t>&& A);
 
     inline integer_t size() const { return _n; }
     inline integer_t nnz() const { return _nnz; }
@@ -210,9 +214,9 @@ namespace strumpack {
     : _n(n), _nnz(ptr[_n]-ptr[0]), _ptr(new integer_t[_n+1]),
       _ind(new integer_t[_nnz]), _val(new scalar_t[_nnz]),
       _symm_sparse(symm_sparsity) {
-    std::copy(ptr, ptr+_n+1, _ptr);
-    std::copy(ind, ind+_nnz, _ind);
-    std::copy(val, val+_nnz, _val);
+    if (ptr) std::copy(ptr, ptr+_n+1, _ptr);
+    if (ind) std::copy(ind, ind+_nnz, _ind);
+    if (val) std::copy(val, val+_nnz, _val);
   }
 
   template<typename scalar_t,typename integer_t>
@@ -221,9 +225,18 @@ namespace strumpack {
     : _n(A._n), _nnz(A._nnz), _ptr(new integer_t[_n+1]),
       _ind(new integer_t[_nnz]), _val(new scalar_t[_nnz]),
       _symm_sparse(A._symm_sparse) {
-    std::copy(A._ptr, A._ptr+_n+1, _ptr);
-    std::copy(A._ind, A._ind+_nnz, _ind);
-    std::copy(A._val, A._val+_nnz, _val);
+    if (A._ptr) std::copy(A._ptr, A._ptr+_n+1, _ptr);
+    if (A._ind) std::copy(A._ind, A._ind+_nnz, _ind);
+    if (A._val) std::copy(A._val, A._val+_nnz, _val);
+  }
+
+  template<typename scalar_t,typename integer_t>
+  CompressedSparseMatrix<scalar_t,integer_t>::CompressedSparseMatrix
+  (CompressedSparseMatrix<scalar_t,integer_t>&& A)
+    : _n(A._n), _nnz(A._nnz), _symm_sparse(A._symm_sparse) {
+    _ptr = A._ptr; A._ptr = nullptr;
+    _ind = A._ind; A._ind = nullptr;
+    _val = A._val; A._val = nullptr;
   }
 
   template<typename scalar_t,typename integer_t>
@@ -238,14 +251,27 @@ namespace strumpack {
   CompressedSparseMatrix<scalar_t,integer_t>::operator=
   (const CompressedSparseMatrix<scalar_t,integer_t>& A) {
     _n = A._n;
-    _nnz = A.nnz;
+    _nnz = A._nnz;
     _symm_sparse = A._symm_sparse;
     _ptr = new integer_t[_n+1];
     _ind = new integer_t[_nnz];
     _val = new scalar_t[_nnz];
-    std::copy(A._ptr, A._ptr+_n+1, _ptr);
-    std::copy(A._ind, A._ind+_nnz, _ind);
-    std::copy(A._val, A._val+_nnz, _val);
+    if (A._ptr) std::copy(A._ptr, A._ptr+_n+1, _ptr);
+    if (A._ind) std::copy(A._ind, A._ind+_nnz, _ind);
+    if (A._val) std::copy(A._val, A._val+_nnz, _val);
+    return *this;
+  }
+
+  template<typename scalar_t,typename integer_t>
+  CompressedSparseMatrix<scalar_t,integer_t>&
+  CompressedSparseMatrix<scalar_t,integer_t>::operator=
+  (CompressedSparseMatrix<scalar_t,integer_t>&& A) {
+    _n = A._n;
+    _nnz = A._nnz;
+    _symm_sparse = A._symm_sparse;
+    _ptr = A._ptr; A._ptr = nullptr;
+    _ind = A._ind; A._ind = nullptr;
+    _val = A._val; A._val = nullptr;
     return *this;
   }
 

@@ -191,7 +191,7 @@ namespace strumpack {
 #endif
       piv = F11.LU();
       if (this->dim_upd()) {
-        F12.laswp(piv, true); //permute_rows_fwd(piv);
+        F12.laswp(piv, true);
         trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11, F12);
         trsm(Side::R, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11, F21);
         gemm(Trans::N, Trans::N, scalar_t(-1.), F21, F12, scalar_t(1.), F22);

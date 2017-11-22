@@ -120,7 +120,9 @@ namespace strumpack {
     DenseMatrix<scalar_t>& add(const DenseMatrix<scalar_t>& B);
     DenseMatrix<scalar_t>& sub(const DenseMatrix<scalar_t>& B);
     DenseMatrix<scalar_t>& scaled_add
-    (scalar_t alpha, const DenseMatrix<scalar_t>& B);
+    (scalar_t alpha, const DenseMatrix<scalar_t>& x);
+    DenseMatrix<scalar_t>& scale_and_add
+    (scalar_t alpha, const DenseMatrix<scalar_t>& x);
     DenseMatrix<scalar_t>& scale_rows(const std::vector<scalar_t>& D);
     DenseMatrix<scalar_t>& div_rows(const std::vector<scalar_t>& D);
     real_t norm() const;
@@ -327,11 +329,14 @@ namespace strumpack {
 
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::operator=(const DenseMatrix<scalar_t>& D) {
-    _rows = D.rows();
-    _cols = D.cols();
-    delete[] _data;
-    _data = new scalar_t[_rows*_cols];
-    _ld = std::max(std::size_t(1), _rows);
+    if (this == &D) return *this;
+    if (_rows != D.rows() || _cols != D.cols()) {
+      _rows = D.rows();
+      _cols = D.cols();
+      delete[] _data;
+      _data = new scalar_t[_rows*_cols];
+      _ld = std::max(std::size_t(1), _rows);
+    }
     for (std::size_t j=0; j<_cols; j++)
       for (std::size_t i=0; i<_rows; i++)
         operator()(i,j) = D(i,j);
@@ -555,11 +560,22 @@ namespace strumpack {
 
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::scaled_add
-  (scalar_t alpha, const DenseMatrix<scalar_t>& B) {
+  (scalar_t alpha, const DenseMatrix<scalar_t>& x) {
     //#pragma omp taskloop default(shared) //grainsize(128) //collapse(2)
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
-        operator()(i, j) += alpha * B(i, j);
+        operator()(i, j) += alpha * x(i, j);
+    STRUMPACK_FLOPS((is_complex<scalar_t>()?8:2)*cols()*rows());
+    return *this;
+  }
+
+  template<typename scalar_t> DenseMatrix<scalar_t>&
+  DenseMatrix<scalar_t>::scale_and_add
+  (scalar_t alpha, const DenseMatrix<scalar_t>& x) {
+    //#pragma omp taskloop default(shared) //grainsize(128) //collapse(2)
+    for (std::size_t j=0; j<cols(); j++)
+      for (std::size_t i=0; i<rows(); i++)
+        operator()(i, j) = alpha * operator()(i, j) + x(i, j);
     STRUMPACK_FLOPS((is_complex<scalar_t>()?8:2)*cols()*rows());
     return *this;
   }

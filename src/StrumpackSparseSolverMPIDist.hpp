@@ -140,6 +140,8 @@ namespace strumpack {
 
     ReturnCode solve
     (const scalar_t* b, scalar_t* x, bool use_initial_guess=false);
+    ReturnCode solve
+    (const DenseM_t& b, DenseM_t& x, bool use_initial_guess=false);
 
   protected:
     virtual SpMat_t* matrix() override { return _mat_mpi.get(); }
@@ -270,28 +272,29 @@ namespace strumpack {
        (this->_opts, *_mat_mpi, *_nd_mpi, this->_comm));
   }
 
-  /* TODO b is modified here! perhaps avoid that? */
   template<typename scalar_t,typename integer_t> ReturnCode
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::solve
-  (const scalar_t* b, scalar_t* x, bool use_initial_guess) {
+  (const DenseM_t& b, DenseM_t& x, bool use_initial_guess) {
     if (!this->_factored) {
       ReturnCode ierr = this->factor();
       if (ierr != ReturnCode::SUCCESS) return ierr;
     }
+    assert(std::size_t(_mat_mpi->local_rows()) == b.rows());
+    assert(b.rows() == x.rows());
+    assert(b.cols() == x.cols());
     TaskTimer t("solve");
     this->perf_counters_start();
     t.start();
-    auto n_local = _mat_mpi->local_rows();
+    auto n_local = x.rows();
     this->_Krylov_its = 0;
 
-    auto bcopy = new scalar_t[n_local];
+    auto bloc = b;
     if (this->_opts.mc64job() == 5)
-      x_mult_y(n_local, bcopy, this->_mc64_Dr.data(), bcopy);
-    else std::copy(b, b+n_local, bcopy);
+      bloc.scale_rows(this->_mc64_Dr);
 
     auto gmres = [&](std::function<void(scalar_t*)> prec) {
       GMResMPI<scalar_t,integer_t>
-      (this->_comm, _mat_mpi.get(), prec, n_local, x, bcopy,
+      (this->_comm, _mat_mpi.get(), prec, n_local, x.data(), bloc.data(),
        this->_opts.rel_tol(), this->_opts.abs_tol(),
        this->_Krylov_its, this->_opts.maxit(),
        this->_opts.gmres_restart(), this->_opts.GramSchmidt_type(),
@@ -299,20 +302,24 @@ namespace strumpack {
     };
     auto bicgstab = [&](std::function<void(scalar_t*)> prec) {
       BiCGStabMPI<scalar_t,integer_t>
-      (this->_comm, _mat_mpi.get(), prec, n_local, x, bcopy,
+      (this->_comm, _mat_mpi.get(), prec, n_local, x.data(), bloc.data(),
        this->_opts.rel_tol(), this->_opts.abs_tol(),
        this->_Krylov_its, this->_opts.maxit(),
        use_initial_guess, this->_opts.verbose() && this->_is_root);
     };
-    auto prec = [&](scalar_t* x) {
+    auto MFsolve = [&](scalar_t* w) {
       //MPI_Pcontrol(1, "multifrontal_solve_dist");
-      DenseMW_t X(n_local, 1, x, n_local);
+      DenseMW_t X(n_local, x.cols(), w, x.ld());
       tree()->multifrontal_solve_dist(X, _mat_mpi->get_dist());
       //MPI_Pcontrol(-1, "multifrontal_solve_dist");
     };
     auto refine = [&]() {
       IterativeRefinementMPI<scalar_t,integer_t>
-      (this->_comm, _mat_mpi.get(), prec, n_local, x, bcopy,
+      (this->_comm, *_mat_mpi.get(),
+       //MFsolve, n_local, x.data(), bloc.data(),
+       [&](DenseM_t& w) {
+        tree()->multifrontal_solve_dist(w, _mat_mpi->get_dist()); },
+       x, bloc,
        this->_opts.rel_tol(), this->_opts.abs_tol(),
        this->_Krylov_its, this->_opts.maxit(),
        use_initial_guess, this->_opts.verbose() && this->_is_root);
@@ -320,30 +327,127 @@ namespace strumpack {
 
     switch (this->_opts.Krylov_solver()) {
     case KrylovSolver::AUTO: {
-      if (this->_opts.use_HSS()) gmres(prec);
+      if (this->_opts.use_HSS()) gmres(MFsolve);
       else refine();
     }; break;
-    case KrylovSolver::REFINE:     { refine(); }; break;
-    case KrylovSolver::GMRES:      { gmres([](scalar_t*){}); }; break;
-    case KrylovSolver::PREC_GMRES: { gmres(prec);  }; break;
-    case KrylovSolver::BICGSTAB:      { bicgstab([](scalar_t*){}); }; break;
-    case KrylovSolver::PREC_BICGSTAB: { bicgstab(prec);  }; break;
+    case KrylovSolver::REFINE: {
+      refine();
+    }; break;
+    case KrylovSolver::GMRES: {
+      assert(x.cols() == 1);
+      gmres([](scalar_t*){});
+    }; break;
+    case KrylovSolver::PREC_GMRES: {
+      assert(x.cols() == 1);
+      gmres(MFsolve);
+    }; break;
+    case KrylovSolver::BICGSTAB: {
+      assert(x.cols() == 1);
+      bicgstab([](scalar_t*){});
+    }; break;
+    case KrylovSolver::PREC_BICGSTAB: {
+      assert(x.cols() == 1);
+      bicgstab(MFsolve);
+    }; break;
     case KrylovSolver::DIRECT: {
-      // TODO bcopy is already a copy, avoid extra copy?
-      std::copy(bcopy, bcopy+n_local, x);
-      prec(x);
+      // TODO bloc is already a copy, avoid extra copy?
+      x = bloc;
+      tree()->multifrontal_solve_dist(x, _mat_mpi->get_dist());
     }; break;
     }
 
     if (this->_opts.mc64job() != 0)
-      permute_vector(x, this->_mc64_cperm, _mat_mpi->get_dist(), this->_comm);
+      // TODO do this in a single routine/comm phase
+      for (std::size_t c=0; c<x.cols(); c++)
+        permute_vector
+          (x.ptr(0,c), this->_mc64_cperm, _mat_mpi->get_dist(), this->_comm);
     if (this->_opts.mc64job() == 5)
-      x_mult_y(n_local, x, this->_mc64_Dc.data());
+      x.scale_rows(this->_mc64_Dc);
 
     t.stop();
     this->perf_counters_stop("DIRECT/GMRES solve");
     this->print_solve_stats(t);
     return ReturnCode::SUCCESS;
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::solve
+  (const scalar_t* b, scalar_t* x, bool use_initial_guess) {
+    auto N = matrix()->size();
+    auto B = ConstDenseMatrixWrapperPtr(N, 1, b, N);
+    DenseMW_t X(N, 1, x, N);
+    return solve(*B, X, use_initial_guess);
+
+    // if (!this->_factored) {
+    //   ReturnCode ierr = this->factor();
+    //   if (ierr != ReturnCode::SUCCESS) return ierr;
+    // }
+    // TaskTimer t("solve");
+    // this->perf_counters_start();
+    // t.start();
+    // auto n_local = _mat_mpi->local_rows();
+    // this->_Krylov_its = 0;
+
+    // auto bcopy = new scalar_t[n_local];
+    // if (this->_opts.mc64job() == 5)
+    //   x_mult_y(n_local, bcopy, this->_mc64_Dr.data(), bcopy);
+    // else std::copy(b, b+n_local, bcopy);
+
+    // auto gmres = [&](std::function<void(scalar_t*)> prec) {
+    //   GMResMPI<scalar_t,integer_t>
+    //   (this->_comm, _mat_mpi.get(), prec, n_local, x, bcopy,
+    //    this->_opts.rel_tol(), this->_opts.abs_tol(),
+    //    this->_Krylov_its, this->_opts.maxit(),
+    //    this->_opts.gmres_restart(), this->_opts.GramSchmidt_type(),
+    //    use_initial_guess, this->_opts.verbose() && this->_is_root);
+    // };
+    // auto bicgstab = [&](std::function<void(scalar_t*)> prec) {
+    //   BiCGStabMPI<scalar_t,integer_t>
+    //   (this->_comm, _mat_mpi.get(), prec, n_local, x, bcopy,
+    //    this->_opts.rel_tol(), this->_opts.abs_tol(),
+    //    this->_Krylov_its, this->_opts.maxit(),
+    //    use_initial_guess, this->_opts.verbose() && this->_is_root);
+    // };
+    // auto prec = [&](scalar_t* x) {
+    //   //MPI_Pcontrol(1, "multifrontal_solve_dist");
+    //   DenseMW_t X(n_local, 1, x, n_local);
+    //   tree()->multifrontal_solve_dist(X, _mat_mpi->get_dist());
+    //   //MPI_Pcontrol(-1, "multifrontal_solve_dist");
+    // };
+    // auto refine = [&]() {
+    //   IterativeRefinementMPI<scalar_t,integer_t>
+    //   (this->_comm, _mat_mpi.get(), prec, n_local, x, bcopy,
+    //    this->_opts.rel_tol(), this->_opts.abs_tol(),
+    //    this->_Krylov_its, this->_opts.maxit(),
+    //    use_initial_guess, this->_opts.verbose() && this->_is_root);
+    // };
+
+    // switch (this->_opts.Krylov_solver()) {
+    // case KrylovSolver::AUTO: {
+    //   if (this->_opts.use_HSS()) gmres(prec);
+    //   else refine();
+    // }; break;
+    // case KrylovSolver::REFINE:     { refine(); }; break;
+    // case KrylovSolver::GMRES:      { gmres([](scalar_t*){}); }; break;
+    // case KrylovSolver::PREC_GMRES: { gmres(prec);  }; break;
+    // case KrylovSolver::BICGSTAB:      { bicgstab([](scalar_t*){}); }; break;
+    // case KrylovSolver::PREC_BICGSTAB: { bicgstab(prec);  }; break;
+    // case KrylovSolver::DIRECT: {
+    //   // TODO bcopy is already a copy, avoid extra copy?
+    //   std::copy(bcopy, bcopy+n_local, x);
+    //   prec(x);
+    // }; break;
+    // }
+
+    // if (this->_opts.mc64job() != 0)
+    //   permute_vector(x, this->_mc64_cperm, _mat_mpi->get_dist(), this->_comm);
+    // if (this->_opts.mc64job() == 5)
+    //   x_mult_y(n_local, x, this->_mc64_Dc.data());
+
+    // t.stop();
+    // this->perf_counters_stop("DIRECT/GMRES solve");
+    // this->print_solve_stats(t);
+    // return ReturnCode::SUCCESS;
   }
 
 } // end namespace strumpack

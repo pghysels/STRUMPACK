@@ -92,6 +92,11 @@ MPIRealType { typedef T value_type; };
 template<class T> struct
 MPIRealType<std::complex<T>>{ typedef T value_type; };
 
+template<typename T> T Allreduce(T t, MPI_Op op, MPI_Comm comm) {
+  MPI_Allreduce(MPI_IN_PLACE, &t, 1, mpi_type<T>(), op, comm);
+  return t;
+}
+
 template<typename scalar_t> typename MPIRealType<scalar_t>::value_type
 nrm2_omp_mpi(int N, scalar_t* X, int incx, MPI_Comm comm) {
   using real_t = typename MPIRealType<scalar_t>::value_type;

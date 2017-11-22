@@ -33,6 +33,7 @@
 
 #include "StrumpackParameters.hpp"
 #include "CompressedSparseMatrix.hpp"
+#include "dense/DenseMatrix.hpp"
 
 namespace strumpack {
 
@@ -43,37 +44,38 @@ namespace strumpack {
   template <typename scalar_t,typename integer_t>
   void IterativeRefinement
   (const CompressedSparseMatrix<scalar_t,integer_t>& A,
-   const std::function<void(scalar_t*)>& direct_solve, integer_t n,
-   scalar_t* x, const scalar_t* b, real_t rtol, real_t atol,
-   int& totit, int maxit, bool non_zero_guess, bool verbose) {
+   const std::function<void(DenseMatrix<scalar_t>&)>& direct_solve,
+   DenseMatrix<scalar_t>& x, const DenseMatrix<scalar_t>& b,
+   real_t rtol, real_t atol, int& totit, int maxit,
+   bool non_zero_guess, bool verbose) {
     using real_t = typename RealType<scalar_t>::value_type;
-    auto r = new scalar_t[n];
+    DenseMatrix<scalar_t> r(x.rows(), x.cols());
     if (non_zero_guess) {
       A.omp_spmv(x, r);
-      blas::axpby(n, scalar_t(1.), b, 1, scalar_t(-1.), r, 1);
+      r.scale_and_add(scalar_t(-1.), b);
     } else {
-      std::copy(b, b+n, r);
-      std::fill(x, x+n, scalar_t(0.));
+      r = b;
+      x.zero();
     }
-    auto res_norm = blas::nrm2(n, r, 1);
+    auto res_norm = r.norm();
     auto res0 = res_norm;
     auto rel_res_norm = real_t(1.);
     auto bw_error = real_t(1.);
     totit = 0;
     if (verbose)
-      std::cout << "REFINEMENT it. " << totit << "\tres = "
-                << std::setw(12) << res_norm
+      std::cout << "REFINEMENT it. " << totit
+                << "\tres = " << std::setw(12) << res_norm
                 << "\trel.res = " << std::setw(12) << rel_res_norm
                 << "\tbw.error = " << std::setw(12) << bw_error
                 << std::endl;
     while (res_norm > atol && rel_res_norm > rtol &&
            totit++ < maxit && bw_error > atol) {
       direct_solve(r);
-      blas::axpy(n, scalar_t(1.), r, 1, x, 1);
+      x.add(r);
       bw_error = A.max_scaled_residual(x, b);
       A.omp_spmv(x, r);
-      blas::axpby(n, scalar_t(1.), b, 1, scalar_t(-1.), r, 1);
-      res_norm = blas::nrm2(n, r, 1);
+      r.scale_and_add(scalar_t(-1.), b);
+      res_norm = r.norm();
       rel_res_norm = res_norm / res0;
       if (verbose)
         std::cout << "REFINEMENT it. " << totit << "\tres = "
@@ -82,7 +84,6 @@ namespace strumpack {
                   << "\tbw.error = " << std::setw(12) << bw_error
                   << std::endl;
     }
-    delete[] r;
   }
 
 } // end namespace strumpack

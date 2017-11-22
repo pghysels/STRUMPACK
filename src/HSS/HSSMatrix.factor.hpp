@@ -100,7 +100,7 @@ namespace strumpack {
         f._piv = f._D.LU(depth);
         if (partial) f._Vt0 = std::move(Vh);
       } else {
-        f._D.laswp(_U.P(), true); //permute_rows_fwd(_U.P()); // compute P^t D
+        f._D.laswp(_U.P(), true); // compute P^t D
         if (_U.rows() > _U.cols()) {
           // set W1 <- (P^t D)_0
           f._W1 = DenseM_t(_U.cols(), _U.rows(), f._D, 0, 0);

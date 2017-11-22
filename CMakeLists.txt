@@ -158,10 +158,8 @@ else()
   set(STRUMPACK_ALL_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_DEBUG}")
 endif()
 
-
-#  src/StrumpackSparseSolver.cpp
-
 set(LIBSRC
+  src/StrumpackSparseSolver.cpp
   src/StrumpackParameters.cpp
   src/misc/TaskTimer.cpp)
 

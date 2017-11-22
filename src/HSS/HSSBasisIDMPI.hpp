@@ -65,7 +65,7 @@ namespace strumpack {
       DistM_t ret(E().ctxt(), rows(), cols());
       ret.eye();
       copy(rows()-cols(), cols(), E(), 0, 0, ret, cols(), 0, E().ctxt());
-      ret.laswp(P(), false); //permute_rows_bwd(P());
+      ret.laswp(P(), false);
       return ret;
     }
 
@@ -81,7 +81,7 @@ namespace strumpack {
         tmpC(E().rows(), b.cols(), c, cols(), 0);
       if (E().rows())
         gemm(Trans::N, Trans::N, scalar_t(1), E(), b, scalar_t(0.), tmpC);
-      c.laswp(P(), false); //permute_rows_bwd(P());
+      c.laswp(P(), false);
       return c;
     }
 
@@ -95,7 +95,7 @@ namespace strumpack {
         tmpC(E().rows(), b.cols(), c, cols(), 0);
       if (E().rows())
         gemm(Trans::N, Trans::N, scalar_t(1), E(), b, scalar_t(0.), tmpC);
-      c.laswp(P(), false); //permute_rows_bwd(P());
+      c.laswp(P(), false);
     }
 
     template<typename scalar_t> DistributedMatrix<scalar_t>
@@ -105,7 +105,7 @@ namespace strumpack {
         return DistM_t(b.ctxt(), E().cols(), b.cols());
       assert(b.rows() == int(rows()));
       DistM_t PtB(b);
-      PtB.laswp(P(), true); //permute_rows_fwd(P());
+      PtB.laswp(P(), true);
       if (!E().rows()) return PtB;
       DistM_t c(b.ctxt(), cols(), b.cols());
       copy(cols(), b.cols(), PtB, 0, 0, c, 0, 0, b.ctxt());
@@ -124,10 +124,10 @@ namespace strumpack {
       assert(c.rows() == int(cols()));
       if (!E().rows()) {
         copy(b.rows(), b.cols(), b, 0, 0, c, 0, 0, b.ctxt());
-        c.laswp(P(), true);// permute_rows_fwd(P());
+        c.laswp(P(), true);
       } else {
         DistM_t PtB(b);
-        PtB.laswp(P(), true); //permute_rows_fwd(P());
+        PtB.laswp(P(), true);
         copy(cols(), b.cols(), PtB, 0, 0, c, 0, 0, b.ctxt());
         if (!E().rows()) return;
         auto tmpPtB = ConstDistributedMatrixWrapperPtr

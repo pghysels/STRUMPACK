@@ -754,13 +754,14 @@ namespace strumpack {
         int_mc64_cperm[i] = _mc64_cperm[i] + 1;
     }
 
-    auto b_loc = b;
+    auto bloc = b;
     if (_opts.mc64job() == 5)
-      b_loc.scale_rows(_mc64_Dr);
-    b_loc.lapmr(intIP, true);
+      bloc.scale_rows(_mc64_Dr);
+    bloc.lapmr(intIP, true);
 
     if (use_initial_guess &&
         _opts.Krylov_solver() != KrylovSolver::DIRECT) {
+      // TODO test this!!!
       if (_opts.mc64job() == 5)
         x.div_rows(_mc64_Dc);
       if (_opts.mc64job() != 0)
@@ -772,50 +773,58 @@ namespace strumpack {
 
     auto gmres_solve = [&](std::function<void(scalar_t*)> preconditioner) {
       GMRes<scalar_t,integer_t>
-      (*matrix(), preconditioner, x.rows(), x.data(), b_loc.data(),
+      (*matrix(), preconditioner, x.rows(), x.data(), bloc.data(),
        _opts.rel_tol(), _opts.abs_tol(), _Krylov_its, _opts.maxit(),
        _opts.gmres_restart(), _opts.GramSchmidt_type(),
        use_initial_guess, _opts.verbose() && _is_root);
     };
     auto bicgstab_solve = [&](std::function<void(scalar_t*)> preconditioner) {
       BiCGStab<scalar_t,integer_t>
-      (*matrix(), preconditioner, x.rows(), x.data(), b_loc.data(),
+      (*matrix(), preconditioner, x.rows(), x.data(), bloc.data(),
        _opts.rel_tol(), _opts.abs_tol(), _Krylov_its, _opts.maxit(),
        use_initial_guess, _opts.verbose() && _is_root);
     };
     auto MFsolve = [&](scalar_t* w) {
-      DenseMW_t X(x.rows(), x.cols(), w, x.rows());
+      DenseMW_t X(x.rows(), 1, w, x.ld());
       tree()->multifrontal_solve(X);
     };
     auto refine = [&]() {
+      tree()->multifrontal_solve(x);
       IterativeRefinement<scalar_t,integer_t>
-      (*matrix(), MFsolve, x.rows(), x.data(), b_loc.data(),
-       _opts.rel_tol(), _opts.abs_tol(), _Krylov_its, _opts.maxit(),
-       use_initial_guess, _opts.verbose() && _is_root);
+      (*matrix(), [&](DenseM_t& w) { tree()->multifrontal_solve(w); },
+       x, bloc, _opts.rel_tol(), _opts.abs_tol(),
+       _Krylov_its, _opts.maxit(), use_initial_guess,
+       _opts.verbose() && _is_root);
     };
 
     switch (_opts.Krylov_solver()) {
     case KrylovSolver::AUTO: {
-      if (_opts.use_HSS()) gmres_solve(MFsolve);
-      else refine();
+      if (_opts.use_HSS()) {
+        assert(x.cols() == 1);
+        gmres_solve(MFsolve);
+      } else refine();
     }; break;
     case KrylovSolver::DIRECT: {
-      x = b_loc;
+      x = bloc;
       tree()->multifrontal_solve(x);
     }; break;
     case KrylovSolver::REFINE: {
       refine();
     }; break;
     case KrylovSolver::PREC_GMRES: {
+      assert(x.cols() == 1);
       gmres_solve(MFsolve);
     }; break;
     case KrylovSolver::GMRES: {
+      assert(x.cols() == 1);
       gmres_solve([](scalar_t* x){});
     }; break;
     case KrylovSolver::PREC_BICGSTAB: {
+      assert(x.cols() == 1);
       bicgstab_solve(MFsolve);
     }; break;
     case KrylovSolver::BICGSTAB: {
+      assert(x.cols() == 1);
       bicgstab_solve([](scalar_t* x){});
     }; break;
     }

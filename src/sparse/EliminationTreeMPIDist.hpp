@@ -109,6 +109,7 @@ namespace strumpack {
        int _ctxt, int pr, int pc)
         : sep_begin(lo), sep_end(hi), P0(_P0), P(_P), ctxt(_ctxt),
           prows(pr), pcols(pc) {}
+      std::size_t dim_sep() const { return sep_end - sep_begin; }
       std::size_t sep_begin, sep_end;
       int P0, P, ctxt, prows, pcols;
     };
@@ -219,8 +220,6 @@ namespace strumpack {
 
     delete[] local_upd;
     delete[] local_subtree_work;
-    _all_pfronts.clear();
-    _all_pfronts.shrink_to_fit();
   }
 
   template<typename scalar_t,typename integer_t>
@@ -379,124 +378,165 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPIDist<scalar_t,integer_t>::multifrontal_solve_dist
-  (DenseM_t& xd, const std::vector<integer_t>& dist) {
-    // TODO multiple RHS
-    auto x = xd.data();
-
-    auto lo = dist[_rank];
-    auto n = dist[_rank+1] - lo;
+  (DenseM_t& x, const std::vector<integer_t>& dist) {
+    const std::size_t B = DistM_t::default_MB;
+    const std::size_t lo = dist[_rank];
+    const std::size_t m = dist[_rank+1] - lo;
+    const std::size_t n = x.cols();
     auto ibuf = new int[4*_P];
     auto scnts = ibuf;
     auto rcnts = ibuf + _P;
     auto sdispls = ibuf + 2*_P;
     auto rdispls = ibuf + 3*_P;
-    struct IdxVal { integer_t idx; scalar_t val; };
-    auto sbuf = new IdxVal[n];
+    // TODO use Triplet / std::tuple
+    struct RCVal { int r, c; scalar_t v; };
+    auto sbuf = new RCVal[m*n];
     // since some C++ pad the struct IdxVal must zero the array or
     // will get valgrind warnings about MPI sending uninitialized data
-    memset(sbuf,0,n*sizeof(IdxVal));
-    auto pp = new IdxVal*[_P];
+    memset(sbuf,0,m*n*sizeof(RCVal));
+    auto pp = new RCVal*[_P];
     std::fill(scnts, scnts+_P, 0);
-    for (integer_t i=0; i<n; i++)
-      scnts[_row_owner[i]]++;
+    if (n == 1) {
+      for (std::size_t r=0; r<m; r++)
+        scnts[_row_owner[r]]++;
+    } else {
+      for (std::size_t r=0; r<m; r++) {
+        auto permr = _nd.perm[r+lo];
+        int pf = _row_pfront[permr];
+        if (pf < 0)
+          scnts[_row_owner[r]] += n;
+        else {
+          auto& f = _all_pfronts[pf];
+          for (std::size_t c=0; c<n; c++)
+            scnts[_row_owner[r] + ((c / B) % f.pcols) * f.prows]++;
+        }
+      }
+    }
     sdispls[0] = 0;
     pp[0] = sbuf;
-    for (integer_t p=1; p<_P; p++) {
+    for (int p=1; p<_P; p++) {
       sdispls[p] = sdispls[p-1] + scnts[p-1];
       pp[p] = sbuf + sdispls[p];
     }
-    for (integer_t i=0; i<n; i++) {
-      auto p = _row_owner[i];
-      pp[p]->idx = _nd.perm[i+lo];
-      pp[p]->val = x[i];
-      pp[p]++;
-    }
-    for (integer_t p=0; p<_P; p++) {
-      sdispls[p] *= sizeof(IdxVal); // convert to bytes
-      scnts[p] *= sizeof(IdxVal);
+    if (n == 1) {
+      for (std::size_t r=0; r<m; r++) {
+        auto dest = _row_owner[r];
+        pp[dest]->r = _nd.perm[r+lo];
+        pp[dest]->c = 0;
+        pp[dest]->v = x(r,0);
+        pp[dest]++;
+      }
+    } else {
+      for (std::size_t r=0; r<m; r++) {
+        auto destr = _row_owner[r];
+        auto permr = _nd.perm[r+lo];
+        int pf = _row_pfront[permr];
+        if (pf < 0) {
+          for (std::size_t c=0; c<n; c++) {
+            pp[destr]->r = permr;
+            pp[destr]->c = c;
+            pp[destr]->v = x(r,c);
+            pp[destr]++;
+          }
+        } else {
+          auto& f = _all_pfronts[pf];
+          for (std::size_t c=0; c<n; c++) {
+            auto dest = destr + ((c / B) % f.pcols) * f.prows;
+            pp[dest]->r = permr;
+            pp[dest]->c = c;
+            pp[dest]->v = x(r,c);
+            pp[dest]++;
+          }
+        }
+      }
     }
     MPI_Alltoall
-      (scnts, 1, mpi_type<int>(), rcnts, 1,
-       mpi_type<int>(), this->_comm);
+      (scnts, 1, mpi_type<int>(), rcnts, 1, mpi_type<int>(), this->_comm);
     rdispls[0] = 0;
     std::size_t rsize = rcnts[0];
     for (int p=1; p<_P; p++) {
       rdispls[p] = rdispls[p-1] + rcnts[p-1];
       rsize += rcnts[p];
     }
-    rsize /= sizeof(IdxVal);
-    auto rbuf = new IdxVal[rsize];
+    auto rbuf = new RCVal[rsize];
+    MPI_Datatype RCVal_mpi_type;
+    MPI_Type_contiguous(sizeof(RCVal), MPI_BYTE, &RCVal_mpi_type);
+    MPI_Type_commit(&RCVal_mpi_type);
     MPI_Alltoallv
-      (sbuf, scnts, sdispls, MPI_BYTE, rbuf, rcnts, rdispls,
-       MPI_BYTE, this->_comm);
-    auto x_loc = new scalar_t[_local_range.second - _local_range.first];
-    auto x_dist = new DistM_t[_local_pfronts.size()];
+      (sbuf, scnts, sdispls, RCVal_mpi_type, rbuf, rcnts, rdispls,
+       RCVal_mpi_type, this->_comm);
+    DenseM_t xloc(_local_range.second - _local_range.first, n);
+    DenseMW_t Xloc
+      (_Aprop.size(), n, xloc.data()-_local_range.first, xloc.ld());
+    auto xdist = new DistM_t[_local_pfronts.size()];
 
-    // TODO precompute to which front each local row belongs!!
     for (std::size_t f=0; f<_local_pfronts.size(); f++)
-      x_dist[f] = DistM_t
-        (_local_pfronts[f].ctxt,
-         _local_pfronts[f].sep_end - _local_pfronts[f].sep_begin, xd.cols());
-
+      xdist[f] = DistM_t
+        (_local_pfronts[f].ctxt, _local_pfronts[f].dim_sep(), n);
 #pragma omp parallel for
     for (std::size_t i=0; i<rsize; i++) {
-      std::size_t r = rbuf[i].idx;
+      std::size_t r = rbuf[i].r;
+      std::size_t c = rbuf[i].c;
       if (r >= _local_range.first && r < _local_range.second)
-        x_loc[r - _local_range.first] = rbuf[i].val;
+        Xloc(r, c) = rbuf[i].v;
       else {
         for (std::size_t f=0; f<_local_pfronts.size(); f++)
           if (r >= _local_pfronts[f].sep_begin &&
               r < _local_pfronts[f].sep_end) {
-            x_dist[f].global(r-_local_pfronts[f].sep_begin, 0) =
-              rbuf[i].val;
+            xdist[f].global(r - _local_pfronts[f].sep_begin, c) = rbuf[i].v;
             break;
           }
       }
     }
 
-    DenseMW_t Xloc
-      (_Aprop.size(), 1, x_loc-_local_range.first,
-       _local_range.second - _local_range.first);
-    this->_root->multifrontal_solve(Xloc, x_dist);
+    this->_root->multifrontal_solve(Xloc, xdist);
 
     std::swap(rbuf, sbuf);
     rcnts = ibuf;
     scnts = ibuf + _P;
     rdispls = ibuf + 2*_P;
     sdispls = ibuf + 3*_P;
-    for (integer_t p=0; p<_P; p++)
-      pp[p] = sbuf + sdispls[p] / sizeof(IdxVal);
+    for (int p=0; p<_P; p++)
+      pp[p] = sbuf + sdispls[p];
     for (std::size_t r=_local_range.first; r<_local_range.second; r++) {
       auto dest = std::upper_bound
         (dist.begin(), dist.end(), _nd.iperm[r])-dist.begin()-1;
-      pp[dest]->idx = _nd.iperm[r];
-      pp[dest]->val = x_loc[r-_local_range.first];
-      pp[dest]++;
+      auto permgr = _nd.iperm[r];
+      for (std::size_t c=0; c<n; c++) {
+        pp[dest]->r = permgr;
+        pp[dest]->c = c;
+        pp[dest]->v = Xloc(r,c);
+        pp[dest]++;
+      }
     }
     for (std::size_t i=0; i<_local_pfronts.size(); i++) {
-      if (x_dist[i].lcols() == 0) continue;
+      if (xdist[i].lcols() == 0) continue;
       auto slo = _local_pfronts[i].sep_begin;
-      for (int r=0; r<x_dist[i].lrows(); r++) {
-        auto gr = x_dist[i].rowl2g(r) + slo;
+      for (int r=0; r<xdist[i].lrows(); r++) {
+        auto gr = xdist[i].rowl2g(r) + slo;
+        auto permgr = _nd.iperm[gr];
         auto dest = std::upper_bound
-          (dist.begin(), dist.end(), _nd.iperm[gr])-dist.begin()-1;
-        pp[dest]->idx = _nd.iperm[gr];
-        pp[dest]->val = x_dist[i](r, 0);
-        pp[dest]++;
+          (dist.begin(), dist.end(), permgr)-dist.begin()-1;
+        for (int c=0; c<xdist[i].lcols(); c++) {
+          pp[dest]->r = permgr;
+          pp[dest]->c = xdist[i].coll2g(c);
+          pp[dest]->v = xdist[i](r,c);
+          pp[dest]++;
+        }
       }
     }
     delete[] pp;
     MPI_Alltoallv
-      (sbuf, scnts, sdispls, MPI_BYTE, rbuf, rcnts,
-       rdispls, MPI_BYTE, this->_comm);
+      (sbuf, scnts, sdispls, RCVal_mpi_type, rbuf, rcnts,
+       rdispls, RCVal_mpi_type, this->_comm);
+    MPI_Type_free(&RCVal_mpi_type);
     delete[] sbuf;
     delete[] ibuf;
 #pragma omp parallel for
-    for (integer_t i=0; i<n; i++)
-      x[rbuf[i].idx-lo] = rbuf[i].val;
+    for (std::size_t i=0; i<m*n; i++)
+      x(rbuf[i].r-lo,rbuf[i].c) = rbuf[i].v;
     delete[] rbuf;
-    delete[] x_loc;
-    delete[] x_dist;
+    delete[] xdist;
   }
 
   template<typename scalar_t,typename integer_t> void

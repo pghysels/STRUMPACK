@@ -99,7 +99,7 @@ namespace strumpack {
             w.reduced_rhs.add(_V.applyC(vconcat(w.c[0].z, w.c[1].z), depth));
         }
       } else {
-        f.laswp(_U.P(), true); //permute_rows_fwd(_U.P());
+        f.laswp(_U.P(), true);
         if (this->U_rows() > this->U_rank()) {
           w.ft1 = DenseM_t(this->U_rank(), f.cols(), f, 0, 0);
           w.y = DenseM_t    // put ft0 in w.y

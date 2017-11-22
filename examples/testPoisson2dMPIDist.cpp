@@ -86,20 +86,29 @@ int main(int argc, char* argv[]) {
     /** build distributed matrix from complete replicated original matrix ***/
     /** TODO directly construct distributed matrix **************************/
     CSRMatrixMPI<scalar,integer> Adist(&A, MPI_COMM_WORLD, false);
-
-    // TODO, delete the global A
+    A = CSRMatrix<scalar,integer>();
 
     auto n_local = Adist.local_rows();
-    std::vector<scalar> b(n_local, scalar(1.)), x(n_local, scalar(0.));
+    int nrhs = 50;
+    DenseMatrix<scalar> b(n_local, nrhs), x(n_local, nrhs),
+      x_exact(n_local, nrhs);
+    x_exact.random();
+    Adist.omp_spmv(x_exact, b);
+
     spss.set_matrix(Adist);
     spss.reorder(n, n);
     spss.factor();
-    spss.solve(b.data(), x.data());
+    spss.solve(b, x);
 
-    auto scaled_res = Adist.max_scaled_residual(x.data(), b.data());
-    if (!myrank)
+    auto scaled_res = Adist.max_scaled_residual(x, b);
+    x.scaled_add(-1., x_exact);
+    auto relerr = x.normF() / x_exact.normF();
+    if (!myrank) {
       std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
                 << scaled_res << std::endl;
+      std::cout << "# relative error = ||x-x_exact||_F/||x_exact||_F = "
+                << relerr << std::endl;
+    }
   }
   TimerList::Finalize();
   scalapack::Cblacs_exit(1);

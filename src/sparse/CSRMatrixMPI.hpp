@@ -77,8 +77,8 @@ namespace strumpack {
     CSRMatrixMPI(const CSRMatrixMPI<scalar_t,integer_t>& A);
     CSRMatrixMPI
     (const CSRMatrix<scalar_t,integer_t>* A, MPI_Comm c, bool only_at_root);
-    CSRMatrixMPI<scalar_t,integer_t>& operator=
-    (CSRMatrixMPI<scalar_t,integer_t> A);
+    // CSRMatrixMPI<scalar_t,integer_t>& operator=
+    // (CSRMatrixMPI<scalar_t,integer_t> A);
 
     inline const std::vector<integer_t>& get_dist() const { return _dist; }
     inline std::vector<integer_t>& get_dist() { return _dist; }
@@ -108,10 +108,7 @@ namespace strumpack {
     int read_matrix_market(const std::string& filename) override;
 
     real_t max_scaled_residual
-    (const DenseM_t& x, const DenseM_t& b) const override {
-      std::cout << "TODO, CSRMatrixMPI::max_scaled_residual" << std::endl;
-      return real_t(1.);
-    }
+    (const DenseM_t& x, const DenseM_t& b) const override;
     real_t max_scaled_residual
     (const scalar_t* x, const scalar_t* b) const override;
 
@@ -383,13 +380,15 @@ namespace strumpack {
     check();
   }
 
-  template<typename scalar_t,typename integer_t>
-  CSRMatrixMPI<scalar_t,integer_t>&
-  CSRMatrixMPI<scalar_t,integer_t>::operator=
-  (CSRMatrixMPI<scalar_t,integer_t> A) {
-    A.swap(*this);
-    return *this;
-  }
+
+  // TODO implement this, implement a move constructor
+  // template<typename scalar_t,typename integer_t>
+  // CSRMatrixMPI<scalar_t,integer_t>&
+  // CSRMatrixMPI<scalar_t,integer_t>::operator=
+  // (CSRMatrixMPI<scalar_t,integer_t> A) {
+  //   std::swap(A, *this);
+  //   return *this;
+  // }
 
   template<typename scalar_t,typename integer_t> void
   CSRMatrixMPI<scalar_t,integer_t>::print() const {
@@ -702,15 +701,17 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   CSRMatrixMPI<scalar_t,integer_t>::spmv
   (const DenseM_t& x, DenseM_t& y) const {
-    assert(x.cols() == 1);
-    omp_spmv(x.data(), y.data());
+    omp_spmv(x, y);
   }
 
   template<typename scalar_t,typename integer_t> void
   CSRMatrixMPI<scalar_t,integer_t>::omp_spmv
   (const DenseM_t& x, DenseM_t& y) const {
-    assert(x.cols() == 1);
-    omp_spmv(x.data(), y.data());
+    assert(x.cols() == y.cols());
+    assert(x.rows() == std::size_t(this->local_rows()));
+    assert(y.rows() == std::size_t(this->local_rows()));
+    for (std::size_t c=0; c<x.cols(); c++)
+      omp_spmv(x.ptr(0,c), y.ptr(0,c));
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -1058,6 +1059,17 @@ namespace strumpack {
     // then make a Distributed matrix from the sequential one
     // Aydin has code for MPI-IO input of matrix-market file
     return 0;
+  }
+
+
+  template<typename scalar_t,typename integer_t>
+  typename RealType<scalar_t>::value_type
+  CSRMatrixMPI<scalar_t,integer_t>::max_scaled_residual
+  (const DenseM_t& x, const DenseM_t& b) const {
+    real_t res(0.);
+    for (std::size_t c=0; c<x.cols(); c++)
+      res = std::max(res, max_scaled_residual(x.ptr(0,c), b.ptr(0,c)));
+    return res;
   }
 
   template<typename scalar_t,typename integer_t>

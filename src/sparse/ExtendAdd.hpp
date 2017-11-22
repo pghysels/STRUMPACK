@@ -312,7 +312,7 @@ namespace strumpack {
       for (int r=r_upd; r<lrows; r++)
         pr[r] = ((I[CB.rowl2g_fixed(r)]-pa_sep) / B) % prows;
       for (int c=0; c<lcols; c++)
-        pc[c] = ((c / B) % pcols) * prows;
+        pc[c] = ((CB.coll2g_fixed(c) / B) % pcols) * prows;
       { // reserve space for the send buffers
         std::vector<std::size_t> cnt(sbuf.size());
         for (int c=0; c<lcols; c++)
@@ -428,7 +428,6 @@ namespace strumpack {
       auto r_2 = r_1 + b.lrows();
       auto upd_c_1 = r_2 + bupd.lrows();
       integer_t r_max_1 = 0, r_max_2 = 0;
-      //integer_t c_max_1 = 0, c_max_2 = 0;
       for (int r=0, ur=0; r<b.lrows(); r++) {
         auto fgr = b.rowl2g_fixed(r) + pa_sep;
         while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
@@ -437,6 +436,7 @@ namespace strumpack {
         r_1[r_max_1] = r;
         upd_r_1[r_max_1++] = (ur / B) % prows;
       }
+      // TODO ur can just continue from before?
       for (int r=0, ur=0; r<bupd.lrows(); r++) {
         auto fgr = pa_upd[bupd.rowl2g_fixed(r)];
         while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
@@ -445,7 +445,7 @@ namespace strumpack {
         r_2[r_max_2] = r;
         upd_r_2[r_max_2++] = (ur / B) % prows;
       }
-      for (int c=0; c<b.lcols(); c++)
+      for (int c=0; c<lcols; c++)
         upd_c_1[c] = ((b.coll2g_fixed(c) / B) % pcols) * prows;
       for (int c=0; c<lcols; c++)
         for (int r=0; r<r_max_1; r++)

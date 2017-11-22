@@ -100,7 +100,7 @@ namespace strumpack {
         f._piv = f._D.LU();
         if (partial) f._Vt0 = std::move(Vh);
       } else {
-        f._D.laswp(_U.P(), true); //permute_rows_fwd(_U.P()); // compute P^t D
+        f._D.laswp(_U.P(), true); // compute P^t D
         if (this->U_rows() > this->U_rank()) {
           f._W1 = DistM_t(_ctxt, this->U_rank(), this->U_rows());
           // set W1 <- (P^t D)_0

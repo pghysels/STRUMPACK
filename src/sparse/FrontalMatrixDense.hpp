@@ -303,7 +303,7 @@ namespace strumpack {
   (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
     if (this->dim_sep()) {
       DenseMW_t bloc(this->dim_sep(), b.cols(), b, this->sep_begin, 0);
-      bloc.laswp(piv, true); //permute_rows_fwd(piv);
+      bloc.laswp(piv, true);
       if (b.cols() == 1) {
         trsv(UpLo::L, Trans::N, Diag::U, F11, bloc, task_depth);
         if (this->dim_upd())

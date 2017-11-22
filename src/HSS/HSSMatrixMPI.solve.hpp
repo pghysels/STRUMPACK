@@ -140,7 +140,7 @@ namespace strumpack {
           if (!this->leaf()) w.reduced_rhs.add(_V.applyC(z));
         }
       } else {
-        f.laswp(_U.P(), true); //permute_rows_fwd(_U.P());
+        f.laswp(_U.P(), true);
         if (this->U_rows() > this->U_rank()) {
           w.ft1 = DistM_t(_ctxt, this->U_rank(), n);
           copy(w.ft1.rows(), n, f, 0, 0, w.ft1, 0, 0, _ctxt_all);
