@@ -50,9 +50,13 @@ int main(int argc, char* argv[]) {
   //     " which might be needed for pt-scotch!" << std::endl;
 
   {
-    int n = 30;
+    int n = 30, nrhs = 1;
     if (argc > 1) n = atoi(argv[1]); // get grid size
     else std::cout << "# please provide grid size" << std::endl;
+    // get number of right-hand sides
+    if (argc > 2) nrhs = std::max(1, atoi(argv[2]));
+    std::cout << "solving 2D " << n << "x" << n << " Poisson problem"
+              << " with " << nrhs << " right hand sides" << std::endl;
 
     StrumpackSparseSolverMPIDist<scalar,integer> spss(MPI_COMM_WORLD);
     spss.options().set_mc64job(0);
@@ -89,7 +93,6 @@ int main(int argc, char* argv[]) {
     A = CSRMatrix<scalar,integer>();
 
     auto n_local = Adist.local_rows();
-    int nrhs = 50;
     DenseMatrix<scalar> b(n_local, nrhs), x(n_local, nrhs),
       x_exact(n_local, nrhs);
     x_exact.random();

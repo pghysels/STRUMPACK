@@ -112,8 +112,6 @@ namespace strumpack {
     (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
      int etree_level=0) const;
 
-    virtual void extend_add_b(F_t* ch, DistM_t& b, scalar_t* wmem, int tag) {}
-    virtual void extract_b(F_t* ch, DistM_t& b, scalar_t* wmem) {}
     void look_left(DistM_t& b_sep, scalar_t* wmem);
     void look_right(DistM_t& y_sep, scalar_t* wmem);
 

@@ -38,8 +38,13 @@ using namespace strumpack;
 
 int main(int argc, char* argv[]) {
   int n = 30;
+  int nrhs = 1;
   if (argc > 1) n = atoi(argv[1]); // get grid size
   else std::cout << "# please provide grid size" << std::endl;
+  // get number of right-hand sides
+  if (argc > 2) nrhs = std::max(1, atoi(argv[2]));
+  std::cout << "solving 2D " << n << "x" << n << " Poisson problem"
+            << " with " << nrhs << " right hand sides" << std::endl;
 
   StrumpackSparseSolver<scalar,integer> spss;
   spss.options().set_mc64job(0);
@@ -69,7 +74,6 @@ int main(int argc, char* argv[]) {
   }
   A.set_symm_sparse();
 
-  int nrhs = 50;
   DenseMatrix<scalar> b(N, nrhs), x(N, nrhs), x_exact(N, nrhs);
   x_exact.random();
   A.omp_spmv(x_exact, b);
