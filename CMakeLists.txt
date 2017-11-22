@@ -51,6 +51,9 @@ include_directories(${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/src)
 FortranCInterface_VERIFY(CXX)
 
 option(USE_OPENMP "Use OpenMP for on-node threading tasking" ON)
+option(ENABLE_DEV_TESTING "Enable extensive testing" OFF)
+option(ENABLE_C_INTERFACE "Build the C interface" ON)
+
 if(USE_OPENMP)
   include(FindOpenMP)
   if(OPENMP_FOUND)
@@ -158,10 +161,14 @@ else()
   set(STRUMPACK_ALL_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_DEBUG}")
 endif()
 
+
 set(LIBSRC
-  src/StrumpackSparseSolver.cpp
   src/StrumpackParameters.cpp
   src/misc/TaskTimer.cpp)
+
+if (ENABLE_C_INTERFACE)
+  list(APPEND LIBSRC src/StrumpackSparseSolver.cpp)
+endif()
 
 set(LIBSRCDENSE
   src/dense/BLASLAPACKOpenMPTask.cpp
@@ -332,14 +339,16 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/pde900.mtx
 configure_file(${CMAKE_SOURCE_DIR}/examples/README
   ${CMAKE_BINARY_DIR}/examples/README COPYONLY)
 
-configure_file(${CMAKE_SOURCE_DIR}/examples/sexample.c
-  ${CMAKE_BINARY_DIR}/examples/sexample.c COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/dexample.c
-  ${CMAKE_BINARY_DIR}/examples/dexample.c COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/cexample.c
-  ${CMAKE_BINARY_DIR}/examples/cexample.c COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/zexample.c
-  ${CMAKE_BINARY_DIR}/examples/zexample.c COPYONLY)
+if (ENABLE_C_INTERFACE)
+  configure_file(${CMAKE_SOURCE_DIR}/examples/sexample.c
+    ${CMAKE_BINARY_DIR}/examples/sexample.c COPYONLY)
+  configure_file(${CMAKE_SOURCE_DIR}/examples/dexample.c
+    ${CMAKE_BINARY_DIR}/examples/dexample.c COPYONLY)
+  configure_file(${CMAKE_SOURCE_DIR}/examples/cexample.c
+    ${CMAKE_BINARY_DIR}/examples/cexample.c COPYONLY)
+  configure_file(${CMAKE_SOURCE_DIR}/examples/zexample.c
+    ${CMAKE_BINARY_DIR}/examples/zexample.c COPYONLY)
+endif()
 configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2d.cpp
   ${CMAKE_BINARY_DIR}/examples/testPoisson2d.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson3d.cpp

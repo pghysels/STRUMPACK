@@ -50,6 +50,8 @@ fi
 if [[ $(hostname -s) = "pieterg-X8DA3" ]]; then
     found_host=true
     cmake ../STRUMPACK -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=../STRUMPACK-install \
+          -DENABLE_DEV_TESTING=ON \
+          -DENABLE_C_INTERFACE=OFF \
           -DCMAKE_CXX_FLAGS="-DCOUNT_FLOPS -DUSE_TASK_TIMER -Wall -Wfatal-errors -Wextra -Wno-unused-parameter" \
           -DMETIS_INCLUDES=$HOME/local/parmetis-4.0.3/metis/include \
           -DMETIS_LIBRARIES=$HOME/local/parmetis-4.0.3/build/Linux-x86_64/libmetis/libmetis.a \
