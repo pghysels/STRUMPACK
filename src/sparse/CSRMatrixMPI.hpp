@@ -390,8 +390,10 @@ namespace strumpack {
       if (rank == 0)
         for (int p=0; p<P; p++)
           scnts[p] = A->get_ptr()[_dist[p+1]] - A->get_ptr()[_dist[p]];
-      MPI_Scatter(scnts, 1, mpi_type<int>(), &_local_nnz,
-                  1, mpi_type<int>(), 0, c);
+      int loc_nnz = 0;
+      MPI_Scatter
+        (scnts, 1, mpi_type<int>(), &loc_nnz, 1, mpi_type<int>(), 0, c);
+      _local_nnz = loc_nnz;
       this->_ptr = new integer_t[_local_rows+1];
       this->_ind = new integer_t[_local_nnz];
       this->_val = new scalar_t[_local_nnz];
