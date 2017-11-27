@@ -761,7 +761,6 @@ namespace strumpack {
 
     if (use_initial_guess &&
         _opts.Krylov_solver() != KrylovSolver::DIRECT) {
-      // TODO test this!!!
       if (_opts.mc64job() == 5)
         x.div_rows(_mc64_Dc);
       if (_opts.mc64job() != 0)
@@ -789,7 +788,6 @@ namespace strumpack {
       tree()->multifrontal_solve(X);
     };
     auto refine = [&]() {
-      tree()->multifrontal_solve(x);
       IterativeRefinement<scalar_t,integer_t>
       (*matrix(), [&](DenseM_t& w) { tree()->multifrontal_solve(w); },
        x, bloc, _opts.rel_tol(), _opts.abs_tol(),
