@@ -797,10 +797,9 @@ namespace strumpack {
 
     switch (_opts.Krylov_solver()) {
     case KrylovSolver::AUTO: {
-      if (_opts.use_HSS()) {
-        assert(x.cols() == 1);
+      if (_opts.use_HSS() && x.cols() == 1)
         gmres_solve(MFsolve);
-      } else refine();
+      else refine();
     }; break;
     case KrylovSolver::DIRECT: {
       x = bloc;
