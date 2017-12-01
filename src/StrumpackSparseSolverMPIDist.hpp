@@ -374,81 +374,10 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> ReturnCode
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::solve
   (const scalar_t* b, scalar_t* x, bool use_initial_guess) {
-    auto N = matrix()->size();
+    auto N = _mat_mpi->local_rows();
     auto B = ConstDenseMatrixWrapperPtr(N, 1, b, N);
     DenseMW_t X(N, 1, x, N);
     return solve(*B, X, use_initial_guess);
-
-    // if (!this->_factored) {
-    //   ReturnCode ierr = this->factor();
-    //   if (ierr != ReturnCode::SUCCESS) return ierr;
-    // }
-    // TaskTimer t("solve");
-    // this->perf_counters_start();
-    // t.start();
-    // auto n_local = _mat_mpi->local_rows();
-    // this->_Krylov_its = 0;
-
-    // auto bcopy = new scalar_t[n_local];
-    // if (this->_opts.mc64job() == 5)
-    //   x_mult_y(n_local, bcopy, this->_mc64_Dr.data(), bcopy);
-    // else std::copy(b, b+n_local, bcopy);
-
-    // auto gmres = [&](std::function<void(scalar_t*)> prec) {
-    //   GMResMPI<scalar_t,integer_t>
-    //   (this->_comm, _mat_mpi.get(), prec, n_local, x, bcopy,
-    //    this->_opts.rel_tol(), this->_opts.abs_tol(),
-    //    this->_Krylov_its, this->_opts.maxit(),
-    //    this->_opts.gmres_restart(), this->_opts.GramSchmidt_type(),
-    //    use_initial_guess, this->_opts.verbose() && this->_is_root);
-    // };
-    // auto bicgstab = [&](std::function<void(scalar_t*)> prec) {
-    //   BiCGStabMPI<scalar_t,integer_t>
-    //   (this->_comm, _mat_mpi.get(), prec, n_local, x, bcopy,
-    //    this->_opts.rel_tol(), this->_opts.abs_tol(),
-    //    this->_Krylov_its, this->_opts.maxit(),
-    //    use_initial_guess, this->_opts.verbose() && this->_is_root);
-    // };
-    // auto prec = [&](scalar_t* x) {
-    //   //MPI_Pcontrol(1, "multifrontal_solve_dist");
-    //   DenseMW_t X(n_local, 1, x, n_local);
-    //   tree()->multifrontal_solve_dist(X, _mat_mpi->get_dist());
-    //   //MPI_Pcontrol(-1, "multifrontal_solve_dist");
-    // };
-    // auto refine = [&]() {
-    //   IterativeRefinementMPI<scalar_t,integer_t>
-    //   (this->_comm, _mat_mpi.get(), prec, n_local, x, bcopy,
-    //    this->_opts.rel_tol(), this->_opts.abs_tol(),
-    //    this->_Krylov_its, this->_opts.maxit(),
-    //    use_initial_guess, this->_opts.verbose() && this->_is_root);
-    // };
-
-    // switch (this->_opts.Krylov_solver()) {
-    // case KrylovSolver::AUTO: {
-    //   if (this->_opts.use_HSS()) gmres(prec);
-    //   else refine();
-    // }; break;
-    // case KrylovSolver::REFINE:     { refine(); }; break;
-    // case KrylovSolver::GMRES:      { gmres([](scalar_t*){}); }; break;
-    // case KrylovSolver::PREC_GMRES: { gmres(prec);  }; break;
-    // case KrylovSolver::BICGSTAB:      { bicgstab([](scalar_t*){}); }; break;
-    // case KrylovSolver::PREC_BICGSTAB: { bicgstab(prec);  }; break;
-    // case KrylovSolver::DIRECT: {
-    //   // TODO bcopy is already a copy, avoid extra copy?
-    //   std::copy(bcopy, bcopy+n_local, x);
-    //   prec(x);
-    // }; break;
-    // }
-
-    // if (this->_opts.mc64job() != 0)
-    //   permute_vector(x, this->_mc64_cperm, _mat_mpi->get_dist(), this->_comm);
-    // if (this->_opts.mc64job() == 5)
-    //   x_mult_y(n_local, x, this->_mc64_Dc.data());
-
-    // t.stop();
-    // this->perf_counters_stop("DIRECT/GMRES solve");
-    // this->print_solve_stats(t);
-    // return ReturnCode::SUCCESS;
   }
 
 } // end namespace strumpack
