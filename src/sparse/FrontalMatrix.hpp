@@ -93,10 +93,10 @@ namespace strumpack {
 
     void multifrontal_solve(DenseM_t& b) const;
     virtual void forward_multifrontal_solve
-    (DenseM_t& b, DenseM_t& bupd, int etree_level=0,
+    (DenseM_t& b, DenseM_t* work, int etree_level=0,
      int task_depth=0) const {};
     virtual void backward_multifrontal_solve
-    (DenseM_t& y, DenseM_t& yupd, int etree_level=0,
+    (DenseM_t& y, DenseM_t* work, int etree_level=0,
      int task_depth=0) const {};
     void extend_add_b
     (const F_t* ch, DenseM_t& b, DenseM_t& bupd, const DenseM_t& CB) const;
@@ -132,6 +132,23 @@ namespace strumpack {
     (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
      bool is_root) {}
 
+
+    // TODO compute this (and levels) once, store it
+    // maybe compute it when setting pointers to the children
+    // create setters/getters for the children
+    integer_t max_dim_upd() const {
+      integer_t max_dupd = dim_upd();
+      if (lchild) max_dupd = std::max(max_dupd, lchild->max_dim_upd());
+      if (rchild) max_dupd = std::max(max_dupd, rchild->max_dim_upd());
+      return max_dupd;
+    }
+    int levels() const {
+      int ll = 0, lr = 0;
+      if (lchild) ll = lchild->levels();
+      if (rchild) lr = rchild->levels();
+      return std::max(ll, lr) + 1;
+    }
+
     integer_t sep;
     integer_t sep_begin;
     integer_t sep_end;
@@ -147,7 +164,7 @@ namespace strumpack {
     virtual long long node_factor_nonzeros() const {
       auto dsep = dim_sep();
       auto dupd = dim_upd();
-      return dsep * ( dsep + 2 * dupd);
+      return dsep * (dsep + 2 * dupd);
     }
     virtual long long dense_node_factor_nonzeros() const {
       return node_factor_nonzeros();
@@ -213,17 +230,6 @@ namespace strumpack {
     return I;
   }
 
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::multifrontal_solve(DenseM_t& b) const {
-    DenseM_t CB;
-    TIMER_TIME(TaskType::FORWARD_SOLVE, 0, t_fwd);
-    forward_multifrontal_solve(b, CB);
-    TIMER_STOP(t_fwd);
-    TIMER_TIME(TaskType::BACKWARD_SOLVE, 0, t_bwd);
-    backward_multifrontal_solve(b, CB);
-    TIMER_STOP(t_bwd);
-  }
 
   // TODO implement in DenseMatrix?? or use upd_to_parent??
   template<typename scalar_t,typename integer_t> inline void
@@ -303,6 +309,21 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
+  FrontalMatrix<scalar_t,integer_t>::multifrontal_solve(DenseM_t& b) const {
+    auto max_dupd = max_dim_upd();
+    auto lvls = levels();
+    std::vector<DenseM_t> CB(lvls);
+    for (auto& cb : CB)
+      cb = DenseM_t(max_dupd, b.cols());
+    TIMER_TIME(TaskType::FORWARD_SOLVE, 0, t_fwd);
+    forward_multifrontal_solve(b, CB.data());
+    TIMER_STOP(t_fwd);
+    TIMER_TIME(TaskType::BACKWARD_SOLVE, 0, t_bwd);
+    backward_multifrontal_solve(b, CB.data());
+    TIMER_STOP(t_bwd);
+  }
+
+  template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::multifrontal_solve
   (DenseM_t& bloc, DistM_t* bdist) const {
     DistM_t CB;
@@ -314,17 +335,30 @@ namespace strumpack {
     backward_multifrontal_solve(bloc, bdist, CB, seqCB);
     TIMER_STOP(t_bwd);
   }
+
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::forward_multifrontal_solve
   (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
    int etree_level) const {
-    forward_multifrontal_solve(bloc, seqbupd, etree_level, 0);
+    auto max_dupd = max_dim_upd();
+    auto lvls = levels();
+    std::vector<DenseM_t> CB(lvls);
+    for (auto& cb : CB)
+      cb = DenseM_t(max_dupd, bloc.cols());
+    forward_multifrontal_solve(bloc, CB.data(), etree_level, 0);
+    seqbupd = CB[0];
   }
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::backward_multifrontal_solve
   (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
    int etree_level) const {
-    backward_multifrontal_solve(yloc, seqyupd, etree_level, 0);
+    auto max_dupd = max_dim_upd();
+    auto lvls = levels();
+    std::vector<DenseM_t> CB(lvls);
+    for (auto& cb : CB)
+      cb = DenseM_t(max_dupd, yloc.cols());
+    CB[0] = seqyupd;
+    backward_multifrontal_solve(yloc, CB.data(), etree_level, 0);
   }
 
   template<typename scalar_t,typename integer_t> long long

@@ -55,8 +55,9 @@ int main(int argc, char* argv[]) {
     else std::cout << "# please provide grid size" << std::endl;
     // get number of right-hand sides
     if (argc > 2) nrhs = std::max(1, atoi(argv[2]));
-    std::cout << "solving 2D " << n << "x" << n << " Poisson problem"
-              << " with " << nrhs << " right hand sides" << std::endl;
+    if (!myrank)
+      std::cout << "solving 2D " << n << "x" << n << " Poisson problem"
+                << " with " << nrhs << " right hand sides" << std::endl;
 
     StrumpackSparseSolverMPIDist<scalar,integer> spss(MPI_COMM_WORLD);
     spss.options().set_mc64job(0);
