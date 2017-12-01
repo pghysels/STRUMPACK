@@ -513,11 +513,11 @@ namespace strumpack {
           (_H->child(0)->ctxt(_H->ctxt_loc()), y.rows(), y.cols());
         copy(y.rows(), y.cols(), y, 0, 0, ly, 0, 0, this->ctxt_all);
         if (this->dim_upd()) {
-          DistM_t wx(_H->ctxt(), _Phi.cols(), yupd.cols());
-          copy(wx.rows(), wx.cols(), _ULVwork->x, 0, 0,
-               wx, 0, 0, this->ctxt_all);
-          DistMW_t yupdHctxt
-            (_H->ctxt(), this->dim_upd(), y.cols(), yupd.data());
+          // TODO can these copies be avoided??
+          DistM_t wx
+            (_H->ctxt(), _Phi.cols(), yupd.cols(), _ULVwork->x, this->ctxt_all);
+          DistM_t yupdHctxt
+            (_H->ctxt(), this->dim_upd(), y.cols(), yupd, this->ctxt_all);
           gemm(Trans::C, Trans::N, scalar_t(-1.), _Phi, yupdHctxt,
                scalar_t(1.), wx);
           copy(wx.rows(), wx.cols(), wx, 0, 0,
