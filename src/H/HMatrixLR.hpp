@@ -162,7 +162,7 @@ namespace strumpack {
       opts_t _opts;
       void draw(std::ostream& of, std::size_t rlo=0, std::size_t clo=0) const;
       std::vector<int> LU(int task_depth);
-      void permute_rows_fwd(const std::vector<int>& piv);
+      void laswp(const std::vector<int>& piv, bool fwd);
 
       template<typename T> friend
       void draw(std::unique_ptr<HMatrixBase<T>> const&, const std::string&);
@@ -203,9 +203,9 @@ namespace strumpack {
       return std::vector<int>();
     }
     template<typename scalar_t> void
-    HMatrixLR<scalar_t>::permute_rows_fwd(const std::vector<int>& piv) {
+    HMatrixLR<scalar_t>::laswp(const std::vector<int>& piv, bool fwd) {
       assert(piv.size() == rows());
-      _U.permute_rows_fwd(piv);
+      _U.laswp(piv, fwd);
     }
 
   } // end namespace H

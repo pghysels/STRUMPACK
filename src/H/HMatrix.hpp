@@ -170,7 +170,7 @@ namespace strumpack {
       std::unique_ptr<HMatrixBase<scalar_t>> _H11;
       void draw(std::ostream& of, std::size_t rlo=0, std::size_t clo=0) const;
       std::vector<int> LU(int task_depth);
-      void permute_rows_fwd(const std::vector<int>& piv);
+      void laswp(const std::vector<int>& piv, bool fwd);
       template<typename T>
       friend void draw(std::unique_ptr<HMatrixBase<T>> const&,
                        const std::string&);
@@ -205,8 +205,8 @@ namespace strumpack {
       return out;
     }
     template<typename scalar_t> void
-    HMatrix<scalar_t>::draw(std::ostream& of,
-                            std::size_t rlo, std::size_t clo) const {
+    HMatrix<scalar_t>::draw
+    (std::ostream& of, std::size_t rlo, std::size_t clo) const {
       H00().draw(of, rlo, clo);
       H01().draw(of, rlo, clo+H00().cols());
       H10().draw(of, rlo+H00().rows(), clo);
@@ -215,7 +215,7 @@ namespace strumpack {
     template<typename scalar_t> std::vector<int>
     HMatrix<scalar_t>::LU(int task_depth) {
       auto piv0 = H00().LU(task_depth);
-      H01().permute_rows_fwd(piv0);
+      H01().laswp(piv0, true);
       // trsm(Side::L, UpLo::L, Trans::N, Diag::U,
       //      scalar_t(1.), H00(), H01(), task_depth);
       // trsm(Side::R, UpLo::U, Trans::N, Diag::N,
@@ -229,14 +229,14 @@ namespace strumpack {
       return piv0;
     }
     template<typename scalar_t> void
-    HMatrix<scalar_t>::permute_rows_fwd(const std::vector<int>& piv) {
+    HMatrix<scalar_t>::laswp(const std::vector<int>& piv, bool fwd) {
       assert(piv.size() == rows());
       std::vector<int> piv0(piv.begin(), piv.begin()+H00().rows());
       std::vector<int> piv1(piv.begin()+H00().rows(), piv.end());
       auto m0 = H00().rows();
       for (auto& i : piv1) i -= m0;
-      H00().permute_rows_fwd(piv0);  H01().permute_rows_fwd(piv0);
-      H10().permute_rows_fwd(piv1);  H11().permute_rows_fwd(piv1);
+      H00().laswp(piv0, fwd);  H01().laswp(piv0, fwd);
+      H10().laswp(piv1, fwd);  H11().laswp(piv1, fwd);
     }
 
   } // end namespace H

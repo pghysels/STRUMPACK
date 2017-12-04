@@ -34,7 +34,7 @@
 #include <fstream>
 #include <string>
 
-#include "DenseMatrix.hpp"
+#include "dense/DenseMatrix.hpp"
 #include "HOptions.hpp"
 
 namespace strumpack {
@@ -73,6 +73,13 @@ namespace strumpack {
           _c[1].refine(leaf_size);
         }
       }
+      bool operator==(const HBlockPartition& other) const {
+        // TODO also check the children??
+        return _lo == other._lo && _hi == other._hi;
+      }
+      bool operator!=(const HBlockPartition& other) const {
+        return !(*this == other);
+      }
 
     private:
       std::size_t _lo = 0, _hi = 0;
@@ -96,6 +103,16 @@ namespace strumpack {
       }
     };
 
+    struct BLRAdmissibility {
+      int leaf_size;
+      bool operator()(const HBlockPartition& a,
+                      const HBlockPartition& b) {
+        // parts must be separated to be admissible
+        //return a.lo() > b.hi() || a.hi() < b.lo();
+        return (a != b) && (a.leaf() || b.leaf());
+      }
+    };
+
     template<typename scalar_t> class HMatrixBase {
       using real_t = typename RealType<scalar_t>::value_type;
       using D_t = DenseMatrix<scalar_t>;
@@ -110,11 +127,9 @@ namespace strumpack {
 
     public:
       static std::unique_ptr<HMatrixBase<scalar_t>>
-      compress(const D_t& A,
-               const HBlockPartition& row_part,
+      compress(const D_t& A, const HBlockPartition& row_part,
                const HBlockPartition& col_part,
-               const adm_t& admissible,
-               const opts_t& opts);
+               const adm_t& admissible, const opts_t& opts);
 
       virtual std::size_t rows() const = 0;
       virtual std::size_t cols() const = 0;
@@ -173,10 +188,10 @@ namespace strumpack {
                            const D_t& b, scalar_t beta, int depth=0) = 0;
 
     protected:
-      virtual void draw(std::ostream& of,
-                        std::size_t rlo=0, std::size_t clo=0) const = 0;
+      virtual void draw
+      (std::ostream& of, std::size_t rlo=0, std::size_t clo=0) const = 0;
       virtual std::vector<int> LU(int task_depth) = 0;
-      virtual void permute_rows_fwd(const std::vector<int>& piv) = 0;
+      virtual void laswp(const std::vector<int>& piv, bool fwd) = 0;
 
       template<typename T> friend
       void draw(std::unique_ptr<HMatrixBase<T>> const&, const std::string&);
@@ -217,11 +232,10 @@ namespace strumpack {
   namespace H {
 
     template<typename scalar_t> std::unique_ptr<HMatrixBase<scalar_t>>
-    HMatrixBase<scalar_t>::compress(const D_t& A,
-                                    const HBlockPartition& row_part,
-                                    const HBlockPartition& col_part,
-                                    const adm_t& admissible,
-                                    const opts_t& opts) {
+    HMatrixBase<scalar_t>::compress
+    (const D_t& A, const HBlockPartition& row_part,
+     const HBlockPartition& col_part,
+     const adm_t& admissible, const opts_t& opts) {
       if (row_part.leaf() || col_part.leaf()) {
         if (admissible(row_part, col_part))
           return std::unique_ptr<HMatrixLR<scalar_t>>

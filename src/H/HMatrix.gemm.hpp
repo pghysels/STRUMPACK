@@ -34,7 +34,7 @@
 #include <fstream>
 #include <string>
 
-#define DEBUG_GEMM
+//#define DEBUG_GEMM
 
 namespace strumpack {
   namespace H {

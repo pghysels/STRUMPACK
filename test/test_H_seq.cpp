@@ -30,7 +30,7 @@
 #include <random>
 using namespace std;
 
-#include "DenseMatrix.hpp"
+#include "dense/DenseMatrix.hpp"
 #include "H/HMatrixBase.hpp"
 using namespace strumpack;
 using namespace strumpack::H;
@@ -128,63 +128,100 @@ int run(int argc, char* argv[]) {
   HBlockPartition part(A.rows());
   part.refine(h_opts.leaf_size());
 
-  StrongAdmissibility adm_strong;
-  auto Hstrong = HMatrixBase<double>::compress
-    (A, part, part, adm_strong, h_opts);
-  if (Hstrong) {
-    cout << "# created STRONG admissible H matrix of dimension "
-         << Hstrong->rows() << " x " << Hstrong->cols()
-         << " with " << Hstrong->levels() << " levels" << endl;
-    cout << "# compression succeeded!" << endl;
-  } else {
-    cout << "# compression failed!!!!!!!!" << endl;
-    return 1;
-  }
-  draw(Hstrong, "Hstrong");
-  cout << "# rank(H) = " << Hstrong->rank() << endl;
-  cout << "# memory(H) = " << Hstrong->memory()/1e6 << " MB, "
-       << 100. * Hstrong->memory() / A.memory() << "% of dense" << endl;
+  {
+    StrongAdmissibility adm_strong;
+    auto Hstrong = HMatrixBase<double>::compress
+      (A, part, part, adm_strong, h_opts);
+    if (Hstrong) {
+      cout << "# created STRONG admissible H matrix of dimension "
+           << Hstrong->rows() << " x " << Hstrong->cols()
+           << " with " << Hstrong->levels() << " levels" << endl;
+      cout << "# compression succeeded!" << endl;
+    } else {
+      cout << "# compression failed!!!!!!!!" << endl;
+      return 1;
+    }
+    draw(Hstrong, "Hstrong");
+    cout << "# rank(H) = " << Hstrong->rank() << endl;
+    cout << "# memory(H) = " << Hstrong->memory()/1e6 << " MB, "
+         << 100. * Hstrong->memory() / A.memory() << "% of dense" << endl;
 
-  auto Hstrong_dense = Hstrong->dense();
-  Hstrong_dense.scaled_add(-1., A);
-  cout << "# relative error = ||A-H*I||_F/||A||_F = "
-       << Hstrong_dense.normF() / A.normF() << endl;
-  cout << "# absolute error = ||A-H*I||_F = " << Hstrong_dense.normF() << endl;
-  if (Hstrong_dense.normF() / A.normF() > ERROR_TOLERANCE
-      * max(h_opts.rel_tol(), h_opts.abs_tol())) {
-    cout << "ERROR: compression error too big!!" << endl;
-    return 1;
-  }
+    auto Hstrong_dense = Hstrong->dense();
+    Hstrong_dense.scaled_add(-1., A);
+    cout << "# relative error = ||A-H*I||_F/||A||_F = "
+         << Hstrong_dense.normF() / A.normF() << endl;
+    cout << "# absolute error = ||A-H*I||_F = " << Hstrong_dense.normF() << endl;
+    if (Hstrong_dense.normF() / A.normF() > ERROR_TOLERANCE
+        * max(h_opts.rel_tol(), h_opts.abs_tol())) {
+      cout << "ERROR: compression error too big!!" << endl;
+      return 1;
+    }
 
-
-  WeakAdmissibility adm_weak;
-  auto Hweak = HMatrixBase<double>::compress
-    (A, part, part, adm_weak, h_opts);
-  if (Hweak) {
-    cout << "# created WEAK admissible H matrix of dimension "
-         << Hweak->rows() << " x " << Hweak->cols()
-         << " with " << Hweak->levels() << " levels" << endl;
-    cout << "# compression succeeded!" << endl;
-  } else {
-    cout << "# compression failed!!!!!!!!" << endl;
-    return 1;
-  }
-  draw(Hweak, "Hweak");
-  cout << "# rank(H) = " << Hweak->rank() << endl;
-  cout << "# memory(H) = " << Hweak->memory()/1e6 << " MB, "
-       << 100. * Hweak->memory() / A.memory() << "% of dense" << endl;
-
-  auto Hweak_dense = Hweak->dense();
-  Hweak_dense.scaled_add(-1., A);
-  cout << "# relative error = ||A-H*I||_F/||A||_F = "
-       << Hweak_dense.normF() / A.normF() << endl;
-  cout << "# absolute error = ||A-H*I||_F = " << Hweak_dense.normF() << endl;
-  if (Hweak_dense.normF() / A.normF() > ERROR_TOLERANCE
-      * max(h_opts.rel_tol(), h_opts.abs_tol())) {
-    cout << "ERROR: compression error too big!!" << endl;
-    return 1;
+    auto piv_strong = LU(Hstrong);
   }
 
+  {
+    WeakAdmissibility adm_weak;
+    auto Hweak = HMatrixBase<double>::compress
+      (A, part, part, adm_weak, h_opts);
+    if (Hweak) {
+      cout << "# created WEAK admissible H matrix of dimension "
+           << Hweak->rows() << " x " << Hweak->cols()
+           << " with " << Hweak->levels() << " levels" << endl;
+      cout << "# compression succeeded!" << endl;
+    } else {
+      cout << "# compression failed!!!!!!!!" << endl;
+      return 1;
+    }
+    draw(Hweak, "Hweak");
+    cout << "# rank(H) = " << Hweak->rank() << endl;
+    cout << "# memory(H) = " << Hweak->memory()/1e6 << " MB, "
+         << 100. * Hweak->memory() / A.memory() << "% of dense" << endl;
+
+    auto Hweak_dense = Hweak->dense();
+    Hweak_dense.scaled_add(-1., A);
+    cout << "# relative error = ||A-H*I||_F/||A||_F = "
+         << Hweak_dense.normF() / A.normF() << endl;
+    cout << "# absolute error = ||A-H*I||_F = " << Hweak_dense.normF() << endl;
+    if (Hweak_dense.normF() / A.normF() > ERROR_TOLERANCE
+        * max(h_opts.rel_tol(), h_opts.abs_tol())) {
+      cout << "ERROR: compression error too big!!" << endl;
+      return 1;
+    }
+
+    auto piv_weak = LU(Hweak);
+  }
+
+
+  {
+    BLRAdmissibility adm_blr;
+    auto Hblr = HMatrixBase<double>::compress
+      (A, part, part, adm_blr, h_opts);
+    if (Hblr) {
+      cout << "# created BLR admissible H matrix of dimension "
+           << Hblr->rows() << " x " << Hblr->cols()
+           << " with " << Hblr->levels() << " levels" << endl;
+      cout << "# compression succeeded!" << endl;
+    } else {
+      cout << "# compression failed!!!!!!!!" << endl;
+      return 1;
+    }
+    draw(Hblr, "Hblr");
+    cout << "# rank(H) = " << Hblr->rank() << endl;
+    cout << "# memory(H) = " << Hblr->memory()/1e6 << " MB, "
+         << 100. * Hblr->memory() / A.memory() << "% of dense" << endl;
+
+    auto Hblr_dense = Hblr->dense();
+    Hblr_dense.scaled_add(-1., A);
+    cout << "# relative error = ||A-H*I||_F/||A||_F = "
+         << Hblr_dense.normF() / A.normF() << endl;
+    cout << "# absolute error = ||A-H*I||_F = " << Hblr_dense.normF() << endl;
+    if (Hblr_dense.normF() / A.normF() > ERROR_TOLERANCE
+        * max(h_opts.rel_tol(), h_opts.abs_tol())) {
+      cout << "ERROR: compression error too big!!" << endl;
+      return 1;
+    }
+  }
 
   // DenseMatrix<double> X(m, n), Y(m, n);
   // X.random();
@@ -196,13 +233,12 @@ int run(int argc, char* argv[]) {
   // cout << "# H*X relative error = ||Y-H*X||_F/||Y||_F = "
   //      << Ytest.normF() / Y.normF() << endl;
 
-  auto piv_weak = LU(Hweak);
+  //  auto piv_weak = LU(Hweak);
   // auto Xsolve = solve(Hstrong, piv, Y);
   // Xsolve.scaled_add(-1., X);
   // cout << "# LU relative error = ||X-(H\Y)||_F/||X||_F = "
   //      << Xsolve.normF() / X.normF() << endl;
 
-  auto piv_strong = LU(Hstrong);
 
   cout << "# exiting" << endl;
   return 0;

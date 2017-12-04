@@ -842,7 +842,7 @@ namespace strumpack {
       for (int r=c+1; r<rank; r++)
         Vt(r, c) = scalar_t(0.);
     V = Vt.transpose();
-    V.permute_rows_bwd(piv);
+    V.laswp(piv, false);
     blas::xxgqr(rows(), rank, rank, tmp.data(), tmp.ld(), tau, &info);
     U = DenseMatrix<scalar_t>(rows(), rank, tmp.ptr(0, 0), tmp.ld());
     delete[] tau;
@@ -853,8 +853,9 @@ namespace strumpack {
     DenseMatrix<scalar_t> tmp(*this);
     auto minmn = std::min(rows(), cols());
     std::vector<scalar_t> S(minmn);
-    int info = blas::gesvd('N', 'N', rows(), cols(), tmp.data(), tmp.ld(),
-                           S.data(), NULL, 1, NULL, 1);
+    int info = blas::gesvd
+      ('N', 'N', rows(), cols(), tmp.data(), tmp.ld(),
+       S.data(), NULL, 1, NULL, 1);
     if (info)
       std::cout << "ERROR in gesvd: info = " << info << std::endl;
     return S;
