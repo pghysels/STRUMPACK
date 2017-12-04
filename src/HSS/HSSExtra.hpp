@@ -6,9 +6,8 @@
 namespace strumpack {
   namespace HSS {
 
-    enum class State : char {UNTOUCHED='U',
-                             PARTIALLY_COMPRESSED='P',
-                             COMPRESSED='C'};
+    enum class State : char
+      {UNTOUCHED='U', PARTIALLY_COMPRESSED='P', COMPRESSED='C'};
 
     template<typename T> std::pair<T,T>
     operator+(const std::pair<T,T>& l, const std::pair<T,T>& r) {
@@ -87,8 +86,9 @@ namespace strumpack {
       DenseMatrix<scalar_t>& Vhat() { return _Vt0; }
       const DenseMatrix<scalar_t>& Vhat() const { return _Vt0; }
       std::size_t memory() {
-        std::size_t mem = sizeof(*this) + _L.memory() + _Vt0.memory() + _W1.memory()
-          + _Q.memory() + _D.memory() + sizeof(int)*_piv.size();
+        std::size_t mem = sizeof(*this) + _L.memory() + _Vt0.memory()
+          + _W1.memory() + _Q.memory() + _D.memory()
+          + sizeof(int)*_piv.size();
         for (auto& c : _ch) mem += c.memory();
         return memory;
       }

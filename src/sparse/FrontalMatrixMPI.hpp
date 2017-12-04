@@ -44,6 +44,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   class FrontalMatrixMPI : public FrontalMatrix<scalar_t,integer_t> {
+    using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
@@ -53,67 +54,66 @@ namespace strumpack {
     template<typename _scalar_t,typename _integer_t> friend class ExtendAdd;
 
   public:
-    FrontalMatrixMPI(CompressedSparseMatrix<scalar_t,integer_t>* _A,
-                     integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-                     integer_t _dim_upd, integer_t* _upd, MPI_Comm _front_comm,
-                     int _total_procs);
+    FrontalMatrixMPI
+    (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
+     std::vector<integer_t>& _upd, MPI_Comm _front_comm, int _total_procs);
     FrontalMatrixMPI(const FrontalMatrixMPI&) = delete;
     FrontalMatrixMPI& operator=(FrontalMatrixMPI const&) = delete;
     virtual ~FrontalMatrixMPI();
-    void sample_CB(const SPOptions<scalar_t>& opts,
-                   DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc,
-                   F_t* parent, int task_depth=0) {};
-    virtual
-    void sample_CB(const SPOptions<scalar_t>& opts,
-                   const DistM_t& R, DistM_t& Sr, DistM_t& Sc,
-                   F_t* pa) const = 0;
-    void extract_2d(const std::vector<std::size_t>& I,
-                    const std::vector<std::size_t>& J, DistM_t& B) const;
-    void get_child_submatrix_2d(const F_t* ch,
-                                const std::vector<std::size_t>& I,
-                                const std::vector<std::size_t>& J,
-                                DistM_t& B) const;
-    void extract_CB_sub_matrix(const std::vector<std::size_t>& I,
-                               const std::vector<std::size_t>& J,
-                               DenseM_t& B, int task_depth) const {};
-    virtual
-    void extract_CB_sub_matrix_2d(const std::vector<std::size_t>& I,
-                                  const std::vector<std::size_t>& J,
-                                  DistM_t& B) const = 0;
-    void extend_add_b(F_t* ch, DistM_t& b_sep, scalar_t* wmem, int tag);
-    void extend_add_b_mpi_to_mpi(FMPI_t* ch, DistM_t& b_sep,
-                                 scalar_t* wmem, int tag);
-    void extend_add_b_seq_to_mpi(F_t* ch, DistM_t& b_sep,
-                                 scalar_t* wmem, int tag);
-    void extract_b(F_t* ch, DistM_t& b_sep, scalar_t* wmem);
-    void extract_b_mpi_to_mpi(FMPI_t* ch, DistM_t& b_sep, scalar_t* wmem);
-    void extract_b_seq_to_mpi(F_t* ch, DistM_t& b_sep, scalar_t* wmem);
+
+    void sample_CB
+    (const SPOptions<scalar_t>& opts, const DenseM_t& R, DenseM_t& Sr,
+     DenseM_t& Sc, F_t* parent, int task_depth=0) override {};
+    virtual void sample_CB
+    (const SPOptions<scalar_t>& opts, const DistM_t& R, DistM_t& Sr,
+     DistM_t& Sc, F_t* pa) const = 0;
+
+    void extract_2d
+    (const SpMat_t& A, const std::vector<std::size_t>& I,
+     const std::vector<std::size_t>& J, DistM_t& B) const;
+    void get_child_submatrix_2d
+    (const F_t* ch, const std::vector<std::size_t>& I,
+     const std::vector<std::size_t>& J,
+     DistM_t& B) const;
+    void extract_CB_sub_matrix
+    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+     DenseM_t& B, int task_depth) const {};
+    virtual void extract_CB_sub_matrix_2d
+    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+     DistM_t& B) const = 0;
+
+    void extend_add_b
+    (DistM_t& b, DistM_t& bupd, const DistM_t& CBl, const DistM_t& CBr,
+     const DenseM_t& seqCBl, const DenseM_t& seqCBr) const;
+    void extract_b
+    (const DistM_t& b, const DistM_t& bupd, DistM_t& CBl, DistM_t& CBr,
+     DenseM_t& seqCBl, DenseM_t& seqCBr) const;
+
     inline bool visit(const F_t* ch) const;
     inline int child_master(const F_t* ch) const;
     inline int blacs_context() const { return ctxt; }
     inline int blacs_context_all() const { return ctxt_all; }
     inline bool active() const {
       return front_comm != MPI_COMM_NULL &&
-        mpi_rank(front_comm) < proc_rows*proc_cols; }
-    static inline
-    void processor_grid(int np_procs, int& np_rows, int& np_cols) {
+        mpi_rank(front_comm) < proc_rows*proc_cols;
+    }
+    static inline void processor_grid
+    (int np_procs, int& np_rows, int& np_cols) {
       np_cols = std::floor(std::sqrt((float)np_procs));
       np_rows = np_procs / np_cols;
     }
     inline int np_rows() const { return proc_rows; }
     inline int np_cols() const { return proc_cols; }
     inline int find_rank(integer_t r, integer_t c, const DistM_t& F) const;
-    inline int find_rank_fixed(integer_t r, integer_t c,
-                               const DistM_t& F) const;
-    virtual void solve_workspace_query(integer_t& mem_size);
+    inline int find_rank_fixed
+    (integer_t r, integer_t c, const DistM_t& F) const;
     virtual long long dense_factor_nonzeros(int task_depth=0) const;
     virtual std::string type() const { return "FrontalMatrixMPI"; }
     virtual bool isMPI() const { return true; }
     MPI_Comm comm() const { return front_comm; }
-    virtual
-    void bisection_partitioning(const SPOptions<scalar_t>& opts,
-                                integer_t* sorder,
-                                bool isroot=true, int task_depth=0);
+    virtual void bisection_partitioning
+    (const SPOptions<scalar_t>& opts, integer_t* sorder,
+     bool isroot=true, int task_depth=0);
 
     friend class FrontalMatrixDenseMPI<scalar_t,integer_t>;
     friend class FrontalMatrixHSSMPI<scalar_t,integer_t>;
@@ -138,10 +138,9 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   FrontalMatrixMPI<scalar_t,integer_t>::FrontalMatrixMPI
-  (CompressedSparseMatrix<scalar_t,integer_t>* _A, integer_t _sep,
-   integer_t _sep_begin, integer_t _sep_end, integer_t _dim_upd,
-   integer_t* _upd, MPI_Comm _front_comm, int _total_procs)
-    : F_t(_A, NULL, NULL,_sep, _sep_begin, _sep_end, _dim_upd, _upd),
+  (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
+   std::vector<integer_t>& _upd, MPI_Comm _front_comm, int _total_procs)
+    : F_t(NULL, NULL,_sep, _sep_begin, _sep_end, _upd),
     total_procs(_total_procs), front_comm(_front_comm) {
     processor_grid(total_procs, proc_rows, proc_cols);
     if (front_comm != MPI_COMM_NULL) {
@@ -171,14 +170,14 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMPI<scalar_t,integer_t>::extract_2d
-  (const std::vector<std::size_t>& I,
+  (const SpMat_t& A, const std::vector<std::size_t>& I,
    const std::vector<std::size_t>& J, DistM_t& B) const {
     auto m = I.size();
     auto n = J.size();
     TIMER_TIME(TaskType::EXTRACT_SEP_2D, 2, t_ex_sep);
     {
       DistM_t tmp(ctxt, m, n);
-      this->A->extract_separator_2d(this->sep_end, I, J, tmp, front_comm);
+      A.extract_separator_2d(this->sep_end, I, J, tmp, front_comm);
       // TODO why this copy???
       strumpack::copy(m, n, tmp, 0, 0, B, 0, 0, ctxt_all);
     }
@@ -261,240 +260,211 @@ namespace strumpack {
   FrontalMatrixMPI<scalar_t,integer_t>::child_master(const F_t* ch) const {
     int ch_master;
     if (auto mpi_ch = dynamic_cast<const FMPI_t*>(ch))
-      ch_master = (ch == this->lchild) ? 0 : total_procs - mpi_ch->total_procs;
+      ch_master = (ch == this->lchild) ? 0 :
+        total_procs - mpi_ch->total_procs;
     else ch_master = (ch == this->lchild) ? 0 : total_procs - 1;
     return ch_master;
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMPI<scalar_t,integer_t>::extend_add_b
-  (F_t* ch, DistM_t& b_sep, scalar_t* wmem, int tag) {
+  (DistM_t& b, DistM_t& bupd, const DistM_t& CBl, const DistM_t& CBr,
+   const DenseM_t& seqCBl, const DenseM_t& seqCBr) const {
     if (mpi_rank(front_comm) == 0) {
-      STRUMPACK_FLOPS(static_cast<long long int>(ch->dim_upd)*ch->dim_upd);
+      STRUMPACK_FLOPS
+        (static_cast<long long int>(CBl.rows()*b.cols()));
+      STRUMPACK_FLOPS
+        (static_cast<long long int>(CBr.rows()*b.cols()));
     }
-    if (FMPI_t* mpi_child = dynamic_cast<FMPI_t*>(ch)) // child is MPI
-      extend_add_b_mpi_to_mpi(mpi_child, b_sep, wmem, tag);
-    else  // child is sequential
-      extend_add_b_seq_to_mpi(ch, b_sep, wmem, tag);
+    auto P = mpi_nprocs(this->front_comm);
+    std::vector<std::vector<scalar_t>> sbuf(P);
+    if (this->visit(this->lchild)) {
+      if (this->lchild->isMPI())
+        ExtAdd::extend_add_column_copy_to_buffers
+          (CBl, sbuf, this, this->lchild->upd_to_parent(this));
+      else ExtAdd::extend_add_column_seq_copy_to_buffers
+             (seqCBl, sbuf, this, this->lchild);
+    }
+    if (this->visit(this->rchild)) {
+      if (this->rchild->isMPI())
+        ExtAdd::extend_add_column_copy_to_buffers
+          (CBr, sbuf, this, this->rchild->upd_to_parent(this));
+      else ExtAdd::extend_add_column_seq_copy_to_buffers
+             (seqCBr, sbuf, this, this->rchild);
+    }
+    scalar_t *rbuf = nullptr, **pbuf = nullptr;
+    all_to_all_v(sbuf, rbuf, pbuf, this->front_comm);
+    for (auto ch : {this->lchild, this->rchild}) {
+      if (!ch) continue;
+      if (auto ch_mpi = dynamic_cast<FMPI_t*>(ch))
+        ExtAdd::extend_add_column_copy_from_buffers
+          (b, bupd, pbuf+this->child_master(ch), this, ch_mpi);
+      else ExtAdd::extend_add_column_seq_copy_from_buffers
+             (b, bupd, pbuf[this->child_master(ch)], this, ch);
+    }
+    delete[] pbuf;
+    delete[] rbuf;
   }
+
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMPI<scalar_t,integer_t>::extract_b
-  (F_t* ch, DistM_t& b_sep, scalar_t* wmem) {
-    if (mpi_rank(front_comm) == 0) {
-      STRUMPACK_FLOPS(static_cast<long long int>(ch->dim_upd)*ch->dim_upd);
+  (const DistM_t& b, const DistM_t& bupd, DistM_t& CBl, DistM_t& CBr,
+   DenseM_t& seqCBl, DenseM_t& seqCBr) const {
+    auto P = mpi_nprocs(this->front_comm);
+    std::vector<std::vector<scalar_t>> sbuf(P);
+    for (auto ch : {this->lchild, this->rchild}) {
+      if (!ch) continue;
+      if (auto ch_mpi = dynamic_cast<FMPI_t*>(ch))
+        ExtAdd::extract_column_copy_to_buffers(b, bupd, sbuf, this, ch_mpi);
+      else ExtAdd::extract_column_seq_copy_to_buffers
+             (b, bupd, sbuf[this->child_master(ch)], this, ch);
     }
-    if (FMPI_t* mpi_child = dynamic_cast<FMPI_t*>(ch))
-      extract_b_mpi_to_mpi(mpi_child, b_sep, wmem); // child is MPI
-    else extract_b_seq_to_mpi(ch, b_sep, wmem);     // child is sequential
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMPI<scalar_t,integer_t>::extend_add_b_mpi_to_mpi
-  (FMPI_t* ch, DistM_t& b_sep, scalar_t* wmem, int tag) {
-    DistMW_t ch_b_upd, b_upd;
-    if (visit(ch))
-      ch_b_upd = DistMW_t(ch->ctxt, ch->dim_upd, 1, wmem+ch->p_wmem);
-    if (front_comm != MPI_COMM_NULL)
-      b_upd = DistMW_t(ctxt, this->dim_upd, 1, wmem+this->p_wmem);
-    std::vector<std::vector<scalar_t>> sbuf;
-    std::vector<MPI_Request> sreq;
-    if (ch_b_upd.pcol() == 0) {
-      // send to all active processes in the parent (only 1 column)
-      auto I = ch->upd_to_parent(this);
-      sbuf.resize(proc_rows);
-      ExtAdd::extend_add_column_copy_to_buffers
-        (ch_b_upd, b_sep, b_upd, sbuf, this, I);
-      sreq.resize(proc_rows);
-      for (int p=0; p<proc_rows; p++)
-        MPI_Isend(sbuf[p].data(), sbuf[p].size(), mpi_type<scalar_t>(),
-                  p, tag, front_comm, &sreq[p]);
-    }
-    if (b_sep.pcol() == 0) {
-      // receive from all active processes in the child (only 1 column)
-      std::vector<std::vector<scalar_t>> rbuf(ch->proc_rows);
-      MPI_Status status;
-      int msg_size;
-      auto ch_master = child_master(ch);
-      for (int p=0; p<ch->proc_rows; p++) {
-        MPI_Probe(MPI_ANY_SOURCE, tag, front_comm, &status);
-        MPI_Get_count(&status, mpi_type<scalar_t>(), &msg_size);
-        auto pi = status.MPI_SOURCE - ch_master;
-        rbuf[pi].resize(msg_size);
-        MPI_Recv(rbuf[pi].data(), msg_size, mpi_type<scalar_t>(),
-                 status.MPI_SOURCE, tag, front_comm, &status);
-      }
-      auto b_rank = [&](integer_t r, integer_t c) -> int {
-        return ch->find_rank(r, 0, ch_b_upd); };
-      ExtAdd::extend_add_column_copy_from_buffers
-        (b_sep, b_upd, rbuf, this->sep_begin, this->upd,
-         ch->upd, ch->dim_upd, b_rank);
-    }
-    if (ch_b_upd.pcol() == 0)
-      MPI_Waitall(sreq.size(), sreq.data(), MPI_STATUSES_IGNORE);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMPI<scalar_t,integer_t>::extend_add_b_seq_to_mpi
-  (F_t* ch, DistM_t& b_sep, scalar_t* wmem, int tag) {
-    int child_rank = child_master(ch);
-    scalar_t* ch_b_upd = wmem+ch->p_wmem;
-    DistMW_t b_upd;
-    if (front_comm != MPI_COMM_NULL)
-      b_upd = DistMW_t(ctxt, this->dim_upd, 1, wmem+this->p_wmem);
-    std::vector<MPI_Request> sreq;
-    std::vector<std::vector<scalar_t>> sbuf;
-    if (mpi_rank(front_comm) == child_rank) {
-      auto I = ch->upd_to_parent(this);
-      sbuf.resize(proc_rows);
-      for (auto& buf : sbuf) buf.reserve(ch->dim_upd / proc_rows);
-
-      // TODO optimize loop?
-      for (integer_t r=0; r<ch->dim_upd; r++) {
-        integer_t pa_row = I[r];
-        if (pa_row < this->dim_sep)
-          sbuf[find_rank(pa_row, 0, b_sep)].
-            push_back(ch_b_upd[r]);
-        else
-          sbuf[find_rank(pa_row-this->dim_sep, 0, b_upd)].
-            push_back(ch_b_upd[r]);
-      }
-      // send to all active processes in the parent (1 column)
-      sreq.resize(proc_rows);
-      for (int p=0; p<proc_rows; p++)
-        MPI_Isend(sbuf[p].data(), sbuf[p].size(), mpi_type<scalar_t>(),
-                  p, tag, front_comm, &sreq[p]);
-    }
-    if (b_sep.pcol() == 0) {
-      // receive from the process working on the child
-      MPI_Status status;
-      MPI_Probe(child_rank, tag, front_comm, &status);
-      int msg_size;
-      MPI_Get_count(&status, mpi_type<scalar_t>(), &msg_size);
-      std::vector<std::vector<scalar_t>> rbuf(1);
-      rbuf[0].resize(msg_size);
-      MPI_Recv(rbuf[0].data(), msg_size, mpi_type<scalar_t>(), child_rank,
-               tag, front_comm, &status);
-      ExtAdd::extend_add_column_copy_from_buffers
-        (b_sep, b_upd, rbuf, this->sep_begin, this->upd, ch->upd, ch->dim_upd,
-         [](integer_t,integer_t) -> int { return 0; });
-    }
-    if (mpi_rank(front_comm) == child_rank)
-      MPI_Waitall(sreq.size(), sreq.data(), MPI_STATUSES_IGNORE);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMPI<scalar_t,integer_t>::solve_workspace_query
-  (integer_t& mem_size) {
-    if (this->lchild) this->lchild->solve_workspace_query(mem_size);
-    if (this->rchild) this->rchild->solve_workspace_query(mem_size);
-    this->p_wmem = mem_size;
-    if (ctxt != -1) {
-      int np_rows, np_cols, p_row, p_col;
-      scalapack::Cblacs_gridinfo(ctxt, &np_rows, &np_cols, &p_row, &p_col);
-      mem_size += scalapack::numroc(this->dim_upd, DistM_t::default_NB,
-                                    p_row, 0, np_rows);
-    }
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMPI<scalar_t,integer_t>::extract_b_mpi_to_mpi
-  (FMPI_t* ch, DistM_t& b_sep, scalar_t* wmem) {
-    DistMW_t ch_b_upd, b_upd;
-    if (visit(ch))
-      ch_b_upd = DistMW_t(ch->ctxt, ch->dim_upd, 1, wmem+ch->p_wmem);
-    if (front_comm != MPI_COMM_NULL)
-      b_upd = DistMW_t(ctxt, this->dim_upd, 1, wmem+this->p_wmem);
-    std::vector<MPI_Request> sreq;
-    std::vector<std::vector<scalar_t>> sbuf;
-    auto I = ch->upd_to_parent(this);
-    if (b_sep.pcol() == 0) {
-      // send to all active processes in the child (only 1 column)
-      sbuf.resize(ch->proc_rows);
-      std::function<int(integer_t)> ch_rank = [&](integer_t r) {
-        return ch->find_rank(r, 0, ch_b_upd);
-      };
-      ExtAdd::extract_b_copy_to_buffers
-        (b_sep, b_upd, sbuf, ch_rank, I, ch->proc_rows);
-      sreq.resize(ch->proc_rows);
-      for (int p=0; p<ch->proc_rows; p++)
-        MPI_Isend(sbuf[p].data(), sbuf[p].size(), mpi_type<scalar_t>(),
-                  p+child_master(ch), 0, front_comm, &sreq[p]);
-    }
-    if (ch_b_upd.pcol() == 0) {
-      // receive from all active processes in the parent (only 1 column)
-      std::vector<std::vector<scalar_t>> rbuf(proc_rows);
-      MPI_Status status;
-      int msg_size;
-      for (int p=0; p<proc_rows; p++) {
-        MPI_Probe(MPI_ANY_SOURCE, 0, front_comm, &status);
-        MPI_Get_count(&status, mpi_type<scalar_t>(), &msg_size);
-        rbuf[status.MPI_SOURCE].resize(msg_size);
-        MPI_Recv(rbuf[status.MPI_SOURCE].data(), msg_size,
-                 mpi_type<scalar_t>(), status.MPI_SOURCE, 0,
-                 front_comm, &status);
-      }
-      std::function<int(integer_t)> src_rank = [&](integer_t r) {
-        return (r < this->dim_sep) ? find_rank(r, 0, b_sep) :
-        find_rank(r-this->dim_sep, 0, b_upd);
-      };
-      ExtAdd::extract_b_copy_from_buffers(ch_b_upd, rbuf, I, src_rank);
-    }
-    if (b_sep.pcol() == 0)
-      MPI_Waitall(sreq.size(), sreq.data(), MPI_STATUSES_IGNORE);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMPI<scalar_t,integer_t>::extract_b_seq_to_mpi
-  (F_t* ch, DistM_t& b_sep, scalar_t* wmem) {
-    int child_rank = child_master(ch);
-    scalar_t* ch_b_upd = wmem+ch->p_wmem;
-    DistMW_t b_upd;
-    if (front_comm != MPI_COMM_NULL)
-      b_upd = DistMW_t(ctxt, this->dim_upd, 1, wmem+this->p_wmem);
-    MPI_Request sreq;
-    std::vector<std::vector<scalar_t>> sbuf(1);
-    auto I = ch->upd_to_parent(this);
-    if (b_sep.pcol() == 0) {
-      // send to all active processes in the child (only 1 column)
-      std::function<int(integer_t)> dest_rank = [&](integer_t){ return 0; };
-      ExtAdd::extract_b_copy_to_buffers(b_sep, b_upd, sbuf, dest_rank, I, 1);
-      MPI_Isend(sbuf[0].data(), sbuf[0].size(), mpi_type<scalar_t>(),
-                child_rank, 0, front_comm, &sreq);
-    }
-    if (mpi_rank(front_comm) == child_rank) {
-      // receive from all active processes in the parent (only 1 column)
-      std::vector<std::vector<scalar_t>> rbuf(proc_rows);
-      MPI_Status status;
-      int msg_size;
-      for (int p=0; p<proc_rows; p++) {
-        MPI_Probe(MPI_ANY_SOURCE, 0, front_comm, &status);
-        MPI_Get_count(&status, mpi_type<scalar_t>(), &msg_size);
-        rbuf[status.MPI_SOURCE].resize(msg_size);
-        MPI_Recv(rbuf[status.MPI_SOURCE].data(), msg_size,
-                 mpi_type<scalar_t>(), status.MPI_SOURCE, 0,
-                 front_comm, &status);
-      }
-      std::vector<scalar_t*> pbuf(rbuf.size());
-      for (std::size_t p=0; p<rbuf.size(); p++) pbuf[p] = rbuf[p].data();
-      for (integer_t r=0; r<ch->dim_upd; r++) {
-        integer_t pa_r = I[r];
-        integer_t rank = (pa_r < this->dim_sep) ? find_rank(pa_r, 0, b_sep)
-          : find_rank(pa_r-this->dim_sep, 0, b_upd);
-        ch_b_upd[r] = *(pbuf[rank]);
-        pbuf[rank]++;
+    scalar_t *rbuf = nullptr, **pbuf = nullptr;
+    all_to_all_v(sbuf, rbuf, pbuf, this->front_comm);
+    if (visit(this->lchild)) {
+      if (auto ch_mpi = dynamic_cast<FMPI_t*>(this->lchild)) {
+        CBl = DistM_t
+          (ch_mpi->ctxt, this->lchild->dim_upd(), b.cols());
+        ExtAdd::extract_column_copy_from_buffers
+          (CBl, pbuf, this, this->lchild);
+      } else {
+        seqCBl = DenseM_t(this->lchild->dim_upd(), b.cols());
+        ExtAdd::extract_column_seq_copy_from_buffers
+          (seqCBl, pbuf, this, this->lchild);
       }
     }
-    if (b_sep.pcol() == 0) MPI_Wait(&sreq, MPI_STATUS_IGNORE);
+    if (visit(this->rchild)) {
+      if (auto ch_mpi = dynamic_cast<FMPI_t*>(this->rchild)) {
+        CBr = DistM_t
+          (ch_mpi->ctxt, this->rchild->dim_upd(), b.cols());
+        ExtAdd::extract_column_copy_from_buffers(CBr, pbuf, this, this->rchild);
+      } else {
+        seqCBr = DenseM_t(this->rchild->dim_upd(), b.cols());
+        ExtAdd::extract_column_seq_copy_from_buffers
+          (seqCBr, pbuf, this, this->rchild);
+      }
+    }
+    delete[] pbuf;
+    delete[] rbuf;
   }
+
+
+  // template<typename scalar_t,typename integer_t> void
+  // FrontalMatrixMPI<scalar_t,integer_t>::extract_b
+  // (const F_t* ch, const DistM_t& b, const DistM_t& bupd,
+  //  DistM_t& CB) const {
+  //   if (mpi_rank(front_comm) == 0) {
+  //     STRUMPACK_FLOPS
+  //       (static_cast<long long int>(ch->dim_upd())*ch->dim_upd());
+  //   }
+  //   if (auto mpi_child = dynamic_cast<FMPI_t*>(ch))
+  //     extract_b_mpi_to_mpi(mpi_child, b, bupd, CB); // child is MPI
+  //   else extract_b_seq_to_mpi(ch, b, bupd, CB);     // child is sequential
+  // }
+
+  // template<typename scalar_t,typename integer_t> void
+  // FrontalMatrixMPI<scalar_t,integer_t>::extract_b_mpi_to_mpi
+  // (FMPI_t* ch, DistM_t& b, scalar_t* wmem) {
+  //   DistMW_t CB, bupd;
+  //   if (visit(ch))
+  //     CB = DistMW_t(ch->ctxt, ch->dim_upd(), 1, wmem+ch->p_wmem);
+  //   if (front_comm != MPI_COMM_NULL)
+  //     bupd = DistMW_t(ctxt, this->dim_upd(), 1, wmem+this->p_wmem);
+  //   std::vector<MPI_Request> sreq;
+  //   std::vector<std::vector<scalar_t>> sbuf;
+  //   auto I = ch->upd_to_parent(this);
+  //   if (b.pcol() == 0) {
+  //     // send to all active processes in the child (only 1 column)
+  //     sbuf.resize(ch->proc_rows);
+  //     std::function<int(integer_t)> ch_rank = [&](integer_t r) {
+  //       return ch->find_rank(r, 0, CB);
+  //     };
+  //     ExtAdd::extract_b_copy_to_buffers
+  //       (b, bupd, sbuf, ch_rank, I, ch->proc_rows);
+  //     sreq.resize(ch->proc_rows);
+  //     for (int p=0; p<ch->proc_rows; p++)
+  //       MPI_Isend(sbuf[p].data(), sbuf[p].size(), mpi_type<scalar_t>(),
+  //                 p+child_master(ch), 0, front_comm, &sreq[p]);
+  //   }
+  //   if (CB.pcol() == 0) {
+  //     // receive from all active processes in the parent (only 1 column)
+  //     std::vector<std::vector<scalar_t>> rbuf(proc_rows);
+  //     MPI_Status status;
+  //     int msg_size;
+  //     for (int p=0; p<proc_rows; p++) {
+  //       MPI_Probe(MPI_ANY_SOURCE, 0, front_comm, &status);
+  //       MPI_Get_count(&status, mpi_type<scalar_t>(), &msg_size);
+  //       rbuf[status.MPI_SOURCE].resize(msg_size);
+  //       MPI_Recv(rbuf[status.MPI_SOURCE].data(), msg_size,
+  //                mpi_type<scalar_t>(), status.MPI_SOURCE, 0,
+  //                front_comm, &status);
+  //     }
+  //     std::function<int(integer_t)> src_rank = [&](integer_t r) {
+  //       return (r < this->dim_sep()) ? find_rank(r, 0, b) :
+  //       find_rank(r-this->dim_sep(), 0, bupd);
+  //     };
+  //     ExtAdd::extract_b_copy_from_buffers(CB, rbuf, I, src_rank);
+  //   }
+  //   if (b.pcol() == 0)
+  //     MPI_Waitall(sreq.size(), sreq.data(), MPI_STATUSES_IGNORE);
+  // }
+
+  // template<typename scalar_t,typename integer_t> void
+  // FrontalMatrixMPI<scalar_t,integer_t>::extract_b_seq_to_mpi
+  // (F_t* ch, DistM_t& b, scalar_t* wmem) {
+  //   int child_rank = child_master(ch);
+  //   scalar_t* CB = wmem+ch->p_wmem;
+  //   DistMW_t bupd;
+  //   if (front_comm != MPI_COMM_NULL)
+  //     bupd = DistMW_t(ctxt, this->dim_upd(), 1, wmem+this->p_wmem);
+  //   MPI_Request sreq;
+  //   std::vector<std::vector<scalar_t>> sbuf(1);
+  //   auto I = ch->upd_to_parent(this);
+  //   if (b.pcol() == 0) {
+  //     // send to all active processes in the child (only 1 column)
+  //     std::function<int(integer_t)> dest_rank = [&](integer_t){ return 0; };
+  //     ExtAdd::extract_b_copy_to_buffers(b, bupd, sbuf, dest_rank, I, 1);
+  //     MPI_Isend(sbuf[0].data(), sbuf[0].size(), mpi_type<scalar_t>(),
+  //               child_rank, 0, front_comm, &sreq);
+  //   }
+  //   if (mpi_rank(front_comm) == child_rank) {
+  //     // receive from all active processes in the parent (only 1 column)
+  //     std::vector<std::vector<scalar_t>> rbuf(proc_rows);
+  //     MPI_Status status;
+  //     int msg_size;
+  //     for (int p=0; p<proc_rows; p++) {
+  //       MPI_Probe(MPI_ANY_SOURCE, 0, front_comm, &status);
+  //       MPI_Get_count(&status, mpi_type<scalar_t>(), &msg_size);
+  //       rbuf[status.MPI_SOURCE].resize(msg_size);
+  //       MPI_Recv(rbuf[status.MPI_SOURCE].data(), msg_size,
+  //                mpi_type<scalar_t>(), status.MPI_SOURCE, 0,
+  //                front_comm, &status);
+  //     }
+  //     std::vector<scalar_t*> pbuf(rbuf.size());
+  //     for (std::size_t p=0; p<rbuf.size(); p++)
+  //       pbuf[p] = rbuf[p].data();
+  //     for (integer_t r=0; r<ch->dim_upd(); r++) {
+  //       integer_t pa_r = I[r];
+  //       integer_t rank = (pa_r < this->dim_sep()) ? find_rank(pa_r, 0, b)
+  //         : find_rank(pa_r-this->dim_sep(), 0, bupd);
+  //       CB[r] = *(pbuf[rank]);
+  //       pbuf[rank]++;
+  //     }
+  //   }
+  //   if (b.pcol() == 0) MPI_Wait(&sreq, MPI_STATUS_IGNORE);
+  // }
 
   template<typename scalar_t,typename integer_t> long long
   FrontalMatrixMPI<scalar_t,integer_t>::dense_factor_nonzeros
   (int task_depth) const {
-    long long nnz =
-      (this->front_comm != MPI_COMM_NULL &&
-       mpi_rank(this->front_comm) == 0) ?
-      this->dim_blk*this->dim_blk-this->dim_upd*this->dim_upd : 0;
+    long long nnz = 0;
+    if (this->front_comm != MPI_COMM_NULL &&
+        mpi_rank(this->front_comm) == 0) {
+      auto dsep = this->dim_sep();
+      auto dupd = this->dim_upd();
+      nnz = dsep * (dsep + 2 * dupd);
+    }
     if (visit(this->lchild))
       nnz += this->lchild->dense_factor_nonzeros(task_depth);
     if (visit(this->rchild))

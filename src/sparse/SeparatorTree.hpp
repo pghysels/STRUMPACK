@@ -38,6 +38,8 @@
 
 namespace strumpack {
 
+
+  // TODO rename this class?? to supernodaltree??
   template<typename integer_t> class Separator {
   public:
     Separator(integer_t _sep_end, integer_t _pa,
@@ -61,23 +63,30 @@ namespace strumpack {
     SeparatorTree(std::vector<integer_t>& etree);
     virtual ~SeparatorTree();
     void broadcast(MPI_Comm comm) const;
-    integer_t levels();
+    integer_t levels() const;
     integer_t level(integer_t i) const;
-    integer_t root();
+    integer_t root() const;
     void print() const;
-    void printm(std::string name);
-    void check();
-    std::unique_ptr<SeparatorTree<integer_t>> subtree(integer_t p,
-                                                      integer_t P);
-    std::unique_ptr<SeparatorTree<integer_t>> toptree(integer_t P);
+    void printm(const std::string& name) const;
+    void check() const;
+    std::unique_ptr<SeparatorTree<integer_t>> subtree
+    (integer_t p, integer_t P) const;
+    std::unique_ptr<SeparatorTree<integer_t>> toptree
+    (integer_t P) const;
 
     inline integer_t separators() const { return _nbsep; }
     inline integer_t* sizes() const { return _sizes; }
     inline integer_t* pa() const { return _pa; }
     inline integer_t* lch() const { return _lch; }
     inline integer_t* rch() const { return _rch; }
-    inline std::unordered_map<integer_t, HSS::HSSPartitionTree>& HSS_trees()
-    { return _HSS_trees; }
+    inline std::unordered_map<integer_t,HSS::HSSPartitionTree>&
+    HSS_trees() {
+      return _HSS_trees;
+    }
+    inline const std::unordered_map<integer_t,HSS::HSSPartitionTree>&
+    HSS_trees() const {
+      return _HSS_trees;
+    }
 
   protected:
     integer_t _nbsep;
@@ -85,13 +94,11 @@ namespace strumpack {
     integer_t* _pa;
     integer_t* _lch;
     integer_t* _rch;
-
-    std::unordered_map<integer_t, HSS::HSSPartitionTree> _HSS_trees;
-
+    std::unordered_map<integer_t,HSS::HSSPartitionTree> _HSS_trees;
     inline integer_t size() const { return 4*_nbsep+1; }
 
   private:
-    integer_t _root;
+    mutable integer_t _root;
   };
 
   template<typename integer_t> SeparatorTree<integer_t>::SeparatorTree
@@ -248,7 +255,8 @@ namespace strumpack {
     check();
   }
 
-  template<typename integer_t> SeparatorTree<integer_t>::~SeparatorTree() {
+  template<typename integer_t>
+  SeparatorTree<integer_t>::~SeparatorTree() {
     delete[] _sizes;
   }
 
@@ -258,7 +266,8 @@ namespace strumpack {
     // TODO broadcast the HSS_trees?
   }
 
-  template<typename integer_t> integer_t SeparatorTree<integer_t>::levels() {
+  template<typename integer_t> integer_t
+  SeparatorTree<integer_t>::levels() const {
     if (_nbsep) {
       return level(root());
     } else return 0;
@@ -273,12 +282,15 @@ namespace strumpack {
     return lvl+1;
   }
 
-  template<typename integer_t> integer_t SeparatorTree<integer_t>::root() {
-    if (_root == -1) _root = std::find(_pa, _pa+_nbsep, -1) - _pa;
+  template<typename integer_t> integer_t
+  SeparatorTree<integer_t>::root() const {
+    if (_root == -1)
+      _root = std::find(_pa, _pa+_nbsep, -1) - _pa;
     return _root;
   }
 
-  template<typename integer_t> void SeparatorTree<integer_t>::print() const {
+  template<typename integer_t> void
+  SeparatorTree<integer_t>::print() const {
     std::cout << "i\tpa\tlch\trch\tsep" << std::endl;
     std::cout << "-------------------------------------------" << std::endl;
     for (integer_t i=0; i<_nbsep; i++)
@@ -289,7 +301,7 @@ namespace strumpack {
   }
 
   template<typename integer_t> void
-  SeparatorTree<integer_t>::printm(std::string name) {
+  SeparatorTree<integer_t>::printm(const std::string& name) const {
     check();
     float avg = 0;
     for (integer_t i=0; i<_nbsep; i++) avg += _sizes[i+1]-_sizes[i];
@@ -343,7 +355,8 @@ namespace strumpack {
     file.close();
   }
 
-  template<typename integer_t> void SeparatorTree<integer_t>::check() {
+  template<typename integer_t> void
+  SeparatorTree<integer_t>::check() const {
 #if !defined(NDEBUG)
     if (_nbsep == 0) return;
     assert(std::count(_pa, _pa+_nbsep, -1) == 1); // 1 root
@@ -383,7 +396,7 @@ namespace strumpack {
 
   /** extract subtree p of P */
   template<typename integer_t> std::unique_ptr<SeparatorTree<integer_t>>
-  SeparatorTree<integer_t>::subtree(integer_t p, integer_t P) {
+  SeparatorTree<integer_t>::subtree(integer_t p, integer_t P) const {
     if (_nbsep == 0)
       return std::unique_ptr<SeparatorTree<integer_t>>
         (new SeparatorTree<integer_t>(0));
@@ -464,7 +477,7 @@ namespace strumpack {
 
   /** extract the tree with the top 2*P-1 nodes, ie a tree with P leafs */
   template<typename integer_t> std::unique_ptr<SeparatorTree<integer_t>>
-  SeparatorTree<integer_t>::toptree(integer_t P) {
+  SeparatorTree<integer_t>::toptree(integer_t P) const {
     integer_t top_nodes = std::min(std::max(integer_t(0), 2*P-1), _nbsep);
     auto top = std::unique_ptr<SeparatorTree<integer_t>>
       (new SeparatorTree<integer_t>(top_nodes));
@@ -532,9 +545,10 @@ namespace strumpack {
    * elimination tree with the permutation. Build a separator tree
    * from the elimination tree. Set the inverse permutation.
    */
-  template<typename integer_t> std::unique_ptr<SeparatorTree<integer_t>>
-  build_sep_tree_from_perm(integer_t n, integer_t* ptr, integer_t* ind,
-                           integer_t* perm, integer_t* iperm) {
+  template<typename integer_t>
+  std::unique_ptr<SeparatorTree<integer_t>> build_sep_tree_from_perm
+  (integer_t n, const integer_t* ptr, const integer_t* ind,
+   integer_t* perm, integer_t* iperm) {
     auto rlo = new integer_t[2*n+ptr[n]];
     auto rhi = rlo + n;
     auto pind = rhi + n;

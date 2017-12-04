@@ -80,7 +80,7 @@ int main(int argc, char* argv[]) {
         col_ptr[ind+1] = nnz;
       }
     }
-    A.set_symmetric_sparsity();
+    A.set_symm_sparse();
 
     std::vector<scalar> b(N, scalar(1.)), x(N, scalar(0.));
 

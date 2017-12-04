@@ -48,7 +48,7 @@ void abort_MPI(MPI_Comm *c, int *error, ...) {
 }
 
 template<typename scalar,typename integer> int
-test(int argc, char* argv[], CSRMatrixMPI<scalar,integer>* Adist) {
+test(int argc, char* argv[], const CSRMatrixMPI<scalar,integer>* Adist) {
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   StrumpackSparseSolverMPIDist<scalar,integer> spss(MPI_COMM_WORLD);
@@ -66,7 +66,7 @@ test(int argc, char* argv[], CSRMatrixMPI<scalar,integer>* Adist) {
   spss.set_distributed_csr_matrix
     (Adist->local_rows(), Adist->get_ptr(), Adist->get_ind(),
      Adist->get_val(), Adist->get_dist().data(),
-     Adist->has_symmetric_sparsity());
+     Adist->symm_sparse());
   if (spss.reorder() != ReturnCode::SUCCESS) {
     if (!rank)
       cout << "problem with reordering of the matrix." << endl;
@@ -185,7 +185,8 @@ int main(int argc, char* argv[]) {
 
   int ierr = 0;
   if (!is_complex) {
-    auto Adist = new CSRMatrixMPI<double,int>(A, MPI_COMM_WORLD, true);
+    auto Adist = new CSRMatrixMPI<double,int>
+      (A, MPI_COMM_WORLD, true);
     delete A;
     ierr = test(argc, argv, Adist);
     delete Adist;

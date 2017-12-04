@@ -32,6 +32,7 @@
 #include <vector>
 #include <unordered_map>
 #include <cassert>
+#include <iostream>
 
 namespace strumpack {
   namespace HSS {

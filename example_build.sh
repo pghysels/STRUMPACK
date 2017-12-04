@@ -61,6 +61,21 @@ if [[ $(hostname -s) = "pieterg-X8DA3" ]]; then
           -DSCOTCH_LIBRARIES="$HOME/local/scotch_6.0.4/lib/libscotch.a;$HOME/local/scotch_6.0.4/lib/libscotcherr.a;$HOME/local/scotch_6.0.4/lib/libptscotch.a;$HOME/local/scotch_6.0.4/lib/libptscotcherr.a"
 
     # cmake ../STRUMPACK -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=../STRUMPACK-install \
+    #       -DUSE_OPENMP=OFF \
+    #       -DMPI_CXX_COMPILER=/home/pieterg/local/mpich-3.1.4-install/bin/mpic++ \
+    #       -DMPI_C_COMPILER=/home/pieterg/local/mpich-3.1.4-install/bin/mpicc \
+    #       -DMPI_Fortran_COMPILER=/home/pieterg/local/mpich-3.1.4-install/bin/mpif90 \
+    #       -DCMAKE_CXX_FLAGS="-DCOUNT_FLOPS -DUSE_TASK_TIMER -Wall -Wfatal-errors -Wextra -Wno-unused-parameter" \
+    #       -DSCALAPACK_LIBRARIES="$HOME/local/scalapack-install/lib/libscalapack.a" \
+    #       -DMETIS_INCLUDES=$HOME/local/parmetis-4.0.3_mpich-3.1.4/metis/include \
+    #       -DMETIS_LIBRARIES=$HOME/local/parmetis-4.0.3_mpich-3.1.4/build/Linux-x86_64/libmetis/libmetis.a \
+    #       -DPARMETIS_INCLUDES=$HOME/local/parmetis-4.0.3_mpich-3.1.4/include \
+    #       -DPARMETIS_LIBRARIES=$HOME/local/parmetis-4.0.3_mpich-3.1.4/build/Linux-x86_64/libparmetis/libparmetis.a \
+    #       -DSCOTCH_INCLUDES=$HOME/local/scotch_6.0.4_mpich-3.1.4/include \
+    #       -DSCOTCH_LIBRARIES="$HOME/local/scotch_6.0.4_mpich-3.1.4/lib/libscotch.a;$HOME/local/scotch_6.0.4_mpich-3.1.4/lib/libscotcherr.a;$HOME/local/scotch_6.0.4_mpich-3.1.4/lib/libptscotch.a;$HOME/local/scotch_6.0.4_mpich-3.1.4/lib/libptscotcherr.a"
+
+    # cmake ../STRUMPACK -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=../STRUMPACK-install \
+    #       -DUSE_OPENMP=OFF \
     #       -DMPI_CXX_COMPILER=/home/pieterg/local/mpich-install/bin/mpic++ \
     #       -DMPI_C_COMPILER=/home/pieterg/local/mpich-install/bin/mpicc \
     #       -DMPI_Fortran_COMPILER=/home/pieterg/local/mpich-install/bin/mpif90 \

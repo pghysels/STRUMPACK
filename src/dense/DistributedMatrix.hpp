@@ -41,8 +41,9 @@ namespace strumpack {
   public:
     DistributedMatrix();
     DistributedMatrix(int ctxt, const DenseMatrix<scalar_t>& m);
-    DistributedMatrix(int ctxt, int M, int N,
-                      const DistributedMatrix<scalar_t>& m, int ctxt_all);
+    DistributedMatrix
+    (int ctxt, int M, int N,
+     const DistributedMatrix<scalar_t>& m, int ctxt_all);
     DistributedMatrix(int ctxt, int M, int N);
     DistributedMatrix(int ctxt, int M, int N, int MB, int NB);
     DistributedMatrix(int desc[9]);
@@ -142,11 +143,13 @@ namespace strumpack {
 
     void print() const { print("A"); }
     void print(std::string name, int precision=15) const;
-    void print_to_file(std::string name, std::string filename,
-                       int width=8) const;
+    void print_to_file
+    (std::string name, std::string filename,
+     int width=8) const;
     void random();
-    void random(random::RandomGeneratorBase<typename RealType<scalar_t>::
-                value_type>& rgen);
+    void random
+    (random::RandomGeneratorBase<typename RealType<scalar_t>::
+     value_type>& rgen);
     void zero();
     void fill(scalar_t a);
     void eye();
@@ -154,16 +157,16 @@ namespace strumpack {
     virtual void resize(std::size_t m, std::size_t n);
     virtual void hconcat(const DistributedMatrix<scalar_t>& b);
     DistributedMatrix<scalar_t> transpose() const;
-    void permute_rows_fwd(const std::vector<int>& P);
-    void permute_rows_bwd(const std::vector<int>& P);
+
+    void laswp(const std::vector<int>& P, bool fwd);
 
     DistributedMatrix<scalar_t>
     extract_rows(const std::vector<std::size_t>& Ir, MPI_Comm comm) const;
     DistributedMatrix<scalar_t>
     extract_cols(const std::vector<std::size_t>& Ic, MPI_Comm comm) const;
-    DistributedMatrix<scalar_t>
-    extract(const std::vector<std::size_t>& I,
-            const std::vector<std::size_t>& J) const;
+    DistributedMatrix<scalar_t> extract
+    (const std::vector<std::size_t>& I,
+     const std::vector<std::size_t>& J) const;
     DistributedMatrix<scalar_t>& add(const DistributedMatrix<scalar_t>& B);
     DistributedMatrix<scalar_t>& scaled_add
     (scalar_t alpha, const DistributedMatrix<scalar_t>& B);
@@ -183,20 +186,21 @@ namespace strumpack {
     DenseMatrix<scalar_t> all_gather(int ctxt_all) const;
 
     DenseMatrix<scalar_t> dense_and_clear();
-    DenseMatrixWrapper<scalar_t> dense_wrapper() const;
+    DenseMatrixWrapper<scalar_t> dense_wrapper();
 
     std::vector<int> LU();
-    DistributedMatrix<scalar_t> solve(const DistributedMatrix<scalar_t>& b,
-                                      const std::vector<int>& piv) const;
-    void LQ(DistributedMatrix<scalar_t>& L,
-            DistributedMatrix<scalar_t>& Q) const;
+    DistributedMatrix<scalar_t> solve
+    (const DistributedMatrix<scalar_t>& b, const std::vector<int>& piv) const;
+    void LQ
+    (DistributedMatrix<scalar_t>& L, DistributedMatrix<scalar_t>& Q) const;
     void orthogonalize(scalar_t& r_max, scalar_t& r_min);
-    void ID_column(DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
-                   std::vector<std::size_t>& ind,
-                   real_t rel_tol, real_t abs_tol);
-    void ID_row(DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
-                std::vector<std::size_t>& ind, real_t rel_tol,
-                real_t abs_tol, int ctxt_T);
+    void ID_column
+    (DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
+     std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol);
+    void ID_row
+    (DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
+     std::vector<std::size_t>& ind, real_t rel_tol,
+     real_t abs_tol, int ctxt_T);
 
 #ifdef STRUMPACK_PBLAS_BLOCKSIZE
     static const int default_MB = STRUMPACK_PBLAS_BLOCKSIZE;
@@ -210,10 +214,10 @@ namespace strumpack {
   /** copy submatrix of a DistM_t at ia,ja of size m,n into a DenseM_t
       b at proc dest in ctxt_all */
   // TODO rename these copy functions to gemr2d
-  template<typename scalar_t> void
-  copy(std::size_t m, std::size_t n, const DistributedMatrix<scalar_t>& a,
-       std::size_t ia, std::size_t ja, DenseMatrix<scalar_t>& b,
-       int dest, int ctxt_all) {
+  template<typename scalar_t> void copy
+  (std::size_t m, std::size_t n, const DistributedMatrix<scalar_t>& a,
+   std::size_t ia, std::size_t ja, DenseMatrix<scalar_t>& b,
+   int dest, int ctxt_all) {
     if (!m || !n) return;
     int b_desc[9];
     scalapack::descset(b_desc, m, n, m, n, 0, dest, ctxt_all, m);
@@ -222,10 +226,10 @@ namespace strumpack {
        b.data(), 1, 1, b_desc, ctxt_all);
   }
 
-  template<typename scalar_t> void
-  copy(std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& a,
-       int src, DistributedMatrix<scalar_t>& b,
-       std::size_t ib, std::size_t jb, int ctxt_all) {
+  template<typename scalar_t> void copy
+  (std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& a,
+   int src, DistributedMatrix<scalar_t>& b,
+   std::size_t ib, std::size_t jb, int ctxt_all) {
     if (!m || !n) return;
     int a_desc[9];
     scalapack::descset
@@ -236,10 +240,10 @@ namespace strumpack {
   }
 
   /** copy submatrix of a at ia,ja of size m,n into b at position ib,jb */
-  template<typename scalar_t> void
-  copy(std::size_t m, std::size_t n, const DistributedMatrix<scalar_t>& a,
-       std::size_t ia, std::size_t ja, DistributedMatrix<scalar_t>& b,
-       std::size_t ib, std::size_t jb, int ctxt_all) {
+  template<typename scalar_t> void copy
+  (std::size_t m, std::size_t n, const DistributedMatrix<scalar_t>& a,
+   std::size_t ia, std::size_t ja, DistributedMatrix<scalar_t>& b,
+   std::size_t ib, std::size_t jb, int ctxt_all) {
     if (!m || !n) return;
     assert(!a.active() ||
            (m+ia <= std::size_t(a.rows()) && n+ja <= std::size_t(a.cols())));
@@ -263,16 +267,16 @@ namespace strumpack {
   public:
     DistributedMatrixWrapper() : DistributedMatrix<scalar_t>(),
       _rows(0), _cols(0), _i(0), _j(0) {}
-    DistributedMatrixWrapper(std::size_t m, std::size_t n,
-                             DistributedMatrix<scalar_t>& A,
-                             std::size_t i, std::size_t j);
-    DistributedMatrixWrapper(int ctxt, std::size_t m,
-                             std::size_t n, scalar_t* A);
-    DistributedMatrixWrapper(int ctxt, std::size_t m, std::size_t n,
-                             int MB, int NB, scalar_t* A);
-    DistributedMatrixWrapper(int ctxt, int rsrc, int csrc,
-                             std::size_t m, std::size_t n,
-                             DenseMatrix<scalar_t>& A);
+    DistributedMatrixWrapper
+    (std::size_t m, std::size_t n, DistributedMatrix<scalar_t>& A,
+     std::size_t i, std::size_t j);
+    DistributedMatrixWrapper
+    (int ctxt, std::size_t m, std::size_t n, scalar_t* A);
+    DistributedMatrixWrapper
+    (int ctxt, std::size_t m, std::size_t n, int MB, int NB, scalar_t* A);
+    DistributedMatrixWrapper
+    (int ctxt, int rsrc, int csrc, std::size_t m, std::size_t n,
+     DenseMatrix<scalar_t>& A);
     virtual ~DistributedMatrixWrapper() { this->_data = nullptr; }
 
     int rows() const override { return _rows; }
@@ -311,9 +315,9 @@ namespace strumpack {
 
   template<typename scalar_t>
   std::unique_ptr<const DistributedMatrixWrapper<scalar_t>>
-  ConstDistributedMatrixWrapperPtr(std::size_t m, std::size_t n,
-                                   const DistributedMatrix<scalar_t>& D,
-                                   std::size_t i, std::size_t j) {
+  ConstDistributedMatrixWrapperPtr
+  (std::size_t m, std::size_t n, const DistributedMatrix<scalar_t>& D,
+   std::size_t i, std::size_t j) {
     return std::unique_ptr<const DistributedMatrixWrapper<scalar_t>>
       (new DistributedMatrixWrapper<scalar_t>
        (m, n, const_cast<DistributedMatrix<scalar_t>&>(D), i, j));
@@ -349,8 +353,9 @@ namespace strumpack {
        &this->_prow, &this->_pcol);
     if (this->active()) {
       this->_data = A;
-      if (scalapack::descinit(this->_desc, _rows, _cols, MB, NB,
-                              0, 0, ctxt, std::max(_rows, 1))) {
+      if (scalapack::descinit
+          (this->_desc, _rows, _cols, MB, NB,
+           0, 0, ctxt, std::max(_rows, 1))) {
         std::cerr << "ERROR: Could not create DistributedMatrixWrapper"
                   << " descriptor!" << std::endl;
         abort();
@@ -419,7 +424,7 @@ namespace strumpack {
   template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix
   (int ctxt, const DenseMatrix<scalar_t>& m)
     : DistributedMatrix(ctxt, m.rows(), m.cols(), default_MB, default_NB) {
-    assert(_prows == 1 && _pcols == 1);
+    //    assert(_prows == 1 && _pcols == 1);
     // TODO just do a copy instead of a gemr2d, or steal the data if
     // we also provide a move constructor!!
     scatter(m);
@@ -654,7 +659,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t> void
-  DistributedMatrix<scalar_t>::permute_rows_bwd(const std::vector<int>& P) {
+  DistributedMatrix<scalar_t>::laswp(const std::vector<int>& P, bool fwd) {
     if (!active()) return;
     int descip[9];
     scalapack::descset
@@ -662,20 +667,7 @@ namespace strumpack {
        ctxt(), MB() + scalapack::numroc
        (rows(), MB(), prow(), 0, prows()));
     scalapack::plapiv
-      ('B', 'R', 'C', rows(), cols(), data(), I(), J(), desc(),
-       P.data(), 1, 1, descip, NULL);
-  }
-
-  template<typename scalar_t> void
-  DistributedMatrix<scalar_t>::permute_rows_fwd(const std::vector<int>& P) {
-    if (!active()) return;
-    int descip[9];
-    scalapack::descset
-      (descip, rows() + MB()*prows(), 1, MB(), 1, 0, pcol(),
-       ctxt(), MB() + scalapack::numroc
-       (rows(), MB(), prow(), 0, prows()));
-    scalapack::plapiv
-      ('F', 'R', 'C', rows(), cols(), data(), I(), J(), desc(),
+      (fwd ? 'F' : 'B', 'R', 'C', rows(), cols(), data(), I(), J(), desc(),
        P.data(), 1, 1, descip, NULL);
   }
 
@@ -966,11 +958,8 @@ namespace strumpack {
   }
 
   template<typename scalar_t> DenseMatrixWrapper<scalar_t>
-  DistributedMatrix<scalar_t>::dense_wrapper() const {
-    return
-      DenseMatrixWrapper<scalar_t>
-      (lrows(), lcols(), const_cast<DistributedMatrix<scalar_t>*>
-       (this)->data(), ld());
+  DistributedMatrix<scalar_t>::dense_wrapper() {
+    return DenseMatrixWrapper<scalar_t>(lrows(), lcols(), data(), ld());
   }
 
   template<typename scalar_t> std::vector<int>

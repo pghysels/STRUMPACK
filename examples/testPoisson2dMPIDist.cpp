@@ -50,9 +50,14 @@ int main(int argc, char* argv[]) {
   //     " which might be needed for pt-scotch!" << std::endl;
 
   {
-    int n = 30;
+    int n = 30, nrhs = 1;
     if (argc > 1) n = atoi(argv[1]); // get grid size
     else std::cout << "# please provide grid size" << std::endl;
+    // get number of right-hand sides
+    if (argc > 2) nrhs = std::max(1, atoi(argv[2]));
+    if (!myrank)
+      std::cout << "solving 2D " << n << "x" << n << " Poisson problem"
+                << " with " << nrhs << " right hand sides" << std::endl;
 
     StrumpackSparseSolverMPIDist<scalar,integer> spss(MPI_COMM_WORLD);
     spss.options().set_mc64job(0);
@@ -81,25 +86,33 @@ int main(int argc, char* argv[]) {
         col_ptr[ind+1] = nnz;
       }
     }
-    A.set_symmetric_sparsity();
+    A.set_symm_sparse();
 
     /** build distributed matrix from complete replicated original matrix ***/
     /** TODO directly construct distributed matrix **************************/
     CSRMatrixMPI<scalar,integer> Adist(&A, MPI_COMM_WORLD, false);
-
-    // TODO, delete the global A
+    A = CSRMatrix<scalar,integer>();
 
     auto n_local = Adist.local_rows();
-    std::vector<scalar> b(n_local, scalar(1.)), x(n_local, scalar(0.));
+    DenseMatrix<scalar> b(n_local, nrhs), x(n_local, nrhs),
+      x_exact(n_local, nrhs);
+    x_exact.random();
+    Adist.omp_spmv(x_exact, b);
+
     spss.set_matrix(Adist);
     spss.reorder(n, n);
     spss.factor();
-    spss.solve(b.data(), x.data());
+    spss.solve(b, x);
 
-    auto scaled_res = Adist.max_scaled_residual(x.data(), b.data());
-    if (!myrank)
+    auto scaled_res = Adist.max_scaled_residual(x, b);
+    x.scaled_add(-1., x_exact);
+    auto relerr = x.normF() / x_exact.normF();
+    if (!myrank) {
       std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
                 << scaled_res << std::endl;
+      std::cout << "# relative error = ||x-x_exact||_F/||x_exact||_F = "
+                << relerr << std::endl;
+    }
   }
   TimerList::Finalize();
   scalapack::Cblacs_exit(1);

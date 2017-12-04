@@ -30,6 +30,7 @@
 #include "StrumpackSparseSolver.hpp"
 
 typedef double scalar;
+typedef double real;
 //typedef int64_t integer;
 typedef int integer;
 
@@ -37,8 +38,13 @@ using namespace strumpack;
 
 int main(int argc, char* argv[]) {
   int n = 30;
+  int nrhs = 1;
   if (argc > 1) n = atoi(argv[1]); // get grid size
   else std::cout << "# please provide grid size" << std::endl;
+  // get number of right-hand sides
+  if (argc > 2) nrhs = std::max(1, atoi(argv[2]));
+  std::cout << "solving 2D " << n << "x" << n << " Poisson problem"
+            << " with " << nrhs << " right hand sides" << std::endl;
 
   StrumpackSparseSolver<scalar,integer> spss;
   spss.options().set_mc64job(0);
@@ -66,20 +72,26 @@ int main(int argc, char* argv[]) {
       col_ptr[ind+1] = nnz;
     }
   }
-  A.set_symmetric_sparsity();
+  A.set_symm_sparse();
 
-  std::vector<scalar> b(N, scalar(1.)), x(N, scalar(0.));
+  DenseMatrix<scalar> b(N, nrhs), x(N, nrhs), x_exact(N, nrhs);
+  x_exact.random();
+  A.omp_spmv(x_exact, b);
 
   spss.set_csr_matrix(N, col_ptr, row_ind, val, true);
   spss.reorder(n, n);
   // spss.factor();   // not really necessary, called if needed by solve
-  spss.solve(b.data(), x.data());
+
+  spss.solve(b, x);
 
   // just a check, system is already solved, so solving again
   // with the solution as initial guess should stop immediately
-  //spss.solve(b.data(), x.data(), true);
+  spss.solve(b, x, true);
 
   std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
-            << A.max_scaled_residual(x.data(), b.data()) << std::endl;
+            << A.max_scaled_residual(x, b) << std::endl;
+  x.scaled_add(-1., x_exact);
+  std::cout << "# relative error = ||x-x_exact||_F/||x_exact||_F = "
+            << x.normF() / x_exact.normF() << std::endl;
   return 0;
 }
