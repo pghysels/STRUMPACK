@@ -326,6 +326,9 @@ if(DOXYGEN_FOUND)
     COMMENT "Generating API documentation with doxygen" VERBATIM)
 endif(DOXYGEN_FOUND)
 
+if (ENABLE_C_INTERFACE)
+  set(C_EXAMPLES "sexample dexample cexample zexample")
+endif()
 
 # build an example makefile
 configure_file(${CMAKE_SOURCE_DIR}/examples/Makefile.in

@@ -1,7 +1,7 @@
-all: sexample dexample cexample zexample testPoisson2d testPoisson3d	\
-	testPoisson2dMPI testPoisson2dMPIDist testMMdouble		\
-	testMMdoubleMPI testMMdoubleMPIDist testMMdouble64		\
-	testMMdoubleMPIDist64 testMMfloat testMMfloatMPIDist		\
+all: @C_EXAMPLES@ testPoisson2d testPoisson3d	\
+	testPoisson2dMPI testPoisson2dMPIDist testMMdouble	\
+	testMMdoubleMPI testMMdoubleMPIDist testMMdouble64	\
+	testMMdoubleMPIDist64 testMMfloat testMMfloatMPIDist	\
 	mtx2bin bin2mtx MLkernel
 
 CC=@MPI_C_COMPILER@
@@ -95,7 +95,7 @@ MLkernel: MLkernel.cpp
 	$(RM) MLkernel.o
 
 clean:
-	rm -f *~ *o sexample dexample cexample zexample testPoisson2d	\
+	rm -f *~ *o @C_EXAMPLES@ testPoisson2d	\
 		testPoisson3d testPoisson2dMPI testPoisson2dMPIDist	\
 		testMMdouble testMMdoubleMPI testMMdoubleMPIDist	\
 		testMMdouble64 testMMdoubleMPIDist64			\
