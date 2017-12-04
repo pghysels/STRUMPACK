@@ -31,7 +31,7 @@
 using namespace std;
 
 #define STRUMPACK_PBLAS_BLOCKSIZE 3
-#include "DistributedMatrix.hpp"
+#include "dense/DistributedMatrix.hpp"
 #include "HSS/HSSMatrixMPI.hpp"
 using namespace strumpack;
 using namespace strumpack::HSS;
@@ -67,11 +67,11 @@ int run(int argc, char* argv[]) {
   int npcol = floor(sqrt((float)P));
   int nprow = P / npcol;
   int ctxt, dummy, prow, pcol;
-  Cblacs_get(0, 0, &ctxt);
-  Cblacs_gridinit(&ctxt, "C", nprow, npcol);
-  Cblacs_gridinfo(ctxt, &dummy, &dummy, &prow, &pcol);
-  int ctxt_all = Csys2blacs_handle(MPI_COMM_WORLD);
-  Cblacs_gridinit(&ctxt_all, "R", 1, P);
+  scalapack::Cblacs_get(0, 0, &ctxt);
+  scalapack::Cblacs_gridinit(&ctxt, "C", nprow, npcol);
+  scalapack::Cblacs_gridinfo(ctxt, &dummy, &dummy, &prow, &pcol);
+  int ctxt_all = scalapack::Csys2blacs_handle(MPI_COMM_WORLD);
+  scalapack::Cblacs_gridinit(&ctxt_all, "R", 1, P);
 
   DistributedMatrix<double> A;
 
@@ -326,7 +326,7 @@ int main(int argc, char* argv[]) {
 #pragma omp single nowait
   ierr = run(argc, argv);
 
-  Cblacs_exit(1);
+  scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return ierr;
 }

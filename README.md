@@ -11,7 +11,7 @@ the U.S. Dept. of Energy).  All rights reserved.
 
 
 ## Website
-    http://portal.nersc.gov/project/sparse/strumpack/
+   [http://portal.nersc.gov/project/sparse/strumpack/](http://portal.nersc.gov/project/sparse/strumpack/)
 
 
 ## Current developers
@@ -33,7 +33,7 @@ low-rank property. In particular, STRUMPACK uses the Hierarchically
 Semi-Separable matrix format (HSS).  Such matrices appear in many
 applications, e.g., Finite Element Methods, Boundary Element Methods
 ... In sparse matrix factorization, the fill-in in the triangular
-factors often has a low-rank structures. Hence, the sparse linear
+factors often has a low-rank structure. Hence, the sparse linear
 solve in STRUMPACK exploits the HSS matrix format to compress the
 fill-in. Exploiting this structure using a compression algorithm
 allows for fast solution of linear systems and/or fast computation of
@@ -55,7 +55,7 @@ preconditioned GMRES and BiCGStab iterative solvers.
    strategy is based on applying low-rank approximations to the
    fill-in of a sparse multifrontal LU factorization.  The code uses
    MPI+OpenMP for hybrid distributed and shared memory parallelism.
-   Main point of contact: Pieter Ghysels (pghysels@lbl.gov).
+   The main point of contact is: Pieter Ghysels (pghysels@lbl.gov).
  - The dense distributed-memory package can be found in the src/HSS
    directory. This is currently not well documented.
 

@@ -30,7 +30,7 @@
 #include "StrumpackSparseSolver.hpp"
 #include "StrumpackSparseSolverMPI.hpp"
 #include "StrumpackSparseSolverMPIDist.hpp"
-#include "CSRMatrix.hpp"
+#include "sparse/CSRMatrix.hpp"
 
 using namespace strumpack;
 
@@ -89,17 +89,22 @@ using namespace strumpack;
   }                                                                     \
 
 #define REI(x) reinterpret_cast<int*>(x)
+#define CREI(x) reinterpret_cast<const int*>(x)
 #define RE64(x) reinterpret_cast<int64_t*>(x)
+#define CRE64(x) reinterpret_cast<const int64_t*>(x)
 #define RES(x) reinterpret_cast<float*>(x)
+#define CRES(x) reinterpret_cast<const float*>(x)
 #define RED(x) reinterpret_cast<double*>(x)
+#define CRED(x) reinterpret_cast<const double*>(x)
 #define REC(x) reinterpret_cast<std::complex<float>*>(x)
+#define CREC(x) reinterpret_cast<const std::complex<float>*>(x)
 #define REZ(x) reinterpret_cast<std::complex<double>*>(x)
+#define CREZ(x) reinterpret_cast<const std::complex<double>*>(x)
 
 extern "C" {
-  void STRUMPACK_init(STRUMPACK_SparseSolver* S, MPI_Comm comm,
-                      STRUMPACK_PRECISION precision,
-                      STRUMPACK_INTERFACE interface,
-                      int argc, char* argv[], int verbose) {
+  void STRUMPACK_init
+  (STRUMPACK_SparseSolver* S, MPI_Comm comm, STRUMPACK_PRECISION precision,
+   STRUMPACK_INTERFACE interface, int argc, char* argv[], int verbose) {
     S->precision = precision;
     S->interface = interface;
     bool v = static_cast<bool>(verbose);
@@ -205,48 +210,48 @@ extern "C" {
     S->solver = NULL;
   }
 
-  void STRUMPACK_set_csr_matrix(STRUMPACK_SparseSolver S,
-                                void* N, void* row_ptr, void* col_ind,
-                                void* values, int symm) {
+  void STRUMPACK_set_csr_matrix
+  (STRUMPACK_SparseSolver S, const void* N, const void* row_ptr,
+   const void* col_ind, const void* values, int symm) {
     switch (S.precision) {
     case STRUMPACK_FLOAT:
       CASTS(S.solver)->set_csr_matrix
-        (*REI(N), REI(row_ptr), REI(col_ind), RES(values), symm);
+        (*CREI(N), CREI(row_ptr), CREI(col_ind), CRES(values), symm);
       break;
     case STRUMPACK_DOUBLE:
       CASTD(S.solver)->set_csr_matrix
-        (*REI(N), REI(row_ptr), REI(col_ind), RED(values), symm);
+        (*CREI(N), CREI(row_ptr), CREI(col_ind), CRED(values), symm);
       break;
     case STRUMPACK_FLOATCOMPLEX:
       CASTC(S.solver)->set_csr_matrix
-        (*REI(N), REI(row_ptr), REI(col_ind), REC(values), symm);
+        (*CREI(N), CREI(row_ptr), CREI(col_ind), CREC(values), symm);
       break;
     case STRUMPACK_DOUBLECOMPLEX:
       CASTZ(S.solver)->set_csr_matrix
-        (*REI(N), REI(row_ptr), REI(col_ind), REZ(values), symm);
+        (*CREI(N), CREI(row_ptr), CREI(col_ind), CREZ(values), symm);
       break;
     case STRUMPACK_FLOAT_64:
       CASTS64(S.solver)->set_csr_matrix
-        (*RE64(N), RE64(row_ptr), RE64(col_ind), RES(values), symm);
+        (*CRE64(N), CRE64(row_ptr), CRE64(col_ind), CRES(values), symm);
       break;
     case STRUMPACK_DOUBLE_64:
       CASTD64(S.solver)->set_csr_matrix
-        (*RE64(N), RE64(row_ptr), RE64(col_ind), RED(values), symm);
+        (*CRE64(N), CRE64(row_ptr), CRE64(col_ind), CRED(values), symm);
       break;
     case STRUMPACK_FLOATCOMPLEX_64:
       CASTC64(S.solver)->set_csr_matrix
-        (*RE64(N), RE64(row_ptr), RE64(col_ind), REC(values), symm);
+        (*CRE64(N), CRE64(row_ptr), CRE64(col_ind), CREC(values), symm);
       break;
     case STRUMPACK_DOUBLECOMPLEX_64:
       CASTZ64(S.solver)->set_csr_matrix
-        (*RE64(N), RE64(row_ptr), RE64(col_ind), REZ(values), symm);
+        (*CRE64(N), CRE64(row_ptr), CRE64(col_ind), CREZ(values), symm);
       break;
     }
   }
 
   void STRUMPACK_set_distributed_csr_matrix
-  (STRUMPACK_SparseSolver S, void* N, void* row_ptr,
-   void* col_ind, void* values, void* dist, int symm) {
+  (STRUMPACK_SparseSolver S, const void* N, const void* row_ptr,
+   const void* col_ind, const void* values, const void* dist, int symm) {
     if (S.interface != STRUMPACK_MPI_DIST) {
       std::cerr << "ERROR: interface != STRUMPACK_MPI_DIST" << std::endl;
       return;
@@ -254,42 +259,43 @@ extern "C" {
     switch (S.precision) {
     case STRUMPACK_FLOAT:
       CASTSMPIDIST(S.solver)->set_distributed_csr_matrix
-        (*REI(N), REI(row_ptr), REI(col_ind), RES(values), REI(dist), symm);
+        (*CREI(N), CREI(row_ptr), CREI(col_ind), CRES(values), CREI(dist), symm);
       break;
     case STRUMPACK_DOUBLE:
       CASTDMPIDIST(S.solver)->set_distributed_csr_matrix
-        (*REI(N), REI(row_ptr), REI(col_ind), RED(values), REI(dist), symm);
+        (*CREI(N), CREI(row_ptr), CREI(col_ind), CRED(values), CREI(dist), symm);
       break;
     case STRUMPACK_FLOATCOMPLEX:
       CASTCMPIDIST(S.solver)->set_distributed_csr_matrix
-        (*REI(N), REI(row_ptr), REI(col_ind), REC(values), REI(dist), symm);
+        (*CREI(N), CREI(row_ptr), CREI(col_ind), CREC(values), CREI(dist), symm);
       break;
     case STRUMPACK_DOUBLECOMPLEX:
       CASTZMPIDIST(S.solver)->set_distributed_csr_matrix
-        (*REI(N), REI(row_ptr), REI(col_ind), REZ(values), REI(dist), symm);
+        (*CREI(N), CREI(row_ptr), CREI(col_ind), CREZ(values), CREI(dist), symm);
       break;
     case STRUMPACK_FLOAT_64:
       CASTS64MPIDIST(S.solver)->set_distributed_csr_matrix
-        (*RE64(N), RE64(row_ptr), RE64(col_ind), RES(values), RE64(dist), symm);
+        (*CRE64(N), CRE64(row_ptr), CRE64(col_ind), CRES(values), CRE64(dist), symm);
       break;
     case STRUMPACK_DOUBLE_64:
       CASTD64MPIDIST(S.solver)->set_distributed_csr_matrix
-        (*RE64(N), RE64(row_ptr), RE64(col_ind), RED(values), RE64(dist), symm);
+        (*CRE64(N), CRE64(row_ptr), CRE64(col_ind), CRED(values), CRE64(dist), symm);
       break;
     case STRUMPACK_FLOATCOMPLEX_64:
       CASTC64MPIDIST(S.solver)->set_distributed_csr_matrix
-        (*RE64(N), RE64(row_ptr), RE64(col_ind), REC(values), RE64(dist), symm);
+        (*CRE64(N), CRE64(row_ptr), CRE64(col_ind), CREC(values), CRE64(dist), symm);
       break;
     case STRUMPACK_DOUBLECOMPLEX_64:
       CASTZ64MPIDIST(S.solver)->set_distributed_csr_matrix
-        (*RE64(N), RE64(row_ptr), RE64(col_ind), REZ(values), RE64(dist), symm);
+        (*CRE64(N), CRE64(row_ptr), CRE64(col_ind), CREZ(values), CRE64(dist), symm);
       break;
     }
   }
 
   void STRUMPACK_set_MPIAIJ_matrix
-  (STRUMPACK_SparseSolver S, void* n, void* d_ptr, void* d_ind, void* d_val,
-   void* o_ptr, void* o_ind, void* o_val, void* garray) {
+  (STRUMPACK_SparseSolver S, const void* n, const void* d_ptr,
+   const void* d_ind, const void* d_val, const void* o_ptr, const void* o_ind,
+   const void* o_val, const void* garray) {
     if (S.interface != STRUMPACK_MPI_DIST) {
       std::cerr << "ERROR: interface != STRUMPACK_MPI_DIST" << std::endl;
       return;
@@ -297,82 +303,82 @@ extern "C" {
     switch (S.precision) {
     case STRUMPACK_FLOAT:
       CASTSMPIDIST(S.solver)->set_MPIAIJ_matrix
-        (*REI(n), REI(d_ptr), REI(d_ind), RES(d_val),
-         REI(o_ptr), REI(o_ind), RES(o_val), REI(garray));
+        (*CREI(n), CREI(d_ptr), CREI(d_ind), CRES(d_val),
+         CREI(o_ptr), CREI(o_ind), CRES(o_val), CREI(garray));
       break;
     case STRUMPACK_DOUBLE:
       CASTDMPIDIST(S.solver)->set_MPIAIJ_matrix
-        (*REI(n), REI(d_ptr), REI(d_ind), RED(d_val),
-         REI(o_ptr), REI(o_ind), RED(o_val), REI(garray));
+        (*CREI(n), CREI(d_ptr), CREI(d_ind), CRED(d_val),
+         CREI(o_ptr), CREI(o_ind), CRED(o_val), CREI(garray));
       break;
     case STRUMPACK_FLOATCOMPLEX:
       CASTCMPIDIST(S.solver)->set_MPIAIJ_matrix
-        (*REI(n), REI(d_ptr), REI(d_ind), REC(d_val),
-         REI(o_ptr), REI(o_ind), REC(o_val), REI(garray));
+        (*CREI(n), CREI(d_ptr), CREI(d_ind), CREC(d_val),
+         CREI(o_ptr), CREI(o_ind), CREC(o_val), CREI(garray));
       break;
     case STRUMPACK_DOUBLECOMPLEX:
       CASTZMPIDIST(S.solver)->set_MPIAIJ_matrix
-        (*REI(n), REI(d_ptr), REI(d_ind), REZ(d_val),
-         REI(o_ptr), REI(o_ind), REZ(o_val), REI(garray));
+        (*CREI(n), CREI(d_ptr), CREI(d_ind), CREZ(d_val),
+         CREI(o_ptr), CREI(o_ind), CREZ(o_val), CREI(garray));
       break;
     case STRUMPACK_FLOAT_64:
       CASTS64MPIDIST(S.solver)->set_MPIAIJ_matrix
-        (*RE64(n), RE64(d_ptr), RE64(d_ind), RES(d_val),
-         RE64(o_ptr), RE64(o_ind), RES(o_val), RE64(garray));
+        (*CRE64(n), CRE64(d_ptr), CRE64(d_ind), CRES(d_val),
+         CRE64(o_ptr), CRE64(o_ind), CRES(o_val), CRE64(garray));
       break;
     case STRUMPACK_DOUBLE_64:
       CASTD64MPIDIST(S.solver)->set_MPIAIJ_matrix
-        (*RE64(n), RE64(d_ptr), RE64(d_ind), RED(d_val),
-         RE64(o_ptr), RE64(o_ind), RED(o_val), RE64(garray));
+        (*CRE64(n), CRE64(d_ptr), CRE64(d_ind), CRED(d_val),
+         CRE64(o_ptr), CRE64(o_ind), CRED(o_val), CRE64(garray));
       break;
     case STRUMPACK_FLOATCOMPLEX_64:
       CASTC64MPIDIST(S.solver)->set_MPIAIJ_matrix
-        (*RE64(n), RE64(d_ptr), RE64(d_ind), REC(d_val),
-         RE64(o_ptr), RE64(o_ind), REC(o_val), RE64(garray));
+        (*CRE64(n), CRE64(d_ptr), CRE64(d_ind), CREC(d_val),
+         CRE64(o_ptr), CRE64(o_ind), CREC(o_val), CRE64(garray));
       break;
     case STRUMPACK_DOUBLECOMPLEX_64:
       CASTZ64MPIDIST(S.solver)->set_MPIAIJ_matrix
-        (*RE64(n), RE64(d_ptr), RE64(d_ind), REZ(d_val),
-         RE64(o_ptr), RE64(o_ind), REZ(o_val), RE64(garray));
+        (*CRE64(n), CRE64(d_ptr), CRE64(d_ind), CREZ(d_val),
+         CRE64(o_ptr), CRE64(o_ind), CREZ(o_val), CRE64(garray));
       break;
     }
   }
 
-  STRUMPACK_RETURN_CODE STRUMPACK_solve(STRUMPACK_SparseSolver S,
-                                        void* b, void* x,
-                                        int use_initial_guess) {
+  STRUMPACK_RETURN_CODE STRUMPACK_solve
+  (STRUMPACK_SparseSolver S, const void* b, void* x,
+   int use_initial_guess) {
     switch (S.precision) {
     case STRUMPACK_FLOAT:
       return static_cast<STRUMPACK_RETURN_CODE>
-        (CASTS(S.solver)->solve(RES(b), RES(x), use_initial_guess));
+        (CASTS(S.solver)->solve(CRES(b), RES(x), use_initial_guess));
       break;
     case STRUMPACK_DOUBLE:
       return static_cast<STRUMPACK_RETURN_CODE>
-        (CASTD(S.solver)->solve(RED(b), RED(x), use_initial_guess));
+        (CASTD(S.solver)->solve(CRED(b), RED(x), use_initial_guess));
       break;
     case STRUMPACK_FLOATCOMPLEX:
       return static_cast<STRUMPACK_RETURN_CODE>
-        (CASTC(S.solver)->solve(REC(b), REC(x), use_initial_guess));
+        (CASTC(S.solver)->solve(CREC(b), REC(x), use_initial_guess));
       break;
     case STRUMPACK_DOUBLECOMPLEX:
       return static_cast<STRUMPACK_RETURN_CODE>
-        (CASTZ(S.solver)->solve(REZ(b), REZ(x), use_initial_guess));
+        (CASTZ(S.solver)->solve(CREZ(b), REZ(x), use_initial_guess));
       break;
     case STRUMPACK_FLOAT_64:
       return static_cast<STRUMPACK_RETURN_CODE>
-        (CASTS64(S.solver)->solve(RES(b), RES(x), use_initial_guess));
+        (CASTS64(S.solver)->solve(CRES(b), RES(x), use_initial_guess));
       break;
     case STRUMPACK_DOUBLE_64:
       return static_cast<STRUMPACK_RETURN_CODE>
-        (CASTD64(S.solver)->solve(RED(b), RED(x), use_initial_guess));
+        (CASTD64(S.solver)->solve(CRED(b), RED(x), use_initial_guess));
       break;
     case STRUMPACK_FLOATCOMPLEX_64:
       return static_cast<STRUMPACK_RETURN_CODE>
-        (CASTC64(S.solver)->solve(REC(b), REC(x), use_initial_guess));
+        (CASTC64(S.solver)->solve(CREC(b), REC(x), use_initial_guess));
       break;
     case STRUMPACK_DOUBLECOMPLEX_64:
       return static_cast<STRUMPACK_RETURN_CODE>
-        (CASTZ64(S.solver)->solve(REZ(b), REZ(x), use_initial_guess));
+        (CASTZ64(S.solver)->solve(CREZ(b), REZ(x), use_initial_guess));
       break;
     }
     return STRUMPACK_SUCCESS;
@@ -388,8 +394,8 @@ extern "C" {
     return static_cast<STRUMPACK_RETURN_CODE>(c);
   }
 
-  STRUMPACK_RETURN_CODE STRUMPACK_reorder_regular(STRUMPACK_SparseSolver S,
-                                                  int nx, int ny, int nz) {
+  STRUMPACK_RETURN_CODE STRUMPACK_reorder_regular
+  (STRUMPACK_SparseSolver S, int nx, int ny, int nz) {
     ReturnCode c = ReturnCode::SUCCESS;;
     switch_precision_return(reorder(nx, ny, nz), c);
     return static_cast<STRUMPACK_RETURN_CODE>(c);
@@ -417,20 +423,26 @@ extern "C" {
   { switch_precision(options().set_abs_tol(tol)); }
   void STRUMPACK_set_nd_param(STRUMPACK_SparseSolver S, int nd_param)
   { switch_precision(options().set_nd_param(nd_param)); }
-  void STRUMPACK_set_reordering_method(STRUMPACK_SparseSolver S,
-                                       STRUMPACK_REORDERING_STRATEGY m)
-  { switch_precision(options().set_reordering_method
-                     (static_cast<ReorderingStrategy>(m))); }
-  void STRUMPACK_set_GramSchmidt_type(STRUMPACK_SparseSolver S,
-                                      STRUMPACK_GRAM_SCHMIDT_TYPE t)
-  { switch_precision(options().set_GramSchmidt_type
-                     (static_cast<GramSchmidtType>(t))); }
+  void STRUMPACK_set_reordering_method
+  (STRUMPACK_SparseSolver S, STRUMPACK_REORDERING_STRATEGY m) {
+    switch_precision
+      (options().set_reordering_method
+       (static_cast<ReorderingStrategy>(m)));
+  }
+  void STRUMPACK_set_GramSchmidt_type
+  (STRUMPACK_SparseSolver S, STRUMPACK_GRAM_SCHMIDT_TYPE t) {
+    switch_precision
+      (options().set_GramSchmidt_type
+       (static_cast<GramSchmidtType>(t)));
+  }
   void STRUMPACK_set_mc64job(STRUMPACK_SparseSolver S, int job)
   { switch_precision(options().set_mc64job(job)); }
-  void STRUMPACK_set_Krylov_solver(STRUMPACK_SparseSolver S,
-                                   STRUMPACK_KRYLOV_SOLVER solver_type)
-  { switch_precision(options().set_Krylov_solver
-                     (static_cast<KrylovSolver>(solver_type))); }
+  void STRUMPACK_set_Krylov_solver
+  (STRUMPACK_SparseSolver S, STRUMPACK_KRYLOV_SOLVER solver_type) {
+    switch_precision
+      (options().set_Krylov_solver
+       (static_cast<KrylovSolver>(solver_type)));
+  }
 
   /* set HSS specific options */
   void STRUMPACK_enable_HSS(STRUMPACK_SparseSolver S)

@@ -28,7 +28,7 @@
  */
 #include <iostream>
 #include "StrumpackSparseSolverMPI.hpp"
-#include "CSRMatrix.hpp"
+#include "sparse/CSRMatrix.hpp"
 
 typedef double scalar;
 //typedef int64_t integer;
@@ -80,7 +80,7 @@ int main(int argc, char* argv[]) {
         col_ptr[ind+1] = nnz;
       }
     }
-    A.set_symmetric_sparsity();
+    A.set_symm_sparse();
 
     std::vector<scalar> b(N, scalar(1.)), x(N, scalar(0.));
 
@@ -94,7 +94,7 @@ int main(int argc, char* argv[]) {
                 << A.max_scaled_residual(x.data(), b.data()) << std::endl;
   }
   TimerList::Finalize();
-  Cblacs_exit(1);
+  scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return 0;
 }

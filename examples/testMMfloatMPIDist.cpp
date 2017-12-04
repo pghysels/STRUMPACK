@@ -31,8 +31,8 @@
 #include <getopt.h>
 
 #include "StrumpackSparseSolverMPIDist.hpp"
-#include "CSRMatrix.hpp"
-#include "CSRMatrixMPI.hpp"
+#include "sparse/CSRMatrix.hpp"
+#include "sparse/CSRMatrixMPI.hpp"
 
 using namespace strumpack;
 
@@ -60,7 +60,7 @@ test(int argc, char* argv[], CSRMatrixMPI<scalar,integer>* Adist) {
   spss.set_distributed_csr_matrix
     (Adist->local_rows(), Adist->get_ptr(), Adist->get_ind(),
      Adist->get_val(), Adist->get_dist().data(),
-     Adist->has_symmetric_sparsity());
+     Adist->symm_sparse());
   if (spss.reorder() != ReturnCode::SUCCESS) {
     if (!rank)
       std::cout << "problem with reordering of the matrix." << std::endl;
@@ -184,7 +184,7 @@ int main(int argc, char* argv[]) {
 
   MPI_Errhandler_free(&eh);
   TimerList::Finalize();
-  Cblacs_exit(1);
+  scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return 0;
 }

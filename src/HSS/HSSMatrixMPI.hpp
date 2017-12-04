@@ -3,13 +3,13 @@
 
 #include <cassert>
 
+#include "misc/MPIWrapper.hpp"
 #include "HSSExtraMPI.hpp"
 #include "DistSamples.hpp"
 #include "HSSMatrixBase.hpp"
 #include "HSSMatrix.hpp"
 #include "HSSPartitionTree.hpp"
 #include "HSSBasisIDMPI.hpp"
-#include "MPI_wrapper.hpp"
 #include "BlockCyclic2BlockRow.hpp"
 
 namespace strumpack {
@@ -331,20 +331,20 @@ namespace strumpack {
         if (_active_procs < P) {
           auto active_comm = mpi_sub_comm(_comm, 0, _active_procs);
           if (mpi_rank(_comm) < _active_procs) {
-            _ctxt = Csys2blacs_handle(active_comm);
-            Cblacs_gridinit(&_ctxt, "C", _prows, _pcols);
-            _ctxt_T = Csys2blacs_handle(active_comm);
-            Cblacs_gridinit(&_ctxt_T, "R", _pcols, _prows);
+            _ctxt = scalapack::Csys2blacs_handle(active_comm);
+            scalapack::Cblacs_gridinit(&_ctxt, "C", _prows, _pcols);
+            _ctxt_T = scalapack::Csys2blacs_handle(active_comm);
+            scalapack::Cblacs_gridinit(&_ctxt_T, "R", _pcols, _prows);
           } else _ctxt = _ctxt_T = -1;
           mpi_free_comm(&active_comm);
         } else {
-          _ctxt = Csys2blacs_handle(_comm);
-          Cblacs_gridinit(&_ctxt, "C", _prows, _pcols);
-          _ctxt_T = Csys2blacs_handle(_comm);
-          Cblacs_gridinit(&_ctxt_T, "R", _pcols, _prows);
+          _ctxt = scalapack::Csys2blacs_handle(_comm);
+          scalapack::Cblacs_gridinit(&_ctxt, "C", _prows, _pcols);
+          _ctxt_T = scalapack::Csys2blacs_handle(_comm);
+          scalapack::Cblacs_gridinit(&_ctxt_T, "R", _pcols, _prows);
         }
-        _ctxt_all = Csys2blacs_handle(_comm);
-        Cblacs_gridinit(&_ctxt_all, "R", 1, P);
+        _ctxt_all = scalapack::Csys2blacs_handle(_comm);
+        scalapack::Cblacs_gridinit(&_ctxt_all, "R", 1, P);
         _ctxt_loc = _ctxt;
       } else {
         _ctxt = _ctxt_T = _ctxt_all = _ctxt_loc = -1;
@@ -360,8 +360,8 @@ namespace strumpack {
             MPI_Group_incl(group, 1, &root, &sub_group);
             MPI_Comm_create(_comm, sub_group, &c0);
             if (mpi_rank(_comm) == 0) {
-              _ctxt_loc = Csys2blacs_handle(c0);
-              Cblacs_gridinit(&_ctxt_loc, "C", 1, 1);
+              _ctxt_loc = scalapack::Csys2blacs_handle(c0);
+              scalapack::Cblacs_gridinit(&_ctxt_loc, "C", 1, 1);
             }
             MPI_Group_free(&group);
             MPI_Group_free(&sub_group);
@@ -380,8 +380,8 @@ namespace strumpack {
             MPI_Group_incl(group, 1, &root, &sub_group);
             MPI_Comm_create(_comm, sub_group, &c1);
             if (mpi_rank(_comm) == root) {
-              _ctxt_loc = Csys2blacs_handle(c1);
-              Cblacs_gridinit(&_ctxt_loc, "C", 1, 1);
+              _ctxt_loc = scalapack::Csys2blacs_handle(c1);
+              scalapack::Cblacs_gridinit(&_ctxt_loc, "C", 1, 1);
             }
             MPI_Group_free(&group);
             MPI_Group_free(&sub_group);
@@ -517,9 +517,9 @@ namespace strumpack {
     }
 
     template<typename scalar_t> HSSMatrixMPI<scalar_t>::~HSSMatrixMPI() {
-      if (_ctxt != -1) Cblacs_gridexit(_ctxt);
-      if (_ctxt_T != -1) Cblacs_gridexit(_ctxt_T);
-      if (_ctxt_all != -1) Cblacs_gridexit(_ctxt_all);
+      if (_ctxt != -1) scalapack::Cblacs_gridexit(_ctxt);
+      if (_ctxt_T != -1) scalapack::Cblacs_gridexit(_ctxt_T);
+      if (_ctxt_all != -1) scalapack::Cblacs_gridexit(_ctxt_all);
       mpi_free_comm(&_comm);
     }
 

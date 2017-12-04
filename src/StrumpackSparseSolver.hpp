@@ -46,15 +46,15 @@
 #ifdef HAVE_PAPI
 #include <papi.h>
 #endif
-#include "SPOptions.hpp"
-#include "CompressedSparseMatrix.hpp"
-#include "CSRMatrix.hpp"
-#include "MatrixReordering.hpp"
-#include "EliminationTree.hpp"
-#include "tools.hpp"
-#include "GMRes.hpp"
-#include "BiCGStab.hpp"
-#include "IterativeRefinement.hpp"
+#include "misc/Tools.hpp"
+#include "StrumpackOptions.hpp"
+#include "sparse/CompressedSparseMatrix.hpp"
+#include "sparse/CSRMatrix.hpp"
+#include "sparse/MatrixReordering.hpp"
+#include "sparse/EliminationTree.hpp"
+#include "sparse/GMRes.hpp"
+#include "sparse/BiCGStab.hpp"
+#include "sparse/IterativeRefinement.hpp"
 
 #ifdef USE_TBB_MALLOC
 void* operator new(std::size_t sz) throw(std::bad_alloc) {
@@ -80,6 +80,12 @@ namespace strumpack {
    */
   template<typename scalar_t,typename integer_t=int>
   class StrumpackSparseSolver {
+    using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
+    using Tree_t = EliminationTree<scalar_t,integer_t>;
+    using Reord_t = MatrixReordering<scalar_t,integer_t>;
+    using DenseM_t = DenseMatrix<scalar_t>;
+    using DenseMW_t = DenseMatrixWrapper<scalar_t>;
+
   public:
     /*! \brief Constructor of the StrumpackSparseSolver class,
      *         taking command line arguments.
@@ -92,8 +98,8 @@ namespace strumpack {
      * \param root    Flag to denote whether this process is the root MPI
      *                process. Only the root will print certain messages.
      */
-    StrumpackSparseSolver(int argc, char* argv[], bool verbose=true,
-                          bool root=true);
+    StrumpackSparseSolver
+    (int argc, char* argv[], bool verbose=true, bool root=true);
 
     StrumpackSparseSolver(bool verbose=true, bool root=true);
     /*! \brief Destructor of the StrumpackSparseSolver class. */
@@ -111,7 +117,7 @@ namespace strumpack {
      *
      * \param A  A CSRMatrix<scalar_t,integer_t> object.
      */
-    virtual void set_matrix(CSRMatrix<scalar_t,integer_t>& A);
+    virtual void set_matrix(const CSRMatrix<scalar_t,integer_t>& A);
     /*! \brief Associate a (sequential) NxN CSR matrix with this
      *         solver.
      *
@@ -134,9 +140,9 @@ namespace strumpack {
      *                    Denotes whether the sparsity pattern of the input
      *                    matrix is symmetric.
      */
-    virtual void set_csr_matrix(integer_t N, integer_t* row_ptr,
-                                integer_t* col_ind, scalar_t* values,
-                                bool symmetric_pattern=false);
+    virtual void set_csr_matrix
+    (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
+     const scalar_t* values, bool symmetric_pattern=false);
     /*! \brief Compute matrix reorderings for numerical stability and
      *         to reduce fill-in.
      *
@@ -195,50 +201,58 @@ namespace strumpack {
      *           (but should be allocated).
      * \return Error code.
      */
-    virtual ReturnCode solve(scalar_t* b, scalar_t* x,
-                             bool use_initial_guess=false);
+    virtual ReturnCode solve
+    (const scalar_t* b, scalar_t* x, bool use_initial_guess=false);
+
+    virtual ReturnCode solve
+    (const DenseM_t& b, DenseM_t& x, bool use_initial_guess=false);
 
     SPOptions<scalar_t>& options() { return _opts; }
+    const SPOptions<scalar_t>& options() const { return _opts; }
     void set_from_options() { _opts.set_from_command_line(); }
     void set_from_options(int argc, char* argv[])
     { _opts.set_from_command_line(argc, argv); }
 
     /*! \brief Get the maximum rank encountered in any of the HSS
      * matrices.  Call this AFTER numerical factorization. */
-    int maximum_rank() { return elimination_tree()->maximum_rank(); }
+    int maximum_rank() const { return tree()->maximum_rank(); }
     /*! \brief Get the number of nonzeros in the (sparse)
         factors. This is the fill-in.  * Call this AFTER numerical
         factorization. */
-    std::size_t factor_nonzeros()
-    { return elimination_tree()->factor_nonzeros(); }
+    std::size_t factor_nonzeros() const
+    { return tree()->factor_nonzeros(); }
     /*! \brief Get the number of nonzeros in the (sparse)
      * factors. This is the fill-in.  Call this AFTER numerical
      * factorization. */
-    std::size_t factor_memory()
-    { return elimination_tree()->factor_nonzeros() * sizeof(scalar_t); }
+    std::size_t factor_memory() const
+    { return tree()->factor_nonzeros() * sizeof(scalar_t); }
     /*! \brief Get the number of iterations performed by the outer
         (Krylov) iterative solver. */
-    int Krylov_iterations() { return _Krylov_its; }
+    int Krylov_iterations() const { return _Krylov_its; }
 
   protected:
-    virtual void setup_elimination_tree();
-    virtual void setup_matrix_reordering();
+    virtual void setup_tree();
+    virtual void setup_reordering();
     virtual int compute_reordering(int nx, int ny, int nz);
     virtual void compute_separator_reordering();
-    virtual CompressedSparseMatrix<scalar_t,integer_t>* matrix()
-    { return _mat; }
-    virtual MatrixReordering<scalar_t,integer_t>* reordering()
-    { return _nd; }
-    virtual EliminationTree<scalar_t,integer_t>* elimination_tree()
-    { return _et; }
+
+    virtual SpMat_t* matrix() { return _mat.get(); }
+    virtual const SpMat_t* matrix() const { return _mat.get(); }
+    virtual Reord_t* reordering() { return _nd.get(); }
+    virtual const Reord_t* reordering() const { return _nd.get(); }
+    virtual Tree_t* tree() { return _tree.get(); }
+    virtual const Tree_t* tree() const { return _tree.get(); }
+
     void papi_initialize();
-    inline long long dense_factor_nonzeros()
-    { return elimination_tree()->dense_factor_nonzeros(); }
-    inline long long dense_factor_memory()
-    { return elimination_tree()->dense_factor_nonzeros() * sizeof(scalar_t); }
-    void print_solve_stats(TaskTimer& t);
+    inline long long dense_factor_nonzeros() const {
+      return tree()->dense_factor_nonzeros();
+    }
+    inline long long dense_factor_memory() const {
+      return tree()->dense_factor_nonzeros() * sizeof(scalar_t);
+    }
+    void print_solve_stats(TaskTimer& t) const;
     virtual void perf_counters_start();
-    virtual void perf_counters_stop(std::string s);
+    virtual void perf_counters_stop(const std::string& s);
     virtual void synchronize() {}
     virtual void communicate_ordering() {}
 
@@ -262,9 +276,9 @@ namespace strumpack {
     long long int _b0 = 0, _btot = 0, _bmin = 0, _bmax = 0;
 #endif
   private:
-    CSRMatrix<scalar_t,integer_t>* _mat = nullptr;
-    MatrixReordering<scalar_t,integer_t>* _nd = nullptr;
-    EliminationTree<scalar_t,integer_t>* _et = nullptr;
+    std::unique_ptr<CSRMatrix<scalar_t,integer_t>> _mat;
+    std::unique_ptr<MatrixReordering<scalar_t,integer_t>> _nd;
+    std::unique_ptr<EliminationTree<scalar_t,integer_t>> _tree;
   };
 
   template<typename scalar_t,typename integer_t>
@@ -316,34 +330,33 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t>
   StrumpackSparseSolver<scalar_t,integer_t>::~StrumpackSparseSolver() {
     std::set_new_handler(_old_handler);
-    delete _nd;
-    delete _et;
-    delete _mat;
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolver<scalar_t,integer_t>::setup_elimination_tree() {
-    if (_et) delete _et;
-    _et = new EliminationTree<scalar_t,integer_t>
-      (_opts, matrix(), reordering()->sep_tree.get());
+  StrumpackSparseSolver<scalar_t,integer_t>::setup_tree() {
+    if (_tree) _tree.reset();
+    _tree = std::unique_ptr<EliminationTree<scalar_t,integer_t>>
+      (new EliminationTree<scalar_t,integer_t>
+       (_opts, *matrix(), *(reordering()->sep_tree)));
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolver<scalar_t,integer_t>::setup_matrix_reordering() {
-    if (_nd) delete _nd;
-    _nd = new MatrixReordering<scalar_t,integer_t>(matrix()->size());
+  StrumpackSparseSolver<scalar_t,integer_t>::setup_reordering() {
+    if (_nd) _nd.reset();
+    _nd = std::unique_ptr<MatrixReordering<scalar_t,integer_t>>
+      (new MatrixReordering<scalar_t,integer_t>(matrix()->size()));
   }
 
   template<typename scalar_t,typename integer_t> int
   StrumpackSparseSolver<scalar_t,integer_t>::compute_reordering
   (int nx, int ny, int nz) {
-    return _nd->nested_dissection(_opts, _mat, nx, ny, nz);
+    return _nd->nested_dissection(_opts, _mat.get(), nx, ny, nz);
   }
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::compute_separator_reordering() {
-    //_nd->separator_reordering(_opts, _mat, _et->root_front());
-    _nd->separator_reordering(_opts, _mat, _opts.verbose() && _is_root);
+    _nd->separator_reordering
+      (_opts, _mat.get(), _opts.verbose() && _is_root);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -396,7 +409,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::perf_counters_stop
-  (std::string s) {
+  (const std::string& s) {
 #if defined(HAVE_PAPI)
     float mflops = 0., rtime = 0., ptime = 0.;
     long_long flpops = 0;
@@ -443,7 +456,8 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolver<scalar_t,integer_t>::print_solve_stats(TaskTimer& t) {
+  StrumpackSparseSolver<scalar_t,integer_t>::print_solve_stats
+  (TaskTimer& t) const {
     double tel = t.elapsed();
     if (_opts.verbose() && _is_root) {
       std::cout << "# DIRECT/GMRES solve:" << std::endl;
@@ -473,19 +487,21 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::set_matrix
-  (CSRMatrix<scalar_t,integer_t>& A) {
-    if (_mat) delete _mat;
-    _mat = A.clone();
+  (const CSRMatrix<scalar_t,integer_t>& A) {
+    if (_mat) _mat.reset();
+    _mat = std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
+      (new CSRMatrix<scalar_t,integer_t>(A));
     _factored = _reordered = false;
   }
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::set_csr_matrix
-  (integer_t N, integer_t* row_ptr, integer_t* col_ind,
-   scalar_t* values, bool symmetric_pattern) {
-    if (_mat) delete _mat;
-    _mat = new CSRMatrix<scalar_t,integer_t>
-      (N, row_ptr, col_ind, values, symmetric_pattern);
+  (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
+   const scalar_t* values, bool symmetric_pattern) {
+    if (_mat) _mat.reset();
+    _mat = std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
+      (new CSRMatrix<scalar_t,integer_t>
+       (N, row_ptr, col_ind, values, symmetric_pattern));
     _factored = _reordered = false;
   }
 
@@ -541,7 +557,7 @@ namespace strumpack {
     TaskTimer t3("nested-dissection");
     perf_counters_start();
     t3.start();
-    setup_matrix_reordering();
+    setup_reordering();
     ierr = compute_reordering(nx, ny, nz);
     if (ierr) {
       std::cerr << "ERROR: nested dissection went wrong, ierr="
@@ -571,13 +587,12 @@ namespace strumpack {
     }
 
     perf_counters_start();
-    TaskTimer t0("symbolic-factorization",
-                 [&](){ setup_elimination_tree(); });
+    TaskTimer t0("symbolic-factorization", [&](){ setup_tree(); });
     reordering()->clear_tree_data();
     if (_opts.verbose()) {
       // this might require a reduction
-      auto nr_dense = elimination_tree()->nr_dense_fronts();
-      auto nr_HSS = elimination_tree()->nr_HSS_fronts();
+      auto nr_dense = tree()->nr_dense_fronts();
+      auto nr_HSS = tree()->nr_HSS_fronts();
       if (_is_root) {
         std::cout << "# symbolic factorization:" << std::endl;
         std::cout << "#   - nr of dense Frontal matrices = "
@@ -615,7 +630,7 @@ namespace strumpack {
     }
     perf_counters_start();
     TaskTimer t1("factorization", [&]() {
-        elimination_tree()->multifrontal_factorization(_opts);
+        tree()->multifrontal_factorization(*matrix(), _opts);
       });
     perf_counters_stop("numerical factorization");
     if (_opts.verbose()) {
@@ -698,14 +713,27 @@ namespace strumpack {
 #endif
       }
     }
-    if (_rank_out) elimination_tree()->print_rank_statistics(*_rank_out);
+    if (_rank_out) tree()->print_rank_statistics(*_rank_out);
     _factored = true;
     return ReturnCode::SUCCESS;
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
   StrumpackSparseSolver<scalar_t,integer_t>::solve
-  (scalar_t* b, scalar_t* x, bool use_initial_guess) {
+  (const scalar_t* b, scalar_t* x, bool use_initial_guess) {
+    auto N = matrix()->size();
+    auto B = ConstDenseMatrixWrapperPtr(N, 1, b, N);
+    DenseMW_t X(N, 1, x, N);
+    return solve(*B, X, use_initial_guess);
+  }
+
+  // TODO make this const
+  //  Krylov its and flops, bytes, time are modified!!
+  // pass those as a pointer to a struct ??
+  // this can also call factor if not already factored!!
+  template<typename scalar_t,typename integer_t> ReturnCode
+  StrumpackSparseSolver<scalar_t,integer_t>::solve
+  (const DenseM_t& b, DenseM_t& x, bool use_initial_guess) {
     if (!_factored) {
       ReturnCode ierr = factor();
       if (ierr != ReturnCode::SUCCESS) return ierr;
@@ -713,84 +741,96 @@ namespace strumpack {
     TaskTimer t("solve");
     perf_counters_start();
     t.start();
-    auto N = matrix()->size();
 
-    auto b_loc = new scalar_t[N];
-    if (_opts.mc64job() == 5) x_mult_y(N, b, _mc64_Dr.data(), b_loc);
-    else {
-      std::copy(b, b+N, b_loc);
-      STRUMPACK_BYTES(sizeof(scalar_t)*static_cast<long long int>(N)*3);
+    integer_t N = matrix()->size();
+    assert(N < std::numeric_limits<int>::max());
+    std::vector<int> intIP(N);
+    for (integer_t i=0; i<N; i++)
+      intIP[i] = reordering()->iperm[i] + 1;
+    std::vector<int> int_mc64_cperm;
+    if (_opts.mc64job() != 0) {
+      int_mc64_cperm.resize(N);
+      for (integer_t i=0; i<N; i++)
+        int_mc64_cperm[i] = _mc64_cperm[i] + 1;
     }
-    permute_vector(N, b_loc, reordering()->iperm, 1);
 
-    if (!use_initial_guess) {
-      std::fill(x, x+N, scalar_t(0.));
-      STRUMPACK_BYTES(sizeof(scalar_t)*static_cast<long long int>(N)*2);
-    } else {
-      if (_opts.mc64job() == 5) x_div_y(N, x, _mc64_Dc.data());
-      if (_opts.mc64job() != 0) permute_vector(N, x, _mc64_cperm, 1);
-      permute_vector(N, x, reordering()->iperm, 1);
+    auto bloc = b;
+    if (_opts.mc64job() == 5)
+      bloc.scale_rows(_mc64_Dr);
+    bloc.lapmr(intIP, true);
+
+    if (use_initial_guess &&
+        _opts.Krylov_solver() != KrylovSolver::DIRECT) {
+      if (_opts.mc64job() == 5)
+        x.div_rows(_mc64_Dc);
+      if (_opts.mc64job() != 0)
+        x.lapmr(int_mc64_cperm, true);
+      x.lapmr(intIP, true);
     }
+
     _Krylov_its = 0;
-    elimination_tree()->allocate_solve_work_memory(); // for 1 vector
 
     auto gmres_solve = [&](std::function<void(scalar_t*)> preconditioner) {
       GMRes<scalar_t,integer_t>
-      (matrix(), preconditioner, N, x, b_loc,
+      (*matrix(), preconditioner, x.rows(), x.data(), bloc.data(),
        _opts.rel_tol(), _opts.abs_tol(), _Krylov_its, _opts.maxit(),
        _opts.gmres_restart(), _opts.GramSchmidt_type(),
        use_initial_guess, _opts.verbose() && _is_root);
     };
     auto bicgstab_solve = [&](std::function<void(scalar_t*)> preconditioner) {
       BiCGStab<scalar_t,integer_t>
-      (matrix(), preconditioner, N, x, b_loc,
-       _opts.rel_tol(), _opts.abs_tol(),
+      (*matrix(), preconditioner, x.rows(), x.data(), bloc.data(),
+       _opts.rel_tol(), _opts.abs_tol(), _Krylov_its, _opts.maxit(),
+       use_initial_guess, _opts.verbose() && _is_root);
+    };
+    auto MFsolve = [&](scalar_t* w) {
+      DenseMW_t X(x.rows(), 1, w, x.ld());
+      tree()->multifrontal_solve(X);
+    };
+    auto refine = [&]() {
+      IterativeRefinement<scalar_t,integer_t>
+      (*matrix(), [&](DenseM_t& w) { tree()->multifrontal_solve(w); },
+       x, bloc, _opts.rel_tol(), _opts.abs_tol(),
        _Krylov_its, _opts.maxit(), use_initial_guess,
        _opts.verbose() && _is_root);
     };
-    auto loc_et = elimination_tree();
-    auto refine = [&]() {
-      IterativeRefinement<scalar_t,integer_t>
-      (matrix(), [loc_et](scalar_t* x){ loc_et->multifrontal_solve(x); },
-       N, x, b_loc, _opts.rel_tol(), _opts.abs_tol(), _Krylov_its,
-       _opts.maxit(), use_initial_guess, _opts.verbose() && _is_root);
-    };
+
     switch (_opts.Krylov_solver()) {
     case KrylovSolver::AUTO: {
-      if (_opts.use_HSS())
-        gmres_solve([loc_et,N](scalar_t* x){
-            loc_et->multifrontal_solve(x);
-          });
+      if (_opts.use_HSS() && x.cols() == 1)
+        gmres_solve(MFsolve);
       else refine();
     }; break;
     case KrylovSolver::DIRECT: {
-      std::copy(b_loc, b_loc+N, x);
-      elimination_tree()->multifrontal_solve(x);
-      STRUMPACK_BYTES(sizeof(scalar_t)*static_cast<long long int>(N)*3);
+      x = bloc;
+      tree()->multifrontal_solve(x);
     }; break;
     case KrylovSolver::REFINE: {
       refine();
     }; break;
     case KrylovSolver::PREC_GMRES: {
-      gmres_solve([loc_et](scalar_t* x){ loc_et->multifrontal_solve(x); });
+      assert(x.cols() == 1);
+      gmres_solve(MFsolve);
     }; break;
     case KrylovSolver::GMRES: {
+      assert(x.cols() == 1);
       gmres_solve([](scalar_t* x){});
     }; break;
     case KrylovSolver::PREC_BICGSTAB: {
-      bicgstab_solve([loc_et](scalar_t* x){ loc_et->multifrontal_solve(x); });
+      assert(x.cols() == 1);
+      bicgstab_solve(MFsolve);
     }; break;
     case KrylovSolver::BICGSTAB: {
+      assert(x.cols() == 1);
       bicgstab_solve([](scalar_t* x){});
     }; break;
     }
 
-    delete[] b_loc;
-    elimination_tree()->delete_solve_work_memory();
-
-    permute_vector(N, x, reordering()->perm, 1);
-    if (_opts.mc64job() != 0) permute_vector(N, x, _mc64_cperm, 0);
-    if (_opts.mc64job() == 5) x_mult_y(N, x, _mc64_Dc.data());
+    x.lapmr(intIP, false);
+    if (_opts.mc64job() != 0)
+      x.lapmr(int_mc64_cperm, false);
+    if (_opts.mc64job() == 5)
+      x.scale_rows(_mc64_Dc);
 
     t.stop();
     perf_counters_stop("DIRECT/GMRES solve");

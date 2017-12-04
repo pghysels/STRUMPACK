@@ -1,31 +1,35 @@
 /*
- * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The Regents of
- * the University of California, through Lawrence Berkeley National Laboratory
- * (subject to receipt of any required approvals from the U.S. Dept. of Energy).
- * All rights reserved.
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
  *
- * If you have questions about your rights to use or distribute this software,
- * please contact Berkeley Lab's Technology Transfer Department at TTD@lbl.gov.
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
  *
- * NOTICE. This software is owned by the U.S. Department of Energy. As such, the
- * U.S. Government has been granted for itself and others acting on its behalf a
- * paid-up, nonexclusive, irrevocable, worldwide license in the Software to
- * reproduce, prepare derivative works, and perform publicly and display publicly.
- * Beginning five (5) years after the date permission to assert copyright is
- * obtained from the U.S. Department of Energy, and subject to any subsequent five
- * (5) year renewals, the U.S. Government is granted for itself and others acting
- * on its behalf a paid-up, nonexclusive, irrevocable, worldwide license in the
- * Software to reproduce, prepare derivative works, distribute copies to the
- * public, perform publicly and display publicly, and to permit others to do so.
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly.  Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government is granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
  *
  * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
- *             (Lawrence Berkeley National Lab, Computational Research Division).
+ *             (Lawrence Berkeley National Lab, Computational Research
+ *             Division).
  *
  */
 #include <iostream>
 #include "StrumpackSparseSolver.hpp"
-#include "CSCMatrix.hpp"
-#include "CSRMatrix.hpp"
+#include "sparse/CSCMatrix.hpp"
+#include "sparse/CSRMatrix.hpp"
 
 typedef double scalar;
 typedef int64_t integer;
@@ -55,19 +59,21 @@ int main(int argc, char* argv[]) {
   for (integer xdim=0; xdim<n; xdim++)
     for (integer ydim=0; ydim<n; ydim++)
       for (integer zdim=0; zdim<n; zdim++) {
-	integer ind = zdim+ydim*n+xdim*n2;
-	val[nnz] = 6.0;	row_ind[nnz++] = ind;
-	if (zdim > 0)  { val[nnz] = -1.0; row_ind[nnz++] = ind-1; } // left
-	if (zdim < n-1){ val[nnz] = -1.0; row_ind[nnz++] = ind+1; } // right
-	if (ydim > 0)  { val[nnz] = -1.0; row_ind[nnz++] = ind-n; } // front
-	if (ydim < n-1){ val[nnz] = -1.0; row_ind[nnz++] = ind+n; } // back
-	if (xdim > 0)  { val[nnz] = -1.0; row_ind[nnz++] = ind-n2; } // up
-	if (xdim < n-1){ val[nnz] = -1.0; row_ind[nnz++] = ind+n2; } // down
-	col_ptr[ind+1] = nnz;
+        integer ind = zdim+ydim*n+xdim*n2;
+        val[nnz] = 6.0;
+        row_ind[nnz++] = ind;
+        if (zdim > 0)  { val[nnz] = -1.0; row_ind[nnz++] = ind-1; } // left
+        if (zdim < n-1){ val[nnz] = -1.0; row_ind[nnz++] = ind+1; } // right
+        if (ydim > 0)  { val[nnz] = -1.0; row_ind[nnz++] = ind-n; } // front
+        if (ydim < n-1){ val[nnz] = -1.0; row_ind[nnz++] = ind+n; } // back
+        if (xdim > 0)  { val[nnz] = -1.0; row_ind[nnz++] = ind-n2; } // up
+        if (xdim < n-1){ val[nnz] = -1.0; row_ind[nnz++] = ind+n2; } // down
+        col_ptr[ind+1] = nnz;
       }
-  A.set_symmetric_sparsity();
+  A.set_symm_sparse();
 
-  std::vector<scalar> b(N, scalar(0.)), x(N, scalar(0.)), x_exact(N, scalar(1.));
+  std::vector<scalar> b(N, scalar(0.)), x(N, scalar(0.)),
+    x_exact(N, scalar(1.));
 
   A.omp_spmv(x_exact.data(), b.data());
 
@@ -76,10 +82,8 @@ int main(int argc, char* argv[]) {
   spss.factor();
   spss.solve(b.data(), x.data());
 
-  // blas::axpy(N, scalar(-1.), x_exact.data(), 1, x.data(), 1);
-  // std::cout << "# error = " << blas::nrm2<scalar,real>(N, x.data(), 1) << std::endl;
-
-  std::cout << "# COMPONENTWISE SCALED RESIDUAL = " << A.max_scaled_residual(x.data(), b.data()) << std::endl;
+  std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
+            << A.max_scaled_residual(x.data(), b.data()) << std::endl;
 
   return 0;
 }

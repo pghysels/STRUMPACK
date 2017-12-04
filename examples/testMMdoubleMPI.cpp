@@ -24,7 +24,7 @@
  */
 #include <iostream>
 #include "StrumpackSparseSolverMPI.hpp"
-#include "CSRMatrix.hpp"
+#include "sparse/CSRMatrix.hpp"
 
 using namespace strumpack;
 
@@ -116,7 +116,7 @@ int main(int argc, char* argv[]) {
     delete A;
   }
   TimerList::Finalize();
-  Cblacs_exit(1);
+  scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return 0;
 }

@@ -30,7 +30,7 @@
 #include <random>
 using namespace std;
 
-#include "DenseMatrix.hpp"
+#include "dense/DenseMatrix.hpp"
 #include "HSS/HSSMatrix.hpp"
 using namespace strumpack;
 using namespace strumpack::HSS;

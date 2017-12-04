@@ -1,13 +1,40 @@
+/*
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
+ *
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
+ *
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly.  Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government is granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
+ *
+ * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
+ *             (Lawrence Berkeley National Lab, Computational Research
+ *             Division).
+ *
+ */
 #ifndef HSS_BASIS_ID_HPP
 #define HSS_BASIS_ID_HPP
 
 #include <cassert>
 
-#include "DenseMatrix.hpp"
+#include "dense/DenseMatrix.hpp"
 
 namespace strumpack {
   namespace HSS {
-
 
     /**
      * The basis is represented as P [I; E],
@@ -38,31 +65,46 @@ namespace strumpack {
       std::size_t memory() const { return E().memory()+sizeof(int)*P().size(); }
       std::size_t nonzeros() const { return E().nonzeros()+P().size(); }
 
-      DenseMatrix<scalar_t> apply(const DenseMatrix<scalar_t>& b, int depth=0) const;
-      DenseMatrix<scalar_t> apply(std::size_t n, const scalar_t* b, int ldb, int depth=0) const;
-      void apply(const DenseMatrix<scalar_t>& b, DenseMatrix<scalar_t>& c, int depth=0) const;
+      DenseMatrix<scalar_t> apply
+      (const DenseMatrix<scalar_t>& b, int depth=0) const;
+      DenseMatrix<scalar_t> apply
+      (std::size_t n, const scalar_t* b, int ldb, int depth=0) const;
+      void apply
+      (const DenseMatrix<scalar_t>& b, DenseMatrix<scalar_t>& c,
+       int depth=0) const;
 
-      DenseMatrix<scalar_t> applyC(const DenseMatrix<scalar_t>& b, int depth=0) const;
-      DenseMatrix<scalar_t> applyC(std::size_t n, const scalar_t* b, int ldb, int depth=0) const;
-      void applyC(const DenseMatrix<scalar_t>& b, DenseMatrix<scalar_t>& c, int depth=0) const;
-      void applyC(std::size_t n, const scalar_t* b, int ldb, DenseMatrix<scalar_t>& c, int depth=0) const;
+      DenseMatrix<scalar_t> applyC
+      (const DenseMatrix<scalar_t>& b, int depth=0) const;
+      DenseMatrix<scalar_t> applyC
+      (std::size_t n, const scalar_t* b, int ldb, int depth=0) const;
+      void applyC
+      (const DenseMatrix<scalar_t>& b, DenseMatrix<scalar_t>& c,
+       int depth=0) const;
+      void applyC
+      (std::size_t n, const scalar_t* b, int ldb, DenseMatrix<scalar_t>& c,
+       int depth=0) const;
 
-      DenseMatrix<scalar_t> extract_rows(const std::vector<std::size_t>& I) const;
+      DenseMatrix<scalar_t> extract_rows
+      (const std::vector<std::size_t>& I) const;
     };
 
-    template<typename scalar_t> HSSBasisID<scalar_t>::HSSBasisID(std::size_t r) {
+    template<typename scalar_t>
+    HSSBasisID<scalar_t>::HSSBasisID(std::size_t r) {
       _P.reserve(r);
       for (std::size_t i=1; i<=r; i++) _P.push_back(i);
       _E = DenseMatrix<scalar_t>(0, r);
     }
 
-    template<typename scalar_t> void HSSBasisID<scalar_t>::clear() {
+    template<typename scalar_t> void
+    HSSBasisID<scalar_t>::clear() {
       _P.clear();
       _E.clear();
     }
 
-    template<typename scalar_t> void HSSBasisID<scalar_t>::print(std::string name) const {
-      std::cout << name << " = { " << rows() << "x" << cols() << std::endl << "\tP = [";
+    template<typename scalar_t> void
+    HSSBasisID<scalar_t>::print(std::string name) const {
+      std::cout << name << " = { "
+                << rows() << "x" << cols() << std::endl << "\tP = [";
       for (auto Pi : P()) std::cout << Pi << " ";
       std::cout << "]" << std::endl;
       _E.print("\tE");
@@ -76,72 +118,88 @@ namespace strumpack {
 #endif
     }
 
-    template<typename scalar_t> DenseMatrix<scalar_t> HSSBasisID<scalar_t>::dense() const {
+    template<typename scalar_t> DenseMatrix<scalar_t>
+    HSSBasisID<scalar_t>::dense() const {
       DenseMatrix<scalar_t> ret(rows(), cols());
       ret.eye();
       copy(E(), ret, cols(), 0);
-      ret.permute_rows_bwd(P());
+      ret.laswp(P(), false);
       return ret;
     }
 
     template<typename scalar_t> DenseMatrix<scalar_t>
-    HSSBasisID<scalar_t>::apply(const DenseMatrix<scalar_t>& b, int depth) const {
+    HSSBasisID<scalar_t>::apply
+    (const DenseMatrix<scalar_t>& b, int depth) const {
       check();
       assert(cols() == b.rows());
-      if (!rows() || !b.cols()) return DenseMatrix<scalar_t>(rows(), b.cols());
+      if (!rows() || !b.cols())
+        return DenseMatrix<scalar_t>(rows(), b.cols());
       DenseMatrix<scalar_t> c(rows(), b.cols());
       copy(cols(), b.cols(), b, 0, 0, c, 0, 0);
-      if (E().rows()) gemm(Trans::N, Trans::N, scalar_t(1), E(), b, scalar_t(0.), c.ptr(cols(), 0), c.ld());
-      c.permute_rows_bwd(P());
+      if (E().rows())
+        gemm(Trans::N, Trans::N, scalar_t(1), E(), b,
+             scalar_t(0.), c.ptr(cols(), 0), c.ld());
+      c.laswp(P(), false);
       return c;
     }
 
     template<typename scalar_t> DenseMatrix<scalar_t>
-    HSSBasisID<scalar_t>::apply(std::size_t n, const scalar_t* b, int ldb, int depth) const {
+    HSSBasisID<scalar_t>::apply
+    (std::size_t n, const scalar_t* b, int ldb, int depth) const {
       auto B = ConstDenseMatrixWrapperPtr<scalar_t>(cols(), n, b, ldb);
       return apply(*B, depth);
     }
 
     template<typename scalar_t> void HSSBasisID<scalar_t>::apply
-    (const DenseMatrix<scalar_t>& b, DenseMatrix<scalar_t>& c, int depth) const {
+    (const DenseMatrix<scalar_t>& b, DenseMatrix<scalar_t>& c,
+     int depth) const {
       copy(cols(), b.cols(), b, 0, 0, c, 0, 0);
-      if (E().rows()) gemm(Trans::N, Trans::N, scalar_t(1), E(), b, scalar_t(0.), c.ptr(cols(), 0), c.ld());
-      c.permute_rows_bwd(P());
+      if (E().rows())
+        gemm(Trans::N, Trans::N, scalar_t(1), E(), b,
+             scalar_t(0.), c.ptr(cols(), 0), c.ld());
+      c.laswp(P(), false);
     }
 
 
     template<typename scalar_t> DenseMatrix<scalar_t>
-    HSSBasisID<scalar_t>::applyC(const DenseMatrix<scalar_t>& b, int depth) const {
+    HSSBasisID<scalar_t>::applyC
+    (const DenseMatrix<scalar_t>& b, int depth) const {
       check();
       assert(rows() == b.rows());
-      if (!cols() || !b.cols()) return DenseMatrix<scalar_t>(E().cols(), b.cols());
+      if (!cols() || !b.cols())
+        return DenseMatrix<scalar_t>(E().cols(), b.cols());
       DenseMatrix<scalar_t> PtB(b);
-      PtB.permute_rows_fwd(P());
+      PtB.laswp(P(), true);
       if (!E().rows()) return PtB;
       DenseMatrix<scalar_t> c(cols(), b.cols(), PtB.ptr(0, 0), PtB.ld());
-      gemm(Trans::C, Trans::N, scalar_t(1.), E(), PtB.ptr(cols(), 0), PtB.ld(), scalar_t(1.), c, depth);
+      gemm(Trans::C, Trans::N, scalar_t(1.),
+           E(), PtB.ptr(cols(), 0), PtB.ld(), scalar_t(1.), c, depth);
       return c;
     }
 
     template<typename scalar_t> DenseMatrix<scalar_t>
-    HSSBasisID<scalar_t>::applyC(std::size_t n, const scalar_t* b, int ldb, int depth) const {
+    HSSBasisID<scalar_t>::applyC
+    (std::size_t n, const scalar_t* b, int ldb, int depth) const {
       auto B = ConstDenseMatrixWrapperPtr<scalar_t>(rows(), n, b, ldb);
       return applyC(*B, depth);
     }
 
     template<typename scalar_t> void HSSBasisID<scalar_t>::applyC
-    (const DenseMatrix<scalar_t>& b, DenseMatrix<scalar_t>& c, int depth) const {
+    (const DenseMatrix<scalar_t>& b, DenseMatrix<scalar_t>& c,
+     int depth) const {
       c.copy(applyC(b, depth)); // TODO avoid copy!!
     }
 
     template<typename scalar_t> void HSSBasisID<scalar_t>::applyC
-    (std::size_t n, const scalar_t* b, int ldb, DenseMatrix<scalar_t>& c, int depth) const {
+    (std::size_t n, const scalar_t* b, int ldb,
+     DenseMatrix<scalar_t>& c, int depth) const {
       auto B = ConstDenseMatrixWrapperPtr<scalar_t>(rows(), n, b, ldb);
       c.copy(applyC(*B, depth)); // TODO avoid copy!!
     }
 
     template<typename scalar_t> DenseMatrix<scalar_t>
-    HSSBasisID<scalar_t>::extract_rows(const std::vector<std::size_t>& I) const {
+    HSSBasisID<scalar_t>::extract_rows
+    (const std::vector<std::size_t>& I) const {
       // TODO implement this without explicitly forming the dense basis matrix
       return dense().extract_rows(I);
     }

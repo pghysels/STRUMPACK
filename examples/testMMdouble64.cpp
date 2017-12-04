@@ -24,8 +24,8 @@
  */
 #include <iostream>
 #include "StrumpackSparseSolver.hpp"
-#include "CSRMatrix.hpp"
-#include "CSCMatrix.hpp"
+#include "sparse/CSRMatrix.hpp"
+#include "sparse/CSCMatrix.hpp"
 
 using namespace strumpack;
 
