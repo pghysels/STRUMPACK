@@ -163,8 +163,8 @@ namespace strumpack {
     };
 
     template<typename scalar_t> void
-    HMatrixDense<scalar_t>::draw(std::ostream& of,
-                                 std::size_t rlo, std::size_t clo) const {
+    HMatrixDense<scalar_t>::draw
+    (std::ostream& of, std::size_t rlo, std::size_t clo) const {
       of << "set obj rect from "
          << rlo << ", " << clo << " to "
          << rlo+rows() << ", " << clo+cols()

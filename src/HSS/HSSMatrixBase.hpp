@@ -266,6 +266,9 @@ namespace strumpack {
       virtual void dense_recursive
       (DenseM_t& A, WorkDense<scalar_t>& w, bool isroot, int depth) const {};
 
+      virtual void draw
+      (std::ostream& of, std::size_t rlo, std::size_t clo) const {};
+
       friend class HSSMatrix<scalar_t>;
       friend class HSSMatrixMPI<scalar_t>;
     };
