@@ -82,16 +82,16 @@ namespace strumpack {
     MatrixReorderingMPI(integer_t n, MPI_Comm c);
     virtual ~MatrixReorderingMPI();
 
-    int nested_dissection(const SPOptions<scalar_t>& opts,
-                          CSRMatrixMPI<scalar_t,integer_t>* A,
-                          int nx, int ny, int nz);
+    int nested_dissection
+    (const SPOptions<scalar_t>& opts, CSRMatrixMPI<scalar_t,integer_t>* A,
+     int nx, int ny, int nz, int components);
 
-    void separator_reordering(const SPOptions<scalar_t>& opts,
-                              CSRMatrixMPI<scalar_t,integer_t>* A,
-                              FrontalMatrix<scalar_t,integer_t>* F);
-    void separator_reordering(const SPOptions<scalar_t>& opts,
-                              CSRMatrixMPI<scalar_t,integer_t>* A,
-                              bool verbose);
+    void separator_reordering
+    (const SPOptions<scalar_t>& opts, CSRMatrixMPI<scalar_t,integer_t>* A,
+     FrontalMatrix<scalar_t,integer_t>* F);
+    void separator_reordering
+    (const SPOptions<scalar_t>& opts, CSRMatrixMPI<scalar_t,integer_t>* A,
+     bool verbose);
     void clear_tree_data();
 
     std::unique_ptr<SeparatorTree<integer_t>> local_sep_tree;
@@ -167,7 +167,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> int
   MatrixReorderingMPI<scalar_t,integer_t>::nested_dissection
   (const SPOptions<scalar_t>& opts, CSRMatrixMPI<scalar_t,integer_t>* A,
-   int nx, int ny, int nz) {
+   int nx, int ny, int nz, int components) {
     if (!is_parallel(opts.reordering_method())) {
       auto rank = mpi_rank(_comm);
       auto P = mpi_nprocs(_comm);
@@ -220,7 +220,13 @@ namespace strumpack {
     } else {
       switch (opts.reordering_method()) {
       case ReorderingStrategy::GEOMETRIC: {
-        if (nx*ny*nz != A->size()) {
+        if (nx*ny*nz*components != A->size()) {
+          nx = opts.nx();
+          ny = opts.nz();
+          nz = opts.nz();
+          components = opts.components();
+        }
+        if (nx*ny*nz*components != A->size()) {
           std::cerr << "# ERROR: Geometric reordering failed. \n"
             "# Geometric reordering only works"
             "on a simple 3 point wide stencil\n"
@@ -230,7 +236,7 @@ namespace strumpack {
         }
         std::tie(this->sep_tree, local_sep_tree) =
           geometric_nested_dissection_dist
-          (nx, ny, nz, A->begin_row(), A->end_row(), _comm,
+          (nx, ny, nz, components, A->begin_row(), A->end_row(), _comm,
            this->perm, this->iperm, opts.nd_param());
         break;
       }

@@ -54,19 +54,19 @@ namespace strumpack {
     MatrixReordering(integer_t _n);
     virtual ~MatrixReordering();
 
-    int nested_dissection(SPOptions<scalar_t>& opts,
-                          CSRMatrix<scalar_t,integer_t>* A,
-                          int nx, int ny, int nz);
-    int nested_dissection(SPOptions<scalar_t>& opts,
-                          CSRMatrix<scalar_t,integer_t>* A,
-                          MPI_Comm comm, int nx, int ny, int nz);
+    int nested_dissection
+    (SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
+     int nx, int ny, int nz, int components);
+    int nested_dissection
+    (SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
+     MPI_Comm comm, int nx, int ny, int nz, int components);
 
-    void separator_reordering(const SPOptions<scalar_t>& opts,
-                              CSRMatrix<scalar_t,integer_t>* A,
-                              FrontalMatrix<scalar_t,integer_t>* F);
-    void separator_reordering(const SPOptions<scalar_t>& opts,
-                              CSRMatrix<scalar_t,integer_t>* A,
-                              bool verbose);
+    void separator_reordering
+    (const SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
+     FrontalMatrix<scalar_t,integer_t>* F);
+    void separator_reordering
+    (const SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
+     bool verbose);
 
     virtual void clear_tree_data();
 
@@ -77,28 +77,24 @@ namespace strumpack {
     std::unique_ptr<SeparatorTree<integer_t>> sep_tree;
 
   protected:
-    virtual void separator_reordering_print(integer_t max_nr_neighbours,
-                                            integer_t max_dim_sep);
-    virtual void nested_dissection_print(SPOptions<scalar_t>& opts,
-                                         integer_t n, integer_t nnz,
-                                         bool verbose);
+    virtual void separator_reordering_print
+    (integer_t max_nr_neighbours, integer_t max_dim_sep);
+    virtual void nested_dissection_print
+    (SPOptions<scalar_t>& opts, integer_t n, integer_t nnz,
+     bool verbose);
 
   private:
-    void split_separator(const SPOptions<scalar_t>& opts,
-                         HSS::HSSPartitionTree& hss_tree,
-                         integer_t& nr_parts, integer_t sep,
-                         CSRMatrix<scalar_t,integer_t>* A, integer_t part,
-                         integer_t count, integer_t* sorder);
-    void extract_separator(const SPOptions<scalar_t>& opts, integer_t part,
-                           integer_t sep_beg, integer_t sep_end,
-                           CSRMatrix<scalar_t,integer_t>* A,
-                           std::vector<idx_t>& xadj,
-                           std::vector<idx_t>& adjncy,
-                           integer_t* sorder);
-    void separator_reordering_recursive(const SPOptions<scalar_t>& opts,
-                                        CSRMatrix<scalar_t,integer_t>* A,
-                                        bool hss_parent, integer_t sep,
-                                        integer_t* sorder);
+    void split_separator
+    (const SPOptions<scalar_t>& opts, HSS::HSSPartitionTree& hss_tree,
+     integer_t& nr_parts, integer_t sep, CSRMatrix<scalar_t,integer_t>* A,
+     integer_t part, integer_t count, integer_t* sorder);
+    void extract_separator
+    (const SPOptions<scalar_t>& opts, integer_t part,
+     integer_t sep_beg, integer_t sep_end, CSRMatrix<scalar_t,integer_t>* A,
+     std::vector<idx_t>& xadj, std::vector<idx_t>& adjncy, integer_t* sorder);
+    void separator_reordering_recursive
+    (const SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
+     bool hss_parent, integer_t sep, integer_t* sorder);
   };
 
   template<typename scalar_t,typename integer_t>
@@ -115,7 +111,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> int
   MatrixReordering<scalar_t,integer_t>::nested_dissection
   (SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
-   int nx, int ny, int nz) {
+   int nx, int ny, int nz, int components) {
     switch (opts.reordering_method()) {
     case ReorderingStrategy::NATURAL: {
       for (integer_t i=0; i<A->size(); i++) perm[i] = i;
@@ -132,7 +128,13 @@ namespace strumpack {
       break;
     }
     case ReorderingStrategy::GEOMETRIC: {
-      if (nx*ny*nz != A->size()) {
+      if (nx*ny*nz*components != A->size()) {
+        nx = opts.nx();
+        ny = opts.ny();
+        nz = opts.nz();
+        components = opts.components();
+      }
+      if (nx*ny*nz*components != A->size()) {
         std::cerr << "# ERROR: Geometric reordering failed. \n"
           "# Geometric reordering only works on"
           " a simple 3 point wide stencil\n"
@@ -141,7 +143,7 @@ namespace strumpack {
         return 1;
       }
       sep_tree = geometric_nested_dissection
-        (nx, ny, nz, perm, iperm, opts.nd_param());
+        (nx, ny, nz, components, perm, iperm, opts.nd_param());
       break;
     }
     case ReorderingStrategy::RCM: {
@@ -163,7 +165,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> int
   MatrixReordering<scalar_t,integer_t>::nested_dissection
   (SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
-   MPI_Comm comm, int nx, int ny, int nz) {
+   MPI_Comm comm, int nx, int ny, int nz, int components) {
     if (!is_parallel(opts.reordering_method())) {
       auto rank = mpi_rank(comm);
       if (!rank) {
@@ -199,7 +201,13 @@ namespace strumpack {
       sep_tree->broadcast(comm);
     } else {
       if (opts.reordering_method() == ReorderingStrategy::GEOMETRIC) {
-        if (nx*ny*nz != A->size()) {
+        if (nx*ny*nz*components != A->size()) {
+          nx = opts.nx();
+          ny = opts.nz();
+          nz = opts.nz();
+          components = opts.components();
+        }
+        if (nx*ny*nz*components != A->size()) {
           std::cerr << "# ERROR: Geometric reordering failed. \n"
             "# Geometric reordering only works on"
             " a simple 3 point wide stencil\n"
@@ -208,7 +216,7 @@ namespace strumpack {
           return 1;
         }
         sep_tree = geometric_nested_dissection
-          (nx, ny, nz, perm, iperm, opts.nd_param());
+          (nx, ny, nz, components, perm, iperm, opts.nd_param());
       } else {
         CSRMatrixMPI<scalar_t,integer_t> Ampi(A, comm, false);
         switch (opts.reordering_method()) {
@@ -226,8 +234,8 @@ namespace strumpack {
           (n, A->get_ptr(), A->get_ind(), perm, iperm);
       }
     }
-    nested_dissection_print(opts, n, A->nnz(),
-                            opts.verbose() && !mpi_rank(comm));
+    nested_dissection_print
+      (opts, n, A->nnz(), opts.verbose() && !mpi_rank(comm));
     return 0;
   }
 

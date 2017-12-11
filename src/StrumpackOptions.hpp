@@ -146,6 +146,10 @@ namespace strumpack {
     /** Reordering options */
     ReorderingStrategy _reordering_method = ReorderingStrategy::METIS;
     int _nd_param = 8;
+    int _nx = 1;
+    int _ny = 1;
+    int _nz = 1;
+    int _components = 1;
     bool _use_METIS_NodeNDP = true;
     bool _use_MUMPS_SYMQAMD = false;
     bool _use_agg_amalg = false;
@@ -182,6 +186,14 @@ namespace strumpack {
     { _reordering_method = m; }
     void set_nd_param(int nd_param)
     { assert(nd_param>=0); _nd_param = nd_param; }
+    void set_dimensions(int nx, int ny=1, int nz=1)
+    { assert(nx>=1 && ny>=1 && nz>=1);
+      _nx = nx; _ny = ny; _nz = nz; }
+    void set_nx(int nx) {assert(nx>=1); _nx = nx; }
+    void set_ny(int ny) {assert(ny>=1); _ny = ny; }
+    void set_nz(int nz) {assert(nz>=1); _nz = nz; }
+    void set_components(int components)
+    { assert(components>=1); _components = components; }
     void enable_METIS_NodeNDP() { _use_METIS_NodeNDP = true; }
     void disable_METIS_NodeNDP() { _use_METIS_NodeNDP = false; }
     void enable_METIS_NodeND() { _use_METIS_NodeNDP = false; }
@@ -220,6 +232,10 @@ namespace strumpack {
     ReorderingStrategy reordering_method() const
     { return _reordering_method; }
     int nd_param() const { return _nd_param; }
+    int nx() const { return _nx; }
+    int ny() const { return _ny; }
+    int nz() const { return _nz; }
+    int components() const { return _components; }
     bool use_METIS_NodeNDP() const { return _use_METIS_NodeNDP; }
     bool use_METIS_NodeND() const { return !_use_METIS_NodeNDP; }
     bool use_MUMPS_SYMQAMD() const { return _use_MUMPS_SYMQAMD; }
@@ -272,6 +288,10 @@ namespace strumpack {
         {"sp_disable_indirect_sampling", no_argument, 0, 26},
         {"sp_enable_replace_tiny_pivots", no_argument, 0, 27},
         {"sp_disable_replace_tiny_pivots", no_argument, 0, 28},
+        {"sp_nx",                        required_argument, 0, 29},
+        {"sp_ny",                        required_argument, 0, 30},
+        {"sp_nz",                        required_argument, 0, 31},
+        {"sp_components",                required_argument, 0, 32},
         {"sp_verbose",                   no_argument, 0, 'v'},
         {"sp_quiet",                     no_argument, 0, 'q'},
         {"help",                         no_argument, 0, 'h'},
@@ -395,6 +415,26 @@ namespace strumpack {
         case 26: { disable_indirect_sampling(); } break;
         case 27: { enable_replace_tiny_pivots(); } break;
         case 28: { disable_replace_tiny_pivots(); } break;
+        case 29: {
+          std::istringstream iss(optarg);
+          iss >> _nx;
+          set_nx(_nx);
+        } break;
+        case 30: {
+          std::istringstream iss(optarg);
+          iss >> _ny;
+          set_ny(_ny);
+        } break;
+        case 31: {
+          std::istringstream iss(optarg);
+          iss >> _nz;
+          set_nz(_nz);
+        } break;
+        case 32: {
+          std::istringstream iss(optarg);
+          iss >> _components;
+          set_components(_components);
+        } break;
         case 'h': { describe_options(); } break;
         case 'v': set_verbose(true); break;
         case 'q': set_verbose(false); break;
@@ -437,6 +477,14 @@ namespace strumpack {
       std::cout << "#          Geometric only works on regular meshes and you"
                 << " need to provide the sizes." << std::endl;
       std::cout << "#   --sp_nd_param int (default " << _nd_param << ")"
+                << std::endl;
+      std::cout << "#   --sp_nx int (default " << _nx << ")"
+                << std::endl;
+      std::cout << "#   --sp_ny int (default " << _ny << ")"
+                << std::endl;
+      std::cout << "#   --sp_nz int (default " << _nz << ")"
+                << std::endl;
+      std::cout << "#   --sp_components int (default " << _components << ")"
                 << std::endl;
       std::cout << "#   --sp_enable_METIS_NodeNDP (default "
                 << std::boolalpha << use_METIS_NodeNDP() << ")" << std::endl;
