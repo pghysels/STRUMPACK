@@ -81,6 +81,7 @@ void TaskTimer::time(std::function<void()> f) {
 }
 
 double TaskTimer::elapsed() {
+  assert(started);
 #if defined(USE_OPENMP_TIMER)
   double begin_time = t_start - TaskTimer::t_begin;
   double stop_time;
