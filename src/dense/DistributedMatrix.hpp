@@ -509,13 +509,15 @@ namespace strumpack {
   template<typename scalar_t> DistributedMatrix<scalar_t>&
   DistributedMatrix<scalar_t>::operator=
   (const DistributedMatrix<scalar_t>& m) {
+    if (_lrows != m._lrows || _lcols != m._lcols) {
+      _lrows = m._lrows;  _lcols = m._lcols;
+      delete[] _data;
+      _data = new scalar_t[_lrows*_lcols];
+    }
+    std::copy(m._data, m._data+_lrows*_lcols, _data);
     _prows = m._prows;  _pcols = m._pcols;
     _prow = m._prow;    _pcol = m._pcol;
-    _lrows = m._lrows;  _lcols = m._lcols;
     std::copy(m._desc, m._desc+9, _desc);
-    delete[] _data;
-    _data = new scalar_t[_lrows*_lcols];
-    std::copy(m._data, m._data+_lrows*_lcols, _data);
     return *this;
   }
 
