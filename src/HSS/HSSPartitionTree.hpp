@@ -54,6 +54,9 @@ namespace strumpack {
         int pid = n-1;
         de_serialize_rec(buf, buf+n, buf+2*n, pid);
       }
+      HSSPartitionTree(const HSSPartitionTree& h)
+        : size(h.size), c(h.c) {
+      }
       void refine(int leaf_size) {
         assert(c.empty());
         if (size > 2*leaf_size) {
@@ -64,23 +67,82 @@ namespace strumpack {
           c[1].refine(leaf_size);
         }
       }
-      void print() {
+      void print() const {
         for (auto& ch : c) ch.print();
         std::cout << size << " ";
       }
-      int nodes() {
+      int nodes() const {
         int nr_nodes = 1;
-        for (auto& ch : c) nr_nodes += ch.nodes();
+        for (auto& ch : c)
+          nr_nodes += ch.nodes();
         return nr_nodes;
       }
-      std::vector<int> serialize() {
+      int levels() const {
+        int lvls = 0;
+        for (auto& ch : c)
+          lvls = std::max(lvls, ch.levels());
+        return lvls + 1;
+      }
+      void truncate_complete() {
+        truncate_complete_rec(1, min_levels());
+      }
+      void expand_complete(bool allow_zero_nodes) {
+        expand_complete_rec(1, levels(), allow_zero_nodes);
+      }
+      std::vector<int> serialize() const {
         int n = nodes(), pid = 0;
         std::vector<int> buf(3*n);
         serialize_rec(buf.data(), buf.data()+n, buf.data()+2*n, pid);
         return buf;
       }
+      bool is_complete() const {
+        if (c.empty()) return true;
+        else return c[0].levels() == c[1].levels();
+      }
+      std::vector<int> leaf_sizes() const {
+        std::vector<int> lf;
+        leaf_sizes_rec(lf);
+        return lf;
+      }
     private:
-      void serialize_rec(int* sizes, int* lchild, int* rchild, int& pid) {
+      int min_levels() const {
+        int lvls = levels();
+        for (auto& ch : c)
+          lvls = std::min(lvls, 1 + ch.min_levels());
+        return lvls;
+      }
+      void truncate_complete_rec(int lvl, int lvls) {
+        if (lvl == lvls) c.clear();
+        else
+          for (auto& ch : c)
+            ch.truncate_complete_rec(lvl+1, lvls);
+      }
+      void expand_complete_rec(int lvl, int lvls, bool allow_zero_nodes) {
+        if (c.empty()) {
+          if (lvl != lvls) {
+            c.resize(2);
+            if (allow_zero_nodes) {
+              c[0].size = size;
+              c[1].size = 0;
+            } else {
+              int l1 = 1 << (lvls - lvl - 1);
+              c[0].size = size - l1;
+              c[1].size = l1;
+            }
+            c[0].expand_complete_rec(lvl+1, lvls, allow_zero_nodes);
+            c[1].expand_complete_rec(lvl+1, lvls, allow_zero_nodes);
+          }
+        } else
+          for (auto& ch : c)
+            ch.expand_complete_rec(lvl+1, lvls, allow_zero_nodes);
+      }
+      void leaf_sizes_rec(std::vector<int>& lf) const {
+        for (auto& ch : c)
+          ch.leaf_sizes_rec(lf);
+        if (c.empty())
+          lf.push_back(size);
+      }
+      void serialize_rec(int* sizes, int* lchild, int* rchild, int& pid) const {
         if (!c.empty()) {
           c[0].serialize_rec(sizes, lchild, rchild, pid);
           auto lroot = pid;
