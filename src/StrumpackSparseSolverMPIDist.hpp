@@ -154,7 +154,7 @@ namespace strumpack {
     virtual void setup_tree() override;
     virtual void setup_reordering() override;
     virtual int compute_reordering
-    (int nx, int ny, int nz, int components) override;
+    (int nx, int ny, int nz, int components, int width) override;
     virtual void compute_separator_reordering() override;
 
   private:
@@ -252,9 +252,9 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> int
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::compute_reordering
-  (int nx, int ny, int nz, int components) {
+  (int nx, int ny, int nz, int components, int width) {
     return _nd_mpi->nested_dissection
-      (this->_opts, _mat_mpi.get(), nx, ny, nz, components);
+      (this->_opts, _mat_mpi.get(), nx, ny, nz, components, width);
   }
 
   template<typename scalar_t,typename integer_t> void

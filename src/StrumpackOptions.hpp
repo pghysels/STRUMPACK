@@ -150,6 +150,7 @@ namespace strumpack {
     int _ny = 1;
     int _nz = 1;
     int _components = 1;
+    int _separator_width = 1;
     bool _use_METIS_NodeNDP = true;
     bool _use_MUMPS_SYMQAMD = false;
     bool _use_agg_amalg = false;
@@ -194,6 +195,8 @@ namespace strumpack {
     void set_nz(int nz) {assert(nz>=1); _nz = nz; }
     void set_components(int components)
     { assert(components>=1); _components = components; }
+    void set_separator_width(int width)
+    { assert(width>=1); _separator_width = width; }
     void enable_METIS_NodeNDP() { _use_METIS_NodeNDP = true; }
     void disable_METIS_NodeNDP() { _use_METIS_NodeNDP = false; }
     void enable_METIS_NodeND() { _use_METIS_NodeNDP = false; }
@@ -236,6 +239,7 @@ namespace strumpack {
     int ny() const { return _ny; }
     int nz() const { return _nz; }
     int components() const { return _components; }
+    int separator_width() const { return _separator_width; }
     bool use_METIS_NodeNDP() const { return _use_METIS_NodeNDP; }
     bool use_METIS_NodeND() const { return !_use_METIS_NodeNDP; }
     bool use_MUMPS_SYMQAMD() const { return _use_MUMPS_SYMQAMD; }
@@ -292,6 +296,7 @@ namespace strumpack {
         {"sp_ny",                        required_argument, 0, 30},
         {"sp_nz",                        required_argument, 0, 31},
         {"sp_components",                required_argument, 0, 32},
+        {"sp_separator_width",           required_argument, 0, 33},
         {"sp_verbose",                   no_argument, 0, 'v'},
         {"sp_quiet",                     no_argument, 0, 'q'},
         {"help",                         no_argument, 0, 'h'},
@@ -435,6 +440,11 @@ namespace strumpack {
           iss >> _components;
           set_components(_components);
         } break;
+        case 33: {
+          std::istringstream iss(optarg);
+          iss >> _separator_width;
+          set_separator_width(_separator_width);
+        } break;
         case 'h': { describe_options(); } break;
         case 'v': set_verbose(true); break;
         case 'q': set_verbose(false); break;
@@ -486,6 +496,8 @@ namespace strumpack {
                 << std::endl;
       std::cout << "#   --sp_components int (default " << _components << ")"
                 << std::endl;
+      std::cout << "#   --sp_separator_width int (default "
+                << _separator_width << ")" << std::endl;
       std::cout << "#   --sp_enable_METIS_NodeNDP (default "
                 << std::boolalpha << use_METIS_NodeNDP() << ")" << std::endl;
       std::cout << "#          use undocumented Metis routine NodeNDP"

@@ -40,9 +40,11 @@ namespace strumpack {
   std::pair<std::unique_ptr<SeparatorTree<integer_t>>,
             std::unique_ptr<SeparatorTree<integer_t>>>
   geometric_nested_dissection_dist
-  (int nx, int ny, int nz, int components, integer_t lo, integer_t hi,
-   MPI_Comm comm, integer_t* perm, integer_t* iperm, int nd_param) {
+  (int nx, int ny, int nz, int components, int width,
+   integer_t lo, integer_t hi, MPI_Comm comm,
+   integer_t* perm, integer_t* iperm, int nd_param) {
     assert(components == 1);
+    assert(width == 1);
     auto P = mpi_nprocs(comm);
     auto rank = mpi_rank(comm);
     integer_t dist_nbsep = 0, local_nbsep = 0;

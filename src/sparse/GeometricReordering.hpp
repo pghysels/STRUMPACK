@@ -38,13 +38,13 @@ namespace strumpack {
   (integer_t* perm, integer_t* iperm, integer_t& perm_begin, integer_t& nbsep,
    std::array<integer_t,3> n0, std::array<integer_t,3> dims,
    std::array<integer_t,3> ld, std::vector<Separator<integer_t>>& tree,
-   int comps, int stratpar) {
-    integer_t N = dims[0]*dims[1]*dims[2];
+   int comps, int width, int stratpar) {
+    integer_t N = comps * (dims[0]*dims[1]*dims[2]);
     // d: dimension along which to split
     int d = std::distance
       (dims.begin(), std::max_element(dims.begin(), dims.end()));
 
-    if (dims[d] < 3 || N <= stratpar) {
+    if (dims[d] < 2+width || N <= stratpar) {
       for (integer_t z=n0[2]; z<n0[2]+dims[2]; z++)
         for (integer_t y=n0[1]; y<n0[1]+dims[1]; y++)
           for (integer_t x=n0[0]; x<n0[0]+dims[0]; x++) {
@@ -63,24 +63,24 @@ namespace strumpack {
       // part 1
       std::array<integer_t,3> part_begin(n0);
       std::array<integer_t,3> part_size(dims);
-      part_size[d] = dims[d]/2;
+      part_size[d] = dims[d]/2 - (width/2);
       recursive_nested_dissection
         (perm, iperm, perm_begin, nbsep, part_begin,
-         part_size, ld, tree, comps, stratpar);
+         part_size, ld, tree, comps, width, stratpar);
       auto left_root_id = nbsep - 1;
 
       // part 2
-      part_begin[d] = n0[d] + dims[d]/2 + 1;
-      part_size[d] = dims[d] - 1 - dims[d]/2;
+      part_begin[d] = n0[d] + dims[d]/2 + width;
+      part_size[d] = dims[d] - width - dims[d]/2;
       recursive_nested_dissection
         (perm, iperm, perm_begin, nbsep, part_begin,
-         part_size, ld, tree, comps, stratpar);
+         part_size, ld, tree, comps, width, stratpar);
       tree[left_root_id].pa = nbsep;
       tree[nbsep-1].pa = nbsep;
 
       // separator
-      part_begin[d] = n0[d] + dims[d]/2;
-      part_size[d] = 1;
+      part_begin[d] = n0[d] + dims[d]/2  - (width/2);
+      part_size[d] = width;
       for (integer_t z=part_begin[2]; z<part_begin[2]+part_size[2]; z++)
         for (integer_t y=part_begin[1]; y<part_begin[1]+part_size[1]; y++)
           for (integer_t x=part_begin[0]; x<part_begin[0]+part_size[0]; x++) {
@@ -102,14 +102,14 @@ namespace strumpack {
 
   template<typename integer_t> std::unique_ptr<SeparatorTree<integer_t>>
   geometric_nested_dissection
-  (int nx, int ny, int nz, int components,
+  (int nx, int ny, int nz, int components, int width,
    integer_t* perm, integer_t* iperm, int nd_param) {
     std::vector<Separator<integer_t>> tree;
     integer_t nbsep = 0, perm_begin = 0;
     recursive_nested_dissection
       (perm, iperm, perm_begin, nbsep,
        {{0, 0, 0}}, {{nx, ny, nz}}, {{nx, ny, nz}},
-       tree, components, nd_param);
+       tree, components, width, nd_param);
     return std::unique_ptr<SeparatorTree<integer_t>>
       (new SeparatorTree<integer_t>(tree));
   }

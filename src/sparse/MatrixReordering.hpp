@@ -56,10 +56,10 @@ namespace strumpack {
 
     int nested_dissection
     (SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
-     int nx, int ny, int nz, int components);
+     int nx, int ny, int nz, int components, int width);
     int nested_dissection
     (SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
-     MPI_Comm comm, int nx, int ny, int nz, int components);
+     MPI_Comm comm, int nx, int ny, int nz, int components, int width);
 
     void separator_reordering
     (const SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
@@ -111,7 +111,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> int
   MatrixReordering<scalar_t,integer_t>::nested_dissection
   (SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
-   int nx, int ny, int nz, int components) {
+   int nx, int ny, int nz, int components, int width) {
     switch (opts.reordering_method()) {
     case ReorderingStrategy::NATURAL: {
       for (integer_t i=0; i<A->size(); i++) perm[i] = i;
@@ -133,6 +133,7 @@ namespace strumpack {
         ny = opts.ny();
         nz = opts.nz();
         components = opts.components();
+        width = opts.separator_width();
       }
       if (nx*ny*nz*components != A->size()) {
         std::cerr << "# ERROR: Geometric reordering failed. \n"
@@ -143,7 +144,11 @@ namespace strumpack {
         return 1;
       }
       sep_tree = geometric_nested_dissection
-        (nx, ny, nz, components, perm, iperm, opts.nd_param());
+        (nx, ny, nz, components, width, perm, iperm, opts.nd_param());
+      // sep_tree = aggressive_amalgamation(A, perm, iperm, opts);
+      // // auto n = nx*ny*nz*components;
+      //sep_tree = build_sep_tree_from_perm
+      //(n, A->get_ptr(), A->get_ind(), perm, iperm);
       break;
     }
     case ReorderingStrategy::RCM: {
@@ -165,7 +170,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> int
   MatrixReordering<scalar_t,integer_t>::nested_dissection
   (SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
-   MPI_Comm comm, int nx, int ny, int nz, int components) {
+   MPI_Comm comm, int nx, int ny, int nz, int components, int width) {
     if (!is_parallel(opts.reordering_method())) {
       auto rank = mpi_rank(comm);
       if (!rank) {
@@ -206,6 +211,7 @@ namespace strumpack {
           ny = opts.nz();
           nz = opts.nz();
           components = opts.components();
+          width = opts.separator_width();
         }
         if (nx*ny*nz*components != A->size()) {
           std::cerr << "# ERROR: Geometric reordering failed. \n"
@@ -216,7 +222,7 @@ namespace strumpack {
           return 1;
         }
         sep_tree = geometric_nested_dissection
-          (nx, ny, nz, components, perm, iperm, opts.nd_param());
+          (nx, ny, nz, components, width, perm, iperm, opts.nd_param());
       } else {
         CSRMatrixMPI<scalar_t,integer_t> Ampi(A, comm, false);
         switch (opts.reordering_method()) {
