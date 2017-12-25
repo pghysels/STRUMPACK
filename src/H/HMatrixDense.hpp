@@ -47,9 +47,12 @@ namespace strumpack {
       using HLR_t = HMatrixLR<scalar_t>;
       using HD_t = HMatrixDense<scalar_t>;
       using H_t = HMatrix<scalar_t>;
+      using elem_t = std::function<scalar_t(std::size_t,std::size_t)>;
 
     public:
       HMatrixDense(const D_t& A, const opts_t& opts) : _D(A) {}
+      HMatrixDense(std::size_t m, std::size_t n,
+                   const elem_t& Aelem, const opts_t& opts);
 
       std::size_t rows() const { return _D.rows(); }
       std::size_t cols() const { return _D.cols(); }
@@ -161,6 +164,15 @@ namespace strumpack {
       template<typename T> friend
       void draw(std::unique_ptr<HMatrixBase<T>> const&, const std::string&);
     };
+
+    template<typename scalar_t>
+    HMatrixDense<scalar_t>::HMatrixDense
+    (std::size_t m, std::size_t n, const elem_t& Aelem, const opts_t& opts) {
+      _D = D_t(m, n);
+      for (std::size_t c=0; c<n; c++)
+        for (std::size_t r=0; r<m; r++)
+          _D(r,c) = Aelem(r,c);
+    }
 
     template<typename scalar_t> void
     HMatrixDense<scalar_t>::draw

@@ -34,6 +34,8 @@
 #include <fstream>
 #include <string>
 
+#include "dense/AdaptiveCrossApproximation.hpp"
+
 namespace strumpack {
   namespace H {
 
@@ -47,9 +49,12 @@ namespace strumpack {
       using HLR_t = HMatrixLR<scalar_t>;
       using HD_t = HMatrixDense<scalar_t>;
       using H_t = HMatrix<scalar_t>;
+      using elem_t = std::function<scalar_t(std::size_t,std::size_t)>;
 
     public:
       HMatrixLR(const D_t& A, const opts_t& opts);
+      HMatrixLR(std::size_t m, std::size_t n,
+                const elem_t& Aelem, const opts_t& opts);
 
       std::size_t rows() const { return _U.rows(); }
       std::size_t cols() const { return _V.rows(); }
@@ -173,15 +178,25 @@ namespace strumpack {
       : _opts(opts) {
       A.low_rank(_U, _V, opts.rel_tol(), opts.abs_tol(), opts.max_rank(), 0);
     }
+
+    template<typename scalar_t>
+    HMatrixLR<scalar_t>::HMatrixLR
+    (std::size_t m, std::size_t n, const elem_t& Aelem, const opts_t& opts) {
+      AdaptiveCrossApproximation
+        (_U, _V, m, n, Aelem,
+         opts.rel_tol(), opts.abs_tol(), opts.max_rank());
+    }
+
     template<typename scalar_t> DenseMatrix<scalar_t>
     HMatrixLR<scalar_t>::dense() const {
       D_t out(rows(), cols());
       gemm(Trans::N, Trans::C, scalar_t(1.), _U, _V, scalar_t(0.), out);
       return out;
     }
+
     template<typename scalar_t> void
-    HMatrixLR<scalar_t>::draw(std::ostream& of,
-                              std::size_t rlo, std::size_t clo) const {
+    HMatrixLR<scalar_t>::draw
+    (std::ostream& of, std::size_t rlo, std::size_t clo) const {
       int minmn = std::min(rows(), cols());
       int red = std::floor(255.0 * rank() / minmn);
       assert(red < 256 && red >= 0);

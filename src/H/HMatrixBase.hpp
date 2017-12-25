@@ -124,10 +124,16 @@ namespace strumpack {
       using HLR_t = HMatrixLR<scalar_t>;
       using HD_t = HMatrixDense<scalar_t>;
       using H_t = HMatrix<scalar_t>;
+      using elem_t = std::function<scalar_t(std::size_t,std::size_t)>;
 
     public:
       static std::unique_ptr<HMatrixBase<scalar_t>>
       compress(const D_t& A, const HBlockPartition& row_part,
+               const HBlockPartition& col_part,
+               const adm_t& admissible, const opts_t& opts);
+      static std::unique_ptr<HMatrixBase<scalar_t>>
+      compress(std::size_t m, std::size_t n, const elem_t& A,
+               const HBlockPartition& row_part,
                const HBlockPartition& col_part,
                const adm_t& admissible, const opts_t& opts);
 
@@ -270,6 +276,52 @@ namespace strumpack {
         }
       }
     }
+
+    template<typename scalar_t> std::unique_ptr<HMatrixBase<scalar_t>>
+    HMatrixBase<scalar_t>::compress
+    (std::size_t m, std::size_t n, const elem_t& Aelem,
+     const HBlockPartition& row_part, const HBlockPartition& col_part,
+     const adm_t& admissible, const opts_t& opts) {
+      if (row_part.leaf() || col_part.leaf()) {
+        if (admissible(row_part, col_part))
+          return std::unique_ptr<HMatrixLR<scalar_t>>
+            (new HMatrixLR<scalar_t>
+             (row_part.size(), col_part.size(), Aelem, opts));
+        else
+          return std::unique_ptr<HMatrixDense<scalar_t>>
+            (new HMatrixDense<scalar_t>
+             (row_part.size(), col_part.size(), Aelem, opts));
+      } else {
+        if (admissible(row_part, col_part))
+          return std::unique_ptr<HMatrixLR<scalar_t>>
+            (new HMatrixLR<scalar_t>
+             (row_part.size(), col_part.size(), Aelem, opts));
+        else {
+          auto A00 = Aelem;
+          auto A01 = [&](std::size_t r, std::size_t c) -> scalar_t {
+            return Aelem(r, c+col_part.c(0).size()); };
+          auto A10 = [&](std::size_t r, std::size_t c) -> scalar_t {
+            return Aelem(r+row_part.c(0).size(), c); };
+          auto A11 = [&](std::size_t r, std::size_t c) -> scalar_t {
+            return Aelem(r+row_part.c(0).size(), c+col_part.c(0).size()); };
+          return std::unique_ptr<HMatrix<scalar_t>>
+            (new HMatrix<scalar_t>
+             (HMatrixBase<scalar_t>::compress
+              (row_part.c(0).size(), col_part.c(0).size(),
+               A00, row_part.c(0), col_part.c(0), admissible, opts),
+              HMatrixBase<scalar_t>::compress
+              (row_part.c(0).size(), col_part.c(1).size(),
+               A01, row_part.c(0), col_part.c(1), admissible, opts),
+              HMatrixBase<scalar_t>::compress
+              (row_part.c(1).size(), col_part.c(0).size(),
+               A10, row_part.c(1), col_part.c(0), admissible, opts),
+              HMatrixBase<scalar_t>::compress
+              (row_part.c(1).size(), col_part.c(1).size(),
+               A11, row_part.c(1), col_part.c(1), admissible, opts)));
+        }
+      }
+    }
+
   } // end namespace H
 } // end namespace strumpack
 

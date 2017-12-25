@@ -119,6 +119,7 @@ namespace strumpack {
     (const std::vector<std::size_t>& I, const DenseMatrix<scalar_t>& B);
     DenseMatrix<scalar_t>& add(const DenseMatrix<scalar_t>& B);
     DenseMatrix<scalar_t>& sub(const DenseMatrix<scalar_t>& B);
+    DenseMatrix<scalar_t>& scale(scalar_t alpha);
     DenseMatrix<scalar_t>& scaled_add
     (scalar_t alpha, const DenseMatrix<scalar_t>& x);
     DenseMatrix<scalar_t>& scale_and_add
@@ -514,8 +515,9 @@ namespace strumpack {
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>
-  DenseMatrix<scalar_t>::extract(const std::vector<std::size_t>& I,
-                                 const std::vector<std::size_t>& J) const {
+  DenseMatrix<scalar_t>::extract
+  (const std::vector<std::size_t>& I,
+   const std::vector<std::size_t>& J) const {
     DenseMatrix<scalar_t> B(I.size(), J.size());
     for (std::size_t j=0; j<J.size(); j++)
       for (std::size_t i=0; i<I.size(); i++) {
@@ -557,6 +559,16 @@ namespace strumpack {
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
         operator()(i, j) -= B(i, j);
+    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*cols()*rows());
+    return *this;
+  }
+
+  template<typename scalar_t> DenseMatrix<scalar_t>&
+  DenseMatrix<scalar_t>::scale(scalar_t alpha) {
+    //#pragma omp taskloop default(shared) //grainsize(128) //collapse(2)
+    for (std::size_t j=0; j<cols(); j++)
+      for (std::size_t i=0; i<rows(); i++)
+        operator()(i, j) *= alpha;
     STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*cols()*rows());
     return *this;
   }
@@ -636,8 +648,9 @@ namespace strumpack {
 
   // TODO do in-place??!! to avoid copy
   template<typename scalar_t> DenseMatrix<scalar_t>
-  DenseMatrix<scalar_t>::solve(const DenseMatrix<scalar_t>& b,
-                               const std::vector<int>& piv, int depth) const {
+  DenseMatrix<scalar_t>::solve
+  (const DenseMatrix<scalar_t>& b,
+   const std::vector<int>& piv, int depth) const {
     int info = 0;
     DenseMatrix<scalar_t> x(b);
     getrs_omp_task
