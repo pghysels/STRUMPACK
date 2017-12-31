@@ -133,12 +133,11 @@ int run(int argc, char* argv[]) {
     return A(r, c);
   };
 
-  A.print("A");
 
   {
     StrongAdmissibility adm_strong;
     auto Hstrong = HMatrixBase<double>::compress
-      (n, n, Aelem, part, part, adm_strong, h_opts);
+      (Aelem, part, part, adm_strong, h_opts);
     if (Hstrong) {
       cout << "# created STRONG admissible H matrix of dimension "
            << Hstrong->rows() << " x " << Hstrong->cols()
@@ -170,7 +169,7 @@ int run(int argc, char* argv[]) {
   {
     WeakAdmissibility adm_weak;
     auto Hweak = HMatrixBase<double>::compress
-      (n, n, Aelem, part, part, adm_weak, h_opts);
+      (Aelem, part, part, adm_weak, h_opts);
     if (Hweak) {
       cout << "# created WEAK admissible H matrix of dimension "
            << Hweak->rows() << " x " << Hweak->cols()
@@ -203,7 +202,7 @@ int run(int argc, char* argv[]) {
   {
     BLRAdmissibility adm_blr;
     auto Hblr = HMatrixBase<double>::compress
-      (n, n, Aelem, part, part, adm_blr, h_opts);
+      (Aelem, part, part, adm_blr, h_opts);
     if (Hblr) {
       cout << "# created BLR admissible H matrix of dimension "
            << Hblr->rows() << " x " << Hblr->cols()

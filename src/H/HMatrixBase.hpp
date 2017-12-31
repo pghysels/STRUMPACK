@@ -132,7 +132,7 @@ namespace strumpack {
                const HBlockPartition& col_part,
                const adm_t& admissible, const opts_t& opts);
       static std::unique_ptr<HMatrixBase<scalar_t>>
-      compress(std::size_t m, std::size_t n, const elem_t& A,
+      compress(const elem_t& A,
                const HBlockPartition& row_part,
                const HBlockPartition& col_part,
                const adm_t& admissible, const opts_t& opts);
@@ -279,9 +279,9 @@ namespace strumpack {
 
     template<typename scalar_t> std::unique_ptr<HMatrixBase<scalar_t>>
     HMatrixBase<scalar_t>::compress
-    (std::size_t m, std::size_t n, const elem_t& Aelem,
-     const HBlockPartition& row_part, const HBlockPartition& col_part,
-     const adm_t& admissible, const opts_t& opts) {
+    (const elem_t& Aelem, const HBlockPartition& row_part,
+     const HBlockPartition& col_part, const adm_t& admissible,
+     const opts_t& opts) {
       if (row_part.leaf() || col_part.leaf()) {
         if (admissible(row_part, col_part))
           return std::unique_ptr<HMatrixLR<scalar_t>>
@@ -295,7 +295,8 @@ namespace strumpack {
         if (admissible(row_part, col_part))
           return std::unique_ptr<HMatrixLR<scalar_t>>
             (new HMatrixLR<scalar_t>
-             (row_part.size(), col_part.size(), Aelem, opts));
+             (row_part.size(), col_part.size(),
+              Aelem, opts));
         else {
           auto A00 = Aelem;
           auto A01 = [&](std::size_t r, std::size_t c) -> scalar_t {
@@ -307,17 +308,13 @@ namespace strumpack {
           return std::unique_ptr<HMatrix<scalar_t>>
             (new HMatrix<scalar_t>
              (HMatrixBase<scalar_t>::compress
-              (row_part.c(0).size(), col_part.c(0).size(),
-               A00, row_part.c(0), col_part.c(0), admissible, opts),
+              (A00, row_part.c(0), col_part.c(0), admissible, opts),
               HMatrixBase<scalar_t>::compress
-              (row_part.c(0).size(), col_part.c(1).size(),
-               A01, row_part.c(0), col_part.c(1), admissible, opts),
+              (A01, row_part.c(0), col_part.c(1), admissible, opts),
               HMatrixBase<scalar_t>::compress
-              (row_part.c(1).size(), col_part.c(0).size(),
-               A10, row_part.c(1), col_part.c(0), admissible, opts),
+              (A10, row_part.c(1), col_part.c(0), admissible, opts),
               HMatrixBase<scalar_t>::compress
-              (row_part.c(1).size(), col_part.c(1).size(),
-               A11, row_part.c(1), col_part.c(1), admissible, opts)));
+              (A11, row_part.c(1), col_part.c(1), admissible, opts)));
         }
       }
     }

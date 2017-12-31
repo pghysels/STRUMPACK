@@ -56,15 +56,7 @@ namespace strumpack {
     std::vector<int> Z;
     Z.reserve(rmax);
     scalar_t normUVt2(0.);
-
-    ////////////////////////////////////////////////
-    // D_t A(m, n);
-    // for (std::size_t j=0; j<n; j++)
-    //   for (std::size_t i=0; i<m; i++)
-    //     A(i, j) = Aelem(i, j);
-    ////////////////////////////////////////////////
-
-
+    real_t normVr(0.), normUr(0.);
     while (rank < rmax) {
       Z.push_back(row);
       DW_t Vr(n, 1, V_, 0, rank);
@@ -72,12 +64,8 @@ namespace strumpack {
         Vr(i, 0) = Aelem(row, i);
       for (int l=0; l<rank; l++)
         Vr.scaled_add(-U_(row, l), DW_t(n, 1, V_, 0, l));
-      // std::cout << "m=" << m << " n=" << n
-      //           << ", row=" << row << " col=" << col
-      //           << " ||V(:," << rank << ")||=" << Vr.norm()
-      //           << std::endl;
-      auto normVr = Vr.norm();
-      if (normVr < sfmin) break;
+      if (Vr.norm() < sfmin)
+        break;
       col = 0;
       auto Vrmax = std::fabs(Vr(col, 0));
       for (std::size_t i=1; i<n; i++) {
@@ -92,56 +80,41 @@ namespace strumpack {
       for (int l=0; l<rank; l++)
         Ur.scaled_add(-V_(col, l), DW_t(m, 1, U_, 0, l));
 
-      //////////////////////////////////////////////////
-      D_t UVt(m, n);
-      DW_t Utemp(m, rank, U_, 0, 0);
-      DW_t Vtemp(n, rank, V_, 0, 0);
-      gemm(Trans::N, Trans::C, scalar_t(1.), Utemp, Vtemp, scalar_t(0.), UVt);
-      auto UVtnorm = UVt.norm();
-
-      // UVt.scaled_add(scalar_t(-1.), A);
-      // auto relerr = UVt.norm() / A.norm();
-      //////////////////////////////////////////////////
-
-
-      auto normUr = Ur.norm();
-
-      // if (normUr * normVr < std::sqrt(normUVt2) * rel_tol)
-      //   //normUr * normVr < abs_tol)
-      //   break;
-      if (normUr * normVr < UVtnorm * rel_tol)
-        break;
-
       normUVt2 += normUr * normUr * normVr * normVr;
-      for (int k=0; k<rank; k++) {
+      for (int k=0; k<rank-1; k++) {
         scalar_t UrdotUk(0.);
-        for (std::size_t i=0; i<m; i++) {
-          // auto tmp = U_(i, rank) * U_(i, k);
-          // UrdotUk += tmp * blas::my_conj(tmp);
-          UrdotUk += U_(i, rank) * U_(i, k);
-        }
+        for (std::size_t i=0; i<m; i++)
+          UrdotUk += U_(i, rank-1) * U_(i, k);
         scalar_t VrdotVk(0.);
-        for (std::size_t i=0; i<n; i++) {
-          // auto tmp = V_(i, rank) * V_(i, k);
-          // VrdotVk += tmp * blas::my_conj(tmp);
-          VrdotVk = V_(i, rank) * V_(i, k);
-        }
+        for (std::size_t i=0; i<n; i++)
+          VrdotVk += V_(i, rank-1) * V_(i, k);
         normUVt2 += scalar_t(2.) * UrdotUk * VrdotVk;
       }
+      normVr = Vr.norm();
+      normUr = Ur.norm();
 
+#if 0
+      scalar_t FrobS(0.);
+      for (std::size_t j=0; j<n; j++)
+        for (std::size_t i=0; i<m; i++) {
+          scalar_t Sij(0.);
+          for (int k=0; k<rank; k++)
+            Sij += U_(i, k) * V_(j, k);
+          FrobS += Sij * Sij;
+        }
+      //assert(std::fabs(normUVt2 - FrobS) < 10.0 * blas::lamch<real_t>('P'));
+      if (std::fabs(normUVt2 - FrobS) > 10.0 * blas::lamch<real_t>('P'))
+        std::cout << "rank=" << rank
+                  << ", ||Ur||=" << normUr << ", ||Vr||=" << normVr
+                  << ", ||UVt||=" << std::sqrt(normUVt2)
+                  << ", | ||UVt|| - ||S|| |="
+                  << std::fabs(normUVt2 - FrobS)
+                  << std::endl;
+#endif
 
-      // std::cout << "normUr=" << normUr << ", normVr=" << normVr
-      //           << ", normUVt2=" << normUVt2
-      //           << ", std::sqrt(normUVt2)=" << std::sqrt(normUVt2)
-      //           << ", UVtnorm = " << UVtnorm
-      //           << ", abs_tol=" << abs_tol
-      //           << ": " << normUr * normVr << " < "
-      //           << std::sqrt(normUVt2) * abs_tol
-      //           // << ", A.norm()=" << A.norm()
-      //           // << ", UVt.norm()=" << UVtnorm
-      //           // << " ||A-UVt||/||A||=" << relerr
-      //           << std::endl;
-
+      if (normUr * normVr < std::sqrt(normUVt2) * rel_tol ||
+          normUr * normVr < abs_tol)
+        break;
 
       // select a new row
       row = 0;
@@ -154,7 +127,6 @@ namespace strumpack {
       }
       rank++;
     }
-
 
 
     // TODO recompress!?
