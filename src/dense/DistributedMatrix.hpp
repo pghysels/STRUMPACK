@@ -1209,6 +1209,47 @@ namespace strumpack {
     return tmp;
   }
 
+
+
+  template<typename scalar_t> long long int
+  LU_flops(const DistributedMatrix<scalar_t>& a) {
+    if (!a.is_master()) return 0;
+    return blas::getrf_flops(a.rows(), a.cols());
+  }
+
+  template<typename scalar_t> long long int
+  ID_row_flops(const DistributedMatrix<scalar_t>& a, int rank) {
+    if (!a.is_master()) return 0;
+    return blas::geqp3_flops(a.cols(), a.rows())
+      + blas::trsm_flops(rank, a.cols() - rank, scalar_t(1.), 'L');
+  }
+
+  template<typename scalar_t> long long int
+  trsm_flops(Side s, scalar_t alpha, const DistributedMatrix<scalar_t>& a,
+             const DistributedMatrix<scalar_t>& b) {
+    if (!a.is_master()) return 0;
+    return blas::trsm_flops(b.rows(), b.cols(), alpha, char(s));
+  }
+
+  template<typename scalar_t> long long int
+  gemm_flops(Trans ta, Trans tb, scalar_t alpha,
+             const DistributedMatrix<scalar_t>& a,
+             const DistributedMatrix<scalar_t>& b, scalar_t beta) {
+    if (!a.is_master()) return 0;
+    return blas::gemm_flops
+      ((ta==Trans::N) ? a.rows() : a.cols(),
+       (tb==Trans::N) ? b.cols() : b.rows(),
+       (ta==Trans::N) ? a.cols() : a.rows(), alpha, beta);
+  }
+
+  template<typename scalar_t> long long int
+  orthogonalize_flops(const DistributedMatrix<scalar_t>& a) {
+    if (!a.is_master()) return 0;
+    auto minrc = std::min(a.rows(), a.cols());
+    return blas::geqrf_flops(a.rows(), minrc) +
+      blas::xxgqr_flops(a.rows(), minrc, minrc);
+  }
+
 } // end namespace strumpack
 
 #endif // DISTRIBUTED_MATRIX_HPP

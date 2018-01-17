@@ -53,21 +53,15 @@ namespace strumpack { // these are all global variables
     extern int num_threads;
     extern int task_recursion_cutoff_level;
 
-    extern long long int flops;
-    extern long long int bytes;
-    //#pragma omp threadprivate(flops, bytes)
+    extern std::atomic<long long int> flops;
+    extern std::atomic<long long int> bytes;
 
-    extern std::atomic<long long int> compression_flops;
-    extern std::atomic<long long int> sample_flops;
-    extern std::atomic<long long int> initial_sample_flops;
     extern std::atomic<long long int> CB_sample_flops;
     extern std::atomic<long long int> sparse_sample_flops;
     extern std::atomic<long long int> extraction_flops;
     extern std::atomic<long long int> ULV_factor_flops;
     extern std::atomic<long long int> schur_flops;
     extern std::atomic<long long int> full_rank_flops;
-
-
     extern std::atomic<long long int> random_flops;
     extern std::atomic<long long int> ID_flops;
     extern std::atomic<long long int> ortho_flops;
@@ -81,11 +75,37 @@ namespace strumpack { // these are all global variables
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
 #ifdef COUNT_FLOPS
-#define STRUMPACK_FLOPS(n) strumpack::params::flops += n;
-#define STRUMPACK_BYTES(n) strumpack::params::bytes += n;
+#define STRUMPACK_FLOPS(n)                      \
+  strumpack::params::flops += n;
+#define STRUMPACK_BYTES(n)                      \
+  strumpack::params::bytes += n;
+#define STRUMPACK_ID_FLOPS(n)                   \
+  strumpack::params::ID_flops += n;
+#define STRUMPACK_QR_FLOPS(n)                   \
+  strumpack::params::QR_flops += n;
+#define STRUMPACK_ORTHO_FLOPS(n)                \
+  strumpack::params::ortho_flops += n;
+#define STRUMPACK_REDUCE_SAMPLE_FLOPS(n)        \
+  strumpack::params::reduce_sample_flops += n;
+#define STRUMPACK_UPDATE_SAMPLE_FLOPS(n)        \
+  strumpack::params::update_sample_flops += n;
+#define STRUMPACK_RANDOM_FLOPS(n)               \
+  strumpack::params::random_flops += n;
+#define STRUMPACK_SPARSE_SAMPLE_FLOPS(n)        \
+  strumpack::params::sparse_sample_flops += n;
+#define STRUMPACK_FULL_RANK_FLOPS(n)        \
+  strumpack::params::full_rank_flops += n;
 #else
 #define STRUMPACK_FLOPS(n) void(0);
 #define STRUMPACK_BYTES(n) void(0);
+#define STRUMPACK_ID_FLOPS(n) void(0);
+#define STRUMPACK_QR_FLOPS(n) void(0);
+#define STRUMPACK_ORTHO_FLOPS(n) void(0);
+#define STRUMPACK_REDUCE_SAMPLE_FLOPS(n) void(0);
+#define STRUMPACK_UPDATE_SAMPLE_FLOPS(n) void(0);
+#define STRUMPACK_RANDOM_FLOPS(n) void(0);
+#define STRUMPACK_SPARSE_SAMPLE_FLOPS(n) void(0);
+#define STRUMPACK_FULL_RANK_FLOPS(n) void(0);
 #endif
 #endif /* DOXYGEN_SHOULD_SKIP_THIS */
 

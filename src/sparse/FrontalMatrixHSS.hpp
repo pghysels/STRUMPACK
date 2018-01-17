@@ -345,7 +345,6 @@ namespace strumpack {
   (const SpMat_t& A, const SPOptions<scalar_t>& opts, DenseM_t& Rr,
    DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc, int etree_level,
    int task_depth) {
-    auto f0 = params::flops;
     Sr.zero();
     Sc.zero();
     const auto dsep = this->dim_sep();
@@ -383,19 +382,17 @@ namespace strumpack {
         }
       }
       STRUMPACK_FLOPS(rgen->flops_per_prng()*d*m);
-      params::random_flops += params::flops - f0;
+      STRUMPACK_RANDOM_FLOPS(rgen->flops_per_prng()*d*m);
     }
 
-    f0 = params::flops;
     A.front_multiply
       (this->sep_begin, this->sep_end, this->upd, Rr, Sr, Sc);
-    params::sparse_sample_flops += params::flops - f0;
-    auto f1 = params::flops;
+    //auto f1 = params::flops;
     if (this->lchild)
       this->lchild->sample_CB(opts, Rr, Sr, Sc, this, task_depth);
     if (this->rchild)
       this->rchild->sample_CB(opts, Rr, Sr, Sc, this, task_depth);
-    params::CB_sample_flops += params::flops - f1;
+    //params::CB_sample_flops += params::flops - f1;
 
     if (opts.indirect_sampling() && etree_level != 0) {
       auto dold = R1.cols();
@@ -458,20 +455,18 @@ namespace strumpack {
     }
     _H.set_openmp_task_depth(task_depth);
     auto mult = [&](DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
-      auto f0 = params::flops;
       random_sampling(A, opts, Rr, Rc, Sr, Sc, etree_level, task_depth);
-      params::sample_flops += params::flops - f0;
-      if (_sampled_columns == 0)
-        params::initial_sample_flops += params::flops - f0;
+      //if (_sampled_columns == 0)
+      //params::initial_sample_flops += params::flops - f0;
       _sampled_columns += Rr.cols();
     };
     auto elem = [&](const std::vector<std::size_t>& I,
                     const std::vector<std::size_t>& J, DenseM_t& B) {
-      auto f0 = params::flops;
+      //auto f0 = params::flops;
       element_extraction(A, I, J, B, task_depth);
-      params::extraction_flops += params::flops - f0;
+      //params::extraction_flops += params::flops - f0;
     };
-    auto f0 = params::flops;
+    //auto f0 = params::flops;
     auto HSSopts = opts.HSS_options();
     int child_samples = 0;
     if (this->lchild)
@@ -482,15 +477,15 @@ namespace strumpack {
     if (opts.indirect_sampling())
       HSSopts.set_user_defined_random(true);
     _H.compress(mult, elem, HSSopts);
-    params::compression_flops += params::flops - f0;
+    //params::compression_flops += params::flops - f0;
     if (this->lchild) this->lchild->release_work_memory();
     if (this->rchild) this->rchild->release_work_memory();
     if (this->dim_sep()) {
       if (etree_level > 0) {
-        auto f0 = params::flops;
+        //auto f0 = params::flops;
         _ULV = _H.partial_factor();
-        params::ULV_factor_flops += params::flops - f0;
-        auto f1 = params::flops;
+        //params::ULV_factor_flops += params::flops - f0;
+        //auto f1 = params::flops;
         _H.Schur_update(_ULV, _Theta, _DUB01, _Phi);
         DenseM_t& Vhat = _ULV.Vhat();
         if (_Theta.cols() < _Phi.cols()) {
@@ -502,11 +497,11 @@ namespace strumpack {
           gemm(Trans::N, Trans::C, scalar_t(1.), _Theta, Vhat,
                scalar_t(0.), _ThetaVhatC_or_VhatCPhiC, task_depth);
         }
-        params::schur_flops += params::flops - f1;
+        //params::schur_flops += params::flops - f1;
       } else {
-        auto f0 = params::flops;
+        //auto f0 = params::flops;
         _ULV = _H.factor();
-        params::ULV_factor_flops += params::flops - f0;
+        //params::ULV_factor_flops += params::flops - f0;
       }
     }
   }

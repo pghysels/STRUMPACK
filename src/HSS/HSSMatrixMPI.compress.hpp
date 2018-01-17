@@ -330,6 +330,9 @@ namespace strumpack {
           copy(this->rows(), dd, RS.leaf_Sc, 0, d_old, w.Sc, 0, 0, _ctxt_all);
           gemm(Trans::N, Trans::N, scalar_t(-1), _D, *wR, scalar_t(1.), w.Sr);
           gemm(Trans::C, Trans::N, scalar_t(-1), _D, *wR, scalar_t(1.), w.Sc);
+          STRUMPACK_UPDATE_SAMPLE_FLOPS
+            (gemm_flops(Trans::N, Trans::N, scalar_t(-1), _D, *wR, scalar_t(1.)) +
+             gemm_flops(Trans::C, Trans::N, scalar_t(-1), _D, *wR, scalar_t(1.)));
         } else {
           w.Sr.resize(this->rows(), c_old+dd);
           w.Sc.resize(this->rows(), c_old+dd);
@@ -343,6 +346,9 @@ namespace strumpack {
                scalar_t(1.), wSr_new);
           gemm(Trans::C, Trans::N, scalar_t(-1), _D, *wR,
                scalar_t(1.), wSc_new);
+          STRUMPACK_UPDATE_SAMPLE_FLOPS
+            (gemm_flops(Trans::N, Trans::N, scalar_t(-1), _D, *wR, scalar_t(1.)) +
+             gemm_flops(Trans::C, Trans::N, scalar_t(-1), _D, *wR, scalar_t(1.)));
         }
       } else {
         std::size_t c_new, c_lo;
@@ -391,6 +397,9 @@ namespace strumpack {
              scalar_t(1.), wSr_new0);
         gemm(Trans::N, Trans::N, scalar_t(-1.), _B10, wc0Rr,
              scalar_t(1.), wSr_new1);
+        STRUMPACK_UPDATE_SAMPLE_FLOPS
+          (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), _B01, wc1Rr, scalar_t(1.)) +
+           gemm_flops(Trans::N, Trans::N, scalar_t(-1.), _B10, wc0Rr, scalar_t(1.)));
 
         DistMW_t wSc_new0(w.c[0].Jc.size(), c_new, w.Sc, 0, c_lo);
         DistMW_t wSc_new1(w.c[1].Jc.size(), c_new, w.Sc,
@@ -424,6 +433,9 @@ namespace strumpack {
              scalar_t(1.), wSc_new0);
         gemm(Trans::C, Trans::N, scalar_t(-1.), _B01, wc0Rc,
              scalar_t(1.), wSc_new1);
+        STRUMPACK_UPDATE_SAMPLE_FLOPS
+          (gemm_flops(Trans::C, Trans::N, scalar_t(-1.), _B10, wc1Rc, scalar_t(1.)) +
+           gemm_flops(Trans::C, Trans::N, scalar_t(-1.), _B01, wc0Rc, scalar_t(1.)));
         w.c[0].Sr.clear(); w.c[0].Sc.clear(); w.c[0].dS = 0;
         w.c[1].Sr.clear(); w.c[1].Sc.clear(); w.c[1].dS = 0;
       }
@@ -435,6 +447,8 @@ namespace strumpack {
                   opts.abs_tol(), _ctxt_T);
       w.Sc.ID_row(_V.E(), _V.P(), w.Jc, opts.rel_tol(),
                   opts.abs_tol(), _ctxt_T);
+      STRUMPACK_ID_FLOPS(ID_row_flops(w.Sr, w.Jr.size()));
+      STRUMPACK_ID_FLOPS(ID_row_flops(w.Sc, w.Jc.size()));
       notify_inactives_J(w);
       if (d-opts.dd() >= opts.max_rank() ||
           (int(w.Jr.size()) <= d - opts.dd() &&
@@ -481,6 +495,8 @@ namespace strumpack {
           w.Rc = DistM_t(_ctxt, this->U_rank(), c_new);
           _V.applyC(*tmpR, w.Rr);
           _U.applyC(*tmpR, w.Rc);
+          STRUMPACK_REDUCE_SAMPLE_FLOPS
+            (_V.applyC_flops(c_new) + _U.applyC_flops(c_new));
         } else {
           auto tmpR = ConstDistributedMatrixWrapperPtr
             (this->rows(), dd, RS.leaf_R, 0, d_old);
@@ -488,6 +504,8 @@ namespace strumpack {
           DistM_t wRc_new(_ctxt, w.Rc.rows(), dd);
           _V.applyC(*tmpR, wRr_new);
           _U.applyC(*tmpR, wRc_new);
+          STRUMPACK_REDUCE_SAMPLE_FLOPS
+            (_V.applyC_flops(dd) + _U.applyC_flops(dd));
           w.Rr.hconcat(wRr_new);
           w.Rc.hconcat(wRc_new);
         }
@@ -503,6 +521,8 @@ namespace strumpack {
           w.Rc = DistM_t(_ctxt, this->U_rank(), w.c[0].dR);
           _V.applyC(wRr, w.Rr);
           _U.applyC(wRc, w.Rc);
+          STRUMPACK_REDUCE_SAMPLE_FLOPS
+            (_V.applyC_flops(w.c[0].dR) + _U.applyC_flops(w.c[0].dR));
         } else {
           DistM_t wRr(_ctxt, this->V_rows(), dd);
           copy(w.c[0].Ic.size(), dd, w.c[0].Rr, 0, w.c[0].dR - dd,
@@ -519,6 +539,8 @@ namespace strumpack {
           DistM_t wRc_new(_ctxt, w.Rc.rows(), dd);
           _V.applyC(wRr, wRr_new);
           _U.applyC(wRc, wRc_new);
+          STRUMPACK_REDUCE_SAMPLE_FLOPS
+            (_V.applyC_flops(dd) + _U.applyC_flops(dd));
           w.Rr.hconcat(wRr_new);
           w.Rc.hconcat(wRc_new);
         }

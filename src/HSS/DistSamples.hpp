@@ -32,6 +32,8 @@ namespace strumpack {
           Sc(Actxt, _hss.cols(), d) {
         _rgen->seed(R.prow(), R.pcol());
         R.random(*_rgen);
+        STRUMPACK_RANDOM_FLOPS
+          (_rgen->flops_per_prng() * R.lrows() * R.lcols());
         _Amult(R, Sr, Sc);
         _hss.to_block_row(R,  sub_Rr, leaf_R);
         sub_Rc = DenseM_t(sub_Rr);
@@ -45,6 +47,8 @@ namespace strumpack {
         auto dd = d-d_old;
         DistM_t Rnew(R.ctxt(), n, dd);
         Rnew.random(*_rgen);
+        STRUMPACK_RANDOM_FLOPS
+          (_rgen->flops_per_prng() * Rnew.lrows() * Rnew.lcols());
         DistM_t Srnew(Sr.ctxt(), n, dd);
         DistM_t Scnew(Sc.ctxt(), n, dd);
         _Amult(Rnew, Srnew, Scnew);

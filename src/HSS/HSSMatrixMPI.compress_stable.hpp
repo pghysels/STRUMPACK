@@ -35,7 +35,6 @@ namespace strumpack {
       auto d = opts.d0();
       auto dd = opts.dd();
       assert(dd <= d);
-      std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen;
       WorkCompressMPI<scalar_t> w;
       DistSamples<scalar_t> RS(d+dd, (Actxt!=-1) ? Actxt :
                                _ctxt, *this, Amult, opts);
@@ -143,11 +142,10 @@ namespace strumpack {
           (opts, w.U_r_max, w.Sr, w.Qr, d, dd,
            this->_U_state == State::UNTOUCHED)) {
         w.Qr.clear();
-        auto f0 = params::flops;
         // TODO pass max_rank to ID in DistributedMatrix
         w.Sr.ID_row(_U.E(), _U.P(), w.Jr, opts.rel_tol(), opts.abs_tol(),
                     /*opts.max_rank(),*/ _ctxt_T);
-        params::ID_flops += params::flops - f0;
+        STRUMPACK_ID_FLOPS(ID_row_flops(w.Sr, _U.cols()));
         this->_U_rank = _U.cols();
         this->_U_rows = _U.rows();
         w.Ir.reserve(_U.cols());
@@ -174,11 +172,10 @@ namespace strumpack {
           (opts, w.V_r_max, w.Sc, w.Qc, d, dd,
            this->_V_state == State::UNTOUCHED)) {
         w.Qc.clear();
-        auto f0 = params::flops;
         // TODO pass max_rank to ID in DistributedMatrix
         w.Sc.ID_row(_V.E(), _V.P(), w.Jc, opts.rel_tol(),
                     opts.abs_tol(), /*opts.max_rank()*/ _ctxt_T);
-        params::ID_flops += params::flops - f0;
+        STRUMPACK_ID_FLOPS(ID_row_flops(w.Sc, _V.cols()));
         this->_V_rank = _V.cols();
         this->_V_rows = _V.rows();
         w.Ic.reserve(_V.cols());
@@ -211,25 +208,28 @@ namespace strumpack {
         Q2 = DistMW_t(m, std::min(dd, m-(d-dd)), Q, 0, d-dd);
         Q12 = DistMW_t(m, std::min(d, m), Q, 0, 0);
       }
-      auto f0 = params::flops;
       scalar_t r_min, r_max;
       Q2.orthogonalize(r_max, r_min);
+      STRUMPACK_QR_FLOPS(orthogonalize_flops(Q2));
       if (untouched) r_max_0 = r_max;
       if (std::abs(r_min) < opts.abs_tol() ||
           std::abs(r_min / r_max_0) < opts.rel_tol())
         return true;
-      params::QR_flops += params::flops - f0;
       DistMW_t Q3(m, dd, Q, 0, d);
       DistM_t Q12tQ3(_ctxt, Q12.cols(), Q3.cols());
       auto S3norm = Q3.norm();
-      f0 = params::flops;
       gemm(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.), Q12tQ3);
       gemm(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.), Q3);
       // iterated classical Gram-Schmidt
       gemm(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.), Q12tQ3);
       gemm(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.), Q3);
-      params::ortho_flops += params::flops - f0;
+      STRUMPACK_ORTHO_FLOPS
+                            (gemm_flops(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.)) +
+                             gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.)) +
+                             gemm_flops(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.)) +
+                             gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.)));
       auto Q3norm = Q3.norm();
+      // TODO norm flops?
       return (Q3norm / std::sqrt(double(dd)) < opts.abs_tol())
         || (Q3norm / S3norm < opts.rel_tol());
     }

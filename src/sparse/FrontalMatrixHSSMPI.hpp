@@ -169,17 +169,17 @@ namespace strumpack {
    DistM_t& Sr, DistM_t& Sc, int etree_level) {
     Sr.zero();
     Sc.zero();
-    auto f0 = params::flops;
+    //auto f0 = params::flops;
     TIMER_TIME(TaskType::FRONT_MULTIPLY_2D, 1, t_fmult);
     A.front_multiply_2d
       (this->sep_begin, this->sep_end, this->upd, R, Sr, Sc,
        this->ctxt_all, this->front_comm, 0);
     TIMER_STOP(t_fmult);
     TIMER_TIME(TaskType::UUTXR, 1, t_UUtxR);
-    params::sparse_sample_flops += params::flops - f0;
-    auto f1 = params::flops;
+    //params::sparse_sample_flops += params::flops - f0;
+    //auto f1 = params::flops;
     sample_children_CB(opts, R, Sr, Sc);
-    params::CB_sample_flops += params::flops - f1;
+    //params::CB_sample_flops += params::flops - f1;
     TIMER_STOP(t_UUtxR);
   }
 
@@ -353,20 +353,20 @@ namespace strumpack {
     if (!this->dim_blk()) return;
 
     auto mult = [&](DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
-      auto f0 = params::flops;
+      //auto f0 = params::flops;
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
       random_sampling(A, opts, R, Sr, Sc, etree_level);
-      params::sample_flops += params::flops - f0;
-      if (_sampled_columns == 0)
-        params::initial_sample_flops += params::flops - f0;
+      //params::sample_flops += params::flops - f0;
+      // if (_sampled_columns == 0)
+      //   params::initial_sample_flops += params::flops - f0;
       _sampled_columns += R.cols();
       TIMER_STOP(t_sampling);
     };
     auto elem = [&](const std::vector<std::size_t>& I,
                     const std::vector<std::size_t>& J, DistM_t& B) {
-      auto f0 = params::flops;
+      //auto f0 = params::flops;
       element_extraction(A, I, J, B);
-      params::extraction_flops += params::flops - f0;
+      //params::extraction_flops += params::flops - f0;
     };
 
     // auto N = this->dim_blk();
@@ -395,7 +395,7 @@ namespace strumpack {
     //   exit(1);
     // }
 
-    auto f0 = params::flops;
+
     // auto HSSopts = opts.HSS_options();
     // int child_samples = 0;
     // TODO do the child random samples need to be communicated??
@@ -407,9 +407,10 @@ namespace strumpack {
     // if (opts.indirect_sampling()) HSSopts.set_user_defined_random(true);
     // _H->compress(mult, elem, HSSopts);
 
+    //auto f0 = params::flops;
     TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_compress);
     _H->compress(mult, elem, opts.HSS_options());
-    params::compression_flops += params::flops - f0;
+    //params::compression_flops += params::flops - f0;
     TIMER_STOP(t_compress);
 
     // // _H->print_info(std::cout, 0, 0);
@@ -428,12 +429,12 @@ namespace strumpack {
 
     if (this->dim_sep()) {
       if (etree_level > 0) {
-        auto f0 = params::flops;
+        //auto f0 = params::flops;
         TIMER_TIME(TaskType::HSS_PARTIALLY_FACTOR, 0, t_pfact);
         _ULV = _H->partial_factor();
         TIMER_STOP(t_pfact);
-        params::ULV_factor_flops += params::flops - f0;
-        auto f1 = params::flops;
+        //params::ULV_factor_flops += params::flops - f0;
+        //auto f1 = params::flops;
         TIMER_TIME(TaskType::HSS_COMPUTE_SCHUR, 0, t_comp_schur);
         _H->Schur_update(_ULV, _Theta, _Vhat, _DUB01, _Phi);
         if (_Theta.cols() < _Phi.cols()) {
@@ -446,13 +447,13 @@ namespace strumpack {
                scalar_t(0.), _ThetaVhatC);
         }
         TIMER_STOP(t_comp_schur);
-        params::schur_flops += params::flops - f1;
+        //params::schur_flops += params::flops - f1;
       } else {
-        auto f0 = params::flops;
+        //auto f0 = params::flops;
         TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
         _ULV = _H->factor();
         TIMER_STOP(t_fact);
-        params::ULV_factor_flops += params::flops - f0;
+        //params::ULV_factor_flops += params::flops - f0;
       }
     }
   }

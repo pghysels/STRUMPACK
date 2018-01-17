@@ -86,6 +86,9 @@ namespace strumpack {
 
       DenseMatrix<scalar_t> extract_rows
       (const std::vector<std::size_t>& I) const;
+
+      long long int apply_flops(std::size_t nrhs) const;
+      long long int applyC_flops(std::size_t nrhs) const;
     };
 
     template<typename scalar_t>
@@ -202,6 +205,18 @@ namespace strumpack {
     (const std::vector<std::size_t>& I) const {
       // TODO implement this without explicitly forming the dense basis matrix
       return dense().extract_rows(I);
+    }
+
+    template<typename scalar_t> long long int
+    HSSBasisID<scalar_t>::apply_flops(std::size_t nrhs) const {
+      return blas::gemm_flops
+        (_E.rows(), nrhs, _E.cols(), scalar_t(1.), scalar_t(0.));
+    }
+
+    template<typename scalar_t> long long int
+    HSSBasisID<scalar_t>::applyC_flops(std::size_t nrhs) const {
+      return blas::gemm_flops
+        (_E.cols(), nrhs, _E.rows(), scalar_t(1.), scalar_t(1.));
     }
 
   } // end namespace HSS

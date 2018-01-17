@@ -30,9 +30,9 @@ namespace strumpack {
         DenseMW_t Rr_new(n, d-d_old, Rr, 0, d_old);
         DenseMW_t Rc_new(n, d-d_old, Rc, 0, d_old);
         if (!opts.user_defined_random()) {
-          auto f0 = params::flops;
           Rr_new.random(*rgen);
-          params::random_flops += params::flops - f0;
+          STRUMPACK_RANDOM_FLOPS
+            (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
           Rc_new.copy(Rr_new);
         }
         DenseMW_t Sr_new(n, d-d_old, Sr, 0, d_old);
@@ -223,7 +223,6 @@ namespace strumpack {
     HSSMatrix<scalar_t>::compute_local_samples
     (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
      WorkCompress<scalar_t>& w, int d0, int d, int depth) {
-      auto f0 = params::flops;
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
@@ -233,6 +232,9 @@ namespace strumpack {
           DenseMW_t wRr(this->rows(), d, Rr, w.offset.second, d0);
           gemm(Trans::N, Trans::N, scalar_t(-1), _D, wRr,
                scalar_t(1.), wSr, depth);
+          STRUMPACK_UPDATE_SAMPLE_FLOPS
+            (gemm_flops
+             (Trans::N, Trans::N, scalar_t(-1), _D, wRr, scalar_t(1.)));
         } else {
           DenseMW_t wSr0(this->_ch[0]->U_rank(), d, Sr,
                          w.offset.second, d0);
@@ -254,6 +256,11 @@ namespace strumpack {
                scalar_t(1.), wSr0, depth);
           gemm(Trans::N, Trans::N, scalar_t(-1.), _B10, wRr0,
                scalar_t(1.), wSr1, depth);
+          STRUMPACK_UPDATE_SAMPLE_FLOPS
+            (gemm_flops
+             (Trans::N, Trans::N, scalar_t(-1.), _B01, wRr1, scalar_t(1.)) +
+             gemm_flops
+             (Trans::N, Trans::N, scalar_t(-1.), _B10, wRr0, scalar_t(1.)));
         }
       }
 #pragma omp task default(shared)                                        \
@@ -265,6 +272,8 @@ namespace strumpack {
           DenseMW_t wRc(this->rows(), d, Rc, w.offset.second, d0);
           gemm(Trans::C, Trans::N, scalar_t(-1), _D, wRc,
                scalar_t(1.), wSc, depth);
+          STRUMPACK_UPDATE_SAMPLE_FLOPS
+            (gemm_flops(Trans::C, Trans::N, scalar_t(-1), _D, wRc, scalar_t(1.)));
         } else {
           DenseMW_t wSc0(this->_ch[0]->V_rank(), d, Sc, w.offset.second, d0);
           DenseMW_t wSc1(this->_ch[1]->V_rank(), d, Sc,
@@ -285,17 +294,20 @@ namespace strumpack {
                scalar_t(1.), wSc0, depth);
           gemm(Trans::C, Trans::N, scalar_t(-1.), _B01, wRc0,
                scalar_t(1.), wSc1, depth);
+          STRUMPACK_UPDATE_SAMPLE_FLOPS
+            (gemm_flops
+             (Trans::C, Trans::N, scalar_t(-1.), _B10, wRc1, scalar_t(1.)) +
+             gemm_flops
+             (Trans::C, Trans::N, scalar_t(-1.), _B01, wRc0, scalar_t(1.)));
         }
       }
 #pragma omp taskwait
-      params::update_sample_flops += params::flops - f0;
     }
 
     // TODO split in U and V compression
     template<typename scalar_t> bool HSSMatrix<scalar_t>::compute_U_V_bases
     (DenseM_t& Sr, DenseM_t& Sc, const opts_t& opts,
      WorkCompress<scalar_t>& w, int d, int depth) {
-      auto f0 = params::flops;
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
@@ -305,6 +317,7 @@ namespace strumpack {
         DenseM_t wSr(u_rows, d, Sr, w.offset.second, 0);
         wSr.ID_row(_U.E(), _U.P(), w.Jr, opts.rel_tol(), opts.abs_tol(),
                    opts.max_rank(), depth);
+        STRUMPACK_ID_FLOPS(ID_row_flops(wSr, _U.cols()));
       }
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
@@ -315,9 +328,9 @@ namespace strumpack {
         DenseM_t wSc(v_rows, d, Sc, w.offset.second, 0);
         wSc.ID_row(_V.E(), _V.P(), w.Jc, opts.rel_tol(), opts.abs_tol(),
                    opts.max_rank(), depth);
+        STRUMPACK_ID_FLOPS(ID_row_flops(wSc, _V.cols()));
       }
 #pragma omp taskwait
-      params::ID_flops += params::flops - f0;
 
       _U.check();  assert(_U.cols() == w.Jr.size());
       _V.check();  assert(_V.cols() == w.Jc.size());
@@ -350,7 +363,6 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrix<scalar_t>::reduce_local_samples
     (DenseM_t& Rr, DenseM_t& Rc, WorkCompress<scalar_t>& w,
      int d0, int d, int depth) {
-      auto f0 = params::flops;
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
@@ -380,7 +392,8 @@ namespace strumpack {
         }
       }
 #pragma omp taskwait
-      params::reduce_sample_flops += params::flops - f0;
+      STRUMPACK_REDUCE_SAMPLE_FLOPS
+        (_V.applyC_flops(d) + _U.applyC_flops(d));
     }
 
   } // end namespace HSS

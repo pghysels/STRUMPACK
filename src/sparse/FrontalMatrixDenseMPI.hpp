@@ -196,6 +196,11 @@ namespace strumpack {
         trsm(Side::R, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11, F21);
         gemm(Trans::N, Trans::N, scalar_t(-1.), F21, F12, scalar_t(1.), F22);
       }
+      STRUMPACK_FULL_RANK_FLOPS
+        (LU_flops(F11) +
+         gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F21, F12, scalar_t(1.)) +
+         trsm_flops(Side::L, scalar_t(1.), F11, F12) +
+         trsm_flops(Side::R, scalar_t(1.), F11, F21));
     }
   }
 

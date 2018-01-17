@@ -257,6 +257,13 @@ namespace strumpack {
     virtual void perf_counters_stop(const std::string& s);
     virtual void synchronize() {}
     virtual void communicate_ordering() {}
+    virtual void flop_breakdown() const;
+    virtual void print_flop_breakdown
+    (float random_flops, float ID_flops, float QR_flops, float ortho_flops,
+     float reduce_sample_flops, float update_sample_flops,
+     float extraction_flops, float CB_sample_flops, float sparse_sample_flops,
+     float ULV_factor_flops, float schur_flops, float full_rank_flops) const;
+    virtual void flop_breakdown_reset() const;
 
     SPOptions<scalar_t> _opts;
     bool _is_root;
@@ -320,11 +327,10 @@ namespace strumpack {
                   << " = log_2(#threads) + 3"<< std::endl;
       }
     }
-#ifdef COUNT_FLOPS
-    // TODO why does this not compile on my GCC 5.0.1??
-    // if (!params::flops.is_lock_free())
-    //   std::cerr << "# WARNING: the flop counter is not lock free"
-    //             << std::endl;
+#if defined(COUNT_FLOPS)
+    if (!params::flops.is_lock_free())
+      std::cerr << "# WARNING: the flop counter is not lock free"
+                << std::endl;
 #endif
     _opts.HSS_options().set_synchronized_compression(true);
   }
@@ -400,13 +406,9 @@ namespace strumpack {
     PAPI_flops(&rtime, &ptime, &flpops, &mflops);
     _flpops = flpops; _rtime = rtime; _ptime = ptime;
 #endif
-#ifdef COUNT_FLOPS
-    _f0 = _b0 = 0;
-#pragma omp parallel reduction(+:_f0) reduction(+:_b0)
-    {
-      _f0 = params::flops;
-      _b0 = params::bytes;
-    }
+#if defined(COUNT_FLOPS)
+    _f0 = params::flops;
+    _b0 = params::bytes;
 #endif
   }
 
@@ -446,15 +448,8 @@ namespace strumpack {
     }
 #endif
 #ifdef COUNT_FLOPS
-    _ftot = -_f0;
-    _btot = -_b0;
-#pragma omp parallel reduction(+:_ftot) reduction(+:_btot)
-    {
-      _ftot = params::flops;
-      _btot = params::bytes;
-    }
-    _fmin = _fmax = _ftot;
-    _bmin = _bmax = _btot;
+    _fmin = _fmax = _ftot = params::flops - _f0;
+    _bmin = _bmax = _btot = params::bytes - _b0;
 #endif
   }
 
@@ -624,6 +619,91 @@ namespace strumpack {
     return ReturnCode::SUCCESS;
   }
 
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::flop_breakdown() const {
+#if defined(COUNT_FLOPS)
+    print_flop_breakdown
+      (params::random_flops, params::ID_flops, params::QR_flops,
+       params::ortho_flops, params::reduce_sample_flops,
+       params::update_sample_flops, params::extraction_flops,
+       params::CB_sample_flops, params::sparse_sample_flops,
+       params::ULV_factor_flops, params::schur_flops,
+       params::full_rank_flops);
+#endif
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::flop_breakdown_reset() const {
+#if defined(COUNT_FLOPS)
+    params::random_flops = 0;
+    params::ID_flops = 0;
+    params::QR_flops = 0;
+    params::ortho_flops = 0;
+    params::reduce_sample_flops = 0;
+    params::update_sample_flops = 0;
+    params::extraction_flops = 0;
+    params::CB_sample_flops = 0;
+    params::sparse_sample_flops = 0;
+    params::ULV_factor_flops = 0;
+    params::schur_flops = 0;
+    params::full_rank_flops = 0;
+#endif
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::print_flop_breakdown
+  (float random_flops, float ID_flops, float QR_flops, float ortho_flops,
+   float reduce_sample_flops, float update_sample_flops,
+   float extraction_flops, float CB_sample_flops, float sparse_sample_flops,
+   float ULV_factor_flops, float schur_flops, float full_rank_flops) const {
+    if (!_is_root) return;
+    float sample_flops = CB_sample_flops
+      + sparse_sample_flops;
+    float compression_flops = random_flops
+      + ID_flops + QR_flops + ortho_flops
+      + reduce_sample_flops + update_sample_flops
+      + extraction_flops + sample_flops;
+    std::cout << std::endl;
+    std::cout << "# ----- FLOP BREAKDOWN ---------------------"
+              << std::endl;
+    std::cout << "# compression           = "
+              << compression_flops << std::endl;
+    std::cout << "#    random             = "
+              << random_flops << std::endl;
+    std::cout << "#    ID                 = "
+              << ID_flops << std::endl;
+    std::cout << "#    QR                 = "
+              << QR_flops << std::endl;
+    std::cout << "#    ortho              = "
+              << ortho_flops << std::endl;
+    std::cout << "#    reduce_samples     = "
+              << reduce_sample_flops << std::endl;
+    std::cout << "#    update_samples     = "
+              << update_sample_flops << std::endl;
+    std::cout << "#    extraction         = "
+              << extraction_flops << "?" << std::endl;
+    std::cout << "#    sampling           = "
+              << sample_flops << std::endl;
+    std::cout << "#       CB_sample       = "
+              << CB_sample_flops << "?" << std::endl;
+    std::cout << "#       sparse_sampling = "
+              << sparse_sample_flops << std::endl;
+    std::cout << "# ULV_factor            = "
+              << ULV_factor_flops << "?" << std::endl;
+    std::cout << "# Schur                 = "
+              << schur_flops << "?" << std::endl;
+    std::cout << "# full_rank             = "
+              << full_rank_flops << std::endl;
+    std::cout << "# --------------------------------------------"
+              << std::endl;
+    std::cout << "# total                 = "
+              << (compression_flops + ULV_factor_flops +
+                  schur_flops + full_rank_flops) << std::endl;
+    std::cout << "# --------------------------------------------"
+              << std::endl;
+    std::cout << std::endl;
+  }
+
   template<typename scalar_t,typename integer_t> ReturnCode
   StrumpackSparseSolver<scalar_t,integer_t>::factor() {
     if (!matrix()) return ReturnCode::MATRIX_NOT_SET;
@@ -633,6 +713,7 @@ namespace strumpack {
       if (ierr != ReturnCode::SUCCESS) return ierr;
     }
     perf_counters_start();
+    flop_breakdown_reset();
     TaskTimer t1("factorization", [&]() {
         tree()->multifrontal_factorization(*matrix(), _opts);
       });
@@ -670,52 +751,8 @@ namespace strumpack {
                   << " distribution with "
                   << get_name(_opts.HSS_options().random_engine())
                   << " engine" << std::endl;
-#if defined(COUNT_FLOPS)
-        std::cout << std::endl;
-        std::cout << "# ----- FLOP BREAKDOWN ---------------------"
-                  << std::endl;
-        std::cout << "# compression           = "
-                  << float(params::compression_flops.load()) << std::endl;
-        std::cout << "#    random             = "
-                  << float(params::random_flops.load()) << std::endl;
-        std::cout << "#    ID                 = "
-                  << float(params::ID_flops.load()) << std::endl;
-        std::cout << "#    QR                 = "
-                  << float(params::QR_flops.load()) << std::endl;
-        std::cout << "#    ortho              = "
-                  << float(params::ortho_flops.load()) << std::endl;
-        std::cout << "#    reduce_samples     = "
-                  << float(params::reduce_sample_flops.load()) << std::endl;
-        std::cout << "#    update_samples     = "
-                  << float(params::update_sample_flops.load()) << std::endl;
-        std::cout << "#    extraction         = "
-                  << float(params::extraction_flops.load()) << std::endl;
-        std::cout << "#    sampling           = "
-                  << float(params::sample_flops.load()) << std::endl;
-        std::cout << "#       CB_sample       = "
-                  << float(params::CB_sample_flops.load()) << std::endl;
-        std::cout << "#       sparse_sampling = "
-                  << float(params::sparse_sample_flops.load()) << std::endl;
-        std::cout << "#       intial_sampling = "
-                  << float(params::initial_sample_flops.load()) << std::endl;
-        std::cout << "# ULV_factor            = "
-                  << float(params::ULV_factor_flops.load()) << std::endl;
-        std::cout << "# Schur                 = "
-                  << float(params::schur_flops.load()) << std::endl;
-        std::cout << "# full_rank             = "
-                  << float(params::full_rank_flops.load()) << std::endl;
-        std::cout << "# --------------------------------------------"
-                  << std::endl;
-        std::cout << "# total                 = "
-                  << float(params::compression_flops.load() +
-                           params::ULV_factor_flops.load() +
-                           params::schur_flops.load() +
-                           params::full_rank_flops.load()) << std::endl;
-        std::cout << "# --------------------------------------------"
-                  << std::endl;
-        std::cout << std::endl;
-#endif
       }
+      flop_breakdown();
     }
     if (_rank_out) tree()->print_rank_statistics(*_rank_out);
     _factored = true;

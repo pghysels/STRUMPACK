@@ -132,8 +132,8 @@ namespace strumpack {
           p->F22(I[r]-pdsep,pc-pdsep) += F22(r,c);
       }
     }
-    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*
-                    static_cast<long long int>(dupd*dupd));
+    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
+    STRUMPACK_FULL_RANK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
     release_work_memory();
   }
 
@@ -194,7 +194,6 @@ namespace strumpack {
         this->rchild->multifrontal_factorization
           (A, opts, etree_level+1, task_depth);
     }
-    auto f0 = params::flops;
     // TODO can we allocate the memory in one go??
     const auto dsep = this->dim_sep();
     const auto dupd = this->dim_upd();
@@ -209,14 +208,12 @@ namespace strumpack {
     }
     if (this->lchild) this->lchild->extend_add_to_dense(this, task_depth);
     if (this->rchild) this->rchild->extend_add_to_dense(this, task_depth);
-    params::full_rank_flops += params::flops - f0;
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::factor_phase2
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
-    auto f0 = params::flops;
     if (this->dim_sep()) {
       piv = F11.LU(task_depth);
       if (opts.replace_tiny_pivots()) {
@@ -240,7 +237,11 @@ namespace strumpack {
            scalar_t(1.), F22, task_depth);
       }
     }
-    params::full_rank_flops += params::flops - f0;
+    STRUMPACK_FULL_RANK_FLOPS
+      (LU_flops(F11) +
+       gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F21, F12, scalar_t(1.)) +
+       trsm_flops(Side::L, scalar_t(1.), F11, F12) +
+       trsm_flops(Side::R, scalar_t(1.), F11, F21));
   }
 
   template<typename scalar_t,typename integer_t> void

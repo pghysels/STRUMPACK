@@ -43,20 +43,15 @@ namespace strumpack {
     int task_recursion_cutoff_level = 0;
 #endif
 
-    long long int flops = 0;
-    long long int bytes = 0;
-    //#pragma omp threadprivate(flops, bytes)
+    std::atomic<long long int> flops(0);
+    std::atomic<long long int> bytes(0);
 
-    std::atomic<long long int> compression_flops(0);
-    std::atomic<long long int> sample_flops(0);
-    std::atomic<long long int> initial_sample_flops(0);
     std::atomic<long long int> CB_sample_flops(0);
     std::atomic<long long int> sparse_sample_flops(0);
     std::atomic<long long int> extraction_flops(0);
     std::atomic<long long int> ULV_factor_flops(0);
     std::atomic<long long int> schur_flops(0);
     std::atomic<long long int> full_rank_flops(0);
-
     std::atomic<long long int> random_flops(0);
     std::atomic<long long int> ID_flops(0);
     std::atomic<long long int> QR_flops(0);

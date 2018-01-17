@@ -307,6 +307,7 @@ namespace strumpack {
   ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::front_multiply
   (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
    const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc) const {
+    long long int local_flops = 0;
     integer_t dupd = upd.size();
     auto ds = shi - slo;
     auto nbvec = R.cols();
@@ -326,6 +327,7 @@ namespace strumpack {
               Sr(row-slo, k) += a * R(col-slo, k);
               Sc(col-slo, k) += a * R(row-slo, k);
             }
+            local_flops += 4 * nbvec;
           } else {
             while (row_upd < dupd && upd[row_upd] < row) row_upd++;
             if (row_upd == dupd) break;
@@ -335,6 +337,7 @@ namespace strumpack {
                 Sr(ds+row_upd, k) += a * R(col-slo, k);
                 Sc(col-slo, k) += a * R(ds+row_upd, k);
               }
+              local_flops += 4 * nbvec;
             }
           }
         }
@@ -354,10 +357,13 @@ namespace strumpack {
               Sr(row-slo, k) += a * R(ds+i, k);
               Sc(ds+i, k) += a * R(row-slo, k);
             }
+            local_flops += 4 * nbvec;
           } else break;
         }
       }
     }
+    STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+    STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -556,6 +562,7 @@ namespace strumpack {
     integer_t dim_upd = upd.size();
     long long int local_flops = 0;
     auto dim_sep = sep_end - sep_begin;
+    auto cols = R.cols();
     auto lcols = R.lcols();
     auto p_rows = R.prows();
     auto p_row  = R.prow();
@@ -585,7 +592,7 @@ namespace strumpack {
               rows_to[row_j_rank]++;
               rows_from[row_j_rank]++;
             }
-            local_flops += 4 * lcols;
+            local_flops += 4 * cols;
           } else {
             while (row_upd < dim_upd && upd[row_upd] < row) row_upd++;
             if (row_upd == dim_upd) break;
@@ -599,7 +606,7 @@ namespace strumpack {
                 rows_to[row_j_rank]++;
                 rows_from[row_j_rank]++;
               }
-              local_flops += 4 * lcols;
+              local_flops += 4 * cols;
             }
           }
         }
@@ -624,13 +631,14 @@ namespace strumpack {
               rows_to[row_j_rank]++;
               rows_from[row_j_rank]++;
             }
-            local_flops += 4 * lcols;
+            local_flops += 4 * cols;
           } else break;
         }
       }
     }
     if (R.is_master()) {
       STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+      STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
     }
 
     size_t ssize = std::accumulate(rows_to, rows_to+p_rows, 0);

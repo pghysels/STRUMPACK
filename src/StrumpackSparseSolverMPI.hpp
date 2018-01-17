@@ -108,6 +108,7 @@ namespace strumpack {
     virtual void compute_separator_reordering() override;
     void perf_counters_stop(const std::string& s) override;
     virtual void synchronize() override { MPI_Barrier(_comm); }
+    virtual void flop_breakdown() const override;
 
   private:
     std::unique_ptr<CSRMatrix<scalar_t,integer_t>> _mat;
@@ -233,6 +234,30 @@ namespace strumpack {
       this->_fmax = flopsbytes[0];
 #endif
     }
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolverMPI<scalar_t,integer_t>::flop_breakdown() const {
+#if defined(COUNT_FLOPS)
+    float flops[12] = {
+      float(params::random_flops.load()),
+      float(params::ID_flops.load()),
+      float(params::QR_flops.load()),
+      float(params::ortho_flops.load()),
+      float(params::reduce_sample_flops.load()),
+      float(params::update_sample_flops.load()),
+      float(params::extraction_flops.load()),
+      float(params::CB_sample_flops.load()),
+      float(params::sparse_sample_flops.load()),
+      float(params::ULV_factor_flops.load()),
+      float(params::schur_flops.load()),
+      float(params::full_rank_flops.load())};
+    float tflops[12];
+    MPI_Reduce(flops, tflops, 12, MPI_FLOAT, MPI_SUM, 0, _comm);
+    this->print_flop_breakdown
+      (tflops[0], tflops[1], tflops[2], tflops[3], tflops[4], tflops[5],
+       tflops[6], tflops[7], tflops[8], tflops[9], tflops[10], tflops[11]);
+#endif
   }
 
 } // end namespace strumpack
