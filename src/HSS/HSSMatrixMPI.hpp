@@ -1,3 +1,30 @@
+/*
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
+ *
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
+ *
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly.  Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government is granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
+ *
+ * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
+ *             (Lawrence Berkeley National Lab, Computational Research
+ *             Division).
+ */
 #ifndef HSS_MATRIX_MPI_HPP
 #define HSS_MATRIX_MPI_HPP
 
@@ -39,14 +66,16 @@ namespace strumpack {
       HSSMatrixMPI() : HSSMatrixBase<scalar_t>(0, 0, true) {}
       HSSMatrixMPI(const DistM_t& A, const opts_t& opts, MPI_Comm c);
       HSSMatrixMPI(const HSSPartitionTree& t, const opts_t& opts, MPI_Comm c);
-      HSSMatrixMPI(const HSSPartitionTree& t, const DistM_t& A,
-                   const opts_t& opts, MPI_Comm c);
-      HSSMatrixMPI(std::size_t m, std::size_t n, const dmult_t& Amult,
-                   int Actxt, const delem_t& Aelem,
-                   const opts_t& opts, MPI_Comm c);
-      HSSMatrixMPI(const HSSPartitionTree& t, const dmult_t& Amult, int Actxt,
-                   const delem_t& Aelem,
-                   const opts_t& opts, MPI_Comm c);
+      HSSMatrixMPI
+      (const HSSPartitionTree& t, const DistM_t& A,
+       const opts_t& opts, MPI_Comm c);
+      HSSMatrixMPI
+      (std::size_t m, std::size_t n, const dmult_t& Amult,
+       int Actxt, const delem_t& Aelem,
+       const opts_t& opts, MPI_Comm c);
+      HSSMatrixMPI
+      (const HSSPartitionTree& t, const dmult_t& Amult, int Actxt,
+       const delem_t& Aelem, const opts_t& opts, MPI_Comm c);
       ~HSSMatrixMPI();
 
       const HSSMatrixBase<scalar_t>* child(int c) const
@@ -60,36 +89,39 @@ namespace strumpack {
       MPI_Comm comm() const { return _comm; }
 
       void compress(const DistM_t& A, const opts_t& opts);
-      void compress(const dmult_t& Amult, const delem_t& Aelem,
-                    const opts_t& opts, int Actxt=-1);
+      void compress
+      (const dmult_t& Amult, const delem_t& Aelem,
+       const opts_t& opts, int Actxt=-1);
 
       HSSFactorsMPI<scalar_t> factor() const;
       HSSFactorsMPI<scalar_t> partial_factor() const;
       void solve(const HSSFactorsMPI<scalar_t>& ULV, DistM_t& b) const;
-      void forward_solve(const HSSFactorsMPI<scalar_t>& ULV,
-                         WorkSolveMPI<scalar_t>& w,
-                         const DistM_t& b, bool partial) const;
-      void backward_solve(const HSSFactorsMPI<scalar_t>& ULV,
-                          WorkSolveMPI<scalar_t>& w, DistM_t& x) const;
+      void forward_solve
+      (const HSSFactorsMPI<scalar_t>& ULV, WorkSolveMPI<scalar_t>& w,
+       const DistM_t& b, bool partial) const;
+      void backward_solve
+      (const HSSFactorsMPI<scalar_t>& ULV,
+       WorkSolveMPI<scalar_t>& w, DistM_t& x) const;
 
       DistM_t apply(const DistM_t& b) const;
       DistM_t applyC(const DistM_t& b) const;
 
       scalar_t get(std::size_t i, std::size_t j) const;
-      DistM_t extract(const std::vector<std::size_t>& I,
-                      const std::vector<std::size_t>& J,
-                      int Bctxt, int Bprows, int Bpcols) const;
-      void extract_add(const std::vector<std::size_t>& I,
-                       const std::vector<std::size_t>& J,
-                       DistM_t& B, int Bprows, int Bpcols) const;
+      DistM_t extract
+      (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+       int Bctxt, int Bprows, int Bpcols) const;
+      void extract_add
+      (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+       DistM_t& B, int Bprows, int Bpcols) const;
 
-      void Schur_update(const HSSFactorsMPI<scalar_t>& f, DistM_t& Theta,
-                        DistM_t& Vhat, DistM_t& DUB01, DistM_t& Phi) const;
-      void Schur_product_direct(const DistM_t& Theta, const DistM_t& Vhat,
-                                const DistM_t& DUB01, const DistM_t& Phi,
-                                const DistM_t&_ThetaVhatC,
-                                const DistM_t& VhatCPhiC, const DistM_t& R,
-                                DistM_t& Sr, DistM_t& Sc) const;
+      void Schur_update
+      (const HSSFactorsMPI<scalar_t>& f, DistM_t& Theta,
+       DistM_t& Vhat, DistM_t& DUB01, DistM_t& Phi) const;
+      void Schur_product_direct
+      (const DistM_t& Theta, const DistM_t& Vhat, const DistM_t& DUB01,
+       const DistM_t& Phi, const DistM_t&_ThetaVhatC,
+       const DistM_t& VhatCPhiC, const DistM_t& R,
+       DistM_t& Sr, DistM_t& Sc) const;
 
       std::size_t max_rank() const;        // collective on comm()
       std::size_t total_memory() const;    // collective on comm()
@@ -100,17 +132,19 @@ namespace strumpack {
       std::size_t nonzeros() const;
       std::size_t levels() const;
 
-      void print_info(std::ostream &out=std::cout,
-                      std::size_t roff=0, std::size_t coff=0) const;
+      void print_info
+      (std::ostream &out=std::cout,
+       std::size_t roff=0, std::size_t coff=0) const;
 
       DistM_t dense(int ctxt) const;
 
       const TreeLocalRanges& tree_ranges() const { return _ranges; }
-      void to_block_row(const DistM_t& A, DenseM_t& sub_A,
-                        DistM_t& leaf_A) const;
+      void to_block_row
+      (const DistM_t& A, DenseM_t& sub_A, DistM_t& leaf_A) const;
       void allocate_block_row(int d, DenseM_t& sub_A, DistM_t& leaf_A) const;
-      void from_block_row(DistM_t& A, const DenseM_t& sub_A,
-                          const DistM_t& leaf_A, int lctxt) const;
+      void from_block_row
+      (DistM_t& A, const DenseM_t& sub_A,
+       const DistM_t& leaf_A, int lctxt) const;
 
     private:
       MPI_Comm _comm;
@@ -210,16 +244,20 @@ namespace strumpack {
                      DistSubLeaf<scalar_t>& x, WorkSolveMPI<scalar_t>& w,
                      bool isroot) const;
 
-      void apply_fwd(const DistSubLeaf<scalar_t>& B,
-                     WorkApplyMPI<scalar_t>& w, bool isroot) const;
-      void apply_bwd(const DistSubLeaf<scalar_t>& B, scalar_t beta,
-                     DistSubLeaf<scalar_t>& C,
-                     WorkApplyMPI<scalar_t>& w, bool isroot) const;
-      void applyT_fwd(const DistSubLeaf<scalar_t>& B,
-                      WorkApplyMPI<scalar_t>& w, bool isroot) const;
-      void applyT_bwd(const DistSubLeaf<scalar_t>& B, scalar_t beta,
-                      DistSubLeaf<scalar_t>& C, WorkApplyMPI<scalar_t>& w,
-                      bool isroot) const;
+      void apply_fwd
+      (const DistSubLeaf<scalar_t>& B, WorkApplyMPI<scalar_t>& w,
+       bool isroot, long long int flops) const;
+      void apply_bwd
+      (const DistSubLeaf<scalar_t>& B, scalar_t beta,
+       DistSubLeaf<scalar_t>& C, WorkApplyMPI<scalar_t>& w,
+       bool isroot, long long int flops) const;
+      void applyT_fwd
+      (const DistSubLeaf<scalar_t>& B, WorkApplyMPI<scalar_t>& w,
+       bool isroot, long long int flops) const;
+      void applyT_bwd
+      (const DistSubLeaf<scalar_t>& B, scalar_t beta,
+       DistSubLeaf<scalar_t>& C, WorkApplyMPI<scalar_t>& w,
+       bool isroot, long long int flops) const;
 
       void extract_fwd(WorkExtractMPI<scalar_t>& w, int lctxt,
                        bool odiag) const;
@@ -228,8 +266,10 @@ namespace strumpack {
       void triplets_to_DistM(std::vector<Triplet<scalar_t>>& triplets,
                              DistM_t& B, int Bprows, int Bpcols) const;
 
-      void apply_UV_big(DistSubLeaf<scalar_t>& Theta, DistM_t& Uop,
-                        DistSubLeaf<scalar_t>& Phi, DistM_t& Vop) const;
+      void apply_UV_big
+      (DistSubLeaf<scalar_t>& Theta, DistM_t& Uop,
+       DistSubLeaf<scalar_t>& Phi, DistM_t& Vop,
+       long long int& flops) const override;
 
       static int Pl(std::size_t n, std::size_t nl, std::size_t nr, int P) {
         return std::max(1, std::min(int(std::round(float(P) * nl / n)), P-1));

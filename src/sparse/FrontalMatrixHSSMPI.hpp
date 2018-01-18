@@ -169,17 +169,13 @@ namespace strumpack {
    DistM_t& Sr, DistM_t& Sc, int etree_level) {
     Sr.zero();
     Sc.zero();
-    //auto f0 = params::flops;
     TIMER_TIME(TaskType::FRONT_MULTIPLY_2D, 1, t_fmult);
     A.front_multiply_2d
       (this->sep_begin, this->sep_end, this->upd, R, Sr, Sc,
        this->ctxt_all, this->front_comm, 0);
     TIMER_STOP(t_fmult);
     TIMER_TIME(TaskType::UUTXR, 1, t_UUtxR);
-    //params::sparse_sample_flops += params::flops - f0;
-    //auto f1 = params::flops;
     sample_children_CB(opts, R, Sr, Sc);
-    //params::CB_sample_flops += params::flops - f1;
     TIMER_STOP(t_UUtxR);
   }
 
@@ -429,31 +425,31 @@ namespace strumpack {
 
     if (this->dim_sep()) {
       if (etree_level > 0) {
-        //auto f0 = params::flops;
         TIMER_TIME(TaskType::HSS_PARTIALLY_FACTOR, 0, t_pfact);
         _ULV = _H->partial_factor();
         TIMER_STOP(t_pfact);
-        //params::ULV_factor_flops += params::flops - f0;
-        //auto f1 = params::flops;
         TIMER_TIME(TaskType::HSS_COMPUTE_SCHUR, 0, t_comp_schur);
         _H->Schur_update(_ULV, _Theta, _Vhat, _DUB01, _Phi);
         if (_Theta.cols() < _Phi.cols()) {
           _VhatCPhiC = DistM_t(_Phi.ctxt(), _Vhat.cols(), _Phi.rows());
           gemm(Trans::C, Trans::C, scalar_t(1.), _Vhat, _Phi,
                scalar_t(0.), _VhatCPhiC);
+          STRUMPACK_SCHUR_FLOPS
+            (gemm_flops(Trans::C, Trans::C, scalar_t(1.), _Vhat, _Phi,
+                        scalar_t(0.)));
         } else {
           _ThetaVhatC = DistM_t(_Theta.ctxt(), _Theta.rows(), _Vhat.rows());
           gemm(Trans::N, Trans::C, scalar_t(1.), _Theta, _Vhat,
                scalar_t(0.), _ThetaVhatC);
+          STRUMPACK_SCHUR_FLOPS
+            (gemm_flops(Trans::N, Trans::C, scalar_t(1.), _Theta, _Vhat,
+                        scalar_t(0.)));
         }
         TIMER_STOP(t_comp_schur);
-        //params::schur_flops += params::flops - f1;
       } else {
-        //auto f0 = params::flops;
         TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
         _ULV = _H->factor();
         TIMER_STOP(t_fact);
-        //params::ULV_factor_flops += params::flops - f0;
       }
     }
   }
@@ -596,12 +592,16 @@ namespace strumpack {
       DistM_t tc(this->ctxt, _VhatCPhiC.rows(), lJ.size(),
                  _VhatCPhiC.extract_cols(lJ, this->front_comm), this->ctxt_all);
       gemm(Trans::N, Trans::N, scalar_t(-1), tr, tc, scalar_t(1.), e);
+      STRUMPACK_EXTRACTION_FLOPS
+        (gemm_flops(Trans::N, Trans::N, scalar_t(-1), tr, tc, scalar_t(1.)));
     } else {
       DistM_t tr(this->ctxt, lI.size(), _ThetaVhatC.cols(),
                  _ThetaVhatC.extract_rows(lI, this->front_comm), this->ctxt_all);
       DistM_t tc(this->ctxt, lJ.size(), _Phi.cols(),
                  _Phi.extract_rows(lJ, this->front_comm), this->ctxt_all);
       gemm(Trans::N, Trans::C, scalar_t(-1), tr, tc, scalar_t(1.), e);
+      STRUMPACK_EXTRACTION_FLOPS
+        (gemm_flops(Trans::N, Trans::C, scalar_t(-1), tr, tc, scalar_t(1.)));
     }
 
     auto P = mpi_nprocs(this->front_comm);

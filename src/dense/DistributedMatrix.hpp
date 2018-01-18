@@ -1218,6 +1218,14 @@ namespace strumpack {
   }
 
   template<typename scalar_t> long long int
+  LQ_flops(const DistributedMatrix<scalar_t>& a) {
+    if (!a.is_master()) return 0;
+    auto minrc = std::min(a.rows(), a.cols());
+    return blas::gelqf_flops(a.rows(), a.cols()) +
+      blas::xxglq_flops(a.cols(), a.cols(), minrc);
+  }
+
+  template<typename scalar_t> long long int
   ID_row_flops(const DistributedMatrix<scalar_t>& a, int rank) {
     if (!a.is_master()) return 0;
     return blas::geqp3_flops(a.cols(), a.rows())

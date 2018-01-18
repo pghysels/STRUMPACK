@@ -93,8 +93,16 @@ namespace strumpack { // these are all global variables
   strumpack::params::random_flops += n;
 #define STRUMPACK_SPARSE_SAMPLE_FLOPS(n)        \
   strumpack::params::sparse_sample_flops += n;
-#define STRUMPACK_FULL_RANK_FLOPS(n)        \
+#define STRUMPACK_FULL_RANK_FLOPS(n)            \
   strumpack::params::full_rank_flops += n;
+#define STRUMPACK_EXTRACTION_FLOPS(n)           \
+  strumpack::params::extraction_flops += n;
+#define STRUMPACK_ULV_FACTOR_FLOPS(n)           \
+  strumpack::params::ULV_factor_flops += n;
+#define STRUMPACK_SCHUR_FLOPS(n)                \
+  strumpack::params::schur_flops += n;
+#define STRUMPACK_CB_SAMPLE_FLOPS(n)            \
+  strumpack::params::CB_sample_flops += n;
 #else
 #define STRUMPACK_FLOPS(n) void(0);
 #define STRUMPACK_BYTES(n) void(0);
@@ -106,6 +114,10 @@ namespace strumpack { // these are all global variables
 #define STRUMPACK_RANDOM_FLOPS(n) void(0);
 #define STRUMPACK_SPARSE_SAMPLE_FLOPS(n) void(0);
 #define STRUMPACK_FULL_RANK_FLOPS(n) void(0);
+#define STRUMPACK_EXTRACTION_FLOPS(n) void(0);
+#define STRUMPACK_ULV_FACTOR_FLOPS(n) void(0);
+#define STRUMPACK_SCHUR_FLOPS(n) void(0);
+#define STRUMPACK_CB_SAMPLE_FLOPS(n) void(0);
 #endif
 #endif /* DOXYGEN_SHOULD_SKIP_THIS */
 

@@ -77,6 +77,9 @@ namespace strumpack {
                scalar_t(0.), f._D.ptr(0, c0u), f._D.ld(), depth);
           gemm(Trans::N, Trans::C, scalar_t(1.), _B10, w.c[0].Vt1,
                scalar_t(0.), f._D.ptr(c0u, 0), f._D.ld(), depth);
+          STRUMPACK_ULV_FACTOR_FLOPS
+            (gemm_flops(Trans::N, Trans::C, scalar_t(1.), _B01, w.c[1].Vt1, scalar_t(0.)) +
+             gemm_flops(Trans::N, Trans::C, scalar_t(1.), _B10, w.c[0].Vt1, scalar_t(0.)));
         }
         if (!isroot || partial) {
           Vh = DenseM_t(_U.rows(), _V.cols());
@@ -90,6 +93,11 @@ namespace strumpack {
           gemm(Trans::N, Trans::N, scalar_t(1.),
                w.c[1].Vt1, V.ptr(this->_ch[0]->V_rank(), 0), V.ld(),
                scalar_t(0.), Vh1, depth);
+          STRUMPACK_ULV_FACTOR_FLOPS
+            (gemm_flops(Trans::N, Trans::N, scalar_t(1.),
+                        w.c[0].Vt1, scalar_t(0.), Vh0) +
+             gemm_flops(Trans::N, Trans::N, scalar_t(1.),
+                        w.c[1].Vt1, scalar_t(0.), Vh1));
         }
         w.c.clear();
       } else {
@@ -98,6 +106,7 @@ namespace strumpack {
       }
       if (isroot) {
         f._piv = f._D.LU(depth);
+        STRUMPACK_ULV_FACTOR_FLOPS(LU_flops(f._D));
         if (partial) f._Vt0 = std::move(Vh);
       } else {
         f._D.laswp(_U.P(), true); // compute P^t D
@@ -110,8 +119,11 @@ namespace strumpack {
           // set W0 <- -E * (P^t D)_0 + W0 = -E * W1 + W0
           gemm(Trans::N, Trans::N, scalar_t(-1.), _U.E(), f._W1,
                scalar_t(1.), W0, depth);
+          STRUMPACK_ULV_FACTOR_FLOPS
+            (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), _U.E(), f._W1, scalar_t(1.)));
 
           W0.LQ(f._L, f._Q, depth);
+          STRUMPACK_ULV_FACTOR_FLOPS(LQ_flops(W0));
           W0.clear();
 
           f._Vt0 = DenseM_t(_U.rows()-_U.cols(), _V.cols());
@@ -126,6 +138,10 @@ namespace strumpack {
           w.Dt = DenseM_t(_U.cols(), _U.cols());
           gemm(Trans::N, Trans::C, scalar_t(1.), f._W1, Q1,
                scalar_t(0.), w.Dt, depth); // W1 * Q1^c
+          STRUMPACK_ULV_FACTOR_FLOPS
+            (gemm_flops(Trans::N, Trans::N, scalar_t(1.), Q0, Vh, scalar_t(0.)) +
+             gemm_flops(Trans::N, Trans::N, scalar_t(1.), Q0, Vh, scalar_t(0.)) +
+             gemm_flops(Trans::N, Trans::C, scalar_t(1.), f._W1, Q1, scalar_t(0.)));
         } else {
           w.Vt1 = std::move(Vh);
           w.Dt = std::move(f._D);

@@ -317,6 +317,9 @@ namespace strumpack {
       Sc = DistM_t(this->ctxt, this->dim_upd(), b);
       gemm(Trans::N, Trans::N, scalar_t(1.), F22, R, scalar_t(0.), Sr);
       gemm(Trans::C, Trans::N, scalar_t(1.), F22, R, scalar_t(0.), Sc);
+      STRUMPACK_CB_SAMPLE_FLOPS
+        (gemm_flops(Trans::N, Trans::N, scalar_t(1.), F22, R, scalar_t(0.)) +
+         gemm_flops(Trans::C, Trans::N, scalar_t(1.), F22, R, scalar_t(0.)));
     }
   }
 

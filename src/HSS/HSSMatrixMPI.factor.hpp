@@ -78,6 +78,9 @@ namespace strumpack {
                _B01, c1Vt1, scalar_t(0.), D01);
           gemm(Trans::N, Trans::C, scalar_t(1.),
                _B10, c0Vt1, scalar_t(0.), D10);
+          STRUMPACK_ULV_FACTOR_FLOPS
+            (gemm_flops(Trans::N, Trans::C, scalar_t(1.), _B01, c1Vt1, scalar_t(0.)) +
+             gemm_flops(Trans::N, Trans::C, scalar_t(1.), _B10, c0Vt1, scalar_t(0.)));
         }
         if (!isroot || partial) {
           Vh = DistM_t(_ctxt, this->U_rows(), this->V_rank());
@@ -90,6 +93,9 @@ namespace strumpack {
                c0Vt1, V0, scalar_t(0.), Vh0);
           gemm(Trans::N, Trans::N, scalar_t(1.),
                c1Vt1, V1, scalar_t(0.), Vh1);
+          STRUMPACK_ULV_FACTOR_FLOPS
+            (gemm_flops(Trans::N, Trans::N, scalar_t(1.), c0Vt1, V0, scalar_t(0.)) +
+             gemm_flops(Trans::N, Trans::N, scalar_t(1.), c1Vt1, V1, scalar_t(0.)));
         }
         w.c.clear();
       } else {
@@ -98,6 +104,7 @@ namespace strumpack {
       }
       if (isroot) {
         f._piv = f._D.LU();
+        STRUMPACK_ULV_FACTOR_FLOPS(LU_flops(f._D));
         if (partial) f._Vt0 = std::move(Vh);
       } else {
         f._D.laswp(_U.P(), true); // compute P^t D
@@ -114,8 +121,11 @@ namespace strumpack {
           // set W0 <- -E * (P^t D)_0 + W0 = -E * W1 + W0
           gemm(Trans::N, Trans::N, scalar_t(-1.),
                _U.E(), f._W1, scalar_t(1.), W0);
+          STRUMPACK_ULV_FACTOR_FLOPS
+            (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), _U.E(), f._W1, scalar_t(1.)));
 
           W0.LQ(f._L, f._Q);
+          STRUMPACK_ULV_FACTOR_FLOPS(LQ_flops(W0));
           W0.clear();
 
           f._Vt0 = DistM_t
@@ -132,6 +142,10 @@ namespace strumpack {
           w.Dt = DistM_t(_ctxt, this->U_rank(), this->U_rank());
           gemm(Trans::N, Trans::C, scalar_t(1.),
                f._W1, Q1, scalar_t(0.), w.Dt); // W1 * Q1^c
+          STRUMPACK_ULV_FACTOR_FLOPS
+            (gemm_flops(Trans::N, Trans::N, scalar_t(1.), Q0, Vh, scalar_t(0.)) +
+             gemm_flops(Trans::N, Trans::N, scalar_t(1.), Q1, Vh, scalar_t(0.)) +
+             gemm_flops(Trans::N, Trans::C, scalar_t(1.), f._W1, Q1, scalar_t(0.)));
         } else {
           w.Vt1 = std::move(Vh);
           w.Dt = std::move(f._D);

@@ -87,6 +87,7 @@ namespace strumpack {
           copy(w.c[1].y, y01, this->_ch[0]->V_rank(), w.c[0].y.cols());
           // TODO get Vdense, then do two separate gemms to reduce flops!!!
           w.y = _V.applyC(y01, depth);
+          STRUMPACK_EXTRACTION_FLOPS(_V.applyC_flops(y01.cols()));
         } else w.y = DenseM_t(0, w.J.size());
       }
     }
@@ -111,6 +112,9 @@ namespace strumpack {
             DenseM_t tmp(w.I.size(), w.z.cols());
             gemm(Trans::N, Trans::N, scalar_t(1), _U.extract_rows(w.I),
                  w.z, scalar_t(0.), tmp, depth);
+            STRUMPACK_EXTRACTION_FLOPS
+              (gemm_flops(Trans::N, Trans::N, scalar_t(1), _U.extract_rows(w.I),
+                          w.z, scalar_t(0.)));
             assert(w.rl2g.size() >= w.I.size());
             for (std::size_t c=0; c<w.z.cols(); c++)
               for (std::size_t r=0; r<w.I.size(); r++)
@@ -142,6 +146,7 @@ namespace strumpack {
         for (std::size_t c=0; c<w.J.size(); c++)
           for (std::size_t r=0; r<w.I.size(); r++)
             B(w.rl2g[r],w.cl2g[c]) += _D(w.I[r],w.J[c]);
+        STRUMPACK_EXTRACTION_FLOPS(w.J.size()*w.I.size());
         if (w.z.cols() && _U.cols()) {
           DenseM_t tmp(w.I.size(), w.z.cols());
           gemm(Trans::N, Trans::N, scalar_t(1), _U.extract_rows(w.I),
@@ -149,6 +154,9 @@ namespace strumpack {
           for (std::size_t c=0; c<w.z.cols(); c++)
             for (std::size_t r=0; r<w.I.size(); r++)
               B(w.rl2g[r],w.zcols[c]) += tmp(r,c);
+          STRUMPACK_EXTRACTION_FLOPS
+            (gemm_flops(Trans::N, Trans::N, scalar_t(1), _U.extract_rows(w.I),
+                        w.z, scalar_t(0.)) + w.z.cols()*w.I.size());
         }
       } else {
         extract_bwd_internal(w, depth);
@@ -192,12 +200,18 @@ namespace strumpack {
           DenseMW_t z00(z0rows, w.c[1].y.cols(), w.c[0].z, 0, 0);
           gemm(Trans::N, Trans::N, scalar_t(1.), _B01,
                w.c[1].y, scalar_t(0.), z00, depth);
+          STRUMPACK_EXTRACTION_FLOPS
+            (gemm_flops(Trans::N, Trans::N, scalar_t(1.), _B01,
+                        w.c[1].y, scalar_t(0.)));
         }
         DenseMW_t z01(z0rows, w.z.cols(), w.c[0].z, 0, w.c[1].y.cols());
         if (U.cols()) {
           DenseMW_t U0(z0rows, U.cols(), U, 0, 0);
           gemm(Trans::N, Trans::N, scalar_t(1.), U0, w.z,
                scalar_t(0.), z01, depth);
+          STRUMPACK_EXTRACTION_FLOPS
+            (gemm_flops(Trans::N, Trans::N, scalar_t(1.), U0, w.z,
+                        scalar_t(0.)));
         } else z01.zero();
         w.c[0].zcols.reserve(z0cols);
         for (auto c : w.c[1].ycols) w.c[0].zcols.push_back(c);
@@ -211,12 +225,18 @@ namespace strumpack {
           DenseMW_t z10(z1rows, w.c[0].y.cols(), w.c[1].z, 0, 0);
           gemm(Trans::N, Trans::N, scalar_t(1.), _B10,
                w.c[0].y, scalar_t(0.), z10, depth);
+          STRUMPACK_EXTRACTION_FLOPS
+            (gemm_flops(Trans::N, Trans::N, scalar_t(1.), _B10,
+                        w.c[0].y, scalar_t(0.)));
         }
         DenseMW_t z11(z1rows, w.z.cols(), w.c[1].z, 0, w.c[0].y.cols());
         if (U.cols()) {
           DenseMW_t U1(z1rows, U.cols(), U, this->_ch[0]->U_rank(), 0);
           gemm(Trans::N, Trans::N, scalar_t(1.), U1, w.z,
                scalar_t(0.), z11, depth);
+          STRUMPACK_EXTRACTION_FLOPS
+            (gemm_flops(Trans::N, Trans::N, scalar_t(1.), U1, w.z,
+                        scalar_t(0.)));
         } else z11.zero();
         w.c[1].zcols.reserve(z1cols);
         for (auto c : w.c[0].ycols) w.c[1].zcols.push_back(c);

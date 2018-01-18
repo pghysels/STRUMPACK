@@ -243,6 +243,9 @@ namespace strumpack {
       for (std::size_t j=0; j<lJ.size(); j++)
         for (std::size_t i=0; i<lI.size(); i++)
           B(oI[i], oJ[j]) += M(i, j);
+      STRUMPACK_EXTRACTION_FLOPS
+        (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), r_theta, c_vhatphiC,
+                    scalar_t(0.)) + lJ.size()*lI.size());
     } else {
       // S = F22 - _ThetaVhatC_or_VhatCPhiC * _Phi'
       auto r = _Phi.cols();
@@ -257,6 +260,9 @@ namespace strumpack {
       for (std::size_t j=0; j<lJ.size(); j++)
         for (std::size_t i=0; i<lI.size(); i++)
           B(oI[i], oJ[j]) += M(i, j);
+      STRUMPACK_EXTRACTION_FLOPS
+        (gemm_flops(Trans::N, Trans::C, scalar_t(-1.), r_thetavhat, r_phi,
+                    scalar_t(0.)) + lJ.size()*lI.size());
     }
   }
 
@@ -292,6 +298,7 @@ namespace strumpack {
   (const DenseM_t& cR, DenseM_t& Sr, DenseM_t& Sc,
    const std::vector<std::size_t>& I, int task_depth) {
 #if 0
+    // TODO count flops here
     auto cSr = _H.child(1)->apply(cR);
     auto cSc = _H.child(1)->applyC(cR);
     if (_Theta.cols() < _Phi.cols()) {
@@ -327,6 +334,7 @@ namespace strumpack {
 #endif
     Sr.scatter_rows_add(I, cSr);
     Sc.scatter_rows_add(I, cSc);
+    STRUMPACK_CB_SAMPLE_FLOPS(cSr.rows()*cSr.cols()*2);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -387,12 +395,10 @@ namespace strumpack {
 
     A.front_multiply
       (this->sep_begin, this->sep_end, this->upd, Rr, Sr, Sc);
-    //auto f1 = params::flops;
     if (this->lchild)
       this->lchild->sample_CB(opts, Rr, Sr, Sc, this, task_depth);
     if (this->rchild)
       this->rchild->sample_CB(opts, Rr, Sr, Sc, this, task_depth);
-    //params::CB_sample_flops += params::flops - f1;
 
     if (opts.indirect_sampling() && etree_level != 0) {
       auto dold = R1.cols();
@@ -456,17 +462,12 @@ namespace strumpack {
     _H.set_openmp_task_depth(task_depth);
     auto mult = [&](DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
       random_sampling(A, opts, Rr, Rc, Sr, Sc, etree_level, task_depth);
-      //if (_sampled_columns == 0)
-      //params::initial_sample_flops += params::flops - f0;
       _sampled_columns += Rr.cols();
     };
     auto elem = [&](const std::vector<std::size_t>& I,
                     const std::vector<std::size_t>& J, DenseM_t& B) {
-      //auto f0 = params::flops;
       element_extraction(A, I, J, B, task_depth);
-      //params::extraction_flops += params::flops - f0;
     };
-    //auto f0 = params::flops;
     auto HSSopts = opts.HSS_options();
     int child_samples = 0;
     if (this->lchild)
@@ -477,32 +478,28 @@ namespace strumpack {
     if (opts.indirect_sampling())
       HSSopts.set_user_defined_random(true);
     _H.compress(mult, elem, HSSopts);
-    //params::compression_flops += params::flops - f0;
     if (this->lchild) this->lchild->release_work_memory();
     if (this->rchild) this->rchild->release_work_memory();
     if (this->dim_sep()) {
       if (etree_level > 0) {
-        //auto f0 = params::flops;
         _ULV = _H.partial_factor();
-        //params::ULV_factor_flops += params::flops - f0;
-        //auto f1 = params::flops;
         _H.Schur_update(_ULV, _Theta, _DUB01, _Phi);
         DenseM_t& Vhat = _ULV.Vhat();
         if (_Theta.cols() < _Phi.cols()) {
           _ThetaVhatC_or_VhatCPhiC = DenseM_t(Vhat.cols(), _Phi.rows());
           gemm(Trans::C, Trans::C, scalar_t(1.), Vhat, _Phi,
                scalar_t(0.), _ThetaVhatC_or_VhatCPhiC, task_depth);
+          STRUMPACK_SCHUR_FLOPS
+            (gemm_flops(Trans::C, Trans::C, scalar_t(1.), Vhat, _Phi, scalar_t(0.)));
         } else {
           _ThetaVhatC_or_VhatCPhiC = DenseM_t(_Theta.rows(), Vhat.rows());
           gemm(Trans::N, Trans::C, scalar_t(1.), _Theta, Vhat,
                scalar_t(0.), _ThetaVhatC_or_VhatCPhiC, task_depth);
+          STRUMPACK_SCHUR_FLOPS
+            (gemm_flops(Trans::N, Trans::C, scalar_t(1.), _Theta, Vhat, scalar_t(0.)));
         }
-        //params::schur_flops += params::flops - f1;
-      } else {
-        //auto f0 = params::flops;
+      } else
         _ULV = _H.factor();
-        //params::ULV_factor_flops += params::flops - f0;
-      }
     }
   }
 

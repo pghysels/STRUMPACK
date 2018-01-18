@@ -194,31 +194,31 @@ namespace strumpack {
 
       virtual void apply_fwd
       (const DenseM_t& b, WorkApply<scalar_t>& w,
-       bool isroot, int depth) const {};
+       bool isroot, int depth, std::atomic<long long int>& flops) const {};
       virtual void apply_bwd
-      (const DenseM_t& b, scalar_t beta, DenseM_t& c,
-       WorkApply<scalar_t>& w, bool isroot, int depth) const {};
+      (const DenseM_t& b, scalar_t beta, DenseM_t& c, WorkApply<scalar_t>& w,
+       bool isroot, int depth, std::atomic<long long int>& flops) const {};
       virtual void applyT_fwd
-      (const DenseM_t& b, WorkApply<scalar_t>& w,
-       bool isroot, int depth) const {};
+      (const DenseM_t& b, WorkApply<scalar_t>& w, bool isroot,
+       int depth, std::atomic<long long int>& flops) const {};
       virtual void applyT_bwd
-      (const DenseM_t& b, scalar_t beta, DenseM_t& c,
-       WorkApply<scalar_t>& w, bool isroot, int depth) const {};
+      (const DenseM_t& b, scalar_t beta, DenseM_t& c, WorkApply<scalar_t>& w,
+       bool isroot, int depth, std::atomic<long long int>& flops) const {};
 
       virtual void apply_fwd
       (const DistSubLeaf<scalar_t>& B, WorkApplyMPI<scalar_t>& w,
-       bool isroot) const;
+       bool isroot, long long int flops) const;
       virtual void apply_bwd
       (const DistSubLeaf<scalar_t>& B, scalar_t beta,
-       DistSubLeaf<scalar_t>& C,
-       WorkApplyMPI<scalar_t>& w, bool isroot) const;
+       DistSubLeaf<scalar_t>& C, WorkApplyMPI<scalar_t>& w,
+       bool isroot, long long int flops) const;
       virtual void applyT_fwd
       (const DistSubLeaf<scalar_t>& B, WorkApplyMPI<scalar_t>& w,
-       bool isroot) const;
+       bool isroot, long long int flops) const;
       virtual void applyT_bwd
       (const DistSubLeaf<scalar_t>& B, scalar_t beta,
-       DistSubLeaf<scalar_t>& C,
-       WorkApplyMPI<scalar_t>& w, bool isroot) const;
+       DistSubLeaf<scalar_t>& C, WorkApplyMPI<scalar_t>& w,
+       bool isroot, long long int flops) const;
 
       virtual void forward_solve
       (const HSSFactors<scalar_t>& ULV, WorkSolve<scalar_t>& w,
@@ -255,13 +255,17 @@ namespace strumpack {
 
       virtual void apply_UV_big
       (DenseM_t& Theta, DenseM_t& Uop, DenseM_t& Phi, DenseM_t& Vop,
-       const std::pair<std::size_t, std::size_t>& offset, int depth) const {};
+       const std::pair<std::size_t, std::size_t>& offset, int depth,
+       std::atomic<long long int>& flops) const {};
       virtual void apply_UtVt_big
       (const DenseM_t& A, DenseM_t& UtA, DenseM_t& VtA,
-       const std::pair<std::size_t, std::size_t>& offset, int depth) const {};
+       const std::pair<std::size_t, std::size_t>& offset,
+       int depth, std::atomic<long long int>& flops) const {};
+
       virtual void apply_UV_big
       (DistSubLeaf<scalar_t>& Theta, DistM_t& Uop,
-       DistSubLeaf<scalar_t>& Phi, DistM_t& Vop) const;
+       DistSubLeaf<scalar_t>& Phi, DistM_t& Vop,
+       long long int& flops) const;
 
       virtual void dense_recursive
       (DenseM_t& A, WorkDense<scalar_t>& w, bool isroot, int depth) const {};
@@ -588,52 +592,64 @@ namespace strumpack {
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::apply_fwd
     (const DistSubLeaf<scalar_t>& B, WorkApplyMPI<scalar_t>& w,
-     bool isroot) const {
+     bool isroot, long long int flops) const {
       if (!active()) return;
       if (!w.w_seq)
         w.w_seq = std::unique_ptr<WorkApply<scalar_t>>
           (new WorkApply<scalar_t>());
       // TODO start OpenMP parallel region!
       if (isroot) w.w_seq->offset = w.offset;
-      apply_fwd(B.sub, *(w.w_seq), isroot, _openmp_task_depth);
+      std::atomic<long long int> lflops(0);
+      apply_fwd(B.sub, *(w.w_seq), isroot, _openmp_task_depth, lflops);
       // TODO avoid copy here, use a move constructor from the DenseM_t
+      flops += lflops.load();
       w.tmp1 = DistM_t(B.ctxt_loc(), w.w_seq->tmp1);
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::apply_bwd
     (const DistSubLeaf<scalar_t>& B, scalar_t beta, DistSubLeaf<scalar_t>& C,
-     WorkApplyMPI<scalar_t>& w, bool isroot) const {
+     WorkApplyMPI<scalar_t>& w, bool isroot, long long int flops) const {
       if (!active()) return;
       // TODO avoid copy here, use a move constructor from the local
       // part of the DistM_t
       w.w_seq->tmp2 = w.tmp2.gather();
       // TODO start OpenMP parallel region!
-      apply_bwd(B.sub, beta, C.sub, *(w.w_seq), isroot, _openmp_task_depth);
+      std::atomic<long long int> lflops(0);
+      apply_bwd
+        (B.sub, beta, C.sub, *(w.w_seq), isroot,
+         _openmp_task_depth, lflops);
+      flops += lflops.load();
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::applyT_fwd
     (const DistSubLeaf<scalar_t>& B, WorkApplyMPI<scalar_t>& w,
-     bool isroot) const {
+     bool isroot, long long int flops) const {
       if (!active()) return;
       if (!w.w_seq)
         w.w_seq = std::unique_ptr<WorkApply<scalar_t>>
           (new WorkApply<scalar_t>());
       // TODO start OpenMP parallel region!
       if (isroot) w.w_seq->offset = w.offset;
-      applyT_fwd(B.sub, *(w.w_seq), isroot, _openmp_task_depth);
+      std::atomic<long long int> lflops(0);
+      applyT_fwd(B.sub, *(w.w_seq), isroot, _openmp_task_depth, lflops);
+      flops += lflops.load();
       // TODO avoid copy here, use a move constructor from the DenseM_t
       w.tmp1 = DistM_t(B.ctxt_loc(), w.w_seq->tmp1);
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::applyT_bwd
     (const DistSubLeaf<scalar_t>& B, scalar_t beta, DistSubLeaf<scalar_t>& C,
-     WorkApplyMPI<scalar_t>& w, bool isroot) const {
+     WorkApplyMPI<scalar_t>& w, bool isroot, long long int flops) const {
       if (!active()) return;
       // TODO avoid copy here, use a move constructor from the local
       // part of the DistM_t
       w.w_seq->tmp2 = w.tmp2.gather();
       // TODO start OpenMP parallel region!
-      applyT_bwd(B.sub, beta, C.sub, *(w.w_seq), isroot, _openmp_task_depth);
+      std::atomic<long long int> lflops(0);
+      applyT_bwd
+        (B.sub, beta, C.sub, *(w.w_seq), isroot,
+         _openmp_task_depth, lflops);
+      flops += lflops.load();
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::factor_recursive
@@ -729,15 +745,17 @@ namespace strumpack {
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::apply_UV_big
     (DistSubLeaf<scalar_t>& Theta, DistM_t& Uop, DistSubLeaf<scalar_t>& Phi,
-     DistM_t& Vop) const {
+     DistM_t& Vop, long long int& flops) const {
       if (!active()) return;
       auto sUop = Uop.gather(); // dense_and_clear
       auto sVop = Vop.gather(); // dense_and_clear();
       const std::pair<std::size_t, std::size_t> offset;
       Uop.clear();
       Vop.clear();
+      std::atomic<long long int> UVflops(0);
       apply_UV_big
-        (Theta.sub, sUop, Phi.sub, sVop, offset, _openmp_task_depth);
+        (Theta.sub, sUop, Phi.sub, sVop, offset, _openmp_task_depth, UVflops);
+      flops += UVflops.load();
     }
 
   } // end namespace HSS

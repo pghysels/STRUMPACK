@@ -88,7 +88,7 @@ namespace strumpack {
           if (locr == -1) locr = lr[t->_r] = B.rowg2l_fixed(t->_r);
           int locc = lc[t->_c];
           if (locc == -1) locc = lc[t->_c] = B.colg2l_fixed(t->_c);
-          B(locr, locc) = t->_v;
+          B(locr, locc) += t->_v;
         }
       }
       delete[] rbuf;
@@ -123,6 +123,8 @@ namespace strumpack {
           copy(this->_ch[1]->V_rank(), w.c[1].ycols.size(), w.c[1].y, 0, 0,
                y01, this->_ch[0]->V_rank(), w.c[0].ycols.size(), _ctxt_all);
           w.y = _V.applyC(y01);
+          STRUMPACK_EXTRACTION_FLOPS
+            (_V.applyC_flops(y01.cols()));
         } else w.y = DistM_t(_ctxt, 0, w.J.size());
       }
     }
@@ -140,8 +142,14 @@ namespace strumpack {
                   (w.rl2g[r], w.cl2g[c], _D.global(w.I[r],w.J[c]));
         if (w.z.cols() && _U.cols()) {
           DistM_t tmp(_ctxt, w.I.size(), w.z.cols());
-          gemm(Trans::N, Trans::N, scalar_t(1),
-               _U.extract_rows(w.I, _comm), w.z, scalar_t(0.), tmp);
+          {
+            auto Uex = _U.extract_rows(w.I, _comm);
+            gemm(Trans::N, Trans::N, scalar_t(1),
+                 Uex, w.z, scalar_t(0.), tmp);
+            STRUMPACK_EXTRACTION_FLOPS
+              (gemm_flops(Trans::N, Trans::N, scalar_t(1),
+                          Uex, w.z, scalar_t(0.)));
+          }
           if (tmp.active())
             for (int c=0; c<w.z.cols(); c++)
               for (std::size_t r=0; r<w.I.size(); r++)
@@ -177,6 +185,9 @@ namespace strumpack {
                  wc1y, 0, 0, _ctxt_all);
             gemm(Trans::N, Trans::N, scalar_t(1.), _B01, wc1y,
                  scalar_t(0.), z00);
+            STRUMPACK_EXTRACTION_FLOPS
+              (gemm_flops(Trans::N, Trans::N, scalar_t(1.), _B01, wc1y,
+                          scalar_t(0.)));
             copy(z0rows, w.c[1].ycols.size(), z00, 0, 0,
                  w.c[0].z, 0, 0, _ctxt_all);
           }
@@ -185,6 +196,9 @@ namespace strumpack {
             DistMW_t U0(z0rows, this->U_rank(), U, 0, 0);
             gemm(Trans::N, Trans::N, scalar_t(1.), U0, w.z,
                  scalar_t(0.), z01);
+            STRUMPACK_EXTRACTION_FLOPS
+              (gemm_flops(Trans::N, Trans::N, scalar_t(1.), U0, w.z,
+                          scalar_t(0.)));
             copy(z0rows, w.z.cols(), z01, 0, 0,
                  w.c[0].z, 0, w.c[1].ycols.size(), _ctxt_all);
           } else {
@@ -207,6 +221,9 @@ namespace strumpack {
                  wc0y, 0, 0, _ctxt_all);
             gemm(Trans::N, Trans::N, scalar_t(1.), _B10, wc0y,
                  scalar_t(0.), z10);
+            STRUMPACK_EXTRACTION_FLOPS
+              (gemm_flops(Trans::N, Trans::N, scalar_t(1.), _B10, wc0y,
+                          scalar_t(0.)));
             copy(z1rows, w.c[0].ycols.size(), z10, 0, 0,
                  w.c[1].z, 0, 0, _ctxt_all);
           }
@@ -215,6 +232,9 @@ namespace strumpack {
             DistMW_t U1(z1rows, this->U_rank(), U, this->_ch[0]->U_rank(), 0);
             gemm(Trans::N, Trans::N, scalar_t(1.),
                  U1, w.z, scalar_t(0.), z11);
+            STRUMPACK_EXTRACTION_FLOPS
+              (gemm_flops(Trans::N, Trans::N, scalar_t(1.),
+                          U1, w.z, scalar_t(0.)));
             copy(z1rows, w.z.cols(), z11, 0, 0,
                  w.c[1].z, 0, w.c[0].ycols.size(), _ctxt_all);
           } else {

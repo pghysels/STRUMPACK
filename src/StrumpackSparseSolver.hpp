@@ -681,17 +681,17 @@ namespace strumpack {
     std::cout << "#    update_samples     = "
               << update_sample_flops << std::endl;
     std::cout << "#    extraction         = "
-              << extraction_flops << "?" << std::endl;
+              << extraction_flops << std::endl;
     std::cout << "#    sampling           = "
               << sample_flops << std::endl;
     std::cout << "#       CB_sample       = "
-              << CB_sample_flops << "?" << std::endl;
+              << CB_sample_flops << std::endl;
     std::cout << "#       sparse_sampling = "
               << sparse_sample_flops << std::endl;
     std::cout << "# ULV_factor            = "
-              << ULV_factor_flops << "?" << std::endl;
+              << ULV_factor_flops << std::endl;
     std::cout << "# Schur                 = "
-              << schur_flops << "?" << std::endl;
+              << schur_flops << std::endl;
     std::cout << "# full_rank             = "
               << full_rank_flops << std::endl;
     std::cout << "# --------------------------------------------"

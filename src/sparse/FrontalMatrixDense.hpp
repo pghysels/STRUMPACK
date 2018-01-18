@@ -150,6 +150,10 @@ namespace strumpack {
     gemm(Trans::C, Trans::N, scalar_t(1.), F22, cR,
          scalar_t(0.), cS, task_depth);
     Sc.scatter_rows_add(I, cS);
+    STRUMPACK_CB_SAMPLE_FLOPS
+      (gemm_flops(Trans::N, Trans::N, scalar_t(1.), F22, cR, scalar_t(0.)) +
+       gemm_flops(Trans::C, Trans::N, scalar_t(1.), F22, cR, scalar_t(0.)) +
+       cS.rows()*cS.cols()*2); // for the skinny-extend add
   }
 
   template<typename scalar_t,typename integer_t> void

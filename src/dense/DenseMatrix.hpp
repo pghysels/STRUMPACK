@@ -949,6 +949,18 @@ namespace strumpack {
   }
 
   template<typename scalar_t> long long int
+  solve_flops(const DenseMatrix<scalar_t>& b) {
+    return blas::getrs_flops(b.rows(), b.cols());
+  }
+
+  template<typename scalar_t> long long int
+  LQ_flops(const DenseMatrix<scalar_t>& a) {
+    auto minrc = std::min(a.rows(), a.cols());
+    return blas::gelqf_flops(a.rows(), a.cols()) +
+      blas::xxglq_flops(a.cols(), a.cols(), minrc);
+  }
+
+  template<typename scalar_t> long long int
   ID_row_flops(const DenseMatrix<scalar_t>& a, int rank) {
     return blas::geqp3_flops(a.cols(), a.rows())
       + blas::trsm_flops(rank, a.cols() - rank, scalar_t(1.), 'L');
@@ -968,6 +980,14 @@ namespace strumpack {
       ((ta==Trans::N) ? a.rows() : a.cols(),
        (tb==Trans::N) ? b.cols() : b.rows(),
        (ta==Trans::N) ? a.cols() : a.rows(), alpha, beta);
+  }
+
+  template<typename scalar_t> long long int
+  gemm_flops(Trans ta, Trans tb, scalar_t alpha,
+             const DenseMatrix<scalar_t>& a, scalar_t beta,
+             const DenseMatrix<scalar_t>& c) {
+    return blas::gemm_flops
+      (c.rows(), c.cols(), (ta==Trans::N) ? a.cols() : a.rows(), alpha, beta);
   }
 
   template<typename scalar_t> long long int
