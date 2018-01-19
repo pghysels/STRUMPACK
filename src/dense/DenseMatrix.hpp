@@ -153,6 +153,8 @@ namespace strumpack {
      int max_rank, int depth) const;
     std::vector<scalar_t> singular_values() const;
 
+    void shift(scalar_t sigma);
+
   private:
     void ID_column_MGS
     (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
@@ -534,7 +536,7 @@ namespace strumpack {
         assert(I[i] < rows());
         operator()(I[i], j) += B(i, j);
       }
-    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*cols()*rows());
+    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*cols()*I.size());
     return *this;
   }
 
@@ -814,6 +816,13 @@ namespace strumpack {
     X = DenseMatrix<scalar_t>(i, n-i, R.ptr(0, i), R.ld());
     std::cout << "TODO count flops for ID_column_MGS,"
               << " note that this routine is not stable!" << std::endl;
+  }
+
+  template<typename scalar_t> void
+  DenseMatrix<scalar_t>::shift(scalar_t sigma) {
+    for (std::size_t i=0; i<std::min(cols(),rows()); i++)
+      operator()(i, i) += sigma;
+    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*std::min(rows(),cols()));
   }
 
   template<typename scalar_t> std::vector<scalar_t>

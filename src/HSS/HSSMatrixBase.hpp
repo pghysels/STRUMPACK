@@ -65,10 +65,11 @@ namespace strumpack {
     public:
       HSSMatrixBase(std::size_t m, std::size_t n, bool active);
       virtual ~HSSMatrixBase() = default;
-      HSSMatrixBase(const HSSMatrixBase&) = delete;
-      HSSMatrixBase& operator=(HSSMatrixBase const&) = delete;
+      HSSMatrixBase(const HSSMatrixBase<scalar_t>& other);
+      HSSMatrixBase<scalar_t>& operator=(const HSSMatrixBase<scalar_t>& other);
       HSSMatrixBase(HSSMatrixBase&& h) = default;
       HSSMatrixBase& operator=(HSSMatrixBase&& h) = default;
+      virtual HSSMatrixBase<scalar_t>* clone() const = 0;
 
       std::pair<std::size_t,std::size_t> dims() const {
         return std::make_pair(_rows, _cols);
@@ -109,6 +110,8 @@ namespace strumpack {
       virtual void backward_solve
       (const HSSFactorsMPI<scalar_t>& ULV, WorkSolveMPI<scalar_t>& w,
        DistM_t& x) const;
+
+      virtual void shift(scalar_t sigma) = 0;
 
       virtual int ctxt(int local_context) const {
         return active() ? local_context : -1;
@@ -280,6 +283,30 @@ namespace strumpack {
       : _rows(m), _cols(n), _U_state(State::UNTOUCHED),
         _V_state(State::UNTOUCHED),
         _openmp_task_depth(0), _active(active) { }
+
+    template<typename scalar_t>
+    HSSMatrixBase<scalar_t>::HSSMatrixBase
+    (const HSSMatrixBase<scalar_t>& other) {
+      *this = other;
+    }
+
+    template<typename scalar_t> HSSMatrixBase<scalar_t>&
+    HSSMatrixBase<scalar_t>::operator=
+    (const HSSMatrixBase<scalar_t>& other) {
+      _rows = other._rows;
+      _cols = other._cols;
+      for (auto& c : other._ch)
+        _ch.emplace_back(c->clone());
+      _U_state = other._U_state;
+      _V_state = other._V_state;
+      _openmp_task_depth = other._openmp_task_depth;
+      _active = other._active;
+      _U_rank = other._U_rank;
+      _U_rows = other._U_rows;
+      _V_rank = other._V_rank;
+      _V_rows = other._V_rows;
+      return *this;
+    }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::forward_solve
     (const HSSFactorsMPI<scalar_t>& ULV, WorkSolveMPI<scalar_t>& w,

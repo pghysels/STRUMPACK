@@ -31,6 +31,11 @@ namespace strumpack {
       HSSMatrix(const DenseM_t& A, const opts_t& opts);
       HSSMatrix(std::size_t m, std::size_t n, const opts_t& opts);
       HSSMatrix(const HSSPartitionTree& t, const opts_t& opts);
+      HSSMatrix(const HSSMatrix<scalar_t>& other);
+      HSSMatrix<scalar_t>& operator=(const HSSMatrix<scalar_t>& other);
+      HSSMatrix(HSSMatrix<scalar_t>&& other) = default;
+      HSSMatrix<scalar_t>& operator=(HSSMatrix<scalar_t>&& other) = default;
+      HSSMatrixBase<scalar_t>* clone() const override;
 
       const HSSMatrix<scalar_t>* child(int c) const {
         return dynamic_cast<HSSMatrix<scalar_t>*>(this->_ch[c].get());
@@ -94,9 +99,11 @@ namespace strumpack {
       DenseM_t dense() const;
       void delete_trailing_block();
 
+      void shift(scalar_t sigma) override;
+
     protected:
-      HSSMatrix(std::size_t m, std::size_t n,
-                const opts_t& opts, bool active);
+      HSSMatrix
+      (std::size_t m, std::size_t n, const opts_t& opts, bool active);
       HSSMatrix(const HSSPartitionTree& t, const opts_t& opts, bool active);
 
       HSSBasisID<scalar_t> _U;
@@ -250,6 +257,32 @@ namespace strumpack {
     HSSMatrix<scalar_t>::HSSMatrix
     (const HSSPartitionTree& t, const opts_t& opts)
       : HSSMatrix<scalar_t>(t, opts, true) { }
+
+    template<typename scalar_t>
+    HSSMatrix<scalar_t>::HSSMatrix(const HSSMatrix<scalar_t>& other)
+      : HSSMatrixBase<scalar_t>(other) {
+      _U = other._U;
+      _V = other._V;
+      _D = other._D;
+      _B01 = other._B01;
+      _B10 = other._B10;
+    }
+
+    template<typename scalar_t> HSSMatrix<scalar_t>&
+    HSSMatrix<scalar_t>::operator=(const HSSMatrix<scalar_t>& other) {
+      HSSMatrixBase<scalar_t>::operator=(other);
+      _U = other._U;
+      _V = other._V;
+      _D = other._D;
+      _B01 = other._B01;
+      _B10 = other._B10;
+      return *this;
+    }
+
+    template<typename scalar_t> HSSMatrixBase<scalar_t>*
+    HSSMatrix<scalar_t>::clone() const {
+      return new HSSMatrix<scalar_t>(*this);
+    }
 
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::delete_trailing_block() {
@@ -436,6 +469,15 @@ namespace strumpack {
         roff += c->rows();
         coff += c->cols();
       }
+    }
+
+    template<typename scalar_t> void
+    HSSMatrix<scalar_t>::shift(scalar_t sigma) {
+      if (!this->active()) return;
+      if (this->leaf()) _D.shift(sigma);
+      else
+        for (auto& c : this->_ch)
+          c->shift(sigma);
     }
 
   } // end namespace HSS

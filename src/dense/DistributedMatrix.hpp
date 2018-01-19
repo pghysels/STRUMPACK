@@ -153,6 +153,7 @@ namespace strumpack {
     void zero();
     void fill(scalar_t a);
     void eye();
+    void shift(scalar_t sigma);
     void clear();
     virtual void resize(std::size_t m, std::size_t n);
     virtual void hconcat(const DistributedMatrix<scalar_t>& b);
@@ -614,11 +615,20 @@ namespace strumpack {
     if (!active()) return;
     int rlo, rhi, clo, chi;
     lranges(rlo, rhi, clo, chi);
-    // TODO set to zero, then a single loop for the diagonal
     for (int c=clo; c<chi; ++c)
       for (int r=rlo; r<rhi; ++r)
-        operator()(r,c) = (rowl2g(r)-I()+1 == coll2g(c)-J()+1) ?
+        operator()(r,c) = (rowl2g(r) == coll2g(c)) ?
           scalar_t(1.) : scalar_t(0.);
+  }
+
+  template<typename scalar_t> void
+  DistributedMatrix<scalar_t>::shift(scalar_t sigma) {
+    int rlo, rhi, clo, chi;
+    lranges(rlo, rhi, clo, chi);
+    for (int c=clo; c<chi; ++c)
+      for (int r=rlo; r<rhi; ++r)
+        if (rowl2g(r) == coll2g(c))
+          operator()(r,c) += sigma;
   }
 
   /** correct value only on the procs in the ctxt */

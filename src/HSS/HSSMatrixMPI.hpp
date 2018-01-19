@@ -76,7 +76,13 @@ namespace strumpack {
       HSSMatrixMPI
       (const HSSPartitionTree& t, const dmult_t& Amult, int Actxt,
        const delem_t& Aelem, const opts_t& opts, MPI_Comm c);
+      HSSMatrixMPI(const HSSMatrixMPI<scalar_t>& other);
+      HSSMatrixMPI(HSSMatrixMPI<scalar_t>&& other) = default;
       ~HSSMatrixMPI();
+
+      HSSMatrixMPI<scalar_t>& operator=(const HSSMatrixMPI<scalar_t>& other);
+      HSSMatrixMPI<scalar_t>& operator=(HSSMatrixMPI<scalar_t>&& other) = default;
+      HSSMatrixBase<scalar_t>* clone() const override;
 
       const HSSMatrixBase<scalar_t>* child(int c) const
       { return this->_ch[c].get(); }
@@ -137,6 +143,8 @@ namespace strumpack {
        std::size_t roff=0, std::size_t coff=0) const;
 
       DistM_t dense(int ctxt) const;
+
+      void shift(scalar_t sigma) override;
 
       const TreeLocalRanges& tree_ranges() const { return _ranges; }
       void to_block_row
@@ -337,6 +345,72 @@ namespace strumpack {
       setup_contexts(mpi_nprocs(c));
       setup_ranges(0, 0);
       compress(Amult, Aelem, opts, Actxt);
+    }
+
+    template<typename scalar_t>
+    HSSMatrixMPI<scalar_t>::HSSMatrixMPI
+    (const HSSMatrixMPI<scalar_t>& other)
+      : HSSMatrixBase<scalar_t>(other) {
+      if (other._comm != MPI_COMM_NULL)
+        MPI_Comm_dup(other._comm, &_comm);
+      else _comm = other._comm;
+      _ctxt = other._ctxt;
+      _ctxt_all = other._ctxt_all;
+      _ctxt_T = other._ctxt_T;
+      _ctxt_loc = other._ctxt_loc;
+      _prows = other._prows;
+      _pcols = other._pcols;
+      _active_procs = other._active_procs;
+      _nprocs = other._nprocs;
+      _ranges = other._ranges;
+      _U = other._U;
+      _V = other._V;
+      _D = other._D;
+      _B01 = other._B01;
+      _B10 = other._B10;
+    }
+
+    template<typename scalar_t> HSSMatrixMPI<scalar_t>&
+    HSSMatrixMPI<scalar_t>::operator=(const HSSMatrixMPI<scalar_t>& other) {
+      HSSMatrixBase<scalar_t>::operator=(other);
+      if (other._comm != MPI_COMM_NULL)
+        MPI_Comm_dup(other._comm, &_comm);
+      else _comm = other._comm;
+      _ctxt = other._ctxt;
+      _ctxt_all = other._ctxt_all;
+      _ctxt_T = other._ctxt_T;
+      _ctxt_loc = other._ctxt_loc;
+      _prows = other._prows;
+      _pcols = other._pcols;
+      _active_procs = other._active_procs;
+      _nprocs = other._nprocs;
+      _ranges = other._ranges;
+      _U = other._U;
+      _V = other._V;
+      _D = other._D;
+      _B01 = other._B01;
+      _B10 = other._B10;
+      return *this;
+    }
+
+    template<typename scalar_t> HSSMatrixMPI<scalar_t>::~HSSMatrixMPI() {
+      auto free_context = [](int c) {
+        if (c == -1) return;
+        int nprow, npcol, prow, pcol;
+        scalapack::Cblacs_gridinfo(c, &nprow, &npcol, &prow, &pcol);
+        // the context might already have been deleted, so is invalid
+        if (nprow == -1) return;
+        scalapack::Cblacs_gridexit(c);
+      };
+      free_context(_ctxt);
+      free_context(_ctxt_T);
+      free_context(_ctxt_all);
+      mpi_free_comm(&_comm);
+    }
+
+    template<typename scalar_t> HSSMatrixBase<scalar_t>*
+    HSSMatrixMPI<scalar_t>::clone() const {
+      return new HSSMatrixMPI<scalar_t>(*this);
     }
 
     /** private constructor */
@@ -556,13 +630,6 @@ namespace strumpack {
       }
     }
 
-    template<typename scalar_t> HSSMatrixMPI<scalar_t>::~HSSMatrixMPI() {
-      if (_ctxt != -1) scalapack::Cblacs_gridexit(_ctxt);
-      if (_ctxt_T != -1) scalapack::Cblacs_gridexit(_ctxt_T);
-      if (_ctxt_all != -1) scalapack::Cblacs_gridexit(_ctxt_all);
-      mpi_free_comm(&_comm);
-    }
-
     template<typename scalar_t> std::size_t
     HSSMatrixMPI<scalar_t>::max_rank() const {
       std::size_t rmax, r=this->rank();
@@ -633,6 +700,13 @@ namespace strumpack {
       DistM_t identity(ctxt, this->cols(), this->cols());
       identity.eye();
       return apply(identity);
+    }
+
+    template<typename scalar_t> void
+    HSSMatrixMPI<scalar_t>::shift(scalar_t sigma) {
+      if (!this->active()) return;
+      if (this->leaf()) _D.shift(sigma);
+      else for (auto& c : this->_ch) c->shift(sigma);
     }
 
     template<typename scalar_t> void
