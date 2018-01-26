@@ -712,6 +712,15 @@ namespace strumpack {
       ReturnCode ierr = reorder();
       if (ierr != ReturnCode::SUCCESS) return ierr;
     }
+    float dfnnz = 0.;
+    if (_opts.verbose()) {
+      dfnnz = dense_factor_memory();
+      if (_is_root) {
+        std::cout << "# multifrontal factorization:" << std::endl;
+        std::cout << "#   - estimated memory usage (exact solver) = "
+                  << dfnnz / 1e6 << " MB" << std::endl;
+      }
+    }
     perf_counters_start();
     flop_breakdown_reset();
     TaskTimer t1("factorization", [&]() {
@@ -720,10 +729,8 @@ namespace strumpack {
     perf_counters_stop("numerical factorization");
     if (_opts.verbose()) {
       auto fnnz = factor_nonzeros();
-      auto dfnnz = dense_factor_memory();
       auto max_rank = maximum_rank();
       if (_is_root) {
-        std::cout << "# multifrontal factorization:" << std::endl;
         std::cout << "#   - factor time = " << t1.elapsed() << std::endl;
         std::cout << "#   - factor nonzeros = "
                   << number_format_with_commas(fnnz) << std::endl;
