@@ -139,14 +139,14 @@ namespace strumpack {
     MPI_Comm _comm;
     void get_local_graphs(CSRMatrixMPI<scalar_t,integer_t>* A_mpi);
     void build_local_sep_tree(CSRMatrixMPI<scalar_t,integer_t>* A_mpi);
-    void allgather_local_order(CSRMatrixMPI<scalar_t,integer_t>* A_mpi,
-                               integer_t* local_order);
-    void distributed_separator_reordering(const SPOptions<scalar_t>& opts,
-                                          integer_t* global_sep_order);
-    void local_separator_reordering(const SPOptions<scalar_t>& opts,
-                                    integer_t* global_sep_order);
-    void nested_dissection_print(const SPOptions<scalar_t>& opts,
-                                 integer_t n, integer_t nnz);
+    void allgather_local_order
+    (CSRMatrixMPI<scalar_t,integer_t>* A_mpi, integer_t* local_order);
+    void distributed_separator_reordering
+    (const SPOptions<scalar_t>& opts, integer_t* global_sep_order);
+    void local_separator_reordering
+    (const SPOptions<scalar_t>& opts, integer_t* global_sep_order);
+    void nested_dissection_print
+    (const SPOptions<scalar_t>& opts, integer_t nnz) const;
   };
 
   template<typename scalar_t,typename integer_t>
@@ -260,7 +260,7 @@ namespace strumpack {
         build_local_sep_tree(A);
       local_sep_tree->check();
     }
-    nested_dissection_print(opts, this->n, A->nnz());
+    nested_dissection_print(opts, A->nnz());
     return 0;
   }
 
@@ -581,7 +581,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   MatrixReorderingMPI<scalar_t,integer_t>::nested_dissection_print
-  (const SPOptions<scalar_t>& opts, integer_t n, integer_t nnz) {
+  (const SPOptions<scalar_t>& opts, integer_t nnz) const {
     if (opts.verbose()) {
       auto total_separators = local_sep_tree->separators();
       MPI_Allreduce(MPI_IN_PLACE, &total_separators, 1,
@@ -593,47 +593,9 @@ namespace strumpack {
         this->sep_tree->level(dsep_leaf) - 1;
       MPI_Allreduce(MPI_IN_PLACE, &max_level, 1,
                     mpi_type<integer_t>(), MPI_MAX, _comm);
-      if (!mpi_rank(_comm)) {
-        std::cout << "# initial matrix:" << std::endl;
-        std::cout << "#   - number of unknowns = "
-                  << number_format_with_commas(n) << std::endl;
-        std::cout << "#   - number of nonzeros = "
-                  << number_format_with_commas(nnz) << std::endl;
-        std::cout << "# nested dissection reordering:" << std::endl;
-        std::cout << "#   - " << get_name(opts.reordering_method())
-                  << " reordering" << std::endl;
-        if (opts.reordering_method() == ReorderingStrategy::METIS) {
-          if (opts.use_METIS_NodeNDP()) {
-            std::cout << "#      - used METIS_NodeNDP (iso METIS_NodeND)"
-                      << std::endl;
-            if (opts.use_MUMPS_SYMQAMD())
-              std::cout
-                << "#      - supernodal tree was built using MUMPS_SYMQAMD "
-                << (opts.use_agg_amalg() ? "with" : "without")
-                << " aggressive amalgamation" << std::endl;
-            else
-              std::cout
-                << "#      - supernodal tree from METIS_NodeNDP is used"
-                << std::endl;
-          } else {
-            std::cout << "#      - used METIS_NodeND (iso METIS_NodeNDP)"
-                      << std::endl;
-            if (opts.use_MUMPS_SYMQAMD())
-              std::cout
-                << "#      - supernodal tree was built using MUMPS_SYMQAMD "
-                << (opts.use_agg_amalg() ? "with" : "without")
-                << " aggressive amalgamation" << std::endl;
-            else
-              std::cout << "#      - supernodal tree was built from etree"
-                        << std::endl;
-          }
-        }
-        std::cout << "#   - strategy parameter = "
-                  << opts.nd_param() << std::endl;
-        std::cout << "#   - number of separators = "
-                  << number_format_with_commas(total_separators) << std::endl;
-        std::cout << "#   - number of levels = " << max_level << std::endl;
-      }
+      if (!mpi_rank(_comm))
+        MatrixReordering<scalar_t,integer_t>::nested_dissection_print
+          (opts, nnz, max_level, total_separators, true);
     }
   }
 

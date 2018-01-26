@@ -55,7 +55,7 @@ namespace strumpack {
     virtual ~MatrixReordering();
 
     int nested_dissection
-    (SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
+    (const SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
      int nx, int ny, int nz, int components, int width);
     int nested_dissection
     (SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
@@ -79,9 +79,9 @@ namespace strumpack {
   protected:
     virtual void separator_reordering_print
     (integer_t max_nr_neighbours, integer_t max_dim_sep);
-    virtual void nested_dissection_print
-    (SPOptions<scalar_t>& opts, integer_t n, integer_t nnz,
-     bool verbose);
+    void nested_dissection_print
+    (const SPOptions<scalar_t>& opts, integer_t nnz, int max_level,
+     int total_separators, bool verbose) const;
 
   private:
     void split_separator
@@ -95,6 +95,8 @@ namespace strumpack {
     void separator_reordering_recursive
     (const SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
      bool hss_parent, integer_t sep, integer_t* sorder);
+    void nested_dissection_print
+    (const SPOptions<scalar_t>& opts, integer_t nnz, bool verbose) const;
   };
 
   template<typename scalar_t,typename integer_t>
@@ -110,7 +112,7 @@ namespace strumpack {
   // if running in parallel, only root should call this
   template<typename scalar_t,typename integer_t> int
   MatrixReordering<scalar_t,integer_t>::nested_dissection
-  (SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
+  (const SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
    int nx, int ny, int nz, int components, int width) {
     switch (opts.reordering_method()) {
     case ReorderingStrategy::NATURAL: {
@@ -163,7 +165,7 @@ namespace strumpack {
       return 1;
     }
     sep_tree->check();
-    nested_dissection_print(opts, n, A->nnz(), opts.verbose());
+    nested_dissection_print(opts, A->nnz(), opts.verbose());
     return 0;
   }
 
@@ -241,7 +243,7 @@ namespace strumpack {
       }
     }
     nested_dissection_print
-      (opts, n, A->nnz(), opts.verbose() && !mpi_rank(comm));
+      (opts, A->nnz(), opts.verbose() && !mpi_rank(comm));
     return 0;
   }
 
@@ -437,7 +439,15 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   MatrixReordering<scalar_t,integer_t>::nested_dissection_print
-  (SPOptions<scalar_t>& opts, integer_t n, integer_t nnz, bool verbose) {
+  (const SPOptions<scalar_t>& opts, integer_t nnz, bool verbose) const {
+    nested_dissection_print
+      (opts, nnz, sep_tree->levels(), sep_tree->separators(), verbose);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  MatrixReordering<scalar_t,integer_t>::nested_dissection_print
+  (const SPOptions<scalar_t>& opts, integer_t nnz, int max_level,
+   int total_separators, bool verbose) const {
     if (verbose) {
       std::cout << "# initial matrix:" << std::endl;
       std::cout << "#   - number of unknowns = "
@@ -475,11 +485,23 @@ namespace strumpack {
       std::cout << "#   - strategy parameter = "
                 << opts.nd_param() << std::endl;
       std::cout << "#   - number of separators = "
-                << number_format_with_commas(sep_tree->separators())
-                << std::endl;
+                << number_format_with_commas(total_separators) << std::endl;
       std::cout << "#   - number of levels = "
-                << number_format_with_commas(sep_tree->levels()) << std::endl;
+                << number_format_with_commas(max_level)
+                << std::flush << std::endl;
     }
+    if (max_level > 50)
+      std::cerr
+        << "# ***** WARNING ****************************************************" << std::endl
+        << "# Detected a large number of levels in the frontal/elimination tree." << std::endl
+        << "# STRUMPACK currently does not handle this safely, which" << std::endl
+        << "# could lead to segmentation faults due to stack overflows." << std::endl
+        << "# As a remedy, you can try to increase the stack size," << std::endl
+        << "# or try a different ordering (metis, scotch, ..)." << std::endl
+        << "# When using metis, it often helps to use --sp_enable_METIS_NodeNDP," << std::endl
+        << "# (enabled by default) iso --sp_enable_METIS_NodeND." << std::endl
+        << "# ******************************************************************"
+        << std::endl;
     if (opts.log_assembly_tree()) {
       std::string filename = "assembly_tree_" +
         get_name(opts.reordering_method());
