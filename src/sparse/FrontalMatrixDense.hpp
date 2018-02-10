@@ -116,8 +116,8 @@ namespace strumpack {
     const std::size_t dupd = this->dim_upd();
     std::size_t upd2sep;
     auto I = this->upd_to_parent(p, upd2sep);
-#pragma omp taskloop default(shared) grainsize(64)      \
-  if(task_depth < params::task_recursion_cutoff_level)
+    // #pragma omp taskloop default(shared) grainsize(64)       \
+    //   if(task_depth < params::task_recursion_cutoff_level)
     for (std::size_t c=0; c<dupd; c++) {
       auto pc = I[c];
       if (pc < pdsep) {
