@@ -34,7 +34,7 @@
 #include <iostream>
 #include <cassert>
 #include "StrumpackParameters.hpp"
-#include "strumpack_config.h"
+#include "StrumpackFortranCInterface.h"
 
 namespace strumpack {
 

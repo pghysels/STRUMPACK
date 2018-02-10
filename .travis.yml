@@ -51,10 +51,10 @@ before_install:
   - sudo apt-get update
   - sudo apt-get install openmpi-bin libopenmpi-dev
   - printf "${BLUE} GC; Done installing OpenMPI-1 via apt\n"
-  
+
 install:
   - export BLUE="\033[34;1m"
-  
+
   - printf "${BLUE} GC; Installing BLAS and LAPACK from apt\n"
   - sudo apt-get install libblas-dev liblapack-dev
   - export BLAS_LIB=/usr/lib/libblas/libblas.so
@@ -119,7 +119,9 @@ install:
     -DBLAS_LIBRARIES=$BLAS_LIB \
     -DLAPACK_LIBRARIES=$LAPACK_LIB \
     -DSCALAPACK_LIBRARIES=$SCALAPACK_LIB \
-    -DCMAKE_CXX_FLAGS="-lstdc++ -DCOUNT_FLOPS=1" \
+    -DSTRUMPACK_COUNT_FLOPS=ON \
+    -DSTRUMPACK_USE_PARMETIS=ON \
+    -DSTRUMPACK_USE_SCOTCH=ON \
     -DMETIS_INCLUDES=$TRAVIS_BUILD_DIR/installDir/parmetis-4.0.3/metis/include \
     -DMETIS_LIBRARIES=$TRAVIS_BUILD_DIR/installDir/parmetis-4.0.3/install/lib/libparmetis.so \
     -DPARMETIS_INCLUDES=$TRAVIS_BUILD_DIR/installDir/parmetis-4.0.3/install/include \

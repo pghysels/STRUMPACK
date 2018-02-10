@@ -1,6 +1,16 @@
 cmake_minimum_required(VERSION 2.8)
 project(STRUMPACK CXX C Fortran)
 
+option(STRUMPACK_USE_METIS "Build with support for Metis" ON)
+option(STRUMPACK_USE_PARMETIS "Build with support for ParMetis" OFF)
+option(STRUMPACK_USE_SCOTCH "Build with support for Scotch/PTScotch" OFF)
+option(STRUMPACK_USE_OPENMP "Use OpenMP for on-node threading tasking" ON)
+option(STRUMPACK_USE_PAPI "Build with support for PAPI monitoring" OFF)
+option(STRUMPACK_COUNT_FLOPS "Build with flop counters" ON)
+option(STRUMPACK_TASK_TIMERS "Build with timers for internal routines" OFF)
+option(STRUMPACK_DEV_TESTING "Enable extensive testing" OFF)
+option(STRUMPACK_C_INTERFACE "Build the C interface" ON)
+
 set(STRUMPACK_VERSION_MAJOR 2)
 set(STRUMPACK_VERSION_MINOR 1)
 set(STRUMPACK_VERSION_PATCH 0)
@@ -45,16 +55,12 @@ if(MPI_Fortran_FOUND)
 endif()
 
 include(FortranCInterface)
-FortranCInterface_HEADER("${PROJECT_BINARY_DIR}/strumpack_config.h"
+FortranCInterface_HEADER(${PROJECT_BINARY_DIR}/StrumpackFortranCInterface.h
   MACRO_NAMESPACE "FC_")
 include_directories(${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/src)
 FortranCInterface_VERIFY(CXX)
 
-option(USE_OPENMP "Use OpenMP for on-node threading tasking" ON)
-option(ENABLE_DEV_TESTING "Enable extensive testing" OFF)
-option(ENABLE_C_INTERFACE "Build the C interface" ON)
-
-if(USE_OPENMP)
+if(STRUMPACK_USE_OPENMP)
   include(FindOpenMP)
   if(OPENMP_FOUND)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
@@ -66,6 +72,7 @@ if(USE_OPENMP)
     support, will proceed without OpenMP!")
   endif()
 else()
+  message(STATUS "Building STRUMPACK without OpenMP support.")
   check_cxx_compiler_flag("-Wno-unknown-pragmas"
     COMPILER_SUPPORTS_NOPRAGMA_WARNING)
   if (COMPILER_SUPPORTS_NOPRAGMA_WARNING)
@@ -111,7 +118,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
   "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
 find_package(SCALAPACK)
-if (SCALAPACK_FOUND)
+if(SCALAPACK_FOUND)
   set(LIBS ${LIBS} ${SCALAPACK_LIBRARIES})
   include_directories(${SCALAPACK_INCLUDES})
 else()
@@ -121,17 +128,53 @@ else()
     " ScaLAPACK is linked in by the compiler wrapper")
 endif()
 
-find_package(ParMetis)
-set(LIBS ${LIBS} ${PARMETIS_LIBRARIES})
-include_directories(${PARMETIS_INCLUDES})
+if(STRUMPACK_USE_PAPI)
+  find_package(PAPI)
+  set(LIBS ${LIBS} ${PAPI_LIBRARIES})
+  include_directories(${PAPI_INCLUDES})
+  if(NOT PAPI_FOUND)
+    message(FATAL_ERROR
+      "Could not find PAPI!"
+      "Set the PAPIDIR environtment variable,"
+      "or set specify PAPI_INCLUDES and PAPI_LIBRARIES."
+      "Get PAPI from http://icl.cs.utk.edu/papi/")
+  endif()
+else()
+  message(STATUS "Building STRUMPACK without PAPI support.")
+endif()
 
+if(STRUMPACK_USE_PARMETIS)
+  find_package(ParMetis)
+  set(LIBS ${LIBS} ${PARMETIS_LIBRARIES})
+  include_directories(${PARMETIS_INCLUDES})
+  if(NOT PARMETIS_FOUND)
+    message(FATAL_ERROR
+      "Could not find ParMETIS!"
+      "Get ParMetis from http://glaros.dtc.umn.edu/gkhome/metis/parmetis/overview")
+  endif()
+else()
+  message(STATUS "Building STRUMPACK without ParMetis support.")
+endif()
+
+# at the moment, Metis is required to build STRUMPACK
 find_package(Metis)
 set(LIBS ${LIBS} ${METIS_LIBRARIES})
 include_directories(${METIS_INCLUDES})
+if(METIS_FOUND)
+  message(STATUS "Found Metis library\n")
+else()
+  message(FATAL_ERROR
+    "Could not find Metis (required)!"
+    "Get Metis from http://glaros.dtc.umn.edu/gkhome/metis/metis/overview\n")
+endif()
 
-find_package(Scotch)
-set(LIBS ${LIBS} ${SCOTCH_LIBRARIES})
-include_directories(${SCOTCH_INCLUDES})
+if(STRUMPACK_USE_SCOTCH)
+  find_package(Scotch)
+  set(LIBS ${LIBS} ${SCOTCH_LIBRARIES})
+  include_directories(${SCOTCH_INCLUDES})
+else()
+  message(STATUS "Building STRUMPACK without Scotch/PTScotch support.")
+endif()
 
 message(STATUS "Linking with: " "${LIBS}")
 message(STATUS "Implicit C libs: " "${CMAKE_C_IMPLICIT_LINK_LIBRARIES}")
@@ -166,7 +209,7 @@ set(LIBSRC
   src/StrumpackParameters.cpp
   src/misc/TaskTimer.cpp)
 
-if (ENABLE_C_INTERFACE)
+if(STRUMPACK_C_INTERFACE)
   list(APPEND LIBSRC src/StrumpackSparseSolver.cpp)
 endif()
 
@@ -217,10 +260,15 @@ set(LIBSRCSPARSE
 add_library(strumpack ${LIBSRC} ${LIBSRCSPARSE} ${LIBSRCDENSE})
 target_link_libraries(strumpack ${LIBS})
 
+
 install(TARGETS strumpack LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
+configure_file(${CMAKE_SOURCE_DIR}/src/StrumpackConfig.hpp.in
+  ${PROJECT_BINARY_DIR}/StrumpackConfig.hpp)
+
 install(FILES
-  ${PROJECT_BINARY_DIR}/strumpack_config.h
+  ${PROJECT_BINARY_DIR}/StrumpackFortranCInterface.h
+  ${PROJECT_BINARY_DIR}/StrumpackConfig.hpp
   src/StrumpackSparseSolver.h
   src/StrumpackSparseSolver.hpp
   src/StrumpackSparseSolverMPI.hpp
@@ -326,7 +374,7 @@ if(DOXYGEN_FOUND)
     COMMENT "Generating API documentation with doxygen" VERBATIM)
 endif(DOXYGEN_FOUND)
 
-if (ENABLE_C_INTERFACE)
+if(STRUMPACK_C_INTERFACE)
   set(C_EXAMPLES "sexample dexample cexample zexample")
 endif()
 
@@ -342,7 +390,7 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/pde900.mtx
 configure_file(${CMAKE_SOURCE_DIR}/examples/README
   ${CMAKE_BINARY_DIR}/examples/README COPYONLY)
 
-if (ENABLE_C_INTERFACE)
+if(STRUMPACK_C_INTERFACE)
   configure_file(${CMAKE_SOURCE_DIR}/examples/sexample.c
     ${CMAKE_BINARY_DIR}/examples/sexample.c COPYONLY)
   configure_file(${CMAKE_SOURCE_DIR}/examples/dexample.c

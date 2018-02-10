@@ -193,7 +193,7 @@ namespace strumpack {
   StrumpackSparseSolverMPI<scalar_t,integer_t>::perf_counters_stop
   (const std::string& s) {
     if (this->_opts.verbose()) {
-#if defined(HAVE_PAPI)
+#if defined(STRUMPACK_USE_PAPI)
       float rtime1=0., ptime1=0., mflops=0.;
       long_long flpops1=0;
 #pragma omp parallel reduction(+:flpops1) reduction(max:rtime1) \
@@ -217,7 +217,7 @@ namespace strumpack {
                   << " sec" << std::endl;
       }
 #endif
-#if defined(COUNT_FLOPS)
+#if defined(STRUMPACK_COUNT_FLOPS)
       long long int flopsbytes[2] = { params::flops - this->_f0,
                                       params::bytes - this->_b0 };
       MPI_Allreduce(MPI_IN_PLACE, flopsbytes, 2,
@@ -238,7 +238,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPI<scalar_t,integer_t>::flop_breakdown() const {
-#if defined(COUNT_FLOPS)
+#if defined(STRUMPACK_COUNT_FLOPS)
     float flops[12] = {
       float(params::random_flops.load()),
       float(params::ID_flops.load()),

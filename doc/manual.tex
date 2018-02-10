@@ -126,8 +126,10 @@ follows:
       -DSCALAPACK_LIBRARIES=<@\textcolor{blue}{"/path/to/scalapack/libscalapack.a;/path/to/blacs/libblacs.a"}@> \
       -DMETIS_INCLUDES=<@\textcolor{blue}{/path/to/metis/incluce}@> \
       -DMETIS_LIBRARIES=<@\textcolor{blue}{/path/to/metis/libmetis.a}@> \
+      -DSTRUMPACK_USE_PARMETIS=ON \                                   # optional
       -DPARMETIS_INCLUDES=<@\textcolor{blue}{/path/to/parmetis/include}@> \
       -DPARMETIS_LIBRARIES=<@\textcolor{blue}{/path/to/parmetis/libparmetis.a}@> \
+      -DSTRUMPACK_USE_SCOTCH=ON \                                     # optional
       -DSCOTCH_INCLUDES=<@\textcolor{blue}{/path/to/scotch/include}@> \
       -DSCOTCH_LIBRARIES=<@\textcolor{blue}{"/path/to/ptscotch/libscotch.a;...libscotcherr.a;...libptscotch.a;...libptscotcherr.a"}@>
   > make
@@ -184,7 +186,8 @@ CMake can find them:
     > cmake <@\textcolor{blue}{../}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@> \
        -DCMAKE_EXE_LINKER_FLAGS=<@\textcolor{blue}{"-L/usr/lib64/mpich/lib/ -lscalapack -lmpiblacs"}@>
   \end{lstlisting}
-\item \textbf{METIS} ($\geq$ 5.1.0) for the nested dissection matrix
+\item \textbf{METIS}
+  ($\geq$ 5.1.0 \textbf{required}) for the nested dissection matrix
   reordering. Metis can be obtained from:
 
   \url{http://glaros.dtc.umn.edu/gkhome/metis/metis/download}.
@@ -203,24 +206,27 @@ CMake can find them:
       -DMETIS_LIBRARIES=<@\textcolor{blue}{/usr/local/metis/lib/libmetis.a}@>
   \end{lstlisting}
 
-\item \textbf{PARMETIS} for parallel nested dissection. ParMetis can
-  be download from
+\item \textbf{PARMETIS} (optional) for parallel nested
+  dissection. ParMetis can be download from
 
   \url{http://glaros.dtc.umn.edu/gkhome/metis/parmetis/download}
 
   The steps to make sure CMake can find ParMetis are similar as for
-  Metis. The variables are
+  Metis. Enable with \lstinline[style=Bash]!-DSTRUMPACK_USE_PARMETIS!.
+  The CMake variables are
   \lstinline[style=Bash]!$PARMETISDIR! or
   \lstinline[style=Bash]!PARMETIS_INCLUDES! and
   \lstinline[style=Bash]!PARMETIS_LIBRARIES!.
 
-\item \textbf{SCOTCH} and \textbf{PT-SCOTCH} ($\geq$ 5.1.12) for
-  matrix reordering. Scotch can be downloaded from:
+\item \textbf{SCOTCH} and \textbf{PT-SCOTCH}
+  ($\geq$ 5.1.12) (optional) for matrix reordering. Scotch can be
+  downloaded from:
 
   \url{http://www.labri.fr/perso/pelegrin/scotch/}
 
-  Configuring CMake to find (PT-)Scotch is similar to Metis. For
-  (PT-)Scotch the variables are
+  Configuring CMake to find (PT-)Scotch is similar to Metis. Enable
+  with \lstinline[style=Bash]!-DSTRUMPACK_USE_SCOTCH! For (PT-)Scotch
+  the CMake variables are
   \lstinline[style=Bash]!$SCOTCHDIR! or
   \lstinline[style=Bash]!SCOTCH_INCLUDES! and
   \lstinline[style=Bash]!SCOTCH_LIBRARIES!. Make sure to specify all
@@ -1321,28 +1327,31 @@ with \texttt{gcc} and include \texttt{-lstdc++}.
 
 \section{Advanced Usage Tips}\label{sec:tips}
 \begin{itemize}
-\item It is recommended to link with the \texttt{TCMalloc} library
-  (\lstinline[style=Bash]!-ltcmalloc!). \texttt{TCMalloc} replaces the
-  default memory allocator (C\texttt{++} \texttt{new}) with a more
-  scalable implementation. Alternatively, you can link with the
-  Intel\tm{} TBB Scalable Allocator
-  (\lstinline[style=Bash]!-ltbbmalloc!), in which case you also need
-  to configure with \lstinline[style=Bash]!-DCMAKE_CXX_FLAGS="-DUSE_TBB_MALLOC"!.
+% \item It is recommended to link with the \texttt{TCMalloc} library
+%   (\lstinline[style=Bash]!-ltcmalloc!). \texttt{TCMalloc} replaces the
+%   default memory allocator (C\texttt{++} \texttt{new}) with a more
+%   scalable implementation. Alternatively, you can link with the
+%   Intel\tm{} TBB Scalable Allocator
+%   (\lstinline[style=Bash]!-ltbbmalloc!), in which case you also need
+%   to configure with \lstinline[style=Bash]!-DCMAKE_CXX_FLAGS="-DUSE_TBB_MALLOC"!.
 \item To keep track of the number of floating point operations
-  performed in the STRUMPACK Sparse Solver, you can run configure with
-  \lstinline[style=Bash]!-DCMAKE_CXX_FLAGS="-DCOUNT_FLOPS"!. Then, when running,
-  do not set the \texttt{quiet} flag in the StrumpackSparseSolver
-  constructor or on the command line and the solver will print some
-  statistics. This will also enable a counter for data movement in the
-  solve phase, from which the (approximately) attained bandwidth usage
-  is derived. This is done because the solve phase is typically
-  bandwidth limited, while the factorization is flop limited.
-\item There is also some support for PAPI. Compile with
-  \lstinline[style=Bash]!-DCMAKE_CXX_FLAGS="-DHAVE_PAPI"! and specify the PAPI
-  include folders and libraries.
+  performed in the STRUMPACK Sparse Solver, you can run CMake with
+  \lstinline[style=Bash]!-DSTRUMPACK_COUNT_FLOPS=ON!. Then, when
+  running, do not set the \texttt{quiet} flag in the
+  StrumpackSparseSolver constructor or on the command line and the
+  solver will print some statistics. This will also enable a counter
+  for data movement in the solve phase, from which the (approximately)
+  attained bandwidth usage is derived. This is done because the solve
+  phase is typically bandwidth limited, while the factorization is
+  flop limited.
+\item There is also some support for PAPI. Run CMake with
+  \lstinline[style=Bash]!-DSTRUMPACK_USE_PAPI=ON! and specify the PAPI
+  include folders and libraries via
+  \lstinline[style=Bash]!-DPAPI_INCLUDES=..! and
+  \lstinline[style=Bash]!-DPAPI_LIBRARIES=..!.
 \item We have added timers all throughout the code. These can be
   enabled with
-  \lstinline[style=Bash]!-DCMAKE_CXX_FLAGS="-DUSE_TASK_TIMER"!. Running the code
+  \lstinline[style=Bash]!-DSTRUMPACK_TASK_TIMERS=ON!. Running the code
   will generate a file \lstinline[style=Bash]!time.log!. A script to
   visualize these timings is provided.
 \item If you compile with MKL or OpenBLAS, you can take advantage of

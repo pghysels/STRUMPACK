@@ -37,13 +37,11 @@
 #include <getopt.h>
 #include <new>
 #include <cmath>
-#ifdef USE_TBB_MALLOC
+#include "StrumpackConfig.hpp"
+#if defined(STRUMPACK_USE_TBB_MALLOC)
 #include <tbb/scalable_allocator.h>
 #endif
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-#ifdef HAVE_PAPI
+#if defined(STRUMPACK_USE_PAPI)
 #include <papi.h>
 #endif
 #include "misc/Tools.hpp"
@@ -56,7 +54,7 @@
 #include "sparse/BiCGStab.hpp"
 #include "sparse/IterativeRefinement.hpp"
 
-#ifdef USE_TBB_MALLOC
+#if defined(STRUMPACK_USE_TBB_MALLOC)
 void* operator new(std::size_t sz) throw(std::bad_alloc) {
   return scalable_malloc(sz);
 }
@@ -276,11 +274,11 @@ namespace strumpack {
     bool _reordered = false;
     int _Krylov_its = 0;
 
-#if defined(HAVE_PAPI)
+#if defined(STRUMPACK_USE_PAPI)
     float _rtime = 0., _ptime = 0.;
     long_long _flpops = 0;
 #endif
-#if defined(COUNT_FLOPS)
+#if defined(STRUMPACK_COUNT_FLOPS)
     long long int _f0 = 0, _ftot = 0, _fmin = 0, _fmax = 0;
     long long int _b0 = 0, _btot = 0, _bmin = 0, _bmax = 0;
 #endif
@@ -327,7 +325,7 @@ namespace strumpack {
                   << " = log_2(#threads) + 3"<< std::endl;
       }
     }
-#if defined(COUNT_FLOPS)
+#if defined(STRUMPACK_COUNT_FLOPS)
     if (!params::flops.is_lock_free())
       std::cerr << "# WARNING: the flop counter is not lock free"
                 << std::endl;
@@ -370,7 +368,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::papi_initialize() {
-#if defined(HAVE_PAPI)
+#if defined(STRUMPACK_USE_PAPI)
     // TODO call PAPI_library_init???
     float mflops = 0.;
     int retval = PAPI_flops(&_rtime, &_ptime, &_flpops, &mflops);
@@ -398,7 +396,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::perf_counters_start() {
-#if defined(HAVE_PAPI)
+#if defined(STRUMPACK_USE_PAPI)
     float mflops = 0., rtime = 0., ptime = 0.;
     long_long flpops = 0; // cannot use class variables in openmp clause
 #pragma omp parallel reduction(+:flpops) reduction(max:rtime) \
@@ -406,7 +404,7 @@ namespace strumpack {
     PAPI_flops(&rtime, &ptime, &flpops, &mflops);
     _flpops = flpops; _rtime = rtime; _ptime = ptime;
 #endif
-#if defined(COUNT_FLOPS)
+#if defined(STRUMPACK_COUNT_FLOPS)
     _f0 = params::flops;
     _b0 = params::bytes;
 #endif
@@ -415,7 +413,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::perf_counters_stop
   (const std::string& s) {
-#if defined(HAVE_PAPI)
+#if defined(STRUMPACK_USE_PAPI)
     float mflops = 0., rtime = 0., ptime = 0.;
     long_long flpops = 0;
 #pragma omp parallel reduction(+:flpops) reduction(max:rtime)  \
@@ -447,7 +445,7 @@ namespace strumpack {
       std::cout << "# mem pagesize:\t\t" << dmem.pagesize << std::endl;
     }
 #endif
-#ifdef COUNT_FLOPS
+#if defined(STRUMPACK_COUNT_FLOPS)
     _fmin = _fmax = _ftot = params::flops - _f0;
     _bmin = _bmax = _btot = params::bytes - _b0;
 #endif
@@ -466,7 +464,7 @@ namespace strumpack {
       std::cout << "#   - number of Krylov iterations = "
                 << _Krylov_its << std::endl;
       std::cout << "#   - solve time = " << tel << std::endl;
-#ifdef COUNT_FLOPS
+#if defined(STRUMPACK_COUNT_FLOPS)
       std::cout << "#   - total flops = " << double(_ftot) << ", min = "
                 << double(_fmin) << ", max = " << double(_fmax) << std::endl;
       std::cout << "#   - flop rate = " << _ftot / tel / 1e9 << " GFlop/s"
@@ -621,7 +619,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::flop_breakdown() const {
-#if defined(COUNT_FLOPS)
+#if defined(STRUMPACK_COUNT_FLOPS)
     print_flop_breakdown
       (params::random_flops, params::ID_flops, params::QR_flops,
        params::ortho_flops, params::reduce_sample_flops,
@@ -634,7 +632,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::flop_breakdown_reset() const {
-#if defined(COUNT_FLOPS)
+#if defined(STRUMPACK_COUNT_FLOPS)
     params::random_flops = 0;
     params::ID_flops = 0;
     params::QR_flops = 0;
@@ -736,7 +734,7 @@ namespace strumpack {
                   << number_format_with_commas(fnnz) << std::endl;
         std::cout << "#   - factor memory = "
                   << fnnz * sizeof(scalar_t) / 1e6 << " MB" << std::endl;
-#ifdef COUNT_FLOPS
+#if defined(STRUMPACK_COUNT_FLOPS)
         std::cout << "#   - total flops = " << double(_ftot) << ", min = "
                   << double(_fmin) << ", max = " << double(_fmax)
                   << std::endl;

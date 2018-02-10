@@ -20,7 +20,7 @@ add_test("user_test_sparse_mpi" ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2
   ${MPIEXEC_PREFLAGS} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi m
   ../examples/pde900.mtx)
 
-if (ENABLE_DEV_TESTING)
+if(STRUMPACK_DEV_TESTING)
   set(THREADS 1 3 8)
   set(PROCS   2 4 9 13 16 17 19)
   set(MATRIX  T U L)

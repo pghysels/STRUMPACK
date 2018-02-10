@@ -103,15 +103,14 @@ public:
   std::vector<std::list<TaskTimer>> list;
 };
 
-
-#ifndef USE_TASK_TIMER
+#if !defined(STRUMPACK_TASK_TIMERS)
 
 #define TIMER_TIME(name, nr, timer) (void)0
 #define TIMER_DEFINE(name, nr, timer) (void)0
 #define TIMER_START(timer) (void)0
 #define TIMER_STOP(timer) (void)0
 
-#else // USE_TASK_TIMER
+#else // STRUMPACK_TASK_TIMERS
 
 #define TIMER_TIME(type, depth, timer) \
   TaskTimer timer(type, depth);        \
@@ -121,7 +120,7 @@ public:
 #define TIMER_START(timer) timer.start();
 #define TIMER_STOP(timer) timer.stop();
 
-#endif // USE_TASK_TIMER
+#endif // STRUMPACK_TASK_TIMERS
 
 
 

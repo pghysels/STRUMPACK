@@ -32,7 +32,7 @@
 #include <stdlib.h>
 #include "BLASLAPACKWrapper.hpp"
 #include "StrumpackParameters.hpp"
-#include "strumpack_config.h"
+#include "StrumpackFortranCInterface.h"
 
 namespace strumpack {
 

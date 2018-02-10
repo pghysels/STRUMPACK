@@ -29,7 +29,7 @@
 #ifndef RCM_REORDERING_HPP
 #define RCM_REORDERING_HPP
 
-#include "strumpack_config.h"
+#include "StrumpackFortranCInterface.h"
 
 extern "C" {
 #define GENRCM_FC FC_GLOBAL(genrcm,GENRCM)

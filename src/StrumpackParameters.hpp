@@ -35,6 +35,7 @@
 #if defined(_OPENMP)
 #include <omp.h>
 #endif
+#include "StrumpackConfig.hpp"
 
 namespace strumpack { // these are all global variables
 
@@ -74,7 +75,7 @@ namespace strumpack { // these are all global variables
   } //end namespace params
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
-#ifdef COUNT_FLOPS
+#if defined(STRUMPACK_COUNT_FLOPS)
 #define STRUMPACK_FLOPS(n)                      \
   strumpack::params::flops += n;
 #define STRUMPACK_BYTES(n)                      \

@@ -39,9 +39,14 @@
 #include "StrumpackOptions.hpp"
 #include "CSRMatrix.hpp"
 #include "CSRMatrixMPI.hpp"
+#include "StrumpackConfig.hpp"
+#if defined(STRUMPACK_USE_SCOTCH)
 #include "ScotchReordering.hpp"
+#endif
 #include "MetisReordering.hpp"
+#if defined(STRUMPACK_USE_PARMETIS)
 #include "ParMetisReordering.hpp"
+#endif
 #include "GeometricReordering.hpp"
 #include "RCMReordering.hpp"
 
@@ -126,7 +131,13 @@ namespace strumpack {
       break;
     }
     case ReorderingStrategy::SCOTCH: {
+#if defined(STRUMPACK_USE_SCOTCH)
       sep_tree = scotch_nested_dissection(A, perm, iperm, opts);
+#else
+      std::cerr << "ERROR: STRUMPACK was not configured with Scotch support"
+                << std::endl;
+      abort();
+#endif
       break;
     }
     case ReorderingStrategy::GEOMETRIC: {
@@ -188,7 +199,13 @@ namespace strumpack {
           break;
         }
         case ReorderingStrategy::SCOTCH: {
+#if defined(STRUMPACK_USE_SCOTCH)
           sep_tree = scotch_nested_dissection(A, perm, iperm, opts);
+#else
+          std::cerr << "ERROR: STRUMPACK was not configured with Scotch support"
+                    << std::endl;
+          abort();
+#endif
           break;
         }
         case ReorderingStrategy::RCM: {
@@ -229,11 +246,23 @@ namespace strumpack {
         CSRMatrixMPI<scalar_t,integer_t> Ampi(A, comm, false);
         switch (opts.reordering_method()) {
         case ReorderingStrategy::PARMETIS: {
+#if defined(STRUMPACK_USE_PARMETIS)
           parmetis_nested_dissection(&Ampi, comm, false, perm, opts);
+#else
+          std::cerr << "ERROR: STRUMPACK was not configured with ParMetis support"
+                    << std::endl;
+          abort();
+#endif
           break;
         }
         case ReorderingStrategy::PTSCOTCH: {
+#if defined(STRUMPACK_USE_SCOTCH)
           ptscotch_nested_dissection(&Ampi, comm, false, perm, opts);
+#else
+          std::cerr << "ERROR: STRUMPACK was not configured with Scotch support"
+                    << std::endl;
+          abort();
+#endif
           break;
         }
         default: assert(true);

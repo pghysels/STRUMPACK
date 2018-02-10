@@ -31,8 +31,13 @@
 #include <unordered_map>
 #include <algorithm>
 #include "CSRGraph.hpp"
+#include "StrumpackConfig.hpp"
+#if defined(STRUMPACK_USE_SCOTCH)
 #include "PTScotchReordering.hpp"
+#endif
+#if defined(STRUMPACK_USE_PARMETIS)
 #include "ParMetisReordering.hpp"
+#endif
 #include "GeometricReorderingMPI.hpp"
 
 namespace strumpack {
@@ -189,8 +194,14 @@ namespace strumpack {
           break;
         }
         case ReorderingStrategy::SCOTCH: {
+#if defined(STRUMPACK_USE_SCOTCH)
           global_sep_tree = scotch_nested_dissection
             (Aseq.get(), this->perm, this->iperm, opts);
+#else
+          std::cerr << "ERROR: STRUMPACK was not configured with Scotch support"
+                    << std::endl;
+          abort();
+#endif
           break;
         }
         case ReorderingStrategy::RCM: {
@@ -242,13 +253,25 @@ namespace strumpack {
         break;
       }
       case ReorderingStrategy::PARMETIS: {
+#if defined(STRUMPACK_USE_PARMETIS)
         this->sep_tree = parmetis_nested_dissection
           (A, _comm, true, this->perm, opts);
+#else
+        std::cerr << "ERROR: STRUMPACK was not configured with ParMetis support"
+                  << std::endl;
+        abort();
+#endif
         break;
       }
       case ReorderingStrategy::PTSCOTCH: {
+#if defined(STRUMPACK_USE_SCOTCH)
         this->sep_tree = ptscotch_nested_dissection
           (A, _comm, true, this->perm, opts);
+#else
+        std::cerr << "ERROR: STRUMPACK was not configured with Scotch support"
+                  << std::endl;
+        abort();
+#endif
         break;
       }
       default: assert(true);
