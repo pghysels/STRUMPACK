@@ -1,3 +1,22 @@
+Version 3.0.0 (in progress)
+===========================
+ - Changes in the build system
+    - ParMETIS, (PT)Scotch are now optional
+ - Work to make STRUMPACK compatible with the xSDK policies
+    - Moved header files in subfolders
+    - Made interface const correct
+    - ..?
+ - Support for multiple right-hand sides
+ - TODO improved threading in HSS code
+ - TODO spack installer
+ - TODO Trilinos interface
+ - TODO C interface to HSS code
+ - TODO Fortran interfaces
+ - geometric nested dissection now supports wider stencils and
+   multiple degrees of freedom per node (TODO add in MPI code)
+ - Many performance and bug fixes
+
+
 Version 2.1.0 Released October 26, 2017
 =======================================
  - Cleanup in the C interface.
