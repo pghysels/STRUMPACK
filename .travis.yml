@@ -82,7 +82,7 @@ install:
 
   - printf "${BLUE} GC; Installing Scotch-6.0 from source\n"
   - cd $TRAVIS_BUILD_DIR/installDir
-  - wget https://gforge.inria.fr/frs/download.php/file/34618/scotch_6.0.4.tar.gz
+  - wget --no-check-certificate https://gforge.inria.fr/frs/download.php/file/34618/scotch_6.0.4.tar.gz
   - tar -xf scotch_6.0.4.tar.gz
   - cd ./scotch_6.0.4
   - mkdir build
