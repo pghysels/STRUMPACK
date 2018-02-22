@@ -43,197 +43,142 @@ using namespace std;
 using namespace strumpack;
 using namespace strumpack::HSS;
 
+#define ERROR_TOLERANCE 1e1
+#define SOLVE_TOLERANCE 1e-12
 #define myscalar double
-#define myreal double
-#define BLACSCTXTSIZE 9
 
-int main(int argc, char *argv[]) {
+int run(int argc, char *argv[]) {
 
   int n = 8;
-  myscalar *A=NULL;
-  int descA[BLACSCTXTSIZE];
 
-  MPI_Init(&argc, &argv);
+  // Setting command line arguments
+  if (argc > 1) n = stoi(argv[1]);
+
+  HSSOptions<double> hss_opts;
+  hss_opts.set_verbose(false);
+
   auto np = mpi_nprocs(MPI_COMM_WORLD);
-  int myid;
-  MPI_Comm_rank(MPI_COMM_WORLD, &myid);
-
   if (!mpi_rank())
     cout << "# usage: ./DenseTestMPI n (problem size)" << endl;
 
-  if (!mpi_rank()) {
-    cout << "# Building distributed matrix" << endl;
+  if (!mpi_rank()){
+    cout << "## Building distributed matrix" << endl;
+    cout << "# matrix size: n = " << n << endl;
   }
 
-  // initialize the BLACS grid
-  int INONE=-1, IZERO=0, IONE=1;
-  int nb=32;
+  // BLACS variables
   int ctxt, dummy, myrow, mycol;
-  int i, j, ii, jj;
-  int locr, locc;
-
   int nprow=floor(sqrt((float)np));
   int npcol=np/nprow;
 
-  scalapack::Cblacs_get(0, 0, &ctxt);
+  scalapack::Cblacs_get(0 /*ctx number*/, 0 /*default number*/, &ctxt);
   scalapack::Cblacs_gridinit(&ctxt,"C",nprow,npcol);
   scalapack::Cblacs_gridinfo(ctxt,&nprow,&npcol,&myrow,&mycol);
-  
-  // cout << "[" << myid << "] ctxt    = " << ctxt    << endl;
-  // cout << "[" << myid << "] np    = " << np    << endl;
-  // cout << "[" << myid << "] nprow = " << nprow << endl;
-  // cout << "[" << myid << "] npcol = " << npcol << endl;
-  // cout << "[" << myid << "] myrow = " << myrow << endl;
-  // cout << "[" << myid << "] mycol = " << mycol << endl;
 
-  /* A is a dense n x n distributed Toeplitz matrix */
-  if(myid<nprow*npcol) {
-    locr=strumpack::scalapack::numroc(n,nb,myrow,IZERO,nprow);
-    locc=strumpack::scalapack::numroc(n,nb,mycol,IZERO,npcol);
-    A=new myscalar[locr*locc];
-    dummy=std::max(1,locr);
-    scalapack::descinit(descA, n, n, nb, nb, IZERO, IZERO, ctxt, dummy);
-
-    for(i=1;i<=locr;i++)
-      for(j=1;j<=locc;j++) {
-        ii = indxl2g( i, nb, myrow,IZERO, nprow ) ;
-        jj = indxl2g( j, nb, mycol,IZERO, npcol ) ;
-        // Toeplitz matrix from Quantum Chemistry.
-        myreal pi=3.1416, d=0.1;
-        A[locr*(j-1)+(i-1)]=ii==jj?pow(pi,2)/6.0/pow(d,2):pow(-1.0,ii-jj)/pow((myreal)ii-jj,2)/pow(d,2);
-
-      }
-  } else {
-    scalapack::descset(descA, n, n, nb, nb, IZERO, IZERO, INONE, IONE);
+  DistributedMatrix<double> A = DistributedMatrix<double>(ctxt, n, n);
+  for (int c=0; c<n; c++)
+  {
+    for (int r=0; r<n; r++)
+    {
+      // Toeplitz matrix from Quantum Chemistry.
+      myscalar pi=3.1416, d=0.1;
+      A.global(r, c, (r==c) ? pow(pi,2)/6.0/pow(d,2) : pow(-1.0,r-c)/pow((myscalar)r-c,2)/pow(d,2) );
+    }
   }
 
-  // TaskTimer::t_begin = GET_TIME_NOW();
-  // TaskTimer timer(string("compression"), 1);
+  hss_opts.set_from_command_line(argc, argv);
+  
 
-  // HSSOptions<double> hss_opts;
-  // hss_opts.set_verbose(true);
-  // hss_opts.set_from_command_line(argc, argv);
+  if ( hss_opts.verbose() == 1 && n < 8 ){
+    cout << "n = " << n << endl;
+    A.print("A");
+  }
 
-  // vector<double> data_train = write_from_file(filename + "_train.csv");
-  // vector<double> data_test = write_from_file(filename + "_" + mode + ".csv");
-  // vector<double> data_train_label =
-  //     write_from_file(filename + "_train_label.csv");
-  // vector<double> data_test_label =
-  //     write_from_file(filename + "_" + mode + "_label.csv");
+  if (!mpi_rank())
+    cout << "## Starting compression" << endl;
 
-  // int n = data_train.size() / d;
-  // int m = data_test.size() / d;
+  if (!mpi_rank()) cout << "# rel_tol = " << hss_opts.rel_tol() << endl;
+  HSSMatrixMPI<double> H(A, hss_opts, MPI_COMM_WORLD);
+  if (H.is_compressed()) {
+    if (!mpi_rank()) {
+      cout << "# created H matrix of dimension "
+           << H.rows() << " x " << H.cols()
+           << " with " << H.levels() << " levels" << endl;
+      cout << "# compression succeeded!" << endl;
+    }
+  } else {
+    if (!mpi_rank()) cout << "# compression failed!!!!!!!!" << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
 
-  // if (!mpi_rank())
-  //   cout << "# matrix size = " << n << " x " << d << endl;
+  auto Hrank = H.max_rank();
+  auto Hmem = H.total_memory();
+  auto Amem = A.total_memory();
+  if (!mpi_rank()) {
+    cout << "# rank(H) = " << Hrank << endl;
+    cout << "# memory(H) = " << Hmem/1e6 << " MB, "
+         << 100. * Hmem / Amem << "% of dense" << endl;
+  }
 
-  // if (!mpi_rank())
-  //   cout << "# Preprocessing data..." << endl;
-  // timer.start();
+  // Checking error against dense matrix
+  if ( hss_opts.verbose() == 1 && n <= 1024) {
+    MPI_Barrier(MPI_COMM_WORLD);
+    auto Hdense = H.dense(A.ctxt());
+    MPI_Barrier(MPI_COMM_WORLD);
 
-  // HSSPartitionTree cluster_tree;
-  // cluster_tree.size = n;
-  // int cluster_size = hss_opts.leaf_size();
-
-  // if (reorder == "2means") {
-  //   recursive_2_means(data_train.data(), n, d, cluster_size, cluster_tree,
-  //                     data_train_label.data());
-  // } else if (reorder == "kd") {
-  //   recursive_kd(data_train.data(), n, d, cluster_size, cluster_tree,
-  //                data_train_label.data());
-  // } else if (reorder == "pca") {
-  //   recursive_pca(data_train.data(), n, d, cluster_size, cluster_tree,
-  //                 data_train_label.data());
-  // }
-
-  // if (!mpi_rank())
-  //   cout << "# Preprocessing took " << timer.elapsed() << endl;
-
-  // if (!mpi_rank())
-  //   cout << "# HSS compression .. " << endl;
-  // timer.start();
-
-  // HSSMatrixMPI<double>* K = nullptr;
-
-  // KernelMPI kernel_matrix
-  //   (data_train, d, h, lambda, hss_opts,
-  //    ctxt_all, nprow, npcol, nmpi, ninc, ACA);
-
-  // auto f0_compress = strumpack::params::flops;
-  // if (reorder != "natural")
-  //   K = new HSSMatrixMPI<double>
-  //     (cluster_tree, kernel_matrix, ctxt, kernel_matrix,
-  //      hss_opts, MPI_COMM_WORLD);
-  // else
-  //   K = new HSSMatrixMPI<double>
-  //     (n, n, kernel_matrix, ctxt, kernel_matrix,
-  //      hss_opts, MPI_COMM_WORLD);
+    Hdense.scaled_add(-1., A);
+    auto HnormF = Hdense.normF();
+    auto AnormF = A.normF();
+    if (!mpi_rank())
+      cout << "# relative error = ||A-H*I||_F/||A||_F = "
+           << HnormF / AnormF << endl;
+    if (A.active() && HnormF / AnormF >
+        ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
+      if (!mpi_rank()) cout << "ERROR: compression error too big!!" << endl;
+      MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+  }
 
 
-  // if (K->is_compressed()) {
-  //   // reduction over all processors
-  //   const auto max_rank = K->max_rank();
-  //   const auto total_memory = K->total_memory();
-  //   if (!mpi_rank())
-  //     cout << "# created K matrix of dimension "
-  //          << K->rows() << " x " << K->cols()
-  //          << " with " << K->levels() << " levels" << endl
-  //          << "# compression succeeded!" << endl
-  //          << "# rank(K) = " << max_rank << endl
-  //          << "# memory(K) = " << total_memory / 1e6 << " MB " << endl;
-  // } else {
-  //   if (!mpi_rank())
-  //     cout << "# compression failed!!!!!!!!" << endl;
-  //   return 1;
-  // }
+  if (!mpi_rank())
+    cout << "## Starting factorization and solve" << endl;
 
-  // if (!mpi_rank())
-  //   cout << "#HSS compression took " << timer.elapsed() << endl;
-  // total_time += timer.elapsed();
+  MPI_Barrier(MPI_COMM_WORLD);
+  if (!mpi_rank()) cout << "# computing ULV factorization of HSS matrix .. ";
+  auto ULV = H.factor();
+  if (!mpi_rank()) cout << "Done!" << endl;
 
-  // auto total_flops_compress = Allreduce
-  //   (strumpack::params::flops - f0_compress, MPI_SUM, MPI_COMM_WORLD);
-  // if (!mpi_rank())
-  //   cout << "# compression flops = " << total_flops_compress << endl;
+  if (!mpi_rank()) cout << "# solving linear system .." << endl;
+  DistributedMatrix<double> B(ctxt, n, 1);
+  B.random();
+  DistributedMatrix<double> C(B);
+  H.solve(ULV, C);
 
-  // // Starting factorization
-  // if (!mpi_rank())
-  //   cout << "factorization start" << endl;
-  // timer.start();
-  // auto f0_factor = strumpack::params::flops;
-  // auto ULV = K->factor();
-  // if (!mpi_rank())
-  //   cout << "# factorization time = " << timer.elapsed() << endl;
-  // total_time += timer.elapsed();
-  // auto total_flops_factor = Allreduce
-  //   (strumpack::params::flops - f0_factor, MPI_SUM, MPI_COMM_WORLD);
-  // if (!mpi_rank())
-  //   cout << "# factorization flops = " << total_flops_factor << endl;
+  DistributedMatrix<double> Bcheck(ctxt, n, 1);
+  apply_HSS(Trans::N, H, C, 0., Bcheck);
+  Bcheck.scaled_add(-1., B);
+  auto Bchecknorm = Bcheck.normF();
+  auto Bnorm = B.normF();
+  if (!mpi_rank())
+    cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
+         << Bchecknorm / Bnorm << endl;
+  if (B.active() && Bchecknorm / Bnorm > SOLVE_TOLERANCE) {
+    if (!mpi_rank())
+      cout << "ERROR: ULV solve relative error too big!!" << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
 
-  // DenseMatrix<double> B(n, 1, &data_train_label[0], n);
-  // DenseMatrix<double> weights(B);
-  // DistributedMatrix<double> Bdist(ctxt, B);
-  // DistributedMatrix<double> wdist(ctxt, weights);
+  if (!mpi_rank())
+    cout << "## Test succeeded, exiting" << endl;
 
-  // if (!mpi_rank())
-  //   cout << "solve start" << endl;
-  // timer.start();
-  // K->solve(ULV, wdist);
-  // if (!mpi_rank())
-  //   cout << "# solve time = " << timer.elapsed() << endl;
-  // total_time += timer.elapsed();
-  // if (!mpi_rank())
-  //   cout << "# total time (comp + fact): " << total_time << endl;
+  return 0;
+}
 
-  // auto Bcheck = K->apply(wdist);
 
-  // Bcheck.scaled_add(-1., Bdist);
-  // auto Bchecknorm = Bcheck.normF() / Bdist.normF();
-  // if (!mpi_rank())
-  //   cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
-  //        << Bchecknorm << endl;
-
+int main(int argc, char *argv[]) {
+  MPI_Init(&argc, &argv);
+  int ierr = run(argc, argv);
   scalapack::Cblacs_exit(1);
   MPI_Finalize();
-  return 0;
+  return ierr;
 }
