@@ -1,4 +1,7 @@
-all: @C_EXAMPLES@ testPoisson2d testPoisson3d	\
+all: testPoisson2dMPIDist testPoisson3dMPIDist \
+DenseTestMPI
+
+all1: @C_EXAMPLES@ testPoisson2d testPoisson3d	\
 	testPoisson2dMPI testPoisson2dMPIDist testMMdouble	\
 	testMMdoubleMPI testMMdoubleMPIDist testMMdouble64	\
 	testMMdoubleMPIDist64 testMMfloat testMMfloatMPIDist	\
@@ -42,19 +45,32 @@ testPoisson2dMPI: testPoisson2dMPI.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testPoisson2dMPI.o
 	$(CXX) $(LDFLAGS) testPoisson2dMPI.o -o $@ $(LIBS)
 	$(RM) testPoisson2dMPI.o
+
 testPoisson2dMPIDist: testPoisson2dMPIDist.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testPoisson2dMPIDist.o
 	$(CXX) $(LDFLAGS) testPoisson2dMPIDist.o -o $@ $(LIBS)
 	$(RM) testPoisson2dMPIDist.o
 
+testPoisson3dMPIDist: testPoisson3dMPIDist.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testPoisson3dMPIDist.o
+	$(CXX) $(LDFLAGS) testPoisson3dMPIDist.o -o $@ $(LIBS)
+	$(RM) testPoisson3dMPIDist.o
+
+DenseTestMPI: DenseTestMPI.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o DenseTestMPI.o
+	$(CXX) $(LDFLAGS) DenseTestMPI.o -o $@ $(LIBS)
+	$(RM) DenseTestMPI.o
+
 testMMdouble: testMMdouble.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMdouble.o
 	$(CXX) $(LDFLAGS) testMMdouble.o -o $@ $(LIBS)
 	$(RM) testMMdouble.o
+
 testMMdoubleMPI: testMMdoubleMPI.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMdoubleMPI.o
 	$(CXX) $(LDFLAGS) testMMdoubleMPI.o -o $@ $(LIBS)
 	$(RM) testMMdoubleMPI.o
+
 testMMdoubleMPIDist: testMMdoubleMPIDist.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMdoubleMPIDist.o
 	$(CXX) $(LDFLAGS) testMMdoubleMPIDist.o -o $@ $(LIBS)
@@ -100,6 +116,7 @@ clean:
 		testMMdouble testMMdoubleMPI testMMdoubleMPIDist	\
 		testMMdouble64 testMMdoubleMPIDist64			\
 		testMMfloat testMMfloatMPIDist				\
-		mtx2bin bin2mtx MLkernel
+		mtx2bin bin2mtx MLkernel \
+		testPoisson3dMPIDist DenseTestMPI
 
 

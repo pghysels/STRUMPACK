@@ -91,7 +91,7 @@ int main(int argc, char* argv[]) {
     /** build distributed matrix from complete replicated original matrix ***/
     /** TODO directly construct distributed matrix **************************/
     CSRMatrixMPI<scalar,integer> Adist(&A, MPI_COMM_WORLD, false);
-    A = CSRMatrix<scalar,integer>();
+    // A = CSRMatrix<scalar,integer>();
 
     auto n_local = Adist.local_rows();
     DenseMatrix<scalar> b(n_local, nrhs), x(n_local, nrhs),
