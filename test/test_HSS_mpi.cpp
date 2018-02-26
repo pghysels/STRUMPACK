@@ -30,7 +30,7 @@
 #include <iostream>
 using namespace std;
 
-#define STRUMPACK_PBLAS_BLOCKSIZE 3
+#define STRUMPACK_PBLAS_BLOCKSIZE 32
 #include "dense/DistributedMatrix.hpp"
 #include "HSS/HSSMatrixMPI.hpp"
 using namespace strumpack;
@@ -45,7 +45,7 @@ int run(int argc, char* argv[]) {
   auto P = mpi_nprocs(MPI_COMM_WORLD);
 
   HSSOptions<double> hss_opts;
-  hss_opts.set_verbose(false);
+  hss_opts.set_verbose(true);
 
   auto usage = [&]() {
     if (!mpi_rank()) {

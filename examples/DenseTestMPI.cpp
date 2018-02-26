@@ -51,11 +51,14 @@ int run(int argc, char *argv[]) {
 
   int n = 8;
 
+  TaskTimer::t_begin = GET_TIME_NOW();
+  TaskTimer timer(string("compression"), 1);
+
   // Setting command line arguments
   if (argc > 1) n = stoi(argv[1]);
 
   HSSOptions<double> hss_opts;
-  hss_opts.set_verbose(false);
+  hss_opts.set_from_command_line(argc, argv);
 
   auto np = mpi_nprocs(MPI_COMM_WORLD);
   if (!mpi_rank())
@@ -75,6 +78,14 @@ int run(int argc, char *argv[]) {
   scalapack::Cblacs_gridinit(&ctxt,"C",nprow,npcol);
   scalapack::Cblacs_gridinfo(ctxt,&nprow,&npcol,&myrow,&mycol);
 
+
+// # ==========================================================================
+// # === Build sparse (distributed) matrix ===
+// # ==========================================================================
+  if (!mpi_rank())
+    cout << "# Building sparse matrix" << endl;
+  timer.start();
+
   DistributedMatrix<double> A = DistributedMatrix<double>(ctxt, n, n);
   for (int c=0; c<n; c++)
   {
@@ -85,17 +96,20 @@ int run(int argc, char *argv[]) {
       A.global(r, c, (r==c) ? pow(pi,2)/6.0/pow(d,2) : pow(-1.0,r-c)/pow((myscalar)r-c,2)/pow(d,2) );
     }
   }
-
-  hss_opts.set_from_command_line(argc, argv);
-  
+  if (!mpi_rank())
+    cout << "## Sparse matrix construction time = " << timer.elapsed() << endl;
 
   if ( hss_opts.verbose() == 1 && n < 8 ){
     cout << "n = " << n << endl;
     A.print("A");
   }
 
+// # ==========================================================================
+// # === Compression ===
+// # ==========================================================================
   if (!mpi_rank())
-    cout << "## Starting compression" << endl;
+    cout << "# Starting compression" << endl;
+  timer.start();
 
   if (!mpi_rank()) cout << "# rel_tol = " << hss_opts.rel_tol() << endl;
   HSSMatrixMPI<double> H(A, hss_opts, MPI_COMM_WORLD);
@@ -110,14 +124,17 @@ int run(int argc, char *argv[]) {
     if (!mpi_rank()) cout << "# compression failed!!!!!!!!" << endl;
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
+  
+  if (!mpi_rank())
+    cout << "## Compression time = " << timer.elapsed() << endl;
 
   auto Hrank = H.max_rank();
   auto Hmem = H.total_memory();
   auto Amem = A.total_memory();
   if (!mpi_rank()) {
     cout << "# rank(H) = " << Hrank << endl;
-    cout << "# memory(H) = " << Hmem/1e6 << " MB, "
-         << 100. * Hmem / Amem << "% of dense" << endl;
+    cout << "# memory(H) = " << Hmem/1e6 << " MB, " << endl;
+    cout << "# mem percentage = " << 100. * Hmem / Amem << "% (of dense)" << endl;
   }
 
   // Checking error against dense matrix
@@ -139,20 +156,37 @@ int run(int argc, char *argv[]) {
     }
   }
 
-
+// # ==========================================================================
+// # === Factorization ===
+// # ==========================================================================
   if (!mpi_rank())
-    cout << "## Starting factorization and solve" << endl;
+    cout << "# Starting factorization" << endl;
+  timer.start();
 
   MPI_Barrier(MPI_COMM_WORLD);
-  if (!mpi_rank()) cout << "# computing ULV factorization of HSS matrix .. ";
-  auto ULV = H.factor();
-  if (!mpi_rank()) cout << "Done!" << endl;
+  if (!mpi_rank()) cout << "# computing ULV factorization of HSS matrix .. " << endl;
+  
+    auto ULV = H.factor();
+  if (!mpi_rank())
+    cout << "## Factorization time = " << timer.elapsed() << endl;
 
+// # ==========================================================================
+// # === Solve ===
+// # ==========================================================================
   if (!mpi_rank()) cout << "# solving linear system .." << endl;
+
   DistributedMatrix<double> B(ctxt, n, 1);
   B.random();
   DistributedMatrix<double> C(B);
-  H.solve(ULV, C);
+  
+  timer.start();
+    H.solve(ULV, C);
+  if (!mpi_rank())
+    cout << "## Solve time = " << timer.elapsed() << endl;
+
+// # ==========================================================================
+// # === Error checking ===
+// # ==========================================================================
 
   DistributedMatrix<double> Bcheck(ctxt, n, 1);
   apply_HSS(Trans::N, H, C, 0., Bcheck);
@@ -168,16 +202,93 @@ int run(int argc, char *argv[]) {
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
 
-  if (!mpi_rank())
-    cout << "## Test succeeded, exiting" << endl;
-
   return 0;
+}
+
+void print_flop_breakdown
+  (float random_flops, float ID_flops, float QR_flops, float ortho_flops,
+   float reduce_sample_flops, float update_sample_flops,
+   float extraction_flops, float CB_sample_flops, float sparse_sample_flops,
+   float ULV_factor_flops, float schur_flops, float full_rank_flops) {
+    
+    // Just root process continues
+    if (mpi_rank() != 0) return;
+
+    float sample_flops = CB_sample_flops
+      + sparse_sample_flops;
+    float compression_flops = random_flops
+      + ID_flops + QR_flops + ortho_flops
+      + reduce_sample_flops + update_sample_flops
+      + extraction_flops + sample_flops;
+    std::cout << std::endl;
+    std::cout << "# ----- FLOP BREAKDOWN ---------------------"
+              << std::endl;
+    std::cout << "# compression           = "
+              << compression_flops << std::endl;
+    std::cout << "#    random             = "
+              << random_flops << std::endl;
+    std::cout << "#    ID                 = "
+              << ID_flops << std::endl;
+    std::cout << "#    QR                 = "
+              << QR_flops << std::endl;
+    std::cout << "#    ortho              = "
+              << ortho_flops << std::endl;
+    std::cout << "#    reduce_samples     = "
+              << reduce_sample_flops << std::endl;
+    std::cout << "#    update_samples     = "
+              << update_sample_flops << std::endl;
+    std::cout << "#    extraction         = "
+              << extraction_flops << std::endl;
+    std::cout << "#    sampling           = "
+              << sample_flops << std::endl;
+    std::cout << "#       CB_sample       = "
+              << CB_sample_flops << std::endl;
+    std::cout << "#       sparse_sampling = "
+              << sparse_sample_flops << std::endl;
+    std::cout << "# ULV_factor            = "
+              << ULV_factor_flops << std::endl;
+    std::cout << "# Schur                 = "
+              << schur_flops << std::endl;
+    std::cout << "# full_rank             = "
+              << full_rank_flops << std::endl;
+    std::cout << "# --------------------------------------------"
+              << std::endl;
+    std::cout << "# total                 = "
+              << (compression_flops + ULV_factor_flops +
+                  schur_flops + full_rank_flops) << std::endl;
+    std::cout << "# --------------------------------------------";
+    std::cout << std::endl;
 }
 
 
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
+
+  // Main program execution  
   int ierr = run(argc, argv);
+
+  // Reducing flop counters
+  float flops[12] = {
+    float(params::random_flops.load()),
+    float(params::ID_flops.load()),
+    float(params::QR_flops.load()),
+    float(params::ortho_flops.load()),
+    float(params::reduce_sample_flops.load()),
+    float(params::update_sample_flops.load()),
+    float(params::extraction_flops.load()),
+    float(params::CB_sample_flops.load()),
+    float(params::sparse_sample_flops.load()),
+    float(params::ULV_factor_flops.load()),
+    float(params::schur_flops.load()),
+    float(params::full_rank_flops.load())
+  };
+
+  float rflops[12];
+    MPI_Reduce(flops, rflops, 12, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+    print_flop_breakdown (rflops[0], rflops[1], rflops[2], rflops[3],
+                          rflops[4], rflops[5], rflops[6], rflops[7], 
+                          rflops[8], rflops[9], rflops[10], rflops[11]);
+
   scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return ierr;
