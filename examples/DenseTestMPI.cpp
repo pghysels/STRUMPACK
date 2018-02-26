@@ -39,18 +39,85 @@
 #include "HSS/HSSMatrixMPI.hpp"
 #include "misc/TaskTimer.hpp"
 
+#define ERROR_TOLERANCE 1e1
+#define SOLVE_TOLERANCE 1e-12
+#define CHECK_ERROR_RANDOMIZED 1
+#define myscalar double
+
 using namespace std;
 using namespace strumpack;
 using namespace strumpack::HSS;
+using DistM_t = DistributedMatrix<double>;
+using DenseM_t = DenseMatrix<double>;
 
-#define ERROR_TOLERANCE 1e1
-#define SOLVE_TOLERANCE 1e-12
-#define myscalar double
+class IUV {
+public:
+  double _alpha = 0.;
+  double _beta = 0.;
+  DistM_t _U, _V;
+  DenseM_t _U1d,_V1d;
+  HSSMatrixMPI<double>* _H;
+  IUV() {}
+  IUV(int ctxt, double alpha, double beta, int m, int rank,
+      int decay_val) : _alpha(alpha), _beta(beta) {
+    _U = DistM_t(ctxt, m, rank);
+    _V = DistM_t(ctxt, m, rank);
+    _U.random();
+    _V.random();
+    for (int c=0; c<_V.lcols(); c++) {
+      auto gc = _V.coll2g(c);
+      auto tmpD = _beta * exp2(-decay_val*double(gc)/rank);
+      for (int r=0; r<_V.lrows(); r++)
+        _V(r, c) = _V(r, c) * tmpD;
+    }
+    _U1d = _U.all_gather(_U.ctxt());
+    _V1d = _V.all_gather(_V.ctxt());
+  }
+
+  void operator()(DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
+    DistM_t tmp(_U.ctxt(), _U.cols(), R.cols());
+    gemm(Trans::C, Trans::N, 1., _V, R, 0., tmp);
+    gemm(Trans::N, Trans::N, 1., _U, tmp, 0., Sr);
+    Sr.scaled_add(_alpha, R);
+
+    gemm(Trans::C, Trans::N, 1., _U, R, 0., tmp);
+    gemm(Trans::N, Trans::N, 1., _V, tmp, 0., Sc);
+    Sc.scaled_add(_alpha, R);
+  }
+
+  DistM_t dense() const {
+    DistM_t D(_U.ctxt(), _U.rows(), _U.rows());
+    D.eye();
+    gemm(Trans::N, Trans::C, 1., _U, _V, _alpha, D);
+    return D;
+  }
+
+  void operator()(const vector<size_t>& I,
+                  const vector<size_t>& J, DistM_t& B) {
+    if (!B.active()) return;
+    for (size_t j=0; j<J.size(); j++)
+      for (size_t i=0; i<I.size(); i++) {
+        if (B.is_local(i,j)) {
+          if (I[i] == J[j]) B.global(i,j) = _alpha;
+          else B.global(i,j) = 0.;
+          for (int k=0; k<_U.cols(); k++)
+            B.global(i,j) += _U1d(I[i],k) * _V1d(J[j], k);
+        }
+      }
+    return;
+  }
+
+};
 
 int run(int argc, char *argv[]) {
 
-  int n = 8;
+  int     n         = 8;
+  int     rk        = 100;
+  double  alpha     = 1.0;
+  double  beta      = 1.0;
+  double  decay_val = 1.0;
 
+  // Initialize timer
   TaskTimer::t_begin = GET_TIME_NOW();
   TaskTimer timer(string("compression"), 1);
 
@@ -78,15 +145,16 @@ int run(int argc, char *argv[]) {
   scalapack::Cblacs_gridinit(&ctxt,"C",nprow,npcol);
   scalapack::Cblacs_gridinfo(ctxt,&nprow,&npcol,&myrow,&mycol);
 
+// # ==========================================================================
+// # === Build dense (distributed) matrix ===
+// # ==========================================================================
 
-// # ==========================================================================
-// # === Build sparse (distributed) matrix ===
-// # ==========================================================================
   if (!mpi_rank())
-    cout << "# Building sparse matrix" << endl;
+    cout << "# Building dense matrix" << endl;
   timer.start();
 
   DistributedMatrix<double> A = DistributedMatrix<double>(ctxt, n, n);
+  // TODO only loop over local rows and columns, get the global coordinate..
   for (int c=0; c<n; c++)
   {
     for (int r=0; r<n; r++)
@@ -97,7 +165,7 @@ int run(int argc, char *argv[]) {
     }
   }
   if (!mpi_rank())
-    cout << "## Sparse matrix construction time = " << timer.elapsed() << endl;
+    cout << "## Dense matrix construction time = " << timer.elapsed() << endl;
 
   if ( hss_opts.verbose() == 1 && n < 8 ){
     cout << "n = " << n << endl;
@@ -109,10 +177,22 @@ int run(int argc, char *argv[]) {
 // # ==========================================================================
   if (!mpi_rank())
     cout << "# Starting compression" << endl;
-  timer.start();
-
+  
   if (!mpi_rank()) cout << "# rel_tol = " << hss_opts.rel_tol() << endl;
-  HSSMatrixMPI<double> H(A, hss_opts, MPI_COMM_WORLD);
+
+  // Simple compression
+  timer.start();
+    HSSMatrixMPI<double> H(A, hss_opts, MPI_COMM_WORLD);
+  if (!mpi_rank())
+    cout << "## Compression time = " << timer.elapsed() << endl;
+
+  // Matrix-free compression
+  // IUV Amf(ctxt, alpha, beta, n, rk, decay_val);
+  // timer.start();
+  //   HSSMatrixMPI<double> H(n, n, Amf, ctxt, Amf, hss_opts, MPI_COMM_WORLD);
+  // if (!mpi_rank())
+  //   cout << "## Compression time = " << timer.elapsed() << endl;
+
   if (H.is_compressed()) {
     if (!mpi_rank()) {
       cout << "# created H matrix of dimension "
@@ -125,9 +205,6 @@ int run(int argc, char *argv[]) {
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
   
-  if (!mpi_rank())
-    cout << "## Compression time = " << timer.elapsed() << endl;
-
   auto Hrank = H.max_rank();
   auto Hmem = H.total_memory();
   auto Amem = A.total_memory();
@@ -187,7 +264,6 @@ int run(int argc, char *argv[]) {
 // # ==========================================================================
 // # === Error checking ===
 // # ==========================================================================
-
   DistributedMatrix<double> Bcheck(ctxt, n, 1);
   apply_HSS(Trans::N, H, C, 0., Bcheck);
   Bcheck.scaled_add(-1., B);
