@@ -433,6 +433,6 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson3dMPIDist.cpp
 configure_file(${CMAKE_SOURCE_DIR}/examples/DenseTestMPI.cpp
   ${CMAKE_BINARY_DIR}/examples/DenseTestMPI.cpp COPYONLY)
 
-include(CTest)
-add_subdirectory(test)
+# include(CTest)
+# add_subdirectory(test)
 

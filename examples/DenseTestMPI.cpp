@@ -57,26 +57,32 @@ public:
   DenseM_t _U1d,_V1d;
   HSSMatrixMPI<double>* _H;
   IUV() {}
-  IUV(int ctxt, double alpha, double beta, int m, int rank,
-      int decay_val) : _alpha(alpha), _beta(beta) {
+
+  // Constructor
+  IUV(int ctxt, double alpha, double beta, int m, int rank, int decay_val) : _alpha(alpha), _beta(beta) {
+    
     _U = DistM_t(ctxt, m, rank);
     _V = DistM_t(ctxt, m, rank);
     _U.random();
     _V.random();
+
     for (int c=0; c<_V.lcols(); c++) {
       auto gc = _V.coll2g(c);
       auto tmpD = _beta * exp2(-decay_val*double(gc)/rank);
       for (int r=0; r<_V.lrows(); r++)
         _V(r, c) = _V(r, c) * tmpD;
     }
+
+    // all_gather blows up the memory?
     _U1d = _U.all_gather(_U.ctxt());
     _V1d = _V.all_gather(_V.ctxt());
   }
 
+  // Function call operator overloading: dmult_t
   void operator()(DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
     DistM_t tmp(_U.ctxt(), _U.cols(), R.cols());
-    gemm(Trans::C, Trans::N, 1., _V, R, 0., tmp);
-    gemm(Trans::N, Trans::N, 1., _U, tmp, 0., Sr);
+    gemm(Trans::C, Trans::N, 1., _V, R, 0., tmp);  // tmp = (1.)_V'*R + (0.)tmp
+    gemm(Trans::N, Trans::N, 1., _U, tmp, 0., Sr); // Sr = _U*tmp + (0.)tmp
     Sr.scaled_add(_alpha, R);
 
     gemm(Trans::C, Trans::N, 1., _U, R, 0., tmp);
@@ -84,13 +90,7 @@ public:
     Sc.scaled_add(_alpha, R);
   }
 
-  DistM_t dense() const {
-    DistM_t D(_U.ctxt(), _U.rows(), _U.rows());
-    D.eye();
-    gemm(Trans::N, Trans::C, 1., _U, _V, _alpha, D);
-    return D;
-  }
-
+  // Function call operator overloading (extract element): delem_t
   void operator()(const vector<size_t>& I,
                   const vector<size_t>& J, DistM_t& B) {
     if (!B.active()) return;
@@ -106,11 +106,18 @@ public:
     return;
   }
 
+  DistM_t dense() const {
+    DistM_t D(_U.ctxt(), _U.rows(), _U.rows());
+    D.eye();
+    gemm(Trans::N, Trans::C, 1., _U, _V, _alpha, D);
+    return D;
+  }
+
 };
 
 int run(int argc, char *argv[]) {
 
-  int     n         = 8;
+  int n = 8;
 
   // Initialize timer
   TaskTimer::t_begin = GET_TIME_NOW();
@@ -147,7 +154,7 @@ int run(int argc, char *argv[]) {
     cout << "# Building dense matrix..." << endl;
   timer.start();
 
-  DistributedMatrix<double> A = DistributedMatrix<double>(ctxt, n, n);
+  DistributedMatrix<double> A = DistributedMatrix<double>(ctxt, n, n); // Creates descriptor
   // TODO only loop over local rows and columns, get the global coordinate..
   for (int c=0; c<n; c++)
   {
@@ -158,6 +165,7 @@ int run(int argc, char *argv[]) {
       A.global(r, c, (r==c) ? pow(pi,2)/6.0/pow(d,2) : pow(-1.0,r-c)/pow((myscalar)r-c,2)/pow(d,2) );
     }
   }
+
   if (!mpi_rank())
     cout << "## Dense matrix construction time = " << timer.elapsed() << endl;
 
@@ -358,10 +366,11 @@ int main(int argc, char *argv[]) {
   };
 
   float rflops[12];
-    MPI_Reduce(flops, rflops, 12, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-    print_flop_breakdown (rflops[0], rflops[1], rflops[2], rflops[3],
-                          rflops[4], rflops[5], rflops[6], rflops[7], 
-                          rflops[8], rflops[9], rflops[10], rflops[11]);
+  MPI_Reduce(flops, rflops, 12, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+    
+  // print_flop_breakdown (rflops[0], rflops[1], rflops[2], rflops[3],
+  //                       rflops[4], rflops[5], rflops[6], rflops[7], 
+  //                       rflops[8], rflops[9], rflops[10], rflops[11]);
 
   scalapack::Cblacs_exit(1);
   MPI_Finalize();
