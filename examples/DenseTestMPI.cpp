@@ -151,7 +151,7 @@ int run(int argc, char *argv[]) {
 // # ==========================================================================
 
   if (!mpi_rank())
-    cout << "# Building dense matrix..." << endl;
+    cout << "# Building dense matrix A..." << endl;
   timer.start();
 
   DistributedMatrix<double> A = DistributedMatrix<double>(ctxt, n, n); // Creates descriptor
@@ -166,8 +166,10 @@ int run(int argc, char *argv[]) {
     }
   }
 
-  if (!mpi_rank())
+  if (!mpi_rank()){
     cout << "## Dense matrix construction time = " << timer.elapsed() << endl;
+    cout << "# A.total_memory() = " << (double)A.total_memory()/(1000.0*1000.0) << "MB" << endl;
+  }
 
   if ( hss_opts.verbose() == 1 && n < 8 ){
     cout << "n = " << n << endl;
@@ -178,7 +180,7 @@ int run(int argc, char *argv[]) {
 // # === Compression ===
 // # ==========================================================================
   if (!mpi_rank())
-    cout << "# Compression..." << endl;
+    cout << "# Creating HSS matrix H..." << endl;
   
   if (!mpi_rank()) cout << "# rel_tol = " << hss_opts.rel_tol() << endl;
 
@@ -208,7 +210,7 @@ int run(int argc, char *argv[]) {
     }
   } else {
     if (!mpi_rank()) cout << "# compression failed!!!!!!!!" << endl;
-    MPI_Abort(MPI_COMM_WORLD, 1);
+    // MPI_Abort(MPI_COMM_WORLD, 1);
   }
   
   auto Hrank = H.max_rank();
@@ -235,7 +237,7 @@ int run(int argc, char *argv[]) {
     if (A.active() && HnormF / AnormF >
         ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
       if (!mpi_rank()) cout << "ERROR: compression error too big!!" << endl;
-      MPI_Abort(MPI_COMM_WORLD, 1);
+      // MPI_Abort(MPI_COMM_WORLD, 1);
     }
   }
 
@@ -349,24 +351,24 @@ int main(int argc, char *argv[]) {
   // Main program execution  
   int ierr = run(argc, argv);
 
-  // Reducing flop counters
-  float flops[12] = {
-    float(params::random_flops.load()),
-    float(params::ID_flops.load()),
-    float(params::QR_flops.load()),
-    float(params::ortho_flops.load()),
-    float(params::reduce_sample_flops.load()),
-    float(params::update_sample_flops.load()),
-    float(params::extraction_flops.load()),
-    float(params::CB_sample_flops.load()),
-    float(params::sparse_sample_flops.load()),
-    float(params::ULV_factor_flops.load()),
-    float(params::schur_flops.load()),
-    float(params::full_rank_flops.load())
-  };
+  // // Reducing flop counters
+  // float flops[12] = {
+  //   float(params::random_flops.load()),
+  //   float(params::ID_flops.load()),
+  //   float(params::QR_flops.load()),
+  //   float(params::ortho_flops.load()),
+  //   float(params::reduce_sample_flops.load()),
+  //   float(params::update_sample_flops.load()),
+  //   float(params::extraction_flops.load()),
+  //   float(params::CB_sample_flops.load()),
+  //   float(params::sparse_sample_flops.load()),
+  //   float(params::ULV_factor_flops.load()),
+  //   float(params::schur_flops.load()),
+  //   float(params::full_rank_flops.load())
+  // };
 
-  float rflops[12];
-  MPI_Reduce(flops, rflops, 12, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+  // float rflops[12];
+  // MPI_Reduce(flops, rflops, 12, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
     
   // print_flop_breakdown (rflops[0], rflops[1], rflops[2], rflops[3],
   //                       rflops[4], rflops[5], rflops[6], rflops[7], 
