@@ -38,6 +38,61 @@ using namespace strumpack::HSS;
 #define ERROR_TOLERANCE 1e2
 #define SOLVE_TOLERANCE 1e-12
 
+void print_flop_breakdown
+  (float random_flops, float ID_flops, float QR_flops, float ortho_flops,
+   float reduce_sample_flops, float update_sample_flops,
+   float extraction_flops, float CB_sample_flops, float sparse_sample_flops,
+   float ULV_factor_flops, float schur_flops, float full_rank_flops) {
+    
+    // Just root process continues
+    // if (mpi_rank() != 0) return;
+
+    float sample_flops = CB_sample_flops
+      + sparse_sample_flops;
+    float compression_flops = random_flops
+      + ID_flops + QR_flops + ortho_flops
+      + reduce_sample_flops + update_sample_flops
+      + extraction_flops + sample_flops;
+
+    std::cout << std::endl;
+    std::cout << "# ----- FLOP BREAKDOWN ---------------------"
+              << std::endl;
+    std::cout << "# compression           = "
+              << compression_flops << std::endl;
+    std::cout << "#    random             = "
+              << random_flops << std::endl;
+    std::cout << "#    ID                 = "
+              << ID_flops << std::endl;
+    std::cout << "#    QR                 = "
+              << QR_flops << std::endl;
+    std::cout << "#    ortho              = "
+              << ortho_flops << std::endl;
+    std::cout << "#    reduce_samples     = "
+              << reduce_sample_flops << std::endl;
+    std::cout << "#    update_samples     = "
+              << update_sample_flops << std::endl;
+    std::cout << "#    extraction         = "
+              << extraction_flops << std::endl;
+    std::cout << "#    sampling           = "
+              << sample_flops << std::endl;
+    std::cout << "#       CB_sample       = "
+              << CB_sample_flops << std::endl;
+    std::cout << "#       sparse_sampling = "
+              << sparse_sample_flops << std::endl;
+    std::cout << "# ULV_factor            = "
+              << ULV_factor_flops << std::endl;
+    std::cout << "# Schur                 = "
+              << schur_flops << std::endl;
+    std::cout << "# full_rank             = "
+              << full_rank_flops << std::endl;
+    std::cout << "# --------------------------------------------"
+              << std::endl;
+    std::cout << "# total                 = "
+              << (compression_flops + ULV_factor_flops +
+                  schur_flops + full_rank_flops) << std::endl;
+    std::cout << "# --------------------------------------------";
+    std::cout << std::endl;
+}
 
 int run(int argc, char* argv[]) {
   int m = 100, n = 1;
@@ -59,6 +114,10 @@ int run(int argc, char* argv[]) {
     hss_opts.describe_options();
     exit(1);
   };
+
+  // Initialize timer
+  TaskTimer::t_begin = GET_TIME_NOW();
+  TaskTimer timer(string("compression"), 1);
 
   DenseMatrix<double> A;
 
@@ -233,9 +292,11 @@ int run(int argc, char* argv[]) {
   }
 
   cout << "# computing ULV factorization of HSS matrix .." << endl;
+  timer.start();
   auto ULV = H.factor();
+  cout << "## factorization time = " << timer.elapsed() << endl;
+  
   cout << "# solving linear system .." << endl;
-
   DenseMatrix<double> B(m, n);
   B.random();
   DenseMatrix<double> C(B);
@@ -259,10 +320,32 @@ int run(int argc, char* argv[]) {
     // TODO check the Schur update
   }
 
+  // Reducing flop counters
+  float flops[12] = {
+    float(params::random_flops.load()),
+    float(params::ID_flops.load()),
+    float(params::QR_flops.load()),
+    float(params::ortho_flops.load()),
+    float(params::reduce_sample_flops.load()),
+    float(params::update_sample_flops.load()),
+    float(params::extraction_flops.load()),
+    float(params::CB_sample_flops.load()),
+    float(params::sparse_sample_flops.load()),
+    float(params::ULV_factor_flops.load()),
+    float(params::schur_flops.load()),
+    float(params::full_rank_flops.load())
+  };
+
+  // float rflops[12] = flops;
+  // MPI_Reduce(flops, rflops, 12, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+    
+  print_flop_breakdown (flops[0], flops[1], flops[2], flops[3],
+                        flops[4], flops[5], flops[6], flops[7], 
+                        flops[8], flops[9], flops[10], flops[11]);
+
   cout << "# exiting" << endl;
   return 0;
 }
-
 
 int main(int argc, char* argv[]) {
   cout << "# Running with:\n# ";
@@ -276,5 +359,6 @@ int main(int argc, char* argv[]) {
 #pragma omp parallel
 #pragma omp single nowait
   ierr = run(argc, argv);
+ 
   return ierr;
 }
