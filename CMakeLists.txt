@@ -430,8 +430,8 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2dMPIDist.cpp
 #   ${CMAKE_BINARY_DIR}/examples/MLkernel.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson3dMPIDist.cpp
   ${CMAKE_BINARY_DIR}/examples/testPoisson3dMPIDist.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/DenseTestMPI.cpp
-  ${CMAKE_BINARY_DIR}/examples/DenseTestMPI.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/DenseToeplitzMPI.cpp
+  ${CMAKE_BINARY_DIR}/examples/DenseToeplitzMPI.cpp COPYONLY)
 
 # include(CTest)
 # add_subdirectory(test)
