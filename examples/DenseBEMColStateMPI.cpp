@@ -46,74 +46,6 @@
 using namespace std;
 using namespace strumpack;
 using namespace strumpack::HSS;
-using DistM_t = DistributedMatrix<double>;
-using DenseM_t = DenseMatrix<double>;
-
-class IUV {
-public:
-  double _alpha = 0.;
-  double _beta = 0.;
-  DistM_t _U, _V;
-  DenseM_t _U1d,_V1d;
-  HSSMatrixMPI<double>* _H;
-  IUV() {}
-
-  // Constructor
-  IUV(int ctxt, double alpha, double beta, int m, int rank, int decay_val) : _alpha(alpha), _beta(beta) {
-    
-    _U = DistM_t(ctxt, m, rank);
-    _V = DistM_t(ctxt, m, rank);
-    _U.random();
-    _V.random();
-
-    for (int c=0; c<_V.lcols(); c++) {
-      auto gc = _V.coll2g(c);
-      auto tmpD = _beta * exp2(-decay_val*double(gc)/rank);
-      for (int r=0; r<_V.lrows(); r++)
-        _V(r, c) = _V(r, c) * tmpD;
-    }
-
-    // all_gather blows up the memory?
-    _U1d = _U.all_gather(_U.ctxt());
-    _V1d = _V.all_gather(_V.ctxt());
-  }
-
-  // Function call operator overloading: dmult_t
-  void operator()(DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
-    DistM_t tmp(_U.ctxt(), _U.cols(), R.cols());
-    gemm(Trans::C, Trans::N, 1., _V, R, 0., tmp);  // tmp = (1.)_V'*R + (0.)tmp
-    gemm(Trans::N, Trans::N, 1., _U, tmp, 0., Sr); // Sr = _U*tmp + (0.)tmp
-    Sr.scaled_add(_alpha, R);
-
-    gemm(Trans::C, Trans::N, 1., _U, R, 0., tmp);
-    gemm(Trans::N, Trans::N, 1., _V, tmp, 0., Sc);
-    Sc.scaled_add(_alpha, R);
-  }
-
-  // Function call operator overloading (extract element): delem_t
-  void operator()(const vector<size_t>& I,
-                  const vector<size_t>& J, DistM_t& B) {
-    if (!B.active()) return;
-    for (size_t j=0; j<J.size(); j++)
-      for (size_t i=0; i<I.size(); i++) {
-        if (B.is_local(i,j)) {
-          if (I[i] == J[j]) B.global(i,j) = _alpha;
-          else B.global(i,j) = 0.;
-          for (int k=0; k<_U.cols(); k++)
-            B.global(i,j) += _U1d(I[i],k) * _V1d(J[j], k);
-        }
-      }
-    return;
-  }
-
-  DistM_t dense() const {
-    DistM_t D(_U.ctxt(), _U.rows(), _U.rows());
-    D.eye();
-    gemm(Trans::N, Trans::C, 1., _U, _V, _alpha, D);
-    return D;
-  }
-
-};
 
 int run(int argc, char *argv[]) {
 
@@ -149,9 +81,8 @@ int run(int argc, char *argv[]) {
 // # ==========================================================================
 // # === Build dense (distributed) matrix ===
 // # ==========================================================================
-
   if (!mpi_rank())
-    cout << "# Building dense matrix..." << endl;
+    cout << "# Building dense matrix A..." << endl;
   timer.start();
 
   DistributedMatrix<double> A = DistributedMatrix<double>(ctxt, n, n); // Creates descriptor
@@ -166,8 +97,10 @@ int run(int argc, char *argv[]) {
     }
   }
 
-  if (!mpi_rank())
+  if (!mpi_rank()){
     cout << "## Dense matrix construction time = " << timer.elapsed() << endl;
+    cout << "# A.total_memory() = " << (double)A.total_memory()/(1000.0*1000.0) << "MB" << endl;
+  }
 
   if ( hss_opts.verbose() == 1 && n < 8 ){
     cout << "n = " << n << endl;
@@ -178,7 +111,7 @@ int run(int argc, char *argv[]) {
 // # === Compression ===
 // # ==========================================================================
   if (!mpi_rank())
-    cout << "# Compression..." << endl;
+    cout << "# Creating HSS matrix H..." << endl;
   
   if (!mpi_rank()) cout << "# rel_tol = " << hss_opts.rel_tol() << endl;
 
@@ -187,17 +120,6 @@ int run(int argc, char *argv[]) {
     HSSMatrixMPI<double> H(A, hss_opts, MPI_COMM_WORLD);
   if (!mpi_rank())
     cout << "## Compression time = " << timer.elapsed() << endl;
-
-  // Matrix-free compression
-  // int     rk        = 100;
-  // double  alpha     = 1.0;
-  // double  beta      = 1.0;
-  // double  decay_val = 1.0;
-  // IUV Amf(ctxt, alpha, beta, n, rk, decay_val);
-  // timer.start();
-  //   HSSMatrixMPI<double> H(n, n, Amf, ctxt, Amf, hss_opts, MPI_COMM_WORLD);
-  // if (!mpi_rank())
-  //   cout << "## Compression time = " << timer.elapsed() << endl;
 
   if (H.is_compressed()) {
     if (!mpi_rank()) {
@@ -208,7 +130,7 @@ int run(int argc, char *argv[]) {
     }
   } else {
     if (!mpi_rank()) cout << "# compression failed!!!!!!!!" << endl;
-    MPI_Abort(MPI_COMM_WORLD, 1);
+    // MPI_Abort(MPI_COMM_WORLD, 1);
   }
   
   auto Hrank = H.max_rank();
@@ -235,7 +157,7 @@ int run(int argc, char *argv[]) {
     if (A.active() && HnormF / AnormF >
         ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
       if (!mpi_rank()) cout << "ERROR: compression error too big!!" << endl;
-      MPI_Abort(MPI_COMM_WORLD, 1);
+      // MPI_Abort(MPI_COMM_WORLD, 1);
     }
   }
 
@@ -368,9 +290,9 @@ int main(int argc, char *argv[]) {
   float rflops[12];
   MPI_Reduce(flops, rflops, 12, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
     
-  // print_flop_breakdown (rflops[0], rflops[1], rflops[2], rflops[3],
-  //                       rflops[4], rflops[5], rflops[6], rflops[7], 
-  //                       rflops[8], rflops[9], rflops[10], rflops[11]);
+  print_flop_breakdown (rflops[0], rflops[1], rflops[2], rflops[3],
+                        rflops[4], rflops[5], rflops[6], rflops[7], 
+                        rflops[8], rflops[9], rflops[10], rflops[11]);
 
   scalapack::Cblacs_exit(1);
   MPI_Finalize();

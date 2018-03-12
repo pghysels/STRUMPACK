@@ -1,5 +1,5 @@
-all: testPoisson2dMPIDist testPoisson3dMPIDist \
-DenseTestMPI
+all: testPoisson2dMPIDist \
+DenseToeplitzMPI DenseBEMColStateMPI
 
 all1: @C_EXAMPLES@ testPoisson2d testPoisson3d	\
 	testPoisson2dMPI testPoisson2dMPIDist testMMdouble	\
@@ -56,10 +56,15 @@ testPoisson3dMPIDist: testPoisson3dMPIDist.cpp
 	$(CXX) $(LDFLAGS) testPoisson3dMPIDist.o -o $@ $(LIBS)
 	$(RM) testPoisson3dMPIDist.o
 
-DenseTestMPI: DenseTestMPI.cpp
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o DenseTestMPI.o
-	$(CXX) $(LDFLAGS) DenseTestMPI.o -o $@ $(LIBS)
-	$(RM) DenseTestMPI.o
+DenseToeplitzMPI: DenseToeplitzMPI.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o DenseToeplitzMPI.o
+	$(CXX) $(LDFLAGS) DenseToeplitzMPI.o -o $@ $(LIBS)
+	$(RM) DenseToeplitzMPI.o
+
+DenseBEMColStateMPI: DenseBEMColStateMPI.cpp
+  $(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o DenseBEMColStateMPI.o
+  $(CXX) $(LDFLAGS) DenseBEMColStateMPI.o -o $@ $(LIBS)
+  $(RM) DenseBEMColStateMPI.o
 
 testMMdouble: testMMdouble.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMdouble.o
@@ -117,6 +122,7 @@ clean:
 		testMMdouble64 testMMdoubleMPIDist64			\
 		testMMfloat testMMfloatMPIDist				\
 		mtx2bin bin2mtx MLkernel \
-		testPoisson3dMPIDist DenseTestMPI
+		testPoisson3dMPIDist \
+    DenseToeplitzMPI DenseBEMColStateMPI
 
 
