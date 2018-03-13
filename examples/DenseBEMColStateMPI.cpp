@@ -45,7 +45,7 @@
 
 typedef std::complex<float> scomplex;
 #define myscalar scomplex
-#define myreal float
+// #define myreal float
 #define SSTR(x) dynamic_cast<std::ostringstream&>(std::ostringstream() << std::dec << x).str()
 
 using namespace std;
@@ -58,7 +58,7 @@ int run(int argc, char *argv[]) {
   TaskTimer::t_begin = GET_TIME_NOW();
   TaskTimer timer(string("compression"), 1);
 
-  HSSOptions<double> hss_opts;
+  HSSOptions<myscalar> hss_opts;
   hss_opts.set_from_command_line(argc, argv);
 
 // # ==========================================================================
@@ -227,52 +227,37 @@ int run(int argc, char *argv[]) {
       scalapack::pgemr2d(nrows[i], ncols[j], Atmp, 1, 1, descAtmp, A, rowoffset[i], coloffset[j], descA, ctxtglob);
     }
 
-  if(myid<nprowA*npcolA)
-    delete[] Atmp;
+  // if(myid<nprowA*npcolA)
+  //   delete[] Atmp;
 
   MPI_Barrier(MPI_COMM_WORLD);
   tend=MPI_Wtime();
   if(!myid) std::cout << "Redistribution done in " << tend-tstart << "s" << std::endl;
 
 // # ==========================================================================
-// # === Build dense (distributed) matrix ===
+// # === Build dense DistributedMatrixWrapper ===
 // # ==========================================================================
+  if (!mpi_rank()) cout << "# DistributedMatrixWrapper..." << endl;
+  timer.start();
 
-  // DistributedMatrix<float> AA = DistributedMatrix<double>(ctxt, &A);
+  DistributedMatrixWrapper<myscalar> AA(ctxt, n, n, nb, nb, A);
 
-  // DistributedMatrix<double> A = DistributedMatrix<double>(ctxt, n, n);
+  if (!mpi_rank()){
+    cout << "## DistributedMatrixWrapper time = " << timer.elapsed() << endl;
+    cout << "# AA.total_memory() = " << (myscalar)AA.total_memory()/(1000.0*1000.0) << "MB" << endl;
+  }
 
-  // if (!mpi_rank()){
-  //   cout << "## Dense matrix construction time = " << timer.elapsed() << endl;
-  //   cout << "# A.total_memory() = " << (double)A.total_memory()/(1000.0*1000.0) << "MB" << endl;
-  // }
-
-  // if ( hss_opts.verbose() == 1 && n < 8 ){
-  //   cout << "n = " << n << endl;
-  //   A.print("A");
-  // }
-
-
-
-
-
-
-
-
-#if false
 // # ==========================================================================
-// # === Compression ===
+// # === Compression to HSS ===
 // # ==========================================================================
-  if (!mpi_rank())
-    cout << "# Creating HSS matrix H..." << endl;
-  
+  if (!mpi_rank()) cout << "# Creating HSS matrix H..." << endl;
   if (!mpi_rank()) cout << "# rel_tol = " << hss_opts.rel_tol() << endl;
-
+  MPI_Barrier(MPI_COMM_WORLD);
+  
   // Simple compression
   timer.start();
-    HSSMatrixMPI<double> H(A, hss_opts, MPI_COMM_WORLD);
-  if (!mpi_rank())
-    cout << "## Compression time = " << timer.elapsed() << endl;
+    HSSMatrixMPI<myscalar> H(static_cast<DistributedMatrix<myscalar>>(AA), hss_opts, MPI_COMM_WORLD);
+  if (!mpi_rank()) cout << "## Compression time = " << timer.elapsed() << endl;
 
   if (H.is_compressed()) {
     if (!mpi_rank()) {
@@ -285,15 +270,20 @@ int run(int argc, char *argv[]) {
     if (!mpi_rank()) cout << "# compression failed!!!!!!!!" << endl;
     // MPI_Abort(MPI_COMM_WORLD, 1);
   }
-  
+
   auto Hrank = H.max_rank();
-  auto Hmem = H.total_memory();
-  auto Amem = A.total_memory();
+  auto Hmem  = H.total_memory();
+  auto Amem  = AA.total_memory();
+
   if (!mpi_rank()) {
     cout << "# rank(H) = " << Hrank << endl;
     cout << "# memory(H) = " << Hmem/1e6 << " MB, " << endl;
     cout << "# mem percentage = " << 100. * Hmem / Amem << "% (of dense)" << endl;
   }
+
+
+
+  #if false
 
   // Checking error against dense matrix
   if ( hss_opts.verbose() == 1 && n <= 1024) {
