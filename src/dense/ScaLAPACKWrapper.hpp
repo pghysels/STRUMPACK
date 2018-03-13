@@ -1469,7 +1469,6 @@ namespace strumpack {
       auto work = new T[ilwork];
       int info = pgeqrf(m, n, a, ia, ja, desca, tau, work, ilwork);
       delete[] work;
-      STRUMPACK_FLOPS((is_complex<T>()?4:1)*static_cast<long long int>(((m>n) ? (double(n)*(double(n)*(.5-(1./3.)*double(n)+double(m)) + double(m) + 23./6.)) : (double(m)*(double(m)*(-.5-(1./3.)*double(m)+double(n)) + 2.*double(n) + 23./6.))) + ((m>n) ? (double(n)*(double(n)*(.5-(1./3.)*double(n)+double(m)) + 5./6.)) : (double(m)*(double(m)*(-.5-(1./3.)*double(m)+double(n)) + double(n) + 5./6.)))));
       return info;
     }
 
@@ -1536,7 +1535,6 @@ namespace strumpack {
       int ilwork = int(std::real(lwork));
       auto work = new T[ilwork];
       info = pxxgqr(m, n, k, a, ia, ja, desca, tau, work, ilwork);
-      STRUMPACK_FLOPS((is_complex<T>()?4:1)*static_cast<long long int>((n==k) ? ((2./3.)*double(n)*double(n)*(3.*double(m) - double(n))) : (4.*double(m)*double(n)*double(k) - 2.*(double(m) + double(n))*double(k)*double(k) + (4./3.)*double(k)*double(k)*double(k))));
       delete[] work;
       return info;
     }
