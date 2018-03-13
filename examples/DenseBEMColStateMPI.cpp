@@ -58,12 +58,8 @@ int run(int argc, char *argv[]) {
   TaskTimer::t_begin = GET_TIME_NOW();
   TaskTimer timer(string("compression"), 1);
 
-  // Setting command line arguments
-  // if (argc > 1) n = stoi(argv[1]);
-
   HSSOptions<double> hss_opts;
   hss_opts.set_from_command_line(argc, argv);
-
 
 // # ==========================================================================
 // # === Reading and BLACS variables ===
@@ -102,11 +98,10 @@ int run(int argc, char *argv[]) {
   for(i=1;i<npcolA;i++)
     coloffset[i]=coloffset[i-1]+ncols[i-1];
 
-  if((ierr=MPI_Comm_rank(MPI_COMM_WORLD,&myid)))
-    return 1;
+  if((ierr=MPI_Comm_rank(MPI_COMM_WORLD,&myid))) return 1;
+  
   np=-1;
-  if((ierr=MPI_Comm_size(MPI_COMM_WORLD,&np)))
-    return 1;
+  if((ierr=MPI_Comm_size(MPI_COMM_WORLD,&np))) return 1;
 
   if(np<nprowA*npcolA) {
     std::cout << "This requires " << nprowA*npcolA << " processes or more." << std::endl;
@@ -120,9 +115,13 @@ int run(int argc, char *argv[]) {
 
   nprow=nprowA;
   npcol=npcolA;
-  scalapack::Cblacs_get(0,0,&ctxtA);
-  scalapack::Cblacs_gridinit(&ctxtA,"R",nprow,npcol);
-  scalapack::Cblacs_gridinfo(ctxtA,&nprow,&npcol,&myrowA,&mycolA);
+
+  // scalapack::Cblacs_get(0,0,&ctxtA);
+  // scalapack::Cblacs_gridinit(&ctxtA,"R",nprow,npcol); // ctxtA(R,8,8)
+  // scalapack::Cblacs_gridinfo(ctxtA,&nprow,&npcol,&myrowA,&mycolA);
+  // if(!myid) {
+  //   cout << "ctxtA(R," << nprow << "," << npcol << ")" <<endl;
+  // }
 
   /* Processes 0..nprow*npcolA read their piece of the matrix */
   MPI_Barrier(MPI_COMM_WORLD);
@@ -170,65 +169,76 @@ int run(int argc, char *argv[]) {
   tend=MPI_Wtime();
   if(!myid) std::cout << "Reading done in: " << tend-tstart << "s" << std::endl;
 
-
-// Part 2
-
+  // Part 2
 
   /* Initialize a context with all the processes */
   scalapack::Cblacs_get(0,0,&ctxtglob);
-  scalapack::Cblacs_gridinit(&ctxtglob,"R",1,np);
+  scalapack::Cblacs_gridinit(&ctxtglob,"R",1,np); // ctxtglob(R,1,64)
 
-//   /* Initialize the BLACS grid */
+  if(!myid) {
+    cout << "ctxtglob(R," << 1 << "," << np << ")" <<endl;
+  }
+
+  /* Initialize the BLACS grid */
   nprow=floor(sqrt((float)np));
   npcol=np/nprow;
+
   scalapack::Cblacs_get(0,0,&ctxt);
-  scalapack::Cblacs_gridinit(&ctxt,"R",nprow,npcol);
+  scalapack::Cblacs_gridinit(&ctxt,"R",nprow,npcol); // ctxt(R,8,8)
   scalapack::Cblacs_gridinfo(ctxt,&nprow,&npcol,&myrow,&mycol);
+  if(!myid) {
+    cout << "ctxt(R," << nprow << "," << npcol << ")" <<endl;
+  }
 
-//   /* Create A in 2D block-cyclic form by redistributing each piece */
-//   if(myid<nprow*npcol) {
-//     locr=numroc_(&n,&nb,&myrow,&IZERO,&nprow);
-//     locc=numroc_(&n,&nb,&mycol,&IZERO,&npcol);
-//     dummy=std::max(1,locr);
-//     A=new myscalar[locr*locc];
-//     descinit_(descA,&n,&n,&nb,&nb,&IZERO,&IZERO,&ctxt,&dummy,&ierr);
-//   } else {
-//     descset_(descA,&n,&n,&nb,&nb,&IZERO,&IZERO,&INONE,&IONE);
-//   }
+  /* Create A in 2D block-cyclic form by redistributing each piece */
+  int nb = 64;
+  int locr, locc;
+  int dummy;
 
-//   /* Redistribute each piece */
-//   if(!myid) std::cout << "Redistributing..." << std::endl;
-//   tstart=MPI_Wtime();
-//   for(i=0;i<nprowA;i++)
-//     for(j=0;j<npcolA;j++) {
-//        Initialize a grid that contains only the process that owns piece (i,j) 
-//       id=i*npcolA+j;
-//       blacs_get_(&IZERO,&IZERO,&ctxttmp);
-//       blacs_gridmap_(&ctxttmp,&id,&IONE,&IONE,&IONE);
-//       if(myid==id) {
-// printf("%d working: (%d,%d): %d x %d\n",myid,i,j,nrows[i],ncols[j]);
-//         /* myid owns the piece of A to be distributed */
-//         descinit_(descAtmp,&nrows[i],&ncols[j],&nb,&nb,&IZERO,&IZERO,&ctxttmp,&nrows[i],&ierr);
-//       } else
-//         descset_(descAtmp,&nrows[i],&ncols[j],&nb,&nb,&IZERO,&IZERO,&INONE,&IONE);
+  if(myid<nprow*npcol) {
+    locr=scalapack::numroc(n, nb, myrow, 0, nprow);
+    locc=scalapack::numroc(n, nb, mycol, 0, npcol);
+    dummy=std::max(1,locr);
+    A=new myscalar[locr*locc];
+    scalapack::descinit(descA, n, n, nb, nb, 0, 0, ctxt, dummy);
+  } 
+  else {
+    scalapack::descset(descA, n, n, nb, nb, 0, 0, 0, 1);
+  }
 
-//       pgemr2d(nrows[i],ncols[j],Atmp,IONE,IONE,descAtmp,A,rowoffset[i],coloffset[j],descA,ctxtglob);
-//     }
-//   if(myid<nprowA*npcolA)
-//     delete[] Atmp;
-//   MPI_Barrier(MPI_COMM_WORLD);
-//   tend=MPI_Wtime();
-//   if(!myid) std::cout << "Done in " << tend-tstart << "s" << std::endl;
+  // /* Redistribute each piece */
 
-  /* Initialize the solver and set parameters */
-  // StrumpackDensePackage<myscalar,myreal> sdp(MPI_COMM_WORLD);
+  if(!myid) std::cout << "Redistributing..." << std::endl;
+  tstart=MPI_Wtime();
+  
+  for(i=0;i<nprowA;i++)
+    for(j=0;j<npcolA;j++) {
+      /* Initialize a grid that contains only the process that owns piece (i,j) */
+      id=i*npcolA+j;
+      scalapack::Cblacs_get(0, 0, &ctxttmp);
+      scalapack::Cblacs_gridmap(&ctxttmp, &id, 1, 1, 1);
+      if(myid==id) {
+        printf("%d working: (%d,%d): %d x %d\n",myid,i,j,nrows[i],ncols[j]);
+        /* myid owns the piece of A to be distributed */
+        scalapack::descinit(descAtmp,nrows[i],ncols[j],nb,nb,0,0,ctxttmp,nrows[i]);
+      } else
+        scalapack::descset(descAtmp, nrows[i], ncols[j], nb, nb, 0, 0, -1, 1);
+
+      scalapack::pgemr2d(nrows[i], ncols[j], Atmp, 1, 1, descAtmp, A, rowoffset[i], coloffset[j], descA, ctxtglob);
+    }
+
+  if(myid<nprowA*npcolA)
+    delete[] Atmp;
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  tend=MPI_Wtime();
+  if(!myid) std::cout << "Redistribution done in " << tend-tstart << "s" << std::endl;
 
 // # ==========================================================================
 // # === Build dense (distributed) matrix ===
 // # ==========================================================================
-  // if (!mpi_rank())
-  //   cout << "# Building dense matrix A..." << endl;
-  // timer.start();
+
+  // DistributedMatrix<float> AA = DistributedMatrix<double>(ctxt, &A);
 
   // DistributedMatrix<double> A = DistributedMatrix<double>(ctxt, n, n);
 
