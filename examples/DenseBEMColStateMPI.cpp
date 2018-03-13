@@ -39,9 +39,14 @@
 #include "HSS/HSSMatrixMPI.hpp"
 #include "misc/TaskTimer.hpp"
 
+#define ENABLE_FLOP_COUNTER 1
 #define ERROR_TOLERANCE 1e1
 #define SOLVE_TOLERANCE 1e-11
-#define myscalar double
+
+typedef std::complex<float> scomplex;
+#define myscalar scomplex
+#define myreal float
+#define SSTR(x) dynamic_cast<std::ostringstream&>(std::ostringstream() << std::dec << x).str()
 
 using namespace std;
 using namespace strumpack;
@@ -49,64 +54,202 @@ using namespace strumpack::HSS;
 
 int run(int argc, char *argv[]) {
 
-  int n = 8;
-
   // Initialize timer
   TaskTimer::t_begin = GET_TIME_NOW();
   TaskTimer timer(string("compression"), 1);
 
   // Setting command line arguments
-  if (argc > 1) n = stoi(argv[1]);
+  // if (argc > 1) n = stoi(argv[1]);
 
   HSSOptions<double> hss_opts;
   hss_opts.set_from_command_line(argc, argv);
 
-  auto np = mpi_nprocs(MPI_COMM_WORLD);
-  if (!mpi_rank())
-    cout << "# usage: ./DenseTestMPI n (problem size)" << endl;
+
+// # ==========================================================================
+// # === Reading and BLACS variables ===
+// # ==========================================================================
+
+  int i,j;
+  int ctxtA, ctxt, ctxttmp, ctxtglob;
+  int ierr;
+  int myid, np, id;
+  int myrow, mycol, nprow, npcol;
+  int myrowA, mycolA;
+  std::string filename, prefix, locfile;
+  std::ifstream fp;
+  scomplex stmp;
+  double tstart, tend;
+
+  // Example 3
+  #define nprowA 8
+  #define npcolA 8
+  int n = 27648; // In 8x8 blocks of 3456x3456
+  int nrows[nprowA]={3456,3456,3456,3456,3456,3456,3456,3456};
+  int ncols[npcolA]={3456,3456,3456,3456,3456,3456,3456,3456};
+  prefix="/global/cscratch1/sd/gichavez/intel17/paper2_tests/mats/example3/";
 
   if (!mpi_rank()){
     cout << "# matrix size: n = " << n << endl;
   }
 
-  // BLACS variables
-  int ctxt, dummy, myrow, mycol;
-  int nprow=floor(sqrt((float)np));
-  int npcol=np/nprow;
+  int rowoffset[nprowA];
+  int coloffset[npcolA];
 
-  scalapack::Cblacs_get(0 /*ctx number*/, 0 /*default number*/, &ctxt);
-  scalapack::Cblacs_gridinit(&ctxt,"C",nprow,npcol);
+  rowoffset[0]=1;
+  for(i=1;i<nprowA;i++)
+    rowoffset[i]=rowoffset[i-1]+nrows[i-1];
+  coloffset[0]=1;
+  for(i=1;i<npcolA;i++)
+    coloffset[i]=coloffset[i-1]+ncols[i-1];
+
+  if((ierr=MPI_Comm_rank(MPI_COMM_WORLD,&myid)))
+    return 1;
+  np=-1;
+  if((ierr=MPI_Comm_size(MPI_COMM_WORLD,&np)))
+    return 1;
+
+  if(np<nprowA*npcolA) {
+    std::cout << "This requires " << nprowA*npcolA << " processes or more." << std::endl;
+    std::cout << "Aborting." << std::endl;
+    MPI_Abort(MPI_COMM_WORLD,-1);
+  }
+
+/* Initialize a BLACS grid with nprowA*npcolA processes */
+  myscalar *Atmp=NULL, *A=NULL, *Btmp=NULL, *X=NULL, *B=NULL;
+  int descA[BLACSCTXTSIZE], descAtmp[BLACSCTXTSIZE], descXB[BLACSCTXTSIZE], descBtmp[BLACSCTXTSIZE];
+
+  nprow=nprowA;
+  npcol=npcolA;
+  scalapack::Cblacs_get(0,0,&ctxtA);
+  scalapack::Cblacs_gridinit(&ctxtA,"R",nprow,npcol);
+  scalapack::Cblacs_gridinfo(ctxtA,&nprow,&npcol,&myrowA,&mycolA);
+
+  /* Processes 0..nprow*npcolA read their piece of the matrix */
+  MPI_Barrier(MPI_COMM_WORLD);
+  tstart=MPI_Wtime();
+  if(myid<nprowA*npcolA) {
+    locfile="ZZ_"+SSTR(myrowA)+"_"+SSTR(mycolA)+"_"+SSTR(nrows[myrowA])+"_"+SSTR(ncols[mycolA]);
+    filename=prefix+locfile;
+    std::cout << "Process " << myid << " reading from file " << locfile << std::endl;
+    fp.open(filename.c_str(),std::ios::binary);
+    if(!fp.is_open()) {
+      std::cout << "Could not open file " << filename << std::endl;
+      return -1;
+    }
+
+    /* First 4 bytes are an integer */
+    fp.read((char *)&ierr,4);
+    if(fp.fail() || ierr!=nrows[myrowA]*ncols[mycolA]*8) {
+      std::cout << "First 8 bytes should be an integer equal to nrows*ncols*8; instead, " << ierr  << std::endl;
+      return -2;
+    }
+
+    /* Read 8-byte fields */
+    Atmp=new myscalar[nrows[myrowA]*ncols[mycolA]];
+    for(i=0;i<nrows[myrowA]*ncols[mycolA];i++) {
+      fp.read((char *)&stmp,8);
+      Atmp[i]=static_cast<myscalar>(stmp);
+      if(fp.fail()) {
+        std::cout << "Something went wrong while reading..." << std::endl;
+        if(fp.eof())
+          std :: cout << "Only " << i << " instead of " << nrows[myrowA]*ncols[mycolA] << std::endl;
+        return 2;
+      }
+    }
+
+    /* Last 4 bytes are an integer */
+    fp.read((char *)&ierr,4);
+    if(fp.fail() || ierr!=nrows[myrowA]*ncols[mycolA]*8) {
+      std::cout << "First 8 bytes should be an integer equal to nrows*ncols*8; instead, " << ierr  << std::endl;
+      return -2;
+    }
+    fp.close();
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
+
+  tend=MPI_Wtime();
+  if(!myid) std::cout << "Reading done in: " << tend-tstart << "s" << std::endl;
+
+
+// Part 2
+
+
+  /* Initialize a context with all the processes */
+  scalapack::Cblacs_get(0,0,&ctxtglob);
+  scalapack::Cblacs_gridinit(&ctxtglob,"R",1,np);
+
+//   /* Initialize the BLACS grid */
+  nprow=floor(sqrt((float)np));
+  npcol=np/nprow;
+  scalapack::Cblacs_get(0,0,&ctxt);
+  scalapack::Cblacs_gridinit(&ctxt,"R",nprow,npcol);
   scalapack::Cblacs_gridinfo(ctxt,&nprow,&npcol,&myrow,&mycol);
+
+//   /* Create A in 2D block-cyclic form by redistributing each piece */
+//   if(myid<nprow*npcol) {
+//     locr=numroc_(&n,&nb,&myrow,&IZERO,&nprow);
+//     locc=numroc_(&n,&nb,&mycol,&IZERO,&npcol);
+//     dummy=std::max(1,locr);
+//     A=new myscalar[locr*locc];
+//     descinit_(descA,&n,&n,&nb,&nb,&IZERO,&IZERO,&ctxt,&dummy,&ierr);
+//   } else {
+//     descset_(descA,&n,&n,&nb,&nb,&IZERO,&IZERO,&INONE,&IONE);
+//   }
+
+//   /* Redistribute each piece */
+//   if(!myid) std::cout << "Redistributing..." << std::endl;
+//   tstart=MPI_Wtime();
+//   for(i=0;i<nprowA;i++)
+//     for(j=0;j<npcolA;j++) {
+//        Initialize a grid that contains only the process that owns piece (i,j) 
+//       id=i*npcolA+j;
+//       blacs_get_(&IZERO,&IZERO,&ctxttmp);
+//       blacs_gridmap_(&ctxttmp,&id,&IONE,&IONE,&IONE);
+//       if(myid==id) {
+// printf("%d working: (%d,%d): %d x %d\n",myid,i,j,nrows[i],ncols[j]);
+//         /* myid owns the piece of A to be distributed */
+//         descinit_(descAtmp,&nrows[i],&ncols[j],&nb,&nb,&IZERO,&IZERO,&ctxttmp,&nrows[i],&ierr);
+//       } else
+//         descset_(descAtmp,&nrows[i],&ncols[j],&nb,&nb,&IZERO,&IZERO,&INONE,&IONE);
+
+//       pgemr2d(nrows[i],ncols[j],Atmp,IONE,IONE,descAtmp,A,rowoffset[i],coloffset[j],descA,ctxtglob);
+//     }
+//   if(myid<nprowA*npcolA)
+//     delete[] Atmp;
+//   MPI_Barrier(MPI_COMM_WORLD);
+//   tend=MPI_Wtime();
+//   if(!myid) std::cout << "Done in " << tend-tstart << "s" << std::endl;
+
+  /* Initialize the solver and set parameters */
+  // StrumpackDensePackage<myscalar,myreal> sdp(MPI_COMM_WORLD);
 
 // # ==========================================================================
 // # === Build dense (distributed) matrix ===
 // # ==========================================================================
-  if (!mpi_rank())
-    cout << "# Building dense matrix A..." << endl;
-  timer.start();
+  // if (!mpi_rank())
+  //   cout << "# Building dense matrix A..." << endl;
+  // timer.start();
 
-  DistributedMatrix<double> A = DistributedMatrix<double>(ctxt, n, n); // Creates descriptor
-  // TODO only loop over local rows and columns, get the global coordinate..
-  for (int c=0; c<n; c++)
-  {
-    for (int r=0; r<n; r++)
-    {
-      // Toeplitz matrix from Quantum Chemistry.
-      myscalar pi=3.1416, d=0.1;
-      A.global(r, c, (r==c) ? pow(pi,2)/6.0/pow(d,2) : pow(-1.0,r-c)/pow((myscalar)r-c,2)/pow(d,2) );
-    }
-  }
+  // DistributedMatrix<double> A = DistributedMatrix<double>(ctxt, n, n);
 
-  if (!mpi_rank()){
-    cout << "## Dense matrix construction time = " << timer.elapsed() << endl;
-    cout << "# A.total_memory() = " << (double)A.total_memory()/(1000.0*1000.0) << "MB" << endl;
-  }
+  // if (!mpi_rank()){
+  //   cout << "## Dense matrix construction time = " << timer.elapsed() << endl;
+  //   cout << "# A.total_memory() = " << (double)A.total_memory()/(1000.0*1000.0) << "MB" << endl;
+  // }
 
-  if ( hss_opts.verbose() == 1 && n < 8 ){
-    cout << "n = " << n << endl;
-    A.print("A");
-  }
+  // if ( hss_opts.verbose() == 1 && n < 8 ){
+  //   cout << "n = " << n << endl;
+  //   A.print("A");
+  // }
 
+
+
+
+
+
+
+
+#if false
 // # ==========================================================================
 // # === Compression ===
 // # ==========================================================================
@@ -206,6 +349,8 @@ int run(int argc, char *argv[]) {
     // MPI_Abort(MPI_COMM_WORLD, 1);
   }
 
+#endif
+
   return 0;
 }
 
@@ -271,28 +416,30 @@ int main(int argc, char *argv[]) {
   // Main program execution  
   int ierr = run(argc, argv);
 
-  // Reducing flop counters
-  float flops[12] = {
-    float(params::random_flops.load()),
-    float(params::ID_flops.load()),
-    float(params::QR_flops.load()),
-    float(params::ortho_flops.load()),
-    float(params::reduce_sample_flops.load()),
-    float(params::update_sample_flops.load()),
-    float(params::extraction_flops.load()),
-    float(params::CB_sample_flops.load()),
-    float(params::sparse_sample_flops.load()),
-    float(params::ULV_factor_flops.load()),
-    float(params::schur_flops.load()),
-    float(params::full_rank_flops.load())
-  };
+  if (ENABLE_FLOP_COUNTER){
+     // Reducing flop counters
+     float flops[12] = {
+       float(params::random_flops.load()),
+       float(params::ID_flops.load()),
+       float(params::QR_flops.load()),
+       float(params::ortho_flops.load()),
+       float(params::reduce_sample_flops.load()),
+       float(params::update_sample_flops.load()),
+       float(params::extraction_flops.load()),
+       float(params::CB_sample_flops.load()),
+       float(params::sparse_sample_flops.load()),
+       float(params::ULV_factor_flops.load()),
+       float(params::schur_flops.load()),
+       float(params::full_rank_flops.load())
+     };
 
-  float rflops[12];
-  MPI_Reduce(flops, rflops, 12, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-    
-  print_flop_breakdown (rflops[0], rflops[1], rflops[2], rflops[3],
-                        rflops[4], rflops[5], rflops[6], rflops[7], 
-                        rflops[8], rflops[9], rflops[10], rflops[11]);
+     float rflops[12];
+     MPI_Reduce(flops, rflops, 12, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+       
+     print_flop_breakdown (rflops[0], rflops[1], rflops[2], rflops[3],
+                           rflops[4], rflops[5], rflops[6], rflops[7], 
+                           rflops[8], rflops[9], rflops[10], rflops[11]);
+  }
 
   scalapack::Cblacs_exit(1);
   MPI_Finalize();
