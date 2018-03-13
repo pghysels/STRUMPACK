@@ -23,6 +23,7 @@ High priority:
 - Study behavior of replacement of tiny pivots. Look at different
   matrices (including large ones!). Implement for distributed fronts!!
 - distributed MC64: Jason's/Ariful's code?
+- xSDK policies: version check API
 
 Medium:
 - matrix equilibration: see SuperLU_dist pdgsequ and pdlaqgs
@@ -33,6 +34,8 @@ Medium:
 - optimize communication in symbolic factorization and redistribution
   into ProportionallyMappedSparseMatrix
 
+- when calling set_csr_matrix on a MPIDist solver, you don't know the
+  local number of rows, begin row etc
 
 Low priority:
 - The library is not completely thread safe at the moment.  explain in
