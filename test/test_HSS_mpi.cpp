@@ -189,7 +189,7 @@ int run(int argc, char* argv[]) {
 
   {
     if (!mpi_rank()) cout << "# matrix-free compression!!" << endl;
-    DistElemMult<double> mat(A, ctxt_all, MPI_COMM_WORLD);
+    DistElemMultDuplicated<double> mat(A, ctxt_all);
     hss_opts.set_synchronized_compression(false);
     HSSMatrixMPI<double> HMF(A.rows(), A.cols(), mat, A.ctxt(), mat,
                              hss_opts, MPI_COMM_WORLD);
@@ -263,7 +263,7 @@ int run(int argc, char* argv[]) {
     for (auto j : J) { cout << j << " "; } cout << "];" << endl;
   }
   auto sub = H.extract(I, J, A.ctxt(), nprow, npcol);
-  auto sub_dense = A.extract(I, J);
+  auto sub_dense = A.extract(I, J, MPI_COMM_WORLD);
   // sub.print("sub");
   // sub_dense.print("sub_dense");
   sub.scaled_add(-1., sub_dense);

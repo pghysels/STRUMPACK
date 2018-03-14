@@ -166,8 +166,8 @@ namespace strumpack {
     DistributedMatrix<scalar_t>
     extract_cols(const std::vector<std::size_t>& Ic, MPI_Comm comm) const;
     DistributedMatrix<scalar_t> extract
-    (const std::vector<std::size_t>& I,
-     const std::vector<std::size_t>& J) const;
+    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+     MPI_Comm comm) const;
     DistributedMatrix<scalar_t>& add(const DistributedMatrix<scalar_t>& B);
     DistributedMatrix<scalar_t>& scaled_add
     (scalar_t alpha, const DistributedMatrix<scalar_t>& B);
@@ -891,16 +891,10 @@ namespace strumpack {
   // TODO optimize
   template<typename scalar_t> DistributedMatrix<scalar_t>
   DistributedMatrix<scalar_t>::extract
-  (const std::vector<std::size_t>& I,
-   const std::vector<std::size_t>& J) const {
+  (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+   MPI_Comm comm) const {
     TIMER_TIME(TaskType::DISTMAT_EXTRACT, 1, t_dist_mat_extract);
-    // TODO optimize this!??
-    DistributedMatrix<scalar_t> B(ctxt(), I.size(), J.size());
-    auto tmp = gather();
-    DenseMatrix<scalar_t> sub;
-    if (is_master()) sub = tmp.extract(I, J);
-    B.scatter(sub);
-    return B;
+    return extract_rows(I, comm).extract_cols(J, comm);
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>&

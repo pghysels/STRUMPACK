@@ -10,12 +10,13 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_stable_nosync
-    (const dmult_t& Amult, const delem_t& Aelem,
+    (const dmult_t& Amult, const delemw_t& Aelem,
      const opts_t& opts, int Actxt) {
       auto d = opts.d0();
       auto dd = opts.dd();
-      DistSamples<scalar_t> RS(d+dd, (Actxt!=-1) ? Actxt :
-                               _ctxt, *this, Amult, opts);
+      DistSamples<scalar_t> RS
+        (d+dd, (Actxt!=-1) ? Actxt :
+         _ctxt, *this, Amult, opts);
       WorkCompressMPI<scalar_t> w;
       while (!this->is_compressed()) {
         if (d != opts.d0()) RS.add_columns(d+dd, opts);
@@ -30,14 +31,15 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_stable_sync
-    (const dmult_t& Amult, const delem_t& Aelem,
+    (const dmult_t& Amult, const delemw_t& Aelem,
      const opts_t& opts, int Actxt) {
       auto d = opts.d0();
       auto dd = opts.dd();
       assert(dd <= d);
       WorkCompressMPI<scalar_t> w;
-      DistSamples<scalar_t> RS(d+dd, (Actxt!=-1) ? Actxt :
-                               _ctxt, *this, Amult, opts);
+      DistSamples<scalar_t> RS
+        (d+dd, (Actxt!=-1) ? Actxt :
+         _ctxt, *this, Amult, opts);
       const auto nr_lvls = this->max_levels();
       while (!this->is_compressed()) {
         if (d != opts.d0()) RS.add_columns(d+dd, opts);
@@ -55,7 +57,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_recursive_stable
-    (DistSamples<scalar_t>& RS, const delem_t& Aelem, const opts_t& opts,
+    (DistSamples<scalar_t>& RS, const delemw_t& Aelem, const opts_t& opts,
      WorkCompressMPI<scalar_t>& w, int d, int dd) {
       if (!this->active()) return;
       if (this->leaf()) {
@@ -68,22 +70,24 @@ namespace strumpack {
           for (std::size_t j=0; j<this->cols(); j++)
             J.push_back(j+w.offset.second);
           _D = DistM_t(_ctxt, this->rows(), this->cols());
-          Aelem(I, J, _D);
+          Aelem(I, J, _D, _A, w.offset.first, w.offset.second, _comm);
         }
       } else {
         w.split(this->_ch[0]->dims());
-        this->_ch[0]->compress_recursive_stable(RS, Aelem, opts,
-                                                w.c[0], d, dd);
-        this->_ch[1]->compress_recursive_stable(RS, Aelem, opts,
-                                                w.c[1], d, dd);
+        this->_ch[0]->compress_recursive_stable
+          (RS, Aelem, opts, w.c[0], d, dd);
+        this->_ch[1]->compress_recursive_stable
+          (RS, Aelem, opts, w.c[1], d, dd);
         communicate_child_data(w);
         if (!this->_ch[0]->is_compressed() ||
             !this->_ch[1]->is_compressed()) return;
         if (this->is_untouched()) {
           _B01 = DistM_t(_ctxt, w.c[0].Ir.size(), w.c[1].Ic.size());
           _B10 = DistM_t(_ctxt, w.c[1].Ir.size(), w.c[0].Ic.size());
-          Aelem(w.c[0].Ir, w.c[1].Ic, _B01);
-          Aelem(w.c[1].Ir, w.c[0].Ic, _B10);
+          Aelem(w.c[0].Ir, w.c[1].Ic, _B01, _A01,
+                w.offset.first, w.offset.second+this->_ch[0]->cols(), _comm);
+          Aelem(w.c[1].Ir, w.c[0].Ic, _B10, _A10,
+                w.offset.first+this->_ch[0]->rows(), w.offset.second, _comm);
         }
       }
       if (w.lvl == 0) this->_U_state = this->_V_state = State::COMPRESSED;

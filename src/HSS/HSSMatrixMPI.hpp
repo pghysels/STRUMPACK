@@ -155,6 +155,13 @@ namespace strumpack {
        const DistM_t& leaf_A, int lctxt) const;
 
     private:
+      using delemw_t = typename std::function
+        <void(const std::vector<std::size_t>& I,
+              const std::vector<std::size_t>& J,
+              DistM_t& B, DistM_t& A,
+              std::size_t rlo, std::size_t clo,
+              MPI_Comm comm)>;
+
       MPI_Comm _comm;
       int _ctxt, _ctxt_all, _ctxt_T, _ctxt_loc;   // TODO default arguments?
       int _prows, _pcols, _active_procs, _nprocs;
@@ -166,91 +173,104 @@ namespace strumpack {
       DistM_t _B01;
       DistM_t _B10;
 
-      HSSMatrixMPI(std::size_t m, std::size_t n, const opts_t& opts,
-                   MPI_Comm c, int P, bool dup_comm,
-                   std::size_t roff, std::size_t coff);
-      HSSMatrixMPI(const HSSPartitionTree& t, const opts_t& opts, MPI_Comm c,
-                   int P, bool dup_comm, std::size_t roff, std::size_t coff);
-      void setup_hierarchy(const opts_t& opts, MPI_Comm c, int P,
-                           bool dup_comm, std::size_t roff, std::size_t coff);
-      void setup_hierarchy(const HSSPartitionTree& t, const opts_t& opts,
-                           MPI_Comm c, int P, bool dup_comm,
-                           std::size_t roff, std::size_t coff);
+      // Used to redistribute the original 2D block cyclic matrix
+      // according to the HSS tree
+      DistM_t _A;
+      DistM_t _A01;
+      DistM_t _A10;
+
+      HSSMatrixMPI
+      (std::size_t m, std::size_t n, const opts_t& opts,
+       MPI_Comm c, int P, bool dup_comm,
+       std::size_t roff, std::size_t coff);
+      HSSMatrixMPI
+      (const HSSPartitionTree& t, const opts_t& opts, MPI_Comm c,
+       int P, bool dup_comm, std::size_t roff, std::size_t coff);
+      void setup_hierarchy
+      (const opts_t& opts, MPI_Comm c, int P,
+       bool dup_comm, std::size_t roff, std::size_t coff);
+      void setup_hierarchy
+      (const HSSPartitionTree& t, const opts_t& opts,
+       MPI_Comm c, int P, bool dup_comm,
+       std::size_t roff, std::size_t coff);
       void setup_contexts(int P);
       void setup_ranges(std::size_t roff, std::size_t coff);
 
-      void compress_original_nosync(const dmult_t& Amult,
-                                    const delem_t& Aelem, const opts_t& opts,
-                                    int Actxt=-1);
-      void compress_original_sync(const dmult_t& Amult, const delem_t& Aelem,
-                                  const opts_t& opts, int Actxt=-1);
-      void compress_stable_nosync(const dmult_t& Amult, const delem_t& Aelem,
-                                  const opts_t& opts, int Actxt=-1);
-      void compress_stable_sync(const dmult_t& Amult, const delem_t& Aelem,
-                                const opts_t& opts, int Actxt=-1);
+      void compress_original_nosync
+      (const dmult_t& Amult, const delemw_t& Aelem,
+       const opts_t& opts, int Actxt=-1);
+      void compress_original_sync
+      (const dmult_t& Amult, const delemw_t& Aelem,
+       const opts_t& opts, int Actxt=-1);
+      void compress_stable_nosync
+      (const dmult_t& Amult, const delemw_t& Aelem,
+       const opts_t& opts, int Actxt=-1);
+      void compress_stable_sync
+      (const dmult_t& Amult, const delemw_t& Aelem,
+       const opts_t& opts, int Actxt=-1);
 
-      void compress_recursive_original(DistSamples<scalar_t>& RS,
-                                       const delem_t& Aelem,
-                                       const opts_t& opts,
-                                       WorkCompressMPI<scalar_t>& w, int dd);
-      void compress_recursive_stable(DistSamples<scalar_t>& RS,
-                                     const delem_t& Aelem, const opts_t& opts,
-                                     WorkCompressMPI<scalar_t>& w,
-                                     int d, int dd);
-      void compute_local_samples(const DistSamples<scalar_t>& RS,
-                                 WorkCompressMPI<scalar_t>& w, int dd);
-      bool compute_U_V_bases(int d, const opts_t& opts,
-                             WorkCompressMPI<scalar_t>& w);
-      void compute_U_basis_stable(const opts_t& opts,
-                                  WorkCompressMPI<scalar_t>& w,
-                                  int d, int dd);
-      void compute_V_basis_stable(const opts_t& opts,
-                                  WorkCompressMPI<scalar_t>& w,
-                                  int d, int dd);
-      bool update_orthogonal_basis(const opts_t& opts, scalar_t& r_max_0,
-                                   const DistM_t& S, DistM_t& Q,
-                                   int d, int dd, bool untouched);
-      void reduce_local_samples(const DistSamples<scalar_t>& RS,
-                                WorkCompressMPI<scalar_t>& w, int dd,
-                                bool was_compressed);
+      void compress_recursive_original
+      (DistSamples<scalar_t>& RS, const delemw_t& Aelem,
+       const opts_t& opts, WorkCompressMPI<scalar_t>& w, int dd);
+      void compress_recursive_stable
+      (DistSamples<scalar_t>& RS, const delemw_t& Aelem, const opts_t& opts,
+       WorkCompressMPI<scalar_t>& w, int d, int dd);
+      void compute_local_samples
+      (const DistSamples<scalar_t>& RS, WorkCompressMPI<scalar_t>& w, int dd);
+      bool compute_U_V_bases
+      (int d, const opts_t& opts, WorkCompressMPI<scalar_t>& w);
+      void compute_U_basis_stable
+      (const opts_t& opts, WorkCompressMPI<scalar_t>& w, int d, int dd);
+      void compute_V_basis_stable
+      (const opts_t& opts, WorkCompressMPI<scalar_t>& w, int d, int dd);
+      bool update_orthogonal_basis
+      (const opts_t& opts, scalar_t& r_max_0, const DistM_t& S,
+       DistM_t& Q, int d, int dd, bool untouched);
+      void reduce_local_samples
+      (const DistSamples<scalar_t>& RS, WorkCompressMPI<scalar_t>& w,
+       int dd, bool was_compressed);
       void communicate_child_data(WorkCompressMPI<scalar_t>& w);
       void notify_inactives_J(WorkCompressMPI<scalar_t>& w);
       void notify_inactives_states(WorkCompressMPI<scalar_t>& w);
 
-      void compress_level_original(DistSamples<scalar_t>& RS,
-                                   const opts_t& opts,
-                                   WorkCompressMPI<scalar_t>& w,
-                                   int dd, int lvl);
-      void compress_level_stable(DistSamples<scalar_t>& RS,
-                                 const opts_t& opts,
-                                 WorkCompressMPI<scalar_t>& w,
-                                 int d, int dd, int lvl);
-      void extract_level(const delem_t& Aelem, const opts_t& opts,
-                         WorkCompressMPI<scalar_t>& w, int lvl);
-      void get_extraction_indices(std::vector<std::vector<std::size_t>>& I,
-                                  std::vector<std::vector<std::size_t>>& J,
-                                  WorkCompressMPI<scalar_t>& w,
-                                  int& self, int lvl);
+      void compress_level_original
+      (DistSamples<scalar_t>& RS, const opts_t& opts,
+       WorkCompressMPI<scalar_t>& w, int dd, int lvl);
+      void compress_level_stable
+      (DistSamples<scalar_t>& RS, const opts_t& opts,
+       WorkCompressMPI<scalar_t>& w, int d, int dd, int lvl);
+      void extract_level
+      (const delemw_t& Aelem, const opts_t& opts,
+       WorkCompressMPI<scalar_t>& w, int lvl);
+      void get_extraction_indices
+      (std::vector<std::vector<std::size_t>>& I,
+       std::vector<std::vector<std::size_t>>& J,
+       WorkCompressMPI<scalar_t>& w,
+       int& self, int lvl);
       void allgather_extraction_indices
       (std::vector<std::vector<std::size_t>>& lI,
        std::vector<std::vector<std::size_t>>& lJ,
        std::vector<std::vector<std::size_t>>& I,
        std::vector<std::vector<std::size_t>>& J,
        int& before, int self, int& after);
-      void extract_D_B(const delem_t& Aelem, int lctxt, const opts_t& opts,
-                       WorkCompressMPI<scalar_t>& w, int lvl);
+      void extract_D_B
+      (const delemw_t& Aelem, int lctxt, const opts_t& opts,
+       WorkCompressMPI<scalar_t>& w, int lvl);
 
-      void factor_recursive(HSSFactorsMPI<scalar_t>& f,
-                            WorkFactorMPI<scalar_t>& w, int local_ctxt,
-                            bool isroot, bool partial) const;
+      void factor_recursive
+      (HSSFactorsMPI<scalar_t>& f,
+       WorkFactorMPI<scalar_t>& w, int local_ctxt,
+       bool isroot, bool partial) const;
 
-      void solve_fwd(const HSSFactorsMPI<scalar_t>& ULV,
-                     const DistSubLeaf<scalar_t>& b,
-                     WorkSolveMPI<scalar_t>& w, bool partial,
-                     bool isroot) const;
-      void solve_bwd(const HSSFactorsMPI<scalar_t>& ULV,
-                     DistSubLeaf<scalar_t>& x, WorkSolveMPI<scalar_t>& w,
-                     bool isroot) const;
+      void solve_fwd
+      (const HSSFactorsMPI<scalar_t>& ULV,
+       const DistSubLeaf<scalar_t>& b,
+       WorkSolveMPI<scalar_t>& w, bool partial,
+       bool isroot) const;
+      void solve_bwd
+      (const HSSFactorsMPI<scalar_t>& ULV,
+       DistSubLeaf<scalar_t>& x, WorkSolveMPI<scalar_t>& w,
+       bool isroot) const;
 
       void apply_fwd
       (const DistSubLeaf<scalar_t>& B, WorkApplyMPI<scalar_t>& w,
@@ -267,12 +287,20 @@ namespace strumpack {
        DistSubLeaf<scalar_t>& C, WorkApplyMPI<scalar_t>& w,
        bool isroot, long long int flops) const;
 
-      void extract_fwd(WorkExtractMPI<scalar_t>& w, int lctxt,
-                       bool odiag) const;
-      void extract_bwd(std::vector<Triplet<scalar_t>>& triplets,
-                       int lctxt, WorkExtractMPI<scalar_t>& w) const;
-      void triplets_to_DistM(std::vector<Triplet<scalar_t>>& triplets,
-                             DistM_t& B, int Bprows, int Bpcols) const;
+      void extract_fwd
+      (WorkExtractMPI<scalar_t>& w, int lctxt,
+       bool odiag) const;
+      void extract_bwd
+      (std::vector<Triplet<scalar_t>>& triplets,
+       int lctxt, WorkExtractMPI<scalar_t>& w) const;
+      void triplets_to_DistM
+      (std::vector<Triplet<scalar_t>>& triplets,
+       DistM_t& B, int Bprows, int Bpcols) const;
+
+      void redistribute_to_tree
+      (const DistM_t& A, std::size_t rlo, std::size_t clo,
+       int Actxt_all, int& dest) override;
+      void delete_redistributed_input() override;
 
       void apply_UV_big
       (DistSubLeaf<scalar_t>& Theta, DistM_t& Uop,
