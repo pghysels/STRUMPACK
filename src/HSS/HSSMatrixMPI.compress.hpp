@@ -36,31 +36,108 @@ namespace strumpack {
   namespace HSS {
 
     template<typename scalar_t> void
-    HSSMatrixMPI<scalar_t>::redistribute_to_tree
-    (const DistM_t& A, std::size_t rlo, std::size_t clo,
-     int Actxt_all, int& dest) {
+    HSSMatrixMPI<scalar_t>::redistribute_to_tree_to_buffers
+    (const DistM_t& A, std::size_t Arlo, std::size_t Aclo,
+     int Actxt_all, std::vector<std::vector<scalar_t>>& sbuf, int dest) {
+      if (!A.active()) return;
+      // TODO reserve memory for sbuf
       if (this->leaf()) {
-        if (this->active())
-          this->_A = DistM_t(_ctxt, this->rows(), this->cols());
-        // TODO put this directly in D??
-        copy(this->rows(), this->cols(), A, rlo, clo,
-             this->_A, 0, 0, Actxt_all);
-        dest += _nprocs;
+        const auto B = DistM_t::default_MB;
+        const DistMW_t Ad
+          (this->rows(), this->cols(), const_cast<DistM_t&>(A), Arlo, Aclo);
+        int rlo, rhi, clo, chi;
+        Ad.lranges(rlo, rhi, clo, chi);
+        // destination rank is:
+        //  dest + ((r / B) % prows) + ((c / B) % pcols) * prows
+        std::vector<int> destr(rhi-rlo);
+        for (int r=rlo; r<rhi; r++)
+          destr[r-rlo] = dest + (Ad.rowl2g_fixed(r) / B) % _prows;
+        for (int c=clo; c<chi; c++)
+          for (int destc=((Ad.coll2g_fixed(c)/B)%_pcols)*_prows,
+                 r=rlo; r<rhi; r++)
+            sbuf[destr[r-rlo]+destc].push_back(Ad(r,c));
       } else {
         auto m0 = this->_ch[0]->rows();
         auto n0 = this->_ch[0]->cols();
         auto m1 = this->_ch[1]->rows();
         auto n1 = this->_ch[1]->cols();
-        this->_ch[0]->redistribute_to_tree
-          (A, rlo, clo, Actxt_all, dest);
-        this->_ch[1]->redistribute_to_tree
-          (A, rlo+m0, clo+n0, Actxt_all, dest);
-        if (this->active()) {
-          this->_A01 = DistM_t(_ctxt, m0, n1);
-          this->_A10 = DistM_t(_ctxt, m1, n0);
-        }
-        copy(m0, n1, A, rlo, clo+n0, this->_A01, 0, 0, Actxt_all);
-        copy(m1, n0, A, rlo+m0, clo, this->_A10, 0, 0, Actxt_all);
+        this->_ch[0]->redistribute_to_tree_to_buffers
+          (A, Arlo, Aclo, Actxt_all, sbuf, dest);
+        this->_ch[1]->redistribute_to_tree_to_buffers
+          (A, Arlo+m0, Aclo+n0, Actxt_all, sbuf, dest+Pl(_nprocs));
+        assert(A.MB() == DistM_t::default_MB);
+        const auto B = DistM_t::default_MB;
+        const DistMW_t A01(m0, n1, const_cast<DistM_t&>(A), Arlo, Aclo+n0);
+        int rlo, rhi, clo, chi;
+        A01.lranges(rlo, rhi, clo, chi);
+        // destination rank is:
+        //  dest + ((r / B) % prows) + ((c / B) % pcols) * prows
+        std::vector<int> destr(rhi-rlo);
+        for (int r=rlo; r<rhi; r++)
+          destr[r-rlo] = dest + (A01.rowl2g_fixed(r) / B) % _prows;
+        for (int c=clo; c<chi; c++)
+          for (int destc=((A01.coll2g_fixed(c)/B)%_pcols)*_prows,
+                 r=rlo; r<rhi; r++)
+            sbuf[destr[r-rlo]+destc].push_back(A01(r,c));
+        const DistMW_t A10(m1, n0, const_cast<DistM_t&>(A), Arlo+m0, Aclo);
+        A10.lranges(rlo, rhi, clo, chi);
+        destr.resize(rhi-rlo);
+        for (int r=rlo; r<rhi; r++)
+          destr[r-rlo] = dest + (A10.rowl2g_fixed(r) / B) % _prows;
+        for (int c=clo; c<chi; c++)
+          for (int destc=((A10.coll2g_fixed(c)/B)%_pcols)*_prows,
+                 r=rlo; r<rhi; r++)
+            sbuf[destr[r-rlo]+destc].push_back(A10(r,c));
+      }
+    }
+
+    template<typename scalar_t> void
+    HSSMatrixMPI<scalar_t>::redistribute_to_tree_from_buffers
+    (const DistM_t& A, int Aprows, int Apcols,
+     std::size_t Arlo, std::size_t Aclo, int Actxt_all, scalar_t** pbuf) {
+      if (!this->active()) return;
+      if (this->leaf()) {
+        _A = DistM_t(_ctxt, this->rows(), this->cols());
+        const auto B = DistM_t::default_MB;
+        int rlo, rhi, clo, chi;
+        _A.lranges(rlo, rhi, clo, chi);
+        std::vector<int> srcr(rhi-rlo);
+        for (int r=rlo; r<rhi; r++)
+          srcr[r-rlo] = ((_A.rowl2g(r) + Arlo) / B) % Aprows;
+        for (int c=clo; c<chi; c++)
+          for (int srcc=(((_A.coll2g(c)+Aclo)/B)%Apcols)*Aprows,
+                 r=rlo; r<rhi; r++)
+            _A(r,c) = *(pbuf[srcr[r-rlo] + srcc]++);
+      } else {
+        auto m0 = this->_ch[0]->rows();
+        auto n0 = this->_ch[0]->cols();
+        auto m1 = this->_ch[1]->rows();
+        auto n1 = this->_ch[1]->cols();
+        this->_ch[0]->redistribute_to_tree_from_buffers
+          (A, Aprows, Apcols, Arlo, Aclo, Actxt_all, pbuf);
+        this->_ch[1]->redistribute_to_tree_from_buffers
+          (A, Aprows, Apcols, Arlo+m0, Aclo+n0, Actxt_all, pbuf);
+        _A01 = DistM_t(_ctxt, m0, n1);
+        _A10 = DistM_t(_ctxt, m1, n0);
+        assert(A.I() == 1 && A.J() == 1);
+        const auto B = DistM_t::default_MB;
+        int rlo, rhi, clo, chi;
+        _A01.lranges(rlo, rhi, clo, chi);
+        std::vector<int> srcr(rhi-rlo);
+        for (int r=rlo; r<rhi; r++)
+          srcr[r-rlo] = ((_A01.rowl2g(r) + Arlo) / B) % Aprows;
+        for (int c=clo; c<chi; c++)
+          for (int srcc=(((_A01.coll2g(c)+Aclo+n0)/B)%Apcols)*Aprows,
+                 r=rlo; r<rhi; r++)
+            _A01(r,c) = *(pbuf[srcr[r-rlo] + srcc]++);
+        _A10.lranges(rlo, rhi, clo, chi);
+        srcr.resize(rhi-rlo);
+        for (int r=rlo; r<rhi; r++)
+          srcr[r-rlo] = ((_A10.rowl2g(r) + Arlo+m0) / B) % Aprows;
+        for (int c=clo; c<chi; c++)
+          for (int srcc=(((_A10.coll2g(c)+Aclo)/B)%Apcols)*Aprows,
+                 r=rlo; r<rhi; r++)
+            _A10(r,c) = *(pbuf[srcr[r-rlo]+srcc]++);
       }
     }
 
@@ -77,8 +154,14 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress(const DistM_t& A, const opts_t& opts) {
-      int dest = 0;
-      redistribute_to_tree(A, 0, 0, _ctxt_all, dest);
+      std::vector<std::vector<scalar_t>> sbuf(_nprocs);
+      redistribute_to_tree_to_buffers(A, 0, 0, _ctxt_all, sbuf);
+      scalar_t *rbuf = nullptr, **pbuf = nullptr;
+      all_to_all_v(sbuf, rbuf, pbuf, _comm);
+      redistribute_to_tree_from_buffers
+        (A, _prows, _pcols, 0, 0, _ctxt_all, pbuf);
+      delete[] pbuf;
+      delete[] rbuf;
       DistElemMult<scalar_t> Afunc(A);
       switch (opts.compression_algorithm()) {
       case CompressionAlgorithm::ORIGINAL:

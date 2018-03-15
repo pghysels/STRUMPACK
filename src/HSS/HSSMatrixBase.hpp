@@ -283,9 +283,13 @@ namespace strumpack {
       virtual void dense_recursive
       (DenseM_t& A, WorkDense<scalar_t>& w, bool isroot, int depth) const {};
 
-      virtual void redistribute_to_tree
-      (const DistM_t& A, std::size_t rlo, std::size_t clo,
-       int Actxt_all, int& dest);
+      virtual void redistribute_to_tree_to_buffers
+      (const DistM_t& A, std::size_t Arlo, std::size_t Aclo, int Actxt_all,
+       std::vector<std::vector<scalar_t>>& sbuf, int dest);
+      virtual void redistribute_to_tree_from_buffers
+      (const DistM_t& A, int Aprows, int Apcols,
+       std::size_t Arlo, std::size_t Aclo,
+       int Actxt_all, scalar_t** pbuf);
       virtual void delete_redistributed_input();
 
       friend class HSSMatrix<scalar_t>;
@@ -803,12 +807,33 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    HSSMatrixBase<scalar_t>::redistribute_to_tree
-    (const DistM_t& A, std::size_t rlo, std::size_t clo,
-     int Actxt_all, int& dest) {
-      if (active())
-        _Asub = DenseM_t(this->rows(), this->cols());
-      copy(rows(), cols(), A, rlo, clo, _Asub, dest++, Actxt_all);
+    HSSMatrixBase<scalar_t>::redistribute_to_tree_to_buffers
+    (const DistM_t& A, std::size_t Arlo, std::size_t Aclo, int Actxt_all,
+     std::vector<std::vector<scalar_t>>& sbuf, int dest) {
+      const DistMW_t Ad
+        (rows(), cols(), const_cast<DistM_t&>(A), Arlo, Aclo);
+      int rlo, rhi, clo, chi;
+      Ad.lranges(rlo, rhi, clo, chi);
+      // TODO reserve memory for sbuf
+      for (int c=clo; c<chi; c++)
+        for (int r=rlo; r<rhi; r++)
+          sbuf[dest].push_back(Ad(r,c));
+    }
+
+    template<typename scalar_t> void
+    HSSMatrixBase<scalar_t>::redistribute_to_tree_from_buffers
+    (const DistM_t& A, int Aprows, int Apcols,
+     std::size_t Arlo, std::size_t Aclo, int Actxt_all, scalar_t** pbuf) {
+      if (!this->active()) return;
+      _Asub = DenseM_t(rows(), cols());
+      const auto B = DistM_t::default_MB;
+      std::vector<std::size_t> srcr(rows());
+      for (std::size_t r=0; r<rows(); r++)
+        srcr[r] = ((r + Arlo) / B) % Aprows;
+      for (std::size_t c=0; c<cols(); c++)
+        for (std::size_t srcc=(((c+Aclo)/B)%Apcols)*Aprows,
+               r=0; r<cols(); r++)
+          _Asub(r,c) = *(pbuf[srcr[r] + srcc]++);
     }
 
     template<typename scalar_t> void

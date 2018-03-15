@@ -297,9 +297,13 @@ namespace strumpack {
       (std::vector<Triplet<scalar_t>>& triplets,
        DistM_t& B, int Bprows, int Bpcols) const;
 
-      void redistribute_to_tree
-      (const DistM_t& A, std::size_t rlo, std::size_t clo,
-       int Actxt_all, int& dest) override;
+      void redistribute_to_tree_to_buffers
+      (const DistM_t& A, std::size_t Arlo, std::size_t Aclo, int Actxt_all,
+       std::vector<std::vector<scalar_t>>& sbuf, int dest=0) override;
+      void redistribute_to_tree_from_buffers
+      (const DistM_t& A, int Aprows, int Apcols,
+       std::size_t rlo, std::size_t clo,
+       int Actxt_all, scalar_t** pbuf) override;
       void delete_redistributed_input() override;
 
       void apply_UV_big
