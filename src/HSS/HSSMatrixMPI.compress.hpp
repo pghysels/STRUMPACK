@@ -50,12 +50,22 @@ namespace strumpack {
         // destination rank is:
         //  dest + ((r / B) % prows) + ((c / B) % pcols) * prows
         std::vector<int> destr(rhi-rlo);
+        std::vector<int> destc(chi-clo);
         for (int r=rlo; r<rhi; r++)
           destr[r-rlo] = dest + (Ad.rowl2g_fixed(r) / B) % _prows;
         for (int c=clo; c<chi; c++)
-          for (int destc=((Ad.coll2g_fixed(c)/B)%_pcols)*_prows,
-                 r=rlo; r<rhi; r++)
-            sbuf[destr[r-rlo]+destc].push_back(Ad(r,c));
+          destc[c-clo] = ((Ad.coll2g_fixed(c) / B) % _pcols) * _prows;
+        {
+          std::vector<std::size_t> cnt(sbuf.size());
+          for (int c=clo; c<chi; c++)
+            for (int r=rlo; r<rhi; r++)
+              cnt[destr[r-rlo]+destc[c-clo]]++;
+          for (std::size_t p=0; p<sbuf.size(); p++)
+            sbuf[p].reserve(sbuf[p].size()+cnt[p]);
+        }
+        for (int c=clo; c<chi; c++)
+          for (int r=rlo; r<rhi; r++)
+            sbuf[destr[r-rlo]+destc[c-clo]].push_back(Ad(r,c));
       } else {
         auto m0 = this->_ch[0]->rows();
         auto n0 = this->_ch[0]->cols();
@@ -68,26 +78,42 @@ namespace strumpack {
         assert(A.MB() == DistM_t::default_MB);
         const auto B = DistM_t::default_MB;
         const DistMW_t A01(m0, n1, const_cast<DistM_t&>(A), Arlo, Aclo+n0);
-        int rlo, rhi, clo, chi;
-        A01.lranges(rlo, rhi, clo, chi);
+        const DistMW_t A10(m1, n0, const_cast<DistM_t&>(A), Arlo+m0, Aclo);
+        int A01rlo, A01rhi, A01clo, A01chi;
+        A01.lranges(A01rlo, A01rhi, A01clo, A01chi);
+        int A10rlo, A10rhi, A10clo, A10chi;
+        A10.lranges(A10rlo, A10rhi, A10clo, A10chi);
         // destination rank is:
         //  dest + ((r / B) % prows) + ((c / B) % pcols) * prows
-        std::vector<int> destr(rhi-rlo);
-        for (int r=rlo; r<rhi; r++)
-          destr[r-rlo] = dest + (A01.rowl2g_fixed(r) / B) % _prows;
-        for (int c=clo; c<chi; c++)
-          for (int destc=((A01.coll2g_fixed(c)/B)%_pcols)*_prows,
-                 r=rlo; r<rhi; r++)
-            sbuf[destr[r-rlo]+destc].push_back(A01(r,c));
-        const DistMW_t A10(m1, n0, const_cast<DistM_t&>(A), Arlo+m0, Aclo);
-        A10.lranges(rlo, rhi, clo, chi);
-        destr.resize(rhi-rlo);
-        for (int r=rlo; r<rhi; r++)
-          destr[r-rlo] = dest + (A10.rowl2g_fixed(r) / B) % _prows;
-        for (int c=clo; c<chi; c++)
-          for (int destc=((A10.coll2g_fixed(c)/B)%_pcols)*_prows,
-                 r=rlo; r<rhi; r++)
-            sbuf[destr[r-rlo]+destc].push_back(A10(r,c));
+        std::vector<int> destrA01(A01rhi-A01rlo);
+        std::vector<int> destcA01(A01chi-A01clo);
+        std::vector<int> destrA10(A10rhi-A10rlo);
+        std::vector<int> destcA10(A10chi-A10clo);
+        for (int r=A01rlo; r<A01rhi; r++)
+          destrA01[r-A01rlo] = dest + (A01.rowl2g_fixed(r) / B) % _prows;
+        for (int c=A01clo; c<A01chi; c++)
+          destcA01[c-A01clo] = ((A01.coll2g_fixed(c) / B) % _pcols) * _prows;
+        for (int r=A10rlo; r<A10rhi; r++)
+          destrA10[r-A10rlo] = dest + (A10.rowl2g_fixed(r) / B) % _prows;
+        for (int c=A10clo; c<A10chi; c++)
+          destcA10[c-A10clo] = ((A10.coll2g_fixed(c) / B) % _pcols) * _prows;
+        {
+          std::vector<std::size_t> cnt(sbuf.size());
+          for (int c=A01clo; c<A01chi; c++)
+            for (int r=A01rlo; r<A01rhi; r++)
+              cnt[destrA01[r-A01rlo]+destcA01[c-A01clo]]++;
+          for (int c=A10clo; c<A10chi; c++)
+            for (int r=A10rlo; r<A10rhi; r++)
+              cnt[destrA10[r-A10rlo]+destcA10[c-A10clo]]++;
+          for (std::size_t p=0; p<sbuf.size(); p++)
+            sbuf[p].reserve(sbuf[p].size()+cnt[p]);
+        }
+        for (int c=A01clo; c<A01chi; c++)
+          for (int r=A01rlo; r<A01rhi; r++)
+            sbuf[destrA01[r-A01rlo]+destcA01[c-A01clo]].push_back(A01(r,c));
+        for (int c=A10clo; c<A10chi; c++)
+          for (int r=A10rlo; r<A10rhi; r++)
+            sbuf[destrA10[r-A10rlo]+destcA10[c-A10clo]].push_back(A10(r,c));
       }
     }
 

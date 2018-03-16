@@ -814,7 +814,7 @@ namespace strumpack {
         (rows(), cols(), const_cast<DistM_t&>(A), Arlo, Aclo);
       int rlo, rhi, clo, chi;
       Ad.lranges(rlo, rhi, clo, chi);
-      // TODO reserve memory for sbuf
+      sbuf.reserve(sbuf.size()+(chi-clo)*(rhi-rlo));
       for (int c=clo; c<chi; c++)
         for (int r=rlo; r<rhi; r++)
           sbuf[dest].push_back(Ad(r,c));
