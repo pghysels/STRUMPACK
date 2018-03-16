@@ -103,9 +103,9 @@ namespace strumpack {
         _A.lranges(rlo, rhi, clo, chi);
         std::vector<int> srcr(rhi-rlo);
         for (int r=rlo; r<rhi; r++)
-          srcr[r-rlo] = ((_A.rowl2g(r) + Arlo) / B) % Aprows;
+          srcr[r-rlo] = ((_A.rowl2g_fixed(r) + Arlo) / B) % Aprows;
         for (int c=clo; c<chi; c++)
-          for (int srcc=(((_A.coll2g(c)+Aclo)/B)%Apcols)*Aprows,
+          for (int srcc=(((_A.coll2g_fixed(c)+Aclo)/B)%Apcols)*Aprows,
                  r=rlo; r<rhi; r++)
             _A(r,c) = *(pbuf[srcr[r-rlo] + srcc]++);
       } else {
@@ -125,17 +125,17 @@ namespace strumpack {
         _A01.lranges(rlo, rhi, clo, chi);
         std::vector<int> srcr(rhi-rlo);
         for (int r=rlo; r<rhi; r++)
-          srcr[r-rlo] = ((_A01.rowl2g(r) + Arlo) / B) % Aprows;
+          srcr[r-rlo] = ((_A01.rowl2g_fixed(r) + Arlo) / B) % Aprows;
         for (int c=clo; c<chi; c++)
-          for (int srcc=(((_A01.coll2g(c)+Aclo+n0)/B)%Apcols)*Aprows,
+          for (int srcc=(((_A01.coll2g_fixed(c)+Aclo+n0)/B)%Apcols)*Aprows,
                  r=rlo; r<rhi; r++)
             _A01(r,c) = *(pbuf[srcr[r-rlo] + srcc]++);
         _A10.lranges(rlo, rhi, clo, chi);
         srcr.resize(rhi-rlo);
         for (int r=rlo; r<rhi; r++)
-          srcr[r-rlo] = ((_A10.rowl2g(r) + Arlo+m0) / B) % Aprows;
+          srcr[r-rlo] = ((_A10.rowl2g_fixed(r) + Arlo+m0) / B) % Aprows;
         for (int c=clo; c<chi; c++)
-          for (int srcc=(((_A10.coll2g(c)+Aclo)/B)%Apcols)*Aprows,
+          for (int srcc=(((_A10.coll2g_fixed(c)+Aclo)/B)%Apcols)*Aprows,
                  r=rlo; r<rhi; r++)
             _A10(r,c) = *(pbuf[srcr[r-rlo]+srcc]++);
       }
