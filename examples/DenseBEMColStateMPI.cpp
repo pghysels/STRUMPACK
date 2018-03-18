@@ -156,7 +156,8 @@ int run(int argc, char *argv[]) {
   for (int i=0; i<nprowA; i++)
     for (int j=0; j<npcolA; j++) {
       int id = i * npcolA + j;
-      copy(nrows[i], ncols[j], Atmp, id, A, 0, 0, ctxt_all);
+      copy(nrows[i], ncols[j], Atmp, id,
+           A, rowoffset[i], coloffset[j], ctxt_all);
       if (myid == id)
         cout << myid << " working: (" << i << "," << j << "): "
              << nrows[i] << " x " << ncols[j] << endl;
