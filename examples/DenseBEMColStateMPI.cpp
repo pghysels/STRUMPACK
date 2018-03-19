@@ -65,7 +65,8 @@ int run(int argc, char *argv[]) {
   int n = 27648; // In 8x8 blocks of 3456x3456
   int nrows[nprowA] = {3456, 3456, 3456, 3456, 3456, 3456, 3456, 3456};
   int ncols[npcolA] = {3456, 3456, 3456, 3456, 3456, 3456, 3456, 3456};
-  string prefix = "/global/cscratch1/sd/pghysels/BEM/mats/example3/";
+  // string prefix = "/global/cscratch1/sd/pghysels/BEM/mats/example3/";
+  string prefix = "/global/cscratch1/sd/gichavez/intel17/paper2_tests/mats/example3/";
 
   int myid = mpi_rank();
   int np = mpi_nprocs();
