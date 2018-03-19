@@ -65,7 +65,7 @@ int run(int argc, char *argv[]) {
   int n = 27648; // In 8x8 blocks of 3456x3456
   int nrows[nprowA] = {3456, 3456, 3456, 3456, 3456, 3456, 3456, 3456};
   int ncols[npcolA] = {3456, 3456, 3456, 3456, 3456, 3456, 3456, 3456};
-  string prefix = "/global/cscratch1/sd/gichavez/intel17/paper2_tests/mats/example3/";
+  string prefix = "/global/cscratch1/sd/pghysels/BEM/mats/example3/";
 
   int myid = mpi_rank();
   int np = mpi_nprocs();
@@ -80,10 +80,10 @@ int run(int argc, char *argv[]) {
 
   int rowoffset[nprowA];
   int coloffset[npcolA];
-  rowoffset[0] = 1;
+  rowoffset[0] = 0;
   for (int i=1; i<nprowA; i++)
     rowoffset[i] = rowoffset[i-1] + nrows[i-1];
-  coloffset[0] = 1;
+  coloffset[0] = 0;
   for (int i=1; i<npcolA; i++)
     coloffset[i] = coloffset[i-1] + ncols[i-1];
 
@@ -123,10 +123,10 @@ int run(int argc, char *argv[]) {
       cout << "Something went wrong while reading..." << endl;
 
     // Last 4 bytes are an integer
-    fp.read((char *)&ierr,4);
+    fp.read((char*)&ierr,4);
     if (fp.fail() || ierr!=nrows[myrowA]*ncols[mycolA]*8) {
       cout << "First 8 bytes should be an integer equal to nrows*ncols*8; "
-           << "instead, " << ierr  << endl;
+           << "instead, " << ierr << endl;
       return -2;
     }
     fp.close();
@@ -167,11 +167,6 @@ int run(int argc, char *argv[]) {
   tend = MPI_Wtime();
   if (!myid)
     cout << "Redistribution done in " << tend - tstart << "s" << endl;
-
-  if (!myid)
-    cout << "# DistributedMatrixWrapper..." << endl;
-  timer.start();
-
   if (!myid)
     cout << "# A.total_memory() = "
          << A.total_memory()/(1000.0*1000.0) << "MB" << endl;
