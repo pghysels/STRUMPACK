@@ -73,7 +73,8 @@ int run(int argc, char *argv[]) {
    *
    */
 
-  myscalar *A=NULL, *X=NULL, *B=NULL;
+  myscalar *X=NULL, *B=NULL;
+  DenseMatrix<myscalar> Acent;
   int descA[BLACSCTXTSIZE], descAcent[BLACSCTXTSIZE], descXB[BLACSCTXTSIZE];
   int n;
   int nb=64;
@@ -124,7 +125,7 @@ int run(int argc, char *argv[]) {
     }
 
     // Acent=new myscalar[n*n];
-    DenseMatrix<myscalar> Acent = DenseMatrix<myscalar>(n, n);
+    Acent = DenseMatrix<myscalar>(n, n);
     fp.read((char*)Acent.data(), 16*Acent.rows()*Acent.cols());
     // for(i=0;i<n*n;i++) {
       // fp.read((char *)&Acent[i],16); // Binary file with double complex number
@@ -173,19 +174,17 @@ int run(int argc, char *argv[]) {
   // pgemr2d(n,n,Acent,IONE,IONE,descAcent,A,IONE,IONE,descA,ctxtglob);
   // delete[] Acent;
 
-  // /* Set the RHS (random vector) and the solution space */
-  // if(myid<nprow*npcol) {
-  //   locr=numroc_(&n,&nb,&myrow,&IZERO,&nprow);
-  //   locc=numroc_(&IONE,&nb,&mycol,&IZERO,&npcol);
-  //   B=new myscalar[locr*locc];
-  //   dummy=std::max(1,locr);
-  //   descinit_(descXB,&n,&IONE,&nb,&nb,&IZERO,&IZERO,&ctxt,&dummy,&ierr);
-  //   for(i=0;i<locr*locc;i++)
-  //     B[i]=1.0;
-  //   X=new myscalar[locr*locc];
-  // } else {
-  //   descset_(descXB,&n,&IONE,&nb,&nb,&IZERO,&IZERO,&INONE,&IONE);
-  // }
+  // Distribute A into 2D block-cyclic form
+  if (!myid)
+    cout << "Redistributing..." << endl;
+  tstart = MPI_Wtime();
+  // Redistribute each piece
+  DistributedMatrix<myscalar> A(ctxt, n, n);
+
+  // copy      (n,        n,        Acent, myid,               A, 1,            1,                   ctxtglob);
+  // pgemr2d(n,        n,        Acent,IONE,IONE,descAcent, A, IONE,         IONE,         descA, ctxtglob);
+
+  Acent.clear();
 
   // //===================================================================
   // //==== Compression to HSS ===========================================
@@ -218,6 +217,19 @@ int run(int argc, char *argv[]) {
   //        << "# mem percentage = " << 100. * Hmem / Amem
   //        << "% (of dense)" << endl;
 
+  // /* Set the RHS (random vector) and the solution space */
+  // if(myid<nprow*npcol) {
+  //   locr=numroc_(&n,&nb,&myrow,&IZERO,&nprow);
+  //   locc=numroc_(&IONE,&nb,&mycol,&IZERO,&npcol);
+  //   B=new myscalar[locr*locc];
+  //   dummy=std::max(1,locr);
+  //   descinit_(descXB,&n,&IONE,&nb,&nb,&IZERO,&IZERO,&ctxt,&dummy,&ierr);
+  //   for(i=0;i<locr*locc;i++)
+  //     B[i]=1.0;
+  //   X=new myscalar[locr*locc];
+  // } else {
+  //   descset_(descXB,&n,&IONE,&nb,&nb,&IZERO,&IZERO,&INONE,&IONE);
+  // }
 
 #if false
 
