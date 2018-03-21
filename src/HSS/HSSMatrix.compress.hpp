@@ -9,7 +9,7 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrix<scalar_t>::compress_original
     (const DenseM_t& A, const opts_t& opts) {
       AFunctor<scalar_t> afunc(A);
-      compress(afunc, afunc, opts);
+      compress_original(afunc, afunc, opts);
     }
 
     template<typename scalar_t> void HSSMatrix<scalar_t>::compress_original
@@ -41,6 +41,8 @@ namespace strumpack {
         if (opts.verbose())
           std::cout << "# compressing with d = " << d-opts.dd()
                     << " + " << opts.dd() << " (original)" << std::endl;
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
         compress_recursive_original
           (Rr, Rc, Sr, Sc, Aelem, opts, w, d-d_old, this->_openmp_task_depth);
         d_old = d;
@@ -127,11 +129,23 @@ namespace strumpack {
         if (w.lvl < lvl) return;
       } else {
         if (w.lvl < lvl) {
-          // TODO tasking
-          this->_ch[0]->compress_level_original
-            (Rr, Rc, Sr, Sc, opts, w.c[0], dd, lvl, depth+1);
-          this->_ch[1]->compress_level_original
-            (Rr, Rc, Sr, Sc, opts, w.c[1], dd, lvl, depth+1);
+          bool tasked = depth < params::task_recursion_cutoff_level;
+          if (tasked) {
+#pragma omp task default(shared)                                        \
+  final(depth >= params::task_recursion_cutoff_level-1) mergeable
+            this->_ch[0]->compress_level_original
+              (Rr, Rc, Sr, Sc, opts, w.c[0], dd, lvl, depth+1);
+#pragma omp task default(shared)                                        \
+  final(depth >= params::task_recursion_cutoff_level-1) mergeable
+            this->_ch[1]->compress_level_original
+              (Rr, Rc, Sr, Sc, opts, w.c[1], dd, lvl, depth+1);
+#pragma omp taskwait
+          } else {
+            this->_ch[0]->compress_level_original
+              (Rr, Rc, Sr, Sc, opts, w.c[0], dd, lvl, depth+1);
+            this->_ch[1]->compress_level_original
+              (Rr, Rc, Sr, Sc, opts, w.c[1], dd, lvl, depth+1);
+          }
           return;
         }
         if (!this->_ch[0]->is_compressed() ||

@@ -193,8 +193,8 @@ namespace strumpack {
       gemm(Trans::N, Trans::C, scalar_t(-1.),
            _ThetaVhatC_or_VhatCPhiC, _Phi,
            scalar_t(1.), F22, task_depth);
-
-    //#pragma omp taskloop default(shared) grainsize(64) if(task_depth < params::task_recursion_cutoff_level)
+#pragma omp taskloop default(shared)                    \
+  if(task_depth < params::task_recursion_cutoff_level)
     for (std::size_t c=0; c<dupd; c++) {
       std::size_t pc = I[c];
       if (pc < pdsep) {
@@ -279,8 +279,10 @@ namespace strumpack {
       DenseM_t cSr, cSc;
       DenseMW_t cRd0(cR.rows(), dchild, cR, 0, 0);
       _H.Schur_product_indirect(_ULV, _DUB01, R1, cRd0, Sr2, Sc2, cSr, cSc);
-      DenseMW_t(Sr.rows(), dchild, Sr, 0, 0).scatter_rows_add(I, cSr);
-      DenseMW_t(Sc.rows(), dchild, Sc, 0, 0).scatter_rows_add(I, cSc);
+      DenseMW_t(Sr.rows(), dchild, Sr, 0, 0)
+        .scatter_rows_add(I, cSr, task_depth);
+      DenseMW_t(Sc.rows(), dchild, Sc, 0, 0)
+        .scatter_rows_add(I, cSc, task_depth);
       R1.clear();
       Sr2.clear();
       Sc2.clear();
@@ -332,8 +334,8 @@ namespace strumpack {
       (_ULV, _Theta, _DUB01, _Phi,
        _ThetaVhatC_or_VhatCPhiC, cR, cSr, cSc);
 #endif
-    Sr.scatter_rows_add(I, cSr);
-    Sc.scatter_rows_add(I, cSc);
+    Sr.scatter_rows_add(I, cSr, task_depth);
+    Sc.scatter_rows_add(I, cSc, task_depth);
     STRUMPACK_CB_SAMPLE_FLOPS(cSr.rows()*cSr.cols()*2);
   }
 
@@ -394,7 +396,7 @@ namespace strumpack {
     }
 
     A.front_multiply
-      (this->sep_begin, this->sep_end, this->upd, Rr, Sr, Sc);
+      (this->sep_begin, this->sep_end, this->upd, Rr, Sr, Sc, task_depth);
     if (this->lchild)
       this->lchild->sample_CB(opts, Rr, Sr, Sc, this, task_depth);
     if (this->rchild)

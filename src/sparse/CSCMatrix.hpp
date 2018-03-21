@@ -51,7 +51,7 @@ namespace strumpack {
     void extract_separator(integer_t separator_end, const std::vector<std::size_t>& I,
 			   const std::vector<std::size_t>& J, DenseM_t& B, int depth) const;
     void front_multiply(integer_t slo, integer_t shi, integer_t* upd, integer_t dim_upd,
-			const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc) const;
+			const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const;
     void extract_front(scalar_t* F11, scalar_t* F12, scalar_t* F21, integer_t dim_sep, integer_t dim_upd,
 		       integer_t sep_begin, integer_t sep_end, integer_t* upd, int depth);
     void extract_F11_block(scalar_t* F, integer_t ldF, integer_t row, integer_t nr_rows, integer_t col, integer_t nr_cols);
@@ -339,7 +339,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   CSCMatrix<scalar_t,integer_t>::front_multiply
   (integer_t slo, integer_t shi, integer_t* upd, integer_t dupd,
-   const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc) const {
+   const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const {
     auto nbvec = R.cols();
     auto ds = shi - slo;
     for (auto col=slo; col<shi; col++) { // separator columns

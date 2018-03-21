@@ -149,7 +149,7 @@ namespace strumpack {
      const std::vector<std::size_t>& J, DistM_t& B, MPI_Comm comm) const = 0;
     virtual void front_multiply
     (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
-     const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc) const = 0;
+     const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const = 0;
     virtual void front_multiply_2d
     (integer_t sep_begin, integer_t sep_end,
      const std::vector<integer_t>& upd,

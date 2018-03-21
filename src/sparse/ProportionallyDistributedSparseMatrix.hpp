@@ -92,7 +92,7 @@ namespace strumpack {
 
     void front_multiply
     (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
-     const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc) const override;
+     const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const override;
     void front_multiply_2d
     (integer_t sep_begin, integer_t sep_end,
      const std::vector<integer_t>& upd, const DistM_t& R,
@@ -306,59 +306,73 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::front_multiply
   (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
-   const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc) const {
+   const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const {
     long long int local_flops = 0;
-    integer_t dupd = upd.size();
-    auto ds = shi - slo;
-    auto nbvec = R.cols();
-    auto c = std::lower_bound
+    const integer_t dupd = upd.size();
+    const std::size_t clo = std::lower_bound
       (_global_col, _global_col+_local_cols, slo) - _global_col;
-    auto chi = std::lower_bound
-      (_global_col+c, _global_col+_local_cols, shi) - _global_col;
-    for (; c<chi; c++) {
-      auto col = _global_col[c];
-      integer_t row_upd = 0;
-      for (auto j=this->_ptr[c]; j<this->_ptr[c+1]; j++) {
-        auto row = this->_ind[j];
-        if (row >= slo) {
-          if (row < shi) {
-            auto a = this->_val[j];
-            for (std::size_t k=0; k<nbvec; k++) {
-              Sr(row-slo, k) += a * R(col-slo, k);
-              Sc(col-slo, k) += a * R(row-slo, k);
-            }
-            local_flops += 4 * nbvec;
-          } else {
-            while (row_upd < dupd && upd[row_upd] < row) row_upd++;
-            if (row_upd == dupd) break;
-            if (upd[row_upd] == row) {
-              auto a = this->_val[j];
-              for (std::size_t k=0; k<nbvec; k++) {
-                Sr(ds+row_upd, k) += a * R(col-slo, k);
-                Sc(col-slo, k) += a * R(ds+row_upd, k);
+    const std::size_t chi = std::lower_bound
+      (_global_col+clo, _global_col+_local_cols, shi) - _global_col;
+    const auto ds = shi - slo;
+    const auto nbvec = R.cols();
+
+    const auto B = 4; // blocking parameter
+#pragma omp taskloop default(shared)                    \
+  if(depth < params::task_recursion_cutoff_level)
+    for (std::size_t k=0; k<nbvec; k+=B) {
+      for (std::size_t c=clo; c<chi; c++) {
+        const auto col = _global_col[c];
+        integer_t row_upd = 0;
+        const auto hij = this->_ptr[c+1];
+        for (auto j=this->_ptr[c]; j<hij; j++) {
+          const auto row = this->_ind[j];
+          if (row >= slo) {
+            if (row < shi) {
+              const auto hikk = std::min(k+B, nbvec);
+              const auto a = this->_val[j];
+              for (std::size_t kk=k; kk<hikk; kk++) {
+                Sr(row-slo, kk) += a * R(col-slo, kk);
+                Sc(col-slo, kk) += a * R(row-slo, kk);
               }
-              local_flops += 4 * nbvec;
+              //local_flops += 4 * B;
+            } else {
+              while (row_upd < dupd && upd[row_upd] < row) row_upd++;
+              if (row_upd == dupd) break;
+              if (upd[row_upd] == row) {
+                const auto hikk = std::min(k+B, nbvec);
+                const auto a = this->_val[j];
+                for (std::size_t kk=k; kk<hikk; kk++) {
+                  Sr(ds+row_upd, kk) += a * R(col-slo, kk);
+                  Sc(col-slo, kk) += a * R(ds+row_upd, kk);
+                }
+                //local_flops += 4 * B;
+              }
             }
           }
         }
       }
     }
-    for (integer_t i=0; i<dupd; i++) { // update columns
-      //while (c < _local_cols && _global_col[c] < upd[i]) c++;
-      c = std::lower_bound
-        (_global_col+c, _global_col+_local_cols, upd[i]) - _global_col;
-      if (c == _local_cols || _global_col[c] != upd[i]) continue;
-      for (auto j=this->_ptr[c]; j<this->_ptr[c+1]; j++) {
-        auto row = this->_ind[j];
-        if (row >= slo) {
-          if (row < shi) {
-            auto a = this->_val[j];
-            for (std::size_t k=0; k<nbvec; k++) {
-              Sr(row-slo, k) += a * R(ds+i, k);
-              Sc(ds+i, k) += a * R(row-slo, k);
-            }
-            local_flops += 4 * nbvec;
-          } else break;
+#pragma omp taskloop default(shared)                    \
+  if(depth < params::task_recursion_cutoff_level)
+    for (std::size_t k=0; k<nbvec; k+=B) {
+      for (integer_t i=0, c=chi; i<dupd; i++) { // update columns
+        c = std::lower_bound
+          (_global_col+c, _global_col+_local_cols, upd[i]) - _global_col;
+        if (c == _local_cols || _global_col[c] != upd[i]) continue;
+        const auto hij = this->_ptr[c+1];
+        for (auto j=this->_ptr[c]; j<hij; j++) {
+          const auto row = this->_ind[j];
+          if (row >= slo) {
+            if (row < shi) {
+              const auto a = this->_val[j];
+              const auto hikk = std::min(k+B, nbvec);
+              for (std::size_t kk=k; kk<hikk; kk++) {
+                Sr(row-slo, kk) += a * R(ds+i, kk);
+                Sc(ds+i, kk) += a * R(row-slo, kk);
+              }
+              //local_flops += 4 * nbvec;
+            } else break;
+          }
         }
       }
     }
@@ -559,13 +573,13 @@ namespace strumpack {
     assert(Scol.fixed());
 
     if (!R.active()) return;
-    integer_t dim_upd = upd.size();
+    const integer_t dim_upd = upd.size();
     long long int local_flops = 0;
-    auto dim_sep = sep_end - sep_begin;
-    auto cols = R.cols();
-    auto lcols = R.lcols();
-    auto p_rows = R.prows();
-    auto p_row  = R.prow();
+    const auto dim_sep = sep_end - sep_begin;
+    const auto cols = R.cols();
+    const auto lcols = R.lcols();
+    const auto p_rows = R.prows();
+    const auto p_row  = R.prow();
     auto rows_to = new integer_t[2*p_rows];
     auto rows_from = rows_to + p_rows;
     std::fill(rows_to, rows_to+2*p_rows, 0);
@@ -574,8 +588,8 @@ namespace strumpack {
       (_global_col, _global_col+_local_cols, sep_begin) - _global_col;
     auto chi = std::lower_bound
       (_global_col+clo, _global_col+_local_cols, sep_end) - _global_col;
-    integer_t c = clo;
-    for (; c<chi; c++) { // separator columns
+
+    for (integer_t c=clo; c<chi; c++) { // separator columns
       auto row_j_rank = R.rowg2p_fixed(_global_col[c] - sep_begin);
       integer_t row_upd = 0;
       auto hij = this->_ptr[c+1];
@@ -612,7 +626,7 @@ namespace strumpack {
         }
       }
     }
-    for (integer_t i=0; i<dim_upd; i++) { // update columns
+    for (integer_t i=0, c=chi; i<dim_upd; i++) { // update columns
       c = std::lower_bound
         (_global_col+c, _global_col+_local_cols, upd[i]) - _global_col;
       if (c == _local_cols || _global_col[c] != upd[i]) continue;
@@ -641,8 +655,8 @@ namespace strumpack {
       STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
     }
 
-    size_t ssize = std::accumulate(rows_to, rows_to+p_rows, 0);
-    size_t rsize = std::accumulate(rows_from, rows_from+p_rows, 0);
+    std::size_t ssize = std::accumulate(rows_to, rows_to+p_rows, 0);
+    std::size_t rsize = std::accumulate(rows_from, rows_from+p_rows, 0);
     auto sbuf = new scalar_t[(ssize+rsize)*lcols];
     auto rbuf = sbuf+ssize*lcols;
     std::fill(sbuf, sbuf+ssize*lcols, scalar_t(0.));
@@ -651,75 +665,84 @@ namespace strumpack {
     for (integer_t p=1; p<p_rows; p++)
       pp[p] = pp[p-1] + rows_to[p-1]*lcols;
 
-    for (c=clo; c<chi; c++) { // separator columns
-      auto Aj = _global_col[c] - sep_begin;
-      auto row_j_rank = R.rowg2p_fixed(Aj);
-      integer_t row_upd = 0;
-      for (integer_t j=this->_ptr[c]; j<this->_ptr[c+1]; j++) {
-        auto row = this->_ind[j];
-        if (row >= sep_begin) {
-          if (row < sep_end) {
-            auto a = this->_val[j];
-            auto Ai = row - sep_begin;
-            auto row_i_rank = R.rowg2p_fixed(Ai);
-            if (row_j_rank == p_row) {
-              for (integer_t k=0, r=R.rowg2l_fixed(Aj); k<lcols; k++)
-                pp[row_i_rank][k] += a * R(r, k);
-              pp[row_i_rank] += lcols;
-            }
-            if (row_i_rank == p_row) { // transpose
-              for (integer_t k=0, r=R.rowg2l_fixed(Ai); k<lcols; k++)
-                pp[row_j_rank][k] += a * R(r, k);
-              pp[row_j_rank] += lcols;
-            }
-          } else {
-            while (row_upd < dim_upd && upd[row_upd] < row)
-              row_upd++;
-            if (row_upd == dim_upd) break;
-            if (upd[row_upd] == row) {
-              auto a = this->_val[j];
-              auto Ai = dim_sep + row_upd;
+#pragma omp parallel for
+    for (int t=0; t<p_rows; t++) {
+      for (integer_t c=clo; c<chi; c++) { // separator columns
+        auto Aj = _global_col[c] - sep_begin;
+        auto row_j_rank = R.rowg2p_fixed(Aj);
+        integer_t row_upd = 0;
+        const auto hij = this->_ptr[c+1];
+        for (integer_t j=this->_ptr[c]; j<hij; j++) {
+          auto row = this->_ind[j];
+          if (row >= sep_begin) {
+            if (row < sep_end) {
+              auto Ai = row - sep_begin;
               auto row_i_rank = R.rowg2p_fixed(Ai);
-              if (row_j_rank == p_row) {
+              if (row_i_rank == t && row_j_rank == p_row) {
+                const auto a = this->_val[j];
                 for (integer_t k=0, r=R.rowg2l_fixed(Aj); k<lcols; k++)
                   pp[row_i_rank][k] += a * R(r, k);
                 pp[row_i_rank] += lcols;
               }
-              if (row_i_rank == p_row) { // transpose
+              if (row_j_rank == t && row_i_rank == p_row) { // transpose
+                const auto a = this->_val[j];
                 for (integer_t k=0, r=R.rowg2l_fixed(Ai); k<lcols; k++)
                   pp[row_j_rank][k] += a * R(r, k);
                 pp[row_j_rank] += lcols;
+              }
+            } else {
+              while (row_upd < dim_upd && upd[row_upd] < row)
+                row_upd++;
+              if (row_upd == dim_upd) break;
+              if (upd[row_upd] == row) {
+                auto Ai = dim_sep + row_upd;
+                auto row_i_rank = R.rowg2p_fixed(Ai);
+                if (row_i_rank == t && row_j_rank == p_row) {
+                  const auto a = this->_val[j];
+                  for (integer_t k=0, r=R.rowg2l_fixed(Aj); k<lcols; k++)
+                    pp[row_i_rank][k] += a * R(r, k);
+                  pp[row_i_rank] += lcols;
+                }
+                if (row_j_rank == t && row_i_rank == p_row) { // transpose
+                  const auto a = this->_val[j];
+                  for (integer_t k=0, r=R.rowg2l_fixed(Ai); k<lcols; k++)
+                    pp[row_j_rank][k] += a * R(r, k);
+                  pp[row_j_rank] += lcols;
+                }
               }
             }
           }
         }
       }
     }
-    for (integer_t i=0; i<dim_upd; i++) { // update columns
-      c = std::lower_bound
-        (_global_col+c, _global_col+_local_cols, upd[i]) - _global_col;
-      if (c == _local_cols || _global_col[c] != upd[i]) continue;
-      auto Aj = dim_sep + i;
-      auto row_j_rank = R.rowg2p_fixed(Aj);
-      auto hij = this->_ptr[c+1];
-      for (integer_t j=this->_ptr[c]; j<hij; j++) {
-        integer_t row = this->_ind[j];
-        if (row >= sep_begin) {
-          if (row < sep_end) {
-            auto a = this->_val[j];
-            auto Ai = row - sep_begin;
-            auto row_i_rank = R.rowg2p_fixed(Ai);
-            if (row_j_rank == p_row) {
-              for (integer_t k=0, r=R.rowg2l_fixed(Aj); k<lcols; k++)
-                pp[row_i_rank][k] += a * R(r, k);
-              pp[row_i_rank] += lcols;
-            }
-            if (row_i_rank == p_row) { // transpose
-              for (integer_t k=0, r=R.rowg2l_fixed(Ai); k<lcols; k++)
-                pp[row_j_rank][k] += a * R(r, k);
-              pp[row_j_rank] += lcols;
-            }
-          } else break;
+#pragma omp parallel for
+    for (int t=0; t<p_rows; t++) {
+      for (integer_t i=0, c=chi; i<dim_upd; i++) { // update columns
+        c = std::lower_bound
+          (_global_col+c, _global_col+_local_cols, upd[i]) - _global_col;
+        if (c == _local_cols || _global_col[c] != upd[i]) continue;
+        auto Aj = dim_sep + i;
+        auto row_j_rank = R.rowg2p_fixed(Aj);
+        auto hij = this->_ptr[c+1];
+        for (integer_t j=this->_ptr[c]; j<hij; j++) {
+          integer_t row = this->_ind[j];
+          if (row >= sep_begin) {
+            if (row < sep_end) {
+              auto a = this->_val[j];
+              auto Ai = row - sep_begin;
+              auto row_i_rank = R.rowg2p_fixed(Ai);
+              if (row_i_rank == t && row_j_rank == p_row) {
+                for (integer_t k=0, r=R.rowg2l_fixed(Aj); k<lcols; k++)
+                  pp[row_i_rank][k] += a * R(r, k);
+                pp[row_i_rank] += lcols;
+              }
+              if (row_j_rank == t && row_i_rank == p_row) { // transpose
+                for (integer_t k=0, r=R.rowg2l_fixed(Ai); k<lcols; k++)
+                  pp[row_j_rank][k] += a * R(r, k);
+                pp[row_j_rank] += lcols;
+              }
+            } else break;
+          }
         }
       }
     }
@@ -746,7 +769,7 @@ namespace strumpack {
 
     // wait for all incoming messages
     MPI_Waitall(p_rows, rreq, MPI_STATUSES_IGNORE);
-    for (c=clo; c<chi; c++) { // separator columns
+    for (integer_t c=clo; c<chi; c++) { // separator columns
       auto Aj = _global_col[c] - sep_begin;
       auto row_j_rank = R.rowg2p_fixed(Aj);
       integer_t row_upd = 0;
@@ -789,7 +812,7 @@ namespace strumpack {
         }
       }
     }
-    for (integer_t i=0; i<dim_upd; i++) { // update columns
+    for (integer_t i=0, c=chi; i<dim_upd; i++) { // update columns
       c = std::lower_bound
         (_global_col+c, _global_col+_local_cols, upd[i]) - _global_col;
       if (c == _local_cols || _global_col[c] != upd[i])

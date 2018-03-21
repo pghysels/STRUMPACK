@@ -83,18 +83,44 @@ namespace strumpack {
         for (std::size_t p=0; p<sbuf.size(); p++)
           sbuf[p].reserve(sbuf[p].size()+cnt[p]);
       }
-      for (int c=0; c<c_upd; c++) // F11
-        for (int r=0; r<r_upd; r++)
-          sbuf[pr[r]+pc[c]].push_back(CB(r,c));
-      for (int c=c_upd; c<lcols; c++) // F12
-        for (int r=0; r<r_upd; r++)
-          sbuf[pr[r]+pc[c]].push_back(CB(r,c));
-      for (int c=0; c<c_upd; c++) // F21
-        for (int r=r_upd; r<lrows; r++)
-          sbuf[pr[r]+pc[c]].push_back(CB(r,c));
-      for (int c=c_upd; c<lcols; c++) // F22
-        for (int r=r_upd; r<lrows; r++)
-          sbuf[pr[r]+pc[c]].push_back(CB(r,c));
+      if (params::num_threads != 1) {
+#pragma omp parallel for
+        for (int t=0; t<int(sbuf.size()); t++) {
+          for (int c=0; c<c_upd; c++) // F11
+            for (int r=0, pcc=pc[c]; r<r_upd; r++) {
+              auto d = pr[r]+pcc;
+              if (d == t) sbuf[d].push_back(CB(r,c));
+            }
+          for (int c=c_upd; c<lcols; c++) // F12
+            for (int r=0, pcc=pc[c]; r<r_upd; r++) {
+              auto d = pr[r]+pcc;
+              if (d == t) sbuf[d].push_back(CB(r,c));
+            }
+          for (int c=0; c<c_upd; c++) // F21
+            for (int r=r_upd, pcc=pc[c]; r<lrows; r++) {
+              auto d = pr[r]+pcc;
+              if (d == t) sbuf[d].push_back(CB(r,c));
+            }
+          for (int c=c_upd; c<lcols; c++) // F22
+            for (int r=r_upd, pcc=pc[c]; r<lrows; r++) {
+              auto d = pr[r]+pcc;
+              if (d == t) sbuf[d].push_back(CB(r,c));
+            }
+        }
+      } else {
+        for (int c=0; c<c_upd; c++) // F11
+          for (int r=0, pcc=pc[c]; r<r_upd; r++)
+            sbuf[pr[r]+pcc].push_back(CB(r,c));
+        for (int c=c_upd; c<lcols; c++) // F12
+          for (int r=0, pcc=pc[c]; r<r_upd; r++)
+            sbuf[pr[r]+pcc].push_back(CB(r,c));
+        for (int c=0; c<c_upd; c++) // F21
+          for (int r=r_upd, pcc=pc[c]; r<lrows; r++)
+            sbuf[pr[r]+pcc].push_back(CB(r,c));
+        for (int c=c_upd; c<lcols; c++) // F22
+          for (int r=r_upd, pcc=pc[c]; r<lrows; r++)
+            sbuf[pr[r]+pcc].push_back(CB(r,c));
+      }
       delete[] pr;
     }
 

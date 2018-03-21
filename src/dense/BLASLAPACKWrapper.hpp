@@ -768,7 +768,6 @@ namespace strumpack {
     (char ta, char tb, int m, int n, int k, float alpha,
      const float *a, int lda, const float *b, int ldb,
      float beta, float *c, int ldc) {
-      lda = std::max(lda, 1);
       FC_GLOBAL(sgemm,SGEMM)
         (&ta, &tb, &m, &n, &k, &alpha, a, &lda, b, &ldb, &beta, c, &ldc);
       STRUMPACK_FLOPS(gemm_flops(m,n,k,alpha,beta));
@@ -778,7 +777,6 @@ namespace strumpack {
     (char ta, char tb, int m, int n, int k, double alpha,
      const double *a, int lda, const double *b, int ldb,
      double beta, double *c, int ldc) {
-      lda = std::max(lda, 1);
       FC_GLOBAL(dgemm,DGEMM)
         (&ta, &tb, &m, &n, &k, &alpha, a, &lda, b, &ldb, &beta, c, &ldc);
       STRUMPACK_FLOPS(gemm_flops(m,n,k,alpha,beta));
@@ -789,7 +787,6 @@ namespace strumpack {
      const std::complex<float>* a, int lda,
      const std::complex<float>* b, int ldb, std::complex<float> beta,
      std::complex<float>* c, int ldc) {
-      lda = std::max(lda, 1);
       FC_GLOBAL(cgemm,CGEMM)
         (&ta, &tb, &m, &n, &k, &alpha, a, &lda, b, &ldb, &beta, c, &ldc);
       STRUMPACK_FLOPS(4*gemm_flops(m,n,k,alpha,beta));
@@ -800,7 +797,6 @@ namespace strumpack {
      const std::complex<double>* a, int lda,
      const std::complex<double>* b, int ldb, std::complex<double> beta,
      std::complex<double>* c, int ldc) {
-      lda = std::max(lda, 1);
       FC_GLOBAL(zgemm,ZGEMM)
         (&ta, &tb, &m, &n, &k, &alpha, a, &lda, b, &ldb, &beta, c, &ldc);
       STRUMPACK_FLOPS(4*gemm_flops(m,n,k,alpha,beta));

@@ -53,12 +53,16 @@ namespace strumpack {
      scalar_t beta, DenseMatrix<scalar_t>& c) {
       WorkApply<scalar_t> w;
       std::atomic<long long int> flops(0);
-      if (ta == Trans::N) {
-        a.apply_fwd(b, w, true, a._openmp_task_depth, flops);
-        a.apply_bwd(b, beta, c, w, true, a._openmp_task_depth, flops);
-      } else {
-        a.applyT_fwd(b, w, true, a._openmp_task_depth, flops);
-        a.applyT_bwd(b, beta, c, w, true, a._openmp_task_depth, flops);
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+      {
+        if (ta == Trans::N) {
+          a.apply_fwd(b, w, true, a._openmp_task_depth, flops);
+          a.apply_bwd(b, beta, c, w, true, a._openmp_task_depth, flops);
+        } else {
+          a.applyT_fwd(b, w, true, a._openmp_task_depth, flops);
+          a.applyT_bwd(b, beta, c, w, true, a._openmp_task_depth, flops);
+        }
       }
     }
 
@@ -99,7 +103,7 @@ namespace strumpack {
         if (_U.cols() && !isroot) { // c = D*b + beta*c + U*w.tmp2
           gemm(Trans::N, Trans::N, scalar_t(1.), _D,
                b.ptr(w.offset.second, 0), b.ld(), beta, lc, depth);
-          lc.add(_U.apply(w.tmp2, depth));
+          lc.add(_U.apply(w.tmp2, depth), depth);
           flops += gemm_flops(Trans::N, Trans::N, scalar_t(1.), _D, beta, lc)
             + lc.rows() * lc.cols();
         } else { // c = D*b + beta*c
@@ -184,7 +188,7 @@ namespace strumpack {
           gemm(Trans::C, Trans::N, scalar_t(1.), _D,
                b.ptr(w.offset.second, 0), b.ld(), beta, lc, depth);
           // TODO this creates a temporary!!
-          lc.add(_V.apply(w.tmp2, depth)); // c += V*w.tmp2
+          lc.add(_V.apply(w.tmp2, depth), depth); // c += V*w.tmp2
           flops += lc.rows()*lc.cols() +
             gemm_flops(Trans::C, Trans::N, scalar_t(1.), _D, beta, lc);
         } else { // c = D'*b + beta*c

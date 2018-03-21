@@ -140,7 +140,7 @@ namespace strumpack {
      integer_t, const integer_t*) const override {}
     void front_multiply
     (integer_t, integer_t, const std::vector<integer_t>&,
-     const DenseM_t&, DenseM_t&, DenseM_t&) const override {}
+     const DenseM_t&, DenseM_t&, DenseM_t&, int depth) const override {}
     void front_multiply_2d
     (integer_t, integer_t, const std::vector<integer_t>&, const DistM_t&,
      DistM_t&, DistM_t&, int, MPI_Comm, int) const override {}

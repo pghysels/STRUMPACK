@@ -113,7 +113,7 @@ namespace strumpack {
      const integer_t* upd) const;
     void front_multiply
     (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
-     const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc) const override;
+     const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const override;
     void front_multiply_2d
     (integer_t sep_begin, integer_t sep_end,
      const std::vector<integer_t>& upd, const DistM_t& R, DistM_t& Srow,
@@ -597,52 +597,69 @@ namespace strumpack {
     }
   }
 
-  // TODO threading in front_multiply?
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::front_multiply
   (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
-   const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc) const {
+   const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const {
     integer_t dupd = upd.size();
     long long int local_flops = 0;
     const integer_t nbvec = R.cols();
     const integer_t ds = shi - slo;
-    for (auto row=slo; row<shi; row++) { // separator rows
-      integer_t upd_ptr = 0;
-      for (auto j=this->_ptr[row]; j<this->_ptr[row+1]; j++) {
-        auto col = this->_ind[j];
-        if (col >= slo) {
-          if (col < shi) {
-            for (integer_t c=0; c<nbvec; c++) {
-              Sr(row-slo, c) += this->_val[j] * R(col-slo, c);
-              Sc(col-slo, c) += this->_val[j] * R(row-slo, c);
-            }
-            local_flops += 4 * nbvec;
-          } else {
-            while (upd_ptr<dupd && upd[upd_ptr]<col) upd_ptr++;
-            if (upd_ptr == dupd) break;
-            if (upd[upd_ptr] == col) {
-              for (integer_t c=0; c<nbvec; c++) {
-                Sr(row-slo, c) += this->_val[j] * R(ds+upd_ptr, c);
-                Sc(ds+upd_ptr, c) += this->_val[j] * R(row-slo, c);
+
+    const auto B = 4; // blocking parameter
+#pragma omp taskloop default(shared)                    \
+  if(depth < params::task_recursion_cutoff_level)
+    for (integer_t c=0; c<nbvec; c+=B) {
+      for (auto row=slo; row<shi; row++) { // separator rows
+        integer_t upd_ptr = 0;
+        const auto hij = this->_ptr[row+1];
+        for (auto j=this->_ptr[row]; j<hij; j++) {
+          const auto col = this->_ind[j];
+          if (col >= slo) {
+            const auto hicc = std::min(c+B, nbvec);
+            const auto vj = this->_val[j];
+            if (col < shi) {
+              for (integer_t cc=c; cc<hicc; cc++) {
+                Sr(row-slo, cc) += vj * R(col-slo, cc);
+                Sc(col-slo, cc) += vj * R(row-slo, cc);
               }
-              local_flops += 4 * nbvec;
+              //local_flops += 4 * B;
+            } else {
+              while (upd_ptr<dupd && upd[upd_ptr]<col) upd_ptr++;
+              if (upd_ptr == dupd) break;
+              if (upd[upd_ptr] == col) {
+                for (integer_t cc=c; cc<hicc; cc++) {
+                  Sr(row-slo, cc) += vj * R(ds+upd_ptr, cc);
+                  Sc(ds+upd_ptr, cc) += vj * R(row-slo, cc);
+                }
+                //local_flops += 4 * B;
+              }
             }
           }
         }
       }
     }
-    for (integer_t i=0; i<dupd; i++) { // remaining rows
-      auto row = upd[i];
-      for (auto j=this->_ptr[row]; j<this->_ptr[row+1]; j++) {
-        auto col = this->_ind[j];
-        if (col >= slo) {
-          if (col < shi) {
-            for (integer_t c=0; c<nbvec; c++) {
-              Sr(ds+i, c) += this->_val[j] * R(col-slo, c);
-              Sc(col-slo, c) += this->_val[j] * R(ds+i, c);
-            }
-            local_flops += 4 * nbvec;
-          } else break;
+
+#pragma omp taskloop default(shared)                    \
+  if(depth < params::task_recursion_cutoff_level)
+    for (integer_t c=0; c<nbvec; c+=B) {
+      for (integer_t i=0; i<dupd; i++) { // remaining rows
+        auto row = upd[i];
+        const auto hij = this->_ptr[row+1];
+        for (auto j=this->_ptr[row]; j<hij; j++) {
+          auto col = this->_ind[j];
+          if (col >= slo) {
+            if (col < shi) {
+              const auto vj = this->_val[j];
+              const auto hicc = std::min(c+B, nbvec);
+              for (integer_t cc=c; cc<hicc; cc++) {
+                Sr(ds+i, cc) += vj * R(col-slo, cc);
+                Sc(col-slo, cc) += vj * R(ds+i, cc);
+              }
+              //#pragma omp atomic
+              //local_flops += 4 * B;
+            } else break;
+          }
         }
       }
     }

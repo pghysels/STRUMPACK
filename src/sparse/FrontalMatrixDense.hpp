@@ -116,8 +116,8 @@ namespace strumpack {
     const std::size_t dupd = this->dim_upd();
     std::size_t upd2sep;
     auto I = this->upd_to_parent(p, upd2sep);
-    // #pragma omp taskloop default(shared) grainsize(64)
-    //   if(task_depth < params::task_recursion_cutoff_level)
+#pragma omp taskloop default(shared) grainsize(64)      \
+  if(task_depth < params::task_recursion_cutoff_level)
     for (std::size_t c=0; c<dupd; c++) {
       auto pc = I[c];
       if (pc < pdsep) {
@@ -146,10 +146,10 @@ namespace strumpack {
     DenseM_t cS(this->dim_upd(), R.cols());
     gemm(Trans::N, Trans::N, scalar_t(1.), F22, cR,
          scalar_t(0.), cS, task_depth);
-    Sr.scatter_rows_add(I, cS);
+    Sr.scatter_rows_add(I, cS, task_depth);
     gemm(Trans::C, Trans::N, scalar_t(1.), F22, cR,
          scalar_t(0.), cS, task_depth);
-    Sc.scatter_rows_add(I, cS);
+    Sc.scatter_rows_add(I, cS, task_depth);
     STRUMPACK_CB_SAMPLE_FLOPS
       (gemm_flops(Trans::N, Trans::N, scalar_t(1.), F22, cR, scalar_t(0.)) +
        gemm_flops(Trans::C, Trans::N, scalar_t(1.), F22, cR, scalar_t(0.)) +
@@ -163,7 +163,7 @@ namespace strumpack {
     if (task_depth == 0) {
       // use tasking for children and for extend-add parallelism
 #pragma omp parallel if(!omp_in_parallel()) default(shared)
-#pragma omp single
+#pragma omp single nowait
       factor_phase1(A, opts, etree_level, task_depth);
       // do not use tasking for blas/lapack parallelism (use system
       // blas threading!)
@@ -256,7 +256,7 @@ namespace strumpack {
     if (task_depth == 0) {
       // tasking when calling the children
 #pragma omp parallel if(!omp_in_parallel())
-#pragma omp single
+#pragma omp single nowait
       fwd_solve_phase1(b, bupd, work, etree_level, task_depth);
       // no tasking for the root node computations, use system blas threading!
       return fwd_solve_phase2
@@ -344,7 +344,7 @@ namespace strumpack {
       bwd_solve_phase1
         (y, yupd, etree_level, params::task_recursion_cutoff_level);
 #pragma omp parallel if(!omp_in_parallel())
-#pragma omp single
+#pragma omp single nowait
       // tasking when calling children
       bwd_solve_phase2(y, yupd, work, etree_level, task_depth);
     } else {
