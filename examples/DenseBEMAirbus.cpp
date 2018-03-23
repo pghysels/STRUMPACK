@@ -39,7 +39,7 @@
 #include "HSS/HSSMatrixMPI.hpp"
 #include "misc/TaskTimer.hpp"
 
-#define ENABLE_FLOP_COUNTER 1
+#define ENABLE_FLOP_COUNTER 0
 #define ERROR_TOLERANCE 1e1
 #define SOLVE_TOLERANCE 1e-11
 
@@ -84,7 +84,7 @@ int run(int argc, char *argv[]) {
   int dummy;
   int myid, np, id;
   int myrow, mycol, nprow, npcol;
-  int ctxt, ctxtcent, ctxtglob;
+  int ctxt;
   double tstart, tend;
   std::string filename, prefix, locfile;
   std::ifstream fp;
@@ -124,98 +124,68 @@ int run(int argc, char *argv[]) {
       cout << "n = " << n << endl;
     }
 
-    // Acent=new myscalar[n*n];
     Acent = DenseMatrix<myscalar>(n, n);
     fp.read((char*)Acent.data(), 16*Acent.rows()*Acent.cols());
-    // for(i=0;i<n*n;i++) {
-      // fp.read((char *)&Acent[i],16); // Binary file with double complex number
-      // if(fp.fail()) {
-      //   std::cout << "Something went wrong while reading..." << std::endl;
-      //   if(fp.eof())
-      //     std :: cout << "Only " << i << " instead of " << n*n << std::endl;
-      //   return 2;
-      // }
-    // }
     fp.close();
     Acent.print();
   }
   tend=MPI_Wtime();
   if(!myid) std::cout << "Reading file done in: " << tend-tstart << "s" << std::endl;
 
-  /* We initialize a context with only id 0 */
-  scalapack::Cblacs_get(0,0,&ctxtcent);
-  scalapack::Cblacs_gridinit(&ctxtcent,"R",1,1);
+  // We initialize a context with all the processes
+  // scalapack::Cblacs_get(0,0,&ctxtglob);
+  // scalapack::Cblacs_gridinit(&ctxtglob,"R",1,np);
 
-  /* We initialize a context with all the processes */
-  scalapack::Cblacs_get(0,0,&ctxtglob);
-  scalapack::Cblacs_gridinit(&ctxtglob,"R",1,np);
-
-  /* We initialize a 2D grid */
+  // Initialize a 2D grid
   nprow=floor(sqrt((float)np));
   npcol=np/nprow;
   scalapack::Cblacs_get(0,0,&ctxt);
-  scalapack::Cblacs_gridinit(&ctxt,"R",nprow,npcol);
+  scalapack::Cblacs_gridinit(&ctxt,"C",nprow,npcol); //changed
   scalapack::Cblacs_gridinfo(ctxt,&nprow,&npcol,&myrow,&mycol);
-
-  /* Distribute A into 2D block-cyclic form */
-  // if(myid==0)
-  //   descinit_(descAcent,&n,&n,&nb,&nb,&IZERO,&IZERO,&ctxtcent,&n,&ierr);
-  // else
-  //   descset_(descAcent,&n,&n,&nb,&nb,&IZERO,&IZERO,&INONE,&IONE);
-  // if(myid<nprow*npcol) {
-  //   locr=numroc_(&n,&nb,&myrow,&IZERO,&nprow);
-  //   locc=numroc_(&n,&nb,&mycol,&IZERO,&npcol);
-  //   dummy=std::max(1,locr);
-  //   A=new myscalar[locr*locc];
-  //   descinit_(descA,&n,&n,&nb,&nb,&IZERO,&IZERO,&ctxt,&dummy,&ierr);
-  // } else {
-  //   descset_(descA,&n,&n,&nb,&nb,&IZERO,&IZERO,&INONE,&IONE);
-  // }
-  // pgemr2d(n,n,Acent,IONE,IONE,descAcent,A,IONE,IONE,descA,ctxtglob);
-  // delete[] Acent;
 
   // Distribute A into 2D block-cyclic form
   if (!myid)
     cout << "Redistributing..." << endl;
   tstart = MPI_Wtime();
-  // Redistribute each piece
+  
   DistributedMatrix<myscalar> A(ctxt, n, n);
-
-  // copy      (n,        n,        Acent, myid,               A, 1,            1,                   ctxtglob);
-  // pgemr2d(n,        n,        Acent,IONE,IONE,descAcent, A, IONE,         IONE,         descA, ctxtglob);
+  copy(n, n, Acent /* denseMat */, 0 /* src */, A /* distMat */, 0, 0, ctxt);
 
   Acent.clear();
+
+  tend=MPI_Wtime();
+  if(!myid) std::cout << "Reading file done in: " << tend-tstart << "s" << std::endl;
 
   // //===================================================================
   // //==== Compression to HSS ===========================================
   // //===================================================================
-  // if (!myid) cout << "# Creating HSS matrix H..." << endl;
-  // if (!myid) cout << "# rel_tol = " << hss_opts.rel_tol() << endl;
-  // MPI_Barrier(MPI_COMM_WORLD);
+  if (!myid) cout << "# Creating HSS matrix H..." << endl;
+  if (!myid) cout << "# rel_tol = " << hss_opts.rel_tol() << endl;
+  MPI_Barrier(MPI_COMM_WORLD);
 
-  // // Simple compression
-  // timer.start();
-  // HSSMatrixMPI<myscalar> H(A, hss_opts, MPI_COMM_WORLD);
-  // if (!myid)
-  //   cout << "## Compression time = " << timer.elapsed() << endl;
+  // Simple compression
+  timer.start();
+  HSSMatrixMPI<myscalar> H(A, hss_opts, MPI_COMM_WORLD);
+  if (!myid)
+    cout << "## Compression time = " << timer.elapsed() << endl;
 
-  // if (!myid) {
-  //   if (H.is_compressed())
-  //     cout << "# created H matrix of dimension "
-  //          << H.rows() << " x " << H.cols()
-  //          << " with " << H.levels() << " levels" << endl
-  //          << "# compression succeeded!" << endl;
-  //   else cout << "# compression failed!!!!!!!!" << endl;
-  // }
+  if (!myid) {
+    if (H.is_compressed())
+      cout << "# created H matrix of dimension "
+           << H.rows() << " x " << H.cols()
+           << " with " << H.levels() << " levels" << endl
+           << "# compression succeeded!" << endl;
+    else cout << "# compression failed!!!!!!!!" << endl;
+  }
 
-  // auto Hrank = H.max_rank();
-  // auto Hmem  = H.total_memory();
-  // auto Amem  = A.total_memory();
-  // if (!myid)
-  //   cout << "# rank(H) = " << Hrank << endl
-  //        << "# memory(H) = " << Hmem/1e6 << " MB, " << endl
-  //        << "# mem percentage = " << 100. * Hmem / Amem
-  //        << "% (of dense)" << endl;
+  auto Hrank = H.max_rank();
+  auto Hmem  = H.total_memory();
+  auto Amem  = A.total_memory();
+  if (!myid)
+    cout << "# rank(H) = " << Hrank << endl
+         << "# memory(H) = " << Hmem/1e6 << " MB, " << endl
+         << "# mem percentage = " << 100. * Hmem / Amem
+         << "% (of dense)" << endl;
 
   // /* Set the RHS (random vector) and the solution space */
   // if(myid<nprow*npcol) {

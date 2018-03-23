@@ -143,9 +143,11 @@ int run(int argc, char *argv[]) {
   npcol = floor(sqrt((float)np));
   nprow = np / npcol;
   int ctxt, dummy, prow, pcol;
+  
   scalapack::Cblacs_get(0, 0, &ctxt);
   scalapack::Cblacs_gridinit(&ctxt, "C", nprow, npcol);
   scalapack::Cblacs_gridinfo(ctxt, &dummy, &dummy, &prow, &pcol);
+
   int ctxt_all = scalapack::Csys2blacs_handle(MPI_COMM_WORLD);
   scalapack::Cblacs_gridinit(&ctxt_all, "R", 1, np);
 
