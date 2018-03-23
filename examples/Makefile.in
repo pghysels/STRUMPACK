@@ -1,8 +1,10 @@
-all: testPoisson2dMPIDist \
+all: DenseSchur100
+
+all1: testPoisson2dMPIDist \
 DenseToeplitzMPI DenseBEMColStateMPI \
 DenseBEMAirbus
 
-all1: @C_EXAMPLES@ testPoisson2d testPoisson3d	\
+all2: @C_EXAMPLES@ testPoisson2d testPoisson3d	\
 	testPoisson2dMPI testPoisson2dMPIDist testMMdouble	\
 	testMMdoubleMPI testMMdoubleMPIDist testMMdouble64	\
 	testMMdoubleMPIDist64 testMMfloat testMMfloatMPIDist	\
@@ -72,6 +74,11 @@ DenseBEMAirbus: DenseBEMAirbus.cpp
 	$(CXX) $(LDFLAGS) DenseBEMAirbus.o -o $@ $(LIBS)
 	$(RM) DenseBEMAirbus.o
 
+DenseSchur100: DenseSchur100.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o DenseSchur100.o
+	$(CXX) $(LDFLAGS) DenseSchur100.o -o $@ $(LIBS)
+	$(RM) DenseSchur100.o
+
 testMMdouble: testMMdouble.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMdouble.o
 	$(CXX) $(LDFLAGS) testMMdouble.o -o $@ $(LIBS)
@@ -130,6 +137,4 @@ clean:
 	mtx2bin bin2mtx MLkernel \
 	testPoisson3dMPIDist \
 	DenseToeplitzMPI DenseBEMColStateMPI \
-	DenseBEMAirbus
-
-
+	DenseBEMAirbus DenseSchur100
