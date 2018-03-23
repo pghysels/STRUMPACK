@@ -72,12 +72,6 @@ int run(int argc, char *argv[]) {
   int np = mpi_nprocs();
   if (!myid)
     cout << "# matrix size: n = " << n << endl;
-  if (np < nprowA*npcolA) {
-    cout << "This requires " << nprowA*npcolA
-         << " processes or more." << endl
-         << "Aborting." << endl;
-    MPI_Abort(MPI_COMM_WORLD,-1);
-  }
 
   int rowoffset[nprowA];
   int coloffset[npcolA];
@@ -88,86 +82,65 @@ int run(int argc, char *argv[]) {
   for (int i=1; i<npcolA; i++)
     coloffset[i] = coloffset[i-1] + ncols[i-1];
 
-  int myrowA, mycolA, ctxtA, nprow=nprowA, npcol=npcolA;
-  scalapack::Cblacs_get(0, 0, &ctxtA);
-  scalapack::Cblacs_gridinit(&ctxtA, "R", nprow, npcol);
-  scalapack::Cblacs_gridinfo(ctxtA, &nprow, &npcol, &myrowA, &mycolA);
-
-  // Processes 0..nprow*npcolA read their piece of the matrix
-  double tstart = MPI_Wtime();
-  DenseMatrix<myscalar> Atmp;
-  if (myid < nprowA*npcolA) {
-    string locfile = "ZZ_" + SSTR(myrowA) + "_" + SSTR(mycolA) + "_" +
-      SSTR(nrows[myrowA]) + "_" + SSTR(ncols[mycolA]);
-    string filename = prefix + locfile;
-    cout << "Process " << myid << " reading from file "
-         << locfile << endl;
-    std::ifstream fp(filename.c_str(), ios::binary);
-    if (!fp.is_open()) {
-      cout << "Could not open file " << filename << endl;
-      return -1;
-    }
-
-    // First 4 bytes are an integer
-    int ierr;
-    fp.read((char*)&ierr, 4);
-    if (fp.fail() || ierr != nrows[myrowA]*ncols[mycolA]*8) {
-      cout << "First 8 bytes should be an integer equal to nrows*ncols*8; "
-           << "instead, " << ierr << endl;
-      return -2;
-    }
-
-    // Read 8-byte fields
-    Atmp = DenseMatrix<myscalar>(nrows[myrowA], ncols[mycolA]);
-    fp.read((char*)Atmp.data(), 8*Atmp.rows()*Atmp.cols());
-    if (fp.fail())
-      cout << "Something went wrong while reading..." << endl;
-
-    // Last 4 bytes are an integer
-    fp.read((char*)&ierr,4);
-    if (fp.fail() || ierr!=nrows[myrowA]*ncols[mycolA]*8) {
-      cout << "First 8 bytes should be an integer equal to nrows*ncols*8; "
-           << "instead, " << ierr << endl;
-      return -2;
-    }
-    fp.close();
-  }
-  MPI_Barrier(MPI_COMM_WORLD);
-  double tend = MPI_Wtime();
-  if (!myid)
-    cout << "Reading done in: " << tend - tstart << "s" << endl;
-
-  // Part 2
-
   // initialize the BLACS grid
-  npcol = floor(sqrt((float)np));
-  nprow = np / npcol;
+  int npcol = floor(sqrt((float)np));
+  int nprow = np / npcol;
   int ctxt, dummy, prow, pcol;
-  
   scalapack::Cblacs_get(0, 0, &ctxt);
   scalapack::Cblacs_gridinit(&ctxt, "C", nprow, npcol);
   scalapack::Cblacs_gridinfo(ctxt, &dummy, &dummy, &prow, &pcol);
-
   int ctxt_all = scalapack::Csys2blacs_handle(MPI_COMM_WORLD);
   scalapack::Cblacs_gridinit(&ctxt_all, "R", 1, np);
 
   if (!myid)
     cout << "Redistributing..." << endl;
-  tstart = MPI_Wtime();
-  // Redistribute each piece
+  double tstart = MPI_Wtime();
+  // read and Redistribute each piece
   DistributedMatrix<myscalar> A(ctxt, n, n);
   for (int i=0; i<nprowA; i++)
     for (int j=0; j<npcolA; j++) {
-      int id = i * npcolA + j;
-      copy(nrows[i], ncols[j], Atmp, id,
+      DenseMatrix<myscalar> Atmp;
+      if (!myid) {
+        string locfile = "ZZ_" + SSTR(i) + "_" + SSTR(j) + "_" +
+          SSTR(nrows[i]) + "_" + SSTR(ncols[j]);
+        string filename = prefix + locfile;
+        cout << "Process " << myid << " reading from file "
+             << locfile << endl;
+        std::ifstream fp(filename.c_str(), ios::binary);
+        if (!fp.is_open()) {
+          cout << "Could not open file " << filename << endl;
+          return -1;
+        }
+        // First 4 bytes are an integer
+        int ierr;
+        fp.read((char*)&ierr, 4);
+        if (fp.fail() || ierr != nrows[i]*ncols[j]*8) {
+          cout << "First 8 bytes should be an integer equal to nrows*ncols*8; "
+               << "instead, " << ierr << endl;
+          return -2;
+        }
+        // Read 8-byte fields
+        Atmp = DenseMatrix<myscalar>(nrows[i], ncols[j]);
+        fp.read((char*)Atmp.data(), 8*Atmp.rows()*Atmp.cols());
+        if (fp.fail())
+          cout << "Something went wrong while reading..." << endl;
+        // Last 4 bytes are an integer
+        fp.read((char*)&ierr,4);
+        if (fp.fail() || ierr!=nrows[i]*ncols[j]*8) {
+          cout << "First 8 bytes should be an integer equal to nrows*ncols*8; "
+               << "instead, " << ierr << endl;
+          return -2;
+        }
+        fp.close();
+      }
+      copy(nrows[i], ncols[j], Atmp, 0,
            A, rowoffset[i], coloffset[j], ctxt_all);
-      if (myid == id)
+      if (!myid)
         cout << myid << " working: (" << i << "," << j << "): "
              << nrows[i] << " x " << ncols[j] << endl;
     }
-  Atmp.clear();
   MPI_Barrier(MPI_COMM_WORLD);
-  tend = MPI_Wtime();
+  double tend = MPI_Wtime();
   if (!myid)
     cout << "Redistribution done in " << tend - tstart << "s" << endl;
   if (!myid)
