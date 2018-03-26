@@ -1,4 +1,4 @@
-all: DenseSchur100
+all: DenseBEMColStateMPI
 
 all1: testPoisson2dMPIDist \
 DenseToeplitzMPI DenseBEMColStateMPI \

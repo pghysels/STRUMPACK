@@ -179,8 +179,6 @@ int run(int argc, char *argv[]) {
          << "% (of dense)" << endl;
 
 
-#if false
-
   // Checking error against dense matrix
   if ( hss_opts.verbose() == 1 && n <= 1024) {
     MPI_Barrier(MPI_COMM_WORLD);
@@ -215,14 +213,16 @@ int run(int argc, char *argv[]) {
   if (!myid)
     cout << "## Factorization time = " << timer.elapsed() << endl;
 
+#if false
+
   //=======================================================================
   //=== Solve ===
   //=======================================================================
   if (!myid) cout << "# Solve..." << endl;
 
-  DistributedMatrix<double> B(ctxt, n, 1);
+  DistributedMatrix<myscalar> B(ctxt, n, 1);
   B.random();
-  DistributedMatrix<double> C(B);
+  DistributedMatrix<myscalar> C(B);
 
   timer.start();
     H.solve(ULV, C);
@@ -232,7 +232,7 @@ int run(int argc, char *argv[]) {
   //=======================================================================
   //=== Error checking ===
   //=======================================================================
-  DistributedMatrix<double> Bcheck(ctxt, n, 1);
+  DistributedMatrix<myscalar> Bcheck(ctxt, n, 1);
   apply_HSS(Trans::N, H, C, 0., Bcheck);
   Bcheck.scaled_add(-1., B);
   auto Bchecknorm = Bcheck.normF();
