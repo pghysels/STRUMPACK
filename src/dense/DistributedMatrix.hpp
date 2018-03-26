@@ -166,8 +166,8 @@ namespace strumpack {
     DistributedMatrix<scalar_t>
     extract_cols(const std::vector<std::size_t>& Ic, MPI_Comm comm) const;
     DistributedMatrix<scalar_t> extract
-    (const std::vector<std::size_t>& I,
-     const std::vector<std::size_t>& J) const;
+    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+     MPI_Comm comm) const;
     DistributedMatrix<scalar_t>& add(const DistributedMatrix<scalar_t>& B);
     DistributedMatrix<scalar_t>& scaled_add
     (scalar_t alpha, const DistributedMatrix<scalar_t>& B);
@@ -313,6 +313,73 @@ namespace strumpack {
     DistributedMatrixWrapper<scalar_t>&
     operator=(DistributedMatrix<scalar_t>&&) = delete;
   };
+
+
+  template<typename scalar_t> long long int
+  LU_flops(const DistributedMatrix<scalar_t>& a) {
+    if (!a.is_master()) return 0;
+    return (is_complex<scalar_t>() ? 4:1) *
+      blas::getrf_flops(a.rows(), a.cols());
+  }
+
+  template<typename scalar_t> long long int
+  LQ_flops(const DistributedMatrix<scalar_t>& a) {
+    if (!a.is_master()) return 0;
+    auto minrc = std::min(a.rows(), a.cols());
+    return (is_complex<scalar_t>() ? 4:1) *
+      (blas::gelqf_flops(a.rows(), a.cols()) +
+       blas::xxglq_flops(a.cols(), a.cols(), minrc));
+  }
+
+  template<typename scalar_t> long long int
+  ID_row_flops(const DistributedMatrix<scalar_t>& a, int rank) {
+    if (!a.is_master()) return 0;
+    return (is_complex<scalar_t>() ? 4:1) *
+      (blas::geqp3_flops(a.cols(), a.rows())
+       + blas::trsm_flops(rank, a.cols() - rank, scalar_t(1.), 'L'));
+  }
+
+  template<typename scalar_t> long long int
+  trsm_flops(Side s, scalar_t alpha, const DistributedMatrix<scalar_t>& a,
+             const DistributedMatrix<scalar_t>& b) {
+    if (!a.is_master()) return 0;
+    return (is_complex<scalar_t>() ? 4:1) *
+      blas::trsm_flops(b.rows(), b.cols(), alpha, char(s));
+  }
+
+  template<typename scalar_t> long long int
+  gemm_flops(Trans ta, Trans tb, scalar_t alpha,
+             const DistributedMatrix<scalar_t>& a,
+             const DistributedMatrix<scalar_t>& b, scalar_t beta) {
+    if (!a.is_master()) return 0;
+    return (is_complex<scalar_t>() ? 4:1) *
+      blas::gemm_flops
+      ((ta==Trans::N) ? a.rows() : a.cols(),
+       (tb==Trans::N) ? b.cols() : b.rows(),
+       (ta==Trans::N) ? a.cols() : a.rows(), alpha, beta);
+  }
+
+  template<typename scalar_t> long long int
+  gemv_flops(Trans ta, const DistributedMatrix<scalar_t>& a,
+             scalar_t alpha, scalar_t beta) {
+    auto m = (ta==Trans::N) ? a.rows() : a.cols();
+    auto n = (ta==Trans::N) ? a.cols() : a.rows();
+    return (is_complex<scalar_t>() ? 4:1) *
+      ((alpha != scalar_t(0.)) * m * (n * 2 - 1) +
+       (alpha != scalar_t(1.) && alpha != scalar_t(0.)) * m +
+       (beta != scalar_t(0.) && beta != scalar_t(1.)) * m +
+       (alpha != scalar_t(0.) && beta != scalar_t(0.)) * m);
+  }
+
+  template<typename scalar_t> long long int
+  orthogonalize_flops(const DistributedMatrix<scalar_t>& a) {
+    if (!a.is_master()) return 0;
+    auto minrc = std::min(a.rows(), a.cols());
+    return (is_complex<scalar_t>() ? 4:1) *
+      (blas::geqrf_flops(a.rows(), minrc) +
+       blas::xxgqr_flops(a.rows(), minrc, minrc));
+  }
+
 
   template<typename scalar_t>
   std::unique_ptr<const DistributedMatrixWrapper<scalar_t>>
@@ -597,6 +664,7 @@ namespace strumpack {
     for (int c=clo; c<chi; ++c)
       for (int r=rlo; r<rhi; ++r)
         operator()(r,c) = rgen->get();
+    STRUMPACK_FLOPS(rgen->flops_per_prng()*(chi-clo)*(rhi-rlo));
   }
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::random
@@ -609,6 +677,7 @@ namespace strumpack {
     for (int c=clo; c<chi; ++c)
       for (int r=rlo; r<rhi; ++r)
         operator()(r,c) = rgen.get();
+    STRUMPACK_FLOPS(rgen.flops_per_prng()*(chi-clo)*(rhi-rlo));
   }
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::eye() {
@@ -822,16 +891,10 @@ namespace strumpack {
   // TODO optimize
   template<typename scalar_t> DistributedMatrix<scalar_t>
   DistributedMatrix<scalar_t>::extract
-  (const std::vector<std::size_t>& I,
-   const std::vector<std::size_t>& J) const {
+  (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+   MPI_Comm comm) const {
     TIMER_TIME(TaskType::DISTMAT_EXTRACT, 1, t_dist_mat_extract);
-    // TODO optimize this!??
-    DistributedMatrix<scalar_t> B(ctxt(), I.size(), J.size());
-    auto tmp = gather();
-    DenseMatrix<scalar_t> sub;
-    if (is_master()) sub = tmp.extract(I, J);
-    B.scatter(sub);
-    return B;
+    return extract_rows(I, comm).extract_cols(J, comm);
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>&
@@ -847,6 +910,7 @@ namespace strumpack {
     for (int c=0; c<lc; ++c)
       for (int r=0; r<lr; ++r)
         operator()(r+rlo,c+clo) += B(r+Brlo,c+Bclo);
+    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*lc*lr);
     return *this;
   }
 
@@ -866,6 +930,7 @@ namespace strumpack {
     for (int c=0; c<lc; ++c)
       for (int r=0; r<lr; ++r)
         operator()(r+rlo,c+clo) += alpha * B(r+Brlo,c+Bclo);
+    STRUMPACK_FLOPS((is_complex<scalar_t>()?8:2)*lc*lr);
     return *this;
   }
 
@@ -977,6 +1042,7 @@ namespace strumpack {
   template<typename scalar_t> std::vector<int>
   DistributedMatrix<scalar_t>::LU() {
     if (!active()) return std::vector<int>();
+    STRUMPACK_FLOPS(LU_flops(*this));
     std::vector<int> ipiv(lrows()+MB());
     int info = scalapack::pgetrf
       (rows(), cols(), data(), I(), J(), desc(), ipiv.data());
@@ -1003,6 +1069,10 @@ namespace strumpack {
          c.data(), c.I(), c.J(), c.desc())) {
       std::cerr << "# ERROR: Failure in PGETRS :(" << std::endl; abort();
     }
+    STRUMPACK_FLOPS
+      (is_master() ?
+       ((is_complex<scalar_t>() ? 4:1) *
+        blas::getrs_flops(c.rows(), c.cols())) : 0);
     return c;
   }
 
@@ -1010,6 +1080,7 @@ namespace strumpack {
   DistributedMatrix<scalar_t>::orthogonalize
   (scalar_t& r_max, scalar_t& r_min) {
     if (!active()) return;
+    STRUMPACK_FLOPS(orthogonalize_flops(*this));
     auto minmn = std::min(rows(), cols());
     auto N = J() + minmn - 1;
     auto ltau = scalapack::numroc(N, NB(), pcol(), 0, pcols());
@@ -1061,6 +1132,7 @@ namespace strumpack {
   template<typename scalar_t> void DistributedMatrix<scalar_t>::LQ
   (DistributedMatrix<scalar_t>& L, DistributedMatrix<scalar_t>& Q) const {
     if (!active()) return;
+    STRUMPACK_FLOPS(LQ_flops(*this));
     assert(I()==1 && J()==1);
     DistributedMatrix<scalar_t> tmp(ctxt(), std::max(rows(), cols()), cols());
     // TODO this is not a pgemr2d, this does not require communication!!
@@ -1113,6 +1185,7 @@ namespace strumpack {
     X = DistributedMatrix<scalar_t>(ctxt(), X_T.cols(), X_T.rows());
     blas::omatcopy('T', X_T.lrows(), X_T.lcols(), X_T.data(), X_T.ld(),
                    X.data(), X.ld());
+    STRUMPACK_FLOPS(ID_row_flops(*this,X.cols()));
   }
 
   template<typename scalar_t> void
@@ -1165,6 +1238,7 @@ namespace strumpack {
        A.data(), A.I(), A.J(), A.desc(),
        B.data(), B.I(), B.J(), B.desc(),
        beta, C.data(), C.I(), C.J(), C.desc());
+    STRUMPACK_FLOPS(gemm_flops(ta, tb, alpha, A, B, beta));
   }
 
   template<typename scalar_t> void trsm
@@ -1180,6 +1254,7 @@ namespace strumpack {
       (char(s), char(u), char(ta), char(d), B.rows(), B.cols(),
        alpha, A.data(), A.I(), A.J(), A.desc(),
        B.data(), B.I(), B.J(), B.desc());
+    STRUMPACK_FLOPS(trsm_flops(s, alpha, A, B));
   }
 
   template<typename scalar_t> void trsv
@@ -1192,6 +1267,9 @@ namespace strumpack {
        A.data(), A.I(), A.J(), A.desc(),
        B.data(), B.I(), B.J(), B.desc(), 1);
     // TODO also support row vectors by passing different incb?
+    STRUMPACK_FLOPS
+      (A.is_master() ?
+       ((is_complex<scalar_t>()?4:1) * blas::trsv_flops(A.rows())) : 0);
   }
 
   template<typename scalar_t> void gemv
@@ -1199,6 +1277,7 @@ namespace strumpack {
    const DistributedMatrix<scalar_t>& X, scalar_t beta,
    DistributedMatrix<scalar_t>& Y) {
     if (!A.active()) return;
+    STRUMPACK_FLOPS(gemv_flops(ta, A, alpha, beta));
     assert(X.cols() == 1 && Y.cols() == 1);
     assert(ta != Trans::N || (A.rows() == Y.rows() && A.cols() == X.rows()));
     assert(ta == Trans::N || (A.cols() == Y.rows() && A.rows() == X.rows()));
@@ -1221,52 +1300,6 @@ namespace strumpack {
 
 
 
-  template<typename scalar_t> long long int
-  LU_flops(const DistributedMatrix<scalar_t>& a) {
-    if (!a.is_master()) return 0;
-    return blas::getrf_flops(a.rows(), a.cols());
-  }
-
-  template<typename scalar_t> long long int
-  LQ_flops(const DistributedMatrix<scalar_t>& a) {
-    if (!a.is_master()) return 0;
-    auto minrc = std::min(a.rows(), a.cols());
-    return blas::gelqf_flops(a.rows(), a.cols()) +
-      blas::xxglq_flops(a.cols(), a.cols(), minrc);
-  }
-
-  template<typename scalar_t> long long int
-  ID_row_flops(const DistributedMatrix<scalar_t>& a, int rank) {
-    if (!a.is_master()) return 0;
-    return blas::geqp3_flops(a.cols(), a.rows())
-      + blas::trsm_flops(rank, a.cols() - rank, scalar_t(1.), 'L');
-  }
-
-  template<typename scalar_t> long long int
-  trsm_flops(Side s, scalar_t alpha, const DistributedMatrix<scalar_t>& a,
-             const DistributedMatrix<scalar_t>& b) {
-    if (!a.is_master()) return 0;
-    return blas::trsm_flops(b.rows(), b.cols(), alpha, char(s));
-  }
-
-  template<typename scalar_t> long long int
-  gemm_flops(Trans ta, Trans tb, scalar_t alpha,
-             const DistributedMatrix<scalar_t>& a,
-             const DistributedMatrix<scalar_t>& b, scalar_t beta) {
-    if (!a.is_master()) return 0;
-    return blas::gemm_flops
-      ((ta==Trans::N) ? a.rows() : a.cols(),
-       (tb==Trans::N) ? b.cols() : b.rows(),
-       (ta==Trans::N) ? a.cols() : a.rows(), alpha, beta);
-  }
-
-  template<typename scalar_t> long long int
-  orthogonalize_flops(const DistributedMatrix<scalar_t>& a) {
-    if (!a.is_master()) return 0;
-    auto minrc = std::min(a.rows(), a.cols());
-    return blas::geqrf_flops(a.rows(), minrc) +
-      blas::xxgqr_flops(a.rows(), minrc, minrc);
-  }
 
 } // end namespace strumpack
 

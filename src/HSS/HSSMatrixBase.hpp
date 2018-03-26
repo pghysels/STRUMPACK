@@ -126,6 +126,12 @@ namespace strumpack {
        int lctxt) const;
 
     protected:
+      using delemw_t = typename std::function
+        <void(const std::vector<std::size_t>& I,
+              const std::vector<std::size_t>& J,
+              DistM_t& B, DistM_t& A,
+              std::size_t rlo, std::size_t clo,
+              MPI_Comm comm)>;
       std::size_t _rows, _cols;
 
       // TODO store children array in the sub-class???
@@ -139,6 +145,10 @@ namespace strumpack {
       virtual std::size_t V_rank() const { return _V_rank; }
       virtual std::size_t U_rows() const { return _U_rows; };
       virtual std::size_t V_rows() const { return _V_rows; };
+
+      // Used to redistribute the original 2D block cyclic matrix
+      // according to the HSS tree
+      DenseM_t _Asub;
 
       virtual void compress_recursive_original
       (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
@@ -161,10 +171,10 @@ namespace strumpack {
       (DenseM_t& S, int d, int dd, int depth) { return real_t(0.); }
 
       virtual void compress_recursive_original
-      (DistSamples<scalar_t>& RS, const delem_t& Aelem,
+      (DistSamples<scalar_t>& RS, const delemw_t& Aelem,
        const opts_t& opts, WorkCompressMPI<scalar_t>& w, int dd);
       virtual void compress_recursive_stable
-      (DistSamples<scalar_t>& RS, const delem_t& Aelem,
+      (DistSamples<scalar_t>& RS, const delemw_t& Aelem,
        const opts_t& opts, WorkCompressMPI<scalar_t>& w, int d, int dd);
       virtual void compress_level_original
       (DistSamples<scalar_t>& RS, const opts_t& opts,
@@ -182,7 +192,7 @@ namespace strumpack {
        const std::pair<std::size_t,std::size_t>& off,
        WorkCompress<scalar_t>& w, int& self, int lvl) {}
       virtual void extract_D_B
-      (const delem_t& Aelem, int lctxt, const opts_t& opts,
+      (const delemw_t& Aelem, int lctxt, const opts_t& opts,
        WorkCompressMPI<scalar_t>& w, int lvl);
       virtual void extract_D_B
       (const elem_t& Aelem, const opts_t& opts,
@@ -273,6 +283,15 @@ namespace strumpack {
       virtual void dense_recursive
       (DenseM_t& A, WorkDense<scalar_t>& w, bool isroot, int depth) const {};
 
+      virtual void redistribute_to_tree_to_buffers
+      (const DistM_t& A, std::size_t Arlo, std::size_t Aclo, int Actxt_all,
+       std::vector<std::vector<scalar_t>>& sbuf, int dest);
+      virtual void redistribute_to_tree_from_buffers
+      (const DistM_t& A, int Aprows, int Apcols,
+       std::size_t Arlo, std::size_t Aclo,
+       int Actxt_all, scalar_t** pbuf);
+      virtual void delete_redistributed_input();
+
       friend class HSSMatrix<scalar_t>;
       friend class HSSMatrixMPI<scalar_t>;
     };
@@ -360,13 +379,13 @@ namespace strumpack {
      */
     template<typename scalar_t> void
     HSSMatrixBase<scalar_t>::compress_recursive_original
-    (DistSamples<scalar_t>& RS, const delem_t& Aelem, const opts_t& opts,
+    (DistSamples<scalar_t>& RS, const delemw_t& Aelem, const opts_t& opts,
      WorkCompressMPI<scalar_t>& w_mpi, int dd) {
       if (!active()) return;
       auto lctxt = RS.HSS().ctxt_loc();
       std::pair<std::size_t,std::size_t> offset;
-      auto lAelem = LocalElemMult<scalar_t>
-        (Aelem, (w_mpi.lvl==0) ? offset : w_mpi.offset, lctxt);
+      LocalElemMult<scalar_t> lAelem
+        (Aelem, (w_mpi.lvl==0) ? offset : w_mpi.offset, lctxt, _Asub);
       w_mpi.create_sequential();
       WorkCompress<scalar_t>& w = *(w_mpi.w_seq);
       if (w.lvl == 0) w.offset = w_mpi.offset;
@@ -374,8 +393,9 @@ namespace strumpack {
       std::swap(w.Jr, w_mpi.Jr); std::swap(w.Jc, w_mpi.Jc);
       bool was_not_compressed = !is_compressed();
       // TODO openmp parallel region, set _openmp_task_depth?
-      compress_recursive_original(RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
-                                  lAelem, opts, w, dd, _openmp_task_depth);
+      compress_recursive_original
+        (RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
+         lAelem, opts, w, dd, _openmp_task_depth);
       if (is_compressed()) {
         auto lctxt = RS.HSS().ctxt_loc();
         auto d = RS.sub_Rr.cols();
@@ -434,8 +454,9 @@ namespace strumpack {
       }
       bool was_not_compressed = !is_compressed();
       // TODO openmp parallel region, set _openmp_task_depth?
-      compress_level_original(RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
-                              opts, w, dd, lvl, _openmp_task_depth);
+      compress_level_original
+        (RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
+         opts, w, dd, lvl, _openmp_task_depth);
       if (w.lvl == lvl) {
         if (is_compressed()) {
           auto lctxt = RS.HSS().ctxt_loc();
@@ -481,13 +502,13 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixBase<scalar_t>::compress_recursive_stable
-    (DistSamples<scalar_t>& RS, const delem_t& Aelem, const opts_t& opts,
+    (DistSamples<scalar_t>& RS, const delemw_t& Aelem, const opts_t& opts,
      WorkCompressMPI<scalar_t>& w_mpi, int d, int dd) {
       if (!active()) return;
       auto lctxt = RS.HSS().ctxt_loc();
       std::pair<std::size_t,std::size_t> offset;
-      auto lAelem = LocalElemMult<scalar_t>
-        (Aelem, (w_mpi.lvl==0) ? offset : w_mpi.offset, lctxt);
+      LocalElemMult<scalar_t> lAelem
+        (Aelem, (w_mpi.lvl==0) ? offset : w_mpi.offset, lctxt, _Asub);
       w_mpi.create_sequential();
       WorkCompress<scalar_t>& w = *(w_mpi.w_seq);
       if (w.lvl == 0) w.offset = w_mpi.offset;
@@ -610,10 +631,10 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::extract_D_B
-    (const delem_t& Aelem, int lctxt, const opts_t& opts,
+    (const delemw_t& Aelem, int lctxt, const opts_t& opts,
      WorkCompressMPI<scalar_t>& w, int lvl) {
       if (!this->active()) return;
-      auto lAelem = LocalElemMult<scalar_t>(Aelem, w.offset, lctxt);
+      LocalElemMult<scalar_t> lAelem(Aelem, w.offset, lctxt, _Asub);
       extract_D_B(lAelem, opts, *w.w_seq, lvl);
     }
 
@@ -783,6 +804,41 @@ namespace strumpack {
       apply_UV_big
         (Theta.sub, sUop, Phi.sub, sVop, offset, _openmp_task_depth, UVflops);
       flops += UVflops.load();
+    }
+
+    template<typename scalar_t> void
+    HSSMatrixBase<scalar_t>::redistribute_to_tree_to_buffers
+    (const DistM_t& A, std::size_t Arlo, std::size_t Aclo, int Actxt_all,
+     std::vector<std::vector<scalar_t>>& sbuf, int dest) {
+      const DistMW_t Ad
+        (rows(), cols(), const_cast<DistM_t&>(A), Arlo, Aclo);
+      int rlo, rhi, clo, chi;
+      Ad.lranges(rlo, rhi, clo, chi);
+      sbuf.reserve(sbuf.size()+(chi-clo)*(rhi-rlo));
+      for (int c=clo; c<chi; c++)
+        for (int r=rlo; r<rhi; r++)
+          sbuf[dest].push_back(Ad(r,c));
+    }
+
+    template<typename scalar_t> void
+    HSSMatrixBase<scalar_t>::redistribute_to_tree_from_buffers
+    (const DistM_t& A, int Aprows, int Apcols,
+     std::size_t Arlo, std::size_t Aclo, int Actxt_all, scalar_t** pbuf) {
+      if (!this->active()) return;
+      _Asub = DenseM_t(rows(), cols());
+      const auto B = DistM_t::default_MB;
+      std::vector<std::size_t> srcr(rows());
+      for (std::size_t r=0; r<rows(); r++)
+        srcr[r] = ((r + Arlo) / B) % Aprows;
+      for (std::size_t c=0; c<cols(); c++)
+        for (std::size_t srcc=(((c+Aclo)/B)%Apcols)*Aprows,
+               r=0; r<cols(); r++)
+          _Asub(r,c) = *(pbuf[srcr[r] + srcc]++);
+    }
+
+    template<typename scalar_t> void
+    HSSMatrixBase<scalar_t>::delete_redistributed_input() {
+      _Asub.clear();
     }
 
   } // end namespace HSS
