@@ -173,7 +173,7 @@ int run(int argc, char *argv[]) {
   auto Hmem  = H.total_memory();
   auto Amem  = A.total_memory();
   if (!myid)
-    cout << "# rank(H) = " << Hrank << endl
+    cout << "## rank(H) = " << Hrank << endl
          << "# memory(H) = " << Hmem/1e6 << " MB, " << endl
          << "# mem percentage = " << 100. * Hmem / Amem
          << "% (of dense)" << endl;
