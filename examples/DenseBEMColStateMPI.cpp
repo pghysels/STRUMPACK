@@ -93,7 +93,7 @@ int run(int argc, char *argv[]) {
   scalapack::Cblacs_gridinit(&ctxt_all, "R", 1, np);
 
   if (!myid)
-    cout << "Redistributing..." << endl;
+    cout << "Reading and redistributing..." << endl;
   double tstart = MPI_Wtime();
   // read and Redistribute each piece
   DistributedMatrix<myscalar> A(ctxt, n, n);
@@ -104,8 +104,8 @@ int run(int argc, char *argv[]) {
         string locfile = "ZZ_" + SSTR(i) + "_" + SSTR(j) + "_" +
           SSTR(nrows[i]) + "_" + SSTR(ncols[j]);
         string filename = prefix + locfile;
-        cout << "Process " << myid << " reading from file "
-             << locfile << endl;
+        // cout << "Process " << myid << " reading from file "
+        //      << locfile << endl;
         std::ifstream fp(filename.c_str(), ios::binary);
         if (!fp.is_open()) {
           cout << "Could not open file " << filename << endl;
@@ -135,14 +135,14 @@ int run(int argc, char *argv[]) {
       }
       copy(nrows[i], ncols[j], Atmp, 0,
            A, rowoffset[i], coloffset[j], ctxt_all);
-      if (!myid)
-        cout << myid << " working: (" << i << "," << j << "): "
-             << nrows[i] << " x " << ncols[j] << endl;
+      // if (!myid)
+      //   cout << myid << " working: (" << i << "," << j << "): "
+      //        << nrows[i] << " x " << ncols[j] << endl;
     }
   MPI_Barrier(MPI_COMM_WORLD);
   double tend = MPI_Wtime();
   if (!myid)
-    cout << "Redistribution done in " << tend - tstart << "s" << endl;
+    cout << "Read and redistribution done in " << tend - tstart << "s" << endl;
   if (!myid)
     cout << "# A.total_memory() = "
          << A.total_memory()/(1000.0*1000.0) << "MB" << endl;
@@ -213,12 +213,12 @@ int run(int argc, char *argv[]) {
   if (!myid)
     cout << "## Factorization time = " << timer.elapsed() << endl;
 
-#if false
 
   //=======================================================================
   //=== Solve ===
   //=======================================================================
   if (!myid) cout << "# Solve..." << endl;
+  MPI_Barrier(MPI_COMM_WORLD);
 
   DistributedMatrix<myscalar> B(ctxt, n, 1);
   B.random();
@@ -226,15 +226,21 @@ int run(int argc, char *argv[]) {
 
   timer.start();
     H.solve(ULV, C);
-  if (!myid)
-    cout << "## Solve time = " << timer.elapsed() << endl;
+  
+  if (!myid) cout << "## Solve time = " << timer.elapsed() << endl;
 
   //=======================================================================
   //=== Error checking ===
   //=======================================================================
   DistributedMatrix<myscalar> Bcheck(ctxt, n, 1);
-  apply_HSS(Trans::N, H, C, 0., Bcheck);
-  Bcheck.scaled_add(-1., B);
+
+// #if false
+
+	myscalar c_m_one(-1.,0.);
+	myscalar c_zero(0.,0.);
+
+  apply_HSS(Trans::N, H, C, c_zero, Bcheck);
+  Bcheck.scaled_add(c_m_one, B);
   auto Bchecknorm = Bcheck.normF();
   auto Bnorm = B.normF();
   if (!myid)
@@ -245,8 +251,7 @@ int run(int argc, char *argv[]) {
       cout << "ERROR: ULV solve relative error too big!!" << endl;
     // MPI_Abort(MPI_COMM_WORLD, 1);
   }
-
-#endif
+// #endif
 
   return 0;
 }
