@@ -41,7 +41,7 @@
 
 #define ENABLE_FLOP_COUNTER 1
 #define ERROR_TOLERANCE 1e1
-#define SOLVE_TOLERANCE 1e-11
+#define SOLVE_TOLERANCE 1e-4
 
 typedef std::complex<float> scomplex;
 #define myscalar scomplex
@@ -67,11 +67,14 @@ int run(int argc, char *argv[]) {
   int ncols[npcolA] = {3456, 3456, 3456, 3456, 3456, 3456, 3456, 3456};
   // string prefix = "/global/cscratch1/sd/pghysels/BEM/mats/example3/";
   string prefix = "/global/cscratch1/sd/gichavez/intel17/paper2_tests/mats/example3/";
+  std::ifstream fp;
+  int ierr;
+  int i,j;
 
   int myid = mpi_rank();
   int np = mpi_nprocs();
-  if (!myid)
-    cout << "# matrix size: n = " << n << endl;
+  
+  if (!myid) cout << "# matrix size: n = " << n << endl;
 
   int rowoffset[nprowA];
   int coloffset[npcolA];
@@ -92,6 +95,8 @@ int run(int argc, char *argv[]) {
   int ctxt_all = scalapack::Csys2blacs_handle(MPI_COMM_WORLD);
   scalapack::Cblacs_gridinit(&ctxt_all, "R", 1, np);
 
+  // #if false
+
   if (!myid)
     cout << "Reading and redistributing..." << endl;
   double tstart = MPI_Wtime();
@@ -101,29 +106,33 @@ int run(int argc, char *argv[]) {
     for (int j=0; j<npcolA; j++) {
       DenseMatrix<myscalar> Atmp;
       if (!myid) {
+
         string locfile = "ZZ_" + SSTR(i) + "_" + SSTR(j) + "_" +
           SSTR(nrows[i]) + "_" + SSTR(ncols[j]);
         string filename = prefix + locfile;
         // cout << "Process " << myid << " reading from file "
         //      << locfile << endl;
+        
         std::ifstream fp(filename.c_str(), ios::binary);
         if (!fp.is_open()) {
           cout << "Could not open file " << filename << endl;
           return -1;
         }
+        
         // First 4 bytes are an integer
-        int ierr;
         fp.read((char*)&ierr, 4);
         if (fp.fail() || ierr != nrows[i]*ncols[j]*8) {
           cout << "First 8 bytes should be an integer equal to nrows*ncols*8; "
                << "instead, " << ierr << endl;
           return -2;
         }
+        
         // Read 8-byte fields
         Atmp = DenseMatrix<myscalar>(nrows[i], ncols[j]);
         fp.read((char*)Atmp.data(), 8*Atmp.rows()*Atmp.cols());
         if (fp.fail())
           cout << "Something went wrong while reading..." << endl;
+        
         // Last 4 bytes are an integer
         fp.read((char*)&ierr,4);
         if (fp.fail() || ierr!=nrows[i]*ncols[j]*8) {
@@ -178,7 +187,6 @@ int run(int argc, char *argv[]) {
          << "# mem percentage = " << 100. * Hmem / Amem
          << "% (of dense)" << endl;
 
-
   // Checking error against dense matrix
   if ( hss_opts.verbose() == 1 && n <= 1024) {
     MPI_Barrier(MPI_COMM_WORLD);
@@ -213,19 +221,105 @@ int run(int argc, char *argv[]) {
   if (!myid)
     cout << "## Factorization time = " << timer.elapsed() << endl;
 
-
   //=======================================================================
   //=== Solve ===
   //=======================================================================
   if (!myid) cout << "# Solve..." << endl;
   MPI_Barrier(MPI_COMM_WORLD);
 
+  // #endif
+
+  //=======================================================================
+  //=== Read RHS ===
+  //=======================================================================
+
   DistributedMatrix<myscalar> B(ctxt, n, 1);
-  B.random();
+  DenseMatrix<myscalar> Btmp;
+
+  // Root reads the RHS from 8 files
+  if(myid==0) {
+
+	  Btmp = DenseMatrix<myscalar>(n, 1);
+	  myscalar *data = Btmp.data();
+  
+    for(int j=0;j<nprowA;j++) {
+      string locfile="CC_"+SSTR(j)+"_"+SSTR(nrows[j]);
+      string filename=prefix+locfile;
+      // std::cout << "Process " << myid << " reading from file " << locfile << std::endl;
+      fp.open(filename.c_str(),std::ios::binary);
+      if(!fp.is_open()) {
+        std::cout << "Could not open file " << filename << std::endl;
+        return -1;
+      }
+
+      fp.read((char *)&ierr,4);
+      if(fp.fail() || ierr!=nrows[j]*8) {
+        std::cout << "First 4 bytes should be an integer equal to nrows*8; instead, "
+         << ierr  << std::endl;
+        return -2;
+      }
+
+      myscalar tmp;
+      for(i=0;i<nrows[j];i++) {
+        fp.read((char *)&tmp,8);
+        // cout << n << "(" << rowoffset[j]-1+i+1 << "," << 1 <<") = "<< tmp << endl;
+        data[rowoffset[j]-1+i+1] = tmp;
+
+        if(fp.fail()) {
+          std::cout << "Something went wrong while reading..." << std::endl;
+          if(fp.eof())
+            std :: cout << "Only " << i << " instead of " << nrows[i] << std::endl;
+          return 2;
+        }
+      }
+
+      fp.read((char *)&ierr,4);
+      if(fp.fail() || ierr!=nrows[j]*8) {
+        std::cout << "Last 4 bytes should be an integer equal to nrows*8; instead, "
+         << ierr  << std::endl;
+        return -2;
+      }
+
+      fp.close();
+    }
+
+    // Btmp.print("Btmp",true, 8);
+  }
+
+  // // Set the RHS (random vector) and the solution space
+  // if(myid<nprow*npcol) {
+  //   locr=numroc_(&n,&nb,&myrow,&IZERO,&nprow);
+  //   locc=numroc_(&nrhs,&nb,&mycol,&IZERO,&npcol);
+  //   B=new myscalar[locr*locc];
+  //   dummy=std::max(1,locr);
+  //   descinit_(descXB,&n,&nrhs,&nb,&nb,&IZERO,&IZERO,&ctxt,&dummy,&ierr);
+  //   X=new myscalar[locr*locc];
+  // } else {
+  //   descset_(descXB,&n,&nrhs,&nb,&nb,&IZERO,&IZERO,&INONE,&IONE);
+  // }
+
+  // // Redistribute 
+  // blacs_get_(&IZERO,&IZERO,&ctxttmp);
+  // blacs_gridmap_(&ctxttmp,&IZERO,&IONE,&IONE,&IONE);
+  // if(!myid==0)
+  //   /* myid owns the piece of A to be distributed */
+  //   descinit_(descBtmp,&n,&IONE,&nb,&nb,&IZERO,&IZERO,&ctxttmp,&n,&ierr);
+  // else
+  //   descset_(descBtmp,&n,&IONE,&nb,&nb,&IZERO,&IZERO,&INONE,&IONE);
+  // pgemr2d(n,IONE,Btmp,IONE,IONE,descBtmp,B,IONE,IONE,descXB,ctxtglob);
+  // if(!myid==0)
+  //   delete[] Btmp;
+
+  copy(n, 1, Btmp, 0, B, 0, 0, ctxt_all);
+  Btmp.clear();
+
+// #if false
+
   DistributedMatrix<myscalar> C(B);
 
   timer.start();
-    H.solve(ULV, C);
+
+  H.solve(ULV, C);
   
   if (!myid) cout << "## Solve time = " << timer.elapsed() << endl;
 
@@ -234,10 +328,8 @@ int run(int argc, char *argv[]) {
   //=======================================================================
   DistributedMatrix<myscalar> Bcheck(ctxt, n, 1);
 
-// #if false
-
-	myscalar c_m_one(-1.,0.);
-	myscalar c_zero(0.,0.);
+  myscalar c_m_one(-1.,0.);
+  myscalar c_zero(0.,0.);
 
   apply_HSS(Trans::N, H, C, c_zero, Bcheck);
   Bcheck.scaled_add(c_m_one, B);
@@ -251,6 +343,7 @@ int run(int argc, char *argv[]) {
       cout << "ERROR: ULV solve relative error too big!!" << endl;
     // MPI_Abort(MPI_COMM_WORLD, 1);
   }
+
 // #endif
 
   return 0;
@@ -310,7 +403,6 @@ void print_flop_breakdown
   cout << "# --------------------------------------------";
   cout << endl;
 }
-
 
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
