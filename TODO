@@ -2,11 +2,9 @@ High priority:
 - run large scaling tests: 3D regular meshes, Poisson, Convection
   diffusion, Helmholtz, with HSS compression, push to as large as
   possible, as many nodes as possible
-- HSS threading
 - spack package
 - Trilinos interface
 - HSS C/Fortran interfaces
-- HSS redistribute dense input matrix according to HSS tree
 - integrate SLATE (start with PLASMA)
 - Provide an example of factor once, solve multiple times.
 - Example for reuse of sparsity structure!

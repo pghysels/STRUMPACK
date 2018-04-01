@@ -34,12 +34,13 @@ There are a number of dependencies which must be met in order for the
 build to succeed. These are:
 - C++11, C and Fortran77 compilers.
 - An MPI library.
-- OpenMP >= 3.1 support in the C++ compiler.
 - BLAS, LAPACK, ScaLAPACK, BLACS. (BLACS usually comes with ScaLAPACK).
 - Metis.
 - getopt_long.
 
 Optional dependencies:
+- OpenMP >= 4.5 support in the C++ compiler.
+  Disable by adding -DSTRUMPACK_USE_OPENMP=OFF
 - ParMetis.
 - Scotch and PT-Scotch.
 
