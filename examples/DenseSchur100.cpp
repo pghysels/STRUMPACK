@@ -63,7 +63,7 @@ int run(int argc, char *argv[]) {
   int nb=64; // Hard-coded in Hsolver
   int locr, locc;
 
-  const char * file = "/global/cscratch1/sd/gichavez/intel17/paper2_tests/mats/Hsolver/front_3d_10000";
+  const char *file = "/global/cscratch1/sd/gichavez/intel17/paper2_tests/mats/Hsolver/front_3d_10000";
 
   int np, ierr, myid;
   double tstart, tend;
@@ -94,7 +94,6 @@ int run(int argc, char *argv[]) {
   long long disp, bufsize, *allbufsize;
 
   myscalar *A=NULL, *X=NULL, *B=NULL;
-  scomplex *Asingle;
   allbufsize = new long long[np];
   bufsize=locr*locc;
   MPI_Allgather(&bufsize,1,MPI_INTEGER8,allbufsize,1,MPI_INTEGER8,MPI_COMM_WORLD);
@@ -104,7 +103,8 @@ int run(int argc, char *argv[]) {
     disp+=allbufsize[i];
   disp*=8; /* Offset in bytes assuming 8-byte single complex */
 
-  Asingle = DenseMatrix<myscalar>(n, n);
+  // scomplex *Asingle;
+  DenseMatrix<myscalar> Asingle = DenseMatrix<myscalar>(n, n);
 
   MPI_File_open(MPI_COMM_WORLD,file,MPI_MODE_RDONLY,MPI_INFO_NULL,&fp);
   MPI_File_set_view(fp,disp,MPI_COMPLEX,MPI_COMPLEX,"native",MPI_INFO_NULL);

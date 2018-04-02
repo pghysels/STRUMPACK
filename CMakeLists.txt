@@ -176,6 +176,8 @@ else()
   message(STATUS "Building STRUMPACK without Scotch/PTScotch support.")
 endif()
 
+# set(LIBS ${LIBS} "-L/global/common/cori/software/ipm/2.0.5/intel/lib -lipmf -lipm")
+
 message(STATUS "Linking with: " "${LIBS}")
 message(STATUS "Implicit C libs: " "${CMAKE_C_IMPLICIT_LINK_LIBRARIES}")
 message(STATUS "Implicit CXX libs: " "${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES}")

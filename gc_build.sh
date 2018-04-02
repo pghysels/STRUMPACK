@@ -21,12 +21,12 @@ cmake .. \
 -DCMAKE_CXX_COMPILER=CC \
 -DCMAKE_C_COMPILER=cc \
 -DCMAKE_Fortran_COMPILER=ftn \
+-DCMAKE_EXE_LINKER_FLAGS="" \
 -DCMAKE_CXX_FLAGS="" \
 -DMETIS_INCLUDES=$PARMETIS_INSTALL/metis/include \
 -DMETIS_LIBRARIES=$PARMETIS_INSTALL/build/Linux-x86_64/libmetis/libmetis.a \
 -DPARMETIS_INCLUDES=$PARMETIS_INSTALL/install/include \
 -DPARMETIS_LIBRARIES=$PARMETIS_INSTALL/install/lib/libparmetis.a \
--DHMATRIX_LIBRARIES=/global/cscratch1/sd/gichavez/intel17/h_matrix_rbf_randomization/build/SRC/libhmatrix.a \
 -DSCOTCH_INCLUDES=$SCOTCH_INSTALL/include \
 -DSCOTCH_LIBRARIES="$SCOTCH_INSTALL/lib/libscotch.a;$SCOTCH_INSTALL/lib/libscotcherr.a;$SCOTCH_INSTALL/lib/libptscotch.a;$SCOTCH_INSTALL/lib/libptscotcherr.a"
 elif [[ $1 == "edison" ]];
@@ -76,6 +76,11 @@ fi
 # -DCMAKE_BUILD_TYPE=Debug
 # -DCMAKE_CXX_FLAGS="-lstdc++ -DUSE_TASK_TIMER -DCOUNT_FLOPS" \
 # -DCMAKE_CXX_FLAGS="" \
+# -DCMAKE_CXX_FLAGS="-L/global/common/cori/software/ipm/2.0.5/intel/lib/libipmf.a -L/global/common/cori/software/ipm/2.0.5/intel/lib/libipm.a" \
+# -DHMATRIX_LIBRARIES=/global/cscratch1/sd/gichavez/intel17/h_matrix_rbf_randomization/build/SRC/libhmatrix.a \
+
+# -DCMAKE_EXE_LINKER_FLAGS="$(IPM)" \
+# -DCMAKE_EXE_LINKER_FLAGS="-dynamic" \
 
 make install VERBOSE=1
 cd examples

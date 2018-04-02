@@ -1,8 +1,7 @@
-all: DenseBEMColStateMPI
+all: DenseBEMColStateMPI DenseSchur100
 
-all1: testPoisson2dMPIDist \
-DenseToeplitzMPI DenseBEMColStateMPI \
-DenseBEMAirbus
+all1: DenseBEMColStateMPI testPoisson2dMPIDist \
+DenseToeplitzMPI DenseBEMAirbus
 
 all2: @C_EXAMPLES@ testPoisson2d testPoisson3d	\
 	testPoisson2dMPI testPoisson2dMPIDist testMMdouble	\
@@ -138,3 +137,5 @@ clean:
 	testPoisson3dMPIDist \
 	DenseToeplitzMPI DenseBEMColStateMPI \
 	DenseBEMAirbus DenseSchur100
+
+# $(CXX) $(LDFLAGS) DenseBEMColStateMPI.o -o $@ $(LIBS) /global/common/cori/software/ipm/2.0.5/intel/lib/libipmf.so.0.0.0 /global/common/cori/software/ipm/2.0.5/intel/lib/libipm.so.0.0.0
