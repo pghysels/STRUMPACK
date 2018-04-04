@@ -65,11 +65,11 @@ int run(int argc, char *argv[]) {
   int nb=64; // Hard-coded in Hsolver
   int locr, locc;
 
-  // const char *file = "/global/cscratch1/sd/gichavez/intel17/paper2_tests/mats/Hsolver/front_3d_10000";
-  const char *file = "/Users/gichavez/Desktop/front_3d_10000";
+  const char *file = "/global/cscratch1/sd/gichavez/intel17/paper2_tests/mats/Hsolver/front_3d_10000";
+  //const char *file = "/Users/gichavez/Desktop/front_3d_10000";
 
   int ctxt;
-  // int descA[BLACSCTXTSIZE], descXB[BLACSCTXTSIZE];
+  int descA[BLACSCTXTSIZE], descXB[BLACSCTXTSIZE];
   int np, ierr, myid;
   int myrow, mycol, nprow, npcol;
   int dummy;
@@ -110,9 +110,9 @@ int run(int argc, char *argv[]) {
     usermap[invusermap[i]]=i;
   delete[] invusermap;
 
-  // scalapack::Cblacs_gridmap(&ctxt,usermap,nprow,nprow,npcol);
-  // delete[] usermap;
-  // scalapack::Cblacs_gridinfo(ctxt,&nprow,&npcol,&myrow,&mycol);
+  scalapack::Cblacs_gridmap(&ctxt,usermap,nprow,nprow,npcol);
+  delete[] usermap;
+  scalapack::Cblacs_gridinfo(ctxt,&nprow,&npcol,&myrow,&mycol);
 
   if(!myid){
     std::cout << "Processor grid for A: " << nprow << "x" << npcol << std::endl << std::endl;
@@ -127,9 +127,10 @@ int run(int argc, char *argv[]) {
   }
 
   DenseMatrix<myscalar> Asingle = DenseMatrix<myscalar>(locr, locc);
+  // DistributedMatrix<myscalar> Asingle = DistributedMatrix<myscalar>(ctxt, n, n);
 
-  // dummy=std::max(1,locr);
-  // scalapack::descinit(descA,n,n,nb,nb,0,0,ctxt,dummy);
+  dummy=std::max(1,locr);
+  scalapack::descinit(descA,n,n,nb,nb,0,0,ctxt,dummy);
 
   // Read matrix from file using MPI I/O.
   // The file is binary, and the same number of processes
@@ -152,10 +153,6 @@ int run(int argc, char *argv[]) {
     disp+=allbufsize[i];
   disp*=8; /* Offset in bytes assuming 8-byte single complex */
 
-  // if (myid==1){
-  //   cout << "disp=" << disp << endl;
-  // }
-
   MPI_File_open(MPI_COMM_WORLD,file,MPI_MODE_RDONLY,MPI_INFO_NULL,&fp);
   MPI_File_set_view(fp,disp,MPI_COMPLEX,MPI_COMPLEX,"native",MPI_INFO_NULL);
   MPI_File_read(fp,Asingle.data(),bufsize,MPI_COMPLEX,MPI_STATUS_IGNORE);
@@ -168,8 +165,6 @@ int run(int argc, char *argv[]) {
   if(!myid) std::cout << "Reading file done in: " << tend-tstart << "s" << std::endl;
 
   std::cout << myid << Asingle(0,0) << std::endl;
-
-  // TODO: Distribute blocks into 2D block cyclic in STRUMPACK V2 format -> A
 
 #if false
 
