@@ -50,6 +50,21 @@ cmake .. \
 -DPARMETIS_LIBRARIES=$PARMETIS_INSTALL/install/lib/libparmetis.a \
 -DSCOTCH_INCLUDES=$SCOTCH_INSTALL/include \
 -DSCOTCH_LIBRARIES="$SCOTCH_INSTALL/lib/libscotch.a;$SCOTCH_INSTALL/lib/libscotcherr.a;$SCOTCH_INSTALL/lib/libptscotch.a;$SCOTCH_INSTALL/lib/libptscotcherr.a"
+elif [[ $1 == "pieter" ]];
+then
+echo $1
+cmake .. \
+-DCMAKE_BUILD_TYPE=Release \
+-DCMAKE_INSTALL_PREFIX=. \
+-DSTRUMPACK_DEV_TESTING=OFF \
+-DSTRUMPACK_C_INTERFACE=OFF \
+-DSTRUMPACK_COUNT_FLOPS=ON \
+-DSTRUMPACK_TASK_TIMERS=ON \
+-DSTRUMPACK_USE_PARMETIS=OFF \
+-DSTRUMPACK_USE_SCOTCH=OFF \
+-DCMAKE_CXX_FLAGS="-Wall -Wfatal-errors -Wextra -Wno-unused-parameter" \
+-DMETIS_INCLUDES=/home/pieterg/local/parmetis-4.0.3/metis/include \
+-DMETIS_LIBRARIES=/home/pieterg/local/parmetis-4.0.3/build/Linux-x86_64/libmetis/libmetis.a
 elif [[ $1 == "imac" ]];
 then
 echo $1
@@ -69,7 +84,7 @@ cmake .. -DCMAKE_BUILD_TYPE=Debug \
 -DSCOTCH_INCLUDES=/usr/local/Cellar/scotch/6.0.4_4/include \
 -DSCOTCH_LIBRARIES="/usr/local/Cellar/scotch/6.0.4_4/lib/libscotch.dylib;/usr/local/Cellar/scotch/6.0.4_4/lib/libscotcherr.dylib;/usr/local/Cellar/scotch/6.0.4_4/lib/libptscotch.dylib;/usr/local/Cellar/scotch/6.0.4_4/lib/libptscotcherr.dylib"
 else
-	echo "Unrecognized configuration. Try: <cori|edison|imac>"
+	echo "Unrecognized configuration. Try: <cori|edison|imac|pieter>"
 	exit 0
 fi
 
