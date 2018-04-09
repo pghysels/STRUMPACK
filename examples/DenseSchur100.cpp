@@ -36,6 +36,8 @@
 #include <vector>
 #include <atomic>
 
+#define STRUMPACK_PBLAS_BLOCKSIZE 64
+
 #include "HSS/HSSMatrixMPI.hpp"
 #include "misc/TaskTimer.hpp"
 
@@ -62,40 +64,28 @@ int run(int argc, char *argv[]) {
    * The matrix file is complex single precision (8 bytes).
    */
 
-  int nb=64; // Hard-coded in Hsolver
-  int locr, locc;
-
   const char *file = "/global/cscratch1/sd/gichavez/intel17/paper2_tests/mats/Hsolver/front_3d_10000";
+  //const char *file = "/home/gichavez/mats/front_3d_10000";
   //const char *file = "/Users/gichavez/Desktop/front_3d_10000";
 
-  int ctxt;
-  int descA[BLACSCTXTSIZE], descXB[BLACSCTXTSIZE];
-  int np, ierr, myid;
-  int myrow, mycol, nprow, npcol;
-  int dummy;
-  int *invusermap, *usermap;
-
-  double tstart, tend;
-  int i;
   HSSOptions<myscalar> hss_opts;
   hss_opts.set_from_command_line(argc, argv);
 
-  // Initialize MPI
-  myid=-1;
-  if((ierr=MPI_Comm_rank(MPI_COMM_WORLD,&myid))) return 1;
-
-  np=-1;
-  if((ierr=MPI_Comm_size(MPI_COMM_WORLD,&np))) return 1;
-
+  int myid = mpi_rank();
+  int np = mpi_nprocs();
   int n = 10000;
 
   /* Initialize the BLACS grid */
-  nprow=floor(sqrt((float)np));
-  npcol=np/nprow;
-  scalapack::Cblacs_get(0,0,&ctxt);
-  invusermap=new int[np];
+  int npcol = floor(sqrt((float)np));
+  int nprow = np / npcol;
+  int ctxt, dummy, myrow, mycol;
+  scalapack::Cblacs_get(0, 0, &ctxt);
+  scalapack::Cblacs_gridinit(&ctxt, "C", nprow, npcol);
+  scalapack::Cblacs_gridinfo(ctxt, &dummy, &dummy, &myrow, &mycol);
+  int ctxt_all = scalapack::Csys2blacs_handle(MPI_COMM_WORLD);
+  scalapack::Cblacs_gridinit(&ctxt_all, "R", 1, np);
 
-  if (!myid){
+  if (!myid) {
     cout << "nprow=" << nprow << endl;
     cout << "npcol=" << npcol << endl;
     cout << "ctxt=" << ctxt << endl;
@@ -103,70 +93,53 @@ int run(int argc, char *argv[]) {
   }
 
   /* Generate usermap with a pseudo ND of the processes */
-  pseudoND(0,nprow-1,0,npcol-1,nprow,npcol,0,1,invusermap);
-  
-  usermap=new int[nprow*npcol];
-  for(i=0;i<nprow*npcol;i++)
-    usermap[invusermap[i]]=i;
-  delete[] invusermap;
+  auto invusermap = new int[np];
+  pseudoND(0, nprow-1, 0, npcol-1, nprow, npcol, 0, 1, invusermap);
+  auto usermap = new int[nprow*npcol];
+  for (int i=0; i<nprow*npcol; i++)
+    usermap[invusermap[i]] = i;
 
-  scalapack::Cblacs_gridmap(&ctxt,usermap,nprow,nprow,npcol);
-  delete[] usermap;
-  scalapack::Cblacs_gridinfo(ctxt,&nprow,&npcol,&myrow,&mycol);
+  if (!myid)
+    cout << "Processor grid for A: " << nprow << "x" << npcol << endl << endl;
 
-  if(!myid){
-    std::cout << "Processor grid for A: " << nprow << "x" << npcol << std::endl << std::endl;
-  }
-
-  locr=scalapack::numroc(n,nb,myrow,0,nprow);
-  locc=scalapack::numroc(n,nb,mycol,0,npcol);
-  
-  if (!myid){
-    cout << "locr=" << locr << endl;
-    cout << "locc=" << locc << endl;
-  }
-
-  DenseMatrix<myscalar> Asingle = DenseMatrix<myscalar>(locr, locc);
-  // DistributedMatrix<myscalar> Asingle = DistributedMatrix<myscalar>(ctxt, n, n);
-
-  dummy=std::max(1,locr);
-  scalapack::descinit(descA,n,n,nb,nb,0,0,ctxt,dummy);
+  DistributedMatrix<myscalar> Asingle(ctxt, n, n);
 
   // Read matrix from file using MPI I/O.
   // The file is binary, and the same number of processes
   // and block sizes nb/nb that were used to generate the file
   // must be used here.
 
-  tstart = MPI_Wtime();
+  double tstart = MPI_Wtime();
 
-  if(!myid) std::cout << "Reading from file " << file << "..." << std::endl;
+  if (!myid)
+    cout << "Reading from file " << file << "..." << endl;
 
   MPI_File fp;
-  long long disp, bufsize, *allbufsize;
+  auto allbufsize = new long long[np];
+  long long bufsize = Asingle.lrows() * Asingle.lcols(); //locr*locc;
+  MPI_Allgather(&bufsize, 1, MPI_LONG_LONG, allbufsize, 1,
+                MPI_LONG_LONG, MPI_COMM_WORLD);
 
-  allbufsize = new long long[np];
-  bufsize=locr*locc;
-  MPI_Allgather(&bufsize,1,MPI_INTEGER8,allbufsize,1,MPI_INTEGER8,MPI_COMM_WORLD);
+  auto disp = new long long[np];
+  disp[0] = 0;
+  for (int i=1; i<np; i++)
+    disp[i] = disp[i-1] + allbufsize[invusermap[i-1]] * 8;
 
-  disp=0;
-  for(i=0;i<myid;i++)
-    disp+=allbufsize[i];
-  disp*=8; /* Offset in bytes assuming 8-byte single complex */
-
-  MPI_File_open(MPI_COMM_WORLD,file,MPI_MODE_RDONLY,MPI_INFO_NULL,&fp);
-  MPI_File_set_view(fp,disp,MPI_COMPLEX,MPI_COMPLEX,"native",MPI_INFO_NULL);
-  MPI_File_read(fp,Asingle.data(),bufsize,MPI_COMPLEX,MPI_STATUS_IGNORE);
+  MPI_File_open(MPI_COMM_WORLD, file, MPI_MODE_RDONLY, MPI_INFO_NULL, &fp);
+  MPI_File_set_view(fp, disp[usermap[myid]], MPI_COMPLEX,
+                    MPI_COMPLEX, "native", MPI_INFO_NULL);
+  MPI_File_read(fp, Asingle.data(), bufsize, MPI_COMPLEX, MPI_STATUS_IGNORE);
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_File_close(&fp);
 
+  delete[] disp;
+  delete[] invusermap;
+  delete[] usermap;
   delete[] allbufsize;
 
-  tend=MPI_Wtime();
-  if(!myid) std::cout << "Reading file done in: " << tend-tstart << "s" << std::endl;
-
-  std::cout << myid << Asingle(0,0) << std::endl;
-
-#if false
+  double tend = MPI_Wtime();
+  if (!myid)
+    cout << "Reading file done in: " << tend-tstart << "s" << endl;
 
   //===================================================================
   //==== Compression to HSS ===========================================
@@ -178,9 +151,9 @@ int run(int argc, char *argv[]) {
   // Simple compression
   tstart = MPI_Wtime();
 
-  HSSMatrixMPI<myscalar> H(A, hss_opts, MPI_COMM_WORLD);
+  HSSMatrixMPI<myscalar> H(Asingle, hss_opts, MPI_COMM_WORLD);
 
-  tend=MPI_Wtime();
+  tend = MPI_Wtime();
   if(!myid) std::cout << "## Compression time = " << tend-tstart << "s" << std::endl;
 
   if (!myid) {
@@ -194,37 +167,40 @@ int run(int argc, char *argv[]) {
 
   auto Hrank = H.max_rank();
   auto Hmem  = H.total_memory();
-  auto Amem  = A.total_memory();
+  auto Amem  = Asingle.total_memory();
   if (!myid)
     cout << "## rank(H) = " << Hrank << endl
          << "# memory(H) = " << Hmem/1e6 << " MB, " << endl
          << "# mem percentage = " << 100. * Hmem / Amem
          << "% (of dense)" << endl;
 
-  // Checking error against dense matrix
-  if ( hss_opts.verbose() == 1 && n <= 1024) {
-    MPI_Barrier(MPI_COMM_WORLD);
-    auto Hdense = H.dense(A.ctxt());
-    MPI_Barrier(MPI_COMM_WORLD);
 
-    Hdense.scaled_add(-1., A);
+  // Checking error against dense matrix
+  if (hss_opts.verbose()) { // == 1 && n <= 1024) {
+    //MPI_Barrier(MPI_COMM_WORLD);
+    auto Hdense = H.dense(Asingle.ctxt());
+    //MPI_Barrier(MPI_COMM_WORLD);
+
+    Hdense.scaled_add(-1., Asingle);
     auto HnormF = Hdense.normF();
-    auto AnormF = A.normF();
+    auto AnormF = Asingle.normF();
     if (!myid)
       cout << "# relative error = ||A-H*I||_F/||A||_F = "
            << HnormF / AnormF << endl;
-    if (A.active() && HnormF / AnormF >
+    if (Asingle.active() && HnormF / AnormF >
         ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
       if (!myid) cout << "ERROR: compression error too big!!" << endl;
       // MPI_Abort(MPI_COMM_WORLD, 1);
     }
   }
 
+
   //=======================================================================
   //=== Factorization ===
   //=======================================================================
   if (!myid)
     cout << "# Factorization..." << endl;
+  TaskTimer timer("Factorization");
   timer.start();
 
   MPI_Barrier(MPI_COMM_WORLD);
@@ -238,10 +214,9 @@ int run(int argc, char *argv[]) {
   //=======================================================================
   //=== Solve ===
   //=======================================================================
-  if (!myid) cout << "# Solve..." << endl;
-  MPI_Barrier(MPI_COMM_WORLD);
-
-#endif
+  if (!myid)
+    cout << "# Solve..." << endl;
+  // MPI_Barrier(MPI_COMM_WORLD);
 
   return 0;
 }
