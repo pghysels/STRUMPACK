@@ -22,11 +22,12 @@
  * publicly and display publicly, and to permit others to do so.
  *
  * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li,
-               Gustavo Chávez.
+               Gustavo Chavez.
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
  *
- */
+*/
+
 #include <cmath>
 #include <fstream>
 #include <iostream>
@@ -39,12 +40,16 @@
 #include "HSS/HSSMatrixMPI.hpp"
 #include "misc/TaskTimer.hpp"
 
-#define ENABLE_FLOP_COUNTER 0
-#define ERROR_TOLERANCE 1e1
-#define SOLVE_TOLERANCE 1e-11
+#include "generateMatrix.hpp"
+#include "generatePermutation.hpp"
+#include "applyPermutation.hpp"
 
-typedef std::complex<float> scomplex;
-#define myscalar scomplex
+#define ENABLE_FLOP_COUNTER 0
+// #define ERROR_TOLERANCE 1e1
+// #define SOLVE_TOLERANCE 1e-11
+
+#define myscalar double
+#define myreal double
 
 using namespace std;
 using namespace strumpack;
@@ -52,7 +57,83 @@ using namespace strumpack::HSS;
 
 int run(int argc, char *argv[]) {
 
-  
+  myscalar *A=NULL, *Acent=NULL, *Bnew=NULL, *B=NULL, *res=NULL;
+  myscalar lambda;
+  myreal tol, err, nrm;
+  int descA[BLACSCTXTSIZE], descAcent[BLACSCTXTSIZE], descB[BLACSCTXTSIZE], desc[BLACSCTXTSIZE];
+  int n;
+  int *perm;
+  int nb = 16;
+  int locr, locc;
+  int i;
+  int ierr;
+  int dummy;
+  int myid, np;
+  int myrow, mycol, nprow, npcol;
+  int ctxt, ctxtcent, ctxtglob;
+  int max_steps, steps, go;
+  double tstart, tend;
+  myscalar ZERO=static_cast<myscalar>(0), ONE=static_cast<myscalar>(1);
+
+  // Initialize MPI
+  if((ierr=MPI_Init(&argc, &argv)))
+    return 1;
+  myid = -1;
+  if((ierr = MPI_Comm_rank(MPI_COMM_WORLD, &myid)))
+    return 1;
+  np = -1;
+  if((ierr = MPI_Comm_size(MPI_COMM_WORLD, &np)))
+    return 1;
+
+  // We initialize a context with only id 0
+  scalapack::Cblacs_get(0, 0, &ctxtcent);
+  scalapack::Cblacs_gridinit(&ctxtcent, "R", 1, 1);
+
+  // We initialize a context with all the processes
+  scalapack::Cblacs_get(0, 0, &ctxtglob);
+  scalapack::Cblacs_gridinit(&ctxtglob, "R", 1, np);
+
+  // We initialize a 2D grid
+  nprow = floor(sqrt((float)np));
+  npcol = np/nprow;
+  scalapack::Cblacs_get(0, 0, &ctxt);
+  scalapack::Cblacs_gridinit(&ctxt, "R", nprow, npcol);
+  scalapack::Cblacs_gridinfo(ctxt, &nprow, &npcol, &myrow, &mycol);
+
+  // A is a dense covariance matrix
+  // It is centralized at first, then distributed.
+  if(myid == 0) {
+    n = 0;
+    A = generateMatrix(argc, argv, &n);
+    MPI_Bcast((void *) &n, 1, MPI_INTEGER, 0, MPI_COMM_WORLD);
+    if(n == 0)
+      return -1;
+    scalapack::descinit(descAcent, n, n, nb, nb, 0, 0, ctxtcent, n);
+
+    perm  = generatePermutation(argc,argv);
+    Acent = applyPermutation(A,n,perm);
+    delete[] A;
+    free(perm);
+  }
+  else {
+    MPI_Bcast((void *) &n, 1, MPI_INTEGER, 0, MPI_COMM_WORLD);
+    if(n == 0)
+      return -1;
+    scalapack::descset(descAcent, n, n, nb, nb, 0, 0, -1, 1);
+  }
+
+  // // Distribute A into 2D block-cyclic form
+  // if(myid<nprow*npcol) {
+  //   locr=numroc_(&n,&nb,&myrow,&IZERO,&nprow);
+  //   locc=numroc_(&n,&nb,&mycol,&IZERO,&npcol);
+  //   dummy=std::max(1,locr);
+  //   A=new double[locr*locc];
+  //   descinit_(descA,&n,&n,&nb,&nb,&IZERO,&IZERO,&ctxt,&dummy,&ierr);
+  // } else {
+  //   descset_(descA,&n,&n,&nb,&nb,&IZERO,&IZERO,&INONE,&IONE);
+  // }
+  // pgemr2d(n,n,Acent,IONE,IONE,descAcent,A,IONE,IONE,descA,ctxtglob);
+  // delete[] Acent;
 
 
 #if false
@@ -192,7 +273,7 @@ void print_flop_breakdown
 
 
 int main(int argc, char *argv[]) {
-  MPI_Init(&argc, &argv);
+  // MPI_Init(&argc, &argv);
 
   // Main program execution
   int ierr = run(argc, argv);

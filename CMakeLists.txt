@@ -441,5 +441,14 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/DenseBEMAirbus.cpp
 configure_file(${CMAKE_SOURCE_DIR}/examples/DenseSchur100.cpp
   ${CMAKE_BINARY_DIR}/examples/DenseSchur100.cpp COPYONLY)
 
+configure_file(${CMAKE_SOURCE_DIR}/examples/DenseCovariance.cpp
+  ${CMAKE_BINARY_DIR}/examples/DenseCovariance.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/generateMatrix.hpp
+  ${CMAKE_BINARY_DIR}/examples/generateMatrix.hpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/generatePermutation.hpp
+  ${CMAKE_BINARY_DIR}/examples/generatePermutation.hpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/applyPermutation.hpp
+  ${CMAKE_BINARY_DIR}/examples/applyPermutation.hpp COPYONLY)
+
 # include(CTest)
 # add_subdirectory(test)

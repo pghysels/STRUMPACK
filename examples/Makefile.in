@@ -1,7 +1,7 @@
-all: DenseBEMColStateMPI DenseSchur100
+all: DenseCovariance
 
 all1: DenseBEMColStateMPI testPoisson2dMPIDist \
-DenseToeplitzMPI DenseBEMAirbus
+DenseToeplitzMPI DenseBEMAirbus DenseSchur100
 
 all2: @C_EXAMPLES@ testPoisson2d testPoisson3d	\
 	testPoisson2dMPI testPoisson2dMPIDist testMMdouble	\
@@ -17,6 +17,13 @@ CFLAGS=@STRUMPACK_ALL_C_FLAGS@
 CXXFLAGS=@STRUMPACK_ALL_CXX_FLAGS@
 LIBS=-L@CMAKE_INSTALL_PREFIX@/lib/ -lstrumpack @STRUMPACK_ALL_LIBS@
 LDFLAGS=@OpenMP_CXX_FLAGS@ @CMAKE_EXE_LINKER_FLAGS@
+
+INC_COVARIANCE=-I/global/homes/g/gichavez/cori/local/mfem-3.3.2 \
+-I/global/homes/g/gichavez/cori/local/hypre-2.10.0b/src/hypre/include \
+-I/global/homes/g/gichavez/cori/local/metis-4.0.3
+LIB_COVARIANCE=-L/global/homes/g/gichavez/cori/local/mfem-3.3.2 -lmfem \
+-L/global/homes/g/gichavez/cori/local/hypre-2.10.0b/src/hypre/lib -lHYPRE \
+-L/global/homes/g/gichavez/cori/local/metis-4.0.3 -lmetis
 
 sexample: sexample.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o sexample.o
@@ -65,8 +72,7 @@ DenseToeplitzMPI: DenseToeplitzMPI.cpp
 
 DenseBEMColStateMPI: DenseBEMColStateMPI.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o DenseBEMColStateMPI.o
-	$(CXX) $(LDFLAGS) DenseBEMColStateMPI.o -o $@ $(LIBS)
-	$(RM) DenseBEMColStateMPI.o
+	$(CXX) $(LDFLAGS) DenseBEMColStateMPI.o -o $@ $(LIBS) -L/global/cscratch1/sd/gichavez/.consulting/INC0117791/IPM/IPM_build_Intel_dynamic/lib -lipm
 
 DenseBEMAirbus: DenseBEMAirbus.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o DenseBEMAirbus.o
@@ -77,6 +83,11 @@ DenseSchur100: DenseSchur100.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o DenseSchur100.o
 	$(CXX) $(LDFLAGS) DenseSchur100.o -o $@ $(LIBS)
 	$(RM) DenseSchur100.o
+
+DenseCovariance: DenseCovariance.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(INC_COVARIANCE) -c $< -o DenseCovariance.o
+	$(CXX) $(LDFLAGS) DenseCovariance.o -o $@ $(LIBS) $(LIB_COVARIANCE)
+	$(RM) DenseCovariance.o
 
 testMMdouble: testMMdouble.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMdouble.o
@@ -97,6 +108,7 @@ testMMdouble64: testMMdouble64.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMdouble64.o
 	$(CXX) $(LDFLAGS) testMMdouble64.o -o $@ $(LIBS)
 	$(RM) testMMdouble64.o
+
 testMMdoubleMPIDist64: testMMdoubleMPIDist64.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMdoubleMPIDist64.o
 	$(CXX) $(LDFLAGS) testMMdoubleMPIDist64.o -o $@ $(LIBS)
@@ -136,6 +148,6 @@ clean:
 	mtx2bin bin2mtx MLkernel \
 	testPoisson3dMPIDist \
 	DenseToeplitzMPI DenseBEMColStateMPI \
-	DenseBEMAirbus DenseSchur100
+	DenseBEMAirbus DenseSchur100 DenseCovariance
 
 # $(CXX) $(LDFLAGS) DenseBEMColStateMPI.o -o $@ $(LIBS) /global/common/cori/software/ipm/2.0.5/intel/lib/libipmf.so.0.0.0 /global/common/cori/software/ipm/2.0.5/intel/lib/libipm.so.0.0.0
