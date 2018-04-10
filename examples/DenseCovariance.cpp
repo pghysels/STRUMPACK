@@ -45,119 +45,82 @@
 #include "applyPermutation.hpp"
 
 #define ENABLE_FLOP_COUNTER 0
-// #define ERROR_TOLERANCE 1e1
-// #define SOLVE_TOLERANCE 1e-11
+#define ERROR_TOLERANCE 1e1
+#define SOLVE_TOLERANCE 1e-11
 
 #define myscalar double
 #define myreal double
 
 using namespace std;
-using namespace strumpack;
-using namespace strumpack::HSS;
+// using namespace strumpack;
+// using namespace strumpack::HSS;
 
 int run(int argc, char *argv[]) {
-
-  myscalar *A=NULL, *Acent=NULL, *Bnew=NULL, *B=NULL, *res=NULL;
-  myscalar lambda;
-  myreal tol, err, nrm;
-  int descA[BLACSCTXTSIZE], descAcent[BLACSCTXTSIZE], descB[BLACSCTXTSIZE], desc[BLACSCTXTSIZE];
-  int n;
-  int *perm;
-  int nb = 16;
-  int locr, locc;
-  int i;
-  int ierr;
-  int dummy;
-  int myid, np;
-  int myrow, mycol, nprow, npcol;
-  int ctxt, ctxtcent, ctxtglob;
-  int max_steps, steps, go;
-  double tstart, tend;
-  myscalar ZERO=static_cast<myscalar>(0), ONE=static_cast<myscalar>(1);
+  // myscalar lambda;
+  // myreal tol, err, nrm;
+  // int max_steps, steps, go;
 
   // Initialize MPI
-  if((ierr=MPI_Init(&argc, &argv)))
-    return 1;
-  myid = -1;
-  if((ierr = MPI_Comm_rank(MPI_COMM_WORLD, &myid)))
-    return 1;
-  np = -1;
-  if((ierr = MPI_Comm_size(MPI_COMM_WORLD, &np)))
-    return 1;
+  MPI_Init(&argc, &argv);
+  int myid = mpi_rank();
+  int np = mpi_nprocs();
 
-  // We initialize a context with only id 0
-  scalapack::Cblacs_get(0, 0, &ctxtcent);
-  scalapack::Cblacs_gridinit(&ctxtcent, "R", 1, 1);
-
-  // We initialize a context with all the processes
-  scalapack::Cblacs_get(0, 0, &ctxtglob);
-  scalapack::Cblacs_gridinit(&ctxtglob, "R", 1, np);
-
-  // We initialize a 2D grid
-  nprow = floor(sqrt((float)np));
-  npcol = np/nprow;
-  scalapack::Cblacs_get(0, 0, &ctxt);
-  scalapack::Cblacs_gridinit(&ctxt, "R", nprow, npcol);
-  scalapack::Cblacs_gridinfo(ctxt, &nprow, &npcol, &myrow, &mycol);
+  // initialize the BLACS grid
+  int npcol = floor(sqrt((float)np));
+  int nprow = np / npcol;
+  int ctxt, dummy, prow, pcol;
+  strumpack::scalapack::Cblacs_get(0, 0, &ctxt);
+  strumpack::scalapack::Cblacs_gridinit(&ctxt, "C", nprow, npcol);
+  strumpack::scalapack::Cblacs_gridinfo(ctxt, &dummy, &dummy, &prow, &pcol);
+  int ctxt_all = strumpack::scalapack::Csys2blacs_handle(MPI_COMM_WORLD);
+  strumpack::scalapack::Cblacs_gridinit(&ctxt_all, "R", 1, np);
 
   // A is a dense covariance matrix
   // It is centralized at first, then distributed.
-  if(myid == 0) {
+  strumpack::DenseMatrix<myscalar> Acent;
+  int n;
+  int *perm = nullptr;
+  if (!myid) {
     n = 0;
-    A = generateMatrix(argc, argv, &n);
-    MPI_Bcast((void *) &n, 1, MPI_INTEGER, 0, MPI_COMM_WORLD);
-    if(n == 0)
-      return -1;
-    scalapack::descinit(descAcent, n, n, nb, nb, 0, 0, ctxtcent, n);
-
-    perm  = generatePermutation(argc,argv);
-    Acent = applyPermutation(A,n,perm);
+    myscalar* A = generateMatrix(argc, argv, &n);
+    MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    if (n == 0) return -1;
+    perm = generatePermutation(argc,argv);
+    Acent = strumpack::DenseMatrix<myscalar>(n, n);
+    applyPermutation(A, n, perm, Acent.data());
     delete[] A;
     free(perm);
   }
   else {
-    MPI_Bcast((void *) &n, 1, MPI_INTEGER, 0, MPI_COMM_WORLD);
-    if(n == 0)
-      return -1;
-    scalapack::descset(descAcent, n, n, nb, nb, 0, 0, -1, 1);
+    MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    if (n == 0) return -1;
   }
 
-  // // Distribute A into 2D block-cyclic form
-  // if(myid<nprow*npcol) {
-  //   locr=numroc_(&n,&nb,&myrow,&IZERO,&nprow);
-  //   locc=numroc_(&n,&nb,&mycol,&IZERO,&npcol);
-  //   dummy=std::max(1,locr);
-  //   A=new double[locr*locc];
-  //   descinit_(descA,&n,&n,&nb,&nb,&IZERO,&IZERO,&ctxt,&dummy,&ierr);
-  // } else {
-  //   descset_(descA,&n,&n,&nb,&nb,&IZERO,&IZERO,&INONE,&IONE);
-  // }
-  // pgemr2d(n,n,Acent,IONE,IONE,descAcent,A,IONE,IONE,descA,ctxtglob);
-  // delete[] Acent;
-
-
-#if false
+  strumpack::DistributedMatrix<myscalar> A(ctxt, n, n);
+  strumpack::copy(n, n, Acent, 0, A, 0, 0, ctxt_all);
 
   //===================================================================
   //==== Compression to HSS ===========================================
   //===================================================================
+  strumpack::HSS::HSSOptions<myscalar> hss_opts;
+  hss_opts.set_from_command_line(argc, argv);
+
   if (!myid) cout << "# Creating HSS matrix H..." << endl;
   if (!myid) cout << "# rel_tol = " << hss_opts.rel_tol() << endl;
   MPI_Barrier(MPI_COMM_WORLD);
 
   // Simple compression
-  tstart = MPI_Wtime();
+  double tstart = MPI_Wtime();
+  strumpack::HSS::HSSMatrixMPI<myscalar> H(A, hss_opts, MPI_COMM_WORLD);
+  double tend = MPI_Wtime();
+  if (!myid) std::cout << "## Compression time = " << tend-tstart << "s" << std::endl;
 
-  HSSMatrixMPI<myscalar> H(A, hss_opts, MPI_COMM_WORLD);
-
-  tend=MPI_Wtime();
-  if(!myid) std::cout << "## Compression time = " << tend-tstart << "s" << std::endl;
-
+  auto mlvl = H.max_levels();
   if (!myid) {
     if (H.is_compressed())
       cout << "# created H matrix of dimension "
            << H.rows() << " x " << H.cols()
-           << " with " << H.levels() << " levels" << endl
+           << " with " << mlvl << " levels" << endl
            << "# compression succeeded!" << endl;
     else cout << "# compression failed!!!!!!!!" << endl;
   }
@@ -195,6 +158,7 @@ int run(int argc, char *argv[]) {
   //=======================================================================
   if (!myid)
     cout << "# Factorization..." << endl;
+  TaskTimer timer(string("fact"), 1);
   timer.start();
 
   MPI_Barrier(MPI_COMM_WORLD);
@@ -211,7 +175,51 @@ int run(int argc, char *argv[]) {
   if (!myid) cout << "# Solve..." << endl;
   MPI_Barrier(MPI_COMM_WORLD);
 
-#endif
+
+  if (!mpi_rank()) cout << "# solving linear system .." << endl;
+  strumpack::DistributedMatrix<double> Xexact(ctxt, n, 1);
+  strumpack::DistributedMatrix<double> B(ctxt, n, 1), Bh(ctxt, n, 1), R(ctxt, n, 1);
+  Xexact.random();
+  strumpack::HSS::apply_HSS(strumpack::Trans::N, H, Xexact, 0., Bh);
+  strumpack::gemm(strumpack::Trans::N, strumpack::Trans::N, 1., A, Xexact, 0., B);
+
+  strumpack::DistributedMatrix<double> X(B);
+  H.solve(ULV, X);
+
+  strumpack::gemm(strumpack::Trans::N, strumpack::Trans::N, 1., A, X, 0., R);
+  R.scaled_add(-1., B);
+  auto resnorm = R.normF();
+
+  strumpack::DistributedMatrix<double> Xh(Bh);
+  H.solve(ULV, Xh);
+  Xh.scaled_add(-1., Xexact);
+  auto errorh = Xh.normF();
+
+  auto Xexactnorm = Xexact.normF();
+  Xexact.scaled_add(-1., X);
+  auto error = Xexact.normF();
+
+  strumpack::DistributedMatrix<double> Bcheck(ctxt, n, 1);
+  strumpack::HSS::apply_HSS(strumpack::Trans::N, H, X, 0., Bcheck);
+  Bcheck.scaled_add(-1., B);
+  auto Bchecknorm = Bcheck.normF();
+  auto Bnorm = B.normF();
+
+  if (!mpi_rank()) {
+    cout << "# relative error = ||(H\\B)-Xexact||_F/||Xexact||_F = "
+         << error / Xexactnorm << ",   A*Xexact=B" << endl;
+    cout << "# relative error = ||(H\\B)-Xexact||_F/||Xexact||_F = "
+         << errorh / Xexactnorm << ",   H*Xexact=B" << endl;
+    cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
+         << Bchecknorm / Bnorm << endl;
+    cout << "# relative residual = ||A*(H\\B)-B||_F/||B||_F = "
+         << resnorm / Bnorm << endl;
+  }
+  if (B.active() && Bchecknorm / Bnorm > SOLVE_TOLERANCE) {
+    if (!mpi_rank())
+      cout << "ERROR: ULV solve relative error too big!!" << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
 
   return 0;
 }
@@ -281,27 +289,27 @@ int main(int argc, char *argv[]) {
   if (ENABLE_FLOP_COUNTER) {
     // Reducing flop counters
     float flops[12] = {
-      float(params::random_flops.load()),
-      float(params::ID_flops.load()),
-      float(params::QR_flops.load()),
-      float(params::ortho_flops.load()),
-      float(params::reduce_sample_flops.load()),
-      float(params::update_sample_flops.load()),
-      float(params::extraction_flops.load()),
-      float(params::CB_sample_flops.load()),
-      float(params::sparse_sample_flops.load()),
-      float(params::ULV_factor_flops.load()),
-      float(params::schur_flops.load()),
-      float(params::full_rank_flops.load())
+      float(strumpack::params::random_flops.load()),
+      float(strumpack::params::ID_flops.load()),
+      float(strumpack::params::QR_flops.load()),
+      float(strumpack::params::ortho_flops.load()),
+      float(strumpack::params::reduce_sample_flops.load()),
+      float(strumpack::params::update_sample_flops.load()),
+      float(strumpack::params::extraction_flops.load()),
+      float(strumpack::params::CB_sample_flops.load()),
+      float(strumpack::params::sparse_sample_flops.load()),
+      float(strumpack::params::ULV_factor_flops.load()),
+      float(strumpack::params::schur_flops.load()),
+      float(strumpack::params::full_rank_flops.load())
     };
     float rflops[12];
     MPI_Reduce(flops, rflops, 12, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-    print_flop_breakdown (rflops[0], rflops[1], rflops[2], rflops[3],
-                          rflops[4], rflops[5], rflops[6], rflops[7],
-                          rflops[8], rflops[9], rflops[10], rflops[11]);
+    print_flop_breakdown(rflops[0], rflops[1], rflops[2], rflops[3],
+                         rflops[4], rflops[5], rflops[6], rflops[7],
+                         rflops[8], rflops[9], rflops[10], rflops[11]);
   }
 
-  scalapack::Cblacs_exit(1);
+  strumpack::scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return ierr;
 }
