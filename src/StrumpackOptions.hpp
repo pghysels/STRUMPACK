@@ -53,27 +53,63 @@ namespace strumpack {
                   only works for regular meshes. (see Sp::reorder)  */
   };
 
-  enum class MC64Job {
+  enum class MatchingJob {
     NONE,                         /*!< Don't do anything                   */
     MAX_CARDINALITY,              /*!< Maximum cardinality                 */
     MAX_SMALLEST_DIAGONAL,        /*!< Maximum smallest diagonal value     */
     MAX_SMALLEST_DIAGONAL_2,      /*!< Same as MAX_SMALLEST_DIAGONAL,
                                     but different algorithm                */
     MAX_DIAGONAL_SUM,             /*!< Maximum sum of diagonal values      */
-    MAX_DIAGONAL_PRODUCT_SCALING  /*!< Maximum product of diagonal values
+    MAX_DIAGONAL_PRODUCT_SCALING, /*!< Maximum product of diagonal values
                                     and row and column scaling             */
+    COMBBLAS                      /*!< Use AWPM from CombBLAS              */
   };
 
-  inline int MC64_job_number(MC64Job job) {
+  inline MatchingJob get_matching(int job) {
+    if (job < 0 || job > 6)
+      std::cerr << "ERROR: Matching job not recognized!!" << std::endl;
     switch (job) {
-    case MC64Job::NONE: return 0;
-    case MC64Job::MAX_CARDINALITY: return 1;
-    case MC64Job::MAX_SMALLEST_DIAGONAL: return 2;
-    case MC64Job::MAX_SMALLEST_DIAGONAL_2: return 3;
-    case MC64Job::MAX_DIAGONAL_SUM: return 4;
-    case MC64Job::MAX_DIAGONAL_PRODUCT_SCALING: return 5;
+    case 0: return MatchingJob::NONE;
+    case 1: return MatchingJob::MAX_CARDINALITY;
+    case 2: return MatchingJob::MAX_SMALLEST_DIAGONAL;
+    case 3: return MatchingJob::MAX_SMALLEST_DIAGONAL_2;
+    case 4: return MatchingJob::MAX_DIAGONAL_SUM;
+    case 5: return MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING;
+    case 6: return MatchingJob::COMBBLAS;
+    }
+    return MatchingJob::NONE;
+  }
+
+  inline int get_matching(MatchingJob job) {
+    switch (job) {
+    case MatchingJob::NONE: return 0;
+    case MatchingJob::MAX_CARDINALITY: return 1;
+    case MatchingJob::MAX_SMALLEST_DIAGONAL: return 2;
+    case MatchingJob::MAX_SMALLEST_DIAGONAL_2: return 3;
+    case MatchingJob::MAX_DIAGONAL_SUM: return 4;
+    case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING: return 5;
+    case MatchingJob::COMBBLAS: return 6;
     }
     return -1;
+  }
+
+  inline std::string get_description(MatchingJob job) {
+    switch (job) {
+    case MatchingJob::NONE: return "none";
+    case MatchingJob::MAX_CARDINALITY:
+      return "maximum cardinality ! Doesn't work";
+    case MatchingJob::MAX_SMALLEST_DIAGONAL:
+      return "maximum smallest diagonal value, version 1";
+    case MatchingJob::MAX_SMALLEST_DIAGONAL_2:
+      return "maximum smallest diagonal value, version 2";
+    case MatchingJob::MAX_DIAGONAL_SUM:
+      return "maximum sum of diagonal values";
+    case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING:
+      return "maximum matching with row and column scaling";
+    case MatchingJob::COMBBLAS:
+      return "approximate weigthed perfect matching, from CombBLAS";
+    }
+    return "UNKNOWN";
   }
 
   inline std::string get_name(ReorderingStrategy method) {
@@ -154,7 +190,7 @@ namespace strumpack {
     bool _use_METIS_NodeNDP = true;
     bool _use_MUMPS_SYMQAMD = false;
     bool _use_agg_amalg = false;
-    int _mc64job = 5;
+    MatchingJob _matching_job = MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING;
     bool _log_assembly_tree = false;
     /** HSS options */
     bool _use_hss = false;
@@ -205,11 +241,8 @@ namespace strumpack {
     void disable_MUMPS_SYMQAMD() { _use_MUMPS_SYMQAMD = false; }
     void enable_agg_amalg() { _use_agg_amalg = true; }
     void disable_agg_amalg() { _use_agg_amalg = false; }
-    void set_mc64job(int job)
-    { if (job < 0 || job > 5)
-        std::cerr << "# WARNING: invalid mc64 job number" << std::endl;
-      _mc64job = job; }
-    void set_mc64job(MC64Job job) { _mc64job = MC64_job_number(job); }
+    void set_matching(MatchingJob job) { _matching_job = job; }
+    //void set_matching(int job) { _matching_job = get_matching(job); }
     void enable_assembly_tree_log() { _log_assembly_tree = true; }
     void disable_assembly_tree_log() { _log_assembly_tree = false; }
     void enable_HSS() { _use_hss = true; }
@@ -244,7 +277,7 @@ namespace strumpack {
     bool use_METIS_NodeND() const { return !_use_METIS_NodeNDP; }
     bool use_MUMPS_SYMQAMD() const { return _use_MUMPS_SYMQAMD; }
     bool use_agg_amalg() const { return _use_agg_amalg; }
-    int mc64job() const { return _mc64job; }
+    MatchingJob matching() const { return _matching_job; }
     bool log_assembly_tree() const { return _log_assembly_tree; }
     bool use_HSS() const { return _use_hss; }
     int HSS_min_front_size() const { return _hss_min_front_size; }
@@ -280,7 +313,7 @@ namespace strumpack {
         {"sp_disable_MUMPS_SYMQAMD",     no_argument, 0, 14},
         {"sp_enable_aggamal",            no_argument, 0, 15},
         {"sp_disable_aggamal",           no_argument, 0, 16},
-        {"sp_mc64job",                   required_argument, 0, 17},
+        {"sp_matching",                  required_argument, 0, 17},
         {"sp_enable_assembly_tree_log",  no_argument, 0, 18},
         {"sp_disable_assembly_tree_log", no_argument, 0, 19},
         {"sp_enable_hss",                no_argument, 0, 20},
@@ -394,8 +427,8 @@ namespace strumpack {
         case 16: { disable_agg_amalg(); } break;
         case 17: {
           std::istringstream iss(optarg);
-          iss >> _mc64job;
-          set_mc64job(_mc64job);
+          int job; iss >> job;
+          set_matching(get_matching(job));
         } break;
         case 18: { enable_assembly_tree_log(); } break;
         case 19: { disable_assembly_tree_log(); } break;
@@ -523,8 +556,11 @@ namespace strumpack {
                 << std::boolalpha << use_agg_amalg() << ")" << std::endl;
       std::cout << "#   --sp_disable_agg_amalg (default "
                 << std::boolalpha << !use_agg_amalg() << ")" << std::endl;
-      std::cout << "#   --sp_mc64job int [0-5] (default "
-                << mc64job() << ")" << std::endl;
+      std::cout << "#   --sp_matching int [0-6] (default "
+                << get_matching(matching()) << ")" << std::endl;
+      for (int i=0; i<7; i++)
+        std::cout << "#      " << i << " " <<
+          get_description(get_matching(i)) << std::endl;
       std::cout << "#   --sp_enable_hss (default " << std::boolalpha
                 << use_HSS() << ")" << std::endl;
       std::cout << "#   --sp_disable_hss (default " << std::boolalpha

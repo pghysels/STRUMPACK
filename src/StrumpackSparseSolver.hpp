@@ -265,9 +265,9 @@ namespace strumpack {
 
     SPOptions<scalar_t> _opts;
     bool _is_root;
-    std::vector<integer_t> _mc64_cperm;
-    std::vector<scalar_t> _mc64_Dr; // row scaling
-    std::vector<scalar_t> _mc64_Dc; // column scaling
+    std::vector<integer_t> _matching_cperm;
+    std::vector<scalar_t> _matching_Dr; // row scaling
+    std::vector<scalar_t> _matching_Dc; // column scaling
     std::new_handler _old_handler;
     std::ostream* _rank_out = nullptr;
     bool _factored = false;
@@ -507,35 +507,17 @@ namespace strumpack {
     if (!matrix()) return ReturnCode::MATRIX_NOT_SET;
     TaskTimer t1("permute-scale");
     int ierr;
-    if (_opts.mc64job() != 0) {
-      if (_opts.verbose() && _is_root) {
-        std::cout << "# mc64ad job " << _opts.mc64job() << ": ";
-        switch (_opts.mc64job()) {
-        case 1:
-          std::cout << "maximum cardinality ! Doesn't work" << std::endl;
-          return ReturnCode::REORDERING_ERROR;
-          break;
-        case 2:
-          std::cout << "maximum smallest diagonal value, version 1"
-                    << std::endl; break;
-        case 3:
-          std::cout << "maximum smallest diagonal value, version 2"
-                    << std::endl; break;
-        case 4:
-          std::cout << "maximum sum of diagonal values" << std::endl;
-          break;
-        case 5:
-          std::cout << "maximum matching + row and column scaling"
-                    << std::endl;
-          break;
-        }
-      }
+    if (_opts.matching() != MatchingJob::NONE) {
+      if (_opts.verbose() && _is_root)
+        std::cout << "# matching job: "
+                  << get_description(_opts.matching())
+                  << std::endl;
       t1.time([&](){
           ierr = matrix()->permute_and_scale
-            (_opts.mc64job(), _mc64_cperm, _mc64_Dr, _mc64_Dc);
+            (_opts.matching(), _matching_cperm, _matching_Dr, _matching_Dc);
         });
       if (ierr) {
-        std::cerr << "ERROR: mc64 failed" << std::endl;
+        std::cerr << "ERROR: matching failed" << std::endl;
         return ReturnCode::REORDERING_ERROR;
       }
     }
@@ -565,8 +547,8 @@ namespace strumpack {
     t3.stop();
     if (_opts.verbose() && _is_root) {
       std::cout << "#   - nd time = " << t3.elapsed() << std::endl;
-      if (_opts.mc64job() != 0)
-        std::cout << "#   - mc64 time = " << t1.elapsed() << std::endl;
+      if (_opts.matching() != MatchingJob::NONE)
+        std::cout << "#   - matching time = " << t1.elapsed() << std::endl;
       std::cout << "#   - symmetrization time = " << t2.elapsed()
                 << std::endl;
     }
@@ -793,24 +775,24 @@ namespace strumpack {
     std::vector<int> intIP(N);
     for (integer_t i=0; i<N; i++)
       intIP[i] = reordering()->iperm[i] + 1;
-    std::vector<int> int_mc64_cperm;
-    if (_opts.mc64job() != 0) {
-      int_mc64_cperm.resize(N);
+    std::vector<int> int_matching_cperm;
+    if (_opts.matching() != MatchingJob::NONE) {
+      int_matching_cperm.resize(N);
       for (integer_t i=0; i<N; i++)
-        int_mc64_cperm[i] = _mc64_cperm[i] + 1;
+        int_matching_cperm[i] = _matching_cperm[i] + 1;
     }
 
     auto bloc = b;
-    if (_opts.mc64job() == 5)
-      bloc.scale_rows(_mc64_Dr);
+    if (_opts.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+      bloc.scale_rows(_matching_Dr);
     bloc.lapmr(intIP, true);
 
     if (use_initial_guess &&
         _opts.Krylov_solver() != KrylovSolver::DIRECT) {
-      if (_opts.mc64job() == 5)
-        x.div_rows(_mc64_Dc);
-      if (_opts.mc64job() != 0)
-        x.lapmr(int_mc64_cperm, true);
+      if (_opts.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+        x.div_rows(_matching_Dc);
+      if (_opts.matching() != MatchingJob::NONE)
+        x.lapmr(int_matching_cperm, true);
       x.lapmr(intIP, true);
     }
 
@@ -873,10 +855,10 @@ namespace strumpack {
     }
 
     x.lapmr(intIP, false);
-    if (_opts.mc64job() != 0)
-      x.lapmr(int_mc64_cperm, false);
-    if (_opts.mc64job() == 5)
-      x.scale_rows(_mc64_Dc);
+    if (_opts.matching() != MatchingJob::NONE)
+      x.lapmr(int_matching_cperm, false);
+    if (_opts.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+      x.scale_rows(_matching_Dc);
 
     t.stop();
     perf_counters_stop("DIRECT/GMRES solve");

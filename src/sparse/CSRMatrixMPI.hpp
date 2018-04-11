@@ -37,6 +37,7 @@
 #include "misc/MPIWrapper.hpp"
 #include "dense/BLASLAPACKWrapper.hpp"
 #include "CSRGraph.hpp"
+#include "AWPMCombBLAS.hpp"
 
 namespace strumpack {
 
@@ -97,9 +98,13 @@ namespace strumpack {
     void permute(const integer_t* iorder, const integer_t* order) override;
     std::unique_ptr<CSRMatrix<scalar_t,integer_t>> gather() const;
     int permute_and_scale
-    (int job, std::vector<integer_t>& perm,
+    (MatchingJob job, std::vector<integer_t>& perm,
      std::vector<scalar_t>& Dr,
      std::vector<scalar_t>& Dc, bool apply=true) override;
+    int permute_and_scale_MC64
+    (MatchingJob job, std::vector<integer_t>& perm,
+     std::vector<scalar_t>& Dr,
+     std::vector<scalar_t>& Dc, bool apply=true);
     void apply_column_permutation
     (const std::vector<integer_t>& perm) override;
     void symmetrize_sparsity() override;
@@ -810,6 +815,24 @@ namespace strumpack {
     return Aseq;
   }
 
+  template<typename scalar_t,typename integer_t> int
+  CSRMatrixMPI<scalar_t,integer_t>::permute_and_scale
+  (MatchingJob job, std::vector<integer_t>& perm, std::vector<scalar_t>& Dr,
+   std::vector<scalar_t>& Dc, bool apply) {
+    if (job == MatchingJob::COMBBLAS) {
+#if defined(STRUMPACK_USE_COMBBLAS)
+      GetAWPM(*this, perm.data());
+      return 0;
+#else
+      if (mpi_rank()==0)
+        std::cerr << "# WARNING Matching with CombBLAS not supported.\n"
+                  << "# Reconfigure STRUMPACK with CombBLAS support."
+                  << std::endl;
+      return 1;
+#endif
+    } else return permute_and_scale_MC64(job, perm, Dr, Dc, apply);
+  }
+
   /**
    * This gathers the matrix to 1 process, then applies MC64
    * sequentially.
@@ -821,14 +844,14 @@ namespace strumpack {
    * Dr and Dc contain the LOCAL scaling vectors.
    */
   template<typename scalar_t,typename integer_t> int
-  CSRMatrixMPI<scalar_t,integer_t>::permute_and_scale
-  (int job, std::vector<integer_t>& perm, std::vector<scalar_t>& Dr,
+  CSRMatrixMPI<scalar_t,integer_t>::permute_and_scale_MC64
+  (MatchingJob job, std::vector<integer_t>& perm, std::vector<scalar_t>& Dr,
    std::vector<scalar_t>& Dc, bool apply) {
-    if (job == 0) return 0;
-    if (job > 5 || job < 0 || job == 1) {
-      if (mpi_rank()==0)
-        std::cout << "# WARNING mc64 job " << job
-                  << " not supported, I'm not doing any column permutation"
+    if (job == MatchingJob::NONE) return 0;
+    if (job == MatchingJob::COMBBLAS || job == MatchingJob::MAX_CARDINALITY) {
+      if (!mpi_rank())
+        std::cerr << "# WARNING mc64 job not supported,"
+                  << " I'm not doing any column permutation"
                   << " or matrix scaling!" << std::endl;
       return 1;
     }
@@ -843,12 +866,13 @@ namespace strumpack {
       Aseq.reset(nullptr);
     } else {
       perm.resize(this->size());
-      if (job == 5) Dc_global.resize(this->size());
+      if (job == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+        Dc_global.resize(this->size());
     }
     MPI_Bcast(&ierr, 1, MPI_INT, 0, _comm);
     if (ierr) return ierr;
     MPI_Bcast(perm.data(), perm.size(), mpi_type<integer_t>(), 0, _comm);
-    if (job == 5) {
+    if (job == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) {
       auto P = mpi_nprocs(_comm);
       auto rank = mpi_rank(_comm);
       auto scnts = new int[2*P];
