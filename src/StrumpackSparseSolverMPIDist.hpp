@@ -276,7 +276,9 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> ReturnCode
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::solve
   (const DenseM_t& b, DenseM_t& x, bool use_initial_guess) {
-    if (!this->_factored) {
+    if (!this->_factored &&
+        this->_opts.Krylov_solver() != KrylovSolver::GMRES &&
+        this->_opts.Krylov_solver() != KrylovSolver::BICGSTAB) {
       ReturnCode ierr = this->factor();
       if (ierr != ReturnCode::SUCCESS) return ierr;
     }
