@@ -1,3 +1,11 @@
+Version 2.3.0 (in progress)
+=====================================
+ - Add option to use Combinatorial BLAS approximate weight perfect
+   matching instead of MC64. Only works in parallel, requires a square
+   number of processes.
+ - Fix integer overflow in the counting of nonzeros in the factors.
+
+
 Version 2.2.0 Released March 32, 2017
 =====================================
  - Changes in the build system
