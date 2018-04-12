@@ -154,7 +154,7 @@ endif()
 if(STRUMPACK_USE_COMBBLAS)
   set(LIBS ${LIBS} ${COMBBLAS_LIBRARIES})
   include_directories(${COMBBLAS_INCLUDES})
-  message("COMBBLAS SUPPORT ENABLED, includes=" "${COMBBLAS_INCLUDES}")
+  message(STATUS "Combinatorial BLAS support enabled")
 endif()
 
 if(STRUMPACK_USE_PARMETIS)
