@@ -38,7 +38,7 @@ test(int argc, char* argv[], CSRMatrixMPI<scalar,integer>* Adist) {
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   StrumpackSparseSolverMPIDist<scalar,integer> spss(MPI_COMM_WORLD);
-  spss.options().set_mc64job(0);
+  spss.options().set_matching(0);
   spss.options().set_from_command_line(argc, argv);
 
   TaskTimer::t_begin = GET_TIME_NOW();

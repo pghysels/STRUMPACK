@@ -435,8 +435,8 @@ extern "C" {
       (options().set_GramSchmidt_type
        (static_cast<GramSchmidtType>(t)));
   }
-  void STRUMPACK_set_mc64job(STRUMPACK_SparseSolver S, int job)
-  { switch_precision(options().set_mc64job(job)); }
+  void STRUMPACK_set_matching(STRUMPACK_SparseSolver S, int job)
+  { switch_precision(options().set_matching(get_matching(job))); }
   void STRUMPACK_set_Krylov_solver
   (STRUMPACK_SparseSolver S, STRUMPACK_KRYLOV_SOLVER solver_type) {
     switch_precision
@@ -508,10 +508,10 @@ extern "C" {
     switch_precision_return(options().GramSchmidt_type(), gs);
     return static_cast<STRUMPACK_GRAM_SCHMIDT_TYPE>(gs);
   }
-  int STRUMPACK_mc64job(STRUMPACK_SparseSolver S) {
-    int job = 0;
-    switch_precision_return(options().mc64job(), job);
-    return job;
+  int STRUMPACK_matching(STRUMPACK_SparseSolver S) {
+    MatchingJob job = MatchingJob::NONE;
+    switch_precision_return(options().matching(), job);
+    return get_matching(job);
   }
   STRUMPACK_KRYLOV_SOLVER STRUMPACK_Krylov_solver(STRUMPACK_SparseSolver S) {
     KrylovSolver s = KrylovSolver::AUTO;

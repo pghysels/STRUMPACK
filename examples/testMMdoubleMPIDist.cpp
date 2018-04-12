@@ -143,13 +143,12 @@ int main(int argc, char* argv[]) {
     else ierr = A->read_matrix_market(f);
     if (!ierr) {
       is_complex = false;
-      // std::vector<int> perm;
-      // std::vector<double> Dr;
-      // std::vector<double> Dc;
-      // ierr = A->permute_and_scale
-      //   (MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING, perm, Dr, Dc);
-      // if (ierr) std::cerr << "MC64 reordering failed!" << std::endl;
-      // A->symmetrize_sparsity();
+      std::vector<int> perm;
+      std::vector<double> Dr, Dc;
+      ierr = A->permute_and_scale
+        (MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING, perm, Dr, Dc);
+      if (ierr) std::cerr << "MC64 reordering failed!" << std::endl;
+      A->symmetrize_sparsity();
     } else {
       delete A;
       is_complex = true;
@@ -160,13 +159,12 @@ int main(int argc, char* argv[]) {
         std::cerr << "Could not read matrix from file." << std::endl;
         return 1;
       }
-      // std::vector<int> perm;
-      // std::vector<std::complex<double>> Dr;
-      // std::vector<std::complex<double>> Dc;
-      // ierr = A_c->permute_and_scale
-      //   (MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING, perm, Dr, Dc);
-      // if (ierr) std::cerr << "MC64 reordering failed!" << std::endl;
-      // A_c->symmetrize_sparsity();
+      std::vector<int> perm;
+      std::vector<std::complex<double>> Dr, Dc;
+      ierr = A_c->permute_and_scale
+        (MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING, perm, Dr, Dc);
+      if (ierr) std::cerr << "MC64 reordering failed!" << std::endl;
+      A_c->symmetrize_sparsity();
     }
   }
   MPI_Bcast(&is_complex, sizeof(bool), MPI_BYTE, 0, MPI_COMM_WORLD);
