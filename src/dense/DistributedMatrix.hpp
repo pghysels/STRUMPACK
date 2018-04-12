@@ -178,11 +178,13 @@ namespace strumpack {
     typename RealType<scalar_t>::value_type norm1() const;
     typename RealType<scalar_t>::value_type normI() const;
     virtual std::size_t memory() const
-    { return sizeof(scalar_t)*lrows()*lcols(); }
+    { return sizeof(scalar_t)*std::size_t(lrows())*std::size_t(lcols()); }
     virtual std::size_t total_memory() const
-    { return sizeof(scalar_t)*rows()*cols(); }
-    virtual std::size_t nonzeros() const { return lrows()*lcols(); }
-    virtual std::size_t total_nonzeros() const { return rows()*cols(); }
+    { return sizeof(scalar_t)*std::size_t(rows())*std::size_t(cols()); }
+    virtual std::size_t nonzeros() const
+    { return std::size_t(lrows())*std::size_t(lcols()); }
+    virtual std::size_t total_nonzeros() const
+    { return std::size_t(rows())*std::size_t(cols()); }
 
     void scatter(const DenseMatrix<scalar_t>& a);
     DenseMatrix<scalar_t> gather() const;

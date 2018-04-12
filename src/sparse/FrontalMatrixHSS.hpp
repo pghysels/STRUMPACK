@@ -684,8 +684,8 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> long long
   FrontalMatrixHSS<scalar_t,integer_t>::dense_node_factor_nonzeros() const {
-    auto dsep = this->dim_sep();
-    auto dupd = this->dim_upd();
+    long long dsep = this->dim_sep();
+    long long dupd = this->dim_upd();
     return dsep * (dsep + 2 * dupd);
   }
 
