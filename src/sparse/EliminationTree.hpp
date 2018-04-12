@@ -64,6 +64,10 @@ namespace strumpack {
     virtual int nr_HSS_fronts() const { return _nr_HSS_fronts; }
     virtual int nr_dense_fronts() const { return _nr_dense_fronts; }
 
+    void dump_front_indices
+    (const SeparatorTree<integer_t>& sep_tree, integer_t sep,
+     std::vector<integer_t>* upd, int depth);
+
   protected:
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
@@ -98,9 +102,30 @@ namespace strumpack {
 #pragma omp single
     symbolic_factorization(A, sep_tree, sep_tree.root(), upd);
 
+    dump_front_indices(sep_tree, sep_tree.root(), upd, 0);
+
     _root = std::unique_ptr<F_t>
       (setup_tree(opts, A, sep_tree, upd, sep_tree.root(), true, 0));
     delete[] upd;
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  EliminationTree<scalar_t,integer_t>::dump_front_indices
+  (const SeparatorTree<integer_t>& sep_tree, integer_t sep,
+   std::vector<integer_t>* upd, int depth) {
+    if (depth > 3) return;
+    auto chl = sep_tree.lch()[sep];
+    auto chr = sep_tree.rch()[sep];
+    if (chl != -1) dump_front_indices(sep_tree, chl, upd, depth+1);
+    if (chr != -1) dump_front_indices(sep_tree, chr, upd, depth+1);
+    auto sep_begin = sep_tree.sizes()[sep];
+    auto sep_end = sep_tree.sizes()[sep+1];
+    std::cout << "DUMP " << sep << " " << chl << " " << chr
+              << " " << sep_begin << " " << sep_end
+              << " " << upd[sep].size() << " ";
+    for (auto u : upd[sep])
+      std::cout << u << " ";
+    std::cout << std::endl;
   }
 
   template<typename scalar_t,typename integer_t> void
