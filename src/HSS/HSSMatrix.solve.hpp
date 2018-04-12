@@ -11,20 +11,28 @@ namespace strumpack {
       // is a valid one
       // assert(ULV._D.rows() == _U.rows());
       WorkSolve<scalar_t> w;
-      solve_fwd(ULV, b, w, false, true, this->_openmp_task_depth);
-      solve_bwd(ULV, b, w, true, this->_openmp_task_depth);
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+      {
+        solve_fwd(ULV, b, w, false, true, this->_openmp_task_depth);
+        solve_bwd(ULV, b, w, true, this->_openmp_task_depth);
+      }
     }
 
     // TODO do not pass work, just return the reduced_rhs, and w.x at the root
     template<typename scalar_t> void HSSMatrix<scalar_t>::forward_solve
     (const HSSFactors<scalar_t>& ULV, WorkSolve<scalar_t>& w,
      const DenseMatrix<scalar_t>& b, bool partial) const {
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
       solve_fwd(ULV, b, w, partial, true, this->_openmp_task_depth);
     }
 
     template<typename scalar_t> void HSSMatrix<scalar_t>::backward_solve
     (const HSSFactors<scalar_t>& ULV, WorkSolve<scalar_t>& w,
      DenseMatrix<scalar_t>& b) const {
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
       solve_bwd(ULV, b, w, true, this->_openmp_task_depth);
     }
 
@@ -96,7 +104,8 @@ namespace strumpack {
             (Trans::C, Trans::N, scalar_t(1.),
              ULV._Vt0, w.x, scalar_t(0.), w.reduced_rhs, depth);
           if (!this->leaf())
-            w.reduced_rhs.add(_V.applyC(vconcat(w.c[0].z, w.c[1].z), depth));
+            w.reduced_rhs.add
+              (_V.applyC(vconcat(w.c[0].z, w.c[1].z), depth), depth);
         }
       } else {
         f.laswp(_U.P(), true);

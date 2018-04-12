@@ -97,29 +97,31 @@ namespace strumpack {
      WorkExtract<scalar_t>& w, int depth) const {
       if (w.I.empty()) return;
       if (this->leaf()) {
-#pragma omp critical
-        {
-          if (w.z.cols() && _U.cols())
-            triplets.reserve
-              (triplets.size() + w.I.size()*(w.J.size()+ w.z.cols()));
-          else triplets.reserve(triplets.size() + w.I.size()*w.J.size());
-          assert(w.cl2g.size() >= w.J.size());
+        std::vector<Triplet<scalar_t>> lt;
+        if (w.z.cols() && _U.cols())
+          lt.reserve(w.I.size()*(w.J.size()+ w.z.cols()));
+        else lt.reserve(w.I.size()*w.J.size());
+        assert(w.cl2g.size() >= w.J.size());
+        assert(w.rl2g.size() >= w.I.size());
+        for (std::size_t c=0; c<w.J.size(); c++)
+          for (std::size_t r=0; r<w.I.size(); r++)
+            lt.emplace_back(w.rl2g[r], w.cl2g[c], _D(w.I[r],w.J[c]));
+        if (w.z.cols() && _U.cols()) {
+          DenseM_t tmp(w.I.size(), w.z.cols());
+          gemm(Trans::N, Trans::N, scalar_t(1), _U.extract_rows(w.I),
+               w.z, scalar_t(0.), tmp, depth);
+          STRUMPACK_EXTRACTION_FLOPS
+            (gemm_flops(Trans::N, Trans::N, scalar_t(1), _U.extract_rows(w.I),
+                        w.z, scalar_t(0.)));
           assert(w.rl2g.size() >= w.I.size());
-          for (std::size_t c=0; c<w.J.size(); c++)
+          for (std::size_t c=0; c<w.z.cols(); c++)
             for (std::size_t r=0; r<w.I.size(); r++)
-              triplets.emplace_back(w.rl2g[r], w.cl2g[c], _D(w.I[r],w.J[c]));
-          if (w.z.cols() && _U.cols()) {
-            DenseM_t tmp(w.I.size(), w.z.cols());
-            gemm(Trans::N, Trans::N, scalar_t(1), _U.extract_rows(w.I),
-                 w.z, scalar_t(0.), tmp, depth);
-            STRUMPACK_EXTRACTION_FLOPS
-              (gemm_flops(Trans::N, Trans::N, scalar_t(1), _U.extract_rows(w.I),
-                          w.z, scalar_t(0.)));
-            assert(w.rl2g.size() >= w.I.size());
-            for (std::size_t c=0; c<w.z.cols(); c++)
-              for (std::size_t r=0; r<w.I.size(); r++)
-                triplets.emplace_back(w.rl2g[r], w.zcols[c], tmp(r,c));
-          }
+              lt.emplace_back(w.rl2g[r], w.zcols[c], tmp(r,c));
+        }
+#pragma omp critical(extract_bwd)
+        {
+          triplets.reserve(triplets.size() + lt.size());
+          triplets.insert(triplets.end(), lt.begin(), lt.end());
         }
       } else {
         extract_bwd_internal(w, depth);

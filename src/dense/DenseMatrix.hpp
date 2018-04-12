@@ -34,6 +34,10 @@
 #include <cassert>
 #include <algorithm>
 
+#if defined(_OPENMP)
+#include <omp.h>
+#endif
+
 #include "misc/RandomWrapper.hpp"
 #include "misc/TaskTimer.hpp"
 #include "BLASLAPACKWrapper.hpp"
@@ -116,15 +120,18 @@ namespace strumpack {
     (const std::vector<std::size_t>& I,
      const std::vector<std::size_t>& J) const;
     DenseMatrix<scalar_t>& scatter_rows_add
-    (const std::vector<std::size_t>& I, const DenseMatrix<scalar_t>& B);
-    DenseMatrix<scalar_t>& add(const DenseMatrix<scalar_t>& B);
-    DenseMatrix<scalar_t>& sub(const DenseMatrix<scalar_t>& B);
+    (const std::vector<std::size_t>& I,
+     const DenseMatrix<scalar_t>& B, int depth);
+    DenseMatrix<scalar_t>& add(const DenseMatrix<scalar_t>& B, int depth=0);
+    DenseMatrix<scalar_t>& sub(const DenseMatrix<scalar_t>& B, int depth=0);
     DenseMatrix<scalar_t>& scaled_add
-    (scalar_t alpha, const DenseMatrix<scalar_t>& x);
+    (scalar_t alpha, const DenseMatrix<scalar_t>& x, int depth=0);
     DenseMatrix<scalar_t>& scale_and_add
-    (scalar_t alpha, const DenseMatrix<scalar_t>& x);
-    DenseMatrix<scalar_t>& scale_rows(const std::vector<scalar_t>& D);
-    DenseMatrix<scalar_t>& div_rows(const std::vector<scalar_t>& D);
+    (scalar_t alpha, const DenseMatrix<scalar_t>& x, int depth=0);
+    DenseMatrix<scalar_t>& scale_rows
+    (const std::vector<scalar_t>& D, int depth=0);
+    DenseMatrix<scalar_t>& div_rows
+    (const std::vector<scalar_t>& D, int depth=0);
     real_t norm() const;
     real_t normF() const;
     real_t norm1() const;
@@ -189,9 +196,9 @@ namespace strumpack {
     std::size_t memory() const { return 0; }
     std::size_t nonzeros() const { return 0; }
 
-    DenseMatrixWrapper(const DenseMatrixWrapper<scalar_t>&) = delete;
+    DenseMatrixWrapper(const DenseMatrixWrapper<scalar_t>&) = default;
     DenseMatrixWrapper(const DenseMatrix<scalar_t>&) = delete;
-    DenseMatrixWrapper(DenseMatrixWrapper<scalar_t>&&) = delete;
+    DenseMatrixWrapper(DenseMatrixWrapper<scalar_t>&&) = default;
     DenseMatrixWrapper(DenseMatrix<scalar_t>&&) = delete;
     DenseMatrixWrapper<scalar_t>&
     operator=(const DenseMatrixWrapper<scalar_t>& D)
@@ -513,8 +520,9 @@ namespace strumpack {
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>
-  DenseMatrix<scalar_t>::extract(const std::vector<std::size_t>& I,
-                                 const std::vector<std::size_t>& J) const {
+  DenseMatrix<scalar_t>::extract
+  (const std::vector<std::size_t>& I,
+   const std::vector<std::size_t>& J) const {
     DenseMatrix<scalar_t> B(I.size(), J.size());
     for (std::size_t j=0; j<J.size(); j++)
       for (std::size_t i=0; i<I.size(); i++) {
@@ -527,10 +535,15 @@ namespace strumpack {
 
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::scatter_rows_add
-  (const std::vector<std::size_t>& I, const DenseMatrix<scalar_t>& B) {
+  (const std::vector<std::size_t>& I, const DenseMatrix<scalar_t>& B,
+   int depth) {
     assert(I.size() == B.rows());
     assert(B.cols() == cols());
-    //#pragma omp taskloop default(none) firstprivate(c,r,l,d) shared(I,B) //grainsize(128) //collapse(2)
+    // #if defined(_OPENMP)
+    // #pragma omp parallel if(!omp_in_parallel())
+    // #pragma omp single nowait
+    // #pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+    // #endif
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<I.size(); i++) {
         assert(I[i] < rows());
@@ -541,8 +554,13 @@ namespace strumpack {
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>&
-  DenseMatrix<scalar_t>::add(const DenseMatrix<scalar_t>& B) {
-    //#pragma omp taskloop default(shared) //grainsize(128) //collapse(2)
+  DenseMatrix<scalar_t>::add
+  (const DenseMatrix<scalar_t>& B, int depth) {
+    // #if defined(_OPENMP)
+    // #pragma omp parallel if(!omp_in_parallel())
+    // #pragma omp single nowait
+    // #pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+    // #endif
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
         operator()(i, j) += B(i, j);
@@ -551,8 +569,13 @@ namespace strumpack {
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>&
-  DenseMatrix<scalar_t>::sub(const DenseMatrix<scalar_t>& B) {
-    //#pragma omp taskloop default(shared) //grainsize(128) //collapse(2)
+  DenseMatrix<scalar_t>::sub
+  (const DenseMatrix<scalar_t>& B, int depth) {
+    // #if defined(_OPENMP)
+    // #pragma omp parallel if(!omp_in_parallel())
+    // #pragma omp single nowait
+    // #pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+    // #endif
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
         operator()(i, j) -= B(i, j);
@@ -562,8 +585,12 @@ namespace strumpack {
 
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::scaled_add
-  (scalar_t alpha, const DenseMatrix<scalar_t>& x) {
-    //#pragma omp taskloop default(shared) //grainsize(128) //collapse(2)
+  (scalar_t alpha, const DenseMatrix<scalar_t>& x, int depth) {
+    // #if defined(_OPENMP)
+    // #pragma omp parallel if(!omp_in_parallel())
+    // #pragma omp single nowait
+    // #pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+    // #endif
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
         operator()(i, j) += alpha * x(i, j);
@@ -573,8 +600,12 @@ namespace strumpack {
 
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::scale_and_add
-  (scalar_t alpha, const DenseMatrix<scalar_t>& x) {
-    //#pragma omp taskloop default(shared) //grainsize(128) //collapse(2)
+  (scalar_t alpha, const DenseMatrix<scalar_t>& x, int depth) {
+    // #if defined(_OPENMP)
+    // #pragma omp parallel if(!omp_in_parallel())
+    // #pragma omp single nowait
+    // #pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+    // #endif
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
         operator()(i, j) = alpha * operator()(i, j) + x(i, j);
@@ -583,7 +614,13 @@ namespace strumpack {
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>&
-  DenseMatrix<scalar_t>::scale_rows(const std::vector<scalar_t>& D) {
+  DenseMatrix<scalar_t>::scale_rows
+  (const std::vector<scalar_t>& D, int depth) {
+    // #if defined(_OPENMP)
+    // #pragma omp parallel if(!omp_in_parallel())
+    // #pragma omp single nowait
+    // #pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+    // #endif
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
         operator()(i, j) *= D[i];
@@ -592,7 +629,13 @@ namespace strumpack {
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>&
-  DenseMatrix<scalar_t>::div_rows(const std::vector<scalar_t>& D) {
+  DenseMatrix<scalar_t>::div_rows
+  (const std::vector<scalar_t>& D, int depth) {
+    // #if defined(_OPENMP)
+    // #pragma omp parallel if(!omp_in_parallel())
+    // #pragma omp single nowait
+    // #pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+    // #endif
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
         operator()(i, j) /= D[i];
@@ -688,7 +731,6 @@ namespace strumpack {
     int minmn = std::min(rows(), cols());
     auto tau = new scalar_t[minmn];
     blas::geqrfmod(rows(), minmn, data(), ld(), tau, &info, depth);
-    // TODO threading!!
     real_t Rmax = std::abs(operator()(0, 0));
     real_t Rmin = Rmax;
     for (int i=0; i<minmn; i++) {
@@ -698,6 +740,7 @@ namespace strumpack {
     }
     r_max = Rmax;
     r_min = Rmin;
+    // TODO threading!!
     blas::xxgqr(rows(), minmn, minmn, data(), ld(), tau, &info);
     if (cols() > rows()) {
       DenseMatrixWrapper<scalar_t> tmp

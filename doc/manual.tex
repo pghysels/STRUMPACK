@@ -52,7 +52,7 @@
   Christopher Gorman\footnotemark[2] \\
   Gustavo Ch\'{a}vez\footnotemark[1] \\
   Fran\c{c}ois-Henry Rouet\footnotemark[3]}
-\date{Version \textbf{2.9.0}, February 2018}
+\date{Version \textbf{2.2.0}, March 2018}
 
 \begin{document}
 
@@ -155,11 +155,16 @@ CMake can find them:
   not need to manually specify the MPI compiler wrappers.  CMake will
   look for MPI options and libraries and set the appropriate compiler
   and linker flags.
-\item \textbf{OpenMP v3.1} support is required in the C\texttt{++}
+\item \textbf{OpenMP v4.5} support is required in the C\texttt{++}
   compiler to use the shared-memory parallelism in the code. OpenMP
-  v3.1 introduces task parallelism, which is used extensively
-  throughout the code. CMake will check whether your compiler supports
-  OpenMP and sets the appropriate compiler and linker flags.
+  support can be disabled by adding the CMake option
+  \begin{lstlisting}[style=Bash]
+    -DSTRUMPACK_USE_OPENMP=OFF
+  \end{lstlisting}
+  OpenMP v3.1 introduces task parallelism, which is used extensively
+  throughout the code. OpenMP v4.5 added the taskloop construct. CMake
+  will check whether your compiler supports OpenMP and sets the
+  appropriate compiler and linker flags.
 \item \textbf{BLAS, LAPACK and ScaLAPACK} libraries. For performance
   it is crucial to use optimized BLAS/LAPACK libraries like for
   instance Intel\tm{} MKL, AMD\tm{} ACML, Cray\tm{} LibSci or

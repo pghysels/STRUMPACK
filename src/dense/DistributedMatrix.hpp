@@ -41,6 +41,8 @@ namespace strumpack {
   public:
     DistributedMatrix();
     DistributedMatrix(int ctxt, const DenseMatrix<scalar_t>& m);
+    DistributedMatrix(int ctxt, DenseMatrix<scalar_t>&& m);
+    DistributedMatrix(int ctxt, DenseMatrixWrapper<scalar_t>&& m);
     DistributedMatrix
     (int ctxt, int M, int N,
      const DistributedMatrix<scalar_t>& m, int ctxt_all);
@@ -187,6 +189,7 @@ namespace strumpack {
     DenseMatrix<scalar_t> all_gather(int ctxt_all) const;
 
     DenseMatrix<scalar_t> dense_and_clear();
+    DenseMatrix<scalar_t> dense() const;
     DenseMatrixWrapper<scalar_t> dense_wrapper();
 
     std::vector<int> LU();
@@ -492,10 +495,51 @@ namespace strumpack {
   template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix
   (int ctxt, const DenseMatrix<scalar_t>& m)
     : DistributedMatrix(ctxt, m.rows(), m.cols(), default_MB, default_NB) {
-    //    assert(_prows == 1 && _pcols == 1);
-    // TODO just do a copy instead of a gemr2d, or steal the data if
-    // we also provide a move constructor!!
-    scatter(m);
+    if (_prows != 1 || _pcols != 1) {
+      std::cout << "ERROR: creating DistM_t from DenseM_t only possible on 1 process!" << std::endl;
+      abort();
+    }
+    for (int c=0; c<_lcols; c++)
+      for (int r=0; r<_lrows; r++)
+        operator()(r, c) = m(r, c);
+  }
+
+  template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix
+  (int ctxt, DenseMatrixWrapper<scalar_t>&& m)
+    : DistributedMatrix(ctxt, m.rows(), m.cols(), default_MB, default_NB) {
+    if (_prows != 1 || _pcols != 1) {
+      std::cout << "ERROR: creating DistM_t from DenseM_t only possible on 1 process!" << std::endl;
+      abort();
+    }
+    for (int c=0; c<_lcols; c++)
+      for (int r=0; r<_lrows; r++)
+        operator()(r, c) = m(r, c);
+  }
+
+  template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix
+  (int ctxt, DenseMatrix<scalar_t>&& m) {
+    _prow = _pcol = 0;
+    _prows = _pcols = 1;
+    _lrows = m.rows();
+    _lcols = m.cols();
+    if (scalapack::descinit
+        (_desc, _lrows, _lcols, default_MB, default_MB, 0, 0,
+         ctxt, std::max(_lrows,1))) {
+      std::cerr << "ERROR: Could not create DistributedMatrix descriptor!"
+                << std::endl;
+      abort();
+    }
+    if (m.ld() == std::size_t(_lrows)) {
+      _data = m._data;
+      m._data = nullptr;
+    } else {
+      _data = new scalar_t[_lrows*_lcols];
+      for (int c=0; c<_lcols; c++)
+        for (int r=0; r<_lrows; r++)
+          operator()(r, c) = m(r, c);
+    }
+    delete[] m._data;
+    m._data = nullptr;
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix
@@ -509,7 +553,6 @@ namespace strumpack {
     : _lrows(m._lrows), _lcols(m._lcols), _prows(m._prows), _pcols(m._pcols),
       _prow(m._prow), _pcol(m._pcol) {
     std::copy(m._desc, m._desc+9, _desc);
-    delete[] _data;
     _data = new scalar_t[_lrows*_lcols];
     std::copy(m._data, m._data+_lrows*_lcols, _data);
   }
@@ -519,7 +562,6 @@ namespace strumpack {
     : _lrows(m._lrows), _lcols(m._lcols), _prows(m._prows), _pcols(m._pcols),
       _prow(m._prow), _pcol(m._pcol) {
     std::copy(m._desc, m._desc+9, _desc);
-    delete[] _data;
     _data = m._data;
     m._data = nullptr;
   }
@@ -1034,6 +1076,18 @@ namespace strumpack {
     return tmp;
   }
 
+  template<typename scalar_t> DenseMatrix<scalar_t>
+  DistributedMatrix<scalar_t>::dense() const {
+    DenseMatrix<scalar_t> tmp(lrows(), lcols());
+    tmp._ld = lrows();
+    int rlo, rhi, clo, chi;
+    lranges(rlo, rhi, clo, chi);
+    for (int c=clo; c<chi; c++)
+      for (int r=rlo; r<rhi; r++)
+        tmp(r-rlo,c-clo) = operator()(r,c);
+    return tmp;
+  }
+
   template<typename scalar_t> DenseMatrixWrapper<scalar_t>
   DistributedMatrix<scalar_t>::dense_wrapper() {
     return DenseMatrixWrapper<scalar_t>(lrows(), lcols(), data(), ld());
@@ -1110,10 +1164,10 @@ namespace strumpack {
       r_max = Rmax;
       r_min = Rmin;
     }
-    scalapack::gamx2d(ctxt(), 'A', ' ', 1, 1, &r_max, 1,
-                      NULL, NULL, -1, -1, -1);
-    scalapack::gamn2d(ctxt(), 'A', ' ', 1, 1, &r_min, 1,
-                      NULL, NULL, -1, -1, -1);
+    scalapack::gamx2d
+      (ctxt(), 'A', ' ', 1, 1, &r_max, 1, NULL, NULL, -1, -1, -1);
+    scalapack::gamn2d
+      (ctxt(), 'A', ' ', 1, 1, &r_min, 1, NULL, NULL, -1, -1, -1);
     info = scalapack::pxxgqr
       (rows(), minmn, minmn, data(), I(), J(), desc(), tau);
     if (info) {

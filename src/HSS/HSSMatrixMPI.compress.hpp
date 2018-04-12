@@ -40,7 +40,6 @@ namespace strumpack {
     (const DistM_t& A, std::size_t Arlo, std::size_t Aclo,
      int Actxt_all, std::vector<std::vector<scalar_t>>& sbuf, int dest) {
       if (!A.active()) return;
-      // TODO reserve memory for sbuf
       if (this->leaf()) {
         const auto B = DistM_t::default_MB;
         const DistMW_t Ad
@@ -191,10 +190,14 @@ namespace strumpack {
       DistElemMult<scalar_t> Afunc(A);
       switch (opts.compression_algorithm()) {
       case CompressionAlgorithm::ORIGINAL:
-        compress_original_nosync(Afunc, Afunc, opts, A.ctxt());
+        if (opts.synchronized_compression())
+          compress_original_sync(Afunc, Afunc, opts, A.ctxt());
+        else compress_original_nosync(Afunc, Afunc, opts, A.ctxt());
         break;
       case CompressionAlgorithm::STABLE:
-        compress_stable_nosync(Afunc, Afunc, opts, A.ctxt());
+        if (opts.synchronized_compression())
+          compress_stable_sync(Afunc, Afunc, opts, A.ctxt());
+        else compress_stable_nosync(Afunc, Afunc, opts, A.ctxt());
         break;
       default:
         std::cout << "Compression algorithm not recognized!" << std::endl;

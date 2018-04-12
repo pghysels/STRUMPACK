@@ -207,8 +207,8 @@ namespace strumpack {
       std::pair<std::size_t,std::size_t> off;
       ch1->apply_UV_big(Sr, B10V0tR0, Sc, B01tU0tR0, off, depth, flops);
 
-      Sr.add(Sr1);
-      Sc.add(Sc1);
+      Sr.add(Sr1, depth);
+      Sc.add(Sc1, depth);
       STRUMPACK_CB_SAMPLE_FLOPS
         (Sr.rows()*Sr.cols() + Sc.rows()*Sc.cols() + flops);
     }

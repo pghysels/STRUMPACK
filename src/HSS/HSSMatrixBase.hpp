@@ -334,12 +334,16 @@ namespace strumpack {
       if (!w.w_seq)
         w.w_seq = std::unique_ptr<WorkSolve<scalar_t>>
           (new WorkSolve<scalar_t>());
-      forward_solve(*(ULV._factors_seq), *(w.w_seq), b.gather(), partial);
-      w.z = DistM_t(b.ctxt(), w.w_seq->z);
-      w.ft1 = DistM_t(b.ctxt(), w.w_seq->ft1);
-      w.y = DistM_t(b.ctxt(), w.w_seq->y);
-      w.x = DistM_t(b.ctxt(), w.w_seq->x);
-      w.reduced_rhs = DistM_t(b.ctxt(), w.w_seq->reduced_rhs);
+#pragma omp parallel
+#pragma omp single nowait
+      forward_solve
+        (*(ULV._factors_seq), *(w.w_seq),
+         const_cast<DistM_t&>(b).dense_wrapper(), partial);
+      w.z = DistM_t(b.ctxt(), std::move(w.w_seq->z));
+      w.ft1 = DistM_t(b.ctxt(), std::move(w.w_seq->ft1));
+      w.y = DistM_t(b.ctxt(), std::move(w.w_seq->y));
+      w.x = DistM_t(b.ctxt(), std::move(w.w_seq->x));
+      w.reduced_rhs = DistM_t(b.ctxt(), std::move(w.w_seq->reduced_rhs));
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::backward_solve
@@ -347,16 +351,18 @@ namespace strumpack {
      DistM_t& x) const {
       if (!this->active()) return;
       DenseM_t lx(x.rows(), x.cols());
-      w.w_seq->x = w.x.gather();
+      w.w_seq->x = w.x.dense_and_clear();
+#pragma omp parallel
+#pragma omp single nowait
       backward_solve(*(ULV._factors_seq), *(w.w_seq), lx);
-      x = DistM_t(x.ctxt(), lx);
+      x = DistM_t(x.ctxt(), std::move(lx));
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::to_block_row
     (const DistM_t& dist, DenseM_t& sub, DistM_t& leaf) const {
       if (!this->active()) return;
       assert(std::size_t(dist.rows())==this->cols());
-      sub = dist.gather();
+      sub = dist.dense();
     }
 
     template<typename scalar_t> void
@@ -392,7 +398,8 @@ namespace strumpack {
       std::swap(w.Ir, w_mpi.Ir); std::swap(w.Ic, w_mpi.Ic);
       std::swap(w.Jr, w_mpi.Jr); std::swap(w.Jc, w_mpi.Jc);
       bool was_not_compressed = !is_compressed();
-      // TODO openmp parallel region, set _openmp_task_depth?
+#pragma omp parallel
+#pragma omp single nowait
       compress_recursive_original
         (RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
          lAelem, opts, w, dd, _openmp_task_depth);
@@ -453,7 +460,8 @@ namespace strumpack {
         std::swap(w.Jr, w_mpi.Jr); std::swap(w.Jc, w_mpi.Jc);
       }
       bool was_not_compressed = !is_compressed();
-      // TODO openmp parallel region, set _openmp_task_depth?
+#pragma omp parallel
+#pragma omp single nowait
       compress_level_original
         (RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
          opts, w, dd, lvl, _openmp_task_depth);
@@ -515,11 +523,11 @@ namespace strumpack {
       std::swap(w.Ir, w_mpi.Ir); std::swap(w.Ic, w_mpi.Ic);
       std::swap(w.Jr, w_mpi.Jr); std::swap(w.Jc, w_mpi.Jc);
       bool was_not_compressed = !is_compressed();
-      // TODO openmp parallel region, set _openmp_task_depth?
+#pragma omp parallel
+#pragma omp single nowait
       compress_recursive_stable
         (RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
          lAelem, opts, w, d, dd, _openmp_task_depth);
-      // Also threading issues here??!!
       if (is_compressed()) {
         auto lctxt = RS.HSS().ctxt_loc();
         auto c = RS.sub_Rr.cols();
@@ -573,7 +581,8 @@ namespace strumpack {
         std::swap(w.Jr, w_mpi.Jr); std::swap(w.Jc, w_mpi.Jc);
       }
       bool was_not_compressed = !is_compressed();
-      // TODO openmp parallel region, set _openmp_task_depth?
+#pragma omp parallel
+#pragma omp single nowait
       compress_level_stable
         (RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
          opts, w, d, dd, lvl, _openmp_task_depth);
@@ -645,24 +654,23 @@ namespace strumpack {
       if (!w.w_seq)
         w.w_seq = std::unique_ptr<WorkApply<scalar_t>>
           (new WorkApply<scalar_t>());
-      // TODO start OpenMP parallel region!
       if (isroot) w.w_seq->offset = w.offset;
       std::atomic<long long int> lflops(0);
+#pragma omp parallel
+#pragma omp single nowait
       apply_fwd(B.sub, *(w.w_seq), isroot, _openmp_task_depth, lflops);
-      // TODO avoid copy here, use a move constructor from the DenseM_t
       flops += lflops.load();
-      w.tmp1 = DistM_t(B.ctxt_loc(), w.w_seq->tmp1);
+      w.tmp1 = DistM_t(B.ctxt_loc(), std::move(w.w_seq->tmp1));
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::apply_bwd
     (const DistSubLeaf<scalar_t>& B, scalar_t beta, DistSubLeaf<scalar_t>& C,
      WorkApplyMPI<scalar_t>& w, bool isroot, long long int flops) const {
       if (!active()) return;
-      // TODO avoid copy here, use a move constructor from the local
-      // part of the DistM_t
-      w.w_seq->tmp2 = w.tmp2.gather();
-      // TODO start OpenMP parallel region!
+      w.w_seq->tmp2 = w.tmp2.dense_and_clear();
       std::atomic<long long int> lflops(0);
+#pragma omp parallel
+#pragma omp single nowait
       apply_bwd
         (B.sub, beta, C.sub, *(w.w_seq), isroot,
          _openmp_task_depth, lflops);
@@ -676,24 +684,23 @@ namespace strumpack {
       if (!w.w_seq)
         w.w_seq = std::unique_ptr<WorkApply<scalar_t>>
           (new WorkApply<scalar_t>());
-      // TODO start OpenMP parallel region!
       if (isroot) w.w_seq->offset = w.offset;
       std::atomic<long long int> lflops(0);
+#pragma omp parallel
+#pragma omp single nowait
       applyT_fwd(B.sub, *(w.w_seq), isroot, _openmp_task_depth, lflops);
       flops += lflops.load();
-      // TODO avoid copy here, use a move constructor from the DenseM_t
-      w.tmp1 = DistM_t(B.ctxt_loc(), w.w_seq->tmp1);
+      w.tmp1 = DistM_t(B.ctxt_loc(), std::move(w.w_seq->tmp1));
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::applyT_bwd
     (const DistSubLeaf<scalar_t>& B, scalar_t beta, DistSubLeaf<scalar_t>& C,
      WorkApplyMPI<scalar_t>& w, bool isroot, long long int flops) const {
       if (!active()) return;
-      // TODO avoid copy here, use a move constructor from the local
-      // part of the DistM_t
-      w.w_seq->tmp2 = w.tmp2.gather();
-      // TODO start OpenMP parallel region!
+      w.w_seq->tmp2 = w.tmp2.dense_and_clear();
       std::atomic<long long int> lflops(0);
+#pragma omp parallel
+#pragma omp single nowait
       applyT_bwd
         (B.sub, beta, C.sub, *(w.w_seq), isroot,
          _openmp_task_depth, lflops);
@@ -710,22 +717,23 @@ namespace strumpack {
       if (!w.w_seq)
         w.w_seq = std::unique_ptr<WorkFactor<scalar_t>>
           (new WorkFactor<scalar_t>());
+#pragma omp parallel
+#pragma omp single nowait
       factor_recursive
         (*(ULV._factors_seq), *(w.w_seq), isroot,
          partial, _openmp_task_depth);
-
-      // TODO if I am the root, then no need to get those matrices to
-      // DistM_t??
-      w.Dt = DistM_t(local_ctxt, w.w_seq->Dt);
-      w.Vt1 = DistM_t(local_ctxt, w.w_seq->Vt1);
-      ULV._Q = DistM_t(local_ctxt, ULV._factors_seq->_Q);
-      ULV._W1 = DistM_t(local_ctxt, ULV._factors_seq->_W1);
-      ULV._Vt0 = DistM_t(local_ctxt, ULV._factors_seq->_Vt0);
-      ULV._L = DistM_t(local_ctxt, ULV._factors_seq->_L);
-      if (isroot) ULV._D = DistM_t(local_ctxt, ULV._factors_seq->_D);
-      ULV._piv.resize(ULV._D.lrows() + ULV._D.MB());
-      std::copy(ULV._factors_seq->_piv.begin(),
-                ULV._factors_seq->_piv.end(), ULV._piv.begin());
+      if (isroot) {
+        if (partial) ULV._Vt0 = DistM_t(local_ctxt, ULV._factors_seq->_Vt0);
+        ULV._D = DistM_t(local_ctxt, ULV._factors_seq->_D);
+        ULV._piv.resize(ULV._D.lrows() + ULV._D.MB());
+        std::copy(ULV._factors_seq->_piv.begin(),
+                  ULV._factors_seq->_piv.end(), ULV._piv.begin());
+      } else {
+        w.Dt = DistM_t(local_ctxt, std::move(w.w_seq->Dt));
+        w.Vt1 = DistM_t(local_ctxt, std::move(w.w_seq->Vt1));
+        ULV._Q = DistM_t(local_ctxt, std::move(ULV._factors_seq->_Q));
+        ULV._W1 = DistM_t(local_ctxt, std::move(ULV._factors_seq->_W1));
+      }
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::solve_fwd
@@ -735,20 +743,22 @@ namespace strumpack {
       if (!w.w_seq)
         w.w_seq = std::unique_ptr<WorkSolve<scalar_t>>
           (new WorkSolve<scalar_t>());
-      // TODO start OpenMP parallel region!
+#pragma omp parallel
+#pragma omp single nowait
       solve_fwd(*(ULV._factors_seq), b.sub, *(w.w_seq),
                 partial, isroot, _openmp_task_depth);
-      w.z = DistM_t(b.ctxt_loc(), w.w_seq->z);
-      w.ft1 = DistM_t(b.ctxt_loc(), w.w_seq->ft1);
-      w.y = DistM_t(b.ctxt_loc(), w.w_seq->y);
+      w.z = DistM_t(b.ctxt_loc(), std::move(w.w_seq->z));
+      w.ft1 = DistM_t(b.ctxt_loc(), std::move(w.w_seq->ft1));
+      w.y = DistM_t(b.ctxt_loc(), std::move(w.w_seq->y));
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::solve_bwd
     (const HSSFactorsMPI<scalar_t>& ULV, DistSubLeaf<scalar_t>& x,
      WorkSolveMPI<scalar_t>& w, bool isroot) const {
       if (!active()) return;
-      w.w_seq->x = w.x.gather();
-      // TODO start OpenMP parallel region!
+      w.w_seq->x = w.x.dense_and_clear();
+#pragma omp parallel
+#pragma omp single nowait
       solve_bwd(*(ULV._factors_seq), x.sub, *(w.w_seq),
                 isroot, _openmp_task_depth);
     }
@@ -763,13 +773,13 @@ namespace strumpack {
       std::swap(w.I, w_seq.I);
       std::swap(w.J, w_seq.J);
       std::swap(w.ycols, w_seq.ycols);
-      // TODO start OpenMP parallel region
-      // TODO check threading issues here!!
+#pragma omp parallel
+#pragma omp single nowait
       extract_fwd(*(w.w_seq), odiag, _openmp_task_depth);
       std::swap(w.I, w_seq.I);
       std::swap(w.J, w_seq.J);
       std::swap(w.ycols, w_seq.ycols);
-      w.y = DistM_t(lctxt, w.w_seq->y);
+      w.y = DistM_t(lctxt, std::move(w.w_seq->y));
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::extract_bwd
@@ -786,8 +796,9 @@ namespace strumpack {
       std::swap(w.zcols, w_seq.zcols);
       std::swap(w.rl2g, w_seq.rl2g);
       std::swap(w.cl2g, w_seq.cl2g);
-      w.w_seq->z = w.z.gather();
-      // TODO check threading issues here!!
+      w.w_seq->z = w.z.dense_and_clear();
+#pragma omp parallel
+#pragma omp single nowait
       extract_bwd(triplets, *(w.w_seq), _openmp_task_depth);
     }
 
@@ -795,12 +806,12 @@ namespace strumpack {
     (DistSubLeaf<scalar_t>& Theta, DistM_t& Uop, DistSubLeaf<scalar_t>& Phi,
      DistM_t& Vop, long long int& flops) const {
       if (!active()) return;
-      auto sUop = Uop.gather(); // dense_and_clear
-      auto sVop = Vop.gather(); // dense_and_clear();
+      auto sUop = Uop.dense_and_clear();
+      auto sVop = Vop.dense_and_clear();
       const std::pair<std::size_t, std::size_t> offset;
-      Uop.clear();
-      Vop.clear();
       std::atomic<long long int> UVflops(0);
+#pragma omp parallel
+#pragma omp single nowait
       apply_UV_big
         (Theta.sub, sUop, Phi.sub, sVop, offset, _openmp_task_depth, UVflops);
       flops += UVflops.load();

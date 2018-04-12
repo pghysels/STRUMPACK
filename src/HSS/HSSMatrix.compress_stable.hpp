@@ -51,8 +51,11 @@ namespace strumpack {
         if (opts.verbose())
           std::cout << "# compressing with d+dd = " << d << "+" << dd
                     << " (stable)" << std::endl;
-        compress_recursive_stable(Rr, Rc, Sr, Sc, Aelem, opts, w,
-                                  d, dd, this->_openmp_task_depth);
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+        compress_recursive_stable
+          (Rr, Rc, Sr, Sc, Aelem, opts, w,
+           d, dd, this->_openmp_task_depth);
         d += dd;
         dd = std::min(dd, opts.max_rank()-d);
       }
@@ -135,11 +138,23 @@ namespace strumpack {
         if (w.lvl < lvl) return;
       } else {
         if (w.lvl < lvl) {
-          // TODO tasking
-          this->_ch[0]->compress_level_stable
-            (Rr, Rc, Sr, Sc, opts, w.c[0], d, dd, lvl, depth);
-          this->_ch[1]->compress_level_stable
-            (Rr, Rc, Sr, Sc, opts, w.c[1], d, dd, lvl, depth);
+          bool tasked = depth < params::task_recursion_cutoff_level;
+          if (tasked) {
+#pragma omp task default(shared)                                        \
+  final(depth >= params::task_recursion_cutoff_level-1) mergeable
+            this->_ch[0]->compress_level_stable
+              (Rr, Rc, Sr, Sc, opts, w.c[0], d, dd, lvl, depth);
+#pragma omp task default(shared)                                        \
+  final(depth >= params::task_recursion_cutoff_level-1) mergeable
+            this->_ch[1]->compress_level_stable
+              (Rr, Rc, Sr, Sc, opts, w.c[1], d, dd, lvl, depth);
+#pragma omp taskwait
+          } else {
+            this->_ch[0]->compress_level_stable
+              (Rr, Rc, Sr, Sc, opts, w.c[0], d, dd, lvl, depth);
+            this->_ch[1]->compress_level_stable
+              (Rr, Rc, Sr, Sc, opts, w.c[1], d, dd, lvl, depth);
+          }
           return;
         }
         if (!this->_ch[0]->is_compressed() ||

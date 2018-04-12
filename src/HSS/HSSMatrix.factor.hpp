@@ -36,6 +36,8 @@ namespace strumpack {
     HSSMatrix<scalar_t>::factor() const {
       HSSFactors<scalar_t> f;
       WorkFactor<scalar_t> w;
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
       factor_recursive(f, w, true, false, this->_openmp_task_depth);
       return f;
     }
