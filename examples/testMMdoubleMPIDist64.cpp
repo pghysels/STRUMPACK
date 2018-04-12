@@ -38,7 +38,7 @@ test(int argc, char* argv[], CSRMatrixMPI<scalar,integer>* Adist) {
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   StrumpackSparseSolverMPIDist<scalar,integer> spss(MPI_COMM_WORLD);
-  spss.options().set_matching(0);
+  spss.options().set_matching(MatchingJob::NONE);
   spss.options().set_from_command_line(argc, argv);
 
   TaskTimer::t_begin = GET_TIME_NOW();
@@ -102,7 +102,8 @@ int main(int argc, char* argv[]) {
       std::vector<int64_t> perm;
       std::vector<double> Dr;
       std::vector<double> Dc;
-      int ierr = A->permute_and_scale(5, perm, Dr, Dc);
+      int ierr = A->permute_and_scale
+        (MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING, perm, Dr, Dc);
       if (ierr) std::cout << "MC64 reordering failed!" << std::endl;
       A->symmetrize_sparsity();
     } else {
@@ -113,7 +114,8 @@ int main(int argc, char* argv[]) {
       std::vector<int64_t> perm;
       std::vector<std::complex<double>> Dr;
       std::vector<std::complex<double>> Dc;
-      int ierr = A_c->permute_and_scale(5, perm, Dr, Dc);
+      int ierr = A_c->permute_and_scale
+        (MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING, perm, Dr, Dc);
       if (ierr) std::cout << "MC64 reordering failed!" << std::endl;
       A_c->symmetrize_sparsity();
     }
