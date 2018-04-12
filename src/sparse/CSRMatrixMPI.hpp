@@ -37,7 +37,9 @@
 #include "misc/MPIWrapper.hpp"
 #include "dense/BLASLAPACKWrapper.hpp"
 #include "CSRGraph.hpp"
+#if defined(STRUMPACK_USE_COMBBLAS)
 #include "AWPMCombBLAS.hpp"
+#endif
 
 namespace strumpack {
 
@@ -821,6 +823,7 @@ namespace strumpack {
    std::vector<scalar_t>& Dc, bool apply) {
     if (job == MatchingJob::COMBBLAS) {
 #if defined(STRUMPACK_USE_COMBBLAS)
+      perm.resize(this->size());
       GetAWPM(*this, perm.data());
       return 0;
 #else

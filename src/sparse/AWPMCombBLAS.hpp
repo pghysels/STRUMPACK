@@ -68,6 +68,8 @@ namespace strumpack {
     combblas::SpParMat<integer_t,real_t,combblas::SpDCCols<integer_t,real_t>> Adcsc(A.comm());
     std::vector<std::vector<std::tuple<integer_t,integer_t,real_t>>> data(procs);
 
+    // TODO make sure the number of procs is a square
+
     // ------------------------------------------------------------
     //  INITIALIZATION.
     // ------------------------------------------------------------
@@ -93,9 +95,6 @@ namespace strumpack {
         }
         int p = Adcsc.Owner(n, n, irow, jcol, lirow, ljcol);
         ++nnz_loc;
-        // std::cout << "pushing tuple " << irow << "," << jcol << " to "
-        //           << lirow << "," << ljcol << " on " << p
-        //           << ", val=" << std::real(A.get_val()[j]) << std::endl;
         data[p].push_back
           (std::make_tuple(lirow, ljcol, std::real(A.get_val()[j])));
       }
@@ -108,21 +107,19 @@ namespace strumpack {
       (Adcsc.getcommgrid(), n, (integer_t) -1);
     combblas::AWPM(Adcsc, mateRow2Col, mateCol2Row, true);
 
-    MPI_Barrier(A.comm());
-
     // now gather the matching vector
-    //MPI_Comm World = mateRow2Col.getcommgrid()->GetWorld();
+    MPI_Comm World = mateRow2Col.getcommgrid()->GetWorld();
     auto rdispls = new int[2*procs];
     auto recvcnt = rdispls + procs;
     int sendcnt = mateRow2Col.LocArrSize();
-    MPI_Allgather(&sendcnt, 1, MPI_INT, recvcnt, 1, MPI_INT, A.comm());
+    MPI_Allgather(&sendcnt, 1, MPI_INT, recvcnt, 1, MPI_INT, World);
     rdispls[0] = 0;
     for (int i=0; i<procs-1; ++i)
       rdispls[i+1] = rdispls[i] + recvcnt[i];
     integer_t *senddata = (integer_t*)mateRow2Col.GetLocArr();
     MPI_Allgatherv
       (senddata, sendcnt, combblas::MPIType<integer_t>(),
-       perm_c, recvcnt, rdispls, combblas::MPIType<integer_t>(), A.comm());
+       perm_c, recvcnt, rdispls, combblas::MPIType<integer_t>(), World);
     delete[] rdispls;
   }
 
