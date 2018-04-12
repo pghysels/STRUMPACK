@@ -34,6 +34,7 @@
 #include <tuple>
 #include <stdio.h>
 #include <string.h>
+#include "StrumpackOptions.hpp"
 #include "misc/Tools.hpp"
 #include "misc/MPIWrapper.hpp"
 
@@ -96,11 +97,10 @@ namespace strumpack {
 
     virtual void permute(const integer_t* iorder, const integer_t* order);
     virtual void permute
-    (const std::vector<integer_t>& iorder, std::vector<integer_t>& order) {
-      permute(iorder.data(), order.data());
-    }
+    (const std::vector<integer_t>& iorder, std::vector<integer_t>& order)
+    { permute(iorder.data(), order.data()); }
     virtual int permute_and_scale
-    (int job, std::vector<integer_t>& perm, std::vector<scalar_t>& Dr,
+    (MatchingJob job, std::vector<integer_t>& perm, std::vector<scalar_t>& Dr,
      std::vector<scalar_t>& Dc, bool apply=true);
     virtual void apply_scaling
     (const std::vector<scalar_t>& Dr, const std::vector<scalar_t>& Dc) = 0;
@@ -299,42 +299,35 @@ namespace strumpack {
      int_t*, int_t*, double*, int_t*, int_t*);
   }
 
-  /*
-   *  0: do nothing
-   *  1: maximum cardinality ! Doesn't work
-   *  2: maximum smallest diagonal value
-   *  3: 2 with different algo
-   *  4: maximum sum of diagonal values
-   *  5: maximum product of diagonal values + scaling
-   */
   template<typename scalar_t,typename integer_t> int
   CompressedSparseMatrix<scalar_t,integer_t>::permute_and_scale
-  (int job, std::vector<integer_t>& perm, std::vector<scalar_t>& Dr,
+  (MatchingJob job, std::vector<integer_t>& perm, std::vector<scalar_t>& Dr,
    std::vector<scalar_t>& Dc, bool apply) {
-    if (job == 0) return 1;
-    if (job > 5 || job < 0) {
-      if (is_mpi_root())
-        std::cerr
-          << "# WARNING: mc64 job " << job
-          << " not supported, I'm not doing any column permutation"
-          << " or matrix scaling!" << std::endl;
+    if (job == MatchingJob::NONE) return 1;
+    if (job == MatchingJob::COMBBLAS) {
+      std::cerr << "# ERROR: CombBLAS matching only supported in parallel."
+                << std::endl;
       return 1;
     }
     perm.resize(_n);
     int_t liw = 0;
     switch (job) {
-    case 2: liw = 4*_n; break;
-    case 3: liw = 10*_n + _nnz; break;
-    case 1: case 4: case 5: default: liw = 5*_n;
+    case MatchingJob::MAX_SMALLEST_DIAGONAL: liw = 4*_n; break;
+    case MatchingJob::MAX_SMALLEST_DIAGONAL_2: liw = 10*_n + _nnz; break;
+    case MatchingJob::MAX_CARDINALITY:
+    case MatchingJob::MAX_DIAGONAL_SUM:
+    case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING:
+    default: liw = 5*_n;
     }
     auto iw = new int_t[liw];
     int_t ldw = 0;
     switch (job) {
-    case 1: ldw = 0; break;
-    case 2: ldw = _n; break;
-    case 3: ldw = _nnz; break;
-    case 4: ldw = 2*_n + _nnz; break;
-    case 5: default: ldw = 3*_n + _nnz; break;
+    case MatchingJob::MAX_CARDINALITY: ldw = 0; break;
+    case MatchingJob::MAX_SMALLEST_DIAGONAL: ldw = _n; break;
+    case MatchingJob::MAX_SMALLEST_DIAGONAL_2: ldw = _nnz; break;
+    case MatchingJob::MAX_DIAGONAL_SUM: ldw = 2*_n + _nnz; break;
+    case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING:
+    default: ldw = 3*_n + _nnz; break;
     }
     auto dw = new double[ldw];
     int_t icntl[10], info[10];
@@ -342,7 +335,24 @@ namespace strumpack {
     strumpack_mc64id_(icntl);
     //icntl[2] = 6; // print diagnostics
     //icntl[3] = 1; // no checking of input should be (slightly) faster
-    strumpack_mc64(job, &num, perm.data(), liw, iw, ldw, dw, icntl, info);
+    switch (job) {
+    case MatchingJob::MAX_CARDINALITY:
+      strumpack_mc64(1, &num, perm.data(), liw, iw, ldw, dw, icntl, info);
+      break;
+    case MatchingJob::MAX_SMALLEST_DIAGONAL:
+      strumpack_mc64(2, &num, perm.data(), liw, iw, ldw, dw, icntl, info);
+      break;
+    case MatchingJob::MAX_SMALLEST_DIAGONAL_2:
+      strumpack_mc64(3, &num, perm.data(), liw, iw, ldw, dw, icntl, info);
+      break;
+    case MatchingJob::MAX_DIAGONAL_SUM:
+      strumpack_mc64(4, &num, perm.data(), liw, iw, ldw, dw, icntl, info);
+      break;
+    case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING:
+      strumpack_mc64(5, &num, perm.data(), liw, iw, ldw, dw, icntl, info);
+      break;
+    default: break;
+    }
     switch (info[0]) {
     case  0: break;
     case  1: if (is_mpi_root())
@@ -364,7 +374,7 @@ namespace strumpack {
       return 1;
       break;
     }
-    if (job == 5) { // scaling
+    if (job == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) { // scaling
       Dr.resize(_n);
       Dc.resize(_n);
 #pragma omp parallel for

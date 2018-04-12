@@ -55,7 +55,7 @@ int main(int argc, char* argv[]) {
     else std::cout << "# please provide grid size" << std::endl;
 
     StrumpackSparseSolverMPI<scalar,integer> spss(MPI_COMM_WORLD);
-    spss.options().set_mc64job(0);
+    spss.options().set_matching(MatchingJob::NONE);
     spss.options().set_reordering_method(ReorderingStrategy::GEOMETRIC);
     spss.options().set_from_command_line(argc, argv);
 

@@ -292,8 +292,8 @@ namespace strumpack {
     this->_Krylov_its = 0;
 
     auto bloc = b;
-    if (this->_opts.mc64job() == 5)
-      bloc.scale_rows(this->_mc64_Dr);
+    if (this->_opts.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+      bloc.scale_rows(this->_matching_Dr);
 
     auto gmres = [&](std::function<void(scalar_t*)> prec) {
       GMResMPI<scalar_t,integer_t>
@@ -360,13 +360,13 @@ namespace strumpack {
     }; break;
     }
 
-    if (this->_opts.mc64job() != 0)
+    if (this->_opts.matching() != MatchingJob::NONE)
       // TODO do this in a single routine/comm phase
       for (std::size_t c=0; c<x.cols(); c++)
         permute_vector
-          (x.ptr(0,c), this->_mc64_cperm, _mat_mpi->get_dist(), this->_comm);
-    if (this->_opts.mc64job() == 5)
-      x.scale_rows(this->_mc64_Dc);
+          (x.ptr(0,c), this->_matching_cperm, _mat_mpi->get_dist(), this->_comm);
+    if (this->_opts.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+      x.scale_rows(this->_matching_Dc);
 
     t.stop();
     this->perf_counters_stop("DIRECT/GMRES solve");
