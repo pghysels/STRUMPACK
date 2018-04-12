@@ -64,11 +64,18 @@ namespace strumpack {
                integer_t* perm_c) {
     integer_t* perm = nullptr; // placeholder for load balancing permutation for CombBLAS
     int procs = mpi_nprocs(A.comm());
+    int sqrtP = (int)std::sqrt((double)procs);
+    if (sqrtP * sqrtP != procs) {
+      if (!mpi_rank(A.comm()))
+        std::cerr << "# WARNING: Combinatorial BLAS currently only works on "
+                  << "a square number of processes. (disabling)" << std::endl;
+      std::iota(perm_c, perm_c+A.size(), 0);
+      return;
+    }
+
     using real_t = typename RealType<scalar_t>::value_type;
     combblas::SpParMat<integer_t,real_t,combblas::SpDCCols<integer_t,real_t>> Adcsc(A.comm());
     std::vector<std::vector<std::tuple<integer_t,integer_t,real_t>>> data(procs);
-
-    // TODO make sure the number of procs is a square
 
     // ------------------------------------------------------------
     //  INITIALIZATION.
