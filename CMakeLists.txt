@@ -99,41 +99,54 @@ else()
     " might be needed by Scotch !!!!")
 endif()
 
-find_package(BLAS)
-if(BLAS_FOUND)
-  message(STATUS "Found BLAS library:   " "${BLAS_LIBRARIES}")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${BLAS_LINKER_FLAGS}")
+if(DEFINED BLAS_LIBRARIES)
   set(LIBS ${LIBS} ${BLAS_LIBRARIES})
 else()
-  message(WARNING "WARNING: Could not find a BLAS library !!!!!!!!!!!\n"
-    "Note that on some machines (like Cray's)"
-    " BLAS is linked in by the compiler wrapper")
+  find_package(BLAS)
+  if(BLAS_FOUND)
+    message(STATUS "Found BLAS library:   " "${BLAS_LIBRARIES}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${BLAS_LINKER_FLAGS}")
+    set(LIBS ${LIBS} ${BLAS_LIBRARIES})
+  else()
+    message(WARNING "WARNING: Could not find a BLAS library !!!!!!!!!!!\n"
+      "Note that on some machines (like Cray's)"
+      " BLAS is linked in by the compiler wrapper")
+  endif()
 endif()
 
-find_package(LAPACK)
-if(LAPACK_FOUND)
-  message(STATUS "Found LAPACK library: " "${LAPACK_LIBRARIES}")
-  set(CMAKE_EXE_LINKER_FLAGS
-    "${CMAKE_EXE_LINKER_FLAGS} ${LAPACK_LINKER_FLAGS}")
+if(DEFINED LAPACK_LIBRARIES)
   set(LIBS ${LIBS} ${LAPACK_LIBRARIES})
 else()
-  message(WARNING "WARNING: Could not find a LAPACK library !!!!!!!!!\n"
-    "Note that on some machines (like Cray's)"
-    " LAPACK is linked in by the compiler wrapper")
+  find_package(LAPACK)
+  if(LAPACK_FOUND)
+    message(STATUS "Found LAPACK library: " "${LAPACK_LIBRARIES}")
+    set(CMAKE_EXE_LINKER_FLAGS
+      "${CMAKE_EXE_LINKER_FLAGS} ${LAPACK_LINKER_FLAGS}")
+    set(LIBS ${LIBS} ${LAPACK_LIBRARIES})
+  else()
+    message(WARNING "WARNING: Could not find a LAPACK library !!!!!!!!!\n"
+      "Note that on some machines (like Cray's)"
+      " LAPACK is linked in by the compiler wrapper")
+  endif()
 endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
   "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
-find_package(SCALAPACK)
-if(SCALAPACK_FOUND)
+if(DEFINED SCALAPACK_LIBRARIES)
   set(LIBS ${LIBS} ${SCALAPACK_LIBRARIES})
   include_directories(${SCALAPACK_INCLUDES})
 else()
-  message(WARNING
-    "WARNING: Could not find a ScaLAPACK/BLACS library !!!!!!!!\n"
-    "Note that on some machines (like Cray's)"
-    " ScaLAPACK is linked in by the compiler wrapper")
+  find_package(SCALAPACK)
+  if(SCALAPACK_FOUND)
+    set(LIBS ${LIBS} ${SCALAPACK_LIBRARIES})
+    include_directories(${SCALAPACK_INCLUDES})
+  else()
+    message(WARNING
+      "WARNING: Could not find a ScaLAPACK/BLACS library !!!!!!!!\n"
+      "Note that on some machines (like Cray's)"
+      " ScaLAPACK is linked in by the compiler wrapper")
+  endif()
 endif()
 
 if(STRUMPACK_USE_PAPI)
@@ -199,16 +212,15 @@ message(STATUS "Implicit Fortran libs: "
 foreach(arg ${LIBS})
   set(STRUMPACK_ALL_LIBS "${STRUMPACK_ALL_LIBS} ${arg}")
 endforeach(arg ${LIBS})
-foreach(arg ${CMAKE_C_IMPLICIT_LINK_LIBRARIES})
-  set(STRUMPACK_ALL_LIBS "${STRUMPACK_ALL_LIBS} -l${arg}")
-endforeach(arg ${CMAKE_C_IMPLICIT_LINK_LIBRARIES})
-foreach(arg ${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES})
-  set(STRUMPACK_ALL_LIBS "${STRUMPACK_ALL_LIBS} -l${arg}")
-endforeach(arg ${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES})
-foreach(arg ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
-  set(STRUMPACK_ALL_LIBS "${STRUMPACK_ALL_LIBS} -l${arg}")
-endforeach(arg ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
-
+# foreach(arg ${CMAKE_C_IMPLICIT_LINK_LIBRARIES})
+#   set(STRUMPACK_ALL_LIBS "${STRUMPACK_ALL_LIBS} -l${arg}")
+# endforeach(arg ${CMAKE_C_IMPLICIT_LINK_LIBRARIES})
+# foreach(arg ${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES})
+#   set(STRUMPACK_ALL_LIBS "${STRUMPACK_ALL_LIBS} -l${arg}")
+# endforeach(arg ${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES})
+# foreach(arg ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
+#   set(STRUMPACK_ALL_LIBS "${STRUMPACK_ALL_LIBS} -l${arg}")
+# endforeach(arg ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
   set(STRUMPACK_ALL_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_RELEASE}")
@@ -418,6 +430,8 @@ if(STRUMPACK_C_INTERFACE)
   configure_file(${CMAKE_SOURCE_DIR}/examples/zexample.c
     ${CMAKE_BINARY_DIR}/examples/zexample.c COPYONLY)
 endif()
+# configure_file(${CMAKE_SOURCE_DIR}/examples/DenseBEMColStateMPI.cpp
+#   ${CMAKE_BINARY_DIR}/examples/DenseBEMColStateMPI.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2d.cpp
   ${CMAKE_BINARY_DIR}/examples/testPoisson2d.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson3d.cpp
@@ -450,4 +464,3 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/MLkernel.cpp
 
 include(CTest)
 add_subdirectory(test)
-

@@ -30,15 +30,26 @@ fi
 
 if [[ $NERSC_HOST = "cori" ]]; then
     found_host=true
+    # for MKL, use the link advisor: https://software.intel.com/en-us/articles/intel-mkl-link-line-advisor
+    ScaLAPACKLIBS="${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a -Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_intel_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_blacs_intelmpi_lp64.a -Wl,--end-group -liomp5 -lpthread -lm -ldl"
+    #ScaLAPACKLIBS="${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a -Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_gnu_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_blacs_intelmpi_lp64.a -Wl,--end-group -lgomp -lpthread -lm -ldl"
+    #ScaLAPACKLIBS=""  # use this when using libsci, (module cray-libsci loaded)
     cmake ../ \
-          -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_INSTALL_PREFIX=../install \
           -DCMAKE_CXX_COMPILER=CC \
           -DCMAKE_C_COMPILER=cc \
           -DCMAKE_Fortran_COMPILER=ftn \
           -DCMAKE_EXE_LINKER_FLAGS="-dynamic" \
-          -DMETIS_INCLUDES=$HOME/local/parmetis-4.0.3/metis/include \
-          -DMETIS_LIBRARIES=$HOME/local/parmetis-4.0.3/build/Linux-x86_64/libmetis/libmetis.a
+          -DBLAS_LIBRARIES="" \
+          -DLAPACK_LIBRARIES="" \
+          -DSCALAPACK_LIBRARIES="$ScaLAPACKLIBS" \
+          -DSTRUMPACK_DEV_TESTING=OFF \
+          -DSTRUMPACK_C_INTERFACE=OFF \
+          -DSTRUMPACK_COUNT_FLOPS=ON \
+          -DSTRUMPACK_TASK_TIMERS=OFF \
+          -DMETIS_INCLUDES=$HOME/local/cori/parmetis-4.0.3/metis/include \
+          -DMETIS_LIBRARIES=$HOME/local/cori/parmetis-4.0.3/build/Linux-x86_64/libmetis/libmetis.a
 
     # -DPARMETIS_INCLUDES=$HOME/local/parmetis-4.0.3/include \
         # -DPARMETIS_LIBRARIES=$HOME/local/parmetis-4.0.3/build/Linux-x86_64/libparmetis/libparmetis.a \
