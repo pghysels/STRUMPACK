@@ -122,10 +122,21 @@ all_to_all_v(std::vector<std::vector<T>>& sbuf, T*& recvbuf, T**& pbuf,
   auto rsizes = ssizes + P;
   auto sdispl = ssizes + 2*P;
   auto rdispl = ssizes + 3*P;
-  for (int p=0; p<P; p++) ssizes[p] = sbuf[p].size();
+  for (int p=0; p<P; p++) {
+    if (sbuf[p].size() > std::numeric_limits<int>::max()) {
+      std::cerr << "# ERROR: 32bit integer overflow in all_to_all_v!!" << std::endl;
+      MPI_Abort(comm, 1);
+    }
+    ssizes[p] = sbuf[p].size();
+  }
   MPI_Alltoall(ssizes, 1, mpi_type<int>(), rsizes, 1, mpi_type<int>(), comm);
   std::size_t totssize = std::accumulate(ssizes, ssizes+P, 0);
   std::size_t totrsize = std::accumulate(rsizes, rsizes+P, 0);
+  if (totrsize > std::numeric_limits<int>::max() ||
+      totssize > std::numeric_limits<int>::max()) {
+    std::cerr << "# ERROR: 32bit integer overflow in all_to_all_v!!" << std::endl;
+    MPI_Abort(comm, 1);
+  }
   T* sendbuf = new T[totssize];
   sdispl[0] = rdispl[0] = 0;
   for (int p=1; p<P; p++) {
@@ -158,10 +169,21 @@ all_to_all_v(std::vector<std::vector<T>>& sbuf, T*& recvbuf,
   auto rsizes = ssizes + P;
   auto sdispl = ssizes + 2*P;
   auto rdispl = ssizes + 3*P;
-  for (int p=0; p<P; p++) ssizes[p] = sbuf[p].size();
+  for (int p=0; p<P; p++) {
+    if (sbuf[p].size() > std::numeric_limits<int>::max()) {
+      std::cerr << "# ERROR: 32bit integer overflow in all_to_all_v!!" << std::endl;
+      MPI_Abort(comm, 1);
+    }
+    ssizes[p] = sbuf[p].size();
+  }
   MPI_Alltoall(ssizes, 1, mpi_type<int>(), rsizes, 1, mpi_type<int>(), comm);
   std::size_t totssize = std::accumulate(ssizes, ssizes+P, 0);
   totrsize = std::accumulate(rsizes, rsizes+P, 0);
+  if (totrsize > std::numeric_limits<int>::max() ||
+      totssize > std::numeric_limits<int>::max()) {
+    std::cerr << "# ERROR: 32bit integer overflow in all_to_all_v!!" << std::endl;
+    MPI_Abort(comm, 1);
+  }
   T* sendbuf = new T[totssize];
   sdispl[0] = rdispl[0] = 0;
   for (int p=1; p<P; p++) {

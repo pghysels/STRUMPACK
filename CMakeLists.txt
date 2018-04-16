@@ -1,30 +1,38 @@
 cmake_minimum_required(VERSION 2.8)
 project(STRUMPACK CXX C Fortran)
 
-option(STRUMPACK_USE_METIS "Build with support for Metis" ON)
+# option(STRUMPACK_USE_METIS "Build with support for Metis" ON)
 option(STRUMPACK_USE_PARMETIS "Build with support for ParMetis" OFF)
 option(STRUMPACK_USE_SCOTCH "Build with support for Scotch/PTScotch" OFF)
 option(STRUMPACK_USE_OPENMP "Use OpenMP for on-node threading tasking" ON)
 option(STRUMPACK_USE_PAPI "Build with support for PAPI monitoring" OFF)
+option(STRUMPACK_USE_COMBBLAS "Use CombBLAS for weighted matching" OFF)
 option(STRUMPACK_COUNT_FLOPS "Build with flop counters" ON)
 option(STRUMPACK_TASK_TIMERS "Build with timers for internal routines" ON)
 option(STRUMPACK_DEV_TESTING "Enable extensive testing" OFF)
 option(STRUMPACK_C_INTERFACE "Build the C interface" OFF)
 
 set(STRUMPACK_VERSION_MAJOR 2)
-set(STRUMPACK_VERSION_MINOR 9)
+set(STRUMPACK_VERSION_MINOR 3)
 set(STRUMPACK_VERSION_PATCH 0)
 set(STRUMPACK_VERSION_FULL
   "${STRUMPACK_VERSION_MAJOR}.${STRUMPACK_VERSION_MINOR}")
 
-set(CMAKE_CXX_STANDARD 11)
+if(STRUMPACK_USE_COMBBLAS)
+  set(CMAKE_CXX_STANDARD 14)
+else()
+  set(CMAKE_CXX_STANDARD 11)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED on)
 include(CheckCXXCompilerFlag)
-check_cxx_compiler_flag("-std=c++11" COMPILER_SUPPORTS_CXX11)
-check_cxx_compiler_flag("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
-if(COMPILER_SUPPORTS_CXX11)
+check_cxx_compiler_flag("-std=c++14" COMPILER_SUPPORTS_CXX14)
+if(COMPILER_SUPPORTS_CXX14)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+elseif(COMPILER_SUPPORTS_CXX11)
+  check_cxx_compiler_flag("-std=c++11" COMPILER_SUPPORTS_CXX11)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 elseif(COMPILER_SUPPORTS_CXX0X)
+  check_cxx_compiler_flag("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
 endif()
 
@@ -91,41 +99,54 @@ else()
     " might be needed by Scotch !!!!")
 endif()
 
-find_package(BLAS)
-if(BLAS_FOUND)
-  message(STATUS "Found BLAS library:   " "${BLAS_LIBRARIES}")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${BLAS_LINKER_FLAGS}")
+if(DEFINED BLAS_LIBRARIES)
   set(LIBS ${LIBS} ${BLAS_LIBRARIES})
 else()
-  message(WARNING "WARNING: Could not find a BLAS library !!!!!!!!!!!\n"
-    "Note that on some machines (like Cray's)"
-    " BLAS is linked in by the compiler wrapper")
+  find_package(BLAS)
+  if(BLAS_FOUND)
+    message(STATUS "Found BLAS library:   " "${BLAS_LIBRARIES}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${BLAS_LINKER_FLAGS}")
+    set(LIBS ${LIBS} ${BLAS_LIBRARIES})
+  else()
+    message(WARNING "WARNING: Could not find a BLAS library !!!!!!!!!!!\n"
+      "Note that on some machines (like Cray's)"
+      " BLAS is linked in by the compiler wrapper")
+  endif()
 endif()
 
-find_package(LAPACK)
-if(LAPACK_FOUND)
-  message(STATUS "Found LAPACK library: " "${LAPACK_LIBRARIES}")
-  set(CMAKE_EXE_LINKER_FLAGS
-    "${CMAKE_EXE_LINKER_FLAGS} ${LAPACK_LINKER_FLAGS}")
+if(DEFINED LAPACK_LIBRARIES)
   set(LIBS ${LIBS} ${LAPACK_LIBRARIES})
 else()
-  message(WARNING "WARNING: Could not find a LAPACK library !!!!!!!!!\n"
-    "Note that on some machines (like Cray's)"
-    " LAPACK is linked in by the compiler wrapper")
+  find_package(LAPACK)
+  if(LAPACK_FOUND)
+    message(STATUS "Found LAPACK library: " "${LAPACK_LIBRARIES}")
+    set(CMAKE_EXE_LINKER_FLAGS
+      "${CMAKE_EXE_LINKER_FLAGS} ${LAPACK_LINKER_FLAGS}")
+    set(LIBS ${LIBS} ${LAPACK_LIBRARIES})
+  else()
+    message(WARNING "WARNING: Could not find a LAPACK library !!!!!!!!!\n"
+      "Note that on some machines (like Cray's)"
+      " LAPACK is linked in by the compiler wrapper")
+  endif()
 endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
   "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
-find_package(SCALAPACK)
-if(SCALAPACK_FOUND)
+if(DEFINED SCALAPACK_LIBRARIES)
   set(LIBS ${LIBS} ${SCALAPACK_LIBRARIES})
   include_directories(${SCALAPACK_INCLUDES})
 else()
-  message(WARNING
-    "WARNING: Could not find a ScaLAPACK/BLACS library !!!!!!!!\n"
-    "Note that on some machines (like Cray's)"
-    " ScaLAPACK is linked in by the compiler wrapper")
+  find_package(SCALAPACK)
+  if(SCALAPACK_FOUND)
+    set(LIBS ${LIBS} ${SCALAPACK_LIBRARIES})
+    include_directories(${SCALAPACK_INCLUDES})
+  else()
+    message(WARNING
+      "WARNING: Could not find a ScaLAPACK/BLACS library !!!!!!!!\n"
+      "Note that on some machines (like Cray's)"
+      " ScaLAPACK is linked in by the compiler wrapper")
+  endif()
 endif()
 
 if(STRUMPACK_USE_PAPI)
@@ -141,6 +162,12 @@ if(STRUMPACK_USE_PAPI)
   endif()
 else()
   message(STATUS "Building STRUMPACK without PAPI support.")
+endif()
+
+if(STRUMPACK_USE_COMBBLAS)
+  set(LIBS ${LIBS} ${COMBBLAS_LIBRARIES})
+  include_directories(${COMBBLAS_INCLUDES})
+  message(STATUS "Combinatorial BLAS support enabled")
 endif()
 
 if(STRUMPACK_USE_PARMETIS)
@@ -187,16 +214,15 @@ message(STATUS "Implicit Fortran libs: "
 foreach(arg ${LIBS})
   set(STRUMPACK_ALL_LIBS "${STRUMPACK_ALL_LIBS} ${arg}")
 endforeach(arg ${LIBS})
-foreach(arg ${CMAKE_C_IMPLICIT_LINK_LIBRARIES})
-  set(STRUMPACK_ALL_LIBS "${STRUMPACK_ALL_LIBS} -l${arg}")
-endforeach(arg ${CMAKE_C_IMPLICIT_LINK_LIBRARIES})
-foreach(arg ${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES})
-  set(STRUMPACK_ALL_LIBS "${STRUMPACK_ALL_LIBS} -l${arg}")
-endforeach(arg ${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES})
-foreach(arg ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
-  set(STRUMPACK_ALL_LIBS "${STRUMPACK_ALL_LIBS} -l${arg}")
-endforeach(arg ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
-
+# foreach(arg ${CMAKE_C_IMPLICIT_LINK_LIBRARIES})
+#   set(STRUMPACK_ALL_LIBS "${STRUMPACK_ALL_LIBS} -l${arg}")
+# endforeach(arg ${CMAKE_C_IMPLICIT_LINK_LIBRARIES})
+# foreach(arg ${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES})
+#   set(STRUMPACK_ALL_LIBS "${STRUMPACK_ALL_LIBS} -l${arg}")
+# endforeach(arg ${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES})
+# foreach(arg ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
+#   set(STRUMPACK_ALL_LIBS "${STRUMPACK_ALL_LIBS} -l${arg}")
+# endforeach(arg ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
   set(STRUMPACK_ALL_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_RELEASE}")
@@ -332,6 +358,10 @@ install(FILES
   src/sparse/mumps_symqamd.hpp
   DESTINATION include/sparse)
 
+if(STRUMPACK_USE_COMBBLAS)
+  install(FILES src/sparse/AWPMCombBLAS.hpp DESTINATION include/sparse)
+endif()
+
 install(FILES src/HSS/HSSMatrix.hpp
   src/HSS/HSSMatrix.factor.hpp
   src/HSS/HSSMatrix.compress.hpp
@@ -402,6 +432,7 @@ if(STRUMPACK_C_INTERFACE)
   configure_file(${CMAKE_SOURCE_DIR}/examples/zexample.c
     ${CMAKE_BINARY_DIR}/examples/zexample.c COPYONLY)
 endif()
+
 # configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2d.cpp
 #   ${CMAKE_BINARY_DIR}/examples/testPoisson2d.cpp COPYONLY)
 # configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson3d.cpp
@@ -452,3 +483,4 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/applyPermutation.hpp
 
 # include(CTest)
 # add_subdirectory(test)
+

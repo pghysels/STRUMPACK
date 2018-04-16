@@ -355,8 +355,8 @@ namespace strumpack {
     long long nnz = 0;
     if (this->front_comm != MPI_COMM_NULL &&
         mpi_rank(this->front_comm) == 0) {
-      auto dsep = this->dim_sep();
-      auto dupd = this->dim_upd();
+      long long dsep = this->dim_sep();
+      long long dupd = this->dim_upd();
       nnz = dsep * (dsep + 2 * dupd);
     }
     if (visit(this->lchild))

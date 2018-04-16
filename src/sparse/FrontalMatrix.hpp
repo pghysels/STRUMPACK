@@ -162,8 +162,8 @@ namespace strumpack {
     FrontalMatrix& operator=(FrontalMatrix const&) = delete;
 
     virtual long long node_factor_nonzeros() const {
-      auto dsep = dim_sep();
-      auto dupd = dim_upd();
+      long long dsep = dim_sep();
+      long long dupd = dim_upd();
       return dsep * (dsep + 2 * dupd);
     }
     virtual long long dense_node_factor_nonzeros() const {

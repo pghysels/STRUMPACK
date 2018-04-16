@@ -9,37 +9,9 @@ if [ $TEST_NUMBER -eq 3 ] || [ $TEST_NUMBER -eq 4 ]
 then
 	printf "${GREEN} ###GC: Downloading sparse test matrices\n\n\n"
 
-	wget https://www.cise.ufl.edu/research/sparse/MM/TOKAMAK/utm300.tar.gz
-	tar -xvzf utm300.tar.gz
-	rm utm300.tar.gz
-
-	wget https://www.cise.ufl.edu/research/sparse/MM/Pothen/mesh3e1.tar.gz
-	tar -xvzf mesh3e1.tar.gz
-	rm mesh3e1.tar.gz
-
-	wget https://www.cise.ufl.edu/research/sparse/MM/Oberwolfach/t2dal.tar.gz
-	tar -xvzf t2dal.tar.gz
-	rm t2dal.tar.gz
-
-	wget https://www.cise.ufl.edu/research/sparse/MM/HB/bcsstk28.tar.gz
-	tar -xvzf bcsstk28.tar.gz
-	rm bcsstk28.tar.gz
-
-	wget https://www.cise.ufl.edu/research/sparse/MM/DRIVCAV/cavity16.tar.gz
-	tar -xvzf cavity16.tar.gz
-	rm cavity16.tar.gz
-
-	wget https://www.cise.ufl.edu/research/sparse/MM/HB/bcsstm08.tar.gz
-	tar -xvzf bcsstm08.tar.gz
-	rm bcsstm08.tar.gz
-
-	wget https://www.cise.ufl.edu/research/sparse/MM/HB/sherman4.tar.gz
-	tar -xvzf sherman4.tar.gz
-	rm sherman4.tar.gz
-
-	wget https://www.cise.ufl.edu/research/sparse/MM/Bai/rdb968.tar.gz
-	tar -xvzf rdb968.tar.gz
-	rm rdb968.tar.gz
+	wget http://portal.nersc.gov/project/sparse/strumpack/test_matrices.tar.gz
+	tar -xvzf test_matrices.tar.gz
+	rm test_matrices.tar.gz
 fi
 
 if [ $TEST_NUMBER -eq 1 ]

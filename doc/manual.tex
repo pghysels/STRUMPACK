@@ -52,7 +52,7 @@
   Christopher Gorman\footnotemark[2] \\
   Gustavo Ch\'{a}vez\footnotemark[1] \\
   Fran\c{c}ois-Henry Rouet\footnotemark[3]}
-\date{Version \textbf{2.2.0}, March 2018}
+\date{Version \textbf{2.3.0}, ?? 2018}
 
 \begin{document}
 
@@ -183,14 +183,20 @@ CMake can find them:
   manually:
   \begin{lstlisting}[style=Bash]
     > cmake <@\textcolor{blue}{../}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@> \
-       -DSCALAPACK_LIBRARIES=<@\textcolor{blue}{"/path/to/scalapack/libscalapack.a;/path/to/blacs/libblacs.a"}@>
+       -DBLAS_LIBRARIES="..." \
+       -DLAPACK_LIBRARIES="..." \
+       -DSCALAPACK_LIBRARIES="..."
   \end{lstlisting}
-  Or one can also directly modify the linker flags to add the
-  ScaLAPACK and BLACS libraries:
+  Or one can also directly modify the linker flags to add for instance
+  the ScaLAPACK and BLACS libraries:
   \begin{lstlisting}[style=Bash]
     > cmake <@\textcolor{blue}{../}@> -DCMAKE_BUILD_TYPE=<@\textcolor{blue}{Release}@> \
        -DCMAKE_EXE_LINKER_FLAGS=<@\textcolor{blue}{"-L/usr/lib64/mpich/lib/ -lscalapack -lmpiblacs"}@>
   \end{lstlisting}
+
+  When using Intel MKL we recommend using the the link advisor: \\
+  \url{https://software.intel.com/en-us/articles/intel-mkl-link-line-advisor}
+
 \item \textbf{METIS}
   ($\geq$ 5.1.0 \textbf{required}) for the nested dissection matrix
   reordering. Metis can be obtained from:
@@ -242,11 +248,23 @@ CMake can find them:
 
 \item \textbf{getopt\_long:} This is a GNU extension to the POSIX
   getopt() C library function.
-\item \textbf{TCMalloc}, \textbf{TBB Malloc} or \textbf{jemalloc}:
-  This is \textbf{optional}, but \textbf{recommended}, as it can lead
-  to dramatic performance improvements for multithreaded code that
-  performs frequent memory allocations. Link with the one of these
-  libraries, e.g.:
+
+\item \textbf{Combinatorial BLAS}~\cite{bulucc2011combinatorial}
+  (optional) can be used for parallel reordering for stability, i.e.,
+  to get nonzeros on the diagonal of the matrix, as an alternative to
+  the sequential MC64 (included). Get it from:
+
+  \url{https://people.eecs.berkeley.edu/~aydin/CombBLAS/html/}
+
+  Enable by specifying
+  \lstinline[style=Bash]!-DSTRUMPACK_USE_COMBBLAS!  and set
+  \lstinline[style=Bash]!COMBBLAS_INCLUDES! and
+  \lstinline[style=Bash]!COMBBLAS_LIBRARIES!.
+
+\item \textbf{TCMalloc}, \textbf{TBB Malloc} or \textbf{jemalloc}
+  (optional): these can lead to dramatic performance improvements for
+  multithreaded code that performs frequent memory allocations. Link
+  with the one of these libraries, e.g.:
   \begin{lstlisting}[style=Bash]
   -DCMAKE_EXE_LINKER_FLAGS=<@\textcolor{blue}{"-ltcmalloc"}@>
   \end{lstlisting}
@@ -275,18 +293,19 @@ algorithm: matrix reordering, factorization and solve.
 \item[Matrix reordering:] There are three distinct matrix reordering
   steps: one for stability, one to limit fill-in and one to reduce
   HSS-ranks. First, the matrix is reordered and possibly scaled for
-  numerical stability by the MC64 code~\cite{duff1999design}. For many
-  matrices, this reordering can safely be disabled. By default, MC64
-  is used to maximize the product of the diagonal values of the
-  matrix, and to scale the rows and columns of the
-  matrix. Alternatively, MC64 can be used to maximize the smallest
-  diagonal value or to maximize the sum of the diagonals. Next, a
-  nested dissection reordering is applied to limit fill-in.  Both
-  (Par)Metis and (PT-)Scotch are supported. We expose one user tunable
-  parameter which controls the size of the smallest
-  separators. Finally, when HSS compression is used, there is an extra
-  reordering step to reduce the HSS-ranks. This reordering uses Metis
-  and does not require user tuning.
+  numerical stability by the MC64 code~\cite{duff1999design} or by a
+  code from Combinatorial BLAS~\cite{bulucc2011combinatorial}. This
+  step is called the matching phase. For many matrices, this
+  reordering can safely be disabled. By default, MC64 is used to
+  maximize the product of the diagonal values of the matrix, and to
+  scale the rows and columns of the matrix. Alternatively, MC64 can be
+  used to maximize the smallest diagonal value or to maximize the sum
+  of the diagonals. Next, a nested dissection reordering is applied to
+  limit fill-in.  Both (Par)Metis and (PT-)Scotch are supported. We
+  expose one user tunable parameter which controls the size of the
+  smallest separators. Finally, when HSS compression is used, there is
+  an extra reordering step to reduce the HSS-ranks. This reordering
+  uses Metis and does not require user tuning.
 
 \item[Factorization:] Before the actual numerical factorization, there
   is a symbolic factorization step to construct the elimination
@@ -370,12 +389,13 @@ all interaction happens through objects of these classes:
   correspondingly distributed right-hand side. For matrix reordering,
   ParMetis or PT-Scotch are used. Include the header file
   \lstinline[style=Bash]!StrumpackSparseSolverMPIDist.hpp! and call
-%  \lstinline[style=C]!MPI_Init(_thread)!. Unfortunately, there is no
-  \lstinline[style=C]!MPI_Init[_thread]!. Unfortunately, there is no
-  distributed version of the MC64 reordering code, so if this
-  reordering (and scaling) step is enabled, the code will gather the
-  distributed sparse matrix on a single node and then apply MC64
-  sequentially.
+  \lstinline[style=C]!MPI_Init[_thread]!.
+
+  % Unfortunately, there is no
+  % distributed version of the MC64 reordering code, so if this
+  % reordering (and scaling) step is enabled, the code will gather the
+  % distributed sparse matrix on a single node and then apply MC64
+  % sequentially.
 \end{itemize}
 
 The three solver classes \lstinline[style=C]!StrumpackSparseSolver!,
@@ -510,7 +530,7 @@ int main(int argc, char* argv[]) {
 
     // construct solver and specify the MPI communicator
     StrumpackSparseSolverMPI<double> sp(MPI_COMM_WORLD);
-    sp.options().set_mc64job(0);
+    sp.options().set_matching(MatchingJob::NONE);
     sp.options().set_from_command_line(argc, argv);
     sp.set_csr_matrix(N, row_ptr, col_ind, val);
     sp.solve(b, x);
@@ -737,42 +757,48 @@ in \lstinline[style=Bash]!strumpack_parameters.hpp!) and can be
 \end{lstlisting}
 
 \subsubsection{Reordering for numerical stability}\label{sec::mc64}
-The reordering for numerical stability is performed using the MC64
-code. For many matrices, this reordering is not necessary and can
-safely be disabled! MC64 supports 5 different modes
-{\small \begin{itemize}
-\item[\textbf{0:}] no reordering for stability, this disables MC64
-\item[\textbf{1:}] currently not supported
-\item[\textbf{2:}] maximize the smallest diagonal value
-\item[\textbf{3:}] maximize the smallest diagonal value, different strategy
-\item[\textbf{4:}] maximize sum of diagonal values
-\item[\textbf{5:}] maximize product of diagonal values and apply row and column scaling
-\end{itemize}}
-which can be selected via
+The reordering for numerical stability is performed using MC64 or
+Combinatorial BLAS. For many matrices, this reordering is not
+necessary and can safely be disabled! MC64 supports 5 different modes
+and there is one option to select the Combinatorial BLAS code:
 \begin{lstlisting}[style=C]
-  void SPOptions::set_mc64job(int job);
-  void SPOptions::set_mc64job(MC64Job job);
-  int SPOptions::mc64job() const;
-\end{lstlisting}
-where \lstinline[style=C]!mc64()! queries the currently selected
-strategy (the default is \textbf{5:} maximum product of diagonal
-values plus row and column scaling). Instead of entering a number, you
-can specify one of the enumerations in \lstinline[style=C]!MC64Job!:
-\begin{lstlisting}[style=C]
-  enum class MC64Job {
+  enum class MatchingJob {
     NONE,                         /*!< Don't do anything                                              */
     MAX_CARDINALITY,              /*!< Maximum cardinality                                            */
     MAX_SMALLEST_DIAGONAL,        /*!< Maximum smallest diagonal value                                */
     MAX_SMALLEST_DIAGONAL_2,      /*!< Same as MAX_SMALLEST_DIAGONAL, different algorithm             */
     MAX_DIAGONAL_SUM,             /*!< Maximum sum of diagonal values                                 */
-    MAX_DIAGONAL_PRODUCT_SCALING  /*!< Maximum product of diagonal values and row and column scaling  */
+    MAX_DIAGONAL_PRODUCT_SCALING, /*!< Maximum product of diagonal values and row and column scaling  */
+    COMBBLAS                      /*!< Use AWPM from Combinatorial BLAS                               */
   };
 \end{lstlisting}
-The command line option
-\begin{lstlisting}[style=Bash]
-  --sp_mc64job [0-5]
+which can be selected via
+\begin{lstlisting}[style=C]
+  void SPOptions::set_matching(MatchingJob job);
+  MatchingJob SPOptions::matching() const;
 \end{lstlisting}
-can also be used.
+where \lstinline[style=C]!matching()! queries the currently selected
+strategy (the default is
+\lstinline[style=C]!MAX_DIAGONAL_PRODUCT_SCALING! maximum product of
+diagonal values plus row and column scaling). The command line option
+\begin{lstlisting}[style=Bash]
+  --sp_matching [0-6]
+\end{lstlisting}
+can also be used, where the integers are defined as:
+{\small \begin{itemize}
+\item[\textbf{0:}] no reordering for stability, this disables MC64/matching
+\item[\textbf{1:}] MC64(1): currently not supported
+\item[\textbf{2:}] MC64(2): maximize the smallest diagonal value
+\item[\textbf{3:}] MC64(3): maximize the smallest diagonal value, different strategy
+\item[\textbf{4:}] MC64(4): maximize sum of diagonal values
+\item[\textbf{5:}] MC64(5): maximize product of diagonal values and apply row and column scaling
+\item[\textbf{6:}] Combinatorial BLAS: approximate weight perfect matching
+\end{itemize}}
+
+The MC64 code is sequential, so when using this option in parallel,
+the graph is first gathered to the root process. The Combinatorial
+BLAS code can currently only be used in parallel, and only with a
+square number of processes.
 
 \subsubsection{Nested dissection reordering}\label{sec:ND}
 The STRUMPACK sparse solver supports both (Par)Metis and (PT-)Scotch
@@ -928,8 +954,7 @@ the \lstinline[style=C]!real! type is the real part of a scalar, i.e.,
     /* when using MUMPS_SYMQAMS, disable aggressive amalgamation      */
     void disable_agg_amalg();
     /* set the job to be used for static pivoting, see section <@\ref{sec::mc64}@>  */
-    void set_mc64job(int job);                            int mc64job() const;
-    void set_mc64job(MC64Job job);
+    void set_matching(MatchingJob job);                   MatchingJob matching() const;
     /* not used at the moment                                         */
     void enable_assembly_tree_log();                      bool log_assembly_tree() const;
     void disable_assembly_tree_log();
@@ -1003,7 +1028,7 @@ precision.
    --sp_disable_MUMPS_SYMQAMD (default true)
    --sp_enable_agg_amalg (default false)
    --sp_disable_agg_amalg (default true)
-   --sp_mc64job 0-5 (default 0)
+   --sp_matching 0-6 (default 5)
    --sp_enable_hss (default false)
    --sp_disable_hss (default true)
    --sp_hss_min_sep_size int (default 256)
@@ -1596,6 +1621,17 @@ code form.
   year={2017},
   month={May},
   publisher={IEEE},
+}
+
+@article{bulucc2011combinatorial,
+  title={{The Combinatorial BLAS: Design, implementation, and applications}},
+  author={Bulu{\c{c}}, Ayd{\i}n and Gilbert, John R},
+  journal={The International Journal of High Performance Computing Applications},
+  volume={25},
+  number={4},
+  pages={496--509},
+  year={2011},
+  publisher={Sage Publications Sage UK: London, England}
 }
 
 \end{filecontents}
