@@ -72,7 +72,7 @@ In order to get good performance, one should install an optimized or
 vendor supplied BLAS implementation. Examples are Intel MKL, Cray
 LibSci, AMD ACML, OpenBLAS or ATLAS.
 
-On Cary systems, the compiler wrappers usually take care of linking
+On Cray systems, the compiler wrappers usually take care of linking
 BLAS/LAPACK and ScaLAPACK. In that case, just set
 -DBLAS_LIBRARIES="" \
 -DLAPACK_LIBRARIES="" \

@@ -208,8 +208,10 @@ int run(int argc, char *argv[]) {
     cout << "# computing ULV factorization of HSS matrix .. " << endl;
 
   auto ULV = H.factor();
-  if (!myid)
+  if (!myid){
     cout << "## Factorization time = " << timer.elapsed() << endl;
+    cout << "## ULV.memory() = " << ULV.memory()/(1e6) << " MB" << endl;
+  }
 
   //=======================================================================
   //=== Solve ===

@@ -114,7 +114,7 @@ namespace strumpack {
           + _W1.memory() + _Q.memory() + _D.memory()
           + sizeof(int)*_piv.size();
         for (auto& c : _ch) mem += c.memory();
-        return memory;
+        return mem;
       }
       std::size_t nonzeros() const {
         std::size_t nnz = _L.nonzeros() + _Vt0.nonzeros() + _W1.nonzeros()

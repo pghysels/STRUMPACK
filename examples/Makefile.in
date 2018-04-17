@@ -1,7 +1,8 @@
-all: DenseCovariance
 
-all1: DenseBEMColStateMPI testPoisson2dMPIDist \
-DenseToeplitzMPI DenseBEMAirbus DenseSchur100
+all: DenseToeplitzMPI DenseToeplitzQChem DenseBEMAirbus \
+DenseBEMColStateMPI DenseSchur100 DenseCovariance
+
+all1: DenseCovariance
 
 all2: @C_EXAMPLES@ testPoisson2d testPoisson3d	\
 	testPoisson2dMPI testPoisson2dMPIDist testMMdouble	\
@@ -26,6 +27,7 @@ INC_COVARIANCE=-I/global/homes/g/gichavez/cori/local/mfem-3.3.2 \
 LIB_COVARIANCE=-L/global/homes/g/gichavez/cori/local/mfem-3.3.2 -lmfem \
 -L/global/homes/g/gichavez/cori/local/hypre-2.10.0b/src/hypre/lib -lHYPRE \
 -L/global/homes/g/gichavez/cori/local/metis-4.0.3 -lmetis
+LIB_IPM=-L/global/cscratch1/sd/gichavez/.consulting/INC0117791/IPM/IPM_build_Intel_dynamic/lib -lipm
 
 sexample: sexample.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o sexample.o
@@ -72,9 +74,16 @@ DenseToeplitzMPI: DenseToeplitzMPI.cpp
 	$(CXX) $(LDFLAGS) DenseToeplitzMPI.o -o $@ $(LIBS)
 	$(RM) DenseToeplitzMPI.o
 
+DenseToeplitzQChem: DenseToeplitzQChem.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o DenseToeplitzQChem.o
+	$(CXX) $(LDFLAGS) DenseToeplitzQChem.o -o $@ $(LIBS)
+	$(RM) DenseToeplitzQChem.o
+
 DenseBEMColStateMPI: DenseBEMColStateMPI.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o DenseBEMColStateMPI.o
-	$(CXX) $(LDFLAGS) DenseBEMColStateMPI.o -o $@ $(LIBS) -L/global/cscratch1/sd/gichavez/.consulting/INC0117791/IPM/IPM_build_Intel_dynamic/lib -lipm
+	$(CXX) $(LDFLAGS) DenseBEMColStateMPI.o -o $@ $(LIBS)
+# $(CXX) $(LDFLAGS) DenseBEMColStateMPI.o -o $@ $(LIBS) $(LIB_IPM)
+	$(RM) DenseBEMColStateMPI.o
 
 DenseBEMAirbus: DenseBEMAirbus.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o DenseBEMAirbus.o
@@ -148,8 +157,6 @@ clean:
 	testMMdouble64 testMMdoubleMPIDist64			\
 	testMMfloat testMMfloatMPIDist				\
 	mtx2bin bin2mtx MLkernel \
-	testPoisson3dMPIDist \
-	DenseToeplitzMPI DenseBEMColStateMPI \
+	testPoisson3dMPIDist DenseToeplitzMPI \
+	DenseToeplitzQChem DenseBEMColStateMPI \
 	DenseBEMAirbus DenseSchur100 DenseCovariance
-
-# $(CXX) $(LDFLAGS) DenseBEMColStateMPI.o -o $@ $(LIBS) /global/common/cori/software/ipm/2.0.5/intel/lib/libipmf.so.0.0.0 /global/common/cori/software/ipm/2.0.5/intel/lib/libipm.so.0.0.0

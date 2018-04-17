@@ -218,8 +218,10 @@ int run(int argc, char *argv[]) {
     cout << "# computing ULV factorization of HSS matrix .. " << endl;
 
   auto ULV = H.factor();
-  if (!myid)
+  if (!myid){
     cout << "## Factorization time = " << timer.elapsed() << endl;
+    cout << "## ULV.memory() = " << ULV.memory()/(1e6) << " MB" << endl;
+  }
 
   //=======================================================================
   //=== Solve ===
@@ -227,12 +229,9 @@ int run(int argc, char *argv[]) {
   if (!myid) cout << "# Solve..." << endl;
   MPI_Barrier(MPI_COMM_WORLD);
 
-  // #endif
-
   //=======================================================================
   //=== Read RHS ===
   //=======================================================================
-
   DistributedMatrix<myscalar> B(ctxt, n, 1);
   DenseMatrix<myscalar> Btmp;
 
@@ -282,45 +281,16 @@ int run(int argc, char *argv[]) {
 
       fp.close();
     }
-
     // Btmp.print("Btmp",true, 8);
   }
-
-  // // Set the RHS (random vector) and the solution space
-  // if(myid<nprow*npcol) {
-  //   locr=numroc_(&n,&nb,&myrow,&IZERO,&nprow);
-  //   locc=numroc_(&nrhs,&nb,&mycol,&IZERO,&npcol);
-  //   B=new myscalar[locr*locc];
-  //   dummy=std::max(1,locr);
-  //   descinit_(descXB,&n,&nrhs,&nb,&nb,&IZERO,&IZERO,&ctxt,&dummy,&ierr);
-  //   X=new myscalar[locr*locc];
-  // } else {
-  //   descset_(descXB,&n,&nrhs,&nb,&nb,&IZERO,&IZERO,&INONE,&IONE);
-  // }
-
-  // // Redistribute 
-  // blacs_get_(&IZERO,&IZERO,&ctxttmp);
-  // blacs_gridmap_(&ctxttmp,&IZERO,&IONE,&IONE,&IONE);
-  // if(!myid==0)
-  //   /* myid owns the piece of A to be distributed */
-  //   descinit_(descBtmp,&n,&IONE,&nb,&nb,&IZERO,&IZERO,&ctxttmp,&n,&ierr);
-  // else
-  //   descset_(descBtmp,&n,&IONE,&nb,&nb,&IZERO,&IZERO,&INONE,&IONE);
-  // pgemr2d(n,IONE,Btmp,IONE,IONE,descBtmp,B,IONE,IONE,descXB,ctxtglob);
-  // if(!myid==0)
-  //   delete[] Btmp;
 
   copy(n, 1, Btmp, 0, B, 0, 0, ctxt_all);
   Btmp.clear();
 
-// #if false
-
   DistributedMatrix<myscalar> C(B);
 
   timer.start();
-
   H.solve(ULV, C);
-  
   if (!myid) cout << "## Solve time = " << timer.elapsed() << endl;
 
   //=======================================================================
@@ -343,8 +313,6 @@ int run(int argc, char *argv[]) {
       cout << "ERROR: ULV solve relative error too big!!" << endl;
     // MPI_Abort(MPI_COMM_WORLD, 1);
   }
-
-// #endif
 
   return 0;
 }

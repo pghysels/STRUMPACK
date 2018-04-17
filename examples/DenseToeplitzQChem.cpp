@@ -63,7 +63,7 @@ int run(int argc, char *argv[]) {
 
   auto np = mpi_nprocs(MPI_COMM_WORLD);
   if (!mpi_rank())
-    cout << "# usage: ./DenseToeplitzMPI n (problem size)" << endl;
+    cout << "# usage: ./DenseToeplitzQChem n (problem size)" << endl;
 
   if (!mpi_rank()){
     cout << "# matrix size: n = " << n << endl;
@@ -92,10 +92,8 @@ int run(int argc, char *argv[]) {
     for (int r=0; r<n; r++)
     {
       // Toeplitz matrix from Quantum Chemistry.
-      // myscalar pi=3.1416, d=0.1;
-      // A.global(r, c, (r==c) ? pow(pi,2)/6.0/pow(d,2) : pow(-1.0,r-c)/pow((myscalar)r-c,2)/pow(d,2) );
-      A.global(r, c, (r==c) ? n*n : r-c );
-      
+      myscalar pi=3.1416, d=0.1;
+      A.global(r, c, (r==c) ? pow(pi,2)/6.0/pow(d,2) : pow(-1.0,r-c)/pow((myscalar)r-c,2)/pow(d,2) );
     }
   }
 
@@ -176,7 +174,7 @@ int run(int argc, char *argv[]) {
     auto ULV = H.factor();
   if (!mpi_rank()){
     cout << "## Factorization time = " << timer.elapsed() << endl;
-    cout << "# ULV.memory() = " << ULV.memory()/(1000.0*1000.0) << " MB" << endl;
+    cout << "# ULV.memory() = " << ULV.memory()/(1000.0*1000.0) << "MB" << endl;
   }
 
 // # ==========================================================================

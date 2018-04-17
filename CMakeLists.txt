@@ -439,8 +439,8 @@ endif()
 #   ${CMAKE_BINARY_DIR}/examples/testPoisson3d.cpp COPYONLY)
 # configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2dMPI.cpp
 #   ${CMAKE_BINARY_DIR}/examples/testPoisson2dMPI.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2dMPIDist.cpp
-  ${CMAKE_BINARY_DIR}/examples/testPoisson2dMPIDist.cpp COPYONLY)
+# configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2dMPIDist.cpp
+#   ${CMAKE_BINARY_DIR}/examples/testPoisson2dMPIDist.cpp COPYONLY)
 # configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdouble.cpp
 #   ${CMAKE_BINARY_DIR}/examples/testMMdouble.cpp COPYONLY)
 # configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPI.cpp
@@ -461,17 +461,19 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2dMPIDist.cpp
 #   ${CMAKE_BINARY_DIR}/examples/bin2mtx.cpp COPYONLY)
 # configure_file(${CMAKE_SOURCE_DIR}/examples/MLkernel.cpp
 #   ${CMAKE_BINARY_DIR}/examples/MLkernel.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson3dMPIDist.cpp
-  ${CMAKE_BINARY_DIR}/examples/testPoisson3dMPIDist.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/DenseBEMColStateMPI.cpp
-  ${CMAKE_BINARY_DIR}/examples/DenseBEMColStateMPI.cpp COPYONLY)
+# configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson3dMPIDist.cpp
+#   ${CMAKE_BINARY_DIR}/examples/testPoisson3dMPIDist.cpp COPYONLY)
+
+configure_file(${CMAKE_SOURCE_DIR}/examples/DenseToeplitzQChem.cpp
+  ${CMAKE_BINARY_DIR}/examples/DenseToeplitzQChem.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/DenseToeplitzMPI.cpp
   ${CMAKE_BINARY_DIR}/examples/DenseToeplitzMPI.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/DenseBEMColStateMPI.cpp
+  ${CMAKE_BINARY_DIR}/examples/DenseBEMColStateMPI.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/DenseBEMAirbus.cpp
   ${CMAKE_BINARY_DIR}/examples/DenseBEMAirbus.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/DenseSchur100.cpp
   ${CMAKE_BINARY_DIR}/examples/DenseSchur100.cpp COPYONLY)
-
 configure_file(${CMAKE_SOURCE_DIR}/examples/DenseCovariance.cpp
   ${CMAKE_BINARY_DIR}/examples/DenseCovariance.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/generateMatrix.hpp
