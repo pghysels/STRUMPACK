@@ -30,10 +30,16 @@ fi
 
 if [[ $NERSC_HOST = "cori" ]]; then
     found_host=true
+
     # for MKL, use the link advisor: https://software.intel.com/en-us/articles/intel-mkl-link-line-advisor
-    ScaLAPACKLIBS="${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a -Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_intel_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_blacs_intelmpi_lp64.a -Wl,--end-group -liomp5 -lpthread -lm -ldl"
-    #ScaLAPACKLIBS="${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a -Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_gnu_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_blacs_intelmpi_lp64.a -Wl,--end-group -lgomp -lpthread -lm -ldl"
+    # Intel compiler
+    #  separate arguments with ;, the -Wl,--start-group ... -Wl,--end-group is a single argument
+    ScaLAPACKLIBS="${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a;-Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_intel_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_blacs_intelmpi_lp64.a -Wl,--end-group;-liomp5;-lpthread;-lm;-ldl"
+    # GNU compiler
+    #ScaLAPACKLIBS="${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a;-Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_gnu_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_blacs_intelmpi_lp64.a -Wl,--end-group;-lgomp;-lpthread;-lm;-ldl"
     #ScaLAPACKLIBS=""  # use this when using libsci, (module cray-libsci loaded)
+
+    COMBBLASHOME=/global/homes/p/pghysels/cori/CombBLAS_beta_16_1/build/
     cmake ../ \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_INSTALL_PREFIX=../install \
@@ -49,7 +55,10 @@ if [[ $NERSC_HOST = "cori" ]]; then
           -DSTRUMPACK_COUNT_FLOPS=ON \
           -DSTRUMPACK_TASK_TIMERS=OFF \
           -DMETIS_INCLUDES=$HOME/local/cori/parmetis-4.0.3/metis/include \
-          -DMETIS_LIBRARIES=$HOME/local/cori/parmetis-4.0.3/build/Linux-x86_64/libmetis/libmetis.a
+          -DMETIS_LIBRARIES=$HOME/local/cori/parmetis-4.0.3/build/Linux-x86_64/libmetis/libmetis.a \
+          -DSTRUMPACK_USE_COMBBLAS=ON \
+          -DCOMBBLAS_INCLUDES=/global/homes/p/pghysels/cori/CombBLAS_beta_16_1/ \
+          -DCOMBBLAS_LIBRARIES="$COMBBLASHOME/libCommGridlib.a;$COMBBLASHOME/libHashlib.a;$COMBBLASHOME/libMemoryPoollib.a;$COMBBLASHOME/libmmiolib.a;$COMBBLASHOME/libMPIOplib.a;$COMBBLASHOME/libMPITypelib.a"
 
     # -DPARMETIS_INCLUDES=$HOME/local/parmetis-4.0.3/include \
         # -DPARMETIS_LIBRARIES=$HOME/local/parmetis-4.0.3/build/Linux-x86_64/libparmetis/libparmetis.a \
