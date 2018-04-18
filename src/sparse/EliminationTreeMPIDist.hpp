@@ -218,6 +218,11 @@ namespace strumpack {
     _Aprop.setup(A, _nd, *this, opts.use_HSS());
     MPI_Pcontrol(-1, "block_row_A_to_prop_A");
 
+    int psep = 0;
+    if (!mpi_rank())
+      std::cout << "# DUMP sep P0 P lch rch sep_begin sep_end upd.size upd" << std::endl;
+    this->_root->dump_front_info(psep, 0);
+
     delete[] local_upd;
     delete[] local_subtree_work;
   }

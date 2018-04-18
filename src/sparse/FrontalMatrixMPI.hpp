@@ -61,6 +61,9 @@ namespace strumpack {
     FrontalMatrixMPI& operator=(FrontalMatrixMPI const&) = delete;
     virtual ~FrontalMatrixMPI();
 
+    // For use in Mathias' UPC++ proxy app
+    virtual void dump_front_info(int& porder_sep, int depth) const override;
+
     void sample_CB
     (const SPOptions<scalar_t>& opts, const DenseM_t& R, DenseM_t& Sr,
      DenseM_t& Sc, F_t* parent, int task_depth=0) override {};
@@ -159,6 +162,33 @@ namespace strumpack {
       ctxt_all = scalapack::Csys2blacs_handle(front_comm);
       scalapack::Cblacs_gridinit(&ctxt_all, "R", 1, total_procs);
     } else ctxt = ctxt_all = -1;
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixMPI<scalar_t,integer_t>::dump_front_info
+  (int& porder_sep, int depth) const {
+    if (depth > 3 || front_comm == MPI_COMM_NULL) return;
+
+    if (visit(this->lchild)) this->lchild->dump_front_info(porder_sep, depth+1);
+    MPI_Allreduce(MPI_IN_PLACE, &porder_sep, 1, MPI_INT, MPI_MAX, front_comm);
+    int lch = (!this->lchild || depth==3) ? -1 : porder_sep-1;
+
+    if (visit(this->rchild)) this->rchild->dump_front_info(porder_sep, depth+1);
+    MPI_Allreduce(MPI_IN_PLACE, &porder_sep, 1, MPI_INT, MPI_MAX, front_comm);
+    int rch = (!this->rchild || depth==3) ? -1 : porder_sep-1;
+
+    if (active() && mpi_rank(front_comm) == 0) {
+      std::cout << "DUMP " << porder_sep
+                << " " << mpi_rank()
+                << " " << mpi_nprocs(front_comm)
+                << " " << lch << " " << rch
+                << " " << this->sep_begin << " " << this->sep_end
+                << " " << this->upd.size() << " ";
+      for (auto u : this->upd)
+        std::cout << u << " ";
+      std::cout << std::endl;
+      porder_sep++;
+    }
   }
 
   template<typename scalar_t,typename integer_t>

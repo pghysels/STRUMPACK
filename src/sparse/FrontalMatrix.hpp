@@ -64,6 +64,9 @@ namespace strumpack {
       delete rchild;
     }
 
+    // For use in Mathias' UPC++ proxy app
+    virtual void dump_front_info(int& porder_sep, int depth) const;
+
     inline integer_t dim_sep() const { return sep_end - sep_begin; }
     inline integer_t dim_upd() const { return upd.size(); }
     inline integer_t dim_blk() const { return dim_sep() + dim_upd(); }
@@ -177,6 +180,25 @@ namespace strumpack {
    integer_t _sep_end, std::vector<integer_t>& _upd)
     : sep(_sep), sep_begin(_sep_begin), sep_end(_sep_end),
       upd(std::move(_upd)), lchild(_lchild), rchild(_rchild) {
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrix<scalar_t,integer_t>::dump_front_info
+  (int& porder_sep, int depth) const {
+    if (depth > 3) return;
+    if (lchild) lchild->dump_front_info(porder_sep, depth+1);
+    int lch = (!lchild || depth==3) ? -1 : porder_sep-1;
+    if (rchild) rchild->dump_front_info(porder_sep, depth+1);
+    int rch = (!rchild || depth==3) ? -1 : porder_sep-1;
+    std::cout << "DUMP " << porder_sep
+              << " " << mpi_rank() << " 1"
+              << " " << lch << " " << rch
+              << " " << sep_begin << " " << sep_end
+              << " " << upd.size() << " ";
+    for (auto u : upd)
+      std::cout << u << " ";
+    std::cout << std::endl;
+    porder_sep++;
   }
 
   /**
