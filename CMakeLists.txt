@@ -9,6 +9,7 @@ option(STRUMPACK_USE_PAPI "Build with support for PAPI monitoring" OFF)
 option(STRUMPACK_USE_COMBBLAS "Use CombBLAS for weighted matching" OFF)
 option(STRUMPACK_COUNT_FLOPS "Build with flop counters" ON)
 option(STRUMPACK_TASK_TIMERS "Build with timers for internal routines" OFF)
+option(STRUMPACK_BUILD_TESTS "Build the tests" ON)
 option(STRUMPACK_DEV_TESTING "Enable extensive testing" OFF)
 option(STRUMPACK_C_INTERFACE "Build the C interface" ON)
 
@@ -218,9 +219,9 @@ endforeach(arg ${LIBS})
 # foreach(arg ${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES})
 #   set(STRUMPACK_ALL_LIBS "${STRUMPACK_ALL_LIBS} -l${arg}")
 # endforeach(arg ${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES})
-# foreach(arg ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
-#   set(STRUMPACK_ALL_LIBS "${STRUMPACK_ALL_LIBS} -l${arg}")
-# endforeach(arg ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
+foreach(arg ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
+  set(STRUMPACK_ALL_LIBS "${STRUMPACK_ALL_LIBS} -l${arg}")
+endforeach(arg ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
   set(STRUMPACK_ALL_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_RELEASE}")
@@ -461,6 +462,7 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/bin2mtx.cpp
 configure_file(${CMAKE_SOURCE_DIR}/examples/MLkernel.cpp
   ${CMAKE_BINARY_DIR}/examples/MLkernel.cpp COPYONLY)
 
-
-include(CTest)
-add_subdirectory(test)
+if(STRUMPACK_BUILD_TESTS)
+  include(CTest)
+  add_subdirectory(test)
+endif()
