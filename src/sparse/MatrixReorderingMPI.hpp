@@ -441,7 +441,7 @@ namespace strumpack {
     auto dsep_iorder = dsep_order + dim_dsep;
     if (dim_dsep) {
       HSS::HSSPartitionTree tree(dim_dsep);
-      if ((dim_dsep >= opts.HSS_min_front_size()) &&
+      if ((dim_dsep >= opts.HSS_min_sep_size()) &&
           (dim_dsep > 2 * opts.HSS_options().leaf_size())) {
         std::vector<integer_t> sep_csr_ptr, sep_csr_ind;
         std::function<void(HSS::HSSPartitionTree&, integer_t&,
