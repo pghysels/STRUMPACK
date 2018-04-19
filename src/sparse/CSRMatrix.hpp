@@ -602,7 +602,7 @@ namespace strumpack {
   (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
    const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const {
     integer_t dupd = upd.size();
-    long long int local_flops = 0;
+    //long long int local_flops = 0;
     const integer_t nbvec = R.cols();
     const integer_t ds = shi - slo;
 
@@ -663,8 +663,8 @@ namespace strumpack {
         }
       }
     }
-    STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
-    STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+    // STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+    // STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
   }
 
   template<typename scalar_t,typename integer_t> void
