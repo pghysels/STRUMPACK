@@ -64,9 +64,9 @@ int run(int argc, char *argv[]) {
    * The matrix file is complex single precision (8 bytes).
    */
 
-  const char *file = "/global/cscratch1/sd/gichavez/intel17/paper2_tests/mats/Hsolver/front_3d_10000";
+  // const char *file = "/global/cscratch1/sd/gichavez/intel17/paper2_tests/mats/Hsolver/front_3d_10000";
   //const char *file = "/home/gichavez/mats/front_3d_10000";
-  //const char *file = "/Users/gichavez/Desktop/front_3d_10000";
+  const char *file = "/Users/gichavez/Documents/Github/paper2_tests/mats/Hsolver/front_3d_10000"; // Needs 64 MPI ranks
 
   HSSOptions<myscalar> hss_opts;
   hss_opts.set_from_command_line(argc, argv);

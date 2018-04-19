@@ -143,7 +143,7 @@ int run(int argc, char *argv[]) {
   }
 
   // Checking error against dense matrix
-  if ( hss_opts.verbose() == 1 && n <= 1024) {
+  if ( n <= 30000 ) {
     MPI_Barrier(MPI_COMM_WORLD);
     auto Hdense = H.dense(A.ctxt());
     MPI_Barrier(MPI_COMM_WORLD);
@@ -184,29 +184,54 @@ int run(int argc, char *argv[]) {
 
   DistributedMatrix<double> B(ctxt, n, 1);
   B.random();
-  DistributedMatrix<double> C(B);
+  DistributedMatrix<double> X(B);
+  DistributedMatrix<double> R(B);
   
   timer.start();
-    H.solve(ULV, C);
+    H.solve(ULV, X);
   if (!mpi_rank())
     cout << "## Solve time = " << timer.elapsed() << endl;
 
 // # ==========================================================================
 // # === Error checking ===
 // # ==========================================================================
-  DistributedMatrix<double> Bcheck(ctxt, n, 1);
-  apply_HSS(Trans::N, H, C, 0., Bcheck);
-  Bcheck.scaled_add(-1., B);
-  auto Bchecknorm = Bcheck.normF();
+  // DistributedMatrix<double> Bcheck(ctxt, n, 1);
+  // apply_HSS(Trans::N, H, C, 0., Bcheck);
+  // Bcheck.scaled_add(-1., B);
+  // auto Bchecknorm = Bcheck.normF();
+  // auto Bnorm = B.normF();
+
+  // if (!mpi_rank())
+  //   cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
+  //        << Bchecknorm / Bnorm << endl;
+  // if (B.active() && Bchecknorm / Bnorm > SOLVE_TOLERANCE) {
+  //   if (!mpi_rank())
+  //     cout << "ERROR: ULV solve relative error too big!!" << endl;
+  //   // MPI_Abort(MPI_COMM_WORLD, 1);
+  // }
+
+
+  // Checking relative residual
+
   auto Bnorm = B.normF();
-  if (!mpi_rank())
-    cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
-         << Bchecknorm / Bnorm << endl;
-  if (B.active() && Bchecknorm / Bnorm > SOLVE_TOLERANCE) {
-    if (!mpi_rank())
-      cout << "ERROR: ULV solve relative error too big!!" << endl;
-    // MPI_Abort(MPI_COMM_WORLD, 1);
+  double resnorm = .0;
+
+  strumpack::gemm(strumpack::Trans::N, strumpack::Trans::N, 1., A, X, 0., R);
+  R.scaled_add(-1., B);
+  resnorm = R.normF();
+  
+  if (!mpi_rank()){
+      cout << "# relative residual = ||A*X-B||_F/||B||_F = "
+           << resnorm / Bnorm << endl;
   }
+
+  // strumpack::HSS::apply_HSS(strumpack::Trans::N, H, X, 0., R);
+  // R.scaled_add(-1., B);
+  // resnorm = R.normF();
+  // if (!mpi_rank()){
+  //     cout << "# relative residual = ||H*X-B||_F/||B||_F = "
+  //          << resnorm / Bnorm << endl;
+  // }
 
   return 0;
 }

@@ -483,6 +483,5 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/generatePermutation.hpp
 configure_file(${CMAKE_SOURCE_DIR}/examples/applyPermutation.hpp
   ${CMAKE_BINARY_DIR}/examples/applyPermutation.hpp COPYONLY)
 
-# include(CTest)
-# add_subdirectory(test)
-
+include(CTest)
+add_subdirectory(test)

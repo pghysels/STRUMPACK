@@ -67,6 +67,8 @@ int run(int argc, char *argv[]) {
   int ncols[npcolA] = {3456, 3456, 3456, 3456, 3456, 3456, 3456, 3456};
   // string prefix = "/global/cscratch1/sd/pghysels/BEM/mats/example3/";
   string prefix = "/global/cscratch1/sd/gichavez/intel17/paper2_tests/mats/example3/";
+  // string prefix = "/Users/gichavez/Documents/Github/paper2_tests/mats/example3/";
+
   std::ifstream fp;
   int ierr;
   int i,j;
@@ -188,7 +190,7 @@ int run(int argc, char *argv[]) {
          << "% (of dense)" << endl;
 
   // Checking error against dense matrix
-  if ( hss_opts.verbose() == 1 && n <= 1024) {
+  if ( n <= 30000) { //n=30k is 7.2GB
     MPI_Barrier(MPI_COMM_WORLD);
     auto Hdense = H.dense(A.ctxt());
     MPI_Barrier(MPI_COMM_WORLD);
