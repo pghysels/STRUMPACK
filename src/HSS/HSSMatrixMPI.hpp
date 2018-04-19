@@ -55,6 +55,10 @@ namespace strumpack {
       using delem_t = typename std::function
         <void(const std::vector<std::size_t>& I,
               const std::vector<std::size_t>& J, DistM_t& B)>;
+      using delem_blocks_t = typename std::function
+        <void(const std::vector<std::vector<std::size_t>>& I,
+              const std::vector<std::vector<std::size_t>>& J,
+              std::vector<DistMW_t>& B)>;
       using elem_t = typename std::function
         <void(const std::vector<std::size_t>& I,
               const std::vector<std::size_t>& J, DenseM_t& B)>;
@@ -72,6 +76,10 @@ namespace strumpack {
       HSSMatrixMPI
       (std::size_t m, std::size_t n, const dmult_t& Amult,
        int Actxt, const delem_t& Aelem,
+       const opts_t& opts, MPI_Comm c);
+      HSSMatrixMPI
+      (std::size_t m, std::size_t n, const dmult_t& Amult,
+       int Actxt, const delem_blocks_t& Aelem,
        const opts_t& opts, MPI_Comm c);
       HSSMatrixMPI
       (const HSSPartitionTree& t, const dmult_t& Amult, int Actxt,
@@ -97,6 +105,9 @@ namespace strumpack {
       void compress(const DistM_t& A, const opts_t& opts);
       void compress
       (const dmult_t& Amult, const delem_t& Aelem,
+       const opts_t& opts, int Actxt=-1);
+      void compress
+      (const dmult_t& Amult, const delem_blocks_t& Aelem,
        const opts_t& opts, int Actxt=-1);
 
       HSSFactorsMPI<scalar_t> factor() const;
@@ -202,6 +213,9 @@ namespace strumpack {
       void compress_original_sync
       (const dmult_t& Amult, const delemw_t& Aelem,
        const opts_t& opts, int Actxt=-1);
+      void compress_original_sync
+      (const dmult_t& Amult, const delem_blocks_t& Aelem,
+       const opts_t& opts, int Actxt=-1);
       void compress_stable_nosync
       (const dmult_t& Amult, const delemw_t& Aelem,
        const opts_t& opts, int Actxt=-1);
@@ -242,11 +256,17 @@ namespace strumpack {
       void extract_level
       (const delemw_t& Aelem, const opts_t& opts,
        WorkCompressMPI<scalar_t>& w, int lvl);
+      void extract_level
+      (const delem_blocks_t& Aelem, const opts_t& opts,
+       WorkCompressMPI<scalar_t>& w, int lvl);
       void get_extraction_indices
       (std::vector<std::vector<std::size_t>>& I,
        std::vector<std::vector<std::size_t>>& J,
-       WorkCompressMPI<scalar_t>& w,
-       int& self, int lvl);
+       WorkCompressMPI<scalar_t>& w, int& self, int lvl);
+      void get_extraction_indices
+      (std::vector<std::vector<std::size_t>>& I,
+       std::vector<std::vector<std::size_t>>& J, std::vector<DistMW_t>& B,
+       int lctxt, WorkCompressMPI<scalar_t>& w, int& self, int lvl);
       void allgather_extraction_indices
       (std::vector<std::vector<std::size_t>>& lI,
        std::vector<std::vector<std::size_t>>& lJ,

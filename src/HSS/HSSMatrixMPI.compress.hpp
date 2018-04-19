@@ -206,6 +206,13 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compress
+    (const dmult_t& Amult, const delem_blocks_t& Aelem,
+     const opts_t& opts, int Actxt) {
+      // TODO this only workd for original, sync for now!!
+      compress_original_sync(Amult, Aelem, opts, Actxt);
+    }
+
+    template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compress
     (const dmult_t& Amult, const delem_t& Aelem,
      const opts_t& opts, int Actxt) {
       auto Aelemw = [&]
@@ -275,6 +282,31 @@ namespace strumpack {
       }
     }
 
+    template<typename scalar_t> void
+    HSSMatrixMPI<scalar_t>::compress_original_sync
+    (const dmult_t& Amult, const delem_blocks_t& Aelem,
+     const opts_t& opts, int Actxt) {
+      WorkCompressMPI<scalar_t> w;
+      int d_old = 0, d = opts.d0();
+      DistSamples<scalar_t> RS
+        (d, (Actxt!=-1) ? Actxt : _ctxt, *this, Amult, opts);
+      const auto nr_lvls = this->max_levels();
+      while (!this->is_compressed() && d < opts.max_rank()) {
+        if (opts.verbose() && !mpi_rank(_comm))
+          std::cout << "# compressing with d = " << d << ", d_old = "
+                    << d_old << ", tol = " << opts.rel_tol() << std::endl;
+        for (int lvl=nr_lvls-1; lvl>=0; lvl--) {
+          extract_level(Aelem, opts, w, lvl);
+          compress_level_original(RS, opts, w, d-d_old, lvl);
+        }
+        if (!this->is_compressed()) {
+          d_old = d;
+          d = std::min(2*d, opts.max_rank());
+          RS.add_columns(d, opts);
+        }
+      }
+    }
+
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::extract_level
     (const delemw_t& Aelem, const opts_t& opts,
      WorkCompressMPI<scalar_t>& w, int lvl) {
@@ -285,9 +317,25 @@ namespace strumpack {
       DistM_t dummy;
       for (int i=0; i<before; i++)
         Aelem(I[i], J[i], dummy, this->_A, 0, 0, _comm);
-      extract_D_B(Aelem, ctxt_loc(), opts, w, lvl);
+      if (I.size()-after-before)
+        extract_D_B(Aelem, ctxt_loc(), opts, w, lvl);
       for (int i=I.size()-after; i<int(I.size()); i++)
         Aelem(I[i], J[i], dummy, this->_A, 0, 0, _comm);
+    }
+
+    template<typename scalar_t> void HSSMatrixMPI<scalar_t>::extract_level
+    (const delem_blocks_t& Aelem, const opts_t& opts,
+     WorkCompressMPI<scalar_t>& w, int lvl) {
+      std::vector<std::vector<std::size_t>> lI, lJ, I, J;
+      std::vector<DistMW_t> lB;
+      int self = 0, before, after;
+      get_extraction_indices(lI, lJ, lB, ctxt_loc(), w, self, lvl);
+      allgather_extraction_indices(lI, lJ, I, J, before, self, after);
+      DistMW_t dummy;
+      std::vector<DistMW_t> B(I.size(), dummy);
+      std::copy(lB.begin(), lB.end(), B.begin()+before);
+      assert(before+lB.size()+after == I.size());
+      Aelem(I, J, B);
     }
 
     template<typename scalar_t> void
@@ -326,6 +374,52 @@ namespace strumpack {
             I.push_back(w.c[0].Ir);  J.push_back(w.c[1].Ic);
             I.push_back(w.c[1].Ir);  J.push_back(w.c[0].Ic);
           }
+        }
+      }
+    }
+
+    template<typename scalar_t> void
+    HSSMatrixMPI<scalar_t>::get_extraction_indices
+    (std::vector<std::vector<std::size_t>>& I,
+     std::vector<std::vector<std::size_t>>& J, std::vector<DistMW_t>& B,
+     int lctxt, WorkCompressMPI<scalar_t>& w, int& self, int lvl) {
+      if (!this->active()) return;
+      if (this->leaf()) {
+        if (w.lvl == lvl && this->is_untouched()) {
+          self++;
+          if (mpi_rank(_comm)==0) {
+            I.emplace_back();
+            J.emplace_back();
+            I.back().reserve(this->rows());
+            J.back().reserve(this->cols());
+            for (std::size_t i=0; i<this->rows(); i++)
+              I.back().push_back(i+w.offset.first);
+            for (std::size_t j=0; j<this->cols(); j++)
+              J.back().push_back(j+w.offset.second);
+          }
+          _D = DistM_t(_ctxt, this->rows(), this->cols());
+          B.push_back(DistMW_t(_D));
+        }
+      } else {
+        w.split(this->_ch[0]->dims());
+        if (w.lvl < lvl) {
+          this->_ch[0]->get_extraction_indices(I, J, B, lctxt, w.c[0], self, lvl);
+          this->_ch[1]->get_extraction_indices(I, J, B, lctxt, w.c[1], self, lvl);
+          return;
+        }
+        communicate_child_data(w);
+        if (!this->_ch[0]->is_compressed() ||
+            !this->_ch[1]->is_compressed()) return;
+        if (this->is_untouched()) {
+          self += 2;
+          if (mpi_rank(_comm)==0) {
+            I.push_back(w.c[0].Ir);  J.push_back(w.c[1].Ic);
+            I.push_back(w.c[1].Ir);  J.push_back(w.c[0].Ic);
+          }
+          _B01 = DistM_t(_ctxt, w.c[0].Ir.size(), w.c[1].Ic.size());
+          _B10 = DistM_t(_ctxt, w.c[1].Ir.size(), w.c[0].Ic.size());
+          B.push_back(DistMW_t(_B01));
+          B.push_back(DistMW_t(_B10));
         }
       }
     }

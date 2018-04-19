@@ -349,76 +349,28 @@ namespace strumpack {
     if (!this->dim_blk()) return;
 
     auto mult = [&](DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
-      //auto f0 = params::flops;
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
       random_sampling(A, opts, R, Sr, Sc, etree_level);
-      //params::sample_flops += params::flops - f0;
-      // if (_sampled_columns == 0)
-      //   params::initial_sample_flops += params::flops - f0;
       _sampled_columns += R.cols();
       TIMER_STOP(t_sampling);
     };
-    auto elem = [&](const std::vector<std::size_t>& I,
-                    const std::vector<std::size_t>& J, DistM_t& B) {
-      //auto f0 = params::flops;
-      element_extraction(A, I, J, B);
-      //params::extraction_flops += params::flops - f0;
+    // auto elem = [&]
+    //   (const std::vector<std::size_t>& I,
+    //    const std::vector<std::size_t>& J, DistM_t& B) {
+    //   element_extraction(A, I, J, B);
+    // };
+    auto elem_blocks = [&]
+      (const std::vector<std::vector<std::size_t>>& I,
+       const std::vector<std::vector<std::size_t>>& J,
+       std::vector<DistMW_t>& B) {
+      for (std::size_t i=0; i<I.size(); i++)
+        element_extraction(A, I[i], J[i], B[i]);
     };
 
-    // auto N = this->dim_blk();
-    // DistM_t eye(this->ctxt, N, N), FI(this->ctxt, N, N),
-    //   FtI(this->ctxt, N, N);
-    // eye.eye();
-    // mult(eye, FI, FtI);
-    // std::vector<std::size_t> I(N);
-    // std::iota(I.begin(), I.end(), 0);
-    // DistM_t Fdense(this->ctxt, N, N);
-    // elem(I, I, Fdense);
-    // auto Ftdense = Fdense.transpose();
-    // Fdense.scaled_add(scalar_t(-1.), FI);
-    // Ftdense.scaled_add(scalar_t(-1.), FtI);
-    // auto errF = Fdense.normF() / FI.normF();
-    // auto errFt = Ftdense.normF() / FtI.normF();
-    // if (mpi_rank(this->front_comm)==0)
-    //   std::cout << "||FI-Fdense||/||FI|| = " << errF
-    //             << " ||FtI-Ftdense||/||FtI|| = " << errFt << std::endl;
-    // if (errF > 1e-8) { // || errFt > 1e-8) {
-    //   Fdense.print("Fdense_err");
-    //   //Ftdense.print("Ftdense_err");
-    //   elem(I, I, Fdense);
-    //   Fdense.print("Fdense");
-    //   FI.print("FI");
-    //   exit(1);
-    // }
-
-
-    // auto HSSopts = opts.HSS_options();
-    // int child_samples = 0;
-    // TODO do the child random samples need to be communicated??
-    // if (this->lchild)
-    //   child_samples = this->lchild->random_samples();
-    // if (this->rchild)
-    //   child_samples = std::max(child_samples, this->rchild->random_samples());
-    // HSSopts.set_d0(std::max(child_samples - HSSopts.dd(), HSSopts.d0()));
-    // if (opts.indirect_sampling()) HSSopts.set_user_defined_random(true);
-    // _H->compress(mult, elem, HSSopts);
-
-    //auto f0 = params::flops;
     TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_compress);
-    _H->compress(mult, elem, opts.HSS_options());
-    //params::compression_flops += params::flops - f0;
+    //_H->compress(mult, elem, opts.HSS_options());
+    _H->compress(mult, elem_blocks, opts.HSS_options());
     TIMER_STOP(t_compress);
-
-    // // _H->print_info(std::cout, 0, 0);
-    // auto Hdense = _H->dense(this->ctxt); //.print("_H");
-    // Hdense.scaled_add(scalar_t(-1.), FI);
-    // auto errH = Hdense.normF() / FI.normF();
-    // if (mpi_rank(this->front_comm)==0)
-    //   std::cout << "||FI-Hdense||/||FI|| = " << errH << std::endl;
-    // if (errH > opts.HSS_options().rel_tol() * 1e2) {
-    //   Hdense.print("Hdense_err");
-    //   exit(1);
-    // }
 
     if (this->lchild) this->lchild->release_work_memory();
     if (this->rchild) this->rchild->release_work_memory();

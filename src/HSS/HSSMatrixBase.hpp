@@ -188,7 +188,17 @@ namespace strumpack {
        WorkCompressMPI<scalar_t>& w, int& self, int lvl);
       virtual void get_extraction_indices
       (std::vector<std::vector<std::size_t>>& I,
+       std::vector<std::vector<std::size_t>>& J, std::vector<DistMW_t>& B,
+       int lctxt, WorkCompressMPI<scalar_t>& w, int& self, int lvl);
+      virtual void get_extraction_indices
+      (std::vector<std::vector<std::size_t>>& I,
        std::vector<std::vector<std::size_t>>& J,
+       const std::pair<std::size_t,std::size_t>& off,
+       WorkCompress<scalar_t>& w, int& self, int lvl) {}
+      virtual void get_extraction_indices
+      (std::vector<std::vector<std::size_t>>& I,
+       std::vector<std::vector<std::size_t>>& J,
+       std::vector<DenseM_t*>& B,
        const std::pair<std::size_t,std::size_t>& off,
        WorkCompress<scalar_t>& w, int& self, int lvl) {}
       virtual void extract_D_B
@@ -637,6 +647,19 @@ namespace strumpack {
       if (!this->active()) return;
       w.create_sequential();
       get_extraction_indices(I, J, w.offset, *w.w_seq, self, lvl);
+    }
+
+    template<typename scalar_t> void
+    HSSMatrixBase<scalar_t>::get_extraction_indices
+    (std::vector<std::vector<std::size_t>>& I,
+     std::vector<std::vector<std::size_t>>& J, std::vector<DistMW_t>& B,
+     int lctxt, WorkCompressMPI<scalar_t>& w, int& self, int lvl) {
+      if (!this->active()) return;
+      w.create_sequential();
+      std::vector<DenseM_t*> Bdense;
+      get_extraction_indices(I, J, Bdense, w.offset, *w.w_seq, self, lvl);
+      for (auto& Bd : Bdense)
+        B.emplace_back(lctxt, 0, 0, Bd->rows(), Bd->cols(), *Bd);
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::extract_D_B
