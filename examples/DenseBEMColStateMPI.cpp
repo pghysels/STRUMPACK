@@ -22,7 +22,7 @@
  * publicly and display publicly, and to permit others to do so.
  *
  * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li,
-               Gustavo Chávez.
+               Gustavo Chavez.
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
  *
@@ -97,8 +97,6 @@ int run(int argc, char *argv[]) {
   int ctxt_all = scalapack::Csys2blacs_handle(MPI_COMM_WORLD);
   scalapack::Cblacs_gridinit(&ctxt_all, "R", 1, np);
 
-  // #if false
-
   if (!myid)
     cout << "Reading and redistributing..." << endl;
   double tstart = MPI_Wtime();
@@ -151,6 +149,7 @@ int run(int argc, char *argv[]) {
       //        << nrows[i] << " x " << ncols[j] << endl;
     }
   MPI_Barrier(MPI_COMM_WORLD);
+
   double tend = MPI_Wtime();
   if (!myid)
     cout << "Read and redistribution done in " << tend - tstart << "s" << endl;
@@ -191,6 +190,9 @@ int run(int argc, char *argv[]) {
 
   // Checking error against dense matrix
   if ( n <= 30000) { //n=30k is 7.2GB
+    if(!myid) 
+      cout << "Checking error against dense matrix" << endl;
+
     MPI_Barrier(MPI_COMM_WORLD);
     auto Hdense = H.dense(A.ctxt());
     MPI_Barrier(MPI_COMM_WORLD);
@@ -288,7 +290,6 @@ int run(int argc, char *argv[]) {
 
   copy(n, 1, Btmp, 0, B, 0, 0, ctxt_all);
   Btmp.clear();
-
   DistributedMatrix<myscalar> C(B);
 
   timer.start();
