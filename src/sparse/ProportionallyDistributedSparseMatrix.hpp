@@ -376,8 +376,8 @@ namespace strumpack {
         }
       }
     }
-    STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
-    STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+    // STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+    // STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
   }
 
   template<typename scalar_t,typename integer_t> void
