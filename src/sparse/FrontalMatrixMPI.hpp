@@ -71,10 +71,9 @@ namespace strumpack {
     void extract_2d
     (const SpMat_t& A, const std::vector<std::size_t>& I,
      const std::vector<std::size_t>& J, DistM_t& B) const;
-    void get_child_submatrix_2d
-    (const F_t* ch, const std::vector<std::size_t>& I,
-     const std::vector<std::size_t>& J,
-     DistM_t& B) const;
+    void get_submatrix_2d
+    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+     DistM_t& Bdist, DenseM_t& Bseq) const override;
     void extract_CB_sub_matrix
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
      DenseM_t& B, int task_depth) const {};
@@ -104,9 +103,6 @@ namespace strumpack {
     }
     inline int np_rows() const { return proc_rows; }
     inline int np_cols() const { return proc_cols; }
-    inline int find_rank(integer_t r, integer_t c, const DistM_t& F) const;
-    inline int find_rank_fixed
-    (integer_t r, integer_t c, const DistM_t& F) const;
     virtual long long dense_factor_nonzeros(int task_depth=0) const;
     virtual std::string type() const { return "FrontalMatrixMPI"; }
     virtual bool isMPI() const { return true; }
@@ -184,66 +180,43 @@ namespace strumpack {
     TIMER_STOP(t_ex_sep);
     TIMER_TIME(TaskType::GET_SUBMATRIX_2D, 2, t_getsub);
     DistM_t Bl, Br;
-    get_child_submatrix_2d(this->lchild, I, J, Bl);
-    get_child_submatrix_2d(this->rchild, I, J, Br);
+    DenseM_t Blseq, Brseq;
+    if (visit(this->lchild)) this->lchild->get_submatrix_2d(I, J, Bl, Blseq);
+    if (visit(this->rchild)) this->rchild->get_submatrix_2d(I, J, Br, Brseq);
     DistM_t tmp(B.ctxt(), m, n);
-    strumpack::copy(m, n, Bl, 0, 0, tmp, 0, 0, ctxt_all);
+    if (this->lchild) {
+      if (this->lchild->isMPI())
+        strumpack::copy(m, n, Bl, 0, 0, tmp, 0, 0, ctxt_all);
+      else
+        strumpack::copy
+          (m, n, Blseq, child_master(this->lchild),
+           tmp, 0, 0, ctxt_all);
+    }
     B.add(tmp);
-    strumpack::copy(m, n, Br, 0, 0, tmp, 0, 0, ctxt_all);
+    if (this->rchild) {
+      if (this->rchild->isMPI())
+        strumpack::copy(m, n, Br, 0, 0, tmp, 0, 0, ctxt_all);
+      else
+        strumpack::copy
+          (m, n, Brseq, child_master(this->rchild),
+           tmp, 0, 0, ctxt_all);
+    }
     B.add(tmp);
     TIMER_STOP(t_getsub);
   }
 
-  // this should not be necessary with proper polymorphic code
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMPI<scalar_t,integer_t>::get_child_submatrix_2d
-  (const F_t* ch, const std::vector<std::size_t>& I,
-   const std::vector<std::size_t>& J, DistM_t& B) const {
-    if (!ch) return;
-    auto m = I.size();
-    auto n = J.size();
-    if (auto mpi_child = dynamic_cast<const FMPI_t*>(ch)) {
-      // TODO check if this really needs to be the child context,
-      // maybe we can do directly to this context??
-      // check in both FrontalMatrixDenseMPI and HSSMPI
-      B = DistM_t(mpi_child->blacs_context(), m, n);
-      B.zero();
-      mpi_child->extract_CB_sub_matrix_2d(I, J, B);
-    } else {
-      TIMER_TIME(TaskType::GET_SUBMATRIX, 2, t_getsub);
-      auto pch = child_master(ch);
-      B = DistM_t(ctxt, m, n);
-      DenseM_t lB;
-      if (mpi_rank(front_comm) == pch) {
-        lB = DenseM_t(m, n);
-        lB.zero();
-        ch->extract_CB_sub_matrix(I, J, lB, 0);
-      }
-      strumpack::copy(m, n, lB, pch, B, 0, 0, ctxt_all);
-    }
-  }
-
-  /** return the rank in front_comm where element r,c in matrix F is
-      located */
-  template<typename scalar_t,typename integer_t> inline int
-  FrontalMatrixMPI<scalar_t,integer_t>::find_rank
-  (integer_t r, integer_t c, const DistM_t& F) const {
-    // the blacs grid is column major
-    return ((r / F.MB()) % proc_rows) + ((c / F.NB()) % proc_cols)
-      * proc_rows;
-  }
-
-  template<typename scalar_t,typename integer_t> inline int
-  FrontalMatrixMPI<scalar_t,integer_t>::find_rank_fixed
-  (integer_t r, integer_t c, const DistM_t& F) const {
-    assert(F.fixed());
-    return ((r / DistM_t::default_MB) % proc_rows)
-      + ((c / DistM_t::default_NB) % proc_cols) * proc_rows;
+  FrontalMatrixMPI<scalar_t,integer_t>::get_submatrix_2d
+  (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+   DistM_t& Bdist, DenseM_t&) const {
+    Bdist = DistM_t(ctxt, I.size(), J.size());
+    Bdist.zero();
+    extract_CB_sub_matrix_2d(I, J, Bdist);
   }
 
   /**
-   * Check if the child needs to be visited not necessary when this rank
-   * is not part of the processes assigned to the child.
+   * Check if the child needs to be visited. Not necessary when this
+   * rank is not part of the processes assigned to the child.
    */
   template<typename scalar_t,typename integer_t> bool
   FrontalMatrixMPI<scalar_t,integer_t>::visit(const F_t* ch) const {
@@ -278,14 +251,14 @@ namespace strumpack {
     }
     auto P = mpi_nprocs(this->front_comm);
     std::vector<std::vector<scalar_t>> sbuf(P);
-    if (this->visit(this->lchild)) {
+    if (visit(this->lchild)) {
       if (this->lchild->isMPI())
         ExtAdd::extend_add_column_copy_to_buffers
           (CBl, sbuf, this, this->lchild->upd_to_parent(this));
       else ExtAdd::extend_add_column_seq_copy_to_buffers
              (seqCBl, sbuf, this, this->lchild);
     }
-    if (this->visit(this->rchild)) {
+    if (visit(this->rchild)) {
       if (this->rchild->isMPI())
         ExtAdd::extend_add_column_copy_to_buffers
           (CBr, sbuf, this, this->rchild->upd_to_parent(this));
