@@ -1,6 +1,6 @@
       SUBROUTINE PCGEQPFmod( M, N, A, IA, JA, DESCA, IPIV, TAU, WORK,
-     $                    LWORK, RWORK, LRWORK, INFO, JPERM, JPIV, RANK,
-     4                    TOL )
+     $     LWORK, RWORK, LRWORK, INFO, JPERM, JPIV, RANK,
+     $     RTOL, ATOL )
 *
 *  -- ScaLAPACK routine (version 1.7) --
 *     University of Tennessee, Knoxville, Oak Ridge National Laboratory,
@@ -15,7 +15,7 @@
 *     ..
 *     .. Array Arguments ..
       INTEGER            DESCA( * ), IPIV( * ), JPERM( * ), JPIV ( * )
-      REAL               RWORK( * ), TOL
+      REAL               RWORK( * ), RTOL, ATOL
       COMPLEX            A( * ), TAU( * ), WORK( * )
 *     ..
 *
@@ -385,12 +385,12 @@
             CALL SGAMX2D( ICTXT, 'A', ' ', 1, 1, TEMP, 1, 1, 1,
      $                    -1, -1, -1)
             IF(J.EQ.JA) THEN
-              IF(ABS(TEMP)<TOL) THEN
+              IF(ABS(TEMP)<ATOL) THEN
                 GOTO 99
               END IF
               A11=ABS(TEMP)
             ELSE
-              IF(ABS(TEMP)/A11<TOL) THEN
+              IF(ABS(TEMP)/A11<RTOL .OR. ABS(TEMP)<ATOL) THEN
                 GOTO 99
               END IF
             END IF
