@@ -92,10 +92,18 @@ namespace strumpack {
 
     void element_extraction
     (const SpMat_t& A, const std::vector<std::size_t>& I,
-     const std::vector<std::size_t>& J, DistM_t& B);
+     const std::vector<std::size_t>& J, DistM_t& B) const;
+    void element_extraction
+    (const SpMat_t& A, const std::vector<std::vector<std::size_t>>& I,
+     const std::vector<std::vector<std::size_t>>& J,
+     std::vector<DistMW_t>& B) const;
     void extract_CB_sub_matrix_2d
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
      DistM_t& B) const override;
+    void extract_CB_sub_matrix_2d
+    (const std::vector<std::vector<std::size_t>>& I,
+     const std::vector<std::vector<std::size_t>>& J,
+     std::vector<DistM_t>& B) const override;
 
     long long node_factor_nonzeros() const;
     integer_t maximum_rank(int task_depth) const;
@@ -363,8 +371,9 @@ namespace strumpack {
       (const std::vector<std::vector<std::size_t>>& I,
        const std::vector<std::vector<std::size_t>>& J,
        std::vector<DistMW_t>& B) {
-      for (std::size_t i=0; i<I.size(); i++)
-        element_extraction(A, I[i], J[i], B[i]);
+      // for (std::size_t i=0; i<I.size(); i++)
+      //   element_extraction(A, I[i], J[i], B[i]);
+      element_extraction(A, I, J, B);
     };
 
     TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_compress);
@@ -497,7 +506,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSSMPI<scalar_t,integer_t>::element_extraction
   (const SpMat_t& A, const std::vector<std::size_t>& I,
-   const std::vector<std::size_t>& J, DistM_t& B) {
+   const std::vector<std::size_t>& J, DistM_t& B) const {
     if (I.empty() || J.empty()) return;
     std::vector<std::size_t> gI, gJ;
     gI.reserve(I.size());
@@ -510,6 +519,31 @@ namespace strumpack {
     for (auto j : J) {
       assert(j < std::size_t(this->dim_blk()));
       gJ.push_back((j < dsep) ? j+this->sep_begin : this->upd[j-dsep]);
+    }
+    TIMER_TIME(TaskType::EXTRACT_2D, 1, t_ex);
+    this->extract_2d(A, gI, gJ, B);
+    TIMER_STOP(t_ex);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHSSMPI<scalar_t,integer_t>::element_extraction
+  (const SpMat_t& A, const std::vector<std::vector<std::size_t>>& I,
+   const std::vector<std::vector<std::size_t>>& J,
+   std::vector<DistMW_t>& B) const {
+    //if (I.empty() || J.empty()) return;
+    std::vector<std::vector<std::size_t>> gI(I.size()), gJ(J.size());
+    for (std::size_t j=0; j<I.size(); j++) {
+      gI[j].reserve(I[j].size());
+      gJ[j].reserve(J[j].size());
+      const std::size_t dsep = this->dim_sep();
+      for (auto i : I[j]) {
+        assert(i < std::size_t(this->dim_blk()));
+        gI[j].push_back((i < dsep) ? i+this->sep_begin : this->upd[i-dsep]);
+      }
+      for (auto i : J[j]) {
+        assert(i < std::size_t(this->dim_blk()));
+        gJ[j].push_back((i < dsep) ? i+this->sep_begin : this->upd[i-dsep]);
+      }
     }
     TIMER_TIME(TaskType::EXTRACT_2D, 1, t_ex);
     this->extract_2d(A, gI, gJ, B);
@@ -562,6 +596,64 @@ namespace strumpack {
     scalar_t* rbuf = nullptr, **pbuf = nullptr;
     all_to_all_v(sbuf, rbuf, pbuf, this->front_comm);
     ExtAdd::extend_copy_from_buffers(B, oI, oJ, e, pbuf);
+    delete[] rbuf;
+    delete[] pbuf;
+    TIMER_STOP(t_ex_schur);
+  }
+
+  /**
+   * Extract from (HSS - theta Vhat^* phi*^).
+   *
+   * Note that B has the same context as this front, otherwise the
+   * communication pattern would be hard to figure out.
+   */
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHSSMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
+  (const std::vector<std::vector<std::size_t>>& I,
+   const std::vector<std::vector<std::size_t>>& J,
+   std::vector<DistM_t>& B) const {
+    if (this->front_comm == MPI_COMM_NULL || !this->dim_upd()) return;
+    TIMER_TIME(TaskType::HSS_EXTRACT_SCHUR, 3, t_ex_schur);
+    auto P = mpi_nprocs(this->front_comm);
+    auto nB = I.size();
+    std::vector<std::vector<std::size_t>>
+      lI(nB), lJ(nB), oI(nB), oJ(nB), gI(nB), gJ(nB);
+    for (std::size_t i=0; i<nB; i++) {
+      this->find_upd_indices(I[i], lI[i], oI[i]);
+      this->find_upd_indices(J[i], lJ[i], oJ[i]);
+      gI[i] = lI[i];  for (auto& idx : gI[i]) idx += this->dim_sep();
+      gJ[i] = lJ[i];  for (auto& idx : gJ[i]) idx += this->dim_sep();
+    }
+    std::vector<DistM_t> e_vec = _H->extract
+      (gI, gJ, this->ctxt, this->np_rows(), this->np_cols());
+
+    std::vector<std::vector<scalar_t>> sbuf(P);
+    // TODO extract all rows at once?????
+    for (std::size_t i=0; i<nB; i++) {
+      if (_Theta.cols() < _Phi.cols()) {
+        DistM_t tr(this->ctxt, lI[i].size(), _Theta.cols(),
+                   _Theta.extract_rows(lI[i], this->front_comm), this->ctxt_all);
+        DistM_t tc(this->ctxt, _VhatCPhiC.rows(), lJ[i].size(),
+                   _VhatCPhiC.extract_cols(lJ[i], this->front_comm), this->ctxt_all);
+        gemm(Trans::N, Trans::N, scalar_t(-1), tr, tc, scalar_t(1.), e_vec[i]);
+        STRUMPACK_EXTRACTION_FLOPS
+          (gemm_flops(Trans::N, Trans::N, scalar_t(-1), tr, tc, scalar_t(1.)));
+      } else {
+        DistM_t tr(this->ctxt, lI[i].size(), _ThetaVhatC.cols(),
+                   _ThetaVhatC.extract_rows(lI[i], this->front_comm), this->ctxt_all);
+        DistM_t tc(this->ctxt, lJ[i].size(), _Phi.cols(),
+                   _Phi.extract_rows(lJ[i], this->front_comm), this->ctxt_all);
+        gemm(Trans::N, Trans::C, scalar_t(-1), tr, tc, scalar_t(1.), e_vec[i]);
+        STRUMPACK_EXTRACTION_FLOPS
+          (gemm_flops(Trans::N, Trans::C, scalar_t(-1), tr, tc, scalar_t(1.)));
+      }
+      ExtAdd::extend_copy_to_buffers(e_vec[i], oI[i], oJ[i], B[i], sbuf);
+    }
+    scalar_t* rbuf = nullptr, **pbuf = nullptr;
+    all_to_all_v(sbuf, rbuf, pbuf, this->front_comm);
+    for (std::size_t i=0; i<nB; i++)
+      ExtAdd::extend_copy_from_buffers(B[i], oI[i], oJ[i], e_vec[i], pbuf);
+
     delete[] rbuf;
     delete[] pbuf;
     TIMER_STOP(t_ex_schur);

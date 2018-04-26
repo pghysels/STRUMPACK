@@ -127,6 +127,10 @@ namespace strumpack {
       DistM_t extract
       (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
        int Bctxt, int Bprows, int Bpcols) const;
+      std::vector<DistM_t> extract
+      (const std::vector<std::vector<std::size_t>>& I,
+       const std::vector<std::vector<std::size_t>>& J,
+       int Bctxt, int Bprows, int Bpcols) const;
       void extract_add
       (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
        DistM_t& B, int Bprows, int Bpcols) const;

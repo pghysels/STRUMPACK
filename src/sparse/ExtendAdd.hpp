@@ -559,6 +559,9 @@ namespace strumpack {
       delete[] lr;
     }
 
+
+    // TODO what if B is not active?? Do we have the correct processor
+    // grid info???
     static void extend_copy_to_buffers
     (const DistM_t& F, const std::vector<std::size_t>& I,
      const std::vector<std::size_t>& J, const DistM_t& B,
