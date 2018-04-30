@@ -134,6 +134,10 @@ namespace strumpack {
       void extract_add
       (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
        DistM_t& B, int Bprows, int Bpcols) const;
+      void extract_add
+      (const std::vector<std::vector<std::size_t>>& I,
+       const std::vector<std::vector<std::size_t>>& J,
+       std::vector<DistM_t>& B, int Bprows, int Bpcols) const;
 
       void Schur_update
       (const HSSFactorsMPI<scalar_t>& f, DistM_t& Theta,
@@ -320,6 +324,12 @@ namespace strumpack {
       void triplets_to_DistM
       (std::vector<Triplet<scalar_t>>& triplets,
        DistM_t& B, int Bprows, int Bpcols) const;
+      void extract_fwd
+      (WorkExtractBlocksMPI<scalar_t>& w, int lctxt,
+       std::vector<bool>& odiag) const;
+      void extract_bwd
+      (std::vector<std::vector<Triplet<scalar_t>>>& triplets,
+       int lctxt, WorkExtractBlocksMPI<scalar_t>& w) const;
 
       void redistribute_to_tree_to_buffers
       (const DistM_t& A, std::size_t Arlo, std::size_t Aclo, int Actxt_all,
@@ -1062,6 +1072,7 @@ namespace strumpack {
 #include "HSSMatrixMPI.factor.hpp"
 #include "HSSMatrixMPI.solve.hpp"
 #include "HSSMatrixMPI.extract.hpp"
+#include "HSSMatrixMPI.extract_blocks.hpp"
 #include "HSSMatrixMPI.Schur.hpp"
 
 #endif // HSS_MATRIX_MPI_HPP

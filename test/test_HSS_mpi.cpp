@@ -257,24 +257,6 @@ int run(int argc, char* argv[]) {
   auto nJ = 8; //random_idx(gen);
   for (int i=0; i<nI; i++) I.push_back(random_idx(gen));
   for (int j=0; j<nJ; j++) J.push_back(random_idx(gen));
-
-  vector<size_t> I2, J2;
-  auto nI2 = 3; //random_idx(gen);
-  auto nJ2 = 4; //random_idx(gen);
-  for (int i=0; i<nI; i++) I2.push_back(random_idx(gen));
-  for (int j=0; j<nJ; j++) J2.push_back(random_idx(gen));
-  vector<vector<size_t>> vI, vJ;
-  vI.push_back(I);
-  vI.push_back(I2);
-  vJ.push_back(J);
-  vJ.push_back(J2);
-  auto sub_vec = H.extract(vI, vJ, A.ctxt(), nprow, npcol);
-  if (!mpi_rank()) {
-    std::cout << "sub_vec.size()=" << sub_vec.size() << std::endl;
-    for (auto i : sub_vec)
-      std::cout << "   sub=" << i.rows() << "x" << i.cols() << std::endl;
-  }
-
   if (!mpi_rank() && hss_opts.verbose()) {
     cout << "# extracting I=[";
     for (auto i : I) { cout << i << " "; } cout << "];\n#            J=[";

@@ -1,3 +1,30 @@
+/*
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
+ *
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
+ *
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly.  Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government is granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
+ *
+ * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
+ *             (Lawrence Berkeley National Lab, Computational Research
+ *             Division).
+ */
 #ifndef HSS_EXTRA_MPI_HPP
 #define HSS_EXTRA_MPI_HPP
 
@@ -205,6 +232,79 @@ namespace strumpack {
         std::copy(c[0].ycols.begin(), c[0].ycols.end(), ycols.begin());
         std::copy(c[1].ycols.begin(), c[1].ycols.end(),
                   ycols.begin()+c0ycols);
+      }
+    };
+
+    template<typename scalar_t> class WorkExtractBlocksMPI {
+    public:
+      WorkExtractBlocksMPI(std::size_t nb) {
+        y.resize(nb);
+        z.resize(nb);
+        I.resize(nb);
+        J.resize(nb);
+        rl2g.resize(nb);
+        cl2g.resize(nb);
+        ycols.resize(nb);
+        zcols.resize(nb);
+      }
+      std::vector<WorkExtractBlocksMPI<scalar_t>> c;
+      std::vector<DistributedMatrix<scalar_t>> y, z;
+      std::vector<std::vector<std::size_t>> I, J, rl2g, cl2g, ycols, zcols;
+      std::vector<std::unique_ptr<WorkExtract<scalar_t>>> w_seq;
+      void split_extraction_sets
+      (const std::pair<std::size_t,std::size_t>& dim) {
+        if (c.empty()) {
+          auto nb = I.size();
+          c.reserve(2);
+          c.emplace_back(nb);
+          c.emplace_back(nb);
+          for (std::size_t k=0; k<nb; k++) {
+            c[0].I[k].reserve(I[k].size());
+            c[1].I[k].reserve(I[k].size());
+            for (auto i : I[k])
+              if (i < dim.first) c[0].I[k].push_back(i);
+              else c[1].I[k].push_back(i - dim.first);
+            c[0].J[k].reserve(J[k].size());
+            c[1].J[k].reserve(J[k].size());
+            for (auto j : J[k])
+              if (j < dim.second) c[0].J[k].push_back(j);
+              else c[1].J[k].push_back(j - dim.second);
+          }
+        }
+      }
+      void communicate_child_ycols(MPI_Comm comm, int rch1) {
+        //std::cout << "TODO optimize these Bcasts!!" << std::endl;
+        auto rch0 = 0;
+        for (std::size_t k=0; k<I.size(); k++) {
+          std::size_t c0ycols = c[0].ycols[k].size();
+          std::size_t c1ycols = c[1].ycols[k].size();
+          MPI_Bcast(&c0ycols, 1, mpi_type<std::size_t>(), rch0, comm);
+          MPI_Bcast(&c1ycols, 1, mpi_type<std::size_t>(), rch1, comm);
+          c[0].ycols[k].resize(c0ycols);
+          c[1].ycols[k].resize(c1ycols);
+          MPI_Bcast
+            (c[0].ycols[k].data(), c0ycols,
+             mpi_type<std::size_t>(), rch0, comm);
+          MPI_Bcast
+            (c[1].ycols[k].data(), c1ycols,
+             mpi_type<std::size_t>(), rch1, comm);
+        }
+      }
+      void combine_child_ycols(const std::vector<bool>& odiag) {
+        for (std::size_t k=0; k<I.size(); k++) {
+          if (!odiag[k]) {
+            ycols[k].clear();
+            continue;
+          }
+          auto c0ycols = c[0].ycols[k].size();
+          auto c1ycols = c[1].ycols[k].size();
+          ycols[k].resize(c0ycols + c1ycols);
+          std::copy
+            (c[0].ycols[k].begin(), c[0].ycols[k].end(), ycols[k].begin());
+          std::copy
+            (c[1].ycols[k].begin(), c[1].ycols[k].end(),
+             ycols[k].begin()+c0ycols);
+        }
       }
     };
 

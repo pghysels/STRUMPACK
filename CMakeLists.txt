@@ -379,6 +379,7 @@ install(FILES src/HSS/HSSMatrix.hpp
   src/HSS/HSSMatrixMPI.compress.hpp
   src/HSS/HSSMatrixMPI.factor.hpp
   src/HSS/HSSMatrixMPI.extract.hpp
+  src/HSS/HSSMatrixMPI.extract_blocks.hpp
   src/HSS/HSSMatrixMPI.solve.hpp
   src/HSS/HSSExtraMPI.hpp
   src/HSS/HSSBasisIDMPI.hpp

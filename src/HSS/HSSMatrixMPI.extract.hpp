@@ -50,20 +50,6 @@ namespace strumpack {
       return B;
     }
 
-    template<typename scalar_t> std::vector<DistributedMatrix<scalar_t>>
-    HSSMatrixMPI<scalar_t>::extract
-    (const std::vector<std::vector<std::size_t>>& I,
-     const std::vector<std::vector<std::size_t>>& J,
-     int Bctxt, int Bprows, int Bpcols) const {
-      std::vector<DistributedMatrix<scalar_t>> B(I.size());
-      for (std::size_t i=0; i<I.size(); i++) {
-        B[i] = DistM_t(Bctxt, I[i].size(), J[i].size());
-        B[i].zero();
-        extract_add(I[i], J[i], B[i], Bprows, Bpcols);
-      }
-      return B;
-    }
-
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::extract_add
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
      DistM_t& B, int Bprows, int Bpcols) const {
@@ -87,7 +73,8 @@ namespace strumpack {
       triplets_to_DistM(triplets, B, Bprows, Bpcols);
     }
 
-    template<typename scalar_t> void HSSMatrixMPI<scalar_t>::triplets_to_DistM
+    template<typename scalar_t>
+    void HSSMatrixMPI<scalar_t>::triplets_to_DistM
     (std::vector<Triplet<scalar_t>>& triplets, DistM_t& B,
      int Bprows, int Bpcols) const {
       auto P = mpi_nprocs(_comm);
@@ -136,7 +123,6 @@ namespace strumpack {
       delete[] destr;
     }
 
-    // TODO lctxt is not used here
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::extract_fwd
     (WorkExtractMPI<scalar_t>& w, int lctxt, bool odiag) const {
       if (!this->active() || w.J.empty()) return;
