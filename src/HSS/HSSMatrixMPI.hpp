@@ -330,6 +330,9 @@ namespace strumpack {
       void extract_bwd
       (std::vector<std::vector<Triplet<scalar_t>>>& triplets,
        int lctxt, WorkExtractBlocksMPI<scalar_t>& w) const;
+      void triplets_to_DistM
+      (std::vector<std::vector<Triplet<scalar_t>>>& triplets,
+       std::vector<DistM_t>& B, int Bprows, int Bpcols) const;
 
       void redistribute_to_tree_to_buffers
       (const DistM_t& A, std::size_t Arlo, std::size_t Aclo, int Actxt_all,
