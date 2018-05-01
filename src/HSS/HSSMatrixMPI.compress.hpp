@@ -208,8 +208,18 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compress
     (const dmult_t& Amult, const delem_blocks_t& Aelem,
      const opts_t& opts, int Actxt) {
-      // TODO this only workd for original, sync for now!!
-      compress_original_sync(Amult, Aelem, opts, Actxt);
+      if (!opts.synchronized_compression())
+        std::cerr << "WARNING: Non synchronized block-extraction version"
+                  << "  of compression not supported,"
+                  << " using synchronized extraction routine" << std::endl;
+      switch (opts.compression_algorithm()) {
+      case CompressionAlgorithm::ORIGINAL:
+        compress_original_sync(Amult, Aelem, opts, Actxt); break;
+      case CompressionAlgorithm::STABLE:
+        compress_stable_sync(Amult, Aelem, opts, Actxt); break;
+      default:
+        std::cout << "Compression algorithm not recognized!" << std::endl;
+      };
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compress

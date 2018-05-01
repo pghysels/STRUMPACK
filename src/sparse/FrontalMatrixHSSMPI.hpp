@@ -371,8 +371,6 @@ namespace strumpack {
       (const std::vector<std::vector<std::size_t>>& I,
        const std::vector<std::vector<std::size_t>>& J,
        std::vector<DistMW_t>& B) {
-      // for (std::size_t i=0; i<I.size(); i++)
-      //   element_extraction(A, I[i], J[i], B[i]);
       element_extraction(A, I, J, B);
     };
 

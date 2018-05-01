@@ -83,6 +83,32 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
+    HSSMatrixMPI<scalar_t>::compress_stable_sync
+    (const dmult_t& Amult, const delem_blocks_t& Aelem,
+     const opts_t& opts, int Actxt) {
+      auto d = opts.d0();
+      auto dd = opts.dd();
+      assert(dd <= d);
+      WorkCompressMPI<scalar_t> w;
+      DistSamples<scalar_t> RS
+        (d+dd, (Actxt!=-1) ? Actxt :
+         _ctxt, *this, Amult, opts);
+      const auto nr_lvls = this->max_levels();
+      while (!this->is_compressed()) {
+        if (d != opts.d0()) RS.add_columns(d+dd, opts);
+        if (opts.verbose() && !mpi_rank(_comm))
+          std::cout << "# compressing with d+dd = " << d << "+" << dd
+                    << " (stable)" << std::endl;
+        for (int lvl=nr_lvls-1; lvl>=0; lvl--) {
+          extract_level(Aelem, opts, w, lvl);
+          compress_level_stable(RS, opts, w, d, dd, lvl);
+        }
+        d += dd;
+        dd = std::min(dd, opts.max_rank()-d);
+      }
+    }
+
+    template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_recursive_stable
     (DistSamples<scalar_t>& RS, const delemw_t& Aelem, const opts_t& opts,
      WorkCompressMPI<scalar_t>& w, int d, int dd) {

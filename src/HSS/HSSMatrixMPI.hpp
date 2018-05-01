@@ -230,6 +230,9 @@ namespace strumpack {
       void compress_stable_sync
       (const dmult_t& Amult, const delemw_t& Aelem,
        const opts_t& opts, int Actxt=-1);
+      void compress_stable_sync
+      (const dmult_t& Amult, const delem_blocks_t& Aelem,
+       const opts_t& opts, int Actxt=-1);
 
       void compress_recursive_original
       (DistSamples<scalar_t>& RS, const delemw_t& Aelem,
