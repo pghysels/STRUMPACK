@@ -1,8 +1,13 @@
 Version 2.3.0 (in progress)
 =====================================
+ - The scalability of the sparse HSS preconditioner has been
+   drastically improved. Extraction of elements (for the diagonal
+   blocks and the B_ij generators) is now done for multiple blocks
+   concurrently.
  - Add option to use Combinatorial BLAS approximate weight perfect
    matching instead of MC64. Only works in parallel, requires a square
-   number of processes.
+   number of processes. This currently requires a special version of
+   CombBLAS.
  - Fix integer overflow in the counting of nonzeros in the factors.
 
 
