@@ -18,6 +18,7 @@ the U.S. Dept. of Energy).  All rights reserved.
  - Pieter Ghysels -- pghysels@lbl.gov (Lawrence Berkeley National Laboratory)
  - Xiaoye S. Li -- xsli@lbl.gov (Lawrence Berkeley National Laboratory)
  - Gustavo Chávez -- gichavez@lbl.gov (Lawrence Berkeley National Laboratory)
+ - Yang Liu -- liuyangzhuan@lbl.gov (Lawrence Berkeley National Laboratory)
  - Christopher Gorman (UC Santa Barbara)
 
 ## Other contributors
