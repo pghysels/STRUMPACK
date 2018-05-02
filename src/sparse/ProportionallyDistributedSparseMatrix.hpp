@@ -307,7 +307,7 @@ namespace strumpack {
   ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::front_multiply
   (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
    const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const {
-    long long int local_flops = 0;
+    //long long int local_flops = 0;
     const integer_t dupd = upd.size();
     const std::size_t clo = std::lower_bound
       (_global_col, _global_col+_local_cols, slo) - _global_col;
@@ -376,8 +376,8 @@ namespace strumpack {
         }
       }
     }
-    STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
-    STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+    // STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+    // STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
   }
 
   template<typename scalar_t,typename integer_t> void

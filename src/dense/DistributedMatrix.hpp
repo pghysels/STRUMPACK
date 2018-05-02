@@ -24,7 +24,6 @@
  * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
- *
  */
 #ifndef DISTRIBUTED_MATRIX_HPP
 #define DISTRIBUTED_MATRIX_HPP
@@ -296,11 +295,11 @@ namespace strumpack {
   template<typename scalar_t>
   class DistributedMatrixWrapper : public DistributedMatrix<scalar_t> {
   private:
-    int _rows, _cols;
-    int _i, _j;
+    int _rows, _cols, _i, _j;
   public:
     DistributedMatrixWrapper() : DistributedMatrix<scalar_t>(),
       _rows(0), _cols(0), _i(0), _j(0) {}
+    DistributedMatrixWrapper(DistributedMatrix<scalar_t>& A);
     DistributedMatrixWrapper
     (std::size_t m, std::size_t n, DistributedMatrix<scalar_t>& A,
      std::size_t i, std::size_t j);
@@ -311,7 +310,16 @@ namespace strumpack {
     DistributedMatrixWrapper
     (int ctxt, int rsrc, int csrc, std::size_t m, std::size_t n,
      DenseMatrix<scalar_t>& A);
+    DistributedMatrixWrapper
+    (const DistributedMatrixWrapper<scalar_t>& A);
+    DistributedMatrixWrapper
+    (DistributedMatrixWrapper<scalar_t>&& A);
     virtual ~DistributedMatrixWrapper() { this->_data = nullptr; }
+    DistributedMatrixWrapper<scalar_t>&
+    operator=(const DistributedMatrixWrapper<scalar_t>& A);
+    DistributedMatrixWrapper<scalar_t>&
+    operator=(DistributedMatrixWrapper<scalar_t>&& A);
+
 
     int rows() const override { return _rows; }
     int cols() const override { return _cols; }
@@ -330,19 +338,8 @@ namespace strumpack {
 
     DenseMatrix<scalar_t> dense_and_clear() = delete;
     DenseMatrixWrapper<scalar_t> dense_wrapper() = delete;
-
-    DistributedMatrixWrapper
-    (const DistributedMatrixWrapper<scalar_t>&) = delete;
-    DistributedMatrixWrapper(const DistributedMatrix<scalar_t>&) = delete;
-    DistributedMatrixWrapper
-    (const DistributedMatrixWrapper<scalar_t>&&) = delete;
-    DistributedMatrixWrapper(const DistributedMatrix<scalar_t>&&) = delete;
-    DistributedMatrixWrapper<scalar_t>&
-    operator=(const DistributedMatrixWrapper<scalar_t>&) = default;
     DistributedMatrixWrapper<scalar_t>&
     operator=(const DistributedMatrix<scalar_t>&) = delete;
-    DistributedMatrixWrapper<scalar_t>&
-    operator=(DistributedMatrixWrapper<scalar_t>&& A) = default;
     DistributedMatrixWrapper<scalar_t>&
     operator=(DistributedMatrix<scalar_t>&&) = delete;
   };
@@ -426,6 +423,12 @@ namespace strumpack {
 
   template<typename scalar_t>
   DistributedMatrixWrapper<scalar_t>::DistributedMatrixWrapper
+  (DistributedMatrix<scalar_t>& A) :
+    DistributedMatrixWrapper<scalar_t>(A.rows(), A.cols(), A, 0, 0) {
+  }
+
+  template<typename scalar_t>
+  DistributedMatrixWrapper<scalar_t>::DistributedMatrixWrapper
   (std::size_t m, std::size_t n, DistributedMatrix<scalar_t>& A,
    std::size_t i, std::size_t j) : _rows(m), _cols(n), _i(i), _j(j) {
     assert(!A.active() || m+i <= std::size_t(A.rows()));
@@ -502,6 +505,39 @@ namespace strumpack {
         (this->_desc, _rows, _cols, MB, NB,
          rsrc, csrc, ctxt, 1);
     }
+  }
+
+  template<typename scalar_t>
+  DistributedMatrixWrapper<scalar_t>::DistributedMatrixWrapper
+  (const DistributedMatrixWrapper<scalar_t>& A) :
+    DistributedMatrix<scalar_t>() {
+    *this = A;
+  }
+
+  template<typename scalar_t>
+  DistributedMatrixWrapper<scalar_t>::DistributedMatrixWrapper
+  (DistributedMatrixWrapper<scalar_t>&& A) :
+    DistributedMatrixWrapper<scalar_t>(A) {
+  }
+
+  template<typename scalar_t> DistributedMatrixWrapper<scalar_t>&
+  DistributedMatrixWrapper<scalar_t>::operator=
+  (const DistributedMatrixWrapper<scalar_t>& A) {
+    this->_data = A._data;
+    std::copy(A._desc, A._desc+9, this->_desc);
+    this->_lrows = A._lrows;  this->_lcols = A._lcols;
+    this->_prows = A._prows;  this->_pcols = A._pcols;
+    this->_prow = A._prow;    this->_pcol = A._pcol;
+    _rows = A._rows;          _cols = A._cols;
+    _i = A._i;                _j = A._j;
+    return *this;
+  }
+
+  template<typename scalar_t> DistributedMatrixWrapper<scalar_t>&
+  DistributedMatrixWrapper<scalar_t>::operator=
+  (DistributedMatrixWrapper<scalar_t>&& A) {
+    *this = A;
+    return *this;
   }
 
   template<typename scalar_t> void DistributedMatrixWrapper<scalar_t>::lranges

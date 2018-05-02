@@ -136,6 +136,7 @@ namespace strumpack {
             if (locc == -1) locc = lc[t->_c] = leaf.colg2l_fixed(t->_c);
             leaf(locr, locc) = t->_v;
           }
+          delete[] lr;
         }
         delete[] rbuf;
       }

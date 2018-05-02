@@ -202,6 +202,47 @@ namespace strumpack {
       }
     }
 
+    template<typename scalar_t> void
+    HSSMatrix<scalar_t>::get_extraction_indices
+    (std::vector<std::vector<std::size_t>>& I,
+     std::vector<std::vector<std::size_t>>& J, std::vector<DenseM_t*>& B,
+     const std::pair<std::size_t,std::size_t>& off,
+     WorkCompress<scalar_t>& w, int& self, int lvl) {
+      if (this->leaf()) {
+        if (w.lvl == lvl && this->is_untouched()) {
+          self++;
+          I.emplace_back();  J.emplace_back();
+          I.back().reserve(this->rows());  J.back().reserve(this->cols());
+          for (std::size_t i=0; i<this->rows(); i++)
+            I.back().push_back(i+w.offset.first+off.first);
+          for (std::size_t j=0; j<this->cols(); j++)
+            J.back().push_back(j+w.offset.second+off.second);
+          _D = DenseM_t(this->rows(), this->cols());
+          B.push_back(&_D);
+        }
+      } else {
+        w.split(this->_ch[0]->dims());
+        if (w.lvl < lvl) {
+          this->_ch[0]->get_extraction_indices(I, J, B, off, w.c[0], self, lvl);
+          this->_ch[1]->get_extraction_indices(I, J, B, off, w.c[1], self, lvl);
+          return;
+        }
+        if (this->is_untouched()) {
+          self += 2;
+          I.push_back(w.c[0].Ir);  J.push_back(w.c[1].Ic);
+          for (auto& i : I.back()) i += off.first;
+          for (auto& j : J.back()) j += off.second;
+          I.push_back(w.c[1].Ir);  J.push_back(w.c[0].Ic);
+          for (auto& i : I.back()) i += off.first;
+          for (auto& j : J.back()) j += off.second;
+          _B01 = DenseM_t(this->_ch[0]->U_rank(), this->_ch[1]->V_rank());
+          _B10 = DenseM_t(this->_ch[1]->U_rank(), this->_ch[0]->V_rank());
+          B.push_back(&_B01);
+          B.push_back(&_B10);
+        }
+      }
+    }
+
     template<typename scalar_t> void HSSMatrix<scalar_t>::extract_D_B
     (const elem_t& Aelem, const opts_t& opts,
      WorkCompress<scalar_t>& w, int lvl) {

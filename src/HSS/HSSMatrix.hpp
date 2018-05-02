@@ -155,6 +155,11 @@ namespace strumpack {
        std::vector<std::vector<std::size_t>>& J,
        const std::pair<std::size_t,std::size_t>& off,
        WorkCompress<scalar_t>& w, int& self, int lvl);
+      void get_extraction_indices
+      (std::vector<std::vector<std::size_t>>& I,
+       std::vector<std::vector<std::size_t>>& J, std::vector<DenseM_t*>& B,
+       const std::pair<std::size_t,std::size_t>& off,
+       WorkCompress<scalar_t>& w, int& self, int lvl);
       void extract_D_B
       (const elem_t& Aelem, const opts_t& opts,
        WorkCompress<scalar_t>& w, int lvl);

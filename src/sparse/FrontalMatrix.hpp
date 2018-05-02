@@ -128,6 +128,14 @@ namespace strumpack {
      bool isroot=true, int task_depth=0);
     void permute_upd_indices(const integer_t* perm, int task_depth=0);
 
+    virtual void get_submatrix_2d
+    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+     DistM_t& Bdist, DenseM_t& Bseq) const;
+    virtual void get_submatrix_2d
+    (const std::vector<std::vector<std::size_t>>& I,
+     const std::vector<std::vector<std::size_t>>& J,
+     std::vector<DistM_t>& Bdist, std::vector<DenseM_t>& Bseq) const;
+
     virtual void set_HSS_partitioning
     (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
      bool is_root) {}
@@ -433,6 +441,30 @@ namespace strumpack {
     std::sort(upd.begin(), upd.end());
 #pragma omp taskwait
   }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrix<scalar_t,integer_t>::get_submatrix_2d
+    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+     DistM_t&, DenseM_t& Bseq) const {
+      TIMER_TIME(TaskType::GET_SUBMATRIX, 2, t_getsub);
+      Bseq = DenseM_t(I.size(), J.size());
+      Bseq.zero();
+      extract_CB_sub_matrix(I, J, Bseq, 0);
+    }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrix<scalar_t,integer_t>::get_submatrix_2d
+  (const std::vector<std::vector<std::size_t>>& I,
+   const std::vector<std::vector<std::size_t>>& J,
+   std::vector<DistM_t>&, std::vector<DenseM_t>& Bseq) const {
+      TIMER_TIME(TaskType::GET_SUBMATRIX, 2, t_getsub);
+      for (std::size_t i=0; i<I.size(); i++) {
+        Bseq.emplace_back(I[i].size(), J[i].size());
+        Bseq[i].zero();
+        // for the threaded code, just extract block per block
+        extract_CB_sub_matrix(I[i], J[i], Bseq[i], 0);
+      }
+    }
 
 } // end namespace strumpack
 

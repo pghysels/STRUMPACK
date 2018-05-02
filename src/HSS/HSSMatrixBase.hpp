@@ -188,7 +188,17 @@ namespace strumpack {
        WorkCompressMPI<scalar_t>& w, int& self, int lvl);
       virtual void get_extraction_indices
       (std::vector<std::vector<std::size_t>>& I,
+       std::vector<std::vector<std::size_t>>& J, std::vector<DistMW_t>& B,
+       int lctxt, WorkCompressMPI<scalar_t>& w, int& self, int lvl);
+      virtual void get_extraction_indices
+      (std::vector<std::vector<std::size_t>>& I,
        std::vector<std::vector<std::size_t>>& J,
+       const std::pair<std::size_t,std::size_t>& off,
+       WorkCompress<scalar_t>& w, int& self, int lvl) {}
+      virtual void get_extraction_indices
+      (std::vector<std::vector<std::size_t>>& I,
+       std::vector<std::vector<std::size_t>>& J,
+       std::vector<DenseM_t*>& B,
        const std::pair<std::size_t,std::size_t>& off,
        WorkCompress<scalar_t>& w, int& self, int lvl) {}
       virtual void extract_D_B
@@ -262,6 +272,12 @@ namespace strumpack {
       virtual void extract_bwd
       (std::vector<Triplet<scalar_t>>& triplets,
        int lctxt, WorkExtractMPI<scalar_t>& w) const;
+      virtual void extract_fwd
+      (WorkExtractBlocksMPI<scalar_t>& w, int lctxt,
+       std::vector<bool>& odiag) const;
+      virtual void extract_bwd
+      (std::vector<std::vector<Triplet<scalar_t>>>& triplets,
+       int lctxt, WorkExtractBlocksMPI<scalar_t>& w) const;
       virtual void extract_bwd
       (std::vector<Triplet<scalar_t>>& triplets,
        WorkExtract<scalar_t>& w, int depth) const {};
@@ -639,6 +655,19 @@ namespace strumpack {
       get_extraction_indices(I, J, w.offset, *w.w_seq, self, lvl);
     }
 
+    template<typename scalar_t> void
+    HSSMatrixBase<scalar_t>::get_extraction_indices
+    (std::vector<std::vector<std::size_t>>& I,
+     std::vector<std::vector<std::size_t>>& J, std::vector<DistMW_t>& B,
+     int lctxt, WorkCompressMPI<scalar_t>& w, int& self, int lvl) {
+      if (!this->active()) return;
+      w.create_sequential();
+      std::vector<DenseM_t*> Bdense;
+      get_extraction_indices(I, J, Bdense, w.offset, *w.w_seq, self, lvl);
+      for (auto& Bd : Bdense)
+        B.emplace_back(lctxt, 0, 0, Bd->rows(), Bd->cols(), *Bd);
+    }
+
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::extract_D_B
     (const delemw_t& Aelem, int lctxt, const opts_t& opts,
      WorkCompressMPI<scalar_t>& w, int lvl) {
@@ -782,6 +811,29 @@ namespace strumpack {
       w.y = DistM_t(lctxt, std::move(w.w_seq->y));
     }
 
+    template<typename scalar_t> void HSSMatrixBase<scalar_t>::extract_fwd
+    (WorkExtractBlocksMPI<scalar_t>& w, int lctxt,
+     std::vector<bool>& odiag) const {
+      if (!active()) return;
+      const auto nb = w.I.size();
+      w.w_seq.resize(nb);
+      for (std::size_t k=0; k<nb; k++) {
+        w.w_seq[k] = std::unique_ptr<WorkExtract<scalar_t>>
+          (new WorkExtract<scalar_t>());
+        WorkExtract<scalar_t>& w_seq = *w.w_seq[k];
+        std::swap(w.I[k], w_seq.I);
+        std::swap(w.J[k], w_seq.J);
+        std::swap(w.ycols[k], w_seq.ycols);
+#pragma omp parallel
+#pragma omp single nowait
+        extract_fwd(w_seq, odiag[k], _openmp_task_depth);
+        std::swap(w.I[k], w_seq.I);
+        std::swap(w.J[k], w_seq.J);
+        std::swap(w.ycols[k], w_seq.ycols);
+        w.y[k] = DistM_t(lctxt, std::move(w_seq.y));
+      }
+    }
+
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::extract_bwd
     (std::vector<Triplet<scalar_t>>& triplets, int lctxt,
      WorkExtractMPI<scalar_t>& w) const {
@@ -799,7 +851,32 @@ namespace strumpack {
       w.w_seq->z = w.z.dense_and_clear();
 #pragma omp parallel
 #pragma omp single nowait
-      extract_bwd(triplets, *(w.w_seq), _openmp_task_depth);
+      extract_bwd(triplets, w_seq, _openmp_task_depth);
+    }
+
+    template<typename scalar_t> void HSSMatrixBase<scalar_t>::extract_bwd
+    (std::vector<std::vector<Triplet<scalar_t>>>& triplets, int lctxt,
+     WorkExtractBlocksMPI<scalar_t>& w) const {
+      if (!active()) return;
+      const auto nb = w.I.size();
+      w.w_seq.resize(nb);
+      for (std::size_t k=0; k<nb; k++) {
+        if (!w.w_seq[k])
+          w.w_seq[k] = std::unique_ptr<WorkExtract<scalar_t>>
+            (new WorkExtract<scalar_t>());
+        WorkExtract<scalar_t>& w_seq = *w.w_seq[k];
+        // move instead??
+        std::swap(w.I[k], w_seq.I);
+        std::swap(w.J[k], w_seq.J);
+        std::swap(w.ycols[k], w_seq.ycols);
+        std::swap(w.zcols[k], w_seq.zcols);
+        std::swap(w.rl2g[k], w_seq.rl2g);
+        std::swap(w.cl2g[k], w_seq.cl2g);
+        w_seq.z = w.z[k].dense_and_clear();
+#pragma omp parallel
+#pragma omp single nowait
+        extract_bwd(triplets[k], w_seq, _openmp_task_depth);
+      }
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::apply_UV_big
