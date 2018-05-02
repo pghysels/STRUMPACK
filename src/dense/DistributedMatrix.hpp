@@ -1323,7 +1323,7 @@ namespace strumpack {
     // TODO also use abs_tol!!
     scalapack::pgeqpfmod
       (rows(), cols(), data(), I(), J(), desc(),
-       _J.data(), gpiv.data(), &rank, rel_tol);
+       _J.data(), gpiv.data(), &rank, rel_tol, abs_tol);
     piv.resize(lcols()+NB());
     ind.resize(rank);
     for (int c=0; c<lcols(); c++) piv[c] = gpiv[coll2g(c)];

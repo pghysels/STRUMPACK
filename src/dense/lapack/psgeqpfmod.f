@@ -1,5 +1,5 @@
       SUBROUTINE PSGEQPFmod( M, N, A, IA, JA, DESCA, IPIV, TAU, WORK,
-     $                    LWORK, INFO, JPERM, JPIV, RANK, TOL )
+     $                    LWORK, INFO, JPERM, JPIV, RANK, RTOL, ATOL )
 *
 *  -- ScaLAPACK routine (version 1.7) --
 *     University of Tennessee, Knoxville, Oak Ridge National Laboratory,
@@ -14,7 +14,7 @@
 *     ..
 *     .. Array Arguments ..
       INTEGER            DESCA( * ), IPIV( * ), JPERM( *), JPIV( * )
-      REAL               A( * ), TAU( * ), WORK( * ), TOL
+      REAL               A( * ), TAU( * ), WORK( * ), RTOL, ATOL
 *     ..
 *
 *  Purpose
@@ -357,12 +357,12 @@
             CALL SGAMX2D( ICTXT, 'A', ' ', 1, 1, TEMP, 1, 1, 1,
      $                    -1, -1, -1)
             IF(J.EQ.JA) THEN
-              IF(ABS(TEMP)<TOL) THEN
+              IF(ABS(TEMP)<ATOL) THEN
                 GOTO 99
               END IF
               A11=ABS(TEMP)
             ELSE
-              IF(ABS(TEMP)/A11<TOL) THEN
+              IF(ABS(TEMP)/A11<RTOL .OR. ABS(TEMP)<ATOL) THEN
                 GOTO 99
               END IF
             END IF
