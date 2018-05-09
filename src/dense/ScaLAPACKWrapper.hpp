@@ -1543,6 +1543,12 @@ namespace strumpack {
       return info;
     }
 
+    inline char topget(int ctxt, char B, char R) {
+      char ret;
+      FC_GLOBAL(pb_topget,PB_TOPGET)(&ctxt, &B, &R, &ret);
+      return ret;
+    }
+
   } // end namespace scalapack
 } // end namespace strumpack
 
