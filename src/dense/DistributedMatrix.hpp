@@ -1,3 +1,30 @@
+/*
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
+ *
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
+ *
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly.  Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government is granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
+ *
+ * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
+ *             (Lawrence Berkeley National Lab, Computational Research
+ *             Division).
+ */
 #ifndef DISTRIBUTED_MATRIX_HPP
 #define DISTRIBUTED_MATRIX_HPP
 
@@ -268,11 +295,11 @@ namespace strumpack {
   template<typename scalar_t>
   class DistributedMatrixWrapper : public DistributedMatrix<scalar_t> {
   private:
-    int _rows, _cols;
-    int _i, _j;
+    int _rows, _cols, _i, _j;
   public:
     DistributedMatrixWrapper() : DistributedMatrix<scalar_t>(),
       _rows(0), _cols(0), _i(0), _j(0) {}
+    DistributedMatrixWrapper(DistributedMatrix<scalar_t>& A);
     DistributedMatrixWrapper
     (std::size_t m, std::size_t n, DistributedMatrix<scalar_t>& A,
      std::size_t i, std::size_t j);
@@ -283,7 +310,16 @@ namespace strumpack {
     DistributedMatrixWrapper
     (int ctxt, int rsrc, int csrc, std::size_t m, std::size_t n,
      DenseMatrix<scalar_t>& A);
+    DistributedMatrixWrapper
+    (const DistributedMatrixWrapper<scalar_t>& A);
+    DistributedMatrixWrapper
+    (DistributedMatrixWrapper<scalar_t>&& A);
     virtual ~DistributedMatrixWrapper() { this->_data = nullptr; }
+    DistributedMatrixWrapper<scalar_t>&
+    operator=(const DistributedMatrixWrapper<scalar_t>& A);
+    DistributedMatrixWrapper<scalar_t>&
+    operator=(DistributedMatrixWrapper<scalar_t>&& A);
+
 
     int rows() const override { return _rows; }
     int cols() const override { return _cols; }
@@ -302,19 +338,8 @@ namespace strumpack {
 
     DenseMatrix<scalar_t> dense_and_clear() = delete;
     DenseMatrixWrapper<scalar_t> dense_wrapper() = delete;
-
-    DistributedMatrixWrapper
-    (const DistributedMatrixWrapper<scalar_t>&) = delete;
-    DistributedMatrixWrapper(const DistributedMatrix<scalar_t>&) = delete;
-    DistributedMatrixWrapper
-    (const DistributedMatrixWrapper<scalar_t>&&) = delete;
-    DistributedMatrixWrapper(const DistributedMatrix<scalar_t>&&) = delete;
-    DistributedMatrixWrapper<scalar_t>&
-    operator=(const DistributedMatrixWrapper<scalar_t>&) = default;
     DistributedMatrixWrapper<scalar_t>&
     operator=(const DistributedMatrix<scalar_t>&) = delete;
-    DistributedMatrixWrapper<scalar_t>&
-    operator=(DistributedMatrixWrapper<scalar_t>&& A) = default;
     DistributedMatrixWrapper<scalar_t>&
     operator=(DistributedMatrix<scalar_t>&&) = delete;
   };
@@ -398,6 +423,12 @@ namespace strumpack {
 
   template<typename scalar_t>
   DistributedMatrixWrapper<scalar_t>::DistributedMatrixWrapper
+  (DistributedMatrix<scalar_t>& A) :
+    DistributedMatrixWrapper<scalar_t>(A.rows(), A.cols(), A, 0, 0) {
+  }
+
+  template<typename scalar_t>
+  DistributedMatrixWrapper<scalar_t>::DistributedMatrixWrapper
   (std::size_t m, std::size_t n, DistributedMatrix<scalar_t>& A,
    std::size_t i, std::size_t j) : _rows(m), _cols(n), _i(i), _j(j) {
     assert(!A.active() || m+i <= std::size_t(A.rows()));
@@ -474,6 +505,39 @@ namespace strumpack {
         (this->_desc, _rows, _cols, MB, NB,
          rsrc, csrc, ctxt, 1);
     }
+  }
+
+  template<typename scalar_t>
+  DistributedMatrixWrapper<scalar_t>::DistributedMatrixWrapper
+  (const DistributedMatrixWrapper<scalar_t>& A) :
+    DistributedMatrix<scalar_t>() {
+    *this = A;
+  }
+
+  template<typename scalar_t>
+  DistributedMatrixWrapper<scalar_t>::DistributedMatrixWrapper
+  (DistributedMatrixWrapper<scalar_t>&& A) :
+    DistributedMatrixWrapper<scalar_t>(A) {
+  }
+
+  template<typename scalar_t> DistributedMatrixWrapper<scalar_t>&
+  DistributedMatrixWrapper<scalar_t>::operator=
+  (const DistributedMatrixWrapper<scalar_t>& A) {
+    this->_data = A._data;
+    std::copy(A._desc, A._desc+9, this->_desc);
+    this->_lrows = A._lrows;  this->_lcols = A._lcols;
+    this->_prows = A._prows;  this->_pcols = A._pcols;
+    this->_prow = A._prow;    this->_pcol = A._pcol;
+    _rows = A._rows;          _cols = A._cols;
+    _i = A._i;                _j = A._j;
+    return *this;
+  }
+
+  template<typename scalar_t> DistributedMatrixWrapper<scalar_t>&
+  DistributedMatrixWrapper<scalar_t>::operator=
+  (DistributedMatrixWrapper<scalar_t>&& A) {
+    *this = A;
+    return *this;
   }
 
   template<typename scalar_t> void DistributedMatrixWrapper<scalar_t>::lranges
@@ -1259,7 +1323,7 @@ namespace strumpack {
     // TODO also use abs_tol!!
     scalapack::pgeqpfmod
       (rows(), cols(), data(), I(), J(), desc(),
-       _J.data(), gpiv.data(), &rank, rel_tol);
+       _J.data(), gpiv.data(), &rank, rel_tol, abs_tol);
     piv.resize(lcols()+NB());
     ind.resize(rank);
     for (int c=0; c<lcols(); c++) piv[c] = gpiv[coll2g(c)];
@@ -1288,12 +1352,109 @@ namespace strumpack {
     assert(A.I()>=1 && A.J()>=1 && B.I()>=1 &&
            B.J()>=1 && C.I()>=1 && C.J()>=1);
     assert(A.ctxt()==B.ctxt() && A.ctxt()==C.ctxt());
+#if 1
     scalapack::pgemm
       (char(ta), char(tb), C.rows(), C.cols(),
        (ta==Trans::N) ? A.cols() : A.rows(), alpha,
        A.data(), A.I(), A.J(), A.desc(),
        B.data(), B.I(), B.J(), B.desc(),
        beta, C.data(), C.I(), C.J(), C.desc());
+#else
+    if (A.I() != 1 || A.J() != 1) {
+      DistributedMatrix<scalar_t> localA(A.ctxt(), A.rows(), A.cols());
+      strumpack::copy(A.rows(), A.cols(), A, 0, 0, localA, 0, 0, A.ctxt());
+      if (B.I() != 1 || B.J() != 1) {
+        DistributedMatrix<scalar_t> localB(B.ctxt(), B.rows(), B.cols());
+        strumpack::copy(B.rows(), B.cols(), B, 0, 0, localB, 0, 0, B.ctxt());
+        if (C.I() != 1 || C.J() != 1) {
+          DistributedMatrix<scalar_t> localC(C.ctxt(), C.rows(), C.cols());
+          strumpack::copy(C.rows(), C.cols(), C, 0, 0, localC, 0, 0, C.ctxt());
+          //std::cout << "Making 3 copies!!" << std::endl;
+          scalapack::pgemm
+            (char(ta), char(tb), C.rows(), C.cols(),
+             (ta==Trans::N) ? A.cols() : A.rows(), alpha,
+             localA.data(), localA.I(), localA.J(), localA.desc(),
+             localB.data(), localB.I(), localB.J(), localB.desc(), beta,
+             localC.data(), localC.I(), localC.J(), localC.desc());
+          strumpack::copy(C.rows(), C.cols(), localC, 0, 0, C, 0, 0, C.ctxt());
+        } else {
+          //std::cout << "Making 2 copies (A,B)!!" << std::endl;
+          scalapack::pgemm
+            (char(ta), char(tb), C.rows(), C.cols(),
+             (ta==Trans::N) ? A.cols() : A.rows(), alpha,
+             localA.data(), localA.I(), localA.J(), localA.desc(),
+             localB.data(), localB.I(), localB.J(), localB.desc(), beta,
+             C.data(), C.I(), C.J(), C.desc());
+        }
+      } else {
+        if (C.I() || C.J()) {
+          DistributedMatrix<scalar_t> localC(C.ctxt(), C.rows(), C.cols());
+          strumpack::copy(C.rows(), C.cols(), C, 0, 0, localC, 0, 0, C.ctxt());
+          //std::cout << "Making 2 copies (A,C)!!" << std::endl;
+          scalapack::pgemm
+            (char(ta), char(tb), C.rows(), C.cols(),
+             (ta==Trans::N) ? A.cols() : A.rows(), alpha,
+             localA.data(), localA.I(), localA.J(), localA.desc(),
+             B.data(), B.I(), B.J(), B.desc(), beta,
+             localC.data(), localC.I(), localC.J(), localC.desc());
+          strumpack::copy(C.rows(), C.cols(), localC, 0, 0, C, 0, 0, C.ctxt());
+        } else {
+          //std::cout << "Making 1 copy (A)!!" << std::endl;
+          scalapack::pgemm
+            (char(ta), char(tb), C.rows(), C.cols(),
+             (ta==Trans::N) ? A.cols() : A.rows(), alpha,
+             localA.data(), localA.I(), localA.J(), localA.desc(),
+             B.data(), B.I(), B.J(), B.desc(), beta,
+             C.data(), C.I(), C.J(), C.desc());
+        }
+      }
+    } else {
+      if (B.I() != 1 || B.J() != 1) {
+        DistributedMatrix<scalar_t> localB(B.ctxt(), B.rows(), B.cols());
+        strumpack::copy(B.rows(), B.cols(), B, 0, 0, localB, 0, 0, B.ctxt());
+        if (C.I() != 1 || C.J() != 1) {
+          DistributedMatrix<scalar_t> localC(C.ctxt(), C.rows(), C.cols());
+          strumpack::copy(C.rows(), C.cols(), C, 0, 0, localC, 0, 0, C.ctxt());
+          //std::cout << "Making 2 copies (B,C)!!" << std::endl;
+          scalapack::pgemm
+            (char(ta), char(tb), C.rows(), C.cols(),
+             (ta==Trans::N) ? A.cols() : A.rows(), alpha,
+             A.data(), A.I(), A.J(), A.desc(),
+             localB.data(), localB.I(), localB.J(), localB.desc(), beta,
+             localC.data(), localC.I(), localC.J(), localC.desc());
+          strumpack::copy(C.rows(), C.cols(), localC, 0, 0, C, 0, 0, C.ctxt());
+        } else {
+          //std::cout << "Making 1 copy (B)!!" << std::endl;
+          scalapack::pgemm
+            (char(ta), char(tb), C.rows(), C.cols(),
+             (ta==Trans::N) ? A.cols() : A.rows(), alpha,
+             A.data(), A.I(), A.J(), A.desc(),
+             localB.data(), localB.I(), localB.J(), localB.desc(), beta,
+             C.data(), C.I(), C.J(), C.desc());
+        }
+      } else {
+        if (C.I() || C.J()) {
+          DistributedMatrix<scalar_t> localC(C.ctxt(), C.rows(), C.cols());
+          strumpack::copy(C.rows(), C.cols(), C, 0, 0, localC, 0, 0, C.ctxt());
+          //std::cout << "Making 1 copy (C)!!" << std::endl;
+          scalapack::pgemm
+            (char(ta), char(tb), C.rows(), C.cols(),
+             (ta==Trans::N) ? A.cols() : A.rows(), alpha,
+             A.data(), A.I(), A.J(), A.desc(),
+             B.data(), B.I(), B.J(), B.desc(), beta,
+             localC.data(), localC.I(), localC.J(), localC.desc());
+          strumpack::copy(C.rows(), C.cols(), localC, 0, 0, C, 0, 0, C.ctxt());
+        } else {
+          scalapack::pgemm
+            (char(ta), char(tb), C.rows(), C.cols(),
+             (ta==Trans::N) ? A.cols() : A.rows(), alpha,
+             A.data(), A.I(), A.J(), A.desc(),
+             B.data(), B.I(), B.J(), B.desc(), beta,
+             C.data(), C.I(), C.J(), C.desc());
+        }
+      }
+    }
+#endif
     STRUMPACK_FLOPS(gemm_flops(ta, tb, alpha, A, B, beta));
   }
 

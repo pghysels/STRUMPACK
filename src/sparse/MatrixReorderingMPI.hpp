@@ -300,8 +300,11 @@ namespace strumpack {
       this->perm[global_sep_order[i]] = this->iperm[i];
     for (integer_t i=0; i<n; i++)
       this->iperm[this->perm[i]] = i;
-    for (integer_t i=0; i<n; i++)
-      std::swap(this->perm[i], this->iperm[i]);
+    for (integer_t i=0; i<n; i++) {
+      auto tmp = this->perm[i];
+      this->perm[i] = this->iperm[i];
+      this->iperm[i] = tmp;
+    }
     delete[] global_sep_order;
   }
 
@@ -441,7 +444,7 @@ namespace strumpack {
     auto dsep_iorder = dsep_order + dim_dsep;
     if (dim_dsep) {
       HSS::HSSPartitionTree tree(dim_dsep);
-      if ((dim_dsep >= opts.HSS_min_front_size()) &&
+      if ((dim_dsep >= opts.HSS_min_sep_size()) &&
           (dim_dsep > 2 * opts.HSS_options().leaf_size())) {
         std::vector<integer_t> sep_csr_ptr, sep_csr_ind;
         std::function<void(HSS::HSSPartitionTree&, integer_t&,

@@ -253,9 +253,9 @@ namespace strumpack {
     _n = A._n;
     _nnz = A._nnz;
     _symm_sparse = A._symm_sparse;
-    _ptr = new integer_t[_n+1];
-    _ind = new integer_t[_nnz];
-    _val = new scalar_t[_nnz];
+    delete[] _ptr; _ptr = new integer_t[_n+1];
+    delete[] _ind; _ind = new integer_t[_nnz];
+    delete[] _val; _val = new scalar_t[_nnz];
     if (A._ptr) std::copy(A._ptr, A._ptr+_n+1, _ptr);
     if (A._ind) std::copy(A._ind, A._ind+_nnz, _ind);
     if (A._val) std::copy(A._val, A._val+_nnz, _val);
@@ -269,9 +269,9 @@ namespace strumpack {
     _n = A._n;
     _nnz = A._nnz;
     _symm_sparse = A._symm_sparse;
-    _ptr = A._ptr; A._ptr = nullptr;
-    _ind = A._ind; A._ind = nullptr;
-    _val = A._val; A._val = nullptr;
+    delete[] _ptr; _ptr = A._ptr; A._ptr = nullptr;
+    delete[] _ind; _ind = A._ind; A._ind = nullptr;
+    delete[] _val; _val = A._val; A._val = nullptr;
     return *this;
   }
 

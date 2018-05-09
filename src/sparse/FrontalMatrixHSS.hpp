@@ -224,45 +224,49 @@ namespace strumpack {
     this->find_upd_indices(I, lI, oI);
     if (lI.empty()) return;
 
-    auto M = _H.child(1)->extract(lI, lJ);
-    for (std::size_t j=0; j<lJ.size(); j++)
-      for (std::size_t i=0; i<lI.size(); i++)
-        B(oI[i], oJ[j]) += M(i, j);
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single
+    {
+      auto M = _H.child(1)->extract(lI, lJ);
+      for (std::size_t j=0; j<lJ.size(); j++)
+        for (std::size_t i=0; i<lI.size(); i++)
+          B(oI[i], oJ[j]) += M(i, j);
 
-    if (_Theta.cols() < _Phi.cols()) {
-      // S = F22 - _Theta * _ThetaVhatC_or_VhatCPhiC
-      auto r = _Theta.cols();
-      DenseM_t r_theta(lI.size(), r);
-      DenseM_t c_vhatphiC(r, lJ.size());
-      for (std::size_t i=0; i<lI.size(); i++)
-        copy(1, r, _Theta, lI[i], 0, r_theta, i, 0);
-      for (std::size_t j=0; j<lJ.size(); j++)
-        copy(r, 1, _ThetaVhatC_or_VhatCPhiC, 0, lJ[j], c_vhatphiC, 0, j);
-      gemm(Trans::N, Trans::N, scalar_t(-1.), r_theta, c_vhatphiC,
-           scalar_t(0.), M, task_depth);
-      for (std::size_t j=0; j<lJ.size(); j++)
+      if (_Theta.cols() < _Phi.cols()) {
+        // S = F22 - _Theta * _ThetaVhatC_or_VhatCPhiC
+        auto r = _Theta.cols();
+        DenseM_t r_theta(lI.size(), r);
+        DenseM_t c_vhatphiC(r, lJ.size());
         for (std::size_t i=0; i<lI.size(); i++)
-          B(oI[i], oJ[j]) += M(i, j);
-      STRUMPACK_EXTRACTION_FLOPS
-        (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), r_theta, c_vhatphiC,
-                    scalar_t(0.)) + lJ.size()*lI.size());
-    } else {
-      // S = F22 - _ThetaVhatC_or_VhatCPhiC * _Phi'
-      auto r = _Phi.cols();
-      DenseM_t r_thetavhat(lI.size(), r);
-      DenseM_t r_phi(lJ.size(), r);
-      for (std::size_t i=0; i<lI.size(); i++)
-        copy(1, r, _ThetaVhatC_or_VhatCPhiC, lI[i], 0, r_thetavhat, i, 0);
-      for (std::size_t j=0; j<lJ.size(); j++)
-        copy(1, r, _Phi, lJ[j], 0, r_phi, j, 0);
-      gemm(Trans::N, Trans::C, scalar_t(-1.), r_thetavhat, r_phi,
-           scalar_t(0.), M, task_depth);
-      for (std::size_t j=0; j<lJ.size(); j++)
+          copy(1, r, _Theta, lI[i], 0, r_theta, i, 0);
+        for (std::size_t j=0; j<lJ.size(); j++)
+          copy(r, 1, _ThetaVhatC_or_VhatCPhiC, 0, lJ[j], c_vhatphiC, 0, j);
+        gemm(Trans::N, Trans::N, scalar_t(-1.), r_theta, c_vhatphiC,
+             scalar_t(0.), M, task_depth);
+        for (std::size_t j=0; j<lJ.size(); j++)
+          for (std::size_t i=0; i<lI.size(); i++)
+            B(oI[i], oJ[j]) += M(i, j);
+        STRUMPACK_EXTRACTION_FLOPS
+          (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), r_theta, c_vhatphiC,
+                      scalar_t(0.)) + lJ.size()*lI.size());
+      } else {
+        // S = F22 - _ThetaVhatC_or_VhatCPhiC * _Phi'
+        auto r = _Phi.cols();
+        DenseM_t r_thetavhat(lI.size(), r);
+        DenseM_t r_phi(lJ.size(), r);
         for (std::size_t i=0; i<lI.size(); i++)
-          B(oI[i], oJ[j]) += M(i, j);
-      STRUMPACK_EXTRACTION_FLOPS
-        (gemm_flops(Trans::N, Trans::C, scalar_t(-1.), r_thetavhat, r_phi,
-                    scalar_t(0.)) + lJ.size()*lI.size());
+          copy(1, r, _ThetaVhatC_or_VhatCPhiC, lI[i], 0, r_thetavhat, i, 0);
+        for (std::size_t j=0; j<lJ.size(); j++)
+          copy(1, r, _Phi, lJ[j], 0, r_phi, j, 0);
+        gemm(Trans::N, Trans::C, scalar_t(-1.), r_thetavhat, r_phi,
+             scalar_t(0.), M, task_depth);
+        for (std::size_t j=0; j<lJ.size(); j++)
+          for (std::size_t i=0; i<lI.size(); i++)
+            B(oI[i], oJ[j]) += M(i, j);
+        STRUMPACK_EXTRACTION_FLOPS
+          (gemm_flops(Trans::N, Trans::C, scalar_t(-1.), r_thetavhat, r_phi,
+                      scalar_t(0.)) + lJ.size()*lI.size());
+      }
     }
   }
 

@@ -491,13 +491,12 @@ namespace strumpack {
 
     this->_root->multifrontal_solve(Xloc, xdist);
 
-    std::swap(rbuf, sbuf);
     rcnts = ibuf;
     scnts = ibuf + _P;
     rdispls = ibuf + 2*_P;
     sdispls = ibuf + 3*_P;
     for (int p=0; p<_P; p++)
-      pp[p] = sbuf + sdispls[p];
+      pp[p] = rbuf + sdispls[p];
     for (std::size_t r=_local_range.first; r<_local_range.second; r++) {
       auto dest = std::upper_bound
         (dist.begin(), dist.end(), _nd.iperm[r])-dist.begin()-1;
@@ -527,15 +526,15 @@ namespace strumpack {
     }
     delete[] pp;
     MPI_Alltoallv
-      (sbuf, scnts, sdispls, RCVal_mpi_type, rbuf, rcnts,
+      (rbuf, scnts, sdispls, RCVal_mpi_type, sbuf, rcnts,
        rdispls, RCVal_mpi_type, this->_comm);
     MPI_Type_free(&RCVal_mpi_type);
-    delete[] sbuf;
+    delete[] rbuf;
     delete[] ibuf;
 #pragma omp parallel for
     for (std::size_t i=0; i<m*n; i++)
-      x(rbuf[i].r-lo,rbuf[i].c) = rbuf[i].v;
-    delete[] rbuf;
+      x(sbuf[i].r-lo,sbuf[i].c) = sbuf[i].v;
+    delete[] sbuf;
     delete[] xdist;
   }
 

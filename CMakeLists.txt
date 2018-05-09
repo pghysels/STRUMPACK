@@ -9,6 +9,7 @@ option(STRUMPACK_USE_PAPI "Build with support for PAPI monitoring" OFF)
 option(STRUMPACK_USE_COMBBLAS "Use CombBLAS for weighted matching" OFF)
 option(STRUMPACK_COUNT_FLOPS "Build with flop counters" ON)
 option(STRUMPACK_TASK_TIMERS "Build with timers for internal routines" ON)
+option(STRUMPACK_BUILD_TESTS "Build the tests" OFF)
 option(STRUMPACK_DEV_TESTING "Enable extensive testing" OFF)
 option(STRUMPACK_C_INTERFACE "Build the C interface" OFF)
 
@@ -220,9 +221,9 @@ endforeach(arg ${LIBS})
 # foreach(arg ${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES})
 #   set(STRUMPACK_ALL_LIBS "${STRUMPACK_ALL_LIBS} -l${arg}")
 # endforeach(arg ${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES})
-# foreach(arg ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
-#   set(STRUMPACK_ALL_LIBS "${STRUMPACK_ALL_LIBS} -l${arg}")
-# endforeach(arg ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
+foreach(arg ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
+  set(STRUMPACK_ALL_LIBS "${STRUMPACK_ALL_LIBS} -l${arg}")
+endforeach(arg ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
   set(STRUMPACK_ALL_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_RELEASE}")
@@ -380,6 +381,7 @@ install(FILES src/HSS/HSSMatrix.hpp
   src/HSS/HSSMatrixMPI.compress.hpp
   src/HSS/HSSMatrixMPI.factor.hpp
   src/HSS/HSSMatrixMPI.extract.hpp
+  src/HSS/HSSMatrixMPI.extract_blocks.hpp
   src/HSS/HSSMatrixMPI.solve.hpp
   src/HSS/HSSExtraMPI.hpp
   src/HSS/HSSBasisIDMPI.hpp
@@ -464,10 +466,10 @@ endif()
 # configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson3dMPIDist.cpp
 #   ${CMAKE_BINARY_DIR}/examples/testPoisson3dMPIDist.cpp COPYONLY)
 
-configure_file(${CMAKE_SOURCE_DIR}/examples/DenseToeplitzQChem.cpp
-  ${CMAKE_BINARY_DIR}/examples/DenseToeplitzQChem.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/DenseToeplitzMPI.cpp
   ${CMAKE_BINARY_DIR}/examples/DenseToeplitzMPI.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/DenseToeplitzQChem.cpp
+  ${CMAKE_BINARY_DIR}/examples/DenseToeplitzQChem.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/DenseBEMColStateMPI.cpp
   ${CMAKE_BINARY_DIR}/examples/DenseBEMColStateMPI.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/DenseBEMAirbus.cpp
@@ -483,5 +485,7 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/generatePermutation.hpp
 configure_file(${CMAKE_SOURCE_DIR}/examples/applyPermutation.hpp
   ${CMAKE_BINARY_DIR}/examples/applyPermutation.hpp COPYONLY)
 
-include(CTest)
-add_subdirectory(test)
+if(STRUMPACK_BUILD_TESTS)
+  include(CTest)
+  add_subdirectory(test)
+endif()

@@ -81,7 +81,22 @@ in order to avoid CMake from looking for the libraries.
 
 When using Intel MKL we recommend using the the link advisor:
 https://software.intel.com/en-us/articles/intel-mkl-link-line-advisor
+Always ask for the 32-bit integer interface layer, check ScaLAPACK and
+BLACS.
 
+For instance when the Intel MKL link line advisor returns the
+following:
+
+${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a -Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_gnu_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_blacs_intelmpi_lp64.a -Wl,--end-group -lgomp -lpthread -lm -ldl
+
+Set this:
+
+-DBLAS_LIBRARIES="" \
+-DLAPACK_LIBRARIES="" \
+-DSCALAPACK_LIBRARIES="${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a;-Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_gnu_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_blacs_intelmpi_lp64.a -Wl,--end-group;-lgomp;-lpthread;-lm;-ldl"
+
+i.e., separate the arguments with a ';', where everything between
+-Wl,--start-group and -Wl,--end-group is a single argument.
 
 
 METIS

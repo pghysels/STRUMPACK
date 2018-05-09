@@ -400,18 +400,20 @@ namespace strumpack {
 
       void FC_GLOBAL(psgeqpfmod,PSGEQPFMOD)
         (int *, int *, float *, int *, int *, const int *, int *,
-         float *, float *, int *, int *, int *, int *, int *, float *);
+         float *, float *, int *, int *, int *, int *, int *,
+         float *, float*);
       void FC_GLOBAL(pdgeqpfmod,PDGEQPFMOD)
         (int *, int *, double *, int *, int *, const int *, int *,
-         double *, double *, int *, int *, int *, int *, int *, double *);
+         double *, double *, int *, int *, int *, int *, int *,
+         double *, double *);
       void FC_GLOBAL(pcgeqpfmod,PCGEQPFMOD)
         (int *, int *, std::complex<float> *, int *, int *, const int *,
          int *, std::complex<float> *, std::complex<float> *, int *, float *,
-         int *, int *, int *, int *, int *,  float *);
+         int *, int *, int *, int *, int *, float *, float *);
       void FC_GLOBAL(pzgeqpfmod,PZGEQPFMOD)
         (int *, int *, std::complex<double> *, int *, int *, const int *,
          int *, std::complex<double> *, std::complex<double> *, int *,
-         double *, int *, int *, int *, int *, int *, double *);
+         double *, int *, int *, int *, int *, int *, double *, double *);
 
       void FC_GLOBAL(psgetrf,PSGETRF)
         (int *, int *, float *, int *, int *, const int *, int *, int *);
@@ -1168,7 +1170,7 @@ namespace strumpack {
 
     inline void pgeqpfmod
     (int m, int n, float* a, int ia, int ja, const int *desca,
-     int *J, int *piv, int *r,  float tol) {
+     int *J, int *piv, int *r, float rtol, float atol) {
       int mb = desca[BLACSmb], nb = desca[BLACSnb];
       int info, prow, pcol, nprow, npcol;
       Cblacs_gridinfo(desca[BLACSctxt], &nprow, &npcol, &prow, &pcol);
@@ -1181,13 +1183,13 @@ namespace strumpack {
       int IONE = 1;
       FC_GLOBAL(psgeqpfmod,PSGEQPFMOD)
         (&m, &n, a, &IONE, &IONE, desca, ipiv, tau,
-         twork, &lwork, &info, J, piv, r, &tol);
+         twork, &lwork, &info, J, piv, r, &rtol, &atol);
       delete[] twork;
       delete[] ipiv;
     }
     inline void pgeqpfmod
     (int m, int n, double* a, int ia, int ja, const int *desca,
-     int *J, int *piv, int *r, double tol) {
+     int *J, int *piv, int *r, double rtol, double atol) {
       int mb = desca[BLACSmb], nb = desca[BLACSnb];
       int info, prow, pcol, nprow, npcol;
       Cblacs_gridinfo(desca[BLACSctxt], &nprow, &npcol, &prow, &pcol);
@@ -1200,13 +1202,13 @@ namespace strumpack {
       int IONE = 1;
       FC_GLOBAL(pdgeqpfmod,PDGEQPFMOD)
         (&m, &n, a, &IONE, &IONE, desca, ipiv, tau,
-         twork, &lwork, &info, J, piv, r, &tol);
+         twork, &lwork, &info, J, piv, r, &rtol, &atol);
       delete[] twork;
       delete[] ipiv;
     }
     inline void pgeqpfmod
     (int m, int n, std::complex<float>* a, int ia, int ja, const int *desca,
-     int *J, int *piv, int *r, float tol) {
+     int *J, int *piv, int *r, float rtol, float atol) {
       int mb = desca[BLACSmb], nb = desca[BLACSnb];
       int info, prow, pcol, nprow, npcol;
       Cblacs_gridinfo(desca[BLACSctxt], &nprow, &npcol, &prow, &pcol);
@@ -1221,14 +1223,15 @@ namespace strumpack {
       int IONE = 1;
       FC_GLOBAL(pcgeqpfmod,PCGEQPFMOD)
         (&m, &n, a, &IONE, &IONE, desca, ipiv, tau,
-         twork, &lwork, rwork, &lrwork, &info, J, piv, r, &tol);
+         twork, &lwork, rwork, &lrwork, &info, J, piv, r,
+         &rtol, &atol);
       delete[] twork;
       delete[] rwork;
       delete[] ipiv;
     }
     inline void pgeqpfmod
     (int m, int n, std::complex<double>* a, int ia, int ja, const int *desca,
-     int *J, int *piv, int *r, double tol) {
+     int *J, int *piv, int *r, double rtol, double atol) {
       int mb = desca[BLACSmb], nb = desca[BLACSnb];
       int info, prow, pcol, nprow, npcol;
       Cblacs_gridinfo(desca[BLACSctxt], &nprow, &npcol, &prow, &pcol);
@@ -1243,7 +1246,8 @@ namespace strumpack {
       int IONE = 1;
       FC_GLOBAL(pzgeqpfmod,PZGEQPFMOD)
         (&m, &n, a, &IONE, &IONE, desca, ipiv, tau,
-         twork, &lwork, rwork, &lrwork, &info, J, piv, r, &tol);
+         twork, &lwork, rwork, &lrwork, &info, J, piv, r,
+         &rtol, &atol);
       delete[] twork;
       delete[] rwork;
       delete[] ipiv;
@@ -1537,6 +1541,12 @@ namespace strumpack {
       info = pxxgqr(m, n, k, a, ia, ja, desca, tau, work, ilwork);
       delete[] work;
       return info;
+    }
+
+    inline char topget(int ctxt, char B, char R) {
+      char ret;
+      FC_GLOBAL(pb_topget,PB_TOPGET)(&ctxt, &B, &R, &ret);
+      return ret;
     }
 
   } // end namespace scalapack
