@@ -254,6 +254,8 @@ namespace strumpack {
           }
         }
         auto U = _U.dense();
+
+        // TODO split this into comm - comp - comm phases
         for (std::size_t k=0; k<nb; k++) {
           if (!w.c[0].I[k].empty()) {
             auto z0cols = w.c[1].ycols[k].size() + w.z[k].cols();
