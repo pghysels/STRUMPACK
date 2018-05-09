@@ -145,7 +145,7 @@ int run(int argc, char *argv[]) {
   }
 
   // Checking error against dense matrix
-  if ( hss_opts.verbose() == 1 && n <= 1024) {
+  if ( 0 ) {
     MPI_Barrier(MPI_COMM_WORLD);
     auto Hdense = H.dense(A.ctxt());
     MPI_Barrier(MPI_COMM_WORLD);

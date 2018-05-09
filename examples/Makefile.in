@@ -1,6 +1,6 @@
 
 all: DenseToeplitzMPI DenseToeplitzQChem DenseBEMAirbus \
-DenseBEMColStateMPI DenseSchur100
+DenseBEMColStateMPI DenseSchur100 DenseCovariance
 
 all1: DenseCovariance
 

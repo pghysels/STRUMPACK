@@ -165,21 +165,24 @@ int run(int argc, char *argv[]) {
          << "% (of dense)" << endl;
 
   // Checking error against dense matrix
-  if ( hss_opts.verbose() == 1 && n <= 1024) {
-    MPI_Barrier(MPI_COMM_WORLD);
-    auto Hdense = H.dense(A.ctxt());
-    MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Barrier(MPI_COMM_WORLD);
+  auto Hdense = H.dense(A.ctxt());
+  MPI_Barrier(MPI_COMM_WORLD);
 
-    Hdense.scaled_add(-1., A);
-    auto HnormF = Hdense.normF();
-    auto AnormF = A.normF();
-    if (!myid)
-      cout << "# relative error = ||A-H*I||_F/||A||_F = "
-           << HnormF / AnormF << endl;
-    if (A.active() && HnormF / AnormF >
-        ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
-      if (!myid) cout << "ERROR: compression error too big!!" << endl;
-      // MPI_Abort(MPI_COMM_WORLD, 1);
+  Hdense.scaled_add(-1., A);
+  auto HnormF = Hdense.normF();
+  auto AnormF = A.normF();
+  
+  if (!myid) {
+    cout << "HnormF = " << HnormF  << endl;
+    cout << "AnormF = " << AnormF  << endl;
+    cout << "# relative error = ||A-H*I||_F/||A||_F = "
+         << HnormF / AnormF << endl;
+
+  if (A.active() && HnormF / AnormF >
+      ERROR_TOLERANCE * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
+    if (!myid) cout << "ERROR: compression error too big!!" << endl;
+    // MPI_Abort(MPI_COMM_WORLD, 1);
     }
   }
 
@@ -209,29 +212,36 @@ int run(int argc, char *argv[]) {
   myscalar c_zero(0.,0.);
 
   DistributedMatrix<myscalar> B(ctxt, n, 1);
-  B.fill(c_one);
-  DistributedMatrix<myscalar> C(B);
+  // B.fill(c_one);
+  B.random();
+  DistributedMatrix<myscalar> X(B);
+  DistributedMatrix<myscalar> R(B);
 
   timer.start();
-    H.solve(ULV, C);
+    H.solve(ULV, X);
   if (!myid)
     cout << "## Solve time = " << timer.elapsed() << endl;
 
   //=======================================================================
   //=== Error checking ===
   //=======================================================================
+
   DistributedMatrix<myscalar> Bcheck(ctxt, n, 1);
-  apply_HSS(Trans::N, H, C, c_zero, Bcheck);
+  apply_HSS(Trans::N, H, X, c_zero, Bcheck);
   Bcheck.scaled_add(c_m_one, B);
   auto Bchecknorm = Bcheck.normF();
   auto Bnorm = B.normF();
-  if (!myid)
-    cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
-         << Bchecknorm / Bnorm << endl;
-  if (B.active() && Bchecknorm / Bnorm > SOLVE_TOLERANCE) {
-    if (!myid)
+  auto solve_rel_res = 0. * B.normF();
+
+  if (!mpi_rank()){
+    solve_rel_res = Bchecknorm / Bnorm;
+    cout << "Bchecknorm = " << Bchecknorm  << endl;
+    cout << "Bnorm = " << Bnorm  << endl;
+    cout << "# relative residual = ||Hx-b||_F/||b||_F = "
+         << solve_rel_res << endl;
+  }
+  if (!mpi_rank() && solve_rel_res > hss_opts.rel_tol()) {
       cout << "ERROR: ULV solve relative error too big!!" << endl;
-    // MPI_Abort(MPI_COMM_WORLD, 1);
   }
 
   return 0;
@@ -326,3 +336,4 @@ int main(int argc, char *argv[]) {
   MPI_Finalize();
   return ierr;
 }
+// 

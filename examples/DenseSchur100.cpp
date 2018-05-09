@@ -22,7 +22,7 @@
  * publicly and display publicly, and to permit others to do so.
  *
  * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li,
-               Gustavo Chávez.
+               Gustavo Chavez.
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
  *
@@ -43,7 +43,7 @@
 
 #define ENABLE_FLOP_COUNTER 0
 #define ERROR_TOLERANCE 1e1
-#define SOLVE_TOLERANCE 1e-11
+#define SOLVE_TOLERANCE 1e-2
 
 typedef std::complex<float> scomplex;
 #define myscalar scomplex
@@ -64,9 +64,9 @@ int run(int argc, char *argv[]) {
    * The matrix file is complex single precision (8 bytes).
    */
 
-  // const char *file = "/global/cscratch1/sd/gichavez/intel17/paper2_tests/mats/Hsolver/front_3d_10000";
+  const char *file = "/global/cscratch1/sd/gichavez/intel17/paper2_tests/mats/Hsolver/front_3d_10000";
   //const char *file = "/home/gichavez/mats/front_3d_10000";
-  const char *file = "/Users/gichavez/Documents/Github/paper2_tests/mats/Hsolver/front_3d_10000"; // Needs 64 MPI ranks
+  // const char *file = "/Users/gichavez/Documents/Github/paper2_tests/mats/Hsolver/front_3d_10000"; // Needs 64 MPI ranks
 
   HSSOptions<myscalar> hss_opts;
   hss_opts.set_from_command_line(argc, argv);
@@ -213,12 +213,41 @@ int run(int argc, char *argv[]) {
     cout << "## ULV.memory() = " << ULV.memory()/(1e6) << " MB" << endl;
   }
 
-  //=======================================================================
-  //=== Solve ===
-  //=======================================================================
-  if (!myid)
-    cout << "# Solve..." << endl;
-  // MPI_Barrier(MPI_COMM_WORLD);
+// # ==========================================================================
+// # === Solve ===
+// # ==========================================================================
+  if (!mpi_rank()) cout << "# Solve..." << endl;
+
+  DistributedMatrix<myscalar> B(ctxt, n, 1);
+  B.random();
+  DistributedMatrix<myscalar> X(B);
+  DistributedMatrix<myscalar> R(B);
+  
+  timer.start();
+    H.solve(ULV, X);
+  if (!mpi_rank()) cout << "## Solve time = " << timer.elapsed() << endl;
+
+  // # ==========================================================================
+  // # === Error checking ===
+  // # ==========================================================================
+  myscalar c_m_one(-1.,0.);
+  myscalar c_zero(0.,0.);
+
+  DistributedMatrix<myscalar> Bcheck(ctxt, n, 1);
+  apply_HSS(Trans::N, H, X, c_zero, Bcheck);
+  Bcheck.scaled_add(c_m_one, B);
+  auto Bchecknorm = Bcheck.normF();
+  auto Bnorm = B.normF();
+  auto solve_rel_res = 0. * B.normF();
+
+  if (!mpi_rank()){
+    solve_rel_res = Bchecknorm / Bnorm;
+    cout << "# relative residual = ||Hx-b||_F/||b||_F = "
+         << solve_rel_res << endl;
+  }
+  if (!mpi_rank() && solve_rel_res > hss_opts.rel_tol()) {
+      cout << "ERROR: ULV solve relative error too big!!" << endl;
+  }
 
   return 0;
 }
