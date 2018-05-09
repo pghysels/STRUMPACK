@@ -241,12 +241,13 @@ namespace strumpack {
       ch_seq = (ch_mpi == this->lchild) ? this->rchild : this->lchild;
     else ch_seq = this->lchild ? this->lchild : this->rchild;
     DenseM_t Rseq, Srseq, Scseq;
+    DistM_t cSr, cSc, S_dummy;
     int m = 0, n = 0;
     auto pch = this->child_master(ch_seq);
+    auto rank = mpi_rank(this->front_comm);
     if (ch_seq) {
       m = R.rows(), n = R.cols();
-      auto p = mpi_rank(this->front_comm);
-      if (p == pch) {
+      if (rank == pch) {
         Rseq = DenseM_t(m, n);
         Srseq = DenseM_t(m, n);
         Scseq = DenseM_t(m, n);
@@ -254,14 +255,17 @@ namespace strumpack {
         Scseq.zero();
       }
       strumpack::copy(m, n, R, 0, 0, Rseq, pch, this->ctxt_all);
-      if (p == pch) ch_seq->sample_CB(opts, Rseq, Srseq, Scseq, this);
     }
     if (ch_mpi) {
-      DistM_t cSr, cSc, S_dummy;
       auto I = ch_mpi->upd_to_parent(this);
       DistM_t cR(ch_mpi->ctxt, I.size(), R.cols(),
                  R.extract_rows(I, this->front_comm), this->ctxt_all);
       ch_mpi->sample_CB(opts, cR, cSr, cSc, this);
+    }
+    if (ch_seq)
+      if (rank == pch)
+        ch_seq->sample_CB(opts, Rseq, Srseq, Scseq, this);
+    if (ch_mpi) {
       TIMER_TIME(TaskType::SKINNY_EXTEND_ADD_MPI1, 2, t_sea);
       if (ch_mpi == this->lchild)
         skinny_extend_add(cSr, cSc, S_dummy, S_dummy, Sr, Sc);
