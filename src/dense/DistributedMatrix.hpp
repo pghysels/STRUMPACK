@@ -1352,12 +1352,109 @@ namespace strumpack {
     assert(A.I()>=1 && A.J()>=1 && B.I()>=1 &&
            B.J()>=1 && C.I()>=1 && C.J()>=1);
     assert(A.ctxt()==B.ctxt() && A.ctxt()==C.ctxt());
+#if 1
     scalapack::pgemm
       (char(ta), char(tb), C.rows(), C.cols(),
        (ta==Trans::N) ? A.cols() : A.rows(), alpha,
        A.data(), A.I(), A.J(), A.desc(),
        B.data(), B.I(), B.J(), B.desc(),
        beta, C.data(), C.I(), C.J(), C.desc());
+#else
+    if (A.I() != 1 || A.J() != 1) {
+      DistributedMatrix<scalar_t> localA(A.ctxt(), A.rows(), A.cols());
+      strumpack::copy(A.rows(), A.cols(), A, 0, 0, localA, 0, 0, A.ctxt());
+      if (B.I() != 1 || B.J() != 1) {
+        DistributedMatrix<scalar_t> localB(B.ctxt(), B.rows(), B.cols());
+        strumpack::copy(B.rows(), B.cols(), B, 0, 0, localB, 0, 0, B.ctxt());
+        if (C.I() != 1 || C.J() != 1) {
+          DistributedMatrix<scalar_t> localC(C.ctxt(), C.rows(), C.cols());
+          strumpack::copy(C.rows(), C.cols(), C, 0, 0, localC, 0, 0, C.ctxt());
+          //std::cout << "Making 3 copies!!" << std::endl;
+          scalapack::pgemm
+            (char(ta), char(tb), C.rows(), C.cols(),
+             (ta==Trans::N) ? A.cols() : A.rows(), alpha,
+             localA.data(), localA.I(), localA.J(), localA.desc(),
+             localB.data(), localB.I(), localB.J(), localB.desc(), beta,
+             localC.data(), localC.I(), localC.J(), localC.desc());
+          strumpack::copy(C.rows(), C.cols(), localC, 0, 0, C, 0, 0, C.ctxt());
+        } else {
+          //std::cout << "Making 2 copies (A,B)!!" << std::endl;
+          scalapack::pgemm
+            (char(ta), char(tb), C.rows(), C.cols(),
+             (ta==Trans::N) ? A.cols() : A.rows(), alpha,
+             localA.data(), localA.I(), localA.J(), localA.desc(),
+             localB.data(), localB.I(), localB.J(), localB.desc(), beta,
+             C.data(), C.I(), C.J(), C.desc());
+        }
+      } else {
+        if (C.I() || C.J()) {
+          DistributedMatrix<scalar_t> localC(C.ctxt(), C.rows(), C.cols());
+          strumpack::copy(C.rows(), C.cols(), C, 0, 0, localC, 0, 0, C.ctxt());
+          //std::cout << "Making 2 copies (A,C)!!" << std::endl;
+          scalapack::pgemm
+            (char(ta), char(tb), C.rows(), C.cols(),
+             (ta==Trans::N) ? A.cols() : A.rows(), alpha,
+             localA.data(), localA.I(), localA.J(), localA.desc(),
+             B.data(), B.I(), B.J(), B.desc(), beta,
+             localC.data(), localC.I(), localC.J(), localC.desc());
+          strumpack::copy(C.rows(), C.cols(), localC, 0, 0, C, 0, 0, C.ctxt());
+        } else {
+          //std::cout << "Making 1 copy (A)!!" << std::endl;
+          scalapack::pgemm
+            (char(ta), char(tb), C.rows(), C.cols(),
+             (ta==Trans::N) ? A.cols() : A.rows(), alpha,
+             localA.data(), localA.I(), localA.J(), localA.desc(),
+             B.data(), B.I(), B.J(), B.desc(), beta,
+             C.data(), C.I(), C.J(), C.desc());
+        }
+      }
+    } else {
+      if (B.I() != 1 || B.J() != 1) {
+        DistributedMatrix<scalar_t> localB(B.ctxt(), B.rows(), B.cols());
+        strumpack::copy(B.rows(), B.cols(), B, 0, 0, localB, 0, 0, B.ctxt());
+        if (C.I() != 1 || C.J() != 1) {
+          DistributedMatrix<scalar_t> localC(C.ctxt(), C.rows(), C.cols());
+          strumpack::copy(C.rows(), C.cols(), C, 0, 0, localC, 0, 0, C.ctxt());
+          //std::cout << "Making 2 copies (B,C)!!" << std::endl;
+          scalapack::pgemm
+            (char(ta), char(tb), C.rows(), C.cols(),
+             (ta==Trans::N) ? A.cols() : A.rows(), alpha,
+             A.data(), A.I(), A.J(), A.desc(),
+             localB.data(), localB.I(), localB.J(), localB.desc(), beta,
+             localC.data(), localC.I(), localC.J(), localC.desc());
+          strumpack::copy(C.rows(), C.cols(), localC, 0, 0, C, 0, 0, C.ctxt());
+        } else {
+          //std::cout << "Making 1 copy (B)!!" << std::endl;
+          scalapack::pgemm
+            (char(ta), char(tb), C.rows(), C.cols(),
+             (ta==Trans::N) ? A.cols() : A.rows(), alpha,
+             A.data(), A.I(), A.J(), A.desc(),
+             localB.data(), localB.I(), localB.J(), localB.desc(), beta,
+             C.data(), C.I(), C.J(), C.desc());
+        }
+      } else {
+        if (C.I() || C.J()) {
+          DistributedMatrix<scalar_t> localC(C.ctxt(), C.rows(), C.cols());
+          strumpack::copy(C.rows(), C.cols(), C, 0, 0, localC, 0, 0, C.ctxt());
+          //std::cout << "Making 1 copy (C)!!" << std::endl;
+          scalapack::pgemm
+            (char(ta), char(tb), C.rows(), C.cols(),
+             (ta==Trans::N) ? A.cols() : A.rows(), alpha,
+             A.data(), A.I(), A.J(), A.desc(),
+             B.data(), B.I(), B.J(), B.desc(), beta,
+             localC.data(), localC.I(), localC.J(), localC.desc());
+          strumpack::copy(C.rows(), C.cols(), localC, 0, 0, C, 0, 0, C.ctxt());
+        } else {
+          scalapack::pgemm
+            (char(ta), char(tb), C.rows(), C.cols(),
+             (ta==Trans::N) ? A.cols() : A.rows(), alpha,
+             A.data(), A.I(), A.J(), A.desc(),
+             B.data(), B.I(), B.J(), B.desc(), beta,
+             C.data(), C.I(), C.J(), C.desc());
+        }
+      }
+    }
+#endif
     STRUMPACK_FLOPS(gemm_flops(ta, tb, alpha, A, B, beta));
   }
 

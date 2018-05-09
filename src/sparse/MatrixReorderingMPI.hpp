@@ -300,8 +300,11 @@ namespace strumpack {
       this->perm[global_sep_order[i]] = this->iperm[i];
     for (integer_t i=0; i<n; i++)
       this->iperm[this->perm[i]] = i;
-    for (integer_t i=0; i<n; i++)
-      std::swap(this->perm[i], this->iperm[i]);
+    for (integer_t i=0; i<n; i++) {
+      auto tmp = this->perm[i];
+      this->perm[i] = this->iperm[i];
+      this->iperm[i] = tmp;
+    }
     delete[] global_sep_order;
   }
 
