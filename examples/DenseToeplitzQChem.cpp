@@ -188,8 +188,7 @@ int run(int argc, char *argv[]) {
   DistributedMatrix<double> B(ctxt, n, 1);
   B.random();
   DistributedMatrix<double> X(B);
-  DistributedMatrix<double> R(B);
-  
+
   timer.start();
     H.solve(ULV, X);
   if (!mpi_rank())
@@ -217,15 +216,20 @@ int run(int argc, char *argv[]) {
   // Checking relative residual
 
   auto Bnorm = B.normF();
-  double resnorm = .0;
 
+  DistributedMatrix<double> R(B);
   strumpack::gemm(strumpack::Trans::N, strumpack::Trans::N, 1., A, X, 0., R);
+  DistributedMatrix<double> R2 = H.apply(X);
   R.scaled_add(-1., B);
-  resnorm = R.normF();
-  
+  R2.scaled_add(-1., B);
+  double resnorm = R.normF();
+  double resnorm2 = R2.normF();
+
   if (!mpi_rank()){
       cout << "# relative residual = ||A*X-B||_F/||B||_F = "
            << resnorm / Bnorm << endl;
+      cout << "# relative residual = ||H*X-B||_F/||B||_F = "
+           << resnorm2 / Bnorm << endl;
   }
 
   // strumpack::HSS::apply_HSS(strumpack::Trans::N, H, X, 0., R);
