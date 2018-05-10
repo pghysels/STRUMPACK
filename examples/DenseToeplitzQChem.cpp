@@ -22,7 +22,7 @@
  * publicly and display publicly, and to permit others to do so.
  *
  * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li,
-               Gustavo Chávez.
+               Gustavo Chavez.
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
  *
@@ -84,9 +84,11 @@ int run(int argc, char *argv[]) {
 
   timer.start();
   DistributedMatrix<double> A(ctxt, n, n); // Creates descriptor
+  
   // Toeplitz matrix from Quantum Chemistry.
   myscalar d = 0.1;
   myscalar d2 = d * d;
+
   // TODO diagonal element is different from the description in the TOMS paper
   myscalar diag = M_PI * M_PI / (6.0 * d2);
   int rlo, rhi, clo, chi;
@@ -146,7 +148,7 @@ int run(int argc, char *argv[]) {
   }
 
   // Checking error against dense matrix
-  if ( n <= 30000 ) {
+  if ( n <= 1000 ) {
     MPI_Barrier(MPI_COMM_WORLD);
     auto Hdense = H.dense(A.ctxt());
     MPI_Barrier(MPI_COMM_WORLD);
@@ -164,9 +166,9 @@ int run(int argc, char *argv[]) {
     }
   }
 
-// # ==========================================================================
+// # =====================
 // # === Factorization ===
-// # ==========================================================================
+// # =====================
   if (!mpi_rank())
     cout << "# Factorization..." << endl;
   timer.start();
@@ -180,9 +182,9 @@ int run(int argc, char *argv[]) {
     cout << "# ULV.memory() = " << ULV.memory()/(1000.0*1000.0) << "MB" << endl;
   }
 
-// # ==========================================================================
+// # =============
 // # === Solve ===
-// # ==========================================================================
+// # =============
   if (!mpi_rank()) cout << "# Solve..." << endl;
 
   DistributedMatrix<double> B(ctxt, n, 1);
@@ -194,26 +196,9 @@ int run(int argc, char *argv[]) {
   if (!mpi_rank())
     cout << "## Solve time = " << timer.elapsed() << endl;
 
-// # ==========================================================================
-// # === Error checking ===
-// # ==========================================================================
-  // DistributedMatrix<double> Bcheck(ctxt, n, 1);
-  // apply_HSS(Trans::N, H, C, 0., Bcheck);
-  // Bcheck.scaled_add(-1., B);
-  // auto Bchecknorm = Bcheck.normF();
-  // auto Bnorm = B.normF();
-
-  // if (!mpi_rank())
-  //   cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
-  //        << Bchecknorm / Bnorm << endl;
-  // if (B.active() && Bchecknorm / Bnorm > SOLVE_TOLERANCE) {
-  //   if (!mpi_rank())
-  //     cout << "ERROR: ULV solve relative error too big!!" << endl;
-  //   // MPI_Abort(MPI_COMM_WORLD, 1);
-  // }
-
-
-  // Checking relative residual
+// # ==================================
+// # === Checking relative residual ===
+// # ==================================
 
   auto Bnorm = B.normF();
 
@@ -231,14 +216,6 @@ int run(int argc, char *argv[]) {
       cout << "# relative residual = ||H*X-B||_F/||B||_F = "
            << resnorm2 / Bnorm << endl;
   }
-
-  // strumpack::HSS::apply_HSS(strumpack::Trans::N, H, X, 0., R);
-  // R.scaled_add(-1., B);
-  // resnorm = R.normF();
-  // if (!mpi_rank()){
-  //     cout << "# relative residual = ||H*X-B||_F/||B||_F = "
-  //          << resnorm / Bnorm << endl;
-  // }
 
   return 0;
 }
