@@ -137,8 +137,8 @@ namespace strumpack {
        int d0, int d, int depth);
       bool update_orthogonal_basis
       (const opts_t& opts, scalar_t& r_max_0,
-       const DenseM_t& S, DenseM_t& Q,
-       int d, int dd, bool untouched, int depth);
+       const DenseM_t& S, DenseM_t& Q, int d, int dd,
+       bool untouched, int L, int depth);
       void set_U_full_rank(WorkCompress<scalar_t>& w);
       void set_V_full_rank(WorkCompress<scalar_t>& w);
 

@@ -197,7 +197,7 @@ namespace strumpack {
       if (d+dd >= opts.max_rank() || d+dd >= u_rows ||
           update_orthogonal_basis
           (opts, w.U_r_max, w.Sr, w.Qr, d, dd,
-           this->_U_state == State::UNTOUCHED)) {
+           this->_U_state == State::UNTOUCHED, w.lvl)) {
         w.Qr.clear();
         // TODO pass max_rank to ID in DistributedMatrix
         w.Sr.ID_row(_U.E(), _U.P(), w.Jr, opts.rel_tol(), opts.abs_tol(),
@@ -227,7 +227,7 @@ namespace strumpack {
       if (d+dd >= opts.max_rank() || d+dd >= v_rows ||
           update_orthogonal_basis
           (opts, w.V_r_max, w.Sc, w.Qc, d, dd,
-           this->_V_state == State::UNTOUCHED)) {
+           this->_V_state == State::UNTOUCHED, w.lvl)) {
         w.Qc.clear();
         // TODO pass max_rank to ID in DistributedMatrix
         w.Sc.ID_row(_V.E(), _V.P(), w.Jc, opts.rel_tol(),
@@ -250,7 +250,7 @@ namespace strumpack {
     template<typename scalar_t> bool
     HSSMatrixMPI<scalar_t>::update_orthogonal_basis
     (const opts_t& opts, scalar_t& r_max_0, const DistM_t& S,
-     DistM_t& Q, int d, int dd, bool untouched) {
+     DistM_t& Q, int d, int dd, bool untouched, int L) {
       int m = S.rows();
       if (d >= m) return true;
       if (Q.cols() == 0) Q = DistM_t(_ctxt, m, d+dd);
@@ -269,8 +269,9 @@ namespace strumpack {
       Q2.orthogonalize(r_max, r_min);
       STRUMPACK_QR_FLOPS(orthogonalize_flops(Q2));
       if (untouched) r_max_0 = r_max;
-      if (std::abs(r_min) < opts.abs_tol() ||
-          std::abs(r_min / r_max_0) < opts.rel_tol())
+      auto rtol = opts.rel_tol() / L;
+      auto atol = opts.abs_tol() / L;
+      if (std::abs(r_min) < atol || std::abs(r_min / r_max_0) < rtol)
         return true;
       DistMW_t Q3(m, dd, Q, 0, d);
       DistM_t Q12tQ3(_ctxt, Q12.cols(), Q3.cols());
@@ -287,8 +288,8 @@ namespace strumpack {
                              gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.)));
       auto Q3norm = Q3.norm();
       // TODO norm flops?
-      return (Q3norm / std::sqrt(double(dd)) < opts.abs_tol())
-        || (Q3norm / S3norm < opts.rel_tol());
+      return (Q3norm / std::sqrt(double(dd)) < atol)
+        || (Q3norm / S3norm < rtol);
     }
 
   } // end namespace HSS
