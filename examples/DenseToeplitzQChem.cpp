@@ -62,42 +62,45 @@ int run(int argc, char *argv[]) {
   hss_opts.set_from_command_line(argc, argv);
 
   auto np = mpi_nprocs(MPI_COMM_WORLD);
-  if (!mpi_rank())
+  if (!mpi_rank()) {
     cout << "# usage: ./DenseToeplitzQChem n (problem size)" << endl;
-
-  if (!mpi_rank()){
     cout << "# matrix size: n = " << n << endl;
   }
 
-  // BLACS variables
-  int ctxt, dummy, myrow, mycol;
-  int nprow=floor(sqrt((float)np));
-  int npcol=np/nprow;
+  int npcol = floor(sqrt((float)np));
+  int nprow = np / npcol;
+  int ctxt, dummy, prow, pcol;
+  scalapack::Cblacs_get(0, 0, &ctxt);
+  scalapack::Cblacs_gridinit(&ctxt, "C", nprow, npcol);
+  scalapack::Cblacs_gridinfo(ctxt, &dummy, &dummy, &prow, &pcol);
+  int ctxt_all = scalapack::Csys2blacs_handle(MPI_COMM_WORLD);
+  scalapack::Cblacs_gridinit(&ctxt_all, "R", 1, np);
 
-  scalapack::Cblacs_get(0 /*ctx number*/, 0 /*default number*/, &ctxt);
-  scalapack::Cblacs_gridinit(&ctxt,"C",nprow,npcol);
-  scalapack::Cblacs_gridinfo(ctxt,&nprow,&npcol,&myrow,&mycol);
-
-// # ==========================================================================
-// # === Build dense (distributed) matrix ===
-// # ==========================================================================
+  //========================================
+  //=== Build dense (distributed) matrix ===
+  //========================================
   if (!mpi_rank())
     cout << "# Building dense matrix A..." << endl;
-  timer.start();
 
-  DistributedMatrix<double> A = DistributedMatrix<double>(ctxt, n, n); // Creates descriptor
-  // TODO only loop over local rows and columns, get the global coordinate..
-  for (int c=0; c<n; c++)
-  {
-    for (int r=0; r<n; r++)
-    {
-      // Toeplitz matrix from Quantum Chemistry.
-      myscalar pi=3.1416, d=0.1;
-      A.global(r, c, (r==c) ? pow(pi,2)/6.0/pow(d,2) : pow(-1.0,r-c)/pow((myscalar)r-c,2)/pow(d,2) );
+  timer.start();
+  DistributedMatrix<double> A(ctxt, n, n); // Creates descriptor
+  // Toeplitz matrix from Quantum Chemistry.
+  myscalar d = 0.1;
+  myscalar d2 = d * d;
+  // TODO diagonal element is different from the description in the TOMS paper
+  myscalar diag = M_PI * M_PI / (6.0 * d2);
+  int rlo, rhi, clo, chi;
+  A.lranges(rlo, rhi, clo, chi);
+  for (int lc=clo; lc<chi; ++lc) {
+    auto c = A.coll2g_fixed(lc);
+    for (int lr=rlo; lr<rhi; ++lr) {
+      auto r = A.rowl2g_fixed(lr);
+      myscalar rc = r - c;
+      A(lr, lc) = (r==c) ? diag : pow(-1.0, rc) / (rc*rc * d2);
     }
   }
 
-  if (!mpi_rank()){
+  if (!mpi_rank()) {
     cout << "## Dense matrix construction time = " << timer.elapsed() << endl;
     cout << "# A.total_memory() = " << (double)A.total_memory()/(1000.0*1000.0) << " MB" << endl;
   }
@@ -107,12 +110,12 @@ int run(int argc, char *argv[]) {
     A.print("A");
   }
 
-// # ==========================================================================
-// # === Compression ===
-// # ==========================================================================
+  //===================
+  //=== Compression ===
+  //===================
   if (!mpi_rank())
     cout << "# Creating HSS matrix H..." << endl;
-  
+
   if (!mpi_rank()) cout << "# rel_tol = " << hss_opts.rel_tol() << endl;
 
   // Simple compression
@@ -132,7 +135,7 @@ int run(int argc, char *argv[]) {
     if (!mpi_rank()) cout << "# compression failed!!!!!!!!" << endl;
     // MPI_Abort(MPI_COMM_WORLD, 1);
   }
-  
+
   auto Hrank = H.max_rank();
   auto Hmem = H.total_memory();
   auto Amem = A.total_memory();
