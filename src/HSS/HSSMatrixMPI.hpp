@@ -796,7 +796,8 @@ namespace strumpack {
       pcols = std::floor(std::sqrt((float)P1total));
       prows = P1total / pcols;
       int P1active = prows * pcols;
-      // TODO start both sends first, make sure it cannot deadlock
+      std::vector<MPI_Request> sreq(P);
+      int sreqs = 0;
       if (rank < P0active) {
         if (rank < (P-P0active)) {
           // I'm one of the first P-P0active processes that are active
@@ -819,10 +820,42 @@ namespace strumpack {
           for (auto i : w.c[0].Jc) buf.push_back(i);
           for (int p=P0active; p<P; p++)
             if (rank == (p - P0active) % P0active)
-              MPI_Send(buf.data(), buf.size(), mpi_type<std::size_t>(),
-                       p, /*tag*/0, _comm);
+              MPI_Isend(buf.data(), buf.size(), mpi_type<std::size_t>(),
+                        p, /*tag*/0, _comm, &sreq[sreqs++]);
         }
-      } else {
+      }
+      if (rank >= root1 && rank < root1+P1active) {
+        if ((rank-root1) < (P-P1active)) {
+          // I'm one of the first P-P1active processes that are active
+          // on child1, so I need to send to one or more others which
+          // are not active on child1, ie the ones in [0,root1) union
+          // [root1+P1active,P)
+          std::vector<std::size_t> buf;
+          buf.reserve(8+w.c[1].Ir.size()+w.c[1].Ic.size()+
+                      w.c[1].Jr.size()+w.c[1].Jc.size());
+          buf.push_back(std::size_t(this->_ch[1]->_U_state));
+          buf.push_back(std::size_t(this->_ch[1]->_V_state));
+          buf.push_back(this->_ch[1]->_U_rank);
+          buf.push_back(this->_ch[1]->_V_rank);
+          buf.push_back(this->_ch[1]->_U_rows);
+          buf.push_back(this->_ch[1]->_V_rows);
+          buf.push_back(w.c[1].dR);
+          buf.push_back(w.c[1].dS);
+          for (auto i : w.c[1].Ir) buf.push_back(i);
+          for (auto i : w.c[1].Ic) buf.push_back(i);
+          for (auto i : w.c[1].Jr) buf.push_back(i);
+          for (auto i : w.c[1].Jc) buf.push_back(i);
+          for (int p=0; p<root1; p++)
+            if (rank - root1 == p % P1active)
+              MPI_Isend(buf.data(), buf.size(), mpi_type<std::size_t>(),
+                        p, /*tag*/1, _comm, &sreq[sreqs++]);
+          for (int p=root1+P1active; p<P; p++)
+            if (rank - root1 == (p - P1active) % P1active)
+              MPI_Isend(buf.data(), buf.size(), mpi_type<std::size_t>(),
+                        p, /*tag*/1, _comm, &sreq[sreqs++]);
+        }
+      }
+      if (!(rank < P0active)) {
         // I'm not active on child0, so I need to receive
         MPI_Status stat;
         int dest=-1, msgsize;
@@ -854,38 +887,7 @@ namespace strumpack {
         assert(msgsize == ptr-buf);
         delete[] buf;
       }
-
-      if (rank >= root1 && rank < root1+P1active) {
-        if ((rank-root1) < (P-P1active)) {
-          // I'm one of the first P-P1active processes that are active
-          // on child1, so I need to send to one or more others which
-          // are not active on child1, ie the ones in [0,root1) union
-          // [root1+P1active,P)
-          std::vector<std::size_t> buf;
-          buf.reserve(8+w.c[1].Ir.size()+w.c[1].Ic.size()+
-                      w.c[1].Jr.size()+w.c[1].Jc.size());
-          buf.push_back(std::size_t(this->_ch[1]->_U_state));
-          buf.push_back(std::size_t(this->_ch[1]->_V_state));
-          buf.push_back(this->_ch[1]->_U_rank);
-          buf.push_back(this->_ch[1]->_V_rank);
-          buf.push_back(this->_ch[1]->_U_rows);
-          buf.push_back(this->_ch[1]->_V_rows);
-          buf.push_back(w.c[1].dR);
-          buf.push_back(w.c[1].dS);
-          for (auto i : w.c[1].Ir) buf.push_back(i);
-          for (auto i : w.c[1].Ic) buf.push_back(i);
-          for (auto i : w.c[1].Jr) buf.push_back(i);
-          for (auto i : w.c[1].Jc) buf.push_back(i);
-          for (int p=0; p<root1; p++)
-            if (rank - root1 == p % P1active)
-              MPI_Send(buf.data(), buf.size(), mpi_type<std::size_t>(),
-                       p, /*tag*/1, _comm);
-          for (int p=root1+P1active; p<P; p++)
-            if (rank - root1 == (p - P1active) % P1active)
-              MPI_Send(buf.data(), buf.size(), mpi_type<std::size_t>(),
-                       p, /*tag*/1, _comm);
-        }
-      } else {
+      if (!(rank >= root1 && rank < root1+P1active)) {
         // I'm not active on child1, so I need to receive
         MPI_Status stat;
         int dest=-1, msgsize;
@@ -922,6 +924,7 @@ namespace strumpack {
         assert(msgsize == ptr-buf);
         delete[] buf;
       }
+      MPI_Waitall(sreqs, sreq.data(), MPI_STATUSES_IGNORE);
     }
 
     template<typename scalar_t> void
