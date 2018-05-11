@@ -798,29 +798,29 @@ namespace strumpack {
       int P1active = prows * pcols;
       std::vector<MPI_Request> sreq(P);
       int sreqs = 0;
+      std::vector<std::size_t> sbuf0, sbuf1;
       if (rank < P0active) {
         if (rank < (P-P0active)) {
           // I'm one of the first P-P0active processes that are active
           // on child0, so I need to send to one or more others which
           // are not active on child0, ie the ones in [P0active,P)
-          std::vector<std::size_t> buf;
-          buf.reserve(8+w.c[0].Ir.size()+w.c[0].Ic.size()+
+          sbuf0.reserve(8+w.c[0].Ir.size()+w.c[0].Ic.size()+
                       w.c[0].Jr.size()+w.c[0].Jc.size());
-          buf.push_back(std::size_t(this->_ch[0]->_U_state));
-          buf.push_back(std::size_t(this->_ch[0]->_V_state));
-          buf.push_back(this->_ch[0]->_U_rank);
-          buf.push_back(this->_ch[0]->_V_rank);
-          buf.push_back(this->_ch[0]->_U_rows);
-          buf.push_back(this->_ch[0]->_V_rows);
-          buf.push_back(w.c[0].dR);
-          buf.push_back(w.c[0].dS);
-          for (auto i : w.c[0].Ir) buf.push_back(i);
-          for (auto i : w.c[0].Ic) buf.push_back(i);
-          for (auto i : w.c[0].Jr) buf.push_back(i);
-          for (auto i : w.c[0].Jc) buf.push_back(i);
+          sbuf0.push_back(std::size_t(this->_ch[0]->_U_state));
+          sbuf0.push_back(std::size_t(this->_ch[0]->_V_state));
+          sbuf0.push_back(this->_ch[0]->_U_rank);
+          sbuf0.push_back(this->_ch[0]->_V_rank);
+          sbuf0.push_back(this->_ch[0]->_U_rows);
+          sbuf0.push_back(this->_ch[0]->_V_rows);
+          sbuf0.push_back(w.c[0].dR);
+          sbuf0.push_back(w.c[0].dS);
+          for (auto i : w.c[0].Ir) sbuf0.push_back(i);
+          for (auto i : w.c[0].Ic) sbuf0.push_back(i);
+          for (auto i : w.c[0].Jr) sbuf0.push_back(i);
+          for (auto i : w.c[0].Jc) sbuf0.push_back(i);
           for (int p=P0active; p<P; p++)
             if (rank == (p - P0active) % P0active)
-              MPI_Isend(buf.data(), buf.size(), mpi_type<std::size_t>(),
+              MPI_Isend(sbuf0.data(), sbuf0.size(), mpi_type<std::size_t>(),
                         p, /*tag*/0, _comm, &sreq[sreqs++]);
         }
       }
@@ -830,28 +830,27 @@ namespace strumpack {
           // on child1, so I need to send to one or more others which
           // are not active on child1, ie the ones in [0,root1) union
           // [root1+P1active,P)
-          std::vector<std::size_t> buf;
-          buf.reserve(8+w.c[1].Ir.size()+w.c[1].Ic.size()+
+          sbuf1.reserve(8+w.c[1].Ir.size()+w.c[1].Ic.size()+
                       w.c[1].Jr.size()+w.c[1].Jc.size());
-          buf.push_back(std::size_t(this->_ch[1]->_U_state));
-          buf.push_back(std::size_t(this->_ch[1]->_V_state));
-          buf.push_back(this->_ch[1]->_U_rank);
-          buf.push_back(this->_ch[1]->_V_rank);
-          buf.push_back(this->_ch[1]->_U_rows);
-          buf.push_back(this->_ch[1]->_V_rows);
-          buf.push_back(w.c[1].dR);
-          buf.push_back(w.c[1].dS);
-          for (auto i : w.c[1].Ir) buf.push_back(i);
-          for (auto i : w.c[1].Ic) buf.push_back(i);
-          for (auto i : w.c[1].Jr) buf.push_back(i);
-          for (auto i : w.c[1].Jc) buf.push_back(i);
+          sbuf1.push_back(std::size_t(this->_ch[1]->_U_state));
+          sbuf1.push_back(std::size_t(this->_ch[1]->_V_state));
+          sbuf1.push_back(this->_ch[1]->_U_rank);
+          sbuf1.push_back(this->_ch[1]->_V_rank);
+          sbuf1.push_back(this->_ch[1]->_U_rows);
+          sbuf1.push_back(this->_ch[1]->_V_rows);
+          sbuf1.push_back(w.c[1].dR);
+          sbuf1.push_back(w.c[1].dS);
+          for (auto i : w.c[1].Ir) sbuf1.push_back(i);
+          for (auto i : w.c[1].Ic) sbuf1.push_back(i);
+          for (auto i : w.c[1].Jr) sbuf1.push_back(i);
+          for (auto i : w.c[1].Jc) sbuf1.push_back(i);
           for (int p=0; p<root1; p++)
             if (rank - root1 == p % P1active)
-              MPI_Isend(buf.data(), buf.size(), mpi_type<std::size_t>(),
+              MPI_Isend(sbuf1.data(), sbuf1.size(), mpi_type<std::size_t>(),
                         p, /*tag*/1, _comm, &sreq[sreqs++]);
           for (int p=root1+P1active; p<P; p++)
             if (rank - root1 == (p - P1active) % P1active)
-              MPI_Isend(buf.data(), buf.size(), mpi_type<std::size_t>(),
+              MPI_Isend(sbuf1.data(), sbuf1.size(), mpi_type<std::size_t>(),
                         p, /*tag*/1, _comm, &sreq[sreqs++]);
         }
       }
@@ -884,7 +883,7 @@ namespace strumpack {
         for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Ic[i] = *ptr++;
         for (int i=0; i<this->_ch[0]->_U_rank; i++) w.c[0].Jr[i] = *ptr++;
         for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Jc[i] = *ptr++;
-        assert(msgsize == ptr-buf);
+        assert(msgsize == std::distance(buf, ptr));
         delete[] buf;
       }
       if (!(rank >= root1 && rank < root1+P1active)) {
@@ -921,7 +920,7 @@ namespace strumpack {
         for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Ic[i] = *ptr++;
         for (int i=0; i<this->_ch[1]->_U_rank; i++) w.c[1].Jr[i] = *ptr++;
         for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Jc[i] = *ptr++;
-        assert(msgsize == ptr-buf);
+        assert(msgsize == std::distance(buf, ptr));
         delete[] buf;
       }
       MPI_Waitall(sreqs, sreq.data(), MPI_STATUSES_IGNORE);
