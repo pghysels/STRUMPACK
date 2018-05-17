@@ -1,3 +1,31 @@
+/*
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
+ *
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
+ *
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly.  Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government is granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
+ *
+ * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
+ *             (Lawrence Berkeley National Lab, Computational Research
+ *             Division).
+ *
+ */
 #ifndef HSS_MATRIX_HPP
 #define HSS_MATRIX_HPP
 
@@ -53,6 +81,11 @@ namespace strumpack {
       void compress_stable(const DenseM_t& A, const opts_t& opts);
       void compress_stable
       (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts);
+      void compress_hard_restart(const DenseM_t& A, const opts_t& opts);
+      void compress_hard_restart
+      (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts);
+
+      void reset() override;
 
       HSSFactors<scalar_t> factor() const;
       HSSFactors<scalar_t> partial_factor() const;
@@ -97,7 +130,7 @@ namespace strumpack {
        std::size_t roff=0, std::size_t coff=0) const;
 
       DenseM_t dense() const;
-      void delete_trailing_block();
+      void delete_trailing_block() override;
 
       void shift(scalar_t sigma) override;
 
@@ -137,8 +170,8 @@ namespace strumpack {
        int d0, int d, int depth);
       bool update_orthogonal_basis
       (const opts_t& opts, scalar_t& r_max_0,
-       const DenseM_t& S, DenseM_t& Q,
-       int d, int dd, bool untouched, int depth);
+       const DenseM_t& S, DenseM_t& Q, int d, int dd,
+       bool untouched, int L, int depth);
       void set_U_full_rank(WorkCompress<scalar_t>& w);
       void set_V_full_rank(WorkCompress<scalar_t>& w);
 
@@ -299,8 +332,12 @@ namespace strumpack {
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::compress(const DenseM_t& A, const opts_t& opts) {
       switch (opts.compression_algorithm()) {
-      case CompressionAlgorithm::ORIGINAL: compress_original(A, opts); break;
-      case CompressionAlgorithm::STABLE: compress_stable(A, opts); break;
+      case CompressionAlgorithm::ORIGINAL:
+        compress_original(A, opts); break;
+      case CompressionAlgorithm::STABLE:
+        compress_stable(A, opts); break;
+      case CompressionAlgorithm::HARD_RESTART:
+        compress_hard_restart(A, opts); break;
       default:
         std::cout << "Compression algorithm not recognized!" << std::endl;
       };
@@ -309,14 +346,24 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrix<scalar_t>::compress
     (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts) {
       switch (opts.compression_algorithm()) {
-      case
-        CompressionAlgorithm::ORIGINAL: compress_original(Amult, Aelem, opts);
-        break;
-      case CompressionAlgorithm::STABLE: compress_stable(Amult, Aelem, opts);
-        break;
+      case CompressionAlgorithm::ORIGINAL:
+        compress_original(Amult, Aelem, opts); break;
+      case CompressionAlgorithm::STABLE:
+        compress_stable(Amult, Aelem, opts); break;
+      case CompressionAlgorithm::HARD_RESTART:
+        compress_hard_restart(Amult, Aelem, opts); break;
       default:
         std::cout << "Compression algorithm not recognized!" << std::endl;
       };
+    }
+
+    template<typename scalar_t> void HSSMatrix<scalar_t>::reset() {
+      _U.clear();
+      _V.clear();
+      _D.clear();
+      _B01.clear();
+      _B10.clear();
+      HSSMatrixBase<scalar_t>::reset();
     }
 
     template<typename scalar_t> DenseMatrix<scalar_t>

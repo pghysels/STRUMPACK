@@ -251,6 +251,7 @@ namespace strumpack {
       std::vector<DistributedMatrix<scalar_t>> y, z;
       std::vector<std::vector<std::size_t>> I, J, rl2g, cl2g, ycols, zcols;
       std::vector<std::unique_ptr<WorkExtract<scalar_t>>> w_seq;
+
       void split_extraction_sets
       (const std::pair<std::size_t,std::size_t>& dim) {
         if (c.empty()) {
@@ -272,24 +273,121 @@ namespace strumpack {
           }
         }
       }
+
       void communicate_child_ycols(MPI_Comm comm, int rch1) {
-        //std::cout << "TODO optimize these Bcasts!!" << std::endl;
-        auto rch0 = 0;
-        for (std::size_t k=0; k<I.size(); k++) {
-          std::size_t c0ycols = c[0].ycols[k].size();
-          std::size_t c1ycols = c[1].ycols[k].size();
-          MPI_Bcast(&c0ycols, 1, mpi_type<std::size_t>(), rch0, comm);
-          MPI_Bcast(&c1ycols, 1, mpi_type<std::size_t>(), rch1, comm);
-          c[0].ycols[k].resize(c0ycols);
-          c[1].ycols[k].resize(c1ycols);
-          MPI_Bcast
-            (c[0].ycols[k].data(), c0ycols,
-             mpi_type<std::size_t>(), rch0, comm);
-          MPI_Bcast
-            (c[1].ycols[k].data(), c1ycols,
-             mpi_type<std::size_t>(), rch1, comm);
+        int rank = mpi_rank(comm), P = mpi_nprocs(comm);
+        int P0total = rch1, P1total = P - rch1;
+        int pcols = std::floor(std::sqrt((float)P0total));
+        int prows = P0total / pcols;
+        int P0active = prows * pcols;
+        pcols = std::floor(std::sqrt((float)P1total));
+        prows = P1total / pcols;
+        int P1active = prows * pcols;
+        std::vector<MPI_Request> sreq(P);
+        int sreqs = 0;
+        std::vector<std::size_t> sbuf0, sbuf1;
+        if (rank < P0active) {
+          if (rank < (P-P0active)) {
+            // I'm one of the first P-P0active processes that are active
+            // on child0, so I need to send to one or more others which
+            // are not active on child0, ie the ones in [P0active,P)
+            std::size_t ssize = 0;
+            for (std::size_t k=0; k<I.size(); k++)
+              ssize += 1 + c[0].ycols[k].size();
+            sbuf0.reserve(ssize);
+            for (std::size_t k=0; k<I.size(); k++) {
+              sbuf0.push_back(c[0].ycols[k].size());
+              for (auto i : c[0].ycols[k])
+                sbuf0.push_back(i);
+            }
+            for (int p=P0active; p<P; p++)
+              if (rank == (p - P0active) % P0active)
+                MPI_Isend(sbuf0.data(), sbuf0.size(), mpi_type<std::size_t>(),
+                          p, /*tag*/0, comm, &sreq[sreqs++]);
+          }
         }
+        if (rank >= rch1 && rank < rch1+P1active) {
+          if ((rank-rch1) < (P-P1active)) {
+            // I'm one of the first P-P1active processes that are active
+            // on child1, so I need to send to one or more others which
+            // are not active on child1, ie the ones in [0,rch1) union
+            // [rch1+P1active,P)
+            std::size_t ssize = 0;
+            for (std::size_t k=0; k<I.size(); k++)
+              ssize += 1 + c[1].ycols[k].size();
+            sbuf1.reserve(ssize);
+            for (std::size_t k=0; k<I.size(); k++) {
+              sbuf1.push_back(c[1].ycols[k].size());
+              for (auto i : c[1].ycols[k])
+                sbuf1.push_back(i);
+            }
+            for (int p=0; p<rch1; p++)
+              if (rank - rch1 == p % P1active) {
+                sreq.emplace_back();
+                MPI_Isend(sbuf1.data(), sbuf1.size(), mpi_type<std::size_t>(),
+                          p, /*tag*/1, comm, &sreq[sreqs++]);
+              }
+            for (int p=rch1+P1active; p<P; p++)
+              if (rank - rch1 == (p - P1active) % P1active) {
+                sreq.emplace_back();
+                MPI_Isend(sbuf1.data(), sbuf1.size(), mpi_type<std::size_t>(),
+                          p, /*tag*/1, comm, &sreq[sreqs++]);
+              }
+          }
+        }
+
+        if (rank >= P0active) {
+          // I'm not active on child0, so I need to receive
+          MPI_Status stat;
+          int dest=-1, msgsize;
+          for (int p=0; p<P0active; p++)
+            if (p == (rank - P0active) % P0active) { dest = p; break; }
+          assert(dest >= 0);
+          MPI_Probe(dest, /*tag*/0, comm, &stat);
+          MPI_Get_count(&stat, mpi_type<std::size_t>(), &msgsize);
+          auto buf = new std::size_t[msgsize];
+          MPI_Recv(buf, msgsize, mpi_type<std::size_t>(), dest,
+                   /*tag*/0, comm, MPI_STATUS_IGNORE);
+          auto ptr = buf;
+          for (std::size_t k=0; k<I.size(); k++) {
+            auto c0ycols = *ptr++;
+            c[0].ycols[k].resize(c0ycols);
+            for (std::size_t i=0; i<c0ycols; i++)
+              c[0].ycols[k][i] = *ptr++;
+          }
+          assert(msgsize == ptr-buf);
+          delete[] buf;
+        }
+        if (!(rank >= rch1 && rank < rch1+P1active)) {
+          // I'm not active on child1, so I need to receive
+          MPI_Status stat;
+          int dest=-1, msgsize;
+          for (int p=rch1; p<rch1+P1active; p++) {
+            if (rank < rch1) {
+              if (p - rch1 == rank % P1active) { dest = p; break; }
+            } else if (p - rch1 == (rank - P1active) % P1active) {
+              dest = p; break;
+            }
+          }
+          assert(dest >= 0);
+          MPI_Probe(dest, /*tag*/1, comm, &stat);
+          MPI_Get_count(&stat, mpi_type<std::size_t>(), &msgsize);
+          auto buf = new std::size_t[msgsize];
+          MPI_Recv(buf, msgsize, mpi_type<std::size_t>(), dest, /*tag*/1,
+                   comm, MPI_STATUS_IGNORE);
+          auto ptr = buf;
+          for (std::size_t k=0; k<I.size(); k++) {
+            auto c1ycols = *ptr++;
+            c[1].ycols[k].resize(c1ycols);
+            for (std::size_t i=0; i<c1ycols; i++)
+              c[1].ycols[k][i] = *ptr++;
+          }
+          assert(msgsize == ptr-buf);
+          delete[] buf;
+        }
+        MPI_Waitall(sreqs, sreq.data(), MPI_STATUSES_IGNORE);
       }
+
       void combine_child_ycols(const std::vector<bool>& odiag) {
         for (std::size_t k=0; k<I.size(); k++) {
           if (!odiag[k]) {

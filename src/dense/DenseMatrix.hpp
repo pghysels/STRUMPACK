@@ -56,10 +56,10 @@ namespace strumpack {
     using real_t = typename RealType<scalar_t>::value_type;
 
   protected:
-    scalar_t* _data;
-    std::size_t _rows;
-    std::size_t _cols;
-    std::size_t _ld;
+    scalar_t* _data = nullptr;
+    std::size_t _rows = 0;
+    std::size_t _cols = 0;
+    std::size_t _ld = 1;
 
   public:
     DenseMatrix();

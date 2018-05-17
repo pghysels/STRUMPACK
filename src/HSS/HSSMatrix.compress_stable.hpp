@@ -1,3 +1,30 @@
+/*
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
+ *
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
+ *
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly.  Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government is granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
+ *
+ * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
+ *             (Lawrence Berkeley National Lab, Computational Research
+ *             Division).
+ */
 #ifndef HSS_MATRIX_COMPRESS_STABLE_HPP
 #define HSS_MATRIX_COMPRESS_STABLE_HPP
 
@@ -18,36 +45,31 @@ namespace strumpack {
       auto dd = opts.dd();
       // assert(dd <= d);
       auto n = this->cols();
-      DenseM_t Rr(n, d+dd), Rc(n, d+dd), Sr(n, d+dd), Sc(n, d+dd);
+      DenseM_t Rr, Rc, Sr, Sc;
       std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen;
       if (!opts.user_defined_random()) {
         rgen = random::make_random_generator<real_t>
           (opts.random_engine(), opts.random_distribution());
-        Rr.random(*rgen);
-        STRUMPACK_RANDOM_FLOPS
-          (rgen->flops_per_prng() * Rr.rows() * Rr.cols());
-        Rc.copy(Rr);
       }
-      Amult(Rr, Rc, Sr, Sc);
       WorkCompress<scalar_t> w;
       while (!this->is_compressed()) {
-        if (d != opts.d0()) {
-          Rr.resize(n, d+dd);
-          Rc.resize(n, d+dd);
-          Sr.resize(n, d+dd);
-          Sc.resize(n, d+dd);
-          DenseMW_t Rr_new(n, dd, Rr, 0, d);
-          DenseMW_t Rc_new(n, dd, Rc, 0, d);
-          DenseMW_t Sr_new(n, dd, Sr, 0, d);
-          DenseMW_t Sc_new(n, dd, Sc, 0, d);
-          if (!opts.user_defined_random()) {
-            Rr_new.random(*rgen);
-            STRUMPACK_RANDOM_FLOPS
-              (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
-            Rc_new.copy(Rr_new);
-          }
-          Amult(Rr_new, Rc_new, Sr_new, Sc_new);
+        Rr.resize(n, d+dd);
+        Rc.resize(n, d+dd);
+        Sr.resize(n, d+dd);
+        Sc.resize(n, d+dd);
+        int c = (d == opts.d0()) ? 0 : d;
+        int dnew = (d == opts.d0()) ? d+dd : dd;
+        DenseMW_t Rr_new(n, dnew, Rr, 0, c);
+        DenseMW_t Rc_new(n, dnew, Rc, 0, c);
+        DenseMW_t Sr_new(n, dnew, Sr, 0, c);
+        DenseMW_t Sc_new(n, dnew, Sc, 0, c);
+        if (!opts.user_defined_random()) {
+          Rr_new.random(*rgen);
+          STRUMPACK_RANDOM_FLOPS
+            (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
+          Rc_new.copy(Rr_new);
         }
+        Amult(Rr_new, Rc_new, Sr_new, Sc_new);
         if (opts.verbose())
           std::cout << "# compressing with d+dd = " << d << "+" << dd
                     << " (stable)" << std::endl;
@@ -56,8 +78,10 @@ namespace strumpack {
         compress_recursive_stable
           (Rr, Rc, Sr, Sc, Aelem, opts, w,
            d, dd, this->_openmp_task_depth);
-        d += dd;
-        dd = std::min(dd, opts.max_rank()-d);
+        if (!this->is_compressed()) {
+          d += dd;
+          dd = std::min(dd, opts.max_rank()-d);
+        }
       }
     }
 
@@ -186,10 +210,11 @@ namespace strumpack {
       if (d+dd >= opts.max_rank() || d+dd >= int(u_rows) ||
           update_orthogonal_basis
           (opts, w.U_r_max, lSr, w.Qr, d, dd,
-           this->_U_state == State::UNTOUCHED, depth)) {
+           this->_U_state == State::UNTOUCHED, w.lvl, depth)) {
         w.Qr.clear();
-        lSr.ID_row(_U.E(), _U.P(), w.Jr, opts.rel_tol(), opts.abs_tol(),
-                   opts.max_rank(), depth);
+        auto rtol = opts.rel_tol() / w.lvl;
+        auto atol = opts.abs_tol() / w.lvl;
+        lSr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol, opts.max_rank(), depth);
         STRUMPACK_ID_FLOPS(ID_row_flops(lSr, _U.cols()));
         this->_U_rank = _U.cols();
         this->_U_rows = _U.rows();
@@ -220,10 +245,11 @@ namespace strumpack {
       if (d+dd >= opts.max_rank() || d+dd >= v_rows ||
           update_orthogonal_basis
           (opts, w.V_r_max, lSc, w.Qc, d, dd,
-           this->_V_state == State::UNTOUCHED, depth)) {
+           this->_V_state == State::UNTOUCHED, w.lvl, depth)) {
         w.Qc.clear();
-        lSc.ID_row(_V.E(), _V.P(), w.Jc, opts.rel_tol(), opts.abs_tol(),
-                   opts.max_rank(), depth);
+        auto rtol = opts.rel_tol() / w.lvl;
+        auto atol = opts.abs_tol() / w.lvl;
+        lSc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol, opts.max_rank(), depth);
         STRUMPACK_ID_FLOPS(ID_row_flops(lSc, _V.cols()));
         this->_V_rank = _V.cols();
         this->_V_rows = _V.rows();
@@ -287,7 +313,7 @@ namespace strumpack {
     HSSMatrix<scalar_t>::update_orthogonal_basis
     (const opts_t& opts, scalar_t& r_max_0,
      const DenseM_t& S, DenseM_t& Q, int d, int dd,
-     bool untouched, int depth) {
+     bool untouched, int L, int depth) {
       int m = S.rows();
       if (d >= m) return true;
       Q.resize(m, d+dd);
@@ -305,8 +331,9 @@ namespace strumpack {
       Q2.orthogonalize(r_max, r_min, depth);
       STRUMPACK_QR_FLOPS(orthogonalize_flops(Q2));
       if (untouched) r_max_0 = r_max;
-      if (std::abs(r_min) < opts.abs_tol() ||
-          std::abs(r_min / r_max_0) < opts.rel_tol())
+      auto atol = opts.abs_tol() / L;
+      auto rtol = opts.rel_tol() / L;
+      if (std::abs(r_min) < atol || std::abs(r_min / r_max_0) < rtol)
         return true;
       DenseMW_t Q3(m, dd, Q, 0, d);
       DenseM_t Q12tQ3(Q12.cols(), Q3.cols());
@@ -326,8 +353,8 @@ namespace strumpack {
                              gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.))));
       auto Q3norm = Q3.norm();
       // TODO norm flops ?
-      return (Q3norm / std::sqrt(double(dd)) < opts.abs_tol())
-        || (Q3norm / S3norm < opts.rel_tol());
+      return (Q3norm / std::sqrt(double(dd)) < atol)
+        || (Q3norm / S3norm < rtol);
     }
 
   } // end namespace HSS

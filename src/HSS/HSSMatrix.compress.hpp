@@ -1,3 +1,30 @@
+/*
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
+ *
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
+ *
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly.  Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government is granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
+ *
+ * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
+ *             (Lawrence Berkeley National Lab, Computational Research
+ *             Division).
+ */
 #ifndef HSS_MATRIX_COMPRESS_HPP
 #define HSS_MATRIX_COMPRESS_HPP
 
@@ -44,9 +71,68 @@ namespace strumpack {
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
         compress_recursive_original
-          (Rr, Rc, Sr, Sc, Aelem, opts, w, d-d_old, this->_openmp_task_depth);
-        d_old = d;
-        d = 2 * (d_old - opts.dd()) + opts.dd();
+          (Rr, Rc, Sr, Sc, Aelem, opts, w, d-d_old,
+           this->_openmp_task_depth);
+        if (!this->is_compressed()) {
+          d_old = d;
+          d = 2 * (d_old - opts.dd()) + opts.dd();
+        }
+      }
+    }
+
+    template<typename scalar_t> void
+    HSSMatrix<scalar_t>::compress_hard_restart
+    (const DenseM_t& A, const opts_t& opts) {
+      AFunctor<scalar_t> afunc(A);
+      compress_hard_restart(afunc, afunc, opts);
+    }
+
+    template<typename scalar_t> void
+    HSSMatrix<scalar_t>::compress_hard_restart
+    (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts) {
+      int d_old = 0, d = opts.d0() + opts.dd();
+      auto n = this->cols();
+      DenseM_t Rr, Rc, Sr, Sc, R2, Sr2, Sc2;
+      std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen;
+      if (!opts.user_defined_random())
+        rgen = random::make_random_generator<real_t>
+          (opts.random_engine(), opts.random_distribution());
+      while (!this->is_compressed()) {
+        WorkCompress<scalar_t> w;
+        Rr = DenseM_t(n, d);
+        Rc = DenseM_t(n, d);
+        Sr = DenseM_t(n, d);
+        Sc = DenseM_t(n, d);
+        strumpack::copy(R2,  Rr, 0, 0);
+        strumpack::copy(R2,  Rc, 0, 0);
+        strumpack::copy(Sr2, Sr, 0, 0);
+        strumpack::copy(Sc2, Sc, 0, 0);
+        DenseMW_t Rr_new(n, d-d_old, Rr, 0, d_old);
+        DenseMW_t Rc_new(n, d-d_old, Rc, 0, d_old);
+        if (!opts.user_defined_random()) {
+          Rr_new.random(*rgen);
+          STRUMPACK_RANDOM_FLOPS
+            (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
+          Rc_new.copy(Rr_new);
+        }
+        DenseMW_t Sr_new(n, d-d_old, Sr, 0, d_old);
+        DenseMW_t Sc_new(n, d-d_old, Sc, 0, d_old);
+        Amult(Rr_new, Rc_new, Sr_new, Sc_new);
+        R2 = Rr; Sr2 = Sr; Sc2 = Sc;
+        if (opts.verbose())
+          std::cout << "# compressing with d = " << d-opts.dd()
+                    << " + " << opts.dd() << " (original, hard restart)"
+                    << std::endl;
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+        compress_recursive_original
+          (Rr, Rc, Sr, Sc, Aelem, opts, w, d,
+           this->_openmp_task_depth);
+        if (!this->is_compressed()) {
+          d_old = d;
+          d = 2 * (d_old - opts.dd()) + opts.dd();
+          reset();
+        }
       }
     }
 
@@ -363,6 +449,8 @@ namespace strumpack {
     template<typename scalar_t> bool HSSMatrix<scalar_t>::compute_U_V_bases
     (DenseM_t& Sr, DenseM_t& Sc, const opts_t& opts,
      WorkCompress<scalar_t>& w, int d, int depth) {
+      auto rtol = opts.rel_tol() / w.lvl;
+      auto atol = opts.abs_tol() / w.lvl;
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
@@ -370,7 +458,7 @@ namespace strumpack {
         auto u_rows = this->leaf() ? this->rows() :
           this->_ch[0]->U_rank()+this->_ch[1]->U_rank();
         DenseM_t wSr(u_rows, d, Sr, w.offset.second, 0);
-        wSr.ID_row(_U.E(), _U.P(), w.Jr, opts.rel_tol(), opts.abs_tol(),
+        wSr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol,
                    opts.max_rank(), depth);
         STRUMPACK_ID_FLOPS(ID_row_flops(wSr, _U.cols()));
       }
@@ -381,7 +469,7 @@ namespace strumpack {
         auto v_rows = this->leaf() ? this->rows() :
           this->_ch[0]->V_rank()+this->_ch[1]->V_rank();
         DenseM_t wSc(v_rows, d, Sc, w.offset.second, 0);
-        wSc.ID_row(_V.E(), _V.P(), w.Jc, opts.rel_tol(), opts.abs_tol(),
+        wSc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol,
                    opts.max_rank(), depth);
         STRUMPACK_ID_FLOPS(ID_row_flops(wSc, _V.cols()));
       }
