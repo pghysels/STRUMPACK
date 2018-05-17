@@ -173,6 +173,9 @@ namespace strumpack {
       (DistM_t& A, const DenseM_t& sub_A,
        const DistM_t& leaf_A, int lctxt) const;
 
+      void delete_trailing_block() override;
+      void reset() override;
+
     private:
       using delemw_t = typename std::function
         <void(const std::vector<std::size_t>& I,
@@ -231,6 +234,15 @@ namespace strumpack {
       (const dmult_t& Amult, const delemw_t& Aelem,
        const opts_t& opts, int Actxt=-1);
       void compress_stable_sync
+      (const dmult_t& Amult, const delem_blocks_t& Aelem,
+       const opts_t& opts, int Actxt=-1);
+      void compress_hard_restart_nosync
+      (const dmult_t& Amult, const delemw_t& Aelem,
+       const opts_t& opts, int Actxt=-1);
+      void compress_hard_restart_sync
+      (const dmult_t& Amult, const delemw_t& Aelem,
+       const opts_t& opts, int Actxt=-1);
+      void compress_hard_restart_sync
       (const dmult_t& Amult, const delem_blocks_t& Aelem,
        const opts_t& opts, int Actxt=-1);
 
@@ -1048,6 +1060,22 @@ namespace strumpack {
       if (!this->active()) return;
       assert(std::size_t(dist.rows())==this->cols());
       BC2BR::block_row_to_block_cyclic(_ranges, dist, sub, leaf, _comm);
+    }
+
+    template<typename scalar_t> void
+    HSSMatrixMPI<scalar_t>::delete_trailing_block() {
+      _B01.clear();
+      _B10.clear();
+      HSSMatrixBase<scalar_t>::delete_trailing_block();
+    }
+
+    template<typename scalar_t> void HSSMatrixMPI<scalar_t>::reset() {
+      _U.clear();
+      _V.clear();
+      _D.clear();
+      _B01.clear();
+      _B10.clear();
+      HSSMatrixBase<scalar_t>::reset();
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::print_info

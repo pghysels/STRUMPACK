@@ -46,11 +46,12 @@ namespace strumpack {
       return 1e-5;
     }
 
-    enum class CompressionAlgorithm { ORIGINAL, STABLE };
+    enum class CompressionAlgorithm { ORIGINAL, STABLE, HARD_RESTART };
     inline std::string get_name(CompressionAlgorithm a) {
       switch (a) {
       case CompressionAlgorithm::ORIGINAL: return "original"; break;
       case CompressionAlgorithm::STABLE: return "stable"; break;
+      case CompressionAlgorithm::HARD_RESTART: return "hard_restart"; break;
       default: return "unknown";
       }
     }
@@ -222,9 +223,12 @@ namespace strumpack {
               set_compression_algorithm(CompressionAlgorithm::ORIGINAL);
             else if (s.compare("stable") == 0)
               set_compression_algorithm(CompressionAlgorithm::STABLE);
+            else if (s.compare("hard_restart") == 0)
+              set_compression_algorithm(CompressionAlgorithm::HARD_RESTART);
             else
               std::cerr << "# WARNING: compression algorithm not recognized,"
-                        << " use 'original' or 'stable'." << std::endl;
+                        << " use 'original', 'stable' or 'hard_restart'."
+                        << std::endl;
           } break;
           case 11: { set_user_defined_random(true); } break;
           case 12: { set_synchronized_compression(true); } break;
@@ -253,7 +257,7 @@ namespace strumpack {
                   << get_name(random_distribution()) << ")" << std::endl
                   << "#   --hss_random_engine linear|mersenne (default "
                   << get_name(random_engine()) << ")" << std::endl
-                  << "#   --hss_compression_algorithm original|stable (default "
+                  << "#   --hss_compression_algorithm original|stable|hard_restart (default "
                   << get_name(compression_algorithm())<< ")" << std::endl
                   << "#   --hss_user_defined_random (default "
                   << user_defined_random() << ")" << std::endl

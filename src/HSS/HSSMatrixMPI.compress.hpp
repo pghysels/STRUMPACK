@@ -199,6 +199,11 @@ namespace strumpack {
           compress_stable_sync(Afunc, Afunc, opts, A.ctxt());
         else compress_stable_nosync(Afunc, Afunc, opts, A.ctxt());
         break;
+      case CompressionAlgorithm::HARD_RESTART:
+        if (opts.synchronized_compression())
+          compress_hard_restart_sync(Afunc, Afunc, opts, A.ctxt());
+        else compress_hard_restart_nosync(Afunc, Afunc, opts, A.ctxt());
+        break;
       default:
         std::cout << "Compression algorithm not recognized!" << std::endl;
       };
@@ -217,6 +222,8 @@ namespace strumpack {
         compress_original_sync(Amult, Aelem, opts, Actxt); break;
       case CompressionAlgorithm::STABLE:
         compress_stable_sync(Amult, Aelem, opts, Actxt); break;
+      case CompressionAlgorithm::HARD_RESTART:
+        compress_hard_restart_sync(Amult, Aelem, opts, Actxt); break;
       default:
         std::cout << "Compression algorithm not recognized!" << std::endl;
       };
@@ -241,6 +248,11 @@ namespace strumpack {
         if (opts.synchronized_compression())
           compress_stable_sync(Amult, Aelemw, opts, Actxt);
         else compress_stable_nosync(Amult, Aelemw, opts, Actxt);
+      } break;
+      case CompressionAlgorithm::HARD_RESTART: {
+        if (opts.synchronized_compression())
+          compress_hard_restart_sync(Amult, Aelemw, opts, Actxt);
+        else compress_hard_restart_nosync(Amult, Aelemw, opts, Actxt);
       } break;
       default:
         std::cout << "Compression algorithm not recognized!" << std::endl;
@@ -315,6 +327,45 @@ namespace strumpack {
           RS.add_columns(d, opts);
         }
       }
+    }
+
+    template<typename scalar_t> void
+    HSSMatrixMPI<scalar_t>::compress_hard_restart_nosync
+    (const dmult_t& Amult, const delemw_t& Aelem,
+     const opts_t& opts, int Actxt) {
+      int d_old = 0, d = opts.d0() + opts.dd();
+      DistSamples<scalar_t> RS
+        (d, (Actxt!=-1) ? Actxt : _ctxt, *this, Amult, opts, true);
+      while (!this->is_compressed()) {
+        WorkCompressMPI<scalar_t> w;
+        if (d != opts.d0() + opts.dd()) RS.add_columns(d, opts);
+        if (opts.verbose() && !mpi_rank(_comm))
+          std::cout << "# compressing with d = " << d-opts.dd()
+                    << " + " << opts.dd() << " (original, hard restart)"
+                    << std::endl;
+        compress_recursive_original(RS, Aelem, opts, w, d);
+        if (!this->is_compressed()) {
+          d_old = d;
+          d = 2 * (d_old - opts.dd()) + opts.dd();
+          reset();
+        }
+      }
+    }
+
+    template<typename scalar_t> void
+    HSSMatrixMPI<scalar_t>::compress_hard_restart_sync
+    (const dmult_t& Amult, const delemw_t& Aelem,
+     const opts_t& opts, int Actxt) {
+      std::cout << "TODO: HSSMatrixMPI<scalar_t>::compress_hard_restart_sync"
+                << std::endl;
+    }
+
+    template<typename scalar_t> void
+    HSSMatrixMPI<scalar_t>::compress_hard_restart_sync
+    (const dmult_t& Amult, const delem_blocks_t& Aelem,
+     const opts_t& opts, int Actxt) {
+      std::cout << "TODO: HSSMatrixMPI<scalar_t>::compress_hard_restart_sync"
+                << std::endl;
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::extract_level
@@ -733,10 +784,10 @@ namespace strumpack {
 
     template<typename scalar_t> bool HSSMatrixMPI<scalar_t>::compute_U_V_bases
     (int d, const opts_t& opts, WorkCompressMPI<scalar_t>& w) {
-      w.Sr.ID_row(_U.E(), _U.P(), w.Jr, opts.rel_tol(),
-                  opts.abs_tol(), _ctxt_T);
-      w.Sc.ID_row(_V.E(), _V.P(), w.Jc, opts.rel_tol(),
-                  opts.abs_tol(), _ctxt_T);
+      auto rtol = opts.rel_tol() / w.lvl;
+      auto atol = opts.abs_tol() / w.lvl;
+      w.Sr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol, _ctxt_T);
+      w.Sc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol, _ctxt_T);
       STRUMPACK_ID_FLOPS(ID_row_flops(w.Sr, w.Jr.size()));
       STRUMPACK_ID_FLOPS(ID_row_flops(w.Sc, w.Jc.size()));
       notify_inactives_J(w);

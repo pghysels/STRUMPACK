@@ -200,8 +200,9 @@ namespace strumpack {
            this->_U_state == State::UNTOUCHED, w.lvl)) {
         w.Qr.clear();
         // TODO pass max_rank to ID in DistributedMatrix
-        w.Sr.ID_row(_U.E(), _U.P(), w.Jr, opts.rel_tol(), opts.abs_tol(),
-                    /*opts.max_rank(),*/ _ctxt_T);
+        auto rtol = opts.rel_tol() / w.lvl;
+        auto atol = opts.abs_tol() / w.lvl;
+        w.Sr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol, _ctxt_T);
         STRUMPACK_ID_FLOPS(ID_row_flops(w.Sr, _U.cols()));
         this->_U_rank = _U.cols();
         this->_U_rows = _U.rows();
@@ -230,8 +231,9 @@ namespace strumpack {
            this->_V_state == State::UNTOUCHED, w.lvl)) {
         w.Qc.clear();
         // TODO pass max_rank to ID in DistributedMatrix
-        w.Sc.ID_row(_V.E(), _V.P(), w.Jc, opts.rel_tol(),
-                    opts.abs_tol(), /*opts.max_rank()*/ _ctxt_T);
+        auto rtol = opts.rel_tol() / w.lvl;
+        auto atol = opts.abs_tol() / w.lvl;
+        w.Sc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol, _ctxt_T);
         STRUMPACK_ID_FLOPS(ID_row_flops(w.Sc, _V.cols()));
         this->_V_rank = _V.cols();
         this->_V_rows = _V.rows();

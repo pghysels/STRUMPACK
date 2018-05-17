@@ -102,7 +102,12 @@ namespace strumpack {
        std::size_t roff=0, std::size_t coff=0) const = 0;
 
       void set_openmp_task_depth(int depth) { _openmp_task_depth = depth; }
-      void delete_trailing_block() { if (_ch.size()==2) _ch.resize(1); }
+      virtual void delete_trailing_block() { if (_ch.size()==2) _ch.resize(1); }
+      virtual void reset() {
+        _U_state = _V_state = State::UNTOUCHED;
+        _U_rank = _U_rows = _V_rank = _V_rows = 0;
+        for (auto& c : _ch) c->reset();
+      }
 
       virtual void forward_solve
       (const HSSFactorsMPI<scalar_t>& ULV, WorkSolveMPI<scalar_t>& w,

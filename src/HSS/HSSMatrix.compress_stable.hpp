@@ -45,36 +45,31 @@ namespace strumpack {
       auto dd = opts.dd();
       // assert(dd <= d);
       auto n = this->cols();
-      DenseM_t Rr(n, d+dd), Rc(n, d+dd), Sr(n, d+dd), Sc(n, d+dd);
+      DenseM_t Rr, Rc, Sr, Sc;
       std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen;
       if (!opts.user_defined_random()) {
         rgen = random::make_random_generator<real_t>
           (opts.random_engine(), opts.random_distribution());
-        Rr.random(*rgen);
-        STRUMPACK_RANDOM_FLOPS
-          (rgen->flops_per_prng() * Rr.rows() * Rr.cols());
-        Rc.copy(Rr);
       }
-      Amult(Rr, Rc, Sr, Sc);
       WorkCompress<scalar_t> w;
       while (!this->is_compressed()) {
-        if (d != opts.d0()) {
-          Rr.resize(n, d+dd);
-          Rc.resize(n, d+dd);
-          Sr.resize(n, d+dd);
-          Sc.resize(n, d+dd);
-          DenseMW_t Rr_new(n, dd, Rr, 0, d);
-          DenseMW_t Rc_new(n, dd, Rc, 0, d);
-          DenseMW_t Sr_new(n, dd, Sr, 0, d);
-          DenseMW_t Sc_new(n, dd, Sc, 0, d);
-          if (!opts.user_defined_random()) {
-            Rr_new.random(*rgen);
-            STRUMPACK_RANDOM_FLOPS
-              (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
-            Rc_new.copy(Rr_new);
-          }
-          Amult(Rr_new, Rc_new, Sr_new, Sc_new);
+        Rr.resize(n, d+dd);
+        Rc.resize(n, d+dd);
+        Sr.resize(n, d+dd);
+        Sc.resize(n, d+dd);
+        int c = (d == opts.d0()) ? 0 : d;
+        int dnew = (d == opts.d0()) ? d+dd : dd;
+        DenseMW_t Rr_new(n, dnew, Rr, 0, c);
+        DenseMW_t Rc_new(n, dnew, Rc, 0, c);
+        DenseMW_t Sr_new(n, dnew, Sr, 0, c);
+        DenseMW_t Sc_new(n, dnew, Sc, 0, c);
+        if (!opts.user_defined_random()) {
+          Rr_new.random(*rgen);
+          STRUMPACK_RANDOM_FLOPS
+            (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
+          Rc_new.copy(Rr_new);
         }
+        Amult(Rr_new, Rc_new, Sr_new, Sc_new);
         if (opts.verbose())
           std::cout << "# compressing with d+dd = " << d << "+" << dd
                     << " (stable)" << std::endl;
@@ -83,8 +78,10 @@ namespace strumpack {
         compress_recursive_stable
           (Rr, Rc, Sr, Sc, Aelem, opts, w,
            d, dd, this->_openmp_task_depth);
-        d += dd;
-        dd = std::min(dd, opts.max_rank()-d);
+        if (!this->is_compressed()) {
+          d += dd;
+          dd = std::min(dd, opts.max_rank()-d);
+        }
       }
     }
 
@@ -215,8 +212,9 @@ namespace strumpack {
           (opts, w.U_r_max, lSr, w.Qr, d, dd,
            this->_U_state == State::UNTOUCHED, w.lvl, depth)) {
         w.Qr.clear();
-        lSr.ID_row(_U.E(), _U.P(), w.Jr, opts.rel_tol(), opts.abs_tol(),
-                   opts.max_rank(), depth);
+        auto rtol = opts.rel_tol() / w.lvl;
+        auto atol = opts.abs_tol() / w.lvl;
+        lSr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol, opts.max_rank(), depth);
         STRUMPACK_ID_FLOPS(ID_row_flops(lSr, _U.cols()));
         this->_U_rank = _U.cols();
         this->_U_rows = _U.rows();
@@ -249,8 +247,9 @@ namespace strumpack {
           (opts, w.V_r_max, lSc, w.Qc, d, dd,
            this->_V_state == State::UNTOUCHED, w.lvl, depth)) {
         w.Qc.clear();
-        lSc.ID_row(_V.E(), _V.P(), w.Jc, opts.rel_tol(), opts.abs_tol(),
-                   opts.max_rank(), depth);
+        auto rtol = opts.rel_tol() / w.lvl;
+        auto atol = opts.abs_tol() / w.lvl;
+        lSc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol, opts.max_rank(), depth);
         STRUMPACK_ID_FLOPS(ID_row_flops(lSc, _V.cols()));
         this->_V_rank = _V.cols();
         this->_V_rows = _V.rows();
