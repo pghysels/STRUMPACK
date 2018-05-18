@@ -476,6 +476,10 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/DenseBEMAirbus.cpp
   ${CMAKE_BINARY_DIR}/examples/DenseBEMAirbus.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/DenseSchur100.cpp
   ${CMAKE_BINARY_DIR}/examples/DenseSchur100.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/DenseSchur500.cpp
+  ${CMAKE_BINARY_DIR}/examples/DenseSchur500.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/test_HSS_mpi_2.cpp
+  ${CMAKE_BINARY_DIR}/examples/test_HSS_mpi_2.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/DenseCovariance.cpp
   ${CMAKE_BINARY_DIR}/examples/DenseCovariance.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/generateMatrix.hpp

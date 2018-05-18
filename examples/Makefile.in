@@ -1,8 +1,6 @@
 
 all: DenseToeplitzMPI DenseToeplitzQChem DenseBEMAirbus \
-DenseBEMColStateMPI DenseSchur100 DenseCovariance
-
-all1: DenseCovariance
+DenseBEMColStateMPI DenseSchur100 DenseSchur500 test_HSS_mpi_2
 
 all2: @C_EXAMPLES@ testPoisson2d testPoisson3d	\
 	testPoisson2dMPI testPoisson2dMPIDist testMMdouble	\
@@ -95,6 +93,16 @@ DenseSchur100: DenseSchur100.cpp
 	$(CXX) $(LDFLAGS) DenseSchur100.o -o $@ $(LIBS)
 	$(RM) DenseSchur100.o
 
+DenseSchur500: DenseSchur500.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o DenseSchur500.o
+	$(CXX) $(LDFLAGS) DenseSchur500.o -o $@ $(LIBS)
+	$(RM) DenseSchur500.o
+
+test_HSS_mpi_2: test_HSS_mpi_2.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o test_HSS_mpi_2.o
+	$(CXX) $(LDFLAGS) test_HSS_mpi_2.o -o $@ $(LIBS)
+	$(RM) test_HSS_mpi_2.o
+
 DenseCovariance: DenseCovariance.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(INC_COVARIANCE) -c $< -o DenseCovariance.o
 	$(CXX) $(LDFLAGS) DenseCovariance.o -o $@ $(LIBS) $(LIB_COVARIANCE)
@@ -159,4 +167,5 @@ clean:
 	mtx2bin bin2mtx MLkernel \
 	testPoisson3dMPIDist DenseToeplitzMPI \
 	DenseToeplitzQChem DenseBEMColStateMPI \
-	DenseBEMAirbus DenseSchur100 DenseCovariance
+	DenseBEMAirbus DenseSchur100 DenseCovariance \
+	DenseSchur500  test_HSS_mpi_2
