@@ -1,6 +1,7 @@
 
 all: DenseToeplitzMPI DenseToeplitzQChem DenseBEMAirbus \
-DenseBEMColStateMPI DenseSchur100 DenseSchur500 test_HSS_mpi_2
+DenseBEMColStateMPI DenseSchur100 DenseSchur500 DenseSchur300 \
+test_HSS_mpi_2
 
 all2: @C_EXAMPLES@ testPoisson2d testPoisson3d	\
 	testPoisson2dMPI testPoisson2dMPIDist testMMdouble	\
@@ -93,6 +94,11 @@ DenseSchur100: DenseSchur100.cpp
 	$(CXX) $(LDFLAGS) DenseSchur100.o -o $@ $(LIBS)
 	$(RM) DenseSchur100.o
 
+DenseSchur300: DenseSchur300.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o DenseSchur300.o
+	$(CXX) $(LDFLAGS) DenseSchur300.o -o $@ $(LIBS)
+	$(RM) DenseSchur300.o
+
 DenseSchur500: DenseSchur500.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o DenseSchur500.o
 	$(CXX) $(LDFLAGS) DenseSchur500.o -o $@ $(LIBS)
@@ -168,4 +174,4 @@ clean:
 	testPoisson3dMPIDist DenseToeplitzMPI \
 	DenseToeplitzQChem DenseBEMColStateMPI \
 	DenseBEMAirbus DenseSchur100 DenseCovariance \
-	DenseSchur500  test_HSS_mpi_2
+	DenseSchur500 DenseSchur300 test_HSS_mpi_2
