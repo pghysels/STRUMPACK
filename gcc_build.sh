@@ -11,22 +11,19 @@ cd build
 if [[ $1 == "cori" ]];
 then
 echo $1
+# source ../load_GCC_Env.sh
 source /global/cscratch1/sd/gichavez/intel17/configEnv.sh
 export CRAYPE_LINK_TYPE="dynamic"
-ScaLAPACKLIBS="${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a -Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_intel_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_blacs_intelmpi_lp64.a -Wl,--end-group -liomp5 -lpthread -lm -ldl"
 cmake .. \
 -DCMAKE_BUILD_TYPE=Release \
 -DCMAKE_INSTALL_PREFIX=. \
 -DCMAKE_CXX_COMPILER=CC \
 -DCMAKE_C_COMPILER=cc \
 -DCMAKE_Fortran_COMPILER=ftn \
--DCMAKE_EXE_LINKER_FLAGS="-dynamic" \
--DCMAKE_CXX_FLAGS="-std=c++11" \
--DBLAS_LIBRARIES="" \
--DLAPACK_LIBRARIES="" \
--DSCALAPACK_LIBRARIES="" \
--DMETIS_INCLUDES=/global/cscratch1/sd/gichavez/edison/intel17/parmetis-4.0.3/metis/include \
--DMETIS_LIBRARIES=/global/cscratch1/sd/gichavez/edison/intel17/parmetis-4.0.3/build/Linux-x86_64/libmetis/libmetis.a
+-DCMAKE_CXX_FLAGS="" \
+-DCMAKE_EXE_LINKER_FLAGS="" \
+-DMETIS_INCLUDES=/global/homes/g/gichavez/cori/gnu/parmetis-4.0.3/metis/include \
+-DMETIS_LIBRARIES=/global/homes/g/gichavez/cori/gnu/parmetis-4.0.3/install/lib/libparmetis.a
 elif [[ $1 == "edison" ]];
 then
 echo $1
@@ -41,7 +38,7 @@ cmake .. \
 -DCMAKE_C_COMPILER=cc \
 -DCMAKE_Fortran_COMPILER=ftn \
 -DCMAKE_EXE_LINKER_FLAGS="" \
--DCMAKE_CXX_FLAGS="-std=c++11" \
+-DCMAKE_CXX_FLAGS="" \
 -DMETIS_INCLUDES=$PARMETIS_INSTALL/metis/include \
 -DMETIS_LIBRARIES=$PARMETIS_INSTALL/build/Linux-x86_64/libmetis/libmetis.a \
 -DPARMETIS_INCLUDES=$PARMETIS_INSTALL/install/include \
@@ -66,21 +63,21 @@ cmake .. \
 elif [[ $1 == "imac" ]];
 then
 echo $1
-# -DSCALAPACK_LIBRARIES=/usr/local/Cellar/scalapack/2.0.2_10/lib/libscalapack.dylib \
-cmake .. \
--DCMAKE_BUILD_TYPE=Release \
+cmake .. -DCMAKE_BUILD_TYPE=Debug \
 -DCMAKE_INSTALL_PREFIX=. \
--DCMAKE_C_COMPILER=/Users/gichavez/Documents/local/openmpi-2.1.1/bin/mpicc \
--DCMAKE_CXX_COMPILER=/Users/gichavez/Documents/local/openmpi-2.1.1/bin/mpic++ \
--DCMAKE_Fortran_COMPILER=/Users/gichavez/Documents/local/openmpi-2.1.1/bin/mpifort \
--DCMAKE_EXE_LINKER_FLAGS="-dynamic -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lgfortran -lquadmath" \
--DCMAKE_CXX_FLAGS="-std=c++11" \
--DBLAS_LIBRARIES=/usr/local/Cellar/openblas/0.2.20_1/lib/libblas.dylib \
--DLAPACK_LIBRARIES=/usr/local/Cellar/openblas/0.2.20_1/lib/liblapack.dylib \
--DSCALAPACK_LIBRARIES=/Users/gichavez/Documents/local/scalapack-2.0.2/libscalapack.a \
+-DCMAKE_C_COMPILER=mpicc \
+-DCMAKE_CXX_COMPILER=mpic++ \
+-DBLAS_LIBRARIES=/usr/local/Cellar/openblas/0.2.20/lib/libblas.dylib \
+-DLAPACK_LIBRARIES=/usr/local/Cellar/openblas/0.2.20/lib/liblapack.dylib \
+-DSCALAPACK_LIBRARIES="/usr/local/Cellar/scalapack/2.0.2_8/lib/libscalapack.dylib" \
+-DCMAKE_CXX_FLAGS="" \
+-DCMAKE_Fortran_COMPILER=mpifort \
 -DMETIS_INCLUDES=/usr/local/Cellar/metis/5.1.0/include \
 -DMETIS_LIBRARIES=/usr/local/Cellar/metis/5.1.0/lib/libmetis.dylib \
-2>&1 | tee -a log_gc_build_imac.txt
+-DPARMETIS_INCLUDES=/usr/local/Cellar/parmetis/4.0.3_4/include \
+-DPARMETIS_LIBRARIES=/usr/local/Cellar/parmetis/4.0.3_4/lib/libparmetis.dylib \
+-DSCOTCH_INCLUDES=/usr/local/Cellar/scotch/6.0.4_4/include \
+-DSCOTCH_LIBRARIES="/usr/local/Cellar/scotch/6.0.4_4/lib/libscotch.dylib;/usr/local/Cellar/scotch/6.0.4_4/lib/libscotcherr.dylib;/usr/local/Cellar/scotch/6.0.4_4/lib/libptscotch.dylib;/usr/local/Cellar/scotch/6.0.4_4/lib/libptscotcherr.dylib"
 else
 	echo "Unrecognized configuration. Try: <cori|edison|imac|pieter>"
 	exit 0
