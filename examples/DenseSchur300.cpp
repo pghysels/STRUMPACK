@@ -64,14 +64,14 @@ int run(int argc, char *argv[]) {
    * The matrix file is complex single precision (8 bytes).
    */
 
-  const char *file = "/global/cscratch1/sd/gichavez/intel17/paper2_tests/mats/Hsolver/front_3d_250000";
+  const char *file = "/global/cscratch1/sd/gichavez/intel17/paper2_tests/mats/Hsolver/front_3d_90000";
 
   HSSOptions<myscalar> hss_opts;
   hss_opts.set_from_command_line(argc, argv);
 
   int myid = mpi_rank();
   int np = mpi_nprocs();
-  int n = 250000;
+  int n = 90000;
 
   /* Initialize the BLACS grid */
   int npcol = floor(sqrt((float)np));

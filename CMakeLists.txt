@@ -472,10 +472,14 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/DenseToeplitzQChem.cpp
   ${CMAKE_BINARY_DIR}/examples/DenseToeplitzQChem.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/DenseBEMColStateMPI.cpp
   ${CMAKE_BINARY_DIR}/examples/DenseBEMColStateMPI.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/DenseBEMColStateMPI_strong.cpp
+  ${CMAKE_BINARY_DIR}/examples/DenseBEMColStateMPI_strong.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/DenseBEMAirbus.cpp
   ${CMAKE_BINARY_DIR}/examples/DenseBEMAirbus.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/DenseSchur100.cpp
   ${CMAKE_BINARY_DIR}/examples/DenseSchur100.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/DenseSchur300.cpp
+  ${CMAKE_BINARY_DIR}/examples/DenseSchur300.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/DenseSchur500.cpp
   ${CMAKE_BINARY_DIR}/examples/DenseSchur500.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/test_HSS_mpi_2.cpp
