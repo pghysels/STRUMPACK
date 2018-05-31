@@ -1201,6 +1201,7 @@ namespace strumpack {
   (scalar_t& r_max, scalar_t& r_min) {
     if (!active()) return;
     STRUMPACK_FLOPS(orthogonalize_flops(*this));
+    TIMER_TIME(TaskType::QR, 1, t_qr);
     auto minmn = std::min(rows(), cols());
     auto N = J() + minmn - 1;
     auto ltau = scalapack::numroc(N, NB(), pcol(), 0, pcols());

@@ -278,11 +278,13 @@ namespace strumpack {
       DistMW_t Q3(m, dd, Q, 0, d);
       DistM_t Q12tQ3(_ctxt, Q12.cols(), Q3.cols());
       auto S3norm = Q3.norm();
+      TIMER_TIME(TaskType::ORTHO, 1, t_ortho);
       gemm(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.), Q12tQ3);
       gemm(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.), Q3);
       // iterated classical Gram-Schmidt
       gemm(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.), Q12tQ3);
       gemm(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.), Q3);
+      TIMER_STOP(t_ortho);
       STRUMPACK_ORTHO_FLOPS
                             (gemm_flops(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.)) +
                              gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.)) +

@@ -38,8 +38,12 @@ namespace strumpack {
       DistElemMult(const DistM_t& A) : _A(A) {}
       const DistM_t& _A;
       void operator()(DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
+        TIMER_TIME(TaskType::FRONT_MULTIPLY_2D, 1, t_fmult);
         gemm(Trans::N, Trans::N, scalar_t(1.), _A, R, scalar_t(0.), Sr);
         gemm(Trans::C, Trans::N, scalar_t(1.), _A, R, scalar_t(0.), Sc);
+        TIMER_STOP(t_fmult);
+        STRUMPACK_CB_SAMPLE_FLOPS(gemm_flops(Trans::N, Trans::N, scalar_t(1.), _A, R, scalar_t(0.)));
+        STRUMPACK_CB_SAMPLE_FLOPS(gemm_flops(Trans::C, Trans::N, scalar_t(1.), _A, R, scalar_t(0.)));
       }
       void operator()
       (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,

@@ -166,6 +166,8 @@ namespace strumpack {
       (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
         gemm(Trans::N, Trans::N, scalar_t(1.), _A, Rr, scalar_t(0.), Sr);
         gemm(Trans::C, Trans::N, scalar_t(1.), _A, Rc, scalar_t(0.), Sc);
+        STRUMPACK_CB_SAMPLE_FLOPS(gemm_flops(Trans::N, Trans::N, scalar_t(1.), _A, Rr, scalar_t(0.)));
+        STRUMPACK_CB_SAMPLE_FLOPS(gemm_flops(Trans::C, Trans::N, scalar_t(1.), _A, Rc, scalar_t(0.)));
       }
       void operator()(const std::vector<size_t>& I,
                       const std::vector<size_t>& J, DenseM_t& B) {

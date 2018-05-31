@@ -364,6 +364,7 @@ namespace strumpack {
     HSSMatrix<scalar_t>::compute_local_samples
     (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
      WorkCompress<scalar_t>& w, int d0, int d, int depth) {
+      TIMER_TIME(TaskType::COMPUTE_SAMPLES, 1, t_compute);
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
@@ -506,6 +507,7 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrix<scalar_t>::reduce_local_samples
     (DenseM_t& Rr, DenseM_t& Rc, WorkCompress<scalar_t>& w,
      int d0, int d, int depth) {
+      TIMER_TIME(TaskType::REDUCE_SAMPLES, 1, t_reduce);
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable

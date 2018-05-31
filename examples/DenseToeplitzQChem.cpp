@@ -304,7 +304,7 @@ int main(int argc, char *argv[]) {
   print_flop_breakdown (rflops[0], rflops[1], rflops[2], rflops[3],
                         rflops[4], rflops[5], rflops[6], rflops[7], 
                         rflops[8], rflops[9], rflops[10], rflops[11]);
-
+  TimerList::Finalize();
   scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return ierr;

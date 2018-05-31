@@ -378,10 +378,8 @@ namespace strumpack {
       element_extraction(A, I, J, B);
     };
 
-    TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_compress);
     //_H->compress(mult, elem, opts.HSS_options());
     _H->compress(mult, elem_blocks, opts.HSS_options());
-    TIMER_STOP(t_compress);
 
     if (this->lchild) this->lchild->release_work_memory();
     if (this->rchild) this->rchild->release_work_memory();

@@ -727,6 +727,7 @@ namespace strumpack {
   DenseMatrix<scalar_t>::orthogonalize
   (scalar_t& r_max, scalar_t& r_min, int depth) {
     if (!cols() || !rows()) return;
+    TIMER_TIME(TaskType::QR, 1, t_qr);
     int info;
     int minmn = std::min(rows(), cols());
     auto tau = new scalar_t[minmn];
