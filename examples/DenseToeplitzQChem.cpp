@@ -47,8 +47,57 @@ using namespace std;
 using namespace strumpack;
 using namespace strumpack::HSS;
 
-int run(int argc, char *argv[]) {
+// Toeplitz matrix from Quantum Chemistry.
+class MFToeplitz {
+private:
+  static constexpr myscalar d = 0.1;
+  static constexpr myscalar d2 = d * d;
+  // TODO diagonal element is different from the description in the TOMS paper
+  static constexpr myscalar diag = M_PI * M_PI / (6.0 * d2);
 
+public:
+  DistributedMatrix<myscalar> A_;
+  MFToeplitz(int ctxt, int n) : A_(ctxt, n, n) {
+    int rlo, rhi, clo, chi;
+    A_.lranges(rlo, rhi, clo, chi);
+    for (int lc=clo; lc<chi; ++lc) {
+      auto c = A_.coll2g_fixed(lc);
+      for (int lr=rlo; lr<rhi; ++lr)
+        A_(lr, lc) = get(A_.rowl2g_fixed(lr), c);
+    }
+  }
+
+  myscalar get(int r, int c) {
+    myscalar rc = myscalar(r) - myscalar(c);
+    return (r==c) ? diag : pow(-1.0, rc) / (rc*rc * d2);
+  }
+
+  void operator()(DistributedMatrix<myscalar>& R,
+                  DistributedMatrix<myscalar>& Sr,
+                  DistributedMatrix<myscalar>& Sc) {
+    TIMER_TIME(TaskType::FRONT_MULTIPLY_2D, 1, t_fmult);
+    gemm(Trans::N, Trans::N, 1., A_, R, 0., Sr);
+    Sc = Sr;
+    TIMER_STOP(t_fmult);
+    STRUMPACK_CB_SAMPLE_FLOPS(gemm_flops(Trans::N, Trans::N, 1., A_, R, 0.));
+  }
+
+  void operator()(const vector<size_t>& I, const vector<size_t>& J,
+                  DistributedMatrix<myscalar>& B) {
+    if (!B.active()) return;
+    // Toeplitz matrix from Quantum Chemistry.
+    int rlo, rhi, clo, chi;
+    B.lranges(rlo, rhi, clo, chi);
+    for (int lc=clo; lc<chi; ++lc) {
+      auto c = J[B.coll2g(lc)];
+      for (int lr=rlo; lr<rhi; ++lr)
+        B(lr, lc) = get(I[B.rowl2g(lr)], c);
+    }
+  }
+};
+
+
+int run(int argc, char *argv[]) {
   int n = 8;
 
   // Initialize timer
@@ -83,24 +132,9 @@ int run(int argc, char *argv[]) {
     cout << "# Building dense matrix A..." << endl;
 
   timer.start();
-  DistributedMatrix<double> A(ctxt, n, n); // Creates descriptor
-  
-  // Toeplitz matrix from Quantum Chemistry.
-  myscalar d = 0.1;
-  myscalar d2 = d * d;
 
-  // TODO diagonal element is different from the description in the TOMS paper
-  myscalar diag = M_PI * M_PI / (6.0 * d2);
-  int rlo, rhi, clo, chi;
-  A.lranges(rlo, rhi, clo, chi);
-  for (int lc=clo; lc<chi; ++lc) {
-    auto c = A.coll2g_fixed(lc);
-    for (int lr=rlo; lr<rhi; ++lr) {
-      auto r = A.rowl2g_fixed(lr);
-      myscalar rc = r - c;
-      A(lr, lc) = (r==c) ? diag : pow(-1.0, rc) / (rc*rc * d2);
-    }
-  }
+  MFToeplitz AMF(ctxt, n);
+  DistributedMatrix<double>& A = AMF.A_;
 
   if (!mpi_rank()) {
     cout << "## Dense matrix construction time = " << timer.elapsed() << endl;
@@ -122,7 +156,7 @@ int run(int argc, char *argv[]) {
 
   // Simple compression
   timer.start();
-    HSSMatrixMPI<double> H(A, hss_opts, MPI_COMM_WORLD);
+  HSSMatrixMPI<double> H(n, n, AMF, ctxt, AMF, hss_opts, MPI_COMM_WORLD);
   if (!mpi_rank())
     cout << "## Compression time = " << timer.elapsed() << endl;
 
@@ -175,8 +209,8 @@ int run(int argc, char *argv[]) {
 
   MPI_Barrier(MPI_COMM_WORLD);
   if (!mpi_rank()) cout << "# computing ULV factorization of HSS matrix .. " << endl;
-  
-    auto ULV = H.factor();
+
+  auto ULV = H.factor();
   if (!mpi_rank()){
     cout << "## Factorization time = " << timer.elapsed() << endl;
     cout << "# ULV.memory() = " << ULV.memory()/(1000.0*1000.0) << "MB" << endl;
@@ -203,7 +237,7 @@ int run(int argc, char *argv[]) {
   auto Bnorm = B.normF();
 
   DistributedMatrix<double> R(B);
-  strumpack::gemm(strumpack::Trans::N, strumpack::Trans::N, 1., A, X, 0., R);
+  gemm(Trans::N, Trans::N, 1., A, X, 0., R);
   DistributedMatrix<double> R2 = H.apply(X);
   R.scaled_add(-1., B);
   R2.scaled_add(-1., B);
@@ -225,7 +259,7 @@ void print_flop_breakdown
    float reduce_sample_flops, float update_sample_flops,
    float extraction_flops, float CB_sample_flops, float sparse_sample_flops,
    float ULV_factor_flops, float schur_flops, float full_rank_flops) {
-    
+
     // Just root process continues
     if (mpi_rank() != 0) return;
 
@@ -279,7 +313,7 @@ void print_flop_breakdown
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
 
-  // Main program execution  
+  // Main program execution
   int ierr = run(argc, argv);
 
   // Reducing flop counters
@@ -300,9 +334,9 @@ int main(int argc, char *argv[]) {
 
   float rflops[12];
   MPI_Reduce(flops, rflops, 12, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-    
+
   print_flop_breakdown (rflops[0], rflops[1], rflops[2], rflops[3],
-                        rflops[4], rflops[5], rflops[6], rflops[7], 
+                        rflops[4], rflops[5], rflops[6], rflops[7],
                         rflops[8], rflops[9], rflops[10], rflops[11]);
   TimerList::Finalize();
   scalapack::Cblacs_exit(1);
