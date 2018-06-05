@@ -1,4 +1,4 @@
-// #define CHECK_ERROR 0
+// #define CHECK_ERROR 1
 #define CHECK_ERROR_RANDOMIZED 1
 
 #include <cmath>
@@ -139,23 +139,24 @@ int run(int argc, char* argv[]) {
     cout << "# dd = " << hss_opts.dd() << endl;
   }
 
-  IUV Amf(ctxt, alpha, beta, m, rk, decay_val);
+  // Initialize timer
+  TaskTimer::t_begin = GET_TIME_NOW();
+  TaskTimer timer(string("compression"), 1);
 
+// # =====================
+// # === Compression =====
+// # =====================
+
+  IUV Amf(ctxt, alpha, beta, m, rk, decay_val);
 
   auto start = std::chrono::system_clock::now();
   HSSMatrixMPI<double> H(m, m, Amf, ctxt, Amf, hss_opts, MPI_COMM_WORLD);
   auto end = std::chrono::system_clock::now();
 
   std::chrono::duration<double> elapsed_seconds = end-start;
-  // std::chrono::duration<double> elapsed_seconds_max;
-  // auto durationMax = std::chrono::system_clock::now();
   double d_elapsed_seconds = elapsed_seconds.count();
   double d_elapsed_seconds_max;
   MPI_Reduce(&d_elapsed_seconds, &d_elapsed_seconds_max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-
-  // std::chrono::duration<double> elapsed_seconds = end-start;
-  // std::cout << "## Compression elapsed time: " << elapsed_seconds.count() << "s\n";
-
   if(!mpi_rank()){
     std::cout << "## Compression elapsed time(max): " << d_elapsed_seconds_max << "s\n";
   }
@@ -175,21 +176,25 @@ int run(int argc, char* argv[]) {
 
   auto Hrank = H.max_rank();
   auto Hmem = H.total_memory();
-#if defined(CHECK_ERROR)
-  DistributedMatrix<double> I(ctxt, m, m),
+  double Amem = 0.0, HnormF = 0.0, AnormF = 0.0;
+
+  // Check error by computing dense matrix of A
+  if (m < 20000) {
+    DistributedMatrix<double> I(ctxt, m, m),
     A(ctxt, m, m), At(ctxt, m, m);
-  I.eye();
-  A.zero();
-  At.zero();
-  Amf(I, A, At);
-  auto Amem = A.total_memory();
-  auto Hdense = H.dense(ctxt);
-  Hdense.scaled_add(-1., A);
-  auto HnormF = Hdense.normF();
-  auto AnormF = A.normF();
-#else
-  double Amem = m*m*sizeof(double);
-#endif
+    I.eye();
+    A.zero();
+    At.zero();
+    Amf(I, A, At);
+    Amem = A.total_memory();
+    auto Hdense = H.dense(ctxt);
+    Hdense.scaled_add(-1., A);
+    HnormF = Hdense.normF();
+    AnormF = A.normF();
+    }
+  else {
+    Amem = m*m*sizeof(double);
+  }
 
 #if defined(CHECK_ERROR_RANDOMIZED)
   int r = 100; // Size of matrix to test compression
@@ -210,18 +215,72 @@ int run(int argc, char* argv[]) {
     cout << "# memory(A) = " << Amem/1e6 << " MB" << endl;
     cout << "# memory(H) = " << Hmem/1e6 << " MB, "
          << 100. * Hmem / Amem << "% of dense" << endl << endl;
-#if defined(CHECK_ERROR)
+  if (m < 20000)
     cout << "# relative error = ||A-H*I||_F/||A||_F = "
          << HnormF / AnormF << endl;
-#endif
+
 #if defined(CHECK_ERROR_RANDOMIZED)
     cout << "# relative error est = ||(A*R)-(H*R)||_F/||A*R||_F = "
          << Hnormcheck / Anormest << endl;
 #endif
   }
+
+// # =====================
+// # === Factorization ===
+// # =====================
+
+  if (!mpi_rank())
+    cout << endl << "# Factorization..." << endl;
+  timer.start();
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  if (!mpi_rank()) cout << "# computing ULV factorization of HSS matrix .. " << endl;
+
+  auto ULV = H.factor();
+  if (!mpi_rank()){
+    cout << "## Factorization time = " << timer.elapsed() << endl;
+    cout << "# ULV.memory() = " << ULV.memory()/(1000.0*1000.0) << "MB" << endl;
+  }
+
+// # =============
+// # === Solve ===
+// # =============
+  if (!mpi_rank()) cout << "# Solve..." << endl;
+
+  DistributedMatrix<double> B(ctxt, m, 1);
+  B.random();
+  DistributedMatrix<double> X(B);
+
+  timer.start();
+    H.solve(ULV, X);
+  if (!mpi_rank())
+    cout << "## Solve time = " << timer.elapsed() << endl;
+
+// // # ==================================
+// // # === Checking relative residual ===
+// // # ==================================
+
+//   auto Bnorm = B.normF();
+
+//   DistributedMatrix<double> R(B);
+//   gemm(Trans::N, Trans::N, 1., A, X, 0., R);
+//   DistributedMatrix<double> R2 = H.apply(X);
+//   R.scaled_add(-1., B);
+//   R2.scaled_add(-1., B);
+//   double resnorm = R.normF();
+//   double resnorm2 = R2.normF();
+
+//   if (!mpi_rank()){
+//       cout << "# relative residual = ||A*X-B||_F/||B||_F = "
+//            << resnorm / Bnorm << endl;
+//       cout << "# relative residual = ||H*X-B||_F/||B||_F = "
+//            << resnorm2 / Bnorm << endl;
+//   }
+
+  if (!mpi_rank()) cout << "##Ending" << endl;
   return 0;
 
-if (!mpi_rank()) cout << "##Ending" << endl;
+
 }
 
 
@@ -229,5 +288,6 @@ int main(int argc, char* argv[]) {
   MPI_Init(&argc, &argv);
   run(argc, argv);
   scalapack::Cblacs_exit(1);
+  TimerList::Finalize();
   MPI_Finalize();
 }
