@@ -59,7 +59,7 @@ int run(int argc, char *argv[]) {
   HSSOptions<myscalar> hss_opts;
   hss_opts.set_from_command_line(argc, argv);
 
-// Example 3
+// Example 2
 #define nprowA 16
 #define npcolA 16
   int n=132300;
@@ -118,8 +118,8 @@ int run(int argc, char *argv[]) {
         string locfile = "ZZ_" + SSTR(i) + "_" + SSTR(j) + "_" +
           SSTR(nrows[i]) + "_" + SSTR(ncols[j]);
         string filename = prefix + locfile;
-        // cout << "Process " << myid << " reading from file "
-        //      << locfile << endl;
+        cout << "Process " << myid << " reading from file "
+             << locfile << endl;
         
         std::ifstream fp(filename.c_str(), ios::binary);
         if (!fp.is_open()) {
@@ -152,9 +152,9 @@ int run(int argc, char *argv[]) {
       }
       copy(nrows[i], ncols[j], Atmp, 0,
            A, rowoffset[i], coloffset[j], ctxt_all);
-      // if (!myid)
-      //   cout << myid << " working: (" << i << "," << j << "): "
-      //        << nrows[i] << " x " << ncols[j] << endl;
+      if (!myid)
+        cout << myid << " working: (" << i << "," << j << "): "
+             << nrows[i] << " x " << ncols[j] << endl;
     }
   MPI_Barrier(MPI_COMM_WORLD);
 
@@ -256,7 +256,7 @@ int run(int argc, char *argv[]) {
     for(int j=0;j<nprowA;j++) {
       string locfile="CC_"+SSTR(j)+"_"+SSTR(nrows[j]);
       string filename=prefix+locfile;
-      // std::cout << "Process " << myid << " reading from file " << locfile << std::endl;
+      std::cout << "Process " << myid << " reading from file " << locfile << std::endl;
       fp.open(filename.c_str(),std::ios::binary);
       if(!fp.is_open()) {
         std::cout << "Could not open file " << filename << std::endl;
@@ -273,7 +273,7 @@ int run(int argc, char *argv[]) {
       myscalar tmp;
       for(i=0;i<nrows[j];i++) {
         fp.read((char *)&tmp,8);
-        // cout << n << "(" << rowoffset[j]-1+i+1 << "," << 1 <<") = "<< tmp << endl;
+        cout << n << "(" << rowoffset[j]-1+i+1 << "," << 1 <<") = "<< tmp << endl;
         data[rowoffset[j]-1+i+1] = tmp;
 
         if(fp.fail()) {

@@ -11,7 +11,6 @@ cd build
 if [[ $1 == "cori" ]];
 then
 echo $1
-# source ../load_GCC_Env.sh
 source /global/cscratch1/sd/gichavez/intel17/configEnv.sh
 export CRAYPE_LINK_TYPE="dynamic"
 cmake .. \
@@ -23,7 +22,10 @@ cmake .. \
 -DCMAKE_CXX_FLAGS="" \
 -DCMAKE_EXE_LINKER_FLAGS="" \
 -DMETIS_INCLUDES=/global/homes/g/gichavez/cori/gnu/parmetis-4.0.3/metis/include \
--DMETIS_LIBRARIES=/global/homes/g/gichavez/cori/gnu/parmetis-4.0.3/install/lib/libparmetis.a
+-DMETIS_LIBRARIES=/global/homes/g/gichavez/cori/gnu/parmetis-4.0.3/install/lib/libparmetis.a \
+-DBLAS_LIBRARIES="" \
+-DLAPACK_LIBRARIES="" \
+-DSCALAPACK_LIBRARIES=""
 elif [[ $1 == "edison" ]];
 then
 echo $1

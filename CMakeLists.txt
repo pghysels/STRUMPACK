@@ -447,8 +447,8 @@ endif()
 #   ${CMAKE_BINARY_DIR}/examples/testMMdouble.cpp COPYONLY)
 # configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPI.cpp
 #   ${CMAKE_BINARY_DIR}/examples/testMMdoubleMPI.cpp COPYONLY)
-# configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPIDist.cpp
-#   ${CMAKE_BINARY_DIR}/examples/testMMdoubleMPIDist.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPIDist.cpp
+  ${CMAKE_BINARY_DIR}/examples/testMMdoubleMPIDist.cpp COPYONLY)
 # configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdouble64.cpp
 #   ${CMAKE_BINARY_DIR}/examples/testMMdouble64.cpp COPYONLY)
 # configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPIDist64.cpp
