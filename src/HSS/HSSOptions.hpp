@@ -74,6 +74,7 @@ namespace strumpack {
       bool _user_defined_random = false;
       bool _log_ranks = false;
       CompressionAlgorithm _compress_algo = CompressionAlgorithm::STABLE;
+      bool _HMT = false;
       bool _sync = false;
       bool _verbose = true;
 
@@ -114,6 +115,7 @@ namespace strumpack {
         _sync = sync;
       }
       void set_log_ranks(bool log_ranks) { _log_ranks = log_ranks; }
+      void set_HMT(bool HMT) { _HMT = HMT; }
       void set_verbose(bool verbose) { _verbose = verbose; }
 
       real_t rel_tol() const { return _rel_tol; }
@@ -133,6 +135,7 @@ namespace strumpack {
       bool user_defined_random() const { return _user_defined_random; }
       bool synchronized_compression() const { return _sync; }
       bool log_ranks() const { return _log_ranks; }
+      bool HMT() const { return _HMT; }
       bool verbose() const { return _verbose; }
 
       void set_from_command_line(int argc, char* argv[]) {
@@ -151,6 +154,7 @@ namespace strumpack {
           {"hss_enable_sync",           no_argument, 0, 12},
           {"hss_disable_sync",          no_argument, 0, 13},
           {"hss_log_ranks",             no_argument, 0, 14},
+          {"hss_HMT",                   no_argument, 0, 15},
           {"hss_verbose",               no_argument, 0, 'v'},
           {"hss_quiet",                 no_argument, 0, 'q'},
           {"help",                      no_argument, 0, 'h'},
@@ -234,6 +238,7 @@ namespace strumpack {
           case 12: { set_synchronized_compression(true); } break;
           case 13: { set_synchronized_compression(false); } break;
           case 14: { set_log_ranks(true); } break;
+          case 15: { set_HMT(true); } break;
           case 'v': set_verbose(true); break;
           case 'q': set_verbose(false); break;
           case 'h': describe_options(); break;
@@ -267,6 +272,8 @@ namespace strumpack {
                   << (!synchronized_compression()) << ")" << std::endl
                   << "#   --hss_log_ranks (default "
                   << log_ranks() << ")" << std::endl
+                  << "#   --hss_HMT(default "
+                  << HMT() << ")" << std::endl
                   << "#   --hss_verbose or -v (default "
                   << verbose() << ")" << std::endl
                   << "#   --hss_quiet or -q (default "

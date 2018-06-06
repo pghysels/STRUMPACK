@@ -290,10 +290,14 @@ namespace strumpack {
                              gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.)) +
                              gemm_flops(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.)) +
                              gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.)));
-      auto Q3norm = Q3.norm();
-      // TODO norm flops?
-      return (Q3norm / std::sqrt(double(dd)) < atol)
-        || (Q3norm / S3norm < rtol);
+      auto Q3norm = Q3.norm(); // TODO norm flops?
+      if (opts.HMT()) {
+        constexpr double c = 1.25331413731550e-01; //1.0 / (10.0 * std::sqrt(2. / M_PI));
+        return Q3norm < atol * c;
+      } else {
+        return (Q3norm / std::sqrt(double(dd)) < atol)
+          || (Q3norm / S3norm < rtol);
+      }
     }
 
   } // end namespace HSS
