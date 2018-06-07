@@ -353,6 +353,13 @@ namespace strumpack {
   }
 
   template<typename scalar_t> long long int
+  solve_flops(const DistributedMatrix<scalar_t>& b) {
+    if (!b.is_master()) return 0;
+    return (is_complex<scalar_t>() ? 4:1) *
+      blas::getrs_flops(b.rows(), b.cols());
+  }
+
+  template<typename scalar_t> long long int
   LQ_flops(const DistributedMatrix<scalar_t>& a) {
     if (!a.is_master()) return 0;
     auto minrc = std::min(a.rows(), a.cols());
