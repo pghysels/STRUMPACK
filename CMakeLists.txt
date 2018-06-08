@@ -492,6 +492,8 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/generatePermutation.hpp
   ${CMAKE_BINARY_DIR}/examples/generatePermutation.hpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/applyPermutation.hpp
   ${CMAKE_BINARY_DIR}/examples/applyPermutation.hpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/test_pgemm.hpp
+  ${CMAKE_BINARY_DIR}/examples/test_pgemm.hpp COPYONLY)
 
 if(STRUMPACK_BUILD_TESTS)
   include(CTest)
