@@ -284,10 +284,97 @@ int run(int argc, char* argv[]) {
 }
 
 
-int main(int argc, char* argv[]) {
+void print_flop_breakdown
+  (float random_flops, float ID_flops, float QR_flops, float ortho_flops,
+   float reduce_sample_flops, float update_sample_flops,
+   float extraction_flops, float CB_sample_flops, float sparse_sample_flops,
+   float ULV_factor_flops, float schur_flops, float full_rank_flops,
+   float hss_solve_flops) {
+
+    // Just root process continues
+    if (mpi_rank() != 0) return;
+
+    float sample_flops = CB_sample_flops
+      + sparse_sample_flops;
+    float compression_flops = random_flops
+      + ID_flops + QR_flops + ortho_flops
+      + reduce_sample_flops + update_sample_flops
+      + extraction_flops + sample_flops;
+    std::cout << std::endl;
+    std::cout << "# ----- FLOP BREAKDOWN ---------------------"
+              << std::endl;
+    std::cout << "# compression           = "
+              << compression_flops << std::endl;
+    std::cout << "#    random             = "
+              << random_flops << std::endl;
+    std::cout << "#    ID                 = "
+              << ID_flops << std::endl;
+    std::cout << "#    QR                 = "
+              << QR_flops << std::endl;
+    std::cout << "#    ortho              = "
+              << ortho_flops << std::endl;
+    std::cout << "#    reduce_samples     = "
+              << reduce_sample_flops << std::endl;
+    std::cout << "#    update_samples     = "
+              << update_sample_flops << std::endl;
+    std::cout << "#    extraction         = "
+              << extraction_flops << std::endl;
+    std::cout << "#    sampling           = "
+              << sample_flops << std::endl;
+    std::cout << "#       CB_sample       = "
+              << CB_sample_flops << std::endl;
+    std::cout << "#       sparse_sampling = "
+              << sparse_sample_flops << std::endl;
+    std::cout << "# ULV_factor            = "
+              << ULV_factor_flops << std::endl;
+    std::cout << "# Schur                 = "
+              << schur_flops << std::endl;
+    std::cout << "# full_rank             = "
+              << full_rank_flops << std::endl;
+    std::cout << "# HSS_solve             = "
+              << hss_solve_flops << std::endl;
+    std::cout << "# --------------------------------------------"
+              << std::endl;
+    std::cout << "# total                 = "
+              << (compression_flops + ULV_factor_flops +
+                  schur_flops + full_rank_flops + hss_solve_flops) << std::endl;
+    std::cout << "# --------------------------------------------";
+    std::cout << std::endl;
+}
+
+
+int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
-  run(argc, argv);
-  scalapack::Cblacs_exit(1);
+
+  // Main program execution
+  int ierr = run(argc, argv);
+
+  // Reducing flop counters
+  float flops[13] = {
+    float(params::random_flops.load()),
+    float(params::ID_flops.load()),
+    float(params::QR_flops.load()),
+    float(params::ortho_flops.load()),
+    float(params::reduce_sample_flops.load()),
+    float(params::update_sample_flops.load()),
+    float(params::extraction_flops.load()),
+    float(params::CB_sample_flops.load()),
+    float(params::sparse_sample_flops.load()),
+    float(params::ULV_factor_flops.load()),
+    float(params::schur_flops.load()),
+    float(params::full_rank_flops.load()),
+    float(params::hss_solve_flops.load())
+  };
+
+  float rflops[13];
+  MPI_Reduce(flops, rflops, 13, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+  print_flop_breakdown (rflops[0], rflops[1], rflops[2], rflops[3],
+                        rflops[4], rflops[5], rflops[6], rflops[7],
+                        rflops[8], rflops[9], rflops[10], rflops[11],
+                        rflops[12]);
   TimerList::Finalize();
+  scalapack::Cblacs_exit(1);
   MPI_Finalize();
+  return ierr;
 }

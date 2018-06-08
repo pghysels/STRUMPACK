@@ -106,7 +106,8 @@ DenseSchur500: DenseSchur500.cpp
 
 test_HSS_mpi_2: test_HSS_mpi_2.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o test_HSS_mpi_2.o
-	$(CXX) $(LDFLAGS) test_HSS_mpi_2.o -o $@ $(LIBS)
+	# $(CXX) $(LDFLAGS) test_HSS_mpi_2.o -o $@ $(LIBS)
+	$(CXX) $(LDFLAGS) test_HSS_mpi_2.o -o $@ $(LIBS) $(LIB_IPM)
 	$(RM) test_HSS_mpi_2.o
 
 DenseBEMColStateMPI_strong: DenseBEMColStateMPI_strong.cpp
