@@ -86,7 +86,6 @@ DenseToeplitzQChem: DenseToeplitzQChem.cpp
 DenseBEMColStateMPI: DenseBEMColStateMPI.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o DenseBEMColStateMPI.o
 	$(CXX) $(LDFLAGS) DenseBEMColStateMPI.o -o $@ $(LIBS)
-# $(CXX) $(LDFLAGS) DenseBEMColStateMPI.o -o $@ $(LIBS) $(LIB_IPM)
 	$(RM) DenseBEMColStateMPI.o
 
 DenseBEMAirbus: DenseBEMAirbus.cpp
@@ -111,8 +110,7 @@ DenseSchur500: DenseSchur500.cpp
 
 test_HSS_mpi_2: test_HSS_mpi_2.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o test_HSS_mpi_2.o
-	# $(CXX) $(LDFLAGS) test_HSS_mpi_2.o -o $@ $(LIBS)
-	$(CXX) $(LDFLAGS) test_HSS_mpi_2.o -o $@ $(LIBS) $(LIB_IPM)
+	$(CXX) $(LDFLAGS) test_HSS_mpi_2.o -o $@ $(LIBS)
 	$(RM) test_HSS_mpi_2.o
 
 DenseBEMColStateMPI_strong: DenseBEMColStateMPI_strong.cpp
@@ -175,10 +173,10 @@ MLkernel: MLkernel.cpp
 	$(CXX) $(LDFLAGS) MLkernel.o -o $@ $(LIBS)
 	$(RM) MLkernel.o
 
-	test_pgemm: test_pgemm.cpp
-		$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o test_pgemm.o
-		$(CXX) $(LDFLAGS) test_pgemm.o -o $@ $(LIBS)
-		$(RM) test_pgemm.o
+test_pgemm: test_pgemm.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o test_pgemm.o
+	$(CXX) $(LDFLAGS) test_pgemm.o -o $@ $(LIBS)
+	$(RM) test_pgemm.o
 
 clean:
 	rm -f *~ *o @C_EXAMPLES@ testPoisson2d	\
