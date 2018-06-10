@@ -77,9 +77,11 @@ public:
                   DistributedMatrix<myscalar>& Sc) {
     TIMER_TIME(TaskType::FRONT_MULTIPLY_2D, 1, t_fmult);
     gemm(Trans::N, Trans::N, 1., A_, R, 0., Sr);
-    Sc = Sr;
+    //Sc = Sr;
     TIMER_STOP(t_fmult);
+    //Sc = Sr;
     STRUMPACK_CB_SAMPLE_FLOPS(gemm_flops(Trans::N, Trans::N, 1., A_, R, 0.));
+    Sc = Sr;
   }
 
   void operator()(const vector<size_t>& I, const vector<size_t>& J,

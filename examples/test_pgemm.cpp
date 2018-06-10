@@ -66,7 +66,7 @@ int run(int argc, char* argv[]) {
   // B.print();
   // C.print();
 
-  float flops = 2.*m*m*s;
+  float flops = m*m*(2.*s-1.);
 
   // % Cori peak
   // Flops / MaxTime / (Cores*Peak) = % of peak
