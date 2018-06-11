@@ -213,9 +213,10 @@ int run(int argc, char *argv[]) {
   if (!mpi_rank()) cout << "# computing ULV factorization of HSS matrix .. " << endl;
 
   auto ULV = H.factor();
+  auto ULVmem = ULV.total_memory(MPI_COMM_WORLD)/(1000.0*1000.0);
   if (!mpi_rank()){
     cout << "## Factorization time = " << timer.elapsed() << endl;
-    cout << "# ULV.memory() = " << ULV.memory()/(1000.0*1000.0) << "MB" << endl;
+    cout << "# ULV.memory() = " << ULVmem << "MB" << endl;
   }
 
 // # =============
