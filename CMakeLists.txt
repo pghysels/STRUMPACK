@@ -398,16 +398,6 @@ set(CPACK_PACKAGE_VERSION_MINOR ${STRUMPACK_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${STRUMPACK_VERSION_PATCH})
 include(CPack)
 
-find_package(Doxygen)
-if(DOXYGEN_FOUND)
-  configure_file(${CMAKE_SOURCE_DIR}/doc/doxygen/doxygen.dox.in
-    ${CMAKE_BINARY_DIR}/doxygen.dox @ONLY)
-  add_custom_target(doc
-    ${DOXYGEN_EXECUTABLE} ${CMAKE_BINARY_DIR}/doxygen.dox
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    COMMENT "Generating API documentation with doxygen" VERBATIM)
-endif(DOXYGEN_FOUND)
-
 if(STRUMPACK_C_INTERFACE)
   set(C_EXAMPLES "sexample dexample cexample zexample")
 endif()
@@ -492,6 +482,8 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/generatePermutation.hpp
   ${CMAKE_BINARY_DIR}/examples/generatePermutation.hpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/applyPermutation.hpp
   ${CMAKE_BINARY_DIR}/examples/applyPermutation.hpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/test_pgemm.cpp
+  ${CMAKE_BINARY_DIR}/examples/test_pgemm.cpp COPYONLY)
 
 if(STRUMPACK_BUILD_TESTS)
   include(CTest)

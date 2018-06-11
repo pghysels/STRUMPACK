@@ -217,8 +217,9 @@ void print_flop_breakdown
   (float random_flops, float ID_flops, float QR_flops, float ortho_flops,
    float reduce_sample_flops, float update_sample_flops,
    float extraction_flops, float CB_sample_flops, float sparse_sample_flops,
-   float ULV_factor_flops, float schur_flops, float full_rank_flops) {
-    
+   float ULV_factor_flops, float schur_flops, float full_rank_flops,
+   float hss_solve_flops) {
+
     // Just root process continues
     if (mpi_rank() != 0) return;
 
@@ -259,11 +260,13 @@ void print_flop_breakdown
               << schur_flops << std::endl;
     std::cout << "# full_rank             = "
               << full_rank_flops << std::endl;
+    std::cout << "# HSS_solve             = "
+              << hss_solve_flops << std::endl;
     std::cout << "# --------------------------------------------"
               << std::endl;
     std::cout << "# total                 = "
               << (compression_flops + ULV_factor_flops +
-                  schur_flops + full_rank_flops) << std::endl;
+                  schur_flops + full_rank_flops + hss_solve_flops) << std::endl;
     std::cout << "# --------------------------------------------";
     std::cout << std::endl;
 }
@@ -272,11 +275,11 @@ void print_flop_breakdown
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
 
-  // Main program execution  
+  // Main program execution
   int ierr = run(argc, argv);
 
   // Reducing flop counters
-  float flops[12] = {
+  float flops[13] = {
     float(params::random_flops.load()),
     float(params::ID_flops.load()),
     float(params::QR_flops.load()),
@@ -288,16 +291,18 @@ int main(int argc, char *argv[]) {
     float(params::sparse_sample_flops.load()),
     float(params::ULV_factor_flops.load()),
     float(params::schur_flops.load()),
-    float(params::full_rank_flops.load())
+    float(params::full_rank_flops.load()),
+    float(params::hss_solve_flops.load())
   };
 
-  float rflops[12];
-  MPI_Reduce(flops, rflops, 12, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-    
-  print_flop_breakdown (rflops[0], rflops[1], rflops[2], rflops[3],
-                        rflops[4], rflops[5], rflops[6], rflops[7], 
-                        rflops[8], rflops[9], rflops[10], rflops[11]);
+  float rflops[13];
+  MPI_Reduce(flops, rflops, 13, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
 
+  print_flop_breakdown (rflops[0], rflops[1], rflops[2], rflops[3],
+                        rflops[4], rflops[5], rflops[6], rflops[7],
+                        rflops[8], rflops[9], rflops[10], rflops[11],
+                        rflops[12]);
+  TimerList::Finalize();
   scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return ierr;

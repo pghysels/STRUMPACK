@@ -1,5 +1,5 @@
 
-all: DenseToeplitzMPI DenseToeplitzQChem DenseBEMAirbus \
+all: test_pgemm DenseToeplitzMPI DenseToeplitzQChem DenseBEMAirbus \
 DenseBEMColStateMPI DenseSchur100 DenseSchur500 DenseSchur300 \
 test_HSS_mpi_2 DenseBEMColStateMPI_strong
 
@@ -32,14 +32,17 @@ sexample: sexample.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o sexample.o
 	$(CXX) $(LDFLAGS) sexample.o -o $@ $(LIBS)
 	$(RM) sexample.o
+
 dexample: dexample.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o dexample.o
 	$(CXX) $(LDFLAGS) dexample.o -o $@ $(LIBS)
 	$(RM) dexample.o
+
 cexample: cexample.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o cexample.o
 	$(CXX) $(LDFLAGS) cexample.o -o $@ $(LIBS)
 	$(RM) cexample.o
+
 zexample: zexample.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o zexample.o
 	$(CXX) $(LDFLAGS) zexample.o -o $@ $(LIBS)
@@ -49,10 +52,12 @@ testPoisson2d: testPoisson2d.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testPoisson2d.o
 	$(CXX) $(LDFLAGS) testPoisson2d.o -o $@ $(LIBS)
 	$(RM) testPoisson2d.o
+
 testPoisson3d: testPoisson3d.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testPoisson3d.o
 	$(CXX) $(LDFLAGS) testPoisson3d.o -o $@ $(LIBS)
 	$(RM) testPoisson3d.o
+
 testPoisson2dMPI: testPoisson2dMPI.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testPoisson2dMPI.o
 	$(CXX) $(LDFLAGS) testPoisson2dMPI.o -o $@ $(LIBS)
@@ -81,7 +86,6 @@ DenseToeplitzQChem: DenseToeplitzQChem.cpp
 DenseBEMColStateMPI: DenseBEMColStateMPI.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o DenseBEMColStateMPI.o
 	$(CXX) $(LDFLAGS) DenseBEMColStateMPI.o -o $@ $(LIBS)
-# $(CXX) $(LDFLAGS) DenseBEMColStateMPI.o -o $@ $(LIBS) $(LIB_IPM)
 	$(RM) DenseBEMColStateMPI.o
 
 DenseBEMAirbus: DenseBEMAirbus.cpp
@@ -168,6 +172,11 @@ MLkernel: MLkernel.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o MLkernel.o
 	$(CXX) $(LDFLAGS) MLkernel.o -o $@ $(LIBS)
 	$(RM) MLkernel.o
+
+test_pgemm: test_pgemm.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o test_pgemm.o
+	$(CXX) $(LDFLAGS) test_pgemm.o -o $@ $(LIBS)
+	$(RM) test_pgemm.o
 
 clean:
 	rm -f *~ *o @C_EXAMPLES@ testPoisson2d	\

@@ -51,6 +51,7 @@ cmake .. \
 elif [[ $1 == "pieter" ]];
 then
 echo $1
+COMBBLASHOME=/home/pieterg/LBL/STRUMPACK/CombBLAS_beta_16_1/CombBLAS_beta_16_1/build/
 cmake .. \
 -DCMAKE_BUILD_TYPE=Release \
 -DCMAKE_INSTALL_PREFIX=. \
@@ -60,9 +61,12 @@ cmake .. \
 -DSTRUMPACK_TASK_TIMERS=ON \
 -DSTRUMPACK_USE_PARMETIS=OFF \
 -DSTRUMPACK_USE_SCOTCH=OFF \
+-DSTRUMPACK_USE_COMBBLAS=ON \
 -DCMAKE_CXX_FLAGS="-Wall -Wfatal-errors -Wextra -Wno-unused-parameter" \
 -DMETIS_INCLUDES=/home/pieterg/local/parmetis-4.0.3/metis/include \
--DMETIS_LIBRARIES=/home/pieterg/local/parmetis-4.0.3/build/Linux-x86_64/libmetis/libmetis.a
+-DMETIS_LIBRARIES=/home/pieterg/local/parmetis-4.0.3/build/Linux-x86_64/libmetis/libmetis.a \
+-DCOMBBLAS_INCLUDES=/home/pieterg/LBL/STRUMPACK/CombBLAS_beta_16_1/CombBLAS_beta_16_1/ \
+-DCOMBBLAS_LIBRARIES="$COMBBLASHOME/libCommGridlib.a;$COMBBLASHOME/libHashlib.a;$COMBBLASHOME/libMemoryPoollib.a;$COMBBLASHOME/libmmiolib.a;$COMBBLASHOME/libMPIOplib.a;$COMBBLASHOME/libMPITypelib.a"
 elif [[ $1 == "imac" ]];
 then
 echo $1
