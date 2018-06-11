@@ -20,8 +20,8 @@ public:
   DenseM_t _U1d,_V1d;
   HSSMatrixMPI<double>* _H;
   IUV() {}
-  IUV(int ctxt, double alpha, double beta, int m, int rank,
-      int decay_val) : _alpha(alpha), _beta(beta) {
+  IUV(int ctxt, int ctxt_all, double alpha, double beta,
+      int m, int rank, int decay_val) : _alpha(alpha), _beta(beta) {
     _U = DistM_t(ctxt, m, rank);
     _V = DistM_t(ctxt, m, rank);
     _U.random();
@@ -32,8 +32,8 @@ public:
       for (int r=0; r<_V.lrows(); r++)
         _V(r, c) = _V(r, c) * tmpD;
     }
-    _U1d = _U.all_gather(_U.ctxt());
-    _V1d = _V.all_gather(_V.ctxt());
+    _U1d = _U.all_gather(ctxt_all);
+    _V1d = _V.all_gather(ctxt_all);
   }
 
   void operator()(DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
@@ -147,7 +147,7 @@ int run(int argc, char* argv[]) {
 // # === Compression =====
 // # =====================
 
-  IUV Amf(ctxt, alpha, beta, m, rk, decay_val);
+  IUV Amf(ctxt, ctxt_all, alpha, beta, m, rk, decay_val);
 
   auto start = std::chrono::system_clock::now();
   HSSMatrixMPI<double> H(m, m, Amf, ctxt, Amf, hss_opts, MPI_COMM_WORLD);
