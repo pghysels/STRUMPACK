@@ -333,8 +333,13 @@ namespace strumpack {
       if (untouched) r_max_0 = r_max;
       auto atol = opts.abs_tol() / L;
       auto rtol = opts.rel_tol() / L;
-      if (std::abs(r_min) < atol || std::abs(r_min / r_max_0) < rtol)
-        return true;
+      if (opts.HMT()) {
+        if (std::abs(r_min) < atol)
+          return true;
+      } else {
+        if (std::abs(r_min) < atol || std::abs(r_min / r_max_0) < rtol)
+          return true;
+      }
       DenseMW_t Q3(m, dd, Q, 0, d);
       DenseM_t Q12tQ3(Q12.cols(), Q3.cols());
       auto S3norm = Q3.norm();
