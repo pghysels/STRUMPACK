@@ -151,6 +151,17 @@ namespace strumpack {
         if (_factors_seq) nnz += _factors_seq->nonzeros();
         return nnz;
       }
+      std::size_t total_memory(MPI_Comm c) {
+        std::size_t mtot, m=memory();
+        MPI_Allreduce(&m, &mtot, 1, mpi_type<std::size_t>(), MPI_SUM, c);
+        return mtot;
+      }
+      std::size_t total_nonzeros(MPI_Comm c) {
+        std::size_t nnztot, nnz=nonzeros();
+        MPI_Allreduce
+          (&nnz, &nnztot, 1, mpi_type<std::size_t>(), MPI_SUM, c);
+        return nnztot;
+      }
     private:
       std::vector<HSSFactorsMPI<scalar_t>> _ch;
       std::unique_ptr<HSSFactors<scalar_t>> _factors_seq;
