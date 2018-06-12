@@ -341,8 +341,10 @@ namespace strumpack {
           return true;
       }
       DenseMW_t Q3(m, dd, Q, 0, d);
+      // only use p columns of Q3 to check the stopping criterion
+      DenseMW_t Q3p(m, opts.p(), Q, 0, d);
       DenseM_t Q12tQ3(Q12.cols(), Q3.cols());
-      auto S3norm = Q3.norm();
+      auto S3norm = Q3p.norm();
       TIMER_TIME(TaskType::ORTHO, 1, t_ortho);
       gemm(Trans::C, Trans::N, scalar_t(1.), Q12, Q3,
            scalar_t(0.), Q12tQ3, depth);
@@ -358,7 +360,7 @@ namespace strumpack {
                              gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.)) +
                              gemm_flops(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.)) +
                              gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.))));
-      auto Q3norm = Q3.norm(); // TODO norm flops ?
+      auto Q3norm = Q3p.norm(); // TODO norm flops ?
       if (opts.HMT()) {
         constexpr double c = 1.25331413731550e-01; //1.0 / (10.0 * std::sqrt(2. / M_PI));
         return Q3norm < atol * c;
