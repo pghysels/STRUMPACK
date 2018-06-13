@@ -1,21 +1,18 @@
-*  =====================================================================
-      SUBROUTINE SGEQP3mod( M, N, A, LDA, JPVT, TAU, WORK, LWORK, INFO,
-     $                      RANK, TOL )
+      SUBROUTINE CGEQP3HMT( M, N, A, LDA, JPVT, TAU, WORK, LWORK, RWORK,
+     $     INFO, RANK, RTOL, ATOL, MN, DEPTH )
 *
 *  -- LAPACK computational routine (version 3.4.2) --
 *  -- LAPACK is a software package provided by Univ. of Tennessee,    --
 *  -- Univ. of California Berkeley, Univ. of Colorado Denver and NAG Ltd..--
 *     September 2012
 *
-*  -- Modified by F-H Rouet, Lawrence Berkeley National Lab, August 2014
-*
-      IMPLICIT NONE
 *     .. Scalar Arguments ..
-      INTEGER            INFO, LDA, LWORK, M, N, RANK
+      INTEGER            INFO, LDA, LWORK, M, N, RANK, MN
 *     ..
 *     .. Array Arguments ..
       INTEGER            JPVT( * )
-      REAL               A( LDA, * ), TAU( * ), WORK( * ), TOL
+      REAL               RWORK( * ), RTOL, ATOL
+      COMPLEX            A( LDA, * ), TAU( * ), WORK( * )
 *     ..
 *
 *  =====================================================================
@@ -25,22 +22,28 @@
       PARAMETER          ( INB = 1, INBMIN = 2, IXOVER = 3 )
 *     ..
 *     .. Local Scalars ..
+      REAL               HMTSCAL
       LOGICAL            LQUERY
       INTEGER            FJB, IWS, J, JB, LWKOPT, MINMN, MINWS, NA, NB,
-     $                   NBMIN, NFXD, NX, SM, SMINMN, SN, TOPBMN, C
+     $                   NBMIN, NFXD, NX, SM, SMINMN, SN, TOPBMN,
+     $                   C
 *     ..
 *     .. External Subroutines ..
-      EXTERNAL           SGEQRF, SLAQP2, SLAQPS, SORMQR, SSWAP, XERBLA
+      EXTERNAL           CGEQRF, CLAQP2MOD, CLAQPSMOD,
+     $     CSWAP, CUNMQR, XERBLA
 *     ..
 *     .. External Functions ..
       INTEGER            ILAENV
-      REAL               SNRM2
-      EXTERNAL           ILAENV, SNRM2
+      REAL               SCNRM2
+      EXTERNAL           ILAENV, SCNRM2
 *     ..
 *     .. Intrinsic Functions ..
       INTRINSIC          INT, MAX, MIN
 *     ..
 *     .. Executable Statements ..
+*
+*     Test input arguments
+*  ====================
 *
       INFO = 0
       LQUERY = ( LWORK.EQ.-1 )
@@ -52,15 +55,18 @@
          INFO = -4
       END IF
 *
+
+      RANK=0
+
       IF( INFO.EQ.0 ) THEN
          MINMN = MIN( M, N )
          IF( MINMN.EQ.0 ) THEN
             IWS = 1
             LWKOPT = 1
          ELSE
-            IWS = 3*N + 1
-            NB = ILAENV( INB, 'SGEQRF', ' ', M, N, -1, -1 )
-            LWKOPT = 2*N + ( N + 1 )*NB
+            IWS = N + 1
+            NB = ILAENV( INB, 'CGEQRF', ' ', M, N, -1, -1 )
+            LWKOPT = ( N + 1 )*NB
          END IF
          WORK( 1 ) = LWKOPT
 *
@@ -70,7 +76,7 @@
       END IF
 *
       IF( INFO.NE.0 ) THEN
-         CALL XERBLA( 'SGEQP3', -INFO )
+         CALL XERBLA( 'CGEQP3', -INFO )
          RETURN
       ELSE IF( LQUERY ) THEN
          RETURN
@@ -88,7 +94,7 @@
       DO 10 J = 1, N
          IF( JPVT( J ).NE.0 ) THEN
             IF( J.NE.NFXD ) THEN
-               CALL SSWAP( M, A( 1, J ), 1, A( 1, NFXD ), 1 )
+               CALL CSWAP( M, A( 1, J ), 1, A( 1, NFXD ), 1 )
                JPVT( J ) = JPVT( NFXD )
                JPVT( NFXD ) = J
             ELSE
@@ -109,14 +115,16 @@
 *
       IF( NFXD.GT.0 ) THEN
          NA = MIN( M, NFXD )
-*CC      CALL SGEQR2( M, NA, A, LDA, TAU, WORK, INFO )
-         CALL SGEQRF( M, NA, A, LDA, TAU, WORK, LWORK, INFO )
+*CC      CALL CGEQR2( M, NA, A, LDA, TAU, WORK, INFO )
+         CALL CGEQRF( M, NA, A, LDA, TAU, WORK, LWORK, INFO )
          IWS = MAX( IWS, INT( WORK( 1 ) ) )
          IF( NA.LT.N ) THEN
-*CC         CALL SORM2R( 'Left', 'Transpose', M, N-NA, NA, A, LDA,
-*CC  $                   TAU, A( 1, NA+1 ), LDA, WORK, INFO )
-            CALL SORMQR( 'Left', 'Transpose', M, N-NA, NA, A, LDA, TAU,
-     $                   A( 1, NA+1 ), LDA, WORK, LWORK, INFO )
+*CC         CALL CUNM2R( 'Left', 'Conjugate Transpose', M, N-NA,
+*CC  $                   NA, A, LDA, TAU, A( 1, NA+1 ), LDA, WORK,
+*CC  $                   INFO )
+            CALL CUNMQR( 'Left', 'Conjugate Transpose', M, N-NA, NA, A,
+     $                   LDA, TAU, A( 1, NA+1 ), LDA, WORK, LWORK,
+     $                   INFO )
             IWS = MAX( IWS, INT( WORK( 1 ) ) )
          END IF
       END IF
@@ -124,8 +132,6 @@
 *     Factorize free columns
 *  ======================
 *
-      RANK=0
-
       IF( NFXD.LT.MINMN ) THEN
 *
          SM = M - NFXD
@@ -134,7 +140,7 @@
 *
 *        Determine the block size.
 *
-         NB = ILAENV( INB, 'SGEQRF', ' ', SM, SN, -1, -1 )
+         NB = ILAENV( INB, 'CGEQRF', ' ', SM, SN, -1, -1 )
          NBMIN = 2
          NX = 0
 *
@@ -142,7 +148,7 @@
 *
 *           Determine when to cross over from blocked to unblocked code.
 *
-            NX = MAX( 0, ILAENV( IXOVER, 'SGEQRF', ' ', SM, SN, -1,
+            NX = MAX( 0, ILAENV( IXOVER, 'CGEQRF', ' ', SM, SN, -1,
      $           -1 ) )
 *
 *
@@ -150,15 +156,15 @@
 *
 *              Determine if workspace is large enough for blocked code.
 *
-               MINWS = 2*SN + ( SN+1 )*NB
+               MINWS = ( SN+1 )*NB
                IWS = MAX( IWS, MINWS )
                IF( LWORK.LT.MINWS ) THEN
 *
 *                 Not enough workspace to use optimal NB: Reduce NB and
 *                 determine the minimum value of NB.
 *
-                  NB = ( LWORK-2*SN ) / ( SN+1 )
-                  NBMIN = MAX( 2, ILAENV( INBMIN, 'SGEQRF', ' ', SM, SN,
+                  NB = LWORK / ( SN+1 )
+                  NBMIN = MAX( 2, ILAENV( INBMIN, 'CGEQRF', ' ', SM, SN,
      $                    -1, -1 ) )
 *
 *
@@ -170,8 +176,8 @@
 *        store the exact column norms.
 *
          DO 20 J = NFXD + 1, N
-            WORK( J ) = SNRM2( SM, A( NFXD+1, J ), 1 )
-            WORK( N+J ) = WORK( J )
+            RWORK( J ) = SCNRM2( SM, A( NFXD+1, J ), 1 )
+            RWORK( N+J ) = RWORK( J )
    20    CONTINUE
 *
          IF( ( NB.GE.NBMIN ) .AND. ( NB.LT.SMINMN ) .AND.
@@ -191,11 +197,15 @@
 *
 *              Factorize JB columns among columns J:N.
 *
-               CALL SLAQPS( M, N-J+1, J-1, JB, FJB, A( 1, J ), LDA,
-     $                      JPVT( J ), TAU( J ), WORK( J ), WORK( N+J ),
-     $                      WORK( 2*N+1 ), WORK( 2*N+JB+1 ), N-J+1 )
+               CALL CLAQPSMOD( M, N-J+1, J-1, JB, FJB, A( 1, J ), LDA,
+     $              JPVT( J ), TAU( J ), RWORK( J ),
+     $              RWORK( N+J ), WORK( 1 ), WORK( JB+1 ),
+     $              N-J+1, DEPTH )
+*
                DO C=J,J+FJB-1
-                 IF(ABS(A(1,1))<TOL.OR.ABS(A(C,C))/ABS(A(1,1))<TOL) THEN
+                  HMTSCAL = 1. + 4. * SQRT(REAL(M) * MN) / (M-C-1)
+                  IF(ABS(A(C,C))/ABS(A(1,1)) <= RTOL/HMTSCAL .OR.
+     $                 ABS(A(C,C)) <= ATOL/HMTSCAL) THEN
                    GOTO 99
                  ELSE
                    RANK=RANK+1
@@ -211,23 +221,28 @@
 *        Use unblocked code to factor the last or only block.
 *
 *
-         IF( J.LE.MINMN )
-     $      CALL SLAQP2( M, N-J+1, J-1, A( 1, J ), LDA, JPVT( J ),
-     $                   TAU( J ), WORK( J ), WORK( N+J ),
-     $                   WORK( 2*N+1 ) )
+         IF( J.LE.MINMN ) THEN
+            CALL CLAQP2MOD( M, N-J+1, J-1, A( 1, J ), LDA, JPVT( J ),
+     $           TAU( J ), RWORK( J ), RWORK( N+J ),
+     $           WORK( 1 ), DEPTH )
+*
             DO C=J,MINMN
-              IF(ABS(A(1,1))<TOL.OR.ABS(A(C,C))/ABS(A(1,1))<TOL) THEN
+               HMTSCAL = 1. + 4. * SQRT(REAL(M) * MN) / (M-C-1)
+               IF(ABS(A(C,C))/ABS(A(1,1)) <= RTOL/HMTSCAL .OR.
+     $                 ABS(A(C,C)) <= ATOL/HMTSCAL) THEN
                 GOTO 99
               ELSE
                 RANK=RANK+1
               ENDIF
             END DO
+         END IF
       END IF
 *
       WORK( 1 ) = IWS
+
    99 CONTINUE
       RETURN
 *
-*     End of SGEQP3
+*     End of CGEQP3
 *
       END

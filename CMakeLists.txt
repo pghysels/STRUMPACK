@@ -246,6 +246,8 @@ set(LIBSRCDENSE
   src/dense/BLASLAPACKOpenMPTask.cpp
   src/dense/lapack/sgeqp3tol.f src/dense/lapack/dgeqp3tol.f
   src/dense/lapack/cgeqp3tol.f src/dense/lapack/zgeqp3tol.f
+  src/dense/lapack/cgeqp3hmt.f src/dense/lapack/dgeqp3hmt.f
+  src/dense/lapack/sgeqp3hmt.f src/dense/lapack/zgeqp3hmt.f
   src/dense/lapack/sgeqrfmod.f src/dense/lapack/dgeqrfmod.f
   src/dense/lapack/cgeqrfmod.f src/dense/lapack/zgeqrfmod.f
   src/dense/lapack/sgeqr2mod.f src/dense/lapack/dgeqr2mod.f
@@ -274,8 +276,8 @@ set(LIBSRCDENSE
   src/dense/lapack/cgelq2mod.f src/dense/lapack/zgelq2mod.f
   src/dense/lapack/pcgeqpfmod.f src/dense/lapack/pdgeqpfmod.f
   src/dense/lapack/psgeqpfmod.f src/dense/lapack/pzgeqpfmod.f
-  src/dense/lapack/cgeqp3mod.f src/dense/lapack/dgeqp3mod.f
-  src/dense/lapack/sgeqp3mod.f src/dense/lapack/zgeqp3mod.f)
+  src/dense/lapack/pcgeqpfhmt.f src/dense/lapack/pdgeqpfhmt.f
+  src/dense/lapack/psgeqpfhmt.f src/dense/lapack/pzgeqpfhmt.f)
 
 set(LIBSRCSPARSE
   src/sparse/rcm/rcm.f

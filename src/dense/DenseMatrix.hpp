@@ -150,6 +150,7 @@ namespace strumpack {
     void LQ
     (DenseMatrix<scalar_t>& L, DenseMatrix<scalar_t>& Q, int depth) const;
     void orthogonalize(scalar_t& r_max, scalar_t& r_min, int depth);
+
     void ID_column
     (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
      std::vector<std::size_t>& ind, real_t rel_tol,
@@ -158,6 +159,15 @@ namespace strumpack {
     (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
      std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
      int max_rank, int depth) const;
+    void ID_column_HMT
+    (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
+     std::vector<std::size_t>& ind, real_t rel_tol,
+     real_t abs_tol, int max_rank, int mn, int depth);
+    void ID_row_HMT
+    (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
+     std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
+     int max_rank, int mn, int depth) const;
+
     std::vector<scalar_t> singular_values() const;
 
     void shift(scalar_t sigma);
@@ -171,6 +181,10 @@ namespace strumpack {
     (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
      std::vector<std::size_t>& ind, real_t rel_tol,
      real_t abs_tol, int max_rank, int depth);
+    void ID_column_GEQP3_HMT
+    (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
+     std::vector<std::size_t>& ind, real_t rel_tol,
+     real_t abs_tol, int max_rank, int mn, int depth);
     template<typename T> friend class DistributedMatrix;
   };
 
@@ -762,6 +776,18 @@ namespace strumpack {
     X = Xt.transpose();
   }
 
+  template<typename scalar_t> void DenseMatrix<scalar_t>::ID_row_HMT
+  (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
+   std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
+   int max_rank, int mn, int depth) const {
+    // TODO optimize by implementing by row directly, avoiding transposes
+    TIMER_TIME(TaskType::HSS_SEQHQRINTERPOL, 1, t_hss_seq_hqr);
+    DenseMatrix<scalar_t> Xt;
+    transpose().ID_column_HMT
+      (Xt, piv, ind, rel_tol, abs_tol, max_rank, mn, depth);
+    X = Xt.transpose();
+  }
+
   template<typename scalar_t> void DenseMatrix<scalar_t>::ID_column
   (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
    std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
@@ -769,6 +795,14 @@ namespace strumpack {
     // GEQP3 is much more accurate!!
     ID_column_GEQP3(X, piv, ind, rel_tol, abs_tol, max_rank, depth);
     //ID_column_MGS(X, piv, ind, rel_tol, abs_tol, max_rank, depth);
+  }
+
+  template<typename scalar_t> void DenseMatrix<scalar_t>::ID_column_HMT
+  (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
+   std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
+   int max_rank, int mn, int depth) {
+    ID_column_GEQP3_HMT
+      (X, piv, ind, rel_tol, abs_tol, max_rank, mn, depth);
   }
 
   template<typename scalar_t> void DenseMatrix<scalar_t>::ID_column_GEQP3
@@ -783,6 +817,33 @@ namespace strumpack {
     // TODO make geqp3tol stop at max_rank
     blas::geqp3tol(m, n, data(), ld(), iind.data(), tau, &info,
                    rank, rel_tol, abs_tol, depth);
+    rank = std::min(rank, max_rank);
+    delete[] tau;
+    for (int i=1; i<=n; i++) {
+      int j = iind[i-1];
+      assert(j-1 >= 0 && j-1 < int(iind.size()));
+      while (j < i) j = iind[j-1];
+      piv[i-1] = j;
+    }
+    ind.resize(rank);
+    for (int i=0; i<rank; i++) ind[i] = iind[i]-1;
+    trsm_omp_task('L', 'U', 'N', 'N', rank, n-rank, scalar_t(1.),
+                  data(), ld(), ptr(0, rank), ld(), depth);
+    X = DenseMatrix<scalar_t>(rank, n-rank, ptr(0, rank), ld());
+  }
+
+  template<typename scalar_t> void DenseMatrix<scalar_t>::ID_column_GEQP3_HMT
+  (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
+   std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
+   int max_rank, int mn, int depth) {
+    int m = rows(), n = cols();
+    auto tau = new scalar_t[std::max(1,std::min(m, n))];
+    piv.resize(n);
+    std::vector<int> iind(n);
+    int rank, info;
+    // TODO make geqp3tol stop at max_rank
+    blas::geqp3hmt(m, n, data(), ld(), iind.data(), tau, &info,
+                   rank, rel_tol, abs_tol, mn, depth);
     rank = std::min(rank, max_rank);
     delete[] tau;
     for (int i=1; i<=n; i++) {

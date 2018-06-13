@@ -415,6 +415,25 @@ namespace strumpack {
          int *, std::complex<double> *, std::complex<double> *, int *,
          double *, int *, int *, int *, int *, int *, double *, double *);
 
+
+      void FC_GLOBAL(psgeqpfhmt,PSGEQPFHMT)
+        (int *, int *, float *, int *, int *, const int *, int *,
+         float *, float *, int *, int *, int *, int *, int *,
+         float *, float *, int *);
+      void FC_GLOBAL(pdgeqpfhmt,PDGEQPFHMT)
+        (int *, int *, double *, int *, int *, const int *, int *,
+         double *, double *, int *, int *, int *, int *, int *,
+         double *, double *, int *);
+      void FC_GLOBAL(pcgeqpfhmt,PCGEQPFHMT)
+        (int *, int *, std::complex<float> *, int *, int *, const int *,
+         int *, std::complex<float> *, std::complex<float> *, int *, float *,
+         int *, int *, int *, int *, int *, float *, float *, int *);
+      void FC_GLOBAL(pzgeqpfhmt,PZGEQPFHMT)
+        (int *, int *, std::complex<double> *, int *, int *, const int *,
+         int *, std::complex<double> *, std::complex<double> *, int *,
+         double *, int *, int *, int *, int *, int *, double *, double *,
+         int *);
+
       void FC_GLOBAL(psgetrf,PSGETRF)
         (int *, int *, float *, int *, int *, const int *, int *, int *);
       void FC_GLOBAL(pdgetrf,PDGETRF)
@@ -1252,6 +1271,92 @@ namespace strumpack {
       delete[] rwork;
       delete[] ipiv;
     }
+
+    inline void pgeqpfhmt
+    (int m, int n, float* a, int ia, int ja, const int *desca,
+     int *J, int *piv, int *r, float rtol, float atol, int minmn) {
+      int mb = desca[BLACSmb], nb = desca[BLACSnb];
+      int info, prow, pcol, nprow, npcol;
+      Cblacs_gridinfo(desca[BLACSctxt], &nprow, &npcol, &prow, &pcol);
+      int locra = numroc(m, mb, prow, 0, nprow);
+      int locca = numroc(n, nb, pcol, 0, npcol);
+      int lwork = 3*(1+locra+locca);
+      auto twork = new float[lwork+locca];
+      auto tau = twork + lwork;
+      auto ipiv = new int[n];
+      int IONE = 1;
+      FC_GLOBAL(psgeqpfhmt,PSGEQPFHMT)
+        (&m, &n, a, &IONE, &IONE, desca, ipiv, tau,
+         twork, &lwork, &info, J, piv, r, &rtol, &atol, &minmn);
+      delete[] twork;
+      delete[] ipiv;
+    }
+    inline void pgeqpfhmt
+    (int m, int n, double* a, int ia, int ja, const int *desca,
+     int *J, int *piv, int *r, double rtol, double atol, int minmn) {
+      int mb = desca[BLACSmb], nb = desca[BLACSnb];
+      int info, prow, pcol, nprow, npcol;
+      Cblacs_gridinfo(desca[BLACSctxt], &nprow, &npcol, &prow, &pcol);
+      int locra = numroc(m, mb, prow, 0, nprow);
+      int locca = numroc(n, nb, pcol, 0, npcol);
+      int lwork = 3*(1+locra+locca);
+      auto twork = new double[lwork+locca];
+      auto tau = twork + lwork;
+      auto ipiv = new int[n];
+      int IONE = 1;
+      FC_GLOBAL(pdgeqpfhmt,PDGEQPFHMT)
+        (&m, &n, a, &IONE, &IONE, desca, ipiv, tau,
+         twork, &lwork, &info, J, piv, r, &rtol, &atol, &minmn);
+      delete[] twork;
+      delete[] ipiv;
+    }
+    inline void pgeqpfhmt
+    (int m, int n, std::complex<float>* a, int ia, int ja, const int *desca,
+     int *J, int *piv, int *r, float rtol, float atol, int minmn) {
+      int mb = desca[BLACSmb], nb = desca[BLACSnb];
+      int info, prow, pcol, nprow, npcol;
+      Cblacs_gridinfo(desca[BLACSctxt], &nprow, &npcol, &prow, &pcol);
+      int locra = numroc(m, mb, prow, 0, nprow);
+      int locca = numroc(n, nb, pcol, 0, npcol);
+      int lwork = 3*(1+locra+locca);
+      auto twork = new std::complex<float>[lwork+locca];
+      auto tau = twork + lwork;
+      int lrwork = 2*(1+locca);
+      auto rwork = new float[lrwork];
+      auto ipiv = new int[n];
+      int IONE = 1;
+      FC_GLOBAL(pcgeqpfhmt,PCGEQPFHMT)
+        (&m, &n, a, &IONE, &IONE, desca, ipiv, tau,
+         twork, &lwork, rwork, &lrwork, &info, J, piv, r,
+         &rtol, &atol, &minmn);
+      delete[] twork;
+      delete[] rwork;
+      delete[] ipiv;
+    }
+    inline void pgeqpfhmt
+    (int m, int n, std::complex<double>* a, int ia, int ja, const int *desca,
+     int *J, int *piv, int *r, double rtol, double atol, int minmn) {
+      int mb = desca[BLACSmb], nb = desca[BLACSnb];
+      int info, prow, pcol, nprow, npcol;
+      Cblacs_gridinfo(desca[BLACSctxt], &nprow, &npcol, &prow, &pcol);
+      int locra = numroc(m, mb, prow, 0, nprow);
+      int locca = numroc(n, nb, pcol, 0, npcol);
+      int lwork = 3*(1+locra+locca);
+      auto twork = new std::complex<double>[lwork+locca];
+      auto tau = twork + lwork;
+      int lrwork = 2*(1+locca);
+      auto rwork = new double[lrwork];
+      auto ipiv = new int[n];
+      int IONE = 1;
+      FC_GLOBAL(pzgeqpfhmt,PZGEQPFHMT)
+        (&m, &n, a, &IONE, &IONE, desca, ipiv, tau,
+         twork, &lwork, rwork, &lrwork, &info, J, piv, r,
+         &rtol, &atol, &minmn);
+      delete[] twork;
+      delete[] rwork;
+      delete[] ipiv;
+    }
+
 
     inline int pgetrf
     (int m, int n, float* a, int ia, int ja, const int *desca, int *ipiv) {

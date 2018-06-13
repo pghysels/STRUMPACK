@@ -230,10 +230,18 @@ namespace strumpack {
     void ID_column
     (DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
      std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol);
+    void ID_column_HMT
+    (DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
+     std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
+     int minmn);
     void ID_row
     (DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
      std::vector<std::size_t>& ind, real_t rel_tol,
      real_t abs_tol, int ctxt_T);
+    void ID_row_HMT
+    (DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
+     std::vector<std::size_t>& ind, real_t rel_tol,
+     real_t abs_tol, int ctxt_T, int minmn);
 
 #ifdef STRUMPACK_PBLAS_BLOCKSIZE
     static const int default_MB = STRUMPACK_PBLAS_BLOCKSIZE;
@@ -1317,6 +1325,28 @@ namespace strumpack {
   }
 
   template<typename scalar_t> void
+  DistributedMatrix<scalar_t>::ID_row_HMT
+  (DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
+   std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
+   int ctxt_T, int minmn) {
+    // transpose the BLACS grid and do a local transpose, then call
+    // ID_column, then do local transpose of output X_T to get back in
+    // the original blacs grid
+    if (!active()) return;
+    TIMER_TIME(TaskType::HSS_PARHQRINTERPOL, 1, t_hss_par_hqr);
+    assert(I()==1 && J()==1);
+    DistributedMatrix<scalar_t> this_T(ctxt_T, cols(), rows());
+    blas::omatcopy('T', lrows(), lcols(), data(), ld(),
+                   this_T.data(), this_T.ld());
+    DistributedMatrix<scalar_t> X_T;
+    this_T.ID_column_HMT(X_T, piv, ind, rel_tol, abs_tol, minmn);
+    X = DistributedMatrix<scalar_t>(ctxt(), X_T.cols(), X_T.rows());
+    blas::omatcopy('T', X_T.lrows(), X_T.lcols(), X_T.data(), X_T.ld(),
+                   X.data(), X.ld());
+    STRUMPACK_FLOPS(ID_row_flops(*this,X.cols()));
+  }
+
+  template<typename scalar_t> void
   DistributedMatrix<scalar_t>::ID_column
   (DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
    std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol) {
@@ -1328,10 +1358,36 @@ namespace strumpack {
     std::iota(gpiv.begin(), gpiv.end(), 1);
     int rank = 0;
     // Step 1: RRQR
-    // TODO also use abs_tol!!
     scalapack::pgeqpfmod
       (rows(), cols(), data(), I(), J(), desc(),
        _J.data(), gpiv.data(), &rank, rel_tol, abs_tol);
+    piv.resize(lcols()+NB());
+    ind.resize(rank);
+    for (int c=0; c<lcols(); c++) piv[c] = gpiv[coll2g(c)];
+    for (int c=0; c<rank; c++) ind[c] = _J[c]-1;
+    // Step 2: TRSM and permutation:
+    //   R1^-1 R = [I R1^-1 R2] = [I X] with R = [R1 R2], R1 r x r
+    DistributedMatrixWrapper<scalar_t> R1(rank, rank, *this, 0, 0);
+    X = DistributedMatrix<scalar_t>(ctxt(), rank, cols()-rank);
+    copy(rank, cols()-rank, *this, 0, rank, X, 0, 0, ctxt());
+    trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), R1, X);
+  }
+
+  template<typename scalar_t> void
+  DistributedMatrix<scalar_t>::ID_column_HMT
+  (DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
+   std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol, int minmn) {
+    if (!active()) return;
+    // _J: indices of permuted colums (int iso size_t -> ind)
+    std::vector<int> _J(cols());
+    std::iota(_J.begin(), _J.end(), 1);
+    std::vector<int> gpiv(cols()); // gpiv: column permutation
+    std::iota(gpiv.begin(), gpiv.end(), 1);
+    int rank = 0;
+    // Step 1: RRQR
+    scalapack::pgeqpfhmt
+      (rows(), cols(), data(), I(), J(), desc(),
+       _J.data(), gpiv.data(), &rank, rel_tol, abs_tol, minmn);
     piv.resize(lcols()+NB());
     ind.resize(rank);
     for (int c=0; c<lcols(); c++) piv[c] = gpiv[coll2g(c)];

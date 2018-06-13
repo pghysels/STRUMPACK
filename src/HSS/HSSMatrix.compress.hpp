@@ -450,12 +450,10 @@ namespace strumpack {
     template<typename scalar_t> bool HSSMatrix<scalar_t>::compute_U_V_bases
     (DenseM_t& Sr, DenseM_t& Sc, const opts_t& opts,
      WorkCompress<scalar_t>& w, int d, int depth) {
-      assert(d == Sr.cols());
-      assert(d == Sc.cols());
-      scalar_t scaling = 1. + 9. *
-        std::sqrt(scalar_t(d) * std::min(this->rows(), this->cols()));
-      auto rtol = opts.rel_tol() / w.lvl / scaling;
-      auto atol = opts.abs_tol() / w.lvl / scaling;
+      assert(d == int(Sr.cols()) && d == int(Sc.cols()));
+      auto rtol = opts.rel_tol() / w.lvl;
+      auto atol = opts.abs_tol() / w.lvl;
+      auto minmn = std::min(this->rows(), this->cols());
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
@@ -463,8 +461,10 @@ namespace strumpack {
         auto u_rows = this->leaf() ? this->rows() :
           this->_ch[0]->U_rank()+this->_ch[1]->U_rank();
         DenseM_t wSr(u_rows, d, Sr, w.offset.second, 0);
-        wSr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol,
-                   opts.max_rank(), depth);
+        // wSr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol,
+        //            opts.max_rank(), depth);
+        wSr.ID_row_HMT(_U.E(), _U.P(), w.Jr, rtol, atol,
+                       opts.max_rank(), minmn, depth);
         STRUMPACK_ID_FLOPS(ID_row_flops(wSr, _U.cols()));
       }
 #pragma omp task default(shared)                                        \
@@ -474,8 +474,10 @@ namespace strumpack {
         auto v_rows = this->leaf() ? this->rows() :
           this->_ch[0]->V_rank()+this->_ch[1]->V_rank();
         DenseM_t wSc(v_rows, d, Sc, w.offset.second, 0);
-        wSc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol,
-                   opts.max_rank(), depth);
+        // wSc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol,
+        //            opts.max_rank(), depth);
+        wSc.ID_row_HMT(_V.E(), _V.P(), w.Jc, rtol, atol,
+                       opts.max_rank(), minmn, depth);
         STRUMPACK_ID_FLOPS(ID_row_flops(wSc, _V.cols()));
       }
 #pragma omp taskwait

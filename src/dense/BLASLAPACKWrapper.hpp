@@ -521,6 +521,25 @@ namespace strumpack {
          double* rwork, int* info, int* rank,
          double* rtol, double* atol, int* depth);
 
+      void FC_GLOBAL(sgeqp3hmt,SGEQP3HMT)
+        (int* m, int* n, float* a, int* lda, int* jpvt,
+         float* tau, float* work, int* lwork, int* info,
+         int* rank, float* rtol, float* atol, int* mn, int* depth);
+      void FC_GLOBAL(dgeqp3hmt,DGEQP3HMT)
+        (int* m, int* n, double* a, int* lda, int* jpvt,
+         double* tau, double* work, int* lwork, int* info,
+         int* rank, double* rtol, double* atol, int* mn, int* depth);
+      void FC_GLOBAL(cgeqp3hmt,CGEQP3HMT)
+        (int* m, int* n, std::complex<float>* a, int* lda, int* jpvt,
+         std::complex<float>* tau, std::complex<float>* work, int* lwork,
+         float* rwork, int* info, int* rank, float* rtol, float* atol,
+         int* mn, int* depth);
+      void FC_GLOBAL(zgeqp3hmt,ZGEQP3HMT)
+        (int* m, int* n, std::complex<double>* a, int* lda, int* jpvt,
+         std::complex<double>* tau, std::complex<double>* work, int* lwork,
+         double* rwork, int* info, int* rank, double* rtol, double* atol,
+         int* mn, int* depth);
+
       void FC_GLOBAL(sgeqrf,SGEQRF)
         (int* m, int* n, float* a, int* lda, float* tau,
          float* work, int* lwork, int* info);
@@ -1547,6 +1566,101 @@ namespace strumpack {
       geqp3tol
         (m, n, a, lda, jpvt, tau, work, ilwork,
          info, rank, rtol, atol, depth);
+      delete[] work;
+    }
+
+
+
+    inline void geqp3hmt
+    (int m, int n, float* a, int lda, int* jpvt, float* tau, float* work,
+     int lwork, int* info, int& rank, float rtol, float atol,
+     int mn, int depth) {
+      FC_GLOBAL(sgeqp3hmt,SGEQP3HMT)
+        (&m, &n, a, &lda, jpvt, tau, work, &lwork, info,
+         &rank, &rtol, &atol, &mn, &depth);
+    }
+    inline void geqp3hmt
+    (int m, int n, double* a, int lda, int* jpvt, double* tau, double* work,
+     int lwork, int* info, int& rank, double rtol, double atol,
+     int mn, int depth) {
+      FC_GLOBAL(dgeqp3hmt,DGEQP3HMT)
+        (&m, &n, a, &lda, jpvt, tau, work, &lwork, info,
+         &rank, &rtol, &atol, &mn, &depth);
+    }
+    inline void geqp3hmt
+    (int m, int n, std::complex<float>* a, int lda, int* jpvt,
+     std::complex<float>* tau, std::complex<float>* work, int lwork,
+     int* info, int& rank, float rtol, float atol,
+     int mn, int depth) {
+      auto rwork = new float[std::max(1, 2*n)];
+      bool tasked = depth < params::task_recursion_cutoff_level;
+      if (tasked) {
+        int loop_tasks = std::max(params::num_threads / (depth+1), 1);
+        int B = std::max(n / loop_tasks, 1);
+        for (int task=0; task<std::ceil(n/float(B)); task++) {
+#pragma omp task default(shared) firstprivate(task)
+          for (int i=task*B; i<std::min((task+1)*B,n); i++)
+            rwork[i] = nrm2(m, &a[i*lda], 1);
+        }
+#pragma omp taskwait
+      } else
+        for (int i=0; i<n; i++)
+          rwork[i] = nrm2(m, &a[i*lda], 1);
+      FC_GLOBAL(cgeqp3hmt,CGEQP3HMT)
+        (&m, &n, a, &lda, jpvt, tau, work, &lwork, rwork, info,
+         &rank, &rtol, &atol, &mn, &depth);
+      delete[] rwork;
+    }
+    inline void geqp3hmt
+    (int m, int n, std::complex<double>* a, int lda, int* jpvt,
+     std::complex<double>* tau, std::complex<double>* work, int lwork,
+     int* info, int& rank, double rtol, double atol,
+     int mn, int depth) {
+      auto rwork = new double[std::max(1, 2*n)];
+      bool tasked = depth < params::task_recursion_cutoff_level;
+      if (tasked) {
+        int loop_tasks = std::max(params::num_threads / (depth+1), 1);
+        int B = std::max(n / loop_tasks, 1);
+        for (int task=0; task<std::ceil(n/float(B)); task++) {
+#pragma omp task default(shared) firstprivate(task)
+          for (int i=task*B; i<std::min((task+1)*B,n); i++)
+            rwork[i] = nrm2(m, &a[i*lda], 1);
+        }
+#pragma omp taskwait
+      } else
+        for (int i=0; i<n; i++)
+          rwork[i] = nrm2(m, &a[i*lda], 1);
+      FC_GLOBAL(zgeqp3hmt,ZGEQP3HMT)
+        (&m, &n, a, &lda, jpvt, tau, work, &lwork, rwork, info,
+         &rank, &rtol, &atol, &mn, &depth);
+      delete[] rwork;
+    }
+    template<typename scalar, typename real> inline void geqp3hmt
+    (int m, int n, scalar* a, int lda, int* jpvt, scalar* tau, int* info,
+     int& rank, real rtol, real atol, int mn, int depth) {
+      scalar lwork;
+      geqp3tol
+        (m, n, a, lda, jpvt, tau, &lwork, -1, info, rank, rtol, atol, depth);
+      int ilwork = int(std::real(lwork));
+      auto work = new scalar[ilwork];
+      if (! is_complex<scalar>()) {
+        bool tasked = depth < params::task_recursion_cutoff_level;
+        if (tasked) {
+          int loop_tasks = std::max(params::num_threads / (depth+1), 1);
+          int B = std::max(n / loop_tasks, 1);
+          for (int task=0; task<std::ceil(n/float(B)); task++) {
+#pragma omp task default(shared) firstprivate(task)
+            for (int i=task*B; i<std::min((task+1)*B,n); i++)
+              work[i] = nrm2(m, &a[i*lda], 1);
+          }
+#pragma omp taskwait
+        } else
+          for (int i=0; i<n; i++)
+            work[i] = nrm2(m, &a[i*lda], 1);
+      }
+      geqp3hmt
+        (m, n, a, lda, jpvt, tau, work, ilwork,
+         info, rank, rtol, atol, mn, depth);
       delete[] work;
     }
 

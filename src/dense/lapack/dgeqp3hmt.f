@@ -1,21 +1,20 @@
-*  =====================================================================
-      SUBROUTINE DGEQP3mod( M, N, A, LDA, JPVT, TAU, WORK, LWORK, INFO,
-     $                      RANK, TOL )
+*
+*        The first N elements of work store the exact column norms.
+*
+      SUBROUTINE DGEQP3HMT( M, N, A, LDA, JPVT, TAU, WORK, LWORK, INFO,
+     $                      RANK, RTOL, ATOL, MN, DEPTH )
 *
 *  -- LAPACK computational routine (version 3.4.2) --
 *  -- LAPACK is a software package provided by Univ. of Tennessee,    --
 *  -- Univ. of California Berkeley, Univ. of Colorado Denver and NAG Ltd..--
 *     September 2012
 *
-*  -- Modified by F-H Rouet, Lawrence Berkeley National Lab, August 2014
-*
-      IMPLICIT NONE
 *     .. Scalar Arguments ..
-      INTEGER            INFO, LDA, LWORK, M, N, RANK
+      INTEGER            INFO, LDA, LWORK, M, N, RANK, MN
 *     ..
 *     .. Array Arguments ..
       INTEGER            JPVT( * )
-      DOUBLE PRECISION   A( LDA, * ), TAU( * ), WORK( * ), TOL
+      DOUBLE PRECISION   A( LDA, * ), TAU( * ), WORK( * ), RTOL, ATOL
 *     ..
 *
 *  =====================================================================
@@ -25,12 +24,15 @@
       PARAMETER          ( INB = 1, INBMIN = 2, IXOVER = 3 )
 *     ..
 *     .. Local Scalars ..
+      DOUBLE PRECISION   HMTSCAL
       LOGICAL            LQUERY
       INTEGER            FJB, IWS, J, JB, LWKOPT, MINMN, MINWS, NA, NB,
-     $                   NBMIN, NFXD, NX, SM, SMINMN, SN, TOPBMN, C
+     $                   NBMIN, NFXD, NX, SM, SMINMN, SN, TOPBMN,
+     $                   C
 *     ..
 *     .. External Subroutines ..
-      EXTERNAL           DGEQRF, DLAQP2, DLAQPS, DORMQR, DSWAP, XERBLA
+      EXTERNAL           DGEQRF, DLAQP2MOD, DLAQPSMOD, DORMQR,
+     $     DSWAP, XERBLA
 *     ..
 *     .. External Functions ..
       INTEGER            ILAENV
@@ -55,6 +57,9 @@
          INFO = -4
       END IF
 *
+
+      RANK=0
+
       IF( INFO.EQ.0 ) THEN
          MINMN = MIN( M, N )
          IF( MINMN.EQ.0 ) THEN
@@ -65,7 +70,7 @@
             NB = ILAENV( INB, 'DGEQRF', ' ', M, N, -1, -1 )
             LWKOPT = 2*N + ( N + 1 )*NB
          END IF
-         WORK( 1 ) = LWKOPT
+c$$$         WORK( 1 ) = LWKOPT
 *
          IF( ( LWORK.LT.IWS ) .AND. .NOT.LQUERY ) THEN
             INFO = -8
@@ -76,6 +81,7 @@
          CALL XERBLA( 'DGEQP3', -INFO )
          RETURN
       ELSE IF( LQUERY ) THEN
+         WORK( 1 ) = LWKOPT
          RETURN
       END IF
 *
@@ -127,8 +133,6 @@
 *     Factorize free columns
 *  ======================
 *
-      RANK=0
-
       IF( NFXD.LT.MINMN ) THEN
 *
          SM = M - NFXD
@@ -173,7 +177,7 @@
 *        store the exact column norms.
 *
          DO 20 J = NFXD + 1, N
-            WORK( J ) = DNRM2( SM, A( NFXD+1, J ), 1 )
+c$$$  WORK( J ) = DNRM2( SM, A( NFXD+1, J ), 1 )
             WORK( N+J ) = WORK( J )
    20    CONTINUE
 *
@@ -194,11 +198,13 @@
 *
 *              Factorize JB columns among columns J:N.
 *
-               CALL DLAQPS( M, N-J+1, J-1, JB, FJB, A( 1, J ), LDA,
-     $                      JPVT( J ), TAU( J ), WORK( J ), WORK( N+J ),
-     $                      WORK( 2*N+1 ), WORK( 2*N+JB+1 ), N-J+1 )
+               CALL DLAQPSMOD( M, N-J+1, J-1, JB, FJB, A( 1, J ), LDA,
+     $              JPVT( J ), TAU( J ), WORK( J ), WORK( N+J ),
+     $              WORK( 2*N+1 ), WORK( 2*N+JB+1 ), N-J+1, DEPTH)
                DO C=J,J+FJB-1
-                 IF(ABS(A(1,1))<TOL.OR.ABS(A(C,C))/ABS(A(1,1))<TOL) THEN
+                  HMTSCAL = 1. + 4. * SQRT(REAL(M) * MN) / (M-C-1)
+                  IF(ABS(A(C,C))/ABS(A(1,1)) <= RTOL/HMTSCAL .OR.
+     $                 ABS(A(C,C)) <= ATOL/HMTSCAL) THEN
                    GOTO 99
                  ELSE
                    RANK=RANK+1
@@ -214,20 +220,24 @@
 *        Use unblocked code to factor the last or only block.
 *
 *
-         IF( J.LE.MINMN )
-     $      CALL DLAQP2( M, N-J+1, J-1, A( 1, J ), LDA, JPVT( J ),
+         IF( J.LE.MINMN ) THEN
+            CALL DLAQP2MOD( M, N-J+1, J-1, A( 1, J ), LDA, JPVT( J ),
      $                   TAU( J ), WORK( J ), WORK( N+J ),
-     $                   WORK( 2*N+1 ) )
+     $                   WORK( 2*N+1 ), DEPTH )
             DO C=J,MINMN
-              IF(ABS(A(1,1))<TOL.OR.ABS(A(C,C))/ABS(A(1,1))<TOL) THEN
+               HMTSCAL = 1. + 4. * SQRT(REAL(M) * MN) / (M-C-1)
+               IF(ABS(A(C,C))/ABS(A(1,1)) <= RTOL/HMTSCAL .OR.
+     $              ABS(A(C,C)) <= ATOL/HMTSCAL) THEN
                 GOTO 99
               ELSE
                 RANK=RANK+1
               ENDIF
             END DO
+         END IF
       END IF
 *
       WORK( 1 ) = IWS
+
    99 CONTINUE
       RETURN
 *
