@@ -790,8 +790,10 @@ namespace strumpack {
 
     template<typename scalar_t> bool HSSMatrixMPI<scalar_t>::compute_U_V_bases
     (int d, const opts_t& opts, WorkCompressMPI<scalar_t>& w) {
-      auto rtol = opts.rel_tol() / w.lvl;
-      auto atol = opts.abs_tol() / w.lvl;
+      scalar_t scaling = 1. + 9. *
+        std::sqrt(scalar_t(d) * std::min(this->rows(), this->cols()));
+      auto rtol = opts.rel_tol() / w.lvl / scaling;
+      auto atol = opts.abs_tol() / w.lvl / scaling;
       w.Sr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol, _ctxt_T);
       w.Sc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol, _ctxt_T);
       STRUMPACK_ID_FLOPS(ID_row_flops(w.Sr, w.Jr.size()));

@@ -450,8 +450,12 @@ namespace strumpack {
     template<typename scalar_t> bool HSSMatrix<scalar_t>::compute_U_V_bases
     (DenseM_t& Sr, DenseM_t& Sc, const opts_t& opts,
      WorkCompress<scalar_t>& w, int d, int depth) {
-      auto rtol = opts.rel_tol() / w.lvl;
-      auto atol = opts.abs_tol() / w.lvl;
+      assert(d == Sr.cols());
+      assert(d == Sc.cols());
+      scalar_t scaling = 1. + 9. *
+        std::sqrt(scalar_t(d) * std::min(this->rows(), this->cols()));
+      auto rtol = opts.rel_tol() / w.lvl / scaling;
+      auto atol = opts.abs_tol() / w.lvl / scaling;
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
