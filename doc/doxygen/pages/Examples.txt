@@ -1,6 +1,6 @@
-/*! \page page7 Examples
+/*! \page examples Examples
 
 
-A number of examples are available in the examples/ folder. This folder, with the sources, is copied to the build directory when running <b>cmake</b>. However, the examples are not part of the CMake build system, so they will not be compiled and linked when running <b>make</b>. A simple Makefile is generated in the examples/ folder in the build directory, with the compiler setting based on what CMake has discovered. However, this Makefile is rather simplistic and in certain cases it might need some manual edits. However, it can serve as an example for how to compile code using STRUMPACK. Check the README file in the examples/ directory for more details.
+A number of examples are available in the examples/ folder. This folder, with the sources, is copied to the build directory when running __cmake__. However, the examples are not part of the CMake build system, so they will not be compiled and linked when running __make__. A simple Makefile is generated in the examples/ folder in the build directory, with the compiler setting based on what CMake has discovered. However, this Makefile is rather simplistic and in certain cases it might need some manual edits. However, it can serve as an example for how to compile code using STRUMPACK. Check the README file in the examples/ directory for more details.
 
 */

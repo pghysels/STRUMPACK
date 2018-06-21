@@ -1,15 +1,17 @@
-/*! \page page9 Advanced Usage Tips
+/*! \page tips Advanced Usage Tips
 
 
-\* To keep track of the number of floating point operations performed in the STRUMPACK Sparse Solver, you can run CMake with -DSTRUMPACK_COUNT_FLOPS=ON. Then, when running, do not set the quiet flag in the StrumpackSparseSolver constructor or on the command line and the solver will print some statistics. This will also enable a counter for data movement in the solve phase, from which the (approximately) attained bandwidth usage is derived. This is done because the solve phase is typically bandwidth limited, while the factorization is flop limited.
++ To keep track of the number of floating point operations performed in the STRUMPACK Sparse Solver, you can run CMake with -DSTRUMPACK_COUNT_FLOPS=ON. Then, when running, do not set the quiet flag in the StrumpackSparseSolver constructor or on the command line and the solver will print some statistics. This will also enable a counter for data movement in the solve phase, from which the (approximately) attained bandwidth usage is derived. This is done because the solve phase is typically bandwidth limited, while the factorization is flop limited.
 
-\* There is also some support for PAPI. Run CMake with -DSTRUMPACK_USE_PAPI=ON and specify the PAPI include folders and libraries via -DPAPI_INCLUDES=.. and -DPAPI_LIBRARIES=... 
++ There is also some support for PAPI. Run CMake with -DSTRUMPACK_USE_PAPI=ON and specify the PAPI include folders and libraries via -DPAPI_INCLUDES=.. and -DPAPI_LIBRARIES=... 
 
-\* If you compile with MKL or OpenBLAS, you can take advantage of some extra optimized routines by specifying -D__HAVE_MKL or -D__HAVE_OPENBLAS respectively.
++ We have added timers all throughout the code. These can be enabled with -DSTRUMPACK_TASK_TIMERS=ON. Running the code will generate a file time.log. A script to visualize these timings is provided.
 
-\* The code is not completely thread safe at the moment: do not call solve on the same StrumpackSparseSolve object from different threads simultaneously.
++ If you compile with MKL or OpenBLAS, you can take advantage of some extra optimized routines by specifying -D__HAVE_MKL or -D__HAVE_OPENBLAS respectively.
 
-\* For comments, feature requests or bug reports: {pghysels,xsli,gichavez}\@lbl.gov
++ The code is not completely thread safe at the moment: do not call solve on the same StrumpackSparseSolve object from different threads simultaneously.
+
++ For comments, feature requests or bug reports: {pghysels,xsli,gichavez}\@lbl.gov
 
 
 */

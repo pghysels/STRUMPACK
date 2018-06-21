@@ -1,45 +1,50 @@
-/*! \page page2 Installation and Requirements
+/*! \page installation Installation and Requirements
 
 The STRUMPACK package uses the CMake build system (CMake version \>= 2.8) . The recommended way of building the STRUMPACK library is as follows:
 
-> \> <b>tar</b> -xvzf strumpack-x.y.z.<b>tar</b>.gz \n
-> \> <b>cd</b> strumpack-x.y.z \n
-> \> <b>mkdir</b> build \n
-> \> <b>cd</b> build \n
-> \> <b>cmake</b> ../ -DCMAKE_BUILD_TYPE=Release \ \n
->    &nbsp;&nbsp;&nbsp;&nbsp; -DCMAKE_INSTALL_PREFIX=/path/to/install \ \n
->    &nbsp;&nbsp;&nbsp;&nbsp; -DCMAKE_CXX_COMPILER=<C++ compiler> \       &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  # this and below are optional, CMake will try to autodetect \n
-> &nbsp;&nbsp;&nbsp;&nbsp; -DCMAKE_Fortran_COMPILER=<Fortran77 compiler> \ \n
-> &nbsp;&nbsp;&nbsp;&nbsp; -DSCALAPACK_LIBRARIES="/path/to/scalapack/libscalapack.a;/path/to/blacs/libblacs.a" \n
-> &nbsp;&nbsp;&nbsp;&nbsp; -DMETIS_INCLUDES=/path/to/metis/incluce \n
-> &nbsp;&nbsp;&nbsp;&nbsp; -DMETIS_LIBRARIES=/path/to/metis/libmetis.a \n
-> &nbsp;&nbsp;&nbsp;&nbsp; -DSTRUMPACK_USE_PARMETIS=ON \ &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;  # optional \n
-> &nbsp;&nbsp;&nbsp;&nbsp; -DPARMETIS_INCLUDES=/path/to/parmetis/include \n
-> &nbsp;&nbsp;&nbsp;&nbsp; -DPARMETIS_LIBRARIES=/path/to/parmetis/libparmetis.a \n
-> &nbsp;&nbsp;&nbsp;&nbsp; -DSTRUMPACK_USE_SCOTCH=ON \ &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;    # optional \n
-> &nbsp;&nbsp;&nbsp;&nbsp; -DSCOTCH_INCLUDES=/path/to/scotch/include \n
-> &nbsp;&nbsp;&nbsp;&nbsp; -DSCOTCH_LIBRARIES="/path/to/ptscotch/libscotch.a;...libscotcherr.a;...libptscotch.a;...libptscotcherr.a" \n
-> \> <b>make</b> \n
-> \> <b>make test</b>  &nbsp;&nbsp;&nbsp;&nbsp;   # optional, takes a while   \n
-> \> <b>make</b> install 
-
+\code {.bash}
+> tar-xvzf strumpack-x.y.z.tar.gz  
+> cd strumpack-x.y.z  
+> mkdir build  
+> cd build  
+> cmake ../ -DCMAKE_BUILD_TYPE=Release \  
+     -DCMAKE_INSTALL_PREFIX=/path/to/install \  
+     -DCMAKE_CXX_COMPILER=<C++ compiler> \       # this and below are optional, CMake will try to autodetect  
+     -DCMAKE_Fortran_COMPILER=<Fortran77 compiler> \  
+     -DSCALAPACK_LIBRARIES="/path/to/scalapack/libscalapack.a;/path/to/blacs/libblacs.a"   
+     -DMETIS_INCLUDES=/path/to/metis/include   
+     -DMETIS_LIBRARIES=/path/to/metis/libmetis.a  
+     -DSTRUMPACK_USE_PARMETIS=ON \               # optional  
+     -DPARMETIS_INCLUDES=/path/to/parmetis/include  
+     -DPARMETIS_LIBRARIES=/path/to/parmetis/libparmetis.a  
+     -DSTRUMPACK_USE_SCOTCH=ON \                 # optional  
+     -DSCOTCH_INCLUDES=/path/to/scotch/include  
+     -DSCOTCH_LIBRARIES="/path/to/ptscotch/libscotch.a;...libscotcherr.a;...libptscotch.a;...libptscotcherr.a"  
+> make 
+> make test                                      # optional, takes a while   
+> make install 
+\endcode
 
  The above will only work if you have the following dependencies, and CMake can find them:
 
-- <b>C++11</b>, <b>C</b> and <b>FORTRAN77</b> compilers. CMake looks for these compilers in the standard locations, if they are installed elsewhere, you can specify them as follows: \n
+- __C++11__, __C__ and __FORTRAN77__ compilers. CMake looks for these compilers in the standard locations, if they are installed elsewhere, you can specify them as follows:  
 
-> \> <b>cmake</b> ../ -DCMAKE_BUILD_TYPE=Release \ \n
->   &nbsp;&nbsp;&nbsp;&nbsp;    -DCMAKE_CXX_COMPILER=g++ \ \n
->    &nbsp;&nbsp;&nbsp;&nbsp;   -DCMAKE_C_COMPILER=gc    \    \n
->    &nbsp;&nbsp;&nbsp;&nbsp;   -DCMAKE_Fortran_COMPILER=gfortran  \
+\code {.bash}
+> cmake ../ -DCMAKE_BUILD_TYPE=Release \  
+     -DCMAKE_CXX_COMPILER=g++ \  
+     -DCMAKE_C_COMPILER=gcc    \     
+     -DCMAKE_Fortran_COMPILER=gfortran  \
+\endcode
 
-- An <b>MPI</b>(Message Passing Interface) library. You should not need to manually specify the MPI compiler wrappers.  CMake will look for MPI options and libraries and set the appropriate compiler and linker flags. 
+- __MPI__(Message Passing Interface) library. You should not need to manually specify the MPI compiler wrappers.  CMake will look for MPI options and libraries and set the appropriate compiler and linker flags. 
 
-- <b>OpenMP v4.5</b> support is required in the C++ compiler to use the shared-memory parallelism in the code. OpenMP support can be disabled by adding the CMake option \n
->    \-DSTRUMPACK_USE_OPENMP=OFF 
+- __OpenMP v4.5__ support is required in the C++ compiler to use the shared-memory parallelism in the code. OpenMP support can be disabled by adding the CMake option
+\code {.bash}
+-DSTRUMPACK_USE_OPENMP=OFF 
+\endcode
 OpenMP v3.1 introduces task parallelism, which is used extensivelythroughout the code. OpenMP v4.5 added the taskloop construct. CMake will check whether your compiler supports OpenMP and sets the appropriate compiler and linker flags. 
 
-- <b>BLAS, LAPACK, and ScaLAPACK libraries</b>. For performance
+- __BLAS, LAPACK, and ScaLAPACK libraries__. For performance
   it is crucial to use optimized BLAS/LAPACK libraries like for
   instance Intel® MKL, AMD® ACML, Cray® LibSci or
   OpenBLAS. The default versions of the Intel® MKL and Cray®
@@ -53,39 +58,47 @@ OpenMP v3.1 introduces task parallelism, which is used extensivelythroughout the
   included in the ScaLAPACK library file). If CMake cannot locate
   these libraries, you can specify their path by setting the
   environment variable $SCALAPACKDIR ot by specifying the libraries manually:
-  > \> <b>cmake</b> ../ -DCMAKE_BUILD_TYPE=Release \ \n
-  >  &nbsp;&nbsp;&nbsp;&nbsp;   -DBLAS_LIBRARIES="..." \  \n
-  >  &nbsp;&nbsp;&nbsp;&nbsp;   -DLAPACK_LIBRARIES="..." \  \n
-  >  &nbsp;&nbsp;&nbsp;&nbsp;   -DSCALAPACK_LIBRARIES="..." 
+  \code {.bash}
+  > cmake ../ -DCMAKE_BUILD_TYPE=Release \  
+       -DBLAS_LIBRARIES="..." \   
+       -DLAPACK_LIBRARIES="..." \   
+       -DSCALAPACK_LIBRARIES="..." 
+  \endcode
 
   Or one can also directly modify the linker flags to add for instance the ScaLAPACK and BLACS libraries:
-  > \> <b>cmake</b> ../ -DCMAKE_BUILD_TYPE=Release \  \n
-  >   &nbsp;&nbsp;&nbsp;&nbsp;  -DCMAKE_EXE_LINKER_FLAGS="-L/usr/lib64/mpich/lib/ -lscalapack -lmpiblacs"
+  \code {.bash}
+  > cmake../ -DCMAKE_BUILD_TYPE=Release \   
+       -DCMAKE_EXE_LINKER_FLAGS="-L/usr/lib64/mpich/lib/ -lscalapack -lmpiblacs"
+  \endcode
 
   When using Intel MKL we recommend using the the link advisor: https://software.intel.com/en-us/articles/intel-mkl-link-line-advisor
 
-- <b>METIS</b> (≥ 5.1.0 <b>required</b>) for the nested dissection matrix reordering. Metis can be obtained from: http://glaros.dtc.umn.edu/gkhome/metis/metis/download. \n
+- __METIS__ (≥ 5.1.0 <b>required</b>) for the nested dissection matrix reordering. Metis can be obtained from: http://glaros.dtc.umn.edu/gkhome/metis/metis/download.  
 CMake looks for the Metis inlude files the library in the default locations as well as in $METISDIR/include and $METISDIR/lib. Using the Bash shell, the METISDIR environment variable can be set as
-<b>export</b> METISDIR=/usr/local/metis/. Alternatively, you can specify the location of the header and library as follows:
-> \> <b>cmake</b> ../ -DCMAKE_BUILD_TYPE=Release \ \n
->   &nbsp;&nbsp;&nbsp;&nbsp;   -DMETIS_INCLUDES=/usr/local/metis/include \ \n
->   &nbsp;&nbsp;&nbsp;&nbsp;   -DMETIS_LIBRARIES=/usr/local/metis/lib/libmetis.a \n
+__export__ METISDIR=/usr/local/metis/. Alternatively, you can specify the location of the header and library as follows:
+\code {.bash}
+> cmake ../ -DCMAKE_BUILD_TYPE=Release \  
+     -DMETIS_INCLUDES=/usr/local/metis/include \  
+     -DMETIS_LIBRARIES=/usr/local/metis/lib/libmetis.a  
+\endcode
 
-- <b>PARMETIS</b> (optional) for parallel nested dissection. ParMetis can be download from http://glaros.dtc.umn.edu/gkhome/metis/parmetis/download \n
-The steps to make sure CMake can find ParMetis are similar as for Metis. Enable with -DSTRUMPACK_USE_PARMETIS. The CMake variables are $PARMETISDIR or PARMETIS_INCLUDES and PARMETIS_LIBRARIES. \n
+- __PARMETIS__ (optional) for parallel nested dissection. ParMetis can be download from http://glaros.dtc.umn.edu/gkhome/metis/parmetis/download \n
+The steps to make sure CMake can find ParMetis are similar as for Metis. Enable with -DSTRUMPACK_USE_PARMETIS. The CMake variables are $PARMETISDIR or PARMETIS_INCLUDES and PARMETIS_LIBRARIES.  
 
-- <b>SCOTCH</b> and <b>PT-SCOTCH</b> (≥ 5.1.12) (optional) for matrix reordering. Scotch can be downloaded from:
-http://www.labri.fr/perso/pelegrin/scotch/ \n
-Configuring CMake to find (PT-)Scotch is similar to Metis. Enable with -DSTRUMPACK_USE_SCOTCH For (PT-)Scotch the CMake variables are $SCOTCHDIR or SCOTCH_INCLUDES and SCOTCH_LIBRARIES. Make sure to specify all libraries: libscotch, libscotcherr, libptscotch and libptscotcherr. \n
+- __SCOTCH__ and __PT-SCOTCH__ (≥ 5.1.12) (optional) for matrix reordering. Scotch can be downloaded from:
+http://www.labri.fr/perso/pelegrin/scotch/  
+Configuring CMake to find (PT-)Scotch is similar to Metis. Enable with -DSTRUMPACK_USE_SCOTCH For (PT-)Scotch the CMake variables are $SCOTCHDIR or SCOTCH_INCLUDES and SCOTCH_LIBRARIES. Make sure to specify all libraries: libscotch, libscotcherr, libptscotch and libptscotcherr.  
 
-- <b>getopt_long</b>: This is a GNU extension to the POSIX getopt() C library function. \n
+- __getopt_long__: This is a GNU extension to the POSIX getopt() C library function.  
 
-- <b>Combinatorial BLAS</b> [1] (optional) can be used for parallel reordering for stability, i.e., to get nonzeros on the diagonal of the matrix, as an alternative to the sequential MC64 (included). Get it from:
-https://people.eecs.berkeley.edu/~aydin/CombBLAS/html/   \n
-Enable by specifying -DSTRUMPACK_USE_COMBBLAS and set COMBBLAS_INCLUDES and COMBBLAS_LIBRARIES. \n
+- __Combinatorial BLAS__ [1] (optional) can be used for parallel reordering for stability, i.e., to get nonzeros on the diagonal of the matrix, as an alternative to the sequential MC64 (included). Get it from:
+https://people.eecs.berkeley.edu/~aydin/CombBLAS/html/    
+Enable by specifying -DSTRUMPACK_USE_COMBBLAS and set COMBBLAS_INCLUDES and COMBBLAS_LIBRARIES.  
 
-- <b>TCMalloc, TBB Malloc </b> or <b> jemalloc </b> (optional): these can lead to dramatic performance improve- ments for multithreaded code that performs frequent memory allocations. Link with the one of these libraries, e.g.: \n
->     \-DCMAKE_EXE_LINKER_FLAGS="-ltcmalloc" \n
+- __TCMalloc, TBB Malloc__ or __jemalloc__ (optional): these can lead to dramatic performance improve- ments for multithreaded code that performs frequent memory allocations. Link with the one of these libraries, e.g.: 
+\code {.bash}
+-DCMAKE_EXE_LINKER_FLAGS="-ltcmalloc"  
+\endcode
 to replace the default memory allocator (C++ new) with a more scalable implementation. See also Section 9.
 
 The code was tested on GNU/Linux with the GNU and Intel® compilers and the OpenBLAS, Intel® MKL® and Cray® LibSci® numerical libraries. If you encounter issues on other platforms or with other BLAS/LAPACK implementations, please let us know. Successful compilation will create a libstrumpack.a file.
