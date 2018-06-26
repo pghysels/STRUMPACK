@@ -69,6 +69,7 @@ namespace strumpack { // these are all global variables
     extern std::atomic<long long int> QR_flops;
     extern std::atomic<long long int> reduce_sample_flops;
     extern std::atomic<long long int> update_sample_flops;
+    extern std::atomic<long long int> hss_solve_flops;
 
 #endif /* DOXYGEN_SHOULD_SKIP_THIS */
 
@@ -104,6 +105,8 @@ namespace strumpack { // these are all global variables
   strumpack::params::schur_flops += n;
 #define STRUMPACK_CB_SAMPLE_FLOPS(n)            \
   strumpack::params::CB_sample_flops += n;
+#define STRUMPACK_HSS_SOLVE_FLOPS(n)            \
+  strumpack::params::hss_solve_flops += n;
 #else
 #define STRUMPACK_FLOPS(n) void(0);
 #define STRUMPACK_BYTES(n) void(0);
@@ -119,6 +122,7 @@ namespace strumpack { // these are all global variables
 #define STRUMPACK_ULV_FACTOR_FLOPS(n) void(0);
 #define STRUMPACK_SCHUR_FLOPS(n) void(0);
 #define STRUMPACK_CB_SAMPLE_FLOPS(n) void(0);
+#define STRUMPACK_HSS_SOLVE_FLOPS(n) void(0);
 #endif
 #endif /* DOXYGEN_SHOULD_SKIP_THIS */
 

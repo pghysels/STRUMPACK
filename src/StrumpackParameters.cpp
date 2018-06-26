@@ -58,6 +58,7 @@ namespace strumpack {
     std::atomic<long long int> ortho_flops(0);
     std::atomic<long long int> reduce_sample_flops(0);
     std::atomic<long long int> update_sample_flops(0);
+    std::atomic<long long int> hss_solve_flops(0);
 
   } // end namespace params
 } // end namespace strumpack

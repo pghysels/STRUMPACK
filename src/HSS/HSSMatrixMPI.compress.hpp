@@ -179,6 +179,8 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress(const DistM_t& A, const opts_t& opts) {
+      TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_compress);
+      TIMER_TIME(TaskType::REDIST_2D_TO_HSS, 0, t_redist);
       std::vector<std::vector<scalar_t>> sbuf(_nprocs);
       redistribute_to_tree_to_buffers(A, 0, 0, _ctxt_all, sbuf);
       scalar_t *rbuf = nullptr, **pbuf = nullptr;
@@ -187,6 +189,7 @@ namespace strumpack {
         (A, _prows, _pcols, 0, 0, _ctxt_all, pbuf);
       delete[] pbuf;
       delete[] rbuf;
+      TIMER_STOP(t_redist);
       DistElemMult<scalar_t> Afunc(A);
       switch (opts.compression_algorithm()) {
       case CompressionAlgorithm::ORIGINAL:
@@ -213,6 +216,7 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compress
     (const dmult_t& Amult, const delem_blocks_t& Aelem,
      const opts_t& opts, int Actxt) {
+      TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_compress);
       if (!opts.synchronized_compression())
         std::cerr << "WARNING: Non synchronized block-extraction version"
                   << "  of compression not supported,"
@@ -232,6 +236,7 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compress
     (const dmult_t& Amult, const delem_t& Aelem,
      const opts_t& opts, int Actxt) {
+      TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_compress);
       auto Aelemw = [&]
         (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
          DistM_t& B, const DistM_t& A, std::size_t rlo, std::size_t clo,

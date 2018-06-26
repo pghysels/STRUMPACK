@@ -276,20 +276,23 @@ namespace strumpack {
       if (std::abs(r_min) < atol || std::abs(r_min / r_max_0) < rtol)
         return true;
       DistMW_t Q3(m, dd, Q, 0, d);
+      // only use p columns of Q3 to check the stopping criterion
+      DistMW_t Q3p(m, opts.p(), Q, 0, d);
       DistM_t Q12tQ3(_ctxt, Q12.cols(), Q3.cols());
-      auto S3norm = Q3.norm();
+      auto S3norm = Q3p.norm();
+      TIMER_TIME(TaskType::ORTHO, 1, t_ortho);
       gemm(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.), Q12tQ3);
       gemm(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.), Q3);
       // iterated classical Gram-Schmidt
       gemm(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.), Q12tQ3);
       gemm(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.), Q3);
+      TIMER_STOP(t_ortho);
       STRUMPACK_ORTHO_FLOPS
                             (gemm_flops(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.)) +
                              gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.)) +
                              gemm_flops(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.)) +
                              gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.)));
-      auto Q3norm = Q3.norm();
-      // TODO norm flops?
+      auto Q3norm = Q3p.norm(); // TODO norm flops?
       return (Q3norm / std::sqrt(double(dd)) < atol)
         || (Q3norm / S3norm < rtol);
     }
