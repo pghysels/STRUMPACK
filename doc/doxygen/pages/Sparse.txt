@@ -34,7 +34,7 @@ ____
 
 The following shows the typical way to use a (sequential or multithreaded) STRUMPACK sparse solver: 
 
-<img src="/Users/lucyguo/Desktop/LBL1/STRUMPACK/doc/doxygen/images/SSSEx.png" width = 100%>
+\image html SSSEx.png width=90%
 
 __Figure 1__:
  Illustration of a small 5 × 5 sparse matrix with 11 nonzeros and its Compressed Sparse Row (CSR) or Yale format representation. We always use 0-based indexing! Let \f$N\f$ = 5 denote the number of rows. The row_ptr array has \f$N\f$ +1 elements, with element \f$i\f$ denoting the start of row \f$i\f$ in the col_ind and values arrays. Element row_ptr[N] = nnz, i.e., the total number of nonzero elements in the matrix. The values array holds the actual matrix values, ordered by row. The corresponding elements in col_ind give the column indices for each nonzero. There can be explicit zero elements in the matrix. The nonzero values and corresponding column indices need not be sorted by column (within a row).
@@ -134,7 +134,7 @@ Finally, we illustrate the usage of \link StrumpackSparseSolverMPIDist.hpp Strum
          // local_n is the number of rows of the input matrix assigned to me
 \endcode
 
-<img src="/Users/lucyguo/Desktop/LBL1/STRUMPACK/doc/doxygen/images/SSSMPIDistEx.png" width = 80%>
+\image html SSSMPIDistEx.png width=90%
 
 __Figure 2__: Illustration of a small 5×5 sparse matrix with 11 nonzeros and its block-row distributed compressed sparse row representation. We always use 0-based indexing! Process P0 owns row 0, process P1 has rows 1 and 2 and process P2 has rows 3 and 4. This distribution of rows over the processes is represented by the dist array. Process p owns rows [dist[p],dist[p+1]). If N = 5 is the number of rows in the entire matrix and P is the total number of processes, then dist[P]=N. The (same) dist array is stored on every process. Each process holds a CSR representation of only its local rows of the matrix, see Figure 1.
 
@@ -238,7 +238,7 @@ There are three types of matrix reordering: for numerical stability, to reduce f
 
 \code {.cpp} ReturnCode strumpack::StrumpackSparseSolver::reorder( ); \endcode
 
-The return value is of type ReturnCode (defined in strumpack_parameters.hpp) and can be
+The return value is of type ReturnCode (defined in StrumpackParameters.hpp) and can be
 
 \code {.cpp}
 enum class ReturnCode {    
@@ -333,7 +333,7 @@ For instance for a regular 2d 2000 \f$×\f$ 4000 grid, you can call this as sp.r
 
 Compute the factorization by calling
 \code {.cpp} ReturnCode strumpack::StrumpackSparseSolver::factor(); \endcode
-where the possible return values are the same as for \link strumpack::StrumpackSparseSolver::reorder() Sp::reorder()\endlink. If \link strumpack::StrumpackSparseSolver::reorder() Sp::reorder()\endlink was not called already, it is called automatically. When HSS compression is not enabled, this will compute an exact LU factorization of the (permuted) sparse input matrix. If HSS compression is enabled (with strumpack::SPOptions::enable_HSS() or \--sp_enable_HSS, see \link HSS_Preconditioning HSS Preconditioning\endlink), the factorization is only approximate.
+where the possible return values are the same as for \link strumpack::StrumpackSparseSolver::reorder() Sp::reorder()\endlink. If \link strumpack::StrumpackSparseSolver::reorder() Sp::reorder()\endlink was not called already, it is called automatically. When HSS compression is not enabled, this will compute an exact LU factorization of the (permuted) sparse input matrix. If HSS compression is enabled (with \link strumpack::SPOptions::enable_HSS() SPOptions::enable_HSS\endlink or \--sp_enable_HSS, see \link HSS_Preconditioning HSS Preconditioning\endlink), the factorization is only approximate.
 
 */
 
@@ -365,7 +365,7 @@ enum class KrylovSolver {
 };
 \endcode
 
-with \link strumpack::KrylovSolver KrylovSolver::AUTO\endlink being the default value. The \link strumpack::KrylovSolver KrylovSolver::AUTO\endlink setting will use iterative refinement when HSS compression is not enabled, and preconditioned GMRES when HSS compression is enabled, see Section 5. To use the solver as a preconditioner, or a single (approximate) solve, set the solver to \link strumpack::KrylovSolver KrylovSolver::DIRECT\endlink. When calling \link strumpack::StrumpackSparseSolverMPIDist SpMPIDist::solve\endlink, the right-hand side and solution vectors should only point to the local parts!
+with \link strumpack::KrylovSolver KrylovSolver::AUTO\endlink being the default value. The \link strumpack::KrylovSolver KrylovSolver::AUTO\endlink setting will use iterative refinement when HSS compression is not enabled, and preconditioned GMRES when HSS compression is enabled, see \link HSS_Preconditioning HSS Preconditioning\endlink. To use the solver as a preconditioner, or a single (approximate) solve, set the solver to \link strumpack::KrylovSolver KrylovSolver::DIRECT\endlink. When calling \link strumpack::StrumpackSparseSolverMPIDist SpMPIDist::solve\endlink, the right-hand side and solution vectors should only point to the local parts!
 
 */
 
@@ -382,7 +382,7 @@ ____
 
 /*! \page scalar_interface SPOptions<scalar> Interface
 
-The complete public interface to the options class is as follows, wher the real type is the real part of a scalar,
+The complete public interface to the options class is as follows, where the real type is the real part of a scalar,
 i.e., decltype(std::real(scalar(0))).
 
 StrumpackOptions.hpp
@@ -398,16 +398,7 @@ enum class GramSchmidtType {
 };
 \endcode
 
-
-
-
-
-<img src="/STRUMPACK/doc/doxygen/images/SPOptions_Interface.png" width = 25%>
-
-
-
-
-\image html SPOptions_Interface.png width=25%
+\image html SPOptions_Interface.png width=33%
 
 __Figure 3__: Illustration of a Hierarchically Semi-Separable (HSS) matrix. Gray blocks are dense matrices. Off- diagonal blocks, on different levels of the HSS hierarchy, are low-rank. The low-rank factors of off-diagonal blocks of different levels are related.
 
@@ -415,7 +406,7 @@ __Figure 3__: Illustration of a Hierarchically Semi-Separable (HSS) matrix. Gray
 
 /*! \page command_options Command Line Options
 
-To get a list of all available options, make sure to pass “int argc, char* argv[]” when initializing the \link strumpack::StrumpackSparseSolver() StrumpackSparseSolver\endlink or when calling \link strumpack::SPOptions::set_from_command_line SPOptions::set_from_command_line\endlink and run the application with --help or -h. Some default values listed here are for double precision and might be different when running in single precision.       
+To get a list of all available options, make sure to pass “int argc, char* argv[]” when initializing the \link strumpack::StrumpackSparseSolver() StrumpackSparseSolver\endlink or when calling \link strumpack::SPOptions::set_from_command_line SPOptions::set_from_command_line\endlink and run the application with --help or -h. Some default values listed here are for double precision and might be different when running in single precision.
 
 STRUMPACK options:
 \code {.bash}
