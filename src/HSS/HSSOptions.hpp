@@ -24,13 +24,17 @@
  * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
- *
+ */
+/*! \file HSSOptions.hpp
+ * \brief For Pieter to complete
  */
 #ifndef HSS_OPTIONS_HPP
 #define HSS_OPTIONS_HPP
 #include <getopt.h>
 
 namespace strumpack {
+  
+  /*! HSS namespace. */
   namespace HSS {
 
     template<typename real_t> inline real_t default_HSS_rel_tol() {
@@ -78,6 +82,9 @@ namespace strumpack {
       bool _verbose = true;
 
     public:
+      /*! \brief For Pieter to complete
+       * \param rel_tol
+       */
       void set_rel_tol(real_t rel_tol) {
         assert(rel_tol <= real_t(1.) && rel_tol >= real_t(0.));
         _rel_tol = rel_tol;
@@ -86,6 +93,9 @@ namespace strumpack {
         assert(abs_tol >= real_t(0.));
         _abs_tol = abs_tol;
       }
+    /*! \brief For Pieter to complete
+     * \param leaf_size
+     */
       void set_leaf_size(int leaf_size) {
         assert(_leaf_size > 0);
         _leaf_size = leaf_size;

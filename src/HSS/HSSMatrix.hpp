@@ -26,6 +26,9 @@
  *             Division).
  *
  */
+/*! \file HSSMatrix.hpp
+ * \brief For Pieter to complete
+ */
 #ifndef HSS_MATRIX_HPP
 #define HSS_MATRIX_HPP
 

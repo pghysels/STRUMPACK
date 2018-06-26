@@ -2,22 +2,22 @@
 
 The sparse multifrontal solver can optionally use Hierarchically Semi-Separable, rank-structured matrices to compress the fill-in. In the multifrontal method, computations are performed on dense matrices called frontal matrices. A frontal matrix can be approximated as an HSS matrix, but this will only be beneficial (compared to storing the frontal as a standard dense matrix and operating on it with BLAS/LAPACK routines) if the frontal matrix is large enough.
 
-Figure 3 illustrates the HSS matrix format. The matrix is partitioned as a 2 × 2 block matrix, with the partitioning recursively applied on the diagonal blocks, until diagonal blocks are smaller than a specified leaf size. The off-diagonal block on each level of the hierarchy are approximated by a low-rank product. This low-rank storage format asymptotically reduces memory usage and floating point operations, while introducing approximation errors. HSS compression is not used by default in the STRUMPACK sparse solver (the default is to perform exact LU factorization), but can be turned on/off via the command line:
+\link scalar_interface Figure 3\endlink illustrates the HSS matrix format. The matrix is partitioned as a 2 × 2 block matrix, with the partitioning recursively applied on the diagonal blocks, until diagonal blocks are smaller than a specified leaf size. The off-diagonal block on each level of the hierarchy are approximated by a low-rank product. This low-rank storage format asymptotically reduces memory usage and floating point operations, while introducing approximation errors. HSS compression is not used by default in the STRUMPACK sparse solver (the default is to perform exact LU factorization), but can be turned on/off via the command line:
 
 \code {.bash}
 --sp_enable_hss   (no argument)  
---sp_disable_hss   (no argument)
+--sp_disable_hss  (no argument)
 \endcode
 
 or via the C++ API as follows
 
-\code {.bash}
-void SPOptions<scalar>::enable_HSS();  
-void SPOptions<scalar>::disable_HSS();  
-bool SPOptions<scalar>::use_HSS();      // check whether HSS compression is enabled
+\code {.cpp}
+void strumpack::SPOptions::enable_HSS();  
+void strumpack::SPOptions::disable_HSS();  
+bool strumpack::SPOptions::use_HSS();      // check whether HSS compression is enabled
 \endcode
 
-When HSS compression is enabled, the default STRUMPACK behavior is to use the HSS enabled approxi- mate LU factorization as a preconditioner within GMRES. This behavior can also be changed, see Section 4.9.
+When HSS compression is enabled, the default STRUMPACK behavior is to use the HSS enabled approximate LU factorization as a preconditioner within GMRES. This behavior can also be changed, see \link solve Solve\endlink.
 
 However, HSS compression has a considerable overhead and only pays off for sufficiently large matrices.
 
@@ -30,19 +30,19 @@ set via the command line via
 
 or via the C++ API as follows
 
-\code
-void SPOptions<scalar>::set_HSS_min_sep_size(int s);  
-int SPOptions<scalar>::HSS_min_sep_size() const;       // get the current value
+\code {.cpp}
+void strumpack::SPOptions::set_HSS_min_sep_size(int s);  
+int strumpack::SPOptions::HSS_min_sep_size() const;       // get the current value
 \endcode
 
-The routine set_HSS_min_sep_size(int s) refers to the size of the top-left block of the front only. This top-left block is the part that corresponds to a separator, as given by the nested dissection reordering algorithm. This top-left block is also referred to as the block containing the fully-summed variable. Factorization (LU in the dense case, ULV in the HSS case) is only applied to this top-left block. __Tuning the value for the minimum separator size can have a big impact on performance and memory usage!__
+The routine \link strumpack::SPOptions::set_HSS_min_sep_size(int s) set_HSS_min_sep_size(int s)\endlink refers to the size of the top-left block of the front only. This top-left block is the part that corresponds to a separator, as given by the nested dissection reordering algorithm. This top-left block is also referred to as the block containing the fully-summed variable. Factorization (LU in the dense case, ULV in the HSS case) is only applied to this top-left block. __Tuning the value for the minimum separator size can have a big impact on performance and memory usage!__
 
-The above options affect the use of HSS within the multifrontal solver. There are more, HSS specific, options which are stored in an object of type HSS::HSSOptions<scalar>. An object of this type is stored in the SPOptions<scalar> object stored in the StrumpackSparseSolver. It can be accessed via the HSS_options() routine as follows:
+The above options affect the use of HSS within the multifrontal solver. There are more, HSS specific, options which are stored in an object of type \link strumpack::HSS HSS::HSSOptions<scalar>\endlink. An object of this type is stored in the \link strumpack::SPOptions SPOptions<scalar>\endlink object stored in the \link strumpack::StrumpackSparseSolver StrumpackSparseSolver\endlink. It can be accessed via the HSS_options() routine as follows:
 
 \code {.cpp}
-StrumpackSparseSolver<double> sp;               // create solver object  
-sp.options().enable_HSS();                      // enable HSS compression in the multifrontal solver  
-sp.options().HSS_options().set_leaf_size(256);  // set the HSS leaf size
+strumpack::StrumpackSparseSolver<double> sp;             // create solver object  
+strumpack::SPOptions::enable_HSS();                      // enable HSS compression in the multifrontal solver  
+strumpack::HSS::HSSOptions::set_leaf_size(256);          // set the HSS leaf size
 \endcode
 
 In STRUMPACK, HSS matrices are constructed using a randomized sampling algorithm [6]. To construct an HSS approximation for a matrix \f$A\f$, sampling of the rows and columns of \f$A\f$ is computed by multiplication with a tall and skinny random matrix \f$R\f$ as follows: \f$S^r = AR\f$ and \f$S^c = A∗R\f$. Ideally, the number of columns in the matrix \f$R\f$ is \f$d = r + p\f$, with \f$r\f$ the maximum off-diagonal block rank in the HSS matrix and p a small oversampling parameter. Unfortunately, the HSS rank is not known a-priori, so it needs to determined adaptively. The adaptive sampling scheme used in STRUMPACK starts with an initial number of random vector \f$d_0\f$, and increases this in steps of \f$\Delta d\f$, until the compression quality reaches the desired user specified tolerance, or until the maximum rank is reached. __The compression tolerances can greatly impact performance.__ They can be set using:
@@ -55,10 +55,10 @@ In STRUMPACK, HSS matrices are constructed using a randomized sampling algorithm
 or via the C++ API
 
 \code
-> void HSSOptions<scalar>::set_rel_tol(real rel_tol);  
-> void HSSOptions<scalar>::set_abs_tol(real abs_tol);  
-> real HSSOptions<scalar>::rel_tol() const; &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; // get the current value  
-> real HSSOptions<scalar>::abs_tol() const;
+> void strumpack::HSS::HSSOptions<scalar>::set_rel_tol(real rel_tol);  
+> void strumpack::HSS::HSSOptions<scalar>::set_abs_tol(real abs_tol);  
+> real strumpack::HSS::HSSOptions<scalar>::rel_tol() const;              // get the current value  
+> real strumpack::HSS::HSSOptions<scalar>::abs_tol() const;
 \endcode
 ____
 
@@ -69,7 +69,7 @@ ____
 
 /*! \page HSS_scalar_interface HSSOptions<scalar> Interface
 
-Other options are available to tune for instance the initial number of random vectors \f$d_0\f$, the increment \f$\Delta d\f$, the random number generator or the random number distribution. The complete public interface for the HSSOptions<scalar> class is:
+Other options are available to tune for instance the initial number of random vectors \f$d_0\f$, the increment \f$\Delta d\f$, the random number generator or the random number distribution. The complete public interface for the \link strumpack::HSS::HSSOptions HSSOptions<scalar>\endlink class is:
 
 \code {.cpp}
 template<typename scalar> class HSSOptions {  
@@ -120,8 +120,7 @@ public:
 
 /*! \page HSS_Command_Options HSS Command Line Options
 
-The HSS specific command line options are: 
-HSS Options:
+The HSS specific command line options are:
 
 \code {.cpp}
 --hss_rel_tol real (default 0.01)  
