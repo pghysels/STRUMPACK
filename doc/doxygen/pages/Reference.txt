@@ -1,0 +1,21 @@
+/*! \page References References
+
+- [1] A. Buluç and J. R. Gilbert, [_The Combinatorial BLAS: Design, implementation, and applications_] (http://journals.sagepub.com/doi/abs/10.1177/1094342011403516), The International Journal of High Performance Computing Applications, 25 (2011), pp. 496–509.  
+
+- [2] G. B. D Yu Chenhan, William B March, [_An N log N Parallel Fast Direct Solver for Kernel Matrices_] (https://ieeexplore.ieee.org/abstract/document/7967179/?reload=true), in 2017 IEEE International Parallel and Distributed Processing Symposium (IPDPS), IEEE, May 2017, pp. 886–896.  
+
+- [3] I. S. Duff and J. Koster, [_The design and use of algorithms for permuting large entries to the diagonal of sparse matrices_] (https://epubs.siam.org/doi/abs/10.1137/S0895479897317661), SIAM Journal on Matrix Analysis and Applications, 20 (1999), pp. 889–901.  
+
+- [4] P. Ghysels, X. S. Li, C. Gorman, and F. H. Rouet, [_A robust parallel preconditioner for indefinite systems using hierarchical matrices and randomized sampling_](https://ieeexplore.ieee.org/abstract/document/7967180/), in 2017 IEEE International Parallel and Distributed Processing Symposium (IPDPS), IEEE, May 2017, pp. 897–906.  
+
+- [5] P. Ghysels, X. S. Li, F.-H. Rouet, S. Williams, and A. Napov, [_An efficient multi-core imple- mentation of a novel HSS-structured multifrontal solver using randomized sampling_](https://epubs.siam.org/doi/abs/10.1137/15M1010117), Submitted to SIAM SISC, (2015).  
+
+- [6] P.-G. Martinsson, [_A fast randomized algorithm for computing a hierarchically semiseparable represen- tation of a matrix_](http://epubs.siam.org/doi/abs/10.1137/100786617), SIAM Journal on Matrix Analysis and Applications, 32 (2011), pp. 1251–1274.  
+
+- [7] F.-H. Rouet, X. S. Li, and P. Ghysels, [_A distributed-memory package for dense hierarchically semi-separable matrix computations using randomization_](https://dl.acm.org/citation.cfm?id=2930660), ACM Transactions on Mathematical Software, (2016). to appear.  
+
+- [8] Y. Saad, [_Iterative methods for sparse linear systems_](https://books.google.com/books?hl=en&lr=&id=h9nwszYPblEC&oi=fnd&pg=PR2&dq=Iterative+methods+for+sparse+linear+systems&ots=PW05H9ATFS&sig=4ypdWFSrwMS4zOfkGpvXBvRnqjo), Society for Industrial Mathematics, 2003.  
+
+- [9] J. Xia, [_Randomized sparse direct solvers_](http://epubs.siam.org/doi/abs/10.1137/12087116X), SIAM Journal on Matrix Analysis and Applications, 34 (2013), pp. 197–227.  
+
+*/

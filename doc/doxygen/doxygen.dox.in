@@ -797,7 +797,7 @@ WARN_LOGFILE           =
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/FAQ.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Acknowledgements.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Copyright.txt \
-	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/License.txt \
+	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Reference.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/images
 
 # This tag can be used to specify the character encoding of the source files

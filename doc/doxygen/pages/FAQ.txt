@@ -6,10 +6,10 @@
 catastrophic error: cannot open source file "chrono"  
 #include <chrono> 
 \endcode
-	You need a C++11 capable compiler, and also a __C++11 enabled standard library__. For instance suppose you are using the Intel 15.0 C++ compiler with GCC 4.4 headers. The Intel 15.0 C++ compiler supports the C++11 standard, but the GCC 4.4 headers do not implement the C++11 standard library. You should install/load a newer GCC version (or just the headers). On cray machines, this can be done with module unload gcc; module load gcc/4.9.3 for instance.
+	- You need a C++11 capable compiler, and also a __C++11 enabled standard library__. For instance suppose you are using the Intel 15.0 C++ compiler with GCC 4.4 headers. The Intel 15.0 C++ compiler supports the C++11 standard, but the GCC 4.4 headers do not implement the C++11 standard library. You should install/load a newer GCC version (or just the headers). On cray machines, this can be done with module unload gcc; module load gcc/4.9.3 for instance.
 
 + When running __make test__, many of the tests fail!  
 
-The parallel execution in ctest is invoked by the MPIEXEC command as discovered by CMake. On many HPC clusters, this does not run unless it is executed from within a batch script. In this case all parallel tests will fail. At the moment, a small number of tests still fail. This is normal behavior.
+	- The parallel execution in ctest is invoked by the MPIEXEC command as discovered by CMake. On many HPC clusters, this does not run unless it is executed from within a batch script. In this case all parallel tests will fail. At the moment, a small number of tests still fail. This is normal behavior.
 
 */
