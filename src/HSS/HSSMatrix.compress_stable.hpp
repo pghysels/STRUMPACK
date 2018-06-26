@@ -337,7 +337,7 @@ namespace strumpack {
         return true;
       DenseMW_t Q3(m, dd, Q, 0, d);
       // only use p columns of Q3 to check the stopping criterion
-      DenseMW_t Q3p(m, opts.p(), Q, 0, d);
+      DenseMW_t Q3p(m, std::min(dd, opts.p()), Q, 0, d);
       DenseM_t Q12tQ3(Q12.cols(), Q3.cols());
       auto S3norm = Q3p.norm();
       TIMER_TIME(TaskType::ORTHO, 1, t_ortho);

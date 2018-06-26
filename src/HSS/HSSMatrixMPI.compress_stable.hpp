@@ -277,7 +277,7 @@ namespace strumpack {
         return true;
       DistMW_t Q3(m, dd, Q, 0, d);
       // only use p columns of Q3 to check the stopping criterion
-      DistMW_t Q3p(m, opts.p(), Q, 0, d);
+      DistMW_t Q3p(m, std::min(dd, opts.p()), Q, 0, d);
       DistM_t Q12tQ3(_ctxt, Q12.cols(), Q3.cols());
       auto S3norm = Q3p.norm();
       TIMER_TIME(TaskType::ORTHO, 1, t_ortho);
