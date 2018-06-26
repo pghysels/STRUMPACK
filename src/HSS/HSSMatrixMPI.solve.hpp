@@ -105,6 +105,11 @@ namespace strumpack {
         copy(y1.rows(), n, w.c[1].y, 0, 0, y1, 0, 0, _ctxt_all);
         gemm(Trans::N, Trans::N, scalar_t(-1.), _B01, z1, scalar_t(1.), f0);
         gemm(Trans::N, Trans::N, scalar_t(-1.), _B10, z0, scalar_t(1.), f1);
+        STRUMPACK_HSS_SOLVE_FLOPS
+          (gemm_flops(Trans::N, Trans::N, scalar_t(-1.),
+                      _B01, z1, scalar_t(1.)) +
+           gemm_flops(Trans::N, Trans::N, scalar_t(-1.),
+                      _B10, z0, scalar_t(1.)));
         if (c0urows > c0urank) {
           DistM_t Q00(_ctxt, c0urows - c0urank, c0urows);
           copy(Q00.rows(), Q00.cols(), ULV._ch[0]._Q, 0, 0,
@@ -116,6 +121,11 @@ namespace strumpack {
           gemm(Trans::C, Trans::N, scalar_t(1.), Q00, y0, scalar_t(0.), tmp0);
           gemm(Trans::N, Trans::N, scalar_t(-1.),
                c0W1, tmp0, scalar_t(1.), f0);
+          STRUMPACK_HSS_SOLVE_FLOPS
+            (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
+                        Q00, y0, scalar_t(0.)) +
+             gemm_flops(Trans::N, Trans::N, scalar_t(-1.),
+                        c0W1, tmp0, scalar_t(1.)));
         }
         if (c1urows > c1urank) {
           DistM_t Q10(_ctxt, c1urows - c1urank, c1urows);
@@ -128,16 +138,30 @@ namespace strumpack {
           gemm(Trans::C, Trans::N, scalar_t(1.), Q10, y1, scalar_t(0.), tmp1);
           gemm(Trans::N, Trans::N, scalar_t(-1.), c1W1, tmp1,
                scalar_t(1.), f1);
+          STRUMPACK_HSS_SOLVE_FLOPS
+            (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
+                        Q10, y1, scalar_t(0.)) +
+             gemm_flops(Trans::N, Trans::N, scalar_t(-1.),
+                        c1W1, tmp1, scalar_t(1.)));
         }
       }
       if (isroot) {
         w.x = ULV._D.solve(f, ULV._piv);
+        STRUMPACK_HSS_SOLVE_FLOPS(solve_flops(f));
         if (partial) {
           // compute reduced_rhs = \hat{V}^* y_0 + V^* [z_0; z_1]
           w.reduced_rhs = DistM_t(_ctxt, this->V_rank(), w.x.cols());
           gemm(Trans::C, Trans::N, scalar_t(1.), ULV._Vt0, w.x,
                scalar_t(0.), w.reduced_rhs);
-          if (!this->leaf()) w.reduced_rhs.add(_V.applyC(z));
+          STRUMPACK_HSS_SOLVE_FLOPS
+            (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
+                        ULV._Vt0, w.x, scalar_t(0.)));
+          if (!this->leaf()) {
+            w.reduced_rhs.add(_V.applyC(z));
+            STRUMPACK_HSS_SOLVE_FLOPS
+              (_V.applyC_flops(z.cols()) +
+               w.reduced_rhs.lrows() * w.reduced_rhs.lcols());
+          }
         }
       } else {
         f.laswp(_U.P(), true);
@@ -150,22 +174,35 @@ namespace strumpack {
           gemm(Trans::N, Trans::N, scalar_t(-1.), _U.E(), w.ft1,
                scalar_t(1.), w.y);
           trsm(Side::L, UpLo::L, Trans::N, Diag::N, scalar_t(1.), ULV._L, w.y);
+          STRUMPACK_HSS_SOLVE_FLOPS
+            (gemm_flops(Trans::N, Trans::N, scalar_t(-1.),
+                        _U.E(), w.ft1, scalar_t(1.)) +
+             trsm_flops(Side::L, scalar_t(1.), ULV._L, w.y));
           if (!this->leaf()) {
             // TODO do the concat first, create wrappers for z0 and z1
             w.z = _V.applyC(z);
             gemm(Trans::C, Trans::N, scalar_t(1.), ULV._Vt0, w.y,
                  scalar_t(1.), w.z);
+            STRUMPACK_HSS_SOLVE_FLOPS
+              (_V.applyC_flops(z.cols()) +
+               gemm_flops(Trans::C, Trans::N, scalar_t(1.),
+                          ULV._Vt0, w.y, scalar_t(1.)));
           } else {
             w.z = DistM_t(_ctxt, this->V_rank(), n);
             gemm(Trans::C, Trans::N, scalar_t(1.), ULV._Vt0, w.y,
                  scalar_t(0.), w.z);
+            STRUMPACK_HSS_SOLVE_FLOPS
+              (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
+                          ULV._Vt0, w.y, scalar_t(0.)));
           }
         } else {
           w.ft1 = DistM_t(_ctxt, this->U_rank(), n);
           w.y = DistM_t(_ctxt, 0, n);
           copy(this->U_rank(), n, f, 0, 0, w.ft1, 0, 0, _ctxt_all);
-          if (!this->leaf()) w.z = _V.applyC(z);
-          else {
+          if (!this->leaf()) {
+            w.z = _V.applyC(z);
+            STRUMPACK_HSS_SOLVE_FLOPS(_V.applyC_flops(z.cols()));
+          } else {
             w.z = DistM_t(_ctxt, this->V_rank(), n);
             w.z.zero(); // TODO can this be avoided?
           }
@@ -195,6 +232,9 @@ namespace strumpack {
             copy(c0urank, n, w.x, 0, 0, tmp, c0urows-c0urank, 0, _ctxt_all);
             gemm(Trans::C, Trans::N, scalar_t(1.), ULV._ch[0]._Q, tmp,
                  scalar_t(0.), w.c[0].x);
+            STRUMPACK_HSS_SOLVE_FLOPS
+              (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
+                          ULV._ch[0]._Q, tmp, scalar_t(0.)));
           } else copy(c0urank, n, w.x, 0, 0, w.c[0].x, 0, 0, _ctxt_all);
         } {
           w.c[1].x = DistM_t(w.c[1].y.ctxt(), c1urows, n);
@@ -207,6 +247,9 @@ namespace strumpack {
                  c1urows-c1urank, 0, _ctxt_all);
             gemm(Trans::C, Trans::N, scalar_t(1.), ULV._ch[1]._Q, tmp,
                  scalar_t(0.), w.c[1].x);
+            STRUMPACK_HSS_SOLVE_FLOPS
+              (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
+                          ULV._ch[1]._Q, tmp, scalar_t(0.)));
           } else copy(c1urank, n, w.x, c0urank, 0, w.c[1].x, 0, 0, _ctxt_all);
         }
         w.x.clear();

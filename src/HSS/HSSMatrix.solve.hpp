@@ -61,35 +61,44 @@ namespace strumpack {
 #pragma omp taskwait
         DenseM_t& f0 = w.c[0].ft1;
         DenseM_t& f1 = w.c[1].ft1;
-        gemm
-          (Trans::N, Trans::N, scalar_t(-1.),
-           _B01, w.c[1].z, scalar_t(1.), f0, depth);
-        gemm
-          (Trans::N, Trans::N, scalar_t(-1.),
-           _B10, w.c[0].z, scalar_t(1.), f1, depth);
+        gemm(Trans::N, Trans::N, scalar_t(-1.),
+             _B01, w.c[1].z, scalar_t(1.), f0, depth);
+        gemm(Trans::N, Trans::N, scalar_t(-1.),
+             _B10, w.c[0].z, scalar_t(1.), f1, depth);
+        STRUMPACK_HSS_SOLVE_FLOPS
+          (gemm_flops(Trans::N, Trans::N, scalar_t(-1.),
+                      _B01, w.c[1].z, scalar_t(1.)) +
+           gemm_flops(Trans::N, Trans::N, scalar_t(-1.),
+                      _B10, w.c[0].z, scalar_t(1.)));
         if (this->_ch[0]->U_rows() > this->_ch[0]->U_rank()) {
           auto Q00 = ConstDenseMatrixWrapperPtr
             (this->_ch[0]->U_rows()-this->_ch[0]->U_rank(),
              this->_ch[0]->U_rows(), ULV._ch[0]._Q, 0, 0);
           DenseM_t tmp0(Q00->cols(), b.cols());
-          gemm
-            (Trans::C, Trans::N, scalar_t(1.),
-             *Q00, w.c[0].y, scalar_t(0.), tmp0, depth);
-          gemm
-            (Trans::N, Trans::N, scalar_t(-1.),
-             ULV._ch[0]._W1, tmp0, scalar_t(1.), f0, depth);
+          gemm(Trans::C, Trans::N, scalar_t(1.),
+               *Q00, w.c[0].y, scalar_t(0.), tmp0, depth);
+          gemm(Trans::N, Trans::N, scalar_t(-1.),
+               ULV._ch[0]._W1, tmp0, scalar_t(1.), f0, depth);
+          STRUMPACK_HSS_SOLVE_FLOPS
+            (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
+                        *Q00, w.c[0].y, scalar_t(0.)) +
+             gemm_flops(Trans::N, Trans::N, scalar_t(-1.),
+                        ULV._ch[0]._W1, tmp0, scalar_t(1.)));
         }
         if (this->_ch[1]->U_rows() > this->_ch[1]->U_rank()) {
           auto Q10 = ConstDenseMatrixWrapperPtr
             (this->_ch[1]->U_rows()-this->_ch[1]->U_rank(),
              this->_ch[1]->U_rows(), ULV._ch[1]._Q, 0, 0);
           DenseM_t tmp1(Q10->cols(), b.cols());
-          gemm
-            (Trans::C, Trans::N, scalar_t(1.),
-             *Q10, w.c[1].y, scalar_t(0.), tmp1, depth);
-          gemm
-            (Trans::N, Trans::N, scalar_t(-1.),
-             ULV._ch[1]._W1, tmp1, scalar_t(1.), f1, depth);
+          gemm(Trans::C, Trans::N, scalar_t(1.),
+               *Q10, w.c[1].y, scalar_t(0.), tmp1, depth);
+          gemm(Trans::N, Trans::N, scalar_t(-1.),
+               ULV._ch[1]._W1, tmp1, scalar_t(1.), f1, depth);
+          STRUMPACK_HSS_SOLVE_FLOPS
+            (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
+                        *Q10, w.c[1].y, scalar_t(0.)) +
+             gemm_flops(Trans::N, Trans::N, scalar_t(-1.),
+                        ULV._ch[1]._W1, tmp1, scalar_t(1.)));
         }
         f = vconcat(f0, f1);
         f0.clear();
@@ -97,15 +106,22 @@ namespace strumpack {
       }
       if (isroot) {
         w.x = ULV._D.solve(f, ULV._piv, depth);
+        STRUMPACK_HSS_SOLVE_FLOPS(solve_flops(f));
         if (partial) {
           // compute reduced_rhs = \hat{V}^* y_0 + V^* [z_0; z_1]
           w.reduced_rhs = DenseM_t(this->V_rank(), w.x.cols());
-          gemm
-            (Trans::C, Trans::N, scalar_t(1.),
-             ULV._Vt0, w.x, scalar_t(0.), w.reduced_rhs, depth);
-          if (!this->leaf())
+          gemm(Trans::C, Trans::N, scalar_t(1.),
+               ULV._Vt0, w.x, scalar_t(0.), w.reduced_rhs, depth);
+          STRUMPACK_HSS_SOLVE_FLOPS
+            (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
+                        ULV._Vt0, w.x, scalar_t(0.)));
+          if (!this->leaf()) {
             w.reduced_rhs.add
               (_V.applyC(vconcat(w.c[0].z, w.c[1].z), depth), depth);
+            STRUMPACK_HSS_SOLVE_FLOPS
+              (_V.applyC_flops(w.c[0].z.cols()) +
+               w.reduced_rhs.rows() * w.reduced_rhs.cols());
+          }
         }
       } else {
         f.laswp(_U.P(), true);
@@ -113,28 +129,36 @@ namespace strumpack {
           w.ft1 = DenseM_t(this->U_rank(), f.cols(), f, 0, 0);
           w.y = DenseM_t    // put ft0 in w.y
             (this->U_rows()-this->U_rank(), f.cols(), f, this->U_rank(), 0);
-          gemm
-            (Trans::N, Trans::N, scalar_t(-1.),
-             _U.E(), w.ft1, scalar_t(1.), w.y, depth);
-          trsm
-            (Side::L, UpLo::L, Trans::N, Diag::N,
-             scalar_t(1.), ULV._L, w.y, depth);
+          gemm(Trans::N, Trans::N, scalar_t(-1.),
+               _U.E(), w.ft1, scalar_t(1.), w.y, depth);
+          trsm(Side::L, UpLo::L, Trans::N, Diag::N,
+               scalar_t(1.), ULV._L, w.y, depth);
+          STRUMPACK_HSS_SOLVE_FLOPS
+            (gemm_flops(Trans::N, Trans::N, scalar_t(-1.),
+                        _U.E(), w.ft1, scalar_t(1.)) +
+             trsm_flops(Side::L, scalar_t(1.), ULV._L, w.y));
           if (!this->leaf()) {
             w.z = _V.applyC(vconcat(w.c[0].z, w.c[1].z), depth);
-            gemm
-              (Trans::C, Trans::N, scalar_t(1.),
-               ULV._Vt0, w.y, scalar_t(1.), w.z, depth);
+            gemm(Trans::C, Trans::N, scalar_t(1.),
+                 ULV._Vt0, w.y, scalar_t(1.), w.z, depth);
+            STRUMPACK_HSS_SOLVE_FLOPS
+              (_V.applyC_flops(w.c[0].z.cols()) +
+               gemm_flops(Trans::C, Trans::N, scalar_t(1.),
+                          ULV._Vt0, w.y, scalar_t(1.)));
           } else {
             w.z = DenseM_t(this->V_rank(), b.cols());
-            gemm
-              (Trans::C, Trans::N, scalar_t(1.),
-               ULV._Vt0, w.y, scalar_t(0.), w.z, depth);
+            gemm(Trans::C, Trans::N, scalar_t(1.),
+                 ULV._Vt0, w.y, scalar_t(0.), w.z, depth);
+            STRUMPACK_HSS_SOLVE_FLOPS
+              (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
+                          ULV._Vt0, w.y, scalar_t(0.)));
           }
         } else {
           w.ft1 = DenseM_t(this->U_rank(), f.cols(), f, 0, 0);
-          if (!this->leaf())
+          if (!this->leaf()) {
             w.z = _V.applyC(vconcat(w.c[0].z, w.c[1].z), depth);
-          else {
+            STRUMPACK_HSS_SOLVE_FLOPS(_V.applyC_flops(w.c[0].z.cols()));
+          } else {
             w.z = DenseM_t(this->V_rank(), b.cols());
             w.z.zero(); // TODO can this be avoided?
           }
@@ -156,18 +180,22 @@ namespace strumpack {
         DenseMW_t x0(this->_ch[0]->U_rank(), x.cols(), w.x, 0, 0);
         DenseMW_t x1(this->_ch[1]->U_rank(), x.cols(), w.x, x0.rows(), 0);
         // TODO instead of concat, use 2 separate gemms!!
-        if (this->_ch[0]->U_rows() > this->_ch[0]->U_rank())
-          gemm
-            (Trans::C, Trans::N, scalar_t(1.),
-             ULV._ch[0]._Q, vconcat(w.c[0].y, x0),
-             scalar_t(0.), w.c[0].x, depth);
-        else w.c[0].x.copy(x0);
-        if (this->_ch[1]->U_rows() > this->_ch[1]->U_rank())
-          gemm
-            (Trans::C, Trans::N, scalar_t(1.),
-             ULV._ch[1]._Q, vconcat(w.c[1].y, x1),
-             scalar_t(0.), w.c[1].x, depth);
-        else w.c[1].x.copy(x1);
+        if (this->_ch[0]->U_rows() > this->_ch[0]->U_rank()) {
+          auto tmp = vconcat(w.c[0].y, x0);
+          gemm(Trans::C, Trans::N, scalar_t(1.), ULV._ch[0]._Q,
+               tmp, scalar_t(0.), w.c[0].x, depth);
+          STRUMPACK_HSS_SOLVE_FLOPS
+            (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
+                        ULV._ch[0]._Q, tmp, scalar_t(0.)));
+        } else w.c[0].x.copy(x0);
+        if (this->_ch[1]->U_rows() > this->_ch[1]->U_rank()) {
+          auto tmp = vconcat(w.c[1].y, x1);
+          gemm(Trans::C, Trans::N, scalar_t(1.),
+               ULV._ch[1]._Q, tmp, scalar_t(0.), w.c[1].x, depth);
+          STRUMPACK_HSS_SOLVE_FLOPS
+            (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
+                        ULV._ch[1]._Q, tmp, scalar_t(0.)));
+        } else w.c[1].x.copy(x1);
         w.x.clear();
         w.c[0].y.clear();
         w.c[1].y.clear();
