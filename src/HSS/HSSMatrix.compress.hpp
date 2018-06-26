@@ -41,7 +41,7 @@ namespace strumpack {
 
     template<typename scalar_t> void HSSMatrix<scalar_t>::compress_original
     (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts) {
-      int d_old = 0, d = opts.d0() + opts.dd();
+      int d_old = 0, d = opts.d0() + opts.p();
       auto n = this->cols();
       DenseM_t Rr, Rc, Sr, Sc;
       std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen;
@@ -66,8 +66,8 @@ namespace strumpack {
         DenseMW_t Sc_new(n, d-d_old, Sc, 0, d_old);
         Amult(Rr_new, Rc_new, Sr_new, Sc_new);
         if (opts.verbose())
-          std::cout << "# compressing with d = " << d-opts.dd()
-                    << " + " << opts.dd() << " (original)" << std::endl;
+          std::cout << "# compressing with d = " << d-opts.p()
+                    << " + " << opts.p() << " (original)" << std::endl;
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
         compress_recursive_original
@@ -75,7 +75,7 @@ namespace strumpack {
            this->_openmp_task_depth);
         if (!this->is_compressed()) {
           d_old = d;
-          d = 2 * (d_old - opts.dd()) + opts.dd();
+          d = 2 * (d_old - opts.p()) + opts.p();
         }
       }
     }
@@ -90,7 +90,7 @@ namespace strumpack {
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::compress_hard_restart
     (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts) {
-      int d_old = 0, d = opts.d0() + opts.dd();
+      int d_old = 0, d = opts.d0() + opts.p();
       auto n = this->cols();
       DenseM_t Rr, Rc, Sr, Sc, R2, Sr2, Sc2;
       std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen;
@@ -120,8 +120,8 @@ namespace strumpack {
         Amult(Rr_new, Rc_new, Sr_new, Sc_new);
         R2 = Rr; Sr2 = Sr; Sc2 = Sc;
         if (opts.verbose())
-          std::cout << "# compressing with d = " << d-opts.dd()
-                    << " + " << opts.dd() << " (original, hard restart)"
+          std::cout << "# compressing with d = " << d-opts.p()
+                    << " + " << opts.p() << " (original, hard restart)"
                     << std::endl;
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
@@ -130,7 +130,7 @@ namespace strumpack {
            this->_openmp_task_depth);
         if (!this->is_compressed()) {
           d_old = d;
-          d = 2 * (d_old - opts.dd()) + opts.dd();
+          d = 2 * (d_old - opts.p()) + opts.p();
           reset();
         }
       }
@@ -364,6 +364,7 @@ namespace strumpack {
     HSSMatrix<scalar_t>::compute_local_samples
     (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
      WorkCompress<scalar_t>& w, int d0, int d, int depth) {
+      TIMER_TIME(TaskType::COMPUTE_SAMPLES, 1, t_compute);
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
@@ -477,9 +478,9 @@ namespace strumpack {
 
       _U.check();  assert(_U.cols() == w.Jr.size());
       _V.check();  assert(_V.cols() == w.Jc.size());
-      if (d-opts.dd() >= opts.max_rank() ||
-          (int(_U.cols()) < d - opts.dd() &&
-           int(_V.cols()) < d - opts.dd())) {
+      if (d-opts.p() >= opts.max_rank() ||
+          (int(_U.cols()) < d - opts.p() &&
+           int(_V.cols()) < d - opts.p())) {
         this->_U_rank = _U.cols();  this->_U_rows = _U.rows();
         this->_V_rank = _V.cols();  this->_V_rows = _V.rows();
         w.Ir.reserve(_U.cols());
@@ -506,6 +507,7 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrix<scalar_t>::reduce_local_samples
     (DenseM_t& Rr, DenseM_t& Rc, WorkCompress<scalar_t>& w,
      int d0, int d, int depth) {
+      TIMER_TIME(TaskType::REDUCE_SAMPLES, 1, t_reduce);
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
