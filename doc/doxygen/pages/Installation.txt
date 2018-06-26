@@ -99,7 +99,7 @@ Enable by specifying -DSTRUMPACK_USE_COMBBLAS and set COMBBLAS_INCLUDES and COMB
 \code {.bash}
 -DCMAKE_EXE_LINKER_FLAGS="-ltcmalloc"  
 \endcode
-to replace the default memory allocator (C++ new) with a more scalable implementation. See also Section 9.
+to replace the default memory allocator (C++ new) with a more scalable implementation. See also \link tips Advanced Usage Tips\endlink.
 
 The code was tested on GNU/Linux with the GNU and Intel® compilers and the OpenBLAS, Intel® MKL® and Cray® LibSci® numerical libraries. If you encounter issues on other platforms or with other BLAS/LAPACK implementations, please let us know. Successful compilation will create a libstrumpack.a file.
 
