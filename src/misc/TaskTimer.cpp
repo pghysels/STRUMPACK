@@ -140,6 +140,11 @@ void TaskTimer::print_name(std::ostream& os) {
     case TaskType::DISTMAT_EXTRACT_ROWS:  os << "DISTMAT_EXTRACT_ROWS"; break;
     case TaskType::DISTMAT_EXTRACT_COLS:  os << "DISTMAT_EXTRACT_COLS"; break;
     case TaskType::DISTMAT_EXTRACT:       os << "DISTMAT_EXTRACT"; break;
+    case TaskType::QR:                    os << "QR"; break;
+    case TaskType::REDUCE_SAMPLES:        os << "REDUCE_SAMPLES"; break;
+    case TaskType::COMPUTE_SAMPLES:       os << "COMPUTE_SAMPLES"; break;
+    case TaskType::ORTHO:                 os << "ORTHO"; break;
+    case TaskType::REDIST_2D_TO_HSS:      os << "REDIST_2D_TO_HSS"; break;
     default: os << "SOMEOTHERTAKSNOTNAMED";
     }
   }
@@ -282,6 +287,11 @@ void TimerList::finalize() {
     print_line(" HSS_compress               ", TaskType::HSS_COMPRESS);
     print_line("    HSS_parHQRInterpol      ", TaskType::HSS_PARHQRINTERPOL);
     print_line("    HSS_seqHQRInterpol      ", TaskType::HSS_SEQHQRINTERPOL);
+    print_line("    QR                      ", TaskType::QR);
+    print_line("    REDUCE_SAMPLES          ", TaskType::REDUCE_SAMPLES);
+    print_line("    COMPUTE_SAMPLES         ", TaskType::COMPUTE_SAMPLES);
+    print_line("    ORTHO                   ", TaskType::ORTHO);
+    print_line("    REDIST_2D_TO_HSS        ", TaskType::REDIST_2D_TO_HSS);
     print_line("    extract_2d              ", TaskType::EXTRACT_2D);
     print_line("       extract_sep_2d       ", TaskType::EXTRACT_SEP_2D);
     print_line("       get_submatrix_2d     ", TaskType::GET_SUBMATRIX_2D);
