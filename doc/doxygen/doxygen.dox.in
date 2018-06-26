@@ -797,7 +797,8 @@ WARN_LOGFILE           =
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/FAQ.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Acknowledgements.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Copyright.txt \
-	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/License.txt 
+	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/License.txt \
+	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/images
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding. Doxygen uses
@@ -888,9 +889,9 @@ EXAMPLE_RECURSIVE      = NO
 
 # The IMAGE_PATH tag can be used to specify one or more files or directories
 # that contain images that are to be included in the documentation (see the
-# \image command).
+# \image command).  \/Users/Desktop/LBL1/STRUMPACK/doc/doxygen/images
 
-IMAGE_PATH             = /Users/Desktop/LBL1/STRUMPACK/doc/doxygen/images
+IMAGE_PATH             = @CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/images/
 
 # The INPUT_FILTER tag can be used to specify a program that doxygen should
 # invoke to filter for each input file. Doxygen will invoke the filter program

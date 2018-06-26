@@ -398,7 +398,16 @@ enum class GramSchmidtType {
 };
 \endcode
 
-<img src="/Users/lucyguo/Desktop/LBL1/STRUMPACK/doc/doxygen/images/SPOptions_Interface.png" width = 25%>
+
+
+
+
+<img src="/STRUMPACK/doc/doxygen/images/SPOptions_Interface.png" width = 25%>
+
+
+
+
+\image html SPOptions_Interface.png width=25%
 
 __Figure 3__: Illustration of a Hierarchically Semi-Separable (HSS) matrix. Gray blocks are dense matrices. Off- diagonal blocks, on different levels of the HSS hierarchy, are low-rank. The low-rank factors of off-diagonal blocks of different levels are related.
 
