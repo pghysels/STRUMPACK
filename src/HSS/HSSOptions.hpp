@@ -65,7 +65,7 @@ namespace strumpack {
       int _leaf_size = 128;
       int _d0 = 128;
       int _dd = 64;
-      int _p = 64;
+      int _p = 10;
       int _max_rank = 5000;
       random::RandomEngine _random_engine =
         random::RandomEngine::LINEAR;
