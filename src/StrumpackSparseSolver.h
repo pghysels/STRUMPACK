@@ -45,8 +45,7 @@ typedef enum {
  * \ingroup Enumerations
  */
 typedef enum {
-  STRUMPACK_MT,
-  STRUMPACK_MPI_DIST /*!< Modified Gram-Schmidt is slower, but stable.  jkhkjhkjhkj     */
+  STRUMPACK_MT, STRUMPACK_MPI_DIST
 } STRUMPACK_INTERFACE;
 
 typedef struct {

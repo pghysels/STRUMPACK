@@ -68,8 +68,8 @@ namespace strumpack {
       real_t _abs_tol = default_HSS_abs_tol<real_t>();
       int _leaf_size = 128;
       int _d0 = 128;
-      int _dd = 32;
-      int _q = 0;
+      int _dd = 64;
+      int _p = 10;
       int _max_rank = 5000;
       random::RandomEngine _random_engine =
         random::RandomEngine::LINEAR;
@@ -102,7 +102,7 @@ namespace strumpack {
       }
       void set_d0(int d0) { assert(d0 > 0); _d0 = d0; }
       void set_dd(int dd) { assert(dd > 0); _dd = dd; }
-      void set_q(int q) { assert(q >= 0); _q = q; }
+      void set_p(int p) { assert(p >= 0); _p = p; }
       void set_max_rank(int max_rank) {
         assert(max_rank > 0);
         _max_rank = max_rank;
@@ -131,7 +131,7 @@ namespace strumpack {
       int leaf_size() const { return _leaf_size; }
       int d0() const { return _d0; }
       int dd() const { return _dd; }
-      int q() const { return _q; }
+      int p() const { return _p; }
       int max_rank() const { return _max_rank; }
       random::RandomEngine random_engine() const { return _random_engine; }
       random::RandomDistribution random_distribution() const {
@@ -152,7 +152,7 @@ namespace strumpack {
           {"hss_leaf_size",             required_argument, 0, 3},
           {"hss_d0",                    required_argument, 0, 4},
           {"hss_dd",                    required_argument, 0, 5},
-          {"hss_q",                     required_argument, 0, 6},
+          {"hss_p",                     required_argument, 0, 6},
           {"hss_max_rank",              required_argument, 0, 7},
           {"hss_random_distribution",   required_argument, 0, 8},
           {"hss_random_engine",         required_argument, 0, 9},
@@ -195,8 +195,8 @@ namespace strumpack {
           } break;
           case 6: {
             std::istringstream iss(optarg);
-            iss >> _q;
-            set_q(_q);
+            iss >> _p;
+            set_p(_p);
           } break;
           case 7: {
             std::istringstream iss(optarg);
@@ -260,7 +260,7 @@ namespace strumpack {
                   << leaf_size() << ")" << std::endl
                   << "#   --hss_d0 int (default " << d0() << ")" << std::endl
                   << "#   --hss_dd int (default " << dd() << ")" << std::endl
-                  << "#   --hss_q int (default " << q() << ")" << std::endl
+                  << "#   --hss_p int (default " << p() << ")" << std::endl
                   << "#   --hss_max_rank int (default "
                   << max_rank() << ")" << std::endl
                   << "#   --hss_random_distribution normal|uniform (default "

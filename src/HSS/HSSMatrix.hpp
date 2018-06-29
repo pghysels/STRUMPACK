@@ -78,15 +78,6 @@ namespace strumpack {
       void compress(const DenseM_t& A, const opts_t& opts);
       void compress
       (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts);
-      void compress_original(const DenseM_t& A, const opts_t& opts);
-      void compress_original
-      (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts);
-      void compress_stable(const DenseM_t& A, const opts_t& opts);
-      void compress_stable
-      (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts);
-      void compress_hard_restart(const DenseM_t& A, const opts_t& opts);
-      void compress_hard_restart
-      (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts);
 
       void reset() override;
 
@@ -147,6 +138,16 @@ namespace strumpack {
       DenseM_t _D;
       DenseM_t _B01;
       DenseM_t _B10;
+
+      void compress_original(const DenseM_t& A, const opts_t& opts);
+      void compress_original
+      (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts);
+      void compress_stable(const DenseM_t& A, const opts_t& opts);
+      void compress_stable
+      (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts);
+      void compress_hard_restart(const DenseM_t& A, const opts_t& opts);
+      void compress_hard_restart
+      (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts);
 
       void compress_recursive_original
       (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
@@ -334,6 +335,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::compress(const DenseM_t& A, const opts_t& opts) {
+      TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_compress);
       switch (opts.compression_algorithm()) {
       case CompressionAlgorithm::ORIGINAL:
         compress_original(A, opts); break;
@@ -348,6 +350,7 @@ namespace strumpack {
 
     template<typename scalar_t> void HSSMatrix<scalar_t>::compress
     (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts) {
+      TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_compress);
       switch (opts.compression_algorithm()) {
       case CompressionAlgorithm::ORIGINAL:
         compress_original(Amult, Aelem, opts); break;
