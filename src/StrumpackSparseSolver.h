@@ -39,6 +39,11 @@ typedef enum {
   STRUMPACK_FLOATCOMPLEX_64, STRUMPACK_DOUBLECOMPLEX_64
 } STRUMPACK_PRECISION;
 
+/*!
+ * \enum uhyjhvg
+ * \brief Interface type
+ * \ingroup Enumerations
+ */
 typedef enum {
   STRUMPACK_MT, STRUMPACK_MPI_DIST
 } STRUMPACK_INTERFACE;

@@ -1,0 +1,7 @@
+/*! \page C_Interface C Interface
+
+
+The C interface is defined in the header file StrumpackSparseSolver.h and is very similar to the C++ interface. For example usage see the programs sexample.c, dexample.c, cexample.c and zexample.c in the examples/ directory, for simple single and double precision real and complex example programs. Note that since the STRUMPACK code is written in C++, even when using the C interface you should link with a C++ aware linker or link with the standard C++ library. For instance when using the GNU toolchain, link with g++ instead of gcc or link with gcc and include -lstdc++.
+
+
+*/

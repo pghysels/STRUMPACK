@@ -25,7 +25,7 @@
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
  */
-/*! \file StrumpackSparseOptions.hpp
+/*! \file StrumpackOptions.hpp
  * \brief Holds options for the sparse solver.
  */
 #ifndef SPOPTIONS_HPP
@@ -167,6 +167,8 @@ namespace strumpack {
   template<> inline float default_rel_tol() { return 1.e-4; }
   template<> inline float default_abs_tol() { return 1.e-6; }
 
+  /*! \brief Options for the sparse solver.
+   */
   template<typename scalar_t> class SPOptions {
     using real_t = typename RealType<scalar_t>::value_type;
 
@@ -211,14 +213,30 @@ namespace strumpack {
 
     void set_verbose(bool verbose) { _verbose = verbose; }
     void set_maxit(int maxit) { assert(maxit >= 1); _maxit = maxit; }
+    /*! \brief For Pieter to complete
+     *
+     * \param rel_tol
+     */
     void set_rel_tol(real_t rel_tol)
     { assert(rel_tol <= real_t(1.) && rel_tol >= real_t(0.));
       _rel_tol = rel_tol; }
     void set_abs_tol(real_t abs_tol)
     { assert(abs_tol >= real_t(0.));  _abs_tol = abs_tol; }
+    /*! \brief Select a Krylov solver
+     *
+     * \param s
+     */
     void set_Krylov_solver(KrylovSolver s) { _Krylov_solver = s; }
+      /*! \brief For Pieter to complete
+       *
+       * \param m
+       */
     void set_gmres_restart(int m) { assert(m >= 1); _gmres_restart = m; }
     void set_GramSchmidt_type(GramSchmidtType t) { _Gram_Schmidt_type = t; }
+      /*! \brief For Pieter to complete
+       *
+       * \param m
+       */
     void set_reordering_method(ReorderingStrategy m)
     { _reordering_method = m; }
     void set_nd_param(int nd_param)
@@ -241,14 +259,25 @@ namespace strumpack {
     void disable_MUMPS_SYMQAMD() { _use_MUMPS_SYMQAMD = false; }
     void enable_agg_amalg() { _use_agg_amalg = true; }
     void disable_agg_amalg() { _use_agg_amalg = false; }
+      /*! \brief For Pieter to complete
+       *
+       * \param job
+       */
     void set_matching(MatchingJob job) { _matching_job = job; }
     //void set_matching(int job) { _matching_job = get_matching(job); }
     void enable_assembly_tree_log() { _log_assembly_tree = true; }
     void disable_assembly_tree_log() { _log_assembly_tree = false; }
+    /*! \brief For Pieter to complete
+     */
     void enable_HSS() { _use_hss = true; }
+    /*! \brief For Pieter to complete
+     */
     void disable_HSS() { _use_hss = false; }
     void set_HSS_min_front_size(int s)
     { assert(_hss_min_front_size >= 0); _hss_min_front_size = s; }
+    /*! \brief For Pieter to complete
+     * \param s
+     */
     void set_HSS_min_sep_size(int s)
     { assert(_hss_min_sep_size >= 0); _hss_min_sep_size = s; }
     void set_separator_ordering_level(int l)
@@ -265,6 +294,9 @@ namespace strumpack {
     KrylovSolver Krylov_solver() const { return _Krylov_solver; }
     int gmres_restart() const { return _gmres_restart; }
     GramSchmidtType GramSchmidt_type() const { return _Gram_Schmidt_type; }
+    /*! \brief For Pieter to complete
+     *
+     */
     ReorderingStrategy reordering_method() const
     { return _reordering_method; }
     int nd_param() const { return _nd_param; }
@@ -277,10 +309,16 @@ namespace strumpack {
     bool use_METIS_NodeND() const { return !_use_METIS_NodeNDP; }
     bool use_MUMPS_SYMQAMD() const { return _use_MUMPS_SYMQAMD; }
     bool use_agg_amalg() const { return _use_agg_amalg; }
+      /*! \brief For Pieter to complete
+       */
     MatchingJob matching() const { return _matching_job; }
     bool log_assembly_tree() const { return _log_assembly_tree; }
+    /*! \brief For Pieter to complete
+     */
     bool use_HSS() const { return _use_hss; }
     int HSS_min_front_size() const { return _hss_min_front_size; }
+    /*! \brief For Pieter to complete
+     */
     int HSS_min_sep_size() const { return _hss_min_sep_size; }
     int separator_ordering_level() const { return _sep_order_level; }
     bool indirect_sampling() const { return _indirect_sampling; }
@@ -288,7 +326,11 @@ namespace strumpack {
 
     const HSS::HSSOptions<scalar_t>& HSS_options() const { return _hss_opts; }
     HSS::HSSOptions<scalar_t>& HSS_options() { return _hss_opts; }
-
+      /*! \brief For Pieter to complete
+       *
+       * \param argc
+       * \param argv
+       */
     void set_from_command_line() { set_from_command_line(_argc, _argv); }
     void set_from_command_line(int argc, char* argv[]) {
       std::vector<char*> argv_initial(argc);

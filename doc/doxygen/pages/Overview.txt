@@ -1,0 +1,27 @@
+/*! \mainpage Overview
+
+STRUMPACK – STRUctured Matrix PACKage – is a C++ library for computations with dense and sparse matrices. It uses so-called _structured matrices_, i.e., matrices that exhibit some kind of low-rank property, in this case with Hierarchically Semi-Separable matrices (HSS), to speed up linear algebra operations. This version of STRUMPACK unifies two main components that were separate in previous versions: a package for dense matrix computations (__STRUMPACK-dense__) and a package (__STRUMPACK-sparse__) for sparse linear systems. The algorithms for solving dense linear systems are described in \ref References "[7]" while the algorithms for solving sparse linear systems are described in \ref References "[5, 4]". STRUMPACK can be used as a general algebraic sparse direct solver (based on the multifrontal factorization method), or as an efficient preconditioner for sparse matrices obtained by discretization of partial differential equations. Included in STRUMPACK are also the GMRES and BiCGStab iterative Krylov solvers, that use the approximate, HSS-accelerated, sparse solver as a preconditioner for the efficient solution of sparse linear systems.
+
+The STRUMPACK project started at the Lawrence Berkeley National Laboratory in 2014 and is supported by the FASTMath SciDAC Institute funded by the Department of Energy and by the Exascale Computing Project (17-SC-20-SC), a collaborative effort of the U.S. Department of Energy Office of Science and the National Nuclear Security Administration. 
+
+Check the STRUMPACK website for more information and for the latest code:  
+http://portal.nersc.gov/project/sparse/strumpack/
+
+____
+
+###Table of Contents:
+
++ \link installation Installation and Requirements \endlink
++ \link algorithm Algorithm \endlink
++ \link sparse Using STRUMPACK Sparse \endlink
++ \link HSS_Preconditioning HSS Preconditioning \endlink
++ \link dense_matrices HSS Approximation of Dense Matrices \endlink
++ \link examples Examples \endlink
++ \link C_Interface C Interface \endlink
++ \link tips Advanced Usage Tips \endlink
++ \link FAQ FAQ \endlink
++ \link acknowledgements Acknowledgements \endlink
++ \link copyright Copyright Notice and License Agreement \endlink
++ \link References References\endlink
+
+*/

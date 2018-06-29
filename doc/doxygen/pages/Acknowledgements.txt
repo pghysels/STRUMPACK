@@ -1,0 +1,11 @@
+/*! \page acknowledgements Acknowledgements
+
+
+The new, more robust version of the adaptive randomized HSS compression algorithm was developed in collaboration with Theo Mary from the Université de Toulouse.
+
+The code for the STRUMPACK-sparse is based on the sequential code StruMF, originally developed by Artem Napov. We wish to thank people who sent us test problems and helped testing the code: Alex Druinsky, Yvan Notay and Shen Wang.
+
+Partial support for this work was provided through Scientific Discovery through Advanced Computing (SciDAC) program funded by U.S. Department of Energy, Office of Science, Advanced Scientific Computing Research (and Basic Energy Sciences/Biological and Environmental Research/High Energy Physics/Fusion Energy Sciences/Nuclear Physics). This research was supported by the Exascale Computing Project (17-SC- 20-SC), a collaborative effort of the U.S. Department of Energy Office of Science and the National Nuclear Security Administration.
+
+
+*/
