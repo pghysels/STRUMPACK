@@ -128,9 +128,6 @@ namespace strumpack {
       part_size[d] = width;
       auto sep_size = part_size[0]*part_size[1]*part_size[2];
       if (sep_size >= hss_data.minimum_separator) {
-        auto sep_size = part_size[0]*part_size[1]*part_size[2];
-        std::cout << "large front (dim_sep = " << sep_size << "), "
-                  << " generating HSS tree .." << std::endl;
         HSS::HSSPartitionTree t;
         recursive_bisection
           (perm, iperm, perm_begin, part_begin, part_size, ld, comps,
