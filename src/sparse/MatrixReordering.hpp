@@ -157,7 +157,8 @@ namespace strumpack {
         return 1;
       }
       sep_tree = geometric_nested_dissection
-        (nx, ny, nz, components, width, perm, iperm, opts.nd_param());
+        (nx, ny, nz, components, width, perm, iperm, opts.nd_param(),
+         opts.HSS_options().leaf_size(), opts.HSS_min_sep_size());
       // sep_tree = aggressive_amalgamation(A, perm, iperm, opts);
       // // auto n = nx*ny*nz*components;
       //sep_tree = build_sep_tree_from_perm
@@ -241,7 +242,8 @@ namespace strumpack {
           return 1;
         }
         sep_tree = geometric_nested_dissection
-          (nx, ny, nz, components, width, perm, iperm, opts.nd_param());
+          (nx, ny, nz, components, width, perm, iperm, opts.nd_param(),
+           opts.HSS_options().leaf_size(), opts.HSS_min_sep_size());
       } else {
         CSRMatrixMPI<scalar_t,integer_t> Ampi(A, comm, false);
         switch (opts.reordering_method()) {
@@ -287,6 +289,9 @@ namespace strumpack {
   MatrixReordering<scalar_t,integer_t>::separator_reordering
   (const SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
    bool verbose) {
+    if (opts.reordering_method() == ReorderingStrategy::GEOMETRIC)
+      return;
+
     auto N = A->size();
     auto sorder = new integer_t[N];
     std::fill(sorder, sorder+N, integer_t(0));
