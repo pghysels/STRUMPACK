@@ -47,7 +47,7 @@ namespace strumpack {
    std::array<integer_t,3> n0, std::array<integer_t,3> dims,
    std::array<integer_t,3> ld, int comps, int leaf_size,
    HSS::HSSPartitionTree& hss_tree) {
-    std::size_t sep_size = dims[0] * dims[1] * dims[2];
+    std::size_t sep_size = comps * dims[0]*dims[1]*dims[2];
     hss_tree.size = sep_size;
     if (sep_size <= std::size_t(leaf_size)) {
       for (integer_t z=n0[2]; z<n0[2]+dims[2]; z++)
@@ -126,12 +126,12 @@ namespace strumpack {
       // separator
       part_begin[d] = n0[d] + dims[d]/2  - (width/2);
       part_size[d] = width;
-      auto sep_size = part_size[0]*part_size[1]*part_size[2];
+      auto sep_size = comps * part_size[0]*part_size[1]*part_size[2];
       if (sep_size >= hss_data.minimum_separator) {
         HSS::HSSPartitionTree t;
         recursive_bisection
-          (perm, iperm, perm_begin, part_begin, part_size, ld, comps,
-           hss_data.leaf_size, t);
+          (perm, iperm, perm_begin, part_begin, part_size, ld,
+           comps, hss_data.leaf_size, t);
         hss_data.trees[nbsep] = t; // Not thread safe!!
       } else {
         for (integer_t z=part_begin[2]; z<part_begin[2]+part_size[2]; z++)
@@ -148,8 +148,8 @@ namespace strumpack {
       }
       if (nbsep)
         tree.emplace_back
-          (tree.back().sep_end + N/dims[d], -1, left_root_id, nbsep-1);
-      else tree.emplace_back(N/dims[d], -1, left_root_id, nbsep-1);
+          (tree.back().sep_end + sep_size, -1, left_root_id, nbsep-1);
+      else tree.emplace_back(sep_size, -1, left_root_id, nbsep-1);
       nbsep++;
     }
   }
