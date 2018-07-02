@@ -442,6 +442,8 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2dMPI.cpp
   ${CMAKE_BINARY_DIR}/examples/testPoisson2dMPI.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2dMPIDist.cpp
   ${CMAKE_BINARY_DIR}/examples/testPoisson2dMPIDist.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson3dMPIDist.cpp
+  ${CMAKE_BINARY_DIR}/examples/testPoisson3dMPIDist.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdouble.cpp
   ${CMAKE_BINARY_DIR}/examples/testMMdouble.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPI.cpp
