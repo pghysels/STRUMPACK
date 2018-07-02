@@ -35,14 +35,14 @@
 
 namespace strumpack {
 
-
   template<typename integer_t>
   std::pair<std::unique_ptr<SeparatorTree<integer_t>>,
             std::unique_ptr<SeparatorTree<integer_t>>>
   geometric_nested_dissection_dist
   (int nx, int ny, int nz, int components, int width,
    integer_t lo, integer_t hi, MPI_Comm comm,
-   integer_t* perm, integer_t* iperm, int nd_param) {
+   integer_t* perm, integer_t* iperm, int nd_param,
+   int HSS_leaf, int min_HSS) {
     assert(components == 1);
     assert(width == 1);
     auto P = mpi_nprocs(comm);
@@ -51,12 +51,14 @@ namespace strumpack {
     std::vector<Separator<integer_t>> dist_tree, local_tree;
     integer_t perm_begin = 0, dsep_leaf_id = 0;
     std::array<integer_t,3> ld = {{nx, ny, nz}};
+    std::unordered_map<integer_t,HSS::HSSPartitionTree> dist_HSS_trees;
+    std::unordered_map<integer_t,HSS::HSSPartitionTree> local_HSS_trees;
 
     std::function<
       void(std::array<integer_t,3>,std::array<integer_t,3>,integer_t)>
       rec_nd = [&](std::array<integer_t,3> n0, std::array<integer_t,3> dims,
                    integer_t dsep_id) {
-      auto N = dims[0]*dims[1]*dims[2];
+      auto N = components * dims[0]*dims[1]*dims[2];
       // d: dimension along which to split
       int d = std::distance
       (dims.begin(), std::max_element(dims.begin(), dims.end()));
@@ -64,14 +66,17 @@ namespace strumpack {
       bool dsep_leaf = dsep && dsep_id >= P;
       bool is_local = dsep_id >= P && dsep_leaf_id == rank;
 
-      if (dims[d] < 3 || N <= nd_param) {
+      if (dims[d] < 2+width || N <= nd_param) {
         for (integer_t z=n0[2]; z<n0[2]+dims[2]; z++)
           for (integer_t y=n0[1]; y<n0[1]+dims[1]; y++)
             for (integer_t x=n0[0]; x<n0[0]+dims[0]; x++) {
-              auto ind = x + y*ld[0] + z*ld[0]*ld[1];
-              perm[ind] = perm_begin;
-              iperm[perm_begin] = ind;
-              perm_begin++;
+              auto ind = components * (x + y*ld[0] + z*ld[0]*ld[1]);
+              for (int c=0; c<components; c++) {
+                perm[ind] = perm_begin;
+                iperm[perm_begin] = ind;
+                perm_begin++;
+                ind++;
+              }
             }
         if (dsep) {
           if (dist_nbsep)
@@ -90,14 +95,14 @@ namespace strumpack {
         // part 1/left
         std::array<integer_t,3> part_begin(n0);
         std::array<integer_t,3> part_size(dims);
-        part_size[d] = dims[d]/2;
+        part_size[d] = dims[d]/2 - (width/2);
         rec_nd(part_begin, part_size, 2*dsep_id);
         auto dist_left_root_id = dist_nbsep - 1;
         auto local_left_root_id = local_nbsep - 1;
 
         // part 2/right
         part_begin[d] = n0[d] + dims[d]/2 + 1;
-        part_size[d] = dims[d] - 1 - dims[d]/2;
+        part_size[d] = dims[d] - width - dims[d]/2;
         rec_nd(part_begin, part_size, 2*dsep_id+1);
         if (dsep && !dsep_leaf) {
           dist_tree[dist_left_root_id].pa = dist_nbsep;
@@ -109,16 +114,29 @@ namespace strumpack {
         }
 
         // separator
-        part_begin[d] = n0[d] + dims[d]/2;
-        part_size[d] = 1;
-        for (integer_t z=part_begin[2]; z<part_begin[2]+part_size[2]; z++)
-          for (integer_t y=part_begin[1]; y<part_begin[1]+part_size[1]; y++)
-            for (integer_t x=part_begin[0]; x<part_begin[0]+part_size[0]; x++) {
-              auto ind = x + y*ld[0] + z*ld[0]*ld[1];
-              perm[ind] = perm_begin;
-              iperm[perm_begin] = ind;
-              perm_begin++;
-            }
+        part_begin[d] = n0[d] + dims[d]/2  - (width/2);
+        part_size[d] = width;
+        auto sep_size = components * part_size[0]*part_size[1]*part_size[2];
+        if (sep_size >= min_HSS) {
+          HSS::HSSPartitionTree t;
+          recursive_bisection
+            (perm, iperm, perm_begin, part_begin, part_size, ld,
+             components, HSS_leaf, t);
+          if (is_local) local_HSS_trees[local_nbsep] = t; // Not thread safe!!
+          else dist_HSS_trees[dist_nbsep] = t; // Not thread safe!!
+        } else {
+          for (integer_t z=part_begin[2]; z<part_begin[2]+part_size[2]; z++)
+            for (integer_t y=part_begin[1]; y<part_begin[1]+part_size[1]; y++)
+              for (integer_t x=part_begin[0]; x<part_begin[0]+part_size[0]; x++) {
+                auto ind = components * (x + y*ld[0] + z*ld[0]*ld[1]);
+                for (int c=0; c<components; c++) {
+                  perm[ind] = perm_begin;
+                  iperm[perm_begin] = ind;
+                  perm_begin++;
+                  ind++;
+                }
+              }
+        }
 
         if (dsep) {
           if (dsep_leaf) {
@@ -130,21 +148,21 @@ namespace strumpack {
           } else {
             if (dist_nbsep)
               dist_tree.emplace_back
-                (dist_tree.back().sep_end + N/dims[d], -1,
+                (dist_tree.back().sep_end + sep_size, -1,
                  dist_left_root_id, dist_nbsep-1);
             else
               dist_tree.emplace_back
-                (N/dims[d], -1, dist_left_root_id, dist_nbsep-1);
+                (sep_size, -1, dist_left_root_id, dist_nbsep-1);
           }
           dist_nbsep++;
         }
         if (is_local) {
           if (local_nbsep)
             local_tree.emplace_back
-              (local_tree.back().sep_end + N/dims[d], -1,
+              (local_tree.back().sep_end + sep_size, -1,
                local_left_root_id, local_nbsep-1);
           else local_tree.emplace_back
-                 (N/dims[d], -1, local_left_root_id, local_nbsep-1);
+                 (sep_size, -1, local_left_root_id, local_nbsep-1);
           local_nbsep++;
         }
       }
@@ -152,12 +170,15 @@ namespace strumpack {
     };
 
     rec_nd({{0, 0, 0}}, {{nx, ny, nz}}, 1);
+    std::unique_ptr<SeparatorTree<integer_t>> local_stree
+      (new SeparatorTree<integer_t>(local_tree));
+    std::unique_ptr<SeparatorTree<integer_t>> dist_stree
+      (new SeparatorTree<integer_t>(dist_tree));
+    local_stree->HSS_trees() = local_HSS_trees;
+    dist_stree->HSS_trees() = dist_HSS_trees;
     return std::make_pair<std::unique_ptr<SeparatorTree<integer_t>>,
                           std::unique_ptr<SeparatorTree<integer_t>>>
-      (std::unique_ptr<SeparatorTree<integer_t>>
-       (new SeparatorTree<integer_t>(dist_tree)),
-       std::unique_ptr<SeparatorTree<integer_t>>
-       (new SeparatorTree<integer_t>(local_tree)));
+      (std::move(dist_stree), std::move(local_stree));
   }
 
 } // end namespace strumpack

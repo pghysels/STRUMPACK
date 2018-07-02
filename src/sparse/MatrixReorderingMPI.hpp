@@ -249,7 +249,8 @@ namespace strumpack {
         std::tie(this->sep_tree, local_sep_tree) =
           geometric_nested_dissection_dist
           (nx, ny, nz, components, width, A->begin_row(), A->end_row(),
-           _comm, this->perm, this->iperm, opts.nd_param());
+           _comm, this->perm, this->iperm, opts.nd_param(),
+           opts.HSS_options().leaf_size(), opts.HSS_min_sep_size());
         break;
       }
       case ReorderingStrategy::PARMETIS: {
@@ -291,6 +292,8 @@ namespace strumpack {
   MatrixReorderingMPI<scalar_t,integer_t>::separator_reordering
   (const SPOptions<scalar_t>& opts, CSRMatrixMPI<scalar_t,integer_t>* A,
    bool verbose) {
+    if (opts.reordering_method() == ReorderingStrategy::GEOMETRIC)
+      return;
     auto n = A->size();
     auto global_sep_order = new integer_t[n];
     for (integer_t i=0; i<n; i++) global_sep_order[i] = i;
@@ -312,6 +315,9 @@ namespace strumpack {
   MatrixReorderingMPI<scalar_t,integer_t>::separator_reordering
   (const SPOptions<scalar_t>& opts, CSRMatrixMPI<scalar_t,integer_t>* A,
    FrontalMatrix<scalar_t,integer_t>* F) {
+    if (opts.reordering_method() == ReorderingStrategy::GEOMETRIC)
+      return;
+
     auto N = A->size();
     auto sorder = new integer_t[N];
     std::fill(sorder, sorder+N, integer_t(0));
@@ -359,6 +365,8 @@ namespace strumpack {
       // this front (and its descendants) are not HSS
       if (dim_sep < opts.HSS_min_sep_size()) return;
       HSS::HSSPartitionTree tree(dim_sep);
+      // std::cout << "sep = " << sep
+      // << ", size = " << dim_sep << std::endl;
       if (dim_sep > 2 * opts.HSS_options().leaf_size()) {
         std::function<void(HSS::HSSPartitionTree&, integer_t&,
                            integer_t, integer_t)> split =
