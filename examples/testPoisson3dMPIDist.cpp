@@ -65,35 +65,35 @@ int main(int argc, char* argv[]) {
     spss.options().set_from_command_line(argc, argv);
 
     // TODO directly build the distributed sparse matrix
-    int n2 = n * n;
-    int N = n * n2;
-    int nnz = 7 * N - 6 * n2;
-    CSRMatrix<scalar,integer> A(N, nnz);
-    integer* col_ptr = A.get_ptr();
-    integer* row_ind = A.get_ind();
-    scalar* val = A.get_val();
+    CSRMatrix<scalar,integer> A;
+    if (!myrank) {
+      int n2 = n * n;
+      int N = n * n2;
+      int nnz = 7 * N - 6 * n2;
+      A = CSRMatrix<scalar,integer>(N, nnz);
+      integer* col_ptr = A.get_ptr();
+      integer* row_ind = A.get_ind();
+      scalar* val = A.get_val();
 
-    nnz = 0;
-    col_ptr[0] = 0;
-    for (integer xdim=0; xdim<n; xdim++)
-      for (integer ydim=0; ydim<n; ydim++)
-        for (integer zdim=0; zdim<n; zdim++) {
-          integer ind = zdim+ydim*n+xdim*n2;
-          val[nnz] = 6.0;
-          row_ind[nnz++] = ind;
-          if (zdim > 0)  { val[nnz] = -1.0; row_ind[nnz++] = ind-1; } // left
-          if (zdim < n-1){ val[nnz] = -1.0; row_ind[nnz++] = ind+1; } // right
-          if (ydim > 0)  { val[nnz] = -1.0; row_ind[nnz++] = ind-n; } // front
-          if (ydim < n-1){ val[nnz] = -1.0; row_ind[nnz++] = ind+n; } // back
-          if (xdim > 0)  { val[nnz] = -1.0; row_ind[nnz++] = ind-n2; } // up
-          if (xdim < n-1){ val[nnz] = -1.0; row_ind[nnz++] = ind+n2; } // down
-          col_ptr[ind+1] = nnz;
-        }
-    A.set_symm_sparse();
-
-    /** build distributed matrix from complete replicated original matrix ***/
-    /** TODO directly construct distributed matrix **************************/
-    CSRMatrixMPI<scalar,integer> Adist(&A, MPI_COMM_WORLD, false);
+      nnz = 0;
+      col_ptr[0] = 0;
+      for (integer xdim=0; xdim<n; xdim++)
+        for (integer ydim=0; ydim<n; ydim++)
+          for (integer zdim=0; zdim<n; zdim++) {
+            integer ind = zdim+ydim*n+xdim*n2;
+            val[nnz] = 6.0;
+            row_ind[nnz++] = ind;
+            if (zdim > 0)  { val[nnz] = -1.0; row_ind[nnz++] = ind-1; } // left
+            if (zdim < n-1){ val[nnz] = -1.0; row_ind[nnz++] = ind+1; } // right
+            if (ydim > 0)  { val[nnz] = -1.0; row_ind[nnz++] = ind-n; } // front
+            if (ydim < n-1){ val[nnz] = -1.0; row_ind[nnz++] = ind+n; } // back
+            if (xdim > 0)  { val[nnz] = -1.0; row_ind[nnz++] = ind-n2; } // up
+            if (xdim < n-1){ val[nnz] = -1.0; row_ind[nnz++] = ind+n2; } // down
+            col_ptr[ind+1] = nnz;
+          }
+      A.set_symm_sparse();
+    }
+    CSRMatrixMPI<scalar,integer> Adist(&A, MPI_COMM_WORLD, true);
     A = CSRMatrix<scalar,integer>();
 
     auto n_local = Adist.local_rows();
