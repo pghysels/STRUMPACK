@@ -916,7 +916,7 @@ namespace strumpack {
           auto fpar = static_cast<FMPI_t*>(front);
           _local_pfronts.emplace_back
             (front->sep_begin, front->sep_end, P0, P,
-             fpar->blacs_context(), fpar->np_rows(), fpar->np_cols());
+             fpar->ctxt(), fpar->nprows(), fpar->npcols());
         }
       }
     }
@@ -996,7 +996,7 @@ namespace strumpack {
           auto fpar = static_cast<FMPI_t*>(front);
           _local_pfronts.emplace_back
             (front->sep_begin, front->sep_end, P0, P,
-             fpar->blacs_context(), fpar->np_rows(), fpar->np_cols());
+             fpar->ctxt(), fpar->nprows(), fpar->npcols());
         }
       }
     }

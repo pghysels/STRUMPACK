@@ -52,8 +52,8 @@ namespace strumpack {
       const auto lrows = CB.lrows();
       const auto lcols = CB.lcols();
       const auto pa_sep = pa->dim_sep();
-      const auto prows = pa->proc_rows;
-      const auto pcols = pa->proc_cols;
+      const auto prows = pa->nprows();
+      const auto pcols = pa->npcols();
       const auto B = DistM_t::default_MB;
       // destination rank is:
       //  ((r / B) % prows) + ((c / B) % pcols) * prows
@@ -134,8 +134,8 @@ namespace strumpack {
       const std::size_t ds = pa->dim_sep();
       const auto pr = new int[CB.rows()+CB.cols()];
       const auto pc = pr + CB.rows();
-      const auto prows = pa->proc_rows;
-      const auto pcols = pa->proc_cols;
+      const auto prows = pa->nprows();
+      const auto pcols = pa->npcols();
       const auto B = DistM_t::default_MB;
       // destination rank is:
       //  ((r / B) % prows) + ((c / B) % pcols) * prows
@@ -241,8 +241,8 @@ namespace strumpack {
       const auto ch_upd = ch->upd;
       const auto pa_upd = pa->upd;
       const auto pa_sep = pa->sep_begin;
-      const auto prows = ch->proc_rows;
-      const auto pcols = ch->proc_cols;
+      const auto prows = ch->nprows();
+      const auto pcols = ch->npcols();
       const auto B = DistM_t::default_MB;
       // source rank is
       //  ((r / B) % prows) + ((c / B) % pcols) * prows
@@ -321,8 +321,8 @@ namespace strumpack {
       const auto lrows = CB.lrows();
       const auto lcols = CB.lcols();
       const auto pa_sep = pa->dim_sep();
-      const auto prows = pa->proc_rows;
-      const auto pcols = pa->proc_cols;
+      const auto prows = pa->nprows();
+      const auto pcols = pa->npcols();
       const auto B = DistM_t::default_MB;
       // destination rank is:
       //  ((r / B) % prows) + ((c / B) % pcols) * prows
@@ -367,8 +367,8 @@ namespace strumpack {
       const auto cols = CB.cols();
       const auto pr = new int[CB.rows()+cols];
       const auto pc = pr + CB.rows();
-      const auto prows = pa->proc_rows;
-      const auto pcols = pa->proc_cols;
+      const auto prows = pa->nprows();
+      const auto pcols = pa->npcols();
       const auto B = DistM_t::default_MB;
       // destination rank is:
       //  ((r / B) % prows) + ((c / B) % pcols) * prows
@@ -441,8 +441,8 @@ namespace strumpack {
       const auto ch_upd = ch->upd;
       const auto pa_upd = pa->upd;
       const auto pa_sep = pa->sep_begin;
-      const auto prows = ch->proc_rows;
-      const auto pcols = ch->proc_cols;
+      const auto prows = ch->nprows();
+      const auto pcols = ch->npcols();
       const auto B = DistM_t::default_MB;
       const auto lcols = b.lcols();
       // source rank is
@@ -491,8 +491,8 @@ namespace strumpack {
      const std::vector<std::size_t>& I) {
       if (!cSr.active()) return;
       assert(cSr.fixed() && cSc.fixed());
-      const auto prows = pa->proc_rows;
-      const auto pcols = pa->proc_cols;
+      const auto prows = pa->nprows();
+      const auto pcols = pa->npcols();
       const auto B = DistM_t::default_MB;
       const auto lrows = cSr.lrows();
       const auto lcols = cSr.lcols();
@@ -532,8 +532,8 @@ namespace strumpack {
       const auto pa_upd = pa->upd;
       const auto ch_upd = ch->upd;
       const auto ch_dim_upd = ch->dim_upd();
-      const auto prows = ch->proc_rows;
-      const auto pcols = ch->proc_cols;
+      const auto prows = ch->nprows();
+      const auto pcols = ch->npcols();
       const auto B = DistM_t::default_MB;
       auto lr = new int[2*lrows+lcols];
       auto srcr = lr + Sr.lrows();
@@ -631,8 +631,8 @@ namespace strumpack {
       const std::size_t pa_dim_sep = b.rows();
       const std::size_t ch_dim_upd = ch->dim_upd();
       const auto ch_master = pa->child_master(ch);
-      const auto prows = ch->proc_rows;
-      const auto pcols = ch->proc_cols;
+      const auto prows = ch->nprows();
+      const auto pcols = ch->npcols();
       const auto B = DistM_t::default_MB;
       const std::size_t blcols = b.lcols();
       const std::size_t blrows = b.lrows();
@@ -727,8 +727,8 @@ namespace strumpack {
      const FrontalMatrixMPI<scalar_t,integer_t>* pa,
      const FrontalMatrix<scalar_t,integer_t>* ch) {
       const auto I = ch->upd_to_parent(pa);
-      const auto prows = pa->proc_rows;
-      const auto pcols = pa->proc_cols;
+      const auto prows = pa->nprows();
+      const auto pcols = pa->npcols();
       const auto B = DistM_t::default_MB;
       const auto pa_dim_sep = pa->dim_sep();
       for (int c=0; c<CB.lcols(); c++) {
@@ -748,8 +748,8 @@ namespace strumpack {
      const FrontalMatrixMPI<scalar_t,integer_t>* pa,
      const FrontalMatrix<scalar_t,integer_t>* ch) {
       const auto I = ch->upd_to_parent(pa);
-      const auto prows = pa->proc_rows;
-      const auto pcols = pa->proc_cols;
+      const auto prows = pa->nprows();
+      const auto pcols = pa->npcols();
       const auto B = DistM_t::default_MB;
       const auto pa_dim_sep = pa->dim_sep();
       for (std::size_t c=0; c<CB.cols(); c++) {

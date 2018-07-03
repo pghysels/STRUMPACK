@@ -317,6 +317,7 @@ install(FILES
   src/dense/BLASLAPACKOpenMPTask.hpp
   src/dense/BLASLAPACKWrapper.hpp
   src/dense/ScaLAPACKWrapper.hpp
+  src/dense/BLACSGrid.hpp
   DESTINATION include/dense)
 
 install(FILES

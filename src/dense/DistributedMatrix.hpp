@@ -38,6 +38,7 @@
 #include "misc/TaskTimer.hpp"
 #include "DenseMatrix.hpp"
 #include "ScaLAPACKWrapper.hpp"
+#include "BLACSGrid.hpp"
 
 namespace strumpack {
 
@@ -52,6 +53,7 @@ namespace strumpack {
   indxg2p(int INDXGLOB, int NB, int IPROC, int ISRCPROC, int NPROCS)
   { return ( ISRCPROC + (INDXGLOB - 1) / NB ) % NPROCS; }
 
+
   template<typename scalar_t> class DistributedMatrix {
     using real_t = typename RealType<scalar_t>::value_type;
 
@@ -60,6 +62,8 @@ namespace strumpack {
     int _desc[9];
     int _lrows;
     int _lcols;
+
+    // store a BLACSGrid&/* instead??
     int _prows;
     int _pcols;
     int _prow;

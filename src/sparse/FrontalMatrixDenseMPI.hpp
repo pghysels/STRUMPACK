@@ -100,9 +100,9 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t>
   FrontalMatrixDenseMPI<scalar_t,integer_t>::FrontalMatrixDenseMPI
   (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-   std::vector<integer_t>& _upd, MPI_Comm _front_comm, int _total_procs)
+   std::vector<integer_t>& _upd, MPI_Comm front_comm, int total_procs)
     : FrontalMatrixMPI<scalar_t,integer_t>
-    (_sep, _sep_begin, _sep_end, _upd, _front_comm, _total_procs) {}
+    (_sep, _sep_begin, _sep_end, _upd, front_comm, total_procs) {}
 
   template<typename scalar_t,typename integer_t>
   FrontalMatrixDenseMPI<scalar_t,integer_t>::~FrontalMatrixDenseMPI() {
@@ -116,10 +116,9 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::extend_add() {
     if (!this->lchild && !this->rchild) return;
-    auto P = mpi_nprocs(this->front_comm);
-    std::vector<std::vector<scalar_t>> sbuf(P);
+    std::vector<std::vector<scalar_t>> sbuf(this->P());
     for (auto ch : {this->lchild, this->rchild}) {
-      if (ch && mpi_rank(this->front_comm) == 0) {
+      if (ch && mpi_rank(this->comm()) == 0) {
         STRUMPACK_FLOPS
           (static_cast<long long int>(ch->dim_upd())*ch->dim_upd());
       }
@@ -128,13 +127,13 @@ namespace strumpack {
         ExtAdd::extend_add_copy_to_buffers
           (ch_mpi->F22, sbuf, this, ch_mpi->upd_to_parent(this));
       } else if (auto ch_seq = dynamic_cast<FD_t*>(ch)) {
-        if (mpi_rank(this->front_comm) == this->child_master(ch))
+        if (mpi_rank(this->comm()) == this->child_master(ch))
           ExtAdd::extend_add_seq_copy_to_buffers
             (ch_seq->F22, sbuf, this, ch_seq);
       }
     }
     scalar_t *rbuf = nullptr, **pbuf = nullptr;
-    all_to_all_v(sbuf, rbuf, pbuf, this->front_comm);
+    all_to_all_v(sbuf, rbuf, pbuf, this->comm());
     for (auto ch : {this->lchild, this->rchild}) {
       if (auto ch_mpi = dynamic_cast<FDMPI_t*>(ch)) {
         ExtAdd::extend_add_copy_from_buffers
@@ -156,20 +155,20 @@ namespace strumpack {
     const auto dupd = this->dim_upd();
     const auto dsep = this->dim_sep();
     if (dsep) {
-      F11 = DistM_t(this->ctxt, dsep, dsep);
+      F11 = DistM_t(this->ctxt(), dsep, dsep);
       using ExtractFront = ExtractFront<scalar_t,integer_t>;
       ExtractFront::extract_F11(F11, A, this->sep_begin, dsep);
       if (this->dim_upd()) {
-        F12 = DistM_t(this->ctxt, dsep, dupd);
+        F12 = DistM_t(this->ctxt(), dsep, dupd);
         ExtractFront::extract_F12
           (F12, A, this->sep_begin, this->sep_end, this->upd);
-        F21 = DistM_t(this->ctxt, dupd, dsep);
+        F21 = DistM_t(this->ctxt(), dupd, dsep);
         ExtractFront::extract_F21
           (F21, A, this->sep_end, this->sep_begin, this->upd);
       }
     }
     if (dupd) {
-      F22 = DistM_t(this->ctxt, dupd, dupd);
+      F22 = DistM_t(this->ctxt(), dupd, dupd);
       F22.zero();
     }
     extend_add();
@@ -180,10 +179,10 @@ namespace strumpack {
     if (this->dim_sep() && F11.active()) {
 #if defined(WRITE_ROOT)
       if (etree_level == 0) {
-        if (!mpi_rank(this->front_comm))
+        if (!mpi_rank(this->comm()))
           std::cout << "Writing root node to file..." << std::endl;
         F11.MPI_binary_write();
-        if (!mpi_rank(this->front_comm))
+        if (!mpi_rank(this->comm()))
           std::cout << "Done. Early abort." << std::endl;
         MPI_Finalize();
         exit(0);
@@ -233,7 +232,7 @@ namespace strumpack {
       this->rchild->forward_multifrontal_solve
         (bloc, bdist, CBr, seqCBr, etree_level);
     DistM_t& b = bdist[this->sep];
-    bupd = DistM_t(this->ctxt, this->dim_upd(), b.cols());
+    bupd = DistM_t(this->ctxt(), this->dim_upd(), b.cols());
     bupd.zero();
     this->extend_add_b(b, bupd, CBl, CBr, seqCBl, seqCBr);
     if (this->dim_sep()) {
@@ -289,15 +288,14 @@ namespace strumpack {
   FrontalMatrixDenseMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
   (const std::vector<std::size_t>& I,
    const std::vector<std::size_t>& J, DistM_t& B) const {
-    if (this->front_comm == MPI_COMM_NULL) return;
+    if (this->comm() == MPI_COMM_NULL) return;
     std::vector<std::size_t> lJ, oJ, lI, oI;
     this->find_upd_indices(J, lJ, oJ);
     this->find_upd_indices(I, lI, oI);
-    auto P = mpi_nprocs(this->front_comm);
-    std::vector<std::vector<scalar_t>> sbuf(P);
+    std::vector<std::vector<scalar_t>> sbuf(this->P());
     ExtAdd::extract_copy_to_buffers(F22, lI, lJ, oI, oJ, B, sbuf);
     scalar_t *rbuf = nullptr, **pbuf = nullptr;
-    all_to_all_v(sbuf, rbuf, pbuf, this->front_comm);
+    all_to_all_v(sbuf, rbuf, pbuf, this->comm());
     ExtAdd::extract_copy_from_buffers(B, lI, lJ, oI, oJ, F22, pbuf);
     delete[] rbuf;
     delete[] pbuf;
@@ -313,8 +311,8 @@ namespace strumpack {
    FrontalMatrix<scalar_t,integer_t>* pa) const {
     if (F11.active() || F22.active()) {
       auto b = R.cols();
-      Sr = DistM_t(this->ctxt, this->dim_upd(), b);
-      Sc = DistM_t(this->ctxt, this->dim_upd(), b);
+      Sr = DistM_t(this->ctxt(), this->dim_upd(), b);
+      Sc = DistM_t(this->ctxt(), this->dim_upd(), b);
       gemm(Trans::N, Trans::N, scalar_t(1.), F22, R, scalar_t(0.), Sr);
       gemm(Trans::C, Trans::N, scalar_t(1.), F22, R, scalar_t(0.), Sc);
       STRUMPACK_CB_SAMPLE_FLOPS

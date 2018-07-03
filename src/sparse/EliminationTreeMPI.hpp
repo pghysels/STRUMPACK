@@ -320,9 +320,9 @@ namespace strumpack {
             (_active_pfronts, sep_begin, sep_end, upd[sep], front_comm, P);
         if (_rank >= P0 && _rank < P0+P) _active_pfronts++;
       } else mpi_free_comm(&front_comm);
-      int ctxt = front ? static_cast<FMPI_t*>(front)->blacs_context() : -1;
+      int ctxt = front ? static_cast<FMPI_t*>(front)->ctxt() : -1;
       int ctxt_all = front ?
-        static_cast<FMPI_t*>(front)->blacs_context_all() : -1;
+        static_cast<FMPI_t*>(front)->ctxt_all() : -1;
       _parallel_fronts.emplace_back
         (sep_begin, sep_end-sep_begin, P0, P, ctxt, ctxt_all);
     }

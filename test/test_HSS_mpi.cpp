@@ -42,7 +42,6 @@ using namespace strumpack::HSS;
 int run(int argc, char* argv[]) {
   int m = 150;
   int n = 1;
-  auto P = mpi_nprocs(MPI_COMM_WORLD);
 
   HSSOptions<double> hss_opts;
   hss_opts.set_verbose(false);
@@ -63,15 +62,11 @@ int run(int argc, char* argv[]) {
     exit(1);
   };
 
-  // initialize the BLACS grid
-  int npcol = floor(sqrt((float)P));
-  int nprow = P / npcol;
-  int ctxt, dummy, prow, pcol;
-  scalapack::Cblacs_get(0, 0, &ctxt);
-  scalapack::Cblacs_gridinit(&ctxt, "C", nprow, npcol);
-  scalapack::Cblacs_gridinfo(ctxt, &dummy, &dummy, &prow, &pcol);
-  int ctxt_all = scalapack::Csys2blacs_handle(MPI_COMM_WORLD);
-  scalapack::Cblacs_gridinit(&ctxt_all, "R", 1, P);
+  BLACSGrid grid(MPI_COMM_WORLD);
+  int ctxt = grid.ctxt();
+  int ctxt_all = grid.ctxt_all();
+  int nprow = grid.nprows();
+  int npcol = grid.npcols();
 
   DistributedMatrix<double> A;
 
