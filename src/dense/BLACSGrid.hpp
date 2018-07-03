@@ -35,7 +35,6 @@ namespace strumpack {
   class BLACSGrid {
   public:
     BLACSGrid(MPI_Comm comm) : BLACSGrid(comm, mpi_nprocs(comm)) { }
-    BLACSGrid(int P) : BLACSGrid(MPI_COMM_NULL, P) {}
     BLACSGrid(MPI_Comm comm, int P) : P_(P) {
       // why floor, why not nearest??
       npcols_ = std::floor(std::sqrt((float)P_));
