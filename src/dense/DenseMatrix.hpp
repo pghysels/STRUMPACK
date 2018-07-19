@@ -996,6 +996,18 @@ namespace strumpack {
        x.data(), 1, beta, y.data(), 1, depth);
   }
 
+  // Jonas
+  template<typename scalar_t> std::vector<int> DenseMatrix<scalar_t>::sytrf(UpLo s) {
+    std::vector<int> IPIV(rows());
+    blas::sytrf(char(s), rows(), data(), ld(), IPIV.data(), work, lwork, info); // need work, lwork, info
+    return IPIV;
+  }
+
+  template<typename scalar_t> void sytrs(UpLo s, const DenseMatrix<scalar_t>& a, const std::vector<int>& IPIV, const DenseMatrix<scalar_t>& b){
+    blas::sytrs(char(s), a.rows(), b.cols(), a.data(), a.ld(), IPIV, b.data(), b.ld(), info); // need info
+  }
+  // end Jonas
+
   template<typename scalar_t> long long int
   LU_flops(const DenseMatrix<scalar_t>& a) {
     return (is_complex<scalar_t>() ? 4:1) *
