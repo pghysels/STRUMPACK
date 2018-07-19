@@ -37,6 +37,13 @@ elseif(COMPILER_SUPPORTS_CXX0X)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
 endif()
 
+set(LIBS ${LIBS} "-L$ENV{PETSC_DIR}/$ENV{PETSC_ARCH}/lib -lpetsc")
+set(LIBS ${LIBS} "-L$ENV{SLEPC_DIR}/$ENV{PETSC_ARCH}/lib -lslepc")
+include_directories("$ENV{PETSC_DIR}/include")
+include_directories("$ENV{SLEPC_DIR}/include")
+include_directories("$ENV{PETSC_DIR}/$ENV{PETSC_ARCH}/include")
+include_directories("$ENV{SLEPC_DIR}/$ENV{PETSC_ARCH}/include")
+
 find_package(MPI REQUIRED)
 if(MPI_C_FOUND)
   message(STATUS "Found C mpi compiler:       " "${MPI_C_COMPILER}")
@@ -356,7 +363,23 @@ install(FILES
   src/sparse/ExtendAdd.hpp
   src/sparse/SeparatorTree.hpp
   src/sparse/mumps_symqamd.hpp
+  src/sparse/ProjectNDOrdering.hpp
   DESTINATION include/sparse)
+
+install(FILES
+  src/sparse/projectnd/BLASLAPACKWrapper.hpp
+  src/sparse/projectnd/Graph.hpp
+  src/sparse/projectnd/LanczosFiedlerSolver.hpp
+  src/sparse/projectnd/LOBPCGFiedlerSolver.hpp
+  src/sparse/projectnd/LOBPCGSolver.hpp
+  src/sparse/projectnd/MultilevelSolver.hpp
+  src/sparse/projectnd/NDOptions.hpp
+  src/sparse/projectnd/PipeLanczosFiedlerSolver.hpp
+  src/sparse/projectnd/PPt.hpp
+  src/sparse/projectnd/SLEPcFiedlerSolver.hpp
+  src/sparse/projectnd/SpectralReordering.hpp
+  DESTINATION include/sparse/projectnd)
+
 
 if(STRUMPACK_USE_COMBBLAS)
   install(FILES src/sparse/AWPMCombBLAS.hpp DESTINATION include/sparse)
@@ -413,7 +436,7 @@ endif()
 
 # build an example makefile
 configure_file(${CMAKE_SOURCE_DIR}/examples/Makefile.in
-  ${CMAKE_SOURCE_DIR}/examples/Makefile)
+  ${CMAKE_SOURCE_DIR}/examples/Makefile @ONLY)
 
 # copy the examples and Makefile to the build directory as well
 configure_file(${CMAKE_SOURCE_DIR}/examples/Makefile
