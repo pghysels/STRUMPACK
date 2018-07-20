@@ -104,7 +104,7 @@ namespace strumpack {
 
       if (isroot) {
       // LDL(Dt) for what is remaining
-      auto IPIV = Dt.sytrf(UpLo::L);
+      auto IPIV = Dt.sytrf();
       readInertiaOffBlockDiag(in, Dt, IPIV);
 
       } else {
@@ -143,7 +143,7 @@ namespace strumpack {
       DenseM_t D21 = D12.transpose();
 
       // LDL(Db(1:rtop, 1:rtop)), then form S = D22 - D21 inv(D11) D12 with inv(D11) using LDL
-      auto IPIV = D11.sytrf(UpLo::L);
+      auto IPIV = D11.sytrf();
       readInertiaOffBlockDiag(in, D11, IPIV);
       sytrs(UpLo::L, D11, IPIV, D12);
       gemm(Trans::N, Trans::N, scalar_t(-1.), D21, D12, scalar_t(1.), D22);

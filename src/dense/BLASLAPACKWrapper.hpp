@@ -738,6 +738,33 @@ namespace strumpack {
         (char* jobu, char* jobvt, int* m, int* n, double* a, int* lda,
          double* s, double* u, int* ldu, double* vt, int* ldvt,
          double* work, int* lwork, int* info);
+
+      void FC_GLOBAL(ssytrf,SSYTRF)
+         (char* s, int* n, float* a, int*lda, int* ipiv, float* work,
+            int* lwork, int* info);
+      void FC_GLOBAL(dsytrf,DSYTRF)
+         (char* s, int* n, double* a, int*lda, int* ipiv, double* work,
+            int* lwork, int* info);
+      void FC_GLOBAL(csytrf,CSYTRF)
+         (char* s, int* n, std::complex<float>* a, int*lda, int* ipiv,
+            std::complex<float>* work, int* lwork, int* info);
+      void FC_GLOBAL(zsytrf,ZSYTRF)
+         (char* s, int* n, std::complex<double>* a, int*lda, int* ipiv,
+            std::complex<double>* work, int* lwork, int* info);
+
+      void FC_GLOBAL(ssytrs,SSYTRS)
+         (char* s, int* n, int* nrhs, float* a, int* lda, int* ipiv,
+            float* b, int* ldb, int* info);
+      void FC_GLOBAL(dsytrs,DSYTRS)
+         (char* s, int* n, int* nrhs, double* a, int* lda, int* ipiv,
+            double* b, int* ldb, int* info);
+      void FC_GLOBAL(csytrs,CSYTRS)
+         (char* s, int* n, int* nrhs, std::complex<float>* a, int* lda,
+            int* ipiv, std::complex<float>* b, int* ldb, int* info);
+      void FC_GLOBAL(zsytrs,ZSYTRS)
+         (char* s, int* n, int* nrhs, std::complex<double>* a, int* lda,
+            int* ipiv, std::complex<double>* b, int* ldb, int* info);
+
     }
 
     inline int ilaenv
@@ -2079,29 +2106,29 @@ namespace strumpack {
          return 2*m*n*k;
       }
     inline void sytrs
-    (char s, int n, int nrhs, const float* a, int lda,
-     const int* ipiv, float* b, int ldb, int* info) {
+    (char s, int n, int nrhs, float* a, int lda,
+     int* ipiv, float* b, int ldb, int* info) {
      FC_GLOBAL(ssytrs,SSYTRS)
        (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, info);
      STRUMPACK_FLOPS(sytrs_flops(n,n,nrhs));
    }
     inline void sytrs
-    (char s, int n, int nrhs, const double* a, int lda,
-     const int* ipiv, double* b, int ldb, int* info) {
+    (char s, int n, int nrhs, double* a, int lda,
+     int* ipiv, double* b, int ldb, int* info) {
      FC_GLOBAL(dsytrs,DSYTRS)
        (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, info);
      STRUMPACK_FLOPS(sytrs_flops(n,n,nrhs));
    }
     inline void sytrs
-    (char s, int n, int nrhs, const std::complex<float>* a, int lda,
-     const int* ipiv, std::complex<float>* b, int ldb, int* info) {
+    (char s, int n, int nrhs, std::complex<float>* a, int lda,
+     int* ipiv, std::complex<float>* b, int ldb, int* info) {
      FC_GLOBAL(csytrs,CSYTRS)
        (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, info);
      STRUMPACK_FLOPS(4*sytrs_flops(n,n,nrhs));
    }
     inline void sytrs
-    (char s, int n, int nrhs, const std::complex<double>* a, int lda,
-     const int* ipiv, std::complex<double>* b, int ldb, int* info) {
+    (char s, int n, int nrhs, std::complex<double>* a, int lda,
+     int* ipiv, std::complex<double>* b, int ldb, int* info) {
      FC_GLOBAL(zsytrs,ZSYTRS)
        (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, info);
      STRUMPACK_FLOPS(4*sytrs_flops(n,n,nrhs));

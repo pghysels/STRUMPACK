@@ -160,6 +160,10 @@ namespace strumpack {
      int max_rank, int depth) const;
     std::vector<scalar_t> singular_values() const;
 
+    std::vector<int> sytrf();
+    void sytrs(UpLo s, const DenseMatrix<scalar_t>& a,
+       const std::vector<int>& IPIV, const DenseMatrix<scalar_t>& b);
+
     void shift(scalar_t sigma);
 
   private:
@@ -997,10 +1001,10 @@ namespace strumpack {
   }
 
   // Jonas
-  template<typename scalar_t> std::vector<int> DenseMatrix<scalar_t>::sytrf(UpLo s) {
+  template<typename scalar_t> std::vector<int> DenseMatrix<scalar_t>::sytrf() {
     std::vector<int> IPIV(rows());
     int info;
-    blas::sytrf(char(s), rows(), data(), ld(), IPIV.data(), &info);
+    blas::sytrf(UpLo::L, rows(), data(), ld(), IPIV.data(), &info);
     return IPIV;
   }
 

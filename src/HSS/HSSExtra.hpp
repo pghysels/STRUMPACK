@@ -104,7 +104,7 @@ namespace strumpack {
     public:
       std::vector<WorkInertia<scalar_t>> c;
       DenseMatrix<scalar_t> S; // Schur complement of what's left from LDL, to pass up the HSS tree
-    }
+    };
 
     template<typename scalar_t> class HSSInertia{
     public:
@@ -115,8 +115,7 @@ namespace strumpack {
       unsigned int np;
       unsigned int nn;
       unsigned int nz;
-
-    }
+    };
     // end Jonas
 
     template<typename scalar_t> class WorkFactor {
