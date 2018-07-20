@@ -366,6 +366,7 @@ install(FILES src/HSS/HSSMatrix.hpp
   src/HSS/HSSMatrix.compress.hpp
   src/HSS/HSSMatrix.compress_stable.hpp
   src/HSS/HSSMatrix.extract.hpp
+  src/HSS/HSSMatrix.inertia.hpp
   src/HSS/HSSBasisID.hpp
   src/HSS/HSSMatrix.Schur.hpp
   src/HSS/HSSMatrix.apply.hpp
