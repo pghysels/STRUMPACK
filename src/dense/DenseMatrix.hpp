@@ -999,12 +999,14 @@ namespace strumpack {
   // Jonas
   template<typename scalar_t> std::vector<int> DenseMatrix<scalar_t>::sytrf(UpLo s) {
     std::vector<int> IPIV(rows());
-    blas::sytrf(char(s), rows(), data(), ld(), IPIV.data(), work, lwork, info); // need work, lwork, info
+    int info;
+    blas::sytrf(char(s), rows(), data(), ld(), IPIV.data(), &info);
     return IPIV;
   }
 
   template<typename scalar_t> void sytrs(UpLo s, const DenseMatrix<scalar_t>& a, const std::vector<int>& IPIV, const DenseMatrix<scalar_t>& b){
-    blas::sytrs(char(s), a.rows(), b.cols(), a.data(), a.ld(), IPIV, b.data(), b.ld(), info); // need info
+    int info;
+    blas::sytrs(char(s), a.rows(), b.cols(), a.data(), a.ld(), IPIV.data(), b.data(), b.ld(), &info);
   }
   // end Jonas
 

@@ -104,7 +104,7 @@ namespace strumpack {
 
       if (isroot) {
       // LDL(Dt) for what is remaining
-      sytrf(UpLo::L, Dt, IPIV); // need to do something about work, lwork, and info
+      auto IPIV = Dt.sytrf(UpLo::L);
       readInertiaOffBlockDiag(in, Dt, IPIV);
 
       } else {
@@ -114,8 +114,14 @@ namespace strumpack {
       auto E_cols = _U.cols();
 
       // Dt <-- P' * Dt * P
-      Dt.lapmt(_U.P, false);
-      Dt.lapmr(_U.P, true);
+      ////// Dt <-- P' * Dt
+      Dt.laswp(_U.P, true);
+      ////// Dt <-- Dt * P = (P' * Dt')';
+      Dt = Dt.transpose();
+      Dt.laswp(_U.P, true);
+      Dt = Dt.transpose();
+      // Dt.lapmt(_U.P, false); // I don't think the P permutation works with lapmt nor with lapmr
+      // Dt.lapmr(_U.P, true);
 
       //      Dt        <--      Omega    *      Dt     *   Omega'         (permutation included in above step)
       // [ D11  D12 ]  ----   [ -E  Irr ] . [ C11 C12 ] . [ -E'  Icc ]

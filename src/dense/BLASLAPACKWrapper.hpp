@@ -2032,6 +2032,83 @@ namespace strumpack {
       return 0;
     }
 
+// Jonas
+    inline long long sytrf_flops(long long n) {
+         return n * n * n / 3;
+    }
+    inline void sytrf
+        (char s, int n, float* a, int lda, int* ipiv, float* work,
+           int lwork, int* info){
+        FC_GLOBAL(ssytrf,SSYTRF)
+        ( &s, &n, a, &lda, ipiv, work, &lwork, info);
+      STRUMPACK_FLOPS(sytrf_flops(n));
+    }
+    inline void sytrf
+        (char s, int n, double* a, int lda, int* ipiv, double* work,
+           int lwork, int* info){
+        FC_GLOBAL(dsytrf,DSYTRF)
+        ( &s, &n, a, &lda, ipiv, work, &lwork, info);
+      STRUMPACK_FLOPS(sytrf_flops(n));
+    }
+    inline void sytrf
+        (char s, int n, std::complex<float>* a, int lda, int* ipiv, std::complex<float>* work,
+           int lwork, int* info){
+        FC_GLOBAL(csytrf,CSYTRF)
+        ( &s, &n, a, &lda, ipiv, work, &lwork, info);
+      STRUMPACK_FLOPS(4*sytrf_flops(n));
+    }
+    inline void sytrf
+        (char s, int n, std::complex<double>* a, int lda, int* ipiv, std::complex<double>* work,
+           int lwork, int* info){
+        FC_GLOBAL(zsytrf,ZSYTRF)
+        ( &s, &n, a, &lda, ipiv, work, &lwork, info);
+      STRUMPACK_FLOPS(4*sytrf_flops(n));
+    }
+    template<typename scalar> inline void sytrf
+    (char s, int n, scalar* a, int lda, int* ipiv, int* info){
+      scalar lwork;
+      sytrf( s, n, a, lda, ipiv, &lwork, -1, info);
+      int ilwork = int(std::real(lwork));
+      scalar* work = new scalar[ilwork];
+      sytrf( s, n, a, lda, ipiv, work, ilwork, info);
+      delete[] work;
+    }
+
+
+    inline long long sytrs_flops(long long m, long long n, long long k) {
+         return 2*m*n*k;
+      }
+    inline void sytrs
+    (char s, int n, int nrhs, const float* a, int lda,
+     const int* ipiv, float* b, int ldb, int* info) {
+     FC_GLOBAL(ssytrs,SSYTRS)
+       (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, info);
+     STRUMPACK_FLOPS(sytrs_flops(n,n,nrhs));
+   }
+    inline void sytrs
+    (char s, int n, int nrhs, const double* a, int lda,
+     const int* ipiv, double* b, int ldb, int* info) {
+     FC_GLOBAL(dsytrs,DSYTRS)
+       (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, info);
+     STRUMPACK_FLOPS(sytrs_flops(n,n,nrhs));
+   }
+    inline void sytrs
+    (char s, int n, int nrhs, const std::complex<float>* a, int lda,
+     const int* ipiv, std::complex<float>* b, int ldb, int* info) {
+     FC_GLOBAL(csytrs,CSYTRS)
+       (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, info);
+     STRUMPACK_FLOPS(4*sytrs_flops(n,n,nrhs));
+   }
+    inline void sytrs
+    (char s, int n, int nrhs, const std::complex<double>* a, int lda,
+     const int* ipiv, std::complex<double>* b, int ldb, int* info) {
+     FC_GLOBAL(zsytrs,ZSYTRS)
+       (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, info);
+     STRUMPACK_FLOPS(4*sytrs_flops(n,n,nrhs));
+   }
+
+  // end Jonas
+
   } //end namespace blas
 } // end namespace strumpack
 
