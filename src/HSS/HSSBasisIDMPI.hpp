@@ -1,3 +1,30 @@
+/*
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
+ *
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
+ *
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly.  Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government is granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
+ *
+ * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
+ *             (Lawrence Berkeley National Lab, Computational Research
+ *             Division).
+ */
 #ifndef HSS_BASIS_ID_MPI_HPP
 #define HSS_BASIS_ID_MPI_HPP
 
@@ -42,7 +69,7 @@ namespace strumpack {
       void applyC(const DistM_t& b, DistM_t& c) const;
 
       DistM_t extract_rows
-      (const std::vector<std::size_t>& I, MPI_Comm comm) const;
+      (const std::vector<std::size_t>& I) const;
 
       long long int apply_flops(std::size_t nrhs) const;
       long long int applyC_flops(std::size_t nrhs) const;
@@ -65,21 +92,20 @@ namespace strumpack {
 
     template<typename scalar_t> DistributedMatrix<scalar_t>
     HSSBasisIDMPI<scalar_t>::dense() const {
-      DistM_t ret(E().ctxt(), rows(), cols());
+      DistM_t ret(E().grid(), rows(), cols());
       ret.eye();
-      copy(rows()-cols(), cols(), E(), 0, 0, ret, cols(), 0, E().ctxt());
+      copy(rows()-cols(), cols(), E(), 0, 0, ret, cols(), 0, E().grid());
       ret.laswp(P(), false);
       return ret;
     }
 
     template<typename scalar_t> DistributedMatrix<scalar_t>
     HSSBasisIDMPI<scalar_t>::apply(const DistM_t& b) const {
-      assert(E().ctxt()==b.ctxt());
       if (!b.active() || !rows() || !b.cols())
-        return DistM_t(b.ctxt(), rows(), b.cols());
-      DistM_t c(b.ctxt(), rows(), b.cols());
+        return DistM_t(b.grid(), rows(), b.cols());
+      DistM_t c(b.grid(), rows(), b.cols());
       // TODO just a local copy!!
-      copy(cols(), b.cols(), b, 0, 0, c, 0, 0, b.ctxt());
+      copy(cols(), b.cols(), b, 0, 0, c, 0, 0, b.grid());
       DistributedMatrixWrapper<scalar_t>
         tmpC(E().rows(), b.cols(), c, cols(), 0);
       if (E().rows())
@@ -90,10 +116,9 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSBasisIDMPI<scalar_t>::apply(const DistM_t& b, DistM_t& c) const {
-      assert(E().ctxt()==b.ctxt());
       if (!b.active() || !rows() || !b.cols()) return;
       // TODO just a local copy!!
-      copy(cols(), b.cols(), b, 0, 0, c, 0, 0, b.ctxt());
+      copy(cols(), b.cols(), b, 0, 0, c, 0, 0, b.grid());
       DistributedMatrixWrapper<scalar_t>
         tmpC(E().rows(), b.cols(), c, cols(), 0);
       if (E().rows())
@@ -103,15 +128,14 @@ namespace strumpack {
 
     template<typename scalar_t> DistributedMatrix<scalar_t>
     HSSBasisIDMPI<scalar_t>::applyC(const DistM_t& b) const {
-      assert(E().ctxt()==b.ctxt());
       if (!b.active() || !cols() || !b.cols())
-        return DistM_t(b.ctxt(), E().cols(), b.cols());
+        return DistM_t(b.grid(), E().cols(), b.cols());
       assert(b.rows() == int(rows()));
       DistM_t PtB(b);
       PtB.laswp(P(), true);
       if (!E().rows()) return PtB;
-      DistM_t c(b.ctxt(), cols(), b.cols());
-      copy(cols(), b.cols(), PtB, 0, 0, c, 0, 0, b.ctxt());
+      DistM_t c(b.grid(), cols(), b.cols());
+      copy(cols(), b.cols(), PtB, 0, 0, c, 0, 0, b.grid());
       auto tmpPtB = ConstDistributedMatrixWrapperPtr
         (E().rows(), b.cols(), PtB, cols(), 0);
       gemm(Trans::C, Trans::N, scalar_t(1.), E(), *tmpPtB, scalar_t(1.), c);
@@ -120,18 +144,17 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSBasisIDMPI<scalar_t>::applyC(const DistM_t& b, DistM_t& c) const {
-      assert(E().ctxt()==b.ctxt());
       if (!b.active() || !cols() || !b.cols()) return;
       assert(b.cols() == c.cols());
       assert(b.rows() == int(rows()));
       assert(c.rows() == int(cols()));
       if (!E().rows()) {
-        copy(b.rows(), b.cols(), b, 0, 0, c, 0, 0, b.ctxt());
+        copy(b.rows(), b.cols(), b, 0, 0, c, 0, 0, b.grid());
         c.laswp(P(), true);
       } else {
         DistM_t PtB(b);
         PtB.laswp(P(), true);
-        copy(cols(), b.cols(), PtB, 0, 0, c, 0, 0, b.ctxt());
+        copy(cols(), b.cols(), PtB, 0, 0, c, 0, 0, b.grid());
         if (!E().rows()) return;
         auto tmpPtB = ConstDistributedMatrixWrapperPtr
           (E().rows(), b.cols(), PtB, cols(), 0);
@@ -141,9 +164,9 @@ namespace strumpack {
 
     template<typename scalar_t> DistributedMatrix<scalar_t>
     HSSBasisIDMPI<scalar_t>::extract_rows
-    (const std::vector<std::size_t>& I, MPI_Comm comm) const {
+    (const std::vector<std::size_t>& I) const {
       // TODO implement this without explicitly forming the dense basis matrix
-      return dense().extract_rows(I, comm);
+      return dense().extract_rows(I);
     }
 
     template<typename scalar_t> long long int

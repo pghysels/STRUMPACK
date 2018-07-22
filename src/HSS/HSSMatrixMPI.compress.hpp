@@ -38,8 +38,10 @@ namespace strumpack {
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::redistribute_to_tree_to_buffers
     (const DistM_t& A, std::size_t Arlo, std::size_t Aclo,
-     int Actxt_all, std::vector<std::vector<scalar_t>>& sbuf, int dest) {
+     std::vector<std::vector<scalar_t>>& sbuf, int dest) {
       if (!A.active()) return;
+      const auto nprows = grid()->nprows();
+      const auto npcols = grid()->npcols();
       if (this->leaf()) {
         const auto B = DistM_t::default_MB;
         const DistMW_t Ad
@@ -51,9 +53,9 @@ namespace strumpack {
         std::vector<int> destr(rhi-rlo);
         std::vector<int> destc(chi-clo);
         for (int r=rlo; r<rhi; r++)
-          destr[r-rlo] = dest + (Ad.rowl2g_fixed(r) / B) % _prows;
+          destr[r-rlo] = dest + (Ad.rowl2g_fixed(r) / B) % nprows;
         for (int c=clo; c<chi; c++)
-          destc[c-clo] = ((Ad.coll2g_fixed(c) / B) % _pcols) * _prows;
+          destc[c-clo] = ((Ad.coll2g_fixed(c) / B) % npcols) * nprows;
         {
           std::vector<std::size_t> cnt(sbuf.size());
           for (int c=clo; c<chi; c++)
@@ -71,9 +73,9 @@ namespace strumpack {
         auto m1 = this->_ch[1]->rows();
         auto n1 = this->_ch[1]->cols();
         this->_ch[0]->redistribute_to_tree_to_buffers
-          (A, Arlo, Aclo, Actxt_all, sbuf, dest);
+          (A, Arlo, Aclo, sbuf, dest);
         this->_ch[1]->redistribute_to_tree_to_buffers
-          (A, Arlo+m0, Aclo+n0, Actxt_all, sbuf, dest+Pl(_nprocs));
+          (A, Arlo+m0, Aclo+n0, sbuf, dest+Pl());
         assert(A.MB() == DistM_t::default_MB);
         const auto B = DistM_t::default_MB;
         const DistMW_t A01(m0, n1, const_cast<DistM_t&>(A), Arlo, Aclo+n0);
@@ -89,13 +91,13 @@ namespace strumpack {
         std::vector<int> destrA10(A10rhi-A10rlo);
         std::vector<int> destcA10(A10chi-A10clo);
         for (int r=A01rlo; r<A01rhi; r++)
-          destrA01[r-A01rlo] = dest + (A01.rowl2g_fixed(r) / B) % _prows;
+          destrA01[r-A01rlo] = dest + (A01.rowl2g_fixed(r) / B) % nprows;
         for (int c=A01clo; c<A01chi; c++)
-          destcA01[c-A01clo] = ((A01.coll2g_fixed(c) / B) % _pcols) * _prows;
+          destcA01[c-A01clo] = ((A01.coll2g_fixed(c) / B) % npcols) * nprows;
         for (int r=A10rlo; r<A10rhi; r++)
-          destrA10[r-A10rlo] = dest + (A10.rowl2g_fixed(r) / B) % _prows;
+          destrA10[r-A10rlo] = dest + (A10.rowl2g_fixed(r) / B) % nprows;
         for (int c=A10clo; c<A10chi; c++)
-          destcA10[c-A10clo] = ((A10.coll2g_fixed(c) / B) % _pcols) * _prows;
+          destcA10[c-A10clo] = ((A10.coll2g_fixed(c) / B) % npcols) * nprows;
         {
           std::vector<std::size_t> cnt(sbuf.size());
           for (int c=A01clo; c<A01chi; c++)
@@ -118,11 +120,12 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::redistribute_to_tree_from_buffers
-    (const DistM_t& A, int Aprows, int Apcols,
-     std::size_t Arlo, std::size_t Aclo, int Actxt_all, scalar_t** pbuf) {
+    (const DistM_t& A, std::size_t Arlo, std::size_t Aclo, scalar_t** pbuf) {
       if (!this->active()) return;
+      const auto Aprows = A.grid()->nprows();
+      const auto Apcols = A.grid()->npcols();
       if (this->leaf()) {
-        _A = DistM_t(_ctxt, this->rows(), this->cols());
+        _A = DistM_t(grid(), this->rows(), this->cols());
         const auto B = DistM_t::default_MB;
         int rlo, rhi, clo, chi;
         _A.lranges(rlo, rhi, clo, chi);
@@ -139,11 +142,11 @@ namespace strumpack {
         auto m1 = this->_ch[1]->rows();
         auto n1 = this->_ch[1]->cols();
         this->_ch[0]->redistribute_to_tree_from_buffers
-          (A, Aprows, Apcols, Arlo, Aclo, Actxt_all, pbuf);
+          (A, Arlo, Aclo, pbuf);
         this->_ch[1]->redistribute_to_tree_from_buffers
-          (A, Aprows, Apcols, Arlo+m0, Aclo+n0, Actxt_all, pbuf);
-        _A01 = DistM_t(_ctxt, m0, n1);
-        _A10 = DistM_t(_ctxt, m1, n0);
+          (A, Arlo+m0, Aclo+n0, pbuf);
+        _A01 = DistM_t(grid(), m0, n1);
+        _A10 = DistM_t(grid(), m1, n0);
         assert(A.I() == 1 && A.J() == 1);
         const auto B = DistM_t::default_MB;
         int rlo, rhi, clo, chi;
@@ -181,12 +184,11 @@ namespace strumpack {
     HSSMatrixMPI<scalar_t>::compress(const DistM_t& A, const opts_t& opts) {
       TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_compress);
       TIMER_TIME(TaskType::REDIST_2D_TO_HSS, 0, t_redist);
-      std::vector<std::vector<scalar_t>> sbuf(_nprocs);
-      redistribute_to_tree_to_buffers(A, 0, 0, _ctxt_all, sbuf);
+      std::vector<std::vector<scalar_t>> sbuf(Comm().size());
+      redistribute_to_tree_to_buffers(A, 0, 0, sbuf);
       scalar_t *rbuf = nullptr, **pbuf = nullptr;
-      all_to_all_v(sbuf, rbuf, pbuf, _comm);
-      redistribute_to_tree_from_buffers
-        (A, _prows, _pcols, 0, 0, _ctxt_all, pbuf);
+      all_to_all_v(sbuf, rbuf, pbuf, comm());
+      redistribute_to_tree_from_buffers(A, 0, 0, pbuf);
       delete[] pbuf;
       delete[] rbuf;
       TIMER_STOP(t_redist);
@@ -194,18 +196,18 @@ namespace strumpack {
       switch (opts.compression_algorithm()) {
       case CompressionAlgorithm::ORIGINAL:
         if (opts.synchronized_compression())
-          compress_original_sync(Afunc, Afunc, opts, A.ctxt());
-        else compress_original_nosync(Afunc, Afunc, opts, A.ctxt());
+          compress_original_sync(Afunc, Afunc, opts);
+        else compress_original_nosync(Afunc, Afunc, opts);
         break;
       case CompressionAlgorithm::STABLE:
         if (opts.synchronized_compression())
-          compress_stable_sync(Afunc, Afunc, opts, A.ctxt());
-        else compress_stable_nosync(Afunc, Afunc, opts, A.ctxt());
+          compress_stable_sync(Afunc, Afunc, opts);
+        else compress_stable_nosync(Afunc, Afunc, opts);
         break;
       case CompressionAlgorithm::HARD_RESTART:
         if (opts.synchronized_compression())
-          compress_hard_restart_sync(Afunc, Afunc, opts, A.ctxt());
-        else compress_hard_restart_nosync(Afunc, Afunc, opts, A.ctxt());
+          compress_hard_restart_sync(Afunc, Afunc, opts);
+        else compress_hard_restart_nosync(Afunc, Afunc, opts);
         break;
       default:
         std::cout << "Compression algorithm not recognized!" << std::endl;
@@ -214,8 +216,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compress
-    (const dmult_t& Amult, const delem_blocks_t& Aelem,
-     const opts_t& opts, int Actxt) {
+    (const dmult_t& Amult, const delem_blocks_t& Aelem, const opts_t& opts) {
       TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_compress);
       if (!opts.synchronized_compression())
         std::cerr << "WARNING: Non synchronized block-extraction version"
@@ -223,19 +224,18 @@ namespace strumpack {
                   << " using synchronized extraction routine" << std::endl;
       switch (opts.compression_algorithm()) {
       case CompressionAlgorithm::ORIGINAL:
-        compress_original_sync(Amult, Aelem, opts, Actxt); break;
+        compress_original_sync(Amult, Aelem, opts); break;
       case CompressionAlgorithm::STABLE:
-        compress_stable_sync(Amult, Aelem, opts, Actxt); break;
+        compress_stable_sync(Amult, Aelem, opts); break;
       case CompressionAlgorithm::HARD_RESTART:
-        compress_hard_restart_sync(Amult, Aelem, opts, Actxt); break;
+        compress_hard_restart_sync(Amult, Aelem, opts); break;
       default:
         std::cout << "Compression algorithm not recognized!" << std::endl;
       };
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compress
-    (const dmult_t& Amult, const delem_t& Aelem,
-     const opts_t& opts, int Actxt) {
+    (const dmult_t& Amult, const delem_t& Aelem, const opts_t& opts) {
       TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_compress);
       auto Aelemw = [&]
         (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
@@ -246,18 +246,18 @@ namespace strumpack {
       switch (opts.compression_algorithm()) {
       case CompressionAlgorithm::ORIGINAL: {
         if (opts.synchronized_compression())
-          compress_original_sync(Amult, Aelemw, opts, Actxt);
-        else compress_original_nosync(Amult, Aelemw, opts, Actxt);
+          compress_original_sync(Amult, Aelemw, opts);
+        else compress_original_nosync(Amult, Aelemw, opts);
       } break;
       case CompressionAlgorithm::STABLE: {
         if (opts.synchronized_compression())
-          compress_stable_sync(Amult, Aelemw, opts, Actxt);
-        else compress_stable_nosync(Amult, Aelemw, opts, Actxt);
+          compress_stable_sync(Amult, Aelemw, opts);
+        else compress_stable_nosync(Amult, Aelemw, opts);
       } break;
       case CompressionAlgorithm::HARD_RESTART: {
         if (opts.synchronized_compression())
-          compress_hard_restart_sync(Amult, Aelemw, opts, Actxt);
-        else compress_hard_restart_nosync(Amult, Aelemw, opts, Actxt);
+          compress_hard_restart_sync(Amult, Aelemw, opts);
+        else compress_hard_restart_nosync(Amult, Aelemw, opts);
       } break;
       default:
         std::cout << "Compression algorithm not recognized!" << std::endl;
@@ -266,16 +266,14 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_original_nosync
-    (const dmult_t& Amult, const delemw_t& Aelem,
-     const opts_t& opts, int Actxt) {
+    (const dmult_t& Amult, const delemw_t& Aelem, const opts_t& opts) {
       // TODO compare with sequential compression, start with d0+p
       int d_old = 0, d = opts.d0() + opts.p();
-      DistSamples<scalar_t> RS
-        (d, (Actxt!=-1) ? Actxt : _ctxt, *this, Amult, opts);
+      DistSamples<scalar_t> RS(d, grid(), *this, Amult, opts);
       WorkCompressMPI<scalar_t> w;
       while (!this->is_compressed()) {
         if (d != opts.d0() + opts.p()) RS.add_columns(d, opts);
-        if (opts.verbose() && !mpi_rank(_comm))
+        if (opts.verbose() && Comm().is_root())
           std::cout << "# compressing with d = " << d-opts.p()
                     << " + " << opts.p() << " (original)" << std::endl;
         compress_recursive_original(RS, Aelem, opts, w, d-d_old);
@@ -286,15 +284,13 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_original_sync
-    (const dmult_t& Amult, const delemw_t& Aelem,
-     const opts_t& opts, int Actxt) {
+    (const dmult_t& Amult, const delemw_t& Aelem, const opts_t& opts) {
       WorkCompressMPI<scalar_t> w;
       int d_old = 0, d = opts.d0();
-      DistSamples<scalar_t> RS
-        (d, (Actxt!=-1) ? Actxt : _ctxt, *this, Amult, opts);
+      DistSamples<scalar_t> RS(d, grid(), *this, Amult, opts);
       const auto nr_lvls = this->max_levels();
       while (!this->is_compressed() && d < opts.max_rank()) {
-        if (opts.verbose() && !mpi_rank(_comm))
+        if (opts.verbose() && Comm().is_root())
           std::cout << "# compressing with d = " << d << ", d_old = "
                     << d_old << ", tol = " << opts.rel_tol() << std::endl;
         for (int lvl=nr_lvls-1; lvl>=0; lvl--) {
@@ -311,15 +307,13 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_original_sync
-    (const dmult_t& Amult, const delem_blocks_t& Aelem,
-     const opts_t& opts, int Actxt) {
+    (const dmult_t& Amult, const delem_blocks_t& Aelem, const opts_t& opts) {
       WorkCompressMPI<scalar_t> w;
       int d_old = 0, d = opts.d0();
-      DistSamples<scalar_t> RS
-        (d, (Actxt!=-1) ? Actxt : _ctxt, *this, Amult, opts);
+      DistSamples<scalar_t> RS(d, grid(), *this, Amult, opts);
       const auto nr_lvls = this->max_levels();
       while (!this->is_compressed() && d < opts.max_rank()) {
-        if (opts.verbose() && !mpi_rank(_comm))
+        if (opts.verbose() && Comm().is_root())
           std::cout << "# compressing with d = " << d << ", d_old = "
                     << d_old << ", tol = " << opts.rel_tol() << std::endl;
         for (int lvl=nr_lvls-1; lvl>=0; lvl--) {
@@ -336,15 +330,13 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_hard_restart_nosync
-    (const dmult_t& Amult, const delemw_t& Aelem,
-     const opts_t& opts, int Actxt) {
+    (const dmult_t& Amult, const delemw_t& Aelem, const opts_t& opts) {
       int d_old = 0, d = opts.d0() + opts.p();
-      DistSamples<scalar_t> RS
-        (d, (Actxt!=-1) ? Actxt : _ctxt, *this, Amult, opts, true);
+      DistSamples<scalar_t> RS(d, grid(), *this, Amult, opts, true);
       while (!this->is_compressed()) {
         WorkCompressMPI<scalar_t> w;
         if (d != opts.d0() + opts.p()) RS.add_columns(d, opts);
-        if (opts.verbose() && !mpi_rank(_comm))
+        if (opts.verbose() && Comm().is_root())
           std::cout << "# compressing with d = " << d-opts.p()
                     << " + " << opts.p() << " (original, hard restart)"
                     << std::endl;
@@ -359,16 +351,14 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_hard_restart_sync
-    (const dmult_t& Amult, const delemw_t& Aelem,
-     const opts_t& opts, int Actxt) {
+    (const dmult_t& Amult, const delemw_t& Aelem, const opts_t& opts) {
       std::cout << "TODO: HSSMatrixMPI<scalar_t>::compress_hard_restart_sync"
                 << std::endl;
     }
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_hard_restart_sync
-    (const dmult_t& Amult, const delem_blocks_t& Aelem,
-     const opts_t& opts, int Actxt) {
+    (const dmult_t& Amult, const delem_blocks_t& Aelem, const opts_t& opts) {
       std::cout << "TODO: HSSMatrixMPI<scalar_t>::compress_hard_restart_sync"
                 << std::endl;
     }
@@ -382,11 +372,11 @@ namespace strumpack {
       allgather_extraction_indices(lI, lJ, I, J, before, self, after);
       DistM_t dummy;
       for (int i=0; i<before; i++)
-        Aelem(I[i], J[i], dummy, this->_A, 0, 0, _comm);
+        Aelem(I[i], J[i], dummy, this->_A, 0, 0, comm());
       if (I.size()-after-before)
-        extract_D_B(Aelem, ctxt_loc(), opts, w, lvl);
+        extract_D_B(Aelem, grid_local(), opts, w, lvl);
       for (int i=I.size()-after; i<int(I.size()); i++)
-        Aelem(I[i], J[i], dummy, this->_A, 0, 0, _comm);
+        Aelem(I[i], J[i], dummy, this->_A, 0, 0, comm());
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::extract_level
@@ -395,7 +385,7 @@ namespace strumpack {
       std::vector<std::vector<std::size_t>> lI, lJ, I, J;
       std::vector<DistMW_t> lB;
       int self = 0, before, after;
-      get_extraction_indices(lI, lJ, lB, ctxt_loc(), w, self, lvl);
+      get_extraction_indices(lI, lJ, lB, grid_local(), w, self, lvl);
       allgather_extraction_indices(lI, lJ, I, J, before, self, after);
       DistMW_t dummy;
       std::vector<DistMW_t> B(I.size(), dummy);
@@ -413,7 +403,7 @@ namespace strumpack {
       if (this->leaf()) {
         if (w.lvl == lvl && this->is_untouched()) {
           self++;
-          if (mpi_rank(_comm)==0) {
+          if (Comm().is_root()) {
             I.emplace_back();
             J.emplace_back();
             I.back().reserve(this->rows());
@@ -436,7 +426,7 @@ namespace strumpack {
             !this->_ch[1]->is_compressed()) return;
         if (this->is_untouched()) {
           self += 2;
-          if (mpi_rank(_comm)==0) {
+          if (Comm().is_root()) {
             I.push_back(w.c[0].Ir);  J.push_back(w.c[1].Ic);
             I.push_back(w.c[1].Ir);  J.push_back(w.c[0].Ic);
           }
@@ -448,12 +438,12 @@ namespace strumpack {
     HSSMatrixMPI<scalar_t>::get_extraction_indices
     (std::vector<std::vector<std::size_t>>& I,
      std::vector<std::vector<std::size_t>>& J, std::vector<DistMW_t>& B,
-     int lctxt, WorkCompressMPI<scalar_t>& w, int& self, int lvl) {
+     const BLACSGrid* lg, WorkCompressMPI<scalar_t>& w, int& self, int lvl) {
       if (!this->active()) return;
       if (this->leaf()) {
         if (w.lvl == lvl && this->is_untouched()) {
           self++;
-          if (mpi_rank(_comm)==0) {
+          if (Comm().is_root()) {
             I.emplace_back();
             J.emplace_back();
             I.back().reserve(this->rows());
@@ -463,14 +453,14 @@ namespace strumpack {
             for (std::size_t j=0; j<this->cols(); j++)
               J.back().push_back(j+w.offset.second);
           }
-          _D = DistM_t(_ctxt, this->rows(), this->cols());
+          _D = DistM_t(grid(), this->rows(), this->cols());
           B.push_back(DistMW_t(_D));
         }
       } else {
         w.split(this->_ch[0]->dims());
         if (w.lvl < lvl) {
-          this->_ch[0]->get_extraction_indices(I, J, B, lctxt, w.c[0], self, lvl);
-          this->_ch[1]->get_extraction_indices(I, J, B, lctxt, w.c[1], self, lvl);
+          this->_ch[0]->get_extraction_indices(I, J, B, lg, w.c[0], self, lvl);
+          this->_ch[1]->get_extraction_indices(I, J, B, lg, w.c[1], self, lvl);
           return;
         }
         communicate_child_data(w);
@@ -478,12 +468,12 @@ namespace strumpack {
             !this->_ch[1]->is_compressed()) return;
         if (this->is_untouched()) {
           self += 2;
-          if (mpi_rank(_comm)==0) {
+          if (Comm().is_root()) {
             I.push_back(w.c[0].Ir);  J.push_back(w.c[1].Ic);
             I.push_back(w.c[1].Ir);  J.push_back(w.c[0].Ic);
           }
-          _B01 = DistM_t(_ctxt, w.c[0].Ir.size(), w.c[1].Ic.size());
-          _B10 = DistM_t(_ctxt, w.c[1].Ir.size(), w.c[0].Ic.size());
+          _B01 = DistM_t(grid(), w.c[0].Ir.size(), w.c[1].Ic.size());
+          _B10 = DistM_t(grid(), w.c[1].Ir.size(), w.c[0].Ic.size());
           B.push_back(DistMW_t(_B01));
           B.push_back(DistMW_t(_B10));
         }
@@ -497,14 +487,14 @@ namespace strumpack {
      std::vector<std::vector<std::size_t>>& I,
      std::vector<std::vector<std::size_t>>& J,
      int& before, int self, int& after) {
-      auto P = mpi_nprocs(_comm);
-      auto rank = mpi_rank(_comm);
+      const int rank = Comm().rank();
+      const int P = Comm().size();
       auto rsize = new int[P];
       rsize[rank] = 1;
       for (auto& i : lI) rsize[rank] += i.size() + 1;
       for (auto& j : lJ) rsize[rank] += j.size() + 1;
       MPI_Allgather(MPI_IN_PLACE, 0, mpi_type<int>(), rsize, 1,
-                    mpi_type<int>(), _comm);
+                    mpi_type<int>(), comm());
       auto displs = new int[P];
       displs[0] = 0;
       for (int p=1; p<P; p++) displs[p] = displs[p-1] + rsize[p-1];
@@ -520,7 +510,7 @@ namespace strumpack {
         ptr += lJ[i].size();
       }
       MPI_Allgatherv(MPI_IN_PLACE, 0, mpi_type<std::size_t>(), sbuf,
-                     rsize, displs, mpi_type<std::size_t>(), _comm);
+                     rsize, displs, mpi_type<std::size_t>(), comm());
       int total = 0;
       for (int p=0; p<P; p++) total += sbuf[displs[p]];
       after = 0;
@@ -545,7 +535,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::extract_D_B
-    (const delemw_t& Aelem, int lctxt, const opts_t& opts,
+    (const delemw_t& Aelem, const BLACSGrid* lg, const opts_t& opts,
      WorkCompressMPI<scalar_t>& w, int lvl) {
       if (!this->active()) return;
       if (this->leaf()) {
@@ -558,24 +548,24 @@ namespace strumpack {
             I.push_back(i+w.offset.first);
           for (std::size_t j=0; j<this->cols(); j++)
             J.push_back(j+w.offset.second);
-          _D = DistM_t(_ctxt, this->rows(), this->cols());
-          Aelem(I, J, _D, _A, w.offset.first, w.offset.second, _comm);
+          _D = DistM_t(grid(), this->rows(), this->cols());
+          Aelem(I, J, _D, _A, w.offset.first, w.offset.second, comm());
         }
       } else {
         if (w.lvl < lvl) {
-          this->_ch[0]->extract_D_B(Aelem, lctxt, opts, w.c[0], lvl);
-          this->_ch[1]->extract_D_B(Aelem, lctxt, opts, w.c[1], lvl);
+          this->_ch[0]->extract_D_B(Aelem, lg, opts, w.c[0], lvl);
+          this->_ch[1]->extract_D_B(Aelem, lg, opts, w.c[1], lvl);
           return;
         }
         if (!this->_ch[0]->is_compressed() ||
             !this->_ch[1]->is_compressed()) return;
         if (this->is_untouched()) {
-          _B01 = DistM_t(_ctxt, w.c[0].Ir.size(), w.c[1].Ic.size());
-          _B10 = DistM_t(_ctxt, w.c[1].Ir.size(), w.c[0].Ic.size());
+          _B01 = DistM_t(grid(), w.c[0].Ir.size(), w.c[1].Ic.size());
+          _B10 = DistM_t(grid(), w.c[1].Ir.size(), w.c[0].Ic.size());
           Aelem(w.c[0].Ir, w.c[1].Ic, _B01, _A01,
-                w.offset.first, w.offset.second+this->_ch[0]->cols(), _comm);
+                w.offset.first, w.offset.second+this->_ch[0]->cols(), comm());
           Aelem(w.c[1].Ir, w.c[0].Ic, _B10, _A10,
-                w.offset.first+this->_ch[0]->rows(), w.offset.second, _comm);
+                w.offset.first+this->_ch[0]->rows(), w.offset.second, comm());
         }
       }
     }
@@ -594,8 +584,8 @@ namespace strumpack {
             I.push_back(i+w.offset.first);
           for (std::size_t j=0; j<this->cols(); j++)
             J.push_back(j+w.offset.second);
-          _D = DistM_t(_ctxt, this->rows(), this->cols());
-          Aelem(I, J, _D, _A, w.offset.first, w.offset.second, _comm);
+          _D = DistM_t(grid(), this->rows(), this->cols());
+          Aelem(I, J, _D, _A, w.offset.first, w.offset.second, comm());
         }
       } else {
         w.split(this->_ch[0]->dims());
@@ -607,12 +597,12 @@ namespace strumpack {
         if (!this->_ch[0]->is_compressed() ||
             !this->_ch[1]->is_compressed()) return;
         if (this->is_untouched()) {
-          _B01 = DistM_t(_ctxt, w.c[0].Ir.size(), w.c[1].Ic.size());
-          _B10 = DistM_t(_ctxt, w.c[1].Ir.size(), w.c[0].Ic.size());
+          _B01 = DistM_t(grid(), w.c[0].Ir.size(), w.c[1].Ic.size());
+          _B10 = DistM_t(grid(), w.c[1].Ir.size(), w.c[0].Ic.size());
           Aelem(w.c[0].Ir, w.c[1].Ic, _B01, _A01,
-                w.offset.first, w.offset.second+this->_ch[0]->cols(), _comm);
+                w.offset.first, w.offset.second+this->_ch[0]->cols(), comm());
           Aelem(w.c[1].Ir, w.c[0].Ic, _B10, _A10,
-                w.offset.first+this->_ch[0]->rows(), w.offset.second, _comm);
+                w.offset.first+this->_ch[0]->rows(), w.offset.second, comm());
         }
       }
       if (w.lvl == 0) this->_U_state = this->_V_state = State::COMPRESSED;
@@ -671,10 +661,10 @@ namespace strumpack {
         auto wR = ConstDistributedMatrixWrapperPtr
           (this->rows(), dd, RS.leaf_R, 0, d_old);
         if (!c_old) {
-          w.Sr = DistM_t(_ctxt, this->rows(), dd);
-          w.Sc = DistM_t(_ctxt, this->rows(), dd);
-          copy(this->rows(), dd, RS.leaf_Sr, 0, d_old, w.Sr, 0, 0, _ctxt_all);
-          copy(this->rows(), dd, RS.leaf_Sc, 0, d_old, w.Sc, 0, 0, _ctxt_all);
+          w.Sr = DistM_t(grid(), this->rows(), dd);
+          w.Sc = DistM_t(grid(), this->rows(), dd);
+          copy(this->rows(), dd, RS.leaf_Sr, 0, d_old, w.Sr, 0, 0, grid());
+          copy(this->rows(), dd, RS.leaf_Sc, 0, d_old, w.Sc, 0, 0, grid());
           gemm(Trans::N, Trans::N, scalar_t(-1), _D, *wR, scalar_t(1.), w.Sr);
           gemm(Trans::C, Trans::N, scalar_t(-1), _D, *wR, scalar_t(1.), w.Sc);
           STRUMPACK_UPDATE_SAMPLE_FLOPS
@@ -685,10 +675,8 @@ namespace strumpack {
           w.Sc.resize(this->rows(), c_old+dd);
           DistMW_t wSr_new(this->rows(), dd, w.Sr, 0, c_old);
           DistMW_t wSc_new(this->rows(), dd, w.Sc, 0, c_old);
-          copy(this->rows(), dd, RS.leaf_Sr, 0, d_old,
-               wSr_new, 0, 0, _ctxt_all);
-          copy(this->rows(), dd, RS.leaf_Sc, 0, d_old,
-               wSc_new, 0, 0, _ctxt_all);
+          copy(this->rows(), dd, RS.leaf_Sr, 0, d_old, wSr_new, 0, 0, grid());
+          copy(this->rows(), dd, RS.leaf_Sc, 0, d_old, wSc_new, 0, 0, grid());
           gemm(Trans::N, Trans::N, scalar_t(-1), _D, *wR,
                scalar_t(1.), wSr_new);
           gemm(Trans::C, Trans::N, scalar_t(-1), _D, *wR,
@@ -700,8 +688,8 @@ namespace strumpack {
       } else {
         std::size_t c_new, c_lo;
         if (!c_old) {
-          w.Sr = DistM_t(_ctxt, w.c[0].Jr.size()+w.c[1].Jr.size(), w.c[0].dS);
-          w.Sc = DistM_t(_ctxt, w.c[0].Jc.size()+w.c[1].Jc.size(), w.c[0].dS);
+          w.Sr = DistM_t(grid(), w.c[0].Jr.size()+w.c[1].Jr.size(), w.c[0].dS);
+          w.Sc = DistM_t(grid(), w.c[0].Jc.size()+w.c[1].Jc.size(), w.c[0].dS);
           c_new = w.Sc.cols();
           c_lo = 0;
         } else {
@@ -720,26 +708,20 @@ namespace strumpack {
             1 + *std::max_element(w.c[0].Jr.begin(), w.c[0].Jr.end());
           int c1Srows = (w.c[1].Jr.empty()) ? 0 :
             1 + *std::max_element(w.c[1].Jr.begin(), w.c[1].Jr.end());
-          DistM_t wc0Sr_new(_ctxt, c0Srows, c_new);
-          DistM_t wc1Sr_new(_ctxt, c1Srows, c_new);
-          copy(c0Srows, c_new, w.c[0].Sr, 0, w.c[0].dS-c_new,
-               wc0Sr_new, 0, 0, _ctxt_all);
-          copy(c1Srows, c_new, w.c[1].Sr, 0, w.c[1].dS-c_new,
-               wc1Sr_new, 0, 0, _ctxt_all);
-          auto tmpr0 = wc0Sr_new.extract_rows(w.c[0].Jr, comm());
-          auto tmpr1 = wc1Sr_new.extract_rows(w.c[1].Jr, comm());
-          copy(w.c[0].Jr.size(), c_new, tmpr0, 0, 0,
-               wSr_new0, 0, 0, _ctxt_all);
-          copy(w.c[1].Jr.size(), c_new, tmpr1, 0, 0,
-               wSr_new1, 0, 0, _ctxt_all);
+          DistM_t wc0Sr_new(grid(), c0Srows, c_new);
+          DistM_t wc1Sr_new(grid(), c1Srows, c_new);
+          copy(c0Srows, c_new, w.c[0].Sr, 0, w.c[0].dS-c_new, wc0Sr_new, 0, 0, grid());
+          copy(c1Srows, c_new, w.c[1].Sr, 0, w.c[1].dS-c_new, wc1Sr_new, 0, 0, grid());
+          auto tmpr0 = wc0Sr_new.extract_rows(w.c[0].Jr);
+          auto tmpr1 = wc1Sr_new.extract_rows(w.c[1].Jr);
+          copy(w.c[0].Jr.size(), c_new, tmpr0, 0, 0, wSr_new0, 0, 0, grid());
+          copy(w.c[1].Jr.size(), c_new, tmpr1, 0, 0, wSr_new1, 0, 0, grid());
         }
 
-        DistM_t wc1Rr(_ctxt, _B01.cols(), c_new);
-        DistM_t wc0Rr(_ctxt, _B10.cols(), c_new);
-        copy(_B01.cols(), c_new, w.c[1].Rr, 0, w.c[1].dR-c_new,
-             wc1Rr, 0, 0, _ctxt_all);
-        copy(_B10.cols(), c_new, w.c[0].Rr, 0, w.c[0].dR-c_new,
-             wc0Rr, 0, 0, _ctxt_all);
+        DistM_t wc1Rr(grid(), _B01.cols(), c_new);
+        DistM_t wc0Rr(grid(), _B10.cols(), c_new);
+        copy(_B01.cols(), c_new, w.c[1].Rr, 0, w.c[1].dR-c_new, wc1Rr, 0, 0, grid());
+        copy(_B10.cols(), c_new, w.c[0].Rr, 0, w.c[0].dR-c_new, wc0Rr, 0, 0, grid());
         gemm(Trans::N, Trans::N, scalar_t(-1.), _B01, wc1Rr,
              scalar_t(1.), wSr_new0);
         gemm(Trans::N, Trans::N, scalar_t(-1.), _B10, wc0Rr,
@@ -756,26 +738,20 @@ namespace strumpack {
             1 + *std::max_element(w.c[0].Jc.begin(), w.c[0].Jc.end());
           int c1Srows = (w.c[1].Jc.empty()) ? 0 :
             1 + *std::max_element(w.c[1].Jc.begin(), w.c[1].Jc.end());
-          DistM_t wc0Sc_new(_ctxt, c0Srows, c_new);
-          DistM_t wc1Sc_new(_ctxt, c1Srows, c_new);
-          copy(c0Srows, c_new, w.c[0].Sc, 0, w.c[0].dS-c_new,
-               wc0Sc_new, 0, 0, _ctxt_all);
-          copy(c1Srows, c_new, w.c[1].Sc, 0, w.c[1].dS-c_new,
-               wc1Sc_new, 0, 0, _ctxt_all);
-          auto tmpr0 = wc0Sc_new.extract_rows(w.c[0].Jc, comm());
-          auto tmpr1 = wc1Sc_new.extract_rows(w.c[1].Jc, comm());
-          copy(w.c[0].Jc.size(), c_new, tmpr0, 0, 0,
-               wSc_new0, 0, 0, _ctxt_all);
-          copy(w.c[1].Jc.size(), c_new, tmpr1, 0, 0,
-               wSc_new1, 0, 0, _ctxt_all);
+          DistM_t wc0Sc_new(grid(), c0Srows, c_new);
+          DistM_t wc1Sc_new(grid(), c1Srows, c_new);
+          copy(c0Srows, c_new, w.c[0].Sc, 0, w.c[0].dS-c_new, wc0Sc_new, 0, 0, grid());
+          copy(c1Srows, c_new, w.c[1].Sc, 0, w.c[1].dS-c_new, wc1Sc_new, 0, 0, grid());
+          auto tmpr0 = wc0Sc_new.extract_rows(w.c[0].Jc);
+          auto tmpr1 = wc1Sc_new.extract_rows(w.c[1].Jc);
+          copy(w.c[0].Jc.size(), c_new, tmpr0, 0, 0, wSc_new0, 0, 0, grid());
+          copy(w.c[1].Jc.size(), c_new, tmpr1, 0, 0, wSc_new1, 0, 0, grid());
         }
 
-        DistM_t wc1Rc(_ctxt, _B10.rows(), c_new);
-        DistM_t wc0Rc(_ctxt, _B01.rows(), c_new);
-        copy(_B10.rows(), c_new, w.c[1].Rc, 0, w.c[1].dR-c_new,
-             wc1Rc, 0, 0, _ctxt_all);
-        copy(_B01.rows(), c_new, w.c[0].Rc, 0, w.c[0].dR-c_new,
-             wc0Rc, 0, 0, _ctxt_all);
+        DistM_t wc1Rc(grid(), _B10.rows(), c_new);
+        DistM_t wc0Rc(grid(), _B01.rows(), c_new);
+        copy(_B10.rows(), c_new, w.c[1].Rc, 0, w.c[1].dR-c_new, wc1Rc, 0, 0, grid());
+        copy(_B01.rows(), c_new, w.c[0].Rc, 0, w.c[0].dR-c_new, wc0Rc, 0, 0, grid());
         gemm(Trans::C, Trans::N, scalar_t(-1.), _B10, wc1Rc,
              scalar_t(1.), wSc_new0);
         gemm(Trans::C, Trans::N, scalar_t(-1.), _B01, wc0Rc,
@@ -792,8 +768,8 @@ namespace strumpack {
     (int d, const opts_t& opts, WorkCompressMPI<scalar_t>& w) {
       auto rtol = opts.rel_tol() / w.lvl;
       auto atol = opts.abs_tol() / w.lvl;
-      w.Sr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol, _ctxt_T);
-      w.Sc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol, _ctxt_T);
+      w.Sr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol);
+      w.Sc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol);
       STRUMPACK_ID_FLOPS(ID_row_flops(w.Sr, w.Jr.size()));
       STRUMPACK_ID_FLOPS(ID_row_flops(w.Sc, w.Jc.size()));
       notify_inactives_J(w);
@@ -839,8 +815,8 @@ namespace strumpack {
           auto c_new = (was_compressed) ? dd : d;
           auto tmpR = ConstDistributedMatrixWrapperPtr
             (this->rows(), c_new, RS.leaf_R, 0, d-c_new);
-          w.Rr = DistM_t(_ctxt, this->V_rank(), c_new);
-          w.Rc = DistM_t(_ctxt, this->U_rank(), c_new);
+          w.Rr = DistM_t(grid(), this->V_rank(), c_new);
+          w.Rc = DistM_t(grid(), this->U_rank(), c_new);
           _V.applyC(*tmpR, w.Rr);
           _U.applyC(*tmpR, w.Rc);
           STRUMPACK_REDUCE_SAMPLE_FLOPS
@@ -848,8 +824,8 @@ namespace strumpack {
         } else {
           auto tmpR = ConstDistributedMatrixWrapperPtr
             (this->rows(), dd, RS.leaf_R, 0, d_old);
-          DistM_t wRr_new(_ctxt, w.Rr.rows(), dd);
-          DistM_t wRc_new(_ctxt, w.Rc.rows(), dd);
+          DistM_t wRr_new(grid(), w.Rr.rows(), dd);
+          DistM_t wRc_new(grid(), w.Rc.rows(), dd);
           _V.applyC(*tmpR, wRr_new);
           _U.applyC(*tmpR, wRc_new);
           STRUMPACK_REDUCE_SAMPLE_FLOPS
@@ -861,30 +837,28 @@ namespace strumpack {
         if (!c_old) {
           auto wRr = vconcat
             (w.c[0].dR, this->_ch[0]->V_rank(), this->_ch[1]->V_rank(),
-             w.c[0].Rr, w.c[1].Rr, _ctxt, _ctxt_all);
+             w.c[0].Rr, w.c[1].Rr, grid(), grid());
           auto wRc = vconcat
             (w.c[0].dR, this->_ch[0]->U_rank(), this->_ch[1]->U_rank(),
-             w.c[0].Rc, w.c[1].Rc, _ctxt, _ctxt_all);
-          w.Rr = DistM_t(_ctxt, this->V_rank(), w.c[0].dR);
-          w.Rc = DistM_t(_ctxt, this->U_rank(), w.c[0].dR);
+             w.c[0].Rc, w.c[1].Rc, grid(), grid());
+          w.Rr = DistM_t(grid(), this->V_rank(), w.c[0].dR);
+          w.Rc = DistM_t(grid(), this->U_rank(), w.c[0].dR);
           _V.applyC(wRr, w.Rr);
           _U.applyC(wRc, w.Rc);
           STRUMPACK_REDUCE_SAMPLE_FLOPS
             (_V.applyC_flops(w.c[0].dR) + _U.applyC_flops(w.c[0].dR));
         } else {
-          DistM_t wRr(_ctxt, this->V_rows(), dd);
-          copy(w.c[0].Ic.size(), dd, w.c[0].Rr, 0, w.c[0].dR - dd,
-               wRr, 0, 0, _ctxt_all);
+          DistM_t wRr(grid(), this->V_rows(), dd);
+          copy(w.c[0].Ic.size(), dd, w.c[0].Rr, 0, w.c[0].dR - dd, wRr, 0, 0, grid());
           copy(w.c[1].Ic.size(), dd, w.c[1].Rr, 0, w.c[1].dR - dd,
-               wRr, w.c[0].Ic.size(), 0, _ctxt_all);
-          DistM_t wRc(_ctxt, this->U_rows(), dd);
-          copy(w.c[0].Ir.size(), dd, w.c[0].Rc, 0, w.c[0].dR - dd,
-               wRc, 0, 0, _ctxt_all);
+               wRr, w.c[0].Ic.size(), 0, grid());
+          DistM_t wRc(grid(), this->U_rows(), dd);
+          copy(w.c[0].Ir.size(), dd, w.c[0].Rc, 0, w.c[0].dR - dd, wRc, 0, 0, grid());
           copy(w.c[1].Ir.size(), dd, w.c[1].Rc, 0, w.c[1].dR - dd,
-               wRc, w.c[0].Ir.size(), 0, _ctxt_all);
+               wRc, w.c[0].Ir.size(), 0, grid());
 
-          DistM_t wRr_new(_ctxt, w.Rr.rows(), dd);
-          DistM_t wRc_new(_ctxt, w.Rc.rows(), dd);
+          DistM_t wRr_new(grid(), w.Rr.rows(), dd);
+          DistM_t wRc_new(grid(), w.Rc.rows(), dd);
           _V.applyC(wRr, wRr_new);
           _U.applyC(wRc, wRc_new);
           STRUMPACK_REDUCE_SAMPLE_FLOPS

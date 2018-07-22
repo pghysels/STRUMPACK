@@ -132,7 +132,7 @@ namespace strumpack {
      const std::vector<std::size_t>&, DenseM_t&, int) const override {}
     void extract_separator_2d
     (integer_t, const std::vector<std::size_t>&,
-     const std::vector<std::size_t>&, DistM_t&, MPI_Comm) const override {}
+     const std::vector<std::size_t>&, DistM_t&) const override {}
     void extract_front
     (DenseM_t&, DenseM_t&, DenseM_t&, integer_t,
      integer_t, const std::vector<integer_t>&, int) const override {}
@@ -150,13 +150,14 @@ namespace strumpack {
      const DenseM_t&, DenseM_t&, DenseM_t&, int depth) const override {}
     void front_multiply_2d
     (integer_t, integer_t, const std::vector<integer_t>&, const DistM_t&,
-     DistM_t&, DistM_t&, int, MPI_Comm, int) const override {}
+     DistM_t&, DistM_t&, int) const override {}
 
   protected:
     void split_diag_offdiag();
     void setup_spmv_buffers() const;
     bool is_mpi_root() const override { return mpi_root(_comm); }
 
+    // TODO use MPIComm
     MPI_Comm _comm;
 
     /**

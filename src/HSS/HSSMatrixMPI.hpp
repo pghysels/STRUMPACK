@@ -68,25 +68,23 @@ namespace strumpack {
 
     public:
       HSSMatrixMPI() : HSSMatrixBase<scalar_t>(0, 0, true) {}
-      HSSMatrixMPI(const DistM_t& A, const opts_t& opts, MPI_Comm c);
-      HSSMatrixMPI(const HSSPartitionTree& t, const opts_t& opts, MPI_Comm c);
+      HSSMatrixMPI(const DistM_t& A, const opts_t& opts);
       HSSMatrixMPI
-      (const HSSPartitionTree& t, const DistM_t& A,
-       const opts_t& opts, MPI_Comm c);
+      (const HSSPartitionTree& t, const DistM_t& A, const opts_t& opts);
       HSSMatrixMPI
-      (std::size_t m, std::size_t n, const dmult_t& Amult,
-       int Actxt, const delem_t& Aelem,
-       const opts_t& opts, MPI_Comm c);
+      (const HSSPartitionTree& t, const BLACSGrid* g, const opts_t& opts);
       HSSMatrixMPI
-      (std::size_t m, std::size_t n, const dmult_t& Amult,
-       int Actxt, const delem_blocks_t& Aelem,
-       const opts_t& opts, MPI_Comm c);
+      (std::size_t m, std::size_t n, const BLACSGrid* Agrid,
+       const dmult_t& Amult, const delem_t& Aelem, const opts_t& opts);
       HSSMatrixMPI
-      (const HSSPartitionTree& t, const dmult_t& Amult, int Actxt,
-       const delem_t& Aelem, const opts_t& opts, MPI_Comm c);
+      (std::size_t m, std::size_t n, const BLACSGrid* Agrid,
+       const dmult_t& Amult, const delem_blocks_t& Aelem, const opts_t& opts);
+      HSSMatrixMPI
+      (const HSSPartitionTree& t, const BLACSGrid* Agrid,
+       const dmult_t& Amult, const delem_t& Aelem, const opts_t& opts);
       HSSMatrixMPI(const HSSMatrixMPI<scalar_t>& other);
       HSSMatrixMPI(HSSMatrixMPI<scalar_t>&& other) = default;
-      ~HSSMatrixMPI();
+      virtual ~HSSMatrixMPI() {}
 
       HSSMatrixMPI<scalar_t>& operator=(const HSSMatrixMPI<scalar_t>& other);
       HSSMatrixMPI<scalar_t>& operator=(HSSMatrixMPI<scalar_t>&& other) = default;
@@ -96,19 +94,17 @@ namespace strumpack {
       { return this->_ch[c].get(); }
       HSSMatrixBase<scalar_t>* child(int c) { return this->_ch[c].get(); }
 
-      int ctxt() const { return _ctxt; }
-      int ctxt(int) const { return _ctxt; }  // this overwrites base class
-      int ctxt_loc() const { return _ctxt_loc; }
-      int ctxt_all() const { return _ctxt_all; }
-      MPI_Comm comm() const { return _comm; }
+      inline const BLACSGrid* grid() const { return blacs_grid_; }
+      inline const BLACSGrid* grid(const BLACSGrid* grid) const override { return blacs_grid_; }
+      inline const BLACSGrid* grid_local() const override { return blacs_grid_local_; }
+      inline const MPIComm& Comm() const { return grid()->Comm(); }
+      inline MPI_Comm comm() const { return Comm().comm(); }
 
       void compress(const DistM_t& A, const opts_t& opts);
       void compress
-      (const dmult_t& Amult, const delem_t& Aelem,
-       const opts_t& opts, int Actxt=-1);
+      (const dmult_t& Amult, const delem_t& Aelem, const opts_t& opts);
       void compress
-      (const dmult_t& Amult, const delem_blocks_t& Aelem,
-       const opts_t& opts, int Actxt=-1);
+      (const dmult_t& Amult, const delem_blocks_t& Aelem, const opts_t& opts);
 
       HSSFactorsMPI<scalar_t> factor() const;
       HSSFactorsMPI<scalar_t> partial_factor() const;
@@ -125,19 +121,19 @@ namespace strumpack {
 
       scalar_t get(std::size_t i, std::size_t j) const;
       DistM_t extract
-      (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-       int Bctxt, int Bprows, int Bpcols) const;
+      (const std::vector<std::size_t>& I,
+       const std::vector<std::size_t>& J, const BLACSGrid* Bgrid) const;
       std::vector<DistM_t> extract
       (const std::vector<std::vector<std::size_t>>& I,
        const std::vector<std::vector<std::size_t>>& J,
-       int Bctxt, int Bprows, int Bpcols) const;
+       const BLACSGrid* Bgrid) const;
       void extract_add
-      (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-       DistM_t& B, int Bprows, int Bpcols) const;
+      (const std::vector<std::size_t>& I,
+       const std::vector<std::size_t>& J, DistM_t& B) const;
       void extract_add
       (const std::vector<std::vector<std::size_t>>& I,
        const std::vector<std::vector<std::size_t>>& J,
-       std::vector<DistM_t>& B, int Bprows, int Bpcols) const;
+       std::vector<DistM_t>& B) const;
 
       void Schur_update
       (const HSSFactorsMPI<scalar_t>& f, DistM_t& Theta,
@@ -161,7 +157,7 @@ namespace strumpack {
       (std::ostream &out=std::cout,
        std::size_t roff=0, std::size_t coff=0) const;
 
-      DistM_t dense(int ctxt) const;
+      DistM_t dense() const;
 
       void shift(scalar_t sigma) override;
 
@@ -170,8 +166,8 @@ namespace strumpack {
       (const DistM_t& A, DenseM_t& sub_A, DistM_t& leaf_A) const;
       void allocate_block_row(int d, DenseM_t& sub_A, DistM_t& leaf_A) const;
       void from_block_row
-      (DistM_t& A, const DenseM_t& sub_A,
-       const DistM_t& leaf_A, int lctxt) const;
+      (DistM_t& A, const DenseM_t& sub_A, const DistM_t& leaf_A,
+       const BLACSGrid* lgrid) const;
 
       void delete_trailing_block() override;
       void reset() override;
@@ -184,9 +180,11 @@ namespace strumpack {
               std::size_t rlo, std::size_t clo,
               MPI_Comm comm)>;
 
-      MPI_Comm _comm;
-      int _ctxt, _ctxt_all, _ctxt_T, _ctxt_loc;   // TODO default arguments?
-      int _prows, _pcols, _active_procs, _nprocs;
+      const BLACSGrid* blacs_grid_;
+      const BLACSGrid* blacs_grid_local_;
+      std::unique_ptr<const BLACSGrid> owned_blacs_grid_;
+      std::unique_ptr<const BLACSGrid> owned_blacs_grid_local_;
+
       TreeLocalRanges _ranges;
 
       HSSBasisIDMPI<scalar_t> _U;
@@ -203,48 +201,36 @@ namespace strumpack {
 
       HSSMatrixMPI
       (std::size_t m, std::size_t n, const opts_t& opts,
-       MPI_Comm c, int P, bool dup_comm,
-       std::size_t roff, std::size_t coff);
+       const MPIComm& c, int P, std::size_t roff, std::size_t coff);
       HSSMatrixMPI
-      (const HSSPartitionTree& t, const opts_t& opts, MPI_Comm c,
-       int P, bool dup_comm, std::size_t roff, std::size_t coff);
+      (const HSSPartitionTree& t, const opts_t& opts,
+       const MPIComm& c, int P, std::size_t roff, std::size_t coff);
       void setup_hierarchy
-      (const opts_t& opts, MPI_Comm c, int P,
-       bool dup_comm, std::size_t roff, std::size_t coff);
+      (const opts_t& opts, std::size_t roff, std::size_t coff);
       void setup_hierarchy
       (const HSSPartitionTree& t, const opts_t& opts,
-       MPI_Comm c, int P, bool dup_comm,
        std::size_t roff, std::size_t coff);
-      void setup_contexts(int P);
+      void setup_local_context();
       void setup_ranges(std::size_t roff, std::size_t coff);
 
       void compress_original_nosync
-      (const dmult_t& Amult, const delemw_t& Aelem,
-       const opts_t& opts, int Actxt=-1);
+      (const dmult_t& Amult, const delemw_t& Aelem, const opts_t& opts);
       void compress_original_sync
-      (const dmult_t& Amult, const delemw_t& Aelem,
-       const opts_t& opts, int Actxt=-1);
+      (const dmult_t& Amult, const delemw_t& Aelem, const opts_t& opts);
       void compress_original_sync
-      (const dmult_t& Amult, const delem_blocks_t& Aelem,
-       const opts_t& opts, int Actxt=-1);
+      (const dmult_t& Amult, const delem_blocks_t& Aelem, const opts_t& opts);
       void compress_stable_nosync
-      (const dmult_t& Amult, const delemw_t& Aelem,
-       const opts_t& opts, int Actxt=-1);
+      (const dmult_t& Amult, const delemw_t& Aelem, const opts_t& opts);
       void compress_stable_sync
-      (const dmult_t& Amult, const delemw_t& Aelem,
-       const opts_t& opts, int Actxt=-1);
+      (const dmult_t& Amult, const delemw_t& Aelem, const opts_t& opts);
       void compress_stable_sync
-      (const dmult_t& Amult, const delem_blocks_t& Aelem,
-       const opts_t& opts, int Actxt=-1);
+      (const dmult_t& Amult, const delem_blocks_t& Aelem, const opts_t& opts);
       void compress_hard_restart_nosync
-      (const dmult_t& Amult, const delemw_t& Aelem,
-       const opts_t& opts, int Actxt=-1);
+      (const dmult_t& Amult, const delemw_t& Aelem, const opts_t& opts);
       void compress_hard_restart_sync
-      (const dmult_t& Amult, const delemw_t& Aelem,
-       const opts_t& opts, int Actxt=-1);
+      (const dmult_t& Amult, const delemw_t& Aelem, const opts_t& opts);
       void compress_hard_restart_sync
-      (const dmult_t& Amult, const delem_blocks_t& Aelem,
-       const opts_t& opts, int Actxt=-1);
+      (const dmult_t& Amult, const delem_blocks_t& Aelem, const opts_t& opts);
 
       void compress_recursive_original
       (DistSamples<scalar_t>& RS, const delemw_t& Aelem,
@@ -289,7 +275,8 @@ namespace strumpack {
       void get_extraction_indices
       (std::vector<std::vector<std::size_t>>& I,
        std::vector<std::vector<std::size_t>>& J, std::vector<DistMW_t>& B,
-       int lctxt, WorkCompressMPI<scalar_t>& w, int& self, int lvl);
+       const BLACSGrid* lg, WorkCompressMPI<scalar_t>& w,
+       int& self, int lvl);
       void allgather_extraction_indices
       (std::vector<std::vector<std::size_t>>& lI,
        std::vector<std::vector<std::size_t>>& lJ,
@@ -297,23 +284,19 @@ namespace strumpack {
        std::vector<std::vector<std::size_t>>& J,
        int& before, int self, int& after);
       void extract_D_B
-      (const delemw_t& Aelem, int lctxt, const opts_t& opts,
+      (const delemw_t& Aelem, const BLACSGrid* lg, const opts_t& opts,
        WorkCompressMPI<scalar_t>& w, int lvl);
 
       void factor_recursive
-      (HSSFactorsMPI<scalar_t>& f,
-       WorkFactorMPI<scalar_t>& w, int local_ctxt,
-       bool isroot, bool partial) const;
+      (HSSFactorsMPI<scalar_t>& f, WorkFactorMPI<scalar_t>& w,
+       const BLACSGrid* lg, bool isroot, bool partial) const;
 
       void solve_fwd
-      (const HSSFactorsMPI<scalar_t>& ULV,
-       const DistSubLeaf<scalar_t>& b,
-       WorkSolveMPI<scalar_t>& w, bool partial,
-       bool isroot) const;
+      (const HSSFactorsMPI<scalar_t>& ULV, const DistSubLeaf<scalar_t>& b,
+       WorkSolveMPI<scalar_t>& w, bool partial, bool isroot) const;
       void solve_bwd
-      (const HSSFactorsMPI<scalar_t>& ULV,
-       DistSubLeaf<scalar_t>& x, WorkSolveMPI<scalar_t>& w,
-       bool isroot) const;
+      (const HSSFactorsMPI<scalar_t>& ULV, DistSubLeaf<scalar_t>& x,
+       WorkSolveMPI<scalar_t>& w, bool isroot) const;
 
       void apply_fwd
       (const DistSubLeaf<scalar_t>& B, WorkApplyMPI<scalar_t>& w,
@@ -331,31 +314,28 @@ namespace strumpack {
        bool isroot, long long int flops) const;
 
       void extract_fwd
-      (WorkExtractMPI<scalar_t>& w, int lctxt,
-       bool odiag) const;
+      (WorkExtractMPI<scalar_t>& w, const BLACSGrid* lg, bool odiag) const;
       void extract_bwd
       (std::vector<Triplet<scalar_t>>& triplets,
-       int lctxt, WorkExtractMPI<scalar_t>& w) const;
+       const BLACSGrid* lg, WorkExtractMPI<scalar_t>& w) const;
       void triplets_to_DistM
-      (std::vector<Triplet<scalar_t>>& triplets,
-       DistM_t& B, int Bprows, int Bpcols) const;
+      (std::vector<Triplet<scalar_t>>& triplets, DistM_t& B) const;
       void extract_fwd
-      (WorkExtractBlocksMPI<scalar_t>& w, int lctxt,
+      (WorkExtractBlocksMPI<scalar_t>& w, const BLACSGrid* lg,
        std::vector<bool>& odiag) const;
       void extract_bwd
       (std::vector<std::vector<Triplet<scalar_t>>>& triplets,
-       int lctxt, WorkExtractBlocksMPI<scalar_t>& w) const;
+       const BLACSGrid* lg, WorkExtractBlocksMPI<scalar_t>& w) const;
       void triplets_to_DistM
       (std::vector<std::vector<Triplet<scalar_t>>>& triplets,
-       std::vector<DistM_t>& B, int Bprows, int Bpcols) const;
+       std::vector<DistM_t>& B) const;
 
       void redistribute_to_tree_to_buffers
-      (const DistM_t& A, std::size_t Arlo, std::size_t Aclo, int Actxt_all,
+      (const DistM_t& A, std::size_t Arlo, std::size_t Aclo,
        std::vector<std::vector<scalar_t>>& sbuf, int dest=0) override;
       void redistribute_to_tree_from_buffers
-      (const DistM_t& A, int Aprows, int Apcols,
-       std::size_t rlo, std::size_t clo,
-       int Actxt_all, scalar_t** pbuf) override;
+      (const DistM_t& A, std::size_t rlo, std::size_t clo,
+       scalar_t** pbuf) override;
       void delete_redistributed_input() override;
 
       void apply_UV_big
@@ -364,17 +344,18 @@ namespace strumpack {
        long long int& flops) const override;
 
       static int Pl(std::size_t n, std::size_t nl, std::size_t nr, int P) {
-        return std::max(1, std::min(int(std::round(float(P) * nl / n)), P-1));
+        return std::max
+          (1, std::min(int(std::round(float(P) * nl / n)), P-1));
       }
       static int Pr(std::size_t n, std::size_t nl, std::size_t nr, int P)
       { return std::max(1, P - Pl(n, nl, nr, P));  }
-      int Pl(int P) const {
+      int Pl() const {
         return Pl(this->rows(), this->_ch[0]->rows(),
-                  this->_ch[1]->rows(), P);
+                  this->_ch[1]->rows(), grid()->P());
       }
-      int Pr(int P) const {
+      int Pr() const {
         return Pr(this->rows(), this->_ch[0]->rows(),
-                  this->_ch[1]->rows(), P);
+                  this->_ch[1]->rows(), grid()->P());
       }
 
       template<typename T> friend
@@ -385,89 +366,70 @@ namespace strumpack {
     };
 
     template<typename scalar_t> HSSMatrixMPI<scalar_t>::HSSMatrixMPI
-    (const DistM_t& A, const opts_t& opts, MPI_Comm c)
-      : HSSMatrixBase<scalar_t>(A.rows(), A.cols(), true) {
-      setup_hierarchy(opts, c, mpi_nprocs(c), true, 0, 0);
-      setup_contexts(mpi_nprocs(c));
+    (const DistM_t& A, const opts_t& opts)
+      : HSSMatrixBase<scalar_t>(A.rows(), A.cols(), true),
+      blacs_grid_(A.grid()) {
+      setup_hierarchy(opts, 0, 0);
+      setup_local_context();
       setup_ranges(0, 0);
       compress(A, opts);
     }
 
     template<typename scalar_t> HSSMatrixMPI<scalar_t>::HSSMatrixMPI
-    (const HSSPartitionTree& t, const opts_t& opts, MPI_Comm c)
-      : HSSMatrixBase<scalar_t>(t.size, t.size, true) {
-      setup_hierarchy(t, opts, c, mpi_nprocs(c), true, 0, 0);
-      setup_contexts(mpi_nprocs(c));
+    (const HSSPartitionTree& t, const BLACSGrid* g, const opts_t& opts)
+      : HSSMatrixBase<scalar_t>(t.size, t.size, true), blacs_grid_(g) {
+      setup_hierarchy(t, opts, 0, 0);
+      setup_local_context();
       setup_ranges(0, 0);
     }
 
     template<typename scalar_t> HSSMatrixMPI<scalar_t>::HSSMatrixMPI
-    (const HSSPartitionTree& t, const DistM_t& A, const opts_t& opts,
-     MPI_Comm c) : HSSMatrixBase<scalar_t>(A.rows(), A.cols(), true) {
+    (const HSSPartitionTree& t, const DistM_t& A, const opts_t& opts)
+      : HSSMatrixBase<scalar_t>(A.rows(), A.cols(), true),
+      blacs_grid_(A.grid()) {
       assert(t.size == A.rows() && t.size == A.cols());
-      setup_hierarchy(t, opts, c, mpi_nprocs(c), true, 0, 0);
-      setup_contexts(mpi_nprocs(c));
+      setup_hierarchy(t, opts, 0, 0);
+      setup_local_context();
       setup_ranges(0, 0);
       compress(A, opts);
     }
 
     template<typename scalar_t> HSSMatrixMPI<scalar_t>::HSSMatrixMPI
-    (std::size_t m, std::size_t n, const dmult_t& Amult, int Actxt,
-     const delem_t& Aelem, const opts_t& opts, MPI_Comm c)
-      : HSSMatrixBase<scalar_t>(m, n, true) {
-      setup_hierarchy(opts, c, mpi_nprocs(c), true, 0, 0);
-      setup_contexts(mpi_nprocs(c));
+    (std::size_t m, std::size_t n, const BLACSGrid* Agrid,
+     const dmult_t& Amult, const delem_t& Aelem, const opts_t& opts)
+      : HSSMatrixBase<scalar_t>(m, n, true), blacs_grid_(Agrid) {
+      setup_hierarchy(opts, 0, 0);
+      setup_local_context();
       setup_ranges(0, 0);
-      compress(Amult, Aelem, opts, Actxt);
+      compress(Amult, Aelem, opts);
     }
 
     template<typename scalar_t> HSSMatrixMPI<scalar_t>::HSSMatrixMPI
-    (const HSSPartitionTree& t, const dmult_t& Amult, int Actxt,
-     const delem_t& Aelem, const opts_t& opts, MPI_Comm c)
-      : HSSMatrixBase<scalar_t>(t.size, t.size, true) {
-      setup_hierarchy(t, opts, c, mpi_nprocs(c), true, 0, 0);
-      setup_contexts(mpi_nprocs(c));
+    (const HSSPartitionTree& t, const BLACSGrid* Agrid,
+     const dmult_t& Amult, const delem_t& Aelem, const opts_t& opts)
+      : HSSMatrixBase<scalar_t>(t.size, t.size, true), blacs_grid_(Agrid) {
+      setup_hierarchy(t, opts, 0, 0);
+      setup_local_context();
       setup_ranges(0, 0);
-      compress(Amult, Aelem, opts, Actxt);
+      compress(Amult, Aelem, opts);
     }
 
     template<typename scalar_t>
     HSSMatrixMPI<scalar_t>::HSSMatrixMPI
     (const HSSMatrixMPI<scalar_t>& other)
-      : HSSMatrixBase<scalar_t>(other) {
-      if (other._comm != MPI_COMM_NULL)
-        MPI_Comm_dup(other._comm, &_comm);
-      else _comm = other._comm;
-      _ctxt = other._ctxt;
-      _ctxt_all = other._ctxt_all;
-      _ctxt_T = other._ctxt_T;
-      _ctxt_loc = other._ctxt_loc;
-      _prows = other._prows;
-      _pcols = other._pcols;
-      _active_procs = other._active_procs;
-      _nprocs = other._nprocs;
-      _ranges = other._ranges;
-      _U = other._U;
-      _V = other._V;
-      _D = other._D;
-      _B01 = other._B01;
-      _B10 = other._B10;
+      : HSSMatrixBase<scalar_t>(other.rows(), other.cols(), other.active()) {
+      *this = other;
     }
 
     template<typename scalar_t> HSSMatrixMPI<scalar_t>&
     HSSMatrixMPI<scalar_t>::operator=(const HSSMatrixMPI<scalar_t>& other) {
       HSSMatrixBase<scalar_t>::operator=(other);
-      if (other._comm != MPI_COMM_NULL)
-        MPI_Comm_dup(other._comm, &_comm);
-      else _comm = other._comm;
-      _ctxt = other._ctxt;
-      _ctxt_all = other._ctxt_all;
-      _ctxt_T = other._ctxt_T;
-      _ctxt_loc = other._ctxt_loc;
-      _prows = other._prows;
-      _pcols = other._pcols;
-      _active_procs = other._active_procs;
-      _nprocs = other._nprocs;
+      blacs_grid_ = other.blacs_grid_;
+      blacs_grid_local_ = other.blacs_grid_local_;
+      auto& og = *other.owned_blacs_grid_.get();
+      owned_blacs_grid_ = std::unique_ptr<BLACSGrid>(new BLACSGrid(og));
+      auto& ogl = *other.owned_blacs_grid_.get();
+      owned_blacs_grid_local_ = std::unique_ptr<BLACSGrid>(new BLACSGrid(ogl));
       _ranges = other._ranges;
       _U = other._U;
       _V = other._V;
@@ -477,21 +439,6 @@ namespace strumpack {
       return *this;
     }
 
-    template<typename scalar_t> HSSMatrixMPI<scalar_t>::~HSSMatrixMPI() {
-      auto free_context = [](int c) {
-        if (c == -1) return;
-        int nprow, npcol, prow, pcol;
-        scalapack::Cblacs_gridinfo(c, &nprow, &npcol, &prow, &pcol);
-        // the context might already have been deleted, so is invalid
-        if (nprow == -1) return;
-        scalapack::Cblacs_gridexit(c);
-      };
-      free_context(_ctxt);
-      free_context(_ctxt_T);
-      free_context(_ctxt_all);
-      mpi_free_comm(&_comm);
-    }
-
     template<typename scalar_t> HSSMatrixBase<scalar_t>*
     HSSMatrixMPI<scalar_t>::clone() const {
       return new HSSMatrixMPI<scalar_t>(*this);
@@ -499,102 +446,63 @@ namespace strumpack {
 
     /** private constructor */
     template<typename scalar_t> HSSMatrixMPI<scalar_t>::HSSMatrixMPI
-    (std::size_t m, std::size_t n, const opts_t& opts, MPI_Comm c, int P,
-     bool dup_comm, std::size_t roff, std::size_t coff)
-      : HSSMatrixBase<scalar_t>(m, n, true) {
-      setup_hierarchy(opts, c, P, dup_comm, roff, coff);
-      setup_contexts(P);
+    (std::size_t m, std::size_t n, const opts_t& opts,
+     const MPIComm& c, int P, std::size_t roff, std::size_t coff)
+      : HSSMatrixBase<scalar_t>(m, n, !c.is_null()) {
+      owned_blacs_grid_ = std::unique_ptr<BLACSGrid>(new BLACSGrid(c, P));
+      blacs_grid_ = owned_blacs_grid_.get();
+      setup_hierarchy(opts, roff, coff);
+      setup_local_context();
       setup_ranges(roff, coff);
     }
 
     /** private constructor */
     template<typename scalar_t> HSSMatrixMPI<scalar_t>::HSSMatrixMPI
-    (const HSSPartitionTree& t, const opts_t& opts, MPI_Comm c, int P,
-     bool dup_comm, std::size_t roff, std::size_t coff)
-      : HSSMatrixBase<scalar_t>(t.size, t.size, true) {
-      setup_hierarchy(t, opts, c, P, dup_comm, roff, coff);
-      setup_contexts(P);
+    (const HSSPartitionTree& t, const opts_t& opts,
+     const MPIComm& c, int P, std::size_t roff, std::size_t coff)
+      : HSSMatrixBase<scalar_t>(t.size, t.size, !c.is_null()) {
+      owned_blacs_grid_ = std::unique_ptr<const BLACSGrid>(new BLACSGrid(c, P));
+      blacs_grid_ = owned_blacs_grid_.get();
+      setup_hierarchy(t, opts, roff, coff);
+      setup_local_context();
       setup_ranges(roff, coff);
     }
 
     template<typename scalar_t> void
-    HSSMatrixMPI<scalar_t>::setup_contexts(int P) {
-      // P is not always mpi_nprocs(_comm), _comm can be MPI_COMM_NULL
-      _nprocs = P;
-      _pcols = std::floor(std::sqrt((float)_nprocs));
-      _prows = P / _pcols;
-      _active_procs = _prows * _pcols;
-      assert(_active_procs >= 1 && _active_procs <= _nprocs);
-      if (_comm != MPI_COMM_NULL) {
-        if (_active_procs < P) {
-          auto active_comm = mpi_sub_comm(_comm, 0, _active_procs);
-          if (mpi_rank(_comm) < _active_procs) {
-            _ctxt = scalapack::Csys2blacs_handle(active_comm);
-            scalapack::Cblacs_gridinit(&_ctxt, "C", _prows, _pcols);
-            _ctxt_T = scalapack::Csys2blacs_handle(active_comm);
-            scalapack::Cblacs_gridinit(&_ctxt_T, "R", _pcols, _prows);
-          } else _ctxt = _ctxt_T = -1;
-          mpi_free_comm(&active_comm);
-        } else {
-          _ctxt = scalapack::Csys2blacs_handle(_comm);
-          scalapack::Cblacs_gridinit(&_ctxt, "C", _prows, _pcols);
-          _ctxt_T = scalapack::Csys2blacs_handle(_comm);
-          scalapack::Cblacs_gridinit(&_ctxt_T, "R", _pcols, _prows);
-        }
-        _ctxt_all = scalapack::Csys2blacs_handle(_comm);
-        scalapack::Cblacs_gridinit(&_ctxt_all, "R", 1, P);
-        _ctxt_loc = _ctxt;
-      } else {
-        _ctxt = _ctxt_T = _ctxt_all = _ctxt_loc = -1;
-        this->_active = false;
-      }
+    HSSMatrixMPI<scalar_t>::setup_local_context() {
       if (!this->leaf()) {
-        if (Pl(P) <= 1) { // child 0 is sequential, create a local context
-          if (_comm != MPI_COMM_NULL) {
-            MPI_Comm c0;
-            int root = 0;
-            MPI_Group group, sub_group;
-            MPI_Comm_group(_comm, &group);
-            MPI_Group_incl(group, 1, &root, &sub_group);
-            MPI_Comm_create(_comm, sub_group, &c0);
-            if (mpi_rank(_comm) == 0) {
-              _ctxt_loc = scalapack::Csys2blacs_handle(c0);
-              scalapack::Cblacs_gridinit(&_ctxt_loc, "C", 1, 1);
+        if (Pl() <= 1) { // child 0 is sequential, create a local context
+          if (!Comm().is_null()) {
+            auto c = Comm().sub_self(0);
+            if (Comm().rank() == 0) {
+              owned_blacs_grid_local_ = std::unique_ptr<const BLACSGrid>
+                (new BLACSGrid(std::move(c), 1));
+              blacs_grid_local_ = owned_blacs_grid_local_.get();
             }
-            MPI_Group_free(&group);
-            MPI_Group_free(&sub_group);
-            mpi_free_comm(&c0);
           }
         } else {
-          auto ch0 = static_cast<HSSMatrixMPI<scalar_t>*>(this->_ch[0].get());
-          if (ch0->_active) _ctxt_loc = ch0->ctxt_loc();
+          if (this->_ch[0]->active())
+            blacs_grid_local_ = this->_ch[0]->grid_local();
         }
-        if (Pr(P) <= 1) { // child 1 is sequential, create a local context
-          if (_comm != MPI_COMM_NULL) {
-            MPI_Comm c1;
-            int root = Pl(P);
-            MPI_Group group, sub_group;
-            MPI_Comm_group(_comm, &group);
-            MPI_Group_incl(group, 1, &root, &sub_group);
-            MPI_Comm_create(_comm, sub_group, &c1);
-            if (mpi_rank(_comm) == root) {
-              _ctxt_loc = scalapack::Csys2blacs_handle(c1);
-              scalapack::Cblacs_gridinit(&_ctxt_loc, "C", 1, 1);
+        if (Pr() <= 1) { // child 1 is sequential, create a local context
+          if (!Comm().is_null()) {
+            auto c = Comm().sub_self(Pl());
+            if (Comm().rank() == Pl()) {
+              owned_blacs_grid_local_ = std::unique_ptr<const BLACSGrid>
+                (new BLACSGrid(std::move(c), 1));
+              blacs_grid_local_ = owned_blacs_grid_local_.get();
             }
-            MPI_Group_free(&group);
-            MPI_Group_free(&sub_group);
-            mpi_free_comm(&c1);
           }
         } else {
-          auto ch1 = static_cast<HSSMatrixMPI<scalar_t>*>(this->_ch[1].get());
-          if (ch1->_active) _ctxt_loc = ch1->ctxt_loc();
+          if (this->_ch[1]->active())
+            blacs_grid_local_ = this->_ch[1]->grid_local();
         }
-      }
+      } else blacs_grid_local_ = blacs_grid_;
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::setup_ranges
     (std::size_t roff, std::size_t coff) {
-      auto P = _nprocs;
+      const int P = grid()->P();
       _ranges = TreeLocalRanges(P);
       if (this->leaf()) {
         for (int p=0; p<P; p++) {
@@ -605,8 +513,8 @@ namespace strumpack {
           _ranges.leaf_procs(p) = P;
         }
       } else {
-        auto pl = Pl(P);
-        auto pr = Pr(P);
+        auto pl = Pl();
+        auto pr = Pr();
         if (pl <= 1) {
           _ranges.rlo(0) = roff;
           _ranges.clo(0) = coff;
@@ -647,34 +555,30 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::setup_hierarchy
-    (const opts_t& opts, MPI_Comm c, int P, bool dup_comm,
-     std::size_t roff, std::size_t coff) {
+    (const opts_t& opts, std::size_t roff, std::size_t coff) {
       auto m = this->rows();
       auto n = this->cols();
-      if (c == MPI_COMM_NULL || !dup_comm) _comm = c;
-      else MPI_Comm_dup(c, &_comm);
       if (m > std::size_t(opts.leaf_size()) ||
           n > std::size_t(opts.leaf_size())) {
         this->_ch.reserve(2);
-        auto pl = Pl(m, m/2, m-m/2, P);
-        auto pr = Pr(m, m/2, m-m/2, P);
+        auto pl = Pl(m, m/2, m-m/2, grid()->P());
+        auto pr = Pr(m, m/2, m-m/2, grid()->P());
         if (pl > 1) {
-          auto c0 = mpi_sub_comm(_comm, 0, pl);
           this->_ch.emplace_back
             (new HSSMatrixMPI<scalar_t>
-             (m/2, n/2, opts, c0, pl, false, roff, coff));
+             (m/2, n/2, opts, Comm().sub(0, pl), pl, roff, coff));
         } else {
-          bool act = (_comm != MPI_COMM_NULL) && (mpi_rank(_comm) == 0);
+          bool act = !Comm().is_null() && Comm().rank() == 0;
           this->_ch.emplace_back
             (new HSSMatrix<scalar_t>(m/2, n/2, opts, act));
         }
         if (pr > 1) {
-          auto c1 = mpi_sub_comm(_comm, pl, pr);
           this->_ch.emplace_back
             (new HSSMatrixMPI<scalar_t>
-             (m-m/2, n-n/2, opts, c1, pr, false, roff+m/2, coff+n/2));
+             (m-m/2, n-n/2, opts, Comm().sub(pl, pr), pr,
+              roff+m/2, coff+n/2));
         } else {
-          bool act = (_comm != MPI_COMM_NULL) && (mpi_rank(_comm) == pl);
+          bool act = !Comm().is_null() && Comm().rank() == pl;
           this->_ch.emplace_back
             (new HSSMatrix<scalar_t>(m-m/2, n-n/2, opts, act));
         }
@@ -683,32 +587,29 @@ namespace strumpack {
 
     // TODO this only works with 1 tree, so all blocks are square!!
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::setup_hierarchy
-    (const HSSPartitionTree& t, const opts_t& opts, MPI_Comm c, int P,
-     bool dup_comm, std::size_t roff, std::size_t coff) {
-      if (c == MPI_COMM_NULL || !dup_comm) _comm = c;
-      else MPI_Comm_dup(c, &_comm);
+    (const HSSPartitionTree& t, const opts_t& opts,
+     std::size_t roff, std::size_t coff) {
       if (!t.c.empty()) {
         assert(t.size == t.c[0].size + t.c[1].size);
+        const int P = grid()->P();
         auto pl = Pl(t.size, t.c[0].size, t.c[1].size, P);
         auto pr = Pr(t.size, t.c[0].size, t.c[1].size, P);
         this->_ch.reserve(2);
         if (pl > 1) {
-          auto c0 = mpi_sub_comm(_comm, 0, pl);
           this->_ch.emplace_back
             (new HSSMatrixMPI<scalar_t>
-             (t.c[0], opts, c0, pl, false, roff, coff));
+             (t.c[0], opts, Comm().sub(0, pl), pl, roff, coff));
         } else {
-          bool act = (_comm != MPI_COMM_NULL) && (mpi_rank(_comm) == 0);
+          bool act = !Comm().is_null() && Comm().rank() == 0;
           this->_ch.emplace_back(new HSSMatrix<scalar_t>(t.c[0], opts, act));
         }
         if (pr > 1) {
-          auto c1 = mpi_sub_comm(_comm, pl, pr);
           this->_ch.emplace_back
             (new HSSMatrixMPI<scalar_t>
-             (t.c[1], opts, c1, pr, false,
+             (t.c[1], opts, Comm().sub(pl, pr), pr,
               roff+t.c[0].size, coff+t.c[0].size));
         } else {
-          bool act = (_comm != MPI_COMM_NULL) && (mpi_rank(_comm) == pl);
+          bool act = !Comm().is_null() && Comm().rank() == pl;
           this->_ch.emplace_back(new HSSMatrix<scalar_t>(t.c[1], opts, act));
         }
       }
@@ -716,9 +617,7 @@ namespace strumpack {
 
     template<typename scalar_t> std::size_t
     HSSMatrixMPI<scalar_t>::max_rank() const {
-      std::size_t rmax, r=this->rank();
-      MPI_Allreduce(&r, &rmax, 1, mpi_type<std::size_t>(), MPI_MAX, _comm);
-      return rmax;
+      return Comm().all_reduce(this->rank(), MPI_MAX);
     }
     template<typename scalar_t> std::size_t
     HSSMatrixMPI<scalar_t>::rank() const {
@@ -730,9 +629,7 @@ namespace strumpack {
 
     template<typename scalar_t> std::size_t
     HSSMatrixMPI<scalar_t>::total_memory() const {
-      std::size_t mtot, m=memory();
-      MPI_Allreduce(&m, &mtot, 1, mpi_type<std::size_t>(), MPI_SUM, _comm);
-      return mtot;
+      return Comm().all_reduce(memory(), MPI_SUM);
     }
     template<typename scalar_t> std::size_t
     HSSMatrixMPI<scalar_t>::memory() const {
@@ -745,10 +642,7 @@ namespace strumpack {
 
     template<typename scalar_t> std::size_t
     HSSMatrixMPI<scalar_t>::total_nonzeros() const {
-      std::size_t nnztot, nnz=nonzeros();
-      MPI_Allreduce(&nnz, &nnztot, 1, mpi_type<std::size_t>(),
-                    MPI_SUM, _comm);
-      return nnztot;
+      return Comm().all_reduce(nonzeros(), MPI_SUM);
     }
     template<typename scalar_t> std::size_t
     HSSMatrixMPI<scalar_t>::nonzeros() const {
@@ -761,9 +655,7 @@ namespace strumpack {
 
     template<typename scalar_t> std::size_t
     HSSMatrixMPI<scalar_t>::max_levels() const {
-      std::size_t ltot, l=levels();
-      MPI_Allreduce(&l, &ltot, 1, mpi_type<std::size_t>(), MPI_MAX, _comm);
-      return ltot;
+      return Comm().all_reduce(levels(), MPI_MAX);
     }
     template<typename scalar_t> std::size_t
     HSSMatrixMPI<scalar_t>::levels() const {
@@ -773,15 +665,12 @@ namespace strumpack {
       return 1 + lvls;
     }
 
-
-    /** ctxt should be included in _ctxt_all, which is the case if it
-        is included in comm? */
     template<typename scalar_t> DistributedMatrix<scalar_t>
-    HSSMatrixMPI<scalar_t>::dense(int ctxt) const {
+    HSSMatrixMPI<scalar_t>::dense() const {
       // TODO faster implementation?  an implementation similar to the
       // sequential algorithm is difficult, as it will require a lot
       // of communication? Maybe just use the extraction routine??
-      DistM_t identity(ctxt, this->cols(), this->cols());
+      DistM_t identity(grid(), this->cols(), this->cols());
       identity.eye();
       return apply(identity);
     }
@@ -800,7 +689,9 @@ namespace strumpack {
       w.c[0].dS = w.c[0].Sr.cols();
       w.c[1].dR = w.c[1].Rr.cols();
       w.c[1].dS = w.c[1].Sr.cols();
-      int rank = mpi_rank(_comm), P = mpi_nprocs(_comm), root1 = Pl(P);
+
+      // TODO rewrite this using the grid info
+      int rank = Comm().rank(), P = Comm().size(), root1 = Pl();
       int P0total = root1, P1total = P - root1;
       int pcols = std::floor(std::sqrt((float)P0total));
       int prows = P0total / pcols;
@@ -833,7 +724,7 @@ namespace strumpack {
           for (int p=P0active; p<P; p++)
             if (rank == (p - P0active) % P0active)
               MPI_Isend(sbuf0.data(), sbuf0.size(), mpi_type<std::size_t>(),
-                        p, /*tag*/0, _comm, &sreq[sreqs++]);
+                        p, /*tag*/0, comm(), &sreq[sreqs++]);
         }
       }
       if (rank >= root1 && rank < root1+P1active) {
@@ -859,11 +750,11 @@ namespace strumpack {
           for (int p=0; p<root1; p++)
             if (rank - root1 == p % P1active)
               MPI_Isend(sbuf1.data(), sbuf1.size(), mpi_type<std::size_t>(),
-                        p, /*tag*/1, _comm, &sreq[sreqs++]);
+                        p, /*tag*/1, comm(), &sreq[sreqs++]);
           for (int p=root1+P1active; p<P; p++)
             if (rank - root1 == (p - P1active) % P1active)
               MPI_Isend(sbuf1.data(), sbuf1.size(), mpi_type<std::size_t>(),
-                        p, /*tag*/1, _comm, &sreq[sreqs++]);
+                        p, /*tag*/1, comm(), &sreq[sreqs++]);
         }
       }
       if (!(rank < P0active)) {
@@ -873,11 +764,11 @@ namespace strumpack {
         for (int p=0; p<P0active; p++)
           if (p == (rank - P0active) % P0active) { dest = p; break; }
         assert(dest >= 0);
-        MPI_Probe(dest, /*tag*/0, _comm, &stat);
+        MPI_Probe(dest, /*tag*/0, comm(), &stat);
         MPI_Get_count(&stat, mpi_type<std::size_t>(), &msgsize);
         auto buf = new std::size_t[msgsize];
         MPI_Recv(buf, msgsize, mpi_type<std::size_t>(), dest, /*tag*/0,
-                 _comm, MPI_STATUS_IGNORE);
+                 comm(), MPI_STATUS_IGNORE);
         auto ptr = buf;
         this->_ch[0]->_U_state = State(*ptr++);
         this->_ch[0]->_V_state = State(*ptr++);
@@ -910,11 +801,11 @@ namespace strumpack {
           }
         }
         assert(dest >= 0);
-        MPI_Probe(dest, /*tag*/1, _comm, &stat);
+        MPI_Probe(dest, /*tag*/1, comm(), &stat);
         MPI_Get_count(&stat, mpi_type<std::size_t>(), &msgsize);
         auto buf = new std::size_t[msgsize];
         MPI_Recv(buf, msgsize, mpi_type<std::size_t>(), dest, /*tag*/1,
-                 _comm, MPI_STATUS_IGNORE);
+                 comm(), MPI_STATUS_IGNORE);
         auto ptr = buf;
         this->_ch[1]->_U_state = State(*ptr++);
         this->_ch[1]->_V_state = State(*ptr++);
@@ -940,8 +831,8 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::notify_inactives_J(WorkCompressMPI<scalar_t>& w) {
-      int rank = mpi_rank(_comm), P = _nprocs, actives = _active_procs;
-      int inactives = P - actives;
+      int rank = Comm().rank(), actives = grid()->npactives();
+      int inactives = grid()->P() - actives;
       if (rank < inactives) {
         std::vector<std::size_t> sbuf;
         sbuf.reserve(2+w.Jr.size()+w.Jc.size());
@@ -950,16 +841,16 @@ namespace strumpack {
         for (auto i : w.Jr) sbuf.push_back(i);
         for (auto i : w.Jc) sbuf.push_back(i);
         MPI_Send(sbuf.data(), sbuf.size(), mpi_type<std::size_t>(),
-                 actives + rank, 0, _comm);
+                 actives + rank, 0, Comm().comm());
       }
       if (rank >= actives) {
         MPI_Status stat;
-        MPI_Probe(rank - actives, 0, _comm, &stat);
+        MPI_Probe(rank - actives, 0, comm(), &stat);
         int msgsize;
         MPI_Get_count(&stat, mpi_type<std::size_t>(), &msgsize);
         auto buf = new std::size_t[msgsize];
         MPI_Recv(buf, msgsize, mpi_type<std::size_t>(), rank - actives,
-                 0, _comm, MPI_STATUS_IGNORE);
+                 0, comm(), MPI_STATUS_IGNORE);
         auto ptr = buf;
         w.Jr.resize(*ptr++);
         w.Jc.resize(*ptr++);
@@ -972,8 +863,17 @@ namespace strumpack {
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::notify_inactives_states
     (WorkCompressMPI<scalar_t>& w) {
-      int rank = mpi_rank(_comm), P = _nprocs, actives = _active_procs;
-      int inactives = P - actives;
+      int rank = Comm().rank(), actives = grid()->npactives();
+      int inactives = grid()->P() - actives;
+
+      std::cout << "rank=" << mpi_rank()
+                << " rank=" << rank
+                << " P=" << grid()->P()
+                << " actives=" << actives
+                << " inactives=" << inactives
+                << std::endl;
+
+
       if (rank < inactives) {
         std::vector<std::size_t> sbuf;
         sbuf.reserve(8+w.Ir.size()+w.Ic.size()+w.Jr.size()+w.Jc.size());
@@ -990,16 +890,16 @@ namespace strumpack {
         for (auto i : w.Jr) sbuf.push_back(i);
         for (auto i : w.Jc) sbuf.push_back(i);
         MPI_Send(sbuf.data(), sbuf.size(), mpi_type<std::size_t>(),
-                 actives + rank, 0, _comm);
+                 actives + rank, 0, comm());
       }
       if (rank >= actives) {
         MPI_Status stat;
-        MPI_Probe(rank - actives, 0, _comm, &stat);
+        MPI_Probe(rank - actives, 0, comm(), &stat);
         int msgsize;
         MPI_Get_count(&stat, mpi_type<std::size_t>(), &msgsize);
         auto buf = new std::size_t[msgsize];
         MPI_Recv(buf, msgsize, mpi_type<std::size_t>(), rank - actives, 0,
-                 _comm, MPI_STATUS_IGNORE);
+                 comm(), MPI_STATUS_IGNORE);
         auto ptr = buf;
         this->_U_state = State(*ptr++);
         this->_V_state = State(*ptr++);
@@ -1019,6 +919,8 @@ namespace strumpack {
         for (int i=0; i<this->_V_rank; i++) w.Jc[i] = *ptr++;
         delete[] buf;
       }
+
+      std::cout << "rank=" << mpi_rank() << " DONE" << std::endl;
     }
 
     /**
@@ -1034,32 +936,33 @@ namespace strumpack {
       if (!this->active()) return;
       assert(std::size_t(dist.rows())==this->cols());
       BC2BR::block_cyclic_to_block_row
-        (_ranges, dist, sub, leaf, ctxt_loc(), _comm);
+        (_ranges, dist, sub, leaf, grid_local(), Comm());
     }
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::allocate_block_row
     (int d, DenseM_t& sub, DistM_t& leaf) const {
       if (!this->active()) return;
-      auto rank = mpi_rank(_comm);
-      for (int p=0; p<_nprocs; p++) {
+      const int rank = Comm().rank();
+      const int P = grid()->P();
+      for (int p=0; p<P; p++) {
         auto m = _ranges.chi(p) - _ranges.clo(p);
         if (_ranges.leaf_procs(p) == 1) {
           if (p == rank) sub = DenseM_t(m, d);
         } else {
           if (p <= rank && rank < p+_ranges.leaf_procs(p))
-            leaf = DistM_t(ctxt_loc(), m, d);
+            leaf = DistM_t(grid_local(), m, d);
           p += _ranges.leaf_procs(p)-1;
         }
       }
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::from_block_row
-    (DistM_t& dist, const DenseM_t& sub,
-     const DistM_t& leaf, int lctxt) const {
+    (DistM_t& dist, const DenseM_t& sub, const DistM_t& leaf,
+     const BLACSGrid* lg) const {
       if (!this->active()) return;
       assert(std::size_t(dist.rows())==this->cols());
-      BC2BR::block_row_to_block_cyclic(_ranges, dist, sub, leaf, _comm);
+      BC2BR::block_row_to_block_cyclic(_ranges, dist, sub, leaf, Comm());
     }
 
     template<typename scalar_t> void
@@ -1081,9 +984,9 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::print_info
     (std::ostream &out, std::size_t roff, std::size_t coff) const {
       if (!this->active()) return;
-      if (!mpi_rank(_comm)) {
-        out << "rank = " << mpi_rank(_comm) << "/" << mpi_rank(MPI_COMM_WORLD)
-            << " P=" << mpi_nprocs(_comm)
+      if (Comm().is_root()) {
+        out << "rank = " << Comm().rank() << "/" << mpi_rank(MPI_COMM_WORLD)
+            << " P=" << Comm().size()
             << " b = [" << roff << "," << roff+this->rows()
             << " x " << coff << "," << coff+this->cols() << "]  U = "
             << this->U_rows() << " x " << this->U_rank() << " V = "
@@ -1092,7 +995,7 @@ namespace strumpack {
         else out << " non-leaf" << std::endl;
       }
       for (auto& c : this->_ch) {
-        MPI_Barrier(_comm);
+        Comm().barrier();
         c->print_info(out, roff, coff);
         roff += c->rows();
         coff += c->cols();

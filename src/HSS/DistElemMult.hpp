@@ -50,8 +50,7 @@ namespace strumpack {
         std::vector<std::size_t> lJ(J);
         for (auto& i : lI) i -= rlo;
         for (auto& j : lJ) j -= clo;
-        // TODO this is the wrong communicator??
-        auto Asub = A.extract(lI, lJ, c);
+        auto Asub = A.extract(lI, lJ);
         assert(Asub.ctxt() == B.ctxt());
         B = Asub;
         // TODO: if I do
@@ -67,13 +66,12 @@ namespace strumpack {
       using DistM_t = DistributedMatrix<scalar_t>;
       using DenseM_t = DenseMatrix<scalar_t>;
     public:
-      DistElemMultDuplicated(const DistM_t& A, int ctxt_all)
-        : _A(A), _Ag(A.all_gather(ctxt_all)) {}
-      const DistM_t& _A;
-      const DenseM_t _Ag;
+      DistElemMultDuplicated(const DistM_t& A)
+        : A_(A), Ag_(A.all_gather()) {}
+
       void operator()(DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
-        gemm(Trans::N, Trans::N, scalar_t(1.), _A, R, scalar_t(0.), Sr);
-        gemm(Trans::C, Trans::N, scalar_t(1.), _A, R, scalar_t(0.), Sc);
+        gemm(Trans::N, Trans::N, scalar_t(1.), A_, R, scalar_t(0.), Sr);
+        gemm(Trans::C, Trans::N, scalar_t(1.), A_, R, scalar_t(0.), Sc);
       }
       void operator()
       (const std::vector<size_t>& I, const std::vector<size_t>& J,
@@ -82,11 +80,15 @@ namespace strumpack {
         assert(int(I.size()) == B.rows() && int(J.size()) == B.cols());
         for (std::size_t j=0; j<J.size(); j++)
           for (std::size_t i=0; i<I.size(); i++) {
-            assert(I[i] >= 0 && int(I[i]) < _A.rows() &&
-                   J[j] >= 0 && int(J[j]) < _A.cols());
-            B.global(i, j, _Ag(I[i], J[j]));
+            assert(I[i] >= 0 && int(I[i]) < A_.rows() &&
+                   J[j] >= 0 && int(J[j]) < A_.cols());
+            B.global(i, j, Ag_(I[i], J[j]));
           }
       }
+
+    private:
+      const DistM_t& A_;
+      const DenseM_t Ag_;
     };
 
     template<typename scalar_t> class LocalElemMult {
@@ -101,27 +103,29 @@ namespace strumpack {
     public:
       LocalElemMult(const delemw_t& Aelem,
                     std::pair<std::size_t,std::size_t>& offset,
-                    int ctxt, const DenseM_t& A)
-        : _dAelem(Aelem), _offset(offset), _ctxt_loc(ctxt), _A(A) {}
-      const delemw_t& _dAelem;
-      const std::pair<std::size_t,std::size_t> _offset;
-      int _ctxt_loc;
-      const DenseM_t& _A;
+                    const BLACSGrid* lg, const DenseM_t& A)
+        : dAelem_(Aelem), offset_(offset), grid_local_(lg), A_(A) {}
 
       void operator()
       (const std::vector<size_t>& I, const std::vector<size_t>& J,
        DenseM_t& B) {
-        if (_A.rows() != 0)
-          B = _A.extract(I, J);
+        if (A_.rows() != 0)
+          B = A_.extract(I, J);
         else {
           std::vector<std::size_t> gI(I), gJ(J);
-          for (auto& i : gI) i += _offset.first;
-          for (auto& j : gJ) j += _offset.second;
-          DistMW_t dB(_ctxt_loc, 0, 0, I.size(), J.size(), B);
+          for (auto& i : gI) i += offset_.first;
+          for (auto& j : gJ) j += offset_.second;
+          DistMW_t dB(grid_local_, 0, 0, I.size(), J.size(), B);
           DistM_t dA;
-          _dAelem(gI, gJ, dB, dA, 0, 0, MPI_COMM_NULL);
+          dAelem_(gI, gJ, dB, dA, 0, 0, MPI_COMM_NULL);
         }
       }
+
+    private:
+      const delemw_t& dAelem_;
+      const std::pair<std::size_t,std::size_t> offset_;
+      const BLACSGrid* grid_local_;
+      const DenseM_t& A_;
     };
 
   } // end namespace HSS

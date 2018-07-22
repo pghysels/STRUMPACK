@@ -94,8 +94,7 @@ namespace strumpack {
      DenseM_t& B, int depth) const override;
     void extract_separator_2d
     (integer_t sep_end, const std::vector<std::size_t>& I,
-     const std::vector<std::size_t>& J,
-     DistM_t& B, MPI_Comm comm) const override;
+     const std::vector<std::size_t>& J, DistM_t& B) const override;
     void extract_front
     (DenseM_t& F11, DenseM_t& F12, DenseM_t& F21, integer_t sep_begin,
      integer_t sep_end, const std::vector<integer_t>& upd,
@@ -116,8 +115,8 @@ namespace strumpack {
      const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const override;
     void front_multiply_2d
     (integer_t sep_begin, integer_t sep_end,
-     const std::vector<integer_t>& upd, const DistM_t& R, DistM_t& Srow,
-     DistM_t& Scol, int ctxt_all, MPI_Comm R_comm, int depth) const override;
+     const std::vector<integer_t>& upd, const DistM_t& R,
+     DistM_t& Srow, DistM_t& Scol, int depth) const override;
   };
 
   template<typename scalar_t,typename integer_t>
@@ -442,7 +441,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::extract_separator_2d
   (integer_t sep_end, const std::vector<std::size_t>& I,
-   const std::vector<std::size_t>& J, DistM_t& B, MPI_Comm comm) const {
+   const std::vector<std::size_t>& J, DistM_t& B) const {
     if (!B.active()) return;
     const integer_t m = I.size();
     const integer_t n = J.size();
@@ -469,22 +468,16 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::front_multiply_2d
   (integer_t sep_begin, integer_t sep_end, const std::vector<integer_t>& upd,
-   const DistM_t& R, DistM_t& Srow, DistM_t& Scol, int ctxt_all,
-   MPI_Comm R_comm, int depth) const {
+   const DistM_t& R, DistM_t& Srow, DistM_t& Scol, int depth) const {
     integer_t dim_upd = upd.size();
     // redistribute R and Srow and Scol to 1d block cyclic column
     // distribution to avoid communication below
-    DistM_t R_bc(R.ctxt(), R.rows(), R.cols(), R.rows(), R.NB());
-    DistM_t Srow_bc
-      (R.ctxt(), Srow.rows(), Srow.cols(), Srow.rows(), Srow.NB());
-    DistM_t Scol_bc
-      (R.ctxt(), Scol.rows(), Scol.cols(), Scol.rows(), Scol.NB());
-    // TODO use copy routines from DistM_t
-    strumpack::copy(R.rows(), R.cols(), R, 0, 0, R_bc, 0, 0, ctxt_all);
-    strumpack::copy
-      (Srow.rows(), Srow.cols(), Srow, 0, 0, Srow_bc, 0, 0, ctxt_all);
-    strumpack::copy
-      (Scol.rows(), Scol.cols(), Scol, 0, 0, Scol_bc, 0, 0, ctxt_all);
+    DistM_t R_bc(R.grid(), R.rows(), R.cols(), R.rows(), R.NB());
+    DistM_t Srow_bc(R.grid(), Srow.rows(), Srow.cols(), Srow.rows(), Srow.NB());
+    DistM_t Scol_bc(R.grid(), Scol.rows(), Scol.cols(), Scol.rows(), Scol.NB());
+    strumpack::copy(R.rows(), R.cols(), R, 0, 0, R_bc, 0, 0, R.grid());
+    strumpack::copy(Srow.rows(), Srow.cols(), Srow, 0, 0, Srow_bc, 0, 0, R.grid());
+    strumpack::copy(Scol.rows(), Scol.cols(), Scol, 0, 0, Scol_bc, 0, 0, R.grid());
 
     if (R.active()) {
       long long int local_flops = 0;
@@ -550,10 +543,8 @@ namespace strumpack {
         STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
       }
     }
-    strumpack::copy
-      (Srow.rows(), Srow.cols(), Srow_bc, 0, 0, Srow, 0, 0, ctxt_all);
-    strumpack::copy
-      (Scol.rows(), Scol.cols(), Scol_bc, 0, 0, Scol, 0, 0, ctxt_all);
+    strumpack::copy(Srow.rows(), Srow.cols(), Srow_bc, 0, 0, Srow, 0, 0, R.grid());
+    strumpack::copy(Scol.rows(), Scol.cols(), Scol_bc, 0, 0, Scol, 0, 0, R.grid());
   }
 
   // TODO parallel -> will be hard to do efficiently

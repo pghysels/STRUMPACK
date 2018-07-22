@@ -146,15 +146,14 @@ namespace strumpack {
      const integer_t* upd) const = 0;
     virtual void extract_separator_2d
     (integer_t sep_end, const std::vector<std::size_t>& I,
-     const std::vector<std::size_t>& J, DistM_t& B, MPI_Comm comm) const = 0;
+     const std::vector<std::size_t>& J, DistM_t& B) const = 0;
     virtual void front_multiply
     (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
      const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const = 0;
     virtual void front_multiply_2d
     (integer_t sep_begin, integer_t sep_end,
-     const std::vector<integer_t>& upd,
-     const DistM_t& R, DistM_t& Srow, DistM_t& Scol,
-     int ctx_all, MPI_Comm R_comm, int depth) const = 0;
+     const std::vector<integer_t>& upd, const DistM_t& R,
+     DistM_t& Srow, DistM_t& Scol, int depth) const = 0;
 
   protected:
     integer_t _n;

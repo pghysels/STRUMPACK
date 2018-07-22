@@ -1,3 +1,30 @@
+/*
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
+ *
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
+ *
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly.  Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government is granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
+ *
+ * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
+ *             (Lawrence Berkeley National Lab, Computational Research
+ *             Division).
+ */
 #ifndef HSS_MATRIXMPI_SCHUR_HPP
 #define HSS_MATRIXMPI_SCHUR_HPP
 
@@ -7,7 +34,7 @@ namespace strumpack {
     /**
      * The Schur complement is F22 - Theta * Vhat^C * Phi^C.  This
      * routine returns Theta, Phi, Vhat and (D0^{-1} * U0 * B01), all
-     * on ctxt().
+     * on grid().
      *   Theta = U1big * B10
      *   Phi = (D0^{-1} * U0 * B01 * V1big^C)^C
      *       = V1big * (D0^{-1} * U0 * B01)^C
@@ -18,7 +45,7 @@ namespace strumpack {
       if (this->leaf()) return;
       auto ch0 = child(0);
       auto ch1 = child(1);
-      DistM_t DU(ctxt(), ch0->U_rows(), ch0->U_rank());
+      DistM_t DU(grid(), ch0->U_rows(), ch0->U_rank());
       if (auto ch0mpi =
           dynamic_cast<const HSSMatrixMPI<scalar_t>*>(child(0))) {
         DistM_t chDU;
@@ -28,7 +55,7 @@ namespace strumpack {
             (!f._D.is_master() ? 0 :
              blas::getrs_flops(f._D.rows(), ch0mpi->_U.cols()));
         }
-        copy(ch0->U_rows(), ch0->U_rank(), chDU, 0, 0, DU, 0, 0, _ctxt_all);
+        copy(ch0->U_rows(), ch0->U_rank(), chDU, 0, 0, DU, 0, 0, grid());
       } else {
         auto ch0seq = dynamic_cast<const HSSMatrix<scalar_t>*>(child(0));
         DenseM_t chDU;
@@ -39,38 +66,36 @@ namespace strumpack {
             (!f._D.is_master() ? 0 :
              blas::getrs_flops(f._D.rows(), ch0seq->_U.cols()));
         }
-        copy(ch0->U_rows(), ch0->U_rank(), chDU, 0/*rank ch0*/,
-             DU, 0, 0, _ctxt_all);
+        copy(ch0->U_rows(), ch0->U_rank(), chDU, 0/*rank ch0*/, DU, 0, 0, grid());
       }
-      DUB01 = DistM_t(ctxt(), ch0->U_rows(), ch1->V_rank());
+      DUB01 = DistM_t(grid(), ch0->U_rows(), ch1->V_rank());
       gemm(Trans::N, Trans::N, scalar_t(1.), DU, _B01, scalar_t(0.), DUB01);
       STRUMPACK_SCHUR_FLOPS
         (gemm_flops(Trans::N, Trans::N, scalar_t(1.), DU, _B01, scalar_t(0.)));
 
-      DistM_t _theta(ch1->ctxt(ctxt_loc()), _B10.rows(), _B10.cols());
-      copy(_B10.rows(), _B10.cols(), _B10, 0, 0, _theta, 0, 0, ctxt_all());
+      DistM_t _theta(ch1->grid(grid_local()), _B10.rows(), _B10.cols());
+      copy(_B10.rows(), _B10.cols(), _B10, 0, 0, _theta, 0, 0, grid());
       auto DUB01t = DUB01.transpose();
-      DistM_t _phi(ch1->ctxt(ctxt_loc()), DUB01t.rows(), DUB01t.cols());
-      copy(DUB01t.rows(), DUB01t.cols(), DUB01t, 0, 0, _phi, 0, 0, ctxt_all());
+      DistM_t _phi(ch1->grid(grid_local()), DUB01t.rows(), DUB01t.cols());
+      copy(DUB01t.rows(), DUB01t.cols(), DUB01t, 0, 0, _phi, 0, 0, grid());
       DUB01t.clear();
 
-      DistSubLeaf<scalar_t> Theta_br(_theta.cols(), ch1, ctxt_loc()),
-        Phi_br(_phi.cols(), ch1, ctxt_loc());
-      DistM_t Theta_ch(ch1->ctxt(ctxt_loc()), ch1->rows(), _theta.cols());
-      DistM_t Phi_ch(ch1->ctxt(ctxt_loc()), ch1->cols(), _phi.cols());
+      DistSubLeaf<scalar_t> Theta_br(_theta.cols(), ch1, grid_local()),
+        Phi_br(_phi.cols(), ch1, grid_local());
+      DistM_t Theta_ch(ch1->grid(grid_local()), ch1->rows(), _theta.cols());
+      DistM_t Phi_ch(ch1->grid(grid_local()), ch1->cols(), _phi.cols());
       long long int flops = 0;
       ch1->apply_UV_big(Theta_br, _theta, Phi_br, _phi, flops);
       STRUMPACK_SCHUR_FLOPS(flops);
       Theta_br.from_block_row(Theta_ch);
       Phi_br.from_block_row(Phi_ch);
-      Theta = DistM_t(ctxt(), Theta_ch.rows(), Theta_ch.cols());
-      Phi = DistM_t(ctxt(), Phi_ch.rows(), Phi_ch.cols());
-      copy(Theta.rows(), Theta.cols(), Theta_ch, 0, 0,
-           Theta, 0, 0, _ctxt_all);
-      copy(Phi.rows(), Phi.cols(), Phi_ch, 0, 0, Phi, 0, 0, _ctxt_all);
+      Theta = DistM_t(grid(), Theta_ch.rows(), Theta_ch.cols());
+      Phi = DistM_t(grid(), Phi_ch.rows(), Phi_ch.cols());
+      copy(Theta.rows(), Theta.cols(), Theta_ch, 0, 0, Theta, 0, 0, grid());
+      copy(Phi.rows(), Phi.cols(), Phi_ch, 0, 0, Phi, 0, 0, grid());
 
-      Vhat = DistM_t(ctxt(), Phi.cols(), Theta.cols());
-      copy(Vhat.rows(), Vhat.cols(), f.Vhat(), 0, 0, Vhat, 0, 0, ctxt_all());
+      Vhat = DistM_t(grid(), Phi.cols(), Theta.cols());
+      copy(Vhat.rows(), Vhat.cols(), f.Vhat(), 0, 0, Vhat, 0, 0, grid());
     }
 
     /**
@@ -93,25 +118,25 @@ namespace strumpack {
       long long int flops = 0;
       auto ch1 = child(1);
       auto n = R.cols();
-      DistM_t RS_ch1(ch1->ctxt(ctxt_loc()), ch1->rows(), R.cols());
-      copy(ch1->rows(), R.cols(), R, 0, 0, RS_ch1, 0, 0, _ctxt_all);
-      DistSubLeaf<scalar_t> R_br(n, ch1, ctxt_loc(), RS_ch1),
-        Sr_br(n, ch1, ctxt_loc()), Sc_br(n, ch1, ctxt_loc());
+      DistM_t RS_ch1(ch1->grid(grid_local()), ch1->rows(), R.cols());
+      copy(ch1->rows(), R.cols(), R, 0, 0, RS_ch1, 0, 0, grid());
+      DistSubLeaf<scalar_t> R_br(n, ch1, grid_local(), RS_ch1),
+        Sr_br(n, ch1, grid_local()), Sc_br(n, ch1, grid_local());
       WorkApplyMPI<scalar_t> wr, wc;
       ch1->apply_fwd(R_br, wr, false, flops);
       ch1->applyT_fwd(R_br, wc, false, flops);
-      DistM_t wrtmp(ctxt(), ch1->V_rank(), n);
-      DistM_t wctmp(ctxt(), ch1->U_rank(), n);
-      copy(ch1->V_rank(), n, wr.tmp1, 0, 0, wrtmp, 0, 0, _ctxt_all);
-      copy(ch1->U_rank(), n, wc.tmp1, 0, 0, wctmp, 0, 0, _ctxt_all);
+      DistM_t wrtmp(grid(), ch1->V_rank(), n);
+      DistM_t wctmp(grid(), ch1->U_rank(), n);
+      copy(ch1->V_rank(), n, wr.tmp1, 0, 0, wrtmp, 0, 0, grid());
+      copy(ch1->U_rank(), n, wc.tmp1, 0, 0, wctmp, 0, 0, grid());
       if (Theta.cols() < Phi.cols()) {
-        DistM_t VtDUB01(ctxt(), Vhat.cols(), DUB01.cols());
+        DistM_t VtDUB01(grid(), Vhat.cols(), DUB01.cols());
         gemm(Trans::C, Trans::N, scalar_t(1.), Vhat, DUB01,
              scalar_t(0.), VtDUB01);
-        DistM_t tmpr(ctxt(), child(0)->V_rank(), n);
+        DistM_t tmpr(grid(), child(0)->V_rank(), n);
         gemm(Trans::N, Trans::N, scalar_t(1.), VtDUB01, wrtmp,
              scalar_t(0.), tmpr);
-        DistM_t tmpc(ctxt(), _B10.cols(), n);
+        DistM_t tmpc(grid(), _B10.cols(), n);
         gemm(Trans::C, Trans::N, scalar_t(1.), _B10, wctmp,
              scalar_t(0.), tmpc);
         STRUMPACK_CB_SAMPLE_FLOPS
@@ -123,28 +148,28 @@ namespace strumpack {
         ch1->applyT_bwd(R_br, scalar_t(0.), Sc_br, wc, true, flops);
 
         Sr_br.from_block_row(RS_ch1);
-        DistM_t Sloc(ctxt(), Sr.rows(), Sr.cols());
-        copy(ch1->rows(), Sr.cols(), RS_ch1, 0, 0, Sloc, 0, 0, _ctxt_all);
+        DistM_t Sloc(grid(), Sr.rows(), Sr.cols());
+        copy(ch1->rows(), Sr.cols(), RS_ch1, 0, 0, Sloc, 0, 0, grid());
         gemm(Trans::N, Trans::N, scalar_t(-1.), Theta, tmpr,
              scalar_t(1.), Sloc);
-        copy(ch1->rows(), Sr.cols(), Sloc, 0, 0, Sr, 0, 0, _ctxt_all);
+        copy(ch1->rows(), Sr.cols(), Sloc, 0, 0, Sr, 0, 0, grid());
 
         Sc_br.from_block_row(RS_ch1);
-        copy(ch1->rows(), Sc.cols(), RS_ch1, 0, 0, Sloc, 0, 0, _ctxt_all);
+        copy(ch1->rows(), Sc.cols(), RS_ch1, 0, 0, Sloc, 0, 0, grid());
         gemm(Trans::C, Trans::N, scalar_t(-1.), VhatCPhiC, tmpc,
              scalar_t(1.), Sloc);
-        copy(ch1->rows(), Sc.cols(), Sloc, 0, 0, Sc, 0, 0, _ctxt_all);
+        copy(ch1->rows(), Sc.cols(), Sloc, 0, 0, Sc, 0, 0, grid());
         STRUMPACK_CB_SAMPLE_FLOPS
           (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Theta, tmpr, scalar_t(1.)) +
            gemm_flops(Trans::C, Trans::N, scalar_t(-1.), VhatCPhiC, tmpc, scalar_t(1.)));
       } else {
-        DistM_t tmpr(ctxt(), DUB01.rows(), n);
+        DistM_t tmpr(grid(), DUB01.rows(), n);
         gemm(Trans::N, Trans::N, scalar_t(1.), DUB01, wrtmp,
              scalar_t(0.), tmpr);
-        DistM_t VB10t(ctxt(), Vhat.rows(), _B10.rows());
+        DistM_t VB10t(grid(), Vhat.rows(), _B10.rows());
         gemm(Trans::N, Trans::C, scalar_t(1.), Vhat, _B10,
              scalar_t(0.), VB10t);
-        DistM_t tmpc(ctxt(), Vhat.rows(), n);
+        DistM_t tmpc(grid(), Vhat.rows(), n);
         gemm(Trans::N, Trans::N, scalar_t(1.), VB10t, wctmp,
              scalar_t(0.), tmpc);
         STRUMPACK_CB_SAMPLE_FLOPS
@@ -156,17 +181,17 @@ namespace strumpack {
         ch1->applyT_bwd(R_br, scalar_t(0.), Sc_br, wc, true, flops);
 
         Sr_br.from_block_row(RS_ch1);
-        DistM_t Sloc(ctxt(), Sr.rows(), Sr.cols());
-        copy(ch1->rows(), Sr.cols(), RS_ch1, 0, 0, Sloc, 0, 0, _ctxt_all);
+        DistM_t Sloc(grid(), Sr.rows(), Sr.cols());
+        copy(ch1->rows(), Sr.cols(), RS_ch1, 0, 0, Sloc, 0, 0, grid());
         gemm(Trans::N, Trans::N, scalar_t(-1.), ThetaVhatC, tmpr,
              scalar_t(1.), Sloc);
-        copy(ch1->rows(), Sr.cols(), Sloc, 0, 0, Sr, 0, 0, _ctxt_all);
+        copy(ch1->rows(), Sr.cols(), Sloc, 0, 0, Sr, 0, 0, grid());
 
         Sc_br.from_block_row(RS_ch1);
-        copy(ch1->rows(), Sc.cols(), RS_ch1, 0, 0, Sloc, 0, 0, _ctxt_all);
+        copy(ch1->rows(), Sc.cols(), RS_ch1, 0, 0, Sloc, 0, 0, grid());
         gemm(Trans::N, Trans::N, scalar_t(-1.), Phi, tmpc,
              scalar_t(1.), Sloc);
-        copy(ch1->rows(), Sc.cols(), Sloc, 0, 0, Sc, 0, 0, _ctxt_all);
+        copy(ch1->rows(), Sc.cols(), Sloc, 0, 0, Sc, 0, 0, grid());
         STRUMPACK_CB_SAMPLE_FLOPS
           (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), ThetaVhatC, tmpr, scalar_t(1.)) +
            gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Phi, tmpc, scalar_t(1.)));
@@ -191,27 +216,25 @@ namespace strumpack {
         if (this->U_rank() && Uop.cols()) {
           auto tmp = _U.apply(Uop);
           flops += _U.apply_flops(Uop.cols());
-          Uop0 = DistM_t(this->_ch[0]->ctxt(Theta.ctxt_loc()),
+          Uop0 = DistM_t(this->_ch[0]->grid(Theta.grid_local()),
                          this->_ch[0]->U_rank(), Uop.cols());
-          Uop1 = DistM_t(this->_ch[1]->ctxt(Theta.ctxt_loc()),
+          Uop1 = DistM_t(this->_ch[1]->grid(Theta.grid_local()),
                          this->_ch[1]->U_rank(), Uop.cols());
-          copy(this->_ch[0]->U_rank(), Uop.cols(), tmp, 0, 0,
-               Uop0, 0, 0, _ctxt_all);
+          copy(this->_ch[0]->U_rank(), Uop.cols(), tmp, 0, 0, Uop0, 0, 0, grid());
           copy(this->_ch[1]->U_rank(), Uop.cols(), tmp,
-               this->_ch[0]->U_rank(), 0, Uop1, 0, 0, _ctxt_all);
+               this->_ch[0]->U_rank(), 0, Uop1, 0, 0, grid());
           Uop.clear();
         }
         if (this->V_rank() && Vop.cols()) {
           auto tmp = _V.apply(Vop);
           flops += _V.apply_flops(Vop.cols());
-          Vop0 = DistM_t(this->_ch[0]->ctxt(Phi.ctxt_loc()),
+          Vop0 = DistM_t(this->_ch[0]->grid(Phi.grid_local()),
                          this->_ch[0]->V_rank(), Vop.cols());
-          Vop1 = DistM_t(this->_ch[1]->ctxt(Phi.ctxt_loc()),
+          Vop1 = DistM_t(this->_ch[1]->grid(Phi.grid_local()),
                          this->_ch[1]->V_rank(), Vop.cols());
-          copy(this->_ch[0]->V_rank(), Vop.cols(), tmp, 0, 0,
-               Vop0, 0, 0, _ctxt_all);
+          copy(this->_ch[0]->V_rank(), Vop.cols(), tmp, 0, 0, Vop0, 0, 0, grid());
           copy(this->_ch[1]->V_rank(), Vop.cols(), tmp,
-               this->_ch[0]->V_rank(), 0, Vop1, 0, 0, _ctxt_all);
+               this->_ch[0]->V_rank(), 0, Vop1, 0, 0, grid());
           Vop.clear();
         }
         this->_ch[0]->apply_UV_big(Theta, Uop0, Phi, Vop0, flops);

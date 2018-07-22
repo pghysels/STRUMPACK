@@ -52,15 +52,15 @@ namespace strumpack {
       DistM_t R, Sr, Sc, leaf_R, leaf_Sr, leaf_Sc;
       DenseM_t sub_Rr, sub_Rc, sub_Sr, sub_Sc;
       DenseM_t sub_R2, sub_Sr2, sub_Sc2;
-      DistSamples(int d, int Actxt, HSSMatrixMPI<scalar_t>& hss,
+      DistSamples(int d, const BLACSGrid* g, HSSMatrixMPI<scalar_t>& hss,
                   const dmult_t& Amult, const opts_t& opts,
                   bool hard_restart=false)
         : _Amult(Amult), _hss(hss),
           _rgen(random::make_random_generator<real_t>
                 (opts.random_engine(), opts.random_distribution())),
           _hard_restart(hard_restart),
-          R(Actxt, _hss.cols(), d), Sr(Actxt, _hss.cols(), d),
-          Sc(Actxt, _hss.cols(), d) {
+          R(g, _hss.cols(), d), Sr(g, _hss.cols(), d),
+          Sc(g, _hss.cols(), d) {
         _rgen->seed(R.prow(), R.pcol());
         R.random(*_rgen);
         STRUMPACK_RANDOM_FLOPS
@@ -70,8 +70,7 @@ namespace strumpack {
         sub_Rc = DenseM_t(sub_Rr);
         _hss.to_block_row(Sr, sub_Sr, leaf_Sr);
         _hss.to_block_row(Sc, sub_Sc, leaf_Sc);
-        if (_hard_restart) {
-          // copies for when doing a hard restart
+        if (_hard_restart) { // copies for when doing a hard restart
           sub_R2 = sub_Rr;
           sub_Sr2 = sub_Sr;
           sub_Sc2 = sub_Sc;
@@ -82,12 +81,12 @@ namespace strumpack {
         auto n = R.rows();
         auto d_old = R.cols();
         auto dd = d-d_old;
-        DistM_t Rnew(R.ctxt(), n, dd);
+        DistM_t Rnew(R.grid(), n, dd);
         Rnew.random(*_rgen);
         STRUMPACK_RANDOM_FLOPS
           (_rgen->flops_per_prng() * Rnew.lrows() * Rnew.lcols());
-        DistM_t Srnew(Sr.ctxt(), n, dd);
-        DistM_t Scnew(Sc.ctxt(), n, dd);
+        DistM_t Srnew(Sr.grid(), n, dd);
+        DistM_t Scnew(Sc.grid(), n, dd);
         _Amult(Rnew, Srnew, Scnew);
         R.hconcat(Rnew);
         Sr.hconcat(Srnew);

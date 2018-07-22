@@ -105,13 +105,13 @@ namespace strumpack {
     struct ParallelFront {
       ParallelFront() {}
       ParallelFront
-      (std::size_t lo, std::size_t hi, int _P0, int _P,
-       int _ctxt, int pr, int pc)
-        : sep_begin(lo), sep_end(hi), P0(_P0), P(_P), ctxt(_ctxt),
-          prows(pr), pcols(pc) {}
+      (std::size_t lo, std::size_t hi, int _P0, int _P, BLACSGrid* g)
+        : sep_begin(lo), sep_end(hi), P0(_P0), P(_P),
+          prows(g->nprows()), pcols(g->npcols()), grid(g) {}
       std::size_t dim_sep() const { return sep_end - sep_begin; }
       std::size_t sep_begin, sep_end;
-      int P0, P, ctxt, prows, pcols;
+      int P0, P, prows, pcols;
+      const BLACSGrid* grid;
     };
 
     /** all parallel fronts */
@@ -472,7 +472,7 @@ namespace strumpack {
 
     for (std::size_t f=0; f<_local_pfronts.size(); f++)
       xdist[f] = DistM_t
-        (_local_pfronts[f].ctxt, _local_pfronts[f].dim_sep(), n);
+        (_local_pfronts[f].grid, _local_pfronts[f].dim_sep(), n);
 #pragma omp parallel for
     for (std::size_t i=0; i<rsize; i++) {
       std::size_t r = rbuf[i].r;
@@ -915,8 +915,7 @@ namespace strumpack {
         if (_rank >= P0 && _rank < P0+P) {
           auto fpar = static_cast<FMPI_t*>(front);
           _local_pfronts.emplace_back
-            (front->sep_begin, front->sep_end, P0, P,
-             fpar->ctxt(), fpar->nprows(), fpar->npcols());
+            (front->sep_begin, front->sep_end, P0, P, fpar->grid());
         }
       }
     }
@@ -995,8 +994,7 @@ namespace strumpack {
         if (_rank >= P0 && _rank < P0+P) {
           auto fpar = static_cast<FMPI_t*>(front);
           _local_pfronts.emplace_back
-            (front->sep_begin, front->sep_end, P0, P,
-             fpar->ctxt(), fpar->nprows(), fpar->npcols());
+            (front->sep_begin, front->sep_end, P0, P, fpar->grid());
         }
       }
     }

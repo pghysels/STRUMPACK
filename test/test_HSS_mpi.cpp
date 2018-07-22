@@ -63,11 +63,6 @@ int run(int argc, char* argv[]) {
   };
 
   BLACSGrid grid(MPI_COMM_WORLD);
-  int ctxt = grid.ctxt();
-  int ctxt_all = grid.ctxt_all();
-  int nprow = grid.nprows();
-  int npcol = grid.npcols();
-
   DistributedMatrix<double> A;
 
   char test_problem = 'T';
@@ -80,7 +75,7 @@ int run(int argc, char* argv[]) {
       cout << "# matrix dimension should be positive integer" << endl;
       usage();
     }
-    A = DistributedMatrix<double>(ctxt, m, m);
+    A = DistributedMatrix<double>(&grid, m, m);
     // TODO only loop over local rows and columns, get the global coordinate..
     for (int j=0; j<m; j++)
       for (int i=0; i<m; i++)
@@ -92,7 +87,7 @@ int run(int argc, char* argv[]) {
       cout << "# matrix dimension should be positive integer" << endl;
       usage();
     }
-    A = DistributedMatrix<double>(ctxt, m, m);
+    A = DistributedMatrix<double>(&grid, m, m);
     // TODO only loop over local rows and columns, get the global coordinate..
     for (int j=0; j<m; j++)
       for (int i=0; i<m; i++)
@@ -105,10 +100,10 @@ int run(int argc, char* argv[]) {
       cout << "# matrix dimension should be positive integer" << endl;
       usage();
     }
-    A = DistributedMatrix<double>(ctxt, m, m);
+    A = DistributedMatrix<double>(&grid, m, m);
     A.eye();
-    DistributedMatrix<double> U(ctxt, m, max(1, int(0.3*m)));
-    DistributedMatrix<double> V(ctxt, m, max(1, int(0.3*m)));
+    DistributedMatrix<double> U(&grid, m, max(1, int(0.3*m)));
+    DistributedMatrix<double> V(&grid, m, max(1, int(0.3*m)));
     U.random();
     V.random();
     gemm(Trans::N, Trans::C, 1./m, U, V, 1., A);
@@ -129,7 +124,7 @@ int run(int argc, char* argv[]) {
       file.read(reinterpret_cast<char*>(Aseq.data()), sizeof(double)*m*m);
     }
     MPI_Bcast(&m, 1, mpi_type<int>(), 0, MPI_COMM_WORLD);
-    A = DistributedMatrix<double>(ctxt, m, m);
+    A = DistributedMatrix<double>(&grid, m, m);
     A.scatter(Aseq);
   } break;
   default:
@@ -141,7 +136,7 @@ int run(int argc, char* argv[]) {
   if (hss_opts.verbose()) A.print("A");
   if (!mpi_rank()) cout << "# tol = " << hss_opts.rel_tol() << endl;
 
-  HSSMatrixMPI<double> H(A, hss_opts, MPI_COMM_WORLD);
+  HSSMatrixMPI<double> H(A, hss_opts);
   if (H.is_compressed()) {
     if (!mpi_rank()) {
       cout << "# created H matrix of dimension "
@@ -164,7 +159,7 @@ int run(int argc, char* argv[]) {
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
-  auto Hdense = H.dense(A.ctxt());
+  auto Hdense = H.dense();
   MPI_Barrier(MPI_COMM_WORLD);
   if (hss_opts.verbose()) Hdense.print("H");
 
@@ -184,11 +179,10 @@ int run(int argc, char* argv[]) {
 
   {
     if (!mpi_rank()) cout << "# matrix-free compression!!" << endl;
-    DistElemMultDuplicated<double> mat(A, ctxt_all);
+    DistElemMultDuplicated<double> mat(A);
     hss_opts.set_synchronized_compression(false);
-    HSSMatrixMPI<double> HMF(A.rows(), A.cols(), mat, A.ctxt(), mat,
-                             hss_opts, MPI_COMM_WORLD);
-    auto HMFdense = HMF.dense(A.ctxt());
+    HSSMatrixMPI<double> HMF(A.rows(), A.cols(), &grid, mat, mat, hss_opts);
+    auto HMFdense = HMF.dense();
     HMFdense.scaled_add(-1., A);
     auto HMFnormF = HMFdense.normF();
     if (!mpi_rank())
@@ -201,12 +195,12 @@ int run(int argc, char* argv[]) {
     HSSMatrixBase<double>* H0 = H.child(0);
     if (auto H0mpi = dynamic_cast<HSSMatrixMPI<double>*>(H0)) {
       DistributedMatrix<double>
-        B0(H0mpi->ctxt(), H0mpi->cols(), H0mpi->cols()),
-        C0check(H0mpi->ctxt(), H0mpi->rows(), B0.cols());
+        B0(H0mpi->grid(), H0mpi->cols(), H0mpi->cols()),
+        C0check(H0mpi->grid(), H0mpi->rows(), B0.cols());
       B0.random();
-      DistributedMatrix<double> A0(H0mpi->ctxt(), H0mpi->rows(),
-                                   H0mpi->cols());
-      copy(H0mpi->rows(), H0mpi->cols(), A, 0, 0, A0, 0, 0, ctxt_all);
+      DistributedMatrix<double> A0
+        (H0mpi->grid(), H0mpi->rows(), H0mpi->cols());
+      copy(H0mpi->rows(), H0mpi->cols(), A, 0, 0, A0, 0, 0, &grid);
       if (H0mpi->active()) {
         auto C0 = H0mpi->apply(B0);
         gemm(Trans::N, Trans::N, 1., A0, B0, beta, C0check);
@@ -257,8 +251,8 @@ int run(int argc, char* argv[]) {
     for (auto i : I) { cout << i << " "; } cout << "];\n#            J=[";
     for (auto j : J) { cout << j << " "; } cout << "];" << endl;
   }
-  auto sub = H.extract(I, J, A.ctxt(), nprow, npcol);
-  auto sub_dense = A.extract(I, J, MPI_COMM_WORLD);
+  auto sub = H.extract(I, J, &grid);
+  auto sub_dense = A.extract(I, J);
   // sub.print("sub");
   // sub_dense.print("sub_dense");
   sub.scaled_add(-1., sub_dense);
@@ -278,12 +272,12 @@ int run(int argc, char* argv[]) {
   if (!mpi_rank()) cout << "Done!" << endl;
 
   if (!mpi_rank()) cout << "# solving linear system .." << endl;
-  DistributedMatrix<double> B(ctxt, m, n);
+  DistributedMatrix<double> B(&grid, m, n);
   B.random();
   DistributedMatrix<double> C(B);
   H.solve(ULV, C);
 
-  DistributedMatrix<double> Bcheck(ctxt, m, n);
+  DistributedMatrix<double> Bcheck(&grid, m, n);
   apply_HSS(Trans::N, H, C, 0., Bcheck);
   Bcheck.scaled_add(-1., B);
   auto Bchecknorm = Bcheck.normF();

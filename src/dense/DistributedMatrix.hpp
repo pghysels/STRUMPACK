@@ -58,28 +58,24 @@ namespace strumpack {
     using real_t = typename RealType<scalar_t>::value_type;
 
   protected:
-    scalar_t* _data = nullptr;
-    int _desc[9];
-    int _lrows;
-    int _lcols;
-
-    // store a BLACSGrid&/* instead??
-    int _prows;
-    int _pcols;
-    int _prow;
-    int _pcol;
+    const BLACSGrid* grid_ = nullptr;
+    scalar_t* data_ = nullptr;
+    int lrows_;
+    int lcols_;
+    int desc_[9];
 
   public:
     DistributedMatrix();
-    DistributedMatrix(int ctxt, const DenseMatrix<scalar_t>& m);
-    DistributedMatrix(int ctxt, DenseMatrix<scalar_t>&& m);
-    DistributedMatrix(int ctxt, DenseMatrixWrapper<scalar_t>&& m);
-    DistributedMatrix
-    (int ctxt, int M, int N,
-     const DistributedMatrix<scalar_t>& m, int ctxt_all);
-    DistributedMatrix(int ctxt, int M, int N);
-    DistributedMatrix(int ctxt, int M, int N, int MB, int NB);
-    DistributedMatrix(int desc[9]);
+    DistributedMatrix(const BLACSGrid* g, const DenseMatrix<scalar_t>& m);
+    DistributedMatrix(const BLACSGrid* g, DenseMatrix<scalar_t>&& m);
+    DistributedMatrix(const BLACSGrid* g, DenseMatrixWrapper<scalar_t>&& m);
+    DistributedMatrix(const BLACSGrid* g, int M, int N,
+                      const DistributedMatrix<scalar_t>& m,
+                      const BLACSGrid* gall);
+    DistributedMatrix(const BLACSGrid* g, int M, int N);
+    DistributedMatrix(const BLACSGrid* g, int M, int N, int MB, int NB);
+    DistributedMatrix(const BLACSGrid* g, int desc[9]);
+
     DistributedMatrix(const DistributedMatrix<scalar_t>& m);
     DistributedMatrix(DistributedMatrix<scalar_t>&& m);
     virtual ~DistributedMatrix();
@@ -89,13 +85,25 @@ namespace strumpack {
     DistributedMatrix<scalar_t>&
     operator=(DistributedMatrix<scalar_t>&& m);
 
-    virtual int rows() const { return _desc[2]; }
-    virtual int cols() const { return _desc[3]; }
-    inline int lrows() const { return _lrows; }
-    inline int lcols() const { return _lcols; }
-    inline int ld() const { return _lrows; }
-    inline int MB() const { return _desc[4]; }
-    inline int NB() const { return _desc[5]; }
+
+    inline const int* desc() const { return desc_; }
+    inline int* desc() { return desc_; }
+    inline bool active() const { return grid() && grid()->active(); }
+
+    inline const BLACSGrid* grid() const { return grid_; }
+    inline const MPIComm& Comm() const { return grid()->Comm(); }
+    inline MPI_Comm comm() const { return Comm().comm(); }
+
+    inline int ctxt() const { return grid() ? grid()->ctxt() : -1; }
+    inline int ctxt_all() const { return grid() ? grid()->ctxt_all() : -1; }
+
+    virtual int rows() const { return desc_[2]; }
+    virtual int cols() const { return desc_[3]; }
+    inline int lrows() const { return lrows_; }
+    inline int lcols() const { return lcols_; }
+    inline int ld() const { return lrows_; }
+    inline int MB() const { return desc_[4]; }
+    inline int NB() const { return desc_[5]; }
     inline int rowblocks() const { return std::ceil(float(lrows()) / MB()); }
     inline int colblocks() const { return std::ceil(float(lcols()) / NB()); }
 
@@ -103,64 +111,60 @@ namespace strumpack {
     virtual int J() const { return 1; }
     virtual void lranges(int& rlo, int& rhi, int& clo, int& chi) const;
 
-    inline const scalar_t* data() const { return _data; }
-    inline scalar_t* data() { return _data; }
+    inline const scalar_t* data() const { return data_; }
+    inline scalar_t* data() { return data_; }
     inline const scalar_t& operator()(int r, int c) const
-    { return _data[r+ld()*c]; }
-    inline scalar_t& operator()(int r, int c) { return _data[r+ld()*c]; }
+    { return data_[r+ld()*c]; }
+    inline scalar_t& operator()(int r, int c) { return data_[r+ld()*c]; }
 
-    inline int prow() const { return _prow; }
-    inline int pcol() const { return _pcol; }
-    inline int prows() const { return _prows; }
-    inline int pcols() const { return _pcols; }
-    inline int procs() const { return (prows() == -1) ? 0 : prows()*pcols(); }
-    inline bool is_master() const { return prow() == 0 && pcol() == 0; }
-    inline int rowl2g(int row) const { assert(_prow != -1);
-      return indxl2g(row+1, MB(), prow(), 0, prows()) - I(); }
-    inline int coll2g(int col) const { assert(_pcol != -1);
-      return indxl2g(col+1, NB(), pcol(), 0, pcols()) - J(); }
-    inline int rowg2l(int row) const { assert(_prow != -1);
-      return indxg2l(row+I(), MB(), prow(), 0, prows()) - 1; }
-    inline int colg2l(int col) const { assert(_pcol != -1);
-      return indxg2l(col+J(), NB(), pcol(), 0, pcols()) - 1; }
-    inline int rowg2p(int row) const { assert(_prow != -1);
-      return indxg2p(row+I(), MB(), prow(), 0, prows()); }
-    inline int colg2p(int col) const { assert(_pcol != -1);
-      return indxg2p(col+J(), NB(), pcol(), 0, pcols()); }
+    inline int prow() const { assert(grid()); return grid()->prow(); }
+    inline int pcol() const { assert(grid()); return grid()->pcol(); }
+    inline int nprows() const { assert(grid()); return grid()->nprows(); }
+    inline int npcols() const { assert(grid()); return grid()->npcols(); }
+
+    inline bool is_master() const { return grid() && prow() == 0 && pcol() == 0; }
+    inline int rowl2g(int row) const { assert(grid());
+      return indxl2g(row+1, MB(), prow(), 0, nprows()) - I(); }
+    inline int coll2g(int col) const { assert(grid());
+      return indxl2g(col+1, NB(), pcol(), 0, npcols()) - J(); }
+    inline int rowg2l(int row) const { assert(grid());
+      return indxg2l(row+I(), MB(), prow(), 0, nprows()) - 1; }
+    inline int colg2l(int col) const { assert(grid());
+      return indxg2l(col+J(), NB(), pcol(), 0, npcols()) - 1; }
+    inline int rowg2p(int row) const { assert(grid());
+      return indxg2p(row+I(), MB(), prow(), 0, nprows()); }
+    inline int colg2p(int col) const { assert(grid());
+      return indxg2p(col+J(), NB(), pcol(), 0, npcols()); }
     inline int rank(int r, int c) const {
-      return rowg2p(r) + colg2p(c) * prows(); }
-    inline bool is_local(int r, int c) const { assert(_prow != -1);
-      return rowg2p(r) == prow() && colg2p(c) == pcol(); }
+      return rowg2p(r) + colg2p(c) * nprows(); }
+    inline bool is_local(int r, int c) const { assert(grid());
+      return rowg2p(r) == prow() && colg2p(c) == pcol();
+    }
 
     inline bool fixed() const { return MB()==default_MB && NB()==default_NB; }
     inline int rowl2g_fixed(int row) const {
-      assert(_prow != -1); assert(fixed());
-      return indxl2g(row+1, default_MB, prow(), 0, prows()) - I(); }
+      assert(grid() && fixed());
+      return indxl2g(row+1, default_MB, prow(), 0, nprows()) - I(); }
     inline int coll2g_fixed(int col) const {
-      assert(_pcol != -1); assert(fixed());
-      return indxl2g(col+1, default_NB, pcol(), 0, pcols()) - J(); }
+      assert(grid() && fixed());
+      return indxl2g(col+1, default_NB, pcol(), 0, npcols()) - J(); }
     inline int rowg2l_fixed(int row) const {
-      assert(_prow != -1); assert(fixed());
-      return indxg2l(row+I(), default_MB, prow(), 0, prows()) - 1; }
+      assert(grid() && fixed());
+      return indxg2l(row+I(), default_MB, prow(), 0, nprows()) - 1; }
     inline int colg2l_fixed(int col) const {
-      assert(_pcol != -1); assert(fixed());
-      return indxg2l(col+J(), default_NB, pcol(), 0, pcols()) - 1; }
+      assert(grid() && fixed());
+      return indxg2l(col+J(), default_NB, pcol(), 0, npcols()) - 1; }
     inline int rowg2p_fixed(int row) const {
-      assert(_prow != -1); assert(fixed());
-      return indxg2p(row+I(), default_MB, prow(), 0, prows()); }
+      assert(grid() && fixed());
+      return indxg2p(row+I(), default_MB, prow(), 0, nprows()); }
     inline int colg2p_fixed(int col) const {
-      assert(_pcol != -1); assert(fixed());
-      return indxg2p(col+J(), default_NB, pcol(), 0, pcols()); }
+      assert(grid() && fixed());
+      return indxg2p(col+J(), default_NB, pcol(), 0, npcols()); }
     inline int rank_fixed(int r, int c) const {
-      assert(fixed()); return rowg2p_fixed(r) + colg2p_fixed(c) * prows(); }
+      assert(grid() && fixed()); return rowg2p_fixed(r) + colg2p_fixed(c) * nprows(); }
     inline bool is_local_fixed(int r, int c) const {
-      assert(_prow != -1); assert(fixed());
+      assert(grid() && fixed());
       return rowg2p_fixed(r) == prow() && colg2p_fixed(c) == pcol(); }
-
-    inline const int* desc() const { return _desc; }
-    inline int* desc() { return _desc; }
-    inline bool active() const { return _prow != -1; }
-    inline int ctxt() const { return _desc[1]; }
 
     // TODO fixed versions??
     inline const scalar_t& global(int r, int c) const
@@ -195,12 +199,12 @@ namespace strumpack {
     void laswp(const std::vector<int>& P, bool fwd);
 
     DistributedMatrix<scalar_t>
-    extract_rows(const std::vector<std::size_t>& Ir, MPI_Comm comm) const;
+    extract_rows(const std::vector<std::size_t>& Ir) const;
     DistributedMatrix<scalar_t>
-    extract_cols(const std::vector<std::size_t>& Ic, MPI_Comm comm) const;
+    extract_cols(const std::vector<std::size_t>& Ic) const;
     DistributedMatrix<scalar_t> extract
-    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-     MPI_Comm comm) const;
+    (const std::vector<std::size_t>& I,
+     const std::vector<std::size_t>& J) const;
     DistributedMatrix<scalar_t>& add(const DistributedMatrix<scalar_t>& B);
     DistributedMatrix<scalar_t>& scaled_add
     (scalar_t alpha, const DistributedMatrix<scalar_t>& B);
@@ -219,7 +223,7 @@ namespace strumpack {
 
     void scatter(const DenseMatrix<scalar_t>& a);
     DenseMatrix<scalar_t> gather() const;
-    DenseMatrix<scalar_t> all_gather(int ctxt_all) const;
+    DenseMatrix<scalar_t> all_gather() const;
 
     DenseMatrix<scalar_t> dense_and_clear();
     DenseMatrix<scalar_t> dense() const;
@@ -236,8 +240,7 @@ namespace strumpack {
      std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol);
     void ID_row
     (DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
-     std::vector<std::size_t>& ind, real_t rel_tol,
-     real_t abs_tol, int ctxt_T);
+     std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol);
 
 #ifdef STRUMPACK_PBLAS_BLOCKSIZE
     static const int default_MB = STRUMPACK_PBLAS_BLOCKSIZE;
@@ -249,46 +252,46 @@ namespace strumpack {
   };
 
   /** copy submatrix of a DistM_t at ia,ja of size m,n into a DenseM_t
-      b at proc dest in ctxt_all */
-  // TODO rename these copy functions to gemr2d
+      b at proc dest in a.grid()->ctxt_all() */
   template<typename scalar_t> void copy
   (std::size_t m, std::size_t n, const DistributedMatrix<scalar_t>& a,
    std::size_t ia, std::size_t ja, DenseMatrix<scalar_t>& b,
-   int dest, int ctxt_all) {
+   int dest, const BLACSGrid* gall) {
     if (!m || !n) return;
     int b_desc[9];
-    scalapack::descset(b_desc, m, n, m, n, 0, dest, ctxt_all, m);
+    scalapack::descset(b_desc, m, n, m, n, 0, dest, a.ctxt_all(), m);
+    assert(gall);
     scalapack::pgemr2d
       (m, n, a.data(), a.I()+ia, a.J()+ja, a.desc(),
-       b.data(), 1, 1, b_desc, ctxt_all);
+       b.data(), 1, 1, b_desc, gall->ctxt_all());
   }
 
   template<typename scalar_t> void copy
-  (std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& a,
-   int src, DistributedMatrix<scalar_t>& b,
-   std::size_t ib, std::size_t jb, int ctxt_all) {
+  (std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& a, int src,
+   DistributedMatrix<scalar_t>& b, std::size_t ib, std::size_t jb,
+   const BLACSGrid* gall) {
     if (!m || !n) return;
     int a_desc[9];
     scalapack::descset
-      (a_desc, m, n, m, n, 0, src, ctxt_all, std::max(m, a.ld()));
+      (a_desc, m, n, m, n, 0, src, b.ctxt_all(), std::max(m, a.ld()));
+    assert(gall);
     scalapack::pgemr2d
-      (m, n, a.data(), 1, 1, a_desc, b.data(), b.I()+ib, b.J()+jb, b.desc(),
-       ctxt_all);
+      (m, n, a.data(), 1, 1, a_desc, b.data(), b.I()+ib, b.J()+jb,
+       b.desc(), gall->ctxt_all());
   }
 
   /** copy submatrix of a at ia,ja of size m,n into b at position ib,jb */
   template<typename scalar_t> void copy
   (std::size_t m, std::size_t n, const DistributedMatrix<scalar_t>& a,
    std::size_t ia, std::size_t ja, DistributedMatrix<scalar_t>& b,
-   std::size_t ib, std::size_t jb, int ctxt_all) {
+   std::size_t ib, std::size_t jb, const BLACSGrid* gall) {
     if (!m || !n) return;
-    assert(!a.active() ||
-           (m+ia <= std::size_t(a.rows()) && n+ja <= std::size_t(a.cols())));
-    assert(!b.active() ||
-           (m+ib <= std::size_t(b.rows()) && n+jb <= std::size_t(b.cols())));
+    assert(!a.active() || (m+ia <= std::size_t(a.rows()) && n+ja <= std::size_t(a.cols())));
+    assert(!b.active() || (m+ib <= std::size_t(b.rows()) && n+jb <= std::size_t(b.cols())));
+    assert(gall);
     scalapack::pgemr2d
       (m, n, a.data(), a.I()+ia, a.J()+ja, a.desc(),
-       b.data(), b.I()+ib, b.J()+jb, b.desc(), ctxt_all);
+       b.data(), b.I()+ib, b.J()+jb, b.desc(), gall->ctxt_all());
   }
 
   /**
@@ -308,17 +311,18 @@ namespace strumpack {
     (std::size_t m, std::size_t n, DistributedMatrix<scalar_t>& A,
      std::size_t i, std::size_t j);
     DistributedMatrixWrapper
-    (int ctxt, std::size_t m, std::size_t n, scalar_t* A);
+    (const BLACSGrid* g, std::size_t m, std::size_t n, scalar_t* A);
     DistributedMatrixWrapper
-    (int ctxt, std::size_t m, std::size_t n, int MB, int NB, scalar_t* A);
+    (const BLACSGrid* g, std::size_t m, std::size_t n,
+     int MB, int NB, scalar_t* A);
     DistributedMatrixWrapper
-    (int ctxt, int rsrc, int csrc, std::size_t m, std::size_t n,
+    (const BLACSGrid* g, int rsrc, int csrc, std::size_t m, std::size_t n,
      DenseMatrix<scalar_t>& A);
     DistributedMatrixWrapper
     (const DistributedMatrixWrapper<scalar_t>& A);
     DistributedMatrixWrapper
     (DistributedMatrixWrapper<scalar_t>&& A);
-    virtual ~DistributedMatrixWrapper() { this->_data = nullptr; }
+    virtual ~DistributedMatrixWrapper() { this->data_ = nullptr; }
     DistributedMatrixWrapper<scalar_t>&
     operator=(const DistributedMatrixWrapper<scalar_t>& A);
     DistributedMatrixWrapper<scalar_t>&
@@ -334,7 +338,7 @@ namespace strumpack {
     void resize(std::size_t m, std::size_t n) { assert(1); }
     void hconcat(const DistributedMatrix<scalar_t>& b) { assert(1); }
     void clear()
-    { this->_data = nullptr; DistributedMatrix<scalar_t>::clear(); }
+    { this->data_ = nullptr; DistributedMatrix<scalar_t>::clear(); }
     std::size_t memory() const { return 0; }
     std::size_t total_memory() const { return 0; }
     std::size_t nonzeros() const { return 0; }
@@ -445,76 +449,74 @@ namespace strumpack {
     assert(!A.active() || m+i <= std::size_t(A.rows()));
     assert(!A.active() || n+j <= std::size_t(A.cols()));
     assert(m >= 0 && n >= 0 && i >=0 && j >= 0);
-    this->_data = A.data();
-    std::copy(A.desc(), A.desc()+9, this->_desc);
-    this->_lrows = A.lrows();   this->_lcols = A.lcols();
-    this->_prows = A.prows();   this->_pcols = A.pcols();
-    this->_prow = A.prow();     this->_pcol = A.pcol();
+    this->data_ = A.data();
+    std::copy(A.desc(), A.desc()+9, this->desc_);
+    this->lrows_ = A.lrows();   this->lcols_ = A.lcols();
+    this->grid_ = A.grid();
   }
 
   template<typename scalar_t>
   DistributedMatrixWrapper<scalar_t>::DistributedMatrixWrapper
-  (int ctxt, std::size_t m, std::size_t n, scalar_t* A)
+  (const BLACSGrid* g, std::size_t m, std::size_t n, scalar_t* A)
     : DistributedMatrixWrapper<scalar_t>
-    (ctxt, m, n, DistributedMatrix<scalar_t>::default_MB,
+    (g, m, n, DistributedMatrix<scalar_t>::default_MB,
      DistributedMatrix<scalar_t>::default_NB, A) {}
 
+
+  // TODO do we need this?
   template<typename scalar_t>
   DistributedMatrixWrapper<scalar_t>::DistributedMatrixWrapper
-  (int ctxt, std::size_t m, std::size_t n, int MB, int NB, scalar_t* A)
+  (const BLACSGrid* g, std::size_t m, std::size_t n,
+   int MB, int NB, scalar_t* A)
     : _rows(m), _cols(n), _i(0), _j(0) {
-    scalapack::Cblacs_gridinfo
-      (ctxt, &this->_prows, &this->_pcols,
-       &this->_prow, &this->_pcol);
+    this->grid_ = g;
     if (this->active()) {
-      this->_data = A;
+      this->data_ = A;
       if (scalapack::descinit
-          (this->_desc, _rows, _cols, MB, NB,
-           0, 0, ctxt, std::max(_rows, 1))) {
+          (this->desc_, _rows, _cols, MB, NB,
+           0, 0, this->ctxt(), std::max(_rows, 1))) {
         std::cerr << "ERROR: Could not create DistributedMatrixWrapper"
                   << " descriptor!" << std::endl;
         abort();
       }
-      this->_lrows = scalapack::numroc
-        (this->_desc[2], this->_desc[4],
-         this->_prow, this->_desc[6], this->_prows);
-      this->_lcols = scalapack::numroc
-        (this->_desc[3], this->_desc[5], this->_pcol,
-         this->_desc[7], this->_pcols);
+      this->lrows_ = scalapack::numroc
+        (this->desc_[2], this->desc_[4],
+         this->prow(), this->desc_[6], this->nprows());
+      this->lcols_ = scalapack::numroc
+        (this->desc_[3], this->desc_[5], this->pcol(),
+         this->desc_[7], this->npcols());
     } else {
-      this->_data = nullptr;
-      scalapack::descset(this->_desc, _rows, _cols, MB, NB, 0, 0, ctxt, 1);
-      this->_lrows = this->_lcols = 0;
+      this->data_ = nullptr;
+      scalapack::descset
+        (this->desc_, _rows, _cols, MB, NB, 0, 0, this->ctxt(), 1);
+      this->lrows_ = this->lcols_ = 0;
     }
   }
 
   template<typename scalar_t>
   DistributedMatrixWrapper<scalar_t>::DistributedMatrixWrapper
-  (int ctxt, int rsrc, int csrc, std::size_t m,
+  (const BLACSGrid* g, int rsrc, int csrc, std::size_t m,
    std::size_t n, DenseMatrix<scalar_t>& A)
     : _rows(m), _cols(n), _i(0), _j(0) {
     int MB = std::max(1, _rows);
     int NB = std::max(1, _cols);
-    scalapack::Cblacs_gridinfo
-      (ctxt, &this->_prows, &this->_pcols,
-       &this->_prow, &this->_pcol);
-    if (this->_prow == rsrc && this->_pcol == csrc) {
-      this->_lrows = _rows;
-      this->_lcols = _cols;
-      this->_data = A.data();
+    this->grid_ = g;
+    if (this->prow() == rsrc && this->pcol() == csrc) {
+      this->lrows_ = _rows;
+      this->lcols_ = _cols;
+      this->data_ = A.data();
       if (scalapack::descinit
-          (this->_desc, _rows, _cols, MB, NB,
-           rsrc, csrc, ctxt, std::max(_rows, 1))) {
+          (this->desc_, _rows, _cols, MB, NB,
+           rsrc, csrc, this->ctxt(), std::max(_rows, 1))) {
         std::cerr << "ERROR: Could not create DistributedMatrixWrapper"
                   << " descriptor!" << std::endl;
         abort();
       }
     } else {
-      this->_lrows = this->_lcols = 0;
-      this->_data = nullptr;
+      this->lrows_ = this->lcols_ = 0;
+      this->data_ = nullptr;
       scalapack::descset
-        (this->_desc, _rows, _cols, MB, NB,
-         rsrc, csrc, ctxt, 1);
+        (this->desc_, _rows, _cols, MB, NB, rsrc, csrc, this->ctxt(), 1);
     }
   }
 
@@ -534,13 +536,15 @@ namespace strumpack {
   template<typename scalar_t> DistributedMatrixWrapper<scalar_t>&
   DistributedMatrixWrapper<scalar_t>::operator=
   (const DistributedMatrixWrapper<scalar_t>& A) {
-    this->_data = A._data;
-    std::copy(A._desc, A._desc+9, this->_desc);
-    this->_lrows = A._lrows;  this->_lcols = A._lcols;
-    this->_prows = A._prows;  this->_pcols = A._pcols;
-    this->_prow = A._prow;    this->_pcol = A._pcol;
-    _rows = A._rows;          _cols = A._cols;
-    _i = A._i;                _j = A._j;
+    this->data_ = A.data_;
+    std::copy(A.desc_, A.desc_+9, this->desc_);
+    this->lrows_ = A.lrows_;
+    this->lcols_ = A.lcols_;
+    this->grid_ = A.grid();
+    _rows = A._rows;
+    _cols = A._cols;
+    _i = A._i;
+    _j = A._j;
     return *this;
   }
 
@@ -554,65 +558,62 @@ namespace strumpack {
   template<typename scalar_t> void DistributedMatrixWrapper<scalar_t>::lranges
   (int& rlo, int& rhi, int& clo, int& chi) const {
     scalapack::infog2l
-      (I(), J(), this->desc(), this->prows(), this->pcols(),
+      (I(), J(), this->desc(), this->nprows(), this->npcols(),
        this->prow(), this->pcol(), rlo, clo);
     scalapack::infog2l
       (I()+this->rows(), J()+this->cols(), this->desc(),
-       this->prows(), this->pcols(),
+       this->nprows(), this->npcols(),
        this->prow(), this->pcol(), rhi, chi);
     rlo--; rhi--; clo--; chi--;
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix()
-    : DistributedMatrix(-1, 0, 0, default_MB, default_NB) {
-    // make sure active() returns false if not constructed properly
-    _prow = _pcol = _prows = _pcols = -1;
+    : DistributedMatrix(nullptr, 0, 0, default_MB, default_NB) {
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix
-  (int ctxt, const DenseMatrix<scalar_t>& m)
-    : DistributedMatrix(ctxt, m.rows(), m.cols(), default_MB, default_NB) {
-    if (_prows != 1 || _pcols != 1) {
+  (const BLACSGrid* g, const DenseMatrix<scalar_t>& m)
+    : DistributedMatrix(g, m.rows(), m.cols(), default_MB, default_NB) {
+    if (nprows() != 1 || npcols() != 1) {
       std::cout << "ERROR: creating DistM_t from DenseM_t only possible on 1 process!" << std::endl;
       abort();
     }
-    for (int c=0; c<_lcols; c++)
-      for (int r=0; r<_lrows; r++)
+    for (int c=0; c<lcols_; c++)
+      for (int r=0; r<lrows_; r++)
         operator()(r, c) = m(r, c);
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix
-  (int ctxt, DenseMatrixWrapper<scalar_t>&& m)
-    : DistributedMatrix(ctxt, m.rows(), m.cols(), default_MB, default_NB) {
-    if (_prows != 1 || _pcols != 1) {
+  (const BLACSGrid* g, DenseMatrixWrapper<scalar_t>&& m)
+    : DistributedMatrix(g, m.rows(), m.cols(), default_MB, default_NB) {
+    if (nprows() != 1 || npcols() != 1) {
       std::cout << "ERROR: creating DistM_t from DenseM_t only possible on 1 process!" << std::endl;
       abort();
     }
-    for (int c=0; c<_lcols; c++)
-      for (int r=0; r<_lrows; r++)
+    for (int c=0; c<lcols_; c++)
+      for (int r=0; r<lrows_; r++)
         operator()(r, c) = m(r, c);
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix
-  (int ctxt, DenseMatrix<scalar_t>&& m) {
-    _prow = _pcol = 0;
-    _prows = _pcols = 1;
-    _lrows = m.rows();
-    _lcols = m.cols();
+  (const BLACSGrid* g, DenseMatrix<scalar_t>&& m) : grid_(g) {
+    assert(g->P() == 1);
+    lrows_ = m.rows();
+    lcols_ = m.cols();
     if (scalapack::descinit
-        (_desc, _lrows, _lcols, default_MB, default_MB, 0, 0,
-         ctxt, std::max(_lrows,1))) {
+        (desc_, lrows_, lcols_, default_MB, default_MB, 0, 0,
+         ctxt(), std::max(lrows_,1))) {
       std::cerr << "ERROR: Could not create DistributedMatrix descriptor!"
                 << std::endl;
       abort();
     }
-    if (m.ld() == std::size_t(_lrows)) {
-      _data = m._data;
+    if (m.ld() == std::size_t(lrows_)) {
+      data_ = m._data;
       m._data = nullptr;
     } else {
-      _data = new scalar_t[_lrows*_lcols];
-      for (int c=0; c<_lcols; c++)
-        for (int r=0; r<_lrows; r++)
+      data_ = new scalar_t[lrows_*lcols_];
+      for (int c=0; c<lcols_; c++)
+        for (int r=0; r<lrows_; r++)
           operator()(r, c) = m(r, c);
     }
     delete[] m._data;
@@ -620,52 +621,60 @@ namespace strumpack {
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix
-  (int ctxt, int M, int N, const DistributedMatrix<scalar_t>& m, int ctxt_all)
-    : DistributedMatrix(ctxt, M, N, default_MB, default_NB) {
-    strumpack::copy(M, N, m, 0, 0, *this, 0, 0, ctxt_all);
+  (const BLACSGrid* g, int M, int N, const DistributedMatrix<scalar_t>& m,
+   const BLACSGrid* gall)
+    : DistributedMatrix(g, M, N, default_MB, default_NB) {
+    strumpack::copy(M, N, m, 0, 0, *this, 0, 0, gall);
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix
   (const DistributedMatrix<scalar_t>& m)
-    : _lrows(m._lrows), _lcols(m._lcols), _prows(m._prows), _pcols(m._pcols),
-      _prow(m._prow), _pcol(m._pcol) {
-    std::copy(m._desc, m._desc+9, _desc);
-    _data = new scalar_t[_lrows*_lcols];
-    std::copy(m._data, m._data+_lrows*_lcols, _data);
+    : grid_(m.grid()), lrows_(m.lrows()), lcols_(m.lcols()) {
+    std::copy(m.desc_, m.desc_+9, desc_);
+    data_ = new scalar_t[lrows_*lcols_];
+    std::copy(m.data_, m.data_+lrows_*lcols_, data_);
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix
   (DistributedMatrix<scalar_t>&& m)
-    : _lrows(m._lrows), _lcols(m._lcols), _prows(m._prows), _pcols(m._pcols),
-      _prow(m._prow), _pcol(m._pcol) {
-    std::copy(m._desc, m._desc+9, _desc);
-    _data = m._data;
-    m._data = nullptr;
+    : grid_(m.grid()), lrows_(m.lrows()), lcols_(m.lcols()) {
+    std::copy(m.desc(), m.desc()+9, desc_);
+    data_ = m.data();
+    m.data_ = nullptr;
   }
 
   template<typename scalar_t>
-  DistributedMatrix<scalar_t>::DistributedMatrix(int ctxt, int M, int N)
-    : DistributedMatrix(ctxt, M, N, default_MB, default_NB) {
+  DistributedMatrix<scalar_t>::DistributedMatrix
+  (const BLACSGrid* g, int M, int N)
+    : DistributedMatrix(g, M, N, default_MB, default_NB) {
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix
-  (int ctxt, int M, int N, int MB, int NB) {
+  (const BLACSGrid* g, int M, int N, int MB, int NB) : grid_(g) {
     assert(M >= 0 && N >= 0 && MB >= 0 && NB >= 0);
     MB = std::max(1, MB);
     NB = std::max(1, NB);
-    scalapack::Cblacs_gridinfo(ctxt, &_prows, &_pcols, &_prow, &_pcol);
-    if (_prow == -1 || _pcol == -1) {
-      _lrows = _lcols = 0;
-      _data = nullptr;
-      scalapack::descset(_desc, M, N, MB, NB, 0, 0, ctxt, std::max(_lrows,1));
+    if (!active()) {
+      lrows_ = lcols_ = 0;
+      data_ = nullptr;
+      scalapack::descset
+        (desc_, M, N, MB, NB, 0, 0, -1, std::max(lrows_,1));
     } else {
-      _lrows = scalapack::numroc(M, MB, _prow, 0, _prows);
-      _lcols = scalapack::numroc(N, NB, _pcol, 0, _pcols);
-      _data = new scalar_t[_lrows*_lcols];
+      lrows_ = scalapack::numroc(M, MB, prow(), 0, nprows());
+      lcols_ = scalapack::numroc(N, NB, pcol(), 0, npcols());
+      data_ = new scalar_t[lrows_*lcols_];
       if (scalapack::descinit
-          (_desc, M, N, MB, NB, 0, 0,
-           ctxt, std::max(_lrows,1))) {
-        std::cerr << "ERROR: Could not create DistributedMatrix descriptor!"
+          (desc_, M, N, MB, NB, 0, 0, ctxt(), std::max(lrows_,1))) {
+        std::cout << " M=" << M
+                  << " N=" << N
+                  << " ctxt=" << ctxt()
+                  << " lrows=" << lrows_
+                  << " lcols=" << lcols_
+                  << " prow=" << prow() << "  nprows=" << nprows()
+                  << " pcol=" << pcol() << "  npcols=" << npcols()
+                  << " ld=" << std::max(lrows_,1)
+                  << " ERROR: Could not create DistributedMatrix descriptor!"
+                  << " rank=" << mpi_rank()
                   << std::endl;
         abort();
       }
@@ -673,18 +682,18 @@ namespace strumpack {
   }
 
   template<typename scalar_t>
-  DistributedMatrix<scalar_t>::DistributedMatrix(int desc[9]) {
-    std::copy(desc, desc+9, _desc);
-    scalapack::Cblacs_gridinfo(_desc[1], &_prows, &_pcols, &_prow, &_pcol);
-    if (_prow == -1 || _pcol == -1) {
-      _lrows = _lcols = 0;
-      _data = nullptr;
+  DistributedMatrix<scalar_t>::DistributedMatrix
+  (const BLACSGrid* g, int desc[9]) : grid_(g) {
+    std::copy(desc, desc+9, desc_);
+    if (active()) {
+      lrows_ = lcols_ = 0;
+      data_ = nullptr;
     } else {
-      _lrows = scalapack::numroc(_desc[2], _desc[4], _prow, _desc[6], _prows);
-      _lcols = scalapack::numroc(_desc[3], _desc[5], _pcol, _desc[7], _pcols);
-      assert(_lrows==_desc[8]);
-      if (_lrows && _lcols) _data = new scalar_t[_lrows*_lcols];
-      else _data = nullptr;
+      lrows_ = scalapack::numroc(desc_[2], desc_[4], prow(), desc_[6], nprows());
+      lcols_ = scalapack::numroc(desc_[3], desc_[5], pcol(), desc_[7], npcols());
+      assert(lrows_==desc_[8]);
+      if (lrows_ && lcols_) data_ = new scalar_t[lrows_*lcols_];
+      else data_ = nullptr;
     }
   }
 
@@ -696,27 +705,25 @@ namespace strumpack {
   template<typename scalar_t> DistributedMatrix<scalar_t>&
   DistributedMatrix<scalar_t>::operator=
   (const DistributedMatrix<scalar_t>& m) {
-    if (_lrows != m._lrows || _lcols != m._lcols) {
-      _lrows = m._lrows;  _lcols = m._lcols;
-      delete[] _data;
-      _data = new scalar_t[_lrows*_lcols];
+    if (lrows_ != m.lrows_ || lcols_ != m.lcols_) {
+      lrows_ = m.lrows_;  lcols_ = m.lcols_;
+      delete[] data_;
+      data_ = new scalar_t[lrows_*lcols_];
     }
-    std::copy(m._data, m._data+_lrows*_lcols, _data);
-    _prows = m._prows;  _pcols = m._pcols;
-    _prow = m._prow;    _pcol = m._pcol;
-    std::copy(m._desc, m._desc+9, _desc);
+    grid_ = m.grid();
+    std::copy(m.data_, m.data_+lrows_*lcols_, data_);
+    std::copy(m.desc_, m.desc_+9, desc_);
     return *this;
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>&
   DistributedMatrix<scalar_t>::operator=(DistributedMatrix<scalar_t>&& m) {
-    _prows = m._prows;  _pcols = m._pcols;
-    _prow = m._prow;    _pcol = m._pcol;
-    _lrows = m._lrows;  _lcols = m._lcols;
-    std::copy(m._desc, m._desc+9, _desc);
-    delete[] _data;
-    _data = m._data;
-    m._data = nullptr;
+    grid_ = m.grid();
+    lrows_ = m.lrows_;  lcols_ = m.lcols_;
+    std::copy(m.desc_, m.desc_+9, desc_);
+    delete[] data_;
+    data_ = m.data_;
+    m.data_ = nullptr;
     return *this;
   }
 
@@ -728,16 +735,15 @@ namespace strumpack {
   }
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::clear() {
-    delete[] _data;
-    _data = nullptr;
-    _prow = _pcol = _prows = _pcols = -1;
-    _lrows = _lcols = 0;
-    scalapack::descset(_desc, 0, 0, MB(), NB(), 0, 0, ctxt(), 1);
+    delete[] data_;
+    data_ = nullptr;
+    lrows_ = lcols_ = 0;
+    scalapack::descset(desc_, 0, 0, MB(), NB(), 0, 0, ctxt(), 1);
   }
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::resize
   (std::size_t m, std::size_t n) {
-    DistributedMatrix<scalar_t> tmp(ctxt(), m, n, MB(), NB());
+    DistributedMatrix<scalar_t> tmp(grid(), m, n, MB(), NB());
     for (int c=0; c<std::min(lcols(), tmp.lcols()); c++)
       for (int r=0; r<std::min(lrows(), tmp.lrows()); r++)
         tmp(r, c) = operator()(r, c);
@@ -747,11 +753,10 @@ namespace strumpack {
   template<typename scalar_t> void DistributedMatrix<scalar_t>::hconcat
   (const DistributedMatrix<scalar_t>& b) {
     assert(rows() == b.rows());
-    assert(ctxt() == b.ctxt());
+    assert(grid() == b.grid());
     auto my_cols = cols();
     resize(rows(), my_cols+b.cols());
-    if (!active()) return;
-    strumpack::copy(rows(), b.cols(), b, 0, 0, *this, 0, my_cols, ctxt());
+    copy(rows(), b.cols(), b, 0, 0, *this, 0, my_cols, grid());
   }
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::zero() {
@@ -777,7 +782,7 @@ namespace strumpack {
     if (!active()) return;
     TIMER_TIME(TaskType::RANDOM_GENERATE, 1, t_gen);
     auto rgen = random::make_default_random_generator<real_t>();
-    rgen->seed(_prow, _pcol);
+    rgen->seed(prow(), pcol());
     int rlo, rhi, clo, chi;
     lranges(rlo, rhi, clo, chi);
     for (int c=clo; c<chi; ++c)
@@ -849,7 +854,7 @@ namespace strumpack {
 
   template<typename scalar_t> DistributedMatrix<scalar_t>
   DistributedMatrix<scalar_t>::transpose() const {
-    DistributedMatrix<scalar_t> tmp(ctxt(), cols(), rows());
+    DistributedMatrix<scalar_t> tmp(grid(), cols(), rows());
     if (!active()) return tmp;
     scalapack::ptranc
       (cols(), rows(), scalar_t(1.), data(), I(), J(),
@@ -863,9 +868,9 @@ namespace strumpack {
     if (!active()) return;
     int descip[9];
     scalapack::descset
-      (descip, rows() + MB()*prows(), 1, MB(), 1, 0, pcol(),
+      (descip, rows() + MB()*nprows(), 1, MB(), 1, 0, pcol(),
        ctxt(), MB() + scalapack::numroc
-       (rows(), MB(), prow(), 0, prows()));
+       (rows(), MB(), prow(), 0, nprows()));
     scalapack::plapiv
       (fwd ? 'F' : 'B', 'R', 'C', rows(), cols(), data(), I(), J(), desc(),
        P.data(), 1, 1, descip, NULL);
@@ -873,29 +878,29 @@ namespace strumpack {
 
   template<typename scalar_t> DistributedMatrix<scalar_t>
   DistributedMatrix<scalar_t>::extract_rows
-  (const std::vector<std::size_t>& Ir, MPI_Comm comm) const {
+  (const std::vector<std::size_t>& Ir) const {
     TIMER_TIME(TaskType::DISTMAT_EXTRACT_ROWS, 1, t_dist_mat_extract_rows);
-    DistributedMatrix<scalar_t> tmp(ctxt(), Ir.size(), cols());
+    DistributedMatrix<scalar_t> tmp(grid(), Ir.size(), cols());
     if (!active()) return tmp;
-    std::vector<std::vector<scalar_t>> sbuf(_prows);
-    std::vector<std::vector<scalar_t>> rbuf(_prows);
+    std::vector<std::vector<scalar_t>> sbuf(nprows());
+    std::vector<std::vector<scalar_t>> rbuf(nprows());
     {
-      std::vector<std::size_t> rsizes(_prows);
-      std::vector<std::size_t> ssizes(_prows);
+      std::vector<std::size_t> rsizes(nprows());
+      std::vector<std::size_t> ssizes(nprows());
       for (std::size_t r=0; r<Ir.size(); r++) {
         auto gr = Ir[r];
         auto owner = rowg2p(gr);
-        if (owner != _prow) rsizes[owner] += _lcols;
+        if (owner != prow()) rsizes[owner] += lcols_;
         else {
           auto dest = rowg2p(r);
-          if (dest == _prow) // just copy to tmp
+          if (dest == prow()) // just copy to tmp
             for (int c=0, tmpr=tmp.rowg2l(r), lr=rowg2l(gr);
-                 c<_lcols; c++)
+                 c<lcols_; c++)
               tmp(tmpr, c) = operator()(lr, c);
-          else ssizes[dest] += _lcols;
+          else ssizes[dest] += lcols_;
         }
       }
-      for (int p=0; p<_prows; p++) {
+      for (int p=0; p<nprows(); p++) {
         rbuf[p].resize(rsizes[p]);
         sbuf[p].reserve(ssizes[p]);
       }
@@ -903,69 +908,72 @@ namespace strumpack {
     for (std::size_t r=0; r<Ir.size(); r++) {
       auto gr = Ir[r];
       auto owner = rowg2p(gr);
-      if (owner == _prow) {
+      if (owner == prow()) {
         auto lr = rowg2l(gr);
         auto dest = rowg2p(r);
-        if (dest != _prow) {
-          for (int c=0; c<_lcols; c++)
+        if (dest != prow()) {
+          for (int c=0; c<lcols_; c++)
             sbuf[dest].push_back(operator()(lr, c));
         }
       }
     }
-    auto sreq = new MPI_Request[2*(_prows-1)];
-    auto rreq = sreq + _prows-1;
-    for (int p=0; p<_prows; p++)
-      if (p != _prow) {
+    auto sreq = new MPI_Request[2*(nprows()-1)];
+    auto rreq = sreq + nprows()-1;
+    for (int p=0; p<nprows(); p++)
+      if (p != prow()) {
         MPI_Isend(sbuf[p].data(), sbuf[p].size(), mpi_type<scalar_t>(),
-                  p+_pcol*_prows, 0, comm, (p < _prow) ? sreq+p : sreq+p-1);
+                  p+pcol()*nprows(), 0, comm(),
+                  (p < prow()) ? sreq+p : sreq+p-1);
         MPI_Irecv(rbuf[p].data(), rbuf[p].size(), mpi_type<scalar_t>(),
-                  p+_pcol*_prows, 0, comm, (p < _prow) ? rreq+p : rreq+p-1);
+                  p+pcol()*nprows(), 0, comm(),
+                  (p < prow()) ? rreq+p : rreq+p-1);
       }
-    MPI_Waitall(_prows-1, rreq, MPI_STATUSES_IGNORE);
-    std::vector<scalar_t*> prbuf(_prows);
-    for (int p=0; p<_prows; p++) prbuf[p] = rbuf[p].data();
+    MPI_Waitall(nprows()-1, rreq, MPI_STATUSES_IGNORE);
+    std::vector<scalar_t*> prbuf(nprows());
+    for (int p=0; p<nprows(); p++) prbuf[p] = rbuf[p].data();
     for (std::size_t r=0; r<Ir.size(); r++) {
       auto gr = Ir[r];
       auto owner = rowg2p(gr);
-      if (owner == _prow) continue;
+      if (owner == prow()) continue;
       auto dest = rowg2p(r);
-      if (dest != _prow) continue;
+      if (dest != prow()) continue;
       auto tmpr = tmp.rowg2l(r);
-      for (int c=0; c<_lcols; c++)
+      for (int c=0; c<lcols_; c++)
         tmp(tmpr, c) = *(prbuf[owner]++);
     }
-    MPI_Waitall(_prows-1, sreq, MPI_STATUSES_IGNORE);
+    MPI_Waitall(nprows()-1, sreq, MPI_STATUSES_IGNORE);
     delete[] sreq;
     return tmp;
   }
 
+
   template<typename scalar_t> DistributedMatrix<scalar_t>
   DistributedMatrix<scalar_t>::extract_cols
-  (const std::vector<std::size_t>& Jc, MPI_Comm comm) const {
+  (const std::vector<std::size_t>& Jc) const {
     TIMER_TIME(TaskType::DISTMAT_EXTRACT_COLS, 1, t_dist_mat_extract_cols);
-    DistributedMatrix<scalar_t> tmp(ctxt(), rows(), Jc.size());
+    DistributedMatrix<scalar_t> tmp(grid(), rows(), Jc.size());
     if (!active()) return tmp;
     assert(I() == 1 && J() == 1);
-    std::vector<std::vector<scalar_t>> sbuf(_pcols);
-    std::vector<std::vector<scalar_t>> rbuf(_pcols);
+    std::vector<std::vector<scalar_t>> sbuf(npcols());
+    std::vector<std::vector<scalar_t>> rbuf(npcols());
     {
-      std::vector<std::size_t> rsizes(_pcols);
-      std::vector<std::size_t> ssizes(_pcols);
+      std::vector<std::size_t> rsizes(npcols());
+      std::vector<std::size_t> ssizes(npcols());
       for (std::size_t c=0; c<Jc.size(); c++) {
         auto gc = Jc[c];
         auto owner = colg2p(gc);
-        if (owner != _pcol) rsizes[owner] += _lrows;
+        if (owner != pcol()) rsizes[owner] += lrows_;
         else {
           auto lc = colg2l(gc);
           auto dest = colg2p(c);
-          if (dest == _pcol) { // just copy to tmp
+          if (dest == pcol()) { // just copy to tmp
             auto tmpc = tmp.colg2l(c);
-            for (int r=0; r<_lrows; r++)
+            for (int r=0; r<lrows_; r++)
               tmp(r, tmpc) = operator()(r, lc);
-          } else ssizes[dest] += _lrows;
+          } else ssizes[dest] += lrows_;
         }
       }
-      for (int p=0; p<_pcols; p++) {
+      for (int p=0; p<npcols(); p++) {
         rbuf[p].resize(rsizes[p]);
         sbuf[p].reserve(ssizes[p]);
       }
@@ -973,36 +981,38 @@ namespace strumpack {
     for (std::size_t c=0; c<Jc.size(); c++) {
       auto gc = Jc[c];
       auto owner = colg2p(gc);
-      if (owner == _pcol) {
+      if (owner == pcol()) {
         auto dest = colg2p(c);
-        if (dest != _pcol)
-          for (int r=0, lc=colg2l(gc); r<_lrows; r++)
+        if (dest != pcol())
+          for (int r=0, lc=colg2l(gc); r<lrows_; r++)
             sbuf[dest].push_back(operator()(r, lc));
       }
     }
-    auto sreq = new MPI_Request[2*(_pcols-1)];
-    auto rreq = sreq + _pcols-1;
-    for (int p=0; p<_pcols; p++)
-      if (p != _pcol) {
+    auto sreq = new MPI_Request[2*(npcols()-1)];
+    auto rreq = sreq + npcols()-1;
+    for (int p=0; p<npcols(); p++)
+      if (p != pcol()) {
         MPI_Isend(sbuf[p].data(), sbuf[p].size(), mpi_type<scalar_t>(),
-                  _prow+p*_prows, 0, comm, (p < _pcol) ? sreq+p : sreq+p-1);
+                  prow()+p*nprows(), 0, comm(),
+                  (p < pcol()) ? sreq+p : sreq+p-1);
         MPI_Irecv(rbuf[p].data(), rbuf[p].size(), mpi_type<scalar_t>(),
-                  _prow+p*_prows, 0, comm, (p < _pcol) ? rreq+p : rreq+p-1);
+                  prow()+p*nprows(), 0, comm(),
+                  (p < pcol()) ? rreq+p : rreq+p-1);
       }
-    MPI_Waitall(_pcols-1, rreq, MPI_STATUSES_IGNORE);
-    std::vector<scalar_t*> prbuf(_pcols);
-    for (int p=0; p<_pcols; p++) prbuf[p] = rbuf[p].data();
+    MPI_Waitall(npcols()-1, rreq, MPI_STATUSES_IGNORE);
+    std::vector<scalar_t*> prbuf(npcols());
+    for (int p=0; p<npcols(); p++) prbuf[p] = rbuf[p].data();
     for (std::size_t c=0; c<Jc.size(); c++) {
       auto gc = Jc[c];
       auto owner = colg2p(gc);
-      if (owner == _pcol) continue;
+      if (owner == pcol()) continue;
       auto dest = colg2p(c);
-      if (dest != _pcol) continue;
+      if (dest != pcol()) continue;
       auto tmpc = tmp.colg2l(c);
-      for (int r=0; r<_lrows; r++)
+      for (int r=0; r<lrows_; r++)
         tmp(r, tmpc) = *(prbuf[owner]++);
     }
-    MPI_Waitall(_pcols-1, sreq, MPI_STATUSES_IGNORE);
+    MPI_Waitall(npcols()-1, sreq, MPI_STATUSES_IGNORE);
     delete[] sreq;
     return tmp;
   }
@@ -1010,10 +1020,10 @@ namespace strumpack {
   // TODO optimize
   template<typename scalar_t> DistributedMatrix<scalar_t>
   DistributedMatrix<scalar_t>::extract
-  (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-   MPI_Comm comm) const {
+  (const std::vector<std::size_t>& I,
+   const std::vector<std::size_t>& J) const {
     TIMER_TIME(TaskType::DISTMAT_EXTRACT, 1, t_dist_mat_extract);
-    return extract_rows(I, comm).extract_cols(J, comm);
+    return extract_rows(I).extract_cols(J);
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>&
@@ -1037,9 +1047,7 @@ namespace strumpack {
   DistributedMatrix<scalar_t>::scaled_add
   (scalar_t alpha, const DistributedMatrix<scalar_t>& B) {
     if (!active()) return *this;
-    assert(ctxt() == B.ctxt());
-    // TODO assert that the layout is the same??
-    // I()==B.I() etc?? ctxt()==B.ctxt()?? MB, NB, rows, cols?
+    assert(grid() == B.grid());
     int rlo, rhi, clo, chi, Brlo, Brhi, Bclo, Bchi;
     lranges(rlo, rhi, clo, chi);
     B.lranges(Brlo, Brhi, Bclo, Bchi);
@@ -1061,9 +1069,9 @@ namespace strumpack {
   template<typename scalar_t> typename RealType<scalar_t>::value_type
   DistributedMatrix<scalar_t>::norm1() const {
     if (!active()) return real_t(-1.);
-    int IACOL = indxg2p(J(), NB(), pcol(), 0, pcols());
+    int IACOL = indxg2p(J(), NB(), pcol(), 0, npcols());
     int Nq0 = scalapack::numroc
-      (cols()+ ((J()-1)%NB()), NB(), pcol(), IACOL, pcols());
+      (cols()+ ((J()-1)%NB()), NB(), pcol(), IACOL, npcols());
     real_t* work = new real_t[Nq0];
     auto norm = scalapack::plange
       ('1', rows(), cols(), data(), I(), J(), desc(), work);
@@ -1074,9 +1082,9 @@ namespace strumpack {
   template<typename scalar_t> typename RealType<scalar_t>::value_type
   DistributedMatrix<scalar_t>::normI() const {
     if (!active()) return real_t(-1.);
-    int IAROW = indxg2p(I(), MB(), prow(), 0, prows());
+    int IAROW = indxg2p(I(), MB(), prow(), 0, nprows());
     int Mp0 = scalapack::numroc
-      (rows()+ ((I()-1)%MB()), MB(), prow(), IAROW, prows());
+      (rows()+ ((I()-1)%MB()), MB(), prow(), IAROW, nprows());
     real_t* work = new real_t[Mp0];
     auto norm = scalapack::plange
       ('I', rows(), cols(), data(), I(), J(), desc(), work);
@@ -1104,7 +1112,7 @@ namespace strumpack {
        a_desc, data(), I(), J(), desc(), ctxt());
   }
 
-  /** gather to proc 0,0 in ctxt */
+  /** gather to proc 0,0 in ctxt() */
   template<typename scalar_t> DenseMatrix<scalar_t>
   DistributedMatrix<scalar_t>::gather() const {
     DenseMatrix<scalar_t> a;
@@ -1112,32 +1120,30 @@ namespace strumpack {
     if (is_master()) a = DenseMatrix<scalar_t>(rows(), cols());
     int a_desc[9];
     scalapack::descset
-      (a_desc, rows(), cols(), rows(), cols(),
-       0, 0, ctxt(), rows());
+      (a_desc, rows(), cols(), rows(), cols(), 0, 0, ctxt(), rows());
     scalapack::pgemr2d
-      (rows(), cols(), data(), I(), J(), desc(),
-       a.data(), 1, 1, a_desc, ctxt());
+      (rows(), cols(), data(), I(), J(), desc(), a.data(), 1, 1, a_desc, ctxt());
     return a;
   }
 
-  /** gather to all process in ctxt_all */
+  /** gather to all process in ctxt_all() */
   template<typename scalar_t> DenseMatrix<scalar_t>
-  DistributedMatrix<scalar_t>::all_gather(int ctxt_all) const {
+  DistributedMatrix<scalar_t>::all_gather() const {
     DenseMatrix<scalar_t> a(rows(), cols());
     int a_desc[9];
     scalapack::descset
       (a_desc, rows(), cols(), rows(), cols(),
-       0, 0, ctxt_all, rows());
+       0, 0, ctxt_all(), rows());
     scalapack::pgemr2d
       (rows(), cols(), data(), I(), J(), desc(),
-       a.data(), 1, 1, a_desc, ctxt_all);
+       a.data(), 1, 1, a_desc, ctxt_all());
     int all_prows, all_pcols, all_prow, all_pcol;
     scalapack::Cblacs_gridinfo
-      (ctxt_all, &all_prows, &all_pcols, &all_prow, &all_pcol);
+      (ctxt_all(), &all_prows, &all_pcols, &all_prow, &all_pcol);
     if (all_prow==0 && all_pcol==0)
-      scalapack::gebs2d(ctxt_all, 'A', ' ', rows(), cols(), a.data(), a.ld());
+      scalapack::gebs2d(ctxt_all(), 'A', ' ', rows(), cols(), a.data(), a.ld());
     else scalapack::gebr2d
-           (ctxt_all, 'A', ' ', rows(), cols(), a.data(), a.ld(), 0, 0);
+           (ctxt_all(), 'A', ' ', rows(), cols(), a.data(), a.ld(), 0, 0);
     return a;
   }
 
@@ -1148,7 +1154,7 @@ namespace strumpack {
     tmp._rows = lrows();
     tmp._cols = lcols();
     tmp._ld = ld();
-    this->_data = nullptr;
+    this->data_ = nullptr;
     clear();
     return tmp;
   }
@@ -1191,7 +1197,7 @@ namespace strumpack {
   DistributedMatrix<scalar_t>::solve
   (const DistributedMatrix<scalar_t>& b, const std::vector<int>& piv) const {
     if (!active())
-      return DistributedMatrix<scalar_t>(b.ctxt(), b.rows(), b.cols());
+      return DistributedMatrix<scalar_t>(b.grid(), b.rows(), b.cols());
     DistributedMatrix<scalar_t> c(b);
     // TODO in place??, add assertions, check dimensions!!
     if (scalapack::pgetrs
@@ -1215,7 +1221,7 @@ namespace strumpack {
     TIMER_TIME(TaskType::QR, 1, t_qr);
     auto minmn = std::min(rows(), cols());
     auto N = J() + minmn - 1;
-    auto ltau = scalapack::numroc(N, NB(), pcol(), 0, pcols());
+    auto ltau = scalapack::numroc(N, NB(), pcol(), 0, npcols());
     auto tau = new scalar_t[ltau];
     auto info = scalapack::pgeqrf
       (rows(), minmn, data(), I(), J(), desc(), tau);
@@ -1266,19 +1272,19 @@ namespace strumpack {
     if (!active()) return;
     STRUMPACK_FLOPS(LQ_flops(*this));
     assert(I()==1 && J()==1);
-    DistributedMatrix<scalar_t> tmp(ctxt(), std::max(rows(), cols()), cols());
+    DistributedMatrix<scalar_t> tmp(grid(), std::max(rows(), cols()), cols());
     // TODO this is not a pgemr2d, this does not require communication!!
-    strumpack::copy(rows(), cols(), *this, 0, 0, tmp, 0, 0, ctxt());
+    strumpack::copy(rows(), cols(), *this, 0, 0, tmp, 0, 0, grid());
     // TODO the last argument to numroc, should it be prows/pcols???
     auto tau = new scalar_t
       [scalapack::numroc(I()+std::min(rows(),cols())-1, MB(),
-                         prow(), 0, prows())];
+                         prow(), 0, nprows())];
     scalapack::pgelqf
       (rows(), tmp.cols(), tmp.data(), tmp.I(), tmp.J(),
        tmp.desc(), tau);
-    L = DistributedMatrix<scalar_t>(ctxt(), rows(), rows());
+    L = DistributedMatrix<scalar_t>(grid(), rows(), rows());
     // TODO this is not a pgemr2d, this does not require communication!!
-    strumpack::copy(rows(), rows(), tmp, 0, 0, L, 0, 0, ctxt());
+    strumpack::copy(rows(), rows(), tmp, 0, 0, L, 0, 0, grid());
     // TODO check the diagonal elements
     // auto sfmin = blas::lamch<real_t>('S');
     // for (std::size_t i=0; i<std::min(rows(), cols()); i++)
@@ -1292,29 +1298,29 @@ namespace strumpack {
     delete[] tau;
     if (tmp.rows() == cols()) Q = std::move(tmp);
     else {
-      Q = DistributedMatrix<scalar_t>(ctxt(), cols(), cols());
+      Q = DistributedMatrix<scalar_t>(grid(), cols(), cols());
       // TODO this is not a pgemr2d, this does not require communication!!
-      strumpack::copy(cols(), cols(), tmp, 0, 0, Q, 0, 0, ctxt());
+      strumpack::copy(cols(), cols(), tmp, 0, 0, Q, 0, 0, grid());
     }
   }
 
   template<typename scalar_t> void
   DistributedMatrix<scalar_t>::ID_row
   (DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
-   std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
-   int ctxt_T) {
+   std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol) {
     // transpose the BLACS grid and do a local transpose, then call
     // ID_column, then do local transpose of output X_T to get back in
     // the original blacs grid
     if (!active()) return;
     TIMER_TIME(TaskType::HSS_PARHQRINTERPOL, 1, t_hss_par_hqr);
     assert(I()==1 && J()==1);
-    DistributedMatrix<scalar_t> this_T(ctxt_T, cols(), rows());
+    auto gT = grid()->transpose();
+    DistributedMatrix<scalar_t> this_T(&gT, cols(), rows());
     blas::omatcopy('T', lrows(), lcols(), data(), ld(),
                    this_T.data(), this_T.ld());
     DistributedMatrix<scalar_t> X_T;
     this_T.ID_column(X_T, piv, ind, rel_tol, abs_tol);
-    X = DistributedMatrix<scalar_t>(ctxt(), X_T.cols(), X_T.rows());
+    X = DistributedMatrix<scalar_t>(grid(), X_T.cols(), X_T.rows());
     blas::omatcopy('T', X_T.lrows(), X_T.lcols(), X_T.data(), X_T.ld(),
                    X.data(), X.ld());
     STRUMPACK_FLOPS(ID_row_flops(*this,X.cols()));
@@ -1343,8 +1349,8 @@ namespace strumpack {
     // Step 2: TRSM and permutation:
     //   R1^-1 R = [I R1^-1 R2] = [I X] with R = [R1 R2], R1 r x r
     DistributedMatrixWrapper<scalar_t> R1(rank, rank, *this, 0, 0);
-    X = DistributedMatrix<scalar_t>(ctxt(), rank, cols()-rank);
-    copy(rank, cols()-rank, *this, 0, rank, X, 0, 0, ctxt());
+    X = DistributedMatrix<scalar_t>(grid(), rank, cols()-rank);
+    copy(rank, cols()-rank, *this, 0, rank, X, 0, 0, grid());
     trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), R1, X);
   }
 
@@ -1520,10 +1526,11 @@ namespace strumpack {
 
   template<typename scalar_t> DistributedMatrix<scalar_t> vconcat
   (int cols, int arows, int brows, const DistributedMatrix<scalar_t>& a,
-   const DistributedMatrix<scalar_t>& b, int ctxt_new, int ctxt_all) {
-    DistributedMatrix<scalar_t> tmp(ctxt_new, arows+brows, cols);
-    copy(arows, cols, a, 0, 0, tmp, 0, 0, ctxt_all);
-    copy(brows, cols, b, 0, 0, tmp, arows, 0, ctxt_all);
+   const DistributedMatrix<scalar_t>& b,
+   const BLACSGrid* gnew, const BLACSGrid* gall) {
+    DistributedMatrix<scalar_t> tmp(gnew, arows+brows, cols);
+    copy(arows, cols, a, 0, 0, tmp, 0, 0, gall);
+    copy(brows, cols, b, 0, 0, tmp, arows, 0, gall);
     return tmp;
   }
 

@@ -70,26 +70,30 @@ namespace strumpack {
 
     template<typename scalar_t> class DistSubLeaf {
     public:
-      DistSubLeaf(int cols, const HSSMatrixBase<scalar_t>* H, int ctxt_loc)
-        : _cols(cols), _hss(H), _ctxt_loc(ctxt_loc) { allocate_block_row(); }
+      DistSubLeaf
+      (int cols, const HSSMatrixBase<scalar_t>* H, const BLACSGrid* lg)
+        : cols_(cols), hss_(H), grid_loc_(lg) { allocate_block_row(); }
       /** dist should be on the context of H */
-      DistSubLeaf(int cols, const HSSMatrixBase<scalar_t>* H, int ctxt_loc,
-                  const DistributedMatrix<scalar_t>& dist)
-        : _cols(cols), _hss(H), _ctxt_loc(ctxt_loc) { to_block_row(dist); }
+      DistSubLeaf
+      (int cols, const HSSMatrixBase<scalar_t>* H, const BLACSGrid* lg,
+       const DistributedMatrix<scalar_t>& dist)
+        : cols_(cols), hss_(H), grid_loc_(lg) { to_block_row(dist); }
       void from_block_row(DistributedMatrix<scalar_t>& dist) const
-      { _hss->from_block_row(dist, sub, leaf, _ctxt_loc); }
+      { hss_->from_block_row(dist, sub, leaf, grid_loc_); }
       DistributedMatrix<scalar_t> leaf;
       DenseMatrix<scalar_t> sub;
-      int ctxt_loc() const { return _ctxt_loc; }
-      int cols() const { return _cols; }
+      const BLACSGrid* grid_local() const { return grid_loc_; }
+      int cols() const { return cols_; }
+
     private:
       void allocate_block_row()
-      { _hss->allocate_block_row(_cols, sub, leaf); }
+      { hss_->allocate_block_row(cols_, sub, leaf); }
       void to_block_row(const DistributedMatrix<scalar_t>& dist)
-      { _hss->to_block_row(dist, sub, leaf); }
-      const int _cols;
-      const HSSMatrixBase<scalar_t>* _hss;
-      const int _ctxt_loc;
+      { hss_->to_block_row(dist, sub, leaf); }
+
+      const int cols_;
+      const HSSMatrixBase<scalar_t>* hss_;
+      const BLACSGrid* grid_loc_;
     };
 
     class TreeLocalRanges {

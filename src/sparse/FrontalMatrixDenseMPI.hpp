@@ -59,7 +59,7 @@ namespace strumpack {
   public:
     FrontalMatrixDenseMPI
     (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-     std::vector<integer_t>& _upd, MPI_Comm _front_comm, int _total_procs);
+     std::vector<integer_t>& _upd, MPI_Comm comm, int P);
     FrontalMatrixDenseMPI(const FrontalMatrixDenseMPI&) = delete;
     FrontalMatrixDenseMPI& operator=(FrontalMatrixDenseMPI const&) = delete;
     ~FrontalMatrixDenseMPI();
@@ -100,9 +100,9 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t>
   FrontalMatrixDenseMPI<scalar_t,integer_t>::FrontalMatrixDenseMPI
   (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-   std::vector<integer_t>& _upd, MPI_Comm front_comm, int total_procs)
+   std::vector<integer_t>& _upd, MPI_Comm comm, int P)
     : FrontalMatrixMPI<scalar_t,integer_t>
-    (_sep, _sep_begin, _sep_end, _upd, front_comm, total_procs) {}
+    (_sep, _sep_begin, _sep_end, _upd, comm, P) {}
 
   template<typename scalar_t,typename integer_t>
   FrontalMatrixDenseMPI<scalar_t,integer_t>::~FrontalMatrixDenseMPI() {
@@ -155,20 +155,20 @@ namespace strumpack {
     const auto dupd = this->dim_upd();
     const auto dsep = this->dim_sep();
     if (dsep) {
-      F11 = DistM_t(this->ctxt(), dsep, dsep);
+      F11 = DistM_t(this->grid(), dsep, dsep);
       using ExtractFront = ExtractFront<scalar_t,integer_t>;
       ExtractFront::extract_F11(F11, A, this->sep_begin, dsep);
       if (this->dim_upd()) {
-        F12 = DistM_t(this->ctxt(), dsep, dupd);
+        F12 = DistM_t(this->grid(), dsep, dupd);
         ExtractFront::extract_F12
           (F12, A, this->sep_begin, this->sep_end, this->upd);
-        F21 = DistM_t(this->ctxt(), dupd, dsep);
+        F21 = DistM_t(this->grid(), dupd, dsep);
         ExtractFront::extract_F21
           (F21, A, this->sep_end, this->sep_begin, this->upd);
       }
     }
     if (dupd) {
-      F22 = DistM_t(this->ctxt(), dupd, dupd);
+      F22 = DistM_t(this->grid(), dupd, dupd);
       F22.zero();
     }
     extend_add();
@@ -176,7 +176,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::partial_factorization() {
-    if (this->dim_sep() && F11.active()) {
+    if (this->dim_sep() && this->grid()->active()) {
 #if defined(WRITE_ROOT)
       if (etree_level == 0) {
         if (!mpi_rank(this->comm()))
@@ -189,17 +189,17 @@ namespace strumpack {
       }
 #endif
       piv = F11.LU();
+      STRUMPACK_FULL_RANK_FLOPS(LU_flops(F11))
       if (this->dim_upd()) {
         F12.laswp(piv, true);
         trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11, F12);
         trsm(Side::R, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11, F21);
         gemm(Trans::N, Trans::N, scalar_t(-1.), F21, F12, scalar_t(1.), F22);
+        STRUMPACK_FULL_RANK_FLOPS
+          (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F21, F12, scalar_t(1.)) +
+           trsm_flops(Side::L, scalar_t(1.), F11, F12) +
+           trsm_flops(Side::R, scalar_t(1.), F11, F21));
       }
-      STRUMPACK_FULL_RANK_FLOPS
-        (LU_flops(F11) +
-         gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F21, F12, scalar_t(1.)) +
-         trsm_flops(Side::L, scalar_t(1.), F11, F12) +
-         trsm_flops(Side::R, scalar_t(1.), F11, F21));
     }
   }
 
@@ -232,7 +232,7 @@ namespace strumpack {
       this->rchild->forward_multifrontal_solve
         (bloc, bdist, CBr, seqCBr, etree_level);
     DistM_t& b = bdist[this->sep];
-    bupd = DistM_t(this->ctxt(), this->dim_upd(), b.cols());
+    bupd = DistM_t(this->grid(), this->dim_upd(), b.cols());
     bupd.zero();
     this->extend_add_b(b, bupd, CBl, CBr, seqCBl, seqCBr);
     if (this->dim_sep()) {
@@ -311,8 +311,8 @@ namespace strumpack {
    FrontalMatrix<scalar_t,integer_t>* pa) const {
     if (F11.active() || F22.active()) {
       auto b = R.cols();
-      Sr = DistM_t(this->ctxt(), this->dim_upd(), b);
-      Sc = DistM_t(this->ctxt(), this->dim_upd(), b);
+      Sr = DistM_t(this->grid(), this->dim_upd(), b);
+      Sc = DistM_t(this->grid(), this->dim_upd(), b);
       gemm(Trans::N, Trans::N, scalar_t(1.), F22, R, scalar_t(0.), Sr);
       gemm(Trans::C, Trans::N, scalar_t(1.), F22, R, scalar_t(0.), Sc);
       STRUMPACK_CB_SAMPLE_FLOPS

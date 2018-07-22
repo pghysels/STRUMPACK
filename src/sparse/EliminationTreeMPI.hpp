@@ -96,11 +96,12 @@ namespace strumpack {
       // TODO store a pointer to the actual front??
       ParFront
       (integer_t _sep_begin, integer_t _dim_sep,
-       int _P0, int _P, int _ctxt, int _ctxt_all)
-        : sep_begin(_sep_begin), dim_sep(_dim_sep), P0(_P0), P(_P),
-          ctxt(_ctxt), ctxt_all(_ctxt_all) {}
+       int _P0, int _P, BLACSGrid* g)
+        : sep_begin(_sep_begin), dim_sep(_dim_sep),
+          P0(_P0), P(_P), grid(g) {}
       integer_t sep_begin, dim_sep;
-      int P0, P, ctxt, ctxt_all;
+      int P0, P;
+      const BLACSGrid* grid;
     };
     std::vector<ParFront> _parallel_fronts;
     integer_t _active_pfronts;
@@ -174,7 +175,7 @@ namespace strumpack {
         // TODO this also does a pgemr2d!
         // TODO check if this is correct?!
         x_dist[pos++] = DistM_t
-          (pf.ctxt, DenseMW_t(pf.dim_sep, x.cols(), x, pf.sep_begin, 0));
+          (pf.grid, DenseMW_t(pf.dim_sep, x.cols(), x, pf.sep_begin, 0));
   }
 
   // TODO: rewrite this with a single alltoallv/allgatherv
@@ -320,11 +321,9 @@ namespace strumpack {
             (_active_pfronts, sep_begin, sep_end, upd[sep], front_comm, P);
         if (_rank >= P0 && _rank < P0+P) _active_pfronts++;
       } else mpi_free_comm(&front_comm);
-      int ctxt = front ? static_cast<FMPI_t*>(front)->ctxt() : -1;
-      int ctxt_all = front ?
-        static_cast<FMPI_t*>(front)->ctxt_all() : -1;
+      auto g = front ? static_cast<FMPI_t*>(front)->grid() : nullptr;
       _parallel_fronts.emplace_back
-        (sep_begin, sep_end-sep_begin, P0, P, ctxt, ctxt_all);
+        (sep_begin, sep_end-sep_begin, P0, P, g);
     }
 
     // only store a node if you are part of its communicator

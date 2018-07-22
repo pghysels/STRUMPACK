@@ -56,10 +56,10 @@ namespace strumpack {
   public:
     FrontalMatrixMPI
     (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-     std::vector<integer_t>& _upd, MPI_Comm front_comm, int total_procs);
+     std::vector<integer_t>& _upd, MPI_Comm comm, int P);
     FrontalMatrixMPI(const FrontalMatrixMPI&) = delete;
     FrontalMatrixMPI& operator=(FrontalMatrixMPI const&) = delete;
-    virtual ~FrontalMatrixMPI();
+    virtual ~FrontalMatrixMPI() {}
 
     void sample_CB
     (const SPOptions<scalar_t>& opts, const DenseM_t& R, DenseM_t& Sr,
@@ -104,13 +104,12 @@ namespace strumpack {
     inline bool visit(const F_t* ch) const;
     inline int child_master(const F_t* ch) const;
 
-    inline MPI_Comm comm() const { return front_comm_; }
-    inline int P() const { return P_; }
-    inline int ctxt() const { return blacs_grid_.ctxt(); }
-    inline int ctxt_all() const { return blacs_grid_.ctxt_all(); }
-    inline bool active() const { return blacs_grid_.active(); }
-    inline int nprows() const { return blacs_grid_.nprows(); }
-    inline int npcols() const { return blacs_grid_.npcols(); }
+    inline MPIComm& Comm() { return grid()->Comm(); }
+    inline const MPIComm& Comm() const { return grid()->Comm(); }
+    inline MPI_Comm comm() const { return Comm().comm(); }
+    inline BLACSGrid* grid() { return &blacs_grid_; }
+    inline const BLACSGrid* grid() const { return &blacs_grid_; }
+    inline int P() const { return grid()->P(); }
 
     virtual long long dense_factor_nonzeros(int task_depth=0) const;
     virtual std::string type() const { return "FrontalMatrixMPI"; }
@@ -120,32 +119,15 @@ namespace strumpack {
      bool isroot=true, int task_depth=0);
 
   protected:
-    // store a BLACS context, for a 2D processor grid
-    BLACSGrid blacs_grid_;
-
-    // number of processes that work on the subtree belonging to this
-    // front, this can be more than the processes in the blacs
-    // conte1xt ctxt and is not necessarily the same as
-    // mpi_nprocs(front_comm_), because if this rank is not part of
-    // front_comm_, mpi_nprocs(front_comm_) == 0
-    int P_;
-
-    // MPI communicator for this front
-    MPI_Comm front_comm_;
+    BLACSGrid blacs_grid_;     // 2D processor grid
   };
 
   template<typename scalar_t,typename integer_t>
   FrontalMatrixMPI<scalar_t,integer_t>::FrontalMatrixMPI
   (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-   std::vector<integer_t>& _upd, MPI_Comm front_comm, int total_procs)
+   std::vector<integer_t>& _upd, MPI_Comm comm, int P)
     : F_t(NULL, NULL, _sep, _sep_begin, _sep_end, _upd),
-      blacs_grid_(front_comm, total_procs),
-      P_(total_procs), front_comm_(front_comm) {
-  }
-
-  template<typename scalar_t,typename integer_t>
-  FrontalMatrixMPI<scalar_t,integer_t>::~FrontalMatrixMPI() {
-    mpi_free_comm(&front_comm_);
+      blacs_grid_(comm, P) {
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -156,10 +138,10 @@ namespace strumpack {
     auto n = J.size();
     TIMER_TIME(TaskType::EXTRACT_SEP_2D, 2, t_ex_sep);
     {
-      DistM_t tmp(ctxt, m, n);
-      A.extract_separator_2d(this->sep_end, I, J, tmp, comm());
+      DistM_t tmp(grid(), m, n);
+      A.extract_separator_2d(this->sep_end, I, J, tmp);
       // TODO why this copy???
-      strumpack::copy(m, n, tmp, 0, 0, B, 0, 0, ctxt_all());
+      copy(m, n, tmp, 0, 0, B, 0, 0, grid());
     }
     TIMER_STOP(t_ex_sep);
     TIMER_TIME(TaskType::GET_SUBMATRIX_2D, 2, t_getsub);
@@ -167,23 +149,17 @@ namespace strumpack {
     DenseM_t Blseq, Brseq;
     if (visit(this->lchild)) this->lchild->get_submatrix_2d(I, J, Bl, Blseq);
     if (visit(this->rchild)) this->rchild->get_submatrix_2d(I, J, Br, Brseq);
-    DistM_t tmp(B.ctxt(), m, n);
+    DistM_t tmp(B.grid(), m, n);
     if (this->lchild) {
       if (this->lchild->isMPI())
-        strumpack::copy(m, n, Bl, 0, 0, tmp, 0, 0, ctxt_all());
-      else
-        strumpack::copy
-          (m, n, Blseq, child_master(this->lchild),
-           tmp, 0, 0, ctxt_all());
+        copy(m, n, Bl, 0, 0, tmp, 0, 0, grid());
+      else copy(m, n, Blseq, child_master(this->lchild), tmp, 0, 0, grid());
     }
     B.add(tmp);
     if (this->rchild) {
       if (this->rchild->isMPI())
-        strumpack::copy(m, n, Br, 0, 0, tmp, 0, 0, ctxt_all());
-      else
-        strumpack::copy
-          (m, n, Brseq, child_master(this->rchild),
-           tmp, 0, 0, ctxt_all());
+        copy(m, n, Br, 0, 0, tmp, 0, 0, grid());
+      else copy(m, n, Brseq, child_master(this->rchild), tmp, 0, 0, grid());
     }
     B.add(tmp);
     TIMER_STOP(t_getsub);
@@ -197,11 +173,10 @@ namespace strumpack {
    std::vector<DistMW_t>& B) const {
     TIMER_TIME(TaskType::EXTRACT_SEP_2D, 2, t_ex_sep);
     for (std::size_t i=0; i<I.size(); i++) {
-      DistM_t tmp(ctxt(), I[i].size(), J[i].size());
-      A.extract_separator_2d(this->sep_end, I[i], J[i], tmp, comm());
+      DistM_t tmp(grid(), I[i].size(), J[i].size());
+      A.extract_separator_2d(this->sep_end, I[i], J[i], tmp);
       // TODO why this copy???
-      strumpack::copy(I[i].size(), J[i].size(), tmp, 0, 0,
-                      B[i], 0, 0, ctxt_all());
+      copy(I[i].size(), J[i].size(), tmp, 0, 0, B[i], 0, 0, grid());
     }
     TIMER_STOP(t_ex_sep);
     TIMER_TIME(TaskType::GET_SUBMATRIX_2D, 2, t_getsub);
@@ -216,28 +191,20 @@ namespace strumpack {
       auto m = I[i].size();
       auto n = J[i].size();
       if (!m || !n) continue;
-      DistM_t tmp(B[i].ctxt(), m, n);
+      DistM_t tmp(B[i].grid(), m, n);
       // TODO combine all these copies???!!
       if (this->lchild) {
         if (this->lchild->isMPI())
-          strumpack::copy
-            (m, n, visit(this->lchild) ? Bl[i] : d, 0, 0,
-             tmp, 0, 0, ctxt_all());
-        else
-          strumpack::copy
-            (m, n, visit(this->lchild) ? Blseq[i] : d2,
-             child_master(this->lchild), tmp, 0, 0, ctxt_all());
+          copy(m, n, visit(this->lchild) ? Bl[i] : d, 0, 0, tmp, 0, 0, grid());
+        else copy(m, n, visit(this->lchild) ? Blseq[i] : d2,
+                  child_master(this->lchild), tmp, 0, 0, grid());
       }
       B[i].add(tmp);
       if (this->rchild) {
         if (this->rchild->isMPI())
-          strumpack::copy
-            (m, n, visit(this->rchild) ? Br[i] : d, 0, 0,
-             tmp, 0, 0, ctxt_all());
-        else
-          strumpack::copy
-            (m, n, visit(this->rchild) ? Brseq[i] : d2,
-             child_master(this->rchild), tmp, 0, 0, ctxt_all());
+          copy(m, n, visit(this->rchild) ? Br[i] : d, 0, 0, tmp, 0, 0, grid());
+        else copy(m, n, visit(this->rchild) ? Brseq[i] : d2,
+                  child_master(this->rchild), tmp, 0, 0, grid());
       }
       B[i].add(tmp);
     }
@@ -248,7 +215,7 @@ namespace strumpack {
   FrontalMatrixMPI<scalar_t,integer_t>::get_submatrix_2d
   (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
    DistM_t& Bdist, DenseM_t&) const {
-    Bdist = DistM_t(ctxt(), I.size(), J.size());
+    Bdist = DistM_t(grid(), I.size(), J.size());
     Bdist.zero();
     extract_CB_sub_matrix_2d(I, J, Bdist);
   }
@@ -260,7 +227,7 @@ namespace strumpack {
    std::vector<DistM_t>& Bdist, std::vector<DenseM_t>&) const {
     // TODO add timer here???
     for (std::size_t i=0; i<I.size(); i++) {
-      Bdist.emplace_back(ctxt(), I[i].size(), J[i].size());
+      Bdist.emplace_back(grid(), I[i].size(), J[i].size());
       Bdist.back().zero();
     }
     extract_CB_sub_matrix_2d(I, J, Bdist);
@@ -283,9 +250,9 @@ namespace strumpack {
   FrontalMatrixMPI<scalar_t,integer_t>::visit(const F_t* ch) const {
     if (!ch) return false;
     if (auto mpi_child = dynamic_cast<const FMPI_t*>(ch)) {
-      if (mpi_child->comm() == MPI_COMM_NULL)
+      if (mpi_child->Comm().is_null())
         return false; // child is MPI
-    } else if (mpi_rank(comm()) != child_master(ch))
+    } else if (Comm().rank() != child_master(ch))
       return false; // child is sequential
     return true;
   }
@@ -294,8 +261,8 @@ namespace strumpack {
   FrontalMatrixMPI<scalar_t,integer_t>::child_master(const F_t* ch) const {
     int ch_master;
     if (auto mpi_ch = dynamic_cast<const FMPI_t*>(ch))
-      ch_master = (ch == this->lchild) ? 0 : P_ - mpi_ch->P_;
-    else ch_master = (ch == this->lchild) ? 0 : P_ - 1;
+      ch_master = (ch == this->lchild) ? 0 : P() - mpi_ch->P();
+    else ch_master = (ch == this->lchild) ? 0 : P() - 1;
     return ch_master;
   }
 
@@ -303,11 +270,9 @@ namespace strumpack {
   FrontalMatrixMPI<scalar_t,integer_t>::extend_add_b
   (DistM_t& b, DistM_t& bupd, const DistM_t& CBl, const DistM_t& CBr,
    const DenseM_t& seqCBl, const DenseM_t& seqCBr) const {
-    if (mpi_rank(comm()) == 0) {
-      STRUMPACK_FLOPS
-        (static_cast<long long int>(CBl.rows()*b.cols()));
-      STRUMPACK_FLOPS
-        (static_cast<long long int>(CBr.rows()*b.cols()));
+    if (Comm().is_root()) {
+      STRUMPACK_FLOPS(static_cast<long long int>(CBl.rows()*b.cols()));
+      STRUMPACK_FLOPS(static_cast<long long int>(CBr.rows()*b.cols()));
     }
     std::vector<std::vector<scalar_t>> sbuf(this->P());
     if (visit(this->lchild)) {
@@ -356,7 +321,7 @@ namespace strumpack {
     if (visit(this->lchild)) {
       if (auto ch_mpi = dynamic_cast<FMPI_t*>(this->lchild)) {
         CBl = DistM_t
-          (ch_mpi->ctxt(), this->lchild->dim_upd(), b.cols());
+          (ch_mpi->grid(), this->lchild->dim_upd(), b.cols());
         ExtAdd::extract_column_copy_from_buffers
           (CBl, pbuf, this, this->lchild);
       } else {
@@ -368,7 +333,7 @@ namespace strumpack {
     if (visit(this->rchild)) {
       if (auto ch_mpi = dynamic_cast<FMPI_t*>(this->rchild)) {
         CBr = DistM_t
-          (ch_mpi->ctxt(), this->rchild->dim_upd(), b.cols());
+          (ch_mpi->grid(), this->rchild->dim_upd(), b.cols());
         ExtAdd::extract_column_copy_from_buffers(CBr, pbuf, this, this->rchild);
       } else {
         seqCBr = DenseM_t(this->rchild->dim_upd(), b.cols());
@@ -384,7 +349,7 @@ namespace strumpack {
   FrontalMatrixMPI<scalar_t,integer_t>::dense_factor_nonzeros
   (int task_depth) const {
     long long nnz = 0;
-    if (comm() != MPI_COMM_NULL && mpi_rank(comm()) == 0) {
+    if (!Comm().is_null() && Comm().is_root()) {
       long long dsep = this->dim_sep();
       long long dupd = this->dim_upd();
       nnz = dsep * (dsep + 2 * dupd);

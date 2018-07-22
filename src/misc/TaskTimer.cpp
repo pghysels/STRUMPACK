@@ -36,6 +36,7 @@
 #include "MPIWrapper.hpp"
 
 using namespace std::chrono;
+using namespace strumpack;
 
 tpoint TaskTimer::t_begin = GET_TIME_NOW();
 TimerList TaskTimer::time_log_list = TimerList();
@@ -150,29 +151,53 @@ void TaskTimer::print_name(std::ostream& os) {
   }
 }
 
-std::ostream& operator<<(std::ostream& os, TaskTimer& t) {
+// std::ostream& operator<<(std::ostream& os, TaskTimer& t) {
+//   //  if (t.type == EXPLICITLY_NAMED_TASK) return os;
+// #if defined(USE_OPENMP_TIMER)
+//   if (!t.stopped) t.stop();
+//   double begin_time = t.t_start - TaskTimer::t_begin;
+//   double stop_time = t.t_stop - TaskTimer::t_begin;
+//   t.print_name(os);
+//   os << " " << t.number << " [ "
+//      << std::setprecision(12) << begin_time << " , "
+//      << std::setprecision(12) << stop_time  << " ] thread: " << t.tid << "\n";
+// #else
+//   if (!t.stopped) t.stop();
+//   duration<double> begin_time = duration_cast<duration<double>>
+//     (t.t_start - TaskTimer::t_begin);
+//   duration<double> stop_time = duration_cast<duration<double>>
+//     (t.t_stop - TaskTimer::t_begin);
+//   t.print_name(os);
+//   os << " " << t.number << " [ "
+//      << std::setprecision(12) << begin_time.count() << " , "
+//      << std::setprecision(12) << stop_time.count()
+//      << " ] thread: " << t.tid << "\n";
+// #endif
+//   return os;
+// }
+
+void TaskTimer::print(std::ostream& os) {
   //  if (t.type == EXPLICITLY_NAMED_TASK) return os;
 #if defined(USE_OPENMP_TIMER)
-  if (!t.stopped) t.stop();
-  double begin_time = t.t_start - TaskTimer::t_begin;
-  double stop_time = t.t_stop - TaskTimer::t_begin;
-  t.print_name(os);
-  os << " " << t.number << " [ "
+  if (!stopped) stop();
+  double begin_time = t_start - TaskTimer::t_begin;
+  double stop_time = t_stop - TaskTimer::t_begin;
+  print_name(os);
+  os << " " << number << " [ "
      << std::setprecision(12) << begin_time << " , "
-     << std::setprecision(12) << stop_time  << " ] thread: " << t.tid << "\n";
+     << std::setprecision(12) << stop_time  << " ] thread: " << tid << "\n";
 #else
-  if (!t.stopped) t.stop();
+  if (!stopped) stop();
   duration<double> begin_time = duration_cast<duration<double>>
-    (t.t_start - TaskTimer::t_begin);
+    (t_start - TaskTimer::t_begin);
   duration<double> stop_time = duration_cast<duration<double>>
-    (t.t_stop - TaskTimer::t_begin);
-  t.print_name(os);
-  os << " " << t.number << " [ "
+    (t_stop - TaskTimer::t_begin);
+  print_name(os);
+  os << " " << number << " [ "
      << std::setprecision(12) << begin_time.count() << " , "
      << std::setprecision(12) << stop_time.count()
-     << " ] thread: " << t.tid << "\n";
+     << " ] thread: " << tid << "\n";
 #endif
-  return os;
 }
 
 void TaskTimer::start() {
@@ -218,7 +243,8 @@ void TimerList::finalize() {
     std::ofstream log;
     log.open("time.log", std::ofstream::out);
     for (unsigned int thread=0; thread<list.size(); thread++)
-      for (auto timing : list[thread]) log << timing;
+      for (auto timing : list[thread]) //log << timing;
+        timing.print(log);
     return;
   }
 
@@ -231,7 +257,8 @@ void TimerList::finalize() {
     log << "# MPI rank " << mpi_rank() << std::endl;
     log << "# ==============" << std::endl;
     for (unsigned int thread=0; thread<list.size(); thread++)
-      for (auto timing : list[thread]) log << timing;
+      for (auto timing : list[thread]) //log << timing;
+        timing.print(log);
     log << std::endl;
     log.close();
   }

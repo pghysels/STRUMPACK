@@ -37,17 +37,14 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_stable_nosync
-    (const dmult_t& Amult, const delemw_t& Aelem,
-     const opts_t& opts, int Actxt) {
+    (const dmult_t& Amult, const delemw_t& Aelem, const opts_t& opts) {
       auto d = opts.d0();
       auto dd = opts.dd();
-      DistSamples<scalar_t> RS
-        (d+dd, (Actxt!=-1) ? Actxt :
-         _ctxt, *this, Amult, opts);
+      DistSamples<scalar_t> RS(d+dd, grid(), *this, Amult, opts);
       WorkCompressMPI<scalar_t> w;
       while (!this->is_compressed()) {
         if (d != opts.d0()) RS.add_columns(d+dd, opts);
-        if (opts.verbose() && !mpi_rank(_comm))
+        if (opts.verbose() && Comm().is_root())
           std::cout << "# compressing with d+dd = " << d << "+" << dd
                     << " (stable)" << std::endl;
         compress_recursive_stable(RS, Aelem, opts, w, d, dd);
@@ -58,19 +55,16 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_stable_sync
-    (const dmult_t& Amult, const delemw_t& Aelem,
-     const opts_t& opts, int Actxt) {
+    (const dmult_t& Amult, const delemw_t& Aelem, const opts_t& opts) {
       auto d = opts.d0();
       auto dd = opts.dd();
       assert(dd <= d);
       WorkCompressMPI<scalar_t> w;
-      DistSamples<scalar_t> RS
-        (d+dd, (Actxt!=-1) ? Actxt :
-         _ctxt, *this, Amult, opts);
+      DistSamples<scalar_t> RS(d+dd, grid(), *this, Amult, opts);
       const auto nr_lvls = this->max_levels();
       while (!this->is_compressed()) {
         if (d != opts.d0()) RS.add_columns(d+dd, opts);
-        if (opts.verbose() && !mpi_rank(_comm))
+        if (opts.verbose() && Comm().is_root())
           std::cout << "# compressing with d+dd = " << d << "+" << dd
                     << " (stable)" << std::endl;
         for (int lvl=nr_lvls-1; lvl>=0; lvl--) {
@@ -84,19 +78,16 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_stable_sync
-    (const dmult_t& Amult, const delem_blocks_t& Aelem,
-     const opts_t& opts, int Actxt) {
+    (const dmult_t& Amult, const delem_blocks_t& Aelem, const opts_t& opts) {
       auto d = opts.d0();
       auto dd = opts.dd();
       assert(dd <= d);
       WorkCompressMPI<scalar_t> w;
-      DistSamples<scalar_t> RS
-        (d+dd, (Actxt!=-1) ? Actxt :
-         _ctxt, *this, Amult, opts);
+      DistSamples<scalar_t> RS(d+dd, grid(), *this, Amult, opts);
       const auto nr_lvls = this->max_levels();
       while (!this->is_compressed()) {
         if (d != opts.d0()) RS.add_columns(d+dd, opts);
-        if (opts.verbose() && !mpi_rank(_comm))
+        if (opts.verbose() && Comm().is_root())
           std::cout << "# compressing with d+dd = " << d << "+" << dd
                     << " (stable)" << std::endl;
         for (int lvl=nr_lvls-1; lvl>=0; lvl--) {
@@ -122,8 +113,8 @@ namespace strumpack {
             I.push_back(i+w.offset.first);
           for (std::size_t j=0; j<this->cols(); j++)
             J.push_back(j+w.offset.second);
-          _D = DistM_t(_ctxt, this->rows(), this->cols());
-          Aelem(I, J, _D, _A, w.offset.first, w.offset.second, _comm);
+          _D = DistM_t(grid(), this->rows(), this->cols());
+          Aelem(I, J, _D, _A, w.offset.first, w.offset.second, comm());
         }
       } else {
         w.split(this->_ch[0]->dims());
@@ -135,12 +126,12 @@ namespace strumpack {
         if (!this->_ch[0]->is_compressed() ||
             !this->_ch[1]->is_compressed()) return;
         if (this->is_untouched()) {
-          _B01 = DistM_t(_ctxt, w.c[0].Ir.size(), w.c[1].Ic.size());
-          _B10 = DistM_t(_ctxt, w.c[1].Ir.size(), w.c[0].Ic.size());
+          _B01 = DistM_t(grid(), w.c[0].Ir.size(), w.c[1].Ic.size());
+          _B10 = DistM_t(grid(), w.c[1].Ir.size(), w.c[0].Ic.size());
           Aelem(w.c[0].Ir, w.c[1].Ic, _B01, _A01,
-                w.offset.first, w.offset.second+this->_ch[0]->cols(), _comm);
+                w.offset.first, w.offset.second+this->_ch[0]->cols(), comm());
           Aelem(w.c[1].Ir, w.c[0].Ic, _B10, _A10,
-                w.offset.first+this->_ch[0]->rows(), w.offset.second, _comm);
+                w.offset.first+this->_ch[0]->rows(), w.offset.second, comm());
         }
       }
       if (w.lvl == 0) this->_U_state = this->_V_state = State::COMPRESSED;
@@ -202,7 +193,7 @@ namespace strumpack {
         // TODO pass max_rank to ID in DistributedMatrix
         auto rtol = opts.rel_tol() / w.lvl;
         auto atol = opts.abs_tol() / w.lvl;
-        w.Sr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol, _ctxt_T);
+        w.Sr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol);
         STRUMPACK_ID_FLOPS(ID_row_flops(w.Sr, _U.cols()));
         this->_U_rank = _U.cols();
         this->_U_rows = _U.rows();
@@ -233,7 +224,7 @@ namespace strumpack {
         // TODO pass max_rank to ID in DistributedMatrix
         auto rtol = opts.rel_tol() / w.lvl;
         auto atol = opts.abs_tol() / w.lvl;
-        w.Sc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol, _ctxt_T);
+        w.Sc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol);
         STRUMPACK_ID_FLOPS(ID_row_flops(w.Sc, _V.cols()));
         this->_V_rank = _V.cols();
         this->_V_rows = _V.rows();
@@ -255,14 +246,14 @@ namespace strumpack {
      DistM_t& Q, int d, int dd, bool untouched, int L) {
       int m = S.rows();
       if (d >= m) return true;
-      if (Q.cols() == 0) Q = DistM_t(_ctxt, m, d+dd);
+      if (Q.cols() == 0) Q = DistM_t(grid(), m, d+dd);
       else Q.resize(m, d+dd);
-      copy(m, dd, S, 0, d, Q, 0, d, _ctxt);
+      copy(m, dd, S, 0, d, Q, 0, d, grid());
       DistMW_t Q2, Q12;
       if (untouched) {
         Q2 = DistMW_t(m, std::min(d, m), Q, 0, 0);
         Q12 = DistMW_t(m, std::min(d, m), Q, 0, 0);
-        copy(m, d, S, 0, 0, Q, 0, 0, _ctxt);
+        copy(m, d, S, 0, 0, Q, 0, 0, grid());
       } else {
         Q2 = DistMW_t(m, std::min(dd, m-(d-dd)), Q, 0, d-dd);
         Q12 = DistMW_t(m, std::min(d, m), Q, 0, 0);
@@ -278,7 +269,7 @@ namespace strumpack {
       DistMW_t Q3(m, dd, Q, 0, d);
       // only use p columns of Q3 to check the stopping criterion
       DistMW_t Q3p(m, std::min(dd, opts.p()), Q, 0, d);
-      DistM_t Q12tQ3(_ctxt, Q12.cols(), Q3.cols());
+      DistM_t Q12tQ3(grid(), Q12.cols(), Q3.cols());
       auto S3norm = Q3p.norm();
       TIMER_TIME(TaskType::ORTHO, 1, t_ortho);
       gemm(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.), Q12tQ3);

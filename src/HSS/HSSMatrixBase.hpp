@@ -118,9 +118,10 @@ namespace strumpack {
 
       virtual void shift(scalar_t sigma) = 0;
 
-      virtual int ctxt(int local_context) const {
-        return active() ? local_context : -1;
-      };
+      virtual const BLACSGrid* grid(const BLACSGrid* local_grid) const {
+        return active() ? local_grid : nullptr;
+      }
+      virtual const BLACSGrid* grid_local() const { return nullptr; }
 
       virtual void to_block_row
       (const DistM_t& A, DenseM_t& sub_A, DistM_t& leaf_A) const;
@@ -128,7 +129,7 @@ namespace strumpack {
       (int d, DenseM_t& sub_A, DistM_t& leaf_A) const;
       virtual void from_block_row
       (DistM_t& A, const DenseM_t& sub_A, const DistM_t& leaf_A,
-       int lctxt) const;
+       const BLACSGrid* lg) const;
 
     protected:
       using delemw_t = typename std::function
@@ -194,7 +195,7 @@ namespace strumpack {
       virtual void get_extraction_indices
       (std::vector<std::vector<std::size_t>>& I,
        std::vector<std::vector<std::size_t>>& J, std::vector<DistMW_t>& B,
-       int lctxt, WorkCompressMPI<scalar_t>& w, int& self, int lvl);
+       const BLACSGrid* lg, WorkCompressMPI<scalar_t>& w, int& self, int lvl);
       virtual void get_extraction_indices
       (std::vector<std::vector<std::size_t>>& I,
        std::vector<std::vector<std::size_t>>& J,
@@ -207,7 +208,7 @@ namespace strumpack {
        const std::pair<std::size_t,std::size_t>& off,
        WorkCompress<scalar_t>& w, int& self, int lvl) {}
       virtual void extract_D_B
-      (const delemw_t& Aelem, int lctxt, const opts_t& opts,
+      (const delemw_t& Aelem, const BLACSGrid* lg, const opts_t& opts,
        WorkCompressMPI<scalar_t>& w, int lvl);
       virtual void extract_D_B
       (const elem_t& Aelem, const opts_t& opts,
@@ -218,7 +219,7 @@ namespace strumpack {
        bool isroot, bool partial, int depth) const {};
       virtual void factor_recursive
       (HSSFactorsMPI<scalar_t>& ULV, WorkFactorMPI<scalar_t>& w,
-       int local_ctxt, bool isroot, bool partial) const;
+       const BLACSGrid* lg, bool isroot, bool partial) const;
 
       virtual void apply_fwd
       (const DenseM_t& b, WorkApply<scalar_t>& w,
@@ -273,16 +274,16 @@ namespace strumpack {
       (DenseMatrix<scalar_t>& B, WorkExtract<scalar_t>& w,
        int depth) const {};
       virtual void extract_fwd
-      (WorkExtractMPI<scalar_t>& w, int lctxt, bool odiag) const;
+      (WorkExtractMPI<scalar_t>& w, const BLACSGrid* lg, bool odiag) const;
       virtual void extract_bwd
       (std::vector<Triplet<scalar_t>>& triplets,
-       int lctxt, WorkExtractMPI<scalar_t>& w) const;
+       const BLACSGrid* lg, WorkExtractMPI<scalar_t>& w) const;
       virtual void extract_fwd
-      (WorkExtractBlocksMPI<scalar_t>& w, int lctxt,
+      (WorkExtractBlocksMPI<scalar_t>& w, const BLACSGrid* lg,
        std::vector<bool>& odiag) const;
       virtual void extract_bwd
       (std::vector<std::vector<Triplet<scalar_t>>>& triplets,
-       int lctxt, WorkExtractBlocksMPI<scalar_t>& w) const;
+       const BLACSGrid* lg, WorkExtractBlocksMPI<scalar_t>& w) const;
       virtual void extract_bwd
       (std::vector<Triplet<scalar_t>>& triplets,
        WorkExtract<scalar_t>& w, int depth) const {};
@@ -305,12 +306,10 @@ namespace strumpack {
       (DenseM_t& A, WorkDense<scalar_t>& w, bool isroot, int depth) const {};
 
       virtual void redistribute_to_tree_to_buffers
-      (const DistM_t& A, std::size_t Arlo, std::size_t Aclo, int Actxt_all,
+      (const DistM_t& A, std::size_t Arlo, std::size_t Aclo,
        std::vector<std::vector<scalar_t>>& sbuf, int dest);
       virtual void redistribute_to_tree_from_buffers
-      (const DistM_t& A, int Aprows, int Apcols,
-       std::size_t Arlo, std::size_t Aclo,
-       int Actxt_all, scalar_t** pbuf);
+      (const DistM_t& A, std::size_t Arlo, std::size_t Aclo, scalar_t** pbuf);
       virtual void delete_redistributed_input();
 
       friend class HSSMatrix<scalar_t>;
@@ -360,11 +359,11 @@ namespace strumpack {
       forward_solve
         (*(ULV._factors_seq), *(w.w_seq),
          const_cast<DistM_t&>(b).dense_wrapper(), partial);
-      w.z = DistM_t(b.ctxt(), std::move(w.w_seq->z));
-      w.ft1 = DistM_t(b.ctxt(), std::move(w.w_seq->ft1));
-      w.y = DistM_t(b.ctxt(), std::move(w.w_seq->y));
-      w.x = DistM_t(b.ctxt(), std::move(w.w_seq->x));
-      w.reduced_rhs = DistM_t(b.ctxt(), std::move(w.w_seq->reduced_rhs));
+      w.z = DistM_t(b.grid(), std::move(w.w_seq->z));
+      w.ft1 = DistM_t(b.grid(), std::move(w.w_seq->ft1));
+      w.y = DistM_t(b.grid(), std::move(w.w_seq->y));
+      w.x = DistM_t(b.grid(), std::move(w.w_seq->x));
+      w.reduced_rhs = DistM_t(b.grid(), std::move(w.w_seq->reduced_rhs));
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::backward_solve
@@ -376,7 +375,7 @@ namespace strumpack {
 #pragma omp parallel
 #pragma omp single nowait
       backward_solve(*(ULV._factors_seq), *(w.w_seq), lx);
-      x = DistM_t(x.ctxt(), std::move(lx));
+      x = DistM_t(x.grid(), std::move(lx));
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::to_block_row
@@ -395,9 +394,9 @@ namespace strumpack {
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::from_block_row
     (DistM_t& dist, const DenseM_t& sub, const DistM_t& leaf,
-     int lctxt) const {
+     const BLACSGrid* lg) const {
       if (!this->active()) return;
-      dist = DistM_t(lctxt, sub);
+      dist = DistM_t(lg, sub);
     }
 
     /**
@@ -409,10 +408,10 @@ namespace strumpack {
     (DistSamples<scalar_t>& RS, const delemw_t& Aelem, const opts_t& opts,
      WorkCompressMPI<scalar_t>& w_mpi, int dd) {
       if (!active()) return;
-      auto lctxt = RS.HSS().ctxt_loc();
+      auto lg = RS.HSS().grid_local();
       std::pair<std::size_t,std::size_t> offset;
       LocalElemMult<scalar_t> lAelem
-        (Aelem, (w_mpi.lvl==0) ? offset : w_mpi.offset, lctxt, _Asub);
+        (Aelem, (w_mpi.lvl==0) ? offset : w_mpi.offset, lg, _Asub);
       w_mpi.create_sequential();
       WorkCompress<scalar_t>& w = *(w_mpi.w_seq);
       if (w.lvl == 0) w.offset = w_mpi.offset;
@@ -425,36 +424,36 @@ namespace strumpack {
         (RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
          lAelem, opts, w, dd, _openmp_task_depth);
       if (is_compressed()) {
-        auto lctxt = RS.HSS().ctxt_loc();
+        auto lg = RS.HSS().grid_local();
         auto d = RS.sub_Rr.cols();
         if (was_not_compressed) {
           w_mpi.Rr = DistM_t
-            (lctxt, DenseMW_t(V_rank(), d, RS.sub_Rr, w.offset.second, 0));
+            (lg, DenseMW_t(V_rank(), d, RS.sub_Rr, w.offset.second, 0));
           w_mpi.Rc = DistM_t
-            (lctxt, DenseMW_t(U_rank(), d, RS.sub_Rc, w.offset.second, 0));
+            (lg, DenseMW_t(U_rank(), d, RS.sub_Rc, w.offset.second, 0));
           w_mpi.Sr = DistM_t
-            (lctxt, DenseMW_t(U_rows(), d, RS.sub_Sr, w.offset.second, 0));
+            (lg, DenseMW_t(U_rows(), d, RS.sub_Sr, w.offset.second, 0));
           w_mpi.Sc = DistM_t
-            (lctxt, DenseMW_t(V_rows(), d, RS.sub_Sc, w.offset.second, 0));
+            (lg, DenseMW_t(V_rows(), d, RS.sub_Sc, w.offset.second, 0));
         } else {
           auto d_old = w_mpi.Rr.cols();
           w_mpi.Rr.resize(V_rank(), d_old+dd);
           w_mpi.Rc.resize(U_rank(), d_old+dd);
           copy(V_rank(), dd,
                DenseMW_t(V_rank(), dd, RS.sub_Rr, w.offset.second, d-dd),
-               0, w_mpi.Rr, 0, d_old, lctxt);
+               0, w_mpi.Rr, 0, d_old, lg);
           copy(U_rank(), dd,
                DenseMW_t(U_rank(), dd, RS.sub_Rc, w.offset.second, d-dd),
-               0, w_mpi.Rc, 0, d_old, lctxt);
+               0, w_mpi.Rc, 0, d_old, lg);
           d_old = w_mpi.Sr.cols();
           w_mpi.Sr.resize(U_rows(), d_old+dd);
           w_mpi.Sc.resize(V_rows(), d_old+dd);
           copy(U_rows(), dd,
                DenseMW_t(U_rows(), dd, RS.sub_Sr, w.offset.second, d-dd),
-               0, w_mpi.Sr, 0, d_old, lctxt);
+               0, w_mpi.Sr, 0, d_old, lg);
           copy(V_rows(), dd,
                DenseMW_t(V_rows(), dd, RS.sub_Sc, w.offset.second, d-dd),
-               0, w_mpi.Sc, 0, d_old, lctxt);
+               0, w_mpi.Sc, 0, d_old, lg);
         }
       }
       std::swap(w.Ir, w_mpi.Ir); std::swap(w.Ic, w_mpi.Ic);
@@ -488,36 +487,36 @@ namespace strumpack {
          opts, w, dd, lvl, _openmp_task_depth);
       if (w.lvl == lvl) {
         if (is_compressed()) {
-          auto lctxt = RS.HSS().ctxt_loc();
+          auto lg = RS.HSS().grid_local();
           auto d = RS.sub_Rr.cols();
           if (was_not_compressed) {
             w_mpi.Rr = DistM_t
-              (lctxt, DenseMW_t(V_rank(), d, RS.sub_Rr, w.offset.second, 0));
+              (lg, DenseMW_t(V_rank(), d, RS.sub_Rr, w.offset.second, 0));
             w_mpi.Rc = DistM_t
-              (lctxt, DenseMW_t(U_rank(), d, RS.sub_Rc, w.offset.second, 0));
+              (lg, DenseMW_t(U_rank(), d, RS.sub_Rc, w.offset.second, 0));
             w_mpi.Sr = DistM_t
-              (lctxt, DenseMW_t(U_rows(), d, RS.sub_Sr, w.offset.second, 0));
+              (lg, DenseMW_t(U_rows(), d, RS.sub_Sr, w.offset.second, 0));
             w_mpi.Sc = DistM_t
-              (lctxt, DenseMW_t(V_rows(), d, RS.sub_Sc, w.offset.second, 0));
+              (lg, DenseMW_t(V_rows(), d, RS.sub_Sc, w.offset.second, 0));
           } else {
             auto d_old = w_mpi.Rr.cols();
             w_mpi.Rr.resize(V_rank(), d_old+dd);
             w_mpi.Rc.resize(U_rank(), d_old+dd);
             copy(V_rank(), dd,
                  DenseMW_t(V_rank(), dd, RS.sub_Rr, w.offset.second, d-dd),
-                 0, w_mpi.Rr, 0, d_old, lctxt);
+                 0, w_mpi.Rr, 0, d_old, lg);
             copy(U_rank(), dd,
                  DenseMW_t(U_rank(), dd, RS.sub_Rc, w.offset.second, d-dd),
-                 0, w_mpi.Rc, 0, d_old, lctxt);
+                 0, w_mpi.Rc, 0, d_old, lg);
             d_old = w_mpi.Sr.cols();
             w_mpi.Sr.resize(U_rows(), d_old+dd);
             w_mpi.Sc.resize(V_rows(), d_old+dd);
             copy(U_rows(), dd,
                  DenseMW_t(U_rows(), dd, RS.sub_Sr, w.offset.second, d-dd),
-                 0, w_mpi.Sr, 0, d_old, lctxt);
+                 0, w_mpi.Sr, 0, d_old, lg);
             copy(V_rows(), dd,
                  DenseMW_t(V_rows(), dd, RS.sub_Sc, w.offset.second, d-dd),
-                 0, w_mpi.Sc, 0, d_old, lctxt);
+                 0, w_mpi.Sc, 0, d_old, lg);
           }
         }
         std::swap(w.Ir, w_mpi.Ir); std::swap(w.Ic, w_mpi.Ic);
@@ -534,10 +533,10 @@ namespace strumpack {
     (DistSamples<scalar_t>& RS, const delemw_t& Aelem, const opts_t& opts,
      WorkCompressMPI<scalar_t>& w_mpi, int d, int dd) {
       if (!active()) return;
-      auto lctxt = RS.HSS().ctxt_loc();
+      auto lg = RS.HSS().grid_local();
       std::pair<std::size_t,std::size_t> offset;
       LocalElemMult<scalar_t> lAelem
-        (Aelem, (w_mpi.lvl==0) ? offset : w_mpi.offset, lctxt, _Asub);
+        (Aelem, (w_mpi.lvl==0) ? offset : w_mpi.offset, lg, _Asub);
       w_mpi.create_sequential();
       WorkCompress<scalar_t>& w = *(w_mpi.w_seq);
       if (w.lvl == 0) w.offset = w_mpi.offset;
@@ -550,36 +549,36 @@ namespace strumpack {
         (RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
          lAelem, opts, w, d, dd, _openmp_task_depth);
       if (is_compressed()) {
-        auto lctxt = RS.HSS().ctxt_loc();
+        //auto lg = RS.HSS().grid_local();
         auto c = RS.sub_Rr.cols();
         if (was_not_compressed) {
           w_mpi.Rr = DistM_t
-            (lctxt, DenseMW_t(V_rank(), c, RS.sub_Rr, w.offset.second, 0));
+            (lg, DenseMW_t(V_rank(), c, RS.sub_Rr, w.offset.second, 0));
           w_mpi.Rc = DistM_t
-            (lctxt, DenseMW_t(U_rank(), c, RS.sub_Rc, w.offset.second, 0));
+            (lg, DenseMW_t(U_rank(), c, RS.sub_Rc, w.offset.second, 0));
           w_mpi.Sr = DistM_t
-            (lctxt, DenseMW_t(U_rows(), c, RS.sub_Sr, w.offset.second, 0));
+            (lg, DenseMW_t(U_rows(), c, RS.sub_Sr, w.offset.second, 0));
           w_mpi.Sc = DistM_t
-            (lctxt, DenseMW_t(V_rows(), c, RS.sub_Sc, w.offset.second, 0));
+            (lg, DenseMW_t(V_rows(), c, RS.sub_Sc, w.offset.second, 0));
         } else {
           auto d_old = w_mpi.Rr.cols();
           w_mpi.Rr.resize(V_rank(), d_old+dd);
           w_mpi.Rc.resize(U_rank(), d_old+dd);
           copy(V_rank(), dd,
                DenseMW_t(V_rank(), dd, RS.sub_Rr, w.offset.second, c-dd),
-               0, w_mpi.Rr, 0, d_old, lctxt);
+               0, w_mpi.Rr, 0, d_old, lg);
           copy(U_rank(), dd,
                DenseMW_t(U_rank(), dd, RS.sub_Rc, w.offset.second, c-dd),
-               0, w_mpi.Rc, 0, d_old, lctxt);
+               0, w_mpi.Rc, 0, d_old, lg);
           d_old = w_mpi.Sr.cols();
           w_mpi.Sr.resize(U_rows(), d_old+dd);
           w_mpi.Sc.resize(V_rows(), d_old+dd);
           copy(U_rows(), dd,
                DenseMW_t(U_rows(), dd, RS.sub_Sr, w.offset.second, c-dd),
-               0, w_mpi.Sr, 0, d_old, lctxt);
+               0, w_mpi.Sr, 0, d_old, lg);
           copy(V_rows(), dd,
                DenseMW_t(V_rows(), dd, RS.sub_Sc, w.offset.second, c-dd),
-               0, w_mpi.Sc, 0, d_old, lctxt);
+               0, w_mpi.Sc, 0, d_old, lg);
         }
       }
       std::swap(w.Ir, w_mpi.Ir); std::swap(w.Ic, w_mpi.Ic);
@@ -609,36 +608,36 @@ namespace strumpack {
          opts, w, d, dd, lvl, _openmp_task_depth);
       if (w.lvl == lvl) {
         if (is_compressed()) {
-          auto lctxt = RS.HSS().ctxt_loc();
+          auto lg = RS.HSS().grid_local();
           auto c = RS.sub_Rr.cols();
           if (was_not_compressed) {
             w_mpi.Rr = DistM_t
-              (lctxt, DenseMW_t(V_rank(), c, RS.sub_Rr, w.offset.second, 0));
+              (lg, DenseMW_t(V_rank(), c, RS.sub_Rr, w.offset.second, 0));
             w_mpi.Rc = DistM_t
-              (lctxt, DenseMW_t(U_rank(), c, RS.sub_Rc, w.offset.second, 0));
+              (lg, DenseMW_t(U_rank(), c, RS.sub_Rc, w.offset.second, 0));
             w_mpi.Sr = DistM_t
-              (lctxt, DenseMW_t(U_rows(), c, RS.sub_Sr, w.offset.second, 0));
+              (lg, DenseMW_t(U_rows(), c, RS.sub_Sr, w.offset.second, 0));
             w_mpi.Sc = DistM_t
-              (lctxt, DenseMW_t(V_rows(), c, RS.sub_Sc, w.offset.second, 0));
+              (lg, DenseMW_t(V_rows(), c, RS.sub_Sc, w.offset.second, 0));
           } else {
             auto d_old = w_mpi.Rr.cols();
             w_mpi.Rr.resize(V_rank(), d_old+dd);
             w_mpi.Rc.resize(U_rank(), d_old+dd);
             copy(V_rank(), dd,
                  DenseMW_t(V_rank(), dd, RS.sub_Rr, w.offset.second, c-dd),
-                 0, w_mpi.Rr, 0, d_old, lctxt);
+                 0, w_mpi.Rr, 0, d_old, lg);
             copy(U_rank(), dd,
                  DenseMW_t(U_rank(), dd, RS.sub_Rc, w.offset.second, c-dd),
-                 0, w_mpi.Rc, 0, d_old, lctxt);
+                 0, w_mpi.Rc, 0, d_old, lg);
             d_old = w_mpi.Sr.cols();
             w_mpi.Sr.resize(U_rows(), d_old+dd);
             w_mpi.Sc.resize(V_rows(), d_old+dd);
             copy(U_rows(), dd,
                  DenseMW_t(U_rows(), dd, RS.sub_Sr, w.offset.second, c-dd),
-                 0, w_mpi.Sr, 0, d_old, lctxt);
+                 0, w_mpi.Sr, 0, d_old, lg);
             copy(V_rows(), dd,
                  DenseMW_t(V_rows(), dd, RS.sub_Sc, w.offset.second, c-dd),
-                 0, w_mpi.Sc, 0, d_old, lctxt);
+                 0, w_mpi.Sc, 0, d_old, lg);
           }
         }
         std::swap(w.Ir, w_mpi.Ir); std::swap(w.Ic, w_mpi.Ic);
@@ -664,20 +663,20 @@ namespace strumpack {
     HSSMatrixBase<scalar_t>::get_extraction_indices
     (std::vector<std::vector<std::size_t>>& I,
      std::vector<std::vector<std::size_t>>& J, std::vector<DistMW_t>& B,
-     int lctxt, WorkCompressMPI<scalar_t>& w, int& self, int lvl) {
+     const BLACSGrid* lg, WorkCompressMPI<scalar_t>& w, int& self, int lvl) {
       if (!this->active()) return;
       w.create_sequential();
       std::vector<DenseM_t*> Bdense;
       get_extraction_indices(I, J, Bdense, w.offset, *w.w_seq, self, lvl);
       for (auto& Bd : Bdense)
-        B.emplace_back(lctxt, 0, 0, Bd->rows(), Bd->cols(), *Bd);
+        B.emplace_back(lg, 0, 0, Bd->rows(), Bd->cols(), *Bd);
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::extract_D_B
-    (const delemw_t& Aelem, int lctxt, const opts_t& opts,
+    (const delemw_t& Aelem, const BLACSGrid* lg, const opts_t& opts,
      WorkCompressMPI<scalar_t>& w, int lvl) {
       if (!this->active()) return;
-      LocalElemMult<scalar_t> lAelem(Aelem, w.offset, lctxt, _Asub);
+      LocalElemMult<scalar_t> lAelem(Aelem, w.offset, lg, _Asub);
       extract_D_B(lAelem, opts, *w.w_seq, lvl);
     }
 
@@ -694,7 +693,7 @@ namespace strumpack {
 #pragma omp single nowait
       apply_fwd(B.sub, *(w.w_seq), isroot, _openmp_task_depth, lflops);
       flops += lflops.load();
-      w.tmp1 = DistM_t(B.ctxt_loc(), std::move(w.w_seq->tmp1));
+      w.tmp1 = DistM_t(B.grid_local(), std::move(w.w_seq->tmp1));
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::apply_bwd
@@ -724,7 +723,7 @@ namespace strumpack {
 #pragma omp single nowait
       applyT_fwd(B.sub, *(w.w_seq), isroot, _openmp_task_depth, lflops);
       flops += lflops.load();
-      w.tmp1 = DistM_t(B.ctxt_loc(), std::move(w.w_seq->tmp1));
+      w.tmp1 = DistM_t(B.grid_local(), std::move(w.w_seq->tmp1));
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::applyT_bwd
@@ -743,7 +742,7 @@ namespace strumpack {
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::factor_recursive
     (HSSFactorsMPI<scalar_t>& ULV, WorkFactorMPI<scalar_t>& w,
-     int local_ctxt, bool isroot, bool partial) const {
+     const BLACSGrid* lg, bool isroot, bool partial) const {
       if (!active()) return;
       if (!ULV._factors_seq)
         ULV._factors_seq = std::unique_ptr<HSSFactors<scalar_t>>
@@ -754,19 +753,18 @@ namespace strumpack {
 #pragma omp parallel
 #pragma omp single nowait
       factor_recursive
-        (*(ULV._factors_seq), *(w.w_seq), isroot,
-         partial, _openmp_task_depth);
+        (*(ULV._factors_seq), *(w.w_seq), isroot, partial, _openmp_task_depth);
       if (isroot) {
-        if (partial) ULV._Vt0 = DistM_t(local_ctxt, ULV._factors_seq->_Vt0);
-        ULV._D = DistM_t(local_ctxt, ULV._factors_seq->_D);
+        if (partial) ULV._Vt0 = DistM_t(lg, ULV._factors_seq->_Vt0);
+        ULV._D = DistM_t(lg, ULV._factors_seq->_D);
         ULV._piv.resize(ULV._D.lrows() + ULV._D.MB());
         std::copy(ULV._factors_seq->_piv.begin(),
                   ULV._factors_seq->_piv.end(), ULV._piv.begin());
       } else {
-        w.Dt = DistM_t(local_ctxt, std::move(w.w_seq->Dt));
-        w.Vt1 = DistM_t(local_ctxt, std::move(w.w_seq->Vt1));
-        ULV._Q = DistM_t(local_ctxt, std::move(ULV._factors_seq->_Q));
-        ULV._W1 = DistM_t(local_ctxt, std::move(ULV._factors_seq->_W1));
+        w.Dt = DistM_t(lg, std::move(w.w_seq->Dt));
+        w.Vt1 = DistM_t(lg, std::move(w.w_seq->Vt1));
+        ULV._Q = DistM_t(lg, std::move(ULV._factors_seq->_Q));
+        ULV._W1 = DistM_t(lg, std::move(ULV._factors_seq->_W1));
       }
     }
 
@@ -781,9 +779,9 @@ namespace strumpack {
 #pragma omp single nowait
       solve_fwd(*(ULV._factors_seq), b.sub, *(w.w_seq),
                 partial, isroot, _openmp_task_depth);
-      w.z = DistM_t(b.ctxt_loc(), std::move(w.w_seq->z));
-      w.ft1 = DistM_t(b.ctxt_loc(), std::move(w.w_seq->ft1));
-      w.y = DistM_t(b.ctxt_loc(), std::move(w.w_seq->y));
+      w.z = DistM_t(b.grid_local(), std::move(w.w_seq->z));
+      w.ft1 = DistM_t(b.grid_local(), std::move(w.w_seq->ft1));
+      w.y = DistM_t(b.grid_local(), std::move(w.w_seq->y));
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::solve_bwd
@@ -798,7 +796,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::extract_fwd
-    (WorkExtractMPI<scalar_t>& w, int lctxt, bool odiag) const {
+    (WorkExtractMPI<scalar_t>& w, const BLACSGrid* lg, bool odiag) const {
       if (!active()) return;
       if (!w.w_seq)
         w.w_seq = std::unique_ptr<WorkExtract<scalar_t>>
@@ -813,11 +811,11 @@ namespace strumpack {
       std::swap(w.I, w_seq.I);
       std::swap(w.J, w_seq.J);
       std::swap(w.ycols, w_seq.ycols);
-      w.y = DistM_t(lctxt, std::move(w.w_seq->y));
+      w.y = DistM_t(lg, std::move(w.w_seq->y));
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::extract_fwd
-    (WorkExtractBlocksMPI<scalar_t>& w, int lctxt,
+    (WorkExtractBlocksMPI<scalar_t>& w, const BLACSGrid* lg,
      std::vector<bool>& odiag) const {
       if (!active()) return;
       const auto nb = w.I.size();
@@ -835,12 +833,12 @@ namespace strumpack {
         std::swap(w.I[k], w_seq.I);
         std::swap(w.J[k], w_seq.J);
         std::swap(w.ycols[k], w_seq.ycols);
-        w.y[k] = DistM_t(lctxt, std::move(w_seq.y));
+        w.y[k] = DistM_t(lg, std::move(w_seq.y));
       }
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::extract_bwd
-    (std::vector<Triplet<scalar_t>>& triplets, int lctxt,
+    (std::vector<Triplet<scalar_t>>& triplets, const BLACSGrid* lg,
      WorkExtractMPI<scalar_t>& w) const {
       if (!active()) return;
       if (!w.w_seq)
@@ -860,8 +858,8 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::extract_bwd
-    (std::vector<std::vector<Triplet<scalar_t>>>& triplets, int lctxt,
-     WorkExtractBlocksMPI<scalar_t>& w) const {
+    (std::vector<std::vector<Triplet<scalar_t>>>& triplets,
+     const BLACSGrid* lg, WorkExtractBlocksMPI<scalar_t>& w) const {
       if (!active()) return;
       const auto nb = w.I.size();
       w.w_seq.resize(nb);
@@ -901,7 +899,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixBase<scalar_t>::redistribute_to_tree_to_buffers
-    (const DistM_t& A, std::size_t Arlo, std::size_t Aclo, int Actxt_all,
+    (const DistM_t& A, std::size_t Arlo, std::size_t Aclo,
      std::vector<std::vector<scalar_t>>& sbuf, int dest) {
       const DistMW_t Ad
         (rows(), cols(), const_cast<DistM_t&>(A), Arlo, Aclo);
@@ -915,11 +913,12 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixBase<scalar_t>::redistribute_to_tree_from_buffers
-    (const DistM_t& A, int Aprows, int Apcols,
-     std::size_t Arlo, std::size_t Aclo, int Actxt_all, scalar_t** pbuf) {
+    (const DistM_t& A, std::size_t Arlo, std::size_t Aclo, scalar_t** pbuf) {
       if (!this->active()) return;
       _Asub = DenseM_t(rows(), cols());
       const auto B = DistM_t::default_MB;
+      const auto Aprows = A.grid()->nprows();
+      const auto Apcols = A.grid()->npcols();
       std::vector<std::size_t> srcr(rows());
       for (std::size_t r=0; r<rows(); r++)
         srcr[r] = ((r + Arlo) / B) % Aprows;

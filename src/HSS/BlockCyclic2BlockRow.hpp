@@ -1,3 +1,30 @@
+/*
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
+ *
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
+ *
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly.  Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government is granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
+ *
+ * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
+ *             (Lawrence Berkeley National Lab, Computational Research
+ *             Division).
+ */
 #ifndef BLOCK_CYCLIC_2_BLOCK_ROW_HPP
 #define BLOCK_CYCLIC_2_BLOCK_ROW_HPP
 
@@ -8,11 +35,10 @@ namespace strumpack {
       template<typename scalar_t> void block_cyclic_to_block_row
       (const TreeLocalRanges& ranges, const DistributedMatrix<scalar_t>& dist,
        DenseMatrix<scalar_t>& sub, DistributedMatrix<scalar_t>& leaf,
-       int lctxt, MPI_Comm comm) {
+       const BLACSGrid* lg, const MPIComm& comm) {
         assert(dist.fixed());
-        const auto P = mpi_nprocs(comm);
-        // TODO if P == 1 create 1 leaf???
-        const auto rank = mpi_rank(comm);
+        const auto P = comm.size();
+        const auto rank = comm.rank();
         const int MB = DistributedMatrix<scalar_t>::default_MB;
         const auto d = dist.cols();
         int maxr = 0;
@@ -53,7 +79,7 @@ namespace strumpack {
               ssize[p] += (chi-clo) * (rhi-rlo);
           } else {
             if (p <= rank && rank < p+leaf_procs)
-              leaf = DistributedMatrix<scalar_t>(lctxt, m, d);
+              leaf = DistributedMatrix<scalar_t>(lg, m, d);
             if (dist.active()) {
               const int leaf_pcols = std::floor(std::sqrt((float)leaf_procs));
               const int leaf_prows = leaf_procs / leaf_pcols;
@@ -116,7 +142,7 @@ namespace strumpack {
         create_triplet_mpi_type<scalar_t>(&triplet_type);
         Triplet<scalar_t>* rbuf = nullptr;
         std::size_t totrsize;
-        all_to_all_v(sbuf, rbuf, totrsize, comm, triplet_type);
+        all_to_all_v(sbuf, rbuf, totrsize, comm.comm(), triplet_type);
         MPI_Type_free(&triplet_type);
         if (ranges.leaf_procs(rank) == 1) {
           assert((ranges.chi(rank) - ranges.clo(rank)) == int(sub.rows()));
@@ -144,15 +170,15 @@ namespace strumpack {
       template<typename scalar_t> void block_row_to_block_cyclic
       (const TreeLocalRanges& ranges, DistributedMatrix<scalar_t>& dist,
        const DenseMatrix<scalar_t>& sub,
-       const DistributedMatrix<scalar_t>& leaf, MPI_Comm comm) {
+       const DistributedMatrix<scalar_t>& leaf, const MPIComm& comm) {
         assert(dist.fixed());
-        const auto P = mpi_nprocs(comm);
-        const auto rank = mpi_rank(comm);
+        const auto P = comm.size();
+        const auto rank = comm.rank();
         const int MB = DistributedMatrix<scalar_t>::default_MB;
         const int dist_pcols = std::floor(std::sqrt((float)P));
         const int dist_prows = P / dist_pcols;
-        assert(!dist.active() || (dist_pcols == dist.pcols()));
-        assert(!dist.active() || (dist_prows == dist.prows()));
+        assert(!dist.active() || (dist_pcols == dist.npcols()));
+        assert(!dist.active() || (dist_prows == dist.nprows()));
         const auto leaf_procs = ranges.leaf_procs(rank);
         auto rbegin = ranges.clo(rank) - ranges.clo(0);
         std::vector<std::vector<Triplet<scalar_t>>> sbuf(P);
@@ -212,7 +238,7 @@ namespace strumpack {
         create_triplet_mpi_type<scalar_t>(&triplet_type);
         Triplet<scalar_t>* rbuf = nullptr;
         std::size_t totrsize;
-        all_to_all_v(sbuf, rbuf, totrsize, comm, triplet_type);
+        all_to_all_v(sbuf, rbuf, totrsize, comm.comm(), triplet_type);
         MPI_Type_free(&triplet_type);
         if (dist.active()) {
           const auto rows = dist.rows();

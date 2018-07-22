@@ -87,8 +87,7 @@ namespace strumpack {
      const integer_t* upd) const override;
     void extract_separator_2d
     (integer_t sep_end, const std::vector<std::size_t>& I,
-     const std::vector<std::size_t>& J, DistM_t& B,
-     MPI_Comm comm) const override ;
+     const std::vector<std::size_t>& J, DistM_t& B) const override ;
 
     void front_multiply
     (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
@@ -96,8 +95,7 @@ namespace strumpack {
     void front_multiply_2d
     (integer_t sep_begin, integer_t sep_end,
      const std::vector<integer_t>& upd, const DistM_t& R,
-     DistM_t& Srow, DistM_t& Scol, int ctxt_all, MPI_Comm R_comm,
-     int depth) const override;
+     DistM_t& Srow, DistM_t& Scol, int depth) const override;
 
     void spmv(const DenseM_t& x, DenseM_t& y) const override {};
     void omp_spmv(const DenseM_t& x, DenseM_t& y) const override {};
@@ -493,7 +491,7 @@ namespace strumpack {
   ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::
   extract_separator_2d
   (integer_t sep_end, const std::vector<std::size_t>& I,
-   const std::vector<std::size_t>& J, DistM_t& B, MPI_Comm comm) const {
+   const std::vector<std::size_t>& J, DistM_t& B) const {
     if (!B.active()) return;
     integer_t m = B.rows();
     integer_t n = B.cols();
@@ -565,8 +563,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::front_multiply_2d
   (integer_t sep_begin, integer_t sep_end, const std::vector<integer_t>& upd,
-   const DistM_t& R, DistM_t& Srow, DistM_t& Scol, int ctxt_all,
-   MPI_Comm R_comm, int depth) const {
+   const DistM_t& R, DistM_t& Srow, DistM_t& Scol, int depth) const {
 
     assert(R.fixed());
     assert(Srow.fixed());
@@ -578,7 +575,7 @@ namespace strumpack {
     const auto dim_sep = sep_end - sep_begin;
     const auto cols = R.cols();
     const auto lcols = R.lcols();
-    const auto p_rows = R.prows();
+    const auto p_rows = R.nprows();
     const auto p_row  = R.prow();
     auto rows_to = new integer_t[2*p_rows];
     auto rows_from = rows_to + p_rows;
@@ -758,14 +755,14 @@ namespace strumpack {
     auto rreq = sreq + p_rows;
     for (integer_t p=0; p<p_rows; p++)
       MPI_Isend(pp[p], rows_to[p]*lcols, mpi_type<scalar_t>(),
-                p+p_col*p_rows, 0, R_comm, sreq+p);
+                p+p_col*p_rows, 0, R.comm(), sreq+p);
 
     pp[0] = rbuf;
     for (integer_t p=1; p<p_rows; p++)
       pp[p] = pp[p-1] + rows_from[p-1]*lcols;
     for (integer_t p=0; p<p_rows; p++)
       MPI_Irecv(pp[p], rows_from[p]*lcols, mpi_type<scalar_t>(),
-                p+p_col*p_rows, 0, R_comm, rreq+p);
+                p+p_col*p_rows, 0, R.comm(), rreq+p);
 
     // wait for all incoming messages
     MPI_Waitall(p_rows, rreq, MPI_STATUSES_IGNORE);

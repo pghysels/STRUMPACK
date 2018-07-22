@@ -35,6 +35,8 @@
 #include <chrono>
 #include <functional>
 
+namespace strumpack {
+
 #if defined(_OPENMP)
 #define USE_OPENMP_TIMER
 #endif
@@ -48,61 +50,62 @@
   typedef timer::time_point tpoint;
 #endif
 
-enum class TaskType : int {
-  RANDOM_SAMPLING=0, RANDOM_GENERATE, FRONT_MULTIPLY_2D, UUTXR,
-  HSS_SCHUR_PRODUCT, SKINNY_EXTEND_ADD_SEQSEQ, SKINNY_EXTEND_ADD_SEQ1,
-  SKINNY_EXTEND_ADD_MPIMPI, SKINNY_EXTEND_ADD_MPI1, HSS_COMPRESS,
-  HSS_PARHQRINTERPOL, HSS_SEQHQRINTERPOL, EXTRACT_2D,
-  EXTRACT_SEP_2D, GET_SUBMATRIX_2D,  HSS_EXTRACT_SCHUR, GET_SUBMATRIX,
-  HSS_PARTIALLY_FACTOR, HSS_COMPUTE_SCHUR, HSS_FACTOR,
-  FORWARD_SOLVE, LOOK_LEFT, SOLVE_LOWER, SOLVE_LOWER_ROOT,
-  BACKWARD_SOLVE, SOLVE_UPPER, LOOK_RIGHT, DISTMAT_EXTRACT_ROWS,
-  DISTMAT_EXTRACT_COLS, DISTMAT_EXTRACT, QR,
-  REDUCE_SAMPLES, COMPUTE_SAMPLES, ORTHO, REDIST_2D_TO_HSS,
-  EXPLICITLY_NAMED_TASK}; // leave this one last
+  enum class TaskType : int {
+    RANDOM_SAMPLING=0, RANDOM_GENERATE, FRONT_MULTIPLY_2D, UUTXR,
+    HSS_SCHUR_PRODUCT, SKINNY_EXTEND_ADD_SEQSEQ, SKINNY_EXTEND_ADD_SEQ1,
+    SKINNY_EXTEND_ADD_MPIMPI, SKINNY_EXTEND_ADD_MPI1, HSS_COMPRESS,
+    HSS_PARHQRINTERPOL, HSS_SEQHQRINTERPOL, EXTRACT_2D,
+    EXTRACT_SEP_2D, GET_SUBMATRIX_2D,  HSS_EXTRACT_SCHUR, GET_SUBMATRIX,
+    HSS_PARTIALLY_FACTOR, HSS_COMPUTE_SCHUR, HSS_FACTOR,
+    FORWARD_SOLVE, LOOK_LEFT, SOLVE_LOWER, SOLVE_LOWER_ROOT,
+    BACKWARD_SOLVE, SOLVE_UPPER, LOOK_RIGHT, DISTMAT_EXTRACT_ROWS,
+    DISTMAT_EXTRACT_COLS, DISTMAT_EXTRACT, QR,
+    REDUCE_SAMPLES, COMPUTE_SAMPLES, ORTHO, REDIST_2D_TO_HSS,
+    EXPLICITLY_NAMED_TASK}; // leave this one last
 
-class TimerList;
+  class TimerList;
 
-class TaskTimer {
-public:
-  TaskTimer(TaskType task_type, int depth=1);
-  TaskTimer(std::string name, int depth=1);
-  TaskTimer(std::string name, std::function<void()> f, int depth=1);
-  ~TaskTimer();
+  class TaskTimer {
+  public:
+    TaskTimer(TaskType task_type, int depth=1);
+    TaskTimer(std::string name, int depth=1);
+    TaskTimer(std::string name, std::function<void()> f, int depth=1);
+    ~TaskTimer();
 
-  void time(std::function<void()> f);
-  void start();
-  void stop();
+    void time(std::function<void()> f);
+    void start();
+    void stop();
 
-  double elapsed();
+    double elapsed();
 
-  std::string t_name;
-  tpoint t_start;
-  tpoint t_stop;
+    std::string t_name;
+    tpoint t_start;
+    tpoint t_stop;
 
-  bool started;
-  bool stopped;
+    bool started;
+    bool stopped;
 
-  TaskType type;
-  int number;
-  int tid;
+    TaskType type;
+    int number;
+    int tid;
 
-  static tpoint t_begin;
-  static TimerList time_log_list;
+    static tpoint t_begin;
+    static TimerList time_log_list;
 
-  void print_name(std::ostream& os);
-  friend std::ostream& operator<<(std::ostream& os, TaskTimer& t);
-};
+    void print_name(std::ostream& os);
+    //friend std::ostream& operator<<(std::ostream& os, TaskTimer& t);
+    void print(std::ostream& os);
+  };
 
-class TimerList {
-public:
-  TimerList();
+  class TimerList {
+  public:
+    TimerList();
 
-  static void Finalize();
-  void finalize();
-  bool is_finalized;
-  std::vector<std::list<TaskTimer>> list;
-};
+    static void Finalize();
+    void finalize();
+    bool is_finalized;
+    std::vector<std::list<TaskTimer>> list;
+  };
 
 #if !defined(STRUMPACK_TASK_TIMERS)
 
@@ -113,8 +116,8 @@ public:
 
 #else // STRUMPACK_TASK_TIMERS
 
-#define TIMER_TIME(type, depth, timer) \
-  TaskTimer timer(type, depth);        \
+#define TIMER_TIME(type, depth, timer)          \
+  TaskTimer timer(type, depth);                 \
   timer.start();
 #define TIMER_DEFINE(type, depth, timer)        \
   TaskTimer timer(type, depth);
@@ -123,6 +126,7 @@ public:
 
 #endif // STRUMPACK_TASK_TIMERS
 
+} // end namespace strumpack
 
 
 #endif // TASK_TIMER_HPP
