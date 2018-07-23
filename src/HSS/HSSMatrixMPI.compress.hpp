@@ -663,8 +663,8 @@ namespace strumpack {
         if (!c_old) {
           w.Sr = DistM_t(grid(), this->rows(), dd);
           w.Sc = DistM_t(grid(), this->rows(), dd);
-          copy(this->rows(), dd, RS.leaf_Sr, 0, d_old, w.Sr, 0, 0, grid());
-          copy(this->rows(), dd, RS.leaf_Sc, 0, d_old, w.Sc, 0, 0, grid());
+          copy(this->rows(), dd, RS.leaf_Sr, 0, d_old, w.Sr, 0, 0, grid()->ctxt_all());
+          copy(this->rows(), dd, RS.leaf_Sc, 0, d_old, w.Sc, 0, 0, grid()->ctxt_all());
           gemm(Trans::N, Trans::N, scalar_t(-1), _D, *wR, scalar_t(1.), w.Sr);
           gemm(Trans::C, Trans::N, scalar_t(-1), _D, *wR, scalar_t(1.), w.Sc);
           STRUMPACK_UPDATE_SAMPLE_FLOPS
@@ -675,8 +675,8 @@ namespace strumpack {
           w.Sc.resize(this->rows(), c_old+dd);
           DistMW_t wSr_new(this->rows(), dd, w.Sr, 0, c_old);
           DistMW_t wSc_new(this->rows(), dd, w.Sc, 0, c_old);
-          copy(this->rows(), dd, RS.leaf_Sr, 0, d_old, wSr_new, 0, 0, grid());
-          copy(this->rows(), dd, RS.leaf_Sc, 0, d_old, wSc_new, 0, 0, grid());
+          copy(this->rows(), dd, RS.leaf_Sr, 0, d_old, wSr_new, 0, 0, grid()->ctxt_all());
+          copy(this->rows(), dd, RS.leaf_Sc, 0, d_old, wSc_new, 0, 0, grid()->ctxt_all());
           gemm(Trans::N, Trans::N, scalar_t(-1), _D, *wR,
                scalar_t(1.), wSr_new);
           gemm(Trans::C, Trans::N, scalar_t(-1), _D, *wR,
@@ -710,18 +710,18 @@ namespace strumpack {
             1 + *std::max_element(w.c[1].Jr.begin(), w.c[1].Jr.end());
           DistM_t wc0Sr_new(grid(), c0Srows, c_new);
           DistM_t wc1Sr_new(grid(), c1Srows, c_new);
-          copy(c0Srows, c_new, w.c[0].Sr, 0, w.c[0].dS-c_new, wc0Sr_new, 0, 0, grid());
-          copy(c1Srows, c_new, w.c[1].Sr, 0, w.c[1].dS-c_new, wc1Sr_new, 0, 0, grid());
+          copy(c0Srows, c_new, w.c[0].Sr, 0, w.c[0].dS-c_new, wc0Sr_new, 0, 0, grid()->ctxt_all());
+          copy(c1Srows, c_new, w.c[1].Sr, 0, w.c[1].dS-c_new, wc1Sr_new, 0, 0, grid()->ctxt_all());
           auto tmpr0 = wc0Sr_new.extract_rows(w.c[0].Jr);
           auto tmpr1 = wc1Sr_new.extract_rows(w.c[1].Jr);
-          copy(w.c[0].Jr.size(), c_new, tmpr0, 0, 0, wSr_new0, 0, 0, grid());
-          copy(w.c[1].Jr.size(), c_new, tmpr1, 0, 0, wSr_new1, 0, 0, grid());
+          copy(w.c[0].Jr.size(), c_new, tmpr0, 0, 0, wSr_new0, 0, 0, grid()->ctxt_all());
+          copy(w.c[1].Jr.size(), c_new, tmpr1, 0, 0, wSr_new1, 0, 0, grid()->ctxt_all());
         }
 
         DistM_t wc1Rr(grid(), _B01.cols(), c_new);
         DistM_t wc0Rr(grid(), _B10.cols(), c_new);
-        copy(_B01.cols(), c_new, w.c[1].Rr, 0, w.c[1].dR-c_new, wc1Rr, 0, 0, grid());
-        copy(_B10.cols(), c_new, w.c[0].Rr, 0, w.c[0].dR-c_new, wc0Rr, 0, 0, grid());
+        copy(_B01.cols(), c_new, w.c[1].Rr, 0, w.c[1].dR-c_new, wc1Rr, 0, 0, grid()->ctxt_all());
+        copy(_B10.cols(), c_new, w.c[0].Rr, 0, w.c[0].dR-c_new, wc0Rr, 0, 0, grid()->ctxt_all());
         gemm(Trans::N, Trans::N, scalar_t(-1.), _B01, wc1Rr,
              scalar_t(1.), wSr_new0);
         gemm(Trans::N, Trans::N, scalar_t(-1.), _B10, wc0Rr,
@@ -740,18 +740,18 @@ namespace strumpack {
             1 + *std::max_element(w.c[1].Jc.begin(), w.c[1].Jc.end());
           DistM_t wc0Sc_new(grid(), c0Srows, c_new);
           DistM_t wc1Sc_new(grid(), c1Srows, c_new);
-          copy(c0Srows, c_new, w.c[0].Sc, 0, w.c[0].dS-c_new, wc0Sc_new, 0, 0, grid());
-          copy(c1Srows, c_new, w.c[1].Sc, 0, w.c[1].dS-c_new, wc1Sc_new, 0, 0, grid());
+          copy(c0Srows, c_new, w.c[0].Sc, 0, w.c[0].dS-c_new, wc0Sc_new, 0, 0, grid()->ctxt_all());
+          copy(c1Srows, c_new, w.c[1].Sc, 0, w.c[1].dS-c_new, wc1Sc_new, 0, 0, grid()->ctxt_all());
           auto tmpr0 = wc0Sc_new.extract_rows(w.c[0].Jc);
           auto tmpr1 = wc1Sc_new.extract_rows(w.c[1].Jc);
-          copy(w.c[0].Jc.size(), c_new, tmpr0, 0, 0, wSc_new0, 0, 0, grid());
-          copy(w.c[1].Jc.size(), c_new, tmpr1, 0, 0, wSc_new1, 0, 0, grid());
+          copy(w.c[0].Jc.size(), c_new, tmpr0, 0, 0, wSc_new0, 0, 0, grid()->ctxt_all());
+          copy(w.c[1].Jc.size(), c_new, tmpr1, 0, 0, wSc_new1, 0, 0, grid()->ctxt_all());
         }
 
         DistM_t wc1Rc(grid(), _B10.rows(), c_new);
         DistM_t wc0Rc(grid(), _B01.rows(), c_new);
-        copy(_B10.rows(), c_new, w.c[1].Rc, 0, w.c[1].dR-c_new, wc1Rc, 0, 0, grid());
-        copy(_B01.rows(), c_new, w.c[0].Rc, 0, w.c[0].dR-c_new, wc0Rc, 0, 0, grid());
+        copy(_B10.rows(), c_new, w.c[1].Rc, 0, w.c[1].dR-c_new, wc1Rc, 0, 0, grid()->ctxt_all());
+        copy(_B01.rows(), c_new, w.c[0].Rc, 0, w.c[0].dR-c_new, wc0Rc, 0, 0, grid()->ctxt_all());
         gemm(Trans::C, Trans::N, scalar_t(-1.), _B10, wc1Rc,
              scalar_t(1.), wSc_new0);
         gemm(Trans::C, Trans::N, scalar_t(-1.), _B01, wc0Rc,
@@ -768,8 +768,9 @@ namespace strumpack {
     (int d, const opts_t& opts, WorkCompressMPI<scalar_t>& w) {
       auto rtol = opts.rel_tol() / w.lvl;
       auto atol = opts.abs_tol() / w.lvl;
-      w.Sr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol);
-      w.Sc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol);
+      auto gT = grid()->transpose();
+      w.Sr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol, &gT);
+      w.Sc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol, &gT);
       STRUMPACK_ID_FLOPS(ID_row_flops(w.Sr, w.Jr.size()));
       STRUMPACK_ID_FLOPS(ID_row_flops(w.Sc, w.Jc.size()));
       notify_inactives_J(w);
@@ -837,10 +838,10 @@ namespace strumpack {
         if (!c_old) {
           auto wRr = vconcat
             (w.c[0].dR, this->_ch[0]->V_rank(), this->_ch[1]->V_rank(),
-             w.c[0].Rr, w.c[1].Rr, grid(), grid());
+             w.c[0].Rr, w.c[1].Rr, grid(), grid()->ctxt_all());
           auto wRc = vconcat
             (w.c[0].dR, this->_ch[0]->U_rank(), this->_ch[1]->U_rank(),
-             w.c[0].Rc, w.c[1].Rc, grid(), grid());
+             w.c[0].Rc, w.c[1].Rc, grid(), grid()->ctxt_all());
           w.Rr = DistM_t(grid(), this->V_rank(), w.c[0].dR);
           w.Rc = DistM_t(grid(), this->U_rank(), w.c[0].dR);
           _V.applyC(wRr, w.Rr);
@@ -849,13 +850,13 @@ namespace strumpack {
             (_V.applyC_flops(w.c[0].dR) + _U.applyC_flops(w.c[0].dR));
         } else {
           DistM_t wRr(grid(), this->V_rows(), dd);
-          copy(w.c[0].Ic.size(), dd, w.c[0].Rr, 0, w.c[0].dR - dd, wRr, 0, 0, grid());
+          copy(w.c[0].Ic.size(), dd, w.c[0].Rr, 0, w.c[0].dR - dd, wRr, 0, 0, grid()->ctxt_all());
           copy(w.c[1].Ic.size(), dd, w.c[1].Rr, 0, w.c[1].dR - dd,
-               wRr, w.c[0].Ic.size(), 0, grid());
+               wRr, w.c[0].Ic.size(), 0, grid()->ctxt_all());
           DistM_t wRc(grid(), this->U_rows(), dd);
-          copy(w.c[0].Ir.size(), dd, w.c[0].Rc, 0, w.c[0].dR - dd, wRc, 0, 0, grid());
+          copy(w.c[0].Ir.size(), dd, w.c[0].Rc, 0, w.c[0].dR - dd, wRc, 0, 0, grid()->ctxt_all());
           copy(w.c[1].Ir.size(), dd, w.c[1].Rc, 0, w.c[1].dR - dd,
-               wRc, w.c[0].Ir.size(), 0, grid());
+               wRc, w.c[0].Ir.size(), 0, grid()->ctxt_all());
 
           DistM_t wRr_new(grid(), w.Rr.rows(), dd);
           DistM_t wRc_new(grid(), w.Rc.rows(), dd);

@@ -71,7 +71,7 @@ namespace strumpack {
       DistM_t f, z;
       if (this->leaf()) {
         f = DistM_t(grid(), this->rows(), n);
-        copy(this->rows(), n, b.leaf, 0, 0, f, 0, 0, grid());
+        copy(this->rows(), n, b.leaf, 0, 0, f, 0, 0, grid()->ctxt_all());
       } else {
         w.c.resize(2);
         this->_ch[0]->solve_fwd(ULV._ch[0], b, w.c[0], partial, false);
@@ -87,22 +87,22 @@ namespace strumpack {
         f = DistM_t(grid(), urows, n);
         DistMW_t f0(c0urank, n, f, 0, 0);
         DistMW_t f1(c1urank, n, f, c0urank, 0);
-        copy(c0urank, n, w.c[0].ft1, 0, 0, f0, 0, 0, grid());
-        copy(c1urank, n, w.c[1].ft1, 0, 0, f1, 0, 0, grid());
+        copy(c0urank, n, w.c[0].ft1, 0, 0, f0, 0, 0, grid()->ctxt_all());
+        copy(c1urank, n, w.c[1].ft1, 0, 0, f1, 0, 0, grid()->ctxt_all());
         w.c[0].ft1.clear();
         w.c[1].ft1.clear();
         z = DistM_t(grid(), vrows, n);
         DistMW_t z0(c0vrank, n, z, 0, 0);
         DistMW_t z1(c1vrank, n, z, c0vrank, 0);
-        copy(c0vrank, n, w.c[0].z, 0, 0, z0, 0, 0, grid());
-        copy(c1vrank, n, w.c[1].z, 0, 0, z1, 0, 0, grid());
+        copy(c0vrank, n, w.c[0].z, 0, 0, z0, 0, 0, grid()->ctxt_all());
+        copy(c1vrank, n, w.c[1].z, 0, 0, z1, 0, 0, grid()->ctxt_all());
         w.c[0].z.clear();
         w.c[1].z.clear();
         DistM_t y0(grid(), c0urows-c0urank, n);
         DistM_t y1(grid(), c1urows-c1urank, n);
         // TODO as extra optimization, combine these pgemr2d's?
-        copy(y0.rows(), n, w.c[0].y, 0, 0, y0, 0, 0, grid());
-        copy(y1.rows(), n, w.c[1].y, 0, 0, y1, 0, 0, grid());
+        copy(y0.rows(), n, w.c[0].y, 0, 0, y0, 0, 0, grid()->ctxt_all());
+        copy(y1.rows(), n, w.c[1].y, 0, 0, y1, 0, 0, grid()->ctxt_all());
         gemm(Trans::N, Trans::N, scalar_t(-1.), _B01, z1, scalar_t(1.), f0);
         gemm(Trans::N, Trans::N, scalar_t(-1.), _B10, z0, scalar_t(1.), f1);
         STRUMPACK_HSS_SOLVE_FLOPS
@@ -110,10 +110,10 @@ namespace strumpack {
            gemm_flops(Trans::N, Trans::N, scalar_t(-1.), _B10, z0, scalar_t(1.)));
         if (c0urows > c0urank) {
           DistM_t Q00(grid(), c0urows - c0urank, c0urows);
-          copy(Q00.rows(), Q00.cols(), ULV._ch[0]._Q, 0, 0, Q00, 0, 0, grid());
+          copy(Q00.rows(), Q00.cols(), ULV._ch[0]._Q, 0, 0, Q00, 0, 0, grid()->ctxt_all());
           DistM_t tmp0(grid(), c0urows, n);
           DistM_t c0W1(grid(), c0urank, c0urows);
-          copy(c0W1.rows(), c0W1.cols(), ULV._ch[0]._W1, 0, 0, c0W1, 0, 0, grid());
+          copy(c0W1.rows(), c0W1.cols(), ULV._ch[0]._W1, 0, 0, c0W1, 0, 0, grid()->ctxt_all());
           gemm(Trans::C, Trans::N, scalar_t(1.), Q00, y0, scalar_t(0.), tmp0);
           gemm(Trans::N, Trans::N, scalar_t(-1.),
                c0W1, tmp0, scalar_t(1.), f0);
@@ -123,10 +123,10 @@ namespace strumpack {
         }
         if (c1urows > c1urank) {
           DistM_t Q10(grid(), c1urows - c1urank, c1urows);
-          copy(c1urows - c1urank, c1urows, ULV._ch[1]._Q, 0, 0, Q10, 0, 0, grid());
+          copy(c1urows - c1urank, c1urows, ULV._ch[1]._Q, 0, 0, Q10, 0, 0, grid()->ctxt_all());
           DistM_t tmp1(grid(), Q10.cols(), n);
           DistM_t c1W1(grid(), c1urank, c1urows);
-          copy(c1W1.rows(), c1W1.cols(), ULV._ch[1]._W1, 0, 0, c1W1, 0, 0, grid());
+          copy(c1W1.rows(), c1W1.cols(), ULV._ch[1]._W1, 0, 0, c1W1, 0, 0, grid()->ctxt_all());
           gemm(Trans::C, Trans::N, scalar_t(1.), Q10, y1, scalar_t(0.), tmp1);
           gemm(Trans::N, Trans::N, scalar_t(-1.), c1W1, tmp1, scalar_t(1.), f1);
           STRUMPACK_HSS_SOLVE_FLOPS
@@ -153,10 +153,10 @@ namespace strumpack {
         f.laswp(_U.P(), true);
         if (this->U_rows() > this->U_rank()) {
           w.ft1 = DistM_t(grid(), this->U_rank(), n);
-          copy(w.ft1.rows(), n, f, 0, 0, w.ft1, 0, 0, grid());
+          copy(w.ft1.rows(), n, f, 0, 0, w.ft1, 0, 0, grid()->ctxt_all());
           w.y = DistM_t(grid(), this->U_rows()-this->U_rank(), n);
           // put ft0 in w.y
-          copy(w.y.rows(), n, f, this->U_rank(), 0, w.y, 0, 0, grid());
+          copy(w.y.rows(), n, f, this->U_rank(), 0, w.y, 0, 0, grid()->ctxt_all());
           gemm(Trans::N, Trans::N, scalar_t(-1.), _U.E(), w.ft1, scalar_t(1.), w.y);
           trsm(Side::L, UpLo::L, Trans::N, Diag::N, scalar_t(1.), ULV._L, w.y);
           STRUMPACK_HSS_SOLVE_FLOPS
@@ -183,7 +183,7 @@ namespace strumpack {
         } else {
           w.ft1 = DistM_t(grid(), this->U_rank(), n);
           w.y = DistM_t(grid(), 0, n);
-          copy(this->U_rank(), n, f, 0, 0, w.ft1, 0, 0, grid());
+          copy(this->U_rank(), n, f, 0, 0, w.ft1, 0, 0, grid()->ctxt_all());
           if (!this->leaf()) {
             w.z = _V.applyC(z);
             STRUMPACK_HSS_SOLVE_FLOPS(_V.applyC_flops(z.cols()));
@@ -201,7 +201,7 @@ namespace strumpack {
       if (!this->active()) return;
       auto n = x.cols();
       if (this->leaf())
-        copy(this->rows(), n, w.x, 0, 0, x.leaf, 0, 0, grid());
+        copy(this->rows(), n, w.x, 0, 0, x.leaf, 0, 0, grid()->ctxt_all());
       else {
         auto c0urank = this->_ch[0]->U_rank();
         auto c1urank = this->_ch[1]->U_rank();
@@ -213,28 +213,28 @@ namespace strumpack {
             DistM_t tmp(w.c[0].y.grid(), c0urows, n);
             // TODO this first one is on the same context, should not
             // need communication!!
-            copy(c0urows-c0urank, n, w.c[0].y, 0, 0, tmp, 0, 0, grid());
-            copy(c0urank, n, w.x, 0, 0, tmp, c0urows-c0urank, 0, grid());
+            copy(c0urows-c0urank, n, w.c[0].y, 0, 0, tmp, 0, 0, grid()->ctxt_all());
+            copy(c0urank, n, w.x, 0, 0, tmp, c0urows-c0urank, 0, grid()->ctxt_all());
             gemm(Trans::C, Trans::N, scalar_t(1.), ULV._ch[0]._Q, tmp,
                  scalar_t(0.), w.c[0].x);
             STRUMPACK_HSS_SOLVE_FLOPS
               (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
                           ULV._ch[0]._Q, tmp, scalar_t(0.)));
-          } else copy(c0urank, n, w.x, 0, 0, w.c[0].x, 0, 0, grid());
+          } else copy(c0urank, n, w.x, 0, 0, w.c[0].x, 0, 0, grid()->ctxt_all());
         } {
           w.c[1].x = DistM_t(w.c[1].y.grid(), c1urows, n);
           if (c1urows > c1urank) {
             // TODO this first one is on the same context, should not
             // need communication!!
             DistM_t tmp(w.c[1].y.grid(), c1urows, n);
-            copy(c1urows-c1urank, n, w.c[1].y, 0, 0, tmp, 0, 0, grid());
-            copy(c1urank, n, w.x, c0urank, 0, tmp, c1urows-c1urank, 0, grid());
+            copy(c1urows-c1urank, n, w.c[1].y, 0, 0, tmp, 0, 0, grid()->ctxt_all());
+            copy(c1urank, n, w.x, c0urank, 0, tmp, c1urows-c1urank, 0, grid()->ctxt_all());
             gemm(Trans::C, Trans::N, scalar_t(1.), ULV._ch[1]._Q, tmp,
                  scalar_t(0.), w.c[1].x);
             STRUMPACK_HSS_SOLVE_FLOPS
               (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
                           ULV._ch[1]._Q, tmp, scalar_t(0.)));
-          } else copy(c1urank, n, w.x, c0urank, 0, w.c[1].x, 0, 0, grid());
+          } else copy(c1urank, n, w.x, c0urank, 0, w.c[1].x, 0, 0, grid()->ctxt_all());
         }
         w.x.clear();
         w.c[0].y.clear();

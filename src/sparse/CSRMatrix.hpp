@@ -475,9 +475,9 @@ namespace strumpack {
     DistM_t R_bc(R.grid(), R.rows(), R.cols(), R.rows(), R.NB());
     DistM_t Srow_bc(R.grid(), Srow.rows(), Srow.cols(), Srow.rows(), Srow.NB());
     DistM_t Scol_bc(R.grid(), Scol.rows(), Scol.cols(), Scol.rows(), Scol.NB());
-    strumpack::copy(R.rows(), R.cols(), R, 0, 0, R_bc, 0, 0, R.grid());
-    strumpack::copy(Srow.rows(), Srow.cols(), Srow, 0, 0, Srow_bc, 0, 0, R.grid());
-    strumpack::copy(Scol.rows(), Scol.cols(), Scol, 0, 0, Scol_bc, 0, 0, R.grid());
+    copy(R.rows(), R.cols(), R, 0, 0, R_bc, 0, 0, R.ctxt_all());
+    copy(Srow.rows(), Srow.cols(), Srow, 0, 0, Srow_bc, 0, 0, R.ctxt_all());
+    copy(Scol.rows(), Scol.cols(), Scol, 0, 0, Scol_bc, 0, 0, R.ctxt_all());
 
     if (R.active()) {
       long long int local_flops = 0;
@@ -543,8 +543,8 @@ namespace strumpack {
         STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
       }
     }
-    strumpack::copy(Srow.rows(), Srow.cols(), Srow_bc, 0, 0, Srow, 0, 0, R.grid());
-    strumpack::copy(Scol.rows(), Scol.cols(), Scol_bc, 0, 0, Scol, 0, 0, R.grid());
+    copy(Srow.rows(), Srow.cols(), Srow_bc, 0, 0, Srow, 0, 0, R.ctxt_all());
+    copy(Scol.rows(), Scol.cols(), Scol_bc, 0, 0, Scol, 0, 0, R.ctxt_all());
   }
 
   // TODO parallel -> will be hard to do efficiently

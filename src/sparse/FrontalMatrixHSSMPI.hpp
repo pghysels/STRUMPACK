@@ -221,10 +221,10 @@ namespace strumpack {
       // the sampling for left/right can be done concurrently
       auto I = lch->upd_to_parent(this);
       DistM_t cRl(lch->grid(), I.size(), R.cols(),
-                  R.extract_rows(I), this->grid());
+                  R.extract_rows(I), this->grid()->ctxt_all());
       I = rch->upd_to_parent(this);
       DistM_t cRr(rch->grid(), I.size(), R.cols(),
-                  R.extract_rows(I), this->grid());
+                  R.extract_rows(I), this->grid()->ctxt_all());
       lch->sample_CB(opts, cRl, cSrl, cScl, this);
       rch->sample_CB(opts, cRr, cSrr, cScr, this);
       TIMER_TIME(TaskType::SKINNY_EXTEND_ADD_MPIMPI, 2, t_sea);
@@ -254,12 +254,12 @@ namespace strumpack {
         Srseq.zero();
         Scseq.zero();
       }
-      strumpack::copy(m, n, R, 0, 0, Rseq, pch, this->grid());
+      copy(m, n, R, 0, 0, Rseq, pch, this->grid()->ctxt_all());
     }
     if (ch_mpi) {
       auto I = ch_mpi->upd_to_parent(this);
       DistM_t cR(ch_mpi->grid(), I.size(), R.cols(),
-                 R.extract_rows(I), this->grid());
+                 R.extract_rows(I), this->grid()->ctxt_all());
       ch_mpi->sample_CB(opts, cR, cSr, cSc, this);
     }
     if (ch_seq)
@@ -275,9 +275,9 @@ namespace strumpack {
     if (ch_seq) {
       TIMER_TIME(TaskType::SKINNY_EXTEND_ADD_SEQ1, 2, t_sea);
       DistM_t Stmp(this->grid(), m, n);
-      strumpack::copy(m, n, Srseq, pch, Stmp, 0, 0, this->grid());
+      copy(m, n, Srseq, pch, Stmp, 0, 0, this->grid()->ctxt_all());
       Sr.add(Stmp);
-      strumpack::copy(m, n, Scseq, pch, Stmp, 0, 0, this->grid());
+      copy(m, n, Scseq, pch, Stmp, 0, 0, this->grid()->ctxt_all());
       Sc.add(Stmp);
       TIMER_STOP(t_sea);
     }
@@ -305,20 +305,20 @@ namespace strumpack {
     DenseM_t Rseq(m, n), Srseq(m, n), Scseq(m, n);
     Srseq.zero();
     Scseq.zero();
-    strumpack::copy(m, n, R, 0, 0, Rseq, pl, this->grid());
-    strumpack::copy(m, n, R, 0, 0, Rseq, pr, this->grid());
+    copy(m, n, R, 0, 0, Rseq, pl, this->grid()->ctxt_all());
+    copy(m, n, R, 0, 0, Rseq, pr, this->grid()->ctxt_all());
     if (rank == pl) this->lchild->sample_CB(opts, Rseq, Srseq, Scseq, this);
     if (rank == pr) this->rchild->sample_CB(opts, Rseq, Srseq, Scseq, this);
     TIMER_TIME(TaskType::SKINNY_EXTEND_ADD_SEQSEQ, 2, t_sea);
     DistM_t Stmp(this->grid(), m, n);
     // TODO combine these 4 copies into 1 all-to-all?
-    strumpack::copy(m, n, Srseq, pl, Stmp, 0, 0, this->grid());
+    copy(m, n, Srseq, pl, Stmp, 0, 0, this->grid()->ctxt_all());
     Sr.add(Stmp);
-    strumpack::copy(m, n, Scseq, pl, Stmp, 0, 0, this->grid());
+    copy(m, n, Scseq, pl, Stmp, 0, 0, this->grid()->ctxt_all());
     Sc.add(Stmp);
-    strumpack::copy(m, n, Srseq, pr, Stmp, 0, 0, this->grid());
+    copy(m, n, Srseq, pr, Stmp, 0, 0, this->grid()->ctxt_all());
     Sr.add(Stmp);
-    strumpack::copy(m, n, Scseq, pr, Stmp, 0, 0, this->grid());
+    copy(m, n, Scseq, pr, Stmp, 0, 0, this->grid()->ctxt_all());
     Sc.add(Stmp);
     TIMER_STOP(t_sea);
   }
@@ -436,11 +436,11 @@ namespace strumpack {
         _ULVwork = std::unique_ptr<HSS::WorkSolveMPI<scalar_t>>
           (new HSS::WorkSolveMPI<scalar_t>());
         DistM_t lb(_H->child(0)->grid(_H->grid_local()), b.rows(), b.cols());
-        copy(b.rows(), b.cols(), b, 0, 0, lb, 0, 0, this->grid());
+        copy(b.rows(), b.cols(), b, 0, 0, lb, 0, 0, this->grid()->ctxt_all());
         _H->child(0)->forward_solve(_ULV, *_ULVwork, lb, true);
         DistM_t rhs(_H->grid(), _Theta.cols(), bupd.cols());
         copy(rhs.rows(), rhs.cols(), _ULVwork->reduced_rhs, 0, 0,
-             rhs, 0, 0, this->grid());
+             rhs, 0, 0, this->grid()->ctxt_all());
         _ULVwork->reduced_rhs.clear();
         if (this->dim_upd())
           gemm(Trans::N, Trans::N, scalar_t(-1.), _Theta, rhs,
@@ -450,7 +450,7 @@ namespace strumpack {
     } else {
       TIMER_TIME(TaskType::SOLVE_LOWER_ROOT, 0, t_solve);
       DistM_t lb(_H->grid(), b.rows(), b.cols());
-      copy(b.rows(), b.cols(), b, 0, 0, lb, 0, 0, this->grid());
+      copy(b.rows(), b.cols(), b, 0, 0, lb, 0, 0, this->grid()->ctxt_all());
       _ULVwork = std::unique_ptr<HSS::WorkSolveMPI<scalar_t>>
         (new HSS::WorkSolveMPI<scalar_t>());
       _H->forward_solve(_ULV, *_ULVwork, lb, false);
@@ -468,26 +468,26 @@ namespace strumpack {
       if (_Phi.cols() && _Theta.cols()) {
         DistM_t ly
           (_H->child(0)->grid(_H->grid_local()), y.rows(), y.cols());
-        copy(y.rows(), y.cols(), y, 0, 0, ly, 0, 0, this->grid());
+        copy(y.rows(), y.cols(), y, 0, 0, ly, 0, 0, this->grid()->ctxt_all());
         if (this->dim_upd()) {
           // TODO can these copies be avoided??
           DistM_t wx
-            (_H->grid(), _Phi.cols(), yupd.cols(), _ULVwork->x, this->grid());
+            (_H->grid(), _Phi.cols(), yupd.cols(), _ULVwork->x, this->grid()->ctxt_all());
           DistM_t yupdHctxt
-            (_H->grid(), this->dim_upd(), y.cols(), yupd, this->grid());
+            (_H->grid(), this->dim_upd(), y.cols(), yupd, this->grid()->ctxt_all());
           gemm(Trans::C, Trans::N, scalar_t(-1.), _Phi, yupdHctxt,
                scalar_t(1.), wx);
-          copy(wx.rows(), wx.cols(), wx, 0, 0, _ULVwork->x, 0, 0, this->grid());
+          copy(wx.rows(), wx.cols(), wx, 0, 0, _ULVwork->x, 0, 0, this->grid()->ctxt_all());
         }
         _H->child(0)->backward_solve(_ULV, *_ULVwork, ly);
-        copy(y.rows(), y.cols(), ly, 0, 0, y, 0, 0, this->grid());
+        copy(y.rows(), y.cols(), ly, 0, 0, y, 0, 0, this->grid()->ctxt_all());
         _ULVwork.reset();
       }
     } else {
       DistM_t ly(_H->grid(), y.rows(), y.cols());
-      copy(y.rows(), y.cols(), y, 0, 0, ly, 0, 0, this->grid());
+      copy(y.rows(), y.cols(), y, 0, 0, ly, 0, 0, this->grid()->ctxt_all());
       _H->backward_solve(_ULV, *_ULVwork, ly);
-      copy(y.rows(), y.cols(), ly, 0, 0, y, 0, 0, this->grid());
+      copy(y.rows(), y.cols(), ly, 0, 0, y, 0, 0, this->grid()->ctxt_all());
     }
     TIMER_STOP(t_expand);
     DistM_t CBl, CBr;
@@ -571,17 +571,17 @@ namespace strumpack {
 
     if (_Theta.cols() < _Phi.cols()) {
       DistM_t tr(this->grid(), lI.size(), _Theta.cols(),
-                 _Theta.extract_rows(lI), this->grid());
+                 _Theta.extract_rows(lI), this->grid()->ctxt_all());
       DistM_t tc(this->grid(), _VhatCPhiC.rows(), lJ.size(),
-                 _VhatCPhiC.extract_cols(lJ), this->grid());
+                 _VhatCPhiC.extract_cols(lJ), this->grid()->ctxt_all());
       gemm(Trans::N, Trans::N, scalar_t(-1), tr, tc, scalar_t(1.), e);
       STRUMPACK_EXTRACTION_FLOPS
         (gemm_flops(Trans::N, Trans::N, scalar_t(-1), tr, tc, scalar_t(1.)));
     } else {
       DistM_t tr(this->grid(), lI.size(), _ThetaVhatC.cols(),
-                 _ThetaVhatC.extract_rows(lI), this->grid());
+                 _ThetaVhatC.extract_rows(lI), this->grid()->ctxt_all());
       DistM_t tc(this->grid(), lJ.size(), _Phi.cols(),
-                 _Phi.extract_rows(lJ), this->grid());
+                 _Phi.extract_rows(lJ), this->grid()->ctxt_all());
       gemm(Trans::N, Trans::C, scalar_t(-1), tr, tc, scalar_t(1.), e);
       STRUMPACK_EXTRACTION_FLOPS
         (gemm_flops(Trans::N, Trans::C, scalar_t(-1), tr, tc, scalar_t(1.)));
@@ -626,17 +626,17 @@ namespace strumpack {
     for (std::size_t i=0; i<nB; i++) {
       if (_Theta.cols() < _Phi.cols()) {
         DistM_t tr(this->grid(), lI[i].size(), _Theta.cols(),
-                   _Theta.extract_rows(lI[i]), this->grid());
+                   _Theta.extract_rows(lI[i]), this->grid()->ctxt_all());
         DistM_t tc(this->grid(), _VhatCPhiC.rows(), lJ[i].size(),
-                   _VhatCPhiC.extract_cols(lJ[i]), this->grid());
+                   _VhatCPhiC.extract_cols(lJ[i]), this->grid()->ctxt_all());
         gemm(Trans::N, Trans::N, scalar_t(-1), tr, tc, scalar_t(1.), e_vec[i]);
         STRUMPACK_EXTRACTION_FLOPS
           (gemm_flops(Trans::N, Trans::N, scalar_t(-1), tr, tc, scalar_t(1.)));
       } else {
         DistM_t tr(this->grid(), lI[i].size(), _ThetaVhatC.cols(),
-                   _ThetaVhatC.extract_rows(lI[i]), this->grid());
+                   _ThetaVhatC.extract_rows(lI[i]), this->grid()->ctxt_all());
         DistM_t tc(this->grid(), lJ[i].size(), _Phi.cols(),
-                   _Phi.extract_rows(lJ[i]), this->grid());
+                   _Phi.extract_rows(lJ[i]), this->grid()->ctxt_all());
         gemm(Trans::N, Trans::C, scalar_t(-1), tr, tc, scalar_t(1.), e_vec[i]);
         STRUMPACK_EXTRACTION_FLOPS
           (gemm_flops(Trans::N, Trans::C, scalar_t(-1), tr, tc, scalar_t(1.)));

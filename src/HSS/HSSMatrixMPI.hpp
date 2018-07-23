@@ -94,11 +94,14 @@ namespace strumpack {
       { return this->_ch[c].get(); }
       HSSMatrixBase<scalar_t>* child(int c) { return this->_ch[c].get(); }
 
-      inline const BLACSGrid* grid() const { return blacs_grid_; }
+      inline const BLACSGrid* grid() const override { return blacs_grid_; }
       inline const BLACSGrid* grid(const BLACSGrid* grid) const override { return blacs_grid_; }
       inline const BLACSGrid* grid_local() const override { return blacs_grid_local_; }
       inline const MPIComm& Comm() const { return grid()->Comm(); }
       inline MPI_Comm comm() const { return Comm().comm(); }
+      int Ptotal() const override { return grid()->P(); }
+      int Pactive() const override { return grid()->npactives(); }
+
 
       void compress(const DistM_t& A, const opts_t& opts);
       void compress
@@ -351,11 +354,11 @@ namespace strumpack {
       { return std::max(1, P - Pl(n, nl, nr, P));  }
       int Pl() const {
         return Pl(this->rows(), this->_ch[0]->rows(),
-                  this->_ch[1]->rows(), grid()->P());
+                  this->_ch[1]->rows(), Ptotal());
       }
       int Pr() const {
         return Pr(this->rows(), this->_ch[0]->rows(),
-                  this->_ch[1]->rows(), grid()->P());
+                  this->_ch[1]->rows(), Ptotal());
       }
 
       template<typename T> friend
@@ -502,7 +505,7 @@ namespace strumpack {
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::setup_ranges
     (std::size_t roff, std::size_t coff) {
-      const int P = grid()->P();
+      const int P = Ptotal();
       _ranges = TreeLocalRanges(P);
       if (this->leaf()) {
         for (int p=0; p<P; p++) {
@@ -561,8 +564,8 @@ namespace strumpack {
       if (m > std::size_t(opts.leaf_size()) ||
           n > std::size_t(opts.leaf_size())) {
         this->_ch.reserve(2);
-        auto pl = Pl(m, m/2, m-m/2, grid()->P());
-        auto pr = Pr(m, m/2, m-m/2, grid()->P());
+        auto pl = Pl(m, m/2, m-m/2, Ptotal());
+        auto pr = Pr(m, m/2, m-m/2, Ptotal());
         if (pl > 1) {
           this->_ch.emplace_back
             (new HSSMatrixMPI<scalar_t>
@@ -689,16 +692,9 @@ namespace strumpack {
       w.c[0].dS = w.c[0].Sr.cols();
       w.c[1].dR = w.c[1].Rr.cols();
       w.c[1].dS = w.c[1].Sr.cols();
-
-      // TODO rewrite this using the grid info
-      int rank = Comm().rank(), P = Comm().size(), root1 = Pl();
-      int P0total = root1, P1total = P - root1;
-      int pcols = std::floor(std::sqrt((float)P0total));
-      int prows = P0total / pcols;
-      int P0active = prows * pcols;
-      pcols = std::floor(std::sqrt((float)P1total));
-      prows = P1total / pcols;
-      int P1active = prows * pcols;
+      int rank = Comm().rank(), P = Ptotal(), root1 = Pl();
+      int P0active = this->_ch[0]->Pactive();
+      int P1active = this->_ch[1]->Pactive();
       std::vector<MPI_Request> sreq(P);
       int sreqs = 0;
       std::vector<std::size_t> sbuf0, sbuf1;
@@ -708,7 +704,7 @@ namespace strumpack {
           // on child0, so I need to send to one or more others which
           // are not active on child0, ie the ones in [P0active,P)
           sbuf0.reserve(8+w.c[0].Ir.size()+w.c[0].Ic.size()+
-                      w.c[0].Jr.size()+w.c[0].Jc.size());
+                        w.c[0].Jr.size()+w.c[0].Jc.size());
           sbuf0.push_back(std::size_t(this->_ch[0]->_U_state));
           sbuf0.push_back(std::size_t(this->_ch[0]->_V_state));
           sbuf0.push_back(this->_ch[0]->_U_rank);
@@ -831,7 +827,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::notify_inactives_J(WorkCompressMPI<scalar_t>& w) {
-      int rank = Comm().rank(), actives = grid()->npactives();
+      int rank = Comm().rank(), actives = Pactive();
       int inactives = grid()->P() - actives;
       if (rank < inactives) {
         std::vector<std::size_t> sbuf;
@@ -863,17 +859,8 @@ namespace strumpack {
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::notify_inactives_states
     (WorkCompressMPI<scalar_t>& w) {
-      int rank = Comm().rank(), actives = grid()->npactives();
-      int inactives = grid()->P() - actives;
-
-      std::cout << "rank=" << mpi_rank()
-                << " rank=" << rank
-                << " P=" << grid()->P()
-                << " actives=" << actives
-                << " inactives=" << inactives
-                << std::endl;
-
-
+      int rank = Comm().rank(), actives = Pactive();
+      int inactives = Ptotal() - actives;
       if (rank < inactives) {
         std::vector<std::size_t> sbuf;
         sbuf.reserve(8+w.Ir.size()+w.Ic.size()+w.Jr.size()+w.Jc.size());
@@ -919,8 +906,6 @@ namespace strumpack {
         for (int i=0; i<this->_V_rank; i++) w.Jc[i] = *ptr++;
         delete[] buf;
       }
-
-      std::cout << "rank=" << mpi_rank() << " DONE" << std::endl;
     }
 
     /**

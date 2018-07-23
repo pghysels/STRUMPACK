@@ -118,10 +118,13 @@ namespace strumpack {
 
       virtual void shift(scalar_t sigma) = 0;
 
+      virtual const BLACSGrid* grid() const { return nullptr; }
       virtual const BLACSGrid* grid(const BLACSGrid* local_grid) const {
         return active() ? local_grid : nullptr;
       }
       virtual const BLACSGrid* grid_local() const { return nullptr; }
+      virtual int Ptotal() const { return 1; }
+      virtual int Pactive() const { return 1; }
 
       virtual void to_block_row
       (const DistM_t& A, DenseM_t& sub_A, DistM_t& leaf_A) const;
@@ -441,19 +444,19 @@ namespace strumpack {
           w_mpi.Rc.resize(U_rank(), d_old+dd);
           copy(V_rank(), dd,
                DenseMW_t(V_rank(), dd, RS.sub_Rr, w.offset.second, d-dd),
-               0, w_mpi.Rr, 0, d_old, lg);
+               0, w_mpi.Rr, 0, d_old, lg->ctxt());
           copy(U_rank(), dd,
                DenseMW_t(U_rank(), dd, RS.sub_Rc, w.offset.second, d-dd),
-               0, w_mpi.Rc, 0, d_old, lg);
+               0, w_mpi.Rc, 0, d_old, lg->ctxt());
           d_old = w_mpi.Sr.cols();
           w_mpi.Sr.resize(U_rows(), d_old+dd);
           w_mpi.Sc.resize(V_rows(), d_old+dd);
           copy(U_rows(), dd,
                DenseMW_t(U_rows(), dd, RS.sub_Sr, w.offset.second, d-dd),
-               0, w_mpi.Sr, 0, d_old, lg);
+               0, w_mpi.Sr, 0, d_old, lg->ctxt());
           copy(V_rows(), dd,
                DenseMW_t(V_rows(), dd, RS.sub_Sc, w.offset.second, d-dd),
-               0, w_mpi.Sc, 0, d_old, lg);
+               0, w_mpi.Sc, 0, d_old, lg->ctxt());
         }
       }
       std::swap(w.Ir, w_mpi.Ir); std::swap(w.Ic, w_mpi.Ic);
@@ -504,19 +507,19 @@ namespace strumpack {
             w_mpi.Rc.resize(U_rank(), d_old+dd);
             copy(V_rank(), dd,
                  DenseMW_t(V_rank(), dd, RS.sub_Rr, w.offset.second, d-dd),
-                 0, w_mpi.Rr, 0, d_old, lg);
+                 0, w_mpi.Rr, 0, d_old, lg->ctxt());
             copy(U_rank(), dd,
                  DenseMW_t(U_rank(), dd, RS.sub_Rc, w.offset.second, d-dd),
-                 0, w_mpi.Rc, 0, d_old, lg);
+                 0, w_mpi.Rc, 0, d_old, lg->ctxt());
             d_old = w_mpi.Sr.cols();
             w_mpi.Sr.resize(U_rows(), d_old+dd);
             w_mpi.Sc.resize(V_rows(), d_old+dd);
             copy(U_rows(), dd,
                  DenseMW_t(U_rows(), dd, RS.sub_Sr, w.offset.second, d-dd),
-                 0, w_mpi.Sr, 0, d_old, lg);
+                 0, w_mpi.Sr, 0, d_old, lg->ctxt());
             copy(V_rows(), dd,
                  DenseMW_t(V_rows(), dd, RS.sub_Sc, w.offset.second, d-dd),
-                 0, w_mpi.Sc, 0, d_old, lg);
+                 0, w_mpi.Sc, 0, d_old, lg->ctxt());
           }
         }
         std::swap(w.Ir, w_mpi.Ir); std::swap(w.Ic, w_mpi.Ic);
@@ -566,19 +569,19 @@ namespace strumpack {
           w_mpi.Rc.resize(U_rank(), d_old+dd);
           copy(V_rank(), dd,
                DenseMW_t(V_rank(), dd, RS.sub_Rr, w.offset.second, c-dd),
-               0, w_mpi.Rr, 0, d_old, lg);
+               0, w_mpi.Rr, 0, d_old, lg->ctxt());
           copy(U_rank(), dd,
                DenseMW_t(U_rank(), dd, RS.sub_Rc, w.offset.second, c-dd),
-               0, w_mpi.Rc, 0, d_old, lg);
+               0, w_mpi.Rc, 0, d_old, lg->ctxt());
           d_old = w_mpi.Sr.cols();
           w_mpi.Sr.resize(U_rows(), d_old+dd);
           w_mpi.Sc.resize(V_rows(), d_old+dd);
           copy(U_rows(), dd,
                DenseMW_t(U_rows(), dd, RS.sub_Sr, w.offset.second, c-dd),
-               0, w_mpi.Sr, 0, d_old, lg);
+               0, w_mpi.Sr, 0, d_old, lg->ctxt());
           copy(V_rows(), dd,
                DenseMW_t(V_rows(), dd, RS.sub_Sc, w.offset.second, c-dd),
-               0, w_mpi.Sc, 0, d_old, lg);
+               0, w_mpi.Sc, 0, d_old, lg->ctxt());
         }
       }
       std::swap(w.Ir, w_mpi.Ir); std::swap(w.Ic, w_mpi.Ic);
@@ -625,19 +628,19 @@ namespace strumpack {
             w_mpi.Rc.resize(U_rank(), d_old+dd);
             copy(V_rank(), dd,
                  DenseMW_t(V_rank(), dd, RS.sub_Rr, w.offset.second, c-dd),
-                 0, w_mpi.Rr, 0, d_old, lg);
+                 0, w_mpi.Rr, 0, d_old, lg->ctxt());
             copy(U_rank(), dd,
                  DenseMW_t(U_rank(), dd, RS.sub_Rc, w.offset.second, c-dd),
-                 0, w_mpi.Rc, 0, d_old, lg);
+                 0, w_mpi.Rc, 0, d_old, lg->ctxt());
             d_old = w_mpi.Sr.cols();
             w_mpi.Sr.resize(U_rows(), d_old+dd);
             w_mpi.Sc.resize(V_rows(), d_old+dd);
             copy(U_rows(), dd,
                  DenseMW_t(U_rows(), dd, RS.sub_Sr, w.offset.second, c-dd),
-                 0, w_mpi.Sr, 0, d_old, lg);
+                 0, w_mpi.Sr, 0, d_old, lg->ctxt());
             copy(V_rows(), dd,
                  DenseMW_t(V_rows(), dd, RS.sub_Sc, w.offset.second, c-dd),
-                 0, w_mpi.Sc, 0, d_old, lg);
+                 0, w_mpi.Sc, 0, d_old, lg->ctxt());
           }
         }
         std::swap(w.Ir, w_mpi.Ir); std::swap(w.Ic, w_mpi.Ic);

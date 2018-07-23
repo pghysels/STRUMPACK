@@ -71,7 +71,7 @@ namespace strumpack {
     DistributedMatrix(const BLACSGrid* g, DenseMatrixWrapper<scalar_t>&& m);
     DistributedMatrix(const BLACSGrid* g, int M, int N,
                       const DistributedMatrix<scalar_t>& m,
-                      const BLACSGrid* gall);
+                      int context_all);
     DistributedMatrix(const BLACSGrid* g, int M, int N);
     DistributedMatrix(const BLACSGrid* g, int M, int N, int MB, int NB);
     DistributedMatrix(const BLACSGrid* g, int desc[9]);
@@ -240,7 +240,8 @@ namespace strumpack {
      std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol);
     void ID_row
     (DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
-     std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol);
+     std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
+     const BLACSGrid* grid_T);
 
 #ifdef STRUMPACK_PBLAS_BLOCKSIZE
     static const int default_MB = STRUMPACK_PBLAS_BLOCKSIZE;
@@ -251,47 +252,46 @@ namespace strumpack {
 #endif
   };
 
-  /** copy submatrix of a DistM_t at ia,ja of size m,n into a DenseM_t
-      b at proc dest in a.grid()->ctxt_all() */
+  /**
+   * copy submatrix of a DistM_t at ia,ja of size m,n into a DenseM_t
+   * b at proc dest
+   */
   template<typename scalar_t> void copy
   (std::size_t m, std::size_t n, const DistributedMatrix<scalar_t>& a,
    std::size_t ia, std::size_t ja, DenseMatrix<scalar_t>& b,
-   int dest, const BLACSGrid* gall) {
+   int dest, int context_all) {
     if (!m || !n) return;
     int b_desc[9];
-    scalapack::descset(b_desc, m, n, m, n, 0, dest, a.ctxt_all(), m);
-    assert(gall);
+    scalapack::descset(b_desc, m, n, m, n, 0, dest, context_all, m);
     scalapack::pgemr2d
       (m, n, a.data(), a.I()+ia, a.J()+ja, a.desc(),
-       b.data(), 1, 1, b_desc, gall->ctxt_all());
+       b.data(), 1, 1, b_desc, context_all);
   }
 
   template<typename scalar_t> void copy
   (std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& a, int src,
    DistributedMatrix<scalar_t>& b, std::size_t ib, std::size_t jb,
-   const BLACSGrid* gall) {
+   int context_all) {
     if (!m || !n) return;
     int a_desc[9];
     scalapack::descset
-      (a_desc, m, n, m, n, 0, src, b.ctxt_all(), std::max(m, a.ld()));
-    assert(gall);
+      (a_desc, m, n, m, n, 0, src, context_all, std::max(m, a.ld()));
     scalapack::pgemr2d
       (m, n, a.data(), 1, 1, a_desc, b.data(), b.I()+ib, b.J()+jb,
-       b.desc(), gall->ctxt_all());
+       b.desc(), context_all);
   }
 
   /** copy submatrix of a at ia,ja of size m,n into b at position ib,jb */
   template<typename scalar_t> void copy
   (std::size_t m, std::size_t n, const DistributedMatrix<scalar_t>& a,
    std::size_t ia, std::size_t ja, DistributedMatrix<scalar_t>& b,
-   std::size_t ib, std::size_t jb, const BLACSGrid* gall) {
+   std::size_t ib, std::size_t jb, int context_all) {
     if (!m || !n) return;
     assert(!a.active() || (m+ia <= std::size_t(a.rows()) && n+ja <= std::size_t(a.cols())));
     assert(!b.active() || (m+ib <= std::size_t(b.rows()) && n+jb <= std::size_t(b.cols())));
-    assert(gall);
     scalapack::pgemr2d
       (m, n, a.data(), a.I()+ia, a.J()+ja, a.desc(),
-       b.data(), b.I()+ib, b.J()+jb, b.desc(), gall->ctxt_all());
+       b.data(), b.I()+ib, b.J()+jb, b.desc(), context_all);
   }
 
   /**
@@ -622,9 +622,9 @@ namespace strumpack {
 
   template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix
   (const BLACSGrid* g, int M, int N, const DistributedMatrix<scalar_t>& m,
-   const BLACSGrid* gall)
+   int context_all)
     : DistributedMatrix(g, M, N, default_MB, default_NB) {
-    strumpack::copy(M, N, m, 0, 0, *this, 0, 0, gall);
+    strumpack::copy(M, N, m, 0, 0, *this, 0, 0, context_all);
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix
@@ -665,16 +665,7 @@ namespace strumpack {
       data_ = new scalar_t[lrows_*lcols_];
       if (scalapack::descinit
           (desc_, M, N, MB, NB, 0, 0, ctxt(), std::max(lrows_,1))) {
-        std::cout << " M=" << M
-                  << " N=" << N
-                  << " ctxt=" << ctxt()
-                  << " lrows=" << lrows_
-                  << " lcols=" << lcols_
-                  << " prow=" << prow() << "  nprows=" << nprows()
-                  << " pcol=" << pcol() << "  npcols=" << npcols()
-                  << " ld=" << std::max(lrows_,1)
-                  << " ERROR: Could not create DistributedMatrix descriptor!"
-                  << " rank=" << mpi_rank()
+        std::cerr << " ERROR: Could not create DistributedMatrix descriptor!"
                   << std::endl;
         abort();
       }
@@ -756,7 +747,8 @@ namespace strumpack {
     assert(grid() == b.grid());
     auto my_cols = cols();
     resize(rows(), my_cols+b.cols());
-    copy(rows(), b.cols(), b, 0, 0, *this, 0, my_cols, grid());
+    if (!active()) return;
+    copy(rows(), b.cols(), b, 0, 0, *this, 0, my_cols, grid()->ctxt());
   }
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::zero() {
@@ -1274,7 +1266,7 @@ namespace strumpack {
     assert(I()==1 && J()==1);
     DistributedMatrix<scalar_t> tmp(grid(), std::max(rows(), cols()), cols());
     // TODO this is not a pgemr2d, this does not require communication!!
-    strumpack::copy(rows(), cols(), *this, 0, 0, tmp, 0, 0, grid());
+    strumpack::copy(rows(), cols(), *this, 0, 0, tmp, 0, 0, grid()->ctxt());
     // TODO the last argument to numroc, should it be prows/pcols???
     auto tau = new scalar_t
       [scalapack::numroc(I()+std::min(rows(),cols())-1, MB(),
@@ -1284,7 +1276,7 @@ namespace strumpack {
        tmp.desc(), tau);
     L = DistributedMatrix<scalar_t>(grid(), rows(), rows());
     // TODO this is not a pgemr2d, this does not require communication!!
-    strumpack::copy(rows(), rows(), tmp, 0, 0, L, 0, 0, grid());
+    strumpack::copy(rows(), rows(), tmp, 0, 0, L, 0, 0, grid()->ctxt());
     // TODO check the diagonal elements
     // auto sfmin = blas::lamch<real_t>('S');
     // for (std::size_t i=0; i<std::min(rows(), cols()); i++)
@@ -1300,22 +1292,22 @@ namespace strumpack {
     else {
       Q = DistributedMatrix<scalar_t>(grid(), cols(), cols());
       // TODO this is not a pgemr2d, this does not require communication!!
-      strumpack::copy(cols(), cols(), tmp, 0, 0, Q, 0, 0, grid());
+      copy(cols(), cols(), tmp, 0, 0, Q, 0, 0, grid()->ctxt());
     }
   }
 
   template<typename scalar_t> void
   DistributedMatrix<scalar_t>::ID_row
   (DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
-   std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol) {
+   std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
+   const BLACSGrid* grid_T) {
     // transpose the BLACS grid and do a local transpose, then call
     // ID_column, then do local transpose of output X_T to get back in
     // the original blacs grid
     if (!active()) return;
     TIMER_TIME(TaskType::HSS_PARHQRINTERPOL, 1, t_hss_par_hqr);
     assert(I()==1 && J()==1);
-    auto gT = grid()->transpose();
-    DistributedMatrix<scalar_t> this_T(&gT, cols(), rows());
+    DistributedMatrix<scalar_t> this_T(grid_T, cols(), rows());
     blas::omatcopy('T', lrows(), lcols(), data(), ld(),
                    this_T.data(), this_T.ld());
     DistributedMatrix<scalar_t> X_T;
@@ -1338,7 +1330,6 @@ namespace strumpack {
     std::iota(gpiv.begin(), gpiv.end(), 1);
     int rank = 0;
     // Step 1: RRQR
-    // TODO also use abs_tol!!
     scalapack::pgeqpfmod
       (rows(), cols(), data(), I(), J(), desc(),
        _J.data(), gpiv.data(), &rank, rel_tol, abs_tol);
@@ -1350,7 +1341,7 @@ namespace strumpack {
     //   R1^-1 R = [I R1^-1 R2] = [I X] with R = [R1 R2], R1 r x r
     DistributedMatrixWrapper<scalar_t> R1(rank, rank, *this, 0, 0);
     X = DistributedMatrix<scalar_t>(grid(), rank, cols()-rank);
-    copy(rank, cols()-rank, *this, 0, rank, X, 0, 0, grid());
+    copy(rank, cols()-rank, *this, 0, rank, X, 0, 0, grid()->ctxt());
     trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), R1, X);
   }
 
@@ -1527,10 +1518,10 @@ namespace strumpack {
   template<typename scalar_t> DistributedMatrix<scalar_t> vconcat
   (int cols, int arows, int brows, const DistributedMatrix<scalar_t>& a,
    const DistributedMatrix<scalar_t>& b,
-   const BLACSGrid* gnew, const BLACSGrid* gall) {
+   const BLACSGrid* gnew, int context_all) {
     DistributedMatrix<scalar_t> tmp(gnew, arows+brows, cols);
-    copy(arows, cols, a, 0, 0, tmp, 0, 0, gall);
-    copy(brows, cols, b, 0, 0, tmp, arows, 0, gall);
+    copy(arows, cols, a, 0, 0, tmp, 0, 0, context_all);
+    copy(brows, cols, b, 0, 0, tmp, arows, 0, context_all);
     return tmp;
   }
 

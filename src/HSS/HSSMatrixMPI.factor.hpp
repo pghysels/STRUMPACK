@@ -64,12 +64,12 @@ namespace strumpack {
         auto c1v = _B01.cols();
         auto u_rows = c0u + c1u;
         // move w.c[x].Vt1 from the child grid to the current grid
-        DistM_t c0Vt1(grid(), c0u, c0v, w.c[0].Vt1, grid());
-        DistM_t c1Vt1(grid(), c1u, c1v, w.c[1].Vt1, grid());
+        DistM_t c0Vt1(grid(), c0u, c0v, w.c[0].Vt1, grid()->ctxt_all());
+        DistM_t c1Vt1(grid(), c1u, c1v, w.c[1].Vt1, grid()->ctxt_all());
         if (u_rows) {
           f._D = DistM_t(grid(), u_rows, u_rows);
-          copy(c0u, c0u, w.c[0].Dt, 0, 0, f._D, 0, 0, grid());
-          copy(c1u, c1u, w.c[1].Dt, 0, 0, f._D, c0u, c0u, grid());
+          copy(c0u, c0u, w.c[0].Dt, 0, 0, f._D, 0, 0, grid()->ctxt_all());
+          copy(c1u, c1u, w.c[1].Dt, 0, 0, f._D, c0u, c0u, grid()->ctxt_all());
           DistMW_t D01(c0u, c1u, f._D, 0, c0u);
           DistMW_t D10(c1u, c0u, f._D, c0u, 0);
           gemm(Trans::N, Trans::C, scalar_t(1.), _B01, c1Vt1, scalar_t(0.), D01);
@@ -105,10 +105,10 @@ namespace strumpack {
         if (this->U_rows() > this->U_rank()) {
           f._W1 = DistM_t(grid(), this->U_rank(), this->U_rows());
           // set W1 <- (P^t D)_0
-          copy(this->U_rank(), this->U_rows(), f._D, 0, 0, f._W1, 0, 0, grid());
+          copy(this->U_rank(), this->U_rows(), f._D, 0, 0, f._W1, 0, 0, grid()->ctxt_all());
           DistM_t W0(grid(), this->U_rows()-this->U_rank(), this->U_rows());
           // set W0 <- (P^t D)_1   (bottom part of P^t D)
-          copy(W0.rows(), W0.cols(), f._D, this->U_rank(), 0, W0, 0, 0, grid());
+          copy(W0.rows(), W0.cols(), f._D, this->U_rank(), 0, W0, 0, 0, grid()->ctxt_all());
           f._D.clear();
           // set W0 <- -E * (P^t D)_0 + W0 = -E * W1 + W0
           gemm(Trans::N, Trans::N, scalar_t(-1.), _U.E(), f._W1, scalar_t(1.), W0);

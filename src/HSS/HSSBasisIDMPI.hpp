@@ -94,7 +94,8 @@ namespace strumpack {
     HSSBasisIDMPI<scalar_t>::dense() const {
       DistM_t ret(E().grid(), rows(), cols());
       ret.eye();
-      copy(rows()-cols(), cols(), E(), 0, 0, ret, cols(), 0, E().grid());
+      if (E().grid())
+        copy(rows()-cols(), cols(), E(), 0, 0, ret, cols(), 0, E().grid()->ctxt());
       ret.laswp(P(), false);
       return ret;
     }
@@ -104,8 +105,7 @@ namespace strumpack {
       if (!b.active() || !rows() || !b.cols())
         return DistM_t(b.grid(), rows(), b.cols());
       DistM_t c(b.grid(), rows(), b.cols());
-      // TODO just a local copy!!
-      copy(cols(), b.cols(), b, 0, 0, c, 0, 0, b.grid());
+      copy(cols(), b.cols(), b, 0, 0, c, 0, 0, b.grid()->ctxt());
       DistributedMatrixWrapper<scalar_t>
         tmpC(E().rows(), b.cols(), c, cols(), 0);
       if (E().rows())
@@ -117,8 +117,7 @@ namespace strumpack {
     template<typename scalar_t> void
     HSSBasisIDMPI<scalar_t>::apply(const DistM_t& b, DistM_t& c) const {
       if (!b.active() || !rows() || !b.cols()) return;
-      // TODO just a local copy!!
-      copy(cols(), b.cols(), b, 0, 0, c, 0, 0, b.grid());
+      copy(cols(), b.cols(), b, 0, 0, c, 0, 0, b.grid()->ctxt());
       DistributedMatrixWrapper<scalar_t>
         tmpC(E().rows(), b.cols(), c, cols(), 0);
       if (E().rows())
@@ -135,7 +134,7 @@ namespace strumpack {
       PtB.laswp(P(), true);
       if (!E().rows()) return PtB;
       DistM_t c(b.grid(), cols(), b.cols());
-      copy(cols(), b.cols(), PtB, 0, 0, c, 0, 0, b.grid());
+      copy(cols(), b.cols(), PtB, 0, 0, c, 0, 0, b.grid()->ctxt());
       auto tmpPtB = ConstDistributedMatrixWrapperPtr
         (E().rows(), b.cols(), PtB, cols(), 0);
       gemm(Trans::C, Trans::N, scalar_t(1.), E(), *tmpPtB, scalar_t(1.), c);
@@ -149,12 +148,12 @@ namespace strumpack {
       assert(b.rows() == int(rows()));
       assert(c.rows() == int(cols()));
       if (!E().rows()) {
-        copy(b.rows(), b.cols(), b, 0, 0, c, 0, 0, b.grid());
+        copy(b.rows(), b.cols(), b, 0, 0, c, 0, 0, b.grid()->ctxt());
         c.laswp(P(), true);
       } else {
         DistM_t PtB(b);
         PtB.laswp(P(), true);
-        copy(cols(), b.cols(), PtB, 0, 0, c, 0, 0, b.grid());
+        copy(cols(), b.cols(), PtB, 0, 0, c, 0, 0, b.grid()->ctxt());
         if (!E().rows()) return;
         auto tmpPtB = ConstDistributedMatrixWrapperPtr
           (E().rows(), b.cols(), PtB, cols(), 0);

@@ -141,7 +141,7 @@ namespace strumpack {
       DistM_t tmp(grid(), m, n);
       A.extract_separator_2d(this->sep_end, I, J, tmp);
       // TODO why this copy???
-      copy(m, n, tmp, 0, 0, B, 0, 0, grid());
+      copy(m, n, tmp, 0, 0, B, 0, 0, grid()->ctxt_all());
     }
     TIMER_STOP(t_ex_sep);
     TIMER_TIME(TaskType::GET_SUBMATRIX_2D, 2, t_getsub);
@@ -152,14 +152,14 @@ namespace strumpack {
     DistM_t tmp(B.grid(), m, n);
     if (this->lchild) {
       if (this->lchild->isMPI())
-        copy(m, n, Bl, 0, 0, tmp, 0, 0, grid());
-      else copy(m, n, Blseq, child_master(this->lchild), tmp, 0, 0, grid());
+        copy(m, n, Bl, 0, 0, tmp, 0, 0, grid()->ctxt_all());
+      else copy(m, n, Blseq, child_master(this->lchild), tmp, 0, 0, grid()->ctxt_all());
     }
     B.add(tmp);
     if (this->rchild) {
       if (this->rchild->isMPI())
-        copy(m, n, Br, 0, 0, tmp, 0, 0, grid());
-      else copy(m, n, Brseq, child_master(this->rchild), tmp, 0, 0, grid());
+        copy(m, n, Br, 0, 0, tmp, 0, 0, grid()->ctxt_all());
+      else copy(m, n, Brseq, child_master(this->rchild), tmp, 0, 0, grid()->ctxt_all());
     }
     B.add(tmp);
     TIMER_STOP(t_getsub);
@@ -176,7 +176,7 @@ namespace strumpack {
       DistM_t tmp(grid(), I[i].size(), J[i].size());
       A.extract_separator_2d(this->sep_end, I[i], J[i], tmp);
       // TODO why this copy???
-      copy(I[i].size(), J[i].size(), tmp, 0, 0, B[i], 0, 0, grid());
+      copy(I[i].size(), J[i].size(), tmp, 0, 0, B[i], 0, 0, grid()->ctxt_all());
     }
     TIMER_STOP(t_ex_sep);
     TIMER_TIME(TaskType::GET_SUBMATRIX_2D, 2, t_getsub);
@@ -195,16 +195,16 @@ namespace strumpack {
       // TODO combine all these copies???!!
       if (this->lchild) {
         if (this->lchild->isMPI())
-          copy(m, n, visit(this->lchild) ? Bl[i] : d, 0, 0, tmp, 0, 0, grid());
+          copy(m, n, visit(this->lchild) ? Bl[i] : d, 0, 0, tmp, 0, 0, grid()->ctxt_all());
         else copy(m, n, visit(this->lchild) ? Blseq[i] : d2,
-                  child_master(this->lchild), tmp, 0, 0, grid());
+                  child_master(this->lchild), tmp, 0, 0, grid()->ctxt_all());
       }
       B[i].add(tmp);
       if (this->rchild) {
         if (this->rchild->isMPI())
-          copy(m, n, visit(this->rchild) ? Br[i] : d, 0, 0, tmp, 0, 0, grid());
+          copy(m, n, visit(this->rchild) ? Br[i] : d, 0, 0, tmp, 0, 0, grid()->ctxt_all());
         else copy(m, n, visit(this->rchild) ? Brseq[i] : d2,
-                  child_master(this->rchild), tmp, 0, 0, grid());
+                  child_master(this->rchild), tmp, 0, 0, grid()->ctxt_all());
       }
       B[i].add(tmp);
     }

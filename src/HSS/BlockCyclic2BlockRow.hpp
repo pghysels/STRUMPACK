@@ -81,6 +81,9 @@ namespace strumpack {
             if (p <= rank && rank < p+leaf_procs)
               leaf = DistributedMatrix<scalar_t>(lg, m, d);
             if (dist.active()) {
+              // const int leaf_pcols = lg->npcols();
+              // const int leaf_prows = lg->nprows();
+              // TODO use routine from BLACSGrid class
               const int leaf_pcols = std::floor(std::sqrt((float)leaf_procs));
               const int leaf_prows = leaf_procs / leaf_pcols;
               for (int r=rlo; r<rhi; r++)
@@ -119,6 +122,9 @@ namespace strumpack {
             }
           } else {
             if (dist.active()) {
+              // const int leaf_pcols = lg->npcols();
+              // const int leaf_prows = lg->nprows();
+              // TODO use routine from BLACSGrid class
               const int leaf_pcols = std::floor(std::sqrt((float)leaf_procs));
               const int leaf_prows = leaf_procs / leaf_pcols;
               for (int r=rlo; r<rhi; r++) {
@@ -175,10 +181,8 @@ namespace strumpack {
         const auto P = comm.size();
         const auto rank = comm.rank();
         const int MB = DistributedMatrix<scalar_t>::default_MB;
-        const int dist_pcols = std::floor(std::sqrt((float)P));
-        const int dist_prows = P / dist_pcols;
-        assert(!dist.active() || (dist_pcols == dist.npcols()));
-        assert(!dist.active() || (dist_prows == dist.nprows()));
+        const int dist_pcols = dist.grid()->npcols();
+        const int dist_prows = dist.grid()->nprows();
         const auto leaf_procs = ranges.leaf_procs(rank);
         auto rbegin = ranges.clo(rank) - ranges.clo(0);
         std::vector<std::vector<Triplet<scalar_t>>> sbuf(P);

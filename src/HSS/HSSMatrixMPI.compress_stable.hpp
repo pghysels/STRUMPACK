@@ -184,6 +184,7 @@ namespace strumpack {
       if (this->_U_state == State::COMPRESSED) return;
       int u_rows = this->leaf() ? this->rows() :
         this->_ch[0]->U_rank()+this->_ch[1]->U_rank();
+      auto gT = grid()->transpose();
       if (!w.Sr.active()) return;
       if (d+dd >= opts.max_rank() || d+dd >= u_rows ||
           update_orthogonal_basis
@@ -193,7 +194,7 @@ namespace strumpack {
         // TODO pass max_rank to ID in DistributedMatrix
         auto rtol = opts.rel_tol() / w.lvl;
         auto atol = opts.abs_tol() / w.lvl;
-        w.Sr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol);
+        w.Sr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol, &gT);
         STRUMPACK_ID_FLOPS(ID_row_flops(w.Sr, _U.cols()));
         this->_U_rank = _U.cols();
         this->_U_rows = _U.rows();
@@ -215,6 +216,7 @@ namespace strumpack {
       if (this->_V_state == State::COMPRESSED) return;
       int v_rows = this->leaf() ? this->rows() :
         this->_ch[0]->V_rank()+this->_ch[1]->V_rank();
+      auto gT = grid()->transpose();
       if (!w.Sc.active()) return;
       if (d+dd >= opts.max_rank() || d+dd >= v_rows ||
           update_orthogonal_basis
@@ -224,7 +226,7 @@ namespace strumpack {
         // TODO pass max_rank to ID in DistributedMatrix
         auto rtol = opts.rel_tol() / w.lvl;
         auto atol = opts.abs_tol() / w.lvl;
-        w.Sc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol);
+        w.Sc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol, &gT);
         STRUMPACK_ID_FLOPS(ID_row_flops(w.Sc, _V.cols()));
         this->_V_rank = _V.cols();
         this->_V_rows = _V.rows();
@@ -248,12 +250,12 @@ namespace strumpack {
       if (d >= m) return true;
       if (Q.cols() == 0) Q = DistM_t(grid(), m, d+dd);
       else Q.resize(m, d+dd);
-      copy(m, dd, S, 0, d, Q, 0, d, grid());
+      copy(m, dd, S, 0, d, Q, 0, d, grid()->ctxt());
       DistMW_t Q2, Q12;
       if (untouched) {
         Q2 = DistMW_t(m, std::min(d, m), Q, 0, 0);
         Q12 = DistMW_t(m, std::min(d, m), Q, 0, 0);
-        copy(m, d, S, 0, 0, Q, 0, 0, grid());
+        copy(m, d, S, 0, 0, Q, 0, 0, grid()->ctxt());
       } else {
         Q2 = DistMW_t(m, std::min(dd, m-(d-dd)), Q, 0, d-dd);
         Q12 = DistMW_t(m, std::min(d, m), Q, 0, 0);

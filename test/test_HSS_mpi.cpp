@@ -200,7 +200,7 @@ int run(int argc, char* argv[]) {
       B0.random();
       DistributedMatrix<double> A0
         (H0mpi->grid(), H0mpi->rows(), H0mpi->cols());
-      copy(H0mpi->rows(), H0mpi->cols(), A, 0, 0, A0, 0, 0, &grid);
+      copy(H0mpi->rows(), H0mpi->cols(), A, 0, 0, A0, 0, 0, grid.ctxt_all());
       if (H0mpi->active()) {
         auto C0 = H0mpi->apply(B0);
         gemm(Trans::N, Trans::N, 1., A0, B0, beta, C0check);
