@@ -83,8 +83,8 @@ namespace strumpack {
      *                   Only the root of mpi_comm will print to stdout.
      */
     StrumpackSparseSolverMPIDist
-    (MPI_Comm mpi_comm, int argc, char* argv[], bool verbose=true);
-    StrumpackSparseSolverMPIDist(MPI_Comm mpi_comm, bool verbose=true);
+    (MPI_Comm comm, int argc, char* argv[], bool verbose=true);
+    StrumpackSparseSolverMPIDist(MPI_Comm comm, bool verbose=true);
     virtual ~StrumpackSparseSolverMPIDist();
 
     void set_matrix(const CSRMatrix<scalar_t,integer_t>& A);
@@ -144,12 +144,16 @@ namespace strumpack {
     (const DenseM_t& b, DenseM_t& x, bool use_initial_guess=false);
 
   protected:
-    virtual SpMat_t* matrix() override { return _mat_mpi.get(); }
-    virtual Reord_t* reordering() override { return _nd_mpi.get(); }
-    virtual Tree_t* tree() override { return _tree_mpi_dist.get(); }
-    virtual const SpMat_t* matrix() const override { return _mat_mpi.get(); }
-    virtual const Reord_t* reordering() const override { return _nd_mpi.get(); }
-    virtual const Tree_t* tree() const override { return _tree_mpi_dist.get(); }
+    using StrumpackSparseSolverMPI<scalar_t,integer_t>::is_root_;
+    using StrumpackSparseSolverMPI<scalar_t,integer_t>::opts_;
+    using StrumpackSparseSolverMPI<scalar_t,integer_t>::comm_;
+
+    virtual SpMat_t* matrix() override { return mat_mpi_.get(); }
+    virtual Reord_t* reordering() override { return nd_mpi_.get(); }
+    virtual Tree_t* tree() override { return tree_mpi_dist_.get(); }
+    virtual const SpMat_t* matrix() const override { return mat_mpi_.get(); }
+    virtual const Reord_t* reordering() const override { return nd_mpi_.get(); }
+    virtual const Tree_t* tree() const override { return tree_mpi_dist_.get(); }
 
     virtual void setup_tree() override;
     virtual void setup_reordering() override;
@@ -158,26 +162,26 @@ namespace strumpack {
     virtual void compute_separator_reordering() override;
 
   private:
-    std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>> _mat_mpi;
-    std::unique_ptr<MatrixReorderingMPI<scalar_t,integer_t>> _nd_mpi;
-    std::unique_ptr<EliminationTreeMPIDist<scalar_t,integer_t>> _tree_mpi_dist;
+    std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>> mat_mpi_;
+    std::unique_ptr<MatrixReorderingMPI<scalar_t,integer_t>> nd_mpi_;
+    std::unique_ptr<EliminationTreeMPIDist<scalar_t,integer_t>> tree_mpi_dist_;
   };
 
   template<typename scalar_t,typename integer_t>
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::
-  StrumpackSparseSolverMPIDist(MPI_Comm mpi_comm, bool verbose) :
+  StrumpackSparseSolverMPIDist(MPI_Comm comm, bool verbose) :
     StrumpackSparseSolverMPIDist<scalar_t,integer_t>
-    (mpi_comm, 0, nullptr, verbose) {
+    (comm, 0, nullptr, verbose) {
   }
 
   template<typename scalar_t,typename integer_t>
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::
-  StrumpackSparseSolverMPIDist(MPI_Comm mpi_comm, int argc, char* argv[],
+  StrumpackSparseSolverMPIDist(MPI_Comm comm, int argc, char* argv[],
                                bool verbose) :
     StrumpackSparseSolverMPI<scalar_t,integer_t>
-    (mpi_comm, argc, argv, verbose) {
+    (comm, argc, argv, verbose) {
     // Set the default reordering to PARMETIS?
-    //this->_opts.set_reordering_method(ReorderingStrategy::PARMETIS);
+    //opts_.set_reordering_method(ReorderingStrategy::PARMETIS);
   }
 
   template<typename scalar_t,typename integer_t>
@@ -188,19 +192,19 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::set_matrix
   (const CSRMatrix<scalar_t,integer_t>& A) {
-    if (_mat_mpi) _mat_mpi.reset();
-    _mat_mpi = std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>>
-      (new CSRMatrixMPI<scalar_t,integer_t>(&A, this->_comm, true));
-    this->_factored = this->_reordered = false;
+    if (mat_mpi_) mat_mpi_.reset();
+    mat_mpi_ = std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>>
+      (new CSRMatrixMPI<scalar_t,integer_t>(&A, comm_.comm(), true));
+    this->factored_ = this->reordered_ = false;
   }
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::set_matrix
   (const CSRMatrixMPI<scalar_t,integer_t>& A) {
-    if (_mat_mpi) _mat_mpi.reset();
-    _mat_mpi = std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>>
+    if (mat_mpi_) mat_mpi_.reset();
+    mat_mpi_ = std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>>
       (new CSRMatrixMPI<scalar_t,integer_t>(A));
-    this->_factored = this->_reordered = false;
+    this->factored_ = this->reordered_ = false;
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -209,23 +213,23 @@ namespace strumpack {
    const scalar_t* values, bool symmetric_pattern) {
     CSRMatrix<scalar_t,integer_t> mat_seq
       (N, row_ptr, col_ind, values, symmetric_pattern);
-    if (_mat_mpi) _mat_mpi.reset();
-    _mat_mpi = std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>>
+    if (mat_mpi_) mat_mpi_.reset();
+    mat_mpi_ = std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>>
       (new CSRMatrixMPI<scalar_t,integer_t>
-       (&mat_seq, this->_comm, true));
-    this->_factored = this->_reordered = false;
+       (&mat_seq, comm_.comm(), true));
+    this->factored_ = this->reordered_ = false;
   }
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::set_distributed_csr_matrix
   (integer_t local_rows, const integer_t* row_ptr, const integer_t* col_ind,
    const scalar_t* values, const integer_t* dist, bool symmetric_pattern) {
-    if (_mat_mpi) _mat_mpi.reset();
-    _mat_mpi = std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>>
+    if (mat_mpi_) mat_mpi_.reset();
+    mat_mpi_ = std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>>
       (new CSRMatrixMPI<scalar_t,integer_t>
        (local_rows, row_ptr, col_ind, values, dist,
-        this->_comm, symmetric_pattern));
-    this->_factored = this->_reordered = false;
+        comm_.comm(), symmetric_pattern));
+    this->factored_ = this->reordered_ = false;
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -233,104 +237,104 @@ namespace strumpack {
   (integer_t local_rows, const integer_t* d_ptr, const integer_t* d_ind,
    const scalar_t* d_val, const integer_t* o_ptr, const integer_t* o_ind,
    const scalar_t* o_val, const integer_t* garray) {
-    if (_mat_mpi) _mat_mpi.reset();
-    _mat_mpi = std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>>
+    if (mat_mpi_) mat_mpi_.reset();
+    mat_mpi_ = std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>>
       (new CSRMatrixMPI<scalar_t,integer_t>
        (local_rows, d_ptr, d_ind, d_val, o_ptr, o_ind, o_val,
-        garray, this->_comm));
-    this->_factored = this->_reordered = false;
+        garray, comm_.comm()));
+    this->factored_ = this->reordered_ = false;
   }
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::
   setup_reordering() {
-    if (_nd_mpi) _nd_mpi.reset();
-    _nd_mpi = std::unique_ptr<MatrixReorderingMPI<scalar_t,integer_t>>
+    if (nd_mpi_) nd_mpi_.reset();
+    nd_mpi_ = std::unique_ptr<MatrixReorderingMPI<scalar_t,integer_t>>
       (new MatrixReorderingMPI<scalar_t,integer_t>
-       (matrix()->size(), this->_comm));
+       (matrix()->size(), comm_.comm()));
   }
 
   template<typename scalar_t,typename integer_t> int
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::compute_reordering
   (int nx, int ny, int nz, int components, int width) {
-    return _nd_mpi->nested_dissection
-      (this->_opts, _mat_mpi.get(), nx, ny, nz, components, width);
+    return nd_mpi_->nested_dissection
+      (opts_, mat_mpi_.get(), nx, ny, nz, components, width);
   }
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::
   compute_separator_reordering() {
-    return _nd_mpi->separator_reordering
-      (this->_opts, _mat_mpi.get(), this->_opts.verbose() && this->_is_root);
+    return nd_mpi_->separator_reordering
+      (opts_, mat_mpi_.get(), opts_.verbose() && is_root_);
   }
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::setup_tree() {
-    if (_tree_mpi_dist) _tree_mpi_dist.reset();
-    _tree_mpi_dist =
+    if (tree_mpi_dist_) tree_mpi_dist_.reset();
+    tree_mpi_dist_ =
       std::unique_ptr<EliminationTreeMPIDist<scalar_t,integer_t>>
       (new EliminationTreeMPIDist<scalar_t,integer_t>
-       (this->_opts, *_mat_mpi, *_nd_mpi, this->_comm));
+       (opts_, *mat_mpi_, *nd_mpi_, comm_));
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::solve
   (const DenseM_t& b, DenseM_t& x, bool use_initial_guess) {
-    if (!this->_factored &&
-        this->_opts.Krylov_solver() != KrylovSolver::GMRES &&
-        this->_opts.Krylov_solver() != KrylovSolver::BICGSTAB) {
+    if (!this->factored_ &&
+        opts_.Krylov_solver() != KrylovSolver::GMRES &&
+        opts_.Krylov_solver() != KrylovSolver::BICGSTAB) {
       ReturnCode ierr = this->factor();
       if (ierr != ReturnCode::SUCCESS) return ierr;
     }
-    assert(std::size_t(_mat_mpi->local_rows()) == b.rows());
+    assert(std::size_t(mat_mpi_->local_rows()) == b.rows());
     assert(b.rows() == x.rows());
     assert(b.cols() == x.cols());
     TaskTimer t("solve");
     this->perf_counters_start();
     t.start();
     auto n_local = x.rows();
-    this->_Krylov_its = 0;
+    this->Krylov_its_ = 0;
 
     auto bloc = b;
-    if (this->_opts.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-      bloc.scale_rows(this->_matching_Dr);
+    if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+      bloc.scale_rows(this->matching_Dr_);
 
     auto gmres = [&](std::function<void(scalar_t*)> prec) {
       GMResMPI<scalar_t,integer_t>
-      (this->_comm, _mat_mpi.get(), prec, n_local, x.data(), bloc.data(),
-       this->_opts.rel_tol(), this->_opts.abs_tol(),
-       this->_Krylov_its, this->_opts.maxit(),
-       this->_opts.gmres_restart(), this->_opts.GramSchmidt_type(),
-       use_initial_guess, this->_opts.verbose() && this->_is_root);
+      (comm_.comm(), mat_mpi_.get(), prec, n_local, x.data(), bloc.data(),
+       opts_.rel_tol(), opts_.abs_tol(),
+       this->Krylov_its_, opts_.maxit(),
+       opts_.gmres_restart(), opts_.GramSchmidt_type(),
+       use_initial_guess, opts_.verbose() && is_root_);
     };
     auto bicgstab = [&](std::function<void(scalar_t*)> prec) {
       BiCGStabMPI<scalar_t,integer_t>
-      (this->_comm, _mat_mpi.get(), prec, n_local, x.data(), bloc.data(),
-       this->_opts.rel_tol(), this->_opts.abs_tol(),
-       this->_Krylov_its, this->_opts.maxit(),
-       use_initial_guess, this->_opts.verbose() && this->_is_root);
+      (comm_.comm(), mat_mpi_.get(), prec, n_local, x.data(), bloc.data(),
+       opts_.rel_tol(), opts_.abs_tol(),
+       this->Krylov_its_, opts_.maxit(),
+       use_initial_guess, opts_.verbose() && is_root_);
     };
     auto MFsolve = [&](scalar_t* w) {
       //MPI_Pcontrol(1, "multifrontal_solve_dist");
       DenseMW_t X(n_local, x.cols(), w, x.ld());
-      tree()->multifrontal_solve_dist(X, _mat_mpi->get_dist());
+      tree()->multifrontal_solve_dist(X, mat_mpi_->get_dist());
       //MPI_Pcontrol(-1, "multifrontal_solve_dist");
     };
     auto refine = [&]() {
       IterativeRefinementMPI<scalar_t,integer_t>
-      (this->_comm, *_mat_mpi.get(),
+      (comm_.comm(), *mat_mpi_.get(),
        //MFsolve, n_local, x.data(), bloc.data(),
        [&](DenseM_t& w) {
-        tree()->multifrontal_solve_dist(w, _mat_mpi->get_dist()); },
+        tree()->multifrontal_solve_dist(w, mat_mpi_->get_dist()); },
        x, bloc,
-       this->_opts.rel_tol(), this->_opts.abs_tol(),
-       this->_Krylov_its, this->_opts.maxit(),
-       use_initial_guess, this->_opts.verbose() && this->_is_root);
+       opts_.rel_tol(), opts_.abs_tol(),
+       this->Krylov_its_, opts_.maxit(),
+       use_initial_guess, opts_.verbose() && is_root_);
     };
 
-    switch (this->_opts.Krylov_solver()) {
+    switch (opts_.Krylov_solver()) {
     case KrylovSolver::AUTO: {
-      if (this->_opts.use_HSS() && x.cols() == 1)
+      if (opts_.use_HSS() && x.cols() == 1)
         gmres(MFsolve);
       else refine();
     }; break;
@@ -356,17 +360,17 @@ namespace strumpack {
     case KrylovSolver::DIRECT: {
       // TODO bloc is already a copy, avoid extra copy?
       x = bloc;
-      tree()->multifrontal_solve_dist(x, _mat_mpi->get_dist());
+      tree()->multifrontal_solve_dist(x, mat_mpi_->get_dist());
     }; break;
     }
 
-    if (this->_opts.matching() != MatchingJob::NONE)
+    if (opts_.matching() != MatchingJob::NONE)
       // TODO do this in a single routine/comm phase
       for (std::size_t c=0; c<x.cols(); c++)
         permute_vector
-          (x.ptr(0,c), this->_matching_cperm, _mat_mpi->get_dist(), this->_comm);
-    if (this->_opts.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-      x.scale_rows(this->_matching_Dc);
+          (x.ptr(0,c), this->matching_cperm_, mat_mpi_->get_dist(), comm_.comm());
+    if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+      x.scale_rows(this->matching_Dc_);
 
     t.stop();
     this->perf_counters_stop("DIRECT/GMRES solve");
@@ -377,7 +381,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> ReturnCode
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::solve
   (const scalar_t* b, scalar_t* x, bool use_initial_guess) {
-    auto N = _mat_mpi->local_rows();
+    auto N = mat_mpi_->local_rows();
     auto B = ConstDenseMatrixWrapperPtr(N, 1, b, N);
     DenseMW_t X(N, 1, x, N);
     return solve(*B, X, use_initial_guess);

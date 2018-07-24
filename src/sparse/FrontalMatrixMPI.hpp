@@ -56,7 +56,7 @@ namespace strumpack {
   public:
     FrontalMatrixMPI
     (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-     std::vector<integer_t>& _upd, MPI_Comm comm, int P);
+     std::vector<integer_t>& _upd, const MPIComm& comm, int P);
     FrontalMatrixMPI(const FrontalMatrixMPI&) = delete;
     FrontalMatrixMPI& operator=(FrontalMatrixMPI const&) = delete;
     virtual ~FrontalMatrixMPI() {}
@@ -125,7 +125,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t>
   FrontalMatrixMPI<scalar_t,integer_t>::FrontalMatrixMPI
   (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-   std::vector<integer_t>& _upd, MPI_Comm comm, int P)
+   std::vector<integer_t>& _upd, const MPIComm& comm, int P)
     : F_t(NULL, NULL, _sep, _sep_begin, _sep_end, _upd),
       blacs_grid_(comm, P) {
   }

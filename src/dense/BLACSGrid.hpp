@@ -84,6 +84,13 @@ namespace strumpack {
     int npactives() const { return nprows() * npcols(); }
     bool active() const { return prow_ != -1; }
 
+
+    static void layout(int procs, int& proc_rows, int& proc_cols) {
+      // why floor, why not nearest??
+      proc_cols = std::floor(std::sqrt((float)procs));
+      proc_rows = procs / proc_cols;
+    }
+
     BLACSGrid transpose() const {
       BLACSGrid g(*this);
       g.transpose_inplace();
@@ -102,9 +109,7 @@ namespace strumpack {
     int pcol_ = -1;
 
     void setup() {
-      // why floor, why not nearest??
-      npcols_ = std::floor(std::sqrt((float)P_));
-      nprows_ = P_ / npcols_;
+      layout(P_, nprows_, npcols_);
       if (comm_.is_null()) {
         ctxt_ = ctxt_all_ = ctxt_T_ = -1;
         prow_ = pcol_ = -1;

@@ -59,7 +59,7 @@ namespace strumpack {
   public:
     FrontalMatrixDenseMPI
     (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-     std::vector<integer_t>& _upd, MPI_Comm comm, int P);
+     std::vector<integer_t>& _upd, const MPIComm& comm, int P);
     FrontalMatrixDenseMPI(const FrontalMatrixDenseMPI&) = delete;
     FrontalMatrixDenseMPI& operator=(FrontalMatrixDenseMPI const&) = delete;
     ~FrontalMatrixDenseMPI();
@@ -100,7 +100,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t>
   FrontalMatrixDenseMPI<scalar_t,integer_t>::FrontalMatrixDenseMPI
   (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-   std::vector<integer_t>& _upd, MPI_Comm comm, int P)
+   std::vector<integer_t>& _upd, const MPIComm& comm, int P)
     : FrontalMatrixMPI<scalar_t,integer_t>
     (_sep, _sep_begin, _sep_end, _upd, comm, P) {}
 
@@ -118,7 +118,7 @@ namespace strumpack {
     if (!this->lchild && !this->rchild) return;
     std::vector<std::vector<scalar_t>> sbuf(this->P());
     for (auto ch : {this->lchild, this->rchild}) {
-      if (ch && mpi_rank(this->comm()) == 0) {
+      if (ch && this->Comm().is_root()) {
         STRUMPACK_FLOPS
           (static_cast<long long int>(ch->dim_upd())*ch->dim_upd());
       }

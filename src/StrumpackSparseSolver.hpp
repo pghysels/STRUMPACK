@@ -206,11 +206,11 @@ namespace strumpack {
     virtual ReturnCode solve
     (const DenseM_t& b, DenseM_t& x, bool use_initial_guess=false);
 
-    SPOptions<scalar_t>& options() { return _opts; }
-    const SPOptions<scalar_t>& options() const { return _opts; }
-    void set_from_options() { _opts.set_from_command_line(); }
+    SPOptions<scalar_t>& options() { return opts_; }
+    const SPOptions<scalar_t>& options() const { return opts_; }
+    void set_from_options() { opts_.set_from_command_line(); }
     void set_from_options(int argc, char* argv[])
-    { _opts.set_from_command_line(argc, argv); }
+    { opts_.set_from_command_line(argc, argv); }
 
     /*! \brief Get the maximum rank encountered in any of the HSS
      * matrices.  Call this AFTER numerical factorization. */
@@ -227,7 +227,7 @@ namespace strumpack {
     { return tree()->factor_nonzeros() * sizeof(scalar_t); }
     /*! \brief Get the number of iterations performed by the outer
         (Krylov) iterative solver. */
-    int Krylov_iterations() const { return _Krylov_its; }
+    int Krylov_iterations() const { return Krylov_its_; }
 
   protected:
     virtual void setup_tree();
@@ -263,24 +263,24 @@ namespace strumpack {
      float ULV_factor_flops, float schur_flops, float full_rank_flops) const;
     virtual void flop_breakdown_reset() const;
 
-    SPOptions<scalar_t> _opts;
-    bool _is_root;
-    std::vector<integer_t> _matching_cperm;
-    std::vector<scalar_t> _matching_Dr; // row scaling
-    std::vector<scalar_t> _matching_Dc; // column scaling
-    std::new_handler _old_handler;
-    std::ostream* _rank_out = nullptr;
-    bool _factored = false;
-    bool _reordered = false;
-    int _Krylov_its = 0;
+    SPOptions<scalar_t> opts_;
+    bool is_root_;
+    std::vector<integer_t> matching_cperm_;
+    std::vector<scalar_t> matching_Dr_; // row scaling
+    std::vector<scalar_t> matching_Dc_; // column scaling
+    std::new_handler old_handler_;
+    std::ostream* rank_out_ = nullptr;
+    bool factored_ = false;
+    bool reordered_ = false;
+    int Krylov_its_ = 0;
 
 #if defined(STRUMPACK_USE_PAPI)
-    float _rtime = 0., _ptime = 0.;
+    float rtime_ = 0., ptime_ = 0.;
     long_long _flpops = 0;
 #endif
 #if defined(STRUMPACK_COUNT_FLOPS)
-    long long int _f0 = 0, _ftot = 0, _fmin = 0, _fmax = 0;
-    long long int _b0 = 0, _btot = 0, _bmin = 0, _bmax = 0;
+    long long int f0_ = 0, ftot_ = 0, fmin_ = 0, fmax_ = 0;
+    long long int b0_ = 0, btot_ = 0, bmin_ = 0, bmax_ = 0;
 #endif
   private:
     std::unique_ptr<CSRMatrix<scalar_t,integer_t>> _mat;
@@ -297,12 +297,12 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t>
   StrumpackSparseSolver<scalar_t,integer_t>::StrumpackSparseSolver
   (int argc, char* argv[], bool verbose, bool root)
-    : _opts(argc, argv), _is_root(root) {
-    _opts.set_verbose(verbose);
-    _old_handler = std::set_new_handler
+    : opts_(argc, argv), is_root_(root) {
+    opts_.set_verbose(verbose);
+    old_handler_ = std::set_new_handler
       ([]{ std::cerr << "STRUMPACK: out of memory!" << std::endl; abort(); });
     papi_initialize();
-    if (_opts.verbose() && _is_root) {
+    if (opts_.verbose() && is_root_) {
       std::cout << "# Initializing STRUMPACK" << std::endl;
 #if defined(_OPENMP)
       if (params::num_threads == 1)
@@ -330,12 +330,12 @@ namespace strumpack {
       std::cerr << "# WARNING: the flop counter is not lock free"
                 << std::endl;
 #endif
-    _opts.HSS_options().set_synchronized_compression(true);
+    opts_.HSS_options().set_synchronized_compression(true);
   }
 
   template<typename scalar_t,typename integer_t>
   StrumpackSparseSolver<scalar_t,integer_t>::~StrumpackSparseSolver() {
-    std::set_new_handler(_old_handler);
+    std::set_new_handler(old_handler_);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -343,7 +343,7 @@ namespace strumpack {
     if (_tree) _tree.reset();
     _tree = std::unique_ptr<EliminationTree<scalar_t,integer_t>>
       (new EliminationTree<scalar_t,integer_t>
-       (_opts, *matrix(), *(reordering()->sep_tree)));
+       (opts_, *matrix(), *(reordering()->sep_tree)));
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -357,13 +357,13 @@ namespace strumpack {
   StrumpackSparseSolver<scalar_t,integer_t>::compute_reordering
   (int nx, int ny, int nz, int components, int width) {
     return _nd->nested_dissection
-      (_opts, _mat.get(), nx, ny, nz, components, width);
+      (opts_, _mat.get(), nx, ny, nz, components, width);
   }
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::compute_separator_reordering() {
     _nd->separator_reordering
-      (_opts, _mat.get(), _opts.verbose() && _is_root);
+      (opts_, _mat.get(), opts_.verbose() && is_root_);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -371,7 +371,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_PAPI)
     // TODO call PAPI_library_init???
     float mflops = 0.;
-    int retval = PAPI_flops(&_rtime, &_ptime, &_flpops, &mflops);
+    int retval = PAPI_flops(&rtime_, &ptime_, &_flpops, &mflops);
     if (retval != PAPI_OK) {
       std::cerr << "# WARNING: problem starting PAPI performance counters:"
                 << std::endl;
@@ -402,11 +402,11 @@ namespace strumpack {
 #pragma omp parallel reduction(+:flpops) reduction(max:rtime) \
   reduction(max:ptime)
     PAPI_flops(&rtime, &ptime, &flpops, &mflops);
-    _flpops = flpops; _rtime = rtime; _ptime = ptime;
+    _flpops = flpops; rtime_ = rtime; ptime_ = ptime;
 #endif
 #if defined(STRUMPACK_COUNT_FLOPS)
-    _f0 = params::flops;
-    _b0 = params::bytes;
+    f0_ = params::flops;
+    b0_ = params::bytes;
 #endif
   }
 
@@ -421,16 +421,16 @@ namespace strumpack {
     PAPI_flops(&rtime, &ptime, &flpops, &mflops);
     PAPI_dmem_info_t dmem;
     PAPI_get_dmem_info(&dmem);
-    if (_opts.verbose() && _is_root) {
+    if (opts_.verbose() && is_root_) {
       std::cout << "# " << s << " PAPI stats:" << std::endl;
       std::cout << "#   - total flops = "
                 << double(flpops-_flpops) << std::endl;
       std::cout << "#   - flop rate = "
-                << double(flpops-_flpops)/(rtime-_rtime)/1e9
+                << double(flpops-_flpops)/(rtime-rtime_)/1e9
                 << " GFlops/s" << std::endl;
-      std::cout << "#   - real time = " << rtime-_rtime
+      std::cout << "#   - real time = " << rtime-rtime_
                 << " sec" << std::endl;
-      std::cout << "#   - processor time = " << ptime-_ptime
+      std::cout << "#   - processor time = " << ptime-ptime_
                 << " sec" << std::endl;
       std::cout << "# mem size:\t\t" << dmem.size << std::endl;
       std::cout << "# mem resident:\t\t" << dmem.resident << std::endl;
@@ -446,8 +446,8 @@ namespace strumpack {
     }
 #endif
 #if defined(STRUMPACK_COUNT_FLOPS)
-    _fmin = _fmax = _ftot = params::flops - _f0;
-    _bmin = _bmax = _btot = params::bytes - _b0;
+    fmin_ = fmax_ = ftot_ = params::flops - f0_;
+    bmin_ = bmax_ = btot_ = params::bytes - b0_;
 #endif
   }
 
@@ -455,27 +455,27 @@ namespace strumpack {
   StrumpackSparseSolver<scalar_t,integer_t>::print_solve_stats
   (TaskTimer& t) const {
     double tel = t.elapsed();
-    if (_opts.verbose() && _is_root) {
+    if (opts_.verbose() && is_root_) {
       std::cout << "# DIRECT/GMRES solve:" << std::endl;
-      std::cout << "#   - abs_tol = " << _opts.abs_tol()
-                << ", rel_tol = " << _opts.rel_tol()
-                << ", restart = " << _opts.gmres_restart()
-                << ", maxit = " << _opts.maxit() << std::endl;
+      std::cout << "#   - abs_tol = " << opts_.abs_tol()
+                << ", rel_tol = " << opts_.rel_tol()
+                << ", restart = " << opts_.gmres_restart()
+                << ", maxit = " << opts_.maxit() << std::endl;
       std::cout << "#   - number of Krylov iterations = "
-                << _Krylov_its << std::endl;
+                << Krylov_its_ << std::endl;
       std::cout << "#   - solve time = " << tel << std::endl;
 #if defined(STRUMPACK_COUNT_FLOPS)
-      std::cout << "#   - total flops = " << double(_ftot) << ", min = "
-                << double(_fmin) << ", max = " << double(_fmax) << std::endl;
-      std::cout << "#   - flop rate = " << _ftot / tel / 1e9 << " GFlop/s"
+      std::cout << "#   - total flops = " << double(ftot_) << ", min = "
+                << double(fmin_) << ", max = " << double(fmax_) << std::endl;
+      std::cout << "#   - flop rate = " << ftot_ / tel / 1e9 << " GFlop/s"
                 << std::endl;
-      std::cout << "#   - bytes moved = " << double(_btot) / 1e6
-                << " MB, min = "<< double(_bmin) / 1e6
-                << " MB, max = " << double(_bmax) / 1e6 << " MB" << std::endl;
-      std::cout << "#   - byte rate = " << _btot / tel / 1e9 << " GByte/s"
+      std::cout << "#   - bytes moved = " << double(btot_) / 1e6
+                << " MB, min = "<< double(bmin_) / 1e6
+                << " MB, max = " << double(bmax_) / 1e6 << " MB" << std::endl;
+      std::cout << "#   - byte rate = " << btot_ / tel / 1e9 << " GByte/s"
                 << std::endl;
       std::cout << "#   - solve arithmetic intensity = "
-                << double(_ftot) / _btot
+                << double(ftot_) / btot_
                 << " flop/byte" << std::endl;
 #endif
     }
@@ -487,7 +487,7 @@ namespace strumpack {
     if (_mat) _mat.reset();
     _mat = std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
       (new CSRMatrix<scalar_t,integer_t>(A));
-    _factored = _reordered = false;
+    factored_ = reordered_ = false;
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -498,7 +498,7 @@ namespace strumpack {
     _mat = std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
       (new CSRMatrix<scalar_t,integer_t>
        (N, row_ptr, col_ind, values, symmetric_pattern));
-    _factored = _reordered = false;
+    factored_ = reordered_ = false;
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
@@ -507,14 +507,14 @@ namespace strumpack {
     if (!matrix()) return ReturnCode::MATRIX_NOT_SET;
     TaskTimer t1("permute-scale");
     int ierr;
-    if (_opts.matching() != MatchingJob::NONE) {
-      if (_opts.verbose() && _is_root)
+    if (opts_.matching() != MatchingJob::NONE) {
+      if (opts_.verbose() && is_root_)
         std::cout << "# matching job: "
-                  << get_description(_opts.matching())
+                  << get_description(opts_.matching())
                   << std::endl;
       t1.time([&](){
           ierr = matrix()->permute_and_scale
-            (_opts.matching(), _matching_cperm, _matching_Dr, _matching_Dc);
+            (opts_.matching(), matching_cperm_, matching_Dr_, matching_Dc_);
         });
       if (ierr) {
         std::cerr << "ERROR: matching failed" << std::endl;
@@ -524,7 +524,7 @@ namespace strumpack {
     auto old_nnz = matrix()->nnz();
     TaskTimer t2("sparsity-symmetrization",
                  [&](){ matrix()->symmetrize_sparsity(); });
-    if (matrix()->nnz() != old_nnz && _opts.verbose() && _is_root) {
+    if (matrix()->nnz() != old_nnz && opts_.verbose() && is_root_) {
       std::cout << "# Matrix padded with zeros to get symmetric pattern."
                 << std::endl;
       std::cout << "# Number of nonzeros increased from "
@@ -545,22 +545,22 @@ namespace strumpack {
     }
     matrix()->permute(reordering()->iperm, reordering()->perm);
     t3.stop();
-    if (_opts.verbose() && _is_root) {
+    if (opts_.verbose() && is_root_) {
       std::cout << "#   - nd time = " << t3.elapsed() << std::endl;
-      if (_opts.matching() != MatchingJob::NONE)
+      if (opts_.matching() != MatchingJob::NONE)
         std::cout << "#   - matching time = " << t1.elapsed() << std::endl;
       std::cout << "#   - symmetrization time = " << t2.elapsed()
                 << std::endl;
     }
     perf_counters_stop("nested dissection");
 
-    if (_opts.use_HSS()) {
+    if (opts_.use_HSS()) {
       perf_counters_start();
       TaskTimer t4("separator-reordering", [&](){
           compute_separator_reordering();
           // TODO also broadcast this?? is computed with scotch
         });
-      if (_opts.verbose() && _is_root)
+      if (opts_.verbose() && is_root_)
         std::cout << "#   - sep-reorder time = " << t4.elapsed() << std::endl;
       perf_counters_stop("separator reordering");
     }
@@ -568,11 +568,11 @@ namespace strumpack {
     perf_counters_start();
     TaskTimer t0("symbolic-factorization", [&](){ setup_tree(); });
     reordering()->clear_tree_data();
-    if (_opts.verbose()) {
+    if (opts_.verbose()) {
       // this might require a reduction
       auto nr_dense = tree()->nr_dense_fronts();
       auto nr_HSS = tree()->nr_HSS_fronts();
-      if (_is_root) {
+      if (is_root_) {
         std::cout << "# symbolic factorization:" << std::endl;
         std::cout << "#   - nr of dense Frontal matrices = "
                   << number_format_with_commas(nr_dense) << std::endl;
@@ -583,19 +583,19 @@ namespace strumpack {
     }
     perf_counters_stop("symbolic factorization");
 
-    // if (_opts.use_HSS()) {
+    // if (opts_.use_HSS()) {
     //   perf_counters_start();
     //   TaskTimer t4("separator-reordering", [&](){
     //            compute_separator_reordering();
     //            // TODO also broadcast this?? is computed with scotch
     //          });
-    // if (_opts.verbose() && _is_root)
+    // if (opts_.verbose() && is_root_)
     //   std::cout << "#   - sep-reorder time = "
     //             << t4.elapsed() << std::endl;
     //   perf_counters_stop("separator reordering");
     // }
 
-    _reordered = true;
+    reordered_ = true;
     return ReturnCode::SUCCESS;
   }
 
@@ -636,7 +636,7 @@ namespace strumpack {
    float reduce_sample_flops, float update_sample_flops,
    float extraction_flops, float CB_sample_flops, float sparse_sample_flops,
    float ULV_factor_flops, float schur_flops, float full_rank_flops) const {
-    if (!_is_root) return;
+    if (!is_root_) return;
     float sample_flops = CB_sample_flops
       + sparse_sample_flops;
     float compression_flops = random_flops
@@ -687,15 +687,15 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> ReturnCode
   StrumpackSparseSolver<scalar_t,integer_t>::factor() {
     if (!matrix()) return ReturnCode::MATRIX_NOT_SET;
-    if (_factored) return ReturnCode::SUCCESS;
-    if (!_reordered) {
+    if (factored_) return ReturnCode::SUCCESS;
+    if (!reordered_) {
       ReturnCode ierr = reorder();
       if (ierr != ReturnCode::SUCCESS) return ierr;
     }
     float dfnnz = 0.;
-    if (_opts.verbose()) {
+    if (opts_.verbose()) {
       dfnnz = dense_factor_memory();
-      if (_is_root) {
+      if (is_root_) {
         std::cout << "# multifrontal factorization:" << std::endl;
         std::cout << "#   - estimated memory usage (exact solver) = "
                   << dfnnz / 1e6 << " MB" << std::endl;
@@ -704,23 +704,23 @@ namespace strumpack {
     perf_counters_start();
     flop_breakdown_reset();
     TaskTimer t1("factorization", [&]() {
-        tree()->multifrontal_factorization(*matrix(), _opts);
+        tree()->multifrontal_factorization(*matrix(), opts_);
       });
     perf_counters_stop("numerical factorization");
-    if (_opts.verbose()) {
+    if (opts_.verbose()) {
       auto fnnz = factor_nonzeros();
       auto max_rank = maximum_rank();
-      if (_is_root) {
+      if (is_root_) {
         std::cout << "#   - factor time = " << t1.elapsed() << std::endl;
         std::cout << "#   - factor nonzeros = "
                   << number_format_with_commas(fnnz) << std::endl;
         std::cout << "#   - factor memory = "
                   << fnnz * sizeof(scalar_t) / 1e6 << " MB" << std::endl;
 #if defined(STRUMPACK_COUNT_FLOPS)
-        std::cout << "#   - total flops = " << double(_ftot) << ", min = "
-                  << double(_fmin) << ", max = " << double(_fmax)
+        std::cout << "#   - total flops = " << double(ftot_) << ", min = "
+                  << double(fmin_) << ", max = " << double(fmax_)
                   << std::endl;
-        std::cout << "#   - flop rate = " << _ftot / t1.elapsed() / 1e9
+        std::cout << "#   - flop rate = " << ftot_ / t1.elapsed() / 1e9
                   << " GFlop/s" << std::endl;
 #endif
         std::cout << "#   - factor memory/nonzeros = "
@@ -728,21 +728,21 @@ namespace strumpack {
                   << " % of multifrontal" << std::endl;
         std::cout << "#   - maximum HSS rank = " << max_rank << std::endl;
         std::cout << "#   - HSS compression = " << std::boolalpha
-                  << _opts.use_HSS() << std::endl;
+                  << opts_.use_HSS() << std::endl;
         std::cout << "#   - relative compression tolerance = "
-                  << _opts.HSS_options().rel_tol() << std::endl;
+                  << opts_.HSS_options().rel_tol() << std::endl;
         std::cout << "#   - absolute compression tolerance = "
-                  << _opts.HSS_options().abs_tol() << std::endl;
+                  << opts_.HSS_options().abs_tol() << std::endl;
         std::cout << "#   - "
-                  << get_name(_opts.HSS_options().random_distribution())
+                  << get_name(opts_.HSS_options().random_distribution())
                   << " distribution with "
-                  << get_name(_opts.HSS_options().random_engine())
+                  << get_name(opts_.HSS_options().random_engine())
                   << " engine" << std::endl;
       }
       flop_breakdown();
     }
-    if (_rank_out) tree()->print_rank_statistics(*_rank_out);
-    _factored = true;
+    if (rank_out_) tree()->print_rank_statistics(*rank_out_);
+    factored_ = true;
     return ReturnCode::SUCCESS;
   }
 
@@ -762,9 +762,9 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> ReturnCode
   StrumpackSparseSolver<scalar_t,integer_t>::solve
   (const DenseM_t& b, DenseM_t& x, bool use_initial_guess) {
-    if (!this->_factored &&
-        _opts.Krylov_solver() != KrylovSolver::GMRES &&
-        _opts.Krylov_solver() != KrylovSolver::BICGSTAB) {
+    if (!this->factored_ &&
+        opts_.Krylov_solver() != KrylovSolver::GMRES &&
+        opts_.Krylov_solver() != KrylovSolver::BICGSTAB) {
       ReturnCode ierr = factor();
       if (ierr != ReturnCode::SUCCESS) return ierr;
     }
@@ -778,40 +778,40 @@ namespace strumpack {
     for (integer_t i=0; i<N; i++)
       intIP[i] = reordering()->iperm[i] + 1;
     std::vector<int> int_matching_cperm;
-    if (_opts.matching() != MatchingJob::NONE) {
+    if (opts_.matching() != MatchingJob::NONE) {
       int_matching_cperm.resize(N);
       for (integer_t i=0; i<N; i++)
-        int_matching_cperm[i] = _matching_cperm[i] + 1;
+        int_matching_cperm[i] = matching_cperm_[i] + 1;
     }
 
     auto bloc = b;
-    if (_opts.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-      bloc.scale_rows(_matching_Dr);
+    if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+      bloc.scale_rows(matching_Dr_);
     bloc.lapmr(intIP, true);
 
     if (use_initial_guess &&
-        _opts.Krylov_solver() != KrylovSolver::DIRECT) {
-      if (_opts.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-        x.div_rows(_matching_Dc);
-      if (_opts.matching() != MatchingJob::NONE)
+        opts_.Krylov_solver() != KrylovSolver::DIRECT) {
+      if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+        x.div_rows(matching_Dc_);
+      if (opts_.matching() != MatchingJob::NONE)
         x.lapmr(int_matching_cperm, true);
       x.lapmr(intIP, true);
     }
 
-    _Krylov_its = 0;
+    Krylov_its_ = 0;
 
     auto gmres_solve = [&](std::function<void(scalar_t*)> preconditioner) {
       GMRes<scalar_t,integer_t>
       (*matrix(), preconditioner, x.rows(), x.data(), bloc.data(),
-       _opts.rel_tol(), _opts.abs_tol(), _Krylov_its, _opts.maxit(),
-       _opts.gmres_restart(), _opts.GramSchmidt_type(),
-       use_initial_guess, _opts.verbose() && _is_root);
+       opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
+       opts_.gmres_restart(), opts_.GramSchmidt_type(),
+       use_initial_guess, opts_.verbose() && is_root_);
     };
     auto bicgstab_solve = [&](std::function<void(scalar_t*)> preconditioner) {
       BiCGStab<scalar_t,integer_t>
       (*matrix(), preconditioner, x.rows(), x.data(), bloc.data(),
-       _opts.rel_tol(), _opts.abs_tol(), _Krylov_its, _opts.maxit(),
-       use_initial_guess, _opts.verbose() && _is_root);
+       opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
+       use_initial_guess, opts_.verbose() && is_root_);
     };
     auto MFsolve = [&](scalar_t* w) {
       DenseMW_t X(x.rows(), 1, w, x.ld());
@@ -820,14 +820,14 @@ namespace strumpack {
     auto refine = [&]() {
       IterativeRefinement<scalar_t,integer_t>
       (*matrix(), [&](DenseM_t& w) { tree()->multifrontal_solve(w); },
-       x, bloc, _opts.rel_tol(), _opts.abs_tol(),
-       _Krylov_its, _opts.maxit(), use_initial_guess,
-       _opts.verbose() && _is_root);
+       x, bloc, opts_.rel_tol(), opts_.abs_tol(),
+       Krylov_its_, opts_.maxit(), use_initial_guess,
+       opts_.verbose() && is_root_);
     };
 
-    switch (_opts.Krylov_solver()) {
+    switch (opts_.Krylov_solver()) {
     case KrylovSolver::AUTO: {
-      if (_opts.use_HSS() && x.cols() == 1)
+      if (opts_.use_HSS() && x.cols() == 1)
         gmres_solve(MFsolve);
       else refine();
     }; break;
@@ -857,10 +857,10 @@ namespace strumpack {
     }
 
     x.lapmr(intIP, false);
-    if (_opts.matching() != MatchingJob::NONE)
+    if (opts_.matching() != MatchingJob::NONE)
       x.lapmr(int_matching_cperm, false);
-    if (_opts.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-      x.scale_rows(_matching_Dc);
+    if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+      x.scale_rows(matching_Dc_);
 
     t.stop();
     perf_counters_stop("DIRECT/GMRES solve");

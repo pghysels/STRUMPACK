@@ -81,11 +81,8 @@ namespace strumpack {
             if (p <= rank && rank < p+leaf_procs)
               leaf = DistributedMatrix<scalar_t>(lg, m, d);
             if (dist.active()) {
-              // const int leaf_pcols = lg->npcols();
-              // const int leaf_prows = lg->nprows();
-              // TODO use routine from BLACSGrid class
-              const int leaf_pcols = std::floor(std::sqrt((float)leaf_procs));
-              const int leaf_prows = leaf_procs / leaf_pcols;
+              int leaf_prows, leaf_pcols;
+              BLACSGrid::layout(leaf_procs, leaf_prows, leaf_pcols);
               for (int r=rlo; r<rhi; r++)
                 destr[r-rlo] = p
                   + (((dist.rowl2g_fixed(r) - rbegin) / MB) % leaf_prows);
@@ -122,11 +119,8 @@ namespace strumpack {
             }
           } else {
             if (dist.active()) {
-              // const int leaf_pcols = lg->npcols();
-              // const int leaf_prows = lg->nprows();
-              // TODO use routine from BLACSGrid class
-              const int leaf_pcols = std::floor(std::sqrt((float)leaf_procs));
-              const int leaf_prows = leaf_procs / leaf_pcols;
+              int leaf_prows, leaf_pcols;
+              BLACSGrid::layout(leaf_procs, leaf_prows, leaf_pcols);
               for (int r=rlo; r<rhi; r++) {
                 gr[r-rlo] = dist.rowl2g_fixed(r) - rbegin;
                 destr[r-rlo] = p + ((gr[r-rlo] / MB) % leaf_prows);

@@ -50,13 +50,12 @@ namespace strumpack {
    * matrix reordering and the symbolic factorization are not
    * distributed (but they are threaded).
    *
-   * The StrumpackSparseSolverMPI class depends on 3 template
-   * paramaters <scalar_t,real_t,integer_t>. Supported combinations
-   * for scalar_t,real_t are: <float,float>, <double,double>,
-   * <std::complex<float>,float> and
-   * <std::complex<double>,double>. The integer_t type defaults to a
-   * regular int. If regular int causes 32 bit integer overflows, you
-   * should switch to integer_t=int64_t instead.
+   * The StrumpackSparseSolverMPI class depends on 2 template
+   * paramaters <scalar_t,integer_t>. Supported types for
+   * scalar_t are: float, double, std::complex<float> and
+   * std::complex<double>. The integer_t type defaults to a
+   * regular int. If regular int causes 32 bit integer overflows,
+   * you should switch to integer_t=int64_t instead.
    */
   template<typename scalar_t,typename integer_t=int>
   class StrumpackSparseSolverMPI :
@@ -71,7 +70,7 @@ namespace strumpack {
      *
      * \param mpi_comm
      *              MPI communicator. Can be MPI_COMM_WORLD or
-     *              a subcommunicator.
+     *              a subcommunicator. This will internally be duplicated.
      * \param argc  The number of arguments, i.e, number of elements
      *              in the argv array.
      * \param argv  Command line arguments. Add -h or --help to
@@ -79,12 +78,12 @@ namespace strumpack {
      * \param verb  Flag to suppres/enable output.
      *              Only the root of mpi_comm will print output to stdout.
      */
-    StrumpackSparseSolverMPI(MPI_Comm mpi_comm, int argc, char* argv[],
+    StrumpackSparseSolverMPI(MPI_Comm comm, int argc, char* argv[],
                              bool verbose=true);
 
-    StrumpackSparseSolverMPI(MPI_Comm mpi_comm, bool verbose=true);
+    StrumpackSparseSolverMPI(MPI_Comm comm, bool verbose=true);
     /*! \brief Destructor. */
-    virtual ~StrumpackSparseSolverMPI();
+    virtual ~StrumpackSparseSolverMPI() {}
 
     virtual void set_matrix(const CSRMatrix<scalar_t,integer_t>& A);
     virtual void set_csr_matrix
@@ -93,13 +92,16 @@ namespace strumpack {
      bool symmetric_pattern);
 
   protected:
-    MPI_Comm _comm;
-    virtual SpMat_t* matrix() override { return _mat.get(); }
-    virtual Reord_t* reordering() override { return _nd.get(); }
-    virtual Tree_t* tree() override { return _tree_mpi.get(); }
-    virtual const SpMat_t* matrix() const override { return _mat.get(); }
-    virtual const Reord_t* reordering() const override { return _nd.get(); }
-    virtual const Tree_t* tree() const override { return _tree_mpi.get(); }
+    using StrumpackSparseSolver<scalar_t,integer_t>::is_root_;
+    using StrumpackSparseSolver<scalar_t,integer_t>::opts_;
+    MPIComm comm_;
+
+    virtual SpMat_t* matrix() override { return mat_.get(); }
+    virtual Reord_t* reordering() override { return nd_.get(); }
+    virtual Tree_t* tree() override { return tree_mpi_.get(); }
+    virtual const SpMat_t* matrix() const override { return mat_.get(); }
+    virtual const Reord_t* reordering() const override { return nd_.get(); }
+    virtual const Tree_t* tree() const override { return tree_mpi_.get(); }
 
     virtual void setup_tree() override;
     virtual void setup_reordering() override;
@@ -107,131 +109,120 @@ namespace strumpack {
     (int nx, int ny, int nz, int components, int width) override;
     virtual void compute_separator_reordering() override;
     void perf_counters_stop(const std::string& s) override;
-    virtual void synchronize() override { MPI_Barrier(_comm); }
+    virtual void synchronize() override { comm_.barrier(); }
     virtual void flop_breakdown() const override;
 
   private:
-    std::unique_ptr<CSRMatrix<scalar_t,integer_t>> _mat;
-    std::unique_ptr<MatrixReordering<scalar_t,integer_t>> _nd;
-    std::unique_ptr<EliminationTreeMPI<scalar_t,integer_t>> _tree_mpi;
+    std::unique_ptr<CSRMatrix<scalar_t,integer_t>> mat_;
+    std::unique_ptr<MatrixReordering<scalar_t,integer_t>> nd_;
+    std::unique_ptr<EliminationTreeMPI<scalar_t,integer_t>> tree_mpi_;
   };
 
   template<typename scalar_t,typename integer_t>
   StrumpackSparseSolverMPI<scalar_t,integer_t>::StrumpackSparseSolverMPI
-  (MPI_Comm mpi_comm, bool verbose)
+  (MPI_Comm comm, bool verbose)
     : StrumpackSparseSolverMPI<scalar_t,integer_t>
-    (mpi_comm, 0, nullptr, verbose) {
+    (comm, 0, nullptr, verbose) {
   }
 
   template<typename scalar_t,typename integer_t>
   StrumpackSparseSolverMPI<scalar_t,integer_t>::StrumpackSparseSolverMPI
-  (MPI_Comm mpi_comm, int argc, char* argv[], bool verbose) :
+  (MPI_Comm comm, int argc, char* argv[], bool verbose) :
     StrumpackSparseSolver<scalar_t,integer_t>
-    (argc, argv, verbose, mpi_rank(mpi_comm) == 0) {
-    MPI_Comm_dup(mpi_comm, &_comm);
-    if (this->_opts.verbose() && this->_is_root)
-      std::cout << "# using " << mpi_nprocs(_comm)
+    (argc, argv, verbose, mpi_rank(comm) == 0), comm_(comm) {
+    if (opts_.verbose() && is_root_)
+      std::cout << "# using " << comm_.size()
                 << " MPI processes" << std::endl;
-  }
-
-  template<typename scalar_t,typename integer_t>
-  StrumpackSparseSolverMPI<scalar_t,integer_t>::~StrumpackSparseSolverMPI() {
-    mpi_free_comm(&_comm);
   }
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPI<scalar_t,integer_t>::set_matrix
   (const CSRMatrix<scalar_t,integer_t>& A) {
-    if (_mat) _mat.reset();
-    _mat = std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
+    if (mat_) mat_.reset();
+    mat_ = std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
       (new CSRMatrix<scalar_t,integer_t>(A));
-    this->_factored = this->_reordered = false;
+    this->factored_ = this->reordered_ = false;
   }
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPI<scalar_t,integer_t>::set_csr_matrix
   (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
    const scalar_t* values, bool symmetric_pattern) {
-    if (_mat) _mat.reset();
-    _mat = std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
+    if (mat_) mat_.reset();
+    mat_ = std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
       (new CSRMatrix<scalar_t,integer_t>
        (N, row_ptr, col_ind, values, symmetric_pattern));
-    this->_factored = this->_reordered = false;
+    this->factored_ = this->reordered_ = false;
   }
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPI<scalar_t,integer_t>::setup_tree() {
-    if (_tree_mpi) _tree_mpi.reset();
-    _tree_mpi = std::unique_ptr<EliminationTreeMPI<scalar_t,integer_t>>
+    if (tree_mpi_) tree_mpi_.reset();
+    tree_mpi_ = std::unique_ptr<EliminationTreeMPI<scalar_t,integer_t>>
       (new EliminationTreeMPI<scalar_t,integer_t>
-       (this->_opts, *matrix(), *reordering(), _comm));
+       (opts_, *matrix(), *reordering(), comm_));
   }
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPI<scalar_t,integer_t>::setup_reordering() {
-    if (_nd) _nd.reset();
-    _nd = std::unique_ptr<MatrixReordering<scalar_t,integer_t>>
+    if (nd_) nd_.reset();
+    nd_ = std::unique_ptr<MatrixReordering<scalar_t,integer_t>>
       (new MatrixReordering<scalar_t,integer_t>(matrix()->size()));
   }
 
   template<typename scalar_t,typename integer_t> int
   StrumpackSparseSolverMPI<scalar_t,integer_t>::compute_reordering
   (int nx, int ny, int nz, int components, int width) {
-    return _nd->nested_dissection
-      (this->_opts, _mat.get(), _comm, nx, ny, nz, components, width);
+    return nd_->nested_dissection
+      (opts_, mat_.get(), comm_.comm(), nx, ny, nz, components, width);
   }
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPI<scalar_t,integer_t>::
   compute_separator_reordering() {
-    //_nd->separator_reordering(this->_opts, _mat, _tree_mpi->root_front());
-    _nd->separator_reordering
-      (this->_opts, _mat.get(), this->_opts.verbose() && this->_is_root);
+    nd_->separator_reordering
+      (opts_, mat_.get(), opts_.verbose() && is_root_);
   }
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPI<scalar_t,integer_t>::perf_counters_stop
   (const std::string& s) {
-    if (this->_opts.verbose()) {
+    if (opts_.verbose()) {
 #if defined(STRUMPACK_USE_PAPI)
       float rtime1=0., ptime1=0., mflops=0.;
       long_long flpops1=0;
 #pragma omp parallel reduction(+:flpops1) reduction(max:rtime1) \
   reduction(max:ptime1)
       PAPI_flops(&rtime1, &ptime1, &flpops1, &mflops);
-      float papi_total_flops = flpops1 - this->_flpops;
-      MPI_Allreduce(MPI_IN_PLACE, &papi_total_flops, 1, MPI_FLOAT,
-                    MPI_SUM, _comm);
+      float papi_total_flops = flpops1 - this->flpops_;
+      papi_total_flops = comm_.all_reduce(papi_total_flops, MPI_SUM);
 
       // TODO memory usage with PAPI
 
-      if (this->_is_root) {
+      if (is_root_) {
         std::cout << "# " << s << " PAPI stats:" << std::endl;
         std::cout << "#   - total flops = " << papi_total_flops << std::endl;
         std::cout << "#   - flop rate = "
-                  <<  papi_total_flops/(rtime1-this->_rtime)/1e9
+                  <<  papi_total_flops/(rtime1-this->rtime_)/1e9
                   << " GFlops/s" << std::endl;
-        std::cout << "#   - real time = " << rtime1-this->_rtime
+        std::cout << "#   - real time = " << rtime1-this->rtime_
                   << " sec" << std::endl;
-        std::cout << "#   - processor time = " << ptime1-this->_ptime
+        std::cout << "#   - processor time = " << ptime1-this->ptime_
                   << " sec" << std::endl;
       }
 #endif
 #if defined(STRUMPACK_COUNT_FLOPS)
-      long long int flopsbytes[2] = { params::flops - this->_f0,
-                                      params::bytes - this->_b0 };
-      MPI_Allreduce(MPI_IN_PLACE, flopsbytes, 2,
-                    MPI_LONG_LONG_INT, MPI_SUM, _comm);
-      this->_ftot = flopsbytes[0];
-      this->_btot = flopsbytes[1];
-      flopsbytes[0] = params::flops - this->_f0;
-      MPI_Allreduce(MPI_IN_PLACE, flopsbytes, 2,
-                    MPI_LONG_LONG_INT, MPI_MIN, _comm);
-      this->_fmin = flopsbytes[0];
-      flopsbytes[0] = params::flops - this->_f0;
-      MPI_Allreduce(MPI_IN_PLACE, flopsbytes, 2,
-                    MPI_LONG_LONG_INT, MPI_MAX, _comm);
-      this->_fmax = flopsbytes[0];
+      long long int flopsbytes[2] = { params::flops - this->f0_,
+                                      params::bytes - this->b0_ };
+      comm_.all_reduce(flopsbytes, 2, MPI_SUM);
+      this->ftot_ = flopsbytes[0];
+      this->btot_ = flopsbytes[1];
+      flopsbytes[0] = params::flops - this->f0_;
+      comm_.all_reduce(flopsbytes, 2, MPI_MIN);
+      this->fmin_ = flopsbytes[0];
+      flopsbytes[0] = params::flops - this->f0_;
+      comm_.all_reduce(flopsbytes, 2, MPI_MAX);
+      this->fmax_ = flopsbytes[0];
 #endif
     }
   }
@@ -252,11 +243,10 @@ namespace strumpack {
       float(params::ULV_factor_flops.load()),
       float(params::schur_flops.load()),
       float(params::full_rank_flops.load())};
-    float tflops[12];
-    MPI_Reduce(flops, tflops, 12, MPI_FLOAT, MPI_SUM, 0, _comm);
+    comm_.reduce(flops, 12, MPI_SUM);
     this->print_flop_breakdown
-      (tflops[0], tflops[1], tflops[2], tflops[3], tflops[4], tflops[5],
-       tflops[6], tflops[7], tflops[8], tflops[9], tflops[10], tflops[11]);
+      (flops[0], flops[1], flops[2], flops[3], flops[4], flops[5],
+       flops[6], flops[7], flops[8], flops[9], flops[10], flops[11]);
 #endif
   }
 

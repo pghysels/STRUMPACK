@@ -92,6 +92,7 @@ namespace strumpack {
       MPI_Barrier(comm_);
     }
 
+    // TODO use MPI_Comm_split??
     MPIComm sub(int P0, int P) const {
       if (is_null() || size() == 1)
         return MPIComm(MPI_COMM_NULL);
@@ -124,13 +125,28 @@ namespace strumpack {
       MPI_Allreduce(MPI_IN_PLACE, &t, 1, mpi_type<T>(), op, comm_);
       return t;
     }
+    template<typename T> T reduce(T t, MPI_Op op) const {
+      if (is_root()) MPI_Reduce(MPI_IN_PLACE, &t, 1, mpi_type<T>(), op, 0, comm_);
+      else MPI_Reduce(&t, &t, 1, mpi_type<T>(), op, 0, comm_);
+      return t;
+    }
+    template<typename T> void all_reduce(T* t, int ssize, MPI_Op op) const {
+      MPI_Allreduce(MPI_IN_PLACE, t, ssize, mpi_type<T>(), op, comm_);
+    }
+    template<typename T> void reduce(T* t, int ssize, MPI_Op op) const {
+      if (is_root()) MPI_Reduce(MPI_IN_PLACE, t, ssize, mpi_type<T>(), op, 0, comm_);
+      else MPI_Reduce(t, t, ssize, mpi_type<T>(), op, 0, comm_);
+    }
 
   private:
     MPI_Comm comm_ = MPI_COMM_WORLD;
 
     void duplicate(MPI_Comm c) {
       if (c == MPI_COMM_NULL) comm_ = c;
-      else MPI_Comm_dup(c, &comm_);
+      else {
+        //std::cout << "WARNING copying an MPI_Comm is expensive!!" << std::endl;
+        MPI_Comm_dup(c, &comm_);
+      }
     }
   };
 

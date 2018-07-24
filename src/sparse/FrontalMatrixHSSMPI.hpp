@@ -57,7 +57,7 @@ namespace strumpack {
   public:
     FrontalMatrixHSSMPI
     (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-     std::vector<integer_t>& _upd, MPI_Comm _front_comm, int _total_procs);
+     std::vector<integer_t>& _upd, const MPIComm& comm, int _total_procs);
     FrontalMatrixHSSMPI(const FrontalMatrixHSSMPI&) = delete;
     FrontalMatrixHSSMPI& operator=(FrontalMatrixHSSMPI const&) = delete;
     ~FrontalMatrixHSSMPI() {}
@@ -148,9 +148,9 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t>
   FrontalMatrixHSSMPI<scalar_t,integer_t>::FrontalMatrixHSSMPI
   (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-   std::vector<integer_t>& _upd, MPI_Comm front_comm, int total_procs)
+   std::vector<integer_t>& _upd, const MPIComm& comm, int total_procs)
     : FrontalMatrixMPI<scalar_t,integer_t>
-    (_sep, _sep_begin, _sep_end, _upd, front_comm, total_procs) {
+    (_sep, _sep_begin, _sep_end, _upd, comm, total_procs) {
   }
 
   template<typename scalar_t,typename integer_t> void
