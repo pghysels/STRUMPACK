@@ -413,7 +413,7 @@ endif()
 
 # build an example makefile
 configure_file(${CMAKE_SOURCE_DIR}/examples/Makefile.in
-  ${CMAKE_SOURCE_DIR}/examples/Makefile)
+  ${CMAKE_SOURCE_DIR}/examples/Makefile @ONLY)
 
 # copy the examples and Makefile to the build directory as well
 configure_file(${CMAKE_SOURCE_DIR}/examples/Makefile

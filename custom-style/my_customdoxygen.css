@@ -1,0 +1,7 @@
+/*This is our custom CSS that overrides
+the Doxygen CSS (in customdoxygen.css).
+Make CSS changes here, not there.*/
+
+#titlearea {
+        background-color: white;
+}
