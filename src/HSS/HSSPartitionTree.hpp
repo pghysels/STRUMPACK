@@ -104,6 +104,7 @@ namespace strumpack {
         leaf_sizes_rec(lf);
         return lf;
       }
+
     private:
       int min_levels() const {
         int lvls = levels();

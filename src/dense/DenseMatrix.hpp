@@ -73,8 +73,8 @@ namespace strumpack {
     DenseMatrix(DenseMatrix<scalar_t>&& D);
     virtual ~DenseMatrix();
 
-    DenseMatrix<scalar_t>& operator=(const DenseMatrix<scalar_t>& D);
-    DenseMatrix<scalar_t>& operator=(DenseMatrix<scalar_t>&& D);
+    virtual DenseMatrix<scalar_t>& operator=(const DenseMatrix<scalar_t>& D);
+    virtual DenseMatrix<scalar_t>& operator=(DenseMatrix<scalar_t>&& D);
 
     inline std::size_t rows() const { return _rows; }
     inline std::size_t cols() const { return _cols; }
@@ -110,7 +110,9 @@ namespace strumpack {
     DenseMatrix<scalar_t> transpose() const;
 
     void laswp(const std::vector<int>& P, bool fwd);
+    void laswp(const int* P, bool fwd);
     void lapmr(const std::vector<int>& P, bool fwd);
+    void lapmt(const std::vector<int>& P, bool fwd);
 
     void extract_rows
     (const std::vector<std::size_t>& I, const DenseMatrix<scalar_t>& B);
@@ -158,6 +160,11 @@ namespace strumpack {
     (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
      std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
      int max_rank, int depth) const;
+
+    void low_rank(DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& Vt,
+                  real_t rel_tol, real_t abs_tol,
+                  int max_rank, int depth) const;
+
     std::vector<scalar_t> singular_values() const;
 
     void shift(scalar_t sigma);
@@ -186,7 +193,10 @@ namespace strumpack {
     DenseMatrixWrapper
     (std::size_t m, std::size_t n, DenseMatrix<scalar_t>& D,
      std::size_t i, std::size_t j)
-      : DenseMatrixWrapper<scalar_t>(m, n, &D(i, j), D.ld()) {}
+      : DenseMatrixWrapper<scalar_t>(m, n, &D(i, j), D.ld()) {
+      assert(i+m <= D.rows());
+      assert(j+n <= D.cols());
+    }
     virtual ~DenseMatrixWrapper() { this->_data = nullptr; }
 
     void clear() {
@@ -205,10 +215,12 @@ namespace strumpack {
     { this->_data = D.data(); this->_rows = D.rows();
       this->_cols = D.cols(); this->_ld = D.ld(); return *this; }
     DenseMatrixWrapper<scalar_t>&
-    operator=(DenseMatrixWrapper<scalar_t>&& D)
-    { this->_data = D.data(); this->_rows = D.rows();
+    operator=(DenseMatrixWrapper<scalar_t>&& D) {
+      this->_data = D.data(); this->_rows = D.rows();
       this->_cols = D.cols(); this->_ld = D.ld(); return *this; }
-    DenseMatrixWrapper<scalar_t>& operator=(const DenseMatrix<scalar_t>& a) {
+
+    DenseMatrix<scalar_t>&
+    operator=(const DenseMatrix<scalar_t>& a) override {
       assert(a.rows()==this->rows() && a.cols()==this->cols());
       for (std::size_t j=0; j<this->cols(); j++)
         for (std::size_t i=0; i<this->rows(); i++)
@@ -238,8 +250,8 @@ namespace strumpack {
   /** copy submatrix of a at ia,ja of size m,n into b at position ib,jb */
   template<typename scalar_t> void
   copy(std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& a,
-       std::size_t ia, std::size_t ja,
-   DenseMatrix<scalar_t>& b, std::size_t ib, std::size_t jb) {
+       std::size_t ia, std::size_t ja, DenseMatrix<scalar_t>& b,
+       std::size_t ib, std::size_t jb) {
     for (std::size_t j=0; j<n; j++)
       for (std::size_t i=0; i<m; i++)
         b(ib+i, jb+j) = a(ia+i, ja+j);
@@ -492,8 +504,18 @@ namespace strumpack {
   }
 
   template<typename scalar_t> void
+  DenseMatrix<scalar_t>::laswp(const int* P, bool fwd) {
+    blas::laswp(cols(), data(), ld(), 1, rows(), P, fwd ? 1 : -1);
+  }
+
+  template<typename scalar_t> void
   DenseMatrix<scalar_t>::lapmr(const std::vector<int>& P, bool fwd) {
     blas::lapmr(fwd, rows(), cols(), data(), ld(), P.data());
+  }
+
+  template<typename scalar_t> void
+  DenseMatrix<scalar_t>::lapmt(const std::vector<int>& P, bool fwd) {
+    blas::lapmt(fwd, rows(), cols(), data(), ld(), P.data());
   }
 
   template<typename scalar_t> void DenseMatrix<scalar_t>::extract_rows
@@ -860,6 +882,35 @@ namespace strumpack {
     X = DenseMatrix<scalar_t>(i, n-i, R.ptr(0, i), R.ld());
     std::cout << "TODO count flops for ID_column_MGS,"
               << " note that this routine is not stable!" << std::endl;
+  }
+
+  template<typename scalar_t> void
+  DenseMatrix<scalar_t>::low_rank
+  (DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
+   real_t rel_tol, real_t abs_tol, int max_rank, int depth) const {
+    DenseMatrix<scalar_t> tmp(*this);
+    int m = rows(), n = cols();
+    int minmn = std::min(m, n);
+    auto tau = new scalar_t[minmn];
+    std::vector<int> ind(n);
+    int rank, info;
+    blas::geqp3tol(m, n, tmp.data(), tmp.ld(), ind.data(),
+                   tau, &info, rank, rel_tol, abs_tol, depth);
+    std::vector<int> piv(n);
+    for (int i=1; i<=n; i++) {
+      int j = ind[i-1];
+      assert(j-1 >= 0 && j-1 < int(ind.size()));
+      while (j < i) j = ind[j-1];
+      piv[i-1] = j;
+    }
+    V = DenseMatrix<scalar_t>(rank, cols(), tmp.ptr(0, 0), tmp.ld());
+    for (int c=0; c<rank; c++)
+      for (int r=c+1; r<rank; r++)
+        V(r, c) = scalar_t(0.);
+    V.lapmt(ind, false);
+    blas::xxgqr(rows(), rank, rank, tmp.data(), tmp.ld(), tau, &info);
+    U = DenseMatrix<scalar_t>(rows(), rank, tmp.ptr(0, 0), tmp.ld());
+    delete[] tau;
   }
 
   template<typename scalar_t> void

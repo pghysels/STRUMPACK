@@ -82,7 +82,8 @@ namespace strumpack {
      int etree_level=0, int task_depth=0) = 0;
 
     virtual void extend_add_to_dense
-    (FrontalMatrixDense<scalar_t,integer_t>* p, int task_depth) {}
+    (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
+     const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) {}
 
     virtual void sample_CB
     (const SPOptions<scalar_t>& opts, const DenseM_t& R,
@@ -170,12 +171,12 @@ namespace strumpack {
     FrontalMatrix& operator=(FrontalMatrix const&) = delete;
 
     virtual long long node_factor_nonzeros() const {
+      return dense_node_factor_nonzeros();
+    }
+    virtual long long dense_node_factor_nonzeros() const {
       long long dsep = dim_sep();
       long long dupd = dim_upd();
       return dsep * (dsep + 2 * dupd);
-    }
-    virtual long long dense_node_factor_nonzeros() const {
-      return node_factor_nonzeros();
     }
   };
 

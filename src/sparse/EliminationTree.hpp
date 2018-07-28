@@ -34,6 +34,7 @@
 #include "StrumpackParameters.hpp"
 #include "CompressedSparseMatrix.hpp"
 #include "FrontalMatrixHSS.hpp"
+#include "FrontalMatrixBLR.hpp"
 #include "FrontalMatrixDense.hpp"
 
 namespace strumpack {
@@ -59,19 +60,22 @@ namespace strumpack {
     virtual long long factor_nonzeros() const;
     virtual long long dense_factor_nonzeros() const;
     void print_rank_statistics(std::ostream &out) const {
-      _root->print_rank_statistics(out);
+      root_->print_rank_statistics(out);
     }
-    virtual int nr_HSS_fronts() const { return _nr_HSS_fronts; }
-    virtual int nr_dense_fronts() const { return _nr_dense_fronts; }
+    virtual int nr_HSS_fronts() const { return nr_HSS_fronts_; }
+    virtual int nr_BLR_fronts() const { return nr_BLR_fronts_; }
+    virtual int nr_dense_fronts() const { return nr_dense_fronts_; }
 
   protected:
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
     using FHSS_t = FrontalMatrixHSS<scalar_t,integer_t>;
+    using FBLR_t = FrontalMatrixBLR<scalar_t,integer_t>;
 
-    int _nr_HSS_fronts = 0;
-    int _nr_dense_fronts = 0;
-    std::unique_ptr<F_t> _root;
+    int nr_HSS_fronts_ = 0;
+    int nr_BLR_fronts_ = 0;
+    int nr_dense_fronts_ = 0;
+    std::unique_ptr<F_t> root_;
 
   private:
     F_t* setup_tree
@@ -98,7 +102,7 @@ namespace strumpack {
 #pragma omp single
     symbolic_factorization(A, sep_tree, sep_tree.root(), upd);
 
-    _root = std::unique_ptr<F_t>
+    root_ = std::unique_ptr<F_t>
       (setup_tree(opts, A, sep_tree, upd, sep_tree.root(), true, 0));
     delete[] upd;
   }
@@ -183,16 +187,23 @@ namespace strumpack {
     //   (dim_sep + upd[sep].size() >= opts.HSS_min_front_size());
     bool is_hss = opts.use_HSS() && hss_parent &&
       (dim_sep >= opts.HSS_min_sep_size());
+    bool is_blr = opts.use_BLR() && (dim_sep >= opts.BLR_min_sep_size());
     if (is_hss) {
       front = new FHSS_t
         (sep, sep_begin, sep_end, upd[sep]);
       front->set_HSS_partitioning
         (opts, sep_tree.HSS_trees().at(sep), level == 0);
-      this->_nr_HSS_fronts++;
+      this->nr_HSS_fronts_++;
     } else {
-      front = new FD_t
-        (sep, sep_begin, sep_end, upd[sep]);
-      this->_nr_dense_fronts++;
+      if (is_blr) {
+        front = new FBLR_t(sep, sep_begin, sep_end, upd[sep]);
+        front->set_HSS_partitioning
+          (opts, sep_tree.HSS_trees().at(sep), level == 0);
+        this->nr_BLR_fronts_++;
+      } else {
+        front = new FD_t(sep, sep_begin, sep_end, upd[sep]);
+        this->nr_dense_fronts_++;
+      }
     }
     if (sep_tree.lch()[sep] != -1)
       front->lchild = setup_tree
@@ -206,13 +217,13 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   EliminationTree<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const SPOptions<scalar_t>& opts) {
-    _root->multifrontal_factorization(A, opts);
+    root_->multifrontal_factorization(A, opts);
   }
 
   template<typename scalar_t,typename integer_t> void
   EliminationTree<scalar_t,integer_t>::multifrontal_solve
   (DenseM_t& x) const {
-    _root->multifrontal_solve(x);
+    root_->multifrontal_solve(x);
   }
 
   template<typename scalar_t,typename integer_t> integer_t
@@ -220,7 +231,7 @@ namespace strumpack {
     integer_t max_rank;
 #pragma omp parallel
 #pragma omp single nowait
-    max_rank = _root->maximum_rank();
+    max_rank = root_->maximum_rank();
     return max_rank;
   }
 
@@ -229,7 +240,7 @@ namespace strumpack {
     long long nonzeros;
 #pragma omp parallel
 #pragma omp single nowait
-    nonzeros = _root->factor_nonzeros();
+    nonzeros = root_->factor_nonzeros();
     return nonzeros;
   }
 
@@ -238,7 +249,7 @@ namespace strumpack {
     long long nonzeros;
 #pragma omp parallel
 #pragma omp single nowait
-    nonzeros = _root->dense_factor_nonzeros();
+    nonzeros = root_->dense_factor_nonzeros();
     return nonzeros;
   }
 

@@ -474,6 +474,17 @@ namespace strumpack {
         (int* fwd, int* m, int* n, std::complex<double>* a, int* lda,
          const int* ipiv);
 
+      void FC_GLOBAL(slapmt,SLAPMT)
+        (int* fwd, int* m, int* n, float* a, int* lda, const int* ipiv);
+      void FC_GLOBAL(dlapmt,DLAPMT)
+        (int* fwd, int* m, int* n, double* a, int* lda, const int* ipiv);
+      void FC_GLOBAL(clapmt,CLAPMT)
+        (int* fwd, int* m, int* n, std::complex<float>* a, int* lda,
+         const int* ipiv);
+      void FC_GLOBAL(zlapmt,ZLAPMT)
+        (int* fwd, int* m, int* n, std::complex<double>* a, int* lda,
+         const int* ipiv);
+
       void FC_GLOBAL(slaset,SLASET)
         (char* s, int* m, int* n, float* alpha,
          float* beta, float* a, int* lda);
@@ -1222,6 +1233,36 @@ namespace strumpack {
       int forward = fwd ? 1 : 0;
       FC_GLOBAL(zlapmr,ZLAPMR)(&forward, &m, &n, a, &lda, ipiv);
       STRUMPACK_BYTES(2*8*lapmr_moves(n,m));
+    }
+
+    inline long long lapmt_moves(long long n, long long m) {
+      return 2 * m * n;
+    }
+    inline void lapmt
+    (bool fwd, int m, int n, float* a, int lda, const int* ipiv) {
+      int forward = fwd ? 1 : 0;
+      FC_GLOBAL(slapmt,SLAPMT)(&forward, &m, &n, a, &lda, ipiv);
+      STRUMPACK_BYTES(4*lapmt_moves(n,m));
+    }
+    inline void lapmt
+    (bool fwd, int m, int n, double* a, int lda, const int* ipiv) {
+      int forward = fwd ? 1 : 0;
+      FC_GLOBAL(dlapmt,DLAPMT)(&forward, &m, &n, a, &lda, ipiv);
+      STRUMPACK_BYTES(8*lapmt_moves(n,m));
+    }
+    inline void lapmt
+    (bool fwd, int m, int n, std::complex<float>* a, int lda,
+     const int* ipiv) {
+      int forward = fwd ? 1 : 0;
+      FC_GLOBAL(clapmt,CLAPMT)(&forward, &m, &n, a, &lda, ipiv);
+      STRUMPACK_BYTES(2*4*lapmt_moves(n,m));
+    }
+    inline void lapmt
+    (bool fwd, int m, int n, std::complex<double>* a, int lda,
+     const int* ipiv) {
+      int forward = fwd ? 1 : 0;
+      FC_GLOBAL(zlapmt,ZLAPMT)(&forward, &m, &n, a, &lda, ipiv);
+      STRUMPACK_BYTES(2*8*lapmt_moves(n,m));
     }
 
 

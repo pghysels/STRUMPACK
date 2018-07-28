@@ -80,10 +80,10 @@ namespace strumpack {
     int P_;
 
     virtual int nr_HSS_fronts() const override {
-      return comm_.all_reduce(this->_nr_HSS_fronts, MPI_SUM);
+      return comm_.all_reduce(this->nr_HSS_fronts_, MPI_SUM);
     }
     virtual int nr_dense_fronts() const override {
-      return comm_.all_reduce(this->_nr_dense_fronts, MPI_SUM);
+      return comm_.all_reduce(this->nr_dense_fronts_, MPI_SUM);
     }
 
   private:
@@ -139,7 +139,7 @@ namespace strumpack {
     symbolic_factorization(A, tree, tree.root(), upd, subtree_work);
 
     SepRange local_range{A.size(), 0};
-    this->_root = std::unique_ptr<F_t>
+    this->root_ = std::unique_ptr<F_t>
       (proportional_mapping
        (tree, opts, upd, subtree_work, local_range, tree.root(),
         0, comm_.size(), comm_, true, true, 0));
@@ -201,7 +201,7 @@ namespace strumpack {
   (DenseM_t& x) const {
     DistM_t* x_dist;
     sequential_to_block_cyclic(x, x_dist);
-    this->_root->multifrontal_solve(x, x_dist);
+    this->root_->multifrontal_solve(x, x_dist);
     block_cyclic_to_sequential(x, x_dist);
     delete[] x_dist;
   }
@@ -286,8 +286,8 @@ namespace strumpack {
     bool is_hss = opts.use_HSS() && hss_parent &&
       (dim_sep >= opts.HSS_min_front_size());
     if (rank_ == P0) {
-      if (is_hss) this->_nr_HSS_fronts++;
-      else this->_nr_dense_fronts++;
+      if (is_hss) this->nr_HSS_fronts_++;
+      else this->nr_dense_fronts_++;
     }
 
     // TODO first create children, then pass pointers to children in

@@ -59,7 +59,8 @@ namespace strumpack {
     ~FrontalMatrixHSS() {}
 
     void extend_add_to_dense
-    (FrontalMatrixDense<scalar_t,integer_t>* p, int task_depth) override;
+    (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
+     const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) override;
 
     void sample_CB
     (const SPOptions<scalar_t>& opts, const DenseM_t& R, DenseM_t& Sr,
@@ -103,7 +104,7 @@ namespace strumpack {
 
     void set_HSS_partitioning
     (const SPOptions<scalar_t>& opts,
-     const HSS::HSSPartitionTree& sep_tree, bool is_root);
+     const HSS::HSSPartitionTree& sep_tree, bool is_root) override;
 
 
     // TODO make private?
@@ -144,7 +145,6 @@ namespace strumpack {
     (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const;
 
     long long node_factor_nonzeros() const override;
-    long long dense_node_factor_nonzeros() const override;
 
     void split_separator
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,
@@ -176,7 +176,8 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::extend_add_to_dense
-  (FrontalMatrixDense<scalar_t,integer_t>* p, int task_depth) {
+  (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
+   const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) {
     const std::size_t pdsep = p->dim_sep();
     const std::size_t dupd = this->dim_upd();
     std::size_t upd2sep;
@@ -199,14 +200,14 @@ namespace strumpack {
       std::size_t pc = I[c];
       if (pc < pdsep) {
         for (std::size_t r=0; r<upd2sep; r++)
-          p->F11(I[r],pc) += F22(r,c);
+          paF11(I[r],pc) += F22(r,c);
         for (std::size_t r=upd2sep; r<dupd; r++)
-          p->F21(I[r]-pdsep,pc) += F22(r,c);
+          paF21(I[r]-pdsep,pc) += F22(r,c);
       } else {
         for (std::size_t r=0; r<upd2sep; r++)
-          p->F12(I[r],pc-pdsep) += F22(r,c);
+          paF12(I[r],pc-pdsep) += F22(r,c);
         for (std::size_t r=upd2sep; r<dupd; r++)
-          p->F22(I[r]-pdsep,pc-pdsep) += F22(r,c);
+          paF22(I[r]-pdsep,pc-pdsep) += F22(r,c);
       }
     }
     STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*static_cast<long long int>(dupd*dupd));
@@ -684,13 +685,6 @@ namespace strumpack {
   FrontalMatrixHSS<scalar_t,integer_t>::node_factor_nonzeros() const {
     return _H.nonzeros() + _ULV.nonzeros() + _Theta.nonzeros()
       + _Phi.nonzeros() + _ThetaVhatC_or_VhatCPhiC.nonzeros();
-  }
-
-  template<typename scalar_t,typename integer_t> long long
-  FrontalMatrixHSS<scalar_t,integer_t>::dense_node_factor_nonzeros() const {
-    long long dsep = this->dim_sep();
-    long long dupd = this->dim_upd();
-    return dsep * (dsep + 2 * dupd);
   }
 
   template<typename scalar_t,typename integer_t> void

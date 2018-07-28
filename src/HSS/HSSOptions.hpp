@@ -33,7 +33,7 @@
 #include <getopt.h>
 
 namespace strumpack {
-  
+
   /*! HSS namespace. */
   namespace HSS {
 
@@ -145,7 +145,12 @@ namespace strumpack {
       bool log_ranks() const { return _log_ranks; }
       bool verbose() const { return _verbose; }
 
-      void set_from_command_line(int argc, char* argv[]) {
+      void set_from_command_line(int argc, const char* const* argv) {
+        std::vector<char*> argv_local(argc);
+        for (int i=0; i<argc; i++) {
+          argv_local[i] = new char[strlen(argv[i])+1];
+          strcpy(argv_local[i], argv[i]);
+        }
         option long_options[] = {
           {"hss_rel_tol",               required_argument, 0, 1},
           {"hss_abs_tol",               required_argument, 0, 2},
@@ -168,8 +173,9 @@ namespace strumpack {
         };
         int c, option_index = 0;
         opterr = optind = 0;
-        while ((c = getopt_long_only(argc, argv, "hvq", long_options,
-                                     &option_index)) != -1) {
+        while ((c = getopt_long_only
+                (argc, argv_local.data(),
+                 "hvq", long_options, &option_index)) != -1) {
           switch (c) {
           case 1: {
             std::istringstream iss(optarg);
@@ -249,7 +255,9 @@ namespace strumpack {
           case 'h': describe_options(); break;
           }
         }
+        for (auto s : argv_local) delete[] s;
       }
+
       void describe_options() const {
         std::cout << "# HSS Options:" << std::endl
                   << "#   --hss_rel_tol real_t (default "

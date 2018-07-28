@@ -195,7 +195,7 @@ namespace strumpack {
 
     local_range_ = std::make_pair(A.size(), 0);
     MPI_Pcontrol(1, "proportional_mapping");
-    this->_root = std::unique_ptr<F_t>
+    this->root_ = std::unique_ptr<F_t>
       (proportional_mapping
        (opts, local_upd, dist_upd, local_subtree_work, dist_subtree_work,
         nd_.sep_tree->root(), 0, P_, 0, 0, comm_, true, 0));
@@ -370,7 +370,7 @@ namespace strumpack {
   EliminationTreeMPIDist<scalar_t,integer_t>::multifrontal_factorization
   (const CompressedSparseMatrix<scalar_t,integer_t>& A,
    const SPOptions<scalar_t>& opts) {
-    this->_root->multifrontal_factorization(Aprop_, opts);
+    this->root_->multifrontal_factorization(Aprop_, opts);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -486,7 +486,7 @@ namespace strumpack {
       }
     }
 
-    this->_root->multifrontal_solve(Xloc, xdist);
+    this->root_->multifrontal_solve(Xloc, xdist);
 
     rcnts = ibuf;
     scnts = ibuf + P_;
@@ -878,8 +878,8 @@ namespace strumpack {
     // // if (is_hss) communicate_distributed_separator_HSS_tree(sep_hss_partition, dsep, P0, P, owner);
 
     if (rank_ == P0) {
-      if (is_hss) this->_nr_HSS_fronts++;
-      else this->_nr_dense_fronts++;
+      if (is_hss) this->nr_HSS_fronts_++;
+      else this->nr_dense_fronts_++;
     }
     F_t* front = nullptr;
     // only store fronts you work on and their siblings (needed for
@@ -957,8 +957,8 @@ namespace strumpack {
     //   (dim_sep + dim_upd >= opts.HSS_min_front_size());
 
     if (rank_ == P0) {
-      if (is_hss) this->_nr_HSS_fronts++;
-      else this->_nr_dense_fronts++;
+      if (is_hss) this->nr_HSS_fronts_++;
+      else this->nr_dense_fronts_++;
     }
     if ((rank_ >= P0 && rank_ < P0+P) ||
         (rank_ >= P0_sibling && rank_ < P0_sibling+P_sibling)) {
