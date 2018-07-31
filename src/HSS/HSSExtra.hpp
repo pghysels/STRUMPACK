@@ -108,10 +108,9 @@ namespace strumpack {
 
     template<typename scalar_t> class HSSInertia{
     public:
-      template<typename T> friend class HSSMatrix;
-      template<typename T> friend class HSSMatrixBase;
-    private:
-      std::vector<HSSInertia<scalar_t>> _ch;
+      // template<typename T> friend class HSSMatrix;
+      // template<typename T> friend class HSSMatrixBase;
+      std::vector<HSSInertia<scalar_t>> ch;
       unsigned int np;
       unsigned int nn;
       unsigned int nz;

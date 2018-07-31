@@ -1004,11 +1004,13 @@ namespace strumpack {
   template<typename scalar_t> std::vector<int> DenseMatrix<scalar_t>::sytrf() {
     std::vector<int> IPIV(rows());
     int info;
-    blas::sytrf(UpLo::L, rows(), data(), ld(), IPIV.data(), &info);
+    if (rows() > 0){
+        blas::sytrf(char(UpLo::L), rows(), data(), ld(), IPIV.data(), &info);
+      }
     return IPIV;
   }
 
-  template<typename scalar_t> void sytrs(UpLo s, const DenseMatrix<scalar_t>& a, const std::vector<int>& IPIV, const DenseMatrix<scalar_t>& b){
+  template<typename scalar_t> void sytrs(UpLo s, DenseMatrix<scalar_t>& a, std::vector<int>& IPIV, DenseMatrix<scalar_t>& b){
     int info;
     blas::sytrs(char(s), a.rows(), b.cols(), a.data(), a.ld(), IPIV.data(), b.data(), b.ld(), &info);
   }

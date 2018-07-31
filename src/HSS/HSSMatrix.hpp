@@ -88,6 +88,8 @@ namespace strumpack {
       (const HSSFactors<scalar_t>& ULV,
        WorkSolve<scalar_t>& w, DenseM_t& x) const;
 
+      HSSInertia<scalar_t> inertia() const;
+
       DenseM_t apply(const DenseM_t& b) const;
       DenseM_t applyC(const DenseM_t& b) const;
 
@@ -201,6 +203,9 @@ namespace strumpack {
       void factor_recursive
       (HSSFactors<scalar_t>& ULV, WorkFactor<scalar_t>& w,
        bool isroot, bool partial, int depth) const;
+
+      void readInertiaOffBlockDiag(HSSInertia<scalar_t>& in, const DenseM_t D, const std::vector<int>& IPIV) const;
+      void inertia_recursive(HSSInertia<scalar_t>& in, WorkInertia<scalar_t>& w, bool isroot, int depth) const ;
 
       void apply_fwd
       (const DenseM_t& b, WorkApply<scalar_t>& w, bool isroot,
@@ -545,5 +550,6 @@ namespace strumpack {
 #include "HSSMatrix.solve.hpp"
 #include "HSSMatrix.extract.hpp"
 #include "HSSMatrix.Schur.hpp"
+#include "HSSMatrix.inertia.hpp"
 
 #endif // HSS_MATRIX_HPP

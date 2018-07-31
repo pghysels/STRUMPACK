@@ -5,11 +5,13 @@ add_executable(test_HSS_seq test_HSS_seq)
 add_executable(test_HSS_mpi test_HSS_mpi)
 add_executable(test_sparse_seq test_sparse_seq)
 add_executable(test_sparse_mpi test_sparse_mpi)
+add_executable(test_HSS_seq_inertia test_HSS_seq_inertia)
 
 target_link_libraries(test_HSS_seq strumpack ${LIB})
 target_link_libraries(test_HSS_mpi strumpack ${LIB})
 target_link_libraries(test_sparse_seq strumpack ${LIB})
 target_link_libraries(test_sparse_mpi strumpack ${LIB})
+target_link_libraries(test_HSS_seq_inertia strumpack ${LIB})
 
 add_test("user_test_HSS_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 100)
 add_test("user_test_HSS_mpi" ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2

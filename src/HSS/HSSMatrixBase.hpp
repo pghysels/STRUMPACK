@@ -213,6 +213,10 @@ namespace strumpack {
       (const elem_t& Aelem, const opts_t& opts,
        WorkCompress<scalar_t>& w, int lvl) {}
 
+       virtual void readInertiaOffBlockDiag(HSSInertia<scalar_t>& in, const DenseM_t D, const std::vector<int>& IPIV) const {};
+       virtual void inertia_recursive(HSSInertia<scalar_t>& in, WorkInertia<scalar_t>& w, bool isroot, int depth) const {} ;
+
+
       virtual void factor_recursive
       (HSSFactors<scalar_t>& ULV, WorkFactor<scalar_t>& w,
        bool isroot, bool partial, int depth) const {};
