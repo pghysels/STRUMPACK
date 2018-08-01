@@ -30,12 +30,11 @@
 #define EXTEND_ADD_HPP
 
 #include "dense/DistributedMatrix.hpp"
+#include "FrontalMatrixMPI.hpp"
+#include "FrontalMatrixDenseMPI.hpp"
+#include "FrontalMatrixHSSMPI.hpp"
 
 namespace strumpack {
-
-  template<typename scalar_t,typename integer_t> class FrontalMatrixMPI;
-  template<typename scalar_t,typename integer_t> class FrontalMatrixHSSMPI;
-  template<typename scalar_t,typename integer_t> class FrontalMatrixDenseMPI;
 
   template<typename scalar_t,typename integer_t> class ExtendAdd {
     using DenseM_t = DenseMatrix<scalar_t>;
@@ -129,7 +128,8 @@ namespace strumpack {
      const FrontalMatrixMPI<scalar_t,integer_t>* pa,
      const FrontalMatrix<scalar_t,integer_t>* ch) {
       std::size_t u2s;
-      const auto I = ch->upd_to_parent(pa, u2s);
+      const auto I = ch->upd_to_parent
+        (static_cast<const FrontalMatrix<scalar_t,integer_t>*>(pa), u2s);
       const std::size_t du = ch->dim_upd();
       const std::size_t ds = pa->dim_sep();
       const auto pr = new int[CB.rows()+CB.cols()];

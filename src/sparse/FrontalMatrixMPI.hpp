@@ -41,6 +41,8 @@
 
 namespace strumpack {
 
+  template<typename scalar_t,typename integer_t> class ExtendAdd;
+
   template<typename scalar_t,typename integer_t>
   class FrontalMatrixMPI : public FrontalMatrix<scalar_t,integer_t> {
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;

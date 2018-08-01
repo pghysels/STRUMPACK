@@ -46,17 +46,13 @@
 
 namespace strumpack {
 
-  // forward declaration
-  template<typename scalar_t> class DistributedMatrix;
-  template<typename scalar_t,typename integer_t> class FrontalMatrixDense;
-  template<typename scalar_t,typename integer_t> class FrontalMatrixMPI;
+  template<typename scalar_t,typename integer_t> class ExtendAdd;
 
   template<typename scalar_t,typename integer_t> class FrontalMatrix {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
-    using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
     using ExtAdd = ExtendAdd<scalar_t,integer_t>;
 
   public:

@@ -39,10 +39,12 @@
 #include "CompressedSparseMatrix.hpp"
 #include "MatrixReordering.hpp"
 #include "FrontalMatrixMPI.hpp"
+#include "FrontalMatrixDense.hpp"
+#include "FrontalMatrixBLR.hpp"
 
 namespace strumpack {
 
-  template<typename scalar_t,typename integer_t> class FrontalMatrixHSSMPI;
+  template<typename scalar_t,typename integer_t> class ExtractFront;
 
   template<typename scalar_t,typename integer_t>
   class FrontalMatrixDenseMPI : public FrontalMatrixMPI<scalar_t,integer_t> {
@@ -52,8 +54,6 @@ namespace strumpack {
     using DistMW_t = DistributedMatrixWrapper<scalar_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
     using FDMPI_t = FrontalMatrixDenseMPI<scalar_t,integer_t>;
-    using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
-    using FBLR_t = FrontalMatrixBLR<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using ExtAdd = ExtendAdd<scalar_t,integer_t>;
     template<typename _scalar_t,typename _integer_t> friend class ExtendAdd;
@@ -154,14 +154,14 @@ namespace strumpack {
     const auto dsep = this->dim_sep();
     if (dsep) {
       F11_ = DistM_t(this->grid(), dsep, dsep);
-      using ExtractFront = ExtractFront<scalar_t,integer_t>;
-      ExtractFront::extract_F11(F11_, A, this->sep_begin, dsep);
+      using ExFront = ExtractFront<scalar_t,integer_t>;
+      ExFront::extract_F11(F11_, A, this->sep_begin, dsep);
       if (this->dim_upd()) {
         F12_ = DistM_t(this->grid(), dsep, dupd);
-        ExtractFront::extract_F12
+        ExFront::extract_F12
           (F12_, A, this->sep_begin, this->sep_end, this->upd);
         F21_ = DistM_t(this->grid(), dupd, dsep);
-        ExtractFront::extract_F21
+        ExFront::extract_F21
           (F21_, A, this->sep_end, this->sep_begin, this->upd);
       }
     }
