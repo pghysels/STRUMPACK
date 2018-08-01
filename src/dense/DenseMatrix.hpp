@@ -126,6 +126,7 @@ namespace strumpack {
      const DenseMatrix<scalar_t>& B, int depth);
     DenseMatrix<scalar_t>& add(const DenseMatrix<scalar_t>& B, int depth=0);
     DenseMatrix<scalar_t>& sub(const DenseMatrix<scalar_t>& B, int depth=0);
+    DenseMatrix<scalar_t>& scale(scalar_t alpha);
     DenseMatrix<scalar_t>& scaled_add
     (scalar_t alpha, const DenseMatrix<scalar_t>& x, int depth=0);
     DenseMatrix<scalar_t>& scale_and_add
@@ -161,9 +162,9 @@ namespace strumpack {
      std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
      int max_rank, int depth) const;
 
-    void low_rank(DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& Vt,
-                  real_t rel_tol, real_t abs_tol,
-                  int max_rank, int depth) const;
+    void low_rank
+    (DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& Vt,
+     real_t rel_tol, real_t abs_tol, int max_rank, int depth) const;
 
     std::vector<scalar_t> singular_values() const;
 
@@ -601,6 +602,20 @@ namespace strumpack {
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
         operator()(i, j) -= B(i, j);
+    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*cols()*rows());
+    return *this;
+  }
+
+  template<typename scalar_t> DenseMatrix<scalar_t>&
+  DenseMatrix<scalar_t>::scale(scalar_t alpha) {
+    // #if defined(_OPENMP)
+    // #pragma omp parallel if(!omp_in_parallel())
+    // #pragma omp single nowait
+    // #pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+    // #endif
+    for (std::size_t j=0; j<cols(); j++)
+      for (std::size_t i=0; i<rows(); i++)
+        operator()(i, j) *= alpha;
     STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*cols()*rows());
     return *this;
   }

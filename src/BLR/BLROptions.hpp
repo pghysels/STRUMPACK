@@ -30,6 +30,8 @@
  */
 #ifndef BLR_OPTIONS_HPP
 #define BLR_OPTIONS_HPP
+
+#include <cstring>
 #include <getopt.h>
 
 namespace strumpack {
@@ -38,24 +40,23 @@ namespace strumpack {
   namespace BLR {
 
     template<typename real_t> inline real_t default_BLR_rel_tol() {
-      return real_t(1e-2);
+      return real_t(1e-4);
     }
     template<typename real_t> inline real_t default_BLR_abs_tol() {
-      return real_t(1e-8);
+      return real_t(1e-10);
     }
     template<> inline float default_BLR_rel_tol() {
-      return 1e-1;
+      return 1e-2;
     }
     template<> inline float default_BLR_abs_tol() {
       return 1e-5;
     }
 
-    enum class CompressionAlgorithm { ORIGINAL, STABLE, HARD_RESTART };
-    inline std::string get_name(CompressionAlgorithm a) {
+    enum class LowRankAlgorithm { RRQR, ACA };
+    inline std::string get_name(LowRankAlgorithm a) {
       switch (a) {
-      case CompressionAlgorithm::ORIGINAL: return "original"; break;
-      case CompressionAlgorithm::STABLE: return "stable"; break;
-      case CompressionAlgorithm::HARD_RESTART: return "hard_restart"; break;
+      case LowRankAlgorithm::RRQR: return "RRQR"; break;
+      case LowRankAlgorithm::ACA: return "ACA"; break;
       default: return "unknown";
       }
     }
@@ -69,6 +70,7 @@ namespace strumpack {
       int _leaf_size = 128;
       int _max_rank = 5000;
       bool _verbose = true;
+      LowRankAlgorithm _lr_algo = LowRankAlgorithm::RRQR;
 
     public:
       /*! \brief For Pieter to complete
@@ -93,12 +95,16 @@ namespace strumpack {
         assert(max_rank > 0);
         _max_rank = max_rank;
       }
+      void set_low_rank_algorithm(LowRankAlgorithm a) {
+        _lr_algo = a;
+      }
       void set_verbose(bool verbose) { _verbose = verbose; }
 
       real_t rel_tol() const { return _rel_tol; }
       real_t abs_tol() const { return _abs_tol; }
       int leaf_size() const { return _leaf_size; }
       int max_rank() const { return _max_rank; }
+      LowRankAlgorithm low_rank_algorithm() const { return _lr_algo; }
       bool verbose() const { return _verbose; }
 
       void set_from_command_line(int argc, const char* const* argv) {
@@ -112,6 +118,7 @@ namespace strumpack {
           {"blr_abs_tol",               required_argument, 0, 2},
           {"blr_leaf_size",             required_argument, 0, 3},
           {"blr_max_rank",              required_argument, 0, 4},
+          {"blr_low_rank_algorithm",    required_argument, 0, 5},
           {"blr_verbose",               no_argument, 0, 'v'},
           {"blr_quiet",                 no_argument, 0, 'q'},
           {"help",                      no_argument, 0, 'h'},
@@ -141,6 +148,19 @@ namespace strumpack {
             iss >> _max_rank;
             set_max_rank(_max_rank);
           } break;
+          case 5: {
+            std::istringstream iss(optarg);
+            std::string s; iss >> s;
+            if (s.compare("RRQR") == 0)
+              set_low_rank_algorithm(LowRankAlgorithm::RRQR);
+            else if (s.compare("ACA") == 0)
+              set_low_rank_algorithm(LowRankAlgorithm::ACA);
+            else
+              std::cerr << "# WARNING: low-rank algorithm not"
+                        << " recognized, use 'RRQR' or 'ACA'."
+                        << std::endl;
+          } break;
+
           case 'v': set_verbose(true); break;
           case 'q': set_verbose(false); break;
           case 'h': describe_options(); break;
@@ -159,6 +179,9 @@ namespace strumpack {
                   << leaf_size() << ")" << std::endl
                   << "#   --blr_max_rank int (default "
                   << max_rank() << ")" << std::endl
+                  << "#   --blr_low_rank_algorithm (default "
+                  << get_name(_lr_algo) << ")" << std::endl
+                  << "       should be one of [RRQR|ACA]" << std::endl
                   << "#   --blr_verbose or -v (default "
                   << verbose() << ")" << std::endl
                   << "#   --blr_quiet or -q (default "

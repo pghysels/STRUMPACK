@@ -125,7 +125,7 @@ int run(int argc, char* argv[]) {
   if (blr_opts.verbose()) A.print("A");
   cout << "# tol = " << blr_opts.rel_tol() << endl;
 
-  BLRMatrix<double> B(A, blr_opts);
+  //BLRMatrix<double> B(A, blr_opts);
   // if (H.is_compressed()) {
   //   cout << "# created H matrix of dimension "
   //        << H.rows() << " x " << H.cols()
@@ -135,25 +135,25 @@ int run(int argc, char* argv[]) {
   //   cout << "# compression failed!!!!!!!!" << endl;
   //   return 1;
   // }
-  cout << "# rank(H) = " << B.maximum_rank() << endl;
-  cout << "# memory(H) = " << B.memory()/1e6 << " MB, "
-       << 100. * B.memory() / A.memory() << "% of dense" << endl;
+  // cout << "# rank(H) = " << B.maximum_rank() << endl;
+  // cout << "# memory(H) = " << B.memory()/1e6 << " MB, "
+  //      << 100. * B.memory() / A.memory() << "% of dense" << endl;
 
-  // H.print_info();
-  auto Bdense = B.dense();
-  Bdense.scaled_add(-1., A);
-  cout << "# relative error = ||A-B*I||_F/||A||_F = "
-       << Bdense.normF() / A.normF() << endl;
-  cout << "# absolute error = ||A-B*I||_F = " << Bdense.normF() << endl;
-  if (Bdense.normF() / A.normF() > ERROR_TOLERANCE
-      * max(blr_opts.rel_tol(),blr_opts.abs_tol())) {
-    cout << "ERROR: compression error too big!!" << endl;
-    return 1;
-  }
+  // // H.print_info();
+  // auto Bdense = B.dense();
+  // Bdense.scaled_add(-1., A);
+  // cout << "# relative error = ||A-B*I||_F/||A||_F = "
+  //      << Bdense.normF() / A.normF() << endl;
+  // cout << "# absolute error = ||A-B*I||_F = " << Bdense.normF() << endl;
+  // if (Bdense.normF() / A.normF() > ERROR_TOLERANCE
+  //     * max(blr_opts.rel_tol(),blr_opts.abs_tol())) {
+  //   cout << "ERROR: compression error too big!!" << endl;
+  //   return 1;
+  // }
 
-  cout << "# computing LU factorization .. ";
-  B.factor();
-  cout << " done!" << endl;
+  // cout << "# computing LU factorization .. ";
+  // B.factor();
+  // cout << " done!" << endl;
 
   cout << "# exiting" << endl;
   return 0;

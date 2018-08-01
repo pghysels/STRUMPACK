@@ -54,6 +54,7 @@ namespace strumpack {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
     using FHSS_t = FrontalMatrixHSS<scalar_t,integer_t>;
+    using FBLR_t = FrontalMatrixBLR<scalar_t,integer_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
     using FDMPI_t = FrontalMatrixDenseMPI<scalar_t,integer_t>;
     using FHSSMPI_t = FrontalMatrixHSSMPI<scalar_t,integer_t>;
@@ -182,14 +183,14 @@ namespace strumpack {
     sbuf[2*rank_] = sbuf[2*rank_+1] = 0.0;
     for (integer_t dsep=0; dsep<nd_.sep_tree->separators(); dsep++)
       if (rank_ == nd_.proc_dist_sep[dsep]) {
-        if (nd_.sep_tree->lch()[dsep] == -1)
+        if (nd_.sep_tree->lch(dsep) == -1)
           sbuf[2*rank_] = local_subtree_work[nd_.local_sep_tree->root()];
         else sbuf[2*rank_+1] = dsep_work;
       }
     MPI_Allgather
       (MPI_IN_PLACE, 2, MPI_FLOAT, sbuf, 2, MPI_FLOAT, comm_.comm());
     for (integer_t dsep=0; dsep<nd_.sep_tree->separators(); dsep++)
-      dist_subtree_work[dsep] = (nd_.sep_tree->lch()[dsep] == -1) ?
+      dist_subtree_work[dsep] = (nd_.sep_tree->lch(dsep) == -1) ?
         sbuf[2*nd_.proc_dist_sep[dsep]] : sbuf[2*nd_.proc_dist_sep[dsep]+1];
     delete[] sbuf;
 
@@ -539,8 +540,8 @@ namespace strumpack {
   EliminationTreeMPIDist<scalar_t,integer_t>::symbolic_factorization_local
   (integer_t sep, std::vector<integer_t>* upd,
    float* subtree_work, int depth) {
-    auto chl = nd_.local_sep_tree->lch()[sep];
-    auto chr = nd_.local_sep_tree->rch()[sep];
+    auto chl = nd_.local_sep_tree->lch(sep);
+    auto chr = nd_.local_sep_tree->rch(sep);
     if (depth < params::task_recursion_cutoff_level) {
       if (chl != -1)
 #pragma omp task untied default(shared)                                 \
@@ -557,12 +558,12 @@ namespace strumpack {
       if (chr != -1)
         symbolic_factorization_local(chr, upd, subtree_work, depth);
     }
-    auto sep_begin = nd_.local_sep_tree->sizes()[sep] +
+    auto sep_begin = nd_.local_sep_tree->sizes(sep) +
       nd_.sub_graph_range.first;
-    auto sep_end = nd_.local_sep_tree->sizes()[sep+1] +
+    auto sep_end = nd_.local_sep_tree->sizes(sep+1) +
       nd_.sub_graph_range.first;
-    for (integer_t r=nd_.local_sep_tree->sizes()[sep];
-         r<nd_.local_sep_tree->sizes()[sep+1]; r++) {
+    for (integer_t r=nd_.local_sep_tree->sizes(sep);
+         r<nd_.local_sep_tree->sizes(sep+1); r++) {
       auto ice = nd_.my_sub_graph->get_ind() +
         nd_.my_sub_graph->get_ptr()[r+1];
       auto icb = std::lower_bound
@@ -638,20 +639,20 @@ namespace strumpack {
       // only consider the distributed separator owned by this
       // process: 1 leaf and 1 non-leaf
       if (nd_.proc_dist_sep[dsep] != rank_) continue;
-      auto pa = nd_.sep_tree->pa()[dsep];
+      auto pa = nd_.sep_tree->pa(dsep);
       if (pa == -1) continue; // skip the root separator
       auto pa_rank = nd_.proc_dist_sep[pa];
-      if (nd_.sep_tree->lch()[dsep] == -1) {
+      if (nd_.sep_tree->lch(dsep) == -1) {
         // leaf of distributed tree is local subgraph for process
         // proc_dist_sep[dsep].  local_upd[dsep] was computed above,
         // send it to the parent process
-        // proc_dist_sep[nd_.sep_tree->pa()[dsep]]. dist_upd is
+        // proc_dist_sep[nd_.sep_tree->pa(dsep)]. dist_upd is
         // local_upd of the root of the local tree, which is
         // local_upd[this->nbsep-1], or local_upd.back()
-        if (nd_.sep_tree->pa()[pa] == -1)
+        if (nd_.sep_tree->pa(pa) == -1)
           continue; // do not send to parent if parent is root
         send_req.emplace_back();
-        int tag = (dsep == nd_.sep_tree->lch()[pa]) ? 1 : 2;
+        int tag = (dsep == nd_.sep_tree->lch(pa)) ? 1 : 2;
         MPI_Isend
           (local_upd[nd_.local_sep_tree->root()].data(),
            local_upd[nd_.local_sep_tree->root()].size(),
@@ -678,8 +679,8 @@ namespace strumpack {
             (std::unique(dist_upd.begin(), dist_upd.end()), dist_upd.end());
         }
 
-        auto chl = nd_.proc_dist_sep[nd_.sep_tree->lch()[dsep]];
-        auto chr = nd_.proc_dist_sep[nd_.sep_tree->rch()[dsep]];
+        auto chl = nd_.proc_dist_sep[nd_.sep_tree->lch(dsep)];
+        auto chr = nd_.proc_dist_sep[nd_.sep_tree->rch(dsep)];
         // receive dist_upd from left child
         MPI_Status stat;
         int msg_size;
@@ -725,10 +726,10 @@ namespace strumpack {
           dsep_right_work;
 
         // send dist_upd and work estimate to parent
-        if (nd_.sep_tree->pa()[pa] != -1) {
+        if (nd_.sep_tree->pa(pa) != -1) {
           // do not send to parent if parent is root
           send_req.emplace_back();
-          int tag = (dsep == nd_.sep_tree->lch()[pa]) ? 1 : 2;
+          int tag = (dsep == nd_.sep_tree->lch(pa)) ? 1 : 2;
           MPI_Isend
             (dist_upd.data(), dist_upd.size(), mpi_type<integer_t>(),
              pa_rank, tag, comm_.comm(), &send_req.back());
@@ -817,7 +818,7 @@ namespace strumpack {
     std::vector<MPI_Request> sreq;
     std::vector<int> sbuf;
     if (rank_ == owner) {
-      sbuf = nd_.sep_tree->HSS_trees()[dsep].serialize();
+      sbuf = nd_.sep_tree->HSS_tree(dsep).serialize();
       sreq.resize(P);
       for (int dest=P0; dest<P0+P; dest++)
         MPI_Isend(sbuf.data(), sbuf.size(), MPI_INT, dest, 0,
@@ -845,8 +846,8 @@ namespace strumpack {
    float* local_subtree_work, float* dist_subtree_work, integer_t dsep,
    int P0, int P, int P0_sibling, int P_sibling,
    const MPIComm& fcomm, bool hss_parent, int level) {
-    auto chl = nd_.sep_tree->lch()[dsep];
-    auto chr = nd_.sep_tree->rch()[dsep];
+    auto chl = nd_.sep_tree->lch(dsep);
+    auto chr = nd_.sep_tree->rch(dsep);
     auto owner = nd_.proc_dist_sep[dsep];
 
     if (chl == -1 && chr == -1) {
@@ -867,8 +868,9 @@ namespace strumpack {
     auto dim_dsep = dsep_end - dsep_begin;
     bool is_hss = opts.use_HSS() && hss_parent &&
       (dim_dsep >= opts.HSS_min_sep_size());
+    bool is_blr = opts.use_BLR() && (dim_dsep >= opts.BLR_min_sep_size());
     HSS::HSSPartitionTree sep_hss_partition(dim_dsep);
-    if (is_hss)
+    if (is_hss || is_blr)
       communicate_distributed_separator_HSS_tree
         (sep_hss_partition, dsep, P0, P, owner);
 
@@ -879,6 +881,7 @@ namespace strumpack {
 
     if (rank_ == P0) {
       if (is_hss) this->nr_HSS_fronts_++;
+      else if (is_blr) this->nr_BLR_fronts_++;
       else this->nr_dense_fronts_++;
     }
     F_t* front = nullptr;
@@ -891,8 +894,11 @@ namespace strumpack {
           front = new FHSS_t
             (dsep, dsep_begin, dsep_end, dsep_upd);
           front->set_HSS_partitioning(opts, sep_hss_partition, level == 0);
-        } else
-          front = new FD_t(dsep, dsep_begin, dsep_end, dsep_upd);
+        } else if (is_blr) {
+          front = new FBLR_t
+            (dsep, dsep_begin, dsep_end, dsep_upd);
+          front->set_HSS_partitioning(opts, sep_hss_partition, level == 0);
+        } else front = new FD_t(dsep, dsep_begin, dsep_end, dsep_upd);
         if (P0 == rank_) {
           local_range_.first = std::min
             (local_range_.first, std::size_t(dsep_begin));
@@ -905,9 +911,11 @@ namespace strumpack {
             (local_pfronts_.size(), dsep_begin, dsep_end,
              dsep_upd, fcomm, P);
           front->set_HSS_partitioning(opts, sep_hss_partition, level == 0);
-        } else
+        } else {
+          if (is_blr) std::cout << "TODO BLR MPI, (using dense instead)" << std::endl;
           front = new FDMPI_t
             (local_pfronts_.size(), dsep_begin, dsep_end, dsep_upd, fcomm, P);
+        }
         if (rank_ >= P0 && rank_ < P0+P) {
           auto fpar = static_cast<FMPI_t*>(front);
           local_pfronts_.emplace_back
@@ -955,9 +963,11 @@ namespace strumpack {
       (dim_sep >= opts.HSS_min_sep_size());
     // bool is_hss = opts.use_HSS() && (dim_sep >= opts.HSS_min_sep_size()) &&
     //   (dim_sep + dim_upd >= opts.HSS_min_front_size());
+    bool is_blr = opts.use_BLR() && (dim_sep >= opts.BLR_min_sep_size());
 
     if (rank_ == P0) {
       if (is_hss) this->nr_HSS_fronts_++;
+      else if (is_blr) this->nr_BLR_fronts_++;
       else this->nr_dense_fronts_++;
     }
     if ((rank_ >= P0 && rank_ < P0+P) ||
@@ -966,8 +976,10 @@ namespace strumpack {
         if (is_hss) {
           front = new FHSS_t(sep, sep_begin, sep_end, upd);
           front->set_HSS_partitioning(opts, tree.sep_HSS_tree[sep], level == 0);
-        } else
-          front = new FD_t(sep, sep_begin, sep_end, upd);
+        } else if (is_blr) {
+          front = new FBLR_t(sep, sep_begin, sep_end, upd);
+          front->set_HSS_partitioning(opts, tree.sep_HSS_tree[sep], level == 0);
+        } else front = new FD_t(sep, sep_begin, sep_end, upd);
         if (P0 == rank_) {
           local_range_.first = std::min
             (local_range_.first, std::size_t(sep_begin));
@@ -979,9 +991,11 @@ namespace strumpack {
           front = new FHSSMPI_t
             (local_pfronts_.size(), sep_begin, sep_end, upd, fcomm, P);
           front->set_HSS_partitioning(opts, tree.sep_HSS_tree[sep], level == 0);
-        } else
+        } else {
+          if (is_blr) std::cout << "TODO BLR MPI, (using dense instead)" << std::endl;
           front = new FDMPI_t
             (local_pfronts_.size(), sep_begin, sep_end, upd, fcomm, P);
+        }
         if (rank_ >= P0 && rank_ < P0+P) {
           auto fpar = static_cast<FMPI_t*>(front);
           local_pfronts_.emplace_back

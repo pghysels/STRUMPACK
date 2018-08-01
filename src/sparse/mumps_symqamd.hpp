@@ -159,56 +159,56 @@ namespace strumpack {
     auto sep_tree = std::unique_ptr<SeparatorTree<integer_t>>
       (new SeparatorTree<integer_t>(fronts + dummies + roots-1));
     for (int f=0; f<sep_tree->separators(); f++)
-      sep_tree->lch()[f] = sep_tree->rch()[f] = -1;
+      sep_tree->lch(f) = sep_tree->rch(f) = -1;
     for (int f=0; f<=sep_tree->separators(); f++)
-      sep_tree->sizes()[f] = 0;
+      sep_tree->sizes(f) = 0;
 
     for (int i=0; i<N; i++) {
       if (NV[i]) {
-        sep_tree->pa()[fid[i]] = (PE[i] == -1) ? -1 : fid[PE[i]];
-        sep_tree->sizes()[fid[i]+1]++;
+        sep_tree->pa(fid[i]) = (PE[i] == -1) ? -1 : fid[PE[i]];
+        sep_tree->sizes(fid[i]+1)++;
       } else { // secondary
         int p = PE[i];
         while (NV[p] == 0) p = PE[p]; // find the principal node
-        sep_tree->sizes()[fid[p]+1]++;
+        sep_tree->sizes(fid[p]+1)++;
       }
     }
     if (roots > 1) {
       // add a single empty root, with the other roots as children
       std::replace(sep_tree->pa(), sep_tree->pa()+fronts,
                    integer_t(-1), integer_t(fronts));
-      sep_tree->pa()[fronts] = -1;
+      sep_tree->pa(fronts) = -1;
       fronts++;
     }
     std::fill(count.begin(), count.end(), 0);
     for (int f=0, ft=fronts; f<fronts; f++) {
-      auto p = sep_tree->pa()[f];
+      auto p = sep_tree->pa(f);
       if (p != -1) {
         count[p]++;
         switch (count[p]) {
-        case 1: sep_tree->lch()[p] = f; break;
-        case 2: sep_tree->rch()[p] = f; break;
+        case 1: sep_tree->lch(p) = f; break;
+        case 2: sep_tree->rch(p) = f; break;
         default:
           // create a dummy holding the 2 existing children of p, with
           // parent p
-          sep_tree->pa()[ft] = p;
-          sep_tree->lch()[ft] = sep_tree->lch()[p];
-          sep_tree->rch()[ft] = sep_tree->rch()[p];
-          sep_tree->sizes()[ft+1] = 0;
-          sep_tree->pa()[sep_tree->lch()[p]] = ft;
-          sep_tree->pa()[sep_tree->rch()[p]] = ft;
+          sep_tree->pa(ft) = p;
+          sep_tree->lch(ft) = sep_tree->lch(p);
+          sep_tree->rch(ft) = sep_tree->rch(p);
+          sep_tree->sizes(ft+1) = 0;
+          sep_tree->pa(sep_tree->lch(p)) = ft;
+          sep_tree->pa(sep_tree->rch(p)) = ft;
           // make the dummy the left child of p, make the current node
           // the right child of p
-          sep_tree->lch()[p] = ft;
-          sep_tree->rch()[p] = f;
+          sep_tree->lch(p) = ft;
+          sep_tree->rch(p) = f;
           ft++;
           break;
         }
       }
     }
     for (integer_t f=0; f<sep_tree->separators(); f++)
-      sep_tree->sizes()[f+1] = sep_tree->sizes()[f] + sep_tree->sizes()[f+1];
-    assert(sep_tree->sizes()[sep_tree->separators()] == N);
+      sep_tree->sizes(f+1) = sep_tree->sizes(f) + sep_tree->sizes(f+1);
+    assert(sep_tree->sizes(sep_tree->separators()) == N);
     delete[] NDENSE;
     delete[] PE;
     delete[] LEN;

@@ -111,8 +111,8 @@ namespace strumpack {
   EliminationTree<scalar_t,integer_t>::symbolic_factorization
   (const SpMat_t& A, const SeparatorTree<integer_t>& sep_tree,
    integer_t sep, std::vector<integer_t>* upd, int depth) const {
-    auto chl = sep_tree.lch()[sep];
-    auto chr = sep_tree.rch()[sep];
+    auto chl = sep_tree.lch(sep);
+    auto chr = sep_tree.rch(sep);
     if (depth < params::task_recursion_cutoff_level) {
       if (chl != -1)
 #pragma omp task untied default(shared)                                 \
@@ -127,8 +127,8 @@ namespace strumpack {
       if (chl != -1) symbolic_factorization(A, sep_tree, chl, upd, depth);
       if (chr != -1) symbolic_factorization(A, sep_tree, chr, upd, depth);
     }
-    auto sep_begin = sep_tree.sizes()[sep];
-    auto sep_end = sep_tree.sizes()[sep+1];
+    auto sep_begin = sep_tree.sizes(sep);
+    auto sep_end = sep_tree.sizes(sep+1);
     if (sep != sep_tree.root()) { // not necessary for the root
       for (integer_t c=sep_begin; c<sep_end; c++) {
         auto ice = A.get_ind()+A.get_ptr()[c+1];
@@ -174,14 +174,14 @@ namespace strumpack {
    const SeparatorTree<integer_t>& sep_tree,
    std::vector<integer_t>* upd, integer_t sep,
    bool hss_parent, int level) {
-    auto sep_begin = sep_tree.sizes()[sep];
-    auto sep_end = sep_tree.sizes()[sep+1];
+    auto sep_begin = sep_tree.sizes(sep);
+    auto sep_end = sep_tree.sizes(sep+1);
     auto dim_sep = sep_end - sep_begin;
     // dummy nodes added at the end of the separator tree have
     // dim_sep==0, but they have sep_begin=sep_end=N, which is wrong
     // So fix this here!
-    if (dim_sep==0 && sep_tree.lch()[sep] != -1)
-      sep_begin = sep_end = sep_tree.sizes()[sep_tree.rch()[sep]+1];
+    if (dim_sep==0 && sep_tree.lch(sep) != -1)
+      sep_begin = sep_end = sep_tree.sizes(sep_tree.rch(sep)+1);
     F_t* front = nullptr;
     // bool is_hss = opts.use_HSS() && (dim_sep >= opts.HSS_min_sep_size()) &&
     //   (dim_sep + upd[sep].size() >= opts.HSS_min_front_size());
@@ -192,25 +192,25 @@ namespace strumpack {
       front = new FHSS_t
         (sep, sep_begin, sep_end, upd[sep]);
       front->set_HSS_partitioning
-        (opts, sep_tree.HSS_trees().at(sep), level == 0);
+        (opts, sep_tree.HSS_tree(sep), level == 0);
       this->nr_HSS_fronts_++;
     } else {
       if (is_blr) {
         front = new FBLR_t(sep, sep_begin, sep_end, upd[sep]);
-        front->set_HSS_partitioning
-          (opts, sep_tree.HSS_trees().at(sep), level == 0);
+        front->set_BLR_partitioning
+          (opts, sep_tree.HSS_tree(sep), sep_tree.admissibility(sep), level == 0);
         this->nr_BLR_fronts_++;
       } else {
         front = new FD_t(sep, sep_begin, sep_end, upd[sep]);
         this->nr_dense_fronts_++;
       }
     }
-    if (sep_tree.lch()[sep] != -1)
+    if (sep_tree.lch(sep) != -1)
       front->lchild = setup_tree
-        (opts, A, sep_tree, upd, sep_tree.lch()[sep], is_hss, level+1);
-    if (sep_tree.rch()[sep] != -1)
+        (opts, A, sep_tree, upd, sep_tree.lch(sep), is_hss, level+1);
+    if (sep_tree.rch(sep) != -1)
       front->rchild = setup_tree
-        (opts, A, sep_tree, upd, sep_tree.rch()[sep], is_hss, level+1);
+        (opts, A, sep_tree, upd, sep_tree.rch(sep), is_hss, level+1);
     return front;
   }
 

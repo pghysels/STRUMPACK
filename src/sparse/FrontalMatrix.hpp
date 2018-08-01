@@ -39,6 +39,7 @@
 #include "CompressedSparseMatrix.hpp"
 #include "MatrixReordering.hpp"
 #include "HSS/HSSMatrix.hpp"
+#include "ExtendAdd.hpp"
 #if defined(_OPENMP)
 #include "omp.h"
 #endif
@@ -48,12 +49,15 @@ namespace strumpack {
   // forward declaration
   template<typename scalar_t> class DistributedMatrix;
   template<typename scalar_t,typename integer_t> class FrontalMatrixDense;
+  template<typename scalar_t,typename integer_t> class FrontalMatrixMPI;
 
   template<typename scalar_t,typename integer_t> class FrontalMatrix {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
+    using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
+    using ExtAdd = ExtendAdd<scalar_t,integer_t>;
 
   public:
     FrontalMatrix
@@ -84,6 +88,14 @@ namespace strumpack {
     virtual void extend_add_to_dense
     (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
      const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) {}
+    virtual void extend_add_copy_to_buffers
+    (std::vector<std::vector<scalar_t>>& sbuf,
+     const FrontalMatrixMPI<scalar_t,integer_t>* pa) const { assert(false); };
+    virtual void extend_add_copy_from_buffers
+    (DistM_t& F11, DistM_t& F12, DistM_t& F21, DistM_t& F22,
+     scalar_t** pbuf, const FrontalMatrixMPI<scalar_t,integer_t>* pa) const {
+      ExtAdd::extend_add_seq_copy_from_buffers(F11, F12, F21, F22, pbuf, pa, this);
+    }
 
     virtual void sample_CB
     (const SPOptions<scalar_t>& opts, const DenseM_t& R,
@@ -137,6 +149,9 @@ namespace strumpack {
      const std::vector<std::vector<std::size_t>>& J,
      std::vector<DistM_t>& Bdist, std::vector<DenseM_t>& Bseq) const;
 
+    virtual void set_BLR_partitioning
+    (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
+     const std::vector<bool>& adm, bool is_root) {}
     virtual void set_HSS_partitioning
     (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
      bool is_root) {}

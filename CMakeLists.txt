@@ -318,6 +318,7 @@ install(FILES
   src/dense/BLASLAPACKWrapper.hpp
   src/dense/ScaLAPACKWrapper.hpp
   src/dense/BLACSGrid.hpp
+  src/dense/ACA.hpp
   DESTINATION include/dense)
 
 install(FILES

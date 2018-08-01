@@ -50,8 +50,10 @@ namespace strumpack {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
     using DistMW_t = DistributedMatrixWrapper<scalar_t>;
+    using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
     using FDMPI_t = FrontalMatrixDenseMPI<scalar_t,integer_t>;
     using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
+    using FBLR_t = FrontalMatrixBLR<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using ExtAdd = ExtendAdd<scalar_t,integer_t>;
     template<typename _scalar_t,typename _integer_t> friend class ExtendAdd;
@@ -60,15 +62,18 @@ namespace strumpack {
     FrontalMatrixDenseMPI
     (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
      std::vector<integer_t>& _upd, const MPIComm& comm, int P);
-    FrontalMatrixDenseMPI(const FrontalMatrixDenseMPI&) = delete;
-    FrontalMatrixDenseMPI& operator=(FrontalMatrixDenseMPI const&) = delete;
-    ~FrontalMatrixDenseMPI();
+    FrontalMatrixDenseMPI(const FDMPI_t&) = delete;
+    FrontalMatrixDenseMPI& operator=(FDMPI_t const&) = delete;
+    ~FrontalMatrixDenseMPI() {}
 
     void release_work_memory() override;
     void build_front(const SpMat_t& A);
     void partial_factorization();
 
     void extend_add();
+    void extend_add_copy_to_buffers
+    (std::vector<std::vector<scalar_t>>& sbuf,
+     const FMPI_t* pa) const override;
 
     void sample_CB
     (const SPOptions<scalar_t>& opts, const DistM_t& R, DistM_t& Sr,
@@ -89,12 +94,14 @@ namespace strumpack {
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
      DistM_t& B) const override;
 
-    long long factor_nonzeros(int task_depth=0) const override;
     std::string type() const override { return "FrontalMatrixDenseMPI"; }
 
   private:
-    DistM_t F11, F12, F21, F22;
+    DistM_t F11_, F12_, F21_, F22_;
     std::vector<int> piv;
+    using FrontalMatrixMPI<scalar_t,integer_t>::Comm;
+
+    long long node_factor_nonzeros() const override;
   };
 
   template<typename scalar_t,typename integer_t>
@@ -104,13 +111,10 @@ namespace strumpack {
     : FrontalMatrixMPI<scalar_t,integer_t>
     (_sep, _sep_begin, _sep_end, _upd, comm, P) {}
 
-  template<typename scalar_t,typename integer_t>
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::~FrontalMatrixDenseMPI() {
-  }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::release_work_memory() {
-    F22.clear(); // remove the update block
+    F22_.clear(); // remove the update block
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -118,35 +122,29 @@ namespace strumpack {
     if (!this->lchild && !this->rchild) return;
     std::vector<std::vector<scalar_t>> sbuf(this->P());
     for (auto ch : {this->lchild, this->rchild}) {
-      if (ch && this->Comm().is_root()) {
+      if (ch && Comm().is_root()) {
         STRUMPACK_FLOPS
           (static_cast<long long int>(ch->dim_upd())*ch->dim_upd());
       }
       if (!this->visit(ch)) continue;
-      if (auto ch_mpi = dynamic_cast<FDMPI_t*>(ch)) {
-        ExtAdd::extend_add_copy_to_buffers
-          (ch_mpi->F22, sbuf, this, ch_mpi->upd_to_parent(this));
-      } else if (auto ch_seq = dynamic_cast<FD_t*>(ch)) {
-        if (mpi_rank(this->comm()) == this->child_master(ch))
-          ExtAdd::extend_add_seq_copy_to_buffers
-            (ch_seq->F22, sbuf, this, ch_seq);
-      }
+      ch->extend_add_copy_to_buffers(sbuf, this);
     }
     scalar_t *rbuf = nullptr, **pbuf = nullptr;
-    all_to_all_v(sbuf, rbuf, pbuf, this->comm());
+    all_to_all_v(sbuf, rbuf, pbuf, Comm().comm());
     for (auto ch : {this->lchild, this->rchild}) {
-      if (auto ch_mpi = dynamic_cast<FDMPI_t*>(ch)) {
-        ExtAdd::extend_add_copy_from_buffers
-          (F11, F12, F21, F22, pbuf+this->child_master(ch),
-           this, ch_mpi);
-      } else if (auto ch_seq = dynamic_cast<FD_t*>(ch)) {
-        ExtAdd::extend_add_seq_copy_from_buffers
-          (F11, F12, F21, F22, pbuf[this->child_master(ch_seq)],
-           this, ch_seq);
-      }
+      if (!ch) continue;
+      ch->extend_add_copy_from_buffers
+        (F11_, F12_, F21_, F22_, pbuf+this->child_master(ch), this);
     }
     delete[] pbuf;
     delete[] rbuf;
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixDenseMPI<scalar_t,integer_t>::extend_add_copy_to_buffers
+  (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
+    ExtAdd::extend_add_copy_to_buffers
+      (F22_, sbuf, pa, this->upd_to_parent(pa));
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -155,21 +153,21 @@ namespace strumpack {
     const auto dupd = this->dim_upd();
     const auto dsep = this->dim_sep();
     if (dsep) {
-      F11 = DistM_t(this->grid(), dsep, dsep);
+      F11_ = DistM_t(this->grid(), dsep, dsep);
       using ExtractFront = ExtractFront<scalar_t,integer_t>;
-      ExtractFront::extract_F11(F11, A, this->sep_begin, dsep);
+      ExtractFront::extract_F11(F11_, A, this->sep_begin, dsep);
       if (this->dim_upd()) {
-        F12 = DistM_t(this->grid(), dsep, dupd);
+        F12_ = DistM_t(this->grid(), dsep, dupd);
         ExtractFront::extract_F12
-          (F12, A, this->sep_begin, this->sep_end, this->upd);
-        F21 = DistM_t(this->grid(), dupd, dsep);
+          (F12_, A, this->sep_begin, this->sep_end, this->upd);
+        F21_ = DistM_t(this->grid(), dupd, dsep);
         ExtractFront::extract_F21
-          (F21, A, this->sep_end, this->sep_begin, this->upd);
+          (F21_, A, this->sep_end, this->sep_begin, this->upd);
       }
     }
     if (dupd) {
-      F22 = DistM_t(this->grid(), dupd, dupd);
-      F22.zero();
+      F22_ = DistM_t(this->grid(), dupd, dupd);
+      F22_.zero();
     }
     extend_add();
   }
@@ -179,26 +177,26 @@ namespace strumpack {
     if (this->dim_sep() && this->grid()->active()) {
 #if defined(WRITE_ROOT)
       if (etree_level == 0) {
-        if (!mpi_rank(this->comm()))
+        if (Comm().is_root())
           std::cout << "Writing root node to file..." << std::endl;
-        F11.MPI_binary_write();
-        if (!mpi_rank(this->comm()))
+        F11_.MPI_binary_write();
+        if (Comm().is_root())
           std::cout << "Done. Early abort." << std::endl;
         MPI_Finalize();
         exit(0);
       }
 #endif
-      piv = F11.LU();
-      STRUMPACK_FULL_RANK_FLOPS(LU_flops(F11))
+      piv = F11_.LU();
+      STRUMPACK_FULL_RANK_FLOPS(LU_flops(F11_))
       if (this->dim_upd()) {
-        F12.laswp(piv, true);
-        trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11, F12);
-        trsm(Side::R, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11, F21);
-        gemm(Trans::N, Trans::N, scalar_t(-1.), F21, F12, scalar_t(1.), F22);
+        F12_.laswp(piv, true);
+        trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11_, F12_);
+        trsm(Side::R, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11_, F21_);
+        gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.), F22_);
         STRUMPACK_FULL_RANK_FLOPS
-          (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F21, F12, scalar_t(1.)) +
-           trsm_flops(Side::L, scalar_t(1.), F11, F12) +
-           trsm_flops(Side::R, scalar_t(1.), F11, F21));
+          (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.)) +
+           trsm_flops(Side::L, scalar_t(1.), F11_, F12_) +
+           trsm_flops(Side::R, scalar_t(1.), F11_, F21_));
       }
     }
   }
@@ -239,13 +237,13 @@ namespace strumpack {
       TIMER_TIME(TaskType::SOLVE_LOWER, 0, t_s);
       b.laswp(piv, true);
       if (b.cols() == 1) {
-        trsv(UpLo::L, Trans::N, Diag::U, F11, b);
+        trsv(UpLo::L, Trans::N, Diag::U, F11_, b);
         if (this->dim_upd())
-          gemv(Trans::N, scalar_t(-1.), F21, b, scalar_t(1.), bupd);
+          gemv(Trans::N, scalar_t(-1.), F21_, b, scalar_t(1.), bupd);
       } else {
-        trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11, b);
+        trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11_, b);
         if (this->dim_upd())
-          gemm(Trans::N, Trans::N, scalar_t(-1.), F21, b, scalar_t(1.), bupd);
+          gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, b, scalar_t(1.), bupd);
       }
       TIMER_STOP(t_s);
     }
@@ -260,12 +258,12 @@ namespace strumpack {
       TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_s);
       if (y.cols() == 1) {
         if (this->dim_upd())
-          gemv(Trans::N, scalar_t(-1.), F12, yupd, scalar_t(1.), y);
-        trsv(UpLo::U, Trans::N, Diag::N, F11, y);
+          gemv(Trans::N, scalar_t(-1.), F12_, yupd, scalar_t(1.), y);
+        trsv(UpLo::U, Trans::N, Diag::N, F11_, y);
       } else {
         if (this->dim_upd())
-          gemm(Trans::N, Trans::N, scalar_t(-1.), F12, yupd, scalar_t(1.), y);
-        trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11, y);
+          gemm(Trans::N, Trans::N, scalar_t(-1.), F12_, yupd, scalar_t(1.), y);
+        trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11_, y);
       }
       TIMER_STOP(t_s);
     }
@@ -288,15 +286,15 @@ namespace strumpack {
   FrontalMatrixDenseMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
   (const std::vector<std::size_t>& I,
    const std::vector<std::size_t>& J, DistM_t& B) const {
-    if (this->comm() == MPI_COMM_NULL) return;
+    if (Comm().is_null()) return;
     std::vector<std::size_t> lJ, oJ, lI, oI;
     this->find_upd_indices(J, lJ, oJ);
     this->find_upd_indices(I, lI, oI);
     std::vector<std::vector<scalar_t>> sbuf(this->P());
-    ExtAdd::extract_copy_to_buffers(F22, lI, lJ, oI, oJ, B, sbuf);
+    ExtAdd::extract_copy_to_buffers(F22_, lI, lJ, oI, oJ, B, sbuf);
     scalar_t *rbuf = nullptr, **pbuf = nullptr;
-    all_to_all_v(sbuf, rbuf, pbuf, this->comm());
-    ExtAdd::extract_copy_from_buffers(B, lI, lJ, oI, oJ, F22, pbuf);
+    all_to_all_v(sbuf, rbuf, pbuf, Comm().comm());
+    ExtAdd::extract_copy_from_buffers(B, lI, lJ, oI, oJ, F22_, pbuf);
     delete[] rbuf;
     delete[] pbuf;
   }
@@ -309,22 +307,21 @@ namespace strumpack {
   FrontalMatrixDenseMPI<scalar_t,integer_t>::sample_CB
   (const SPOptions<scalar_t>& opts, const DistM_t& R, DistM_t& Sr, DistM_t& Sc,
    FrontalMatrix<scalar_t,integer_t>* pa) const {
-    if (F11.active() || F22.active()) {
+    if (F11_.active() || F22_.active()) {
       auto b = R.cols();
       Sr = DistM_t(this->grid(), this->dim_upd(), b);
       Sc = DistM_t(this->grid(), this->dim_upd(), b);
-      gemm(Trans::N, Trans::N, scalar_t(1.), F22, R, scalar_t(0.), Sr);
-      gemm(Trans::C, Trans::N, scalar_t(1.), F22, R, scalar_t(0.), Sc);
+      gemm(Trans::N, Trans::N, scalar_t(1.), F22_, R, scalar_t(0.), Sr);
+      gemm(Trans::C, Trans::N, scalar_t(1.), F22_, R, scalar_t(0.), Sc);
       STRUMPACK_CB_SAMPLE_FLOPS
-        (gemm_flops(Trans::N, Trans::N, scalar_t(1.), F22, R, scalar_t(0.)) +
-         gemm_flops(Trans::C, Trans::N, scalar_t(1.), F22, R, scalar_t(0.)));
+        (gemm_flops(Trans::N, Trans::N, scalar_t(1.), F22_, R, scalar_t(0.)) +
+         gemm_flops(Trans::C, Trans::N, scalar_t(1.), F22_, R, scalar_t(0.)));
     }
   }
 
   template<typename scalar_t,typename integer_t> long long
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::factor_nonzeros
-  (int task_depth) const {
-    return this->dense_factor_nonzeros(task_depth);
+  FrontalMatrixDenseMPI<scalar_t,integer_t>::node_factor_nonzeros() const {
+    return F11_.nonzeros() + F12_.nonzeros() + F21_.nonzeros();
   }
 
 } // end namespace strumpack

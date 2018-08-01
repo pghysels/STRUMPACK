@@ -38,7 +38,6 @@
 #include "dense/DistributedMatrix.hpp"
 #include "CompressedSparseMatrix.hpp"
 #include "MatrixReordering.hpp"
-#include "ExtendAdd.hpp"
 
 namespace strumpack {
 
@@ -100,6 +99,10 @@ namespace strumpack {
     void extract_b
     (const DistM_t& b, const DistM_t& bupd, DistM_t& CBl, DistM_t& CBr,
      DenseM_t& seqCBl, DenseM_t& seqCBr) const;
+
+    void extend_add_copy_from_buffers
+    (DistM_t& F11, DistM_t& F12, DistM_t& F21, DistM_t& F22, scalar_t** pbuf,
+     const FrontalMatrixMPI<scalar_t,integer_t>* pa) const override;
 
     inline bool visit(const F_t* ch) const;
     inline int child_master(const F_t* ch) const;
@@ -264,6 +267,14 @@ namespace strumpack {
       ch_master = (ch == this->lchild) ? 0 : P() - mpi_ch->P();
     else ch_master = (ch == this->lchild) ? 0 : P() - 1;
     return ch_master;
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixMPI<scalar_t,integer_t>::extend_add_copy_from_buffers
+  (DistM_t& F11, DistM_t& F12, DistM_t& F21, DistM_t& F22, scalar_t** pbuf,
+   const FrontalMatrixMPI<scalar_t,integer_t>* pa) const {
+    ExtAdd::extend_add_copy_from_buffers
+      (F11, F12, F21, F22, pbuf, pa, this);
   }
 
   template<typename scalar_t,typename integer_t> void

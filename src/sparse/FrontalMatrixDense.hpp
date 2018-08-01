@@ -46,6 +46,7 @@ namespace strumpack {
     : public FrontalMatrix<scalar_t,integer_t> {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
+    using ExtAdd = ExtendAdd<scalar_t,integer_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
 
   public:
@@ -80,6 +81,12 @@ namespace strumpack {
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
      DenseM_t& B, int task_depth) const override;
     std::string type() const override { return "FrontalMatrixDense"; }
+
+    void extend_add_copy_to_buffers
+    (std::vector<std::vector<scalar_t>>& sbuf,
+     const FrontalMatrixMPI<scalar_t,integer_t>* pa) const override {
+      ExtAdd::extend_add_seq_copy_to_buffers(F22, sbuf, pa, this);
+    }
 
   private:
     FrontalMatrixDense(const FrontalMatrixDense&) = delete;

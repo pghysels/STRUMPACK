@@ -30,6 +30,8 @@
  */
 #ifndef HSS_OPTIONS_HPP
 #define HSS_OPTIONS_HPP
+
+#include <cstring>
 #include <getopt.h>
 
 namespace strumpack {

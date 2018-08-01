@@ -35,14 +35,15 @@
 #include <cassert>
 
 #include "../dense/DenseMatrix.hpp"
+#include "../dense/ACA.hpp"
 #include "BLROptions.hpp"
 
 namespace strumpack {
   namespace BLR {
 
     // forward declarations
-    template<typename scalar_t> class BLRLRTile;
-    template<typename scalar_t> class BLRDenseTile;
+    template<typename scalar_t> class LRTile;
+    template<typename scalar_t> class DenseTile;
 
 
     template<typename scalar_t> class BLRTile {
@@ -56,14 +57,15 @@ namespace strumpack {
       virtual std::size_t memory() const = 0;
       virtual std::size_t nonzeros() const = 0;
       virtual std::size_t maximum_rank() const = 0;
+      virtual bool is_low_rank() const = 0;
       virtual void dense(DenseM_t& A) const = 0;
 
-      virtual DenseM_t& D() { assert(false); }
-      virtual DenseM_t& U() { assert(false); }
-      virtual DenseM_t& V() { assert(false); }
-      virtual const DenseM_t& D() const { assert(false); }
-      virtual const DenseM_t& U() const { assert(false); }
-      virtual const DenseM_t& V() const { assert(false); }
+      virtual DenseM_t& D() = 0; //{ assert(false); }
+      virtual DenseM_t& U() = 0; //{ assert(false); }
+      virtual DenseM_t& V() = 0; //{ assert(false); }
+      virtual const DenseM_t& D() const = 0; //{ assert(false); }
+      virtual const DenseM_t& U() const = 0; //{ assert(false); }
+      virtual const DenseM_t& V() const = 0; //{ assert(false); }
 
       virtual std::vector<int> LU() { assert(false); return std::vector<int>(); };
       virtual void laswp(const std::vector<int>& piv, bool fwd) = 0;
@@ -79,10 +81,10 @@ namespace strumpack {
                           const DenseM_t& b, scalar_t beta,
                           DenseM_t& c, int task_depth) const = 0;
       virtual void gemm_b(Trans ta, Trans tb, scalar_t alpha,
-                          const BLRLRTile<scalar_t>& a, scalar_t beta,
+                          const LRTile<scalar_t>& a, scalar_t beta,
                           DenseM_t& c) const = 0;
       virtual void gemm_b(Trans ta, Trans tb, scalar_t alpha,
-                          const BLRDenseTile<scalar_t>& a, scalar_t beta,
+                          const DenseTile<scalar_t>& a, scalar_t beta,
                           DenseM_t& c) const = 0;
       virtual void gemm_b(Trans ta, Trans tb, scalar_t alpha,
                           const DenseM_t& a, scalar_t beta,
@@ -90,27 +92,33 @@ namespace strumpack {
     };
 
 
-    template<typename scalar_t> class BLRDenseTile
+    template<typename scalar_t> class DenseTile
       : public BLRTile<scalar_t> {
       using DenseM_t = DenseMatrix<scalar_t>;
       using BLRT_t = BLRTile<scalar_t>;
 
     public:
-      BLRDenseTile(std::size_t m, std::size_t n) : D_(m, n) {}
-      BLRDenseTile(const DenseM_t& D) : D_(D) {}
+      DenseTile(std::size_t m, std::size_t n) : D_(m, n) {}
+      DenseTile(const DenseM_t& D) : D_(D) {}
 
-      std::size_t rows() const { return D_.rows(); }
-      std::size_t cols() const { return D_.cols(); }
-      std::size_t rank() const { return std::min(rows(), cols()); }
+      std::size_t rows() const override { return D_.rows(); }
+      std::size_t cols() const override { return D_.cols(); }
+      std::size_t rank() const override { return std::min(rows(), cols()); }
 
       std::size_t memory() const override { return D_.memory(); }
       std::size_t nonzeros() const override { return D_.nonzeros(); }
       std::size_t maximum_rank() const override { return 0; }
+      bool is_low_rank() const override { return false; };
 
       void dense(DenseM_t& A) const override { A = D_; }
 
       DenseM_t& D() override { return D_; }
       const DenseM_t& D() const override { return D_; }
+
+      DenseM_t& U() override { assert(false); return D_; }
+      DenseM_t& V() override { assert(false); return D_; }
+      const DenseM_t& U() const override { assert(false); return D_; }
+      const DenseM_t& V() const override { assert(false); return D_; }
 
       std::vector<int> LU() override {
         return D_.LU(params::task_recursion_cutoff_level);
@@ -138,7 +146,7 @@ namespace strumpack {
         gemm(ta, tb, alpha, D_, b, beta, c, task_depth);
       }
       void gemm_b(Trans ta, Trans tb, scalar_t alpha,
-                  const BLRLRTile<scalar_t>& a, scalar_t beta,
+                  const LRTile<scalar_t>& a, scalar_t beta,
                   DenseM_t& c) const override {
         DenseM_t tmp(a.rank(), tb==Trans::N ? cols() : rows());
         gemm(ta, tb, scalar_t(1.), ta==Trans::N ? a.V() : a.U(), D_,
@@ -147,7 +155,7 @@ namespace strumpack {
              beta, c, params::task_recursion_cutoff_level);
       }
       void gemm_b(Trans ta, Trans tb, scalar_t alpha,
-                  const BLRDenseTile<scalar_t>& a, scalar_t beta,
+                  const DenseTile<scalar_t>& a, scalar_t beta,
                   DenseM_t& c) const override {
         gemm(ta, tb, alpha, a.D(), D(), beta, c);
       }
@@ -165,15 +173,24 @@ namespace strumpack {
     /**
      * Low rank U*V tile
      */
-    template<typename scalar_t> class BLRLRTile
+    template<typename scalar_t> class LRTile
       : public BLRTile<scalar_t> {
       using DenseM_t = DenseMatrix<scalar_t>;
       using Opts_t = BLROptions<scalar_t>;
 
     public:
-      BLRLRTile(const DenseM_t& T, const Opts_t& opts) {
-        T.low_rank(U_, V_, opts.rel_tol(), opts.abs_tol(), opts.max_rank(),
-                   params::task_recursion_cutoff_level);
+      LRTile(const DenseM_t& T, const Opts_t& opts) {
+        if (opts.low_rank_algorithm() == LowRankAlgorithm::RRQR) {
+          T.low_rank(U_, V_, opts.rel_tol(), opts.abs_tol(), opts.max_rank(),
+                     params::task_recursion_cutoff_level);
+        } else if (opts.low_rank_algorithm() == LowRankAlgorithm::ACA) {
+          DenseM_t Vt;
+          adaptive_cross_approximation<scalar_t>
+            (U_, Vt, T.rows(), T.cols(),
+             [&](std::size_t i, std::size_t j)->scalar_t { return T(i, j); },
+             opts.rel_tol(), opts.abs_tol(), opts.max_rank());
+          V_ = Vt.transpose();
+        }
         // std::cout << "rank= " << rank()
         //           << " rows= " << rows()
         //           << " cols= " << cols() << std::endl;
@@ -182,6 +199,7 @@ namespace strumpack {
       std::size_t rows() const { return U_.rows(); }
       std::size_t cols() const { return V_.cols(); }
       std::size_t rank() const { return U_.cols(); }
+      bool is_low_rank() const override { return true; };
 
       std::size_t memory() const override { return U_.memory() + V_.memory(); }
       std::size_t nonzeros() const override { return U_.nonzeros() + V_.nonzeros(); }
@@ -192,8 +210,10 @@ namespace strumpack {
              params::task_recursion_cutoff_level);
       }
 
+      DenseM_t& D() override { assert(false); return U_; }
       DenseM_t& U() override { return U_; }
       DenseM_t& V() override { return V_; }
+      const DenseM_t& D() const override { assert(false); return U_; }
       const DenseM_t& U() const override { return U_; }
       const DenseM_t& V() const override { return V_; }
 
@@ -230,7 +250,7 @@ namespace strumpack {
              beta, c, task_depth);
       }
       void gemm_b(Trans ta, Trans tb, scalar_t alpha,
-                  const BLRLRTile<scalar_t>& a, scalar_t beta,
+                  const LRTile<scalar_t>& a, scalar_t beta,
                   DenseM_t& c) const override {
         DenseM_t tmp1(a.rank(), rank());
         gemm(ta, tb, scalar_t(1.), ta==Trans::N ? a.V() : a.U(),
@@ -243,7 +263,7 @@ namespace strumpack {
              beta, c, params::task_recursion_cutoff_level);
       }
       void gemm_b(Trans ta, Trans tb, scalar_t alpha,
-                  const BLRDenseTile<scalar_t>& a, scalar_t beta,
+                  const DenseTile<scalar_t>& a, scalar_t beta,
                   DenseM_t& c) const override {
         gemm_b(ta, tb, alpha, a.D(), beta, c,
                params::task_recursion_cutoff_level);
@@ -315,27 +335,30 @@ namespace strumpack {
         for (std::size_t j=0; j<colblocks(); j++)
           for (std::size_t i=0; i<rowblocks(); i++)
             block(i, j) = std::unique_ptr<BLRTile<scalar_t>>
-              (new BLRLRTile<scalar_t>(tile(A, i, j), opts));
+              (new LRTile<scalar_t>(tile(A, i, j), opts));
       }
 
-      BLRMatrix(const std::vector<std::size_t>& tiles, DenseM_t& A,
-                std::vector<int>& piv, const Opts_t& opts)
+      BLRMatrix(const std::vector<std::size_t>& tiles,
+                const std::function<bool(std::size_t,std::size_t)>& admissible,
+                DenseM_t& A, std::vector<int>& piv, const Opts_t& opts)
         : BLRMatrix<scalar_t>(A.rows(), tiles, A.cols(), tiles, opts) {
         assert(rowblocks() == colblocks());
         piv.resize(rows());
         std::vector<int> tile_piv;
         for (std::size_t i=0; i<rowblocks(); i++) {
-          block(i, i) = std::unique_ptr<BLRDenseTile<scalar_t>>
-            (new BLRDenseTile<scalar_t>(tile(A, i, i)));
+          create_dense_tile(i, i, A);
           tile_piv = tile(i, i).LU();
           for (std::size_t l=0; l<tile_piv.size(); l++)
             piv[l+tilerowoff(i)] = tilerowoff(i) + tile_piv[l];
           for (std::size_t j=i+1; j<rowblocks(); j++) {
             // these blocks have received all updates, compress now
-            block(i, j) = std::unique_ptr<BLRLRTile<scalar_t>>
-              (new BLRLRTile<scalar_t>(tile(A, i, j), opts));
-            block(j, i) = std::unique_ptr<BLRLRTile<scalar_t>>
-              (new BLRLRTile<scalar_t>(tile(A, j, i), opts));
+            if (admissible(i, j)) {
+              create_LR_tile(i, j, A, opts);
+              create_LR_tile(j, i, A, opts);
+            } else {
+              create_dense_tile(i, j, A);
+              create_dense_tile(j, i, A);
+            }
             // solve with U, the blocks under the diagonal block
             trsm(Side::R, UpLo::U, Trans::N, Diag::N,
                  scalar_t(1.), tile(i, i), tile(j, i));
@@ -383,9 +406,30 @@ namespace strumpack {
         return A;
       }
 
-      void solve(const DenseM_t& b, DenseM_t& x) const {
-        // TODO: in place?
-        // simply call laswp, trsm, trsm
+      void solve(std::vector<int>& piv, const DenseM_t& b) const {
+        // TODO test this
+        // b.laswp(piv, true);
+        // trsm();
+        // trsm();
+      }
+
+      void print(const std::string& name) {
+        std::cout << "BLR(" << name << ")="
+                  << rows() << "x" << cols() << ", "
+                  << rowblocks() << "x" << colblocks() << ", "
+                  << (float(nonzeros()) / (rows()*cols()) * 100.) << "%"
+                  << " [" << std::endl;
+        for (std::size_t i=0; i<nbrows_; i++) {
+          for (std::size_t j=0; j<nbcols_; j++) {
+            auto& tij = tile(i, j);
+            if (tij.is_low_rank())
+              std::cout << "LR:" << tij.rows() << "x"
+                        << tij.cols() << "/" << tij.rank() << " ";
+            else std::cout << "D:" << tij.rows() << "x" << tij.cols() << " ";
+          }
+          std::cout << std::endl;
+        }
+        std::cout << "];" << std::endl;
       }
 
     private:
@@ -399,8 +443,7 @@ namespace strumpack {
 
       BLRMatrix(std::size_t m, const std::vector<std::size_t>& rowtiles,
                 std::size_t n, const std::vector<std::size_t>& coltiles,
-                const Opts_t& opts)
-        : m_(m), n_(n) {
+                const Opts_t& opts) : m_(m), n_(n) {
         nbrows_ = rowtiles.size();
         nbcols_ = coltiles.size();
         roff_.resize(nbrows_+1);
@@ -433,6 +476,21 @@ namespace strumpack {
       inline DenseMW_t tile(DenseM_t& A, std::size_t i, std::size_t j) const {
         return DenseMW_t
           (tilerows(i), tilecols(j), A, tilerowoff(i), tilecoloff(j));
+      }
+
+      void create_dense_tile
+      (std::size_t i, std::size_t j, DenseM_t& A) {
+        block(i, j) = std::unique_ptr<DenseTile<scalar_t>>
+          (new DenseTile<scalar_t>(tile(A, i, j)));
+      }
+
+      void create_LR_tile
+      (std::size_t i, std::size_t j, DenseM_t& A, const Opts_t& opts) {
+        block(i, j) = std::unique_ptr<LRTile<scalar_t>>
+          (new LRTile<scalar_t>(tile(A, i, j), opts));
+        auto& t = tile(i, j);
+        if (t.rank()*(t.rows() + t.cols()) > t.rows()*t.cols())
+          create_dense_tile(i, j, A);
       }
 
       template<typename T> friend void

@@ -334,7 +334,8 @@ namespace strumpack {
 
     switch (opts_.Krylov_solver()) {
     case KrylovSolver::AUTO: {
-      if (opts_.use_HSS() && x.cols() == 1)
+      if ((opts_.use_HSS() || opts_.use_BLR())
+          && x.cols() == 1)
         gmres(MFsolve);
       else refine();
     }; break;

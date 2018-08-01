@@ -359,8 +359,8 @@ namespace strumpack {
     std::vector<integer_t> sep_csr_ptr, sep_csr_ind;
 
     std::function<void(integer_t)> reorder_separator = [&](integer_t sep) {
-      auto sep_begin = local_sep_tree->sizes()[sep];
-      auto sep_end = local_sep_tree->sizes()[sep+1];
+      auto sep_begin = local_sep_tree->sizes(sep);
+      auto sep_end = local_sep_tree->sizes(sep+1);
       auto dim_sep = sep_end - sep_begin;
       // this front (and its descendants) are not HSS
       if (dim_sep < opts.HSS_min_sep_size()) return;
@@ -413,11 +413,11 @@ namespace strumpack {
         for (integer_t i=sep_begin; i<sep_end; i++)
           local_sep_order[i] = -local_sep_order[i];
       }
-      local_sep_tree->HSS_trees()[sep] = tree;
-      if (local_sep_tree->lch()[sep] != -1)
-        reorder_separator(local_sep_tree->lch()[sep]);
-      if (local_sep_tree->rch()[sep] != -1)
-        reorder_separator(local_sep_tree->rch()[sep]);
+      local_sep_tree->HSS_tree(sep) = tree;
+      if (local_sep_tree->lch(sep) != -1)
+        reorder_separator(local_sep_tree->lch(sep));
+      if (local_sep_tree->rch(sep) != -1)
+        reorder_separator(local_sep_tree->rch(sep));
     };
     if (local_sep_tree->separators() > 0)
       reorder_separator(local_sep_tree->root());
@@ -500,7 +500,7 @@ namespace strumpack {
       } else
         for (integer_t i=0; i<dim_dsep; i++)
           dsep_order[i] = i+dsep_begin;
-      this->sep_tree->HSS_trees()[dsep_internal] = tree;
+      this->sep_tree->HSS_tree(dsep_internal) = tree;
       for (integer_t i=0; i<dim_dsep; i++)
         dsep_iorder[dsep_order[i]-dsep_begin] = i;
     }
@@ -530,12 +530,12 @@ namespace strumpack {
     proc_dist_sep = new integer_t[this->sep_tree->separators()];
     for (integer_t sep=0, p_local=0, p_dist=0;
          sep<this->sep_tree->separators(); sep++) {
-      if (this->sep_tree->lch()[sep] == -1) {
+      if (this->sep_tree->lch(sep) == -1) {
         // sep is a leaf, so it is the local graph of proces p
         if (p_local==rank) dsep_leaf = sep;
         sub_graph_ranges[p_local] =
-          std::make_pair(this->sep_tree->sizes()[sep],
-                         this->sep_tree->sizes()[sep+1]);
+          std::make_pair(this->sep_tree->sizes(sep),
+                         this->sep_tree->sizes(sep+1));
         proc_dist_sep[sep] = p_local++;
       } else {
         // sep was computed using distributed nested dissection,
@@ -543,8 +543,8 @@ namespace strumpack {
         if (p_dist==rank)
           dsep_internal = sep;
         dist_sep_ranges[p_dist] =
-          std::make_pair(this->sep_tree->sizes()[sep],
-                         this->sep_tree->sizes()[sep+1]);
+          std::make_pair(this->sep_tree->sizes(sep),
+                         this->sep_tree->sizes(sep+1));
         proc_dist_sep[sep] = p_dist++;
       }
     }

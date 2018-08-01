@@ -45,7 +45,7 @@ namespace strumpack {
 
     static void extend_add_copy_to_buffers
     (const DistM_t& CB, std::vector<std::vector<scalar_t>>& sbuf,
-     const FrontalMatrixDenseMPI<scalar_t,integer_t>* pa,
+     const FrontalMatrixMPI<scalar_t,integer_t>* pa,
      const std::vector<std::size_t>& I) {
       if (!CB.active()) return;
       assert(CB.fixed());
@@ -126,8 +126,8 @@ namespace strumpack {
 
     static void extend_add_seq_copy_to_buffers
     (const DenseM_t& CB, std::vector<std::vector<scalar_t>>& sbuf,
-     const FrontalMatrixDenseMPI<scalar_t,integer_t>* pa,
-     const FrontalMatrixDense<scalar_t,integer_t>* ch) {
+     const FrontalMatrixMPI<scalar_t,integer_t>* pa,
+     const FrontalMatrix<scalar_t,integer_t>* ch) {
       std::size_t u2s;
       const auto I = ch->upd_to_parent(pa, u2s);
       const std::size_t du = ch->dim_upd();
@@ -175,9 +175,10 @@ namespace strumpack {
 
     static void extend_add_seq_copy_from_buffers
     (DistM_t& F11, DistM_t& F12, DistM_t& F21, DistM_t& F22,
-     scalar_t*& pbuf, const FrontalMatrixDenseMPI<scalar_t,integer_t>* pa,
-     const FrontalMatrixDense<scalar_t,integer_t>* ch) {
+     scalar_t** ppbuf, const FrontalMatrixMPI<scalar_t,integer_t>* pa,
+     const FrontalMatrix<scalar_t,integer_t>* ch) {
       if (!(F11.active() || F22.active())) return;
+      auto pbuf = *ppbuf;
       const auto ch_dim_upd = ch->dim_upd();
       const auto ch_upd = ch->upd;
       const auto pa_upd = pa->upd;
@@ -234,8 +235,8 @@ namespace strumpack {
 
     static void extend_add_copy_from_buffers
     (DistM_t& F11, DistM_t& F12, DistM_t& F21, DistM_t& F22,
-     scalar_t** pbuf, const FrontalMatrixDenseMPI<scalar_t,integer_t>* pa,
-     const FrontalMatrixDenseMPI<scalar_t,integer_t>* ch) {
+     scalar_t** pbuf, const FrontalMatrixMPI<scalar_t,integer_t>* pa,
+     const FrontalMatrixMPI<scalar_t,integer_t>* ch) {
       if (!(F11.active() || F22.active())) return;
       const auto ch_dim_upd = ch->dim_upd();
       const auto ch_upd = ch->upd;

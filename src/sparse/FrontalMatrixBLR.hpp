@@ -40,6 +40,7 @@
 #include "CompressedSparseMatrix.hpp"
 #include "MatrixReordering.hpp"
 #include "BLR/BLRMatrix.hpp"
+#include "ExtendAdd.hpp"
 
 namespace strumpack {
 
@@ -48,7 +49,9 @@ namespace strumpack {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
+    using ExtAdd = ExtendAdd<scalar_t,integer_t>;
     using BLRM_t = BLR::BLRMatrix<scalar_t>;
+    using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
 
   public:
     FrontalMatrixBLR
@@ -77,11 +80,20 @@ namespace strumpack {
     void extract_CB_sub_matrix
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
      DenseM_t& B, int task_depth) const override;
+
     std::string type() const override { return "FrontalMatrixBLR"; }
 
+    void extend_add_copy_to_buffers
+    (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override;
+
+    void set_BLR_partitioning
+    (const SPOptions<scalar_t>& opts,
+     const HSS::HSSPartitionTree& sep_tree,
+     const std::vector<bool>& adm, bool is_root) override;
     void set_HSS_partitioning
     (const SPOptions<scalar_t>& opts,
-     const HSS::HSSPartitionTree& sep_tree, bool is_root) override;
+     const HSS::HSSPartitionTree& sep_tree,
+     bool is_root) override;
 
   private:
     DenseM_t F11_, F12_, F21_, F22_;
@@ -89,6 +101,7 @@ namespace strumpack {
     std::vector<int> piv_;
     std::vector<std::size_t> sep_tiles_;
     std::vector<std::size_t> upd_tiles_;
+    std::vector<bool> adm_;
 
     FrontalMatrixBLR(const FrontalMatrixBLR&) = delete;
     FrontalMatrixBLR& operator=(FrontalMatrixBLR const&) = delete;
@@ -209,7 +222,10 @@ namespace strumpack {
       this->rchild->extend_add_to_dense
         (F11_, F12_, F21_, F22_, this, task_depth);
     if (this->dim_sep()) {
-      F11blr_ = BLRM_t(sep_tiles_, F11_, piv_, opts.BLR_options());
+      F11blr_ = BLRM_t(sep_tiles_,
+                       [&](std::size_t i, std::size_t j) -> bool {
+                         return adm_[i+j*sep_tiles_.size()]; },
+                       F11_, piv_, opts.BLR_options());
       F11_.clear();
       if (this->dim_upd()) {
         F12_.laswp(piv_, true);
@@ -226,6 +242,12 @@ namespace strumpack {
       }
     }
     // TODO flops
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixBLR<scalar_t,integer_t>::extend_add_copy_to_buffers
+  (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
+    ExtAdd::extend_add_seq_copy_to_buffers(F22_, sbuf, pa, this);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -418,6 +440,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> long long
   FrontalMatrixBLR<scalar_t,integer_t>::node_factor_nonzeros() const {
+    std::cout << "Memory!!" << std::endl;
     return F11blr_.nonzeros() + F12blr_.nonzeros() + F21blr_.nonzeros();
   }
 
@@ -425,10 +448,30 @@ namespace strumpack {
   FrontalMatrixBLR<scalar_t,integer_t>::set_HSS_partitioning
   (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
    bool is_root) {
+    std::cout << "set admissibility condition!!" << std::endl;
     if (this->dim_sep()) {
       assert(sep_tree.size == this->dim_sep());
       auto lf = sep_tree.leaf_sizes();
       sep_tiles_.assign(lf.begin(), lf.end());
+      adm_.resize(sep_tiles_.size()*sep_tiles_.size(), true);
+    }
+    if (this->dim_upd()) {
+      auto leaf = opts.BLR_options().leaf_size();
+      auto nt = std::ceil(float(this->dim_upd()) / leaf);
+      upd_tiles_.resize(nt, leaf);
+      upd_tiles_.back() = this->dim_upd() - leaf*(nt-1);
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixBLR<scalar_t,integer_t>::set_BLR_partitioning
+  (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
+   const std::vector<bool>& adm, bool is_root) {
+    if (this->dim_sep()) {
+      assert(sep_tree.size == this->dim_sep());
+      auto lf = sep_tree.leaf_sizes();
+      sep_tiles_.assign(lf.begin(), lf.end());
+      adm_ = adm;
     }
     if (this->dim_upd()) {
       auto leaf = opts.BLR_options().leaf_size();

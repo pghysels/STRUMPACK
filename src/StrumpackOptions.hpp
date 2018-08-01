@@ -31,7 +31,7 @@
 #ifndef SPOPTIONS_HPP
 #define SPOPTIONS_HPP
 
-#include <string.h>
+#include <cstring>
 
 // this is needed for RealType, put that somewhere else?
 #include "dense/BLASLAPACKWrapper.hpp"

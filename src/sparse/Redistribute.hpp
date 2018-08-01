@@ -158,7 +158,7 @@ namespace strumpack {
         p_buf += sizeof(float)*nbsep;
         for (integer_t s=0; s<nbsep+1; s++) {
           *reinterpret_cast<integer_t*>(p_buf) =
-            nd.local_sep_tree->sizes()[s] + nd.sub_graph_range.first;
+            nd.local_sep_tree->sizes(s) + nd.sub_graph_range.first;
           p_buf += sizeof(integer_t);
         }
         for (integer_t i=0; i<nbsep; i++) {

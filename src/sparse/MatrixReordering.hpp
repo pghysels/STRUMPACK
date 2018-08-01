@@ -156,13 +156,19 @@ namespace strumpack {
                   << std::endl;
         return 1;
       }
+      int leaf = A->size();
+      int min_sep_size = A->size();
+      if (opts.use_HSS()) {
+        leaf = opts.HSS_options().leaf_size();
+        min_sep_size = opts.HSS_min_sep_size();
+      }
+      if (opts.use_BLR()) {
+        leaf = opts.BLR_options().leaf_size();
+        min_sep_size = opts.BLR_min_sep_size();
+      }
       sep_tree = geometric_nested_dissection
         (nx, ny, nz, components, width, perm, iperm, opts.nd_param(),
-         opts.HSS_options().leaf_size(), opts.HSS_min_sep_size());
-      // sep_tree = aggressive_amalgamation(A, perm, iperm, opts);
-      // // auto n = nx*ny*nz*components;
-      //sep_tree = build_sep_tree_from_perm
-      //(n, A->get_ptr(), A->get_ind(), perm, iperm);
+         leaf, min_sep_size);
       break;
     }
     case ReorderingStrategy::RCM: {
@@ -316,42 +322,60 @@ namespace strumpack {
   MatrixReordering<scalar_t,integer_t>::separator_reordering_recursive
   (const SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
    bool hss_parent, integer_t sep, integer_t* sorder) {
-    auto sep_begin = sep_tree->sizes()[sep];
-    auto sep_end = sep_tree->sizes()[sep + 1];
+    auto sep_begin = sep_tree->sizes(sep);
+    auto sep_end = sep_tree->sizes(sep + 1);
     auto dim_sep = sep_end - sep_begin;
     bool is_hss = hss_parent && (dim_sep >= opts.HSS_min_sep_size());
-    if (is_hss) {
-      if (sep_tree->lch()[sep] != -1) {
+    bool is_blr = opts.use_BLR() && (dim_sep >= opts.BLR_min_sep_size());
+    if (is_hss || is_blr) {
+      int min_sep = is_hss ? opts.HSS_min_sep_size() : opts.BLR_min_sep_size();
+      if (sep_tree->lch(sep) != -1) {
 #pragma omp task firstprivate(sep) default(shared)
         separator_reordering_recursive
-          (opts, A, is_hss, sep_tree->lch()[sep], sorder);
+          (opts, A, is_hss, sep_tree->lch(sep), sorder);
       }
-      if (sep_tree->rch()[sep] != -1) {
+      if (sep_tree->rch(sep) != -1) {
 #pragma omp task firstprivate(sep) default(shared)
         separator_reordering_recursive
-          (opts, A, is_hss, sep_tree->rch()[sep], sorder);
+          (opts, A, is_hss, sep_tree->rch(sep), sorder);
       }
 #pragma omp taskwait
       HSS::HSSPartitionTree hss_tree(dim_sep);
-      if (dim_sep > 2 * opts.HSS_min_sep_size()) {
+      std::vector<bool> adm;
+      if (dim_sep > 2 * min_sep) {
         integer_t nr_parts = 0;
         split_separator(opts, hss_tree, nr_parts, sep, A, 0, 1, sorder);
+
+        // for BLR find which blocks are admissible
+        adm.resize(nr_parts*nr_parts, true);
+        for (integer_t i=sep_begin; i<sep_end; i++) {
+          auto pi = sorder[i];
+          for (integer_t j=A->get_ptr()[i]; j<A->get_ptr()[i+1]; j++) {
+            auto ij = A->get_ind()[j];
+            if (ij < sep_begin || ij >= sep_end) continue;
+            auto pj = sorder[ij];
+            if (pi != pj)
+              adm[pi+nr_parts*pj] = adm[pj+nr_parts*pi] = false;
+          }
+        }
+
         auto count = sep_begin;
         for (integer_t part=0; part<nr_parts; part++)
           for (integer_t i=sep_begin; i<sep_end; i++)
             if (sorder[i] == part) sorder[i] = -count++;
       } else for (integer_t i=sep_begin; i<sep_end; i++) sorder[i] = -i;
 #pragma omp critical
-      {
-        sep_tree->HSS_trees()[sep] = hss_tree; // not thread safe!
+      {  // not thread safe!
+        sep_tree->set_HSS_tree(sep, std::move(hss_tree));
+        sep_tree->set_admissibility(sep, std::move(adm));
       }
     } else {
-      if (sep_tree->lch()[sep] != -1)
+      if (sep_tree->lch(sep) != -1)
         separator_reordering_recursive
-          (opts, A, is_hss, sep_tree->lch()[sep], sorder);
-      if (sep_tree->rch()[sep] != -1)
+          (opts, A, is_hss, sep_tree->lch(sep), sorder);
+      if (sep_tree->rch(sep) != -1)
         separator_reordering_recursive
-          (opts, A, is_hss, sep_tree->rch()[sep], sorder);
+          (opts, A, is_hss, sep_tree->rch(sep), sorder);
       for (integer_t i=sep_begin; i<sep_end; i++) sorder[i] = -i;
     }
   }
@@ -361,8 +385,8 @@ namespace strumpack {
   (const SPOptions<scalar_t>& opts, HSS::HSSPartitionTree& hss_tree,
    integer_t& nr_parts, integer_t sep, CSRMatrix<scalar_t,integer_t>* A,
    integer_t part, integer_t count, integer_t* sorder) {
-    auto sep_begin = sep_tree->sizes()[sep];
-    auto sep_end = sep_tree->sizes()[sep+1];
+    auto sep_begin = sep_tree->sizes(sep);
+    auto sep_end = sep_tree->sizes(sep+1);
     std::vector<idx_t> xadj, adjncy;
     extract_separator(opts, part, sep_begin, sep_end, A, xadj, adjncy, sorder);
     idx_t ncon = 1, edge_cut = 0, two = 2, nvtxs=xadj.size()-1;
@@ -383,8 +407,10 @@ namespace strumpack {
         hss_tree.c[p].size++;
       }
     delete[] partitioning;
+    int leaf = opts.use_HSS() ? opts.HSS_options().leaf_size() :
+      opts.BLR_options().leaf_size();
     for (integer_t p=0; p<2; p++)
-      if (hss_tree.c[p].size > 2 * opts.HSS_options().leaf_size())
+      if (hss_tree.c[p].size > 2 * leaf)
         split_separator(opts, hss_tree.c[p], nr_parts, sep, A,
                         -count-p, count+2, sorder);
       else std::replace(sorder+sep_begin, sorder+sep_end,
