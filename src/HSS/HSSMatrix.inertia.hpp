@@ -31,8 +31,8 @@ namespace strumpack {
           a = D(k,k);
           b = D(k+1,k);
           c = D(k+1,k+1);
-          auto lam1 = 0.5*( (a+c) + std::sqrt((a-c)*(a-c) + 4.*b*b));
-          auto lam2 = 0.5*( (a+c) - std::sqrt((a-c)*(a-c) + 4.*b*b));
+          auto lam1 = scalar_t(0.5)*( (a+c) + std::sqrt((a-c)*(a-c) + scalar_t(4.)*b*b));
+          auto lam2 = scalar_t(0.5)*( (a+c) - std::sqrt((a-c)*(a-c) + scalar_t(4.)*b*b));
           if (std::real(lam1) > 0.) {
             np += 1;
           } else if (std::real(lam1) < 0.) {
@@ -133,17 +133,19 @@ namespace strumpack {
       // D12 = -E*C11  + C21
       // D21 = -C11*E' + C12   = D12'
       // D22 =  C11
-      DenseM_t C12(E_cols, E_rows, Dt, 0, E_cols);
+      DenseMW_t C12(E_cols, E_rows, Dt, 0, E_cols);
+      DenseMW_t C21(E_rows, E_cols, Dt, E_cols, 0);
       DenseM_t D22(E_cols, E_cols, Dt, 0, 0); // D22 = C11
 
-      DenseM_t D11(E_rows, E_rows, Dt, E_cols, E_cols); // D11 <-- C22
-      gemm(Trans::N, Trans::C, scalar_t(1.), D22, _U.E(), scalar_t(-2.), C12);
+      DenseMW_t D11(E_rows, E_rows, Dt, E_cols, E_cols); // D11 <-- C22
+      gemm(Trans::N, Trans::C, scalar_t(1.), D22, _U.E(), scalar_t(-1.), C12);
       gemm(Trans::N, Trans::N, scalar_t(1.), _U.E(), C12, scalar_t(1.), D11);
+      gemm(Trans::N, Trans::C, scalar_t(-1.), C21, _U.E(), scalar_t(1.), D11);
 
-      DenseM_t D12(E_rows, E_cols, Dt, E_cols, 0); // D12 <-- C21
+      DenseMW_t D12(E_rows, E_cols, Dt, E_cols, 0); // D12 <-- C21
       gemm(Trans::N, Trans::N, scalar_t(-1.), _U.E(), D22, scalar_t(1.), D12);
 
-      DenseM_t D21 = D12.transpose();
+      auto D21 = D12.transpose();
 
       // LDL(Db(1:rtop, 1:rtop)), then form S = D22 - D21 inv(D11) D12 with inv(D11) using LDL
       auto IPIV = D11.sytrf();
