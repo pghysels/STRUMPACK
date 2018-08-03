@@ -130,6 +130,11 @@ namespace strumpack {
                            construct HSS matrix of this front */
     std::uint32_t _sampled_columns = 0;
 
+    Inertia inertia_node() const override {
+      if (this->dim_upd()) return _H.child(0)->inertia();
+      else return _H.inertia();
+    }
+
   private:
     FrontalMatrixHSS(const FrontalMatrixHSS&) = delete;
     FrontalMatrixHSS& operator=(FrontalMatrixHSS const&) = delete;

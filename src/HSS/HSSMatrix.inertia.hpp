@@ -5,25 +5,21 @@ namespace strumpack {
   namespace HSS {
 
     // assumes both A and HSS(A) compression are real symmetric
-    template<typename scalar_t> HSSInertia<scalar_t> HSSMatrix<scalar_t>::inertia() const {
-      HSSInertia<scalar_t> in;
+    template<typename scalar_t> Inertia HSSMatrix<scalar_t>::inertia() const {
       WorkInertia<scalar_t> w;
-      inertia_recursive(in, w, true, 0);
-      return in;
+      return inertia_recursive(w, true, 0);
     }
 
 
-    template<typename scalar_t> void HSSMatrix<scalar_t>::readInertiaOffBlockDiag(HSSInertia<scalar_t>& in, const DenseM_t D, const std::vector<int>& IPIV) const{
-      unsigned int np = 0;
-      unsigned int nn = 0;
-      unsigned int nz = 0;
+    template<typename scalar_t> Inertia HSSMatrix<scalar_t>::readInertiaOffBlockDiag(const DenseM_t D, const std::vector<int>& IPIV) const{
+      Inertia in;
       unsigned int k  = 0;
       scalar_t a;
       scalar_t b;
       scalar_t c;
       auto nD = D.rows();
       if (nD == 0) {
-        return;
+        return in;
       }
       while (k < nD-1) {
         if ((IPIV[k+1] < 0) && (IPIV[k]==IPIV[k+1])){
@@ -34,18 +30,18 @@ namespace strumpack {
           auto lam1 = scalar_t(0.5)*( (a+c) + std::sqrt((a-c)*(a-c) + scalar_t(4.)*b*b));
           auto lam2 = scalar_t(0.5)*( (a+c) - std::sqrt((a-c)*(a-c) + scalar_t(4.)*b*b));
           if (std::real(lam1) > 0.) {
-            np += 1;
+            in.np += 1;
           } else if (std::real(lam1) < 0.) {
-            nn += 1;
+            in.nn += 1;
           } else {
-            nz += 1;
+            in.nz += 1;
           }
           if (std::real(lam2) > 0.) {
-            np += 1;
+            in.np += 1;
           } else if (std::real(lam2) < 0.) {
-            nn += 1;
+            in.nn += 1;
           } else {
-            nz += 1;
+            in.nz += 1;
           }
           k += 2;
 
@@ -53,11 +49,11 @@ namespace strumpack {
           // 1x1 block
           a = D(k,k);
           if (std::real(a) > 0.) {
-            np += 1;
+            in.np += 1;
           } else if (std::real(a) < 0.) {
-            nn += 1;
+            in.nn += 1;
           } else {
-            nz += 1;
+            in.nz += 1;
           }
           k += 1;
         }
@@ -65,31 +61,32 @@ namespace strumpack {
       if (k < nD) { // need one more 1x1 block to finish
         a = D(k,k);
         if (std::real(a) > 0.) {
-          np += 1;
+          in.np += 1;
         } else if (std::real(a) < 0.) {
-          nn += 1;
+          in.nn += 1;
         } else {
-          nz += 1;
+          in.nz += 1;
         }
         k += 1;
       }
-      in.np += np;
-      in.nn += nn;
-      in.nz += nz;
+      // in.np += np;
+      // in.nn += nn;
+      // in.nz += nz;
+      return in;
     }
 
-    template<typename scalar_t> void HSSMatrix<scalar_t>::inertia_recursive(HSSInertia<scalar_t>& in, WorkInertia<scalar_t>& w, bool isroot, int depth) const {
-
+    template<typename scalar_t> Inertia HSSMatrix<scalar_t>::inertia_recursive(WorkInertia<scalar_t>& w, bool isroot, int depth) const {
+      Inertia in;
       DenseM_t Dt;
       // Form Dt
       if (!this->leaf()){
         w.c.resize(2);
-        in.ch.resize(2);
-        this->_ch[0]->inertia_recursive(in.ch[0], w.c[0], false, depth+1);
-        this->_ch[1]->inertia_recursive(in.ch[1], w.c[1], false, depth+1);
-        in.np = in.ch[0].np + in.ch[1].np;
-        in.nn = in.ch[0].nn + in.ch[1].nn;
-        in.nz = in.ch[0].nz + in.ch[1].nz;
+        //in.ch.resize(2);
+        Inertia in0 = this->_ch[0]->inertia_recursive(w.c[0], false, depth+1);
+        Inertia in1 = this->_ch[1]->inertia_recursive(w.c[1], false, depth+1);
+        in.np = in0.np + in1.np;
+        in.nn = in0.nn + in1.nn;
+        in.nz = in0.nz + in1.nz;
         // Form Dt = [S{ch1} B12{i}; B21{i} S{ch2}]
         auto u_size = this->_ch[0]->U_rank() + this->_ch[1]->U_rank();
         Dt = DenseM_t(u_size, u_size);
@@ -109,7 +106,10 @@ namespace strumpack {
       if (isroot) {
       // LDL(Dt) for what is remaining
       auto IPIV = Dt.sytrf();
-      readInertiaOffBlockDiag(in, Dt, IPIV);
+      auto inroot = readInertiaOffBlockDiag(Dt, IPIV);
+      in.np += inroot.np;
+      in.nn += inroot.nn;
+      in.nz += inroot.nz;
 
       } else {
 
@@ -149,12 +149,15 @@ namespace strumpack {
 
       // LDL(Db(1:rtop, 1:rtop)), then form S = D22 - D21 inv(D11) D12 with inv(D11) using LDL
       auto IPIV = D11.sytrf();
-      readInertiaOffBlockDiag(in, D11, IPIV);
+      auto inD11 = readInertiaOffBlockDiag(D11, IPIV);
+      in.np += inD11.np;
+      in.nn += inD11.nn;
+      in.nz += inD11.nz;
       sytrs(UpLo::L, D11, IPIV, D12);
       gemm(Trans::N, Trans::N, scalar_t(-1.), D21, D12, scalar_t(1.), D22);
       w.S = D22;
       }
-
+      return in;
     }
 
   }

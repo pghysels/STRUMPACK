@@ -141,6 +141,18 @@ namespace strumpack {
      bool is_root) {}
 
 
+    virtual Inertia inertia() const {
+      Inertia i = inertia_node();
+      Inertia il, ir;
+      if (lchild) il = lchild->inertia();
+      if (rchild) ir = rchild->inertia();
+      i.np = i.np + il.np + ir.np;
+      i.nn = i.nn + il.nn + ir.nn;
+      i.nz = i.nz + il.nz + ir.nz;
+      return i;
+    }
+    virtual Inertia inertia_node() const = 0;
+
     // TODO compute this (and levels) once, store it
     // maybe compute it when setting pointers to the children
     // create setters/getters for the children

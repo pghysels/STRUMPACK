@@ -88,6 +88,10 @@ int main(int argc, char* argv[]) {
   // with the solution as initial guess should stop immediately
   spss.solve(b, x, true);
 
+  auto in = spss.inertia();
+  std::cout << "Inertia = {" << in.np << ","
+            << in.nn << "," << in.nz << "}" << std::endl;
+
   std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
             << A.max_scaled_residual(x, b) << std::endl;
   x.scaled_add(-1., x_exact);

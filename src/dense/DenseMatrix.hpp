@@ -166,6 +166,13 @@ namespace strumpack {
 
     void shift(scalar_t sigma);
 
+    Inertia inertia() const {
+      // TODO
+      Inertia in;
+      in.np = rows();
+      return in;
+    }
+
   private:
     void ID_column_MGS
     (DenseMatrix<scalar_t>& X, std::vector<int>& piv,

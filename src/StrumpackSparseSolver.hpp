@@ -229,6 +229,8 @@ namespace strumpack {
         (Krylov) iterative solver. */
     int Krylov_iterations() const { return _Krylov_its; }
 
+    Inertia inertia() const { return tree()->inertia(); }
+
   protected:
     virtual void setup_tree();
     virtual void setup_reordering();

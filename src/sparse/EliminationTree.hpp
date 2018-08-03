@@ -64,6 +64,8 @@ namespace strumpack {
     virtual int nr_HSS_fronts() const { return _nr_HSS_fronts; }
     virtual int nr_dense_fronts() const { return _nr_dense_fronts; }
 
+    virtual Inertia inertia() const { return _root->inertia(); }
+
   protected:
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using FD_t = FrontalMatrixDense<scalar_t,integer_t>;

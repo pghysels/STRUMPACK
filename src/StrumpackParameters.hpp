@@ -39,6 +39,14 @@
 
 namespace strumpack { // these are all global variables
 
+  class Inertia {
+  public:
+    Inertia() {}
+    std::size_t np = 0;
+    std::size_t nn = 0;
+    std::size_t nz = 0;
+  };
+
   /*! \brief Enumeration for the possible return codes.
    * \ingroup Enumerations */
   enum class ReturnCode {
