@@ -93,13 +93,15 @@ namespace strumpack {
     }
 
     // TODO use MPI_Comm_split??
-    MPIComm sub(int P0, int P) const {
+    MPIComm sub(int P0, int P, int stride=1) const {
       if (is_null() || size() == 1)
         return MPIComm(MPI_COMM_NULL);
       assert(P0 + P <= size());
       MPIComm sub_comm;
       std::vector<int> sub_ranks(P);
-      std::iota(sub_ranks.begin(), sub_ranks.end(), P0);
+      //std::iota(sub_ranks.begin(), sub_ranks.end(), P0);
+      for (int i=0; i<P; i++)
+        sub_ranks[i] = P0 + i*stride;
       MPI_Group group, sub_group;
       MPI_Comm_group(comm_, &group);                          // get group from comm
       MPI_Group_incl(group, P, sub_ranks.data(), &sub_group); // group ranks [P0,P0+P) into sub_group

@@ -340,6 +340,7 @@ install(FILES
   src/sparse/FrontalMatrixHSSMPI.hpp
   src/sparse/FrontalMatrixMPI.hpp
   src/sparse/FrontalMatrixBLR.hpp
+  src/sparse/FrontalMatrixBLRMPI.hpp
   src/sparse/GMRes.hpp
   src/sparse/GMResMPI.hpp
   src/sparse/GeometricReordering.hpp
@@ -365,6 +366,7 @@ if(STRUMPACK_USE_COMBBLAS)
 endif()
 
 install(FILES src/BLR/BLRMatrix.hpp
+  src/BLR/BLRMatrixMPI.hpp
   src/BLR/BLROptions.hpp
   DESTINATION include/BLR)
 

@@ -41,6 +41,8 @@
 #include "FrontalMatrixHSS.hpp"
 #include "FrontalMatrixDense.hpp"
 #include "FrontalMatrixDenseMPI.hpp"
+#include "FrontalMatrixHSSMPI.hpp"
+#include "FrontalMatrixBLRMPI.hpp"
 #include "Redistribute.hpp"
 #include "HSS/HSSPartitionTree.hpp"
 
@@ -58,6 +60,7 @@ namespace strumpack {
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
     using FDMPI_t = FrontalMatrixDenseMPI<scalar_t,integer_t>;
     using FHSSMPI_t = FrontalMatrixHSSMPI<scalar_t,integer_t>;
+    using FBLRMPI_t = FrontalMatrixBLRMPI<scalar_t,integer_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
     using SepRange = std::pair<std::size_t,std::size_t>;
 
@@ -912,9 +915,15 @@ namespace strumpack {
              dsep_upd, fcomm, P);
           front->set_HSS_partitioning(opts, sep_hss_partition, level == 0);
         } else {
-          if (is_blr) std::cout << "TODO BLR MPI, (using dense instead)" << std::endl;
-          front = new FDMPI_t
-            (local_pfronts_.size(), dsep_begin, dsep_end, dsep_upd, fcomm, P);
+          if (is_blr) {
+            front = new FBLRMPI_t
+              (local_pfronts_.size(), dsep_begin, dsep_end,
+               dsep_upd, fcomm, P);
+            front->set_HSS_partitioning(opts, sep_hss_partition, level == 0);
+          } else
+            front = new FDMPI_t
+              (local_pfronts_.size(), dsep_begin, dsep_end,
+               dsep_upd, fcomm, P);
         }
         if (rank_ >= P0 && rank_ < P0+P) {
           auto fpar = static_cast<FMPI_t*>(front);
@@ -992,9 +1001,13 @@ namespace strumpack {
             (local_pfronts_.size(), sep_begin, sep_end, upd, fcomm, P);
           front->set_HSS_partitioning(opts, tree.sep_HSS_tree[sep], level == 0);
         } else {
-          if (is_blr) std::cout << "TODO BLR MPI, (using dense instead)" << std::endl;
-          front = new FDMPI_t
-            (local_pfronts_.size(), sep_begin, sep_end, upd, fcomm, P);
+          if (is_blr) {
+            front = new FBLRMPI_t
+              (local_pfronts_.size(), sep_begin, sep_end, upd, fcomm, P);
+            front->set_HSS_partitioning(opts, tree.sep_HSS_tree[sep], level == 0);
+          } else
+            front = new FDMPI_t
+              (local_pfronts_.size(), sep_begin, sep_end, upd, fcomm, P);
         }
         if (rank_ >= P0 && rank_ < P0+P) {
           auto fpar = static_cast<FMPI_t*>(front);
