@@ -317,7 +317,7 @@ namespace strumpack {
     auto MFsolve = [&](scalar_t* w) {
       //MPI_Pcontrol(1, "multifrontal_solve_dist");
       DenseMW_t X(n_local, x.cols(), w, x.ld());
-      tree()->multifrontal_solve_dist(X, mat_mpi_->get_dist());
+      tree()->multifrontal_solve_dist(X, mat_mpi_->dist());
       //MPI_Pcontrol(-1, "multifrontal_solve_dist");
     };
     auto refine = [&]() {
@@ -325,7 +325,7 @@ namespace strumpack {
       (comm_.comm(), *mat_mpi_.get(),
        //MFsolve, n_local, x.data(), bloc.data(),
        [&](DenseM_t& w) {
-        tree()->multifrontal_solve_dist(w, mat_mpi_->get_dist()); },
+        tree()->multifrontal_solve_dist(w, mat_mpi_->dist()); },
        x, bloc,
        opts_.rel_tol(), opts_.abs_tol(),
        this->Krylov_its_, opts_.maxit(),
@@ -361,7 +361,7 @@ namespace strumpack {
     case KrylovSolver::DIRECT: {
       // TODO bloc is already a copy, avoid extra copy?
       x = bloc;
-      tree()->multifrontal_solve_dist(x, mat_mpi_->get_dist());
+      tree()->multifrontal_solve_dist(x, mat_mpi_->dist());
     }; break;
     }
 
@@ -369,7 +369,7 @@ namespace strumpack {
       // TODO do this in a single routine/comm phase
       for (std::size_t c=0; c<x.cols(); c++)
         permute_vector
-          (x.ptr(0,c), this->matching_cperm_, mat_mpi_->get_dist(), comm_.comm());
+          (x.ptr(0,c), this->matching_cperm_, mat_mpi_->dist(), comm_.comm());
     if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
       x.scale_rows(this->matching_Dc_);
 

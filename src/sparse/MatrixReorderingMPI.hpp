@@ -184,7 +184,7 @@ namespace strumpack {
         case ReorderingStrategy::NATURAL: {
           for (integer_t i=0; i<A->size(); i++) this->perm[i] = i;
           global_sep_tree = build_sep_tree_from_perm
-            (Aseq->size(), Aseq->get_ptr(), Aseq->get_ind(),
+            (Aseq->size(), Aseq->ptr(), Aseq->ind(),
              this->perm, this->iperm);
           break;
         }
@@ -562,8 +562,8 @@ namespace strumpack {
     auto n = A->size();
     auto sub_n = my_sub_graph->size();
     auto sub_graph_etree =
-      spsymetree(my_sub_graph->get_ptr(), my_sub_graph->get_ptr()+1,
-                 my_sub_graph->get_ind(),
+      spsymetree(my_sub_graph->ptr(), my_sub_graph->ptr()+1,
+                 my_sub_graph->ind(),
                  sub_n, sub_graph_range.first);
     auto post_order = etree_postorder(sub_graph_etree);
     auto iwork = new integer_t[sub_n];

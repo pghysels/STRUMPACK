@@ -801,9 +801,9 @@ namespace strumpack {
       if (sorder[i] == part) {
         xadj.push_back(e);
         std::fill(mark, mark+dsep, false);
-        for (integer_t j=A.get_ptr()[i];
-             j<A.get_ptr()[i+1]; j++) {
-          auto c = A.get_ind()[j];
+        for (integer_t j=A.ptr(i);
+             j<A.ptr(i+1); j++) {
+          auto c = A.ind(j);
           if (c == i) continue;
           auto lc = c - this->sep_begin;
           if (lc >= 0 && lc < dsep && sorder[c]==part && !mark[lc]) {
@@ -812,9 +812,9 @@ namespace strumpack {
             e++;
           } else {
             if (opts.separator_ordering_level() > 0) {
-              for (integer_t k=A.get_ptr()[c];
-                   k<A.get_ptr()[c+1]; k++) {
-                auto cc = A.get_ind()[k];
+              for (integer_t k=A.ptr(c);
+                   k<A.ptr(c+1); k++) {
+                auto cc = A.ind(k);
                 auto lcc = cc - this->sep_begin;
                 if (cc!=i && lcc >= 0 && lcc < dsep &&
                     sorder[cc]==part && !mark[lcc]) {

@@ -45,8 +45,8 @@ namespace strumpack {
   std::unique_ptr<SeparatorTree<integer_t>> aggressive_amalgamation
   (CompressedSparseMatrix<scalar_t,integer_t>* A,
    integer_t* perm, integer_t* iperm, const SPOptions<scalar_t>& opts) {
-    auto ptr = A->get_ptr();
-    auto ind = A->get_ind();
+    auto ptr = A->ptr();
+    auto ind = A->ind();
     int N = A->size();
     int NNZ = A->nnz();
 

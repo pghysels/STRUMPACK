@@ -160,8 +160,8 @@ namespace strumpack {
                            integer_t* perm, integer_t* iperm,
                            const SPOptions<scalar_t>& opts) {
     auto n = A->size();
-    auto ptr = A->get_ptr();
-    auto ind = A->get_ind();
+    auto ptr = A->ptr();
+    auto ind = A->ind();
     SCOTCH_Graph graph;
     SCOTCH_graphInit(&graph);
     auto ptr_nodiag = new SCOTCH_Num[n+1 + ptr[n]-ptr[0]];

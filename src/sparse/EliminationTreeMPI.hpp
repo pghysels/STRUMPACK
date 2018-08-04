@@ -233,9 +233,9 @@ namespace strumpack {
     auto sep_end = tree.sizes(sep+1);
     if (sep != tree.separators()-1) { // not necessary for the root
       for (integer_t c=sep_begin; c<sep_end; c++) {
-        auto ice = A.get_ind()+A.get_ptr()[c+1];
+        auto ice = A.ind()+A.ptr(c+1);
         auto icb = std::lower_bound
-          (A.get_ind()+A.get_ptr()[c], ice, sep_end);
+          (A.ind()+A.ptr(c), ice, sep_end);
         auto mid = upd[sep].size();
         std::copy(icb, ice, std::back_inserter(upd[sep]));
         std::inplace_merge

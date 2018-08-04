@@ -567,10 +567,10 @@ namespace strumpack {
       nd_.sub_graph_range.first;
     for (integer_t r=nd_.local_sep_tree->sizes(sep);
          r<nd_.local_sep_tree->sizes(sep+1); r++) {
-      auto ice = nd_.my_sub_graph->get_ind() +
-        nd_.my_sub_graph->get_ptr()[r+1];
+      auto ice = nd_.my_sub_graph->ind() +
+        nd_.my_sub_graph->ptr(r+1);
       auto icb = std::lower_bound
-        (nd_.my_sub_graph->get_ind() + nd_.my_sub_graph->get_ptr()[r],
+        (nd_.my_sub_graph->ind() + nd_.my_sub_graph->ptr(r),
          ice, sep_end);
       auto mid = upd[sep].size();
       std::copy(icb, ice, std::back_inserter(upd[sep]));
@@ -669,11 +669,11 @@ namespace strumpack {
         auto sep_begin = nd_.dist_sep_range.first;
         auto sep_end = nd_.dist_sep_range.second;
         for (integer_t r=0; r<sep_end-sep_begin; r++) {
-          auto ice = nd_.my_dist_sep->get_ind() +
-            nd_.my_dist_sep->get_ptr()[r+1];
+          auto ice = nd_.my_dist_sep->ind() +
+            nd_.my_dist_sep->ptr(r+1);
           auto icb = std::lower_bound
-            (nd_.my_dist_sep->get_ind() +
-             nd_.my_dist_sep->get_ptr()[r], ice, sep_end);
+            (nd_.my_dist_sep->ind() +
+             nd_.my_dist_sep->ptr(r), ice, sep_end);
           auto mid = dist_upd.size();
           std::copy(icb, ice, std::back_inserter(dist_upd));
           std::inplace_merge

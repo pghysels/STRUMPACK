@@ -123,7 +123,7 @@ namespace strumpack {
     case ReorderingStrategy::NATURAL: {
       for (integer_t i=0; i<A->size(); i++) perm[i] = i;
       sep_tree = build_sep_tree_from_perm
-        (A->size(), A->get_ptr(), A->get_ind(), perm, iperm);
+        (A->size(), A->ptr(), A->ind(), perm, iperm);
       break;
     }
     case ReorderingStrategy::METIS: {
@@ -198,7 +198,7 @@ namespace strumpack {
         case ReorderingStrategy::NATURAL: {
           for (integer_t i=0; i<A->size(); i++) perm[i] = i;
           sep_tree = build_sep_tree_from_perm
-            (A->size(), A->get_ptr(), A->get_ind(), perm, iperm);
+            (A->size(), A->ptr(), A->ind(), perm, iperm);
           break;
         }
         case ReorderingStrategy::METIS: {
@@ -276,7 +276,7 @@ namespace strumpack {
         default: assert(true);
         }
         sep_tree = build_sep_tree_from_perm
-          (n, A->get_ptr(), A->get_ind(), perm, iperm);
+          (n, A->ptr(), A->ind(), perm, iperm);
       }
     }
     nested_dissection_print
@@ -350,8 +350,8 @@ namespace strumpack {
         adm.resize(nr_parts*nr_parts, true);
         for (integer_t i=sep_begin; i<sep_end; i++) {
           auto pi = sorder[i];
-          for (integer_t j=A->get_ptr()[i]; j<A->get_ptr()[i+1]; j++) {
-            auto ij = A->get_ind()[j];
+          for (integer_t j=A->ptr(i); j<A->ptr(i+1); j++) {
+            auto ij = A->ind(j);
             if (ij < sep_begin || ij >= sep_end) continue;
             auto pj = sorder[ij];
             if (pi != pj)
@@ -436,8 +436,8 @@ namespace strumpack {
       if (sorder[i] == part) {
         xadj.push_back(e);
         std::fill(mark, mark+dim_sep, false);
-        for (integer_t j=A->get_ptr()[i]; j<A->get_ptr()[i+1]; j++) {
-          auto c = A->get_ind()[j];
+        for (integer_t j=A->ptr(i); j<A->ptr(i+1); j++) {
+          auto c = A->ind(j);
           if (c == i) continue;
           auto lc = c - sep_begin;
           if (lc >= 0 && lc < dim_sep && sorder[c]==part && !mark[lc]) {
@@ -446,8 +446,8 @@ namespace strumpack {
             e++;
           } else {
             if (opts.separator_ordering_level() > 0) {
-              for (integer_t k=A->get_ptr()[c]; k<A->get_ptr()[c+1]; k++) {
-                auto cc = A->get_ind()[k];
+              for (integer_t k=A->ptr(c); k<A->ptr(c+1); k++) {
+                auto cc = A->ind(k);
                 auto lcc = cc - sep_begin;
                 if (cc!=i && lcc >= 0 && lcc < dim_sep &&
                     sorder[cc]==part && !mark[lcc]) {

@@ -129,7 +129,7 @@ namespace strumpack {
       return s0 + s1 + 1;
     };
     parent(0, 0);
-    sep_tree->pa()[nodes - 1] = -1;
+    sep_tree->pa(nodes - 1) = -1;
 
     // Generates the children positions of all the nodes in
     // a subtree and returns the number of nodes in that
@@ -185,8 +185,8 @@ namespace strumpack {
                           integer_t* perm, integer_t* iperm,
                           const SPOptions<scalar_t>& opts) {
     auto n = A->size();
-    auto ptr = A->get_ptr();
-    auto ind = A->get_ind();
+    auto ptr = A->ptr();
+    auto ind = A->ind();
     auto xadj = new idx_t[n+1 + ptr[n]];
     auto adjncy = xadj + n+1;
     integer_t e = 0;

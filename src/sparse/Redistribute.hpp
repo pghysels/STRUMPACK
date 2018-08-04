@@ -45,7 +45,7 @@ namespace strumpack {
    */
   template<typename scalar_t,typename integer_t> void permute_vector
   (scalar_t* x, std::vector<integer_t>& iorder,
-   std::vector<integer_t>& dist, MPI_Comm comm) {
+   const std::vector<integer_t>& dist, MPI_Comm comm) {
     auto rank = mpi_rank(comm);
     auto P = mpi_nprocs(comm);
     auto lo = dist[rank];

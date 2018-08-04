@@ -166,8 +166,8 @@ namespace strumpack {
   (CSRMatrixMPI<scalar_t,integer_t>* A, MPI_Comm comm, bool build_tree,
    integer_t* perm, const SPOptions<scalar_t>& opts) {
     auto local_rows = A->local_rows();
-    auto ptr = A->get_ptr();
-    auto ind = A->get_ind();
+    auto ptr = A->ptr();
+    auto ind = A->ind();
     auto ptr_nodiag = new SCOTCH_Num[local_rows+1 + ptr[local_rows]];
     auto ind_nodiag = ptr_nodiag + local_rows+1;
     integer_t nnz_nodiag = 0;
@@ -221,9 +221,9 @@ namespace strumpack {
     auto rcnts = new int[2*P];
     auto displs = rcnts + P;
     for (int p=0; p<P; p++) {
-      rcnts[p] = A->get_dist()[p+1] - A->get_dist()[p];
+      rcnts[p] = A->dist(p+1) - A->dist(p);
       // need to copy because displs needs to be 'int'
-      displs[p] = A->get_dist()[p];
+      displs[p] = A->dist(p);
     }
     MPI_Allgatherv(local_order, local_rows, mpi_type<integer_t>(),
                    perm, rcnts, displs, mpi_type<integer_t>(), comm);

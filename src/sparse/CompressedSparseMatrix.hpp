@@ -80,15 +80,24 @@ namespace strumpack {
     CompressedSparseMatrix<scalar_t,integer_t>& operator=
     (CompressedSparseMatrix<scalar_t,integer_t>&& A);
 
-    inline integer_t size() const { return _n; }
-    inline integer_t nnz() const { return _nnz; }
-    inline integer_t* get_ptr() const { return _ptr; }
-    inline integer_t* get_ind() const { return _ind; }
-    inline scalar_t* get_val() const { return _val; }
-    inline bool symm_sparse() const { return _symm_sparse; }
-    inline void set_symm_sparse(bool symm_sparse=true) {
-      _symm_sparse = symm_sparse;
-    }
+    inline integer_t size() const { return n_; }
+    inline integer_t nnz() const { return nnz_; }
+
+    inline const integer_t* ptr() const { return ptr_; }
+    inline const integer_t* ind() const { return ind_; }
+    inline const scalar_t* val() const { return val_; }
+    inline integer_t* ptr() { return ptr_; }
+    inline integer_t* ind() { return ind_; }
+    inline scalar_t* val() { return val_; }
+    inline const integer_t& ptr(integer_t i) const { assert(i <= size()); return ptr_[i]; }
+    inline const integer_t& ind(integer_t i) const { assert(i < nnz()); return ind_[i]; }
+    inline const scalar_t& val(integer_t i) const { assert(i < nnz()); return val_[i]; }
+    inline integer_t& ptr(integer_t i) { assert(i <= size()); return ptr_[i]; }
+    inline integer_t& ind(integer_t i) { assert(i < nnz()); return ind_[i]; }
+    inline scalar_t& val(integer_t i) { assert(i < nnz()); return val_[i]; }
+
+    inline bool symm_sparse() const { return symm_sparse_; }
+    inline void set_symm_sparse(bool symm_sparse=true) { symm_sparse_ = symm_sparse; }
 
     virtual void spmv(const DenseM_t& x, DenseM_t& y) const = 0;
     virtual void omp_spmv(const DenseM_t& x, DenseM_t& y) const = 0;
@@ -156,26 +165,27 @@ namespace strumpack {
      DistM_t& Srow, DistM_t& Scol, int depth) const = 0;
 
   protected:
-    integer_t _n;
-    integer_t _nnz;
-    integer_t* _ptr;
-    integer_t* _ind;
-    scalar_t* _val;
-    bool _symm_sparse;
+    integer_t n_;
+    integer_t nnz_;
+
+    // TODO make this a vector???
+    integer_t* ptr_;
+    integer_t* ind_;
+    scalar_t* val_;
+    bool symm_sparse_;
 
     enum MMsym {GENERAL, SYMMETRIC, SKEWSYMMETRIC, HERMITIAN};
     std::vector<std::tuple<integer_t,integer_t,scalar_t>>
     read_matrix_market_entries(const std::string& filename);
     // void clone_data
     // (const CompressedSparseMatrix<scalar_t,integer_t>& A) const;
-    inline void set_ptr(integer_t* new_ptr) { delete[] _ptr; _ptr = new_ptr; }
-    inline void set_ind(integer_t* new_ind) { delete[] _ind; _ind = new_ind; }
-    inline void set_val(scalar_t* new_val) { delete[] _val; _val = new_val; }
+    inline void set_ptr(integer_t* new_ptr) { delete[] ptr_; ptr_ = new_ptr; }
+    inline void set_ind(integer_t* new_ind) { delete[] ind_; ind_ = new_ind; }
+    inline void set_val(scalar_t* new_val) { delete[] val_; val_ = new_val; }
     virtual bool is_mpi_root() const { return mpi_root(); }
 
     long long spmv_flops() const {
-      return (is_complex<scalar_t>() ? 4 : 1 ) *
-        (2ll * this->_nnz - this->_n);
+      return (is_complex<scalar_t>() ? 4 : 1 ) * (2ll * nnz_ - n_);
     }
     long long spmv_bytes() const {
       // read   ind  nnz  integer_t
@@ -184,80 +194,80 @@ namespace strumpack {
       //        x    n    scalar_t
       //        y    n    scalar_t
       // write  y    n    scalar_t
-      return (sizeof(scalar_t) * 3 + sizeof(integer_t)) * this->_n
-        + (sizeof(scalar_t) + sizeof(integer_t)) * this->_nnz;
+      return (sizeof(scalar_t) * 3 + sizeof(integer_t)) * n_
+        + (sizeof(scalar_t) + sizeof(integer_t)) * nnz_;
     }
   };
 
   template<typename scalar_t,typename integer_t>
   CompressedSparseMatrix<scalar_t,integer_t>::CompressedSparseMatrix()
-    : _n(0), _nnz(0), _ptr(NULL), _ind(NULL), _val(NULL),
-      _symm_sparse(false) {
+    : n_(0), nnz_(0), ptr_(NULL), ind_(NULL), val_(NULL),
+      symm_sparse_(false) {
   }
 
   template<typename scalar_t,typename integer_t>
   CompressedSparseMatrix<scalar_t,integer_t>::CompressedSparseMatrix
   (integer_t n, integer_t nnz, bool symm_sparse)
-    : _n(n), _nnz(nnz), _symm_sparse(symm_sparse) {
-    _ptr = new integer_t[_n+1];
-    _ind = new integer_t[_nnz];
-    _val = new scalar_t[_nnz];
-    _ptr[0] = 0;
-    _ptr[_n] = _nnz;
+    : n_(n), nnz_(nnz), symm_sparse_(symm_sparse) {
+    ptr_ = new integer_t[n_+1];
+    ind_ = new integer_t[nnz_];
+    val_ = new scalar_t[nnz_];
+    ptr_[0] = 0;
+    ptr_[n_] = nnz_;
   }
 
   template<typename scalar_t,typename integer_t>
   CompressedSparseMatrix<scalar_t,integer_t>::CompressedSparseMatrix
   (integer_t n, const integer_t* ptr, const integer_t* ind,
    const scalar_t* val, bool symm_sparsity)
-    : _n(n), _nnz(ptr[_n]-ptr[0]), _ptr(new integer_t[_n+1]),
-      _ind(new integer_t[_nnz]), _val(new scalar_t[_nnz]),
-      _symm_sparse(symm_sparsity) {
-    if (ptr) std::copy(ptr, ptr+_n+1, _ptr);
-    if (ind) std::copy(ind, ind+_nnz, _ind);
-    if (val) std::copy(val, val+_nnz, _val);
+    : n_(n), nnz_(ptr[n_]-ptr[0]), ptr_(new integer_t[n_+1]),
+      ind_(new integer_t[nnz_]), val_(new scalar_t[nnz_]),
+      symm_sparse_(symm_sparsity) {
+    if (ptr) std::copy(ptr, ptr+n_+1, ptr_);
+    if (ind) std::copy(ind, ind+nnz_, ind_);
+    if (val) std::copy(val, val+nnz_, val_);
   }
 
   template<typename scalar_t,typename integer_t>
   CompressedSparseMatrix<scalar_t,integer_t>::CompressedSparseMatrix
   (const CompressedSparseMatrix<scalar_t,integer_t>& A)
-    : _n(A._n), _nnz(A._nnz), _ptr(new integer_t[_n+1]),
-      _ind(new integer_t[_nnz]), _val(new scalar_t[_nnz]),
-      _symm_sparse(A._symm_sparse) {
-    if (A._ptr) std::copy(A._ptr, A._ptr+_n+1, _ptr);
-    if (A._ind) std::copy(A._ind, A._ind+_nnz, _ind);
-    if (A._val) std::copy(A._val, A._val+_nnz, _val);
+    : n_(A.n_), nnz_(A.nnz_), ptr_(new integer_t[n_+1]),
+      ind_(new integer_t[nnz_]), val_(new scalar_t[nnz_]),
+      symm_sparse_(A.symm_sparse_) {
+    if (A.ptr_) std::copy(A.ptr_, A.ptr_+n_+1, ptr_);
+    if (A.ind_) std::copy(A.ind_, A.ind_+nnz_, ind_);
+    if (A.val_) std::copy(A.val_, A.val_+nnz_, val_);
   }
 
   template<typename scalar_t,typename integer_t>
   CompressedSparseMatrix<scalar_t,integer_t>::CompressedSparseMatrix
   (CompressedSparseMatrix<scalar_t,integer_t>&& A)
-    : _n(A._n), _nnz(A._nnz), _symm_sparse(A._symm_sparse) {
-    _ptr = A._ptr; A._ptr = nullptr;
-    _ind = A._ind; A._ind = nullptr;
-    _val = A._val; A._val = nullptr;
+    : n_(A.n_), nnz_(A.nnz_), symm_sparse_(A.symm_sparse_) {
+    ptr_ = A.ptr_; A.ptr_ = nullptr;
+    ind_ = A.ind_; A.ind_ = nullptr;
+    val_ = A.val_; A.val_ = nullptr;
   }
 
   template<typename scalar_t,typename integer_t>
   CompressedSparseMatrix<scalar_t,integer_t>::~CompressedSparseMatrix() {
-    delete[] _ptr;
-    delete[] _ind;
-    delete[] _val;
+    delete[] ptr_;
+    delete[] ind_;
+    delete[] val_;
   }
 
   template<typename scalar_t,typename integer_t>
   CompressedSparseMatrix<scalar_t,integer_t>&
   CompressedSparseMatrix<scalar_t,integer_t>::operator=
   (const CompressedSparseMatrix<scalar_t,integer_t>& A) {
-    _n = A._n;
-    _nnz = A._nnz;
-    _symm_sparse = A._symm_sparse;
-    delete[] _ptr; _ptr = new integer_t[_n+1];
-    delete[] _ind; _ind = new integer_t[_nnz];
-    delete[] _val; _val = new scalar_t[_nnz];
-    if (A._ptr) std::copy(A._ptr, A._ptr+_n+1, _ptr);
-    if (A._ind) std::copy(A._ind, A._ind+_nnz, _ind);
-    if (A._val) std::copy(A._val, A._val+_nnz, _val);
+    n_ = A.n_;
+    nnz_ = A.nnz_;
+    symm_sparse_ = A.symm_sparse_;
+    delete[] ptr_; ptr_ = new integer_t[n_+1];
+    delete[] ind_; ind_ = new integer_t[nnz_];
+    delete[] val_; val_ = new scalar_t[nnz_];
+    if (A.ptr_) std::copy(A.ptr_, A.ptr_+n_+1, ptr_);
+    if (A.ind_) std::copy(A.ind_, A.ind_+nnz_, ind_);
+    if (A.val_) std::copy(A.val_, A.val_+nnz_, val_);
     return *this;
   }
 
@@ -265,12 +275,12 @@ namespace strumpack {
   CompressedSparseMatrix<scalar_t,integer_t>&
   CompressedSparseMatrix<scalar_t,integer_t>::operator=
   (CompressedSparseMatrix<scalar_t,integer_t>&& A) {
-    _n = A._n;
-    _nnz = A._nnz;
-    _symm_sparse = A._symm_sparse;
-    delete[] _ptr; _ptr = A._ptr; A._ptr = nullptr;
-    delete[] _ind; _ind = A._ind; A._ind = nullptr;
-    delete[] _val; _val = A._val; A._val = nullptr;
+    n_ = A.n_;
+    nnz_ = A.nnz_;
+    symm_sparse_ = A.symm_sparse_;
+    delete[] ptr_; ptr_ = A.ptr_; A.ptr_ = nullptr;
+    delete[] ind_; ind_ = A.ind_; A.ind_ = nullptr;
+    delete[] val_; val_ = A.val_; A.val_ = nullptr;
     return *this;
   }
 
@@ -281,13 +291,13 @@ namespace strumpack {
     std::cout << "nnz: " << nnz() << std::endl;
     std::cout << "ptr: " << std::endl << "\t";
     for (integer_t i=0; i<=size(); i++)
-      std::cout << _ptr[i] << " ";
+      std::cout << ptr_[i] << " ";
     std::cout << std::endl << "ind: ";
     for (integer_t i=0; i<nnz(); i++)
-      std::cout << _ind[i] << " ";
+      std::cout << ind_[i] << " ";
     std::cout << std::endl << "val: ";
     for (integer_t i=0; i<nnz(); i++)
-      std::cout << _val[i] << " ";
+      std::cout << val_[i] << " ";
     std::cout << std::endl;
   }
 
@@ -308,25 +318,25 @@ namespace strumpack {
                 << std::endl;
       return 1;
     }
-    perm.resize(_n);
+    perm.resize(n_);
     int_t liw = 0;
     switch (job) {
-    case MatchingJob::MAX_SMALLEST_DIAGONAL: liw = 4*_n; break;
-    case MatchingJob::MAX_SMALLEST_DIAGONAL_2: liw = 10*_n + _nnz; break;
+    case MatchingJob::MAX_SMALLEST_DIAGONAL: liw = 4*n_; break;
+    case MatchingJob::MAX_SMALLEST_DIAGONAL_2: liw = 10*n_ + nnz_; break;
     case MatchingJob::MAX_CARDINALITY:
     case MatchingJob::MAX_DIAGONAL_SUM:
     case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING:
-    default: liw = 5*_n;
+    default: liw = 5*n_;
     }
     auto iw = new int_t[liw];
     int_t ldw = 0;
     switch (job) {
     case MatchingJob::MAX_CARDINALITY: ldw = 0; break;
-    case MatchingJob::MAX_SMALLEST_DIAGONAL: ldw = _n; break;
-    case MatchingJob::MAX_SMALLEST_DIAGONAL_2: ldw = _nnz; break;
-    case MatchingJob::MAX_DIAGONAL_SUM: ldw = 2*_n + _nnz; break;
+    case MatchingJob::MAX_SMALLEST_DIAGONAL: ldw = n_; break;
+    case MatchingJob::MAX_SMALLEST_DIAGONAL_2: ldw = nnz_; break;
+    case MatchingJob::MAX_DIAGONAL_SUM: ldw = 2*n_ + nnz_; break;
     case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING:
-    default: ldw = 3*_n + _nnz; break;
+    default: ldw = 3*n_ + nnz_; break;
     }
     auto dw = new double[ldw];
     int_t icntl[10], info[10];
@@ -374,63 +384,63 @@ namespace strumpack {
       break;
     }
     if (job == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) { // scaling
-      Dr.resize(_n);
-      Dc.resize(_n);
+      Dr.resize(n_);
+      Dc.resize(n_);
 #pragma omp parallel for
-      for (integer_t i=0; i<_n; i++) {
+      for (integer_t i=0; i<n_; i++) {
         Dr[i] = scalar_t(std::exp(dw[i]));
-        Dc[i] = scalar_t(std::exp(dw[_n+i]));
+        Dc[i] = scalar_t(std::exp(dw[n_+i]));
       }
       if (apply) apply_scaling(Dr, Dc);
     }
     delete[] iw; delete[] dw;
     if (apply) apply_column_permutation(perm);
-    if (apply) _symm_sparse = false;
+    if (apply) symm_sparse_ = false;
     return 0;
   }
 
   template<typename scalar_t,typename integer_t> void
   CompressedSparseMatrix<scalar_t,integer_t>::symmetrize_sparsity() {
-    if (_symm_sparse) return;
-    auto a2_ctr = new integer_t[_n];
+    if (symm_sparse_) return;
+    auto a2_ctr = new integer_t[n_];
 #pragma omp parallel for
-    for (integer_t i=0; i<_n; i++) a2_ctr[i] = _ptr[i+1]-_ptr[i];
+    for (integer_t i=0; i<n_; i++) a2_ctr[i] = ptr_[i+1]-ptr_[i];
 
     bool change = false;
 #pragma omp parallel for
-    for (integer_t i=0; i<_n; i++)
-      for (integer_t jj=_ptr[i]; jj<_ptr[i+1]; jj++) {
-        integer_t kb = _ptr[_ind[jj]], ke = _ptr[_ind[jj]+1];
-        if (std::find(_ind+kb, _ind+ke, i) == _ind+ke) {
+    for (integer_t i=0; i<n_; i++)
+      for (integer_t jj=ptr_[i]; jj<ptr_[i+1]; jj++) {
+        integer_t kb = ptr_[ind_[jj]], ke = ptr_[ind_[jj]+1];
+        if (std::find(ind_+kb, ind_+ke, i) == ind_+ke) {
 #pragma omp critical
           {
-            a2_ctr[_ind[jj]]++;
+            a2_ctr[ind_[jj]]++;
             change = true;
           }
         }
       }
     if (change) {
-      auto a2_ptr = new integer_t[_n+1];
+      auto a2_ptr = new integer_t[n_+1];
       a2_ptr[0] = 0;
-      for (integer_t i=0; i<_n; i++) a2_ptr[i+1] = a2_ptr[i] + a2_ctr[i];
-      auto new_nnz = a2_ptr[_n] - a2_ptr[0];
+      for (integer_t i=0; i<n_; i++) a2_ptr[i+1] = a2_ptr[i] + a2_ctr[i];
+      auto new_nnz = a2_ptr[n_] - a2_ptr[0];
       auto a2_ind = new integer_t[new_nnz];
       auto a2_val = new scalar_t[new_nnz];
-      _nnz = new_nnz;
+      nnz_ = new_nnz;
 #pragma omp parallel for
-      for (integer_t i=0; i<_n; i++) {
-        a2_ctr[i] = a2_ptr[i] + _ptr[i+1] - _ptr[i];
-        for (integer_t jj=_ptr[i], k=a2_ptr[i]; jj<_ptr[i+1]; jj++) {
-          a2_ind[k  ] = _ind[jj];
-          a2_val[k++] = _val[jj];
+      for (integer_t i=0; i<n_; i++) {
+        a2_ctr[i] = a2_ptr[i] + ptr_[i+1] - ptr_[i];
+        for (integer_t jj=ptr_[i], k=a2_ptr[i]; jj<ptr_[i+1]; jj++) {
+          a2_ind[k  ] = ind_[jj];
+          a2_val[k++] = val_[jj];
         }
       }
 #pragma omp parallel for
-      for (integer_t i=0; i<_n; i++)
-        for (integer_t jj=_ptr[i]; jj<_ptr[i+1]; jj++) {
-          integer_t kb = _ptr[_ind[jj]], ke = _ptr[_ind[jj]+1];
-          if (std::find(_ind+kb,_ind+ke, i) == _ind+ke) {
-            integer_t t = _ind[jj];
+      for (integer_t i=0; i<n_; i++)
+        for (integer_t jj=ptr_[i]; jj<ptr_[i+1]; jj++) {
+          integer_t kb = ptr_[ind_[jj]], ke = ptr_[ind_[jj]+1];
+          if (std::find(ind_+kb,ind_+ke, i) == ind_+ke) {
+            integer_t t = ind_[jj];
 #pragma omp critical
             {
               a2_ind[a2_ctr[t]] = i;
@@ -444,7 +454,7 @@ namespace strumpack {
       set_val(a2_val);
     }
     delete[] a2_ctr;
-    _symm_sparse = true;
+    symm_sparse_ = true;
   }
 
   template<typename scalar_t> scalar_t
@@ -494,28 +504,28 @@ namespace strumpack {
     MMsym s = GENERAL;
     if (strstr(cline, "skew-symmetric")) {
       s = SKEWSYMMETRIC;
-      _symm_sparse = true;
+      symm_sparse_ = true;
     } else if (strstr(cline, "symmetric")) {
       s = SYMMETRIC;
-      _symm_sparse = true;
+      symm_sparse_ = true;
     } else if (strstr(cline, "hermitian")) {
       s = HERMITIAN;
-      _symm_sparse = true;
+      symm_sparse_ = true;
     }
 
     while (fgets(cline, max_cline, fp)) {
       if (cline[0] != '%') { // first line should be: m n nnz
         int m, in, innz;
         sscanf(cline, "%d %d %d", &m, &in, &innz);
-        _nnz = static_cast<integer_t>(innz);
-        _n = static_cast<integer_t>(in);
-        if (s != GENERAL) _nnz = 2 * _nnz - _n;
+        nnz_ = static_cast<integer_t>(innz);
+        n_ = static_cast<integer_t>(in);
+        if (s != GENERAL) nnz_ = 2 * nnz_ - n_;
         if (is_mpi_root())
           std::cout << "# reading " << number_format_with_commas(m) << " by "
-                    << number_format_with_commas(_n) << " matrix with "
-                    << number_format_with_commas(_nnz) << " nnz's from "
+                    << number_format_with_commas(n_) << " matrix with "
+                    << number_format_with_commas(nnz_) << " nnz's from "
                     << filename << std::endl;
-        if (m != _n) {
+        if (m != n_) {
           if (is_mpi_root())
             std::cerr << "ERROR: matrix is not square!" << std::endl;
           exit(1);
@@ -524,7 +534,7 @@ namespace strumpack {
       }
     }
     std::vector<std::tuple<integer_t,integer_t,scalar_t>> A;
-    A.reserve(_nnz);
+    A.reserve(nnz_);
     bool zero_based = false;
     if (!is_complex<scalar_t>()) {
       int ir, ic;
@@ -591,22 +601,22 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   CompressedSparseMatrix<scalar_t,integer_t>::permute
   (const integer_t* iorder, const integer_t* order) {
-    auto new_ptr = new integer_t[_n+1];
-    auto new_ind = new integer_t[_nnz];
-    auto new_val = new scalar_t[_nnz];
+    auto new_ptr = new integer_t[n_+1];
+    auto new_ind = new integer_t[nnz_];
+    auto new_val = new scalar_t[nnz_];
     integer_t nnz = 0;
     new_ptr[0] = 0;
-    for (integer_t i=0; i<_n; i++) {
-      auto lb = _ptr[iorder[i]];
-      auto ub = _ptr[iorder[i]+1];
+    for (integer_t i=0; i<n_; i++) {
+      auto lb = ptr_[iorder[i]];
+      auto ub = ptr_[iorder[i]+1];
       for (integer_t j=lb; j<ub; j++) {
-        new_ind[nnz] = order[_ind[j]];
-        new_val[nnz++] = _val[j];
+        new_ind[nnz] = order[ind_[j]];
+        new_val[nnz++] = val_[j];
       }
       new_ptr[i+1] = nnz;
     }
 #pragma omp parallel for
-    for (integer_t i=0; i<_n; i++) {
+    for (integer_t i=0; i<n_; i++) {
       auto lb = new_ptr[i];
       auto ub = new_ptr[i+1];
       sort_indices_values
