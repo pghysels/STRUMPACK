@@ -160,22 +160,19 @@ namespace strumpack {
   FrontalMatrixBLR<scalar_t,integer_t>::sample_CB
   (const SPOptions<scalar_t>& opts, const DenseM_t& R, DenseM_t& Sr,
    DenseM_t& Sc, FrontalMatrix<scalar_t,integer_t>* pa, int task_depth) {
-
-    assert(false);
-
-    // auto I = this->upd_to_parent(pa);
-    // auto cR = R.extract_rows(I);
-    // DenseM_t cS(this->dim_upd(), R.cols());
-    // gemm(Trans::N, Trans::N, scalar_t(1.), F22, cR,
-    //      scalar_t(0.), cS, task_depth);
-    // Sr.scatter_rows_add(I, cS, task_depth);
-    // gemm(Trans::C, Trans::N, scalar_t(1.), F22, cR,
-    //      scalar_t(0.), cS, task_depth);
-    // Sc.scatter_rows_add(I, cS, task_depth);
-    // STRUMPACK_CB_SAMPLE_FLOPS
-    //   (gemm_flops(Trans::N, Trans::N, scalar_t(1.), F22, cR, scalar_t(0.)) +
-    //    gemm_flops(Trans::C, Trans::N, scalar_t(1.), F22, cR, scalar_t(0.)) +
-    //    cS.rows()*cS.cols()*2); // for the skinny-extend add
+    auto I = this->upd_to_parent(pa);
+    auto cR = R.extract_rows(I);
+    DenseM_t cS(this->dim_upd(), R.cols());
+    gemm(Trans::N, Trans::N, scalar_t(1.), F22_, cR,
+         scalar_t(0.), cS, task_depth);
+    Sr.scatter_rows_add(I, cS, task_depth);
+    gemm(Trans::C, Trans::N, scalar_t(1.), F22_, cR,
+         scalar_t(0.), cS, task_depth);
+    Sc.scatter_rows_add(I, cS, task_depth);
+    STRUMPACK_CB_SAMPLE_FLOPS
+      (gemm_flops(Trans::N, Trans::N, scalar_t(1.), F22_, cR, scalar_t(0.)) +
+       gemm_flops(Trans::C, Trans::N, scalar_t(1.), F22_, cR, scalar_t(0.)) +
+       cS.rows()*cS.cols()*2); // for the skinny-extend add
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -423,24 +420,20 @@ namespace strumpack {
   FrontalMatrixBLR<scalar_t,integer_t>::extract_CB_sub_matrix
   (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
    DenseM_t& B, int task_depth) const {
-
-    assert(false);
-
-    // std::vector<std::size_t> lJ, oJ;
-    // this->find_upd_indices(J, lJ, oJ);
-    // if (lJ.empty()) return;
-    // std::vector<std::size_t> lI, oI;
-    // this->find_upd_indices(I, lI, oI);
-    // if (lI.empty()) return;
-    // for (std::size_t j=0; j<lJ.size(); j++)
-    //   for (std::size_t i=0; i<lI.size(); i++)
-    //     B(oI[i], oJ[j]) += F22(lI[i], lJ[j]);
-    // STRUMPACK_FLOPS((is_complex<scalar_t>() ? 2 : 1) * lJ.size() * lI.size());
+    std::vector<std::size_t> lJ, oJ;
+    this->find_upd_indices(J, lJ, oJ);
+    if (lJ.empty()) return;
+    std::vector<std::size_t> lI, oI;
+    this->find_upd_indices(I, lI, oI);
+    if (lI.empty()) return;
+    for (std::size_t j=0; j<lJ.size(); j++)
+      for (std::size_t i=0; i<lI.size(); i++)
+        B(oI[i], oJ[j]) += F22_(lI[i], lJ[j]);
+    STRUMPACK_FLOPS((is_complex<scalar_t>() ? 2 : 1) * lJ.size() * lI.size());
   }
 
   template<typename scalar_t,typename integer_t> long long
   FrontalMatrixBLR<scalar_t,integer_t>::node_factor_nonzeros() const {
-    std::cout << "Memory!!" << std::endl;
     return F11blr_.nonzeros() + F12blr_.nonzeros() + F21blr_.nonzeros();
   }
 
