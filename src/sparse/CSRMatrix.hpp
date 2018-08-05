@@ -55,13 +55,6 @@ namespace strumpack {
     CSRMatrix
     (integer_t n, const integer_t* ptr, const integer_t* ind,
      const scalar_t* values, bool symm_sparsity=false);
-    CSRMatrix(const CSRMatrix<scalar_t,integer_t>& A);
-    CSRMatrix(CSRMatrix<scalar_t,integer_t>&& A);
-    CSRMatrix(const CSCMatrix<scalar_t,integer_t>& A);
-    CSRMatrix<scalar_t,integer_t>& operator=
-    (const CSRMatrix<scalar_t,integer_t>& A);
-    CSRMatrix<scalar_t,integer_t>& operator=
-    (CSRMatrix<scalar_t,integer_t>&& A);
 
     void spmv(const DenseM_t& x, DenseM_t& y) const override;
     void omp_spmv(const DenseM_t& x, DenseM_t& y) const override;
@@ -141,54 +134,6 @@ namespace strumpack {
   CSRMatrix<scalar_t,integer_t>::CSRMatrix(integer_t n, integer_t nnz)
     : CompressedSparseMatrix<scalar_t,integer_t>(n, nnz) {}
 
-  template<typename scalar_t,typename integer_t>
-  CSRMatrix<scalar_t,integer_t>::CSRMatrix
-  (const CSRMatrix<scalar_t,integer_t>& A)
-    : CompressedSparseMatrix<scalar_t,integer_t>(A) {
-  }
-
-  template<typename scalar_t,typename integer_t>
-  CSRMatrix<scalar_t,integer_t>::CSRMatrix
-  (CSRMatrix<scalar_t,integer_t>&& A)
-    : CompressedSparseMatrix<scalar_t,integer_t>(std::move(A)) {
-  }
-
-  template<typename scalar_t,typename integer_t>
-  CSRMatrix<scalar_t,integer_t>::CSRMatrix
-  (const CSCMatrix<scalar_t,integer_t>& A)
-    : CompressedSparseMatrix<scalar_t,integer_t>
-    (A.size(), A.nnz(), A.symm_sparse()) {
-    std::vector<integer_t> rowsums(n_, 0);
-    for (integer_t col=0; col<n_; col++)
-      for (integer_t i=A.ptr(col); i<A.ptr(col+1); i++)
-        rowsums[A.ind(i)]++;
-    ptr_[0] = 0;
-    for (integer_t r=0; r<n_; r++)
-      ptr_[r+1] = ptr_[r] + rowsums[r];
-    std::fill(rowsums.begin(), rowsums.end(), 0);
-    for (integer_t col=0; col<n_; col++) {
-      for (integer_t i=A.ptr(col); i<A.ptr(col+1); i++) {
-        integer_t row = A.ind(i);
-        integer_t j = ptr_[row] + rowsums[row]++;
-        val_[j] = A.val(i);
-        ind_[j] = col;
-      }
-    }
-  }
-
-  template<typename scalar_t,typename integer_t>
-  CSRMatrix<scalar_t,integer_t>& CSRMatrix<scalar_t,integer_t>::operator=
-  (const CSRMatrix<scalar_t,integer_t>& A) {
-    CompressedSparseMatrix<scalar_t,integer_t>::operator=(A);
-    return *this;
-  }
-
-  template<typename scalar_t,typename integer_t>
-  CSRMatrix<scalar_t,integer_t>& CSRMatrix<scalar_t,integer_t>::operator=
-  (CSRMatrix<scalar_t,integer_t>&& A) {
-    CompressedSparseMatrix<scalar_t,integer_t>::operator=(std::move(A));
-    return *this;
-  }
 
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::print_dense(const std::string& name) const {
@@ -304,9 +249,9 @@ namespace strumpack {
               << ", nnz=" << number_format_with_commas(nnz_)
               << std::endl;
     symm_sparse_ = false;
-    ptr_ = new integer_t[n_+1];
-    ind_ = new integer_t[nnz_];
-    val_ = new scalar_t[nnz_];
+    ptr_.resize(n_+1);
+    ind_.resize(nnz_);
+    val_.resize(nnz_);
     for (integer_t i=0; i<n_+1; i++)
       fs.read((char*)(&ptr_[i]), sizeof(integer_t));
     for (integer_t i=0; i<nnz_; i++)
@@ -709,9 +654,9 @@ namespace strumpack {
           std::make_tuple(std::get<0>(b), std::get<1>(b));
       });
 
-    ptr_ = new integer_t[n_+1];
-    ind_ = new integer_t[nnz_];
-    val_ = new scalar_t[nnz_];
+    ptr_.resize(n_+1);
+    ind_.resize(nnz_);
+    val_.resize(nnz_);
     integer_t row = -1;
     for (integer_t i=0; i<nnz_; i++) {
       val_[i] = std::get<2>(A[i]);

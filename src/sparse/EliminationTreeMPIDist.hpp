@@ -928,7 +928,7 @@ namespace strumpack {
         if (rank_ >= P0 && rank_ < P0+P) {
           auto fpar = static_cast<FMPI_t*>(front);
           local_pfronts_.emplace_back
-            (front->sep_begin, front->sep_end, P0, P, fpar->grid());
+            (front->sep_begin(), front->sep_end(), P0, P, fpar->grid());
         }
       }
     }
@@ -945,8 +945,8 @@ namespace strumpack {
       (opts, local_upd, dist_upd, local_subtree_work, dist_subtree_work,
        chr, P0+P-Pr, Pr, P0, Pl, fcomm.sub(P-Pr, Pr), is_hss, level+1);
     if (front) {
-      front->lchild = lch;
-      front->rchild = rch;
+      front->set_lchild(lch);
+      front->set_rchild(rch);
     }
     return front;
   }
@@ -1012,7 +1012,7 @@ namespace strumpack {
         if (rank_ >= P0 && rank_ < P0+P) {
           auto fpar = static_cast<FMPI_t*>(front);
           local_pfronts_.emplace_back
-            (front->sep_begin, front->sep_end, P0, P, fpar->grid());
+            (front->sep_begin(), front->sep_end(), P0, P, fpar->grid());
         }
       }
     }
@@ -1025,12 +1025,14 @@ namespace strumpack {
       int Pl = std::max
         (1, std::min(int(std::round(P * wl / (wl + wr))), P-1));
       int Pr = std::max(1, P - Pl);
-      front->lchild = proportional_mapping_sub_graphs
-        (opts, tree, dsep, chl, P0, Pl, P0+P-Pr, Pr,
-         fcomm.sub(0, Pl), is_hss, level+1);
-      front->rchild = proportional_mapping_sub_graphs
-        (opts, tree, dsep, chr, P0+P-Pr, Pr, P0, Pl,
-         fcomm.sub(P-Pr, Pr), is_hss, level+1);
+      front->set_lchild
+        (proportional_mapping_sub_graphs
+         (opts, tree, dsep, chl, P0, Pl, P0+P-Pr, Pr,
+          fcomm.sub(0, Pl), is_hss, level+1));
+      front->set_rchild
+        (proportional_mapping_sub_graphs
+         (opts, tree, dsep, chr, P0+P-Pr, Pr, P0, Pl,
+          fcomm.sub(P-Pr, Pr), is_hss, level+1));
     }
     return front;
   }

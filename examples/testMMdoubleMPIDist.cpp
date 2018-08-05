@@ -58,8 +58,8 @@ test(int argc, char* argv[], CSRMatrixMPI<scalar,integer>* Adist) {
   Adist->omp_spmv(x_exact.data(), b.data());
 
   spss.set_distributed_csr_matrix
-    (Adist->local_rows(), Adist->get_ptr(), Adist->get_ind(),
-     Adist->get_val(), Adist->get_dist().data(),
+    (Adist->local_rows(), Adist->ptr(), Adist->ind(),
+     Adist->val(), Adist->dist().data(),
      Adist->symm_sparse());
   if (spss.reorder() != ReturnCode::SUCCESS) {
     if (!rank)

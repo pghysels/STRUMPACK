@@ -140,6 +140,55 @@ namespace strumpack {
       else MPI_Reduce(t, t, ssize, mpi_type<T>(), op, 0, comm_);
     }
 
+    template<typename T> void all_to_all_v
+    (std::vector<std::vector<T>>& sbuf, std::vector<T>& rbuf,
+     std::vector<T*>& pbuf) const {
+      all_to_all_v(sbuf, rbuf, pbuf, mpi_type<T>());
+    }
+
+    template<typename T> void all_to_all_v
+    (std::vector<std::vector<T>>& sbuf, std::vector<T>& rbuf,
+     std::vector<T*>& pbuf, const MPI_Datatype Ttype) const {
+      assert(sbuf.size() == std::size_t(size()));
+      auto P = size();
+      auto ssizes = new int[4*P];
+      auto rsizes = ssizes + P;
+      auto sdispl = ssizes + 2*P;
+      auto rdispl = ssizes + 3*P;
+      for (int p=0; p<P; p++) {
+        if (sbuf[p].size() > std::numeric_limits<int>::max()) {
+          std::cerr << "# ERROR: 32bit integer overflow in all_to_all_v!!" << std::endl;
+          MPI_Abort(comm_, 1);
+        }
+        ssizes[p] = sbuf[p].size();
+      }
+      MPI_Alltoall(ssizes, 1, mpi_type<int>(), rsizes, 1, mpi_type<int>(), comm_);
+      std::size_t totssize = std::accumulate(ssizes, ssizes+P, 0);
+      std::size_t totrsize = std::accumulate(rsizes, rsizes+P, 0);
+      if (totrsize > std::numeric_limits<int>::max() ||
+          totssize > std::numeric_limits<int>::max()) {
+        std::cerr << "# ERROR: 32bit integer overflow in all_to_all_v!!" << std::endl;
+        MPI_Abort(comm_, 1);
+      }
+      T* sendbuf = new T[totssize];
+      sdispl[0] = rdispl[0] = 0;
+      for (int p=1; p<P; p++) {
+        sdispl[p] = sdispl[p-1] + ssizes[p-1];
+        rdispl[p] = rdispl[p-1] + rsizes[p-1];
+      }
+      for (int p=0; p<P; p++)
+        std::copy(sbuf[p].begin(), sbuf[p].end(), sendbuf+sdispl[p]);
+      std::vector<std::vector<T>>().swap(sbuf);
+      rbuf.resize(totrsize);
+      MPI_Alltoallv(sendbuf, ssizes, sdispl, Ttype,
+                    rbuf.data(), rsizes, rdispl, Ttype, comm_);
+      pbuf.resize(P);
+      for (int p=0; p<P; p++)
+        pbuf[p] = rbuf.data() + rdispl[p];
+      delete[] ssizes;
+      delete[] sendbuf;
+    }
+
   private:
     MPI_Comm comm_ = MPI_COMM_WORLD;
 

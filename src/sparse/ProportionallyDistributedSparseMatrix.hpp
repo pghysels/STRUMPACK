@@ -56,7 +56,6 @@ namespace strumpack {
 
   public:
     ProportionallyDistributedSparseMatrix();
-    virtual ~ProportionallyDistributedSparseMatrix();
 
     void setup
     (const CSRMatrixMPI<scalar_t,integer_t>& Ampi,
@@ -106,20 +105,22 @@ namespace strumpack {
      const std::vector<scalar_t>& Dc) override {};
     void apply_column_permutation
     (const std::vector<integer_t>& perm) override {};
-    int read_matrix_market(const std::string& filename) override {
-      return 1;
-    };
-    real_t max_scaled_residual(const scalar_t* x, const scalar_t* b) const {
-      return real_t(1.);
-    };
-    real_t max_scaled_residual(const DenseM_t& x, const DenseM_t& b) const {
-      return real_t(1.);
-    };
+    int read_matrix_market(const std::string& filename) override { return 1; };
+    real_t max_scaled_residual(const scalar_t* x, const scalar_t* b) const { return real_t(1.); };
+    real_t max_scaled_residual(const DenseM_t& x, const DenseM_t& b) const { return real_t(1.); };
 
   protected:
     integer_t local_cols_;  // number of columns stored on this proces
-    integer_t* global_col_; // for each local column, this gives the
-                            // global column index
+    std::vector<integer_t> global_col_; // for each local column, this
+                                        // gives the global column
+                                        // index
+
+    integer_t find_global(integer_t c, integer_t clo=0) const {
+      // TODO create a loopkup vector
+      return std::distance
+        (global_col_.begin(),
+         std::lower_bound(global_col_.begin()+clo, global_col_.end(), c));
+    }
 
     using CompressedSparseMatrix<scalar_t,integer_t>::n_;
     using CompressedSparseMatrix<scalar_t,integer_t>::nnz_;
@@ -131,13 +132,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t>
   ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::
   ProportionallyDistributedSparseMatrix()
-    : CompressedSparseMatrix<scalar_t,integer_t>(), global_col_(nullptr) { }
-
-  template<typename scalar_t,typename integer_t>
-  ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::
-  ~ProportionallyDistributedSparseMatrix() {
-    delete[] global_col_;
-  }
+    : CompressedSparseMatrix<scalar_t,integer_t>() { }
 
   template<typename scalar_t,typename integer_t> void
   ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::setup
@@ -236,10 +231,10 @@ namespace strumpack {
     local_cols_ = _local_nnz ? 1 : 0;
     for (integer_t t=1; t<_local_nnz; t++)
       if (triplets[t].c != triplets[t-1].c) local_cols_++;
-    ptr_ = new integer_t[local_cols_+1];
-    global_col_ = new integer_t[local_cols_];
-    ind_ = new integer_t[_local_nnz];
-    val_ = new scalar_t[_local_nnz];
+    ptr_.resize(local_cols_+1);
+    global_col_.resize(local_cols_);
+    ind_.resize(_local_nnz);
+    val_.resize(_local_nnz);
     integer_t col = 0;
     ptr_[col] = 0;
     if (local_cols_) {
@@ -285,8 +280,7 @@ namespace strumpack {
     integer_t n = J.size();
     if (m == 0 || n == 0) return;
     for (integer_t j=0; j<n; j++) {
-      integer_t c = std::lower_bound
-        (global_col_, global_col_+local_cols_, J[j]) - global_col_;
+      integer_t c = find_global(J[j]);
       if (c == local_cols_ || global_col_[c] != integer_t(J[j])) {
         std::fill(B.ptr(0,j), B.ptr(m, j), scalar_t(0.));
         continue;
@@ -313,10 +307,8 @@ namespace strumpack {
    const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const {
     //long long int local_flops = 0;
     const integer_t dupd = upd.size();
-    const std::size_t clo = std::lower_bound
-      (global_col_, global_col_+local_cols_, slo) - global_col_;
-    const std::size_t chi = std::lower_bound
-      (global_col_+clo, global_col_+local_cols_, shi) - global_col_;
+    const std::size_t clo = find_global(slo);
+    const std::size_t chi = find_global(shi);
     const auto ds = shi - slo;
     const auto nbvec = R.cols();
 
@@ -360,8 +352,7 @@ namespace strumpack {
   if(depth < params::task_recursion_cutoff_level)
     for (std::size_t k=0; k<nbvec; k+=B) {
       for (integer_t i=0, c=chi; i<dupd; i++) { // update columns
-        c = std::lower_bound
-          (global_col_+c, global_col_+local_cols_, upd[i]) - global_col_;
+        c = find_global(upd[i], c);
         if (c == local_cols_ || global_col_[c] != upd[i]) continue;
         const auto hij = ptr_[c+1];
         for (auto j=ptr_[c]; j<hij; j++) {
@@ -389,10 +380,8 @@ namespace strumpack {
   (DenseM_t& F11, DenseM_t& F12, DenseM_t& F21, integer_t sep_begin,
    integer_t sep_end, const std::vector<integer_t>& upd, int depth) const {
     integer_t dim_upd = upd.size();
-    auto c = std::lower_bound
-      (global_col_, global_col_+local_cols_, sep_begin) - global_col_;
-    auto chi = std::lower_bound
-      (global_col_+c, global_col_+local_cols_, sep_end) - global_col_;
+    auto c = find_global(sep_begin);
+    auto chi = find_global(sep_end, c);
     for (; c<chi; c++) {
       auto col = global_col_[c];
       integer_t row_ptr = 0;
@@ -414,8 +403,7 @@ namespace strumpack {
     }
     for (integer_t i=0; i<dim_upd; ++i) { // update columns
       //while (c < local_cols_ && global_col_[c] < upd[i]) c++;
-      c = std::lower_bound
-        (global_col_+c, global_col_+local_cols_, upd[i]) - global_col_;
+      c = find_global(upd[i], c);
       if (c == local_cols_ || global_col_[c] != upd[i]) continue;
       for (integer_t j=ptr_[c]; j<ptr_[c+1]; j++) {
         auto row = ind_[j];
@@ -432,10 +420,8 @@ namespace strumpack {
   ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::extract_F11_block
   (scalar_t* F, integer_t ldF, integer_t row, integer_t nr_rows,
    integer_t col, integer_t nr_cols) const {
-    auto c = std::lower_bound
-      (global_col_, global_col_+local_cols_, col) - global_col_;
-    auto chi = std::lower_bound
-      (global_col_+c, global_col_+local_cols_, col+nr_cols) - global_col_;
+    auto c = find_global(col);
+    auto chi = find_global(col+nr_cols, c);
     for (; c<chi; c++) {
       for (integer_t j=ptr_[c]; j<ptr_[c+1]; j++) {
         auto r = ind_[j];
@@ -453,13 +439,11 @@ namespace strumpack {
   (scalar_t* F, integer_t ldF, integer_t row, integer_t nr_rows,
    integer_t col, integer_t nr_cols, const integer_t* upd) const {
     if (nr_cols == 0 || nr_rows == 0) return;
-    auto c = std::lower_bound
-      (global_col_, global_col_+local_cols_, upd[0]) - global_col_;
+    auto c = find_global(upd[0]);
     for (integer_t i=0; i<nr_cols; i++) {
       //while (c < local_cols_ && global_col_[c] < upd[i]) c++;
       if (i > 0)
-        c = std::lower_bound
-          (global_col_+c, global_col_+local_cols_, upd[i]) - global_col_;
+        c = find_global(upd[i], c);
       if (c == local_cols_ || global_col_[c] != upd[i]) continue;
       for (integer_t j=ptr_[c]; j<ptr_[c+1]; j++) {
         auto r = ind_[j];
@@ -476,10 +460,8 @@ namespace strumpack {
   (scalar_t* F, integer_t ldF, integer_t row, integer_t nr_rows,
    integer_t col, integer_t nr_cols, const integer_t* upd) const{
     if (nr_rows == 0 || nr_cols == 0) return;
-    auto c = std::lower_bound
-      (global_col_, global_col_+local_cols_, col) - global_col_;
-    auto chi = std::lower_bound
-      (global_col_+c, global_col_+local_cols_, col+nr_cols) - global_col_;
+    auto c = find_global(col);
+    auto chi = find_global(col+nr_cols, c);
     for (; c<chi; c++) {
       integer_t row_upd = 0;
       for (integer_t j=ptr_[c]; j<ptr_[c+1]; j++) {
@@ -505,8 +487,7 @@ namespace strumpack {
     B.zero();
     for (integer_t j=0; j<n; j++) {
       integer_t jj = J[j];
-      integer_t c = std::lower_bound
-        (global_col_, global_col_+local_cols_, jj) - global_col_;
+      integer_t c = find_global(jj);
       if (c == local_cols_ || global_col_[c] != jj) continue;
       for (integer_t i=0; i<m; i++) {
         integer_t ii = I[i];
@@ -570,11 +551,9 @@ namespace strumpack {
   ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::front_multiply_2d
   (integer_t sep_begin, integer_t sep_end, const std::vector<integer_t>& upd,
    const DistM_t& R, DistM_t& Srow, DistM_t& Scol, int depth) const {
-
     assert(R.fixed());
     assert(Srow.fixed());
     assert(Scol.fixed());
-
     if (!R.active()) return;
     const integer_t dim_upd = upd.size();
     long long int local_flops = 0;
@@ -587,10 +566,8 @@ namespace strumpack {
     auto rows_from = rows_to + p_rows;
     std::fill(rows_to, rows_to+2*p_rows, 0);
 
-    auto clo = std::lower_bound
-      (global_col_, global_col_+local_cols_, sep_begin) - global_col_;
-    auto chi = std::lower_bound
-      (global_col_+clo, global_col_+local_cols_, sep_end) - global_col_;
+    auto clo = find_global(sep_begin);
+    auto chi = find_global(sep_end);
 
     for (integer_t c=clo; c<chi; c++) { // separator columns
       auto row_j_rank = R.rowg2p_fixed(global_col_[c] - sep_begin);
@@ -630,8 +607,7 @@ namespace strumpack {
       }
     }
     for (integer_t i=0, c=chi; i<dim_upd; i++) { // update columns
-      c = std::lower_bound
-        (global_col_+c, global_col_+local_cols_, upd[i]) - global_col_;
+      c = find_global(upd[i], c);
       if (c == local_cols_ || global_col_[c] != upd[i]) continue;
       auto row_j_rank = R.rowg2p_fixed(dim_sep + i);
       auto hij = ptr_[c+1];
@@ -721,8 +697,7 @@ namespace strumpack {
 #pragma omp parallel for
     for (int t=0; t<p_rows; t++) {
       for (integer_t i=0, c=chi; i<dim_upd; i++) { // update columns
-        c = std::lower_bound
-          (global_col_+c, global_col_+local_cols_, upd[i]) - global_col_;
+        c = find_global(upd[i], c);
         if (c == local_cols_ || global_col_[c] != upd[i]) continue;
         auto Aj = dim_sep + i;
         auto row_j_rank = R.rowg2p_fixed(Aj);
@@ -816,8 +791,7 @@ namespace strumpack {
       }
     }
     for (integer_t i=0, c=chi; i<dim_upd; i++) { // update columns
-      c = std::lower_bound
-        (global_col_+c, global_col_+local_cols_, upd[i]) - global_col_;
+      c = find_global(upd[i], c);
       if (c == local_cols_ || global_col_[c] != upd[i])
         continue;
       auto Aj = dim_sep + i;

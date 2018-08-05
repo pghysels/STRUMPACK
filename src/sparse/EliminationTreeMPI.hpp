@@ -336,19 +336,19 @@ namespace strumpack {
       auto fl = proportional_mapping
         (tree, opts, upd, subtree_work, local_range, chl, P0, Pl,
          fcomm.sub(0, Pl), keep, is_hss, level+1);
-      if (front) front->lchild = fl;
+      if (front) front->set_lchild(fl);
       if (chr != -1) {
         auto fr = proportional_mapping
           (tree, opts, upd, subtree_work, local_range, chr, P0+P-Pr, Pr,
            fcomm.sub(P-Pr, Pr), keep, is_hss, level+1);
-        if (front) front->rchild = fr;
+        if (front) front->set_rchild(fr);
       }
     } else {
       if (chr != -1) {
         auto fr = proportional_mapping
           (tree, opts, upd, subtree_work, local_range, chr, P0, P,
            fcomm, keep, is_hss, level+1);
-        if (front) front->rchild = fr;
+        if (front) front->set_rchild(fr);
       }
     }
     return front;

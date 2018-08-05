@@ -75,6 +75,7 @@ namespace strumpack {
 
     virtual void clear_tree_data();
 
+    // TODO make private, use std::vector!
     integer_t n;
     integer_t* perm;
     integer_t* iperm;
@@ -141,34 +142,9 @@ namespace strumpack {
       break;
     }
     case ReorderingStrategy::GEOMETRIC: {
-      if (nx*ny*nz*components != A->size()) {
-        nx = opts.nx();
-        ny = opts.ny();
-        nz = opts.nz();
-        components = opts.components();
-        width = opts.separator_width();
-      }
-      if (nx*ny*nz*components != A->size()) {
-        std::cerr << "# ERROR: Geometric reordering failed. \n"
-          "# Geometric reordering only works on"
-          " a simple 3 point wide stencil\n"
-          "# on a regular grid and you need to provide the mesh sizes."
-                  << std::endl;
-        return 1;
-      }
-      int leaf = A->size();
-      int min_sep_size = A->size();
-      if (opts.use_HSS()) {
-        leaf = opts.HSS_options().leaf_size();
-        min_sep_size = opts.HSS_min_sep_size();
-      }
-      if (opts.use_BLR()) {
-        leaf = opts.BLR_options().leaf_size();
-        min_sep_size = opts.BLR_min_sep_size();
-      }
       sep_tree = geometric_nested_dissection
-        (nx, ny, nz, components, width, perm, iperm, opts.nd_param(),
-         leaf, min_sep_size);
+        (A, nx, ny, nz, components, width, perm, iperm, opts);
+      if (!sep_tree) return 1;
       break;
     }
     case ReorderingStrategy::RCM: {
@@ -232,24 +208,9 @@ namespace strumpack {
       sep_tree->broadcast(comm);
     } else {
       if (opts.reordering_method() == ReorderingStrategy::GEOMETRIC) {
-        if (nx*ny*nz*components != A->size()) {
-          nx = opts.nx();
-          ny = opts.nz();
-          nz = opts.nz();
-          components = opts.components();
-          width = opts.separator_width();
-        }
-        if (nx*ny*nz*components != A->size()) {
-          std::cerr << "# ERROR: Geometric reordering failed. \n"
-            "# Geometric reordering only works on"
-            " a simple 3 point wide stencil\n"
-            "# on a regular grid and you need to provide the mesh sizes."
-                    << std::endl;
-          return 1;
-        }
         sep_tree = geometric_nested_dissection
-          (nx, ny, nz, components, width, perm, iperm, opts.nd_param(),
-           opts.HSS_options().leaf_size(), opts.HSS_min_sep_size());
+          (A, nx, ny, nz, components, width, perm, iperm, opts);
+        if (!sep_tree) return 1;
       } else {
         CSRMatrixMPI<scalar_t,integer_t> Ampi(A, comm, false);
         switch (opts.reordering_method()) {
@@ -346,19 +307,19 @@ namespace strumpack {
         integer_t nr_parts = 0;
         split_separator(opts, hss_tree, nr_parts, sep, A, 0, 1, sorder);
 
-        // for BLR find which blocks are admissible
-        adm.resize(nr_parts*nr_parts, true);
-        for (integer_t i=sep_begin; i<sep_end; i++) {
-          auto pi = sorder[i];
-          for (integer_t j=A->ptr(i); j<A->ptr(i+1); j++) {
-            auto ij = A->ind(j);
-            if (ij < sep_begin || ij >= sep_end) continue;
-            auto pj = sorder[ij];
-            if (pi != pj)
-              adm[pi+nr_parts*pj] = adm[pj+nr_parts*pi] = false;
+        if (is_blr) { // find which blocks are admissible
+          adm.resize(nr_parts*nr_parts, true);
+          for (integer_t i=sep_begin; i<sep_end; i++) {
+            auto pi = sorder[i];
+            for (integer_t j=A->ptr(i); j<A->ptr(i+1); j++) {
+              auto ij = A->ind(j);
+              if (ij < sep_begin || ij >= sep_end) continue;
+              auto pj = sorder[ij];
+              if (pi != pj)
+                adm[pi+nr_parts*pj] = adm[pj+nr_parts*pi] = false;
+            }
           }
         }
-
         auto count = sep_begin;
         for (integer_t part=0; part<nr_parts; part++)
           for (integer_t i=sep_begin; i<sep_end; i++)
@@ -367,7 +328,8 @@ namespace strumpack {
 #pragma omp critical
       {  // not thread safe!
         sep_tree->set_HSS_tree(sep, std::move(hss_tree));
-        sep_tree->set_admissibility(sep, std::move(adm));
+        if (is_blr)
+          sep_tree->set_admissibility(sep, std::move(adm));
       }
     } else {
       if (sep_tree->lch(sep) != -1)
