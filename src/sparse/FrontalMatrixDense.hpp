@@ -79,7 +79,8 @@ namespace strumpack {
      DenseM_t& B, int task_depth) const override;
     std::string type() const override { return "FrontalMatrixDense"; }
 
-    Inertia inertia_node() const override { return F11.inertia(); }
+    Inertia inertia_node() override { return F11.inertia(); }
+    // Inertia inertia_node() const override { return F11.inertia(); }
 
   private:
     FrontalMatrixDense(const FrontalMatrixDense&) = delete;

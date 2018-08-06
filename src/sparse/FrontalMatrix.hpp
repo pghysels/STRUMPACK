@@ -141,7 +141,8 @@ namespace strumpack {
      bool is_root) {}
 
 
-    virtual Inertia inertia() const {
+    // virtual Inertia inertia() const {
+    virtual Inertia inertia() {
       Inertia i = inertia_node();
       Inertia il, ir;
       if (lchild) il = lchild->inertia();
@@ -151,7 +152,8 @@ namespace strumpack {
       i.nz = i.nz + il.nz + ir.nz;
       return i;
     }
-    virtual Inertia inertia_node() const = 0;
+    virtual Inertia inertia_node() { std::cout << "todo" << std::endl;}
+    // virtual Inertia inertia_node() const = 0;
 
     // TODO compute this (and levels) once, store it
     // maybe compute it when setting pointers to the children

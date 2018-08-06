@@ -166,12 +166,73 @@ namespace strumpack {
 
     void shift(scalar_t sigma);
 
-    Inertia inertia() const {
-      // TODO
+
+    Inertia readMyInertiaOffBlockDiag(const std::vector<int>& IPIV) const{
       Inertia in;
-      in.np = rows();
+      unsigned int k  = 0;
+      scalar_t a;
+      scalar_t b;
+      scalar_t c;
+      auto nD = rows();
+      if (nD == 0) {
+        return in;
+      }
+      while (k < nD-1) {
+        if ((IPIV[k+1] < 0) && (IPIV[k]==IPIV[k+1])){
+          // 2x2 block
+          a = operator()(k,k);
+          b = operator()(k+1,k);
+          c = operator()(k+1,k+1);
+          auto lam1 = scalar_t(0.5)*( (a+c) + std::sqrt((a-c)*(a-c) + scalar_t(4.)*b*b));
+          auto lam2 = scalar_t(0.5)*( (a+c) - std::sqrt((a-c)*(a-c) + scalar_t(4.)*b*b));
+          if (std::real(lam1) > 0.) {
+            in.np += 1;
+          } else if (std::real(lam1) < 0.) {
+            in.nn += 1;
+          } else {
+            in.nz += 1;
+          }
+          if (std::real(lam2) > 0.) {
+            in.np += 1;
+          } else if (std::real(lam2) < 0.) {
+            in.nn += 1;
+          } else {
+            in.nz += 1;
+          }
+          k += 2;
+
+        } else {
+          // 1x1 block
+          a = operator()(k,k);
+          if (std::real(a) > 0.) {
+            in.np += 1;
+          } else if (std::real(a) < 0.) {
+            in.nn += 1;
+          } else {
+            in.nz += 1;
+          }
+          k += 1;
+        }
+      }
+      if (k < nD) { // need one more 1x1 block to finish
+        a = operator()(k,k);
+        if (std::real(a) > 0.) {
+          in.np += 1;
+        } else if (std::real(a) < 0.) {
+          in.nn += 1;
+        } else {
+          in.nz += 1;
+        }
+        k += 1;
+      }
       return in;
     }
+
+    Inertia inertia() {
+      auto IPIV = sytrf();
+      return readMyInertiaOffBlockDiag(IPIV);
+    }
+
 
   private:
     void ID_column_MGS
@@ -1008,7 +1069,7 @@ namespace strumpack {
   }
 
   // Jonas
-  template<typename scalar_t> std::vector<int> DenseMatrix<scalar_t>::sytrf() {
+  template<typename scalar_t> std::vector<int> DenseMatrix<scalar_t>::sytrf()  {
     std::vector<int> IPIV(rows());
     int info;
     if (rows() > 0){
