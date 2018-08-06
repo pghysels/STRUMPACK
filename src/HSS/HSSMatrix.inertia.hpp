@@ -129,7 +129,7 @@ namespace strumpack {
       //      Dt        <--      Omega    *      Dt     *   Omega'         (permutation included in above step)
       // [ D11  D12 ]  ----   [ -E  Irr ] . [ C11 C12 ] . [ -E'  Icc ]
       // [ D21  D22 ]  ----   [ Icc 0cr ]   [ C21 C22 ]   [ Irr  0rc ]
-      // D11 =  E*C11*E' - 2*E*C12 + C22   = E*(C11*E' - 2*C12) + C22
+      // D11 =  E*C11*E' - E*C12 - C21*E' + C22
       // D12 = -E*C11  + C21
       // D21 = -C11*E' + C12   = D12'
       // D22 =  C11

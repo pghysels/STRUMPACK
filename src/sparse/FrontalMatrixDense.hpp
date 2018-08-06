@@ -51,6 +51,7 @@ namespace strumpack {
   public:
     DenseM_t F11, F12, F21, F22;
     std::vector<int> piv; // regular int because it is passed to BLAS
+    Inertia inertia_;
 
     FrontalMatrixDense
     (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
@@ -79,7 +80,10 @@ namespace strumpack {
      DenseM_t& B, int task_depth) const override;
     std::string type() const override { return "FrontalMatrixDense"; }
 
-    Inertia inertia_node() override { return F11.inertia(); }
+    Inertia inertia_node() override {
+      // return F11.inertia();
+      return inertia_;
+    }
     // Inertia inertia_node() const override { return F11.inertia(); }
 
   private:
@@ -222,6 +226,10 @@ namespace strumpack {
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
     if (this->dim_sep()) {
+
+      // would like a better way to do this
+      inertia_ = F11.inertia();
+
       piv = F11.LU(task_depth);
       if (opts.replace_tiny_pivots()) {
         // TODO consider other values for thresh

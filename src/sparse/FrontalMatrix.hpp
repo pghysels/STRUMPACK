@@ -152,7 +152,7 @@ namespace strumpack {
       i.nz = i.nz + il.nz + ir.nz;
       return i;
     }
-    virtual Inertia inertia_node() { std::cout << "todo" << std::endl;}
+    virtual Inertia inertia_node() { std::cout << "todo" << std::endl; }
     // virtual Inertia inertia_node() const = 0;
 
     // TODO compute this (and levels) once, store it
