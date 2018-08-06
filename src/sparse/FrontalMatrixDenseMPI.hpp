@@ -71,8 +71,7 @@ namespace strumpack {
 
     void extend_add();
     void extend_add_copy_to_buffers
-    (std::vector<std::vector<scalar_t>>& sbuf,
-     const FMPI_t* pa) const override;
+    (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override;
 
     void sample_CB
     (const SPOptions<scalar_t>& opts, const DistM_t& R, DistM_t& Sr,
@@ -125,30 +124,25 @@ namespace strumpack {
   FrontalMatrixDenseMPI<scalar_t,integer_t>::extend_add() {
     if (!lchild_ && !rchild_) return;
     std::vector<std::vector<scalar_t>> sbuf(this->P());
-    for (auto ch : {lchild_, rchild_}) {
+    for (auto& ch : {lchild_.get(), rchild_.get()}) {
       if (ch && Comm().is_root()) {
         STRUMPACK_FLOPS
           (static_cast<long long int>(ch->dim_upd())*ch->dim_upd());
       }
-      if (!visit(ch)) continue;
       ch->extend_add_copy_to_buffers(sbuf, this);
     }
-    scalar_t *rbuf = nullptr, **pbuf = nullptr;
-    all_to_all_v(sbuf, rbuf, pbuf, Comm().comm());
-    for (auto ch : {lchild_, rchild_}) {
-      if (!ch) continue;
+    std::vector<scalar_t> rbuf;
+    std::vector<scalar_t*> pbuf;
+    Comm().all_to_all_v(sbuf, rbuf, pbuf);
+    for (auto& ch : {lchild_.get(), rchild_.get()})
       ch->extend_add_copy_from_buffers
-        (F11_, F12_, F21_, F22_, pbuf+this->child_master(ch), this);
-    }
-    delete[] pbuf;
-    delete[] rbuf;
+        (F11_, F12_, F21_, F22_, pbuf.data()+this->master(ch), this);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
-    ExtAdd::extend_add_copy_to_buffers
-      (F22_, sbuf, pa, this->upd_to_parent(pa));
+    ExtAdd::extend_add_copy_to_buffers(F22_, sbuf, pa, this->upd_to_parent(pa));
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -179,17 +173,6 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::partial_factorization() {
     if (this->dim_sep() && grid()->active()) {
-#if defined(WRITE_ROOT)
-      if (etree_level == 0) {
-        if (Comm().is_root())
-          std::cout << "Writing root node to file..." << std::endl;
-        F11_.MPI_binary_write();
-        if (Comm().is_root())
-          std::cout << "Done. Early abort." << std::endl;
-        MPI_Finalize();
-        exit(0);
-      }
-#endif
       piv = F11_.LU();
       STRUMPACK_FULL_RANK_FLOPS(LU_flops(F11_));
       if (this->dim_upd()) {
@@ -296,11 +279,10 @@ namespace strumpack {
     this->find_upd_indices(I, lI, oI);
     std::vector<std::vector<scalar_t>> sbuf(this->P());
     ExtAdd::extract_copy_to_buffers(F22_, lI, lJ, oI, oJ, B, sbuf);
-    scalar_t *rbuf = nullptr, **pbuf = nullptr;
-    all_to_all_v(sbuf, rbuf, pbuf, Comm().comm());
+    std::vector<scalar_t> rbuf;
+    std::vector<scalar_t*> pbuf;
+    Comm().all_to_all_v(sbuf, rbuf, pbuf);
     ExtAdd::extract_copy_from_buffers(B, lI, lJ, oI, oJ, F22_, pbuf);
-    delete[] rbuf;
-    delete[] pbuf;
   }
 
   /**

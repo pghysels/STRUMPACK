@@ -210,6 +210,8 @@ namespace strumpack {
     TIMER_STOP(t_sprod);
   }
 
+
+  // TODO rewrite this, avoid dynamic_cast
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSSMPI<scalar_t,integer_t>::sample_children_CB
   (const Opts& opts, DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
@@ -222,8 +224,8 @@ namespace strumpack {
     }
     // both children are MPI
     if (lchild_->isMPI() && rchild_->isMPI()) {
-      auto lch = dynamic_cast<FMPI_t*>(lchild_);
-      auto rch = dynamic_cast<FMPI_t*>(rchild_);
+      auto lch = dynamic_cast<FMPI_t*>(lchild_.get());
+      auto rch = dynamic_cast<FMPI_t*>(rchild_.get());
       DistM_t cSrl, cScl, cSrr, cScr;
       // this needs to be done first, because it is collective, then
       // the sampling for left/right can be done concurrently
@@ -242,16 +244,16 @@ namespace strumpack {
     }
     // one child is seq or NULL, the other is MPI or NULL
     F_t* ch_seq = nullptr;
-    FMPI_t* ch_mpi = dynamic_cast<FMPI_t*>(lchild_);
+    FMPI_t* ch_mpi = dynamic_cast<FMPI_t*>(lchild_.get());
     if (!ch_mpi)
-      ch_mpi = dynamic_cast<FMPI_t*>(rchild_);
+      ch_mpi = dynamic_cast<FMPI_t*>(rchild_.get());
     if (ch_mpi)
-      ch_seq = (ch_mpi == lchild_) ? rchild_ : lchild_;
-    else ch_seq = lchild_ ? lchild_ : rchild_;
+      ch_seq = (ch_mpi == lchild_.get()) ? rchild_.get() : lchild_.get();
+    else ch_seq = lchild_ ? lchild_.get() : rchild_.get();
     DenseM_t Rseq, Srseq, Scseq;
     DistM_t cSr, cSc, S_dummy;
     int m = 0, n = 0;
-    auto pch = this->child_master(ch_seq);
+    auto pch = this->master(ch_seq);
     auto rank = Comm().rank();
     if (ch_seq) {
       m = R.rows(), n = R.cols();
@@ -275,7 +277,7 @@ namespace strumpack {
         ch_seq->sample_CB(opts, Rseq, Srseq, Scseq, this);
     if (ch_mpi) {
       TIMER_TIME(TaskType::SKINNY_EXTEND_ADD_MPI1, 2, t_sea);
-      if (ch_mpi == lchild_)
+      if (ch_mpi == lchild_.get())
         skinny_extend_add(cSr, cSc, S_dummy, S_dummy, Sr, Sc);
       else skinny_extend_add(S_dummy, S_dummy, cSr, cSc, Sr, Sc);
       TIMER_STOP(t_sea);
@@ -308,8 +310,8 @@ namespace strumpack {
     auto m = R.rows();
     auto n = R.cols();
     auto rank = Comm().rank();
-    auto pl = this->child_master(lchild_);
-    auto pr = this->child_master(rchild_);
+    auto pl = this->master(lchild_);
+    auto pr = this->master(rchild_);
     DenseM_t Rseq(m, n), Srseq(m, n), Scseq(m, n);
     Srseq.zero();
     Scseq.zero();
@@ -331,13 +333,15 @@ namespace strumpack {
     TIMER_STOP(t_sea);
   }
 
+
+  // TODO avoid dynamic_cast, use Comm.all_to_all_v
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSSMPI<scalar_t,integer_t>::skinny_extend_add
   (DistM_t& cSrl, DistM_t& cScl, DistM_t& cSrr, DistM_t& cScr,
    DistM_t& Sr, DistM_t& Sc) {
     std::vector<std::vector<scalar_t>> sbuf(this->P());
-    auto lch = dynamic_cast<FMPI_t*>(lchild_);
-    auto rch = dynamic_cast<FMPI_t*>(rchild_);
+    auto lch = dynamic_cast<FMPI_t*>(lchild_.get());
+    auto rch = dynamic_cast<FMPI_t*>(rchild_.get());
     if (cSrl.active())
       ExtAdd::skinny_extend_add_copy_to_buffers
         (cSrl, cScl, sbuf, this, lch->upd_to_parent(this));
@@ -351,7 +355,7 @@ namespace strumpack {
         (Sr, Sc, pbuf, this, lch);
     if (rch) // unpack right child contribution
       ExtAdd::skinny_extend_add_copy_from_buffers
-        (Sr, Sc, pbuf+this->child_master(rch), this, rch);
+        (Sr, Sc, pbuf+this->master(rch), this, rch);
     delete[] pbuf;
     delete[] rbuf;
   }

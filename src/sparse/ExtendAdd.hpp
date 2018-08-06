@@ -630,7 +630,7 @@ namespace strumpack {
       const auto I = ch->upd_to_parent(pa);
       const std::size_t pa_dim_sep = b.rows();
       const std::size_t ch_dim_upd = ch->dim_upd();
-      const auto ch_master = pa->child_master(ch);
+      const auto ch_master = pa->master(ch);
       const auto prows = ch->grid()->nprows();
       const auto pcols = ch->grid()->npcols();
       const auto B = DistM_t::default_MB;
@@ -802,7 +802,7 @@ namespace strumpack {
     static void extract_copy_from_buffers
     (DistM_t& F, std::vector<std::size_t>& I, std::vector<std::size_t>& J,
      std::vector<std::size_t>& oI, std::vector<std::size_t>& oJ,
-     const DistM_t& B, scalar_t** pbuf) {
+     const DistM_t& B, std::vector<scalar_t*>& pbuf) {
       if (!F.active()) return;
       if (F.fixed()) {
         for (std::size_t c=0; c<oJ.size(); c++) {

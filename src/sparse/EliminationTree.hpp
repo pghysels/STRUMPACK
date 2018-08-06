@@ -79,7 +79,7 @@ namespace strumpack {
     std::unique_ptr<F_t> root_;
 
   private:
-    F_t* setup_tree
+    std::unique_ptr<F_t> setup_tree
     (const SPOptions<scalar_t>& opts, const SpMat_t& A,
      const SeparatorTree<integer_t>& sep_tree,
      std::vector<integer_t>* upd, integer_t sep,
@@ -103,8 +103,7 @@ namespace strumpack {
 #pragma omp single
     symbolic_factorization(A, sep_tree, sep_tree.root(), upd);
 
-    root_ = std::unique_ptr<F_t>
-      (setup_tree(opts, A, sep_tree, upd, sep_tree.root(), true, 0));
+    root_ = setup_tree(opts, A, sep_tree, upd, sep_tree.root(), true, 0);
     delete[] upd;
   }
 
@@ -169,7 +168,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t>
-  FrontalMatrix<scalar_t,integer_t>*
+  std::unique_ptr<FrontalMatrix<scalar_t,integer_t>>
   EliminationTree<scalar_t,integer_t>::setup_tree
   (const SPOptions<scalar_t>& opts, const SpMat_t& A,
    const SeparatorTree<integer_t>& sep_tree,
@@ -188,21 +187,23 @@ namespace strumpack {
     bool is_hss = opts.use_HSS() && hss_parent &&
       (dim_sep >= opts.HSS_min_sep_size());
     bool is_blr = opts.use_BLR() && (dim_sep >= opts.BLR_min_sep_size());
-    F_t* front = nullptr;
+    std::unique_ptr<F_t> front;
     if (is_hss) {
-      front = new FHSS_t
-        (sep, sep_begin, sep_end, upd[sep]);
+      front = std::unique_ptr<F_t>
+        (new FHSS_t(sep, sep_begin, sep_end, upd[sep]));
       front->set_HSS_partitioning
         (opts, sep_tree.HSS_tree(sep), level == 0);
       nr_HSS_fronts_++;
     } else {
       if (is_blr) {
-        front = new FBLR_t(sep, sep_begin, sep_end, upd[sep]);
+        front = std::unique_ptr<F_t>
+          (new FBLR_t(sep, sep_begin, sep_end, upd[sep]));
         front->set_BLR_partitioning
           (opts, sep_tree.HSS_tree(sep), sep_tree.admissibility(sep), level == 0);
         nr_BLR_fronts_++;
       } else {
-        front = new FD_t(sep, sep_begin, sep_end, upd[sep]);
+        front = std::unique_ptr<F_t>
+          (new FD_t(sep, sep_begin, sep_end, upd[sep]));
         nr_dense_fronts_++;
       }
     }

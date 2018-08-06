@@ -62,8 +62,6 @@ namespace strumpack {
     FrontalMatrixBLRMPI
     (integer_t sep, integer_t sep_begin, integer_t sep_end,
      std::vector<integer_t>& upd, const MPIComm& comm, int P);
-    FrontalMatrixBLRMPI(const FBLRMPI_t&) = delete;
-    FrontalMatrixBLRMPI& operator=(FBLRMPI_t const&) = delete;
 
     void release_work_memory() override;
     void build_front(const SpMat_t& A);
@@ -71,8 +69,7 @@ namespace strumpack {
 
     void extend_add();
     void extend_add_copy_to_buffers
-    (std::vector<std::vector<scalar_t>>& sbuf,
-     const FMPI_t* pa) const override;
+    (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override;
 
     void sample_CB
     (const SPOptions<scalar_t>& opts, const DistM_t& R, DistM_t& Sr,
@@ -96,12 +93,10 @@ namespace strumpack {
     std::string type() const override { return "FrontalMatrixBLRMPI"; }
 
     void set_BLR_partitioning
-    (const SPOptions<scalar_t>& opts,
-     const HSS::HSSPartitionTree& sep_tree,
+    (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
      const std::vector<bool>& adm, bool is_root) override;
     void set_HSS_partitioning
-    (const SPOptions<scalar_t>& opts,
-     const HSS::HSSPartitionTree& sep_tree,
+    (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
      bool is_root) override;
 
   private:
@@ -126,10 +121,10 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   FrontalMatrixBLRMPI<scalar_t,integer_t>::FrontalMatrixBLRMPI
-  (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-   std::vector<integer_t>& _upd, const MPIComm& comm, int P)
+  (integer_t sep, integer_t sep_begin, integer_t sep_end,
+   std::vector<integer_t>& upd, const MPIComm& comm, int P)
     : FrontalMatrixMPI<scalar_t,integer_t>
-    (_sep, _sep_begin, _sep_end, _upd, comm, P), blr_grid_(Comm()) {}
+    (sep, sep_begin, sep_end, upd, comm, P), blr_grid_(Comm()) {}
 
 
   template<typename scalar_t,typename integer_t> void
@@ -141,23 +136,20 @@ namespace strumpack {
   FrontalMatrixBLRMPI<scalar_t,integer_t>::extend_add() {
     if (!lchild_ && !rchild_) return;
     std::vector<std::vector<scalar_t>> sbuf(this->P());
-    for (auto ch : {lchild_, rchild_}) {
+    for (auto& ch : {lchild_.get(), rchild_.get()}) {
       if (ch && Comm().is_root()) {
         STRUMPACK_FLOPS
           (static_cast<long long int>(ch->dim_upd())*ch->dim_upd());
       }
-      if (!visit(ch)) continue;
-      ch->extend_add_copy_to_buffers(sbuf, this);
+      if (visit(ch)) ch->extend_add_copy_to_buffers(sbuf, this);
     }
-    scalar_t *rbuf = nullptr, **pbuf = nullptr;
-    all_to_all_v(sbuf, rbuf, pbuf, Comm().comm());
-    for (auto ch : {lchild_, rchild_}) {
-      if (!ch) continue;
-      ch->extend_add_copy_from_buffers
-        (F11_, F12_, F21_, F22_, pbuf+this->child_master(ch), this);
-    }
-    delete[] pbuf;
-    delete[] rbuf;
+    std::vector<scalar_t> rbuf;
+    std::vector<scalar_t*> pbuf;
+    Comm().all_to_all_v(sbuf, rbuf, pbuf);
+    for (auto& ch : {lchild_.get(), rchild_.get()})
+      if (ch)
+        ch->extend_add_copy_from_buffers
+          (F11_, F12_, F21_, F22_, pbuf.data()+this->master(ch), this);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -307,11 +299,10 @@ namespace strumpack {
     this->find_upd_indices(I, lI, oI);
     std::vector<std::vector<scalar_t>> sbuf(this->P());
     ExtAdd::extract_copy_to_buffers(F22_, lI, lJ, oI, oJ, B, sbuf);
-    scalar_t *rbuf = nullptr, **pbuf = nullptr;
-    all_to_all_v(sbuf, rbuf, pbuf, Comm().comm());
+    std::vector<scalar_t> rbuf;
+    std::vector<scalar_t*> pbuf;
+    Comm().all_to_all_v(sbuf, rbuf, pbuf);
     ExtAdd::extract_copy_from_buffers(B, lI, lJ, oI, oJ, F22_, pbuf);
-    delete[] rbuf;
-    delete[] pbuf;
   }
 
   /**

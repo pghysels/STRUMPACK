@@ -121,14 +121,16 @@ namespace strumpack {
      std::vector<scalar_t*>& pbuf, const FMPI_t* pa) const override;
 
     bool visit(const F_t* ch) const;
-    int child_master(const F_t* ch) const;
+    bool visit(const std::unique_ptr<F_t>& ch) const;
+    int master(const F_t* ch) const;
+    int master(const std::unique_ptr<F_t>& ch) const;
 
     MPIComm& Comm() { return grid()->Comm(); }
     const MPIComm& Comm() const { return grid()->Comm(); }
     MPI_Comm comm() const { return Comm().comm(); }
     BLACSGrid* grid() { return &blacs_grid_; }
     const BLACSGrid* grid() const { return &blacs_grid_; }
-    int P() const { return grid()->P(); }
+    int P() const override { return grid()->P(); }
 
     virtual long long dense_factor_nonzeros(int task_depth=0) const;
     virtual std::string type() const { return "FrontalMatrixMPI"; }
@@ -175,13 +177,13 @@ namespace strumpack {
     if (lchild_) {
       if (lchild_->isMPI())
         copy(m, n, Bl, 0, 0, tmp, 0, 0, grid()->ctxt_all());
-      else copy(m, n, Blseq, child_master(lchild_), tmp, 0, 0, grid()->ctxt_all());
+      else copy(m, n, Blseq, master(lchild_), tmp, 0, 0, grid()->ctxt_all());
     }
     B.add(tmp);
     if (rchild_) {
       if (rchild_->isMPI())
         copy(m, n, Br, 0, 0, tmp, 0, 0, grid()->ctxt_all());
-      else copy(m, n, Brseq, child_master(rchild_), tmp, 0, 0, grid()->ctxt_all());
+      else copy(m, n, Brseq, master(rchild_), tmp, 0, 0, grid()->ctxt_all());
     }
     B.add(tmp);
     TIMER_STOP(t_getsub);
@@ -219,14 +221,14 @@ namespace strumpack {
         if (lchild_->isMPI())
           copy(m, n, visit(lchild_) ? Bl[i] : d, 0, 0, tmp, 0, 0, grid()->ctxt_all());
         else copy(m, n, visit(lchild_) ? Blseq[i] : d2,
-                  child_master(lchild_), tmp, 0, 0, grid()->ctxt_all());
+                  master(lchild_), tmp, 0, 0, grid()->ctxt_all());
       }
       B[i].add(tmp);
       if (rchild_) {
         if (rchild_->isMPI())
           copy(m, n, visit(rchild_) ? Br[i] : d, 0, 0, tmp, 0, 0, grid()->ctxt_all());
         else copy(m, n, visit(rchild_) ? Brseq[i] : d2,
-                  child_master(rchild_), tmp, 0, 0, grid()->ctxt_all());
+                  master(rchild_), tmp, 0, 0, grid()->ctxt_all());
       }
       B[i].add(tmp);
     }
@@ -269,23 +271,39 @@ namespace strumpack {
    * rank is not part of the processes assigned to the child.
    */
   template<typename scalar_t,typename integer_t> bool
-  FrontalMatrixMPI<scalar_t,integer_t>::visit(const F_t* ch) const {
+  FrontalMatrixMPI<scalar_t,integer_t>::visit
+  (const F_t* ch) const {
     if (!ch) return false;
+    // TODO do this differently!!
     if (auto mpi_child = dynamic_cast<const FMPI_t*>(ch)) {
       if (mpi_child->Comm().is_null())
         return false; // child is MPI
-    } else if (Comm().rank() != child_master(ch))
+    } else if (Comm().rank() != master(ch))
       return false; // child is sequential
     return true;
   }
 
+  template<typename scalar_t,typename integer_t> bool
+  FrontalMatrixMPI<scalar_t,integer_t>::visit
+  (const std::unique_ptr<F_t>& ch) const {
+    return visit(ch.get());
+  }
+
   template<typename scalar_t,typename integer_t> int
-  FrontalMatrixMPI<scalar_t,integer_t>::child_master(const F_t* ch) const {
-    int ch_master;
-    if (auto mpi_ch = dynamic_cast<const FMPI_t*>(ch))
-      ch_master = (ch == lchild_) ? 0 : P() - mpi_ch->P();
-    else ch_master = (ch == lchild_) ? 0 : P() - 1;
-    return ch_master;
+  FrontalMatrixMPI<scalar_t,integer_t>::master
+  (const std::unique_ptr<F_t>& ch) const {
+    return master(ch.get());
+  }
+
+  template<typename scalar_t,typename integer_t> int
+  FrontalMatrixMPI<scalar_t,integer_t>::master
+  (const F_t* ch) const {
+    // int ch_master;
+    // if (auto mpi_ch = dynamic_cast<const FMPI_t*>(ch))
+    //   ch_master = (ch == lchild_) ? 0 : P() - mpi_ch->P();
+    // else ch_master = (ch == lchild_) ? 0 : P() - 1;
+    // return ch_master;
+    return (ch == lchild_.get()) ? 0 : P() - ch->P();
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -320,7 +338,7 @@ namespace strumpack {
       STRUMPACK_FLOPS(static_cast<long long int>(CBl.rows()*b.cols()));
       STRUMPACK_FLOPS(static_cast<long long int>(CBr.rows()*b.cols()));
     }
-    std::vector<std::vector<scalar_t>> sbuf(this->P());
+    std::vector<std::vector<scalar_t>> sbuf(P());
     if (visit(lchild_))
       lchild_->extend_add_column_copy_to_buffers(CBl, seqCBl, sbuf, this);
     if (visit(rchild_))
@@ -328,9 +346,9 @@ namespace strumpack {
     std::vector<scalar_t> rbuf;
     std::vector<scalar_t*> pbuf;
     Comm().all_to_all_v(sbuf, rbuf, pbuf);
-    for (auto ch : {lchild_, rchild_})
+    for (auto& ch : {lchild_.get(), rchild_.get()})
       if (ch) ch->extend_add_column_copy_from_buffers
-                (b, bupd, pbuf.data()+child_master(ch), this);
+                (b, bupd, pbuf.data()+master(ch), this);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -352,10 +370,10 @@ namespace strumpack {
   FrontalMatrixMPI<scalar_t,integer_t>::extract_b
   (const DistM_t& b, const DistM_t& bupd, DistM_t& CBl, DistM_t& CBr,
    DenseM_t& seqCBl, DenseM_t& seqCBr) const {
-    std::vector<std::vector<scalar_t>> sbuf(this->P());
-    for (auto ch : {lchild_, rchild_})
+    std::vector<std::vector<scalar_t>> sbuf(P());
+    for (auto ch : {lchild_.get(), rchild_.get()})
       if (ch) ch->extract_column_copy_to_buffers
-                (b, bupd, child_master(ch), sbuf, this);
+                (b, bupd, master(ch), sbuf, this);
     std::vector<scalar_t> rbuf;
     std::vector<scalar_t*> pbuf;
     Comm().all_to_all_v(sbuf, rbuf, pbuf);

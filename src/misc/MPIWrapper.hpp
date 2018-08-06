@@ -67,12 +67,8 @@ namespace strumpack {
       return *this;
     }
 
-    inline MPI_Comm comm() const {
-      return comm_;
-    }
-    inline bool is_null() const {
-      return comm_ == MPI_COMM_NULL;
-    }
+    inline MPI_Comm comm() const { return comm_; }
+    inline bool is_null() const { return comm_ == MPI_COMM_NULL; }
     inline int rank() const {
       assert(comm_ != MPI_COMM_NULL);
       int r;
@@ -85,21 +81,15 @@ namespace strumpack {
       MPI_Comm_size(comm_, &nprocs);
       return nprocs;
     }
-    inline bool is_root() const {
-      return rank() == 0;
-    }
-    inline void barrier() const {
-      MPI_Barrier(comm_);
-    }
+    inline bool is_root() const { return rank() == 0; }
+    inline void barrier() const { MPI_Barrier(comm_); }
 
-    // TODO use MPI_Comm_split??
     MPIComm sub(int P0, int P, int stride=1) const {
       if (is_null() || size() == 1)
         return MPIComm(MPI_COMM_NULL);
       assert(P0 + P <= size());
       MPIComm sub_comm;
       std::vector<int> sub_ranks(P);
-      //std::iota(sub_ranks.begin(), sub_ranks.end(), P0);
       for (int i=0; i<P; i++)
         sub_ranks[i] = P0 + i*stride;
       MPI_Group group, sub_group;
