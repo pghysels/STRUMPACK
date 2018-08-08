@@ -510,12 +510,12 @@ namespace strumpack {
         sscanf(cline, "%d %d %d", &m, &in, &innz);
         _nnz = static_cast<integer_t>(innz);
         _n = static_cast<integer_t>(in);
-        if (s != GENERAL) _nnz = 2 * _nnz - _n;
         if (is_mpi_root())
           std::cout << "# reading " << number_format_with_commas(m) << " by "
                     << number_format_with_commas(_n) << " matrix with "
                     << number_format_with_commas(_nnz) << " nnz's from "
                     << filename << std::endl;
+        if (s != GENERAL) _nnz = 2 * _nnz;
         if (m != _n) {
           if (is_mpi_root())
             std::cerr << "ERROR: matrix is not square!" << std::endl;
@@ -576,6 +576,7 @@ namespace strumpack {
         }
       }
     }
+    _nnz = A.size();
     fclose(fp);
     if (!zero_based)
       for (auto& t : A) {
