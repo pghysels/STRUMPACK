@@ -99,9 +99,6 @@ namespace strumpack {
     HSS_trees() const { return _HSS_trees; }
     const HSS::HSSPartitionTree& HSS_tree(integer_t sep) const { return _HSS_trees.at(sep); }
     HSS::HSSPartitionTree& HSS_tree(integer_t sep) { return _HSS_trees[sep]; }
-    void set_HSS_tree(integer_t sep, HSS::HSSPartitionTree&& tree) {
-      _HSS_trees[sep] = std::move(tree);
-    }
 
     std::unordered_map<integer_t,std::vector<bool>>&
     admissibilities() { return adm_; }
@@ -109,10 +106,6 @@ namespace strumpack {
     admissibilities() const { return adm_; }
     const std::vector<bool>& admissibility(integer_t sep) const { return adm_.at(sep); }
     std::vector<bool>& admissibility(integer_t sep) { return adm_[sep]; }
-
-    void set_admissibility(integer_t sep, std::vector<bool>&& adm) {
-      adm_[sep] = std::move(adm);
-    }
 
   protected:
     integer_t _nbsep;

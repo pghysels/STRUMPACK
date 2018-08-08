@@ -301,7 +301,8 @@ namespace strumpack {
         } else if (is_blr) {
           front = std::unique_ptr<F_t>
             (new FBLR_t(sep, sep_begin, sep_end, upd[sep]));
-          front->set_HSS_partitioning(opts, tree.HSS_tree(sep), level == 0);
+          front->set_BLR_partitioning
+            (opts, tree.HSS_tree(sep), tree.admissibility(sep), level == 0);
         } else
           front = std::unique_ptr<F_t>
             (new FD_t(sep, sep_begin, sep_end, upd[sep]));
@@ -322,7 +323,8 @@ namespace strumpack {
           if (is_blr) {
             front = std::unique_ptr<F_t>
               (new FBLRMPI_t(active_pfronts_, sep_begin, sep_end, upd[sep], fcomm, P));
-            front->set_HSS_partitioning(opts, tree.HSS_tree(sep), level == 0);
+            front->set_BLR_partitioning
+              (opts, tree.HSS_tree(sep), tree.admissibility(sep), level == 0);
           } else
             front = std::unique_ptr<F_t>
               (new FDMPI_t(active_pfronts_, sep_begin, sep_end, upd[sep], fcomm, P));

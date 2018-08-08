@@ -256,27 +256,68 @@ namespace strumpack {
   MatrixReordering<scalar_t,integer_t>::separator_reordering
   (const SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
    bool verbose) {
-    if (opts.reordering_method() == ReorderingStrategy::GEOMETRIC)
-      return;
-
-    auto N = A->size();
-    auto sorder = new integer_t[N];
-    std::fill(sorder, sorder+N, integer_t(0));
-    integer_t root = sep_tree->root();
+    if (opts.reordering_method() != ReorderingStrategy::GEOMETRIC) {
+      auto N = A->size();
+      auto sorder = new integer_t[N];
+      std::fill(sorder, sorder+N, integer_t(0));
+      integer_t root = sep_tree->root();
 #pragma omp parallel
 #pragma omp single
-    separator_reordering_recursive(opts, A, true, root, sorder);
+      separator_reordering_recursive(opts, A, true, root, sorder);
 
-    auto iwork = iperm;
-    for (integer_t i=0; i<N; i++) sorder[i] = -sorder[i];
-    for (integer_t i=0; i<N; i++) iwork[sorder[i]] = i;
-    A->permute(iwork, sorder);
+      auto iwork = iperm;
+      for (integer_t i=0; i<N; i++) sorder[i] = -sorder[i];
+      for (integer_t i=0; i<N; i++) iwork[sorder[i]] = i;
+      A->permute(iwork, sorder);
+      // product of perm and sep_order
+      for (integer_t i=0; i<N; i++) iwork[i] = sorder[perm[i]];
+      for (integer_t i=0; i<N; i++) perm[i] = iwork[i];
+      for (integer_t i=0; i<N; i++) iperm[perm[i]] = i;
+      delete[] sorder;
+    }
 
-    // product of perm and sep_order
-    for (integer_t i=0; i<N; i++) iwork[i] = sorder[perm[i]];
-    for (integer_t i=0; i<N; i++) perm[i] = iwork[i];
-    for (integer_t i=0; i<N; i++) iperm[perm[i]] = i;
-    delete[] sorder;
+    if (opts.use_BLR()) {
+      // find which blocks are admissible:
+      //  loop over all edges in the separator [sep_begin,sep_end)
+      //  if the 2 end vertices of this edge belong to different leafs in
+      //  the HSS tree, then the interaction between the corresponding BLR
+      //  blocks is not admissible
+      for (auto& s : sep_tree->HSS_trees()) {
+        auto sep = s.first;
+        auto& hss_tree = s.second;
+        auto sep_begin = sep_tree->sizes(sep);
+        auto sep_end = sep_tree->sizes(sep + 1);
+        auto tiles = hss_tree.leaf_sizes();
+        integer_t nr_tiles = tiles.size();
+        std::vector<integer_t> tile_sizes(nr_tiles+1);
+        tile_sizes[0] = sep_begin;
+        for (integer_t i=0; i<nr_tiles; i++)
+          tile_sizes[i+1] = tiles[i] + tile_sizes[i];
+        std::vector<bool> adm(nr_tiles * nr_tiles, true);
+        for (integer_t t=0; t<nr_tiles; t++) {
+          adm[t+t*nr_tiles] = false;
+          for (integer_t i=tile_sizes[t]; i<tile_sizes[t+1]; i++) {
+            auto Ai = iperm[i];
+            for (integer_t j=A->ptr(Ai); j<A->ptr(Ai+1); j++) {
+              auto Aj = perm[A->ind(j)];
+              if (Aj < sep_begin || Aj >= sep_end) continue;
+              integer_t tj = std::distance
+                (tile_sizes.begin(), std::upper_bound
+                 (tile_sizes.begin(), tile_sizes.end(), Aj)) - 1;
+              if (t != tj) adm[t+nr_tiles*tj] = adm[tj+nr_tiles*t] = false;
+            }
+          }
+        }
+        // std::cout << "adm = [" << std::endl;
+        // for (integer_t ti=0; ti<nr_tiles; ti++) {
+        //   for (integer_t tj=0; tj<nr_tiles; tj++)
+        //     std::cout << adm[ti+nr_tiles*tj] << " ";
+        //   std::cout << std::endl;
+        // }
+        // std::cout << "];" << std::endl;
+        sep_tree->admissibility(sep) = std::move(adm);
+      }
+    }
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -302,24 +343,9 @@ namespace strumpack {
       }
 #pragma omp taskwait
       HSS::HSSPartitionTree hss_tree(dim_sep);
-      std::vector<bool> adm;
       if (dim_sep > 2 * min_sep) {
         integer_t nr_parts = 0;
         split_separator(opts, hss_tree, nr_parts, sep, A, 0, 1, sorder);
-
-        if (is_blr) { // find which blocks are admissible
-          adm.resize(nr_parts*nr_parts, true);
-          for (integer_t i=sep_begin; i<sep_end; i++) {
-            auto pi = sorder[i];
-            for (integer_t j=A->ptr(i); j<A->ptr(i+1); j++) {
-              auto ij = A->ind(j);
-              if (ij < sep_begin || ij >= sep_end) continue;
-              auto pj = sorder[ij];
-              if (pi != pj)
-                adm[pi+nr_parts*pj] = adm[pj+nr_parts*pi] = false;
-            }
-          }
-        }
         auto count = sep_begin;
         for (integer_t part=0; part<nr_parts; part++)
           for (integer_t i=sep_begin; i<sep_end; i++)
@@ -327,9 +353,7 @@ namespace strumpack {
       } else for (integer_t i=sep_begin; i<sep_end; i++) sorder[i] = -i;
 #pragma omp critical
       {  // not thread safe!
-        sep_tree->set_HSS_tree(sep, std::move(hss_tree));
-        if (is_blr)
-          sep_tree->set_admissibility(sep, std::move(adm));
+        sep_tree->HSS_tree(sep) = std::move(hss_tree);
       }
     } else {
       if (sep_tree->lch(sep) != -1)
