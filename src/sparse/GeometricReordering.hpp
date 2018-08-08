@@ -142,7 +142,8 @@ namespace strumpack {
            gd.components, gd.leaf, t);
         gd.trees[nbsep] = t; // Not thread safe!!
 
-        std::cout << "TODO admissibility info!!!" << std::endl;
+        auto nr_tiles = t.leaf_sizes().size();
+        gd.admissibility[nbsep] = std::vector<bool>(nr_tiles*nr_tiles, true);
 
         // if (opts.use_BLR()) { // find which blocks are admissible
         //   adm.resize(nr_parts*nr_parts, true);
@@ -222,7 +223,8 @@ namespace strumpack {
        {{0, 0, 0}}, {{nx, ny, nz}}, {{nx, ny, nz}}, tree, gd);
     std::unique_ptr<SeparatorTree<integer_t>> stree
       (new SeparatorTree<integer_t>(tree));
-    stree->HSS_trees() = gd.trees;
+    stree->HSS_trees() = std::move(gd.trees);
+    stree->admissibilities() = std::move(gd.admissibility);
 
     if (opts.use_BLR())
       std::cout << "TODO admissibility info!!!" << std::endl;
