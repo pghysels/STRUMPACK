@@ -89,7 +89,7 @@ int main(int argc, char* argv[]) {
   spss.solve(b, x, true);
 
   auto in = spss.inertia();
-  std::cout << "Inertia = {" << in.np << ","
+  std::cout << "# Inertia = {" << in.np << ","
             << in.nn << "," << in.nz << "}" << std::endl;
 
   std::cout << "# COMPONENTWISE SCALED RESIDUAL = "

@@ -143,17 +143,18 @@ namespace strumpack {
 
     // virtual Inertia inertia() const {
     virtual Inertia inertia() {
-      Inertia i = inertia_node();
       Inertia il, ir;
       if (lchild) il = lchild->inertia();
       if (rchild) ir = rchild->inertia();
+      Inertia i = inertia_node();
       i.np = i.np + il.np + ir.np;
       i.nn = i.nn + il.nn + ir.nn;
       i.nz = i.nz + il.nz + ir.nz;
       return i;
     }
-    virtual Inertia inertia_node() { std::cout << "todo" << std::endl; }
-    // virtual Inertia inertia_node() const = 0;
+
+    // TODO
+    virtual Inertia inertia_node() {}
 
     // TODO compute this (and levels) once, store it
     // maybe compute it when setting pointers to the children

@@ -84,7 +84,6 @@ namespace strumpack {
       // return F11.inertia();
       return inertia_;
     }
-    // Inertia inertia_node() const override { return F11.inertia(); }
 
   private:
     FrontalMatrixDense(const FrontalMatrixDense&) = delete;
@@ -217,6 +216,7 @@ namespace strumpack {
       F22 = DenseM_t(dupd, dupd);
       F22.zero();
     }
+
     if (this->lchild) this->lchild->extend_add_to_dense(this, task_depth);
     if (this->rchild) this->rchild->extend_add_to_dense(this, task_depth);
   }
@@ -228,29 +228,41 @@ namespace strumpack {
     if (this->dim_sep()) {
 
       // would like a better way to do this
-      inertia_ = F11.inertia();
+      DenseM_t F11c(F11);
+      inertia_ = F11c.inertia();
 
-      piv = F11.LU(task_depth);
-      if (opts.replace_tiny_pivots()) {
-        // TODO consider other values for thresh
-        //  - sqrt(eps)*|A|_1 as in SuperLU ?
-        auto thresh = blas::lamch<real_t>('E') * A.size();
-        for (std::size_t i=0; i<F11.rows(); i++)
-          if (std::abs(F11(i,i)) < thresh)
-            F11(i,i) = (std::real(F11(i,i)) < 0) ? -thresh : thresh;
-      }
+      piv = F11.sytrf();
       if (this->dim_upd()) {
-        F12.laswp(piv, true);
-        trsm
-          (Side::L, UpLo::L, Trans::N, Diag::U,
-           scalar_t(1.), F11, F12, task_depth);
-        trsm
-          (Side::R, UpLo::U, Trans::N, Diag::N,
-           scalar_t(1.), F11, F21, task_depth);
-        gemm
-          (Trans::N, Trans::N, scalar_t(-1.), F21, F12,
-           scalar_t(1.), F22, task_depth);
+          sytrs(UpLo::L, F11, piv, F12);
+          gemm(Trans::N, Trans::N, scalar_t(-1.), F21, F12, scalar_t(1.), F22);
       }
+
+      // piv = F11.LU(task_depth);
+      // // print permutation vector
+      // for (int i=0; i<F11.rows(); i++) {
+      //     std::cout << "piv(" << i << ") : " << piv[i] << std::endl;
+      // }
+      //
+      // if (opts.replace_tiny_pivots()) {
+      //   // TODO consider other values for thresh
+      //   //  - sqrt(eps)*|A|_1 as in SuperLU ?
+      //   auto thresh = blas::lamch<real_t>('E') * A.size();
+      //   for (std::size_t i=0; i<F11.rows(); i++)
+      //     if (std::abs(F11(i,i)) < thresh)
+      //       F11(i,i) = (std::real(F11(i,i)) < 0) ? -thresh : thresh;
+      // }
+      // if (this->dim_upd()) {
+      //   F12.laswp(piv, true);
+      //   trsm
+      //     (Side::L, UpLo::L, Trans::N, Diag::U,
+      //      scalar_t(1.), F11, F12, task_depth);
+      //   trsm
+      //     (Side::R, UpLo::U, Trans::N, Diag::N,
+      //      scalar_t(1.), F11, F21, task_depth);
+      //   gemm
+      //     (Trans::N, Trans::N, scalar_t(-1.), F21, F12,
+      //      scalar_t(1.), F22, task_depth);
+      // }
     }
     STRUMPACK_FULL_RANK_FLOPS
       (LU_flops(F11) +
