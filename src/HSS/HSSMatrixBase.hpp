@@ -312,7 +312,8 @@ namespace strumpack {
       (const DistM_t& A, std::size_t Arlo, std::size_t Aclo,
        std::vector<std::vector<scalar_t>>& sbuf, int dest);
       virtual void redistribute_to_tree_from_buffers
-      (const DistM_t& A, std::size_t Arlo, std::size_t Aclo, scalar_t** pbuf);
+      (const DistM_t& A, std::size_t Arlo, std::size_t Aclo,
+       std::vector<scalar_t*>& pbuf);
       virtual void delete_redistributed_input();
 
       friend class HSSMatrix<scalar_t>;
@@ -916,7 +917,8 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixBase<scalar_t>::redistribute_to_tree_from_buffers
-    (const DistM_t& A, std::size_t Arlo, std::size_t Aclo, scalar_t** pbuf) {
+    (const DistM_t& A, std::size_t Arlo, std::size_t Aclo,
+     std::vector<scalar_t*>& pbuf) {
       if (!this->active()) return;
       _Asub = DenseM_t(rows(), cols());
       const auto B = DistM_t::default_MB;

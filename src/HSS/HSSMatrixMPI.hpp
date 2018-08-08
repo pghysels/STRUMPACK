@@ -338,7 +338,7 @@ namespace strumpack {
        std::vector<std::vector<scalar_t>>& sbuf, int dest=0) override;
       void redistribute_to_tree_from_buffers
       (const DistM_t& A, std::size_t rlo, std::size_t clo,
-       scalar_t** pbuf) override;
+       std::vector<scalar_t*>& pbuf) override;
       void delete_redistributed_input() override;
 
       void apply_UV_big
@@ -695,8 +695,7 @@ namespace strumpack {
       int rank = Comm().rank(), P = Ptotal(), root1 = Pl();
       int P0active = this->_ch[0]->Pactive();
       int P1active = this->_ch[1]->Pactive();
-      std::vector<MPI_Request> sreq(P);
-      int sreqs = 0;
+      std::vector<MPIRequest> sreq;
       std::vector<std::size_t> sbuf0, sbuf1;
       if (rank < P0active) {
         if (rank < (P-P0active)) {
@@ -719,8 +718,7 @@ namespace strumpack {
           for (auto i : w.c[0].Jc) sbuf0.push_back(i);
           for (int p=P0active; p<P; p++)
             if (rank == (p - P0active) % P0active)
-              MPI_Isend(sbuf0.data(), sbuf0.size(), mpi_type<std::size_t>(),
-                        p, /*tag*/0, comm(), &sreq[sreqs++]);
+              sreq.emplace_back(Comm().isend(sbuf0, p, 0));
         }
       }
       if (rank >= root1 && rank < root1+P1active) {
@@ -730,7 +728,7 @@ namespace strumpack {
           // are not active on child1, ie the ones in [0,root1) union
           // [root1+P1active,P)
           sbuf1.reserve(8+w.c[1].Ir.size()+w.c[1].Ic.size()+
-                      w.c[1].Jr.size()+w.c[1].Jc.size());
+                        w.c[1].Jr.size()+w.c[1].Jc.size());
           sbuf1.push_back(std::size_t(this->_ch[1]->_U_state));
           sbuf1.push_back(std::size_t(this->_ch[1]->_V_state));
           sbuf1.push_back(this->_ch[1]->_U_rank);
@@ -745,27 +743,20 @@ namespace strumpack {
           for (auto i : w.c[1].Jc) sbuf1.push_back(i);
           for (int p=0; p<root1; p++)
             if (rank - root1 == p % P1active)
-              MPI_Isend(sbuf1.data(), sbuf1.size(), mpi_type<std::size_t>(),
-                        p, /*tag*/1, comm(), &sreq[sreqs++]);
+              sreq.emplace_back(Comm().isend(sbuf1, p, 1));
           for (int p=root1+P1active; p<P; p++)
             if (rank - root1 == (p - P1active) % P1active)
-              MPI_Isend(sbuf1.data(), sbuf1.size(), mpi_type<std::size_t>(),
-                        p, /*tag*/1, comm(), &sreq[sreqs++]);
+              sreq.emplace_back(Comm().isend(sbuf1, p, 1));
         }
       }
       if (!(rank < P0active)) {
         // I'm not active on child0, so I need to receive
-        MPI_Status stat;
-        int dest=-1, msgsize;
+        int dest = -1;
         for (int p=0; p<P0active; p++)
           if (p == (rank - P0active) % P0active) { dest = p; break; }
         assert(dest >= 0);
-        MPI_Probe(dest, /*tag*/0, comm(), &stat);
-        MPI_Get_count(&stat, mpi_type<std::size_t>(), &msgsize);
-        auto buf = new std::size_t[msgsize];
-        MPI_Recv(buf, msgsize, mpi_type<std::size_t>(), dest, /*tag*/0,
-                 comm(), MPI_STATUS_IGNORE);
-        auto ptr = buf;
+        auto buf = Comm().template recv<std::size_t>(dest, 0);
+        auto ptr = buf.begin();
         this->_ch[0]->_U_state = State(*ptr++);
         this->_ch[0]->_V_state = State(*ptr++);
         this->_ch[0]->_U_rank = *ptr++;
@@ -782,13 +773,11 @@ namespace strumpack {
         for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Ic[i] = *ptr++;
         for (int i=0; i<this->_ch[0]->_U_rank; i++) w.c[0].Jr[i] = *ptr++;
         for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Jc[i] = *ptr++;
-        assert(msgsize == std::distance(buf, ptr));
-        delete[] buf;
+        //assert(msgsize == std::distance(buf, ptr));
       }
       if (!(rank >= root1 && rank < root1+P1active)) {
         // I'm not active on child1, so I need to receive
-        MPI_Status stat;
-        int dest=-1, msgsize;
+        int dest = -1;
         for (int p=root1; p<root1+P1active; p++) {
           if (rank < root1) {
             if (p - root1 == rank % P1active) { dest = p; break; }
@@ -797,12 +786,8 @@ namespace strumpack {
           }
         }
         assert(dest >= 0);
-        MPI_Probe(dest, /*tag*/1, comm(), &stat);
-        MPI_Get_count(&stat, mpi_type<std::size_t>(), &msgsize);
-        auto buf = new std::size_t[msgsize];
-        MPI_Recv(buf, msgsize, mpi_type<std::size_t>(), dest, /*tag*/1,
-                 comm(), MPI_STATUS_IGNORE);
-        auto ptr = buf;
+        auto buf = Comm().template recv<std::size_t>(dest, 1);
+        auto ptr = buf.begin();
         this->_ch[1]->_U_state = State(*ptr++);
         this->_ch[1]->_V_state = State(*ptr++);
         this->_ch[1]->_U_rank = *ptr++;
@@ -819,10 +804,9 @@ namespace strumpack {
         for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Ic[i] = *ptr++;
         for (int i=0; i<this->_ch[1]->_U_rank; i++) w.c[1].Jr[i] = *ptr++;
         for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Jc[i] = *ptr++;
-        assert(msgsize == std::distance(buf, ptr));
-        delete[] buf;
+        //assert(msgsize == std::distance(buf, ptr));
       }
-      MPI_Waitall(sreqs, sreq.data(), MPI_STATUSES_IGNORE);
+      wait_all(sreq);
     }
 
     template<typename scalar_t> void
@@ -836,23 +820,15 @@ namespace strumpack {
         sbuf.push_back(w.Jc.size());
         for (auto i : w.Jr) sbuf.push_back(i);
         for (auto i : w.Jc) sbuf.push_back(i);
-        MPI_Send(sbuf.data(), sbuf.size(), mpi_type<std::size_t>(),
-                 actives + rank, 0, Comm().comm());
+        Comm().send(sbuf, actives+rank, 0);
       }
       if (rank >= actives) {
-        MPI_Status stat;
-        MPI_Probe(rank - actives, 0, comm(), &stat);
-        int msgsize;
-        MPI_Get_count(&stat, mpi_type<std::size_t>(), &msgsize);
-        auto buf = new std::size_t[msgsize];
-        MPI_Recv(buf, msgsize, mpi_type<std::size_t>(), rank - actives,
-                 0, comm(), MPI_STATUS_IGNORE);
-        auto ptr = buf;
+        auto buf = Comm().template recv<std::size_t>(rank - actives, 0);
+        auto ptr = buf.begin();
         w.Jr.resize(*ptr++);
         w.Jc.resize(*ptr++);
         for (std::size_t i=0; i<w.Jr.size(); i++) w.Jr[i] = *ptr++;
         for (std::size_t i=0; i<w.Jc.size(); i++) w.Jc[i] = *ptr++;
-        delete[] buf;
       }
     }
 
@@ -876,18 +852,11 @@ namespace strumpack {
         for (auto i : w.Ic) sbuf.push_back(i);
         for (auto i : w.Jr) sbuf.push_back(i);
         for (auto i : w.Jc) sbuf.push_back(i);
-        MPI_Send(sbuf.data(), sbuf.size(), mpi_type<std::size_t>(),
-                 actives + rank, 0, comm());
+        Comm().send(sbuf, actives+rank, 0);
       }
       if (rank >= actives) {
-        MPI_Status stat;
-        MPI_Probe(rank - actives, 0, comm(), &stat);
-        int msgsize;
-        MPI_Get_count(&stat, mpi_type<std::size_t>(), &msgsize);
-        auto buf = new std::size_t[msgsize];
-        MPI_Recv(buf, msgsize, mpi_type<std::size_t>(), rank - actives, 0,
-                 comm(), MPI_STATUS_IGNORE);
-        auto ptr = buf;
+        auto buf = Comm().template recv<std::size_t>(rank-actives, 0);
+        auto ptr = buf.begin();
         this->_U_state = State(*ptr++);
         this->_V_state = State(*ptr++);
         this->_U_rank = *ptr++;
@@ -904,7 +873,6 @@ namespace strumpack {
         for (int i=0; i<this->_V_rank; i++) w.Ic[i] = *ptr++;
         for (int i=0; i<this->_U_rank; i++) w.Jr[i] = *ptr++;
         for (int i=0; i<this->_V_rank; i++) w.Jc[i] = *ptr++;
-        delete[] buf;
       }
     }
 

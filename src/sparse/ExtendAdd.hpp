@@ -595,7 +595,8 @@ namespace strumpack {
 
     static void extend_copy_from_buffers
     (DistM_t& F, const std::vector<std::size_t>& oI,
-     const std::vector<std::size_t>& oJ, const DistM_t& B, scalar_t** pbuf) {
+     const std::vector<std::size_t>& oJ, const DistM_t& B,
+     std::vector<scalar_t*>& pbuf) {
       if (!F.active()) return;
       assert(F.fixed());
       const auto prows = B.nprows();

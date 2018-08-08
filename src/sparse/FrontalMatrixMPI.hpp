@@ -127,7 +127,6 @@ namespace strumpack {
 
     MPIComm& Comm() { return grid()->Comm(); }
     const MPIComm& Comm() const { return grid()->Comm(); }
-    MPI_Comm comm() const { return Comm().comm(); }
     BLACSGrid* grid() { return &blacs_grid_; }
     const BLACSGrid* grid() const { return &blacs_grid_; }
     int P() const override { return grid()->P(); }

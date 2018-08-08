@@ -601,11 +601,10 @@ namespace strumpack {
 
     std::vector<std::vector<scalar_t>> sbuf(this->P());
     ExtAdd::extend_copy_to_buffers(e, oI, oJ, B, sbuf);
-    scalar_t* rbuf = nullptr, **pbuf = nullptr;
-    all_to_all_v(sbuf, rbuf, pbuf, Comm().comm());
+    std::vector<scalar_t> rbuf;
+    std::vector<scalar_t*> pbuf;
+    Comm().all_to_all_v(sbuf, rbuf, pbuf);
     ExtAdd::extend_copy_from_buffers(B, oI, oJ, e, pbuf);
-    delete[] rbuf;
-    delete[] pbuf;
     TIMER_STOP(t_ex_schur);
   }
 
@@ -655,13 +654,11 @@ namespace strumpack {
       }
       ExtAdd::extend_copy_to_buffers(e_vec[i], oI[i], oJ[i], B[i], sbuf);
     }
-    scalar_t* rbuf = nullptr, **pbuf = nullptr;
-    all_to_all_v(sbuf, rbuf, pbuf, Comm().comm());
+    std::vector<scalar_t> rbuf;
+    std::vector<scalar_t*> pbuf;
+    Comm().all_to_all_v(sbuf, rbuf, pbuf);
     for (std::size_t i=0; i<nB; i++)
       ExtAdd::extend_copy_from_buffers(B[i], oI[i], oJ[i], e_vec[i], pbuf);
-
-    delete[] rbuf;
-    delete[] pbuf;
     TIMER_STOP(t_ex_schur);
   }
 
