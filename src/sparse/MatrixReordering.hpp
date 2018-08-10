@@ -289,32 +289,41 @@ namespace strumpack {
         auto sep_end = sep_tree->sizes(sep + 1);
         auto tiles = hss_tree.leaf_sizes();
         integer_t nr_tiles = tiles.size();
-        std::vector<integer_t> tile_sizes(nr_tiles+1);
-        tile_sizes[0] = sep_begin;
-        for (integer_t i=0; i<nr_tiles; i++)
-          tile_sizes[i+1] = tiles[i] + tile_sizes[i];
         std::vector<bool> adm(nr_tiles * nr_tiles, true);
-        for (integer_t t=0; t<nr_tiles; t++) {
+        for (integer_t t=0; t<nr_tiles; t++)
           adm[t+t*nr_tiles] = false;
-          for (integer_t i=tile_sizes[t]; i<tile_sizes[t+1]; i++) {
-            auto Ai = iperm[i];
-            for (integer_t j=A->ptr(Ai); j<A->ptr(Ai+1); j++) {
-              auto Aj = perm[A->ind(j)];
-              if (Aj < sep_begin || Aj >= sep_end) continue;
-              integer_t tj = std::distance
-                (tile_sizes.begin(), std::upper_bound
-                 (tile_sizes.begin(), tile_sizes.end(), Aj)) - 1;
-              if (t != tj) adm[t+nr_tiles*tj] = adm[tj+nr_tiles*t] = false;
+        if (opts.BLR_options().admissibility() == BLR::Admissibility::STRONG) {
+          std::vector<integer_t> tile_sizes(nr_tiles+1);
+          tile_sizes[0] = sep_begin;
+          for (integer_t i=0; i<nr_tiles; i++)
+            tile_sizes[i+1] = tiles[i] + tile_sizes[i];
+          for (integer_t t=0; t<nr_tiles; t++) {
+            for (integer_t i=tile_sizes[t]; i<tile_sizes[t+1]; i++) {
+              auto Ai = iperm[i];
+              for (integer_t j=A->ptr(Ai); j<A->ptr(Ai+1); j++) {
+                auto Aj = perm[A->ind(j)];
+                if (Aj < sep_begin || Aj >= sep_end) continue;
+                integer_t tj = std::distance
+                  (tile_sizes.begin(), std::upper_bound
+                   (tile_sizes.begin(), tile_sizes.end(), Aj)) - 1;
+                if (t != tj) adm[t+nr_tiles*tj] = adm[tj+nr_tiles*t] = false;
+              }
             }
           }
         }
-        // std::cout << "adm = [" << std::endl;
-        // for (integer_t ti=0; ti<nr_tiles; ti++) {
-        //   for (integer_t tj=0; tj<nr_tiles; tj++)
-        //     std::cout << adm[ti+nr_tiles*tj] << " ";
-        //   std::cout << std::endl;
-        // }
-        // std::cout << "];" << std::endl;
+#if 0
+        if (sep == sep_tree->root()) {
+          std::cout << "root_adm_"
+                    << BLR::get_name(opts.BLR_options().admissibility())
+                    << " = [" << std::endl;
+          for (integer_t ti=0; ti<nr_tiles; ti++) {
+            for (integer_t tj=0; tj<nr_tiles; tj++)
+              std::cout << adm[ti+nr_tiles*tj] << " ";
+            std::cout << std::endl;
+          }
+          std::cout << "];" << std::endl;
+        }
+#endif
         sep_tree->admissibility(sep) = std::move(adm);
       }
     }

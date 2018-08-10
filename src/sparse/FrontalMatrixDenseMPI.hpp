@@ -129,14 +129,17 @@ namespace strumpack {
         STRUMPACK_FLOPS
           (static_cast<long long int>(ch->dim_upd())*ch->dim_upd());
       }
+      if (!visit(ch)) continue;
       ch->extend_add_copy_to_buffers(sbuf, this);
     }
     std::vector<scalar_t> rbuf;
     std::vector<scalar_t*> pbuf;
     Comm().all_to_all_v(sbuf, rbuf, pbuf);
-    for (auto& ch : {lchild_.get(), rchild_.get()})
+    for (auto& ch : {lchild_.get(), rchild_.get()}) {
+      if (!ch) continue;
       ch->extend_add_copy_from_buffers
         (F11_, F12_, F21_, F22_, pbuf.data()+this->master(ch), this);
+    }
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -193,11 +196,9 @@ namespace strumpack {
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
     if (visit(lchild_))
-      lchild_->multifrontal_factorization
-        (A, opts, etree_level+1, task_depth);
+      lchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
     if (visit(rchild_))
-      rchild_->multifrontal_factorization
-        (A, opts, etree_level+1, task_depth);
+      rchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
     build_front(A);
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();

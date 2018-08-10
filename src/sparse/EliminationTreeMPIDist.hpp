@@ -147,13 +147,13 @@ namespace strumpack {
     void communicate_distributed_separator
     (integer_t dsep, std::vector<integer_t>& dist_upd,
      integer_t& dsep_begin, integer_t& dsep_end,
-     std::vector<integer_t>& dsep_upd,
-     int P0, int P, int P0_sibling, int P_sibling,
-     int owner, bool use_hss);
+     std::vector<integer_t>& dsep_upd, int P0, int P,
+     int P0_sibling, int P_sibling, int owner, bool use_hss);
 
-    void communicate_distributed_separator_HSS_tree
-    (HSS::HSSPartitionTree& tree, integer_t dsep,
-     int P0, int P, int owner);
+    void communicate_hss_tree
+    (HSS::HSSPartitionTree& tree, integer_t dsep, int P0, int P, int owner);
+    void communicate_admissibility
+    (std::vector<bool>& adm, integer_t dsep, int P0, int P, int owner);
   };
 
   template<typename scalar_t,typename integer_t>
@@ -172,10 +172,10 @@ namespace strumpack {
       nd_.local_sep_tree->separators();
 
     float dsep_work;
-    MPI_Pcontrol(1, "symbolic_factorization");
+    MPIComm::control_start("symbolic_factorization");
     symbolic_factorization
       (local_upd, dist_upd, local_subtree_work, dsep_work);
-    MPI_Pcontrol(-1, "symbolic_factorization");
+    MPIComm::control_stop("symbolic_factorization");
 
     // communicate dist_subtree_work to everyone
     auto sbuf = new float[2*P_];
@@ -196,11 +196,11 @@ namespace strumpack {
     delete[] sbuf;
 
     local_range_ = std::make_pair(A.size(), 0);
-    MPI_Pcontrol(1, "proportional_mapping");
+    MPIComm::control_start("proportional_mapping");
     this->root_ = proportional_mapping
       (opts, local_upd, dist_upd, local_subtree_work, dist_subtree_work,
        nd_.sep_tree->root(), 0, P_, 0, 0, comm_, true, 0);
-    MPI_Pcontrol(-1, "proportional_mapping");
+    MPIComm::control_stop("proportional_mapping");
 
     MPI_Pcontrol(1, "block_row_A_to_prop_A");
     if (local_range_.first > local_range_.second)
@@ -806,12 +806,9 @@ namespace strumpack {
     }
   }
 
-  // TODO merge in communicate_distributed_separator
   template<typename scalar_t,typename integer_t> void
-  EliminationTreeMPIDist<scalar_t,integer_t>::
-  communicate_distributed_separator_HSS_tree
-  (HSS::HSSPartitionTree& sep_hss_tree, integer_t dsep,
-   int P0, int P, int owner) {
+  EliminationTreeMPIDist<scalar_t,integer_t>::communicate_hss_tree
+  (HSS::HSSPartitionTree& hss_tree, integer_t dsep, int P0, int P, int owner) {
     std::vector<MPI_Request> sreq;
     std::vector<int> sbuf;
     if (rank_ == owner) {
@@ -829,10 +826,29 @@ namespace strumpack {
       std::vector<int> rbuf(msg_size);
       MPI_Recv(rbuf.data(), rbuf.size(), MPI_INT, owner, 0,
                comm_.comm(), &stat);
-      sep_hss_tree = HSS::HSSPartitionTree(rbuf);
+      hss_tree = HSS::HSSPartitionTree(rbuf);
     }
     if (rank_ == owner)
       MPI_Waitall(sreq.size(), sreq.data(), MPI_STATUSES_IGNORE);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  EliminationTreeMPIDist<scalar_t,integer_t>::communicate_admissibility
+  (std::vector<bool>& adm, integer_t dsep, int P0, int P, int owner) {
+    std::vector<MPIRequest> sreq;
+    std::vector<int> sbuf;
+    if (rank_ == owner) {
+      auto& a = nd_.sep_tree->admissibility(dsep);
+      sbuf.assign(a.begin(), a.end());
+      for (int dest=P0; dest<P0+P; dest++)
+        sreq.emplace_back(comm_.isend(sbuf, dest, 0));
+    }
+    if (rank_ >= P0 && rank_ < P0+P) {
+      auto rbuf = comm_.template recv<int>(owner, 0);
+      adm.assign(rbuf.begin(), rbuf.end());
+    }
+    if (rank_ == owner)
+      wait_all(sreq);
   }
 
   template<typename scalar_t,typename integer_t>
@@ -866,15 +882,16 @@ namespace strumpack {
     bool is_hss = opts.use_HSS() && hss_parent &&
       (dim_dsep >= opts.HSS_min_sep_size());
     bool is_blr = opts.use_BLR() && (dim_dsep >= opts.BLR_min_sep_size());
-    HSS::HSSPartitionTree sep_hss_partition(dim_dsep);
+    HSS::HSSPartitionTree hss_tree(dim_dsep);
     if (is_hss || is_blr)
-      communicate_distributed_separator_HSS_tree
-        (sep_hss_partition, dsep, P0, P, owner);
+      communicate_hss_tree(hss_tree, dsep, P0, P, owner);
+    std::vector<bool> adm;
+    if (is_blr) communicate_admissibility(adm, dsep, P0, P, owner);
 
     // bool is_hss = opts.use_HSS() && (dim_dsep >= opts.HSS_min_sep_size()) &&
     //   (dim_dsep + dsep_upd.size() >= opts.HSS_min_front_size());
-    // // HSS::HSSPartitionTree sep_hss_partition(dim_dsep);
-    // // if (is_hss) communicate_distributed_separator_HSS_tree(sep_hss_partition, dsep, P0, P, owner);
+    // // HSS::HSSPartitionTree hss_tree(dim_dsep);
+    // // if (is_hss) communicate_distributed_separator_HSS_tree(hss_tree, dsep, P0, P, owner);
 
     if (rank_ == P0) {
       if (is_hss) this->nr_HSS_fronts_++;
@@ -890,11 +907,11 @@ namespace strumpack {
         if (is_hss) {
           front = std::unique_ptr<F_t>
             (new FHSS_t(dsep, dsep_begin, dsep_end, dsep_upd));
-          front->set_HSS_partitioning(opts, sep_hss_partition, level == 0);
+          front->set_HSS_partitioning(opts, hss_tree, level == 0);
         } else if (is_blr) {
           front = std::unique_ptr<F_t>
             (new FBLR_t(dsep, dsep_begin, dsep_end, dsep_upd));
-          front->set_HSS_partitioning(opts, sep_hss_partition, level == 0);
+          front->set_BLR_partitioning(opts, hss_tree, adm, level == 0);
         } else
           front = std::unique_ptr<F_t>
             (new FD_t(dsep, dsep_begin, dsep_end, dsep_upd));
@@ -909,13 +926,13 @@ namespace strumpack {
           front = std::unique_ptr<F_t>
             (new FHSSMPI_t(local_pfronts_.size(), dsep_begin, dsep_end,
                            dsep_upd, fcomm, P));
-          front->set_HSS_partitioning(opts, sep_hss_partition, level == 0);
+          front->set_HSS_partitioning(opts, hss_tree, level == 0);
         } else {
           if (is_blr) {
             front = std::unique_ptr<F_t>
               (new FBLRMPI_t(local_pfronts_.size(), dsep_begin, dsep_end,
                              dsep_upd, fcomm, P));
-            front->set_HSS_partitioning(opts, sep_hss_partition, level == 0);
+            front->set_BLR_partitioning(opts, hss_tree, adm, level == 0);
           } else
             front = std::unique_ptr<F_t>
               (new FDMPI_t(local_pfronts_.size(), dsep_begin, dsep_end,
@@ -956,7 +973,7 @@ namespace strumpack {
    integer_t dsep, integer_t sep, int P0, int P,
    int P0_sibling, int P_sibling, const MPIComm& fcomm,
    bool hss_parent, int level) {
-    if (tree.data == NULL) return NULL;
+    if (!tree.nr_sep) return nullptr;
     auto sep_begin = tree.sep_ptr[sep];
     auto sep_end = tree.sep_ptr[sep+1];
     auto dim_sep = sep_end - sep_begin;
@@ -980,11 +997,11 @@ namespace strumpack {
       if (P == 1) {
         if (is_hss) {
           front = std::unique_ptr<F_t>(new FHSS_t(sep, sep_begin, sep_end, upd));
-          front->set_HSS_partitioning(opts, tree.sep_HSS_tree[sep], level == 0);
+          front->set_HSS_partitioning(opts, tree.HSS_tree[sep], level == 0);
         } else if (is_blr) {
           front = std::unique_ptr<F_t>(new FBLR_t(sep, sep_begin, sep_end, upd));
           front->set_BLR_partitioning
-            (opts, tree.HSS_tree(sep), tree.admissibility(sep), level == 0);
+            (opts, tree.HSS_tree[sep], tree.admissibility[sep], level == 0);
         } else front = std::unique_ptr<F_t>(new FD_t(sep, sep_begin, sep_end, upd));
         if (P0 == rank_) {
           local_range_.first = std::min
@@ -997,14 +1014,14 @@ namespace strumpack {
           front = std::unique_ptr<F_t>
             (new FHSSMPI_t
              (local_pfronts_.size(), sep_begin, sep_end, upd, fcomm, P));
-          front->set_HSS_partitioning(opts, tree.sep_HSS_tree[sep], level == 0);
+          front->set_HSS_partitioning(opts, tree.HSS_tree[sep], level == 0);
         } else {
           if (is_blr) {
             front = std::unique_ptr<F_t>
               (new FBLRMPI_t
                (local_pfronts_.size(), sep_begin, sep_end, upd, fcomm, P));
             front->set_BLR_partitioning
-              (opts, tree.HSS_tree(sep), tree.admissibility(sep), level == 0);
+              (opts, tree.HSS_tree[sep], tree.admissibility[sep], level == 0);
           } else
             front = std::unique_ptr<F_t>
               (new FDMPI_t

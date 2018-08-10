@@ -185,23 +185,25 @@ namespace strumpack {
       }
     }
     gd.separator_reordering = opts.use_HSS() || opts.use_BLR();
-    gd.min_sep = A->size();
-    gd.leaf = A->size();
-    if (opts.use_HSS()) {
-      gd.min_sep = opts.HSS_min_sep_size();
-      gd.leaf = opts.HSS_options().leaf_size();
-    } else if (opts.use_BLR()) {
-      gd.min_sep = opts.BLR_min_sep_size();
-      gd.leaf = opts.BLR_options().leaf_size();
+    if (gd.separator_reordering) {
+      gd.min_sep = A->size();
+      gd.leaf = A->size();
+      if (opts.use_HSS()) {
+        gd.min_sep = opts.HSS_min_sep_size();
+        gd.leaf = opts.HSS_options().leaf_size();
+      } else if (opts.use_BLR()) {
+        gd.min_sep = opts.BLR_min_sep_size();
+        gd.leaf = opts.BLR_options().leaf_size();
+      }
     }
-
     std::vector<Separator<integer_t>> tree;
     integer_t nbsep = 0, pbegin = 0;
     recursive_nested_dissection
       (pbegin, nbsep, {{0, 0, 0}}, {{nx, ny, nz}}, {{nx, ny, nz}}, tree, gd);
     std::unique_ptr<SeparatorTree<integer_t>> stree
       (new SeparatorTree<integer_t>(tree));
-    stree->HSS_trees() = std::move(gd.trees);
+    if (gd.separator_reordering)
+      stree->HSS_trees() = std::move(gd.trees);
     return stree;
   }
 

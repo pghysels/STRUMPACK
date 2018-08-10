@@ -67,6 +67,7 @@ namespace strumpack {
 
   inline void wait_all(std::vector<MPIRequest>& reqs) {
     for (auto& r : reqs) r.wait();
+    reqs.clear();
   }
 
   class MPIComm {
@@ -232,6 +233,13 @@ namespace strumpack {
       MPI_Group_free(&group);
       MPI_Group_free(&sub_group);
       return c0;
+    }
+
+    static void control_start(const std::string& name) {
+      MPI_Pcontrol(1, name);
+    }
+    static void control_stop(const std::string& name) {
+      MPI_Pcontrol(-1, name);
     }
 
   private:

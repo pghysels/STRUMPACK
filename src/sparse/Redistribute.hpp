@@ -31,6 +31,7 @@
 
 #include <limits>
 #include "MatrixReorderingMPI.hpp"
+#include "../misc/MPIWrapper.hpp"
 
 namespace strumpack {
 
@@ -97,6 +98,7 @@ namespace strumpack {
     delete[] rbuf;
   }
 
+
   /**
    * Helper class to receive the sub graph that is owned by process
    * owner.  This class will store the separator tree information,
@@ -104,17 +106,21 @@ namespace strumpack {
    * that was originally at process owner.
    */
   template<typename integer_t> class RedistSubTree {
+  private:
+    std::vector<integer_t> rbufi;
+    std::vector<float> rbuff;
+
   public:
-    char* data = NULL;
     integer_t nr_sep = 0;
-    integer_t* lchild = NULL;
-    integer_t* rchild = NULL;
+    integer_t* lchild = nullptr;
+    integer_t* rchild = nullptr;
     integer_t root = -1;
-    float* work = NULL;
-    integer_t* sep_ptr = NULL;
-    integer_t* dim_upd = NULL;
-    integer_t** upd = NULL;
-    std::unordered_map<integer_t, HSS::HSSPartitionTree> sep_HSS_tree;
+    integer_t* sep_ptr = nullptr;
+    integer_t* dim_upd = nullptr;
+    std::vector<integer_t*> upd;
+    float* work = nullptr;
+    std::unordered_map<integer_t, HSS::HSSPartitionTree> HSS_tree;
+    std::unordered_map<integer_t, std::vector<bool>> admissibility;
 
     // send the symbolic info of the entire tree belonging to dist_sep
     // owned by owner to [P0,P0+P) send only the root of the sub tree
@@ -123,61 +129,47 @@ namespace strumpack {
     (const MatrixReorderingMPI<scalar_t,integer_t>& nd,
      const std::vector<integer_t>* _upd, float* _work,
      integer_t P0, integer_t P, integer_t P0_sibling,
-     integer_t P_sibling, integer_t owner, MPI_Comm comm) {
-      auto rank = mpi_rank(comm);
+     integer_t P_sibling, integer_t owner, const MPIComm& comm) {
+
+      auto rank = comm.rank();
       int dest0 = std::min(P0, P0_sibling);
       int dest1 = std::max(P0+P, P0_sibling+P_sibling);
-      char* send_buf = NULL;
-      std::vector<MPI_Request> send_req;
+      std::vector<integer_t> sbufi;
+      std::vector<float> sbuff;
+      std::vector<MPIRequest> sreq;
       if (rank == owner) {
         auto nbsep = nd.local_sep_tree->separators();
-        size_t msg_size = sizeof(integer_t)*(1+nbsep*3+1+1) +
-          sizeof(float)*nbsep;
-        for (integer_t i=0; i<nbsep; i++)
-          msg_size += sizeof(integer_t)*(1+_upd[i].size());
-        std::vector<int> hss_partitions =
-          serialize(nd.local_sep_tree->HSS_trees());
-        msg_size += sizeof(int) * hss_partitions.size();
+        const auto& trees = nd.local_sep_tree->HSS_trees();
+        const auto& adm = nd.local_sep_tree->admissibilities();
 
-        send_buf = static_cast<char*>( ::operator new(msg_size) );
-        char* p_buf = send_buf;
-        *reinterpret_cast<integer_t*>(p_buf) = nbsep;
-        p_buf += sizeof(nbsep);
-        std::copy
-          (nd.local_sep_tree->lch(), nd.local_sep_tree->lch()+nbsep,
-           reinterpret_cast<integer_t*>(p_buf));
-        p_buf += sizeof(integer_t)*nbsep;
-        std::copy
-          (nd.local_sep_tree->rch(), nd.local_sep_tree->rch()+nbsep,
-           reinterpret_cast<integer_t*>(p_buf));
-        p_buf += sizeof(integer_t)*nbsep;
-        // send the index of the root
-        *reinterpret_cast<integer_t*>(p_buf) = nd.local_sep_tree->root();
-        p_buf += sizeof(integer_t);
-        std::copy(_work, _work+nbsep, reinterpret_cast<float*>(p_buf));
-        p_buf += sizeof(float)*nbsep;
-        for (integer_t s=0; s<nbsep+1; s++) {
-          *reinterpret_cast<integer_t*>(p_buf) =
-            nd.local_sep_tree->sizes(s) + nd.sub_graph_range.first;
-          p_buf += sizeof(integer_t);
+        sbufi.push_back(nbsep);
+        sbufi.insert(sbufi.end(), nd.local_sep_tree->lch(), nd.local_sep_tree->lch()+nbsep);
+        sbufi.insert(sbufi.end(), nd.local_sep_tree->rch(), nd.local_sep_tree->rch()+nbsep);
+        sbufi.push_back(nd.local_sep_tree->root());
+        for (integer_t s=0; s<nbsep+1; s++)
+          sbufi.push_back(nd.local_sep_tree->sizes(s) + nd.sub_graph_range.first);
+        for (integer_t i=0; i<nbsep; i++)
+          sbufi.push_back(_upd[i].size());
+        for (integer_t i=0; i<nbsep; i++)
+          sbufi.insert(sbufi.end(), _upd[i].begin(), _upd[i].end());
+        sbufi.push_back(trees.size());
+        for (auto& t : trees) {
+          sbufi.push_back(t.first);
+          auto ht_buf = t.second.serialize();
+          sbufi.push_back(ht_buf.size());
+          sbufi.insert(sbufi.end(), ht_buf.begin(), ht_buf.end());
         }
-        for (integer_t i=0; i<nbsep; i++) {
-          *reinterpret_cast<integer_t*>(p_buf) =
-            static_cast<integer_t>(_upd[i].size());
-          p_buf += sizeof(integer_t);
+        sbufi.push_back(adm.size());
+        for (auto& a : adm) {
+          sbufi.push_back(a.first);
+          sbufi.push_back(a.second.size());
+          sbufi.insert(sbufi.end(), a.second.begin(), a.second.end());
         }
-        for (integer_t i=0; i<nbsep; i++) {
-          std::copy
-            (_upd[i].begin(), _upd[i].end(),
-             reinterpret_cast<integer_t*>(p_buf));
-          p_buf += sizeof(integer_t)*_upd[i].size();
-        }
-        std::copy
-          (hss_partitions.begin(), hss_partitions.end(),
-           reinterpret_cast<int*>(p_buf));
-        p_buf +=  sizeof(int)*hss_partitions.size();
-        assert(p_buf == send_buf+msg_size);
-        if (msg_size >= std::numeric_limits<int>::max())
+
+        sbuff.reserve(nbsep);
+        sbuff.insert(sbuff.end(), _work, _work+nbsep);
+
+        if (sbufi.size() >= std::numeric_limits<int>::max())
           std::cerr << "ERROR: In " << __FILE__ << ", line "
                     << __LINE__ << ",\n"
                     << "\tmessage is more than "
@@ -185,67 +177,59 @@ namespace strumpack {
                     << std::endl
                     << "\tPlease send this message to"
                     << " the STRUMPACK developers." << std::endl;
-        send_req.resize(dest1-dest0);
+        sreq.reserve(2*(dest1-dest0));
 
         // TODO the sibling only needs the root of the tree!!
-        for (int dest=dest0; dest<dest1; dest++)
-          MPI_Isend
-            (send_buf, msg_size, MPI_BYTE, dest, 0, comm,
-             &send_req[dest-dest0]);
+        for (int dest=dest0; dest<dest1; dest++) {
+          sreq.emplace_back(comm.isend(sbufi, dest, 0));
+          sreq.emplace_back(comm.isend(sbuff, dest, 1));
+        }
       }
       bool receiver = (rank >= dest0 && rank < dest1);
       if (receiver) {
-        MPI_Status stat;
-        MPI_Probe(owner, 0, comm, &stat);
-        int msg_size;
-        MPI_Get_count(&stat, MPI_BYTE, &msg_size);
-        data = static_cast<char*>( ::operator new(msg_size) );
-        MPI_Recv(data, msg_size, MPI_BYTE, owner, 0, comm, &stat);
+        rbufi = comm.template recv<integer_t>(owner, 0);
+        rbuff = comm.template recv<float>(owner, 1);
       }
       if (rank == owner) {
-        MPI_Waitall(send_req.size(), send_req.data(), MPI_STATUSES_IGNORE);
-        ::operator delete(send_buf);
-        send_req.clear();
+        wait_all(sreq);
+        sbuff.clear(); sbuff.shrink_to_fit();
+        sbufi.clear(); sbufi.shrink_to_fit();
       }
       if (receiver) {
-        char* p_data = data;
-        nr_sep = *((integer_t*)p_data);
-        p_data += sizeof(integer_t);
-        lchild = (integer_t*)p_data;
-        p_data += nr_sep * sizeof(integer_t);
-        rchild = (integer_t*)p_data;
-        p_data += nr_sep * sizeof(integer_t);
-        root = *((integer_t*)p_data);
-        p_data += sizeof(integer_t);
-        work = (float*)p_data;
-        p_data += nr_sep * sizeof(float);
-        sep_ptr = (integer_t*)p_data;
-        p_data += (nr_sep+1) * sizeof(integer_t);
-        dim_upd = (integer_t*)p_data;
-        p_data += nr_sep * sizeof(integer_t);
-        upd = new integer_t*[nr_sep];
-        upd[0] = (integer_t*)p_data;
+        auto pi = rbufi.begin();
+        nr_sep = *pi++;
+        lchild = &*pi;   pi += nr_sep;
+        rchild = &*pi;   pi += nr_sep;
+        root = *pi++;
+        sep_ptr = &*pi;  pi += nr_sep + 1;
+        dim_upd = &*pi;  pi += nr_sep;
+        upd = std::vector<integer_t*>(nr_sep);
+        upd[0] = &*pi;   pi += dim_upd[0];
         for (integer_t sep=0; sep<nr_sep-1; sep++) {
           upd[sep+1] = upd[sep] + dim_upd[sep];
-          p_data += dim_upd[sep] * sizeof(integer_t);
+          pi += dim_upd[sep+1];
         }
-        p_data += dim_upd[nr_sep-1] * sizeof(integer_t);
-        int sep_tree_size = *((int*)p_data);
-        p_data += sizeof(int);
-        for (int t=0; t<sep_tree_size; t++) {
-          int sep = *((int*)p_data);
-          p_data += sizeof(int);
-          int buf_size = *((int*)p_data);
-          p_data += sizeof(int);
-          sep_HSS_tree[sep] = HSS::HSSPartitionTree(buf_size, (int*)p_data);
-          p_data += buf_size * sizeof(int);
+        auto nr_trees = *pi++;
+        HSS_tree.reserve(nr_trees);
+        for (integer_t t=0; t<nr_trees; t++) {
+          auto sep = *pi++;
+          auto size = *pi++;
+          std::vector<int> hss(size);
+          std::copy(pi, pi+size, hss.begin());
+          pi += size;
+          HSS_tree[sep] = std::move(HSS::HSSPartitionTree(hss));
         }
+        auto nr_adm = *pi++;
+        admissibility.reserve(nr_adm);
+        for (integer_t a=0; a<nr_adm; a++) {
+          auto sep = *pi++;
+          auto size = *pi++;
+          std::vector<bool> adm(size);
+          std::copy(pi, pi+size, adm.begin());
+          admissibility[sep] = std::move(adm);
+        }
+        work = rbuff.data();
       }
-    }
-
-    ~RedistSubTree() {
-      ::operator delete(data);
-      delete[] upd;
     }
   };
 
