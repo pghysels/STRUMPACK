@@ -533,6 +533,11 @@ namespace strumpack {
        const std::vector<std::size_t>& tiles1, const std::vector<std::size_t>& tiles2,
        const std::function<bool(std::size_t,std::size_t)>& admissible,
        const BLROptions<T>& opts);
+
+      template<typename T> friend void
+      BLR_trsmLNU_gemm
+      (const BLRMatrix<T>& F1, const BLRMatrix<T>& F2,
+       DenseMatrix<T>& B1, DenseMatrix<T>& B2, int task_depth);
     };
 
     template<typename scalar_t> inline void
@@ -565,7 +570,7 @@ namespace strumpack {
           }
           for (std::size_t j=i+1; j<rb; j++) {
 #pragma omp task default(shared) depend(in:B[i+lrb*i])  \
-  depend(inout:B[i+lrb*j])
+  depend(inout:B[i+lrb*j]) priority(rb-j)
             { // these blocks have received all updates, compress now
               if (admissible(i, j)) B11.create_LR_tile(i, j, A11, opts);
               else B11.create_dense_tile(i, j, A11);
@@ -577,7 +582,7 @@ namespace strumpack {
                    scalar_t(1.), B11.tile(i, i), B11.tile(i, j));
             }
 #pragma omp task default(shared) depend(in:B[i+lrb*i])  \
-  depend(inout:B[j+lrb*i])
+  depend(inout:B[j+lrb*i]) priority(rb-j)
             {
               if (admissible(j, i)) B11.create_LR_tile(j, i, A11, opts);
               else B11.create_dense_tile(j, i, A11);
@@ -591,7 +596,7 @@ namespace strumpack {
   depend(inout:B[i+lrb*(rb+j)])
             {
               B12.create_LR_tile(i, j, A12, opts);
-              // permute and solve with L, blocks right from the diagonal block
+              // permute and solve with L  blocks right from the diagonal block
               std::vector<int> tpiv
                 (piv.begin()+B11.tileroff(i), piv.begin()+B11.tileroff(i+1));
               B12.tile(i, j).laswp(tpiv, true);
@@ -609,8 +614,9 @@ namespace strumpack {
           }
           for (std::size_t j=i+1; j<rb; j++)
             for (std::size_t k=i+1; k<rb; k++) {
+              //std::size_t jk = std::min(j,k);
 #pragma omp task default(shared) depend(in:B[i+lrb*j],B[k+lrb*i])       \
-  depend(inout:B[k+lrb*j])
+  depend(inout:B[k+lrb*j]) priority(rb-j)
               { // Schur complement updates, always into full rank
                 auto Akj = B11.tile(A11, k, j);
                 gemm(Trans::N, Trans::N, scalar_t(-1.),
@@ -656,6 +662,72 @@ namespace strumpack {
       A12.clear();
       A21.clear();
       delete[] B;
+    }
+
+    template<typename scalar_t> void BLR_trsmLNU_gemm
+    (const BLRMatrix<scalar_t>& F1, const BLRMatrix<scalar_t>& F2,
+     DenseMatrix<scalar_t>& B1, DenseMatrix<scalar_t>& B2, int task_depth) {
+      using DMW_t = DenseMatrixWrapper<scalar_t>;
+      if (B1.cols() == 1) {
+        auto rb = F1.rowblocks();
+        auto rb2 = F2.rowblocks();
+        auto lrb = rb+rb2;
+        auto B = new int[lrb];
+#pragma omp taskgroup
+        {
+          for (std::size_t i=0; i<rb; i++) {
+#pragma omp task default(shared) depend(inout:B[i])
+            {
+              DMW_t Bi(F1.tilecols(i), B1.cols(), B1, F1.tilecoff(i), 0);
+              trsv(UpLo::L, Trans::N, Diag::U, F1.tile(i, i).D(), Bi,
+                   params::task_recursion_cutoff_level);
+            }
+            for (std::size_t j=i+1; j<rb; j++) {
+#pragma omp task default(shared) depend(in:B[i]) depend(inout:B[j]) priority(rb-i)
+              {
+                DMW_t Bi(F1.tilerows(i), B1.cols(), B1, F1.tileroff(i), 0);
+                DMW_t Bj(F1.tilerows(j), B1.cols(), B1, F1.tileroff(j), 0);
+                F1.tile(j, i).gemv_a(Trans::N, scalar_t(-1.), Bi, scalar_t(1.), Bj);
+              }
+            }
+            for (std::size_t j=0; j<rb2; j++) {
+#pragma omp task default(shared) depend(in:B[i]) depend(inout:B[rb+j]) priority(0)
+              {
+                DMW_t Bi(F1.tilerows(i), B1.cols(), B1, F1.tileroff(i), 0);
+                DMW_t Bj(F2.tilerows(j), B2.cols(), B2, F2.tileroff(j), 0);
+                F2.tile(j, i).gemv_a(Trans::N, scalar_t(-1.), Bi, scalar_t(1.), Bj);
+              }
+            }
+          }
+        }
+        delete[] B;
+      } else {
+        // TODO optimize by merging
+        trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+             scalar_t(1.), F1, B1, task_depth);
+        gemm(Trans::N, Trans::N, scalar_t(-1.), F2, B1,
+             scalar_t(1.), B2, task_depth);
+      }
+    }
+
+    template<typename scalar_t> void BLR_gemm_trsmUNN
+    (const BLRMatrix<scalar_t>& F1, const BLRMatrix<scalar_t>& F2,
+     DenseMatrix<scalar_t>& B1, DenseMatrix<scalar_t>& B2, int task_depth) {
+      //using DMW_t = DenseMatrixWrapper<scalar_t>;
+      if (B1.cols() == 1) {
+
+        // TODO!!
+
+        gemv(Trans::N, scalar_t(-1.), F2, B2,
+             scalar_t(1.), B1, task_depth);
+        trsv(UpLo::U, Trans::N, Diag::N, F1, B1, task_depth);
+      } else {
+        // TODO optimize by merging
+        gemm(Trans::N, Trans::N, scalar_t(-1.), F2, B2,
+             scalar_t(1.), B1, task_depth);
+        trsm(Side::L, UpLo::U, Trans::N, Diag::N,
+             scalar_t(1.), F1, B1, task_depth);
+      }
     }
 
     template<typename scalar_t> void
