@@ -99,15 +99,23 @@ namespace strumpack {
       (dims.begin(), std::max_element(dims.begin(), dims.end()));
 
     if (dims[d] < 2+width || N <= stratpar) {
-      for (integer_t z=n0[2]; z<n0[2]+dims[2]; z++)
-        for (integer_t y=n0[1]; y<n0[1]+dims[1]; y++)
-          for (integer_t x=n0[0]; x<n0[0]+dims[0]; x++) {
-            auto ind = comps * (x + y*ld[0] + z*ld[0]*ld[1]);
-            for (int c=0; c<comps; c++) {
-              gd.perm[ind] = pbegin;
-              gd.iperm[pbegin++] = ind++;
+      if (gd.separator_reordering && N >= gd.min_sep) {
+        HSS::HSSPartitionTree hss_tree;
+        recursive_bisection
+          (gd.perm, gd.iperm, pbegin, n0, dims, ld,
+           gd.components, gd.leaf, hss_tree);
+        gd.trees[nbsep] = hss_tree; // Not thread safe!!
+      } else {
+        for (integer_t z=n0[2]; z<n0[2]+dims[2]; z++)
+          for (integer_t y=n0[1]; y<n0[1]+dims[1]; y++)
+            for (integer_t x=n0[0]; x<n0[0]+dims[0]; x++) {
+              auto ind = comps * (x + y*ld[0] + z*ld[0]*ld[1]);
+              for (int c=0; c<comps; c++) {
+                gd.perm[ind] = pbegin;
+                gd.iperm[pbegin++] = ind++;
+              }
             }
-          }
+      }
       if (nbsep) tree.emplace_back(tree.back().sep_end + N, -1, -1, -1);
       else tree.emplace_back(N, -1, -1, -1);
       nbsep++;
