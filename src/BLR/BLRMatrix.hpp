@@ -575,6 +575,10 @@ namespace strumpack {
       BLR_trsmLNU_gemm
       (const BLRMatrix<T>& F1, const BLRMatrix<T>& F2,
        DenseMatrix<T>& B1, DenseMatrix<T>& B2, int task_depth);
+      template<typename T> friend void
+      BLR_gemm_trsmUNN
+      (const BLRMatrix<T>& F1, const BLRMatrix<T>& F2,
+       DenseMatrix<T>& B1, DenseMatrix<T>& B2, int task_depth);
     };
 
     template<typename scalar_t> inline void
@@ -715,7 +719,7 @@ namespace strumpack {
           for (std::size_t i=0; i<rb; i++) {
 #pragma omp task default(shared) depend(inout:B[i])
             {
-              DMW_t Bi(F1.tilecols(i), B1.cols(), B1, F1.tilecoff(i), 0);
+              DMW_t Bi(F1.tilerows(i), B1.cols(), B1, F1.tileroff(i), 0);
               trsv(UpLo::L, Trans::N, Diag::U, F1.tile(i, i).D(), Bi,
                    params::task_recursion_cutoff_level);
             }
@@ -750,14 +754,38 @@ namespace strumpack {
     template<typename scalar_t> void BLR_gemm_trsmUNN
     (const BLRMatrix<scalar_t>& F1, const BLRMatrix<scalar_t>& F2,
      DenseMatrix<scalar_t>& B1, DenseMatrix<scalar_t>& B2, int task_depth) {
-      //using DMW_t = DenseMatrixWrapper<scalar_t>;
+      using DMW_t = DenseMatrixWrapper<scalar_t>;
       if (B1.cols() == 1) {
-
-        // TODO!!
-
-        gemv(Trans::N, scalar_t(-1.), F2, B2,
-             scalar_t(1.), B1, task_depth);
-        trsv(UpLo::U, Trans::N, Diag::N, F1, B1, task_depth);
+        auto rb = F1.colblocks();
+        auto rb2 = F2.colblocks();
+        auto lrb = rb+rb2;
+        auto B = new int[lrb];
+#pragma omp taskgroup
+        {
+          for (std::size_t i=rb; i --> 0; ) {
+            assert(i < rb);
+            for (std::size_t j=0; j<rb2; j++)
+#pragma omp task default(shared) depend(in:B[rb+j]) depend(inout:B[i]) priority(1)
+              {
+                DMW_t Bi(F1.tilerows(i), B1.cols(), B1, F1.tileroff(i), 0);
+                DMW_t Bj(F2.tilecols(j), B2.cols(), B2, F2.tilecoff(j), 0);
+                F2.tile(i, j).gemv_a(Trans::N, scalar_t(-1.), Bj, scalar_t(1.), Bi);
+              }
+            for (std::size_t j=i+1; j<rb; j++)
+#pragma omp task default(shared) depend(in:B[j]) depend(inout:B[i]) priority(1)
+              {
+                DMW_t Bi(F1.tilerows(i), B1.cols(), B1, F1.tileroff(i), 0);
+                DMW_t Bj(F1.tilecols(j), B1.cols(), B1, F1.tilecoff(j), 0);
+                F1.tile(i, j).gemv_a(Trans::N, scalar_t(-1.), Bj, scalar_t(1.), Bi);
+              }
+#pragma omp task default(shared) depend(inout:B[i]) priority(0)
+            {
+              DMW_t Bi(F1.tilerows(i), B1.cols(), B1, F1.tileroff(i), 0);
+              trsv(UpLo::U, Trans::N, Diag::N, F1.tile(i, i).D(), Bi,
+                   params::task_recursion_cutoff_level);
+            }
+          }
+        }
       } else {
         // TODO optimize by merging
         gemm(Trans::N, Trans::N, scalar_t(-1.), F2, B2,

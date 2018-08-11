@@ -337,7 +337,7 @@ namespace strumpack {
   (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t yloc(dim_sep(), y.cols(), y, this->sep_begin_, 0);
-#if 1
+#if 0
       if (y.cols() == 1) {
         if (dim_upd())
           gemv(Trans::N, scalar_t(-1.), F12blr_, yupd,
@@ -350,10 +350,10 @@ namespace strumpack {
         trsm(Side::L, UpLo::U, Trans::N, Diag::N,
              scalar_t(1.), F11blr_, yloc, task_depth);
       }
-    }
 #else
-    BLR::BLR_gemm_trsmUNN(F11blr_, F12blr_, yloc, yupd, task_depth);
+      BLR::BLR_gemm_trsmUNN(F11blr_, F12blr_, yloc, yupd, task_depth);
 #endif
+    }
   }
 
   template<typename scalar_t,typename integer_t> void
