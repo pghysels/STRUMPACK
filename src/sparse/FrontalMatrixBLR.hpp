@@ -69,6 +69,9 @@ namespace strumpack {
     void multifrontal_factorization
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,
      int etree_level=0, int task_depth=0) override;
+    void factor_node
+    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+     int etree_level=0, int task_depth=0);
 
     void forward_multifrontal_solve
     (DenseM_t& b, DenseM_t* work, int etree_level=0,
@@ -174,8 +177,21 @@ namespace strumpack {
        cS.rows()*cS.cols()*2); // for the skinny-extend add
   }
 
+
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::multifrontal_factorization
+  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+   int etree_level, int task_depth) {
+    if (task_depth == 0) {
+      // use tasking for children and for extend-add parallelism
+#pragma omp parallel if(!omp_in_parallel()) default(shared)
+#pragma omp single nowait
+      factor_node(A, opts, etree_level, task_depth);
+    } else factor_node(A, opts, etree_level, task_depth);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixBLR<scalar_t,integer_t>::factor_node
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
     if (task_depth < params::task_recursion_cutoff_level) {
@@ -198,7 +214,6 @@ namespace strumpack {
         rchild_->multifrontal_factorization
           (A, opts, etree_level+1, task_depth);
     }
-    // TODO can we allocate the memory in one go??
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();
     F11_ = DenseM_t(dsep, dsep); F11_.zero();
@@ -218,6 +233,14 @@ namespace strumpack {
       rchild_->extend_add_to_dense
         (F11_, F12_, F21_, F22_, this, task_depth);
     if (dim_sep()) {
+#if 1
+      BLR::BLR_construct_and_partial_factor
+        (F11_, F12_, F21_, F22_, F11blr_, piv_, F12blr_, F21blr_,
+         sep_tiles_, upd_tiles_,
+         [&](std::size_t i, std::size_t j) -> bool {
+          return adm_[i+j*sep_tiles_.size()]; },
+         opts.BLR_options());
+#else
       F11blr_ = BLRM_t(sep_tiles_,
                        [&](std::size_t i, std::size_t j) -> bool {
                          return adm_[i+j*sep_tiles_.size()]; },
@@ -227,19 +250,19 @@ namespace strumpack {
         F12_.laswp(piv_, true);
         trsm(Side::L, UpLo::L, Trans::N, Diag::U,
              scalar_t(1.), F11blr_, F12_, task_depth);
-        F12blr_ = BLRM_t(sep_tiles_, upd_tiles_, F12_, opts.BLR_options());
+        F12blr_ = BLRM_t(F12_, sep_tiles_, upd_tiles_, opts.BLR_options());
         F12_.clear();
         trsm(Side::R, UpLo::U, Trans::N, Diag::N,
              scalar_t(1.), F11blr_, F21_, task_depth);
-        F21blr_ = BLRM_t(upd_tiles_, sep_tiles_, F21_, opts.BLR_options());
+        F21blr_ = BLRM_t(F21_, upd_tiles_, sep_tiles_, opts.BLR_options());
         F21_.clear();
         gemm(Trans::N, Trans::N, scalar_t(-1.), F21blr_, F12blr_,
              scalar_t(1.), F22_, task_depth);
       }
+#endif
+      // TODO flops
     }
-    // TODO flops
   }
-
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {

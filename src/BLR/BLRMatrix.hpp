@@ -327,11 +327,11 @@ namespace strumpack {
     public:
       BLRMatrix() {}
 
-      BLRMatrix(const std::vector<std::size_t>& rowtiles,
+      BLRMatrix(DenseM_t& A,
+                const std::vector<std::size_t>& rowtiles,
                 const std::vector<std::size_t>& coltiles,
-                DenseM_t& A, const Opts_t& opts)
-        : BLRMatrix<scalar_t>
-        (A.rows(), rowtiles, A.cols(), coltiles, opts) {
+                const Opts_t& opts)
+        : BLRMatrix<scalar_t>(A.rows(), rowtiles, A.cols(), coltiles) {
         for (std::size_t j=0; j<colblocks(); j++)
           for (std::size_t i=0; i<rowblocks(); i++)
             block(i, j) = std::unique_ptr<BLRTile<scalar_t>>
@@ -341,40 +341,56 @@ namespace strumpack {
       BLRMatrix(const std::vector<std::size_t>& tiles,
                 const std::function<bool(std::size_t,std::size_t)>& admissible,
                 DenseM_t& A, std::vector<int>& piv, const Opts_t& opts)
-        : BLRMatrix<scalar_t>(A.rows(), tiles, A.cols(), tiles, opts) {
+        : BLRMatrix<scalar_t>(A.rows(), tiles, A.cols(), tiles) {
         assert(rowblocks() == colblocks());
         piv.resize(rows());
-        std::vector<int> tile_piv;
-        for (std::size_t i=0; i<rowblocks(); i++) {
-          create_dense_tile(i, i, A);
-          tile_piv = tile(i, i).LU();
-          for (std::size_t l=0; l<tile_piv.size(); l++)
-            piv[l+tilerowoff(i)] = tilerowoff(i) + tile_piv[l];
-          for (std::size_t j=i+1; j<rowblocks(); j++) {
-            // these blocks have received all updates, compress now
-            if (admissible(i, j)) {
-              create_LR_tile(i, j, A, opts);
-              create_LR_tile(j, i, A, opts);
-            } else {
-              create_dense_tile(i, j, A);
-              create_dense_tile(j, i, A);
+        auto rb = rowblocks();
+        auto B = new int[rb*rb](); // dummy for task synchronization
+#pragma omp taskgroup
+        {
+          for (std::size_t i=0; i<rowblocks(); i++) {
+#pragma omp task default(shared) depend(inout:B[i+rb*i])
+            {
+              create_dense_tile(i, i, A);
+              auto tpiv = tile(i, i).LU();
+              std::copy(tpiv.begin(), tpiv.end(), piv.begin()+tileroff(i));
             }
-            // solve with U, the blocks under the diagonal block
-            trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-                 scalar_t(1.), tile(i, i), tile(j, i));
-            // permute and solve with L, blocks right from the diagonal block
-            tile(i, j).laswp(tile_piv, true);
-            trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-                 scalar_t(1.), tile(i, i), tile(i, j));
+            for (std::size_t j=i+1; j<rowblocks(); j++) {
+#pragma omp task default(shared) depend(in:B[i+rb*i]) depend(inout:B[i+rb*j])
+              { // these blocks have received all updates, compress now
+                if (admissible(i, j)) create_LR_tile(i, j, A, opts);
+                else create_dense_tile(i, j, A);
+                // permute and solve with L, blocks right from the diagonal block
+                std::vector<int> tpiv
+                  (piv.begin()+tileroff(i), piv.begin()+tileroff(i+1));
+                tile(i, j).laswp(tpiv, true);
+                trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                     scalar_t(1.), tile(i, i), tile(i, j));
+              }
+#pragma omp task default(shared) depend(in:B[i+rb*i]) depend(inout:B[j+rb*i])
+              {
+                if (admissible(j, i)) create_LR_tile(j, i, A, opts);
+                else create_dense_tile(j, i, A);
+                // solve with U, the blocks under the diagonal block
+                trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+                     scalar_t(1.), tile(i, i), tile(j, i));
+              }
+            }
+            for (std::size_t j=i+1; j<colblocks(); j++)
+              for (std::size_t k=i+1; k<rowblocks(); k++) {
+#pragma omp task default(shared) depend(in:B[i+rb*j],B[k+rb*i]) depend(inout:B[k+rb*j])
+                { // Schur complement updates, always into full rank
+                  DenseMW_t Akj = tile(A, k, j);
+                  gemm(Trans::N, Trans::N, scalar_t(-1.),
+                       tile(k, i), tile(i, j), scalar_t(1.), Akj);
+                }
+              }
           }
-          // Schur complement updates, always into full rank
-          for (std::size_t j=i+1; j<colblocks(); j++)
-            for (std::size_t k=i+1; k<rowblocks(); k++) {
-              DenseMW_t Akj = tile(A, k, j);
-              gemm(Trans::N, Trans::N, scalar_t(-1.),
-                   tile(k, i), tile(i, j), scalar_t(1.), Akj);
-            }
         }
+        for (std::size_t i=0; i<rowblocks(); i++)
+          for (std::size_t l=tileroff(i); l<tileroff(i+1); l++)
+            piv[l] += tileroff(i);
+        delete[] B;
       }
 
       std::size_t rows() const { return m_; }
@@ -398,6 +414,7 @@ namespace strumpack {
 
       DenseM_t dense() const {
         DenseM_t A(rows(), cols());
+#pragma omp taskloop collapse(2) default(shared)
         for (std::size_t j=0; j<colblocks(); j++)
           for (std::size_t i=0; i<rowblocks(); i++) {
             DenseMW_t Aij = tile(A, i, j);
@@ -442,8 +459,8 @@ namespace strumpack {
       std::vector<std::unique_ptr<BLRTile<scalar_t>>> blocks_;
 
       BLRMatrix(std::size_t m, const std::vector<std::size_t>& rowtiles,
-                std::size_t n, const std::vector<std::size_t>& coltiles,
-                const Opts_t& opts) : m_(m), n_(n) {
+                std::size_t n, const std::vector<std::size_t>& coltiles)
+        : m_(m), n_(n) {
         nbrows_ = rowtiles.size();
         nbcols_ = coltiles.size();
         roff_.resize(nbrows_+1);
@@ -461,8 +478,8 @@ namespace strumpack {
       inline std::size_t colblocks() const { return nbcols_; }
       inline std::size_t tilerows(std::size_t i) const { return roff_[i+1] - roff_[i]; }
       inline std::size_t tilecols(std::size_t j) const { return coff_[j+1] - coff_[j]; }
-      inline std::size_t tilerowoff(std::size_t i) const { return roff_[i]; }
-      inline std::size_t tilecoloff(std::size_t j) const { return coff_[j]; }
+      inline std::size_t tileroff(std::size_t i) const { return roff_[i]; }
+      inline std::size_t tilecoff(std::size_t j) const { return coff_[j]; }
 
       inline BLRTile<scalar_t>& tile(std::size_t i, std::size_t j) {
         return *blocks_[i+j*rowblocks()].get();
@@ -475,7 +492,7 @@ namespace strumpack {
       }
       inline DenseMW_t tile(DenseM_t& A, std::size_t i, std::size_t j) const {
         return DenseMW_t
-          (tilerows(i), tilecols(j), A, tilerowoff(i), tilecoloff(j));
+          (tilerows(i), tilecols(j), A, tileroff(i), tilecoff(j));
       }
 
       void create_dense_tile
@@ -508,31 +525,162 @@ namespace strumpack {
       template<typename T> friend void
       gemv(Trans ta, T alpha, const BLRMatrix<T>& a, const DenseMatrix<T>& x,
            T beta, DenseMatrix<T>& y, int task_depth);
+
+      template<typename T> friend void
+      BLR_construct_and_partial_factor
+      (DenseMatrix<T>& A11, DenseMatrix<T>& A12, DenseMatrix<T>& A21, DenseMatrix<T>& A22,
+       BLRMatrix<T>& B11, std::vector<int>& piv, BLRMatrix<T>& B12, BLRMatrix<T>& B21,
+       const std::vector<std::size_t>& tiles1, const std::vector<std::size_t>& tiles2,
+       const std::function<bool(std::size_t,std::size_t)>& admissible,
+       const BLROptions<T>& opts);
     };
 
+    template<typename scalar_t> inline void
+    BLR_construct_and_partial_factor
+    (DenseMatrix<scalar_t>& A11, DenseMatrix<scalar_t>& A12,
+     DenseMatrix<scalar_t>& A21, DenseMatrix<scalar_t>& A22,
+     BLRMatrix<scalar_t>& B11, std::vector<int>& piv,
+     BLRMatrix<scalar_t>& B12, BLRMatrix<scalar_t>& B21,
+     const std::vector<std::size_t>& tiles1,
+     const std::vector<std::size_t>& tiles2,
+     const std::function<bool(std::size_t,std::size_t)>& admissible,
+     const BLROptions<scalar_t>& opts) {
+      B11 = BLRMatrix<scalar_t>(A11.rows(), tiles1, A11.cols(), tiles1);
+      B12 = BLRMatrix<scalar_t>(A12.rows(), tiles1, A12.cols(), tiles2);
+      B21 = BLRMatrix<scalar_t>(A21.rows(), tiles2, A21.cols(), tiles1);
+
+      piv.resize(B11.rows());
+      auto rb = B11.rowblocks();
+      auto rb2 = B21.rowblocks();
+      auto lrb = rb+rb2;
+      auto B = new int[lrb*lrb](); // dummy for task synchronization
+#pragma omp taskgroup
+      {
+        for (std::size_t i=0; i<rb; i++) {
+#pragma omp task default(shared) depend(inout:B[i+lrb*i])
+          {
+            B11.create_dense_tile(i, i, A11);
+            auto tpiv = B11.tile(i, i).LU();
+            std::copy(tpiv.begin(), tpiv.end(), piv.begin()+B11.tileroff(i));
+          }
+          for (std::size_t j=i+1; j<rb; j++) {
+#pragma omp task default(shared) depend(in:B[i+lrb*i])  \
+  depend(inout:B[i+lrb*j])
+            { // these blocks have received all updates, compress now
+              if (admissible(i, j)) B11.create_LR_tile(i, j, A11, opts);
+              else B11.create_dense_tile(i, j, A11);
+              // permute and solve with L, blocks right from the diagonal block
+              std::vector<int> tpiv
+                (piv.begin()+B11.tileroff(i), piv.begin()+B11.tileroff(i+1));
+              B11.tile(i, j).laswp(tpiv, true);
+              trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                   scalar_t(1.), B11.tile(i, i), B11.tile(i, j));
+            }
+#pragma omp task default(shared) depend(in:B[i+lrb*i])  \
+  depend(inout:B[j+lrb*i])
+            {
+              if (admissible(j, i)) B11.create_LR_tile(j, i, A11, opts);
+              else B11.create_dense_tile(j, i, A11);
+              // solve with U, the blocks under the diagonal block
+              trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+                   scalar_t(1.), B11.tile(i, i), B11.tile(j, i));
+            }
+          }
+          for (std::size_t j=0; j<rb2; j++) {
+#pragma omp task default(shared) depend(in:B[i+lrb*i])  \
+  depend(inout:B[i+lrb*(rb+j)])
+            {
+              B12.create_LR_tile(i, j, A12, opts);
+              // permute and solve with L, blocks right from the diagonal block
+              std::vector<int> tpiv
+                (piv.begin()+B11.tileroff(i), piv.begin()+B11.tileroff(i+1));
+              B12.tile(i, j).laswp(tpiv, true);
+              trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                   scalar_t(1.), B11.tile(i, i), B12.tile(i, j));
+            }
+#pragma omp task default(shared) depend(in:B[i+lrb*i])  \
+  depend(inout:B[(rb+j)+lrb*i])
+            {
+              B21.create_LR_tile(j, i, A21, opts);
+              // solve with U, the blocks under the diagonal block
+              trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+                   scalar_t(1.), B11.tile(i, i), B21.tile(j, i));
+            }
+          }
+          for (std::size_t j=i+1; j<rb; j++)
+            for (std::size_t k=i+1; k<rb; k++) {
+#pragma omp task default(shared) depend(in:B[i+lrb*j],B[k+lrb*i])       \
+  depend(inout:B[k+lrb*j])
+              { // Schur complement updates, always into full rank
+                auto Akj = B11.tile(A11, k, j);
+                gemm(Trans::N, Trans::N, scalar_t(-1.),
+                     B11.tile(k, i), B11.tile(i, j), scalar_t(1.), Akj);
+              }
+            }
+          for (std::size_t k=i+1; k<rb; k++)
+            for (std::size_t j=0; j<rb2; j++) {
+#pragma omp task default(shared) depend(in:B[k+lrb*i],B[i+lrb*(rb+j)])  \
+  depend(inout:B[k+lrb*(rb+j)])
+              { // Schur complement updates, always into full rank
+                auto Akj = B12.tile(A12, k, j);
+                gemm(Trans::N, Trans::N, scalar_t(-1.),
+                     B11.tile(k, i), B12.tile(i, j), scalar_t(1.), Akj);
+              }
+#pragma omp task default(shared) depend(in:B[i+lrb*k],B[(j+rb)+lrb*i]) \
+  depend(inout:B[(rb+j)+lrb*k])
+              { // Schur complement updates, always into full rank
+                auto Ajk = B21.tile(A21, j, k);
+                gemm(Trans::N, Trans::N, scalar_t(-1.),
+                     B21.tile(j, i), B11.tile(i, k), scalar_t(1.), Ajk);
+              }
+            }
+
+          for (std::size_t j=0; j<rb2; j++)
+            for (std::size_t k=0; k<rb2; k++) {
+#pragma omp task default(shared) depend(in:B[i+lrb*(rb+j)],B[(rb+k)+lrb*i]) \
+  depend(inout:B[(rb+k)+lrb*(rb+j)])
+              { // Schur complement updates, always into full rank
+                DenseMatrixWrapper<scalar_t> Akj
+                  (B21.tilerows(k), B12.tilecols(j), A22,
+                   B21.tileroff(k), B12.tilecoff(j));
+                gemm(Trans::N, Trans::N, scalar_t(-1.),
+                     B21.tile(k, i), B12.tile(i, j), scalar_t(1.), Akj);
+              }
+            }
+        }
+      }
+      for (std::size_t i=0; i<rb; i++)
+        for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
+          piv[l] += B11.tileroff(i);
+      A11.clear();
+      A12.clear();
+      A21.clear();
+      delete[] B;
+    }
 
     template<typename scalar_t> void
     trsm(Side s, UpLo ul, Trans ta, Diag d,
          scalar_t alpha, const BLRMatrix<scalar_t>& a,
          DenseMatrix<scalar_t>& b, int task_depth) {
+      // TODO threading? is this used?
       using DMW_t = DenseMatrixWrapper<scalar_t>;
       if (s == Side::R && ul == UpLo::U) {
         for (std::size_t j=0; j<a.colblocks(); j++) {
-          DMW_t bj(b.rows(), a.tilerows(j), b, 0, a.tilerowoff(j));
+          DMW_t bj(b.rows(), a.tilerows(j), b, 0, a.tileroff(j));
           for (std::size_t k=0; k<j; k++)
             gemm(Trans::N, ta, scalar_t(-1.),
-                 DMW_t(b.rows(), a.tilerows(k), b, 0, a.tilerowoff(k)),
+                 DMW_t(b.rows(), a.tilerows(k), b, 0, a.tileroff(k)),
                  ta==Trans::N ? a.tile(k, j) : a.tile(j, k),
                  scalar_t(1.), bj, task_depth);
           trsm(s, ul, ta, d, alpha, a.tile(j, j), bj, task_depth);
         }
       } else if (s == Side::L && ul == UpLo::L) {
         for (std::size_t j=0; j<a.colblocks(); j++) {
-          DMW_t bj(a.tilecols(j), b.cols(), b, a.tilecoloff(j), 0);
+          DMW_t bj(a.tilecols(j), b.cols(), b, a.tilecoff(j), 0);
           for (std::size_t k=0; k<j; k++)
             gemm(ta, Trans::N, scalar_t(-1.),
                  ta==Trans::N ? a.tile(j, k) : a.tile(k, j),
-                 DMW_t(a.tilecols(k), b.cols(), b, a.tilecoloff(k), 0),
+                 DMW_t(a.tilecols(k), b.cols(), b, a.tilecoff(k), 0),
                  scalar_t(1.), bj, task_depth);
           trsm(s, ul, ta, d, alpha, a.tile(j, j), bj, task_depth);
         }
@@ -542,26 +690,27 @@ namespace strumpack {
     template<typename scalar_t> void
     trsv(UpLo ul, Trans ta, Diag d, const BLRMatrix<scalar_t>& a,
          DenseMatrix<scalar_t>& b, int task_depth) {
+      // TODO threading
       assert(b.cols() == 1);
       using DMW_t = DenseMatrixWrapper<scalar_t>;
       if (ul == UpLo::L) {
         for (std::size_t i=0; i<a.rowblocks(); i++) {
-          DMW_t bi(a.tilecols(i), b.cols(), b, a.tilecoloff(i), 0);
+          DMW_t bi(a.tilecols(i), b.cols(), b, a.tilecoff(i), 0);
           for (std::size_t j=0; j<i; j++)
             (ta==Trans::N ? a.tile(i, j) : a.tile(j, i)).gemv_a
               (ta, scalar_t(-1.),
-               DMW_t(a.tilecols(j), b.cols(), b, a.tilecoloff(j), 0),
+               DMW_t(a.tilecols(j), b.cols(), b, a.tilecoff(j), 0),
                scalar_t(1.), bi);
           trsv(ul, ta, d, a.tile(i, i).D(), bi,
                params::task_recursion_cutoff_level);
         }
       } else {
         for (int i=int(a.rowblocks())-1; i>=0; i--) {
-          DMW_t bi(a.tilecols(i), b.cols(), b, a.tilecoloff(i), 0);
+          DMW_t bi(a.tilecols(i), b.cols(), b, a.tilecoff(i), 0);
           for (int j=int(a.colblocks())-1; j>i; j--)
             (ta==Trans::N ? a.tile(i, j) : a.tile(j, i)).gemv_a
               (ta, scalar_t(-1.),
-               DMW_t(a.tilecols(j), b.cols(), b, a.tilecoloff(j), 0),
+               DMW_t(a.tilecols(j), b.cols(), b, a.tilecoff(j), 0),
                scalar_t(1.), bi);
           trsv(ul, ta, d, a.tile(i, i).D(), bi,
                params::task_recursion_cutoff_level);
@@ -573,27 +722,28 @@ namespace strumpack {
     gemv(Trans ta, scalar_t alpha, const BLRMatrix<scalar_t>& a,
          const DenseMatrix<scalar_t>& x, scalar_t beta,
          DenseMatrix<scalar_t>& y, int task_depth) {
+      // TODO threading
       assert(x.cols() == 1);
       assert(y.cols() == 1);
       using DMW_t = DenseMatrixWrapper<scalar_t>;
       if (ta == Trans::N) {
         for (std::size_t i=0; i<a.rowblocks(); i++) {
-          DMW_t yi(a.tilerows(i), y.cols(), y, a.tilerowoff(i), 0);
+          DMW_t yi(a.tilerows(i), y.cols(), y, a.tileroff(i), 0);
           for (std::size_t j=0; j<a.colblocks(); j++) {
             DMW_t xj(a.tilecols(j), x.cols(),
                      const_cast<DenseMatrix<scalar_t>&>(x),
-                     a.tilecoloff(j), 0);
+                     a.tilecoff(j), 0);
             a.tile(i, j).gemv_a
               (ta, alpha, xj, j==0 ? beta : scalar_t(1.), yi);
           }
         }
       } else {
         for (std::size_t i=0; i<a.colblocks(); i++) {
-          DMW_t yi(a.tilecols(i), y.cols(), y, a.tilecoloff(i), 0);
+          DMW_t yi(a.tilecols(i), y.cols(), y, a.tilecoff(i), 0);
           for (std::size_t j=0; j<a.rowblocks(); j++) {
             DMW_t xj(a.tilerows(j), x.cols(),
                      const_cast<DenseMatrix<scalar_t>&>(x),
-                     a.tilerowoff(j), 0);
+                     a.tileroff(j), 0);
             a.tile(j, i).gemv_a
               (ta, alpha, xj, j==0 ? beta : scalar_t(1.), yi);
           }
@@ -608,14 +758,14 @@ namespace strumpack {
       const auto imax = ta == Trans::N ? a.rowblocks() : a.colblocks();
       const auto jmax = tb == Trans::N ? b.colblocks() : b.rowblocks();
       const auto kmax = ta == Trans::N ? a.colblocks() : a.rowblocks();
-      // TODO pragma omp taskloop collapse(2)
+#pragma omp taskloop collapse(2) default(shared)
       for (std::size_t i=0; i<imax; i++)
         for (std::size_t j=0; j<jmax; j++) {
           DenseMatrixWrapper<scalar_t> cij
             (ta==Trans::N ? a.tilerows(i) : a.tilecols(i),
              tb==Trans::N ? b.tilecols(j) : b.tilerows(j), c,
-             ta==Trans::N ? a.tilerowoff(i) : a.tilecoloff(i),
-             tb==Trans::N ? b.tilecoloff(j) : b.tilerowoff(j));
+             ta==Trans::N ? a.tileroff(i) : a.tilecoff(i),
+             tb==Trans::N ? b.tilecoff(j) : b.tileroff(j));
           for (std::size_t k=0; k<kmax; k++)
             gemm(ta, tb, alpha, ta==Trans::N ? a.tile(i, k) : a.tile(k, i),
                  tb==Trans::N ? b.tile(k, j) : b.tile(j, k),
