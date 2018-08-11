@@ -229,6 +229,10 @@ namespace strumpack {
         (Krylov) iterative solver. */
     int Krylov_iterations() const { return Krylov_its_; }
 
+    void draw(const std::string& name) const {
+      tree()->draw(*matrix(), name);
+    }
+
   protected:
     virtual void setup_tree();
     virtual void setup_reordering();

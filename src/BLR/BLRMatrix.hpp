@@ -60,6 +60,9 @@ namespace strumpack {
       virtual bool is_low_rank() const = 0;
       virtual void dense(DenseM_t& A) const = 0;
 
+      virtual void draw
+      (std::ostream& of, std::size_t roff, std::size_t coff) const = 0;
+
       virtual DenseM_t& D() = 0; //{ assert(false); }
       virtual DenseM_t& U() = 0; //{ assert(false); }
       virtual DenseM_t& V() = 0; //{ assert(false); }
@@ -111,6 +114,16 @@ namespace strumpack {
       bool is_low_rank() const override { return false; };
 
       void dense(DenseM_t& A) const override { A = D_; }
+
+      void draw
+      (std::ostream& of, std::size_t roff, std::size_t coff) const override {
+        char prev = std::cout.fill('0');
+        of << "set obj rect from "
+           << roff << ", " << coff << " to "
+           << roff+rows() << ", " << coff+cols()
+           << " fc rgb '#FF0000'" << std::endl;
+        std::cout.fill(prev);
+      }
 
       DenseM_t& D() override { return D_; }
       const DenseM_t& D() const override { return D_; }
@@ -208,6 +221,22 @@ namespace strumpack {
       void dense(DenseM_t& A) const override {
         gemm(Trans::N, Trans::N, scalar_t(1.), U_, V_, scalar_t(0.), A,
              params::task_recursion_cutoff_level);
+      }
+
+      void draw
+      (std::ostream& of, std::size_t roff, std::size_t coff) const override {
+        char prev = std::cout.fill('0');
+        int minmn = std::min(rows(), cols());
+        int red = std::floor(255.0 * rank() / minmn);
+        int blue = 255 - red;
+        of << "set obj rect from "
+           << roff << ", " << coff << " to "
+           << roff+rows() << ", " << coff+cols()
+           << " fc rgb '#"
+           << std::hex << std::setw(2) << std::setfill('0') << red
+           << "00" << std::setw(2)  << std::setfill('0') << blue
+           << "'" << std::dec << std::endl;
+        std::cout.fill(prev);
       }
 
       DenseM_t& D() override { assert(false); return U_; }
@@ -421,6 +450,14 @@ namespace strumpack {
             tile(i, j).dense(Aij);
           }
         return A;
+      }
+
+      void draw(std::ostream& of, std::size_t roff, std::size_t coff) const {
+#pragma omp taskloop collapse(2) default(shared)
+        for (std::size_t j=0; j<colblocks(); j++)
+          for (std::size_t i=0; i<rowblocks(); i++) {
+            tile(i, j).draw(of, roff+tileroff(i), coff+tilecoff(j));
+          }
       }
 
       void solve(std::vector<int>& piv, const DenseM_t& b) const {

@@ -130,6 +130,8 @@ namespace strumpack {
     FrontalMatrixHSS(const FrontalMatrixHSS&) = delete;
     FrontalMatrixHSS& operator=(FrontalMatrixHSS const&) = delete;
 
+    void draw_node(std::ostream& of, bool is_root) const override;
+
     void multifrontal_factorization_node
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,
      int etree_level, int task_depth);
@@ -607,6 +609,13 @@ namespace strumpack {
   FrontalMatrixHSS<scalar_t,integer_t>::node_factor_nonzeros() const {
     return _H.nonzeros() + _ULV.nonzeros() + _Theta.nonzeros()
       + _Phi.nonzeros() + _ThetaVhatC_or_VhatCPhiC.nonzeros();
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHSS<scalar_t,integer_t>::draw_node
+  (std::ostream& of, bool is_root) const {
+    if (is_root) _H.draw(of, sep_begin_, sep_begin_);
+    else _H.child(0)->draw(of, sep_begin_, sep_begin_);
   }
 
   template<typename scalar_t,typename integer_t> void

@@ -134,6 +134,9 @@ namespace strumpack {
       (DistM_t& A, const DenseM_t& sub_A, const DistM_t& leaf_A,
        const BLACSGrid* lg) const;
 
+      virtual void draw
+      (std::ostream& of, std::size_t rlo, std::size_t clo) const {};
+
     protected:
       using delemw_t = typename std::function
         <void(const std::vector<std::size_t>& I,

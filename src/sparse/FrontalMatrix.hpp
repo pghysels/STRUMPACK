@@ -70,6 +70,8 @@ namespace strumpack {
     integer_t dim_blk() const { return dim_sep() + dim_upd(); }
     const std::vector<integer_t>& upd() const { return upd_; }
 
+    void draw(std::ostream& of, int etree_level=0) const;
+
     void find_upd_indices
     (const std::vector<std::size_t>& I, std::vector<std::size_t>& lI,
      std::vector<std::size_t>& oI) const;
@@ -220,6 +222,8 @@ namespace strumpack {
     FrontalMatrix(const FrontalMatrix&) = delete;
     FrontalMatrix& operator=(FrontalMatrix const&) = delete;
 
+    virtual void draw_node(std::ostream& of, bool is_root) const;
+
     virtual long long node_factor_nonzeros() const {
       return dense_node_factor_nonzeros();
     }
@@ -236,6 +240,37 @@ namespace strumpack {
    integer_t sep_end, std::vector<integer_t>& upd)
     : sep_(sep), sep_begin_(sep_begin), sep_end_(sep_end),
       upd_(std::move(upd)), lchild_(lchild), rchild_(rchild) {
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrix<scalar_t,integer_t>::draw
+  (std::ostream& of, int etree_level) const {
+    draw_node(of, etree_level == 0);
+    for (auto u : upd_) {
+      char prev = std::cout.fill('0');
+      of << "set obj rect from "
+         << sep_begin_ << ", " << u << " to "
+         << sep_end_ << ", " << u+1
+         << " fc rgb '#FF0000'" << std::endl
+         << "set obj rect from "
+         << u << ", " << sep_begin_ << " to "
+         << u+1 << ", " << sep_end_
+         << " fc rgb '#FF0000'" << std::endl;
+      std::cout.fill(prev);
+    }
+    if (lchild_) lchild_->draw(of, etree_level+1);
+    if (rchild_) rchild_->draw(of, etree_level+1);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrix<scalar_t,integer_t>::draw_node
+  (std::ostream& of, bool is_root) const {
+    char prev = std::cout.fill('0');
+    of << "set obj rect from "
+       << sep_begin_ << ", " << sep_begin_ << " to "
+       << sep_end_ << ", " << sep_end_
+       << " fc rgb '#FF0000'" << std::endl;
+    std::cout.fill(prev);
   }
 
   /**

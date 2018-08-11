@@ -114,6 +114,8 @@ namespace strumpack {
     void bwd_solve_phase1
     (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const;
 
+    void draw_node(std::ostream& of, bool is_root) const override;
+
     long long node_factor_nonzeros() const override;
 
     using FrontalMatrix<scalar_t,integer_t>::lchild_;
@@ -410,6 +412,12 @@ namespace strumpack {
       upd_tiles_.resize(nt, leaf);
       upd_tiles_.back() = dim_upd() - leaf*(nt-1);
     }
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixBLR<scalar_t,integer_t>::draw_node
+  (std::ostream& of, bool is_root) const {
+    F11blr_.draw(of, this->sep_begin(), this->sep_begin());
   }
 
 } // end namespace strumpack

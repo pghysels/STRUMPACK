@@ -128,6 +128,8 @@ namespace strumpack {
 
       void shift(scalar_t sigma) override;
 
+      void draw(std::ostream& of, std::size_t rlo=0, std::size_t clo=0) const;
+
     protected:
       HSSMatrix
       (std::size_t m, std::size_t n, const opts_t& opts, bool active);
@@ -253,6 +255,9 @@ namespace strumpack {
       void apply_HSS
       (Trans ta, const HSSMatrix<T>& a, const DenseMatrix<T>& b,
        T beta, DenseMatrix<T>& c);
+      template<typename T> friend
+      void draw(const HSSMatrix<T>& H, const std::string& name);
+
       friend class HSSMatrixMPI<scalar_t>;
     };
 
@@ -536,6 +541,57 @@ namespace strumpack {
       else
         for (auto& c : this->_ch)
           c->shift(sigma);
+    }
+
+    template<typename scalar_t> void HSSMatrix<scalar_t>::draw
+    (std::ostream& of, std::size_t rlo, std::size_t clo) const {
+      if (!this->leaf()) {
+        char prev = std::cout.fill('0');
+        int rank0 = std::max(_B01.rows(), _B01.cols());
+        int rank1 = std::max(_B10.rows(), _B10.cols());
+        int minmn = std::min(this->rows(), this->cols());
+        int red = std::floor(255.0 * rank0 / minmn);
+        int blue = 255 - red;
+        of << "set obj rect from "
+           << rlo << ", " << clo+this->_ch[0]->cols() << " to "
+           << rlo+this->_ch[0]->rows()
+           << ", " << clo+this->cols()
+           << " fc rgb '#"
+           << std::hex << std::setw(2) << std::setfill('0') << red
+           << "00" << std::setw(2)  << std::setfill('0') << blue
+           << "'" << std::dec << std::endl;
+        red = std::floor(255.0 * rank1 / minmn);
+        blue = 255 - red;
+        of << "set obj rect from "
+           << rlo+this->_ch[0]->rows() << ", " << clo
+           << " to " << rlo+this->rows()
+           << ", " << clo+this->_ch[0]->cols()
+           << " fc rgb '#"
+           << std::hex << std::setw(2) << std::setfill('0') << red
+           << "00" << std::setw(2)  << std::setfill('0') << blue
+           << "'" << std::dec << std::endl;
+        std::cout.fill(prev);
+        this->_ch[0]->draw(of, rlo, clo);
+        this->_ch[1]->draw
+          (of, rlo+this->_ch[0]->rows(), clo+this->_ch[0]->cols());
+      } else {
+        of << "set obj rect from "
+           << rlo << ", " << clo << " to "
+           << rlo+this->rows() << ", " << clo+this->cols()
+           << " fc rgb 'red'" << std::endl;
+      }
+    }
+
+    template<typename scalar_t>
+    void draw(const HSSMatrix<scalar_t>& H, const std::string& name) {
+      std::ofstream of("plot" + name + ".gnuplot");
+      of << "set terminal pdf enhanced color size 5,4" << std::endl;
+      of << "set output '" << name << ".pdf'" << std::endl;
+      H.draw(of);
+      of << "set xrange [0:" << H.cols() << "]" << std::endl;
+      of << "set yrange [" << H.rows() << ":0]" << std::endl;
+      of << "plot x lt -1 notitle" << std::endl;
+      of.close();
     }
 
   } // end namespace HSS

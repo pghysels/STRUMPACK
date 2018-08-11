@@ -67,6 +67,8 @@ namespace strumpack {
     virtual int nr_BLR_fronts() const { return nr_BLR_fronts_; }
     virtual int nr_dense_fronts() const { return nr_dense_fronts_; }
 
+    void draw(const SpMat_t& A, const std::string& name) const;
+
   protected:
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
@@ -253,6 +255,20 @@ namespace strumpack {
 #pragma omp single nowait
     nonzeros = root_->dense_factor_nonzeros();
     return nonzeros;
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  EliminationTree<scalar_t,integer_t>::draw
+  (const SpMat_t& A, const std::string& name) const {
+    std::ofstream of("plot" + name + ".gnuplot");
+    of << "set terminal pdf enhanced color size 5,4" << std::endl;
+    of << "set output '" << name << ".pdf'" << std::endl;
+    of << "set style rectangle fillstyle noborder" << std::endl;
+    root_->draw(of);
+    of << "set xrange [0:" << A.size() << "]" << std::endl;
+    of << "set yrange [" << A.size() << ":0]" << std::endl;
+    of << "plot x lt -1 notitle" << std::endl;
+    of.close();
   }
 
 } // end namespace strumpack
