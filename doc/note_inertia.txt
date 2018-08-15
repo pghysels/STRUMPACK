@@ -1,0 +1,69 @@
+15 August 2018
+Jonas Actor
+Scalable Solvers Group, Lawrence Berkeley National Laboratory
+Computational and Applied Mathematics, Rice University
+jonasactor@rice.edu
+
+Notes on Inertia Calculations in STRUMPACK
+
+Things that work, in serial:
+  - Inertia calculations for dense matrices
+  - Inertia calculations for dense HSS matrices
+  - Inertia for most sparse non-HSS matrices
+
+Things that need more work:
+  - Parallel implementation
+      - Issue: OpenMP pragmas for multithreading in inertia codes
+      - Issue: No comparable sytrf_rook() in SCALAPACK. Could use LU with
+               pivoting disabled instead, but would need to use a different
+               method for solving for the Schur complements.
+  - Inertia for sparse matrices with lots of zeros on diagonal
+      - Issue: LDL^T, LU factorization of singular fronts yields zero pivots
+  - Inertia for sparse HSS matrices
+      - Issue: Multifrontal factorization of HSS matrices starts a partial
+               ULV factorization, which uses LU+pivoting and is therefore no
+               longer symmetric. Need to make sure that inertia is found
+               for the HSS matrix post-compression, pre-factorization.
+
+Notes:
+  - Ensuring that HSS uses the same random samples for both the row and column
+    space of A has been added to the original compression option, not the
+    stable compression option. Make sure to run with using option
+    --hss_compression_algorithm original to maintain symmetry of HSS factors.
+  - Current sparse matching options (using MC64) do not perform symmetric
+    matchings. As a result, inertia routines must be run using option
+    --sp_matching 0.
+  - For sparse matrices with zero blocks on the diagonal (such as saddle point
+    or KKT matrices), reorderings methods play an outsized role in determining
+    whether STRUMPACK can factorize the matrix. Reordering strategies other
+    than a natural ordering often cause the zero blocks to be promoted farther
+    up the diagonal, causing fronts to be singular (or for the factorization to
+    otherwise break down). When these zero blocks are left towards the bottom
+    right of the factorization, there is a substantial chance that the Schur
+    complements in the multifrontal factorization fill the zero blocks, allowing
+    for computation to proceed. As a result, it is often necessary to run using
+    option --sp_reordering_method natural instead of using metis, etc.
+  - When using natural reordering strategy with matching disabled, the
+    multifrontal factorization yields many small frontal matrices, often of
+    size 1x1 or 2x2. Having matrices this small slows down the computation.
+  - Depending on the options used at runtime, using STRUMPACK to solve a system
+    of linear equations after finding the inertia yields solves that do not
+    converge, or that converge slowly. This issue might be an artifact of
+    factorizations that yield zero pivots for the LDL^T factorizations; more
+    work should be done to investigate this issue.
+
+Examples that work:
+  - Any dense HSS matrix. See test_HSS_seq_inertia.cpp as an example.
+  - The Poisson problems in the test example testPoisson2d, testPoisson3d.
+  - With no matching, natural reordering, and no HSS compression, the example
+    testMMfloat example works using matrices c-19.mtx and freeFlyingRobot_12.mtx
+    from the SuiteSparse Matrix Collection.
+
+Examples that do not work:
+ - The testMMfloat example does not work for the ExaSGD matrix
+   118_4/globalmat.mtx, nor for the SuiteSparse matrix spaceShuttleEntry_2.mtx.
+
+Correct inertias (from MATLAB):
+  - spaceShuttleEntry_2 :  815  613  0    cond(A):  5.5e06
+  -  freeFlyingRobot_12 : 3344 2234  0    cond(A):  1.2e16 --ill-conditioned--
+  -                c-19 : 1462  815  0    cond(A):  2.2e06
