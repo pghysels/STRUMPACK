@@ -12,13 +12,21 @@ Things that work, in serial:
   - Inertia for most sparse non-HSS matrices
 
 Things that need more work:
+  - Symmetric matching MC64
+      - Issue: Try to update MC64 so that we can use symmetric matching.
+               Hopefully this will solve the issues with zero blocks on the
+               diagonal for certain sparse matrices. For more information, see
+               the technical report "Strategies for scaling and pivoting for
+               sparse symmetric indefinite problems", Iain S. Duff and Stephane
+               Pralet, 17 May 2005, CCLRC RAL.
   - Parallel implementation
       - Issue: OpenMP pragmas for multithreading in inertia codes
       - Issue: No comparable sytrf_rook() in SCALAPACK. Could use LU with
                pivoting disabled instead, but would need to use a different
                method for solving for the Schur complements.
   - Inertia for sparse matrices with lots of zeros on diagonal
-      - Issue: LDL^T, LU factorization of singular fronts yields zero pivots
+      - Issue: LDL^T, LU factorization of singular fronts yields zero pivots.
+               Hopefully this is a non-issue with a symmetric MC64 matching.
   - Inertia for sparse HSS matrices
       - Issue: Multifrontal factorization of HSS matrices starts a partial
                ULV factorization, which uses LU+pivoting and is therefore no
@@ -51,6 +59,12 @@ Notes:
     converge, or that converge slowly. This issue might be an artifact of
     factorizations that yield zero pivots for the LDL^T factorizations; more
     work should be done to investigate this issue.
+  - The code currently uses sytrf_rook() for LDL^T factorization; this is
+    preferred over sytrf() due to improved stability and bounds for the 'L'
+    factors by using rook pivoting. The same is true for sytrs_rook() over
+    sytrs(). If using LAPACK 3.7.0 or greater, sytrf_rk() is preferred over
+    sytrf_rook(), and the corresponding sytrs_3 is preferred over sytrs_rook(),
+    but this is not yet implemented and also has a slightly different signature.
 
 Examples that work:
   - Any dense HSS matrix. See test_HSS_seq_inertia.cpp as an example.
