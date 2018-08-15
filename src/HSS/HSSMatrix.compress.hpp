@@ -39,6 +39,7 @@ namespace strumpack {
       compress_original(afunc, afunc, opts);
     }
 
+    // changed for symmetry; see comment below
     template<typename scalar_t> void HSSMatrix<scalar_t>::compress_original
     (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts) {
       int d_old = 0, d = opts.d0() + opts.p();
@@ -65,13 +66,16 @@ namespace strumpack {
         DenseMW_t Sr_new(n, d-d_old, Sr, 0, d_old);
         DenseMW_t Sc_new(n, d-d_old, Sc, 0, d_old);
         Amult(Rr_new, Rc_new, Sr_new, Sc_new);
+        // Rc_new = Rr_new; // for symmetry
+        // Sc_new = Sr_new; // for symmetry
         if (opts.verbose())
           std::cout << "# compressing with d = " << d-opts.p()
                     << " + " << opts.p() << " (original)" << std::endl;
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
         compress_recursive_original
-          (Rr, Rc, Sr, Sc, Aelem, opts, w, d-d_old,
+          // (Rr, Rc, Sr, Sc, Aelem, opts, w, d-d_old,
+          (Rr, Rr, Sr, Sr, Aelem, opts, w, d-d_old, // changed for symmetry
            this->_openmp_task_depth);
         if (!this->is_compressed()) {
           d_old = d;

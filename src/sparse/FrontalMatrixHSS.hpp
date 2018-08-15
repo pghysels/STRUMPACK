@@ -509,8 +509,9 @@ namespace strumpack {
           STRUMPACK_SCHUR_FLOPS
             (gemm_flops(Trans::N, Trans::C, scalar_t(1.), _Theta, Vhat, scalar_t(0.)));
         }
-      } else
+      } else {
         _ULV = _H.factor();
+      }
     }
   }
 

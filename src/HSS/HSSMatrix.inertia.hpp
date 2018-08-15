@@ -1,17 +1,28 @@
 #ifndef HSS_MATRIX_INERTIA_HPP
 #define HSS_MATRIX_INERTIA_HPP
 
+
 namespace strumpack {
   namespace HSS {
 
-    // assumes both A and HSS(A) compression are real symmetric
+    // Begins recursive Inertia calculation for HSS tree
+    // Output: Inertia in, a triple of the number of positive, negative, and zero
+    //         eigenvalues in the HSS matrix
     template<typename scalar_t> Inertia HSSMatrix<scalar_t>::inertia() const {
       WorkInertia<scalar_t> w;
       return inertia_recursive(w, true, 0);
     }
 
-
-    template<typename scalar_t> Inertia HSSMatrix<scalar_t>::readInertiaOffBlockDiag(const DenseM_t D, const std::vector<int>& IPIV) const{
+    // Traverses the diagonal of matrix to find its inertia, where matrix has
+    // already been factorized using LAPACK sytrf_rook
+    // Inertia is given by values on diagonal and first superdiagonal
+    // Input:  DenseM_t D, matrix, given as output of sytrf_rook factorization
+    //         vector IPIV, pivots from sytrf_rook factorization
+    // Output: Inertia in, a triple of the number of positive, negative, and
+    //         zero eigenvalues in this matrix
+    template<typename scalar_t>
+    Inertia HSSMatrix<scalar_t>::readInertiaOffBlockDiag
+    (const DenseM_t D, const std::vector<int>& IPIV) const {
       Inertia in;
       unsigned int k  = 0;
       scalar_t a;
@@ -22,13 +33,16 @@ namespace strumpack {
         return in;
       }
       while (k < nD-1) {
-        if ((IPIV[k+1] < 0) && (IPIV[k]==IPIV[k+1])){
+        if ((IPIV[k+1] < 0) && (IPIV[k] < 0)) {
+        // if ((IPIV[k+1] < 0) && (IPIV[k]==IPIV[k+1])){ //for non-rook sytrf
           // 2x2 block
           a = D(k,k);
           b = D(k+1,k);
           c = D(k+1,k+1);
-          auto lam1 = scalar_t(0.5)*( (a+c) + std::sqrt((a-c)*(a-c) + scalar_t(4.)*b*b));
-          auto lam2 = scalar_t(0.5)*( (a+c) - std::sqrt((a-c)*(a-c) + scalar_t(4.)*b*b));
+          auto lam1 = scalar_t(0.5)*( (a+c) +
+                      std::sqrt((a-c)*(a-c) + scalar_t(4.)*b*b));
+          auto lam2 = scalar_t(0.5)*( (a+c) -
+                      std::sqrt((a-c)*(a-c) + scalar_t(4.)*b*b));
           if (std::real(lam1) > 0.) {
             in.np += 1;
           } else if (std::real(lam1) < 0.) {
@@ -69,19 +83,24 @@ namespace strumpack {
         }
         k += 1;
       }
-      // in.np += np;
-      // in.nn += nn;
-      // in.nz += nz;
       return in;
     }
 
-    template<typename scalar_t> Inertia HSSMatrix<scalar_t>::inertia_recursive(WorkInertia<scalar_t>& w, bool isroot, int depth) const {
+    // Finds the inertia of a (dense) HSS matrix.
+    // Assumes A, HSS(A) are symmetric
+    // Input:  WorkInertia w, stores factors from lower levels of recursion
+    //         bool isroot, set to true if at root of HSS tree, false otherwise
+    //         int depth, for (future) OpenMP implementation
+    // Output: Inertia in, a triple of the number of positive, negative, and
+    //         zero eigenvalues in this level of HSS tree and below
+    template<typename scalar_t>
+    Inertia HSSMatrix<scalar_t>::inertia_recursive
+    (WorkInertia<scalar_t>& w, bool isroot, int depth) const {
       Inertia in;
       DenseM_t Dt;
       // Form Dt
       if (!this->leaf()){
         w.c.resize(2);
-        //in.ch.resize(2);
         Inertia in0 = this->_ch[0]->inertia_recursive(w.c[0], false, depth+1);
         Inertia in1 = this->_ch[1]->inertia_recursive(w.c[1], false, depth+1);
         in.np = in0.np + in1.np;
@@ -91,6 +110,9 @@ namespace strumpack {
         auto u_size = this->_ch[0]->U_rank() + this->_ch[1]->U_rank();
         Dt = DenseM_t(u_size, u_size);
         auto c0u = this->_ch[0]->U_rank();
+        assert(_B01.rows() == _B10.cols());
+        assert(_B10.rows() == _B01.cols());
+
         copy(w.c[0].S, Dt, 0, 0);
         copy(w.c[1].S, Dt, c0u, c0u);
         copy(_B01, Dt, 0, c0u);
@@ -105,7 +127,7 @@ namespace strumpack {
 
       if (isroot) {
       // LDL(Dt) for what is remaining
-      auto IPIV = Dt.sytrf();
+      auto IPIV = Dt.sytrf_rook();
       auto inroot = readInertiaOffBlockDiag(Dt, IPIV);
       in.np += inroot.np;
       in.nn += inroot.nn;
@@ -123,10 +145,9 @@ namespace strumpack {
       Dt = Dt.transpose();
       Dt.laswp(_U.P(), true);
       Dt = Dt.transpose();
-      // Dt.lapmt(_U.P, false); // I don't think the P permutation works with lapmt nor with lapmr
-      // Dt.lapmr(_U.P, true);
 
-      //      Dt        <--      Omega    *      Dt     *   Omega'         (permutation included in above step)
+      // Permutation included in above step
+      //      Dt        <--      Omega    *      Dt     *   Omega'     \
       // [ D11  D12 ]  ----   [ -E  Irr ] . [ C11 C12 ] . [ -E'  Icc ]
       // [ D21  D22 ]  ----   [ Icc 0cr ]   [ C21 C22 ]   [ Irr  0rc ]
       // D11 =  E*C11*E' - E*C12 - C21*E' + C22
@@ -147,13 +168,13 @@ namespace strumpack {
 
       auto D21 = D12.transpose();
 
-      // LDL(Db(1:rtop, 1:rtop)), then form S = D22 - D21 inv(D11) D12 with inv(D11) using LDL
-      auto IPIV = D11.sytrf();
+      // LDL(D11), then form S = D22 - D21 inv(D11) D12 using LDL
+      auto IPIV = D11.sytrf_rook();
       auto inD11 = readInertiaOffBlockDiag(D11, IPIV);
       in.np += inD11.np;
       in.nn += inD11.nn;
       in.nz += inD11.nz;
-      sytrs(UpLo::L, D11, IPIV, D12);
+      sytrs_rook(UpLo::L, D11, IPIV, D12);
       gemm(Trans::N, Trans::N, scalar_t(-1.), D21, D12, scalar_t(1.), D22);
       w.S = D22;
       }

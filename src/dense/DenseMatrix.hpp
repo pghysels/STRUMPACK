@@ -161,12 +161,20 @@ namespace strumpack {
     std::vector<scalar_t> singular_values() const;
 
     std::vector<int> sytrf();
+    std::vector<int> sytrf_rook();
     void sytrs(UpLo s, const DenseMatrix<scalar_t>& a,
        const std::vector<int>& IPIV, const DenseMatrix<scalar_t>& b);
+    void sytrs_rook(UpLo s, const DenseMatrix<scalar_t>& a,
+       const std::vector<int>& IPIV, const DenseMatrix<scalar_t>& b);
+
 
     void shift(scalar_t sigma);
 
-
+    // Traverse diagonal to find inertia of matrix.
+    // Use after calling sytrf_rook.
+    // For modifications to use sytrf instead, see comments
+    // Input : vector IPIV, pivots from LDL^T factorization sytrf_rook
+    // Output: Inertia in, triple of counts of signs of eigenvalues
     Inertia readMyInertiaOffBlockDiag(const std::vector<int>& IPIV) const{
       Inertia in;
       unsigned int k  = 0;
@@ -178,13 +186,16 @@ namespace strumpack {
         return in;
       }
       while (k < nD-1) {
-        if ((IPIV[k+1] < 0) && (IPIV[k]==IPIV[k+1])){
+        if ((IPIV[k+1] < 0) && (IPIV[k] < 0)){
+        // if ((IPIV[k+1] < 0) && (IPIV[k]==IPIV[k+1])){ // for non-rook sytrf
           // 2x2 block
           a = operator()(k,k);
           b = operator()(k+1,k);
           c = operator()(k+1,k+1);
-          auto lam1 = scalar_t(0.5)*( (a+c) + std::sqrt((a-c)*(a-c) + scalar_t(4.)*b*b));
-          auto lam2 = scalar_t(0.5)*( (a+c) - std::sqrt((a-c)*(a-c) + scalar_t(4.)*b*b));
+          auto lam1 = scalar_t(0.5)*( (a+c) +
+                      std::sqrt((a-c)*(a-c) + scalar_t(4.)*b*b));
+          auto lam2 = scalar_t(0.5)*( (a+c) -
+                      std::sqrt((a-c)*(a-c) + scalar_t(4.)*b*b));
           if (std::real(lam1) > 0.) {
             in.np += 1;
           } else if (std::real(lam1) < 0.) {
@@ -229,7 +240,7 @@ namespace strumpack {
     }
 
     Inertia inertia() {
-      auto IPIV = sytrf();
+      auto IPIV = sytrf_rook();
       return readMyInertiaOffBlockDiag(IPIV);
     }
 
@@ -1068,21 +1079,53 @@ namespace strumpack {
        x.data(), 1, beta, y.data(), 1, depth);
   }
 
-  // Jonas
-  template<typename scalar_t> std::vector<int> DenseMatrix<scalar_t>::sytrf()  {
+  template<typename scalar_t> std::vector<int> DenseMatrix<scalar_t>::sytrf() {
     std::vector<int> IPIV(rows());
     int info;
     if (rows() > 0){
         blas::sytrf(char(UpLo::L), rows(), data(), ld(), IPIV.data(), &info);
       }
+    if (info)  std::cout << "LDL factor sytrf error INFO=" << info << std::endl;
     return IPIV;
   }
 
-  template<typename scalar_t> void sytrs(UpLo s, DenseMatrix<scalar_t>& a, std::vector<int>& IPIV, DenseMatrix<scalar_t>& b){
+  template<typename scalar_t> void
+  sytrs(UpLo s, DenseMatrix<scalar_t>& a, std::vector<int>& IPIV,
+        DenseMatrix<scalar_t>& b){
     int info;
-    blas::sytrs(char(s), a.rows(), b.cols(), a.data(), a.ld(), IPIV.data(), b.data(), b.ld(), &info);
+    blas::sytrs(char(s), a.rows(), b.cols(), a.data(), a.ld(), IPIV.data(),
+                b.data(), b.ld(), &info);
+    if (info) {
+      std::cout << "LDL solve sytrs error INFO=" << info << std::endl;
+      exit(1);
+    }
   }
-  // end Jonas
+
+  template<typename scalar_t>
+  std::vector<int> DenseMatrix<scalar_t>::sytrf_rook()  {
+    std::vector<int> IPIV(rows());
+    int info;
+    if (rows() > 0){
+      blas::sytrf_rook(char(UpLo::L), rows(), data(), ld(), IPIV.data(), &info);
+      if (info)  {
+        std::cout << "LDL factor sytrf_rook error INFO=" << info << std::endl;
+      }
+    }
+    return IPIV;
+  }
+
+  template<typename scalar_t>
+  void sytrs_rook(UpLo s, DenseMatrix<scalar_t>& a, std::vector<int>& IPIV,
+                  DenseMatrix<scalar_t>& b){
+    int info;
+    blas::sytrs_rook(char(s), a.rows(), b.cols(), a.data(), a.ld(), IPIV.data(),
+                     b.data(), b.ld(), &info);
+    if (info) {
+      std::cout << "LDL solve sytrs_rook error INFO=" << info << std::endl;
+      exit(1);
+    }
+  }
+
 
   template<typename scalar_t> long long int
   LU_flops(const DenseMatrix<scalar_t>& a) {
