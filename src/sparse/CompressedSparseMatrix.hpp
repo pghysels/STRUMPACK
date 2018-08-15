@@ -515,7 +515,11 @@ namespace strumpack {
                     << number_format_with_commas(_n) << " matrix with "
                     << number_format_with_commas(_nnz) << " nnz's from "
                     << filename << std::endl;
+<<<<<<< HEAD
         if (s != GENERAL) _nnz = 2 * _nnz - _n;
+=======
+        if (s != GENERAL) _nnz = 2 * _nnz;
+>>>>>>> bfd87759a822960f19788bdc8fd82098b50134dd
         if (m != _n) {
           if (is_mpi_root())
             std::cerr << "ERROR: matrix is not square!" << std::endl;
