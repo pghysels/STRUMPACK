@@ -512,7 +512,7 @@ namespace strumpack {
         }
       }
     }
-    _nnz = A.size();
+    nnz_ = A.size();
     fclose(fp);
     if (!zero_based)
       for (auto& t : A) {
