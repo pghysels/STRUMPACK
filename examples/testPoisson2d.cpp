@@ -54,9 +54,9 @@ int main(int argc, char* argv[]) {
   integer N = n * n;
   integer nnz = 5 * N - 4 * n;
   CSRMatrix<scalar,integer> A(N, nnz);
-  integer* col_ptr = A.get_ptr();
-  integer* row_ind = A.get_ind();
-  scalar* val = A.get_val();
+  integer* col_ptr = A.ptr();
+  integer* row_ind = A.ind();
+  scalar* val = A.val();
 
   nnz = 0;
   col_ptr[0] = 0;

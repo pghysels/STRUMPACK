@@ -35,8 +35,9 @@
 namespace strumpack {
 
   template<typename integer_t> inline int WRAPPER_ParMETIS_V32_NodeND
-  (std::vector<integer_t>& dist, idx_t* xadj, idx_t* adjncy, idx_t numflag,
-   integer_t* local_order, idx_t* sizes, MPI_Comm c, integer_t local_rows) {
+  (const std::vector<integer_t>& dist, idx_t* xadj, idx_t* adjncy,
+   idx_t numflag, integer_t* local_order, idx_t* sizes,
+   MPI_Comm c, integer_t local_rows) {
     auto vtxdist = new idx_t[dist.size()+1+local_rows];
     auto loc_order = vtxdist + dist.size()+1;
     for (size_t i=0; i<dist.size(); i++) vtxdist[i] = dist[i];
@@ -48,11 +49,11 @@ namespace strumpack {
     return ierr;
   }
   template<> inline int WRAPPER_ParMETIS_V32_NodeND
-  (std::vector<idx_t>& dist, idx_t* xadj, idx_t* adjncy, idx_t numflag,
+  (const std::vector<idx_t>& dist, idx_t* xadj, idx_t* adjncy, idx_t numflag,
    idx_t* local_order, idx_t* sizes, MPI_Comm c, idx_t local_rows) {
     return ParMETIS_V32_NodeND
-      (dist.data(), xadj, adjncy, NULL, &numflag, NULL, NULL, NULL,
-       NULL, NULL, NULL, NULL, local_order, sizes, &c);
+      (const_cast<idx_t*>(dist.data()), xadj, adjncy, NULL, &numflag,
+       NULL, NULL, NULL, NULL, NULL, NULL, NULL, local_order, sizes, &c);
   }
 
   template<typename scalar_t,typename integer_t>
@@ -62,8 +63,8 @@ namespace strumpack {
    bool build_tree, integer_t* perm, const SPOptions<scalar_t>& opts) {
     auto P = mpi_nprocs(comm);
     auto local_rows = A->local_rows();
-    auto ptr = A->get_ptr();
-    auto ind = A->get_ind();
+    auto ptr = A->ptr();
+    auto ind = A->ind();
     auto xadj = new idx_t[local_rows+1 + A->local_nnz()];
     auto adjncy = xadj + local_rows+1; //new idx_t[A->local_nnz()];
     xadj[0] = 0;
@@ -79,7 +80,7 @@ namespace strumpack {
     auto local_order = new integer_t[local_rows];
     auto sizes = new idx_t[2*p2-1];
     int ierr = WRAPPER_ParMETIS_V32_NodeND
-      (A->get_dist(), xadj, adjncy, numflag,
+      (A->dist(), xadj, adjncy, numflag,
        local_order, sizes, comm, local_rows);
     if (ierr != METIS_OK) {
       if (!mpi_rank(comm))
@@ -92,9 +93,9 @@ namespace strumpack {
     auto rcnts = new int[2*P];
     auto displs = rcnts + P;
     for (int p=0; p<P; p++) {
-      rcnts[p] = A->get_dist()[p+1] - A->get_dist()[p];
+      rcnts[p] = A->dist(p+1) - A->dist(p);
       // need to copy because displs needs to be 'int'
-      displs[p] = A->get_dist()[p];
+      displs[p] = A->dist(p);
     }
     MPI_Allgatherv(local_order, local_rows, mpi_type<integer_t>(),
                    perm, rcnts, displs, mpi_type<integer_t>(), comm);
@@ -107,11 +108,11 @@ namespace strumpack {
       integer_t dist_nr_sep = 2*p2 - 1;
       sep_tree = std::unique_ptr<SeparatorTree<integer_t>>
         (new SeparatorTree<integer_t>(dist_nr_sep));
-      sep_tree->sizes()[0] = 0;
+      sep_tree->sizes(0) = 0;
       for (integer_t i=0; i<dist_nr_sep; i++) {
-        sep_tree->pa()[i] = -1;
-        sep_tree->lch()[i] = -1;
-        sep_tree->rch()[i] = -1;
+        sep_tree->pa(i) = -1;
+        sep_tree->lch(i) = -1;
+        sep_tree->rch(i) = -1;
       }
       int nr_dist_levels = std::log2(p2);
       std::function<void(integer_t,integer_t&,integer_t)>
@@ -121,13 +122,13 @@ namespace strumpack {
           build_dist_binary_separator_tree(2*dsep+2, pid, level-1);
           integer_t lch = pid - 1;
           build_dist_binary_separator_tree(2*dsep+1, pid, level-1);
-          sep_tree->lch()[pid] = lch;
-          sep_tree->rch()[pid] = pid-1;
-          sep_tree->pa()[lch] = pid;
-          sep_tree->pa()[pid-1] = pid;
+          sep_tree->lch(pid) = lch;
+          sep_tree->rch(pid) = pid-1;
+          sep_tree->pa(lch) = pid;
+          sep_tree->pa(pid-1) = pid;
         }
-        sep_tree->sizes()[pid+1] = sizes[dist_nr_sep-1-dsep]
-        + sep_tree->sizes()[pid];
+        sep_tree->sizes(pid+1) = sizes[dist_nr_sep-1-dsep]
+        + sep_tree->sizes(pid);
         pid++;
       };
       integer_t pid = 0;

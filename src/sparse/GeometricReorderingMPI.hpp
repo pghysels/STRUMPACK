@@ -169,6 +169,10 @@ namespace strumpack {
       if (dsep && dsep_leaf) dsep_leaf_id++;
     };
 
+
+    // TODO tree only when HSS enabled .. cf seq geometric ordering
+    // use blr leaf size if BLR is chosen iso HSS
+
     rec_nd({{0, 0, 0}}, {{nx, ny, nz}}, 1);
     std::unique_ptr<SeparatorTree<integer_t>> local_stree
       (new SeparatorTree<integer_t>(local_tree));
@@ -176,8 +180,9 @@ namespace strumpack {
       (new SeparatorTree<integer_t>(dist_tree));
     local_stree->HSS_trees() = local_HSS_trees;
     dist_stree->HSS_trees() = dist_HSS_trees;
-    return std::make_pair<std::unique_ptr<SeparatorTree<integer_t>>,
-                          std::unique_ptr<SeparatorTree<integer_t>>>
+    return std::make_pair
+      <std::unique_ptr<SeparatorTree<integer_t>>,
+       std::unique_ptr<SeparatorTree<integer_t>>>
       (std::move(dist_stree), std::move(local_stree));
   }
 

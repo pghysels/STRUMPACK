@@ -134,6 +134,9 @@ namespace strumpack {
       (DistM_t& A, const DenseM_t& sub_A, const DistM_t& leaf_A,
        const BLACSGrid* lg) const;
 
+      virtual void draw
+      (std::ostream& of, std::size_t rlo, std::size_t clo) const {};
+
     protected:
       using delemw_t = typename std::function
         <void(const std::vector<std::size_t>& I,
@@ -312,7 +315,8 @@ namespace strumpack {
       (const DistM_t& A, std::size_t Arlo, std::size_t Aclo,
        std::vector<std::vector<scalar_t>>& sbuf, int dest);
       virtual void redistribute_to_tree_from_buffers
-      (const DistM_t& A, std::size_t Arlo, std::size_t Aclo, scalar_t** pbuf);
+      (const DistM_t& A, std::size_t Arlo, std::size_t Aclo,
+       std::vector<scalar_t*>& pbuf);
       virtual void delete_redistributed_input();
 
       friend class HSSMatrix<scalar_t>;
@@ -916,7 +920,8 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixBase<scalar_t>::redistribute_to_tree_from_buffers
-    (const DistM_t& A, std::size_t Arlo, std::size_t Aclo, scalar_t** pbuf) {
+    (const DistM_t& A, std::size_t Arlo, std::size_t Aclo,
+     std::vector<scalar_t*>& pbuf) {
       if (!this->active()) return;
       _Asub = DenseM_t(rows(), cols());
       const auto B = DistM_t::default_MB;

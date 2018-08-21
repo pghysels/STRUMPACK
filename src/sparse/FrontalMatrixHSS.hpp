@@ -41,12 +41,8 @@
 
 namespace strumpack {
 
-  // forward declarations
-  template<typename scalar_t,typename integer_t> class FrontalMatrixDense;
-
   template<typename scalar_t,typename integer_t> class FrontalMatrixHSS
     : public FrontalMatrix<scalar_t,integer_t> {
-    //using real_t = typename RealType<scalar_t>::value_type
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
@@ -54,12 +50,12 @@ namespace strumpack {
 
   public:
     FrontalMatrixHSS
-    (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-     std::vector<integer_t>& _upd);
-    ~FrontalMatrixHSS() {}
+    (integer_t sep, integer_t sep_begin, integer_t sep_end,
+     std::vector<integer_t>& upd);
 
     void extend_add_to_dense
-    (FrontalMatrixDense<scalar_t,integer_t>* p, int task_depth) override;
+    (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
+     const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) override;
 
     void sample_CB
     (const SPOptions<scalar_t>& opts, const DenseM_t& R, DenseM_t& Sr,
@@ -103,7 +99,7 @@ namespace strumpack {
 
     void set_HSS_partitioning
     (const SPOptions<scalar_t>& opts,
-     const HSS::HSSPartitionTree& sep_tree, bool is_root);
+     const HSS::HSSPartitionTree& sep_tree, bool is_root) override;
 
 
     // TODO make private?
@@ -134,6 +130,8 @@ namespace strumpack {
     FrontalMatrixHSS(const FrontalMatrixHSS&) = delete;
     FrontalMatrixHSS& operator=(FrontalMatrixHSS const&) = delete;
 
+    void draw_node(std::ostream& of, bool is_root) const override;
+
     void multifrontal_factorization_node
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,
      int etree_level, int task_depth);
@@ -144,7 +142,6 @@ namespace strumpack {
     (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const;
 
     long long node_factor_nonzeros() const override;
-    long long dense_node_factor_nonzeros() const override;
 
     void split_separator
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,
@@ -154,14 +151,21 @@ namespace strumpack {
     (const SpMat_t& A, const SPOptions<scalar_t>& opts, integer_t part,
      std::vector<idx_t>& xadj, std::vector<idx_t>& adjncy,
      integer_t* sorder);
+
+    using FrontalMatrix<scalar_t,integer_t>::lchild_;
+    using FrontalMatrix<scalar_t,integer_t>::rchild_;
+    using FrontalMatrix<scalar_t,integer_t>::dim_sep;
+    using FrontalMatrix<scalar_t,integer_t>::dim_upd;
+    using FrontalMatrix<scalar_t,integer_t>::sep_begin_;
+    using FrontalMatrix<scalar_t,integer_t>::sep_end_;
   };
 
   template<typename scalar_t,typename integer_t>
   FrontalMatrixHSS<scalar_t,integer_t>::FrontalMatrixHSS
-  (integer_t _sep, integer_t _sep_begin, integer_t _sep_end,
-   std::vector<integer_t>& _upd)
+  (integer_t sep, integer_t sep_begin, integer_t sep_end,
+   std::vector<integer_t>& upd)
     : FrontalMatrix<scalar_t,integer_t>
-    (NULL, NULL, _sep, _sep_begin, _sep_end, _upd) {
+    (nullptr, nullptr, sep, sep_begin, sep_end, upd) {
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -176,9 +180,10 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::extend_add_to_dense
-  (FrontalMatrixDense<scalar_t,integer_t>* p, int task_depth) {
+  (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
+   const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) {
     const std::size_t pdsep = p->dim_sep();
-    const std::size_t dupd = this->dim_upd();
+    const std::size_t dupd = dim_upd();
     std::size_t upd2sep;
     auto I = this->upd_to_parent(p, upd2sep);
 
@@ -199,14 +204,14 @@ namespace strumpack {
       std::size_t pc = I[c];
       if (pc < pdsep) {
         for (std::size_t r=0; r<upd2sep; r++)
-          p->F11(I[r],pc) += F22(r,c);
+          paF11(I[r],pc) += F22(r,c);
         for (std::size_t r=upd2sep; r<dupd; r++)
-          p->F21(I[r]-pdsep,pc) += F22(r,c);
+          paF21(I[r]-pdsep,pc) += F22(r,c);
       } else {
         for (std::size_t r=0; r<upd2sep; r++)
-          p->F12(I[r],pc-pdsep) += F22(r,c);
+          paF12(I[r],pc-pdsep) += F22(r,c);
         for (std::size_t r=upd2sep; r<dupd; r++)
-          p->F22(I[r]-pdsep,pc-pdsep) += F22(r,c);
+          paF22(I[r]-pdsep,pc-pdsep) += F22(r,c);
       }
     }
     STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*static_cast<long long int>(dupd*dupd));
@@ -274,7 +279,7 @@ namespace strumpack {
   FrontalMatrixHSS<scalar_t,integer_t>::sample_CB
   (const SPOptions<scalar_t>& opts, const DenseM_t& R,
    DenseM_t& Sr, DenseM_t& Sc, F_t* pa, int task_depth) {
-    if (!this->dim_upd()) return;
+    if (!dim_upd()) return;
     auto I = this->upd_to_parent(pa);
     auto cR = R.extract_rows(I);
     auto dchild = R1.cols();
@@ -361,8 +366,8 @@ namespace strumpack {
    int task_depth) {
     Sr.zero();
     Sc.zero();
-    const auto dsep = this->dim_sep();
-    const auto dupd = this->dim_upd();
+    const auto dsep = dim_sep();
+    const auto dupd = dim_upd();
     if (opts.indirect_sampling()) {
       auto rgen = random::make_random_generator<real_t>
         (opts.HSS_options().random_engine(),
@@ -375,12 +380,12 @@ namespace strumpack {
         for (integer_t c=0; c<d; c+=dd) {
           integer_t r = 0, cs = c + _sampled_columns;
           for (; r<dsep; r++) {
-            rgen->seed(std::uint32_t(r+this->sep_begin), std::uint32_t(cs));
+            rgen->seed(std::uint32_t(r+sep_begin_), std::uint32_t(cs));
             for (integer_t cc=c; cc<c+dd; cc++)
               Rr(r,cc) = Rc(r,cc) = rgen->get();
           }
           for (; r<m; r++) {
-            rgen->seed(std::uint32_t(this->upd[r-dsep]),
+            rgen->seed(std::uint32_t(this->upd_[r-dsep]),
                        std::uint32_t(cs));
             for (integer_t cc=c; cc<c+dd; cc++)
               Rr(r,cc) = Rc(r,cc) = rgen->get();
@@ -390,9 +395,9 @@ namespace strumpack {
         for (integer_t c=0; c<d; c++) {
           integer_t r = 0, cs = c + _sampled_columns;
           for (; r<dsep; r++)
-            Rr(r,c) = Rc(r,c) = rgen->get(r+this->sep_begin, cs);
+            Rr(r,c) = Rc(r,c) = rgen->get(r+sep_begin_, cs);
           for (; r<m; r++)
-            Rr(r,c) = Rc(r,c) = rgen->get(this->upd[r-dsep], cs);
+            Rr(r,c) = Rc(r,c) = rgen->get(this->upd_[r-dsep], cs);
         }
       }
       STRUMPACK_FLOPS(rgen->flops_per_prng()*d*m);
@@ -400,11 +405,11 @@ namespace strumpack {
     }
 
     A.front_multiply
-      (this->sep_begin, this->sep_end, this->upd, Rr, Sr, Sc, task_depth);
-    if (this->lchild)
-      this->lchild->sample_CB(opts, Rr, Sr, Sc, this, task_depth);
-    if (this->rchild)
-      this->rchild->sample_CB(opts, Rr, Sr, Sc, this, task_depth);
+      (sep_begin_, sep_end_, this->upd_, Rr, Sr, Sc, task_depth);
+    if (lchild_)
+      lchild_->sample_CB(opts, Rr, Sr, Sc, this, task_depth);
+    if (rchild_)
+      rchild_->sample_CB(opts, Rr, Sr, Sc, this, task_depth);
 
     if (opts.indirect_sampling() && etree_level != 0) {
       auto dold = R1.cols();
@@ -426,18 +431,18 @@ namespace strumpack {
     std::vector<std::size_t> gI, gJ;
     gI.reserve(I.size());
     gJ.reserve(J.size());
-    const auto dsep = this->dim_sep();
+    const auto dsep = dim_sep();
     for (auto i : I)
       gI.push_back
-        ((integer_t(i) < dsep) ? i+this->sep_begin : this->upd[i-dsep]);
+        ((integer_t(i) < dsep) ? i+sep_begin_ : this->upd_[i-dsep]);
     for (auto j : J)
       gJ.push_back
-        ((integer_t(j) < dsep) ? j+this->sep_begin : this->upd[j-dsep]);
-    A.extract_separator(this->sep_end, gI, gJ, B, task_depth);
-    if (this->lchild)
-      this->lchild->extract_CB_sub_matrix(gI, gJ, B, task_depth);
-    if (this->rchild)
-      this->rchild->extract_CB_sub_matrix(gI, gJ, B, task_depth);
+        ((integer_t(j) < dsep) ? j+sep_begin_ : this->upd_[j-dsep]);
+    A.extract_separator(sep_end_, gI, gJ, B, task_depth);
+    if (lchild_)
+      lchild_->extract_CB_sub_matrix(gI, gJ, B, task_depth);
+    if (rchild_)
+      rchild_->extract_CB_sub_matrix(gI, gJ, B, task_depth);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -446,23 +451,23 @@ namespace strumpack {
    int etree_level, int task_depth) {
     bool tasked = task_depth < params::task_recursion_cutoff_level;
     if (tasked) {
-      if (this->lchild)
+      if (lchild_)
 #pragma omp task default(shared)                                        \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->lchild->multifrontal_factorization
+        lchild_->multifrontal_factorization
           (A, opts, etree_level+1, task_depth+1);
-      if (this->rchild)
+      if (rchild_)
 #pragma omp task default(shared)                                        \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->rchild->multifrontal_factorization
+        rchild_->multifrontal_factorization
           (A, opts, etree_level+1, task_depth+1);
 #pragma omp taskwait
     } else {
-      if (this->lchild)
-        this->lchild->multifrontal_factorization
+      if (lchild_)
+        lchild_->multifrontal_factorization
           (A, opts, etree_level+1, task_depth);
-      if (this->rchild)
-        this->rchild->multifrontal_factorization
+      if (rchild_)
+        rchild_->multifrontal_factorization
           (A, opts, etree_level+1, task_depth);
     }
     _H.set_openmp_task_depth(task_depth);
@@ -476,17 +481,17 @@ namespace strumpack {
     };
     auto HSSopts = opts.HSS_options();
     int child_samples = 0;
-    if (this->lchild)
-      child_samples = this->lchild->random_samples();
-    if (this->rchild)
-      child_samples = std::max(child_samples, this->rchild->random_samples());
+    if (lchild_)
+      child_samples = lchild_->random_samples();
+    if (rchild_)
+      child_samples = std::max(child_samples, rchild_->random_samples());
     HSSopts.set_d0(std::max(child_samples - HSSopts.dd(), HSSopts.d0()));
     if (opts.indirect_sampling())
       HSSopts.set_user_defined_random(true);
     _H.compress(mult, elem, HSSopts);
-    if (this->lchild) this->lchild->release_work_memory();
-    if (this->rchild) this->rchild->release_work_memory();
-    if (this->dim_sep()) {
+    if (lchild_) lchild_->release_work_memory();
+    if (rchild_) rchild_->release_work_memory();
+    if (dim_sep()) {
       if (etree_level > 0) {
         _ULV = _H.partial_factor();
         _H.Schur_update(_ULV, _Theta, _DUB01, _Phi);
@@ -522,64 +527,23 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::fwd_solve_node
   (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const {
-    bool tasked = task_depth<params::task_recursion_cutoff_level;
-    DenseMW_t bupd(this->dim_upd(), b.cols(), work[0], 0, 0);
+    DenseMW_t bupd(dim_upd(), b.cols(), work[0], 0, 0);
     bupd.zero();
-    if (tasked) {
-      if (this->lchild)
-#pragma omp task untied default(shared)                                 \
-  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->lchild->forward_multifrontal_solve
-          (b, work+1, etree_level+1, task_depth+1);
-      if (this->rchild)
-#pragma omp task untied default(shared)                                 \
-  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        {
-          std::vector<DenseM_t> work2(this->rchild->levels());
-          for (auto& cb : work2)
-            cb = DenseM_t(this->rchild->max_dim_upd(), b.cols());
-          this->rchild->forward_multifrontal_solve
-            (b, work2.data(), etree_level+1, task_depth+1);
-          DenseMW_t CBch
-            (this->rchild->dim_upd(), b.cols(), work2[0], 0, 0);
-          this->extend_add_b(this->rchild, b, bupd, CBch);
-        }
-#pragma omp taskwait
-      if (this->lchild) {
-        DenseMW_t CBch
-          (this->lchild->dim_upd(), b.cols(), work[1], 0, 0);
-        this->extend_add_b(this->lchild, b, bupd, CBch);
-      }
-    } else {
-      if (this->lchild) {
-        this->lchild->forward_multifrontal_solve
-          (b, work+1, etree_level+1, task_depth);
-        DenseMW_t CBch
-          (this->lchild->dim_upd(), b.cols(), work[1], 0, 0);
-        this->extend_add_b(this->lchild, b, bupd, CBch);
-      }
-      if (this->rchild) {
-        this->rchild->forward_multifrontal_solve
-          (b, work+1, etree_level+1, task_depth);
-        DenseMW_t CBch
-          (this->rchild->dim_upd(), b.cols(), work[1], 0, 0);
-        this->extend_add_b(this->rchild, b, bupd, CBch);
-      }
-    }
+    this->fwd_solve_phase1(b, bupd, work, etree_level, task_depth);
     if (etree_level) {
       if (_Theta.cols() && _Phi.cols()) {
-        DenseMW_t bloc(this->dim_sep(), b.cols(), b, this->sep_begin, 0);
+        DenseMW_t bloc(dim_sep(), b.cols(), b, sep_begin_, 0);
         // TODO get rid of this!!!
         _ULVwork = std::unique_ptr<HSS::WorkSolve<scalar_t>>
           (new HSS::WorkSolve<scalar_t>());
         _H.child(0)->forward_solve(_ULV, *_ULVwork, bloc, true);
-        if (this->dim_upd())
+        if (dim_upd())
           gemm(Trans::N, Trans::N, scalar_t(-1.), _Theta,
                _ULVwork->reduced_rhs, scalar_t(1.), bupd, task_depth);
         _ULVwork->reduced_rhs.clear();
       }
     } else {
-      DenseMW_t bloc(this->dim_sep(), b.cols(), b, this->sep_begin, 0);
+      DenseMW_t bloc(dim_sep(), b.cols(), b, sep_begin_, 0);
       _ULVwork = std::unique_ptr<HSS::WorkSolve<scalar_t>>
         (new HSS::WorkSolve<scalar_t>());
       _H.forward_solve(_ULV, *_ULVwork, bloc, false);
@@ -599,74 +563,35 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::bwd_solve_node
   (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const {
-    DenseMW_t yupd(this->dim_upd(), y.cols(), work[0], 0, 0);
-    bool tasked = task_depth<params::task_recursion_cutoff_level;
+    DenseMW_t yupd(dim_upd(), y.cols(), work[0], 0, 0);
     if (etree_level) {
       if (_Phi.cols() && _Theta.cols()) {
-        if (this->dim_upd()) {
+        if (dim_upd()) {
           gemm(Trans::C, Trans::N, scalar_t(-1.), _Phi, yupd,
                scalar_t(1.), _ULVwork->x, task_depth);
         }
-        DenseMW_t yloc(this->dim_sep(), y.cols(), y, this->sep_begin, 0);
+        DenseMW_t yloc(dim_sep(), y.cols(), y, sep_begin_, 0);
         _H.child(0)->backward_solve(_ULV, *_ULVwork, yloc);
         _ULVwork.reset();
       }
     } else {
-      DenseMW_t yloc(this->dim_sep(), y.cols(), y, this->sep_begin, 0);
+      DenseMW_t yloc(dim_sep(), y.cols(), y, sep_begin_, 0);
       _H.backward_solve(_ULV, *_ULVwork, yloc);
     }
-    if (tasked) {
-      if (this->lchild) {
-#pragma omp task untied default(shared)                                 \
-  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        {
-          DenseMW_t CB(this->lchild->dim_upd(), y.cols(), work[1], 0, 0);
-          this->extract_b(this->lchild, y, yupd, CB);
-          this->lchild->backward_multifrontal_solve
-            (y, work+1, etree_level+1, task_depth+1);
-        }
-      }
-      if (this->rchild) {
-#pragma omp task untied default(shared)                                 \
-  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        {
-          std::vector<DenseM_t> work2(this->rchild->levels());
-          for (auto& cb : work2)
-            cb = DenseM_t(this->rchild->max_dim_upd(), y.cols());
-          DenseMW_t CB(this->rchild->dim_upd(), y.cols(), work2[0], 0, 0);
-          this->extract_b(this->rchild, y, yupd, CB);
-          this->rchild->backward_multifrontal_solve
-            (y, work2.data(), etree_level+1, task_depth+1);
-        }
-      }
-#pragma omp taskwait
-    } else {
-      if (this->lchild) {
-        DenseMW_t CB(this->lchild->dim_upd(), y.cols(), work[1], 0, 0);
-        this->extract_b(this->lchild, y, yupd, CB);
-        this->lchild->backward_multifrontal_solve
-          (y, work+1, etree_level+1, task_depth);
-      }
-      if (this->rchild) {
-        DenseMW_t CB(this->rchild->dim_upd(), y.cols(), work[1], 0, 0);
-        this->extract_b(this->rchild, y, yupd, CB);
-        this->rchild->backward_multifrontal_solve
-          (y, work+1, etree_level+1, task_depth);
-      }
-    }
+    this->bwd_solve_phase2(y, yupd, work, etree_level, task_depth);
   }
 
   template<typename scalar_t,typename integer_t> integer_t
   FrontalMatrixHSS<scalar_t,integer_t>::maximum_rank(int task_depth) const {
     integer_t r = _H.rank(), rl = 0, rr = 0;
-    if (this->lchild)
+    if (lchild_)
 #pragma omp task untied default(shared)                                 \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-      rl = this->lchild->maximum_rank(task_depth+1);
-    if (this->rchild)
+      rl = lchild_->maximum_rank(task_depth+1);
+    if (rchild_)
 #pragma omp task untied default(shared)                                 \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-      rr = this->rchild->maximum_rank(task_depth+1);
+      rr = rchild_->maximum_rank(task_depth+1);
 #pragma omp taskwait
     return std::max(r, std::max(rl, rr));
   }
@@ -674,8 +599,8 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::print_rank_statistics
   (std::ostream &out) const {
-    if (this->lchild) this->lchild->print_rank_statistics(out);
-    if (this->rchild) this->rchild->print_rank_statistics(out);
+    if (lchild_) lchild_->print_rank_statistics(out);
+    if (rchild_) rchild_->print_rank_statistics(out);
     out << "# HSSMatrix " << _H.rows() << "x" << _H.cols() << std::endl;
     _H.print_info(out);
   }
@@ -686,25 +611,25 @@ namespace strumpack {
       + _Phi.nonzeros() + _ThetaVhatC_or_VhatCPhiC.nonzeros();
   }
 
-  template<typename scalar_t,typename integer_t> long long
-  FrontalMatrixHSS<scalar_t,integer_t>::dense_node_factor_nonzeros() const {
-    long long dsep = this->dim_sep();
-    long long dupd = this->dim_upd();
-    return dsep * (dsep + 2 * dupd);
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHSS<scalar_t,integer_t>::draw_node
+  (std::ostream& of, bool is_root) const {
+    if (is_root) _H.draw(of, sep_begin_, sep_begin_);
+    else _H.child(0)->draw(of, sep_begin_, sep_begin_);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::set_HSS_partitioning
   (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
    bool is_root) {
-    assert(sep_tree.size == this->dim_sep());
+    assert(sep_tree.size == dim_sep());
     if (is_root)
       _H = HSS::HSSMatrix<scalar_t>(sep_tree, opts.HSS_options());
     else {
       HSS::HSSPartitionTree hss_tree(this->dim_blk());
       hss_tree.c.reserve(2);
       hss_tree.c.push_back(sep_tree);
-      hss_tree.c.emplace_back(this->dim_upd());
+      hss_tree.c.emplace_back(dim_upd());
       hss_tree.c.back().refine(opts.HSS_options().leaf_size());
       _H = HSS::HSSMatrix<scalar_t>(hss_tree, opts.HSS_options());
     }
@@ -714,21 +639,21 @@ namespace strumpack {
   FrontalMatrixHSS<scalar_t,integer_t>::bisection_partitioning
   (const SPOptions<scalar_t>& opts, integer_t* sorder,
    bool isroot, int task_depth) {
-    if (this->lchild)
+    if (lchild_)
 #pragma omp task default(shared)                        \
   if(task_depth < params::task_recursion_cutoff_level)
-      this->lchild->bisection_partitioning(opts, sorder, false, task_depth+1);
-    if (this->rchild)
+      lchild_->bisection_partitioning(opts, sorder, false, task_depth+1);
+    if (rchild_)
 #pragma omp task default(shared)                        \
   if(task_depth < params::task_recursion_cutoff_level)
-      this->rchild->bisection_partitioning(opts, sorder, false, task_depth+1);
+      rchild_->bisection_partitioning(opts, sorder, false, task_depth+1);
 #pragma omp taskwait
 
     std::cout << "TODO FrontalMatrixHSS::bisection_partitioning" << std::endl;
 
-    for (integer_t i=this->sep_begin; i<this->sep_end; i++)
+    for (integer_t i=sep_begin_; i<sep_end_; i++)
       sorder[i] = -i;
-    HSS::HSSPartitionTree sep_tree(this->dim_sep());
+    HSS::HSSPartitionTree sep_tree(dim_sep());
     sep_tree.refine(opts.HSS_options().leaf_size());
 
     // TODO this still needs to work when the sparse matrix is a
@@ -736,11 +661,11 @@ namespace strumpack {
     // if (this->dim_sep >= 2 * opts.HSS_options().leaf_size()) {
     //   integer_t nrparts = 0;
     //   split_separator(opts, sep_tree, nrparts, 0, 1, sorder);
-    //   auto count = this->sep_begin;
+    //   auto count = sep_begin_;
     //   for (integer_t part=0; part<nrparts; part++)
-    //          for (integer_t i=this->sep_begin; i<this->sep_end; i++)
+    //          for (integer_t i=sep_begin_; i<sep_end_; i++)
     //            if (sorder[i] == part) sorder[i] = -count++;
-    // } else for (integer_t i=this->sep_begin; i<this->sep_end; i++) sorder[i] = -i;
+    // } else for (integer_t i=sep_begin_; i<sep_end_; i++) sorder[i] = -i;
 
     if (isroot)
       _H = HSS::HSSMatrix<scalar_t>(sep_tree, opts.HSS_options());
@@ -748,7 +673,7 @@ namespace strumpack {
       HSS::HSSPartitionTree hss_tree(this->dim_blk());
       hss_tree.c.reserve(2);
       hss_tree.c.push_back(sep_tree);
-      hss_tree.c.emplace_back(this->dim_upd());
+      hss_tree.c.emplace_back(dim_upd());
       hss_tree.c.back().refine(opts.HSS_options().leaf_size());
       _H = HSS::HSSMatrix<scalar_t>(hss_tree, opts.HSS_options());
     }
@@ -773,7 +698,7 @@ namespace strumpack {
       exit(1);
     }
     hss_tree.c.resize(2);
-    for (integer_t i=this->sep_begin, j=0; i<this->sep_end; i++)
+    for (integer_t i=sep_begin_, j=0; i<sep_end_; i++)
       if (sorder[i] == part) {
         auto p = partitioning[j++];
         sorder[i] = -count - p;
@@ -785,7 +710,7 @@ namespace strumpack {
         split_separator
           (A, opts, hss_tree.c[p], nr_parts, -count-p, count+2, sorder);
       else std::replace
-             (sorder+this->sep_begin, sorder+this->sep_end,
+             (sorder+sep_begin_, sorder+sep_end_,
               -count-p, nr_parts++);
   }
 
@@ -795,33 +720,33 @@ namespace strumpack {
    std::vector<idx_t>& xadj, std::vector<idx_t>& adjncy, integer_t* sorder) {
     assert(opts.separator_ordering_level() == 0 ||
            opts.separator_ordering_level() == 1);
-    auto dsep = this->dim_sep();
+    auto dsep = dim_sep();
     auto mark = new bool[dsep];
     auto ind_to_part = new integer_t[dsep];
     integer_t nvtxs = 0;
     for (integer_t r=0; r<dsep; r++)
-      ind_to_part[r] = (sorder[r+this->sep_begin] == part) ? nvtxs++ : -1;
+      ind_to_part[r] = (sorder[r+sep_begin_] == part) ? nvtxs++ : -1;
     xadj.reserve(nvtxs+1);
     adjncy.reserve(5*nvtxs);
-    for (integer_t i=this->sep_begin, e=0; i<this->sep_end; i++) {
+    for (integer_t i=sep_begin_, e=0; i<sep_end_; i++) {
       if (sorder[i] == part) {
         xadj.push_back(e);
         std::fill(mark, mark+dsep, false);
-        for (integer_t j=A.get_ptr()[i];
-             j<A.get_ptr()[i+1]; j++) {
-          auto c = A.get_ind()[j];
+        for (integer_t j=A.ptr(i);
+             j<A.ptr(i+1); j++) {
+          auto c = A.ind(j);
           if (c == i) continue;
-          auto lc = c - this->sep_begin;
+          auto lc = c - sep_begin_;
           if (lc >= 0 && lc < dsep && sorder[c]==part && !mark[lc]) {
             mark[lc] = true;
             adjncy.push_back(ind_to_part[lc]);
             e++;
           } else {
             if (opts.separator_ordering_level() > 0) {
-              for (integer_t k=A.get_ptr()[c];
-                   k<A.get_ptr()[c+1]; k++) {
-                auto cc = A.get_ind()[k];
-                auto lcc = cc - this->sep_begin;
+              for (integer_t k=A.ptr(c);
+                   k<A.ptr(c+1); k++) {
+                auto cc = A.ind(k);
+                auto lcc = cc - sep_begin_;
                 if (cc!=i && lcc >= 0 && lcc < dsep &&
                     sorder[cc]==part && !mark[lcc]) {
                   mark[lcc] = true;

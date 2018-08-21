@@ -92,18 +92,17 @@ namespace strumpack {
     integer_t nnz_loc = 0;
     integer_t irow, jcol, lirow, ljcol;
     for (integer_t i=0; i<m_loc; ++i) {
-      for (integer_t j=A.get_ptr()[i]; j<A.get_ptr()[i+1]; ++j) {
+      for (integer_t j=A.ptr(i); j<A.ptr(i+1); ++j) {
         if (perm != NULL) {
           irow = perm[i+fst_row];      // Row number in P*A*P^T
-          jcol = perm[A.get_ind()[j]]; // Column number in P*A*P^T
+          jcol = perm[A.ind(j)]; // Column number in P*A*P^T
         } else {
           irow = i+fst_row;
-          jcol = A.get_ind()[j];
+          jcol = A.ind(j);
         }
         int p = Adcsc.Owner(n, n, irow, jcol, lirow, ljcol);
         ++nnz_loc;
-        data[p].push_back
-          (std::make_tuple(lirow, ljcol, std::real(A.get_val()[j])));
+        data[p].push_back(std::make_tuple(lirow, ljcol, std::real(A.val(j))));
       }
     }
 

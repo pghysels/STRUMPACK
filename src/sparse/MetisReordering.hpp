@@ -123,13 +123,13 @@ namespace strumpack {
         s0 = parent(pos, 2 * v + 2);
         s1 = parent(pos + s0, 2 * v + 1);
         root = pos + s0 + s1;
-        sep_tree->pa()[pos + s0 - 1] = root;
-        sep_tree->pa()[pos + s0 + s1 - 1] = root;
+        sep_tree->pa(pos + s0 - 1) = root;
+        sep_tree->pa(pos + s0 + s1 - 1) = root;
       } else std::tie(s0, s1) = std::make_tuple(0, 0);
       return s0 + s1 + 1;
     };
     parent(0, 0);
-    sep_tree->pa()[nodes - 1] = -1;
+    sep_tree->pa(nodes - 1) = -1;
 
     // Generates the children positions of all the nodes in
     // a subtree and returns the number of nodes in that
@@ -142,12 +142,12 @@ namespace strumpack {
         s0 = children(pos, 2 * v + 2);
         s1 = children(pos + s0, 2 * v + 1);
         root = pos + s0 + s1;
-        sep_tree->lch()[root] = pos + s0 - 1;
-        sep_tree->rch()[root] = pos + s0 + s1 - 1;
+        sep_tree->lch(root) = pos + s0 - 1;
+        sep_tree->rch(root) = pos + s0 + s1 - 1;
       } else {
         std::tie(s0, s1) = std::make_tuple(0, 0);
-        sep_tree->lch()[pos] = -1;
-        sep_tree->rch()[pos] = -1;
+        sep_tree->lch(pos) = -1;
+        sep_tree->rch(pos) = -1;
       }
       return s0 + s1 + 1;
     };
@@ -169,12 +169,12 @@ namespace strumpack {
         std::tie(s0, s1) = std::make_pair(0, 0);
         std::tie(q0, q1) = std::make_pair(0, 0);
       }
-      sep_tree->sizes()[pos + s0 + s1] = offs + q0 + q1;
+      sep_tree->sizes(pos + s0 + s1) = offs + q0 + q1;
       return std::make_pair(s0 + s1 + 1, q0 + q1 + sizes[nodes - (v + 1)]);
     };
     integer_t vertices;
     std::tie(std::ignore, vertices) = offset(0, 0, 0);
-    sep_tree->sizes()[nodes] = vertices;
+    sep_tree->sizes(nodes) = vertices;
     return sep_tree;
   }
 
@@ -185,8 +185,8 @@ namespace strumpack {
                           integer_t* perm, integer_t* iperm,
                           const SPOptions<scalar_t>& opts) {
     auto n = A->size();
-    auto ptr = A->get_ptr();
-    auto ind = A->get_ind();
+    auto ptr = A->ptr();
+    auto ind = A->ind();
     auto xadj = new idx_t[n+1 + ptr[n]];
     auto adjncy = xadj + n+1;
     integer_t e = 0;

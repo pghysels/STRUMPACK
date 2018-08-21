@@ -55,13 +55,6 @@ namespace strumpack {
     CSRMatrix
     (integer_t n, const integer_t* ptr, const integer_t* ind,
      const scalar_t* values, bool symm_sparsity=false);
-    CSRMatrix(const CSRMatrix<scalar_t,integer_t>& A);
-    CSRMatrix(CSRMatrix<scalar_t,integer_t>&& A);
-    CSRMatrix(const CSCMatrix<scalar_t,integer_t>& A);
-    CSRMatrix<scalar_t,integer_t>& operator=
-    (const CSRMatrix<scalar_t,integer_t>& A);
-    CSRMatrix<scalar_t,integer_t>& operator=
-    (CSRMatrix<scalar_t,integer_t>&& A);
 
     void spmv(const DenseM_t& x, DenseM_t& y) const override;
     void omp_spmv(const DenseM_t& x, DenseM_t& y) const override;
@@ -117,6 +110,13 @@ namespace strumpack {
     (integer_t sep_begin, integer_t sep_end,
      const std::vector<integer_t>& upd, const DistM_t& R,
      DistM_t& Srow, DistM_t& Scol, int depth) const override;
+
+    using CompressedSparseMatrix<scalar_t,integer_t>::n_;
+    using CompressedSparseMatrix<scalar_t,integer_t>::nnz_;
+    using CompressedSparseMatrix<scalar_t,integer_t>::ptr_;
+    using CompressedSparseMatrix<scalar_t,integer_t>::ind_;
+    using CompressedSparseMatrix<scalar_t,integer_t>::val_;
+    using CompressedSparseMatrix<scalar_t,integer_t>::symm_sparse_;
   };
 
   template<typename scalar_t,typename integer_t>
@@ -134,66 +134,18 @@ namespace strumpack {
   CSRMatrix<scalar_t,integer_t>::CSRMatrix(integer_t n, integer_t nnz)
     : CompressedSparseMatrix<scalar_t,integer_t>(n, nnz) {}
 
-  template<typename scalar_t,typename integer_t>
-  CSRMatrix<scalar_t,integer_t>::CSRMatrix
-  (const CSRMatrix<scalar_t,integer_t>& A)
-    : CompressedSparseMatrix<scalar_t,integer_t>(A) {
-  }
-
-  template<typename scalar_t,typename integer_t>
-  CSRMatrix<scalar_t,integer_t>::CSRMatrix
-  (CSRMatrix<scalar_t,integer_t>&& A)
-    : CompressedSparseMatrix<scalar_t,integer_t>(std::move(A)) {
-  }
-
-  template<typename scalar_t,typename integer_t>
-  CSRMatrix<scalar_t,integer_t>::CSRMatrix
-  (const CSCMatrix<scalar_t,integer_t>& A)
-    : CompressedSparseMatrix<scalar_t,integer_t>
-    (A.size(), A.nnz(), A.symm_sparse()) {
-    std::vector<integer_t> rowsums(this->_n, 0);
-    for (integer_t col=0; col<this->_n; col++)
-      for (integer_t i=A.get_ptr()[col]; i<A.get_ptr()[col+1]; i++)
-        rowsums[A.get_ind()[i]]++;
-    this->_ptr[0] = 0;
-    for (integer_t r=0; r<this->_n; r++)
-      this->_ptr[r+1] = this->_ptr[r] + rowsums[r];
-    std::fill(rowsums.begin(), rowsums.end(), 0);
-    for (integer_t col=0; col<this->_n; col++) {
-      for (integer_t i=A.get_ptr()[col]; i<A.get_ptr()[col+1]; i++) {
-        integer_t row = A.get_ind()[i];
-        integer_t j = this->_ptr[row] + rowsums[row]++;
-        this->_val[j] = A.get_val()[i];
-        this->_ind[j] = col;
-      }
-    }
-  }
-
-  template<typename scalar_t,typename integer_t>
-  CSRMatrix<scalar_t,integer_t>& CSRMatrix<scalar_t,integer_t>::operator=
-  (const CSRMatrix<scalar_t,integer_t>& A) {
-    CompressedSparseMatrix<scalar_t,integer_t>::operator=(A);
-    return *this;
-  }
-
-  template<typename scalar_t,typename integer_t>
-  CSRMatrix<scalar_t,integer_t>& CSRMatrix<scalar_t,integer_t>::operator=
-  (CSRMatrix<scalar_t,integer_t>&& A) {
-    CompressedSparseMatrix<scalar_t,integer_t>::operator=(std::move(A));
-    return *this;
-  }
 
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::print_dense(const std::string& name) const {
-    auto M = new scalar_t[this->_n * this->_n];
-    std::fill(M, M+(this->_n*this->_n), scalar_t(0.));
-    for (integer_t row=0; row<this->_n; row++)
-      for (integer_t j=this->_ptr[row]; j<this->_ptr[row+1]; j++)
-        M[row + this->_ind[j]*this->_n] = this->_val[j];
+    auto M = new scalar_t[n_ * n_];
+    std::fill(M, M+(n_*n_), scalar_t(0.));
+    for (integer_t row=0; row<n_; row++)
+      for (integer_t j=ptr_[row]; j<ptr_[row+1]; j++)
+        M[row + ind_[j]*n_] = val_[j];
     std::cout << name << " = [";
-    for (integer_t row=0; row<this->_n; row++) {
-      for (integer_t col=0; col<this->_n; col++)
-        std::cout << M[row + this->_n * col] << " ";
+    for (integer_t row=0; row<n_; row++) {
+      for (integer_t col=0; col<n_; col++)
+        std::cout << M[row + n_ * col] << " ";
       std::cout << ";" << std::endl;
     }
     std::cout << "];" << std::endl;
@@ -208,19 +160,19 @@ namespace strumpack {
       fs << "%%MatrixMarket matrix coordinate complex general\n";
     else
       fs << "%%MatrixMarket matrix coordinate real general\n";
-    fs << this->_n << " " << this->_n << " " << this->_nnz << "\n";
+    fs << n_ << " " << n_ << " " << nnz_ << "\n";
     fs.precision(17);
     if (is_complex<scalar_t>()) {
-      for (integer_t row=0; row<this->_n; row++)
-        for (integer_t j=this->_ptr[row]; j<this->_ptr[row+1]; j++)
-          fs << row+1 << " " << this->_ind[j]+1 << " "
-             << std::real(this->_val[j]) << " "
-             << std::imag(this->_val[j]) << "\n";
+      for (integer_t row=0; row<n_; row++)
+        for (integer_t j=ptr_[row]; j<ptr_[row+1]; j++)
+          fs << row+1 << " " << ind_[j]+1 << " "
+             << std::real(val_[j]) << " "
+             << std::imag(val_[j]) << "\n";
     } else {
-      for (integer_t row=0; row<this->_n; row++)
-        for (integer_t j=this->_ptr[row]; j<this->_ptr[row+1]; j++)
-          fs << row+1 << " " << this->_ind[j]+1 << " "
-             << this->_val[j] << "\n";
+      for (integer_t row=0; row<n_; row++)
+        for (integer_t j=ptr_[row]; j<ptr_[row+1]; j++)
+          fs << row+1 << " " << ind_[j]+1 << " "
+             << val_[j] << "\n";
     }
   }
 
@@ -241,16 +193,16 @@ namespace strumpack {
       else if (std::is_same<real_t,double>()) s = 'd';
     }
     fs.write(&s, sizeof(char));
-    fs.write((char*)&this->_n, sizeof(integer_t));
-    fs.write((char*)&this->_n, sizeof(integer_t));
-    fs.write((char*)&this->_nnz, sizeof(integer_t));
+    fs.write((char*)&n_, sizeof(integer_t));
+    fs.write((char*)&n_, sizeof(integer_t));
+    fs.write((char*)&nnz_, sizeof(integer_t));
 
-    for (integer_t i=0; i<this->_n+1; i++)
-      fs.write((char*)(&this->_ptr[i]), sizeof(integer_t));
-    for (integer_t i=0; i<this->_nnz; i++)
-      fs.write((char*)(&this->_ind[i]), sizeof(integer_t));
-    for (integer_t i=0; i<this->_nnz; i++)
-      fs.write((char*)(&(this->_val[i])), sizeof(scalar_t));
+    for (integer_t i=0; i<n_+1; i++)
+      fs.write((char*)(&ptr_[i]), sizeof(integer_t));
+    for (integer_t i=0; i<nnz_; i++)
+      fs.write((char*)(&ind_[i]), sizeof(integer_t));
+    for (integer_t i=0; i<nnz_; i++)
+      fs.write((char*)(&(val_[i])), sizeof(scalar_t));
 
     if (!fs.good()) {
       std::cout << "Error writing to file !!" << std::endl;
@@ -289,23 +241,23 @@ namespace strumpack {
         " input matrix is of type " << s << std::endl;
       return 1;//throw "Error: scalar type of input matrix does not match";
     }
-    fs.read((char*)&this->_n, sizeof(integer_t));
-    fs.read((char*)&this->_n, sizeof(integer_t));
-    fs.read((char*)&this->_nnz, sizeof(integer_t));
+    fs.read((char*)&n_, sizeof(integer_t));
+    fs.read((char*)&n_, sizeof(integer_t));
+    fs.read((char*)&nnz_, sizeof(integer_t));
     std::cout << "# Reading matrix with n="
-              << number_format_with_commas(this->_n)
-              << ", nnz=" << number_format_with_commas(this->_nnz)
+              << number_format_with_commas(n_)
+              << ", nnz=" << number_format_with_commas(nnz_)
               << std::endl;
-    this->_symm_sparse = false;
-    this->_ptr = new integer_t[this->_n+1];
-    this->_ind = new integer_t[this->_nnz];
-    this->_val = new scalar_t[this->_nnz];
-    for (integer_t i=0; i<this->_n+1; i++)
-      fs.read((char*)(&this->_ptr[i]), sizeof(integer_t));
-    for (integer_t i=0; i<this->_nnz; i++)
-      fs.read((char*)(&this->_ind[i]), sizeof(integer_t));
-    for (integer_t i=0; i<this->_nnz; i++)
-      fs.read((char*)(&this->_val[i]), sizeof(scalar_t));
+    symm_sparse_ = false;
+    ptr_.resize(n_+1);
+    ind_.resize(nnz_);
+    val_.resize(nnz_);
+    for (integer_t i=0; i<n_+1; i++)
+      fs.read((char*)(&ptr_[i]), sizeof(integer_t));
+    for (integer_t i=0; i<nnz_; i++)
+      fs.read((char*)(&ind_[i]), sizeof(integer_t));
+    for (integer_t i=0; i<nnz_; i++)
+      fs.read((char*)(&val_[i]), sizeof(scalar_t));
     fs.close();
     return 0;
   }
@@ -325,27 +277,27 @@ namespace strumpack {
 #if defined(__INTEL_MKL__)
   template<> void CSRMatrix<float>::spmv(const float* x, float* y) const {
     char trans = 'N';
-    mkl_cspblas_scsrgemv(&no, &n, this->_val, this->_ptr, this->_ind, x, y);
+    mkl_cspblas_scsrgemv(&no, &n, val_, ptr_, ind_, x, y);
     STRUMPACK_FLOPS(this->spmv_flops());
     STRUMPACK_BYTES(this->spmv_bytes());
   }
   template<> void CSRMatrix<double>::spmv(const double* x, double* y) const {
     char trans = 'N';
-    mkl_cspblas_dcsrgemv(&no, &n, this->_val, this->_ptr, this->_ind, x, y);
+    mkl_cspblas_dcsrgemv(&no, &n, val_, ptr_, ind_, x, y);
     STRUMPACK_FLOPS(this->spmv_flops());
     STRUMPACK_BYTES(this->spmv_bytes());
   }
   template<> void CSRMatrix<std::complex<float>>::spmv
   (const std::complex<float>* x, std::complex<float>* y) const {
     char trans = 'N';
-    mkl_cspblas_ccsrgemv(&no, &n, this->_val, this->_ptr, this->_ind, x, y);
+    mkl_cspblas_ccsrgemv(&no, &n, val_, ptr_, ind_, x, y);
     STRUMPACK_FLOPS(this->spmv_flops());
     STRUMPACK_BYTES(this->spmv_bytes());
   }
   template<> void CSRMatrix<std::complex<double>>::spmv
   (const std::complex<double>* x, std::complex<double>* y) const {
     char trans = 'N';
-    mkl_cspblas_zcsrgemv(&no, &n, this->_val, this->_ptr, this->_ind, x, y);
+    mkl_cspblas_zcsrgemv(&no, &n, val_, ptr_, ind_, x, y);
     STRUMPACK_FLOPS(this->spmv_flops());
     STRUMPACK_BYTES(this->spmv_bytes());
   }
@@ -355,11 +307,11 @@ namespace strumpack {
   CSRMatrix<scalar_t,integer_t>::omp_spmv
   (const scalar_t* x, scalar_t* y) const {
 #pragma omp parallel for
-    for (integer_t r=0; r<this->_n; r++) {
-      const auto hij = this->_ptr[r+1];
+    for (integer_t r=0; r<n_; r++) {
+      const auto hij = ptr_[r+1];
       scalar_t yr(0);
-      for (integer_t j=this->_ptr[r]; j<hij; j++)
-        yr += this->_val[j] * x[this->_ind[j]];
+      for (integer_t j=ptr_[r]; j<hij; j++)
+        yr += val_[j] * x[ind_[j]];
       y[r] = yr;
     }
     STRUMPACK_FLOPS(this->spmv_flops());
@@ -370,8 +322,8 @@ namespace strumpack {
   CSRMatrix<scalar_t,integer_t>::omp_spmv
   (const DenseM_t& x, DenseM_t& y) const {
     assert(x.cols() == y.cols());
-    assert(x.rows() == std::size_t(this->_n));
-    assert(y.rows() == std::size_t(this->_n));
+    assert(x.rows() == std::size_t(n_));
+    assert(y.rows() == std::size_t(n_));
     for (std::size_t c=0; c<x.cols(); c++)
       omp_spmv(x.ptr(0,c), y.ptr(0,c));
   }
@@ -380,8 +332,8 @@ namespace strumpack {
   CSRMatrix<scalar_t,integer_t>::strumpack_mc64
   (int_t job, int_t* num, integer_t* perm, int_t liw, int_t* iw, int_t ldw,
    double* dw, int_t* icntl, int_t* info) {
-    int_t n = this->_n;
-    int_t nnz = this->_nnz;
+    int_t n = n_;
+    int_t nnz = nnz_;
     double* dval = new double[nnz];
     int_t* col_ptr = new int_t[n+1+nnz+n+n];
     int_t* row_ind = col_ptr + n + 1;
@@ -389,18 +341,18 @@ namespace strumpack {
     int_t* rowsums = permutation + n;
     for (int_t i=0; i<n; i++) rowsums[i] = 0;
     for (int_t col=0; col<n; col++)
-      for (int_t i=this->_ptr[col]; i<this->_ptr[col+1]; i++)
-        rowsums[this->_ind[i]]++;
+      for (int_t i=ptr_[col]; i<ptr_[col+1]; i++)
+        rowsums[ind_[i]]++;
     col_ptr[0] = 1;  // start from 1, because mc64 is fortran!
     for (int_t r=0; r<n; r++) col_ptr[r+1] = col_ptr[r] + rowsums[r];
     for (int_t i=0; i<n; i++) rowsums[i] = 0;
     for (int_t col=0; col<n; col++) {
-      for (int_t i=this->_ptr[col]; i<this->_ptr[col+1]; i++) {
-        int_t row = this->_ind[i];
+      for (int_t i=ptr_[col]; i<ptr_[col+1]; i++) {
+        int_t row = ind_[i];
         int_t j = col_ptr[row] - 1 + rowsums[row]++;
         if (is_complex<scalar_t>())
-          dval[j] = static_cast<double>(std::abs(this->_val[i]));
-        else dval[j] = static_cast<double>(std::real(this->_val[i]));
+          dval[j] = static_cast<double>(std::abs(val_[i]));
+        else dval[j] = static_cast<double>(std::real(val_[i]));
         row_ind[j] = col + 1;
       }
     }
@@ -423,16 +375,16 @@ namespace strumpack {
     for (integer_t i=0; i<m; i++) {
       integer_t r = I[i];
       // indices sorted in increasing order
-      auto cmin = this->_ind[this->_ptr[r]];
-      auto cmax = this->_ind[this->_ptr[r+1]-1];
+      auto cmin = ind_[ptr_[r]];
+      auto cmax = ind_[ptr_[r+1]-1];
       for (integer_t k=0; k<n; k++) {
         integer_t c = J[k];
         if (c >= cmin && c <= cmax && (r < sep_end || c < sep_end)) {
-          auto a_pos = this->_ptr[r];
-          auto a_max = this->_ptr[r+1];
-          while (a_pos < a_max-1 && this->_ind[a_pos] < c) a_pos++;
-          B(i,k) = (this->_ind[a_pos] == c) ?
-            this->_val[a_pos] : scalar_t(0.);
+          auto a_pos = ptr_[r];
+          auto a_max = ptr_[r+1];
+          while (a_pos < a_max-1 && ind_[a_pos] < c) a_pos++;
+          B(i,k) = (ind_[a_pos] == c) ?
+            val_[a_pos] : scalar_t(0.);
         } else B(i,k) = scalar_t(0.);
       }
     }
@@ -450,15 +402,15 @@ namespace strumpack {
     for (integer_t i=0; i<m; i++) {
       integer_t r = I[i];
       // indices sorted in increasing order
-      auto cmin = this->_ind[this->_ptr[r]];
-      auto cmax = this->_ind[this->_ptr[r+1]-1];
+      auto cmin = ind_[ptr_[r]];
+      auto cmax = ind_[ptr_[r+1]-1];
       for (integer_t k=0; k<n; k++) {
         integer_t c = J[k];
         if (c >= cmin && c <= cmax && (r < sep_end || c < sep_end)) {
-          auto a_pos = this->_ptr[r];
-          auto a_max = this->_ptr[r+1]-1;
-          while (a_pos<a_max && this->_ind[a_pos]<c) a_pos++;
-          if (this->_ind[a_pos] == c) B.global(i, k, this->_val[a_pos]);
+          auto a_pos = ptr_[r];
+          auto a_max = ptr_[r+1]-1;
+          while (a_pos<a_max && ind_[a_pos]<c) a_pos++;
+          if (ind_[a_pos] == c) B.global(i, k, val_[a_pos]);
         }
       }
     }
@@ -485,17 +437,17 @@ namespace strumpack {
       auto n = R_bc.cols();
       for (integer_t row=sep_begin; row<sep_end; row++) { // separator rows
         auto upd_ptr = 0;
-        auto hij = this->_ptr[row+1];
-        for (integer_t j=this->_ptr[row]; j<hij; j++) {
-          auto col = this->_ind[j];
+        auto hij = ptr_[row+1];
+        for (integer_t j=ptr_[row]; j<hij; j++) {
+          auto col = ind_[j];
           if (col >= sep_begin) {
             if (col < sep_end) {
               scalapack::pgeadd
-                ('N', 1, n, this->_val[j], R_bc.data(), col-sep_begin+1, 1,
+                ('N', 1, n, val_[j], R_bc.data(), col-sep_begin+1, 1,
                  R_bc.desc(), scalar_t(1.), Srow_bc.data(), row-sep_begin+1,
                  1, Srow_bc.desc());
               scalapack::pgeadd
-                ('N', 1, n, this->_val[j], R_bc.data(), row-sep_begin+1, 1,
+                ('N', 1, n, val_[j], R_bc.data(), row-sep_begin+1, 1,
                  R_bc.desc(), scalar_t(1.), Scol_bc.data(), col-sep_begin+1,
                  1, Scol_bc.desc());
               local_flops += 4 * n;
@@ -504,11 +456,11 @@ namespace strumpack {
               if (upd_ptr == dim_upd) break;
               if (upd[upd_ptr] == col) {
                 scalapack::pgeadd
-                  ('N', 1, n, this->_val[j], R_bc.data(), dim_sep+upd_ptr+1,
+                  ('N', 1, n, val_[j], R_bc.data(), dim_sep+upd_ptr+1,
                    1, R_bc.desc(), scalar_t(1.), Srow_bc.data(),
                    row-sep_begin+1, 1, Srow_bc.desc());
                 scalapack::pgeadd
-                             ('N', 1, n, this->_val[j], R_bc.data(),
+                             ('N', 1, n, val_[j], R_bc.data(),
                               row-sep_begin+1, 1, R_bc.desc(), scalar_t(1.),
                               Scol_bc.data(), dim_sep+upd_ptr+1, 1,
                               Scol_bc.desc());
@@ -520,17 +472,17 @@ namespace strumpack {
       }
       for (integer_t i=0; i<dim_upd; i++) { // remaining rows
         integer_t row = upd[i];
-        auto hij = this->_ptr[row+1];
-        for (integer_t j=this->_ptr[row]; j<hij; j++) {
-          integer_t col = this->_ind[j];
+        auto hij = ptr_[row+1];
+        for (integer_t j=ptr_[row]; j<hij; j++) {
+          integer_t col = ind_[j];
           if (col >= sep_begin) {
             if (col < sep_end) {
               scalapack::pgeadd
-                ('N', 1, n, this->_val[j], R_bc.data(), col-sep_begin+1, 1,
+                ('N', 1, n, val_[j], R_bc.data(), col-sep_begin+1, 1,
                  R_bc.desc(), scalar_t(1.), Srow_bc.data(), dim_sep+i+1,
                  1, Srow_bc.desc());
               scalapack::pgeadd
-                ('N', 1, n, this->_val[j], R_bc.data(), dim_sep+i+1, 1,
+                ('N', 1, n, val_[j], R_bc.data(), dim_sep+i+1, 1,
                  R_bc.desc(), scalar_t(1.), Scol_bc.data(), col-sep_begin+1,
                  1, Scol_bc.desc());
               local_flops += 4 * n;
@@ -557,31 +509,31 @@ namespace strumpack {
     integer_t dim_upd = upd.size();
     for (integer_t row=0; row<dim_sep; row++) { // separator rows
       integer_t upd_ptr = 0;
-      const auto hij = this->_ptr[row+sep_begin+1];
-      for (integer_t j=this->_ptr[row+sep_begin];
+      const auto hij = ptr_[row+sep_begin+1];
+      for (integer_t j=ptr_[row+sep_begin];
            j<hij; j++) {
-        integer_t col = this->_ind[j];
+        integer_t col = ind_[j];
         if (col >= sep_begin) {
           if (col < sep_end)
-            F11(row, col-sep_begin) = this->_val[j];
+            F11(row, col-sep_begin) = val_[j];
           else {
             while (upd_ptr<dim_upd && upd[upd_ptr]<col)
               upd_ptr++;
             if (upd_ptr == dim_upd) break;
             if (upd[upd_ptr] == col)
-              F12(row, upd_ptr) = this->_val[j];
+              F12(row, upd_ptr) = val_[j];
           }
         }
       }
     }
     for (integer_t i=0; i<dim_upd; i++) { // update rows
       auto row = upd[i];
-      const auto hij = this->_ptr[row+1];
-      for (integer_t j=this->_ptr[row]; j<hij; j++) {
-        integer_t col = this->_ind[j];
+      const auto hij = ptr_[row+1];
+      for (integer_t j=ptr_[row]; j<hij; j++) {
+        integer_t col = ind_[j];
         if (col >= sep_begin) {
           if (col < sep_end)
-            F21(i, col-sep_begin) = this->_val[j];
+            F21(i, col-sep_begin) = val_[j];
           else break;
         }
       }
@@ -603,12 +555,12 @@ namespace strumpack {
     for (integer_t c=0; c<nbvec; c+=B) {
       for (auto row=slo; row<shi; row++) { // separator rows
         integer_t upd_ptr = 0;
-        const auto hij = this->_ptr[row+1];
-        for (auto j=this->_ptr[row]; j<hij; j++) {
-          const auto col = this->_ind[j];
+        const auto hij = ptr_[row+1];
+        for (auto j=ptr_[row]; j<hij; j++) {
+          const auto col = ind_[j];
           if (col >= slo) {
             const auto hicc = std::min(c+B, nbvec);
-            const auto vj = this->_val[j];
+            const auto vj = val_[j];
             if (col < shi) {
               for (integer_t cc=c; cc<hicc; cc++) {
                 Sr(row-slo, cc) += vj * R(col-slo, cc);
@@ -636,12 +588,12 @@ namespace strumpack {
     for (integer_t c=0; c<nbvec; c+=B) {
       for (integer_t i=0; i<dupd; i++) { // remaining rows
         auto row = upd[i];
-        const auto hij = this->_ptr[row+1];
-        for (auto j=this->_ptr[row]; j<hij; j++) {
-          auto col = this->_ind[j];
+        const auto hij = ptr_[row+1];
+        for (auto j=ptr_[row]; j<hij; j++) {
+          auto col = ind_[j];
           if (col >= slo) {
             if (col < shi) {
-              const auto vj = this->_val[j];
+              const auto vj = val_[j];
               const auto hicc = std::min(c+B, nbvec);
               for (integer_t cc=c; cc<hicc; cc++) {
                 Sr(ds+i, cc) += vj * R(col-slo, cc);
@@ -662,9 +614,9 @@ namespace strumpack {
   CSRMatrix<scalar_t,integer_t>::apply_scaling
   (const std::vector<scalar_t>& Dr, const std::vector<scalar_t>& Dc) {
 #pragma omp parallel for
-    for (integer_t j=0; j<this->_n; j++)
-      for (integer_t i=this->_ptr[j]; i<this->_ptr[j+1]; i++)
-        this->_val[i] = this->_val[i] * Dr[j] * Dc[this->_ind[i]];
+    for (integer_t j=0; j<n_; j++)
+      for (integer_t i=ptr_[j]; i<ptr_[j+1]; i++)
+        val_[i] = val_[i] * Dr[j] * Dc[ind_[i]];
     STRUMPACK_FLOPS
       ((is_complex<scalar_t>()?6:1)*
        static_cast<long long int>(2.*double(this->nnz())));
@@ -673,15 +625,15 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::apply_column_permutation
   (const std::vector<integer_t>& perm) {
-    integer_t* iperm = new integer_t[this->_n];
-    for (integer_t i=0; i<this->_n; i++) iperm[perm[i]] = i;
+    integer_t* iperm = new integer_t[n_];
+    for (integer_t i=0; i<n_; i++) iperm[perm[i]] = i;
 #pragma omp parallel for
-    for (integer_t row=0; row<this->_n; row++) {
-      for (integer_t i=this->_ptr[row]; i<this->_ptr[row+1]; i++)
-        this->_ind[i] = iperm[this->_ind[i]];
+    for (integer_t row=0; row<n_; row++) {
+      for (integer_t i=ptr_[row]; i<ptr_[row+1]; i++)
+        ind_[i] = iperm[ind_[i]];
       sort_indices_values<scalar_t>
-        (&this->_ind[this->_ptr[row]], &this->_val[this->_ptr[row]],
-         integer_t(0), this->_ptr[row+1]-this->_ptr[row]);
+        (&ind_[ptr_[row]], &val_[ptr_[row]],
+         integer_t(0), ptr_[row+1]-ptr_[row]);
     }
     delete[] iperm;
   }
@@ -702,20 +654,20 @@ namespace strumpack {
           std::make_tuple(std::get<0>(b), std::get<1>(b));
       });
 
-    this->_ptr = new integer_t[this->_n+1];
-    this->_ind = new integer_t[this->_nnz];
-    this->_val = new scalar_t[this->_nnz];
+    ptr_.resize(n_+1);
+    ind_.resize(nnz_);
+    val_.resize(nnz_);
     integer_t row = -1;
-    for (integer_t i=0; i<this->_nnz; i++) {
-      this->_val[i] = std::get<2>(A[i]);
-      this->_ind[i] = std::get<1>(A[i]);
+    for (integer_t i=0; i<nnz_; i++) {
+      val_[i] = std::get<2>(A[i]);
+      ind_[i] = std::get<1>(A[i]);
       auto new_row = std::get<0>(A[i]);
       if (new_row != row) {
-        for (int j=row+1; j<=new_row; j++) this->_ptr[j] = i;
+        for (int j=row+1; j<=new_row; j++) ptr_[j] = i;
         row = new_row;
       }
     }
-    for (int j=row+1; j<=this->_n; j++) this->_ptr[j] = this->_nnz;
+    for (int j=row+1; j<=n_; j++) ptr_[j] = nnz_;
     return 0;
   }
 
@@ -723,15 +675,15 @@ namespace strumpack {
   CSRMatrix<scalar_t,integer_t>::extract_F11_block
   (scalar_t* F, integer_t ldF, integer_t row, integer_t nr_rows,
    integer_t col, integer_t nr_cols) const {
-    const auto rhi = std::min(row+nr_rows, this->_n);
+    const auto rhi = std::min(row+nr_rows, n_);
     for (integer_t r=row; r<rhi; r++) {
-      auto j = this->_ptr[r];
-      const auto hij = this->_ptr[r+1];
-      while (j<hij && this->_ind[j] < col) j++;
+      auto j = ptr_[r];
+      const auto hij = ptr_[r+1];
+      while (j<hij && ind_[j] < col) j++;
       for ( ; j<hij; j++) {
-        integer_t c = this->_ind[j];
+        integer_t c = ind_[j];
         if (c < col+nr_cols)
-          F[r-row + (c-col)*ldF] = this->_val[j];
+          F[r-row + (c-col)*ldF] = val_[j];
         else break;
       }
     }
@@ -742,16 +694,16 @@ namespace strumpack {
   (scalar_t* F, integer_t ldF, integer_t row,
    integer_t nr_rows, integer_t col, integer_t nr_cols,
    const integer_t* upd) const {
-    for (integer_t r=row; r<std::min(row+nr_rows, this->_n); r++) {
+    for (integer_t r=row; r<std::min(row+nr_rows, n_); r++) {
       integer_t upd_pos = 0;
-      const auto hij = this->_ptr[r+1];
-      for (integer_t j=this->_ptr[r]; j<hij; j++) {
-        auto c = this->_ind[j];
+      const auto hij = ptr_[r+1];
+      for (integer_t j=ptr_[r]; j<hij; j++) {
+        auto c = ind_[j];
         if (c >= col) {
           while (upd_pos<nr_cols && upd[upd_pos]<c) upd_pos++;
           if (upd_pos == nr_cols) break;
           if (upd[upd_pos] == c)
-            F[r-row + upd_pos*ldF] = this->_val[j];
+            F[r-row + upd_pos*ldF] = val_[j];
         }
       }
     }
@@ -762,16 +714,16 @@ namespace strumpack {
   (scalar_t* F, integer_t ldF, integer_t row,
    integer_t nr_rows, integer_t col, integer_t nr_cols,
    const integer_t* upd) const {
-    auto rhi = std::min(row+nr_rows, this->_n);
+    auto rhi = std::min(row+nr_rows, n_);
     for (integer_t i=row; i<rhi; i++) {
       const auto r = upd[i-row];
-      auto j = this->_ptr[r];
-      const auto hij = this->_ptr[r+1];
-      while (j<hij && this->_ind[j] < col) j++;
+      auto j = ptr_[r];
+      const auto hij = ptr_[r+1];
+      while (j<hij && ind_[j] < col) j++;
       for ( ; j<hij; j++) {
-        auto c = this->_ind[j];
+        auto c = ind_[j];
         if (c < col+nr_cols)
-          F[i-row + (c-col)*ldF] = this->_val[j];
+          F[i-row + (c-col)*ldF] = val_[j];
         else break;
       }
     }
@@ -782,17 +734,17 @@ namespace strumpack {
   CSRMatrix<scalar_t,integer_t>::max_scaled_residual
   (const DenseM_t& x, const DenseM_t& b) const {
     real_t res = real_t(0.);
-    const integer_t m = this->_n;
+    const integer_t m = n_;
     const integer_t n = x.cols();
     for (integer_t c=0; c<n; c++) {
 #pragma omp parallel for reduction(max:res)
       for (integer_t r=0; r<m; r++) {
         auto true_res = b(r, c);
         auto abs_res = std::abs(b(r, c));
-        const auto hij = this->_ptr[r+1];
-        for (integer_t j=this->_ptr[r]; j<hij; ++j) {
-          const auto v = this->_val[j];
-          const auto rj = this->_ind[j];
+        const auto hij = ptr_[r+1];
+        for (integer_t j=ptr_[r]; j<hij; ++j) {
+          const auto v = val_[j];
+          const auto rj = ind_[j];
           true_res -= v * x(rj, c);
           abs_res += std::abs(v) * std::abs(x(rj,c));
         }
@@ -806,8 +758,8 @@ namespace strumpack {
   RealType<scalar_t>::value_type
   CSRMatrix<scalar_t,integer_t>::max_scaled_residual
   (const scalar_t* x, const scalar_t* b) const {
-    auto X = ConstDenseMatrixWrapperPtr(this->_n, 1, x, this->_n);
-    auto B = ConstDenseMatrixWrapperPtr(this->_n, 1, b, this->_n);
+    auto X = ConstDenseMatrixWrapperPtr(n_, 1, x, n_);
+    auto B = ConstDenseMatrixWrapperPtr(n_, 1, b, n_);
     return max_scaled_residual(*X, *B);
   }
 

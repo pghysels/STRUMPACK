@@ -49,11 +49,6 @@ namespace strumpack {
         int pid = n-1;
         de_serialize_rec(buf.data(), buf.data()+n, buf.data()+2*n, pid);
       }
-      HSSPartitionTree(int buf_size, int* buf) {
-        int n = buf_size / 3;
-        int pid = n-1;
-        de_serialize_rec(buf, buf+n, buf+2*n, pid);
-      }
       HSSPartitionTree(const HSSPartitionTree& h)
         : size(h.size), c(h.c) {
       }
@@ -104,6 +99,7 @@ namespace strumpack {
         leaf_sizes_rec(lf);
         return lf;
       }
+
     private:
       int min_levels() const {
         int lvls = levels();
@@ -161,19 +157,6 @@ namespace strumpack {
         }
       }
     };
-
-    template<typename integer_t> std::vector<int>
-    serialize(std::unordered_map<integer_t, HSSPartitionTree>& hss_tree_map) {
-      std::vector<int> buf;
-      buf.push_back(hss_tree_map.size());
-      for (auto& ht : hss_tree_map) {
-        buf.push_back(ht.first);
-        auto ht_buf = ht.second.serialize();
-        buf.push_back(ht_buf.size());
-        buf.insert(buf.end(), ht_buf.begin(), ht_buf.end());
-      }
-      return buf;
-    }
 
   } // end namespace HSS
 } // end namespace strumpack

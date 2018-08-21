@@ -47,8 +47,8 @@ test(int argc, char* argv[], CSRMatrixMPI<scalar,integer>* Adist) {
   std::vector<scalar> b(n_local, scalar(1.)), x(n_local, scalar(0.));
 
   spss.set_distributed_csr_matrix
-    (Adist->local_rows(), Adist->get_ptr(), Adist->get_ind(),
-     Adist->get_val(), Adist->get_dist().data(), Adist->symm_sparse());
+    (Adist->local_rows(), Adist->ptr(), Adist->ind(),
+     Adist->val(), Adist->dist().data(), Adist->symm_sparse());
   if (spss.reorder() != ReturnCode::SUCCESS) {
     if (!rank)
       std::cout << "problem with reordering of the matrix."

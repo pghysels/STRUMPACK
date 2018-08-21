@@ -69,24 +69,43 @@ namespace strumpack {
     void print() const;
     void printm(const std::string& name) const;
     void check() const;
-    std::unique_ptr<SeparatorTree<integer_t>> subtree
-    (integer_t p, integer_t P) const;
-    std::unique_ptr<SeparatorTree<integer_t>> toptree
-    (integer_t P) const;
+    std::unique_ptr<SeparatorTree<integer_t>> subtree(integer_t p, integer_t P) const;
+    std::unique_ptr<SeparatorTree<integer_t>> toptree(integer_t P) const;
 
     inline integer_t separators() const { return _nbsep; }
-    inline integer_t* sizes() const { return _sizes; }
-    inline integer_t* pa() const { return _pa; }
-    inline integer_t* lch() const { return _lch; }
-    inline integer_t* rch() const { return _rch; }
-    inline std::unordered_map<integer_t,HSS::HSSPartitionTree>&
-    HSS_trees() {
-      return _HSS_trees;
-    }
-    inline const std::unordered_map<integer_t,HSS::HSSPartitionTree>&
-    HSS_trees() const {
-      return _HSS_trees;
-    }
+
+    integer_t& sizes(integer_t sep) { return _sizes[sep]; }
+    integer_t sizes(integer_t sep) const { return _sizes[sep]; }
+
+    const integer_t* pa() const { return _pa; }
+    const integer_t* lch() const { return _lch; }
+    const integer_t* rch() const { return _rch; }
+
+    integer_t* pa() { return _pa; }
+    integer_t* lch() { return _lch; }
+    integer_t* rch() { return _rch; }
+
+    integer_t pa(integer_t sep) const { return _pa[sep]; }
+    integer_t lch(integer_t sep) const { return _lch[sep]; }
+    integer_t rch(integer_t sep) const { return _rch[sep]; }
+
+    integer_t& pa(integer_t sep) { return _pa[sep]; }
+    integer_t& lch(integer_t sep) { return _lch[sep]; }
+    integer_t& rch(integer_t sep) { return _rch[sep]; }
+
+    std::unordered_map<integer_t,HSS::HSSPartitionTree>&
+    HSS_trees() { return _HSS_trees; }
+    const std::unordered_map<integer_t,HSS::HSSPartitionTree>&
+    HSS_trees() const { return _HSS_trees; }
+    const HSS::HSSPartitionTree& HSS_tree(integer_t sep) const { return _HSS_trees.at(sep); }
+    HSS::HSSPartitionTree& HSS_tree(integer_t sep) { return _HSS_trees[sep]; }
+
+    std::unordered_map<integer_t,std::vector<bool>>&
+    admissibilities() { return adm_; }
+    const std::unordered_map<integer_t,std::vector<bool>>&
+    admissibilities() const { return adm_; }
+    const std::vector<bool>& admissibility(integer_t sep) const { return adm_.at(sep); }
+    std::vector<bool>& admissibility(integer_t sep) { return adm_[sep]; }
 
   protected:
     integer_t _nbsep;
@@ -94,7 +113,10 @@ namespace strumpack {
     integer_t* _pa;
     integer_t* _lch;
     integer_t* _rch;
+
     std::unordered_map<integer_t,HSS::HSSPartitionTree> _HSS_trees;
+    std::unordered_map<integer_t,std::vector<bool>> adm_;
+
     inline integer_t size() const { return 4*_nbsep+1; }
 
   private:

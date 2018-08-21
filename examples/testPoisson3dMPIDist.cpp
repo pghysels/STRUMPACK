@@ -71,9 +71,9 @@ int main(int argc, char* argv[]) {
       int N = n * n2;
       int nnz = 7 * N - 6 * n2;
       A = CSRMatrix<scalar,integer>(N, nnz);
-      integer* col_ptr = A.get_ptr();
-      integer* row_ind = A.get_ind();
-      scalar* val = A.get_val();
+      integer* col_ptr = A.ptr();
+      integer* row_ind = A.ind();
+      scalar* val = A.val();
 
       nnz = 0;
       col_ptr[0] = 0;

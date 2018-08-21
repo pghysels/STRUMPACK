@@ -136,20 +136,20 @@ namespace strumpack {
     std::unique_ptr<SeparatorTree<integer_t>>
       sep_tree(new SeparatorTree<integer_t>(nbsep));
     for (integer_t i=0; i<nbsep+1; i++) {
-      if (i <= nbsep_non_empty) sep_tree->sizes()[i] = scotch_sizes[i];
-      else sep_tree->sizes()[i] = sep_tree->sizes()[i-1];
+      if (i <= nbsep_non_empty) sep_tree->sizes(i) = scotch_sizes[i];
+      else sep_tree->sizes(i) = sep_tree->sizes(i-1);
     }
     for (integer_t i=0; i<nbsep; i++) {
-      sep_tree->lch()[i] = scotch_lch[i];
-      sep_tree->rch()[i] = scotch_rch[i];
-      if (sep_tree->lch()[i]!=-1) sep_tree->pa()[sep_tree->lch()[i]] = i;
-      if (sep_tree->rch()[i]!=-1) sep_tree->pa()[sep_tree->rch()[i]] = i;
+      sep_tree->lch(i) = scotch_lch[i];
+      sep_tree->rch(i) = scotch_rch[i];
+      if (sep_tree->lch(i)!=-1) sep_tree->pa(sep_tree->lch(i)) = i;
+      if (sep_tree->rch(i)!=-1) sep_tree->pa(sep_tree->rch(i)) = i;
     }
     integer_t root =
       std::distance(scotch_tree.begin(),
                     std::find(scotch_tree.begin(),
                               scotch_tree.end()+nbsep, integer_t(-1)));
-    sep_tree->pa()[root] = -1;
+    sep_tree->pa(root) = -1;
     return sep_tree;
   }
 
@@ -160,8 +160,8 @@ namespace strumpack {
                            integer_t* perm, integer_t* iperm,
                            const SPOptions<scalar_t>& opts) {
     auto n = A->size();
-    auto ptr = A->get_ptr();
-    auto ind = A->get_ind();
+    auto ptr = A->ptr();
+    auto ind = A->ind();
     SCOTCH_Graph graph;
     SCOTCH_graphInit(&graph);
     auto ptr_nodiag = new SCOTCH_Num[n+1 + ptr[n]-ptr[0]];

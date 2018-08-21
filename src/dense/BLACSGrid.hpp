@@ -145,7 +145,7 @@ namespace strumpack {
     friend std::ostream& operator<<(std::ostream& os, const BLACSGrid* g);
   };
 
-  std::ostream& operator<<(std::ostream& os, const BLACSGrid* g) {
+  inline std::ostream& operator<<(std::ostream& os, const BLACSGrid* g) {
     if (!g) os << "null";
     else
       os << " ctxt[" << g->ctxt()

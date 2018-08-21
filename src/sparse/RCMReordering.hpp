@@ -62,8 +62,8 @@ namespace strumpack {
   rcm_reordering(CompressedSparseMatrix<scalar_t,integer_t>* A,
                  integer_t* perm, integer_t* iperm) {
     auto n = A->size();
-    auto ptr = A->get_ptr();
-    auto ind = A->get_ind();
+    auto ptr = A->ptr();
+    auto ind = A->ind();
     auto xadj = new int[n+1 + ptr[n]];
     auto adjncy = xadj + n+1;
     integer_t e = 0;

@@ -31,13 +31,14 @@
 #ifndef SPOPTIONS_HPP
 #define SPOPTIONS_HPP
 
-#include <string.h>
+#include <cstring>
 
 // this is needed for RealType, put that somewhere else?
 #include "dense/BLASLAPACKWrapper.hpp"
 #include "misc/RandomWrapper.hpp"
 #include "misc/MPIWrapper.hpp"
 #include "HSS/HSSOptions.hpp"
+#include "BLR/BLROptions.hpp"
 
 namespace strumpack {
 
@@ -52,6 +53,20 @@ namespace strumpack {
     GEOMETRIC   /*!< A simple geometric nested dissection code that
                   only works for regular meshes. (see Sp::reorder)  */
   };
+
+  enum class CompressionType {
+    NONE,   /*!< No compression, purely direct solver  */
+    HSS,    /*!< HSS compression of frontal matrices   */
+    BLR     /*!< Block low-rank compression of fronts  */
+  };
+
+  inline std::string get_name(CompressionType comp) {
+    switch (comp) {
+    case CompressionType::NONE: return "none";
+    case CompressionType::HSS: return "HSS";
+    case CompressionType::BLR: return "BLR";
+    }
+  }
 
   enum class MatchingJob {
     NONE,                         /*!< Don't do anything                   */
@@ -147,7 +162,7 @@ namespace strumpack {
   /*! \brief Type of outer iterative (Krylov) solver.
    * \ingroup Enumerations */
   enum class KrylovSolver {
-    AUTO,           /*!< Use iterative refinement if no HSS compression is
+    AUTO,           /*!< Use iterative refinement if no compression is
                       used, otherwise use GMRes.                            */
     DIRECT,         /*!< No outer iterative solver, just a single
                       application of the multifrontal solver.               */
@@ -194,8 +209,11 @@ namespace strumpack {
     bool _use_agg_amalg = false;
     MatchingJob _matching_job = MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING;
     bool _log_assembly_tree = false;
+
+    /** compression options */
+    CompressionType _comp = CompressionType::NONE;
+
     /** HSS options */
-    bool _use_hss = false;
     int _hss_min_front_size = 1000;
     int _hss_min_sep_size = 256;
     int _sep_order_level = 1;
@@ -203,13 +221,21 @@ namespace strumpack {
     bool _replace_tiny_pivots = false;
     HSS::HSSOptions<scalar_t> _hss_opts;
 
+    /** BLR options */
+    BLR::BLROptions<scalar_t> _blr_opts;
+    int _blr_min_front_size = 1000;
+    int _blr_min_sep_size = 256;
+
     int _argc = 0;
     char** _argv = nullptr;
 
   public:
     SPOptions() { _hss_opts.set_verbose(false); }
     SPOptions(int argc, char* argv[]) :
-      _argc(argc), _argv(argv) { _hss_opts.set_verbose(false); }
+      _argc(argc), _argv(argv) {
+      _hss_opts.set_verbose(false);
+      _blr_opts.set_verbose(false);
+    }
 
     void set_verbose(bool verbose) { _verbose = verbose; }
     void set_maxit(int maxit) { assert(maxit >= 1); _maxit = maxit; }
@@ -267,12 +293,13 @@ namespace strumpack {
     //void set_matching(int job) { _matching_job = get_matching(job); }
     void enable_assembly_tree_log() { _log_assembly_tree = true; }
     void disable_assembly_tree_log() { _log_assembly_tree = false; }
+
     /*! \brief For Pieter to complete
      */
-    void enable_HSS() { _use_hss = true; }
+    void enable_HSS() { _comp = CompressionType::HSS; }
     /*! \brief For Pieter to complete
      */
-    void disable_HSS() { _use_hss = false; }
+    void disable_HSS() { _comp = CompressionType::NONE; }
     void set_HSS_min_front_size(int s)
     { assert(_hss_min_front_size >= 0); _hss_min_front_size = s; }
     /*! \brief For Pieter to complete
@@ -280,6 +307,18 @@ namespace strumpack {
      */
     void set_HSS_min_sep_size(int s)
     { assert(_hss_min_sep_size >= 0); _hss_min_sep_size = s; }
+    /*! \brief For Pieter to complete
+     */
+
+    void enable_BLR() { _comp = CompressionType::BLR; }
+    /*! \brief For Pieter to complete
+     */
+    void disable_BLR() { _comp = CompressionType::NONE; }
+    void set_BLR_min_front_size(int s)
+    { assert(_blr_min_front_size >= 0); _blr_min_front_size = s; }
+    void set_BLR_min_sep_size(int s)
+    { assert(_blr_min_sep_size >= 0); _blr_min_sep_size = s; }
+
     void set_separator_ordering_level(int l)
     { assert(l >= 0); _sep_order_level = l; }
     void enable_indirect_sampling() { _indirect_sampling = true; }
@@ -315,28 +354,35 @@ namespace strumpack {
     bool log_assembly_tree() const { return _log_assembly_tree; }
     /*! \brief For Pieter to complete
      */
-    bool use_HSS() const { return _use_hss; }
+    bool use_HSS() const { return _comp == CompressionType::HSS; }
     int HSS_min_front_size() const { return _hss_min_front_size; }
     /*! \brief For Pieter to complete
      */
     int HSS_min_sep_size() const { return _hss_min_sep_size; }
+    bool use_BLR() const { return _comp == CompressionType::BLR; }
+    int BLR_min_front_size() const { return _blr_min_front_size; }
+    int BLR_min_sep_size() const { return _blr_min_sep_size; }
     int separator_ordering_level() const { return _sep_order_level; }
     bool indirect_sampling() const { return _indirect_sampling; }
     bool replace_tiny_pivots() const { return _replace_tiny_pivots; }
 
     const HSS::HSSOptions<scalar_t>& HSS_options() const { return _hss_opts; }
     HSS::HSSOptions<scalar_t>& HSS_options() { return _hss_opts; }
-      /*! \brief For Pieter to complete
-       *
-       * \param argc
-       * \param argv
-       */
+
+    const BLR::BLROptions<scalar_t>& BLR_options() const { return _blr_opts; }
+    BLR::BLROptions<scalar_t>& BLR_options() { return _blr_opts; }
+
+    /*! \brief For Pieter to complete
+     *
+     * \param argc
+     * \param argv
+     */
     void set_from_command_line() { set_from_command_line(_argc, _argv); }
-    void set_from_command_line(int argc, char* argv[]) {
-      std::vector<char*> argv_initial(argc);
+    void set_from_command_line(int argc, const char* const* argv) {
+      std::vector<char*> argv_local(argc);
       for (int i=0; i<argc; i++) {
-        argv_initial[i] = new char[strlen(argv[i])+1];
-        strcpy(argv_initial[i], argv[i]);
+        argv_local[i] = new char[strlen(argv[i])+1];
+        strcpy(argv_local[i], argv[i]);
       }
       option long_options[] = {
         {"sp_maxit",                     required_argument, 0, 1},
@@ -362,16 +408,20 @@ namespace strumpack {
         {"sp_disable_hss",               no_argument, 0, 21},
         {"sp_hss_min_front_size",        required_argument, 0, 22},
         {"sp_hss_min_sep_size",          required_argument, 0, 23},
-        {"sp_separator_ordering_level",  required_argument, 0, 24},
-        {"sp_enable_indirect_sampling",  no_argument, 0, 25},
-        {"sp_disable_indirect_sampling", no_argument, 0, 26},
-        {"sp_enable_replace_tiny_pivots", no_argument, 0, 27},
-        {"sp_disable_replace_tiny_pivots", no_argument, 0, 28},
-        {"sp_nx",                        required_argument, 0, 29},
-        {"sp_ny",                        required_argument, 0, 30},
-        {"sp_nz",                        required_argument, 0, 31},
-        {"sp_components",                required_argument, 0, 32},
-        {"sp_separator_width",           required_argument, 0, 33},
+        {"sp_enable_blr",                no_argument, 0, 24},
+        {"sp_disable_blr",               no_argument, 0, 25},
+        {"sp_blr_min_front_size",        required_argument, 0, 26},
+        {"sp_blr_min_sep_size",          required_argument, 0, 27},
+        {"sp_separator_ordering_level",  required_argument, 0, 28},
+        {"sp_enable_indirect_sampling",  no_argument, 0, 29},
+        {"sp_disable_indirect_sampling", no_argument, 0, 30},
+        {"sp_enable_replace_tiny_pivots", no_argument, 0, 31},
+        {"sp_disable_replace_tiny_pivots", no_argument, 0, 32},
+        {"sp_nx",                        required_argument, 0, 33},
+        {"sp_ny",                        required_argument, 0, 34},
+        {"sp_nz",                        required_argument, 0, 35},
+        {"sp_components",                required_argument, 0, 36},
+        {"sp_separator_width",           required_argument, 0, 37},
         {"sp_verbose",                   no_argument, 0, 'v'},
         {"sp_quiet",                     no_argument, 0, 'q'},
         {"help",                         no_argument, 0, 'h'},
@@ -380,8 +430,9 @@ namespace strumpack {
       int c, option_index = 0;
       // bool unrecognized_options = false;
       opterr = 0;
-      while ((c = getopt_long_only(argc, argv, "hvq",
-                                   long_options, &option_index)) != -1) {
+      while ((c = getopt_long_only
+              (argc, argv_local.data(),
+               "hvq", long_options, &option_index)) != -1) {
         switch (c) {
         case 1: {
           std::istringstream iss(optarg);
@@ -486,36 +537,48 @@ namespace strumpack {
           iss >> _hss_min_sep_size;
           set_HSS_min_sep_size(_hss_min_sep_size);
         } break;
-        case 24: {
+        case 24: { enable_BLR(); } break;
+        case 25: { disable_BLR(); } break;
+        case 26: {
+          std::istringstream iss(optarg);
+          iss >> _blr_min_front_size;
+          set_BLR_min_front_size(_blr_min_front_size);
+        } break;
+        case 27: {
+          std::istringstream iss(optarg);
+          iss >> _blr_min_sep_size;
+          set_BLR_min_sep_size(_blr_min_sep_size);
+        } break;
+        case 28: {
           std::istringstream iss(optarg);
           iss >> _sep_order_level;
           set_separator_ordering_level(_sep_order_level);
         } break;
-        case 25: { enable_indirect_sampling(); } break;
-        case 26: { disable_indirect_sampling(); } break;
-        case 27: { enable_replace_tiny_pivots(); } break;
-        case 28: { disable_replace_tiny_pivots(); } break;
-        case 29: {
+        case 29: { enable_indirect_sampling(); } break;
+        case 30: { disable_indirect_sampling(); } break;
+        case 31: { enable_replace_tiny_pivots(); } break;
+        case 32: { disable_replace_tiny_pivots(); } break;
+        case 33: {
           std::istringstream iss(optarg);
           iss >> _nx;
           set_nx(_nx);
         } break;
-        case 30: {
+        case 34: {
           std::istringstream iss(optarg);
           iss >> _ny;
           set_ny(_ny);
         } break;
-        case 31: {
+        case 35: {
           std::istringstream iss(optarg);
           iss >> _nz;
           set_nz(_nz);
         } break;
-        case 32: {
+        case 36: {
           std::istringstream iss(optarg);
           iss >> _components;
           set_components(_components);
         } break;
-        case 33: {
+        case 37: {
           std::istringstream iss(optarg);
           iss >> _separator_width;
           set_separator_width(_separator_width);
@@ -527,11 +590,13 @@ namespace strumpack {
         default: break;
         }
       }
+      for (auto s : argv_local) delete[] s;
+
       // if (unrecognized_options/* && is_root*/)
       //   std::cerr << "# WARNING STRUMPACK: Unrecognized options."
       //             << std::endl;
-      HSS_options().set_from_command_line(argc, argv_initial.data());
-      for (auto s : argv_initial) delete[] s;
+      HSS_options().set_from_command_line(argc, argv);
+      BLR_options().set_from_command_line(argc, argv);
     }
 
     void describe_options() const {
@@ -614,6 +679,14 @@ namespace strumpack {
       std::cout << "#   --sp_hss_min_sep_size int (default "
                 << HSS_min_sep_size() << ")" << std::endl;
       std::cout << "#          minimum size of the separator for HSS"
+                << " compression of the front" << std::endl;
+      std::cout << "#   --sp_enable_blr (default " << std::boolalpha
+                << use_BLR() << ")" << std::endl;
+      std::cout << "#   --sp_disable_blr (default " << std::boolalpha
+                << !use_BLR() << ")" << std::endl;
+      std::cout << "#   --sp_blr_min_sep_size int (default "
+                << BLR_min_sep_size() << ")" << std::endl;
+      std::cout << "#          minimum size of the separator for BLR"
                 << " compression of the front" << std::endl;
       std::cout << "#   --sp_separator_ordering_level (default "
                 << separator_ordering_level() << ")" << std::endl;

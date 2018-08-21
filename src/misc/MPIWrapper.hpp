@@ -31,6 +31,7 @@
 #include <complex>
 #include <cassert>
 #include <numeric>
+#include <memory>
 #include "mpi.h"
 #include "StrumpackParameters.hpp"
 
@@ -46,6 +47,28 @@ namespace strumpack {
   template<> inline MPI_Datatype mpi_type<double>() { return MPI_DOUBLE; }
   template<> inline MPI_Datatype mpi_type<std::complex<float>>() { return MPI_C_FLOAT_COMPLEX; }
   template<> inline MPI_Datatype mpi_type<std::complex<double>>() { return MPI_C_DOUBLE_COMPLEX; }
+
+  class MPIRequest {
+  public:
+    MPIRequest() {
+      req_ = std::unique_ptr<MPI_Request>(new MPI_Request());
+    }
+    MPIRequest(const MPIRequest&) = delete;
+    MPIRequest(MPIRequest&&) = default;
+    MPIRequest& operator=(const MPIRequest&) = delete;
+    MPIRequest& operator=(MPIRequest&&) = default;
+
+    void wait() { MPI_Wait(req_.get(), MPI_STATUS_IGNORE); }
+
+  private:
+    std::unique_ptr<MPI_Request> req_;
+    friend class MPIComm;
+  };
+
+  inline void wait_all(std::vector<MPIRequest>& reqs) {
+    for (auto& r : reqs) r.wait();
+    reqs.clear();
+  }
 
   class MPIComm {
   public:
@@ -67,39 +90,130 @@ namespace strumpack {
       return *this;
     }
 
-    inline MPI_Comm comm() const {
-      return comm_;
-    }
-    inline bool is_null() const {
-      return comm_ == MPI_COMM_NULL;
-    }
-    inline int rank() const {
+    MPI_Comm comm() const { return comm_; }
+
+    bool is_null() const { return comm_ == MPI_COMM_NULL; }
+
+    int rank() const {
       assert(comm_ != MPI_COMM_NULL);
       int r;
       MPI_Comm_rank(comm_, &r);
       return r;
     }
-    inline int size() const {
+
+    int size() const {
       assert(comm_ != MPI_COMM_NULL);
       int nprocs;
       MPI_Comm_size(comm_, &nprocs);
       return nprocs;
     }
-    inline bool is_root() const {
-      return rank() == 0;
-    }
-    inline void barrier() const {
-      MPI_Barrier(comm_);
+
+    bool is_root() const { return rank() == 0; }
+
+    void barrier() const { MPI_Barrier(comm_); }
+
+    template<typename T>
+    MPIRequest isend(const std::vector<T>& sbuf, int dest, int tag) const {
+      MPIRequest req;
+      MPI_Isend(sbuf.data(), sbuf.size(), mpi_type<T>(),
+                dest, tag, comm_, req.req_.get());
+      return std::move(req);
     }
 
-    // TODO use MPI_Comm_split??
-    MPIComm sub(int P0, int P) const {
+    template<typename T>
+    void send(const std::vector<T>& sbuf, int dest, int tag) const {
+      MPI_Send(sbuf.data(), sbuf.size(), mpi_type<T>(), dest, tag, comm_);
+    }
+
+    template<typename T>
+    std::vector<T> recv(int src, int tag) const {
+      MPI_Status stat;
+      MPI_Probe(src, tag, comm_, &stat);
+      int msgsize;
+      MPI_Get_count(&stat, mpi_type<T>(), &msgsize);
+      std::vector<T> rbuf(msgsize);
+      MPI_Recv(rbuf.data(), msgsize, mpi_type<T>(), src, tag,
+               comm_, MPI_STATUS_IGNORE);
+      return rbuf;
+    }
+
+    template<typename T> T all_reduce(T t, MPI_Op op) const {
+      MPI_Allreduce(MPI_IN_PLACE, &t, 1, mpi_type<T>(), op, comm_);
+      return t;
+    }
+
+    template<typename T> T reduce(T t, MPI_Op op) const {
+      if (is_root()) MPI_Reduce(MPI_IN_PLACE, &t, 1, mpi_type<T>(), op, 0, comm_);
+      else MPI_Reduce(&t, &t, 1, mpi_type<T>(), op, 0, comm_);
+      return t;
+    }
+
+    template<typename T> void all_reduce(T* t, int ssize, MPI_Op op) const {
+      MPI_Allreduce(MPI_IN_PLACE, t, ssize, mpi_type<T>(), op, comm_);
+    }
+
+    template<typename T> void reduce(T* t, int ssize, MPI_Op op) const {
+      if (is_root()) MPI_Reduce(MPI_IN_PLACE, t, ssize, mpi_type<T>(), op, 0, comm_);
+      else MPI_Reduce(t, t, ssize, mpi_type<T>(), op, 0, comm_);
+    }
+
+    template<typename T> void all_to_all_v
+    (std::vector<std::vector<T>>& sbuf, std::vector<T>& rbuf,
+     std::vector<T*>& pbuf) const {
+      all_to_all_v(sbuf, rbuf, pbuf, mpi_type<T>());
+    }
+
+    template<typename T> void all_to_all_v
+    (std::vector<std::vector<T>>& sbuf, std::vector<T>& rbuf,
+     std::vector<T*>& pbuf, const MPI_Datatype Ttype) const {
+      assert(sbuf.size() == std::size_t(size()));
+      auto P = size();
+      auto ssizes = new int[4*P];
+      auto rsizes = ssizes + P;
+      auto sdispl = ssizes + 2*P;
+      auto rdispl = ssizes + 3*P;
+      for (int p=0; p<P; p++) {
+        if (sbuf[p].size() > std::numeric_limits<int>::max()) {
+          std::cerr << "# ERROR: 32bit integer overflow in all_to_all_v!!" << std::endl;
+          MPI_Abort(comm_, 1);
+        }
+        ssizes[p] = sbuf[p].size();
+      }
+      MPI_Alltoall(ssizes, 1, mpi_type<int>(), rsizes, 1, mpi_type<int>(), comm_);
+      std::size_t totssize = std::accumulate(ssizes, ssizes+P, 0);
+      std::size_t totrsize = std::accumulate(rsizes, rsizes+P, 0);
+      if (totrsize > std::numeric_limits<int>::max() ||
+          totssize > std::numeric_limits<int>::max()) {
+        std::cerr << "# ERROR: 32bit integer overflow in all_to_all_v!!" << std::endl;
+        MPI_Abort(comm_, 1);
+      }
+      T* sendbuf = new T[totssize];
+      sdispl[0] = rdispl[0] = 0;
+      for (int p=1; p<P; p++) {
+        sdispl[p] = sdispl[p-1] + ssizes[p-1];
+        rdispl[p] = rdispl[p-1] + rsizes[p-1];
+      }
+      for (int p=0; p<P; p++)
+        std::copy(sbuf[p].begin(), sbuf[p].end(), sendbuf+sdispl[p]);
+      std::vector<std::vector<T>>().swap(sbuf);
+      rbuf.resize(totrsize);
+      MPI_Alltoallv(sendbuf, ssizes, sdispl, Ttype,
+                    rbuf.data(), rsizes, rdispl, Ttype, comm_);
+      pbuf.resize(P);
+      for (int p=0; p<P; p++)
+        pbuf[p] = rbuf.data() + rdispl[p];
+      delete[] ssizes;
+      delete[] sendbuf;
+    }
+
+    MPIComm sub(int P0, int P, int stride=1) const {
       if (is_null() || size() == 1)
         return MPIComm(MPI_COMM_NULL);
       assert(P0 + P <= size());
       MPIComm sub_comm;
       std::vector<int> sub_ranks(P);
-      std::iota(sub_ranks.begin(), sub_ranks.end(), P0);
+      for (int i=0; i<P; i++)
+        sub_ranks[i] = P0 + i*stride;
       MPI_Group group, sub_group;
       MPI_Comm_group(comm_, &group);                          // get group from comm
       MPI_Group_incl(group, P, sub_ranks.data(), &sub_group); // group ranks [P0,P0+P) into sub_group
@@ -121,21 +235,11 @@ namespace strumpack {
       return c0;
     }
 
-    template<typename T> T all_reduce(T t, MPI_Op op) const {
-      MPI_Allreduce(MPI_IN_PLACE, &t, 1, mpi_type<T>(), op, comm_);
-      return t;
+    static void control_start(const std::string& name) {
+      MPI_Pcontrol(1, name);
     }
-    template<typename T> T reduce(T t, MPI_Op op) const {
-      if (is_root()) MPI_Reduce(MPI_IN_PLACE, &t, 1, mpi_type<T>(), op, 0, comm_);
-      else MPI_Reduce(&t, &t, 1, mpi_type<T>(), op, 0, comm_);
-      return t;
-    }
-    template<typename T> void all_reduce(T* t, int ssize, MPI_Op op) const {
-      MPI_Allreduce(MPI_IN_PLACE, t, ssize, mpi_type<T>(), op, comm_);
-    }
-    template<typename T> void reduce(T* t, int ssize, MPI_Op op) const {
-      if (is_root()) MPI_Reduce(MPI_IN_PLACE, t, ssize, mpi_type<T>(), op, 0, comm_);
-      else MPI_Reduce(t, t, ssize, mpi_type<T>(), op, 0, comm_);
+    static void control_stop(const std::string& name) {
+      MPI_Pcontrol(-1, name);
     }
 
   private:
@@ -143,10 +247,7 @@ namespace strumpack {
 
     void duplicate(MPI_Comm c) {
       if (c == MPI_COMM_NULL) comm_ = c;
-      else {
-        //std::cout << "WARNING copying an MPI_Comm is expensive!!" << std::endl;
-        MPI_Comm_dup(c, &comm_);
-      }
+      else MPI_Comm_dup(c, &comm_);
     }
   };
 

@@ -50,25 +50,25 @@ int main(int argc, char* argv[]) {
   int N = n * n2;
   int nnz = 7 * N - 6 * n2;
   CSRMatrix<scalar,integer> A(N, nnz);
-  integer* col_ptr = A.get_ptr();
-  integer* row_ind = A.get_ind();
-  scalar* val = A.get_val();
+  auto cptr = A.ptr();
+  auto rind = A.ind();
+  auto val = A.val();
 
   nnz = 0;
-  col_ptr[0] = 0;
+  cptr[0] = 0;
   for (integer xdim=0; xdim<n; xdim++)
     for (integer ydim=0; ydim<n; ydim++)
       for (integer zdim=0; zdim<n; zdim++) {
         integer ind = zdim+ydim*n+xdim*n2;
         val[nnz] = 6.0;
-        row_ind[nnz++] = ind;
-        if (zdim > 0)  { val[nnz] = -1.0; row_ind[nnz++] = ind-1; } // left
-        if (zdim < n-1){ val[nnz] = -1.0; row_ind[nnz++] = ind+1; } // right
-        if (ydim > 0)  { val[nnz] = -1.0; row_ind[nnz++] = ind-n; } // front
-        if (ydim < n-1){ val[nnz] = -1.0; row_ind[nnz++] = ind+n; } // back
-        if (xdim > 0)  { val[nnz] = -1.0; row_ind[nnz++] = ind-n2; } // up
-        if (xdim < n-1){ val[nnz] = -1.0; row_ind[nnz++] = ind+n2; } // down
-        col_ptr[ind+1] = nnz;
+        rind[nnz++] = ind;
+        if (zdim > 0)  { val[nnz] = -1.0; rind[nnz++] = ind-1; } // left
+        if (zdim < n-1){ val[nnz] = -1.0; rind[nnz++] = ind+1; } // right
+        if (ydim > 0)  { val[nnz] = -1.0; rind[nnz++] = ind-n; } // front
+        if (ydim < n-1){ val[nnz] = -1.0; rind[nnz++] = ind+n; } // back
+        if (xdim > 0)  { val[nnz] = -1.0; rind[nnz++] = ind-n2; } // up
+        if (xdim < n-1){ val[nnz] = -1.0; rind[nnz++] = ind+n2; } // down
+        cptr[ind+1] = nnz;
       }
   A.set_symm_sparse();
 
@@ -81,6 +81,8 @@ int main(int argc, char* argv[]) {
   spss.reorder(n, n, n);
   spss.factor();
   spss.solve(b.data(), x.data());
+
+  // spss.draw("P3D" + std::to_string(n));
 
   std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
             << A.max_scaled_residual(x.data(), b.data()) << std::endl;

@@ -120,7 +120,8 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::redistribute_to_tree_from_buffers
-    (const DistM_t& A, std::size_t Arlo, std::size_t Aclo, scalar_t** pbuf) {
+    (const DistM_t& A, std::size_t Arlo, std::size_t Aclo,
+     std::vector<scalar_t*>& pbuf) {
       if (!this->active()) return;
       const auto Aprows = A.grid()->nprows();
       const auto Apcols = A.grid()->npcols();
@@ -184,13 +185,14 @@ namespace strumpack {
     HSSMatrixMPI<scalar_t>::compress(const DistM_t& A, const opts_t& opts) {
       TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_compress);
       TIMER_TIME(TaskType::REDIST_2D_TO_HSS, 0, t_redist);
-      std::vector<std::vector<scalar_t>> sbuf(Comm().size());
-      redistribute_to_tree_to_buffers(A, 0, 0, sbuf);
-      scalar_t *rbuf = nullptr, **pbuf = nullptr;
-      all_to_all_v(sbuf, rbuf, pbuf, comm());
-      redistribute_to_tree_from_buffers(A, 0, 0, pbuf);
-      delete[] pbuf;
-      delete[] rbuf;
+      {
+        std::vector<std::vector<scalar_t>> sbuf(Comm().size());
+        redistribute_to_tree_to_buffers(A, 0, 0, sbuf);
+        std::vector<scalar_t> rbuf;
+        std::vector<scalar_t*> pbuf;
+        Comm().all_to_all_v(sbuf, rbuf, pbuf);
+        redistribute_to_tree_from_buffers(A, 0, 0, pbuf);
+      }
       TIMER_STOP(t_redist);
       DistElemMult<scalar_t> Afunc(A);
       switch (opts.compression_algorithm()) {

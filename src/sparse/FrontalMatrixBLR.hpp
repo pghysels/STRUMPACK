@@ -26,8 +26,8 @@
  *             Division).
  *
  */
-#ifndef FRONTAL_MATRIX_DENSE_HPP
-#define FRONTAL_MATRIX_DENSE_HPP
+#ifndef FRONTAL_MATRIX_BLR_HPP
+#define FRONTAL_MATRIX_BLR_HPP
 
 #include <iostream>
 #include <fstream>
@@ -39,18 +39,22 @@
 #include "dense/BLASLAPACKWrapper.hpp"
 #include "CompressedSparseMatrix.hpp"
 #include "MatrixReordering.hpp"
+#include "BLR/BLRMatrix.hpp"
+#include "ExtendAdd.hpp"
 
 namespace strumpack {
 
-  template<typename scalar_t,typename integer_t> class FrontalMatrixDense
+  template<typename scalar_t,typename integer_t> class FrontalMatrixBLR
     : public FrontalMatrix<scalar_t,integer_t> {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
-    using ExtAdd = ExtendAdd<scalar_t,integer_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
+    using ExtAdd = ExtendAdd<scalar_t,integer_t>;
+    using BLRM_t = BLR::BLRMatrix<scalar_t>;
+    using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
 
   public:
-    FrontalMatrixDense
+    FrontalMatrixBLR
     (integer_t sep, integer_t sep_begin, integer_t sep_end,
      std::vector<integer_t>& upd);
 
@@ -58,7 +62,6 @@ namespace strumpack {
     void extend_add_to_dense
     (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
      const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) override;
-
     void sample_CB
     (const SPOptions<scalar_t>& opts, const DenseM_t& R, DenseM_t& Sr,
      DenseM_t& Sc, FrontalMatrix<scalar_t,integer_t>* pa,
@@ -66,6 +69,9 @@ namespace strumpack {
     void multifrontal_factorization
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,
      int etree_level=0, int task_depth=0) override;
+    void factor_node
+    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+     int etree_level=0, int task_depth=0);
 
     void forward_multifrontal_solve
     (DenseM_t& b, DenseM_t* work, int etree_level=0,
@@ -77,32 +83,40 @@ namespace strumpack {
     void extract_CB_sub_matrix
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
      DenseM_t& B, int task_depth) const override;
-    std::string type() const override { return "FrontalMatrixDense"; }
+
+    std::string type() const override { return "FrontalMatrixBLR"; }
 
     void extend_add_copy_to_buffers
-    (std::vector<std::vector<scalar_t>>& sbuf,
-     const FrontalMatrixMPI<scalar_t,integer_t>* pa) const override {
-      ExtAdd::extend_add_seq_copy_to_buffers(F22_, sbuf, pa, this);
-    }
+    (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override;
+
+    void set_BLR_partitioning
+    (const SPOptions<scalar_t>& opts,
+     const HSS::HSSPartitionTree& sep_tree,
+     const std::vector<bool>& adm, bool is_root) override;
+    void set_HSS_partitioning
+    (const SPOptions<scalar_t>& opts,
+     const HSS::HSSPartitionTree& sep_tree,
+     bool is_root) override;
 
   private:
     DenseM_t F11_, F12_, F21_, F22_;
-    std::vector<int> piv; // regular int because it is passed to BLAS
+    BLRM_t F11blr_, F12blr_, F21blr_;
+    std::vector<int> piv_;
+    std::vector<std::size_t> sep_tiles_;
+    std::vector<std::size_t> upd_tiles_;
+    std::vector<bool> adm_;
 
-    FrontalMatrixDense(const FrontalMatrixDense&) = delete;
-    FrontalMatrixDense& operator=(FrontalMatrixDense const&) = delete;
-
-    void factor_phase1
-    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
-     int etree_level, int task_depth);
-    void factor_phase2
-    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
-     int etree_level, int task_depth);
+    FrontalMatrixBLR(const FrontalMatrixBLR&) = delete;
+    FrontalMatrixBLR& operator=(FrontalMatrixBLR const&) = delete;
 
     void fwd_solve_phase2
     (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const;
     void bwd_solve_phase1
     (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const;
+
+    void draw_node(std::ostream& of, bool is_root) const override;
+
+    long long node_factor_nonzeros() const override;
 
     using FrontalMatrix<scalar_t,integer_t>::lchild_;
     using FrontalMatrix<scalar_t,integer_t>::rchild_;
@@ -111,14 +125,14 @@ namespace strumpack {
   };
 
   template<typename scalar_t,typename integer_t>
-  FrontalMatrixDense<scalar_t,integer_t>::FrontalMatrixDense
+  FrontalMatrixBLR<scalar_t,integer_t>::FrontalMatrixBLR
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd)
     : FrontalMatrix<scalar_t,integer_t>
     (nullptr, nullptr, sep, sep_begin, sep_end, upd) {}
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_dense
+  FrontalMatrixBLR<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) {
     const std::size_t pdsep = paF11.rows();
@@ -147,7 +161,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::sample_CB
+  FrontalMatrixBLR<scalar_t,integer_t>::sample_CB
   (const SPOptions<scalar_t>& opts, const DenseM_t& R, DenseM_t& Sr,
    DenseM_t& Sc, FrontalMatrix<scalar_t,integer_t>* pa, int task_depth) {
     auto I = this->upd_to_parent(pa);
@@ -165,26 +179,21 @@ namespace strumpack {
        cS.rows()*cS.cols()*2); // for the skinny-extend add
   }
 
+
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::multifrontal_factorization
+  FrontalMatrixBLR<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
     if (task_depth == 0) {
       // use tasking for children and for extend-add parallelism
 #pragma omp parallel if(!omp_in_parallel()) default(shared)
 #pragma omp single nowait
-      factor_phase1(A, opts, etree_level, task_depth);
-      // do not use tasking for blas/lapack parallelism (use system
-      // blas threading!)
-      factor_phase2(A, opts, etree_level, params::task_recursion_cutoff_level);
-    } else {
-      factor_phase1(A, opts, etree_level, task_depth);
-      factor_phase2(A, opts, etree_level, task_depth);
-    }
+      factor_node(A, opts, etree_level, task_depth);
+    } else factor_node(A, opts, etree_level, task_depth);
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::factor_phase1
+  FrontalMatrixBLR<scalar_t,integer_t>::factor_node
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
     if (task_depth < params::task_recursion_cutoff_level) {
@@ -207,7 +216,6 @@ namespace strumpack {
         rchild_->multifrontal_factorization
           (A, opts, etree_level+1, task_depth);
     }
-    // TODO can we allocate the memory in one go??
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();
     F11_ = DenseM_t(dsep, dsep); F11_.zero();
@@ -226,41 +234,45 @@ namespace strumpack {
     if (rchild_)
       rchild_->extend_add_to_dense
         (F11_, F12_, F21_, F22_, this, task_depth);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::factor_phase2
-  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
-   int etree_level, int task_depth) {
     if (dim_sep()) {
-      piv = F11_.LU(task_depth);
-      if (opts.replace_tiny_pivots()) {
-        // TODO consider other values for thresh
-        //  - sqrt(eps)*|A|_1 as in SuperLU ?
-        auto thresh = blas::lamch<real_t>('E') * A.size();
-        for (std::size_t i=0; i<F11_.rows(); i++)
-          if (std::abs(F11_(i,i)) < thresh)
-            F11_(i,i) = (std::real(F11_(i,i)) < 0) ? -thresh : thresh;
-      }
+#if 1
+      BLR::BLR_construct_and_partial_factor
+        (F11_, F12_, F21_, F22_, F11blr_, piv_, F12blr_, F21blr_,
+         sep_tiles_, upd_tiles_,
+         [&](std::size_t i, std::size_t j) -> bool {
+          return adm_[i+j*sep_tiles_.size()]; },
+         opts.BLR_options());
+#else
+      F11blr_ = BLRM_t(sep_tiles_,
+                       [&](std::size_t i, std::size_t j) -> bool {
+                         return adm_[i+j*sep_tiles_.size()]; },
+                       F11_, piv_, opts.BLR_options());
+      F11_.clear();
       if (dim_upd()) {
-        F12_.laswp(piv, true);
+        F12_.laswp(piv_, true);
         trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-             scalar_t(1.), F11_, F12_, task_depth);
+             scalar_t(1.), F11blr_, F12_, task_depth);
+        F12blr_ = BLRM_t(F12_, sep_tiles_, upd_tiles_, opts.BLR_options());
+        F12_.clear();
         trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-             scalar_t(1.), F11_, F21_, task_depth);
-        gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_,
+             scalar_t(1.), F11blr_, F21_, task_depth);
+        F21blr_ = BLRM_t(F21_, upd_tiles_, sep_tiles_, opts.BLR_options());
+        F21_.clear();
+        gemm(Trans::N, Trans::N, scalar_t(-1.), F21blr_, F12blr_,
              scalar_t(1.), F22_, task_depth);
       }
+#endif
+      // TODO flops
     }
-    STRUMPACK_FULL_RANK_FLOPS
-      (LU_flops(F11_) +
-       gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.)) +
-       trsm_flops(Side::L, scalar_t(1.), F11_, F12_) +
-       trsm_flops(Side::R, scalar_t(1.), F11_, F21_));
+  }
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixBLR<scalar_t,integer_t>::extend_add_copy_to_buffers
+  (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
+    ExtAdd::extend_add_seq_copy_to_buffers(F22_, sbuf, pa, this);
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::forward_multifrontal_solve
+  FrontalMatrixBLR<scalar_t,integer_t>::forward_multifrontal_solve
   (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const {
     DenseMW_t bupd(dim_upd(), b.cols(), work[0], 0, 0);
     bupd.zero();
@@ -278,28 +290,32 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::fwd_solve_phase2
+  FrontalMatrixBLR<scalar_t,integer_t>::fwd_solve_phase2
   (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
-      bloc.laswp(piv, true);
+      bloc.laswp(piv_, true);
+#if 0
       if (b.cols() == 1) {
-        trsv(UpLo::L, Trans::N, Diag::U, F11_, bloc, task_depth);
+        trsv(UpLo::L, Trans::N, Diag::U, F11blr_, bloc, task_depth);
         if (dim_upd())
-          gemv(Trans::N, scalar_t(-1.), F21_, bloc,
+          gemv(Trans::N, scalar_t(-1.), F21blr_, bloc,
                scalar_t(1.), bupd, task_depth);
       } else {
         trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-             scalar_t(1.), F11_, bloc, task_depth);
+             scalar_t(1.), F11blr_, bloc, task_depth);
         if (dim_upd())
-          gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, bloc,
+          gemm(Trans::N, Trans::N, scalar_t(-1.), F21blr_, bloc,
                scalar_t(1.), bupd, task_depth);
       }
+#else
+      BLR::BLR_trsmLNU_gemm(F11blr_, F21blr_, bloc, bupd, task_depth);
+#endif
     }
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::backward_multifrontal_solve
+  FrontalMatrixBLR<scalar_t,integer_t>::backward_multifrontal_solve
   (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const {
     DenseMW_t yupd(dim_upd(), y.cols(), work[0], 0, 0);
     if (task_depth == 0) {
@@ -317,27 +333,31 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::bwd_solve_phase1
+  FrontalMatrixBLR<scalar_t,integer_t>::bwd_solve_phase1
   (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t yloc(dim_sep(), y.cols(), y, this->sep_begin_, 0);
+#if 0
       if (y.cols() == 1) {
         if (dim_upd())
-          gemv(Trans::N, scalar_t(-1.), F12_, yupd,
+          gemv(Trans::N, scalar_t(-1.), F12blr_, yupd,
                scalar_t(1.), yloc, task_depth);
-        trsv(UpLo::U, Trans::N, Diag::N, F11_, yloc, task_depth);
+        trsv(UpLo::U, Trans::N, Diag::N, F11blr_, yloc, task_depth);
       } else {
         if (dim_upd())
-          gemm(Trans::N, Trans::N, scalar_t(-1.), F12_, yupd,
+          gemm(Trans::N, Trans::N, scalar_t(-1.), F12blr_, yupd,
                scalar_t(1.), yloc, task_depth);
-        trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.),
-             F11_, yloc, task_depth);
+        trsm(Side::L, UpLo::U, Trans::N, Diag::N,
+             scalar_t(1.), F11blr_, yloc, task_depth);
       }
+#else
+      BLR::BLR_gemm_trsmUNN(F11blr_, F12blr_, yloc, yupd, task_depth);
+#endif
     }
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::extract_CB_sub_matrix
+  FrontalMatrixBLR<scalar_t,integer_t>::extract_CB_sub_matrix
   (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
    DenseM_t& B, int task_depth) const {
     std::vector<std::size_t> lJ, oJ;
@@ -350,6 +370,54 @@ namespace strumpack {
       for (std::size_t i=0; i<lI.size(); i++)
         B(oI[i], oJ[j]) += F22_(lI[i], lJ[j]);
     STRUMPACK_FLOPS((is_complex<scalar_t>() ? 2 : 1) * lJ.size() * lI.size());
+  }
+
+  template<typename scalar_t,typename integer_t> long long
+  FrontalMatrixBLR<scalar_t,integer_t>::node_factor_nonzeros() const {
+    return F11blr_.nonzeros() + F12blr_.nonzeros() + F21blr_.nonzeros();
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixBLR<scalar_t,integer_t>::set_HSS_partitioning
+  (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
+   bool is_root) {
+    std::cout << "set admissibility condition!!" << std::endl;
+    if (dim_sep()) {
+      assert(sep_tree.size == dim_sep());
+      auto lf = sep_tree.leaf_sizes();
+      sep_tiles_.assign(lf.begin(), lf.end());
+      adm_.resize(sep_tiles_.size()*sep_tiles_.size(), true);
+    }
+    if (dim_upd()) {
+      auto leaf = opts.BLR_options().leaf_size();
+      auto nt = std::ceil(float(dim_upd()) / leaf);
+      upd_tiles_.resize(nt, leaf);
+      upd_tiles_.back() = dim_upd() - leaf*(nt-1);
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixBLR<scalar_t,integer_t>::set_BLR_partitioning
+  (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
+   const std::vector<bool>& adm, bool is_root) {
+    if (dim_sep()) {
+      assert(sep_tree.size == dim_sep());
+      auto lf = sep_tree.leaf_sizes();
+      sep_tiles_.assign(lf.begin(), lf.end());
+      adm_ = adm;
+    }
+    if (dim_upd()) {
+      auto leaf = opts.BLR_options().leaf_size();
+      auto nt = std::ceil(float(dim_upd()) / leaf);
+      upd_tiles_.resize(nt, leaf);
+      upd_tiles_.back() = dim_upd() - leaf*(nt-1);
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixBLR<scalar_t,integer_t>::draw_node
+  (std::ostream& of, bool is_root) const {
+    F11blr_.draw(of, this->sep_begin(), this->sep_begin());
   }
 
 } // end namespace strumpack
