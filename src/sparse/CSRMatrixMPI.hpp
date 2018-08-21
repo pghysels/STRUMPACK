@@ -329,9 +329,8 @@ namespace strumpack {
         for (int p=0; p<P; p++)
           scnts[p] = A->ptr(dist_[p+1]) - A->ptr(dist_[p]);
       int loc_nnz;
-      MPI_Scatter
-        (scnts, 1, mpi_type<int>(), &loc_nnz,
-         1, mpi_type<int>(), 0, c);
+      MPI_Scatter(scnts, 1, mpi_type<int>(), &loc_nnz,
+                  1, mpi_type<int>(), 0, c);
       local_nnz_ = loc_nnz;
       ptr_.resize(local_rows_+1);
       ind_.resize(local_nnz_);
@@ -342,7 +341,7 @@ namespace strumpack {
           sdisp[p] = dist_[p];
         }
       MPI_Scatterv
-        (rank ? NULL : A->ptr(), scnts, sdisp,
+        (rank ? NULL : const_cast<integer_t*>(A->ptr()), scnts, sdisp,
          mpi_type<integer_t>(), ptr_.data(), local_rows_+1,
          mpi_type<integer_t>(), 0, c);
       if (rank == 0)
@@ -351,11 +350,11 @@ namespace strumpack {
           sdisp[p] = A->ptr(dist_[p]);
         }
       MPI_Scatterv
-        (rank ? NULL : A->ind(), scnts, sdisp,
+        (rank ? NULL : const_cast<integer_t*>(A->ind()), scnts, sdisp,
          mpi_type<integer_t>(), ind_.data(), local_nnz_,
          mpi_type<integer_t>(), 0, c);
       MPI_Scatterv
-        (rank ? NULL : A->val(), scnts, sdisp,
+        (rank ? NULL : const_cast<scalar_t*>(A->val()), scnts, sdisp,
          mpi_type<scalar_t>(),  val_.data(), local_nnz_,
          mpi_type<scalar_t>(), 0, c);
       delete[] scnts;
@@ -768,8 +767,8 @@ namespace strumpack {
       }
     }
     MPI_Gatherv
-      (this->ptr()+1, local_rows_, mpi_type<integer_t>(),
-       rank ? NULL : Aseq->ptr(), rcnts, displs,
+      (const_cast<integer_t*>(this->ptr())+1, local_rows_,
+       mpi_type<integer_t>(), rank ? NULL : Aseq->ptr(), rcnts, displs,
        mpi_type<integer_t>(), 0, _comm);
     if (rank==0) {
       Aseq->ptr(0) = 0;
@@ -786,11 +785,11 @@ namespace strumpack {
       }
     }
     MPI_Gatherv
-      (this->ind(), local_nnz_, mpi_type<integer_t>(),
+      (const_cast<integer_t*>(this->ind()), local_nnz_, mpi_type<integer_t>(),
        rank ? NULL : Aseq->ind(), rcnts, displs,
        mpi_type<integer_t>(), 0, _comm);
     MPI_Gatherv
-      (this->val(), local_nnz_, mpi_type<scalar_t>(),
+      (const_cast<scalar_t*>(this->val()), local_nnz_, mpi_type<scalar_t>(),
        rank ? NULL : Aseq->val(), rcnts, displs,
        mpi_type<scalar_t>(), 0, _comm);
     delete[] rcnts;
