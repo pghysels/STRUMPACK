@@ -1,7 +1,18 @@
 /*! \page dense_matrices HSS Approximation of Dense Matrices
 
 
-The HSS code can be found in the src/HSS/ subdirectory. All HSS code is in a namespace called \link strumpack::HSS HSS\endlink. The class for a sequential/multithreaded HSS matrix is \link strumpack::HSS::HSSMatrix HSSMatrix<scalar>\endlink, while the distributed memory HSS class is \link strumpack::HSS::HSSMatrixMPI HSSMatrixMPI<scalar>\endlink. For examples of the usage of these classes, see the test code in __test__/test_HSS_seq.cpp and __test__/test_HSS_mpi.cpp respectively. There is also one sequential example in examples/MLkernel.cpp, which uses HSS compression for kernel matrices as used in certain machine learning applications, see for instance \ref References "[2]". This part of the code will be better documented in future STRUMPACK releases.
+The HSS code can be found in the src/HSS/ subdirectory. All HSS code
+is in a namespace called \link strumpack::HSS HSS\endlink. The class
+for a sequential/multithreaded HSS matrix is \link
+strumpack::HSS::HSSMatrix HSSMatrix<scalar>\endlink, while the
+distributed memory HSS class is \link strumpack::HSS::HSSMatrixMPI
+HSSMatrixMPI<scalar>\endlink. For examples of the usage of these
+classes, see the test code in __test__/test_HSS_seq.cpp and
+__test__/test_HSS_mpi.cpp respectively. There is also one sequential
+example in examples/MLkernel.cpp, which uses HSS compression for
+kernel matrices as used in certain machine learning applications, see
+for instance \ref References "[2]". This part of the code will be
+better documented in future STRUMPACK releases.
 
 
 */
