@@ -71,9 +71,9 @@ StrumpackSparseSolver\endlink. It can be accessed via the
 BLR_options() routine as follows:
 
 \code {.cpp}
-strumpack::StrumpackSparseSolver<double> sp;             // create solver object
-strumpack::SPOptions::enable_BLR();                      // enable BLR compression in the multifrontal solver
-strumpack::BLR::BLROptions::set_leaf_size(256);          // set the BLR leaf size
+strumpack::StrumpackSparseSolver<double> sp;      // create solver object
+sp.options().enable_BLR();                        // enable BLR compression in the multifrontal solver
+sp.options().BLR_options().set_leaf_size(256);    // set the BLR leaf size
 \endcode
 
  __The compression tolerances can greatly impact performance.__ They

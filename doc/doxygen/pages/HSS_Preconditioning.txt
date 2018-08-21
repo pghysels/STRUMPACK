@@ -76,9 +76,9 @@ StrumpackSparseSolver\endlink. It can be accessed via the
 HSS_options() routine as follows:
 
 \code {.cpp}
-strumpack::StrumpackSparseSolver<double> sp;             // create solver object
-strumpack::SPOptions::enable_HSS();                      // enable HSS compression in the multifrontal solver
-strumpack::HSS::HSSOptions::set_leaf_size(256);          // set the HSS leaf size
+strumpack::StrumpackSparseSolver<double> sp;    // create solver object
+sp.options().enable_HSS();                      // enable HSS compression in the multifrontal solver
+sp.options().HSS_options().set_leaf_size(256);  // set the HSS leaf size
 \endcode
 
 In STRUMPACK, HSS matrices are constructed using a randomized sampling
