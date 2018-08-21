@@ -206,7 +206,7 @@ namespace strumpack {
                   << max_rank() << ")" << std::endl
                   << "#   --blr_low_rank_algorithm (default "
                   << get_name(lr_algo_) << ")" << std::endl
-                  << "       should be one of [RRQR|ACA]" << std::endl
+                  << "       should be RRQR (ACA not supported yet)" << std::endl
                   << "#   --blr_admissibility (default "
                   << get_name(adm_) << ")" << std::endl
                   << "       should be one of [weak|strong]" << std::endl

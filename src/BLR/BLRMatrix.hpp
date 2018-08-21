@@ -35,7 +35,6 @@
 #include <cassert>
 
 #include "../dense/DenseMatrix.hpp"
-#include "../dense/ACA.hpp"
 #include "BLROptions.hpp"
 
 namespace strumpack {
@@ -197,16 +196,14 @@ namespace strumpack {
           T.low_rank(U_, V_, opts.rel_tol(), opts.abs_tol(), opts.max_rank(),
                      params::task_recursion_cutoff_level);
         } else if (opts.low_rank_algorithm() == LowRankAlgorithm::ACA) {
-          DenseM_t Vt;
-          adaptive_cross_approximation<scalar_t>
-            (U_, Vt, T.rows(), T.cols(),
-             [&](std::size_t i, std::size_t j)->scalar_t { return T(i, j); },
-             opts.rel_tol(), opts.abs_tol(), opts.max_rank());
-          V_ = Vt.transpose();
+          std::cerr << "ERROR: ACA is currently not supported." << std::endl;
+          // DenseM_t Vt;
+          // adaptive_cross_approximation<scalar_t>
+          //   (U_, Vt, T.rows(), T.cols(),
+          //    [&](std::size_t i, std::size_t j)->scalar_t { return T(i, j); },
+          //    opts.rel_tol(), opts.abs_tol(), opts.max_rank());
+          // V_ = Vt.transpose();
         }
-        // std::cout << "rank= " << rank()
-        //           << " rows= " << rows()
-        //           << " cols= " << cols() << std::endl;
       }
 
       std::size_t rows() const { return U_.rows(); }
