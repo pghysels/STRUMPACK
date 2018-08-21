@@ -15,7 +15,9 @@ ____
 + \link algorithm Algorithm \endlink
 + \link sparse Using STRUMPACK Sparse \endlink
 + \link HSS_Preconditioning HSS Preconditioning \endlink
++ \link BLR_Preconditioning BLR Preconditioning \endlink
 + \link dense_matrices HSS Approximation of Dense Matrices \endlink
++ \link blr_matrices BLR Approximation of Dense Matrices \endlink
 + \link examples Examples \endlink
 + \link C_Interface C Interface \endlink
 + \link tips Advanced Usage Tips \endlink

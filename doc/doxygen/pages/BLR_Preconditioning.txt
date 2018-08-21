@@ -1,0 +1,96 @@
+/*! \page BLR_Preconditioning BLR Preconditioning
+
+Apart from hierarchically semi-separable rank-structured matrices, the
+sparse multifrontal solver can also use Block Low-Rank (BLR) matrices
+to compress the fill-in. In the multifrontal method, computations are
+performed on dense matrices called frontal matrices. A frontal matrix
+can be approximated as a BLR matrix, but this will only be beneficial
+(compared to storing the frontal as a standard dense matrix and
+operating on it with BLAS/LAPACK routines) if the frontal matrix is
+large enough.
+
+__Currently STRUMPACK only has some experimental sequential and
+multithreaded support for BLR compression.__
+
+Rank-structured compression is not used by default in the STRUMPACK
+sparse solver (the default is to perform exact LU factorization), but
+BLR compression can be turned on/off via the command line:
+
+\code {.bash}
+--sp_enable_blr   (no argument)
+--sp_disable_blr  (no argument)
+\endcode
+
+or via the C++ API as follows
+
+\code {.cpp}
+void strumpack::SPOptions::enable_BLR();
+void strumpack::SPOptions::disable_BLR();
+bool strumpack::SPOptions::use_BLR();      // check whether BLR compression is enabled
+\endcode
+
+When BLR compression is enabled, the default STRUMPACK behavior is to
+use the BLR enabled approximate LU factorization as a preconditioner
+within GMRES. This behavior can also be changed, see \link solve
+Solve\endlink.
+
+However, BLR compression has a considerable overhead and only pays off
+for sufficiently large matrices.  Therefore STRUMPACK has a tuning
+parameter to specify the minimum size a dense matrix needs to be to be
+considered a candidate for HSS compression. The minimum dense matrix
+size for BLR compression is set via the command line via
+
+\code {.bash}
+--sp_blr_min_sep_size int (default 256)
+\endcode
+
+or via the C++ API as follows
+
+\code {.cpp}
+void strumpack::SPOptions::set_BLR_min_sep_size(int s);
+int strumpack::SPOptions::BLR_min_sep_size() const;       // get the current value
+\endcode
+
+The routine \link strumpack::SPOptions::set_BLR_min_sep_size(int s)
+set_BLR_min_sep_size(int s)\endlink refers to the size of the top-left
+block of the front only. This top-left block is the part that
+corresponds to a separator, as given by the nested dissection
+reordering algorithm. This top-left block is also referred to as the
+block containing the fully-summed variable. Factorization is only
+applied to this top-left block. __Tuning the value for the minimum
+separator size can have a big impact on performance and memory
+usage!__
+
+The above options affect the use of BLR within the multifrontal
+solver. There are more, BLR specific, options which are stored in an
+object of type \link strumpack::BLR
+BLR::BLROptions<scalar>\endlink. An object of this type is stored in
+the \link strumpack::SPOptions SPOptions<scalar>\endlink object stored
+in the \link strumpack::StrumpackSparseSolver
+StrumpackSparseSolver\endlink. It can be accessed via the
+BLR_options() routine as follows:
+
+\code {.cpp}
+strumpack::StrumpackSparseSolver<double> sp;             // create solver object
+strumpack::SPOptions::enable_BLR();                      // enable BLR compression in the multifrontal solver
+strumpack::BLR::BLROptions::set_leaf_size(256);          // set the BLR leaf size
+\endcode
+
+ __The compression tolerances can greatly impact performance.__ They
+can be set using:
+
+\code
+> --blr_rel_tol real (default 0.01)
+> --blr_abs_tol real (default 1e-08)
+\endcode
+
+or via the C++ API
+
+\code
+> void strumpack::BLR::BLROptions<scalar>::set_rel_tol(real rel_tol);
+> void strumpack::BLR::BLROptions<scalar>::set_abs_tol(real abs_tol);
+> real strumpack::BLR::BLROptions<scalar>::rel_tol() const;              // get the current value
+> real strumpack::BLR::BLROptions<scalar>::abs_tol() const;
+\endcode
+
+*/
