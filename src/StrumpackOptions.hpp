@@ -152,6 +152,7 @@ namespace strumpack {
     }
     return false;
   }
+
   /*! \brief Type of Gram-Schmidt orthogonalization used in GMRes.
    * \ingroup Enumerations */
   enum class GramSchmidtType {

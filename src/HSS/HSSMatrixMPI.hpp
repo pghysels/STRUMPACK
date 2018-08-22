@@ -88,7 +88,7 @@ namespace strumpack {
 
       HSSMatrixMPI<scalar_t>& operator=(const HSSMatrixMPI<scalar_t>& other);
       HSSMatrixMPI<scalar_t>& operator=(HSSMatrixMPI<scalar_t>&& other) = default;
-      HSSMatrixBase<scalar_t>* clone() const override;
+      std::unique_ptr<HSSMatrixBase<scalar_t>> clone() const override;
 
       const HSSMatrixBase<scalar_t>* child(int c) const
       { return this->_ch[c].get(); }
@@ -442,9 +442,10 @@ namespace strumpack {
       return *this;
     }
 
-    template<typename scalar_t> HSSMatrixBase<scalar_t>*
+    template<typename scalar_t> std::unique_ptr<HSSMatrixBase<scalar_t>>
     HSSMatrixMPI<scalar_t>::clone() const {
-      return new HSSMatrixMPI<scalar_t>(*this);
+      return std::unique_ptr<HSSMatrixBase<scalar_t>>
+        (new HSSMatrixMPI<scalar_t>(*this));
     }
 
     /** private constructor */

@@ -69,7 +69,7 @@ namespace strumpack {
       HSSMatrixBase<scalar_t>& operator=(const HSSMatrixBase<scalar_t>& other);
       HSSMatrixBase(HSSMatrixBase&& h) = default;
       HSSMatrixBase& operator=(HSSMatrixBase&& h) = default;
-      virtual HSSMatrixBase<scalar_t>* clone() const = 0;
+      virtual std::unique_ptr<HSSMatrixBase<scalar_t>> clone() const = 0;
 
       std::pair<std::size_t,std::size_t> dims() const {
         return std::make_pair(_rows, _cols);

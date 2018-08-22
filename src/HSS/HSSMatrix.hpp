@@ -27,7 +27,11 @@
  *
  */
 /*! \file HSSMatrix.hpp
- * \brief For Pieter to complete
+ *
+ * \brief This file contains the HSSMatrix class definition as well as
+ * implementations for a number of it's member routines. Other member
+ * routines are implemented in files such as HSSMatrix.apply.hpp,
+ * HSSMatrix.factor.hpp etc.
  */
 #ifndef HSS_MATRIX_HPP
 #define HSS_MATRIX_HPP
@@ -43,8 +47,27 @@
 namespace strumpack {
   namespace HSS {
 
+    // forward declaration
     template<typename scalar_t> class HSSMatrixMPI;
 
+
+    /**
+     * \class HSSMatrix
+     *
+     * \brief HSSMatrix is a class to represent a sequential/threaded
+     * Hierarchically Semi-Separable matrix.
+     *
+     * This is for non-symmetric matrices, but can be used with
+     * symmetric matrices as well. This class inherits from
+     * HSSMatrixBase. The template type can be float, double,
+     * std:complex<float> or std::complex<double>. For the distributed
+     * memory code for HSS matrices, see HSSMatrixMPI. An HSS matrix
+     * is represented recursively, using 2 children which are also
+     * HSSMatrix object, except at the lowest level (the leafs), where
+     * the HSSMatrix has no children. Hence, the tree representing the
+     * HSS matrix is always a binary tree, but not necessarily a
+     * complete binary tree.
+     */
     template<typename scalar_t> class HSSMatrix
       : public HSSMatrixBase<scalar_t> {
       using real_t = typename RealType<scalar_t>::value_type;
@@ -58,35 +81,221 @@ namespace strumpack {
       using opts_t = HSSOptions<scalar_t>;
 
     public:
+      /**
+       * Default constructor, constructs an empty 0 x 0 matrix.
+       */
       HSSMatrix();
-      HSSMatrix(const DenseM_t& A, const opts_t& opts);
-      HSSMatrix(std::size_t m, std::size_t n, const opts_t& opts);
-      HSSMatrix(const HSSPartitionTree& t, const opts_t& opts);
-      HSSMatrix(const HSSMatrix<scalar_t>& other);
-      HSSMatrix<scalar_t>& operator=(const HSSMatrix<scalar_t>& other);
-      HSSMatrix(HSSMatrix<scalar_t>&& other) = default;
-      HSSMatrix<scalar_t>& operator=(HSSMatrix<scalar_t>&& other) = default;
-      HSSMatrixBase<scalar_t>* clone() const override;
 
+      /**
+       * Construct an HSS representation for a dense matrix A. The HSS
+       * tree will be constructed by splitting the row/column set
+       * evenly and recursively until the leafs in the HSS tree are
+       * smaller than opts.leaf_size(). Alternative constructors can
+       * be used to specify a specific HSS partitioning
+       * tree. Internaly, this will call the appropriate compress
+       * routine to construct the HSS representation, using the
+       * options (such as compression tolerance, adaptive compression
+       * scheme etc) as specified in the HSSOptions opts object.
+       *
+       * \param A dense matrix (unmodified) to compress as HSS
+       * \param opts object containing a number of options for HSS
+       * compression
+       * \see DenseMatrix
+       * \see HSSOptions
+       */
+      HSSMatrix(const DenseM_t& A, const opts_t& opts);
+
+      /**
+       * Construct an HSS representation for an m x n matrix. The HSS
+       * tree will be constructed by splitting the row/column set
+       * evenly and recursively until the leafs in the HSS tree are
+       * smaller than opts.leaf_size(). After construction, the HSS
+       * matrix will be empty, and can be filled by calling one of the
+       * compress member routines. Alternative constructors can be
+       * used to specify a specific HSS partitioning tree.
+       *
+       * \param m number of rows in the constructed HSS matrix
+       * \param n number of rows in the constructed HSS matrix
+       * \param opts object containing a number of options for HSS
+       * compression
+       * \see HSSOptions
+       */
+      HSSMatrix(std::size_t m, std::size_t n, const opts_t& opts);
+
+      /**
+       * Construct an HSS matrix using a specified HSS tree. After
+       * construction, the HSS matrix will be empty, and can be filled
+       * by calling one of the compress member routines.
+       *
+       * \param t tree specifying the HSS matrix partitioning
+       * \param opts object containing a number of options for HSS
+       * compression
+       * \see HSSOptions
+       */
+      HSSMatrix(const HSSPartitionTree& t, const opts_t& opts);
+
+      /**
+       * Copy constructor. Copying an HSSMatrix can be an expensive
+       * operation.
+       * \param other HSS matrix to be copied
+       */
+      HSSMatrix(const HSSMatrix<scalar_t>& other);
+
+      /**
+       * Copy assignment operator. Copying an HSSMatrix can be an
+       * expensive operation.
+       * \param other HSS matrix to be copied
+       */
+      HSSMatrix<scalar_t>& operator=(const HSSMatrix<scalar_t>& other);
+
+      /**
+       * Move constructor.
+       * \param other HSS matrix to be moved from, will be emptied
+       */
+      HSSMatrix(HSSMatrix<scalar_t>&& other) = default;
+
+      /**
+       * Move assignment operator.
+       * \param other HSS matrix to be moved from, will be emptied
+       */
+      HSSMatrix<scalar_t>& operator=(HSSMatrix<scalar_t>&& other) = default;
+
+      /**
+       * Create a clone of this matrix.
+       * TODO remove this!!???
+       */
+      std::unique_ptr<HSSMatrixBase<scalar_t>> clone() const override;
+
+      /**
+       * Return a const raw (non-owning) pointer to child c of this
+       * HSS matrix. A child of an HSS matrix is itself an HSS
+       * matrix. The value of c should be 0 or 1, and this HSS matrix
+       * should not be a leaf!
+       */
       const HSSMatrix<scalar_t>* child(int c) const {
         return dynamic_cast<HSSMatrix<scalar_t>*>(this->_ch[c].get());
       }
+
+      /**
+       * Return a raw (non-owning) pointer to child c of this HSS
+       * matrix. A child of an HSS matrix is itself an HSS matrix. The
+       * value of c should be 0 or 1, and this HSS matrix should not
+       * be a leaf!
+       */
       HSSMatrix<scalar_t>* child(int c) {
         return dynamic_cast<HSSMatrix<scalar_t>*>(this->_ch[c].get());
       }
 
+      /**
+       * Initialize this HSS matrix as the compressed HSS
+       * representation of a given dense matrix. The HSS matrix should
+       * have been constructed with the proper sizes, i.e., rows() ==
+       * A.rows() and cols() == A.cols().  Internaly, this will call
+       * the appropriate compress routine to construct the HSS
+       * representation, using the options (such as compression
+       * tolerance, adaptive compression scheme etc) as specified in
+       * the HSSOptions opts object.
+       *
+       * \param A dense matrix (unmodified) to compress as HSS
+       * \param opts object containing a number of options for HSS
+       * compression
+       * \see DenseMatrix
+       * \see HSSOptions
+       */
       void compress(const DenseM_t& A, const opts_t& opts);
+
+      /**
+       * Initialize this HSS matrix as the compressed HSS
+       * representation of a given dense matrix. The HSS matrix should
+       * have been constructed with the proper sizes, i.e., rows() ==
+       * A.rows() and cols() == A.cols().  Internaly, this will call
+       * the appropriate compress routine to construct the HSS
+       * representation, using the options (such as compression
+       * tolerance, adaptive compression scheme etc) as specified in
+       * the HSSOptions opts object.
+       *
+       * \param A dense matrix (unmodified) to compress as HSS
+       * \param opts object containing a number of options for HSS
+       * compression
+       * \see DenseMatrix
+       * \see HSSOptions
+       */
       void compress
       (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts);
 
+      /**
+       * Reset the matrix to an empty, 0 x 0 matrix, freeing up all
+       * it's memory.
+       */
       void reset() override;
 
+      /**
+       * Compute a ULV factorization of this matrix. The factors are
+       * returned as an HSSFactors object, the current HSS matrix is
+       * not modified.
+       */
       HSSFactors<scalar_t> factor() const;
+
+      /**
+       * Compute a partial ULV factorization of this matrix. Only the
+       * left child is factored. This is not similar to calling
+       * child(0)->factor(), except that the HSSFactors resulting from
+       * calling partial_factor can be used to compute the Schur
+       * complement. The factors are returned as an HSSFactors object,
+       * the current HSS matrix is not modified.
+       *
+       * \see Schur_update, Schur_product_direct and
+       * Schur_product_indirect
+       */
       HSSFactors<scalar_t> partial_factor() const;
+
+      /**
+       * Solve a linear system with the ULV factorization of this
+       * HSSMatrix. The right hand side vector (or matrix) b is
+       * overwritten with the solution x of Ax=b.
+       *
+       * \param ULV ULV factorization of this matrix
+       * \param b on input, the right hand side vector, on output the
+       * solution of A x = b (with A this HSS matrix). The vector b
+       * should be b.rows() == cols().
+       * \see factor
+       */
       void solve(const HSSFactors<scalar_t>& ULV, DenseM_t& b) const;
+
+      /**
+       * Perform only the forward phase of the ULV linear solve. This
+       * is for advanced use only, typically to be used in combination
+       * with partial_factor. You should really just use factor/solve
+       * when possible.
+       *
+       * \param ULV  ULV factorization of this matrix
+       * \param w temporary working storage, to pass information from
+       * forward_solve to backward_solve
+       * \param b on input, the right hand side vector, on output the
+       * intermediate solution. The vector b
+       * should be b.rows() == cols().
+       * \param partial denotes wether the matrix was fully or
+       * partially factored
+       * \see factor, partial_factor, backward_solve
+       */
       void forward_solve
       (const HSSFactors<scalar_t>& ULV, WorkSolve<scalar_t>& w,
        const DenseM_t& b, bool partial) const;
+
+      /**
+       * Perform only the backward phase of the ULV linear solve. This
+       * is for advanced use only, typically to be used in combination
+       * with partial_factor. You should really just use factor/solve
+       * when possible.
+       *
+       * \param ULV  ULV factorization of this matrix
+       * \param w temporary working storage, to pass information from
+       * forward_solve to backward_solve
+       * \param b on input, the vector obtained from forward_solve, on
+       * output the solution of A x = b (with A this HSS matrix). The
+       * vector b should be b.rows() == cols().
+       * \see factor, partial_factor, backward_solve
+       */
       void backward_solve
       (const HSSFactors<scalar_t>& ULV,
        WorkSolve<scalar_t>& w, DenseM_t& x) const;
@@ -102,14 +311,23 @@ namespace strumpack {
       (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
        DenseM_t& B) const;
 
+      /**
+       * Compute a Schur complement update... TODO
+       */
       void Schur_update
       (const HSSFactors<scalar_t>& f, DenseM_t& Theta,
        DenseM_t& DUB01, DenseM_t& Phi) const;
+      /**
+       * TODO
+       */
       void Schur_product_direct
       (const HSSFactors<scalar_t>& f,
        const DenseM_t& Theta, const DenseM_t& DUB01,
        const DenseM_t& Phi, const DenseM_t&_ThetaVhatC_or_VhatCPhiC,
        const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc) const;
+      /**
+       * TODO
+       */
       void Schur_product_indirect
       (const HSSFactors<scalar_t>& f, const DenseM_t& DUB01,
        const DenseM_t& R1, const DenseM_t& R2, const DenseM_t& Sr2,
@@ -326,9 +544,10 @@ namespace strumpack {
       return *this;
     }
 
-    template<typename scalar_t> HSSMatrixBase<scalar_t>*
+    template<typename scalar_t> std::unique_ptr<HSSMatrixBase<scalar_t>>
     HSSMatrix<scalar_t>::clone() const {
-      return new HSSMatrix<scalar_t>(*this);
+      return std::unique_ptr<HSSMatrixBase<scalar_t>>
+        (new HSSMatrix<scalar_t>(*this));
     }
 
     template<typename scalar_t> void

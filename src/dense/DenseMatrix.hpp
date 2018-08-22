@@ -59,6 +59,7 @@ namespace strumpack {
     C='C',  /*!< Complex conjugate */
     T='T'   /*!< Transpose         */
   };
+
   /**
    * Which side to apply the operation on, as used by several BLAS
    * routines.  \ingroup Enumerations
@@ -67,6 +68,7 @@ namespace strumpack {
     L='L',  /*!< Left side         */
     R='R'   /*!< Right side        */
   };
+
   /**
    * Which triangular part of the matrix to consider, as used by
    * several BLAS routines.  \ingroup Enumerations
@@ -75,6 +77,7 @@ namespace strumpack {
     U='U',  /*!< Upper triangle    */
     L='L'   /*!< Lower triangle    */
   };
+
   /**
    * Whether the matrix in unit diagonal or not.  \ingroup
    * Enumerations
@@ -108,11 +111,13 @@ namespace strumpack {
     std::size_t _ld = 1;
 
   public:
+
     /**
      * Default constructor, constucts 0x0 empty matrix, with leading
      * dimension 1.
      */
     DenseMatrix();
+
     /**
      * Constructs, and allocates, an m x n dense matrix, using column
      * major storage. The leading dimension will be max(1, m).
@@ -121,6 +126,7 @@ namespace strumpack {
      * \param n Number of columns in the constructed matrix.
      */
     DenseMatrix(std::size_t m, std::size_t n);
+
     /**
      * Construct/allocate a dense m x n matrix, and initialize it by
      * copying the data pointed to by D (with leading dimension
@@ -135,6 +141,7 @@ namespace strumpack {
      */
     DenseMatrix
     (std::size_t m, std::size_t n, const scalar_t* D, std::size_t ld);
+
     /**
      * Construct a dense m x n matrix by copying a submatrix from
      * matrix D. The copied submatrix has has top-left corner at
@@ -153,15 +160,19 @@ namespace strumpack {
     DenseMatrix
     (std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& D,
      std::size_t i, std::size_t j);
+
     /** Copy constructor */
     DenseMatrix(const DenseMatrix<scalar_t>& D);
+
     /** Move constructor */
     DenseMatrix(DenseMatrix<scalar_t>&& D);
+
     /** Destructor */
     virtual ~DenseMatrix();
 
     /** Copy operator, expensive operation for large matrices. */
     virtual DenseMatrix<scalar_t>& operator=(const DenseMatrix<scalar_t>& D);
+
     /**
      * Move operator
      * \param D Matrix to be moved into this object, will be emptied.
@@ -170,21 +181,26 @@ namespace strumpack {
 
     /** Number of rows of the matrix */
     inline std::size_t rows() const { return _rows; }
+
     /** Number of columns of the matrix */
     inline std::size_t cols() const { return _cols; }
+
     /**
      * Leading dimension used to store the matrix, typically set to
      * max(1, rows())
      */
     inline std::size_t ld() const { return _ld; }
+
     /**
      * Const pointer to the raw data used to represent this matrix.
      */
     inline const scalar_t* data() const { return _data; }
+
     /**
      * Pointer to the raw data used to represent this matrix.
      */
     inline scalar_t* data() { return _data; }
+
     /**
      * Const reference to element (i,j) in the matrix. This will do a
      * bounds check with assertions, which are enabled in Debug mode,
@@ -195,6 +211,7 @@ namespace strumpack {
      */
     inline const scalar_t& operator()(std::size_t i, std::size_t j) const
     { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return _data[i+_ld*j]; }
+
     /**
      * Const pointer to element (i,j) in the matrix. This will do a
      * bounds check with assertions, which are enabled in Debug mode,
@@ -205,6 +222,7 @@ namespace strumpack {
      */
     inline const scalar_t* ptr(std::size_t i, std::size_t j) const
     { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return _data+i+_ld*j; }
+
     /**
      * Reference to element (i,j) in the matrix. This will do a bounds
      * check with assertions, which are enabled in Debug mode,
@@ -215,6 +233,7 @@ namespace strumpack {
      */
     inline scalar_t& operator()(std::size_t i, std::size_t j)
     { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return _data[i+_ld*j]; }
+
     /**
      * Pointer to element (i,j) in the matrix. This will do a bounds
      * check with assertions, which are enabled in Debug mode,
@@ -233,6 +252,7 @@ namespace strumpack {
      * only its sizes and its norm are printed. Useful for debugging.
      */
     void print() const { print("A"); }
+
     /**
      * Print the matrix to std::cout, in a format interpretable by
      * Matlab/Octave. The matrix is printed in full when not too big,
@@ -247,6 +267,7 @@ namespace strumpack {
      * printing floating point values, defaults to 8.
      */
     void print(std::string name, bool all=false, int width=8) const;
+
     /**
      * Print the matrix to a file, in a format readable by
      * Matlab/Octave.
@@ -258,12 +279,14 @@ namespace strumpack {
      */
     void print_to_file
     (std::string name, std::string filename, int width=8) const;
+
     /**
      * Fill the matrix with random numbers, using random number
      * generator/distribution
      * random::make_default_random_generator<real_t>()
      */
     void random();
+
     /**
      * Fill the matrix with random numbers, using the specified random
      * number generator.
@@ -271,19 +294,24 @@ namespace strumpack {
     void random
     (random::RandomGeneratorBase<typename RealType<scalar_t>::
      value_type>& rgen);
+
     /** Fill matrix with a constant value */
     void fill(scalar_t v);
+
     /** Set all matrix elements to zero */
     void zero();
+
     /**
      * Set the matrix to the identity matrix. Also works for
      * rectangular matrices.
      */
     void eye();
+
     /**
      * Clear the matrix. Resets the number of rows and columns to 0.
      */
     virtual void clear();
+
     /**
      * Resize the matrix. The relevant parts of the original matrix
      * will be copied to the new matrix. The contents of new parts of
@@ -293,6 +321,7 @@ namespace strumpack {
      * \param m Number of columns after resizing.
      */
     void resize(std::size_t m, std::size_t n);
+
     /**
      * Horizontally concatenate a matrix to this matrix: [this b].
      * The resulting matrix will have the same number of rows as b and
@@ -302,6 +331,7 @@ namespace strumpack {
      * should have to same number of rows, rows == b.rows().
      */
     void hconcat(const DenseMatrix<scalar_t>& b);
+
     /**
      * Copy a submatrix of size rows() x cols() from B, at position
      * (i,j) into this matrix. The following conditions should be
@@ -315,6 +345,7 @@ namespace strumpack {
      */
     void copy
     (const DenseMatrix<scalar_t>& B, std::size_t i=0, std::size_t j=0);
+
     /**
      * Copy a submatrix of size rows() x cols() from matrix B, with
      * leading dimension ld, into this matrix.
@@ -324,6 +355,7 @@ namespace strumpack {
      * be at least cols()
      */
     void copy(const scalar_t* B, std::size_t ldb);
+
     /** Return the transpose of this matrix */
     DenseMatrix<scalar_t> transpose() const;
 
@@ -338,6 +370,7 @@ namespace strumpack {
      * order
      */
     void laswp(const std::vector<int>& P, bool fwd);
+
     /**
      * Apply the LAPACK routine xLASWP to the matrix. xLASWP performs
      * a series of row interchanges on the matrix.  One row
@@ -349,6 +382,7 @@ namespace strumpack {
      * order
      */
     void laswp(const int* P, bool fwd);
+
     /**
      * Apply the LAPACK routine xLAPMR to the matrix. xLAPMR
      * rearranges the rows of the M by N matrix X as specified by the
@@ -362,6 +396,7 @@ namespace strumpack {
      * \param fwd apply permutation, or inverse permutation, see above
      */
     void lapmr(const std::vector<int>& P, bool fwd);
+
     /**
      * Apply the LAPACK routines xLAPMT to the matrix. xLAPMT
      * rearranges the columns of the M by N matrix X as specified by
@@ -388,6 +423,7 @@ namespace strumpack {
      */
     void extract_rows
     (const std::vector<std::size_t>& I, const DenseMatrix<scalar_t>& B);
+
     /**
      * Return a matrix with rows I of this matrix.
      *
