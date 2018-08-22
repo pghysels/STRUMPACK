@@ -778,6 +778,7 @@ WARN_LOGFILE           =
 	@CMAKE_CURRENT_SOURCE_DIR@/src/sparse/CSRMatrixMPI.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/dense/DenseMatrix.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/dense/DistributedMatrix.hpp \
+	@CMAKE_CURRENT_SOURCE_DIR@/src/dense/BLACSGrid.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/HSS/HSSOptions.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/HSS/HSSPartitionTree.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/HSS/HSSMatrixBase.hpp \
@@ -785,6 +786,7 @@ WARN_LOGFILE           =
 	@CMAKE_CURRENT_SOURCE_DIR@/src/HSS/HSSExtraMPI.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/HSS/HSSMatrix.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/HSS/HSSMatrixMPI.hpp \
+	@CMAKE_CURRENT_SOURCE_DIR@/src/misc/MPIWrapper.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Overview.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Installation.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Algorithm.txt \

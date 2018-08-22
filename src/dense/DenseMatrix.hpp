@@ -26,6 +26,11 @@
  *             Division).
  *
  */
+/*! \file DenseMatrix.hpp
+ *
+ * \brief Contains the DenseMatrix and DenseMatrixWrapper classes,
+ * simple wrappers around BLAS/LAPACK style dense matrices.
+ */
 #ifndef DENSE_MATRIX_HPP
 #define DENSE_MATRIX_HPP
 
@@ -45,13 +50,54 @@
 
 namespace strumpack {
 
-  enum class Trans : char { N='N', C='C', T='T' };
-  enum class Side : char { L='L', R='R' };
-  enum class UpLo : char { U='U', L='L' };
-  enum class Diag : char { U='U', N='N' };
+  /**
+   * Operation to perform on the matrix, as used by several BLAS
+   * routines.  \ingroup Enumerations
+   */
+  enum class Trans : char {
+    N='N',  /*!< No transpose      */
+    C='C',  /*!< Complex conjugate */
+    T='T'   /*!< Transpose         */
+  };
+  /**
+   * Which side to apply the operation on, as used by several BLAS
+   * routines.  \ingroup Enumerations
+   */
+  enum class Side : char {
+    L='L',  /*!< Left side         */
+    R='R'   /*!< Right side        */
+  };
+  /**
+   * Which triangular part of the matrix to consider, as used by
+   * several BLAS routines.  \ingroup Enumerations
+   */
+  enum class UpLo : char {
+    U='U',  /*!< Upper triangle    */
+    L='L'   /*!< Lower triangle    */
+  };
+  /**
+   * Whether the matrix in unit diagonal or not.  \ingroup
+   * Enumerations
+   */
+  enum class Diag : char {
+    U='U',  /*!< Unit diagonal     */
+    N='N'   /*!< Non-unit diagonal */
+  };
 
-  template<typename scalar_t> class DistributedMatrix;
 
+  /**
+   * \class DenseMatrix
+   * \brief This class represents a matrix, stored in column major
+   * format, to allow direct use of BLAS/LAPACK routines.
+   *
+   * This class represents a (2D) matrix, stored in column major
+   * format, to allow direct use of BLAS/LAPACK routines. Possible
+   * values for the scalar_t template type are: float, double,
+   * std::complex<float> and std::complex<double>. A DenseMatrix
+   * allocates, owns and deallocates its memory. If you want to use
+   * pre-allocated memory to represent a dense matrix, use the
+   * DenseMatrixWrapper<scalar_t> class.
+   */
   template<typename scalar_t> class DenseMatrix {
     using real_t = typename RealType<scalar_t>::value_type;
 
@@ -62,51 +108,211 @@ namespace strumpack {
     std::size_t _ld = 1;
 
   public:
+    /**
+     * Default constructor, constucts 0x0 empty matrix, with leading
+     * dimension 1.
+     */
     DenseMatrix();
+    /**
+     * Constructs, and allocates, an m x n dense matrix, using column
+     * major storage. The leading dimension will be max(1, m).
+     * \param m Number of rows in the constructed matrix.
+     * \param n Number of columns in the constructed matrix.
+     */
     DenseMatrix(std::size_t m, std::size_t n);
+    /**
+     * Construct/allocate a dense m x n matrix, and initialize it by
+     * copying the data pointed to by D (with leading dimension
+     * ld).
+     * \param m Number of rows in the constructed matrix.
+     * \param n Number of columns in the constructed matrix.
+     * \param D pointer to data to be copied in newly allocated
+     * DenseMatrix. Cannot be null.
+     * \param ld Leading dimension of logically 2D matrix pointed to
+     * by D. Should be >= m.
+     */
     DenseMatrix
     (std::size_t m, std::size_t n, const scalar_t* D, std::size_t ld);
+    /**
+     * Construct a dense m x n matrix by copying a submatrix from
+     * matrix D. The copied submatrix has has top-left corner at
+     * position i,j in D, i.e. is D(i:i+m,j:j+n). The submatrix should
+     * be contained in D, i.e.: i+m <= D.rows() and j+n <= D.cols().
+     *
+     * \param m Number of rows in the constructed matrix.
+     * \param n Number of columns in the constructed matrix.
+     * \param D Matrix from which the newly constructed DenseMatrix is
+     * a submatrix.
+     * \param i Row-offset in D, denoting top side of submatrix to
+     * copy to new matrix.
+     * \param j Column-offset in D, denoting left side of submatrix to
+     * copy to new matrix.
+     */
     DenseMatrix
     (std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& D,
      std::size_t i, std::size_t j);
+    /** Copy constructor */
     DenseMatrix(const DenseMatrix<scalar_t>& D);
+    /** Move constructor */
     DenseMatrix(DenseMatrix<scalar_t>&& D);
+    /** Destructor */
     virtual ~DenseMatrix();
 
+    /** Copy operator, expensive operation for large matrices. */
     virtual DenseMatrix<scalar_t>& operator=(const DenseMatrix<scalar_t>& D);
+    /**
+     * Move operator
+     * \param D Matrix to be moved into this object, will be emptied.
+     */
     virtual DenseMatrix<scalar_t>& operator=(DenseMatrix<scalar_t>&& D);
 
+    /** Number of rows of the matrix */
     inline std::size_t rows() const { return _rows; }
+    /** Number of columns of the matrix */
     inline std::size_t cols() const { return _cols; }
+    /**
+     * Leading dimension used to store the matrix, typically set to
+     * max(1, rows())
+     */
     inline std::size_t ld() const { return _ld; }
+    /**
+     * Const pointer to the raw data used to represent this matrix.
+     */
     inline const scalar_t* data() const { return _data; }
+    /**
+     * Pointer to the raw data used to represent this matrix.
+     */
     inline scalar_t* data() { return _data; }
+    /**
+     * Const reference to element (i,j) in the matrix. This will do a
+     * bounds check with assertions, which are enabled in Debug mode,
+     * disabled in Release mode.
+     * \param i Row index, i < rows()
+     * \param j Column index, j < cols()
+     */
     inline const scalar_t& operator()(std::size_t i, std::size_t j) const
     { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return _data[i+_ld*j]; }
+    /**
+     * Const pointer to element (i,j) in the matrix. This will do a
+     * bounds check with assertions, which are enabled in Debug mode,
+     * disabled in Release mode.
+     * \param i Row index, i < rows()
+     * \param j Column index, j < cols()
+     */
     inline const scalar_t* ptr(std::size_t i, std::size_t j) const
     { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return _data+i+_ld*j; }
+    /**
+     * Reference to element (i,j) in the matrix. This will do a bounds
+     * check with assertions, which are enabled in Debug mode,
+     * disabled in Release mode.
+     * \param i Row index, i < rows()
+     * \param j Column index, j < cols()
+     */
     inline scalar_t& operator()(std::size_t i, std::size_t j)
     { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return _data[i+_ld*j]; }
+    /**
+     * Pointer to element (i,j) in the matrix. This will do a bounds
+     * check with assertions, which are enabled in Debug mode,
+     * disabled in Release mode.
+     * \param i Row index, i < rows()
+     * \param j Column index, j < cols()
+     */
     inline scalar_t* ptr(std::size_t i, std::size_t j)
     { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return _data+i+_ld*j; }
 
+    /**
+     * Print the matrix to std::cout, in a format interpretable by
+     * Matlab/Octave. The matrix will only be printed in full when not
+     * too big, i.e., when rows() <= 20 and cols() <= 32. Otherwise
+     * only its sizes and its norm are printed. Useful for debugging.
+     */
     void print() const { print("A"); }
+    /**
+     * Print the matrix to std::cout, in a format interpretable by
+     * Matlab/Octave. The matrix is printed in full when not too big,
+     * i.e., when rows() <= 20 and cols() <= 32, or when all is set to
+     * true. Otherwise only its sizes and its norm are printed. Useful
+     * for debugging.
+     * \param name Name to use when printing.
+     * \param all If true, print all values, if false, only print all
+     * values when not too big. Defaults to false.
+     * \param param width Specifies how many digits to use for
+     * printing floating point values, defaults to 8.
+     */
     void print(std::string name, bool all=false, int width=8) const;
+    /**
+     * Print the matrix to a file, in a format readable by
+     * Matlab/Octave.
+     * \param name Name to use for the printed matrix.
+     * \param filename Name of the file to write to
+     * \param width Number of digits to use to represent floating
+     * point values, defaults to 8.
+     */
     void print_to_file
     (std::string name, std::string filename, int width=8) const;
+    /**
+     * Fill the matrix with random numbers, using random number
+     * generator/distribution
+     * random::make_default_random_generator<real_t>()
+     */
     void random();
+    /**
+     * Fill the matrix with random numbers, using the specified random
+     * number generator.
+     */
     void random
     (random::RandomGeneratorBase<typename RealType<scalar_t>::
      value_type>& rgen);
+    /** Fill matrix with a constant value */
     void fill(scalar_t v);
+    /** Set all matrix elements to zero */
     void zero();
+    /**
+     * Set the matrix to the identity matrix. Also works for
+     * rectangular matrices.
+     */
     void eye();
+    /**
+     * Clear the matrix. Resets the number of rows and columns to 0.
+     */
     virtual void clear();
+    /**
+     * Resize the matrix. The relevant parts of the original matrix
+     * will be copied to the new matrix. The contents of new parts of
+     * the matrix are undefined.
+     * \param m Number of rows after resizing.
+     * \param m Number of columns after resizing.
+     */
     void resize(std::size_t m, std::size_t n);
+    /**
+     * Horizontally concatenate a matrix to this matrix: [this b].
+     * The resulting matrix will have the same number of rows as b and
+     * as this original matrix, and will have cols()+b.cols() columns.
+     * \param b Matrix to concatenate to this matrix. The b matrix
+     * should have to same number of rows, rows == b.rows().
+     */
     void hconcat(const DenseMatrix<scalar_t>& b);
+    /**
+     * Copy a submatrix of size rows() x cols() from B, at position
+     * (i,j) into this matrix. The following conditions should be
+     * satisfied: i+rows() <= B.rows() and j+cols() <= B.cols().
+     * \param B Matrix from which to copy
+     * \param i Row-offset denoting the top of the submatrix of B to
+     * copy
+     * \param i Column-offset denoting the top of the submatrix of B
+     * to copy
+     */
     void copy
     (const DenseMatrix<scalar_t>& B, std::size_t i=0, std::size_t j=0);
+    /**
+     * Copy a submatrix of size rows() x cols() from matrix B, with
+     * leading dimension ld, into this matrix.
+     * \param B Pointer to the matrix data to copy
+     * \param ld Leading dimension of matrix pointed to by B, should
+     * be at least cols()
+     */
     void copy(const scalar_t* B, std::size_t ldb);
+    /** Return the transpose of this matrix */
     DenseMatrix<scalar_t> transpose() const;
 
     void laswp(const std::vector<int>& P, bool fwd);
