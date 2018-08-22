@@ -116,6 +116,7 @@ namespace strumpack {
     /**
      * Constructs, and allocates, an m x n dense matrix, using column
      * major storage. The leading dimension will be max(1, m).
+     *
      * \param m Number of rows in the constructed matrix.
      * \param n Number of columns in the constructed matrix.
      */
@@ -124,6 +125,7 @@ namespace strumpack {
      * Construct/allocate a dense m x n matrix, and initialize it by
      * copying the data pointed to by D (with leading dimension
      * ld).
+     *
      * \param m Number of rows in the constructed matrix.
      * \param n Number of columns in the constructed matrix.
      * \param D pointer to data to be copied in newly allocated
@@ -187,6 +189,7 @@ namespace strumpack {
      * Const reference to element (i,j) in the matrix. This will do a
      * bounds check with assertions, which are enabled in Debug mode,
      * disabled in Release mode.
+     *
      * \param i Row index, i < rows()
      * \param j Column index, j < cols()
      */
@@ -196,6 +199,7 @@ namespace strumpack {
      * Const pointer to element (i,j) in the matrix. This will do a
      * bounds check with assertions, which are enabled in Debug mode,
      * disabled in Release mode.
+     *
      * \param i Row index, i < rows()
      * \param j Column index, j < cols()
      */
@@ -205,6 +209,7 @@ namespace strumpack {
      * Reference to element (i,j) in the matrix. This will do a bounds
      * check with assertions, which are enabled in Debug mode,
      * disabled in Release mode.
+     *
      * \param i Row index, i < rows()
      * \param j Column index, j < cols()
      */
@@ -214,6 +219,7 @@ namespace strumpack {
      * Pointer to element (i,j) in the matrix. This will do a bounds
      * check with assertions, which are enabled in Debug mode,
      * disabled in Release mode.
+     *
      * \param i Row index, i < rows()
      * \param j Column index, j < cols()
      */
@@ -233,6 +239,7 @@ namespace strumpack {
      * i.e., when rows() <= 20 and cols() <= 32, or when all is set to
      * true. Otherwise only its sizes and its norm are printed. Useful
      * for debugging.
+     *
      * \param name Name to use when printing.
      * \param all If true, print all values, if false, only print all
      * values when not too big. Defaults to false.
@@ -243,6 +250,7 @@ namespace strumpack {
     /**
      * Print the matrix to a file, in a format readable by
      * Matlab/Octave.
+     *
      * \param name Name to use for the printed matrix.
      * \param filename Name of the file to write to
      * \param width Number of digits to use to represent floating
@@ -280,6 +288,7 @@ namespace strumpack {
      * Resize the matrix. The relevant parts of the original matrix
      * will be copied to the new matrix. The contents of new parts of
      * the matrix are undefined.
+     *
      * \param m Number of rows after resizing.
      * \param m Number of columns after resizing.
      */
@@ -288,6 +297,7 @@ namespace strumpack {
      * Horizontally concatenate a matrix to this matrix: [this b].
      * The resulting matrix will have the same number of rows as b and
      * as this original matrix, and will have cols()+b.cols() columns.
+     *
      * \param b Matrix to concatenate to this matrix. The b matrix
      * should have to same number of rows, rows == b.rows().
      */
@@ -296,6 +306,7 @@ namespace strumpack {
      * Copy a submatrix of size rows() x cols() from B, at position
      * (i,j) into this matrix. The following conditions should be
      * satisfied: i+rows() <= B.rows() and j+cols() <= B.cols().
+     *
      * \param B Matrix from which to copy
      * \param i Row-offset denoting the top of the submatrix of B to
      * copy
@@ -307,6 +318,7 @@ namespace strumpack {
     /**
      * Copy a submatrix of size rows() x cols() from matrix B, with
      * leading dimension ld, into this matrix.
+     *
      * \param B Pointer to the matrix data to copy
      * \param ld Leading dimension of matrix pointed to by B, should
      * be at least cols()
@@ -315,13 +327,76 @@ namespace strumpack {
     /** Return the transpose of this matrix */
     DenseMatrix<scalar_t> transpose() const;
 
+    /**
+     * Apply the LAPACK routine xLASWP to the matrix. xLASWP performs
+     * a series of row interchanges on the matrix.  One row
+     * interchange is initiated for each of rows in the vector P.
+     *
+     * \param P vector with row interchanges, this is assumed to be of
+     * size rows()
+     * \param fwd if fwd is false, the pivots are applied in reverse
+     * order
+     */
     void laswp(const std::vector<int>& P, bool fwd);
+    /**
+     * Apply the LAPACK routine xLASWP to the matrix. xLASWP performs
+     * a series of row interchanges on the matrix.  One row
+     * interchange is initiated for each of rows in the vector P.
+     *
+     * \param P vector with row interchanges, this is assumed to be of
+     * size rows()
+     * \param fwd if fwd is false, the pivots are applied in reverse
+     * order
+     */
     void laswp(const int* P, bool fwd);
+    /**
+     * Apply the LAPACK routine xLAPMR to the matrix. xLAPMR
+     * rearranges the rows of the M by N matrix X as specified by the
+     * permutation K(1),K(2),...,K(M) of the integers 1,...,M.
+     * If fwd == true, forward permutation:
+     *    X(K(I),*) is moved X(I,*) for I = 1,2,...,M.
+     * If fwd == false, backward permutation:
+     *    X(I,*) is moved to X(K(I),*) for I = 1,2,...,M.
+     *
+     * \param P permutation vector, should be of size rows()
+     * \param fwd apply permutation, or inverse permutation, see above
+     */
     void lapmr(const std::vector<int>& P, bool fwd);
+    /**
+     * Apply the LAPACK routines xLAPMT to the matrix. xLAPMT
+     * rearranges the columns of the M by N matrix X as specified by
+     * the permutation K(1),K(2),...,K(N) of the integers 1,...,N.
+     * If fwd == true, forward permutation:
+     *     X(*,K(J)) is moved X(*,J) for J = 1,2,...,N.
+     * If fwd == false, backward permutation:
+     *     X(*,J) is moved to X(*,K(J)) for J = 1,2,...,N.
+     *
+     * \param P permutation vector, should be of size cols()
+     * \param fwd apply permutation, or inverse permutation, see above
+     */
     void lapmt(const std::vector<int>& P, bool fwd);
 
+    /**
+     * Extract rows of this matrix to a specified matrix. Row I[i] in
+     * this matrix will become row i in matrix B.
+     *
+     * \param I set of indices of rows to extract from this
+     * matrix. The elements of I should not be sorted, but they should
+     * be I[i] < rows().
+     * \params B matrix to extraxt to. B should have the correct size,
+     * ie. B.cols() == cols() and B.rows() == I.size()
+     */
     void extract_rows
     (const std::vector<std::size_t>& I, const DenseMatrix<scalar_t>& B);
+    /**
+     * Return a matrix with rows I of this matrix.
+     *
+     * \param I set of indices of rows to extract from this
+     * matrix. The elements of I should not be sorted, but they should
+     * be I[i] < rows().
+     * \params B matrix to extraxt to. B should have the correct size,
+     * ie. B.cols() == cols() and B.rows() == I.size()
+     */
     DenseMatrix<scalar_t> extract_rows
     (const std::vector<std::size_t>& I) const;
     DenseMatrix<scalar_t> extract
