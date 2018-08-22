@@ -1,0 +1,85 @@
+
+
+enum class KernelType {RBF, ...};
+enum class ClusteringMethod {KMEANS, PCA, ...};
+enum class DistanceMetric {EUCLIDEAN, KERNEL};
+
+// Functor
+class RBFKernel {
+ double h;
+ double alpha;
+
+ RBFKernel(double width, ) : h(width), alpha(a) {
+    
+ }
+ double operator()(double* x, double* y) {
+   return ... / h;
+ }
+};
+
+
+template<typename real_t>
+geometric_kernel_regression
+(DenseMatrix<real_t>& data_points,
+ std::function<real_t(real_t*,real_t*)> kernel,
+ ClusteringMethod clustering,
+ int k, // number of approx neighbors
+ DistanceMetric d=EUCLIDEAN) {
+
+ tree = clustering(
+   - k-means (recursive 2-means)
+   - PCA
+   - K-d tree
+   );
+
+ [ann, scores] = approximate_nearest_neighbors(k, data_points);
+ // ann is a N x k vector
+ //      for each point, k neighbor indices
+ // scores: for each point, each of the k neighbors, the score
+
+ HSSMatrix<real_t> K(tree);
+ K.compress(ann, scores, data_points, kernel);
+
+ factorization
+
+ solve
+
+ prediction
+
+
+}
+
+
+geometry_oblivious_kernel_compression (_regression)
+(std::function<real_t(int,int)> matrix,
+ ClusteringMethod clustering,
+ DistanceMetric d=EUCLIDEAN) {
+
+
+}
+
+
+
+
+
+
+
+///////////////////////////////
+/// User code
+///////////////////////////////
+
+// use pre-defined kernel
+RBFKernel k(1., -3);
+
+for (i=..)
+ k.h = 2.*i;
+ kernel_regression(data, k, KMEANS);
+}
+
+double alpha = 1;
+// user defined kernel
+auto kernel = [&alpha](double* x, double* y) -> double {
+     return exp(-alpha * ..);
+}
+kernel_regression(data, kernel, KMEANS);
+
