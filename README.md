@@ -19,7 +19,6 @@ the U.S. Dept. of Energy).  All rights reserved.
  - Xiaoye S. Li - xsli@lbl.gov (Lawrence Berkeley National Laboratory)
  - Gustavo Chávez - gichavez@lbl.gov (Lawrence Berkeley National Laboratory)
  - Yang Liu - liuyangzhuan@lbl.gov (Lawrence Berkeley National Laboratory)
- - Christopher Gorman - (UC Santa Barbara)
 
 ## Other contributors
  - Lucy Guo - lcguo@lbl.gov
@@ -27,6 +26,8 @@ the U.S. Dept. of Energy).  All rights reserved.
  - François-Henry Rouet - fhrouet@lbl.gov,fhrouet@lstc.com (Livermore
    Software Technology Corp., Lawrence Berkeley National Laboratory)
  - Theo Mary - theo.mary@manchester.ac.uk (University of Manchester)
+ - Christopher Gorman - (UC Santa Barbara)
+ - Jonas Actor - (Rice University)
 
 ## Overview
 STRUMPACK - STRUctured Matrix PACKage - is a software library
