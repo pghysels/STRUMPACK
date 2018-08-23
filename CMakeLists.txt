@@ -76,6 +76,53 @@ if(STRUMPACK_USE_OPENMP)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
     set(CMAKE_EXE_LINKER_FLAGS
       "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+    message(STATUS "OpenMP specification date: " "${OpenMP_CXX_SPEC_DATE}")
+    # if(OpenMP_CXX_SPEC_DATE VERSION_GREATER_EQUAL 201307)
+    #   message(STATUS "Compiler claims to support OpenMP 4.0")
+    message(STATUS "Checking for support of OpenMP task dependencies")
+    set(CMAKE_REQUIRED_FLAGS "${CMAKE_CXX_FLAGS}")
+    check_cxx_source_compiles(
+      "#include <iostream>
+int main() {
+int x=0, y=5;
+#pragma omp parallel
+#pragma omp single
+{
+#pragma omp task depend(inout:x) depend(out:y)
+{ y = x; x += 3; }
+#pragma omp task depend(in:x) depend(out:y)
+{ y = 3 * x; }
+}
+return 0;
+}" STRUMPACK_USE_OPENMP_TASK_DEPEND)
+    if (STRUMPACK_USE_OPENMP_TASK_DEPEND)
+      message(STATUS "Enabling OpenMP tasks with dependencies.")
+    else()
+      message(STATUS "Compiler claims to support OpenMP 4.0,"
+        " but failed to compile a test code with task dependencies."
+        " STRUMPACK will not use OpenMP tasks with dependencies.")
+    endif()
+    # endif()
+    # if(OpenMP_CXX_SPEC_DATE VERSION_GREATER_EQUAL 201511)
+    #   message(STATUS "Compiler claims to support OpenMP 4.5")
+    message(STATUS "Checking for support of OpenMP taskloop")
+    set(CMAKE_REQUIRED_FLAGS "${CMAKE_CXX_FLAGS}")
+    check_cxx_source_compiles(
+      "#include <iostream>
+int main() {
+#pragma omp parallel
+#pragma omp single
+#pragma omp taskloop
+for (int i=0; i<100; i++) std::cout << \"hello\" << std::endl;
+return 0;
+}" STRUMPACK_USE_OPENMP_TASKLOOP)
+    if (STRUMPACK_USE_OPENMP_TASKLOOP)
+      message(STATUS "Enabling OpenMP taskloop construct")
+    else()
+      message(STATUS "Compiler claims to support OpenMP 4.5,"
+        " but failed to compile a taskloop test code."
+        " STRUMPACK will not use the OpenMP taskloop construct.")
+    endif()
   else()
     message(WARNING "WARNING: Could not detect OpenMP compiler
     support, will proceed without OpenMP!")

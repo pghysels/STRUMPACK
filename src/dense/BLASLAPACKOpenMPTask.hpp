@@ -331,8 +331,9 @@ namespace strumpack {
     }
   }
 
+// TODO test this code, or replace with SLATE
 #if 0 //_OPENMP >= 201307
-
+  //#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
   template<typename scalar> void trsv_omp_task
   (char ul, char ta, char d, int n, const scalar* a, int lda,
    scalar* x, int incx, int depth) {
@@ -412,6 +413,7 @@ namespace strumpack {
     }
   }
 #endif
+
 
   template<typename scalar> void trmm_omp_task
   (char s, char ul, char ta, char d, int m, int n,

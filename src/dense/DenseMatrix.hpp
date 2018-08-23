@@ -1009,11 +1009,11 @@ namespace strumpack {
    int depth) {
     assert(I.size() == B.rows());
     assert(B.cols() == cols());
-    // #if defined(_OPENMP)
-    // #pragma omp parallel if(!omp_in_parallel())
-    // #pragma omp single nowait
-    // #pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
-    // #endif
+#if defined(_OPENMP) && defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+#pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+#endif
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<I.size(); i++) {
         assert(I[i] < rows());
@@ -1026,11 +1026,11 @@ namespace strumpack {
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::add
   (const DenseMatrix<scalar_t>& B, int depth) {
-    // #if defined(_OPENMP)
-    // #pragma omp parallel if(!omp_in_parallel())
-    // #pragma omp single nowait
-    // #pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
-    // #endif
+#if defined(_OPENMP) && defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+#pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+#endif
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
         operator()(i, j) += B(i, j);
@@ -1041,11 +1041,11 @@ namespace strumpack {
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::sub
   (const DenseMatrix<scalar_t>& B, int depth) {
-    // #if defined(_OPENMP)
-    // #pragma omp parallel if(!omp_in_parallel())
-    // #pragma omp single nowait
-    // #pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
-    // #endif
+#if defined(_OPENMP) && defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+#pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+#endif
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
         operator()(i, j) -= B(i, j);
@@ -1055,11 +1055,11 @@ namespace strumpack {
 
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::scale(scalar_t alpha, int depth) {
-    // #if defined(_OPENMP)
-    // #pragma omp parallel if(!omp_in_parallel())
-    // #pragma omp single nowait
-    // #pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
-    // #endif
+#if defined(_OPENMP) && defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+#pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+#endif
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
         operator()(i, j) *= alpha;
@@ -1070,11 +1070,11 @@ namespace strumpack {
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::scaled_add
   (scalar_t alpha, const DenseMatrix<scalar_t>& B, int depth) {
-    // #if defined(_OPENMP)
-    // #pragma omp parallel if(!omp_in_parallel())
-    // #pragma omp single nowait
-    // #pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
-    // #endif
+#if defined(_OPENMP) && defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+#pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+#endif
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
         operator()(i, j) += alpha * B(i, j);
@@ -1085,11 +1085,11 @@ namespace strumpack {
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::scale_and_add
   (scalar_t alpha, const DenseMatrix<scalar_t>& B, int depth) {
-    // #if defined(_OPENMP)
-    // #pragma omp parallel if(!omp_in_parallel())
-    // #pragma omp single nowait
-    // #pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
-    // #endif
+#if defined(_OPENMP) && defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+#pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+#endif
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
         operator()(i, j) = alpha * operator()(i, j) + B(i, j);
@@ -1100,11 +1100,11 @@ namespace strumpack {
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::scale_rows
   (const std::vector<scalar_t>& D, int depth) {
-    // #if defined(_OPENMP)
-    // #pragma omp parallel if(!omp_in_parallel())
-    // #pragma omp single nowait
-    // #pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
-    // #endif
+#if defined(_OPENMP) && defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+#pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+#endif
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
         operator()(i, j) *= D[i];
@@ -1115,11 +1115,11 @@ namespace strumpack {
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::div_rows
   (const std::vector<scalar_t>& D, int depth) {
-    // #if defined(_OPENMP)
-    // #pragma omp parallel if(!omp_in_parallel())
-    // #pragma omp single nowait
-    // #pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
-    // #endif
+#if defined(_OPENMP) && defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+#pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+#endif
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
         operator()(i, j) /= D[i];
@@ -1291,9 +1291,11 @@ namespace strumpack {
     ind.resize(n);
     DenseMatrix<scalar_t> R(m, n);
     auto cnrms = new real_t[n];
-    //#pragma omp taskloop grainsize(32) default(shared)
-    //if(depth < params::task_recursion_cutoff_level)
-    //final(depth >= params::task_recursion_cutoff_level-1) mergeable
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp taskloop grainsize(32) default(shared)  \
+  if(depth < params::task_recursion_cutoff_level)                       \
+  final(depth >= params::task_recursion_cutoff_level-1) mergeable
+#endif
     for (std::size_t i=0; i<n; i++) {
       cnrms[i] = blas::nrm2(m, ptr(0, i), 1);
       cnrms[i] *= cnrms[i];

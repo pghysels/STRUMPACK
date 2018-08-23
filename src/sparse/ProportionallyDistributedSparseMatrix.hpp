@@ -313,8 +313,10 @@ namespace strumpack {
     const auto nbvec = R.cols();
 
     const auto B = 4; // blocking parameter
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop default(shared)                    \
   if(depth < params::task_recursion_cutoff_level)
+#endif
     for (std::size_t k=0; k<nbvec; k+=B) {
       for (std::size_t c=clo; c<chi; c++) {
         const auto col = global_col_[c];
@@ -348,8 +350,11 @@ namespace strumpack {
         }
       }
     }
+
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop default(shared)                    \
   if(depth < params::task_recursion_cutoff_level)
+#endif
     for (std::size_t k=0; k<nbvec; k+=B) {
       for (integer_t i=0, c=chi; i<dupd; i++) { // update columns
         c = find_global(upd[i], c);

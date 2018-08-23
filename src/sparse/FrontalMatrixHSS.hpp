@@ -198,8 +198,10 @@ namespace strumpack {
       gemm(Trans::N, Trans::C, scalar_t(-1.),
            _ThetaVhatC_or_VhatCPhiC, _Phi,
            scalar_t(1.), F22, task_depth);
-#pragma omp taskloop default(shared)                    \
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp taskloop default(shared)                            \
   if(task_depth < params::task_recursion_cutoff_level)
+#endif
     for (std::size_t c=0; c<dupd; c++) {
       std::size_t pc = I[c];
       if (pc < pdsep) {

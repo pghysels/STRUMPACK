@@ -550,8 +550,10 @@ namespace strumpack {
     const integer_t ds = shi - slo;
 
     const auto B = 4; // blocking parameter
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop default(shared)                    \
   if(depth < params::task_recursion_cutoff_level)
+#endif
     for (integer_t c=0; c<nbvec; c+=B) {
       for (auto row=slo; row<shi; row++) { // separator rows
         integer_t upd_ptr = 0;
@@ -583,8 +585,10 @@ namespace strumpack {
       }
     }
 
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop default(shared)                    \
   if(depth < params::task_recursion_cutoff_level)
+#endif
     for (integer_t c=0; c<nbvec; c+=B) {
       for (integer_t i=0; i<dupd; i++) { // remaining rows
         auto row = upd[i];
