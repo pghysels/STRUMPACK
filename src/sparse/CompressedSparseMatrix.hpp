@@ -36,7 +36,10 @@
 #include <string.h>
 #include "StrumpackOptions.hpp"
 #include "misc/Tools.hpp"
-#include "misc/MPIWrapper.hpp"
+#if defined(STRUMPACK_USE_MPI)
+#include "../dense/DistributedMatrix.hpp"
+#endif
+#include "../dense/DenseMatrix.hpp"
 
 // where is this used?? in MC64?
 #ifdef _LONGINT
@@ -47,9 +50,6 @@
 
 namespace strumpack {
 
-  template<typename scalar_t> class DistributedMatrix;
-  template<typename scalar_t> class DenseMatrix;
-
   /**
    * Abstract base class to represent either compressed sparse row or
    * compressed sparse column matrices.  The rows and the columns
@@ -57,9 +57,11 @@ namespace strumpack {
    */
   template<typename scalar_t,typename integer_t>
   class CompressedSparseMatrix {
-    using DistM_t = DistributedMatrix<scalar_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using real_t = typename RealType<scalar_t>::value_type;
+#if defined(STRUMPACK_USE_MPI)
+    using DistM_t = DistributedMatrix<scalar_t>;
+#endif
 
   public:
     CompressedSparseMatrix();
@@ -133,6 +135,11 @@ namespace strumpack {
     (DenseM_t& F11, DenseM_t& F12, DenseM_t& F21,
      integer_t sep_begin, integer_t sep_end,
      const std::vector<integer_t>& upd, int depth) const = 0;
+    virtual void front_multiply
+    (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+     const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const = 0;
+
+#if defined(STRUMPACK_USE_MPI)
     virtual void extract_F11_block
     (scalar_t* F, integer_t ldF, integer_t row, integer_t nr_rows,
      integer_t col, integer_t nr_cols) const = 0;
@@ -147,13 +154,11 @@ namespace strumpack {
     virtual void extract_separator_2d
     (integer_t sep_end, const std::vector<std::size_t>& I,
      const std::vector<std::size_t>& J, DistM_t& B) const = 0;
-    virtual void front_multiply
-    (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
-     const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const = 0;
     virtual void front_multiply_2d
     (integer_t sep_begin, integer_t sep_end,
      const std::vector<integer_t>& upd, const DistM_t& R,
      DistM_t& Srow, DistM_t& Scol, int depth) const = 0;
+#endif
 
   protected:
     integer_t n_;
@@ -166,8 +171,6 @@ namespace strumpack {
     enum MMsym {GENERAL, SYMMETRIC, SKEWSYMMETRIC, HERMITIAN};
     std::vector<std::tuple<integer_t,integer_t,scalar_t>>
     read_matrix_market_entries(const std::string& filename);
-
-    virtual bool is_mpi_root() const { return mpi_root(); }
 
     long long spmv_flops() const {
       return (is_complex<scalar_t>() ? 4 : 1 ) * (2ll * nnz_ - n_);
@@ -213,7 +216,6 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   CompressedSparseMatrix<scalar_t,integer_t>::print() const {
-    if (!is_mpi_root()) return;
     std::cout << "size: " << size() << std::endl;
     std::cout << "nnz: " << nnz() << std::endl;
     std::cout << "ptr: " << std::endl << "\t";
@@ -291,20 +293,20 @@ namespace strumpack {
     }
     switch (info[0]) {
     case  0: break;
-    case  1: if (is_mpi_root())
-        std::cerr << "# ERROR: matrix is structurally singular" << std::endl;
+    case  1:
+      std::cerr << "# ERROR: matrix is structurally singular" << std::endl;
       delete[] dw;
       delete[] iw;
       return 1;
       break;
-    case  2: if (is_mpi_root())
+    case  2:
         std::cerr << "# WARNING: mc64 scaling produced"
                   << " large scaling factors which may cause overflow!"
                   << std::endl;
       break;
-    default: if (is_mpi_root())
-        std::cerr << "# ERROR: mc64 failed with info[0]=" << info[0]
-                  << std::endl;
+    default:
+      std::cerr << "# ERROR: mc64 failed with info[0]=" << info[0]
+                << std::endl;
       delete[] dw;
       delete[] iw;
       return 1;
@@ -401,25 +403,22 @@ namespace strumpack {
   std::vector<std::tuple<integer_t,integer_t,scalar_t>>
   CompressedSparseMatrix<scalar_t,integer_t>::read_matrix_market_entries
   (const std::string& filename) {
-    if (is_mpi_root())
-      std::cout << "# opening file \'" << filename << "\'" << std::endl;
+    std::cout << "# opening file \'" << filename << "\'" << std::endl;
     FILE *fp = fopen(filename.c_str(), "r");
     if (fp == NULL) {
-      if (is_mpi_root()) std::cerr << "ERROR: could not read file";
+      std::cerr << "ERROR: could not read file";
       exit(1);
     }
     const int max_cline = 256;
     char cline[max_cline];
     if (fgets(cline, max_cline, fp) == NULL) {
-      if (is_mpi_root())
-        std::cerr << "ERROR: could not read from file" << std::endl;
+      std::cerr << "ERROR: could not read from file" << std::endl;
       exit(1);
     }
-    if (is_mpi_root()) printf("# %s", cline);
+    printf("# %s", cline);
     if (strstr(cline, "pattern")) {
-      if (is_mpi_root())
-        std::cerr << "ERROR: This is not a matrix,"
-                  << " but just a sparsity pattern" << std::endl;
+      std::cerr << "ERROR: This is not a matrix,"
+                << " but just a sparsity pattern" << std::endl;
       exit(1);
     }
     else if (strstr(cline, "complex")) {
@@ -446,15 +445,13 @@ namespace strumpack {
         sscanf(cline, "%d %d %d", &m, &in, &innz);
         nnz_ = static_cast<integer_t>(innz);
         n_ = static_cast<integer_t>(in);
-        if (is_mpi_root())
-          std::cout << "# reading " << number_format_with_commas(m) << " by "
-                    << number_format_with_commas(n_) << " matrix with "
-                    << number_format_with_commas(nnz_) << " nnz's from "
-                    << filename << std::endl;
+        std::cout << "# reading " << number_format_with_commas(m) << " by "
+                  << number_format_with_commas(n_) << " matrix with "
+                  << number_format_with_commas(nnz_) << " nnz's from "
+                  << filename << std::endl;
         if (s != GENERAL) nnz_ = 2 * nnz_;
         if (m != n_) {
-          if (is_mpi_root())
-            std::cerr << "ERROR: matrix is not square!" << std::endl;
+          std::cerr << "ERROR: matrix is not square!" << std::endl;
           exit(1);
         }
         break;

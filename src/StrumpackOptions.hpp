@@ -36,7 +36,6 @@
 // this is needed for RealType, put that somewhere else?
 #include "dense/BLASLAPACKWrapper.hpp"
 #include "misc/RandomWrapper.hpp"
-#include "misc/MPIWrapper.hpp"
 #include "HSS/HSSOptions.hpp"
 #include "BLR/BLROptions.hpp"
 

@@ -33,18 +33,19 @@
 #include <vector>
 #include <tuple>
 #include "misc/Tools.hpp"
+#if defined(STRUMPACK_USE_MPI)
 #include "dense/DistributedMatrix.hpp"
+#endif
 #include "dense/DenseMatrix.hpp"
 #include "CompressedSparseMatrix.hpp"
 
 namespace strumpack {
 
-  // forward declaration
-  template<typename scalar_t,typename integer_t> class CSCMatrix;
-
   template<typename scalar_t,typename integer_t> class CSRMatrix
     : public CompressedSparseMatrix<scalar_t,integer_t> {
+#if defined(STRUMPACK_USE_MPI)
     using DistM_t = DistributedMatrix<scalar_t>;
+#endif
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using real_t = typename RealType<scalar_t>::value_type;
@@ -81,17 +82,19 @@ namespace strumpack {
 
 
     // TODO implement these outside of this class
+    void front_multiply
+    (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+     const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const override;
     void extract_separator
     (integer_t sep_end, const std::vector<std::size_t>& I,
      const std::vector<std::size_t>& J,
      DenseM_t& B, int depth) const override;
-    void extract_separator_2d
-    (integer_t sep_end, const std::vector<std::size_t>& I,
-     const std::vector<std::size_t>& J, DistM_t& B) const override;
     void extract_front
     (DenseM_t& F11, DenseM_t& F12, DenseM_t& F21, integer_t sep_begin,
      integer_t sep_end, const std::vector<integer_t>& upd,
      int depth) const override;
+
+#if defined(STRUMPACK_USE_MPI)
     void extract_F11_block
     (scalar_t* F, integer_t ldF, integer_t row, integer_t nr_rows,
      integer_t col, integer_t nr_cols) const override;
@@ -103,13 +106,14 @@ namespace strumpack {
     (scalar_t* F, integer_t ldF, integer_t row,
      integer_t nr_rows, integer_t col, integer_t nr_cols,
      const integer_t* upd) const;
-    void front_multiply
-    (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
-     const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const override;
+    void extract_separator_2d
+    (integer_t sep_end, const std::vector<std::size_t>& I,
+     const std::vector<std::size_t>& J, DistM_t& B) const override;
     void front_multiply_2d
     (integer_t sep_begin, integer_t sep_end,
      const std::vector<integer_t>& upd, const DistM_t& R,
      DistM_t& Srow, DistM_t& Scol, int depth) const override;
+#endif
 
     using CompressedSparseMatrix<scalar_t,integer_t>::n_;
     using CompressedSparseMatrix<scalar_t,integer_t>::nnz_;
@@ -390,115 +394,6 @@ namespace strumpack {
     }
   }
 
-  template<typename scalar_t,typename integer_t> void
-  CSRMatrix<scalar_t,integer_t>::extract_separator_2d
-  (integer_t sep_end, const std::vector<std::size_t>& I,
-   const std::vector<std::size_t>& J, DistM_t& B) const {
-    if (!B.active()) return;
-    const integer_t m = I.size();
-    const integer_t n = J.size();
-    if (m == 0 || n == 0) return;
-    B.zero();
-    for (integer_t i=0; i<m; i++) {
-      integer_t r = I[i];
-      // indices sorted in increasing order
-      auto cmin = ind_[ptr_[r]];
-      auto cmax = ind_[ptr_[r+1]-1];
-      for (integer_t k=0; k<n; k++) {
-        integer_t c = J[k];
-        if (c >= cmin && c <= cmax && (r < sep_end || c < sep_end)) {
-          auto a_pos = ptr_[r];
-          auto a_max = ptr_[r+1]-1;
-          while (a_pos<a_max && ind_[a_pos]<c) a_pos++;
-          if (ind_[a_pos] == c) B.global(i, k, val_[a_pos]);
-        }
-      }
-    }
-  }
-
-  /** TODO this can be done more cleverly */
-  template<typename scalar_t,typename integer_t> void
-  CSRMatrix<scalar_t,integer_t>::front_multiply_2d
-  (integer_t sep_begin, integer_t sep_end, const std::vector<integer_t>& upd,
-   const DistM_t& R, DistM_t& Srow, DistM_t& Scol, int depth) const {
-    integer_t dim_upd = upd.size();
-    // redistribute R and Srow and Scol to 1d block cyclic column
-    // distribution to avoid communication below
-    DistM_t R_bc(R.grid(), R.rows(), R.cols(), R.rows(), R.NB());
-    DistM_t Srow_bc(R.grid(), Srow.rows(), Srow.cols(), Srow.rows(), Srow.NB());
-    DistM_t Scol_bc(R.grid(), Scol.rows(), Scol.cols(), Scol.rows(), Scol.NB());
-    copy(R.rows(), R.cols(), R, 0, 0, R_bc, 0, 0, R.ctxt_all());
-    copy(Srow.rows(), Srow.cols(), Srow, 0, 0, Srow_bc, 0, 0, R.ctxt_all());
-    copy(Scol.rows(), Scol.cols(), Scol, 0, 0, Scol_bc, 0, 0, R.ctxt_all());
-
-    if (R.active()) {
-      long long int local_flops = 0;
-      auto dim_sep = sep_end - sep_begin;
-      auto n = R_bc.cols();
-      for (integer_t row=sep_begin; row<sep_end; row++) { // separator rows
-        auto upd_ptr = 0;
-        auto hij = ptr_[row+1];
-        for (integer_t j=ptr_[row]; j<hij; j++) {
-          auto col = ind_[j];
-          if (col >= sep_begin) {
-            if (col < sep_end) {
-              scalapack::pgeadd
-                ('N', 1, n, val_[j], R_bc.data(), col-sep_begin+1, 1,
-                 R_bc.desc(), scalar_t(1.), Srow_bc.data(), row-sep_begin+1,
-                 1, Srow_bc.desc());
-              scalapack::pgeadd
-                ('N', 1, n, val_[j], R_bc.data(), row-sep_begin+1, 1,
-                 R_bc.desc(), scalar_t(1.), Scol_bc.data(), col-sep_begin+1,
-                 1, Scol_bc.desc());
-              local_flops += 4 * n;
-            } else {
-              while (upd_ptr<dim_upd && upd[upd_ptr]<col) upd_ptr++;
-              if (upd_ptr == dim_upd) break;
-              if (upd[upd_ptr] == col) {
-                scalapack::pgeadd
-                  ('N', 1, n, val_[j], R_bc.data(), dim_sep+upd_ptr+1,
-                   1, R_bc.desc(), scalar_t(1.), Srow_bc.data(),
-                   row-sep_begin+1, 1, Srow_bc.desc());
-                scalapack::pgeadd
-                             ('N', 1, n, val_[j], R_bc.data(),
-                              row-sep_begin+1, 1, R_bc.desc(), scalar_t(1.),
-                              Scol_bc.data(), dim_sep+upd_ptr+1, 1,
-                              Scol_bc.desc());
-                local_flops += 4 * n;
-              }
-            }
-          }
-        }
-      }
-      for (integer_t i=0; i<dim_upd; i++) { // remaining rows
-        integer_t row = upd[i];
-        auto hij = ptr_[row+1];
-        for (integer_t j=ptr_[row]; j<hij; j++) {
-          integer_t col = ind_[j];
-          if (col >= sep_begin) {
-            if (col < sep_end) {
-              scalapack::pgeadd
-                ('N', 1, n, val_[j], R_bc.data(), col-sep_begin+1, 1,
-                 R_bc.desc(), scalar_t(1.), Srow_bc.data(), dim_sep+i+1,
-                 1, Srow_bc.desc());
-              scalapack::pgeadd
-                ('N', 1, n, val_[j], R_bc.data(), dim_sep+i+1, 1,
-                 R_bc.desc(), scalar_t(1.), Scol_bc.data(), col-sep_begin+1,
-                 1, Scol_bc.desc());
-              local_flops += 4 * n;
-            } else break;
-          }
-        }
-      }
-      if (R.is_master()) {
-        STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
-        STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
-      }
-    }
-    copy(Srow.rows(), Srow.cols(), Srow_bc, 0, 0, Srow, 0, 0, R.ctxt_all());
-    copy(Scol.rows(), Scol.cols(), Scol_bc, 0, 0, Scol, 0, 0, R.ctxt_all());
-  }
-
   // TODO parallel -> will be hard to do efficiently
   // assume F11, F12 and F21 are set to zero
   template<typename scalar_t,typename integer_t> void
@@ -675,6 +570,151 @@ namespace strumpack {
     return 0;
   }
 
+  template<typename scalar_t,typename integer_t> typename
+  RealType<scalar_t>::value_type
+  CSRMatrix<scalar_t,integer_t>::max_scaled_residual
+  (const DenseM_t& x, const DenseM_t& b) const {
+    real_t res = real_t(0.);
+    const integer_t m = n_;
+    const integer_t n = x.cols();
+    for (integer_t c=0; c<n; c++) {
+#pragma omp parallel for reduction(max:res)
+      for (integer_t r=0; r<m; r++) {
+        auto true_res = b(r, c);
+        auto abs_res = std::abs(b(r, c));
+        const auto hij = ptr_[r+1];
+        for (integer_t j=ptr_[r]; j<hij; ++j) {
+          const auto v = val_[j];
+          const auto rj = ind_[j];
+          true_res -= v * x(rj, c);
+          abs_res += std::abs(v) * std::abs(x(rj,c));
+        }
+        res = std::max(res, std::abs(true_res) / std::abs(abs_res));
+      }
+    }
+    return res;
+  }
+
+  template<typename scalar_t,typename integer_t> typename
+  RealType<scalar_t>::value_type
+  CSRMatrix<scalar_t,integer_t>::max_scaled_residual
+  (const scalar_t* x, const scalar_t* b) const {
+    auto X = ConstDenseMatrixWrapperPtr(n_, 1, x, n_);
+    auto B = ConstDenseMatrixWrapperPtr(n_, 1, b, n_);
+    return max_scaled_residual(*X, *B);
+  }
+
+
+#if defined(STRUMPACK_USE_MPI)
+  template<typename scalar_t,typename integer_t> void
+  CSRMatrix<scalar_t,integer_t>::extract_separator_2d
+  (integer_t sep_end, const std::vector<std::size_t>& I,
+   const std::vector<std::size_t>& J, DistM_t& B) const {
+    if (!B.active()) return;
+    const integer_t m = I.size();
+    const integer_t n = J.size();
+    if (m == 0 || n == 0) return;
+    B.zero();
+    for (integer_t i=0; i<m; i++) {
+      integer_t r = I[i];
+      // indices sorted in increasing order
+      auto cmin = ind_[ptr_[r]];
+      auto cmax = ind_[ptr_[r+1]-1];
+      for (integer_t k=0; k<n; k++) {
+        integer_t c = J[k];
+        if (c >= cmin && c <= cmax && (r < sep_end || c < sep_end)) {
+          auto a_pos = ptr_[r];
+          auto a_max = ptr_[r+1]-1;
+          while (a_pos<a_max && ind_[a_pos]<c) a_pos++;
+          if (ind_[a_pos] == c) B.global(i, k, val_[a_pos]);
+        }
+      }
+    }
+  }
+
+  /** TODO this can be done more cleverly */
+  template<typename scalar_t,typename integer_t> void
+  CSRMatrix<scalar_t,integer_t>::front_multiply_2d
+  (integer_t sep_begin, integer_t sep_end, const std::vector<integer_t>& upd,
+   const DistM_t& R, DistM_t& Srow, DistM_t& Scol, int depth) const {
+    integer_t dim_upd = upd.size();
+    // redistribute R and Srow and Scol to 1d block cyclic column
+    // distribution to avoid communication below
+    DistM_t R_bc(R.grid(), R.rows(), R.cols(), R.rows(), R.NB());
+    DistM_t Srow_bc(R.grid(), Srow.rows(), Srow.cols(), Srow.rows(), Srow.NB());
+    DistM_t Scol_bc(R.grid(), Scol.rows(), Scol.cols(), Scol.rows(), Scol.NB());
+    copy(R.rows(), R.cols(), R, 0, 0, R_bc, 0, 0, R.ctxt_all());
+    copy(Srow.rows(), Srow.cols(), Srow, 0, 0, Srow_bc, 0, 0, R.ctxt_all());
+    copy(Scol.rows(), Scol.cols(), Scol, 0, 0, Scol_bc, 0, 0, R.ctxt_all());
+
+    if (R.active()) {
+      long long int local_flops = 0;
+      auto dim_sep = sep_end - sep_begin;
+      auto n = R_bc.cols();
+      for (integer_t row=sep_begin; row<sep_end; row++) { // separator rows
+        auto upd_ptr = 0;
+        auto hij = ptr_[row+1];
+        for (integer_t j=ptr_[row]; j<hij; j++) {
+          auto col = ind_[j];
+          if (col >= sep_begin) {
+            if (col < sep_end) {
+              scalapack::pgeadd
+                ('N', 1, n, val_[j], R_bc.data(), col-sep_begin+1, 1,
+                 R_bc.desc(), scalar_t(1.), Srow_bc.data(), row-sep_begin+1,
+                 1, Srow_bc.desc());
+              scalapack::pgeadd
+                ('N', 1, n, val_[j], R_bc.data(), row-sep_begin+1, 1,
+                 R_bc.desc(), scalar_t(1.), Scol_bc.data(), col-sep_begin+1,
+                 1, Scol_bc.desc());
+              local_flops += 4 * n;
+            } else {
+              while (upd_ptr<dim_upd && upd[upd_ptr]<col) upd_ptr++;
+              if (upd_ptr == dim_upd) break;
+              if (upd[upd_ptr] == col) {
+                scalapack::pgeadd
+                  ('N', 1, n, val_[j], R_bc.data(), dim_sep+upd_ptr+1,
+                   1, R_bc.desc(), scalar_t(1.), Srow_bc.data(),
+                   row-sep_begin+1, 1, Srow_bc.desc());
+                scalapack::pgeadd
+                             ('N', 1, n, val_[j], R_bc.data(),
+                              row-sep_begin+1, 1, R_bc.desc(), scalar_t(1.),
+                              Scol_bc.data(), dim_sep+upd_ptr+1, 1,
+                              Scol_bc.desc());
+                local_flops += 4 * n;
+              }
+            }
+          }
+        }
+      }
+      for (integer_t i=0; i<dim_upd; i++) { // remaining rows
+        integer_t row = upd[i];
+        auto hij = ptr_[row+1];
+        for (integer_t j=ptr_[row]; j<hij; j++) {
+          integer_t col = ind_[j];
+          if (col >= sep_begin) {
+            if (col < sep_end) {
+              scalapack::pgeadd
+                ('N', 1, n, val_[j], R_bc.data(), col-sep_begin+1, 1,
+                 R_bc.desc(), scalar_t(1.), Srow_bc.data(), dim_sep+i+1,
+                 1, Srow_bc.desc());
+              scalapack::pgeadd
+                ('N', 1, n, val_[j], R_bc.data(), dim_sep+i+1, 1,
+                 R_bc.desc(), scalar_t(1.), Scol_bc.data(), col-sep_begin+1,
+                 1, Scol_bc.desc());
+              local_flops += 4 * n;
+            } else break;
+          }
+        }
+      }
+      if (R.is_master()) {
+        STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+        STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+      }
+    }
+    copy(Srow.rows(), Srow.cols(), Srow_bc, 0, 0, Srow, 0, 0, R.ctxt_all());
+    copy(Scol.rows(), Scol.cols(), Scol_bc, 0, 0, Scol, 0, 0, R.ctxt_all());
+  }
+
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::extract_F11_block
   (scalar_t* F, integer_t ldF, integer_t row, integer_t nr_rows,
@@ -732,40 +772,7 @@ namespace strumpack {
       }
     }
   }
-
-  template<typename scalar_t,typename integer_t> typename
-  RealType<scalar_t>::value_type
-  CSRMatrix<scalar_t,integer_t>::max_scaled_residual
-  (const DenseM_t& x, const DenseM_t& b) const {
-    real_t res = real_t(0.);
-    const integer_t m = n_;
-    const integer_t n = x.cols();
-    for (integer_t c=0; c<n; c++) {
-#pragma omp parallel for reduction(max:res)
-      for (integer_t r=0; r<m; r++) {
-        auto true_res = b(r, c);
-        auto abs_res = std::abs(b(r, c));
-        const auto hij = ptr_[r+1];
-        for (integer_t j=ptr_[r]; j<hij; ++j) {
-          const auto v = val_[j];
-          const auto rj = ind_[j];
-          true_res -= v * x(rj, c);
-          abs_res += std::abs(v) * std::abs(x(rj,c));
-        }
-        res = std::max(res, std::abs(true_res) / std::abs(abs_res));
-      }
-    }
-    return res;
-  }
-
-  template<typename scalar_t,typename integer_t> typename
-  RealType<scalar_t>::value_type
-  CSRMatrix<scalar_t,integer_t>::max_scaled_residual
-  (const scalar_t* x, const scalar_t* b) const {
-    auto X = ConstDenseMatrixWrapperPtr(n_, 1, x, n_);
-    auto B = ConstDenseMatrixWrapperPtr(n_, 1, b, n_);
-    return max_scaled_residual(*X, *B);
-  }
+#endif
 
 } // end namespace strumpack
 

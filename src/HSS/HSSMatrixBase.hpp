@@ -33,34 +33,40 @@
 #include <iostream>
 
 #include "dense/DenseMatrix.hpp"
-#include "dense/DistributedMatrix.hpp"
 #include "HSSOptions.hpp"
+#if defined(STRUMPACK_USE_MPI)
+#include "dense/DistributedMatrix.hpp"
 #include "HSSExtraMPI.hpp"
 #include "DistSamples.hpp"
 #include "HSSMatrixMPI.hpp"
 #include "DistElemMult.hpp"
+#endif
 
 namespace strumpack {
   namespace HSS {
 
     template<typename scalar_t> class HSSMatrix;
+#if defined(STRUMPACK_USE_MPI)
     template<typename scalar_t> class HSSMatrixMPI;
     template<typename scalar_t> class DistSubLeaf;
     template<typename scalar_t> class DistSamples;
+#endif //defined(STRUMPACK_USE_MPI)
 
     template<typename scalar_t> class HSSMatrixBase {
       using real_t = typename RealType<scalar_t>::value_type;
-      using DistM_t = DistributedMatrix<scalar_t>;
-      using DistMW_t = DistributedMatrixWrapper<scalar_t>;
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
-      using delem_t = typename std::function
-        <void(const std::vector<std::size_t>& I,
-              const std::vector<std::size_t>& J, DistM_t& B)>;
       using elem_t = typename std::function
         <void(const std::vector<std::size_t>& I,
               const std::vector<std::size_t>& J, DenseM_t& B)>;
       using opts_t = HSSOptions<scalar_t>;
+#if defined(STRUMPACK_USE_MPI)
+      using DistM_t = DistributedMatrix<scalar_t>;
+      using DistMW_t = DistributedMatrixWrapper<scalar_t>;
+      using delem_t = typename std::function
+        <void(const std::vector<std::size_t>& I,
+              const std::vector<std::size_t>& J, DistM_t& B)>;
+#endif //defined(STRUMPACK_USE_MPI)
 
     public:
       HSSMatrixBase(std::size_t m, std::size_t n, bool active);
@@ -109,14 +115,18 @@ namespace strumpack {
         for (auto& c : _ch) c->reset();
       }
 
+      virtual void shift(scalar_t sigma) = 0;
+
+      virtual void draw
+      (std::ostream& of, std::size_t rlo, std::size_t clo) const {};
+
+#if defined(STRUMPACK_USE_MPI)
       virtual void forward_solve
       (const HSSFactorsMPI<scalar_t>& ULV, WorkSolveMPI<scalar_t>& w,
        const DistM_t& b, bool partial) const;
       virtual void backward_solve
       (const HSSFactorsMPI<scalar_t>& ULV, WorkSolveMPI<scalar_t>& w,
        DistM_t& x) const;
-
-      virtual void shift(scalar_t sigma) = 0;
 
       virtual const BLACSGrid* grid() const { return nullptr; }
       virtual const BLACSGrid* grid(const BLACSGrid* local_grid) const {
@@ -133,17 +143,9 @@ namespace strumpack {
       virtual void from_block_row
       (DistM_t& A, const DenseM_t& sub_A, const DistM_t& leaf_A,
        const BLACSGrid* lg) const;
-
-      virtual void draw
-      (std::ostream& of, std::size_t rlo, std::size_t clo) const {};
+#endif //defined(STRUMPACK_USE_MPI)
 
     protected:
-      using delemw_t = typename std::function
-        <void(const std::vector<std::size_t>& I,
-              const std::vector<std::size_t>& J,
-              DistM_t& B, DistM_t& A,
-              std::size_t rlo, std::size_t clo,
-              MPI_Comm comm)>;
       std::size_t _rows, _cols;
 
       // TODO store children array in the sub-class???
@@ -181,6 +183,64 @@ namespace strumpack {
 
       virtual real_t update_orthogonal_basis
       (DenseM_t& S, int d, int dd, int depth) { return real_t(0.); }
+
+      virtual void factor_recursive
+      (HSSFactors<scalar_t>& ULV, WorkFactor<scalar_t>& w,
+       bool isroot, bool partial, int depth) const {};
+
+      virtual void apply_fwd
+      (const DenseM_t& b, WorkApply<scalar_t>& w,
+       bool isroot, int depth, std::atomic<long long int>& flops) const {};
+      virtual void apply_bwd
+      (const DenseM_t& b, scalar_t beta, DenseM_t& c, WorkApply<scalar_t>& w,
+       bool isroot, int depth, std::atomic<long long int>& flops) const {};
+      virtual void applyT_fwd
+      (const DenseM_t& b, WorkApply<scalar_t>& w, bool isroot,
+       int depth, std::atomic<long long int>& flops) const {};
+      virtual void applyT_bwd
+      (const DenseM_t& b, scalar_t beta, DenseM_t& c, WorkApply<scalar_t>& w,
+       bool isroot, int depth, std::atomic<long long int>& flops) const {};
+
+      virtual void forward_solve
+      (const HSSFactors<scalar_t>& ULV, WorkSolve<scalar_t>& w,
+       const DenseMatrix<scalar_t>& b, bool partial) const {};
+      virtual void backward_solve
+      (const HSSFactors<scalar_t>& ULV, WorkSolve<scalar_t>& w,
+       DenseMatrix<scalar_t>& b) const {};
+      virtual void solve_fwd
+      (const HSSFactors<scalar_t>& ULV, const DenseM_t& b,
+       WorkSolve<scalar_t>& w, bool partial, bool isroot, int depth) const {};
+      virtual void solve_bwd
+      (const HSSFactors<scalar_t>& ULV, DenseM_t& x, WorkSolve<scalar_t>& w,
+       bool isroot, int depth) const {};
+
+      virtual void extract_fwd
+      (WorkExtract<scalar_t>& w, bool odiag, int depth) const {};
+      virtual void extract_bwd
+      (DenseMatrix<scalar_t>& B, WorkExtract<scalar_t>& w,
+       int depth) const {};
+
+      virtual void apply_UV_big
+      (DenseM_t& Theta, DenseM_t& Uop, DenseM_t& Phi, DenseM_t& Vop,
+       const std::pair<std::size_t, std::size_t>& offset, int depth,
+       std::atomic<long long int>& flops) const {};
+      virtual void apply_UtVt_big
+      (const DenseM_t& A, DenseM_t& UtA, DenseM_t& VtA,
+       const std::pair<std::size_t, std::size_t>& offset,
+       int depth, std::atomic<long long int>& flops) const {};
+
+      virtual void dense_recursive
+      (DenseM_t& A, WorkDense<scalar_t>& w, bool isroot, int depth) const {};
+
+      friend class HSSMatrix<scalar_t>;
+
+#if defined(STRUMPACK_USE_MPI)
+      using delemw_t = typename std::function
+        <void(const std::vector<std::size_t>& I,
+              const std::vector<std::size_t>& J,
+              DistM_t& B, DistM_t& A,
+              std::size_t rlo, std::size_t clo,
+              MPI_Comm comm)>;
 
       virtual void compress_recursive_original
       (DistSamples<scalar_t>& RS, const delemw_t& Aelem,
@@ -220,53 +280,25 @@ namespace strumpack {
       (const elem_t& Aelem, const opts_t& opts,
        WorkCompress<scalar_t>& w, int lvl) {}
 
-      virtual void factor_recursive
-      (HSSFactors<scalar_t>& ULV, WorkFactor<scalar_t>& w,
-       bool isroot, bool partial, int depth) const {};
+      virtual void apply_fwd
+      (const DistSubLeaf<scalar_t>& B, WorkApplyMPI<scalar_t>& w,
+       bool isroot, long long int flops) const;
+      virtual void apply_bwd
+      (const DistSubLeaf<scalar_t>& B, scalar_t beta,
+       DistSubLeaf<scalar_t>& C, WorkApplyMPI<scalar_t>& w,
+       bool isroot, long long int flops) const;
+      virtual void applyT_fwd
+      (const DistSubLeaf<scalar_t>& B, WorkApplyMPI<scalar_t>& w,
+       bool isroot, long long int flops) const;
+      virtual void applyT_bwd
+      (const DistSubLeaf<scalar_t>& B, scalar_t beta,
+       DistSubLeaf<scalar_t>& C, WorkApplyMPI<scalar_t>& w,
+       bool isroot, long long int flops) const;
+
       virtual void factor_recursive
       (HSSFactorsMPI<scalar_t>& ULV, WorkFactorMPI<scalar_t>& w,
        const BLACSGrid* lg, bool isroot, bool partial) const;
 
-      virtual void apply_fwd
-      (const DenseM_t& b, WorkApply<scalar_t>& w,
-       bool isroot, int depth, std::atomic<long long int>& flops) const {};
-      virtual void apply_bwd
-      (const DenseM_t& b, scalar_t beta, DenseM_t& c, WorkApply<scalar_t>& w,
-       bool isroot, int depth, std::atomic<long long int>& flops) const {};
-      virtual void applyT_fwd
-      (const DenseM_t& b, WorkApply<scalar_t>& w, bool isroot,
-       int depth, std::atomic<long long int>& flops) const {};
-      virtual void applyT_bwd
-      (const DenseM_t& b, scalar_t beta, DenseM_t& c, WorkApply<scalar_t>& w,
-       bool isroot, int depth, std::atomic<long long int>& flops) const {};
-
-      virtual void apply_fwd
-      (const DistSubLeaf<scalar_t>& B, WorkApplyMPI<scalar_t>& w,
-       bool isroot, long long int flops) const;
-      virtual void apply_bwd
-      (const DistSubLeaf<scalar_t>& B, scalar_t beta,
-       DistSubLeaf<scalar_t>& C, WorkApplyMPI<scalar_t>& w,
-       bool isroot, long long int flops) const;
-      virtual void applyT_fwd
-      (const DistSubLeaf<scalar_t>& B, WorkApplyMPI<scalar_t>& w,
-       bool isroot, long long int flops) const;
-      virtual void applyT_bwd
-      (const DistSubLeaf<scalar_t>& B, scalar_t beta,
-       DistSubLeaf<scalar_t>& C, WorkApplyMPI<scalar_t>& w,
-       bool isroot, long long int flops) const;
-
-      virtual void forward_solve
-      (const HSSFactors<scalar_t>& ULV, WorkSolve<scalar_t>& w,
-       const DenseMatrix<scalar_t>& b, bool partial) const {};
-      virtual void backward_solve
-      (const HSSFactors<scalar_t>& ULV, WorkSolve<scalar_t>& w,
-       DenseMatrix<scalar_t>& b) const {};
-      virtual void solve_fwd
-      (const HSSFactors<scalar_t>& ULV, const DenseM_t& b,
-       WorkSolve<scalar_t>& w, bool partial, bool isroot, int depth) const {};
-      virtual void solve_bwd
-      (const HSSFactors<scalar_t>& ULV, DenseM_t& x, WorkSolve<scalar_t>& w,
-       bool isroot, int depth) const {};
       virtual void solve_fwd
       (const HSSFactorsMPI<scalar_t>& ULV, const DistSubLeaf<scalar_t>& b,
        WorkSolveMPI<scalar_t>& w, bool partial, bool isroot) const;
@@ -274,11 +306,6 @@ namespace strumpack {
       (const HSSFactorsMPI<scalar_t>& ULV, DistSubLeaf<scalar_t>& x,
        WorkSolveMPI<scalar_t>& w, bool isroot) const;
 
-      virtual void extract_fwd
-      (WorkExtract<scalar_t>& w, bool odiag, int depth) const {};
-      virtual void extract_bwd
-      (DenseMatrix<scalar_t>& B, WorkExtract<scalar_t>& w,
-       int depth) const {};
       virtual void extract_fwd
       (WorkExtractMPI<scalar_t>& w, const BLACSGrid* lg, bool odiag) const;
       virtual void extract_bwd
@@ -295,21 +322,9 @@ namespace strumpack {
        WorkExtract<scalar_t>& w, int depth) const {};
 
       virtual void apply_UV_big
-      (DenseM_t& Theta, DenseM_t& Uop, DenseM_t& Phi, DenseM_t& Vop,
-       const std::pair<std::size_t, std::size_t>& offset, int depth,
-       std::atomic<long long int>& flops) const {};
-      virtual void apply_UtVt_big
-      (const DenseM_t& A, DenseM_t& UtA, DenseM_t& VtA,
-       const std::pair<std::size_t, std::size_t>& offset,
-       int depth, std::atomic<long long int>& flops) const {};
-
-      virtual void apply_UV_big
       (DistSubLeaf<scalar_t>& Theta, DistM_t& Uop,
        DistSubLeaf<scalar_t>& Phi, DistM_t& Vop,
        long long int& flops) const;
-
-      virtual void dense_recursive
-      (DenseM_t& A, WorkDense<scalar_t>& w, bool isroot, int depth) const {};
 
       virtual void redistribute_to_tree_to_buffers
       (const DistM_t& A, std::size_t Arlo, std::size_t Aclo,
@@ -319,8 +334,8 @@ namespace strumpack {
        std::vector<scalar_t*>& pbuf);
       virtual void delete_redistributed_input();
 
-      friend class HSSMatrix<scalar_t>;
       friend class HSSMatrixMPI<scalar_t>;
+#endif //defined(STRUMPACK_USE_MPI)
     };
 
     template<typename scalar_t>
@@ -354,6 +369,7 @@ namespace strumpack {
       return *this;
     }
 
+#if defined(STRUMPACK_USE_MPI)
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::forward_solve
     (const HSSFactorsMPI<scalar_t>& ULV, WorkSolveMPI<scalar_t>& w,
      const DistM_t& b, bool partial) const {
@@ -940,6 +956,7 @@ namespace strumpack {
     HSSMatrixBase<scalar_t>::delete_redistributed_input() {
       _Asub.clear();
     }
+#endif //defined(STRUMPACK_USE_MPI)
 
   } // end namespace HSS
 } // end namespace strumpack

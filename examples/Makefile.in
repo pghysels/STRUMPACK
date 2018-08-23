@@ -1,11 +1,11 @@
-all: @C_EXAMPLES@ testPoisson2d testPoisson3d	\
-	testPoisson2dMPI testPoisson2dMPIDist testPoisson3dMPIDist	\
-	testMMdouble testMMdoubleMPI testMMdoubleMPIDist testMMdouble64	\
-	testMMdoubleMPIDist64 testMMfloat testMMfloatMPIDist	\
+all: @C_EXAMPLES@	\
+	testPoisson2d testPoisson3d	\
+	testMMdouble testMMdouble64 testMMfloat	\
+	@MPI_EXAMPLES@	\
 	mtx2bin bin2mtx MLkernel
 
-CC=@MPI_C_COMPILER@
-CXX=@MPI_CXX_COMPILER@
+CC=@STRUMPACK_C_COMPILER@
+CXX=@STRUMPACK_CXX_COMPILER@
 CPPFLAGS=-I@CMAKE_INSTALL_PREFIX@/include \
 	-I@METIS_INCLUDES@ -I@PARMETIS_INCLUDES@ -I@SCOTCH_INCLUDES@ \
 	-I@COMBBLAS_INCLUDES@

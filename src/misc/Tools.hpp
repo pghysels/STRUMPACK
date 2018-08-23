@@ -31,10 +31,24 @@
 
 #include <vector>
 #include <iomanip>
+#if defined(STRUMPACK_USE_MPI)
+#include "MPIWrapper.hpp"
+#endif
 #include "StrumpackParameters.hpp"
 #include "dense/BLASLAPACKWrapper.hpp"
 
 namespace strumpack {
+
+  inline bool mpi_root() {
+#if defined(STRUMPACK_USE_MPI)
+    int flag;
+    MPI_Initialized(&flag);
+    if (flag) return mpi_rank() == 0;
+    else return true;
+#else
+    return true;
+#endif
+  }
 
   // this sorts both indices and values at the same time
   template<typename scalar_t,typename integer_t> void

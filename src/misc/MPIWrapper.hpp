@@ -31,6 +31,7 @@
 #include <complex>
 #include <cassert>
 #include <numeric>
+#include <limits>
 #include <memory>
 #include "mpi.h"
 #include "StrumpackParameters.hpp"
@@ -265,13 +266,6 @@ namespace strumpack {
     int nprocs;
     MPI_Comm_size(c, &nprocs);
     return nprocs;
-  }
-
-  inline bool mpi_root(MPI_Comm c=MPI_COMM_WORLD) {
-    int flag;
-    MPI_Initialized(&flag);
-    if (flag) return mpi_rank(c) == 0;
-    else return true;
   }
 
   inline MPI_Comm mpi_sub_comm(MPI_Comm comm, int P0, int P) {

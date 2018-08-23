@@ -39,6 +39,9 @@
 #include "dense/BLASLAPACKWrapper.hpp"
 #include "CompressedSparseMatrix.hpp"
 #include "MatrixReordering.hpp"
+#if defined(STRUMPACK_USE_MPI)
+#include "ExtendAdd.hpp"
+#endif
 
 namespace strumpack {
 
@@ -46,8 +49,10 @@ namespace strumpack {
     : public FrontalMatrix<scalar_t,integer_t> {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
-    using ExtAdd = ExtendAdd<scalar_t,integer_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
+#if defined(STRUMPACK_USE_MPI)
+    using ExtAdd = ExtendAdd<scalar_t,integer_t>;
+#endif
 
   public:
     FrontalMatrixDense
@@ -79,11 +84,13 @@ namespace strumpack {
      DenseM_t& B, int task_depth) const override;
     std::string type() const override { return "FrontalMatrixDense"; }
 
+#if defined(STRUMPACK_USE_MPI)
     void extend_add_copy_to_buffers
     (std::vector<std::vector<scalar_t>>& sbuf,
      const FrontalMatrixMPI<scalar_t,integer_t>* pa) const override {
       ExtAdd::extend_add_seq_copy_to_buffers(F22_, sbuf, pa, this);
     }
+#endif
 
   private:
     DenseM_t F11_, F12_, F21_, F22_;

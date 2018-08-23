@@ -29,11 +29,14 @@
 #include <iostream>
 #include <iomanip>
 #include <fstream>
+#include <cassert>
 #if defined(_OPENMP)
 #include <omp.h>
 #endif
 #include "TaskTimer.hpp"
+#if defined(STUMPACK_USE_MPI)
 #include "MPIWrapper.hpp"
+#endif
 
 using namespace std::chrono;
 using namespace strumpack;
@@ -227,6 +230,14 @@ void TimerList::Finalize() {
 }
 
 void TimerList::finalize() {
+#if !defined(STRUMPACK_USE_MPI)
+  std::ofstream log;
+  log.open("time.log", std::ofstream::out);
+  for (unsigned int thread=0; thread<list.size(); thread++)
+    for (auto timing : list[thread]) //log << timing;
+      timing.print(log);
+  return;
+#else
   if (is_finalized) return;
   is_finalized = true;
   int mpi_finalized;
@@ -348,5 +359,6 @@ void TimerList::finalize() {
     std::cout << std::endl;
   }
   delete[] t;
+#endif
 }
 

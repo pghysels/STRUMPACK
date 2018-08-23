@@ -155,7 +155,6 @@ namespace strumpack {
   protected:
     void split_diag_offdiag();
     void setup_spmv_buffers() const;
-    bool is_mpi_root() const override { return mpi_root(_comm); }
 
     // TODO use MPIComm
     MPI_Comm _comm;

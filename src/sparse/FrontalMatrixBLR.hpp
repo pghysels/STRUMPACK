@@ -40,7 +40,9 @@
 #include "CompressedSparseMatrix.hpp"
 #include "MatrixReordering.hpp"
 #include "BLR/BLRMatrix.hpp"
+#if defined(STRUMPACK_USE_MPI)
 #include "ExtendAdd.hpp"
+#endif
 
 namespace strumpack {
 
@@ -49,9 +51,11 @@ namespace strumpack {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
-    using ExtAdd = ExtendAdd<scalar_t,integer_t>;
     using BLRM_t = BLR::BLRMatrix<scalar_t>;
+#if defined(STRUMPACK_USE_MPI)
+    using ExtAdd = ExtendAdd<scalar_t,integer_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
+#endif
 
   public:
     FrontalMatrixBLR
@@ -86,8 +90,12 @@ namespace strumpack {
 
     std::string type() const override { return "FrontalMatrixBLR"; }
 
+#if defined(STRUMPACK_USE_MPI)
     void extend_add_copy_to_buffers
-    (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override;
+    (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override {
+      ExtAdd::extend_add_seq_copy_to_buffers(F22_, sbuf, pa, this);
+    }
+#endif
 
     void set_BLR_partitioning
     (const SPOptions<scalar_t>& opts,
@@ -266,11 +274,6 @@ namespace strumpack {
 #endif
       // TODO flops
     }
-  }
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLR<scalar_t,integer_t>::extend_add_copy_to_buffers
-  (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
-    ExtAdd::extend_add_seq_copy_to_buffers(F22_, sbuf, pa, this);
   }
 
   template<typename scalar_t,typename integer_t> void

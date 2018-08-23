@@ -1,7 +1,11 @@
 cmake_minimum_required(VERSION 2.8)
 project(STRUMPACK CXX C Fortran)
 
+## Metis is required for now
 # option(STRUMPACK_USE_METIS "Build with support for Metis" ON)
+
+option(STRUMPACK_USE_MPI "Build with MPI support" ON)
+
 option(STRUMPACK_USE_PARMETIS "Build with support for ParMetis" OFF)
 option(STRUMPACK_USE_SCOTCH "Build with support for Scotch/PTScotch" OFF)
 option(STRUMPACK_USE_OPENMP "Use OpenMP for on-node threading tasking" ON)
@@ -12,6 +16,14 @@ option(STRUMPACK_TASK_TIMERS "Build with timers for internal routines" OFF)
 option(STRUMPACK_BUILD_TESTS "Build the tests" ON)
 option(STRUMPACK_DEV_TESTING "Enable extensive testing" OFF)
 option(STRUMPACK_C_INTERFACE "Build the C interface" ON)
+
+if(NOT STRUMPACK_USE_MPI)
+  if(STRUMPACK_USE_PARMETIS)
+    message(STATUS "Disabling ParMetis. ParMetis requires MPI support,"
+      " but compiling without MPI support! ")
+    set(STRUMPACK_USE_PARMETIS OFF)
+  endif()
+endif()
 
 set(STRUMPACK_VERSION_MAJOR 2)
 set(STRUMPACK_VERSION_MINOR 3)
@@ -37,30 +49,32 @@ elseif(COMPILER_SUPPORTS_CXX0X)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
 endif()
 
-find_package(MPI REQUIRED)
-if(MPI_C_FOUND)
-  message(STATUS "Found C mpi compiler:       " "${MPI_C_COMPILER}")
-  include_directories(${MPI_C_INCLUDE_PATH})
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${MPI_C_COMPILE_FLAGS}" )
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_C_LINK_FLAGS}" )
-  set(LIBS ${LIBS} ${MPI_C_LIBRARIES})
-endif()
-if(MPI_CXX_FOUND)
-  message(STATUS "Found C++ mpi compiler:     " "${MPI_CXX_COMPILER}")
-  include_directories(${MPI_CXX_INCLUDE_PATH})
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_COMPILE_FLAGS}" )
-  set(CMAKE_EXE_LINKER_FLAGS
-    "${CMAKE_EXE_LINKER_FLAGS} ${MPI_CXX_LINK_FLAGS}" )
-  set(LIBS ${LIBS} ${MPI_CXX_LIBRARIES})
-endif()
-if(MPI_Fortran_FOUND)
-  message(STATUS "Found Fortran mpi compiler: " "${MPI_Fortran_COMPILER}")
-  include_directories(${MPI_Fortran_INCLUDE_PATH})
-  set(CMAKE_Fortran_FLAGS
-    "${CMAKE_Fortran_FLAGS} ${MPI_Fortran_COMPILE_FLAGS}" )
-  set(CMAKE_EXE_LINKER_FLAGS
-    "${CMAKE_EXE_LINKER_FLAGS} ${MPI_Fortran_LINK_FLAGS}" )
-  set(LIBS ${LIBS} ${MPI_Fortran_LIBRARIES})
+if (STRUMPACK_USE_MPI)
+  find_package(MPI REQUIRED)
+  if(MPI_C_FOUND)
+    message(STATUS "Found C mpi compiler:       " "${MPI_C_COMPILER}")
+    include_directories(${MPI_C_INCLUDE_PATH})
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${MPI_C_COMPILE_FLAGS}" )
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_C_LINK_FLAGS}" )
+    set(LIBS ${LIBS} ${MPI_C_LIBRARIES})
+  endif()
+  if(MPI_CXX_FOUND)
+    message(STATUS "Found C++ mpi compiler:     " "${MPI_CXX_COMPILER}")
+    include_directories(${MPI_CXX_INCLUDE_PATH})
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_COMPILE_FLAGS}" )
+    set(CMAKE_EXE_LINKER_FLAGS
+      "${CMAKE_EXE_LINKER_FLAGS} ${MPI_CXX_LINK_FLAGS}" )
+    set(LIBS ${LIBS} ${MPI_CXX_LIBRARIES})
+  endif()
+  if(MPI_Fortran_FOUND)
+    message(STATUS "Found Fortran mpi compiler: " "${MPI_Fortran_COMPILER}")
+    include_directories(${MPI_Fortran_INCLUDE_PATH})
+    set(CMAKE_Fortran_FLAGS
+      "${CMAKE_Fortran_FLAGS} ${MPI_Fortran_COMPILE_FLAGS}" )
+    set(CMAKE_EXE_LINKER_FLAGS
+      "${CMAKE_EXE_LINKER_FLAGS} ${MPI_Fortran_LINK_FLAGS}" )
+    set(LIBS ${LIBS} ${MPI_Fortran_LIBRARIES})
+  endif()
 endif()
 
 include(FortranCInterface)
@@ -181,19 +195,21 @@ endif()
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
   "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
-if(DEFINED SCALAPACK_LIBRARIES)
-  set(LIBS ${LIBS} ${SCALAPACK_LIBRARIES})
-  include_directories(${SCALAPACK_INCLUDES})
-else()
-  find_package(SCALAPACK)
-  if(SCALAPACK_FOUND)
+if (STRUMPACK_USE_MPI)
+  if(DEFINED SCALAPACK_LIBRARIES)
     set(LIBS ${LIBS} ${SCALAPACK_LIBRARIES})
     include_directories(${SCALAPACK_INCLUDES})
   else()
-    message(WARNING
-      "WARNING: Could not find a ScaLAPACK/BLACS library !!!!!!!!\n"
-      "Note that on some machines (like Cray's)"
-      " ScaLAPACK is linked in by the compiler wrapper")
+    find_package(SCALAPACK)
+    if(SCALAPACK_FOUND)
+      set(LIBS ${LIBS} ${SCALAPACK_LIBRARIES})
+      include_directories(${SCALAPACK_INCLUDES})
+    else()
+      message(WARNING
+        "WARNING: Could not find a ScaLAPACK/BLACS library !!!!!!!!\n"
+        "Note that on some machines (like Cray's)"
+        " ScaLAPACK is linked in by the compiler wrapper")
+    endif()
   endif()
 endif()
 
@@ -212,23 +228,25 @@ else()
   message(STATUS "Building STRUMPACK without PAPI support.")
 endif()
 
-if(STRUMPACK_USE_COMBBLAS)
-  set(LIBS ${LIBS} ${COMBBLAS_LIBRARIES})
-  include_directories(${COMBBLAS_INCLUDES})
-  message(STATUS "Combinatorial BLAS support enabled")
-endif()
-
-if(STRUMPACK_USE_PARMETIS)
-  find_package(ParMetis)
-  set(LIBS ${LIBS} ${PARMETIS_LIBRARIES})
-  include_directories(${PARMETIS_INCLUDES})
-  if(NOT PARMETIS_FOUND)
-    message(FATAL_ERROR
-      "Could not find ParMETIS!"
-      "Get ParMetis from http://glaros.dtc.umn.edu/gkhome/metis/parmetis/overview")
+if (STRUMPACK_USE_MPI)
+  if(STRUMPACK_USE_COMBBLAS)
+    set(LIBS ${LIBS} ${COMBBLAS_LIBRARIES})
+    include_directories(${COMBBLAS_INCLUDES})
+    message(STATUS "Combinatorial BLAS support enabled")
   endif()
-else()
-  message(STATUS "Building STRUMPACK without ParMetis support.")
+
+  if(STRUMPACK_USE_PARMETIS)
+    find_package(ParMetis)
+    set(LIBS ${LIBS} ${PARMETIS_LIBRARIES})
+    include_directories(${PARMETIS_INCLUDES})
+    if(NOT PARMETIS_FOUND)
+      message(FATAL_ERROR
+        "Could not find ParMETIS!"
+        "Get ParMetis from http://glaros.dtc.umn.edu/gkhome/metis/parmetis/overview")
+    endif()
+  else()
+    message(STATUS "Building STRUMPACK without ParMetis support.")
+  endif()
 endif()
 
 # at the moment, Metis is required to build STRUMPACK
@@ -317,8 +335,6 @@ set(LIBSRCDENSE
   src/dense/lapack/cgelqfmod.f src/dense/lapack/zgelqfmod.f
   src/dense/lapack/sgelq2mod.f src/dense/lapack/dgelq2mod.f
   src/dense/lapack/cgelq2mod.f src/dense/lapack/zgelq2mod.f
-  src/dense/lapack/pcgeqpfmod.f src/dense/lapack/pdgeqpfmod.f
-  src/dense/lapack/psgeqpfmod.f src/dense/lapack/pzgeqpfmod.f
   src/dense/lapack/cgeqp3mod.f src/dense/lapack/dgeqp3mod.f
   src/dense/lapack/sgeqp3mod.f src/dense/lapack/zgeqp3mod.f)
 
@@ -328,12 +344,19 @@ set(LIBSRCSPARSE
   src/sparse/rcm/fnroot.f
   src/sparse/rcm/genrcm.f
   src/sparse/rcm/rootls.f
-  src/sparse/MUMPS/ana_orderings.F
   src/sparse/strumpack_mc64ad.c)
+
+if(STRUMPACK_USE_MPI)
+  list(APPEND LIBSRCDENSE
+    src/dense/lapack/pcgeqpfmod.f src/dense/lapack/pdgeqpfmod.f
+    src/dense/lapack/psgeqpfmod.f src/dense/lapack/pzgeqpfmod.f)
+
+  list(APPEND LIBSRCSPARSE
+    src/sparse/MUMPS/ana_orderings.F)
+endif()
 
 add_library(strumpack ${LIBSRC} ${LIBSRCSPARSE} ${LIBSRCDENSE})
 target_link_libraries(strumpack ${LIBS})
-
 
 install(TARGETS strumpack LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
@@ -345,78 +368,46 @@ install(FILES
   ${PROJECT_BINARY_DIR}/StrumpackConfig.hpp
   src/StrumpackSparseSolver.h
   src/StrumpackSparseSolver.hpp
-  src/StrumpackSparseSolverMPI.hpp
-  src/StrumpackSparseSolverMPIDist.hpp
   src/StrumpackOptions.hpp
   src/StrumpackParameters.hpp
   DESTINATION include)
 
 install(FILES
   src/misc/TaskTimer.hpp
-  src/misc/MPIWrapper.hpp
   src/misc/RandomWrapper.hpp
   src/misc/Tools.hpp
   DESTINATION include/misc)
 
 install(FILES
-  src/dense/DistributedMatrix.hpp
   src/dense/DenseMatrix.hpp
   src/dense/BLASLAPACKOpenMPTask.hpp
   src/dense/BLASLAPACKWrapper.hpp
-  src/dense/ScaLAPACKWrapper.hpp
-  src/dense/BLACSGrid.hpp
   DESTINATION include/dense)
 
 install(FILES
   src/sparse/BiCGStab.hpp
-  src/sparse/BiCGStabMPI.hpp
-  src/sparse/CSCMatrix.hpp
   src/sparse/CSRGraph.hpp
   src/sparse/CSRMatrix.hpp
-  src/sparse/CSRMatrixMPI.hpp
   src/sparse/CompressedSparseMatrix.hpp
   src/sparse/ETree.hpp
   src/sparse/EliminationTree.hpp
-  src/sparse/EliminationTreeMPI.hpp
-  src/sparse/EliminationTreeMPIDist.hpp
   src/sparse/FrontalMatrix.hpp
   src/sparse/FrontalMatrixDense.hpp
-  src/sparse/FrontalMatrixDenseMPI.hpp
   src/sparse/FrontalMatrixHSS.hpp
-  src/sparse/FrontalMatrixHSSMPI.hpp
-  src/sparse/FrontalMatrixMPI.hpp
   src/sparse/FrontalMatrixBLR.hpp
-  src/sparse/FrontalMatrixBLRMPI.hpp
   src/sparse/GMRes.hpp
-  src/sparse/GMResMPI.hpp
   src/sparse/GeometricReordering.hpp
-  src/sparse/GeometricReorderingMPI.hpp
   src/sparse/IterativeRefinement.hpp
-  src/sparse/IterativeRefinementMPI.hpp
   src/sparse/MatrixReordering.hpp
-  src/sparse/MatrixReorderingMPI.hpp
   src/sparse/MetisReordering.hpp
-  src/sparse/PTScotchReordering.hpp
-  src/sparse/ParMetisReordering.hpp
-  src/sparse/ProportionallyDistributedSparseMatrix.hpp
   src/sparse/Redistribute.hpp
   src/sparse/ScotchReordering.hpp
   src/sparse/RCMReordering.hpp
-  src/sparse/ExtendAdd.hpp
   src/sparse/SeparatorTree.hpp
-  src/sparse/mumps_symqamd.hpp
   DESTINATION include/sparse)
 
-if(STRUMPACK_USE_COMBBLAS)
-  install(FILES src/sparse/AWPMCombBLAS.hpp DESTINATION include/sparse)
-endif()
-
-install(FILES src/BLR/BLRMatrix.hpp
-  src/BLR/BLRMatrixMPI.hpp
-  src/BLR/BLROptions.hpp
-  DESTINATION include/BLR)
-
-install(FILES src/HSS/HSSMatrix.hpp
+install(FILES
+  src/HSS/HSSMatrix.hpp
   src/HSS/HSSMatrix.factor.hpp
   src/HSS/HSSMatrix.compress.hpp
   src/HSS/HSSMatrix.compress_stable.hpp
@@ -429,21 +420,79 @@ install(FILES src/HSS/HSSMatrix.hpp
   src/HSS/HSSMatrixBase.hpp
   src/HSS/HSSPartitionTree.hpp
   src/HSS/HSSOptions.hpp
-  src/HSS/HSSMatrixMPI.hpp
-  src/HSS/HSSMatrixMPI.apply.hpp
-  src/HSS/HSSMatrixMPI.compress.hpp
-  src/HSS/HSSMatrixMPI.factor.hpp
-  src/HSS/HSSMatrixMPI.extract.hpp
-  src/HSS/HSSMatrixMPI.extract_blocks.hpp
-  src/HSS/HSSMatrixMPI.solve.hpp
-  src/HSS/HSSExtraMPI.hpp
-  src/HSS/HSSBasisIDMPI.hpp
-  src/HSS/DistSamples.hpp
-  src/HSS/DistElemMult.hpp
-  src/HSS/HSSMatrixMPI.compress_stable.hpp
-  src/HSS/HSSMatrixMPI.Schur.hpp
-  src/HSS/BlockCyclic2BlockRow.hpp
   DESTINATION include/HSS)
+
+install(FILES
+  src/BLR/BLRMatrix.hpp
+  src/BLR/BLROptions.hpp
+  DESTINATION include/BLR)
+
+
+if(STRUMPACK_USE_MPI)
+  install(FILES
+    src/StrumpackSparseSolverMPI.hpp
+    src/StrumpackSparseSolverMPIDist.hpp
+    DESTINATION include)
+
+  install(FILES
+    src/misc/MPIWrapper.hpp
+    DESTINATION include/misc)
+
+  install(FILES
+    src/dense/DistributedMatrix.hpp
+    src/dense/ScaLAPACKWrapper.hpp
+    src/dense/BLACSGrid.hpp
+    DESTINATION include/dense)
+
+  install(FILES
+    src/sparse/BiCGStabMPI.hpp
+    src/sparse/CSRMatrixMPI.hpp
+    src/sparse/EliminationTreeMPI.hpp
+    src/sparse/EliminationTreeMPIDist.hpp
+    src/sparse/FrontalMatrixDenseMPI.hpp
+    src/sparse/FrontalMatrixHSSMPI.hpp
+    src/sparse/FrontalMatrixMPI.hpp
+    src/sparse/FrontalMatrixBLRMPI.hpp
+    src/sparse/GMResMPI.hpp
+    src/sparse/GeometricReorderingMPI.hpp
+    src/sparse/IterativeRefinementMPI.hpp
+    src/sparse/MatrixReorderingMPI.hpp
+    src/sparse/PTScotchReordering.hpp
+    src/sparse/ParMetisReordering.hpp
+    src/sparse/ProportionallyDistributedSparseMatrix.hpp
+    src/sparse/Redistribute.hpp
+    src/sparse/ExtendAdd.hpp
+    src/sparse/mumps_symqamd.hpp
+    DESTINATION include/sparse)
+
+  install(FILES
+    src/HSS/HSSMatrixMPI.hpp
+    src/HSS/HSSMatrixMPI.apply.hpp
+    src/HSS/HSSMatrixMPI.compress.hpp
+    src/HSS/HSSMatrixMPI.factor.hpp
+    src/HSS/HSSMatrixMPI.extract.hpp
+    src/HSS/HSSMatrixMPI.extract_blocks.hpp
+    src/HSS/HSSMatrixMPI.solve.hpp
+    src/HSS/HSSExtraMPI.hpp
+    src/HSS/HSSBasisIDMPI.hpp
+    src/HSS/DistSamples.hpp
+    src/HSS/DistElemMult.hpp
+    src/HSS/HSSMatrixMPI.compress_stable.hpp
+    src/HSS/HSSMatrixMPI.Schur.hpp
+    src/HSS/BlockCyclic2BlockRow.hpp
+    DESTINATION include/HSS)
+
+  install(FILES
+    src/BLR/BLRMatrixMPI.hpp
+    DESTINATION include/BLR)
+endif()
+
+if(STRUMPACK_USE_COMBBLAS)
+  install(FILES
+    src/sparse/AWPMCombBLAS.hpp
+    DESTINATION include/sparse)
+endif()
+
 
 set(CPACK_GENERATOR "TGZ")
 set(CPACK_PACKAGE_VERSION_MAJOR ${STRUMPACK_VERSION_MAJOR})
@@ -466,6 +515,14 @@ if(STRUMPACK_C_INTERFACE)
 endif()
 
 # build an example makefile
+if(STRUMPACK_USE_MPI)
+  set(STRUMPACK_C_COMPILER "${MPI_C_COMPILER}")
+  set(STRUMPACK_CXX_COMPILER "${MPI_CXX_COMPILER}")
+  set(MPI_EXAMPLES "testPoisson2dMPI testPoisson2dMPIDist testPoisson3dMPIDist testMMdouble testMMdoubleMPI testMMdoubleMPIDist testMMdouble64 testMMdoubleMPIDist64 testMMfloat testMMfloatMPIDist")
+else()
+  set(STRUMPACK_C_COMPILER "${CMAKE_C_COMPILER}")
+  set(STRUMPACK_CXX_COMPILER "${CMAKE_CXX_COMPILER}")
+endif()
 configure_file(${CMAKE_SOURCE_DIR}/examples/Makefile.in
   ${CMAKE_SOURCE_DIR}/examples/Makefile @ONLY)
 
@@ -477,6 +534,23 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/pde900.mtx
 configure_file(${CMAKE_SOURCE_DIR}/examples/README
   ${CMAKE_BINARY_DIR}/examples/README COPYONLY)
 
+configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2d.cpp
+  ${CMAKE_BINARY_DIR}/examples/testPoisson2d.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson3d.cpp
+  ${CMAKE_BINARY_DIR}/examples/testPoisson3d.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdouble.cpp
+  ${CMAKE_BINARY_DIR}/examples/testMMdouble.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdouble64.cpp
+  ${CMAKE_BINARY_DIR}/examples/testMMdouble64.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/testMMfloat.cpp
+  ${CMAKE_BINARY_DIR}/examples/testMMfloat.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/mtx2bin.cpp
+  ${CMAKE_BINARY_DIR}/examples/mtx2bin.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/bin2mtx.cpp
+  ${CMAKE_BINARY_DIR}/examples/bin2mtx.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/MLkernel.cpp
+  ${CMAKE_BINARY_DIR}/examples/MLkernel.cpp COPYONLY)
+
 if(STRUMPACK_C_INTERFACE)
   configure_file(${CMAKE_SOURCE_DIR}/examples/sexample.c
     ${CMAKE_BINARY_DIR}/examples/sexample.c COPYONLY)
@@ -487,38 +561,23 @@ if(STRUMPACK_C_INTERFACE)
   configure_file(${CMAKE_SOURCE_DIR}/examples/zexample.c
     ${CMAKE_BINARY_DIR}/examples/zexample.c COPYONLY)
 endif()
-# configure_file(${CMAKE_SOURCE_DIR}/examples/DenseBEMColStateMPI.cpp
-#   ${CMAKE_BINARY_DIR}/examples/DenseBEMColStateMPI.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2d.cpp
-  ${CMAKE_BINARY_DIR}/examples/testPoisson2d.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson3d.cpp
-  ${CMAKE_BINARY_DIR}/examples/testPoisson3d.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2dMPI.cpp
-  ${CMAKE_BINARY_DIR}/examples/testPoisson2dMPI.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2dMPIDist.cpp
-  ${CMAKE_BINARY_DIR}/examples/testPoisson2dMPIDist.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson3dMPIDist.cpp
-  ${CMAKE_BINARY_DIR}/examples/testPoisson3dMPIDist.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdouble.cpp
-  ${CMAKE_BINARY_DIR}/examples/testMMdouble.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPI.cpp
-  ${CMAKE_BINARY_DIR}/examples/testMMdoubleMPI.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPIDist.cpp
-  ${CMAKE_BINARY_DIR}/examples/testMMdoubleMPIDist.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdouble64.cpp
-  ${CMAKE_BINARY_DIR}/examples/testMMdouble64.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPIDist64.cpp
-  ${CMAKE_BINARY_DIR}/examples/testMMdoubleMPIDist64.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testMMfloat.cpp
-  ${CMAKE_BINARY_DIR}/examples/testMMfloat.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testMMfloatMPIDist.cpp
-  ${CMAKE_BINARY_DIR}/examples/testMMfloatMPIDist.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/mtx2bin.cpp
-  ${CMAKE_BINARY_DIR}/examples/mtx2bin.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/bin2mtx.cpp
-  ${CMAKE_BINARY_DIR}/examples/bin2mtx.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/MLkernel.cpp
-  ${CMAKE_BINARY_DIR}/examples/MLkernel.cpp COPYONLY)
+
+if(STRUMPACK_USE_MPI)
+  configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2dMPI.cpp
+    ${CMAKE_BINARY_DIR}/examples/testPoisson2dMPI.cpp COPYONLY)
+  configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2dMPIDist.cpp
+    ${CMAKE_BINARY_DIR}/examples/testPoisson2dMPIDist.cpp COPYONLY)
+  configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson3dMPIDist.cpp
+    ${CMAKE_BINARY_DIR}/examples/testPoisson3dMPIDist.cpp COPYONLY)
+  configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPI.cpp
+    ${CMAKE_BINARY_DIR}/examples/testMMdoubleMPI.cpp COPYONLY)
+  configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPIDist.cpp
+    ${CMAKE_BINARY_DIR}/examples/testMMdoubleMPIDist.cpp COPYONLY)
+  configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPIDist64.cpp
+    ${CMAKE_BINARY_DIR}/examples/testMMdoubleMPIDist64.cpp COPYONLY)
+  configure_file(${CMAKE_SOURCE_DIR}/examples/testMMfloatMPIDist.cpp
+    ${CMAKE_BINARY_DIR}/examples/testMMfloatMPIDist.cpp COPYONLY)
+endif()
 
 if(STRUMPACK_BUILD_TESTS)
   include(CTest)

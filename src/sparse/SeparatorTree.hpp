@@ -62,7 +62,7 @@ namespace strumpack {
     // construct from an elimination tree
     SeparatorTree(std::vector<integer_t>& etree);
     virtual ~SeparatorTree();
-    void broadcast(MPI_Comm comm) const;
+
     integer_t levels() const;
     integer_t level(integer_t i) const;
     integer_t root() const;
@@ -106,6 +106,10 @@ namespace strumpack {
     admissibilities() const { return adm_; }
     const std::vector<bool>& admissibility(integer_t sep) const { return adm_.at(sep); }
     std::vector<bool>& admissibility(integer_t sep) { return adm_[sep]; }
+
+#if defined(STRUMPACK_USE_MPI)
+    void broadcast(MPI_Comm comm) const;
+#endif
 
   protected:
     integer_t _nbsep;
@@ -282,11 +286,13 @@ namespace strumpack {
     delete[] _sizes;
   }
 
+#if defined(STRUMPACK_USE_MPI)
   template<typename integer_t> void
   SeparatorTree<integer_t>::broadcast(MPI_Comm comm) const {
     MPI_Bcast(_sizes, size(), mpi_type<integer_t>(), 0, comm);
     // TODO broadcast the HSS_trees?
   }
+#endif
 
   template<typename integer_t> integer_t
   SeparatorTree<integer_t>::levels() const {

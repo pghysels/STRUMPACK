@@ -31,7 +31,6 @@ using namespace std;
 
 #include "StrumpackSparseSolver.hpp"
 #include "sparse/CSRMatrix.hpp"
-#include "sparse/CSCMatrix.hpp"
 
 using namespace strumpack;
 

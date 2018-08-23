@@ -34,7 +34,9 @@
 #include <memory>
 #include <metis.h>
 #include "SeparatorTree.hpp"
+#if defined(STRUMPACK_USE_MPI)
 #include "mumps_symqamd.hpp"
+#endif
 
 namespace strumpack {
 
@@ -206,19 +208,27 @@ namespace strumpack {
         std::max(integer_t(3), ( n / opts.nd_param() ) / 2 * 2 + 1);
       integer_t separators = nodes / 2;
       auto sizes = new idx_t[nodes + 1];
-      ierr = WRAPPER_METIS_NodeNDP(n, xadj, adjncy, NULL, separators + 1,
-                                   NULL, iperm, perm, sizes);
+      ierr = WRAPPER_METIS_NodeNDP
+        (n, xadj, adjncy, NULL, separators + 1, NULL, iperm, perm, sizes);
       delete[] xadj;
+#if defined(STRUMPACK_USE_MPI)
       if (opts.use_MUMPS_SYMQAMD())
         sep_tree = aggressive_amalgamation(A, perm, iperm, opts);
       else sep_tree = sep_tree_from_metis_sizes(nodes, separators, sizes);
+#else
+      sep_tree = sep_tree_from_metis_sizes(nodes, separators, sizes);
+#endif
       delete[] sizes;
     } else {
       ierr = WRAPPER_METIS_NodeND(n, xadj, adjncy, NULL, NULL, iperm, perm);
       delete[] xadj;
+#if defined(STRUMPACK_USE_MPI)
       if (opts.use_MUMPS_SYMQAMD())
         sep_tree = aggressive_amalgamation(A, perm, iperm, opts);
       else sep_tree = build_sep_tree_from_perm(n, ptr, ind, perm, iperm);
+#else
+      sep_tree = build_sep_tree_from_perm(n, ptr, ind, perm, iperm);
+#endif
     }
     if (ierr != METIS_OK) {
       std::cerr << "# ERROR: Metis nested dissection reordering failed"

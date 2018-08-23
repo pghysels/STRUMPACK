@@ -735,10 +735,14 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrix<scalar_t>::print_info
     (std::ostream &out, std::size_t roff, std::size_t coff) const {
       if (!this->active()) return;
+#if defined(STRUMPACK_USE_MPI)
       int flag, rank;
       MPI_Initialized(&flag);
       if (flag) rank = mpi_rank();
       else rank = 0;
+#else
+      int rank = 0;
+#endif
       out << "SEQ rank=" << rank
           << " b = [" << roff << "," << roff+this->rows()
           << " x " << coff << "," << coff+this->cols() << "]  U = "

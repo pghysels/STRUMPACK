@@ -34,12 +34,14 @@
 #include <algorithm>
 #include <memory>
 
-#include "misc/MPIWrapper.hpp"
 #include "HSS/HSSPartitionTree.hpp"
 #include "StrumpackOptions.hpp"
-#include "CSRMatrix.hpp"
-#include "CSRMatrixMPI.hpp"
 #include "StrumpackConfig.hpp"
+#include "CSRMatrix.hpp"
+#if defined(STRUMPACK_USE_MPI)
+#include "misc/MPIWrapper.hpp"
+#include "CSRMatrixMPI.hpp"
+#endif
 #if defined(STRUMPACK_USE_SCOTCH)
 #include "ScotchReordering.hpp"
 #endif
@@ -62,9 +64,11 @@ namespace strumpack {
     int nested_dissection
     (const SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
      int nx, int ny, int nz, int components, int width);
+#if defined(STRUMPACK_USE_MPI)
     int nested_dissection
     (SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
      MPI_Comm comm, int nx, int ny, int nz, int components, int width);
+#endif
 
     void separator_reordering
     (const SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
@@ -163,6 +167,7 @@ namespace strumpack {
     return 0;
   }
 
+#if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t,typename integer_t> int
   MatrixReordering<scalar_t,integer_t>::nested_dissection
   (SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>* A,
@@ -244,6 +249,7 @@ namespace strumpack {
       (opts, A->nnz(), opts.verbose() && !mpi_rank(comm));
     return 0;
   }
+#endif
 
   template<typename scalar_t,typename integer_t> void
   MatrixReordering<scalar_t,integer_t>::clear_tree_data() {

@@ -28,7 +28,6 @@
  */
 #include <iostream>
 #include "StrumpackSparseSolver.hpp"
-#include "sparse/CSCMatrix.hpp"
 #include "sparse/CSRMatrix.hpp"
 
 typedef double scalar;

@@ -39,23 +39,30 @@
 #include "CompressedSparseMatrix.hpp"
 #include "MatrixReordering.hpp"
 #include "HSS/HSSMatrix.hpp"
+#if defined(STRUMPACK_USE_MPI)
 #include "ExtendAdd.hpp"
+#endif
 #if defined(_OPENMP)
 #include "omp.h"
 #endif
 
 namespace strumpack {
 
+#if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t,typename integer_t> class ExtendAdd;
+#endif
 
   template<typename scalar_t,typename integer_t> class FrontalMatrix {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
-    using DistM_t = DistributedMatrix<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
+#if defined(STRUMPACK_USE_MPI)
+    using DistM_t = DistributedMatrix<scalar_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
     using ExtAdd = ExtendAdd<scalar_t,integer_t>;
+#endif
+
 
   public:
     FrontalMatrix
@@ -86,19 +93,12 @@ namespace strumpack {
      int etree_level=0, int task_depth=0) = 0;
 
     void multifrontal_solve(DenseM_t& b) const;
-    void multifrontal_solve(DenseM_t& bloc, DistM_t* bdist) const;
     virtual void forward_multifrontal_solve
     (DenseM_t& b, DenseM_t* work, int etree_level=0,
      int task_depth=0) const {};
     virtual void backward_multifrontal_solve
     (DenseM_t& y, DenseM_t* work, int etree_level=0,
      int task_depth=0) const {};
-    virtual void forward_multifrontal_solve
-    (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
-     int etree_level=0) const;
-    virtual void backward_multifrontal_solve
-    (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
-     int etree_level=0) const;
 
     void fwd_solve_phase1
     (DenseM_t& b, DenseM_t& bupd, DenseM_t* work,
@@ -111,9 +111,74 @@ namespace strumpack {
     (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
      const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) {}
 
+    virtual int random_samples() const { return 0; }
+
+    virtual void sample_CB
+    (const SPOptions<scalar_t>& opts, const DenseM_t& R,
+     DenseM_t& Sr, DenseM_t& Sc, F_t* parent, int task_depth=0) = 0;
+    virtual void extract_CB_sub_matrix
+    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+     DenseM_t& B, int task_depth) const = 0;
+
+    void extend_add_b
+    (DenseM_t& b, DenseM_t& bupd, const DenseM_t& CB, const F_t* pa) const;
+    void extract_b
+    (const DenseM_t& y, const DenseM_t& yupd, DenseM_t& CB, const F_t* pa) const;
+
+    virtual integer_t maximum_rank(int task_depth=0) const { return 0; }
+    virtual long long factor_nonzeros(int task_depth=0) const;
+    virtual long long dense_factor_nonzeros(int task_depth=0) const;
+    virtual bool isHSS() const { return false; }
+    virtual bool isMPI() const { return false; }
+    virtual void print_rank_statistics(std::ostream &out) const {}
+    virtual std::string type() const { return "FrontalMatrix"; }
+    virtual void bisection_partitioning
+    (const SPOptions<scalar_t>& opts, integer_t* sorder,
+     bool isroot=true, int task_depth=0);
+    void permute_upd_indices(const integer_t* perm, int task_depth=0);
+
+    virtual void set_BLR_partitioning
+    (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
+     const std::vector<bool>& adm, bool is_root) {}
+    virtual void set_HSS_partitioning
+    (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
+     bool is_root) {}
+
+    int levels() const {
+      int ll = 0, lr = 0;
+      if (lchild_) ll = lchild_->levels();
+      if (rchild_) lr = rchild_->levels();
+      return std::max(ll, lr) + 1;
+    }
+
+    void set_lchild(std::unique_ptr<F_t> ch) { lchild_ = std::move(ch); }
+    void set_rchild(std::unique_ptr<F_t> ch) { rchild_ = std::move(ch); }
+
+    // TODO compute this (and levels) once, store it
+    // maybe compute it when setting pointers to the children
+    // create setters/getters for the children
+    integer_t max_dim_upd() const {
+      integer_t max_dupd = dim_upd();
+      if (lchild_) max_dupd = std::max(max_dupd, lchild_->max_dim_upd());
+      if (rchild_) max_dupd = std::max(max_dupd, rchild_->max_dim_upd());
+      return max_dupd;
+    }
+
+    virtual int P() const { return 1; }
+
+
+#if defined(STRUMPACK_USE_MPI)
+    void multifrontal_solve(DenseM_t& bloc, DistM_t* bdist) const;
+    virtual void forward_multifrontal_solve
+    (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
+     int etree_level=0) const;
+    virtual void backward_multifrontal_solve
+    (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
+     int etree_level=0) const;
+
     virtual void extend_add_copy_to_buffers
     (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
-      assert(false);
+      assert(false); // TODO static assert?
     };
     virtual void extend_add_copy_from_buffers
     (DistM_t& F11, DistM_t& F12, DistM_t& F21, DistM_t& F22,
@@ -144,32 +209,6 @@ namespace strumpack {
       ExtAdd::extract_column_seq_copy_from_buffers(seqCB, pbuf, pa, this);
     }
 
-    virtual int random_samples() const { return 0; }
-
-    virtual void sample_CB
-    (const SPOptions<scalar_t>& opts, const DenseM_t& R,
-     DenseM_t& Sr, DenseM_t& Sc, F_t* parent, int task_depth=0) = 0;
-    virtual void extract_CB_sub_matrix
-    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-     DenseM_t& B, int task_depth) const = 0;
-
-    void extend_add_b
-    (DenseM_t& b, DenseM_t& bupd, const DenseM_t& CB, const F_t* pa) const;
-    void extract_b
-    (const DenseM_t& y, const DenseM_t& yupd, DenseM_t& CB, const F_t* pa) const;
-
-    virtual integer_t maximum_rank(int task_depth=0) const { return 0; }
-    virtual long long factor_nonzeros(int task_depth=0) const;
-    virtual long long dense_factor_nonzeros(int task_depth=0) const;
-    virtual bool isHSS() const { return false; }
-    virtual bool isMPI() const { return false; }
-    virtual void print_rank_statistics(std::ostream &out) const {}
-    virtual std::string type() const { return "FrontalMatrix"; }
-    virtual void bisection_partitioning
-    (const SPOptions<scalar_t>& opts, integer_t* sorder,
-     bool isroot=true, int task_depth=0);
-    void permute_upd_indices(const integer_t* perm, int task_depth=0);
-
     virtual void get_submatrix_2d
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
      DistM_t& Bdist, DenseM_t& Bseq) const;
@@ -177,35 +216,7 @@ namespace strumpack {
     (const std::vector<std::vector<std::size_t>>& I,
      const std::vector<std::vector<std::size_t>>& J,
      std::vector<DistM_t>& Bdist, std::vector<DenseM_t>& Bseq) const;
-
-    virtual void set_BLR_partitioning
-    (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
-     const std::vector<bool>& adm, bool is_root) {}
-    virtual void set_HSS_partitioning
-    (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
-     bool is_root) {}
-
-    int levels() const {
-      int ll = 0, lr = 0;
-      if (lchild_) ll = lchild_->levels();
-      if (rchild_) lr = rchild_->levels();
-      return std::max(ll, lr) + 1;
-    }
-
-    void set_lchild(std::unique_ptr<F_t> ch) { lchild_ = std::move(ch); }
-    void set_rchild(std::unique_ptr<F_t> ch) { rchild_ = std::move(ch); }
-
-    // TODO compute this (and levels) once, store it
-    // maybe compute it when setting pointers to the children
-    // create setters/getters for the children
-    integer_t max_dim_upd() const {
-      integer_t max_dupd = dim_upd();
-      if (lchild_) max_dupd = std::max(max_dupd, lchild_->max_dim_upd());
-      if (rchild_) max_dupd = std::max(max_dupd, rchild_->max_dim_upd());
-      return max_dupd;
-    }
-
-    virtual int P() const { return 1; }
+#endif
 
   protected:
     integer_t sep_;
@@ -385,45 +396,6 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::multifrontal_solve
-  (DenseM_t& bloc, DistM_t* bdist) const {
-    DistM_t CB;
-    DenseM_t seqCB;
-    TIMER_TIME(TaskType::FORWARD_SOLVE, 0, t_fwd);
-    forward_multifrontal_solve(bloc, bdist, CB, seqCB);
-    TIMER_STOP(t_fwd);
-    TIMER_TIME(TaskType::BACKWARD_SOLVE, 0, t_bwd);
-    backward_multifrontal_solve(bloc, bdist, CB, seqCB);
-    TIMER_STOP(t_bwd);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::forward_multifrontal_solve
-  (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
-   int etree_level) const {
-    auto max_dupd = max_dim_upd();
-    auto lvls = levels();
-    std::vector<DenseM_t> CB(lvls);
-    for (auto& cb : CB)
-      cb = DenseM_t(max_dupd, bloc.cols());
-    forward_multifrontal_solve(bloc, CB.data(), etree_level, 0);
-    seqbupd = CB[0];
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::backward_multifrontal_solve
-  (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
-   int etree_level) const {
-    auto max_dupd = max_dim_upd();
-    auto lvls = levels();
-    std::vector<DenseM_t> CB(lvls);
-    for (auto& cb : CB)
-      cb = DenseM_t(max_dupd, yloc.cols());
-    CB[0] = seqyupd;
-    backward_multifrontal_solve(yloc, CB.data(), etree_level, 0);
-  }
-
-  template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::fwd_solve_phase1
   (DenseM_t& b, DenseM_t& bupd, DenseM_t* work,
    int etree_level, int task_depth) const {
@@ -583,29 +555,71 @@ namespace strumpack {
 #pragma omp taskwait
   }
 
+
+#if defined(STRUMPACK_USE_MPI)
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrix<scalar_t,integer_t>::multifrontal_solve
+  (DenseM_t& bloc, DistM_t* bdist) const {
+    DistM_t CB;
+    DenseM_t seqCB;
+    TIMER_TIME(TaskType::FORWARD_SOLVE, 0, t_fwd);
+    forward_multifrontal_solve(bloc, bdist, CB, seqCB);
+    TIMER_STOP(t_fwd);
+    TIMER_TIME(TaskType::BACKWARD_SOLVE, 0, t_bwd);
+    backward_multifrontal_solve(bloc, bdist, CB, seqCB);
+    TIMER_STOP(t_bwd);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrix<scalar_t,integer_t>::forward_multifrontal_solve
+  (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
+   int etree_level) const {
+    auto max_dupd = max_dim_upd();
+    auto lvls = levels();
+    std::vector<DenseM_t> CB(lvls);
+    for (auto& cb : CB)
+      cb = DenseM_t(max_dupd, bloc.cols());
+    forward_multifrontal_solve(bloc, CB.data(), etree_level, 0);
+    seqbupd = CB[0];
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrix<scalar_t,integer_t>::backward_multifrontal_solve
+  (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
+   int etree_level) const {
+    auto max_dupd = max_dim_upd();
+    auto lvls = levels();
+    std::vector<DenseM_t> CB(lvls);
+    for (auto& cb : CB)
+      cb = DenseM_t(max_dupd, yloc.cols());
+    CB[0] = seqyupd;
+    backward_multifrontal_solve(yloc, CB.data(), etree_level, 0);
+  }
+
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::get_submatrix_2d
-    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-     DistM_t&, DenseM_t& Bseq) const {
-      TIMER_TIME(TaskType::GET_SUBMATRIX, 2, t_getsub);
-      Bseq = DenseM_t(I.size(), J.size());
-      Bseq.zero();
-      extract_CB_sub_matrix(I, J, Bseq, 0);
-    }
+  (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+   DistM_t&, DenseM_t& Bseq) const {
+    TIMER_TIME(TaskType::GET_SUBMATRIX, 2, t_getsub);
+    Bseq = DenseM_t(I.size(), J.size());
+    Bseq.zero();
+    extract_CB_sub_matrix(I, J, Bseq, 0);
+  }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::get_submatrix_2d
   (const std::vector<std::vector<std::size_t>>& I,
    const std::vector<std::vector<std::size_t>>& J,
    std::vector<DistM_t>&, std::vector<DenseM_t>& Bseq) const {
-      TIMER_TIME(TaskType::GET_SUBMATRIX, 2, t_getsub);
-      for (std::size_t i=0; i<I.size(); i++) {
-        Bseq.emplace_back(I[i].size(), J[i].size());
-        Bseq[i].zero();
-        // for the threaded code, just extract block per block
-        extract_CB_sub_matrix(I[i], J[i], Bseq[i], 0);
-      }
+    TIMER_TIME(TaskType::GET_SUBMATRIX, 2, t_getsub);
+    for (std::size_t i=0; i<I.size(); i++) {
+      Bseq.emplace_back(I[i].size(), J[i].size());
+      Bseq[i].zero();
+      // for the threaded code, just extract block per block
+      extract_CB_sub_matrix(I[i], J[i], Bseq[i], 0);
     }
+  }
+#endif
 
 } // end namespace strumpack
 
