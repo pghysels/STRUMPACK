@@ -238,10 +238,10 @@ namespace strumpack {
     }
 
     static void control_start(const std::string& name) {
-      MPI_Pcontrol(1, name);
+      MPI_Pcontrol(1, name.c_str());
     }
     static void control_stop(const std::string& name) {
-      MPI_Pcontrol(-1, name);
+      MPI_Pcontrol(-1, name.c_str());
     }
 
   private:
