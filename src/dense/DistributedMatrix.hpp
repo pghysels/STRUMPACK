@@ -608,16 +608,16 @@ namespace strumpack {
       abort();
     }
     if (m.ld() == std::size_t(lrows_)) {
-      data_ = m._data;
-      m._data = nullptr;
+      data_ = m.data_;
+      m.data_ = nullptr;
     } else {
       data_ = new scalar_t[lrows_*lcols_];
       for (int c=0; c<lcols_; c++)
         for (int r=0; r<lrows_; r++)
           operator()(r, c) = m(r, c);
     }
-    delete[] m._data;
-    m._data = nullptr;
+    delete[] m.data_;
+    m.data_ = nullptr;
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix
@@ -1142,10 +1142,10 @@ namespace strumpack {
   template<typename scalar_t> DenseMatrix<scalar_t>
   DistributedMatrix<scalar_t>::dense_and_clear() {
     DenseMatrix<scalar_t> tmp;
-    tmp._data = data();
-    tmp._rows = lrows();
-    tmp._cols = lcols();
-    tmp._ld = ld();
+    tmp.data_ = data();
+    tmp.rows_ = lrows();
+    tmp.cols_ = lcols();
+    tmp.ld_ = ld();
     this->data_ = nullptr;
     clear();
     return tmp;
@@ -1154,7 +1154,7 @@ namespace strumpack {
   template<typename scalar_t> DenseMatrix<scalar_t>
   DistributedMatrix<scalar_t>::dense() const {
     DenseMatrix<scalar_t> tmp(lrows(), lcols());
-    tmp._ld = lrows();
+    tmp.ld_ = lrows();
     int rlo, rhi, clo, chi;
     lranges(rlo, rhi, clo, chi);
     for (int c=clo; c<chi; c++)

@@ -100,15 +100,26 @@ namespace strumpack {
    * allocates, owns and deallocates its memory. If you want to use
    * pre-allocated memory to represent a dense matrix, use the
    * DenseMatrixWrapper<scalar_t> class.
+   *
+   * Several routines in this matrix perform some sort of bounds or
+   * size checking using __assertions__. These assertions can be
+   * removed by compiling with -DNDEBUG, which is added by default
+   * when using a CMake Release build.
+   *
+   * Several routines in this class take a __depth__ parameter. This
+   * refers to the depth of the nested OpenMP task spawning. No more
+   * tasks will be generated once the depth reaches a certain maximum
+   * level (params::task_recursion_cutoff_level), in order to limit
+   * the overhead of task spawning.
    */
   template<typename scalar_t> class DenseMatrix {
     using real_t = typename RealType<scalar_t>::value_type;
 
   protected:
-    scalar_t* _data = nullptr;
-    std::size_t _rows = 0;
-    std::size_t _cols = 0;
-    std::size_t _ld = 1;
+    scalar_t* data_ = nullptr;
+    std::size_t rows_ = 0;
+    std::size_t cols_ = 0;
+    std::size_t ld_ = 1;
 
   public:
 
@@ -180,26 +191,26 @@ namespace strumpack {
     virtual DenseMatrix<scalar_t>& operator=(DenseMatrix<scalar_t>&& D);
 
     /** Number of rows of the matrix */
-    inline std::size_t rows() const { return _rows; }
+    inline std::size_t rows() const { return rows_; }
 
     /** Number of columns of the matrix */
-    inline std::size_t cols() const { return _cols; }
+    inline std::size_t cols() const { return cols_; }
 
     /**
      * Leading dimension used to store the matrix, typically set to
      * max(1, rows())
      */
-    inline std::size_t ld() const { return _ld; }
+    inline std::size_t ld() const { return ld_; }
 
     /**
      * Const pointer to the raw data used to represent this matrix.
      */
-    inline const scalar_t* data() const { return _data; }
+    inline const scalar_t* data() const { return data_; }
 
     /**
      * Pointer to the raw data used to represent this matrix.
      */
-    inline scalar_t* data() { return _data; }
+    inline scalar_t* data() { return data_; }
 
     /**
      * Const reference to element (i,j) in the matrix. This will do a
@@ -210,7 +221,7 @@ namespace strumpack {
      * \param j Column index, j < cols()
      */
     inline const scalar_t& operator()(std::size_t i, std::size_t j) const
-    { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return _data[i+_ld*j]; }
+    { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return data_[i+ld_*j]; }
 
     /**
      * Const pointer to element (i,j) in the matrix. This will do a
@@ -221,7 +232,7 @@ namespace strumpack {
      * \param j Column index, j < cols()
      */
     inline const scalar_t* ptr(std::size_t i, std::size_t j) const
-    { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return _data+i+_ld*j; }
+    { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return data_+i+ld_*j; }
 
     /**
      * Reference to element (i,j) in the matrix. This will do a bounds
@@ -232,7 +243,7 @@ namespace strumpack {
      * \param j Column index, j < cols()
      */
     inline scalar_t& operator()(std::size_t i, std::size_t j)
-    { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return _data[i+_ld*j]; }
+    { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return data_[i+ld_*j]; }
 
     /**
      * Pointer to element (i,j) in the matrix. This will do a bounds
@@ -243,7 +254,7 @@ namespace strumpack {
      * \param j Column index, j < cols()
      */
     inline scalar_t* ptr(std::size_t i, std::size_t j)
-    { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return _data+i+_ld*j; }
+    { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return data_+i+ld_*j; }
 
     /**
      * Print the matrix to std::cout, in a format interpretable by
@@ -435,35 +446,154 @@ namespace strumpack {
      */
     DenseMatrix<scalar_t> extract_rows
     (const std::vector<std::size_t>& I) const;
+
+    /**
+     * Return a submatrix of this matrix defined by (I,J). The vectors
+     * I and J define the row and column indices of the submatrix. The
+     * extracted submatrix will be I.size() x J.size(). The extracted
+     * submatrix, lets call it B, satisfies B(i,j) =
+     * this->operator()(I[i],J[j]).
+     *
+     * \param I row indices of elements to extract, I[i] < rows()
+     * \param J column indices of elements to extract, J[j] < cols()
+     */
     DenseMatrix<scalar_t> extract
     (const std::vector<std::size_t>& I,
      const std::vector<std::size_t>& J) const;
+
+    /**
+     * Add the rows of matrix B into this matrix at the rows specified
+     * by vector I, ie, add row i of matrix B to row I[i] of this
+     * matrix. This is used in the sparse solver.
+     *
+     * \param I index set in this matrix, where to add the rows of B,
+     * I[i] < rows()
+     * \param B matrix with rows to scatter in this matrix
+     * \param depth current OpenMP task recursion depth
+     */
     DenseMatrix<scalar_t>& scatter_rows_add
     (const std::vector<std::size_t>& I,
      const DenseMatrix<scalar_t>& B, int depth);
+
+    /**
+     * Add matrix B to this matrix. Return a reference to this matrix.
+     *
+     * \param B matrix to add to this matrix.
+     * \param depth current OpenMP task recursion depth
+     */
     DenseMatrix<scalar_t>& add(const DenseMatrix<scalar_t>& B, int depth=0);
+
+    /**
+     * Subtract matrix B from this matrix. Return a reference to this
+     * matrix.
+     *
+     * \param B matrix to subtract from this matrix
+     * \param depth current OpenMP task recursion depth
+     */
     DenseMatrix<scalar_t>& sub(const DenseMatrix<scalar_t>& B, int depth=0);
-    DenseMatrix<scalar_t>& scale(scalar_t alpha);
+
+    /**
+     * Scale this matrix by a constant factor.
+     *
+     * \param alpha scaling factor
+     */
+    DenseMatrix<scalar_t>& scale(scalar_t alpha, int depth=0);
+
+    /**
+     * Add a scalar multiple of a given matrix to this matrix, ie,
+     * this += alpha * B.
+     *
+     * \param alpha scalar factor
+     * \param B matrix to add, should be the same size of this matrix
+     * \param depth current OpenMP task recursion depth
+     */
     DenseMatrix<scalar_t>& scaled_add
-    (scalar_t alpha, const DenseMatrix<scalar_t>& x, int depth=0);
+    (scalar_t alpha, const DenseMatrix<scalar_t>& B, int depth=0);
+
+    /**
+     * Scale this matrix, and add a given matrix to this matrix, ie,
+     * this = alpha * this + B.
+     *
+     * \param alpha scalar factor
+     * \param B matrix to add, should be the same size of this matrix
+     * \param depth current OpenMP task recursion depth
+     */
     DenseMatrix<scalar_t>& scale_and_add
-    (scalar_t alpha, const DenseMatrix<scalar_t>& x, int depth=0);
+    (scalar_t alpha, const DenseMatrix<scalar_t>& B, int depth=0);
+
+    /**
+     * Scale the rows of this matrix with the scalar values from the
+     * vector D. Row i in this matrix is scaled with D[i].
+     *
+     * \param D scaling vector, D.size() == rows()
+     * \param depth current OpenMP task recursion depth
+     */
     DenseMatrix<scalar_t>& scale_rows
     (const std::vector<scalar_t>& D, int depth=0);
+
+    /**
+     * Scale the rows of this matrix with the inverses of the scalar
+     * values in vector D, ie, this->operator()(i,j) /= D[i].
+     *
+     * \param D scalar factors, D.size() == rows()
+     * \param depth current OpenMP task recursion depth
+     */
     DenseMatrix<scalar_t>& div_rows
     (const std::vector<scalar_t>& D, int depth=0);
+
+    /**
+     * Return default norm of this matrix. Currently the default is
+     * set to the Frobenius norm.
+     */
     real_t norm() const;
+
+    /**
+     * Return the Frobenius norm of this matrix.
+     */
     real_t normF() const;
+
+    /**
+     * Return the 1-norm of this matrix.
+     */
     real_t norm1() const;
+
+    /**
+     * Return the infinity norm of this matrix.
+     */
     real_t normI() const;
+
+    /**
+     * Return the (approximate) amount memory taken by this
+     * memory. Simply nonzeros()*sizeof(scalar_t). The matrix metadata
+     * is not counted in this.
+     */
     virtual std::size_t memory() const {
       return sizeof(scalar_t) * rows() * cols();
     }
+
+    /**
+     * Return the number of nonzeros in this matrix, ie, simply
+     * rows()*cols().
+     */
     virtual std::size_t nonzeros() const {
       return rows()*cols();
     }
 
+    /**
+     * Compute an LU factorization of this matrix using partial
+     * pivoting with row interchanges. The factorization has the form
+     * A = P * L * U, where P is a permutation matrix, L is lower
+     * triangular with unit diagonal elements, and U is upper
+     * triangular. This call the LAPACK routine DGETRF. The L and U
+     * factors are stored in place, the permutation is returned, and
+     * can be applied with the laswp() routine.
+     *
+     * \param depth current OpenMP task recursion depth
+     * \see laswp
+     */
     std::vector<int> LU(int depth);
+
+
     DenseMatrix<scalar_t> solve
     (const DenseMatrix<scalar_t>& b,
      const std::vector<int>& piv, int depth) const;
@@ -505,8 +635,8 @@ namespace strumpack {
     DenseMatrixWrapper() : DenseMatrix<scalar_t>() {}
     DenseMatrixWrapper
     (std::size_t m, std::size_t n, scalar_t* D, std::size_t ld) {
-      this->_data = D; this->_rows = m; this->_cols = n;
-      this->_ld = std::max(std::size_t(1), ld);
+      this->data_ = D; this->rows_ = m; this->cols_ = n;
+      this->ld_ = std::max(std::size_t(1), ld);
     }
     DenseMatrixWrapper
     (std::size_t m, std::size_t n, DenseMatrix<scalar_t>& D,
@@ -515,11 +645,11 @@ namespace strumpack {
       assert(i+m <= D.rows());
       assert(j+n <= D.cols());
     }
-    virtual ~DenseMatrixWrapper() { this->_data = nullptr; }
+    virtual ~DenseMatrixWrapper() { this->data_ = nullptr; }
 
     void clear() {
-      this->_rows = 0; this->_cols = 0;
-      this->_ld = 1; this->_data = nullptr;
+      this->rows_ = 0; this->cols_ = 0;
+      this->ld_ = 1; this->data_ = nullptr;
     }
     std::size_t memory() const { return 0; }
     std::size_t nonzeros() const { return 0; }
@@ -530,12 +660,12 @@ namespace strumpack {
     DenseMatrixWrapper(DenseMatrix<scalar_t>&&) = delete;
     DenseMatrixWrapper<scalar_t>&
     operator=(const DenseMatrixWrapper<scalar_t>& D)
-    { this->_data = D.data(); this->_rows = D.rows();
-      this->_cols = D.cols(); this->_ld = D.ld(); return *this; }
+    { this->data_ = D.data(); this->rows_ = D.rows();
+      this->cols_ = D.cols(); this->ld_ = D.ld(); return *this; }
     DenseMatrixWrapper<scalar_t>&
     operator=(DenseMatrixWrapper<scalar_t>&& D) {
-      this->_data = D.data(); this->_rows = D.rows();
-      this->_cols = D.cols(); this->_ld = D.ld(); return *this; }
+      this->data_ = D.data(); this->rows_ = D.rows();
+      this->cols_ = D.cols(); this->ld_ = D.ld(); return *this; }
 
     DenseMatrix<scalar_t>&
     operator=(const DenseMatrix<scalar_t>& a) override {
@@ -617,79 +747,79 @@ namespace strumpack {
 
 
   template<typename scalar_t> DenseMatrix<scalar_t>::DenseMatrix()
-    : _data(nullptr), _rows(0), _cols(0), _ld(1) { }
+    : data_(nullptr), rows_(0), cols_(0), ld_(1) { }
 
   template<typename scalar_t> DenseMatrix<scalar_t>::DenseMatrix
   (std::size_t m, std::size_t n)
-    : _data(new scalar_t[m*n]), _rows(m),
-      _cols(n), _ld(std::max(std::size_t(1), m)) { }
+    : data_(new scalar_t[m*n]), rows_(m),
+      cols_(n), ld_(std::max(std::size_t(1), m)) { }
 
   template<typename scalar_t> DenseMatrix<scalar_t>::DenseMatrix
   (std::size_t m, std::size_t n, const scalar_t* D, std::size_t ld)
-    : _data(new scalar_t[m*n]), _rows(m), _cols(n),
-      _ld(std::max(std::size_t(1), m)) {
+    : data_(new scalar_t[m*n]), rows_(m), cols_(n),
+      ld_(std::max(std::size_t(1), m)) {
     assert(ld >= m);
-    for (std::size_t j=0; j<_cols; j++)
-      for (std::size_t i=0; i<_rows; i++)
+    for (std::size_t j=0; j<cols_; j++)
+      for (std::size_t i=0; i<rows_; i++)
         operator()(i, j) = D[i+j*ld];
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>::DenseMatrix
   (std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& D,
    std::size_t i, std::size_t j)
-    : _data(new scalar_t[m*n]), _rows(m), _cols(n),
-      _ld(std::max(std::size_t(1), m)) {
-    for (std::size_t _j=0; _j<std::min(_cols, D.cols()-j); _j++)
-      for (std::size_t _i=0; _i<std::min(_rows, D.rows()-i); _i++)
+    : data_(new scalar_t[m*n]), rows_(m), cols_(n),
+      ld_(std::max(std::size_t(1), m)) {
+    for (std::size_t _j=0; _j<std::min(cols_, D.cols()-j); _j++)
+      for (std::size_t _i=0; _i<std::min(rows_, D.rows()-i); _i++)
         operator()(_i, _j) = D(_i+i, _j+j);
   }
 
   template<typename scalar_t>
   DenseMatrix<scalar_t>::DenseMatrix(const DenseMatrix<scalar_t>& D)
-    : _data(new scalar_t[D.rows()*D.cols()]), _rows(D.rows()),
-      _cols(D.cols()), _ld(std::max(std::size_t(1), D.rows())) {
-    for (std::size_t j=0; j<_cols; j++)
-      for (std::size_t i=0; i<_rows; i++)
+    : data_(new scalar_t[D.rows()*D.cols()]), rows_(D.rows()),
+      cols_(D.cols()), ld_(std::max(std::size_t(1), D.rows())) {
+    for (std::size_t j=0; j<cols_; j++)
+      for (std::size_t i=0; i<rows_; i++)
         operator()(i, j) = D(i, j);
   }
 
   template<typename scalar_t>
   DenseMatrix<scalar_t>::DenseMatrix(DenseMatrix<scalar_t>&& D)
-    : _data(D.data()), _rows(D.rows()), _cols(D.cols()), _ld(D.ld()) {
-    D._data = nullptr;
-    D._rows = 0;
-    D._cols = 0;
-    D._ld = 1;
+    : data_(D.data()), rows_(D.rows()), cols_(D.cols()), ld_(D.ld()) {
+    D.data_ = nullptr;
+    D.rows_ = 0;
+    D.cols_ = 0;
+    D.ld_ = 1;
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>::~DenseMatrix() {
-    delete[] _data;
+    delete[] data_;
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::operator=(const DenseMatrix<scalar_t>& D) {
     if (this == &D) return *this;
-    if (_rows != D.rows() || _cols != D.cols()) {
-      _rows = D.rows();
-      _cols = D.cols();
-      delete[] _data;
-      _data = new scalar_t[_rows*_cols];
-      _ld = std::max(std::size_t(1), _rows);
+    if (rows_ != D.rows() || cols_ != D.cols()) {
+      rows_ = D.rows();
+      cols_ = D.cols();
+      delete[] data_;
+      data_ = new scalar_t[rows_*cols_];
+      ld_ = std::max(std::size_t(1), rows_);
     }
-    for (std::size_t j=0; j<_cols; j++)
-      for (std::size_t i=0; i<_rows; i++)
+    for (std::size_t j=0; j<cols_; j++)
+      for (std::size_t i=0; i<rows_; i++)
         operator()(i,j) = D(i,j);
     return *this;
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::operator=(DenseMatrix<scalar_t>&& D) {
-    _rows = D.rows();
-    _cols = D.cols();
-    _ld = D.ld();
-    delete[] _data;
-    _data = D.data();
-    D._data = nullptr;
+    rows_ = D.rows();
+    cols_ = D.cols();
+    ld_ = D.ld();
+    delete[] data_;
+    data_ = D.data();
+    D.data_ = nullptr;
     return *this;
   }
 
@@ -761,11 +891,11 @@ namespace strumpack {
   }
 
   template<typename scalar_t> void DenseMatrix<scalar_t>::clear() {
-    _rows = 0;
-    _cols = 0;
-    _ld = 1;
-    delete[] _data;
-    _data = nullptr;
+    rows_ = 0;
+    cols_ = 0;
+    ld_ = 1;
+    delete[] data_;
+    data_ = nullptr;
   }
 
   template<typename scalar_t> void
@@ -774,11 +904,11 @@ namespace strumpack {
     for (std::size_t j=0; j<std::min(cols(),n); j++)
       for (std::size_t i=0; i<std::min(rows(),m); i++)
         tmp[i+j*m] = operator()(i,j);
-    delete[] _data;
-    _data = tmp;
-    _ld = std::max(std::size_t(1), m);
-    _rows = m;
-    _cols = n;
+    delete[] data_;
+    data_ = tmp;
+    ld_ = std::max(std::size_t(1), m);
+    rows_ = m;
+    cols_ = n;
   }
 
   template<typename scalar_t> void
@@ -924,7 +1054,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>&
-  DenseMatrix<scalar_t>::scale(scalar_t alpha) {
+  DenseMatrix<scalar_t>::scale(scalar_t alpha, int depth) {
     // #if defined(_OPENMP)
     // #pragma omp parallel if(!omp_in_parallel())
     // #pragma omp single nowait
@@ -939,7 +1069,7 @@ namespace strumpack {
 
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::scaled_add
-  (scalar_t alpha, const DenseMatrix<scalar_t>& x, int depth) {
+  (scalar_t alpha, const DenseMatrix<scalar_t>& B, int depth) {
     // #if defined(_OPENMP)
     // #pragma omp parallel if(!omp_in_parallel())
     // #pragma omp single nowait
@@ -947,14 +1077,14 @@ namespace strumpack {
     // #endif
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
-        operator()(i, j) += alpha * x(i, j);
+        operator()(i, j) += alpha * B(i, j);
     STRUMPACK_FLOPS((is_complex<scalar_t>()?8:2)*cols()*rows());
     return *this;
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::scale_and_add
-  (scalar_t alpha, const DenseMatrix<scalar_t>& x, int depth) {
+  (scalar_t alpha, const DenseMatrix<scalar_t>& B, int depth) {
     // #if defined(_OPENMP)
     // #pragma omp parallel if(!omp_in_parallel())
     // #pragma omp single nowait
@@ -962,7 +1092,7 @@ namespace strumpack {
     // #endif
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
-        operator()(i, j) = alpha * operator()(i, j) + x(i, j);
+        operator()(i, j) = alpha * operator()(i, j) + B(i, j);
     STRUMPACK_FLOPS((is_complex<scalar_t>()?8:2)*cols()*rows());
     return *this;
   }
