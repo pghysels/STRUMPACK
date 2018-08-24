@@ -6,8 +6,8 @@ the U.S. Dept. of Energy).  All rights reserved.
 
 [![Build Status](https://travis-ci.org/pghysels/STRUMPACK.svg?branch=master)](https://travis-ci.org/pghysels/STRUMPACK)
 
-## Installation instructions
-   See INSTALL.txt
+## Documentation & Installation instructions
+   [http://portal.nersc.gov/project/sparse/strumpack/master/]([http://portal.nersc.gov/project/sparse/strumpack/master/)
 
 
 ## Website
