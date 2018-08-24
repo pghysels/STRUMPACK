@@ -368,6 +368,13 @@ namespace strumpack {
       void compress_hard_restart(const DenseM_t& A, const opts_t& opts);
       void compress_hard_restart
       (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts);
+      
+      //NEW
+      // void compress_ann
+      // (const mult_t& Amult, const elem_t& Aelem,
+      // data_points, ann_indices, scores_indices
+      // const kopts_t& kopts);
+      // const opts_t& opts);
 
       void compress_recursive_original
       (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
