@@ -49,6 +49,8 @@ namespace strumpack {
       using DenseM_t = DenseMatrix<scalar_t>;
 
     public:
+      virtual ~BLRTile() = default;
+
       virtual std::size_t rows() const = 0;
       virtual std::size_t cols() const = 0;
       virtual std::size_t rank() const = 0;
