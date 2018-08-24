@@ -223,6 +223,12 @@ namespace strumpack {
       void compress
       (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts);
 
+
+      void compress_ann
+      (DenseM_t& ann, DenseM_t& scores, const elem_t& Aelem,
+       const opts_t& opts);
+
+
       /**
        * Reset the matrix to an empty, 0 x 0 matrix, freeing up all
        * it's memory.
@@ -368,13 +374,23 @@ namespace strumpack {
       void compress_hard_restart(const DenseM_t& A, const opts_t& opts);
       void compress_hard_restart
       (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts);
-      
+
       //NEW
       // void compress_ann
       // (const mult_t& Amult, const elem_t& Aelem,
-      // data_points, ann_indices, scores_indices
-      // const kopts_t& kopts);
-      // const opts_t& opts);
+      //  data_points, ann_indices, scores_indices,
+      //  //const kopts_t& kopts);
+      //  const opts_t& opts);
+
+      void compress_recursive_ann
+      (DenseM_t& ann, DenseM_t& scores,
+       const elem_t& Aelem, const opts_t& opts,
+       WorkCompressANN<scalar_t>& w, int d) override;
+
+      void compute_local_samples_ann
+      (DenseM_t& ann, DenseM_t& scores, WorkCompressANN<scalar_t>& w,
+       const elem_t& Aelem, int d);
+
 
       void compress_recursive_original
       (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
@@ -826,6 +842,7 @@ namespace strumpack {
 #include "HSSMatrix.apply.hpp"
 #include "HSSMatrix.compress.hpp"
 #include "HSSMatrix.compress_stable.hpp"
+#include "HSSMatrix.compress.kernel.hpp"
 #include "HSSMatrix.factor.hpp"
 #include "HSSMatrix.solve.hpp"
 #include "HSSMatrix.extract.hpp"

@@ -807,7 +807,14 @@ int main(int argc, char *argv[]) {
   timer.start();
   //  K.compress(Kdense, hss_opts);
   Kernel kernel_matrix(data_train, d, h, lambda);
-  K.compress(kernel_matrix, kernel_matrix, hss_opts);
+
+
+  // TODO get from ANN search
+  DenseMatrix<double> ann, scores;
+  K.compress_ann(ann, scores, kernel_matrix, hss_opts);
+  //K.compress(kernel_matrix, kernel_matrix, hss_opts);
+
+
   cout << "# compression time = " << timer.elapsed() << endl;
   total_time += timer.elapsed();
 

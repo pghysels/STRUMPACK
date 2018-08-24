@@ -69,6 +69,23 @@ namespace strumpack {
       }
     };
 
+
+    template<typename scalar_t> class WorkCompressANN :
+      public WorkCompressBase<scalar_t>  {
+    public:
+      std::vector<WorkCompressANN<scalar_t>> c;
+      DenseMatrix<scalar_t> S;
+      std::vector<std::size_t> Scolids;
+      void split(const std::pair<std::size_t,std::size_t>& dim) {
+        if (c.empty()) {
+          c.resize(2);
+          c[0].offset = this->offset;
+          c[1].offset = this->offset + dim;
+          c[0].lvl = c[1].lvl = this->lvl + 1;
+        }
+      }
+    };
+
     template<typename scalar_t> class WorkApply {
     public:
       std::pair<std::size_t,std::size_t> offset;
