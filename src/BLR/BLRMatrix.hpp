@@ -378,7 +378,8 @@ namespace strumpack {
         {
           for (std::size_t i=0; i<rowblocks(); i++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-#pragma omp task default(shared) depend(inout:B[i+rb*i])
+            std::size_t ii = i+rb*i;
+#pragma omp task default(shared) firstprivate(i,ii) depend(inout:B[ii])
 #endif
             {
               create_dense_tile(i, i, A);
@@ -387,7 +388,9 @@ namespace strumpack {
             }
             for (std::size_t j=i+1; j<rowblocks(); j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-#pragma omp task default(shared) depend(in:B[i+rb*i]) depend(inout:B[i+rb*j])
+              std::size_t ij = i+rb*j;
+#pragma omp task default(shared) firstprivate(i,j,ii,ij)        \
+  depend(in:B[ii]) depend(inout:B[ij])
 #endif
               { // these blocks have received all updates, compress now
                 if (admissible(i, j)) create_LR_tile(i, j, A, opts);
@@ -400,7 +403,9 @@ namespace strumpack {
                      scalar_t(1.), tile(i, i), tile(i, j));
               }
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-#pragma omp task default(shared) depend(in:B[i+rb*i]) depend(inout:B[j+rb*i])
+              std::size_t ji = j+rb*i;
+#pragma omp task default(shared) firstprivate(i,j,ji,ii)        \
+  depend(in:B[ii]) depend(inout:B[ji])
 #endif
               {
                 if (admissible(j, i)) create_LR_tile(j, i, A, opts);
@@ -413,7 +418,9 @@ namespace strumpack {
             for (std::size_t j=i+1; j<colblocks(); j++)
               for (std::size_t k=i+1; k<rowblocks(); k++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-#pragma omp task default(shared) depend(in:B[i+rb*j],B[k+rb*i]) depend(inout:B[k+rb*j])
+                std::size_t ij = i+rb*j, ki = k+rb*i, kj = k+rb*j;
+#pragma omp task default(shared) firstprivate(i,j,k,ij,ki,kj)   \
+  depend(in:B[ij],B[ki]) depend(inout:B[kj])
 #endif
                 { // Schur complement updates, always into full rank
                   DenseMW_t Akj = tile(A, k, j);
@@ -619,7 +626,8 @@ namespace strumpack {
       {
         for (std::size_t i=0; i<rb; i++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-#pragma omp task default(shared) depend(inout:B[i+lrb*i])
+          std::size_t ii = i+lrb*i;
+#pragma omp task default(shared) firstprivate(i,ii) depend(inout:B[ii])
 #endif
           {
             B11.create_dense_tile(i, i, A11);
@@ -628,8 +636,9 @@ namespace strumpack {
           }
           for (std::size_t j=i+1; j<rb; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-#pragma omp task default(shared) depend(in:B[i+lrb*i])  \
-  depend(inout:B[i+lrb*j]) priority(rb-j)
+            std::size_t ij = i+lrb*j;
+#pragma omp task default(shared) firstprivate(i,j,ij,ii)  \
+  depend(in:B[ii]) depend(inout:B[ij]) priority(rb-j)
 #endif
             { // these blocks have received all updates, compress now
               if (admissible(i, j)) B11.create_LR_tile(i, j, A11, opts);
@@ -642,8 +651,9 @@ namespace strumpack {
                    scalar_t(1.), B11.tile(i, i), B11.tile(i, j));
             }
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-#pragma omp task default(shared) depend(in:B[i+lrb*i])  \
-  depend(inout:B[j+lrb*i]) priority(rb-j)
+            std::size_t ji = j+lrb*i;
+#pragma omp task default(shared) firstprivate(i,j,ji,ii)        \
+  depend(in:B[ii]) depend(inout:B[ji]) priority(rb-j)
 #endif
             {
               if (admissible(j, i)) B11.create_LR_tile(j, i, A11, opts);
@@ -655,8 +665,9 @@ namespace strumpack {
           }
           for (std::size_t j=0; j<rb2; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-#pragma omp task default(shared) depend(in:B[i+lrb*i])  \
-  depend(inout:B[i+lrb*(rb+j)])
+            std::size_t ij2 = i+lrb*(rb+j);
+#pragma omp task default(shared) firstprivate(i,j,ij2,ii)       \
+  depend(in:B[ii]) depend(inout:B[ij2])
 #endif
             {
               B12.create_LR_tile(i, j, A12, opts);
@@ -668,8 +679,9 @@ namespace strumpack {
                    scalar_t(1.), B11.tile(i, i), B12.tile(i, j));
             }
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-#pragma omp task default(shared) depend(in:B[i+lrb*i])  \
-  depend(inout:B[(rb+j)+lrb*i])
+            std::size_t j2i = (rb+j)+lrb*i;
+#pragma omp task default(shared) firstprivate(i,j,j2i,ii)       \
+  depend(in:B[ii]) depend(inout:B[j2i])
 #endif
             {
               B21.create_LR_tile(j, i, A21, opts);
@@ -680,10 +692,10 @@ namespace strumpack {
           }
           for (std::size_t j=i+1; j<rb; j++)
             for (std::size_t k=i+1; k<rb; k++) {
-              //std::size_t jk = std::min(j,k);
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-#pragma omp task default(shared) depend(in:B[i+lrb*j],B[k+lrb*i])       \
-  depend(inout:B[k+lrb*j]) priority(rb-j)
+              std::size_t ij = i+lrb*j, ki = k+lrb*i, kj = k+lrb*j;
+#pragma omp task default(shared) firstprivate(i,j,k,ij,ki,kj)   \
+  depend(in:B[ij],B[ki]) depend(inout:B[kj]) priority(rb-j)
 #endif
               { // Schur complement updates, always into full rank
                 auto Akj = B11.tile(A11, k, j);
@@ -694,8 +706,9 @@ namespace strumpack {
           for (std::size_t k=i+1; k<rb; k++)
             for (std::size_t j=0; j<rb2; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-#pragma omp task default(shared) depend(in:B[k+lrb*i],B[i+lrb*(rb+j)])  \
-  depend(inout:B[k+lrb*(rb+j)])
+              std::size_t ki = k+lrb*i, ij2 = i+lrb*(rb+j), kj2 = k+lrb*(rb+j);
+#pragma omp task default(shared) firstprivate(i,k,j,ki,ij2,kj2) \
+  depend(in:B[ki],B[ij2]) depend(inout:B[kj2])
 #endif
               { // Schur complement updates, always into full rank
                 auto Akj = B12.tile(A12, k, j);
@@ -703,8 +716,9 @@ namespace strumpack {
                      B11.tile(k, i), B12.tile(i, j), scalar_t(1.), Akj);
               }
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-#pragma omp task default(shared) depend(in:B[i+lrb*k],B[(j+rb)+lrb*i]) \
-  depend(inout:B[(rb+j)+lrb*k])
+              std::size_t ik = i+lrb*k, j2i = (j+rb)+lrb*i, j2k = (rb+j)+lrb*k;
+#pragma omp task default(shared) firstprivate(i,k,j,ik,j2i,j2k)      \
+  depend(in:B[ik],B[j2i]) depend(inout:B[j2k])
 #endif
               { // Schur complement updates, always into full rank
                 auto Ajk = B21.tile(A21, j, k);
@@ -716,8 +730,9 @@ namespace strumpack {
           for (std::size_t j=0; j<rb2; j++)
             for (std::size_t k=0; k<rb2; k++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-#pragma omp task default(shared) depend(in:B[i+lrb*(rb+j)],B[(rb+k)+lrb*i]) \
-  depend(inout:B[(rb+k)+lrb*(rb+j)])
+              std::size_t ij2 = i+lrb*(rb+j), k2i = (rb+k)+lrb*i, k2j2 = (rb+k)+lrb*(rb+j);
+#pragma omp task default(shared) firstprivate(i,j,k,ij2,k2i,k2j2)       \
+  depend(in:B[ij2],B[k2i]) depend(inout:B[k2j2])
 #endif
               { // Schur complement updates, always into full rank
                 DenseMatrixWrapper<scalar_t> Akj
@@ -755,7 +770,7 @@ namespace strumpack {
         {
           for (std::size_t i=0; i<rb; i++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-#pragma omp task default(shared) depend(inout:B[i])
+#pragma omp task default(shared) firstprivate(i) depend(inout:B[i])
 #endif
             {
               DMW_t Bi(F1.tilerows(i), B1.cols(), B1, F1.tileroff(i), 0);
@@ -764,7 +779,8 @@ namespace strumpack {
             }
             for (std::size_t j=i+1; j<rb; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-#pragma omp task default(shared) depend(in:B[i]) depend(inout:B[j]) priority(rb-i)
+#pragma omp task default(shared) firstprivate(i,j)      \
+  depend(in:B[i]) depend(inout:B[j]) priority(rb-i)
 #endif
               {
                 DMW_t Bi(F1.tilerows(i), B1.cols(), B1, F1.tileroff(i), 0);
@@ -774,7 +790,9 @@ namespace strumpack {
             }
             for (std::size_t j=0; j<rb2; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-#pragma omp task default(shared) depend(in:B[i]) depend(inout:B[rb+j]) priority(0)
+              std::size_t j2 = rb+j;
+#pragma omp task default(shared) firstprivate(i,j,j2)   \
+  depend(in:B[i]) depend(inout:B[j2]) priority(0)
 #endif
               {
                 DMW_t Bi(F1.tilerows(i), B1.cols(), B1, F1.tileroff(i), 0);
@@ -811,18 +829,22 @@ namespace strumpack {
         {
           for (std::size_t i=rb; i --> 0; ) {
             assert(i < rb);
-            for (std::size_t j=0; j<rb2; j++)
+            for (std::size_t j=0; j<rb2; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-#pragma omp task default(shared) depend(in:B[rb+j]) depend(inout:B[i]) priority(1)
+              std::size_t j2 = rb+j;
+#pragma omp task default(shared) firstprivate(i,j,j2)   \
+  depend(in:B[j2]) depend(inout:B[i]) priority(1)
 #endif
               {
                 DMW_t Bi(F1.tilerows(i), B1.cols(), B1, F1.tileroff(i), 0);
                 DMW_t Bj(F2.tilecols(j), B2.cols(), B2, F2.tilecoff(j), 0);
                 F2.tile(i, j).gemv_a(Trans::N, scalar_t(-1.), Bj, scalar_t(1.), Bi);
               }
+            }
             for (std::size_t j=i+1; j<rb; j++)
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-#pragma omp task default(shared) depend(in:B[j]) depend(inout:B[i]) priority(1)
+#pragma omp task default(shared) firstprivate(i,j)      \
+  depend(in:B[j]) depend(inout:B[i]) priority(1)
 #endif
               {
                 DMW_t Bi(F1.tilerows(i), B1.cols(), B1, F1.tileroff(i), 0);
@@ -830,7 +852,7 @@ namespace strumpack {
                 F1.tile(i, j).gemv_a(Trans::N, scalar_t(-1.), Bj, scalar_t(1.), Bi);
               }
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-#pragma omp task default(shared) depend(inout:B[i]) priority(0)
+#pragma omp task default(shared) firstprivate(i) depend(inout:B[i]) priority(0)
 #endif
             {
               DMW_t Bi(F1.tilerows(i), B1.cols(), B1, F1.tileroff(i), 0);
