@@ -9,6 +9,13 @@ Version 2.3.0 (in progress)
    number of processes. This currently requires a special version of
    CombBLAS.
  - Fix integer overflow in the counting of nonzeros in the factors.
+ - Allow compilation without MPI (and ScaLAPACK, ParMetis..)
+ - Add experimental support for Block Low-Rank compression, for both
+   sparse (preconditioning) and dense. For now, this is only shared
+   memory.
+ - Improvements in the build system: In the CMake script, check
+   whether OpenMP task dependencies and OpenMP taskloops are
+   supported.
 
 
 Version 2.2.0 Released March 32, 2017
