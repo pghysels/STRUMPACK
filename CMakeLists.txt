@@ -373,6 +373,7 @@ install(FILES src/HSS/HSSMatrix.hpp
   src/HSS/HSSMatrix.factor.hpp
   src/HSS/HSSMatrix.compress.hpp
   src/HSS/HSSMatrix.compress_stable.hpp
+  src/HSS/HSSMatrix.compress.kernel.hpp
   src/HSS/HSSMatrix.extract.hpp
   src/HSS/HSSBasisID.hpp
   src/HSS/HSSMatrix.Schur.hpp

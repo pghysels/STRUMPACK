@@ -179,6 +179,21 @@ namespace strumpack {
        const opts_t& opts, WorkCompress<scalar_t>& w,
        int d, int dd, int lvl, int depth) {}
 
+
+      // virtual void compress_recursive_ann
+      // (DenseM_t& ann, DenseM_t& scores,
+      //  const elem_t& Aelem, const opts_t& opts,
+      //  WorkCompressANN<scalar_t>& w, int d) {}
+      virtual void compress_recursive_ann
+      (DenseM_t& ann, DenseM_t& scores,
+       const elem_t& Aelem, const opts_t& opts,
+       WorkCompressANN<scalar_t>& w, int d) {}
+
+
+      // virtual void compute_local_samples_ann
+      // (DenseM_t& ann, DenseM_t& scores, WorkCompressANN<scalar_t>& w,
+      //  const elem_t& Aelem, int d) {}
+
       virtual real_t update_orthogonal_basis
       (DenseM_t& S, int d, int dd, int depth) { return real_t(0.); }
 
