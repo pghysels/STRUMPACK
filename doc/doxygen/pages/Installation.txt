@@ -42,7 +42,7 @@ CMake can find them:
 
 - __MPI__ (Message Passing Interface) library. Support for MPI is
   enabled by default in STRUMPACK, but can be disabled by adding
-  \code{.bash} -DSTRUMPACK_USE_OPENMP=OFF \endcode to the CMake
+  \code{.bash} -DSTRUMPACK_USE_MPI=OFF \endcode to the CMake
   command. You should not need to manually specify the MPI compiler
   wrappers. CMake will look for MPI options and libraries and set the
   appropriate compiler and linker flags.
