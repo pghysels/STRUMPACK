@@ -26,7 +26,9 @@ class GaussianKernel {
 
   private:
     double h;
-    int d;
+    // int d; pass it from the kernel evaluation
+
+    KernelDataset& data_set;
 
   public:
     GaussianKernel(int in_d, double in_h): d(in_d), h(in_h) { }
@@ -44,7 +46,7 @@ class GaussianKernel {
       return sqrt(dist2(x, y));
     }
 
-    // Kernel evaluation
+    // Kernel evaluation (use a pointer)
     double operator() (const vector<double> &x, const vector<double> &y) {
       return exp(-dist2(x, y) / (2. * h * h));
     }  
@@ -55,7 +57,7 @@ class LaplacianKernel {
 
   private:
     double h;
-    int d;
+    // int d; 
   
   public:
     LaplacianKernel(int d_in, double h_in): d(d_in), h(h_in) { }
@@ -75,24 +77,24 @@ class LaplacianKernel {
 
 };
 
-class KernelDataset{
+class KernelDataset{ //input data from csv (excel) files
 
   private:
     size_t n;
     size_t d;
     DataSetType set_type;
-    vector<double> data;
-    vector<int> labels;
+    Dense_t data(n,d);
+    vector<int> labels; // integer that specified the class type
     string data_filename;
     string labels_filename;
 
   public:
     KernelDataset(size_t n_input, int d_input, 
-    DataSetType set_type_input, 
-    string data_filename_input, string labels_filename_input)
-    : n(n_input), d(d_input), set_type(set_type_input),
-      data_filename(data_filename_input), 
-      labels_filename(labels_filename_input) {
+      DataSetType set_type_input, 
+      string data_filename_input, string labels_filename_input)
+      : n(n_input), d(d_input), set_type(set_type_input),
+        data_filename(data_filename_input), 
+        labels_filename(labels_filename_input) {
 
         cout << "Reading data and labels from files" << endl;
      
@@ -143,32 +145,98 @@ int main(){
   KernelDataset testing_data    (1000, 8, DataSetType::TEST,       "./data/SUSY10k_test_data.csv",  "./data/SUSY10k_test_label.csv");
   KernelDataset validation_data (1000, 8, DataSetType::VALIDATION, "./data/SUSY10k_valid_data.csv", "./data/SUSY10k_valid_label.csv");
 
-
   HSSOptions<double> hss_opts;
+
   HSSPartitionTree cluster_tree;
 
-  // 2. Compute cluster tree
+  // 2. Cluster data
+  // cluster_tree is an ouput, by reference.
+  training_data.cluster(ClusteringMethod::KMEANS, cluster_tree, hss_opts);
+
+  // 3. HSS instace matrix based on cluster tree
   HSSMatrix HSS = HSSMatrix<double>(cluster_tree, hss_opts);
 
-  // 3. Cluster data
-  train.cluster(ClusteringMethod::KMEANS, cluster_tree, hss_opts);
-
   // 4. Compute ANN
-  int k = 32,
-  DenseM_t<double> ann(n,k);
-  DenseM_t<int>    scores(n,k);
-  train.compute_ann(ann, scores);
+  int k = 32, //number of neighbors
+  int ann_iter;
+
+  DenseM_t<int>       ann(n,k);    // indices
+  DenseM_t<real_t>    scores(n,k); // distances
+
+  training_data.compute_ann(ann, ann_iter, scores);
+
 
   // Compress with ANN
-  HSS.compress_ann(ann, scores, Aelem, opts)
+  // TODO: Pass KernelType::GAUSSIAN to Aelem
+
+  HSS.compress_ann(ann, scores, Aelem, opts);
+  
+  // HSS.compress_ann(training_data, gKernel, opts);
+  // HSS.compress_ann(gKernel, opts);
+
+
+
+
+
 
   // Fit: Create matrix factorization with kernel paratemers
   fit(HSS, gKernel, train_data, test_data);
 
-  vector<double> prediction_vector;
+  // Output vector
+  vector<n> prediction_vector; // probabilities
 
   // Test the model accuracy on unseen data
-  predict(HSS, validation_data, prediction_vector);
+  binary_predict(HSS, validation_data, prediction_vector);
+
+
+
+
+  // Output vector
+  int c; // number of classes
+  Dense_t<n,c> prediction_vector; // probabilities
+
+  // Test the model accuracy on unseen data
+  multiclass_predict(HSS, validation_data, prediction_vector);
 
   return 0;
 }
+
+
+
+
+// Expert driver with HSS for FIT
+
+1. Load data(training, testing)
+  1.2 Cluster data
+
+2. Instanciate Kernel
+
+3. Create HSS matrix
+
+4. Compress
+  4.1 Compute ANN
+
+5. Fit
+  5.1 <OpenTuner,GridSearch,Wissam>. INPUT:h, lambda. OUTPUT:pred_acc
+
+
+// Expert driver with HSS for PREDICT
+
+1. Load data (validation)
+  1.2 Cluster data
+
+2. Instanciate Kernel
+
+3. Create HSS matrix <--- type of matrix
+
+4. Compress
+  4.1 Compute ANN
+
+5. Predict
+
+
+// Simple driver:
+
+1. Load h, training and validation data
+2. Predict, output labels
+
