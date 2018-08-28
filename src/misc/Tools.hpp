@@ -31,11 +31,12 @@
 
 #include <vector>
 #include <iomanip>
+#include "StrumpackConfig.hpp"
+#include "StrumpackParameters.hpp"
+#include "dense/BLASLAPACKWrapper.hpp"
 #if defined(STRUMPACK_USE_MPI)
 #include "MPIWrapper.hpp"
 #endif
-#include "StrumpackParameters.hpp"
-#include "dense/BLASLAPACKWrapper.hpp"
 
 namespace strumpack {
 
