@@ -1,5 +1,5 @@
-Version 2.3.0 (in progress)
-=====================================
+Version 2.3.0 (in progress) -> 3.0.0 ??
+=======================================
  - The scalability of the sparse HSS preconditioner has been
    drastically improved. Extraction of elements (for the diagonal
    blocks and the B_ij generators) is now done for multiple blocks
@@ -16,6 +16,11 @@ Version 2.3.0 (in progress)
  - Improvements in the build system: In the CMake script, check
    whether OpenMP task dependencies and OpenMP taskloops are
    supported.
+ - Removed the CSCMatrix class for compressed sparse column storage,
+   this was not tested/used.
+ - Revamped website (thanks Lucy), and doxygen documentation/manual
+ - Added lots of doxygen documentation/comments
+ - Several bugfixes!
 
 
 Version 2.2.0 Released March 32, 2017
