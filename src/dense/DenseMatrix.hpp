@@ -94,12 +94,10 @@ namespace strumpack {
    * format, to allow direct use of BLAS/LAPACK routines.
    *
    * This class represents a (2D) matrix, stored in column major
-   * format, to allow direct use of BLAS/LAPACK routines. Possible
-   * values for the scalar_t template type are: float, double,
-   * std::complex<float> and std::complex<double>. A DenseMatrix
-   * allocates, owns and deallocates its memory. If you want to use
-   * pre-allocated memory to represent a dense matrix, use the
-   * DenseMatrixWrapper<scalar_t> class.
+   * format, to allow direct use of BLAS/LAPACK routines. A
+   * DenseMatrix allocates, owns and deallocates its memory. If you
+   * want to use pre-allocated memory to represent a dense matrix, use
+   * the DenseMatrixWrapper<scalar_t> class.
    *
    * Several routines in this matrix perform some sort of bounds or
    * size checking using __assertions__. These assertions can be
@@ -111,6 +109,15 @@ namespace strumpack {
    * tasks will be generated once the depth reaches a certain maximum
    * level (params::task_recursion_cutoff_level), in order to limit
    * the overhead of task spawning.
+   *
+   * \tparam scalar_t Possible values for the scalar_t template type
+   * are: float, double, std::complex<float> and std::complex<double>.
+   *
+   * Several BLAS-like interfaces are provided:
+   * \see strumpack::gemm
+   * \see strumpack::trsm
+   * \see strumpack::trmm
+   * \see strumpack::gemv
    */
   template<typename scalar_t> class DenseMatrix {
     using real_t = typename RealType<scalar_t>::value_type;
@@ -589,32 +596,139 @@ namespace strumpack {
      * can be applied with the laswp() routine.
      *
      * \param depth current OpenMP task recursion depth
-     * \see laswp
+     * \see laswp, solve
      */
     std::vector<int> LU(int depth);
 
-
+    /**
+     * Solve a linear system with this matrix, factored in its LU
+     * factors (in place), using a call to this->LU. There can be
+     * multiple right hand side vectors. The solution is returned by
+     * value.
+     *
+     * \param b input, right hand side vector/matrix
+     * \param piv pivot vector returned by LU factorization
+     * \param depth current OpenMP task recursion depth
+     * \see LU
+     */
     DenseMatrix<scalar_t> solve
     (const DenseMatrix<scalar_t>& b,
      const std::vector<int>& piv, int depth) const;
+
+    /**
+     * Compute an LQ (lower triangular, unitary) factorization of this
+     * matrix. This matrix is not modified, the L and Q factors are
+     * returned by reference in the L and Q arguments. L and Q do not
+     * have to be allocated, they will be resized accordingly.
+     *
+     * \param L lower triangular matrix, output argument. Does not
+     * have to be allocated.
+     * \param Q unitary matrix, not necessarily square. Does not have
+     * to be allocated.
+     * \param depth current OpenMP task recursion depth
+     */
     void LQ
     (DenseMatrix<scalar_t>& L, DenseMatrix<scalar_t>& Q, int depth) const;
+
+    /**
+     * Builds an orthonormal basis for the columns in this matrix,
+     * using QR factorization. It return the maximum and minimum
+     * elements on the diagonal of the upper triangular matrix in the
+     * QR factorization. These values can be used to check whether the
+     * matrix was rank deficient.
+     *
+     * \param r_max maximum value encountered on the diagonal of R (as
+     * returned from QR factorization)
+     * \param r_min minimum value encountered on the diagonal of R (as
+     * returned from QR factorization)
+     * \param depth current OpenMP task recursion depth
+     */
     void orthogonalize(scalar_t& r_max, scalar_t& r_min, int depth);
+
+    /**
+     * Compute an interpolative decomposition on the columns, ie,
+     * write this matrix as a linear combination of some of its
+     * columns. This is computed using QR with column pivoting
+     * (dgeqp3, modified to take tolerances), also refered to as a
+     * rank-revealing QR (RRQR), followed by a triangular solve.
+     *
+     * TODO check this, also definition of ind and piv??!!
+     *
+     *   this ~= this(:,ind) * [eye(rank,rank) X] \\
+     *        ~= (this(:,piv))(:,1:rank) * [eye(rank,rank) X]
+     *
+     * \param X output, see description above, will have rank rows ???
+     * \param piv pivot vector resulting from the column pivoted QR
+     * \param ind set of columns selected from this matrix by RRQR
+     * \param rel_tol relative tolerance used in the RRQR (column
+     * pivoted QR)
+     * \param abs_tol absolute tolerance used in the RRQR (column
+     * pivoted QR)
+     * \param max_rank maximum rank for RRQR
+     * \param depth current OpenMP task recursion depth
+     * \see ID_row
+     */
     void ID_column
     (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
      std::vector<std::size_t>& ind, real_t rel_tol,
      real_t abs_tol, int max_rank, int depth);
+
+    /**
+     * Similar to ID_column, but transposed. This is implemented by
+     * calling ID_column on the transpose of this matrix, the
+     * resulting X is then again transposed.
+     *
+     * \param X output, see description in ID_column, will have rank
+     * columns ???
+     * \param piv pivot vector resulting from the column pivoted QR
+     * \param ind set of columns selected from this matrix by RRQR
+     * \param rel_tol relative tolerance used in the RRQR (column
+     * pivoted QR)
+     * \param abs_tol absolute tolerance used in the RRQR (column
+     * pivoted QR)
+     * \param max_rank maximum rank for RRQR
+     * \param depth current OpenMP task recursion depth
+     * \see ID_column
+     */
     void ID_row
     (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
      std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
      int max_rank, int depth) const;
 
+    /**
+     * Computes a low-rank factorization of this matrix, with
+     * specified relative and absolute tolerances, (used in column
+     * pivoted (rank-revealing) QR).
+     *
+     *    this ~= U * V
+     *
+     * \param U matrix U, low-rank factor. Will be of size
+     * this->rows() x rank. Does not need to be allcoated beforehand.
+     * \param V matrix V, low-rank factor. Will be of size rank x
+     * this->cols(). Does not need to be allcoated beforehand.
+     * \param rel_tol relative tolerance used in the RRQR (column
+     * pivoted QR)
+     * \param abs_tol absolute tolerance used in the RRQR (column
+     * pivoted QR)
+     * \param max_rank maximum rank for RRQR
+     * \param depth current OpenMP task recursion depth
+     */
     void low_rank
-    (DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& Vt,
+    (DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
      real_t rel_tol, real_t abs_tol, int max_rank, int depth) const;
 
+    /**
+     * Return a vector with the singular values of this matrix. Used
+     * only for debugging puposes.
+     */
     std::vector<scalar_t> singular_values() const;
 
+    /**
+     * Shift the diagonal with a value sigma, ie. add a scaled
+     * identity matrix.
+     *
+     * \param sigma scalar value to add to diagonal
+     */
     void shift(scalar_t sigma);
 
   private:
@@ -629,15 +743,64 @@ namespace strumpack {
     template<typename T> friend class DistributedMatrix;
   };
 
+
+  /**
+   * \class DenseMatrixWrapper
+   * \brief Like DenseMatrix, this class represents a matrix, stored
+   * in column major format, to allow direct use of BLAS/LAPACK
+   * routines. However, objects of the DenseMatrixWrapper class do not
+   * allocate, own or free their data.
+   *
+   * The user has to make sure that the memory that was used to create
+   * this matrix stays valid for as long as this matrix wrapper, or
+   * any other wrappers derived from this wrapper (submatrices), is
+   * required. The DenseMatrixWrapper class is a subclass of
+   * DenseMatrix, so a DenseMatrixWrapper can be used as a
+   * DenseMatrix. A DenseMatrixWrapper can be used to wrap already
+   * allocated memory, or to create a submatrix of a DenseMatrix.
+   *
+   * \tparam scalar_t Possible values for the scalar_t template type
+   * are: float, double, std::complex<float> and std::complex<double>.
+   *
+   * \see DenseMatrix
+   */
   template<typename scalar_t>
   class DenseMatrixWrapper : public DenseMatrix<scalar_t> {
   public:
+    /**
+     * Default constructor. Creates an empty, 0x0 matrix.
+     */
     DenseMatrixWrapper() : DenseMatrix<scalar_t>() {}
+
+    /**
+     * Constructor. Create an m x n matrix wrapper using already
+     * allocated memory, pointed to by D, with leading dimension ld.
+     *
+     * \param m number of rows of the new (sub) matrix
+     * \param n number of columns of the new matrix
+     * \param D pointer to memory representing matrix, this should
+     * point to at least ld*n bytes of allocated memory
+     * \param ld leading dimension of matrix allocated at D. ld >= m
+     */
     DenseMatrixWrapper
     (std::size_t m, std::size_t n, scalar_t* D, std::size_t ld) {
       this->data_ = D; this->rows_ = m; this->cols_ = n;
       this->ld_ = std::max(std::size_t(1), ld);
     }
+
+    /**
+     * Constructor. Create a DenseMatrixWrapper as a submatrix of size
+     * m x n, of a DenseMatrix (or DenseMatrixWrapper) D, at position
+     * i,j in D. The constructed DenseMatrixWrapper will be the
+     * submatrix D(i:i+m,j:j+n).
+     *
+     * \param m number of rows of the new (sub) matrix
+     * \param n number of columns of the new matrix
+     * \param D matrix from which to take a submatrix
+     * \param i row offset in D of the top left corner of the submatrix
+     * \param j columns offset in D of the top left corner of the
+     * submatrix
+     */
     DenseMatrixWrapper
     (std::size_t m, std::size_t n, DenseMatrix<scalar_t>& D,
      std::size_t i, std::size_t j)
@@ -645,28 +808,99 @@ namespace strumpack {
       assert(i+m <= D.rows());
       assert(j+n <= D.cols());
     }
+
+    /**
+     * Virtual destructor. Since a DenseMatrixWrapper does not
+     * actually own it's memory, put just keeps a pointer, this will
+     * not free any memory.
+     */
     virtual ~DenseMatrixWrapper() { this->data_ = nullptr; }
 
+    /**
+     * Clear the DenseMatrixWrapper. Ie, set to an empty matrix. This
+     * will not affect the original matrix, to which this is a
+     * wrapper, only the wrapper itself is reset. No memory is
+     * released.
+     */
     void clear() {
       this->rows_ = 0; this->cols_ = 0;
       this->ld_ = 1; this->data_ = nullptr;
     }
+
+    /**
+     * Return the amount of memory taken by this wrapper, ie,
+     * 0. (since the wrapper itself does not own the memory). The
+     * memory will likely be owned by a DenseMatrix, while this
+     * DenseMatrixWrapper is just a submatrix of that existing
+     * matrix. Returning 0 here avoids counting memory double.
+     *
+     * \see nonzeros
+     */
     std::size_t memory() const { return 0; }
+
+    /**
+     * Return the number of nonzeros taken by this wrapper, ie,
+     * 0. (since the wrapper itself does not own the memory). The
+     * memory will likely be owned by a DenseMatrix, while this
+     * DenseMatrixWrapper is just a submatrix of that existing
+     * matrix. Returning 0 here avoids counting nonzeros double.
+     *
+     * \see memory
+     */
     std::size_t nonzeros() const { return 0; }
 
+    /**
+     * Default copy constructor, from another DenseMatrixWrapper.
+     */
     DenseMatrixWrapper(const DenseMatrixWrapper<scalar_t>&) = default;
+
+    /**
+     * Constructing a DenseMatrixWrapper from a DenseMatrixWrapper is
+     * not allowed.
+     * TODO Why not??!! just delegate to DenseMatrixWrapper(m, n, D, i, j)??
+     */
     DenseMatrixWrapper(const DenseMatrix<scalar_t>&) = delete;
+
+    /**
+     * Default move constructor.
+     */
     DenseMatrixWrapper(DenseMatrixWrapper<scalar_t>&&) = default;
+
+    /**
+     * Moving from a DenseMatrix is not allowed.
+     */
     DenseMatrixWrapper(DenseMatrix<scalar_t>&&) = delete;
+
+    /**
+     * Assignment operator. Shallow copy only. This only copies the
+     * wrapper object. Does not copy matrix elements.
+     *
+     * \param D matrix wrapper to copy from, this will be duplicated
+     */
     DenseMatrixWrapper<scalar_t>&
     operator=(const DenseMatrixWrapper<scalar_t>& D)
     { this->data_ = D.data(); this->rows_ = D.rows();
       this->cols_ = D.cols(); this->ld_ = D.ld(); return *this; }
+
+    /**
+     * Move assignment. This moves only the wrapper.
+     *
+     * \param D matrix wrapper to move from. This will not be
+     * modified.
+     */
     DenseMatrixWrapper<scalar_t>&
     operator=(DenseMatrixWrapper<scalar_t>&& D) {
       this->data_ = D.data(); this->rows_ = D.rows();
       this->cols_ = D.cols(); this->ld_ = D.ld(); return *this; }
 
+    /**
+     * Assignment operator, from a DenseMatrix. Assign the memory of
+     * the DenseMatrix to the matrix wrapped by this
+     * DenseMatrixWrapper object.
+     *
+     * \param a matrix to copy from, should be a.rows() ==
+     * this->rows() and a.cols() == this->cols()
+     */
     DenseMatrix<scalar_t>&
     operator=(const DenseMatrix<scalar_t>& a) override {
       assert(a.rows()==this->rows() && a.cols()==this->cols());
@@ -1412,6 +1646,22 @@ namespace strumpack {
     return S;
   }
 
+  /**
+   * GEMM, defined for DenseMatrix objects (or DenseMatrixWrapper).
+   *
+   * DGEMM  performs one of the matrix-matrix operations
+   *
+   *    C := alpha*op( A )*op( B ) + beta*C,
+   *
+   * where  op( X ) is one of
+   *
+   *    op( X ) = X   or   op( X ) = X**T,
+   *
+   * alpha and beta are scalars, and A, B and C are matrices, with op( A )
+   * an m by k matrix,  op( B )  a  k by n matrix and  C an m by n matrix.
+   *
+   * \param depth current OpenMP task recursion depth
+   */
   template<typename scalar_t> void
   gemm(Trans ta, Trans tb, scalar_t alpha, const DenseMatrix<scalar_t>& a,
        const DenseMatrix<scalar_t>& b, scalar_t beta,
@@ -1514,6 +1764,14 @@ namespace strumpack {
        a.data(), a.ld(), b.data(), 1, depth);
   }
 
+  /**
+   * DGEMV performs one of the matrix-vector operations
+   *
+   *    y := alpha*A*x + beta*y,   or   y := alpha*A**T*x + beta*y,
+   *
+   * where alpha and beta are scalars, x and y are vectors and A is an
+   * m by n matrix.
+   */
   template<typename scalar_t> void
   gemv(Trans ta, scalar_t alpha, const DenseMatrix<scalar_t>& a,
        const DenseMatrix<scalar_t>& x, scalar_t beta,
@@ -1527,18 +1785,21 @@ namespace strumpack {
        x.data(), 1, beta, y.data(), 1, depth);
   }
 
+  /** return number of flops for LU factorization */
   template<typename scalar_t> long long int
   LU_flops(const DenseMatrix<scalar_t>& a) {
     return (is_complex<scalar_t>() ? 4:1) *
       blas::getrf_flops(a.rows(), a.cols());
   }
 
+  /** return number of flops for solve, using LU factorization */
   template<typename scalar_t> long long int
   solve_flops(const DenseMatrix<scalar_t>& b) {
     return (is_complex<scalar_t>() ? 4:1) *
       blas::getrs_flops(b.rows(), b.cols());
   }
 
+  /** return number of flops for LQ factorization */
   template<typename scalar_t> long long int
   LQ_flops(const DenseMatrix<scalar_t>& a) {
     auto minrc = std::min(a.rows(), a.cols());
@@ -1547,6 +1808,7 @@ namespace strumpack {
        blas::xxglq_flops(a.cols(), a.cols(), minrc));
   }
 
+  /** return number of flops for interpolative decomposition */
   template<typename scalar_t> long long int
   ID_row_flops(const DenseMatrix<scalar_t>& a, int rank) {
     return (is_complex<scalar_t>() ? 4:1) *
@@ -1554,6 +1816,7 @@ namespace strumpack {
        blas::trsm_flops(rank, a.cols() - rank, scalar_t(1.), 'L'));
   }
 
+  /** return number of flops for a trsm */
   template<typename scalar_t> long long int
   trsm_flops(Side s, scalar_t alpha, const DenseMatrix<scalar_t>& a,
              const DenseMatrix<scalar_t>& b) {
@@ -1561,6 +1824,7 @@ namespace strumpack {
       blas::trsm_flops(b.rows(), b.cols(), alpha, char(s));
   }
 
+  /** return number of flops for a gemm, given a and b */
   template<typename scalar_t> long long int
   gemm_flops(Trans ta, Trans tb, scalar_t alpha,
              const DenseMatrix<scalar_t>& a,
@@ -1572,6 +1836,7 @@ namespace strumpack {
        (ta==Trans::N) ? a.cols() : a.rows(), alpha, beta);
   }
 
+  /** return number of flops for a gemm, given a and c */
   template<typename scalar_t> long long int
   gemm_flops(Trans ta, Trans tb, scalar_t alpha,
              const DenseMatrix<scalar_t>& a, scalar_t beta,
@@ -1581,6 +1846,7 @@ namespace strumpack {
       (c.rows(), c.cols(), (ta==Trans::N) ? a.cols() : a.rows(), alpha, beta);
   }
 
+  /** return number of flops for orthogonalization */
   template<typename scalar_t> long long int
   orthogonalize_flops(const DenseMatrix<scalar_t>& a) {
     auto minrc = std::min(a.rows(), a.cols());
