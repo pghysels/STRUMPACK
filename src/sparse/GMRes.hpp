@@ -39,6 +39,10 @@ namespace strumpack {
   /*
    * This is left preconditioned restarted GMRes.
    *  TODO Can we apply this to multiple rhs's?
+   *  TODO clean this up:
+   *   - make a consistent interface for Krylov solvers,
+   *   - take an operator lamda
+   *   - define some Vector class?
    *
    *  Input vectors x and b have stride 1, length n
    */
