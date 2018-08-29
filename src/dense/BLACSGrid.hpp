@@ -25,6 +25,10 @@
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
  */
+/*! \file BLACSGrid.hpp
+ *
+ * \brief Contains a wrapper class around a BLACS grid/context.
+ */
 #ifndef BLACS_GRID_HPP
 #define BLACS_GRID_HPP
 
@@ -33,20 +37,127 @@
 
 namespace strumpack {
 
+  /**
+   * \class BLACSGrid
+   * \brief This is a small wrapper class around a BLACS grid and a
+   * BLACS context.
+   *
+   * The main purpose of this wrapper is to handle the (global)
+   * resource of BLACS grid, ie, creation and destruction, as well as
+   * to encapsulate the BLACS interface into a single small piece of
+   * code. This will hopefully make it much easier to at one point in
+   * the near future get rid of ScaLAPACK and BLACS, and replace it
+   * with SLATE.
+   *
+   * This class also stores (and owns) an MPIComm object. The BLACS
+   * grid is a 2D grid, consisting of nprows x npcols processes, with
+   * ranks assigned COLUMN MAJOR!!. However, the total number of
+   * processes, P, can be larger than nprows x npcols, meaning some
+   * processes are included in the MPIComm, but not in the grid, ie,
+   * they are idle. Leaving some processes idle can give a grid with a
+   * better aspect ratio, compared to using all available ranks,
+   * leading to more scalable code.
+   *
+   * The MPIComm object can also be MPI_COMM_NULL, while P can still
+   * be 0. This is useful for getting info about a grid (the layout),
+   * in which this rank is not active, for instance to know to which
+   * rank to communicate.
+   */
   class BLACSGrid {
   public:
+    /**
+     * Default constructor. Does not construct any BLACS grid or
+     * context.
+     */
     BLACSGrid() {}
+
+    /**
+     * Construct a BLACSGrid from an MPIComm object. The MPIComm will
+     * be duplicated. The BLACS grid will be created. This operation
+     * is collective on comm.
+     *
+     * \param comm MPIComm used to initialize the grid, this will be
+     * duplicated
+     */
     BLACSGrid(const MPIComm& comm) : BLACSGrid(comm, comm.size()) { }
+
+    /**
+     * Construct a BLACSGrid from an MPIComm object. The MPIComm will
+     * be moved from (reset to MPI_COMM_NULL). The BLACS grid will be
+     * created. This operation is collective on comm.
+     *
+     * \param comm MPIComm used to initialize the grid, this will be
+     * moved (reset to MPI_COMM_NULL)
+     */
     BLACSGrid(MPIComm&& comm) : BLACSGrid(comm, comm.size()) { }
+
+    /**
+     * Construct a BLACSGrid from an MPIComm object. The MPIComm will
+     * be duplicated. The BLACS grid will be created. This operation
+     * is collective on comm. comm can be a null communicator
+     * (MPI_COMM_NULL), but P can be used to specify the number of
+     * processes in the grid (including potentially idle ranks).
+     *
+     * \param comm MPIComm used to initialize the grid, this will be
+     * duplicated
+     * \param P total number of ranks in the new grid (P ==
+     * comm.size() or comm.is_null())
+     */
     BLACSGrid(const MPIComm& comm, int P) : comm_(comm), P_(P) { setup(); }
+
+    /**
+     * Construct a BLACSGrid from an MPIComm object. The MPIComm will
+     * be moved. The BLACS grid will be created. This operation is
+     * collective on comm. comm can be a null communicator
+     * (MPI_COMM_NULL), but P can be used to specify the number of
+     * processes in the grid (including potentially idle ranks).
+     *
+     * \param comm MPIComm used to initialize the grid, this will be
+     * moved from, and then reset to a null communicator
+     * (MPI_COMM_NULL)
+     * \param P total number of ranks in the new grid (P ==
+     * comm.size() or comm.is_null())
+     */
     BLACSGrid(MPIComm&& comm, int P) : comm_(comm), P_(P) { setup(); }
+
+    /**
+     * Destructor, this will free all resources associated with this
+     * grid.
+     */
     ~BLACSGrid() {
       if (ctxt_ != -1) scalapack::Cblacs_gridexit(ctxt_);
       if (ctxt_all_ != -1) scalapack::Cblacs_gridexit(ctxt_all_);
       if (ctxt_T_ != -1) scalapack::Cblacs_gridexit(ctxt_T_);
     }
+
+    /**
+     * Copy constructor. This might be expensive, the entire grid will
+     * be copied. The resulting grid will be a new grid, with a
+     * different BLACS context, and so cannot be used in the same
+     * ScaLAPACK call as the original grid. Also the MPIComm object
+     * will be copied. This operation is collective on all processes
+     * in the MPIComm.
+     *
+     * \param grid BLACSGrid to copy from
+     */
     BLACSGrid(const BLACSGrid& grid) { *this = grid; }
+
+    /**
+     * Move constructor.
+     */
     BLACSGrid(BLACSGrid&& grid) { *this = std::move(grid); }
+
+    /**
+     * Copy assignment. This might be expensive, the entire grid will
+     * be copied. The resulting grid will be a new grid, with a
+     * different BLACS context, and so cannot be used in the same
+     * ScaLAPACK call as the original grid. Also the MPIComm object
+     * will be copied. This operation is collective on all processes
+     * in the MPIComm.
+     *
+     * \param grid BLACSGrid to copy from
+     * \return the newly created grid
+     */
     BLACSGrid& operator=(const BLACSGrid& grid) {
       //std::cout << "WARNING copying a BLACS grid is expensive!!" << std::endl;
       comm_ = grid.Comm();
@@ -54,6 +165,13 @@ namespace strumpack {
       setup();
       return *this;
     }
+
+    /**
+     * Move assignment, does not make a copy.
+     *
+     * \param grid grid to move from, this will be reset to a
+     * non-existing grid (a -1 context).
+     */
     BLACSGrid& operator=(BLACSGrid&& grid) {
       comm_ = std::move(grid.comm_);
       P_ = grid.P_;
@@ -72,25 +190,105 @@ namespace strumpack {
       return *this;
     }
 
+    /**
+     * Return a (const) reference to the MPIComm object.
+     */
     const MPIComm& Comm() const { return comm_; }
+
+    /**
+     * Return a reference to the MPIComm object.
+     */
     MPIComm& Comm() { return comm_; }
+
+    /**
+     * Return the blacs context, a context to a blacs grid with nprows
+     * processor rows and npcols processor columns (ranks are assigned
+     * column major). Or -1 for a non-initialized grid or for ranks
+     * which are idle in this grid.
+     */
     int ctxt() const { return ctxt_; }
+
+    /**
+     * Return a BLACS context for a grid including all the ranks, not
+     * just those active on ctxt(), but all the ranks in Comm(). The
+     * grid is a single row with Comm().size() columns. Will return -1
+     * for a non-initialized grid, or initialized with a null
+     * communicator.
+     *
+     * This can be used as the last argument for a call to P*DGEMR2d.
+     */
     int ctxt_all() const { return ctxt_all_; }
+
+    /**
+     * Number of processor rows in the grid, -1 if this rank is idle
+     * in the grid, or if not initialized.
+     */
     int nprows() const { return nprows_; }
+
+    /**
+     * Number of processor columns in the grid, -1 if this rank is
+     * idle in the grid, or if not initialized.
+     */
     int npcols() const { return npcols_; }
+
+    /**
+     * This ranks processor row in the grid. -1 if this rank is not
+     * part of the grid.
+     */
     int prow() const { return prow_; }
+
+    /**
+     * This ranks processor column in the grid. -1 if this rank is not
+     * part of the grid.
+     */
     int pcol() const { return pcol_; }
+
+    /**
+     * Total number of ranks in this grid, including any ranks that
+     * may be idle. P >= nprows()*npcols(). If Comm() is not a null
+     * communicator, then P == Comm.size().
+     */
     int P() const { return P_; }
+
+    /**
+     * Number of processes active in the grid, simply
+     * nprows()*npcols().
+     */
     int npactives() const { return nprows() * npcols(); }
+
+    /**
+     * Checks whether this rank is active on this grid, ie, the grid
+     * has been initialized, and this rank is not one of the idle
+     * ranks.
+     */
     bool active() const { return prow_ != -1; }
 
-
+    /**
+     * For a given number of processes procs, find a 2D layout. This
+     * will try to find a 2D layout using P, or as close to P as
+     * possible, number of ranks, while making the grid as square as
+     * possible. The number of processes in the 2D layout can be less
+     * than procs, ie, some ranks will be idle, to improve
+     * parallelism. procs >= proc_rows * proc_cols.
+     *
+     * \param procs maximum number of processes in the 2d layout
+     * \param proc_rows output, number of rows in the 2d layout
+     * \param proc_cols output, number of columns in the 2d layout
+     */
     static void layout(int procs, int& proc_rows, int& proc_cols) {
       // why floor, why not nearest??
       proc_cols = std::floor(std::sqrt((float)procs));
       proc_rows = procs / proc_cols;
     }
 
+    /**
+     * Return a BLACSGrid which is the transpose of the current
+     * grid. Ie., has npcols processor rows and nprows processor
+     * columns. This can be used to perform operations on the
+     * transpose of a distributed matrix. Instead of transposing the
+     * matrix, which requires communication, one can transpose the
+     * BLACS grid and only transpose the local storage.
+     */
     BLACSGrid transpose() const {
       BLACSGrid g(*this);
       g.transpose_inplace();
@@ -145,6 +343,11 @@ namespace strumpack {
     friend std::ostream& operator<<(std::ostream& os, const BLACSGrid* g);
   };
 
+
+  /**
+   * Print some info about the BLACS grid to stream os. Just used for
+   * debugging.
+   */
   inline std::ostream& operator<<(std::ostream& os, const BLACSGrid* g) {
     if (!g) os << "null";
     else
