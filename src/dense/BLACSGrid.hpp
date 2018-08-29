@@ -25,8 +25,8 @@
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
  */
-/*! \file BLACSGrid.hpp
- *
+/*!
+ * \file BLACSGrid.hpp
  * \brief Contains a wrapper class around a BLACS grid/context.
  */
 #ifndef BLACS_GRID_HPP

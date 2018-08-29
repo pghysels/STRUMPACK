@@ -61,6 +61,16 @@ namespace strumpack {
     std::vector<integer_t> prbuf;
   };
 
+
+  /**
+   * \class CSRMatrixMPI
+   * \brief Block-row distributed compressed sparse row storage.
+   *
+   * TODO: cleanup this class
+   *  - use MPIComm
+   *  - store the block diagonal as a CSRMatrix
+   *  - ...
+   */
   template<typename scalar_t,typename integer_t>
   class CSRMatrixMPI : public CompressedSparseMatrix<scalar_t,integer_t> {
     using DistM_t = DistributedMatrix<scalar_t>;
@@ -90,9 +100,7 @@ namespace strumpack {
     inline integer_t local_nnz() const { return local_nnz_; }
 
     void spmv(const DenseM_t& x, DenseM_t& y) const override;
-    void omp_spmv(const DenseM_t& x, DenseM_t& y) const override;
     void spmv(const scalar_t* x, scalar_t* y) const override;
-    void omp_spmv(const scalar_t* x, scalar_t* y) const override;
 
     void apply_scaling
     (const std::vector<scalar_t>& Dr,
@@ -126,6 +134,8 @@ namespace strumpack {
     void print_MM(const std::string& filename) const override;
     void check() const;
 
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     // implement outside of this class
     void extract_separator
     (integer_t, const std::vector<std::size_t>&,
@@ -151,6 +161,7 @@ namespace strumpack {
     void front_multiply_2d
     (integer_t, integer_t, const std::vector<integer_t>&, const DistM_t&,
      DistM_t&, DistM_t&, int) const override {}
+#endif //DOXYGEN_SHOULD_SKIP_THIS
 
   protected:
     void split_diag_offdiag();
@@ -668,28 +679,16 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   CSRMatrixMPI<scalar_t,integer_t>::spmv
-  (const scalar_t* x, scalar_t* y) const {
-    omp_spmv(x, y);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  CSRMatrixMPI<scalar_t,integer_t>::spmv
-  (const DenseM_t& x, DenseM_t& y) const {
-    omp_spmv(x, y);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  CSRMatrixMPI<scalar_t,integer_t>::omp_spmv
   (const DenseM_t& x, DenseM_t& y) const {
     assert(x.cols() == y.cols());
     assert(x.rows() == std::size_t(local_rows()));
     assert(y.rows() == std::size_t(local_rows()));
     for (std::size_t c=0; c<x.cols(); c++)
-      omp_spmv(x.ptr(0,c), y.ptr(0,c));
+      spmv(x.ptr(0,c), y.ptr(0,c));
   }
 
   template<typename scalar_t,typename integer_t> void
-  CSRMatrixMPI<scalar_t,integer_t>::omp_spmv
+  CSRMatrixMPI<scalar_t,integer_t>::spmv
   (const scalar_t* x, scalar_t* y) const {
     setup_spmv_buffers();
 

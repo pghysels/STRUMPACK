@@ -100,7 +100,7 @@ int main(int argc, char* argv[]) {
     DenseMatrix<scalar> b(n_local, nrhs), x(n_local, nrhs),
       x_exact(n_local, nrhs);
     x_exact.random();
-    Adist.omp_spmv(x_exact, b);
+    Adist.spmv(x_exact, b);
 
     spss.set_matrix(Adist);
     spss.reorder(n, n, n);

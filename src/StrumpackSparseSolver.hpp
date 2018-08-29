@@ -819,16 +819,20 @@ namespace strumpack {
 
     Krylov_its_ = 0;
 
-    auto gmres_solve = [&](std::function<void(scalar_t*)> preconditioner) {
-      GMRes<scalar_t,integer_t>
-      (*matrix(), preconditioner, x.rows(), x.data(), bloc.data(),
+    auto spmv = [&](const scalar_t* x, scalar_t* y) {
+      matrix()->spmv(x, y);
+    };
+
+    auto gmres_solve = [&](const std::function<void(scalar_t*)>& prec) {
+      GMRes<scalar_t>
+      (spmv, prec, x.rows(), x.data(), bloc.data(),
        opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
        opts_.gmres_restart(), opts_.GramSchmidt_type(),
        use_initial_guess, opts_.verbose() && is_root_);
     };
-    auto bicgstab_solve = [&](std::function<void(scalar_t*)> preconditioner) {
-      BiCGStab<scalar_t,integer_t>
-      (*matrix(), preconditioner, x.rows(), x.data(), bloc.data(),
+    auto bicgstab_solve = [&](const std::function<void(scalar_t*)>& prec) {
+      BiCGStab<scalar_t>
+      (spmv, prec, x.rows(), x.data(), bloc.data(),
        opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
        use_initial_guess, opts_.verbose() && is_root_);
     };

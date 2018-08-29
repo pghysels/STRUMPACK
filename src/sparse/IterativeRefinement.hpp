@@ -51,7 +51,7 @@ namespace strumpack {
     using real_t = typename RealType<scalar_t>::value_type;
     DenseMatrix<scalar_t> r(x.rows(), x.cols());
     if (non_zero_guess) {
-      A.omp_spmv(x, r);
+      A.spmv(x, r);
       r.scale_and_add(scalar_t(-1.), b);
     } else {
       r = b;
@@ -73,7 +73,7 @@ namespace strumpack {
       direct_solve(r);
       x.add(r);
       bw_error = A.max_scaled_residual(x, b);
-      A.omp_spmv(x, r);
+      A.spmv(x, r);
       r.scale_and_add(scalar_t(-1.), b);
       res_norm = r.norm();
       rel_res_norm = res_norm / res0;

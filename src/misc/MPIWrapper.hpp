@@ -26,8 +26,8 @@
  *             Division).
  *
  */
-/*! \file MPIWrapper.hpp
- *
+/*!
+ * \file MPIWrapper.hpp
  * \brief Contains some simple C++ MPI wrapper utilities.
  */
 #ifndef MPI_WRAPPER_HPP
@@ -591,42 +591,6 @@ namespace strumpack {
     MPI_Comm_size(c, &nprocs);
     return nprocs;
   }
-
-  /**
-   *
-   * This routine is deprecated, will be removed soon. USe the MPIComm
-   * interface instead.
-   */
-  template<typename T> T Allreduce(T t, MPI_Op op, MPI_Comm comm) {
-    MPI_Allreduce(MPI_IN_PLACE, &t, 1, mpi_type<T>(), op, comm);
-    return t;
-  }
-
-
-  // TODO where is this used???
-  template<class T> struct
-  MPIRealType { typedef T value_type; };
-  template<class T> struct
-  MPIRealType<std::complex<T>>{ typedef T value_type; };
-
-  // TODO move this somewhere else?
-  template<typename scalar_t> typename MPIRealType<scalar_t>::value_type
-  nrm2_omp_mpi(int N, scalar_t* X, int incx, MPI_Comm comm) {
-    using real_t = typename MPIRealType<scalar_t>::value_type;
-    real_t local_nrm(0.), nrm;
-    if (incx==1) {
-#pragma omp parallel for reduction(+:local_nrm)
-      for (int i=0; i<N; i++) local_nrm += std::real(std::conj(X[i])*X[i]);
-    } else {
-#pragma omp parallel for reduction(+:local_nrm)
-      for (int i=0; i<N; i++)
-        local_nrm += std::real(std::conj(X[i*incx])*X[i*incx]);
-    }
-    MPI_Allreduce(&local_nrm, &nrm, 1, mpi_type<real_t>(), MPI_SUM, comm);
-    STRUMPACK_FLOPS(static_cast<long long int>(N)*2);
-    return std::sqrt(nrm);
-  }
-
 
 } // end namespace strumpack
 

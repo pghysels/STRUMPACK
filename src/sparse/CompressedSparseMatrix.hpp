@@ -26,6 +26,11 @@
  *             Division).
  *
  */
+/*!
+ * \file CompressedSparseMatrix.hpp
+ * \brief Contains the CompressedSparseMatrix class, a base class for
+ * compressed sparse storage.
+ */
 #ifndef COMPRESSEDSPARSEMATRIX_HPP
 #define COMPRESSEDSPARSEMATRIX_HPP
 
@@ -51,9 +56,23 @@
 namespace strumpack {
 
   /**
-   * Abstract base class to represent either compressed sparse row or
-   * compressed sparse column matrices.  The rows and the columns
-   * should always be sorted.
+   * \class CompressedSparseMatrix
+   * \brief Abstract base class for compressed sparse matrix storage.
+   *
+   * This is an abstract (pure virtual) base class for compressed
+   * sparse matrices.
+   *
+   * This is only for __square__ matrices!
+   *
+   * The rows and the columns should always be __sorted__!
+   *
+   **** __TODO make the public interface non-virtual__ ****
+   *
+   * \tparam scalar_t type used to store matrix values
+   * \tparam integer_t type used for indices in the row/column pointer
+   * arrays and the column/row indices
+   *
+   * \see CSRMatrix, CSRMatrixMPI
    */
   template<typename scalar_t,typename integer_t>
   class CompressedSparseMatrix {
@@ -64,38 +83,170 @@ namespace strumpack {
 #endif
 
   public:
-    CompressedSparseMatrix();
-    CompressedSparseMatrix
-    (integer_t n, integer_t nnz, bool symm_sparse=false);
-    CompressedSparseMatrix
-    (integer_t n, const integer_t* row_ptr, const integer_t* col_ind,
-     const scalar_t* values, bool symm_sparsity);
+    /**
+     * Virtual destructor.
+     */
     virtual ~CompressedSparseMatrix() {}
 
+    /**
+     * Return the size of this __square__ matrix, ie, the number of
+     * rows and columns. For distributed memory matrices, this refer
+     * to the global size, not the local size.
+     */
     integer_t size() const { return n_; }
+
+    /**
+     * Return the number of nonzeros in this matrix.  For distributed
+     * memory matrices, this refer to the global number of nonzeros,
+     * not the local number of nonzeros.
+     */
     integer_t nnz() const { return nnz_; }
 
+    /**
+     * Return a (const) pointer to the (row/column) pointer. For a
+     * compressed sparse row format, this will be a pointer to an
+     * array of dimension size()+1, where element ptr[i] denotes the
+     * start (in ind() or val()) of row i, and ptr[i+1] is the end of
+     * row i.
+     *
+     * \see ptr(integer_t i)
+     */
     const integer_t* ptr() const { return ptr_.data(); }
+
+    /**
+     * Return a (const) pointer to the (row/column) indices. For
+     * compressed sparse row, this will return a pointer to an array
+     * of column indices, 1 for each nonzero.
+     *
+     * \see ptr, ind(integer_t i)
+     */
     const integer_t* ind() const { return ind_.data(); }
+
+    /**
+     * Return a (const) pointer to the nonzero values. For compressed
+     * sparse row, this will return a pointer to an array of nonzero
+     * values.
+     *
+     * \see ptr, ind
+     */
     const scalar_t* val() const { return val_.data(); }
+
+    /**
+     * Return a pointer to the (row/column) pointer. For a compressed
+     * sparse row format, this will be a pointer to an array of
+     * dimension size()+1, where element ptr[i] denotes the start (in
+     * ind() or val()) of row i, and ptr[i+1] is the end of row i.
+     *
+     * \see ptr(integer_t i)
+     */
     integer_t* ptr() { return ptr_.data(); }
+
+    /**
+     * Return a pointer to the (row/column) indices. For compressed
+     * sparse row, this will return a pointer to an array of column
+     * indices, 1 for each nonzero.
+     *
+     * \see ptr, ind(integer_t i)
+     */
     integer_t* ind() { return ind_.data(); }
+
+    /**
+     * Return a pointer to the nonzero values. For compressed sparse
+     * row, this will return a pointer to an array of nonzero values.
+     *
+     * \see ptr, ind
+     */
     scalar_t* val() { return val_.data(); }
-    const integer_t& ptr(integer_t i) const { assert(i <= size()); return ptr_[i]; }
-    const integer_t& ind(integer_t i) const { assert(i < nnz()); return ind_[i]; }
-    const scalar_t& val(integer_t i) const { assert(i < nnz()); return val_[i]; }
+
+    /**
+     * Access ptr[i], ie, the start of row i (in ind, or in val). This
+     * will assert that i >= 0 and i <= size(). These assertions are
+     * removed when compiling in Release mode (adding -DNDEBUG).
+     */
+    const integer_t& ptr(integer_t i) const { assert(i >= 0 && i <= size()); return ptr_[i]; }
+
+    /**
+     * Access ind[i], ie, the row/column index of the i-th
+     * nonzero. This will assert that i >= 0 and i < nnz(). These
+     * assertions are removed when compiling in Release mode (adding
+     * -DNDEBUG).
+     */
+    const integer_t& ind(integer_t i) const { assert(i >= 0 && i < nnz()); return ind_[i]; }
+
+    /**
+     * Access ind[i], ie, the value of the i-th nonzero. This will
+     * assert that i >= 0 and i < nnz(). These assertions are removed
+     * when compiling in Release mode (adding -DNDEBUG).
+     */
+    const scalar_t& val(integer_t i) const { assert(i >= 0 && i < nnz()); return val_[i]; }
+
+    /**
+     * Access ptr[i], ie, the start of row i (in ind, or in val). This
+     * will assert that i >= 0 and i <= size(). These assertions are
+     * removed when compiling in Release mode (adding -DNDEBUG).
+     */
     integer_t& ptr(integer_t i) { assert(i <= size()); return ptr_[i]; }
+
+    /**
+     * Access ind[i], ie, the row/column index of the i-th
+     * nonzero. This will assert that i >= 0 and i < nnz(). These
+     * assertions are removed when compiling in Release mode (adding
+     * -DNDEBUG).
+     */
     integer_t& ind(integer_t i) { assert(i < nnz()); return ind_[i]; }
+
+    /**
+     * Access ind[i], ie, the value of the i-th nonzero. This will
+     * assert that i >= 0 and i < nnz(). These assertions are removed
+     * when compiling in Release mode (adding -DNDEBUG).
+     */
     scalar_t& val(integer_t i) { assert(i < nnz()); return val_[i]; }
 
+    /**
+     * Check whether the matrix has a symmetric sparsity pattern (as
+     * specified in the constructor, will not actually check).
+     */
     bool symm_sparse() const { return symm_sparse_; }
+
+    /**
+     * Specify that the sparsity pattern of this matrix is symmetric,
+     * or not.
+     *
+     * \param symm_sparse bool, set this to true (default if not
+     * provided) to specify that the sparsity pattern is symmetric
+     */
     void set_symm_sparse(bool symm_sparse=true) { symm_sparse_ = symm_sparse; }
 
-    // TODO make the public interface non-virtual
+
+    /**
+     * Sparse matrix times dense vector/matrix product
+     *    y = this * x
+     * x and y can have multiple columns.
+     * y should be pre-allocated!
+     *
+     * TODO make the public interface non-virtual
+     *
+     * \param x input right hand-side vector/matrix, should satisfy
+     * x.size() == this->size()
+     * \param y output, result of y = this * x, should satisfy
+     * y.size() == this->size()
+     */
     virtual void spmv(const DenseM_t& x, DenseM_t& y) const = 0;
-    virtual void omp_spmv(const DenseM_t& x, DenseM_t& y) const = 0;
+
+    /**
+     * Sparse matrix times dense vector product
+     *    y = this * x
+     * x and y can have multiple columns.
+     * y should be pre-allocated.
+     *
+     * TODO make the public interface non-virtual
+     *
+     * \param x input right hand-side vector/matrix, should be a
+     * pointer to an array of size size()
+     * \param y output, result of y = this * x, should be a pointer to
+     * an array of size size(), already allocated
+     */
     virtual void spmv(const scalar_t* x, scalar_t* y) const = 0;
-    virtual void omp_spmv(const scalar_t* x, scalar_t* y) const = 0;
 
     virtual void permute(const integer_t* iorder, const integer_t* order);
     virtual void permute
@@ -127,6 +278,7 @@ namespace strumpack {
     (int_t job, int_t* num, integer_t* perm, int_t liw, int_t* iw, int_t ldw,
      double* dw, int_t* icntl, int_t* info) {}
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     // TODO implement these outside of this class
     virtual void extract_separator
     (integer_t sep_end, const std::vector<std::size_t>& I,
@@ -158,7 +310,8 @@ namespace strumpack {
     (integer_t sep_begin, integer_t sep_end,
      const std::vector<integer_t>& upd, const DistM_t& R,
      DistM_t& Srow, DistM_t& Scol, int depth) const = 0;
-#endif
+#endif //STRUMPACK_USE_MPI
+#endif //DOXYGEN_SHOULD_SKIP_THIS
 
   protected:
     integer_t n_;
@@ -169,6 +322,14 @@ namespace strumpack {
     bool symm_sparse_;
 
     enum MMsym {GENERAL, SYMMETRIC, SKEWSYMMETRIC, HERMITIAN};
+
+    CompressedSparseMatrix();
+    CompressedSparseMatrix
+    (integer_t n, integer_t nnz, bool symm_sparse=false);
+    CompressedSparseMatrix
+    (integer_t n, const integer_t* row_ptr, const integer_t* col_ind,
+     const scalar_t* values, bool symm_sparsity);
+
     std::vector<std::tuple<integer_t,integer_t,scalar_t>>
     read_matrix_market_entries(const std::string& filename);
 

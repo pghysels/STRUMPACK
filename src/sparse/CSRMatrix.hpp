@@ -26,6 +26,10 @@
  *             Division).
  *
  */
+/*!
+ * \file CSRMatrix.hpp
+ * \brief Contains the compressed sparse row matrix storage class.
+ */
 #ifndef CSRMATRIX_HPP
 #define CSRMATRIX_HPP
 #include <sstream>
@@ -41,6 +45,16 @@
 
 namespace strumpack {
 
+  /**
+   * \class CSRMatrix
+   * \brief Class for storing a compressed sparse row matrix (single
+   * node).
+   *
+   * \tparam scalar_t
+   * \tparam integer_t
+   *
+   * \see CompressedSparseMatrix, CSRMatrixMPI
+   */
   template<typename scalar_t,typename integer_t> class CSRMatrix
     : public CompressedSparseMatrix<scalar_t,integer_t> {
 #if defined(STRUMPACK_USE_MPI)
@@ -58,9 +72,7 @@ namespace strumpack {
      const scalar_t* values, bool symm_sparsity=false);
 
     void spmv(const DenseM_t& x, DenseM_t& y) const override;
-    void omp_spmv(const DenseM_t& x, DenseM_t& y) const override;
     void spmv(const scalar_t* x, scalar_t* y) const override;
-    void omp_spmv(const scalar_t* x, scalar_t* y) const override;
 
     void apply_scaling
     (const std::vector<scalar_t>& Dr,
@@ -81,6 +93,7 @@ namespace strumpack {
     void print_binary(const std::string& filename) const;
 
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     // TODO implement these outside of this class
     void front_multiply
     (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
@@ -113,7 +126,8 @@ namespace strumpack {
     (integer_t sep_begin, integer_t sep_end,
      const std::vector<integer_t>& upd, const DistM_t& R,
      DistM_t& Srow, DistM_t& Scol, int depth) const override;
-#endif
+#endif //defined(STRUMPACK_USE_MPI)
+#endif //DOXYGEN_SHOULD_SKIP_THIS
 
     using CompressedSparseMatrix<scalar_t,integer_t>::n_;
     using CompressedSparseMatrix<scalar_t,integer_t>::nnz_;
@@ -266,19 +280,8 @@ namespace strumpack {
     return 0;
   }
 
-  template<typename scalar_t,typename integer_t> void
-  CSRMatrix<scalar_t,integer_t>::spmv
-  (const scalar_t* x, scalar_t* y) const {
-    omp_spmv(x, y);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  CSRMatrix<scalar_t,integer_t>::spmv
-  (const DenseM_t& x, DenseM_t& y) const {
-    omp_spmv(x, y);
-  }
-
 #if defined(__INTEL_MKL__)
+  // TODO test this, enable from CMake
   template<> void CSRMatrix<float>::spmv(const float* x, float* y) const {
     char trans = 'N';
     mkl_cspblas_scsrgemv(&no, &n, val_, ptr_, ind_, x, y);
@@ -308,7 +311,7 @@ namespace strumpack {
 #endif
 
   template<typename scalar_t,typename integer_t> void
-  CSRMatrix<scalar_t,integer_t>::omp_spmv
+  CSRMatrix<scalar_t,integer_t>::spmv
   (const scalar_t* x, scalar_t* y) const {
 #pragma omp parallel for
     for (integer_t r=0; r<n_; r++) {
@@ -323,13 +326,13 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  CSRMatrix<scalar_t,integer_t>::omp_spmv
+  CSRMatrix<scalar_t,integer_t>::spmv
   (const DenseM_t& x, DenseM_t& y) const {
     assert(x.cols() == y.cols());
     assert(x.rows() == std::size_t(n_));
     assert(y.rows() == std::size_t(n_));
     for (std::size_t c=0; c<x.cols(); c++)
-      omp_spmv(x.ptr(0,c), y.ptr(0,c));
+      spmv(x.ptr(0,c), y.ptr(0,c));
   }
 
   template<typename scalar_t,typename integer_t> void

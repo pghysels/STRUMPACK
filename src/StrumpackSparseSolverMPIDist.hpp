@@ -299,43 +299,41 @@ namespace strumpack {
     if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
       bloc.scale_rows(this->matching_Dr_);
 
-    auto gmres = [&](std::function<void(scalar_t*)> prec) {
-      GMResMPI<scalar_t,integer_t>
-      (comm_.comm(), mat_mpi_.get(), prec, n_local, x.data(), bloc.data(),
+    auto spmv = [&](const scalar_t* x, scalar_t* y) {
+      mat_mpi_->spmv(x, y);
+    };
+
+    auto gmres = [&](const std::function<void(scalar_t*)>& prec) {
+      GMResMPI<scalar_t>
+      (comm_, spmv, prec, n_local, x.data(), bloc.data(),
        opts_.rel_tol(), opts_.abs_tol(),
        this->Krylov_its_, opts_.maxit(),
        opts_.gmres_restart(), opts_.GramSchmidt_type(),
        use_initial_guess, opts_.verbose() && is_root_);
     };
-    auto bicgstab = [&](std::function<void(scalar_t*)> prec) {
-      BiCGStabMPI<scalar_t,integer_t>
-      (comm_.comm(), mat_mpi_.get(), prec, n_local, x.data(), bloc.data(),
+    auto bicgstab = [&](const std::function<void(scalar_t*)>& prec) {
+      BiCGStabMPI<scalar_t>
+      (comm_, spmv, prec, n_local, x.data(), bloc.data(),
        opts_.rel_tol(), opts_.abs_tol(),
        this->Krylov_its_, opts_.maxit(),
        use_initial_guess, opts_.verbose() && is_root_);
     };
     auto MFsolve = [&](scalar_t* w) {
-      //MPI_Pcontrol(1, "multifrontal_solve_dist");
       DenseMW_t X(n_local, x.cols(), w, x.ld());
       tree()->multifrontal_solve_dist(X, mat_mpi_->dist());
-      //MPI_Pcontrol(-1, "multifrontal_solve_dist");
     };
     auto refine = [&]() {
       IterativeRefinementMPI<scalar_t,integer_t>
-      (comm_.comm(), *mat_mpi_.get(),
-       //MFsolve, n_local, x.data(), bloc.data(),
-       [&](DenseM_t& w) {
+      (comm_, *mat_mpi_.get(), [&](DenseM_t& w) {
         tree()->multifrontal_solve_dist(w, mat_mpi_->dist()); },
-       x, bloc,
-       opts_.rel_tol(), opts_.abs_tol(),
-       this->Krylov_its_, opts_.maxit(),
-       use_initial_guess, opts_.verbose() && is_root_);
+        x, bloc, opts_.rel_tol(), opts_.abs_tol(),
+        this->Krylov_its_, opts_.maxit(),
+        use_initial_guess, opts_.verbose() && is_root_);
     };
 
     switch (opts_.Krylov_solver()) {
     case KrylovSolver::AUTO: {
-      if ((opts_.use_HSS() || opts_.use_BLR())
-          && x.cols() == 1)
+      if ((opts_.use_HSS() || opts_.use_BLR()) && x.cols() == 1)
         gmres(MFsolve);
       else refine();
     }; break;

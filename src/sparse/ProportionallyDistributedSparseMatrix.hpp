@@ -97,9 +97,8 @@ namespace strumpack {
      DistM_t& Srow, DistM_t& Scol, int depth) const override;
 
     void spmv(const DenseM_t& x, DenseM_t& y) const override {};
-    void omp_spmv(const DenseM_t& x, DenseM_t& y) const override {};
     void spmv(const scalar_t* x, scalar_t* y) const override {};
-    void omp_spmv(const scalar_t* x, scalar_t* y) const override {};
+
     void apply_scaling
     (const std::vector<scalar_t>& Dr,
      const std::vector<scalar_t>& Dc) override {};

@@ -38,26 +38,21 @@ namespace strumpack {
 
   /*
    * This is left preconditioned restarted GMRes.
-   *  TODO Can we apply this to multiple rhs's?
-   *  TODO clean this up:
-   *   - make a consistent interface for Krylov solvers,
-   *   - take an operator lamda
-   *   - define some Vector class?
    *
    *  Input vectors x and b have stride 1, length n
    */
-  template<typename scalar_t,typename integer_t>
-  typename RealType<scalar_t>::value_type GMRes
-  (const CompressedSparseMatrix<scalar_t,integer_t>& A,
+  template<typename scalar_t> typename RealType<scalar_t>::value_type GMRes
+  (const std::function<void(const scalar_t*,scalar_t*)>& spmv,
    const std::function<void(scalar_t*)>& preconditioner,
-   integer_t n, scalar_t* x, const scalar_t* b, real_t rtol, real_t atol,
+   std::size_t n, scalar_t* x, const scalar_t* b, real_t rtol, real_t atol,
    int& totit, int maxit, int restart, GramSchmidtType GStype,
    bool non_zero_guess, bool verbose) {
     using real_t = typename RealType<scalar_t>::value_type;
     if (restart > maxit) restart = maxit;
-    auto givens_c = new scalar_t
-      [restart + restart + restart+1 +
-       (restart+1)*restart + n*(restart+1) + n];
+    std::unique_ptr<scalar_t[]> work
+      (new scalar_t[restart + restart + restart+1 +
+                    (restart+1)*restart + n*(restart+1) + n]);
+    auto givens_c = work.get();
     auto givens_s = givens_c + restart;
     auto b_ = givens_s + restart;
     auto hess = b_ + restart+1;
@@ -74,7 +69,7 @@ namespace strumpack {
     totit = 0;
     while (no_conv) {
       if (non_zero_guess || totit>0) {
-        A.omp_spmv(x, V);
+        spmv(x, V);
         preconditioner(V);
         blas::axpby(n, scalar_t(1.), b_prec, 1, scalar_t(-1.), V, 1);
       } else {
@@ -96,7 +91,7 @@ namespace strumpack {
                   << rho/rho0 << "\t restart!" << std::endl;
       for (int it=0; it<restart; it++) {
         totit++;
-        A.omp_spmv(&V[it*n], &V[(it+1)*n]);
+        spmv(&V[it*n], &V[(it+1)*n]);
         preconditioner(&V[(it+1)*n]);
 
         if (GStype == GramSchmidtType::CLASSICAL) {
@@ -148,7 +143,6 @@ namespace strumpack {
       blas::gemv
         ('N', n, nrit+1, scalar_t(1.), V, n, b_, 1, scalar_t(1.), x, 1);
     }
-    delete[] givens_c;
     return rho;
   }
 

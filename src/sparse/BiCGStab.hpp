@@ -39,15 +39,17 @@ namespace strumpack {
   /**
    * http://www.netlib.org/templates/matlab/bicgstab.m
    */
-  template <typename scalar_t,typename integer_t> real_t BiCGStab
-  (const CompressedSparseMatrix<scalar_t,integer_t>& A,
+  template <typename scalar_t>
+  typename RealType<scalar_t>::value_type BiCGStab
+  (const std::function<void(const scalar_t*,scalar_t*)>& spmv,
    const std::function<void(scalar_t*)>& preconditioner,
-   integer_t n, scalar_t* x, const scalar_t* b, real_t rtol, real_t atol,
+   std::size_t n, scalar_t* x, const scalar_t* b, real_t rtol, real_t atol,
    int& totit, int maxit, bool non_zero_guess, bool verbose) {
     using real_t = typename RealType<scalar_t>::value_type;
     real_t bnrm2 = blas::nrm2(n, b, 1);
     if (bnrm2 == 0.0) return real_t(0.0);
-    auto r = new scalar_t[8*n];
+    std::unique_ptr<scalar_t[]> work(new scalar_t[8*n]);
+    auto r = work.get();
     auto r_tld = r + n;
     auto p_hat = r + 2 * n;
     auto s_hat = r + 3 * n;
@@ -56,7 +58,7 @@ namespace strumpack {
     auto s = r + 6 * n;
     auto t = r + 7 * n;
     if (non_zero_guess) {      // compute initial residual
-      A.omp_spmv(x, r);
+      spmv(x, r);
       blas::axpby(n, scalar_t(1.), b, 1, scalar_t(-1.), r, 1);
     } else {
       std::copy(b, b+n, r);
@@ -68,11 +70,9 @@ namespace strumpack {
       std::cout << "BiCGStab it. " << totit
                 << "\tres = " << std::setw(12) << resid
                 << "\trel.res = " << std::setw(12) << error << std::endl;
-    if (error <= rtol || resid <= atol) {
-      delete[] r;
+    if (error <= rtol || resid <= atol)
       return error;
-    }
-    scalar_t alpha=scalar_t(0.), rho, rho_1=scalar_t(0.), beta;
+    scalar_t alpha = scalar_t(0.), rho, rho_1 = scalar_t(0.), beta;
     scalar_t omega = scalar_t(1.);
     std::copy(r, r+n, r_tld);
     for (totit=1; totit<=maxit; totit++) {
@@ -84,15 +84,15 @@ namespace strumpack {
         blas::axpy(n, -omega, v, 1, p, 1);
         blas::axpby(n, scalar_t(1), r, 1, beta, p, 1);
       } else std::copy(r, r+n, p);
-      std::copy(p, p+n, p_hat);                              // p_hat = M \ p
+      std::copy(p, p+n, p_hat);               // p_hat = M \ p
       preconditioner(p_hat);
-      A.omp_spmv(p_hat, v);                                 // v = A * p_hat
+      spmv(p_hat, v);                         // v = A * p_hat
       alpha = rho / blas::dotc(n, r_tld, 1, v, 1);
-      std::copy(r, r+n, s);                                  // s = r_1 - alpha v
+      std::copy(r, r+n, s);                   // s = r_1 - alpha v
       blas::axpy(n, -alpha, v, 1, s, 1);
       if (blas::nrm2(n, s, 1) < atol) {       // early convergence check
         blas::axpy(n, alpha, p_hat, 1, x, 1);
-        A.omp_spmv(x, r);
+        spmv(x, r);
         blas::axpby(n, scalar_t(1.), b, 1, scalar_t(-1.), r, 1);
         resid = blas::nrm2(n, r, 1);
         error = resid / bnrm2;
@@ -102,13 +102,13 @@ namespace strumpack {
                     << "\trel.res = " << std::setw(12) << error << std::endl;
         break;
       }
-      std::copy(s, s+n, s_hat);                                     // s_hat = M \ s
+      std::copy(s, s+n, s_hat);               // s_hat = M \ s
       preconditioner(s_hat);
-      A.omp_spmv(s_hat, t);                                        // t = A*s_hat
+      spmv(s_hat, t);                         // t = A*s_hat
       omega = blas::dotc(n, t, 1, s, 1) / blas::dotc(n, t, 1, t, 1);    // omega = ( t'*s) / ( t'*t );
-      blas::axpy(n, alpha, p_hat, 1, x, 1);                           // x = x + alpha*p_hat + omega*s_hat
+      blas::axpy(n, alpha, p_hat, 1, x, 1);   // x = x + alpha*p_hat + omega*s_hat
       blas::axpy(n, omega, s_hat, 1, x, 1);
-      std::copy(s, s+n, r);                                         // r = s - omega*t
+      std::copy(s, s+n, r);                   // r = s - omega*t
       blas::axpy(n, -omega, t, 1, r, 1);
       resid = blas::nrm2(n, r, 1);
       error = resid / bnrm2;
@@ -121,7 +121,6 @@ namespace strumpack {
       rho_1 = rho;
     }
     error = blas::nrm2(n, r, 1) / bnrm2;
-    delete[] r;
     return error;
   }
 

@@ -41,7 +41,7 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
 
   int N = A.size();
   std::vector<scalar_t> b(N), x(N), x_exact(N, scalar_t(1.)/std::sqrt(N));
-  A.omp_spmv(x_exact.data(), b.data());
+  A.spmv(x_exact.data(), b.data());
 
   spss.set_matrix(A);
   if (spss.reorder() != ReturnCode::SUCCESS) {

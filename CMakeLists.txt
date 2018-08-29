@@ -440,6 +440,7 @@ if(STRUMPACK_USE_MPI)
 
   install(FILES
     src/dense/DistributedMatrix.hpp
+    src/dense/DistributedVector.hpp
     src/dense/ScaLAPACKWrapper.hpp
     src/dense/BLACSGrid.hpp
     DESTINATION include/dense)

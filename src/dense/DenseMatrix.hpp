@@ -26,8 +26,8 @@
  *             Division).
  *
  */
-/*! \file DenseMatrix.hpp
- *
+/*!
+ * \file DenseMatrix.hpp
  * \brief Contains the DenseMatrix and DenseMatrixWrapper classes,
  * simple wrappers around BLAS/LAPACK style dense matrices.
  */

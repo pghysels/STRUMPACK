@@ -39,6 +39,7 @@ using namespace std;
 #include "StrumpackSparseSolverMPIDist.hpp"
 #include "sparse/CSRMatrix.hpp"
 #include "sparse/CSRMatrixMPI.hpp"
+#include "dense/DistributedVector.hpp"
 
 using namespace strumpack;
 
@@ -61,7 +62,7 @@ test(int argc, char* argv[], const CSRMatrixMPI<scalar,integer>* Adist) {
   auto n_local = Adist->local_rows();
   vector<scalar> b(n_local), x(n_local),
     x_exact(n_local, scalar(1.)/sqrt(N));
-  Adist->omp_spmv(x_exact.data(), b.data());
+  Adist->spmv(x_exact.data(), b.data());
 
   spss.set_distributed_csr_matrix
     (Adist->local_rows(), Adist->ptr(), Adist->ind(),
@@ -85,8 +86,9 @@ test(int argc, char* argv[], const CSRMatrixMPI<scalar,integer>* Adist) {
          << scaled_res << endl;
 
   blas::axpy(n_local, scalar(-1.), x_exact.data(), 1, x.data(), 1);
-  auto nrm_error = nrm2_omp_mpi(n_local, x.data(), 1, MPI_COMM_WORLD);
-  auto nrm_x_exact = nrm2_omp_mpi(n_local, x_exact.data(), 1, MPI_COMM_WORLD);
+
+  auto nrm_error = norm2(x, MPIComm());
+  auto nrm_x_exact = norm2(x_exact, MPIComm());
   if (!rank)
     cout << "# RELATIVE ERROR = "
          << (nrm_error/nrm_x_exact) << endl;

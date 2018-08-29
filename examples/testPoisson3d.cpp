@@ -74,7 +74,7 @@ int main(int argc, char* argv[]) {
   std::vector<scalar> b(N, scalar(0.)), x(N, scalar(0.)),
     x_exact(N, scalar(1.));
 
-  A.omp_spmv(x_exact.data(), b.data());
+  A.spmv(x_exact.data(), b.data());
 
   spss.set_matrix(A);
   spss.reorder(n, n, n);

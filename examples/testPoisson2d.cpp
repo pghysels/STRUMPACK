@@ -76,7 +76,7 @@ int main(int argc, char* argv[]) {
 
   DenseMatrix<scalar> b(N, nrhs), x(N, nrhs), x_exact(N, nrhs);
   x_exact.random();
-  A.omp_spmv(x_exact, b);
+  A.spmv(x_exact, b);
 
   spss.set_csr_matrix(N, col_ptr, row_ind, val, true);
   spss.reorder(n, n);
