@@ -333,8 +333,7 @@ namespace strumpack {
     TIMER_STOP(t_sea);
   }
 
-
-  // TODO avoid dynamic_cast, use Comm.all_to_all_v
+  // TODO avoid dynamic_cast
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSSMPI<scalar_t,integer_t>::skinny_extend_add
   (DistM_t& cSrl, DistM_t& cScl, DistM_t& cSrr, DistM_t& cScr,
@@ -348,16 +347,15 @@ namespace strumpack {
     if (cSrr.active())
       ExtAdd::skinny_extend_add_copy_to_buffers
         (cSrr, cScr, sbuf, this, rch->upd_to_parent(this));
-    scalar_t *rbuf = nullptr, **pbuf = nullptr;
-    all_to_all_v(sbuf, rbuf, pbuf, Comm().comm());
+    std::vector<scalar_t> rbuf;
+    std::vector<scalar_t*> pbuf;
+    Comm().all_to_all_v(sbuf, rbuf, pbuf);
     if (lch) // unpack left child contribution
       ExtAdd::skinny_extend_add_copy_from_buffers
-        (Sr, Sc, pbuf, this, lch);
+        (Sr, Sc, pbuf.data(), this, lch);
     if (rch) // unpack right child contribution
       ExtAdd::skinny_extend_add_copy_from_buffers
-        (Sr, Sc, pbuf+this->master(rch), this, rch);
-    delete[] pbuf;
-    delete[] rbuf;
+        (Sr, Sc, pbuf.data()+this->master(rch), this, rch);
   }
 
   template<typename scalar_t,typename integer_t> void

@@ -130,25 +130,24 @@ namespace strumpack {
         for (auto& t : triplets[k])
           sbuf[destr[t._r]+destc[t._c]].emplace_back(t, k);
       }
-      Quadlet* rbuf = nullptr;
-      std::size_t totrsize = 0;
       MPI_Datatype quadlet_type;
       MPI_Type_contiguous(sizeof(Quadlet), MPI_BYTE, &quadlet_type);
       MPI_Type_commit(&quadlet_type);
-      all_to_all_v(sbuf, rbuf, totrsize, comm(), quadlet_type);
+      std::vector<Quadlet> rbuf;
+      std::vector<Quadlet*> pbuf;
+      Comm().all_to_all_v(sbuf, rbuf, pbuf, quadlet_type);
       MPI_Type_free(&quadlet_type);
       std::fill(nb_destr, nb_destr+nb*(maxBrows+maxBcols), -1);
-      for (auto q=rbuf; q!=rbuf+totrsize; q++) {
-        auto k = q->k;
+      for (auto& q : rbuf) {
+        auto k = q.k;
         auto lr = nb_destr + k*(maxBrows+maxBcols);
         auto lc = lr + maxBrows;
-        int locr = lr[q->r];
-        if (locr == -1) locr = lr[q->r] = B[k].rowg2l_fixed(q->r);
-        int locc = lc[q->c];
-        if (locc == -1) locc = lc[q->c] = B[k].colg2l_fixed(q->c);
-        B[k](locr, locc) += q->v;
+        int locr = lr[q.r];
+        if (locr == -1) locr = lr[q.r] = B[k].rowg2l_fixed(q.r);
+        int locc = lc[q.c];
+        if (locc == -1) locc = lc[q.c] = B[k].colg2l_fixed(q.c);
+        B[k](locr, locc) += q.v;
       }
-      delete[] rbuf;
       delete[] nb_destr;
     }
 

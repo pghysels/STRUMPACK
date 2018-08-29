@@ -140,31 +140,30 @@ namespace strumpack {
         delete[] destr;
         MPI_Datatype triplet_type;
         create_triplet_mpi_type<scalar_t>(&triplet_type);
-        Triplet<scalar_t>* rbuf = nullptr;
-        std::size_t totrsize;
-        all_to_all_v(sbuf, rbuf, totrsize, comm.comm(), triplet_type);
+        std::vector<Triplet<scalar_t>> rbuf;
+        std::vector<Triplet<scalar_t>*> pbuf;
+        comm.all_to_all_v(sbuf, rbuf, pbuf, triplet_type);
         MPI_Type_free(&triplet_type);
         if (ranges.leaf_procs(rank) == 1) {
           assert((ranges.chi(rank) - ranges.clo(rank)) == int(sub.rows()));
           assert(int(sub.cols()) == dist.cols());
-          for (auto t=rbuf; t!=rbuf+totrsize; t++)
-            sub(t->_r, t->_c) = t->_v;
+          for (auto& t : rbuf)
+            sub(t._r, t._c) = t._v;
         } else if (leaf.active()) {
           const auto rows = leaf.rows();
           const auto cols = leaf.cols();
           auto lr = new int[rows+cols];
           auto lc = lr + rows;
           std::fill(lr, lr+rows+cols, -1);
-          for (auto t=rbuf; t!=rbuf+totrsize; t++) {
-            int locr = lr[t->_r];
-            if (locr == -1) locr = lr[t->_r] = leaf.rowg2l_fixed(t->_r);
-            int locc = lc[t->_c];
-            if (locc == -1) locc = lc[t->_c] = leaf.colg2l_fixed(t->_c);
-            leaf(locr, locc) = t->_v;
+          for (auto& t : rbuf) {
+            int locr = lr[t._r];
+            if (locr == -1) locr = lr[t._r] = leaf.rowg2l_fixed(t._r);
+            int locc = lc[t._c];
+            if (locc == -1) locc = lc[t._c] = leaf.colg2l_fixed(t._c);
+            leaf(locr, locc) = t._v;
           }
           delete[] lr;
         }
-        delete[] rbuf;
       }
 
       template<typename scalar_t> void block_row_to_block_cyclic
@@ -234,9 +233,9 @@ namespace strumpack {
         }
         MPI_Datatype triplet_type;
         create_triplet_mpi_type<scalar_t>(&triplet_type);
-        Triplet<scalar_t>* rbuf = nullptr;
-        std::size_t totrsize;
-        all_to_all_v(sbuf, rbuf, totrsize, comm.comm(), triplet_type);
+        std::vector<Triplet<scalar_t>> rbuf;
+        std::vector<Triplet<scalar_t>*> pbuf;
+        comm.all_to_all_v(sbuf, rbuf, pbuf, triplet_type);
         MPI_Type_free(&triplet_type);
         if (dist.active()) {
           const auto rows = dist.rows();
@@ -244,16 +243,15 @@ namespace strumpack {
           auto lr = new int[rows+cols];
           auto lc = lr + rows;
           std::fill(lr, lr+rows+cols, -1);
-          for (auto t=rbuf; t!=rbuf+totrsize; t++) {
-            int locr = lr[t->_r];
-            if (locr == -1) locr = lr[t->_r] = dist.rowg2l_fixed(t->_r);
-            int locc = lc[t->_c];
-            if (locc == -1) locc = lc[t->_c] = dist.colg2l_fixed(t->_c);
-            dist(locr, locc) = t->_v;
+          for (auto& t : rbuf) {
+            int locr = lr[t._r];
+            if (locr == -1) locr = lr[t._r] = dist.rowg2l_fixed(t._r);
+            int locc = lc[t._c];
+            if (locc == -1) locc = lc[t._c] = dist.colg2l_fixed(t._c);
+            dist(locr, locc) = t._v;
           }
           delete[] lr;
         }
-        delete[] rbuf;
       }
 
     } //end namespace BC2BR
