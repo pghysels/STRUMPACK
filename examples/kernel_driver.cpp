@@ -3,12 +3,6 @@
 # include <vector>
 using namespace std;
 
-enum class KernelType {
-  GAUSSIAN,      /*!< Radial basis function Gaussian kernel */
-  LAPLACIAN,     /*!< Radial basis function Laplacian kernel */
-  USER_DEFINED   /*!< User defined kernel */
-};
-
 enum class ClusteringMethod {
   NATURAL,       /*!< No ordering */
   KMEANS,        /*!< Recursive 2-means*/
@@ -23,12 +17,9 @@ enum class DataSetType {
 };
 
 class GaussianKernel {
-
   private:
     double h;
-    // int d; pass it from the kernel evaluation
-
-    KernelDataset& data_set;
+    // KernelDataset& data_set; // Interface v2
 
   public:
     GaussianKernel(int in_d, double in_h): d(in_d), h(in_h) { }
@@ -51,13 +42,13 @@ class GaussianKernel {
       return exp(-dist2(x, y) / (2. * h * h));
     }  
 
+
 };
 
 class LaplacianKernel {
 
   private:
     double h;
-    // int d; 
   
   public:
     LaplacianKernel(int d_in, double h_in): d(d_in), h(h_in) { }
@@ -80,24 +71,27 @@ class LaplacianKernel {
 class KernelDataset{ //input data from csv (excel) files
 
   private:
-    size_t n;
-    size_t d;
+    size_t n;  // Size of dataset
+    size_t d;  // Dimension of each sample
+    size_t c;  // Number of classes
+    
     DataSetType set_type;
-    Dense_t data(n,d);
-    vector<int> labels; // integer that specified the class type
+
+    Dense_t data(n,d);  // [n,d] actual dataset
+    vector<int> labels; // [n,1] integer that specifies the class type <0,1,2,...>
+
     string data_filename;
     string labels_filename;
 
   public:
+    // Constructor
     KernelDataset(size_t n_input, int d_input, 
       DataSetType set_type_input, 
       string data_filename_input, string labels_filename_input)
       : n(n_input), d(d_input), set_type(set_type_input),
         data_filename(data_filename_input), 
         labels_filename(labels_filename_input) {
-
         cout << "Reading data and labels from files" << endl;
-     
     }
 
     void cluster(ClusteringMethod cluster_method){
@@ -122,8 +116,9 @@ class KernelDataset{ //input data from csv (excel) files
        }
     }
 
-    void compute_ann(int k, DenseM_t& ann, DenseM_t& scores, 
-      const elem_t& Aelem, HSSOptions hss_opts){
+    void compute_ann(int k, int iterations, 
+                    DenseM_t& ann, DenseM_t& scores, 
+                    HSSOptions hss_opts){
         cout << "computing ANN" << endl;
     }
 
@@ -157,56 +152,54 @@ int main(){
   HSSMatrix HSS = HSSMatrix<double>(cluster_tree, hss_opts);
 
   // 4. Compute ANN
-  int k = 32, //number of neighbors
-  int ann_iter;
-
+  int k = 32;   // number of neighbors
+  int ann_iter; // number of ANN iterations
   DenseM_t<int>       ann(n,k);    // indices
   DenseM_t<real_t>    scores(n,k); // distances
-
-  training_data.compute_ann(ann, ann_iter, scores);
+  training_data.compute_ann(k, ann_iter, ann, ann_iter, scores);
 
 
   // Compress with ANN
-  // TODO: Pass KernelType::GAUSSIAN to Aelem
-
   HSS.compress_ann(ann, scores, Aelem, opts);
-  
   // HSS.compress_ann(training_data, gKernel, opts);
   // HSS.compress_ann(gKernel, opts);
 
 
+  // PREDICT: Create matrix factorization with kernel paratemers 
+  // and report prediction accuracy on testing data
 
-
-
-
-  // Fit: Create matrix factorization with kernel paratemers
-  fit(HSS, gKernel, train_data, test_data);
-
-  // Output vector
   vector<n> prediction_vector; // probabilities
+  binary_predict(HSS, testing_data, prediction_vector);
 
-  // Test the model accuracy on unseen data
-  binary_predict(HSS, validation_data, prediction_vector);
-
-
-
-
-  // Output vector
-  int c; // number of classes
   Dense_t<n,c> prediction_vector; // probabilities
-
-  // Test the model accuracy on unseen data
-  multiclass_predict(HSS, validation_data, prediction_vector);
+  multiclass_predict(HSS, testing_data, prediction_vector);
 
   return 0;
 }
 
 
 
+////////////////////////////////////////////////
+// Driver1. Expert driver with HSS for PREDICT
+////////////////////////////////////////////////
+1. Load data (training, testing)
+  1.2 Cluster data
 
-// Expert driver with HSS for FIT
+2. Instanciate Kernel
 
-1. Load data(training, testing)
+3. Create HSS matrix <--- type of matrix
+
+4. Compress
+  4.1 Compute ANN
+
+5. Predict (binary or multiclass)
+
+
+//////////////////////////////////////////////// 
+// Driver2. Expert driver with HSS for FIT
+////////////////////////////////////////////////
+
+1. Load data(training, validation)
   1.2 Cluster data
 
 2. Instanciate Kernel
@@ -220,23 +213,11 @@ int main(){
   5.1 <OpenTuner,GridSearch,Wissam>. INPUT:h, lambda. OUTPUT:pred_acc
 
 
-// Expert driver with HSS for PREDICT
 
-1. Load data (validation)
-  1.2 Cluster data
+////////////////////////////////////////////////
+// Driver3. Simple driver.
+////////////////////////////////////////////////
 
-2. Instanciate Kernel
-
-3. Create HSS matrix <--- type of matrix
-
-4. Compress
-  4.1 Compute ANN
-
-5. Predict
-
-
-// Simple driver:
-
-1. Load h, training and validation data
+1. Get kernel parameters (h), training and validation data
 2. Predict, output labels
 
