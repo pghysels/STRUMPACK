@@ -76,6 +76,7 @@ namespace strumpack {
       std::vector<WorkCompressANN<scalar_t>> c;
       DenseMatrix<scalar_t> S;
       std::vector<std::size_t> Scolids;
+      std::vector<double> Scolscs;
       void split(const std::pair<std::size_t,std::size_t>& dim) {
         if (c.empty()) {
           c.resize(2);

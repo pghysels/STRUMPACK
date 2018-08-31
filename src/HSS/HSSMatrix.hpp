@@ -220,13 +220,11 @@ namespace strumpack {
        * \see DenseMatrix
        * \see HSSOptions
        */
-      void compress
-      (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts);
+      void compress (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts);
 
 
-      void compress_ann
-      (DenseM_t& ann, DenseM_t& scores, const elem_t& Aelem,
-       const opts_t& opts);
+      //void compress_ann (DenseM_t& ann, DenseM_t& scores, const elem_t& Aelem, const opts_t& opts);
+      void compress_ann (DenseM_t&  ann, DenseM_t& scores, const elem_t& Aelem, const opts_t& opts);
 
 
       /**
@@ -383,7 +381,7 @@ namespace strumpack {
       //  const opts_t& opts);
 
       void compress_recursive_ann
-      (DenseM_t& ann, DenseM_t& scores,
+      (DenseM_t& ann, DenseM_t&  scores,
        const elem_t& Aelem, const opts_t& opts,
        WorkCompressANN<scalar_t>& w, int d) override;
 
@@ -406,6 +404,9 @@ namespace strumpack {
       bool compute_U_V_bases
       (DenseM_t& Sr, DenseM_t& Sc, const opts_t& opts,
        WorkCompress<scalar_t>& w, int d, int depth);
+      bool compute_U_V_bases_ANN
+      (DenseM_t& Sr, DenseM_t& Sc, const opts_t& opts,
+       WorkCompressANN<scalar_t>& w, int d, int depth);
       void compute_U_basis_stable
       (DenseM_t& Sr, const opts_t& opts,
        WorkCompress<scalar_t>& w, int d, int dd, int depth);
