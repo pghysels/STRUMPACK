@@ -1,10 +1,10 @@
-all: KernelRegression_ann
+all: KernelRegression_ann MLkernel
 
 all_old: @C_EXAMPLES@ testPoisson2d testPoisson3d	\
 	testPoisson2dMPI testPoisson2dMPIDist testPoisson3dMPIDist	\
 	testMMdouble testMMdoubleMPI testMMdoubleMPIDist testMMdouble64	\
 	testMMdoubleMPIDist64 testMMfloat testMMfloatMPIDist	\
-	mtx2bin bin2mtx MLkernel
+	mtx2bin bin2mtx MLkernel KernelRegression_ann
 
 CC=@MPI_C_COMPILER@
 CXX=@MPI_CXX_COMPILER@
