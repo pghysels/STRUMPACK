@@ -113,6 +113,6 @@ clean:
 		testMMdouble testMMdoubleMPI testMMdoubleMPIDist	\
 		testMMdouble64 testMMdoubleMPIDist64			\
 		testMMfloat testMMfloatMPIDist				\
-		mtx2bin bin2mtx MLkernel
+		mtx2bin bin2mtx MLkernel KernelRegression_ann
 
 
