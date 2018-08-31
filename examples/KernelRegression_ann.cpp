@@ -32,8 +32,10 @@
 #include <string>
 #include <vector>
 
+
 #include "HSS/HSSMatrix.hpp"
 #include "misc/TaskTimer.hpp"
+#include "find_ann.hpp"
 
 #include "FileManipulation.h"
 #include <fstream>
@@ -42,6 +44,9 @@ using namespace std;
 using namespace strumpack;
 using namespace strumpack::HSS;
 
+//----------------------------------------------------------------------------
+//--------PREPROCESSING-------------------------------------------------------
+//----------------------------------------------------------------------------
 extern "C" {
 #define SSYEVX_FC FC_GLOBAL(ssyevx, SSYEVX)
 #define DSYEVX_FC FC_GLOBAL(dsyevx, DSYEVX)
@@ -106,7 +111,7 @@ inline double dist2(double *x, double *y, int d) {
   return k;
 }
 
-inline double dist(double *x, double *y, int d) { return sqrt(dist2(x, y, d)); }
+//inline double dist(double *x, double *y, int d) { return sqrt(dist2(x, y, d)); }
 
 inline double norm1(double *x, double *y, int d) {
   double k = 0.;
@@ -474,6 +479,7 @@ void pca_partition(double *p, int n, int d, int *nc, double *labels) {
   }
   mean_value /= n;
 
+
   // split the data
   int *cluster = new int[n];
   for (int i = 0; i < n; i++) {
@@ -538,6 +544,10 @@ void recursive_pca(double *p, int n, int d, int cluster_size,
   delete[] nc;
 }
 
+//----------------------------------------------------------------------------
+//--------CLASS KERNEL--------------------------------------------------------
+//----------------------------------------------------------------------------
+
 class Kernel {
   using DenseM_t = DenseMatrix<double>;
   using DenseMW_t = DenseMatrixWrapper<double>;
@@ -565,6 +575,7 @@ public:
       }
     }
   }
+
 
   void times(DenseM_t &Rr, DenseM_t &Sr) {
     assert(Rr.rows() == _n);
@@ -601,6 +612,10 @@ public:
     Sc.copy(Sr);
   }
 };
+
+//----------------------------------------------------------------------------
+//--------FILE MANIPULATIONS--------------------------------------------------
+//----------------------------------------------------------------------------
 
 vector<double> write_from_file(string filename) {
   vector<double> data;
@@ -663,6 +678,310 @@ void save_to_binary_file(string FILE, size_t n, int d){
 
 }
 
+//----------------------------------------------------------------------------
+//--------ANN SEARCH----------------------------------------------------------
+//----------------------------------------------------------------------------
+
+
+
+// //----------------------FIND APPROXIMATE NEAREST NEIGHBORS FROM PROJECTION TREE---------------------------
+
+// 1. CONSTRUCT THE TREE
+// leaves - list of all indices such that leaves[leaf_sizes[i]]...leaves[leaf_sizes[i+1]] 
+// belong to i-th leaf of the projection tree
+// gauss_id and gaussian samples - for the fixed samples option 
+void construct_projection_tree(vector<double> &data, int n, int d, int min_leaf_size, 
+                               vector<int> &cur_indices, int start, int cur_node_size,
+                               vector<int> &leaves, vector<int> &leaf_sizes, mt19937 &generator)
+//                               int &gauss_id, const vector<double> &gaussian_samples)
+{
+    if (cur_node_size < min_leaf_size) 
+    {
+        int prev_size = leaf_sizes.back();
+        leaf_sizes.push_back(cur_node_size + prev_size);  
+        for (int i = 0; i < cur_node_size; i++)
+        {
+            leaves.push_back(cur_indices[start + i]);
+        }
+        return;
+    }
+
+    // choose random direction
+    vector<double> direction_vector(d);
+    normal_distribution<double> normal_distr(0.0,1.0);
+    for (int i = 0; i < d; i++) 
+    {
+        direction_vector[i] = normal_distr(generator);
+        //  option for fixed direction samples
+        //  direction_vector[i] = gaussian_samples[gauss_id*d + i];
+        //  cout << direction_vector[i] << ' ';
+    }
+    // gauss_id++;
+    double dir_vector_norm = norm(&direction_vector[0], d);
+    for (int i = 0; i < d; i++) 
+    {
+        direction_vector[i] /= dir_vector_norm;
+    }
+
+    // choose margin (MARGIN IS CURRENTLY NOT USED)
+    //double diameter = estimate_set_diameter(data, n, d, cur_indices, cur_node_size, generator);
+    //uniform_real_distribution<double> uniform_on_segment(-1, 1);
+    //double delta = uniform_on_segment(generator);
+    //double margin = delta*6*diameter/sqrt(d);
+
+
+    // find relative coordinates
+    vector<double> relative_coordinates(cur_node_size, 0.0);
+    for (int i = 0; i < cur_node_size; i++)
+    {
+        relative_coordinates[i] = dot_product(&data[cur_indices[start + i] * d], &direction_vector[0], d);
+    }
+  
+    // median split
+    vector<int> idx(cur_node_size);
+    iota(idx.begin(), idx.end(), 0);
+    std::sort(idx.begin(), idx.end(), [&](int a, int b) {
+        return relative_coordinates[a] < relative_coordinates[b];   
+    });
+    vector<int> cur_indices_sorted(cur_node_size, 0);
+    for (int i = 0; i < cur_node_size; i++)
+    {
+      cur_indices_sorted[i] = cur_indices[start + idx[i]];
+    }
+    for (int i = start; i < start + cur_node_size; i++)
+    {
+      cur_indices[i] = cur_indices_sorted[i - start];
+    }
+    
+    int half_size =  (int)cur_node_size / 2;
+
+
+    construct_projection_tree(data, n, d, min_leaf_size, 
+                               cur_indices, start, half_size, 
+                               leaves, leaf_sizes, generator);
+                               //, gauss_id, gaussian_samples);
+
+    construct_projection_tree(data, n, d, min_leaf_size, 
+                               cur_indices, start + half_size, cur_node_size - half_size, 
+                               leaves, leaf_sizes, generator);
+                               //, gauss_id, gaussian_samples);
+
+}
+
+// 2. FIND CLOSEST POINTS INSIDE LEAVES
+// find ann_number exact neighbors for every point among the points within its leaf (in randomized projection tree)
+void find_neibs_in_tree(vector<double> &data, int n, int d, int ann_number, vector<int> &leaves, 
+                               vector<int> &leaf_sizes, vector<int> &neighbors, vector<double> &neighbor_scores)
+{
+    for (int leaf = 0; leaf < leaf_sizes.size() - 1; leaf++) 
+    {
+        // initialize size and content of the current leaf
+        int cur_leaf_size = leaf_sizes[leaf+1] - leaf_sizes[leaf];
+        vector<int> index_subset(cur_leaf_size, 0); // list of indices in the current leaf
+        for (int i = 0; i < index_subset.size(); i++)
+        {
+            index_subset[i] = leaves[leaf_sizes[leaf] + i];
+        }
+
+        vector<vector<double>> leaf_dists;
+        find_distance_matrix(data, d, index_subset, leaf_dists);
+        
+        // record ann_number closest points in each leaf to neighbors
+        for (int i = 0; i < cur_leaf_size; i++) 
+        {
+            vector<int> idx(cur_leaf_size);
+            iota(idx.begin(), idx.end(), 0);
+            std::sort(idx.begin(), idx.end(), [&](int i1, int i2) {
+                return leaf_dists[i][i1] < leaf_dists[i][i2];
+             });
+            for (int j = 0; j < ann_number; j++)
+            {
+                int neibid = leaves[leaf_sizes[leaf] + idx[j]];
+                double neibscore = leaf_dists[i][idx[j]];
+                neighbors[index_subset[i] * ann_number + j] = neibid;
+                neighbor_scores[index_subset[i] * ann_number + j] = neibscore;
+            }
+        }
+    }
+}
+
+// 3. FIND ANN IN ONE TREE SAMPLE
+void find_ann_candidates(vector<double> &data, int n, int d, int ann_number, 
+                         vector<int> &neighbors, vector<double> &neighbor_scores)
+                         //vector<double> &gaussian_samples)
+{
+    random_device rd;
+    mt19937 generator(rd());
+
+    int min_leaf_size = 6*ann_number;
+    
+    vector<int> leaves;
+    vector<int> leaf_sizes;
+    leaf_sizes.push_back(0);
+
+    int cur_node_size = n;
+    int start = 0;
+   //  int gauss_id = 0;
+    vector<int> cur_indices(cur_node_size);
+    iota(cur_indices.begin(), cur_indices.end(), 0);
+
+     construct_projection_tree(data, n, d, min_leaf_size, 
+                               cur_indices, start, cur_node_size, 
+                               leaves, leaf_sizes, generator);
+                               // , gauss_id, gaussian_samples);
+
+    find_neibs_in_tree(data, n, d, ann_number, leaves, leaf_sizes, neighbors, neighbor_scores);
+}
+
+//---------------CHOOSE BEST NEIGHBORS FROM TWO TREE SAMPLES------------------
+
+// take closest neighbors from neighbors and new_neighbors, write them to neighbors and their scores to neighbor_scores
+void choose_best_neighbors(vector<int> &neighbors, vector<double> &neighbor_scores, 
+                           vector<int> &new_neighbors, vector<double> &new_neighbor_scores, int ann_number)
+{
+    for (int vertex = 0; vertex < neighbors.size(); vertex = vertex + ann_number)
+    {
+        vector<int> cur_neighbors(ann_number, 0);
+        vector<double> cur_neighbor_scores(ann_number, 0.0);
+        int iter1 = 0;
+        int iter2 = 0;
+        int cur = 0;
+        while ((iter1 < ann_number) && (iter2 < ann_number) && (cur < ann_number))
+        {
+            if (neighbor_scores[vertex+iter1] > new_neighbor_scores[vertex+iter2])
+            {
+                cur_neighbors[cur] = new_neighbors[vertex+iter2];
+                cur_neighbor_scores[cur] = new_neighbor_scores[vertex+iter2];
+                iter2++;
+            } else {
+                cur_neighbors[cur] = neighbors[vertex+iter1];
+                cur_neighbor_scores[cur] = neighbor_scores[vertex+iter1];
+                if (neighbors[vertex+iter1] == new_neighbors[vertex+iter2])
+                {
+                    iter2++;
+                }
+                iter1++;
+            }
+            cur++;
+        }
+        while (cur < ann_number)
+        {
+            if (iter1 == ann_number)
+            {
+                cur_neighbors[cur] = new_neighbors[vertex+iter2];
+                cur_neighbor_scores[cur] = new_neighbor_scores[vertex+iter2];
+                iter2++;
+            }
+            else 
+            {
+                cur_neighbors[cur] = neighbors[vertex+iter1];
+                cur_neighbor_scores[cur] = neighbor_scores[vertex+iter1];
+                iter1++;
+            }
+            cur++;
+        }
+
+        for(int i = 0; i < ann_number; i++)
+        {
+            neighbors[vertex+i] = cur_neighbors[i];
+            neighbor_scores[vertex+i] = cur_neighbor_scores[i];
+        }
+    }
+
+}
+
+//----------------QUALITY CHECK WITH TRUE NEIGHBORS----------------------------
+void find_true_nn(vector<double> &data, int n, int d, int ann_number, vector<int> &n_neighbors, vector<double> &n_neighbor_scores)
+{
+         // create full distance matrix
+        vector<vector<double>> all_dists;
+        vector<int> all_ids(n); // index subset = everything
+        iota(all_ids.begin(), all_ids.end(), 0);
+        find_distance_matrix(data, d, all_ids, all_dists);
+
+       // record ann_number closest points in each leaf to neighbors
+        for (int i = 0; i < n; i++) 
+        {
+            vector<int> idx(n);
+            iota(idx.begin(), idx.end(), 0);
+            std::sort(idx.begin(), idx.end(), [&](int i1, int i2) {
+                return all_dists[i][i1] < all_dists[i][i2];
+             });
+            for (int j = 0; j < ann_number; j++)
+            {
+                n_neighbors[i * ann_number + j] = idx[j];
+                n_neighbor_scores[i * ann_number + j] = all_dists[i][idx[j]];
+            }
+        }
+}
+
+// quality = average fraction of ann_number approximate neighbors (neighbors), which are 
+// within the closest ann_number of true neighbors (n_neighbors); average is taken over all data points
+double check_quality(vector<double> &data, int n, int d, int ann_number, vector<int> &neighbors)
+{
+    vector<int> n_neighbors(n*ann_number, 0);
+    vector<double> n_neighbor_scores(n*ann_number, 0.0);
+    auto start_nn = chrono::system_clock::now();
+    find_true_nn(data, n, d, ann_number, n_neighbors, n_neighbor_scores);
+    auto end_nn = chrono::system_clock::now();
+    chrono::duration<double> elapsed_seconds_nn = end_nn-start_nn;
+    cout << "elapsed time for exact neighbor search: " << elapsed_seconds_nn.count() << " sec" << endl;
+
+    vector<double> quality_vec;
+    for (int i = 0; i < n; i++) 
+    {
+        int iter1 = ann_number*i;
+        int iter2 = ann_number*i;
+        int num_nei_found = 0;
+        while (iter2 < ann_number*(i+1))
+        {
+            if (neighbors[iter1] == n_neighbors[iter2])
+            {
+                iter1++;
+                iter2++;
+                num_nei_found++;
+            }
+            else
+            {
+                iter2++;
+            }
+        }
+       quality_vec.push_back((double)num_nei_found/ann_number);
+    }
+    cout << endl;
+  
+    double ann_quality = 0.0;
+    for (int i = 0; i < quality_vec.size(); i++)
+    {
+        ann_quality += quality_vec[i];
+    }
+    return (double)ann_quality/quality_vec.size();
+}
+
+//------------ITERATE OVER SEVERAL PROJECTION TREES TO FIND ANN----------------
+void find_approximate_neighbors(vector<double> &data, int n, int d, 
+                                    int num_iters, int ann_number, 
+                                    vector<int> &neighbors, vector<double> &neighbor_scores)
+                                    // vector<double> &gaussian_samples
+{
+    find_ann_candidates(data, n, d, ann_number, neighbors, neighbor_scores);
+                        //, gaussian_samples);
+    for (int iter = 1; iter < num_iters; iter++)
+    {
+        vector<int> new_neighbors(n*ann_number, 0);
+        vector<double> new_neighbor_scores(n*ann_number, 0.0);   
+        find_ann_candidates(data, n, d, ann_number, new_neighbors, new_neighbor_scores);
+        choose_best_neighbors(neighbors, neighbor_scores, new_neighbors, new_neighbor_scores, ann_number);
+        cout << "iter " << iter << " done" << endl;       
+        }
+
+}
+
+
+//----------------------------------------------------------------------------
+//--------MAIN----------------------------------------------------------------
+//----------------------------------------------------------------------------
+
 int main(int argc, char *argv[]) {
   string filename("smalltest.dat");
   int d = 2;
@@ -707,8 +1026,8 @@ int main(int argc, char *argv[]) {
   hss_opts.set_verbose(true);
   hss_opts.set_from_command_line(argc, argv);
 
-  cout << "# Reading data..." << endl;
-  timer.start();
+  //cout << "# Reading data..." << endl;
+ // timer.start();
 
   string data_train_dat_FILE = filename + "_train.csv";
   string data_train_lab_FILE = filename + "_train_label.csv";
@@ -721,60 +1040,8 @@ int main(int argc, char *argv[]) {
   vector<double> data_test        = write_from_file(data_test_dat_FILE);
   vector<double> data_test_label  = write_from_file(data_test_lab_FILE);
 
-  // // // Save csv file to binary file
-  // save_to_binary_file(data_train_dat_FILE, count_lines(data_train_dat_FILE), d); //data
-  // save_to_binary_file(data_train_lab_FILE, count_lines(data_train_lab_FILE), 1); //labels
-  // save_to_binary_file(data_test_dat_FILE, count_lines(data_test_dat_FILE), d); //data
-  // save_to_binary_file(data_test_lab_FILE, count_lines(data_test_lab_FILE), 1); //labels
-
-  // Size of training and testing datasets
-  // size_t ntrain = count_lines(data_train_lab_FILE);
-  // size_t ntest  = count_lines(data_test_lab_FILE);
-  // cout << "ntrain = " << ntrain << endl;
-  // cout << "ntest = " << ntest << endl;
-
-  // vector<double> data_train(ntrain*d);
-  // vector<double> data_train_label(ntrain*1);
-  // vector<double> data_test(ntest*d);
-  // vector<double> data_test_label(ntest*1);
-
-  // // Read from binary file
-  // read_vector_from_binary_file(data_train,        ntrain*d, data_train_dat_FILE+".bin");
-  // read_vector_from_binary_file(data_train_label,  ntrain*1, data_train_lab_FILE+".bin");
-  // read_vector_from_binary_file(data_test,         ntest*d,  data_test_dat_FILE+".bin");
-  // read_vector_from_binary_file(data_test_label,   ntest*1,  data_test_lab_FILE+".bin");
-
-  cout << "# Reading took " << timer.elapsed() << endl;
-
-  // New normalization
-  // size_t training   = 10000;
-  // size_t testing    = 1000;
-  // size_t validation = 0; 
-
-  // vector<double> data_train; 
-  // vector<double> data_train_label;
   
-  // vector<double> data_test;
-  // vector<double> data_test_label;
-  
-  // vector<double> data_valid;
-  // vector<double> data_valid_label;
-
-  // string filename_DATA   = "/Users/gichavez/Desktop/susy10k/susy_10Kn_train.csv";
-  // string filename_LABELS = "/Users/gichavez/Desktop/susy10k/susy_10Kn_train_label.csv";
-
-  // data_read_normalize_from_file(filename_DATA, d, training, validation, testing, data_train, data_valid, data_test);
-  // labels_read_from_file(filename_LABELS, d, training, validation, testing, data_train_label, data_valid_label, data_test_label);
-
-  // cout << "# data_train.size() = " << data_train.size()/d << endl;
-  // cout << "# data_valid.size() = " << data_valid.size()/d << endl;
-  // cout << "# data_test.size() = " << data_test.size()/d << endl;
-
-  // cout << "# data_train_label.size() = " << data_train_label.size() << endl;
-  // cout << "# data_valid_label.size() = " << data_valid_label.size() << endl;
-  // cout << "# data_test_label.size() = " << data_test_label.size() << endl;
-  // exit(0);
-  // New normalization
+  //cout << "# Reading took " << timer.elapsed() << endl;
 
   int n = data_train.size() / d;
   int m = data_test.size() / d;
@@ -783,6 +1050,7 @@ int main(int argc, char *argv[]) {
   HSSPartitionTree cluster_tree;
   cluster_tree.size = n;
   int cluster_size = hss_opts.leaf_size();
+
 
   if (reorder == "2means") {
     recursive_2_means(data_train.data(), n, d, cluster_size, cluster_tree,
@@ -804,15 +1072,50 @@ int main(int argc, char *argv[]) {
     K = HSSMatrix<double>(n, n, hss_opts);
   }
 
+
+// FIND ANN ------------------------------------------------
+  int ann_number = 64;
+  vector<int> neighbors(n*ann_number, 0);
+  vector<double> neighbor_scores(n*ann_number, 0.0);
+
+  int num_iters = 5;
+  auto start_ann = chrono::system_clock::now();
+  find_approximate_neighbors(data_train, n, d, num_iters, ann_number, neighbors, neighbor_scores);
+                               // gaussian_samples);
+  auto end_ann = chrono::system_clock::now();
+  chrono::duration<double> elapsed_seconds_ann = end_ann-start_ann;
+  cout << "elapsed time for approximate neighbor search: " << elapsed_seconds_ann.count() << " sec" << endl;
+  
+
+  vector<double> neighbors_d;
+  for (int i = 0; i < ann_number*n; i++)
+  {
+    neighbors_d.push_back((double)neighbors[i]);
+  }
+  DenseMatrixWrapper<double> ann(ann_number, n, &neighbors_d[0], ann_number);
+  DenseMatrixWrapper<double> scores(ann_number, n, &neighbor_scores[0], ann_number);
   timer.start();
-  //  K.compress(Kdense, hss_opts);
+
+  for (int i = 0; i < ann_number; i++)
+  {
+     cout << ann(i, 0) << ' ';
+    }
+    cout << endl;
+
+    for (int i = 0; i < ann_number; i++)
+    {
+      cout << scores(i, 0) << ' ';
+    }
+    cout << endl;
+
   Kernel kernel_matrix(data_train, d, h, lambda);
+  //cout << "# rank(K) = " << kernel_matrix.normF() << endl;
+
+  // ---CHOOSE SEARCH OPTION ANN/STANDARD--------------
+   //K.compress_ann(ann, scores, kernel_matrix, hss_opts);
+   K.compress(kernel_matrix, kernel_matrix, hss_opts);
 
 
-  // TODO get from ANN search
-  DenseMatrix<double> ann, scores;
-  K.compress_ann(ann, scores, kernel_matrix, hss_opts);
-  //K.compress(kernel_matrix, kernel_matrix, hss_opts);
 
 
   cout << "# compression time = " << timer.elapsed() << endl;
@@ -829,6 +1132,39 @@ int main(int argc, char *argv[]) {
   cout << "# rank(K) = " << K.rank() << endl;
   cout << "# memory(K) = " << K.memory() / 1e6 << " MB " << endl;
 
+  
+
+  DenseMatrix<double> Kdense(n, n);
+  if (kernel == 1) {
+    for (int c=0; c<n; c++)
+      for (int r=0; r<n; r++) 
+      {
+        Kdense(r, c) = Gauss_kernel(&data_train[r*d], &data_train[c*d], d, h);
+        if (r == c)
+        {
+          Kdense(r, c) = Kdense(r, c) + lambda;
+        }
+      }
+  } else {
+    for (int c=0; c<n; c++)
+      for (int r=0; r<n; r++) 
+      {
+        Kdense(r, c) = Laplace_kernel(&data_train[r*d], &data_train[c*d], d, h);
+        if (r == c)
+        {
+          Kdense(r, c) = Kdense(r, c) + lambda;
+        }
+      }
+  }
+
+ cout << 100. * K.memory() /  Kdense.memory() << "% of dense" << endl;
+  //K.print_info();
+  auto Ktest = K.dense();
+  Ktest.scaled_add(-1., Kdense);
+  cout << "compression tolerance" << max(hss_opts.rel_tol(), hss_opts.abs_tol()) <<endl;
+  cout << "# compression error = ||Kdense-K*I||_F/||Kdense||_F = "
+        << Ktest.normF() / Kdense.normF() << endl;
+  
   cout << "factorization start" << endl;
   timer.start();
   auto ULV = K.factor();
@@ -845,11 +1181,46 @@ int main(int argc, char *argv[]) {
   total_time += timer.elapsed();
   cout << "# total time: " << total_time << endl;
 
-  auto Bcheck = K.apply(weights);
+  //------generate random vector----
+  vector<double> sample_vector(n);
+  normal_distribution<double> normal_distr(0.0,1.0);
+  for (int i = 0; i < n; i++) 
+  {
+    sample_vector[i] = normal_distr(generator);
+  }
+  double sample_norm = norm(&sample_vector[0], n);
+  for (int i = 0; i < n; i++) 
+  {
+    sample_vector[i] /= sample_norm;
+  }
+  
+  DenseMatrixWrapper<double> sample_v(n, 1, &sample_vector[0], n);
 
-  Bcheck.scaled_add(-1., B);
-  cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
-       << Bcheck.normF() / B.normF() << endl;
+  // for (int i = 0; i < d; i++) 
+  // {
+  // cout << sample_v(i, 0) << endl;
+  // }
+
+  DenseMatrix<double> sample_rhs(n, 1);
+  gemm(Trans::N, Trans::N, 1., Kdense, sample_v, 0., sample_rhs);
+  
+  K.solve(ULV, sample_rhs);
+
+ // auto Bcheck = K.apply(weights);
+  sample_v.scaled_add(-1., sample_rhs);
+
+  //cout << "weights_F =  "
+  //    << weights.normF() << endl;
+  
+  //cout << "# relative error = ||B-H*(H\\B)||_F = "
+  //    << Bcheck.normF() << endl;
+
+  // for (int i = 0; i < d; i++) 
+  // {
+  //   cout << sample_v(i, 0) << endl;
+  // }
+  cout << "solution error = "
+        << sample_v.normF() << endl;
 
   cout << "# Starting prediction step " << endl;
   timer.start();
@@ -876,13 +1247,13 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < m; ++i) {
     prediction[i] = ((prediction[i] > 0) ? 1. : -1.);
   }
-
   // compute accuracy score of prediction
   double incorrect_quant = 0;
   for (int i = 0; i < m; ++i) {
     double a = (prediction[i] - data_test_label[i]) / 2;
     incorrect_quant += (a > 0 ? a : -a);
   }
+
 
   cout << "# Prediction took " << timer.elapsed() << endl;
   cout << "# prediction score: " << ((m - incorrect_quant) / m) * 100 << "%"

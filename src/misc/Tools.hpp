@@ -77,6 +77,30 @@ namespace strumpack {
     return ss.str();
   }
 
+//--------------SORT PAIRS---------------------------
+
+  template <typename T>
+  std::vector<std::size_t> find_sort_permutation(const std::vector<T>& vec)
+  {
+     std::vector<std::size_t> order(vec.size());
+     std::iota(order.begin(), order.end(), 0);
+     std::sort(order.begin(), order.end(),
+        [&](std::size_t i, std::size_t j){ return vec[i] < vec[j]; });
+     return order;
+  }
+
+  template <typename T>
+  std::vector<T> apply_permutation(
+    const std::vector<T>& vec,
+    const std::vector<std::size_t>& p)
+  {
+    std::vector<T> sorted_vec(vec.size());
+    std::transform(p.begin(), p.end(), sorted_vec.begin(),
+        [&](std::size_t i){ return vec[i]; });
+    return sorted_vec;
+  }
+
+
 } // end namespace strumpack
 
 #endif // TOOLS_H
