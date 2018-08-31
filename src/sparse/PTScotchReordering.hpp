@@ -37,18 +37,18 @@
 namespace strumpack {
 
   template<typename integer_t> inline int WRAPPER_SCOTCH_dgraphOrderPerm
-  (integer_t n, SCOTCH_Dgraph* graph,
-   SCOTCH_Dordering* ordeptr, integer_t* order) {
-    SCOTCH_Num* permloctab = new SCOTCH_Num[n];
-    int ierr = SCOTCH_dgraphOrderPerm(graph, ordeptr, permloctab);
+  (SCOTCH_Dgraph* graph, SCOTCH_Dordering* ordeptr,
+   std::vector<integer_t>& order) {
+    std::vector<SCOTCH_Num> permloctab(order.size());
+    int ierr = SCOTCH_dgraphOrderPerm(graph, ordeptr, permloctab.data());
     if (ierr) return ierr;
-    std::copy(permloctab, permloctab+n, order);
+    order.assign(permloctab.begin(), permloctab.end());
     return 0;
   }
   template<> inline int WRAPPER_SCOTCH_dgraphOrderPerm
-  (SCOTCH_Num n, SCOTCH_Dgraph* graph,
-   SCOTCH_Dordering* ordeptr, SCOTCH_Num* order) {
-    return SCOTCH_dgraphOrderPerm(graph, ordeptr, order);
+  (SCOTCH_Dgraph* graph, SCOTCH_Dordering* ordeptr,
+   std::vector<SCOTCH_Num>& order) {
+    return SCOTCH_dgraphOrderPerm(graph, ordeptr, order.data());
   }
 
   inline std::string get_ptscotch_strategy_string(int stratpar) {
@@ -163,18 +163,18 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   std::unique_ptr<SeparatorTree<integer_t>> ptscotch_nested_dissection
-  (CSRMatrixMPI<scalar_t,integer_t>* A, MPI_Comm comm, bool build_tree,
-   integer_t* perm, const SPOptions<scalar_t>& opts) {
-    auto local_rows = A->local_rows();
-    auto ptr = A->ptr();
-    auto ind = A->ind();
-    auto ptr_nodiag = new SCOTCH_Num[local_rows+1 + ptr[local_rows]];
-    auto ind_nodiag = ptr_nodiag + local_rows+1;
+  (const CSRMatrixMPI<scalar_t,integer_t>& A, MPI_Comm comm, bool build_tree,
+   std::vector<integer_t>& perm, const SPOptions<scalar_t>& opts) {
+    auto local_rows = A.local_rows();
+    auto ptr = A.ptr();
+    auto ind = A.ind();
+    std::vector<SCOTCH_Num> ptr_nodiag(local_rows+1),
+      ind_nodiag(ptr[local_rows]);
     integer_t nnz_nodiag = 0;
     ptr_nodiag[0] = 0;
     for (integer_t i=0; i<local_rows; i++) { // remove diagonal elements
       for (integer_t j=ptr[i]; j<ptr[i+1]; j++)
-        if (ind[j]!=i+A->begin_row()) ind_nodiag[nnz_nodiag++] = ind[j];
+        if (ind[j]!=i+A.begin_row()) ind_nodiag[nnz_nodiag++] = ind[j];
       ptr_nodiag[i+1] = nnz_nodiag;
     } // ptr_nodiag will now point locally, ind_nodiag still has
       // global column/row indices
@@ -185,8 +185,9 @@ namespace strumpack {
       std::cerr << "# ERROR: PTScotch failed to initialize the graph."
                 << std::endl;
     ierr = SCOTCH_dgraphBuild
-      (&graph, 0, local_rows, local_rows, ptr_nodiag, ptr_nodiag+1,
-       NULL, NULL, nnz_nodiag, nnz_nodiag, ind_nodiag, NULL, NULL);
+      (&graph, 0, local_rows, local_rows, ptr_nodiag.data(),
+       &ptr_nodiag[1], NULL, NULL, nnz_nodiag, nnz_nodiag,
+       ind_nodiag.data(), NULL, NULL);
     if (ierr)
       std::cerr << "# ERROR: PTScotch failed to build the graph."
                 << std::endl;
@@ -210,25 +211,26 @@ namespace strumpack {
     if (ierr)
       std::cerr << "# ERROR: PTScotch failed to compute the reordering."
                 << std::endl;
-    auto local_order = new integer_t[local_rows];
+    std::vector<integer_t> local_order(local_rows);
     ierr = WRAPPER_SCOTCH_dgraphOrderPerm
-      (local_rows, &graph, &ordeptr, local_order);
+      (&graph, &ordeptr, local_order);
     if (ierr)
       std::cerr << "# ERROR: PTScotch failed to retrieve the reordering."
                 << std::endl;
 
     auto P = mpi_nprocs(comm);
-    auto rcnts = new int[2*P];
-    auto displs = rcnts + P;
-    for (int p=0; p<P; p++) {
-      rcnts[p] = A->dist(p+1) - A->dist(p);
-      // need to copy because displs needs to be 'int'
-      displs[p] = A->dist(p);
+    {
+      std::unique_ptr<int[]> rcnts(new int[2*P]);
+      auto displs = rcnts.get() + P;
+      for (int p=0; p<P; p++) {
+        rcnts[p] = A.dist(p+1) - A.dist(p);
+        // need to copy because displs needs to be 'int'
+        displs[p] = A.dist(p);
+      }
+      MPI_Allgatherv
+        (local_order.data(), local_rows, mpi_type<integer_t>(),
+         perm.data(), rcnts.get(), displs, mpi_type<integer_t>(), comm);
     }
-    MPI_Allgatherv(local_order, local_rows, mpi_type<integer_t>(),
-                   perm, rcnts, displs, mpi_type<integer_t>(), comm);
-    delete[] rcnts;
-    delete[] local_order;
 
     std::unique_ptr<SeparatorTree<integer_t>> sep_tree;
     if (build_tree) {
@@ -252,7 +254,6 @@ namespace strumpack {
     SCOTCH_dgraphOrderExit(&graph, &ordeptr);
     SCOTCH_dgraphExit(&graph);
     SCOTCH_stratExit(&strategy);
-    delete[] ptr_nodiag;
     return sep_tree;
   }
 

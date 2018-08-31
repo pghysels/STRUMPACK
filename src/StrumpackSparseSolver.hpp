@@ -25,8 +25,8 @@
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
  */
-/*! \file StrumpackSparseSolver.hpp
- *
+/**
+ * \file StrumpackSparseSolver.hpp
  * \brief Contains the definition of the sequential/multithreaded
  * sparse solver class.
  */
@@ -64,17 +64,30 @@ void operator delete(void* ptr) throw() {
 }
 #endif
 
-/*! All of STRUMPACK-sparse is contained in the strumpack namespace. */
+/**
+ * All of STRUMPACK is contained in the strumpack namespace.
+ */
 namespace strumpack {
 
-  /*! \brief StrumpackSparseSolver<scalar_t,integer_t> is the
-   *         main sequential or multithreaded sparse solver class.
+  /**
+   * \class StrumpackSparseSolver
    *
-   * The StrumpackSparseSolver<scalar_t,integer_t> class depends on 3
-   * template paramaters. Scalar_t can be: float, double,
-   * std::complex<float>, std::complex<double>. The integer_t type
-   * defaults to a regular int. If regular int causes 32 bit integer
-   * overflows, you should switch to integer_t=int64_t instead.
+   * \brief StrumpackSparseSolver is the main sequential or
+   * multithreaded sparse solver class.
+   *
+   * This is the main interface to STRUMPACK's sparse solver. Use this
+   * for a sequential or multithreaded sparse solver. For the fully
+   * distributed solver, see StrumpackSparseSolverMPIDist.
+   *
+   * \tparam scalar_t can be: float, double, std::complex<float> or
+   * std::complex<double>.
+   *
+   * \tparam integer_t defaults to a regular int. If regular int
+   * causes 32 bit integer overflows, you should switch to
+   * integer_t=int64_t instead. This should be a __signed__ integer
+   * type.
+   *
+   * \see StrumpackSparseSolverMPIDist, StrumpackSparseSolverMPI
    */
   template<typename scalar_t,typename integer_t=int>
   class StrumpackSparseSolver {
@@ -85,25 +98,38 @@ namespace strumpack {
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
 
   public:
-    /*! \brief Constructor of the StrumpackSparseSolver class,
-     *         taking command line arguments.
+
+    /**
+     * Constructor of the StrumpackSparseSolver class, taking command
+     * line arguments.
      *
-     * \param argc    The number of arguments, i.e,
-     *                number of elements in the argv array.
-     * \param argv    Command line arguments. Add -h or --help to
-     *                have a description printed.
-     * \param verb    Flag to enable output.
-     * \param root    Flag to denote whether this process is the root MPI
-     *                process. Only the root will print certain messages.
+     * \param argc number of arguments, i.e, number of elements in
+     * the argv array
+     * \param argv command line arguments. Add -h or --help to have a
+     * description printed
+     * \param verbose flag to enable/disable output to cout
+     * \param root flag to denote whether this process is the root MPI
+     * process, only the root will print certain messages to cout
      */
     StrumpackSparseSolver
     (int argc, char* argv[], bool verbose=true, bool root=true);
 
+    /**
+     * Constructor of the StrumpackSparseSolver class.
+     *
+     * \param verbose flag to enable/disable output to cout
+     * \param root flag to denote whether this process is the root MPI
+     * process. Only the root will print certain messages
+     */
     StrumpackSparseSolver(bool verbose=true, bool root=true);
-    /*! \brief Destructor of the StrumpackSparseSolver class. */
+
+    /**
+     * (Virtual) destructor of the StrumpackSparseSolver class.
+     */
     virtual ~StrumpackSparseSolver();
 
-    /*! \brief Associate a (sequential) CSRMatrix with this solver.
+    /**
+     * Associate a (sequential) CSRMatrix with this solver.
      *
      * This matrix will not be modified. An internal copy will be
      * made, so it is safe to delete the data immediately after
@@ -113,11 +139,13 @@ namespace strumpack {
      * communicator associated with the solver. This method is thus
      * collective on the MPI communicator associated with the solver.
      *
-     * \param A  A CSRMatrix<scalar_t,integer_t> object.
+     * \param A A CSRMatrix<scalar_t,integer_t> object, will
+     * internally be duplicated
      */
     virtual void set_matrix(const CSRMatrix<scalar_t,integer_t>& A);
-    /*! \brief Associate a (sequential) NxN CSR matrix with this
-     *         solver.
+
+    /**
+     * Associate a (sequential) NxN CSR matrix with this solver.
      *
      * This matrix will not be modified. An internal copy will be
      * made, so it is safe to delete the data immediately after
@@ -126,112 +154,195 @@ namespace strumpack {
      * immediately be distributed over all the processes in the
      * communicator associated with the solver. This method is thus
      * collective on the MPI communicator associated with the solver.
+     * See the manual for a description of the CSR format. You can
+     * also use the CSRMatrix class.
      *
-     * \param N           The number of rows and columns of the CSR
-     *                    input matrix.
-     * \param row_ptr     Indices in col_ind and values for the start
-     *                    of each row. Nonzeros for row r are in
-     *                    [row_ptr[r],row_ptr[r+1]).
-     * \param col_ind     Column indices of each nonzero.
-     * \param values      Nonzero values.
-     * \param symmetric_pattern
-     *                    Denotes whether the sparsity pattern of the input
-     *                    matrix is symmetric.
+     * \param N number of rows and columns of the CSR input matrix.
+     * \param row_ptr indices in col_ind and values for the start of
+     * each row. Nonzeros for row r are in [row_ptr[r],row_ptr[r+1])
+     * \param col_ind column indices of each nonzero
+     * \param values nonzero values
+     * \param symmetric_pattern denotes whether the sparsity
+     * __pattern__ of the input matrix is symmetric, does not require
+     * the matrix __values__ to be symmetric
      */
     virtual void set_csr_matrix
     (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
      const scalar_t* values, bool symmetric_pattern=false);
-    /*! \brief Compute matrix reorderings for numerical stability and
-     *         to reduce fill-in.
+
+    /**
+     * Compute matrix reorderings for numerical stability and to
+     * reduce fill-in.
      *
      * Start computation of the matrix reorderings. See the relevant
-     * options to control the matrix reordering. A first reordering is
-     * the MC64 column permutation for numerical stability. This can
-     * be disabled if the matrix has large nonzero diagonal
-     * entries. MC64 optionally also performs row and column
+     * options to control the matrix reordering in the manual. A first
+     * reordering is the MC64 column permutation for numerical
+     * stability. This can be disabled if the matrix has large nonzero
+     * diagonal entries. MC64 optionally also performs row and column
      * scaling. Next, a fill-reducing reordering is computed. This is
      * done with the nested dissection algortihms of either
      * (PT-)Scotch, (Par)Metis or a simple geometric nested dissection
      * code which only works on regular meshes.
      *
-     * \param nx  This (optional) parameter is only meaningful when the
-     *            matrix corresponds to a stencil on a regular mesh.
-     *            The stencil is assumed to be at most 3 points wide in each
-     *            dimension and only contain a single degree of freedom per
-     *            grid point. The nx parameter denotes the number of grid
-     *            points in the first spatial dimension.
-     * \param ny  See parameters nx. Parameter ny denotes the number of
-     *            gridpoints in the second spatial dimension.
-     *            This should only be set if the mesh is 2 or 3 dimensional.
-     * \param nz  See parameters nx. Parameter nz denotes the number of
-     *            gridpoints in the third spatial dimension.
-     *            This should only be set if the mesh is 3 dimensional.
-     * \return    Error code.
-     * \sa        set_mc64job, set_matrix_reordering_method,
-     *            set_nested_dissection_parameter,
-     *            set_scotch_strategy
+     * \param nx this (optional) parameter is only meaningful when the
+     * matrix corresponds to a stencil on a regular mesh. The stencil
+     * is assumed to be at most 3 points wide in each dimension and
+     * only contain a single degree of freedom per grid point. The nx
+     * parameter denotes the number of grid points in the first
+     * spatial dimension.
+     * \param ny see parameters nx. Parameter ny denotes the number of
+     * gridpoints in the second spatial dimension.
+     * This should only be set if the mesh is 2 or 3 dimensional.
+     * \param nz See parameters nx. Parameter nz denotes the number of
+     * gridpoints in the third spatial dimension.
+     * This should only be set if the mesh is 3 dimensional.
+     * \return error code
+     * \see SPOptions
      */
     virtual ReturnCode reorder
     (int nx=1, int ny=1, int nz=1, int components=1, int width=1);
-    /*! \brief Perform numerical factorization of the sparse input matrix.
+
+    /**
+     * Perform numerical factorization of the sparse input matrix.
      *
-     * This is the computationally expensive part of the code.
-     * \return    Error code.
+     * This is the computationally expensive part of the
+     * code. However, once the factorization is performed, it can be
+     * reused for multiple solves. This requires that a valid matrix
+     * has been assigned to this solver. internally this check whether
+     * the matrix has been reordered (with a call to reorder), and if
+     * not, it will call reorder.
+     *
+     * \return error code
+     * \see set_matrix, set_csr_matrix
      */
     ReturnCode factor();
-    /*! \brief  Solve a linear system with a single right-hand side.
+
+    /**
+     * Solve a linear system with a single right-hand side.
      *
-     * \param b  Input, will not be modified. Pointer to the right-hand side.
-     *           Array should be lenght N, the dimension of the input matrix
-     *           for StrumpackSparseSolver and StrumpackSparseSolverMPI. For
-     *           StrumpackSparseSolverMPIDist, the length of b should be
-     *           correspond the partitioning of the block-row distributed
-     *           input matrix.
-     * \param x  Output. Pointer to the solution vector.
-     *           Array should be lenght N, the dimension of the input matrix
-     *           for StrumpackSparseSolver and StrumpackSparseSolverMPI. For
-     *           StrumpackSparseSolverMPIDist, the length of b should be
-     *           correspond the partitioning of the block-row distributed
-     *           input matrix.
-     * \param use_initial_guess
-     *           Set to true if x contains an intial guess to the solution.
-     *           This is mainly useful when using an iterative solver.
-     *           If set to false, x should not be set
-     *           (but should be allocated).
-     * \return Error code.
+     * \param b input, will not be modified. Pointer to the right-hand
+     * side. Array should be lenght N, the dimension of the input
+     * matrix for StrumpackSparseSolver and
+     * StrumpackSparseSolverMPI. For StrumpackSparseSolverMPIDist, the
+     * length of b should be correspond the partitioning of the
+     * block-row distributed input matrix.
+     * \param x Output, pointer to the solution vector.  Array should
+     * be lenght N, the dimension of the input matrix for
+     * StrumpackSparseSolver and StrumpackSparseSolverMPI. For
+     * StrumpackSparseSolverMPIDist, the length of b should be
+     * correspond the partitioning of the block-row distributed input
+     * matrix.
+     * \param use_initial_guess set to true if x contains an intial
+     * guess to the solution. This is mainly useful when using an
+     * iterative solver. If set to false, x should not be set (but
+     * should be allocated).
+     * \return error code
      */
     virtual ReturnCode solve
     (const scalar_t* b, scalar_t* x, bool use_initial_guess=false);
 
+    /**
+     * Solve a linear system with a single or multiple right-hand
+     * sides.
+     *
+     * \param b input, will not be modified. DenseMatrix containgin
+     * the right-hand side vector/matrix. Should have N rows, with N
+     * the dimension of the input matrix for StrumpackSparseSolver and
+     * StrumpackSparseSolverMPI. For StrumpackSparseSolverMPIDist, the
+     * number or rows of b should be correspond to the partitioning of
+     * the block-row distributed input matrix.
+     * \param x Output, pointer to the solution vector.  Array should
+     * be lenght N, the dimension of the input matrix for
+     * StrumpackSparseSolver and StrumpackSparseSolverMPI. For
+     * StrumpackSparseSolverMPIDist, the length of b should be
+     * correspond the partitioning of the block-row distributed input
+     * matrix.
+     * \param use_initial_guess set to true if x contains an intial
+     * guess to the solution.  This is mainly useful when using an
+     * iterative solver.  If set to false, x should not be set (but
+     * should be allocated).
+     * \return error code
+     * \see DenseMatrix, solve()
+     */
     virtual ReturnCode solve
     (const DenseM_t& b, DenseM_t& x, bool use_initial_guess=false);
 
+    /**
+     * Return the object holding the options for this sparse solver.
+     */
     SPOptions<scalar_t>& options() { return opts_; }
+
+    /**
+     * Return the object holding the options for this sparse solver.
+     */
     const SPOptions<scalar_t>& options() const { return opts_; }
+
+    /**
+     * Parse the command line options passed in the constructor, and
+     * modify the options object accordingly. Run with option -h or
+     * --help to see a list of supported options. Or check the
+     * SPOptions documentation.
+     */
     void set_from_options() { opts_.set_from_command_line(); }
+
+    /**
+     * Parse the command line options, and modify the options object
+     * accordingly. Run with option -h or --help to see a list of
+     * supported options. Or check the SPOptions documentation.
+     *
+     * \param argc number of options in argv
+     * \param argv list of options
+     */
     void set_from_options(int argc, char* argv[])
     { opts_.set_from_command_line(argc, argv); }
 
-    /*! \brief Get the maximum rank encountered in any of the HSS
-     * matrices.  Call this AFTER numerical factorization. */
+    /**
+     * Return the maximum rank encountered in any of the HSS matrices
+     * used to compress the sparse triangular factors. This should be
+     * called after the factorization phase. For the
+     * StrumpackSparseSolverMPI and StrumpackSparseSolverMPIDist
+     * distributed memory solvers, this routine is collective on the
+     * MPI communicator.
+     */
     int maximum_rank() const { return tree()->maximum_rank(); }
-    /*! \brief Get the number of nonzeros in the (sparse)
-        factors. This is the fill-in.  * Call this AFTER numerical
-        factorization. */
-    std::size_t factor_nonzeros() const
-    { return tree()->factor_nonzeros(); }
-    /*! \brief Get the number of nonzeros in the (sparse)
-     * factors. This is the fill-in.  Call this AFTER numerical
-     * factorization. */
+
+    /**
+     * Return the number of nonzeros in the (sparse) factors. This is
+     * known as the fill-in. This should be called after computing the
+     * numerical factorization. For the StrumpackSparseSolverMPI and
+     * StrumpackSparseSolverMPIDist distributed memory solvers, this
+     * routine is collective on the MPI communicator.
+     */
+    std::size_t factor_nonzeros() const { return tree()->factor_nonzeros(); }
+
+    /**
+     * Return the amount of memory taken by the sparse factorization
+     * factors. This is the fill-in. It is simply computed as
+     * factor_nonzeros() * sizeof(scalar_t), so it does not include
+     * any overhead from the metadata for the datastructures. This
+     * should be called after the factorization. For the
+     * StrumpackSparseSolverMPI and StrumpackSparseSolverMPIDist
+     * distributed memory solvers, this routine is collective on the
+     * MPI communicator.
+     */
     std::size_t factor_memory() const
     { return tree()->factor_nonzeros() * sizeof(scalar_t); }
-    /*! \brief Get the number of iterations performed by the outer
-        (Krylov) iterative solver. */
+
+    /**
+     * Return the number of iterations performed by the outer (Krylov)
+     * iterative solver. Call this after calling the solve routine.
+     */
     int Krylov_iterations() const { return Krylov_its_; }
 
-    void draw(const std::string& name) const {
-      tree()->draw(*matrix(), name);
-    }
+    /**
+     * Create a gnuplot script to draw/plot the sparse factors. Only
+     * do this for small matrices! It is very slow!
+     *
+     * \param name filename of the generated gnuplot script. Running
+     * \verbatim gnuplot plotname.gnuplot \endverbatim will generate a
+     * pdf file.
+     */
+    void draw(const std::string& name) const { tree()->draw(*matrix(), name); }
 
   protected:
     virtual void setup_tree();
@@ -240,12 +351,12 @@ namespace strumpack {
     (int nx, int ny, int nz, int components, int width);
     virtual void compute_separator_reordering();
 
-    virtual SpMat_t* matrix() { return _mat.get(); }
-    virtual const SpMat_t* matrix() const { return _mat.get(); }
-    virtual Reord_t* reordering() { return _nd.get(); }
-    virtual const Reord_t* reordering() const { return _nd.get(); }
-    virtual Tree_t* tree() { return _tree.get(); }
-    virtual const Tree_t* tree() const { return _tree.get(); }
+    virtual SpMat_t* matrix() { return mat_.get(); }
+    virtual Reord_t* reordering() { return nd_.get(); }
+    virtual Tree_t* tree() { return tree_.get(); }
+    virtual const SpMat_t* matrix() const { return mat_.get(); }
+    virtual const Reord_t* reordering() const { return nd_.get(); }
+    virtual const Tree_t* tree() const { return tree_.get(); }
 
     void papi_initialize();
     inline long long dense_factor_nonzeros() const {
@@ -287,9 +398,9 @@ namespace strumpack {
     long long int b0_ = 0, btot_ = 0, bmin_ = 0, bmax_ = 0;
 #endif
   private:
-    std::unique_ptr<CSRMatrix<scalar_t,integer_t>> _mat;
-    std::unique_ptr<MatrixReordering<scalar_t,integer_t>> _nd;
-    std::unique_ptr<EliminationTree<scalar_t,integer_t>> _tree;
+    std::unique_ptr<CSRMatrix<scalar_t,integer_t>> mat_;
+    std::unique_ptr<MatrixReordering<scalar_t,integer_t>> nd_;
+    std::unique_ptr<EliminationTree<scalar_t,integer_t>> tree_;
   };
 
   template<typename scalar_t,typename integer_t>
@@ -344,30 +455,27 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::setup_tree() {
-    if (_tree) _tree.reset();
-    _tree = std::unique_ptr<EliminationTree<scalar_t,integer_t>>
-      (new EliminationTree<scalar_t,integer_t>
-       (opts_, *matrix(), *(reordering()->sep_tree)));
+    tree_ = std::unique_ptr<EliminationTree<scalar_t,integer_t>>
+      (new EliminationTree<scalar_t,integer_t>(opts_, *mat_, nd_->tree()));
   }
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::setup_reordering() {
-    if (_nd) _nd.reset();
-    _nd = std::unique_ptr<MatrixReordering<scalar_t,integer_t>>
+    nd_ = std::unique_ptr<MatrixReordering<scalar_t,integer_t>>
       (new MatrixReordering<scalar_t,integer_t>(matrix()->size()));
   }
 
   template<typename scalar_t,typename integer_t> int
   StrumpackSparseSolver<scalar_t,integer_t>::compute_reordering
   (int nx, int ny, int nz, int components, int width) {
-    return _nd->nested_dissection
-      (opts_, _mat.get(), nx, ny, nz, components, width);
+    return nd_->nested_dissection
+      (opts_, *mat_, nx, ny, nz, components, width);
   }
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::compute_separator_reordering() {
-    _nd->separator_reordering
-      (opts_, _mat.get(), opts_.verbose() && is_root_);
+    nd_->separator_reordering
+      (opts_, *mat_, opts_.verbose() && is_root_);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -488,8 +596,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::set_matrix
   (const CSRMatrix<scalar_t,integer_t>& A) {
-    if (_mat) _mat.reset();
-    _mat = std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
+    mat_ = std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
       (new CSRMatrix<scalar_t,integer_t>(A));
     factored_ = reordered_ = false;
   }
@@ -498,8 +605,7 @@ namespace strumpack {
   StrumpackSparseSolver<scalar_t,integer_t>::set_csr_matrix
   (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
    const scalar_t* values, bool symmetric_pattern) {
-    if (_mat) _mat.reset();
-    _mat = std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
+    mat_ = std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
       (new CSRMatrix<scalar_t,integer_t>
        (N, row_ptr, col_ind, values, symmetric_pattern));
     factored_ = reordered_ = false;
@@ -547,7 +653,7 @@ namespace strumpack {
                 << ierr << std::endl;
       return ReturnCode::REORDERING_ERROR;
     }
-    matrix()->permute(reordering()->iperm, reordering()->perm);
+    matrix()->permute(reordering()->iperm(), reordering()->perm());
     t3.stop();
     if (opts_.verbose() && is_root_) {
       std::cout << "#   - nd time = " << t3.elapsed() << std::endl;
@@ -795,7 +901,7 @@ namespace strumpack {
     assert(N < std::numeric_limits<int>::max());
     std::vector<int> intIP(N);
     for (integer_t i=0; i<N; i++)
-      intIP[i] = reordering()->iperm[i] + 1;
+      intIP[i] = reordering()->iperm()[i] + 1;
     std::vector<int> int_matching_cperm;
     if (opts_.matching() != MatchingJob::NONE) {
       int_matching_cperm.resize(N);

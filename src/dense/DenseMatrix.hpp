@@ -736,10 +736,12 @@ namespace strumpack {
     (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
      std::vector<std::size_t>& ind, real_t rel_tol,
      real_t abs_tol, int max_rank, int depth);
+
     void ID_column_GEQP3
     (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
      std::vector<std::size_t>& ind, real_t rel_tol,
      real_t abs_tol, int max_rank, int depth);
+
     template<typename T> friend class DistributedMatrix;
   };
 
@@ -749,7 +751,7 @@ namespace strumpack {
    * \brief Like DenseMatrix, this class represents a matrix, stored
    * in column major format, to allow direct use of BLAS/LAPACK
    * routines. However, objects of the DenseMatrixWrapper class do not
-   * allocate, own or free their data.
+   * allocate, own or free any data.
    *
    * The user has to make sure that the memory that was used to create
    * this matrix stays valid for as long as this matrix wrapper, or

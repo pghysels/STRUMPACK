@@ -65,9 +65,11 @@ namespace strumpack {
 
   public:
     EliminationTreeMPI(const MPIComm& comm);
+
     EliminationTreeMPI
     (const SPOptions<scalar_t>& opts, const SpMat_t& A,
      Reord_t& nd, const MPIComm& comm);
+
     virtual ~EliminationTreeMPI() {}
 
     void multifrontal_solve(DenseM_t& x) const override;
@@ -119,9 +121,8 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   EliminationTreeMPI<scalar_t,integer_t>::EliminationTreeMPI
-  (const MPIComm& comm)
-    : EliminationTree<scalar_t,integer_t>(),
-    comm_(comm), rank_(comm_.rank()), P_(comm_.size()) {
+  (const MPIComm& comm) : EliminationTree<scalar_t,integer_t>(),
+    comm_(comm), rank_(comm.rank()), P_(comm.size()) {
   }
 
   template<typename scalar_t,typename integer_t>
@@ -129,8 +130,8 @@ namespace strumpack {
   (const SPOptions<scalar_t>& opts, const SpMat_t& A,
    Reord_t& nd, const MPIComm& comm)
     : EliminationTree<scalar_t,integer_t>(),
-    comm_(comm), rank_(comm_.rank()), P_(comm_.size()), active_pfronts_(0) {
-    auto tree = *(nd.sep_tree);
+    comm_(comm), rank_(comm.rank()), P_(comm.size()), active_pfronts_(0) {
+    auto& tree = nd.tree();
 
     // use vector instead? problem with OpenMP??
     auto upd = new std::vector<integer_t>[tree.separators()];

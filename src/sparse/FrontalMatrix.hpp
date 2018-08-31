@@ -527,12 +527,12 @@ namespace strumpack {
 #pragma omp task default(shared) firstprivate(sorder,task_depth,rch)    \
   if(task_depth < params::task_recursion_cutoff_level)
       rch->bisection_partitioning(opts, sorder, false, task_depth+1);
+#pragma omp taskwait
 
     // default is to do nothing, see FrontalMatrixHSS for an actual
     // implementation
     for (integer_t i=sep_begin_; i<sep_end_; i++)
       sorder[i] = -i;
-#pragma omp taskwait
   }
 
   template<typename scalar_t,typename integer_t> void

@@ -166,24 +166,23 @@ namespace strumpack {
   }
 
   template<typename integer_t,typename scalar_t>
-  std::unique_ptr<SeparatorTree<integer_t>>
-  geometric_nested_dissection
-  (const CSRMatrix<scalar_t,integer_t>* A, int nx, int ny, int nz,
-   int components, int width, integer_t* perm, integer_t* iperm,
-   const SPOptions<scalar_t>& opts) {
+  std::unique_ptr<SeparatorTree<integer_t>> geometric_nested_dissection
+  (const CSRMatrix<scalar_t,integer_t>& A, int nx, int ny, int nz,
+   int components, int width, std::vector<integer_t>& perm,
+   std::vector<integer_t>& iperm, const SPOptions<scalar_t>& opts) {
     GeomOrderData<integer_t> gd;
-    gd.perm = perm;
-    gd.iperm = iperm;
+    gd.perm = perm.data();
+    gd.iperm = iperm.data();
     gd.components = components;
     gd.width = width;
     gd.stratpar = opts.nd_param();
-    if (nx*ny*nz*components != A->size()) {
+    if (nx*ny*nz*components != A.size()) {
       nx = opts.nx();
       ny = opts.nz();
       nz = opts.nz();
       gd.components = opts.components();
       gd.width = opts.separator_width();
-      if (nx*ny*nz*gd.components != A->size()) {
+      if (nx*ny*nz*gd.components != A.size()) {
         std::cerr << "# ERROR: Geometric reordering failed. \n"
           "# Geometric reordering only works on"
           " a simple 3 point wide stencil\n"
@@ -194,8 +193,8 @@ namespace strumpack {
     }
     gd.separator_reordering = opts.use_HSS() || opts.use_BLR();
     if (gd.separator_reordering) {
-      gd.min_sep = A->size();
-      gd.leaf = A->size();
+      gd.min_sep = A.size();
+      gd.leaf = A.size();
       if (opts.use_HSS()) {
         gd.min_sep = opts.HSS_min_sep_size();
         gd.leaf = opts.HSS_options().leaf_size();

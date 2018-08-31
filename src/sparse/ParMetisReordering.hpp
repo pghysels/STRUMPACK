@@ -35,72 +35,76 @@
 namespace strumpack {
 
   template<typename integer_t> inline int WRAPPER_ParMETIS_V32_NodeND
-  (const std::vector<integer_t>& dist, idx_t* xadj, idx_t* adjncy,
-   idx_t numflag, integer_t* local_order, idx_t* sizes,
-   MPI_Comm c, integer_t local_rows) {
-    auto vtxdist = new idx_t[dist.size()+1+local_rows];
-    auto loc_order = vtxdist + dist.size()+1;
-    for (size_t i=0; i<dist.size(); i++) vtxdist[i] = dist[i];
+  (const std::vector<integer_t>& dist, std::vector<idx_t>& xadj,
+   std::vector<idx_t>& adjncy, idx_t numflag,
+   std::vector<integer_t>& local_order, std::vector<idx_t>& sizes,
+   MPI_Comm c) {
+    std::vector<idx_t> vtxdist(dist.size()), loc_order(local_order.size());
+    vtxdist.assign(dist.begin(), dist.end());
     int ierr = ParMETIS_V32_NodeND
-      (vtxdist, xadj, adjncy, NULL, &numflag, NULL, NULL, NULL,
-       NULL, NULL, NULL, NULL, loc_order, sizes, &c);
-    for (integer_t i=0; i<local_rows; i++) local_order[i] = loc_order[i];
-    delete[] vtxdist;
+      (vtxdist.data(), xadj.data(), adjncy.data(), NULL,
+       &numflag, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+       loc_order.data(), sizes.data(), &c);
+    local_order.assign(loc_order.begin(), loc_order.end());
     return ierr;
   }
   template<> inline int WRAPPER_ParMETIS_V32_NodeND
-  (const std::vector<idx_t>& dist, idx_t* xadj, idx_t* adjncy, idx_t numflag,
-   idx_t* local_order, idx_t* sizes, MPI_Comm c, idx_t local_rows) {
+  (const std::vector<idx_t>& dist, std::vector<idx_t>& xadj,
+   std::vector<idx_t>& adjncy, idx_t numflag,
+   std::vector<idx_t>& local_order, std::vector<idx_t>& sizes,
+   MPI_Comm c) {
     return ParMETIS_V32_NodeND
-      (const_cast<idx_t*>(dist.data()), xadj, adjncy, NULL, &numflag,
-       NULL, NULL, NULL, NULL, NULL, NULL, NULL, local_order, sizes, &c);
+      (const_cast<idx_t*>(dist.data()), xadj.data(), adjncy.data(),
+       NULL, &numflag, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+       local_order.data(), sizes.data(), &c);
   }
 
   template<typename scalar_t,typename integer_t>
   std::unique_ptr<SeparatorTree<integer_t>>
   parmetis_nested_dissection
-  (CSRMatrixMPI<scalar_t,integer_t>* A, MPI_Comm comm,
-   bool build_tree, integer_t* perm, const SPOptions<scalar_t>& opts) {
+  (const CSRMatrixMPI<scalar_t,integer_t>& A, MPI_Comm comm,
+   bool build_tree, std::vector<integer_t>& perm,
+   const SPOptions<scalar_t>& opts) {
     auto P = mpi_nprocs(comm);
-    auto local_rows = A->local_rows();
-    auto ptr = A->ptr();
-    auto ind = A->ind();
-    auto xadj = new idx_t[local_rows+1 + A->local_nnz()];
-    auto adjncy = xadj + local_rows+1; //new idx_t[A->local_nnz()];
+    auto local_rows = A.local_rows();
+    auto ptr = A.ptr();
+    auto ind = A.ind();
+    std::vector<idx_t> xadj(local_rows+1), adjncy(A.local_nnz());
     xadj[0] = 0;
     integer_t e = 0;
     for (integer_t i=0; i<local_rows; i++) { // remove diagonal elements
       for (integer_t j=ptr[i]; j<ptr[i+1]; j++)
-        if (ind[j]!=i+A->begin_row()) adjncy[e++] = ind[j];
+        if (ind[j]!=i+A.begin_row()) adjncy[e++] = ind[j];
       xadj[i+1] = e;
     } // xadj will now point locally, adjncy still has global
       // column/row indices
     idx_t numflag = 0;
     int p2 = std::pow(2, std::floor(std::log2(P)));
-    auto local_order = new integer_t[local_rows];
-    auto sizes = new idx_t[2*p2-1];
-    int ierr = WRAPPER_ParMETIS_V32_NodeND
-      (A->dist(), xadj, adjncy, numflag,
-       local_order, sizes, comm, local_rows);
-    if (ierr != METIS_OK) {
-      if (!mpi_rank(comm))
-        std::cerr << "ParMETIS_V32_NodeND failed with ierr="
-                  << ierr << std::endl;
-      return nullptr; // TODO throw an exception
-    }
-    delete[] xadj;
+    std::vector<idx_t> sizes(2*p2-1);
 
-    auto rcnts = new int[2*P];
-    auto displs = rcnts + P;
-    for (int p=0; p<P; p++) {
-      rcnts[p] = A->dist(p+1) - A->dist(p);
-      // need to copy because displs needs to be 'int'
-      displs[p] = A->dist(p);
+    {
+      std::vector<integer_t> local_order(local_rows);
+      int ierr = WRAPPER_ParMETIS_V32_NodeND
+        (A.dist(), xadj, adjncy, numflag,
+         local_order, sizes, comm);
+      if (ierr != METIS_OK) {
+        if (!mpi_rank(comm))
+          std::cerr << "ParMETIS_V32_NodeND failed with ierr="
+                    << ierr << std::endl;
+        return nullptr; // TODO throw an exception
+      }
+
+      std::unique_ptr<int[]> rcnts(new int[2*P]);
+      auto displs = rcnts.get() + P;
+      for (int p=0; p<P; p++) {
+        rcnts[p] = A.dist(p+1) - A.dist(p);
+        // need to copy because displs needs to be 'int'
+        displs[p] = A.dist(p);
+      }
+      MPI_Allgatherv
+        (local_order.data(), local_rows, mpi_type<integer_t>(),
+         perm.data(), rcnts.get(), displs, mpi_type<integer_t>(), comm);
     }
-    MPI_Allgatherv(local_order, local_rows, mpi_type<integer_t>(),
-                   perm, rcnts, displs, mpi_type<integer_t>(), comm);
-    delete[] rcnts;
-    delete[] local_order;
 
     std::unique_ptr<SeparatorTree<integer_t>> sep_tree;
     if (build_tree) {
@@ -134,7 +138,6 @@ namespace strumpack {
       integer_t pid = 0;
       build_dist_binary_separator_tree(0, pid, nr_dist_levels);
     }
-    delete[] sizes;
     return sep_tree;
   }
 

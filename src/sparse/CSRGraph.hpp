@@ -37,48 +37,56 @@
 
 namespace strumpack {
 
+  /**
+   * TODO comment
+   */
   template<typename integer_t> class CSRGraph {
   public:
     CSRGraph();
-    CSRGraph(const CSRGraph&) = delete;
-    CSRGraph& operator=(const CSRGraph&) = delete;
-    CSRGraph(CSRGraph&&);
-    CSRGraph& operator=(CSRGraph&&);
     CSRGraph(integer_t n, integer_t nvert);
-    ~CSRGraph();
-    void print();
-    inline integer_t size() const { return _n_vert; }
-    inline integer_t nvert() const { return _n_vert; }
-    inline integer_t nedge() const { return _n_edge; }
 
-    inline const integer_t* ptr() const { return _ptr; }
-    inline const integer_t* ind() const { return _ind; }
-    inline integer_t* ptr() { return _ptr; }
-    inline integer_t* ind() { return _ind; }
-    inline const integer_t& ptr(integer_t i) const { assert(i <= nvert()); return _ptr[i]; }
-    inline const integer_t& ind(integer_t i) const { assert(i < nedge()); return _ind[i]; }
-    inline integer_t& ptr(integer_t i) { assert(i <= nvert()); return _ptr[i]; }
-    inline integer_t& ind(integer_t i) { assert(i < nedge()); return _ind[i]; }
+    void print();
+    integer_t size() const { return n_vert_; }
+    integer_t nvert() const { return n_vert_; }
+    integer_t nedge() const { return n_edge_; }
+
+    const integer_t* ptr() const { return ptr_.data(); }
+    const integer_t* ind() const { return ind_.data(); }
+    integer_t* ptr() { return ptr_.data(); }
+    integer_t* ind() { return ind_.data(); }
+    const integer_t& ptr(integer_t i) const { assert(i <= nvert()); return ptr_[i]; }
+    const integer_t& ind(integer_t i) const { assert(i < nedge()); return ind_[i]; }
+    integer_t& ptr(integer_t i) { assert(i <= nvert()); return ptr_[i]; }
+    integer_t& ind(integer_t i) { assert(i < nedge()); return ind_[i]; }
 
     void sort_rows();
+
     void permute_local
-    (integer_t* order, integer_t* iorder, integer_t clo, integer_t chi);
-    void permute_columns(integer_t* order);
+    (const std::vector<integer_t>& order,
+     const std::vector<integer_t>& iorder,
+     integer_t clo, integer_t chi);
+
+    void permute_columns(const std::vector<integer_t>& order);
+
     void permute_rows_local_cols_global
-    (integer_t* order, integer_t* iorder, integer_t clo, integer_t chi);
+    (const std::vector<integer_t>& order,
+     const std::vector<integer_t>& iorder,
+     integer_t clo, integer_t chi);
+
     void extract_separator_subgraph
     (int sep_order_level, integer_t lo,
      integer_t sep_begin, integer_t sep_end,
      integer_t part, integer_t* order,
      std::vector<integer_t>& sep_csr_ptr,
      std::vector<integer_t>& sep_csr_ind);
+
     void clear_temp_data() { _o.clear(); }
 
   private:
-    integer_t _n_vert;
-    integer_t _n_edge;
-    integer_t* _ptr = nullptr;
-    integer_t* _ind = nullptr;
+    integer_t n_vert_;
+    integer_t n_edge_;
+    std::vector<integer_t> ptr_;
+    std::vector<integer_t> ind_;
 
     /* This (unordered_)map is used to find length-2 edges that go
        outside the local graph. This avoids a quadratic search */
@@ -86,57 +94,26 @@ namespace strumpack {
   };
 
   template<typename integer_t> CSRGraph<integer_t>::CSRGraph()
-    : _n_vert(0), _n_edge(0), _ptr(nullptr), _ind(nullptr) {}
+    : n_vert_(0), n_edge_(0) {}
 
   template<typename integer_t>
   CSRGraph<integer_t>::CSRGraph(integer_t nr_vert, integer_t nr_edge)
-    : _n_vert(nr_vert), _n_edge(nr_edge) {
-    _ptr = new integer_t[nr_vert+1];
-    _ind = new integer_t[nr_edge];
-  }
-
-  template<typename integer_t>
-  CSRGraph<integer_t>::CSRGraph(CSRGraph&& rhs) {
-    _n_vert = rhs._n_vert;
-    _n_edge = rhs._n_edge;
-    _ptr = rhs._ptr;
-    _ind = rhs._ind;
-    rhs._ptr = rhs._ind = nullptr;
-  }
-
-  template<typename integer_t> CSRGraph<integer_t>&
-  CSRGraph<integer_t>::operator=(CSRGraph<integer_t> &&rhs) {
-    if (this != &rhs) {
-      _n_vert = rhs._n_vert;
-      _n_edge = rhs._n_edge;
-      rhs._n_vert = rhs._n_edge = 0;
-      delete[] _ptr;
-      delete[] _ind;
-      _ptr = rhs._ptr;
-      _ind = rhs._ind;
-      rhs._ptr = rhs._ind = nullptr;
-    }
-    return *this;
-  }
-
-  template<typename integer_t> CSRGraph<integer_t>::~CSRGraph() {
-    delete[] _ptr;
-    delete[] _ind;
+    : n_vert_(nr_vert), n_edge_(nr_edge), ptr_(nr_vert+1), ind_(nr_edge) {
   }
 
   template<typename integer_t> void
   CSRGraph<integer_t>::sort_rows() {
 #pragma omp parallel for
-    for (integer_t r=0; r<_n_vert; r++)
-      std::sort(_ind+_ptr[r], _ind+_ptr[r+1]);
+    for (integer_t r=0; r<n_vert_; r++)
+      std::sort(&ind_[ptr_[r]], &ind_[ptr_[r+1]]);
   }
 
   template<typename integer_t> void
   CSRGraph<integer_t>::print() {
-    for (integer_t i=0; i<_n_vert; i++) {
+    for (integer_t i=0; i<n_vert_; i++) {
       std::cout << "r=" << i << ", ";
-      for (integer_t j=_ptr[i]; j<_ptr[i+1]; j++)
-        std::cout << _ind[j] << " ";
+      for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
+        std::cout << ind_[j] << " ";
       std::cout << std::endl;
     }
     std::cout << std::endl;
@@ -155,22 +132,23 @@ namespace strumpack {
    */
   template<typename integer_t> void
   CSRGraph<integer_t>::permute_local
-  (integer_t* order, integer_t* iorder, integer_t clo, integer_t chi) {
-    auto new_ptr = new integer_t[_n_vert+1];
-    auto new_ind = new integer_t[_n_edge];
+  (const std::vector<integer_t>& order, const std::vector<integer_t>& iorder,
+   integer_t clo, integer_t chi) {
+    std::vector<integer_t> new_ptr(n_vert_+1);
+    std::vector<integer_t> new_ind(n_edge_);
     integer_t nnz = 0;
     new_ptr[0] = 0;
-    for (integer_t i=0; i<_n_vert; i++) {
-      auto lb = _ptr[iorder[i]];
-      auto ub = _ptr[iorder[i]+1];
+    for (integer_t i=0; i<n_vert_; i++) {
+      auto lb = ptr_[iorder[i]];
+      auto ub = ptr_[iorder[i]+1];
       for (integer_t j=lb; j<ub; j++) {
-        auto c = _ind[j];
+        auto c = ind_[j];
         new_ind[nnz++] = (c >= clo && c < chi) ? order[c-clo] : c;
       }
       new_ptr[i+1] = nnz;
     }
-    delete[] _ptr; _ptr = new_ptr;
-    delete[] _ind; _ind = new_ind;
+    std::swap(ptr_, new_ptr);
+    std::swap(ind_, new_ind);
   }
 
   /**
@@ -180,27 +158,30 @@ namespace strumpack {
    */
   template<typename integer_t> void
   CSRGraph<integer_t>::permute_rows_local_cols_global
-  (integer_t* order, integer_t* iorder, integer_t clo, integer_t chi) {
-    auto new_ptr = new integer_t[_n_vert+1];
-    auto new_ind = new integer_t[_n_edge];
+  (const std::vector<integer_t>& order,
+   const std::vector<integer_t>& iorder,
+   integer_t clo, integer_t chi) {
+    std::vector<integer_t> new_ptr(n_vert_+1);
+    std::vector<integer_t> new_ind(n_edge_);
     integer_t nnz = 0;
     new_ptr[0] = 0;
-    for (integer_t i=0; i<_n_vert; i++) {
-      auto lb = _ptr[iorder[i]];
-      auto ub = _ptr[iorder[i]+1];
+    for (integer_t i=0; i<n_vert_; i++) {
+      auto lb = ptr_[iorder[i]];
+      auto ub = ptr_[iorder[i]+1];
       for (integer_t j=lb; j<ub; j++)
-        new_ind[nnz++] = order[_ind[j]];
+        new_ind[nnz++] = order[ind_[j]];
       new_ptr[i+1] = nnz;
     }
-    delete[] _ptr; _ptr = new_ptr;
-    delete[] _ind; _ind = new_ind;
+    std::swap(ptr_, new_ptr);
+    std::swap(ind_, new_ind);
   }
 
   template<typename integer_t> void
-  CSRGraph<integer_t>::permute_columns(integer_t* order) {
-    for (integer_t i=0; i<_n_vert; i++)
-      for (integer_t j=_ptr[i]; j<_ptr[i+1]; j++)
-        _ind[j] = order[_ind[j]];
+  CSRGraph<integer_t>::permute_columns
+  (const std::vector<integer_t>& order) {
+    for (integer_t i=0; i<n_vert_; i++)
+      for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
+        ind_[j] = order[ind_[j]];
   }
 
   template<typename integer_t> void
@@ -213,10 +194,10 @@ namespace strumpack {
     // for all nodes not in this graph to which there is an outgoing
     //   edge, we keep a list of edges to/from that node
     if (_o.empty()) {
-      auto hi = lo + _n_vert;
-      for (integer_t r=0; r<_n_vert; r++)
-        for (integer_t j=_ptr[r]; j<_ptr[r+1]; j++) {
-          auto c = _ind[j];
+      auto hi = lo + n_vert_;
+      for (integer_t r=0; r<n_vert_; r++)
+        for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++) {
+          auto c = ind_[j];
           if (c < lo || c >= hi) _o[c].push_back(r);
         }
     }
@@ -225,7 +206,7 @@ namespace strumpack {
     sep_csr_ind.clear();
     auto dim_sep = sep_end - sep_begin;
     std::vector<bool> mark(dim_sep);
-    auto ind_to_part = new integer_t[dim_sep];
+    std::unique_ptr<integer_t[]> ind_to_part(new integer_t[dim_sep]);
     integer_t count = 0;
     for (integer_t r=0; r<dim_sep; r++)
       ind_to_part[r] = (order[r] == part) ? count++ : -1;
@@ -235,10 +216,10 @@ namespace strumpack {
       if (order[r-sep_begin] == part) {
         sep_csr_ptr.push_back(sep_edges);
         std::fill(mark.begin(), mark.end(), false);
-        for (integer_t j=_ptr[r]; j<_ptr[r+1]; j++) {
-          auto c = _ind[j] - lo;
+        for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++) {
+          auto c = ind_[j] - lo;
           if (c == r) continue;
-          if (c >= 0 && c < _n_vert) {
+          if (c >= 0 && c < n_vert_) {
             auto lc = c - sep_begin;
             if (lc >= 0 && lc < dim_sep && order[lc] == part && !mark[lc]) {
               mark[lc] = true;
@@ -246,8 +227,8 @@ namespace strumpack {
               sep_edges++;
             } else {
               if (sep_order_level > 0) {
-                for (integer_t k=_ptr[c]; k<_ptr[c+1]; k++) {
-                  auto cc = _ind[k] - lo;
+                for (integer_t k=ptr_[c]; k<ptr_[c+1]; k++) {
+                  auto cc = ind_[k] - lo;
                   auto lcc = cc - sep_begin;
                   if (cc != r && lcc >= 0 && lcc < dim_sep &&
                       order[lcc] == part && !mark[lcc]) {
@@ -275,7 +256,6 @@ namespace strumpack {
       }
     }
     sep_csr_ptr.push_back(sep_csr_ind.size());
-    delete[] ind_to_part;
   }
 
 } // end namespace strumpack

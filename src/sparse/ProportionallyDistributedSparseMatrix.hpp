@@ -153,11 +153,11 @@ namespace strumpack {
     std::fill(scnts, scnts+P, 0);
 #pragma omp parallel for
     for (integer_t r=0; r<Ampi.local_rows(); r++) {
-      auto r_perm = nd.perm[r+Ampi.begin_row()];
+      auto r_perm = nd.perm()[r+Ampi.begin_row()];
       auto hij = Ampi.ptr(r+1)-Ampi.ptr(0);
       for (integer_t j=Ampi.ptr(r)-Ampi.ptr(0); j<hij; j++) {
         if (std::abs(Ampi.val(j)) > eps) {
-          auto c_perm = nd.perm[Ampi.ind(j)];
+          auto c_perm = nd.perm()[Ampi.ind(j)];
           auto d = dest[j] = et.get_sparse_mapped_destination
             (Ampi, r_perm, c_perm, duplicate_fronts);
           auto hip = std::get<0>(d)+std::get<1>(d);
@@ -173,12 +173,12 @@ namespace strumpack {
     pp[0] = sbuf;
     for (int p=1; p<P; p++) pp[p] = pp[p-1] + scnts[p-1];
     for (integer_t r=0; r<Ampi.local_rows(); r++) {
-      auto r_perm = nd.perm[r+Ampi.begin_row()];
+      auto r_perm = nd.perm()[r+Ampi.begin_row()];
       auto hij = Ampi.ptr(r+1)-Ampi.ptr(0);
       for (integer_t j=Ampi.ptr(r)-Ampi.ptr(0); j<hij; j++) {
         auto a = Ampi.val(j);
         if (std::abs(a) > eps) {
-          Triplet t = {r_perm, nd.perm[Ampi.ind(j)], a};
+          Triplet t = {r_perm, nd.perm()[Ampi.ind(j)], a};
           auto d = dest[j];
           auto hip = std::get<0>(d)+std::get<1>(d);
           for (int p=std::get<0>(d); p<hip; p+=std::get<2>(d)) {

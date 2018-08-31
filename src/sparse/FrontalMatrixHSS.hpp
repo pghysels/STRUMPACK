@@ -95,7 +95,7 @@ namespace strumpack {
     int random_samples() const { return R1.cols(); };
     void bisection_partitioning
     (const SPOptions<scalar_t>& opts, integer_t* sorder,
-     bool isroot=true, int task_depth=0);
+     bool isroot=true, int task_depth=0) override;
 
     void set_HSS_partitioning
     (const SPOptions<scalar_t>& opts,

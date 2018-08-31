@@ -39,28 +39,29 @@ namespace strumpack {
   // base template, integer_t != SCOTCH_Num, so need to copy everything
   template<typename integer_t> inline int WRAPPER_SCOTCH_graphOrder
   (integer_t n, SCOTCH_Graph* graph, SCOTCH_Strat* strat,
-   integer_t* permtab, integer_t* peritab,
-   integer_t* cblkptr, SCOTCH_Num* rangtab, SCOTCH_Num* treetab) {
-    SCOTCH_Num scotch_cblkptr = *cblkptr;
-    auto scotch_permtab = new SCOTCH_Num[2*n];
-    auto scotch_peritab = scotch_permtab + n;
+   std::vector<integer_t>& permtab, std::vector<integer_t>& peritab,
+   integer_t& cblkptr, std::vector<SCOTCH_Num>& rangtab,
+   std::vector<SCOTCH_Num>& treetab) {
+    SCOTCH_Num scotch_cblkptr = cblkptr;
+    std::vector<SCOTCH_Num> scotch_permtab(n), scotch_peritab(n);
     int ierr = SCOTCH_graphOrder
-      (graph, strat, scotch_permtab, scotch_peritab,
-       &scotch_cblkptr, rangtab, treetab);
+      (graph, strat, scotch_permtab.data(), scotch_peritab.data(),
+       &scotch_cblkptr, rangtab.data(), treetab.data());
     if (ierr) return ierr;
-    std::copy(scotch_permtab, scotch_permtab+n, permtab);
-    std::copy(scotch_peritab, scotch_peritab+n, peritab);
-    delete[] scotch_permtab;
-    *cblkptr = scotch_cblkptr;
+    permtab.assign(scotch_permtab.begin(), scotch_permtab.end());
+    peritab.assign(scotch_peritab.begin(), scotch_peritab.end());
+    cblkptr = scotch_cblkptr;
     return 0;
   }
   // if integer_t == SCOTCH_Num, no need to copy
   template<> inline int WRAPPER_SCOTCH_graphOrder
   (SCOTCH_Num n, SCOTCH_Graph* graph, SCOTCH_Strat* strat,
-   SCOTCH_Num* permtab, SCOTCH_Num* peritab,
-   SCOTCH_Num* cblkptr, SCOTCH_Num* rangtab, SCOTCH_Num* treetab) {
+   std::vector<SCOTCH_Num>& permtab, std::vector<SCOTCH_Num>& peritab,
+   SCOTCH_Num& cblkptr, std::vector<SCOTCH_Num>& rangtab,
+   std::vector<SCOTCH_Num>& treetab) {
     return SCOTCH_graphOrder
-      (graph, strat, permtab, peritab, cblkptr, rangtab, treetab);
+      (graph, strat, permtab.data(), peritab.data(), &cblkptr,
+       rangtab.data(), treetab.data());
   }
 
   inline std::string get_scotch_strategy_string(int stratpar) {
@@ -101,9 +102,9 @@ namespace strumpack {
       scotch_tree.push_back(SCOTCH_Num(-1));
     }
     integer_t nbsep = scotch_tree.size();
-    std::vector<integer_t> count(nbsep, 0);
-    std::vector<integer_t> scotch_lch(nbsep, integer_t(-1));
-    std::vector<integer_t> scotch_rch(nbsep, integer_t(-1));
+    std::vector<integer_t> count(nbsep, 0),
+      scotch_lch(nbsep, integer_t(-1)),
+      scotch_rch(nbsep, integer_t(-1));
     for (integer_t i=0; i<nbsep; i++) {
       integer_t p = scotch_tree[i];
       if (p != -1) {
@@ -156,16 +157,16 @@ namespace strumpack {
   // TODO throw exception on error
   template<typename scalar_t,typename integer_t>
   std::unique_ptr<SeparatorTree<integer_t>>
-  scotch_nested_dissection(CompressedSparseMatrix<scalar_t,integer_t>* A,
-                           integer_t* perm, integer_t* iperm,
-                           const SPOptions<scalar_t>& opts) {
-    auto n = A->size();
-    auto ptr = A->ptr();
-    auto ind = A->ind();
+  scotch_nested_dissection
+  (const CompressedSparseMatrix<scalar_t,integer_t>& A,
+   std::vector<integer_t>& perm, std::vector<integer_t>& iperm,
+   const SPOptions<scalar_t>& opts) {
+    auto n = A.size();
+    auto ptr = A.ptr();
+    auto ind = A.ind();
     SCOTCH_Graph graph;
     SCOTCH_graphInit(&graph);
-    auto ptr_nodiag = new SCOTCH_Num[n+1 + ptr[n]-ptr[0]];
-    auto ind_nodiag = ptr_nodiag + n+1;
+    std::vector<SCOTCH_Num> ptr_nodiag(n+1), ind_nodiag(ptr[n]-ptr[0]);
     integer_t nnz_nodiag = 0;
     ptr_nodiag[0] = 0;
     for (integer_t i=0; i<n; i++) { // remove diagonal elements
@@ -176,8 +177,8 @@ namespace strumpack {
     if (nnz_nodiag==0)
       std::cerr << "# WARNING: matrix seems to be diagonal!" << std::endl;
     int ierr = SCOTCH_graphBuild
-      (&graph, 0, n, ptr_nodiag, NULL, NULL, NULL,
-       ptr_nodiag[n], ind_nodiag, NULL);
+      (&graph, 0, n, ptr_nodiag.data(), NULL, NULL, NULL,
+       ptr_nodiag[n], ind_nodiag.data(), NULL);
     if (ierr)
       std::cerr << "# ERROR: Scotch failed to build graph." << std::endl;
     assert(SCOTCH_graphCheck(&graph) == 0);
@@ -192,15 +193,12 @@ namespace strumpack {
     if (ierr)
       std::cerr << "# ERROR: Scotch failed to compute ordering." << std::endl;
 
-    std::vector<SCOTCH_Num> scotch_sizes(n+1);
-    std::vector<SCOTCH_Num> scotch_tree(n);
+    std::vector<SCOTCH_Num> scotch_sizes(n+1), scotch_tree(n);
     integer_t nbsep = 0;
     ierr = WRAPPER_SCOTCH_graphOrder<integer_t>
-      (n, &graph, &strategy, perm, iperm,
-       &nbsep, scotch_sizes.data(), scotch_tree.data());
+      (n, &graph, &strategy, perm, iperm, nbsep, scotch_sizes, scotch_tree);
     if (ierr)
       std::cerr << "# ERROR: Scotch failed to compute ordering." << std::endl;
-    delete[] ptr_nodiag;
 
     SCOTCH_graphExit(&graph);
     SCOTCH_stratExit(&strategy);

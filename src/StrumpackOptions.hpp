@@ -41,7 +41,10 @@
 
 namespace strumpack {
 
-  // TODO move this to MatrixReordering class
+  /**
+   * Enumeration of possible sparse fill-reducing orderings.
+   * \ingroup Enumerations
+   */
   enum class ReorderingStrategy {
     NATURAL,    /*!< Do not reorder the system                      */
     METIS,      /*!< Use Metis nested-dissection reordering         */
@@ -53,12 +56,52 @@ namespace strumpack {
                   only works for regular meshes. (see Sp::reorder)  */
   };
 
+  /**
+   * Return a string with the name of the reordering method.
+   */
+  inline std::string get_name(ReorderingStrategy method) {
+    switch (method) {
+    case ReorderingStrategy::NATURAL: return "Natural"; break;
+    case ReorderingStrategy::METIS: return "Metis"; break;
+    case ReorderingStrategy::SCOTCH: return "Scotch"; break;
+    case ReorderingStrategy::GEOMETRIC: return "Geometric"; break;
+    case ReorderingStrategy::PARMETIS: return "ParMetis"; break;
+    case ReorderingStrategy::PTSCOTCH: return "PTScotch"; break;
+    case ReorderingStrategy::RCM: return "RCM"; break;
+    }
+    return "UNKNOWN";
+  }
+
+  /**
+   * Check whether or not the reordering needs to be run in parallel.
+   */
+  inline bool is_parallel(ReorderingStrategy method) {
+    switch (method) {
+    case ReorderingStrategy::NATURAL: return false; break;
+    case ReorderingStrategy::METIS: return false; break;
+    case ReorderingStrategy::SCOTCH: return false; break;
+    case ReorderingStrategy::GEOMETRIC: return true; break;
+    case ReorderingStrategy::PARMETIS: return true; break;
+    case ReorderingStrategy::PTSCOTCH: return true; break;
+    case ReorderingStrategy::RCM: return false; break;
+    }
+    return false;
+  }
+
+  /**
+   * Enumeration of rank-structured data formats, which can be used
+   * for compression within the sparse solver.
+   * \ingroup Enumerations
+   */
   enum class CompressionType {
     NONE,   /*!< No compression, purely direct solver  */
     HSS,    /*!< HSS compression of frontal matrices   */
     BLR     /*!< Block low-rank compression of fronts  */
   };
 
+  /**
+   * Return a name/string for the CompressionType.
+   */
   inline std::string get_name(CompressionType comp) {
     switch (comp) {
     case CompressionType::NONE: return "none";
@@ -67,6 +110,12 @@ namespace strumpack {
     }
   }
 
+
+  /**
+   * Enumeration of possible matching algorithms, used for permutation
+   * of the sparse matrix to improve stability.
+   * \ingroup Enumerations
+   */
   enum class MatchingJob {
     NONE,                         /*!< Don't do anything                   */
     MAX_CARDINALITY,              /*!< Maximum cardinality                 */
@@ -79,6 +128,9 @@ namespace strumpack {
     COMBBLAS                      /*!< Use AWPM from CombBLAS              */
   };
 
+  /**
+   * Convert a job number to a MatchingJob enum type.
+   */
   inline MatchingJob get_matching(int job) {
     if (job < 0 || job > 6)
       std::cerr << "ERROR: Matching job not recognized!!" << std::endl;
@@ -94,6 +146,10 @@ namespace strumpack {
     return MatchingJob::NONE;
   }
 
+  /**
+   * Convert a MatchingJob enum type to a job number. Prefer to use
+   * the MachingJob enum instead of the job number.
+   */
   inline int get_matching(MatchingJob job) {
     switch (job) {
     case MatchingJob::NONE: return 0;
@@ -107,6 +163,9 @@ namespace strumpack {
     return -1;
   }
 
+  /**
+   * Return a string describing the matching algorithm.
+   */
   inline std::string get_description(MatchingJob job) {
     switch (job) {
     case MatchingJob::NONE: return "none";
@@ -126,41 +185,20 @@ namespace strumpack {
     return "UNKNOWN";
   }
 
-  inline std::string get_name(ReorderingStrategy method) {
-    switch (method) {
-    case ReorderingStrategy::NATURAL: return "Natural"; break;
-    case ReorderingStrategy::METIS: return "Metis"; break;
-    case ReorderingStrategy::SCOTCH: return "Scotch"; break;
-    case ReorderingStrategy::GEOMETRIC: return "Geometric"; break;
-    case ReorderingStrategy::PARMETIS: return "ParMetis"; break;
-    case ReorderingStrategy::PTSCOTCH: return "PTScotch"; break;
-    case ReorderingStrategy::RCM: return "RCM"; break;
-    }
-    return "UNKNOWN";
-  }
 
-  inline bool is_parallel(ReorderingStrategy method) {
-    switch (method) {
-    case ReorderingStrategy::NATURAL: return false; break;
-    case ReorderingStrategy::METIS: return false; break;
-    case ReorderingStrategy::SCOTCH: return false; break;
-    case ReorderingStrategy::GEOMETRIC: return true; break;
-    case ReorderingStrategy::PARMETIS: return true; break;
-    case ReorderingStrategy::PTSCOTCH: return true; break;
-    case ReorderingStrategy::RCM: return false; break;
-    }
-    return false;
-  }
-
-  /*! \brief Type of Gram-Schmidt orthogonalization used in GMRes.
-   * \ingroup Enumerations */
+  /**
+   * Type of Gram-Schmidt orthogonalization used in GMRes.
+   * \ingroup Enumerations
+   */
   enum class GramSchmidtType {
     CLASSICAL,   /*!< Classical Gram-Schmidt is faster, more scalable.   */
     MODIFIED     /*!< Modified Gram-Schmidt is slower, but stable.       */
   };
 
-  /*! \brief Type of outer iterative (Krylov) solver.
-   * \ingroup Enumerations */
+  /**
+   * Type of outer iterative (Krylov) solver.
+   * \ingroup Enumerations
+   */
   enum class KrylovSolver {
     AUTO,           /*!< Use iterative refinement if no compression is
                       used, otherwise use GMRes.                            */
@@ -175,169 +213,314 @@ namespace strumpack {
     BICGSTAB        /*!< UN-preconditioned BiCGStab. (for testing mainly)   */
   };
 
+  /**
+   * Default relative tolerance used when solving a linear system. For
+   * iterative solvers such as GMRES and BiCGStab, this is the
+   * relative residual tolerance. Exact value depends on the floating
+   * point type.
+   */
   template<typename real_t> inline real_t default_rel_tol()
   { return real_t(1.e-6); }
+  /**
+   * Default absolute tolerance used when solving a linear system. For
+   * iterative solvers such as GMRES and BiCGStab, this is the
+   * residual tolerance. Exact value depends on the floating point
+   * type.
+   */
   template<typename real_t> inline real_t default_abs_tol()
   { return real_t(1.e-10); }
   template<> inline float default_rel_tol() { return 1.e-4; }
   template<> inline float default_abs_tol() { return 1.e-6; }
 
-  /*! \brief Options for the sparse solver.
+  /**
+   * \class SPOptions
+   * \brief Options for the sparse solver.
+   *
+   * This sparse solver object also stores an object with HSS options
+   * (HSS_options), and one with BLR options (BLR_options), since HSS
+   * and BLR compression can be used in the sparse solver.
+   *
+   * Running with -h or --help will print a list of options when the
+   * set_from_command_line routine is called.
+   *
+   * \tparam scalar_t can be float, double, std::complex<float> or
+   * std::complex<double>, should be the same as used for the
+   * StrumpackSparseSolver object
    */
   template<typename scalar_t> class SPOptions {
     using real_t = typename RealType<scalar_t>::value_type;
 
-  private:
-    bool _verbose = true;
-    /** Krylov solver options */
-    int _maxit = 5000;
-    real_t _rel_tol = default_rel_tol<real_t>();
-    real_t _abs_tol = default_abs_tol<real_t>();
-    KrylovSolver _Krylov_solver = KrylovSolver::AUTO;
-    int _gmres_restart = 30;
-    GramSchmidtType _Gram_Schmidt_type = GramSchmidtType::MODIFIED;
-    /** Reordering options */
-    ReorderingStrategy _reordering_method = ReorderingStrategy::METIS;
-    int _nd_param = 8;
-    int _nx = 1;
-    int _ny = 1;
-    int _nz = 1;
-    int _components = 1;
-    int _separator_width = 1;
-    bool _use_METIS_NodeNDP = true;
-    bool _use_MUMPS_SYMQAMD = false;
-    bool _use_agg_amalg = false;
-    MatchingJob _matching_job = MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING;
-    bool _log_assembly_tree = false;
-
-    /** compression options */
-    CompressionType _comp = CompressionType::NONE;
-
-    /** HSS options */
-    int _hss_min_front_size = 1000;
-    int _hss_min_sep_size = 256;
-    int _sep_order_level = 1;
-    bool _indirect_sampling = false;
-    bool _replace_tiny_pivots = false;
-    HSS::HSSOptions<scalar_t> _hss_opts;
-
-    /** BLR options */
-    BLR::BLROptions<scalar_t> _blr_opts;
-    int _blr_min_front_size = 1000;
-    int _blr_min_sep_size = 256;
-
-    int _argc = 0;
-    char** _argv = nullptr;
-
   public:
+    /**
+     * Default constructor, initializing all options to their default
+     * values.
+     */
     SPOptions() { _hss_opts.set_verbose(false); }
+
+    /**
+     * Constructor, initializing all options to their default
+     * values. This will store a copy of *argv[]. It will not yet
+     * parse the options!! The options are only parsed when calling
+     * set_from_command_line(). This allows the user of this class to
+     * set certain options using the member functions of this class,
+     * and then overwrite those with command line arguments later.
+     *
+     * \param argc number of arguments (number of char* in argv)
+     * \param argv inout from the command line with list of options
+     */
     SPOptions(int argc, char* argv[]) :
       _argc(argc), _argv(argv) {
       _hss_opts.set_verbose(false);
       _blr_opts.set_verbose(false);
     }
 
+    /**
+     * Set verbose to true/false, ie, allow the sparse solver to print
+     * out progress information, statistics on time, flops, memory
+     * usage etc. to cout. Warnings will go to cerr regardless of the
+     * verbose options set here.
+     */
     void set_verbose(bool verbose) { _verbose = verbose; }
+
+    /**
+     * Set the maximum number of iterations to use in any of the
+     * iterative solvers.
+     */
     void set_maxit(int maxit) { assert(maxit >= 1); _maxit = maxit; }
-    /*! \brief For Pieter to complete
+
+    /**
+     * Set the relative tolerance to use in the iterative
+     * solvers. This will typically be the relative residual decrease.
      *
-     * \param rel_tol
+     * \param rel_tol relative tolerance
      */
     void set_rel_tol(real_t rel_tol)
-    { assert(rel_tol <= real_t(1.) && rel_tol >= real_t(0.));
-      _rel_tol = rel_tol; }
+    { assert(rel_tol <= real_t(1.) && rel_tol >= real_t(0.)); _rel_tol = rel_tol; }
+
+    /**
+     * Set the absolute tolerance to use in the iterative
+     * solvers.
+     *
+     * \param abs_tol absolute tolerance
+     */
     void set_abs_tol(real_t abs_tol)
     { assert(abs_tol >= real_t(0.));  _abs_tol = abs_tol; }
-    /*! \brief Select a Krylov solver
+
+    /**
+     * Select a Krylov outer solver
      *
-     * \param s
+     * \param s outer, iterative solver to use
      */
     void set_Krylov_solver(KrylovSolver s) { _Krylov_solver = s; }
-      /*! \brief For Pieter to complete
-       *
-       * \param m
-       */
+
+    /**
+     * Set the GMRES restart length
+     *
+     * \param m GMRES restart, should be > 0 and not too crazy big
+     */
     void set_gmres_restart(int m) { assert(m >= 1); _gmres_restart = m; }
+
+    /**
+     * Set the type of Gram-Schmidt orthogonalization to use in GMRES
+     *
+     * \param t Gram-Schmidt type to use in GMRES
+     */
     void set_GramSchmidt_type(GramSchmidtType t) { _Gram_Schmidt_type = t; }
-      /*! \brief For Pieter to complete
-       *
-       * \param m
-       */
-    void set_reordering_method(ReorderingStrategy m)
-    { _reordering_method = m; }
+
+    /**
+     * Set the sparse fill-reducing reordering. This can greatly
+     * affect the memory usage and factorization time. However, note
+     * that most reordering routines are provided by third party
+     * libraries, such as Metis and Scotch. In order to use those,
+     * STRUMPACK needs to be configured with support for those
+     * libraries. Some reorderings only work when using the
+     * distributed memory solvers (StrumpackSparseSolverMPI or
+     * StrumpackSparseSolverMPIDist).
+     *
+     * \param m fill reducing reordering
+     */
+    void set_reordering_method(ReorderingStrategy m) { _reordering_method = m; }
+
+    /**
+     * Set the parameter used in nested dissection to determine when
+     * to stop the nested-dissection recursion. Larger values may lead
+     * to less nodes in the separator tree, which eliminates some
+     * overhead, but typically leads to more fill.
+     */
     void set_nd_param(int nd_param)
     { assert(nd_param>=0); _nd_param = nd_param; }
+
+    /**
+     * Set the mesh dimensions. This is only useful when the sparse
+     * matrix was generated by a stencil on a regular 1d, 2d or 3d
+     * mesh. The stencil can be multiple gridpoints wide, and there
+     * can be multiple degrees of freedom per gridpoint. The degrees
+     * of freedom for a single gridpoint should be ordered
+     * consecutively. When the dimensions of the grid are specified,
+     * along with the width of the stencil and the number of degrees
+     * of freedom per gridpoint, one can use the GEOMETRIC option for
+     * the fill-reducing reordering.
+     *
+     * \param nx dimension of the grid along the first axis
+     * \param ny dimension of the grid along the second axis, should
+     * not be specified for a 1d mesh
+     * \param nz dimension of the grid along the third axis, should
+     * not be specified for a 2d mesh
+     * \see set_components, set_separator_width,
+     *  ReorderingStrategy::GEOMETRIC, set_reordering_method
+     */
     void set_dimensions(int nx, int ny=1, int nz=1)
     { assert(nx>=1 && ny>=1 && nz>=1);
       _nx = nx; _ny = ny; _nz = nz; }
+
     void set_nx(int nx) {assert(nx>=1); _nx = nx; }
+
     void set_ny(int ny) {assert(ny>=1); _ny = ny; }
+
     void set_nz(int nz) {assert(nz>=1); _nz = nz; }
+
+    /**
+     * Set the number of components per gridpoint. This is only useful
+     * when the sparse matrix was generated by a stencil on a regular
+     * 1d, 2d or 3d mesh. The degrees of freedom for a single
+     * gridpoint should be ordered consecutively.
+     *
+     * \param components number of components per gridpoint
+     * \see set_dimensions, set_separator_width,
+     * ReorderingStrategy::GEOMETRIC, set_reordering_method
+     */
     void set_components(int components)
     { assert(components>=1); _components = components; }
+
+    /**
+     * Set the width of the separator, which depends on the width of
+     * the stencil. For instance for a 1d 3-point stencil, the
+     * separator is just a single point, for a 2d 5-point stencil the
+     * separator is a single line and for a 3d stencil, the separator
+     * is a single plane, and hence, for all these cases, the
+     * separator width is 1. Wider stencils need a wider separator,
+     * for instance a stencil with 5 points in each dimension needs a
+     * separator width of 3. This is only useful when the sparse
+     * matrix was generated by a stencil on a regular 1d, 2d or 3d
+     * mesh. The degrees of freedom for a single gridpoint should be
+     * ordered consecutively.
+     *
+     * \param width width of the separator
+     * \see set_dimensions, set_components,
+     * ReorderingStrategy::GEOMETRIC, set_reordering_method
+     */
     void set_separator_width(int width)
     { assert(width>=1); _separator_width = width; }
+
+    /**
+     * Enable use of the routine METIS_NodeNDP, instead of
+     * METIS_NodeND. METIS_NodeNDP is a non-documented Metis routine
+     * to perform nested dissection which (unlike METIS_NodeND) also
+     * return the separator tree.
+     *
+     * \see disable_METIS_NodeNDP, enable_METIS_NodeND,
+     * disable_METIS_NodeND
+     */
     void enable_METIS_NodeNDP() { _use_METIS_NodeNDP = true; }
+
+    /**
+     * Disable use of the routine METIS_NodeNDP, and instead use
+     * METIS_NodeND. METIS_NodeNDP is a non-documented Metis routine
+     * to perform nested dissection which (unlike METIS_NodeND) also
+     * return the separator tree.
+     *
+     * \see enable_METIS_NodeNDP, enable_METIS_NodeND,
+     * disable_METIS_NodeND
+     */
     void disable_METIS_NodeNDP() { _use_METIS_NodeNDP = false; }
+
+
+    /**
+     * Use the routine METIS_NodeND instead of the undocumented
+     * routine METIS_NodeNDP.
+     *
+     * \see enable_METIS_NodeNDP, disable_METIS_NodeNDP,
+     * disable_METIS_NodeND
+     */
     void enable_METIS_NodeND() { _use_METIS_NodeNDP = false; }
+
+    /**
+     * Do not use the routine METIS_NodeND, but instead use the
+     * undocumented routine METIS_NodeNDP.
+     *
+     * \see enable_METIS_NodeNDP, disable_METIS_NodeNDP,
+     * enable_METIS_NodeND
+     */
     void disable_METIS_NodeND() { _use_METIS_NodeNDP = true; }
+
+
     void enable_MUMPS_SYMQAMD() { _use_MUMPS_SYMQAMD = true; }
+
     void disable_MUMPS_SYMQAMD() { _use_MUMPS_SYMQAMD = false; }
+
     void enable_agg_amalg() { _use_agg_amalg = true; }
+
     void disable_agg_amalg() { _use_agg_amalg = false; }
-      /*! \brief For Pieter to complete
-       *
-       * \param job
-       */
+
+    /**
+     *
+     * \param job
+     */
     void set_matching(MatchingJob job) { _matching_job = job; }
-    //void set_matching(int job) { _matching_job = get_matching(job); }
+
     void enable_assembly_tree_log() { _log_assembly_tree = true; }
+
     void disable_assembly_tree_log() { _log_assembly_tree = false; }
 
-    /*! \brief For Pieter to complete
-     */
     void enable_HSS() { _comp = CompressionType::HSS; }
-    /*! \brief For Pieter to complete
-     */
+
     void disable_HSS() { _comp = CompressionType::NONE; }
+
     void set_HSS_min_front_size(int s)
     { assert(_hss_min_front_size >= 0); _hss_min_front_size = s; }
-    /*! \brief For Pieter to complete
-     * \param s
-     */
+
     void set_HSS_min_sep_size(int s)
     { assert(_hss_min_sep_size >= 0); _hss_min_sep_size = s; }
-    /*! \brief For Pieter to complete
-     */
 
     void enable_BLR() { _comp = CompressionType::BLR; }
-    /*! \brief For Pieter to complete
-     */
+
     void disable_BLR() { _comp = CompressionType::NONE; }
+
     void set_BLR_min_front_size(int s)
     { assert(_blr_min_front_size >= 0); _blr_min_front_size = s; }
+
     void set_BLR_min_sep_size(int s)
     { assert(_blr_min_sep_size >= 0); _blr_min_sep_size = s; }
 
     void set_separator_ordering_level(int l)
     { assert(l >= 0); _sep_order_level = l; }
+
     void enable_indirect_sampling() { _indirect_sampling = true; }
+
     void disable_indirect_sampling() { _indirect_sampling = false; }
+
     void enable_replace_tiny_pivots() { _replace_tiny_pivots = true; }
+
     void disable_replace_tiny_pivots() { _replace_tiny_pivots = false; }
 
+
+
+
     bool verbose() const { return _verbose; }
+
     int maxit() const { return _maxit; }
+
     real_t rel_tol() const { return _rel_tol; }
+
     real_t abs_tol() const { return _abs_tol; }
+
     KrylovSolver Krylov_solver() const { return _Krylov_solver; }
+
     int gmres_restart() const { return _gmres_restart; }
+
     GramSchmidtType GramSchmidt_type() const { return _Gram_Schmidt_type; }
-    /*! \brief For Pieter to complete
-     *
-     */
-    ReorderingStrategy reordering_method() const
-    { return _reordering_method; }
+
+    ReorderingStrategy reordering_method() const { return _reordering_method; }
     int nd_param() const { return _nd_param; }
     int nx() const { return _nx; }
     int ny() const { return _ny; }
@@ -702,6 +885,48 @@ namespace strumpack {
       //synchronize();
       //HSS_options().describe_options();
     }
+
+  private:
+    bool _verbose = true;
+    /** Krylov solver options */
+    int _maxit = 5000;
+    real_t _rel_tol = default_rel_tol<real_t>();
+    real_t _abs_tol = default_abs_tol<real_t>();
+    KrylovSolver _Krylov_solver = KrylovSolver::AUTO;
+    int _gmres_restart = 30;
+    GramSchmidtType _Gram_Schmidt_type = GramSchmidtType::MODIFIED;
+    /** Reordering options */
+    ReorderingStrategy _reordering_method = ReorderingStrategy::METIS;
+    int _nd_param = 8;
+    int _nx = 1;
+    int _ny = 1;
+    int _nz = 1;
+    int _components = 1;
+    int _separator_width = 1;
+    bool _use_METIS_NodeNDP = true;
+    bool _use_MUMPS_SYMQAMD = false;
+    bool _use_agg_amalg = false;
+    MatchingJob _matching_job = MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING;
+    bool _log_assembly_tree = false;
+
+    /** compression options */
+    CompressionType _comp = CompressionType::NONE;
+
+    /** HSS options */
+    int _hss_min_front_size = 1000;
+    int _hss_min_sep_size = 256;
+    int _sep_order_level = 1;
+    bool _indirect_sampling = false;
+    bool _replace_tiny_pivots = false;
+    HSS::HSSOptions<scalar_t> _hss_opts;
+
+    /** BLR options */
+    BLR::BLROptions<scalar_t> _blr_opts;
+    int _blr_min_front_size = 1000;
+    int _blr_min_sep_size = 256;
+
+    int _argc = 0;
+    char** _argv = nullptr;
   };
 
 } // end namespace strumpack

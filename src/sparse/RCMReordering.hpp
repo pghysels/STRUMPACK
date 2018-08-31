@@ -33,39 +33,40 @@
 
 extern "C" {
 #define GENRCM_FC FC_GLOBAL(genrcm,GENRCM)
-  void GENRCM_FC(int *neqns, int *xadj, int *adjncy, int *perm,
-                 int *mask, int *xls);
+  void GENRCM_FC
+  (int* neqns, int* xadj, int* adjncy, int* perm, int* mask, int* xls);
 }
 
 namespace strumpack {
 
   template<typename integer_t> inline void WRAPPER_rcm
-  (int n, int* xadj, int* adjncy, integer_t* perm) {
-    auto mask = new int[5*n];
-    auto xls = mask + 2*n;
-    auto int_perm = xls + 2*n;
-    GENRCM_FC(&n, xadj, adjncy, int_perm, mask, xls);
-    for (int i=0; i<n; i++) perm[i] = int_perm[i]-1;
-    delete[] mask;
+  (std::vector<int>& xadj, std::vector<int>& adjncy,
+   std::vector<integer_t>& perm) {
+    int n = perm.size();
+    std::vector<int> mask(2*n), xls(2*n), int_perm(n);
+    GENRCM_FC(&n, xadj.data(), adjncy.data(), int_perm.data(),
+              mask.data(), xls.data());
+    for (int i=0; i<n; i++)
+      perm[i] = int_perm[i]-1;
   }
   template<> inline void WRAPPER_rcm
-  (int n, int* xadj, int* adjncy, int* perm) {
-    auto mask = new int[4*n];
-    auto xls = mask + 2*n;
-    GENRCM_FC(&n, xadj, adjncy, perm, mask, xls);
+  (std::vector<int>& xadj, std::vector<int>& adjncy,
+   std::vector<int>& perm) {
+    int n = perm.size();
+    std::vector<int> mask(2*n), xls(2*n);
+    GENRCM_FC
+      (&n, xadj.data(), adjncy.data(), perm.data(), mask.data(), xls.data());
     for (int i=0; i<n; i++) perm[i]--;
-    delete[] mask;
   }
 
   template<typename scalar_t,typename integer_t>
-  std::unique_ptr<SeparatorTree<integer_t>>
-  rcm_reordering(CompressedSparseMatrix<scalar_t,integer_t>* A,
-                 integer_t* perm, integer_t* iperm) {
-    auto n = A->size();
-    auto ptr = A->ptr();
-    auto ind = A->ind();
-    auto xadj = new int[n+1 + ptr[n]];
-    auto adjncy = xadj + n+1;
+  std::unique_ptr<SeparatorTree<integer_t>> rcm_reordering
+  (const CompressedSparseMatrix<scalar_t,integer_t>& A,
+   std::vector<integer_t>& perm, std::vector<integer_t>& iperm) {
+    auto n = A.size();
+    auto ptr = A.ptr();
+    auto ind = A.ind();
+    std::vector<int> xadj(n+1), adjncy(ptr[n]);
     integer_t e = 0;
     for (integer_t j=0; j<n; j++) {
       xadj[j] = e+1;
@@ -76,9 +77,8 @@ namespace strumpack {
     if (e==0)
       if (mpi_root())
         std::cerr << "# WARNING: matrix seems to be diagonal!" << std::endl;
-    WRAPPER_rcm(n, xadj, adjncy, perm);
-    delete[] xadj;
-    return build_sep_tree_from_perm(n, ptr, ind, perm, iperm);
+    WRAPPER_rcm(xadj, adjncy, perm);
+    return build_sep_tree_from_perm(ptr, ind, perm, iperm);
   }
 
 } // end namespace strumpack

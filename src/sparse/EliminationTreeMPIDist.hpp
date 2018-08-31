@@ -68,7 +68,7 @@ namespace strumpack {
     EliminationTreeMPIDist
     (const SPOptions<scalar_t>& opts,
      const CSRMatrixMPI<scalar_t,integer_t>& A,
-     const MatrixReorderingMPI<scalar_t,integer_t>& nd,
+     MatrixReorderingMPI<scalar_t,integer_t>& nd,
      const MPIComm& comm);
 
     void multifrontal_factorization
@@ -87,7 +87,7 @@ namespace strumpack {
     using EliminationTreeMPI<scalar_t,integer_t>::rank_;
     using EliminationTreeMPI<scalar_t,integer_t>::P_;
 
-    const MatrixReorderingMPI<scalar_t,integer_t>& nd_;
+    MatrixReorderingMPI<scalar_t,integer_t>& nd_;
     ProportionallyDistributedSparseMatrix<scalar_t,integer_t> Aprop_;
 
     SepRange local_range_;
@@ -104,7 +104,7 @@ namespace strumpack {
      * vector of size _A.size(), storing for each row, to which front
      * it belongs.
      */
-    std::vector<int> _row_pfront;
+    std::vector<int> row_pfront_;
     void find_row_front(const CSRMatrixMPI<scalar_t,integer_t>& A);
 
     struct ParallelFront {
@@ -125,17 +125,19 @@ namespace strumpack {
     std::vector<ParallelFront> local_pfronts_;
 
     void symbolic_factorization
-    (std::vector<integer_t>* upd, std::vector<integer_t>& dist_upd,
-     float* subtree_work, float& dsep_work);
+    (std::vector<std::vector<integer_t>>& upd,
+     std::vector<integer_t>& dist_upd,
+     std::vector<float>& subtree_work, float& dsep_work);
 
     void symbolic_factorization_local
-    (integer_t sep, std::vector<integer_t>* upd,
-     float* subtree_work, int depth);
+    (integer_t sep, std::vector<std::vector<integer_t>>& upd,
+     std::vector<float>& subtree_work, int depth);
 
     std::unique_ptr<F_t> proportional_mapping
-    (const SPOptions<scalar_t>& opts, std::vector<integer_t>* upd,
+    (const SPOptions<scalar_t>& opts,
+     std::vector<std::vector<integer_t>>& upd,
      std::vector<integer_t>& dist_upd,
-     float* subtree_work, float* dist_subtree_work,
+     std::vector<float>& subtree_work, std::vector<float>& dist_subtree_work,
      integer_t dsep, int P0, int P, int P0_sibling, int P_sibling,
      const MPIComm& fcomm, bool hss_parent, int level);
 
@@ -156,20 +158,19 @@ namespace strumpack {
     (std::vector<bool>& adm, integer_t dsep, int P0, int P, int owner);
   };
 
+
   template<typename scalar_t,typename integer_t>
   EliminationTreeMPIDist<scalar_t,integer_t>::EliminationTreeMPIDist
   (const SPOptions<scalar_t>& opts, const CSRMatrixMPI<scalar_t,integer_t>& A,
-   const MatrixReorderingMPI<scalar_t,integer_t>& nd, const MPIComm& comm)
+   MatrixReorderingMPI<scalar_t,integer_t>& nd, const MPIComm& comm)
     : EliminationTreeMPI<scalar_t,integer_t>(comm), nd_(nd) {
-    auto local_upd =
-      new std::vector<integer_t>[nd_.local_sep_tree->separators()];
+    std::vector<std::vector<integer_t>> local_upd(nd_.local_tree().separators());
+
     // every process is responsible for 1 distributed separator, so
     // store only 1 dist_upd
     std::vector<integer_t> dist_upd;
-    auto local_subtree_work = new float
-      [nd_.local_sep_tree->separators() + nd_.sep_tree->separators()];
-    auto dist_subtree_work = local_subtree_work +
-      nd_.local_sep_tree->separators();
+    std::vector<float> local_subtree_work(nd_.local_tree().separators()),
+      dist_subtree_work(nd_.tree().separators());
 
     float dsep_work;
     MPIComm::control_start("symbolic_factorization");
@@ -177,29 +178,30 @@ namespace strumpack {
       (local_upd, dist_upd, local_subtree_work, dsep_work);
     MPIComm::control_stop("symbolic_factorization");
 
-    // communicate dist_subtree_work to everyone
-    auto sbuf = new float[2*P_];
-    // initialize buffer or valgrind will complain about MPI sending
-    // uninitialized data
-    sbuf[2*rank_] = sbuf[2*rank_+1] = 0.0;
-    for (integer_t dsep=0; dsep<nd_.sep_tree->separators(); dsep++)
-      if (rank_ == nd_.proc_dist_sep[dsep]) {
-        if (nd_.sep_tree->lch(dsep) == -1)
-          sbuf[2*rank_] = local_subtree_work[nd_.local_sep_tree->root()];
-        else sbuf[2*rank_+1] = dsep_work;
-      }
-    MPI_Allgather
-      (MPI_IN_PLACE, 2, MPI_FLOAT, sbuf, 2, MPI_FLOAT, comm_.comm());
-    for (integer_t dsep=0; dsep<nd_.sep_tree->separators(); dsep++)
-      dist_subtree_work[dsep] = (nd_.sep_tree->lch(dsep) == -1) ?
-        sbuf[2*nd_.proc_dist_sep[dsep]] : sbuf[2*nd_.proc_dist_sep[dsep]+1];
-    delete[] sbuf;
+
+    {// communicate dist_subtree_work to everyone
+      std::vector<float> sbuf(2*P_);
+      // initialize buffer or valgrind will complain about MPI sending
+      // uninitialized data
+      sbuf[2*rank_] = sbuf[2*rank_+1] = 0.0;
+      for (integer_t dsep=0; dsep<nd_.tree().separators(); dsep++)
+        if (rank_ == nd_.proc_dist_sep[dsep]) {
+          if (nd_.tree().lch(dsep) == -1)
+            sbuf[2*rank_] = local_subtree_work[nd_.local_tree().root()];
+          else sbuf[2*rank_+1] = dsep_work;
+        }
+      MPI_Allgather
+        (MPI_IN_PLACE, 2, MPI_FLOAT, sbuf.data(), 2, MPI_FLOAT, comm_.comm());
+      for (integer_t dsep=0; dsep<nd_.tree().separators(); dsep++)
+        dist_subtree_work[dsep] = (nd_.tree().lch(dsep) == -1) ?
+          sbuf[2*nd_.proc_dist_sep[dsep]] : sbuf[2*nd_.proc_dist_sep[dsep]+1];
+    }
 
     local_range_ = std::make_pair(A.size(), 0);
     MPIComm::control_start("proportional_mapping");
     this->root_ = proportional_mapping
       (opts, local_upd, dist_upd, local_subtree_work, dist_subtree_work,
-       nd_.sep_tree->root(), 0, P_, 0, 0, comm_, true, 0);
+       nd_.tree().root(), 0, P_, 0, 0, comm_, true, 0);
     MPIComm::control_stop("proportional_mapping");
 
     MPI_Pcontrol(1, "block_row_A_to_prop_A");
@@ -215,9 +217,6 @@ namespace strumpack {
     find_row_front(A);
     Aprop_.setup(A, nd_, *this, opts.use_HSS());
     MPI_Pcontrol(-1, "block_row_A_to_prop_A");
-
-    delete[] local_upd;
-    delete[] local_subtree_work;
   }
 
 
@@ -235,9 +234,9 @@ namespace strumpack {
   EliminationTreeMPIDist<scalar_t,integer_t>::get_sparse_mapped_destination
   (const CSRMatrixMPI<scalar_t,integer_t>& A,
    std::size_t i, std::size_t j, bool duplicate_fronts) const {
-    auto fi = _row_pfront[i];
+    auto fi = row_pfront_[i];
     if (fi < 0) return std::make_tuple(-fi-1, 1, 1);
-    auto fj = _row_pfront[j];
+    auto fj = row_pfront_[j];
     if (fj < 0) return std::make_tuple(-fj-1, 1, 1);
     constexpr auto B = DistM_t::default_MB;
     int pfront =
@@ -330,7 +329,7 @@ namespace strumpack {
     row_owner_.assign(n_loc, -1);
 #pragma omp parallel for
     for (std::size_t r=0; r<n_loc; r++) {
-      std::size_t pr = nd_.perm[r+lo];
+      std::size_t pr = nd_.perm()[r+lo];
       for (int p=0; p<P_; p++) // local separators
         if (pr >= this->subtree_ranges[p].first &&
             pr < this->subtree_ranges[p].second) {
@@ -352,15 +351,15 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPIDist<scalar_t,integer_t>::find_row_front
   (const CSRMatrixMPI<scalar_t,integer_t>& A) {
-    _row_pfront.resize(A.size());
+    row_pfront_.resize(A.size());
     for (int p=0; p<P_; p++) // local separators
       for (std::size_t r=this->subtree_ranges[p].first;
            r<this->subtree_ranges[p].second; r++)
-        _row_pfront[r] = -p-1;
+        row_pfront_[r] = -p-1;
     for (std::size_t i=0; i<all_pfronts_.size(); i++) {
       auto& f = all_pfronts_[i];
       for (std::size_t r=f.sep_begin; r<f.sep_end; r++)
-        _row_pfront[r] = i;
+        row_pfront_[r] = i;
     }
   }
 
@@ -396,8 +395,8 @@ namespace strumpack {
         scnts[row_owner_[r]]++;
     } else {
       for (std::size_t r=0; r<m; r++) {
-        auto permr = nd_.perm[r+lo];
-        int pf = _row_pfront[permr];
+        auto permr = nd_.perm()[r+lo];
+        int pf = row_pfront_[permr];
         if (pf < 0)
           scnts[row_owner_[r]] += n;
         else {
@@ -416,7 +415,7 @@ namespace strumpack {
     if (n == 1) {
       for (std::size_t r=0; r<m; r++) {
         auto dest = row_owner_[r];
-        pp[dest]->r = nd_.perm[r+lo];
+        pp[dest]->r = nd_.perm()[r+lo];
         pp[dest]->c = 0;
         pp[dest]->v = x(r,0);
         pp[dest]++;
@@ -424,8 +423,8 @@ namespace strumpack {
     } else {
       for (std::size_t r=0; r<m; r++) {
         auto destr = row_owner_[r];
-        auto permr = nd_.perm[r+lo];
-        int pf = _row_pfront[permr];
+        auto permr = nd_.perm()[r+lo];
+        int pf = row_pfront_[permr];
         if (pf < 0) {
           for (std::size_t c=0; c<n; c++) {
             pp[destr]->r = permr;
@@ -494,8 +493,8 @@ namespace strumpack {
       pp[p] = rbuf + sdispls[p];
     for (std::size_t r=local_range_.first; r<local_range_.second; r++) {
       auto dest = std::upper_bound
-        (dist.begin(), dist.end(), nd_.iperm[r])-dist.begin()-1;
-      auto permgr = nd_.iperm[r];
+        (dist.begin(), dist.end(), nd_.iperm()[r])-dist.begin()-1;
+      auto permgr = nd_.iperm()[r];
       for (std::size_t c=0; c<n; c++) {
         pp[dest]->r = permgr;
         pp[dest]->c = c;
@@ -508,7 +507,7 @@ namespace strumpack {
       auto slo = local_pfronts_[i].sep_begin;
       for (int r=0; r<xdist[i].lrows(); r++) {
         auto gr = xdist[i].rowl2g(r) + slo;
-        auto permgr = nd_.iperm[gr];
+        auto permgr = nd_.iperm()[gr];
         auto dest = std::upper_bound
           (dist.begin(), dist.end(), permgr)-dist.begin()-1;
         for (int c=0; c<xdist[i].lcols(); c++) {
@@ -535,10 +534,10 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPIDist<scalar_t,integer_t>::symbolic_factorization_local
-  (integer_t sep, std::vector<integer_t>* upd,
-   float* subtree_work, int depth) {
-    auto chl = nd_.local_sep_tree->lch(sep);
-    auto chr = nd_.local_sep_tree->rch(sep);
+  (integer_t sep, std::vector<std::vector<integer_t>>& upd,
+   std::vector<float>& subtree_work, int depth) {
+    auto chl = nd_.local_tree().lch(sep);
+    auto chr = nd_.local_tree().rch(sep);
     if (depth < params::task_recursion_cutoff_level) {
       if (chl != -1)
 #pragma omp task untied default(shared)                                 \
@@ -555,17 +554,15 @@ namespace strumpack {
       if (chr != -1)
         symbolic_factorization_local(chr, upd, subtree_work, depth);
     }
-    auto sep_begin = nd_.local_sep_tree->sizes(sep) +
+    auto sep_begin = nd_.local_tree().sizes(sep) +
       nd_.sub_graph_range.first;
-    auto sep_end = nd_.local_sep_tree->sizes(sep+1) +
+    auto sep_end = nd_.local_tree().sizes(sep+1) +
       nd_.sub_graph_range.first;
-    for (integer_t r=nd_.local_sep_tree->sizes(sep);
-         r<nd_.local_sep_tree->sizes(sep+1); r++) {
-      auto ice = nd_.my_sub_graph->ind() +
-        nd_.my_sub_graph->ptr(r+1);
+    for (integer_t r=nd_.local_tree().sizes(sep);
+         r<nd_.local_tree().sizes(sep+1); r++) {
+      auto ice = nd_.my_sub_graph.ind() + nd_.my_sub_graph.ptr(r+1);
       auto icb = std::lower_bound
-        (nd_.my_sub_graph->ind() + nd_.my_sub_graph->ptr(r),
-         ice, sep_end);
+        (nd_.my_sub_graph.ind() + nd_.my_sub_graph.ptr(r), ice, sep_end);
       auto mid = upd[sep].size();
       std::copy(icb, ice, std::back_inserter(upd[sep]));
       std::inplace_merge
@@ -617,45 +614,46 @@ namespace strumpack {
    */
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPIDist<scalar_t,integer_t>::symbolic_factorization
-  (std::vector<integer_t>* local_upd, std::vector<integer_t>& dist_upd,
-   float* local_subtree_work, float& dsep_work) {
-    nd_.my_sub_graph->sort_rows();
-    if (nd_.local_sep_tree->separators() > 0) {
+  (std::vector<std::vector<integer_t>>& local_upd,
+   std::vector<integer_t>& dist_upd, std::vector<float>& local_subtree_work,
+   float& dsep_work) {
+    nd_.my_sub_graph.sort_rows();
+    if (nd_.local_tree().separators() > 0) {
 #pragma omp parallel
 #pragma omp single
       symbolic_factorization_local
-        (nd_.local_sep_tree->root(), local_upd, local_subtree_work, 0);
+        (nd_.local_tree().root(), local_upd, local_subtree_work, 0);
     }
 
     /* initialize dsep_work so valgrind does not complain, as it is
        not always set below */
     dsep_work = 0.0;
-    nd_.my_dist_sep->sort_rows();
+    nd_.my_dist_sep.sort_rows();
     std::vector<MPI_Request> send_req;
-    for (integer_t dsep=0; dsep<nd_.sep_tree->separators(); dsep++) {
+    for (integer_t dsep=0; dsep<nd_.tree().separators(); dsep++) {
       // only consider the distributed separator owned by this
       // process: 1 leaf and 1 non-leaf
       if (nd_.proc_dist_sep[dsep] != rank_) continue;
-      auto pa = nd_.sep_tree->pa(dsep);
+      auto pa = nd_.tree().pa(dsep);
       if (pa == -1) continue; // skip the root separator
       auto pa_rank = nd_.proc_dist_sep[pa];
-      if (nd_.sep_tree->lch(dsep) == -1) {
+      if (nd_.tree().lch(dsep) == -1) {
         // leaf of distributed tree is local subgraph for process
         // proc_dist_sep[dsep].  local_upd[dsep] was computed above,
         // send it to the parent process
-        // proc_dist_sep[nd_.sep_tree->pa(dsep)]. dist_upd is
+        // proc_dist_sep[nd_.tree().pa(dsep)]. dist_upd is
         // local_upd of the root of the local tree, which is
         // local_upd[this->nbsep-1], or local_upd.back()
-        if (nd_.sep_tree->pa(pa) == -1)
+        if (nd_.tree().pa(pa) == -1)
           continue; // do not send to parent if parent is root
         send_req.emplace_back();
-        int tag = (dsep == nd_.sep_tree->lch(pa)) ? 1 : 2;
+        int tag = (dsep == nd_.tree().lch(pa)) ? 1 : 2;
         MPI_Isend
-          (local_upd[nd_.local_sep_tree->root()].data(),
-           local_upd[nd_.local_sep_tree->root()].size(),
+          (local_upd[nd_.local_tree().root()].data(),
+           local_upd[nd_.local_tree().root()].size(),
            mpi_type<integer_t>(), pa_rank, tag, comm_.comm(),
            &send_req.back());
-        dsep_work = local_subtree_work[nd_.local_sep_tree->root()];
+        dsep_work = local_subtree_work[nd_.local_tree().root()];
         send_req.emplace_back();
         MPI_Isend(&dsep_work, 1, MPI_FLOAT, pa_rank, tag+2,
                   comm_.comm(), &send_req.back());
@@ -663,11 +661,9 @@ namespace strumpack {
         auto sep_begin = nd_.dist_sep_range.first;
         auto sep_end = nd_.dist_sep_range.second;
         for (integer_t r=0; r<sep_end-sep_begin; r++) {
-          auto ice = nd_.my_dist_sep->ind() +
-            nd_.my_dist_sep->ptr(r+1);
+          auto ice = nd_.my_dist_sep.ind() + nd_.my_dist_sep.ptr(r+1);
           auto icb = std::lower_bound
-            (nd_.my_dist_sep->ind() +
-             nd_.my_dist_sep->ptr(r), ice, sep_end);
+            (nd_.my_dist_sep.ind() + nd_.my_dist_sep.ptr(r), ice, sep_end);
           auto mid = dist_upd.size();
           std::copy(icb, ice, std::back_inserter(dist_upd));
           std::inplace_merge
@@ -676,8 +672,8 @@ namespace strumpack {
             (std::unique(dist_upd.begin(), dist_upd.end()), dist_upd.end());
         }
 
-        auto chl = nd_.proc_dist_sep[nd_.sep_tree->lch(dsep)];
-        auto chr = nd_.proc_dist_sep[nd_.sep_tree->rch(dsep)];
+        auto chl = nd_.proc_dist_sep[nd_.tree().lch(dsep)];
+        auto chr = nd_.proc_dist_sep[nd_.tree().rch(dsep)];
         // receive dist_upd from left child
         MPI_Status stat;
         int msg_size;
@@ -723,10 +719,10 @@ namespace strumpack {
           dsep_right_work;
 
         // send dist_upd and work estimate to parent
-        if (nd_.sep_tree->pa(pa) != -1) {
+        if (nd_.tree().pa(pa) != -1) {
           // do not send to parent if parent is root
           send_req.emplace_back();
-          int tag = (dsep == nd_.sep_tree->lch(pa)) ? 1 : 2;
+          int tag = (dsep == nd_.tree().lch(pa)) ? 1 : 2;
           MPI_Isend
             (dist_upd.data(), dist_upd.size(), mpi_type<integer_t>(),
              pa_rank, tag, comm_.comm(), &send_req.back());
@@ -812,7 +808,7 @@ namespace strumpack {
     std::vector<MPI_Request> sreq;
     std::vector<int> sbuf;
     if (rank_ == owner) {
-      sbuf = nd_.sep_tree->HSS_tree(dsep).serialize();
+      sbuf = nd_.tree().HSS_tree(dsep).serialize();
       sreq.resize(P);
       for (int dest=P0; dest<P0+P; dest++)
         MPI_Isend(sbuf.data(), sbuf.size(), MPI_INT, dest, 0,
@@ -838,7 +834,7 @@ namespace strumpack {
     std::vector<MPIRequest> sreq;
     std::vector<int> sbuf;
     if (rank_ == owner) {
-      auto& a = nd_.sep_tree->admissibility(dsep);
+      auto& a = nd_.tree().admissibility(dsep);
       sbuf.assign(a.begin(), a.end());
       for (int dest=P0; dest<P0+P; dest++)
         sreq.emplace_back(comm_.isend(sbuf, dest, 0));
@@ -854,13 +850,14 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t>
   std::unique_ptr<FrontalMatrix<scalar_t,integer_t>>
   EliminationTreeMPIDist<scalar_t,integer_t>::proportional_mapping
-  (const SPOptions<scalar_t>& opts, std::vector<integer_t>* local_upd,
-   std::vector<integer_t>& dist_upd,
-   float* local_subtree_work, float* dist_subtree_work, integer_t dsep,
+  (const SPOptions<scalar_t>& opts,
+   std::vector<std::vector<integer_t>>& local_upd,
+   std::vector<integer_t>& dist_upd, std::vector<float>& local_subtree_work,
+   std::vector<float>& dist_subtree_work, integer_t dsep,
    int P0, int P, int P0_sibling, int P_sibling,
    const MPIComm& fcomm, bool hss_parent, int level) {
-    auto chl = nd_.sep_tree->lch(dsep);
-    auto chr = nd_.sep_tree->rch(dsep);
+    auto chl = nd_.tree().lch(dsep);
+    auto chr = nd_.tree().rch(dsep);
     auto owner = nd_.proc_dist_sep[dsep];
 
     if (chl == -1 && chr == -1) {

@@ -41,8 +41,8 @@ namespace strumpack {
   geometric_nested_dissection_dist
   (int nx, int ny, int nz, int components, int width,
    integer_t lo, integer_t hi, MPI_Comm comm,
-   integer_t* perm, integer_t* iperm, int nd_param,
-   int HSS_leaf, int min_HSS) {
+   std::vector<integer_t>& perm, std::vector<integer_t>& iperm,
+   int nd_param, int HSS_leaf, int min_HSS) {
     assert(components == 1);
     assert(width == 1);
     auto P = mpi_nprocs(comm);
@@ -120,8 +120,8 @@ namespace strumpack {
         if (sep_size >= min_HSS) {
           HSS::HSSPartitionTree t;
           recursive_bisection
-            (perm, iperm, perm_begin, part_begin, part_size, ld,
-             components, HSS_leaf, t);
+            (perm.data(), iperm.data(), perm_begin,
+             part_begin, part_size, ld, components, HSS_leaf, t);
           if (is_local) local_HSS_trees[local_nbsep] = t; // Not thread safe!!
           else dist_HSS_trees[dist_nbsep] = t; // Not thread safe!!
         } else {

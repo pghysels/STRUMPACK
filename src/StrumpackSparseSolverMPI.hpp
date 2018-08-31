@@ -78,11 +78,14 @@ namespace strumpack {
      * \param verb  Flag to suppres/enable output.
      *              Only the root of mpi_comm will print output to stdout.
      */
-    StrumpackSparseSolverMPI(MPI_Comm comm, int argc, char* argv[],
-                             bool verbose=true);
+    StrumpackSparseSolverMPI
+    (MPI_Comm comm, int argc, char* argv[], bool verbose=true);
 
     StrumpackSparseSolverMPI(MPI_Comm comm, bool verbose=true);
-    /*! \brief Destructor. */
+
+    /**
+     * Destructor, virtual.
+     */
     virtual ~StrumpackSparseSolverMPI() {}
 
     virtual void set_matrix(const CSRMatrix<scalar_t,integer_t>& A);
@@ -138,7 +141,6 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPI<scalar_t,integer_t>::set_matrix
   (const CSRMatrix<scalar_t,integer_t>& A) {
-    if (mat_) mat_.reset();
     mat_ = std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
       (new CSRMatrix<scalar_t,integer_t>(A));
     this->factored_ = this->reordered_ = false;
@@ -148,7 +150,6 @@ namespace strumpack {
   StrumpackSparseSolverMPI<scalar_t,integer_t>::set_csr_matrix
   (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
    const scalar_t* values, bool symmetric_pattern) {
-    if (mat_) mat_.reset();
     mat_ = std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
       (new CSRMatrix<scalar_t,integer_t>
        (N, row_ptr, col_ind, values, symmetric_pattern));
@@ -157,31 +158,28 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPI<scalar_t,integer_t>::setup_tree() {
-    if (tree_mpi_) tree_mpi_.reset();
     tree_mpi_ = std::unique_ptr<EliminationTreeMPI<scalar_t,integer_t>>
-      (new EliminationTreeMPI<scalar_t,integer_t>
-       (opts_, *matrix(), *reordering(), comm_));
+      (new EliminationTreeMPI<scalar_t,integer_t>(opts_, *mat_, *nd_, comm_));
   }
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPI<scalar_t,integer_t>::setup_reordering() {
-    if (nd_) nd_.reset();
     nd_ = std::unique_ptr<MatrixReordering<scalar_t,integer_t>>
-      (new MatrixReordering<scalar_t,integer_t>(matrix()->size()));
+      (new MatrixReordering<scalar_t,integer_t>(mat_->size()));
   }
 
   template<typename scalar_t,typename integer_t> int
   StrumpackSparseSolverMPI<scalar_t,integer_t>::compute_reordering
   (int nx, int ny, int nz, int components, int width) {
     return nd_->nested_dissection
-      (opts_, mat_.get(), comm_.comm(), nx, ny, nz, components, width);
+      (opts_, *mat_, comm_.comm(), nx, ny, nz, components, width);
   }
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPI<scalar_t,integer_t>::
   compute_separator_reordering() {
     nd_->separator_reordering
-      (opts_, mat_.get(), opts_.verbose() && is_root_);
+      (opts_, *mat_, opts_.verbose() && is_root_);
   }
 
   template<typename scalar_t,typename integer_t> void

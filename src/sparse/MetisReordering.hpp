@@ -41,71 +41,81 @@
 namespace strumpack {
 
   template<typename integer_t> inline int WRAPPER_METIS_NodeNDP
-  (integer_t n, idx_t* xadj, idx_t* adjncy, idx_t* vwgt, idx_t seps,
-   idx_t* options, integer_t* perm, integer_t* iperm, idx_t* sizes) {
-    auto order = new idx_t[2*n];
-    auto iorder = order + n;
-    int ierr = METIS_NodeNDP(n, xadj, adjncy, vwgt, seps,
-                             options, order, iorder, sizes);
-    std::copy(order, order+n, perm);
-    std::copy(iorder, iorder+n, iperm);
-    delete[] order;
+  (std::vector<idx_t>& xadj, std::vector<idx_t>& adjncy,
+   idx_t* vwgt, idx_t seps, idx_t* options, std::vector<integer_t>& perm,
+   std::vector<integer_t>& iperm, std::vector<idx_t>& sizes) {
+    idx_t n = perm.size();
+    std::vector<idx_t> order(n);
+    std::vector<idx_t> iorder(n);
+    int ierr = METIS_NodeNDP
+      (n, xadj.data(), adjncy.data(), vwgt, seps, options,
+       order.data(), iorder.data(), sizes.data());
+    perm.assign(order.begin(), order.end());
+    iperm.assign(iorder.begin(), iorder.end());
     return ierr;
   }
-  template<> inline int
-  WRAPPER_METIS_NodeNDP(idx_t n, idx_t* xadj, idx_t* adjncy, idx_t* vwgt,
-                        idx_t seps, idx_t* options,
-                        idx_t* perm, idx_t* iperm, idx_t* sizes) {
-    return METIS_NodeNDP(n, xadj, adjncy, vwgt, seps, options,
-                         perm, iperm, sizes);
+  template<> inline int WRAPPER_METIS_NodeNDP
+  (std::vector<idx_t>& xadj, std::vector<idx_t>& adjncy,
+   idx_t* vwgt, idx_t seps, idx_t* options, std::vector<idx_t>& perm,
+   std::vector<idx_t>& iperm, std::vector<idx_t>& sizes) {
+    idx_t n = perm.size();
+    return METIS_NodeNDP
+      (n, xadj.data(), adjncy.data(), vwgt, seps, options,
+       perm.data(), iperm.data(), sizes.data());
   }
 
   template<typename integer_t> inline int WRAPPER_METIS_NodeND
-  (integer_t n, idx_t* xadj, idx_t* adjncy, idx_t* vwgt,
-   idx_t* options, integer_t* perm, integer_t* iperm) {
-    auto order = new idx_t[2*n];
-    auto iorder = order + n;
-    idx_t _n(n);
-    int ierr = METIS_NodeND(&_n, xadj, adjncy, vwgt, options, order, iorder);
-    std::copy(order, order+n, perm);
-    std::copy(iorder, iorder+n, iperm);
-    delete[] order;
+  (std::vector<idx_t>& xadj, std::vector<idx_t>& adjncy,
+   idx_t* vwgt, idx_t* options, std::vector<integer_t>& perm,
+   std::vector<integer_t>& iperm) {
+    idx_t n = perm.size();
+    std::vector<idx_t> order(n);
+    std::vector<idx_t> iorder(n);
+    int ierr = METIS_NodeND
+      (&n, xadj.data(), adjncy.data(), vwgt, options,
+       order.data(), iorder.data());
+    perm.assign(order.begin(), order.end());
+    iperm.assign(iorder.begin(), iorder.end());
     return ierr;
   }
-  template<> inline int
-  WRAPPER_METIS_NodeND(idx_t n, idx_t* xadj, idx_t* adjncy, idx_t* vwgt,
-                       idx_t* options, idx_t* perm, idx_t* iperm) {
-    return METIS_NodeND(&n, xadj, adjncy, vwgt, options, perm, iperm);
+  template<> inline int WRAPPER_METIS_NodeND
+  (std::vector<idx_t>& xadj, std::vector<idx_t>& adjncy,
+   idx_t* vwgt, idx_t* options, std::vector<idx_t>& perm,
+   std::vector<idx_t>& iperm) {
+    idx_t n = perm.size();
+    return METIS_NodeND
+      (&n, xadj.data(), adjncy.data(), vwgt, options,
+       perm.data(), iperm.data());
   }
 
   // this is used in separator reordering
   template<typename integer_t> inline int WRAPPER_METIS_PartGraphRecursive
-  (idx_t* nvtxs, idx_t* ncon, std::vector<integer_t>& sep_csr_ptr,
-   std::vector<integer_t>& sep_csr_ind, idx_t* two,
-   idx_t* edge_cut, idx_t* partitioning) {
-    auto ptr = new idx_t[sep_csr_ptr.size()+sep_csr_ind.size()];
-    auto ind = ptr + sep_csr_ptr.size();
-    for (size_t i=0; i<sep_csr_ptr.size(); i++) ptr[i] = sep_csr_ptr[i];
-    for (size_t i=0; i<sep_csr_ind.size(); i++) ind[i] = sep_csr_ind[i];
+  (idx_t nvtxs, idx_t ncon, std::vector<integer_t>& csr_ptr,
+   std::vector<integer_t>& csr_ind, idx_t nparts,
+   idx_t& edge_cut, std::vector<idx_t>& partitioning) {
+    std::vector<idx_t> ptr(csr_ptr.size());
+    std::vector<idx_t> ind(csr_ind.size());
+    ptr.assign(csr_ptr.begin(), csr_ptr.end());
+    ind.assign(csr_ind.begin(), csr_ind.end());
     int ierr = METIS_PartGraphRecursive
-      (nvtxs, ncon, ptr, ind, NULL, NULL, NULL,
-       two, NULL, NULL, NULL, edge_cut, partitioning);
-    delete[] ptr;
+      (&nvtxs, &ncon, ptr.data(), ind.data(), NULL, NULL, NULL,
+       &nparts, NULL, NULL, NULL, &edge_cut, partitioning.data());
     return ierr;
   }
   template<> inline int WRAPPER_METIS_PartGraphRecursive
-  (idx_t* nvtxs, idx_t* ncon, std::vector<idx_t>& sep_csr_ptr,
-   std::vector<idx_t>& sep_csr_ind, idx_t* two,
-   idx_t* edge_cut, idx_t* partitioning) {
+  (idx_t nvtxs, idx_t ncon, std::vector<idx_t>& csr_ptr,
+   std::vector<idx_t>& csr_ind, idx_t nparts,
+   idx_t& edge_cut, std::vector<idx_t>& partitioning) {
     return METIS_PartGraphRecursive
-      (nvtxs, ncon, sep_csr_ptr.data(), sep_csr_ind.data(),
-       NULL, NULL, NULL, two, NULL, NULL, NULL, edge_cut, partitioning);
+      (&nvtxs, &ncon, csr_ptr.data(), csr_ind.data(),
+       NULL, NULL, NULL, &nparts, NULL, NULL, NULL,
+       &edge_cut, partitioning.data());
   }
 
 
   template<typename integer_t> std::unique_ptr<SeparatorTree<integer_t>>
-  sep_tree_from_metis_sizes(integer_t nodes, integer_t
-                            separators, idx_t* sizes) {
+  sep_tree_from_metis_sizes
+  (integer_t nodes, integer_t separators, std::vector<idx_t>& sizes) {
     std::unique_ptr<SeparatorTree<integer_t>>
       sep_tree(new SeparatorTree<integer_t>(nodes));
 
@@ -183,14 +193,14 @@ namespace strumpack {
   // TODO throw an exception
   template<typename scalar_t,typename integer_t>
   std::unique_ptr<SeparatorTree<integer_t>>
-  metis_nested_dissection(CompressedSparseMatrix<scalar_t,integer_t>* A,
-                          integer_t* perm, integer_t* iperm,
-                          const SPOptions<scalar_t>& opts) {
-    auto n = A->size();
-    auto ptr = A->ptr();
-    auto ind = A->ind();
-    auto xadj = new idx_t[n+1 + ptr[n]];
-    auto adjncy = xadj + n+1;
+  metis_nested_dissection
+  (const CompressedSparseMatrix<scalar_t,integer_t>& A,
+   std::vector<integer_t>& perm, std::vector<integer_t>& iperm,
+   const SPOptions<scalar_t>& opts) {
+    auto n = A.size();
+    auto ptr = A.ptr();
+    auto ind = A.ind();
+    std::vector<idx_t> xadj(n+1), adjncy(ptr[n]);
     integer_t e = 0;
     for (integer_t j=0; j<n; j++) {
       xadj[j] = e;
@@ -207,27 +217,26 @@ namespace strumpack {
       integer_t nodes =
         std::max(integer_t(3), ( n / opts.nd_param() ) / 2 * 2 + 1);
       integer_t separators = nodes / 2;
-      auto sizes = new idx_t[nodes + 1];
+      std::vector<idx_t> sizes(nodes + 1);
       ierr = WRAPPER_METIS_NodeNDP
-        (n, xadj, adjncy, NULL, separators + 1, NULL, iperm, perm, sizes);
-      delete[] xadj;
+        (xadj, adjncy, NULL, separators + 1, NULL, iperm, perm, sizes);
 #if defined(STRUMPACK_USE_MPI)
       if (opts.use_MUMPS_SYMQAMD())
         sep_tree = aggressive_amalgamation(A, perm, iperm, opts);
-      else sep_tree = sep_tree_from_metis_sizes(nodes, separators, sizes);
+      else
+        sep_tree = sep_tree_from_metis_sizes(nodes, separators, sizes);
 #else
       sep_tree = sep_tree_from_metis_sizes(nodes, separators, sizes);
 #endif
-      delete[] sizes;
     } else {
-      ierr = WRAPPER_METIS_NodeND(n, xadj, adjncy, NULL, NULL, iperm, perm);
-      delete[] xadj;
+      ierr = WRAPPER_METIS_NodeND(xadj, adjncy, NULL, NULL, iperm, perm);
 #if defined(STRUMPACK_USE_MPI)
       if (opts.use_MUMPS_SYMQAMD())
         sep_tree = aggressive_amalgamation(A, perm, iperm, opts);
-      else sep_tree = build_sep_tree_from_perm(n, ptr, ind, perm, iperm);
+      else
+        sep_tree = build_sep_tree_from_perm(ptr, ind, perm, iperm);
 #else
-      sep_tree = build_sep_tree_from_perm(n, ptr, ind, perm, iperm);
+      sep_tree = build_sep_tree_from_perm(ptr, ind, perm, iperm);
 #endif
     }
     if (ierr != METIS_OK) {

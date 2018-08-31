@@ -66,7 +66,7 @@ namespace strumpack {
    *
    * The rows and the columns should always be __sorted__!
    *
-   **** __TODO make the public interface non-virtual__ ****
+   * __TODO make the public interface non-virtual__
    *
    * \tparam scalar_t type used to store matrix values
    * \tparam integer_t type used for indices in the row/column pointer
@@ -248,9 +248,13 @@ namespace strumpack {
      */
     virtual void spmv(const scalar_t* x, scalar_t* y) const = 0;
 
+    /**
+     * TODO Obtain reordering Anew = A(iorder,iorder). In addition,
+     * entries of IND, VAL are sorted in increasing order
+     */
     virtual void permute(const integer_t* iorder, const integer_t* order);
     virtual void permute
-    (const std::vector<integer_t>& iorder, std::vector<integer_t>& order)
+    (const std::vector<integer_t>& iorder, const std::vector<integer_t>& order)
     { permute(iorder.data(), order.data()); }
     virtual int permute_and_scale
     (MatchingJob job, std::vector<integer_t>& perm, std::vector<scalar_t>& Dr,
@@ -680,10 +684,6 @@ namespace strumpack {
     return A;
   }
 
-  /**
-   * Obtain reordering Anew = A(iorder,iorder). In addition, entries
-   * of IND, VAL are sorted in increasing order
-   */
   template<typename scalar_t,typename integer_t> void
   CompressedSparseMatrix<scalar_t,integer_t>::permute
   (const integer_t* iorder, const integer_t* order) {

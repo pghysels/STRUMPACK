@@ -59,9 +59,9 @@ namespace strumpack {
    * leading to more scalable code.
    *
    * The MPIComm object can also be MPI_COMM_NULL, while P can still
-   * be 0. This is useful for getting info about a grid (the layout),
-   * in which this rank is not active, for instance to know to which
-   * rank to communicate.
+   * be > 0. This is useful for getting info about a grid (the
+   * layout), in which this rank is not active, for instance to know
+   * to which rank to communicate.
    */
   class BLACSGrid {
   public:

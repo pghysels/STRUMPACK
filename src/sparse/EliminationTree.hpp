@@ -46,10 +46,12 @@ namespace strumpack {
     using DenseM_t = DenseMatrix<scalar_t>;
 
   public:
-    EliminationTree();
+    EliminationTree() {}
+
     EliminationTree
     (const SPOptions<scalar_t>& opts, const SpMat_t& A,
      const SeparatorTree<integer_t>& sep_tree);
+
     virtual ~EliminationTree() = default;
 
     virtual void multifrontal_factorization
@@ -92,8 +94,6 @@ namespace strumpack {
      integer_t sep, std::vector<integer_t>* upd, int depth=0) const;
   };
 
-  template<typename scalar_t,typename integer_t>
-  EliminationTree<scalar_t,integer_t>::EliminationTree() { }
 
   template<typename scalar_t,typename integer_t>
   EliminationTree<scalar_t,integer_t>::EliminationTree

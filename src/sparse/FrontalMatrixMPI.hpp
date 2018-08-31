@@ -136,7 +136,7 @@ namespace strumpack {
     virtual bool isMPI() const { return true; }
     virtual void bisection_partitioning
     (const SPOptions<scalar_t>& opts, integer_t* sorder,
-     bool isroot=true, int task_depth=0);
+     bool isroot=true, int task_depth=0) override;
 
   protected:
     BLACSGrid blacs_grid_;     // 2D processor grid

@@ -125,10 +125,10 @@ namespace strumpack {
     real_t max_scaled_residual
     (const scalar_t* x, const scalar_t* b) const override;
 
-    // TODO return by value? return a unique_ptr?
-    CSRGraph<integer_t>* get_sub_graph
-    (const integer_t* perm,
-     const std::pair<integer_t,integer_t>* graph_ranges) const;
+    CSRGraph<integer_t> get_sub_graph
+    (const std::vector<integer_t>& perm,
+     const std::vector<std::pair<integer_t,integer_t>>& graph_ranges) const;
+
     void print() const override;
     void print_dense(const std::string& name) const override;
     void print_MM(const std::string& filename) const override;
@@ -478,11 +478,11 @@ namespace strumpack {
    * Extract part [graph_begin, graph_end) from this sparse matrix,
    * after applying the symmetric permutation perm/iperm.
    */
-  // TODO move this to CSRGraph, have it return a unique_ptr or value!
-  template<typename scalar_t,typename integer_t> CSRGraph<integer_t>*
+  // TODO move this to CSRGraph
+  template<typename scalar_t,typename integer_t> CSRGraph<integer_t>
   CSRMatrixMPI<scalar_t,integer_t>::get_sub_graph
-  (const integer_t* perm,
-   const std::pair<integer_t,integer_t>* graph_ranges) const {
+  (const std::vector<integer_t>& perm,
+   const std::vector<std::pair<integer_t,integer_t>>& graph_ranges) const {
     auto rank = mpi_rank(_comm);
     auto P = mpi_nprocs(_comm);
     auto scnts = new int[4*P+local_rows()];
@@ -544,16 +544,16 @@ namespace strumpack {
       n_edges += rbuf[prbuf+1];
       prbuf += 2 + rbuf[prbuf+1];
     }
-    auto g = new CSRGraph<integer_t>(n_vert, n_edges);
-    g->ptr(0) = 0;
+    CSRGraph<integer_t> g(n_vert, n_edges);
+    g.ptr(0) = 0;
     for (integer_t i=1; i<=n_vert; i++)
-      g->ptr(i) = g->ptr(i-1) + edge_count[i-1];
+      g.ptr(i) = g.ptr(i-1) + edge_count[i-1];
     delete[] edge_count;
     prbuf = 0;
     while (prbuf < rsize) {
       auto my_row = rbuf[prbuf] - graph_ranges[rank].first;
       std::copy(rbuf+prbuf+2, rbuf+prbuf+2+rbuf[prbuf+1],
-                g->ind()+g->ptr(my_row));
+                g.ind()+g.ptr(my_row));
       prbuf += 2 + rbuf[prbuf+1];
     }
     delete[] rbuf;

@@ -1,29 +1,33 @@
 /*
- * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The Regents of
- * the University of California, through Lawrence Berkeley National Laboratory
- * (subject to receipt of any required approvals from the U.S. Dept. of Energy).
- * All rights reserved.
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
  *
- * If you have questions about your rights to use or distribute this software,
- * please contact Berkeley Lab's Technology Transfer Department at TTD@lbl.gov.
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
  *
- * NOTICE. This software is owned by the U.S. Department of Energy. As such, the
- * U.S. Government has been granted for itself and others acting on its behalf a
- * paid-up, nonexclusive, irrevocable, worldwide license in the Software to
- * reproduce, prepare derivative works, and perform publicly and display publicly.
- * Beginning five (5) years after the date permission to assert copyright is
- * obtained from the U.S. Department of Energy, and subject to any subsequent five
- * (5) year renewals, the U.S. Government is granted for itself and others acting
- * on its behalf a paid-up, nonexclusive, irrevocable, worldwide license in the
- * Software to reproduce, prepare derivative works, distribute copies to the
- * public, perform publicly and display publicly, and to permit others to do so.
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly.  Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government is granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
  *
  * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
- *             (Lawrence Berkeley National Lab, Computational Research Division).
+ *             (Lawrence Berkeley National Lab, Computational Research
+ *             Division).
  *
  */
-#ifndef ETREE_HPP
-#define ETREE_HPP
+#ifndef STRUMPACK_ETREE_HPP
+#define STRUMPACK_ETREE_HPP
 
 #include <cassert>
 #include <stack>
@@ -87,9 +91,9 @@ namespace strumpack {
    */
   template<typename integer_t> std::vector<integer_t>
   spsymetree(integer_t *acolst, integer_t *acolend, // column starts and ends past 1
-	     integer_t *arow,                       // row indices of A
-	     integer_t n,                           // dimension of A
-	     integer_t subgraph_begin=0) {          // first row/column of subgraph
+             integer_t *arow,                       // row indices of A
+             integer_t n,                           // dimension of A
+             integer_t subgraph_begin=0) {          // first row/column of subgraph
     // if working on subgraph, acolst/end only for subgraph and n is number of vertices in the subgraph
     std::vector<integer_t> root(n, 0); // root of subtee of etree
     std::vector<integer_t> pp(n, 0);
@@ -100,43 +104,50 @@ namespace strumpack {
       root[cset] = col;
       parent[col] = n;
       for (p=acolst[col]; p<acolend[col]; p++) {
-	row = arow[p] - subgraph_begin;
-	if (row >= col) continue;
-	rset = find(row, pp);
-	rroot = root[rset];
-	if (rroot != col) {
-	  parent[rroot] = col;
-	  cset = link(cset, rset, pp);
-	  root[cset] = col;
-	}
+        row = arow[p] - subgraph_begin;
+        if (row >= col) continue;
+        rset = find(row, pp);
+        rroot = root[rset];
+        if (rroot != col) {
+          parent[rroot] = col;
+          cset = link(cset, rset, pp);
+          root[cset] = col;
+        }
       }
     }
     return parent;
   }
 
-  /** Depth-first search from vertex n on the etree. Non-recursive version. */
+  /**
+   * Depth-first search from vertex n on the etree.
+   * Non-recursive version.
+   */
   template<typename integer_t> void etdfs_non_recursive
-  (integer_t n, integer_t* parent, integer_t* first_kid, integer_t* next_kid,
-   std::vector<integer_t>& post, integer_t postnum) {
+  (integer_t n, const integer_t* parent, const integer_t* first_kid,
+   const integer_t* next_kid, std::vector<integer_t>& post,
+   integer_t postnum) {
     integer_t current = n, first, next;
     while (postnum != n) {
       first = first_kid[current];     // no kid for the current node
       if (first == -1) {              // no first kid for the current node
-	post[current] = postnum++;    // numbering this node because it has no kid
-	next = next_kid[current];     // looking for the next kid
-	while (next == -1) {
-	  current = parent[current];  // no more kids : back to the parent node
-	  post[current] = postnum++;  // numbering the parent node
-	  next = next_kid[current];   // get the next kid
-	}
-	if (postnum == n+1) return;   // stopping criterion
-	current = next;               // updating current node
+        post[current] = postnum++;    // numbering this node because it has no kid
+        next = next_kid[current];     // looking for the next kid
+        while (next == -1) {
+          current = parent[current];  // no more kids : back to the parent node
+          post[current] = postnum++;  // numbering the parent node
+          next = next_kid[current];   // get the next kid
+        }
+        if (postnum == n+1) return;   // stopping criterion
+        current = next;               // updating current node
       } else current = first;         // updating current node
     }
   }
 
-  /** Post order an etree. */
-  template<typename integer_t> std::vector<integer_t> etree_postorder(integer_t n, integer_t* parent) {
+  /**
+   * Post-order an etree.
+   */
+  template<typename integer_t> std::vector<integer_t>
+  etree_postorder(integer_t n, const integer_t* parent) {
     auto first_kid = new integer_t[2*(n+1)];
     auto next_kid = first_kid + n+1;
     std::fill(first_kid, first_kid+n+1, integer_t(-1));
@@ -154,10 +165,11 @@ namespace strumpack {
     return post;
   }
 
-  template<typename integer_t> std::vector<integer_t> etree_postorder(std::vector<integer_t> etree) {
+  template<typename integer_t> std::vector<integer_t>
+  etree_postorder(const std::vector<integer_t>& etree) {
     return etree_postorder<integer_t>(etree.size(), etree.data());
   }
 
 } // end namespace strumpack
 
-#endif // ETREE_HPP
+#endif // STRUMPACK_ETREE_HPP

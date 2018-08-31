@@ -575,11 +575,10 @@ namespace strumpack {
    */
   template<typename integer_t>
   std::unique_ptr<SeparatorTree<integer_t>> build_sep_tree_from_perm
-  (integer_t n, const integer_t* ptr, const integer_t* ind,
-   integer_t* perm, integer_t* iperm) {
-    auto rlo = new integer_t[2*n+ptr[n]];
-    auto rhi = rlo + n;
-    auto pind = rhi + n;
+  (const integer_t* ptr, const integer_t* ind,
+   std::vector<integer_t>& perm, std::vector<integer_t>& iperm) {
+    integer_t n = perm.size();
+    std::vector<integer_t> rlo(n), rhi(n), pind(ptr[n]);
     for (integer_t i=0; i<n; i++) {
       rlo[perm[i]] = ptr[i];
       rhi[perm[i]] = ptr[i+1];
@@ -587,16 +586,15 @@ namespace strumpack {
     for (integer_t j=0; j<n; j++)
       for (integer_t i=rlo[j]; i<rhi[j]; i++)
         pind[i] = perm[ind[i]];
-    auto etree = spsymetree(rlo, rhi, pind, n);
+    auto etree = spsymetree(rlo.data(), rhi.data(), pind.data(), n);
     auto post = etree_postorder<integer_t>(etree);
-    auto iwork = iperm;
+    auto& iwork = iperm;
     for (integer_t i=0; i<n; i++) iwork[post[i]] = post[etree[i]];
     for (integer_t i=0; i<n; i++) etree[i] = iwork[i];
     // product of perm and post
     for (integer_t i=0; i<n; i++) iwork[i] = post[perm[i]];
     for (integer_t i=0; i<n; i++) perm[i] = iwork[i];
     for (integer_t i=0; i<n; i++) iperm[perm[i]] = i;
-    delete[] rlo;
     return std::unique_ptr<SeparatorTree<integer_t>>
       (new SeparatorTree<integer_t>(etree));  // build separator tree
   }

@@ -127,7 +127,8 @@ namespace strumpack {
     // to [P0_brother,P0_brother+P_brother)
     template<typename scalar_t> RedistSubTree
     (const MatrixReorderingMPI<scalar_t,integer_t>& nd,
-     const std::vector<integer_t>* _upd, float* _work,
+     const std::vector<std::vector<integer_t>>& _upd,
+     const std::vector<float>& _work,
      integer_t P0, integer_t P, integer_t P0_sibling,
      integer_t P_sibling, integer_t owner, const MPIComm& comm) {
 
@@ -138,16 +139,16 @@ namespace strumpack {
       std::vector<float> sbuff;
       std::vector<MPIRequest> sreq;
       if (rank == owner) {
-        auto nbsep = nd.local_sep_tree->separators();
-        const auto& trees = nd.local_sep_tree->HSS_trees();
-        const auto& adm = nd.local_sep_tree->admissibilities();
+        auto nbsep = nd.local_tree().separators();
+        const auto& trees = nd.local_tree().HSS_trees();
+        const auto& adm = nd.local_tree().admissibilities();
 
         sbufi.push_back(nbsep);
-        sbufi.insert(sbufi.end(), nd.local_sep_tree->lch(), nd.local_sep_tree->lch()+nbsep);
-        sbufi.insert(sbufi.end(), nd.local_sep_tree->rch(), nd.local_sep_tree->rch()+nbsep);
-        sbufi.push_back(nd.local_sep_tree->root());
+        sbufi.insert(sbufi.end(), nd.local_tree().lch(), nd.local_tree().lch()+nbsep);
+        sbufi.insert(sbufi.end(), nd.local_tree().rch(), nd.local_tree().rch()+nbsep);
+        sbufi.push_back(nd.local_tree().root());
         for (integer_t s=0; s<nbsep+1; s++)
-          sbufi.push_back(nd.local_sep_tree->sizes(s) + nd.sub_graph_range.first);
+          sbufi.push_back(nd.local_tree().sizes(s) + nd.sub_graph_range.first);
         for (integer_t i=0; i<nbsep; i++)
           sbufi.push_back(_upd[i].size());
         for (integer_t i=0; i<nbsep; i++)
@@ -167,7 +168,7 @@ namespace strumpack {
         }
 
         sbuff.reserve(nbsep);
-        sbuff.insert(sbuff.end(), _work, _work+nbsep);
+        sbuff.insert(sbuff.end(), _work.begin(), _work.end());
 
         if (sbufi.size() >= std::numeric_limits<int>::max())
           std::cerr << "ERROR: In " << __FILE__ << ", line "
