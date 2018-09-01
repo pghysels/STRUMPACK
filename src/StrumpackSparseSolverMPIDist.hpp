@@ -150,13 +150,6 @@ namespace strumpack {
     using StrumpackSparseSolverMPI<scalar_t,integer_t>::opts_;
     using StrumpackSparseSolverMPI<scalar_t,integer_t>::comm_;
 
-    // virtual SpMat_t& matrix() override { return *mat_mpi_; }
-    // virtual Reord_t& reordering() override { return *nd_mpi_; }
-    // virtual Tree_t& tree() override { return *tree_mpi_dist_; }
-    // virtual const SpMat_t& matrix() const override { return *mat_mpi_; }
-    // virtual const Reord_t& reordering() const override { return *nd_mpi_; }
-    // virtual const Tree_t& tree() const override { return *tree_mpi_dist_; }
-
     virtual SpMat_t* matrix() override { return mat_mpi_.get(); }
     virtual Reord_t* reordering() override { return nd_mpi_.get(); }
     virtual Tree_t* tree() override { return tree_mpi_dist_.get(); }

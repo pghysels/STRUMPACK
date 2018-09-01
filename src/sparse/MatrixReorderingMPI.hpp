@@ -86,7 +86,6 @@ namespace strumpack {
     : public MatrixReordering<scalar_t,integer_t> {
 
   public:
-    MatrixReorderingMPI() : MatrixReordering<scalar_t,integer_t>() {}
 
     MatrixReorderingMPI(integer_t n, MPI_Comm c);
 
@@ -386,7 +385,7 @@ namespace strumpack {
           idx_t edge_cut = 0, nvtxs = sep_csr_ptr.size()-1;
           std::vector<idx_t> partitioning(nvtxs);
           int info = WRAPPER_METIS_PartGraphRecursive
-          (nvtxs, 2, sep_csr_ptr, sep_csr_ind, 2, edge_cut, partitioning);
+          (nvtxs, 1, sep_csr_ptr, sep_csr_ind, 2, edge_cut, partitioning);
           if (info !=  METIS_OK) {
             std::cerr << "METIS_PartGraphRecursive for separator"
               " reordering returned: " << info << std::endl;

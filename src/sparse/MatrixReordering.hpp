@@ -103,25 +103,20 @@ namespace strumpack {
 
   private:
     void split_separator
-    (const SPOptions<scalar_t>& opts,
-     HSS::HSSPartitionTree& hss_tree,
+    (const SPOptions<scalar_t>& opts, HSS::HSSPartitionTree& hss_tree,
      integer_t& nr_parts, integer_t sep,
-     const CSRMatrix<scalar_t,integer_t>& A,
-     integer_t part, integer_t count,
+     const CSRMatrix<scalar_t,integer_t>& A, integer_t part, integer_t count,
      std::vector<integer_t>& sorder);
 
     void extract_separator
     (const SPOptions<scalar_t>& opts, integer_t part,
      integer_t sep_beg, integer_t sep_end,
-     const CSRMatrix<scalar_t,integer_t>& A,
-     std::vector<idx_t>& xadj, std::vector<idx_t>& adjncy,
-     std::vector<integer_t>& sorder);
+     const CSRMatrix<scalar_t,integer_t>& A, std::vector<idx_t>& xadj,
+     std::vector<idx_t>& adjncy, std::vector<integer_t>& sorder);
 
     void separator_reordering_recursive
-    (const SPOptions<scalar_t>& opts,
-     const CSRMatrix<scalar_t,integer_t>& A,
-     bool hss_parent, integer_t sep,
-     std::vector<integer_t>& sorder);
+    (const SPOptions<scalar_t>& opts, const CSRMatrix<scalar_t,integer_t>& A,
+     bool hss_parent, integer_t sep, std::vector<integer_t>& sorder);
 
     void nested_dissection_print
     (const SPOptions<scalar_t>& opts, integer_t nnz, bool verbose) const;
