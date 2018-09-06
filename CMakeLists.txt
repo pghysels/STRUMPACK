@@ -479,6 +479,8 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/FileManipulation.cpp
   ${CMAKE_BINARY_DIR}/examples/FileManipulation.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/FileManipulation.h
   ${CMAKE_BINARY_DIR}/examples/FileManipulation.h COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/find_ann.hpp
+  ${CMAKE_BINARY_DIR}/examples/find_ann.hpp COPYONLY)
 
 if(STRUMPACK_BUILD_TESTS)
   include(CTest)
