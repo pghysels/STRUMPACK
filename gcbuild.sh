@@ -1,5 +1,13 @@
 
+if [[ $1 == "r" ]];
+then
+rm -rf build
+mkdir build
+fi
+
+cd build
 export CRAYPE_LINK_TYPE="dynamic"
+
 cmake .. \
 -DCMAKE_BUILD_TYPE=Release \
 -DCMAKE_INSTALL_PREFIX=. \
@@ -13,3 +21,7 @@ cmake .. \
 -DBLAS_LIBRARIES="/usr/local/Cellar/openblas/0.2.20_1/lib/libblas.dylib" \
 -DLAPACK_LIBRARIES="/usr/local/Cellar/openblas/0.2.20_1/lib/liblapack.dylib" \
 -DSCALAPACK_LIBRARIES="/Users/gichavez/Documents/local/scalapack-2.0.2/libscalapack.a" \
+
+make install VERBOSE=1
+cd examples
+make
