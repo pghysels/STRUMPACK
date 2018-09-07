@@ -25,8 +25,8 @@
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
  */
-/*! \file StrumpackSparseSolverMPI.hpp
- *
+/**
+ * \file StrumpackSparseSolverMPI.hpp
  * \brief Contains the definition of MPI distributed sparse solver
  * class with REPLICATED input.
  */
@@ -40,22 +40,33 @@
 
 namespace strumpack {
 
-  /*! \brief This is the interface for the distributed memory solver
-   *         with REPLICATED input.
+  /**
+   * \class StrumpackSparseSolverMPI
    *
-   * The factorization and solve are distributed using MPI. The sparse
-   * factors (fill-in) are distributed over the MPI processes, but
-   * each MPI process needs a copy of the entire input sparse matrix,
-   * the entire right-hand side and the entire solution vector. The
-   * matrix reordering and the symbolic factorization are not
-   * distributed (but they are threaded).
+   * \brief This is the interface for the distributed memory solver
+   * with REPLICATED input.
    *
-   * The StrumpackSparseSolverMPI class depends on 2 template
-   * paramaters <scalar_t,integer_t>. Supported types for
-   * scalar_t are: float, double, std::complex<float> and
-   * std::complex<double>. The integer_t type defaults to a
-   * regular int. If regular int causes 32 bit integer overflows,
-   * you should switch to integer_t=int64_t instead.
+   * This solver class inherits from StrumpackSparseSolver. Unlike
+   * StrumpackSparseSolver, the factorization and solve are
+   * distributed using MPI. The sparse factors (fill-in) are
+   * distributed over the MPI processes, but each MPI process needs a
+   * copy of the entire input sparse matrix, the entire right-hand
+   * side and the entire solution vector. The matrix reordering and
+   * the symbolic factorization are not distributed (but they are
+   * threaded).
+   *
+   * __We recommend not to use this interface, but to use
+   * StrumpackSparseSolverMPIDist instead.__
+   *
+   * \tparam scalar_t can be: float, double, std::complex<float> or
+   * std::complex<double>.
+   *
+   * \tparam integer_t defaults to a regular int. If regular int
+   * causes 32 bit integer overflows, you should switch to
+   * integer_t=int64_t instead. This should be a __signed__ integer
+   * type.
+   *
+   * \see StrumpackSparseSolverMPIDist, StrumpackSparseSolver
    */
   template<typename scalar_t,typename integer_t=int>
   class StrumpackSparseSolverMPI :
@@ -65,22 +76,32 @@ namespace strumpack {
     using Reord_t = MatrixReordering<scalar_t,integer_t>;
 
   public:
-    /*! \brief Constructor taking an MPI communicator and command line
-     *         arguments.
+    /**
+     * Constructor taking an MPI communicator and command line
+     * arguments. This routine is collective on all ranks in the MPI
+     * communicator comm.
      *
-     * \param mpi_comm
-     *              MPI communicator. Can be MPI_COMM_WORLD or
-     *              a subcommunicator. This will internally be duplicated.
-     * \param argc  The number of arguments, i.e, number of elements
-     *              in the argv array.
-     * \param argv  Command line arguments. Add -h or --help to
-     *              have a description printed.
-     * \param verb  Flag to suppres/enable output.
-     *              Only the root of mpi_comm will print output to stdout.
+     * \param mpi_comm MPI communicator. Can be MPI_COMM_WORLD or a
+     * subcommunicator. This will internally be duplicated.
+     * \param argc The number of arguments, i.e, number of elements in
+     * the argv array.
+     * \param argv Command line arguments. Add -h or --help to
+     * have a description printed.
+     * \param verb Flag to suppres/enable output.  Only the root of
+     * comm will print output to stdout.
      */
     StrumpackSparseSolverMPI
     (MPI_Comm comm, int argc, char* argv[], bool verbose=true);
 
+    /**
+     * Constructor of the StrumpackSparseSolver class. This routine is
+     * collective on all ranks in the MPI communicator comm.
+     *
+     * \param verbose flag to enable/disable output to cout
+     * \param root flag to denote whether this process is the root MPI
+     * process. Only the root will print certain messages
+     * \see set_from_options
+     */
     StrumpackSparseSolverMPI(MPI_Comm comm, bool verbose=true);
 
     /**
@@ -88,11 +109,52 @@ namespace strumpack {
      */
     virtual ~StrumpackSparseSolverMPI() {}
 
+    /**
+     * Set a matrix for this sparse solver. This method overwrites the
+     * corresponding routine from the base class
+     * StrumpackSparseSolver. For this interface, every rank needs to
+     * provide a copy of the entire matrix. This routine is collective
+     * on the MPI communicator from this solver.
+     *
+     * \param A input sparse matrix, should be provided on all
+     * ranks. The matrix will be copied internally, so it can be
+     * safely modified/deleted after calling this function.
+     * \see set_csr_matrix
+     */
     virtual void set_matrix(const CSRMatrix<scalar_t,integer_t>& A);
+
+
+    /**
+     * Set a matrix, in compressed sparse row storage, for this sparse
+     * solver. Indices in the CSR storage are 0-based. This method
+     * overwrites the corresponding routine from the base class
+     * StrumpackSparseSolver. For this interface, every rank needs to
+     * provide a copy of the entire matrix. This routine is collective
+     * on the MPI communicator from this solver. The matrix will be
+     * copied internally, so it can be safely modified/deleted after
+     * calling this function.
+     *
+     * \param N number of rows/column in the input matrix
+     * \param row_ptr row pointers, points to the start of each row in
+     * the col_ind and values arrays. Array of size N+1, with
+     * row_ptr[N+1] the total number of nonzeros
+     * \param col_ind for each nonzeros, the column index
+     * \param values nonzero values
+     * \param symmetric_pattern denote whether the sparsity pattern
+     * (not the numerical values) of the sparse inut matrix is
+     * symmetric.
+     * \see set_matrix
+     */
     virtual void set_csr_matrix
     (integer_t N, const integer_t* row_ptr,
      const integer_t* col_ind, const scalar_t* values,
      bool symmetric_pattern);
+
+    /**
+     * Return the MPI_Comm object associated with this solver.
+     * \return MPI_Comm object for this solver.
+     */
+    MPI_Comm comm() const { return comm_; }
 
   protected:
     using StrumpackSparseSolver<scalar_t,integer_t>::is_root_;

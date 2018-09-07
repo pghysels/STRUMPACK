@@ -120,6 +120,7 @@ namespace strumpack {
      * \param verbose flag to enable/disable output to cout
      * \param root flag to denote whether this process is the root MPI
      * process. Only the root will print certain messages
+     * \see set_from_options
      */
     StrumpackSparseSolver(bool verbose=true, bool root=true);
 
@@ -218,7 +219,10 @@ namespace strumpack {
     ReturnCode factor();
 
     /**
-     * Solve a linear system with a single right-hand side.
+     * Solve a linear system with a single right-hand side. Before
+     * being able to solve a linear system, the matrix needs to be
+     * factored. One can call factor() explicitly, or if this was not
+     * yet done, this routine will call factor() internally.
      *
      * \param b input, will not be modified. Pointer to the right-hand
      * side. Array should be lenght N, the dimension of the input
@@ -243,7 +247,10 @@ namespace strumpack {
 
     /**
      * Solve a linear system with a single or multiple right-hand
-     * sides.
+     * sides. Before being able to solve a linear system, the matrix
+     * needs to be factored. One can call factor() explicitly, or if
+     * this was not yet done, this routine will call factor()
+     * internally.
      *
      * \param b input, will not be modified. DenseMatrix containgin
      * the right-hand side vector/matrix. Should have N rows, with N
@@ -262,7 +269,7 @@ namespace strumpack {
      * iterative solver.  If set to false, x should not be set (but
      * should be allocated).
      * \return error code
-     * \see DenseMatrix, solve()
+     * \see DenseMatrix, solve(), factor()
      */
     virtual ReturnCode solve
     (const DenseM_t& b, DenseM_t& x, bool use_initial_guess=false);

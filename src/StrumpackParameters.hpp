@@ -25,6 +25,10 @@
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
  */
+/**
+ * \file StrumpackParameters.hpp
+ * \brief Contains the definition of some useful (global) variables.
+ */
 #ifndef STRUMPACK_PARAMETERS_HPP
 #define STRUMPACK_PARAMETERS_HPP
 #include <atomic>
@@ -39,8 +43,10 @@
 
 namespace strumpack { // these are all global variables
 
-  /*! \brief Enumeration for the possible return codes.
-   * \ingroup Enumerations */
+  /**
+   * \brief Enumeration for the possible return codes.
+   * \ingroup Enumerations
+   */
   enum class ReturnCode {
     SUCCESS,          /*!< Operation completed successfully. */
     MATRIX_NOT_SET,   /*!< The input matrix was not set.     */
@@ -71,7 +77,7 @@ namespace strumpack { // these are all global variables
     extern std::atomic<long long int> update_sample_flops;
     extern std::atomic<long long int> hss_solve_flops;
 
-#endif /* DOXYGEN_SHOULD_SKIP_THIS */
+#endif //DOXYGEN_SHOULD_SKIP_THIS
 
   } //end namespace params
 
@@ -124,7 +130,7 @@ namespace strumpack { // these are all global variables
 #define STRUMPACK_CB_SAMPLE_FLOPS(n) void(0);
 #define STRUMPACK_HSS_SOLVE_FLOPS(n) void(0);
 #endif
-#endif /* DOXYGEN_SHOULD_SKIP_THIS */
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
 } //end namespace strumpack
 

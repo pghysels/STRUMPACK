@@ -24,7 +24,11 @@
  * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
- *
+ */
+/**
+ * \file CSRMatrixMPI.hpp
+ * \brief Contains the CSRMatrixMPI class definition, a class
+ * representing a block-row distributed compressed sparse row matrix.
  */
 #ifndef CSRMATRIXMPI_HPP
 #define CSRMATRIXMPI_HPP
@@ -43,6 +47,7 @@
 
 namespace strumpack {
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
   template<typename scalar_t,typename integer_t> class SPMVBuffers {
   public:
     bool initialized = false;
@@ -60,6 +65,7 @@ namespace strumpack {
     // corresponding index in the receive buffer
     std::vector<integer_t> prbuf;
   };
+#endif //DOXYGEN_SHOULD_SKIP_THIS
 
 
   /**
@@ -70,6 +76,9 @@ namespace strumpack {
    *  - use MPIComm
    *  - store the block diagonal as a CSRMatrix
    *  - ...
+   *
+   * \tparam scalar_t ...
+   * \tparam integer_t  TODO set a default for this?
    */
   template<typename scalar_t,typename integer_t>
   class CSRMatrixMPI : public CompressedSparseMatrix<scalar_t,integer_t> {
