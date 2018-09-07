@@ -37,6 +37,7 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrix<scalar_t>::compress_ann
     (DenseM_t& ann, DenseM_t& scores, const elem_t& Aelem, const opts_t& opts) {
 
+      std::cout << "---> USING COMPRESS_ANN <---" << std::endl;
       //int d_old = 0, d = opts.d0() + opts.p();
 
       int d = opts.d0();

@@ -972,8 +972,8 @@ void find_approximate_neighbors(vector<double> &data, int n, int d,
         vector<double> new_neighbor_scores(n*ann_number, 0.0);   
         find_ann_candidates(data, n, d, ann_number, new_neighbors, new_neighbor_scores);
         choose_best_neighbors(neighbors, neighbor_scores, new_neighbors, new_neighbor_scores, ann_number);
-        cout << "iter " << iter << " done" << endl;       
-        }
+        // cout << "iter " << iter << " done" << endl;       
+    }
 
 }
 
@@ -992,9 +992,10 @@ int main(int argc, char *argv[]) {
   double total_time;
   string mode("valid");
 
+  cout << endl;
   cout << "# usage: ./KernelRegression_mf file d h lambda "
           "kern(1=Gau,2=Lapl) "
-          "reorder(nat, 2mea, kd, pca) mode(valid, test)"
+          "reorder(nat, 2means, kd, pca) mode(valid, test)"
        << endl;
 
   if (argc > 1)
@@ -1012,13 +1013,14 @@ int main(int argc, char *argv[]) {
   if (argc > 7)
     mode = string(argv[7]);
 
-  cout << "# data dimension = " << d << endl;
-  cout << "# kernel h = " << h << endl;
-  cout << "# lambda = " << lambda << endl;
-  cout << "# kernel type = " << ((kernel == 1) ? "Gauss" : "Laplace") << endl;
-  cout << "# reordering/clustering = " << reorder << endl;
-  cout << "# validation/test = " << mode << endl;
-  
+  cout << endl;
+  cout << "# data dimension    = " << d << endl;
+  cout << "# kernel h          = " << h << endl;
+  cout << "# lambda            = " << lambda << endl;
+  cout << "# kernel type       = " << ((kernel == 1) ? "Gauss" : "Laplace") << endl;
+  cout << "# reordering/clust  = " << reorder << endl;
+  cout << "# validation/test   = " << mode << endl;
+
   TaskTimer::t_begin = GET_TIME_NOW();
   TaskTimer timer(string("compression"), 1);
 
@@ -1026,8 +1028,16 @@ int main(int argc, char *argv[]) {
   hss_opts.set_verbose(true);
   hss_opts.set_from_command_line(argc, argv);
 
-  //cout << "# Reading data..." << endl;
- // timer.start();
+  cout << endl;
+  cout << "# hss_opts.d0       = " << hss_opts.d0()    << endl;
+  cout << "# hss_opts.dd       = " << hss_opts.dd()    << endl;
+  cout << "# hss_opts.rel_t    = " << hss_opts.rel_tol()   << endl;
+  cout << "# hss_opts.abs_t    = " << hss_opts.abs_tol()   << endl;
+  cout << "# hss_opts.leaf     = " << hss_opts.leaf_size() << endl;
+  cout << endl;
+
+  cout << "# Reading data..." << endl;
+  timer.start();
 
   string data_train_dat_FILE = filename + "_train.csv";
   string data_train_lab_FILE = filename + "_train_label.csv";
@@ -1041,7 +1051,7 @@ int main(int argc, char *argv[]) {
   vector<double> data_test_label  = write_from_file(data_test_lab_FILE);
 
   
-  //cout << "# Reading took " << timer.elapsed() << endl;
+  cout << "# Reading took " << timer.elapsed() << endl;
 
   int n = data_train.size() / d;
   int m = data_test.size() / d;
@@ -1050,7 +1060,6 @@ int main(int argc, char *argv[]) {
   HSSPartitionTree cluster_tree;
   cluster_tree.size = n;
   int cluster_size = hss_opts.leaf_size();
-
 
   if (reorder == "2means") {
     recursive_2_means(data_train.data(), n, d, cluster_size, cluster_tree,
@@ -1063,7 +1072,8 @@ int main(int argc, char *argv[]) {
                   data_train_label.data());
   }
 
-  cout << "starting HSS compression .. " << endl;
+  cout << endl;
+  cout << "# Starting HSS compression... " << endl;
 
   HSSMatrix<double> K;
   if (reorder != "natural")
@@ -1080,11 +1090,10 @@ int main(int argc, char *argv[]) {
 
   int num_iters = 5;
   auto start_ann = chrono::system_clock::now();
-  find_approximate_neighbors(data_train, n, d, num_iters, ann_number, neighbors, neighbor_scores);
-                               // gaussian_samples);
+    find_approximate_neighbors(data_train, n, d, num_iters, ann_number, neighbors, neighbor_scores);
   auto end_ann = chrono::system_clock::now();
   chrono::duration<double> elapsed_seconds_ann = end_ann-start_ann;
-  cout << "elapsed time for approximate neighbor search: " << elapsed_seconds_ann.count() << " sec" << endl;
+  cout << "# Time for approximate neighbor search: " << elapsed_seconds_ann.count() << " sec" << endl;
   
 
   vector<double> neighbors_d;
@@ -1096,29 +1105,26 @@ int main(int argc, char *argv[]) {
   DenseMatrixWrapper<double> scores(ann_number, n, &neighbor_scores[0], ann_number);
   timer.start();
 
-  for (int i = 0; i < ann_number; i++)
-  {
-     cout << ann(i, 0) << ' ';
-    }
-    cout << endl;
+  // Print scores and ann
+  // for (int i = 0; i < ann_number; i++) {
+  //   cout << ann(i, 0) << ' ';
+  // }
+  // cout << endl;
 
-    for (int i = 0; i < ann_number; i++)
-    {
-      cout << scores(i, 0) << ' ';
-    }
-    cout << endl;
+  // for (int i = 0; i < ann_number; i++) {
+  // cout << scores(i, 0) << ' ';
+  // }
+  // cout << endl;
 
   Kernel kernel_matrix(data_train, d, h, lambda);
   //cout << "# rank(K) = " << kernel_matrix.normF() << endl;
 
   // ---CHOOSE SEARCH OPTION ANN/STANDARD--------------
-   //K.compress_ann(ann, scores, kernel_matrix, hss_opts);
+  //  K.compress_ann(ann, scores, kernel_matrix, hss_opts);
    K.compress(kernel_matrix, kernel_matrix, hss_opts);
 
 
-
-
-  cout << "# compression time = " << timer.elapsed() << endl;
+  cout << "### compression time = " << timer.elapsed() << " ###" <<endl;
   total_time += timer.elapsed();
 
   if (K.is_compressed()) {
@@ -1157,15 +1163,15 @@ int main(int argc, char *argv[]) {
       }
   }
 
- cout << 100. * K.memory() /  Kdense.memory() << "% of dense" << endl;
+  cout << "# "<< 100. * K.memory() /  Kdense.memory() << "% of dense" << endl;
   //K.print_info();
   auto Ktest = K.dense();
   Ktest.scaled_add(-1., Kdense);
-  cout << "compression tolerance" << max(hss_opts.rel_tol(), hss_opts.abs_tol()) <<endl;
   cout << "# compression error = ||Kdense-K*I||_F/||Kdense||_F = "
-        << Ktest.normF() / Kdense.normF() << endl;
+       << Ktest.normF() / Kdense.normF() << endl;
   
-  cout << "factorization start" << endl;
+  cout << endl;
+  cout << "# Factorization start" << endl;
   timer.start();
   auto ULV = K.factor();
   cout << "# factorization time = " << timer.elapsed() << endl;
@@ -1174,7 +1180,8 @@ int main(int argc, char *argv[]) {
   DenseMatrix<double> B(n, 1, &data_train_label[0], n);
   DenseMatrix<double> weights(B);
 
-  cout << "solution start" << endl;
+  cout << endl;
+  cout << "# Solution start..." << endl;
   timer.start();
   K.solve(ULV, weights);
   cout << "# solve time = " << timer.elapsed() << endl;
@@ -1219,10 +1226,11 @@ int main(int argc, char *argv[]) {
   // {
   //   cout << sample_v(i, 0) << endl;
   // }
-  cout << "solution error = "
+  cout << "# solution error = "
         << sample_v.normF() << endl;
 
-  cout << "# Starting prediction step " << endl;
+  cout << endl;
+  cout << "# Starting prediction..." << endl;
   timer.start();
 
   double *prediction = new double[m];
