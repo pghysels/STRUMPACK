@@ -764,7 +764,7 @@ namespace strumpack {
    * \tparam scalar_t Possible values for the scalar_t template type
    * are: float, double, std::complex<float> and std::complex<double>.
    *
-   * \see DenseMatrix
+   * \see DenseMatrix, ConstDenseMatrixWrapperPtr
    */
   template<typename scalar_t>
   class DenseMatrixWrapper : public DenseMatrix<scalar_t> {
@@ -913,6 +913,19 @@ namespace strumpack {
     }
   };
 
+
+  /**
+   * Create a DenseMatrixWrapper for a const dense matrix.
+   * TODO: we need to find a better way to handle this.
+   *
+   * \param m number of rows of the submatrix (the created wrapper),
+   * the view in the matrix D
+   * \param n number of columns of the submatrix
+   * \param D pointer to a dense matrix. This will not be modified,
+   * will not be freed.
+   * \param ld leading dimension of D, ld >= m
+   * \return unique_ptr with a const DenseMatrixWrapper
+   */
   template<typename scalar_t>
   std::unique_ptr<const DenseMatrixWrapper<scalar_t>>
   ConstDenseMatrixWrapperPtr
@@ -920,6 +933,25 @@ namespace strumpack {
     return std::unique_ptr<const DenseMatrixWrapper<scalar_t>>
       (new DenseMatrixWrapper<scalar_t>(m, n, const_cast<scalar_t*>(D), ld));
   }
+
+  /**
+   * Create a DenseMatrixWrapper for a const dense matrix.
+   * TODO: we need to find a better way to handle this.
+   * Should have i+m <= D.rows() and j+n <= D.cols().
+   *
+   *
+   * \param m number of rows of the submatrix (the created wrapper),
+   * the view in the matrix D
+   * \param n number of columns of the submatrix
+   * \param D pointer to a dense matrix. This will not be modified,
+   * will not be freed.
+   * \param ld leading dimension of D
+   * \param i row offset in the matrix D, denoting the top left corner
+   * of the submatrix to be created
+   * \param j column offset in the matrix D, denoting the top left corner
+   * of the submatrix to be created
+   * \return unique_ptr with a const DenseMatrixWrapper
+   */
   template<typename scalar_t>
   std::unique_ptr<const DenseMatrixWrapper<scalar_t>>
   ConstDenseMatrixWrapperPtr
@@ -931,7 +963,22 @@ namespace strumpack {
   }
 
 
-  /** copy submatrix of a at ia,ja of size m,n into b at position ib,jb */
+  /**
+   * Copy submatrix of a at ia,ja of size m,n into b at position
+   * ib,jb.  Should have ia+m <= a.rows(), ja+n <= a.cols(), ib+m <=
+   * b.rows() and jb.n <= b.cols().
+   *
+   * \param m number of rows to copy
+   * \param n number of columns to copy
+   * \param a DenseMatrix to copy from
+   * \param ia row offset of top left corner of submatrix of a to copy
+   * \param ja column offset of top left corner of submatrix of a to
+   * copy
+   * \param b matrix to copy to
+   * \param ib row offset of top left corner of place in b to copy to
+   * \param jb column offset of top left corner of place in b to copy
+   * to
+   */
   template<typename scalar_t> void
   copy(std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& a,
        std::size_t ia, std::size_t ja, DenseMatrix<scalar_t>& b,
@@ -941,14 +988,30 @@ namespace strumpack {
         b(ib+i, jb+j) = a(ia+i, ja+j);
   }
 
-  /** copy matrix a into matrix b at position ib, jb */
+  /**
+   * Copy matrix a into matrix b at position ib, jb.  Should have
+   * ib+a.rows() <= b.row() and jb+a.cols() <= b.cols().
+   *
+   * \param a matrix to copy
+   * \param b matrix to copy to
+   * \param ib row offset of top left corner of place in b to copy to
+   * \param jb column offset of top left corner of place in b to copy
+   * to
+   */
   template<typename scalar_t> void
   copy(const DenseMatrix<scalar_t>& a, DenseMatrix<scalar_t>& b,
        std::size_t ib, std::size_t jb) {
     copy(a.rows(), a.cols(), a, 0, 0, b, ib, jb);
   }
 
-  /** copy matrix a into matrix b at position ib, jb */
+  /**
+   * Copy matrix a into matrix b. Should have ldb >= a.rows(). Matrix
+   * b should have been allocated.
+   *
+   * \param a matrix to copy
+   * \param b dense matrix to copy to
+   * \param ldb leading dimension of b
+   */
   template<typename scalar_t> void
   copy(const DenseMatrix<scalar_t>& a, scalar_t* b, std::size_t ldb) {
     for (std::size_t j=0; j<a.cols(); j++)
@@ -956,6 +1019,15 @@ namespace strumpack {
         b[i+j*ldb] = a(i, j);
   }
 
+
+  /**
+   * Vertically concatenate 2 DenseMatrix objects a and b: [a; b]. Should have
+   * a.cols() == b.cols()
+   *
+   * \param a dense matrix, will be placed on top
+   * \param b dense matrix, will be below
+   * \return [a; b]
+   */
   template<typename scalar_t> DenseMatrix<scalar_t>
   vconcat(const DenseMatrix<scalar_t>& a, const DenseMatrix<scalar_t>& b) {
     assert(a.cols() == b.cols());
@@ -965,6 +1037,14 @@ namespace strumpack {
     return tmp;
   }
 
+  /**
+   * Horizontally concatenate 2 DenseMatrix objects a and b: [a;
+   * b]. Should have a.rows() == b.rows()
+   *
+   * \param a dense matrix, will be placed left
+   * \param b dense matrix, will be placed right
+   * \return [a b]
+   */
   template<typename scalar_t> DenseMatrix<scalar_t>
   hconcat(const DenseMatrix<scalar_t>& a, const DenseMatrix<scalar_t>& b) {
     assert(a.rows() == b.rows());
@@ -974,6 +1054,13 @@ namespace strumpack {
     return tmp;
   }
 
+  /**
+   * Create an identity matrix of size m x n, ie, 1 on the main
+   * diagonal, zero everywhere else.
+   *
+   * \return DenseMatrix with rows()==m, cols()==n, operator()(i,i)==1
+   * and operator()(i,j)==0 for i!=j.
+   */
   template<typename scalar_t> DenseMatrix<scalar_t>
   eye(std::size_t m, std::size_t n) {
     DenseMatrix<scalar_t> I(m, n);
