@@ -32,6 +32,13 @@
 #endif
 
 namespace strumpack {
+
+  void get_version(int& major, int& minor, int& patch) {
+    major = STRUMPACK_VERSION_MAJOR;
+    minor = STRUMPACK_VERSION_MINOR;
+    patch = STRUMPACK_VERSION_PATCH;
+  }
+
   namespace params {
 
 #if defined(_OPENMP)
