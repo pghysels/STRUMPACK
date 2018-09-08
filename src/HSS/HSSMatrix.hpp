@@ -26,7 +26,8 @@
  *             Division).
  *
  */
-/*! \file HSSMatrix.hpp
+/**
+ * \file HSSMatrix.hpp
  *
  * \brief This file contains the HSSMatrix class definition as well as
  * implementations for a number of it's member routines. Other member
@@ -50,12 +51,11 @@ namespace strumpack {
     // forward declaration
     template<typename scalar_t> class HSSMatrixMPI;
 
-
     /**
      * \class HSSMatrix
      *
-     * \brief HSSMatrix is a class to represent a sequential/threaded
-     * Hierarchically Semi-Separable matrix.
+     * \brief Class to represent a sequential/threaded Hierarchically
+     * Semi-Separable matrix.
      *
      * This is for non-symmetric matrices, but can be used with
      * symmetric matrices as well. This class inherits from

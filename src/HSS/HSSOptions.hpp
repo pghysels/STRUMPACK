@@ -25,8 +25,10 @@
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
  */
-/*! \file HSSOptions.hpp
- * \brief For Pieter to complete
+/**
+ * \file HSSOptions.hpp
+ * \brief Contains the HSSOptions class as well as general routines
+ * for HSS options.
  */
 #ifndef HSS_OPTIONS_HPP
 #define HSS_OPTIONS_HPP
@@ -39,20 +41,67 @@ namespace strumpack {
   /*! HSS namespace. */
   namespace HSS {
 
+    /**
+     * Get the default relative HSS compression tolerance (this is for
+     * double precision, might be overloaded depending on floating
+     * point precision). This can be changed using the HSSOptions
+     * object. Tuning this parameter (in the HSSOptions object) is
+     * crucial for performance of the HSS algorithms.
+     */
     template<typename real_t> inline real_t default_HSS_rel_tol() {
       return real_t(1e-2);
     }
+    /**
+     * Get the default absolute HSS compression tolerance (this is for
+     * double precision, might be overloaded for single
+     * precision). This can be changed using the HSSOptions object.
+     */
     template<typename real_t> inline real_t default_HSS_abs_tol() {
       return real_t(1e-8);
     }
+
+    /**
+     * Get the default relative HSS compression tolerance for single
+     * precision computations. This can be changed using the
+     * HSSOptions object. Tuning this parameter (in the
+     * HSSOptions<float> object) is crucial for performance of the HSS
+     * algorithms.
+     */
     template<> inline float default_HSS_rel_tol() {
       return 1e-1;
     }
+    /**
+     * Get the default absolute HSS compression tolerance for single
+     * precision computations. This can be changed using the
+     * HSSOptions object.
+     */
     template<> inline float default_HSS_abs_tol() {
       return 1e-5;
     }
 
-    enum class CompressionAlgorithm { ORIGINAL, STABLE, HARD_RESTART };
+    /**
+     * Enumeration of possible versions of the randomized sampling HSS
+     * compression algorithms.
+     * \ingroup Enumerations
+     */
+    enum class CompressionAlgorithm {
+      ORIGINAL,    /*!< Start with an initial guess of the rank,
+                      double the number of random samples until
+                      desired accuracy. */
+      STABLE,      /*!< Start with an initial guess of the rank, add a
+                     fix amount of random vectors, until desired
+                     accuracy is reached. */
+      HARD_RESTART /*!< Start with an initial guess of the rank, add a
+                     fix amount of random vectors, if not enough,
+                     start again from scratch using twice as many
+                     random sample vectors. */
+    };
+
+    /**
+     * Return a string with the name of the compression algorithm.
+     * \param a type of the randomized compression algorihtm
+     * \return name, string with a short description
+     */
     inline std::string get_name(CompressionAlgorithm a) {
       switch (a) {
       case CompressionAlgorithm::ORIGINAL: return "original"; break;
@@ -62,79 +111,200 @@ namespace strumpack {
       }
     }
 
+    /**
+     * \class HSSOptions
+     * \brief Class containing several options for the HSS code and
+     * data-structures
+     *
+     * \tparam scalar_t scalar type, can be float, double,
+     * std::complex<float> or std::complex<double>. This is used here
+     * mainly because tolerances might depend on the precision.
+     */
     template<typename scalar_t> class HSSOptions {
-      using real_t = typename RealType<scalar_t>::value_type;
-
-    private:
-      real_t _rel_tol = default_HSS_rel_tol<real_t>();
-      real_t _abs_tol = default_HSS_abs_tol<real_t>();
-      int _leaf_size = 128;
-      int _d0 = 128;
-      int _dd = 64;
-      int _p = 10;
-      int _max_rank = 5000;
-      random::RandomEngine _random_engine =
-        random::RandomEngine::LINEAR;
-      random::RandomDistribution _random_distribution =
-        random::RandomDistribution::NORMAL;
-      bool _user_defined_random = false;
-      bool _log_ranks = false;
-      CompressionAlgorithm _compress_algo = CompressionAlgorithm::STABLE;
-      bool _sync = false;
-      bool _verbose = true;
 
     public:
-      /*! \brief For Pieter to complete
-       * \param rel_tol
+      /**
+       * real_t is the real type corresponding to the (possibly
+       * complex) scalar_t template parameter
+       */
+      using real_t = typename RealType<scalar_t>::value_type;
+
+      /**
+       * Set the relative tolerance to be used for HSS
+       * compression. Tuning this parameter is very important for
+       * performance.
+       *
+       * \param rel_tol relative compression tolerance
        */
       void set_rel_tol(real_t rel_tol) {
         assert(rel_tol <= real_t(1.) && rel_tol >= real_t(0.));
         _rel_tol = rel_tol;
       }
+
+      /**
+       * Set the absolute compression tolerance.
+       *
+       * \param abs_tol absolute compression tolerance
+       */
       void set_abs_tol(real_t abs_tol) {
         assert(abs_tol >= real_t(0.));
         _abs_tol = abs_tol;
       }
-    /*! \brief For Pieter to complete
-     * \param leaf_size
-     */
+
+      /**
+       * Set the HSS leaf size. The smallest diagonal blocks in the
+       * HSS hierarchy will have size approximately the leaf size
+       * (within a factor 2).
+       *
+       * \param leaf_size
+       */
       void set_leaf_size(int leaf_size) {
         assert(_leaf_size > 0);
         _leaf_size = leaf_size;
       }
+
+      /**
+       * Set the initial number of random samples to be used in the
+       * random sampling HSS construction algorithm. See the manual
+       * for more information on the randomized compression algorithm.
+       */
       void set_d0(int d0) { assert(d0 > 0); _d0 = d0; }
+
+      /**
+       * Set the number of random to be used to increment the random
+       * samples vectors in the adaptive randomized HSS compression
+       * algorithm. This is only used when compression_algorithm() ==
+       * CompressionAlgorithm::STABLE. See the manual for more
+       * information on the randomized compression algorithm.
+       */
       void set_dd(int dd) { assert(dd > 0); _dd = dd; }
+
+      /**
+       * Oversampling parameter. Used in adaptive compression, to
+       * check stopping criterion.
+       */
       void set_p(int p) { assert(p >= 0); _p = p; }
+
+      /**
+       * Set the maximum rank allowed in HSS compression.
+       */
       void set_max_rank(int max_rank) {
         assert(max_rank > 0);
         _max_rank = max_rank;
       }
+
+      /**
+       * Set the random engine, used in randomized compression.
+       * \see RandomEngine, RandomDistribution, set_random_distribution()
+       */
       void set_random_engine(random::RandomEngine random_engine) {
         _random_engine = random_engine;
       }
+
+      /**
+       * Set the random distribution, used in randomized compression.
+       * \see RandomEngine, RandomDistribution, set_random_engine()
+       */
       void set_random_distribution
       (random::RandomDistribution random_distribution) {
         _random_distribution = random_distribution;
       }
+
+      /**
+       * Specify the variant of the adaptive compression
+       * algorithm. See the manual for more information.
+       */
       void set_compression_algorithm(CompressionAlgorithm a) {
         _compress_algo = a;
       }
+
+      /**
+       * Set this to true if you want to manually fill the random
+       * sample vectors with random values.
+       */
       void set_user_defined_random(bool user_defined_random) {
         _user_defined_random = user_defined_random;
       }
+
+      /**
+       * Set this to true if you require communication in the element
+       * extraction routine, since in that case the element extraction
+       * is collective, and has to be synchronized.
+       */
       void set_synchronized_compression(bool sync) {
         _sync = sync;
       }
+
+      /**
+       * Log the HSS ranks to a file. TODO is this currently
+       * supported??
+       */
       void set_log_ranks(bool log_ranks) { _log_ranks = log_ranks; }
+
+      /**
+       * Enable or disable verbose output (only by the root process)
+       * to stdout.
+       */
       void set_verbose(bool verbose) { _verbose = verbose; }
 
+      /**
+       * Get the relative compression tolerance.
+       * \return the relative compression tolerance
+       * \see set_rel_tol(), set_abs_tol(), get_abs_tol()
+       */
       real_t rel_tol() const { return _rel_tol; }
+
+      /**
+       * Get the absolute compression tolerance.
+       * \return the absolute compression tolerance
+       * \see set_abs_tol(), set_rel_tol(), get_rel_tol()
+       */
       real_t abs_tol() const { return _abs_tol; }
+
+      /**
+       * Get the HSS leaf size.
+       * \return the (approximate) HSS leaf size
+       * \see set_leaf_size()
+       */
       int leaf_size() const { return _leaf_size; }
+
+      /**
+       * Get the initial number of random vector that will be used in
+       * adaptive randomized HSS compression. See the manual for more
+       * info.
+       *
+       * \return initial guess for the rank, used in adaptive
+       * compression
+       * \see set_d0(), set_dd(), set_p()
+       */
       int d0() const { return _d0; }
+
+      /**
+       * Increment for the number of random vectors during adaptive
+       * compression.
+       *
+       * \return amount with which the number of random vectors will
+       * be incremented
+       * \see set_d0(), set_dd()
+       */
       int dd() const { return _dd; }
+
+      /**
+       * Get the current value of the oversampling parameter.
+       * \return the oversampling parameter.
+       * \see set_p()
+       */
       int p() const { return _p; }
+
+      /**
+       * Get the maximum allowable rank (note, this is not the actual
+       * maximum computed rank).
+       * \return maximum allowable rank
+       * \see set_max_rank()
+       */
       int max_rank() const { return _max_rank; }
+
+
       random::RandomEngine random_engine() const { return _random_engine; }
       random::RandomDistribution random_distribution() const {
         return _random_distribution;
@@ -293,6 +463,24 @@ namespace strumpack {
                   << !verbose() << ")" << std::endl
                   << "#   --help or -h" << std::endl;
       }
+
+    private:
+      real_t _rel_tol = default_HSS_rel_tol<real_t>();
+      real_t _abs_tol = default_HSS_abs_tol<real_t>();
+      int _leaf_size = 128;
+      int _d0 = 128;
+      int _dd = 64;
+      int _p = 10;
+      int _max_rank = 5000;
+      random::RandomEngine _random_engine =
+        random::RandomEngine::LINEAR;
+      random::RandomDistribution _random_distribution =
+        random::RandomDistribution::NORMAL;
+      bool _user_defined_random = false;
+      bool _log_ranks = false;
+      CompressionAlgorithm _compress_algo = CompressionAlgorithm::STABLE;
+      bool _sync = false;
+      bool _verbose = true;
     };
 
   } // end namespace HSS

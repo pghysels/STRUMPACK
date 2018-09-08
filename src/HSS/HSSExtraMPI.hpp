@@ -34,6 +34,7 @@
 namespace strumpack {
   namespace HSS {
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     template<typename scalar_t>
     class WorkCompressMPI : public WorkCompressBase<scalar_t> {
     public:
@@ -57,7 +58,10 @@ namespace strumpack {
         w_seq->lvl = this->lvl;
       }
     };
+#endif //DOXYGEN_SHOULD_SKIP_THIS
 
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     template<typename scalar_t> class WorkApplyMPI {
     public:
       std::pair<std::size_t,std::size_t> offset;
@@ -65,9 +69,12 @@ namespace strumpack {
       DistributedMatrix<scalar_t> tmp1, tmp2;
       std::unique_ptr<WorkApply<scalar_t>> w_seq;
     };
+#endif //DOXYGEN_SHOULD_SKIP_THIS
+
 
     template<typename scalar_t> class HSSMatrixBase;
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     template<typename scalar_t> class DistSubLeaf {
     public:
       DistSubLeaf
@@ -95,6 +102,8 @@ namespace strumpack {
       const HSSMatrixBase<scalar_t>* hss_;
       const BLACSGrid* grid_loc_;
     };
+#endif //DOXYGEN_SHOULD_SKIP_THIS
+
 
     class TreeLocalRanges {
     public:
@@ -122,6 +131,7 @@ namespace strumpack {
       int _ctxt = -1;
     };
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     template<typename scalar_t> class WorkFactorMPI {
     public:
       std::vector<WorkFactorMPI<scalar_t>> c;
@@ -133,13 +143,32 @@ namespace strumpack {
       DistributedMatrix<scalar_t> Vt1;
       std::unique_ptr<WorkFactor<scalar_t>> w_seq;
     };
+#endif //DOXYGEN_SHOULD_SKIP_THIS
 
+
+    /**
+     * \class HSSFactorsMPI
+     * \brief Contains data related to ULV factorization of a
+     * distributed HSS matrix.
+     *
+     * Class containing data regarding the ULV factorization of an
+     * HSSMatrixMPI This is constructed inside the ULV factorization
+     * routine and should be passed to the HSS solve routine (along
+     * with the original HSS matrix).
+     */
     template<typename scalar_t> class HSSFactorsMPI {
       template<typename T> friend class HSSMatrixMPI;
       template<typename T> friend class HSSMatrixBase;
+
     public:
-      const DistributedMatrix<scalar_t>& Vhat() const { return _Vt0; }
-      DistributedMatrix<scalar_t>& Vhat() { return _Vt0; }
+
+      /**
+       * Get the amount of memory __(per rank)__ used to store this
+       * data (excluding any metadata). To get the memory for the
+       * entire factorization, you should also count the memory of the
+       * original HSS matrix, as that is still required to perform a
+       * solve.
+       */
       std::size_t memory() {
         std::size_t mem = sizeof(*this) + _L.memory() + _Vt0.memory()
           + _W1.memory() + _Q.memory() + _D.memory()
@@ -148,6 +177,14 @@ namespace strumpack {
         if (_factors_seq) mem += _factors_seq->memory();
         return mem;
       }
+
+      /**
+       * Get the number of nonzeros __(per rank)__ in this data. To
+       * get the total number of nonzeros for the entire
+       * factorization, you should also count the nonzeros of the
+       * original HSS matrix, as that is still required to perform a
+       * solve.
+       */
       std::size_t nonzeros() const {
         std::size_t nnz = _L.nonzeros() + _Vt0.nonzeros() + _W1.nonzeros()
           + _Q.nonzeros() + _D.nonzeros();
@@ -155,17 +192,45 @@ namespace strumpack {
         if (_factors_seq) nnz += _factors_seq->nonzeros();
         return nnz;
       }
+
+      /**
+       * Get the total amount of memory over all ranks, used to store
+       * this data (excluding any metadata). To get the memory for the
+       * entire factorization, you should also count the memory of the
+       * original HSS matrix, as that is still required to perform a
+       * solve. __This is collective over all the communicator c.__
+       */
       std::size_t total_memory(MPI_Comm c) {
         std::size_t mtot, m=memory();
         MPI_Allreduce(&m, &mtot, 1, mpi_type<std::size_t>(), MPI_SUM, c);
         return mtot;
       }
+
+
+      /**
+       * Get the total number of nonzeros over all ranks in this
+       * data. To get the total number of nonzeros for the entire
+       * factorization, you should also count the nonzeros of the
+       * original HSS matrix, as that is still required to perform a
+       * solve. __This is collective over all the communicator c.__
+       */
       std::size_t total_nonzeros(MPI_Comm c) {
         std::size_t nnztot, nnz=nonzeros();
         MPI_Allreduce
           (&nnz, &nnztot, 1, mpi_type<std::size_t>(), MPI_SUM, c);
         return nnztot;
       }
+
+      /**
+       * Used in the sparse solver to construct the Schur complement.
+       */
+      const DistributedMatrix<scalar_t>& Vhat() const { return _Vt0; }
+
+      /**
+       * Used in the sparse solver to construct the Schur complement.
+       */
+      DistributedMatrix<scalar_t>& Vhat() { return _Vt0; }
+
     private:
       std::vector<HSSFactorsMPI<scalar_t>> _ch;
       std::unique_ptr<HSSFactors<scalar_t>> _factors_seq;
@@ -190,6 +255,8 @@ namespace strumpack {
       std::vector<int> _piv;            // hold permutation from LU(D) at root
     };
 
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     template<typename scalar_t> class WorkSolveMPI {
     public:
       std::vector<WorkSolveMPI<scalar_t>> c;
@@ -205,7 +272,10 @@ namespace strumpack {
       DistributedMatrix<scalar_t> reduced_rhs;
       std::pair<std::size_t,std::size_t> offset;
     };
+#endif //DOXYGEN_SHOULD_SKIP_THIS
 
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     template<typename scalar_t> class WorkExtractMPI {
     public:
       std::vector<WorkExtractMPI<scalar_t>> c;
@@ -251,7 +321,10 @@ namespace strumpack {
                   ycols.begin()+c0ycols);
       }
     };
+#endif //DOXYGEN_SHOULD_SKIP_THIS
 
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     template<typename scalar_t> class WorkExtractBlocksMPI {
     public:
       WorkExtractBlocksMPI(std::size_t nb) {
@@ -422,12 +495,16 @@ namespace strumpack {
         }
       }
     };
+#endif //DOXYGEN_SHOULD_SKIP_THIS
 
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     template<typename scalar_t> void
     create_triplet_mpi_type(MPI_Datatype* triplet_type) {
       MPI_Type_contiguous(sizeof(Triplet<scalar_t>), MPI_BYTE, triplet_type);
       MPI_Type_commit(triplet_type);
     }
+#endif //DOXYGEN_SHOULD_SKIP_THIS
 
   } // end namespace HSS
 } // end namespace strumpack

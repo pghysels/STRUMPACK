@@ -422,7 +422,8 @@ namespace strumpack {
     case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING:
     default: liw = 5*n_;
     }
-    auto iw = new int_t[liw];
+    auto iw_ = std::unique_ptr<int_t[]>(new int_t[liw]);
+    auto iw = iw_.get();
     int_t ldw = 0;
     switch (job) {
     case MatchingJob::MAX_CARDINALITY: ldw = 0; break;
@@ -432,36 +433,19 @@ namespace strumpack {
     case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING:
     default: ldw = 3*n_ + nnz_; break;
     }
-    auto dw = new double[ldw];
+    auto dw_ = std::unique_ptr<double[]>(new double[ldw]);
+    auto dw = dw_.get();
     int_t icntl[10], info[10];
     int_t num;
     strumpack_mc64id_(icntl);
     //icntl[2] = 6; // print diagnostics
     //icntl[3] = 1; // no checking of input should be (slightly) faster
-    switch (job) {
-    case MatchingJob::MAX_CARDINALITY:
-      strumpack_mc64(1, &num, perm.data(), liw, iw, ldw, dw, icntl, info);
-      break;
-    case MatchingJob::MAX_SMALLEST_DIAGONAL:
-      strumpack_mc64(2, &num, perm.data(), liw, iw, ldw, dw, icntl, info);
-      break;
-    case MatchingJob::MAX_SMALLEST_DIAGONAL_2:
-      strumpack_mc64(3, &num, perm.data(), liw, iw, ldw, dw, icntl, info);
-      break;
-    case MatchingJob::MAX_DIAGONAL_SUM:
-      strumpack_mc64(4, &num, perm.data(), liw, iw, ldw, dw, icntl, info);
-      break;
-    case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING:
-      strumpack_mc64(5, &num, perm.data(), liw, iw, ldw, dw, icntl, info);
-      break;
-    default: break;
-    }
+    strumpack_mc64(get_matching(job), &num, perm.data(),
+                   liw, iw, ldw, dw, icntl, info);
     switch (info[0]) {
     case  0: break;
     case  1:
       std::cerr << "# ERROR: matrix is structurally singular" << std::endl;
-      delete[] dw;
-      delete[] iw;
       return 1;
       break;
     case  2:
@@ -472,8 +456,6 @@ namespace strumpack {
     default:
       std::cerr << "# ERROR: mc64 failed with info[0]=" << info[0]
                 << std::endl;
-      delete[] dw;
-      delete[] iw;
       return 1;
       break;
     }
@@ -487,7 +469,6 @@ namespace strumpack {
       }
       if (apply) apply_scaling(Dr, Dc);
     }
-    delete[] iw; delete[] dw;
     if (apply) apply_column_permutation(perm);
     if (apply) symm_sparse_ = false;
     return 0;

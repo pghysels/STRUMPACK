@@ -787,6 +787,7 @@ WARN_LOGFILE           =
 	@CMAKE_CURRENT_SOURCE_DIR@/src/HSS/HSSMatrix.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/HSS/HSSMatrixMPI.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/misc/MPIWrapper.hpp \
+	@CMAKE_CURRENT_SOURCE_DIR@/src/misc/RandomWrapper.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Overview.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Installation.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Algorithm.txt \

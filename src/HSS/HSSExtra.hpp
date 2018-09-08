@@ -33,14 +33,35 @@
 namespace strumpack {
   namespace HSS {
 
+    /**
+     * Enumeration of possible states of an HSS matrix/node. This is
+     * used in the adaptive HSS compression algorithms, where a node
+     * can be untouched (it is not yet visited by the compression
+     * algorithm), partially_compressed (a compression was attempted
+     * but failed, so the adaptive algorithm will have to try again),
+     * or can be successfully compressed.
+     * \ingroup Enumerations
+     */
     enum class State : char
-      {UNTOUCHED='U', PARTIALLY_COMPRESSED='P', COMPRESSED='C'};
+      {UNTOUCHED='U',   /*!< Node was not yet visited by the
+                           compression algorithm */
+       PARTIALLY_COMPRESSED='P', /*!< Compression was attempted for
+                                    this node, but failed. The
+                                    adaptive compression should try
+                                    again. */
+       COMPRESSED='C'   /*!< This HSS node was succesfully
+                           compressed. */
+      };
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     template<typename T> std::pair<T,T>
     operator+(const std::pair<T,T>& l, const std::pair<T,T>& r) {
       return {l.first+r.first, l.second+r.second};
     }
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     template<typename scalar_t> class WorkCompressBase {
     public:
       WorkCompressBase() {}
@@ -105,13 +126,29 @@ namespace strumpack {
       DenseMatrix<scalar_t> Dt;  // (U.cols x U.cols) \tilde(D)
       DenseMatrix<scalar_t> Vt1; // (U.cols x V.cols) bottom part of \tilde{V}
     };
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
+
+    /**
+     * \class HSSFactors
+     * \brief Contains data related to ULV factorization of an HSS
+     * matrix.
+     *
+     * Class containing data regarding the ULV factorization of an HSS
+     * matrix. This is constructed inside the ULV factorization
+     * routine and should be passed to the HSS solve routine (along
+     * with the original HSS matrix).
+     */
     template<typename scalar_t> class HSSFactors {
     public:
-      template<typename T> friend class HSSMatrix;
-      template<typename T> friend class HSSMatrixBase;
-      DenseMatrix<scalar_t>& Vhat() { return _Vt0; }
-      const DenseMatrix<scalar_t>& Vhat() const { return _Vt0; }
+
+      /**
+       * Get the amount of memory used to store this data (excluding
+       * any metadata). To get the memory for the entire
+       * factorization, you should also count the memory of the
+       * original HSS matrix, as that is still required to perform a
+       * solve.
+       */
       std::size_t memory() {
         std::size_t mem = sizeof(*this) + _L.memory() + _Vt0.memory()
           + _W1.memory() + _Q.memory() + _D.memory()
@@ -119,12 +156,29 @@ namespace strumpack {
         for (auto& c : _ch) mem += c.memory();
         return mem;
       }
+
+      /**
+       * Get the number of nonzeros in this data. To get the total
+       * number of nonzeros for the entire factorization, you should
+       * also count the nonzeros of the original HSS matrix, as that
+       * is still required to perform a solve.
+       */
       std::size_t nonzeros() const {
         std::size_t nnz = _L.nonzeros() + _Vt0.nonzeros() + _W1.nonzeros()
           + _Q.nonzeros() + _D.nonzeros();
         for (auto& c : _ch) nnz += c.nonzeros();
         return nnz;
       }
+
+      /**
+       * Used in the sparse solver to construct the Schur complement.
+       */
+      const DenseMatrix<scalar_t>& Vhat() const { return _Vt0; }
+      /**
+       * Used in the sparse solver to construct the Schur complement.
+       */
+      DenseMatrix<scalar_t>& Vhat() { return _Vt0; }
+
     private:
       std::vector<HSSFactors<scalar_t>> _ch;
       DenseMatrix<scalar_t> _L;   // (U.rows-U.cols x U.rows-U.cols),
@@ -140,8 +194,11 @@ namespace strumpack {
       DenseMatrix<scalar_t> _D;   // (U.rows x U.rows) at the root holds LU(D)
                                   // else empty
       std::vector<int> _piv;      // hold permutation from LU(D) at root
+      template<typename T> friend class HSSMatrix;
+      template<typename T> friend class HSSMatrixBase;
     };
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     template<typename scalar_t> class WorkSolve {
     public:
       std::vector<WorkSolve<scalar_t>> c;
@@ -156,7 +213,10 @@ namespace strumpack {
       DenseMatrix<scalar_t> reduced_rhs;
       std::pair<std::size_t,std::size_t> offset;
     };
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     template<typename scalar_t> class AFunctor {
       using DenseM_t = DenseMatrix<scalar_t>;
     public:
@@ -178,20 +238,27 @@ namespace strumpack {
           }
       }
     };
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     template<typename scalar_t> class WorkDense {
     public:
       std::pair<std::size_t,std::size_t> offset;
       std::vector<WorkDense<scalar_t>> c;
       DenseMatrix<scalar_t> tmpU, tmpV;
     };
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     template<typename scalar_t> class Triplet {
     public:
       int _r; int _c; scalar_t _v;
       Triplet() {}
       Triplet(int r, int c, scalar_t v): _r(r), _c(c), _v(v) {}
     };
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
   } // end namespace HSS
 } // end namespace strumpack

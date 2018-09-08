@@ -534,8 +534,7 @@ namespace strumpack {
       for (integer_t i=ptr_[row]; i<ptr_[row+1]; i++)
         ind_[i] = iperm[ind_[i]];
       sort_indices_values<scalar_t>
-        (&ind_[ptr_[row]], &val_[ptr_[row]],
-         integer_t(0), ptr_[row+1]-ptr_[row]);
+        (ind_.data(), val_.data(), ptr_[row], ptr_[row+1]);
     }
     delete[] iperm;
   }
