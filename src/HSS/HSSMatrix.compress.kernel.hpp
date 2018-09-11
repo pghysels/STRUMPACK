@@ -34,19 +34,18 @@
 namespace strumpack {
   namespace HSS {
 
-    template<typename scalar_t> void HSSMatrix<scalar_t>::compress_ann
-    (DenseM_t& ann, DenseM_t& scores, const elem_t& Aelem, const opts_t& opts) {
-
+    template<typename scalar_t> void 
+    HSSMatrix<scalar_t>::compress_ann
+    (DenseM_t& ann, DenseM_t& scores, const elem_t& Aelem,
+    const opts_t& opts) {
       std::cout << "---> USING COMPRESS_ANN <---" << std::endl;
       //int d_old = 0, d = opts.d0() + opts.p();
 
-      int d = opts.d0();
+      int  d = opts.d0();
       auto n = this->cols();
 
       WorkCompressANN<scalar_t> w;
-
       compress_recursive_ann(ann, scores, Aelem, opts, w, d);
-
 
       // if (!this->is_compressed()) {
       //   // d_old = d;
@@ -57,8 +56,9 @@ namespace strumpack {
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::compress_recursive_ann
     (DenseM_t& ann, DenseM_t& scores,
-     const elem_t& Aelem, const opts_t& opts,
-     WorkCompressANN<scalar_t>& w, int d) {
+    const elem_t& Aelem, const opts_t& opts,
+    WorkCompressANN<scalar_t>& w, int d) {
+
       if (this->leaf()) {
         if (this->is_untouched()) {
           std::vector<std::size_t> I, J;
@@ -71,14 +71,16 @@ namespace strumpack {
           _D = DenseM_t(this->rows(), this->cols());
           Aelem(I, J, _D);
         }
-      } else {
+      }
+      else {
         w.split(this->_ch[0]->dims());
         this->_ch[0]->compress_recursive_ann
           (ann, scores, Aelem, opts, w.c[0], d);
         this->_ch[1]->compress_recursive_ann
           (ann, scores, Aelem, opts, w.c[1], d);
         if (!this->_ch[0]->is_compressed() ||
-            !this->_ch[1]->is_compressed()) return;
+            !this->_ch[1]->is_compressed()) 
+          return;
         if (this->is_untouched()) {
           _B01 = DenseM_t(this->_ch[0]->U_rank(), this->_ch[1]->V_rank());
           Aelem(w.c[0].Ir, w.c[1].Ic, _B01);
@@ -86,26 +88,30 @@ namespace strumpack {
           Aelem(w.c[1].Ir, w.c[0].Ic, _B10);
         }
       }
-      if (w.lvl == 0) this->_U_state = this->_V_state = State::COMPRESSED;
+      
+      if (w.lvl == 0){ 
+        this->_U_state = this->_V_state = State::COMPRESSED;
+      }
       else {
         compute_local_samples_ann(ann, scores, w, Aelem, d);
 
         // TODO get this working
         compute_U_V_bases_ANN(w.S, w.S, opts, w, d, 0);
-       // std::cout << "computed id " << std::endl;
+        // std::cout << "computed id " << std::endl;
+
         this->_U_state = this->_V_state = State::COMPRESSED;
       }
+    
     }
-  
 
     //NEW Main routine to change
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::compute_local_samples_ann
     (DenseM_t& ann, DenseM_t& scores, WorkCompressANN<scalar_t>& w,
-     const elem_t& Aelem, int d) {
+    const elem_t& Aelem, int d) {
       std::size_t ann_number = ann.rows();
+      
       if (this->leaf()) {
-
         //std::cout << this->rows() << std::endl;
         std::vector<std::size_t> I;
         I.reserve(this->rows());
@@ -129,7 +135,6 @@ namespace strumpack {
             }
           }
         }
-
 
         // remove duplicates 
         std::vector<std::size_t> order = find_sort_permutation(leaf_neibs);
@@ -171,31 +176,30 @@ namespace strumpack {
         //  std::cout << std::endl;
         //  }
 
-         // make at most d column samples
-         if (leaf_neibs.size() < d)
-         {
-           for (std::size_t j = 0; j < leaf_neibs.size(); j++)
-          {
-            w.Scolids.push_back(leaf_neibs[j]);
-            w.Scolscs.push_back(leaf_neib_scores[j]);
-          }
-         } 
-         else
-         {
-          std::vector<std::size_t> order = find_sort_permutation(leaf_neib_scores);
-          leaf_neibs = apply_permutation(leaf_neibs, order);
-          leaf_neib_scores = apply_permutation(leaf_neib_scores, order);
-          for (std::size_t j = 0; j < d; j++)
-          {
-            w.Scolids.push_back(leaf_neibs[j]);
-            w.Scolscs.push_back(leaf_neib_scores[j]);
-          }
-           
-         }
+        // make at most d column samples
+        if (leaf_neibs.size() < d) {
+          for (std::size_t j = 0; j < leaf_neibs.size(); j++)
+        {
+          w.Scolids.push_back(leaf_neibs[j]);
+          w.Scolscs.push_back(leaf_neib_scores[j]);
+        }
+        } 
+        else
+        {
+        std::vector<std::size_t> order = find_sort_permutation(leaf_neib_scores);
+        leaf_neibs = apply_permutation(leaf_neibs, order);
+        leaf_neib_scores = apply_permutation(leaf_neib_scores, order);
+        for (std::size_t j = 0; j < d; j++)
+        {
+          w.Scolids.push_back(leaf_neibs[j]);
+          w.Scolscs.push_back(leaf_neib_scores[j]);
+        }
+          
+        }
         w.S = DenseM_t(I.size(), w.Scolids.size());
         Aelem(I, w.Scolids, w.S);
-
-      } else {
+      }
+      else {
 
         // TODO
         std::vector<std::size_t> I;
@@ -293,14 +297,13 @@ namespace strumpack {
         //  std::cout << std::endl;
         w.S = DenseM_t(I.size(), w.Scolids.size());
         Aelem(I, w.Scolids, w.S);
-
-
       }
     }
 
- template<typename scalar_t> bool HSSMatrix<scalar_t>::compute_U_V_bases_ANN
+    template<typename scalar_t> bool 
+    HSSMatrix<scalar_t>::compute_U_V_bases_ANN
     (DenseM_t& Sr, DenseM_t& Sc, const opts_t& opts,
-     WorkCompressANN<scalar_t>& w, int d, int depth) {
+    WorkCompressANN<scalar_t>& w, int d, int depth) {
        
       auto rtol = opts.rel_tol() / w.lvl;
       auto atol = opts.abs_tol() / w.lvl;
@@ -308,7 +311,6 @@ namespace strumpack {
       auto u_rows = this->leaf() ? this->rows() :
         this->_ch[0]->U_rank()+this->_ch[1]->U_rank();
       
-
       //DenseM_t wSr(u_rows, d, Sr, w.offset.second, 0);
       DenseM_t wSr(u_rows, Sr.cols(), Sr, 0, 0);
 
