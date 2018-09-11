@@ -1120,8 +1120,8 @@ int main(int argc, char *argv[]) {
   //cout << "# rank(K) = " << kernel_matrix.normF() << endl;
 
   // ---CHOOSE SEARCH OPTION ANN/STANDARD--------------
-  //  K.compress_ann(ann, scores, kernel_matrix, hss_opts);
-   K.compress(kernel_matrix, kernel_matrix, hss_opts);
+   K.compress_ann(ann, scores, kernel_matrix, hss_opts);
+  //  K.compress(kernel_matrix, kernel_matrix, hss_opts);
 
 
   cout << "### compression time = " << timer.elapsed() << " ###" <<endl;
@@ -1136,40 +1136,38 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   cout << "# rank(K) = " << K.rank() << endl;
-  cout << "# memory(K) = " << K.memory() / 1e6 << " MB " << endl;
+  cout << "# HSS memory(K) = " << K.memory() / 1e6 << " MB " << endl;
 
   
-
+  // Build dense matrix to test error
   DenseMatrix<double> Kdense(n, n);
   if (kernel == 1) {
     for (int c=0; c<n; c++)
-      for (int r=0; r<n; r++) 
-      {
+      for (int r=0; r<n; r++){
         Kdense(r, c) = Gauss_kernel(&data_train[r*d], &data_train[c*d], d, h);
-        if (r == c)
-        {
+        if (r == c) {
           Kdense(r, c) = Kdense(r, c) + lambda;
         }
       }
-  } else {
+  } 
+  else {
     for (int c=0; c<n; c++)
-      for (int r=0; r<n; r++) 
-      {
-        Kdense(r, c) = Laplace_kernel(&data_train[r*d], &data_train[c*d], d, h);
-        if (r == c)
-        {
-          Kdense(r, c) = Kdense(r, c) + lambda;
-        }
+    for (int r=0; r<n; r++){
+      Kdense(r, c) = Laplace_kernel(&data_train[r*d], &data_train[c*d], d, h);
+      if (r == c) {
+        Kdense(r, c) = Kdense(r, c) + lambda;
       }
+    }
   }
 
-  cout << "# "<< 100. * K.memory() /  Kdense.memory() << "% of dense" << endl;
-  //K.print_info();
+  cout << "# HSS matrix is "<< 100. * K.memory() /  Kdense.memory() << "% of dense" << endl;
+  // K.print_info(); // Multiple rank information
+
   auto Ktest = K.dense();
   Ktest.scaled_add(-1., Kdense);
   cout << "# compression error = ||Kdense-K*I||_F/||Kdense||_F = "
        << Ktest.normF() / Kdense.normF() << endl;
-  
+
   cout << endl;
   cout << "# Factorization start" << endl;
   timer.start();
@@ -1230,7 +1228,7 @@ int main(int argc, char *argv[]) {
         << sample_v.normF() << endl;
 
   cout << endl;
-  cout << "# Starting prediction..." << endl;
+  cout << "# Prediction start..." << endl;
   timer.start();
 
   double *prediction = new double[m];
