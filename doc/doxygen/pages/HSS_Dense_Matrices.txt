@@ -14,5 +14,9 @@ kernel matrices as used in certain machine learning applications, see
 for instance \ref References "[2]". This part of the code will be
 better documented in future STRUMPACK releases.
 
+__Currently the class \link strumpack::HSS::HSSMatrixMPI
+HSSMatrixMPI<scalar>\endlink cannot be used for on a communicator with
+a single MPI process. In that case, one should use the sequential
+\link strumpack::HSS::HSSMatrix HSSMatrix<scalar>\endlink class.__
 
 */
