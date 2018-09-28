@@ -21,7 +21,15 @@ High priority:
 - Study behavior of replacement of tiny pivots. Look at different
   matrices (including large ones!). Implement for distributed fronts!!
 - distributed MC64: Jason's/Ariful's code?
-- xSDK policies: version check API
+
+- xSDK policies
+   CMake:
+        - TPL_ ...
+        - XSDKDefault.cmake
+
+
+
+
 
 Medium:
 - matrix equilibration: see SuperLU_dist pdgsequ and pdlaqgs
