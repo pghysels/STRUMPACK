@@ -80,20 +80,18 @@ fi
 
 if [[ $(hostname -s) = "pieterg-X8DA3" ]]; then
     found_host=true
-    COMBBLASHOME=/home/pieterg/LBL/STRUMPACK/CombBLAS_beta_16_1/CombBLAS_beta_16_1/build/
     cmake ../ \
           -DCMAKE_BUILD_TYPE=Debug \
           -DCMAKE_INSTALL_PREFIX=../install \
+          -DCMAKE_CXX_FLAGS="-Wall -Wfatal-errors -Wextra -Wno-unused-parameter" \
+          -DSTRUMPACK_USE_MPI=ON \
+          -DSTRUMPACK_USE_OPENMP=ON \
           -DSTRUMPACK_DEV_TESTING=ON \
           -DSTRUMPACK_C_INTERFACE=ON \
           -DSTRUMPACK_COUNT_FLOPS=ON \
           -DSTRUMPACK_TASK_TIMERS=ON \
           -DSTRUMPACK_USE_PARMETIS=ON \
           -DSTRUMPACK_USE_SCOTCH=ON \
-          -DSTRUMPACK_USE_COMBBLAS=ON \
-          -DCOMBBLAS_INCLUDES=/home/pieterg/LBL/STRUMPACK/CombBLAS_beta_16_1/CombBLAS_beta_16_1/ \
-          -DCOMBBLAS_LIBRARIES="$COMBBLASHOME/libCommGridlib.a;$COMBBLASHOME/libHashlib.a;$COMBBLASHOME/libMemoryPoollib.a;$COMBBLASHOME/libmmiolib.a;$COMBBLASHOME/libMPIOplib.a;$COMBBLASHOME/libMPITypelib.a" \
-          -DCMAKE_CXX_FLAGS="-Wall -Wfatal-errors -Wextra -Wno-unused-parameter" \
           -DMETIS_INCLUDES=$HOME/local/parmetis-4.0.3/metis/include \
           -DMETIS_LIBRARIES=$HOME/local/parmetis-4.0.3/build/Linux-x86_64/libmetis/libmetis.a \
           -DPARMETIS_INCLUDES=$HOME/local/parmetis-4.0.3/include \
@@ -110,6 +108,7 @@ if ! $found_host; then
 fi
 
 make install VERBOSE=1
+make test
 cd examples
 make -k
 cd ../../
