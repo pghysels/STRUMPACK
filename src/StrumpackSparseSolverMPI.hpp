@@ -154,7 +154,7 @@ namespace strumpack {
      * Return the MPI_Comm object associated with this solver.
      * \return MPI_Comm object for this solver.
      */
-    MPI_Comm comm() const { return comm_; }
+    MPI_Comm comm() const { return comm_.comm(); }
 
   protected:
     using StrumpackSparseSolver<scalar_t,integer_t>::is_root_;
