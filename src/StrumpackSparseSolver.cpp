@@ -435,6 +435,8 @@ extern "C" {
       (options().set_GramSchmidt_type
        (static_cast<GramSchmidtType>(t)));
   }
+  void STRUMPACK_set_mc64job(STRUMPACK_SparseSolver S, int job)
+  { switch_precision(options().set_matching(get_matching(job))); }
   void STRUMPACK_set_matching(STRUMPACK_SparseSolver S, int job)
   { switch_precision(options().set_matching(get_matching(job))); }
   void STRUMPACK_set_Krylov_solver

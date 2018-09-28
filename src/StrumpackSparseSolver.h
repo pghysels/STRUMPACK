@@ -145,6 +145,8 @@ extern "C" {
   (STRUMPACK_SparseSolver S, STRUMPACK_REORDERING_STRATEGY m);
   void STRUMPACK_set_GramSchmidt_type
   (STRUMPACK_SparseSolver S, STRUMPACK_GRAM_SCHMIDT_TYPE t);
+  /** this will be deprecated! */
+  void STRUMPACK_set_mc64job(STRUMPACK_SparseSolver S, int job);
   void STRUMPACK_set_matching(STRUMPACK_SparseSolver S, int job);
   void STRUMPACK_set_Krylov_solver
   (STRUMPACK_SparseSolver S, STRUMPACK_KRYLOV_SOLVER solver_type);
