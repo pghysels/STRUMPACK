@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.2)
 project(STRUMPACK CXX C Fortran)
 
 ## Metis is required for now
