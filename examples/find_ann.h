@@ -1,33 +1,50 @@
-#include <cmath>
-#include <fstream>
-#include <iostream>
+#ifndef find_ann_h
+#define find_ann_h
+
+#include <iostream>  // Input/Output streams
+#include <vector>    // STD Dynamic vectors
+#include <fstream>   // Open file
+#include <sstream>   // Open file
+#include <cmath>     // Common math, pow
+#include <algorithm> // sort
+#include <numeric>   // std::iota
 #include <random>
-#include <sstream>
 #include <string>
-#include <vector>
-
-#include "HSS/HSSMatrix.hpp"
-#include "misc/TaskTimer.hpp"
-#include "find_ann.hpp"
-
+#include <chrono>
+#include <ctime>
 #include "FileManipulation.h"
-#include <fstream>
 
 using namespace std;
 using namespace strumpack;
 using namespace strumpack::HSS;
 
-//----------------------FIND APPROXIMATE NEAREST NEIGHBORS FROM PROJECTION TREE---------------------------
+//--------------DISTANCE MATRIX------------------
+// finds distances between all data points with indices from index_subset
+void find_distance_matrix(vector<double> &data, int d, vector<int> &index_subset, vector<vector<double>> &distances)
+{
+    int subset_size = index_subset.size();
+    distances.resize(subset_size, vector<double>(subset_size, 0.0));
+        
+    for (int i = 0; i < subset_size; i++) 
+    {
+        for (int j = i + 1; j < subset_size; j++) 
+        {
+            distances[j][i] = dist(&data[index_subset[i] * d], &data[index_subset[j] * d], d);
+            distances[i][j] = distances[j][i];
+        }
+    } 
+}
+
+// //-------FIND APPROXIMATE NEAREST NEIGHBORS FROM PROJECTION TREE---
 
 // 1. CONSTRUCT THE TREE
-// leaves - list of all indices such that leaves[leaf_sizes[i]]...leaves[leaf_sizes[i+1]] 
+// leaves - list of all indices such that 
+// leaves[leaf_sizes[i]]...leaves[leaf_sizes[i+1]] 
 // belong to i-th leaf of the projection tree
 // gauss_id and gaussian samples - for the fixed samples option 
-void construct_projection_tree(vector<double> &data, int n, int d, int min_leaf_size, 
-                               vector<int> &cur_indices, int start, int cur_node_size,
-                               vector<int> &leaves, vector<int> &leaf_sizes, mt19937 &generator)
-//                               int &gauss_id, const vector<double> &gaussian_samples)
-{
+void construct_projection_tree (vector<double> &data, int n, int d,
+int min_leaf_size, vector<int> &cur_indices, int start, int cur_node_size,
+vector<int> &leaves, vector<int> &leaf_sizes, mt19937 &generator) {
     if (cur_node_size < min_leaf_size) 
     {
         int prev_size = leaf_sizes.back();
@@ -102,10 +119,12 @@ void construct_projection_tree(vector<double> &data, int n, int d, int min_leaf_
 }
 
 // 2. FIND CLOSEST POINTS INSIDE LEAVES
-// find ann_number exact neighbors for every point among the points within its leaf (in randomized projection tree)
-void find_neibs_in_tree(vector<double> &data, int n, int d, int ann_number, vector<int> &leaves, 
-                               vector<int> &leaf_sizes, vector<int> &neighbors, vector<double> &neighbor_scores)
-{
+// find ann_number exact neighbors for every point among the points
+// within its leaf (in randomized projection tree)
+void find_neibs_in_tree(vector<double> &data, int n, int d, int ann_number,
+vector<int> &leaves, vector<int> &leaf_sizes, vector<int> &neighbors,
+vector<double> &neighbor_scores) {
+
     for (int leaf = 0; leaf < leaf_sizes.size() - 1; leaf++) 
     {
         // initialize size and content of the current leaf
@@ -140,11 +159,7 @@ void find_neibs_in_tree(vector<double> &data, int n, int d, int ann_number, vect
 
 // 3. FIND ANN IN ONE TREE SAMPLE
 void find_ann_candidates(vector<double> &data, int n, int d, int ann_number, 
-                         vector<int> &neighbors, vector<double> &neighbor_scores)
-                         //vector<double> &gaussian_samples)
-{
-    random_device rd;
-    mt19937 generator(rd());
+vector<int> &neighbors,vector<double> &neighbor_scores, mt19937 &generator) {
 
     int min_leaf_size = 6*ann_number;
     
@@ -168,10 +183,11 @@ void find_ann_candidates(vector<double> &data, int n, int d, int ann_number,
 
 //---------------CHOOSE BEST NEIGHBORS FROM TWO TREE SAMPLES------------------
 
-// take closest neighbors from neighbors and new_neighbors, write them to neighbors and their scores to neighbor_scores
-void choose_best_neighbors(vector<int> &neighbors, vector<double> &neighbor_scores, 
-                           vector<int> &new_neighbors, vector<double> &new_neighbor_scores, int ann_number)
-{
+// take closest neighbors from neighbors and new_neighbors,
+// write them to neighbors and their scores to neighbor_scores
+void choose_best_neighbors(vector<int> &neighbors,
+vector<double> &neighbor_scores, vector<int> &new_neighbors,
+vector<double> &new_neighbor_scores, int ann_number) {
     for (int vertex = 0; vertex < neighbors.size(); vertex = vertex + ann_number)
     {
         vector<int> cur_neighbors(ann_number, 0);
@@ -224,8 +240,8 @@ void choose_best_neighbors(vector<int> &neighbors, vector<double> &neighbor_scor
 }
 
 //----------------QUALITY CHECK WITH TRUE NEIGHBORS----------------------------
-void find_true_nn(vector<double> &data, int n, int d, int ann_number, vector<int> &n_neighbors, vector<double> &n_neighbor_scores)
-{
+void find_true_nn(vector<double> &data, int n, int d, int ann_number,
+vector<int> &n_neighbors, vector<double> &n_neighbor_scores) {
          // create full distance matrix
         vector<vector<double>> all_dists;
         vector<int> all_ids(n); // index subset = everything
@@ -248,17 +264,19 @@ void find_true_nn(vector<double> &data, int n, int d, int ann_number, vector<int
         }
 }
 
-// quality = average fraction of ann_number approximate neighbors (neighbors), which are 
-// within the closest ann_number of true neighbors (n_neighbors); average is taken over all data points
-double check_quality(vector<double> &data, int n, int d, int ann_number, vector<int> &neighbors)
-{
+// quality = average fraction of ann_number approximate neighbors (neighbors),
+//  which are within the closest ann_number of true neighbors (n_neighbors);
+// average is taken over all data points
+double check_quality(vector<double> &data, int n, int d, int ann_number,
+vector<int> &neighbors) {
     vector<int> n_neighbors(n*ann_number, 0);
     vector<double> n_neighbor_scores(n*ann_number, 0.0);
     auto start_nn = chrono::system_clock::now();
     find_true_nn(data, n, d, ann_number, n_neighbors, n_neighbor_scores);
     auto end_nn = chrono::system_clock::now();
     chrono::duration<double> elapsed_seconds_nn = end_nn-start_nn;
-    cout << "elapsed time for exact neighbor search: " << elapsed_seconds_nn.count() << " sec" << endl;
+    cout << "elapsed time for exact neighbor search: " 
+         << elapsed_seconds_nn.count() << " sec" << endl;
 
     vector<double> quality_vec;
     for (int i = 0; i < n; i++) 
@@ -291,66 +309,24 @@ double check_quality(vector<double> &data, int n, int d, int ann_number, vector<
     return (double)ann_quality/quality_vec.size();
 }
 
+//------------ Main function call----------------
 //------------ITERATE OVER SEVERAL PROJECTION TREES TO FIND ANN----------------
-void find_approximate_neighbors(vector<double> &data, int n, int d, 
-                                    int num_iters, int ann_number, 
-                                    vector<int> &neighbors, vector<double> &neighbor_scores)
-                                    // vector<double> &gaussian_samples
-{
-    find_ann_candidates(data, n, d, ann_number, neighbors, neighbor_scores);
-                        //, gaussian_samples);
-    for (int iter = 1; iter < num_iters; iter++)
-    {
-        vector<int> new_neighbors(n*ann_number, 0);
-        vector<double> new_neighbor_scores(n*ann_number, 0.0);   
-        find_ann_candidates(data, n, d, ann_number, new_neighbors, new_neighbor_scores);
-        choose_best_neighbors(neighbors, neighbor_scores, new_neighbors, new_neighbor_scores, ann_number);
-        cout << "iter " << iter << " done" << endl;       
-        }
+void find_approximate_neighbors(vector<double> &data, int n, int d,
+int num_iters, int ann_number, vector<int> &neighbors,
+vector<double> &neighbor_scores, mt19937 &generator) {
+    
+  find_ann_candidates(data, n, d, ann_number, neighbors, neighbor_scores,
+                      generator);
 
+  for (int iter = 1; iter < num_iters; iter++) {
+      vector<int> new_neighbors(n*ann_number, 0);
+      vector<double> new_neighbor_scores(n*ann_number, 0.0);   
+      find_ann_candidates(data, n, d, ann_number, new_neighbors,
+      new_neighbor_scores, generator);
+      choose_best_neighbors(neighbors, neighbor_scores, new_neighbors,
+       new_neighbor_scores, ann_number);
+      // cout << "iter " << iter << " done" << endl;       
+  }
 }
 
-// int main(int argc, char const *argv[])
-// {
-//     int d = 8;
-//     int ann_number = 10;
-
-//     vector<double> data;
-//     read_from_file("./datasets/SUSY/susy_10Kn_train.csv", data);
-//     int n = data.size() / d;
-//     cout << "# matrix size = " << n << " x " << d << endl;
-
-//     // option for fixed direction samples
-//     // vector<double> gaussian_samples;
-//     // read_from_file("./datasets/gaussian_samples.csv", gaussian_samples);
-
-//     vector<int> neighbors(n*ann_number, 0);
-//     vector<double> neighbor_scores(n*ann_number, 0.0);
-
-//     int num_iters = 5;
-//     auto start_ann = chrono::system_clock::now();
-//     find_approximate_neighbors(data, n, d, num_iters, ann_number, neighbors, neighbor_scores);
-//                                // gaussian_samples);
-//     auto end_ann = chrono::system_clock::now();
-//     chrono::duration<double> elapsed_seconds_ann = end_ann-start_ann;
-//     cout << "elapsed time for approximate neighbor search: " << elapsed_seconds_ann.count() << " sec" << endl;
-
- 
-//     // option to check quality with true neighbors
-//     cout << "constructing true neighbors to check quality ... " << endl;
-//     cout << "quality of ann: " << check_quality(data, n, d, ann_number, neighbors) << endl;
-
-//     // print neighbors of the first s vertices 
-//     int s = 2;
-//     for (int i = 0; i < s; i++)
-//     {
-//         cout << "point " << i << ": ";
-//         for (int j = 0; j < ann_number; j++)
-//         {
-//             cout << " " << neighbors[i*ann_number + j];
-//         }
-//         cout << endl;
-//     }
-    
-   
-// }
+#endif

@@ -9,7 +9,7 @@ cd build
 export CRAYPE_LINK_TYPE="dynamic"
 
 cmake .. \
--DCMAKE_BUILD_TYPE=Release \
+-DCMAKE_BUILD_TYPE=Debug \
 -DCMAKE_INSTALL_PREFIX=. \
 -DCMAKE_CXX_COMPILER=mpic++ \
 -DCMAKE_C_COMPILER=mpicc \

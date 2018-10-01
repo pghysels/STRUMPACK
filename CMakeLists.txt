@@ -475,12 +475,12 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/MLkernel.cpp
   ${CMAKE_BINARY_DIR}/examples/MLkernel.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/KernelRegression_ann.cpp
   ${CMAKE_BINARY_DIR}/examples/KernelRegression_ann.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/FileManipulation.cpp
-  ${CMAKE_BINARY_DIR}/examples/FileManipulation.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/FileManipulation.h
   ${CMAKE_BINARY_DIR}/examples/FileManipulation.h COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/find_ann.hpp
-  ${CMAKE_BINARY_DIR}/examples/find_ann.hpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/preprocessing.h
+  ${CMAKE_BINARY_DIR}/examples/preprocessing.h COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/find_ann.h
+  ${CMAKE_BINARY_DIR}/examples/find_ann.h COPYONLY)
 
 if(STRUMPACK_BUILD_TESTS)
   include(CTest)
