@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-DATA="/Users/gichavez/Documents/mats/SUSY1/susy_train_10K_test_1K/susy_10Kn"
+# DATA="/Users/gichavez/Documents/mats/SUSY1/susy_train_10K_test_1K/susy_10Kn"
+DATA="/Users/gichavez/Documents/mats/SUSY1/susy_train_1K_test_1K/susy_1Kn"
 EXEC="/Users/gichavez/Documents/Github/code_strann/build/examples/KernelRegression_ann"
 
 # Kernel type, Gaussian=1, Laplacian=2
@@ -20,14 +21,14 @@ time ${EXEC} ${DATA} ${dim} ${hval} ${lval} ${kernel} 2means test \
       --hss_rel_tol=${RTOL} -hss_leaf_size=128 --hss_max_rank=2000 \
       --hss_dd=${DD} --hss_verbose
 
-RTOL=1e-2
-DD=128
-time ${EXEC} ${DATA} ${dim} ${hval} ${lval} ${kernel} 2means test \
-      --hss_rel_tol=${RTOL} -hss_leaf_size=128 --hss_max_rank=2000 \
-      --hss_dd=${DD} --hss_verbose
+# RTOL=1e-2
+# DD=128
+# time ${EXEC} ${DATA} ${dim} ${hval} ${lval} ${kernel} 2means test \
+#       --hss_rel_tol=${RTOL} -hss_leaf_size=128 --hss_max_rank=2000 \
+#       --hss_dd=${DD} --hss_verbose
 
-RTOL=1e-3
-DD=512
-time ${EXEC} ${DATA} ${dim} ${hval} ${lval} ${kernel} 2means test \
-      --hss_rel_tol=${RTOL} -hss_leaf_size=128 --hss_max_rank=2000 \
-      --hss_dd=${DD} --hss_verbose
+# RTOL=1e-3
+# DD=512
+# time ${EXEC} ${DATA} ${dim} ${hval} ${lval} ${kernel} 2means test \
+#       --hss_rel_tol=${RTOL} -hss_leaf_size=128 --hss_max_rank=2000 \
+#       --hss_dd=${DD} --hss_verbose

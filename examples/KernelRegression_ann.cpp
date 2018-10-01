@@ -32,7 +32,6 @@
 #include <string>
 #include <vector>
 
-
 #include "HSS/HSSMatrix.hpp"
 #include "misc/TaskTimer.hpp"
 #include "find_ann.hpp"
@@ -50,10 +49,12 @@ using namespace strumpack::HSS;
 extern "C" {
 #define SSYEVX_FC FC_GLOBAL(ssyevx, SSYEVX)
 #define DSYEVX_FC FC_GLOBAL(dsyevx, DSYEVX)
+
 void SSYEVX_FC(char *JOBZ, char *RANGE, char *UPLO, int *N, float *A, int *LDA,
                float *VL, float *VU, int *IL, int *IU, float *ABSTOL, int *M,
                float *W, float *Z, int *LDZ, float *WORK, int *LWORK,
                int *IWORK, int *IFAIL, int *INFO);
+
 void DSYEVX_FC(char *JOBZ, char *RANGE, char *UPLO, int *N, double *A, int *LDA,
                double *VL, double *VU, int *IL, int *IU, double *ABSTOL, int *M,
                double *W, double *Z, int *LDZ, double *WORK, int *LWORK,
@@ -78,6 +79,7 @@ inline int syevx(char JOBZ, char RANGE, char UPLO, int N, float *A, int LDA,
   delete[] IWORK;
   return INFO;
 }
+
 inline int dyevx(char JOBZ, char RANGE, char UPLO, int N, double *A, int LDA,
                  double VL, double VU, int IL, int IU, double ABSTOL, int &M,
                  double *W, double *Z, int LDZ) {
@@ -97,12 +99,10 @@ inline int dyevx(char JOBZ, char RANGE, char UPLO, int N, double *A, int LDA,
   return INFO;
 }
 
-#define ERROR_TOLERANCE 1e2
-
 const int kmeans_max_it = 100;
-random_device rd;
 double r;
-mt19937 generator(rd());
+// random_device rd;
+mt19937 generator(1);
 
 inline double dist2(double *x, double *y, int d) {
   double k = 0.;
@@ -110,8 +110,6 @@ inline double dist2(double *x, double *y, int d) {
     k += pow(x[i] - y[i], 2.);
   return k;
 }
-
-//inline double dist(double *x, double *y, int d) { return sqrt(dist2(x, y, d)); }
 
 inline double norm1(double *x, double *y, int d) {
   double k = 0.;
@@ -138,7 +136,6 @@ inline int *kmeans_start_random(int n, int k) {
 }
 
 // 3 more start sampling methods for the case k == 2
-
 int *kmeans_start_random_dist_maximized(int n, double *p, int d) {
   constexpr size_t k = 2;
 
@@ -314,7 +311,7 @@ void k_means(int k, double *p, int n, int d, int *nc, double *labels) {
 }
 
 void recursive_2_means(double *p, int n, int d, int cluster_size,
-                       HSSPartitionTree &tree, double *labels) {
+HSSPartitionTree &tree, double *labels) {
   if (n < cluster_size)
     return;
   auto nc = new int[2];
@@ -331,7 +328,7 @@ void recursive_2_means(double *p, int n, int d, int cluster_size,
 }
 
 void kd_partition(double *p, int n, int d, int *nc, double *labels,
-                  int cluster_size) {
+int cluster_size) {
   // find coordinate of the most spread
   double *maxes = new double[d];
   double *mins = new double[d];
@@ -630,8 +627,8 @@ vector<double> write_from_file(string filename) {
   return data;
 }
 
-bool save_vector_to_binary_file( const vector<double> data, size_t length, const string& file_path )
-{
+bool save_vector_to_binary_file( const vector<double> data, size_t length,
+const string& file_path ) {
     ofstream fileOut(file_path.c_str(), ios::binary | ios::out | ios::app);
     if ( !fileOut.is_open() )
         return false;
@@ -640,8 +637,8 @@ bool save_vector_to_binary_file( const vector<double> data, size_t length, const
     return true;
 }
 
-bool read_vector_from_binary_file( const vector<double> &data, size_t length, const string& file_path)
-{
+bool read_vector_from_binary_file( const vector<double> &data, size_t length,
+const string& file_path) {
     ifstream is(file_path.c_str(), ios::binary | ios::in);
     if ( !is.is_open() )
         return false;
@@ -678,23 +675,21 @@ void save_to_binary_file(string FILE, size_t n, int d){
 
 }
 
+
 //----------------------------------------------------------------------------
 //--------ANN SEARCH----------------------------------------------------------
 //----------------------------------------------------------------------------
 
-
-
-// //----------------------FIND APPROXIMATE NEAREST NEIGHBORS FROM PROJECTION TREE---------------------------
+// //-------FIND APPROXIMATE NEAREST NEIGHBORS FROM PROJECTION TREE---
 
 // 1. CONSTRUCT THE TREE
-// leaves - list of all indices such that leaves[leaf_sizes[i]]...leaves[leaf_sizes[i+1]] 
+// leaves - list of all indices such that 
+// leaves[leaf_sizes[i]]...leaves[leaf_sizes[i+1]] 
 // belong to i-th leaf of the projection tree
 // gauss_id and gaussian samples - for the fixed samples option 
-void construct_projection_tree(vector<double> &data, int n, int d, int min_leaf_size, 
-                               vector<int> &cur_indices, int start, int cur_node_size,
-                               vector<int> &leaves, vector<int> &leaf_sizes, mt19937 &generator)
-//                               int &gauss_id, const vector<double> &gaussian_samples)
-{
+void construct_projection_tree (vector<double> &data, int n, int d,
+int min_leaf_size, vector<int> &cur_indices, int start, int cur_node_size,
+vector<int> &leaves, vector<int> &leaf_sizes, mt19937 &generator) {
     if (cur_node_size < min_leaf_size) 
     {
         int prev_size = leaf_sizes.back();
@@ -769,10 +764,11 @@ void construct_projection_tree(vector<double> &data, int n, int d, int min_leaf_
 }
 
 // 2. FIND CLOSEST POINTS INSIDE LEAVES
-// find ann_number exact neighbors for every point among the points within its leaf (in randomized projection tree)
-void find_neibs_in_tree(vector<double> &data, int n, int d, int ann_number, vector<int> &leaves, 
-                               vector<int> &leaf_sizes, vector<int> &neighbors, vector<double> &neighbor_scores)
-{
+// find ann_number exact neighbors for every point among the points
+// within its leaf (in randomized projection tree)
+void find_neibs_in_tree(vector<double> &data, int n, int d, int ann_number,
+vector<int> &leaves, vector<int> &leaf_sizes, vector<int> &neighbors,
+vector<double> &neighbor_scores) {
     for (int leaf = 0; leaf < leaf_sizes.size() - 1; leaf++) 
     {
         // initialize size and content of the current leaf
@@ -807,11 +803,7 @@ void find_neibs_in_tree(vector<double> &data, int n, int d, int ann_number, vect
 
 // 3. FIND ANN IN ONE TREE SAMPLE
 void find_ann_candidates(vector<double> &data, int n, int d, int ann_number, 
-                         vector<int> &neighbors, vector<double> &neighbor_scores)
-                         //vector<double> &gaussian_samples)
-{
-    random_device rd;
-    mt19937 generator(rd());
+vector<int> &neighbors,vector<double> &neighbor_scores, mt19937 &generator) {
 
     int min_leaf_size = 6*ann_number;
     
@@ -835,10 +827,11 @@ void find_ann_candidates(vector<double> &data, int n, int d, int ann_number,
 
 //---------------CHOOSE BEST NEIGHBORS FROM TWO TREE SAMPLES------------------
 
-// take closest neighbors from neighbors and new_neighbors, write them to neighbors and their scores to neighbor_scores
-void choose_best_neighbors(vector<int> &neighbors, vector<double> &neighbor_scores, 
-                           vector<int> &new_neighbors, vector<double> &new_neighbor_scores, int ann_number)
-{
+// take closest neighbors from neighbors and new_neighbors,
+// write them to neighbors and their scores to neighbor_scores
+void choose_best_neighbors(vector<int> &neighbors,
+vector<double> &neighbor_scores, vector<int> &new_neighbors,
+vector<double> &new_neighbor_scores, int ann_number) {
     for (int vertex = 0; vertex < neighbors.size(); vertex = vertex + ann_number)
     {
         vector<int> cur_neighbors(ann_number, 0);
@@ -891,8 +884,8 @@ void choose_best_neighbors(vector<int> &neighbors, vector<double> &neighbor_scor
 }
 
 //----------------QUALITY CHECK WITH TRUE NEIGHBORS----------------------------
-void find_true_nn(vector<double> &data, int n, int d, int ann_number, vector<int> &n_neighbors, vector<double> &n_neighbor_scores)
-{
+void find_true_nn(vector<double> &data, int n, int d, int ann_number,
+vector<int> &n_neighbors, vector<double> &n_neighbor_scores) {
          // create full distance matrix
         vector<vector<double>> all_dists;
         vector<int> all_ids(n); // index subset = everything
@@ -915,9 +908,11 @@ void find_true_nn(vector<double> &data, int n, int d, int ann_number, vector<int
         }
 }
 
-// quality = average fraction of ann_number approximate neighbors (neighbors), which are 
-// within the closest ann_number of true neighbors (n_neighbors); average is taken over all data points
-double check_quality(vector<double> &data, int n, int d, int ann_number, vector<int> &neighbors)
+// quality = average fraction of ann_number approximate neighbors (neighbors),
+//  which are within the closest ann_number of true neighbors (n_neighbors);
+// average is taken over all data points
+double check_quality(vector<double> &data, int n, int d, int ann_number,
+vector<int> &neighbors)
 {
     vector<int> n_neighbors(n*ann_number, 0);
     vector<double> n_neighbor_scores(n*ann_number, 0.0);
@@ -925,7 +920,8 @@ double check_quality(vector<double> &data, int n, int d, int ann_number, vector<
     find_true_nn(data, n, d, ann_number, n_neighbors, n_neighbor_scores);
     auto end_nn = chrono::system_clock::now();
     chrono::duration<double> elapsed_seconds_nn = end_nn-start_nn;
-    cout << "elapsed time for exact neighbor search: " << elapsed_seconds_nn.count() << " sec" << endl;
+    cout << "elapsed time for exact neighbor search: " 
+         << elapsed_seconds_nn.count() << " sec" << endl;
 
     vector<double> quality_vec;
     for (int i = 0; i < n; i++) 
@@ -959,22 +955,21 @@ double check_quality(vector<double> &data, int n, int d, int ann_number, vector<
 }
 
 //------------ITERATE OVER SEVERAL PROJECTION TREES TO FIND ANN----------------
-void find_approximate_neighbors(vector<double> &data, int n, int d, 
-                                    int num_iters, int ann_number, 
-                                    vector<int> &neighbors, vector<double> &neighbor_scores)
-                                    // vector<double> &gaussian_samples
-{
-    find_ann_candidates(data, n, d, ann_number, neighbors, neighbor_scores);
-                        //, gaussian_samples);
-    for (int iter = 1; iter < num_iters; iter++)
-    {
-        vector<int> new_neighbors(n*ann_number, 0);
-        vector<double> new_neighbor_scores(n*ann_number, 0.0);   
-        find_ann_candidates(data, n, d, ann_number, new_neighbors, new_neighbor_scores);
-        choose_best_neighbors(neighbors, neighbor_scores, new_neighbors, new_neighbor_scores, ann_number);
-        // cout << "iter " << iter << " done" << endl;       
-    }
+void find_approximate_neighbors
+(vector<double> &data, int n, int d, int num_iters, int ann_number, 
+vector<int> &neighbors, vector<double> &neighbor_scores) {
+    
+  find_ann_candidates(data, n, d, ann_number, neighbors, neighbor_scores,
+                      generator);
 
+  for (int iter = 1; iter < num_iters; iter++)
+  {
+      vector<int> new_neighbors(n*ann_number, 0);
+      vector<double> new_neighbor_scores(n*ann_number, 0.0);   
+      find_ann_candidates(data, n, d, ann_number, new_neighbors, new_neighbor_scores, generator);
+      choose_best_neighbors(neighbors, neighbor_scores, new_neighbors, new_neighbor_scores, ann_number);
+      // cout << "iter " << iter << " done" << endl;       
+  }
 }
 
 
@@ -1014,12 +1009,12 @@ int main(int argc, char *argv[]) {
     mode = string(argv[7]);
 
   cout << endl;
-  cout << "# data dimension    = " << d << endl;
-  cout << "# kernel h          = " << h << endl;
-  cout << "# lambda            = " << lambda << endl;
-  cout << "# kernel type       = " << ((kernel == 1) ? "Gauss" : "Laplace") << endl;
-  cout << "# reordering/clust  = " << reorder << endl;
-  cout << "# validation/test   = " << mode << endl;
+  cout << "# data dimension    = "<<d << endl;
+  cout << "# kernel h          = "<<h << endl;
+  cout << "# lambda            = "<<lambda << endl;
+  cout << "# kernel type       = "<<((kernel == 1) ? "Gauss":"Laplace") << endl;
+  cout << "# reordering/clust  = "<<reorder << endl;
+  cout << "# validation/test   = "<<mode << endl;
 
   TaskTimer::t_begin = GET_TIME_NOW();
   TaskTimer timer(string("compression"), 1);
@@ -1083,17 +1078,19 @@ int main(int argc, char *argv[]) {
   }
 
 
-// FIND ANN ------------------------------------------------
+  // FIND ANN ------------------------------------------------
   int ann_number = 64;
   vector<int> neighbors(n*ann_number, 0);
   vector<double> neighbor_scores(n*ann_number, 0.0);
 
   int num_iters = 5;
   auto start_ann = chrono::system_clock::now();
-    find_approximate_neighbors(data_train, n, d, num_iters, ann_number, neighbors, neighbor_scores);
+  find_approximate_neighbors(data_train, n, d, num_iters, ann_number,
+  neighbors, neighbor_scores);
   auto end_ann = chrono::system_clock::now();
   chrono::duration<double> elapsed_seconds_ann = end_ann-start_ann;
-  cout << "# Time for approximate neighbor search: " << elapsed_seconds_ann.count() << " sec" << endl;
+  cout << "# Time for approximate neighbor search: " 
+       << elapsed_seconds_ann.count() << " sec" << endl;
   
 
   vector<double> neighbors_d;
@@ -1102,7 +1099,9 @@ int main(int argc, char *argv[]) {
     neighbors_d.push_back((double)neighbors[i]);
   }
   DenseMatrixWrapper<double> ann(ann_number, n, &neighbors_d[0], ann_number);
-  DenseMatrixWrapper<double> scores(ann_number, n, &neighbor_scores[0], ann_number);
+  DenseMatrixWrapper<double> scores(ann_number, n, &neighbor_scores[0],
+                                    ann_number);
+
   timer.start();
 
   // Print scores and ann
@@ -1120,7 +1119,7 @@ int main(int argc, char *argv[]) {
   //cout << "# rank(K) = " << kernel_matrix.normF() << endl;
 
   // ---CHOOSE SEARCH OPTION ANN/STANDARD--------------
-   K.compress_ann(ann, scores, kernel_matrix, hss_opts);
+  K.compress_ann(ann, scores, kernel_matrix, hss_opts);
   //  K.compress(kernel_matrix, kernel_matrix, hss_opts);
 
 
@@ -1160,7 +1159,8 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  cout << "# HSS matrix is "<< 100. * K.memory() /  Kdense.memory() << "% of dense" << endl;
+  cout << "# HSS matrix is "<< 100. * K.memory() /  Kdense.memory() 
+       << "% of dense" << endl;
   // K.print_info(); // Multiple rank information
 
   auto Ktest = K.dense();

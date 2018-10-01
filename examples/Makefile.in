@@ -1,4 +1,4 @@
-all: KernelRegression_ann MLkernel
+all: KernelRegression_ann
 
 all_old: @C_EXAMPLES@ testPoisson2d testPoisson3d	\
 	testPoisson2dMPI testPoisson2dMPIDist testPoisson3dMPIDist	\
