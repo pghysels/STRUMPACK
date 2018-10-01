@@ -1,5 +1,5 @@
-#ifndef _preprocessing_hpp
-#define _preprocessing_hpp
+#ifndef preprocessing_hpp
+#define preprocessing_hpp
 
 #include <iostream>  // Input/Output streams
 #include <vector>    // STD Dynamic vectors
