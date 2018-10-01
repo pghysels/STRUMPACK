@@ -760,7 +760,8 @@ namespace strumpack {
   template<typename scalar> inline void getrs_omp_task
   (char t, int m, int n, const scalar *a, int lda, const int* piv,
    scalar *b, int ldb, int* flag, int depth) {
-    if (depth>=params::task_recursion_cutoff_level)
+    if (depth>=params::task_recursion_cutoff_level ||
+	2*double(m)*n <= OMPThreshold)
       blas::getrs(t, m, n, a, lda, piv, b, ldb, flag);
     else {
       flag = 0;

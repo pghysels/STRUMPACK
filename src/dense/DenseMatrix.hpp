@@ -1506,6 +1506,7 @@ namespace strumpack {
    const std::vector<int>& piv, int depth) const {
     int info = 0;
     DenseMatrix<scalar_t> x(b);
+    if (!rows()) return x;
     getrs_omp_task
       (char(Trans::N), rows(), b.cols(), data(), ld(), piv.data(),
        x.data(), x.ld(), &info, depth);
