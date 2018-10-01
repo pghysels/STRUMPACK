@@ -31,7 +31,11 @@ namespace strumpack {
       w.I = I;
       w.ycols.reserve(J.size());
       for (std::size_t c=0; c<J.size(); c++) w.ycols.push_back(c);
+
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
       extract_fwd(w, false, this->_openmp_task_depth);
+
       w.rl2g.reserve(I.size());
       for (std::size_t r=0; r<I.size(); r++) w.rl2g.push_back(r);
       w.cl2g.reserve(J.size());
@@ -40,6 +44,9 @@ namespace strumpack {
       // TODO is this necessary???
       w.z = DenseM_t(_U.cols(), w.ycols.size());
       w.z.zero();
+
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
       extract_bwd(B, w, this->_openmp_task_depth);
     }
 

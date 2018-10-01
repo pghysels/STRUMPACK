@@ -602,6 +602,8 @@ namespace strumpack {
       // apply_HSS(Trans::N, *this, eye<scalar_t>(this->cols(),
       // this->cols()), scalar_t(0.), A);
       WorkDense<scalar_t> w;
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
       dense_recursive(A, w, true, this->_openmp_task_depth);
       return A;
     }
