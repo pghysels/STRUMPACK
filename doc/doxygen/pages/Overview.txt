@@ -10,8 +10,9 @@ versions: a package for dense matrix computations
 (__STRUMPACK-dense__) and a package (__STRUMPACK-sparse__) for sparse
 linear systems. The algorithms for solving dense linear systems are
 described in \ref References "[7]" while the algorithms for solving
-sparse linear systems are described in \ref References "[5,
-4]". STRUMPACK can be used as a general algebraic sparse direct solver
+sparse linear systems are described in \ref References "[5,4]".
+
+STRUMPACK can be used as a general algebraic sparse direct solver
 (based on the multifrontal factorization method), or as an efficient
 preconditioner for sparse matrices obtained by discretization of
 partial differential equations. Included in STRUMPACK are also the
