@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
   else printf("# please provide grid size\n");
 
   STRUMPACK_SparseSolver spss;
-  STRUMPACK_init(&spss, 0, STRUMPACK_FLOAT, STRUMPACK_MT, argc, argv, 1);
+  STRUMPACK_init_mt(&spss, STRUMPACK_FLOAT, STRUMPACK_MT, argc, argv, 1);
   STRUMPACK_set_matching(spss, 0);
   STRUMPACK_set_reordering_method(spss, STRUMPACK_GEOMETRIC);
   STRUMPACK_set_from_options(spss);

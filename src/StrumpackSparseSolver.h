@@ -30,22 +30,30 @@
 #define STRUMPACK_SPARSE_SOLVER_H
 
 #include <stdint.h>
+
+#if defined(STRUMPACK_USE_MPI)
 #include "mpi.h"
+#endif
 
 typedef enum {
-  STRUMPACK_FLOAT, STRUMPACK_DOUBLE,
-  STRUMPACK_FLOATCOMPLEX, STRUMPACK_DOUBLECOMPLEX,
-  STRUMPACK_FLOAT_64, STRUMPACK_DOUBLE_64,
-  STRUMPACK_FLOATCOMPLEX_64, STRUMPACK_DOUBLECOMPLEX_64
+  STRUMPACK_FLOAT,
+  STRUMPACK_DOUBLE,
+  STRUMPACK_FLOATCOMPLEX,
+  STRUMPACK_DOUBLECOMPLEX,
+  STRUMPACK_FLOAT_64,
+  STRUMPACK_DOUBLE_64,
+  STRUMPACK_FLOATCOMPLEX_64,
+  STRUMPACK_DOUBLECOMPLEX_64
 } STRUMPACK_PRECISION;
 
 /*!
- * \enum uhyjhvg
- * \brief Interface type
+ * Enumeration of STRUMPACK interfaces, the MPI interface with
+ * replicated input/output is not supported from the C interface.
  * \ingroup Enumerations
  */
 typedef enum {
-  STRUMPACK_MT, STRUMPACK_MPI_DIST
+  STRUMPACK_MT,        /*!< sequential/multithreaded interface    */
+  STRUMPACK_MPI_DIST   /*!< fully distributed, MPI, interface     */
 } STRUMPACK_INTERFACE;
 
 typedef struct {
@@ -103,22 +111,33 @@ typedef enum {
 extern "C" {
 #endif
 
+  void STRUMPACK_init_mt
+  (STRUMPACK_SparseSolver* S, STRUMPACK_PRECISION precision,
+   STRUMPACK_INTERFACE interface, int argc, char* argv[], int verbose);
+
+#if defined(STRUMPACK_USE_MPI)
   void STRUMPACK_init
   (STRUMPACK_SparseSolver* S, MPI_Comm comm, STRUMPACK_PRECISION precision,
    STRUMPACK_INTERFACE interface, int argc, char* argv[], int verbose);
+#endif
+
   void STRUMPACK_destroy(STRUMPACK_SparseSolver* S);
 
   void STRUMPACK_set_csr_matrix
   (STRUMPACK_SparseSolver S, const void* N, const void* row_ptr,
    const void* col_ind, const void* values, int symmetric_pattern);
+
+#if defined(STRUMPACK_USE_MPI)
   void STRUMPACK_set_distributed_csr_matrix
   (STRUMPACK_SparseSolver S, const void* local_rows, const void* row_ptr,
    const void* col_ind, const void* values, const void* dist,
    int symmetric_pattern);
+
   void STRUMPACK_set_MPIAIJ_matrix
   (STRUMPACK_SparseSolver S, const void* n, const void* d_ptr,
    const void* d_ind, const void* d_val, const void* o_ptr,
    const void* o_ind, const void* o_val, const void* garray);
+#endif
 
   STRUMPACK_RETURN_CODE STRUMPACK_solve
   (STRUMPACK_SparseSolver S, const void* b, void* x, int use_initial_guess);

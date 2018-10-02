@@ -28,8 +28,10 @@
  */
 #include "StrumpackSparseSolver.h"
 #include "StrumpackSparseSolver.hpp"
+#if defined(STRUMPACK_USE_MPI)
 #include "StrumpackSparseSolverMPI.hpp"
 #include "StrumpackSparseSolverMPIDist.hpp"
+#endif
 #include "sparse/CSRMatrix.hpp"
 
 using namespace strumpack;
@@ -43,6 +45,7 @@ using namespace strumpack;
 #define CASTC64(x) (static_cast<StrumpackSparseSolver<std::complex<float>,int64_t>*>(x))
 #define CASTZ64(x) (static_cast<StrumpackSparseSolver<std::complex<double>,int64_t>*>(x))
 
+#if defined(STRUMPACK_USE_MPI)
 #define CASTSMPIDIST(x) (static_cast<StrumpackSparseSolverMPIDist<float,int>*>(x))
 #define CASTDMPIDIST(x) (static_cast<StrumpackSparseSolverMPIDist<double,int>*>(x))
 #define CASTCMPIDIST(x) (static_cast<StrumpackSparseSolverMPIDist<std::complex<float>,int>*>(x))
@@ -51,6 +54,7 @@ using namespace strumpack;
 #define CASTD64MPIDIST(x) (static_cast<StrumpackSparseSolverMPIDist<double,int64_t>*>(x))
 #define CASTC64MPIDIST(x) (static_cast<StrumpackSparseSolverMPIDist<std::complex<float>,int64_t>*>(x))
 #define CASTZ64MPIDIST(x) (static_cast<StrumpackSparseSolverMPIDist<std::complex<double>,int64_t>*>(x))
+#endif
 
 #define switch_precision(m)                                             \
   switch (S.precision) {                                                \
@@ -102,6 +106,60 @@ using namespace strumpack;
 #define CREZ(x) reinterpret_cast<const std::complex<double>*>(x)
 
 extern "C" {
+
+  void STRUMPACK_init_mt
+  (STRUMPACK_SparseSolver* S, STRUMPACK_PRECISION precision,
+   STRUMPACK_INTERFACE interface, int argc, char* argv[], int verbose) {
+    S->precision = precision;
+    S->interface = interface;
+    bool v = static_cast<bool>(verbose);
+    switch (interface) {
+    case STRUMPACK_MT: {
+      switch (precision) {
+      case STRUMPACK_FLOAT:
+        S->solver = static_cast<void*>
+          (new StrumpackSparseSolver<float,int>(argc, argv, v));
+        break;
+      case STRUMPACK_DOUBLE:
+        S->solver = static_cast<void*>
+          (new StrumpackSparseSolver<double,int>(argc, argv, v));
+        break;
+      case STRUMPACK_FLOATCOMPLEX:
+        S->solver = static_cast<void*>
+          (new StrumpackSparseSolver<std::complex<float>,int>(argc, argv, v));
+        break;
+      case STRUMPACK_DOUBLECOMPLEX:
+        S->solver = static_cast<void*>
+          (new StrumpackSparseSolver<std::complex<double>,int>
+           (argc, argv, v));
+        break;
+      case STRUMPACK_FLOAT_64:
+        S->solver = static_cast<void*>
+          (new StrumpackSparseSolver<float,int64_t>(argc, argv, v));
+        break;
+      case STRUMPACK_DOUBLE_64:
+        S->solver = static_cast<void*>
+          (new StrumpackSparseSolver<double,int64_t>(argc, argv, v));
+        break;
+      case STRUMPACK_FLOATCOMPLEX_64:
+        S->solver = static_cast<void*>
+          (new StrumpackSparseSolver<std::complex<float>,int64_t>
+           (argc, argv, v));
+        break;
+      case STRUMPACK_DOUBLECOMPLEX_64:
+        S->solver = static_cast<void*>
+          (new StrumpackSparseSolver<std::complex<double>,int64_t>
+           (argc, argv, v));
+        break;
+      default: std::cerr << "ERROR: wrong precision!" << std::endl;
+      }
+    } break;
+    default: std::cerr << "ERROR: wrong interface!" << std::endl;
+    }
+  }
+
+
+#if defined(STRUMPACK_USE_MPI)
   void STRUMPACK_init
   (STRUMPACK_SparseSolver* S, MPI_Comm comm, STRUMPACK_PRECISION precision,
    STRUMPACK_INTERFACE interface, int argc, char* argv[], int verbose) {
@@ -195,6 +253,7 @@ extern "C" {
     default: std::cerr << "ERROR: wrong interface!" << std::endl;
     }
   }
+#endif
 
   void STRUMPACK_destroy(STRUMPACK_SparseSolver* S) {
     switch (S->precision) {
@@ -249,6 +308,7 @@ extern "C" {
     }
   }
 
+#if defined(STRUMPACK_USE_MPI)
   void STRUMPACK_set_distributed_csr_matrix
   (STRUMPACK_SparseSolver S, const void* N, const void* row_ptr,
    const void* col_ind, const void* values, const void* dist, int symm) {
@@ -343,6 +403,7 @@ extern "C" {
       break;
     }
   }
+#endif
 
   STRUMPACK_RETURN_CODE STRUMPACK_solve
   (STRUMPACK_SparseSolver S, const void* b, void* x,
