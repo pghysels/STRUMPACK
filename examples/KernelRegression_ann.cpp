@@ -56,13 +56,16 @@ public:
   int _n = 0;
   double _h = 0.;
   double _l = 0.;
+
   Kernel() = default;
+
   Kernel(vector<double> data, int d, double h, double l)
-      : _data(std::move(data)), _d(d), _n(_data.size() / _d), _h(h), _l(l) {
+  : _data(std::move(data)), _d(d), _n(_data.size() / _d), _h(h), _l(l) {
     assert(_n * _d == _data.size());
   }
+
   void operator()(const vector<size_t> &I, const vector<size_t> &J,
-                  DenseM_t &B) {
+  DenseM_t &B) {
     assert(I.size() == B.rows() && J.size() == B.cols());
     for (size_t j = 0; j < J.size(); j++) {
       for (size_t i = 0; i < I.size(); i++) {
@@ -74,13 +77,12 @@ public:
     }
   }
 
-
   void times(DenseM_t &Rr, DenseM_t &Sr) {
     assert(Rr.rows() == _n);
     Sr.zero();
     const size_t B = 64;
     DenseM_t Asub(B, B);
-#pragma omp parallel for firstprivate(Asub) schedule(dynamic)
+    #pragma omp parallel for firstprivate(Asub) schedule(dynamic)
     for (size_t r = 0; r < _n; r += B) {
       // loop over blocks of A
       for (size_t c = 0; c < _n; c += B) {
@@ -105,10 +107,10 @@ public:
     }
   }
 
-  void operator()(DenseM_t &Rr, DenseM_t &Rc, DenseM_t &Sr, DenseM_t &Sc) {
-    times(Rr, Sr);
-    Sc.copy(Sr);
-  }
+  // void operator()(DenseM_t &Rr, DenseM_t &Rc, DenseM_t &Sr, DenseM_t &Sc) {
+  //   times(Rr, Sr);
+  //   Sc.copy(Sr);
+  // }
 };
 
 int main(int argc, char *argv[]) {
@@ -219,7 +221,10 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < ann_number*n; i++) {
     neighbors_d.push_back((double)neighbors[i]);
   }
+
+  // Indices of closest neighbors, sorted in ascending order
   DenseMatrixWrapper<double> ann(ann_number, n, &neighbors_d[0], ann_number);
+  // Distances to closest neighbors, sorted in ascending order
   DenseMatrixWrapper<double> scores(ann_number, n, &neighbor_scores[0],
                                     ann_number);
   // Find ANN: end ------------------------------------------------
@@ -252,7 +257,7 @@ int main(int argc, char *argv[]) {
           Kdense(r, c) = Kdense(r, c) + lambda;
         }
       }
-  } 
+  }
   else {
     for (int c=0; c<n; c++)
     for (int r=0; r<n; r++){
@@ -295,7 +300,7 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < n; i++) {
     sample_vector[i] /= sample_norm;
   }
-  
+
   DenseMatrixWrapper<double> sample_v(n, 1, &sample_vector[0], n);
   DenseMatrix<double> sample_rhs(n, 1);
   gemm(Trans::N, Trans::N, 1., Kdense, sample_v, 0., sample_rhs);
@@ -330,7 +335,7 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < m; ++i) {
     prediction[i] = ((prediction[i] > 0) ? 1. : -1.);
   }
-  
+
   // compute accuracy score of prediction
   double incorrect_quant = 0;
   for (int i = 0; i < m; ++i) {

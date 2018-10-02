@@ -49,6 +49,7 @@ namespace strumpack {
     const elem_t& Aelem, const opts_t& opts,
     WorkCompressANN<scalar_t>& w) {
       if (this->leaf()) {
+        std::cout << "LEAF(" << this->rows() << "," << this->cols() << ")"<< std::endl;
         if (this->is_untouched()) {
           std::vector<std::size_t> I, J;
           I.reserve(this->rows());
@@ -61,6 +62,7 @@ namespace strumpack {
           Aelem(I, J, _D);
         }
       } else {
+        std::cout << "NLEF(" << this->rows() << "," << this->cols() << ")"<< std::endl;
         w.split(this->_ch[0]->dims());
         this->_ch[0]->compress_recursive_ann
           (ann, scores, Aelem, opts, w.c[0]);
@@ -76,6 +78,7 @@ namespace strumpack {
           Aelem(w.c[1].Ir, w.c[0].Ic, _B10);
         }
       }
+
       if (w.lvl == 0) {
         this->_U_state = this->_V_state = State::COMPRESSED;
       } else {

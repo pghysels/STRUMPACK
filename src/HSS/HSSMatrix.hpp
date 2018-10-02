@@ -375,7 +375,7 @@ namespace strumpack {
       void compress_hard_restart
       (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts);
 
-      //NEW
+      //NEW methods for ANN: start
       void compress_recursive_ann
       (DenseM_t& ann, DenseM_t&  scores,
        const elem_t& Aelem, const opts_t& opts,
@@ -386,6 +386,7 @@ namespace strumpack {
       bool compute_U_V_bases_ANN
       (DenseM_t& S, const opts_t& opts,
        WorkCompressANN<scalar_t>& w, int depth);
+      //NEW methods for ANN: end
 
       void compress_recursive_original
       (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
