@@ -1,10 +1,10 @@
-all: KernelRegression_ann
+all: KernelRegression_ann KernelRegression_ann_MPI
 
 all_old: @C_EXAMPLES@ testPoisson2d testPoisson3d	\
 	testPoisson2dMPI testPoisson2dMPIDist testPoisson3dMPIDist	\
 	testMMdouble testMMdoubleMPI testMMdoubleMPIDist testMMdouble64	\
 	testMMdoubleMPIDist64 testMMfloat testMMfloatMPIDist	\
-	mtx2bin bin2mtx MLkernel KernelRegression_ann
+	mtx2bin bin2mtx MLkernel KernelRegression_ann KernelRegression_ann_MPI
 
 CC=@MPI_C_COMPILER@
 CXX=@MPI_CXX_COMPILER@
@@ -107,12 +107,17 @@ KernelRegression_ann: KernelRegression_ann.cpp
 	$(CXX) $(LDFLAGS) KernelRegression_ann.o -o $@ $(LIBS)
 	$(RM) KernelRegression_ann.o
 
+KernelRegression_ann_MPI: KernelRegression_ann_MPI.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o KernelRegression_ann_MPI.o
+	$(CXX) $(LDFLAGS) KernelRegression_ann_MPI.o -o $@ $(LIBS)
+	$(RM) KernelRegression_ann_MPI.o
+
 clean:
 	rm -f *~ *o @C_EXAMPLES@ testPoisson2d	\
 		testPoisson3d testPoisson2dMPI testPoisson2dMPIDist	\
 		testMMdouble testMMdoubleMPI testMMdoubleMPIDist	\
 		testMMdouble64 testMMdoubleMPIDist64			\
 		testMMfloat testMMfloatMPIDist				\
-		mtx2bin bin2mtx MLkernel KernelRegression_ann
+		mtx2bin bin2mtx MLkernel KernelRegression_ann KernelRegression_ann_MPI
 
 
