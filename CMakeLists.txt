@@ -481,6 +481,8 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/preprocessing.h
   ${CMAKE_BINARY_DIR}/examples/preprocessing.h COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/find_ann.h
   ${CMAKE_BINARY_DIR}/examples/find_ann.h COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/KernelRegression_ann_MPI.cpp
+  ${CMAKE_BINARY_DIR}/examples/KernelRegression_ann_MPI.cpp COPYONLY)
 
 if(STRUMPACK_BUILD_TESTS)
   include(CTest)
