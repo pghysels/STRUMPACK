@@ -31,7 +31,7 @@ Version 3.0.0 Released September 28, 2018
  - Several bugfixes!
 
 
-Version 2.2.0 Released March 32, 2018
+Version 2.2.0 Released March 31, 2018
 =====================================
  - Changes in the build system
     - ParMETIS, (PT)Scotch are now optional
