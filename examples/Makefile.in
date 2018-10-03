@@ -1,4 +1,4 @@
-all: KernelRegression_ann KernelRegression_ann_MPI
+all: KernelRegression_ann KernelRegression_ann_MPI scratch
 
 all_old: @C_EXAMPLES@ testPoisson2d testPoisson3d	\
 	testPoisson2dMPI testPoisson2dMPIDist testPoisson3dMPIDist	\
@@ -112,12 +112,18 @@ KernelRegression_ann_MPI: KernelRegression_ann_MPI.cpp
 	$(CXX) $(LDFLAGS) KernelRegression_ann_MPI.o -o $@ $(LIBS)
 	$(RM) KernelRegression_ann_MPI.o
 
+scratch: scratch.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o scratch.o
+	$(CXX) $(LDFLAGS) scratch.o -o $@ $(LIBS)
+	$(RM) scratch.o
+
 clean:
 	rm -f *~ *o @C_EXAMPLES@ testPoisson2d	\
 		testPoisson3d testPoisson2dMPI testPoisson2dMPIDist	\
 		testMMdouble testMMdoubleMPI testMMdoubleMPIDist	\
 		testMMdouble64 testMMdoubleMPIDist64			\
 		testMMfloat testMMfloatMPIDist				\
-		mtx2bin bin2mtx MLkernel KernelRegression_ann KernelRegression_ann_MPI
+		mtx2bin bin2mtx MLkernel KernelRegression_ann KernelRegression_ann_MPI \
+    scratch
 
 
