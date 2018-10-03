@@ -193,6 +193,7 @@ extern "C" {
   (STRUMPACK_SparseSolver S);
   STRUMPACK_GRAM_SCHMIDT_TYPE STRUMPACK_GramSchmidt_type
   (STRUMPACK_SparseSolver S);
+  int STRUMPACK_mc64job(STRUMPACK_SparseSolver S);
   int STRUMPACK_matching(STRUMPACK_SparseSolver S);
   STRUMPACK_KRYLOV_SOLVER STRUMPACK_Krylov_solver(STRUMPACK_SparseSolver S);
 

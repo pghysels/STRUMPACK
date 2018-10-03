@@ -571,6 +571,9 @@ extern "C" {
     switch_precision_return(options().GramSchmidt_type(), gs);
     return static_cast<STRUMPACK_GRAM_SCHMIDT_TYPE>(gs);
   }
+  int STRUMPACK_mc64job(STRUMPACK_SparseSolver S) {
+    return STRUMPACK_matching(S);
+  }
   int STRUMPACK_matching(STRUMPACK_SparseSolver S) {
     MatchingJob job = MatchingJob::NONE;
     switch_precision_return(options().matching(), job);
