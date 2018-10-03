@@ -76,8 +76,8 @@ namespace strumpack {
     MPIComm(MPI_Comm c) { duplicate(c); }
     MPIComm(const MPIComm& c) { *this = c; }
     MPIComm(MPIComm&& c) { *this = std::move(c); }
-    ~MPIComm() {
-      if (comm_ != MPI_COMM_NULL)
+    virtual ~MPIComm() {
+      if (comm_ != MPI_COMM_NULL && comm_ != MPI_COMM_WORLD)
         MPI_Comm_free(&comm_);
     }
     MPIComm& operator=(const MPIComm& c) {

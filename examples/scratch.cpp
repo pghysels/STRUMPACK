@@ -12,25 +12,29 @@ int n = 8;
 
 void run()
 {
-  auto P = mpi_nprocs(MPI_COMM_WORLD);
-  cout << mpi_nprocs() << "/" << mpi_rank() << endl;
+  MPIComm c;
+  auto P = c.size();
+  cout << P << "/" << c.rank() << endl;
 
   // Initialize BLACSGrid
-  BLACSGrid grid(MPI_COMM_WORLD);
-
+  BLACSGrid grid(c);
+  DistributedMatrix<double> Adist(&grid, n, n);
   DenseMatrix<double> Adense;
-  DistributedMatrix<double> Adist;
-  DistributedMatrixWrapper<double> Adist;
 
   if (!mpi_rank())
-  {
+{
+   Adense = DenseMatrix<double>(n, n);
+
     // Dense matrix only on master rank
-    Adense = DenseMatrix(n,n);
     int cnt = 0;
     for (int j = 0; j < n; j++)
       for (int i = 0; i < n; i++)
         Adense(i, j) = cnt++;
   }
+
+    // scatter Adense (from the root) to the distributed matrix Adist
+  Adist.scatter(Adense);
+  Adist.print("Adist");
 
 }
 
