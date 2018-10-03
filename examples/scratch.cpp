@@ -16,25 +16,38 @@ void run()
   auto P = c.size();
   cout << P << "/" << c.rank() << endl;
 
-  // Initialize BLACSGrid
-  BLACSGrid grid(c);
-  DistributedMatrix<double> Adist(&grid, n, n);
-  DenseMatrix<double> Adense;
-
-  if (!mpi_rank())
-{
-   Adense = DenseMatrix<double>(n, n);
-
-    // Dense matrix only on master rank
-    int cnt = 0;
-    for (int j = 0; j < n; j++)
-      for (int i = 0; i < n; i++)
-        Adense(i, j) = cnt++;
+  auto cA = c.sub(0, 2); // Sub-communicator. ranks (0,1)
+  if (!cA.is_null()) {
+    BLACSGrid gridA(cA);
+    DenseMatrix<double> Adense;
+    DistributedMatrix<double> Adist(&gridA, n, n);
+    if (mpi_rank() == 0){
+      int cnt = 0;
+      Adense = DenseMatrix<double>(n, n);
+      cnt = 0;
+      for (int j = 0; j < n; j++)
+        for (int i = 0; i < n; i++)
+          Adense(i, j) = cnt++;
+    }
+    Adist.scatter(Adense);
+    Adist.print("Adist");
   }
 
-    // scatter Adense (from the root) to the distributed matrix Adist
-  Adist.scatter(Adense);
-  Adist.print("Adist");
+  auto cB = c.sub(2, 2); // Sub-communicator. ranks (2,3)
+  if (!cB.is_null()) {
+    BLACSGrid gridB(cB);
+    DenseMatrix<double> Bdense;
+    DistributedMatrix<double> Bdist(&gridB, n, n);
+    if (mpi_rank() == 2){
+      Bdense = DenseMatrix<double>(n, n);
+      int cnt = 100;
+      for (int j = 0; j < n; j++)
+        for (int i = 0; i < n; i++)
+          Bdense(i, j) = cnt++;
+    }
+    Bdist.scatter(Bdense);
+    Bdist.print("Bdist");
+  }
 
 }
 
