@@ -1,9 +1,7 @@
 #include <iostream>
-
 #include "HSS/HSSMatrix.hpp"
 #include "dense/DenseMatrix.hpp"
 #include "dense/DistributedMatrix.hpp"
-
 using namespace std;
 using namespace strumpack;
 using namespace strumpack::HSS;
@@ -14,7 +12,7 @@ void run()
 {
   MPIComm c;
   auto P = c.size();
-  cout << P << "/" << c.rank() << endl;
+  cout << "Rank " << P << "/" << c.rank() << endl;
 
   auto cA = c.sub(0, 2); // Sub-communicator. ranks (0,1)
   if (!cA.is_null()) {
@@ -51,12 +49,9 @@ void run()
 
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
-
   run();
-
   MPI_Finalize();
   return 0;
 }

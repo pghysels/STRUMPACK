@@ -45,7 +45,7 @@ using namespace strumpack;
 using namespace strumpack::HSS;
 
 // random_device rd;
-mt19937 generator(1);
+mt19937 generator(1); // Fixed seed
 
 class KernelMPI {
   using DenseM_t = DenseMatrix<double>;
@@ -60,19 +60,25 @@ public:
   double _h = 0.;
   double _l = 0.;
   KernelMPI() = default;
+
   KernelMPI(vector<double> data, int d, double h, double l)
-    : _data(std::move(data)), _d(d), _n(_data.size() / _d), _h(h), _l(l) {
+  : _data(std::move(data)), _d(d), _n(_data.size() / _d), _h(h), _l(l) {
     assert(_n * _d == _data.size());
   }
 
   void operator()(const vector<size_t> &I, const vector<size_t> &J,
   DistM_t &B) {
-    if (!B.active()) return;
+    if (!B.active())
+      return;
     assert(I.size() == B.rows() && J.size() == B.cols());
-    for (size_t j = 0; j < J.size(); j++) {
-      if (B.colg2p(j) != B.pcol()) continue;
-      for (size_t i = 0; i < I.size(); i++) {
-        if (B.rowg2p(i) == B.prow()) {
+    for (size_t j = 0; j < J.size(); j++)
+    {
+      if (B.colg2p(j) != B.pcol())
+        continue;
+      for (size_t i = 0; i < I.size(); i++)
+      {
+        if (B.rowg2p(i) == B.prow())
+        {
           assert(B.is_local(i, j));
           B.global(i, j) = Gauss_kernel(&_data[I[i] * _d], &_data[J[j] * _d], _d, _h);
           if (I[i] == J[j])
@@ -87,18 +93,22 @@ public:
     const auto Bc = S.lcols();
     DenseM_t Asub(B, B);
     #pragma omp parallel for firstprivate(Asub) schedule(dynamic)
-    for (int lr = 0; lr < S.lrows(); lr += B) {
+    for (int lr = 0; lr < S.lrows(); lr += B)
+    {
       const int Br = std::min(B, S.lrows() - lr);
       const int Ar = S.rowl2g(lr);
-      for (int k = 0, Ac = Rprow*B; Ac < _n; k += B) {
+      for (int k = 0, Ac = Rprow * B; Ac < _n; k += B)
+      {
         const int Bk = std::min(B, _n - Ac);
         // construct a block of A
-        for (size_t j = 0; j < Bk; j++) {
-          for (size_t i = 0; i < Br; i++) {
-            Asub(i, j) = Gauss_kernel
-              (&_data[(Ar + i) * _d], &_data[(Ac + j) * _d], _d, _h);
+        for (size_t j = 0; j < Bk; j++)
+        {
+          for (size_t i = 0; i < Br; i++)
+          {
+            Asub(i, j) = Gauss_kernel(&_data[(Ar + i) * _d], &_data[(Ac + j) * _d], _d, _h);
           }
-          if (Ar==Ac) Asub(j,j) += _l;
+          if (Ar == Ac)
+            Asub(j, j) += _l;
         }
         DenseMW_t Ablock(Br, Bk, Asub, 0, 0);
         DenseMW_t Sblock(Br, Bc, &S(lr, 0), S.ld());
@@ -113,47 +123,39 @@ public:
   void operator()(DistM_t &R, DistM_t &Sr, DistM_t &Sc) {
     Sr.zero();
     int maxlocrows = R.MB() * (R.rows() / R.MB());
-    if (R.rows() % R.MB()) maxlocrows += R.MB();
+    if (R.rows() % R.MB())
+      maxlocrows += R.MB();
     int maxloccols = R.MB() * (R.cols() / R.MB());
-    if (R.cols() % R.MB()) maxloccols += R.MB();
+    if (R.cols() % R.MB())
+      maxloccols += R.MB();
     DenseM_t tmp(maxlocrows, maxloccols);
     // each processor broadcasts his/her local part of R to all
     // processes in the same column of the BLACS grid, one after the
     // other
-    for (int p=0; p<R.nprows(); p++) {
-      if (p == R.prow()) {
-        strumpack::scalapack::gebs2d
-          (R.ctxt(), 'C', ' ', R.lrows(), R.lcols(), R.data(), R.ld());
+    for (int p = 0; p < R.nprows(); p++)
+    {
+      if (p == R.prow())
+      {
+        strumpack::scalapack::gebs2d(R.ctxt(), 'C', ' ', R.lrows(), R.lcols(), R.data(), R.ld());
         DenseMW_t Rdense(R.lrows(), R.lcols(), R.data(), R.ld());
         strumpack::copy(Rdense, tmp, 0, 0);
-      } else {
-        int recvrows = strumpack::scalapack::numroc
-          (R.rows(), R.MB(), p, 0, R.nprows());
-        strumpack::scalapack::gebr2d
-          (R.ctxt(), 'C', ' ', recvrows, R.lcols(),
-           tmp.data(), tmp.ld(), p, R.pcol());
+      }
+      else
+      {
+        int recvrows = strumpack::scalapack::numroc(R.rows(), R.MB(), p, 0, R.nprows());
+        strumpack::scalapack::gebr2d(R.ctxt(), 'C', ' ', recvrows, R.lcols(),
+                                     tmp.data(), tmp.ld(), p, R.pcol());
       }
       times(tmp, Sr, p);
     }
     Sc = Sr;
   }
+
 };
 
-int main(int argc, char *argv[]) {
-  MPI_Init(&argc, &argv);
-  auto P = mpi_nprocs(MPI_COMM_WORLD);
-  // initialize the BLACS grid
-  int npcol = floor(sqrt((float)P));
-  int nprow = P / npcol;
-  int ctxt, dummy, prow, pcol;
-  scalapack::Cblacs_get(0, 0, &ctxt);
-  scalapack::Cblacs_gridinit(&ctxt, "C", nprow, npcol);
-  scalapack::Cblacs_gridinfo(ctxt, &dummy, &dummy, &prow, &pcol);
-  int ctxt_all = scalapack::Csys2blacs_handle(MPI_COMM_WORLD);
-  scalapack::Cblacs_gridinit(&ctxt_all, "R", 1, P);
-
-  // Get BLACSGrid object
-  BLACSGrid grid(MPI_COMM_WORLD);
+int run(int argc, char *argv[]) {
+  MPIComm c;
+  BLACSGrid grid(c);
 
   string filename("smalltest.dat");
   int d = 2;
@@ -166,7 +168,7 @@ int main(int argc, char *argv[]) {
 
   if (!mpi_rank())
     cout << "# usage: ./KernelRegression file d h kernel(1=Gauss,2=Laplace) "
-      "reorder(natural, 2means, kd, pca) lambda"
+            "reorder(natural, 2means, kd, pca) lambda"
          << endl;
   if (argc > 1)
     filename = string(argv[1]);
@@ -200,9 +202,9 @@ int main(int argc, char *argv[]) {
   vector<double> data_train = write_from_file(filename + "_train.csv");
   vector<double> data_test = write_from_file(filename + "_" + mode + ".csv");
   vector<double> data_train_label =
-    write_from_file(filename + "_train_label.csv");
+      write_from_file(filename + "_train_label.csv");
   vector<double> data_test_label =
-    write_from_file(filename + "_" + mode + "_label.csv");
+      write_from_file(filename + "_" + mode + "_label.csv");
 
   int n = data_train.size() / d;
   int m = data_test.size() / d;
@@ -227,28 +229,19 @@ int main(int argc, char *argv[]) {
   if (!mpi_rank())
     cout << "starting HSS compression .. " << endl;
 
-  HSSMatrixMPI<double>* K = nullptr;
+  HSSMatrixMPI<double> *K = nullptr;
 
   TaskTimer::t_begin = GET_TIME_NOW();
   TaskTimer timer(string("compression"), 1);
   timer.start();
   KernelMPI kernel_matrix(data_train, d, h, lambda);
 
-  // if (reorder != "natural")
-  //   K = new HSSMatrixMPI<double>
-  //     (cluster_tree, kernel_matrix, ctxt, kernel_matrix,
-  //      hss_opts, MPI_COMM_WORLD);
-  // else
-  //   K = new HSSMatrixMPI<double>
-  //     (n, n, kernel_matrix, ctxt, kernel_matrix,
-  //      hss_opts, MPI_COMM_WORLD);
-
-
-// HSSMatrixMPI(std::size_t m, std::size_t n, const BLACSGrid* Agrid,
-// const dmult_t& Amult, const delem_t& Aelem, const opts_t& opts);
-
-  K = new HSSMatrixMPI<double>(n, n, &grid, kernel_matrix, kernel_matrix,
-  hss_opts);
+  if (reorder != "natural")
+    K = new HSSMatrixMPI<double>(cluster_tree, &grid,
+            kernel_matrix, kernel_matrix, hss_opts);
+  else
+    K = new HSSMatrixMPI<double>(n, n, &grid,
+            kernel_matrix, kernel_matrix, hss_opts);
 
   if (!mpi_rank())
     cout << "# compression time = " << timer.elapsed() << endl;
@@ -265,7 +258,8 @@ int main(int argc, char *argv[]) {
            << "# compression succeeded!" << endl
            << "# rank(K) = " << max_rank << endl
            << "# memory(K) = " << total_memory / 1e6 << " MB " << endl;
-  } else {
+  }
+  else {
     if (!mpi_rank())
       cout << "# compression failed!!!!!!!!" << endl;
     return 1;
@@ -273,16 +267,24 @@ int main(int argc, char *argv[]) {
 
   if (!mpi_rank())
     cout << "factorization start" << endl;
+
   timer.start();
   auto ULV = K->factor();
   if (!mpi_rank())
     cout << "# factorization time = " << timer.elapsed() << endl;
   total_time += timer.elapsed();
 
-  DenseMatrix<double> B(n, 1, &data_train_label[0], n);
-  DenseMatrix<double> weights(B);
-  DistributedMatrix<double> Bdist(&grid, B);
-  DistributedMatrix<double> wdist(&grid, weights);
+  DenseMatrix<double> B;
+  DenseMatrix<double> weights;
+  if (!mpi_rank()){
+    B       = DenseMatrix<double>(n, 1, &data_train_label[0], n);
+    weights = DenseMatrix<double>(n, 1, &data_train_label[0], n);
+  }
+
+  DistributedMatrix<double> Bdist(&grid, n, 1);
+  DistributedMatrix<double> wdist(&grid, n, 1);
+  Bdist.scatter(B);
+  Bdist.scatter(weights);
 
   if (!mpi_rank())
     cout << "solution start" << endl;
@@ -294,49 +296,87 @@ int main(int argc, char *argv[]) {
   if (!mpi_rank())
     cout << "# total time: " << total_time << endl;
 
-  auto Bcheck = K->apply(wdist);
+  //// ----- Error checking with dense matrix: start ----- ////
 
-  Bcheck.scaled_add(-1., Bdist);
-  auto Bchecknorm = Bcheck.normF() / Bdist.normF();
-  if (!mpi_rank())
-    cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
-         << Bchecknorm << endl;
+  // Build dense matrix out o HSS matrix
+  auto KtestD = K->dense();
+  auto Ktest = KtestD.gather(); // Gather matrix to rank 0
 
-  double* prediction = new double[m];
-  std::fill(prediction, prediction+m, 0.);
-
-  if (kernel == 1) {
-    for (int c = 0; c < m; c++) {
-      for (int r = 0; r < n; r++) {
-        prediction[c] +=
-          Gauss_kernel(&data_train[r * d], &data_test[c * d], d, h) *
-          weights(r, 0);
+  if (!mpi_rank()){
+    // Build dense matrix to test error
+    DenseMatrix<double> Kdense(n, n);
+    if (kernel == 1) {
+      for (int c=0; c<n; c++)
+        for (int r=0; r<n; r++){
+          Kdense(r, c) = Gauss_kernel(&data_train[r*d], &data_train[c*d], d, h);
+          if (r == c) {
+            Kdense(r, c) = Kdense(r, c) + lambda;
+          }
+        }
+    }
+    else {
+      for (int c=0; c<n; c++)
+      for (int r=0; r<n; r++){
+        Kdense(r, c) = Laplace_kernel(&data_train[r*d], &data_train[c*d], d, h);
+        if (r == c) {
+          Kdense(r, c) = Kdense(r, c) + lambda;
+        }
       }
     }
-  } else {
-    for (int c = 0; c < m; c++) {
-      for (int r = 0; r < n; r++) {
-        prediction[c] +=
-          Laplace_kernel(&data_train[r * d], &data_test[c * d], d, h) *
-          wdist(r, 0);
+
+    Ktest.scaled_add(-1., Kdense);
+    cout << "# compression error = ||Kdense-K*I||_F/||Kdense||_F = "
+        << Ktest.normF() / Kdense.normF() << endl;
+  }
+  //// ----- Error checking with dense matrix: end ----- ////
+
+  // Computing prediction accuracy on root rank
+  if (!mpi_rank()){
+
+    double* prediction = new double[m];
+    std::fill(prediction, prediction+m, 0.); // Fill with "iterator"
+
+    if (kernel == 1) {
+      for (int c = 0; c < m; c++) {
+        for (int r = 0; r < n; r++) {
+          prediction[c] +=
+            Gauss_kernel(&data_train[r * d], &data_test[c * d], d, h) *
+            weights(r, 0);
+        }
+      }
+    } else {
+      for (int c = 0; c < m; c++) {
+        for (int r = 0; r < n; r++) {
+          prediction[c] +=
+            Laplace_kernel(&data_train[r * d], &data_test[c * d], d, h) *
+            weights(r, 0);
+        }
       }
     }
+
+    for (int i = 0; i < m; ++i)
+      prediction[i] = ((prediction[i] > 0) ? 1. : -1.);
+
+    // compute accuracy score of prediction
+    double incorrect_quant = 0;
+    for (int i = 0; i < m; ++i) {
+      double a = (prediction[i] - data_test_label[i]) / 2;
+      incorrect_quant += (a > 0 ? a : -a);
+    }
+    if (!mpi_rank())
+      cout << "# prediction score: " << ((m - incorrect_quant) / m) * 100 << "%"
+          << endl << endl;
+
+    delete [] prediction;
   }
 
-  for (int i = 0; i < m; ++i)
-    prediction[i] = ((prediction[i] > 0) ? 1. : -1.);
-
-  // compute accuracy score of prediction
-  double incorrect_quant = 0;
-  for (int i = 0; i < m; ++i) {
-    double a = (prediction[i] - data_test_label[i]) / 2;
-    incorrect_quant += (a > 0 ? a : -a);
-  }
-  if (!mpi_rank())
-    cout << "# prediction score: " << ((m - incorrect_quant) / m) * 100 << "%"
-         << endl << endl;
-
-  scalapack::Cblacs_exit(1);
-  MPI_Finalize();
   return 0;
+}
+
+int main(int argc, char *argv[])
+{
+  MPI_Init(&argc, &argv);
+  int ierr = run(argc, argv);
+  MPI_Finalize();
+  return ierr;
 }

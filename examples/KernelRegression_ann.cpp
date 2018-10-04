@@ -107,10 +107,10 @@ public:
     }
   }
 
-  // void operator()(DenseM_t &Rr, DenseM_t &Rc, DenseM_t &Sr, DenseM_t &Sc) {
-  //   times(Rr, Sr);
-  //   Sc.copy(Sr);
-  // }
+  void operator()(DenseM_t &Rr, DenseM_t &Rc, DenseM_t &Sr, DenseM_t &Sc) {
+    times(Rr, Sr);
+    Sc.copy(Sr);
+  }
 };
 
 int main(int argc, char *argv[]) {
@@ -233,8 +233,8 @@ int main(int argc, char *argv[]) {
   Kernel kernel_matrix(data_train, d, h, lambda);
 
   timer.start();
-  K.compress_ann(ann, scores, kernel_matrix, hss_opts);
-  //  K.compress(kernel_matrix, kernel_matrix, hss_opts);
+  // K.compress_ann(ann, scores, kernel_matrix, hss_opts);
+  K.compress(kernel_matrix, kernel_matrix, hss_opts);
   cout << "### compression time = " << timer.elapsed() << " ###" <<endl;
 
   if (K.is_compressed()) {
@@ -248,7 +248,8 @@ int main(int argc, char *argv[]) {
   cout << "# rank(K) = " << K.rank() << endl;
   cout << "# HSS memory(K) = " << K.memory() / 1e6 << " MB " << endl;
 
-  DenseMatrix<double> Kdense(n, n); // Build dense matrix to test error
+  // Build dense matrix to test error
+  DenseMatrix<double> Kdense(n, n);
   if (kernel == 1) {
     for (int c=0; c<n; c++)
       for (int r=0; r<n; r++){
