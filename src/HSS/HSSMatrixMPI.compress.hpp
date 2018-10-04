@@ -266,6 +266,25 @@ namespace strumpack {
       };
     }
 
+    //New kernel routine: start
+    template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compress_ann
+    (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem, const opts_t& opts) {
+      TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_compress);
+
+      auto Aelemw = [&]
+        (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+         DistM_t& B, const DistM_t& A, std::size_t rlo, std::size_t clo,
+         MPI_Comm comm) {
+        Aelem(I, J, B);
+      };
+
+      if (opts.synchronized_compression())
+        compress_kernel_sync(opts); // compress_kernel_sync(Aelemw, opts);
+      else
+        compress_kernel_nosync(opts); // compress_kernel_nosync(Aelemw, opts);
+    }
+    //New kernel routine: end
+
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_original_nosync
     (const dmult_t& Amult, const delemw_t& Aelem, const opts_t& opts) {

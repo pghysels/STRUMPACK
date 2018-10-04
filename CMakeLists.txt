@@ -395,6 +395,7 @@ install(FILES src/HSS/HSSMatrix.hpp
   src/HSS/DistSamples.hpp
   src/HSS/DistElemMult.hpp
   src/HSS/HSSMatrixMPI.compress_stable.hpp
+  src/HSS/HSSMatrixMPI.compress_kernel.hpp
   src/HSS/HSSMatrixMPI.Schur.hpp
   src/HSS/BlockCyclic2BlockRow.hpp
   DESTINATION include/HSS)

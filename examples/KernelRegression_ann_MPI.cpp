@@ -227,6 +227,31 @@ int run(int argc, char *argv[]) {
   }
 
   if (!mpi_rank())
+    cout << "finding ANN.. " << endl;
+  // Find ANN: start ------------------------------------------------
+  int ann_number = 64;
+  vector<int> neighbors(n*ann_number, 0);
+  vector<double> neighbor_scores(n*ann_number, 0.0);
+  int num_iters = 5;
+
+  // timer.start();
+    find_approximate_neighbors(data_train, n, d, num_iters, ann_number,
+    neighbors, neighbor_scores, generator);
+  // cout << "# ANN time = " << timer.elapsed() << " sec" <<endl;
+
+  vector<double> neighbors_d;
+  for (int i = 0; i < ann_number*n; i++) {
+    neighbors_d.push_back((double)neighbors[i]);
+  }
+
+  // Indices of closest neighbors, sorted in ascending order
+  DenseMatrixWrapper<double> ann(ann_number, n, &neighbors_d[0], ann_number);
+  // Distances to closest neighbors, sorted in ascending order
+  DenseMatrixWrapper<double> scores(ann_number, n, &neighbor_scores[0],
+                                    ann_number);
+  // Find ANN: end ------------------------------------------------
+
+  if (!mpi_rank())
     cout << "starting HSS compression .. " << endl;
 
   HSSMatrixMPI<double> *K = nullptr;
@@ -236,12 +261,16 @@ int run(int argc, char *argv[]) {
   timer.start();
   KernelMPI kernel_matrix(data_train, d, h, lambda);
 
-  if (reorder != "natural")
-    K = new HSSMatrixMPI<double>(cluster_tree, &grid,
-            kernel_matrix, kernel_matrix, hss_opts);
-  else
-    K = new HSSMatrixMPI<double>(n, n, &grid,
-            kernel_matrix, kernel_matrix, hss_opts);
+  // if (reorder != "natural")
+  //   K = new HSSMatrixMPI<double>(cluster_tree, &grid,
+  //           kernel_matrix, kernel_matrix, hss_opts);
+  // else
+  //   K = new HSSMatrixMPI<double>(n, n, &grid,
+  //           kernel_matrix, kernel_matrix, hss_opts);
+
+  // Constructor for ANN compression
+  K = new HSSMatrixMPI<double>(n, n, &grid,
+          ann, scores, kernel_matrix, hss_opts);
 
   if (!mpi_rank())
     cout << "# compression time = " << timer.elapsed() << endl;

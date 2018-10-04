@@ -82,6 +82,10 @@ namespace strumpack {
       HSSMatrixMPI
       (const HSSPartitionTree& t, const BLACSGrid* Agrid,
        const dmult_t& Amult, const delem_t& Aelem, const opts_t& opts);
+      HSSMatrixMPI
+      (std::size_t m, std::size_t n, const BLACSGrid* Agrid,
+      DenseM_t& ann, DenseM_t& scores,
+      const delem_t& Aelem, const opts_t& opts);
       HSSMatrixMPI(const HSSMatrixMPI<scalar_t>& other);
       HSSMatrixMPI(HSSMatrixMPI<scalar_t>&& other) = default;
       virtual ~HSSMatrixMPI() {}
@@ -108,6 +112,9 @@ namespace strumpack {
       (const dmult_t& Amult, const delem_t& Aelem, const opts_t& opts);
       void compress
       (const dmult_t& Amult, const delem_blocks_t& Aelem, const opts_t& opts);
+      void compress_ann
+      (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem,
+      const opts_t& opts);
 
       HSSFactorsMPI<scalar_t> factor() const;
       HSSFactorsMPI<scalar_t> partial_factor() const;
@@ -234,6 +241,15 @@ namespace strumpack {
       (const dmult_t& Amult, const delemw_t& Aelem, const opts_t& opts);
       void compress_hard_restart_sync
       (const dmult_t& Amult, const delem_blocks_t& Aelem, const opts_t& opts);
+
+      // New kernel routines: start
+      void compress_kernel_nosync
+      (const opts_t& opts);
+      void compress_kernel_sync
+      (const opts_t& opts);
+      // void compress_kernel_sync
+      // (const opts_t& opts);
+      // New kernel routines: end
 
       void compress_recursive_original
       (DistSamples<scalar_t>& RS, const delemw_t& Aelem,
@@ -415,6 +431,18 @@ namespace strumpack {
       setup_local_context();
       setup_ranges(0, 0);
       compress(Amult, Aelem, opts);
+    }
+
+    // New constructor for ANN compression
+    template<typename scalar_t> HSSMatrixMPI<scalar_t>::HSSMatrixMPI
+    (std::size_t m, std::size_t n, const BLACSGrid* Agrid,
+    DenseM_t& ann, DenseM_t& scores,
+    const delem_t& Aelem, const opts_t& opts)
+    : HSSMatrixBase<scalar_t>(m, n, true), blacs_grid_(Agrid) {
+      setup_hierarchy(opts, 0, 0);
+      setup_local_context();
+      setup_ranges(0, 0);
+      compress_ann(ann, scores, Aelem, opts);
     }
 
     template<typename scalar_t>
@@ -962,6 +990,7 @@ namespace strumpack {
 #include "HSSMatrixMPI.apply.hpp"
 #include "HSSMatrixMPI.compress.hpp"
 #include "HSSMatrixMPI.compress_stable.hpp"
+#include "HSSMatrixMPI.compress_kernel.hpp"
 #include "HSSMatrixMPI.factor.hpp"
 #include "HSSMatrixMPI.solve.hpp"
 #include "HSSMatrixMPI.extract.hpp"

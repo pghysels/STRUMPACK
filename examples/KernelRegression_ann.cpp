@@ -233,8 +233,8 @@ int main(int argc, char *argv[]) {
   Kernel kernel_matrix(data_train, d, h, lambda);
 
   timer.start();
-  // K.compress_ann(ann, scores, kernel_matrix, hss_opts);
-  K.compress(kernel_matrix, kernel_matrix, hss_opts);
+  K.compress_ann(ann, scores, kernel_matrix, hss_opts);
+  // K.compress(kernel_matrix, kernel_matrix, hss_opts);
   cout << "### compression time = " << timer.elapsed() << " ###" <<endl;
 
   if (K.is_compressed()) {
