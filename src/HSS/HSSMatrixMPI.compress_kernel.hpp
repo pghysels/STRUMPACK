@@ -56,14 +56,14 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_kernel_sync
-    (const opts_t& opts) {
-      std::cout << "compress_kernel_sync" << std::endl;
-      // auto d = opts.d0();
-      // auto dd = opts.dd();
-      // assert(dd <= d);
-      // WorkCompressMPI<scalar_t> w;
+    (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem, const opts_t& opts) {
+      std::cout << "GC: compress_kernel_sync" << std::endl;
+      auto d = opts.d0();
+      auto dd = opts.dd();
+      assert(dd <= d);
+      WorkCompressMPI_ANN<scalar_t> w;
       // DistSamples<scalar_t> RS(d+dd, grid(), *this, Amult, opts);
-      // const auto nr_lvls = this->max_levels();
+      const auto nr_lvls = this->max_levels();
       // while (!this->is_compressed()) {
       //   if (d != opts.d0()) RS.add_columns(d+dd, opts);
       //   if (opts.verbose() && Comm().is_root())

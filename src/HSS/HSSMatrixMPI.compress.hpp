@@ -279,7 +279,7 @@ namespace strumpack {
       };
 
       if (opts.synchronized_compression())
-        compress_kernel_sync(opts); // compress_kernel_sync(Aelemw, opts);
+        compress_kernel_sync(ann, scores, Aelem, opts);
       else
         compress_kernel_nosync(opts); // compress_kernel_nosync(Aelemw, opts);
     }

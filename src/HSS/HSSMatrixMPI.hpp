@@ -246,7 +246,7 @@ namespace strumpack {
       void compress_kernel_nosync
       (const opts_t& opts);
       void compress_kernel_sync
-      (const opts_t& opts);
+      (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem, const opts_t& opts);
       // void compress_kernel_sync
       // (const opts_t& opts);
       // New kernel routines: end

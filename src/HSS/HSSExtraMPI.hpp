@@ -58,6 +58,34 @@ namespace strumpack {
       }
     };
 
+    // New class for kernel compression
+    template<typename scalar_t>
+    class WorkCompressMPI_ANN : public WorkCompressBase<scalar_t> {
+    public:
+      std::vector<WorkCompressMPI<scalar_t>> c;
+      // DistributedMatrix<scalar_t> Rr, Rc, Sr, Sc;
+      // DistributedMatrix<scalar_t> Qr, Qc;
+      // int dR = 0, dS = 0;
+      DenseMatrix<scalar_t> S;            // new
+      std::vector<std::size_t> Scolids;   // new
+      std::vector<double> Scolscs;        // new
+      std::unique_ptr<WorkCompress<scalar_t>> w_seq;
+      void split(const std::pair<std::size_t,std::size_t>& dim) {
+        if (c.empty()) {
+          c.resize(2);
+          c[0].offset = this->offset;
+          c[1].offset = this->offset + dim;
+          c[0].lvl = c[1].lvl = this->lvl + 1;
+        }
+      }
+      void create_sequential() {
+        if (!w_seq)
+          w_seq = std::unique_ptr<WorkCompress<scalar_t>>
+            (new WorkCompress<scalar_t>());
+        w_seq->lvl = this->lvl;
+      }
+    };
+
     template<typename scalar_t> class WorkApplyMPI {
     public:
       std::pair<std::size_t,std::size_t> offset;
