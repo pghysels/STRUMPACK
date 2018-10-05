@@ -37,12 +37,13 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_kernel_nosync
-    (const opts_t& opts) {
+    (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem,
+    const opts_t& opts) {
       std::cout << "compress_kernel_nosync" << std::endl;
-      // auto d = opts.d0();
-      // auto dd = opts.dd();
+      auto d = opts.d0();
+      auto dd = opts.dd();
       // DistSamples<scalar_t> RS(d+dd, grid(), *this, Amult, opts);
-      // WorkCompressMPI<scalar_t> w;
+      WorkCompressMPI_ANN<scalar_t> w;
       // while (!this->is_compressed()) {
       //   if (d != opts.d0()) RS.add_columns(d+dd, opts);
       //   if (opts.verbose() && Comm().is_root())
@@ -55,57 +56,9 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    HSSMatrixMPI<scalar_t>::compress_kernel_sync
-    (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem, const opts_t& opts) {
-      std::cout << "GC: compress_kernel_sync" << std::endl;
-      auto d = opts.d0();
-      auto dd = opts.dd();
-      assert(dd <= d);
-      WorkCompressMPI_ANN<scalar_t> w;
-      // DistSamples<scalar_t> RS(d+dd, grid(), *this, Amult, opts);
-      const auto nr_lvls = this->max_levels();
-      // while (!this->is_compressed()) {
-      //   if (d != opts.d0()) RS.add_columns(d+dd, opts);
-      //   if (opts.verbose() && Comm().is_root())
-      //     std::cout << "# compressing with d+dd = " << d << "+" << dd
-      //               << " (kernel)" << std::endl;
-      //   for (int lvl=nr_lvls-1; lvl>=0; lvl--) {
-      //     extract_level(Aelem, opts, w, lvl);
-      //     compress_level_kernel(RS, opts, w, d, dd, lvl);
-      //   }
-      //   d += dd;
-      //   dd = std::min(dd, opts.max_rank()-d);
-      // }
-    }
-
-  #if 0
-    template<typename scalar_t> void
-    HSSMatrixMPI<scalar_t>::compress_kernel_sync
-    (const delem_blocks_t& Aelem, const opts_t& opts) {
-      // auto d = opts.d0();
-      // auto dd = opts.dd();
-      // assert(dd <= d);
-      // WorkCompressMPI<scalar_t> w;
-      // DistSamples<scalar_t> RS(d+dd, grid(), *this, Amult, opts);
-      // const auto nr_lvls = this->max_levels();
-      // while (!this->is_compressed()) {
-      //   if (d != opts.d0()) RS.add_columns(d+dd, opts);
-      //   if (opts.verbose() && Comm().is_root())
-      //     std::cout << "# compressing with d+dd = " << d << "+" << dd
-      //               << " (kernel)" << std::endl;
-      //   for (int lvl=nr_lvls-1; lvl>=0; lvl--) {
-      //     extract_level(Aelem, opts, w, lvl);
-      //     compress_level_kernel(RS, opts, w, d, dd, lvl);
-      //   }
-      //   d += dd;
-      //   dd = std::min(dd, opts.max_rank()-d);
-      // }
-    }
-
-    template<typename scalar_t> void
-    HSSMatrixMPI<scalar_t>::compress_recursive_kernel //for nosync
-    (DistSamples<scalar_t>& RS, const delemw_t& Aelem, const opts_t& opts,
-    WorkCompressMPI<scalar_t>& w, int d, int dd) {
+    HSSMatrixMPI<scalar_t>::compress_recursive_kernel
+    (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem, const opts_t& opts,
+    WorkCompressMPI_ANN<scalar_t>& w, int d, int dd) {
       // if (!this->active()) return;
       // if (this->leaf()) {
       //   if (this->is_untouched()) {
@@ -125,7 +78,7 @@ namespace strumpack {
       //     (RS, Aelem, opts, w.c[0], d, dd);
       //   this->_ch[1]->compress_recursive_kernel
       //     (RS, Aelem, opts, w.c[1], d, dd);
-      //   communicate_child_data(w);
+      //   communicate_child_data(w);                 <-- Needs major aditions
       //   if (!this->_ch[0]->is_compressed() ||
       //       !this->_ch[1]->is_compressed()) return;
       //   if (this->is_untouched()) {
@@ -151,39 +104,10 @@ namespace strumpack {
       // }
     }
 
-    template<typename scalar_t> void
-    HSSMatrixMPI<scalar_t>::compress_level_kernel
-    (DistSamples<scalar_t>& RS, const opts_t& opts,
-    WorkCompressMPI<scalar_t>& w, int d, int dd, int lvl) {
-      // if (!this->active()) return;
-      // if (this->leaf()) {
-      //   if (w.lvl < lvl) return;
-      // } else {
-      //   if (w.lvl < lvl) {
-      //     this->_ch[0]->compress_level_kernel(RS, opts, w.c[0], d, dd, lvl);
-      //     this->_ch[1]->compress_level_kernel(RS, opts, w.c[1], d, dd, lvl);
-      //     return;
-      //   }
-      //   if (!this->_ch[0]->is_compressed() ||
-      //       !this->_ch[1]->is_compressed()) return;
-      // }
-      // if (w.lvl==0) this->_U_state = this->_V_state = State::COMPRESSED;
-      // else {
-      //   if (this->is_untouched()) compute_local_samples(RS, w, d+dd);
-      //   else compute_local_samples(RS, w, dd);
-      //   if (!this->is_compressed()) {
-      //     compute_U_basis_kernel(opts, w, d, dd);
-      //     compute_V_basis_kernel(opts, w, d, dd);
-      //     notify_inactives_states(w);
-      //     if (this->is_compressed())
-      //       reduce_local_samples(RS, w, d+dd, false);
-      //   } else reduce_local_samples(RS, w, dd, true);
-      // }
-    }
-
+    #if 0
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compute_U_basis_kernel
-    (const opts_t& opts, WorkCompressMPI<scalar_t>& w, int d, int dd) {
+    (const opts_t& opts, WorkCompressMPI_ANN<scalar_t>& w, int d, int dd) {
       // if (this->_U_state == State::COMPRESSED) return;
       // int u_rows = this->leaf() ? this->rows() :
       //   this->_ch[0]->U_rank()+this->_ch[1]->U_rank();
@@ -215,7 +139,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compute_V_basis_kernel
-    (const opts_t& opts, WorkCompressMPI<scalar_t>& w, int d, int dd) {
+    (const opts_t& opts, WorkCompressMPI_ANN<scalar_t>& w, int d, int dd) {
       // if (this->_V_state == State::COMPRESSED) return;
       // int v_rows = this->leaf() ? this->rows() :
       //   this->_ch[0]->V_rank()+this->_ch[1]->V_rank();
@@ -292,6 +216,7 @@ namespace strumpack {
       // return (Q3norm / std::sqrt(double(dd)) < atol)
       //   || (Q3norm / S3norm < rtol);
     }
+
   #endif
 
   } // end namespace HSS

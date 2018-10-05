@@ -242,14 +242,13 @@ namespace strumpack {
       void compress_hard_restart_sync
       (const dmult_t& Amult, const delem_blocks_t& Aelem, const opts_t& opts);
 
-      // New kernel routines: start
+      // NEW kernel routines: start
       void compress_kernel_nosync
-      (const opts_t& opts);
-      void compress_kernel_sync
       (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem, const opts_t& opts);
-      // void compress_kernel_sync
-      // (const opts_t& opts);
-      // New kernel routines: end
+      void compress_recursive_kernel
+      (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem,
+      const opts_t& opts, WorkCompressMPI_ANN<scalar_t>& w, int d, int dd);
+      // NEW kernel routines: end
 
       void compress_recursive_original
       (DistSamples<scalar_t>& RS, const delemw_t& Aelem,
