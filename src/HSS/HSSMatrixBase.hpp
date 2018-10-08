@@ -179,7 +179,7 @@ namespace strumpack {
        const opts_t& opts, WorkCompress<scalar_t>& w,
        int d, int dd, int lvl, int depth) {}
 
-
+      // New functions for kernel compression: start
       virtual void compress_recursive_ann
       (DenseM_t& ann, DenseM_t& scores,
        const elem_t& Aelem, const opts_t& opts,
@@ -187,6 +187,11 @@ namespace strumpack {
 
       virtual real_t update_orthogonal_basis
       (DenseM_t& S, int d, int dd, int depth) { return real_t(0.); }
+
+      virtual void compress_recursive_kernel
+      (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem,
+      WorkCompressMPI_ANN<scalar_t>& w, int d, int dd, const opts_t& opts) {}
+      // New functions for kernel compression: end
 
       virtual void compress_recursive_original
       (DistSamples<scalar_t>& RS, const delemw_t& Aelem,

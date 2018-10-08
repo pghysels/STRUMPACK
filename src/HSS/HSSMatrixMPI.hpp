@@ -242,13 +242,29 @@ namespace strumpack {
       void compress_hard_restart_sync
       (const dmult_t& Amult, const delem_blocks_t& Aelem, const opts_t& opts);
 
-      // NEW kernel routines: start
+      // NEW MPI kernel routines: start
       void compress_kernel_nosync
-      (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem, const opts_t& opts);
+      (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem,
+      const opts_t& opts);
       void compress_recursive_kernel
       (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem,
-      const opts_t& opts, WorkCompressMPI_ANN<scalar_t>& w, int d, int dd);
-      // NEW kernel routines: end
+      WorkCompressMPI_ANN<scalar_t>& w, int d, int dd, const opts_t& opts);
+      void compute_local_samples_kernel_MPI
+      (DenseM_t &ann, DenseM_t &scores, WorkCompressMPI_ANN<scalar_t> &w,
+      const delem_t &Aelem, const opts_t &opts);
+      void reduce_local_samples_kernel_MPI
+      (const DistSamples<scalar_t>& RS, WorkCompressMPI_ANN<scalar_t>& w,
+      int dd, bool was_compressed);
+      void compute_U_basis_kernel
+      (const opts_t& opts, WorkCompressMPI_ANN<scalar_t>& w, int d, int dd);
+      void compute_V_basis_kernel
+      (const opts_t& opts, WorkCompressMPI_ANN<scalar_t>& w, int d, int dd);
+      bool update_orthogonal_basis_kernel
+      (const opts_t& opts, scalar_t& r_max_0, const DistM_t& S,
+      DistM_t& Q, int d, int dd, bool untouched, int L);
+      void communicate_child_data_kernel(WorkCompressMPI_ANN<scalar_t>& w);
+      void notify_inactives_states_kernel(WorkCompressMPI_ANN<scalar_t>& w);
+      // NEW MPI kernel routines: end
 
       void compress_recursive_original
       (DistSamples<scalar_t>& RS, const delemw_t& Aelem,
