@@ -87,7 +87,7 @@ namespace strumpack {
      std::vector<DistM_t>& Bdist, std::vector<DenseM_t>& Bseq) const override;
     void extract_CB_sub_matrix
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-     DenseM_t& B, int task_depth) const {};
+     DenseM_t& B, int task_depth) const override {};
     virtual void extract_CB_sub_matrix_2d
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
      DistM_t& B) const = 0;
@@ -131,9 +131,9 @@ namespace strumpack {
     const BLACSGrid* grid() const { return &blacs_grid_; }
     int P() const override { return grid()->P(); }
 
-    virtual long long dense_factor_nonzeros(int task_depth=0) const;
-    virtual std::string type() const { return "FrontalMatrixMPI"; }
-    virtual bool isMPI() const { return true; }
+    virtual long long dense_factor_nonzeros(int task_depth=0) const override;
+    virtual std::string type() const override { return "FrontalMatrixMPI"; }
+    virtual bool isMPI() const override { return true; }
     virtual void bisection_partitioning
     (const SPOptions<scalar_t>& opts, integer_t* sorder,
      bool isroot=true, int task_depth=0) override;

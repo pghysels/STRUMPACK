@@ -208,9 +208,9 @@ namespace strumpack {
         }
       }
 
-      std::size_t rows() const { return U_.rows(); }
-      std::size_t cols() const { return V_.cols(); }
-      std::size_t rank() const { return U_.cols(); }
+      std::size_t rows() const override { return U_.rows(); }
+      std::size_t cols() const override { return V_.cols(); }
+      std::size_t rank() const override { return U_.cols(); }
       bool is_low_rank() const override { return true; };
 
       std::size_t memory() const override { return U_.memory() + V_.memory(); }

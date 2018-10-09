@@ -59,7 +59,7 @@ namespace strumpack {
     (integer_t sep, integer_t sep_begin, integer_t sep_end,
      std::vector<integer_t>& upd);
 
-    void release_work_memory() { F22_.clear(); }
+    void release_work_memory() override { F22_.clear(); }
     void extend_add_to_dense
     (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
      const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) override;

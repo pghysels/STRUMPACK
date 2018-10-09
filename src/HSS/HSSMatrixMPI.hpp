@@ -114,10 +114,10 @@ namespace strumpack {
       void solve(const HSSFactorsMPI<scalar_t>& ULV, DistM_t& b) const;
       void forward_solve
       (const HSSFactorsMPI<scalar_t>& ULV, WorkSolveMPI<scalar_t>& w,
-       const DistM_t& b, bool partial) const;
+       const DistM_t& b, bool partial) const override;
       void backward_solve
       (const HSSFactorsMPI<scalar_t>& ULV,
-       WorkSolveMPI<scalar_t>& w, DistM_t& x) const;
+       WorkSolveMPI<scalar_t>& w, DistM_t& x) const override;
 
       DistM_t apply(const DistM_t& b) const;
       DistM_t applyC(const DistM_t& b) const;
@@ -151,14 +151,14 @@ namespace strumpack {
       std::size_t total_memory() const;    // collective on comm()
       std::size_t total_nonzeros() const;  // collective on comm()
       std::size_t max_levels() const;      // collective on comm()
-      std::size_t rank() const;
-      std::size_t memory() const;
-      std::size_t nonzeros() const;
-      std::size_t levels() const;
+      std::size_t rank() const override;
+      std::size_t memory() const override;
+      std::size_t nonzeros() const override;
+      std::size_t levels() const override;
 
       void print_info
       (std::ostream &out=std::cout,
-       std::size_t roff=0, std::size_t coff=0) const;
+       std::size_t roff=0, std::size_t coff=0) const override;
 
       DistM_t dense() const;
 
@@ -166,11 +166,12 @@ namespace strumpack {
 
       const TreeLocalRanges& tree_ranges() const { return _ranges; }
       void to_block_row
-      (const DistM_t& A, DenseM_t& sub_A, DistM_t& leaf_A) const;
-      void allocate_block_row(int d, DenseM_t& sub_A, DistM_t& leaf_A) const;
+      (const DistM_t& A, DenseM_t& sub_A, DistM_t& leaf_A) const override;
+      void allocate_block_row
+      (int d, DenseM_t& sub_A, DistM_t& leaf_A) const override;
       void from_block_row
       (DistM_t& A, const DenseM_t& sub_A, const DistM_t& leaf_A,
-       const BLACSGrid* lgrid) const;
+       const BLACSGrid* lgrid) const override;
 
       void delete_trailing_block() override;
       void reset() override;
@@ -237,10 +238,10 @@ namespace strumpack {
 
       void compress_recursive_original
       (DistSamples<scalar_t>& RS, const delemw_t& Aelem,
-       const opts_t& opts, WorkCompressMPI<scalar_t>& w, int dd);
+       const opts_t& opts, WorkCompressMPI<scalar_t>& w, int dd) override;
       void compress_recursive_stable
       (DistSamples<scalar_t>& RS, const delemw_t& Aelem, const opts_t& opts,
-       WorkCompressMPI<scalar_t>& w, int d, int dd);
+       WorkCompressMPI<scalar_t>& w, int d, int dd) override;
       void compute_local_samples
       (const DistSamples<scalar_t>& RS, WorkCompressMPI<scalar_t>& w, int dd);
       bool compute_U_V_bases
@@ -261,10 +262,10 @@ namespace strumpack {
 
       void compress_level_original
       (DistSamples<scalar_t>& RS, const opts_t& opts,
-       WorkCompressMPI<scalar_t>& w, int dd, int lvl);
+       WorkCompressMPI<scalar_t>& w, int dd, int lvl) override;
       void compress_level_stable
       (DistSamples<scalar_t>& RS, const opts_t& opts,
-       WorkCompressMPI<scalar_t>& w, int d, int dd, int lvl);
+       WorkCompressMPI<scalar_t>& w, int d, int dd, int lvl) override;
       void extract_level
       (const delemw_t& Aelem, const opts_t& opts,
        WorkCompressMPI<scalar_t>& w, int lvl);
@@ -274,12 +275,12 @@ namespace strumpack {
       void get_extraction_indices
       (std::vector<std::vector<std::size_t>>& I,
        std::vector<std::vector<std::size_t>>& J,
-       WorkCompressMPI<scalar_t>& w, int& self, int lvl);
+       WorkCompressMPI<scalar_t>& w, int& self, int lvl) override;
       void get_extraction_indices
       (std::vector<std::vector<std::size_t>>& I,
        std::vector<std::vector<std::size_t>>& J, std::vector<DistMW_t>& B,
        const BLACSGrid* lg, WorkCompressMPI<scalar_t>& w,
-       int& self, int lvl);
+       int& self, int lvl) override;
       void allgather_extraction_indices
       (std::vector<std::vector<std::size_t>>& lI,
        std::vector<std::vector<std::size_t>>& lJ,
@@ -288,47 +289,48 @@ namespace strumpack {
        int& before, int self, int& after);
       void extract_D_B
       (const delemw_t& Aelem, const BLACSGrid* lg, const opts_t& opts,
-       WorkCompressMPI<scalar_t>& w, int lvl);
+       WorkCompressMPI<scalar_t>& w, int lvl) override;
 
       void factor_recursive
       (HSSFactorsMPI<scalar_t>& f, WorkFactorMPI<scalar_t>& w,
-       const BLACSGrid* lg, bool isroot, bool partial) const;
+       const BLACSGrid* lg, bool isroot, bool partial) const override;
 
       void solve_fwd
       (const HSSFactorsMPI<scalar_t>& ULV, const DistSubLeaf<scalar_t>& b,
-       WorkSolveMPI<scalar_t>& w, bool partial, bool isroot) const;
+       WorkSolveMPI<scalar_t>& w, bool partial, bool isroot) const override;
       void solve_bwd
       (const HSSFactorsMPI<scalar_t>& ULV, DistSubLeaf<scalar_t>& x,
-       WorkSolveMPI<scalar_t>& w, bool isroot) const;
+       WorkSolveMPI<scalar_t>& w, bool isroot) const override;
 
       void apply_fwd
       (const DistSubLeaf<scalar_t>& B, WorkApplyMPI<scalar_t>& w,
-       bool isroot, long long int flops) const;
+       bool isroot, long long int flops) const override;
       void apply_bwd
       (const DistSubLeaf<scalar_t>& B, scalar_t beta,
        DistSubLeaf<scalar_t>& C, WorkApplyMPI<scalar_t>& w,
-       bool isroot, long long int flops) const;
+       bool isroot, long long int flops) const override;
       void applyT_fwd
       (const DistSubLeaf<scalar_t>& B, WorkApplyMPI<scalar_t>& w,
-       bool isroot, long long int flops) const;
+       bool isroot, long long int flops) const override;
       void applyT_bwd
       (const DistSubLeaf<scalar_t>& B, scalar_t beta,
        DistSubLeaf<scalar_t>& C, WorkApplyMPI<scalar_t>& w,
-       bool isroot, long long int flops) const;
+       bool isroot, long long int flops) const override;
 
       void extract_fwd
-      (WorkExtractMPI<scalar_t>& w, const BLACSGrid* lg, bool odiag) const;
+      (WorkExtractMPI<scalar_t>& w, const BLACSGrid* lg,
+       bool odiag) const override;
       void extract_bwd
       (std::vector<Triplet<scalar_t>>& triplets,
-       const BLACSGrid* lg, WorkExtractMPI<scalar_t>& w) const;
+       const BLACSGrid* lg, WorkExtractMPI<scalar_t>& w) const override;
       void triplets_to_DistM
       (std::vector<Triplet<scalar_t>>& triplets, DistM_t& B) const;
       void extract_fwd
       (WorkExtractBlocksMPI<scalar_t>& w, const BLACSGrid* lg,
-       std::vector<bool>& odiag) const;
+       std::vector<bool>& odiag) const override;
       void extract_bwd
       (std::vector<std::vector<Triplet<scalar_t>>>& triplets,
-       const BLACSGrid* lg, WorkExtractBlocksMPI<scalar_t>& w) const;
+       const BLACSGrid* lg, WorkExtractBlocksMPI<scalar_t>& w) const override;
       void triplets_to_DistM
       (std::vector<std::vector<Triplet<scalar_t>>>& triplets,
        std::vector<DistM_t>& B) const;

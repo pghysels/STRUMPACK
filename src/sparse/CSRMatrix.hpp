@@ -118,7 +118,7 @@ namespace strumpack {
     void extract_F21_block
     (scalar_t* F, integer_t ldF, integer_t row,
      integer_t nr_rows, integer_t col, integer_t nr_cols,
-     const integer_t* upd) const;
+     const integer_t* upd) const override;
     void extract_separator_2d
     (integer_t sep_end, const std::vector<std::size_t>& I,
      const std::vector<std::size_t>& J, DistM_t& B) const override;

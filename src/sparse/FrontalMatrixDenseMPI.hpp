@@ -75,7 +75,7 @@ namespace strumpack {
 
     void sample_CB
     (const SPOptions<scalar_t>& opts, const DistM_t& R, DistM_t& Sr,
-     DistM_t& Sc, F_t* pa) const;
+     DistM_t& Sc, F_t* pa) const override;
 
     void multifrontal_factorization
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,

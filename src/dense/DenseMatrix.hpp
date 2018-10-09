@@ -824,7 +824,7 @@ namespace strumpack {
      * wrapper, only the wrapper itself is reset. No memory is
      * released.
      */
-    void clear() {
+    void clear() override {
       this->rows_ = 0; this->cols_ = 0;
       this->ld_ = 1; this->data_ = nullptr;
     }
@@ -838,7 +838,7 @@ namespace strumpack {
      *
      * \see nonzeros
      */
-    std::size_t memory() const { return 0; }
+    std::size_t memory() const override { return 0; }
 
     /**
      * Return the number of nonzeros taken by this wrapper, ie,
@@ -849,7 +849,7 @@ namespace strumpack {
      *
      * \see memory
      */
-    std::size_t nonzeros() const { return 0; }
+    std::size_t nonzeros() const override { return 0; }
 
     /**
      * Default copy constructor, from another DenseMatrixWrapper.

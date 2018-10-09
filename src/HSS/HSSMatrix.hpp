@@ -280,7 +280,7 @@ namespace strumpack {
        */
       void forward_solve
       (const HSSFactors<scalar_t>& ULV, WorkSolve<scalar_t>& w,
-       const DenseM_t& b, bool partial) const;
+       const DenseM_t& b, bool partial) const override;
 
       /**
        * Perform only the backward phase of the ULV linear solve. This
@@ -298,7 +298,7 @@ namespace strumpack {
        */
       void backward_solve
       (const HSSFactors<scalar_t>& ULV,
-       WorkSolve<scalar_t>& w, DenseM_t& x) const;
+       WorkSolve<scalar_t>& w, DenseM_t& x) const override;
 
       DenseM_t apply(const DenseM_t& b) const;
       DenseM_t applyC(const DenseM_t& b) const;
@@ -333,20 +333,21 @@ namespace strumpack {
        const DenseM_t& R1, const DenseM_t& R2, const DenseM_t& Sr2,
        const DenseM_t& Sc2, DenseM_t& Sr, DenseM_t& Sc) const;
 
-      std::size_t rank() const;
-      std::size_t memory() const;
-      std::size_t nonzeros() const;
-      std::size_t levels() const;
+      std::size_t rank() const override;
+      std::size_t memory() const override;
+      std::size_t nonzeros() const override;
+      std::size_t levels() const override;
       void print_info
       (std::ostream &out=std::cout,
-       std::size_t roff=0, std::size_t coff=0) const;
+       std::size_t roff=0, std::size_t coff=0) const override;
 
       DenseM_t dense() const;
       void delete_trailing_block() override;
 
       void shift(scalar_t sigma) override;
 
-      void draw(std::ostream& of, std::size_t rlo=0, std::size_t clo=0) const;
+      void draw
+      (std::ostream& of, std::size_t rlo=0, std::size_t clo=0) const override;
 
     protected:
       HSSMatrix
@@ -372,11 +373,11 @@ namespace strumpack {
       void compress_recursive_original
       (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
        const elem_t& Aelem, const opts_t& opts,
-       WorkCompress<scalar_t>& w, int dd, int depth);
+       WorkCompress<scalar_t>& w, int dd, int depth) override;
       void compress_recursive_stable
       (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
        const elem_t& Aelem, const opts_t& opts,
-       WorkCompress<scalar_t>& w, int d, int dd, int depth);
+       WorkCompress<scalar_t>& w, int d, int dd, int depth) override;
       void compute_local_samples
       (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
        WorkCompress<scalar_t>& w, int d0, int d, int depth);
@@ -402,28 +403,28 @@ namespace strumpack {
       void compress_level_original
       (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
        const opts_t& opts, WorkCompress<scalar_t>& w,
-       int dd, int lvl, int depth);
+       int dd, int lvl, int depth) override;
       void compress_level_stable
       (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
        const opts_t& opts, WorkCompress<scalar_t>& w,
-       int d, int dd, int lvl, int depth);
+       int d, int dd, int lvl, int depth) override;
       void get_extraction_indices
       (std::vector<std::vector<std::size_t>>& I,
        std::vector<std::vector<std::size_t>>& J,
        const std::pair<std::size_t,std::size_t>& off,
-       WorkCompress<scalar_t>& w, int& self, int lvl);
+       WorkCompress<scalar_t>& w, int& self, int lvl) override;
       void get_extraction_indices
       (std::vector<std::vector<std::size_t>>& I,
        std::vector<std::vector<std::size_t>>& J, std::vector<DenseM_t*>& B,
        const std::pair<std::size_t,std::size_t>& off,
-       WorkCompress<scalar_t>& w, int& self, int lvl);
+       WorkCompress<scalar_t>& w, int& self, int lvl) override;
       void extract_D_B
       (const elem_t& Aelem, const opts_t& opts,
-       WorkCompress<scalar_t>& w, int lvl);
+       WorkCompress<scalar_t>& w, int lvl) override;
 
       void factor_recursive
       (HSSFactors<scalar_t>& ULV, WorkFactor<scalar_t>& w,
-       bool isroot, bool partial, int depth) const;
+       bool isroot, bool partial, int depth) const override;
 
       void apply_fwd
       (const DenseM_t& b, WorkApply<scalar_t>& w, bool isroot,
@@ -443,18 +444,19 @@ namespace strumpack {
       void solve_fwd
       (const HSSFactors<scalar_t>& ULV, const DenseM_t& b,
        WorkSolve<scalar_t>& w,
-       bool partial, bool isroot, int depth) const;
+       bool partial, bool isroot, int depth) const override;
       void solve_bwd
       (const HSSFactors<scalar_t>& ULV, DenseM_t& x,
        WorkSolve<scalar_t>& w,
-       bool isroot, int depth) const;
+       bool isroot, int depth) const override;
 
-      void extract_fwd(WorkExtract<scalar_t>& w, bool odiag, int depth) const;
+      void extract_fwd
+      (WorkExtract<scalar_t>& w, bool odiag, int depth) const override;
       void extract_bwd
-      (DenseM_t& B, WorkExtract<scalar_t>& w, int depth) const;
+      (DenseM_t& B, WorkExtract<scalar_t>& w, int depth) const override;
       void extract_bwd
       (std::vector<Triplet<scalar_t>>& triplets,
-       WorkExtract<scalar_t>& w, int depth) const;
+       WorkExtract<scalar_t>& w, int depth) const override;
       void extract_bwd_internal(WorkExtract<scalar_t>& w, int depth) const;
 
       void apply_UV_big
@@ -467,7 +469,8 @@ namespace strumpack {
        int depth, std::atomic<long long int>& flops) const override;
 
       void dense_recursive
-      (DenseM_t& A, WorkDense<scalar_t>& w, bool isroot, int depth) const;
+      (DenseM_t& A, WorkDense<scalar_t>& w,
+       bool isroot, int depth) const override;
 
       template<typename T> friend
       void apply_HSS

@@ -105,8 +105,13 @@ namespace strumpack {
     void apply_column_permutation
     (const std::vector<integer_t>& perm) override {};
     int read_matrix_market(const std::string& filename) override { return 1; };
-    real_t max_scaled_residual(const scalar_t* x, const scalar_t* b) const { return real_t(1.); };
-    real_t max_scaled_residual(const DenseM_t& x, const DenseM_t& b) const { return real_t(1.); };
+
+    real_t max_scaled_residual
+    (const scalar_t* x, const scalar_t* b) const override
+    { return real_t(1.); };
+    real_t max_scaled_residual
+    (const DenseM_t& x, const DenseM_t& b) const override
+    { return real_t(1.); };
 
   protected:
     integer_t local_cols_;  // number of columns stored on this proces

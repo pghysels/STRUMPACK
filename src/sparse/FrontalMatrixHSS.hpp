@@ -74,7 +74,7 @@ namespace strumpack {
      const std::vector<std::size_t>& J, DenseM_t& B, int task_depth);
     void extract_CB_sub_matrix
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-     DenseM_t& B, int task_depth) const;
+     DenseM_t& B, int task_depth) const override;
 
     void multifrontal_factorization
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,
@@ -92,7 +92,7 @@ namespace strumpack {
     bool isHSS() const override { return true; };
     std::string type() const override { return "FrontalMatrixHSS"; }
 
-    int random_samples() const { return R1.cols(); };
+    int random_samples() const override { return R1.cols(); };
     void bisection_partitioning
     (const SPOptions<scalar_t>& opts, integer_t* sorder,
      bool isroot=true, int task_depth=0) override;

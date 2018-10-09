@@ -123,7 +123,7 @@ namespace strumpack {
      * be safely modified/deleted after calling this function.
      * \see set_csr_matrix
      */
-    void set_matrix(const CSRMatrix<scalar_t,integer_t>& A);
+    void set_matrix(const CSRMatrix<scalar_t,integer_t>& A) override;
 
     /**
      * Set a (distributed) matrix for this sparse solver. This matrix
@@ -163,7 +163,7 @@ namespace strumpack {
      */
     virtual void set_csr_matrix
     (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
-     const scalar_t* values, bool symmetric_pattern=false);
+     const scalar_t* values, bool symmetric_pattern=false) override;
 
     /**
      * Associate a block-row distributed CSR matrix with the solver
@@ -225,7 +225,7 @@ namespace strumpack {
      * \return error code, solve(), factor()
      */
     ReturnCode solve
-    (const scalar_t* b, scalar_t* x, bool use_initial_guess=false);
+    (const scalar_t* b, scalar_t* x, bool use_initial_guess=false) override;
 
     /**
      * Solve a linear system with a single or multiple right-hand
@@ -254,7 +254,7 @@ namespace strumpack {
      * \see DenseMatrix, solve(), factor()
      */
     ReturnCode solve
-    (const DenseM_t& b, DenseM_t& x, bool use_initial_guess=false);
+    (const DenseM_t& b, DenseM_t& x, bool use_initial_guess=false) override;
 
   protected:
     using StrumpackSparseSolverMPI<scalar_t,integer_t>::is_root_;

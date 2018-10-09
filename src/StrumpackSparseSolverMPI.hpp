@@ -121,7 +121,7 @@ namespace strumpack {
      * safely modified/deleted after calling this function.
      * \see set_csr_matrix
      */
-    virtual void set_matrix(const CSRMatrix<scalar_t,integer_t>& A);
+    virtual void set_matrix(const CSRMatrix<scalar_t,integer_t>& A) override;
 
 
     /**
@@ -148,7 +148,7 @@ namespace strumpack {
     virtual void set_csr_matrix
     (integer_t N, const integer_t* row_ptr,
      const integer_t* col_ind, const scalar_t* values,
-     bool symmetric_pattern);
+     bool symmetric_pattern) override;
 
     /**
      * Return the MPI_Comm object associated with this solver.

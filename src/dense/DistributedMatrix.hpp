@@ -331,18 +331,18 @@ namespace strumpack {
 
     int rows() const override { return _rows; }
     int cols() const override { return _cols; }
-    int I() const { return _i+1; }
-    int J() const { return _j+1; }
-    void lranges(int& rlo, int& rhi, int& clo, int& chi) const;
+    int I() const override { return _i+1; }
+    int J() const override { return _j+1; }
+    void lranges(int& rlo, int& rhi, int& clo, int& chi) const override;
 
-    void resize(std::size_t m, std::size_t n) { assert(1); }
-    void hconcat(const DistributedMatrix<scalar_t>& b) { assert(1); }
+    void resize(std::size_t m, std::size_t n) override { assert(1); }
+    void hconcat(const DistributedMatrix<scalar_t>& b) override { assert(1); }
     void clear()
     { this->data_ = nullptr; DistributedMatrix<scalar_t>::clear(); }
-    std::size_t memory() const { return 0; }
-    std::size_t total_memory() const { return 0; }
-    std::size_t nonzeros() const { return 0; }
-    std::size_t total_nonzeros() const { return 0; }
+    std::size_t memory() const override { return 0; }
+    std::size_t total_memory() const override { return 0; }
+    std::size_t nonzeros() const override { return 0; }
+    std::size_t total_nonzeros() const override { return 0; }
 
     DenseMatrix<scalar_t> dense_and_clear() = delete;
     DenseMatrixWrapper<scalar_t> dense_wrapper() = delete;
