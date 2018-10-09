@@ -272,7 +272,7 @@ if (STRUMPACK_USE_MPI)
   if(TPL_ENABLE_COMBBLAS)
     option(STRUMPACK_USE_COMBBLAS "" ON)
     set(LIBS ${LIBS} ${TPL_COMBBLAS_LIBRARIES})
-    include_directories(${TPL_COMBBLAS_INCLUDES})
+    include_directories(${TPL_COMBBLAS_INCLUDE_DIRS})
     message(STATUS "Combinatorial BLAS support enabled")
   endif()
 
