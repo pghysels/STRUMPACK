@@ -181,6 +181,22 @@ namespace strumpack {
        const opts_t& opts, WorkCompress<scalar_t>& w,
        int d, int dd, int lvl, int depth) {}
 
+      virtual void get_extraction_indices
+      (std::vector<std::vector<std::size_t>>& I,
+       std::vector<std::vector<std::size_t>>& J,
+       const std::pair<std::size_t,std::size_t>& off,
+       WorkCompress<scalar_t>& w, int& self, int lvl) {}
+
+      virtual void get_extraction_indices
+      (std::vector<std::vector<std::size_t>>& I,
+       std::vector<std::vector<std::size_t>>& J,
+       std::vector<DenseM_t*>& B,
+       const std::pair<std::size_t,std::size_t>& off,
+       WorkCompress<scalar_t>& w, int& self, int lvl) {}
+      virtual void extract_D_B
+      (const elem_t& Aelem, const opts_t& opts,
+       WorkCompress<scalar_t>& w, int lvl) {}
+
       virtual real_t update_orthogonal_basis
       (DenseM_t& S, int d, int dd, int depth) { return real_t(0.); }
 
@@ -219,6 +235,9 @@ namespace strumpack {
       virtual void extract_bwd
       (DenseMatrix<scalar_t>& B, WorkExtract<scalar_t>& w,
        int depth) const {};
+      virtual void extract_bwd
+      (std::vector<Triplet<scalar_t>>& triplets,
+       WorkExtract<scalar_t>& w, int depth) const {};
 
       virtual void apply_UV_big
       (DenseM_t& Theta, DenseM_t& Uop, DenseM_t& Phi, DenseM_t& Vop,
@@ -262,23 +281,9 @@ namespace strumpack {
       (std::vector<std::vector<std::size_t>>& I,
        std::vector<std::vector<std::size_t>>& J, std::vector<DistMW_t>& B,
        const BLACSGrid* lg, WorkCompressMPI<scalar_t>& w, int& self, int lvl);
-      virtual void get_extraction_indices
-      (std::vector<std::vector<std::size_t>>& I,
-       std::vector<std::vector<std::size_t>>& J,
-       const std::pair<std::size_t,std::size_t>& off,
-       WorkCompress<scalar_t>& w, int& self, int lvl) {}
-      virtual void get_extraction_indices
-      (std::vector<std::vector<std::size_t>>& I,
-       std::vector<std::vector<std::size_t>>& J,
-       std::vector<DenseM_t*>& B,
-       const std::pair<std::size_t,std::size_t>& off,
-       WorkCompress<scalar_t>& w, int& self, int lvl) {}
       virtual void extract_D_B
       (const delemw_t& Aelem, const BLACSGrid* lg, const opts_t& opts,
        WorkCompressMPI<scalar_t>& w, int lvl);
-      virtual void extract_D_B
-      (const elem_t& Aelem, const opts_t& opts,
-       WorkCompress<scalar_t>& w, int lvl) {}
 
       virtual void apply_fwd
       (const DistSubLeaf<scalar_t>& B, WorkApplyMPI<scalar_t>& w,
@@ -317,9 +322,6 @@ namespace strumpack {
       virtual void extract_bwd
       (std::vector<std::vector<Triplet<scalar_t>>>& triplets,
        const BLACSGrid* lg, WorkExtractBlocksMPI<scalar_t>& w) const;
-      virtual void extract_bwd
-      (std::vector<Triplet<scalar_t>>& triplets,
-       WorkExtract<scalar_t>& w, int depth) const {};
 
       virtual void apply_UV_big
       (DistSubLeaf<scalar_t>& Theta, DistM_t& Uop,
