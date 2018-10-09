@@ -13,15 +13,15 @@ follows:
      -DCMAKE_INSTALL_PREFIX=/path/to/install \
      -DCMAKE_CXX_COMPILER=<C++ compiler> \       # this and below are optional, CMake will try to autodetect
      -DCMAKE_Fortran_COMPILER=<Fortran77 compiler> \
-     -DSCALAPACK_LIBRARIES="/path/to/scalapack/libscalapack.a;/path/to/blacs/libblacs.a"
-     -DMETIS_INCLUDES=/path/to/metis/include
-     -DMETIS_LIBRARIES=/path/to/metis/libmetis.a
-     -DSTRUMPACK_USE_PARMETIS=ON \               # optional
-     -DPARMETIS_INCLUDES=/path/to/parmetis/include
-     -DPARMETIS_LIBRARIES=/path/to/parmetis/libparmetis.a
-     -DSTRUMPACK_USE_SCOTCH=ON \                 # optional
-     -DSCOTCH_INCLUDES=/path/to/scotch/include
-     -DSCOTCH_LIBRARIES="/path/to/ptscotch/libscotch.a;...libscotcherr.a;...libptscotch.a;...libptscotcherr.a"
+     -DTPL_SCALAPACK_LIBRARIES="/path/to/scalapack/libscalapack.a;/path/to/blacs/libblacs.a"
+     -DTPL_METIS_INCLUDE_DIRS=/path/to/metis/include
+     -DTPL_METIS_LIBRARIES=/path/to/metis/libmetis.a
+     -DTPL_ENABLE_PARMETIS=ON \               # optional
+     -DTPL_PARMETIS_INCLUDE_DIRS=/path/to/parmetis/include
+     -DTPL_PARMETIS_LIBRARIES=/path/to/parmetis/libparmetis.a
+     -DTPL_ENABLE_SCOTCH=ON \                 # optional
+     -DTPL_SCOTCH_INCLUDE_DIRS=/path/to/scotch/include
+     -DTPL_SCOTCH_LIBRARIES="/path/to/ptscotch/libscotch.a;...libscotcherr.a;...libptscotch.a;...libptscotcherr.a"
 > make
 > make test                                      # optional, takes a while
 > make install
@@ -80,9 +80,9 @@ only if found.
   ot by specifying the libraries manually:
 \code {.bash}
  > cmake ../ -DCMAKE_BUILD_TYPE=Release \
-      -DBLAS_LIBRARIES="..." \
-      -DLAPACK_LIBRARIES="..." \
-      -DSCALAPACK_LIBRARIES="..."
+      -DTPL_BLAS_LIBRARIES="..." \
+      -DTPL_LAPACK_LIBRARIES="..." \
+      -DTPL_SCALAPACK_LIBRARIES="..."
 \endcode
   Or one can also directly modify the linker flags to add for instance the ScaLAPACK and BLACS libraries:
 \code {.bash}
@@ -102,24 +102,24 @@ METISDIR=/usr/local/metis/. Alternatively, you can specify the
 location of the header and library as follows:
 \code {.bash}
 > cmake ../ -DCMAKE_BUILD_TYPE=Release \
-     -DMETIS_INCLUDES=/usr/local/metis/include \
-     -DMETIS_LIBRARIES=/usr/local/metis/lib/libmetis.a
+     -DTPL_METIS_INCLUDE_DIRS=/usr/local/metis/include \
+     -DTPL_METIS_LIBRARIES=/usr/local/metis/lib/libmetis.a
 \endcode
 
 - __PARMETIS__ (optional, only used when compiling with MPI) for
 parallel nested dissection. ParMetis can be download from
 http://glaros.dtc.umn.edu/gkhome/metis/parmetis/download \n The steps
 to make sure CMake can find ParMetis are similar as for Metis. Enable
-with -DSTRUMPACK_USE_PARMETIS. The CMake variables are $PARMETISDIR or
-PARMETIS_INCLUDES and PARMETIS_LIBRARIES.
+with -DTPL_ENABLE_PARMETIS. The CMake variables are $PARMETISDIR or
+TPL_PARMETIS_INCLUDE_DIRS and TPL_PARMETIS_LIBRARIES.
 
 - __SCOTCH__ and __PT-SCOTCH__ (≥ 5.1.12) (optional) for matrix
 reordering. Scotch can be downloaded from:
 http://www.labri.fr/perso/pelegrin/scotch/ Configuring CMake to find
-(PT-)Scotch is similar to Metis. Enable with -DSTRUMPACK_USE_SCOTCH
-For (PT-)Scotch the CMake variables are $SCOTCHDIR or SCOTCH_INCLUDES
-and SCOTCH_LIBRARIES. Make sure to specify all libraries: libscotch,
-libscotcherr, libptscotch and libptscotcherr.
+(PT-)Scotch is similar to Metis. Enable with -DTPL_ENABLE_SCOTCH For
+(PT-)Scotch the CMake variables are $SCOTCHDIR or
+TPL_SCOTCH_INCLUDE_DIRS and TPL_SCOTCH_LIBRARIES. Make sure to specify all
+libraries: libscotch, libscotcherr, libptscotch and libptscotcherr.
 
 - __getopt_long__: This is a GNU extension to the POSIX getopt() C
   library function.
@@ -128,8 +128,8 @@ libscotcherr, libptscotch and libptscotcherr.
 reordering for stability, i.e., to get nonzeros on the diagonal of the
 matrix, as an alternative to the sequential MC64 (included). Get it
 from: https://people.eecs.berkeley.edu/~aydin/CombBLAS/html/ Enable by
-specifying -DSTRUMPACK_USE_COMBBLAS and set COMBBLAS_INCLUDES and
-COMBBLAS_LIBRARIES.
+specifying -DTPL_ENABLE_COMBBLAS and set TPL_COMBBLAS_INCLUDE_DIRS
+and TPL_COMBBLAS_LIBRARIES.
 
 - __TCMalloc, TBB Malloc__ or __jemalloc__ (optional): these can lead
 to dramatic performance improvements for multithreaded code that

@@ -21,9 +21,9 @@ following steps:
     -DCMAKE_CXX_COMPILER=<C++ (MPI) compiler> \        # optional, should be detected
     -DCMAKE_C_COMPILER=<C (MPI) compiler> \
     -DCMAKE_Fortran_COMPILER=<Fortran77 (MPI) compiler> \
-    -DSCALAPACK_LIBRARIES="/path/to/scalapack/libscalapack.a;/path/to/blacs/libblacs.a" \
-    -DMETIS_INCLUDES=/path/to/metis/include \
-    -DMETIS_LIBRARIES=/path/to/metis/libmetis.a
+    -DTPL_SCALAPACK_LIBRARIES="/path/to/scalapack/libscalapack.a;/path/to/blacs/libblacs.a" \
+    -DTPL_METIS_INCLUDE_DIRS=/path/to/metis/include \
+    -DTPL_METIS_LIBRARIES=/path/to/metis/libmetis.a
 > make
 > make install
 > make test     # optional
@@ -67,8 +67,8 @@ $SCALAPACKDIR and $BLACSDIR. You can set these on the command line via
 > export BLACSDIR=/path/to/blacs
 
 If BLACS/SCALAPACK are not installed in a standard location, you can
-also specify the libraries directly via -DBLAS_LIBRARIES=".."
--DLAPACK_LIBRARIES=".." -DSCALAPACK_LIBRARIES=".." or directly via the
+also specify the libraries directly via -DTPL_BLAS_LIBRARIES=".."
+-DTPL_LAPACK_LIBRARIES=".." -DTPL_SCALAPACK_LIBRARIES=".." or directly via the
 linker flags as follows:
 > cmake ../ -DCMAKE_BUILD_TYPE=Release \
    -DCMAKE_EXE_LINKER_FLAGS="-L/usr/lib64/mpich/lib/ -lscalapack -lmpiblacs"
@@ -79,9 +79,9 @@ LibSci, AMD ACML, OpenBLAS or ATLAS.
 
 On Cary systems, the compiler wrappers usually take care of linking
 BLAS/LAPACK and ScaLAPACK. In that case, just set
--DBLAS_LIBRARIES="" \
--DLAPACK_LIBRARIES="" \
--DSCALAPACK_LIBRARIES="" \
+-DTPL_BLAS_LIBRARIES="" \
+-DTPL_LAPACK_LIBRARIES="" \
+-DTPL_SCALAPACK_LIBRARIES="" \
 in order to avoid CMake from looking for the libraries.
 
 When using Intel MKL we recommend using the the link advisor:
@@ -96,9 +96,9 @@ ${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a -Wl,--start-group ${MKLROOT}/lib/
 
 Set this:
 
--DBLAS_LIBRARIES="" \
--DLAPACK_LIBRARIES="" \
--DSCALAPACK_LIBRARIES="${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a;-Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_gnu_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_blacs_intelmpi_lp64.a -Wl,--end-group;-lgomp;-lpthread;-lm;-ldl"
+-DTPL_BLAS_LIBRARIES="" \
+-DTPL_LAPACK_LIBRARIES="" \
+-DTPL_SCALAPACK_LIBRARIES="${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a;-Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_gnu_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_blacs_intelmpi_lp64.a -Wl,--end-group;-lgomp;-lpthread;-lm;-ldl"
 
 i.e., separate the arguments with a ';', where everything between
 -Wl,--start-group and -Wl,--end-group is a single argument.
@@ -112,8 +112,8 @@ CMake will then look in $METISDIR/include for metis.h. Likewise, it
 will look in $METISDIR/lib for libmetis. Alternatively, one can
 specify the paths directly when calling CMake as follows:
 > cmake ../ -DCMAKE_BUILD_TYPE=Release \
-    -DMETIS_INCLUDES=/usr/local/metis/include \
-    -DMETIS_LIBRARIES=/usr/local/metis/lib/libmetis.a
+    -DTPL_METIS_INCLUDE_DIRS=/usr/local/metis/include \
+    -DTPL_METIS_LIBRARIES=/usr/local/metis/lib/libmetis.a
 
 
 
@@ -121,9 +121,9 @@ ParMETIS and (PT)Scotch (optional)
 ==================================
 ParMETIS and (PT)Scotch are optional dependencies.  ParMETIS can be
 enable by adding the following option to the CMake command:
-    -DSTRUMPACK_USE_PARMETIS=ON
+    -DTPL_ENABLE_PARMETIS=ON
 And similarly for (PT-)Scotch:
-    -DSTRUMPACK_USE_SCOTCH=ON
+    -DTPL_ENABLE_SCOTCH=ON
 
 For ParMETIS and PT-Scotch, the following environment variables can be
 set:
@@ -135,14 +135,14 @@ $SCOTCHDIR/include for scotch.h and ptscotch.h. Likewise, it will look
 in $PARMETISDIR/lib and $SCOTCHDIR/lib for libparmetis, libscotch,
 libscotcherr, libptscotch, libptscotcherr.
 
-Or, one can set -DPARMETIS_INCLUDES, -DPARMETIS_LIBRARIES,
--DSCOTCH_INCLUDES and -DSCOTCH_LIBRARIES":
+Or, one can set -DTPL_PARMETIS_INCLUDE_DIRS, -DTPL_PARMETIS_LIBRARIES,
+-DTPL_SCOTCH_INCLUDE_DIRS and -DTPL_SCOTCH_LIBRARIES":
 
-    -DPARMETIS_INCLUDES=/path/to/parmetis/include \
-    -DPARMETIS_LIBRARIES=/path/to/parmetis/libparmetis.a
+    -DTPL_PARMETIS_INCLUDE_DIRS=/path/to/parmetis/include \
+    -DTPL_PARMETIS_LIBRARIES=/path/to/parmetis/libparmetis.a
 
-    -DSCOTCH_INCLUDES=/path/to/scotch/include \
-    -DSCOTCH_LIBRARIES="/path/to/ptscotch/libscotch.a;...libscotcherr.a;...libptscotch.a;...libptscotcherr.a"
+    -DTPL_SCOTCH_INCLUDE_DIRS=/path/to/scotch/include \
+    -DTPL_SCOTCH_LIBRARIES="/path/to/ptscotch/libscotch.a;...libscotcherr.a;...libptscotch.a;...libptscotcherr.a"
 
 
 CombBLAS (optional)
@@ -152,9 +152,9 @@ permute the matrix to get nonzeros on the diagonal.
 
 https://people.eecs.berkeley.edu/~aydin/CombBLAS/html/
 
-Enable this feature by adding -DSTRUMPACK_USE_COMBBLAS to the CMake
-command. Then specify -DCOMBBLAS_INCLUDES=".." and
--DCOMBBLAS_LIBRARIES="..".
+Enable this feature by adding -DTPL_ENABLE_COMBBLAS to the CMake
+command. Then specify -DTPL_COMBBLAS_INCLUDE_DIRS=".." and
+-DTPL_COMBBLAS_LIBRARIES="..".
 
 
 Usage Instructions
