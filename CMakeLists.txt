@@ -1,27 +1,40 @@
 cmake_minimum_required(VERSION 3.2)
-project(STRUMPACK CXX C Fortran)
+#project(STRUMPACK CXX C Fortran)
+project(STRUMPACK NONE)
 
 ## Metis is required for now
 # option(STRUMPACK_USE_METIS "Build with support for Metis" ON)
 
 option(STRUMPACK_USE_MPI "Build with MPI support" ON)
-
-option(STRUMPACK_USE_PARMETIS "Build with support for ParMetis" OFF)
-option(STRUMPACK_USE_SCOTCH "Build with support for Scotch/PTScotch" OFF)
 option(STRUMPACK_USE_OPENMP "Use OpenMP for on-node threading tasking" ON)
-option(STRUMPACK_USE_PAPI "Build with support for PAPI monitoring" OFF)
-option(STRUMPACK_USE_COMBBLAS "Use CombBLAS for weighted matching" OFF)
+
+option(TPL_ENABLE_PARMETIS "Build with support for ParMetis" OFF)
+option(TPL_ENABLE_SCOTCH "Build with support for Scotch/PTScotch" OFF)
+option(TPL_ENABLE_PAPI "Build with support for PAPI monitoring" OFF)
+option(TPL_ENABLE_COMBBLAS "Use CombBLAS for weighted matching" OFF)
+
 option(STRUMPACK_COUNT_FLOPS "Build with flop counters" ON)
 option(STRUMPACK_TASK_TIMERS "Build with timers for internal routines" OFF)
 option(STRUMPACK_BUILD_TESTS "Build the tests" ON)
 option(STRUMPACK_DEV_TESTING "Enable extensive testing" OFF)
 option(STRUMPACK_C_INTERFACE "Build the C interface" ON)
 
+######################################################################
+# IDEAS: xSDK standards module
+set(USE_XSDK_DEFAULTS TRUE)
+set(XSDK_ENABLE_CXX ON)
+set(XSDK_ENABLE_C ON)
+set(XSDK_ENABLE_Fortran ON)
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/XSDKDefaults.cmake")
+######################################################################
+
+enable_language(CXX C Fortran)
+
 if(NOT STRUMPACK_USE_MPI)
-  if(STRUMPACK_USE_PARMETIS)
+  if(TPL_ENABLE_PARMETIS)
     message(STATUS "Disabling ParMetis. ParMetis requires MPI support,"
       " but compiling without MPI support! ")
-    set(STRUMPACK_USE_PARMETIS OFF)
+    set(TPL_ENABLE_PARMETIS OFF)
   endif()
 endif()
 
@@ -33,7 +46,7 @@ set(STRUMPACK_VERSION_FULL
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-if(STRUMPACK_USE_COMBBLAS)
+if(TPL_ENABLE_COMBBLAS)
   set(CMAKE_CXX_STANDARD 14)
 else()
   set(CMAKE_CXX_STANDARD 11)
@@ -85,7 +98,7 @@ FortranCInterface_HEADER(${PROJECT_BINARY_DIR}/StrumpackFortranCInterface.h
 include_directories(${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/src)
 FortranCInterface_VERIFY(CXX)
 
-if(STRUMPACK_USE_OPENMP)
+if(TPL_ENABLE_OPENMP)
   include(FindOpenMP)
   if(OPENMP_FOUND)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
@@ -187,8 +200,8 @@ if(NOT STRUMPACK_ATOMICS_WITHOUT_LIB)
   endif()
 endif()
 
-if(DEFINED BLAS_LIBRARIES)
-  set(LIBS ${LIBS} ${BLAS_LIBRARIES})
+if(DEFINED TPL_BLAS_LIBRARIES)
+  set(LIBS ${LIBS} ${TPL_BLAS_LIBRARIES})
 else()
   find_package(BLAS)
   if(BLAS_FOUND)
@@ -202,8 +215,8 @@ else()
   endif()
 endif()
 
-if(DEFINED LAPACK_LIBRARIES)
-  set(LIBS ${LIBS} ${LAPACK_LIBRARIES})
+if(DEFINED TPL_LAPACK_LIBRARIES)
+  set(LIBS ${LIBS} ${TPL_LAPACK_LIBRARIES})
 else()
   find_package(LAPACK)
   if(LAPACK_FOUND)
@@ -222,14 +235,14 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
   "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
 if (STRUMPACK_USE_MPI)
-  if(DEFINED SCALAPACK_LIBRARIES)
-    set(LIBS ${LIBS} ${SCALAPACK_LIBRARIES})
-    include_directories(${SCALAPACK_INCLUDES})
+  if(DEFINED TPL_SCALAPACK_LIBRARIES)
+    set(LIBS ${LIBS} ${TPL_SCALAPACK_LIBRARIES})
+    # include_directories(${TPL_SCALAPACK_INCLUDE_DIRS})
   else()
     find_package(SCALAPACK)
     if(SCALAPACK_FOUND)
       set(LIBS ${LIBS} ${SCALAPACK_LIBRARIES})
-      include_directories(${SCALAPACK_INCLUDES})
+      # include_directories(${SCALAPACK_INCLUDES})
     else()
       message(WARNING
         "WARNING: Could not find a ScaLAPACK/BLACS library !!!!!!!!\n"
@@ -239,7 +252,8 @@ if (STRUMPACK_USE_MPI)
   endif()
 endif()
 
-if(STRUMPACK_USE_PAPI)
+if(TPL_ENABLE_PAPI)
+  option(STRUMPACK_USE_PAPI "" ON)
   find_package(PAPI)
   set(LIBS ${LIBS} ${PAPI_LIBRARIES})
   include_directories(${PAPI_INCLUDES})
@@ -247,7 +261,7 @@ if(STRUMPACK_USE_PAPI)
     message(FATAL_ERROR
       "Could not find PAPI!"
       "Set the PAPIDIR environtment variable,"
-      "or set specify PAPI_INCLUDES and PAPI_LIBRARIES."
+      "or specify PAPI_INCLUDES and PAPI_LIBRARIES."
       "Get PAPI from http://icl.cs.utk.edu/papi/")
   endif()
 else()
@@ -255,13 +269,15 @@ else()
 endif()
 
 if (STRUMPACK_USE_MPI)
-  if(STRUMPACK_USE_COMBBLAS)
-    set(LIBS ${LIBS} ${COMBBLAS_LIBRARIES})
-    include_directories(${COMBBLAS_INCLUDES})
+  if(TPL_ENABLE_COMBBLAS)
+    option(STRUMPACK_USE_COMBBLAS "" ON)
+    set(LIBS ${LIBS} ${TPL_COMBBLAS_LIBRARIES})
+    include_directories(${TPL_COMBBLAS_INCLUDES})
     message(STATUS "Combinatorial BLAS support enabled")
   endif()
 
-  if(STRUMPACK_USE_PARMETIS)
+  if(TPL_ENABLE_PARMETIS)
+    option(STRUMPACK_USE_PARMETIS "" ON)
     find_package(ParMetis)
     set(LIBS ${LIBS} ${PARMETIS_LIBRARIES})
     include_directories(${PARMETIS_INCLUDES})
@@ -287,7 +303,8 @@ else()
     "Get Metis from http://glaros.dtc.umn.edu/gkhome/metis/metis/overview\n")
 endif()
 
-if(STRUMPACK_USE_SCOTCH)
+if(TPL_ENABLE_SCOTCH)
+  option(STRUMPACK_USE_SCOTCH "" ON)
   find_package(Scotch)
   set(LIBS ${LIBS} ${SCOTCH_LIBRARIES})
   include_directories(${SCOTCH_INCLUDES})
@@ -313,6 +330,13 @@ endforeach(arg ${LIBS})
 foreach(arg ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
   set(STRUMPACK_ALL_LIBS "${STRUMPACK_ALL_LIBS} -l${arg}")
 endforeach(arg ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
+
+get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  PROPERTY INCLUDE_DIRECTORIES)
+foreach(dir ${dirs})
+  set(STRUMPACK_ALL_INCLUDE_DIRS "${STRUMPACK_ALL_INCLUDE_DIRS} -I${dir}")
+endforeach()
+
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
   set(STRUMPACK_ALL_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_RELEASE}")
@@ -514,7 +538,7 @@ if(STRUMPACK_USE_MPI)
     DESTINATION include/BLR)
 endif()
 
-if(STRUMPACK_USE_COMBBLAS)
+if(TPL_ENABLE_COMBBLAS)
   install(FILES
     src/sparse/AWPMCombBLAS.hpp
     DESTINATION include/sparse)

@@ -9,25 +9,6 @@ cd build
 
 found_host=false
 
-#  -DCMAKE_CXX_FLAGS="-DUSE_TASK_TIMER -DCOUNT_FLOPS"
-
-if [[ $NERSC_HOST = "edison" ]]; then
-    found_host=true
-    cmake ../ \
-          -DCMAKE_BUILD_TYPE=Debug \
-          -DCMAKE_INSTALL_PREFIX=../install \
-          -DCMAKE_CXX_COMPILER=CC \
-          -DCMAKE_C_COMPILER=cc \
-          -DCMAKE_Fortran_COMPILER=ftn \
-          -DCMAKE_EXE_LINKER_FLAGS="-dynamic" \
-          -DMETIS_INCLUDES=$HOME/local/parmetis-4.0.3/metis/include \
-          -DMETIS_LIBRARIES=$HOME/local/parmetis-4.0.3/build/Linux-x86_64/libmetis/libmetis.a \
-          -DPARMETIS_INCLUDES=$HOME/local/parmetis-4.0.3/include \
-          -DPARMETIS_LIBRARIES=$HOME/local/parmetis-4.0.3/build/Linux-x86_64/libparmetis/libparmetis.a \
-          -DSCOTCH_INCLUDES=$HOME/local/scotch_6.0.4/include \
-          -DSCOTCH_LIBRARIES="$HOME/local/scotch_6.0.4/lib/libscotch.a;$HOME/local/scotch_6.0.4/lib/libscotcherr.a;$HOME/local/scotch_6.0.4/lib/libptscotch.a;$HOME/local/scotch_6.0.4/lib/libptscotcherr.a"
-fi
-
 if [[ $NERSC_HOST = "cori" ]]; then
     found_host=true
 
@@ -47,23 +28,15 @@ if [[ $NERSC_HOST = "cori" ]]; then
           -DCMAKE_C_COMPILER=cc \
           -DCMAKE_Fortran_COMPILER=ftn \
           -DCMAKE_EXE_LINKER_FLAGS="-dynamic" \
-          -DBLAS_LIBRARIES="" \
-          -DLAPACK_LIBRARIES="" \
-          -DSCALAPACK_LIBRARIES="$ScaLAPACKLIBS" \
-          -DSTRUMPACK_DEV_TESTING=OFF \
-          -DSTRUMPACK_C_INTERFACE=OFF \
-          -DSTRUMPACK_COUNT_FLOPS=ON \
-          -DSTRUMPACK_TASK_TIMERS=OFF \
-          -DMETIS_INCLUDES=$HOME/local/cori/parmetis-4.0.3/metis/include \
-          -DMETIS_LIBRARIES=$HOME/local/cori/parmetis-4.0.3/build/Linux-x86_64/libmetis/libmetis.a \
-          -DSTRUMPACK_USE_COMBBLAS=ON \
-          -DCOMBBLAS_INCLUDES=/global/homes/p/pghysels/cori/CombBLAS_beta_16_1/ \
+          -DSTRUMPACK_C_INTERFACE=ON \
+          -DTPL_BLAS_LIBRARIES="" \
+          -DTPL_LAPACK_LIBRARIES="" \
+          -DTPL_SCALAPACK_LIBRARIES="$ScaLAPACKLIBS" \
+          -DTPL_METIS_INCLUDE_DIRS=$HOME/local/cori/parmetis-4.0.3/metis/include \
+          -DTPL_METIS_LIBRARIES=$HOME/local/cori/parmetis-4.0.3/build/Linux-x86_64/libmetis/libmetis.a \
+          -DTPL_ENABLE_COMBBLAS=ON \
+          -DCOMBBLAS_INCLUDE_DIRS=/global/homes/p/pghysels/cori/CombBLAS_beta_16_1/ \
           -DCOMBBLAS_LIBRARIES="$COMBBLASHOME/libCommGridlib.a;$COMBBLASHOME/libHashlib.a;$COMBBLASHOME/libMemoryPoollib.a;$COMBBLASHOME/libmmiolib.a;$COMBBLASHOME/libMPIOplib.a;$COMBBLASHOME/libMPITypelib.a"
-
-    # -DPARMETIS_INCLUDES=$HOME/local/parmetis-4.0.3/include \
-        # -DPARMETIS_LIBRARIES=$HOME/local/parmetis-4.0.3/build/Linux-x86_64/libparmetis/libparmetis.a \
-        # -DSCOTCH_INCLUDES=$HOME/local/scotch_6.0.4/include \
-        # -DSCOTCH_LIBRARIES="$HOME/local/scotch_6.0.4/lib/libscotch.a;$HOME/local/scotch_6.0.4/lib/libscotcherr.a;$HOME/local/scotch_6.0.4/lib/libptscotch.a;$HOME/local/scotch_6.0.4/lib/libptscotcherr.a"
 fi
 
 if [[ $(hostname -s) = "xps13" ]]; then
@@ -71,11 +44,8 @@ if [[ $(hostname -s) = "xps13" ]]; then
     cmake ../ \
           -DCMAKE_BUILD_TYPE=Debug \
           -DCMAKE_INSTALL_PREFIX=../install \
-          -DMETIS_INCLUDES=/home/pieterg/local/parmetis-4.0.3/metis/include \
-          -DMETIS_LIBRARIES=/home/pieterg/local/parmetis-4.0.3/build/Linux-x86_64/libmetis/libmetis.a
-
-    # -DPARMETIS_INCLUDES=/home/pieterg/local/parmetis-4.0.3/include \
-        # -DPARMETIS_LIBRARIES=/home/pieterg/local/parmetis-4.0.3/build/Linux-x86_64/libparmetis/libparmetis.a
+          -DTPL_METIS_INCLUDE_DIRS=/home/pieterg/local/parmetis-4.0.3/metis/include \
+          -DTPL_METIS_LIBRARIES=/home/pieterg/local/parmetis-4.0.3/build/Linux-x86_64/libmetis/libmetis.a
 fi
 
 if [[ $(hostname -s) = "pieterg-X8DA3" ]]; then
@@ -83,21 +53,17 @@ if [[ $(hostname -s) = "pieterg-X8DA3" ]]; then
     cmake ../ \
           -DCMAKE_BUILD_TYPE=Debug \
           -DCMAKE_INSTALL_PREFIX=../install \
-          -DCMAKE_CXX_FLAGS="-Wall -Wfatal-errors -Wextra -Wno-unused-parameter" \
-          -DSTRUMPACK_USE_MPI=ON \
+          -DSTRUMPACK_USE_MPI=OFF \
           -DSTRUMPACK_USE_OPENMP=ON \
-          -DSTRUMPACK_DEV_TESTING=ON \
           -DSTRUMPACK_C_INTERFACE=ON \
-          -DSTRUMPACK_COUNT_FLOPS=ON \
-          -DSTRUMPACK_TASK_TIMERS=ON \
-          -DSTRUMPACK_USE_PARMETIS=ON \
-          -DSTRUMPACK_USE_SCOTCH=ON \
-          -DMETIS_INCLUDES=$HOME/local/parmetis-4.0.3/metis/include \
-          -DMETIS_LIBRARIES=$HOME/local/parmetis-4.0.3/build/Linux-x86_64/libmetis/libmetis.a \
-          -DPARMETIS_INCLUDES=$HOME/local/parmetis-4.0.3/include \
-          -DPARMETIS_LIBRARIES=$HOME/local/parmetis-4.0.3/build/Linux-x86_64/libparmetis/libparmetis.a \
-          -DSCOTCH_INCLUDES=$HOME/local/scotch_6.0.4/include \
-          -DSCOTCH_LIBRARIES="$HOME/local/scotch_6.0.4/lib/libscotch.a;$HOME/local/scotch_6.0.4/lib/libscotcherr.a;$HOME/local/scotch_6.0.4/lib/libptscotch.a;$HOME/local/scotch_6.0.4/lib/libptscotcherr.a"
+          -DTPL_ENABLE_PARMETIS=ON \
+          -DTPL_ENABLE_SCOTCH=ON \
+          -DTPL_METIS_INCLUDE_DIRS=$HOME/local/parmetis-4.0.3/metis/include \
+          -DTPL_METIS_LIBRARIES=$HOME/local/parmetis-4.0.3/build/Linux-x86_64/libmetis/libmetis.a \
+          -DTPL_PARMETIS_INCLUDE_DIRS=$HOME/local/parmetis-4.0.3/include \
+          -DTPL_PARMETIS_LIBRARIES=$HOME/local/parmetis-4.0.3/build/Linux-x86_64/libparmetis/libparmetis.a \
+          -DTPL_SCOTCH_INCLUDE_DIRS=$HOME/local/scotch_6.0.4/include \
+          -DTPL_SCOTCH_LIBRARIES="$HOME/local/scotch_6.0.4/lib/libscotch.a;$HOME/local/scotch_6.0.4/lib/libscotcherr.a;$HOME/local/scotch_6.0.4/lib/libptscotch.a;$HOME/local/scotch_6.0.4/lib/libptscotcherr.a"
 fi
 
 

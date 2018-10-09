@@ -1,14 +1,12 @@
 all: @C_EXAMPLES@	\
 	testPoisson2d testPoisson3d	\
 	testMMdouble testMMdouble64 testMMfloat	\
-	@MPI_EXAMPLES@	\
-	mtx2bin bin2mtx MLkernel
+	mtx2bin bin2mtx MLkernel \
+	@MPI_EXAMPLES@
 
 CC=@STRUMPACK_C_COMPILER@
 CXX=@STRUMPACK_CXX_COMPILER@
-CPPFLAGS=-I@CMAKE_INSTALL_PREFIX@/include \
-	-I@METIS_INCLUDES@ -I@PARMETIS_INCLUDES@ -I@SCOTCH_INCLUDES@ \
-	-I@COMBBLAS_INCLUDES@
+CPPFLAGS=@STRUMPACK_ALL_INCLUDE_DIRS@
 
 CFLAGS=@STRUMPACK_ALL_C_FLAGS@
 CXXFLAGS=@STRUMPACK_ALL_CXX_FLAGS@
@@ -104,7 +102,7 @@ clean:
 	rm -f *~ *o @C_EXAMPLES@ \
 	testPoisson2d testPoisson3d	\
 	testMMdouble testMMdouble64 testMMfloat	\
-	@MPI_EXAMPLES@	\
-	mtx2bin bin2mtx MLkernel
+	mtx2bin bin2mtx MLkernel	\
+	@MPI_EXAMPLES@
 
 

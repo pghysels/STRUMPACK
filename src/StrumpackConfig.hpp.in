@@ -30,7 +30,7 @@
 
 #cmakedefine STRUMPACK_USE_MPI
 
-#cmakedefine STRUMPACK_USE_METIS
+// #cmakedefine STRUMPACK_USE_METIS
 #cmakedefine STRUMPACK_USE_PARMETIS
 #cmakedefine STRUMPACK_USE_SCOTCH
 #cmakedefine STRUMPACK_USE_OPENMP
