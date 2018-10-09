@@ -448,9 +448,14 @@ namespace strumpack {
       }
     }
 #if defined(STRUMPACK_COUNT_FLOPS)
-    if (!params::flops.is_lock_free())
-      std::cerr << "# WARNING: the flop counter is not lock free"
-                << std::endl;
+    /*
+     * This is commented out, because when using this, on some
+     * platforms you need to link with -latomic. I don't know how to
+     * handle that in a portable way.
+     */
+    // if (!params::flops.is_lock_free())
+    //   std::cerr << "# WARNING: the flop counter is not lock free"
+    //             << std::endl;
 #endif
     opts_.HSS_options().set_synchronized_compression(true);
   }
