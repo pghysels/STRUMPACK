@@ -410,6 +410,9 @@ namespace strumpack {
       auto lf = sep_tree.leaf_sizes();
       sep_tiles_.assign(lf.begin(), lf.end());
       adm_ = adm;
+      if (adm.empty()) // TODO should not happen??
+        adm_.resize(sep_tiles_.size()*sep_tiles_.size(), true);
+      else adm_ = adm;
     }
     if (dim_upd()) {
       auto leaf = opts.BLR_options().leaf_size();

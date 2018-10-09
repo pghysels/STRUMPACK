@@ -266,6 +266,7 @@ namespace strumpack {
           geometric_nested_dissection_dist
           (nx, ny, nz, components, width, A.begin_row(), A.end_row(),
            _comm, perm_, iperm_, opts.nd_param(),
+           // TODO BLR???
            opts.HSS_options().leaf_size(), opts.HSS_min_sep_size());
         break;
       }
@@ -366,58 +367,65 @@ namespace strumpack {
       local_sep_order[i] = i + sub_graph_range.first;
     std::vector<integer_t> sep_csr_ptr, sep_csr_ind;
 
+    int min_sep = opts.use_HSS() ? opts.HSS_min_sep_size() :
+      opts.BLR_min_sep_size();
+    int leaf = opts.use_HSS() ? opts.HSS_options().leaf_size() :
+      opts.BLR_options().leaf_size();
+
     std::function<void(integer_t)> reorder_separator = [&](integer_t sep) {
       auto sep_begin = local_tree_->sizes(sep);
       auto sep_end = local_tree_->sizes(sep+1);
       auto dim_sep = sep_end - sep_begin;
       // this front (and its descendants) are not HSS
-      if (dim_sep < opts.HSS_min_sep_size()) return;
-      HSS::HSSPartitionTree tree(dim_sep);
-      if (dim_sep > 2 * opts.HSS_options().leaf_size()) {
-        std::function<void(HSS::HSSPartitionTree&, integer_t&,
-                           integer_t, integer_t)> split =
-          [&](HSS::HSSPartitionTree& hss_tree, integer_t& nr_parts,
-              integer_t part, integer_t count) {
-          my_sub_graph.extract_separator_subgraph
-          (opts.separator_ordering_level(), sub_graph_range.first,
-           sep_begin, sep_end, part, &local_sep_order[sep_begin],
-           sep_csr_ptr, sep_csr_ind);
-          idx_t edge_cut = 0, nvtxs = sep_csr_ptr.size()-1;
-          std::vector<idx_t> partitioning(nvtxs);
-          int info = WRAPPER_METIS_PartGraphRecursive
-          (nvtxs, 1, sep_csr_ptr, sep_csr_ind, 2, edge_cut, partitioning);
-          if (info !=  METIS_OK) {
-            std::cerr << "METIS_PartGraphRecursive for separator"
-              " reordering returned: " << info << std::endl;
-            exit(1);
-          }
-          hss_tree.c.resize(2);
-          for (integer_t i=sep_begin, j=0; i<sep_end; i++)
-            if (local_sep_order[i] == part) {
-              auto p = partitioning[j++];
-              local_sep_order[i] = -count - p;
-              hss_tree.c[p].size++;
+      if (dim_sep >= min_sep) {
+        HSS::HSSPartitionTree tree(dim_sep);
+        if (dim_sep > 2 * leaf) {
+          std::function<void(HSS::HSSPartitionTree&, integer_t&,
+                             integer_t, integer_t)> split =
+            [&](HSS::HSSPartitionTree& hss_tree, integer_t& nr_parts,
+                integer_t part, integer_t count) {
+            my_sub_graph.extract_separator_subgraph
+            (opts.separator_ordering_level(), sub_graph_range.first,
+             sep_begin, sep_end, part, &local_sep_order[sep_begin],
+             sep_csr_ptr, sep_csr_ind);
+            idx_t edge_cut = 0, nvtxs = sep_csr_ptr.size()-1;
+            std::vector<idx_t> partitioning(nvtxs);
+            int info = WRAPPER_METIS_PartGraphRecursive
+            (nvtxs, 1, sep_csr_ptr, sep_csr_ind, 2, edge_cut, partitioning);
+            if (info !=  METIS_OK) {
+              std::cerr << "METIS_PartGraphRecursive for separator"
+                " reordering returned: " << info << std::endl;
+              exit(1);
             }
-          for (integer_t p=0; p<2; p++)
-            if (hss_tree.c[p].size > 2 * opts.HSS_options().leaf_size())
-              split(hss_tree.c[p], nr_parts, -count-p, count+2);
-            else
-              std::replace(&local_sep_order[sep_begin],
-                           &local_sep_order[sep_end], -count-p, nr_parts++);
-        };
-        std::fill(&local_sep_order[sep_begin],
-                  &local_sep_order[sep_end], integer_t(0));
-        integer_t parts = 0;
-        split(tree, parts, 0, 1);
-        for (integer_t part=0, count=sep_begin+sub_graph_range.first;
-             part<parts; part++)
+            hss_tree.c.resize(2);
+            for (integer_t i=sep_begin, j=0; i<sep_end; i++)
+              if (local_sep_order[i] == part) {
+                auto p = partitioning[j++];
+                local_sep_order[i] = -count - p;
+                hss_tree.c[p].size++;
+              }
+            for (integer_t p=0; p<2; p++)
+              if (hss_tree.c[p].size > 2 * leaf)
+                split(hss_tree.c[p], nr_parts, -count-p, count+2);
+              else
+                std::replace(&local_sep_order[sep_begin],
+                             &local_sep_order[sep_end], -count-p, nr_parts++);
+          };
+          std::fill(&local_sep_order[sep_begin],
+                    &local_sep_order[sep_end], integer_t(0));
+          integer_t parts = 0;
+          split(tree, parts, 0, 1);
+          for (integer_t part=0, count=sep_begin+sub_graph_range.first;
+               part<parts; part++)
+            for (integer_t i=sep_begin; i<sep_end; i++)
+              if (local_sep_order[i] == part)
+                local_sep_order[i] = -count++;
           for (integer_t i=sep_begin; i<sep_end; i++)
-            if (local_sep_order[i] == part)
-              local_sep_order[i] = -count++;
-        for (integer_t i=sep_begin; i<sep_end; i++)
-          local_sep_order[i] = -local_sep_order[i];
+            local_sep_order[i] = -local_sep_order[i];
+        }
+        local_tree_->HSS_tree(sep) = tree;
       }
-      local_tree_->HSS_tree(sep) = tree;
+      if (opts.use_HSS() && dim_sep < min_sep) return;
       if (local_tree_->lch(sep) != -1)
         reorder_separator(local_tree_->lch(sep));
       if (local_tree_->rch(sep) != -1)
@@ -452,10 +460,15 @@ namespace strumpack {
     auto dsep_end = dist_sep_range.second;
     auto dim_dsep = dsep_end - dsep_begin;
     std::vector<integer_t> dsep_order(dim_dsep), dsep_iorder(dim_dsep);
+
+    int min_sep = opts.use_HSS() ? opts.HSS_min_sep_size() : opts.BLR_min_sep_size();
+    int leaf = opts.use_HSS() ? opts.HSS_options().leaf_size() :
+      opts.BLR_options().leaf_size();
+
     if (dim_dsep) {
       HSS::HSSPartitionTree tree(dim_dsep);
-      if ((dim_dsep >= opts.HSS_min_sep_size()) &&
-          (dim_dsep > 2 * opts.HSS_options().leaf_size())) {
+      if ((dim_dsep >= min_sep) &&
+          (dim_dsep > 2 * leaf)) {
         std::vector<integer_t> sep_csr_ptr, sep_csr_ind;
         std::function<void(HSS::HSSPartitionTree&, integer_t&,
                            integer_t, integer_t)> split =
@@ -481,7 +494,7 @@ namespace strumpack {
               hss_tree.c[p].size++;
             }
           for (integer_t p=0; p<2; p++)
-            if (hss_tree.c[p].size > 2 * opts.HSS_options().leaf_size())
+            if (hss_tree.c[p].size > 2 * leaf)
               split(hss_tree.c[p], nr_parts, -count-p, count+2);
             else
               std::replace
