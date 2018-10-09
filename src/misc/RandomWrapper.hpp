@@ -103,6 +103,7 @@ namespace strumpack {
      */
     template<typename real_t> class RandomGeneratorBase {
     public:
+      virtual ~RandomGeneratorBase() {}
       virtual void seed(std::size_t s) = 0;
       virtual void seed(std::seed_seq& s) = 0;
       virtual void seed(std::uint32_t i, std::uint32_t j) = 0;
