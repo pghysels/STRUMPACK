@@ -36,21 +36,21 @@ namespace strumpack {
   namespace HSS {
 
     template<typename scalar_t> void
-    HSSMatrixMPI<scalar_t>::compress_kernel_nosync
+    HSSMatrixMPI<scalar_t>::compress_kernel_nosync_MPI
     (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem,
     const opts_t& opts) {
       // std::cout << "compress_kernel_nosync_MPI" << std::endl;
       auto d = opts.d0();
       auto dd = opts.dd();
-      WorkCompressMPI_ANN<scalar_t> w;
-      compress_recursive_kernel(ann, scores, Aelem, w, d, dd, opts );
+      WorkCompressMPI_ANN<scalar_t> w_mpi;
+      compress_recursive_kernel_MPI(ann, scores, Aelem, w_mpi, d, dd, opts );
     }
 
     template<typename scalar_t> void
-    HSSMatrixMPI<scalar_t>::compress_recursive_kernel
+    HSSMatrixMPI<scalar_t>::compress_recursive_kernel_MPI
     (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem,
-    WorkCompressMPI_ANN<scalar_t>& w, int d, int dd, const opts_t& opts) {
-      // std::cout << "compress_recursive_kernel" << std::endl;
+    WorkCompressMPI_ANN<scalar_t>& w_mpi, int d, int dd, const opts_t& opts) {
+      // std::cout << "compress_recursive_kernel_MPI" << std::endl;
       if (!this->active()) return;
       if (this->leaf()) {
         std::cout << "LEAF" << std::endl;
@@ -59,27 +59,30 @@ namespace strumpack {
           I.reserve(this->rows());
           J.reserve(this->cols());
           for (std::size_t i=0; i<this->rows(); i++)
-            I.push_back(i+w.offset.first);
+            I.push_back(i+w_mpi.offset.first);
           for (std::size_t j=0; j<this->cols(); j++)
-            J.push_back(j+w.offset.second);
+            J.push_back(j+w_mpi.offset.second);
           _D = DistM_t(grid(), this->rows(), this->cols());
+          Aelem(I, J, _D);
           // Aelem(I, J, _D, _A, w.offset.first, w.offset.second, comm());
         }
       }
       else {
         std::cout << "NLEF(" << this->rows() << "," << this->cols() << ")\n";
-        w.split(this->_ch[0]->dims());
-        this->_ch[0]->compress_recursive_kernel
-          (ann, scores, Aelem, w.c[0], d, dd, opts);
-        this->_ch[1]->compress_recursive_kernel
-          (ann, scores, Aelem, w.c[1], d, dd, opts);
+        w_mpi.split(this->_ch[0]->dims());
+        this->_ch[0]->compress_recursive_kernel_MPI
+          (ann, scores, Aelem, w_mpi.c[0], d, dd, opts);
+        this->_ch[1]->compress_recursive_kernel_MPI
+          (ann, scores, Aelem, w_mpi.c[1], d, dd, opts);
         // communicate_child_data_kernel(w); //   <-- Needs major modifications
         if (!this->_ch[0]->is_compressed() ||
             !this->_ch[1]->is_compressed()) return;
 
         if (this->is_untouched()) {
-          _B01 = DistM_t(grid(), w.c[0].Ir.size(), w.c[1].Ic.size());
-          _B10 = DistM_t(grid(), w.c[1].Ir.size(), w.c[0].Ic.size());
+          _B01 = DistM_t(grid(), w_mpi.c[0].Ir.size(), w_mpi.c[1].Ic.size());
+          _B10 = DistM_t(grid(), w_mpi.c[1].Ir.size(), w_mpi.c[0].Ic.size());
+          Aelem(w_mpi.c[0].Ir, w_mpi.c[1].Ic, _B01);
+          Aelem(w_mpi.c[1].Ir, w_mpi.c[0].Ic, _B10);
           // Aelem(w.c[0].Ir, w.c[1].Ic, _B01, _A01,
           //       w.offset.first, w.offset.second+this->_ch[0]->cols(), comm());
           // Aelem(w.c[1].Ir, w.c[0].Ic, _B10, _A10,
@@ -87,15 +90,15 @@ namespace strumpack {
         }
       }
 
-      if (w.lvl == 0)
+      if (w_mpi.lvl == 0)
         this->_U_state = this->_V_state = State::COMPRESSED;
       else {
         if (!this->is_compressed()) {
-          compute_local_samples_kernel_MPI(ann, scores, w, Aelem, opts);
-          compute_U_basis_kernel(opts, w, d, dd);
-          compute_V_basis_kernel(opts, w, d, dd);
-          // notify_inactives_states_kernel(w);
-          // reduce_local_samples_kernel_MPI(RS, w, d+dd, false);
+          compute_local_samples_kernel_MPI(ann, scores, w_mpi, Aelem, opts);
+          // compute_U_basis_kernel(opts, w_mpi, d, dd);
+          // compute_V_basis_kernel(opts, w_mpi, d, dd);
+          // notify_inactives_states_kernel(w_mpi);
+          // reduce_local_samples_kernel_MPI(RS, w_mpi, d+dd, false);
         }
       }
     }
@@ -103,7 +106,7 @@ namespace strumpack {
     // Main differences here
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compute_local_samples_kernel_MPI
-    (DenseM_t &ann, DenseM_t &scores, WorkCompressMPI_ANN<scalar_t> &w,
+    (DenseM_t &ann, DenseM_t &scores, WorkCompressMPI_ANN<scalar_t> &w_mpi,
     const delem_t &Aelem, const opts_t &opts) {
       std::cout << "compute_local_samples_kernel_MPI";
 
@@ -240,23 +243,22 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::reduce_local_samples_kernel_MPI
-    (const DistSamples<scalar_t>& RS, WorkCompressMPI_ANN<scalar_t>& w,
+    (const DistSamples<scalar_t>& RS, WorkCompressMPI_ANN<scalar_t>& w_mpi,
     int dd, bool was_compressed) {
       std::cout << "reduce_local_samples_kernel_MPI";
     }
 
     template<typename scalar_t> void
-    HSSMatrixMPI<scalar_t>::compute_U_basis_kernel
-    (const opts_t& opts, WorkCompressMPI_ANN<scalar_t>& w, int d, int dd) {
+    HSSMatrixMPI<scalar_t>::compute_U_basis_kernel_MPI
+    (const opts_t& opts, WorkCompressMPI_ANN<scalar_t>& w_mpi, int d, int dd) {
       std::cout << "compute_U_basis_kernel";
-      this->_U_state = State::COMPRESSED;
       if (this->_U_state == State::COMPRESSED) return;
       // int u_rows = this->leaf() ? this->rows() :
       //   this->_ch[0]->U_rank()+this->_ch[1]->U_rank();
       // auto gT = grid()->transpose();
       // if (!w.Sr.active()) return;
       // if (d+dd >= opts.max_rank() || d+dd >= u_rows ||
-      //     update_orthogonal_basis
+      //     update_orthogonal_basis_kernel_MPI
       //     (opts, w.U_r_max, w.Sr, w.Qr, d, dd,
       //      this->_U_state == State::UNTOUCHED, w.lvl)) {
       //   w.Qr.clear();
@@ -280,17 +282,16 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    HSSMatrixMPI<scalar_t>::compute_V_basis_kernel
-    (const opts_t& opts, WorkCompressMPI_ANN<scalar_t>& w, int d, int dd) {
-      std::cout << "compute_U_basis_kernel";
-      this->_V_state = State::COMPRESSED;
+    HSSMatrixMPI<scalar_t>::compute_V_basis_kernel_MPI
+    (const opts_t& opts, WorkCompressMPI_ANN<scalar_t>& w_mpi, int d, int dd) {
+      std::cout << "compute_V_basis_kernel";
       if (this->_V_state == State::COMPRESSED) return;
       // int v_rows = this->leaf() ? this->rows() :
       //   this->_ch[0]->V_rank()+this->_ch[1]->V_rank();
       // auto gT = grid()->transpose();
       // if (!w.Sc.active()) return;
       // if (d+dd >= opts.max_rank() || d+dd >= v_rows ||
-      //     update_orthogonal_basis_kernel
+      //     update_orthogonal_basis_kernel_MPI
       //     (opts, w.V_r_max, w.Sc, w.Qc, d, dd,
       //      this->_V_state == State::UNTOUCHED, w.lvl)) {
       //   w.Qc.clear();
@@ -314,223 +315,176 @@ namespace strumpack {
     }
 
     template<typename scalar_t> bool
-    HSSMatrixMPI<scalar_t>::update_orthogonal_basis_kernel
-    (const opts_t& opts, scalar_t& r_max_0, const DistM_t& S,
-    DistM_t& Q, int d, int dd, bool untouched, int L) {
-      // int m = S.rows();
-      // if (d >= m) return true;
-      // if (Q.cols() == 0) Q = DistM_t(grid(), m, d+dd);
-      // else Q.resize(m, d+dd);
-      // copy(m, dd, S, 0, d, Q, 0, d, grid()->ctxt());
-      // DistMW_t Q2, Q12;
-      // if (untouched) {
-      //   Q2 = DistMW_t(m, std::min(d, m), Q, 0, 0);
-      //   Q12 = DistMW_t(m, std::min(d, m), Q, 0, 0);
-      //   copy(m, d, S, 0, 0, Q, 0, 0, grid()->ctxt());
-      // } else {
-      //   Q2 = DistMW_t(m, std::min(dd, m-(d-dd)), Q, 0, d-dd);
-      //   Q12 = DistMW_t(m, std::min(d, m), Q, 0, 0);
+    HSSMatrixMPI<scalar_t>::update_orthogonal_basis_kernel_MPI() {
+    }
+
+    template<typename scalar_t> void
+    HSSMatrixMPI<scalar_t>::communicate_child_data_kernel_MPI
+    (WorkCompressMPI_ANN<scalar_t>& w_mpi) {
+      // w.c[0].dR = w.c[0].Rr.cols();
+      // w.c[0].dS = w.c[0].Sr.cols();
+      // w.c[1].dR = w.c[1].Rr.cols();
+      // w.c[1].dS = w.c[1].Sr.cols();
+      // int rank = Comm().rank(), P = Ptotal(), root1 = Pl();
+      // int P0active = this->_ch[0]->Pactive();
+      // int P1active = this->_ch[1]->Pactive();
+      // std::vector<MPIRequest> sreq;
+      // std::vector<std::size_t> sbuf0, sbuf1;
+      // if (rank < P0active) {
+      //   if (rank < (P-P0active)) {
+      //     // I'm one of the first P-P0active processes that are active
+      //     // on child0, so I need to send to one or more others which
+      //     // are not active on child0, ie the ones in [P0active,P)
+      //     sbuf0.reserve(8+w.c[0].Ir.size()+w.c[0].Ic.size()+
+      //                   w.c[0].Jr.size()+w.c[0].Jc.size());
+      //     sbuf0.push_back(std::size_t(this->_ch[0]->_U_state));
+      //     sbuf0.push_back(std::size_t(this->_ch[0]->_V_state));
+      //     sbuf0.push_back(this->_ch[0]->_U_rank);
+      //     sbuf0.push_back(this->_ch[0]->_V_rank);
+      //     sbuf0.push_back(this->_ch[0]->_U_rows);
+      //     sbuf0.push_back(this->_ch[0]->_V_rows);
+      //     sbuf0.push_back(w.c[0].dR);
+      //     sbuf0.push_back(w.c[0].dS);
+      //     for (auto i : w.c[0].Ir) sbuf0.push_back(i);
+      //     for (auto i : w.c[0].Ic) sbuf0.push_back(i);
+      //     for (auto i : w.c[0].Jr) sbuf0.push_back(i);
+      //     for (auto i : w.c[0].Jc) sbuf0.push_back(i);
+      //     for (int p=P0active; p<P; p++)
+      //       if (rank == (p - P0active) % P0active)
+      //         sreq.emplace_back(Comm().isend(sbuf0, p, 0));
+      //   }
       // }
-      // scalar_t r_min, r_max;
-      // Q2.orthogonalize(r_max, r_min);
-      // STRUMPACK_QR_FLOPS(orthogonalize_flops(Q2));
-      // if (untouched) r_max_0 = r_max;
-      // auto rtol = opts.rel_tol() / L;
-      // auto atol = opts.abs_tol() / L;
-      // if (std::abs(r_min) < atol || std::abs(r_min / r_max_0) < rtol)
-      //   return true;
-      // DistMW_t Q3(m, dd, Q, 0, d);
-      // // only use p columns of Q3 to check the stopping criterion
-      // DistMW_t Q3p(m, std::min(dd, opts.p()), Q, 0, d);
-      // DistM_t Q12tQ3(grid(), Q12.cols(), Q3.cols());
-      // auto S3norm = Q3p.norm();
-      // TIMER_TIME(TaskType::ORTHO, 1, t_ortho);
-      // gemm(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.), Q12tQ3);
-      // gemm(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.), Q3);
-      // // iterated classical Gram-Schmidt
-      // gemm(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.), Q12tQ3);
-      // gemm(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.), Q3);
-      // TIMER_STOP(t_ortho);
-      // STRUMPACK_ORTHO_FLOPS
-      //                       (gemm_flops(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.)) +
-      //                        gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.)) +
-      //                        gemm_flops(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.)) +
-      //                        gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.)));
-      // auto Q3norm = Q3p.norm(); // TODO norm flops?
-      // return (Q3norm / std::sqrt(double(dd)) < atol)
-      //   || (Q3norm / S3norm < rtol);
+      // if (rank >= root1 && rank < root1+P1active) {
+      //   if ((rank-root1) < (P-P1active)) {
+      //     // I'm one of the first P-P1active processes that are active
+      //     // on child1, so I need to send to one or more others which
+      //     // are not active on child1, ie the ones in [0,root1) union
+      //     // [root1+P1active,P)
+      //     sbuf1.reserve(8+w.c[1].Ir.size()+w.c[1].Ic.size()+
+      //                   w.c[1].Jr.size()+w.c[1].Jc.size());
+      //     sbuf1.push_back(std::size_t(this->_ch[1]->_U_state));
+      //     sbuf1.push_back(std::size_t(this->_ch[1]->_V_state));
+      //     sbuf1.push_back(this->_ch[1]->_U_rank);
+      //     sbuf1.push_back(this->_ch[1]->_V_rank);
+      //     sbuf1.push_back(this->_ch[1]->_U_rows);
+      //     sbuf1.push_back(this->_ch[1]->_V_rows);
+      //     sbuf1.push_back(w.c[1].dR);
+      //     sbuf1.push_back(w.c[1].dS);
+      //     for (auto i : w.c[1].Ir) sbuf1.push_back(i);
+      //     for (auto i : w.c[1].Ic) sbuf1.push_back(i);
+      //     for (auto i : w.c[1].Jr) sbuf1.push_back(i);
+      //     for (auto i : w.c[1].Jc) sbuf1.push_back(i);
+      //     for (int p=0; p<root1; p++)
+      //       if (rank - root1 == p % P1active)
+      //         sreq.emplace_back(Comm().isend(sbuf1, p, 1));
+      //     for (int p=root1+P1active; p<P; p++)
+      //       if (rank - root1 == (p - P1active) % P1active)
+      //         sreq.emplace_back(Comm().isend(sbuf1, p, 1));
+      //   }
+      // }
+      // if (!(rank < P0active)) {
+      //   // I'm not active on child0, so I need to receive
+      //   int dest = -1;
+      //   for (int p=0; p<P0active; p++)
+      //     if (p == (rank - P0active) % P0active) { dest = p; break; }
+      //   assert(dest >= 0);
+      //   auto buf = Comm().template recv<std::size_t>(dest, 0);
+      //   auto ptr = buf.begin();
+      //   this->_ch[0]->_U_state = State(*ptr++);
+      //   this->_ch[0]->_V_state = State(*ptr++);
+      //   this->_ch[0]->_U_rank = *ptr++;
+      //   this->_ch[0]->_V_rank = *ptr++;
+      //   this->_ch[0]->_U_rows = *ptr++;
+      //   this->_ch[0]->_V_rows = *ptr++;
+      //   w.c[0].dR = *ptr++;
+      //   w.c[0].dS = *ptr++;
+      //   w.c[0].Ir.resize(this->_ch[0]->_U_rank);
+      //   w.c[0].Ic.resize(this->_ch[0]->_V_rank);
+      //   w.c[0].Jr.resize(this->_ch[0]->_U_rank);
+      //   w.c[0].Jc.resize(this->_ch[0]->_V_rank);
+      //   for (int i=0; i<this->_ch[0]->_U_rank; i++) w.c[0].Ir[i] = *ptr++;
+      //   for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Ic[i] = *ptr++;
+      //   for (int i=0; i<this->_ch[0]->_U_rank; i++) w.c[0].Jr[i] = *ptr++;
+      //   for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Jc[i] = *ptr++;
+      //   //assert(msgsize == std::distance(buf, ptr));
+      // }
+      // if (!(rank >= root1 && rank < root1+P1active)) {
+      //   // I'm not active on child1, so I need to receive
+      //   int dest = -1;
+      //   for (int p=root1; p<root1+P1active; p++) {
+      //     if (rank < root1) {
+      //       if (p - root1 == rank % P1active) { dest = p; break; }
+      //     } else if (p - root1 == (rank - P1active) % P1active) {
+      //       dest = p; break;
+      //     }
+      //   }
+      //   assert(dest >= 0);
+      //   auto buf = Comm().template recv<std::size_t>(dest, 1);
+      //   auto ptr = buf.begin();
+      //   this->_ch[1]->_U_state = State(*ptr++);
+      //   this->_ch[1]->_V_state = State(*ptr++);
+      //   this->_ch[1]->_U_rank = *ptr++;
+      //   this->_ch[1]->_V_rank = *ptr++;
+      //   this->_ch[1]->_U_rows = *ptr++;
+      //   this->_ch[1]->_V_rows = *ptr++;
+      //   w.c[1].dR = *ptr++;
+      //   w.c[1].dS = *ptr++;
+      //   w.c[1].Ir.resize(this->_ch[1]->_U_rank);
+      //   w.c[1].Ic.resize(this->_ch[1]->_V_rank);
+      //   w.c[1].Jr.resize(this->_ch[1]->_U_rank);
+      //   w.c[1].Jc.resize(this->_ch[1]->_V_rank);
+      //   for (int i=0; i<this->_ch[1]->_U_rank; i++) w.c[1].Ir[i] = *ptr++;
+      //   for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Ic[i] = *ptr++;
+      //   for (int i=0; i<this->_ch[1]->_U_rank; i++) w.c[1].Jr[i] = *ptr++;
+      //   for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Jc[i] = *ptr++;
+      //   //assert(msgsize == std::distance(buf, ptr));
+      // }
+      // wait_all(sreq);
     }
 
     template<typename scalar_t> void
-    HSSMatrixMPI<scalar_t>::communicate_child_data_kernel
-    (WorkCompressMPI_ANN<scalar_t>& w) {
-      w.c[0].dR = w.c[0].Rr.cols();
-      w.c[0].dS = w.c[0].Sr.cols();
-      w.c[1].dR = w.c[1].Rr.cols();
-      w.c[1].dS = w.c[1].Sr.cols();
-      int rank = Comm().rank(), P = Ptotal(), root1 = Pl();
-      int P0active = this->_ch[0]->Pactive();
-      int P1active = this->_ch[1]->Pactive();
-      std::vector<MPIRequest> sreq;
-      std::vector<std::size_t> sbuf0, sbuf1;
-      if (rank < P0active) {
-        if (rank < (P-P0active)) {
-          // I'm one of the first P-P0active processes that are active
-          // on child0, so I need to send to one or more others which
-          // are not active on child0, ie the ones in [P0active,P)
-          sbuf0.reserve(8+w.c[0].Ir.size()+w.c[0].Ic.size()+
-                        w.c[0].Jr.size()+w.c[0].Jc.size());
-          sbuf0.push_back(std::size_t(this->_ch[0]->_U_state));
-          sbuf0.push_back(std::size_t(this->_ch[0]->_V_state));
-          sbuf0.push_back(this->_ch[0]->_U_rank);
-          sbuf0.push_back(this->_ch[0]->_V_rank);
-          sbuf0.push_back(this->_ch[0]->_U_rows);
-          sbuf0.push_back(this->_ch[0]->_V_rows);
-          sbuf0.push_back(w.c[0].dR);
-          sbuf0.push_back(w.c[0].dS);
-          for (auto i : w.c[0].Ir) sbuf0.push_back(i);
-          for (auto i : w.c[0].Ic) sbuf0.push_back(i);
-          for (auto i : w.c[0].Jr) sbuf0.push_back(i);
-          for (auto i : w.c[0].Jc) sbuf0.push_back(i);
-          for (int p=P0active; p<P; p++)
-            if (rank == (p - P0active) % P0active)
-              sreq.emplace_back(Comm().isend(sbuf0, p, 0));
-        }
-      }
-      if (rank >= root1 && rank < root1+P1active) {
-        if ((rank-root1) < (P-P1active)) {
-          // I'm one of the first P-P1active processes that are active
-          // on child1, so I need to send to one or more others which
-          // are not active on child1, ie the ones in [0,root1) union
-          // [root1+P1active,P)
-          sbuf1.reserve(8+w.c[1].Ir.size()+w.c[1].Ic.size()+
-                        w.c[1].Jr.size()+w.c[1].Jc.size());
-          sbuf1.push_back(std::size_t(this->_ch[1]->_U_state));
-          sbuf1.push_back(std::size_t(this->_ch[1]->_V_state));
-          sbuf1.push_back(this->_ch[1]->_U_rank);
-          sbuf1.push_back(this->_ch[1]->_V_rank);
-          sbuf1.push_back(this->_ch[1]->_U_rows);
-          sbuf1.push_back(this->_ch[1]->_V_rows);
-          sbuf1.push_back(w.c[1].dR);
-          sbuf1.push_back(w.c[1].dS);
-          for (auto i : w.c[1].Ir) sbuf1.push_back(i);
-          for (auto i : w.c[1].Ic) sbuf1.push_back(i);
-          for (auto i : w.c[1].Jr) sbuf1.push_back(i);
-          for (auto i : w.c[1].Jc) sbuf1.push_back(i);
-          for (int p=0; p<root1; p++)
-            if (rank - root1 == p % P1active)
-              sreq.emplace_back(Comm().isend(sbuf1, p, 1));
-          for (int p=root1+P1active; p<P; p++)
-            if (rank - root1 == (p - P1active) % P1active)
-              sreq.emplace_back(Comm().isend(sbuf1, p, 1));
-        }
-      }
-      if (!(rank < P0active)) {
-        // I'm not active on child0, so I need to receive
-        int dest = -1;
-        for (int p=0; p<P0active; p++)
-          if (p == (rank - P0active) % P0active) { dest = p; break; }
-        assert(dest >= 0);
-        auto buf = Comm().template recv<std::size_t>(dest, 0);
-        auto ptr = buf.begin();
-        this->_ch[0]->_U_state = State(*ptr++);
-        this->_ch[0]->_V_state = State(*ptr++);
-        this->_ch[0]->_U_rank = *ptr++;
-        this->_ch[0]->_V_rank = *ptr++;
-        this->_ch[0]->_U_rows = *ptr++;
-        this->_ch[0]->_V_rows = *ptr++;
-        w.c[0].dR = *ptr++;
-        w.c[0].dS = *ptr++;
-        w.c[0].Ir.resize(this->_ch[0]->_U_rank);
-        w.c[0].Ic.resize(this->_ch[0]->_V_rank);
-        w.c[0].Jr.resize(this->_ch[0]->_U_rank);
-        w.c[0].Jc.resize(this->_ch[0]->_V_rank);
-        for (int i=0; i<this->_ch[0]->_U_rank; i++) w.c[0].Ir[i] = *ptr++;
-        for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Ic[i] = *ptr++;
-        for (int i=0; i<this->_ch[0]->_U_rank; i++) w.c[0].Jr[i] = *ptr++;
-        for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Jc[i] = *ptr++;
-        //assert(msgsize == std::distance(buf, ptr));
-      }
-      if (!(rank >= root1 && rank < root1+P1active)) {
-        // I'm not active on child1, so I need to receive
-        int dest = -1;
-        for (int p=root1; p<root1+P1active; p++) {
-          if (rank < root1) {
-            if (p - root1 == rank % P1active) { dest = p; break; }
-          } else if (p - root1 == (rank - P1active) % P1active) {
-            dest = p; break;
-          }
-        }
-        assert(dest >= 0);
-        auto buf = Comm().template recv<std::size_t>(dest, 1);
-        auto ptr = buf.begin();
-        this->_ch[1]->_U_state = State(*ptr++);
-        this->_ch[1]->_V_state = State(*ptr++);
-        this->_ch[1]->_U_rank = *ptr++;
-        this->_ch[1]->_V_rank = *ptr++;
-        this->_ch[1]->_U_rows = *ptr++;
-        this->_ch[1]->_V_rows = *ptr++;
-        w.c[1].dR = *ptr++;
-        w.c[1].dS = *ptr++;
-        w.c[1].Ir.resize(this->_ch[1]->_U_rank);
-        w.c[1].Ic.resize(this->_ch[1]->_V_rank);
-        w.c[1].Jr.resize(this->_ch[1]->_U_rank);
-        w.c[1].Jc.resize(this->_ch[1]->_V_rank);
-        for (int i=0; i<this->_ch[1]->_U_rank; i++) w.c[1].Ir[i] = *ptr++;
-        for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Ic[i] = *ptr++;
-        for (int i=0; i<this->_ch[1]->_U_rank; i++) w.c[1].Jr[i] = *ptr++;
-        for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Jc[i] = *ptr++;
-        //assert(msgsize == std::distance(buf, ptr));
-      }
-      wait_all(sreq);
+    HSSMatrixMPI<scalar_t>::notify_inactives_states_kernel_MPI
+    (WorkCompressMPI_ANN<scalar_t>& w_mpi) {
+      // int rank = Comm().rank(), actives = Pactive();
+      // int inactives = Ptotal() - actives;
+      // if (rank < inactives) {
+      //   std::vector<std::size_t> sbuf;
+      //   sbuf.reserve(8+w.Ir.size()+w.Ic.size()+w.Jr.size()+w.Jc.size());
+      //   sbuf.push_back(std::size_t(this->_U_state));
+      //   sbuf.push_back(std::size_t(this->_V_state));
+      //   sbuf.push_back(this->_U_rank);
+      //   sbuf.push_back(this->_V_rank);
+      //   sbuf.push_back(this->_U_rows);
+      //   sbuf.push_back(this->_V_rows);
+      //   sbuf.push_back(w.Rr.cols());
+      //   sbuf.push_back(w.Sr.cols());
+      //   for (auto i : w.Ir) sbuf.push_back(i);
+      //   for (auto i : w.Ic) sbuf.push_back(i);
+      //   for (auto i : w.Jr) sbuf.push_back(i);
+      //   for (auto i : w.Jc) sbuf.push_back(i);
+      //   Comm().send(sbuf, actives+rank, 0);
+      // }
+      // if (rank >= actives) {
+      //   auto buf = Comm().template recv<std::size_t>(rank-actives, 0);
+      //   auto ptr = buf.begin();
+      //   this->_U_state = State(*ptr++);
+      //   this->_V_state = State(*ptr++);
+      //   this->_U_rank = *ptr++;
+      //   this->_V_rank = *ptr++;
+      //   this->_U_rows = *ptr++;
+      //   this->_V_rows = *ptr++;
+      //   w.dR = *ptr++;
+      //   w.dS = *ptr++;
+      //   w.Ir.resize(this->_U_rank);
+      //   w.Ic.resize(this->_V_rank);
+      //   w.Jr.resize(this->_U_rank);
+      //   w.Jc.resize(this->_V_rank);
+      //   for (int i=0; i<this->_U_rank; i++) w.Ir[i] = *ptr++;
+      //   for (int i=0; i<this->_V_rank; i++) w.Ic[i] = *ptr++;
+      //   for (int i=0; i<this->_U_rank; i++) w.Jr[i] = *ptr++;
+      //   for (int i=0; i<this->_V_rank; i++) w.Jc[i] = *ptr++;
+      // }
     }
-
-    template<typename scalar_t> void
-    HSSMatrixMPI<scalar_t>::notify_inactives_states_kernel
-    (WorkCompressMPI_ANN<scalar_t>& w) {
-      int rank = Comm().rank(), actives = Pactive();
-      int inactives = Ptotal() - actives;
-      if (rank < inactives) {
-        std::vector<std::size_t> sbuf;
-        sbuf.reserve(8+w.Ir.size()+w.Ic.size()+w.Jr.size()+w.Jc.size());
-        sbuf.push_back(std::size_t(this->_U_state));
-        sbuf.push_back(std::size_t(this->_V_state));
-        sbuf.push_back(this->_U_rank);
-        sbuf.push_back(this->_V_rank);
-        sbuf.push_back(this->_U_rows);
-        sbuf.push_back(this->_V_rows);
-        sbuf.push_back(w.Rr.cols());
-        sbuf.push_back(w.Sr.cols());
-        for (auto i : w.Ir) sbuf.push_back(i);
-        for (auto i : w.Ic) sbuf.push_back(i);
-        for (auto i : w.Jr) sbuf.push_back(i);
-        for (auto i : w.Jc) sbuf.push_back(i);
-        Comm().send(sbuf, actives+rank, 0);
-      }
-      if (rank >= actives) {
-        auto buf = Comm().template recv<std::size_t>(rank-actives, 0);
-        auto ptr = buf.begin();
-        this->_U_state = State(*ptr++);
-        this->_V_state = State(*ptr++);
-        this->_U_rank = *ptr++;
-        this->_V_rank = *ptr++;
-        this->_U_rows = *ptr++;
-        this->_V_rows = *ptr++;
-        w.dR = *ptr++;
-        w.dS = *ptr++;
-        w.Ir.resize(this->_U_rank);
-        w.Ic.resize(this->_V_rank);
-        w.Jr.resize(this->_U_rank);
-        w.Jc.resize(this->_V_rank);
-        for (int i=0; i<this->_U_rank; i++) w.Ir[i] = *ptr++;
-        for (int i=0; i<this->_V_rank; i++) w.Ic[i] = *ptr++;
-        for (int i=0; i<this->_U_rank; i++) w.Jr[i] = *ptr++;
-        for (int i=0; i<this->_V_rank; i++) w.Jc[i] = *ptr++;
-      }
-    }
-
-  #if 0
-  #endif
 
   } // end namespace HSS
 } // end namespace strumpack

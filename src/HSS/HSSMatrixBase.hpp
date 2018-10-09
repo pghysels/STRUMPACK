@@ -180,17 +180,20 @@ namespace strumpack {
        int d, int dd, int lvl, int depth) {}
 
       // New functions for kernel compression: start
+      // Sequential code:
       virtual void compress_recursive_ann
       (DenseM_t& ann, DenseM_t& scores,
-       const elem_t& Aelem, const opts_t& opts,
-       WorkCompressANN<scalar_t>& w) {}
-
+      const elem_t& Aelem, const opts_t& opts,
+      WorkCompressANN<scalar_t>& w) {}
       virtual real_t update_orthogonal_basis
       (DenseM_t& S, int d, int dd, int depth) { return real_t(0.); }
-
-      virtual void compress_recursive_kernel
+      // MPI code:
+      virtual void compress_recursive_kernel_MPI
       (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem,
       WorkCompressMPI_ANN<scalar_t>& w, int d, int dd, const opts_t& opts) {}
+      virtual real_t update_orthogonal_basis_kernel_MPI
+      (const opts_t& opts, scalar_t& r_max_0, const DistM_t& S,
+      DistM_t& Q, int d, int dd, bool untouched, int L) { return real_t(0.); }
       // New functions for kernel compression: end
 
       virtual void compress_recursive_original
@@ -205,6 +208,13 @@ namespace strumpack {
       virtual void compress_level_stable
       (DistSamples<scalar_t>& RS, const opts_t& opts,
        WorkCompressMPI<scalar_t>& w, int d, int dd, int lvl);
+
+      // New functions for kernel compression: start
+      // To switch from distributed compression to sequential compression
+      // virtual void compress_recursive_kernel_MPI();
+      // Implementation below in this file.
+      // New functions for kernel compression: end
+
       virtual void get_extraction_indices
       (std::vector<std::vector<std::size_t>>& I,
        std::vector<std::vector<std::size_t>>& J,
@@ -416,6 +426,14 @@ namespace strumpack {
       if (!this->active()) return;
       dist = DistM_t(lg, sub);
     }
+
+    /**
+     * This switches from distributed compression to sequential/
+     * threaded compression on the subtree.
+     */
+    // template<typename scalar_t> void
+    // HSSMatrixBase<scalar_t>::compress_recursive_kernel_MPI() {
+    // }
 
     /**
      * This switches from distributed compression to sequential/

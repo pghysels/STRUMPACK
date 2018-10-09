@@ -276,7 +276,7 @@ namespace strumpack {
          MPI_Comm comm) {
         Aelem(I, J, B);
       };
-      compress_kernel_nosync(ann, scores, Aelem, opts);
+      compress_kernel_nosync_MPI(ann, scores, Aelem, opts);
     }
     //NEW kernel routine: end
 
