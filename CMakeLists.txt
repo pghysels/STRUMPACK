@@ -166,6 +166,27 @@ else()
     " might be needed by Scotch !!!!")
 endif()
 
+include(CheckLibraryExists)
+check_cxx_source_compiles(
+  "#include <cstdint>
+#include <atomic>
+std::atomic<uintptr_t> x;
+std::atomic<uintmax_t> y;
+int main() {
+  bool lf = x.is_lock_free();
+  return x + y;
+}
+" STRUMPACK_ATOMICS_WITHOUT_LIB)
+if(NOT STRUMPACK_ATOMICS_WITHOUT_LIB)
+  check_library_exists(atomic __atomic_fetch_add_8 ""
+    STRUMPACK_LIBCXX_HAS_ATOMIC_LIB)
+  if(STRUMPACK_LIBCXX_HAS_ATOMIC_LIB)
+    set(LIBS ${LIBS} "-latomic")
+  else()
+    message(STATUS "Failed to find required libatomic")
+  endif()
+endif()
+
 if(DEFINED BLAS_LIBRARIES)
   set(LIBS ${LIBS} ${BLAS_LIBRARIES})
 else()
