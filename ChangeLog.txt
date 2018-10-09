@@ -1,3 +1,10 @@
+Version 3.0.4 ...
+======================================
+ - Always generate position independent code.
+ - Suppress many warnings when using clang.
+ - Fix possible memory leak.
+ - Fix linking issue whith atomic operations.
+
 Version 3.0.3 Released October 4, 2018
 ======================================
  - Check for support of the OpenMP priority clause (OpenMP 4.5)

@@ -3,7 +3,7 @@ Build Instructions
 
 See the online documentation for more detailed instructions:
 http://portal.nersc.gov/project/sparse/strumpack/master/index.html
-http://portal.nersc.gov/project/sparse/strumpack/v.3.0.3/index.html
+http://portal.nersc.gov/project/sparse/strumpack/v.3.0.4/index.html
 
 Or see example_build.sh for examples on how to call CMake.
 
