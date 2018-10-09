@@ -116,18 +116,18 @@ install:
     -DCMAKE_C_COMPILER=mpicc \
     -DCMAKE_CXX_COMPILER=mpic++ \
     -DCMAKE_Fortran_COMPILER=mpif90 \
-    -DBLAS_LIBRARIES=$BLAS_LIB \
-    -DLAPACK_LIBRARIES=$LAPACK_LIB \
-    -DSCALAPACK_LIBRARIES=$SCALAPACK_LIB \
+    -DTPL_BLAS_LIBRARIES=$BLAS_LIB \
+    -DTPL_LAPACK_LIBRARIES=$LAPACK_LIB \
+    -DTPL_SCALAPACK_LIBRARIES=$SCALAPACK_LIB \
     -DSTRUMPACK_COUNT_FLOPS=ON \
-    -DSTRUMPACK_USE_PARMETIS=ON \
-    -DSTRUMPACK_USE_SCOTCH=ON \
-    -DMETIS_INCLUDES=$TRAVIS_BUILD_DIR/installDir/parmetis-4.0.3/metis/include \
-    -DMETIS_LIBRARIES=$TRAVIS_BUILD_DIR/installDir/parmetis-4.0.3/install/lib/libparmetis.so \
-    -DPARMETIS_INCLUDES=$TRAVIS_BUILD_DIR/installDir/parmetis-4.0.3/install/include \
-    -DPARMETIS_LIBRARIES=$TRAVIS_BUILD_DIR/installDir/parmetis-4.0.3/install/lib/libparmetis.so \
-    -DSCOTCH_INCLUDES=$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/include \
-    -DSCOTCH_LIBRARIES="$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libscotch.a;$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libscotcherr.a;$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libptscotch.a;$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libptscotcherr.a"
+    -DTPL_ENABLE_PARMETIS=ON \
+    -DTPL_ENABLE_SCOTCH=ON \
+    -DTPL_METIS_INCLUDE_DIRS=$TRAVIS_BUILD_DIR/installDir/parmetis-4.0.3/metis/include \
+    -DTPL_METIS_LIBRARIES=$TRAVIS_BUILD_DIR/installDir/parmetis-4.0.3/install/lib/libparmetis.so \
+    -DTPL_PARMETIS_INCLUDE_DIRS=$TRAVIS_BUILD_DIR/installDir/parmetis-4.0.3/install/include \
+    -DTPL_PARMETIS_LIBRARIES=$TRAVIS_BUILD_DIR/installDir/parmetis-4.0.3/install/lib/libparmetis.so \
+    -DTPL_SCOTCH_INCLUDE_DIRS=$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/include \
+    -DTPL_SCOTCH_LIBRARIES="$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libscotch.a;$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libscotcherr.a;$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libptscotch.a;$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libptscotcherr.a"
   - make install VERBOSE=1
   - printf "${BLUE} GC; Done installing STRUMPACK from source\n"
 
