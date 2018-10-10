@@ -246,10 +246,9 @@ namespace strumpack {
       void compress_kernel_nosync_MPI
       (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem,
       const opts_t& opts);
-      void compress_recursive_kernel_MPI
+      void compress_recursive_ann
       (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem,
-      WorkCompressMPI_ANN<scalar_t>& w, int d, int dd, const opts_t& opts);
-      void compress_recursive_kernel_MPI(); // Switch to sequential compression
+      WorkCompressMPI_ANN<scalar_t>& w_mpi, int d, int dd, const opts_t& opts) override;
       void compute_local_samples_kernel_MPI
       (DenseM_t &ann, DenseM_t &scores, WorkCompressMPI_ANN<scalar_t> &w,
       const delem_t &Aelem, const opts_t &opts);

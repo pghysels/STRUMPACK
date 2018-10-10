@@ -48,6 +48,7 @@ namespace strumpack {
     (DenseM_t& ann, DenseM_t& scores,
     const elem_t& Aelem, const opts_t& opts,
     WorkCompressANN<scalar_t>& w) {
+      std::cout << "compress_recursive_ann_seq" << std::endl;
       if (this->leaf()) {
         std::cout << "LEAF(" << this->rows() << "," << this->cols() << ")\n";
         if (this->is_untouched()) {

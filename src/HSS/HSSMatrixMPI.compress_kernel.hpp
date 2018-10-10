@@ -39,18 +39,18 @@ namespace strumpack {
     HSSMatrixMPI<scalar_t>::compress_kernel_nosync_MPI
     (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem,
     const opts_t& opts) {
-      // std::cout << "compress_kernel_nosync_MPI" << std::endl;
+      // std::cout << "compress_recursive_ann" << std::endl;
       auto d = opts.d0();
       auto dd = opts.dd();
       WorkCompressMPI_ANN<scalar_t> w_mpi;
-      compress_recursive_kernel_MPI(ann, scores, Aelem, w_mpi, d, dd, opts );
+      compress_recursive_ann(ann, scores, Aelem, w_mpi, d, dd, opts );
     }
 
     template<typename scalar_t> void
-    HSSMatrixMPI<scalar_t>::compress_recursive_kernel_MPI
+    HSSMatrixMPI<scalar_t>::compress_recursive_ann
     (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem,
     WorkCompressMPI_ANN<scalar_t>& w_mpi, int d, int dd, const opts_t& opts) {
-      // std::cout << "compress_recursive_kernel_MPI" << std::endl;
+      std::cout << "compress_recursive_ann_dist" << std::endl;
       if (!this->active()) return;
       if (this->leaf()) {
         std::cout << "LEAF" << std::endl;
@@ -70,9 +70,9 @@ namespace strumpack {
       else {
         std::cout << "NLEF(" << this->rows() << "," << this->cols() << ")\n";
         w_mpi.split(this->_ch[0]->dims());
-        this->_ch[0]->compress_recursive_kernel_MPI
+        this->_ch[0]->compress_recursive_ann
           (ann, scores, Aelem, w_mpi.c[0], d, dd, opts);
-        this->_ch[1]->compress_recursive_kernel_MPI
+        this->_ch[1]->compress_recursive_ann
           (ann, scores, Aelem, w_mpi.c[1], d, dd, opts);
         // communicate_child_data_kernel(w); //   <-- Needs major modifications
         if (!this->_ch[0]->is_compressed() ||
