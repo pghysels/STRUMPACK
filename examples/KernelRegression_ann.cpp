@@ -217,13 +217,11 @@ int main(int argc, char *argv[]) {
     neighbors, neighbor_scores, generator);
   cout << "# ANN time = " << timer.elapsed() << " sec" <<endl;
 
-  vector<double> neighbors_d;
-  for (int i = 0; i < ann_number*n; i++) {
-    neighbors_d.push_back((double)neighbors[i]);
-  }
+  DenseMatrix<std::size_t> ann(ann_number, n);
+  for (int i=0; i<ann_number; i++)
+    for (int j=0; j<n; j++)
+      ann(i, j) = std::size_t(neighbors[i+j*ann_number]);
 
-  // Indices of closest neighbors, sorted in ascending order
-  DenseMatrixWrapper<double> ann(ann_number, n, &neighbors_d[0], ann_number);
   // Distances to closest neighbors, sorted in ascending order
   DenseMatrixWrapper<double> scores(ann_number, n, &neighbor_scores[0],
                                     ann_number);

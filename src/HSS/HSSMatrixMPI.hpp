@@ -84,8 +84,12 @@ namespace strumpack {
        const dmult_t& Amult, const delem_t& Aelem, const opts_t& opts);
       HSSMatrixMPI
       (std::size_t m, std::size_t n, const BLACSGrid* Agrid,
-      DenseM_t& ann, DenseM_t& scores,
-      const delem_t& Aelem, const opts_t& opts);
+       DenseMatrix<std::size_t>& ann, DenseM_t& scores,
+       const delem_t& Aelem, const opts_t& opts);
+      HSSMatrixMPI
+      (const HSSPartitionTree& t, const BLACSGrid* Agrid,
+       DenseMatrix<std::size_t>& ann, DenseM_t& scores,
+       const delem_t& Aelem, const opts_t& opts);
       HSSMatrixMPI(const HSSMatrixMPI<scalar_t>& other);
       HSSMatrixMPI(HSSMatrixMPI<scalar_t>&& other) = default;
       virtual ~HSSMatrixMPI() {}
@@ -113,8 +117,8 @@ namespace strumpack {
       void compress
       (const dmult_t& Amult, const delem_blocks_t& Aelem, const opts_t& opts);
       void compress_ann
-      (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem,
-      const opts_t& opts);
+      (DenseMatrix<std::size_t>& ann, DenseM_t& scores, const delem_t& Aelem,
+       const opts_t& opts);
 
       HSSFactorsMPI<scalar_t> factor() const;
       HSSFactorsMPI<scalar_t> partial_factor() const;
@@ -244,24 +248,26 @@ namespace strumpack {
 
       // NEW MPI kernel routines: start
       void compress_kernel_nosync_MPI
-      (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem,
-      const opts_t& opts);
+      (DenseMatrix<std::size_t>& ann, DenseM_t& scores,
+       const delem_t& Aelem, const opts_t& opts);
       void compress_recursive_ann
-      (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem,
-      WorkCompressMPI_ANN<scalar_t>& w_mpi, int d, int dd, const opts_t& opts) override;
+      (DenseMatrix<std::size_t>& ann, DenseM_t& scores, const delem_t& Aelem,
+       WorkCompressMPIANN<scalar_t>& w_mpi, int d, int dd,
+       const opts_t& opts) override;
       void compute_local_samples_kernel_MPI
-      (DenseM_t &ann, DenseM_t &scores, WorkCompressMPI_ANN<scalar_t> &w,
-      const delem_t &Aelem, const opts_t &opts);
+      (DenseMatrix<std::size_t>& ann, DenseM_t &scores,
+       WorkCompressMPIANN<scalar_t> &w, const delem_t &Aelem,
+       const opts_t &opts);
       void reduce_local_samples_kernel_MPI
-      (const DistSamples<scalar_t>& RS, WorkCompressMPI_ANN<scalar_t>& w,
-      int dd, bool was_compressed);
+      (const DistSamples<scalar_t>& RS, WorkCompressMPIANN<scalar_t>& w,
+       int dd, bool was_compressed);
       void compute_U_basis_kernel_MPI
-      (const opts_t& opts, WorkCompressMPI_ANN<scalar_t>& w, int d, int dd);
+      (const opts_t& opts, WorkCompressMPIANN<scalar_t>& w, int d, int dd);
       void compute_V_basis_kernel_MPI
-      (const opts_t& opts, WorkCompressMPI_ANN<scalar_t>& w, int d, int dd);
+      (const opts_t& opts, WorkCompressMPIANN<scalar_t>& w, int d, int dd);
       bool update_orthogonal_basis_kernel_MPI();
-      void communicate_child_data_kernel_MPI(WorkCompressMPI_ANN<scalar_t>& w);
-      void notify_inactives_states_kernel_MPI(WorkCompressMPI_ANN<scalar_t>& w);
+      void communicate_child_data_kernel_MPI(WorkCompressMPIANN<scalar_t>& w);
+      void notify_inactives_states_kernel_MPI(WorkCompressMPIANN<scalar_t>& w);
       // NEW MPI kernel routines: end
 
       void compress_recursive_original
@@ -449,10 +455,21 @@ namespace strumpack {
     // New constructor for ANN compression
     template<typename scalar_t> HSSMatrixMPI<scalar_t>::HSSMatrixMPI
     (std::size_t m, std::size_t n, const BLACSGrid* Agrid,
-    DenseM_t& ann, DenseM_t& scores,
-    const delem_t& Aelem, const opts_t& opts)
-    : HSSMatrixBase<scalar_t>(m, n, true), blacs_grid_(Agrid) {
+     DenseMatrix<std::size_t>& ann, DenseM_t& scores,
+     const delem_t& Aelem, const opts_t& opts)
+      : HSSMatrixBase<scalar_t>(m, n, true), blacs_grid_(Agrid) {
       setup_hierarchy(opts, 0, 0);
+      setup_local_context();
+      setup_ranges(0, 0);
+      compress_ann(ann, scores, Aelem, opts);
+    }
+
+    template<typename scalar_t> HSSMatrixMPI<scalar_t>::HSSMatrixMPI
+    (const HSSPartitionTree& t, const BLACSGrid* Agrid,
+     DenseMatrix<std::size_t>& ann, DenseM_t& scores,
+     const delem_t& Aelem, const opts_t& opts)
+      : HSSMatrixBase<scalar_t>(t.size, t.size, true), blacs_grid_(Agrid) {
+      setup_hierarchy(t, opts, 0, 0);
       setup_local_context();
       setup_ranges(0, 0);
       compress_ann(ann, scores, Aelem, opts);

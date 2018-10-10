@@ -31,6 +31,8 @@
 
 #include <vector>
 #include <iomanip>
+#include <numeric>
+#include <algorithm>
 #include "StrumpackParameters.hpp"
 #include "dense/BLASLAPACKWrapper.hpp"
 

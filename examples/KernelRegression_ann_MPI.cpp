@@ -235,20 +235,20 @@ int run(int argc, char *argv[]) {
   int num_iters = 5;
 
   // timer.start();
-    find_approximate_neighbors(data_train, n, d, num_iters, ann_number,
-    neighbors, neighbor_scores, generator);
+  find_approximate_neighbors
+    (data_train, n, d, num_iters, ann_number,
+     neighbors, neighbor_scores, generator);
   // cout << "# ANN time = " << timer.elapsed() << " sec" <<endl;
 
-  vector<double> neighbors_d;
-  for (int i = 0; i < ann_number*n; i++) {
-    neighbors_d.push_back((double)neighbors[i]);
-  }
 
-  // Indices of closest neighbors, sorted in ascending order
-  DenseMatrixWrapper<double> ann(ann_number, n, &neighbors_d[0], ann_number);
+  DenseMatrix<std::size_t> ann(ann_number, n);
+  for (int i=0; i<ann_number; i++)
+    for (int j=0; j<n; j++)
+      ann(i, j) = std::size_t(neighbors[i+j*ann_number]);
+
   // Distances to closest neighbors, sorted in ascending order
-  DenseMatrixWrapper<double> scores(ann_number, n, &neighbor_scores[0],
-                                    ann_number);
+  DenseMatrixWrapper<double> scores
+    (ann_number, n, &neighbor_scores[0], ann_number);
   // Find ANN: end ------------------------------------------------
 
   if (!mpi_rank())
@@ -261,16 +261,13 @@ int run(int argc, char *argv[]) {
   timer.start();
   KernelMPI kernel_matrix(data_train, d, h, lambda);
 
-  // if (reorder != "natural")
-  //   K = new HSSMatrixMPI<double>(cluster_tree, &grid,
-  //           kernel_matrix, kernel_matrix, hss_opts);
-  // else
-  //   K = new HSSMatrixMPI<double>(n, n, &grid,
-  //           kernel_matrix, kernel_matrix, hss_opts);
-
   // Constructor for ANN compression
-  K = new HSSMatrixMPI<double>(n, n, &grid,
-          ann, scores, kernel_matrix, hss_opts);
+  if (reorder != "natural")
+    K = new HSSMatrixMPI<double>
+      (cluster_tree, &grid, ann, scores, kernel_matrix, hss_opts);
+  else
+    K = new HSSMatrixMPI<double>
+      (n, n, &grid, ann, scores, kernel_matrix, hss_opts);
 
   if (!mpi_rank())
     cout << "# compression time = " << timer.elapsed() << endl;

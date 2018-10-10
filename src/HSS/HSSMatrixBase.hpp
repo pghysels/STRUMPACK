@@ -182,18 +182,19 @@ namespace strumpack {
       // New functions for kernel compression: start
       // Sequential code:
       virtual void compress_recursive_ann
-      (DenseM_t& ann, DenseM_t& scores,
-      const elem_t& Aelem, const opts_t& opts,
-      WorkCompressANN<scalar_t>& w) {}
+      (DenseMatrix<std::size_t>& ann, DenseM_t& scores,
+       const elem_t& Aelem, const opts_t& opts,
+       WorkCompressANN<scalar_t>& w) {}
       virtual real_t update_orthogonal_basis
       (DenseM_t& S, int d, int dd, int depth) { return real_t(0.); }
+
       // MPI code:
       virtual void compress_recursive_ann
-      (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem,
-      WorkCompressMPI_ANN<scalar_t>& w, int d, int dd, const opts_t& opts) {}
+      (DenseMatrix<std::size_t>& ann, DenseM_t& scores, const delem_t& Aelem,
+       WorkCompressMPIANN<scalar_t>& w, int d, int dd, const opts_t& opts) {}
       virtual real_t update_orthogonal_basis_kernel_MPI
       (const opts_t& opts, scalar_t& r_max_0, const DistM_t& S,
-      DistM_t& Q, int d, int dd, bool untouched, int L) { return real_t(0.); }
+       DistM_t& Q, int d, int dd, bool untouched, int L) { return real_t(0.); }
       // New functions for kernel compression: end
 
       virtual void compress_recursive_original
@@ -212,7 +213,7 @@ namespace strumpack {
       // New functions for kernel compression: start
       // To switch from distributed compression to sequential compression
       virtual void compress_recursive_ann
-      (WorkCompressMPI_ANN<scalar_t>& w_mpi);
+      (WorkCompressMPIANN<scalar_t>& w_mpi);
       // Implementation below in this file.
       // New functions for kernel compression: end
 
@@ -434,7 +435,7 @@ namespace strumpack {
      */
     template<typename scalar_t> void
     HSSMatrixBase<scalar_t>::compress_recursive_ann
-    (WorkCompressMPI_ANN<scalar_t>& w_mpi) {
+    (WorkCompressMPIANN<scalar_t>& w_mpi) {
         std::cout << "switches from distributed compression to sequential\n";
     }
 

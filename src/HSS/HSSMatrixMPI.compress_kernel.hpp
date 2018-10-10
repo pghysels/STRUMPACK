@@ -35,21 +35,37 @@
 namespace strumpack {
   namespace HSS {
 
+    //NEW kernel routine: start
+    template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compress_ann
+    (DenseMatrix<std::size_t>& ann, DenseM_t& scores, const delem_t& Aelem,
+     const opts_t& opts) {
+      TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_compress);
+      auto Aelemw = [&]
+        (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+         DistM_t& B, const DistM_t& A, std::size_t rlo, std::size_t clo,
+         MPI_Comm comm) {
+        Aelem(I, J, B);
+      };
+      compress_kernel_nosync_MPI(ann, scores, Aelem, opts);
+    }
+    //NEW kernel routine: end
+
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_kernel_nosync_MPI
-    (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem,
-    const opts_t& opts) {
+    (DenseMatrix<std::size_t>& ann, DenseM_t& scores,
+     const delem_t& Aelem, const opts_t& opts) {
       // std::cout << "compress_recursive_ann" << std::endl;
       auto d = opts.d0();
       auto dd = opts.dd();
-      WorkCompressMPI_ANN<scalar_t> w_mpi;
+      WorkCompressMPIANN<scalar_t> w_mpi;
       compress_recursive_ann(ann, scores, Aelem, w_mpi, d, dd, opts );
     }
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_recursive_ann
-    (DenseM_t& ann, DenseM_t& scores, const delem_t& Aelem,
-    WorkCompressMPI_ANN<scalar_t>& w_mpi, int d, int dd, const opts_t& opts) {
+    (DenseMatrix<std::size_t>& ann, DenseM_t& scores, const delem_t& Aelem,
+     WorkCompressMPIANN<scalar_t>& w_mpi, int d, int dd,
+     const opts_t& opts) {
       std::cout << "compress_recursive_ann_dist" << std::endl;
       if (!this->active()) return;
       if (this->leaf()) {
@@ -106,8 +122,9 @@ namespace strumpack {
     // Main differences here
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compute_local_samples_kernel_MPI
-    (DenseM_t &ann, DenseM_t &scores, WorkCompressMPI_ANN<scalar_t> &w_mpi,
-    const delem_t &Aelem, const opts_t &opts) {
+    (DenseMatrix<std::size_t>& ann, DenseM_t& scores,
+     WorkCompressMPIANN<scalar_t>& w_mpi, const delem_t& Aelem,
+     const opts_t& opts) {
       std::cout << "compute_local_samples_kernel_MPI";
 
       // std::size_t ann_number = ann.rows();
@@ -243,14 +260,15 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::reduce_local_samples_kernel_MPI
-    (const DistSamples<scalar_t>& RS, WorkCompressMPI_ANN<scalar_t>& w_mpi,
-    int dd, bool was_compressed) {
+    (const DistSamples<scalar_t>& RS, WorkCompressMPIANN<scalar_t>& w_mpi,
+     int dd, bool was_compressed) {
       std::cout << "reduce_local_samples_kernel_MPI";
     }
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compute_U_basis_kernel_MPI
-    (const opts_t& opts, WorkCompressMPI_ANN<scalar_t>& w_mpi, int d, int dd) {
+    (const opts_t& opts, WorkCompressMPIANN<scalar_t>& w_mpi,
+     int d, int dd) {
       std::cout << "compute_U_basis_kernel";
       if (this->_U_state == State::COMPRESSED) return;
       // int u_rows = this->leaf() ? this->rows() :
@@ -283,7 +301,8 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compute_V_basis_kernel_MPI
-    (const opts_t& opts, WorkCompressMPI_ANN<scalar_t>& w_mpi, int d, int dd) {
+    (const opts_t& opts, WorkCompressMPIANN<scalar_t>& w_mpi,
+     int d, int dd) {
       std::cout << "compute_V_basis_kernel";
       if (this->_V_state == State::COMPRESSED) return;
       // int v_rows = this->leaf() ? this->rows() :
@@ -320,7 +339,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::communicate_child_data_kernel_MPI
-    (WorkCompressMPI_ANN<scalar_t>& w_mpi) {
+    (WorkCompressMPIANN<scalar_t>& w_mpi) {
       // w.c[0].dR = w.c[0].Rr.cols();
       // w.c[0].dS = w.c[0].Sr.cols();
       // w.c[1].dR = w.c[1].Rr.cols();
@@ -444,7 +463,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::notify_inactives_states_kernel_MPI
-    (WorkCompressMPI_ANN<scalar_t>& w_mpi) {
+    (WorkCompressMPIANN<scalar_t>& w_mpi) {
       // int rank = Comm().rank(), actives = Pactive();
       // int inactives = Ptotal() - actives;
       // if (rank < inactives) {

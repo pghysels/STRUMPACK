@@ -60,9 +60,9 @@ namespace strumpack {
 
     // New class for kernel compression
     template<typename scalar_t>
-    class WorkCompressMPI_ANN : public WorkCompressBase<scalar_t> {
+    class WorkCompressMPIANN : public WorkCompressBase<scalar_t> {
     public:
-      std::vector<WorkCompressMPI_ANN<scalar_t>> c;
+      std::vector<WorkCompressMPIANN<scalar_t>> c;
       // DistributedMatrix<scalar_t> Rr, Rc, Sr, Sc;
       // DistributedMatrix<scalar_t> Qr, Qc;
       // int dR = 0, dS = 0;
