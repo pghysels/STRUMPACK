@@ -91,134 +91,67 @@ namespace strumpack {
     (DenseMatrix<std::size_t>& ann, DenseM_t& scores,
      WorkCompressANN<scalar_t>& w, const elem_t& Aelem, const opts_t& opts) {
       std::size_t ann_number = ann.rows();
-
+      std::vector<std::size_t> I;
       if (this->leaf()) {
-        std::vector<std::size_t> I;
         I.reserve(this->rows());
         for (std::size_t i=0; i<this->rows(); i++)
           I.push_back(i+w.offset.first);
 
-        // combine non-diagonal neibs of all points in the leaf
-        std::vector<std::size_t> leaf_neibs;
-        std::vector<double> leaf_neib_scores;
-        for (std::size_t i = w.offset.first; i < w.offset.first + this->rows(); i++) {
-          for (std::size_t j = 0; j < ann_number; j++) {
+        for (std::size_t i=w.offset.first;
+             i<w.offset.first+this->rows(); i++)
+          for (std::size_t j=0; j<ann_number; j++)
             if ((ann(j, i) < w.offset.first) ||
-                (ann(j, i) >= w.offset.first + this->rows())) {
-              leaf_neibs.push_back(ann(j, i));
-              leaf_neib_scores.push_back(scores(j, i));
-            }
-          }
-        }
-
-        // sort column indices and corresponding scores
-        std::vector<std::size_t> order = find_sort_permutation(leaf_neibs);
-        leaf_neibs = apply_permutation(leaf_neibs, order);
-        leaf_neib_scores = apply_permutation(leaf_neib_scores, order);
-
-        // remove duplicates
-        std::size_t cur = 0;
-        for (std::size_t i = 1; i < leaf_neibs.size(); i++) {
-          if (leaf_neibs[i] > leaf_neibs[i-1]) {
-            cur++;
-            leaf_neibs[cur] = leaf_neibs[i];
-            leaf_neib_scores[cur] = leaf_neib_scores[i];
-          } else {
-            // keep the smallest score
-            if (leaf_neib_scores[cur] > leaf_neib_scores[i])
-              leaf_neib_scores[cur] = leaf_neib_scores[i];
-          }
-        }
-        leaf_neibs.resize(cur+1);
-        leaf_neib_scores.resize(cur+1);
-
-        // maximum number of samples is leaf size + some oversampling
-        int d_max = I.size() + opts.dd();
-        if (leaf_neibs.size() < d_max) {
-          for (std::size_t j = 0; j < leaf_neibs.size(); j++) {
-            w.Scolids.push_back(leaf_neibs[j]);
-            w.Scolscs.push_back(leaf_neib_scores[j]);
-          }
-        } else {
-          // sort based on scores
-          std::vector<std::size_t> order = find_sort_permutation(leaf_neib_scores);
-          leaf_neibs = apply_permutation(leaf_neibs, order);
-          leaf_neib_scores = apply_permutation(leaf_neib_scores, order);
-          // keep only d_max closest
-          for (std::size_t j = 0; j < d_max; j++) {
-            w.Scolids.push_back(leaf_neibs[j]);
-            w.Scolscs.push_back(leaf_neib_scores[j]);
-          }
-        }
-        w.S = DenseM_t(I.size(), w.Scolids.size());
-        Aelem(I, w.Scolids, w.S);
-      }
-      else {
-        std::vector<std::size_t> I;
-        for (std::size_t i = 0; i < w.c[0].Ir.size(); i++)
+                (ann(j, i) >= w.offset.first + this->rows()))
+              w.ids_scores.emplace_back(ann(j, i), scores(j, i));
+      } else {
+        I.reserve(w.c[0].Ir.size() + w.c[1].Ir.size());
+        for (std::size_t i=0; i<w.c[0].Ir.size(); i++)
           I.push_back(w.c[0].Ir[i]);
-        for (std::size_t i = 0; i < w.c[1].Ir.size(); i++)
+        for (std::size_t i=0; i<w.c[1].Ir.size(); i++)
           I.push_back(w.c[1].Ir[i]);
 
-        std::vector<std::size_t> colids;
-        std::vector<double> colscs;
-        for (std::size_t i = 0; i < w.c[0].Scolids.size(); i++) {
-          if ((w.c[0].Scolids[i] < w.offset.first) ||
-              (w.c[0].Scolids[i] >= w.offset.first + this->rows())) {
-            colids.push_back(w.c[0].Scolids[i]);
-            colscs.push_back(w.c[0].Scolscs[i]);
-          }
-        }
-        for (std::size_t i = 0; i < w.c[1].Scolids.size(); i++) {
-          if ((w.c[1].Scolids[i] < w.offset.first) ||
-              (w.c[1].Scolids[i] >= w.offset.first + this->rows())) {
-            colids.push_back(w.c[1].Scolids[i]);
-            colscs.push_back(w.c[1].Scolscs[i]);
-          }
-        }
-
-        // sort column indices and corresponding scores
-        std::vector<std::size_t> order = find_sort_permutation(colids);
-        colids = apply_permutation(colids, order);
-        colscs = apply_permutation(colscs, order);
-
-        // remove duplicate column indices
-        std::size_t cur = 0;
-        for (std::size_t i = 1; i < colids.size(); i++) {
-          if (colids[i] > colids[i-1]) {
-            cur++;
-            colids[cur] = colids[i];
-            colscs[cur] = colscs[i];
-          } else {
-            // keep the smallest score
-            if (colscs[cur] > colscs[i])
-              colscs[cur] = colscs[i];
-          }
-        }
-        colids.resize(cur+1);
-        colscs.resize(cur+1);
-
-        int d_max = w.c[0].Ir.size() + w.c[1].Ir.size() + opts.dd();
-        if (colids.size() < d_max) {
-            for (std::size_t j = 0; j < colids.size(); j++) {
-              // if we want to add more samples until d, it is here
-              w.Scolids.push_back(colids[j]);
-              w.Scolscs.push_back(colscs[j]);
-            }
-        } else {
-          // sort based on scores
-          std::vector<std::size_t> order = find_sort_permutation(colscs);
-          colids = apply_permutation(colids, order);
-          colscs = apply_permutation(colscs, order);
-          // keep only d closest
-          for (std::size_t j = 0; j < d_max; j++) {
-            w.Scolids.push_back(colids[j]);
-            w.Scolscs.push_back(colscs[j]);
-          }
-        }
-        w.S = DenseM_t(I.size(), w.Scolids.size());
-        Aelem(I, w.Scolids, w.S);
+        for (std::size_t i=0; i<w.c[0].ids_scores.size(); i++)
+          if ((w.c[0].ids_scores[i].first < w.offset.first) ||
+              (w.c[0].ids_scores[i].first >= w.offset.first + this->rows()))
+            w.ids_scores.emplace_back(w.c[0].ids_scores[i]);
+        for (std::size_t i=0; i<w.c[1].ids_scores.size(); i++)
+          if ((w.c[1].ids_scores[i].first < w.offset.first) ||
+              (w.c[1].ids_scores[i].first >= w.offset.first + this->rows()))
+            w.ids_scores.emplace_back(w.c[1].ids_scores[i]);
       }
+
+      // sort on column indices first, then on scores
+      std::sort(w.ids_scores.begin(), w.ids_scores.end());
+
+      // remove duplicate indices, keep only first entry of
+      // duplicates, which is the one with the highest score, because
+      // of the above sort
+      w.ids_scores.erase
+        (std::unique(w.ids_scores.begin(), w.ids_scores.end(),
+                     [](std::pair<std::size_t,double>& a,
+                        std::pair<std::size_t,double>& b) {
+                       return a.first == b.first; }), w.ids_scores.end());
+
+      // maximum number of samples
+      std::size_t d_max = this->leaf() ?
+        I.size() + opts.dd() :   // leaf size + some oversampling
+        w.c[0].Ir.size() + w.c[1].Ir.size() + opts.dd();
+      auto d = std::min(w.ids_scores.size(), d_max);
+
+      std::vector<std::size_t> Scolids;
+      if (d < w.ids_scores.size()) {
+        // sort based on scores, keep only d_max closest
+        std::sort(w.ids_scores.begin(), w.ids_scores.end(),
+                  [](std::pair<std::size_t,double>& a,
+                     std::pair<std::size_t,double>& b) {
+                    return a.second < b.second; });
+        w.ids_scores.resize(d);
+      }
+      Scolids.reserve(d);
+      for (std::size_t j=0; j<d; j++)
+        Scolids.push_back(w.ids_scores[j].first);
+      w.S = DenseM_t(I.size(), Scolids.size());
+      Aelem(I, Scolids, w.S);
     }
 
     template<typename scalar_t> bool
