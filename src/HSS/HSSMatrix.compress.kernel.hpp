@@ -76,9 +76,9 @@ namespace strumpack {
         }
       }
 
-      if (w.lvl == 0) {
+      if (w.lvl == 0)
         this->_U_state = this->_V_state = State::COMPRESSED;
-      } else {
+      else {
         compute_local_samples_ann(ann, scores, w, Aelem, opts);
         compute_U_V_bases_ann(w.S, opts, w, 0);
         this->_U_state = this->_V_state = State::COMPRESSED;

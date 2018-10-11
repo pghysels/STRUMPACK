@@ -183,18 +183,12 @@ namespace strumpack {
       // Sequential code:
       virtual void compress_recursive_ann
       (DenseMatrix<std::size_t>& ann, DenseM_t& scores,
-       const elem_t& Aelem, const opts_t& opts,
-       WorkCompressANN<scalar_t>& w) {}
-      virtual real_t update_orthogonal_basis
-      (DenseM_t& S, int d, int dd, int depth) { return real_t(0.); }
+       const elem_t& Aelem, const opts_t& opts, WorkCompressANN<scalar_t>& w) {}
 
       // MPI code:
       virtual void compress_recursive_ann
-      (DenseMatrix<std::size_t>& ann, DenseM_t& scores, const delem_t& Aelem,
-       WorkCompressMPIANN<scalar_t>& w, int d, int dd, const opts_t& opts) {}
-      virtual real_t update_orthogonal_basis_kernel_MPI
-      (const opts_t& opts, scalar_t& r_max_0, const DistM_t& S,
-       DistM_t& Q, int d, int dd, bool untouched, int L) { return real_t(0.); }
+      (DenseMatrix<std::size_t>& ann, DenseM_t& scores, const delemw_t& Aelem,
+       WorkCompressMPIANN<scalar_t>& w, const opts_t& opts, const BLACSGrid* lg);
       // New functions for kernel compression: end
 
       virtual void compress_recursive_original
@@ -209,13 +203,6 @@ namespace strumpack {
       virtual void compress_level_stable
       (DistSamples<scalar_t>& RS, const opts_t& opts,
        WorkCompressMPI<scalar_t>& w, int d, int dd, int lvl);
-
-      // New functions for kernel compression: start
-      // To switch from distributed compression to sequential compression
-      virtual void compress_recursive_ann
-      (WorkCompressMPIANN<scalar_t>& w_mpi);
-      // Implementation below in this file.
-      // New functions for kernel compression: end
 
       virtual void get_extraction_indices
       (std::vector<std::vector<std::size_t>>& I,
@@ -435,8 +422,23 @@ namespace strumpack {
      */
     template<typename scalar_t> void
     HSSMatrixBase<scalar_t>::compress_recursive_ann
-    (WorkCompressMPIANN<scalar_t>& w_mpi) {
-        std::cout << "switches from distributed compression to sequential\n";
+    (DenseMatrix<std::size_t>& ann, DenseM_t& scores, const delemw_t& Aelem,
+     WorkCompressMPIANN<scalar_t>& w_mpi, const opts_t& opts,
+     const BLACSGrid* lg) {
+      if (!active()) return;
+      std::pair<std::size_t,std::size_t> offset;
+      LocalElemMult<scalar_t> lAelem
+        (Aelem, offset, lg, _Asub);
+      w_mpi.create_sequential();
+      WorkCompressANN<scalar_t>& w = *(w_mpi.w_seq);
+      w.offset = w_mpi.offset;
+      compress_recursive_ann(ann, scores, lAelem, opts, w);
+      w_mpi.S = DistM_t(lg, std::move(w.S));
+      std::swap(w.Ir, w_mpi.Ir);
+      std::swap(w.Ic, w_mpi.Ic);
+      std::swap(w.Jr, w_mpi.Jr);
+      std::swap(w.Jc, w_mpi.Jc);
+      std::swap(w.ids_scores, w_mpi.ids_scores);
     }
 
     /**

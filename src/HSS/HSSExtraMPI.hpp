@@ -63,16 +63,11 @@ namespace strumpack {
     class WorkCompressMPIANN : public WorkCompressBase<scalar_t> {
     public:
       std::vector<WorkCompressMPIANN<scalar_t>> c;
-      // DistributedMatrix<scalar_t> Rr, Rc, Sr, Sc;
-      // DistributedMatrix<scalar_t> Qr, Qc;
-      // int dR = 0, dS = 0;
-      DenseMatrix<scalar_t> S;            // new
-      std::vector<std::size_t> Scolids;   // new
-      std::vector<double> Scolscs;        // new
-      std::unique_ptr<WorkCompress<scalar_t>> w_seq;
+      DistributedMatrix<scalar_t> S;   // new
+      std::vector<std::pair<std::size_t,double>> ids_scores;
+      std::unique_ptr<WorkCompressANN<scalar_t>> w_seq;
 
       void split(const std::pair<std::size_t,std::size_t>& dim) {
-        // std::cout<< "split here";
         if (c.empty()) {
           c.resize(2);
           c[0].offset = this->offset;
@@ -83,8 +78,8 @@ namespace strumpack {
 
       void create_sequential() {
         if (!w_seq)
-          w_seq = std::unique_ptr<WorkCompress<scalar_t>>
-            (new WorkCompress<scalar_t>());
+          w_seq = std::unique_ptr<WorkCompressANN<scalar_t>>
+            (new WorkCompressANN<scalar_t>());
         w_seq->lvl = this->lvl;
       }
     };
