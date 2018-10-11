@@ -230,7 +230,7 @@ int run(int argc, char *argv[]) {
     cout << "finding ANN.. " << endl;
 
   // Find ANN: start ------------------------------------------------
-  int ann_number = 64;
+  int ann_number = 5 * d;
   vector<int> neighbors(n*ann_number, 0);
   vector<double> neighbor_scores(n*ann_number, 0.0);
   int num_iters = 5;
