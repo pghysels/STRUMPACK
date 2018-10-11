@@ -298,8 +298,8 @@ namespace strumpack {
         for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Ic[i] = *ptr++;
         for (int i=0; i<this->_ch[0]->_U_rank; i++) w.c[0].Jr[i] = *ptr++;
         for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Jc[i] = *ptr++;
-        for (int i=0; i<d; i++) w.c[0].ids_scores[i].first = *ptr++;
-        for (int i=0; i<d; i++)
+        for (std::size_t i=0; i<d; i++) w.c[0].ids_scores[i].first = *ptr++;
+        for (std::size_t i=0; i<d; i++)
           w.c[0].ids_scores[i].second = reinterpret_cast<double&>(*ptr++);
         //assert(msgsize == std::distance(buf, ptr));
       }
@@ -332,8 +332,8 @@ namespace strumpack {
         for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Ic[i] = *ptr++;
         for (int i=0; i<this->_ch[1]->_U_rank; i++) w.c[1].Jr[i] = *ptr++;
         for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Jc[i] = *ptr++;
-        for (int i=0; i<d; i++) w.c[1].ids_scores[i].first = *ptr++;
-        for (int i=0; i<d; i++)
+        for (std::size_t i=0; i<d; i++) w.c[1].ids_scores[i].first = *ptr++;
+        for (std::size_t i=0; i<d; i++)
           w.c[1].ids_scores[i].second = reinterpret_cast<double&>(*ptr++);
         //assert(msgsize == std::distance(buf, ptr));
       }
