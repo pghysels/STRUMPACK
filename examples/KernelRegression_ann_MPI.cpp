@@ -166,7 +166,7 @@ int run(int argc, char *argv[]) {
   double total_time = 0.;
   string mode("test");
 
-  if (!mpi_rank())
+  if (c.is_root())
     cout << "# usage: ./KernelRegression file d h kernel(1=Gauss,2=Laplace) "
             "reorder(natural, 2means, kd, pca) lambda"
          << endl;
@@ -185,7 +185,7 @@ int run(int argc, char *argv[]) {
   if (argc > 7)
     mode = string(argv[7]);
 
-  if (!mpi_rank()) {
+  if (c.is_root()) {
     cout << "# data dimension = " << d << endl;
     cout << "# kernel h = " << h << endl;
     cout << "# lambda = " << lambda << endl;
@@ -208,7 +208,7 @@ int run(int argc, char *argv[]) {
 
   int n = data_train.size() / d;
   int m = data_test.size() / d;
-  if (!mpi_rank())
+  if (c.is_root())
     cout << "# matrix size = " << n << " x " << d << endl;
 
   HSSPartitionTree cluster_tree;
@@ -226,8 +226,9 @@ int run(int argc, char *argv[]) {
                   data_train_label.data());
   }
 
-  if (!mpi_rank())
+  if (c.is_root())
     cout << "finding ANN.. " << endl;
+
   // Find ANN: start ------------------------------------------------
   int ann_number = 64;
   vector<int> neighbors(n*ann_number, 0);
@@ -240,7 +241,6 @@ int run(int argc, char *argv[]) {
      neighbors, neighbor_scores, generator);
   // cout << "# ANN time = " << timer.elapsed() << " sec" <<endl;
 
-
   DenseMatrix<std::size_t> ann(ann_number, n);
   for (int i=0; i<ann_number; i++)
     for (int j=0; j<n; j++)
@@ -251,135 +251,118 @@ int run(int argc, char *argv[]) {
     (ann_number, n, &neighbor_scores[0], ann_number);
   // Find ANN: end ------------------------------------------------
 
-  if (!mpi_rank())
+  if (c.is_root())
     cout << "starting HSS compression .. " << endl;
 
-  HSSMatrixMPI<double> *K = nullptr;
-
+  HSSMatrixMPI<double> K;
   TaskTimer::t_begin = GET_TIME_NOW();
   TaskTimer timer(string("compression"), 1);
   timer.start();
   KernelMPI kernel_matrix(data_train, d, h, lambda);
-
   // Constructor for ANN compression
   if (reorder != "natural")
-    K = new HSSMatrixMPI<double>
+    K = HSSMatrixMPI<double>
       (cluster_tree, &grid, ann, scores, kernel_matrix, hss_opts);
   else
-    K = new HSSMatrixMPI<double>
+    K = HSSMatrixMPI<double>
       (n, n, &grid, ann, scores, kernel_matrix, hss_opts);
-
-  if (!mpi_rank())
+  if (c.is_root())
     cout << "# compression time = " << timer.elapsed() << endl;
   total_time += timer.elapsed();
 
-  if (K->is_compressed()) {
+  if (K.is_compressed()) {
     // reduction over all processors
-    const auto max_rank = K->max_rank();
-    const auto total_memory = K->total_memory();
-    if (!mpi_rank())
+    const auto max_rank = K.max_rank();
+    const auto total_memory = K.total_memory();
+    if (c.is_root())
       cout << "# created K matrix of dimension "
-           << K->rows() << " x " << K->cols()
-           << " with " << K->levels() << " levels" << endl
+           << K.rows() << " x " << K.cols()
+           << " with " << K.levels() << " levels" << endl
            << "# compression succeeded!" << endl
            << "# rank(K) = " << max_rank << endl
            << "# memory(K) = " << total_memory / 1e6 << " MB " << endl;
   }
   else {
-    if (!mpi_rank())
+    if (c.is_root())
       cout << "# compression failed!!!!!!!!" << endl;
     return 1;
   }
 
-  if (!mpi_rank())
+  if (c.is_root())
     cout << "factorization start" << endl;
 
   timer.start();
-  auto ULV = K->factor();
-  if (!mpi_rank())
+  auto ULV = K.factor();
+  if (c.is_root())
     cout << "# factorization time = " << timer.elapsed() << endl;
   total_time += timer.elapsed();
 
   DenseMatrix<double> B;
-  DenseMatrix<double> weights;
-  if (!mpi_rank()){
-    B       = DenseMatrix<double>(n, 1, &data_train_label[0], n);
-    weights = DenseMatrix<double>(n, 1, &data_train_label[0], n);
-  }
-
-  DistributedMatrix<double> Bdist(&grid, n, 1);
   DistributedMatrix<double> wdist(&grid, n, 1);
-  Bdist.scatter(B);
-  Bdist.scatter(weights);
+  if (c.is_root())
+    B = DenseMatrix<double>(n, 1, &data_train_label[0], n);
+  wdist.scatter(B);
 
-  if (!mpi_rank())
+  if (c.is_root())
     cout << "solution start" << endl;
   timer.start();
-  K->solve(ULV, wdist);
-  if (!mpi_rank())
+  K.solve(ULV, wdist);
+  if (c.is_root())
     cout << "# solve time = " << timer.elapsed() << endl;
   total_time += timer.elapsed();
-  if (!mpi_rank())
+  if (c.is_root())
     cout << "# total time: " << total_time << endl;
 
+  auto weights = wdist.gather();
+
   //// ----- Error checking with dense matrix: start ----- ////
-
-  // Build dense matrix out o HSS matrix
-  auto KtestD = K->dense();
-  auto Ktest = KtestD.gather(); // Gather matrix to rank 0
-
-  if (!mpi_rank()){
-    // Build dense matrix to test error
-    DenseMatrix<double> Kdense(n, n);
-    if (kernel == 1) {
-      for (int c=0; c<n; c++)
-        for (int r=0; r<n; r++){
-          Kdense(r, c) = Gauss_kernel(&data_train[r*d], &data_train[c*d], d, h);
-          if (r == c) {
-            Kdense(r, c) = Kdense(r, c) + lambda;
-          }
+  if (n <= 1000) {
+    // Build dense matrix out of HSS matrix
+    auto KtestD = K.dense();
+    auto Ktest = KtestD.gather(); // Gather matrix to rank 0
+    if (c.is_root()) {
+      // Build dense matrix to test error
+      DenseMatrix<double> Kdense(n, n);
+      if (kernel == 1) {
+        for (int c=0; c<n; c++) {
+          for (int r=0; r<n; r++)
+            Kdense(r, c) = Gauss_kernel
+              (&data_train[r*d], &data_train[c*d], d, h);
+          Kdense(c, c) += lambda;
         }
-    }
-    else {
-      for (int c=0; c<n; c++)
-      for (int r=0; r<n; r++){
-        Kdense(r, c) = Laplace_kernel(&data_train[r*d], &data_train[c*d], d, h);
-        if (r == c) {
-          Kdense(r, c) = Kdense(r, c) + lambda;
+      } else {
+        for (int c=0; c<n; c++) {
+          for (int r=0; r<n; r++)
+            Kdense(r, c) = Laplace_kernel
+              (&data_train[r*d], &data_train[c*d], d, h);
+          Kdense(c, c) += lambda;
         }
       }
+      Ktest.scaled_add(-1., Kdense);
+      cout << "# compression error = ||Kdense-K*I||_F/||Kdense||_F = "
+           << Ktest.normF() / Kdense.normF() << endl;
     }
-
-    Ktest.scaled_add(-1., Kdense);
-    cout << "# compression error = ||Kdense-K*I||_F/||Kdense||_F = "
-        << Ktest.normF() / Kdense.normF() << endl;
   }
   //// ----- Error checking with dense matrix: end ----- ////
 
   // Computing prediction accuracy on root rank
-  if (!mpi_rank()){
-
-    double* prediction = new double[m];
-    std::fill(prediction, prediction+m, 0.); // Fill with "iterator"
-
+  if (c.is_root()) {
+    std::vector<double> prediction(m);
     if (kernel == 1) {
-      for (int c = 0; c < m; c++) {
+      for (int c = 0; c < m; c++)
         for (int r = 0; r < n; r++) {
           prediction[c] +=
             Gauss_kernel(&data_train[r * d], &data_test[c * d], d, h) *
             weights(r, 0);
         }
-      }
     } else {
-      for (int c = 0; c < m; c++) {
+      for (int c = 0; c < m; c++)
         for (int r = 0; r < n; r++) {
           prediction[c] +=
             Laplace_kernel(&data_train[r * d], &data_test[c * d], d, h) *
             weights(r, 0);
         }
-      }
     }
-
     for (int i = 0; i < m; ++i)
       prediction[i] = ((prediction[i] > 0) ? 1. : -1.);
 
@@ -389,13 +372,11 @@ int run(int argc, char *argv[]) {
       double a = (prediction[i] - data_test_label[i]) / 2;
       incorrect_quant += (a > 0 ? a : -a);
     }
-    if (!mpi_rank())
-      cout << "# prediction score: " << ((m - incorrect_quant) / m) * 100 << "%"
-          << endl << endl;
-
-    delete [] prediction;
+    if (c.is_root())
+      cout << "# prediction score: "
+           << ((m - incorrect_quant) / m) * 100 << "%"
+           << endl << endl;
   }
-
   return 0;
 }
 

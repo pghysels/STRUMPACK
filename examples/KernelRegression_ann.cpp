@@ -267,7 +267,7 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  cout << "# HSS matrix is "<< 100. * K.memory() /  Kdense.memory() 
+  cout << "# HSS matrix is "<< 100. * K.memory() /  Kdense.memory()
        << "% of dense" << endl;
 
   auto Ktest = K.dense();
@@ -296,9 +296,8 @@ int main(int argc, char *argv[]) {
     sample_vector[i] = normal_distr(generator);
   }
   double sample_norm = norm(&sample_vector[0], n);
-  for (int i = 0; i < n; i++) {
+  for (int i = 0; i < n; i++)
     sample_vector[i] /= sample_norm;
-  }
 
   DenseMatrixWrapper<double> sample_v(n, 1, &sample_vector[0], n);
   DenseMatrix<double> sample_rhs(n, 1);
@@ -312,11 +311,7 @@ int main(int argc, char *argv[]) {
   // Prediction: start-----------------------------------
   cout << endl << "# Prediction start..." << endl;
   timer.start();
-  double *prediction = new double[m];
-  for (int i = 0; i < m; ++i) {
-    prediction[i] = 0;
-  }
-
+  std::vector<double> prediction(m);
   if (kernel == 1) {
     for (int c = 0; c < m; c++)
       for (int r = 0; r < n; r++)
@@ -331,9 +326,8 @@ int main(int argc, char *argv[]) {
             weights(r, 0);
   }
 
-  for (int i = 0; i < m; ++i) {
+  for (int i = 0; i < m; ++i)
     prediction[i] = ((prediction[i] > 0) ? 1. : -1.);
-  }
 
   // compute accuracy score of prediction
   double incorrect_quant = 0;
