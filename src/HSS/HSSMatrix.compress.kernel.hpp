@@ -40,13 +40,16 @@ namespace strumpack {
      const elem_t& Aelem, const opts_t& opts) {
       std::cout << "---> USING COMPRESS_ANN <---" << std::endl;
       WorkCompressANN<scalar_t> w;
-      compress_recursive_ann(ann, scores, Aelem, opts, w);
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+      compress_recursive_ann
+        (ann, scores, Aelem, opts, w, this->_openmp_task_depth);
     }
 
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::compress_recursive_ann
     (DenseMatrix<std::size_t>& ann, DenseM_t& scores, const elem_t& Aelem,
-     const opts_t& opts, WorkCompressANN<scalar_t>& w) {
+     const opts_t& opts, WorkCompressANN<scalar_t>& w, int depth) {
       if (this->leaf()) {
         if (this->is_untouched()) {
           std::vector<std::size_t> I, J;
@@ -61,10 +64,23 @@ namespace strumpack {
         }
       } else {
         w.split(this->_ch[0]->dims());
-        this->_ch[0]->compress_recursive_ann
-          (ann, scores, Aelem, opts, w.c[0]);
-        this->_ch[1]->compress_recursive_ann
-          (ann, scores, Aelem, opts, w.c[1]);
+        bool tasked = depth < params::task_recursion_cutoff_level;
+        if (tasked) {
+#pragma omp task default(shared)                                        \
+  final(depth >= params::task_recursion_cutoff_level-1) mergeable
+          this->_ch[0]->compress_recursive_ann
+            (ann, scores, Aelem, opts, w.c[0], depth+1);
+#pragma omp task default(shared)                                        \
+  final(depth >= params::task_recursion_cutoff_level-1) mergeable
+          this->_ch[1]->compress_recursive_ann
+            (ann, scores, Aelem, opts, w.c[1], depth+1);
+#pragma omp taskwait
+        } else {
+          this->_ch[0]->compress_recursive_ann
+            (ann, scores, Aelem, opts, w.c[0], depth);
+          this->_ch[1]->compress_recursive_ann
+            (ann, scores, Aelem, opts, w.c[1], depth);
+        }
         if (!this->_ch[0]->is_compressed() ||
             !this->_ch[1]->is_compressed())
           return;
@@ -75,17 +91,15 @@ namespace strumpack {
           Aelem(w.c[1].Ir, w.c[0].Ic, _B10);
         }
       }
-
       if (w.lvl == 0)
         this->_U_state = this->_V_state = State::COMPRESSED;
       else {
         compute_local_samples_ann(ann, scores, w, Aelem, opts);
-        compute_U_V_bases_ann(w.S, opts, w, 0);
+        compute_U_V_bases_ann(w.S, opts, w, depth);
         this->_U_state = this->_V_state = State::COMPRESSED;
       }
     }
 
-    //NEW Main routine to change
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::compute_local_samples_ann
     (DenseMatrix<std::size_t>& ann, DenseM_t& scores,

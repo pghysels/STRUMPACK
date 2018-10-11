@@ -379,7 +379,7 @@ namespace strumpack {
       void compress_recursive_ann
       (DenseMatrix<std::size_t>& ann, DenseM_t&  scores,
        const elem_t& Aelem, const opts_t& opts,
-       WorkCompressANN<scalar_t>& w) override;
+       WorkCompressANN<scalar_t>& w, int depth) override;
       void compute_local_samples_ann
       (DenseMatrix<std::size_t>& ann, DenseM_t& scores,
        WorkCompressANN<scalar_t>& w, const elem_t& Aelem, const opts_t& opts);

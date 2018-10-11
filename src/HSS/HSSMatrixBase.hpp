@@ -183,7 +183,8 @@ namespace strumpack {
       // Sequential code:
       virtual void compress_recursive_ann
       (DenseMatrix<std::size_t>& ann, DenseM_t& scores,
-       const elem_t& Aelem, const opts_t& opts, WorkCompressANN<scalar_t>& w) {}
+       const elem_t& Aelem, const opts_t& opts,
+       WorkCompressANN<scalar_t>& w, int depth) {}
 
       // MPI code:
       virtual void compress_recursive_ann
@@ -432,7 +433,10 @@ namespace strumpack {
       w_mpi.create_sequential();
       WorkCompressANN<scalar_t>& w = *(w_mpi.w_seq);
       w.offset = w_mpi.offset;
-      compress_recursive_ann(ann, scores, lAelem, opts, w);
+#pragma omp parallel
+#pragma omp single nowait
+      compress_recursive_ann
+        (ann, scores, lAelem, opts, w, _openmp_task_depth);
       w_mpi.S = DistM_t(lg, std::move(w.S));
       std::swap(w.Ir, w_mpi.Ir);
       std::swap(w.Ic, w_mpi.Ic);
