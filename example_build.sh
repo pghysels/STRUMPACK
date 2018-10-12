@@ -16,27 +16,44 @@ if [[ $NERSC_HOST = "cori" ]]; then
     # Intel compiler
     #  separate arguments with ;, the -Wl,--start-group ... -Wl,--end-group is a single argument
     ScaLAPACKLIBS="${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a;-Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_intel_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_blacs_intelmpi_lp64.a -Wl,--end-group;-liomp5;-lpthread;-lm;-ldl"
+
     # GNU compiler
-    #ScaLAPACKLIBS="${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a;-Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_gnu_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_blacs_intelmpi_lp64.a -Wl,--end-group;-lgomp;-lpthread;-lm;-ldl"
+    # ScaLAPACKLIBS="${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a;-Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_gnu_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_blacs_intelmpi_lp64.a -Wl,--end-group;-lgomp;-lpthread;-lm;-ldl"
     #ScaLAPACKLIBS=""  # use this when using libsci, (module cray-libsci loaded)
 
-    COMBBLASHOME=/global/homes/p/pghysels/cori/CombBLAS_beta_16_1/build/
+    COMBBLASHOME=/global/homes/p/pghysels/cori/CombBLAS_beta_16_1/
+    COMBBLASBUILD=/global/homes/p/pghysels/cori/CombBLAS_beta_16_1/build/
+    PARMETISHOME=$HOME/local/cori/parmetis-4.0.3/
+    SCOTCHHOME=$HOME/local/cori/scotch_6.0.4/
+    SLATEHOME=$HOME/local/cori/slate/
+
     cmake ../ \
-          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_BUILD_TYPE=Debug \
           -DCMAKE_INSTALL_PREFIX=../install \
           -DCMAKE_CXX_COMPILER=CC \
           -DCMAKE_C_COMPILER=cc \
           -DCMAKE_Fortran_COMPILER=ftn \
+          -DSTRUMPACK_USE_OPENMP=ON \
           -DCMAKE_EXE_LINKER_FLAGS="-dynamic" \
-          -DSTRUMPACK_C_INTERFACE=ON \
           -DTPL_BLAS_LIBRARIES="" \
           -DTPL_LAPACK_LIBRARIES="" \
           -DTPL_SCALAPACK_LIBRARIES="$ScaLAPACKLIBS" \
-          -DTPL_METIS_INCLUDE_DIRS=$HOME/local/cori/parmetis-4.0.3/metis/include \
-          -DTPL_METIS_LIBRARIES=$HOME/local/cori/parmetis-4.0.3/build/Linux-x86_64/libmetis/libmetis.a \
-          -DTPL_ENABLE_COMBBLAS=ON \
-          -DCOMBBLAS_INCLUDE_DIRS=/global/homes/p/pghysels/cori/CombBLAS_beta_16_1/ \
-          -DCOMBBLAS_LIBRARIES="$COMBBLASHOME/libCommGridlib.a;$COMBBLASHOME/libHashlib.a;$COMBBLASHOME/libMemoryPoollib.a;$COMBBLASHOME/libmmiolib.a;$COMBBLASHOME/libMPIOplib.a;$COMBBLASHOME/libMPITypelib.a"
+          -DSTRUMPACK_DEV_TESTING=OFF \
+          -DSTRUMPACK_BUILD_TESTS=ON \
+          -DSTRUMPACK_C_INTERFACE=OFF \
+          -DSTRUMPACK_COUNT_FLOPS=ON \
+          -DSTRUMPACK_TASK_TIMERS=OFF \
+          -DTPL_METIS_INCLUDE_DIRS=$PARMETISHOME/metis/include \
+          -DTPL_METIS_LIBRARIES=$PARMETISHOME/build/Linux-x86_64/libmetis/libmetis.a \
+          -DTPL_ENABLE_COMBBLAS=OFF \
+          -DTPL_COMBBLAS_INCLUDE_DIRS=$COMBBLASHOME \
+          -DTPL_COMBBLAS_LIBRARIES="$COMBBLASBUILD/libCommGridlib.a;$COMBBLASBUILD/libHashlib.a;$COMBBLASBUILD/libMemoryPoollib.a;$COMBBLASBUILD/libmmiolib.a;$COMBBLASBUILD/libMPIOplib.a;$COMBBLASBUILD/libMPITypelib.a" \
+          -DTPL_ENABLE_PARMETIS=ON \
+          -DTPL_PARMETIS_INCLUDE_DIRS=$PARMETISHOME/include \
+          -DTPL_PARMETIS_LIBRARIES=$PARMETISHOME/build/Linux-x86_64/libparmetis/libparmetis.a \
+          -DTPL_ENABLE_SCOTCH=ON \
+          -DTPL_SCOTCH_INCLUDE_DIRS=$SCOTCHHOME/include \
+          -DTPL_SCOTCH_LIBRARIES="$SCOTCHHOME/lib/libscotch.a;$SCOTCHHOME/lib/libscotcherr.a;$SCOTCHHOME/lib/libptscotch.a;$SCOTCHHOME/lib/libptscotcherr.a"
 fi
 
 if [[ $(hostname -s) = "xps13" ]]; then
