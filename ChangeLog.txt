@@ -1,5 +1,9 @@
-Version 3.0.4 ...
-======================================
+Version 3.1.0 Released October ..., 2018
+========================================
+ - Changes to the build system for xSDK compliance.
+   Third party packages are now enabled using -DTPL_ENABLE_<package>=ON,
+   and libraries and includes specified as
+   -DTPL_<package>_INCLUDE_DIRS=.. -DTPL_<package>_LIBRARIES=..
  - Always generate position independent code.
  - Suppress many warnings when using clang.
  - Fix possible memory leak.
