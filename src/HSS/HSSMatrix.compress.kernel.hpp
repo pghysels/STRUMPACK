@@ -142,8 +142,8 @@ namespace strumpack {
       // of the above sort
       w.ids_scores.erase
         (std::unique(w.ids_scores.begin(), w.ids_scores.end(),
-                     [](std::pair<std::size_t,double>& a,
-                        std::pair<std::size_t,double>& b) {
+                     [](const std::pair<std::size_t,double>& a,
+                        const std::pair<std::size_t,double>& b) {
                        return a.first == b.first; }), w.ids_scores.end());
 
       // maximum number of samples
@@ -156,8 +156,8 @@ namespace strumpack {
       if (d < w.ids_scores.size()) {
         // sort based on scores, keep only d_max closest
         std::sort(w.ids_scores.begin(), w.ids_scores.end(),
-                  [](std::pair<std::size_t,double>& a,
-                     std::pair<std::size_t,double>& b) {
+                  [](const std::pair<std::size_t,double>& a,
+                     const std::pair<std::size_t,double>& b) {
                     return a.second < b.second; });
         w.ids_scores.resize(d);
       }
