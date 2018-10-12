@@ -226,51 +226,48 @@ int run(int argc, char *argv[]) {
                   data_train_label.data());
   }
 
-  TaskTimer::t_begin = GET_TIME_NOW();
-  TaskTimer timer(string("compression"), 1);
-
-  if (c.is_root())
-    cout << "finding ANN.. " << endl;
+  // if (c.is_root())
+  //   cout << "finding ANN.. " << endl;
 
   // Find ANN: start ------------------------------------------------
-  int ann_number = 5 * d;
-  vector<int> neighbors(n*ann_number, 0);
-  vector<double> neighbor_scores(n*ann_number, 0.0);
-  int num_iters = 5;
+  // int ann_number = 5 * d;
+  // vector<int> neighbors(n*ann_number, 0);
+  // vector<double> neighbor_scores(n*ann_number, 0.0);
+  // int num_iters = 5;
 
-  timer.start();
-  find_approximate_neighbors
-    (data_train, n, d, num_iters, ann_number,
-     neighbors, neighbor_scores, generator);
+  // // timer.start();
+  // find_approximate_neighbors
+  //   (data_train, n, d, num_iters, ann_number,
+  //    neighbors, neighbor_scores, generator);
+  // // cout << "# ANN time = " << timer.elapsed() << " sec" <<endl;
 
-  if (c.is_root()){
-    cout << "# ANN time = " << timer.elapsed() << " sec" <<endl;
-    total_time += timer.elapsed();
-  }
+  // DenseMatrix<std::size_t> ann(ann_number, n);
+  // for (int i=0; i<ann_number; i++)
+  //   for (int j=0; j<n; j++)
+  //     ann(i, j) = std::size_t(neighbors[i+j*ann_number]);
 
-  DenseMatrix<std::size_t> ann(ann_number, n);
-  for (int i=0; i<ann_number; i++)
-    for (int j=0; j<n; j++)
-      ann(i, j) = std::size_t(neighbors[i+j*ann_number]);
-
-  // Distances to closest neighbors, sorted in ascending order
-  DenseMatrixWrapper<double> scores
-    (ann_number, n, &neighbor_scores[0], ann_number);
+  // // Distances to closest neighbors, sorted in ascending order
+  // DenseMatrixWrapper<double> scores
+  //   (ann_number, n, &neighbor_scores[0], ann_number);
   // Find ANN: end ------------------------------------------------
 
   if (c.is_root())
     cout << "starting HSS compression .. " << endl;
 
   HSSMatrixMPI<double> K;
+  TaskTimer::t_begin = GET_TIME_NOW();
+  TaskTimer timer(string("compression"), 1);
   timer.start();
   KernelMPI kernel_matrix(data_train, d, h, lambda);
+  
   // Constructor for ANN compression
   if (reorder != "natural")
     K = HSSMatrixMPI<double>
-      (cluster_tree, &grid, ann, scores, kernel_matrix, hss_opts);
+      (cluster_tree, &grid, kernel_matrix, kernel_matrix, hss_opts);
   else
     K = HSSMatrixMPI<double>
-      (n, n, &grid, ann, scores, kernel_matrix, hss_opts);
+      (n, n, &grid, kernel_matrix, kernel_matrix, hss_opts);
+
   if (c.is_root())
     cout << "# compression time = " << timer.elapsed() << endl;
   total_time += timer.elapsed();

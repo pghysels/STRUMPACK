@@ -34,13 +34,19 @@ sh /Users/gichavez/Documents/Github/code_strann/gcbuild.sh r
 
 # # Sequential
 # EXEC="/Users/gichavez/Documents/Github/code_strann/build/examples/KernelRegression_ann"
-# time ${EXEC} ${DATA} ${dim} ${hval} ${lval} ${kernel} natural test \
-#       --hss_rel_tol=${RTOL} --hss_leaf_size=64 --hss_max_rank=2000 \
-#       --hss_dd=${DD} --hss_verbose
+#  time ${EXEC} ${DATA} ${dim} ${hval} ${lval} ${kernel} natural test \
+#        --hss_rel_tol=${RTOL} --hss_leaf_size=64 --hss_max_rank=2000 \
+#        --hss_dd=${DD} --hss_verbose
 
 # # Distributed
-EXEC="/Users/gichavez/Documents/Github/code_strann/build/examples/KernelRegression_ann_MPI"
+EXEC="/Users/gichavez/Documents/Github/code_strann/build/examples/KernelRegression_rs_MPI"
+echo ${EXEC}
 time mpirun -n 4 ${EXEC} ${DATA} ${dim} ${hval} ${lval} ${kernel} natural test \
-      --hss_rel_tol=${RTOL} --hss_leaf_size=64 --hss_max_rank=2000 \
-      --hss_dd=${DD} --hss_verbose
+     --hss_rel_tol=${RTOL} --hss_leaf_size=64 --hss_max_rank=2000 \
+     --hss_dd=${DD} --hss_verbose
 
+EXEC="/Users/gichavez/Documents/Github/code_strann/build/examples/KernelRegression_ann_MPI"
+echo ${EXEC}
+time mpirun -n 4 ${EXEC} ${DATA} ${dim} ${hval} ${lval} ${kernel} natural test \
+     --hss_rel_tol=${RTOL} --hss_leaf_size=64 --hss_max_rank=2000 \
+     --hss_dd=${DD} --hss_verbose
