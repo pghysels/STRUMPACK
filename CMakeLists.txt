@@ -21,7 +21,7 @@ option(STRUMPACK_C_INTERFACE "Build the C interface" ON)
 
 ######################################################################
 # IDEAS: xSDK standards module
-set(USE_XSDK_DEFAULTS TRUE)
+set(USE_XSDK_DEFAULTS FALSE)
 set(XSDK_ENABLE_CXX ON)
 set(XSDK_ENABLE_C ON)
 set(XSDK_ENABLE_Fortran ON)
@@ -39,8 +39,8 @@ if(NOT STRUMPACK_USE_MPI)
 endif()
 
 set(STRUMPACK_VERSION_MAJOR 3)
-set(STRUMPACK_VERSION_MINOR 0)
-set(STRUMPACK_VERSION_PATCH 4)
+set(STRUMPACK_VERSION_MINOR 1)
+set(STRUMPACK_VERSION_PATCH 0)
 set(STRUMPACK_VERSION_FULL
   "${STRUMPACK_VERSION_MAJOR}.${STRUMPACK_VERSION_MINOR}")
 
@@ -64,7 +64,7 @@ elseif(COMPILER_SUPPORTS_CXX0X)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
 endif()
 
-if (STRUMPACK_USE_MPI)
+if(STRUMPACK_USE_MPI)
   find_package(MPI REQUIRED)
   if(MPI_C_FOUND)
     message(STATUS "Found C mpi compiler:       " "${MPI_C_COMPILER}")
@@ -98,7 +98,7 @@ FortranCInterface_HEADER(${PROJECT_BINARY_DIR}/StrumpackFortranCInterface.h
 include_directories(${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/src)
 FortranCInterface_VERIFY(CXX)
 
-if(TPL_ENABLE_OPENMP)
+if(STRUMPACK_USE_OPENMP)
   include(FindOpenMP)
   if(OPENMP_FOUND)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
@@ -106,14 +106,17 @@ if(TPL_ENABLE_OPENMP)
     set(CMAKE_EXE_LINKER_FLAGS
       "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
     message(STATUS "OpenMP specification date: " "${OpenMP_CXX_SPEC_DATE}")
-    if(OpenMP_CXX_SPEC_DATE VERSION_GREATER_EQUAL 201511)
-      message(STATUS "Compiler claims to support OpenMP 4.5")
-      # if(OpenMP_CXX_SPEC_DATE VERSION_GREATER_EQUAL 201307)
-      #   message(STATUS "Compiler claims to support OpenMP 4.0")
-      message(STATUS "Checking OpenMP task dependencies/priorities")
-      set(CMAKE_REQUIRED_FLAGS "${CMAKE_CXX_FLAGS}")
-      check_cxx_source_compiles(
-        "#include <iostream>
+    if(DEFINED OpenMP_CXX_SPEC_DATE)
+      if(OpenMP_CXX_SPEC_DATE VERSION_GREATER_EQUAL 201511)
+        message(STATUS "Compiler claims to support OpenMP 4.5")
+      elseif(OpenMP_CXX_SPEC_DATE VERSION_GREATER_EQUAL 201307)
+        message(STATUS "Compiler claims to support OpenMP 4.0")
+      endif()
+    endif()
+    message(STATUS "Checking OpenMP task dependencies/priorities")
+    set(CMAKE_REQUIRED_FLAGS "${CMAKE_CXX_FLAGS}")
+    check_cxx_source_compiles(
+      "#include <iostream>
 int main() {
 int x=0, y=5;
 #pragma omp parallel
@@ -126,20 +129,17 @@ int x=0, y=5;
 }
 return 0;
 }" STRUMPACK_USE_OPENMP_TASK_DEPEND)
-      if (STRUMPACK_USE_OPENMP_TASK_DEPEND)
-        message(STATUS "Enabling OpenMP task dependencies/priorities.")
-      else()
-        message(STATUS
-          "Failed to compile code with OpenMP task dependencies/priorities."
-          " STRUMPACK will not use OpenMP tasks with dependencies/priorities.")
-      endif()
-      # endif()
-      # if(OpenMP_CXX_SPEC_DATE VERSION_GREATER_EQUAL 201511)
-      #   message(STATUS "Compiler claims to support OpenMP 4.5")
-      message(STATUS "Checking OpenMP taskloop")
-      set(CMAKE_REQUIRED_FLAGS "${CMAKE_CXX_FLAGS}")
-      check_cxx_source_compiles(
-        "#include <iostream>
+    if(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+      message(STATUS "Enabling OpenMP task dependencies/priorities.")
+    else()
+      message(STATUS
+        "Failed to compile code with OpenMP task dependencies/priorities."
+        " STRUMPACK will not use OpenMP tasks with dependencies/priorities.")
+    endif()
+    message(STATUS "Checking OpenMP taskloop")
+    set(CMAKE_REQUIRED_FLAGS "${CMAKE_CXX_FLAGS}")
+    check_cxx_source_compiles(
+      "#include <iostream>
 int main() {
 #pragma omp parallel
 #pragma omp single
@@ -147,13 +147,12 @@ int main() {
 for (int i=0; i<100; i++) std::cout << \"hello\" << std::endl;
 return 0;
 }" STRUMPACK_USE_OPENMP_TASKLOOP)
-      if (STRUMPACK_USE_OPENMP_TASKLOOP)
-        message(STATUS "Enabling OpenMP taskloop construct")
-      else()
-        message(STATUS
-          "Failed to compile code with OpenMP taskloop."
-          " STRUMPACK will not use OpenMP taskloops.")
-      endif()
+    if(STRUMPACK_USE_OPENMP_TASKLOOP)
+      message(STATUS "Enabling OpenMP taskloop construct")
+    else()
+      message(STATUS
+        "Failed to compile code with OpenMP taskloop."
+        " STRUMPACK will not use OpenMP taskloops.")
     endif()
   else()
     message(WARNING "WARNING: Could not detect OpenMP compiler
@@ -163,7 +162,7 @@ else()
   message(STATUS "Building STRUMPACK without OpenMP support.")
   check_cxx_compiler_flag("-Wno-unknown-pragmas"
     COMPILER_SUPPORTS_NOPRAGMA_WARNING)
-  if (COMPILER_SUPPORTS_NOPRAGMA_WARNING)
+  if(COMPILER_SUPPORTS_NOPRAGMA_WARNING)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unknown-pragmas")
   endif()
 endif()
@@ -234,7 +233,7 @@ endif()
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
   "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
-if (STRUMPACK_USE_MPI)
+if(STRUMPACK_USE_MPI)
   if(DEFINED TPL_SCALAPACK_LIBRARIES)
     set(LIBS ${LIBS} ${TPL_SCALAPACK_LIBRARIES})
     # include_directories(${TPL_SCALAPACK_INCLUDE_DIRS})
@@ -268,7 +267,7 @@ else()
   message(STATUS "Building STRUMPACK without PAPI support.")
 endif()
 
-if (STRUMPACK_USE_MPI)
+if(STRUMPACK_USE_MPI)
   if(TPL_ENABLE_COMBBLAS)
     option(STRUMPACK_USE_COMBBLAS "" ON)
     set(LIBS ${LIBS} ${TPL_COMBBLAS_LIBRARIES})
