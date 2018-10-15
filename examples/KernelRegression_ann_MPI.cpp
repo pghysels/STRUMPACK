@@ -1,27 +1,29 @@
 /*
- * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The Regents of
- * the University of California, through Lawrence Berkeley National Laboratory
- * (subject to receipt of any required approvals from the U.S. Dept. of Energy).
- * All rights reserved.
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
  *
- * If you have questions about your rights to use or distribute this software,
- * please contact Berkeley Lab's Technology Transfer Department at TTD@lbl.gov.
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
  *
- * NOTICE. This software is owned by the U.S. Department of Energy. As such, the
- * U.S. Government has been granted for itself and others acting on its behalf a
- * paid-up, nonexclusive, irrevocable, worldwide license in the Software to
- * reproduce, prepare derivative works, and perform publicly and display
- * publicly. Beginning five (5) years after the date permission to assert
- * copyright is obtained from the U.S. Department of Energy, and subject to any
- * subsequent five (5) year renewals, the U.S. Government is granted for itself
- * and others acting on its behalf a paid-up, nonexclusive, irrevocable,
- * worldwide license in the Software to reproduce, prepare derivative works,
- * distribute copies to the public, perform publicly and display publicly, and
- * to permit others to do so.
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly. Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government is granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
  *
  * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
  *             (Lawrence Berkeley National Lab, Computational Research
- * Division).
+ *             Division).
  *
  */
 #include <cmath>
@@ -33,11 +35,12 @@
 #include <vector>
 #include <fstream>
 
+#include "clustering/KMeans.hpp"
+#include "clustering/NeighborSearch.hpp"
 #include "HSS/HSSMatrix.hpp"
 #include "misc/TaskTimer.hpp"
 #include "FileManipulation.h"
 #include "preprocessing.h"
-#include "find_ann.h"
 #include "dense/DistributedMatrix.hpp"
 
 using namespace std;
@@ -54,103 +57,38 @@ class KernelMPI {
   using DistMW_t = DistributedMatrixWrapper<double>;
 
 public:
-  vector<double> _data;
-  int _d = 0;
-  int _n = 0;
-  double _h = 0.;
-  double _l = 0.;
+  vector<double> data_;
+  size_t d_ = 0;
+  size_t n_ = 0;
+  double h_ = 0.;
+  double l_ = 0.;
   KernelMPI() = default;
 
   KernelMPI(vector<double> data, int d, double h, double l)
-  : _data(std::move(data)), _d(d), _n(_data.size() / _d), _h(h), _l(l) {
-    assert(_n * _d == _data.size());
+    : data_(std::move(data)), d_(d), n_(data_.size() / d_), h_(h), l_(l) {
+    assert(n_ * d_ == data_.size());
   }
 
-  void operator()(const vector<size_t> &I, const vector<size_t> &J,
-  DistM_t &B) {
-    if (!B.active())
-      return;
+  /**
+   * Compute selected elements {I,J} of the kernel matrix,
+   * and put them in matrix B.
+   */
+  void operator()
+  (const vector<size_t>& I, const vector<size_t>& J, DistM_t& B) {
+    if (!B.active()) return;
     assert(I.size() == B.rows() && J.size() == B.cols());
-    for (size_t j = 0; j < J.size(); j++)
-    {
-      if (B.colg2p(j) != B.pcol())
-        continue;
-      for (size_t i = 0; i < I.size(); i++)
-      {
-        if (B.rowg2p(i) == B.prow())
-        {
+    for (size_t j=0; j<J.size(); j++) {
+      if (B.colg2p(j) != B.pcol()) continue;
+      for (size_t i=0; i<I.size(); i++) {
+        if (B.rowg2p(i) == B.prow()) {
           assert(B.is_local(i, j));
-          B.global(i, j) = Gauss_kernel(&_data[I[i] * _d], &_data[J[j] * _d], _d, _h);
-          if (I[i] == J[j])
-            B.global(i, j) += _l;
+          B.global(i, j) = Gauss_kernel
+            (&data_[I[i]*d_], &data_[J[j]*d_], d_, h_);
+          if (I[i] == J[j]) B.global(i, j) += l_;
         }
       }
     }
   }
-
-  void times(DenseM_t &R, DistM_t &S, int Rprow) {
-    const auto B = S.MB();
-    const auto Bc = S.lcols();
-    DenseM_t Asub(B, B);
-    #pragma omp parallel for firstprivate(Asub) schedule(dynamic)
-    for (int lr = 0; lr < S.lrows(); lr += B)
-    {
-      const int Br = std::min(B, S.lrows() - lr);
-      const int Ar = S.rowl2g(lr);
-      for (int k = 0, Ac = Rprow * B; Ac < _n; k += B)
-      {
-        const int Bk = std::min(B, _n - Ac);
-        // construct a block of A
-        for (size_t j = 0; j < Bk; j++)
-        {
-          for (size_t i = 0; i < Br; i++)
-          {
-            Asub(i, j) = Gauss_kernel(&_data[(Ar + i) * _d], &_data[(Ac + j) * _d], _d, _h);
-          }
-          if (Ar == Ac)
-            Asub(j, j) += _l;
-        }
-        DenseMW_t Ablock(Br, Bk, Asub, 0, 0);
-        DenseMW_t Sblock(Br, Bc, &S(lr, 0), S.ld());
-        DenseMW_t Rblock(Bk, Bc, &R(k, 0), R.ld());
-        // multiply block of A with a row-block of Rr and add result to Sr
-        gemm(Trans::N, Trans::N, 1., Ablock, Rblock, 1., Sblock);
-        Ac += S.nprows() * B;
-      }
-    }
-  }
-
-  void operator()(DistM_t &R, DistM_t &Sr, DistM_t &Sc) {
-    Sr.zero();
-    int maxlocrows = R.MB() * (R.rows() / R.MB());
-    if (R.rows() % R.MB())
-      maxlocrows += R.MB();
-    int maxloccols = R.MB() * (R.cols() / R.MB());
-    if (R.cols() % R.MB())
-      maxloccols += R.MB();
-    DenseM_t tmp(maxlocrows, maxloccols);
-    // each processor broadcasts his/her local part of R to all
-    // processes in the same column of the BLACS grid, one after the
-    // other
-    for (int p = 0; p < R.nprows(); p++)
-    {
-      if (p == R.prow())
-      {
-        strumpack::scalapack::gebs2d(R.ctxt(), 'C', ' ', R.lrows(), R.lcols(), R.data(), R.ld());
-        DenseMW_t Rdense(R.lrows(), R.lcols(), R.data(), R.ld());
-        strumpack::copy(Rdense, tmp, 0, 0);
-      }
-      else
-      {
-        int recvrows = strumpack::scalapack::numroc(R.rows(), R.MB(), p, 0, R.nprows());
-        strumpack::scalapack::gebr2d(R.ctxt(), 'C', ' ', recvrows, R.lcols(),
-                                     tmp.data(), tmp.ld(), p, R.pcol());
-      }
-      times(tmp, Sr, p);
-    }
-    Sc = Sr;
-  }
-
 };
 
 int run(int argc, char *argv[]) {
@@ -170,20 +108,13 @@ int run(int argc, char *argv[]) {
     cout << "# usage: ./KernelRegression file d h kernel(1=Gauss,2=Laplace) "
             "reorder(natural, 2means, kd, pca) lambda"
          << endl;
-  if (argc > 1)
-    filename = string(argv[1]);
-  if (argc > 2)
-    d = stoi(argv[2]);
-  if (argc > 3)
-    h = stof(argv[3]);
-  if (argc > 4)
-    lambda = stof(argv[4]);
-  if (argc > 5)
-    kernel = stoi(argv[5]);
-  if (argc > 6)
-    reorder = string(argv[6]);
-  if (argc > 7)
-    mode = string(argv[7]);
+  if (argc > 1) filename = string(argv[1]);
+  if (argc > 2) d = stoi(argv[2]);
+  if (argc > 3) h = stof(argv[3]);
+  if (argc > 4) lambda = stof(argv[4]);
+  if (argc > 5) kernel = stoi(argv[5]);
+  if (argc > 6) reorder = string(argv[6]);
+  if (argc > 7) mode = string(argv[7]);
 
   if (c.is_root()) {
     cout << "# data dimension = " << d << endl;
@@ -210,21 +141,22 @@ int run(int argc, char *argv[]) {
   int m = data_test.size() / d;
   if (c.is_root())
     cout << "# matrix size = " << n << " x " << d << endl;
+  DenseMatrixWrapper<double> train_matrix(d, n, data_train.data(), d);
 
   HSSPartitionTree cluster_tree;
   cluster_tree.size = n;
   int cluster_size = hss_opts.leaf_size();
 
   if (reorder == "2means") {
-    recursive_2_means(data_train.data(), n, d, cluster_size, cluster_tree,
-                      data_train_label.data(), generator);
-  } else if (reorder == "kd") {
+    DenseMatrixWrapper<double> label_matrix(1, n, data_train_label.data(), 1);
+    recursive_2_means
+      (train_matrix, cluster_size, cluster_tree, label_matrix, generator);
+  } else if (reorder == "kd")
     recursive_kd(data_train.data(), n, d, cluster_size, cluster_tree,
                  data_train_label.data());
-  } else if (reorder == "pca") {
+  else if (reorder == "pca")
     recursive_pca(data_train.data(), n, d, cluster_size, cluster_tree,
                   data_train_label.data());
-  }
 
   TaskTimer::t_begin = GET_TIME_NOW();
   TaskTimer timer(string("compression"), 1);
@@ -233,29 +165,17 @@ int run(int argc, char *argv[]) {
     cout << "finding ANN.. " << endl;
 
   // Find ANN: start ------------------------------------------------
-  int ann_number = 5 * d;
-  vector<int> neighbors(n*ann_number, 0);
-  vector<double> neighbor_scores(n*ann_number, 0.0);
+  int ann_number = 64;
   int num_iters = 5;
-
+  DenseMatrix<size_t> neighbors;
+  DenseMatrix<double> scores;
   timer.start();
   find_approximate_neighbors
-    (data_train, n, d, num_iters, ann_number,
-     neighbors, neighbor_scores, generator);
-
-  if (c.is_root()){
+    (train_matrix, num_iters, ann_number, neighbors, scores, generator);
+  if (c.is_root()) {
     cout << "# ANN time = " << timer.elapsed() << " sec" <<endl;
     total_time += timer.elapsed();
   }
-
-  DenseMatrix<std::size_t> ann(ann_number, n);
-  for (int i=0; i<ann_number; i++)
-    for (int j=0; j<n; j++)
-      ann(i, j) = std::size_t(neighbors[i+j*ann_number]);
-
-  // Distances to closest neighbors, sorted in ascending order
-  DenseMatrixWrapper<double> scores
-    (ann_number, n, &neighbor_scores[0], ann_number);
   // Find ANN: end ------------------------------------------------
 
   if (c.is_root())
@@ -267,10 +187,10 @@ int run(int argc, char *argv[]) {
   // Constructor for ANN compression
   if (reorder != "natural")
     K = HSSMatrixMPI<double>
-      (cluster_tree, &grid, ann, scores, kernel_matrix, hss_opts);
+      (cluster_tree, &grid, neighbors, scores, kernel_matrix, hss_opts);
   else
     K = HSSMatrixMPI<double>
-      (n, n, &grid, ann, scores, kernel_matrix, hss_opts);
+      (n, n, &grid, neighbors, scores, kernel_matrix, hss_opts);
   if (c.is_root())
     cout << "# compression time = " << timer.elapsed() << endl;
   total_time += timer.elapsed();
@@ -286,8 +206,7 @@ int run(int argc, char *argv[]) {
            << "# compression succeeded!" << endl
            << "# rank(K) = " << max_rank << endl
            << "# memory(K) = " << total_memory / 1e6 << " MB " << endl;
-  }
-  else {
+  } else {
     if (c.is_root())
       cout << "# compression failed!!!!!!!!" << endl;
     return 1;
@@ -385,8 +304,7 @@ int run(int argc, char *argv[]) {
   return 0;
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
   int ierr = run(argc, argv);
   MPI_Finalize();

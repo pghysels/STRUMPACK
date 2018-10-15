@@ -312,6 +312,11 @@ install(FILES
   DESTINATION include/misc)
 
 install(FILES
+  src/clustering/NeighborSearch.hpp
+  src/clustering/KMeans.hpp
+  DESTINATION include/clustering)
+
+install(FILES
   src/dense/DistributedMatrix.hpp
   src/dense/DenseMatrix.hpp
   src/dense/BLASLAPACKOpenMPTask.hpp

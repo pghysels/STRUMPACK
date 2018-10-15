@@ -74,248 +74,46 @@ inline int dyevx(char JOBZ, char RANGE, char UPLO, int N, double *A, int LDA,
 }
 
 //------STANDARD VECTOR ALGEBRA-----------------
-inline double dist(double* x, double* y, int d)  {
+inline double dist(const double* x, const double* y, int d)  {
   double k = 0.;
    for (int i = 0; i < d; i++) k += pow(x[i] - y[i], 2.);
    return sqrt(k);
 }
 
-inline double norm(double* x, int d)  {
+inline double norm(const double* x, int d)  {
   double k = 0.;
   for (int i = 0; i < d; i++) k += pow(x[i], 2.);
   return sqrt(k);
 }
 
-inline double dot_product(double* x, double* y, int d)  {
+inline double dot_product(const double* x, const double* y, int d)  {
   double k = 0.;
   for (int i = 0; i < d; i++) k += x[i]*y[i];
   return k;
 }
 
-inline double dist2(double *x, double *y, int d) {
+inline double dist2(const double *x, const double *y, int d) {
   double k = 0.;
   for (int i = 0; i < d; i++)
     k += pow(x[i] - y[i], 2.);
   return k;
 }
 
-inline double norm1(double *x, double *y, int d) {
+inline double norm1(const double *x, const double *y, int d) {
   double k = 0.;
   for (int i = 0; i < d; i++)
     k += fabs(x[i] - y[i]);
   return k;
 }
 
-inline double Gauss_kernel(double *x, double *y, int d, double h) {
+inline double Gauss_kernel
+(const double *x, const double *y, int d, double h) {
   return exp(-dist2(x, y, d) / (2. * h * h));
 }
 
-inline double Laplace_kernel(double *x, double *y, int d, double h) {
+inline double Laplace_kernel
+(const double *x, const double *y, int d, double h) {
   return exp(-norm1(x, y, d) / h);
-}
-
-inline int *kmeans_start_random(int n, int k, mt19937 &generator) {
-  uniform_int_distribution<int> uniform_random(0, n - 1);
-  int *ind_centers = new int[k];
-  for (int i = 0; i < k; i++) {
-    ind_centers[i] = uniform_random(generator);
-  }
-  return ind_centers;
-}
-
-// 3 more start sampling methods for the case k == 2
-int *kmeans_start_random_dist_maximized(int n, double *p, int d,
-mt19937 &generator) {
-  constexpr size_t k = 2;
-
-  uniform_int_distribution<int> uniform_random(0, n - 1);
-  const auto t = uniform_random(generator);
-  // compute probabilities
-  double *cur_dist = new double[n];
-  for (int i = 0; i < n; i++) {
-    cur_dist[i] = dist2(&p[i * d], &p[t * d], d);
-  }
-
-  std::discrete_distribution<int> random_center(&cur_dist[0], &cur_dist[n]);
-
-  delete[] cur_dist;
-
-  int *ind_centers = new int[k];
-  ind_centers[0] = t;
-  ind_centers[1] = random_center(generator);
-  return ind_centers;
-}
-
-// for k = 2 only
-int *kmeans_start_dist_maximized(int n, double *p, int d) {
-  constexpr size_t k = 2;
-
-  // find centroid
-  double centroid[d];
-
-  for (int i = 0; i < d; i++) {
-    centroid[i] = 0;
-  }
-
-  for (int i = 0; i < n; i++) {
-    for (int j = 0; j < d; j++) {
-      centroid[j] += p[i * d + j];
-    }
-  }
-
-  for (int j = 0; j < d; j++)
-    centroid[j] /= n;
-
-  // find farthest point from centroid
-  int first_index = 0;
-  double max_dist = -1;
-
-  for (int i = 0; i < n; i++) {
-    double dd = dist(&p[i * d], centroid, d);
-    if (dd > max_dist) {
-      max_dist = dd;
-      first_index = i;
-    }
-  }
-  // find fathest point from the firsth point
-  int second_index = 0;
-  max_dist = -1;
-  for (int i = 0; i < n; i++) {
-    double dd = dist(&p[i * d], &p[first_index * d], d);
-    if (dd > max_dist) {
-      max_dist = dd;
-      second_index = i;
-    }
-  }
-  int *ind_centers = new int[k];
-  ind_centers[0] = first_index;
-  ind_centers[1] = second_index;
-  return ind_centers;
-}
-
-inline int *kmeans_start_fixed(int n, double *p, int d) {
-  int *ind_centers = new int[2];
-  ind_centers[0] = 0;
-  ind_centers[1] = n - 1;
-  return ind_centers;
-}
-
-void k_means(int k, double *p, int n, int d, int *nc, double *labels,
-mt19937 &generator) {
-  double **center = new double *[k];
-
-  const int kmeans_max_it = 100;
-  int *ind_centers = NULL;
-
-  constexpr int kmeans_options = 2;
-  switch (kmeans_options) {
-  case 1:
-    ind_centers = kmeans_start_random(n, k, generator);
-    break;
-  case 2:
-    ind_centers = kmeans_start_random_dist_maximized(n, p, d, generator);
-    break;
-  case 3:
-    ind_centers = kmeans_start_dist_maximized(n, p, d);
-    break;
-  case 4:
-    ind_centers = kmeans_start_fixed(n, p, d);
-    break;
-  }
-
-  for (int c = 0; c < k; c++) {
-    center[c] = new double[d];
-    for (int j = 0; j < d; j++)
-      center[c][j] = p[ind_centers[c] * d + j];
-  }
-
-  int iter = 0;
-  bool changes = true;
-  int *cluster = new int[n];
-  for (int i = 0; i < n; i++) {
-    cluster[i] = 0;
-  }
-
-  while ((changes == true) and (iter < kmeans_max_it)) {
-    // for each point, find the closest cluster center
-    changes = false;
-    for (int i = 0; i < n; i++) {
-      double min_dist = dist(&p[i * d], center[0], d);
-      cluster[i] = 0;
-      for (int c = 1; c < k; c++) {
-        double dd = dist(&p[i * d], center[c], d);
-        if (dd <= min_dist) {
-          min_dist = dd;
-          if (c != cluster[i]) {
-            changes = true;
-          }
-          cluster[i] = c;
-        }
-      }
-    }
-
-    for (int c = 0; c < k; c++) {
-      nc[c] = 0;
-      for (int j = 0; j < d; j++)
-        center[c][j] = 0.;
-    }
-    for (int i = 0; i < n; i++) {
-      auto c = cluster[i];
-      nc[c]++;
-      for (int j = 0; j < d; j++)
-        center[c][j] += p[i * d + j];
-    }
-    for (int c = 0; c < k; c++)
-      for (int j = 0; j < d; j++)
-        center[c][j] /= nc[c];
-    iter++;
-  }
-
-  int *ci = new int[k];
-  for (int c = 0; c < k; c++)
-    ci[c] = 0;
-  double *p_perm = new double[n * d];
-  double *labels_perm = new double[n];
-  int row = 0;
-  for (int c = 0; c < k; c++) {
-    for (int j = 0; j < nc[c]; j++) {
-      while (cluster[ci[c]] != c)
-        ci[c]++;
-      for (int l = 0; l < d; l++)
-        p_perm[l + row * d] = p[l + ci[c] * d];
-      labels_perm[row] = labels[ci[c]];
-      ci[c]++;
-      row++;
-    }
-  }
-  copy(p_perm, p_perm + n * d, p);
-  copy(labels_perm, labels_perm + n, labels);
-  delete[] p_perm;
-  delete[] labels_perm;
-  delete[] ci;
-
-  for (int i = 0; i < k; i++)
-    delete[] center[i];
-  delete[] center;
-  delete[] cluster;
-  delete[] ind_centers;
-}
-
-void recursive_2_means(double *p, int n, int d, int cluster_size,
-HSSPartitionTree &tree, double *labels, mt19937 &generator) {
-  if (n < cluster_size)
-    return;
-  auto nc = new int[2];
-  k_means(2, p, n, d, nc, labels, generator);
-  if (nc[0] == 0 || nc[1] == 0)
-    return;
-  tree.c.resize(2);
-  tree.c[0].size = nc[0];
-  tree.c[1].size = nc[1];
-  recursive_2_means(p, nc[0], d, cluster_size, tree.c[0], labels, generator);
-  recursive_2_means(p + nc[0] * d, nc[1], d, cluster_size, tree.c[1],
-                    labels + nc[0], generator);
-  delete[] nc;
 }
 
 void kd_partition(double *p, int n, int d, int *nc, double *labels,

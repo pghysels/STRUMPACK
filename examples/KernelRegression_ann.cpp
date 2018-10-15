@@ -1,27 +1,29 @@
 /*
- * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The Regents of
- * the University of California, through Lawrence Berkeley National Laboratory
- * (subject to receipt of any required approvals from the U.S. Dept. of Energy).
- * All rights reserved.
+ * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
+ * Regents of the University of California, through Lawrence Berkeley
+ * National Laboratory (subject to receipt of any required approvals
+ * from the U.S. Dept. of Energy).  All rights reserved.
  *
- * If you have questions about your rights to use or distribute this software,
- * please contact Berkeley Lab's Technology Transfer Department at TTD@lbl.gov.
+ * If you have questions about your rights to use or distribute this
+ * software, please contact Berkeley Lab's Technology Transfer
+ * Department at TTD@lbl.gov.
  *
- * NOTICE. This software is owned by the U.S. Department of Energy. As such, the
- * U.S. Government has been granted for itself and others acting on its behalf a
- * paid-up, nonexclusive, irrevocable, worldwide license in the Software to
- * reproduce, prepare derivative works, and perform publicly and display
- * publicly. Beginning five (5) years after the date permission to assert
- * copyright is obtained from the U.S. Department of Energy, and subject to any
- * subsequent five (5) year renewals, the U.S. Government is granted for itself
- * and others acting on its behalf a paid-up, nonexclusive, irrevocable,
- * worldwide license in the Software to reproduce, prepare derivative works,
- * distribute copies to the public, perform publicly and display publicly, and
- * to permit others to do so.
+ * NOTICE. This software is owned by the U.S. Department of Energy. As
+ * such, the U.S. Government has been granted for itself and others
+ * acting on its behalf a paid-up, nonexclusive, irrevocable,
+ * worldwide license in the Software to reproduce, prepare derivative
+ * works, and perform publicly and display publicly. Beginning five
+ * (5) years after the date permission to assert copyright is obtained
+ * from the U.S. Department of Energy, and subject to any subsequent
+ * five (5) year renewals, the U.S. Government is granted for itself
+ * and others acting on its behalf a paid-up, nonexclusive,
+ * irrevocable, worldwide license in the Software to reproduce,
+ * prepare derivative works, distribute copies to the public, perform
+ * publicly and display publicly, and to permit others to do so.
  *
  * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
  *             (Lawrence Berkeley National Lab, Computational Research
- * Division).
+ *             Division).
  *
  */
 #include <cmath>
@@ -33,11 +35,13 @@
 #include <vector>
 #include <fstream>
 
+#include "clustering/KMeans.hpp"
+#include "clustering/NeighborSearch.hpp"
+
 #include "HSS/HSSMatrix.hpp"
 #include "misc/TaskTimer.hpp"
 #include "FileManipulation.h"
 #include "preprocessing.h"
-#include "find_ann.h"
 
 using namespace std;
 using namespace strumpack;
@@ -51,50 +55,42 @@ class Kernel {
   using DenseMW_t = DenseMatrixWrapper<double>;
 
 public:
-  vector<double> _data;
-  int _d = 0;
-  int _n = 0;
-  double _h = 0.;
-  double _l = 0.;
+  const double* data_;
+  size_t d_ = 0;
+  size_t n_ = 0;
+  double h_ = 0.;
+  double l_ = 0.;
 
-  Kernel() = default;
+  Kernel(const std::vector<double>& data, int d, double h, double l)
+    : data_(data.data()), d_(d), n_(data.size() / d_), h_(h), l_(l) { }
 
-  Kernel(vector<double> data, int d, double h, double l)
-  : _data(std::move(data)), _d(d), _n(_data.size() / _d), _h(h), _l(l) {
-    assert(_n * _d == _data.size());
-  }
-
-  void operator()(const vector<size_t> &I, const vector<size_t> &J,
-  DenseM_t &B) {
+  void operator()
+  (const vector<size_t>& I, const vector<size_t>& J, DenseM_t& B) {
     assert(I.size() == B.rows() && J.size() == B.cols());
-    for (size_t j = 0; j < J.size(); j++) {
-      for (size_t i = 0; i < I.size(); i++) {
-        B(i, j) = Gauss_kernel(&_data[I[i] * _d], &_data[J[j] * _d], _d, _h);
-        if (I[i] == J[j]) {
-          B(i, j) += _l;
-        }
+    for (size_t j=0; j<J.size(); j++)
+      for (size_t i=0; i<I.size(); i++) {
+        B(i, j) = Gauss_kernel(&data_[I[i]*d_], &data_[J[j]*d_], d_, h_);
+        if (I[i] == J[j]) B(i, j) += l_;
       }
-    }
   }
 
-  void times(DenseM_t &Rr, DenseM_t &Sr) {
-    assert(Rr.rows() == _n);
+  void times(DenseM_t& Rr, DenseM_t& Sr) {
+    assert(Rr.rows() == n_);
     Sr.zero();
     const size_t B = 64;
     DenseM_t Asub(B, B);
-    #pragma omp parallel for firstprivate(Asub) schedule(dynamic)
-    for (size_t r = 0; r < _n; r += B) {
+#pragma omp parallel for firstprivate(Asub) schedule(dynamic)
+    for (size_t r=0; r<n_; r+=B) {
       // loop over blocks of A
-      for (size_t c = 0; c < _n; c += B) {
-        const int Br = std::min(B, _n - r);
-        const int Bc = std::min(B, _n - c);
+      for (size_t c=0; c<n_; c+= B) {
+        const size_t Br = std::min(B, n_ - r);
+        const size_t Bc = std::min(B, n_ - c);
         // construct a block of A
-        for (size_t j = 0; j < Bc; j++) {
-          for (size_t i = 0; i < Br; i++) {
+        for (size_t j=0; j<Bc; j++) {
+          for (size_t i=0; i<Br; i++)
             Asub(i, j) = Gauss_kernel
-              (&_data[(r + i) * _d], &_data[(c + j) * _d], _d, _h);
-          }
-          if (r==c) Asub(j, j) += _l;
+              (&data_[(r + i) * d_], &data_[(c + j) * d_], d_, h_);
+          if (r==c) Asub(j, j) += l_;
         }
         DenseMW_t Ablock(Br, Bc, Asub, 0, 0);
         // Rblock is a subblock of Rr of dimension Bc x Rr.cols(),
@@ -107,7 +103,7 @@ public:
     }
   }
 
-  void operator()(DenseM_t &Rr, DenseM_t &Rc, DenseM_t &Sr, DenseM_t &Sc) {
+  void operator()(DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
     times(Rr, Sr);
     Sc.copy(Sr);
   }
@@ -122,33 +118,27 @@ int main(int argc, char *argv[]) {
   int kernel = 1; // Gaussian=1, Laplace=2
   string mode("test");
 
-  cout << endl << "# usage: ./KernelRegression_mf file d h lambda "
-          "kern(1=Gau,2=Lapl) "
-          "reorder(nat, 2means, kd, pca) mode(valid, test)"
+  cout << endl
+       << "# usage: ./KernelRegression_mf file d h lambda "
+       << "kern(1=Gau,2=Lapl) "
+       << "reorder(nat, 2means, kd, pca) mode(valid, test)"
        << endl;
 
-  if (argc > 1)
-    filename = string(argv[1]);
-  if (argc > 2)
-    d = stoi(argv[2]);
-  if (argc > 3)
-    h = stof(argv[3]);
-  if (argc > 4)
-    lambda = stof(argv[4]);
-  if (argc > 5)
-    kernel = stoi(argv[5]);
-  if (argc > 6)
-    reorder = string(argv[6]);
-  if (argc > 7)
-    mode = string(argv[7]);
+  if (argc > 1) filename = string(argv[1]);
+  if (argc > 2) d = stoi(argv[2]);
+  if (argc > 3) h = stof(argv[3]);
+  if (argc > 4) lambda = stof(argv[4]);
+  if (argc > 5) kernel = stoi(argv[5]);
+  if (argc > 6) reorder = string(argv[6]);
+  if (argc > 7) mode = string(argv[7]);
 
   cout << endl;
-  cout << "# data dimension    = "<<d << endl;
-  cout << "# kernel h          = "<<h << endl;
-  cout << "# lambda            = "<<lambda << endl;
-  cout << "# kernel type       = "<<((kernel == 1) ? "Gauss":"Laplace") << endl;
-  cout << "# reordering/clust  = "<<reorder << endl;
-  cout << "# validation/test   = "<<mode << endl;
+  cout << "# data dimension    = " << d << endl;
+  cout << "# kernel h          = " << h << endl;
+  cout << "# lambda            = " << lambda << endl;
+  cout << "# kernel type       = " << ((kernel == 1) ? "Gauss":"Laplace") << endl;
+  cout << "# reordering/clust  = " << reorder << endl;
+  cout << "# validation/test   = " << mode << endl;
 
   TaskTimer::t_begin = GET_TIME_NOW();
   TaskTimer timer(string("compression"), 1);
@@ -182,56 +172,46 @@ int main(int argc, char *argv[]) {
   int n = data_train.size() / d;
   int m = data_test.size() / d;
   cout << "# matrix size = " << n << " x " << d << endl;
+  DenseMatrixWrapper<double> train_matrix(d, n, data_train.data(), d);
 
   HSSPartitionTree cluster_tree;
   cluster_tree.size = n;
   int cluster_size = hss_opts.leaf_size();
 
   if (reorder == "2means") {
-    recursive_2_means(data_train.data(), n, d, cluster_size, cluster_tree,
-                      data_train_label.data(), generator);
-  } else if (reorder == "kd") {
+    DenseMatrixWrapper<double> label_matrix(1, n, data_train_label.data(), 1);
+    recursive_2_means
+      (train_matrix, cluster_size, cluster_tree, label_matrix, generator);
+  } else if (reorder == "kd")
     recursive_kd(data_train.data(), n, d, cluster_size, cluster_tree,
                  data_train_label.data());
-  } else if (reorder == "pca") {
+  else if (reorder == "pca")
     recursive_pca(data_train.data(), n, d, cluster_size, cluster_tree,
                   data_train_label.data());
-  }
 
   cout << endl << "# Starting HSS compression..." << endl;
   HSSMatrix<double> K;
   if (reorder != "natural")
     K = HSSMatrix<double>(cluster_tree, hss_opts);
-  else{
+  else
     K = HSSMatrix<double>(n, n, hss_opts);
-  }
 
   // Find ANN: start ------------------------------------------------
-  int ann_number = 5 * d;
-  vector<int> neighbors(n*ann_number, 0);
-  vector<double> neighbor_scores(n*ann_number, 0.0);
+  int ann_number = 64;
   int num_iters = 5;
-
+  DenseMatrix<size_t> neighbors;
+  DenseMatrix<double> scores;
   timer.start();
-    find_approximate_neighbors(data_train, n, d, num_iters, ann_number,
-    neighbors, neighbor_scores, generator);
+  find_approximate_neighbors
+    (train_matrix, num_iters, ann_number, neighbors, scores, generator);
   cout << "# ANN time = " << timer.elapsed() << " sec" <<endl;
-
-  DenseMatrix<std::size_t> ann(ann_number, n);
-  for (int i=0; i<ann_number; i++)
-    for (int j=0; j<n; j++)
-      ann(i, j) = std::size_t(neighbors[i+j*ann_number]);
-
-  // Distances to closest neighbors, sorted in ascending order
-  DenseMatrixWrapper<double> scores(ann_number, n, &neighbor_scores[0],
-                                    ann_number);
   // Find ANN: end ------------------------------------------------
 
   // Compression: start ------------------------------------------------
   Kernel kernel_matrix(data_train, d, h, lambda);
 
   timer.start();
-  K.compress_ann(ann, scores, kernel_matrix, hss_opts);
+  K.compress_ann(neighbors, scores, kernel_matrix, hss_opts);
   // K.compress(kernel_matrix, kernel_matrix, hss_opts);
   cout << "### compression time = " << timer.elapsed() << " ###" <<endl;
 
@@ -250,21 +230,16 @@ int main(int argc, char *argv[]) {
   DenseMatrix<double> Kdense(n, n);
   if (kernel == 1) {
     for (int c=0; c<n; c++)
-      for (int r=0; r<n; r++){
+      for (int r=0; r<n; r++) {
         Kdense(r, c) = Gauss_kernel(&data_train[r*d], &data_train[c*d], d, h);
-        if (r == c) {
-          Kdense(r, c) = Kdense(r, c) + lambda;
-        }
+        if (r == c) Kdense(r, c) = Kdense(r, c) + lambda;
       }
-  }
-  else {
+  } else {
     for (int c=0; c<n; c++)
-    for (int r=0; r<n; r++){
-      Kdense(r, c) = Laplace_kernel(&data_train[r*d], &data_train[c*d], d, h);
-      if (r == c) {
-        Kdense(r, c) = Kdense(r, c) + lambda;
+      for (int r=0; r<n; r++) {
+        Kdense(r, c) = Laplace_kernel(&data_train[r*d], &data_train[c*d], d, h);
+        if (r == c) Kdense(r, c) = Kdense(r, c) + lambda;
       }
-    }
   }
 
   cout << "# HSS matrix is "<< 100. * K.memory() /  Kdense.memory()
@@ -304,8 +279,7 @@ int main(int argc, char *argv[]) {
   gemm(Trans::N, Trans::N, 1., Kdense, sample_v, 0., sample_rhs);
   K.solve(ULV, sample_rhs);
   sample_v.scaled_add(-1., sample_rhs);
-  cout << "# solution error = "
-       << sample_v.normF() << endl;
+  cout << "# solution error = " << sample_v.normF() << endl;
   // Factorization and Solve: end-----------------------------------
 
   // Prediction: start-----------------------------------
@@ -316,14 +290,14 @@ int main(int argc, char *argv[]) {
     for (int c = 0; c < m; c++)
       for (int r = 0; r < n; r++)
         prediction[c] +=
-            Gauss_kernel(&data_train[r * d], &data_test[c * d], d, h) *
-            weights(r, 0);
+          Gauss_kernel(&data_train[r * d], &data_test[c * d], d, h) *
+          weights(r, 0);
   } else {
     for (int c = 0; c < m; c++)
       for (int r = 0; r < n; r++)
         prediction[c] +=
-            Laplace_kernel(&data_train[r * d], &data_test[c * d], d, h) *
-            weights(r, 0);
+          Laplace_kernel(&data_train[r * d], &data_test[c * d], d, h) *
+          weights(r, 0);
   }
 
   for (int i = 0; i < m; ++i)
