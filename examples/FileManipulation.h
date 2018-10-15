@@ -127,7 +127,6 @@ size_t count_lines( const string &filename ){
 }
 
 void disp_column_check_normalization( const vector<double>& v, int col, int dim, size_t n){
-	size_t cntCols = 0;
 	size_t cntLines = 0;
 
 	std::vector<double> col_vec;
