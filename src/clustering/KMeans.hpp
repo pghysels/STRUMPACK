@@ -61,7 +61,7 @@ namespace strumpack {
     for (std::size_t i=0; i<n; i++)
       cur_dist[i] = Euclidean_distance_squared(d, &p(0, i), &p(0, t));
     std::discrete_distribution<int> random_center
-      (&cur_dist[0], &cur_dist[n-1]);
+      (cur_dist.begin(), cur_dist.end());
     std::vector<std::size_t> ind_centers(k);
     ind_centers[0] = t;
     ind_centers[1] = random_center(generator);

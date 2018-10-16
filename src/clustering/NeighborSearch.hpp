@@ -49,7 +49,7 @@ namespace strumpack {
     real_t k(0.);
     for (std::size_t i=0; i<d; i++)
       k += (x[i]-y[i])*(x[i]-y[i]);
-    return std::sqrt(k);
+    return k;
   }
   // TODO move somewhere else
   template<typename scalar_t,
