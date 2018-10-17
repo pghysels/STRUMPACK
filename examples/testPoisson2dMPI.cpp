@@ -51,6 +51,7 @@ int main(int argc, char* argv[]) {
 
   {
     int n = 30;
+    int nrhs = 5;
     if (argc > 1) n = atoi(argv[1]); // get grid size
     else std::cout << "# please provide grid size" << std::endl;
 
@@ -82,16 +83,18 @@ int main(int argc, char* argv[]) {
     }
     A.set_symm_sparse();
 
-    std::vector<scalar> b(N, scalar(1.)), x(N, scalar(0.));
+    DenseMatrix<scalar> b(N, nrhs), x(N, nrhs), x_exact(N, nrhs);
+    x_exact.random();
+    A.spmv(x_exact, b);
 
     spss.set_matrix(A);
     spss.reorder(n, n);
     spss.factor();
-    spss.solve(b.data(), x.data());
+    spss.solve(b, x);
 
     if (!myrank)
       std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
-                << A.max_scaled_residual(x.data(), b.data()) << std::endl;
+                << A.max_scaled_residual(x, b) << std::endl;
   }
   TimerList::Finalize();
   scalapack::Cblacs_exit(1);

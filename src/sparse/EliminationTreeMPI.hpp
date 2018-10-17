@@ -155,6 +155,7 @@ namespace strumpack {
     delete[] subtree_work;
   }
 
+  // TODO: rewrite this with a single alltoallv/allgatherv
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPI<scalar_t,integer_t>::sequential_to_block_cyclic
   (DenseM_t& x, DistM_t*& x_dist) const {
@@ -164,11 +165,13 @@ namespace strumpack {
     x_dist = new DistM_t[pos];
     pos = 0;
     for (auto& pf : parallel_fronts_)
-      if (rank_ >= pf.P0 && rank_ < pf.P0+pf.P)
-        // TODO this also does a pgemr2d!
-        // TODO check if this is correct?!
-        x_dist[pos++] = DistM_t
-          (pf.grid, DenseMW_t(pf.dim_sep, x.cols(), x, pf.sep_begin, 0));
+      if (rank_ >= pf.P0 && rank_ < pf.P0+pf.P) {
+        x_dist[pos] = DistM_t(pf.grid, pf.dim_sep, x.cols());
+        DenseM_t xloc(pf.dim_sep, x.cols());
+        copy(pf.dim_sep, x.cols(), x, pf.sep_begin, 0, xloc, 0, 0);
+        x_dist[pos].scatter(xloc);
+        pos++;
+      }
   }
 
   // TODO: rewrite this with a single alltoallv/allgatherv
@@ -182,20 +185,24 @@ namespace strumpack {
         (std::size_t(0), subtree_ranges[p].second - subtree_ranges[p].first);
       disp[p] = subtree_ranges[p].first;
     }
-    MPI_Allgatherv
-      (MPI_IN_PLACE, 0, mpi_type<scalar_t>(), x.data(),
-       cnts, disp, mpi_type<scalar_t>(), comm_.comm());
+    for (std::size_t c=0; c<x.cols(); c++)
+      MPI_Allgatherv
+        (MPI_IN_PLACE, 0, mpi_type<scalar_t>(), x.ptr(0, c),
+         cnts, disp, mpi_type<scalar_t>(), comm_.comm());
     delete[] cnts;
 
     auto xd = x_dist;
-    for (auto& pf : parallel_fronts_)
+    for (auto& pf : parallel_fronts_) {
       if (rank_ >= pf.P0 && rank_ < pf.P0+pf.P) {
-        // TODO check if this is correct
-        DenseMW_t x_loc(pf.dim_sep, x.cols(), x, pf.sep_begin, 0);
-        x_loc = (xd++)->gather();
-        MPI_Bcast
-          (x_loc.data(), pf.dim_sep, mpi_type<scalar_t>(), pf.P0, comm_.comm());
+        auto xloc = (xd++)->gather();
+        if (rank_ == pf.P0)
+          copy(xloc.rows(), xloc.cols(), xloc, 0, 0, x, pf.sep_begin, 0);
       }
+      for (std::size_t c=0; c<x.cols(); c++)
+        MPI_Bcast
+          (x.ptr(pf.sep_begin, c), pf.dim_sep,
+           mpi_type<scalar_t>(), pf.P0, comm_.comm());
+    }
   }
 
   template<typename scalar_t,typename integer_t> void
