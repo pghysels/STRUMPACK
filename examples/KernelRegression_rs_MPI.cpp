@@ -138,6 +138,7 @@ public:
 
   void operator()(DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
     Sr.zero();
+    if (!hermitian_) Sc.zero();
     int maxlocrows = R.MB() * (R.rows() / R.MB());
     if (R.rows() % R.MB())
       maxlocrows += R.MB();
@@ -162,8 +163,7 @@ public:
            tmp.data(), tmp.ld(), p, R.pcol());
       }
       times(Trans::N, tmp, Sr, p);
-      if (!hermitian_)
-        times(Trans::C, tmp, Sc, p);
+      if (!hermitian_) times(Trans::C, tmp, Sc, p);
     }
     if (hermitian_) Sc = Sr;
   }
