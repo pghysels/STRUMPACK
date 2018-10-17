@@ -269,38 +269,96 @@ int run(int argc, char *argv[]) {
   }
   //// ----- Error checking with dense matrix: end ----- ////
 
-  // Computing prediction accuracy on root rank
-  if (c.is_root()) {
-    std::vector<double> prediction(m);
-    if (kernel == 1) {
-      for (int c = 0; c < m; c++)
-        for (int r = 0; r < n; r++) {
-          prediction[c] +=
-            Gauss_kernel(&data_train[r * d], &data_test[c * d], d, h) *
-            weights(r, 0);
-        }
-    } else {
-      for (int c = 0; c < m; c++)
-        for (int r = 0; r < n; r++) {
-          prediction[c] +=
-            Laplace_kernel(&data_train[r * d], &data_test[c * d], d, h) *
-            weights(r, 0);
-        }
-    }
-    for (int i = 0; i < m; ++i)
-      prediction[i] = ((prediction[i] > 0) ? 1. : -1.);
+  // // Computing prediction accuracy on root rank
+  // if (c.is_root()) {
+  //   cout << "# Starting prediction step" << endl;
+  //   timer.start();
+  //   std::vector<double> prediction(m);
+  //   if (kernel == 1) {
+  //     for (int c = 0; c < m; c++)
+  //       for (int r = 0; r < n; r++) {
+  //         prediction[c] +=
+  //           Gauss_kernel(&data_train[r * d], &data_test[c * d], d, h) *
+  //           weights(r, 0);
+  //       }
+  //   } else {
+  //     for (int c = 0; c < m; c++)
+  //       for (int r = 0; r < n; r++) {
+  //         prediction[c] +=
+  //           Laplace_kernel(&data_train[r * d], &data_test[c * d], d, h) *
+  //           weights(r, 0);
+  //       }
+  //   }
+  //   for (int i = 0; i < m; ++i)
+  //     prediction[i] = ((prediction[i] > 0) ? 1. : -1.);
 
-    // compute accuracy score of prediction
-    double incorrect_quant = 0;
-    for (int i = 0; i < m; ++i) {
-      double a = (prediction[i] - data_test_label[i]) / 2;
-      incorrect_quant += (a > 0 ? a : -a);
-    }
-    if (c.is_root())
-      cout << "# prediction score: "
-           << ((m - incorrect_quant) / m) * 100 << "%"
-           << endl << endl;
+  //   // compute accuracy score of prediction
+  //   double incorrect_quant = 0;
+  //   for (int i = 0; i < m; ++i) {
+  //     double a = (prediction[i] - data_test_label[i]) / 2;
+  //     incorrect_quant += (a > 0 ? a : -a);
+  //   }
+  //   if (c.is_root()){
+  //     cout << "# seq prediction took " << timer.elapsed() << endl;
+  //     cout << "# prediction score: "
+  //          << ((m - incorrect_quant) / m) * 100 << "%"
+  //          << endl << endl;
+  //   }
+  // }
+
+  // Computing prediction in parallel
+  if (!mpi_rank())
+    cout << "# Starting prediction step" << endl;
+  timer.start();
+
+  double* prediction = new double[m];
+  std::fill(prediction, prediction+m, 0.);
+
+  timer.start();
+  if (kernel == 1) {
+    if (wdist.active() && wdist.lcols() > 0)
+      #pragma omp parallel for
+      for (int c = 0; c < m; c++) {
+        for (int r = 0; r < wdist.lrows(); r++) {
+          prediction[c] +=
+            Gauss_kernel
+            (&data_train[wdist.rowl2g(r) * d], &data_test[c * d], d, h)
+            * wdist(r, 0);
+        }
+      }
+  } else {
+    if (wdist.active() && wdist.lcols() > 0)
+      #pragma omp parallel for
+      for (int c = 0; c < m; c++) {
+        for (int r = 0; r < wdist.lrows(); r++) {
+          prediction[c] +=
+            Laplace_kernel
+            (&data_train[wdist.rowl2g(r) * d], &data_test[c * d], d, h)
+            * wdist(r, 0);
+        }
+      }
   }
+  MPI_Allreduce
+    (MPI_IN_PLACE, prediction, m, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+  #pragma omp parallel for
+  for (int i = 0; i < m; ++i)
+    prediction[i] = ((prediction[i] > 0) ? 1. : -1.);
+
+  // compute accuracy score of prediction
+  double incorrect_quant = 0;
+  #pragma omp parallel for reduction(+:incorrect_quant)
+  for (int i = 0; i < m; ++i) {
+    double a = (prediction[i] - data_test_label[i]) / 2;
+    incorrect_quant += (a > 0 ? a : -a);
+  }
+
+  if (!mpi_rank())
+    cout << "# par prediction took " << timer.elapsed() << endl;
+  if (!mpi_rank())
+    cout << "# prediction score: " << ((m - incorrect_quant) / m) * 100 << "%"
+         << endl << endl;
+
   return 0;
 }
 
