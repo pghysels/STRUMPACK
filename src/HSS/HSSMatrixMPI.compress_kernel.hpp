@@ -78,7 +78,6 @@ namespace strumpack {
         communicate_child_data_ann(w);
         if (!this->_ch[0]->is_compressed() ||
             !this->_ch[1]->is_compressed()) return;
-
         if (this->is_untouched()) {
           _B01 = DistM_t(grid(), w.c[0].Ir.size(), w.c[1].Ic.size());
           _B10 = DistM_t(grid(), w.c[1].Ir.size(), w.c[0].Ic.size());
@@ -171,9 +170,11 @@ namespace strumpack {
       auto rtol = opts.rel_tol() / w.lvl;
       auto atol = opts.abs_tol() / w.lvl;
       auto gT = grid()->transpose();
-      S.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol, &gT);
-      // TODO copy V from U
-      S.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol, &gT);
+      DistM_t wSr(S);
+      wSr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol, &gT);
+      _V.E() = _U.E();
+      _V.P() = _U.P();
+      w.Jc = w.Jr;
       STRUMPACK_ID_FLOPS(ID_row_flops(S, w.Jr.size()));
       STRUMPACK_ID_FLOPS(ID_row_flops(S, w.Jc.size()));
       notify_inactives_J(w);
@@ -251,7 +252,7 @@ namespace strumpack {
           // [root1+P1active,P)
           sbuf1.reserve(7+w.c[1].Ir.size()+w.c[1].Ic.size()+
                         w.c[1].Jr.size()+w.c[1].Jc.size()+
-                        2*w.c[0].ids_scores.size());
+                        2*w.c[1].ids_scores.size());
           sbuf1.push_back(std::size_t(this->_ch[1]->_U_state));
           sbuf1.push_back(std::size_t(this->_ch[1]->_V_state));
           sbuf1.push_back(this->_ch[1]->_U_rank);

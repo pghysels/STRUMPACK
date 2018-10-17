@@ -1330,9 +1330,11 @@ namespace strumpack {
     std::iota(gpiv.begin(), gpiv.end(), 1);
     int rank = 0;
     // Step 1: RRQR
-    scalapack::pgeqpfmod
-      (rows(), cols(), data(), I(), J(), desc(),
-       _J.data(), gpiv.data(), &rank, rel_tol, abs_tol);
+    if (rows() && cols())
+      scalapack::pgeqpfmod
+        (rows(), cols(), data(), I(), J(), desc(),
+         _J.data(), gpiv.data(), &rank, rel_tol, abs_tol);
+    else std::iota(gpiv.begin(), gpiv.end(), 1);
     piv.resize(lcols()+NB());
     ind.resize(rank);
     for (int c=0; c<lcols(); c++) piv[c] = gpiv[coll2g(c)];
