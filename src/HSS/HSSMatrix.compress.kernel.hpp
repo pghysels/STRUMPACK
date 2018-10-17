@@ -111,6 +111,7 @@ namespace strumpack {
         for (std::size_t i=0; i<this->rows(); i++)
           I.push_back(i+w.offset.first);
 
+        w.ids_scores.reserve(this->rows()*ann_number);
         for (std::size_t i=w.offset.first;
              i<w.offset.first+this->rows(); i++)
           for (std::size_t j=0; j<ann_number; j++)
@@ -124,6 +125,8 @@ namespace strumpack {
         for (std::size_t i=0; i<w.c[1].Ir.size(); i++)
           I.push_back(w.c[1].Ir[i]);
 
+        w.ids_scores.reserve(w.c[0].ids_scores.size()+
+                             w.c[1].ids_scores.size());
         for (std::size_t i=0; i<w.c[0].ids_scores.size(); i++)
           if ((w.c[0].ids_scores[i].first < w.offset.first) ||
               (w.c[0].ids_scores[i].first >= w.offset.first + this->rows()))
@@ -154,11 +157,12 @@ namespace strumpack {
 
       std::vector<std::size_t> Scolids;
       if (d < w.ids_scores.size()) {
-        // sort based on scores, keep only d_max closest
-        std::sort(w.ids_scores.begin(), w.ids_scores.end(),
-                  [](const std::pair<std::size_t,double>& a,
-                     const std::pair<std::size_t,double>& b) {
-                    return a.second < b.second; });
+        // sort based on scores, keep only d closest
+        std::nth_element
+          (w.ids_scores.begin(), w.ids_scores.begin()+d, w.ids_scores.end(),
+           [](const std::pair<std::size_t,double>& a,
+              const std::pair<std::size_t,double>& b) {
+            return a.second < b.second; });
         w.ids_scores.resize(d);
       }
       Scolids.reserve(d);
