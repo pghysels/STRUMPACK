@@ -62,11 +62,16 @@ public:
   size_t n_ = 0;
   double h_ = 0.;
   double l_ = 0.;
+  bool hermitian_ = true;
   KernelMPI() = default;
 
   KernelMPI(vector<double> data, int d, double h, double l)
     : data_(std::move(data)), d_(d), n_(data_.size() / d_), h_(h), l_(l) {
     assert(n_ * d_ == data_.size());
+  }
+
+  double Keval(size_t i, size_t j) {
+    return Gauss_kernel(&data_[i*d_], &data_[j*d_], d_, h_);
   }
 
   /**
@@ -82,15 +87,14 @@ public:
       for (size_t i=0; i<I.size(); i++) {
         if (B.rowg2p(i) == B.prow()) {
           assert(B.is_local(i, j));
-          B.global(i, j) = Gauss_kernel
-            (&data_[I[i]*d_], &data_[J[j]*d_], d_, h_);
+          B.global(i, j) = Keval(I[i], J[j]);
           if (I[i] == J[j]) B.global(i, j) += l_;
         }
       }
     }
   }
 
-  void times(DenseM_t& R, DistM_t& S, int Rprow) {
+  void times(Trans opA, DenseM_t& R, DistM_t& S, int Rprow) {
     const size_t B = S.MB();
     const size_t Bc = S.lcols();
     DenseM_t Asub(B, B);
@@ -100,12 +104,27 @@ public:
       const size_t Ar = S.rowl2g(lr);
       for (size_t k=0, Ac=Rprow*B; Ac<n_; k+=B) {
         const size_t Bk = std::min(B, n_ - Ac);
-        // construct a block of A
-        for (size_t j=0; j<Bk; j++) {
-          for (size_t i=0; i<Br; i++)
-            Asub(i, j) = Gauss_kernel
-              (&data_[(Ar+i)*d_], &data_[(Ac+j)*d_], d_, h_);
-          if (Ar == Ac) Asub(j, j) += l_;
+        // construct a block of A (or A^c)
+        switch (opA) {
+        case Trans::N:
+          for (size_t j=0; j<Bk; j++) {
+            for (size_t i=0; i<Br; i++)
+              Asub(i, j) = Keval(Ar+i, Ac+j);
+            if (Ar == Ac) Asub(j, j) += l_;
+          } break;
+        case Trans::T:
+          for (size_t j=0; j<Bk; j++) {
+            for (size_t i=0; i<Br; i++)
+              Asub(i, j) = Keval(Ac+j, Ar+i);
+            if (Ar == Ac) Asub(j, j) += l_;
+          } break;
+        case Trans::C:
+          for (size_t j=0; j<Bk; j++) {
+            for (size_t i=0; i<Br; i++)
+              Asub(i, j) = blas::my_conj(Keval(Ac+j, Ar+i));
+            if (Ar == Ac) Asub(j, j) += l_;
+          }
+          break;
         }
         DenseMW_t Ablock(Br, Bk, Asub, 0, 0),
           Sblock(Br, Bc, &S(lr, 0), S.ld()),
@@ -142,9 +161,11 @@ public:
           (R.ctxt(), 'C', ' ', recvrows, R.lcols(),
            tmp.data(), tmp.ld(), p, R.pcol());
       }
-      times(tmp, Sr, p);
+      times(Trans::N, tmp, Sr, p);
+      if (!hermitian_)
+        times(Trans::C, tmp, Sc, p);
     }
-    Sc = Sr;
+    if (hermitian_) Sc = Sr;
   }
 };
 
