@@ -35,6 +35,7 @@
 #include <vector>
 #include <fstream>
 
+#include "clustering/KDTree.hpp"
 #include "clustering/KMeans.hpp"
 #include "clustering/NeighborSearch.hpp"
 #include "HSS/HSSMatrix.hpp"
@@ -142,18 +143,17 @@ int run(int argc, char *argv[]) {
   if (c.is_root())
     cout << "# matrix size = " << n << " x " << d << endl;
   DenseMatrixWrapper<double> train_matrix(d, n, data_train.data(), d);
+  DenseMatrixWrapper<double> label_matrix(1, n, data_train_label.data(), 1);
 
   HSSPartitionTree cluster_tree;
   cluster_tree.size = n;
   int cluster_size = hss_opts.leaf_size();
 
-  if (reorder == "2means") {
-    DenseMatrixWrapper<double> label_matrix(1, n, data_train_label.data(), 1);
+  if (reorder == "2means")
     recursive_2_means
       (train_matrix, cluster_size, cluster_tree, label_matrix, generator);
-  } else if (reorder == "kd")
-    recursive_kd(data_train.data(), n, d, cluster_size, cluster_tree,
-                 data_train_label.data());
+  else if (reorder == "kd")
+    recursive_kd(train_matrix, cluster_size, cluster_tree, label_matrix);
   else if (reorder == "pca")
     recursive_pca(data_train.data(), n, d, cluster_size, cluster_tree,
                   data_train_label.data());

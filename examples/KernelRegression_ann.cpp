@@ -35,6 +35,7 @@
 #include <vector>
 #include <fstream>
 
+#include "clustering/KDTree.hpp"
 #include "clustering/KMeans.hpp"
 #include "clustering/NeighborSearch.hpp"
 
@@ -173,21 +174,21 @@ int main(int argc, char *argv[]) {
   int m = data_test.size() / d;
   cout << "# matrix size = " << n << " x " << d << endl;
   DenseMatrixWrapper<double> train_matrix(d, n, data_train.data(), d);
+  DenseMatrixWrapper<double> label_matrix(1, n, data_train_label.data(), 1);
 
   HSSPartitionTree cluster_tree;
   cluster_tree.size = n;
   int cluster_size = hss_opts.leaf_size();
-
-  if (reorder == "2means") {
-    DenseMatrixWrapper<double> label_matrix(1, n, data_train_label.data(), 1);
+  timer.start();
+  if (reorder == "2means")
     recursive_2_means
       (train_matrix, cluster_size, cluster_tree, label_matrix, generator);
-  } else if (reorder == "kd")
-    recursive_kd(data_train.data(), n, d, cluster_size, cluster_tree,
-                 data_train_label.data());
+  else if (reorder == "kd")
+    recursive_kd(train_matrix, cluster_size, cluster_tree, label_matrix);
   else if (reorder == "pca")
     recursive_pca(data_train.data(), n, d, cluster_size, cluster_tree,
                   data_train_label.data());
+  cout << "# clustering time = " << timer.elapsed() << " sec" <<endl;
 
   cout << endl << "# Starting HSS compression..." << endl;
   HSSMatrix<double> K;
@@ -204,7 +205,7 @@ int main(int argc, char *argv[]) {
   timer.start();
   find_approximate_neighbors
     (train_matrix, num_iters, ann_number, neighbors, scores, generator);
-  cout << "# ANN time = " << timer.elapsed() << " sec" <<endl;
+  cout << "# ANN time = " << timer.elapsed() << " sec" << endl;
   // Find ANN: end ------------------------------------------------
 
   // Compression: start ------------------------------------------------
@@ -226,29 +227,29 @@ int main(int argc, char *argv[]) {
   cout << "# rank(K) = " << K.rank() << endl;
   cout << "# HSS memory(K) = " << K.memory() / 1e6 << " MB " << endl;
 
-  // Build dense matrix to test error
-  DenseMatrix<double> Kdense(n, n);
-  if (kernel == 1) {
-    for (int c=0; c<n; c++)
-      for (int r=0; r<n; r++) {
-        Kdense(r, c) = Gauss_kernel(&data_train[r*d], &data_train[c*d], d, h);
-        if (r == c) Kdense(r, c) = Kdense(r, c) + lambda;
-      }
-  } else {
-    for (int c=0; c<n; c++)
-      for (int r=0; r<n; r++) {
-        Kdense(r, c) = Laplace_kernel(&data_train[r*d], &data_train[c*d], d, h);
-        if (r == c) Kdense(r, c) = Kdense(r, c) + lambda;
-      }
-  }
+  // // Build dense matrix to test error
+  // DenseMatrix<double> Kdense(n, n);
+  // if (kernel == 1) {
+  //   for (int c=0; c<n; c++)
+  //     for (int r=0; r<n; r++) {
+  //       Kdense(r, c) = Gauss_kernel(&data_train[r*d], &data_train[c*d], d, h);
+  //       if (r == c) Kdense(r, c) = Kdense(r, c) + lambda;
+  //     }
+  // } else {
+  //   for (int c=0; c<n; c++)
+  //     for (int r=0; r<n; r++) {
+  //       Kdense(r, c) = Laplace_kernel(&data_train[r*d], &data_train[c*d], d, h);
+  //       if (r == c) Kdense(r, c) = Kdense(r, c) + lambda;
+  //     }
+  // }
 
-  cout << "# HSS matrix is "<< 100. * K.memory() /  Kdense.memory()
-       << "% of dense" << endl;
+  // cout << "# HSS matrix is "<< 100. * K.memory() /  Kdense.memory()
+  //      << "% of dense" << endl;
 
-  auto Ktest = K.dense();
-  Ktest.scaled_add(-1., Kdense);
-  cout << "# compression error = ||Kdense-K*I||_F/||Kdense||_F = "
-       << Ktest.normF() / Kdense.normF() << endl;
+  // auto Ktest = K.dense();
+  // Ktest.scaled_add(-1., Kdense);
+  // cout << "# compression error = ||Kdense-K*I||_F/||Kdense||_F = "
+  //      << Ktest.normF() / Kdense.normF() << endl;
   // Compression: end ------------------------------------------------
 
   // Factorization and Solve: start-----------------------------------
@@ -274,12 +275,12 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < n; i++)
     sample_vector[i] /= sample_norm;
 
-  DenseMatrixWrapper<double> sample_v(n, 1, &sample_vector[0], n);
+  // DenseMatrixWrapper<double> sample_v(n, 1, &sample_vector[0], n);
   DenseMatrix<double> sample_rhs(n, 1);
-  gemm(Trans::N, Trans::N, 1., Kdense, sample_v, 0., sample_rhs);
+  // gemm(Trans::N, Trans::N, 1., Kdense, sample_v, 0., sample_rhs);
   K.solve(ULV, sample_rhs);
-  sample_v.scaled_add(-1., sample_rhs);
-  cout << "# solution error = " << sample_v.normF() << endl;
+  // sample_v.scaled_add(-1., sample_rhs);
+  // cout << "# solution error = " << sample_v.normF() << endl;
   // Factorization and Solve: end-----------------------------------
 
   // Prediction: start-----------------------------------

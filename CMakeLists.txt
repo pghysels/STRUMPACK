@@ -314,6 +314,7 @@ install(FILES
 install(FILES
   src/clustering/NeighborSearch.hpp
   src/clustering/KMeans.hpp
+  src/clustering/KDTree.hpp
   DESTINATION include/clustering)
 
 install(FILES
