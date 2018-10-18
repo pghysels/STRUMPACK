@@ -177,15 +177,16 @@ namespace strumpack {
       changes = false;
       for (std::size_t i=0; i<n; i++) {
         auto min_dist = Euclidean_distance(d, &p(0, i), &center(0, 0));
-        cluster[i] = 0;
+        int ci = 0;
         for (int c=1; c<k; c++) {
           auto dd = Euclidean_distance(d, &p(0, i), &center(0, c));
-          if (dd <= min_dist) {
+          if (dd < min_dist) {
             min_dist = dd;
-            if (c != cluster[i]) changes = true;
-            cluster[i] = c;
+            ci = c;
           }
         }
+        if (ci != cluster[i]) changes = true;
+        cluster[i] = ci;
       }
       std::fill(nc.begin(), nc.end(), 0);
       center.zero();
