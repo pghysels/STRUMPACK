@@ -128,7 +128,7 @@ namespace strumpack {
     const auto l = labels.rows();
     std::vector<std::size_t> nc(2);
     k_means(2, p, nc, labels, generator);
-    if (nc[0] == 0 || nc[1] == 0) return;
+    if (!nc[0] || !nc[1]) return;
     tree.c.resize(2);
     tree.c[0].size = nc[0];
     tree.c[1].size = nc[1];
@@ -201,25 +201,20 @@ namespace strumpack {
           center(j, c) /= nc[c];
       iter++;
     }
-    // TODO avoid these extra copies, use lapack permutation routine??
-    // can probably permute manually??
-    std::vector<std::size_t> ci(k);
-    DenseMatrix<scalar_t> p_perm(d, n);
-    DenseMatrix<scalar_t> labels_perm(nl, n);
-    std::size_t row = 0;
-    for (int c=0; c<k; c++) {
-      for (std::size_t j=0; j<nc[c]; j++) {
-        while (cluster[ci[c]] != c) ci[c]++;
-        for (std::size_t l=0; l<d; l++)
-          p_perm(l, row) = p(l, ci[c]);
-        for (std::size_t l=0; l<nl; l++)
-          labels_perm(l, row) = labels(l, ci[c]);
-        ci[c]++;
-        row++;
+    // permute the data
+    std::size_t ct = 0;
+    for (int c=0; c<k-1; c++)
+      for (std::size_t j=0, cj=ct; j<nc[c]; j++) {
+        while (cluster[cj] != c) cj++;
+        if (cj != ct) {
+          blas::swap(d, p.ptr(0,cj), 1, p.ptr(0,ct), 1);
+          blas::swap(nl, labels.ptr(0,cj), 1, labels.ptr(0,ct), 1);
+          cluster[cj] = cluster[ct];
+          cluster[ct] = c;
+        }
+        cj++;
+        ct++;
       }
-    }
-    labels = labels_perm;
-    p = p_perm;
   }
 
 } // end namespace strumpack
