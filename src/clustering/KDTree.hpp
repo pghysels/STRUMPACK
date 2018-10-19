@@ -62,21 +62,23 @@ namespace strumpack {
         dim = j;
       }
     }
+
+    std::vector<std::size_t> cluster(n);
+    nc.resize(2);
+    nc[0] = nc[1] = 0;
+
+#if 0 // mean
     // find the mean
     scalar_t mean_value(0.);
     for (std::size_t i=0; i<n; ++i)
       mean_value += p(dim, i);
     mean_value /= n;
     // split the data
-    std::vector<std::size_t> cluster(n);
-    nc.resize(2);
-    nc[0] = nc[1] = 0;
     for (std::size_t i=0; i<n; ++i)
       if (p(dim, i) > mean_value) {
         cluster[i] = 1;
         nc[1]++;
       } else nc[0]++;
-
     // if clusters are too disbalanced, assign trivial clusters
     if ((nc[0] < cluster_size && nc[1] > 100 * cluster_size) ||
         (nc[1] < cluster_size && nc[0] > 100 * cluster_size)) {
@@ -92,6 +94,23 @@ namespace strumpack {
         }
       }
     }
+#else // median
+    std::vector<std::size_t> idx(n);
+    std::iota(idx.begin(), idx.end(), 0);
+    std::nth_element
+      (idx.begin(), idx.begin() + n/2, idx.end(),
+       [&](const std::size_t& a, const std::size_t& b) {
+        return p(dim, a) < p(dim, b);
+      });
+    // split the data
+    nc[0] = n/2;
+    nc[1] = n - n/2;
+    for (std::size_t i=0; i<n/2; i++)
+      cluster[idx[i]] = 0;
+    for (std::size_t i=n/2; i<n; i++)
+      cluster[idx[i]] = 1;
+#endif
+
     // permute the data
     std::size_t ct = 0;
     for (std::size_t j=0, cj=ct; j<nc[0]; j++) {
