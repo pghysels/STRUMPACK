@@ -33,6 +33,7 @@
 #include <complex>
 #include <iostream>
 #include <cassert>
+#include <memory>
 #include "StrumpackParameters.hpp"
 #include "StrumpackFortranCInterface.h"
 
@@ -749,6 +750,17 @@ namespace strumpack {
         (char* jobu, char* jobvt, int* m, int* n, double* a, int* lda,
          double* s, double* u, int* ldu, double* vt, int* ldvt,
          double* work, int* lwork, int* info);
+
+      void FC_GLOBAL(ssyevx,SSYEVX)
+        (char* jobz, char* range, char* uplo, int* n,
+         float* a, int* lda, float* vl, float* vu, int* il, int* iu,
+         float* abstol, int* m, float* w, float* z, int* ldz,
+         float* work, int* lwork, int* iwork, int* ifail, int* info);
+      void FC_GLOBAL(dsyevx,DSYEVX)
+        (char* jobz, char* range, char* uplo, int* n,
+         double* a, int* lda, double* vl, double* vu, int* il, int* iu,
+         double* abstol, int* m, double* w, double* z, int* ldz,
+         double* work, int* lwork, int* iwork, int* ifail, int* info);
     }
 
     inline int ilaenv
@@ -2005,7 +2017,7 @@ namespace strumpack {
       } else return FC_GLOBAL(dlange,DLANGE)(&norm, &m, &n, a, &lda, nullptr);
     }
     inline float lange
-      (char norm, int m, int n, const std::complex<float> *a, int lda) {
+    (char norm, int m, int n, const std::complex<float> *a, int lda) {
       if (norm == 'I' || norm == 'i') {
         auto work = new float[m];
         auto ret = FC_GLOBAL(clange,CLANGE)(&norm, &m, &n, a, &lda, work);
@@ -2014,7 +2026,7 @@ namespace strumpack {
       } else return FC_GLOBAL(clange,CLANGE)(&norm, &m, &n, a, &lda, nullptr);
     }
     inline double lange
-      (char norm, int m, int n, const std::complex<double> *a, int lda) {
+    (char norm, int m, int n, const std::complex<double> *a, int lda) {
       if (norm == 'I' || norm == 'i') {
         auto work = new double[m];
         auto ret = FC_GLOBAL(zlange,ZLANGE)(&norm, &m, &n, a, &lda, work);
@@ -2023,10 +2035,9 @@ namespace strumpack {
       } else return FC_GLOBAL(zlange,ZLANGE)(&norm, &m, &n, a, &lda, nullptr);
     }
 
-
     inline int gesvd
-      (char jobu, char jobvt, int m, int n, float* a, int lda,
-       float* s, float* u, int ldu, float* vt, int ldvt) {
+    (char jobu, char jobvt, int m, int n, float* a, int lda,
+     float* s, float* u, int ldu, float* vt, int ldvt) {
       int info;
       int lwork = -1;
       float swork;
@@ -2042,8 +2053,8 @@ namespace strumpack {
       return info;
     }
     inline int gesvd
-      (char jobu, char jobvt, int m, int n, double* a, int lda,
-       double* s, double* u, int ldu, double* vt, int ldvt) {
+    (char jobu, char jobvt, int m, int n, double* a, int lda,
+     double* s, double* u, int ldu, double* vt, int ldvt) {
       int info;
       int lwork = -1;
       double dwork;
@@ -2059,18 +2070,57 @@ namespace strumpack {
       return info;
     }
     inline int gesvd
-      (char jobu, char jobvt, int m, int n, std::complex<float>* a, int lda,
-       std::complex<float>* s, std::complex<float>* u, int ldu,
-       std::complex<float>* vt, int ldvt) {
+    (char jobu, char jobvt, int m, int n, std::complex<float>* a, int lda,
+     std::complex<float>* s, std::complex<float>* u, int ldu,
+     std::complex<float>* vt, int ldvt) {
       std::cout << "TODO gesvd for std::complex<float>" << std::endl;
       return 0;
     }
     inline int gesvd
-      (char jobu, char jobvt, int m, int n, std::complex<double>* a, int lda,
-       std::complex<double>* s, std::complex<double>* u, int ldu,
-       std::complex<double>* vt, int ldvt) {
+    (char jobu, char jobvt, int m, int n, std::complex<double>* a, int lda,
+     std::complex<double>* s, std::complex<double>* u, int ldu,
+     std::complex<double>* vt, int ldvt) {
       std::cout << "TODO gesvd for std::complex<double>" << std::endl;
       return 0;
+    }
+
+    inline int syevx
+    (char jobz, char range, char uplo, int n, float* a, int lda,
+     float vl, float vu, int il, int iu, float abstol, int& m,
+     float* w, float* z, int ldz) {
+      int info;
+      std::unique_ptr<int[]> iwork(new int[5*n+n]);
+      auto ifail = iwork.get()+5*n;
+      int lwork = -1;
+      float swork;
+      FC_GLOBAL(ssyevx,SSYEVX)
+        (&jobz, &range, &uplo, &n, a, &lda, &vl, &vu, &il, &iu, &abstol, &m,
+         w, z, &ldz, &swork, &lwork, iwork.get(), ifail, &info);
+      lwork = int(swork);
+      std::unique_ptr<float[]> work(new float[lwork]);
+      FC_GLOBAL(ssyevx,SSYEVX)
+        (&jobz, &range, &uplo, &n, a, &lda, &vl, &vu, &il, &iu, &abstol, &m,
+         w, z, &ldz, work.get(), &lwork, iwork.get(), ifail, &info);
+      return info;
+    }
+    inline int syevx
+    (char jobz, char range, char uplo, int n, double* a, int lda,
+     double vl, double vu, int il, int iu, double abstol, int& m,
+     double* w, double* z, int ldz) {
+      int info;
+      std::unique_ptr<int[]> iwork(new int[5*n+n]);
+      auto ifail = iwork.get()+5*n;
+      int lwork = -1;
+      double dwork;
+      FC_GLOBAL(dsyevx,DSYEVX)
+        (&jobz, &range, &uplo, &n, a, &lda, &vl, &vu, &il, &iu, &abstol, &m,
+         w, z, &ldz, &dwork, &lwork, iwork.get(), ifail, &info);
+      lwork = int(dwork);
+      std::unique_ptr<double[]> work(new double[lwork]);
+      FC_GLOBAL(dsyevx,DSYEVX)
+        (&jobz, &range, &uplo, &n, a, &lda, &vl, &vu, &il, &iu, &abstol, &m,
+         w, z, &ldz, work.get(), &lwork, iwork.get(), ifail, &info);
+      return info;
     }
 
   } //end namespace blas

@@ -315,6 +315,7 @@ install(FILES
   src/clustering/NeighborSearch.hpp
   src/clustering/KMeans.hpp
   src/clustering/KDTree.hpp
+  src/clustering/PCAPartitioning.hpp
   DESTINATION include/clustering)
 
 install(FILES

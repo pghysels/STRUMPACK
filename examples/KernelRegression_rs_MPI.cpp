@@ -35,6 +35,7 @@
 #include <vector>
 #include <fstream>
 
+#include "clustering/PCAPartitioning.hpp"
 #include "clustering/KDTree.hpp"
 #include "clustering/KMeans.hpp"
 #include "HSS/HSSMatrix.hpp"
@@ -234,9 +235,7 @@ int run(int argc, char *argv[]) {
   else if (reorder == "kd")
     recursive_kd(train_matrix, cluster_size, cluster_tree, label_matrix);
   else if (reorder == "pca")
-    recursive_pca(data_train.data(), n, d, cluster_size, cluster_tree,
-                  data_train_label.data());
-
+    recursive_pca(train_matrix, cluster_size, cluster_tree, label_matrix);
 
   if (c.is_root())
     cout << "starting HSS compression .. " << endl;
