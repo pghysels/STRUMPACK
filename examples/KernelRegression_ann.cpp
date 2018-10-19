@@ -35,6 +35,7 @@
 #include <vector>
 #include <fstream>
 
+#include "clustering/CobblePartitioning.hpp"
 #include "clustering/PCAPartitioning.hpp"
 #include "clustering/KDTree.hpp"
 #include "clustering/KMeans.hpp"
@@ -121,9 +122,9 @@ int main(int argc, char *argv[]) {
   string mode("test");
 
   cout << endl
-       << "# usage: ./KernelRegression_mf file d h lambda "
-       << "kern(1=Gau,2=Lapl) "
-       << "reorder(nat, 2means, kd, pca) mode(valid, test)"
+       << "# usage: ./KernelRegression_ann file d h lambda "
+       << "kern(1=Gauss,2=Laplace) "
+       << "reorder(natural, 2means, kd, pca, cobble) mode(valid, test)"
        << endl;
 
   if (argc > 1) filename = string(argv[1]);
@@ -188,6 +189,8 @@ int main(int argc, char *argv[]) {
     recursive_kd(train_matrix, cluster_size, cluster_tree, label_matrix);
   else if (reorder == "pca")
     recursive_pca(train_matrix, cluster_size, cluster_tree, label_matrix);
+  else if (reorder == "cobble")
+    recursive_cobble(train_matrix, cluster_size, cluster_tree, label_matrix);
   cout << "# clustering time = " << timer.elapsed() << " sec" <<endl;
 
   cout << endl << "# Starting HSS compression..." << endl;

@@ -26,8 +26,8 @@
  *             Division).
  *
  */
-#ifndef KDTREE_PARTITIONING_HPP
-#define KDTREE_PARTITIONING_HPP
+#ifndef COBBLE_PARTITIONING_HPP
+#define COBBLE_PARTITIONING_HPP
 
 #include <vector>
 #include <random>
@@ -38,78 +38,54 @@
 
 namespace strumpack {
 
-  template<typename scalar_t> void kd_partition
+  template<typename scalar_t,
+           typename real_t=typename RealType<scalar_t>::value_type>
+  void cobble_partition
   (DenseMatrix<scalar_t>& p, std::vector<std::size_t>& nc,
-   DenseMatrix<scalar_t>& labels, std::size_t cluster_size) {
-    auto n = p.cols();
+   DenseMatrix<scalar_t>& labels) {
     auto d = p.rows();
+    auto n = p.cols();
     auto nl = labels.rows();
-    // find coordinate of the most spread
-    std::vector<scalar_t> maxs(d), mins(d);
-    for (std::size_t j=0; j<d; ++j)
-      maxs[j] = mins[j] = p(j, 0);
-    for (std::size_t i=1; i<n; ++i)
-      for (std::size_t j=0; j<d; ++j) {
-        maxs[j] = std::max(p(j, i), maxs[j]);
-        mins[j] = std::min(p(j, i), mins[j]);
-      }
-    scalar_t max_var = maxs[0] - mins[0];
-    std::size_t dim = 0;
-    for (std::size_t j=1; j<d; ++j) {
-      auto t = maxs[j] - mins[j];
-      if (t > max_var) {
-        max_var = t;
-        dim = j;
+    // find centroid
+    std::vector<scalar_t> centroid(d);
+    for (std::size_t i=0; i<n; i++)
+      for (std::size_t j=0; j<d; j++)
+        centroid[j] += p(j, i);
+    for (std::size_t j=0; j<d; j++)
+      centroid[j] /= n;
+
+    // find farthest point from centroid
+    std::size_t first_index = 0;
+    real_t max_dist(-1);
+    for (std::size_t i=0; i<n; i++) {
+      auto dd = Euclidean_distance(d, p.ptr(0, i), centroid.data());
+      if (dd > max_dist) {
+        max_dist = dd;
+        first_index = i;
       }
     }
 
-    std::vector<int> cluster(n);
-    nc.resize(2);
-    nc[0] = nc[1] = 0;
+    // compute and sort distance from the firsth point
+    std::vector<real_t> dists(n);
+    for (std::size_t i=0; i<n; i++)
+      dists[i] = Euclidean_distance(d, p.ptr(0, i), p.ptr(0, first_index));
 
-#if 0 // mean
-    // find the mean
-    scalar_t mean_value(0.);
-    for (std::size_t i=0; i<n; ++i)
-      mean_value += p(dim, i);
-    mean_value /= n;
-    // split the data
-    for (std::size_t i=0; i<n; ++i)
-      if (p(dim, i) > mean_value) {
-        cluster[i] = 1;
-        nc[1]++;
-      } else nc[0]++;
-    // if clusters are too disbalanced, assign trivial clusters
-    if ((nc[0] < cluster_size && nc[1] > 100 * cluster_size) ||
-        (nc[1] < cluster_size && nc[0] > 100 * cluster_size)) {
-      // TODO should we still sort the data??
-      nc[0] = nc[1] = 0;
-      for (std::size_t i=0; i<n; i++) {
-        if (i <= n / 2) {
-          cluster[i] = 0;
-          nc[0]++;
-        } else {
-          cluster[i] = 1;
-          nc[1]++;
-        }
-      }
-    }
-#else // median
     std::vector<std::size_t> idx(n);
     std::iota(idx.begin(), idx.end(), 0);
     std::nth_element
       (idx.begin(), idx.begin() + n/2, idx.end(),
        [&](const std::size_t& a, const std::size_t& b) {
-        return p(dim, a) < p(dim, b);
+        return dists[a] < dists[b];
       });
+
     // split the data
     nc[0] = n/2;
     nc[1] = n - n/2;
+    std::vector<int> cluster(n);
     for (std::size_t i=0; i<n/2; i++)
       cluster[idx[i]] = 0;
     for (std::size_t i=n/2; i<n; i++)
       cluster[idx[i]] = 1;
-#endif
 
     // permute the data
     std::size_t ct = 0;
@@ -126,7 +102,7 @@ namespace strumpack {
     }
   }
 
-  template<typename scalar_t> void recursive_kd
+  template<typename scalar_t> void recursive_cobble
   (DenseMatrix<scalar_t>& p, std::size_t cluster_size,
    HSS::HSSPartitionTree& tree, DenseMatrix<scalar_t>& labels) {
     auto n = p.cols();
@@ -134,7 +110,7 @@ namespace strumpack {
     auto l = labels.rows();
     if (n < cluster_size) return;
     std::vector<std::size_t> nc(2);
-    kd_partition(p, nc, labels, cluster_size);
+    cobble_partition(p, nc, labels);
     if (!nc[0] || !nc[1]) return;
     tree.c.resize(2);
     tree.c[0].size = nc[0];
@@ -142,14 +118,14 @@ namespace strumpack {
     {
       DenseMatrixWrapper<scalar_t> p0(d, nc[0], p, 0, 0);
       DenseMatrixWrapper<scalar_t> l0(l, nc[0], labels, 0, 0);
-      recursive_kd(p0, cluster_size, tree.c[0], l0);
+      recursive_cobble(p0, cluster_size, tree.c[0], l0);
     } {
       DenseMatrixWrapper<scalar_t> p1(d, nc[1], p, 0, nc[0]);
       DenseMatrixWrapper<scalar_t> l1(l, nc[1], labels, 0, nc[0]);
-      recursive_kd(p1, cluster_size, tree.c[1], l1);
+      recursive_cobble(p1, cluster_size, tree.c[1], l1);
     }
   }
 
 } // end namespace strumpack
 
-#endif // KDTREE_PARTITIONING_HPP
+#endif // COBBLE_PARTITIONING_HPP

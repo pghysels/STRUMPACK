@@ -316,6 +316,7 @@ install(FILES
   src/clustering/KMeans.hpp
   src/clustering/KDTree.hpp
   src/clustering/PCAPartitioning.hpp
+  src/clustering/CobblePartitioning.hpp
   DESTINATION include/clustering)
 
 install(FILES
