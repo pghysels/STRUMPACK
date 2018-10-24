@@ -448,9 +448,9 @@ namespace strumpack {
       }
     }
 #if defined(STRUMPACK_COUNT_FLOPS)
-    if (!params::flops.is_lock_free())
-      std::cerr << "# WARNING: the flop counter is not lock free"
-                << std::endl;
+    // if (!params::flops.is_lock_free())
+    //   std::cerr << "# WARNING: the flop counter is not lock free"
+    //             << std::endl;
 #endif
     opts_.HSS_options().set_synchronized_compression(true);
   }

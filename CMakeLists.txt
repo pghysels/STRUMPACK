@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.2)
-#project(STRUMPACK CXX C Fortran)
-project(STRUMPACK NONE)
+project(STRUMPACK CXX C Fortran)
+#project(STRUMPACK NONE)
 
 ## Metis is required for now
 # option(STRUMPACK_USE_METIS "Build with support for Metis" ON)
@@ -21,14 +21,14 @@ option(STRUMPACK_C_INTERFACE "Build the C interface" ON)
 
 ######################################################################
 # IDEAS: xSDK standards module
-set(USE_XSDK_DEFAULTS FALSE)
-set(XSDK_ENABLE_CXX ON)
-set(XSDK_ENABLE_C ON)
-set(XSDK_ENABLE_Fortran ON)
-include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/XSDKDefaults.cmake")
+# set(USE_XSDK_DEFAULTS FALSE)
+# set(XSDK_ENABLE_CXX ON)
+# set(XSDK_ENABLE_C ON)
+# set(XSDK_ENABLE_Fortran ON)
+# include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/XSDKDefaults.cmake")
+# enable_language(CXX C Fortran)
 ######################################################################
 
-enable_language(CXX C Fortran)
 
 if(NOT STRUMPACK_USE_MPI)
   if(TPL_ENABLE_PARMETIS)
@@ -190,12 +190,14 @@ int main() {
 }
 " STRUMPACK_ATOMICS_WITHOUT_LIB)
 if(NOT STRUMPACK_ATOMICS_WITHOUT_LIB)
-  check_library_exists(atomic __atomic_fetch_add_8 ""
-    STRUMPACK_LIBCXX_HAS_ATOMIC_LIB)
-  if(STRUMPACK_LIBCXX_HAS_ATOMIC_LIB)
-    set(LIBS ${LIBS} "-latomic")
+  find_library(STRUMPACK_LIB_ATOMIC
+    NAMES atomic atomic atomic.so.1 libatomic.so.1)
+  if(STRUMPACK_LIB_ATOMIC)
+    message(STATUS "Found libatomic at ${STRUMPACK_LIB_ATOMIC}")
+    set(LIBS ${LIBS} ${STRUMPACK_LIB_ATOMIC})
   else()
-    message(STATUS "Failed to find required libatomic")
+    message(WARNING "Failed to find required -latomic, trying to link with -latomic anyway")
+    set(LIBS ${LIBS} "-latomic")
   endif()
 endif()
 
