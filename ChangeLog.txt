@@ -1,3 +1,9 @@
+Version 3.1.1 Released October 25, 2018
+=======================================
+ - Fix check for libatomic, needs to be linked explicitly on some
+   versions of Clang
+ - Do not call the IDEAS: xSDK standards module
+
 Version 3.1.0 Released October 18, 2018
 =======================================
  - Changes to the build system for xSDK compliance.

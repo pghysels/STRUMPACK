@@ -28,7 +28,7 @@ if [[ $NERSC_HOST = "cori" ]]; then
     SLATEHOME=$HOME/local/cori/slate/
 
     cmake ../ \
-          -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_INSTALL_PREFIX=../install \
           -DCMAKE_CXX_COMPILER=CC \
           -DCMAKE_C_COMPILER=cc \
@@ -70,7 +70,8 @@ if [[ $(hostname -s) = "pieterg-X8DA3" ]]; then
     cmake ../ \
           -DCMAKE_BUILD_TYPE=Debug \
           -DCMAKE_INSTALL_PREFIX=../install \
-          -DSTRUMPACK_USE_MPI=OFF \
+          -DSTRUMPACK_USE_MPI=ON \
+          -DSTRUMPACK_BUILD_TESTS=ON \
           -DSTRUMPACK_USE_OPENMP=ON \
           -DSTRUMPACK_C_INTERFACE=ON \
           -DTPL_ENABLE_PARMETIS=ON \
