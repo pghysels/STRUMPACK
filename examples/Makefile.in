@@ -1,6 +1,4 @@
-all: KernelRegression_ann \
-	KernelRegression_ann_MPI KernelRegression_rs_MPI \
-	scratch
+all: KernelRegression_ann KernelRegression_ann_MPI
 
 all_old: @C_EXAMPLES@ testPoisson2d testPoisson3d	\
 	testPoisson2dMPI testPoisson2dMPIDist testPoisson3dMPIDist	\
