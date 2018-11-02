@@ -154,8 +154,10 @@ int run(int argc, char *argv[]) {
 
   int n = data_train.size() / d;
   int m = data_test.size() / d;
-  if (c.is_root())
+  if (c.is_root()){
     cout << "# matrix size = " << n << " x " << d << endl;
+    cout << "# test size = " << m << " x " << d << endl;
+  }
   DenseMatrixWrapper<real_t> train_matrix(d, n, data_train.data(), d);
   DenseMatrixWrapper<real_t> label_matrix(1, n, data_train_label.data(), 1);
 

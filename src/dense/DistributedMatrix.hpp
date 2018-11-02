@@ -1336,6 +1336,7 @@ namespace strumpack {
          _J.data(), gpiv.data(), &rank, rel_tol, abs_tol);
     else std::iota(gpiv.begin(), gpiv.end(), 1);
     piv.resize(lcols()+NB());
+    // rank = std::min(rank, 1000);
     ind.resize(rank);
     for (int c=0; c<lcols(); c++) piv[c] = gpiv[coll2g(c)];
     for (int c=0; c<rank; c++) ind[c] = _J[c]-1;
