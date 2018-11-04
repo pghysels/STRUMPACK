@@ -77,7 +77,7 @@ namespace strumpack {
     const auto n = p.cols();
     const auto d = p.rows();
     // find centroid
-    std::vector<real_t> centroid(d);
+    std::vector<scalar_t> centroid(d);
     for (std::size_t i=0; i<n; i++)
       for (std::size_t j=0; j<d; j++)
         centroid[j] += p(j, i);
