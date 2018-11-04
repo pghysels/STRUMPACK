@@ -35,13 +35,15 @@
 #include <vector>
 #include <fstream>
 
+typedef float real_t;
+
 #include "clustering/PCAPartitioning.hpp"
 #include "clustering/KDTree.hpp"
 #include "clustering/KMeans.hpp"
 #include "clustering/NeighborSearch.hpp"
 #include "HSS/HSSMatrix.hpp"
 #include "misc/TaskTimer.hpp"
-#include "FileManipulation.h"
+// #include "FileManipulation.h"
 #include "preprocessing.h"
 #include "dense/DistributedMatrix.hpp"
 
@@ -53,20 +55,20 @@ using namespace strumpack::HSS;
 mt19937 generator(1); // Fixed seed
 
 class KernelMPI {
-  using DenseM_t = DenseMatrix<double>;
-  using DenseMW_t = DenseMatrixWrapper<double>;
-  using DistM_t = DistributedMatrix<double>;
-  using DistMW_t = DistributedMatrixWrapper<double>;
+  using DenseM_t = DenseMatrix<real_t>;
+  using DenseMW_t = DenseMatrixWrapper<real_t>;
+  using DistM_t = DistributedMatrix<real_t>;
+  using DistMW_t = DistributedMatrixWrapper<real_t>;
 
 public:
-  vector<double> data_;
+  vector<real_t> data_;
   size_t d_ = 0;
   size_t n_ = 0;
-  double h_ = 0.;
-  double l_ = 0.;
+  real_t h_ = 0.;
+  real_t l_ = 0.;
   KernelMPI() = default;
 
-  KernelMPI(vector<double> data, int d, double h, double l)
+  KernelMPI(vector<real_t> data, int d, real_t h, real_t l)
     : data_(std::move(data)), d_(d), n_(data_.size() / d_), h_(h), l_(l) {
     assert(n_ * d_ == data_.size());
   }
@@ -93,6 +95,19 @@ public:
   }
 };
 
+vector<real_t> read_from_file(string filename) {
+  vector<real_t> data;
+  ifstream f(filename);
+  string l;
+  while (getline(f, l)) {
+    istringstream sl(l);
+    string s;
+    while (getline(sl, s, ','))
+      data.push_back(stod(s));
+  }
+  return data;
+}
+
 int run(int argc, char *argv[]) {
   MPIComm c;
   BLACSGrid grid(c);
@@ -100,10 +115,10 @@ int run(int argc, char *argv[]) {
   string filename("smalltest.dat");
   int d = 2;
   string reorder("natural");
-  double h = 3.;
-  double lambda = 1.;
+  real_t h = 3.;
+  real_t lambda = 1.;
   int kernel = 1; // Gaussian=1, Laplace=2
-  double total_time = 0.;
+  real_t total_time = 0.;
   string mode("test");
 
   if (c.is_root())
@@ -128,23 +143,23 @@ int run(int argc, char *argv[]) {
     cout << "# validation/test = " << mode << endl;
   }
 
-  HSSOptions<double> hss_opts;
+  HSSOptions<real_t> hss_opts;
   hss_opts.set_verbose(true);
   hss_opts.set_from_command_line(argc, argv);
 
-  vector<double> data_train = write_from_file(filename + "_train.csv");
-  vector<double> data_test = write_from_file(filename + "_" + mode + ".csv");
-  vector<double> data_train_label =
-      write_from_file(filename + "_train_label.csv");
-  vector<double> data_test_label =
-      write_from_file(filename + "_" + mode + "_label.csv");
+  vector<real_t> data_train       = read_from_file(filename + "_train.csv");
+  vector<real_t> data_test        = read_from_file(filename + "_" + mode + ".csv");
+  vector<real_t> data_train_label = read_from_file(filename + "_train_label.csv");
+  vector<real_t> data_test_label  = read_from_file(filename + "_" + mode + "_label.csv");
 
   int n = data_train.size() / d;
   int m = data_test.size() / d;
-  if (c.is_root())
+  if (c.is_root()){
     cout << "# matrix size = " << n << " x " << d << endl;
-  DenseMatrixWrapper<double> train_matrix(d, n, data_train.data(), d);
-  DenseMatrixWrapper<double> label_matrix(1, n, data_train_label.data(), 1);
+    cout << "# test size = " << m << " x " << d << endl;
+  }
+  DenseMatrixWrapper<real_t> train_matrix(d, n, data_train.data(), d);
+  DenseMatrixWrapper<real_t> label_matrix(1, n, data_train_label.data(), 1);
 
   HSSPartitionTree cluster_tree;
   cluster_tree.size = n;
@@ -168,7 +183,7 @@ int run(int argc, char *argv[]) {
   int ann_number = 64;
   int num_iters = 5;
   DenseMatrix<size_t> neighbors;
-  DenseMatrix<double> scores;
+  DenseMatrix<real_t> scores;
   timer.start();
   find_approximate_neighbors
     (train_matrix, num_iters, ann_number, neighbors, scores, generator);
@@ -181,15 +196,15 @@ int run(int argc, char *argv[]) {
   if (c.is_root())
     cout << "starting HSS compression .. " << endl;
 
-  HSSMatrixMPI<double> K;
+  HSSMatrixMPI<real_t> K;
   timer.start();
   KernelMPI kernel_matrix(data_train, d, h, lambda);
   // Constructor for ANN compression
   if (reorder != "natural")
-    K = HSSMatrixMPI<double>
+    K = HSSMatrixMPI<real_t>
       (cluster_tree, &grid, neighbors, scores, kernel_matrix, hss_opts);
   else
-    K = HSSMatrixMPI<double>
+    K = HSSMatrixMPI<real_t>
       (n, n, &grid, neighbors, scores, kernel_matrix, hss_opts);
   if (c.is_root())
     cout << "# compression time = " << timer.elapsed() << endl;
@@ -221,10 +236,10 @@ int run(int argc, char *argv[]) {
     cout << "# factorization time = " << timer.elapsed() << endl;
   total_time += timer.elapsed();
 
-  DenseMatrix<double> B;
-  DistributedMatrix<double> wdist(&grid, n, 1);
+  DenseMatrix<real_t> B;
+  DistributedMatrix<real_t> wdist(&grid, n, 1);
   if (c.is_root())
-    B = DenseMatrix<double>(n, 1, &data_train_label[0], n);
+    B = DenseMatrix<real_t>(n, 1, &data_train_label[0], n);
   wdist.scatter(B);
 
   if (c.is_root())
@@ -246,7 +261,7 @@ int run(int argc, char *argv[]) {
     auto Ktest = KtestD.gather(); // Gather matrix to rank 0
     if (c.is_root()) {
       // Build dense matrix to test error
-      DenseMatrix<double> Kdense(n, n);
+      DenseMatrix<real_t> Kdense(n, n);
       if (kernel == 1) {
         for (int c=0; c<n; c++) {
           for (int r=0; r<n; r++)
@@ -273,7 +288,7 @@ int run(int argc, char *argv[]) {
   // if (c.is_root()) {
   //   cout << "# Starting prediction step" << endl;
   //   timer.start();
-  //   std::vector<double> prediction(m);
+  //   std::vector<real_t> prediction(m);
   //   if (kernel == 1) {
   //     for (int c = 0; c < m; c++)
   //       for (int r = 0; r < n; r++) {
@@ -293,9 +308,9 @@ int run(int argc, char *argv[]) {
   //     prediction[i] = ((prediction[i] > 0) ? 1. : -1.);
 
   //   // compute accuracy score of prediction
-  //   double incorrect_quant = 0;
+  //   real_t incorrect_quant = 0;
   //   for (int i = 0; i < m; ++i) {
-  //     double a = (prediction[i] - data_test_label[i]) / 2;
+  //     real_t a = (prediction[i] - data_test_label[i]) / 2;
   //     incorrect_quant += (a > 0 ? a : -a);
   //   }
   //   if (c.is_root()){

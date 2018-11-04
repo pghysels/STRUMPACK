@@ -49,7 +49,7 @@ namespace strumpack {
     scalar_t lambda;
     DenseMatrix<scalar_t> Z(d, 1);
     DenseMatrix<scalar_t> ptp(d, d);
-    gemm(Trans::N, Trans::C, scalar_t(1.), p, p, 0., ptp);
+    gemm(Trans::N, Trans::C, scalar_t(1.), p, p, scalar_t(0.), ptp);
     double abstol = 1e-5;
     blas::syevx('V', 'I', 'U', d, ptp.data(), d, scalar_t(1.),
                 scalar_t(1.), d, d, abstol, num, &lambda, Z.data(), d);

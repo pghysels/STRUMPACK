@@ -35,6 +35,8 @@
 #include <vector>
 #include <fstream>
 
+typedef float real_t;
+
 #include "clustering/CobblePartitioning.hpp"
 #include "clustering/PCAPartitioning.hpp"
 #include "clustering/KDTree.hpp"
@@ -43,7 +45,7 @@
 
 #include "HSS/HSSMatrix.hpp"
 #include "misc/TaskTimer.hpp"
-#include "FileManipulation.h"
+// #include "FileManipulation.h"
 #include "preprocessing.h"
 
 using namespace std;
@@ -54,17 +56,17 @@ using namespace strumpack::HSS;
 mt19937 generator(1);
 
 class Kernel {
-  using DenseM_t = DenseMatrix<double>;
-  using DenseMW_t = DenseMatrixWrapper<double>;
+  using DenseM_t = DenseMatrix<real_t>;
+  using DenseMW_t = DenseMatrixWrapper<real_t>;
 
 public:
-  const double* data_;
+  const real_t* data_;
   size_t d_ = 0;
   size_t n_ = 0;
-  double h_ = 0.;
-  double l_ = 0.;
+  real_t h_ = 0.;
+  real_t l_ = 0.;
 
-  Kernel(const std::vector<double>& data, int d, double h, double l)
+  Kernel(const std::vector<real_t>& data, int d, real_t h, real_t l)
     : data_(data.data()), d_(d), n_(data.size() / d_), h_(h), l_(l) { }
 
   void operator()
@@ -80,6 +82,7 @@ public:
   void times(DenseM_t& Rr, DenseM_t& Sr) {
     assert(Rr.rows() == n_);
     Sr.zero();
+    real_t one = 1.0;
     const size_t B = 64;
     DenseM_t Asub(B, B);
 #pragma omp parallel for firstprivate(Asub) schedule(dynamic)
@@ -101,7 +104,7 @@ public:
         DenseMW_t Rblock(Bc, Rr.cols(), Rr, c, 0);
         DenseMW_t Sblock(Br, Sr.cols(), Sr, r, 0);
         // multiply block of A with a row-block of Rr and add result to Sr
-        gemm(Trans::N, Trans::N, 1., Ablock, Rblock, 1., Sblock);
+        gemm(Trans::N, Trans::N, real_t(1.0), Ablock, Rblock, real_t(1.0), Sblock);
       }
     }
   }
@@ -112,12 +115,25 @@ public:
   }
 };
 
+vector<real_t> read_from_file(string filename) {
+  vector<real_t> data;
+  ifstream f(filename);
+  string l;
+  while (getline(f, l)) {
+    istringstream sl(l);
+    string s;
+    while (getline(sl, s, ','))
+      data.push_back(stod(s));
+  }
+  return data;
+}
+
 int main(int argc, char *argv[]) {
   string filename("smalltest.dat");
   int d = 2;
   string reorder("natural");
-  double h = 3.;
-  double lambda = 1.;
+  real_t h = 3.;
+  real_t lambda = 1.;
   int kernel = 1; // Gaussian=1, Laplace=2
   string mode("test");
 
@@ -146,7 +162,7 @@ int main(int argc, char *argv[]) {
   TaskTimer::t_begin = GET_TIME_NOW();
   TaskTimer timer(string("compression"), 1);
 
-  HSSOptions<double> hss_opts;
+  HSSOptions<real_t> hss_opts;
   hss_opts.set_verbose(true);
   hss_opts.set_from_command_line(argc, argv);
 
@@ -166,17 +182,17 @@ int main(int argc, char *argv[]) {
   string data_test_lab_FILE  = filename + "_" + mode + "_label.csv";
 
   // Read from csv file
-  vector<double> data_train       = write_from_file(data_train_dat_FILE);
-  vector<double> data_train_label = write_from_file(data_train_lab_FILE);
-  vector<double> data_test        = write_from_file(data_test_dat_FILE);
-  vector<double> data_test_label  = write_from_file(data_test_lab_FILE);
+  vector<real_t> data_train       = read_from_file(data_train_dat_FILE);
+  vector<real_t> data_train_label = read_from_file(data_train_lab_FILE);
+  vector<real_t> data_test        = read_from_file(data_test_dat_FILE);
+  vector<real_t> data_test_label  = read_from_file(data_test_lab_FILE);
   cout << "# Reading took " << timer.elapsed() << endl;
 
   int n = data_train.size() / d;
   int m = data_test.size() / d;
   cout << "# matrix size = " << n << " x " << d << endl;
-  DenseMatrixWrapper<double> train_matrix(d, n, data_train.data(), d);
-  DenseMatrixWrapper<double> label_matrix(1, n, data_train_label.data(), 1);
+  DenseMatrixWrapper<real_t> train_matrix(d, n, data_train.data(), d);
+  DenseMatrixWrapper<real_t> label_matrix(1, n, data_train_label.data(), 1);
 
   HSSPartitionTree cluster_tree;
   cluster_tree.size = n;
@@ -194,17 +210,17 @@ int main(int argc, char *argv[]) {
   cout << "# clustering time = " << timer.elapsed() << " sec" <<endl;
 
   cout << endl << "# Starting HSS compression..." << endl;
-  HSSMatrix<double> K;
+  HSSMatrix<real_t> K;
   if (reorder != "natural")
-    K = HSSMatrix<double>(cluster_tree, hss_opts);
+    K = HSSMatrix<real_t>(cluster_tree, hss_opts);
   else
-    K = HSSMatrix<double>(n, n, hss_opts);
+    K = HSSMatrix<real_t>(n, n, hss_opts);
 
   // Find ANN: start ------------------------------------------------
   int ann_number = 64;
   int num_iters = 5;
   DenseMatrix<size_t> neighbors;
-  DenseMatrix<double> scores;
+  DenseMatrix<real_t> scores;
   timer.start();
   find_approximate_neighbors
     (train_matrix, num_iters, ann_number, neighbors, scores, generator);
@@ -231,7 +247,7 @@ int main(int argc, char *argv[]) {
   cout << "# HSS memory(K) = " << K.memory() / 1e6 << " MB " << endl;
 
   // // Build dense matrix to test error
-  // DenseMatrix<double> Kdense(n, n);
+  // DenseMatrix<real_t> Kdense(n, n);
   // if (kernel == 1) {
   //   for (int c=0; c<n; c++)
   //     for (int r=0; r<n; r++) {
@@ -261,25 +277,25 @@ int main(int argc, char *argv[]) {
   auto ULV = K.factor();
   cout << "# factorization time = " << timer.elapsed() << endl;
 
-  DenseMatrix<double> B(n, 1, &data_train_label[0], n);
-  DenseMatrix<double> weights(B);
+  DenseMatrix<real_t> B(n, 1, &data_train_label[0], n);
+  DenseMatrix<real_t> weights(B);
 
   cout << endl << "# Solution start..." << endl;
   timer.start();
   K.solve(ULV, weights);
   cout << "# solve time = " << timer.elapsed() << endl;
 
-  vector<double> sample_vector(n); // Generate random vector
-  normal_distribution<double> normal_distr(0.0,1.0);
+  vector<real_t> sample_vector(n); // Generate random vector
+  normal_distribution<real_t> normal_distr(0.0,1.0);
   for (int i = 0; i < n; i++) {
     sample_vector[i] = normal_distr(generator);
   }
-  double sample_norm = norm(&sample_vector[0], n);
+  real_t sample_norm = norm(&sample_vector[0], n);
   for (int i = 0; i < n; i++)
     sample_vector[i] /= sample_norm;
 
-  // DenseMatrixWrapper<double> sample_v(n, 1, &sample_vector[0], n);
-  DenseMatrix<double> sample_rhs(n, 1);
+  // DenseMatrixWrapper<real_t> sample_v(n, 1, &sample_vector[0], n);
+  DenseMatrix<real_t> sample_rhs(n, 1);
   // gemm(Trans::N, Trans::N, 1., Kdense, sample_v, 0., sample_rhs);
   K.solve(ULV, sample_rhs);
   // sample_v.scaled_add(-1., sample_rhs);
@@ -289,7 +305,7 @@ int main(int argc, char *argv[]) {
   // Prediction: start-----------------------------------
   cout << endl << "# Prediction start..." << endl;
   timer.start();
-  std::vector<double> prediction(m);
+  std::vector<real_t> prediction(m);
   if (kernel == 1) {
     for (int c = 0; c < m; c++)
       for (int r = 0; r < n; r++)
@@ -308,9 +324,9 @@ int main(int argc, char *argv[]) {
     prediction[i] = ((prediction[i] > 0) ? 1. : -1.);
 
   // compute accuracy score of prediction
-  double incorrect_quant = 0;
+  real_t incorrect_quant = 0;
   for (int i = 0; i < m; ++i) {
-    double a = (prediction[i] - data_test_label[i]) / 2;
+    real_t a = (prediction[i] - data_test_label[i]) / 2;
     incorrect_quant += (a > 0 ? a : -a);
   }
 
