@@ -97,6 +97,7 @@ namespace strumpack {
         compute_local_samples_ann(ann, scores, w, Aelem, opts);
         compute_U_V_bases_ann(w.S, opts, w, depth);
         this->_U_state = this->_V_state = State::COMPRESSED;
+        w.c.clear();
       }
     }
 
