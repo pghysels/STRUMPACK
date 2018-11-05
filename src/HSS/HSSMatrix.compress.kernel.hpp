@@ -156,7 +156,6 @@ namespace strumpack {
         w.c[0].Ir.size() + w.c[1].Ir.size() + opts.dd();
       auto d = std::min(w.ids_scores.size(), d_max);
 
-      std::vector<std::size_t> Scolids;
       if (d < w.ids_scores.size()) {
         // sort based on scores, keep only d closest
         std::nth_element
@@ -166,11 +165,53 @@ namespace strumpack {
             return a.second < b.second; });
         w.ids_scores.resize(d);
       }
-      Scolids.reserve(d);
+
+      std::vector<std::size_t> Scolids(d);
       for (std::size_t j=0; j<d; j++)
-        Scolids.push_back(w.ids_scores[j].first);
+        Scolids[j] = w.ids_scores[j].first;
       w.S = DenseM_t(I.size(), Scolids.size());
       Aelem(I, Scolids, w.S);
+      return;
+
+      // sort based on ids; this is needed in the parent, see below
+      std::sort(w.ids_scores.begin(), w.ids_scores.end());
+
+      if (this->leaf()) {
+        std::vector<std::size_t> Scolids(d);
+        for (std::size_t j=0; j<d; j++)
+          Scolids[j] = w.ids_scores[j].first;
+        w.S = DenseM_t(I.size(), Scolids.size());
+        Aelem(I, Scolids, w.S);
+      } else {
+        w.S = DenseM_t(I.size(), d);
+        for (int c=0; c<2; c++) {
+          std::size_t m = w.c[c].Ir.size();
+          auto it_lo = w.c[c].ids_scores.begin();
+          auto it_end = w.c[c].ids_scores.end();
+          auto dm = (c == 0) ? 0 : w.c[0].Ir.size();
+          std::vector<std::size_t> idj(1);
+          for (std::size_t j=0; j<d; j++) {
+            idj[0] = w.ids_scores[j].first;
+            // this assumes the ids_scores of the child is sorted on ids
+            // find the first element that has an id not less than idj[0]
+            auto l = std::lower_bound
+              (it_lo, it_end, idj[0],
+               [](const std::pair<std::size_t,double>& a,
+                  const std::size_t& b) { return a.first < b; });
+            it_lo = l;
+            if (l != it_end && l->first == idj[0]) {
+              // found the idj[0] in the child, hence, the column was
+              // already computed by the child
+              auto li = std::distance(w.c[c].ids_scores.begin(), l);
+              for (std::size_t i=0; i<m; i++)
+                w.S(dm+i, j) = w.c[c].S(w.c[c].Jr[i], li);
+            } else {
+              DenseMW_t colj(m, 1, w.S, dm, j);
+              Aelem(w.c[c].Ir, idj, colj);
+            }
+          }
+        }
+      }
     }
 
     template<typename scalar_t> bool
@@ -182,7 +223,7 @@ namespace strumpack {
       DenseM_t wSr(S);
       wSr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol, opts.max_rank(), depth);
       STRUMPACK_ID_FLOPS(ID_row_flops(wSr, _U.cols()));
-      // exploit symmetrix, set V = U
+      // exploit symmetry, set V = U
       _V.E() = _U.E();
       _V.P() = _U.P();
       w.Jc = w.Jr;
