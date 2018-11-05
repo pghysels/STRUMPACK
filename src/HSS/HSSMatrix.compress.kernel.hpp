@@ -166,13 +166,6 @@ namespace strumpack {
         w.ids_scores.resize(d);
       }
 
-      std::vector<std::size_t> Scolids(d);
-      for (std::size_t j=0; j<d; j++)
-        Scolids[j] = w.ids_scores[j].first;
-      w.S = DenseM_t(I.size(), Scolids.size());
-      Aelem(I, Scolids, w.S);
-      return;
-
       // sort based on ids; this is needed in the parent, see below
       std::sort(w.ids_scores.begin(), w.ids_scores.end());
 
