@@ -771,8 +771,8 @@ namespace strumpack {
       auto rtol = opts.rel_tol() / w.lvl;
       auto atol = opts.abs_tol() / w.lvl;
       auto gT = grid()->transpose();
-      w.Sr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol, &gT);
-      w.Sc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol, &gT);
+      w.Sr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol, opts.max_rank(), &gT);
+      w.Sc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol, opts.max_rank(), &gT);
       STRUMPACK_ID_FLOPS(ID_row_flops(w.Sr, w.Jr.size()));
       STRUMPACK_ID_FLOPS(ID_row_flops(w.Sc, w.Jc.size()));
       notify_inactives_J(w);

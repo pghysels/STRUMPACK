@@ -237,11 +237,11 @@ namespace strumpack {
     void orthogonalize(scalar_t& r_max, scalar_t& r_min);
     void ID_column
     (DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
-     std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol);
+     std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol, int max_rank);
     void ID_row
     (DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
      std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
-     const BLACSGrid* grid_T);
+     int max_rank, const BLACSGrid* grid_T);
 
 #ifdef STRUMPACK_PBLAS_BLOCKSIZE
     static const int default_MB = STRUMPACK_PBLAS_BLOCKSIZE;
@@ -1300,7 +1300,7 @@ namespace strumpack {
   DistributedMatrix<scalar_t>::ID_row
   (DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
    std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
-   const BLACSGrid* grid_T) {
+   int max_rank, const BLACSGrid* grid_T) {
     // transpose the BLACS grid and do a local transpose, then call
     // ID_column, then do local transpose of output X_T to get back in
     // the original blacs grid
@@ -1311,7 +1311,7 @@ namespace strumpack {
     blas::omatcopy('T', lrows(), lcols(), data(), ld(),
                    this_T.data(), this_T.ld());
     DistributedMatrix<scalar_t> X_T;
-    this_T.ID_column(X_T, piv, ind, rel_tol, abs_tol);
+    this_T.ID_column(X_T, piv, ind, rel_tol, abs_tol, max_rank);
     X = DistributedMatrix<scalar_t>(grid(), X_T.cols(), X_T.rows());
     blas::omatcopy('T', X_T.lrows(), X_T.lcols(), X_T.data(), X_T.ld(),
                    X.data(), X.ld());
@@ -1321,7 +1321,7 @@ namespace strumpack {
   template<typename scalar_t> void
   DistributedMatrix<scalar_t>::ID_column
   (DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
-   std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol) {
+   std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol, int max_rank) {
     if (!active()) return;
     // _J: indices of permuted colums (int iso size_t -> ind)
     std::vector<int> _J(cols());
@@ -1336,6 +1336,7 @@ namespace strumpack {
          _J.data(), gpiv.data(), &rank, rel_tol, abs_tol);
     else std::iota(gpiv.begin(), gpiv.end(), 1);
     piv.resize(lcols()+NB());
+    rank = std::min(rank, max_rank);
     ind.resize(rank);
     for (int c=0; c<lcols(); c++) piv[c] = gpiv[coll2g(c)];
     for (int c=0; c<rank; c++) ind[c] = _J[c]-1;

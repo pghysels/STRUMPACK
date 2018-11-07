@@ -176,7 +176,7 @@ namespace strumpack {
       auto atol = opts.abs_tol() / w.lvl;
       auto gT = grid()->transpose();
       DistM_t wSr(S);
-      wSr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol, &gT);
+      wSr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol, opts.max_rank(), &gT);
       _V.E() = _U.E();
       _V.P() = _U.P();
       w.Jc = w.Jr;
