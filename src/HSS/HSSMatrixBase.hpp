@@ -182,13 +182,13 @@ namespace strumpack {
       // New functions for kernel compression: start
       // Sequential code:
       virtual void compress_recursive_ann
-      (DenseMatrix<std::size_t>& ann, DenseM_t& scores,
+      (DenseMatrix<std::uint32_t>& ann, DenseM_t& scores,
        const elem_t& Aelem, const opts_t& opts,
        WorkCompressANN<scalar_t>& w, int depth) {}
 
       // MPI code:
       virtual void compress_recursive_ann
-      (DenseMatrix<std::size_t>& ann, DenseM_t& scores, const delemw_t& Aelem,
+      (DenseMatrix<std::uint32_t>& ann, DenseM_t& scores, const delemw_t& Aelem,
        WorkCompressMPIANN<scalar_t>& w, const opts_t& opts, const BLACSGrid* lg);
       // New functions for kernel compression: end
 
@@ -423,7 +423,7 @@ namespace strumpack {
      */
     template<typename scalar_t> void
     HSSMatrixBase<scalar_t>::compress_recursive_ann
-    (DenseMatrix<std::size_t>& ann, DenseM_t& scores, const delemw_t& Aelem,
+    (DenseMatrix<std::uint32_t>& ann, DenseM_t& scores, const delemw_t& Aelem,
      WorkCompressMPIANN<scalar_t>& w_mpi, const opts_t& opts,
      const BLACSGrid* lg) {
       if (!active()) return;

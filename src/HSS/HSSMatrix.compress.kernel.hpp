@@ -36,7 +36,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::compress_ann
-    (DenseMatrix<std::size_t>& ann, DenseM_t& scores,
+    (DenseMatrix<std::uint32_t>& ann, DenseM_t& scores,
      const elem_t& Aelem, const opts_t& opts) {
       std::cout << "---> USING COMPRESS_ANN <---" << std::endl;
       WorkCompressANN<scalar_t> w;
@@ -48,7 +48,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::compress_recursive_ann
-    (DenseMatrix<std::size_t>& ann, DenseM_t& scores, const elem_t& Aelem,
+    (DenseMatrix<std::uint32_t>& ann, DenseM_t& scores, const elem_t& Aelem,
      const opts_t& opts, WorkCompressANN<scalar_t>& w, int depth) {
       if (this->leaf()) {
         if (this->is_untouched()) {
@@ -103,7 +103,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::compute_local_samples_ann
-    (DenseMatrix<std::size_t>& ann, DenseM_t& scores,
+    (DenseMatrix<std::uint32_t>& ann, DenseM_t& scores,
      WorkCompressANN<scalar_t>& w, const elem_t& Aelem, const opts_t& opts) {
       std::size_t ann_number = ann.rows();
       std::vector<std::size_t> I;

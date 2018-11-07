@@ -82,7 +82,6 @@ public:
   void times(DenseM_t& Rr, DenseM_t& Sr) {
     assert(Rr.rows() == n_);
     Sr.zero();
-    real_t one = 1.0;
     const size_t B = 64;
     DenseM_t Asub(B, B);
 #pragma omp parallel for firstprivate(Asub) schedule(dynamic)
@@ -219,7 +218,7 @@ int main(int argc, char *argv[]) {
   // Find ANN: start ------------------------------------------------
   int ann_number = 64;
   int num_iters = 5;
-  DenseMatrix<size_t> neighbors;
+  DenseMatrix<uint32_t> neighbors;
   DenseMatrix<real_t> scores;
   timer.start();
   find_approximate_neighbors
@@ -307,12 +306,14 @@ int main(int argc, char *argv[]) {
   timer.start();
   std::vector<real_t> prediction(m);
   if (kernel == 1) {
+#pragma omp parallel for
     for (int c = 0; c < m; c++)
       for (int r = 0; r < n; r++)
         prediction[c] +=
           Gauss_kernel(&data_train[r * d], &data_test[c * d], d, h) *
           weights(r, 0);
   } else {
+#pragma omp parallel for
     for (int c = 0; c < m; c++)
       for (int r = 0; r < n; r++)
         prediction[c] +=

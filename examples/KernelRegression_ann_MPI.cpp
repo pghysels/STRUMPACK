@@ -182,7 +182,7 @@ int run(int argc, char *argv[]) {
   // Find ANN: start ------------------------------------------------
   int ann_number = 64;
   int num_iters = 5;
-  DenseMatrix<size_t> neighbors;
+  DenseMatrix<uint32_t> neighbors;
   DenseMatrix<real_t> scores;
   timer.start();
   find_approximate_neighbors

@@ -37,7 +37,7 @@ namespace strumpack {
 
     //NEW kernel routine: start
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compress_ann
-    (DenseMatrix<std::size_t>& ann, DenseM_t& scores, const delem_t& Aelem,
+    (DenseMatrix<std::uint32_t>& ann, DenseM_t& scores, const delem_t& Aelem,
      const opts_t& opts) {
       TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_compress);
       auto Aelemw = [&]
@@ -53,7 +53,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_recursive_ann
-    (DenseMatrix<std::size_t>& ann, DenseM_t& scores, const delemw_t& Aelem,
+    (DenseMatrix<std::uint32_t>& ann, DenseM_t& scores, const delemw_t& Aelem,
      WorkCompressMPIANN<scalar_t>& w, const opts_t& opts,
      const BLACSGrid* lg) {
       if (!this->active()) return;
@@ -98,7 +98,7 @@ namespace strumpack {
     // Main differences here
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compute_local_samples_ann
-    (DenseMatrix<std::size_t>& ann, DenseM_t& scores,
+    (DenseMatrix<std::uint32_t>& ann, DenseM_t& scores,
      WorkCompressMPIANN<scalar_t>& w, const delemw_t& Aelem,
      const opts_t& opts) {
       std::size_t ann_number = ann.rows();
