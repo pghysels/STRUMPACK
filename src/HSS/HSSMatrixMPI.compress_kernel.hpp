@@ -80,9 +80,8 @@ namespace strumpack {
             !this->_ch[1]->is_compressed()) return;
         if (this->is_untouched()) {
           _B01 = DistM_t(grid(), w.c[0].Ir.size(), w.c[1].Ic.size());
-          _B10 = DistM_t(grid(), w.c[1].Ir.size(), w.c[0].Ic.size());
           Aelem(w.c[0].Ir, w.c[1].Ic, _B01, _A01, 0, 0, comm());
-          Aelem(w.c[1].Ir, w.c[0].Ic, _B10, _A10, 0, 0, comm());
+          _B10 = _B01.transpose();
         }
       }
       if (w.lvl == 0)

@@ -87,8 +87,7 @@ namespace strumpack {
         if (this->is_untouched()) {
           _B01 = DenseM_t(this->_ch[0]->U_rank(), this->_ch[1]->V_rank());
           Aelem(w.c[0].Ir, w.c[1].Ic, _B01);
-          _B10 = DenseM_t(this->_ch[1]->U_rank(), this->_ch[0]->V_rank());
-          Aelem(w.c[1].Ir, w.c[0].Ic, _B10);
+          _B10 = _B01.transpose();
         }
       }
       if (w.lvl == 0)
