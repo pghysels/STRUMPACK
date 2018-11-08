@@ -124,6 +124,7 @@ vector<real_t> read_from_file(string filename) {
     while (getline(sl, s, ','))
       data.push_back(stod(s));
   }
+  data.shrink_to_fit();
   return data;
 }
 
