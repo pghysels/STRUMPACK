@@ -44,6 +44,7 @@
 #include "HSSOptions.hpp"
 #include "HSSExtra.hpp"
 #include "HSSMatrixBase.hpp"
+#include "kernel/Kernel.hpp"
 
 namespace strumpack {
   namespace HSS {
@@ -135,6 +136,16 @@ namespace strumpack {
       HSSMatrix(const HSSPartitionTree& t, const opts_t& opts);
 
       /**
+       * TODO comment this kernel approximation interface!!
+       *
+       * labels are passed because they need to be permuted!
+       * K has a reference to the data
+       */
+      HSSMatrix
+      (kernel::Kernel<scalar_t>& K, DenseM_t& labels, const opts_t& opts);
+
+
+      /**
        * Copy constructor. Copying an HSSMatrix can be an expensive
        * operation.
        * \param other HSS matrix to be copied
@@ -222,6 +233,7 @@ namespace strumpack {
        */
       void compress
       (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts);
+
 
       /**
        * Reset the matrix to an empty, 0 x 0 matrix, freeing up all
@@ -422,6 +434,19 @@ namespace strumpack {
       (const elem_t& Aelem, const opts_t& opts,
        WorkCompress<scalar_t>& w, int lvl) override;
 
+      void compress
+      (const kernel::Kernel<scalar_t>& K, const opts_t& opts);
+      void compress_recursive_ann
+      (DenseMatrix<std::uint32_t>& ann, DenseMatrix<real_t>&  scores,
+       const elem_t& Aelem, const opts_t& opts,
+       WorkCompressANN<scalar_t>& w, int depth) override;
+      void compute_local_samples_ann
+      (DenseMatrix<std::uint32_t>& ann, DenseMatrix<real_t>& scores,
+       WorkCompressANN<scalar_t>& w, const elem_t& Aelem, const opts_t& opts);
+      bool compute_U_V_bases_ann
+      (DenseM_t& S, const opts_t& opts,
+       WorkCompressANN<scalar_t>& w, int depth);
+
       void factor_recursive
       (HSSFactors<scalar_t>& ULV, WorkFactor<scalar_t>& w,
        bool isroot, bool partial, int depth) const override;
@@ -525,6 +550,21 @@ namespace strumpack {
     HSSMatrix<scalar_t>::HSSMatrix
     (const HSSPartitionTree& t, const opts_t& opts)
       : HSSMatrix<scalar_t>(t, opts, true) { }
+
+    template<typename scalar_t>
+    HSSMatrix<scalar_t>::HSSMatrix
+    (kernel::Kernel<scalar_t>& K, DenseM_t& labels, const opts_t& opts)
+      : HSSMatrixBase<scalar_t>(K.n(), K.n(), true) {
+      auto t = binary_tree_clustering
+        (opts.clustering_algorithm(), K.data(), labels, opts.leaf_size());
+      if (!t.c.empty()) {
+        assert(t.c.size() == 2);
+        this->_ch.reserve(2);
+        this->_ch.emplace_back(new HSSMatrix<scalar_t>(t.c[0], opts));
+        this->_ch.emplace_back(new HSSMatrix<scalar_t>(t.c[1], opts));
+      }
+      compress(K, opts);
+    }
 
     template<typename scalar_t>
     HSSMatrix<scalar_t>::HSSMatrix(const HSSMatrix<scalar_t>& other)
@@ -828,6 +868,7 @@ namespace strumpack {
 #include "HSSMatrix.apply.hpp"
 #include "HSSMatrix.compress.hpp"
 #include "HSSMatrix.compress_stable.hpp"
+#include "HSSMatrix.compress_kernel.hpp"
 #include "HSSMatrix.factor.hpp"
 #include "HSSMatrix.solve.hpp"
 #include "HSSMatrix.extract.hpp"

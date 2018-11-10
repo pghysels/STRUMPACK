@@ -90,7 +90,7 @@ namespace strumpack {
      DenseM_t& B, int task_depth) const override {};
     virtual void extract_CB_sub_matrix_2d
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-     DistM_t& B) const = 0;
+     DistM_t& B) const {};
     virtual void extract_CB_sub_matrix_2d
     (const std::vector<std::vector<std::size_t>>& I,
      const std::vector<std::vector<std::size_t>>& J,

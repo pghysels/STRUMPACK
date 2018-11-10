@@ -43,6 +43,7 @@
 #include "FrontalMatrixDenseMPI.hpp"
 #include "FrontalMatrixHSSMPI.hpp"
 #include "FrontalMatrixBLRMPI.hpp"
+#include "FrontalMatrixHODLRMPI.hpp"
 #include "Redistribute.hpp"
 #include "HSS/HSSPartitionTree.hpp"
 
@@ -57,10 +58,12 @@ namespace strumpack {
     using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
     using FHSS_t = FrontalMatrixHSS<scalar_t,integer_t>;
     using FBLR_t = FrontalMatrixBLR<scalar_t,integer_t>;
+    using FHODLR_t = FrontalMatrixHODLR<scalar_t,integer_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
     using FDMPI_t = FrontalMatrixDenseMPI<scalar_t,integer_t>;
     using FHSSMPI_t = FrontalMatrixHSSMPI<scalar_t,integer_t>;
     using FBLRMPI_t = FrontalMatrixBLRMPI<scalar_t,integer_t>;
+    using FHODLRMPI_t = FrontalMatrixHODLRMPI<scalar_t,integer_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
     using SepRange = std::pair<std::size_t,std::size_t>;
 
@@ -879,8 +882,9 @@ namespace strumpack {
     bool is_hss = opts.use_HSS() && hss_parent &&
       (dim_dsep >= opts.HSS_min_sep_size());
     bool is_blr = opts.use_BLR() && (dim_dsep >= opts.BLR_min_sep_size());
+    bool is_hodlr = opts.use_HODLR() && (dim_dsep >= opts.HODLR_min_sep_size());
     HSS::HSSPartitionTree hss_tree(dim_dsep);
-    if (is_hss || is_blr)
+    if (is_hss || is_blr || is_hodlr)
       communicate_hss_tree(hss_tree, dsep, P0, P, owner);
     std::vector<bool> adm;
     if (is_blr) communicate_admissibility(adm, dsep, P0, P, owner);
@@ -893,6 +897,7 @@ namespace strumpack {
     if (rank_ == P0) {
       if (is_hss) this->nr_HSS_fronts_++;
       else if (is_blr) this->nr_BLR_fronts_++;
+      else if (is_hodlr) this->nr_HODLR_fronts_++;
       else this->nr_dense_fronts_++;
     }
     std::unique_ptr<F_t> front;
@@ -909,9 +914,12 @@ namespace strumpack {
           front = std::unique_ptr<F_t>
             (new FBLR_t(dsep, dsep_begin, dsep_end, dsep_upd));
           front->set_BLR_partitioning(opts, hss_tree, adm, level == 0);
-        } else
+        } else if (is_hodlr) {
           front = std::unique_ptr<F_t>
-            (new FD_t(dsep, dsep_begin, dsep_end, dsep_upd));
+            (new FHODLR_t(dsep, dsep_begin, dsep_end, dsep_upd));
+          front->set_HODLR_partitioning(opts, hss_tree, level == 0);
+        } else front = std::unique_ptr<F_t>
+                 (new FD_t(dsep, dsep_begin, dsep_end, dsep_upd));
         if (P0 == rank_) {
           local_range_.first = std::min
             (local_range_.first, std::size_t(dsep_begin));
@@ -924,16 +932,20 @@ namespace strumpack {
             (new FHSSMPI_t(local_pfronts_.size(), dsep_begin, dsep_end,
                            dsep_upd, fcomm, P));
           front->set_HSS_partitioning(opts, hss_tree, level == 0);
-        } else {
-          if (is_blr) {
-            front = std::unique_ptr<F_t>
-              (new FBLRMPI_t(local_pfronts_.size(), dsep_begin, dsep_end,
-                             dsep_upd, fcomm, P));
-            front->set_BLR_partitioning(opts, hss_tree, adm, level == 0);
-          } else
-            front = std::unique_ptr<F_t>
-              (new FDMPI_t(local_pfronts_.size(), dsep_begin, dsep_end,
+        } else if (is_blr) {
+          front = std::unique_ptr<F_t>
+            (new FBLRMPI_t(local_pfronts_.size(), dsep_begin, dsep_end,
                            dsep_upd, fcomm, P));
+          front->set_BLR_partitioning(opts, hss_tree, adm, level == 0);
+        } else if (is_hodlr) {
+          front = std::unique_ptr<F_t>
+            (new FHODLRMPI_t(local_pfronts_.size(), dsep_begin, dsep_end,
+                             dsep_upd, fcomm, P));
+          front->set_HODLR_partitioning(opts, hss_tree, level == 0);
+        } else {
+          front = std::unique_ptr<F_t>
+            (new FDMPI_t(local_pfronts_.size(), dsep_begin, dsep_end,
+                         dsep_upd, fcomm, P));
         }
         if (rank_ >= P0 && rank_ < P0+P) {
           auto fpar = static_cast<FMPI_t*>(front.get());
@@ -983,10 +995,12 @@ namespace strumpack {
     // bool is_hss = opts.use_HSS() && (dim_sep >= opts.HSS_min_sep_size()) &&
     //   (dim_sep + dim_upd >= opts.HSS_min_front_size());
     bool is_blr = opts.use_BLR() && (dim_sep >= opts.BLR_min_sep_size());
+    bool is_hodlr = opts.use_HODLR() && (dim_sep >= opts.HODLR_min_sep_size());
 
     if (rank_ == P0) {
       if (is_hss) this->nr_HSS_fronts_++;
       else if (is_blr) this->nr_BLR_fronts_++;
+      else if (is_hodlr) this->nr_HODLR_fronts_++;
       else this->nr_dense_fronts_++;
     }
     if ((rank_ >= P0 && rank_ < P0+P) ||
@@ -999,6 +1013,10 @@ namespace strumpack {
           front = std::unique_ptr<F_t>(new FBLR_t(sep, sep_begin, sep_end, upd));
           front->set_BLR_partitioning
             (opts, tree.HSS_tree[sep], tree.admissibility[sep], level == 0);
+        } else if (is_hodlr) {
+          front = std::unique_ptr<F_t>(new FHODLR_t(sep, sep_begin, sep_end, upd));
+          front->set_HODLR_partitioning
+            (opts, tree.HSS_tree[sep], level == 0);
         } else front = std::unique_ptr<F_t>(new FD_t(sep, sep_begin, sep_end, upd));
         if (P0 == rank_) {
           local_range_.first = std::min
@@ -1012,18 +1030,21 @@ namespace strumpack {
             (new FHSSMPI_t
              (local_pfronts_.size(), sep_begin, sep_end, upd, fcomm, P));
           front->set_HSS_partitioning(opts, tree.HSS_tree[sep], level == 0);
-        } else {
-          if (is_blr) {
-            front = std::unique_ptr<F_t>
-              (new FBLRMPI_t
-               (local_pfronts_.size(), sep_begin, sep_end, upd, fcomm, P));
-            front->set_BLR_partitioning
-              (opts, tree.HSS_tree[sep], tree.admissibility[sep], level == 0);
-          } else
-            front = std::unique_ptr<F_t>
-              (new FDMPI_t
-               (local_pfronts_.size(), sep_begin, sep_end, upd, fcomm, P));
-        }
+        } else if (is_blr) {
+          front = std::unique_ptr<F_t>
+            (new FBLRMPI_t
+             (local_pfronts_.size(), sep_begin, sep_end, upd, fcomm, P));
+          front->set_BLR_partitioning
+            (opts, tree.HSS_tree[sep], tree.admissibility[sep], level == 0);
+        } else if (is_hodlr) {
+          front = std::unique_ptr<F_t>
+            (new FHODLRMPI_t
+             (local_pfronts_.size(), sep_begin, sep_end, upd, fcomm, P));
+          front->set_HODLR_partitioning(opts, tree.HSS_tree[sep], level == 0);
+        } else
+          front = std::unique_ptr<F_t>
+            (new FDMPI_t
+             (local_pfronts_.size(), sep_begin, sep_end, upd, fcomm, P));
         if (rank_ >= P0 && rank_ < P0+P) {
           auto fpar = static_cast<FMPI_t*>(front.get());
           local_pfronts_.emplace_back

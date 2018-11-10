@@ -1,7 +1,7 @@
 all: @C_EXAMPLES@	\
 	testPoisson2d testPoisson3d	\
 	testMMdouble testMMdouble64 testMMfloat	\
-	mtx2bin bin2mtx MLkernel \
+	mtx2bin bin2mtx KernelRegression \
 	@MPI_EXAMPLES@
 
 CC=@STRUMPACK_C_COMPILER@
@@ -93,16 +93,21 @@ bin2mtx: bin2mtx.cpp
 	$(CXX) $(LDFLAGS) bin2mtx.o -o $@ $(LIBS)
 	$(RM) bin2mtx.o
 
-MLkernel: MLkernel.cpp
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o MLkernel.o
-	$(CXX) $(LDFLAGS) MLkernel.o -o $@ $(LIBS)
-	$(RM) MLkernel.o
+KernelRegression: KernelRegression.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o KernelRegression.o
+	$(CXX) $(LDFLAGS) KernelRegression.o -o $@ $(LIBS)
+	$(RM) KernelRegression.o
+
+KernelRegressionMPI: KernelRegressionMPI.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o KernelRegressionMPI.o
+	$(CXX) $(LDFLAGS) KernelRegressionMPI.o -o $@ $(LIBS)
+	$(RM) KernelRegressionMPI.o
 
 clean:
 	rm -f *~ *o @C_EXAMPLES@ \
 	testPoisson2d testPoisson3d	\
 	testMMdouble testMMdouble64 testMMfloat	\
-	mtx2bin bin2mtx MLkernel	\
+	mtx2bin bin2mtx KernelRegression	\
 	@MPI_EXAMPLES@
 
 

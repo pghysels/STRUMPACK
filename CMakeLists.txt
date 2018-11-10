@@ -12,6 +12,7 @@ option(TPL_ENABLE_PARMETIS "Build with support for ParMetis" OFF)
 option(TPL_ENABLE_SCOTCH "Build with support for Scotch/PTScotch" OFF)
 option(TPL_ENABLE_PAPI "Build with support for PAPI monitoring" OFF)
 option(TPL_ENABLE_COMBBLAS "Use CombBLAS for weighted matching" OFF)
+option(TPL_ENABLE_HODLRBF "Use HOD-LR-BF code by Yang Liu" OFF)
 
 option(STRUMPACK_COUNT_FLOPS "Build with flop counters" ON)
 option(STRUMPACK_TASK_TIMERS "Build with timers for internal routines" OFF)
@@ -35,6 +36,11 @@ if(NOT STRUMPACK_USE_MPI)
     message(STATUS "Disabling ParMetis. ParMetis requires MPI support,"
       " but compiling without MPI support! ")
     set(TPL_ENABLE_PARMETIS OFF)
+  endif()
+  if(TPL_ENABLE_HODLRBF)
+    message(STATUS "Disabling HODLRBF. HODLRBF requires MPI support,"
+      " but compiling without MPI support! ")
+    set(TPL_ENABLE_HODLRBF OFF)
   endif()
 endif()
 
@@ -313,6 +319,12 @@ else()
   message(STATUS "Building STRUMPACK without Scotch/PTScotch support.")
 endif()
 
+if(TPL_ENABLE_HODLRBF)
+  option(STRUMPACK_USE_HODLRBF "" ON)
+  set(LIBS ${TPL_HODLRBF_LIBRARIES} ${LIBS})
+  include_directories(${TPL_HODLRBF_INCLUDE_DIRS})
+endif()
+
 message(STATUS "Linking with: " "${LIBS}")
 message(STATUS "Implicit C libs: " "${CMAKE_C_IMPLICIT_LINK_LIBRARIES}")
 message(STATUS "Implicit CXX libs: " "${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES}")
@@ -430,6 +442,21 @@ install(FILES
   DESTINATION include/misc)
 
 install(FILES
+  src/clustering/NeighborSearch.hpp
+  src/clustering/Clustering.hpp
+  src/clustering/KMeans.hpp
+  src/clustering/KDTree.hpp
+  src/clustering/PCAPartitioning.hpp
+  src/clustering/CobblePartitioning.hpp
+  DESTINATION include/clustering)
+
+install(FILES
+  src/kernel/Kernel.hpp
+  src/kernel/Metrics.hpp
+  DESTINATION include/kernel)
+
+install(FILES
+  src/dense/DistributedMatrix.hpp
   src/dense/DenseMatrix.hpp
   src/dense/BLASLAPACKOpenMPTask.hpp
   src/dense/BLASLAPACKWrapper.hpp
@@ -446,6 +473,7 @@ install(FILES
   src/sparse/FrontalMatrixDense.hpp
   src/sparse/FrontalMatrixHSS.hpp
   src/sparse/FrontalMatrixBLR.hpp
+  src/sparse/FrontalMatrixHODLR.hpp
   src/sparse/GMRes.hpp
   src/sparse/GeometricReordering.hpp
   src/sparse/IterativeRefinement.hpp
@@ -462,6 +490,7 @@ install(FILES
   src/HSS/HSSMatrix.factor.hpp
   src/HSS/HSSMatrix.compress.hpp
   src/HSS/HSSMatrix.compress_stable.hpp
+  src/HSS/HSSMatrix.compress_kernel.hpp
   src/HSS/HSSMatrix.extract.hpp
   src/HSS/HSSBasisID.hpp
   src/HSS/HSSMatrix.Schur.hpp
@@ -478,6 +507,10 @@ install(FILES
   src/BLR/BLROptions.hpp
   DESTINATION include/BLR)
 
+install(FILES
+  src/HODLR/HODLROptions.hpp
+  src/HODLR/HODLRMatrix.hpp
+  DESTINATION include/HODLR)
 
 if(STRUMPACK_USE_MPI)
   install(FILES
@@ -505,6 +538,7 @@ if(STRUMPACK_USE_MPI)
     src/sparse/FrontalMatrixHSSMPI.hpp
     src/sparse/FrontalMatrixMPI.hpp
     src/sparse/FrontalMatrixBLRMPI.hpp
+    src/sparse/FrontalMatrixHODLRMPI.hpp
     src/sparse/GMResMPI.hpp
     src/sparse/GeometricReorderingMPI.hpp
     src/sparse/IterativeRefinementMPI.hpp
@@ -521,6 +555,8 @@ if(STRUMPACK_USE_MPI)
     src/HSS/HSSMatrixMPI.hpp
     src/HSS/HSSMatrixMPI.apply.hpp
     src/HSS/HSSMatrixMPI.compress.hpp
+    src/HSS/HSSMatrixMPI.compress_stable.hpp
+    src/HSS/HSSMatrixMPI.compress_kernel.hpp
     src/HSS/HSSMatrixMPI.factor.hpp
     src/HSS/HSSMatrixMPI.extract.hpp
     src/HSS/HSSMatrixMPI.extract_blocks.hpp
@@ -529,7 +565,6 @@ if(STRUMPACK_USE_MPI)
     src/HSS/HSSBasisIDMPI.hpp
     src/HSS/DistSamples.hpp
     src/HSS/DistElemMult.hpp
-    src/HSS/HSSMatrixMPI.compress_stable.hpp
     src/HSS/HSSMatrixMPI.Schur.hpp
     src/HSS/BlockCyclic2BlockRow.hpp
     DESTINATION include/HSS)
@@ -570,7 +605,7 @@ endif()
 if(STRUMPACK_USE_MPI)
   set(STRUMPACK_C_COMPILER "${MPI_C_COMPILER}")
   set(STRUMPACK_CXX_COMPILER "${MPI_CXX_COMPILER}")
-  set(MPI_EXAMPLES "testPoisson2dMPI testPoisson2dMPIDist testPoisson3dMPIDist testMMdouble testMMdoubleMPI testMMdoubleMPIDist testMMdouble64 testMMdoubleMPIDist64 testMMfloat testMMfloatMPIDist")
+  set(MPI_EXAMPLES "KernelRegressionMPI testPoisson2dMPI testPoisson2dMPIDist testPoisson3dMPIDist testMMdouble testMMdoubleMPI testMMdoubleMPIDist testMMdouble64 testMMdoubleMPIDist64 testMMfloat testMMfloatMPIDist")
 else()
   set(STRUMPACK_C_COMPILER "${CMAKE_C_COMPILER}")
   set(STRUMPACK_CXX_COMPILER "${CMAKE_CXX_COMPILER}")
@@ -600,8 +635,8 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/mtx2bin.cpp
   ${CMAKE_BINARY_DIR}/examples/mtx2bin.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/bin2mtx.cpp
   ${CMAKE_BINARY_DIR}/examples/bin2mtx.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/MLkernel.cpp
-  ${CMAKE_BINARY_DIR}/examples/MLkernel.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/KernelRegression.cpp
+  ${CMAKE_BINARY_DIR}/examples/KernelRegression.cpp COPYONLY)
 
 if(STRUMPACK_C_INTERFACE)
   configure_file(${CMAKE_SOURCE_DIR}/examples/sexample.c
@@ -629,6 +664,8 @@ if(STRUMPACK_USE_MPI)
     ${CMAKE_BINARY_DIR}/examples/testMMdoubleMPIDist64.cpp COPYONLY)
   configure_file(${CMAKE_SOURCE_DIR}/examples/testMMfloatMPIDist.cpp
     ${CMAKE_BINARY_DIR}/examples/testMMfloatMPIDist.cpp COPYONLY)
+  configure_file(${CMAKE_SOURCE_DIR}/examples/KernelRegressionMPI.cpp
+    ${CMAKE_BINARY_DIR}/examples/KernelRegressionMPI.cpp COPYONLY)
 endif()
 
 if(STRUMPACK_BUILD_TESTS)

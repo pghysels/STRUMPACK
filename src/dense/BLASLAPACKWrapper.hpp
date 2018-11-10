@@ -33,6 +33,7 @@
 #include <complex>
 #include <iostream>
 #include <cassert>
+#include <memory>
 #include "StrumpackParameters.hpp"
 #include "StrumpackFortranCInterface.h"
 
@@ -749,6 +750,17 @@ namespace strumpack {
         (char* jobu, char* jobvt, int* m, int* n, double* a, int* lda,
          double* s, double* u, int* ldu, double* vt, int* ldvt,
          double* work, int* lwork, int* info);
+
+      void FC_GLOBAL(ssyevx,SSYEVX)
+        (char* jobz, char* range, char* uplo, int* n,
+         float* a, int* lda, float* vl, float* vu, int* il, int* iu,
+         float* abstol, int* m, float* w, float* z, int* ldz,
+         float* work, int* lwork, int* iwork, int* ifail, int* info);
+      void FC_GLOBAL(dsyevx,DSYEVX)
+        (char* jobz, char* range, char* uplo, int* n,
+         double* a, int* lda, double* vl, double* vu, int* il, int* iu,
+         double* abstol, int* m, double* w, double* z, int* ldz,
+         double* work, int* lwork, int* iwork, int* ifail, int* info);
     }
 
     inline int ilaenv
@@ -2071,6 +2083,45 @@ namespace strumpack {
        std::complex<double>* vt, int ldvt) {
       std::cout << "TODO gesvd for std::complex<double>" << std::endl;
       return 0;
+    }
+
+    inline int syevx
+    (char jobz, char range, char uplo, int n, float* a, int lda,
+     float vl, float vu, int il, int iu, float abstol, int& m,
+     float* w, float* z, int ldz) {
+      int info;
+      std::unique_ptr<int[]> iwork(new int[5*n+n]);
+      auto ifail = iwork.get()+5*n;
+      int lwork = -1;
+      float swork;
+      FC_GLOBAL(ssyevx,SSYEVX)
+        (&jobz, &range, &uplo, &n, a, &lda, &vl, &vu, &il, &iu, &abstol, &m,
+         w, z, &ldz, &swork, &lwork, iwork.get(), ifail, &info);
+      lwork = int(swork);
+      std::unique_ptr<float[]> work(new float[lwork]);
+      FC_GLOBAL(ssyevx,SSYEVX)
+        (&jobz, &range, &uplo, &n, a, &lda, &vl, &vu, &il, &iu, &abstol, &m,
+         w, z, &ldz, work.get(), &lwork, iwork.get(), ifail, &info);
+      return info;
+    }
+    inline int syevx
+    (char jobz, char range, char uplo, int n, double* a, int lda,
+     double vl, double vu, int il, int iu, double abstol, int& m,
+     double* w, double* z, int ldz) {
+      int info;
+      std::unique_ptr<int[]> iwork(new int[5*n+n]);
+      auto ifail = iwork.get()+5*n;
+      int lwork = -1;
+      double dwork;
+      FC_GLOBAL(dsyevx,DSYEVX)
+        (&jobz, &range, &uplo, &n, a, &lda, &vl, &vu, &il, &iu, &abstol, &m,
+         w, z, &ldz, &dwork, &lwork, iwork.get(), ifail, &info);
+      lwork = int(dwork);
+      std::unique_ptr<double[]> work(new double[lwork]);
+      FC_GLOBAL(dsyevx,DSYEVX)
+        (&jobz, &range, &uplo, &n, a, &lda, &vl, &vu, &il, &iu, &abstol, &m,
+         w, z, &ldz, work.get(), &lwork, iwork.get(), ifail, &info);
+      return info;
     }
 
   } //end namespace blas

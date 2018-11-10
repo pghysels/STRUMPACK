@@ -38,6 +38,7 @@
 #include "HSSPartitionTree.hpp"
 #include "HSSBasisIDMPI.hpp"
 #include "BlockCyclic2BlockRow.hpp"
+#include "kernel/Kernel.hpp"
 
 namespace strumpack {
   namespace HSS {
@@ -82,6 +83,9 @@ namespace strumpack {
       HSSMatrixMPI
       (const HSSPartitionTree& t, const BLACSGrid* Agrid,
        const dmult_t& Amult, const delem_t& Aelem, const opts_t& opts);
+      HSSMatrixMPI
+      (kernel::Kernel<scalar_t>& K, const BLACSGrid* Agrid,
+       DenseM_t& labels, const opts_t& opts);
       HSSMatrixMPI(const HSSMatrixMPI<scalar_t>& other);
       HSSMatrixMPI(HSSMatrixMPI<scalar_t>&& other) = default;
       virtual ~HSSMatrixMPI() {}
@@ -108,6 +112,8 @@ namespace strumpack {
       (const dmult_t& Amult, const delem_t& Aelem, const opts_t& opts);
       void compress
       (const dmult_t& Amult, const delem_blocks_t& Aelem, const opts_t& opts);
+      void compress
+      (const kernel::Kernel<scalar_t>& K, const opts_t& opts);
 
       HSSFactorsMPI<scalar_t> factor() const;
       HSSFactorsMPI<scalar_t> partial_factor() const;
@@ -236,6 +242,18 @@ namespace strumpack {
       void compress_hard_restart_sync
       (const dmult_t& Amult, const delem_blocks_t& Aelem, const opts_t& opts);
 
+      void compress_recursive_ann
+      (DenseMatrix<std::uint32_t>& ann, DenseMatrix<real_t>& scores,
+       const delemw_t& Aelem, WorkCompressMPIANN<scalar_t>& w,
+       const opts_t& opts, const BLACSGrid* lg) override;
+      void compute_local_samples_ann
+      (DenseMatrix<std::uint32_t>& ann, DenseMatrix<real_t>& scores,
+       WorkCompressMPIANN<scalar_t>& w, const delemw_t& Aelem,
+       const opts_t& opts);
+      bool compute_U_V_bases_ann
+      (DistM_t& S, const opts_t& opts, WorkCompressMPIANN<scalar_t>& w);
+      void communicate_child_data_ann(WorkCompressMPIANN<scalar_t>& w);
+
       void compress_recursive_original
       (DistSamples<scalar_t>& RS, const delemw_t& Aelem,
        const opts_t& opts, WorkCompressMPI<scalar_t>& w, int dd) override;
@@ -258,6 +276,7 @@ namespace strumpack {
        int dd, bool was_compressed);
       void communicate_child_data(WorkCompressMPI<scalar_t>& w);
       void notify_inactives_J(WorkCompressMPI<scalar_t>& w);
+      void notify_inactives_J(WorkCompressMPIANN<scalar_t>& w);
       void notify_inactives_states(WorkCompressMPI<scalar_t>& w);
 
       void compress_level_original
@@ -417,6 +436,18 @@ namespace strumpack {
       setup_local_context();
       setup_ranges(0, 0);
       compress(Amult, Aelem, opts);
+    }
+
+    template<typename scalar_t> HSSMatrixMPI<scalar_t>::HSSMatrixMPI
+    (kernel::Kernel<scalar_t>& K, const BLACSGrid* Kgrid,
+     DenseM_t& labels, const opts_t& opts)
+      : HSSMatrixBase<scalar_t>(K.n(), K.n(), true), blacs_grid_(Kgrid) {
+      auto t = binary_tree_clustering
+        (opts.clustering_algorithm(), K.data(), labels, opts.leaf_size());
+      setup_hierarchy(t, opts, 0, 0);
+      setup_local_context();
+      setup_ranges(0, 0);
+      compress(K, opts);
     }
 
     template<typename scalar_t>
@@ -964,6 +995,7 @@ namespace strumpack {
 #include "HSSMatrixMPI.apply.hpp"
 #include "HSSMatrixMPI.compress.hpp"
 #include "HSSMatrixMPI.compress_stable.hpp"
+#include "HSSMatrixMPI.compress_kernel.hpp"
 #include "HSSMatrixMPI.factor.hpp"
 #include "HSSMatrixMPI.solve.hpp"
 #include "HSSMatrixMPI.extract.hpp"

@@ -60,6 +60,30 @@ namespace strumpack {
     };
 #endif //DOXYGEN_SHOULD_SKIP_THIS
 
+    template<typename scalar_t,
+             typename real_t=typename RealType<scalar_t>::value_type>
+    class WorkCompressMPIANN : public WorkCompressBase<scalar_t> {
+    public:
+      std::vector<WorkCompressMPIANN<scalar_t>> c;
+      DistributedMatrix<scalar_t> S;
+      std::vector<std::pair<std::size_t,real_t>> ids_scores;
+      std::unique_ptr<WorkCompressANN<scalar_t>> w_seq;
+
+      void split(const std::pair<std::size_t,std::size_t>& dim) {
+        if (c.empty()) {
+          c.resize(2);
+          c[0].offset = this->offset;
+          c[1].offset = this->offset + dim;
+          c[0].lvl = c[1].lvl = this->lvl + 1;
+        }
+      }
+      void create_sequential() {
+        if (!w_seq)
+          w_seq = std::unique_ptr<WorkCompressANN<scalar_t>>
+            (new WorkCompressANN<scalar_t>());
+        w_seq->lvl = this->lvl;
+      }
+    };
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
     template<typename scalar_t> class WorkApplyMPI {

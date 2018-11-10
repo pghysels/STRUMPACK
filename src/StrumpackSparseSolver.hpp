@@ -671,7 +671,7 @@ namespace strumpack {
     }
     perf_counters_stop("nested dissection");
 
-    if (opts_.use_HSS() || opts_.use_BLR()) {
+    if (opts_.use_HSS() || opts_.use_BLR() || opts_.use_HODLR()) {
       perf_counters_start();
       TaskTimer t4("separator-reordering", [&](){
           compute_separator_reordering();
@@ -690,6 +690,7 @@ namespace strumpack {
       auto nr_dense = tree()->nr_dense_fronts();
       auto nr_HSS = tree()->nr_HSS_fronts();
       auto nr_BLR = tree()->nr_BLR_fronts();
+      auto nr_HODLR = tree()->nr_HODLR_fronts();
       if (is_root_) {
         std::cout << "# symbolic factorization:" << std::endl;
         std::cout << "#   - nr of dense Frontal matrices = "
@@ -698,6 +699,8 @@ namespace strumpack {
                   << number_format_with_commas(nr_HSS) << std::endl;
         std::cout << "#   - nr of BLR Frontal matrices = "
                   << number_format_with_commas(nr_BLR) << std::endl;
+        std::cout << "#   - nr of HODLR Frontal matrices = "
+                  << number_format_with_commas(nr_HODLR) << std::endl;
         std::cout << "#   - symb-factor time = " << t0.elapsed() << std::endl;
       }
     }
@@ -846,10 +849,10 @@ namespace strumpack {
         std::cout << "#   - factor memory/nonzeros = "
                   << float(fnnz * sizeof(scalar_t)) / dfnnz * 100.0
                   << " % of multifrontal" << std::endl;
-        std::cout << "#   - maximum HSS rank = " << max_rank << std::endl;
         std::cout << "#   - HSS compression = " << std::boolalpha
                   << opts_.use_HSS() << std::endl;
         if (opts_.use_HSS()) {
+          std::cout << "#   - maximum HSS rank = " << max_rank << std::endl;
           std::cout << "#   - relative compression tolerance = "
                     << opts_.HSS_options().rel_tol() << std::endl;
           std::cout << "#   - absolute compression tolerance = "
@@ -868,7 +871,14 @@ namespace strumpack {
           std::cout << "#   - absolute compression tolerance = "
                     << opts_.BLR_options().abs_tol() << std::endl;
         }
-
+        std::cout << "#   - HODLR compression = " << std::boolalpha
+                  << opts_.use_HODLR() << std::endl;
+        if (opts_.use_HODLR()) {
+          std::cout << "#   - relative compression tolerance = "
+                    << opts_.HODLR_options().rel_tol() << std::endl;
+          std::cout << "#   - absolute compression tolerance = "
+                    << opts_.HODLR_options().abs_tol() << std::endl;
+        }
       }
       if (opts_.use_HSS())
         flop_breakdown();
@@ -963,7 +973,8 @@ namespace strumpack {
 
     switch (opts_.Krylov_solver()) {
     case KrylovSolver::AUTO: {
-      if ((opts_.use_HSS() || opts_.use_BLR()) && x.cols() == 1)
+      if ((opts_.use_HSS() || opts_.use_BLR() ||
+           opts_.use_HODLR()) && x.cols() == 1)
         gmres_solve(MFsolve);
       else refine();
     }; break;

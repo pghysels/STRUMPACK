@@ -1603,10 +1603,13 @@ namespace strumpack {
     auto tau = new scalar_t[std::max(1,std::min(m, n))];
     piv.resize(n);
     std::vector<int> iind(n);
-    int rank, info;
+    int rank = 0, info = 0;
     // TODO make geqp3tol stop at max_rank
-    blas::geqp3tol(m, n, data(), ld(), iind.data(), tau, &info,
-                   rank, rel_tol, abs_tol, depth);
+    if (m && n)
+      blas::geqp3tol
+        (m, n, data(), ld(), iind.data(), tau, &info,
+         rank, rel_tol, abs_tol, depth);
+    else std::iota(iind.begin(), iind.end(), 1);
     rank = std::min(rank, max_rank);
     delete[] tau;
     for (int i=1; i<=n; i++) {

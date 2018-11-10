@@ -75,13 +75,16 @@ if [[ $(hostname -s) = "pieterg-X8DA3" ]]; then
           -DSTRUMPACK_USE_OPENMP=ON \
           -DSTRUMPACK_C_INTERFACE=ON \
           -DTPL_ENABLE_PARMETIS=ON \
-          -DTPL_ENABLE_SCOTCH=ON \
           -DTPL_METIS_INCLUDE_DIRS=$HOME/local/parmetis-4.0.3/metis/include \
           -DTPL_METIS_LIBRARIES=$HOME/local/parmetis-4.0.3/build/Linux-x86_64/libmetis/libmetis.a \
           -DTPL_PARMETIS_INCLUDE_DIRS=$HOME/local/parmetis-4.0.3/include \
           -DTPL_PARMETIS_LIBRARIES=$HOME/local/parmetis-4.0.3/build/Linux-x86_64/libparmetis/libparmetis.a \
+          -DTPL_ENABLE_SCOTCH=ON \
           -DTPL_SCOTCH_INCLUDE_DIRS=$HOME/local/scotch_6.0.4/include \
-          -DTPL_SCOTCH_LIBRARIES="$HOME/local/scotch_6.0.4/lib/libscotch.a;$HOME/local/scotch_6.0.4/lib/libscotcherr.a;$HOME/local/scotch_6.0.4/lib/libptscotch.a;$HOME/local/scotch_6.0.4/lib/libptscotcherr.a"
+          -DTPL_SCOTCH_LIBRARIES="$HOME/local/scotch_6.0.4/lib/libscotch.a;$HOME/local/scotch_6.0.4/lib/libscotcherr.a;$HOME/local/scotch_6.0.4/lib/libptscotch.a;$HOME/local/scotch_6.0.4/lib/libptscotcherr.a" \
+          -DTPL_ENABLE_HODLRBF=ON \
+          -DTPL_HODLRBF_INCLUDE_DIRS="$HOME/LBL/STRUMPACK/hod-lr-bf/SRC_DOUBLE/;$HOME/LBL/STRUMPACK/hod-lr-bf/SRC_DOUBLECOMPLEX" \
+          -DTPL_HODLRBF_LIBRARIES="$HOME/LBL/STRUMPACK/hod-lr-bf/build/SRC_DOUBLE/libdhodlrbf.a;$HOME/LBL/STRUMPACK/hod-lr-bf/build/SRC_DOUBLECOMPLEX/libzhodlrbf.a"
 fi
 
 

@@ -35,6 +35,7 @@
 
 #include <cstring>
 #include <getopt.h>
+#include "clustering/Clustering.hpp"
 
 namespace strumpack {
 
@@ -219,6 +220,14 @@ namespace strumpack {
       }
 
       /**
+       * Specify the clustering algorithm. This is used when
+       * constructing a kernel matrix approximation.
+       */
+      void set_clustering_algorithm(ClusteringAlgorithm a) {
+        _clustering_algo = a;
+      }
+
+      /**
        * Set this to true if you want to manually fill the random
        * sample vectors with random values.
        */
@@ -312,6 +321,9 @@ namespace strumpack {
       CompressionAlgorithm compression_algorithm() const {
         return _compress_algo;
       }
+      ClusteringAlgorithm clustering_algorithm() const {
+        return _clustering_algo;
+      }
       bool user_defined_random() const { return _user_defined_random; }
       bool synchronized_compression() const { return _sync; }
       bool log_ranks() const { return _log_ranks; }
@@ -334,10 +346,11 @@ namespace strumpack {
           {"hss_random_distribution",   required_argument, 0, 8},
           {"hss_random_engine",         required_argument, 0, 9},
           {"hss_compression_algorithm", required_argument, 0, 10},
-          {"hss_user_defined_random",   no_argument, 0, 11},
-          {"hss_enable_sync",           no_argument, 0, 12},
-          {"hss_disable_sync",          no_argument, 0, 13},
-          {"hss_log_ranks",             no_argument, 0, 14},
+          {"hss_clustering_algorithm",  required_argument, 0, 11},
+          {"hss_user_defined_random",   no_argument, 0, 12},
+          {"hss_enable_sync",           no_argument, 0, 13},
+          {"hss_disable_sync",          no_argument, 0, 14},
+          {"hss_log_ranks",             no_argument, 0, 15},
           {"hss_verbose",               no_argument, 0, 'v'},
           {"hss_quiet",                 no_argument, 0, 'q'},
           {"help",                      no_argument, 0, 'h'},
@@ -418,10 +431,15 @@ namespace strumpack {
                         << " use 'original', 'stable' or 'hard_restart'."
                         << std::endl;
           } break;
-          case 11: { set_user_defined_random(true); } break;
-          case 12: { set_synchronized_compression(true); } break;
-          case 13: { set_synchronized_compression(false); } break;
-          case 14: { set_log_ranks(true); } break;
+          case 11: {
+            std::istringstream iss(optarg);
+            std::string s; iss >> s;
+            set_clustering_algorithm(get_clustering_algorithm(s));
+          } break;
+          case 12: { set_user_defined_random(true); } break;
+          case 13: { set_synchronized_compression(true); } break;
+          case 14: { set_synchronized_compression(false); } break;
+          case 15: { set_log_ranks(true); } break;
           case 'v': set_verbose(true); break;
           case 'q': set_verbose(false); break;
           case 'h': describe_options(); break;
@@ -449,6 +467,8 @@ namespace strumpack {
                   << get_name(random_engine()) << ")" << std::endl
                   << "#   --hss_compression_algorithm original|stable|hard_restart (default "
                   << get_name(compression_algorithm())<< ")" << std::endl
+                  << "#   --hss_clustering_algorithm natural|2means|kdtree|pca|cobble (default "
+                  << get_name(clustering_algorithm())<< ")" << std::endl
                   << "#   --hss_user_defined_random (default "
                   << user_defined_random() << ")" << std::endl
                   << "#   --hss_enable_sync (default "
@@ -461,7 +481,7 @@ namespace strumpack {
                   << verbose() << ")" << std::endl
                   << "#   --hss_quiet or -q (default "
                   << !verbose() << ")" << std::endl
-                  << "#   --help or -h" << std::endl;
+                  << "#   --help or -h" << std::endl << std::endl;
       }
 
     private:
@@ -480,6 +500,7 @@ namespace strumpack {
       bool _log_ranks = false;
       CompressionAlgorithm _compress_algo = CompressionAlgorithm::STABLE;
       bool _sync = false;
+      ClusteringAlgorithm _clustering_algo = ClusteringAlgorithm::TWO_MEANS;
       bool _verbose = true;
     };
 

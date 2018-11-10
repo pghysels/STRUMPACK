@@ -35,6 +35,7 @@
 #include "CompressedSparseMatrix.hpp"
 #include "FrontalMatrixHSS.hpp"
 #include "FrontalMatrixBLR.hpp"
+#include "FrontalMatrixHODLR.hpp"
 #include "FrontalMatrixDense.hpp"
 
 namespace strumpack {
@@ -67,6 +68,7 @@ namespace strumpack {
     }
     virtual int nr_HSS_fronts() const { return nr_HSS_fronts_; }
     virtual int nr_BLR_fronts() const { return nr_BLR_fronts_; }
+    virtual int nr_HODLR_fronts() const { return nr_HODLR_fronts_; }
     virtual int nr_dense_fronts() const { return nr_dense_fronts_; }
 
     void draw(const SpMat_t& A, const std::string& name) const;
@@ -76,9 +78,11 @@ namespace strumpack {
     using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
     using FHSS_t = FrontalMatrixHSS<scalar_t,integer_t>;
     using FBLR_t = FrontalMatrixBLR<scalar_t,integer_t>;
+    using FHODLR_t = FrontalMatrixHODLR<scalar_t,integer_t>;
 
     int nr_HSS_fronts_ = 0;
     int nr_BLR_fronts_ = 0;
+    int nr_HODLR_fronts_ = 0;
     int nr_dense_fronts_ = 0;
     std::unique_ptr<F_t> root_;
 
@@ -189,6 +193,7 @@ namespace strumpack {
     bool is_hss = opts.use_HSS() && hss_parent &&
       (dim_sep >= opts.HSS_min_sep_size());
     bool is_blr = opts.use_BLR() && (dim_sep >= opts.BLR_min_sep_size());
+    bool is_hodlr = opts.use_HODLR() && (dim_sep >= opts.HODLR_min_sep_size());
     std::unique_ptr<F_t> front;
     if (is_hss) {
       front = std::unique_ptr<F_t>
@@ -204,9 +209,17 @@ namespace strumpack {
           (opts, sep_tree.HSS_tree(sep), sep_tree.admissibility(sep), level == 0);
         nr_BLR_fronts_++;
       } else {
-        front = std::unique_ptr<F_t>
-          (new FD_t(sep, sep_begin, sep_end, upd[sep]));
-        nr_dense_fronts_++;
+        if (is_hodlr) {
+          front = std::unique_ptr<F_t>
+            (new FHODLR_t(sep, sep_begin, sep_end, upd[sep]));
+          front->set_HODLR_partitioning
+            (opts, sep_tree.HSS_tree(sep), level == 0);
+          nr_HODLR_fronts_++;
+        } else {
+          front = std::unique_ptr<F_t>
+            (new FD_t(sep, sep_begin, sep_end, upd[sep]));
+          nr_dense_fronts_++;
+        }
       }
     }
     if (sep_tree.lch(sep) != -1)

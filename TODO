@@ -22,15 +22,6 @@ High priority:
   matrices (including large ones!). Implement for distributed fronts!!
 - distributed MC64: Jason's/Ariful's code?
 
-- xSDK policies
-   CMake:
-        - TPL_ ...
-        - XSDKDefault.cmake
-
-
-
-
-
 Medium:
 - matrix equilibration: see SuperLU_dist pdgsequ and pdlaqgs
 - Use more scalable dense linear algebra, based on tiled algorithms,

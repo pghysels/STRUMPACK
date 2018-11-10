@@ -180,6 +180,10 @@ namespace strumpack {
       (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
        const opts_t& opts, WorkCompress<scalar_t>& w,
        int d, int dd, int lvl, int depth) {}
+      virtual void compress_recursive_ann
+      (DenseMatrix<std::uint32_t>& ann, DenseMatrix<real_t>& scores,
+       const elem_t& Aelem, const opts_t& opts,
+       WorkCompressANN<scalar_t>& w, int depth) {}
 
       virtual void get_extraction_indices
       (std::vector<std::vector<std::size_t>>& I,
@@ -273,6 +277,11 @@ namespace strumpack {
       virtual void compress_level_stable
       (DistSamples<scalar_t>& RS, const opts_t& opts,
        WorkCompressMPI<scalar_t>& w, int d, int dd, int lvl);
+      virtual void compress_recursive_ann
+      (DenseMatrix<std::uint32_t>& ann, DenseMatrix<real_t>& scores,
+       const delemw_t& Aelem, WorkCompressMPIANN<scalar_t>& w,
+       const opts_t& opts, const BLACSGrid* lg);
+
       virtual void get_extraction_indices
       (std::vector<std::vector<std::size_t>>& I,
        std::vector<std::vector<std::size_t>>& J,
@@ -673,6 +682,31 @@ namespace strumpack {
         }
       }
     }
+
+    template<typename scalar_t> void
+    HSSMatrixBase<scalar_t>::compress_recursive_ann
+    (DenseMatrix<std::uint32_t>& ann, DenseMatrix<real_t>& scores,
+     const delemw_t& Aelem, WorkCompressMPIANN<scalar_t>& w_mpi,
+     const opts_t& opts, const BLACSGrid* lg) {
+      if (!active()) return;
+      std::pair<std::size_t,std::size_t> offset;
+      LocalElemMult<scalar_t> lAelem
+        (Aelem, offset, lg, _Asub);
+      w_mpi.create_sequential();
+      WorkCompressANN<scalar_t>& w = *(w_mpi.w_seq);
+      w.offset = w_mpi.offset;
+#pragma omp parallel
+#pragma omp single nowait
+      compress_recursive_ann
+        (ann, scores, lAelem, opts, w, _openmp_task_depth);
+      w_mpi.S = DistM_t(lg, std::move(w.S));
+      std::swap(w.Ir, w_mpi.Ir);
+      std::swap(w.Ic, w_mpi.Ic);
+      std::swap(w.Jr, w_mpi.Jr);
+      std::swap(w.Jc, w_mpi.Jc);
+      std::swap(w.ids_scores, w_mpi.ids_scores);
+    }
+
 
     template<typename scalar_t> void
     HSSMatrixBase<scalar_t>::get_extraction_indices

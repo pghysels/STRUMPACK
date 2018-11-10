@@ -39,6 +39,7 @@
 #include "misc/RandomWrapper.hpp"
 #include "HSS/HSSOptions.hpp"
 #include "BLR/BLROptions.hpp"
+#include "HODLR/HODLROptions.hpp"
 
 namespace strumpack {
 
@@ -97,7 +98,9 @@ namespace strumpack {
   enum class CompressionType {
     NONE,   /*!< No compression, purely direct solver  */
     HSS,    /*!< HSS compression of frontal matrices   */
-    BLR     /*!< Block low-rank compression of fronts  */
+    BLR,    /*!< Block low-rank compression of fronts  */
+    HODLR   /*!< Hierarchically Off-diagonal Low-Rank
+                 compression of frontal matrices,      */
   };
 
   /**
@@ -108,6 +111,7 @@ namespace strumpack {
     case CompressionType::NONE: return "none";
     case CompressionType::HSS: return "HSS";
     case CompressionType::BLR: return "BLR";
+    case CompressionType::HODLR: return "HODLR";
     }
   }
 
@@ -238,8 +242,9 @@ namespace strumpack {
    * \brief Options for the sparse solver.
    *
    * This sparse solver object also stores an object with HSS options
-   * (HSS_options), and one with BLR options (BLR_options), since HSS
-   * and BLR compression can be used in the sparse solver.
+   * (HSS_options), one with BLR options (BLR_options) and one with
+   * HODLR options (HODLR_options), since HSS, BLR and HODLR
+   * compression can be used in the sparse solver.
    *
    * Running with -h or --help will print a list of options when the
    * set_from_command_line() routine is called.
@@ -321,7 +326,7 @@ namespace strumpack {
      * factorization.
      *
      * \param s outer, iterative solver to use
-     * \see enable_HSS(), enable_BLR()
+     * \see enable_HSS(), enable_BLR(), enable_HODLR()
      */
     void set_Krylov_solver(KrylovSolver s) { _Krylov_solver = s; }
 
@@ -563,7 +568,7 @@ namespace strumpack {
      * the AUTO solver setting, but can be manually overwritten).
      *
      * \see disable_HSS(), HSS_options(), set_HSS_min_sep_size(),
-     * enable_BLR(),
+     * enable_BLR(), enable_HODLR()
      */
     void enable_HSS() { _comp = CompressionType::HSS; }
 
@@ -572,7 +577,7 @@ namespace strumpack {
      * compression will be reset to NONE, and the solver will act as a
      * direct solver without compression.
      *
-     * \see enable_HSS(), enable_BLR()
+     * \see enable_HSS(), enable_BLR(), enable_HODLR()
      */
     void disable_HSS() { _comp = CompressionType::NONE; }
 
@@ -651,6 +656,55 @@ namespace strumpack {
      */
     void set_BLR_min_sep_size(int s)
     { assert(_blr_min_sep_size >= 0); _blr_min_sep_size = s; }
+
+
+    /**
+     * Enable HODLR compression inside the sparse solver. If HSS/BLR
+     * compression was previously enabled, this will be disabled, and
+     * changed to HODLR compression. We refer to the manual for a
+     * description, and tips on tuning the HODLR enabled
+     * preconditioner. Enabling HODLR compression will change the
+     * default iterative solver from iterative refinement to GMRES
+     * (this is the AUTO solver strategy).
+     *
+     * \see disable_HODLR(), set_HODLR_min_sep_size(), HODLR_options()
+     */
+    void enable_HODLR() { _comp = CompressionType::HODLR; }
+
+    /**
+     * Disable HODLR compression in the sparse solver.
+     *
+     * \see enable_HODLR()
+     */
+    void disable_HODLR() { _comp = CompressionType::NONE; }
+
+    /**
+     * Set the minimum size of frontal matrices (dense submatrices of
+     * the sparse triangular factors) for which to use HODLR compression
+     * (when HODLR compression has been enabled by the user using
+     * enable_HODLR()). Most fronts will be quite small, and will not
+     * have benefit from HODLR compression.
+     *
+     * __This is currently ignored!! Use set_HODLR_min_sep_size
+     * instead__
+     *
+     * \see HODLR_options(), set_HODLR_min_sep_size()
+     */
+    void set_HODLR_min_front_size(int s)
+    { assert(_hodlr_min_front_size >= 0); _hodlr_min_front_size = s; }
+
+    /**
+     * Set the minimum size of the top left part of frontal matrices
+     * (dense submatrices of the sparse triangular factors), ie, the
+     * part corresponding to the separators, for which to use HODLR
+     * compression (when HODLR compression has been enabled by the user
+     * using enable_HODLR()). Most fronts will be quite small, and will
+     * not have benefit from HODLR compression.
+     *
+     * \see HODLR_options(), set_HODLR_min_front_size()
+     */
+    void set_HODLR_min_sep_size(int s)
+    { assert(_hodlr_min_sep_size >= 0); _hodlr_min_sep_size = s; }
 
     /**
      * This is used in the reordering of the separators, which is
@@ -869,6 +923,28 @@ namespace strumpack {
     int BLR_min_sep_size() const { return _blr_min_sep_size; }
 
     /**
+     * Is HODLR compression enabled?
+     * \see enable_BLR()
+     */
+    bool use_HODLR() const { return _comp == CompressionType::HODLR; }
+
+    /**
+     * Get the minimum front size for HODLR compression.
+     *
+     *__Not used at the moment!!, Use set_HODLR_min_sep_size()
+     * instead.__
+     *
+     * \see set_HODLR_min_sep_size(), set_HODLR_min_front_size()
+     */
+    int HODLR_min_front_size() const { return _hodlr_min_front_size; }
+
+    /**
+     * Get the minimum size of a separator to enable HODLR compression.
+     * \see set_HODLR_min_sep_size()
+     */
+    int HODLR_min_sep_size() const { return _hodlr_min_sep_size; }
+
+    /**
      * Get the current value of the number of additional links to
      * include in the separator before reordering.
      * \see set_separator_ordering_level()
@@ -910,6 +986,18 @@ namespace strumpack {
     BLR::BLROptions<scalar_t>& BLR_options() { return _blr_opts; }
 
     /**
+     * Get a (const) reference to an object holding various options
+     * pertaining to the HODLR code, and data structures.
+     */
+    const HODLR::HODLROptions<scalar_t>& HODLR_options() const { return _hodlr_opts; }
+
+    /**
+     * Get a reference to an object holding various options pertaining
+     * to the HODLR code, and data structures.
+     */
+    HODLR::HODLROptions<scalar_t>& HODLR_options() { return _hodlr_opts; }
+
+    /**
      * Parse the command line options that were passed to this object
      * in the constructor. Run the code with -h or --help and call
      * this routine to see a list of supported options.
@@ -918,11 +1006,12 @@ namespace strumpack {
 
     /**
      * Parse command line options. These options will not be
-     * modified. The options can also contain HSS or BLR specific
-     * options, they will be parsed by the HSS::HSSOptions and
-     * BLR::BLROptions objects returned by HSS_options() and
-     * BLR_options() respectively. Run the code with -h or --help and
-     * call this routine to see a list of supported options.
+     * modified. The options can also contain HSS, BLR or HODLR
+     * specific options, they will be parsed by the HSS::HSSOptions
+     * and BLR::BLROptions, HODLR::HODLROptions objects returned by
+     * HSS_options(), BLR_options() and HODLR_options()
+     * respectively. Run the code with -h or --help and call this
+     * routine to see a list of supported options.
      *
      * \param argc number of arguments in the argv array
      * \param argv list of options
@@ -961,16 +1050,20 @@ namespace strumpack {
         {"sp_disable_blr",               no_argument, 0, 25},
         {"sp_blr_min_front_size",        required_argument, 0, 26},
         {"sp_blr_min_sep_size",          required_argument, 0, 27},
-        {"sp_separator_ordering_level",  required_argument, 0, 28},
-        {"sp_enable_indirect_sampling",  no_argument, 0, 29},
-        {"sp_disable_indirect_sampling", no_argument, 0, 30},
-        {"sp_enable_replace_tiny_pivots", no_argument, 0, 31},
-        {"sp_disable_replace_tiny_pivots", no_argument, 0, 32},
-        {"sp_nx",                        required_argument, 0, 33},
-        {"sp_ny",                        required_argument, 0, 34},
-        {"sp_nz",                        required_argument, 0, 35},
-        {"sp_components",                required_argument, 0, 36},
-        {"sp_separator_width",           required_argument, 0, 37},
+        {"sp_enable_hodlr",              no_argument, 0, 28},
+        {"sp_disable_hodlr",             no_argument, 0, 29},
+        {"sp_hodlr_min_front_size",      required_argument, 0, 30},
+        {"sp_hodlr_min_sep_size",        required_argument, 0, 31},
+        {"sp_separator_ordering_level",  required_argument, 0, 32},
+        {"sp_enable_indirect_sampling",  no_argument, 0, 33},
+        {"sp_disable_indirect_sampling", no_argument, 0, 34},
+        {"sp_enable_replace_tiny_pivots", no_argument, 0, 35},
+        {"sp_disable_replace_tiny_pivots", no_argument, 0, 36},
+        {"sp_nx",                        required_argument, 0, 37},
+        {"sp_ny",                        required_argument, 0, 38},
+        {"sp_nz",                        required_argument, 0, 39},
+        {"sp_components",                required_argument, 0, 40},
+        {"sp_separator_width",           required_argument, 0, 41},
         {"sp_verbose",                   no_argument, 0, 'v'},
         {"sp_quiet",                     no_argument, 0, 'q'},
         {"help",                         no_argument, 0, 'h'},
@@ -1098,36 +1191,48 @@ namespace strumpack {
           iss >> _blr_min_sep_size;
           set_BLR_min_sep_size(_blr_min_sep_size);
         } break;
-        case 28: {
+        case 28: { enable_HODLR(); } break;
+        case 29: { disable_HODLR(); } break;
+        case 30: {
+          std::istringstream iss(optarg);
+          iss >> _hodlr_min_front_size;
+          set_HODLR_min_front_size(_hodlr_min_front_size);
+        } break;
+        case 31: {
+          std::istringstream iss(optarg);
+          iss >> _hodlr_min_sep_size;
+          set_HODLR_min_sep_size(_hodlr_min_sep_size);
+        } break;
+        case 32: {
           std::istringstream iss(optarg);
           iss >> _sep_order_level;
           set_separator_ordering_level(_sep_order_level);
         } break;
-        case 29: { enable_indirect_sampling(); } break;
-        case 30: { disable_indirect_sampling(); } break;
-        case 31: { enable_replace_tiny_pivots(); } break;
-        case 32: { disable_replace_tiny_pivots(); } break;
-        case 33: {
+        case 33: { enable_indirect_sampling(); } break;
+        case 34: { disable_indirect_sampling(); } break;
+        case 35: { enable_replace_tiny_pivots(); } break;
+        case 36: { disable_replace_tiny_pivots(); } break;
+        case 37: {
           std::istringstream iss(optarg);
           iss >> _nx;
           set_nx(_nx);
         } break;
-        case 34: {
+        case 38: {
           std::istringstream iss(optarg);
           iss >> _ny;
           set_ny(_ny);
         } break;
-        case 35: {
+        case 39: {
           std::istringstream iss(optarg);
           iss >> _nz;
           set_nz(_nz);
         } break;
-        case 36: {
+        case 40: {
           std::istringstream iss(optarg);
           iss >> _components;
           set_components(_components);
         } break;
-        case 37: {
+        case 41: {
           std::istringstream iss(optarg);
           iss >> _separator_width;
           set_separator_width(_separator_width);
@@ -1146,6 +1251,7 @@ namespace strumpack {
       //             << std::endl;
       HSS_options().set_from_command_line(argc, argv);
       BLR_options().set_from_command_line(argc, argv);
+      HODLR_options().set_from_command_line(argc, argv);
     }
 
     /**
@@ -1241,6 +1347,14 @@ namespace strumpack {
                 << BLR_min_sep_size() << ")" << std::endl;
       std::cout << "#          minimum size of the separator for BLR"
                 << " compression of the front" << std::endl;
+      std::cout << "#   --sp_enable_hodlr (default " << std::boolalpha
+                << use_HODLR() << ")" << std::endl;
+      std::cout << "#   --sp_disable_hodlr (default " << std::boolalpha
+                << !use_HODLR() << ")" << std::endl;
+      std::cout << "#   --sp_hodlr_min_sep_size int (default "
+                << HODLR_min_sep_size() << ")" << std::endl;
+      std::cout << "#          minimum size of the separator for HODLR"
+                << " compression of the front" << std::endl;
       std::cout << "#   --sp_separator_ordering_level (default "
                 << separator_ordering_level() << ")" << std::endl;
       std::cout << "#   --sp_enable_indirect_sampling" << std::endl;
@@ -1294,6 +1408,11 @@ namespace strumpack {
     BLR::BLROptions<scalar_t> _blr_opts;
     int _blr_min_front_size = 1000;
     int _blr_min_sep_size = 256;
+
+    /** HODLR options */
+    HODLR::HODLROptions<scalar_t> _hodlr_opts;
+    int _hodlr_min_front_size = 1000;
+    int _hodlr_min_sep_size = 256;
 
     int _argc = 0;
     char** _argv = nullptr;
