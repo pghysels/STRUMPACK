@@ -191,17 +191,10 @@ namespace strumpack {
         return nullptr;
       }
     }
-    gd.separator_reordering = opts.use_HSS() || opts.use_BLR();
+    gd.separator_reordering = (opts.compression() != CompressionType::NONE);
     if (gd.separator_reordering) {
-      gd.min_sep = A.size();
-      gd.leaf = A.size();
-      if (opts.use_HSS()) {
-        gd.min_sep = opts.HSS_min_sep_size();
-        gd.leaf = opts.HSS_options().leaf_size();
-      } else if (opts.use_BLR()) {
-        gd.min_sep = opts.BLR_min_sep_size();
-        gd.leaf = opts.BLR_options().leaf_size();
-      }
+      gd.min_sep = opts.compression_min_sep_size();
+      gd.leaf = opts.compression_leaf_size();
     }
     std::vector<Separator<integer_t>> tree;
     integer_t nbsep = 0, pbegin = 0;

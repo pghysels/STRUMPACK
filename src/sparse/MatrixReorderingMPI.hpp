@@ -266,8 +266,7 @@ namespace strumpack {
           geometric_nested_dissection_dist
           (nx, ny, nz, components, width, A.begin_row(), A.end_row(),
            _comm, perm_, iperm_, opts.nd_param(),
-           // TODO BLR???
-           opts.HSS_options().leaf_size(), opts.HSS_min_sep_size());
+           opts.compression_leaf_size(), opts.compression_min_sep_size());
         break;
       }
       case ReorderingStrategy::PARMETIS: {
@@ -367,11 +366,8 @@ namespace strumpack {
       local_sep_order[i] = i + sub_graph_range.first;
     std::vector<integer_t> sep_csr_ptr, sep_csr_ind;
 
-    int min_sep = opts.use_HSS() ? opts.HSS_min_sep_size() :
-      opts.BLR_min_sep_size();
-    int leaf = opts.use_HSS() ? opts.HSS_options().leaf_size() :
-      opts.BLR_options().leaf_size();
-
+    int min_sep = opts.compression_min_sep_size();
+    int leaf = opts.compression_leaf_size();
     std::function<void(integer_t)> reorder_separator = [&](integer_t sep) {
       auto sep_begin = local_tree_->sizes(sep);
       auto sep_end = local_tree_->sizes(sep+1);
@@ -425,7 +421,9 @@ namespace strumpack {
         }
         local_tree_->HSS_tree(sep) = tree;
       }
-      if (opts.use_HSS() && dim_sep < min_sep) return;
+      // this stops the recursion, so a parent of an HSS/HODLR front
+      // is always also HSS/HODLR
+      if ((opts.use_HSS() || opts.use_HODLR()) && dim_sep < min_sep) return;
       if (local_tree_->lch(sep) != -1)
         reorder_separator(local_tree_->lch(sep));
       if (local_tree_->rch(sep) != -1)
@@ -461,10 +459,8 @@ namespace strumpack {
     auto dim_dsep = dsep_end - dsep_begin;
     std::vector<integer_t> dsep_order(dim_dsep), dsep_iorder(dim_dsep);
 
-    int min_sep = opts.use_HSS() ? opts.HSS_min_sep_size() : opts.BLR_min_sep_size();
-    int leaf = opts.use_HSS() ? opts.HSS_options().leaf_size() :
-      opts.BLR_options().leaf_size();
-
+    int min_sep = opts.compression_min_sep_size();
+    int leaf = opts.compression_leaf_size();
     if (dim_dsep) {
       HSS::HSSPartitionTree tree(dim_dsep);
       if ((dim_dsep >= min_sep) &&

@@ -40,7 +40,6 @@
 using namespace std;
 using namespace strumpack;
 using namespace strumpack::HSS;
-using namespace strumpack::HODLR;
 using namespace strumpack::kernel;
 
 
@@ -138,7 +137,7 @@ int main(int argc, char *argv[]) {
 
 #if defined(STRUMPACK_USE_HODLRBF)
   {
-    HODLROptions<scalar_t> opts;
+    HODLR::HODLROptions<scalar_t> opts;
     opts.set_verbose(true);
     opts.set_from_command_line(argc, argv);
     if (c.is_root()) opts.describe_options();

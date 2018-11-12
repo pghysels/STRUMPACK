@@ -60,6 +60,19 @@ namespace strumpack {
     T='T'   /*!< Transpose         */
   };
 
+  inline Trans c2T(char op) {
+    switch (op) {
+    case 'n': case 'N': return Trans::N;
+    case 't': case 'T': return Trans::T;
+    case 'c': case 'C': return Trans::C;
+    default:
+      std::cerr << "ERROR: char " << op << " not recognized,"
+                << " should be one of n/N, t/T or c/C" << std::endl;
+      return Trans::N;
+    }
+  }
+
+
   /**
    * Which side to apply the operation on, as used by several BLAS
    * routines.  \ingroup Enumerations

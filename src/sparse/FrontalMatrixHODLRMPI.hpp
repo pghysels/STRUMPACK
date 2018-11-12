@@ -39,6 +39,8 @@
 #include "CompressedSparseMatrix.hpp"
 #include "MatrixReordering.hpp"
 #include "FrontalMatrixMPI.hpp"
+#include "HODLR/HODLRMatrix.hpp"
+#include "HODLR/LRBFMatrix.hpp"
 
 namespace strumpack {
 
@@ -99,7 +101,9 @@ namespace strumpack {
      bool is_root) override;
 
   private:
-    std::unique_ptr<HODLR::HODLRMatrix<scalar_t>> F11_, F22_;
+    HODLR::HODLRMatrix<scalar_t> F11_;
+    HODLR::LRBFMatrix<scalar_t> F12_, F21_;
+    std::unique_ptr<HODLR::HODLRMatrix<scalar_t>> F22_;
 
     using FrontalMatrix<scalar_t,integer_t>::lchild_;
     using FrontalMatrix<scalar_t,integer_t>::rchild_;
@@ -199,34 +203,42 @@ namespace strumpack {
         (A, opts, etree_level+1, task_depth);
     if (!dim_blk()) return;
 
-    // TODO implement the sampling routine!!
-    auto mult = [&](DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc) {
+    auto sample_F11 = [&](char op, const DenseM_t& R, DenseM_t& S) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-      //random_sampling(A, opts, R, Sr, Sc, etree_level);
+      std::cout << "TODO sample F11!" << std::endl;
       TIMER_STOP(t_sampling);
     };
-    //F11_->compress(mult);
+    auto sample_F12 = [&](char op, const DenseM_t& R, DenseM_t& S) {
+      TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
+      std::cout << "TODO sample F12!" << std::endl;
+      TIMER_STOP(t_sampling);
+    };
+    auto sample_F21 = [&](char op, const DenseM_t& R, DenseM_t& S) {
+      TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
+      std::cout << "TODO sample F21!" << std::endl;
+      TIMER_STOP(t_sampling);
+    };
+
+    F11_.compress(sample_F11);
+    F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_);
+    F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
+    F12_.compress(sample_F12);
+    F21_.compress(sample_F21);
+
+    TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
+    F11_.factor();
+    TIMER_STOP(t_fact);
+
+    auto sample_CB = [&](char op, const DenseM_t& R, DenseM_t& S) {
+      TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
+      std::cout << "TODO sample CB!" << std::endl;
+      TIMER_STOP(t_sampling);
+    };
+    F22_->compress(sample_CB);
+
+
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
-
-    if (dim_sep()) {
-      if (etree_level > 0) {
-        TIMER_TIME(TaskType::HSS_PARTIALLY_FACTOR, 0, t_pfact);
-        F11_->factor();
-        TIMER_STOP(t_pfact);
-        TIMER_TIME(TaskType::HSS_COMPUTE_SCHUR, 0, t_comp_schur);
-
-        // TODO construct F12_ and F21_
-        // TODO construct F22 as (F22 - F21 inv(F11) F12)
-
-        std::cout << "TODO HODLR Schur update" << std::endl;
-        TIMER_STOP(t_comp_schur);
-      } else {
-        TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
-        F11_->factor();
-        TIMER_STOP(t_fact);
-      }
-    }
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -322,23 +334,16 @@ namespace strumpack {
     //if (!this->active()) return;
     if (Comm().is_null()) return;
     assert(sep_tree.size == dim_sep());
-    std::cout << "TODO create HODLR matrix hierarchy" << std::endl;
-    if (is_root) {
-      // _H = std::unique_ptr<HSS::HSSMatrixMPI<scalar_t>>
-      //   (new HSS::HSSMatrixMPI<scalar_t>
-      //    (sep_tree, grid(), opts.HSS_options()));
-    } else {
-      HSS::HSSPartitionTree hss_tree(dim_blk());
-      hss_tree.c.reserve(2);
-      hss_tree.c.push_back(sep_tree);
-      hss_tree.c.emplace_back(dim_upd());
-      hss_tree.c.back().refine(opts.HSS_options().leaf_size());
-      // _H = std::unique_ptr<HSS::HSSMatrixMPI<scalar_t>>
-      //   (new HSS::HSSMatrixMPI<scalar_t>
-      //    (hss_tree, grid(), opts.HSS_options()));
+    F11_ = HODLR::HODLRMatrix<scalar_t>
+      (Comm(), sep_tree, opts.HODLR_options());
+    if (!is_root && dim_upd()) {
+      HSS::HSSPartitionTree CB_tree(dim_upd());
+      CB_tree.refine(opts.HODLR_options().leaf_size());
+      F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
+        (new HODLR::HODLRMatrix<scalar_t>
+         (Comm(), CB_tree, opts.HODLR_options()));
     }
   }
-
 
 } // end namespace strumpack
 

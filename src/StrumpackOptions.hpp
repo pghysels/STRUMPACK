@@ -581,6 +581,17 @@ namespace strumpack {
      */
     void disable_HSS() { _comp = CompressionType::NONE; }
 
+
+    /**
+     * Set the type of rank-structured compression to use.
+     *
+     * \param c compression type
+     *
+     * \see enable_HSS(), disable_HSS(), enable_BLR(), disable_BLR(),
+     * enable_HODLR(), disable_HODLR()
+     */
+    void set_compression(CompressionType c) { _comp = c; }
+
     /**
      * Set the minimum size of frontal matrices (dense submatrices of
      * the sparse triangular factors) for which to use HSS compression
@@ -594,7 +605,7 @@ namespace strumpack {
      * \see HSS_options(), set_HSS_min_sep_size()
      */
     void set_HSS_min_front_size(int s)
-    { assert(_hss_min_front_size >= 0); _hss_min_front_size = s; }
+    { assert(s >= 0); _hss_min_front_size = s; }
 
     /**
      * Set the minimum size of the top left part of frontal matrices
@@ -642,7 +653,7 @@ namespace strumpack {
      * \see BLR_options(), set_BLR_min_sep_size()
      */
     void set_BLR_min_front_size(int s)
-    { assert(_blr_min_front_size >= 0); _blr_min_front_size = s; }
+    { assert(s >= 0); _blr_min_front_size = s; }
 
     /**
      * Set the minimum size of the top left part of frontal matrices
@@ -691,20 +702,50 @@ namespace strumpack {
      * \see HODLR_options(), set_HODLR_min_sep_size()
      */
     void set_HODLR_min_front_size(int s)
-    { assert(_hodlr_min_front_size >= 0); _hodlr_min_front_size = s; }
+    { assert(s >= 0); _hodlr_min_front_size = s; }
 
     /**
      * Set the minimum size of the top left part of frontal matrices
      * (dense submatrices of the sparse triangular factors), ie, the
      * part corresponding to the separators, for which to use HODLR
-     * compression (when HODLR compression has been enabled by the user
-     * using enable_HODLR()). Most fronts will be quite small, and will
-     * not have benefit from HODLR compression.
+     * compression (when HODLR compression has been enabled by the
+     * user using enable_HODLR()). Most fronts will be quite small,
+     * and will not have benefit from HODLR compression.
      *
      * \see HODLR_options(), set_HODLR_min_front_size()
      */
     void set_HODLR_min_sep_size(int s)
-    { assert(_hodlr_min_sep_size >= 0); _hodlr_min_sep_size = s; }
+    { assert(s >= 0); _hodlr_min_sep_size = s; }
+
+    /**
+     * Set the minimum size of the top left part of frontal matrices
+     * (dense submatrices of the sparse triangular factors), ie, the
+     * part corresponding to the separators, for which to use
+     * compression (when HSS/BLR/HODLR compression has been enabled by
+     * the user using either enable_HSS(), enable_BLR() or
+     * enable_HODLR()). Most fronts will be quite small, and will not
+     * have benefit from compression.
+     *
+     * \see set_HSS_min_front_size(), set_BLR_min_front_size(),
+     * set_HODLR_min_front_size()
+     */
+    void set_compression_min_sep_size(int s) {
+      assert(s >= 0);
+      _hss_min_sep_size = s;
+      _blr_min_sep_size = s;
+      _hodlr_min_sep_size = s;
+    }
+
+    /**
+     * Set the leaf size used by any of the rank-structured formats.
+     *
+     * \see HSS_options(), BLR_options(), HODLR_options()
+     */
+    void set_compression_leaf_size(int s) {
+      _hss_opts.set_leaf_size(s);
+      _blr_opts.set_leaf_size(s);
+      _hodlr_opts.set_leaf_size(s);
+    }
 
     /**
      * This is used in the reordering of the separators, which is
@@ -945,6 +986,47 @@ namespace strumpack {
     int HODLR_min_sep_size() const { return _hodlr_min_sep_size; }
 
     /**
+     * Get the type of compression to use.
+     */
+    CompressionType compression() const { return _comp; }
+
+    /**
+     * Get the minimum size of a separator to enable HSS, BLR or HODLR
+     * compression. This will depend on which type of compression is
+     * selected.
+     *
+     * \see HSS_min_sep_size(), BLR_min_sep_size(), HODLR_min_sep_size(),
+     * enable_HSS(), enable_BLR(), enable_HODLR()
+     */
+    int compression_min_sep_size() const {
+      switch (_comp) {
+      case CompressionType::HSS: return _hss_min_sep_size;
+      case CompressionType::BLR: return _blr_min_sep_size;
+      case CompressionType::HODLR: return _hodlr_min_sep_size;
+      case CompressionType::NONE:
+      default: return 0;
+      }
+    }
+
+    /**
+     * Get the leaf size used in the rank-structured format used for
+     * compression. This will depend on which type of compression is
+     * selected.
+     *
+     * \see HSS_min_sep_size(), BLR_min_sep_size(), HODLR_min_sep_size(),
+     * enable_HSS(), enable_BLR(), enable_HODLR()
+     */
+    int compression_leaf_size() const {
+      switch (_comp) {
+      case CompressionType::HSS: return _hss_opts.leaf_size();
+      case CompressionType::BLR: return _blr_opts.leaf_size();
+      case CompressionType::HODLR: return _hodlr_opts.leaf_size();
+      case CompressionType::NONE:
+      default: return 0;
+      }
+    }
+
+    /**
      * Get the current value of the number of additional links to
      * include in the separator before reordering.
      * \see set_separator_ordering_level()
@@ -1054,16 +1136,19 @@ namespace strumpack {
         {"sp_disable_hodlr",             no_argument, 0, 29},
         {"sp_hodlr_min_front_size",      required_argument, 0, 30},
         {"sp_hodlr_min_sep_size",        required_argument, 0, 31},
-        {"sp_separator_ordering_level",  required_argument, 0, 32},
-        {"sp_enable_indirect_sampling",  no_argument, 0, 33},
-        {"sp_disable_indirect_sampling", no_argument, 0, 34},
-        {"sp_enable_replace_tiny_pivots", no_argument, 0, 35},
-        {"sp_disable_replace_tiny_pivots", no_argument, 0, 36},
-        {"sp_nx",                        required_argument, 0, 37},
-        {"sp_ny",                        required_argument, 0, 38},
-        {"sp_nz",                        required_argument, 0, 39},
-        {"sp_components",                required_argument, 0, 40},
-        {"sp_separator_width",           required_argument, 0, 41},
+        {"sp_compression",               required_argument, 0, 32},
+        {"sp_compression_min_sep_size",  required_argument, 0, 33},
+        {"sp_compression_leaf_size",     required_argument, 0, 34},
+        {"sp_separator_ordering_level",  required_argument, 0, 35},
+        {"sp_enable_indirect_sampling",  no_argument, 0, 36},
+        {"sp_disable_indirect_sampling", no_argument, 0, 37},
+        {"sp_enable_replace_tiny_pivots", no_argument, 0, 38},
+        {"sp_disable_replace_tiny_pivots", no_argument, 0, 39},
+        {"sp_nx",                        required_argument, 0, 40},
+        {"sp_ny",                        required_argument, 0, 41},
+        {"sp_nz",                        required_argument, 0, 42},
+        {"sp_components",                required_argument, 0, 43},
+        {"sp_separator_width",           required_argument, 0, 44},
         {"sp_verbose",                   no_argument, 0, 'v'},
         {"sp_quiet",                     no_argument, 0, 'q'},
         {"help",                         no_argument, 0, 'h'},
@@ -1204,35 +1289,63 @@ namespace strumpack {
           set_HODLR_min_sep_size(_hodlr_min_sep_size);
         } break;
         case 32: {
+          std::string s; std::istringstream iss(optarg); iss >> s;
+          for (auto& c : s) c = std::toupper(c);
+          if (s.compare("NONE") == 0)
+            set_compression(CompressionType::NONE);
+          else if (s.compare("HSS") == 0)
+            set_compression(CompressionType::HSS);
+          else if (s.compare("BLR") == 0)
+            set_compression(CompressionType::BLR);
+          else if (s.compare("HODLR") == 0)
+            set_compression(CompressionType::HODLR);
+          else
+            std::cerr << "# WARNING: compression type not"
+              " recognized, use 'NONE', 'HSS', 'BLR' or 'HODLR'"
+                      << std::endl;
+        } break;
+        case 33: {
+          std::istringstream iss(optarg);
+          int min_sep;
+          iss >> min_sep;
+          set_compression_min_sep_size(min_sep);
+        } break;
+        case 34: {
+          std::istringstream iss(optarg);
+          int ls;
+          iss >> ls;
+          set_compression_leaf_size(ls);
+        } break;
+        case 35: {
           std::istringstream iss(optarg);
           iss >> _sep_order_level;
           set_separator_ordering_level(_sep_order_level);
         } break;
-        case 33: { enable_indirect_sampling(); } break;
-        case 34: { disable_indirect_sampling(); } break;
-        case 35: { enable_replace_tiny_pivots(); } break;
-        case 36: { disable_replace_tiny_pivots(); } break;
-        case 37: {
+        case 36: { enable_indirect_sampling(); } break;
+        case 37: { disable_indirect_sampling(); } break;
+        case 38: { enable_replace_tiny_pivots(); } break;
+        case 39: { disable_replace_tiny_pivots(); } break;
+        case 40: {
           std::istringstream iss(optarg);
           iss >> _nx;
           set_nx(_nx);
         } break;
-        case 38: {
+        case 41: {
           std::istringstream iss(optarg);
           iss >> _ny;
           set_ny(_ny);
         } break;
-        case 39: {
+        case 42: {
           std::istringstream iss(optarg);
           iss >> _nz;
           set_nz(_nz);
         } break;
-        case 40: {
+        case 43: {
           std::istringstream iss(optarg);
           iss >> _components;
           set_components(_components);
         } break;
-        case 41: {
+        case 44: {
           std::istringstream iss(optarg);
           iss >> _separator_width;
           set_separator_width(_separator_width);
@@ -1270,8 +1383,8 @@ namespace strumpack {
                 << std::endl;
       std::cout << "#          Krylov absolute (preconditioned) residual"
                 << " stopping tolerance" << std::endl;
-      std::cout << "#   --sp_Krylov_solver auto|direct|refinement|pgmres|"
-                << "gmres|pbicgstab|bicgstab" << std::endl;
+      std::cout << "#   --sp_Krylov_solver [auto|direct|refinement|pgmres|"
+                << "gmres|pbicgstab|bicgstab]" << std::endl;
       std::cout << "#          default: auto (refinement when no HSS, pgmres"
                 << " (preconditioned) with HSS compression)" << std::endl;
       std::cout << "#   --sp_gmres_restart int (default " << gmres_restart()
@@ -1280,8 +1393,8 @@ namespace strumpack {
       std::cout << "#   --sp_GramSchmidt_type [modified|classical]"
                 << std::endl;
       std::cout << "#          Gram-Schmidt type for GMRES" << std::endl;
-      std::cout << "#   --sp_reordering_method natural|metis|scotch|parmetis|"
-                << "ptscotch|rcm|geometric" << std::endl;
+      std::cout << "#   --sp_reordering_method [natural|metis|scotch|parmetis|"
+                << "ptscotch|rcm|geometric]" << std::endl;
       std::cout << "#          Code for nested dissection." << std::endl;
       std::cout << "#          Geometric only works on regular meshes and you"
                 << " need to provide the sizes." << std::endl;
@@ -1355,6 +1468,17 @@ namespace strumpack {
                 << HODLR_min_sep_size() << ")" << std::endl;
       std::cout << "#          minimum size of the separator for HODLR"
                 << " compression of the front" << std::endl;
+      std::cout << "#   --sp_compression [NONE|HSS|BLR|HODLR]" << std::endl
+                << "#          type of rank-structured compression to use"
+                << std::endl;
+      std::cout << "#   --sp_compression_min_sep_size (default "
+                << compression_min_sep_size() << ")" << std::endl
+                << "#          minimum separator size for compression"
+                << std::endl;
+      std::cout << "#   --sp_compression_leaf_size (default "
+                << compression_leaf_size() << ")" << std::endl
+                << "#          leaf size for rank-structured representation"
+                << std::endl;
       std::cout << "#   --sp_separator_ordering_level (default "
                 << separator_ordering_level() << ")" << std::endl;
       std::cout << "#   --sp_enable_indirect_sampling" << std::endl;
@@ -1365,7 +1489,7 @@ namespace strumpack {
                 << std::endl;
       std::cout << "#   --sp_quiet or -q (default " << !verbose() << ")"
                 << std::endl;
-      std::cout << "#   --help or -h" << std::endl;
+      std::cout << "#   --help or -h" << std::endl << std::endl;
       //synchronize();
       //HSS_options().describe_options();
     }

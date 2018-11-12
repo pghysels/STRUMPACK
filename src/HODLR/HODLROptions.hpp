@@ -129,7 +129,7 @@ namespace strumpack {
           {"hodlr_clustering_algorithm",  required_argument, 0, 5},
           {"hodlr_verbose",               no_argument, 0, 'v'},
           {"hodlr_quiet",                 no_argument, 0, 'q'},
-          {"help",                      no_argument, 0, 'h'},
+          {"help",                        no_argument, 0, 'h'},
           {NULL, 0, NULL, 0}
         };
         int c, option_index = 0;
@@ -193,7 +193,7 @@ namespace strumpack {
       real_t abs_tol_ = default_HODLR_abs_tol<real_t>();
       int leaf_size_ = 128;
       int max_rank_ = 5000;
-      ClusteringAlgorithm _clustering_algo = ClusteringAlgorithm::TWO_MEANS;
+      ClusteringAlgorithm _clustering_algo = ClusteringAlgorithm::COBBLE;
       bool verbose_ = true;
     };
 

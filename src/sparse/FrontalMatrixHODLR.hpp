@@ -38,6 +38,7 @@
 #include "CompressedSparseMatrix.hpp"
 #include "MatrixReordering.hpp"
 #include "HODLR/HODLRMatrix.hpp"
+#include "HODLR/LRBFMatrix.hpp"
 #include "HSS/HSSPartitionTree.hpp"
 
 namespace strumpack {
@@ -53,6 +54,8 @@ namespace strumpack {
     FrontalMatrixHODLR
     (integer_t sep, integer_t sep_begin, integer_t sep_end,
      std::vector<integer_t>& upd);
+    FrontalMatrixHODLR(const FrontalMatrixHODLR&) = delete;
+    FrontalMatrixHODLR& operator=(FrontalMatrixHODLR const&) = delete;
 
     void extend_add_to_dense
     (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
@@ -88,8 +91,12 @@ namespace strumpack {
      const HSS::HSSPartitionTree& sep_tree, bool is_root) override;
 
   private:
-    FrontalMatrixHODLR(const FrontalMatrixHODLR&) = delete;
-    FrontalMatrixHODLR& operator=(FrontalMatrixHODLR const&) = delete;
+    HODLR::HODLRMatrix<scalar_t> F11_;
+    HODLR::LRBFMatrix<scalar_t> F12_, F21_;
+    std::unique_ptr<HODLR::HODLRMatrix<scalar_t>> F22_;
+#if defined(STRUMPACK_USE_MPI)
+    MPIComm commself_;
+#endif
 
     void draw_node(std::ostream& of, bool is_root) const override;
 
@@ -117,19 +124,48 @@ namespace strumpack {
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd)
     : FrontalMatrix<scalar_t,integer_t>
-    (nullptr, nullptr, sep, sep_begin, sep_end, upd) {
+    (nullptr, nullptr, sep, sep_begin, sep_end, upd),
+    commself_(MPI_COMM_SELF) {
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLR<scalar_t,integer_t>::release_work_memory() {
-    std::cout << "TODO clean memory" << std::endl;
+    F22_.reset(nullptr);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLR<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) {
-    std::cout << "extend add to dense" << std::endl;
+    const std::size_t pdsep = paF11.rows();
+    const std::size_t dupd = dim_upd();
+    std::size_t upd2sep;
+    auto I = this->upd_to_parent(p, upd2sep);
+    DenseM_t CB(dupd, dupd);
+    {
+      DenseM_t id(dupd, dupd);
+      id.eye();
+      F22_->mult('N', id, CB);
+    }
+
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp taskloop default(shared) grainsize(64)      \
+  if(task_depth < params::task_recursion_cutoff_level)
+#endif
+    for (std::size_t c=0; c<dupd; c++) {
+      auto pc = I[c];
+      if (pc < pdsep) {
+        for (std::size_t r=0; r<upd2sep; r++)
+          paF11(I[r],pc) += CB(r,c);
+        for (std::size_t r=upd2sep; r<dupd; r++)
+          paF21(I[r]-pdsep,pc) += CB(r,c);
+      } else {
+        for (std::size_t r=0; r<upd2sep; r++)
+          paF12(I[r],pc-pdsep) += CB(r, c);
+        for (std::size_t r=upd2sep; r<dupd; r++)
+          paF22(I[r]-pdsep,pc-pdsep) += CB(r,c);
+      }
+    }
     release_work_memory();
   }
 
@@ -205,26 +241,73 @@ namespace strumpack {
           (A, opts, etree_level+1, task_depth);
     }
 
-    auto mult = [&](DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
-      random_sampling(A, opts, Rr, Rc, Sr, Sc, etree_level, task_depth);
-    };
-    auto HODLRopts = opts.HODLR_options();
+    const auto dsep = dim_sep();
+    const auto dupd = dim_upd();
 
-    std::cout << "TODO build HODLR matrix for this front" << std::endl;
-    //_H.compress(mult, elem, HODLRopts);
+    //// ------ temporary test code ------------------------------
+    DenseM_t dF11(dsep, dsep); dF11.zero();
+    DenseM_t dF12(dsep, dupd); dF12.zero();
+    DenseM_t dF21(dupd, dsep); dF21.zero();
+    DenseM_t dF22(dupd, dupd); dF22.zero();
+    A.extract_front
+      (dF11, dF12, dF21, this->sep_begin_, this->sep_end_,
+       this->upd_, task_depth);
+    if (lchild_)
+      lchild_->extend_add_to_dense
+        (dF11, dF12, dF21, dF22, this, task_depth);
+    if (rchild_)
+      rchild_->extend_add_to_dense
+        (dF11, dF12, dF21, dF22, this, task_depth);
+    //// ---------------------------------------------------------
+
+    auto sample_F11 = [&](char op, const DenseM_t& R, DenseM_t& S) {
+      TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
+      gemm(c2T(op), Trans::N, scalar_t(1.), dF11, R, scalar_t(0.), S, task_depth);
+      TIMER_STOP(t_sampling);
+    };
+    auto sample_F12 = [&](char op, const DenseM_t& R, DenseM_t& S) {
+      TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
+      gemm(c2T(op), Trans::N, scalar_t(1.), dF12, R, scalar_t(0.), S, task_depth);
+      TIMER_STOP(t_sampling);
+    };
+    auto sample_F21 = [&](char op, const DenseM_t& R, DenseM_t& S) {
+      TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
+      gemm(c2T(op), Trans::N, scalar_t(1.), dF21, R, scalar_t(0.), S, task_depth);
+      TIMER_STOP(t_sampling);
+    };
+
+    F11_.compress(sample_F11);
+    F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_);
+    F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
+    F12_.compress(sample_F12);
+    F21_.compress(sample_F21);
+
+    TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
+    F11_.factor();
+    TIMER_STOP(t_fact);
+
+    //// ------ temporary test code -----------------------------
+    auto piv = dF11.LU(task_depth);
+    dF12.laswp(piv, true);
+    trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+         scalar_t(1.), dF11, dF12, task_depth);
+    trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+         scalar_t(1.), dF11, dF21, task_depth);
+    gemm(Trans::N, Trans::N, scalar_t(-1.), dF21, dF12,
+         scalar_t(1.), dF22, task_depth);
+    //// ---------------------------------------------------------
+
+    auto sample_CB = [&](char op, const DenseM_t& R, DenseM_t& S) {
+      TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
+      Trans opA = (op == 'N' || op == 'n') ? Trans::N :
+      ((op == 't' || op == 'T') ? Trans::T : Trans::C);
+      gemm(opA, Trans::N, scalar_t(1.), dF22, R, scalar_t(0.), S, task_depth);
+      TIMER_STOP(t_sampling);
+    };
+    F22_->compress(sample_CB);
 
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
-    if (dim_sep()) {
-      if (etree_level > 0) {
-        // _ULV = _H.partial_factor();
-        // _H.Schur_update(_ULV, _Theta, _DUB01, _Phi);
-        std::cout << "TODO factor FS part of front" << std::endl;
-        std::cout << "TODO compute Schur complement update" << std::endl;
-      } else
-        //_ULV = _H.factor();
-        std::cout << "TODO factor root front" << std::endl;
-    }
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -286,7 +369,7 @@ namespace strumpack {
   (std::ostream &out) const {
     if (lchild_) lchild_->print_rank_statistics(out);
     if (rchild_) rchild_->print_rank_statistics(out);
-    out << "# HODLRMatrix .... " << std::endl;
+    out << "# HODLRMatrix rank info .... TODO" << std::endl;
     // _H.print_info(out);
   }
 
@@ -308,19 +391,22 @@ namespace strumpack {
   (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
    bool is_root) {
     assert(sep_tree.size == dim_sep());
-
-    std::cout << "create HODLR matrix hierarchy" << std::endl;
-
-    if (is_root) {
-      //_H = HODLR::HODLRMatrix<scalar_t>(sep_tree, opts.HODLR_options());
-    } else {
-      HSS::HSSPartitionTree hss_tree(this->dim_blk());
-      hss_tree.c.reserve(2);
-      hss_tree.c.push_back(sep_tree);
-      hss_tree.c.emplace_back(dim_upd());
-      hss_tree.c.back().refine(opts.HODLR_options().leaf_size());
-      //_H = HODLR::HODLRMatrix<scalar_t>(hss_tree, opts.HODLR_options());
+#if defined(STRUMPACK_USE_MPI)
+    F11_ = HODLR::HODLRMatrix<scalar_t>
+      (commself_, sep_tree, opts.HODLR_options());
+    if (!is_root && dim_upd()) {
+      HSS::HSSPartitionTree CB_tree(dim_upd());
+      CB_tree.refine(opts.HODLR_options().leaf_size());
+      F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
+        (new HODLR::HODLRMatrix<scalar_t>
+         (commself_, CB_tree, opts.HODLR_options()));
     }
+#else
+    std::cerr
+      << "ERROR: HODLR compression requires MPI support,"
+      << "but STRUMPACK was not configured with MPI support."
+      << std::endl;
+#endif
   }
 
 } // end namespace strumpack

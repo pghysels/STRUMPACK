@@ -116,7 +116,7 @@ namespace strumpack {
 
     void separator_reordering_recursive
     (const SPOptions<scalar_t>& opts, const CSRMatrix<scalar_t,integer_t>& A,
-     bool hss_parent, integer_t sep, std::vector<integer_t>& sorder);
+     bool compressed_parent, integer_t sep, std::vector<integer_t>& sorder);
 
     void nested_dissection_print
     (const SPOptions<scalar_t>& opts, integer_t nnz, bool verbose) const;
@@ -346,23 +346,25 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   MatrixReordering<scalar_t,integer_t>::separator_reordering_recursive
   (const SPOptions<scalar_t>& opts, const CSRMatrix<scalar_t,integer_t>& A,
-   bool hss_parent, integer_t sep, std::vector<integer_t>& sorder) {
+   bool compressed_parent, integer_t sep, std::vector<integer_t>& sorder) {
     auto sep_begin = sep_tree_->sizes(sep);
     auto sep_end = sep_tree_->sizes(sep + 1);
     auto dim_sep = sep_end - sep_begin;
-    bool is_hss = hss_parent && (dim_sep >= opts.HSS_min_sep_size());
-    bool is_blr = opts.use_BLR() && (dim_sep >= opts.BLR_min_sep_size());
-    if (is_hss || is_blr) {
-      int min_sep = is_hss ? opts.HSS_min_sep_size() : opts.BLR_min_sep_size();
+    int min_sep = opts.compression_min_sep_size();
+    int leaf = opts.compression_leaf_size();
+    bool is_hss = compressed_parent && (dim_sep >= min_sep);
+    bool is_hodlr = compressed_parent && (dim_sep >= min_sep);
+    bool is_blr = opts.use_BLR() && (dim_sep >= min_sep);
+    if (is_hss || is_blr || is_hodlr) {
       if (sep_tree_->lch(sep) != -1) {
 #pragma omp task firstprivate(sep) default(shared)
         separator_reordering_recursive
-          (opts, A, is_hss, sep_tree_->lch(sep), sorder);
+          (opts, A, is_hss || is_hodlr, sep_tree_->lch(sep), sorder);
       }
       if (sep_tree_->rch(sep) != -1) {
 #pragma omp task firstprivate(sep) default(shared)
         separator_reordering_recursive
-          (opts, A, is_hss, sep_tree_->rch(sep), sorder);
+          (opts, A, is_hss || is_hodlr, sep_tree_->rch(sep), sorder);
       }
 #pragma omp taskwait
       HSS::HSSPartitionTree hss_tree(dim_sep);
@@ -381,10 +383,10 @@ namespace strumpack {
     } else {
       if (sep_tree_->lch(sep) != -1)
         separator_reordering_recursive
-          (opts, A, is_hss, sep_tree_->lch(sep), sorder);
+          (opts, A, is_hss || is_hodlr, sep_tree_->lch(sep), sorder);
       if (sep_tree_->rch(sep) != -1)
         separator_reordering_recursive
-          (opts, A, is_hss, sep_tree_->rch(sep), sorder);
+          (opts, A, is_hss || is_hodlr, sep_tree_->rch(sep), sorder);
       for (integer_t i=sep_begin; i<sep_end; i++) sorder[i] = -i;
     }
   }
@@ -414,8 +416,7 @@ namespace strumpack {
         sorder[i] = -count - p;
         hss_tree.c[p].size++;
       }
-    int leaf = opts.use_HSS() ? opts.HSS_options().leaf_size() :
-      opts.BLR_options().leaf_size();
+    int leaf = opts.compression_leaf_size();
     for (integer_t p=0; p<2; p++)
       if (hss_tree.c[p].size > 2 * leaf)
         split_separator(opts, hss_tree.c[p], nr_parts, sep, A,

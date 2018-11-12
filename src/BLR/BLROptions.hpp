@@ -206,15 +206,15 @@ namespace strumpack {
                   << max_rank() << ")" << std::endl
                   << "#   --blr_low_rank_algorithm (default "
                   << get_name(lr_algo_) << ")" << std::endl
-                  << "       should be RRQR (ACA not supported yet)" << std::endl
+                  << "#      should be RRQR (ACA not supported yet)" << std::endl
                   << "#   --blr_admissibility (default "
                   << get_name(adm_) << ")" << std::endl
-                  << "       should be one of [weak|strong]" << std::endl
+                  << "#      should be one of [weak|strong]" << std::endl
                   << "#   --blr_verbose or -v (default "
                   << verbose() << ")" << std::endl
                   << "#   --blr_quiet or -q (default "
                   << !verbose() << ")" << std::endl
-                  << "#   --help or -h" << std::endl;
+                  << "#   --help or -h" << std::endl << std::endl;
       }
     };
 
