@@ -33,10 +33,12 @@
 #include <algorithm>
 #include "StrumpackParameters.hpp"
 #include "CompressedSparseMatrix.hpp"
+#include "FrontalMatrixDense.hpp"
 #include "FrontalMatrixHSS.hpp"
 #include "FrontalMatrixBLR.hpp"
+#if defined(STRUMPACK_USE_HODLRBF)
 #include "FrontalMatrixHODLR.hpp"
-#include "FrontalMatrixDense.hpp"
+#endif
 
 namespace strumpack {
 
@@ -78,7 +80,9 @@ namespace strumpack {
     using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
     using FHSS_t = FrontalMatrixHSS<scalar_t,integer_t>;
     using FBLR_t = FrontalMatrixBLR<scalar_t,integer_t>;
+#if defined(STRUMPACK_USE_HODLRBF)
     using FHODLR_t = FrontalMatrixHODLR<scalar_t,integer_t>;
+#endif
 
     int nr_HSS_fronts_ = 0;
     int nr_BLR_fronts_ = 0;
@@ -193,7 +197,11 @@ namespace strumpack {
     bool is_hss = opts.use_HSS() && hss_parent &&
       (dim_sep >= opts.HSS_min_sep_size());
     bool is_blr = opts.use_BLR() && (dim_sep >= opts.BLR_min_sep_size());
+#if defined(STRUMPACK_USE_HODLRBF)
     bool is_hodlr = opts.use_HODLR() && (dim_sep >= opts.HODLR_min_sep_size());
+#else
+    bool is_hodlr = false;
+#endif
     std::unique_ptr<F_t> front;
     if (is_hss) {
       front = std::unique_ptr<F_t>
@@ -210,11 +218,13 @@ namespace strumpack {
         nr_BLR_fronts_++;
       } else {
         if (is_hodlr) {
+#if defined(STRUMPACK_USE_HODLRBF)
           front = std::unique_ptr<F_t>
             (new FHODLR_t(sep, sep_begin, sep_end, upd[sep]));
           front->set_HODLR_partitioning
             (opts, sep_tree.HSS_tree(sep), level == 0);
           nr_HODLR_fronts_++;
+#endif
         } else {
           front = std::unique_ptr<F_t>
             (new FD_t(sep, sep_begin, sep_end, upd[sep]));

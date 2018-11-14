@@ -124,9 +124,11 @@ namespace strumpack {
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd)
     : FrontalMatrix<scalar_t,integer_t>
-    (nullptr, nullptr, sep, sep_begin, sep_end, upd),
-    commself_(MPI_COMM_SELF) {
-  }
+    (nullptr, nullptr, sep, sep_begin, sep_end, upd)
+#if defined(STRUMPACK_USE_MPI)
+    , commself_(MPI_COMM_SELF)
+#endif
+  { }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLR<scalar_t,integer_t>::release_work_memory() {
@@ -265,46 +267,51 @@ namespace strumpack {
       gemm(c2T(op), Trans::N, scalar_t(1.), dF11, R, scalar_t(0.), S, task_depth);
       TIMER_STOP(t_sampling);
     };
-    auto sample_F12 = [&](char op, const DenseM_t& R, DenseM_t& S) {
+    auto sample_F12 = [&]
+      (char op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-      gemm(c2T(op), Trans::N, scalar_t(1.), dF12, R, scalar_t(0.), S, task_depth);
+      gemm(c2T(op), Trans::N, a, dF12, R, b, S, task_depth);
       TIMER_STOP(t_sampling);
     };
-    auto sample_F21 = [&](char op, const DenseM_t& R, DenseM_t& S) {
+    auto sample_F21 = [&]
+      (char op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-      gemm(c2T(op), Trans::N, scalar_t(1.), dF21, R, scalar_t(0.), S, task_depth);
+      gemm(c2T(op), Trans::N, a, dF21, R, b, S, task_depth);
       TIMER_STOP(t_sampling);
     };
 
     F11_.compress(sample_F11);
-    F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_);
-    F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
-    F12_.compress(sample_F12);
-    F21_.compress(sample_F21);
-
+    if (dupd) {
+      F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_);
+      F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
+      F12_.compress(sample_F12);
+      F21_.compress(sample_F21);
+    }
     TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
     F11_.factor();
     TIMER_STOP(t_fact);
 
     //// ------ temporary test code -----------------------------
     auto piv = dF11.LU(task_depth);
-    dF12.laswp(piv, true);
-    trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-         scalar_t(1.), dF11, dF12, task_depth);
-    trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-         scalar_t(1.), dF11, dF21, task_depth);
-    gemm(Trans::N, Trans::N, scalar_t(-1.), dF21, dF12,
-         scalar_t(1.), dF22, task_depth);
-    //// ---------------------------------------------------------
+    if (dupd) {
+      dF12.laswp(piv, true);
+      trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+           scalar_t(1.), dF11, dF12, task_depth);
+      trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+           scalar_t(1.), dF11, dF21, task_depth);
+      gemm(Trans::N, Trans::N, scalar_t(-1.), dF21, dF12,
+           scalar_t(1.), dF22, task_depth);
+      //// ---------------------------------------------------------
 
-    auto sample_CB = [&](char op, const DenseM_t& R, DenseM_t& S) {
-      TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-      Trans opA = (op == 'N' || op == 'n') ? Trans::N :
-      ((op == 't' || op == 'T') ? Trans::T : Trans::C);
-      gemm(opA, Trans::N, scalar_t(1.), dF22, R, scalar_t(0.), S, task_depth);
-      TIMER_STOP(t_sampling);
-    };
-    F22_->compress(sample_CB);
+      auto sample_CB = [&](char op, const DenseM_t& R, DenseM_t& S) {
+        TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
+        Trans opA = (op == 'N' || op == 'n') ? Trans::N :
+        ((op == 't' || op == 'T') ? Trans::T : Trans::C);
+        gemm(opA, Trans::N, scalar_t(1.), dF22, R, scalar_t(0.), S, task_depth);
+        TIMER_STOP(t_sampling);
+      };
+      F22_->compress(sample_CB);
+    }
 
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
@@ -326,8 +333,13 @@ namespace strumpack {
     DenseMW_t bupd(dim_upd(), b.cols(), work[0], 0, 0);
     bupd.zero();
     this->fwd_solve_phase1(b, bupd, work, etree_level, task_depth);
-
-    std::cout << "TODO fwd solve" << std::endl;
+    if (dim_sep()) {
+      DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
+      DenseM_t rhs(bloc);
+      F11_.solve(rhs, bloc);
+      if (dim_upd())
+        F21_.mult('N', scalar_t(-1.), bloc, scalar_t(1.), bupd);
+    }
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -344,8 +356,10 @@ namespace strumpack {
   FrontalMatrixHODLR<scalar_t,integer_t>::bwd_solve_node
   (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const {
     DenseMW_t yupd(dim_upd(), y.cols(), work[0], 0, 0);
-    std::cout << "TODO bwd solve" << std::endl;
-
+    if (dim_sep() && dim_upd()) {
+      DenseMW_t yloc(dim_sep(), y.cols(), y, this->sep_begin_, 0);
+      F12_.mult('N', scalar_t(-1.), yupd, scalar_t(1.), yloc);
+    }
     this->bwd_solve_phase2(y, yupd, work, etree_level, task_depth);
   }
 
@@ -392,8 +406,9 @@ namespace strumpack {
    bool is_root) {
     assert(sep_tree.size == dim_sep());
 #if defined(STRUMPACK_USE_MPI)
-    F11_ = HODLR::HODLRMatrix<scalar_t>
-      (commself_, sep_tree, opts.HODLR_options());
+    F11_ = std::move
+      (HODLR::HODLRMatrix<scalar_t>
+       (commself_, sep_tree, opts.HODLR_options()));
     if (!is_root && dim_upd()) {
       HSS::HSSPartitionTree CB_tree(dim_upd());
       CB_tree.refine(opts.HODLR_options().leaf_size());

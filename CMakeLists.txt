@@ -507,10 +507,16 @@ install(FILES
   src/BLR/BLROptions.hpp
   DESTINATION include/BLR)
 
-install(FILES
-  src/HODLR/HODLROptions.hpp
-  src/HODLR/HODLRMatrix.hpp
-  DESTINATION include/HODLR)
+if(TPL_ENABLE_HODLRBF)
+  install(FILES
+    src/HODLR/HODLROptions.hpp
+    src/HODLR/HODLRMatrix.hpp
+    DESTINATION include/HODLR)
+
+  install(FILES
+    src/sparse/FrontalMatrixHODLR.hpp
+    DESTINATION include/sparse)
+endif()
 
 if(STRUMPACK_USE_MPI)
   install(FILES
@@ -538,7 +544,6 @@ if(STRUMPACK_USE_MPI)
     src/sparse/FrontalMatrixHSSMPI.hpp
     src/sparse/FrontalMatrixMPI.hpp
     src/sparse/FrontalMatrixBLRMPI.hpp
-    src/sparse/FrontalMatrixHODLRMPI.hpp
     src/sparse/GMResMPI.hpp
     src/sparse/GeometricReorderingMPI.hpp
     src/sparse/IterativeRefinementMPI.hpp
@@ -550,6 +555,12 @@ if(STRUMPACK_USE_MPI)
     src/sparse/ExtendAdd.hpp
     src/sparse/mumps_symqamd.hpp
     DESTINATION include/sparse)
+
+  if(TPL_ENABLE_HODLRBF)
+    install(FILES
+      src/sparse/FrontalMatrixHODLRMPI.hpp
+      DESTINATION include/sparse)
+  endif()
 
   install(FILES
     src/HSS/HSSMatrixMPI.hpp

@@ -31,8 +31,6 @@
 
 #include "dense/DistributedMatrix.hpp"
 #include "FrontalMatrixMPI.hpp"
-#include "FrontalMatrixDenseMPI.hpp"
-#include "FrontalMatrixHSSMPI.hpp"
 
 namespace strumpack {
 
@@ -487,7 +485,7 @@ namespace strumpack {
     static void skinny_extend_add_copy_to_buffers
     (const DistM_t& cSr, const DistM_t& cSc,
      std::vector<std::vector<scalar_t>>& sbuf,
-     const FrontalMatrixHSSMPI<scalar_t,integer_t>* pa,
+     const FrontalMatrixMPI<scalar_t,integer_t>* pa,
      const std::vector<std::size_t>& I) {
       if (!cSr.active()) return;
       assert(cSr.fixed() && cSc.fixed());

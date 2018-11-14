@@ -35,18 +35,13 @@
 #include <cassert>
 
 #include "dense/DenseMatrix.hpp"
-#include "dense/DistributedMatrix.hpp"
-
-#if defined(STRUMPACK_USE_HODLRBF)
 #include "dC_HODLR_wrapper.h"
 #include "zC_HODLR_wrapper.h"
-#endif
 
 namespace strumpack {
 
   namespace HODLR {
 
-#if defined(STRUMPACK_USE_HODLRBF)
     template<typename scalar_t> void HODLR_createptree
     (int& P, int* groups, MPI_Fint comm, F2Cptr& ptree) {
       std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
@@ -148,6 +143,7 @@ namespace strumpack {
       //    C_FuncZmn, K, &comm);
     }
 
+
     template<typename scalar_t> void HODLR_construct_matvec_init
     (int N, int lvls, int* tree, int* perm, int& lrow,
      F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
@@ -161,6 +157,11 @@ namespace strumpack {
       d_c_hodlr_construct_matvec_init
         (&N, &lvls, tree, perm, &lrow, &ho_bf, &options,
          &stats, &msh, &kerquant, &ptree);
+      // std::cout << "Init done ho_bf=" << std::endl;
+
+      // d_c_hodlr_construct_matvec_compute
+      //   (&ho_bf, &options, &stats, &msh, &kerquant, &ptree, matvec, fdata);
+      // std::cout << "Compute done ho_bf=" << std::endl;
     }
     template<> void HODLR_construct_matvec_init<std::complex<double>>
     (int N, int lvls, int* tree, int* perm, int& lrow,
@@ -296,7 +297,7 @@ namespace strumpack {
     template<> void HODLR_mult<double>
     (char op, const double* X, double* Y, int Xlrows, int Ylrows, int cols,
      F2Cptr ho_bf, F2Cptr options, F2Cptr stats, F2Cptr ptree) {
-      d_c_hodlr_mult(&op, const_cast<double*>(X), Y, &Xlrows, &Ylrows,
+      d_c_hodlr_mult(&op, X, Y, &Xlrows, &Ylrows,
                      &cols, &ho_bf, &options, &stats, &ptree);
     }
     template<> void HODLR_mult<std::complex<double>>
@@ -308,6 +309,27 @@ namespace strumpack {
       //    &cols, &ho_bf, &options, &stats, &ptree);
     }
 
+    template<typename scalar_t> void LRBF_mult
+    (char op, const scalar_t* X, scalar_t* Y, int Xlrows, int Ylrows, int cols,
+     F2Cptr lr_bf, F2Cptr options, F2Cptr stats, F2Cptr ptree,
+     scalar_t a, scalar_t b) {
+      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
+    }
+    template<> void LRBF_mult<double>
+    (char op, const double* X, double* Y, int Xlrows, int Ylrows, int cols,
+     F2Cptr lr_bf, F2Cptr options, F2Cptr stats, F2Cptr ptree,
+     double a, double b) {
+      d_c_bf_mult(&op, X, Y, &Xlrows, &Ylrows, &cols,
+                  &lr_bf, &options, &stats, &ptree, &a, &b);
+    }
+    template<> void LRBF_mult<std::complex<double>>
+    (char op, const std::complex<double>* X, std::complex<double>* Y,
+     int Xlrows, int Ylrows, int cols, F2Cptr lr_bf, F2Cptr options,
+     F2Cptr stats, F2Cptr ptree, std::complex<double> a,
+     std::complex<double> b) {
+      // z_c_bf_mult(&op, X, Y, &Xlrows, &Ylrows, &cols,
+      //             &lr_bf, &options, &stats, &ptree, &a, &b);
+    }
 
     template<typename scalar_t> void HODLR_factor
     (F2Cptr ho_bf, F2Cptr options, F2Cptr stats, F2Cptr ptree, F2Cptr msh) {
@@ -340,7 +362,6 @@ namespace strumpack {
       // z_c_hodlr_solve(X, const_cast<std::complex<double>*>(B), &lrows, &rhs,
       //                 &ho_bf, &options, &stats, &ptree);
     }
-#endif
 
   } // end namespace HODLR
 } // end namespace strumpack

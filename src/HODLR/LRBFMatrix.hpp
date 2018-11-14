@@ -35,6 +35,7 @@
 #include <cassert>
 
 #include "HSS/HSSPartitionTree.hpp"
+#include "dense/DistributedMatrix.hpp"
 #include "HODLROptions.hpp"
 #include "HODLRWrapper.hpp"
 
@@ -50,7 +51,7 @@ namespace strumpack {
       using DenseM_t = DenseMatrix<scalar_t>;
       using opts_t = HODLROptions<scalar_t>;
       using mult_t = typename std::function<
-        void(char,const DenseM_t&,DenseM_t&)>;
+        void(char,scalar_t,const DenseM_t&,scalar_t,DenseM_t&)>;
 
     public:
       LRBFMatrix() {}
@@ -61,7 +62,11 @@ namespace strumpack {
       LRBFMatrix
       (const HODLRMatrix<scalar_t>& A, const HODLRMatrix<scalar_t>& B);
 
-      ~LRBFMatrix();
+      LRBFMatrix(const LRBFMatrix<scalar_t>& h) = delete;
+      LRBFMatrix(LRBFMatrix<scalar_t>&& h) { *this = h; }
+      virtual ~LRBFMatrix();
+      LRBFMatrix<scalar_t>& operator=(const LRBFMatrix<scalar_t>& h) = delete;
+      LRBFMatrix<scalar_t>& operator=(LRBFMatrix<scalar_t>&& h);
 
       std::size_t rows() const { return rows_; }
       std::size_t cols() const { return cols_; }
@@ -73,18 +78,11 @@ namespace strumpack {
       std::size_t end_col() const { return rdist_[c_->rank()+1]; }
       const MPIComm& Comm() const { return *c_; }
 
-#if defined(STRUMPACK_USE_HODLRBF)
       void compress(const mult_t& Amult);
-      void mult(char op, const DenseM_t& X, DenseM_t& Y) /*const*/;
-      // void mult(char op, const DistM_t& X, DistM_t& Y) /*const*/;
-#else
-      void compress(const mult_t& Amult) {}
-      void mult(char op, const DenseM_t& X, DenseM_t& Y) /*const*/ {}
-      // void mult(char op, const DistM_t& X, DistM_t& Y) /*const*/ {}
-#endif
+      void mult(char op, scalar_t alpha, const DenseM_t& X,
+                scalar_t beta, DenseM_t& Y) const;
 
     private:
-#if defined(STRUMPACK_USE_HODLRBF)
       F2Cptr lr_bf_ = nullptr;     // LRBF handle returned by Fortran code
       F2Cptr options_ = nullptr;   // options structure returned by Fortran code
       F2Cptr stats_ = nullptr;     // statistics structure returned by Fortran code
@@ -92,8 +90,7 @@ namespace strumpack {
       F2Cptr kerquant_ = nullptr;  // kernel quantities structure returned by Fortran code
       F2Cptr ptree_ = nullptr;     // process tree returned by Fortran code
       MPI_Fint Fcomm_;             // the fortran MPI communicator
-#endif
-      const MPIComm* c_;
+      const MPIComm* c_ = nullptr;
       int rows_, cols_, lrows_, lcols_;
       std::vector<int> rdist_, cdist_;  // begin rows/cols of each rank
     };
@@ -101,7 +98,6 @@ namespace strumpack {
     template<typename scalar_t> LRBFMatrix<scalar_t>::LRBFMatrix
     (const HODLRMatrix<scalar_t>& A, const HODLRMatrix<scalar_t>& B)
       : c_(A.c_) {
-#if defined(STRUMPACK_USE_HODLRBF)
       rows_ = A.rows();
       cols_ = B.cols();
       Fcomm_ = MPI_Comm_c2f(c_->comm());
@@ -134,36 +130,45 @@ namespace strumpack {
         rdist_[p+1] += rdist_[p];
         cdist_[p+1] += cdist_[p];
       }
-#else
-      std::cerr << "ERROR: STRUMPACK was not configured with HODLRBF support."
-                << std::endl;
-#endif
     }
 
     template<typename scalar_t> LRBFMatrix<scalar_t>::~LRBFMatrix() {
-#if defined(STRUMPACK_USE_HODLRBF)
-      HODLR_deletestats<scalar_t>(stats_);
-      HODLR_deleteproctree<scalar_t>(ptree_);
-      HODLR_deletemesh<scalar_t>(msh_);
-      HODLR_deletekernelquant<scalar_t>(kerquant_);
-      HODLR_deleteoptions<scalar_t>(options_);
-      LRBF_deletebf<scalar_t>(lr_bf_);
-#endif
+      if (stats_) HODLR_deletestats<scalar_t>(stats_);
+      if (ptree_) HODLR_deleteproctree<scalar_t>(ptree_);
+      if (msh_) HODLR_deletemesh<scalar_t>(msh_);
+      if (kerquant_) HODLR_deletekernelquant<scalar_t>(kerquant_);
+      if (options_) HODLR_deleteoptions<scalar_t>(options_);
+      if (lr_bf_) LRBF_deletebf<scalar_t>(lr_bf_);
     }
 
-#if defined(STRUMPACK_USE_HODLRBF)
+    template<typename scalar_t> LRBFMatrix<scalar_t>&
+    LRBFMatrix<scalar_t>::operator=(LRBFMatrix<scalar_t>&& h) {
+      lr_bf_ = h.lr_bf_;       h.lr_bf_ = nullptr;
+      options_ = h.options_;   h.options_ = nullptr;
+      stats_ = h.stats_;       h.stats_ = nullptr;
+      msh_ = h.msh_;           h.msh_ = nullptr;
+      kerquant_ = h.kerquant_; h.kerquant_ = nullptr;
+      ptree_ = h.ptree_;       h.ptree_ = nullptr;
+      Fcomm_ = h.Fcomm_;
+      c_ = h.c_;
+      rows_ = h.rows_;
+      cols_ = h.cols_;
+      lrows_ = h.lrows_;
+      lcols_ = h.lcols_;
+      std::swap(rdist_, h.rdist_);
+      std::swap(cdist_, h.cdist_);
+      return *this;
+    }
+
     template<typename scalar_t> void LRBF_matvec_routine
     (const char* op, int* nin, int* nout, int* nvec,
      const scalar_t* X, scalar_t* Y, C2Fptr func, scalar_t* a, scalar_t* b) {
       auto A = static_cast<std::function<
-        void(char,const DenseMatrix<scalar_t>&,
-             DenseMatrix<scalar_t>&)>*>(func);
+        void(char,scalar_t,const DenseMatrix<scalar_t>&,
+             scalar_t,DenseMatrix<scalar_t>&)>*>(func);
       DenseMatrixWrapper<scalar_t> Yw(*nout, *nvec, Y, *nout),
         Xw(*nin, *nvec, const_cast<scalar_t*>(X), *nin);
-
-      // TODO take a and b into account!!
-      std::cout << "TODO a and b" << std::endl;
-      (*A)(*op, Xw, Yw);
+      (*A)(*op, *a, Xw, *b, Yw);
     }
 
     template<typename scalar_t> void
@@ -176,12 +181,11 @@ namespace strumpack {
 
     template<typename scalar_t> void
     LRBFMatrix<scalar_t>::mult
-    (char op, const DenseM_t& X, DenseM_t& Y) /*const*/ {
-      // TODO how to multiply BF?
-      // HODLR_mult(op, X.data(), Y.data(), lrows_, lrows_, X.cols(),
-      //            ho_bf_, options_, stats_, ptree_);
+    (char op, scalar_t alpha, const DenseM_t& X,
+     scalar_t beta, DenseM_t& Y) const {
+      LRBF_mult(op, X.data(), Y.data(), lrows_, lrows_, X.cols(),
+                lr_bf_, options_, stats_, ptree_, alpha, beta);
     }
-#endif
 
   } // end namespace HODLR
 } // end namespace strumpack

@@ -34,11 +34,8 @@
 #include <algorithm>
 #include <cmath>
 #include "misc/TaskTimer.hpp"
-#include "misc/MPIWrapper.hpp"
-#include "dense/DistributedMatrix.hpp"
-#include "CompressedSparseMatrix.hpp"
-#include "MatrixReordering.hpp"
 #include "FrontalMatrixMPI.hpp"
+#include "HSS/HSSMatrixMPI.hpp"
 
 namespace strumpack {
 

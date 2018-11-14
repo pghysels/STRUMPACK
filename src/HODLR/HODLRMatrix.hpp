@@ -37,6 +37,7 @@
 #include "HSS/HSSPartitionTree.hpp"
 #include "kernel/Kernel.hpp"
 #include "clustering/Clustering.hpp"
+#include "dense/DistributedMatrix.hpp"
 #include "HODLROptions.hpp"
 #include "HODLRWrapper.hpp"
 
@@ -64,8 +65,12 @@ namespace strumpack {
       HODLRMatrix
       (const MPIComm& c, const HSS::HSSPartitionTree& tree,
        const opts_t& opts);
-
+      HODLRMatrix(const HODLRMatrix<scalar_t>& h) = delete;
+      HODLRMatrix(HODLRMatrix<scalar_t>&& h) { *this = h; }
       virtual ~HODLRMatrix();
+      HODLRMatrix<scalar_t>& operator=(const HODLRMatrix<scalar_t>& h) = delete;
+      HODLRMatrix<scalar_t>& operator=(HODLRMatrix<scalar_t>&& h);
+
 
       std::size_t rows() const { return rows_; }
       std::size_t cols() const { return cols_; }
@@ -74,24 +79,14 @@ namespace strumpack {
       std::size_t end_row() const { return dist_[c_->rank()+1]; }
       const MPIComm& Comm() const { return *c_; }
 
-#if defined(STRUMPACK_USE_HODLRBF)
       void compress(const mult_t& Amult);
-      void mult(char op, const DenseM_t& X, DenseM_t& Y) /*const*/;
-      void mult(char op, const DistM_t& X, DistM_t& Y) /*const*/;
+      void mult(char op, const DenseM_t& X, DenseM_t& Y) const;
+      void mult(char op, const DistM_t& X, DistM_t& Y) const;
       void factor();
-      void solve(const DenseM_t& B, DenseM_t& X);
-      void solve(const DistM_t& B, DistM_t& X);
-#else
-      void compress(const mult_t& Amult) {}
-      void mult(char op, const DenseM_t& X, DenseM_t& Y) /*const*/ {}
-      void mult(char op, const DistM_t& X, DistM_t& Y) /*const*/ {}
-      void factor() {}
-      void solve(const DenseM_t& B, DenseM_t& X) {}
-      void solve(const DistM_t& B, DistM_t& X) {}
-#endif
+      void solve(const DenseM_t& B, DenseM_t& X) const;
+      void solve(const DistM_t& B, DistM_t& X) const;
 
     private:
-#if defined(STRUMPACK_USE_HODLRBF)
       F2Cptr ho_bf_ = nullptr;     // HODLR handle returned by Fortran code
       F2Cptr options_ = nullptr;   // options structure returned by Fortran code
       F2Cptr stats_ = nullptr;     // statistics structure returned by Fortran code
@@ -99,18 +94,17 @@ namespace strumpack {
       F2Cptr kerquant_ = nullptr;  // kernel quantities structure returned by Fortran code
       F2Cptr ptree_ = nullptr;     // process tree returned by Fortran code
       MPI_Fint Fcomm_;             // the fortran MPI communicator
-#endif
-      const MPIComm* c_;
+      const MPIComm* c_ = nullptr;
       int rows_, cols_, lrows_;
       std::vector<int> perm_, iperm_; // permutation used by the HODLR code
       std::vector<int> dist_;         // begin rows of each rank
 
       DenseM_t redistribute_2D_to_1D(const DistM_t& R) const;
       void redistribute_1D_to_2D(const DenseM_t& S1D, DistM_t& S2D) const;
+
       template<typename S> friend class LRBFMatrix;
     };
 
-#if defined(STRUMPACK_USE_HODLRBF)
     /**
      * Routine used to pass to the fortran code to compute a selected
      * element of a kernel. The kernel argument needs to be a pointer
@@ -127,12 +121,10 @@ namespace strumpack {
     (int* i, int* j, scalar_t* v, C2Fptr kernel) {
       *v = static_cast<kernel::Kernel<scalar_t>*>(kernel)->eval(*i, *j);
     }
-#endif
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
     (const MPIComm& c, kernel::Kernel<scalar_t>& K,
      DenseM_t& labels, const opts_t& opts) : c_(&c) {
-#if defined(STRUMPACK_USE_HODLRBF)
       int d = K.d();
       rows_ = cols_ = K.n();
 
@@ -191,17 +183,11 @@ namespace strumpack {
          dist_.data()+1, 1, MPI_INT, c_->comm());
       for (int p=0; p<P; p++)
         dist_[p+1] += dist_[p];
-#else
-      std::cerr << "ERROR: STRUMPACK was not configured with HODLRBF support."
-                << std::endl;
-#endif
     }
-
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
     (const MPIComm& c, const HSS::HSSPartitionTree& tree,
      const opts_t& opts) : c_(&c) {
-#if defined(STRUMPACK_USE_HODLRBF)
       rows_ = cols_ = tree.size;
 
       Fcomm_ = MPI_Comm_c2f(c_->comm());
@@ -253,25 +239,36 @@ namespace strumpack {
          dist_.data()+1, 1, MPI_INT, c_->comm());
       for (int p=0; p<P; p++)
         dist_[p+1] += dist_[p];
-#else
-      std::cerr << "ERROR: STRUMPACK was not configured with HODLRBF support."
-                << std::endl;
-#endif
     }
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::~HODLRMatrix() {
-#if defined(STRUMPACK_USE_HODLRBF)
-      HODLR_deletestats<scalar_t>(stats_);
-      HODLR_deleteproctree<scalar_t>(ptree_);
-      HODLR_deletemesh<scalar_t>(msh_);
-      HODLR_deletekernelquant<scalar_t>(kerquant_);
-      HODLR_deletehobf<scalar_t>(ho_bf_);
-      HODLR_deleteoptions<scalar_t>(options_);
-#endif
+      if (stats_) HODLR_deletestats<scalar_t>(stats_);
+      if (ptree_) HODLR_deleteproctree<scalar_t>(ptree_);
+      if (msh_) HODLR_deletemesh<scalar_t>(msh_);
+      if (kerquant_) HODLR_deletekernelquant<scalar_t>(kerquant_);
+      if (ho_bf_) HODLR_deletehobf<scalar_t>(ho_bf_);
+      if (options_) HODLR_deleteoptions<scalar_t>(options_);
     }
 
+    template<typename scalar_t> HODLRMatrix<scalar_t>&
+    HODLRMatrix<scalar_t>::operator=(HODLRMatrix<scalar_t>&& h) {
+      ho_bf_ = h.ho_bf_;       h.ho_bf_ = nullptr;
+      options_ = h.options_;   h.options_ = nullptr;
+      stats_ = h.stats_;       h.stats_ = nullptr;
+      msh_ = h.msh_;           h.msh_ = nullptr;
+      kerquant_ = h.kerquant_; h.kerquant_ = nullptr;
+      ptree_ = h.ptree_;       h.ptree_ = nullptr;
+      Fcomm_ = h.Fcomm_;
+      c_ = h.c_;
+      rows_ = h.rows_;
+      cols_ = h.cols_;
+      lrows_ = h.lrows_;
+      std::swap(perm_, h.perm_);
+      std::swap(iperm_, h.iperm_);
+      std::swap(dist_, h.dist_);
+      return *this;
+    }
 
-#if defined(STRUMPACK_USE_HODLRBF)
     template<typename scalar_t> void HODLR_matvec_routine
     (const char* op, int* nin, int* nout, int* nvec,
      const scalar_t* X, scalar_t* Y, C2Fptr func) {
@@ -294,14 +291,14 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::mult
-    (char op, const DenseM_t& X, DenseM_t& Y) /*const*/ {
+    (char op, const DenseM_t& X, DenseM_t& Y) const {
       HODLR_mult(op, X.data(), Y.data(), lrows_, lrows_, X.cols(),
                  ho_bf_, options_, stats_, ptree_);
     }
 
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::mult
-    (char op, const DistM_t& X, DistM_t& Y) /*const*/ {
+    (char op, const DistM_t& X, DistM_t& Y) const {
       DenseM_t Y1D(lrows_, X.cols());
       {
         auto X1D = redistribute_2D_to_1D(X);
@@ -317,13 +314,13 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    HODLRMatrix<scalar_t>::solve(const DenseM_t& B, DenseM_t& X) /*const*/ {
+    HODLRMatrix<scalar_t>::solve(const DenseM_t& B, DenseM_t& X) const {
       HODLR_solve(X.data(), B.data(), lrows_, X.cols(),
                   ho_bf_, options_, stats_, ptree_);
     }
 
     template<typename scalar_t> void
-    HODLRMatrix<scalar_t>::solve(const DistM_t& B, DistM_t& X) /*const*/ {
+    HODLRMatrix<scalar_t>::solve(const DistM_t& B, DistM_t& X) const {
       DenseM_t X1D(lrows_, X.cols());
       {
         auto B1D = redistribute_2D_to_1D(B);
@@ -332,7 +329,7 @@ namespace strumpack {
       }
       redistribute_1D_to_2D(X1D, X);
     }
-#endif
+
 
     template<typename scalar_t> DenseMatrix<scalar_t>
     HODLRMatrix<scalar_t>::redistribute_2D_to_1D(const DistM_t& R) const {

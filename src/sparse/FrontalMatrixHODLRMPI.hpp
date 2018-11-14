@@ -208,12 +208,14 @@ namespace strumpack {
       std::cout << "TODO sample F11!" << std::endl;
       TIMER_STOP(t_sampling);
     };
-    auto sample_F12 = [&](char op, const DenseM_t& R, DenseM_t& S) {
+    auto sample_F12 = [&]
+      (char op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
       std::cout << "TODO sample F12!" << std::endl;
       TIMER_STOP(t_sampling);
     };
-    auto sample_F21 = [&](char op, const DenseM_t& R, DenseM_t& S) {
+    auto sample_F21 = [&]
+      (char op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
       std::cout << "TODO sample F21!" << std::endl;
       TIMER_STOP(t_sampling);
@@ -334,8 +336,9 @@ namespace strumpack {
     //if (!this->active()) return;
     if (Comm().is_null()) return;
     assert(sep_tree.size == dim_sep());
-    F11_ = HODLR::HODLRMatrix<scalar_t>
-      (Comm(), sep_tree, opts.HODLR_options());
+    F11_ = std::move
+      (HODLR::HODLRMatrix<scalar_t>
+       (Comm(), sep_tree, opts.HODLR_options()));
     if (!is_root && dim_upd()) {
       HSS::HSSPartitionTree CB_tree(dim_upd());
       CB_tree.refine(opts.HODLR_options().leaf_size());
