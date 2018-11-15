@@ -47,6 +47,19 @@ namespace strumpack {
    */
   namespace HODLR {
 
+    template<typename scalar_t> void LRBF_matvec_routine
+    (const char* op, int* nin, int* nout, int* nvec,
+     const scalar_t* X, scalar_t* Y, C2Fptr func, scalar_t* a, scalar_t* b) {
+      auto A = static_cast<std::function<
+        void(char,scalar_t,const DenseMatrix<scalar_t>&,
+             scalar_t,DenseMatrix<scalar_t>&)>*>(func);
+      DenseMatrixWrapper<scalar_t> Yw(*nout, *nvec, Y, *nout),
+        Xw(*nin, *nvec, const_cast<scalar_t*>(X), *nin);
+      //(*A)(*op, *a, Xw, *b, Yw);
+      Yw.zero();
+    }
+
+
     template<typename scalar_t> class LRBFMatrix {
       using DenseM_t = DenseMatrix<scalar_t>;
       using opts_t = HODLROptions<scalar_t>;
@@ -60,7 +73,8 @@ namespace strumpack {
        * A and B should be defined on the same MPI communicator.
        */
       LRBFMatrix
-      (const HODLRMatrix<scalar_t>& A, const HODLRMatrix<scalar_t>& B);
+      (const HODLRMatrix<scalar_t>& A, const HODLRMatrix<scalar_t>& B,
+       const mult_t& Amult);
 
       LRBFMatrix(const LRBFMatrix<scalar_t>& h) = delete;
       LRBFMatrix(LRBFMatrix<scalar_t>&& h) { *this = h; }
@@ -78,7 +92,6 @@ namespace strumpack {
       std::size_t end_col() const { return rdist_[c_->rank()+1]; }
       const MPIComm& Comm() const { return *c_; }
 
-      void compress(const mult_t& Amult);
       void mult(char op, scalar_t alpha, const DenseM_t& X,
                 scalar_t beta, DenseM_t& Y) const;
 
@@ -96,11 +109,11 @@ namespace strumpack {
     };
 
     template<typename scalar_t> LRBFMatrix<scalar_t>::LRBFMatrix
-    (const HODLRMatrix<scalar_t>& A, const HODLRMatrix<scalar_t>& B)
-      : c_(A.c_) {
+    (const HODLRMatrix<scalar_t>& A, const HODLRMatrix<scalar_t>& B,
+     const mult_t& Amult) : c_(A.c_) {
       rows_ = A.rows();
       cols_ = B.cols();
-      Fcomm_ = MPI_Comm_c2f(c_->comm());
+      Fcomm_ = A.Fcomm_; //MPI_Comm_c2f(c_->comm());
       int P = c_->size();
       int rank = c_->rank();
       std::vector<int> groups(P);
@@ -109,12 +122,33 @@ namespace strumpack {
       // create hodlr data structures
       HODLR_createptree<scalar_t>(P, groups.data(), Fcomm_, ptree_);
       HODLR_createstats<scalar_t>(stats_);
-      F2Cptr Aoptions = const_cast<F2Cptr>(A.options_);
-      HODLR_copyoptions<scalar_t>(Aoptions, options_);
+
+      // F2Cptr Aoptions = const_cast<F2Cptr>(A.options_);
+      // HODLR_copyoptions<scalar_t>(Aoptions, options_);
+
+      HODLR_createoptions<scalar_t>(options_);
+
+      // set hodlr options
+      int com_opt = 2;   // compression option 1:SVD 2:RRQR 3:ACA 4:BACA
+      int sort_opt = 0;  // 0:natural order, 1:kd-tree, 2:cobble-like ordering
+                         // 3:gram distance-based cobble-like ordering
+      HODLR_set_D_option<scalar_t>(options_, "tol_comp", 1e-2);
+      HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
+      HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
+      //HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", com_opt);
+      HODLR_set_I_option<scalar_t>(options_, "xyzsort", sort_opt);
+      HODLR_set_I_option<scalar_t>(options_, "ErrFillFull", 0);
+      HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", 100);
+
 
       LRBF_construct_matvec_init<scalar_t>
         (rows_, cols_, lrows_, lcols_, A.msh_, B.msh_, lr_bf_, options_,
          stats_, msh_, kerquant_, ptree_);
+
+      C2Fptr f = static_cast<void*>(const_cast<mult_t*>(&Amult));
+      LRBF_construct_matvec_compute
+        (lr_bf_, options_, stats_, msh_, kerquant_, ptree_,
+         &(LRBF_matvec_routine<scalar_t>), f);
 
       rdist_.resize(P+1);
       cdist_.resize(P+1);
@@ -158,25 +192,6 @@ namespace strumpack {
       std::swap(rdist_, h.rdist_);
       std::swap(cdist_, h.cdist_);
       return *this;
-    }
-
-    template<typename scalar_t> void LRBF_matvec_routine
-    (const char* op, int* nin, int* nout, int* nvec,
-     const scalar_t* X, scalar_t* Y, C2Fptr func, scalar_t* a, scalar_t* b) {
-      auto A = static_cast<std::function<
-        void(char,scalar_t,const DenseMatrix<scalar_t>&,
-             scalar_t,DenseMatrix<scalar_t>&)>*>(func);
-      DenseMatrixWrapper<scalar_t> Yw(*nout, *nvec, Y, *nout),
-        Xw(*nin, *nvec, const_cast<scalar_t*>(X), *nin);
-      (*A)(*op, *a, Xw, *b, Yw);
-    }
-
-    template<typename scalar_t> void
-    LRBFMatrix<scalar_t>::compress(const mult_t& Amult) {
-      C2Fptr f = static_cast<void*>(const_cast<mult_t*>(&Amult));
-      LRBF_construct_matvec_compute
-        (lr_bf_, options_, stats_, msh_, kerquant_, ptree_,
-         &(LRBF_matvec_routine<scalar_t>), f);
     }
 
     template<typename scalar_t> void

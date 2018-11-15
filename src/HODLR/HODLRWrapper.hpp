@@ -157,11 +157,6 @@ namespace strumpack {
       d_c_hodlr_construct_matvec_init
         (&N, &lvls, tree, perm, &lrow, &ho_bf, &options,
          &stats, &msh, &kerquant, &ptree);
-      // std::cout << "Init done ho_bf=" << std::endl;
-
-      // d_c_hodlr_construct_matvec_compute
-      //   (&ho_bf, &options, &stats, &msh, &kerquant, &ptree, matvec, fdata);
-      // std::cout << "Compute done ho_bf=" << std::endl;
     }
     template<> void HODLR_construct_matvec_init<std::complex<double>>
     (int N, int lvls, int* tree, int* perm, int& lrow,

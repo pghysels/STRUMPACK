@@ -35,11 +35,8 @@
 
 #include "misc/TaskTimer.hpp"
 #include "FrontalMatrix.hpp"
-#include "CompressedSparseMatrix.hpp"
-#include "MatrixReordering.hpp"
 #include "HODLR/HODLRMatrix.hpp"
 #include "HODLR/LRBFMatrix.hpp"
-#include "HSS/HSSPartitionTree.hpp"
 
 namespace strumpack {
 
@@ -94,9 +91,7 @@ namespace strumpack {
     HODLR::HODLRMatrix<scalar_t> F11_;
     HODLR::LRBFMatrix<scalar_t> F12_, F21_;
     std::unique_ptr<HODLR::HODLRMatrix<scalar_t>> F22_;
-#if defined(STRUMPACK_USE_MPI)
     MPIComm commself_;
-#endif
 
     void draw_node(std::ostream& of, bool is_root) const override;
 
@@ -124,11 +119,8 @@ namespace strumpack {
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd)
     : FrontalMatrix<scalar_t,integer_t>
-    (nullptr, nullptr, sep, sep_begin, sep_end, upd)
-#if defined(STRUMPACK_USE_MPI)
-    , commself_(MPI_COMM_SELF)
-#endif
-  { }
+    (nullptr, nullptr, sep, sep_begin, sep_end, upd),
+    commself_(MPI_COMM_SELF) { }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLR<scalar_t,integer_t>::release_work_memory() {
@@ -282,10 +274,8 @@ namespace strumpack {
 
     F11_.compress(sample_F11);
     if (dupd) {
-      F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_);
-      F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
-      F12_.compress(sample_F12);
-      F21_.compress(sample_F21);
+      F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_, sample_F12);
+      F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_, sample_F21);
     }
     TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
     F11_.factor();
@@ -305,9 +295,7 @@ namespace strumpack {
 
       auto sample_CB = [&](char op, const DenseM_t& R, DenseM_t& S) {
         TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-        Trans opA = (op == 'N' || op == 'n') ? Trans::N :
-        ((op == 't' || op == 'T') ? Trans::T : Trans::C);
-        gemm(opA, Trans::N, scalar_t(1.), dF22, R, scalar_t(0.), S, task_depth);
+        gemm(c2T(op), Trans::N, scalar_t(1.), dF22, R, scalar_t(0.), S, task_depth);
         TIMER_STOP(t_sampling);
       };
       F22_->compress(sample_CB);
@@ -405,7 +393,6 @@ namespace strumpack {
   (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
    bool is_root) {
     assert(sep_tree.size == dim_sep());
-#if defined(STRUMPACK_USE_MPI)
     F11_ = std::move
       (HODLR::HODLRMatrix<scalar_t>
        (commself_, sep_tree, opts.HODLR_options()));
@@ -416,12 +403,6 @@ namespace strumpack {
         (new HODLR::HODLRMatrix<scalar_t>
          (commself_, CB_tree, opts.HODLR_options()));
     }
-#else
-    std::cerr
-      << "ERROR: HODLR compression requires MPI support,"
-      << "but STRUMPACK was not configured with MPI support."
-      << std::endl;
-#endif
   }
 
 } // end namespace strumpack

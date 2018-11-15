@@ -222,10 +222,8 @@ namespace strumpack {
     };
 
     F11_.compress(sample_F11);
-    F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_);
-    F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
-    F12_.compress(sample_F12);
-    F21_.compress(sample_F21);
+    F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_, sample_F12);
+    F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_, sample_F21);
 
     TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
     F11_.factor();
