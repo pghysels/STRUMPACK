@@ -33,6 +33,7 @@
 #define SPOPTIONS_HPP
 
 #include <cstring>
+#include <limits>
 
 // this is needed for RealType, put that somewhere else?
 #include "dense/BLASLAPACKWrapper.hpp"
@@ -1004,7 +1005,7 @@ namespace strumpack {
       case CompressionType::BLR: return _blr_min_sep_size;
       case CompressionType::HODLR: return _hodlr_min_sep_size;
       case CompressionType::NONE:
-      default: return 0;
+      default: return std::numeric_limits<int>::max();
       }
     }
 
@@ -1022,7 +1023,7 @@ namespace strumpack {
       case CompressionType::BLR: return _blr_opts.leaf_size();
       case CompressionType::HODLR: return _hodlr_opts.leaf_size();
       case CompressionType::NONE:
-      default: return 0;
+      default: return std::numeric_limits<int>::max();
       }
     }
 
