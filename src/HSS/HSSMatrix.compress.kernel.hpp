@@ -38,7 +38,7 @@ namespace strumpack {
     HSSMatrix<scalar_t>::compress_ann
     (DenseMatrix<std::uint32_t>& ann, DenseM_t& scores,
      const elem_t& Aelem, const opts_t& opts) {
-      std::cout << "---> USING COMPRESS_ANN <---" << std::endl;
+      //std::cout << "---> USING COMPRESS_ANN <---" << std::endl;
       WorkCompressANN<scalar_t> w;
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait

@@ -45,7 +45,6 @@ typedef float real_t;
 
 #include "HSS/HSSMatrix.hpp"
 #include "misc/TaskTimer.hpp"
-// #include "FileManipulation.h"
 #include "preprocessing.h"
 
 using namespace std;
@@ -134,11 +133,10 @@ int main(int argc, char *argv[]) {
   string reorder("natural");
   real_t h = 3.;
   real_t lambda = 1.;
-  int kernel = 1; // Gaussian=1, Laplace=2
+  int kernel = 1; // Gaussian=1, Laplacian=2
   string mode("test");
 
-  cout << endl
-       << "# usage: ./KernelRegression_ann file d h lambda "
+  cout << "# usage: ./KernelRegression_ann file d h lambda "
        << "kern(1=Gauss,2=Laplace) "
        << "reorder(natural, 2means, kd, pca, cobble) mode(valid, test)"
        << endl;
@@ -161,6 +159,7 @@ int main(int argc, char *argv[]) {
 
   TaskTimer::t_begin = GET_TIME_NOW();
   TaskTimer timer(string("compression"), 1);
+  float fit_time = 0.0;
 
   HSSOptions<real_t> hss_opts;
   hss_opts.set_verbose(true);
@@ -186,7 +185,7 @@ int main(int argc, char *argv[]) {
   vector<real_t> data_train_label = read_from_file(data_train_lab_FILE);
   vector<real_t> data_test        = read_from_file(data_test_dat_FILE);
   vector<real_t> data_test_label  = read_from_file(data_test_lab_FILE);
-  cout << "# Reading took " << timer.elapsed() << endl;
+  cout << "## Reading time " << timer.elapsed() << endl << endl;
 
   int n = data_train.size() / d;
   int m = data_test.size() / d;
@@ -207,7 +206,8 @@ int main(int argc, char *argv[]) {
     recursive_pca(train_matrix, cluster_size, cluster_tree, label_matrix);
   else if (reorder == "cobble")
     recursive_cobble(train_matrix, cluster_size, cluster_tree, label_matrix);
-  cout << "# clustering time = " << timer.elapsed() << " sec" <<endl;
+  cout << "## Clustering time = " << timer.elapsed() << endl;
+  fit_time += timer.elapsed();
 
   cout << endl << "# Starting HSS compression..." << endl;
   HSSMatrix<real_t> K;
@@ -224,7 +224,8 @@ int main(int argc, char *argv[]) {
   timer.start();
   find_approximate_neighbors
     (train_matrix, num_iters, ann_number, neighbors, scores, generator);
-  cout << "# ANN time = " << timer.elapsed() << " sec" << endl;
+  cout << "## ANN time = " << timer.elapsed() << endl << endl;
+  fit_time += timer.elapsed();
   // Find ANN: end ------------------------------------------------
 
   // Compression: start ------------------------------------------------
@@ -233,7 +234,8 @@ int main(int argc, char *argv[]) {
   timer.start();
   K.compress_ann(neighbors, scores, kernel_matrix, hss_opts);
   // K.compress(kernel_matrix, kernel_matrix, hss_opts);
-  cout << "### compression time = " << timer.elapsed() << " ###" <<endl;
+  cout << "## Compression time = " << timer.elapsed() << endl << endl;
+  fit_time += timer.elapsed();
 
   if (K.is_compressed()) {
     cout << "# created K matrix of dimension " << K.rows() << " x " << K.cols()
@@ -275,7 +277,8 @@ int main(int argc, char *argv[]) {
   cout << endl << "# Factorization start" << endl;
   timer.start();
   auto ULV = K.factor();
-  cout << "# factorization time = " << timer.elapsed() << endl;
+  cout << "## Factorization time = " << timer.elapsed() << endl;
+  fit_time += timer.elapsed();
 
   DenseMatrix<real_t> B(n, 1, &data_train_label[0], n);
   DenseMatrix<real_t> weights(B);
@@ -283,7 +286,8 @@ int main(int argc, char *argv[]) {
   cout << endl << "# Solution start..." << endl;
   timer.start();
   K.solve(ULV, weights);
-  cout << "# solve time = " << timer.elapsed() << endl;
+  cout << "## Solve time = " << timer.elapsed() << endl;
+  fit_time += timer.elapsed();
 
   vector<real_t> sample_vector(n); // Generate random vector
   normal_distribution<real_t> normal_distr(0.0,1.0);
@@ -332,9 +336,10 @@ int main(int argc, char *argv[]) {
     incorrect_quant += (a > 0 ? a : -a);
   }
 
-  cout << "# Prediction took " << timer.elapsed() << endl;
-  cout << "# prediction score: " << ((m - incorrect_quant) / m) * 100 << "%"
-       << endl << endl;
+  cout << "## Prediction time = " << timer.elapsed() << endl;
+  cout << "## Fit time = " << fit_time << endl;
+  cout << "## c-err: " << 100.0 - (((m - incorrect_quant) / m) * 100) 
+  	   << "%" << endl << endl;
   // Prediction: end-----------------------------------
 
   return 0;
