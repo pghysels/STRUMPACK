@@ -114,6 +114,7 @@ namespace strumpack {
     case CompressionType::BLR: return "BLR";
     case CompressionType::HODLR: return "HODLR";
     }
+    return "UNKNOWN";
   }
 
 
@@ -283,6 +284,7 @@ namespace strumpack {
       _argc(argc), _argv(argv) {
       _hss_opts.set_verbose(false);
       _blr_opts.set_verbose(false);
+      _hodlr_opts.set_verbose(false);
     }
 
     /**

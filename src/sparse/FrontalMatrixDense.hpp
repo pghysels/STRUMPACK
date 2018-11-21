@@ -47,6 +47,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> class FrontalMatrixDense
     : public FrontalMatrix<scalar_t,integer_t> {
+    using F_t = FrontalMatrix<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
@@ -62,12 +63,26 @@ namespace strumpack {
     void release_work_memory() override { F22_.clear(); }
     void extend_add_to_dense
     (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
-     const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) override;
+     const F_t* p, int task_depth) override;
 
     void sample_CB
-    (const SPOptions<scalar_t>& opts, const DenseM_t& R, DenseM_t& Sr,
-     DenseM_t& Sc, FrontalMatrix<scalar_t,integer_t>* pa,
+    (const SPOptions<scalar_t>& opts, const DenseM_t& R,
+     DenseM_t& Sr, DenseM_t& Sc, F_t* pa,
      int task_depth) override;
+
+    void sample_CB_to_F11
+    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+     int task_depth) const override;
+    void sample_CB_to_F12
+    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+     int task_depth) const override;
+    void sample_CB_to_F21
+    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+     int task_depth) const override;
+    void sample_CB_to_F22
+    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+     int task_depth) const override;
+
     void multifrontal_factorization
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,
      int etree_level=0, int task_depth=0) override;
@@ -111,7 +126,7 @@ namespace strumpack {
     void bwd_solve_phase1
     (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const;
 
-    using FrontalMatrix<scalar_t,integer_t>::lchild_;
+    using F_t::lchild_;
     using FrontalMatrix<scalar_t,integer_t>::rchild_;
     using FrontalMatrix<scalar_t,integer_t>::dim_sep;
     using FrontalMatrix<scalar_t,integer_t>::dim_upd;
@@ -121,13 +136,12 @@ namespace strumpack {
   FrontalMatrixDense<scalar_t,integer_t>::FrontalMatrixDense
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd)
-    : FrontalMatrix<scalar_t,integer_t>
-    (nullptr, nullptr, sep, sep_begin, sep_end, upd) {}
+    : F_t(nullptr, nullptr, sep, sep_begin, sep_end, upd) {}
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
-   const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) {
+   const F_t* p, int task_depth) {
     const std::size_t pdsep = paF11.rows();
     const std::size_t dupd = dim_upd();
     std::size_t upd2sep;
@@ -153,25 +167,6 @@ namespace strumpack {
     STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
     STRUMPACK_FULL_RANK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
     release_work_memory();
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::sample_CB
-  (const SPOptions<scalar_t>& opts, const DenseM_t& R, DenseM_t& Sr,
-   DenseM_t& Sc, FrontalMatrix<scalar_t,integer_t>* pa, int task_depth) {
-    auto I = this->upd_to_parent(pa);
-    auto cR = R.extract_rows(I);
-    DenseM_t cS(dim_upd(), R.cols());
-    gemm(Trans::N, Trans::N, scalar_t(1.), F22_, cR,
-         scalar_t(0.), cS, task_depth);
-    Sr.scatter_rows_add(I, cS, task_depth);
-    gemm(Trans::C, Trans::N, scalar_t(1.), F22_, cR,
-         scalar_t(0.), cS, task_depth);
-    Sc.scatter_rows_add(I, cS, task_depth);
-    STRUMPACK_CB_SAMPLE_FLOPS
-      (gemm_flops(Trans::N, Trans::N, scalar_t(1.), F22_, cR, scalar_t(0.)) +
-       gemm_flops(Trans::C, Trans::N, scalar_t(1.), F22_, cR, scalar_t(0.)) +
-       cS.rows()*cS.cols()*2); // for the skinny-extend add
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -359,6 +354,138 @@ namespace strumpack {
       for (std::size_t i=0; i<lI.size(); i++)
         B(oI[i], oJ[j]) += F22_(lI[i], lJ[j]);
     STRUMPACK_FLOPS((is_complex<scalar_t>() ? 2 : 1) * lJ.size() * lI.size());
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixDense<scalar_t,integer_t>::sample_CB
+  (const SPOptions<scalar_t>& opts, const DenseM_t& R, DenseM_t& Sr,
+   DenseM_t& Sc, F_t* pa, int task_depth) {
+    auto I = this->upd_to_parent(pa);
+    auto cR = R.extract_rows(I);
+    DenseM_t cS(dim_upd(), R.cols());
+    gemm(Trans::N, Trans::N, scalar_t(1.), F22_, cR,
+         scalar_t(0.), cS, task_depth);
+    Sr.scatter_rows_add(I, cS, task_depth);
+    gemm(Trans::C, Trans::N, scalar_t(1.), F22_, cR,
+         scalar_t(0.), cS, task_depth);
+    Sc.scatter_rows_add(I, cS, task_depth);
+    STRUMPACK_CB_SAMPLE_FLOPS
+      (gemm_flops(Trans::N, Trans::N, scalar_t(1.), F22_, cR, scalar_t(0.)) +
+       gemm_flops(Trans::C, Trans::N, scalar_t(1.), F22_, cR, scalar_t(0.)) +
+       cS.rows()*cS.cols()*2); // for the skinny-extend add
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixDense<scalar_t,integer_t>::sample_CB_to_F11
+  (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
+    const std::size_t dupd = dim_upd();
+    if (!dupd) return;
+    std::size_t u2s;
+    auto Ir = this->upd_to_parent(pa, u2s);
+    auto Rcols = R.cols();
+    DenseM_t cR(u2s, Rcols);
+    for (std::size_t c=0; c<Rcols; c++)
+      for (std::size_t r=0; r<u2s; r++)
+        cR(r,c) = R(Ir[r],c);
+    DenseM_t cS(u2s, Rcols);
+    DenseMW_t CB11(u2s, u2s, const_cast<DenseM_t&>(F22_), 0, 0);
+    gemm(op, Trans::N, scalar_t(1.), CB11, cR, scalar_t(0.), cS, task_depth);
+    for (std::size_t c=0; c<Rcols; c++)
+      for (std::size_t r=0; r<u2s; r++)
+        S(Ir[r],c) += cS(r,c);
+    STRUMPACK_CB_SAMPLE_FLOPS(u2s*Rcols);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixDense<scalar_t,integer_t>::sample_CB_to_F12
+  (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
+    const std::size_t dupd = dim_upd();
+    if (!dupd) return;
+    std::size_t u2s;
+    auto Ir = this->upd_to_parent(pa, u2s);
+    auto pds = pa->dim_sep();
+    auto Rcols = R.cols();
+    DenseMW_t CB12(u2s, dupd-u2s, const_cast<DenseM_t&>(F22_), 0, u2s);
+    if (op == Trans::N) {
+      DenseM_t cR(dupd-u2s, Rcols);
+      for (std::size_t c=0; c<Rcols; c++)
+        for (std::size_t r=u2s; r<dupd; r++)
+          cR(r-u2s,c) = R(Ir[r]-pds,c);
+      DenseM_t cS(u2s, Rcols);
+      gemm(op, Trans::N, scalar_t(1.), CB12, cR, scalar_t(0.), cS, task_depth);
+      for (std::size_t c=0; c<Rcols; c++)
+        for (std::size_t r=0; r<u2s; r++)
+          S(Ir[r],c) += cS(r,c);
+      STRUMPACK_CB_SAMPLE_FLOPS(u2s*Rcols);
+    } else {
+      DenseM_t cR(u2s, Rcols);
+      for (std::size_t c=0; c<Rcols; c++)
+        for (std::size_t r=0; r<u2s; r++)
+          cR(r,c) = R(Ir[r],c);
+      DenseM_t cS(dupd-u2s, Rcols);
+      gemm(op, Trans::N, scalar_t(1.), CB12, cR, scalar_t(0.), cS, task_depth);
+      for (std::size_t c=0; c<Rcols; c++)
+        for (std::size_t r=u2s; r<dupd; r++)
+          S(Ir[r]-pds,c) += cS(r-u2s,c);
+      STRUMPACK_CB_SAMPLE_FLOPS((dupd-u2s)*Rcols);
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixDense<scalar_t,integer_t>::sample_CB_to_F21
+  (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
+    const std::size_t dupd = dim_upd();
+    if (!dupd) return;
+    std::size_t u2s;
+    auto Ir = this->upd_to_parent(pa, u2s);
+    auto Rcols = R.cols();
+    auto pds = pa->dim_sep();
+    DenseMW_t CB21(dupd-u2s, u2s, const_cast<DenseM_t&>(F22_), u2s, 0);
+    if (op == Trans::N) {
+      DenseM_t cR(u2s, Rcols);
+      for (std::size_t c=0; c<Rcols; c++)
+        for (std::size_t r=0; r<u2s; r++)
+          cR(r,c) = R(Ir[r],c);
+      DenseM_t cS(dupd-u2s, Rcols);
+      gemm(op, Trans::N, scalar_t(1.), CB21, cR, scalar_t(0.), cS, task_depth);
+      for (std::size_t c=0; c<Rcols; c++)
+        for (std::size_t r=u2s; r<dupd; r++)
+          S(Ir[r]-pds,c) += cS(r-u2s,c);
+      STRUMPACK_CB_SAMPLE_FLOPS((dupd-u2s)*Rcols);
+    } else {
+      DenseM_t cR(dupd-u2s, Rcols);
+      for (std::size_t c=0; c<Rcols; c++)
+        for (std::size_t r=u2s; r<dupd; r++)
+          cR(r-u2s,c) = R(Ir[r]-pds,c);
+      DenseM_t cS(u2s, Rcols);
+      gemm(op, Trans::N, scalar_t(1.), CB21, cR, scalar_t(0.), cS, task_depth);
+      for (std::size_t c=0; c<Rcols; c++)
+        for (std::size_t r=0; r<u2s; r++)
+          S(Ir[r],c) += cS(r,c);
+      STRUMPACK_CB_SAMPLE_FLOPS(u2s*Rcols);
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixDense<scalar_t,integer_t>::sample_CB_to_F22
+  (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
+    const std::size_t dupd = dim_upd();
+    if (!dupd) return;
+    std::size_t u2s;
+    auto Ir = this->upd_to_parent(pa, u2s);
+    auto pds = pa->dim_sep();
+    auto Rcols = R.cols();
+    DenseM_t cR(dupd-u2s, Rcols);
+    for (std::size_t c=0; c<Rcols; c++)
+      for (std::size_t r=u2s; r<dupd; r++)
+        cR(r-u2s,c) = R(Ir[r]-pds,c);
+    DenseM_t cS(dupd-u2s, Rcols);
+    DenseMW_t CB22(dupd-u2s, dupd-u2s, const_cast<DenseM_t&>(F22_), u2s, u2s);
+    gemm(op, Trans::N, scalar_t(1.), CB22, cR, scalar_t(0.), cS, task_depth);
+    for (std::size_t c=0; c<Rcols; c++)
+      for (std::size_t r=u2s; r<dupd; r++)
+        S(Ir[r]-pds,c) += cS(r-u2s,c);
+    STRUMPACK_CB_SAMPLE_FLOPS((dupd-u2s)*Rcols);
   }
 
 } // end namespace strumpack

@@ -74,6 +74,8 @@ namespace strumpack {
     void spmv(const DenseM_t& x, DenseM_t& y) const override;
     void spmv(const scalar_t* x, scalar_t* y) const override;
 
+    void spmv(Trans op, const DenseM_t& x, DenseM_t& y) const;
+
     void apply_scaling
     (const std::vector<scalar_t>& Dr,
      const std::vector<scalar_t>& Dc) override;
@@ -129,6 +131,7 @@ namespace strumpack {
 #endif //defined(STRUMPACK_USE_MPI)
 #endif //DOXYGEN_SHOULD_SKIP_THIS
 
+  private:
     using CompressedSparseMatrix<scalar_t,integer_t>::n_;
     using CompressedSparseMatrix<scalar_t,integer_t>::nnz_;
     using CompressedSparseMatrix<scalar_t,integer_t>::ptr_;
@@ -280,35 +283,35 @@ namespace strumpack {
     return 0;
   }
 
-#if defined(__INTEL_MKL__)
-  // TODO test this, enable from CMake
-  template<> void CSRMatrix<float>::spmv(const float* x, float* y) const {
-    char trans = 'N';
-    mkl_cspblas_scsrgemv(&no, &n, val_, ptr_, ind_, x, y);
-    STRUMPACK_FLOPS(this->spmv_flops());
-    STRUMPACK_BYTES(this->spmv_bytes());
-  }
-  template<> void CSRMatrix<double>::spmv(const double* x, double* y) const {
-    char trans = 'N';
-    mkl_cspblas_dcsrgemv(&no, &n, val_, ptr_, ind_, x, y);
-    STRUMPACK_FLOPS(this->spmv_flops());
-    STRUMPACK_BYTES(this->spmv_bytes());
-  }
-  template<> void CSRMatrix<std::complex<float>>::spmv
-  (const std::complex<float>* x, std::complex<float>* y) const {
-    char trans = 'N';
-    mkl_cspblas_ccsrgemv(&no, &n, val_, ptr_, ind_, x, y);
-    STRUMPACK_FLOPS(this->spmv_flops());
-    STRUMPACK_BYTES(this->spmv_bytes());
-  }
-  template<> void CSRMatrix<std::complex<double>>::spmv
-  (const std::complex<double>* x, std::complex<double>* y) const {
-    char trans = 'N';
-    mkl_cspblas_zcsrgemv(&no, &n, val_, ptr_, ind_, x, y);
-    STRUMPACK_FLOPS(this->spmv_flops());
-    STRUMPACK_BYTES(this->spmv_bytes());
-  }
-#endif
+// #if defined(__INTEL_MKL__)
+//   // TODO test this, enable from CMake
+//   template<> void CSRMatrix<float>::spmv(const float* x, float* y) const {
+//     char trans = 'N';
+//     mkl_cspblas_scsrgemv(&no, &n, val_, ptr_, ind_, x, y);
+//     STRUMPACK_FLOPS(this->spmv_flops());
+//     STRUMPACK_BYTES(this->spmv_bytes());
+//   }
+//   template<> void CSRMatrix<double>::spmv(const double* x, double* y) const {
+//     char trans = 'N';
+//     mkl_cspblas_dcsrgemv(&no, &n, val_, ptr_, ind_, x, y);
+//     STRUMPACK_FLOPS(this->spmv_flops());
+//     STRUMPACK_BYTES(this->spmv_bytes());
+//   }
+//   template<> void CSRMatrix<std::complex<float>>::spmv
+//   (const std::complex<float>* x, std::complex<float>* y) const {
+//     char trans = 'N';
+//     mkl_cspblas_ccsrgemv(&no, &n, val_, ptr_, ind_, x, y);
+//     STRUMPACK_FLOPS(this->spmv_flops());
+//     STRUMPACK_BYTES(this->spmv_bytes());
+//   }
+//   template<> void CSRMatrix<std::complex<double>>::spmv
+//   (const std::complex<double>* x, std::complex<double>* y) const {
+//     char trans = 'N';
+//     mkl_cspblas_zcsrgemv(&no, &n, val_, ptr_, ind_, x, y);
+//     STRUMPACK_FLOPS(this->spmv_flops());
+//     STRUMPACK_BYTES(this->spmv_bytes());
+//   }
+// #endif
 
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::spmv
@@ -328,12 +331,47 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::spmv
   (const DenseM_t& x, DenseM_t& y) const {
-    assert(x.cols() == y.cols());
-    assert(x.rows() == std::size_t(n_));
-    assert(y.rows() == std::size_t(n_));
+    // assert(x.cols() == y.cols());
+    // assert(x.rows() == std::size_t(n_));
+    // assert(y.rows() == std::size_t(n_));
     for (std::size_t c=0; c<x.cols(); c++)
       spmv(x.ptr(0,c), y.ptr(0,c));
   }
+
+  // TODO use MKL routines for better performance
+  template<typename scalar_t,typename integer_t> void
+  CSRMatrix<scalar_t,integer_t>::spmv
+  (Trans op, const DenseM_t& x, DenseM_t& y) const {
+    if (op != Trans::N) y.zero();
+    for (std::size_t c=0; c<x.cols(); c++) {
+      auto px = x.ptr(0, c);
+      auto py = y.ptr(0, c);
+      if (op == Trans::N) {
+        for (integer_t r=0; r<n_; r++) {
+          const auto hij = ptr_[r+1];
+          scalar_t yr(0);
+          for (integer_t j=ptr_[r]; j<hij; j++)
+            yr += val_[j] * px[ind_[j]];
+          py[r] = yr;
+        }
+      } else if (op == Trans::T) {
+        for (integer_t r=0; r<n_; r++) {
+          const auto hij = ptr_[r+1];
+          for (integer_t j=ptr_[r]; j<hij; j++)
+            py[ind_[j]] += val_[j] * px[r];
+        }
+      } else if (op == Trans::C) {
+        for (integer_t r=0; r<n_; r++) {
+          const auto hij = ptr_[r+1];
+          for (integer_t j=ptr_[r]; j<hij; j++)
+            py[ind_[j]] += blas::my_conj(val_[j]) * px[r];
+        }
+      }
+    }
+    STRUMPACK_FLOPS(x.cols()*this->spmv_flops());
+    STRUMPACK_BYTES(x.cols()*this->spmv_bytes());
+  }
+
 
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::strumpack_mc64

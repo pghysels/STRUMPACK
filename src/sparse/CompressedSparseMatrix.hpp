@@ -63,6 +63,7 @@ namespace strumpack {
    * sparse matrices.
    *
    * This is only for __square__ matrices!
+   * __TODO make this work on non-square matrices__
    *
    * The rows and the columns should always be __sorted__!
    *

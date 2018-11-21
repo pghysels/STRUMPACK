@@ -56,11 +56,23 @@ namespace strumpack {
 
     void extend_add_to_dense
     (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
-     const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) override;
+     const F_t* p, int task_depth) override;
 
-    void sample_CB
-    (const SPOptions<scalar_t>& opts, const DenseM_t& R, DenseM_t& Sr,
-     DenseM_t& Sc, F_t* pa, int task_depth) override;
+    void sample_CB_to_F11
+    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+     int task_depth) const override;
+    void sample_CB_to_F12
+    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+     int task_depth) const override;
+    void sample_CB_to_F21
+    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+     int task_depth) const override;
+    void sample_CB_to_F22
+    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+     int task_depth) const override;
+
+    void extract_sparse
+    (const SpMat_t& A, SpMat_t& A11, SpMat_t& A12, SpMat_t& A21) const;
 
     void release_work_memory() override;
     void random_sampling
@@ -118,8 +130,7 @@ namespace strumpack {
   FrontalMatrixHODLR<scalar_t,integer_t>::FrontalMatrixHODLR
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd)
-    : FrontalMatrix<scalar_t,integer_t>
-    (nullptr, nullptr, sep, sep_begin, sep_end, upd),
+    : F_t(nullptr, nullptr, sep, sep_begin, sep_end, upd),
     commself_(MPI_COMM_SELF) { }
 
   template<typename scalar_t,typename integer_t> void
@@ -130,7 +141,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLR<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
-   const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) {
+   const F_t* p, int task_depth) {
     const std::size_t pdsep = paF11.rows();
     const std::size_t dupd = dim_upd();
     std::size_t upd2sep;
@@ -139,9 +150,8 @@ namespace strumpack {
     {
       DenseM_t id(dupd, dupd);
       id.eye();
-      F22_->mult('N', id, CB);
+      F22_->mult(Trans::N, id, CB);
     }
-
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop default(shared) grainsize(64)      \
   if(task_depth < params::task_recursion_cutoff_level)
@@ -164,23 +174,115 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLR<scalar_t,integer_t>::sample_CB
-  (const SPOptions<scalar_t>& opts, const DenseM_t& R,
-   DenseM_t& Sr, DenseM_t& Sc, F_t* pa, int task_depth) {
-    if (!dim_upd()) return;
-    auto I = this->upd_to_parent(pa);
-    auto cR = R.extract_rows(I);
-    DenseM_t cSr(cR.rows(), cR.cols());
-    DenseM_t cSc(cR.rows(), cR.cols());
+  FrontalMatrixHODLR<scalar_t,integer_t>::sample_CB_to_F11
+  (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
+    const std::size_t dupd = dim_upd();
+    if (!dupd) return;
+    std::size_t u2s;
+    auto Ir = this->upd_to_parent(pa, u2s);
+    auto Rcols = R.cols();
+    DenseM_t cR(dupd, Rcols);
+    for (std::size_t c=0; c<Rcols; c++) {
+      for (std::size_t r=0; r<u2s; r++) cR(r,c) = R(Ir[r],c);
+      for (std::size_t r=u2s; r<dupd; r++) cR(r,c) = scalar_t(0.);
+    }
+    DenseM_t cS(dupd, Rcols);
+    F22_->mult(op, cR, cS);
+    for (std::size_t c=0; c<Rcols; c++)
+      for (std::size_t r=0; r<u2s; r++)
+        S(Ir[r],c) += cS(r,c);
+    STRUMPACK_CB_SAMPLE_FLOPS(Rcols*u2s);
+  }
 
-    std::cout << "TODO sample with HODLR for CB" << std::endl;
-    // _H.Schur_product_direct
-    //   (_ULV, _Theta, _DUB01, _Phi,
-    //    _ThetaVhatC_or_VhatCPhiC, cR, cSr, cSc);
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLR<scalar_t,integer_t>::sample_CB_to_F12
+  (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
+    const std::size_t dupd = dim_upd();
+    if (!dupd) return;
+    std::size_t u2s;
+    auto Ir = this->upd_to_parent(pa, u2s);
+    auto Rcols = R.cols();
+    auto pds = pa->dim_sep();
+    DenseM_t cR(dupd, Rcols), cS(dupd, Rcols);
+    if (op == Trans::N) {
+      for (std::size_t c=0; c<Rcols; c++) {
+        for (std::size_t r=0; r<u2s; r++) cR(r,c) = scalar_t(0.);
+        for (std::size_t r=u2s; r<dupd; r++)
+          cR(r,c) = R(Ir[r]-pds,c);
+      }
+      F22_->mult(op, cR, cS);
+      for (std::size_t c=0; c<Rcols; c++)
+        for (std::size_t r=0; r<u2s; r++)
+          S(Ir[r],c) += cS(r,c);
+      STRUMPACK_CB_SAMPLE_FLOPS(Rcols*u2s);
+    } else {
+      for (std::size_t c=0; c<Rcols; c++) {
+        for (std::size_t r=0; r<u2s; r++) cR(r,c) = R(Ir[r],c);
+        for (std::size_t r=u2s; r<dupd; r++) cR(r,c) = scalar_t(0.);
+      }
+      F22_->mult(op, cR, cS);
+      for (std::size_t c=0; c<Rcols; c++)
+        for (std::size_t r=u2s; r<dupd; r++)
+          S(Ir[r]-pds,c) += cS(r,c);
+      STRUMPACK_CB_SAMPLE_FLOPS(Rcols*(dupd-u2s));
+    }
+  }
 
-    Sr.scatter_rows_add(I, cSr, task_depth);
-    Sc.scatter_rows_add(I, cSc, task_depth);
-    STRUMPACK_CB_SAMPLE_FLOPS(cSr.rows()*cSr.cols()*2);
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLR<scalar_t,integer_t>::sample_CB_to_F21
+  (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
+    const std::size_t dupd = dim_upd();
+    if (!dupd) return;
+    std::size_t u2s;
+    auto Ir = this->upd_to_parent(pa, u2s);
+    auto pds = pa->dim_sep();
+    auto Rcols = R.cols();
+    DenseM_t cR(dupd, Rcols), cS(dupd, Rcols);
+    if (op == Trans::N) {
+      for (std::size_t c=0; c<Rcols; c++) {
+        for (std::size_t r=0; r<u2s; r++) cR(r,c) = R(Ir[r],c);
+        for (std::size_t r=u2s; r<dupd; r++) cR(r,c) = scalar_t(0.);
+      }
+      F22_->mult(op, cR, cS);
+      for (std::size_t c=0; c<Rcols; c++)
+        for (std::size_t r=u2s; r<dupd; r++)
+          S(Ir[r]-pds,c) += cS(r,c);
+      STRUMPACK_CB_SAMPLE_FLOPS(Rcols*(dupd-u2s));
+    } else {
+      for (std::size_t c=0; c<Rcols; c++) {
+        for (std::size_t r=0; r<u2s; r++) cR(r,c) = scalar_t(0.);
+        for (std::size_t r=u2s; r<dupd; r++)
+          cR(r,c) = R(Ir[r]-pds,c);
+      }
+      F22_->mult(op, cR, cS);
+      for (std::size_t c=0; c<Rcols; c++)
+        for (std::size_t r=0; r<u2s; r++)
+          S(Ir[r],c) += cS(r,c);
+      STRUMPACK_CB_SAMPLE_FLOPS(Rcols*u2s);
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLR<scalar_t,integer_t>::sample_CB_to_F22
+  (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
+    const std::size_t dupd = dim_upd();
+    if (!dupd) return;
+    std::size_t u2s;
+    auto Ir = this->upd_to_parent(pa, u2s);
+    auto pds = pa->dim_sep();
+    auto Rcols = R.cols();
+    DenseM_t cR(dupd, Rcols);
+    for (std::size_t c=0; c<Rcols; c++) {
+      for (std::size_t r=0; r<u2s; r++) cR(r,c) = scalar_t(0.);
+      for (std::size_t r=u2s; r<dupd; r++)
+        cR(r,c) = R(Ir[r]-pds,c);
+    }
+    DenseM_t cS(dupd, Rcols);
+    F22_->mult(op, cR, cS);
+    for (std::size_t c=0; c<Rcols; c++)
+      for (std::size_t r=u2s; r<dupd; r++)
+        S(Ir[r]-pds,c) += cS(r,c);
+    STRUMPACK_CB_SAMPLE_FLOPS(Rcols*(dupd-u2s));
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -195,18 +297,74 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLR<scalar_t,integer_t>::random_sampling
-  (const SpMat_t& A, const SPOptions<scalar_t>& opts, DenseM_t& Rr,
-   DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc, int etree_level,
-   int task_depth) {
-    Sr.zero();
-    Sc.zero();
-    A.front_multiply
-      (sep_begin_, sep_end_, this->upd_, Rr, Sr, Sc, task_depth);
-    if (lchild_)
-      lchild_->sample_CB(opts, Rr, Sr, Sc, this, task_depth);
-    if (rchild_)
-      rchild_->sample_CB(opts, Rr, Sr, Sc, this, task_depth);
+  FrontalMatrixHODLR<scalar_t,integer_t>::extract_sparse
+  (const SpMat_t& A, SpMat_t& A11, SpMat_t& A12, SpMat_t& A21) const {
+    auto dsep = dim_sep();
+    auto dupd = dim_upd();
+    auto slo = this->sep_begin();
+    auto shi = this->sep_end();
+    integer_t nnz11 = 0, nnz12 = 0, nnz21 = 0;
+    for (integer_t r=slo; r<shi; r++) {
+      auto jhi = A.ptr(r+1);
+      for (integer_t j=A.ptr(r); j<jhi; j++) {
+        auto c = A.ind(j);
+        if (c >= slo) {
+          if (c < shi) nnz11++;
+          else nnz12++;
+        }
+      }
+    }
+    for (std::size_t r=this->sep_end(); r<A.size(); r++)
+      for (std::size_t j=A.ptr(r); j<A.ptr(r+1); j++) {
+        auto c = A.ind(j);
+        if (c >= this->sep_begin() && c < this->sep_end())
+          nnz21++;
+      }
+    A11 = CSRMatrix<scalar_t,integer_t>(dsep, nnz11);
+    A12 = CSRMatrix<scalar_t,integer_t>(dsep, nnz12);
+    A21 = CSRMatrix<scalar_t,integer_t>(dupd, nnz21);
+
+    A11.ptr(0) = A12.ptr(0) = A21.ptr(0) = 0;
+    nnz11 = nnz12 = nnz21 = 0;
+    for (integer_t r=0; r<dsep; r++) {
+      auto gr = r + this->sep_begin();
+      A11.ptr(r+1) = A11.ptr(r);
+      A12.ptr(r+1) = A12.ptr(r);
+      auto jhi = A.ptr(gr+1);
+      for (integer_t j=A.ptr(gr); j<jhi; j++) {
+        auto c = A.ind(j);
+        c -= slo;
+        if (c >= 0) {
+          if (c < dsep) {
+            A11.ptr(r+1)++;
+            A11.ind(nnz11) = c;
+            A11.val(nnz11++) = A.val(j);
+          } else {
+            A12.ptr(r+1)++;
+            A12.ind(nnz12) = std::distance
+              (this->upd_.begin(),
+               std::lower_bound(this->upd_.begin(), this->upd_.end(), c+slo));
+            A12.val(nnz12++) = A.val(j);
+          }
+        }
+      }
+    }
+    for (integer_t r=0; r<dupd; r++) {
+      auto gr = this->upd_[r];
+      A21.ptr(r+1) = A21.ptr(r);
+      auto jhi = A.ptr(gr+1);
+      for (integer_t j=A.ptr(gr); j<jhi; j++) {
+        auto c = A.ind(j);
+        c -= slo;
+        if (c >= 0) {
+          if (c < dsep) {
+            A21.ptr(r+1)++;
+            A21.ind(nnz21) = c;
+            A21.val(nnz21++) = A.val(j);
+          } else continue;
+        }
+      }
+    }
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -238,37 +396,58 @@ namespace strumpack {
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();
 
+    CSRMatrix<scalar_t,integer_t> A11, A12, A21;
+    extract_sparse(A, A11, A12, A21);
+
     //// ------ temporary test code ------------------------------
-    DenseM_t dF11(dsep, dsep); dF11.zero();
-    DenseM_t dF12(dsep, dupd); dF12.zero();
-    DenseM_t dF21(dupd, dsep); dF21.zero();
-    DenseM_t dF22(dupd, dupd); dF22.zero();
-    A.extract_front
-      (dF11, dF12, dF21, this->sep_begin_, this->sep_end_,
-       this->upd_, task_depth);
-    if (lchild_)
-      lchild_->extend_add_to_dense
-        (dF11, dF12, dF21, dF22, this, task_depth);
-    if (rchild_)
-      rchild_->extend_add_to_dense
-        (dF11, dF12, dF21, dF22, this, task_depth);
+    // DenseM_t dF11(dsep, dsep); dF11.zero();
+    // DenseM_t dF12(dsep, dupd); dF12.zero();
+    // DenseM_t dF21(dupd, dsep); dF21.zero();
+    // DenseM_t dF22(dupd, dupd); dF22.zero();
+    // A.extract_front
+    //   (dF11, dF12, dF21, this->sep_begin_, this->sep_end_,
+    //    this->upd_, task_depth);
+    // if (lchild_)
+    //   lchild_->extend_add_to_dense
+    //     (dF11, dF12, dF21, dF22, this, task_depth);
+    // if (rchild_)
+    //   rchild_->extend_add_to_dense
+    //     (dF11, dF12, dF21, dF22, this, task_depth);
     //// ---------------------------------------------------------
 
     auto sample_F11 = [&](char op, const DenseM_t& R, DenseM_t& S) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-      gemm(c2T(op), Trans::N, scalar_t(1.), dF11, R, scalar_t(0.), S, task_depth);
+      auto tr = c2T(op);
+      //gemm(tr, Trans::N, scalar_t(1.), dF11, R, scalar_t(0.), S, task_depth);
+      A11.spmv(tr, R, S);
+      if (lchild_) lchild_->sample_CB_to_F11(tr, R, S, this, task_depth);
+      if (rchild_) rchild_->sample_CB_to_F11(tr, R, S, this, task_depth);
       TIMER_STOP(t_sampling);
     };
     auto sample_F12 = [&]
       (char op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-      gemm(c2T(op), Trans::N, a, dF12, R, b, S, task_depth);
+      auto tr = c2T(op);
+      //gemm(tr, Trans::N, a, dF12, R, b, S, task_depth);
+      DenseM_t lR(R), lS(S);
+      lR.scale(a);
+      A12.spmv(tr, lR, lS);
+      if (lchild_) lchild_->sample_CB_to_F12(tr, lR, lS, this, task_depth);
+      if (rchild_) rchild_->sample_CB_to_F12(tr, lR, lS, this, task_depth);
+      S.scale_and_add(b, lS);
       TIMER_STOP(t_sampling);
     };
     auto sample_F21 = [&]
       (char op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-      gemm(c2T(op), Trans::N, a, dF21, R, b, S, task_depth);
+      auto tr = c2T(op);
+      //gemm(tr, Trans::N, a, dF21, R, b, S, task_depth);
+      DenseM_t lR(R), lS(S);
+      lR.scale(a);
+      A21.spmv(tr, lR, lS);
+      if (lchild_) lchild_->sample_CB_to_F21(tr, lR, lS, this, task_depth);
+      if (rchild_) rchild_->sample_CB_to_F21(tr, lR, lS, this, task_depth);
+      S.scale_and_add(b, lS);
       TIMER_STOP(t_sampling);
     };
 
@@ -277,30 +456,48 @@ namespace strumpack {
       F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_, sample_F12);
       F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_, sample_F21);
     }
+
     TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
     F11_.factor();
     TIMER_STOP(t_fact);
 
     //// ------ temporary test code -----------------------------
-    auto piv = dF11.LU(task_depth);
+    // auto piv = dF11.LU(task_depth);
     if (dupd) {
-      dF12.laswp(piv, true);
-      trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-           scalar_t(1.), dF11, dF12, task_depth);
-      trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-           scalar_t(1.), dF11, dF21, task_depth);
-      gemm(Trans::N, Trans::N, scalar_t(-1.), dF21, dF12,
-           scalar_t(1.), dF22, task_depth);
+      // dF12.laswp(piv, true);
+      // trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+      //      scalar_t(1.), dF11, dF12, task_depth);
+      // trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+      //      scalar_t(1.), dF11, dF21, task_depth);
+
+      // BETA=0 means dF22 has only the Schur update
+      // BETA=1 means dF22 has the full Schur complement
+      // gemm(Trans::N, Trans::N, scalar_t(-1.), dF21, dF12,
+      //      scalar_t(0.), dF22, task_depth);
       //// ---------------------------------------------------------
 
       auto sample_CB = [&](char op, const DenseM_t& R, DenseM_t& S) {
         TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-        gemm(c2T(op), Trans::N, scalar_t(1.), dF22, R, scalar_t(0.), S, task_depth);
+        auto tr = c2T(op);
+        // gemm(tr, Trans::N, scalar_t(1.), dF22, R, scalar_t(0.), S, task_depth);
+        // S.zero();
+        DenseM_t F12R(dsep, R.cols()), invF11F12R(dsep, R.cols());
+        if (tr == Trans::N) {
+          F12_.mult(tr, scalar_t(1.), R, scalar_t(0.), F12R);
+          F11_.inv_mult(tr, F12R, invF11F12R);
+          //F11_.solve(F12R, invF11F12R);
+          F21_.mult(tr, scalar_t(-1.), invF11F12R, scalar_t(0.), S);
+        } else {
+          F21_.mult(tr, scalar_t(1.), R, scalar_t(0.), F12R);
+          F11_.inv_mult(tr, F12R, invF11F12R);
+          F12_.mult(tr, scalar_t(-1.), invF11F12R, scalar_t(0.), S);
+        }
+        if (lchild_) lchild_->sample_CB_to_F22(tr, R, S, this, task_depth);
+        if (rchild_) rchild_->sample_CB_to_F22(tr, R, S, this, task_depth);
         TIMER_STOP(t_sampling);
       };
       F22_->compress(sample_CB);
     }
-
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
   }
@@ -326,7 +523,7 @@ namespace strumpack {
       DenseM_t rhs(bloc);
       F11_.solve(rhs, bloc);
       if (dim_upd())
-        F21_.mult('N', scalar_t(-1.), bloc, scalar_t(1.), bupd);
+        F21_.mult(Trans::N, scalar_t(-1.), bloc, scalar_t(1.), bupd);
     }
   }
 
@@ -346,7 +543,7 @@ namespace strumpack {
     DenseMW_t yupd(dim_upd(), y.cols(), work[0], 0, 0);
     if (dim_sep() && dim_upd()) {
       DenseMW_t yloc(dim_sep(), y.cols(), y, this->sep_begin_, 0);
-      F12_.mult('N', scalar_t(-1.), yupd, scalar_t(1.), yloc);
+      F12_.mult(Trans::N, scalar_t(-1.), yupd, scalar_t(1.), yloc);
     }
     this->bwd_solve_phase2(y, yupd, work, etree_level, task_depth);
   }

@@ -116,6 +116,20 @@ namespace strumpack {
     virtual void sample_CB
     (const SPOptions<scalar_t>& opts, const DenseM_t& R,
      DenseM_t& Sr, DenseM_t& Sc, F_t* parent, int task_depth=0) {};
+
+    virtual void sample_CB_to_F11
+    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+     int task_depth=0) const {}
+    virtual void sample_CB_to_F12
+    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+     int task_depth=0) const {}
+    virtual void sample_CB_to_F21
+    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+     int task_depth=0) const {}
+    virtual void sample_CB_to_F22
+    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+     int task_depth=0) const {}
+
     virtual void extract_CB_sub_matrix
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
      DenseM_t& B, int task_depth) const {};

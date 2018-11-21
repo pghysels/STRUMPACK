@@ -55,8 +55,7 @@ namespace strumpack {
              scalar_t,DenseMatrix<scalar_t>&)>*>(func);
       DenseMatrixWrapper<scalar_t> Yw(*nout, *nvec, Y, *nout),
         Xw(*nin, *nvec, const_cast<scalar_t*>(X), *nin);
-      //(*A)(*op, *a, Xw, *b, Yw);
-      Yw.zero();
+      (*A)(*op, *a, Xw, *b, Yw);
     }
 
 
@@ -92,7 +91,7 @@ namespace strumpack {
       std::size_t end_col() const { return rdist_[c_->rank()+1]; }
       const MPIComm& Comm() const { return *c_; }
 
-      void mult(char op, scalar_t alpha, const DenseM_t& X,
+      void mult(Trans op, scalar_t alpha, const DenseM_t& X,
                 scalar_t beta, DenseM_t& Y) const;
 
     private:
@@ -123,23 +122,8 @@ namespace strumpack {
       HODLR_createptree<scalar_t>(P, groups.data(), Fcomm_, ptree_);
       HODLR_createstats<scalar_t>(stats_);
 
-      // F2Cptr Aoptions = const_cast<F2Cptr>(A.options_);
-      // HODLR_copyoptions<scalar_t>(Aoptions, options_);
-
-      HODLR_createoptions<scalar_t>(options_);
-
-      // set hodlr options
-      int com_opt = 2;   // compression option 1:SVD 2:RRQR 3:ACA 4:BACA
-      int sort_opt = 0;  // 0:natural order, 1:kd-tree, 2:cobble-like ordering
-                         // 3:gram distance-based cobble-like ordering
-      HODLR_set_D_option<scalar_t>(options_, "tol_comp", 1e-2);
-      HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
-      HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
-      //HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", com_opt);
-      HODLR_set_I_option<scalar_t>(options_, "xyzsort", sort_opt);
-      HODLR_set_I_option<scalar_t>(options_, "ErrFillFull", 0);
-      HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", 100);
-
+      F2Cptr Aoptions = const_cast<F2Cptr>(A.options_);
+      HODLR_copyoptions<scalar_t>(Aoptions, options_);
 
       LRBF_construct_matvec_init<scalar_t>
         (rows_, cols_, lrows_, lcols_, A.msh_, B.msh_, lr_bf_, options_,
@@ -196,10 +180,18 @@ namespace strumpack {
 
     template<typename scalar_t> void
     LRBFMatrix<scalar_t>::mult
-    (char op, scalar_t alpha, const DenseM_t& X,
+    (Trans op, scalar_t alpha, const DenseM_t& X,
      scalar_t beta, DenseM_t& Y) const {
-      LRBF_mult(op, X.data(), Y.data(), lrows_, lrows_, X.cols(),
-                lr_bf_, options_, stats_, ptree_, alpha, beta);
+      assert(Y.cols() == X.cols());
+      if (op == Trans::N) {
+        assert(X.rows() == cols_ && Y.rows() == rows_);
+        LRBF_mult(char(op), X.data(), Y.data(), lcols_, lrows_, X.cols(),
+                  lr_bf_, options_, stats_, ptree_, alpha, beta);
+      } else {
+        assert(X.rows() == rows_ && Y.rows() == cols_);
+        LRBF_mult(char(op), X.data(), Y.data(), lrows_, lcols_, X.cols(),
+                  lr_bf_, options_, stats_, ptree_, alpha, beta);
+      }
     }
 
   } // end namespace HODLR

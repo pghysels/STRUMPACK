@@ -315,7 +315,7 @@ namespace strumpack {
      F2Cptr lr_bf, F2Cptr options, F2Cptr stats, F2Cptr ptree,
      double a, double b) {
       d_c_bf_mult(&op, X, Y, &Xlrows, &Ylrows, &cols,
-                  &lr_bf, &options, &stats, &ptree, &a, &b);
+                  &lr_bf/*, &options*/, &stats, &ptree, &a, &b);
     }
     template<> void LRBF_mult<std::complex<double>>
     (char op, const std::complex<double>* X, std::complex<double>* Y,
@@ -356,6 +356,26 @@ namespace strumpack {
      F2Cptr stats, F2Cptr ptree) {
       // z_c_hodlr_solve(X, const_cast<std::complex<double>*>(B), &lrows, &rhs,
       //                 &ho_bf, &options, &stats, &ptree);
+    }
+
+    template<typename scalar_t> void HODLR_inv_mult
+    (char op, const scalar_t* B, scalar_t* X, int Xlrows, int Blrows, int rhs,
+     F2Cptr ho_bf, F2Cptr options, F2Cptr stats, F2Cptr ptree) {
+      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
+    }
+    template<> void HODLR_inv_mult<double>
+    (char op, const double* B, double* X, int Xlrows, int Blrows, int rhs,
+     F2Cptr ho_bf, F2Cptr options, F2Cptr stats, F2Cptr ptree) {
+      d_c_hodlr_inv_mult
+        (&op, B, X, &Xlrows, &Blrows, &rhs, &ho_bf, &options, &stats, &ptree);
+    }
+    template<> void HODLR_inv_mult<std::complex<double>>
+    (char op, const std::complex<double>* B, std::complex<double>* X,
+     int Xlrows, int Blrows, int rhs, F2Cptr ho_bf, F2Cptr options,
+     F2Cptr stats, F2Cptr ptree) {
+      // z_c_hodlr_inv_mult
+      //   (&op, B, X, &Xlrows, &Blrows,
+      //    &rhs, &ho_bf, &options, &stats, &ptree);
     }
 
   } // end namespace HODLR

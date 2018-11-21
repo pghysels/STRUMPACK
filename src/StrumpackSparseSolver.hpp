@@ -849,8 +849,8 @@ namespace strumpack {
         std::cout << "#   - factor memory/nonzeros = "
                   << float(fnnz * sizeof(scalar_t)) / dfnnz * 100.0
                   << " % of multifrontal" << std::endl;
-        std::cout << "#   - HSS compression = " << std::boolalpha
-                  << opts_.use_HSS() << std::endl;
+        std::cout << "#   - compression = " << std::boolalpha
+                  << get_name(opts_.compression()) << std::endl;
         if (opts_.use_HSS()) {
           std::cout << "#   - maximum HSS rank = " << max_rank << std::endl;
           std::cout << "#   - relative compression tolerance = "
@@ -863,16 +863,12 @@ namespace strumpack {
                     << get_name(opts_.HSS_options().random_engine())
                     << " engine" << std::endl;
         }
-        std::cout << "#   - BLR compression = " << std::boolalpha
-                  << opts_.use_BLR() << std::endl;
         if (opts_.use_BLR()) {
           std::cout << "#   - relative compression tolerance = "
                     << opts_.BLR_options().rel_tol() << std::endl;
           std::cout << "#   - absolute compression tolerance = "
                     << opts_.BLR_options().abs_tol() << std::endl;
         }
-        std::cout << "#   - HODLR compression = " << std::boolalpha
-                  << opts_.use_HODLR() << std::endl;
         if (opts_.use_HODLR()) {
           std::cout << "#   - relative compression tolerance = "
                     << opts_.HODLR_options().rel_tol() << std::endl;
@@ -973,8 +969,8 @@ namespace strumpack {
 
     switch (opts_.Krylov_solver()) {
     case KrylovSolver::AUTO: {
-      if ((opts_.use_HSS() || opts_.use_BLR() ||
-           opts_.use_HODLR()) && x.cols() == 1)
+      if (opts_.compression() != CompressionType::NONE
+          && x.cols() == 1)
         gmres_solve(MFsolve);
       else refine();
     }; break;

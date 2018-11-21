@@ -80,11 +80,12 @@ namespace strumpack {
       const MPIComm& Comm() const { return *c_; }
 
       void compress(const mult_t& Amult);
-      void mult(char op, const DenseM_t& X, DenseM_t& Y) const;
-      void mult(char op, const DistM_t& X, DistM_t& Y) const;
+      void mult(Trans op, const DenseM_t& X, DenseM_t& Y) const;
+      void mult(Trans op, const DistM_t& X, DistM_t& Y) const;
       void factor();
       void solve(const DenseM_t& B, DenseM_t& X) const;
       void solve(const DistM_t& B, DistM_t& X) const;
+      void inv_mult(Trans op, const DenseM_t& X, DenseM_t& Y) const;
 
     private:
       F2Cptr ho_bf_ = nullptr;     // HODLR handle returned by Fortran code
@@ -147,6 +148,7 @@ namespace strumpack {
       int sort_opt = 0;  // 0:natural order, 1:kd-tree, 2:cobble-like ordering
                          // 3:gram distance-based cobble-like ordering
       HODLR_set_D_option<scalar_t>(options_, "tol_comp", opts.rel_tol());
+      HODLR_set_I_option<scalar_t>(options_, "verbosity", int(opts.verbose()));
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
       //HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", opts.leaf_size());
       HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
@@ -206,6 +208,7 @@ namespace strumpack {
       int sort_opt = 0;  // 0:natural order, 1:kd-tree, 2:cobble-like ordering
                          // 3:gram distance-based cobble-like ordering
       HODLR_set_D_option<scalar_t>(options_, "tol_comp", opts.rel_tol());
+      HODLR_set_I_option<scalar_t>(options_, "verbosity", int(opts.verbose()));
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
       HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
       //HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", com_opt);
@@ -291,21 +294,29 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::mult
-    (char op, const DenseM_t& X, DenseM_t& Y) const {
-      HODLR_mult(op, X.data(), Y.data(), lrows_, lrows_, X.cols(),
+    (Trans op, const DenseM_t& X, DenseM_t& Y) const {
+      HODLR_mult(char(op), X.data(), Y.data(), lrows_, lrows_, X.cols(),
                  ho_bf_, options_, stats_, ptree_);
     }
 
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::mult
-    (char op, const DistM_t& X, DistM_t& Y) const {
+    (Trans op, const DistM_t& X, DistM_t& Y) const {
       DenseM_t Y1D(lrows_, X.cols());
       {
         auto X1D = redistribute_2D_to_1D(X);
-        HODLR_mult(op, X1D.data(), Y1D.data(), lrows_, lrows_,
+        HODLR_mult(char(op), X1D.data(), Y1D.data(), lrows_, lrows_,
                    X.cols(), ho_bf_, options_, stats_, ptree_);
       }
       redistribute_1D_to_2D(Y1D, Y);
+    }
+
+    template<typename scalar_t> void
+    HODLRMatrix<scalar_t>::inv_mult
+    (Trans op, const DenseM_t& X, DenseM_t& Y) const {
+      HODLR_inv_mult
+        (char(op), X.data(), Y.data(), lrows_, lrows_, X.cols(),
+         ho_bf_, options_, stats_, ptree_);
     }
 
     template<typename scalar_t> void
