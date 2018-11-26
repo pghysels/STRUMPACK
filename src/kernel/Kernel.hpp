@@ -308,7 +308,7 @@ namespace strumpack {
       }
     }
 
-  }
+  } // end namespace kernel
 
 } // end namespace strumpack
 

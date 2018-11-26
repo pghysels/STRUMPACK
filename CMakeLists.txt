@@ -362,7 +362,8 @@ endif()
 
 set(LIBSRC
   src/StrumpackParameters.cpp
-  src/misc/TaskTimer.cpp)
+  src/misc/TaskTimer.cpp
+  src/kernel/Kernel.cpp)
 
 if(STRUMPACK_C_INTERFACE)
   list(APPEND LIBSRC src/StrumpackSparseSolver.cpp)
@@ -436,6 +437,10 @@ install(FILES
   DESTINATION include)
 
 install(FILES
+  src/python/STRUMPACKKernel.py
+  DESTINATION include/python)
+
+install(FILES
   src/misc/TaskTimer.hpp
   src/misc/RandomWrapper.hpp
   src/misc/Tools.hpp
@@ -452,6 +457,7 @@ install(FILES
 
 install(FILES
   src/kernel/Kernel.hpp
+  src/kernel/Kernel.h
   src/kernel/Metrics.hpp
   DESTINATION include/kernel)
 
@@ -648,6 +654,8 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/bin2mtx.cpp
   ${CMAKE_BINARY_DIR}/examples/bin2mtx.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/KernelRegression.cpp
   ${CMAKE_BINARY_DIR}/examples/KernelRegression.cpp COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/KernelRegression.py
+  ${CMAKE_BINARY_DIR}/examples/KernelRegression.py COPYONLY)
 
 if(STRUMPACK_C_INTERFACE)
   configure_file(${CMAKE_SOURCE_DIR}/examples/sexample.c
