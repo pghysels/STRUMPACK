@@ -1,0 +1,7 @@
+/*! \page hodlr_matrices HODLR Approximation of Dense Matrices
+
+TODO
+
+See strumpack::HODLR::HODLRMatrix and strumpack::HODLR::HODLROptions.
+
+*/

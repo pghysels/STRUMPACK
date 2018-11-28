@@ -40,6 +40,7 @@ ____
 + \link HSS_Preconditioning HSS Preconditioning \endlink
 + \link BLR_Preconditioning BLR Preconditioning \endlink
 + \link dense_matrices HSS Approximation of Dense Matrices \endlink
++ \link hodlr_matrices HODLR Approximation of Dense Matrices \endlink
 + \link blr_matrices BLR Approximation of Dense Matrices \endlink
 + \link examples Examples \endlink
 + \link C_Interface C Interface \endlink

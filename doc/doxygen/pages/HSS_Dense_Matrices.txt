@@ -1,22 +1,238 @@
 /*! \page dense_matrices HSS Approximation of Dense Matrices
 
 
-The HSS code can be found in the src/HSS/ subdirectory. All HSS code
-is in a namespace called \link strumpack::HSS HSS\endlink. The class
-for a sequential/multithreaded HSS matrix is \link
-strumpack::HSS::HSSMatrix HSSMatrix<scalar>\endlink, while the
-distributed memory HSS class is \link strumpack::HSS::HSSMatrixMPI
-HSSMatrixMPI<scalar>\endlink. For examples of the usage of these
-classes, see the test code in __test__/test_HSS_seq.cpp and
-__test__/test_HSS_mpi.cpp respectively. There is also one sequential
-example in examples/MLkernel.cpp, which uses HSS compression for
-kernel matrices as used in certain machine learning applications, see
-for instance \ref References "[2]". This part of the code will be
-better documented in future STRUMPACK releases.
+The HSS include files are installed in the __include/HSS/__
+subdirectory, or in __src/HSS/__. All HSS code is in the namespace
+strumpack::HSS. The class for a sequential/multithreaded HSS matrix is
+strumpack::HSS::HSSMatrix, while the distributed memory HSS class is
+strumpack::HSS::HSSMatrixMPI. For examples of the usage of these
+classes, see the test code in __test/test_HSS_seq.cpp__ and
+__test/test_HSS_mpi.cpp__ respectively. There is also one sequential
+example in __examples/KernelRegression.cpp__, which uses HSS
+compression for kernel matrices as used in certain machine learning
+applications, see below, and see for instance \ref References "[2]".
 
-__Currently the class \link strumpack::HSS::HSSMatrixMPI
-HSSMatrixMPI<scalar>\endlink cannot be used for on a communicator with
-a single MPI process. In that case, one should use the sequential
-\link strumpack::HSS::HSSMatrix HSSMatrix<scalar>\endlink class.__
+We use a simple wrapper class strumpack::DenseMatrix, as a wrapper
+around a column-major matrix. See the documentation for that class for
+more info.
+
+
+
+HSS Matrix Construction
+-----------------------
+
+There are currently two ways to construct an HSS matrix:
+
+- By giving an __explicit dense matrix as input__. This requires that
+  the user builds the entire matrix. Currently, our HSS compression
+  code uses randomized sampling, which repeatedly multiplies the given
+  dense input matrix with a randomly generated matrix. This leads to
+  an overall O(N^2r) complexity, where r is the maximum HSS rank. This
+  complexity, combined with the O(N^2) memory requirements mean that
+  this way of constructing an HSS matrix can be prohibitively
+  expensive for large matrices.
+
+- By __specifying two routines__:
+
+   + A matrix times (multiple)vector product routine: Specifying a
+   fast matrix times (multiple)vector multiplication routine will
+   greatly speed-up the HSS construction phase (compared to performing
+   the random sampling with an explicit dense matrix).
+
+   + An element extraction routine: The randomized HSS construction
+   algorithm still needs to have access to certain selected elements
+   from the original matrix. The user needs to provide a routine to
+   evaluate the submatrix A(I,J) for a row index set I and a column
+   index set J.
+
+
+The interfaces to construct HSS matrices in these two different ways
+are detailed below.
+
+
+Unfortunately, many applications do not fit in the two cases listed
+above, i.e., you cannot build the dense matrix first (too expensive),
+or you do not have a fast matrix vector product or fast acces to
+individual elements. We have experimental code to construct an HODLR
+matrix representation for those cases, see \link hodlr_matrices HODLR
+\endlink.
+
+
+The HSS Partition Tree
+----------------------
+
+The clustering of the HSS matrix is defined by an
+strumpack::HSS::HSSPartitionTree. The strumpack::HSS::HSSPartitionTree
+uses a recursive representation, a child in the tree is also a
+strumpack::HSS::HSSPartitionTree. A node in this tree should always
+have 0 or 2 children, and the size of the tree should always be the
+sum of the sizes of its children. To build a whole tree use the simple
+constructor to specify the size n of the corresponding HSS matrix,
+then refine it.
+
+To refine uniformly to a given leaf size is reached use:
+
+\code {.cpp}
+void strumpack::HSS::HSSPartitionTree::refine(int leaf_size);
+\endcode
+
+or refine it manualy by adding nodes to the child vector
+strumpack::HSS::HSSPartitionTree::c:
+
+\code {.cpp}
+// construct a basic, empty, 1 level tree
+strumpack::HSS::HSSPartitionTree t(N);
+// uniformly refine the tree to a given leaf size
+t.refine(leaf_size)
+
+
+// OR manually define the tree
+strumpack::HSS::HSSPartitionTree t(N);
+// each node should have either 0 or 2 childeren
+t.c.emplace_back(N/2);
+t.c.emplace_back(N-N/2);
+// the result is a tree with only 2 levels, which can be refined further
+\endcode
+
+Alternatively, one can use one of the clustering algorithms, see
+binary_tree_clustering().
+
+
+
+Sequential/Threaded HSS Matrix Construction
+-------------------------------------------
+
+See the class strumpack::HSS::HSSMatrix, which is a subclass of the
+abstract class strumpack::HSS::HSSMatrixBase.
+
+HSS matrix construction from an explicit __dense matrix__ can be done
+as follows:
+
+\code {.cpp}
+strumpack::DenseMatrix<double> A(m, n);
+// ... fill the dense matrix A
+
+// Create an HSS options object and set some options.
+strumpack::HSS::HSSOptions<double> opts;
+opts.set_leaf_size(512);
+opts.set_rel_tol(1e-2);
+// allow the command line arguments to overwrite any options
+opts.set_from_command_line(argc, argv);
+
+// Construct the HSS matrix from the dense matrix, using the options specified in opts.
+// This will use a uniform partitioning of the matrix, using a leaf size from opts.leaf_size(),
+// and it will immediately start the HSS compression.
+strumpack::HSS::HSSMatrix<double> H1(A, opts);
+
+// OR construct an HSS matrix with a given cluster/partition tree.
+strumpack::HSS::HSSMatrix<double> H2(t, opts);
+// and compress it
+H2.compress(A, opts);
+\endcode
+
+Alternatively, to construct an HSS without first building the whole
+dense matrix, you need to define a matrix-vector multiplication
+routine and an element extraction routine. The matrix-vector product
+should have t the following signature:
+
+\code {.cpp}
+std::function<void(
+    strumpack::DenseMatrix<scalar_t>& Rr,  // input, set by compression code
+    strumpack::DenseMatrix<scalar_t>& Rc,  // input, set by compression code
+    strumpack::DenseMatrix<scalar_t>& Sr,  // output, compute as A * Rr
+    strumpack::DenseMatrix<scalar_t>& Sc   // output, compute as A^c * Rr or A^T * Rc
+)>;
+\endcode
+
+where Rr and Rc are random matrices (set by the HSS compression code),
+and the routine should fill in Sr and Sc. This can be a functor, or a
+lambda function for instance.  The random sample matrix Sr should be
+computed by the matrix-(multiple)vector multiplication routine as
+A*Rr. The Sr matrix will aready be allocated by the compression
+routine and should satisfy Sr.rows() == A.rows() and Sr.cols() ==
+Rr.cols(). The random sample matrix Sc should be computed by the
+matrix-(multiple)vector multiplication routine as A^T*Rr, or
+A^C*Rr. This will aready be allocated by the compression routine and
+should be Sc.rows() == A.cols() and Sc.cols() == Rc.cols().
+
+And the element extraction routine should have the signature:
+
+\code {.cpp}
+std::function<void(
+    const std::vector<std::size_t>& I,   // row index set
+    const std::vector<std::size_t>& J,   // column index set
+    strumpack::DenseMatrix<scalar_t>& B  // output B == A(I,J)
+)>;
+\endcode
+
+where the user is responsible for computing the elements A(I,J) and
+putting them into the matrix B. B will already be allocated and is of
+size I.size() x J.size().
+
+The HSS construction would look as follows:
+
+\code {.cpp}
+using DenseM_t = strumpack::DenseMatrix<double>;
+auto Amult = [&](DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
+  // TODO compute Rr = A * Sr
+  // TODO compute Rc = A^c * Sr
+};
+auto Aelem = [&](const std::vector<std::size_t>& I,
+                 const std::vector<std::size_t>& J,
+                 DenseM_t& B) {
+  for (std::size_t j=0; j<J.size(); j++)
+    for (std::size_t i=0; i<I.size(); i++)
+      B(i, j) = A(I[i], J[j]); // get/compute elements of A
+};
+
+strumpack::HSS::HSSOptions<double> opts;
+opts.set_from_command_line(argc, argv);
+strumpack::HSS::HSSPartitionTree t(N);
+t.refine(opt.leaf_size());
+strumpack::HSS::HSSMatrix<double> H(t, opts)
+H.compress(Amult, Aelem, opts);
+\endcode
+
+
+
+Kernel Matrix Approximation
+---------------------------
+
+We have an optimized HSS construction algorithm for the so called
+kernel matrices, which arise in several applications, such as kernel
+ridge regression in machine learning. One can use the
+strumpack::HSS::HSSMatrix constructor:
+
+\code {.cpp}
+strumpack::HSS::HSSMatrix(strumpack::kernel::Kernel<scalar_t>& K,
+                          strumpack::DenseMatrix<scalar_t>& labels,
+                          const strumpack::HSS::HSSOptions<scalar_t>& opts);
+\endcode
+
+However, for kernel ridge regression, the strumpack::kernel::Kernel
+class provides some easy to use driver routines, see
+
+\code {.cpp}
+strumpack::DenseMatrix<scalar_t>
+strumpack::kernel::Kernel::fit_HSS(std::vector<scalar_t>& labels,
+                                   const strumpack::HSS::HSSOptions<scalar_t>& opts);
+std::vector<scalar_t>
+strumpack::kernel::Kernel::predict(const strumpack::DenseMatrix<scalar_t>& test,
+                                   const strumpack::DenseMatrix<scalar_t>& weights);
+\endcode
+
+There is also a Python interface to these Kernel regression routines,
+compatibile with scikit-learn, see
+__install/python/STRUMPACKKernel.py__ and
+__examples/KernelRegression.py__.
+
+
+
+Limitations
+------------
+
+Currently the class strumpack::HSS::HSSMatrixMPI cannot be used for on
+a communicator with a single MPI process. In that case, one should use
+the sequential strumpack::HSS::HSSMatrix class.
 
 */
