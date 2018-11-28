@@ -26,6 +26,10 @@
  *             Division).
  *
  */
+/**
+ * \file HSSPartitionTree.hpp
+ * \brief This file contains the HSSPartitionTree class definition.
+ */
 #ifndef HSS_PARTITION_TREE_HPP
 #define HSS_PARTITION_TREE_HPP
 
@@ -37,24 +41,90 @@
 namespace strumpack {
   namespace HSS {
 
-    /** a node in this tree should always have 0 or 2 children */
+    /**
+     * \class HSSPartitionTree
+     *
+     * \brief The cluster tree, or partition tree that represents the
+     * matrix partitioning of an HSS matrix.
+     *
+     * This uses a recursive representation, a child in the tree is
+     * also an HSSPartitionTree. A node in this tree should always
+     * have 0 or 2 children, and the size of the tree should always be
+     * the sum of the sizes of its children.
+     *
+     * This class is also used to represent the HODLR and BLR
+     * partitionings!
+     *
+     * To build a whole tree use the constructor HSSPartitionTree(int n)
+     * and then refine it, either evenly using refine(int leaf_size),
+     * or manualy by adding nodes to the child vector HSSPartitionTree::c.
+     *
+     * Or you can use one of the clustering algorithms, see
+     * binary_tree_clustering()
+     */
     class HSSPartitionTree {
     public:
+      /**
+       * Size of the corresponing HSS matrix.  This should always be
+       * >= 0 and should be equal to the sum of the sizes of the
+       * children.
+       */
       int size;
+
+      /**
+       * Vector with children. This should always have c.size() == 0
+       * or c.size() == 2, for a leaf and an internal node of the tree
+       * respectively.
+       */
       std::vector<HSSPartitionTree> c;
+
+      /**
+       * Constructor, initializes to an empty tree, with size 0.
+       */
       HSSPartitionTree() : size(0) {}
+
+      /**
+       * Constructor, initializes to a matrix with size n, only 1 node
+       * (1 level), so no refinement.
+       *
+       * \param n Size of the corresponding HSS matrix.
+       * \see n, c, refine
+       */
       HSSPartitionTree(int n) : size(n) {}
+
+      /**
+       * Constructor, taking a vector desribing an entire tree. This
+       * is used for deserialization. The constructor argument buf
+       * should be one obtained from calling serialize on an
+       * HSSPartitionTree object.
+       *
+       * \param buf Serialized HSSPartitionTree
+       * \see serialize
+       */
       HSSPartitionTree(std::vector<int>& buf) {
         int n = buf.size() / 3;
         int pid = n-1;
         de_serialize_rec(buf.data(), buf.data()+n, buf.data()+2*n, pid);
       }
+
+      /**
+       * Copy constructor, makes a deep copy of the entire tree.
+       */
       HSSPartitionTree(const HSSPartitionTree& h)
         : size(h.size), c(h.c) {
       }
+
+      /**
+       * Refine the tree to a given leaf size. This just splits the
+       * nodes into equal parts (+/- 1) as long as a node is larger
+       * than 2*leaf_size.
+       *
+       * \param leaf_size Leaf size, leafs in the resulting tree will
+       * be smaller or equal to this leaf_size.
+       */
       void refine(int leaf_size) {
         assert(c.empty());
-        if (size > 2*leaf_size) {
+        if (size >= 2*leaf_size) {
           c.resize(2);
           c[0].size = size/2;
           c[0].refine(leaf_size);
@@ -62,38 +132,104 @@ namespace strumpack {
           c[1].refine(leaf_size);
         }
       }
+
+      /**
+       * Print the sizes of the nodes in the tree, in postorder.
+       */
       void print() const {
         for (auto& ch : c) ch.print();
         std::cout << size << " ";
       }
+
+      /**
+       * Return the total number of nodes in this tree.
+       *
+       * \return Total number of nodes, 1 for a tree with only 1
+       * level, ..
+       */
       int nodes() const {
         int nr_nodes = 1;
         for (auto& ch : c)
           nr_nodes += ch.nodes();
         return nr_nodes;
       }
+
+      /**
+       * Return the number of levels in this tree.
+       *
+       * \return Number of levels in the tree (>= 1).
+       */
       int levels() const {
         int lvls = 0;
         for (auto& ch : c)
           lvls = std::max(lvls, ch.levels());
         return lvls + 1;
       }
+
+      /**
+       * Truncate this tree to a complete tree. This routine will
+       * first find the leaf node with the least number of ancestors,
+       * then remove all nodes which have more ancestors. The
+       * resulting tree will be complete and binary.
+       *
+       * \see expand_complete
+       */
       void truncate_complete() {
         truncate_complete_rec(1, min_levels());
       }
+
+      /**
+       * Further refine the tree to make it complete. This will add
+       * zero or size 1 leaf nodes at the lowest level.
+       *
+       * \param allow_zero_nodes If True, then the leaf nodes which
+       * are not at the lowest level, are split into two nodes with
+       * sizes (size,0), recursively until the tree is complete. If
+       * False, a leaf node which is not at the lowest level, will be
+       * split into 2 children with sizes (size-x,x) where x is such
+       * that all leafs in the final tree have at least size 1 (this
+       * might fail in certain cases, if too many levels are
+       * required).
+       *
+       * \see truncate_complete
+       */
       void expand_complete(bool allow_zero_nodes) {
         expand_complete_rec(1, levels(), allow_zero_nodes);
       }
+
+      /**
+       * Serialize the entire tree to a single vector storing size and
+       * child/parent info. This can be used to communicate the tree
+       * with MPI for instance.  A new tree can be constructed at the
+       * receiving side with the apporiate constructor.
+       *
+       * \return Serialized tree. Do not rely on the meaning of the
+       * elements in the vector, only use with the corresponding
+       * constructor.
+       */
       std::vector<int> serialize() const {
         int n = nodes(), pid = 0;
         std::vector<int> buf(3*n);
         serialize_rec(buf.data(), buf.data()+n, buf.data()+2*n, pid);
         return buf;
       }
+
+      /**
+       * Check whether this tree is complete.
+       *
+       * \return True if this tree is complete, False otherwise.
+       * \see expand_complete, truncate_complete
+       */
       bool is_complete() const {
         if (c.empty()) return true;
         else return c[0].levels() == c[1].levels();
       }
+
+      /**
+       * Return a vector with leaf sizes.
+       *
+       * \return vector with the sizes of the leafs.
+       */
       std::vector<int> leaf_sizes() const {
         std::vector<int> lf;
         leaf_sizes_rec(lf);

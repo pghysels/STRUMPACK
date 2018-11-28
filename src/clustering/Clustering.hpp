@@ -55,6 +55,12 @@ namespace strumpack {
     COBBLE      /*!< Cobble partitioning                      */
   };
 
+  /**
+   * Return a short string with the name of the clustering algorithm.
+   *
+   * \param c Clustering algorithm.
+   * \param String with the name of the clustering algorithm.
+   */
   inline std::string get_name(ClusteringAlgorithm c) {
     switch (c) {
     case ClusteringAlgorithm::NATURAL: return "natural"; break;
@@ -66,6 +72,12 @@ namespace strumpack {
     }
   }
 
+  /**
+   * Return a ClusteringAlgorithm enum based on the input string.
+   *
+   * \param c String, possible values are 'natural', '2means',
+   * 'kdtree', 'pca' and 'cobble'. This is case sensitive.
+   */
   inline ClusteringAlgorithm
   get_clustering_algorithm(const std::string& c) {
     if (c.compare("natural") == 0)     return ClusteringAlgorithm::NATURAL;
@@ -96,7 +108,7 @@ namespace strumpack {
    * to p will be applied to labels.
    *
    * \param cluster_size Stop partitioning when this cluster_size is
-   * reached.
+   * reached. This corresponds to the HSS/HODLR leaf size.
    *
    * \return This is output, the tree defined by the (recursive)
    * clustering.

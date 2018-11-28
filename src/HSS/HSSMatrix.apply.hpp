@@ -47,25 +47,6 @@ namespace strumpack {
       return c;
     }
 
-    /** C = ta(A_HSS) * B + beta * C   */
-    template<typename scalar_t> void apply_HSS
-    (Trans ta, const HSSMatrix<scalar_t>& a, const DenseMatrix<scalar_t>& b,
-     scalar_t beta, DenseMatrix<scalar_t>& c) {
-      WorkApply<scalar_t> w;
-      std::atomic<long long int> flops(0);
-#pragma omp parallel if(!omp_in_parallel())
-#pragma omp single nowait
-      {
-        if (ta == Trans::N) {
-          a.apply_fwd(b, w, true, a._openmp_task_depth, flops);
-          a.apply_bwd(b, beta, c, w, true, a._openmp_task_depth, flops);
-        } else {
-          a.applyT_fwd(b, w, true, a._openmp_task_depth, flops);
-          a.applyT_bwd(b, beta, c, w, true, a._openmp_task_depth, flops);
-        }
-      }
-    }
-
     template<typename scalar_t> void HSSMatrix<scalar_t>::apply_fwd
     (const DenseM_t& b, WorkApply<scalar_t>& w, bool isroot,
      int depth, std::atomic<long long int>& flops) const {

@@ -26,6 +26,11 @@
  *             Division).
  *
  */
+/**
+ * \file HSSMatrixBase.hpp
+ * \brief This file contains the HSSMatrixBase class definition, an
+ * abstract class for HSS matrix representation.
+ */
 #ifndef HSS_MATRIX_BASE_HPP
 #define HSS_MATRIX_BASE_HPP
 
@@ -52,6 +57,21 @@ namespace strumpack {
     template<typename scalar_t> class DistSamples;
 #endif //defined(STRUMPACK_USE_MPI)
 
+
+    /**
+     * \class HSSMatrixBase
+     *
+     * \brief Abstract base class for Hierarchically Semi-Separable
+     * (HSS) matrices.
+     *
+     * This is for non-symmetric HSS matrices, but can be used with
+     * symmetric matrices as well.
+     *
+     * \tparam scalar_t Can be float, double, std:complex<float> or
+     * std::complex<double>.
+     *
+     * \see HSSMatrix, HSSMatrixMPI
+     */
     template<typename scalar_t> class HSSMatrixBase {
       using real_t = typename RealType<scalar_t>::value_type;
       using DenseM_t = DenseMatrix<scalar_t>;
@@ -69,54 +89,230 @@ namespace strumpack {
 #endif //defined(STRUMPACK_USE_MPI)
 
     public:
+      /**
+       * Construct an m x n HSS matrix, not initialized.
+       *
+       * \param m number of rows
+       * \param n number of columns
+       * \param active Denote if this matrix (node) is active on this
+       * process.
+       */
       HSSMatrixBase(std::size_t m, std::size_t n, bool active);
+
+      /**
+       * Default virtual destructor.
+       */
       virtual ~HSSMatrixBase() = default;
+
+      /**
+       * Copy constructor.
+       * \param other HSS matrix to copy.
+       */
       HSSMatrixBase(const HSSMatrixBase<scalar_t>& other);
+
+      /**
+       * Copy assignment operator, makes a deep copy.
+       * \param other HSS matrix to copy.
+       * \return reference to this HSS matrix.
+       */
       HSSMatrixBase<scalar_t>& operator=(const HSSMatrixBase<scalar_t>& other);
+
+      /**
+       * Move constructor.
+       * \param h HSS matrix to move from, h will be emptied.
+       */
       HSSMatrixBase(HSSMatrixBase&& h) = default;
+
+      /**
+       * Move assignment operator.
+       * \param h HSS matrix to move from, h will be emptied.
+       * \return reference to this HSS matrix.
+       */
       HSSMatrixBase& operator=(HSSMatrixBase&& h) = default;
+
+      /**
+       * Clone this HSS matrix.
+       * TODO delete this??
+       *
+       * \return std::unique_ptr to a clone of this HSS matrix.
+       */
       virtual std::unique_ptr<HSSMatrixBase<scalar_t>> clone() const = 0;
 
+      /**
+       * Returns the dimensions of this HSS matrix, as a pair.
+       *
+       * \return pair with number of rows and columns of this HSS
+       * matrix.
+       */
       std::pair<std::size_t,std::size_t> dims() const {
         return std::make_pair(_rows, _cols);
       }
+
+      /**
+       * Return the number of rows in this HSS matrix.
+       * \return number of rows
+       */
       std::size_t rows() const { return _rows; }
+
+      /**
+       * Return the number of columns in this HSS matrix.
+       * \return number of columns
+       */
       std::size_t cols() const { return _cols; }
+
+      /**
+       * Check whether this node of the HSS tree is a leaf.
+       * \return true if this node is a leaf, false otherwise.
+       */
       bool leaf() const { return _ch.empty(); }
+
+      /**
+       * Return a const reference to the child (0, or 1) of this HSS
+       * matrix. This is only valid when !this->leaf(). It is assumed
+       * that a non-leaf node always has exactly 2 children.
+       *
+       * \param c Number of the child, should be 0 or 1, for the left
+       * or the right child.
+       * \return Const reference to the child (HSSMatrixBase).
+       */
       const HSSMatrixBase<scalar_t>& child(int c) const {
         assert(c>=0 && c<_ch.size()); return *(_ch[c]);
       }
+
+      /**
+       * Return a reference to the child (0, or 1) of this HSS
+       * matrix. This is only valid when !this->leaf(). It is assumed
+       * that a non-leaf node always has exactly 2 children.
+       *
+       * \param c Number of the child, should be 0 or 1, for the left
+       * or the right child.
+       * \return Reference to the child (HSSMatrixBase).
+       */
       HSSMatrixBase<scalar_t>& child(int c) {
         assert(c>=0 && c<_ch.size()); return *(_ch[c]);
       }
+
+      /**
+       * Check whether the HSS matrix was compressed.
+       *
+       * \return True if this HSS matrix was succesfully compressed,
+       * false otherwise.
+       *
+       * \see is_untouched
+       */
       bool is_compressed() const {
         return _U_state == State::COMPRESSED &&
           _V_state == State::COMPRESSED;
       }
+
+      /**
+       * Check whether the HSS compression was started for this
+       * matrix.
+       *
+       * \return True if HSS compression was not started yet, false
+       * otherwise. False may mean that compression was started but
+       * failed, or that compression succeeded.
+       *
+       * \see is_compressed
+       */
       bool is_untouched() const {
         return _U_state == State::UNTOUCHED &&
           _V_state == State::UNTOUCHED;
       }
+
+      /**
+       * Check if this HSS matrix (or node in the HSS tree) is active
+       * on this rank.
+       *
+       * \return True if this node is active, false otherwise.
+       */
       bool active() const { return _active; };
 
+      /**
+       * Return the maximum rank of this HSS matrix over all
+       * off-diagonal blocks, and all levels.
+       *
+       * \return Maximum HSS rank.
+       */
       virtual std::size_t rank() const = 0;
+
+      /**
+       * Return the total amount of memory used by this HSS matrix, in
+       * bytes. This counts the memory for the low rank basis matrices
+       * as well as some of the memory used for the data structures.
+       *
+       * \return Memory usage in bytes.
+       * \see nonzeros
+       */
       virtual std::size_t memory() const = 0;
+
+      /**
+       * Return the total number of nonzeros stored in the HSS
+       * generator matrices (D,U,V at leafs U,B,V at non-leafs).
+       *
+       * \return Nonzeros in the HSS representation.
+       * \see memory
+       */
       virtual std::size_t nonzeros() const = 0;
+
+      /**
+       * Return the number of levels in the HSS matrix.
+       *
+       * \return Number of HSS levels (>= 1).
+       */
       virtual std::size_t levels() const = 0;
+
+      /**
+       * Print info about this HSS matrix, such as tree info, ranks,
+       * etc.
+       *
+       * \param out Stream to print to, defaults to std::cout
+       * \param roff Row offset of top left corner, defaults to
+       * 0. This is used to recursively print the tree, you can leave
+       * this at the default.
+       * \param coff Column offset of top left corner, defaults to
+       * 0. This is used to recursively print the tree, you can leave
+       * this at the default.
+       */
       virtual void print_info
       (std::ostream &out=std::cout,
        std::size_t roff=0, std::size_t coff=0) const = 0;
 
+      /**
+       * Set the depth of openmp nested tasks. This can be used to
+       * limit the number of tasks to spawn in the HSS routines, which
+       * is can reduce task creation overhead.  This is used in the
+       * sparse solver when multiple HSS matrices are created from
+       * within multiple openmp tasks. The HSS routines all use openmp
+       * tasking to traverse the HSS tree and for parallelism within
+       * the HSS nodes as well.
+       */
       void set_openmp_task_depth(int depth) { _openmp_task_depth = depth; }
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
       virtual void delete_trailing_block() { if (_ch.size()==2) _ch.resize(1); }
       virtual void reset() {
         _U_state = _V_state = State::UNTOUCHED;
         _U_rank = _U_rows = _V_rank = _V_rows = 0;
         for (auto& c : _ch) c->reset();
       }
+#endif
 
+      /**
+       * APply a shift to the diagonal of this matrix. Ie, this +=
+       * sigma * I, with I the identity matrix. Call this after
+       * compression.
+       *
+       * \param sigma Shift to be applied to the diagonal.
+       */
       virtual void shift(scalar_t sigma) = 0;
 
+      /**
+       * Internal routine to draw this HSS matrix. Do not use this
+       * directly. Use HSS::draw.
+       *
+       * \see HSS::draw
+       */
       virtual void draw
       (std::ostream& of, std::size_t rlo, std::size_t clo) const {};
 

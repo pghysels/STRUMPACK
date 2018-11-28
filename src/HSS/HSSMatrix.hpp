@@ -60,14 +60,16 @@ namespace strumpack {
      *
      * This is for non-symmetric matrices, but can be used with
      * symmetric matrices as well. This class inherits from
-     * HSSMatrixBase. The template type can be float, double,
-     * std:complex<float> or std::complex<double>. For the distributed
-     * memory code for HSS matrices, see HSSMatrixMPI. An HSS matrix
-     * is represented recursively, using 2 children which are also
-     * HSSMatrix object, except at the lowest level (the leafs), where
-     * the HSSMatrix has no children. Hence, the tree representing the
-     * HSS matrix is always a binary tree, but not necessarily a
-     * complete binary tree.
+     * HSSMatrixBase.  An HSS matrix is represented recursively, using
+     * 2 children which are also HSSMatrix objects, except at the
+     * lowest level (the leafs), where the HSSMatrix has no
+     * children. Hence, the tree representing the HSS matrix is always
+     * a binary tree, but not necessarily a complete binary tree.
+     *
+     * \tparam scalar_t Can be float, double, std:complex<float> or
+     * std::complex<double>.
+     *
+     * \see HSSMatrixMPI, HSSMatrixBase
      */
     template<typename scalar_t> class HSSMatrix
       : public HSSMatrixBase<scalar_t> {
@@ -217,22 +219,55 @@ namespace strumpack {
 
       /**
        * Initialize this HSS matrix as the compressed HSS
-       * representation of a given dense matrix. The HSS matrix should
-       * have been constructed with the proper sizes, i.e., rows() ==
-       * A.rows() and cols() == A.cols().  Internaly, this will call
-       * the appropriate compress routine to construct the HSS
-       * representation, using the options (such as compression
-       * tolerance, adaptive compression scheme etc) as specified in
-       * the HSSOptions opts object.
+       * representation. The compression uses the
+       * matrix-(multiple)vector multiplication routine Amult, and the
+       * element (sub-matrix) extraction routine Aelem, both provided
+       * by the user. The HSS matrix should have been constructed with
+       * the proper sizes, i.e., rows() == A.rows() and cols() ==
+       * A.cols().  Internaly, this will call the appropriate compress
+       * routine to construct the HSS representation, using the
+       * options (such as compression tolerance, adaptive compression
+       * scheme etc) as specified in the HSSOptions opts object.
        *
-       * \param A dense matrix (unmodified) to compress as HSS
+       * \param Amult matrix-(multiple)vector product routine. This
+       * can be a functor, or a lambda function for instance.
+       * \param Rr Parameter to the matvec routine. Random
+       * matrix. This will be set by the compression routine.
+       * \param Rc Parameter to the matvec routine. Random
+       * matrix. This will be set by the compression routine.
+       * \param Sr Parameter to the matvec routine. Random sample
+       * matrix, to be computed by the matrix-(multiple)vector
+       * multiplication routine as A*Rr. This will aready be allocated
+       * by the compression routine and should be Sr.rows() ==
+       * this->rows() and Sr.cols() == Rr.cols().
+       * \param Sc random sample matrix, to be computed by the
+       * matrix-(multiple)vector multiplication routine as A^T*Rr, or
+       * A^C*Rr. This will aready be allocated by the compression
+       * routine and should be Sc.rows() == this->cols() and Sc.cols()
+       * == Rc.cols().
+       *
+       * \param Aelem element extraction routine. This can be a
+       * functor, or a lambda function for instance.
+       * \param I Parameter in the element extraction routine. Set of
+       * row indices of elements to extract.
+       * \param J Parameter in the element extraction routine. Set of
+       * column indices of elements to extract.
+       * \param B Parameter in the element extraction routine. Matrix
+       * where to place extracted elements. This matrix will already
+       * be allocated. It will have B.rows() == I.size() and B.cols()
+       * == J.size().
        * \param opts object containing a number of options for HSS
        * compression
        * \see DenseMatrix
        * \see HSSOptions
        */
       void compress
-      (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts);
+      (const std::function
+       <void(DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc)>& Amult,
+       const std::function
+       <void(const std::vector<std::size_t>& I,
+             const std::vector<std::size_t>& J, DenseM_t& B)>& Aelem,
+       const opts_t& opts);
 
 
       /**
@@ -312,49 +347,101 @@ namespace strumpack {
       (const HSSFactors<scalar_t>& ULV,
        WorkSolve<scalar_t>& w, DenseM_t& x) const override;
 
+      /**
+       * Multiply this HSS matrix with a dense matrix (vector), ie,
+       * compute x = this * b.
+       *
+       * \param b Matrix to multiply with, from the left.
+       * \return The result of this * b.
+       * \see applyC, HSS::apply_HSS
+       */
       DenseM_t apply(const DenseM_t& b) const;
+
+      /**
+       * Multiply the transpose or complex conjugate of this HSS
+       * matrix with a dense matrix (vector), ie, compute x = this^C *
+       * b.
+       *
+       * \param b Matrix to multiply with, from the left.
+       * \return The result of this^C * b.
+       * \see apply, HSS::apply_HSS
+       */
       DenseM_t applyC(const DenseM_t& b) const;
 
+      /**
+       * Extract a single element this(i,j) from this HSS matrix. This
+       * is expensive and should not be used to compute multiple
+       * elements.
+       *
+       * \param i Global row index of element to compute.
+       * \param j Global column index of element to compute.
+       * \return this(i,j)
+       * \see extract
+       */
       scalar_t get(std::size_t i, std::size_t j) const;
+
+      /**
+       * Compute a submatrix this(I,J) from this HSS matrix.
+       *
+       * \param I set of row indices of elements to compute from this
+       * HSS matrix.
+       * \param I set of column indices of elements to compute from
+       * this HSS matrix.
+       * \return Submatrix from this HSS matrix this(I,J)
+       * \see get, extract_add
+       */
       DenseM_t extract
       (const std::vector<std::size_t>& I,
        const std::vector<std::size_t>& J) const;
+
+      /**
+       * Compute a submatrix this(I,J) from this HSS matrix and add it
+       * to a given matrix B.
+       *
+       * \param I set of row indices of elements to compute from this
+       * HSS matrix.
+       * \param I set of column indices of elements to compute from
+       * this HSS matrix.
+       * \param The extracted submatrix this(I,J) will be added to
+       * this matrix. Should satisfy B.rows() == I.size() and B.cols()
+       * == J.size().
+       * \see get, extract
+       */
       void extract_add
       (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
        DenseM_t& B) const;
 
-      /**
-       * Compute a Schur complement update... TODO
-       */
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
       void Schur_update
       (const HSSFactors<scalar_t>& f, DenseM_t& Theta,
        DenseM_t& DUB01, DenseM_t& Phi) const;
-      /**
-       * TODO
-       */
       void Schur_product_direct
       (const HSSFactors<scalar_t>& f,
        const DenseM_t& Theta, const DenseM_t& DUB01,
        const DenseM_t& Phi, const DenseM_t&_ThetaVhatC_or_VhatCPhiC,
        const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc) const;
-      /**
-       * TODO
-       */
       void Schur_product_indirect
       (const HSSFactors<scalar_t>& f, const DenseM_t& DUB01,
        const DenseM_t& R1, const DenseM_t& R2, const DenseM_t& Sr2,
        const DenseM_t& Sc2, DenseM_t& Sr, DenseM_t& Sc) const;
+      void delete_trailing_block() override;
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
       std::size_t rank() const override;
       std::size_t memory() const override;
       std::size_t nonzeros() const override;
       std::size_t levels() const override;
       void print_info
-      (std::ostream &out=std::cout,
+      (std::ostream& out=std::cout,
        std::size_t roff=0, std::size_t coff=0) const override;
 
+      /**
+       * Return a full/dense representation of this HSS matrix.
+       *
+       * \return Dense matrix obtained from multiplying out the
+       * low-rank representation.
+       */
       DenseM_t dense() const;
-      void delete_trailing_block() override;
 
       void shift(scalar_t sigma) override;
 
@@ -497,12 +584,18 @@ namespace strumpack {
       (DenseM_t& A, WorkDense<scalar_t>& w,
        bool isroot, int depth) const override;
 
-      template<typename T> friend
-      void apply_HSS
+      /**
+       * \see HSS::apply_HSS
+       */
+      template<typename T> friend void apply_HSS
       (Trans ta, const HSSMatrix<T>& a, const DenseMatrix<T>& b,
        T beta, DenseMatrix<T>& c);
-      template<typename T> friend
-      void draw(const HSSMatrix<T>& H, const std::string& name);
+
+      /**
+       * \see HSS::draw
+       */
+      template<typename T> friend void draw
+      (const HSSMatrix<T>& H, const std::string& name);
 
       friend class HSSMatrixMPI<scalar_t>;
     };
@@ -850,6 +943,14 @@ namespace strumpack {
       }
     }
 
+
+    /**
+     * Write a gnuplot script to draw this an matrix.
+     *
+     * \param H HSS matrix to draw.
+     * \param name Name of the HSS matrix. The script will be created
+     * in the file plotname.gnuplot.
+     */
     template<typename scalar_t>
     void draw(const HSSMatrix<scalar_t>& H, const std::string& name) {
       std::ofstream of("plot" + name + ".gnuplot");
@@ -860,6 +961,35 @@ namespace strumpack {
       of << "set yrange [" << H.rows() << ":0]" << std::endl;
       of << "plot x lt -1 notitle" << std::endl;
       of.close();
+    }
+
+    /**
+     * Compute C = op(A) * B + beta * C, with HSS matrix A.
+     *
+     * \param op Transpose/complex conjugate or none to be applied to
+     * the HSS matrix A.
+     * \param A HSS matrix
+     * \param B Dense matrix
+     * \param beta Scalar
+     * \param C Result, should already be allocated to the appropriate
+     * size.
+     */
+    template<typename scalar_t> void apply_HSS
+    (Trans op, const HSSMatrix<scalar_t>& A, const DenseMatrix<scalar_t>& B,
+     scalar_t beta, DenseMatrix<scalar_t>& C) {
+      WorkApply<scalar_t> w;
+      std::atomic<long long int> flops(0);
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+      {
+        if (op == Trans::N) {
+          A.apply_fwd(B, w, true, A._openmp_task_depth, flops);
+          A.apply_bwd(B, beta, C, w, true, A._openmp_task_depth, flops);
+        } else {
+          A.applyT_fwd(B, w, true, A._openmp_task_depth, flops);
+          A.applyT_bwd(B, beta, C, w, true, A._openmp_task_depth, flops);
+        }
+      }
     }
 
   } // end namespace HSS
