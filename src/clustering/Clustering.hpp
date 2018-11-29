@@ -97,24 +97,26 @@ namespace strumpack {
   /**
    * Reorder the input data and define a (binary) cluster tree.
    *
-   * \param algo Clustering algorithm to use
+   * \param algo ClusteringAlgorithm to use
    *
-   * \param p Input data set. This is a dxn matrix. d is the number of
-   * features, n is the number of datapoint. Hence the data is stored
-   * point after point (column major). This will be reordered
-   * according to perm.
+   * \param p Input data set. This is a dxn matrix (column major). d
+   * is the number of features, n is the number of datapoints. Hence
+   * the data is stored point after point (column major). This will be
+   * reordered according to perm.
    *
    * \param perm The permutation. The permutation uses 1-based
-   * indexing! So it can be used with lapack permutation
-   * routines. This will be resized to the correct size.
+   * indexing, so it can be used with lapack permutation routines
+   * (such as DenseMatrix::lapmt). This will be resized to the correct
+   * size, ie., n == p.cols().
    *
    * \param cluster_size Stop partitioning when this cluster_size is
    * reached. This corresponds to the HSS/HODLR leaf size.
    *
-   * \return This is output, a tree defined by the (recursive)
-   * clustering.
+   * \return This is output, a HSS::HSSPartitionTree defined by the
+   * (recursive) clustering.
    *
-   * \see strumpack::DenseMatrix::lapmt
+   * \see strumpack::DenseMatrix::lapmt, get_clustering_algorithm,
+   * get_name(ClusteringAlgorithm)
    */
   template<typename scalar_t>
   HSS::HSSPartitionTree binary_tree_clustering

@@ -80,7 +80,9 @@ namespace strumpack {
       /**
        * Construct an HODLR approximation for the kernel matrix K.
        *
-       * \param c MPI communicator
+       * \param c MPI communicator, a reference to this communicator
+       * is stored. So the MPIComm object c needs to stay alive for
+       * the scope of this matrix.
        * \param K Kernel matrix object. The data associated with this
        * kernel will be permuted according to the clustering algorithm
        * selected by the HODLROptions objects.
@@ -97,7 +99,9 @@ namespace strumpack {
        * construction, the HODLR matrix will be empty, and can be filled
        * by calling one of the compress member routines.
        *
-       * \param c MPI communicator
+       * \param c MPI communicator, a reference to this communicator
+       * is stored. So the MPIComm object c needs to stay alive for
+       * the scope of this matrix.
        * \param t tree specifying the HODLR matrix partitioning
        * \param opts object containing a number of options for HODLR
        * compression
@@ -107,28 +111,153 @@ namespace strumpack {
       (const MPIComm& c, const HSS::HSSPartitionTree& tree,
        const opts_t& opts);
 
+      /**
+       * Copy constructor is not supported.
+       */
       HODLRMatrix(const HODLRMatrix<scalar_t>& h) = delete;
+
+      /**
+       * Move constructor.
+       * \param h HODLRMatrix to move from, will be emptied.
+       */
       HODLRMatrix(HODLRMatrix<scalar_t>&& h) { *this = h; }
 
+      /**
+       * Virtual destructor.
+       */
       virtual ~HODLRMatrix();
+
+      /**
+       * Copy assignement operator is not supported.
+       */
       HODLRMatrix<scalar_t>& operator=(const HODLRMatrix<scalar_t>& h) = delete;
+
+      /**
+       * Move assignment operator.
+       * \param h HODLRMatrix to move from, will be emptied.
+       */
       HODLRMatrix<scalar_t>& operator=(HODLRMatrix<scalar_t>&& h);
 
+      /**
+       * Return the number of rows in the matrix.
+       * \return Global number of rows in the matrix.
+       */
       std::size_t rows() const { return rows_; }
+      /**
+       * Return the number of columns in the matrix.
+       * \return Global number of columns in the matrix.
+       */
       std::size_t cols() const { return cols_; }
+      /**
+       * Return the number of local rows, owned by this process.
+       * \return Number of local rows.
+       */
       std::size_t lrows() const { return lrows_; }
+      /**
+       * Return the first row of the local rows owned by this process.
+       * \return Return first local row
+       */
       std::size_t begin_row() const { return dist_[c_->rank()]; }
+      /**
+       * Return last row (+1) of the local rows (begin_rows()+lrows())
+       * \return Final local row (+1).
+       */
       std::size_t end_row() const { return dist_[c_->rank()+1]; }
+      /**
+       * Return MPI communicator wrapper object.
+       */
       const MPIComm& Comm() const { return *c_; }
 
+      /**
+       * Construct the compressed HODLR representation of the matrix,
+       * using only a matrix-(multiple)vector multiplication routine.
+       *
+       * \param Amult Routine for the matrix-vector product. char
+       * argument will be 'N'/'n', 'T'/'t' or 'C'/'c' for none,
+       * transpose or complex conjugate. The const DenseM_t& argument
+       * is the the random matrix R, and the final DenseM_t& argument
+       * S is what the user routine should compute as A*R, A^t*R or
+       * A^c*R. S will already be allocated.
+       */
       void compress
-      (const std::function<void(char,const DenseM_t&,DenseM_t&)>& Amult);
+      (const std::function<void(char op,const DenseM_t& R,DenseM_t& S)>& Amult);
+
+
+      /**
+       * Multiply this HODLR matrix with a dense matrix: Y = op(X),
+       * where op can be none, transpose or complex conjugate. X and Y
+       * are the local parts of block-row distributed matrices. The
+       * number of rows in X and Y should correspond to the
+       * distribution of this HODLR matrix.
+       *
+       * \param op Transpose, conjugate, or none.
+       * \param X Right-hand side matrix. This is the local part of
+       * the distributed matrix X. Should be X.rows() == this.lrows().
+       * \param Y Result, should be Y.cols() == X.cols(), Y.rows() ==
+       * this.lrows()
+       * \see lrows, begin_row, end_row, mult
+       */
       void mult(Trans op, const DenseM_t& X, DenseM_t& Y) const;
+
+      /**
+       * Multiply this HODLR matrix with a dense matrix: Y = op(X),
+       * where op can be none, transpose or complex conjugate. X and Y
+       * are in 2D block cyclic distribution.
+       *
+       * \param op Transpose, conjugate, or none.
+       * \param X Right-hand side matrix. Should be X.rows() ==
+       * this.rows().
+       * \param Y Result, should be Y.cols() == X.cols(), Y.rows() ==
+       * this.rows()
+       * \see mult
+       */
       void mult(Trans op, const DistM_t& X, DistM_t& Y) const;
+
+      /**
+       * Compute the factorization of this HODLR matrix. The matrix
+       * can still be used for multiplication.
+       *
+       * \see solve, inv_mult
+       */
       void factor();
+
+      /**
+       * Solve a system of linear equations A*X=B, with possibly
+       * multiple right-hand sides.
+       *
+       * \param B Right hand side. This is the local part of
+       * the distributed matrix B. Should be B.rows() == this.lrows().
+       * \param X Result, should be X.cols() == B.cols(), X.rows() ==
+       * this.lrows(). X should be allocated.
+       * \see factor, lrows, begin_row, end_row, inv_mult
+       */
       void solve(const DenseM_t& B, DenseM_t& X) const;
+
+      /**
+       * Solve a system of linear equations A*X=B, with possibly
+       * multiple right-hand sides. X and B are in 2D block cyclic
+       * distribution.
+       *
+       * \param B Right hand side. This is the local part of
+       * the distributed matrix B. Should be B.rows() == this.rows().
+       * \param X Result, should be X.cols() == B.cols(), X.rows() ==
+       * this.rows(). X should be allocated.
+       * \see factor, lrows, begin_row, end_row, inv_mult
+       */
       void solve(const DistM_t& B, DistM_t& X) const;
-      void inv_mult(Trans op, const DenseM_t& X, DenseM_t& Y) const;
+
+      /**
+       * Solve a system of linear equations op(A)*X=B, with possibly
+       * multiple right-hand sides, where op can be none, transpose or
+       * complex conjugate.
+       *
+       * \param B Right hand side. This is the local part of
+       * the distributed matrix B. Should be B.rows() == this.lrows().
+       * \param X Result, should be X.cols() == B.cols(), X.rows() ==
+       * this.lrows(). X should be allocated.
+       * \see factor, solve, lrows, begin_row, end_row
+       */
+      void inv_mult(Trans op, const DenseM_t& B, DenseM_t& X) const;
 
     private:
       F2Cptr ho_bf_ = nullptr;     // HODLR handle returned by Fortran code

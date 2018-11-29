@@ -94,8 +94,9 @@ t.c.emplace_back(N-N/2);
 // the result is a tree with only 2 levels, which can be refined further
 \endcode
 
-Alternatively, one can use one of the clustering algorithms, see
-binary_tree_clustering().
+Alternatively, if you have access underlying geometry that is used to
+construct the matrix, you can use one of the clustering algorithms,
+see binary_tree_clustering().
 
 
 
