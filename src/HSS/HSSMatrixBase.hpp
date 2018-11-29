@@ -50,12 +50,14 @@
 namespace strumpack {
   namespace HSS {
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     template<typename scalar_t> class HSSMatrix;
 #if defined(STRUMPACK_USE_MPI)
     template<typename scalar_t> class HSSMatrixMPI;
     template<typename scalar_t> class DistSubLeaf;
     template<typename scalar_t> class DistSamples;
 #endif //defined(STRUMPACK_USE_MPI)
+#endif //DOXYGEN_SHOULD_SKIP_THIS
 
 
     /**

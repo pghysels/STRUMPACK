@@ -35,6 +35,7 @@ namespace strumpack {
 
     template<typename scalar_t> class HSSMatrixMPI;
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     template<typename scalar_t> class DistSamples {
       using real_t = typename RealType<scalar_t>::value_type;
       using DistM_t = DistributedMatrix<scalar_t>;
@@ -115,6 +116,7 @@ namespace strumpack {
         leaf_Sc.hconcat(leafScnew);
       }
     };
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
   } // end namespace HSS
 } // end namespace strumpack

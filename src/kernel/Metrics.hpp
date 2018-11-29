@@ -26,7 +26,7 @@
  *             Division).
  *
  */
-/*! \file Metrixs.hpp
+/*! \file Metrics.hpp
  * \brief Definitions of distance metrics.
  */
 #ifndef STRUMPACK_METRICS_HPP
@@ -45,7 +45,7 @@ namespace strumpack {
    * \tparam real_t real type corresponding to scalar_t
    * \param d dimension of the points
    * \param x pointer to first point (stored with stride 1)
-   * \param x pointer to second point (stored with stride 1)
+   * \param y pointer to second point (stored with stride 1)
    */
   template<typename scalar_t,
            typename real_t=typename RealType<scalar_t>::value_type>
@@ -66,7 +66,7 @@ namespace strumpack {
    * \tparam real_t real type corresponding to scalar_t
    * \param d dimension of the points
    * \param x pointer to first point (stored with stride 1)
-   * \param x pointer to second point (stored with stride 1)
+   * \param y pointer to second point (stored with stride 1)
    */
   template<typename scalar_t,
            typename real_t=typename RealType<scalar_t>::value_type>

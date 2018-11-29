@@ -25,8 +25,9 @@
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
  */
-/*! \file HODLROptions.hpp
- * \brief For Pieter to complete
+/**
+ * \file HODLROptions.hpp
+ * \brief Contains the class holding HODLR matrix options.
  */
 #ifndef HODLR_OPTIONS_HPP
 #define HODLR_OPTIONS_HPP
@@ -37,66 +38,113 @@
 
 namespace strumpack {
 
-  /*! HODLR namespace. */
   namespace HODLR {
 
+    /**
+     * Get the default relative HODLR compression tolerance (this is
+     * for double precision, might be overloaded depending on floating
+     * point precision). This can be changed using the HODLROptions
+     * object. Tuning this parameter (in the HODLROptions object) is
+     * crucial for performance of the HODLR algorithms.
+     */
     template<typename real_t> inline real_t default_HODLR_rel_tol() {
       return real_t(1e-4);
     }
+    /**
+     * Get the default absolute HODLR compression tolerance (this is
+     * for double precision, might be overloaded for single
+     * precision). This can be changed using the HODLROptions object.
+     */
     template<typename real_t> inline real_t default_HODLR_abs_tol() {
       return real_t(1e-10);
     }
+
+    /**
+     * Get the default relative HODLR compression tolerance for single
+     * precision computations. This can be changed using the
+     * HODLROptions object. Tuning this parameter (in the
+     * HODLROptions<float> object) is crucial for performance of the
+     * HODLR algorithms.
+     */
     template<> inline float default_HODLR_rel_tol() {
       return 1e-2;
     }
+    /**
+     * Get the default absolute HODLR compression tolerance for single
+     * precision computations. This can be changed using the
+     * HODLROptions object.
+     */
     template<> inline float default_HODLR_abs_tol() {
       return 1e-5;
     }
 
-    enum class LowRankAlgorithm { RRQR, ACA };
-    inline std::string get_name(LowRankAlgorithm a) {
-      switch (a) {
-      case LowRankAlgorithm::RRQR: return "RRQR"; break;
-      case LowRankAlgorithm::ACA: return "ACA"; break;
-      default: return "unknown";
-      }
-    }
 
-    enum class Admissibility { STRONG, WEAK };
-    inline std::string get_name(Admissibility a) {
-      switch (a) {
-      case Admissibility::STRONG: return "strong"; break;
-      case Admissibility::WEAK: return "weak"; break;
-      default: return "unknown";
-      }
-    }
-
+    /**
+     * \class HODLROptions
+     * \brief Class containing several options for the HODLR code and
+     * data-structures
+     *
+     * \tparam scalar_t scalar type, can be float, double,
+     * std::complex<float> or std::complex<double>. This is used here
+     * mainly because tolerances might depend on the precision.
+     */
     template<typename scalar_t> class HODLROptions {
-      using real_t = typename RealType<scalar_t>::value_type;
 
     public:
-      /*! \brief For Pieter to complete
-       * \param rel_tol
+      /**
+       * real_t is the real type corresponding to the (possibly
+       * complex) scalar_t template parameter
+       */
+      using real_t = typename RealType<scalar_t>::value_type;
+
+      /**
+       * Default constructor, sets all options to their default
+       * values.
+       */
+      HODLROptions() {}
+
+      /**
+       * Set the relative tolerance to be used for HODLR
+       * compression. Tuning this parameter is very important for
+       * performance.
+       *
+       * \param rel_tol relative compression tolerance
        */
       void set_rel_tol(real_t rel_tol) {
         assert(rel_tol <= real_t(1.) && rel_tol >= real_t(0.));
         rel_tol_ = rel_tol;
       }
+
+      /**
+       * Set the absolute compression tolerance.
+       *
+       * \param abs_tol absolute compression tolerance
+       */
       void set_abs_tol(real_t abs_tol) {
         assert(abs_tol >= real_t(0.));
         abs_tol_ = abs_tol;
       }
-      /*! \brief For Pieter to complete
+
+      /**
+       * Set the HODLR leaf size. The smallest diagonal blocks in the
+       * HODLR hierarchy will have size approximately the leaf size
+       * (within a factor 2).
+       *
        * \param leaf_size
        */
       void set_leaf_size(int leaf_size) {
         assert(leaf_size_ > 0);
         leaf_size_ = leaf_size;
       }
+
+      /**
+       * Set the maximum rank allowed in HODLR compression.
+       */
       void set_max_rank(int max_rank) {
         assert(max_rank > 0);
         max_rank_ = max_rank;
       }
+
       /**
        * Specify the clustering algorithm. This is used when
        * constructing a kernel matrix approximation.
@@ -104,17 +152,68 @@ namespace strumpack {
       void set_clustering_algorithm(ClusteringAlgorithm a) {
         _clustering_algo = a;
       }
+
+      /**
+       * Enable or disable verbose output (only by the root process)
+       * to stdout.
+       */
       void set_verbose(bool verbose) { verbose_ = verbose; }
 
+      /**
+       * Get the relative compression tolerance.
+       * \return the relative compression tolerance
+       * \see set_rel_tol(), set_abs_tol(), get_abs_tol()
+       */
       real_t rel_tol() const { return rel_tol_; }
+
+      /**
+       * Get the absolute compression tolerance.
+       * \return the absolute compression tolerance
+       * \see set_abs_tol(), set_rel_tol(), get_rel_tol()
+       */
       real_t abs_tol() const { return abs_tol_; }
+
+      /**
+       * Get the HODLR leaf size.
+       * \return the (approximate) HODLR leaf size
+       * \see set_leaf_size()
+       */
       int leaf_size() const { return leaf_size_; }
+
+      /**
+       * Get the maximum allowable rank (note, this is not the actual
+       * maximum computed rank).
+       * \return maximum allowable rank
+       * \see set_max_rank()
+       */
       int max_rank() const { return max_rank_; }
+
+      /**
+       * Get the clustering algorithm to be used. This is used when
+       * constructing an HODLR approximation of a kernel matrix.
+       * \return clustering algorithm
+       * \see set_clustering_algorithm
+       */
       ClusteringAlgorithm clustering_algorithm() const {
         return _clustering_algo;
       }
+
+      /**
+       * Verbose or quiet?
+       * \return True if we want output from the HODLR algorithms,
+       * else False.
+       * \see set_verbose
+       */
       bool verbose() const { return verbose_; }
 
+      /**
+       * Parse the command line options given by argc and argv.  The
+       * options will not be modified. Run with --help to see an
+       * overview of available options, or call describe_options().
+       *
+       * \param argc Number of elements in argv
+       * \param argv Array with options
+       */
       void set_from_command_line(int argc, const char* const* argv) {
         std::vector<char*> argv_local(argc);
         for (int i=0; i<argc; i++) {
@@ -169,6 +268,10 @@ namespace strumpack {
         for (auto s : argv_local) delete[] s;
       }
 
+      /**
+       * Print an overview of the available command line options and
+       * their current values.
+       */
       void describe_options() const {
         std::cout << "# HODLR Options:" << std::endl
                   << "#   --hodlr_rel_tol real_t (default "

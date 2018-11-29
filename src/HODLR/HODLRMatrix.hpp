@@ -26,7 +26,8 @@
  *             Division).
  *
  */
-/*! \file HODLRMatrix.hpp
+/**
+ * \file HODLRMatrix.hpp
  * \brief Class wrapping around Yang Liu's HODLR code.
  */
 #ifndef STRUMPACK_HODLR_MATRIX_HPP
@@ -45,10 +46,23 @@ namespace strumpack {
 
   /**
    * Code in this namespace is a wrapper aroung Yang Liu's Fortran
-   * code: https://github.com/liuyangzhuan/hod-lr-bf
+   * code: https://github.com/liuyangzhuan/hod-lr-bf (this repo is
+   * currently private)
    */
   namespace HODLR {
 
+    /**
+     * \class HODLRMatrix
+     *
+     * \brief Hierarchically low-rank matrix representation.
+     *
+     * This requires MPI support.
+     *
+     * \tparam scalar_t Can be float, double, std:complex<float> or
+     * std::complex<double>.
+     *
+     * \see HSS::HSSMatrix
+     */
     template<typename scalar_t> class HODLRMatrix {
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
@@ -58,19 +72,47 @@ namespace strumpack {
         void(char,const DenseM_t&,DenseM_t&)>;
 
     public:
+      /**
+       * Default constructor, makes an empty 0 x 0 matrix.
+       */
       HODLRMatrix() {}
+
+      /**
+       * Construct an HODLR approximation for the kernel matrix K.
+       *
+       * \param c MPI communicator
+       * \param K Kernel matrix object. The data associated with this
+       * kernel will be permuted according to the clustering algorithm
+       * selected by the HODLROptions objects.
+       * \param perm Will be set to the permutation. This will be
+       * resized.
+       * \param opts object containing a number of HODLR options
+       */
       HODLRMatrix
       (const MPIComm& c, kernel::Kernel<scalar_t>& K,
        std::vector<int>& perm, const opts_t& opts);
+
+      /**
+       * Construct an HODLR matrix using a specified HODLR tree. After
+       * construction, the HODLR matrix will be empty, and can be filled
+       * by calling one of the compress member routines.
+       *
+       * \param c MPI communicator
+       * \param t tree specifying the HODLR matrix partitioning
+       * \param opts object containing a number of options for HODLR
+       * compression
+       * \see compress, HODLROptions
+       */
       HODLRMatrix
       (const MPIComm& c, const HSS::HSSPartitionTree& tree,
        const opts_t& opts);
+
       HODLRMatrix(const HODLRMatrix<scalar_t>& h) = delete;
       HODLRMatrix(HODLRMatrix<scalar_t>&& h) { *this = h; }
+
       virtual ~HODLRMatrix();
       HODLRMatrix<scalar_t>& operator=(const HODLRMatrix<scalar_t>& h) = delete;
       HODLRMatrix<scalar_t>& operator=(HODLRMatrix<scalar_t>&& h);
-
 
       std::size_t rows() const { return rows_; }
       std::size_t cols() const { return cols_; }
@@ -79,7 +121,8 @@ namespace strumpack {
       std::size_t end_row() const { return dist_[c_->rank()+1]; }
       const MPIComm& Comm() const { return *c_; }
 
-      void compress(const mult_t& Amult);
+      void compress
+      (const std::function<void(char,const DenseM_t&,DenseM_t&)>& Amult);
       void mult(Trans op, const DenseM_t& X, DenseM_t& Y) const;
       void mult(Trans op, const DistM_t& X, DistM_t& Y) const;
       void factor();
@@ -96,7 +139,7 @@ namespace strumpack {
       F2Cptr ptree_ = nullptr;     // process tree returned by Fortran code
       MPI_Fint Fcomm_;             // the fortran MPI communicator
       const MPIComm* c_ = nullptr;
-      int rows_, cols_, lrows_;
+      int rows_ = 0, cols_ = 0, lrows_ = 0;
       std::vector<int> perm_, iperm_; // permutation used by the HODLR code
       std::vector<int> dist_;         // begin rows of each rank
 

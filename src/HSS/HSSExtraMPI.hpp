@@ -60,6 +60,7 @@ namespace strumpack {
     };
 #endif //DOXYGEN_SHOULD_SKIP_THIS
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     template<typename scalar_t,
              typename real_t=typename RealType<scalar_t>::value_type>
     class WorkCompressMPIANN : public WorkCompressBase<scalar_t> {
@@ -84,6 +85,7 @@ namespace strumpack {
         w_seq->lvl = this->lvl;
       }
     };
+#endif //DOXYGEN_SHOULD_SKIP_THIS
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
     template<typename scalar_t> class WorkApplyMPI {

@@ -59,7 +59,7 @@ namespace strumpack {
    * Return a short string with the name of the clustering algorithm.
    *
    * \param c Clustering algorithm.
-   * \param String with the name of the clustering algorithm.
+   * \return String with the name of the clustering algorithm.
    */
   inline std::string get_name(ClusteringAlgorithm c) {
     switch (c) {
@@ -103,10 +103,6 @@ namespace strumpack {
    * features, n is the number of datapoint. Hence the data is stored
    * point after point (column major). This will be reordered
    * according to perm.
-   *
-   * \param labels Matrix of size lxn (l typically 1), with the labels
-   * corresponding to the dataset in p. The same reordering as applied
-   * to p will be applied to labels.
    *
    * \param perm The permutation. The permutation uses 1-based
    * indexing! So it can be used with lapack permutation

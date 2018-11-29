@@ -54,11 +54,21 @@ namespace strumpack {
   namespace kernel {
 
     /**
-     * Representation of a kernel matrix. This is an abstract class.
-     * This class contains a reference to the datapoints representing
-     * the kernel: X. X is a d x n matrix (d features and n
-     * datapoints).
+     * \class Kernel
      *
+     * \brief Representation of a kernel matrix.
+     *
+     * This is an abstract class. This class contains a reference to
+     * the datapoints representing the kernel: X. X is a d x n matrix
+     * (d features and n datapoints).
+     *
+     * The actual kernel function is implemented in one of the
+     * subclasses of this class. Subclasses need to implement the
+     * purely virtual function eval_kernel_function.
+     *
+     * \tparam scalar_t Scalar type of the input data points and the
+     * kernel representation. Can be float, double,
+     * std::complex<float> or std::complex<double>.
      */
     template<typename scalar_t> class Kernel {
       using DenseM_t = DenseMatrix<scalar_t>;
@@ -104,9 +114,9 @@ namespace strumpack {
       /**
        * Evaluate an entry of the kernel matrix.
        *
-       * \param m row coordinate of entry to evaluate
-       * \param n column coordinate of entry to evaluate
-       * \return the value K(m, n) of the kernel
+       * \param i row coordinate of entry to evaluate
+       * \param j column coordinate of entry to evaluate
+       * \return the value K(i, j) of the kernel
        */
       scalar_t eval(std::size_t i, std::size_t j) const {
         return eval_kernel_function(data_.ptr(0, i), data_.ptr(0, j))
@@ -115,12 +125,14 @@ namespace strumpack {
 
       /**
        * Evaluate multiple entries at once: evaluate the submatrix
-       * K(I,J) and put the result in matrix B.
+       * K(I,J) and put the result in matrix B. This is used in the
+       * HSS and HODLR construction algorithms for this kernel.
        *
        * \param I set of row indices of elements to extract
        * \param J set of col indices of elements to extract
-       * \return K(I,J), matrix B should be the correct size, ie.,
-       * B.rows() == I.size() and B.cols() == J.size()
+       * \param B B will be set to K(I,J). Matrix B should be the
+       * correct size, ie., B.rows() == I.size() and B.cols() ==
+       * J.size()
        */
       void operator()(const std::vector<std::size_t>& I,
                       const std::vector<std::size_t>& J,
@@ -134,46 +146,101 @@ namespace strumpack {
       }
 
       /**
-       * TODO describe
-       * data will get permuted, together with the labels
+       * Compute weights for kernel ridge regression
+       * classification. This will build an approximate HSS
+       * representation of the kernel matrix and use that to solve a
+       * linear system with the kernel matrix and the weights vector
+       * as the right-hand side. The weights can then later be used in
+       * the predict method for prediction. The data associated to
+       * this kernel, and the labels, will get permuted.
+       *
+       * __TODO__ labels should be a vector of bool's or int's??
+       *
+       * \param labels Binary labels, supposed to be in {-1, 1}.
+       * Should be labels.size() == this->n().
+       * \param opts HSS options
+       * \return A vector (1 column matrix) with scalar weights, to be
+       * used in predict
+       * \see predict, fit_HODLR
        */
       DenseM_t fit_HSS
       (std::vector<scalar_t>& labels, const HSS::HSSOptions<scalar_t>& opts);
 
       /**
-       * TODO describe
-       * weights is a column vector (can be multiple vectors)
+       * Return prediction scores for the test points, using the
+       * weights computed in fit_HSS() or fit_HODLR().
+       *
+       * \param test Test data set, should be test.rows() == this->d()
+       * \param weights Weights computed by fit_HSS() or fit_HODLR()
+       * \return Vector with prediction scores. One can use the sign
+       * (threshold zero), to decide which of 2 classes each test
+       * point belongs to.
+       * \see fit_HSS, fit_HODLR
        */
       std::vector<scalar_t> predict
       (const DenseM_t& test, const DenseM_t& weights) const;
 
 #if defined(STRUMPACK_USE_MPI)
       /**
-       * TODO describe
-       * data will get permuted, together with the labels
+       * Compute weights for kernel ridge regression
+       * classification. This will build an approximate HSS
+       * representation of the kernel matrix and use that to solve a
+       * linear system with the kernel matrix and the weights vector
+       * as the right-hand side. The weights can then later be used in
+       * the predict() method for prediction. The data associated to
+       * this kernel, and the labels, will get permuted.
+       *
+       * __TODO__ labels should be a vector of bool's or int's??
+       *
+       * \param grid Processor grid to use for the MPI distributed
+       * computations
+       * \param labels Binary labels, supposed to be in {-1, 1}.
+       * Should be labels.size() == this->n().
+       * \param opts HSS options
+       * \return A distributed vector with scalar weights, to be used
+       * in predict(), distributed on the BLACSGrid grid.
+       * \see predict, fit_HODLR
        */
       DistM_t fit_HSS
       (const BLACSGrid& grid, std::vector<scalar_t>& labels,
        const HSS::HSSOptions<scalar_t>& opts);
 
       /**
-       * TODO describe
-       * weights is a column vector (can be multiple vectors)
+       * Return prediction scores for the test points, using the
+       * weights computed in fit_HSS() or fit_HODLR().
+       *
+       * \param test Test data set, should be test.rows() == this->d()
+       * \param weights Weights computed by fit_HSS() or fit_HODLR()
+       * \return Vector with prediction scores. One can use the sign
+       * (threshold zero), to decide which of 2 classes each test
+       * point belongs to.
+       * \see fit_HSS, fit_HODLR
        */
       std::vector<scalar_t> predict
       (const DenseM_t& test, const DistM_t& weights) const;
 
 #if defined(STRUMPACK_USE_HODLRBF)
-
       /**
-       * What does this return? The local part of the 1D block row
-       * distributed weights? Or the whole weights vector on every
-       * rank?
+       * Compute weights for kernel ridge regression
+       * classification. This will build an approximate HODLR
+       * representation of the kernel matrix and use that to solve a
+       * linear system with the kernel matrix and the weights vector
+       * as the right-hand side. The weights can then later be used in
+       * the predict() method for prediction. The data associated to
+       * this kernel, and the labels, will get permuted.
+       *
+       * __TODO__ labels should be a vector of bool's or int's??
+       *
+       * \param c MPI communicator on which to perform the calculation
+       * \param labels Binary labels, supposed to be in {-1, 1}.
+       * Should be labels.size() == this->n().
+       * \param opts HSS options
+       * \return A vector with scalar weights, to be used in predict()
+       * \see predict, fit_HSS
        */
       DenseM_t fit_HODLR
       (const MPIComm& c, std::vector<scalar_t>& labels,
        const HODLR::HODLROptions<scalar_t>& opts);
-
 #endif
 #endif
 
@@ -195,19 +262,55 @@ namespace strumpack {
       DenseM_t& data_;
       scalar_t lambda_;
 
+      /**
+       * Purely virtual function that needs to be defined in the
+       * subclass. This defines the actual kernel function. All data
+       * points will be of dimension d(), and one can use several
+       * already defined distances, such as
+       * Euclidean_distance_squared, Euclidean_distance, or
+       * norm1_distance.
+       *
+       * \param x Pointer to first data point, of dimension d().
+       * \param y Pointer to second data point, of dimension d().
+       * \return Evaluation of kernel function
+       * \see GaussKernel::eval_kernel_function,
+       * LaplacKernel::eval_kernel_function
+       */
       virtual scalar_t eval_kernel_function
       (const scalar_t* x, const scalar_t* y) const = 0;
     };
 
 
     /**
-     * Gaussian (radial basis function) kernel.
+     * \class GaussKernel
      *
-     * \see Kernel
+     * \brief Gaussian or radial basis function kernel.
+     *
+     * Implements the kernel: \f$\exp \left( -\frac{\|x-y\|_2^2}{2
+     * h^2} \right)\f$, with an extra regularization parameter lambda
+     * on the diagonal.
+     *
+     * This is a subclass of Kernel. It only implements the
+     * (protected) eval_kernel_function routine, the rest of the
+     * functionality is inherited. To create your own kernel, simply
+     * copy this class, rename and change the eval_kernel_function
+     * implementation.
+     *
+     * \see Kernel, LaplaceKernel
      */
     template<typename scalar_t>
     class GaussKernel : public Kernel<scalar_t> {
     public:
+      /**
+       * Constructor of the kernel object.
+       *
+       * \param data Data defining the kernel matrix. data.rows() is
+       * the number of features, and data.cols() is the number of data
+       * points, ie, the dimension of the kernel matrix.
+       *
+       * \param h Kernel width
+       * \param lambda Regularization parameter, added to the diagonal
+       */
       GaussKernel(DenseMatrix<scalar_t>& data, scalar_t h, scalar_t lambda)
         : Kernel<scalar_t>(data, lambda), h_(h) {}
 
@@ -224,13 +327,35 @@ namespace strumpack {
 
 
     /**
-     * Laplace kernel.
+     * \class LaplaceKernel
      *
-     * \see GaussKernel, Kernel
+     * \brief Laplace kernel.
+     *
+     * Implements the kernel: \f$\exp \left( -\frac{\|x-y\|_1}{h}
+     * \right)\f$, with an extra regularization parameter lambda on
+     * the diagonal.
+     *
+     * This is a subclass of Kernel. It only implements the
+     * (protected) eval_kernel_function routine, the rest of the
+     * functionality is inherited. To create your own kernel, simply
+     * copy this class, rename and change the eval_kernel_function
+     * implementation.
+     *
+     * \see Kernel, GaussKernel
      */
     template<typename scalar_t>
     class LaplaceKernel : public Kernel<scalar_t> {
     public:
+      /**
+       * Constructor of the kernel object.
+       *
+       * \param data Data defining the kernel matrix. data.rows() is
+       * the number of features, and data.cols() is the number of data
+       * points, ie, the dimension of the kernel matrix.
+       *
+       * \param h Kernel width
+       * \param lambda Regularization parameter, added to the diagonal
+       */
       LaplaceKernel(DenseMatrix<scalar_t>& data, scalar_t h, scalar_t lambda)
         : Kernel<scalar_t>(data, lambda), h_(h) {}
 
@@ -287,6 +412,7 @@ namespace strumpack {
      *
      * \tparam scalar_t the scalar type to represent the kernel.
      *
+     * \param k Type of kernel
      * \param args arguments to be passed through to the constructor
      * of the actual kernel (fi, data, h, lambda for GaussKernel)
      *

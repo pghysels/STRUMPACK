@@ -121,7 +121,7 @@ namespace strumpack {
        * \param n number of rows in the constructed HSS matrix
        * \param opts object containing a number of options for HSS
        * compression
-       * \see HSSOptions
+       * \see compress, HSSOptions
        */
       HSSMatrix(std::size_t m, std::size_t n, const opts_t& opts);
 
@@ -133,15 +133,19 @@ namespace strumpack {
        * \param t tree specifying the HSS matrix partitioning
        * \param opts object containing a number of options for HSS
        * compression
-       * \see HSSOptions
+       * \see compress, HSSOptions
        */
       HSSMatrix(const HSSPartitionTree& t, const opts_t& opts);
 
       /**
-       * TODO comment this kernel approximation interface!!
+       * Construct an HSS approximation for the kernel matrix K.
        *
-       * labels are passed because they need to be permuted!
-       * K has a reference to the data
+       * \param K Kernel matrix object. The data associated with this
+       * kernel will be permuted according to the clustering algorithm
+       * selected by the HSSOptions objects.
+       * \param perm Will be set to the permutation. This will be
+       * resized.
+       * \param opts object containing a number of HSS options
        */
       HSSMatrix
       (kernel::Kernel<scalar_t>& K, std::vector<int>& perm,

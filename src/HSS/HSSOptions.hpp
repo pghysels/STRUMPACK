@@ -266,7 +266,7 @@ namespace strumpack {
       /**
        * Get the absolute compression tolerance.
        * \return the absolute compression tolerance
-       * \see set_abs_tol(), set_rel_tol(), get_rel_tol()
+       * \see set_abs_tol(), set_rel_tol(), rel_tol()
        */
       real_t abs_tol() const { return _abs_tol; }
 
@@ -313,22 +313,87 @@ namespace strumpack {
        */
       int max_rank() const { return _max_rank; }
 
-
+      /**
+       * Return the type of random engine to use.
+       * \return random engine
+       * \see set_random_engine
+       */
       random::RandomEngine random_engine() const { return _random_engine; }
+
+      /**
+       * Return the type of random distribution to use in the random
+       * sampling HSS construction.
+       * \return random distribution
+       * \see set_random_distribution
+       */
       random::RandomDistribution random_distribution() const {
         return _random_distribution;
       }
+
+      /**
+       * Return which variant of the compression algorithm to use.
+       * \return Variant of HSS compression algorithm
+       * \see set_compression_algorithm
+       */
       CompressionAlgorithm compression_algorithm() const {
         return _compress_algo;
       }
+
+      /**
+       * Get the clustering algorithm to be used. This is used when
+       * constructing an HSS approximation of a kernel matrix.
+       * \return clustering algorithm
+       * \see set_clustering_algorithm
+       */
       ClusteringAlgorithm clustering_algorithm() const {
         return _clustering_algo;
       }
+
+      /**
+       * Will the user define its own random matrices?
+       *
+       * \return True if the user will fill up the random matrices,
+       * used in the random sampling based HSS construcion,
+       * him/her-self.
+       * \see set_user_defined_random
+       */
       bool user_defined_random() const { return _user_defined_random; }
+
+      /**
+       * Whether or not the synchronize the element extraction
+       * routine.
+       * \return True if synchronization is required in the element
+       * extraction routine, else False.
+       * \see set_synchromized_compression
+       */
       bool synchronized_compression() const { return _sync; }
+
+      /**
+       * Check if the ranks should be printed to a log file.  __NOT
+       * supported currently__
+       *
+       * \return True is the ranks should be printed to a log file,
+       * else False.
+       * \see set_log_ranks
+       */
       bool log_ranks() const { return _log_ranks; }
+
+      /**
+       * Verbose or quiet?
+       * \return True if we want output from the HSS algorithms,
+       * else False.
+       * \see set_verbose
+       */
       bool verbose() const { return _verbose; }
 
+      /**
+       * Parse the command line options given by argc and argv.  The
+       * options will not be modified. Run with --help to see an
+       * overview of available options, or call describe_options().
+       *
+       * \param argc Number of elements in argv
+       * \param argv Array with options
+       */
       void set_from_command_line(int argc, const char* const* argv) {
         std::vector<char*> argv_local(argc);
         for (int i=0; i<argc; i++) {
@@ -448,6 +513,10 @@ namespace strumpack {
         for (auto s : argv_local) delete[] s;
       }
 
+      /**
+       * Print an overview of the available command line options and
+       * their current values.
+       */
       void describe_options() const {
         std::cout << "# HSS Options:" << std::endl
                   << "#   --hss_rel_tol real_t (default "
