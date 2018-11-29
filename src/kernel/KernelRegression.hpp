@@ -56,8 +56,11 @@ namespace strumpack {
       if (opts.verbose())
         std::cout << "# starting HSS compression..." << std::endl;
       timer.start();
+      std::vector<int> perm;
+      HSS::HSSMatrix<scalar_t> H(*this, perm, opts);
       DenseMW_t B(1, n(), labels.data(), 1);
-      HSS::HSSMatrix<scalar_t> H(*this, B, opts);
+      B.lapmt(perm, true);
+      perm.clear();
       if (opts.verbose()) {
         std::cout << "### HSS compression time = "
                   << timer.elapsed() << " ###" << std::endl;
@@ -109,8 +112,11 @@ namespace strumpack {
       bool verb = opts.verbose() && c.is_root();
       if (verb) std::cout << "# starting HSS compression..." << std::endl;
       timer.start();
+      std::vector<int> perm;
+      HSS::HSSMatrixMPI<scalar_t> H(*this, &grid, perm, opts);
       DenseMW_t B(1, n(), labels.data(), 1);
-      HSS::HSSMatrixMPI<scalar_t> H(*this, &grid, B, opts);
+      B.lapmt(perm, true);
+      perm.clear();
       if (opts.verbose()) {
         const auto lvls = H.max_levels();
         const auto rank = H.max_rank();
@@ -173,8 +179,11 @@ namespace strumpack {
       bool verb = opts.verbose() && c.is_root();
       if (verb) std::cout << "# starting HODLR compression..." << std::endl;
       timer.start();
+      std::vector<int> perm;
+      HODLR::HODLRMatrix<scalar_t> H(c, *this, perm, opts);
       DenseMW_t B(1, n(), labels.data(), 1);
-      HODLR::HODLRMatrix<scalar_t> H(c, *this, B, opts);
+      B.lapmt(perm, true);
+      perm.clear();
       if (verb)
         std::cout << "### HODLR compression time = "
                   << timer.elapsed() << " ###" << std::endl;

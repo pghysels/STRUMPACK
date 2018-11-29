@@ -40,10 +40,9 @@ namespace strumpack {
 
   template<typename scalar_t> void pca_partition
   (DenseMatrix<scalar_t>& p, std::vector<std::size_t>& nc,
-   DenseMatrix<scalar_t>& labels) {
+   int* perm) {
     auto n = p.cols();
     auto d = p.rows();
-    auto nl = labels.rows();
     // find first pca direction
     int num = 0;
     scalar_t lambda;
@@ -99,7 +98,7 @@ namespace strumpack {
       while (cluster[cj] != 0) cj++;
       if (cj != ct) {
         blas::swap(d, p.ptr(0,cj), 1, p.ptr(0,ct), 1);
-        blas::swap(nl, labels.ptr(0,cj), 1, labels.ptr(0,ct), 1);
+        std::swap(perm[cj], perm[ct]);
         cluster[cj] = cluster[ct];
         cluster[ct] = 0;
       }
@@ -108,29 +107,23 @@ namespace strumpack {
     }
   }
 
-  template<typename scalar_t> void recursive_pca
-  (DenseMatrix<scalar_t>& p, std::size_t cluster_size,
-   HSS::HSSPartitionTree& tree, DenseMatrix<scalar_t>& labels) {
+
+  template<typename scalar_t> HSS::HSSPartitionTree recursive_pca
+  (DenseMatrix<scalar_t>& p, std::size_t cluster_size, int* perm) {
     auto n = p.cols();
-    auto d = p.rows();
-    auto l = labels.rows();
-    tree.size = n;
-    if (n < cluster_size) return;
+    HSS::HSSPartitionTree tree(n);
+    if (n < cluster_size) return tree;
     std::vector<std::size_t> nc(2);
-    pca_partition(p, nc, labels);
-    if (!nc[0] || !nc[1]) return;
+    pca_partition(p, nc, perm);
+    if (!nc[0] || !nc[1]) return tree;
     tree.c.resize(2);
     tree.c[0].size = nc[0];
     tree.c[1].size = nc[1];
-    {
-      DenseMatrixWrapper<scalar_t> p0(d, nc[0], p, 0, 0);
-      DenseMatrixWrapper<scalar_t> l0(l, nc[0], labels, 0, 0);
-      recursive_pca(p0, cluster_size, tree.c[0], l0);
-    } {
-      DenseMatrixWrapper<scalar_t> p1(d, nc[1], p, 0, nc[0]);
-      DenseMatrixWrapper<scalar_t> l1(l, nc[1], labels, 0, nc[0]);
-      recursive_pca(p1, cluster_size, tree.c[1], l1);
-    }
+    DenseMatrixWrapper<scalar_t> p0(p.rows(), nc[0], p, 0, 0);
+    tree.c[0] = recursive_pca(p0, cluster_size, perm);
+    DenseMatrixWrapper<scalar_t> p1(p.rows(), nc[1], p, 0, nc[0]);
+    tree.c[1] = recursive_pca(p1, cluster_size, perm+nc[0]);
+    return tree;
   }
 
 } // end namespace strumpack

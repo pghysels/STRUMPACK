@@ -118,43 +118,14 @@ namespace strumpack {
     return ind_centers;
   }
 
-  template<typename scalar_t> void recursive_2_means
-  (DenseMatrix<scalar_t>& p, std::size_t cluster_size,
-   HSS::HSSPartitionTree& tree, DenseMatrix<scalar_t>& labels,
-   std::mt19937& generator) {
-    const auto n = p.cols();
-    tree.size = n;
-    if (n < cluster_size) return;
-    const auto d = p.rows();
-    const auto l = labels.rows();
-    std::vector<std::size_t> nc(2);
-    k_means(2, p, nc, labels, generator);
-    if (!nc[0] || !nc[1]) return;
-    tree.c.resize(2);
-    tree.c[0].size = nc[0];
-    tree.c[1].size = nc[1];
-    // TODO threading
-    {
-      DenseMatrixWrapper<scalar_t> p0(d, nc[0], p, 0, 0);
-      DenseMatrixWrapper<scalar_t> l0(l, nc[0], labels, 0, 0);
-      recursive_2_means
-        (p0, cluster_size, tree.c[0], l0, generator);
-    } {
-      DenseMatrixWrapper<scalar_t> p1(d, nc[1], p, 0, nc[0]);
-      DenseMatrixWrapper<scalar_t> l1(l, nc[1], labels, 0, nc[0]);
-      recursive_2_means
-        (p1, cluster_size, tree.c[1], l1, generator);
-    }
-  }
 
   template<typename scalar_t,
            typename real_t=typename RealType<scalar_t>::value_type>
   void k_means
   (int k, DenseMatrix<scalar_t>& p, std::vector<std::size_t>& nc,
-   DenseMatrix<scalar_t>& labels, std::mt19937& generator) {
+   int* perm, std::mt19937& generator) {
     const auto d = p.rows();
     const auto n = p.cols();
-    const auto nl = labels.rows();
     DenseMatrix<scalar_t> center(d, k);
     const int kmeans_max_it = 100;
     std::vector<std::size_t> ind_centers;
@@ -209,13 +180,35 @@ namespace strumpack {
         while (cluster[cj] != c) cj++;
         if (cj != ct) {
           blas::swap(d, p.ptr(0,cj), 1, p.ptr(0,ct), 1);
-          blas::swap(nl, labels.ptr(0,cj), 1, labels.ptr(0,ct), 1);
+          std::swap(perm[cj], perm[ct]);
           cluster[cj] = cluster[ct];
           cluster[ct] = c;
         }
         cj++;
         ct++;
       }
+  }
+
+
+  template<typename scalar_t>
+  HSS::HSSPartitionTree recursive_2_means
+  (DenseMatrix<scalar_t>& p, std::size_t cluster_size,
+   int* perm, std::mt19937& generator) {
+    const auto n = p.cols();
+    HSS::HSSPartitionTree tree(n);
+    if (n < cluster_size) return tree;
+    std::vector<std::size_t> nc(2);
+    k_means(2, p, nc, perm, generator);
+    if (!nc[0] || !nc[1]) return tree;
+    tree.c.resize(2);
+    tree.c[0].size = nc[0];
+    tree.c[1].size = nc[1];
+    // TODO threading
+    DenseMatrixWrapper<scalar_t> p0(p.rows(), nc[0], p, 0, 0);
+    tree.c[0] = recursive_2_means(p0, cluster_size, perm, generator);
+    DenseMatrixWrapper<scalar_t> p1(p.rows(), nc[1], p, 0, nc[0]);
+    tree.c[1] = recursive_2_means(p1, cluster_size, perm+nc[0], generator);
+    return tree;
   }
 
 } // end namespace strumpack

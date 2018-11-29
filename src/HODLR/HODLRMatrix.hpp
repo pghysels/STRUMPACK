@@ -61,7 +61,7 @@ namespace strumpack {
       HODLRMatrix() {}
       HODLRMatrix
       (const MPIComm& c, kernel::Kernel<scalar_t>& K,
-       DenseM_t& labels, const opts_t& opts);
+       std::vector<int>& perm, const opts_t& opts);
       HODLRMatrix
       (const MPIComm& c, const HSS::HSSPartitionTree& tree,
        const opts_t& opts);
@@ -125,12 +125,12 @@ namespace strumpack {
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
     (const MPIComm& c, kernel::Kernel<scalar_t>& K,
-     DenseM_t& labels, const opts_t& opts) : c_(&c) {
+     std::vector<int>& perm, const opts_t& opts) : c_(&c) {
       int d = K.d();
       rows_ = cols_ = K.n();
 
       auto tree = binary_tree_clustering
-        (opts.clustering_algorithm(), K.data(), labels, opts.leaf_size());
+        (opts.clustering_algorithm(), K.data(), perm, opts.leaf_size());
 
       Fcomm_ = MPI_Comm_c2f(c_->comm());
       int P = c_->size();

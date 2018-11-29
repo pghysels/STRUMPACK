@@ -101,23 +101,32 @@ namespace strumpack {
    *
    * \param p Input data set. This is a dxn matrix. d is the number of
    * features, n is the number of datapoint. Hence the data is stored
-   * point after point (column major).
+   * point after point (column major). This will be reordered
+   * according to perm.
    *
    * \param labels Matrix of size lxn (l typically 1), with the labels
    * corresponding to the dataset in p. The same reordering as applied
    * to p will be applied to labels.
    *
+   * \param perm The permutation. The permutation uses 1-based
+   * indexing! So it can be used with lapack permutation
+   * routines. This will be resized to the correct size.
+   *
    * \param cluster_size Stop partitioning when this cluster_size is
    * reached. This corresponds to the HSS/HODLR leaf size.
    *
-   * \return This is output, the tree defined by the (recursive)
+   * \return This is output, a tree defined by the (recursive)
    * clustering.
+   *
+   * \see strumpack::DenseMatrix::lapmt
    */
   template<typename scalar_t>
   HSS::HSSPartitionTree binary_tree_clustering
   (ClusteringAlgorithm algo, DenseMatrix<scalar_t>& p,
-   DenseMatrix<scalar_t>& labels, std::size_t cluster_size) {
+   std::vector<int>& perm, std::size_t cluster_size) {
     HSS::HSSPartitionTree tree;
+    perm.resize(p.cols());
+    std::iota(perm.begin(), perm.end(), 1);
     switch (algo) {
     case ClusteringAlgorithm::NATURAL: {
       tree.size = p.cols();
@@ -125,19 +134,20 @@ namespace strumpack {
     } break;
     case ClusteringAlgorithm::TWO_MEANS: {
       std::mt19937 gen(1); // reproducible
-      recursive_2_means(p, cluster_size, tree, labels, gen);
+      tree = recursive_2_means(p, cluster_size, perm.data(), gen);
     } break;
     case ClusteringAlgorithm::KD_TREE:
-      recursive_kd(p, cluster_size, tree, labels); break;
+      tree = recursive_kd(p, cluster_size, perm.data()); break;
     case ClusteringAlgorithm::PCA:
-      recursive_pca(p, cluster_size, tree, labels); break;
+      tree = recursive_pca(p, cluster_size, perm.data()); break;
     case ClusteringAlgorithm::COBBLE:
-      recursive_cobble(p, cluster_size, tree, labels); break;
+      tree = recursive_cobble(p, cluster_size, perm.data()); break;
     default:
       std::cerr << "ERROR: clustering type not recognized." << std::endl;
     }
     return tree;
   }
+
 
 } // end namespace strumpack
 

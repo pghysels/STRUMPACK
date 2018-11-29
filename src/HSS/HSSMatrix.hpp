@@ -144,7 +144,8 @@ namespace strumpack {
        * K has a reference to the data
        */
       HSSMatrix
-      (kernel::Kernel<scalar_t>& K, DenseM_t& labels, const opts_t& opts);
+      (kernel::Kernel<scalar_t>& K, std::vector<int>& perm,
+       const opts_t& opts);
 
 
       /**
@@ -646,10 +647,10 @@ namespace strumpack {
 
     template<typename scalar_t>
     HSSMatrix<scalar_t>::HSSMatrix
-    (kernel::Kernel<scalar_t>& K, DenseM_t& labels, const opts_t& opts)
+    (kernel::Kernel<scalar_t>& K, std::vector<int>& perm, const opts_t& opts)
       : HSSMatrixBase<scalar_t>(K.n(), K.n(), true) {
       auto t = binary_tree_clustering
-        (opts.clustering_algorithm(), K.data(), labels, opts.leaf_size());
+        (opts.clustering_algorithm(), K.data(), perm, opts.leaf_size());
       if (!t.c.empty()) {
         assert(t.c.size() == 2);
         this->_ch.reserve(2);
