@@ -1,6 +1,6 @@
-all: @C_EXAMPLES@	\
-	testPoisson2d testPoisson3d	\
-	testMMdouble testMMdouble64 testMMfloat	\
+all: @C_EXAMPLES@ \
+	testPoisson2d testPoisson3d \
+	testMMdouble testMMdouble64 testMMfloat \
 	mtx2bin bin2mtx KernelRegression \
 	@MPI_EXAMPLES@
 
@@ -105,9 +105,9 @@ KernelRegressionMPI: KernelRegressionMPI.cpp
 
 clean:
 	rm -f *~ *o @C_EXAMPLES@ \
-	testPoisson2d testPoisson3d	\
-	testMMdouble testMMdouble64 testMMfloat	\
-	mtx2bin bin2mtx KernelRegression	\
+	testPoisson2d testPoisson3d \
+	testMMdouble testMMdouble64 testMMfloat \
+	mtx2bin bin2mtx KernelRegression \
 	@MPI_EXAMPLES@
 
 

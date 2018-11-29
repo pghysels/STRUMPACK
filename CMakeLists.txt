@@ -101,7 +101,7 @@ endif()
 include(FortranCInterface)
 FortranCInterface_HEADER(${PROJECT_BINARY_DIR}/StrumpackFortranCInterface.h
   MACRO_NAMESPACE "FC_")
-include_directories(${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/src)
+#include_directories(${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/src)
 FortranCInterface_VERIFY(CXX)
 
 if(STRUMPACK_USE_OPENMP)
@@ -349,7 +349,7 @@ get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 foreach(dir ${dirs})
   set(STRUMPACK_ALL_INCLUDE_DIRS "${STRUMPACK_ALL_INCLUDE_DIRS} -I${dir}")
 endforeach()
-
+set(STRUMPACK_ALL_INCLUDE_DIRS "${STRUMPACK_ALL_INCLUDE_DIRS} -I${CMAKE_INSTALL_PREFIX}/include")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
   set(STRUMPACK_ALL_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_RELEASE}")
@@ -359,6 +359,8 @@ else()
   set(STRUMPACK_ALL_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_DEBUG}")
 endif()
 
+
+include_directories(${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/src)
 
 set(LIBSRC
   src/StrumpackParameters.cpp
@@ -457,6 +459,7 @@ install(FILES
 
 install(FILES
   src/kernel/Kernel.hpp
+  src/kernel/KernelRegression.hpp
   src/kernel/Kernel.h
   src/kernel/Metrics.hpp
   DESTINATION include/kernel)
@@ -517,6 +520,8 @@ if(TPL_ENABLE_HODLRBF)
   install(FILES
     src/HODLR/HODLROptions.hpp
     src/HODLR/HODLRMatrix.hpp
+    src/HODLR/HODLRWrapper.hpp
+    src/HODLR/LRBFMatrix.hpp
     DESTINATION include/HODLR)
 
   install(FILES
