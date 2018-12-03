@@ -37,15 +37,24 @@
       // std::experimental::parallel?
 #include <parallel/algorithm>
 #endif
+
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t> class EliminationTreeMPIDist;
 
   /**
-   * Sparse matrix distributed based on the proportional mapping of
-   * the elimination tree, only to be used during the multifrontal
-   * factorization phase. It does not implement stuff like a general
-   * spmv (use original matrix for that).
+   * \class ProportionallyDistributedSparseMatrix
+   *
+   * \brief Sparse matrix distributed based on the proportional
+   * mapping of the elimination tree, only to be used during the
+   * multifrontal factorization phase. It does not implement stuff
+   * like a general spmv (use original matrix for that).
+   *
+   * __TODO__ How is this stored?
+   *
+   * __TODO__ This needs some performance improvements! Try to use
+   * optimizes (MKL) routines for the spmv (in the random sampling
+   * code).
    */
   template<typename scalar_t,typename integer_t>
   class ProportionallyDistributedSparseMatrix :
