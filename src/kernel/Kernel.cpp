@@ -28,6 +28,9 @@
  */
 #include "KernelRegression.hpp"
 #include "Kernel.h"
+#if defined(STRUMPACK_USE_MPI)
+#include "mpi.h"
+#endif
 
 using namespace strumpack;
 using namespace strumpack::kernel;
@@ -38,7 +41,12 @@ class STRUMPACKKernelRegression {
 public:
   STRUMPACKKernelRegression() {}
   std::unique_ptr<Kernel<scalar_t>> K_;
+  bool dist_ = false;
   DenseMatrix<scalar_t> training_, weights_;
+#if defined(STRUMPACK_USE_MPI)
+  BLACSGrid grid_;
+  DistributedMatrix<scalar_t> dweights_;
+#endif
 };
 
 #ifdef __cplusplus
@@ -48,9 +56,16 @@ extern "C" {
   //STRUMPACKKernel STRUMPACK_create_kernel_double
   STRUMPACKKernel STRUMPACK_create_kernel_double
   (int n, int d, double* train, double h, double lambda, int type) {
-    std::cout << "# C++, creating kernel: n="
-      << n << ", d=" << d << " h=" << h << " lambda=" << lambda
-      << std::endl;
+    int rank = 0;
+#if defined(STRUMPACK_USE_MPI)
+    int initialized;
+    MPI_Initialized(&initialized);
+    if (initialized) MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+#endif
+    if (!rank)
+      std::cout << "# C++, creating kernel: n="
+                << n << ", d=" << d << " h=" << h << " lambda=" << lambda
+                << std::endl;
     auto kernel = new STRUMPACKKernelRegression<double>();
     kernel->training_ = DenseMatrix<double>(d, n, train, d);
     switch(type) {
@@ -80,7 +95,21 @@ extern "C" {
     KR->weights_ = KR->K_->fit_HSS(vl, opts);
   }
 
-  void STRUMPACK_kernel_fit_HODLR_double
+#if defined(STRUMPACK_USE_MPI)
+  void STRUMPACK_kernel_fit_HSS_MPI_double
+  (STRUMPACKKernel kernel, double* labels, int argc, char* argv[]) {
+    auto KR = static_cast<STRUMPACKKernelRegression<double>*>(kernel);
+    KR->grid_ = std::move(BLACSGrid(MPIComm(MPI_COMM_WORLD)));
+    std::vector<double> vl(labels, labels+KR->K_->n());
+    HSSOptions<double> opts;
+    opts.set_verbose(false);
+    opts.set_clustering_algorithm(ClusteringAlgorithm::COBBLE);
+    opts.set_from_command_line(argc, argv);
+    KR->dweights_ = KR->K_->fit_HSS(KR->grid_, vl, opts);
+    KR->dist_ = true;
+  }
+
+  void STRUMPACK_kernel_fit_HODLR_MPI_double
   (STRUMPACKKernel kernel, double* labels, int argc, char* argv[]) {
 #if defined(STRUMPACK_USE_HODLRBF)
     auto KR = static_cast<STRUMPACKKernelRegression<double>*>(kernel);
@@ -89,7 +118,7 @@ extern "C" {
     opts.set_verbose(false);
     opts.set_clustering_algorithm(ClusteringAlgorithm::COBBLE);
     opts.set_from_command_line(argc, argv);
-    KR->weights_ = KR->K_->fit_HODLR(MPI_COMM_SELF, vl, opts);
+    KR->weights_ = KR->K_->fit_HODLR(MPI_COMM_WORLD, vl, opts);
 #else
     std::cerr << "ERROR: STRUMPACK was not configured with HODLR support."
               << "       Using HSS compression as fallback!!" << std::endl;
@@ -101,9 +130,17 @@ extern "C" {
   (STRUMPACKKernel kernel, int m, double* test, double* prediction) {
     auto KR = static_cast<STRUMPACKKernelRegression<double>*>(kernel);
     DenseMatrixWrapper<double> test_(KR->K_->d(), m, test, KR->K_->d());
-    auto pred = KR->K_->predict(test_, KR->weights_);
-    std::copy(pred.begin(), pred.end(), prediction);
+    if (KR->dist_) {
+#if defined(STRUMPACK_USE_MPI)
+      auto pred = KR->K_->predict(test_, KR->dweights_);
+      std::copy(pred.begin(), pred.end(), prediction);
+#endif
+    } else {
+      auto pred = KR->K_->predict(test_, KR->weights_);
+      std::copy(pred.begin(), pred.end(), prediction);
+   }
   }
+#endif
 
 #ifdef __cplusplus
 }

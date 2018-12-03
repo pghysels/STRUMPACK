@@ -12,12 +12,13 @@ class STRUMPACKKernel(BaseEstimator, ClassifierMixin):
 
     # use same names/types of kernels as in the SVC code?
     def __init__(self, h=1., lam=4., kernel='rbf',
-                 approximation='HSS', argv=None):
+                 approximation='HSS', mpi=False, argv=None):
         self.h = h
         self.lam = lam
-        self.argv = argv
         self.kernel = kernel
         self.approximation = approximation
+        self.mpi = mpi
+        self.argv = argv
 
 
     def __del__(self):
@@ -26,6 +27,11 @@ class STRUMPACKKernel(BaseEstimator, ClassifierMixin):
 
 
     def fit(self, X, y):
+        # TODO make sure that X and y are float64 aka double
+        if X.dtype is not np.dtype('double'):
+            print("ERROR: STRUMPACKKernel expects "
+                  "double precision floating point")
+
         # check that X and y have correct shape
         X, y = check_X_y(X, y)
         # store the classes seen during fit
@@ -38,6 +44,8 @@ class STRUMPACKKernel(BaseEstimator, ClassifierMixin):
             print("Warning: Kernel type", self.kernel, "not recognized")
             print("         Possible values are 'rbf'/'Gauss' or 'Laplace'")
             print("         Using the default 'rbf' kernel")
+        if self.approximation is 'HODLR' and self.mpi is False:
+            print("ERROR: HODLR requires mpi=True")
         self.K_ = sp.STRUMPACK_create_kernel_double(
             ctypes.c_int(X.shape[0]), ctypes.c_int(X.shape[1]),
             ctypes.c_void_p(X.ctypes.data),
@@ -51,12 +59,17 @@ class STRUMPACKKernel(BaseEstimator, ClassifierMixin):
             enc_arg = arg.encode('utf-8')
             argv[i] = ctypes.create_string_buffer(enc_arg)
         if self.approximation == 'HSS':
-            sp.STRUMPACK_kernel_fit_HSS_double(
-                self.K_, ctypes.c_void_p(y.astype(float).ctypes.data),
-                ctypes.c_int(argc), argv)
+            if self.mpi:
+                sp.STRUMPACK_kernel_fit_HSS_MPI_double(
+                    self.K_, ctypes.c_void_p(y.ctypes.data),
+                    ctypes.c_int(argc), argv)
+            else:
+                sp.STRUMPACK_kernel_fit_HSS_double(
+                    self.K_, ctypes.c_void_p(y.ctypes.data),
+                    ctypes.c_int(argc), argv)
         elif self.approximation == 'HODLR':
-            sp.STRUMPACK_kernel_fit_HODLR_double(
-                self.K_, ctypes.c_void_p(y.astype(float).ctypes.data),
+            sp.STRUMPACK_kernel_fit_HODLR_MPI_double(
+                self.K_, ctypes.c_void_p(y.ctypes.data),
                 ctypes.c_int(argc), argv)
         else:
             print("Warning: Approximation type", self.approximation,
@@ -64,7 +77,7 @@ class STRUMPACKKernel(BaseEstimator, ClassifierMixin):
             print("         Possible values are 'HSS' or 'HODLR'")
             print("         Using the default 'HSS' kernel")
             sp.STRUMPACK_kernel_fit_HSS_double(
-                self.K_, ctypes.c_void_p(y.astype(float).ctypes.data),
+                self.K_, ctypes.c_void_p(y.astype(np.float64).ctypes.data),
                 ctypes.c_int(argc), argv)
         # return the classifier
         return self
@@ -78,7 +91,7 @@ class STRUMPACKKernel(BaseEstimator, ClassifierMixin):
             self.K_, ctypes.c_int(X.shape[0]),
             ctypes.c_void_p(X.ctypes.data),
             ctypes.c_void_p(prediction.ctypes.data))
-        return [self.classes_[0] if prediction[i] < 0 else self.classes_[1]
+        return [self.classes_[0] if prediction[i] < 0.0 else self.classes_[1]
                 for i in range(X.shape[0])]
 
     def decision_function(self, X):

@@ -661,6 +661,8 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/KernelRegression.cpp
   ${CMAKE_BINARY_DIR}/examples/KernelRegression.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/KernelRegression.py
   ${CMAKE_BINARY_DIR}/examples/KernelRegression.py COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/examples/KernelRegressionMPI.py
+  ${CMAKE_BINARY_DIR}/examples/KernelRegressionMPI.py COPYONLY)
 
 if(STRUMPACK_C_INTERFACE)
   configure_file(${CMAKE_SOURCE_DIR}/examples/sexample.c

@@ -48,9 +48,23 @@ extern "C" {
   void STRUMPACK_kernel_fit_HSS_double
   (STRUMPACKKernel K, double* labels, int argc, char* argv[]);
 
-  void STRUMPACK_kernel_fit_HODLR_double
+#if defined(STRUMPACK_USE_MPI)
+  /**
+   * TODO should pass an MPIComm object from python
+   */
+  void STRUMPACK_kernel_fit_HSS_MPI_double
   (STRUMPACKKernel K, double* labels, int argc, char* argv[]);
 
+  /**
+   * TODO should pass an MPIComm object from python
+   */
+  void STRUMPACK_kernel_fit_HODLR_MPI_double
+  (STRUMPACKKernel K, double* labels, int argc, char* argv[]);
+#endif
+
+  /**
+   * This works for both sequential and MPI fits.
+   */
   void STRUMPACK_kernel_predict_double
   (STRUMPACKKernel K, int m, double* test, double* prediction);
 
