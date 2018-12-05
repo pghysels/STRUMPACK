@@ -42,11 +42,16 @@ extern "C" {
 
   STRUMPACKKernel STRUMPACK_create_kernel_double
   (int n, int d, double* train, double h, double lambda, int type);
+  STRUMPACKKernel STRUMPACK_create_kernel_float
+  (int n, int d, float* train, float h, float lambda, int type);
 
   void STRUMPACK_destroy_kernel_double(STRUMPACKKernel K);
+  void STRUMPACK_destroy_kernel_float(STRUMPACKKernel K);
 
   void STRUMPACK_kernel_fit_HSS_double
   (STRUMPACKKernel K, double* labels, int argc, char* argv[]);
+  void STRUMPACK_kernel_fit_HSS_float
+  (STRUMPACKKernel K, float* labels, int argc, char* argv[]);
 
 #if defined(STRUMPACK_USE_MPI)
   /**
@@ -54,12 +59,16 @@ extern "C" {
    */
   void STRUMPACK_kernel_fit_HSS_MPI_double
   (STRUMPACKKernel K, double* labels, int argc, char* argv[]);
+  void STRUMPACK_kernel_fit_HSS_MPI_float
+  (STRUMPACKKernel K, float* labels, int argc, char* argv[]);
 
   /**
    * TODO should pass an MPIComm object from python
    */
   void STRUMPACK_kernel_fit_HODLR_MPI_double
   (STRUMPACKKernel K, double* labels, int argc, char* argv[]);
+  void STRUMPACK_kernel_fit_HODLR_MPI_float
+  (STRUMPACKKernel K, float* labels, int argc, char* argv[]);
 #endif
 
   /**
@@ -67,6 +76,8 @@ extern "C" {
    */
   void STRUMPACK_kernel_predict_double
   (STRUMPACKKernel K, int m, double* test, double* prediction);
+  void STRUMPACK_kernel_predict_float
+  (STRUMPACKKernel K, int m, float* test, float* prediction);
 
 #ifdef __cplusplus
 }

@@ -27,58 +27,77 @@ class STRUMPACKKernel(BaseEstimator, ClassifierMixin):
 
 
     def fit(self, X, y):
-        # TODO make sure that X and y are float64 aka double
-        if X.dtype is not np.dtype('double'):
-            print("ERROR: STRUMPACKKernel expects "
-                  "double precision floating point")
+        if X.dtype != np.float32 and \
+           X.dtype != np.float64:
+            print(X.dtype)
+            raise ValueError("precision", X.dtype, "not supported")
+
+        if self.approximation is 'HODLR' and self.mpi is False:
+            raise ValueError("HODLR approximation requires mpi=True")
+        ktype = 0
+        if self.kernel == 'rbf' or self.kernel == 'Gauss': ktype = 0
+        elif self.kernel == 'Laplace': ktype = 1
+        else:
+            raise ValueError("Kernel type", self.kernel, "not recognized")
+        if self.approximation is not 'HSS' and \
+           self.approximation is not 'HODLR':
+            raise ValueError("Approximation type not recoagnized,"
+                             "should be 'HSS' or 'HODLR'")
 
         # check that X and y have correct shape
         X, y = check_X_y(X, y)
         # store the classes seen during fit
         self.classes_ = unique_labels(y)
 
-        k = 0
-        if self.kernel == 'rbf' or self.kernel == 'Gauss': k = 0
-        elif self.kernel == 'Laplace': k = 1
-        else:
-            print("Warning: Kernel type", self.kernel, "not recognized")
-            print("         Possible values are 'rbf'/'Gauss' or 'Laplace'")
-            print("         Using the default 'rbf' kernel")
-        if self.approximation is 'HODLR' and self.mpi is False:
-            print("ERROR: HODLR requires mpi=True")
-        self.K_ = sp.STRUMPACK_create_kernel_double(
-            ctypes.c_int(X.shape[0]), ctypes.c_int(X.shape[1]),
-            ctypes.c_void_p(X.ctypes.data),
-            ctypes.c_double(self.h), ctypes.c_double(self.lam),
-            ctypes.c_int(k))
-        if self.argv==None: self.argv=[]
+        if X.dtype == np.float64:
+            self.K_ = sp.STRUMPACK_create_kernel_double(
+                ctypes.c_int(X.shape[0]), ctypes.c_int(X.shape[1]),
+                ctypes.c_void_p(X.ctypes.data),
+                ctypes.c_double(self.h), ctypes.c_double(self.lam),
+                ctypes.c_int(ktype))
+        elif X.dtype == np.float32:
+            self.K_ = sp.STRUMPACK_create_kernel_float(
+                ctypes.c_int(X.shape[0]), ctypes.c_int(X.shape[1]),
+                ctypes.c_void_p(X.ctypes.data),
+                ctypes.c_float(self.h), ctypes.c_float(self.lam),
+                ctypes.c_int(ktype))
+
+        if self.argv is None: self.argv=[]
         LP_c_char = ctypes.POINTER(ctypes.c_char)
         argc = len(self.argv)
         argv = (LP_c_char * (argc + 1))()
         for i, arg in enumerate(self.argv):
             enc_arg = arg.encode('utf-8')
             argv[i] = ctypes.create_string_buffer(enc_arg)
-        if self.approximation == 'HSS':
+
+        if self.approximation is 'HSS':
             if self.mpi:
-                sp.STRUMPACK_kernel_fit_HSS_MPI_double(
-                    self.K_, ctypes.c_void_p(y.ctypes.data),
-                    ctypes.c_int(argc), argv)
+                if X.dtype == np.float64:
+                    sp.STRUMPACK_kernel_fit_HSS_MPI_double(
+                        self.K_, ctypes.c_void_p(y.ctypes.data),
+                        ctypes.c_int(argc), argv)
+                elif X.dtype == np.float32:
+                    sp.STRUMPACK_kernel_fit_HSS_MPI_float(
+                        self.K_, ctypes.c_void_p(y.ctypes.data),
+                        ctypes.c_int(argc), argv)
             else:
-                sp.STRUMPACK_kernel_fit_HSS_double(
+                if X.dtype == np.float64:
+                    sp.STRUMPACK_kernel_fit_HSS_double(
+                        self.K_, ctypes.c_void_p(y.ctypes.data),
+                        ctypes.c_int(argc), argv)
+                elif X.dtype == np.float32:
+                    sp.STRUMPACK_kernel_fit_HSS_float(
+                        self.K_, ctypes.c_void_p(y.ctypes.data),
+                        ctypes.c_int(argc), argv)
+        elif self.approximation is 'HODLR':
+            if X.dtype == np.float64:
+                sp.STRUMPACK_kernel_fit_HODLR_MPI_double(
                     self.K_, ctypes.c_void_p(y.ctypes.data),
                     ctypes.c_int(argc), argv)
-        elif self.approximation == 'HODLR':
-            sp.STRUMPACK_kernel_fit_HODLR_MPI_double(
-                self.K_, ctypes.c_void_p(y.ctypes.data),
-                ctypes.c_int(argc), argv)
-        else:
-            print("Warning: Approximation type", self.approximation,
-                  "not recognized")
-            print("         Possible values are 'HSS' or 'HODLR'")
-            print("         Using the default 'HSS' kernel")
-            sp.STRUMPACK_kernel_fit_HSS_double(
-                self.K_, ctypes.c_void_p(y.astype(np.float64).ctypes.data),
-                ctypes.c_int(argc), argv)
+            elif X.dtype == np.float32:
+                sp.STRUMPACK_kernel_fit_HODLR_MPI_float(
+                    self.K_, ctypes.c_void_p(y.ctypes.data),
+                    ctypes.c_int(argc), argv)
         # return the classifier
         return self
 
@@ -86,19 +105,31 @@ class STRUMPACKKernel(BaseEstimator, ClassifierMixin):
     def predict(self, X):
         # TODO make sure there are only 2 classes?
         check_is_fitted(self, 'K_')
-        prediction = np.zeros((X.shape[0],1))
-        sp.STRUMPACK_kernel_predict_double(
-            self.K_, ctypes.c_int(X.shape[0]),
-            ctypes.c_void_p(X.ctypes.data),
-            ctypes.c_void_p(prediction.ctypes.data))
+        prediction = np.zeros((X.shape[0],1), dtype=X.dtype)
+        if X.dtype == np.float64:
+            sp.STRUMPACK_kernel_predict_double(
+                self.K_, ctypes.c_int(X.shape[0]),
+                ctypes.c_void_p(X.ctypes.data),
+                ctypes.c_void_p(prediction.ctypes.data))
+        elif X.dtype == np.float32:
+            sp.STRUMPACK_kernel_predict_float(
+                self.K_, ctypes.c_int(X.shape[0]),
+                ctypes.c_void_p(X.ctypes.data),
+                ctypes.c_void_p(prediction.ctypes.data))
         return [self.classes_[0] if prediction[i] < 0.0 else self.classes_[1]
                 for i in range(X.shape[0])]
 
     def decision_function(self, X):
         check_is_fitted(self, 'K_')
-        prediction = np.zeros((X.shape[0],1))
-        sp.STRUMPACK_kernel_predict_double(
-            self.K_, ctypes.c_int(X.shape[0]),
-            ctypes.c_void_p(X.ctypes.data),
-            ctypes.c_void_p(prediction.ctypes.data))
+        prediction = np.zeros((X.shape[0],1), dtype=X.dtype)
+        if X.dtype == np.float64:
+            sp.STRUMPACK_kernel_predict_double(
+                self.K_, ctypes.c_int(X.shape[0]),
+                ctypes.c_void_p(X.ctypes.data),
+                ctypes.c_void_p(prediction.ctypes.data))
+        elif X.dtype == np.float32:
+            sp.STRUMPACK_kernel_predict_float(
+                self.K_, ctypes.c_int(X.shape[0]),
+                ctypes.c_void_p(X.ctypes.data),
+                ctypes.c_void_p(prediction.ctypes.data))
         return prediction

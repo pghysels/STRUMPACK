@@ -42,10 +42,11 @@ if (nargs > 2): h = float(sys.argv[2]);
 if (nargs > 3): lam = float(sys.argv[3]);
 
 # read data
-train_points = np.genfromtxt(fname + '_train.csv', delimiter=",")
-train_labels = np.genfromtxt(fname + '_train_label.csv', delimiter=",")
-test_points = np.genfromtxt(fname + '_test.csv', delimiter=",")
-test_labels = np.genfromtxt(fname + '_test_label.csv', delimiter=",")
+prec = np.float32
+train_points = np.genfromtxt(fname + '_train.csv', delimiter=",", dtype=prec)
+train_labels = np.genfromtxt(fname + '_train_label.csv', delimiter=",", dtype=prec)
+test_points = np.genfromtxt(fname + '_test.csv', delimiter=",", dtype=prec)
+test_labels = np.genfromtxt(fname + '_test_label.csv', delimiter=",", dtype=prec)
 n, d = train_points.shape
 m = test_points.shape[0]
 print('n =', n, 'd =', d, 'm =', m)

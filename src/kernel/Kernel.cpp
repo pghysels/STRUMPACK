@@ -49,98 +49,147 @@ public:
 #endif
 };
 
+template<typename scalar_t> STRUMPACKKernel STRUMPACK_create_kernel
+(int n, int d, scalar_t* train, scalar_t h, scalar_t lambda, int type) {
+  int rank = 0;
+#if defined(STRUMPACK_USE_MPI)
+  int initialized;
+  MPI_Initialized(&initialized);
+  if (initialized) MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+#endif
+  if (!rank)
+    std::cout << "# C++, creating kernel: n=" << n << ", d=" << d
+              << " h=" << h << " lambda=" << lambda << std::endl;
+  auto kernel = new STRUMPACKKernelRegression<scalar_t>();
+  kernel->training_ = DenseMatrix<scalar_t>(d, n, train, d);
+  switch(type) {
+  case 0:
+    kernel->K_.reset(new GaussKernel<scalar_t>(kernel->training_, h, lambda));
+    break;
+  case 1:
+    kernel->K_.reset(new LaplaceKernel<scalar_t>(kernel->training_, h, lambda));
+    break;
+  default: std::cout << "ERROR: Kernel type not recognized!" << std::endl;
+  }
+  return kernel;
+}
+
+template<typename scalar_t> void STRUMPACK_kernel_fit_HSS
+(STRUMPACKKernel kernel, scalar_t* labels, int argc, char* argv[]) {
+  auto KR = static_cast<STRUMPACKKernelRegression<scalar_t>*>(kernel);
+  std::vector<scalar_t> vl(labels, labels+KR->K_->n());
+  HSSOptions<scalar_t> opts;
+  opts.set_verbose(false);
+  opts.set_clustering_algorithm(ClusteringAlgorithm::COBBLE);
+  opts.set_from_command_line(argc, argv);
+  KR->weights_ = KR->K_->fit_HSS(vl, opts);
+}
+
+#if defined(STRUMPACK_USE_MPI)
+template<typename scalar_t> void STRUMPACK_kernel_fit_HSS_MPI
+(STRUMPACKKernel kernel, scalar_t* labels, int argc, char* argv[]) {
+  auto KR = static_cast<STRUMPACKKernelRegression<scalar_t>*>(kernel);
+  KR->grid_ = std::move(BLACSGrid(MPIComm(MPI_COMM_WORLD)));
+  std::vector<scalar_t> vl(labels, labels+KR->K_->n());
+  HSSOptions<scalar_t> opts;
+  opts.set_verbose(false);
+  opts.set_clustering_algorithm(ClusteringAlgorithm::COBBLE);
+  opts.set_from_command_line(argc, argv);
+  KR->dweights_ = KR->K_->fit_HSS(KR->grid_, vl, opts);
+  KR->dist_ = true;
+}
+
+template<typename scalar_t> void STRUMPACK_kernel_fit_HODLR_MPI
+(STRUMPACKKernel kernel, scalar_t* labels, int argc, char* argv[]) {
+#if defined(STRUMPACK_USE_HODLRBF)
+  auto KR = static_cast<STRUMPACKKernelRegression<scalar_t>*>(kernel);
+  std::vector<scalar_t> vl(labels, labels+KR->K_->n());
+  HODLR::HODLROptions<scalar_t> opts;
+  opts.set_verbose(false);
+  opts.set_clustering_algorithm(ClusteringAlgorithm::COBBLE);
+  opts.set_from_command_line(argc, argv);
+  KR->weights_ = KR->K_->fit_HODLR(MPI_COMM_WORLD, vl, opts);
+#else
+  std::cerr << "ERROR: STRUMPACK was not configured with HODLR support."
+            << "       Using HSS compression as fallback!!" << std::endl;
+  STRUMPACK_kernel_fit_HSS_MPI<scalar_t>(kernel, labels, argc, argv);
+#endif
+}
+#endif
+
+template<typename scalar_t> void STRUMPACK_kernel_predict
+(STRUMPACKKernel kernel, int m, scalar_t* test, scalar_t* prediction) {
+  auto KR = static_cast<STRUMPACKKernelRegression<scalar_t>*>(kernel);
+  DenseMatrixWrapper<scalar_t> test_(KR->K_->d(), m, test, KR->K_->d());
+  if (KR->dist_) {
+#if defined(STRUMPACK_USE_MPI)
+    auto pred = KR->K_->predict(test_, KR->dweights_);
+    std::copy(pred.begin(), pred.end(), prediction);
+#endif
+  } else {
+    auto pred = KR->K_->predict(test_, KR->weights_);
+    std::copy(pred.begin(), pred.end(), prediction);
+  }
+}
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-  //STRUMPACKKernel STRUMPACK_create_kernel_double
   STRUMPACKKernel STRUMPACK_create_kernel_double
   (int n, int d, double* train, double h, double lambda, int type) {
-    int rank = 0;
-#if defined(STRUMPACK_USE_MPI)
-    int initialized;
-    MPI_Initialized(&initialized);
-    if (initialized) MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-#endif
-    if (!rank)
-      std::cout << "# C++, creating kernel: n="
-                << n << ", d=" << d << " h=" << h << " lambda=" << lambda
-                << std::endl;
-    auto kernel = new STRUMPACKKernelRegression<double>();
-    kernel->training_ = DenseMatrix<double>(d, n, train, d);
-    switch(type) {
-    case 0:
-      kernel->K_.reset(new GaussKernel<double>(kernel->training_, h, lambda));
-      break;
-    case 1:
-      kernel->K_.reset(new LaplaceKernel<double>(kernel->training_, h, lambda));
-      break;
-    default: std::cout << "ERROR: Kernel type not recognized!" << std::endl;
-    }
-    return kernel;
+    return STRUMPACK_create_kernel<double>(n, d, train, h, lambda, type);
+  }
+  STRUMPACKKernel STRUMPACK_create_kernel_float
+  (int n, int d, float* train, float h, float lambda, int type) {
+    return STRUMPACK_create_kernel<float>(n, d, train, h, lambda, type);
   }
 
   void STRUMPACK_destroy_kernel_double(STRUMPACKKernel kernel) {
     delete static_cast<STRUMPACKKernelRegression<double>*>(kernel);
   }
+  void STRUMPACK_destroy_kernel_float(STRUMPACKKernel kernel) {
+    delete static_cast<STRUMPACKKernelRegression<float>*>(kernel);
+  }
 
   void STRUMPACK_kernel_fit_HSS_double
   (STRUMPACKKernel kernel, double* labels, int argc, char* argv[]) {
-    auto KR = static_cast<STRUMPACKKernelRegression<double>*>(kernel);
-    std::vector<double> vl(labels, labels+KR->K_->n());
-    HSSOptions<double> opts;
-    opts.set_verbose(false);
-    opts.set_clustering_algorithm(ClusteringAlgorithm::COBBLE);
-    opts.set_from_command_line(argc, argv);
-    KR->weights_ = KR->K_->fit_HSS(vl, opts);
+    STRUMPACK_kernel_fit_HSS<double>(kernel, labels, argc, argv);
+  }
+  void STRUMPACK_kernel_fit_HSS_float
+  (STRUMPACKKernel kernel, float* labels, int argc, char* argv[]) {
+    STRUMPACK_kernel_fit_HSS<float>(kernel, labels, argc, argv);
   }
 
 #if defined(STRUMPACK_USE_MPI)
   void STRUMPACK_kernel_fit_HSS_MPI_double
   (STRUMPACKKernel kernel, double* labels, int argc, char* argv[]) {
-    auto KR = static_cast<STRUMPACKKernelRegression<double>*>(kernel);
-    KR->grid_ = std::move(BLACSGrid(MPIComm(MPI_COMM_WORLD)));
-    std::vector<double> vl(labels, labels+KR->K_->n());
-    HSSOptions<double> opts;
-    opts.set_verbose(false);
-    opts.set_clustering_algorithm(ClusteringAlgorithm::COBBLE);
-    opts.set_from_command_line(argc, argv);
-    KR->dweights_ = KR->K_->fit_HSS(KR->grid_, vl, opts);
-    KR->dist_ = true;
+    STRUMPACK_kernel_fit_HSS_MPI<double>(kernel, labels, argc, argv);
+  }
+  void STRUMPACK_kernel_fit_HSS_MPI_float
+  (STRUMPACKKernel kernel, float* labels, int argc, char* argv[]) {
+    STRUMPACK_kernel_fit_HSS_MPI<float>(kernel, labels, argc, argv);
   }
 
   void STRUMPACK_kernel_fit_HODLR_MPI_double
   (STRUMPACKKernel kernel, double* labels, int argc, char* argv[]) {
-#if defined(STRUMPACK_USE_HODLRBF)
-    auto KR = static_cast<STRUMPACKKernelRegression<double>*>(kernel);
-    std::vector<double> vl(labels, labels+KR->K_->n());
-    HODLR::HODLROptions<double> opts;
-    opts.set_verbose(false);
-    opts.set_clustering_algorithm(ClusteringAlgorithm::COBBLE);
-    opts.set_from_command_line(argc, argv);
-    KR->weights_ = KR->K_->fit_HODLR(MPI_COMM_WORLD, vl, opts);
-#else
-    std::cerr << "ERROR: STRUMPACK was not configured with HODLR support."
-              << "       Using HSS compression as fallback!!" << std::endl;
-    STRUMPACK_kernel_fit_HSS_double(kernel, labels, argc, argv);
-#endif
+    STRUMPACK_kernel_fit_HODLR_MPI<double>(kernel, labels, argc, argv);
   }
+  void STRUMPACK_kernel_fit_HODLR_MPI_float
+  (STRUMPACKKernel kernel, float* labels, int argc, char* argv[]) {
+    STRUMPACK_kernel_fit_HODLR_MPI<float>(kernel, labels, argc, argv);
+  }
+#endif
 
   void STRUMPACK_kernel_predict_double
   (STRUMPACKKernel kernel, int m, double* test, double* prediction) {
-    auto KR = static_cast<STRUMPACKKernelRegression<double>*>(kernel);
-    DenseMatrixWrapper<double> test_(KR->K_->d(), m, test, KR->K_->d());
-    if (KR->dist_) {
-#if defined(STRUMPACK_USE_MPI)
-      auto pred = KR->K_->predict(test_, KR->dweights_);
-      std::copy(pred.begin(), pred.end(), prediction);
-#endif
-    } else {
-      auto pred = KR->K_->predict(test_, KR->weights_);
-      std::copy(pred.begin(), pred.end(), prediction);
-   }
+    STRUMPACK_kernel_predict<double>(kernel, m, test, prediction);
   }
-#endif
+  void STRUMPACK_kernel_predict_float
+  (STRUMPACKKernel kernel, int m, float* test, float* prediction) {
+    STRUMPACK_kernel_predict<float>(kernel, m, test, prediction);
+  }
 
 #ifdef __cplusplus
 }
