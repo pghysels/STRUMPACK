@@ -222,7 +222,7 @@ namespace strumpack {
     get_all_pfronts();
     find_row_owner(A);
     find_row_front(A);
-    Aprop_.setup(A, nd_, *this, opts.use_HSS());
+    Aprop_.setup(A, nd_, *this, opts.use_HSS() || opts.use_HODLR());
     MPI_Pcontrol(-1, "block_row_A_to_prop_A");
   }
 
