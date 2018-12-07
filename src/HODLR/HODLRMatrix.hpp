@@ -380,7 +380,9 @@ namespace strumpack {
       int sort_opt = 0;  // 0:natural order, 1:kd-tree, 2:cobble-like ordering
                          // 3:gram distance-based cobble-like ordering
       HODLR_set_D_option<scalar_t>(options_, "tol_comp", opts.rel_tol());
-      HODLR_set_I_option<scalar_t>(options_, "verbosity", int(opts.verbose()));
+      if (opts.verbose())
+        HODLR_set_I_option<scalar_t>(options_, "verbosity", 0);
+      else HODLR_set_I_option<scalar_t>(options_, "verbosity", -1);
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
       //HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", opts.leaf_size());
       HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
@@ -443,7 +445,9 @@ namespace strumpack {
       int sort_opt = 0;  // 0:natural order, 1:kd-tree, 2:cobble-like ordering
                          // 3:gram distance-based cobble-like ordering
       HODLR_set_D_option<scalar_t>(options_, "tol_comp", opts.rel_tol());
-      HODLR_set_I_option<scalar_t>(options_, "verbosity", int(opts.verbose()));
+      if (opts.verbose())
+        HODLR_set_I_option<scalar_t>(options_, "verbosity", 0);
+      else HODLR_set_I_option<scalar_t>(options_, "verbosity", -1);
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
       HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
       HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", com_opt);
