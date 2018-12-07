@@ -40,7 +40,7 @@
 #include "HSS/HSSMatrix.hpp"
 #if defined(STRUMPACK_USE_MPI)
 #include "HSS/HSSMatrixMPI.hpp"
-#if defined(STRUMPACK_USE_HODLRBF)
+#if defined(STRUMPACK_USE_BPACK)
 #include "HODLR/HODLRMatrix.hpp"
 #endif
 #endif
@@ -170,7 +170,7 @@ namespace strumpack {
       return prediction;
     }
 
-#if defined(STRUMPACK_USE_HODLRBF)
+#if defined(STRUMPACK_USE_BPACK)
     template<typename scalar_t>
     DenseMatrix<scalar_t> Kernel<scalar_t>::fit_HODLR
     (const MPIComm& c, std::vector<scalar_t>& labels,

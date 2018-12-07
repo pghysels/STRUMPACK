@@ -74,8 +74,10 @@ namespace strumpack {
     (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override;
 
     void sample_CB
-    (const SPOptions<scalar_t>& opts, const DistM_t& R, DistM_t& Sr,
-     DistM_t& Sc, F_t* pa) const override;
+    (const DistM_t& R, DistM_t& Sr, DistM_t& Sc, F_t* pa) const override;
+    void sample_CB
+    (Trans op, const DistM_t& R, DistM_t& S,
+     FrontalMatrix<scalar_t,integer_t>* pa) const override;
 
     void multifrontal_factorization
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,
@@ -292,7 +294,7 @@ namespace strumpack {
    */
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::sample_CB
-  (const SPOptions<scalar_t>& opts, const DistM_t& R, DistM_t& Sr, DistM_t& Sc,
+  (const DistM_t& R, DistM_t& Sr, DistM_t& Sc,
    FrontalMatrix<scalar_t,integer_t>* pa) const {
     if (F11_.active() || F22_.active()) {
       auto b = R.cols();
@@ -303,6 +305,19 @@ namespace strumpack {
       STRUMPACK_CB_SAMPLE_FLOPS
         (gemm_flops(Trans::N, Trans::N, scalar_t(1.), F22_, R, scalar_t(0.)) +
          gemm_flops(Trans::C, Trans::N, scalar_t(1.), F22_, R, scalar_t(0.)));
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixDenseMPI<scalar_t,integer_t>::sample_CB
+  (Trans op, const DistM_t& R, DistM_t& S,
+   FrontalMatrix<scalar_t,integer_t>* pa) const {
+    if (F11_.active() || F22_.active()) {
+      auto b = R.cols();
+      S = DistM_t(grid(), this->dim_upd(), b);
+      gemm(op, Trans::N, scalar_t(1.), F22_, R, scalar_t(0.), S);
+      STRUMPACK_CB_SAMPLE_FLOPS
+        (gemm_flops(op, Trans::N, scalar_t(1.), F22_, R, scalar_t(0.)));
     }
   }
 

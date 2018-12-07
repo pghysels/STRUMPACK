@@ -63,12 +63,21 @@ namespace strumpack {
     FrontalMatrixMPI& operator=(FrontalMatrixMPI const&) = delete;
     virtual ~FrontalMatrixMPI() = default;
 
-    void sample_CB
-    (const SPOptions<scalar_t>& opts, const DenseM_t& R, DenseM_t& Sr,
-     DenseM_t& Sc, F_t* parent, int task_depth=0) override {};
     virtual void sample_CB
-    (const SPOptions<scalar_t>& opts, const DistM_t& R, DistM_t& Sr,
-     DistM_t& Sc, F_t* pa) const = 0;
+    (const DistM_t& R, DistM_t& Sr, DistM_t& Sc, F_t* pa) const {}
+    void sample_CB
+    (const SPOptions<scalar_t>& opts, const DistM_t& R,
+     DistM_t& Sr, DistM_t& Sc, const DenseM_t& seqR, DenseM_t& seqSr,
+     DenseM_t& seqSc, F_t* pa) override {
+      sample_CB(R, Sr, Sc, pa);
+    }
+    virtual void sample_CB
+    (Trans op, const DistM_t& R, DistM_t& Sr, F_t* pa) const {};
+    void sample_CB
+    (Trans op, const DistM_t& R, DistM_t& S, const DenseM_t& Rseq,
+     DenseM_t& Sseq, FrontalMatrix<scalar_t,integer_t>* pa) const override {
+      sample_CB(op, R, S, pa);
+    }
 
     void extract_2d
     (const SpMat_t& A, const std::vector<std::size_t>& I,
@@ -105,20 +114,50 @@ namespace strumpack {
 
     void extend_add_copy_from_buffers
     (DistM_t& F11, DistM_t& F12, DistM_t& F21, DistM_t& F22, scalar_t** pbuf,
-     const FrontalMatrixMPI<scalar_t,integer_t>* pa) const override;
+     const FrontalMatrixMPI<scalar_t,integer_t>* pa) const override {
+      ExtAdd::extend_add_copy_from_buffers
+        (F11, F12, F21, F22, pbuf, pa, this);
+    }
 
     void extend_add_column_copy_to_buffers
     (const DistM_t& CB, const DenseM_t& seqCB,
-     std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override;
+     std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override {
+      ExtAdd::extend_add_column_copy_to_buffers
+        (CB, sbuf, pa, this->upd_to_parent(pa));
+    }
     void extend_add_column_copy_from_buffers
     (DistM_t& B, DistM_t& Bupd, scalar_t** pbuf,
-     const FrontalMatrixMPI<scalar_t,integer_t>* pa) const override;
+     const FrontalMatrixMPI<scalar_t,integer_t>* pa) const override {
+      ExtAdd::extend_add_column_copy_from_buffers
+        (B, Bupd, pbuf, pa, this);
+    }
+
     void extract_column_copy_to_buffers
     (const DistM_t& b, const DistM_t& bupd, int ch_master,
-     std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override;
+     std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override {
+      ExtAdd::extract_column_copy_to_buffers(b, bupd, sbuf, pa, this);
+    }
     void extract_column_copy_from_buffers
     (const DistM_t& b, DistM_t& CB, DenseM_t& seqCB,
-     std::vector<scalar_t*>& pbuf, const FMPI_t* pa) const override;
+     std::vector<scalar_t*>& pbuf, const FMPI_t* pa) const override {
+      CB = DistM_t(grid(), this->dim_upd(), b.cols());
+      ExtAdd::extract_column_copy_from_buffers(CB, pbuf, pa, this);
+    }
+
+    void skinny_ea_to_buffers
+    (const DistM_t& S, const DenseM_t& seqS,
+     std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override {
+      ExtAdd::skinny_extend_add_copy_to_buffers
+        (S, sbuf, pa, this->upd_to_parent(pa));
+    }
+    void skinny_ea_from_buffers
+    (DistM_t& S, scalar_t** pbuf, const FMPI_t* pa) const override {
+      ExtAdd::skinny_extend_add_copy_from_buffers(S, pbuf, pa, this);
+    }
+
+    void extract_from_R2D
+    (const DistM_t& R, DistM_t& cR, DenseM_t& seqcR,
+     const FMPI_t* pa, bool visit) const override;
 
     bool visit(const F_t* ch) const;
     bool visit(const std::unique_ptr<F_t>& ch) const;
@@ -306,30 +345,6 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMPI<scalar_t,integer_t>::extend_add_copy_from_buffers
-  (DistM_t& F11, DistM_t& F12, DistM_t& F21, DistM_t& F22, scalar_t** pbuf,
-   const FrontalMatrixMPI<scalar_t,integer_t>* pa) const {
-    ExtAdd::extend_add_copy_from_buffers
-      (F11, F12, F21, F22, pbuf, pa, this);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMPI<scalar_t,integer_t>::extend_add_column_copy_from_buffers
-  (DistM_t& B, DistM_t& Bupd, scalar_t** pbuf,
-   const FrontalMatrixMPI<scalar_t,integer_t>* pa) const {
-    ExtAdd::extend_add_column_copy_from_buffers
-      (B, Bupd, pbuf, pa, this);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMPI<scalar_t,integer_t>::extend_add_column_copy_to_buffers
-  (const DistM_t& CB, const DenseM_t& seqCB,
-   std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
-    ExtAdd::extend_add_column_copy_to_buffers
-      (CB, sbuf, pa, this->upd_to_parent(pa));
-  }
-
-  template<typename scalar_t,typename integer_t> void
   FrontalMatrixMPI<scalar_t,integer_t>::extend_add_b
   (DistM_t& b, DistM_t& bupd, const DistM_t& CBl, const DistM_t& CBr,
    const DenseM_t& seqCBl, const DenseM_t& seqCBr) const {
@@ -351,18 +366,12 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMPI<scalar_t,integer_t>::extract_column_copy_to_buffers
-  (const DistM_t& b, const DistM_t& bupd, int ch_master,
-   std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
-    ExtAdd::extract_column_copy_to_buffers(b, bupd, sbuf, pa, this);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMPI<scalar_t,integer_t>::extract_column_copy_from_buffers
-  (const DistM_t& b, DistM_t& CB, DenseM_t& seqCB,
-   std::vector<scalar_t*>& pbuf, const FMPI_t* pa) const {
-    CB = DistM_t(grid(), this->dim_upd(), b.cols());
-    ExtAdd::extract_column_copy_from_buffers(CB, pbuf, pa, this);
+  FrontalMatrixMPI<scalar_t,integer_t>::extract_from_R2D
+  (const DistM_t& R, DistM_t& cR, DenseM_t& seqcR,
+   const FMPI_t* pa, bool visit) const {
+    auto I = this->upd_to_parent(pa);
+    cR = DistM_t(grid(), I.size(), R.cols(),
+                 R.extract_rows(I), pa->grid()->ctxt_all());
   }
 
   template<typename scalar_t,typename integer_t> void

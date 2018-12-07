@@ -65,21 +65,11 @@ namespace strumpack {
 
     void release_work_memory() override;
     void extend_add(int task_depth) {}
-    void random_sampling
-    (const SpMat_t& A, const Opts& opts,
-     DistM_t& R, DistM_t& Sr, DistM_t& Sc, int etree_level);
+
     void sample_CB
-    (const Opts& opts, const DistM_t& R, DistM_t& Sr,
-     DistM_t& Sc, F_t* pa) const override;
-    void sample_children_CB
-    (const Opts& opts,
-     DistM_t& R, DistM_t& Sr, DistM_t& Sc);
-    void sample_children_CB_seqseq
-    (const Opts& opts, const DistM_t& R,
-     DistM_t& Sr, DistM_t& Sc);
-    void skinny_extend_add
-    (DistM_t& cSrl, DistM_t& cScl, DistM_t& cSrr, DistM_t& cScr,
-     DistM_t& Sr, DistM_t& Sc);
+    (Trans op, const DistM_t& R, DistM_t& S, F_t* pa) const override;
+    void sample_children_CB(Trans op, const DistM_t& R, DistM_t& S);
+    void skinny_extend_add(DistM_t& cSl, DistM_t& cSr, DistM_t& S);
 
     void multifrontal_factorization
     (const SpMat_t& A, const Opts& opts,
@@ -129,67 +119,46 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::random_sampling
-  (const SpMat_t& A, const Opts& opts, DistM_t& R,
-   DistM_t& Sr, DistM_t& Sc, int etree_level) {
-    Sr.zero();
-    Sc.zero();
-    TIMER_TIME(TaskType::FRONT_MULTIPLY_2D, 1, t_fmult);
-    A.front_multiply_2d
-      (this->sep_begin_, this->sep_end_, this->upd_, R, Sr, Sc, 0);
-    TIMER_STOP(t_fmult);
-    TIMER_TIME(TaskType::UUTXR, 1, t_UUtxR);
-    sample_children_CB(opts, R, Sr, Sc);
-    TIMER_STOP(t_UUtxR);
-  }
-
-  template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::sample_CB
-  (const Opts& opts, const DistM_t& R,
-   DistM_t& Sr, DistM_t& Sc, F_t* pa) const {
+  (Trans op, const DistM_t& R, DistM_t& S, F_t* pa) const {
     if (!dim_upd()) return;
     if (Comm().is_null()) return;
     auto b = R.cols();
-    Sr = DistM_t(grid(), dim_upd(), b);
-    Sc = DistM_t(grid(), dim_upd(), b);
+    S = DistM_t(grid(), dim_upd(), b);
     TIMER_TIME(TaskType::HSS_SCHUR_PRODUCT, 2, t_sprod);
-
-    std::cout << "TODO: sample with child CB" << std::endl;
-    // _H->Schur_product_direct
-    //   (_Theta, _Vhat, _DUB01, _Phi, _ThetaVhatC, _VhatCPhiC, R, Sr, Sc);
-
+    F22_->mult(op, R, S);
     TIMER_STOP(t_sprod);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::sample_children_CB
-  (const Opts& opts, DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
+  (Trans op, const DistM_t& R, DistM_t& S) {
     if (!lchild_ && !rchild_) return;
-
-    std::cout << "TODO: call sample_CB on the children" << std::endl;
-  }
-
-  // TODO avoid duplication with HSS
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::skinny_extend_add
-  (DistM_t& cSrl, DistM_t& cScl, DistM_t& cSrr, DistM_t& cScr,
-   DistM_t& Sr, DistM_t& Sc) {
+    DistM_t Sl, Sr, Rl, Rr;
+    DenseM_t seqSl, seqSr, seqRl, seqRr;
+    if (lchild_) {
+      lchild_->extract_from_R2D(R, Rl, seqRl, this, visit(lchild_));
+      seqSl = DenseM_t(seqRl.rows(), seqRl.cols());
+      seqSl.zero();
+    }
+    if (rchild_) {
+      rchild_->extract_from_R2D(R, Rr, seqRr, this, visit(rchild_));
+      seqSr = DenseM_t(seqRr.rows(), seqRr.cols());
+      seqSr.zero();
+    }
+    if (visit(lchild_)) lchild_->sample_CB(op, Rl, Sl, seqRl, seqSl, this);
+    if (visit(rchild_)) rchild_->sample_CB(op, Rr, Sr, seqRl, seqSr, this);
     std::vector<std::vector<scalar_t>> sbuf(this->P());
-    if (cSrl.active())
-      ExtAdd::skinny_extend_add_copy_to_buffers
-        (cSrl, cScl, sbuf, this, lchild_->upd_to_parent(this));
-    if (cSrr.active())
-      ExtAdd::skinny_extend_add_copy_to_buffers
-        (cSrr, cScr, sbuf, this, rchild_->upd_to_parent(this));
+    if (visit(lchild_)) lchild_->skinny_ea_to_buffers(Sl, seqSl, sbuf, this);
+    if (visit(rchild_)) rchild_->skinny_ea_to_buffers(Sr, seqSr, sbuf, this);
     std::vector<scalar_t> rbuf;
     std::vector<scalar_t*> pbuf;
     Comm().all_to_all_v(sbuf, rbuf, pbuf);
-    if (lchild_) // unpack left child contribution
-      ExtAdd::skinny_extend_add_copy_from_buffers
-        (Sr, Sc, pbuf.data(), this, lchild_);
-    if (rchild_) // unpack right child contribution
-      ExtAdd::skinny_extend_add_copy_from_buffers
-        (Sr, Sc, pbuf.data()+this->master(rchild_), this, rchild_);
+    if (lchild_)
+      lchild_->skinny_ea_from_buffers(S, pbuf.data(), this);
+    if (rchild_)
+      rchild_->skinny_ea_from_buffers
+        (S, pbuf.data()+this->master(rchild_), this);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -203,40 +172,95 @@ namespace strumpack {
         (A, opts, etree_level+1, task_depth);
     if (!dim_blk()) return;
 
-    auto sample_F11 = [&](char op, const DenseM_t& R, DenseM_t& S) {
-      TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-      std::cout << "TODO sample F11!" << std::endl;
-      TIMER_STOP(t_sampling);
-    };
-    auto sample_F12 = [&]
-      (char op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
-      TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-      std::cout << "TODO sample F12!" << std::endl;
-      TIMER_STOP(t_sampling);
-    };
-    auto sample_F21 = [&]
-      (char op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
-      TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-      std::cout << "TODO sample F21!" << std::endl;
-      TIMER_STOP(t_sampling);
+    const auto dsep = dim_sep();
+    const auto dupd = dim_upd();
+
+    auto sample_front = [&](Trans op, const DistM_t& R, DistM_t& S) {
+      S.zero();
+      DistM_t Sdummy(grid(), dsep+dupd, R.cols());
+      if (op == Trans::N)
+        A.front_multiply_2d // TODO only perform op, remove dummy
+          (this->sep_begin_, this->sep_end_, this->upd_, R, S, Sdummy, 0);
+      else
+        A.front_multiply_2d // TODO only perform op, remove dummy
+          (this->sep_begin_, this->sep_end_, this->upd_, R, Sdummy, S, 0);
+      sample_children_CB(op, R, S);
     };
 
+    auto sample_F11 = [&](Trans op, const DenseM_t& R1, DenseM_t& S1) {
+      TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
+      auto n = R1.cols();
+      DistM_t R(grid(), dsep+dupd, n), S(grid(), dsep+dupd, n);
+      DistMW_t R1dist(dsep, n, R, 0, 0);
+      DistMW_t(dupd, n, R, dsep, 0).zero();
+      F11_.redistribute_1D_to_2D(R1, R1dist);
+      sample_front(op, R, S);
+      F11_.redistribute_2D_to_1D(DistMW_t(dsep, n, S, 0, 0), S1);
+      TIMER_STOP(t_sampling);
+    };
     F11_.compress(sample_F11);
-    F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_, sample_F12);
-    F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_, sample_F21);
-
     TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
     F11_.factor();
     TIMER_STOP(t_fact);
 
-    auto sample_CB = [&](char op, const DenseM_t& R, DenseM_t& S) {
-      TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-      std::cout << "TODO sample CB!" << std::endl;
-      TIMER_STOP(t_sampling);
-    };
-    F22_->compress(sample_CB);
+    if (dupd) {
+      auto sample_F12 = [&]
+        (Trans op, scalar_t a, const DenseM_t& R2, scalar_t b, DenseM_t& S1) {
+        TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
+        auto n = R2.cols();
+        DistM_t R(grid(), dsep+dupd, n), S(grid(), dsep+dupd, n);
+        DistMW_t R2dist(dupd, n, R, dsep, 0);
+        DistMW_t(dsep, n, R, 0, 0).zero();
+        F12_.redistribute_1D_to_2D(R2, R2dist, F12_.cdist());
+        sample_front(op, R, S);
+        F12_.redistribute_2D_to_1D
+        (a, DistMW_t(dsep, n, S, 0, 0), b, S1, F12_.rdist());
+        TIMER_STOP(t_sampling);
+      };
+      auto sample_F21 = [&]
+        (Trans op, scalar_t a, const DenseM_t& R1, scalar_t b, DenseM_t& S2) {
+        TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
+        auto n = R1.cols();
+        DistM_t R(grid(), dsep+dupd, n), S(grid(), dsep+dupd, n);
+        DistMW_t R1dist(dsep, n, R, 0, 0);
+        DistMW_t(dupd, n, R, dsep, 0).zero();
+        F21_.redistribute_1D_to_2D(R1, R1dist, F21_.cdist());
+        sample_front(op, R, S);
+        F12_.redistribute_2D_to_1D
+        (a, DistMW_t(dupd, n, S, dsep, 0), b, S2, F21_.rdist());
+        TIMER_STOP(t_sampling);
+      };
+      if (dupd) {
+        F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_, sample_F12);
+        F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_, sample_F21);
+      }
 
-
+      auto sample_F22 = [&](Trans op, const DenseM_t& R2, DenseM_t& S2) {
+        TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
+        auto n = R2.cols();
+        DistM_t R(grid(), dsep+dupd, n), S(grid(), dsep+dupd, n);
+        DistMW_t(dsep, n, R, 0, 0).zero();
+        DistMW_t R2dist(dupd, n, R, dsep, 0);
+        F22_->redistribute_1D_to_2D(R2, R2dist);
+        sample_front(op, R, S);
+        F22_->redistribute_2D_to_1D(DistMW_t(dupd, n, S, dsep, 0), S2);
+        DenseM_t F12R2(F12_.lrows(), R2.cols()),
+        invF11F12R2(F11_.lrows(), R2.cols()), S2tmp(S2.rows(), S2.cols());
+        if (op == Trans::N) {
+          F12_.mult(op, R2, F12R2);
+          F11_.inv_mult(op, F12R2, invF11F12R2);
+          //F11_.solve(F12R, invF11F12R);
+          F21_.mult(op, invF11F12R2, S2tmp);
+        } else {
+          F21_.mult(op, R2, F12R2);
+          F11_.inv_mult(op, F12R2, invF11F12R2);
+          F12_.mult(op, invF11F12R2, S2tmp);
+        }
+        S2.scaled_add(scalar_t(-1.), S2tmp);
+        TIMER_STOP(t_sampling);
+      };
+      F22_->compress(sample_F22);
+    }
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
   }
@@ -254,27 +278,20 @@ namespace strumpack {
       rchild_->forward_multifrontal_solve
         (bloc, bdist, CBr, seqCBr, etree_level+1);
     DistM_t& b = bdist[this->sep_];
-    //bupd = DistM_t(_H->grid(), dim_upd(), b.cols());
+    bupd = DistM_t(grid(), dim_upd(), b.cols());
     bupd.zero();
     this->extend_add_b(b, bupd, CBl, CBr, seqCBl, seqCBr);
-
-    std::cout << "TODO solve fwd" << std::endl;
-
-    // if (this->dim_sep()) {
-    //   TIMER_TIME(TaskType::SOLVE_LOWER, 0, t_s);
-    //   b.laswp(piv, true);
-    //   if (b.cols() == 1) {
-    //     trsv(UpLo::L, Trans::N, Diag::U, F11_, b);
-    //     if (this->dim_upd())
-    //       gemv(Trans::N, scalar_t(-1.), F21_, b, scalar_t(1.), bupd);
-    //   } else {
-    //     trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11_, b);
-    //     if (this->dim_upd())
-    //       gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, b, scalar_t(1.), bupd);
-    //   }
-    //   TIMER_STOP(t_s);
-    // }
-
+    if (this->dim_sep()) {
+      TIMER_TIME(TaskType::SOLVE_LOWER, 0, t_s);
+      DistM_t rhs(b);
+      F11_.solve(rhs, b);
+      if (this->dim_upd()) {
+        DistM_t tmp(bupd.grid(), bupd.rows(), bupd.cols());
+        F21_.mult(Trans::N, b, tmp);
+        bupd.scaled_add(scalar_t(-1.), tmp);
+      }
+      TIMER_STOP(t_s);
+    }
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -282,23 +299,13 @@ namespace strumpack {
   (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
    int etree_level) const {
     DistM_t& y = ydist[this->sep_];
-
-    std::cout << "TODO solve bwd" << std::endl;
-
-    // if (this->dim_sep()) {
-    //   TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_s);
-    //   if (y.cols() == 1) {
-    //     if (this->dim_upd())
-    //       gemv(Trans::N, scalar_t(-1.), F12_, yupd, scalar_t(1.), y);
-    //     trsv(UpLo::U, Trans::N, Diag::N, F11_, y);
-    //   } else {
-    //     if (this->dim_upd())
-    //       gemm(Trans::N, Trans::N, scalar_t(-1.), F12_, yupd, scalar_t(1.), y);
-    //     trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11_, y);
-    //   }
-    //   TIMER_STOP(t_s);
-    // }
-
+    if (this->dim_sep() && this->dim_upd()) {
+      TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_s);
+      DistM_t tmp(y.grid(), y.rows(), y.cols());
+      F12_.mult(Trans::N, yupd, tmp);
+      y.scaled_add(scalar_t(-1.), tmp);
+      TIMER_STOP(t_s);
+    }
     DistM_t CBl, CBr;
     DenseM_t seqCBl, seqCBr;
     this->extract_b(y, yupd, CBl, CBr, seqCBl, seqCBr);

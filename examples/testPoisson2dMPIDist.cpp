@@ -34,6 +34,12 @@ typedef double scalar;
 //typedef int64_t integer;
 typedef int integer;
 
+void abort_MPI(MPI_Comm *c, int *error, ...) {
+  std::cout << "rank = " << strumpack::MPIComm().rank()
+            << " ABORTING!!!!!" << std::endl;
+  abort();
+}
+
 using namespace strumpack;
 
 int main(int argc, char* argv[]) {
@@ -48,6 +54,10 @@ int main(int argc, char* argv[]) {
   // if (thread_level != MPI_THREAD_MULTIPLE && myrank == 0)
   //   std::cout << "MPI implementation does not support MPI_THREAD_MULTIPLE,"
   //     " which might be needed for pt-scotch!" << std::endl;
+
+  MPI_Errhandler eh;
+  MPI_Comm_create_errhandler(abort_MPI, &eh);
+  MPI_Comm_set_errhandler(MPI_COMM_WORLD, eh);
 
   {
     int n = 30, nrhs = 1;

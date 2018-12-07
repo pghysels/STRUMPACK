@@ -41,7 +41,7 @@
 #include "dense/DenseMatrix.hpp"
 #if defined(STRUMPACK_USE_MPI)
 #include "dense/DistributedMatrix.hpp"
-#if defined(STRUMPACK_USE_HODLRBF)
+#if defined(STRUMPACK_USE_BPACK)
 #include "HODLR/HODLROptions.hpp"
 #endif
 #endif
@@ -219,7 +219,7 @@ namespace strumpack {
       std::vector<scalar_t> predict
       (const DenseM_t& test, const DistM_t& weights) const;
 
-#if defined(STRUMPACK_USE_HODLRBF)
+#if defined(STRUMPACK_USE_BPACK)
       /**
        * Compute weights for kernel ridge regression
        * classification. This will build an approximate HODLR

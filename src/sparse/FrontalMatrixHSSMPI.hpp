@@ -60,25 +60,18 @@ namespace strumpack {
 
     void release_work_memory() override;
     void extend_add(int task_depth) {}
+
     void random_sampling
-    (const SpMat_t& A, const Opts& opts,
-     DistM_t& R, DistM_t& Sr, DistM_t& Sc, int etree_level);
+    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+     const DistM_t& R, DistM_t& Sr, DistM_t& Sc);
     void sample_CB
-    (const Opts& opts, const DistM_t& R, DistM_t& Sr,
-     DistM_t& Sc, F_t* pa) const override;
+    (const DistM_t& R, DistM_t& Sr, DistM_t& Sc, F_t* pa) const override;
     void sample_children_CB
-    (const Opts& opts,
-     DistM_t& R, DistM_t& Sr, DistM_t& Sc);
-    void sample_children_CB_seqseq
-    (const Opts& opts, const DistM_t& R,
-     DistM_t& Sr, DistM_t& Sc);
-    void skinny_extend_add
-    (DistM_t& cSrl, DistM_t& cScl, DistM_t& cSrr, DistM_t& cScr,
+    (const SPOptions<scalar_t>& opts, const DistM_t& R,
      DistM_t& Sr, DistM_t& Sc);
 
     void multifrontal_factorization
-    (const SpMat_t& A, const Opts& opts,
-     int etree_level=0, int task_depth=0) override;
+    (const SpMat_t& A, const Opts& opts, int etree_level=0, int task_depth=0) override;
 
     void forward_multifrontal_solve
     (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
@@ -170,17 +163,10 @@ namespace strumpack {
     _DUB01.clear();
   }
 
-  /**
-   * Simply generate Rrow as a random matrix, but in such a way that
-   * rows which also occur in the sibling or in the parent are the same
-   * there.
-   * Rcol is just a copy of Rrow.
-   * Compute F * Rrow and F^T Rcol.
-   */
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSSMPI<scalar_t,integer_t>::random_sampling
-  (const SpMat_t& A, const Opts& opts, DistM_t& R,
-   DistM_t& Sr, DistM_t& Sc, int etree_level) {
+  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+   const DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
     Sr.zero();
     Sc.zero();
     TIMER_TIME(TaskType::FRONT_MULTIPLY_2D, 1, t_fmult);
@@ -194,8 +180,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSSMPI<scalar_t,integer_t>::sample_CB
-  (const Opts& opts, const DistM_t& R,
-   DistM_t& Sr, DistM_t& Sc, F_t* pa) const {
+  (const DistM_t& R, DistM_t& Sr, DistM_t& Sc, F_t* pa) const {
     if (!dim_upd()) return;
     if (Comm().is_null()) return;
     auto b = R.cols();
@@ -207,152 +192,53 @@ namespace strumpack {
     TIMER_STOP(t_sprod);
   }
 
-
-  // TODO rewrite this, avoid dynamic_cast
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSSMPI<scalar_t,integer_t>::sample_children_CB
-  (const Opts& opts, DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
-    if (!lchild_ && !rchild_) return;
-    // both children are sequential
-    if (lchild_ && !lchild_->isMPI() &&
-        rchild_ && !rchild_->isMPI()) {
-      sample_children_CB_seqseq(opts, R, Sr, Sc);
-      return;
-    }
-    // both children are MPI
-    if (lchild_->isMPI() && rchild_->isMPI()) {
-      auto lch = dynamic_cast<FMPI_t*>(lchild_.get());
-      auto rch = dynamic_cast<FMPI_t*>(rchild_.get());
-      DistM_t cSrl, cScl, cSrr, cScr;
-      // this needs to be done first, because it is collective, then
-      // the sampling for left/right can be done concurrently
-      auto I = lch->upd_to_parent(this);
-      DistM_t cRl(lch->grid(), I.size(), R.cols(),
-                  R.extract_rows(I), grid()->ctxt_all());
-      I = rch->upd_to_parent(this);
-      DistM_t cRr(rch->grid(), I.size(), R.cols(),
-                  R.extract_rows(I), grid()->ctxt_all());
-      lch->sample_CB(opts, cRl, cSrl, cScl, this);
-      rch->sample_CB(opts, cRr, cSrr, cScr, this);
-      TIMER_TIME(TaskType::SKINNY_EXTEND_ADD_MPIMPI, 2, t_sea);
-      skinny_extend_add(cSrl, cScl, cSrr, cScr, Sr, Sc);
-      TIMER_STOP(t_sea);
-      return;
-    }
-    // one child is seq or NULL, the other is MPI or NULL
-    F_t* ch_seq = nullptr;
-    FMPI_t* ch_mpi = dynamic_cast<FMPI_t*>(lchild_.get());
-    if (!ch_mpi)
-      ch_mpi = dynamic_cast<FMPI_t*>(rchild_.get());
-    if (ch_mpi)
-      ch_seq = (ch_mpi == lchild_.get()) ? rchild_.get() : lchild_.get();
-    else ch_seq = lchild_ ? lchild_.get() : rchild_.get();
-    DenseM_t Rseq, Srseq, Scseq;
-    DistM_t cSr, cSc, S_dummy;
-    int m = 0, n = 0;
-    auto pch = this->master(ch_seq);
-    auto rank = Comm().rank();
-    if (ch_seq) {
-      m = R.rows(), n = R.cols();
-      if (rank == pch) {
-        Rseq = DenseM_t(m, n);
-        Srseq = DenseM_t(m, n);
-        Scseq = DenseM_t(m, n);
-        Srseq.zero();
-        Scseq.zero();
-      }
-      copy(m, n, R, 0, 0, Rseq, pch, grid()->ctxt_all());
-    }
-    if (ch_mpi) {
-      auto I = ch_mpi->upd_to_parent(this);
-      DistM_t cR(ch_mpi->grid(), I.size(), R.cols(),
-                 R.extract_rows(I), grid()->ctxt_all());
-      ch_mpi->sample_CB(opts, cR, cSr, cSc, this);
-    }
-    if (ch_seq)
-      if (rank == pch)
-        ch_seq->sample_CB(opts, Rseq, Srseq, Scseq, this);
-    if (ch_mpi) {
-      TIMER_TIME(TaskType::SKINNY_EXTEND_ADD_MPI1, 2, t_sea);
-      if (ch_mpi == lchild_.get())
-        skinny_extend_add(cSr, cSc, S_dummy, S_dummy, Sr, Sc);
-      else skinny_extend_add(S_dummy, S_dummy, cSr, cSc, Sr, Sc);
-      TIMER_STOP(t_sea);
-    }
-    if (ch_seq) {
-      TIMER_TIME(TaskType::SKINNY_EXTEND_ADD_SEQ1, 2, t_sea);
-      DistM_t Stmp(grid(), m, n);
-      copy(m, n, Srseq, pch, Stmp, 0, 0, grid()->ctxt_all());
-      Sr.add(Stmp);
-      copy(m, n, Scseq, pch, Stmp, 0, 0, grid()->ctxt_all());
-      Sc.add(Stmp);
-      TIMER_STOP(t_sea);
-    }
-  }
-
-  /**
-   * Both children are sequential. This means this front only has 2
-   * processes working on it. Both these processes are the master of 1
-   * of the children, so they will both need to construct a sequential
-   * copy of R, then compute Srowseq and Scolseq, and add it to the 2D
-   * block-cyclicly distributed Srow and Scol of the parent.
-   *
-   * It is very important to combine this function for the two
-   * children together, to avoid that the children are handled one
-   * after the other!!
-   */
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSSMPI<scalar_t,integer_t>::sample_children_CB_seqseq
-  (const Opts& opts, const DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
-    auto m = R.rows();
-    auto n = R.cols();
-    auto rank = Comm().rank();
-    auto pl = this->master(lchild_);
-    auto pr = this->master(rchild_);
-    DenseM_t Rseq(m, n), Srseq(m, n), Scseq(m, n);
-    Srseq.zero();
-    Scseq.zero();
-    copy(m, n, R, 0, 0, Rseq, pl, grid()->ctxt_all());
-    copy(m, n, R, 0, 0, Rseq, pr, grid()->ctxt_all());
-    if (rank == pl) lchild_->sample_CB(opts, Rseq, Srseq, Scseq, this);
-    if (rank == pr) rchild_->sample_CB(opts, Rseq, Srseq, Scseq, this);
-    TIMER_TIME(TaskType::SKINNY_EXTEND_ADD_SEQSEQ, 2, t_sea);
-    DistM_t Stmp(grid(), m, n);
-    // TODO combine these 4 copies into 1 all-to-all?
-    copy(m, n, Srseq, pl, Stmp, 0, 0, grid()->ctxt_all());
-    Sr.add(Stmp);
-    copy(m, n, Scseq, pl, Stmp, 0, 0, grid()->ctxt_all());
-    Sc.add(Stmp);
-    copy(m, n, Srseq, pr, Stmp, 0, 0, grid()->ctxt_all());
-    Sr.add(Stmp);
-    copy(m, n, Scseq, pr, Stmp, 0, 0, grid()->ctxt_all());
-    Sc.add(Stmp);
-    TIMER_STOP(t_sea);
-  }
-
-  // TODO avoid dynamic_cast
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSSMPI<scalar_t,integer_t>::skinny_extend_add
-  (DistM_t& cSrl, DistM_t& cScl, DistM_t& cSrr, DistM_t& cScr,
+  (const SPOptions<scalar_t>& opts, const DistM_t& R,
    DistM_t& Sr, DistM_t& Sc) {
+    if (!lchild_ && !rchild_) return;
+    DistM_t cSrl, cSrr, cScl, cScr, Rl, Rr;
+    DenseM_t seqSrl, seqSrr, seqScl, seqScr, seqRl, seqRr;
+    if (lchild_) {
+      lchild_->extract_from_R2D(R, Rl, seqRl, this, visit(lchild_));
+      seqSrl = DenseM_t(seqRl.rows(), seqRl.cols());
+      seqScl = DenseM_t(seqRl.rows(), seqRl.cols());
+      seqSrl.zero();
+      seqScl.zero();
+    }
+    if (rchild_) {
+      rchild_->extract_from_R2D(R, Rr, seqRr, this, visit(rchild_));
+      seqSrr = DenseM_t(seqRr.rows(), seqRr.cols());
+      seqScr = DenseM_t(seqRr.rows(), seqRr.cols());
+      seqSrr.zero();
+      seqScr.zero();
+    }
+    if (visit(lchild_))
+      lchild_->sample_CB(opts, Rl, cSrl, cScl, seqRl, seqSrl, seqScl, this);
+    if (visit(rchild_))
+      rchild_->sample_CB(opts, Rr, cSrr, cScr, seqRr, seqSrr, seqScr, this);
     std::vector<std::vector<scalar_t>> sbuf(this->P());
-    auto lch = dynamic_cast<FMPI_t*>(lchild_.get());
-    auto rch = dynamic_cast<FMPI_t*>(rchild_.get());
-    if (cSrl.active())
-      ExtAdd::skinny_extend_add_copy_to_buffers
-        (cSrl, cScl, sbuf, this, lch->upd_to_parent(this));
-    if (cSrr.active())
-      ExtAdd::skinny_extend_add_copy_to_buffers
-        (cSrr, cScr, sbuf, this, rch->upd_to_parent(this));
+    if (visit(lchild_)) {
+      lchild_->skinny_ea_to_buffers(cSrl, seqSrl, sbuf, this);
+      lchild_->skinny_ea_to_buffers(cScl, seqScl, sbuf, this);
+    }
+    if (visit(rchild_)) {
+      rchild_->skinny_ea_to_buffers(cSrr, seqSrr, sbuf, this);
+      rchild_->skinny_ea_to_buffers(cScr, seqScr, sbuf, this);
+    }
     std::vector<scalar_t> rbuf;
     std::vector<scalar_t*> pbuf;
     Comm().all_to_all_v(sbuf, rbuf, pbuf);
-    if (lch) // unpack left child contribution
-      ExtAdd::skinny_extend_add_copy_from_buffers
-        (Sr, Sc, pbuf.data(), this, lch);
-    if (rch) // unpack right child contribution
-      ExtAdd::skinny_extend_add_copy_from_buffers
-        (Sr, Sc, pbuf.data()+this->master(rch), this, rch);
+    if (lchild_) {
+      lchild_->skinny_ea_from_buffers(Sr, pbuf.data(), this);
+      lchild_->skinny_ea_from_buffers(Sc, pbuf.data(), this);
+    }
+    if (rchild_) {
+      rchild_->skinny_ea_from_buffers
+        (Sr, pbuf.data()+this->master(rchild_), this);
+      rchild_->skinny_ea_from_buffers
+        (Sc, pbuf.data()+this->master(rchild_), this);
+    }
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -368,7 +254,7 @@ namespace strumpack {
 
     auto mult = [&](DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-      random_sampling(A, opts, R, Sr, Sc, etree_level);
+      random_sampling(A, opts, R, Sr, Sc);
       _sampled_columns += R.cols();
       TIMER_STOP(t_sampling);
     };

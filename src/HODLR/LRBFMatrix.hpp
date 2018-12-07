@@ -51,19 +51,20 @@ namespace strumpack {
     (const char* op, int* nin, int* nout, int* nvec,
      const scalar_t* X, scalar_t* Y, C2Fptr func, scalar_t* a, scalar_t* b) {
       auto A = static_cast<std::function<
-        void(char,scalar_t,const DenseMatrix<scalar_t>&,
+        void(Trans,scalar_t,const DenseMatrix<scalar_t>&,
              scalar_t,DenseMatrix<scalar_t>&)>*>(func);
       DenseMatrixWrapper<scalar_t> Yw(*nout, *nvec, Y, *nout),
         Xw(*nin, *nvec, const_cast<scalar_t*>(X), *nin);
-      (*A)(*op, *a, Xw, *b, Yw);
+      (*A)(c2T(*op), *a, Xw, *b, Yw);
     }
 
 
     template<typename scalar_t> class LRBFMatrix {
       using DenseM_t = DenseMatrix<scalar_t>;
+      using DistM_t = DistributedMatrix<scalar_t>;
       using opts_t = HODLROptions<scalar_t>;
       using mult_t = typename std::function<
-        void(char,scalar_t,const DenseM_t&,scalar_t,DenseM_t&)>;
+        void(Trans,scalar_t,const DenseM_t&,scalar_t,DenseM_t&)>;
 
     public:
       LRBFMatrix() {}
@@ -87,12 +88,36 @@ namespace strumpack {
       std::size_t lcols() const { return lcols_; }
       std::size_t begin_row() const { return rdist_[c_->rank()]; }
       std::size_t end_row() const { return rdist_[c_->rank()+1]; }
-      std::size_t begin_col() const { return rdist_[c_->rank()]; }
-      std::size_t end_col() const { return rdist_[c_->rank()+1]; }
+      const std::vector<int>& rdist() const { return rdist_; }
+      std::size_t begin_col() const { return cdist_[c_->rank()]; }
+      std::size_t end_col() const { return cdist_[c_->rank()+1]; }
+      const std::vector<int>& cdist() const { return cdist_; }
       const MPIComm& Comm() const { return *c_; }
 
-      void mult(Trans op, scalar_t alpha, const DenseM_t& X,
-                scalar_t beta, DenseM_t& Y) const;
+      void mult(Trans op, const DenseM_t& X, DenseM_t& Y) const;
+
+      /**
+       * Multiply this low-rank (or butterfly) matrix with a dense
+       * matrix: Y = op(A) * X, where op can be none,
+       * transpose or complex conjugate. X and Y are in 2D block
+       * cyclic distribution.
+       *
+       * \param op Transpose, conjugate, or none.
+       * \param X Right-hand side matrix. Should be X.rows() ==
+       * this.rows().
+       * \param Y Result, should be Y.cols() == X.cols(), Y.rows() ==
+       * this.rows()
+       * \see mult
+       */
+      void mult(Trans op, const DistM_t& X, DistM_t& Y) const;
+
+      DenseM_t redistribute_2D_to_1D
+      (const DistM_t& R2D, const std::vector<int>& dist) const;
+      void redistribute_2D_to_1D
+      (scalar_t a, const DistM_t& R2D, scalar_t b, DenseM_t& R1D,
+       const std::vector<int>& dist) const;
+      void redistribute_1D_to_2D
+      (const DenseM_t& S1D, DistM_t& S2D, const std::vector<int>& dist) const;
 
     private:
       F2Cptr lr_bf_ = nullptr;     // LRBF handle returned by Fortran code
@@ -109,10 +134,10 @@ namespace strumpack {
 
     template<typename scalar_t> LRBFMatrix<scalar_t>::LRBFMatrix
     (const HODLRMatrix<scalar_t>& A, const HODLRMatrix<scalar_t>& B,
-     const mult_t& Amult) : c_(A.c_) {
+     const mult_t& Amult) : c_(&A.c_) {
       rows_ = A.rows();
       cols_ = B.cols();
-      Fcomm_ = A.Fcomm_; //MPI_Comm_c2f(c_->comm());
+      Fcomm_ = A.Fcomm_;
       int P = c_->size();
       int rank = c_->rank();
       std::vector<int> groups(P);
@@ -180,17 +205,156 @@ namespace strumpack {
 
     template<typename scalar_t> void
     LRBFMatrix<scalar_t>::mult
-    (Trans op, scalar_t alpha, const DenseM_t& X,
-     scalar_t beta, DenseM_t& Y) const {
+    (Trans op, const DenseM_t& X, DenseM_t& Y) const {
       assert(Y.cols() == X.cols());
       if (op == Trans::N) {
         assert(X.rows() == cols_ && Y.rows() == rows_);
         LRBF_mult(char(op), X.data(), Y.data(), lcols_, lrows_, X.cols(),
-                  lr_bf_, options_, stats_, ptree_, alpha, beta);
+                  lr_bf_, options_, stats_, ptree_);
       } else {
         assert(X.rows() == rows_ && Y.rows() == cols_);
         LRBF_mult(char(op), X.data(), Y.data(), lrows_, lcols_, X.cols(),
-                  lr_bf_, options_, stats_, ptree_, alpha, beta);
+                  lr_bf_, options_, stats_, ptree_);
+      }
+    }
+
+    template<typename scalar_t> void
+    LRBFMatrix<scalar_t>::mult
+    (Trans op, const DistM_t& X, DistM_t& Y) const {
+      DenseM_t Y1D(lrows_, X.cols());
+      {
+        auto X1D = redistribute_2D_to_1D(X, cdist_);
+        if (op == Trans::N) {
+          assert(X.rows() == cols_ && Y.rows() == rows_);
+          LRBF_mult(char(op), X1D.data(), Y1D.data(), lcols_, lrows_,
+                    X1D.cols(), lr_bf_, options_, stats_, ptree_);
+        } else {
+          assert(X.rows() == rows_ && Y.rows() == cols_);
+          LRBF_mult(char(op), X1D.data(), Y1D.data(), lrows_, lcols_,
+                    X1D.cols(), lr_bf_, options_, stats_, ptree_);
+        }
+      }
+      redistribute_1D_to_2D(Y1D, Y, rdist_);
+    }
+
+    template<typename scalar_t> DenseMatrix<scalar_t>
+    LRBFMatrix<scalar_t>::redistribute_2D_to_1D
+    (const DistM_t& R2D, const std::vector<int>& dist) const {
+      const auto rank = c_->rank();
+      DenseM_t R1D(dist[rank+1] - dist[rank], R2D.cols());
+      redistribute_2D_to_1D(scalar_t(1.), R2D, scalar_t(0.), R1D, dist);
+      return R1D;
+    }
+
+    template<typename scalar_t> void
+    LRBFMatrix<scalar_t>::redistribute_2D_to_1D
+    (scalar_t a, const DistM_t& R2D, scalar_t b, DenseM_t& R1D,
+     const std::vector<int>& dist) const {
+      const auto P = c_->size();
+      const auto rank = c_->rank();
+      const auto Rcols = R2D.cols();
+      const auto Rlcols = R2D.lcols();
+      const auto Rlrows = R2D.lrows();
+      const auto B = DistM_t::default_MB;
+      //const auto lrows = dist[rank+1] - dist[rank];
+      const auto lrows = R1D.rows();
+      assert(lrows == dist[rank+1] - dist[rank]);
+      int nprows = R2D.nprows(), npcols = R2D.npcols();
+      std::vector<std::vector<scalar_t>> sbuf(P);
+      if (R2D.active()) {
+        // global, local, proc
+        std::vector<std::tuple<int,int,int>> glp(Rlrows);
+        {
+          std::vector<std::size_t> count(P);
+          for (int r=0; r<Rlrows; r++) {
+            auto gr = R2D.rowl2g(r);
+            auto p = -1 + std::distance
+              (dist.begin(), std::upper_bound
+               (dist.begin(), dist.end(), gr));
+            glp[r] = std::tuple<int,int,int>{gr, r, p};
+            count[p] += Rlcols;
+          }
+          sort(glp.begin(), glp.end());
+          for (int p=0; p<P; p++)
+            sbuf[p].reserve(count[p]);
+        }
+        for (int r=0; r<Rlrows; r++)
+          for (int c=0, lr=std::get<1>(glp[r]),
+                 p=std::get<2>(glp[r]); c<Rlcols; c++)
+            sbuf[p].push_back(R2D(lr,c));
+      }
+      std::vector<scalar_t> rbuf;
+      std::vector<scalar_t*> pbuf;
+      c_->all_to_all_v(sbuf, rbuf, pbuf);
+      if (lrows) {
+        std::vector<int> src_c(Rcols);
+        for (int c=0; c<Rcols; c++)
+          src_c[c] = ((c / B) % npcols) * nprows;
+        if (a == scalar_t(1.) && b == scalar_t(0.)) {
+          for (int r=0; r<lrows; r++) {
+            auto gr = r + dist[rank];
+            auto src_r = (gr / B) % nprows;
+            for (int c=0; c<Rcols; c++)
+              R1D(r, c) = *(pbuf[src_r + src_c[c]]++);
+          }
+        } else {
+          for (int r=0; r<lrows; r++) {
+            auto gr = r + dist[rank];
+            auto src_r = (gr / B) % nprows;
+            for (int c=0; c<Rcols; c++)
+              R1D(r, c) = *(pbuf[src_r + src_c[c]]++) * a + b * R1D(r, c);
+          }
+        }
+      }
+    }
+
+    template<typename scalar_t> void
+    LRBFMatrix<scalar_t>::redistribute_1D_to_2D
+    (const DenseM_t& S1D, DistM_t& S2D, const std::vector<int>& dist) const {
+      const auto rank = c_->rank();
+      const auto P = c_->size();
+      const auto B = DistM_t::default_MB;
+      const auto cols = S1D.cols();
+      const auto Slcols = S2D.lcols();
+      const auto Slrows = S2D.lrows();
+      const auto lrows = dist[rank+1] - dist[rank];
+      int nprows = S2D.nprows(), npcols = S2D.npcols();
+      std::vector<std::vector<scalar_t>> sbuf(P);
+      if (lrows) {
+        std::vector<std::tuple<int,int,int>> glp(lrows);
+        for (int r=0; r<lrows; r++) {
+          auto gr = r + dist[rank];
+          glp[r] = std::tuple<int,int,int>{gr,r,(gr / B) % nprows};
+        }
+        sort(glp.begin(), glp.end());
+        std::vector<int> pc(cols);
+        for (int c=0; c<cols; c++)
+          pc[c] = ((c / B) % npcols) * nprows;
+        {
+          std::vector<std::size_t> count(P);
+          for (int r=0; r<lrows; r++)
+            for (int c=0, pr=std::get<2>(glp[r]); c<cols; c++)
+              count[pr+pc[c]]++;
+          for (int p=0; p<P; p++)
+            sbuf[p].reserve(count[p]);
+        }
+        for (int r=0; r<lrows; r++)
+          for (int c=0, lr=std::get<1>(glp[r]),
+                 pr=std::get<2>(glp[r]); c<cols; c++)
+            sbuf[pr+pc[c]].push_back(S1D(lr,c));
+      }
+      std::vector<scalar_t> rbuf;
+      std::vector<scalar_t*> pbuf;
+      c_->all_to_all_v(sbuf, rbuf, pbuf);
+      if (S2D.active()) {
+        for (int r=0; r<Slrows; r++) {
+          auto gr = S2D.rowl2g(r);
+          auto p = -1 + std::distance
+            (dist.begin(), std::upper_bound
+             (dist.begin(), dist.end(), gr));
+          for (int c=0; c<Slcols; c++)
+            S2D(r,c) = *(pbuf[p]++);
+        }
       }
     }
 

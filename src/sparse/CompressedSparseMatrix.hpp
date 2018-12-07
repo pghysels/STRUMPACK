@@ -315,6 +315,18 @@ namespace strumpack {
     (integer_t sep_begin, integer_t sep_end,
      const std::vector<integer_t>& upd, const DistM_t& R,
      DistM_t& Srow, DistM_t& Scol, int depth) const = 0;
+    // virtual void front_multiply_2d_F11
+    // (integer_t sep_begin, integer_t sep_end,
+    //  const std::vector<integer_t>& upd, const DistM_t& R,
+    //  DistM_t& S, int depth) const = 0;
+    // virtual void front_multiply_2d_F12
+    // (integer_t sep_begin, integer_t sep_end,
+    //  const std::vector<integer_t>& upd, const DistM_t& R,
+    //  DistM_t& S, int depth) const = 0;
+    // virtual void front_multiply_2d_F21
+    // (integer_t sep_begin, integer_t sep_end,
+    //  const std::vector<integer_t>& upd, const DistM_t& R,
+    //  DistM_t& S, int depth) const = 0;
 #endif //STRUMPACK_USE_MPI
 #endif //DOXYGEN_SHOULD_SKIP_THIS
 

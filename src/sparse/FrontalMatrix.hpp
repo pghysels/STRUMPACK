@@ -113,9 +113,13 @@ namespace strumpack {
 
     virtual int random_samples() const { return 0; }
 
+    // TODO why not const? HSS problem?
     virtual void sample_CB
     (const SPOptions<scalar_t>& opts, const DenseM_t& R,
      DenseM_t& Sr, DenseM_t& Sc, F_t* parent, int task_depth=0) {};
+    virtual void sample_CB
+    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* parent,
+     int task_depth=0) const {};
 
     virtual void sample_CB_to_F11
     (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
@@ -193,10 +197,22 @@ namespace strumpack {
     (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
      int etree_level=0) const;
 
+    virtual void sample_CB
+    (Trans op, const DistM_t& R, DistM_t& S,
+     const DenseM_t& seqR, DenseM_t& seqS, F_t* pa) const {
+      sample_CB(op, seqR, seqS, pa);
+    };
+    virtual void sample_CB
+    (const SPOptions<scalar_t>& opts, const DistM_t& R,
+     DistM_t& Sr, DistM_t& Sc, const DenseM_t& seqR,
+     DenseM_t& seqSr, DenseM_t& seqSc, F_t* pa) {
+      sample_CB(opts, seqR, seqSr, seqSc, pa, 0);
+    }
+
     virtual void extend_add_copy_to_buffers
     (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
       assert(false); // TODO static assert?
-    };
+    }
     virtual void extend_add_copy_from_buffers
     (DistM_t& F11, DistM_t& F12, DistM_t& F21, DistM_t& F22,
      scalar_t** pbuf, const FMPI_t* pa) const {
@@ -226,6 +242,25 @@ namespace strumpack {
       ExtAdd::extract_column_seq_copy_from_buffers(seqCB, pbuf, pa, this);
     }
 
+    virtual void skinny_ea_to_buffers
+    (const DistM_t& S, const DenseM_t& seqS,
+     std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
+      ExtAdd::skinny_extend_add_seq_copy_to_buffers
+        (seqS, sbuf, pa, this->upd_to_parent(pa));
+    }
+    virtual void skinny_ea_from_buffers
+    (DistM_t& S, scalar_t** pbuf, const FMPI_t* pa) const {
+      ExtAdd::skinny_extend_add_seq_copy_from_buffers(S, *pbuf, pa, this);
+    }
+
+    virtual void extract_from_R2D
+    (const DistM_t& R, DistM_t& cR, DenseM_t& seqcR,
+     const FMPI_t* pa, bool visit) const {
+      if (visit) seqcR = DenseM_t(R.rows(), R.cols());
+      copy(R.rows(), R.cols(), R, 0, 0, seqcR,
+           pa->master(this), pa->grid()->ctxt_all());
+    }
+
     virtual void get_submatrix_2d
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
      DistM_t& Bdist, DenseM_t& Bseq) const;
@@ -236,15 +271,9 @@ namespace strumpack {
 #endif
 
   protected:
-    integer_t sep_;
-    integer_t sep_begin_;
-    integer_t sep_end_;
+    integer_t sep_, sep_begin_, sep_end_;
     std::vector<integer_t> upd_;
-
-    // TODO use a vector?
-    //std::vector<std::unique_ptr<F_t>> ch_;
-    std::unique_ptr<F_t> lchild_;
-    std::unique_ptr<F_t> rchild_;
+    std::unique_ptr<F_t> lchild_, rchild_;
 
   private:
     FrontalMatrix(const FrontalMatrix&) = delete;

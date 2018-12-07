@@ -58,8 +58,9 @@ namespace strumpack {
      const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) override;
 
     void sample_CB
-    (const SPOptions<scalar_t>& opts, const DenseM_t& R, DenseM_t& Sr,
-     DenseM_t& Sc, F_t* pa, int task_depth) override;
+    (const SPOptions<scalar_t>& opts, const DenseM_t& R,
+     DenseM_t& Sr, DenseM_t& Sc, F_t* pa, int task_depth) override;
+
     void sample_CB_direct
     (const DenseM_t& cR, DenseM_t& Sr, DenseM_t& Sc,
      const std::vector<std::size_t>& I, int task_depth);

@@ -301,8 +301,8 @@ namespace strumpack {
   (const SpMat_t& A, SpMat_t& A11, SpMat_t& A12, SpMat_t& A21) const {
     auto dsep = dim_sep();
     auto dupd = dim_upd();
-    auto slo = this->sep_begin();
-    auto shi = this->sep_end();
+    auto slo = sep_begin_;
+    auto shi = sep_end_;
     integer_t nnz11 = 0, nnz12 = 0, nnz21 = 0;
     for (integer_t r=slo; r<shi; r++) {
       auto jhi = A.ptr(r+1);
@@ -314,11 +314,10 @@ namespace strumpack {
         }
       }
     }
-    for (std::size_t r=this->sep_end(); r<A.size(); r++)
+    for (std::size_t r=sep_end_; r<A.size(); r++)
       for (std::size_t j=A.ptr(r); j<A.ptr(r+1); j++) {
         auto c = A.ind(j);
-        if (c >= this->sep_begin() && c < this->sep_end())
-          nnz21++;
+        if (c >= sep_begin_ && c < sep_end_) nnz21++;
       }
     A11 = CSRMatrix<scalar_t,integer_t>(dsep, nnz11);
     A12 = CSRMatrix<scalar_t,integer_t>(dsep, nnz12);
@@ -399,35 +398,32 @@ namespace strumpack {
     CSRMatrix<scalar_t,integer_t> A11, A12, A21;
     extract_sparse(A, A11, A12, A21);
 
-    auto sample_F11 = [&](char op, const DenseM_t& R, DenseM_t& S) {
+    auto sample_F11 = [&](Trans op, const DenseM_t& R, DenseM_t& S) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-      auto tr = c2T(op);
-      A11.spmv(tr, R, S);
-      if (lchild_) lchild_->sample_CB_to_F11(tr, R, S, this, task_depth);
-      if (rchild_) rchild_->sample_CB_to_F11(tr, R, S, this, task_depth);
+      A11.spmv(op, R, S);
+      if (lchild_) lchild_->sample_CB_to_F11(op, R, S, this, task_depth);
+      if (rchild_) rchild_->sample_CB_to_F11(op, R, S, this, task_depth);
       TIMER_STOP(t_sampling);
     };
     auto sample_F12 = [&]
-      (char op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
+      (Trans op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-      auto tr = c2T(op);
       DenseM_t lR(R), lS(S);
       lR.scale(a);
-      A12.spmv(tr, lR, lS);
-      if (lchild_) lchild_->sample_CB_to_F12(tr, lR, lS, this, task_depth);
-      if (rchild_) rchild_->sample_CB_to_F12(tr, lR, lS, this, task_depth);
+      A12.spmv(op, lR, lS);
+      if (lchild_) lchild_->sample_CB_to_F12(op, lR, lS, this, task_depth);
+      if (rchild_) rchild_->sample_CB_to_F12(op, lR, lS, this, task_depth);
       S.scale_and_add(b, lS);
       TIMER_STOP(t_sampling);
     };
     auto sample_F21 = [&]
-      (char op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
+      (Trans op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-      auto tr = c2T(op);
       DenseM_t lR(R), lS(S);
       lR.scale(a);
-      A21.spmv(tr, lR, lS);
-      if (lchild_) lchild_->sample_CB_to_F21(tr, lR, lS, this, task_depth);
-      if (rchild_) rchild_->sample_CB_to_F21(tr, lR, lS, this, task_depth);
+      A21.spmv(op, lR, lS);
+      if (lchild_) lchild_->sample_CB_to_F21(op, lR, lS, this, task_depth);
+      if (rchild_) rchild_->sample_CB_to_F21(op, lR, lS, this, task_depth);
       S.scale_and_add(b, lS);
       TIMER_STOP(t_sampling);
     };
@@ -443,22 +439,22 @@ namespace strumpack {
     TIMER_STOP(t_fact);
 
     if (dupd) {
-      auto sample_CB = [&](char op, const DenseM_t& R, DenseM_t& S) {
+      auto sample_CB = [&](Trans op, const DenseM_t& R, DenseM_t& S) {
         TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-        auto tr = c2T(op);
         DenseM_t F12R(dsep, R.cols()), invF11F12R(dsep, R.cols());
-        if (tr == Trans::N) {
-          F12_.mult(tr, scalar_t(1.), R, scalar_t(0.), F12R);
-          F11_.inv_mult(tr, F12R, invF11F12R);
+        if (op == Trans::N) {
+          F12_.mult(op, R, F12R);
+          F11_.inv_mult(op, F12R, invF11F12R);
           //F11_.solve(F12R, invF11F12R);
-          F21_.mult(tr, scalar_t(-1.), invF11F12R, scalar_t(0.), S);
+          F21_.mult(op, invF11F12R, S);
         } else {
-          F21_.mult(tr, scalar_t(1.), R, scalar_t(0.), F12R);
-          F11_.inv_mult(tr, F12R, invF11F12R);
-          F12_.mult(tr, scalar_t(-1.), invF11F12R, scalar_t(0.), S);
+          F21_.mult(op, R, F12R);
+          F11_.inv_mult(op, F12R, invF11F12R);
+          F12_.mult(op, invF11F12R, S);
         }
-        if (lchild_) lchild_->sample_CB_to_F22(tr, R, S, this, task_depth);
-        if (rchild_) rchild_->sample_CB_to_F22(tr, R, S, this, task_depth);
+        S.scale(-1.);
+        if (lchild_) lchild_->sample_CB_to_F22(op, R, S, this, task_depth);
+        if (rchild_) rchild_->sample_CB_to_F22(op, R, S, this, task_depth);
         TIMER_STOP(t_sampling);
       };
       F22_->compress(sample_CB);
@@ -487,8 +483,11 @@ namespace strumpack {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
       DenseM_t rhs(bloc);
       F11_.solve(rhs, bloc);
-      if (dim_upd())
-        F21_.mult(Trans::N, scalar_t(-1.), bloc, scalar_t(1.), bupd);
+      if (dim_upd()) {
+        DenseM_t tmp(bupd.rows(), bupd.cols());
+        F21_.mult(Trans::N, bloc, tmp);
+        bupd.scaled_add(scalar_t(-1.), tmp);
+      }
     }
   }
 
@@ -507,8 +506,10 @@ namespace strumpack {
   (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const {
     DenseMW_t yupd(dim_upd(), y.cols(), work[0], 0, 0);
     if (dim_sep() && dim_upd()) {
+      DenseM_t tmp(dim_sep(), y.cols());
+      F12_.mult(Trans::N, yupd, tmp);
       DenseMW_t yloc(dim_sep(), y.cols(), y, this->sep_begin_, 0);
-      F12_.mult(Trans::N, scalar_t(-1.), yupd, scalar_t(1.), yloc);
+      yloc.scaled_add(scalar_t(-1.), tmp);
     }
     this->bwd_solve_phase2(y, yupd, work, etree_level, task_depth);
   }
@@ -561,6 +562,7 @@ namespace strumpack {
     if (!is_root && dim_upd()) {
       HSS::HSSPartitionTree CB_tree(dim_upd());
       CB_tree.refine(opts.HODLR_options().leaf_size());
+      MPIComm cw;
       F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
         (new HODLR::HODLRMatrix<scalar_t>
          (commself_, CB_tree, opts.HODLR_options()));

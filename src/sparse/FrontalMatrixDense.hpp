@@ -67,8 +67,10 @@ namespace strumpack {
 
     void sample_CB
     (const SPOptions<scalar_t>& opts, const DenseM_t& R,
-     DenseM_t& Sr, DenseM_t& Sc, F_t* pa,
-     int task_depth) override;
+     DenseM_t& Sr, DenseM_t& Sc, F_t* pa, int task_depth) override;
+    void sample_CB
+    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+     int task_depth) const override;
 
     void sample_CB_to_F11
     (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
@@ -97,6 +99,7 @@ namespace strumpack {
     void extract_CB_sub_matrix
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
      DenseM_t& B, int task_depth) const override;
+
     std::string type() const override { return "FrontalMatrixDense"; }
 
 #if defined(STRUMPACK_USE_MPI)
@@ -373,6 +376,20 @@ namespace strumpack {
       (gemm_flops(Trans::N, Trans::N, scalar_t(1.), F22_, cR, scalar_t(0.)) +
        gemm_flops(Trans::C, Trans::N, scalar_t(1.), F22_, cR, scalar_t(0.)) +
        cS.rows()*cS.cols()*2); // for the skinny-extend add
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixDense<scalar_t,integer_t>::sample_CB
+  (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
+    auto I = this->upd_to_parent(pa);
+    auto cR = R.extract_rows(I);
+    DenseM_t cS(dim_upd(), R.cols());
+    gemm(op, Trans::N, scalar_t(1.), F22_, cR,
+         scalar_t(0.), cS, task_depth);
+    S.scatter_rows_add(I, cS, task_depth);
+    STRUMPACK_CB_SAMPLE_FLOPS
+      (gemm_flops(op, Trans::N, scalar_t(1.), F22_, cR, scalar_t(0.)) +
+       cS.rows()*cS.cols()); // for the skinny-extend add
   }
 
   template<typename scalar_t,typename integer_t> void

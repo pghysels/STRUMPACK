@@ -12,7 +12,7 @@ option(TPL_ENABLE_PARMETIS "Build with support for ParMetis" OFF)
 option(TPL_ENABLE_SCOTCH "Build with support for Scotch/PTScotch" OFF)
 option(TPL_ENABLE_PAPI "Build with support for PAPI monitoring" OFF)
 option(TPL_ENABLE_COMBBLAS "Use CombBLAS for weighted matching" OFF)
-option(TPL_ENABLE_HODLRBF "Use HOD-LR-BF code by Yang Liu" OFF)
+option(TPL_ENABLE_BPACK "Use BPACK (ButterflyPACK) code by Yang Liu" OFF)
 
 option(STRUMPACK_COUNT_FLOPS "Build with flop counters" ON)
 option(STRUMPACK_TASK_TIMERS "Build with timers for internal routines" OFF)
@@ -37,10 +37,10 @@ if(NOT STRUMPACK_USE_MPI)
       " but compiling without MPI support! ")
     set(TPL_ENABLE_PARMETIS OFF)
   endif()
-  if(TPL_ENABLE_HODLRBF)
-    message(STATUS "Disabling HODLRBF. HODLRBF requires MPI support,"
+  if(TPL_ENABLE_BPACK)
+    message(STATUS "Disabling BPACK (ButterflyPACK). BPACK requires MPI support,"
       " but compiling without MPI support! ")
-    set(TPL_ENABLE_HODLRBF OFF)
+    set(TPL_ENABLE_BPACK OFF)
   endif()
 endif()
 
@@ -319,10 +319,10 @@ else()
   message(STATUS "Building STRUMPACK without Scotch/PTScotch support.")
 endif()
 
-if(TPL_ENABLE_HODLRBF)
-  option(STRUMPACK_USE_HODLRBF "" ON)
-  set(LIBS ${TPL_HODLRBF_LIBRARIES} ${LIBS})
-  include_directories(${TPL_HODLRBF_INCLUDE_DIRS})
+if(TPL_ENABLE_BPACK)
+  option(STRUMPACK_USE_BPACK "" ON)
+  set(LIBS ${TPL_BPACK_LIBRARIES} ${LIBS})
+  include_directories(${TPL_BPACK_INCLUDE_DIRS})
 endif()
 
 message(STATUS "Linking with: " "${LIBS}")
@@ -516,7 +516,7 @@ install(FILES
   src/BLR/BLROptions.hpp
   DESTINATION include/BLR)
 
-if(TPL_ENABLE_HODLRBF)
+if(TPL_ENABLE_BPACK)
   install(FILES
     src/HODLR/HODLROptions.hpp
     src/HODLR/HODLRMatrix.hpp
@@ -567,7 +567,7 @@ if(STRUMPACK_USE_MPI)
     src/sparse/mumps_symqamd.hpp
     DESTINATION include/sparse)
 
-  if(TPL_ENABLE_HODLRBF)
+  if(TPL_ENABLE_BPACK)
     install(FILES
       src/sparse/FrontalMatrixHODLRMPI.hpp
       DESTINATION include/sparse)

@@ -1,7 +1,145 @@
 /*! \page hodlr_matrices HODLR Approximation of Dense Matrices
 
-TODO
 
-See strumpack::HODLR::HODLRMatrix and strumpack::HODLR::HODLROptions.
+STRUMPACK's HODLR code uses an external library, which can be found
+here:
+
+__TODO__
+
+See the \ref installation instructions for how to configure and
+compile STRUMPACK with support for HODLR.
+
+
+The HODLR include files are installed in the __include/HODLR/__
+subdirectory, or in __src/HODLR/__. All HODLR code is in the namespace
+strumpack::HODLR. The main class for sequential/multithreaded as well
+as distributed memory HODLR matrices is strumpack::HODLR::HODLRMatrix.
+
+We use a simple wrapper class strumpack::DenseMatrix, as a wrapper
+around a column-major matrix. See the documentation for that class for
+more info.
+
+
+
+HODLR Matrix Construction
+=========================
+
+There are currently 3 ways to construct an HODLR matrix:
+
+- By specifying a matrix time (multiple-)vector product routine.
+
+- By specifying a matrix element evaluation routine.
+
+- By specifying a strumpack::kernel::Kernel object, containing a set
+  of (high-dimensional) points and a kernel function.
+
+
+
+HODLR Construction from Element Evaluation
+------------------------------------------
+
+
+Use the constructor
+
+\code {.cpp}
+void strumpack::HODLR::HODLRMatrix
+      (const strumpack::MPIComm& c,                          // MPI_Comm wrapper
+       const strumpack::HSS::HSSPartitionTree& tree,         // partition/cluster tree
+       const std::function<scalar_t(                         // return value = A(i,j)
+          int i,                                             // row coordinate
+          int j,                                             // column coordinate
+        )>& Aelem,                                           // element extraction routine
+       const strumpack::HODLR::HODLROptions<scalar_t>& opts  // options object
+    );
+\endcode
+
+For example, to construct an HODLR approximation of a Toeplitz matrix:
+
+\code {.cpp}
+
+#include "HODLR/HODLRMatrix.hpp"
+
+...
+
+strumpack::MPIComm c;  // defaults to MPI_COMM_WORLD
+
+int N = 1000;
+strumpack::HSS::HSSPartitionTree t(N);         // construct a tree for an NxN matrix
+t.refine(32);                                  // refine the tree
+strumpack::HODLR::HODLROptions<double> opts;
+opts.set_from_command_line(argc, argv);        // optionally, parse command line options
+strumpack::HODLR::HODLRMatrix<double>
+     H(c, t, [](int i, int j) {
+        return (i==j) ? 1. : 1./(1+abs(i-j)); },
+       opts);
+H.factor();
+...
+\endcode
+
+
+
+HODLR Construction from Matrix-Vector Multiplication
+----------------------------------------------------
+
+Use the constructor
+
+\code {.cpp}
+void strumpack::HODLR::HODLRMatrix
+      (const strumpack::MPIComm& c,                          // MPI_Comm wrapper
+       const strumpack::HSS::HSSPartitionTree& tree,         // partition/cluster tree
+       const std::function<void(                             // matrix-vector multiplication routine
+          strumpack::Trans op,                               // none, transpose, conjugate
+          const strumpack::DenseMatrix<scalar_t>& R,         // input (random matrix)
+          strumpack::DenseMatrix<scalar_t>& S                // output, compute as S = op(A)*R (S already allocated) 
+        )>& Amult,
+       const strumpack::HODLR::HODLROptions<scalar_t>& opts  // options object
+    );
+\endcode
+
+The strumpack::MPIComm object is a simple wrapper around an MPI communicator.
+The partition or cluster tree data structure is the same as for HSS
+matrices. See \ref dense_matrices for how to construct this tree.
+
+
+Kernel Matrix Approximation
+---------------------------
+
+We have an optimized HODLR construction algorithm for the so called
+kernel matrices, which arise in several applications, such as kernel
+ridge regression in machine learning. One can use the
+strumpack::HODLR::HODLRMatrix constructor:
+
+\code {.cpp}
+strumpack::HODLR::HODLRMatrix(strumpack::kernel::Kernel<scalar_t>& K,
+                              std::vector<int>& perm,
+                              const strumpack::HODLR::HODLROptions<scalar_t>& opts);
+\endcode
+
+However, for kernel ridge regression, the strumpack::kernel::Kernel
+class provides some easy to use driver routines, see
+
+\code {.cpp}
+strumpack::DenseMatrix<scalar_t>
+strumpack::kernel::Kernel::fit_HODLR(const MPIComm& c,
+                                     std::vector<scalar_t>& labels,
+                                     const strumpack::HODLR::HODLROptions<scalar_t>& opts);
+std::vector<scalar_t>
+strumpack::kernel::Kernel::predict(const strumpack::DenseMatrix<scalar_t>& test,
+                                   const strumpack::DenseMatrix<scalar_t>& weights);
+\endcode
+
+There is also a Python interface to these Kernel regression routines,
+compatibile with scikit-learn, see
+__install/python/STRUMPACKKernel.py__ and
+__examples/KernelRegressionMPI.py__.
+
+
+
+HODLR Matrix Operations
+=======================
+
+__TODO__ discuss parallel storage, mult, factor, solve, inv_mult,
+etc..
+
 
 */

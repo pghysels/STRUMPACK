@@ -67,9 +67,11 @@ fi
 
 if [[ $(hostname -s) = "pieterg-X8DA3" ]]; then
     found_host=true
+    BPACKHOME=/home/pieterg/LBL/STRUMPACK/ButterflyPACK/
     cmake ../ \
           -DCMAKE_BUILD_TYPE=Debug \
           -DCMAKE_INSTALL_PREFIX=../install \
+          -DBUILD_SHARED_LIBS=ON \
           -DSTRUMPACK_USE_MPI=ON \
           -DSTRUMPACK_BUILD_TESTS=ON \
           -DSTRUMPACK_USE_OPENMP=ON \
@@ -82,9 +84,9 @@ if [[ $(hostname -s) = "pieterg-X8DA3" ]]; then
           -DTPL_ENABLE_SCOTCH=ON \
           -DTPL_SCOTCH_INCLUDE_DIRS=$HOME/local/scotch_6.0.4/include \
           -DTPL_SCOTCH_LIBRARIES="$HOME/local/scotch_6.0.4/lib/libscotch.a;$HOME/local/scotch_6.0.4/lib/libscotcherr.a;$HOME/local/scotch_6.0.4/lib/libptscotch.a;$HOME/local/scotch_6.0.4/lib/libptscotcherr.a" \
-          -DTPL_ENABLE_HODLRBF=ON \
-          -DTPL_HODLRBF_INCLUDE_DIRS="$HOME/LBL/STRUMPACK/hod-lr-bf/SRC_DOUBLE/;$HOME/LBL/STRUMPACK/hod-lr-bf/SRC_DOUBLECOMPLEX" \
-          -DTPL_HODLRBF_LIBRARIES="$HOME/LBL/STRUMPACK/hod-lr-bf/build/SRC_DOUBLE/libdhodlrbf.a;$HOME/LBL/STRUMPACK/hod-lr-bf/build/SRC_DOUBLECOMPLEX/libzhodlrbf.a"
+          -DTPL_ENABLE_BPACK=OFF \
+          -DTPL_BPACK_INCLUDE_DIRS="$BPACKHOME/SRC_DOUBLE/;$BPACKHOME/SRC_DOUBLECOMPLEX" \
+          -DTPL_BPACK_LIBRARIES="$BPACKHOME/build/SRC_DOUBLE/libdbutterflypack.so;$BPACKHOME/build/SRC_DOUBLECOMPLEX/libzbutterflypack.so"
 fi
 
 

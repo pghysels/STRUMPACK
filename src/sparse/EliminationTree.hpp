@@ -36,7 +36,7 @@
 #include "FrontalMatrixDense.hpp"
 #include "FrontalMatrixHSS.hpp"
 #include "FrontalMatrixBLR.hpp"
-#if defined(STRUMPACK_USE_HODLRBF)
+#if defined(STRUMPACK_USE_BPACK)
 #include "FrontalMatrixHODLR.hpp"
 #endif
 
@@ -80,7 +80,7 @@ namespace strumpack {
     using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
     using FHSS_t = FrontalMatrixHSS<scalar_t,integer_t>;
     using FBLR_t = FrontalMatrixBLR<scalar_t,integer_t>;
-#if defined(STRUMPACK_USE_HODLRBF)
+#if defined(STRUMPACK_USE_BPACK)
     using FHODLR_t = FrontalMatrixHODLR<scalar_t,integer_t>;
 #endif
 
@@ -197,7 +197,7 @@ namespace strumpack {
     bool is_hss = opts.use_HSS() && hss_parent &&
       (dim_sep >= opts.HSS_min_sep_size());
     bool is_blr = opts.use_BLR() && (dim_sep >= opts.BLR_min_sep_size());
-#if defined(STRUMPACK_USE_HODLRBF)
+#if defined(STRUMPACK_USE_BPACK)
     bool is_hodlr = opts.use_HODLR() && (dim_sep >= opts.HODLR_min_sep_size());
 #else
     bool is_hodlr = false;
@@ -218,7 +218,7 @@ namespace strumpack {
         nr_BLR_fronts_++;
       } else {
         if (is_hodlr) {
-#if defined(STRUMPACK_USE_HODLRBF)
+#if defined(STRUMPACK_USE_BPACK)
           front = std::unique_ptr<F_t>
             (new FHODLR_t(sep, sep_begin, sep_end, upd[sep]));
           front->set_HODLR_partitioning

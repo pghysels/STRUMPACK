@@ -101,7 +101,7 @@ template<typename scalar_t> void STRUMPACK_kernel_fit_HSS_MPI
 
 template<typename scalar_t> void STRUMPACK_kernel_fit_HODLR_MPI
 (STRUMPACKKernel kernel, scalar_t* labels, int argc, char* argv[]) {
-#if defined(STRUMPACK_USE_HODLRBF)
+#if defined(STRUMPACK_USE_BPACK)
   auto KR = static_cast<STRUMPACKKernelRegression<scalar_t>*>(kernel);
   std::vector<scalar_t> vl(labels, labels+KR->K_->n());
   HODLR::HODLROptions<scalar_t> opts;

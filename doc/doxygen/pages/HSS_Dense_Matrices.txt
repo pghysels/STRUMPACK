@@ -206,7 +206,7 @@ strumpack::HSS::HSSMatrix constructor:
 
 \code {.cpp}
 strumpack::HSS::HSSMatrix(strumpack::kernel::Kernel<scalar_t>& K,
-                          strumpack::DenseMatrix<scalar_t>& labels,
+                          std::vector<int>& perm,
                           const strumpack::HSS::HSSOptions<scalar_t>& opts);
 \endcode
 

@@ -869,12 +869,14 @@ namespace strumpack {
           std::cout << "#   - absolute compression tolerance = "
                     << opts_.BLR_options().abs_tol() << std::endl;
         }
+#if defined(STRUMPACK_USE_BPACK)
         if (opts_.use_HODLR()) {
           std::cout << "#   - relative compression tolerance = "
                     << opts_.HODLR_options().rel_tol() << std::endl;
           std::cout << "#   - absolute compression tolerance = "
                     << opts_.HODLR_options().abs_tol() << std::endl;
         }
+#endif
       }
       if (opts_.use_HSS())
         flop_breakdown();

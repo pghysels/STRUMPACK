@@ -72,8 +72,7 @@ namespace strumpack {
     (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override;
 
     void sample_CB
-    (const SPOptions<scalar_t>& opts, const DistM_t& R, DistM_t& Sr,
-     DistM_t& Sc, F_t* pa) const override;
+    (const DistM_t& R, DistM_t& Sr, DistM_t& Sc, F_t* pa) const override;
 
     void multifrontal_factorization
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,
@@ -311,7 +310,7 @@ namespace strumpack {
    */
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLRMPI<scalar_t,integer_t>::sample_CB
-  (const SPOptions<scalar_t>& opts, const DistM_t& R, DistM_t& Sr, DistM_t& Sc,
+  (const DistM_t& R, DistM_t& Sr, DistM_t& Sc,
    FrontalMatrix<scalar_t,integer_t>* pa) const {
     if (F11_.active() || F22_.active()) {
       auto b = R.cols();

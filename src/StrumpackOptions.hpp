@@ -40,7 +40,9 @@
 #include "misc/RandomWrapper.hpp"
 #include "HSS/HSSOptions.hpp"
 #include "BLR/BLROptions.hpp"
+#if defined(STRUMPACK_USE_BPACK)
 #include "HODLR/HODLROptions.hpp"
+#endif
 
 namespace strumpack {
 
@@ -284,7 +286,9 @@ namespace strumpack {
       _argc(argc), _argv(argv) {
       _hss_opts.set_verbose(false);
       _blr_opts.set_verbose(false);
+#if defined(STRUMPACK_USE_BPACK)
       _hodlr_opts.set_verbose(false);
+#endif
     }
 
     /**
@@ -747,7 +751,9 @@ namespace strumpack {
     void set_compression_leaf_size(int s) {
       _hss_opts.set_leaf_size(s);
       _blr_opts.set_leaf_size(s);
+#if defined(STRUMPACK_USE_BPACK)
       _hodlr_opts.set_leaf_size(s);
+#endif
     }
 
     /**
@@ -1023,7 +1029,10 @@ namespace strumpack {
       switch (_comp) {
       case CompressionType::HSS: return _hss_opts.leaf_size();
       case CompressionType::BLR: return _blr_opts.leaf_size();
-      case CompressionType::HODLR: return _hodlr_opts.leaf_size();
+      case CompressionType::HODLR:
+#if defined(STRUMPACK_USE_BPACK)
+        return _hodlr_opts.leaf_size();
+#endif
       case CompressionType::NONE:
       default: return std::numeric_limits<int>::max();
       }
@@ -1070,6 +1079,7 @@ namespace strumpack {
      */
     BLR::BLROptions<scalar_t>& BLR_options() { return _blr_opts; }
 
+#if defined(STRUMPACK_USE_BPACK)
     /**
      * Get a (const) reference to an object holding various options
      * pertaining to the HODLR code, and data structures.
@@ -1081,6 +1091,7 @@ namespace strumpack {
      * to the HODLR code, and data structures.
      */
     HODLR::HODLROptions<scalar_t>& HODLR_options() { return _hodlr_opts; }
+#endif
 
     /**
      * Parse the command line options that were passed to this object
@@ -1367,7 +1378,9 @@ namespace strumpack {
       //             << std::endl;
       HSS_options().set_from_command_line(argc, argv);
       BLR_options().set_from_command_line(argc, argv);
+#if defined(STRUMPACK_USE_BPACK)
       HODLR_options().set_from_command_line(argc, argv);
+#endif
     }
 
     /**
@@ -1537,7 +1550,9 @@ namespace strumpack {
     int _blr_min_sep_size = 256;
 
     /** HODLR options */
+#if defined(STRUMPACK_USE_BPACK)
     HODLR::HODLROptions<scalar_t> _hodlr_opts;
+#endif
     int _hodlr_min_front_size = 1000;
     int _hodlr_min_sep_size = 256;
 

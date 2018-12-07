@@ -38,7 +38,7 @@
 #include "sparse/GMResMPI.hpp"
 #include "sparse/IterativeRefinementMPI.hpp"
 #include "sparse/BiCGStabMPI.hpp"
-#include "mpi.h"
+#include "misc/MPIWrapper.hpp"
 
 namespace strumpack {
 
