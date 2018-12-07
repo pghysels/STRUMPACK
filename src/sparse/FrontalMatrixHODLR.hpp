@@ -71,9 +71,6 @@ namespace strumpack {
     (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
      int task_depth) const override;
 
-    void extract_sparse
-    (const SpMat_t& A, SpMat_t& A11, SpMat_t& A12, SpMat_t& A21) const;
-
     void release_work_memory() override;
     void random_sampling
     (const SpMat_t& A, const SPOptions<scalar_t>& opts, DenseM_t& Rr,
@@ -297,76 +294,6 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLR<scalar_t,integer_t>::extract_sparse
-  (const SpMat_t& A, SpMat_t& A11, SpMat_t& A12, SpMat_t& A21) const {
-    auto dsep = dim_sep();
-    auto dupd = dim_upd();
-    auto slo = sep_begin_;
-    auto shi = sep_end_;
-    integer_t nnz11 = 0, nnz12 = 0, nnz21 = 0;
-    for (integer_t r=slo; r<shi; r++) {
-      auto jhi = A.ptr(r+1);
-      for (integer_t j=A.ptr(r); j<jhi; j++) {
-        auto c = A.ind(j);
-        if (c >= slo) {
-          if (c < shi) nnz11++;
-          else nnz12++;
-        }
-      }
-    }
-    for (std::size_t r=sep_end_; r<A.size(); r++)
-      for (std::size_t j=A.ptr(r); j<A.ptr(r+1); j++) {
-        auto c = A.ind(j);
-        if (c >= sep_begin_ && c < sep_end_) nnz21++;
-      }
-    A11 = CSRMatrix<scalar_t,integer_t>(dsep, nnz11);
-    A12 = CSRMatrix<scalar_t,integer_t>(dsep, nnz12);
-    A21 = CSRMatrix<scalar_t,integer_t>(dupd, nnz21);
-
-    A11.ptr(0) = A12.ptr(0) = A21.ptr(0) = 0;
-    nnz11 = nnz12 = nnz21 = 0;
-    for (integer_t r=0; r<dsep; r++) {
-      auto gr = r + this->sep_begin();
-      A11.ptr(r+1) = A11.ptr(r);
-      A12.ptr(r+1) = A12.ptr(r);
-      auto jhi = A.ptr(gr+1);
-      for (integer_t j=A.ptr(gr); j<jhi; j++) {
-        auto c = A.ind(j);
-        c -= slo;
-        if (c >= 0) {
-          if (c < dsep) {
-            A11.ptr(r+1)++;
-            A11.ind(nnz11) = c;
-            A11.val(nnz11++) = A.val(j);
-          } else {
-            A12.ptr(r+1)++;
-            A12.ind(nnz12) = std::distance
-              (this->upd_.begin(),
-               std::lower_bound(this->upd_.begin(), this->upd_.end(), c+slo));
-            A12.val(nnz12++) = A.val(j);
-          }
-        }
-      }
-    }
-    for (integer_t r=0; r<dupd; r++) {
-      auto gr = this->upd_[r];
-      A21.ptr(r+1) = A21.ptr(r);
-      auto jhi = A.ptr(gr+1);
-      for (integer_t j=A.ptr(gr); j<jhi; j++) {
-        auto c = A.ind(j);
-        c -= slo;
-        if (c >= 0) {
-          if (c < dsep) {
-            A21.ptr(r+1)++;
-            A21.ind(nnz21) = c;
-            A21.val(nnz21++) = A.val(j);
-          } else continue;
-        }
-      }
-    }
-  }
-
-  template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLR<scalar_t,integer_t>::multifrontal_factorization_node
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
@@ -395,12 +322,9 @@ namespace strumpack {
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();
 
-    CSRMatrix<scalar_t,integer_t> A11, A12, A21;
-    extract_sparse(A, A11, A12, A21);
-
     auto sample_F11 = [&](Trans op, const DenseM_t& R, DenseM_t& S) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-      A11.spmv(op, R, S);
+      A.front_multiply_F11(op, sep_begin_, sep_end_, R, S, 0);
       if (lchild_) lchild_->sample_CB_to_F11(op, R, S, this, task_depth);
       if (rchild_) rchild_->sample_CB_to_F11(op, R, S, this, task_depth);
       TIMER_STOP(t_sampling);
@@ -410,7 +334,7 @@ namespace strumpack {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
       DenseM_t lR(R), lS(S);
       lR.scale(a);
-      A12.spmv(op, lR, lS);
+      A.front_multiply_F12(op, sep_begin_, sep_end_, this->upd_, R, S, 0);
       if (lchild_) lchild_->sample_CB_to_F12(op, lR, lS, this, task_depth);
       if (rchild_) rchild_->sample_CB_to_F12(op, lR, lS, this, task_depth);
       S.scale_and_add(b, lS);
@@ -421,7 +345,7 @@ namespace strumpack {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
       DenseM_t lR(R), lS(S);
       lR.scale(a);
-      A21.spmv(op, lR, lS);
+      A.front_multiply_F21(op, sep_begin_, sep_end_, this->upd_, R, S, 0);
       if (lchild_) lchild_->sample_CB_to_F21(op, lR, lS, this, task_depth);
       if (rchild_) rchild_->sample_CB_to_F21(op, lR, lS, this, task_depth);
       S.scale_and_add(b, lS);
@@ -445,7 +369,6 @@ namespace strumpack {
         if (op == Trans::N) {
           F12_.mult(op, R, F12R);
           F11_.inv_mult(op, F12R, invF11F12R);
-          //F11_.solve(F12R, invF11F12R);
           F21_.mult(op, invF11F12R, S);
         } else {
           F21_.mult(op, R, F12R);

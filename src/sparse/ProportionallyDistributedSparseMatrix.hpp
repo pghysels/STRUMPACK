@@ -100,24 +100,20 @@ namespace strumpack {
     void front_multiply
     (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
      const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const override;
+    void front_multiply_F11
+    (Trans op, integer_t slo, integer_t shi,
+     const DenseM_t& R, DenseM_t& S, int depth) const override;
+    void front_multiply_F12
+    (Trans op, integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+     const DenseM_t& R, DenseM_t& S, int depth) const override;
+    void front_multiply_F21
+    (Trans op, integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+     const DenseM_t& R, DenseM_t& S, int depth) const override;
 
     void front_multiply_2d
     (integer_t sep_begin, integer_t sep_end,
      const std::vector<integer_t>& upd, const DistM_t& R,
      DistM_t& Srow, DistM_t& Scol, int depth) const override;
-
-    // void front_multiply_2d_F11
-    // (integer_t sep_begin, integer_t sep_end,
-    //  const std::vector<integer_t>& upd, const DistM_t& R,
-    //  DistM_t& S, int depth) const override;
-    // void front_multiply_2d_F12
-    // (integer_t sep_begin, integer_t sep_end,
-    //  const std::vector<integer_t>& upd, const DistM_t& R,
-    //  DistM_t& S, int depth) const override;
-    // void front_multiply_2d_F21
-    // (integer_t sep_begin, integer_t sep_end,
-    //  const std::vector<integer_t>& upd, const DistM_t& R,
-    //  DistM_t& S, int depth) const override;
 
     void spmv(const DenseM_t& x, DenseM_t& y) const override {};
     void spmv(const scalar_t* x, scalar_t* y) const override {};
@@ -405,6 +401,128 @@ namespace strumpack {
     }
     // STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
     // STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::front_multiply_F11
+  (Trans op, integer_t slo, integer_t shi,
+   const DenseM_t& R, DenseM_t& S, int depth) const {
+    const std::size_t clo = find_global(slo);
+    const std::size_t chi = find_global(shi);
+    const auto ds = shi - slo;
+    const auto nbvec = R.cols();
+    const auto B = 4; // blocking parameter
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp taskloop default(shared)                    \
+  if(depth < params::task_recursion_cutoff_level)
+#endif
+    for (std::size_t k=0; k<nbvec; k+=B) {
+      for (std::size_t c=clo; c<chi; c++) {
+        const auto col = global_col_[c];
+        integer_t row_upd = 0;
+        const auto hij = ptr_[c+1];
+        for (auto j=ptr_[c]; j<hij; j++) {
+          const auto row = ind_[j];
+          if (row >= slo) {
+            if (row < shi) {
+              const auto hikk = std::min(k+B, nbvec);
+              const auto a = val_[j];
+              for (std::size_t kk=k; kk<hikk; kk++) {
+                if (op == Trans::N)
+                  S(row-slo, kk) += a * R(col-slo, kk);
+                else if (op == Trans::T)
+                  S(col-slo, kk) += a * R(row-slo, kk);
+                else
+                  S(col-slo, kk) += blas::my_conj(a) * R(row-slo, kk);
+              }
+            } else break;
+          }
+        }
+      }
+    }
+  }
+
+
+  template<typename scalar_t,typename integer_t> void
+  ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::front_multiply_F21
+  (Trans op, integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+   const DenseM_t& R, DenseM_t& S, int depth) const {
+    const integer_t dupd = upd.size();
+    const std::size_t clo = find_global(slo);
+    const std::size_t chi = find_global(shi);
+    const auto ds = shi - slo;
+    const auto nbvec = R.cols();
+    const auto B = 4; // blocking parameter
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp taskloop default(shared)                    \
+  if(depth < params::task_recursion_cutoff_level)
+#endif
+    for (std::size_t k=0; k<nbvec; k+=B) {
+      for (std::size_t c=clo; c<chi; c++) {
+        const auto col = global_col_[c];
+        integer_t row_upd = 0;
+        const auto hij = ptr_[c+1];
+        for (auto j=ptr_[c]; j<hij; j++) {
+          const auto row = ind_[j];
+          if (row >= shi) {
+            while (row_upd < dupd && upd[row_upd] < row) row_upd++;
+            if (row_upd == dupd) break;
+            if (upd[row_upd] == row) {
+              const auto hikk = std::min(k+B, nbvec);
+              const auto a = val_[j];
+              for (std::size_t kk=k; kk<hikk; kk++) {
+                if (op == Trans::N)
+                  S(ds+row_upd, kk) += a * R(col-slo, kk);
+                else if (op == Trans::T)
+                  S(col-slo, kk) += a * R(ds+row_upd, kk);
+                else
+                  S(col-slo, kk) += blas::my_conj(a) * R(ds+row_upd, kk);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::front_multiply_F12
+  (Trans op, integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+   const DenseM_t& R, DenseM_t& S, int depth) const {
+    const integer_t dupd = upd.size();
+    const std::size_t clo = find_global(slo);
+    const std::size_t chi = find_global(shi);
+    const auto ds = shi - slo;
+    const auto nbvec = R.cols();
+    const auto B = 4; // blocking parameter
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp taskloop default(shared)                    \
+  if(depth < params::task_recursion_cutoff_level)
+#endif
+    for (std::size_t k=0; k<nbvec; k+=B) {
+      for (integer_t i=0, c=chi; i<dupd; i++) { // update columns
+        c = find_global(upd[i], c);
+        if (c == local_cols_ || global_col_[c] != upd[i]) continue;
+        const auto hij = ptr_[c+1];
+        for (auto j=ptr_[c]; j<hij; j++) {
+          const auto row = ind_[j];
+          if (row >= slo) {
+            if (row < shi) {
+              const auto a = val_[j];
+              const auto hikk = std::min(k+B, nbvec);
+              for (std::size_t kk=k; kk<hikk; kk++) {
+                if (op == Trans::N)
+                  S(row-slo, kk) += a * R(ds+i, kk);
+                else if (op == Trans::T)
+                  S(ds+i, kk) += a * R(row-slo, kk);
+                else
+                  S(ds+i, kk) += blas::my_conj(a) * R(row-slo, kk);
+              }
+            } else break;
+          }
+        }
+      }
+    }
   }
 
   template<typename scalar_t,typename integer_t> void
