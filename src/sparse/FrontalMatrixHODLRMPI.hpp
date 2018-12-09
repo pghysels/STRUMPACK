@@ -147,7 +147,7 @@ namespace strumpack {
       seqSr.zero();
     }
     if (visit(lchild_)) lchild_->sample_CB(op, Rl, Sl, seqRl, seqSl, this);
-    if (visit(rchild_)) rchild_->sample_CB(op, Rr, Sr, seqRl, seqSr, this);
+    if (visit(rchild_)) rchild_->sample_CB(op, Rr, Sr, seqRr, seqSr, this);
     std::vector<std::vector<scalar_t>> sbuf(this->P());
     if (visit(lchild_)) lchild_->skinny_ea_to_buffers(Sl, seqSl, sbuf, this);
     if (visit(rchild_)) rchild_->skinny_ea_to_buffers(Sr, seqSr, sbuf, this);
@@ -205,35 +205,53 @@ namespace strumpack {
 
     if (dupd) {
       auto sample_F12 = [&]
-        (Trans op, scalar_t a, const DenseM_t& R2, scalar_t b, DenseM_t& S1) {
+        (Trans op, scalar_t a, const DenseM_t& Rl, scalar_t b, DenseM_t& Sl) {
         TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-        auto n = R2.cols();
+        auto n = Rl.cols();
         DistM_t R(grid(), dsep+dupd, n), S(grid(), dsep+dupd, n);
-        DistMW_t R2dist(dupd, n, R, dsep, 0);
-        DistMW_t(dsep, n, R, 0, 0).zero();
-        F12_.redistribute_1D_to_2D(R2, R2dist, F12_.cdist());
-        sample_front(op, R, S);
-        F12_.redistribute_2D_to_1D
-        (a, DistMW_t(dsep, n, S, 0, 0), b, S1, F12_.rdist());
+        if (op == Trans::N) {
+          DistMW_t R2dist(dupd, n, R, dsep, 0);
+          DistMW_t(dsep, n, R, 0, 0).zero();
+          F12_.redistribute_1D_to_2D(Rl, R2dist, F12_.cdist());
+          sample_front(op, R, S);
+          F12_.redistribute_2D_to_1D
+            (a, DistMW_t(dsep, n, S, 0, 0), b, Sl, F12_.rdist());
+        } else {
+          DistMW_t R1dist(dsep, n, R, 0, 0);
+          DistMW_t(dupd, n, R, dsep, 0).zero();
+          F12_.redistribute_1D_to_2D(Rl, R1dist, F12_.rdist());
+          sample_front(op, R, S);
+          F12_.redistribute_2D_to_1D
+          (a, DistMW_t(dupd, n, S, dsep, 0), b, Sl, F12_.cdist());
+        }
         TIMER_STOP(t_sampling);
       };
       auto sample_F21 = [&]
-        (Trans op, scalar_t a, const DenseM_t& R1, scalar_t b, DenseM_t& S2) {
+        (Trans op, scalar_t a, const DenseM_t& Rl, scalar_t b, DenseM_t& Sl) {
         TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-        auto n = R1.cols();
+        auto n = Rl.cols();
         DistM_t R(grid(), dsep+dupd, n), S(grid(), dsep+dupd, n);
-        DistMW_t R1dist(dsep, n, R, 0, 0);
-        DistMW_t(dupd, n, R, dsep, 0).zero();
-        F21_.redistribute_1D_to_2D(R1, R1dist, F21_.cdist());
-        sample_front(op, R, S);
-        F12_.redistribute_2D_to_1D
-        (a, DistMW_t(dupd, n, S, dsep, 0), b, S2, F21_.rdist());
+        if (op == Trans::N) {
+          DistMW_t R1dist(dsep, n, R, 0, 0);
+          DistMW_t(dupd, n, R, dsep, 0).zero();
+          F21_.redistribute_1D_to_2D(Rl, R1dist, F21_.cdist());
+          sample_front(op, R, S);
+          F12_.redistribute_2D_to_1D
+            (a, DistMW_t(dupd, n, S, dsep, 0), b, Sl, F21_.rdist());
+        } else {
+          DistMW_t R2dist(dupd, n, R, dsep, 0);
+          DistMW_t(dsep, n, R, 0, 0).zero();
+          F21_.redistribute_1D_to_2D(Rl, R2dist, F21_.rdist());
+          sample_front(op, R, S);
+          F12_.redistribute_2D_to_1D
+            (a, DistMW_t(dsep, n, S, 0, 0), b, Sl, F21_.cdist());
+        }
         TIMER_STOP(t_sampling);
       };
-      if (dupd) {
-        F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_, sample_F12);
-        F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_, sample_F21);
-      }
+      F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_);
+      F12_.compress(sample_F12);
+      F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
+      F21_.compress(sample_F21);
 
       auto sample_F22 = [&](Trans op, const DenseM_t& R2, DenseM_t& S2) {
         TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);

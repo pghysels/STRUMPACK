@@ -34,6 +34,7 @@
 #define STRUMPACK_HODLR_MATRIX_HPP
 
 #include <cassert>
+#include <algorithm>
 
 #include "HSS/HSSPartitionTree.hpp"
 #include "kernel/Kernel.hpp"
@@ -496,6 +497,7 @@ namespace strumpack {
       std::vector<int> leafs = full_tree.leaf_sizes();
 
       c_ = (c.size() <= leafs.size()) ? c : c.sub(0, leafs.size());
+      if (c_.is_null()) return;
       Fcomm_ = MPI_Comm_c2f(c_.comm());
       int P = c_.size();
       int rank = c_.rank();
@@ -584,6 +586,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::compress(const mult_t& Amult) {
+      if (c_.is_null()) return;
       C2Fptr f = static_cast<void*>(const_cast<mult_t*>(&Amult));
       HODLR_construct_matvec_compute
         (ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
@@ -593,6 +596,7 @@ namespace strumpack {
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::mult
     (Trans op, const DenseM_t& X, DenseM_t& Y) const {
+      if (c_.is_null()) return;
       HODLR_mult(char(op), X.data(), Y.data(), lrows_, lrows_, X.cols(),
                  ho_bf_, options_, stats_, ptree_);
     }
@@ -600,6 +604,7 @@ namespace strumpack {
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::mult
     (Trans op, const DistM_t& X, DistM_t& Y) const {
+      if (c_.is_null()) return;
       DenseM_t Y1D(lrows_, X.cols());
       {
         auto X1D = redistribute_2D_to_1D(X);
@@ -612,6 +617,7 @@ namespace strumpack {
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::inv_mult
     (Trans op, const DenseM_t& X, DenseM_t& Y) const {
+      if (c_.is_null()) return;
       HODLR_inv_mult
         (char(op), X.data(), Y.data(), lrows_, lrows_, X.cols(),
          ho_bf_, options_, stats_, ptree_);
@@ -619,17 +625,20 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::factor() {
+      if (c_.is_null()) return;
       HODLR_factor<scalar_t>(ho_bf_, options_, stats_, ptree_, msh_);
     }
 
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::solve(const DenseM_t& B, DenseM_t& X) const {
+      if (c_.is_null()) return;
       HODLR_solve(X.data(), B.data(), lrows_, X.cols(),
                   ho_bf_, options_, stats_, ptree_);
     }
 
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::solve(const DistM_t& B, DistM_t& X) const {
+      if (c_.is_null()) return;
       DenseM_t X1D(lrows_, X.cols());
       {
         auto B1D = redistribute_2D_to_1D(B);
@@ -650,20 +659,23 @@ namespace strumpack {
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::redistribute_2D_to_1D
     (const DistM_t& R2D, DenseM_t& R1D) const {
+      if (c_.is_null()) return;
       const auto P = c_.size();
       const auto rank = c_.rank();
       const auto Rcols = R2D.cols();
-      const auto Rlcols = R2D.lcols();
-      const auto Rlrows = R2D.lrows();
+      int R2Drlo, R2Drhi, R2Dclo, R2Dchi;
+      R2D.lranges(R2Drlo, R2Drhi, R2Dclo, R2Dchi);
+      const auto Rlcols = R2Dchi - R2Dclo;
+      const auto Rlrows = R2Drhi - R2Drlo;
+      const auto nprows = R2D.nprows();
       const auto B = DistM_t::default_MB;
-      int nprows = R2D.nprows(), npcols = R2D.npcols();
       std::vector<std::vector<scalar_t>> sbuf(P);
       if (R2D.active()) {
         // global, local, proc
         std::vector<std::tuple<int,int,int>> glp(Rlrows);
         {
           std::vector<std::size_t> count(P);
-          for (int r=0; r<Rlrows; r++) {
+          for (int r=R2Drlo; r<R2Drhi; r++) {
             auto gr = perm_[R2D.rowl2g(r)];
             auto p = -1 + std::distance
               (dist_.begin(), std::upper_bound
@@ -671,13 +683,13 @@ namespace strumpack {
             glp[r] = std::tuple<int,int,int>{gr, r, p};
             count[p] += Rlcols;
           }
-          sort(glp.begin(), glp.end());
+          std::sort(glp.begin(), glp.end());
           for (int p=0; p<P; p++)
             sbuf[p].reserve(count[p]);
         }
-        for (int r=0; r<Rlrows; r++)
-          for (int c=0, lr=std::get<1>(glp[r]),
-                 p=std::get<2>(glp[r]); c<Rlcols; c++)
+        for (int r=R2Drlo; r<R2Drhi; r++)
+          for (int c=R2Dclo, lr=std::get<1>(glp[r]),
+                 p=std::get<2>(glp[r]); c<R2Dchi; c++)
             sbuf[p].push_back(R2D(lr,c));
       }
       std::vector<scalar_t> rbuf;
@@ -687,10 +699,10 @@ namespace strumpack {
       if (lrows_) {
         std::vector<int> src_c(Rcols);
         for (int c=0; c<Rcols; c++)
-          src_c[c] = ((c / B) % npcols) * nprows;
+          src_c[c] = R2D.colg2p_fixed(c)*nprows;
         for (int r=0; r<lrows_; r++) {
           auto gr = perm_[r + dist_[rank]];
-          auto src_r = (gr / B) % nprows;
+          auto src_r = R2D.rowg2p_fixed(gr);
           for (int c=0; c<Rcols; c++)
             R1D(r, c) = *(pbuf[src_r + src_c[c]]++);
         }
@@ -700,24 +712,30 @@ namespace strumpack {
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::redistribute_1D_to_2D
     (const DenseM_t& S1D, DistM_t& S2D) const {
+      if (c_.is_null()) return;
       const auto rank = c_.rank();
       const auto P = c_.size();
       const auto B = DistM_t::default_MB;
       const auto cols = S1D.cols();
-      const auto Slcols = S2D.lcols();
-      const auto Slrows = S2D.lrows();
-      int nprows = S2D.nprows(), npcols = S2D.npcols();
+      int S2Drlo, S2Drhi, S2Dclo, S2Dchi;
+      S2D.lranges(S2Drlo, S2Drhi, S2Dclo, S2Dchi);
+      const auto nprows = S2D.nprows();
       std::vector<std::vector<scalar_t>> sbuf(P);
+      assert(S1D.rows() == lrows_);
+      assert(S1D.rows() == dist_[rank+1] - dist_[rank]);
       if (lrows_) {
         std::vector<std::tuple<int,int,int>> glp(lrows_);
         for (int r=0; r<lrows_; r++) {
           auto gr = iperm_[r + dist_[rank]];
-          glp[r] = std::tuple<int,int,int>{gr,r,(gr / B) % nprows};
+          //auto gr = r + dist_[rank];
+          assert(gr == r + dist_[rank]);
+          assert(gr >= 0 && gr < S2D.rows());
+          glp[r] = std::tuple<int,int,int>{gr,r,S2D.rowg2p_fixed(gr)};
         }
-        sort(glp.begin(), glp.end());
+        std::sort(glp.begin(), glp.end());
         std::vector<int> pc(cols);
         for (int c=0; c<cols; c++)
-          pc[c] = ((c / B) % npcols) * nprows;
+          pc[c] = S2D.colg2p_fixed(c)*nprows;
         {
           std::vector<std::size_t> count(P);
           for (int r=0; r<lrows_; r++)
@@ -735,12 +753,16 @@ namespace strumpack {
       std::vector<scalar_t*> pbuf;
       c_.all_to_all_v(sbuf, rbuf, pbuf);
       if (S2D.active()) {
-        for (int r=0; r<Slrows; r++) {
+        for (int r=S2Drlo; r<S2Drhi; r++) {
           auto gr = perm_[S2D.rowl2g(r)];
+          assert(gr == S2D.rowl2g(r));
           auto p = -1 + std::distance
             (dist_.begin(), std::upper_bound(dist_.begin(), dist_.end(), gr));
-          for (int c=0; c<Slcols; c++)
-            S2D(r,c) = *(pbuf[p]++);
+          assert(p < P && p >= 0);
+          for (int c=S2Dclo; c<S2Dchi; c++) {
+            auto tmp = *(pbuf[p]++);
+            S2D(r,c) = tmp;
+          }
         }
       }
     }

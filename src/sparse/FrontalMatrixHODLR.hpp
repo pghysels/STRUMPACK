@@ -329,40 +329,41 @@ namespace strumpack {
       if (rchild_) rchild_->sample_CB_to_F11(op, R, S, this, task_depth);
       TIMER_STOP(t_sampling);
     };
-    auto sample_F12 = [&]
-      (Trans op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
-      TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-      DenseM_t lR(R), lS(S);
-      lR.scale(a);
-      A.front_multiply_F12(op, sep_begin_, sep_end_, this->upd_, R, S, 0);
-      if (lchild_) lchild_->sample_CB_to_F12(op, lR, lS, this, task_depth);
-      if (rchild_) rchild_->sample_CB_to_F12(op, lR, lS, this, task_depth);
-      S.scale_and_add(b, lS);
-      TIMER_STOP(t_sampling);
-    };
-    auto sample_F21 = [&]
-      (Trans op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
-      TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-      DenseM_t lR(R), lS(S);
-      lR.scale(a);
-      A.front_multiply_F21(op, sep_begin_, sep_end_, this->upd_, R, S, 0);
-      if (lchild_) lchild_->sample_CB_to_F21(op, lR, lS, this, task_depth);
-      if (rchild_) rchild_->sample_CB_to_F21(op, lR, lS, this, task_depth);
-      S.scale_and_add(b, lS);
-      TIMER_STOP(t_sampling);
-    };
-
     F11_.compress(sample_F11);
-    if (dupd) {
-      F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_, sample_F12);
-      F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_, sample_F21);
-    }
 
     TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
     F11_.factor();
     TIMER_STOP(t_fact);
 
     if (dupd) {
+      auto sample_F12 = [&]
+        (Trans op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
+        TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
+        DenseM_t lR(R), lS(S);
+        lR.scale(a);
+        A.front_multiply_F12(op, sep_begin_, sep_end_, this->upd_, R, S, 0);
+        if (lchild_) lchild_->sample_CB_to_F12(op, lR, lS, this, task_depth);
+        if (rchild_) rchild_->sample_CB_to_F12(op, lR, lS, this, task_depth);
+        S.scale_and_add(b, lS);
+        TIMER_STOP(t_sampling);
+      };
+      auto sample_F21 = [&]
+        (Trans op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
+        TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
+        DenseM_t lR(R), lS(S);
+        lR.scale(a);
+        A.front_multiply_F21(op, sep_begin_, sep_end_, this->upd_, R, S, 0);
+        if (lchild_) lchild_->sample_CB_to_F21(op, lR, lS, this, task_depth);
+        if (rchild_) rchild_->sample_CB_to_F21(op, lR, lS, this, task_depth);
+        S.scale_and_add(b, lS);
+        TIMER_STOP(t_sampling);
+      };
+
+      F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_);
+      F12_.compress(sample_F12);
+      F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
+      F21_.compress(sample_F21);
+
       auto sample_CB = [&](Trans op, const DenseM_t& R, DenseM_t& S) {
         TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
         DenseM_t F12R(dsep, R.cols()), invF11F12R(dsep, R.cols());
