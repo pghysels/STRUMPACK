@@ -472,11 +472,11 @@ namespace strumpack {
               const auto a = val_[j];
               for (std::size_t kk=k; kk<hikk; kk++) {
                 if (op == Trans::N)
-                  S(ds+row_upd, kk) += a * R(col-slo, kk);
+                  S(row_upd, kk) += a * R(col-slo, kk);
                 else if (op == Trans::T)
-                  S(col-slo, kk) += a * R(ds+row_upd, kk);
+                  S(col-slo, kk) += a * R(row_upd, kk);
                 else
-                  S(col-slo, kk) += blas::my_conj(a) * R(ds+row_upd, kk);
+                  S(col-slo, kk) += blas::my_conj(a) * R(row_upd, kk);
               }
             }
           }
@@ -490,9 +490,9 @@ namespace strumpack {
   (Trans op, integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
    const DenseM_t& R, DenseM_t& S, int depth) const {
     const integer_t dupd = upd.size();
-    const std::size_t clo = find_global(slo);
+    //const std::size_t clo = find_global(slo);
     const std::size_t chi = find_global(shi);
-    const auto ds = shi - slo;
+    //const auto ds = shi - slo;
     const auto nbvec = R.cols();
     const auto B = 4; // blocking parameter
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
@@ -512,11 +512,11 @@ namespace strumpack {
               const auto hikk = std::min(k+B, nbvec);
               for (std::size_t kk=k; kk<hikk; kk++) {
                 if (op == Trans::N)
-                  S(row-slo, kk) += a * R(ds+i, kk);
+                  S(row-slo, kk) += a * R(i, kk);
                 else if (op == Trans::T)
-                  S(ds+i, kk) += a * R(row-slo, kk);
+                  S(i, kk) += a * R(row-slo, kk);
                 else
-                  S(ds+i, kk) += blas::my_conj(a) * R(row-slo, kk);
+                  S(i, kk) += blas::my_conj(a) * R(row-slo, kk);
               }
             } else break;
           }

@@ -270,9 +270,10 @@ namespace strumpack {
               (dist.begin(), std::upper_bound
                (dist.begin(), dist.end(), gr));
             glp[r] = std::tuple<int,int,int>{gr, r, p};
+            assert(p >= 0 && p < P);
             count[p] += Rlcols;
           }
-          sort(glp.begin(), glp.end());
+          std::sort(glp.begin(), glp.end());
           for (int p=0; p<P; p++)
             sbuf[p].reserve(count[p]);
         }
