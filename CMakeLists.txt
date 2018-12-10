@@ -438,8 +438,11 @@ install(FILES
   src/StrumpackParameters.hpp
   DESTINATION include)
 
+configure_file(${CMAKE_SOURCE_DIR}/src/python/STRUMPACKKernel.py.in
+  ${PROJECT_BINARY_DIR}/STRUMPACKKernel.py)
+
 install(FILES
-  src/python/STRUMPACKKernel.py
+  ${PROJECT_BINARY_DIR}/STRUMPACKKernel.py
   DESTINATION include/python)
 
 install(FILES
