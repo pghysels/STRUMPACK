@@ -1,10 +1,16 @@
 /*! \page hodlr_matrices HODLR Approximation of Dense Matrices
 
 
+HODLR, or Hierarchically Off-Diagonal Low Rank, is a rank-structured
+format that is similar to HSS, but simpler. It uses the same weak
+admissibility, i.e, all off-diagonal blocks are low rank, but it does
+not use nested bases. Compared to HSS, HODLR theoretically has worse
+asymptotic complexity, but the algorithms might be faster in practice
+for medium sized problems.
+
 STRUMPACK's HODLR code uses an external library, which can be found
 here:
-
-__TODO__
+   \link https://github.com/liuyangzhuan/ButterflyPACK https://github.com/liuyangzhuan/ButterflyPACK \endlink
 
 See the \ref installation instructions for how to configure and
 compile STRUMPACK with support for HODLR.
