@@ -124,7 +124,9 @@ int main(int argc, char *argv[]) {
         (prediction[i] < 0 && test_labels[i] >= 0))
       incorrect_quant++;
   cout << "# prediction score: "
-       << (float(m - incorrect_quant) / m) * 100. << "%"
+       << (float(m - incorrect_quant) / m) * 100. << "%" << endl
+       << "# c-err: "
+       << (float(incorrect_quant) / m) * 100. << "%"
        << endl << endl;
 
   return 0;
