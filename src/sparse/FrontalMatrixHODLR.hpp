@@ -322,8 +322,28 @@ namespace strumpack {
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();
 
+    // //// ------ temporary test code ------------------------------
+    // DenseM_t dF11(dsep, dsep); dF11.zero();
+    // DenseM_t dF12(dsep, dupd); dF12.zero();
+    // DenseM_t dF21(dupd, dsep); dF21.zero();
+    // DenseM_t dF22(dupd, dupd); dF22.zero();
+    // A.extract_front
+    //   (dF11, dF12, dF21, this->sep_begin_, this->sep_end_,
+    //    this->upd_, task_depth);
+    // if (lchild_)
+    //   lchild_->extend_add_to_dense
+    //     (dF11, dF12, dF21, dF22, this, task_depth);
+    // if (rchild_)
+    //   rchild_->extend_add_to_dense
+    //     (dF11, dF12, dF21, dF22, this, task_depth);
+    // //// ---------------------------------------------------------
+    // //// ------ temporary test code -----------------------------
+    // //// ---------------------------------------------------------
+
+
     auto sample_F11 = [&](Trans op, const DenseM_t& R, DenseM_t& S) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
+      S.zero();
       A.front_multiply_F11(op, sep_begin_, sep_end_, R, S, 0);
       if (lchild_) lchild_->sample_CB_to_F11(op, R, S, this, task_depth);
       if (rchild_) rchild_->sample_CB_to_F11(op, R, S, this, task_depth);
@@ -339,12 +359,13 @@ namespace strumpack {
       auto sample_F12 = [&]
         (Trans op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
         TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-        DenseM_t lR(R), lS(S);
+        DenseM_t lR(R);
         lR.scale(a);
+        if (b == scalar_t(0.)) S.zero();
+        else S.scale(b);
         A.front_multiply_F12(op, sep_begin_, sep_end_, this->upd_, R, S, 0);
-        if (lchild_) lchild_->sample_CB_to_F12(op, lR, lS, this, task_depth);
-        if (rchild_) rchild_->sample_CB_to_F12(op, lR, lS, this, task_depth);
-        S.scale_and_add(b, lS);
+        if (lchild_) lchild_->sample_CB_to_F12(op, lR, S, this, task_depth);
+        if (rchild_) rchild_->sample_CB_to_F12(op, lR, S, this, task_depth);
         TIMER_STOP(t_sampling);
       };
       auto sample_F21 = [&]
@@ -352,10 +373,11 @@ namespace strumpack {
         TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
         DenseM_t lR(R), lS(S);
         lR.scale(a);
+        if (b == scalar_t(0.)) S.zero();
+        else S.scale(b);
         A.front_multiply_F21(op, sep_begin_, sep_end_, this->upd_, R, S, 0);
-        if (lchild_) lchild_->sample_CB_to_F21(op, lR, lS, this, task_depth);
-        if (rchild_) rchild_->sample_CB_to_F21(op, lR, lS, this, task_depth);
-        S.scale_and_add(b, lS);
+        if (lchild_) lchild_->sample_CB_to_F21(op, lR, S, this, task_depth);
+        if (rchild_) rchild_->sample_CB_to_F21(op, lR, S, this, task_depth);
         TIMER_STOP(t_sampling);
       };
 
@@ -363,6 +385,19 @@ namespace strumpack {
       F12_.compress(sample_F12);
       F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
       F21_.compress(sample_F21);
+
+
+      // auto piv = dF11.LU(task_depth);
+      // dF12.laswp(piv, true);
+      // trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+      //      scalar_t(1.), dF11, dF12, task_depth);
+      // trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+      //      scalar_t(1.), dF11, dF21, task_depth);
+      // // BETA=0 means dF22 has only the Schur update
+      // // BETA=1 means dF22 has the full Schur complement
+      // gemm(Trans::N, Trans::N, scalar_t(-1.), dF21, dF12,
+      //      scalar_t(1.), dF22, task_depth);
+
 
       auto sample_CB = [&](Trans op, const DenseM_t& R, DenseM_t& S) {
         TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);

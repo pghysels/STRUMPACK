@@ -293,20 +293,15 @@ namespace strumpack {
         std::vector<int> src_c(Rcols);
         for (int c=0; c<Rcols; c++)
           src_c[c] = R2D.colg2p_fixed(c)*nprows;
-        if (a == scalar_t(1.) && b == scalar_t(0.)) {
-          for (int r=0; r<lrows; r++) {
-            auto gr = r + dist[rank];
-            auto src_r = R2D.rowg2p_fixed(gr);
-            for (int c=0; c<Rcols; c++)
-              R1D(r, c) = *(pbuf[src_r + src_c[c]]++);
-          }
+        if (b == scalar_t(0.)) {
+          // don't assume that 0 * Nan == 0
+          for (int r=0; r<lrows; r++)
+            for (int c=0, src_r=R2D.rowg2p_fixed(r+dist[rank]); c<Rcols; c++)
+              R1D(r, c) = *(pbuf[src_r + src_c[c]]++) * a;
         } else {
-          for (int r=0; r<lrows; r++) {
-            auto gr = r + dist[rank];
-            auto src_r = R2D.rowg2p_fixed(gr);
-            for (int c=0; c<Rcols; c++)
+          for (int r=0; r<lrows; r++)
+            for (int c=0, src_r=R2D.rowg2p_fixed(r+dist[rank]); c<Rcols; c++)
               R1D(r, c) = *(pbuf[src_r + src_c[c]]++) * a + b * R1D(r, c);
-          }
         }
       }
     }
