@@ -249,6 +249,10 @@ namespace strumpack {
      const std::vector<int>& dist) const {
       const auto P = c_->size();
       const auto rank = c_->rank();
+      // for (int p=0; p<P; p++)
+      //   copy(dist[rank+1]-dist[rank], R2D.cols(), R2D, dist[rank], 0,
+      //        R1D, p, R2D.grid()->ctxt_all());
+      // return;
       const auto Rcols = R2D.cols();
       int R2Drlo, R2Drhi, R2Dclo, R2Dchi;
       R2D.lranges(R2Drlo, R2Drhi, R2Dclo, R2Dchi);
@@ -269,7 +273,7 @@ namespace strumpack {
             auto p = -1 + std::distance
               (dist.begin(), std::upper_bound
                (dist.begin(), dist.end(), gr));
-            glp[r] = std::tuple<int,int,int>{gr, r, p};
+            glp[r-R2Drlo] = std::tuple<int,int,int>{gr, r, p};
             assert(p >= 0 && p < P);
             count[p] += Rlcols;
           }
@@ -278,8 +282,8 @@ namespace strumpack {
             sbuf[p].reserve(count[p]);
         }
         for (int r=R2Drlo; r<R2Drhi; r++)
-          for (int c=R2Dclo, lr=std::get<1>(glp[r]),
-                 p=std::get<2>(glp[r]); c<R2Dchi; c++)
+          for (int c=R2Dclo, lr=std::get<1>(glp[r-R2Drlo]),
+                 p=std::get<2>(glp[r-R2Drlo]); c<R2Dchi; c++)
             sbuf[p].push_back(R2D(lr,c));
       }
       std::vector<scalar_t> rbuf;

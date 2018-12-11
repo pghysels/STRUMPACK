@@ -381,9 +381,7 @@ namespace strumpack {
       int sort_opt = 0;  // 0:natural order, 1:kd-tree, 2:cobble-like ordering
                          // 3:gram distance-based cobble-like ordering
       HODLR_set_D_option<scalar_t>(options_, "tol_comp", opts.rel_tol());
-      if (opts.verbose())
-        HODLR_set_I_option<scalar_t>(options_, "verbosity", 0);
-      else HODLR_set_I_option<scalar_t>(options_, "verbosity", -1);
+      HODLR_set_I_option<scalar_t>(options_, "verbosity", opts.verbose() ? 0 : -1);
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
       //HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", opts.leaf_size());
       HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
@@ -446,9 +444,7 @@ namespace strumpack {
       int sort_opt = 0;  // 0:natural order, 1:kd-tree, 2:cobble-like ordering
                          // 3:gram distance-based cobble-like ordering
       HODLR_set_D_option<scalar_t>(options_, "tol_comp", opts.rel_tol());
-      if (opts.verbose())
-        HODLR_set_I_option<scalar_t>(options_, "verbosity", 0);
-      else HODLR_set_I_option<scalar_t>(options_, "verbosity", -1);
+      HODLR_set_I_option<scalar_t>(options_, "verbosity", opts.verbose() ? 0 : -1);
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
       HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
       HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", com_opt);
@@ -515,7 +511,7 @@ namespace strumpack {
       int sort_opt = 0;  // 0:natural order, 1:kd-tree, 2:cobble-like ordering
                          // 3:gram distance-based cobble-like ordering
       HODLR_set_D_option<scalar_t>(options_, "tol_comp", opts.rel_tol());
-      HODLR_set_I_option<scalar_t>(options_, "verbosity", int(opts.verbose()));
+      HODLR_set_I_option<scalar_t>(options_, "verbosity", opts.verbose() ? 0 : -1);
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
       HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
       //HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", com_opt);
@@ -662,6 +658,10 @@ namespace strumpack {
       if (c_.is_null()) return;
       const auto P = c_.size();
       const auto rank = c_.rank();
+      // for (int p=0; p<P; p++)
+      //   copy(dist_[rank+1]-dist_[rank], R2D.cols(), R2D, dist_[rank], 0,
+      //        R1D, p, R2D.grid()->ctxt_all());
+      // return;
       const auto Rcols = R2D.cols();
       int R2Drlo, R2Drhi, R2Dclo, R2Dchi;
       R2D.lranges(R2Drlo, R2Drhi, R2Dclo, R2Dchi);
@@ -680,7 +680,7 @@ namespace strumpack {
             auto p = -1 + std::distance
               (dist_.begin(), std::upper_bound
                (dist_.begin(), dist_.end(), gr));
-            glp[r] = std::tuple<int,int,int>{gr, r, p};
+            glp[r-R2Drlo] = std::tuple<int,int,int>{gr, r, p};
             count[p] += Rlcols;
           }
           std::sort(glp.begin(), glp.end());
@@ -688,8 +688,8 @@ namespace strumpack {
             sbuf[p].reserve(count[p]);
         }
         for (int r=R2Drlo; r<R2Drhi; r++)
-          for (int c=R2Dclo, lr=std::get<1>(glp[r]),
-                 p=std::get<2>(glp[r]); c<R2Dchi; c++)
+          for (int c=R2Dclo, lr=std::get<1>(glp[r-R2Drlo]),
+                 p=std::get<2>(glp[r-R2Drlo]); c<R2Dchi; c++)
             sbuf[p].push_back(R2D(lr,c));
       }
       std::vector<scalar_t> rbuf;
@@ -727,8 +727,7 @@ namespace strumpack {
         std::vector<std::tuple<int,int,int>> glp(lrows_);
         for (int r=0; r<lrows_; r++) {
           auto gr = iperm_[r + dist_[rank]];
-          //auto gr = r + dist_[rank];
-          assert(gr == r + dist_[rank]);
+          // assert(gr == r + dist_[rank]);
           assert(gr >= 0 && gr < S2D.rows());
           glp[r] = std::tuple<int,int,int>{gr,r,S2D.rowg2p_fixed(gr)};
         }
