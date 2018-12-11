@@ -62,8 +62,8 @@ namespace strumpack {
       B.lapmt(perm, true);
       perm.clear();
       if (opts.verbose()) {
-        std::cout << "### HSS compression time = "
-                  << timer.elapsed() << " ###" << std::endl;
+        std::cout << "# HSS compression time = "
+                  << timer.elapsed() << std::endl;
         if (H.is_compressed())
           std::cout << "# created HSS matrix of dimension "
                     << H.rows() << " x " << H.cols()
@@ -122,8 +122,8 @@ namespace strumpack {
         const auto rank = H.max_rank();
         const auto mem = H.total_memory();
         if (c.is_root()) {
-          std::cout << "### HSS compression time = "
-                    << timer.elapsed() << " ###" << std::endl;
+          std::cout << "# HSS compression time = "
+                    << timer.elapsed() << std::endl;
           if (H.is_compressed())
             std::cout << "# created HSS matrix of dimension "
                       << H.rows() << " x " << H.cols()
@@ -185,8 +185,8 @@ namespace strumpack {
       B.lapmt(perm, true);
       perm.clear();
       if (verb)
-        std::cout << "### HODLR compression time = "
-                  << timer.elapsed() << " ###" << std::endl;
+        std::cout << "# HODLR compression time = "
+                  << timer.elapsed() << std::endl;
       timer.start();
       H.factor();
       if (verb)

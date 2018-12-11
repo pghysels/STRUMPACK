@@ -41,10 +41,14 @@ namespace strumpack {
       DenseMatrix<std::uint32_t> ann;
       DenseMatrix<real_t> scores;
       std::mt19937 gen(1); // reproducible
-      // TODO read these from opts
-      int ann_number = 64, num_iters = 5;
+      TaskTimer timer("approximate_neighbors");
+      timer.start();
       find_approximate_neighbors
-        (K.data(), num_iters, ann_number, ann, scores, gen);
+        (K.data(), opts.ann_iterations(),
+         opts.approximate_neighbors(), ann, scores, gen);
+      if (opts.verbose())
+        std::cout << "# approximate neighbor search time = "
+                  << timer.elapsed() << std::endl;
       WorkCompressANN<scalar_t> w;
       auto Aelem = [&K]
         (const std::vector<std::size_t>& I,

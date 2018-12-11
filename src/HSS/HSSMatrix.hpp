@@ -653,8 +653,13 @@ namespace strumpack {
     HSSMatrix<scalar_t>::HSSMatrix
     (kernel::Kernel<scalar_t>& K, std::vector<int>& perm, const opts_t& opts)
       : HSSMatrixBase<scalar_t>(K.n(), K.n(), true) {
+      TaskTimer timer("clustering");
+      timer.start();
       auto t = binary_tree_clustering
         (opts.clustering_algorithm(), K.data(), perm, opts.leaf_size());
+      if (opts.verbose())
+        std::cout << "# clustering (" << get_name(opts.clustering_algorithm())
+                  << ") time = " << timer.elapsed() << std::endl;
       if (!t.c.empty()) {
         assert(t.c.size() == 2);
         this->_ch.reserve(2);

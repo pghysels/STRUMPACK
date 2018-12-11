@@ -214,6 +214,8 @@ namespace strumpack {
       /**
        * Specify the variant of the adaptive compression
        * algorithm. See the manual for more information.
+       *
+       * \param a Type of (adaptive) compression scheme
        */
       void set_compression_algorithm(CompressionAlgorithm a) {
         _compress_algo = a;
@@ -222,9 +224,34 @@ namespace strumpack {
       /**
        * Specify the clustering algorithm. This is used when
        * constructing a kernel matrix approximation.
+       *
+       * \param a Clustering algorithm.
        */
       void set_clustering_algorithm(ClusteringAlgorithm a) {
         _clustering_algo = a;
+      }
+
+      /**
+       * Set the number of approximate nearest neighbors used in the
+       * HSS compression algorithm for kernel matrices.
+       *
+       * \param neighbors Number of approximate neighbors
+       */
+      void set_approximate_neighbors(int neighbors) {
+        _approximate_neighbors = neighbors;
+      }
+
+      /**
+       * Set the number of iterations used in the approximate nearest
+       * neighbors search algorithm used in the HSS compression
+       * algorithm for kernel matrices. The algorithm will build iters
+       * number of random trees.
+       *
+       * \param iters Number of random trees to be build
+       */
+      void set_ann_iterations(int iters) {
+        assert(iters > 0);
+        _ann_iterations = iters;
       }
 
       /**
@@ -350,6 +377,28 @@ namespace strumpack {
       }
 
       /**
+       * Get the number of approximate nearest neighbors used in the
+       * HSS compression algorithm for kernel matrices.
+       *
+       * \return Number of approximate neighbors
+       */
+      int approximate_neighbors() const {
+        return _approximate_neighbors;
+      }
+
+      /**
+       * Get the number of iterations used in the approximate nearest
+       * neighbors search algorithm used in the HSS compression
+       * algorithm for kernel matrices. The algorithm will build iters
+       * number of random trees.
+       *
+       * \return Number of random trees to be build
+       */
+      int ann_iterations() const {
+        return _ann_iterations;
+      }
+
+      /**
        * Will the user define its own random matrices?
        *
        * \return True if the user will fill up the random matrices,
@@ -412,10 +461,12 @@ namespace strumpack {
           {"hss_random_engine",         required_argument, 0, 9},
           {"hss_compression_algorithm", required_argument, 0, 10},
           {"hss_clustering_algorithm",  required_argument, 0, 11},
-          {"hss_user_defined_random",   no_argument, 0, 12},
-          {"hss_enable_sync",           no_argument, 0, 13},
-          {"hss_disable_sync",          no_argument, 0, 14},
-          {"hss_log_ranks",             no_argument, 0, 15},
+          {"hss_approximate_neighbors", required_argument, 0, 12},
+          {"hss_ann_iterations",        required_argument, 0, 13},
+          {"hss_user_defined_random",   no_argument, 0, 14},
+          {"hss_enable_sync",           no_argument, 0, 15},
+          {"hss_disable_sync",          no_argument, 0, 16},
+          {"hss_log_ranks",             no_argument, 0, 17},
           {"hss_verbose",               no_argument, 0, 'v'},
           {"hss_quiet",                 no_argument, 0, 'q'},
           {"help",                      no_argument, 0, 'h'},
@@ -501,10 +552,20 @@ namespace strumpack {
             std::string s; iss >> s;
             set_clustering_algorithm(get_clustering_algorithm(s));
           } break;
-          case 12: { set_user_defined_random(true); } break;
-          case 13: { set_synchronized_compression(true); } break;
-          case 14: { set_synchronized_compression(false); } break;
-          case 15: { set_log_ranks(true); } break;
+          case 12: {
+            std::istringstream iss(optarg);
+            iss >> _approximate_neighbors;
+            set_approximate_neighbors(_approximate_neighbors);
+          } break;
+          case 13: {
+            std::istringstream iss(optarg);
+            iss >> _ann_iterations;
+            set_ann_iterations(_ann_iterations);
+          } break;
+          case 14: { set_user_defined_random(true); } break;
+          case 15: { set_synchronized_compression(true); } break;
+          case 16: { set_synchronized_compression(false); } break;
+          case 17: { set_log_ranks(true); } break;
           case 'v': set_verbose(true); break;
           case 'q': set_verbose(false); break;
           case 'h': describe_options(); break;
@@ -540,6 +601,10 @@ namespace strumpack {
                   << get_name(clustering_algorithm())<< ")" << std::endl
                   << "#   --hss_user_defined_random (default "
                   << user_defined_random() << ")" << std::endl
+                  << "#   --hss_approximate_neighbors int (default "
+                  << approximate_neighbors() << ")" << std::endl
+                  << "#   --hss_ann_iterations int (default "
+                  << ann_iterations() << ")" << std::endl
                   << "#   --hss_enable_sync (default "
                   << synchronized_compression() << ")" << std::endl
                   << "#   --hss_disable_sync (default "
@@ -570,6 +635,8 @@ namespace strumpack {
       CompressionAlgorithm _compress_algo = CompressionAlgorithm::STABLE;
       bool _sync = false;
       ClusteringAlgorithm _clustering_algo = ClusteringAlgorithm::TWO_MEANS;
+      int _approximate_neighbors = 64;
+      int _ann_iterations = 5;
       bool _verbose = true;
     };
 

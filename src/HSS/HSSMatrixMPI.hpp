@@ -442,8 +442,13 @@ namespace strumpack {
     (kernel::Kernel<scalar_t>& K, const BLACSGrid* Kgrid,
      std::vector<int>& perm, const opts_t& opts)
       : HSSMatrixBase<scalar_t>(K.n(), K.n(), true), blacs_grid_(Kgrid) {
+      TaskTimer timer("clustering");
+      timer.start();
       auto t = binary_tree_clustering
         (opts.clustering_algorithm(), K.data(), perm, opts.leaf_size());
+      if (opts.verbose() && Comm().is_root())
+        std::cout << "# clustering (" << get_name(opts.clustering_algorithm())
+                  << ") time = " << timer.elapsed() << std::endl;
       setup_hierarchy(t, opts, 0, 0);
       setup_local_context();
       setup_ranges(0, 0);
