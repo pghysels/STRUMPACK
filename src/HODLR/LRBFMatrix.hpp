@@ -73,13 +73,13 @@ namespace strumpack {
       std::size_t cols() const { return cols_; }
       std::size_t lrows() const { return lrows_; }
       std::size_t lcols() const { return lcols_; }
-      std::size_t begin_row() const { return rdist_[c_->rank()]; }
-      std::size_t end_row() const { return rdist_[c_->rank()+1]; }
+      std::size_t begin_row() const { return rdist_[c_.rank()]; }
+      std::size_t end_row() const { return rdist_[c_.rank()+1]; }
       const std::vector<int>& rdist() const { return rdist_; }
-      std::size_t begin_col() const { return cdist_[c_->rank()]; }
-      std::size_t end_col() const { return cdist_[c_->rank()+1]; }
+      std::size_t begin_col() const { return cdist_[c_.rank()]; }
+      std::size_t end_col() const { return cdist_[c_.rank()+1]; }
       const std::vector<int>& cdist() const { return cdist_; }
-      const MPIComm& Comm() const { return *c_; }
+      const MPIComm& Comm() const { return c_; }
 
       void compress(const mult_t& Amult);
 
@@ -116,19 +116,19 @@ namespace strumpack {
       F2Cptr kerquant_ = nullptr;  // kernel quantities structure returned by Fortran code
       F2Cptr ptree_ = nullptr;     // process tree returned by Fortran code
       MPI_Fint Fcomm_;             // the fortran MPI communicator
-      const MPIComm* c_ = nullptr;
+      MPIComm c_;
       int rows_, cols_, lrows_, lcols_;
       std::vector<int> rdist_, cdist_;  // begin rows/cols of each rank
     };
 
     template<typename scalar_t> LRBFMatrix<scalar_t>::LRBFMatrix
     (const HODLRMatrix<scalar_t>& A, const HODLRMatrix<scalar_t>& B)
-      : c_(&A.c_) {
+      : c_(A.c_) {
       rows_ = A.rows();
       cols_ = B.cols();
       Fcomm_ = A.Fcomm_;
-      int P = c_->size();
-      int rank = c_->rank();
+      int P = c_.size();
+      int rank = c_.rank();
       std::vector<int> groups(P);
       std::iota(groups.begin(), groups.end(), 0);
 
@@ -149,10 +149,10 @@ namespace strumpack {
       cdist_[rank+1] = lcols_;
       MPI_Allgather
         (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
-         rdist_.data()+1, 1, MPI_INT, c_->comm());
+         rdist_.data()+1, 1, MPI_INT, c_.comm());
       MPI_Allgather
         (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
-         cdist_.data()+1, 1, MPI_INT, c_->comm());
+         cdist_.data()+1, 1, MPI_INT, c_.comm());
       for (int p=0; p<P; p++) {
         rdist_[p+1] += rdist_[p];
         cdist_[p+1] += cdist_[p];
@@ -223,21 +223,24 @@ namespace strumpack {
     (Trans op, const DistM_t& X, DistM_t& Y) const {
       DenseM_t Y1D(lrows_, X.cols());
       {
-        auto X1D = redistribute_2D_to_1D(X, cdist_);
-        if (op == Trans::N)
+        if (op == Trans::N) {
+          auto X1D = redistribute_2D_to_1D(X, cdist_);
           LRBF_mult(char(op), X1D.data(), Y1D.data(), lcols_, lrows_,
                     X1D.cols(), lr_bf_, options_, stats_, ptree_);
-        else
+          redistribute_1D_to_2D(Y1D, Y, rdist_);
+        } else {
+          auto X1D = redistribute_2D_to_1D(X, rdist_);
           LRBF_mult(char(op), X1D.data(), Y1D.data(), lrows_, lcols_,
                     X1D.cols(), lr_bf_, options_, stats_, ptree_);
+          redistribute_1D_to_2D(Y1D, Y, cdist_);
+        }
       }
-      redistribute_1D_to_2D(Y1D, Y, rdist_);
     }
 
     template<typename scalar_t> DenseMatrix<scalar_t>
     LRBFMatrix<scalar_t>::redistribute_2D_to_1D
     (const DistM_t& R2D, const std::vector<int>& dist) const {
-      const auto rank = c_->rank();
+      const auto rank = c_.rank();
       DenseM_t R1D(dist[rank+1] - dist[rank], R2D.cols());
       redistribute_2D_to_1D(scalar_t(1.), R2D, scalar_t(0.), R1D, dist);
       return R1D;
@@ -247,8 +250,8 @@ namespace strumpack {
     LRBFMatrix<scalar_t>::redistribute_2D_to_1D
     (scalar_t a, const DistM_t& R2D, scalar_t b, DenseM_t& R1D,
      const std::vector<int>& dist) const {
-      const auto P = c_->size();
-      const auto rank = c_->rank();
+      const auto P = c_.size();
+      const auto rank = c_.rank();
       // for (int p=0; p<P; p++)
       //   copy(dist[rank+1]-dist[rank], R2D.cols(), R2D, dist[rank], 0,
       //        R1D, p, R2D.grid()->ctxt_all());
@@ -288,7 +291,7 @@ namespace strumpack {
       }
       std::vector<scalar_t> rbuf;
       std::vector<scalar_t*> pbuf;
-      c_->all_to_all_v(sbuf, rbuf, pbuf);
+      c_.all_to_all_v(sbuf, rbuf, pbuf);
       if (lrows) {
         std::vector<int> src_c(Rcols);
         for (int c=0; c<Rcols; c++)
@@ -309,8 +312,8 @@ namespace strumpack {
     template<typename scalar_t> void
     LRBFMatrix<scalar_t>::redistribute_1D_to_2D
     (const DenseM_t& S1D, DistM_t& S2D, const std::vector<int>& dist) const {
-      const auto rank = c_->rank();
-      const auto P = c_->size();
+      const auto rank = c_.rank();
+      const auto P = c_.size();
       const auto B = DistM_t::default_MB;
       const auto cols = S1D.cols();
       int S2Drlo, S2Drhi, S2Dclo, S2Dchi;
@@ -343,7 +346,7 @@ namespace strumpack {
       }
       std::vector<scalar_t> rbuf;
       std::vector<scalar_t*> pbuf;
-      c_->all_to_all_v(sbuf, rbuf, pbuf);
+      c_.all_to_all_v(sbuf, rbuf, pbuf);
       if (S2D.active()) {
         for (int r=S2Drlo; r<S2Drhi; r++) {
           auto gr = S2D.rowl2g(r);

@@ -71,7 +71,9 @@ namespace strumpack {
 
     void extend_add();
     void extend_add_copy_to_buffers
-    (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override;
+    (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override {
+      ExtAdd::extend_add_copy_to_buffers(F22_, sbuf, pa, this->upd_to_parent(pa));
+    }
 
     void sample_CB
     (const DistM_t& R, DistM_t& Sr, DistM_t& Sc, F_t* pa) const override;
@@ -142,12 +144,6 @@ namespace strumpack {
       ch->extend_add_copy_from_buffers
         (F11_, F12_, F21_, F22_, pbuf.data()+this->master(ch), this);
     }
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::extend_add_copy_to_buffers
-  (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
-    ExtAdd::extend_add_copy_to_buffers(F22_, sbuf, pa, this->upd_to_parent(pa));
   }
 
   template<typename scalar_t,typename integer_t> void

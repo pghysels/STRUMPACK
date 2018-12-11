@@ -64,7 +64,6 @@ namespace strumpack {
     FrontalMatrixHODLRMPI& operator=(FrontalMatrixHODLRMPI const&) = delete;
 
     void release_work_memory() override;
-    void extend_add(int task_depth) {}
 
     void sample_CB
     (Trans op, const DistM_t& R, DistM_t& S, F_t* pa) const override;
