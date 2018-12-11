@@ -511,10 +511,14 @@ namespace strumpack {
       delete[] destr;
     }
 
+
+    /*
+     * This does not do the 'extend' part, that was already done at
+     * the child. Here, just send to the parent, so it can be added.
+     */
     static void skinny_extend_add_seq_copy_to_buffers
     (const DenseM_t& cS, std::vector<std::vector<scalar_t>>& sbuf,
-     const FrontalMatrixMPI<scalar_t,integer_t>* pa,
-     const std::vector<std::size_t>& I) {
+     const FrontalMatrixMPI<scalar_t,integer_t>* pa) {
       const auto prows = pa->grid()->nprows();
       const auto pcols = pa->grid()->npcols();
       const auto B = DistM_t::default_MB;
@@ -523,7 +527,7 @@ namespace strumpack {
       auto destr = new int[rows+cols];
       auto destc = destr + rows;
       for (int r=0; r<rows; r++)
-        destr[r] = (I[r] / B) % prows;
+        destr[r] = (r / B) % prows;
       for (int c=0; c<cols; c++)
         destc[c] = ((c / B) % pcols) * prows;
       {
@@ -585,26 +589,9 @@ namespace strumpack {
       assert(S.fixed());
       const auto lrows = S.lrows();
       const auto lcols = S.lcols();
-      const auto sep_begin = pa->sep_begin();
-      const auto dim_sep = pa->dim_sep();
-      const auto pa_upd = pa->upd();
-      const auto ch_upd = ch->upd();
-      const auto ch_dim_upd = ch->dim_upd();
-      const auto B = DistM_t::default_MB;
-      auto lr = new int[lrows];
-      integer_t rmax = 0;
-      for (int r=0, ur=0; r<lrows; r++) {
-        auto t = S.rowl2g_fixed(r);
-        auto fgr = (t < dim_sep) ? t+sep_begin : pa_upd[t-dim_sep];
-        while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
-        if (ur == ch_dim_upd) break;
-        if (ch_upd[ur] != fgr) continue;
-        lr[rmax] = r;
-      }
       for (int c=0; c<lcols; c++)
-        for (int r=0; r<rmax; r++)
-          S(lr[r],c) += *(pbuf++);
-      delete[] lr;
+        for (int r=0; r<lrows; r++)
+          S(r,c) += *(pbuf++);
     }
 
 

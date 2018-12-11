@@ -246,7 +246,7 @@ namespace strumpack {
     (const DistM_t& S, const DenseM_t& seqS,
      std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
       ExtAdd::skinny_extend_add_seq_copy_to_buffers
-        (seqS, sbuf, pa, this->upd_to_parent(pa));
+        (seqS, sbuf, pa);
     }
     virtual void skinny_ea_from_buffers
     (DistM_t& S, scalar_t** pbuf, const FMPI_t* pa) const {
