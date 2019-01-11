@@ -65,9 +65,27 @@ namespace strumpack {
 
     void release_work_memory() override;
 
+    // TEMP remove
+    // void build_front(const SpMat_t& A);
+    // void extend_add();
+    // void extend_add_copy_to_buffers
+    // (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override {
+    //   // TODO
+    //   DistM_t id(grid(), this->dim_upd(), this->dim_upd()),
+    //     cb(grid(), this->dim_upd(), this->dim_upd());
+    //   id.eye();
+    //   F22_->mult(Trans::N, id, cb);
+    //   ExtAdd::extend_add_copy_to_buffers(cb, sbuf, pa, this->upd_to_parent(pa));
+    // }
+
     void sample_CB
     (Trans op, const DistM_t& R, DistM_t& S, F_t* pa) const override;
     void sample_children_CB(Trans op, const DistM_t& R, DistM_t& S);
+
+    // TEMP remove
+    // void sample_children_CB(const SPOptions<scalar_t>& opts, const DistM_t& R,
+    //                         DistM_t& Sr, DistM_t& Sc);
+
     void skinny_extend_add(DistM_t& cSl, DistM_t& cSr, DistM_t& S);
 
     void multifrontal_factorization
@@ -93,6 +111,10 @@ namespace strumpack {
     HODLR::HODLRMatrix<scalar_t> F11_;
     HODLR::LRBFMatrix<scalar_t> F12_, F21_;
     std::unique_ptr<HODLR::HODLRMatrix<scalar_t>> F22_;
+
+    // TEMP remove
+    // DistM_t dF11_, dF12_, dF21_, dF22_;
+    // std::vector<int> piv;
 
     using FrontalMatrix<scalar_t,integer_t>::lchild_;
     using FrontalMatrix<scalar_t,integer_t>::rchild_;
@@ -122,8 +144,7 @@ namespace strumpack {
   (Trans op, const DistM_t& R, DistM_t& S, F_t* pa) const {
     if (!dim_upd()) return;
     if (Comm().is_null()) return;
-    auto b = R.cols();
-    S = DistM_t(grid(), dim_upd(), b);
+    S = DistM_t(grid(), dim_upd(), R.cols());
     TIMER_TIME(TaskType::HSS_SCHUR_PRODUCT, 2, t_sprod);
     F22_->mult(op, R, S);
     TIMER_STOP(t_sprod);
@@ -160,6 +181,106 @@ namespace strumpack {
         (S, pbuf.data()+this->master(rchild_), this);
   }
 
+
+
+  // temp debugging code
+  // template<typename scalar_t,typename integer_t> void
+  // FrontalMatrixHODLRMPI<scalar_t,integer_t>::sample_children_CB
+  // (const SPOptions<scalar_t>& opts, const DistM_t& R,
+  //  DistM_t& Sr, DistM_t& Sc) {
+  //   if (!lchild_ && !rchild_) return;
+  //   DistM_t cSrl, cSrr, cScl, cScr, Rl, Rr;
+  //   DenseM_t seqSrl, seqSrr, seqScl, seqScr, seqRl, seqRr;
+  //   if (lchild_) {
+  //     lchild_->extract_from_R2D(R, Rl, seqRl, this, visit(lchild_));
+  //     seqSrl = DenseM_t(seqRl.rows(), seqRl.cols());
+  //     seqScl = DenseM_t(seqRl.rows(), seqRl.cols());
+  //     seqSrl.zero();
+  //     seqScl.zero();
+  //   }
+  //   if (rchild_) {
+  //     rchild_->extract_from_R2D(R, Rr, seqRr, this, visit(rchild_));
+  //     seqSrr = DenseM_t(seqRr.rows(), seqRr.cols());
+  //     seqScr = DenseM_t(seqRr.rows(), seqRr.cols());
+  //     seqSrr.zero();
+  //     seqScr.zero();
+  //   }
+  //   if (visit(lchild_))
+  //     lchild_->sample_CB(opts, Rl, cSrl, cScl, seqRl, seqSrl, seqScl, this);
+  //   if (visit(rchild_))
+  //     rchild_->sample_CB(opts, Rr, cSrr, cScr, seqRr, seqSrr, seqScr, this);
+  //   std::vector<std::vector<scalar_t>> sbuf(this->P());
+  //   if (visit(lchild_)) {
+  //     lchild_->skinny_ea_to_buffers(cSrl, seqSrl, sbuf, this);
+  //     lchild_->skinny_ea_to_buffers(cScl, seqScl, sbuf, this);
+  //   }
+  //   if (visit(rchild_)) {
+  //     rchild_->skinny_ea_to_buffers(cSrr, seqSrr, sbuf, this);
+  //     rchild_->skinny_ea_to_buffers(cScr, seqScr, sbuf, this);
+  //   }
+  //   std::vector<scalar_t> rbuf;
+  //   std::vector<scalar_t*> pbuf;
+  //   Comm().all_to_all_v(sbuf, rbuf, pbuf);
+  //   if (lchild_) {
+  //     lchild_->skinny_ea_from_buffers(Sr, pbuf.data(), this);
+  //     lchild_->skinny_ea_from_buffers(Sc, pbuf.data(), this);
+  //   }
+  //   if (rchild_) {
+  //     rchild_->skinny_ea_from_buffers
+  //       (Sr, pbuf.data()+this->master(rchild_), this);
+  //     rchild_->skinny_ea_from_buffers
+  //       (Sc, pbuf.data()+this->master(rchild_), this);
+  //   }
+  // }
+
+  // template<typename scalar_t,typename integer_t> void
+  // FrontalMatrixHODLRMPI<scalar_t,integer_t>::extend_add() {
+  //   if (!lchild_ && !rchild_) return;
+  //   std::vector<std::vector<scalar_t>> sbuf(this->P());
+  //   for (auto& ch : {lchild_.get(), rchild_.get()}) {
+  //     if (ch && Comm().is_root()) {
+  //       STRUMPACK_FLOPS
+  //         (static_cast<long long int>(ch->dim_upd())*ch->dim_upd());
+  //     }
+  //     if (!visit(ch)) continue;
+  //     ch->extend_add_copy_to_buffers(sbuf, this);
+  //   }
+  //   std::vector<scalar_t> rbuf;
+  //   std::vector<scalar_t*> pbuf;
+  //   Comm().all_to_all_v(sbuf, rbuf, pbuf);
+  //   for (auto& ch : {lchild_.get(), rchild_.get()}) {
+  //     if (!ch) continue;
+  //     ch->extend_add_copy_from_buffers
+  //       (dF11_, dF12_, dF21_, dF22_, pbuf.data()+this->master(ch), this);
+  //   }
+  // }
+
+  // template<typename scalar_t,typename integer_t> void
+  // FrontalMatrixHODLRMPI<scalar_t,integer_t>::build_front
+  // (const SpMat_t& A) {
+  //   const auto dupd = this->dim_upd();
+  //   const auto dsep = this->dim_sep();
+  //   if (dsep) {
+  //     dF11_ = DistM_t(grid(), dsep, dsep);
+  //     using ExFront = ExtractFront<scalar_t,integer_t>;
+  //     ExFront::extract_F11(dF11_, A, this->sep_begin_, dsep);
+  //     if (this->dim_upd()) {
+  //       dF12_ = DistM_t(grid(), dsep, dupd);
+  //       ExFront::extract_F12
+  //         (dF12_, A, this->sep_begin_, this->sep_end_, this->upd_);
+  //       dF21_ = DistM_t(grid(), dupd, dsep);
+  //       ExFront::extract_F21
+  //         (dF21_, A, this->sep_end_, this->sep_begin_, this->upd_);
+  //     }
+  //   }
+  //   if (dupd) {
+  //     dF22_ = DistM_t(grid(), dupd, dupd);
+  //     dF22_.zero();
+  //   }
+  //   extend_add();
+  // }
+
+
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts& opts, int etree_level, int task_depth) {
@@ -174,15 +295,27 @@ namespace strumpack {
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();
 
+    // TEMP remove
+    // build_front(A);
+    // DistM_t F(grid(), dsep+dupd, dsep+dupd);
+    // copy(dsep, dsep, dF11_, 0, 0, F, 0, 0, grid()->ctxt_all());
+    // copy(dsep, dupd, dF12_, 0, 0, F, 0, dsep, grid()->ctxt_all());
+    // copy(dupd, dsep, dF21_, 0, 0, F, dsep, 0, grid()->ctxt_all());
+    // copy(dupd, dupd, dF22_, 0, 0, F, dsep, dsep, grid()->ctxt_all());
+
     auto sample_front = [&](Trans op, const DistM_t& R, DistM_t& S) {
+      // gemm(op, Trans::N, scalar_t(1.), F, R, scalar_t(0.), S);
       S.zero();
       DistM_t Sdummy(grid(), dsep+dupd, R.cols());
-      if (op == Trans::N)
+      if (op == Trans::N) {
         A.front_multiply_2d // TODO only perform op, remove dummy
           (this->sep_begin_, this->sep_end_, this->upd_, R, S, Sdummy, 0);
-      else
+        //sample_children_CB(opts, R, S, Sdummy);
+      } else {
         A.front_multiply_2d // TODO only perform op, remove dummy
-          (this->sep_begin_, this->sep_end_, this->upd_, R, Sdummy, S, 0);
+        (this->sep_begin_, this->sep_end_, this->upd_, R, Sdummy, S, 0);
+        //sample_children_CB(opts, R, Sdummy, S);
+      }
       sample_children_CB(op, R, S);
     };
 
@@ -318,9 +451,10 @@ namespace strumpack {
     DistM_t& y = ydist[this->sep_];
     if (this->dim_sep() && this->dim_upd()) {
       TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_s);
-      DistM_t tmp(y.grid(), y.rows(), y.cols());
+      DistM_t tmp(y.grid(), y.rows(), y.cols()), tmp2(y.grid(), y.rows(), y.cols());
       F12_.mult(Trans::N, yupd, tmp);
-      y.scaled_add(scalar_t(-1.), tmp);
+      F11_.solve(tmp, tmp2);
+      y.scaled_add(scalar_t(-1.), tmp2);
       TIMER_STOP(t_s);
     }
     DistM_t CBl, CBr;

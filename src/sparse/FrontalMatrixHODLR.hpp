@@ -58,6 +58,20 @@ namespace strumpack {
     (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
      const F_t* p, int task_depth) override;
 
+    // TODO remove
+    // void extend_add_copy_to_buffers
+    // (std::vector<std::vector<scalar_t>>& sbuf,
+    //  const FrontalMatrixMPI<scalar_t,integer_t>* pa) const override {
+    //   const std::size_t dupd = dim_upd();
+    //   DenseM_t CB(dupd, dupd);
+    //   {
+    //     DenseM_t id(dupd, dupd);
+    //     id.eye();
+    //     F22_->mult(Trans::N, id, CB);
+    //   }
+    //   ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers(CB, sbuf, pa, this);
+    // }
+
     void sample_CB_to_F11
     (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
      int task_depth) const override;
@@ -101,6 +115,10 @@ namespace strumpack {
     HODLR::LRBFMatrix<scalar_t> F12_, F21_;
     std::unique_ptr<HODLR::HODLRMatrix<scalar_t>> F22_;
     MPIComm commself_;
+
+    // TODO remove
+    // DenseM_t dF11, dF12, dF21, dF22;
+    // std::vector<int> piv;
 
     void draw_node(std::ostream& of, bool is_root) const override;
 
@@ -322,11 +340,11 @@ namespace strumpack {
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();
 
-    // //// ------ temporary test code ------------------------------
-    // DenseM_t dF11(dsep, dsep); dF11.zero();
-    // DenseM_t dF12(dsep, dupd); dF12.zero();
-    // DenseM_t dF21(dupd, dsep); dF21.zero();
-    // DenseM_t dF22(dupd, dupd); dF22.zero();
+    //// ------ temporary test code ------------------------------
+    // dF11 = DenseM_t (dsep, dsep); dF11.zero();
+    // dF12 = DenseM_t(dsep, dupd); dF12.zero();
+    // dF21 = DenseM_t(dupd, dsep); dF21.zero();
+    // dF22 = DenseM_t(dupd, dupd); dF22.zero();
     // A.extract_front
     //   (dF11, dF12, dF21, this->sep_begin_, this->sep_end_,
     //    this->upd_, task_depth);
@@ -336,13 +354,13 @@ namespace strumpack {
     // if (rchild_)
     //   rchild_->extend_add_to_dense
     //     (dF11, dF12, dF21, dF22, this, task_depth);
-    // //// ---------------------------------------------------------
-    // //// ------ temporary test code -----------------------------
-    // //// ---------------------------------------------------------
+    //////////////////////////////////////////////////////////////
 
 
     auto sample_F11 = [&](Trans op, const DenseM_t& R, DenseM_t& S) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
+      // gemm(op, Trans::N, scalar_t(1.0), dF11, R, scalar_t(0.), S);
+      // return;
       S.zero();
       A.front_multiply_F11(op, sep_begin_, sep_end_, R, S, 0);
       if (lchild_) lchild_->sample_CB_to_F11(op, R, S, this, task_depth);
@@ -355,10 +373,16 @@ namespace strumpack {
     F11_.factor();
     TIMER_STOP(t_fact);
 
+    // TEMP ///////////////////////////////////////////////////////
+    // piv = dF11.LU(task_depth);
+    ///////////////////////////////////////////////////////////////
+
     if (dupd) {
       auto sample_F12 = [&]
         (Trans op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
         TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
+        // gemm(op, Trans::N, a, dF12, R, b, S);
+        // return;
         DenseM_t lR(R);
         lR.scale(a);
         if (b == scalar_t(0.)) S.zero();
@@ -371,6 +395,8 @@ namespace strumpack {
       auto sample_F21 = [&]
         (Trans op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
         TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
+        // gemm(op, Trans::N, a, dF21, R, b, S);
+        // return;
         DenseM_t lR(R), lS(S);
         lR.scale(a);
         if (b == scalar_t(0.)) S.zero();
@@ -386,8 +412,7 @@ namespace strumpack {
       F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
       F21_.compress(sample_F21);
 
-
-      // auto piv = dF11.LU(task_depth);
+      /////////////////////////////////////////////////////////////////
       // dF12.laswp(piv, true);
       // trsm(Side::L, UpLo::L, Trans::N, Diag::U,
       //      scalar_t(1.), dF11, dF12, task_depth);
@@ -395,16 +420,22 @@ namespace strumpack {
       //      scalar_t(1.), dF11, dF21, task_depth);
       // // BETA=0 means dF22 has only the Schur update
       // // BETA=1 means dF22 has the full Schur complement
+      // DenseM_t Schur(dupd, dupd);
       // gemm(Trans::N, Trans::N, scalar_t(-1.), dF21, dF12,
-      //      scalar_t(1.), dF22, task_depth);
-
+      //      scalar_t(0.), Schur, task_depth);
+      // // gemm(Trans::N, Trans::N, scalar_t(-1.), dF21, dF12,
+      // //      scalar_t(1.), dF22, task_depth);
+      /////////////////////////////////////////////////////////////////
 
       auto sample_CB = [&](Trans op, const DenseM_t& R, DenseM_t& S) {
         TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
+        // gemm(op, Trans::N, scalar_t(1.), Schur, R, scalar_t(0.), S);
+        // return;
         DenseM_t F12R(dsep, R.cols()), invF11F12R(dsep, R.cols());
         if (op == Trans::N) {
           F12_.mult(op, R, F12R);
           F11_.inv_mult(op, F12R, invF11F12R);
+          //F11_.solve(F12R, invF11F12R);
           F21_.mult(op, invF11F12R, S);
         } else {
           F21_.mult(op, R, F12R);
@@ -414,6 +445,7 @@ namespace strumpack {
         S.scale(-1.);
         if (lchild_) lchild_->sample_CB_to_F22(op, R, S, this, task_depth);
         if (rchild_) rchild_->sample_CB_to_F22(op, R, S, this, task_depth);
+        // gemm(op, Trans::N, scalar_t(1.), dF22, R, scalar_t(1.), S);
         TIMER_STOP(t_sampling);
       };
       F22_->compress(sample_CB);
@@ -465,10 +497,11 @@ namespace strumpack {
   (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const {
     DenseMW_t yupd(dim_upd(), y.cols(), work[0], 0, 0);
     if (dim_sep() && dim_upd()) {
-      DenseM_t tmp(dim_sep(), y.cols());
+      DenseM_t tmp(dim_sep(), y.cols()), tmp2(dim_sep(), y.cols());
       F12_.mult(Trans::N, yupd, tmp);
+      F11_.solve(tmp, tmp2);
       DenseMW_t yloc(dim_sep(), y.cols(), y, this->sep_begin_, 0);
-      yloc.scaled_add(scalar_t(-1.), tmp);
+      yloc.scaled_add(scalar_t(-1.), tmp2);
     }
     this->bwd_solve_phase2(y, yupd, work, etree_level, task_depth);
   }
