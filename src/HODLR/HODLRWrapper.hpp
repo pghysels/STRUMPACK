@@ -36,6 +36,7 @@
 
 #include "dense/DenseMatrix.hpp"
 #include "dC_BPACK_wrapper.h"
+#undef HODLR_WRAP
 #include "zC_BPACK_wrapper.h"
 
 namespace strumpack {
@@ -111,7 +112,7 @@ namespace strumpack {
       z_c_bpack_set_I_option(&options, opt.c_str(), v);
     }
 
-    template<typename scalar_t> void HODLR_construct
+    template<typename scalar_t> void HODLR_construct_element
     (int n, int d, scalar_t* data, int lvls, int* leafs, int* perm,
      int& lrows, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
@@ -119,25 +120,25 @@ namespace strumpack {
      C2Fptr K, MPI_Fint comm) {
       std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
     }
-    template<> inline void HODLR_construct<double>
+    template<> inline void HODLR_construct_element<double>
     (int n, int d, double* data, int lvls, int* leafs, int* perm,
      int& lrows, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, double*, C2Fptr),
      C2Fptr K, MPI_Fint comm) {
-      d_c_bpack_construct
+      d_c_bpack_construct_element
         (&n, &d, data, &lvls, leafs, perm, &lrows, &ho_bf, &options,
          &stats, &msh, &kerquant, &ptree,
          C_FuncZmn, K, &comm);
     }
-    template<> inline void HODLR_construct<std::complex<double>>
+    template<> inline void HODLR_construct_element<std::complex<double>>
     (int n, int d, std::complex<double>* data, int lvls, int* leafs,
      int* perm, int& lrows, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, std::complex<double>*, C2Fptr),
      C2Fptr K, MPI_Fint comm) {
       //TODO, data should be double??
-      // z_c_bpack_construct
+      // z_c_bpack_construct_element
       //   (&n, &d, data, &lvls, leafs, perm, &lrows, &ho_bf, &options,
       //    &stats, &msh, &kerquant, &ptree,
       //    C_FuncZmn, K, &comm);
@@ -266,11 +267,11 @@ namespace strumpack {
     template<> inline void HODLR_deletekernelquant<std::complex<float>>(F2Cptr& kerquant) { std::cout << "TODO HODLR_deletekernelquant" << std::endl; }
     template<> inline void HODLR_deletekernelquant<std::complex<double>>(F2Cptr& kerquant) { z_c_bpack_deletekernelquant(&kerquant); }
 
-    template<typename scalar_t> void HODLR_deletehobf(F2Cptr&);
-    template<> inline void HODLR_deletehobf<float>(F2Cptr& ho_bf) { std::cout << "TODO HODLR_deletehobf" << std::endl; }
-    template<> inline void HODLR_deletehobf<double>(F2Cptr& ho_bf) { d_c_bpack_deletehobf(&ho_bf); }
-    template<> inline void HODLR_deletehobf<std::complex<float>>(F2Cptr& ho_bf) { std::cout << "TODO HODLR_deletehobf" << std::endl; }
-    template<> inline void HODLR_deletehobf<std::complex<double>>(F2Cptr& ho_bf) { z_c_bpack_deletehobf(&ho_bf); }
+    template<typename scalar_t> void HODLR_delete(F2Cptr&);
+    template<> inline void HODLR_delete<float>(F2Cptr& ho_bf) { std::cout << "TODO HODLR_delete" << std::endl; }
+    template<> inline void HODLR_delete<double>(F2Cptr& ho_bf) { d_c_bpack_delete(&ho_bf); }
+    template<> inline void HODLR_delete<std::complex<float>>(F2Cptr& ho_bf) { std::cout << "TODO HODLR_delete" << std::endl; }
+    template<> inline void HODLR_delete<std::complex<double>>(F2Cptr& ho_bf) { z_c_bpack_delete(&ho_bf); }
 
     template<typename scalar_t> void LRBF_deletebf(F2Cptr&);
     template<> inline void LRBF_deletebf<float>(F2Cptr& lr_bf) { std::cout << "TODO LRBF_deletebf" << std::endl; }

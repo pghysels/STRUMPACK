@@ -363,7 +363,8 @@ namespace strumpack {
       int lvls = tree.levels();
       std::vector<int> leafs = tree.leaf_sizes();
 
-      c_ = (c.size() <= leafs.size()) ? c : c.sub(0, leafs.size());
+      //c_ = (c.size() <= leafs.size()) ? c : c.sub(0, leafs.size());
+      c_ = c;
       Fcomm_ = MPI_Comm_c2f(c_.comm());
       int P = c_.size();
       int rank = c_.rank();
@@ -392,7 +393,7 @@ namespace strumpack {
 
       perm_.resize(rows_);
       // construct HODLR with geometrical points
-      HODLR_construct
+      HODLR_construct_element
         (rows_, d, K.data().data(), lvls-1, leafs.data(),
          perm_.data(), lrows_, ho_bf_, options_, stats_, msh_, kerquant_,
          ptree_, &(HODLR_kernel_evaluation<scalar_t>), &K, Fcomm_);
@@ -426,7 +427,8 @@ namespace strumpack {
       int lvls = full_tree.levels();
       std::vector<int> leafs = full_tree.leaf_sizes();
 
-      c_ = (c.size() <= leafs.size()) ? c : c.sub(0, leafs.size());
+      //c_ = (c.size() <= leafs.size()) ? c : c.sub(0, leafs.size());
+      c_ = c;
       Fcomm_ = MPI_Comm_c2f(c_.comm());
       int P = c_.size();
       int rank = c_.rank();
@@ -453,7 +455,7 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", 100);
 
       perm_.resize(rows_);
-      HODLR_construct
+      HODLR_construct_element
         (rows_, 0, NULL, lvls-1, leafs.data(),
          perm_.data(), lrows_, ho_bf_, options_, stats_, msh_, kerquant_,
          ptree_, &(HODLR_element_evaluation<scalar_t>), &Aelem, Fcomm_);
@@ -492,7 +494,8 @@ namespace strumpack {
       int lvls = full_tree.levels();
       std::vector<int> leafs = full_tree.leaf_sizes();
 
-      c_ = (c.size() <= leafs.size()) ? c : c.sub(0, leafs.size());
+      //c_ = (c.size() <= leafs.size()) ? c : c.sub(0, leafs.size());
+      c_ = c;
       if (c_.is_null()) return;
       Fcomm_ = MPI_Comm_c2f(c_.comm());
       int P = c_.size();
@@ -546,7 +549,7 @@ namespace strumpack {
       if (ptree_) HODLR_deleteproctree<scalar_t>(ptree_);
       if (msh_) HODLR_deletemesh<scalar_t>(msh_);
       if (kerquant_) HODLR_deletekernelquant<scalar_t>(kerquant_);
-      if (ho_bf_) HODLR_deletehobf<scalar_t>(ho_bf_);
+      if (ho_bf_) HODLR_delete<scalar_t>(ho_bf_);
       if (options_) HODLR_deleteoptions<scalar_t>(options_);
     }
 
