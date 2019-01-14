@@ -1,7 +1,7 @@
 all: @C_EXAMPLES@ \
 	testPoisson2d testPoisson3d \
 	testMMdouble testMMdouble64 testMMfloat \
-	mtx2bin bin2mtx KernelRegression \
+	mtx2bin bin2mtx KernelRegression KernelRegressionNys \
 	@MPI_EXAMPLES@
 
 CC=@STRUMPACK_C_COMPILER@
@@ -98,6 +98,11 @@ KernelRegression: KernelRegression.cpp
 	$(CXX) $(LDFLAGS) KernelRegression.o -o $@ $(LIBS)
 	$(RM) KernelRegression.o
 
+KernelRegressionNys: KernelRegressionNys.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o KernelRegressionNys.o
+	$(CXX) $(LDFLAGS) KernelRegressionNys.o -o $@ $(LIBS)
+	$(RM) KernelRegressionNys.o
+
 KernelRegressionMPI: KernelRegressionMPI.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o KernelRegressionMPI.o
 	$(CXX) $(LDFLAGS) KernelRegressionMPI.o -o $@ $(LIBS)
@@ -107,7 +112,7 @@ clean:
 	rm -f *~ *o @C_EXAMPLES@ \
 	testPoisson2d testPoisson3d \
 	testMMdouble testMMdouble64 testMMfloat \
-	mtx2bin bin2mtx KernelRegression \
+	mtx2bin bin2mtx KernelRegression KernelRegressionNys \
 	@MPI_EXAMPLES@
 
 
