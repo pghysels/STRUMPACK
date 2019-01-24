@@ -216,6 +216,11 @@ namespace strumpack {
        */
       const MPIComm& Comm() const { return c_; }
 
+      double get_stat(const std::string& name) const {
+        if (!stats_) return 0;
+        return BPACK_get_stat<scalar_t>(stats_, name);
+      }
+
       /**
        * Construct the compressed HODLR representation of the matrix,
        * using only a matrix-(multiple)vector multiplication routine.

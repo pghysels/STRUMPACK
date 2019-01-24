@@ -70,20 +70,20 @@ namespace strumpack {
      DenseM_t& Sr, DenseM_t& Sc, F_t* pa, int task_depth) override;
     void sample_CB
     (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth) const override;
+     int task_depth=0) const override;
 
     void sample_CB_to_F11
     (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth) const override;
+     int task_depth=0) const override;
     void sample_CB_to_F12
     (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth) const override;
+     int task_depth=0) const override;
     void sample_CB_to_F21
     (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth) const override;
+     int task_depth=0) const override;
     void sample_CB_to_F22
     (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth) const override;
+     int task_depth=0) const override;
 
     void multifrontal_factorization
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,

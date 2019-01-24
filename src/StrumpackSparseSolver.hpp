@@ -671,7 +671,7 @@ namespace strumpack {
     }
     perf_counters_stop("nested dissection");
 
-    if (opts_.use_HSS() || opts_.use_BLR() || opts_.use_HODLR()) {
+    if (opts_.compression() != CompressionType::NONE) {
       perf_counters_start();
       TaskTimer t4("separator-reordering", [&](){
           compute_separator_reordering();
@@ -871,6 +871,7 @@ namespace strumpack {
         }
 #if defined(STRUMPACK_USE_BPACK)
         if (opts_.use_HODLR()) {
+          std::cout << "#   - maximum HODLR rank = " << max_rank << std::endl;
           std::cout << "#   - relative compression tolerance = "
                     << opts_.HODLR_options().rel_tol() << std::endl;
           std::cout << "#   - absolute compression tolerance = "

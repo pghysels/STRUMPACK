@@ -304,18 +304,14 @@ namespace strumpack {
     // copy(dupd, dupd, dF22_, 0, 0, F, dsep, dsep, grid()->ctxt_all());
 
     auto sample_front = [&](Trans op, const DistM_t& R, DistM_t& S) {
-      // gemm(op, Trans::N, scalar_t(1.), F, R, scalar_t(0.), S);
       S.zero();
       DistM_t Sdummy(grid(), dsep+dupd, R.cols());
-      if (op == Trans::N) {
+      if (op == Trans::N)
         A.front_multiply_2d // TODO only perform op, remove dummy
           (this->sep_begin_, this->sep_end_, this->upd_, R, S, Sdummy, 0);
-        //sample_children_CB(opts, R, S, Sdummy);
-      } else {
+      else
         A.front_multiply_2d // TODO only perform op, remove dummy
         (this->sep_begin_, this->sep_end_, this->upd_, R, Sdummy, S, 0);
-        //sample_children_CB(opts, R, Sdummy, S);
-      }
       sample_children_CB(op, R, S);
     };
 
@@ -334,6 +330,7 @@ namespace strumpack {
     TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
     F11_.factor();
     TIMER_STOP(t_fact);
+    STRUMPACK_FLOPS(F11_.get_stat("Flop_Fill") + F11_.get_stat("Flop_Factor"));
 
     if (dupd) {
       auto sample_F12 = [&]
@@ -384,6 +381,7 @@ namespace strumpack {
       F12_.compress(sample_F12);
       F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
       F21_.compress(sample_F21);
+      STRUMPACK_FLOPS(F12_.get_stat("Flop_Fill") + F21_.get_stat("Flop_Factor"));
 
       auto sample_F22 = [&](Trans op, const DenseM_t& R2, DenseM_t& S2) {
         TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
@@ -407,9 +405,13 @@ namespace strumpack {
           F12_.mult(op, invF11F12R2, S2tmp);
         }
         S2.scaled_add(scalar_t(-1.), S2tmp);
+        STRUMPACK_FLOPS(F12_.get_stat("Flop_C_Mult") +
+                        F11_.get_stat("Flop_Solve") +
+                        F21_.get_stat("Flop_C_Mult") + S2.rows()*S2.cols());
         TIMER_STOP(t_sampling);
       };
       F22_->compress(sample_F22);
+      STRUMPACK_FLOPS(F22_->get_stat("Flop_Fill"));
     }
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
@@ -471,7 +473,9 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> integer_t
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::maximum_rank
   (int task_depth) const {
-    integer_t mr = -1; //_H->max_rank();
+    integer_t mr = std::max(F11_.get_stat("Rank_max"),
+                            std::max(F12_.get_stat("Rank_max"),
+                                     F21_.get_stat("Rank_max")));
     if (visit(lchild_))
       mr = std::max(mr, lchild_->maximum_rank(task_depth));
     if (visit(rchild_))
@@ -481,9 +485,9 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> long long
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::node_factor_nonzeros() const {
-    // TODO does this return only when root??
-    return -1; //(_H ? _H->nonzeros() : 0) + _ULV.nonzeros() +
-    //_Theta.nonzeros() + _Phi.nonzeros();
+    return F11_.get_stat("Mem_Fill") + F11_.get_stat("Mem_Factor")
+      + F12_.get_stat("Mem_Fill") + F21_.get_stat("Mem_Fill")
+      * 10.0e6 / sizeof(scalar_t);
   }
 
   template<typename scalar_t,typename integer_t> void

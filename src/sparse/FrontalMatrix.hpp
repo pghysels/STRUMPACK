@@ -116,10 +116,11 @@ namespace strumpack {
     // TODO why not const? HSS problem?
     virtual void sample_CB
     (const SPOptions<scalar_t>& opts, const DenseM_t& R,
-     DenseM_t& Sr, DenseM_t& Sc, F_t* parent, int task_depth=0) {};
+     DenseM_t& Sr, DenseM_t& Sc, F_t* parent, int task_depth=0)
+    { assert(false); }
     virtual void sample_CB
     (Trans op, const DenseM_t& R, DenseM_t& S, F_t* parent,
-     int task_depth=0) const {};
+     int task_depth=0) const { assert(false); }
 
     virtual void sample_CB_to_F11
     (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,

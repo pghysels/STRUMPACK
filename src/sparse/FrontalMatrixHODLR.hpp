@@ -72,18 +72,21 @@ namespace strumpack {
     //   ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers(CB, sbuf, pa, this);
     // }
 
+    void sample_CB
+    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+     int task_depth=0) const override;
     void sample_CB_to_F11
     (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth) const override;
+     int task_depth=0) const override;
     void sample_CB_to_F12
     (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth) const override;
+     int task_depth=0) const override;
     void sample_CB_to_F21
     (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth) const override;
+     int task_depth=0) const override;
     void sample_CB_to_F22
     (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth) const override;
+     int task_depth=0) const override;
 
     void release_work_memory() override;
     void random_sampling
@@ -186,6 +189,20 @@ namespace strumpack {
       }
     }
     release_work_memory();
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLR<scalar_t,integer_t>::sample_CB
+  (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
+    auto I = this->upd_to_parent(pa);
+    auto cR = R.extract_rows(I);
+    DenseM_t cS(dim_upd(), R.cols());
+    F22_->mult(op, cR, cS);
+    S.scatter_rows_add(I, cS, task_depth);
+    // TODO flops!!
+    // STRUMPACK_CB_SAMPLE_FLOPS
+    //   (gemm_flops(op, Trans::N, scalar_t(1.), F22_, cR, scalar_t(0.)) +
+    //    cS.rows()*cS.cols()); // for the skinny-extend add
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -368,10 +385,10 @@ namespace strumpack {
       TIMER_STOP(t_sampling);
     };
     F11_.compress(sample_F11);
-
     TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
     F11_.factor();
     TIMER_STOP(t_fact);
+    STRUMPACK_FLOPS(F11_.get_stat("Flop_Fill") + F11_.get_stat("Flop_Factor"));
 
     // TEMP ///////////////////////////////////////////////////////
     // piv = dF11.LU(task_depth);
@@ -411,6 +428,7 @@ namespace strumpack {
       F12_.compress(sample_F12);
       F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
       F21_.compress(sample_F21);
+      STRUMPACK_FLOPS(F12_.get_stat("Flop_Fill") + F21_.get_stat("Flop_Factor"));
 
       /////////////////////////////////////////////////////////////////
       // dF12.laswp(piv, true);
@@ -443,12 +461,16 @@ namespace strumpack {
           F12_.mult(op, invF11F12R, S);
         }
         S.scale(-1.);
+        STRUMPACK_FLOPS(F12_.get_stat("Flop_C_Mult") +
+                        F11_.get_stat("Flop_Solve") +
+                        F21_.get_stat("Flop_C_Mult") + S.rows()*S.cols());
         if (lchild_) lchild_->sample_CB_to_F22(op, R, S, this, task_depth);
         if (rchild_) rchild_->sample_CB_to_F22(op, R, S, this, task_depth);
         // gemm(op, Trans::N, scalar_t(1.), dF22, R, scalar_t(1.), S);
         TIMER_STOP(t_sampling);
       };
       F22_->compress(sample_CB);
+      STRUMPACK_FLOPS(F22_->get_stat("Flop_Fill"));
     }
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
@@ -508,7 +530,10 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> integer_t
   FrontalMatrixHODLR<scalar_t,integer_t>::maximum_rank(int task_depth) const {
-    integer_t r = /*_H.rank()*/ -1, rl = 0, rr = 0;
+    integer_t r = std::max(F11_.get_stat("Rank_max"),
+                           std::max(F12_.get_stat("Rank_max"),
+                                    F21_.get_stat("Rank_max")));
+    integer_t rl = 0, rr = 0;
     if (lchild_)
 #pragma omp task untied default(shared)                                 \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
@@ -532,7 +557,9 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> long long
   FrontalMatrixHODLR<scalar_t,integer_t>::node_factor_nonzeros() const {
-    return -1;
+    return (F11_.get_stat("Rank_max") + F11_.get_stat("Mem_Factor")
+            + F12_.get_stat("Mem_Fill") + F21_.get_stat("Mem_Fill"))
+      * 10.0e6 / sizeof(scalar_t);
   }
 
   template<typename scalar_t,typename integer_t> void

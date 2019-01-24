@@ -100,6 +100,11 @@ namespace strumpack {
        */
       void mult(Trans op, const DistM_t& X, DistM_t& Y) const;
 
+      double get_stat(const std::string& name) const {
+        if (!stats_) return 0;
+        return BPACK_get_stat<scalar_t>(stats_, name);
+      }
+
       DenseM_t redistribute_2D_to_1D
       (const DistM_t& R2D, const std::vector<int>& dist) const;
       void redistribute_2D_to_1D

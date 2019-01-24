@@ -36,7 +36,6 @@
 
 #include "dense/DenseMatrix.hpp"
 #include "dC_BPACK_wrapper.h"
-#undef HODLR_WRAP
 #include "zC_BPACK_wrapper.h"
 
 namespace strumpack {
@@ -110,6 +109,39 @@ namespace strumpack {
     template<> inline void HODLR_set_I_option<std::complex<double>>
     (F2Cptr options, const std::string& opt, int v) {
       z_c_bpack_set_I_option(&options, opt.c_str(), v);
+    }
+
+    /**
+     * Possible values:
+     *
+     *  Time_Fill, Time_Factor, Time_Solve, Time_Sblock, Time_Inv,
+     *  Time_SMW, Time_RedistB, Time_RedistV, Time_C_Mult,
+     *  Time_Direct_LU, Time_Add_Multiply, Time_Multiply, Time_XLUM,
+     *  Time_Split, Time_Comm, Time_Idle
+     *
+     *  Flop_Fill, Flop_Factor, Flop_Solve, Flop_C_Mult
+     *
+     *  Mem_Factor, Mem_Fill, Mem_Sblock, Mem_SMW, Mem_Direct_inv,
+     *  Mem_Direct_for, Mem_int_vec, Mem_Comp_for
+     *
+     *  Rank_max
+     */
+    template<typename scalar_t> double BPACK_get_stat
+    (F2Cptr stats, const std::string& name) {
+      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
+      return scalar_t(0.);
+    }
+    template<> inline double BPACK_get_stat<double>
+    (F2Cptr stats, const std::string& name) {
+      double val;
+      d_c_bpack_getstats(&stats, name.c_str(), &val);
+      return val;
+    }
+    template<> inline double BPACK_get_stat<std::complex<double>>
+    (F2Cptr stats, const std::string& name) {
+      double val;
+      z_c_bpack_getstats(&stats, name.c_str(), &val);
+      return val;
     }
 
     template<typename scalar_t> void HODLR_construct_element
