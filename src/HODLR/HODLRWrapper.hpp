@@ -129,7 +129,7 @@ namespace strumpack {
     template<typename scalar_t> double BPACK_get_stat
     (F2Cptr stats, const std::string& name) {
       std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-      return scalar_t(0.);
+      return 0.;
     }
     template<> inline double BPACK_get_stat<double>
     (F2Cptr stats, const std::string& name) {
