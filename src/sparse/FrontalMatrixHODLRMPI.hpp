@@ -485,8 +485,8 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> long long
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::node_factor_nonzeros() const {
-    return F11_.get_stat("Mem_Fill") + F11_.get_stat("Mem_Factor")
-      + F12_.get_stat("Mem_Fill") + F21_.get_stat("Mem_Fill")
+    return (F11_.get_stat("Mem_Fill") + F11_.get_stat("Mem_Factor")
+            + F12_.get_stat("Mem_Fill") + F21_.get_stat("Mem_Fill"))
       * 10.0e6 / sizeof(scalar_t);
   }
 
