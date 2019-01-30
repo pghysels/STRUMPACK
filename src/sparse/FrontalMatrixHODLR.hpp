@@ -458,11 +458,6 @@ namespace strumpack {
         TIMER_TIME(TaskType::UUTXR, 1, t_UUtxR);
         TIMER_TIME(TaskType::HSS_SCHUR_PRODUCT, 2, t_sprod);
         DenseM_t F12R(dsep, R.cols()), invF11F12R(dsep, R.cols());
-#if defined(STRUMPACK_COUNT_FLOPS)
-        long long int f21_mult_flops = F21_.get_stat("Flop_C_Mult");
-        long long int invf11_mult_flops = F11_.get_stat("Flop_Solve");
-        long long int f12_mult_flops = F12_.get_stat("Flop_C_Mult");
-#endif
         if (op == Trans::N) {
           F12_.mult(op, R, F12R);
           F11_.inv_mult(op, F12R, invF11F12R);
@@ -476,10 +471,10 @@ namespace strumpack {
         TIMER_STOP(t_sprod);
         S.scale(-1.);
 #if defined(STRUMPACK_COUNT_FLOPS)
-        f21_mult_flops = F21_.get_stat("Flop_C_Mult") - f21_mult_flops;
-        invf11_mult_flops = F11_.get_stat("Flop_Solve") - invf11_mult_flops;
-        f12_mult_flops = F12_.get_stat("Flop_C_Mult") - f12_mult_flops;
-        long long int schur_flops = f21_mult_flops + invf11_mult_flops
+        long long int f21_mult_flops = F21_.get_stat("Flop_C_Mult"),
+        invf11_mult_flops = F11_.get_stat("Flop_Solve"),
+        f12_mult_flops = F12_.get_stat("Flop_C_Mult"),
+        schur_flops = f21_mult_flops + invf11_mult_flops
         + f12_mult_flops + S.rows()*S.cols();
         STRUMPACK_SCHUR_FLOPS(schur_flops);
         STRUMPACK_FLOPS(schur_flops);
@@ -500,13 +495,6 @@ namespace strumpack {
       STRUMPACK_FLOPS(f22_fill_flops);
 #endif
     }
-    std::cout << "dsep=" << dsep << " dupd=" << dupd
-              << " ranks: " << F11_.get_stat("Rank_max") << ", ";
-    if (dupd)
-      std::cout << F12_.get_stat("Rank_max") << ", "
-                << F21_.get_stat("Rank_max") << ", "
-                << F22_->get_stat("Rank_max") << std::endl;
-    else std::cout << std::endl;
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
   }
@@ -531,10 +519,13 @@ namespace strumpack {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
       DenseM_t rhs(bloc);
       F11_.solve(rhs, bloc);
+      STRUMPACK_FLOPS(F11_.get_stat("Flop_Solve"));
       if (dim_upd()) {
         DenseM_t tmp(bupd.rows(), bupd.cols());
         F21_.mult(Trans::N, bloc, tmp);
         bupd.scaled_add(scalar_t(-1.), tmp);
+        STRUMPACK_FLOPS(F21_.get_stat("Flop_C_Mult") +
+                        2*bupd.rows()*bupd.cols());
       }
     }
   }
@@ -559,6 +550,9 @@ namespace strumpack {
       F11_.solve(tmp, tmp2);
       DenseMW_t yloc(dim_sep(), y.cols(), y, this->sep_begin_, 0);
       yloc.scaled_add(scalar_t(-1.), tmp2);
+      STRUMPACK_FLOPS(F12_.get_stat("Flop_C_Mult") +
+                      F11_.get_stat("Flop_Solve") +
+                      2*yloc.rows()*yloc.cols());
     }
     this->bwd_solve_phase2(y, yupd, work, etree_level, task_depth);
   }

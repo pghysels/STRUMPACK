@@ -366,11 +366,15 @@ namespace strumpack {
     auto I = this->upd_to_parent(pa);
     auto cR = R.extract_rows(I);
     DenseM_t cS(dim_upd(), R.cols());
+    TIMER_TIME(TaskType::F22_MULT, 1, t_f22mult);
     gemm(Trans::N, Trans::N, scalar_t(1.), F22_, cR,
          scalar_t(0.), cS, task_depth);
+    TIMER_STOP(t_f22mult);
     Sr.scatter_rows_add(I, cS, task_depth);
+    TIMER_TIME(TaskType::F22_MULT, 1, t_f22mult2);
     gemm(Trans::C, Trans::N, scalar_t(1.), F22_, cR,
          scalar_t(0.), cS, task_depth);
+    TIMER_STOP(t_f22mult2);
     Sc.scatter_rows_add(I, cS, task_depth);
     STRUMPACK_CB_SAMPLE_FLOPS
       (gemm_flops(Trans::N, Trans::N, scalar_t(1.), F22_, cR, scalar_t(0.)) +
@@ -384,8 +388,10 @@ namespace strumpack {
     auto I = this->upd_to_parent(pa);
     auto cR = R.extract_rows(I);
     DenseM_t cS(dim_upd(), R.cols());
+    TIMER_TIME(TaskType::F22_MULT, 1, t_f22mult);
     gemm(op, Trans::N, scalar_t(1.), F22_, cR,
          scalar_t(0.), cS, task_depth);
+    TIMER_STOP(t_f22mult);
     S.scatter_rows_add(I, cS, task_depth);
     STRUMPACK_CB_SAMPLE_FLOPS
       (gemm_flops(op, Trans::N, scalar_t(1.), F22_, cR, scalar_t(0.)) +

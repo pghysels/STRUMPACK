@@ -311,7 +311,9 @@ namespace strumpack {
     if (F11_.active() || F22_.active()) {
       auto b = R.cols();
       S = DistM_t(grid(), this->dim_upd(), b);
+      TIMER_TIME(TaskType::F22_MULT, 1, t_f22mult);
       gemm(op, Trans::N, scalar_t(1.), F22_, R, scalar_t(0.), S);
+      TIMER_STOP(t_f22mult);
       STRUMPACK_CB_SAMPLE_FLOPS
         (gemm_flops(op, Trans::N, scalar_t(1.), F22_, R, scalar_t(0.)));
     }

@@ -124,7 +124,7 @@ namespace strumpack {
     if (!dim_upd()) return;
     if (Comm().is_null()) return;
     S = DistM_t(grid(), dim_upd(), R.cols());
-    TIMER_TIME(TaskType::HSS_SCHUR_PRODUCT, 2, t_sprod);
+    TIMER_TIME(TaskType::F22_MULT, 2, t_sprod);
     F22_->mult(op, R, S);
     TIMER_STOP(t_sprod);
   }
@@ -177,14 +177,9 @@ namespace strumpack {
 
     auto sample_front = [&](Trans op, const DistM_t& R, DistM_t& S) {
       S.zero();
-      DistM_t Sdummy(grid(), dsep+dupd, R.cols());
       TIMER_TIME(TaskType::FRONT_MULTIPLY_2D, 1, t_fmult);
-      if (op == Trans::N)
-        A.front_multiply_2d // TODO only perform op, remove dummy
-          (this->sep_begin_, this->sep_end_, this->upd_, R, S, Sdummy, 0);
-      else
-        A.front_multiply_2d // TODO only perform op, remove dummy
-        (this->sep_begin_, this->sep_end_, this->upd_, R, Sdummy, S, 0);
+      A.front_multiply_2d
+      (op, this->sep_begin_, this->sep_end_, this->upd_, R, S, 0);
       TIMER_STOP(t_fmult);
       TIMER_TIME(TaskType::UUTXR, 1, t_UUtxR);
       sample_children_CB(op, R, S);
@@ -284,11 +279,6 @@ namespace strumpack {
         TIMER_TIME(TaskType::HSS_SCHUR_PRODUCT, 2, t_sprod);
         DenseM_t F12R2(F12_.lrows(), R2.cols()),
         invF11F12R2(F11_.lrows(), R2.cols()), S2tmp(S2.rows(), S2.cols());
-#if defined(STRUMPACK_COUNT_FLOPS)
-        long long int f21_mult_flops = F21_.get_stat("Flop_C_Mult");
-        long long int invf11_mult_flops = F11_.get_stat("Flop_Solve");
-        long long int f12_mult_flops = F12_.get_stat("Flop_C_Mult");
-#endif
         if (op == Trans::N) {
           F12_.mult(op, R2, F12R2);
           F11_.inv_mult(op, F12R2, invF11F12R2);
@@ -302,10 +292,10 @@ namespace strumpack {
         S2.scaled_add(scalar_t(-1.), S2tmp);
         TIMER_STOP(t_sprod);
 #if defined(STRUMPACK_COUNT_FLOPS)
-        f21_mult_flops = F21_.get_stat("Flop_C_Mult") - f21_mult_flops;
-        invf11_mult_flops = F11_.get_stat("Flop_Solve") - invf11_mult_flops;
-        f12_mult_flops = F12_.get_stat("Flop_C_Mult") - f12_mult_flops;
-        long long int schur_flops = f21_mult_flops + invf11_mult_flops
+        long long int f21_mult_flops = F21_.get_stat("Flop_C_Mult"),
+        invf11_mult_flops = F11_.get_stat("Flop_Solve"),
+        f12_mult_flops = F12_.get_stat("Flop_C_Mult"),
+        schur_flops = f21_mult_flops + invf11_mult_flops
         + f12_mult_flops + S.rows()*S.cols();
         STRUMPACK_SCHUR_FLOPS(schur_flops);
         STRUMPACK_FLOPS(schur_flops);
@@ -348,10 +338,13 @@ namespace strumpack {
       TIMER_TIME(TaskType::SOLVE_LOWER, 0, t_s);
       DistM_t rhs(b);
       F11_.solve(rhs, b);
+      STRUMPACK_FLOPS(F11_.get_stat("Flop_Solve"));
       if (this->dim_upd()) {
         DistM_t tmp(bupd.grid(), bupd.rows(), bupd.cols());
         F21_.mult(Trans::N, b, tmp);
         bupd.scaled_add(scalar_t(-1.), tmp);
+        STRUMPACK_FLOPS(F21_.get_stat("Flop_C_Mult") +
+                        2*bupd.rows()*bupd.cols());
       }
       TIMER_STOP(t_s);
     }
@@ -368,6 +361,9 @@ namespace strumpack {
       F12_.mult(Trans::N, yupd, tmp);
       F11_.solve(tmp, tmp2);
       y.scaled_add(scalar_t(-1.), tmp2);
+      STRUMPACK_FLOPS(F12_.get_stat("Flop_C_Mult") +
+                      F11_.get_stat("Flop_Solve") +
+                      2*yloc.rows()*yloc.cols());
       TIMER_STOP(t_s);
     }
     DistM_t CBl, CBr;
