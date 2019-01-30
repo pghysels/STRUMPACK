@@ -146,6 +146,23 @@ namespace strumpack {
       }
 
       /**
+       * Set the initial guess for the rank.
+       */
+      void set_rank_guess(int rank_guess) {
+        assert(rank_guess > 0);
+        rank_guess_ = rank_guess;
+      }
+
+      /**
+       * Set the rate of increment for adaptively determining the
+       * rank.
+       */
+      void set_rank_rate(double rank_rate) {
+        assert(rank_rate > 0);
+        rank_rate_ = rank_rate;
+      }
+
+      /**
        * Specify the clustering algorithm. This is used when
        * constructing a kernel matrix approximation.
        */
@@ -189,6 +206,17 @@ namespace strumpack {
       int max_rank() const { return max_rank_; }
 
       /**
+       * Get the initial guess for the rank.
+       */
+      int rank_guess() const { return rank_guess_; }
+
+      /**
+       * Get the rate of increment for adaptively determining the
+       * rank.
+       */
+      double rank_rate() const { return rank_rate_; }
+
+      /**
        * Get the clustering algorithm to be used. This is used when
        * constructing an HODLR approximation of a kernel matrix.
        * \return clustering algorithm
@@ -225,7 +253,9 @@ namespace strumpack {
           {"hodlr_abs_tol",               required_argument, 0, 2},
           {"hodlr_leaf_size",             required_argument, 0, 3},
           {"hodlr_max_rank",              required_argument, 0, 4},
-          {"hodlr_clustering_algorithm",  required_argument, 0, 5},
+          {"hodlr_rank_guess",            required_argument, 0, 5},
+          {"hodlr_rank_rate",             required_argument, 0, 6},
+          {"hodlr_clustering_algorithm",  required_argument, 0, 7},
           {"hodlr_verbose",               no_argument, 0, 'v'},
           {"hodlr_quiet",                 no_argument, 0, 'q'},
           {"help",                        no_argument, 0, 'h'},
@@ -257,6 +287,16 @@ namespace strumpack {
           } break;
           case 5: {
             std::istringstream iss(optarg);
+            iss >> rank_guess_;
+            set_rank_guess(rank_guess_);
+          } break;
+          case 6: {
+            std::istringstream iss(optarg);
+            iss >> rank_rate_;
+            set_rank_rate(rank_rate_);
+          } break;
+          case 7: {
+            std::istringstream iss(optarg);
             std::string s; iss >> s;
             set_clustering_algorithm(get_clustering_algorithm(s));
           } break;
@@ -282,6 +322,10 @@ namespace strumpack {
                   << leaf_size() << ")" << std::endl
                   << "#   --hodlr_max_rank int (default "
                   << max_rank() << ")" << std::endl
+                  << "#   --hodlr_rank_guess int (default "
+                  << rank_guess() << ")" << std::endl
+                  << "#   --hodlr_rank_rate double (default "
+                  << rank_rate() << ")" << std::endl
                   << "#   --hodlr_clustering_algorithm natural|2means|kdtree|pca|cobble (default "
                   << get_name(clustering_algorithm())<< ")" << std::endl
                   << "#   --hodlr_verbose or -v (default "
@@ -295,6 +339,8 @@ namespace strumpack {
       real_t rel_tol_ = default_HODLR_rel_tol<real_t>();
       real_t abs_tol_ = default_HODLR_abs_tol<real_t>();
       int leaf_size_ = 128;
+      int rank_guess_ = 128;
+      double rank_rate_ = 2.;
       int max_rank_ = 5000;
       ClusteringAlgorithm _clustering_algo = ClusteringAlgorithm::COBBLE;
       bool verbose_ = true;

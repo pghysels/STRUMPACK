@@ -82,6 +82,7 @@ namespace strumpack {
       const MPIComm& Comm() const { return c_; }
 
       void compress(const mult_t& Amult);
+      void compress(const mult_t& Amult, int rank_guess);
 
       void mult(Trans op, const DenseM_t& X, DenseM_t& Y) const;
 
@@ -212,6 +213,12 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
+    LRBFMatrix<scalar_t>::compress(const mult_t& Amult, int rank_guess) {
+      HODLR_set_I_option<scalar_t>(options_, "rank0", rank_guess);
+      compress(Amult);
+    }
+
+    template<typename scalar_t> void
     LRBFMatrix<scalar_t>::mult
     (Trans op, const DenseM_t& X, DenseM_t& Y) const {
       assert(Y.cols() == X.cols());
@@ -255,6 +262,7 @@ namespace strumpack {
     LRBFMatrix<scalar_t>::redistribute_2D_to_1D
     (scalar_t a, const DistM_t& R2D, scalar_t b, DenseM_t& R1D,
      const std::vector<int>& dist) const {
+      TIMER_TIME(TaskType::REDIST_2D_TO_HSS, 0, t_redist);
       const auto P = c_.size();
       const auto rank = c_.rank();
       // for (int p=0; p<P; p++)
@@ -317,6 +325,7 @@ namespace strumpack {
     template<typename scalar_t> void
     LRBFMatrix<scalar_t>::redistribute_1D_to_2D
     (const DenseM_t& S1D, DistM_t& S2D, const std::vector<int>& dist) const {
+      TIMER_TIME(TaskType::REDIST_2D_TO_HSS, 0, t_redist);
       const auto rank = c_.rank();
       const auto P = c_.size();
       const auto B = DistM_t::default_MB;

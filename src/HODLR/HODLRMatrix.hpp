@@ -235,6 +235,22 @@ namespace strumpack {
       void compress
       (const std::function<void(Trans op,const DenseM_t& R,DenseM_t& S)>& Amult);
 
+      /**
+       * Construct the compressed HODLR representation of the matrix,
+       * using only a matrix-(multiple)vector multiplication routine.
+       *
+       * \param Amult Routine for the matrix-vector product. Trans op
+       * argument will be N, T or C for none, transpose or complex
+       * conjugate. The const DenseM_t& argument is the the random
+       * matrix R, and the final DenseM_t& argument S is what the user
+       * routine should compute as A*R, A^t*R or A^c*R. S will already
+       * be allocated.
+       * \param rank_guess Initial guess for the rank
+       */
+      void compress
+      (const std::function<void(Trans op,const DenseM_t& R,DenseM_t& S)>& Amult,
+       int rank_guess);
+
 
       /**
        * Multiply this HODLR matrix with a dense matrix: Y = op(X),
@@ -395,6 +411,8 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "xyzsort", sort_opt);
       HODLR_set_I_option<scalar_t>(options_, "ErrFillFull", 0);
       HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", 100);
+      HODLR_set_I_option<scalar_t>(options_, "rank0", opts.rank_guess());
+      HODLR_set_D_option<scalar_t>(options_, "rankrate", opts.rank_rate());
 
       perm_.resize(rows_);
       // construct HODLR with geometrical points
@@ -458,6 +476,8 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "xyzsort", sort_opt);
       HODLR_set_I_option<scalar_t>(options_, "ErrFillFull", 0);
       HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", 100);
+      HODLR_set_I_option<scalar_t>(options_, "rank0", opts.rank_guess());
+      HODLR_set_D_option<scalar_t>(options_, "rankrate", opts.rank_rate());
 
       perm_.resize(rows_);
       HODLR_construct_element
@@ -519,13 +539,15 @@ namespace strumpack {
       int sort_opt = 0;  // 0:natural order, 1:kd-tree, 2:cobble-like ordering
                          // 3:gram distance-based cobble-like ordering
       HODLR_set_D_option<scalar_t>(options_, "tol_comp", opts.rel_tol());
-      HODLR_set_I_option<scalar_t>(options_, "verbosity", opts.verbose() ? 0 : -1);
+      HODLR_set_I_option<scalar_t>(options_, "verbosity", opts.verbose() ? 1 : -1);
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
       HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
       //HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", com_opt);
       HODLR_set_I_option<scalar_t>(options_, "xyzsort", sort_opt);
       HODLR_set_I_option<scalar_t>(options_, "ErrFillFull", 0);
       HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", 100);
+      HODLR_set_I_option<scalar_t>(options_, "rank0", opts.rank_guess());
+      HODLR_set_D_option<scalar_t>(options_, "rankrate", opts.rank_rate());
 
       perm_.resize(rows_);
       HODLR_construct_matvec_init<scalar_t>
@@ -598,6 +620,13 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
+    HODLRMatrix<scalar_t>::compress
+    (const mult_t& Amult, int rank_guess) {
+      HODLR_set_I_option<scalar_t>(options_, "rank0", rank_guess);
+      compress(Amult);
+    }
+
+    template<typename scalar_t> void
     HODLRMatrix<scalar_t>::mult
     (Trans op, const DenseM_t& X, DenseM_t& Y) const {
       if (c_.is_null()) return;
@@ -663,6 +692,7 @@ namespace strumpack {
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::redistribute_2D_to_1D
     (const DistM_t& R2D, DenseM_t& R1D) const {
+      TIMER_TIME(TaskType::REDIST_2D_TO_HSS, 0, t_redist);
       if (c_.is_null()) return;
       const auto P = c_.size();
       const auto rank = c_.rank();
@@ -720,6 +750,7 @@ namespace strumpack {
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::redistribute_1D_to_2D
     (const DenseM_t& S1D, DistM_t& S2D) const {
+      TIMER_TIME(TaskType::REDIST_2D_TO_HSS, 0, t_redist);
       if (c_.is_null()) return;
       const auto rank = c_.rank();
       const auto P = c_.size();
