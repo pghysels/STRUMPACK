@@ -256,7 +256,6 @@ namespace strumpack {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
       random_sampling(A, opts, R, Sr, Sc);
       _sampled_columns += R.cols();
-      TIMER_STOP(t_sampling);
     };
     // auto elem = [&]
     //   (const std::vector<std::size_t>& I,

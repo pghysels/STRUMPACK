@@ -87,6 +87,15 @@ namespace strumpack { // these are all global variables
     extern std::atomic<long long int> update_sample_flops;
     extern std::atomic<long long int> hss_solve_flops;
 
+    extern std::atomic<long long int> f11_fill_flops;
+    extern std::atomic<long long int> f12_fill_flops;
+    extern std::atomic<long long int> f21_fill_flops;
+    extern std::atomic<long long int> f22_fill_flops;
+
+    extern std::atomic<long long int> f21_mult_flops;
+    extern std::atomic<long long int> invf11_mult_flops;
+    extern std::atomic<long long int> f12_mult_flops;
+
 #endif //DOXYGEN_SHOULD_SKIP_THIS
 
   } //end namespace params
@@ -123,6 +132,22 @@ namespace strumpack { // these are all global variables
   strumpack::params::CB_sample_flops += n;
 #define STRUMPACK_HSS_SOLVE_FLOPS(n)            \
   strumpack::params::hss_solve_flops += n;
+
+#define STRUMPACK_HODLR_F11_FILL_FLOPS(n)       \
+  strumpack::params::f11_fill_flops += n;
+#define STRUMPACK_HODLR_F12_FILL_FLOPS(n)       \
+  strumpack::params::f12_fill_flops += n
+#define STRUMPACK_HODLR_F21_FILL_FLOPS(n)       \
+  strumpack::params::f21_fill_flops += n
+#define STRUMPACK_HODLR_F22_FILL_FLOPS(n)       \
+  strumpack::params::f22_fill_flops += n
+
+#define STRUMPACK_HODLR_F21_MULT_FLOPS(n)       \
+  strumpack::params::f21_mult_flops += n
+#define STRUMPACK_HODLR_INVF11_MULT_FLOPS(n)    \
+  strumpack::params::invf11_mult_flops += n
+#define STRUMPACK_HODLR_F12_MULT_FLOPS(n)       \
+  strumpack::params::f12_mult_flops += n
 #else
 #define STRUMPACK_FLOPS(n) void(0);
 #define STRUMPACK_BYTES(n) void(0);
@@ -139,6 +164,15 @@ namespace strumpack { // these are all global variables
 #define STRUMPACK_SCHUR_FLOPS(n) void(0);
 #define STRUMPACK_CB_SAMPLE_FLOPS(n) void(0);
 #define STRUMPACK_HSS_SOLVE_FLOPS(n) void(0);
+
+#define STRUMPACK_HODLR_F11_FILL_FLOPS(n) void(0);
+#define STRUMPACK_HODLR_F12_FILL_FLOPS(n) void(0);
+#define STRUMPACK_HODLR_F21_FILL_FLOPS(n) void(0);
+#define STRUMPACK_HODLR_F22_FILL_FLOPS(n) void(0);
+
+#define STRUMPACK_HODLR_F21_MULT_FLOPS(n) void(0);
+#define STRUMPACK_HODLR_INVF11_MULT_FLOPS(n) void(0);
+#define STRUMPACK_HODLR_F12_FILL_FLOPS(n) void(0);
 #endif
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 

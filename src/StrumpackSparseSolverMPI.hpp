@@ -175,7 +175,7 @@ namespace strumpack {
     virtual void compute_separator_reordering() override;
     void perf_counters_stop(const std::string& s) override;
     virtual void synchronize() override { comm_.barrier(); }
-    virtual void flop_breakdown() const override;
+    virtual void reduce_flop_counters() const override;
 
   private:
     std::unique_ptr<CSRMatrix<scalar_t,integer_t>> mat_;
@@ -288,25 +288,49 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPI<scalar_t,integer_t>::flop_breakdown() const {
+  StrumpackSparseSolverMPI<scalar_t,integer_t>::reduce_flop_counters() const {
 #if defined(STRUMPACK_COUNT_FLOPS)
-    float flops[12] = {
-      float(params::random_flops.load()),
-      float(params::ID_flops.load()),
-      float(params::QR_flops.load()),
-      float(params::ortho_flops.load()),
-      float(params::reduce_sample_flops.load()),
-      float(params::update_sample_flops.load()),
-      float(params::extraction_flops.load()),
-      float(params::CB_sample_flops.load()),
-      float(params::sparse_sample_flops.load()),
-      float(params::ULV_factor_flops.load()),
-      float(params::schur_flops.load()),
-      float(params::full_rank_flops.load())};
-    comm_.reduce(flops, 12, MPI_SUM);
-    this->print_flop_breakdown
-      (flops[0], flops[1], flops[2], flops[3], flops[4], flops[5],
-       flops[6], flops[7], flops[8], flops[9], flops[10], flops[11]);
+    std::array<long long int,19> flops = {
+      params::random_flops.load(),
+      params::ID_flops.load(),
+      params::QR_flops.load(),
+      params::ortho_flops.load(),
+      params::reduce_sample_flops.load(),
+      params::update_sample_flops.load(),
+      params::extraction_flops.load(),
+      params::CB_sample_flops.load(),
+      params::sparse_sample_flops.load(),
+      params::ULV_factor_flops.load(),
+      params::schur_flops.load(),
+      params::full_rank_flops.load(),
+      params::f11_fill_flops.load(),
+      params::f12_fill_flops.load(),
+      params::f21_fill_flops.load(),
+      params::f22_fill_flops.load(),
+      params::f21_mult_flops.load(),
+      params::invf11_mult_flops.load(),
+      params::f12_mult_flops.load()
+    };
+    comm_.reduce(flops.data(), flops.size(), MPI_SUM);
+    params::random_flops = flops[0];
+    params::ID_flops = flops[1];
+    params::QR_flops = flops[2];
+    params::ortho_flops = flops[3];
+    params::reduce_sample_flops = flops[4];
+    params::update_sample_flops = flops[5];
+    params::extraction_flops = flops[6];
+    params::CB_sample_flops = flops[7];
+    params::sparse_sample_flops = flops[8];
+    params::ULV_factor_flops = flops[9];
+    params::schur_flops = flops[10];
+    params::full_rank_flops = flops[11];
+    params::f11_fill_flops = flops[12];
+    params::f12_fill_flops = flops[13];
+    params::f21_fill_flops = flops[14];
+    params::f22_fill_flops = flops[15];
+    params::f21_mult_flops = flops[16];
+    params::invf11_mult_flops = flops[17];
+    params::f12_mult_flops = flops[18];
 #endif
   }
 

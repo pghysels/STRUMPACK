@@ -377,13 +377,10 @@ namespace strumpack {
     virtual void perf_counters_stop(const std::string& s);
     virtual void synchronize() {}
     virtual void communicate_ordering() {}
-    virtual void flop_breakdown() const;
-    virtual void print_flop_breakdown
-    (float random_flops, float ID_flops, float QR_flops, float ortho_flops,
-     float reduce_sample_flops, float update_sample_flops,
-     float extraction_flops, float CB_sample_flops, float sparse_sample_flops,
-     float ULV_factor_flops, float schur_flops, float full_rank_flops) const;
+    virtual void print_flop_breakdown_HSS() const;
+    virtual void print_flop_breakdown_HODLR() const;
     virtual void flop_breakdown_reset() const;
+    virtual void reduce_flop_counters() const {}
 
     SPOptions<scalar_t> opts_;
     bool is_root_;
@@ -723,19 +720,6 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolver<scalar_t,integer_t>::flop_breakdown() const {
-#if defined(STRUMPACK_COUNT_FLOPS)
-    print_flop_breakdown
-      (params::random_flops, params::ID_flops, params::QR_flops,
-       params::ortho_flops, params::reduce_sample_flops,
-       params::update_sample_flops, params::extraction_flops,
-       params::CB_sample_flops, params::sparse_sample_flops,
-       params::ULV_factor_flops, params::schur_flops,
-       params::full_rank_flops);
-#endif
-  }
-
-  template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::flop_breakdown_reset() const {
 #if defined(STRUMPACK_COUNT_FLOPS)
     params::random_flops = 0;
@@ -750,61 +734,76 @@ namespace strumpack {
     params::ULV_factor_flops = 0;
     params::schur_flops = 0;
     params::full_rank_flops = 0;
+    params::f11_fill_flops = 0;
+    params::f12_fill_flops = 0;
+    params::f21_fill_flops = 0;
+    params::f22_fill_flops = 0;
+    params::f21_mult_flops = 0;
+    params::invf11_mult_flops = 0;
+    params::f12_mult_flops = 0;
 #endif
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolver<scalar_t,integer_t>::print_flop_breakdown
-  (float random_flops, float ID_flops, float QR_flops, float ortho_flops,
-   float reduce_sample_flops, float update_sample_flops,
-   float extraction_flops, float CB_sample_flops, float sparse_sample_flops,
-   float ULV_factor_flops, float schur_flops, float full_rank_flops) const {
+  StrumpackSparseSolver<scalar_t,integer_t>::print_flop_breakdown_HSS() const {
+    reduce_flop_counters();
     if (!is_root_) return;
-    float sample_flops = CB_sample_flops
-      + sparse_sample_flops;
-    float compression_flops = random_flops
-      + ID_flops + QR_flops + ortho_flops
-      + reduce_sample_flops + update_sample_flops
-      + extraction_flops + sample_flops;
+    float sample_flops = params::CB_sample_flops + params::sparse_sample_flops;
+    float compression_flops = params::random_flops + params::ID_flops +
+      params::QR_flops + params::ortho_flops + params::reduce_sample_flops +
+      params::update_sample_flops + params::extraction_flops + sample_flops;
     std::cout << std::endl;
-    std::cout << "# ----- FLOP BREAKDOWN ---------------------"
-              << std::endl;
-    std::cout << "# compression           = "
-              << compression_flops << std::endl;
-    std::cout << "#    random             = "
-              << random_flops << std::endl;
-    std::cout << "#    ID                 = "
-              << ID_flops << std::endl;
-    std::cout << "#    QR                 = "
-              << QR_flops << std::endl;
-    std::cout << "#    ortho              = "
-              << ortho_flops << std::endl;
-    std::cout << "#    reduce_samples     = "
-              << reduce_sample_flops << std::endl;
-    std::cout << "#    update_samples     = "
-              << update_sample_flops << std::endl;
-    std::cout << "#    extraction         = "
-              << extraction_flops << std::endl;
-    std::cout << "#    sampling           = "
-              << sample_flops << std::endl;
-    std::cout << "#       CB_sample       = "
-              << CB_sample_flops << std::endl;
-    std::cout << "#       sparse_sampling = "
-              << sparse_sample_flops << std::endl;
-    std::cout << "# ULV_factor            = "
-              << ULV_factor_flops << std::endl;
-    std::cout << "# Schur                 = "
-              << schur_flops << std::endl;
-    std::cout << "# full_rank             = "
-              << full_rank_flops << std::endl;
-    std::cout << "# --------------------------------------------"
-              << std::endl;
+    std::cout << "# ----- FLOP BREAKDOWN ---------------------" << std::endl;
+    std::cout << "# compression           = " << compression_flops << std::endl;
+    std::cout << "#    random             = " << float(params::random_flops) << std::endl;
+    std::cout << "#    ID                 = " << float(params::ID_flops) << std::endl;
+    std::cout << "#    QR                 = " << float(params::QR_flops) << std::endl;
+    std::cout << "#    ortho              = " << float(params::ortho_flops) << std::endl;
+    std::cout << "#    reduce_samples     = " << float(params::reduce_sample_flops) << std::endl;
+    std::cout << "#    update_samples     = " << float(params::update_sample_flops) << std::endl;
+    std::cout << "#    extraction         = " << float(params::extraction_flops) << std::endl;
+    std::cout << "#    sampling           = " << sample_flops << std::endl;
+    std::cout << "#       CB_sample       = " << float(params::CB_sample_flops) << std::endl;
+    std::cout << "#       sparse_sampling = " << float(params::sparse_sample_flops) << std::endl;
+    std::cout << "# ULV_factor            = " << float(params::ULV_factor_flops) << std::endl;
+    std::cout << "# Schur                 = " << float(params::schur_flops) << std::endl;
+    std::cout << "# full_rank             = " << float(params::full_rank_flops) << std::endl;
+    std::cout << "# --------------------------------------------" << std::endl;
     std::cout << "# total                 = "
-              << (compression_flops + ULV_factor_flops +
-                  schur_flops + full_rank_flops) << std::endl;
-    std::cout << "# --------------------------------------------"
-              << std::endl;
+              << (compression_flops + params::ULV_factor_flops +
+                  params::schur_flops + params::full_rank_flops) << std::endl;
+    std::cout << "# --------------------------------------------" << std::endl << std::endl;
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::print_flop_breakdown_HODLR() const {
+    reduce_flop_counters();
+    if (!is_root_) return;
+    float sample_flops = strumpack::params::CB_sample_flops +
+      strumpack::params::schur_flops + strumpack::params::sparse_sample_flops;
+    float compression_flops = strumpack::params::f11_fill_flops +
+      strumpack::params::f12_fill_flops + strumpack::params::f21_fill_flops +
+      strumpack::params::f22_fill_flops + sample_flops;
     std::cout << std::endl;
+    std::cout << "# ----- FLOP BREAKDOWN ---------------------" << std::endl;
+    std::cout << "# F11_compression       = " << float(params::f11_fill_flops) << std::endl;
+    std::cout << "# F12_compression       = " << float(params::f12_fill_flops) << std::endl;
+    std::cout << "# F21_compression       = " << float(params::f21_fill_flops) << std::endl;
+    std::cout << "# F22_compression       = " << float(params::f22_fill_flops) << std::endl;
+    std::cout << "# sampling              = " << sample_flops << std::endl;
+    std::cout << "#    CB_sample          = " << float(params::CB_sample_flops) << std::endl;
+    std::cout << "#    sparse_sampling    = " << float(params::sparse_sample_flops) << std::endl;
+    std::cout << "#    Schur_sampling     = " << float(params::schur_flops) << std::endl;
+    std::cout << "#       F21             = " << float(params::f21_mult_flops) << std::endl;
+    std::cout << "#       inv(F11)        = " << float(params::invf11_mult_flops) << std::endl;
+    std::cout << "#       F12             = " << float(params::f12_mult_flops) << std::endl;
+    std::cout << "# HODLR_factor          = " << float(params::ULV_factor_flops) << std::endl;
+    std::cout << "# full_rank             = " << float(params::full_rank_flops) << std::endl;
+    std::cout << "# --------------------------------------------" << std::endl;
+    std::cout << "# total                 = "
+              << (compression_flops + strumpack::params::ULV_factor_flops +
+                  strumpack::params::full_rank_flops) << std::endl;
+    std::cout << "# --------------------------------------------" << std::endl << std::endl;
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
@@ -879,8 +878,8 @@ namespace strumpack {
         }
 #endif
       }
-      if (opts_.use_HSS())
-        flop_breakdown();
+      if (opts_.use_HSS()) print_flop_breakdown_HSS();
+      if (opts_.use_HODLR()) print_flop_breakdown_HODLR();
     }
     if (rank_out_) tree()->print_rank_statistics(*rank_out_);
     factored_ = true;

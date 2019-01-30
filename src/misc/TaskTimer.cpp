@@ -34,8 +34,8 @@
 #include <omp.h>
 #endif
 #include "TaskTimer.hpp"
-#if defined(STUMPACK_USE_MPI)
-#include "MPIWrapper.hpp"
+#if defined(STRUMPACK_USE_MPI)
+#include "misc/MPIWrapper.hpp"
 #endif
 
 using namespace std::chrono;
@@ -114,6 +114,7 @@ void TaskTimer::print_name(std::ostream& os) {
     case TaskType::RANDOM_GENERATE:       os << "RANDOM_GENERATE"; break;
     case TaskType::FRONT_MULTIPLY_2D:     os << "FRONT_MULTIPLY_2D"; break;
     case TaskType::UUTXR:                 os << "UUTXR"; break;
+    case TaskType::F22_MULT:              os << "F22_MULT"; break;
     case TaskType::HSS_SCHUR_PRODUCT:
       os << "HSS_SCHUR_PRODUCT"; break;
     case TaskType::SKINNY_EXTEND_ADD_SEQSEQ:
@@ -125,6 +126,7 @@ void TaskTimer::print_name(std::ostream& os) {
     case TaskType::SKINNY_EXTEND_ADD_MPI1:
       os << "SKINNY_EXTEND_ADD_MPI1"; break;
     case TaskType::HSS_COMPRESS:          os << "HSS_COMPRESS"; break;
+    case TaskType::LRBF_COMPRESS:         os << "LRBF_COMPRESS"; break;
     case TaskType::HSS_PARHQRINTERPOL:    os << "HSS_PARHQRINTERPOL"; break;
     case TaskType::HSS_SEQHQRINTERPOL:    os << "HSS_SEQHQRINTERPOL"; break;
     case TaskType::EXTRACT_2D:            os << "EXTRACT_2D"; break;
@@ -259,7 +261,9 @@ void TimerList::finalize() {
     return;
   }
 
-  for (int p=0; p<mpi_rank(); p++) MPI_Barrier(MPI_COMM_WORLD);
+  MPIComm c;
+  int rank = c.rank(), P = c.size();
+  for (int p=0; p<rank; p++) MPI_Barrier(MPI_COMM_WORLD);
   {
     std::ofstream log;
     if (mpi_rank())
@@ -273,7 +277,7 @@ void TimerList::finalize() {
     log << std::endl;
     log.close();
   }
-  for (int p=mpi_rank(); p<=mpi_nprocs(); p++) MPI_Barrier(MPI_COMM_WORLD);
+  for (int p=rank; p<=P; p++) MPI_Barrier(MPI_COMM_WORLD);
 
   int timers = int(TaskType::EXPLICITLY_NAMED_TASK);
   auto t = new double[4*timers];
@@ -285,11 +289,13 @@ void TimerList::finalize() {
   for (unsigned int thread=0; thread<list.size(); thread++)
     for (auto timing : list[thread])
       t[int(timing.type)] += timing.elapsed();
-  MPI_Reduce(t, t_sum, timers, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-  MPI_Reduce(t, t_min, timers, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
-  MPI_Reduce(t, t_max, timers, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-  if (!mpi_rank()) {
-    auto P = mpi_nprocs();
+  std::copy(t, t+timers, t_sum);
+  std::copy(t, t+timers, t_min);
+  std::copy(t, t+timers, t_max);
+  c.reduce(t_sum, timers, MPI_SUM);
+  c.reduce(t_min, timers, MPI_MIN);
+  c.reduce(t_max, timers, MPI_MAX);
+  if (!rank) {
     auto print_line = [&](const std::string& op, TaskType idx) {
       std::cout << "|" << op << "| "
       << std::setw(10) << t_sum[int(idx)] << " | "
@@ -310,19 +316,21 @@ void TimerList::finalize() {
     std::cout << hline;
     print_line(" random_sampling            ", TaskType::RANDOM_SAMPLING);
     print_line("    random_generate         ", TaskType::RANDOM_GENERATE);
-    print_line("    front_multiply_2d       ", TaskType::FRONT_MULTIPLY_2D);
-    print_line("    UUtxR                   ", TaskType::UUTXR);
-    print_line("       HSS_Schur_product    ", TaskType::HSS_SCHUR_PRODUCT);
-    print_line("       skinny_extend_add_ss ",
-               TaskType::SKINNY_EXTEND_ADD_SEQSEQ);
-    print_line("       skinny_extend_add_s  ",
-               TaskType::SKINNY_EXTEND_ADD_SEQ1);
-    print_line("       skinny_extend_add_mm ",
-               TaskType::SKINNY_EXTEND_ADD_MPIMPI);
-    print_line("       skinny_extend_add_m  ",
-               TaskType::SKINNY_EXTEND_ADD_MPI1);
+    print_line("    front_multiply          ", TaskType::FRONT_MULTIPLY_2D);
+    print_line("    CB_mult                 ", TaskType::UUTXR);
+    print_line("       F22_mult             ", TaskType::F22_MULT);
+    print_line("       Schur_mult           ", TaskType::HSS_SCHUR_PRODUCT);
+    // print_line("       skinny_extend_add_ss ",
+    //            TaskType::SKINNY_EXTEND_ADD_SEQSEQ);
+    // print_line("       skinny_extend_add_s  ",
+    //            TaskType::SKINNY_EXTEND_ADD_SEQ1);
+    // print_line("       skinny_extend_add_mm ",
+    //            TaskType::SKINNY_EXTEND_ADD_MPIMPI);
+    // print_line("       skinny_extend_add_m  ",
+    //            TaskType::SKINNY_EXTEND_ADD_MPI1);
     std::cout << hline;
     print_line(" HSS_compress               ", TaskType::HSS_COMPRESS);
+    print_line(" LRBF_compress              ", TaskType::LRBF_COMPRESS);
     print_line("    HSS_parHQRInterpol      ", TaskType::HSS_PARHQRINTERPOL);
     print_line("    HSS_seqHQRInterpol      ", TaskType::HSS_SEQHQRINTERPOL);
     print_line("    QR                      ", TaskType::QR);
@@ -336,10 +344,10 @@ void TimerList::finalize() {
     print_line("          HSS_extract_Schur ", TaskType::HSS_EXTRACT_SCHUR);
     print_line("       get_submatrix        ", TaskType::GET_SUBMATRIX);
     std::cout << hline;
-    print_line(" HSS_partially_factor       ",
+    print_line(" Partial_factor             ",
                TaskType::HSS_PARTIALLY_FACTOR);
-    print_line(" HSS_compute_Schur          ", TaskType::HSS_COMPUTE_SCHUR);
-    print_line(" HSS_factor                 ", TaskType::HSS_FACTOR);
+    print_line(" Compute_Schur              ", TaskType::HSS_COMPUTE_SCHUR);
+    print_line(" Factor                     ", TaskType::HSS_FACTOR);
     std::cout << hline;
     print_line(" Forward_solve              ", TaskType::FORWARD_SOLVE);
     print_line("    look_left               ", TaskType::LOOK_LEFT);

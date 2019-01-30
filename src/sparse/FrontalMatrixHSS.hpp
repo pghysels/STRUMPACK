@@ -290,7 +290,9 @@ namespace strumpack {
     if (dchild > 0 && opts.indirect_sampling()) {
       DenseM_t cSr, cSc;
       DenseMW_t cRd0(cR.rows(), dchild, cR, 0, 0);
+      TIMER_TIME(TaskType::HSS_SCHUR_PRODUCT, 2, t_sprod);
       _H.Schur_product_indirect(_ULV, _DUB01, R1, cRd0, Sr2, Sc2, cSr, cSc);
+      TIMER_STOP(t_sprod);
       DenseMW_t(Sr.rows(), dchild, Sr, 0, 0)
         .scatter_rows_add(I, cSr, task_depth);
       DenseMW_t(Sc.rows(), dchild, Sc, 0, 0)
@@ -342,9 +344,11 @@ namespace strumpack {
 #else
     DenseM_t cSr(cR.rows(), cR.cols());
     DenseM_t cSc(cR.rows(), cR.cols());
+    TIMER_TIME(TaskType::HSS_SCHUR_PRODUCT, 2, t_sprod);
     _H.Schur_product_direct
       (_ULV, _Theta, _DUB01, _Phi,
        _ThetaVhatC_or_VhatCPhiC, cR, cSr, cSc);
+    TIMER_STOP(t_sprod);
 #endif
     Sr.scatter_rows_add(I, cSr, task_depth);
     Sc.scatter_rows_add(I, cSc, task_depth);
@@ -407,12 +411,16 @@ namespace strumpack {
       STRUMPACK_RANDOM_FLOPS(rgen->flops_per_prng()*d*m);
     }
 
+    TIMER_TIME(TaskType::FRONT_MULTIPLY_2D, 1, t_fmult);
     A.front_multiply
       (sep_begin_, sep_end_, this->upd_, Rr, Sr, Sc, task_depth);
+    TIMER_STOP(t_fmult);
+    TIMER_TIME(TaskType::UUTXR, 1, t_UUtxR);
     if (lchild_)
       lchild_->sample_CB(opts, Rr, Sr, Sc, this, task_depth);
     if (rchild_)
       rchild_->sample_CB(opts, Rr, Sr, Sc, this, task_depth);
+    TIMER_STOP(t_UUtxR);
 
     if (opts.indirect_sampling() && etree_level != 0) {
       auto dold = R1.cols();
@@ -441,7 +449,11 @@ namespace strumpack {
     for (auto j : J)
       gJ.push_back
         ((integer_t(j) < dsep) ? j+sep_begin_ : this->upd_[j-dsep]);
-    A.extract_separator(sep_end_, gI, gJ, B, task_depth);
+    {
+      TIMER_TIME(TaskType::EXTRACT_SEP_2D, 2, t_ex_sep);
+      A.extract_separator(sep_end_, gI, gJ, B, task_depth);
+    }
+    TIMER_TIME(TaskType::GET_SUBMATRIX_2D, 2, t_getsub);
     if (lchild_)
       lchild_->extract_CB_sub_matrix(gI, gJ, B, task_depth);
     if (rchild_)
@@ -475,11 +487,13 @@ namespace strumpack {
     }
     _H.set_openmp_task_depth(task_depth);
     auto mult = [&](DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
+      TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
       random_sampling(A, opts, Rr, Rc, Sr, Sc, etree_level, task_depth);
       _sampled_columns += Rr.cols();
     };
     auto elem = [&](const std::vector<std::size_t>& I,
                     const std::vector<std::size_t>& J, DenseM_t& B) {
+      TIMER_TIME(TaskType::EXTRACT_2D, 1, t_ex);
       element_extraction(A, I, J, B, task_depth);
     };
     auto HSSopts = opts.HSS_options();
@@ -496,7 +510,10 @@ namespace strumpack {
     if (rchild_) rchild_->release_work_memory();
     if (dim_sep()) {
       if (etree_level > 0) {
+        TIMER_TIME(TaskType::HSS_PARTIALLY_FACTOR, 0, t_pfact);
         _ULV = _H.partial_factor();
+        TIMER_STOP(t_pfact);
+        TIMER_TIME(TaskType::HSS_COMPUTE_SCHUR, 0, t_comp_schur);
         _H.Schur_update(_ULV, _Theta, _DUB01, _Phi);
         DenseM_t& Vhat = _ULV.Vhat();
         if (_Theta.cols() < _Phi.cols()) {
@@ -512,8 +529,11 @@ namespace strumpack {
           STRUMPACK_SCHUR_FLOPS
             (gemm_flops(Trans::N, Trans::C, scalar_t(1.), _Theta, Vhat, scalar_t(0.)));
         }
-      } else
+      } else {
+        TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
         _ULV = _H.factor();
+        TIMER_STOP(t_fact);
+      }
     }
   }
 

@@ -30,8 +30,9 @@
  * \file MPIWrapper.hpp
  * \brief Contains some simple C++ MPI wrapper utilities.
  */
-#ifndef MPI_WRAPPER_HPP
-#define MPI_WRAPPER_HPP
+#ifndef STRUMPACK_MPI_WRAPPER_HPP
+#define STRUMPACK_MPI_WRAPPER_HPP
+
 #include <complex>
 #include <cassert>
 #include <numeric>
@@ -594,4 +595,4 @@ namespace strumpack {
 
 } // end namespace strumpack
 
-#endif
+#endif // STRUMPACK_MPI_WRAPPER_HPP

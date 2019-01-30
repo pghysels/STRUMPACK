@@ -58,20 +58,6 @@ namespace strumpack {
     (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
      const F_t* p, int task_depth) override;
 
-    // TODO remove
-    // void extend_add_copy_to_buffers
-    // (std::vector<std::vector<scalar_t>>& sbuf,
-    //  const FrontalMatrixMPI<scalar_t,integer_t>* pa) const override {
-    //   const std::size_t dupd = dim_upd();
-    //   DenseM_t CB(dupd, dupd);
-    //   {
-    //     DenseM_t id(dupd, dupd);
-    //     id.eye();
-    //     F22_->mult(Trans::N, id, CB);
-    //   }
-    //   ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers(CB, sbuf, pa, this);
-    // }
-
     void sample_CB
     (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
      int task_depth=0) const override;
@@ -119,10 +105,6 @@ namespace strumpack {
     std::unique_ptr<HODLR::HODLRMatrix<scalar_t>> F22_;
     MPIComm commself_;
 
-    // TODO remove
-    // DenseM_t dF11, dF12, dF21, dF22;
-    // std::vector<int> piv;
-
     void draw_node(std::ostream& of, bool is_root) const override;
 
     void multifrontal_factorization_node
@@ -168,7 +150,14 @@ namespace strumpack {
     {
       DenseM_t id(dupd, dupd);
       id.eye();
+      TIMER_TIME(TaskType::F22_MULT, 1, t_f22mult);
       F22_->mult(Trans::N, id, CB);
+      TIMER_STOP(t_f22mult);
+#if defined(STRUMPACK_COUNT_FLOPS)
+      long long int f = F22_->get_stat("Flop_C_Mult");
+      STRUMPACK_CB_SAMPLE_FLOPS(f);
+      STRUMPACK_FLOPS(f);
+#endif
     }
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop default(shared) grainsize(64)      \
@@ -197,12 +186,15 @@ namespace strumpack {
     auto I = this->upd_to_parent(pa);
     auto cR = R.extract_rows(I);
     DenseM_t cS(dim_upd(), R.cols());
+    TIMER_TIME(TaskType::F22_MULT, 1, t_f22mult);
     F22_->mult(op, cR, cS);
+    TIMER_STOP(t_f22mult);
     S.scatter_rows_add(I, cS, task_depth);
-    // TODO flops!!
-    // STRUMPACK_CB_SAMPLE_FLOPS
-    //   (gemm_flops(op, Trans::N, scalar_t(1.), F22_, cR, scalar_t(0.)) +
-    //    cS.rows()*cS.cols()); // for the skinny-extend add
+#if defined(STRUMPACK_COUNT_FLOPS)
+    long long int f = F22_->get_stat("Flop_C_Mult") + cS.rows()*cS.cols();
+    STRUMPACK_CB_SAMPLE_FLOPS(f);
+    STRUMPACK_FLOPS(f);
+#endif
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -219,11 +211,17 @@ namespace strumpack {
       for (std::size_t r=u2s; r<dupd; r++) cR(r,c) = scalar_t(0.);
     }
     DenseM_t cS(dupd, Rcols);
+    TIMER_TIME(TaskType::F22_MULT, 1, t_f22mult);
     F22_->mult(op, cR, cS);
+    TIMER_STOP(t_f22mult);
     for (std::size_t c=0; c<Rcols; c++)
       for (std::size_t r=0; r<u2s; r++)
         S(Ir[r],c) += cS(r,c);
-    STRUMPACK_CB_SAMPLE_FLOPS(Rcols*u2s);
+#if defined(STRUMPACK_COUNT_FLOPS)
+    long long int f = F22_->get_stat("Flop_C_Mult") + Rcols*u2s;
+    STRUMPACK_CB_SAMPLE_FLOPS(f);
+    STRUMPACK_FLOPS(f);
+#endif
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -242,21 +240,33 @@ namespace strumpack {
         for (std::size_t r=u2s; r<dupd; r++)
           cR(r,c) = R(Ir[r]-pds,c);
       }
+      TIMER_TIME(TaskType::F22_MULT, 1, t_f22mult);
       F22_->mult(op, cR, cS);
+      TIMER_STOP(t_f22mult);
       for (std::size_t c=0; c<Rcols; c++)
         for (std::size_t r=0; r<u2s; r++)
           S(Ir[r],c) += cS(r,c);
-      STRUMPACK_CB_SAMPLE_FLOPS(Rcols*u2s);
+#if defined(STRUMPACK_COUNT_FLOPS)
+      long long int f = F22_->get_stat("Flop_C_Mult") + Rcols*u2s;
+      STRUMPACK_CB_SAMPLE_FLOPS(f);
+      STRUMPACK_FLOPS(f);
+#endif
     } else {
       for (std::size_t c=0; c<Rcols; c++) {
         for (std::size_t r=0; r<u2s; r++) cR(r,c) = R(Ir[r],c);
         for (std::size_t r=u2s; r<dupd; r++) cR(r,c) = scalar_t(0.);
       }
+      TIMER_TIME(TaskType::F22_MULT, 1, t_f22mult);
       F22_->mult(op, cR, cS);
+      TIMER_STOP(t_f22mult);
       for (std::size_t c=0; c<Rcols; c++)
         for (std::size_t r=u2s; r<dupd; r++)
           S(Ir[r]-pds,c) += cS(r,c);
-      STRUMPACK_CB_SAMPLE_FLOPS(Rcols*(dupd-u2s));
+#if defined(STRUMPACK_COUNT_FLOPS)
+      long long int f = F22_->get_stat("Flop_C_Mult") + Rcols*(dupd-u2s);
+      STRUMPACK_CB_SAMPLE_FLOPS(f);
+      STRUMPACK_FLOPS(f);
+#endif
     }
   }
 
@@ -275,22 +285,34 @@ namespace strumpack {
         for (std::size_t r=0; r<u2s; r++) cR(r,c) = R(Ir[r],c);
         for (std::size_t r=u2s; r<dupd; r++) cR(r,c) = scalar_t(0.);
       }
+      TIMER_TIME(TaskType::F22_MULT, 1, t_f22mult);
       F22_->mult(op, cR, cS);
+      TIMER_STOP(t_f22mult);
       for (std::size_t c=0; c<Rcols; c++)
         for (std::size_t r=u2s; r<dupd; r++)
           S(Ir[r]-pds,c) += cS(r,c);
-      STRUMPACK_CB_SAMPLE_FLOPS(Rcols*(dupd-u2s));
+#if defined(STRUMPACK_COUNT_FLOPS)
+      long long int f = F22_->get_stat("Flop_C_Mult") + Rcols*(dupd-u2s);
+      STRUMPACK_CB_SAMPLE_FLOPS(f);
+      STRUMPACK_FLOPS(f);
+#endif
     } else {
       for (std::size_t c=0; c<Rcols; c++) {
         for (std::size_t r=0; r<u2s; r++) cR(r,c) = scalar_t(0.);
         for (std::size_t r=u2s; r<dupd; r++)
           cR(r,c) = R(Ir[r]-pds,c);
       }
+      TIMER_TIME(TaskType::F22_MULT, 1, t_f22mult);
       F22_->mult(op, cR, cS);
+      TIMER_STOP(t_f22mult);
       for (std::size_t c=0; c<Rcols; c++)
         for (std::size_t r=0; r<u2s; r++)
           S(Ir[r],c) += cS(r,c);
-      STRUMPACK_CB_SAMPLE_FLOPS(Rcols*u2s);
+#if defined(STRUMPACK_COUNT_FLOPS)
+      long long int f = F22_->get_stat("Flop_C_Mult") + Rcols*u2s;
+      STRUMPACK_CB_SAMPLE_FLOPS(f);
+      STRUMPACK_FLOPS(f);
+#endif
     }
   }
 
@@ -310,11 +332,17 @@ namespace strumpack {
         cR(r,c) = R(Ir[r]-pds,c);
     }
     DenseM_t cS(dupd, Rcols);
+    TIMER_TIME(TaskType::F22_MULT, 1, t_f22mult);
     F22_->mult(op, cR, cS);
+    TIMER_STOP(t_f22mult);
     for (std::size_t c=0; c<Rcols; c++)
       for (std::size_t r=u2s; r<dupd; r++)
         S(Ir[r]-pds,c) += cS(r,c);
-    STRUMPACK_CB_SAMPLE_FLOPS(Rcols*(dupd-u2s));
+#if defined(STRUMPACK_COUNT_FLOPS)
+    long long int f = F22_->get_stat("Flop_C_Mult") + Rcols*(dupd-u2s);
+    STRUMPACK_CB_SAMPLE_FLOPS(f);
+    STRUMPACK_FLOPS(f);
+#endif
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -357,99 +385,84 @@ namespace strumpack {
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();
 
-    //// ------ temporary test code ------------------------------
-    // dF11 = DenseM_t (dsep, dsep); dF11.zero();
-    // dF12 = DenseM_t(dsep, dupd); dF12.zero();
-    // dF21 = DenseM_t(dupd, dsep); dF21.zero();
-    // dF22 = DenseM_t(dupd, dupd); dF22.zero();
-    // A.extract_front
-    //   (dF11, dF12, dF21, this->sep_begin_, this->sep_end_,
-    //    this->upd_, task_depth);
-    // if (lchild_)
-    //   lchild_->extend_add_to_dense
-    //     (dF11, dF12, dF21, dF22, this, task_depth);
-    // if (rchild_)
-    //   rchild_->extend_add_to_dense
-    //     (dF11, dF12, dF21, dF22, this, task_depth);
-    //////////////////////////////////////////////////////////////
-
-
     auto sample_F11 = [&](Trans op, const DenseM_t& R, DenseM_t& S) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-      // gemm(op, Trans::N, scalar_t(1.0), dF11, R, scalar_t(0.), S);
-      // return;
       S.zero();
+      TIMER_TIME(TaskType::FRONT_MULTIPLY_2D, 1, t_fmult);
       A.front_multiply_F11(op, sep_begin_, sep_end_, R, S, 0);
+      TIMER_STOP(t_fmult);
+      TIMER_TIME(TaskType::UUTXR, 1, t_UUtxR);
       if (lchild_) lchild_->sample_CB_to_F11(op, R, S, this, task_depth);
       if (rchild_) rchild_->sample_CB_to_F11(op, R, S, this, task_depth);
-      TIMER_STOP(t_sampling);
     };
+    TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_f11_compress);
     F11_.compress(sample_F11);
+    TIMER_STOP(t_f11_compress);
     TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
     F11_.factor();
     TIMER_STOP(t_fact);
-    STRUMPACK_FLOPS(F11_.get_stat("Flop_Fill") + F11_.get_stat("Flop_Factor"));
-
-    // TEMP ///////////////////////////////////////////////////////
-    // piv = dF11.LU(task_depth);
-    ///////////////////////////////////////////////////////////////
+#if defined(STRUMPACK_COUNT_FLOPS)
+    long long int f11_fill_flops = F11_.get_stat("Flop_Fill");
+    long long int f11_factor_flops = F11_.get_stat("Flop_Factor");
+    STRUMPACK_HODLR_F11_FILL_FLOPS(f11_fill_flops);
+    STRUMPACK_ULV_FACTOR_FLOPS(f11_factor_flops);
+    STRUMPACK_FLOPS(f11_fill_flops + f11_factor_flops);
+#endif
 
     if (dupd) {
       auto sample_F12 = [&]
         (Trans op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
         TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-        // gemm(op, Trans::N, a, dF12, R, b, S);
-        // return;
         DenseM_t lR(R);
         lR.scale(a);
         if (b == scalar_t(0.)) S.zero();
         else S.scale(b);
+        TIMER_TIME(TaskType::FRONT_MULTIPLY_2D, 1, t_fmult);
         A.front_multiply_F12(op, sep_begin_, sep_end_, this->upd_, R, S, 0);
+        TIMER_STOP(t_fmult);
+        TIMER_TIME(TaskType::UUTXR, 1, t_UUtxR);
         if (lchild_) lchild_->sample_CB_to_F12(op, lR, S, this, task_depth);
         if (rchild_) rchild_->sample_CB_to_F12(op, lR, S, this, task_depth);
-        TIMER_STOP(t_sampling);
       };
       auto sample_F21 = [&]
         (Trans op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
         TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-        // gemm(op, Trans::N, a, dF21, R, b, S);
-        // return;
         DenseM_t lR(R), lS(S);
         lR.scale(a);
         if (b == scalar_t(0.)) S.zero();
         else S.scale(b);
+        TIMER_TIME(TaskType::FRONT_MULTIPLY_2D, 1, t_fmult);
         A.front_multiply_F21(op, sep_begin_, sep_end_, this->upd_, R, S, 0);
+        TIMER_STOP(t_fmult);
+        TIMER_TIME(TaskType::UUTXR, 1, t_UUtxR);
         if (lchild_) lchild_->sample_CB_to_F21(op, lR, S, this, task_depth);
         if (rchild_) rchild_->sample_CB_to_F21(op, lR, S, this, task_depth);
-        TIMER_STOP(t_sampling);
       };
-
+      TIMER_TIME(TaskType::LRBF_COMPRESS, 0, t_lrbf_compress);
       F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_);
+      //F12_.compress(sample_F12, 2*F11_.get_stat("Rank_max"));
       F12_.compress(sample_F12);
       F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
-      F21_.compress(sample_F21);
-      STRUMPACK_FLOPS(F12_.get_stat("Flop_Fill") + F21_.get_stat("Flop_Factor"));
-
-      /////////////////////////////////////////////////////////////////
-      // dF12.laswp(piv, true);
-      // trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-      //      scalar_t(1.), dF11, dF12, task_depth);
-      // trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-      //      scalar_t(1.), dF11, dF21, task_depth);
-      // // BETA=0 means dF22 has only the Schur update
-      // // BETA=1 means dF22 has the full Schur complement
-      // DenseM_t Schur(dupd, dupd);
-      // gemm(Trans::N, Trans::N, scalar_t(-1.), dF21, dF12,
-      //      scalar_t(0.), Schur, task_depth);
-      // // gemm(Trans::N, Trans::N, scalar_t(-1.), dF21, dF12,
-      // //      scalar_t(1.), dF22, task_depth);
-      /////////////////////////////////////////////////////////////////
+      F21_.compress(sample_F21, F12_.get_stat("Rank_max")+10);
+      TIMER_STOP(t_lrbf_compress);
+#if defined(STRUMPACK_COUNT_FLOPS)
+      long long int f12_fill_flops = F12_.get_stat("Flop_Fill");
+      long long int f21_fill_flops = F21_.get_stat("Flop_Fill");
+      STRUMPACK_HODLR_F12_FILL_FLOPS(f12_fill_flops);
+      STRUMPACK_HODLR_F21_FILL_FLOPS(f21_fill_flops);
+      STRUMPACK_FLOPS(f12_fill_flops + f21_fill_flops);
+#endif
 
       auto sample_CB = [&](Trans op, const DenseM_t& R, DenseM_t& S) {
         TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-        // gemm(op, Trans::N, scalar_t(1.), Schur, R, scalar_t(0.), S);
-        // return;
+        TIMER_TIME(TaskType::UUTXR, 1, t_UUtxR);
+        TIMER_TIME(TaskType::HSS_SCHUR_PRODUCT, 2, t_sprod);
         DenseM_t F12R(dsep, R.cols()), invF11F12R(dsep, R.cols());
+#if defined(STRUMPACK_COUNT_FLOPS)
+        long long int f21_mult_flops = F21_.get_stat("Flop_C_Mult");
+        long long int invf11_mult_flops = F11_.get_stat("Flop_Solve");
+        long long int f12_mult_flops = F12_.get_stat("Flop_C_Mult");
+#endif
         if (op == Trans::N) {
           F12_.mult(op, R, F12R);
           F11_.inv_mult(op, F12R, invF11F12R);
@@ -460,18 +473,40 @@ namespace strumpack {
           F11_.inv_mult(op, F12R, invF11F12R);
           F12_.mult(op, invF11F12R, S);
         }
+        TIMER_STOP(t_sprod);
         S.scale(-1.);
-        STRUMPACK_FLOPS(F12_.get_stat("Flop_C_Mult") +
-                        F11_.get_stat("Flop_Solve") +
-                        F21_.get_stat("Flop_C_Mult") + S.rows()*S.cols());
+#if defined(STRUMPACK_COUNT_FLOPS)
+        f21_mult_flops = F21_.get_stat("Flop_C_Mult") - f21_mult_flops;
+        invf11_mult_flops = F11_.get_stat("Flop_Solve") - invf11_mult_flops;
+        f12_mult_flops = F12_.get_stat("Flop_C_Mult") - f12_mult_flops;
+        long long int schur_flops = f21_mult_flops + invf11_mult_flops
+        + f12_mult_flops + S.rows()*S.cols();
+        STRUMPACK_SCHUR_FLOPS(schur_flops);
+        STRUMPACK_FLOPS(schur_flops);
+        STRUMPACK_HODLR_F21_MULT_FLOPS(f21_mult_flops);
+        STRUMPACK_HODLR_F12_MULT_FLOPS(f12_mult_flops);
+        STRUMPACK_HODLR_INVF11_MULT_FLOPS(invf11_mult_flops);
+#endif
         if (lchild_) lchild_->sample_CB_to_F22(op, R, S, this, task_depth);
         if (rchild_) rchild_->sample_CB_to_F22(op, R, S, this, task_depth);
-        // gemm(op, Trans::N, scalar_t(1.), dF22, R, scalar_t(1.), S);
-        TIMER_STOP(t_sampling);
       };
-      F22_->compress(sample_CB);
-      STRUMPACK_FLOPS(F22_->get_stat("Flop_Fill"));
+      TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_f22_compress);
+      F22_->compress(sample_CB, std::max(F12_.get_stat("Rank_max"),
+                                         F21_.get_stat("Rank_max")));
+      TIMER_STOP(t_f22_compress);
+#if defined(STRUMPACK_COUNT_FLOPS)
+      long long int f22_fill_flops = F22_->get_stat("Flop_Fill");
+      STRUMPACK_HODLR_F22_FILL_FLOPS(f22_fill_flops);
+      STRUMPACK_FLOPS(f22_fill_flops);
+#endif
     }
+    std::cout << "dsep=" << dsep << " dupd=" << dupd
+              << " ranks: " << F11_.get_stat("Rank_max") << ", ";
+    if (dupd)
+      std::cout << F12_.get_stat("Rank_max") << ", "
+                << F21_.get_stat("Rank_max") << ", "
+                << F22_->get_stat("Rank_max") << std::endl;
+    else std::cout << std::endl;
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
   }
@@ -581,7 +616,6 @@ namespace strumpack {
     if (!is_root && dim_upd()) {
       HSS::HSSPartitionTree CB_tree(dim_upd());
       CB_tree.refine(opts.HODLR_options().leaf_size());
-      MPIComm cw;
       F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
         (new HODLR::HODLRMatrix<scalar_t>
          (commself_, CB_tree, opts.HODLR_options()));
