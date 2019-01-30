@@ -170,6 +170,9 @@ namespace strumpack {
     void front_multiply_2d
     (integer_t, integer_t, const std::vector<integer_t>&, const DistM_t&,
      DistM_t&, DistM_t&, int) const override {}
+    void front_multiply_2d
+    (Trans op, integer_t, integer_t, const std::vector<integer_t>&,
+     const DistM_t&, DistM_t&, int) const override {}
 #endif //DOXYGEN_SHOULD_SKIP_THIS
 
   protected:

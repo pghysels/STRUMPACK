@@ -128,6 +128,10 @@ namespace strumpack {
     (integer_t sep_begin, integer_t sep_end,
      const std::vector<integer_t>& upd, const DistM_t& R,
      DistM_t& Srow, DistM_t& Scol, int depth) const override;
+    void front_multiply_2d
+    (Trans op, integer_t sep_begin, integer_t sep_end,
+     const std::vector<integer_t>& upd, const DistM_t& R,
+     DistM_t& S, int depth) const override;
 #endif //defined(STRUMPACK_USE_MPI)
 #endif //DOXYGEN_SHOULD_SKIP_THIS
 
@@ -481,7 +485,6 @@ namespace strumpack {
   (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
    const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const {
     integer_t dupd = upd.size();
-    //long long int local_flops = 0;
     const integer_t nbvec = R.cols();
     const integer_t ds = shi - slo;
 
@@ -491,6 +494,7 @@ namespace strumpack {
   if(depth < params::task_recursion_cutoff_level)
 #endif
     for (integer_t c=0; c<nbvec; c+=B) {
+      long long int local_flops = 0;
       for (auto row=slo; row<shi; row++) { // separator rows
         integer_t upd_ptr = 0;
         const auto hij = ptr_[row+1];
@@ -502,23 +506,25 @@ namespace strumpack {
             if (col < shi) {
               for (integer_t cc=c; cc<hicc; cc++) {
                 Sr(row-slo, cc) += vj * R(col-slo, cc);
-                Sc(col-slo, cc) += vj * R(row-slo, cc);
+                Sc(col-slo, cc) += blas::my_conj(vj) * R(row-slo, cc);
               }
-              //local_flops += 4 * B;
+              local_flops += 4*(hicc-c);
             } else {
               while (upd_ptr<dupd && upd[upd_ptr]<col) upd_ptr++;
               if (upd_ptr == dupd) break;
               if (upd[upd_ptr] == col) {
                 for (integer_t cc=c; cc<hicc; cc++) {
                   Sr(row-slo, cc) += vj * R(ds+upd_ptr, cc);
-                  Sc(ds+upd_ptr, cc) += vj * R(row-slo, cc);
+                  Sc(ds+upd_ptr, cc) += blas::my_conj(vj) * R(row-slo, cc);
                 }
-                //local_flops += 4 * B;
+                local_flops += 4*(hicc-c);
               }
             }
           }
         }
       }
+      STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+      STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
     }
 
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
@@ -526,6 +532,7 @@ namespace strumpack {
   if(depth < params::task_recursion_cutoff_level)
 #endif
     for (integer_t c=0; c<nbvec; c+=B) {
+      long long int local_flops = 0;
       for (integer_t i=0; i<dupd; i++) { // remaining rows
         auto row = upd[i];
         const auto hij = ptr_[row+1];
@@ -539,15 +546,14 @@ namespace strumpack {
                 Sr(ds+i, cc) += vj * R(col-slo, cc);
                 Sc(col-slo, cc) += vj * R(ds+i, cc);
               }
-              //#pragma omp atomic
-              //local_flops += 4 * B;
+              local_flops += 4*(hicc-c);
             } else break;
           }
         }
       }
+      STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+      STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
     }
-    // STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
-    // STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -753,6 +759,18 @@ namespace strumpack {
     }
     copy(Srow.rows(), Srow.cols(), Srow_bc, 0, 0, Srow, 0, 0, R.ctxt_all());
     copy(Scol.rows(), Scol.cols(), Scol_bc, 0, 0, Scol, 0, 0, R.ctxt_all());
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  CSRMatrix<scalar_t,integer_t>::front_multiply_2d
+  (Trans op, integer_t sep_begin, integer_t sep_end,
+   const std::vector<integer_t>& upd, const DistM_t& R,
+   DistM_t& S, int depth) const {
+    // TODO optimize this!!
+    DistM_t Sdummy(S.grid(), S.rows(), S.cols());
+    if (op == Trans::N)
+      front_multiply_2d(sep_begin, sep_end, upd, R, S, Sdummy, 0);
+    else front_multiply_2d(sep_begin, sep_end, upd, R, Sdummy, S, 0);
   }
 
   template<typename scalar_t,typename integer_t> void

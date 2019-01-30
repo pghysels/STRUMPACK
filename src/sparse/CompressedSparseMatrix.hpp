@@ -315,6 +315,10 @@ namespace strumpack {
     (integer_t sep_begin, integer_t sep_end,
      const std::vector<integer_t>& upd, const DistM_t& R,
      DistM_t& Srow, DistM_t& Scol, int depth) const = 0;
+    virtual void front_multiply_2d
+    (Trans op, integer_t sep_begin, integer_t sep_end,
+     const std::vector<integer_t>& upd, const DistM_t& R,
+     DistM_t& S, int depth) const = 0;
 
     virtual void front_multiply_F11
     (Trans op, integer_t slo, integer_t shi,

@@ -114,6 +114,14 @@ namespace strumpack {
     (integer_t sep_begin, integer_t sep_end,
      const std::vector<integer_t>& upd, const DistM_t& R,
      DistM_t& Srow, DistM_t& Scol, int depth) const override;
+    void front_multiply_2d
+    (Trans op, integer_t sep_begin, integer_t sep_end,
+     const std::vector<integer_t>& upd, const DistM_t& R,
+     DistM_t& S, int depth) const override {
+      if (op == Trans::N)
+        front_multiply_2d_N(sep_begin, sep_end, upd, R, S, depth);
+      else front_multiply_2d_TC(sep_begin, sep_end, upd, R, S, depth);
+    }
 
     void spmv(const DenseM_t& x, DenseM_t& y) const override {};
     void spmv(const scalar_t* x, scalar_t* y) const override {};
@@ -144,6 +152,15 @@ namespace strumpack {
         (global_col_.begin(),
          std::lower_bound(global_col_.begin()+clo, global_col_.end(), c));
     }
+
+    void front_multiply_2d_N
+    (integer_t sep_begin, integer_t sep_end,
+     const std::vector<integer_t>& upd, const DistM_t& R,
+     DistM_t& S, int depth) const;
+    void front_multiply_2d_TC
+    (integer_t sep_begin, integer_t sep_end,
+     const std::vector<integer_t>& upd, const DistM_t& R,
+     DistM_t& S, int depth) const;
 
     using CompressedSparseMatrix<scalar_t,integer_t>::n_;
     using CompressedSparseMatrix<scalar_t,integer_t>::nnz_;
@@ -328,7 +345,6 @@ namespace strumpack {
   ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::front_multiply
   (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
    const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const {
-    //long long int local_flops = 0;
     const integer_t dupd = upd.size();
     const std::size_t clo = find_global(slo);
     const std::size_t chi = find_global(shi);
@@ -341,6 +357,7 @@ namespace strumpack {
   if(depth < params::task_recursion_cutoff_level)
 #endif
     for (std::size_t k=0; k<nbvec; k+=B) {
+      long long int local_flops = 0;
       for (std::size_t c=clo; c<chi; c++) {
         const auto col = global_col_[c];
         integer_t row_upd = 0;
@@ -355,7 +372,7 @@ namespace strumpack {
                 Sr(row-slo, kk) += a * R(col-slo, kk);
                 Sc(col-slo, kk) += a * R(row-slo, kk);
               }
-              //local_flops += 4 * B;
+              local_flops += 4 * (hikk - k);
             } else {
               while (row_upd < dupd && upd[row_upd] < row) row_upd++;
               if (row_upd == dupd) break;
@@ -364,14 +381,16 @@ namespace strumpack {
                 const auto a = val_[j];
                 for (std::size_t kk=k; kk<hikk; kk++) {
                   Sr(ds+row_upd, kk) += a * R(col-slo, kk);
-                  Sc(col-slo, kk) += a * R(ds+row_upd, kk);
+                  Sc(col-slo, kk) += blas::my_conj(a) * R(ds+row_upd, kk);
                 }
-                //local_flops += 4 * B;
+                local_flops += 4 * (hikk - k);
               }
             }
           }
         }
       }
+      STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+      STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
     }
 
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
@@ -379,6 +398,7 @@ namespace strumpack {
   if(depth < params::task_recursion_cutoff_level)
 #endif
     for (std::size_t k=0; k<nbvec; k+=B) {
+      long long int local_flops = 0;
       for (integer_t i=0, c=chi; i<dupd; i++) { // update columns
         c = find_global(upd[i], c);
         if (c == local_cols_ || global_col_[c] != upd[i]) continue;
@@ -391,16 +411,16 @@ namespace strumpack {
               const auto hikk = std::min(k+B, nbvec);
               for (std::size_t kk=k; kk<hikk; kk++) {
                 Sr(row-slo, kk) += a * R(ds+i, kk);
-                Sc(ds+i, kk) += a * R(row-slo, kk);
+                Sc(ds+i, kk) += blas::my_conj(a) * R(row-slo, kk);
               }
-              //local_flops += 4 * nbvec;
+              local_flops += 4 * (hikk - k);
             } else break;
           }
         }
       }
+      STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+      STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
     }
-    // STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
-    // STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -417,6 +437,7 @@ namespace strumpack {
   if(depth < params::task_recursion_cutoff_level)
 #endif
     for (std::size_t k=0; k<nbvec; k+=B) {
+      long long int local_flops = 0;
       for (std::size_t c=clo; c<chi; c++) {
         const auto col = global_col_[c];
         integer_t row_upd = 0;
@@ -435,13 +456,15 @@ namespace strumpack {
                 else
                   S(col-slo, kk) += blas::my_conj(a) * R(row-slo, kk);
               }
+              local_flops += 2 * (hikk - k);
             } else break;
           }
         }
       }
+      STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+      STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
     }
   }
-
 
   template<typename scalar_t,typename integer_t> void
   ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::front_multiply_F21
@@ -458,6 +481,7 @@ namespace strumpack {
   if(depth < params::task_recursion_cutoff_level)
 #endif
     for (std::size_t k=0; k<nbvec; k+=B) {
+      long long int local_flops = 0;
       for (std::size_t c=clo; c<chi; c++) {
         const auto col = global_col_[c];
         integer_t row_upd = 0;
@@ -478,10 +502,13 @@ namespace strumpack {
                 else
                   S(col-slo, kk) += blas::my_conj(a) * R(row_upd, kk);
               }
+              local_flops += 2 * (hikk - k);
             }
           }
         }
       }
+      STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+      STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
     }
   }
 
@@ -500,6 +527,7 @@ namespace strumpack {
   if(depth < params::task_recursion_cutoff_level)
 #endif
     for (std::size_t k=0; k<nbvec; k+=B) {
+      long long int local_flops = 0;
       for (integer_t i=0, c=chi; i<dupd; i++) { // update columns
         c = find_global(upd[i], c);
         if (c == local_cols_ || global_col_[c] != upd[i]) continue;
@@ -518,10 +546,13 @@ namespace strumpack {
                 else
                   S(i, kk) += blas::my_conj(a) * R(row-slo, kk);
               }
+              local_flops += 2 * (hikk - k);
             } else break;
           }
         }
       }
+      STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+      STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
     }
   }
 
@@ -732,7 +763,7 @@ namespace strumpack {
               rows_to[row_i_rank]++;
               rows_from[row_i_rank]++;
             }
-            if (row_i_rank == p_row) {
+            if (row_i_rank == p_row) { // transpose
               rows_to[row_j_rank]++;
               rows_from[row_j_rank]++;
             }
@@ -746,7 +777,7 @@ namespace strumpack {
                 rows_to[row_i_rank]++;
                 rows_from[row_i_rank]++;
               }
-              if (row_i_rank == p_row) {
+              if (row_i_rank == p_row) { // transpose
                 rows_to[row_j_rank]++;
                 rows_from[row_j_rank]++;
               }
@@ -770,7 +801,7 @@ namespace strumpack {
               rows_to[row_i_rank]++;
               rows_from[row_i_rank]++;
             }
-            if (row_i_rank == p_row) {
+            if (row_i_rank == p_row) { // transpose
               rows_to[row_j_rank]++;
               rows_from[row_j_rank]++;
             }
@@ -814,7 +845,7 @@ namespace strumpack {
                 pp[row_i_rank] += lcols;
               }
               if (row_j_rank == t && row_i_rank == p_row) { // transpose
-                const auto a = val_[j];
+                const auto a = blas::my_conj(val_[j]);
                 for (integer_t k=0, r=R.rowg2l_fixed(Ai); k<lcols; k++)
                   pp[row_j_rank][k] += a * R(r, k);
                 pp[row_j_rank] += lcols;
@@ -833,7 +864,7 @@ namespace strumpack {
                   pp[row_i_rank] += lcols;
                 }
                 if (row_j_rank == t && row_i_rank == p_row) { // transpose
-                  const auto a = val_[j];
+                  const auto a = blas::my_conj(val_[j]);
                   for (integer_t k=0, r=R.rowg2l_fixed(Ai); k<lcols; k++)
                     pp[row_j_rank][k] += a * R(r, k);
                   pp[row_j_rank] += lcols;
@@ -856,7 +887,7 @@ namespace strumpack {
           integer_t row = ind_[j];
           if (row >= sep_begin) {
             if (row < sep_end) {
-              auto a = val_[j];
+              const auto a = blas::my_conj(val_[j]);
               auto Ai = row - sep_begin;
               auto row_i_rank = R.rowg2p_fixed(Ai);
               if (row_i_rank == t && row_j_rank == p_row) {
@@ -961,6 +992,481 @@ namespace strumpack {
             if (row_j_rank == p_row) { // transpose
               for (integer_t k=0, r=Scol.rowg2l_fixed(Aj); k<lcols; k++)
                 Scol(r, k) += pp[row_i_rank][k];
+              pp[row_i_rank] += lcols;
+            }
+          } else break;
+        }
+      }
+    }
+    delete[] pp;
+    delete[] rows_to;
+
+    // wait for sends to finish
+    MPI_Waitall(p_rows, sreq, MPI_STATUSES_IGNORE);
+    delete[] sreq;
+    delete[] sbuf;
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::
+  front_multiply_2d_N
+  (integer_t sep_begin, integer_t sep_end, const std::vector<integer_t>& upd,
+   const DistM_t& R, DistM_t& S, int depth) const {
+    // DistM_t Sdummy(S.grid(), S.rows(), S.cols());
+    // front_multiply_2d(sep_begin, sep_end, upd, R, S, Sdummy, 0);
+    // return;
+
+    assert(R.fixed());
+    assert(S.fixed());
+    if (!R.active()) return;
+    const integer_t dim_upd = upd.size();
+    long long int local_flops = 0;
+    const auto dim_sep = sep_end - sep_begin;
+    const auto cols = R.cols();
+    const auto lcols = R.lcols();
+    const auto p_rows = R.nprows();
+    const auto p_row  = R.prow();
+    auto rows_to = new integer_t[2*p_rows];
+    auto rows_from = rows_to + p_rows;
+    std::fill(rows_to, rows_to+2*p_rows, 0);
+
+    auto clo = find_global(sep_begin);
+    auto chi = find_global(sep_end);
+
+    for (integer_t c=clo; c<chi; c++) { // separator columns
+      auto row_j_rank = R.rowg2p_fixed(global_col_[c] - sep_begin);
+      integer_t row_upd = 0;
+      auto hij = ptr_[c+1];
+      for (integer_t j=ptr_[c]; j<hij; j++) {
+        auto row = ind_[j];
+        if (row >= sep_begin) {
+          if (row < sep_end) {
+            auto row_i_rank = R.rowg2p_fixed(row - sep_begin);
+            if (row_j_rank == p_row) {
+              rows_to[row_i_rank]++;
+              rows_from[row_i_rank]++;
+            }
+            local_flops += 2 * cols;
+          } else {
+            while (row_upd < dim_upd && upd[row_upd] < row) row_upd++;
+            if (row_upd == dim_upd) break;
+            if (upd[row_upd] == row) {
+              auto row_i_rank = R.rowg2p_fixed(dim_sep + row_upd);
+              if (row_j_rank == p_row) {
+                rows_to[row_i_rank]++;
+                rows_from[row_i_rank]++;
+              }
+              local_flops += 2 * cols;
+            }
+          }
+        }
+      }
+    }
+    for (integer_t i=0, c=chi; i<dim_upd; i++) { // update columns
+      c = find_global(upd[i], c);
+      if (c == local_cols_ || global_col_[c] != upd[i]) continue;
+      auto row_j_rank = R.rowg2p_fixed(dim_sep + i);
+      auto hij = ptr_[c+1];
+      for (integer_t j=ptr_[c]; j<hij; j++) {
+        integer_t row = ind_[j];
+        if (row >= sep_begin) {
+          if (row < sep_end) {
+            auto row_i_rank = R.rowg2p_fixed(row - sep_begin);
+            if (row_j_rank == p_row) {
+              rows_to[row_i_rank]++;
+              rows_from[row_i_rank]++;
+            }
+            local_flops += 2 * cols;
+          } else break;
+        }
+      }
+    }
+    if (R.is_master()) {
+      STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+      STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+    }
+
+    std::size_t ssize = std::accumulate(rows_to, rows_to+p_rows, 0);
+    std::size_t rsize = std::accumulate(rows_from, rows_from+p_rows, 0);
+    auto sbuf = new scalar_t[(ssize+rsize)*lcols];
+    auto rbuf = sbuf+ssize*lcols;
+    std::fill(sbuf, sbuf+ssize*lcols, scalar_t(0.));
+    auto pp = new scalar_t*[p_rows];
+    pp[0] = sbuf;
+    for (integer_t p=1; p<p_rows; p++)
+      pp[p] = pp[p-1] + rows_to[p-1]*lcols;
+
+#pragma omp parallel for
+    for (int t=0; t<p_rows; t++) {
+      for (integer_t c=clo; c<chi; c++) { // separator columns
+        auto Aj = global_col_[c] - sep_begin;
+        auto row_j_rank = R.rowg2p_fixed(Aj);
+        integer_t row_upd = 0;
+        const auto hij = ptr_[c+1];
+        for (integer_t j=ptr_[c]; j<hij; j++) {
+          auto row = ind_[j];
+          if (row >= sep_begin) {
+            if (row < sep_end) {
+              auto Ai = row - sep_begin;
+              auto row_i_rank = R.rowg2p_fixed(Ai);
+              if (row_i_rank == t && row_j_rank == p_row) {
+                const auto a = val_[j];
+                for (integer_t k=0, r=R.rowg2l_fixed(Aj); k<lcols; k++)
+                  pp[row_i_rank][k] += a * R(r, k);
+                pp[row_i_rank] += lcols;
+              }
+            } else {
+              while (row_upd < dim_upd && upd[row_upd] < row)
+                row_upd++;
+              if (row_upd == dim_upd) break;
+              if (upd[row_upd] == row) {
+                auto Ai = dim_sep + row_upd;
+                auto row_i_rank = R.rowg2p_fixed(Ai);
+                if (row_i_rank == t && row_j_rank == p_row) {
+                  const auto a = val_[j];
+                  for (integer_t k=0, r=R.rowg2l_fixed(Aj); k<lcols; k++)
+                    pp[row_i_rank][k] += a * R(r, k);
+                  pp[row_i_rank] += lcols;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+#pragma omp parallel for
+    for (int t=0; t<p_rows; t++) {
+      for (integer_t i=0, c=chi; i<dim_upd; i++) { // update columns
+        c = find_global(upd[i], c);
+        if (c == local_cols_ || global_col_[c] != upd[i]) continue;
+        auto Aj = dim_sep + i;
+        auto row_j_rank = R.rowg2p_fixed(Aj);
+        auto hij = ptr_[c+1];
+        for (integer_t j=ptr_[c]; j<hij; j++) {
+          integer_t row = ind_[j];
+          if (row >= sep_begin) {
+            if (row < sep_end) {
+              auto a = val_[j];
+              auto Ai = row - sep_begin;
+              auto row_i_rank = R.rowg2p_fixed(Ai);
+              if (row_i_rank == t && row_j_rank == p_row) {
+                for (integer_t k=0, r=R.rowg2l_fixed(Aj); k<lcols; k++)
+                  pp[row_i_rank][k] += a * R(r, k);
+                pp[row_i_rank] += lcols;
+              }
+            } else break;
+          }
+        }
+      }
+    }
+
+    // TODO instead of a send/receive loop, get the column
+    // communicator from BLACS?
+
+    pp[0] = sbuf;
+    for (integer_t p=1; p<p_rows; p++)
+      pp[p] = pp[p-1] + rows_to[p-1]*lcols;
+    auto p_col  = R.pcol();
+    auto sreq = new MPI_Request[p_rows*2];
+    auto rreq = sreq + p_rows;
+    for (integer_t p=0; p<p_rows; p++)
+      MPI_Isend(pp[p], rows_to[p]*lcols, mpi_type<scalar_t>(),
+                p+p_col*p_rows, 0, R.comm(), sreq+p);
+
+    pp[0] = rbuf;
+    for (integer_t p=1; p<p_rows; p++)
+      pp[p] = pp[p-1] + rows_from[p-1]*lcols;
+    for (integer_t p=0; p<p_rows; p++)
+      MPI_Irecv(pp[p], rows_from[p]*lcols, mpi_type<scalar_t>(),
+                p+p_col*p_rows, 0, R.comm(), rreq+p);
+
+    // wait for all incoming messages
+    MPI_Waitall(p_rows, rreq, MPI_STATUSES_IGNORE);
+    for (integer_t c=clo; c<chi; c++) { // separator columns
+      auto Aj = global_col_[c] - sep_begin;
+      auto row_j_rank = R.rowg2p_fixed(Aj);
+      integer_t row_upd = 0;
+      auto hij = ptr_[c+1];
+      for (integer_t j=ptr_[c]; j<hij; j++) {
+        auto row = ind_[j];
+        if (row >= sep_begin) {
+          if (row < sep_end) {
+            auto Ai = row - sep_begin;
+            auto row_i_rank = R.rowg2p_fixed(Ai);
+            if (row_i_rank == p_row) {
+              for (integer_t k=0, r=S.rowg2l_fixed(Ai); k<lcols; k++)
+                S(r, k) += pp[row_j_rank][k];
+              pp[row_j_rank] += lcols;
+            }
+          } else {
+            while (row_upd < dim_upd && upd[row_upd] < row)
+              row_upd++;
+            if (row_upd == dim_upd) break;
+            if (upd[row_upd] == row) {
+              auto Ai = dim_sep + row_upd;
+              auto row_i_rank = R.rowg2p_fixed(Ai);
+              if (row_i_rank == p_row) {
+                for (integer_t k=0, r=S.rowg2l_fixed(Ai); k<lcols; k++)
+                  S(r, k) += pp[row_j_rank][k];
+                pp[row_j_rank] += lcols;
+              }
+            }
+          }
+        }
+      }
+    }
+    for (integer_t i=0, c=chi; i<dim_upd; i++) { // update columns
+      c = find_global(upd[i], c);
+      if (c == local_cols_ || global_col_[c] != upd[i])
+        continue;
+      auto Aj = dim_sep + i;
+      auto row_j_rank = R.rowg2p_fixed(Aj);
+      auto hij = ptr_[c+1];
+      for (integer_t j=ptr_[c]; j<hij; j++) {
+        integer_t row = ind_[j];
+        if (row >= sep_begin) {
+          if (row < sep_end) {
+            auto Ai = row - sep_begin;
+            auto row_i_rank = R.rowg2p_fixed(Ai);
+            if (row_i_rank == p_row) {
+              for (integer_t k=0, r=S.rowg2l_fixed(Ai); k<lcols; k++)
+                S(r, k) += pp[row_j_rank][k];
+              pp[row_j_rank] += lcols;
+            }
+          } else break;
+        }
+      }
+    }
+    delete[] pp;
+    delete[] rows_to;
+
+    // wait for sends to finish
+    MPI_Waitall(p_rows, sreq, MPI_STATUSES_IGNORE);
+    delete[] sreq;
+    delete[] sbuf;
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  ProportionallyDistributedSparseMatrix<scalar_t,integer_t>::
+  front_multiply_2d_TC
+  (integer_t sep_begin, integer_t sep_end, const std::vector<integer_t>& upd,
+   const DistM_t& R, DistM_t& S, int depth) const {
+    // DistM_t Sdummy(S.grid(), S.rows(), S.cols());
+    // front_multiply_2d(sep_begin, sep_end, upd, R, Sdummy, S, 0);
+    // return;
+
+    assert(R.fixed());
+    assert(S.fixed());
+    if (!R.active()) return;
+    const integer_t dim_upd = upd.size();
+    long long int local_flops = 0;
+    const auto dim_sep = sep_end - sep_begin;
+    const auto cols = R.cols();
+    const auto lcols = R.lcols();
+    const auto p_rows = R.nprows();
+    const auto p_row  = R.prow();
+    auto rows_to = new integer_t[2*p_rows];
+    auto rows_from = rows_to + p_rows;
+    std::fill(rows_to, rows_to+2*p_rows, 0);
+
+    auto clo = find_global(sep_begin);
+    auto chi = find_global(sep_end);
+
+    for (integer_t c=clo; c<chi; c++) { // separator columns
+      auto row_j_rank = R.rowg2p_fixed(global_col_[c] - sep_begin);
+      integer_t row_upd = 0;
+      auto hij = ptr_[c+1];
+      for (integer_t j=ptr_[c]; j<hij; j++) {
+        auto row = ind_[j];
+        if (row >= sep_begin) {
+          if (row < sep_end) {
+            if (R.rowg2p_fixed(row - sep_begin) == p_row) { // transpose
+              rows_to[row_j_rank]++;
+              rows_from[row_j_rank]++;
+            }
+            local_flops += 2 * cols;
+          } else {
+            while (row_upd < dim_upd && upd[row_upd] < row) row_upd++;
+            if (row_upd == dim_upd) break;
+            if (upd[row_upd] == row) {
+              if (R.rowg2p_fixed(dim_sep + row_upd) == p_row) { // transpose
+                rows_to[row_j_rank]++;
+                rows_from[row_j_rank]++;
+              }
+              local_flops += 2 * cols;
+            }
+          }
+        }
+      }
+    }
+    for (integer_t i=0, c=chi; i<dim_upd; i++) { // update columns
+      c = find_global(upd[i], c);
+      if (c == local_cols_ || global_col_[c] != upd[i]) continue;
+      auto row_j_rank = R.rowg2p_fixed(dim_sep + i);
+      auto hij = ptr_[c+1];
+      for (integer_t j=ptr_[c]; j<hij; j++) {
+        integer_t row = ind_[j];
+        if (row >= sep_begin) {
+          if (row < sep_end) {
+            if (R.rowg2p_fixed(row - sep_begin) == p_row) { // transpose
+              rows_to[row_j_rank]++;
+              rows_from[row_j_rank]++;
+            }
+            local_flops += 2 * cols;
+          } else break;
+        }
+      }
+    }
+    if (R.is_master()) {
+      STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+      STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+    }
+
+    std::size_t ssize = std::accumulate(rows_to, rows_to+p_rows, 0);
+    std::size_t rsize = std::accumulate(rows_from, rows_from+p_rows, 0);
+    auto sbuf = new scalar_t[(ssize+rsize)*lcols];
+    auto rbuf = sbuf+ssize*lcols;
+    std::fill(sbuf, sbuf+ssize*lcols, scalar_t(0.));
+    auto pp = new scalar_t*[p_rows];
+    pp[0] = sbuf;
+    for (integer_t p=1; p<p_rows; p++)
+      pp[p] = pp[p-1] + rows_to[p-1]*lcols;
+
+#pragma omp parallel for
+    for (int t=0; t<p_rows; t++) {
+      for (integer_t c=clo; c<chi; c++) { // separator columns
+        auto Aj = global_col_[c] - sep_begin;
+        auto row_j_rank = R.rowg2p_fixed(Aj);
+        integer_t row_upd = 0;
+        const auto hij = ptr_[c+1];
+        for (integer_t j=ptr_[c]; j<hij; j++) {
+          auto row = ind_[j];
+          if (row >= sep_begin) {
+            if (row < sep_end) {
+              auto Ai = row - sep_begin;
+              auto row_i_rank = R.rowg2p_fixed(Ai);
+              if (row_j_rank == t && row_i_rank == p_row) { // transpose
+                const auto a = blas::my_conj(val_[j]);
+                for (integer_t k=0, r=R.rowg2l_fixed(Ai); k<lcols; k++)
+                  pp[row_j_rank][k] += a * R(r, k);
+                pp[row_j_rank] += lcols;
+              }
+            } else {
+              while (row_upd < dim_upd && upd[row_upd] < row)
+                row_upd++;
+              if (row_upd == dim_upd) break;
+              if (upd[row_upd] == row) {
+                auto Ai = dim_sep + row_upd;
+                auto row_i_rank = R.rowg2p_fixed(Ai);
+                if (row_j_rank == t && row_i_rank == p_row) { // transpose
+                  const auto a = blas::my_conj(val_[j]);
+                  for (integer_t k=0, r=R.rowg2l_fixed(Ai); k<lcols; k++)
+                    pp[row_j_rank][k] += a * R(r, k);
+                  pp[row_j_rank] += lcols;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+#pragma omp parallel for
+    for (int t=0; t<p_rows; t++) {
+      for (integer_t i=0, c=chi; i<dim_upd; i++) { // update columns
+        c = find_global(upd[i], c);
+        if (c == local_cols_ || global_col_[c] != upd[i]) continue;
+        auto Aj = dim_sep + i;
+        auto row_j_rank = R.rowg2p_fixed(Aj);
+        auto hij = ptr_[c+1];
+        for (integer_t j=ptr_[c]; j<hij; j++) {
+          integer_t row = ind_[j];
+          if (row >= sep_begin) {
+            if (row < sep_end) {
+              const auto a = blas::my_conj(val_[j]);
+              auto Ai = row - sep_begin;
+              auto row_i_rank = R.rowg2p_fixed(Ai);
+              if (row_j_rank == t && row_i_rank == p_row) { // transpose
+                for (integer_t k=0, r=R.rowg2l_fixed(Ai); k<lcols; k++)
+                  pp[row_j_rank][k] += a * R(r, k);
+                pp[row_j_rank] += lcols;
+              }
+            } else break;
+          }
+        }
+      }
+    }
+
+    // TODO instead of a send/receive loop, get the column
+    // communicator from BLACS?
+
+    pp[0] = sbuf;
+    for (integer_t p=1; p<p_rows; p++)
+      pp[p] = pp[p-1] + rows_to[p-1]*lcols;
+    auto p_col  = R.pcol();
+    auto sreq = new MPI_Request[p_rows*2];
+    auto rreq = sreq + p_rows;
+    for (integer_t p=0; p<p_rows; p++)
+      MPI_Isend(pp[p], rows_to[p]*lcols, mpi_type<scalar_t>(),
+                p+p_col*p_rows, 0, R.comm(), sreq+p);
+
+    pp[0] = rbuf;
+    for (integer_t p=1; p<p_rows; p++)
+      pp[p] = pp[p-1] + rows_from[p-1]*lcols;
+    for (integer_t p=0; p<p_rows; p++)
+      MPI_Irecv(pp[p], rows_from[p]*lcols, mpi_type<scalar_t>(),
+                p+p_col*p_rows, 0, R.comm(), rreq+p);
+
+    // wait for all incoming messages
+    MPI_Waitall(p_rows, rreq, MPI_STATUSES_IGNORE);
+    for (integer_t c=clo; c<chi; c++) { // separator columns
+      auto Aj = global_col_[c] - sep_begin;
+      auto row_j_rank = R.rowg2p_fixed(Aj);
+      integer_t row_upd = 0;
+      auto hij = ptr_[c+1];
+      for (integer_t j=ptr_[c]; j<hij; j++) {
+        auto row = ind_[j];
+        if (row >= sep_begin) {
+          if (row < sep_end) {
+            auto Ai = row - sep_begin;
+            auto row_i_rank = R.rowg2p_fixed(Ai);
+            if (row_j_rank == p_row) { // transpose
+              for (integer_t k=0, r=S.rowg2l_fixed(Aj); k<lcols; k++)
+                S(r, k) += pp[row_i_rank][k];
+              pp[row_i_rank] += lcols;
+            }
+          } else {
+            while (row_upd < dim_upd && upd[row_upd] < row)
+              row_upd++;
+            if (row_upd == dim_upd) break;
+            if (upd[row_upd] == row) {
+              auto Ai = dim_sep + row_upd;
+              auto row_i_rank = R.rowg2p_fixed(Ai);
+              if (row_j_rank == p_row) { // transpose
+                for (integer_t k=0, r=S.rowg2l_fixed(Aj); k<lcols; k++)
+                  S(r, k) += pp[row_i_rank][k];
+                pp[row_i_rank] += lcols;
+              }
+            }
+          }
+        }
+      }
+    }
+    for (integer_t i=0, c=chi; i<dim_upd; i++) { // update columns
+      c = find_global(upd[i], c);
+      if (c == local_cols_ || global_col_[c] != upd[i])
+        continue;
+      auto Aj = dim_sep + i;
+      auto row_j_rank = R.rowg2p_fixed(Aj);
+      auto hij = ptr_[c+1];
+      for (integer_t j=ptr_[c]; j<hij; j++) {
+        integer_t row = ind_[j];
+        if (row >= sep_begin) {
+          if (row < sep_end) {
+            auto Ai = row - sep_begin;
+            auto row_i_rank = R.rowg2p_fixed(Ai);
+            if (row_j_rank == p_row) { // transpose
+              for (integer_t k=0, r=S.rowg2l_fixed(Aj); k<lcols; k++)
+                S(r, k) += pp[row_i_rank][k];
               pp[row_i_rank] += lcols;
             }
           } else break;
