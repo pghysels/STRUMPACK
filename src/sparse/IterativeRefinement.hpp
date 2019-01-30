@@ -41,14 +41,14 @@ namespace strumpack {
    * This is iterative refinement
    *  Input vectors x and b have stride 1, length n
    */
-  template <typename scalar_t,typename integer_t>
+  template<typename scalar_t,typename integer_t,
+           typename real_t = typename RealType<scalar_t>::value_type>
   void IterativeRefinement
   (const CompressedSparseMatrix<scalar_t,integer_t>& A,
    const std::function<void(DenseMatrix<scalar_t>&)>& direct_solve,
    DenseMatrix<scalar_t>& x, const DenseMatrix<scalar_t>& b,
    real_t rtol, real_t atol, int& totit, int maxit,
    bool non_zero_guess, bool verbose) {
-    using real_t = typename RealType<scalar_t>::value_type;
     DenseMatrix<scalar_t> r(x.rows(), x.cols());
     if (non_zero_guess) {
       A.spmv(x, r);

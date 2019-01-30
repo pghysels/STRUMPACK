@@ -41,13 +41,14 @@ namespace strumpack {
    *
    *  Input vectors x and b have stride 1, length n
    */
-  template<typename scalar_t> typename RealType<scalar_t>::value_type GMRes
+  template<typename scalar_t,
+           typename real_t = typename RealType<scalar_t>::value_type>
+  real_t GMRes
   (const std::function<void(const scalar_t*,scalar_t*)>& spmv,
    const std::function<void(scalar_t*)>& preconditioner,
    std::size_t n, scalar_t* x, const scalar_t* b, real_t rtol, real_t atol,
    int& totit, int maxit, int restart, GramSchmidtType GStype,
    bool non_zero_guess, bool verbose) {
-    using real_t = typename RealType<scalar_t>::value_type;
     if (restart > maxit) restart = maxit;
     std::unique_ptr<scalar_t[]> work
       (new scalar_t[restart + restart + restart+1 +

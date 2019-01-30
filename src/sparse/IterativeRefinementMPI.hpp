@@ -39,13 +39,14 @@ namespace strumpack {
    * This is iterative refinement
    *  Input vectors x and b have stride 1, length n
    */
-  template<typename scalar_t,typename integer_t> void IterativeRefinementMPI
+  template<typename scalar_t,typename integer_t,
+           typename real_t = typename RealType<scalar_t>::value_type>
+  void IterativeRefinementMPI
   (const MPIComm& comm,
    const CSRMatrixMPI<scalar_t,integer_t>& A,
    const std::function<void(DenseMatrix<scalar_t>&)>& direct_solve,
    DenseMatrix<scalar_t>& x, DenseMatrix<scalar_t>& b, real_t rtol,
    real_t atol, int& totit, int maxit, bool non_zero_guess, bool verbose) {
-    using real_t = typename RealType<scalar_t>::value_type;
     auto norm = [&](const DenseMatrix<scalar_t>& v) -> real_t {
       real_t vnrm = v.norm();
       return std::sqrt(comm.all_reduce(vnrm*vnrm, MPI_SUM));

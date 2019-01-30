@@ -39,13 +39,13 @@ namespace strumpack {
   /**
    * http://www.netlib.org/templates/matlab/bicgstab.m
    */
-  template <typename scalar_t>
-  typename RealType<scalar_t>::value_type BiCGStab
+  template<typename scalar_t,
+           typename real_t = typename RealType<scalar_t>::value_type>
+  real_t BiCGStab
   (const std::function<void(const scalar_t*,scalar_t*)>& spmv,
    const std::function<void(scalar_t*)>& preconditioner,
    std::size_t n, scalar_t* x, const scalar_t* b, real_t rtol, real_t atol,
    int& totit, int maxit, bool non_zero_guess, bool verbose) {
-    using real_t = typename RealType<scalar_t>::value_type;
     real_t bnrm2 = blas::nrm2(n, b, 1);
     if (bnrm2 == 0.0) return real_t(0.0);
     std::unique_ptr<scalar_t[]> work(new scalar_t[8*n]);
