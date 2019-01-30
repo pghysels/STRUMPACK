@@ -315,8 +315,8 @@ namespace strumpack {
 #endif
       };
       TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_f22_compress);
-      F22_->compress(sample_CB, std::max(F12_.get_stat("Rank_max"),
-                                         F21_.get_stat("Rank_max")));
+      F22_->compress(sample_F22, std::max(F12_.get_stat("Rank_max"),
+                                          F21_.get_stat("Rank_max")));
       TIMER_STOP(t_f22_compress);
 #if defined(STRUMPACK_COUNT_FLOPS)
       long long int f22_fill_flops = F22_->get_stat("Flop_Fill");
