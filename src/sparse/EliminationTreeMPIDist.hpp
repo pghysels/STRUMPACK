@@ -146,12 +146,12 @@ namespace strumpack {
      std::vector<integer_t>& dist_upd,
      std::vector<float>& subtree_work, std::vector<float>& dist_subtree_work,
      integer_t dsep, int P0, int P, int P0_sibling, int P_sibling,
-     const MPIComm& fcomm, bool hss_parent, int level);
+     const MPIComm& fcomm, bool parent_compression, int level);
 
     std::unique_ptr<F_t> proportional_mapping_sub_graphs
     (const SPOptions<scalar_t>& opts, RedistSubTree<integer_t>& tree,
      integer_t dsep, integer_t sep, int P0, int P, int P0_sibling,
-     int P_sibling, const MPIComm& fcomm, bool hss_parent, int level);
+     int P_sibling, const MPIComm& fcomm, bool parent_compression, int level);
 
     void communicate_distributed_separator
     (integer_t dsep, std::vector<integer_t>& dist_upd,
@@ -744,11 +744,16 @@ namespace strumpack {
   }
 
   /**
-   * Send the distributed separator from the process responsible for it,
-   * to all the processes working on the frontal matrix corresponding to
-   * it, and to all processes working on the sibling front (needed for
-   * extend-add).  Hence this routine only needs to be called by those
-   * processes (or simply by everyone in comm_).
+   * Send the distributed separator from the process responsible for
+   * it, to all the processes working on the frontal matrix
+   * corresponding to it, and to all processes working on the sibling
+   * front (needed for extend-add).  Hence this routine only needs to
+   * be called by those processes (or simply by everyone in comm_).
+   *
+   * If bcast_dim_sep is set to true, the sizes of the separator are
+   * communicated to all processes in comm_.
+   * TODO I don't see why this is necessary? A process is always
+   * also part of its parent, so should always have that info?
    */
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPIDist<scalar_t,integer_t>::
@@ -756,7 +761,7 @@ namespace strumpack {
   (integer_t dsep, std::vector<integer_t>& dist_upd,
    integer_t& dsep_begin, integer_t& dsep_end,
    std::vector<integer_t>& dsep_upd, int P0, int P,
-   int P0_sibling, int P_sibling, int owner, bool use_hss) {
+   int P0_sibling, int P_sibling, int owner, bool bcast_dim_sep) {
     integer_t* sbuf = NULL;
     std::vector<MPI_Request> sreq;
     int dest0 = std::min(P0, P0_sibling);
@@ -766,13 +771,13 @@ namespace strumpack {
       sbuf[0] = nd_.dist_sep_range.first;
       sbuf[1] = nd_.dist_sep_range.second;
       std::copy(dist_upd.begin(), dist_upd.end(), sbuf+2);
-      if (use_hss) sreq.resize(P_);
+      if (bcast_dim_sep) sreq.resize(P_);
       else sreq.resize(dest1-dest0);
       int msg = 0;
       for (int dest=dest0; dest<dest1; dest++)
         MPI_Isend(sbuf, 2 + dist_upd.size(), mpi_type<integer_t>(),
                   dest, 0, comm_.comm(), &sreq[msg++]);
-      if (use_hss) {
+      if (bcast_dim_sep) {
         // when using HSS compression, every process needs to know the
         // size of this front, because you need to know if your parent
         // is HSS
@@ -796,7 +801,7 @@ namespace strumpack {
       dsep_end = rbuf[1];
       dsep_upd.assign(rbuf+2, rbuf+msg_size);
       delete[] rbuf;
-    } else if (use_hss) {
+    } else if (bcast_dim_sep) {
       integer_t rbuf[2];
       MPI_Recv(rbuf, 2, mpi_type<integer_t>(), owner,
                0, comm_.comm(), MPI_STATUS_IGNORE);
@@ -862,7 +867,7 @@ namespace strumpack {
    std::vector<integer_t>& dist_upd, std::vector<float>& local_subtree_work,
    std::vector<float>& dist_subtree_work, integer_t dsep,
    int P0, int P, int P0_sibling, int P_sibling,
-   const MPIComm& fcomm, bool hss_parent, int level) {
+   const MPIComm& fcomm, bool parent_compression, int level) {
     auto chl = nd_.tree().lch(dsep);
     auto chr = nd_.tree().rch(dsep);
     auto owner = nd_.proc_dist_sep[dsep];
@@ -874,16 +879,18 @@ namespace strumpack {
          P0_sibling, P_sibling, owner, comm_.comm());
       return proportional_mapping_sub_graphs
         (opts, sub_tree, dsep, sub_tree.root, P0, P, P0_sibling, P_sibling,
-         fcomm, hss_parent, level);
+         fcomm, parent_compression, level);
     }
 
-    integer_t dsep_begin, dsep_end;
+    integer_t dsep_begin = 0, dsep_end = 0;
     std::vector<integer_t> dsep_upd;
     communicate_distributed_separator
       (dsep, dist_upd, dsep_begin, dsep_end, dsep_upd,
-       P0, P, P0_sibling, P_sibling, owner, opts.use_HSS() && hss_parent);
+       P0, P, P0_sibling, P_sibling, owner, false);
+       //(opts.use_HSS() || opts.use_HODLR()) && parent_compression);
+
     auto dim_dsep = dsep_end - dsep_begin;
-    bool is_hss = opts.use_HSS() && hss_parent &&
+    bool is_hss = opts.use_HSS() && parent_compression &&
       (dim_dsep >= opts.HSS_min_sep_size());
     bool is_blr = opts.use_BLR() && (dim_dsep >= opts.BLR_min_sep_size());
 #if defined(STRUMPACK_USE_BPACK)
@@ -891,16 +898,12 @@ namespace strumpack {
 #else
     bool is_hodlr = false;
 #endif
+    bool use_compression = is_hss || is_blr || is_hodlr;
     HSS::HSSPartitionTree hss_tree(dim_dsep);
-    if (is_hss || is_blr || is_hodlr)
+    if (use_compression)
       communicate_hss_tree(hss_tree, dsep, P0, P, owner);
     std::vector<bool> adm;
     if (is_blr) communicate_admissibility(adm, dsep, P0, P, owner);
-
-    // bool is_hss = opts.use_HSS() && (dim_dsep >= opts.HSS_min_sep_size()) &&
-    //   (dim_dsep + dsep_upd.size() >= opts.HSS_min_front_size());
-    // // HSS::HSSPartitionTree hss_tree(dim_dsep);
-    // // if (is_hss) communicate_distributed_separator_HSS_tree(hss_tree, dsep, P0, P, owner);
 
     if (rank_ == P0) {
       if (is_hss) this->nr_HSS_fronts_++;
@@ -974,10 +977,10 @@ namespace strumpack {
     int Pr = std::max(1, P - Pl);
     auto lch = proportional_mapping
       (opts, local_upd, dist_upd, local_subtree_work, dist_subtree_work,
-       chl, P0, Pl, P0+P-Pr, Pr, fcomm.sub(0, Pl), is_hss, level+1);
+       chl, P0, Pl, P0+P-Pr, Pr, fcomm.sub(0, Pl), use_compression, level+1);
     auto rch = proportional_mapping
       (opts, local_upd, dist_upd, local_subtree_work, dist_subtree_work,
-       chr, P0+P-Pr, Pr, P0, Pl, fcomm.sub(P-Pr, Pr), is_hss, level+1);
+       chr, P0+P-Pr, Pr, P0, Pl, fcomm.sub(P-Pr, Pr), use_compression, level+1);
     if (front) {
       front->set_lchild(std::move(lch));
       front->set_rchild(std::move(rch));
@@ -985,15 +988,17 @@ namespace strumpack {
     return front;
   }
 
-  /** This should only be called by [P0,P0+P) and
-      [P0_sibling,P0_sibling+P_sibling) */
+  /**
+   * This should only be called by [P0,P0+P) and
+   * [P0_sibling,P0_sibling+P_sibling)
+   */
   template<typename scalar_t,typename integer_t>
   std::unique_ptr<FrontalMatrix<scalar_t,integer_t>>
   EliminationTreeMPIDist<scalar_t,integer_t>::proportional_mapping_sub_graphs
   (const SPOptions<scalar_t>& opts, RedistSubTree<integer_t>& tree,
    integer_t dsep, integer_t sep, int P0, int P,
    int P0_sibling, int P_sibling, const MPIComm& fcomm,
-   bool hss_parent, int level) {
+   bool parent_compression, int level) {
     if (!tree.nr_sep) return nullptr;
     auto sep_begin = tree.sep_ptr[sep];
     auto sep_end = tree.sep_ptr[sep+1];
@@ -1002,16 +1007,15 @@ namespace strumpack {
     std::vector<integer_t> upd(tree.upd[sep], tree.upd[sep]+dim_upd);
     std::unique_ptr<F_t> front;
 
-    bool is_hss = opts.use_HSS() && hss_parent &&
+    bool is_hss = opts.use_HSS() && parent_compression &&
       (dim_sep >= opts.HSS_min_sep_size());
-    // bool is_hss = opts.use_HSS() && (dim_sep >= opts.HSS_min_sep_size()) &&
-    //   (dim_sep + dim_upd >= opts.HSS_min_front_size());
     bool is_blr = opts.use_BLR() && (dim_sep >= opts.BLR_min_sep_size());
 #if defined(STRUMPACK_USE_BPACK)
     bool is_hodlr = opts.use_HODLR() && (dim_sep >= opts.HODLR_min_sep_size());
 #else
     bool is_hodlr = false;
 #endif
+    bool use_compression = is_hss || is_blr || is_hodlr;
     if (rank_ == P0) {
       if (is_hss) this->nr_HSS_fronts_++;
       else if (is_blr) this->nr_BLR_fronts_++;
@@ -1083,11 +1087,11 @@ namespace strumpack {
       front->set_lchild
         (proportional_mapping_sub_graphs
          (opts, tree, dsep, chl, P0, Pl, P0+P-Pr, Pr,
-          fcomm.sub(0, Pl), is_hss, level+1));
+          fcomm.sub(0, Pl), is_hss || is_hodlr, level+1));
       front->set_rchild
         (proportional_mapping_sub_graphs
          (opts, tree, dsep, chr, P0+P-Pr, Pr, P0, Pl,
-          fcomm.sub(P-Pr, Pr), is_hss, level+1));
+          fcomm.sub(P-Pr, Pr), is_hss || is_hodlr, level+1));
     }
     return front;
   }

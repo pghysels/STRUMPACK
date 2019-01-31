@@ -97,7 +97,8 @@ namespace strumpack {
     HSS_trees() { return _HSS_trees; }
     const std::unordered_map<integer_t,HSS::HSSPartitionTree>&
     HSS_trees() const { return _HSS_trees; }
-    const HSS::HSSPartitionTree& HSS_tree(integer_t sep) const { return _HSS_trees.at(sep); }
+    const HSS::HSSPartitionTree&
+    HSS_tree(integer_t sep) const { return _HSS_trees.at(sep); }
     HSS::HSSPartitionTree& HSS_tree(integer_t sep) { return _HSS_trees[sep]; }
 
     std::unordered_map<integer_t,std::vector<bool>>&
