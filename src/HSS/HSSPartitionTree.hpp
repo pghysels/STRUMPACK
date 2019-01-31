@@ -198,6 +198,17 @@ namespace strumpack {
       }
 
       /**
+       * Further refine the tree to make it a complete tree with a
+       * specified number of levels.
+       *
+       * \param lvls The requested number of levels. Should be >=
+       * this->levels.
+       */
+      void expand_complete_levels(int lvls) {
+        expand_complete_levels_rec(1, lvls);
+      }
+
+      /**
        * Serialize the entire tree to a single vector storing size and
        * child/parent info. This can be used to communicate the tree
        * with MPI for instance.  A new tree can be constructed at the
@@ -267,6 +278,20 @@ namespace strumpack {
         } else
           for (auto& ch : c)
             ch.expand_complete_rec(lvl+1, lvls, allow_zero_nodes);
+      }
+      void expand_complete_levels_rec
+      (int lvl, int lvls) {
+        if (c.empty()) {
+          if (lvl != lvls) {
+            c.resize(2);
+            c[0].size = size / 2;
+            c[1].size = size - size / 2;
+            c[0].expand_complete_levels_rec(lvl+1, lvls);
+            c[1].expand_complete_levels_rec(lvl+1, lvls);
+          }
+        } else
+          for (auto& ch : c)
+            ch.expand_complete_levels_rec(lvl+1, lvls);
       }
       void leaf_sizes_rec(std::vector<int>& lf) const {
         for (auto& ch : c)

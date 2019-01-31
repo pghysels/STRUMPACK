@@ -47,8 +47,8 @@ namespace strumpack {
 
   /**
    * Code in this namespace is a wrapper aroung Yang Liu's Fortran
-   * code: https://github.com/liuyangzhuan/hod-lr-bf (this repo is
-   * currently private)
+   * code:
+   *    https://github.com/liuyangzhuan/ButterflyPACK
    */
   namespace HODLR {
 
@@ -60,7 +60,7 @@ namespace strumpack {
      * This requires MPI support.
      *
      * There are 3 different ways to create an HODLRMatrix
-     *  - By specifying a matrix-(multipl)vector multiplication
+     *  - By specifying a matrix-(multiple)vector multiplication
      *    routine.
      *  - By specifying an element extraction routine.
      *  - By specifying a strumpack::kernel::Kernel matrix, defined by
@@ -379,12 +379,11 @@ namespace strumpack {
 
       auto tree = binary_tree_clustering
         (opts.clustering_algorithm(), K.data(), perm, opts.leaf_size());
-      // TODO does the tree need to be complete?
-      tree.expand_complete(false); // no empty nodes!
-      int lvls = tree.levels();
-      std::vector<int> leafs = tree.leaf_sizes();
+      int min_lvl = 2 + std::ceil(std::log2(c.size()));
+      int lvls = std::max(min_lvl, tree.levels());
+      tree.expand_complete_levels(lvls);
+      auto leafs = tree.leaf_sizes();
 
-      //c_ = (c.size() <= leafs.size()) ? c : c.sub(0, leafs.size());
       c_ = c;
       Fcomm_ = MPI_Comm_c2f(c_.comm());
       int P = c_.size();
@@ -446,11 +445,11 @@ namespace strumpack {
       rows_ = cols_ = tree.size;
 
       HSS::HSSPartitionTree full_tree(tree);
-      full_tree.expand_complete(false); // no empty nodes!
-      int lvls = full_tree.levels();
-      std::vector<int> leafs = full_tree.leaf_sizes();
+      int min_lvl = 2 + std::ceil(std::log2(c.size()));
+      int lvls = std::max(min_lvl, full_tree.levels());
+      full_tree.expand_complete_levels(lvls);
+      auto leafs = full_tree.leaf_sizes();
 
-      //c_ = (c.size() <= leafs.size()) ? c : c.sub(0, leafs.size());
       c_ = c;
       Fcomm_ = MPI_Comm_c2f(c_.comm());
       int P = c_.size();
@@ -515,11 +514,11 @@ namespace strumpack {
       rows_ = cols_ = tree.size;
 
       HSS::HSSPartitionTree full_tree(tree);
-      full_tree.expand_complete(false); // no empty nodes!
-      int lvls = full_tree.levels();
-      std::vector<int> leafs = full_tree.leaf_sizes();
+      int min_lvl = 2 + std::ceil(std::log2(c.size()));
+      int lvls = std::max(min_lvl, full_tree.levels());
+      full_tree.expand_complete_levels(lvls);
+      auto leafs = full_tree.leaf_sizes();
 
-      //c_ = (c.size() <= leafs.size()) ? c : c.sub(0, leafs.size());
       c_ = c;
       if (c_.is_null()) return;
       Fcomm_ = MPI_Comm_c2f(c_.comm());
