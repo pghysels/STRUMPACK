@@ -886,8 +886,8 @@ namespace strumpack {
     std::vector<integer_t> dsep_upd;
     communicate_distributed_separator
       (dsep, dist_upd, dsep_begin, dsep_end, dsep_upd,
-       P0, P, P0_sibling, P_sibling, owner, false);
-       //(opts.use_HSS() || opts.use_HODLR()) && parent_compression);
+       P0, P, P0_sibling, P_sibling, owner,
+       (opts.use_HSS() || opts.use_HODLR()) && parent_compression);
 
     auto dim_dsep = dsep_end - dsep_begin;
     bool is_hss = opts.use_HSS() && parent_compression &&
