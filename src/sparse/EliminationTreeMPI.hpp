@@ -88,11 +88,16 @@ namespace strumpack {
 
   protected:
     const MPIComm& comm_;
-    int rank_;
-    int P_;
+    int rank_, P_;
 
     virtual int nr_HSS_fronts() const override {
       return comm_.all_reduce(this->nr_HSS_fronts_, MPI_SUM);
+    }
+    virtual int nr_BLR_fronts() const override {
+      return comm_.all_reduce(this->nr_BLR_fronts_, MPI_SUM);
+    }
+    virtual int nr_HODLR_fronts() const override {
+      return comm_.all_reduce(this->nr_HODLR_fronts_, MPI_SUM);
     }
     virtual int nr_dense_fronts() const override {
       return comm_.all_reduce(this->nr_dense_fronts_, MPI_SUM);
