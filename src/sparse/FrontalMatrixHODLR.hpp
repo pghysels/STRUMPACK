@@ -472,7 +472,7 @@ namespace strumpack {
         S.scale(-1.);
 #if defined(STRUMPACK_COUNT_FLOPS)
         long long int f21_mult_flops = F21_.get_stat("Flop_C_Mult"),
-        invf11_mult_flops = F11_.get_stat("Flop_Solve"),
+        invf11_mult_flops = F11_.get_stat("Flop_C_Mult"),
         f12_mult_flops = F12_.get_stat("Flop_C_Mult"),
         schur_flops = f21_mult_flops + invf11_mult_flops
         + f12_mult_flops + S.rows()*S.cols();
