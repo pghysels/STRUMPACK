@@ -63,6 +63,25 @@ namespace strumpack {
     }
     return distances;
   }
+
+  // finds distances between all data points with indices from
+  // index_subset to all points in the data set
+  template<typename scalar_t=double, typename int_t=int,
+           typename real_t=typename RealType<scalar_t>::value_type>
+  DenseMatrix<real_t> find_distance_matrix_from_subset
+  (const DenseMatrix<scalar_t>& data,
+   const std::vector<int_t>& index_subset) {
+    auto n = data.cols();
+    auto d = data.rows();
+    auto subset_size = index_subset.size();
+    DenseMatrix<real_t> distances(subset_size, n);
+    for (std::size_t j=0; j<n; j++)
+      for (std::size_t i=0; i<subset_size; i++)
+        distances(i, j) = Euclidean_distance_squared
+          (d, &data(0, index_subset[i]), &data(0, j));
+    return distances;
+  }
+
   //-------FIND APPROXIMATE NEAREST NEIGHBORS FROM PROJECTION TREE---
 
   // 1. CONSTRUCT THE TREE
@@ -148,9 +167,9 @@ namespace strumpack {
       std::vector<int_t> idx(cur_leaf_size);
       for (std::size_t i=0; i<cur_leaf_size; i++) {
         std::iota(idx.begin(), idx.end(), 0);
-        std::nth_element(idx.begin(), idx.begin()+ann_number, idx.end(),
-                         [&](const int_t& i1, const int_t& i2) {
-                           return leaf_dists(i,i1) < leaf_dists(i,i2); });
+        std::partial_sort(idx.begin(), idx.begin()+ann_number, idx.end(),
+                          [&](const int_t& i1, const int_t& i2) {
+                            return leaf_dists(i,i1) < leaf_dists(i,i2); });
         for (std::size_t j=0; j<ann_number; j++) {
           neighbors(j, index_subset[i]) = leaves[leaf_sizes[leaf] + idx[j]];
           scores(j, index_subset[i]) = leaf_dists(i, idx[j]);
@@ -234,67 +253,64 @@ namespace strumpack {
   template<typename scalar_t=double, typename int_t=int,
            typename real_t=typename RealType<scalar_t>::value_type>
   void find_true_nn
-  (const DenseMatrix<scalar_t>& data, DenseMatrix<int_t>& neighbors,
-   DenseMatrix<real_t>& scores) {
+  (const DenseMatrix<scalar_t>& data, const std::vector<std::size_t>& samples,
+   DenseMatrix<int_t>& neighbors, DenseMatrix<real_t>& scores) {
     auto n = data.cols();
     auto ann_number = neighbors.rows();
-    std::vector<int_t> all_ids(n); // index subset = everything
-    std::iota(all_ids.begin(), all_ids.end(), 0);
-    // create full distance matrix
-    auto all_dists = find_distance_matrix(data, all_ids);
-
+    auto sample_dists = find_distance_matrix_from_subset(data, samples);
     // record ann_number closest points in each leaf to neighbors
-#pragma omp parallel for
-    for (std::size_t i=0; i<n; i++) {
-      std::vector<int_t> idx(n);
+    std::vector<int_t> idx(n);
+    for (std::size_t i=0; i<samples.size(); i++) {
       std::iota(idx.begin(), idx.end(), 0);
-      std::nth_element
+      std::partial_sort
         (idx.begin(), idx.begin()+ann_number, idx.end(),
          [&](const int_t& i1, const int& i2) {
-          return all_dists(i, i1) < all_dists(i, i2); });
+          return sample_dists(i, i1) < sample_dists(i, i2); });
       for (int j=0; j<ann_number; j++) {
         neighbors(j, i) = idx[j];
-        scores(j, i) = all_dists(i, idx[j]);
+        scores(j, i) = sample_dists(i, idx[j]);
       }
     }
   }
 
   // quality = average fraction of ann_number approximate neighbors
   //  (neighbors), which are within the closest ann_number of true
-  //  neighbors (n_neighbors); average is taken over all data points
+  //  neighbors (n_neighbors); average is taken over a subset
+  //  (nr_samples)
   template<typename scalar_t=double, typename int_t=int,
            typename real_t=typename RealType<scalar_t>::value_type>
   double check_quality
-  (const DenseMatrix<scalar_t>& data, const DenseMatrix<int_t>& neighbors) {
+  (const DenseMatrix<scalar_t>& data, const DenseMatrix<int_t>& neighbors,
+   std::mt19937& generator) {
     auto n = data.cols();
+    auto d = data.rows();
     auto ann_number = neighbors.rows();
-    DenseMatrix<int_t> n_neighbors(ann_number, n);
-    DenseMatrix<real_t> n_scores(ann_number, n);
+    int nr_samples = 100;
+    std::vector<std::size_t> samples(nr_samples);
+    {
+      std::uniform_int_distribution<std::size_t> uni_int(0, n);
+      for (std::size_t i=0; i<samples.size(); i++)
+        samples[i] = uni_int(generator);
+    }
+    DenseMatrix<int_t> n_neighbors(ann_number, nr_samples);
+    DenseMatrix<real_t> n_scores(ann_number, nr_samples);
     n_neighbors.zero();
     n_scores.zero();
-    auto start_nn = std::chrono::system_clock::now();
-    find_true_nn(data, n_neighbors, n_scores);
-    auto end_nn = std::chrono::system_clock::now();
-    std::chrono::duration<double> elapsed_seconds_nn = end_nn-start_nn;
-    std::cout << "elapsed time for exact neighbor search: "
-              << elapsed_seconds_nn.count() << " sec" << std::endl;
-    std::vector<double> quality_vec(n);
-    for (std::size_t i=0; i<n; i++) {
+    find_true_nn(data, samples, n_neighbors, n_scores);
+    double ann_quality = 0.0;
+    for (std::size_t j=0; j<nr_samples; j++) {
+      auto i = samples[j];
       std::size_t r1 = 0, r2 = 0;
       int num_nei_found = 0;
       while (r2 < ann_number)
-        if (neighbors(r1, i) == n_neighbors(r2, i)) {
+        if (neighbors(r1, i) == n_neighbors(r2, j)) {
           r1++;
           r2++;
           num_nei_found++;
         } else r2++;
-      quality_vec[i] = (double)num_nei_found / ann_number;
+      ann_quality += (double)num_nei_found / ann_number;
     }
-    std::cout << std::endl;
-    double ann_quality = 0.0;
-    for (std::size_t i=0; i<quality_vec.size(); i++)
-      ann_quality += quality_vec[i];
-    return (double)ann_quality/quality_vec.size();
+    return ann_quality / nr_samples;
   }
 
   //------------ Main function call----------------
@@ -310,17 +326,21 @@ namespace strumpack {
     neighbors.zero();
     scores.zero();
     find_ann_candidates(data, neighbors, scores, generator);
-    //std::cout << "quality=" << check_quality(data, neighbors) << std::endl;
     // construct several random projection trees to find approximate
     // nearest neighbors
-    for (std::size_t iter=1; iter<num_iters; iter++) {
-      DenseMatrix<int_t> new_neighbors(ann_number, n);
-      DenseMatrix<real_t> new_scores(ann_number, n);
+    DenseMatrix<int_t> new_neighbors(ann_number, n);
+    DenseMatrix<real_t> new_scores(ann_number, n);
+    double quality = check_quality(data, neighbors, generator);
+    int iter = 1;
+    while (quality < 0.99 && iter++ < num_iters) {
       new_neighbors.zero();
       new_scores.zero();
       find_ann_candidates(data, new_neighbors, new_scores, generator);
       choose_best_neighbors(neighbors, scores, new_neighbors, new_scores);
+      quality = check_quality(data, neighbors, generator);
     }
+    std::cout << "# ANN search quality = " << quality
+              << " after " << iter << " iterations" << std::endl;
   }
 
 } // end namespace strumpack
