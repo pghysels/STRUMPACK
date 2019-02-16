@@ -171,6 +171,14 @@ namespace strumpack {
       }
 
       /**
+       * Set the number of butterfly levels to use for each HODLR
+       * matrix.
+       */
+      void set_butterfly_levels(int bfl) {
+        butterfly_levels_ = bfl;
+      }
+
+      /**
        * Enable or disable verbose output (only by the root process)
        * to stdout.
        */
@@ -227,6 +235,12 @@ namespace strumpack {
       }
 
       /**
+       * get the number of butterfly levels to use for each HODLR
+       * matrix.
+       */
+      int butterfly_levels() const { return butterfly_levels_; }
+
+      /**
        * Verbose or quiet?
        * \return True if we want output from the HODLR algorithms,
        * else False.
@@ -256,6 +270,7 @@ namespace strumpack {
           {"hodlr_rank_guess",            required_argument, 0, 5},
           {"hodlr_rank_rate",             required_argument, 0, 6},
           {"hodlr_clustering_algorithm",  required_argument, 0, 7},
+          {"hodlr_butterfly_levels",      required_argument, 0, 8},
           {"hodlr_verbose",               no_argument, 0, 'v'},
           {"hodlr_quiet",                 no_argument, 0, 'q'},
           {"help",                        no_argument, 0, 'h'},
@@ -300,6 +315,11 @@ namespace strumpack {
             std::string s; iss >> s;
             set_clustering_algorithm(get_clustering_algorithm(s));
           } break;
+          case 8: {
+            std::istringstream iss(optarg);
+            iss >> butterfly_levels_;
+            set_butterfly_levels(butterfly_levels_);
+          } break;
           case 'v': set_verbose(true); break;
           case 'q': set_verbose(false); break;
           case 'h': describe_options(); break;
@@ -328,6 +348,8 @@ namespace strumpack {
                   << rank_rate() << ")" << std::endl
                   << "#   --hodlr_clustering_algorithm natural|2means|kdtree|pca|cobble (default "
                   << get_name(clustering_algorithm())<< ")" << std::endl
+                  << "#   --hodlr_butterfly_levels (default "
+                  << butterfly_levels() << ")" << std::endl
                   << "#   --hodlr_verbose or -v (default "
                   << verbose() << ")" << std::endl
                   << "#   --hodlr_quiet or -q (default "
@@ -343,6 +365,7 @@ namespace strumpack {
       double rank_rate_ = 2.;
       int max_rank_ = 5000;
       ClusteringAlgorithm _clustering_algo = ClusteringAlgorithm::COBBLE;
+      int butterfly_levels_ = 0;
       bool verbose_ = true;
     };
 

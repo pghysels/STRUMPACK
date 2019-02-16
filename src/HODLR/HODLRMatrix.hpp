@@ -412,6 +412,11 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", 100);
       HODLR_set_I_option<scalar_t>(options_, "rank0", opts.rank_guess());
       HODLR_set_D_option<scalar_t>(options_, "rankrate", opts.rank_rate());
+      if (opts.butterfly_levels() > 0)
+        HODLR_set_I_option<scalar_t>(options_, "LRlevel", opts.butterfly_levels());
+      HODLR_set_D_option<scalar_t>(options_, "tol_comp", opts.rel_tol());
+      HODLR_set_D_option<scalar_t>(options_, "tol_rand", opts.rel_tol());
+      HODLR_set_D_option<scalar_t>(options_, "tol_Rdetect", 0.1*opts.rel_tol());
 
       perm_.resize(rows_);
       // construct HODLR with geometrical points
@@ -477,6 +482,11 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", 100);
       HODLR_set_I_option<scalar_t>(options_, "rank0", opts.rank_guess());
       HODLR_set_D_option<scalar_t>(options_, "rankrate", opts.rank_rate());
+      if (opts.butterfly_levels() > 0)
+        HODLR_set_I_option<scalar_t>(options_, "LRlevel", opts.butterfly_levels());
+      HODLR_set_D_option<scalar_t>(options_, "tol_comp", opts.rel_tol());
+      HODLR_set_D_option<scalar_t>(options_, "tol_rand", opts.rel_tol());
+      HODLR_set_D_option<scalar_t>(options_, "tol_Rdetect", 0.1*opts.rel_tol());
 
       perm_.resize(rows_);
       HODLR_construct_element
@@ -537,8 +547,7 @@ namespace strumpack {
       int com_opt = 2;   // compression option 1:SVD 2:RRQR 3:ACA 4:BACA
       int sort_opt = 0;  // 0:natural order, 1:kd-tree, 2:cobble-like ordering
                          // 3:gram distance-based cobble-like ordering
-      HODLR_set_D_option<scalar_t>(options_, "tol_comp", opts.rel_tol());
-      HODLR_set_I_option<scalar_t>(options_, "verbosity", opts.verbose() ? 1 : -1);
+      HODLR_set_I_option<scalar_t>(options_, "verbosity", opts.verbose() ? 2 : -1);
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
       HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
       //HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", com_opt);
@@ -547,6 +556,11 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", 100);
       HODLR_set_I_option<scalar_t>(options_, "rank0", opts.rank_guess());
       HODLR_set_D_option<scalar_t>(options_, "rankrate", opts.rank_rate());
+      if (opts.butterfly_levels() > 0)
+        HODLR_set_I_option<scalar_t>(options_, "LRlevel", opts.butterfly_levels());
+      HODLR_set_D_option<scalar_t>(options_, "tol_comp", opts.rel_tol());
+      HODLR_set_D_option<scalar_t>(options_, "tol_rand", opts.rel_tol());
+      HODLR_set_D_option<scalar_t>(options_, "tol_Rdetect", 0.1*opts.rel_tol());
 
       perm_.resize(rows_);
       HODLR_construct_matvec_init<scalar_t>
