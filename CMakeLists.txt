@@ -400,9 +400,7 @@ set(LIBSRCDENSE
   src/dense/lapack/sgelqfmod.f src/dense/lapack/dgelqfmod.f
   src/dense/lapack/cgelqfmod.f src/dense/lapack/zgelqfmod.f
   src/dense/lapack/sgelq2mod.f src/dense/lapack/dgelq2mod.f
-  src/dense/lapack/cgelq2mod.f src/dense/lapack/zgelq2mod.f
-  src/dense/lapack/cgeqp3mod.f src/dense/lapack/dgeqp3mod.f
-  src/dense/lapack/sgeqp3mod.f src/dense/lapack/zgeqp3mod.f)
+  src/dense/lapack/cgelq2mod.f src/dense/lapack/zgelq2mod.f)
 
 set(LIBSRCSPARSE
   src/sparse/rcm/rcm.f
