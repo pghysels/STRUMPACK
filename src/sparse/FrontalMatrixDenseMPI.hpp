@@ -198,6 +198,10 @@ namespace strumpack {
     if (visit(rchild_))
       rchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
     build_front(A);
+    if (opts.write_root_front()) {
+      F11_.print_to_files("Froot");
+      Comm().barrier();
+    }
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
     partial_factorization();

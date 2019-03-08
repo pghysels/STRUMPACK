@@ -181,8 +181,9 @@ namespace strumpack {
     void print() const { print("A"); }
     void print(std::string name, int precision=15) const;
     void print_to_file
-    (std::string name, std::string filename,
-     int width=8) const;
+    (std::string name, std::string filename, int width=8) const;
+    void print_to_files
+    (std::string name, int precision=16) const;
     void random();
     void random
     (random::RandomGeneratorBase<typename RealType<scalar_t>::
@@ -842,6 +843,29 @@ namespace strumpack {
     if (!active()) return;
     auto tmp = gather();
     if (is_master()) tmp.print_to_file(name, filename, width);
+  }
+
+  template<typename scalar_t> void
+  DistributedMatrix<scalar_t>::print_to_files
+  (std::string name, int precision) const {
+    if (!active()) return;
+    std::string filename
+      (name + "_pr" + std::to_string(prow()) + "_pc" +
+       std::to_string(pcol()) + ".dat");
+    std::fstream fs(filename, std::fstream::out);
+    fs << "# M N m n MB NB nPr nPc Pr Pc" << std::endl
+       << rows() << " " << cols() << " "
+       << lrows_ << " " << lcols_ << " "
+       << MB() << " " << NB() << " "
+       << nprows() << " " << npcols() << " "
+       << prow() << " " << pcol()
+       << std::endl;
+    fs << std::setprecision(precision) << std::setw(20);
+    for (std::size_t i=0; i<lrows_; i++) {
+      for (std::size_t j=0; j<lcols_; j++)
+        fs << operator()(i,j) << " ";
+      fs << std::endl;
+    }
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>

@@ -805,6 +805,8 @@ namespace strumpack {
      */
     void disable_replace_tiny_pivots() { _replace_tiny_pivots = false; }
 
+    void set_write_root_front(bool b)  { _write_root_front = b; }
+
 
     /**
      * Check if verbose output is enabled.
@@ -1056,6 +1058,11 @@ namespace strumpack {
     bool replace_tiny_pivots() const { return _replace_tiny_pivots; }
 
     /**
+     * The root front will be written to a file.
+     */
+    bool write_root_front() const { return _write_root_front; }
+
+    /**
      * Get a (const) reference to an object holding various options
      * pertaining to the HSS code, and data structures.
      */
@@ -1163,6 +1170,7 @@ namespace strumpack {
         {"sp_nz",                        required_argument, 0, 42},
         {"sp_components",                required_argument, 0, 43},
         {"sp_separator_width",           required_argument, 0, 44},
+        {"sp_write_root_front",          no_argument, 0, 45},
         {"sp_verbose",                   no_argument, 0, 'v'},
         {"sp_quiet",                     no_argument, 0, 'q'},
         {"help",                         no_argument, 0, 'h'},
@@ -1364,6 +1372,7 @@ namespace strumpack {
           iss >> _separator_width;
           set_separator_width(_separator_width);
         } break;
+        case 45: set_write_root_front(true); break;
         case 'h': { describe_options(); } break;
         case 'v': set_verbose(true); break;
         case 'q': set_verbose(false); break;
@@ -1501,6 +1510,7 @@ namespace strumpack {
       std::cout << "#   --sp_disable_indirect_sampling" << std::endl;
       std::cout << "#   --sp_enable_replace_tiny_pivots" << std::endl;
       std::cout << "#   --sp_disable_replace_tiny_pivots" << std::endl;
+      std::cout << "#   --sp_write_root_front" << std::endl;
       std::cout << "#   --sp_verbose or -v (default " << verbose() << ")"
                 << std::endl;
       std::cout << "#   --sp_quiet or -q (default " << !verbose() << ")"
@@ -1532,6 +1542,8 @@ namespace strumpack {
     bool _use_agg_amalg = false;
     MatchingJob _matching_job = MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING;
     bool _log_assembly_tree = false;
+    bool _replace_tiny_pivots = false;
+    bool _write_root_front = false;
 
     /** compression options */
     CompressionType _comp = CompressionType::NONE;
@@ -1541,7 +1553,6 @@ namespace strumpack {
     int _hss_min_sep_size = 256;
     int _sep_order_level = 1;
     bool _indirect_sampling = false;
-    bool _replace_tiny_pivots = false;
     HSS::HSSOptions<scalar_t> _hss_opts;
 
     /** BLR options */
