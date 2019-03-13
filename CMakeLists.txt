@@ -365,7 +365,8 @@ include_directories(${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/src)
 set(LIBSRC
   src/StrumpackParameters.cpp
   src/misc/TaskTimer.cpp
-  src/kernel/Kernel.cpp)
+  src/kernel/Kernel.cpp
+  src/HODLR/HODLRWrapper.cpp)
 
 if(STRUMPACK_C_INTERFACE)
   list(APPEND LIBSRC src/StrumpackSparseSolver.cpp)
