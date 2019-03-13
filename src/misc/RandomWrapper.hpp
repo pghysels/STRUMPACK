@@ -35,6 +35,7 @@
 
 #include <memory>
 #include <random>
+#include <iostream>
 
 namespace strumpack {
 
