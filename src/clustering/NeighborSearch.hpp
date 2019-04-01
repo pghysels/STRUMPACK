@@ -183,8 +183,7 @@ namespace strumpack {
            typename real_t=typename RealType<scalar_t>::value_type>
   void find_ann_candidates
   (const DenseMatrix<scalar_t>& data, DenseMatrix<int_t>& neighbors,
-   DenseMatrix<real_t>& scores,
-   std::mt19937& generator) {
+   DenseMatrix<real_t>& scores, std::mt19937& generator) {
     auto n = data.cols();
     auto ann_number = neighbors.rows();
     std::size_t min_leaf_size = 6 * ann_number;
