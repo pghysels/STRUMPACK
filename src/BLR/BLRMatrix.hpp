@@ -506,13 +506,16 @@ namespace strumpack {
         std::cout << "];" << std::endl;
       }
 
+      std::size_t rowblocks() const { return nbrows_; }
+      std::size_t colblocks() const { return nbcols_; }
+      std::size_t tilerows(std::size_t i) const { return roff_[i+1] - roff_[i]; }
+      std::size_t tilecols(std::size_t j) const { return coff_[j+1] - coff_[j]; }
+      std::size_t tileroff(std::size_t i) const { return roff_[i]; }
+      std::size_t tilecoff(std::size_t j) const { return coff_[j]; }
+
     private:
-      std::size_t m_;
-      std::size_t n_;
-      std::size_t nbrows_;
-      std::size_t nbcols_;
-      std::vector<std::size_t> roff_;
-      std::vector<std::size_t> coff_;
+      std::size_t m_ = 0, n_ = 0, nbrows_ = 0, nbcols_ = 0;
+      std::vector<std::size_t> roff_, coff_;
       std::vector<std::unique_ptr<BLRTile<scalar_t>>> blocks_;
 
       BLRMatrix(std::size_t m, const std::vector<std::size_t>& rowtiles,
@@ -531,23 +534,16 @@ namespace strumpack {
         blocks_.resize(nbrows_ * nbcols_);
       }
 
-      inline std::size_t rowblocks() const { return nbrows_; }
-      inline std::size_t colblocks() const { return nbcols_; }
-      inline std::size_t tilerows(std::size_t i) const { return roff_[i+1] - roff_[i]; }
-      inline std::size_t tilecols(std::size_t j) const { return coff_[j+1] - coff_[j]; }
-      inline std::size_t tileroff(std::size_t i) const { return roff_[i]; }
-      inline std::size_t tilecoff(std::size_t j) const { return coff_[j]; }
-
-      inline BLRTile<scalar_t>& tile(std::size_t i, std::size_t j) {
+      BLRTile<scalar_t>& tile(std::size_t i, std::size_t j) {
         return *blocks_[i+j*rowblocks()].get();
       }
-      inline const BLRTile<scalar_t>& tile(std::size_t i, std::size_t j) const {
+      const BLRTile<scalar_t>& tile(std::size_t i, std::size_t j) const {
         return *blocks_[i+j*rowblocks()].get();
       }
-      inline std::unique_ptr<BLRTile<scalar_t>>& block(std::size_t i, std::size_t j) {
+      std::unique_ptr<BLRTile<scalar_t>>& block(std::size_t i, std::size_t j) {
         return blocks_[i+j*rowblocks()];
       }
-      inline DenseMW_t tile(DenseM_t& A, std::size_t i, std::size_t j) const {
+      DenseMW_t tile(DenseM_t& A, std::size_t i, std::size_t j) const {
         return DenseMW_t
           (tilerows(i), tilecols(j), A, tileroff(i), tilecoff(j));
       }

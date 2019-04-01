@@ -107,7 +107,7 @@ namespace strumpack {
      bool is_root) override;
 
   private:
-    DenseM_t F11_, F12_, F21_, F22_;
+    DenseM_t F22_;
     BLRM_t F11blr_, F12blr_, F21blr_;
     std::vector<int> piv_;
     std::vector<std::size_t> sep_tiles_;
@@ -228,11 +228,10 @@ namespace strumpack {
     }
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();
-    F11_ = DenseM_t(dsep, dsep); F11_.zero();
-    F12_ = DenseM_t(dsep, dupd); F12_.zero();
-    F21_ = DenseM_t(dupd, dsep); F21_.zero();
+    DenseM_t F11(dsep, dsep), F12(dsep, dupd), F21(dupd, dsep);
+    F11.zero(); F12.zero(); F21.zero();
     A.extract_front
-      (F11_, F12_, F21_, this->sep_begin_, this->sep_end_,
+      (F11, F12, F21, this->sep_begin_, this->sep_end_,
        this->upd_, task_depth);
     if (dupd) {
       F22_ = DenseM_t(dupd, dupd);
@@ -240,14 +239,14 @@ namespace strumpack {
     }
     if (lchild_)
       lchild_->extend_add_to_dense
-        (F11_, F12_, F21_, F22_, this, task_depth);
+        (F11, F12, F21, F22_, this, task_depth);
     if (rchild_)
       rchild_->extend_add_to_dense
-        (F11_, F12_, F21_, F22_, this, task_depth);
+        (F11, F12, F21, F22_, this, task_depth);
     if (dim_sep()) {
 #if 1
       BLR::BLR_construct_and_partial_factor
-        (F11_, F12_, F21_, F22_, F11blr_, piv_, F12blr_, F21blr_,
+        (F11, F12, F21, F22_, F11blr_, piv_, F12blr_, F21blr_,
          sep_tiles_, upd_tiles_,
          [&](std::size_t i, std::size_t j) -> bool {
           return adm_[i+j*sep_tiles_.size()]; },
@@ -256,18 +255,18 @@ namespace strumpack {
       F11blr_ = BLRM_t
         (sep_tiles_, [&](std::size_t i, std::size_t j) -> bool {
           return adm_[i+j*sep_tiles_.size()]; },
-          F11_, piv_, opts.BLR_options());
-      F11_.clear();
+          F11, piv_, opts.BLR_options());
+      F11.clear();
       if (dim_upd()) {
-        F12_.laswp(piv_, true);
+        F12.laswp(piv_, true);
         trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-             scalar_t(1.), F11blr_, F12_, task_depth);
-        F12blr_ = BLRM_t(F12_, sep_tiles_, upd_tiles_, opts.BLR_options());
-        F12_.clear();
+             scalar_t(1.), F11blr_, F12, task_depth);
+        F12blr_ = BLRM_t(F12, sep_tiles_, upd_tiles_, opts.BLR_options());
+        F12.clear();
         trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-             scalar_t(1.), F11blr_, F21_, task_depth);
-        F21blr_ = BLRM_t(F21_, upd_tiles_, sep_tiles_, opts.BLR_options());
-        F21_.clear();
+             scalar_t(1.), F11blr_, F21, task_depth);
+        F21blr_ = BLRM_t(F21, upd_tiles_, sep_tiles_, opts.BLR_options());
+        F21.clear();
         gemm(Trans::N, Trans::N, scalar_t(-1.), F21blr_, F12blr_,
              scalar_t(1.), F22_, task_depth);
       }
