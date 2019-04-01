@@ -1704,13 +1704,11 @@ namespace strumpack {
               << " note that this routine is not stable!" << std::endl;
   }
 
-  template<typename scalar_t> void
-  DenseMatrix<scalar_t>::low_rank
+  template<typename scalar_t> void DenseMatrix<scalar_t>::low_rank
   (DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
    real_t rel_tol, real_t abs_tol, int max_rank, int depth) const {
     DenseMatrix<scalar_t> tmp(*this);
-    int m = rows(), n = cols();
-    int minmn = std::min(m, n);
+    int m = rows(), n = cols(), minmn = std::min(m, n);
     auto tau = new scalar_t[minmn];
     std::vector<int> ind(n);
     int rank, info;
