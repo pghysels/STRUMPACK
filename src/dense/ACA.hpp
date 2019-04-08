@@ -96,7 +96,8 @@ namespace strumpack {
         normUr2 += std::real(Ur(i, 0) * Ur(i, 0));
       approx_norm =
         std::sqrt(std::real(approx_norm*approx_norm +
-                            2. * cross_products + normUr2 * normVr2));
+                            real_t(2.) * cross_products
+                            + normUr2 * normVr2));
       real_t normVr = std::sqrt(normVr2), normUr = std::sqrt(normUr2);
       rank++;
 
