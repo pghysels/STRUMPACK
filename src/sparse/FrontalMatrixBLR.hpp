@@ -110,8 +110,7 @@ namespace strumpack {
     DenseM_t F22_;
     BLRM_t F11blr_, F12blr_, F21blr_;
     std::vector<int> piv_;
-    std::vector<std::size_t> sep_tiles_;
-    std::vector<std::size_t> upd_tiles_;
+    std::vector<std::size_t> sep_tiles_, upd_tiles_;
     std::vector<bool> adm_;
 
     FrontalMatrixBLR(const FrontalMatrixBLR&) = delete;
@@ -243,7 +242,7 @@ namespace strumpack {
     if (rchild_)
       rchild_->extend_add_to_dense
         (F11, F12, F21, F22_, this, task_depth);
-    if (dim_sep()) {
+    if (dsep) {
 #if 1
       BLR::BLR_construct_and_partial_factor
         (F11, F12, F21, F22_, F11blr_, piv_, F12blr_, F21blr_,
@@ -252,10 +251,20 @@ namespace strumpack {
           return adm_[i+j*sep_tiles_.size()]; },
          opts.BLR_options());
 #else
-      F11blr_ = BLRM_t
-        (sep_tiles_, [&](std::size_t i, std::size_t j) -> bool {
-          return adm_[i+j*sep_tiles_.size()]; },
-          F11, piv_, opts.BLR_options());
+
+      if (opts.BLR_options().low_rank_algorithm() ==
+          BLR::LowRankAlgorithm::ACA)
+        F11blr_ = BLRM_t
+          (dsep, sep_tiles_, [&](std::size_t i, std::size_t j) -> bool {
+            return adm_[i+j*sep_tiles_.size()]; },
+            [&](std::size_t i, std::size_t j) -> scalar_t {
+              return F11(i, j); },
+            piv_, opts.BLR_options());
+      else
+        F11blr_ = BLRM_t
+          (sep_tiles_, [&](std::size_t i, std::size_t j) -> bool {
+            return adm_[i+j*sep_tiles_.size()]; },
+            F11, piv_, opts.BLR_options());
       F11.clear();
       if (dim_upd()) {
         F12.laswp(piv_, true);
