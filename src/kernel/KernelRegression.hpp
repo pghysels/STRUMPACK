@@ -45,7 +45,7 @@
 #endif
 #endif
 
-#define ITERATIVE_REFINEMENT 1
+//#define ITERATIVE_REFINEMENT 1
 
 namespace strumpack {
 
