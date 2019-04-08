@@ -512,11 +512,13 @@ namespace strumpack {
 
       DenseM_t dense() const {
         DenseM_t A(rows(), cols());
+        auto cb = colblocks();
+        auto rb = rowblocks();
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop collapse(2) default(shared)
 #endif
-        for (std::size_t j=0; j<colblocks(); j++)
-          for (std::size_t i=0; i<rowblocks(); i++) {
+        for (std::size_t j=0; j<cb; j++)
+          for (std::size_t i=0; i<rb; i++) {
             DenseMW_t Aij = tile(A, i, j);
             tile(i, j).dense(Aij);
           }
@@ -524,11 +526,13 @@ namespace strumpack {
       }
 
       void draw(std::ostream& of, std::size_t roff, std::size_t coff) const {
+        auto cb = colblocks();
+        auto rb = rowblocks();
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop collapse(2) default(shared)
 #endif
-        for (std::size_t j=0; j<colblocks(); j++)
-          for (std::size_t i=0; i<rowblocks(); i++) {
+        for (std::size_t j=0; j<cb; j++)
+          for (std::size_t i=0; i<rb; i++) {
             tile(i, j).draw(of, roff+tileroff(i), coff+tilecoff(j));
           }
       }
