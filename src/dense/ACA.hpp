@@ -50,12 +50,12 @@ namespace strumpack {
     int rmax = std::min(minmn, max_rank);
     D_t U_(m, rmax), V_(n, rmax);
     std::mt19937 mt;
-    std::uniform_int_distribution<int> rgen(0, minmn);
+    std::uniform_int_distribution<int> rgen(0, m-1);
     int row = rgen(mt), col = 0, rank = 0;
     std::vector<int> rowids, colids;
     rowids.reserve(rmax);
     colids.reserve(rmax);
-    scalar_t approx_norm(0.);
+    real_t approx_norm(0.);
     while (rank < rmax) {
       rowids.push_back(row);
       DW_t Vr(n, 1, V_, 0, rank);
@@ -91,9 +91,9 @@ namespace strumpack {
       }
       real_t normVr2(0.), normUr2(0.);
       for (std::size_t i=0; i<n; i++)
-        normVr2 += Vr(i, 0) * Vr(i, 0);
+        normVr2 += std::real(Vr(i, 0) * Vr(i, 0));
       for (std::size_t i=0; i<m; i++)
-        normUr2 += Ur(i, 0) * Ur(i, 0);
+        normUr2 += std::real(Ur(i, 0) * Ur(i, 0));
       approx_norm =
         std::sqrt(std::real(approx_norm*approx_norm +
                             2. * cross_products + normUr2 * normVr2));
@@ -136,6 +136,7 @@ namespace strumpack {
     }
 
     // // recompression TODO what tolerance to use here??
+    // // TODO also compress V
     // D_t B;
     // DW_t(m, rank, U_, 0, 0).low_rank(U, B, rtol, atol, rank, 0);
     // //DW_t(m, rank, U_, 0, 0).low_rank(U, B, 1e-20, 1e-20, rank, 0);
