@@ -41,7 +41,8 @@ namespace strumpack {
   void adaptive_cross_approximation
   (DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
    std::size_t m, std::size_t n,
-   const std::function<scalar_t(std::size_t,std::size_t)>& Aelem,
+   const std::function<void(std::size_t,scalar_t*,int)>& Arow,
+   const std::function<void(std::size_t,scalar_t*,int)>& Acol,
    real_t rtol, real_t atol, int max_rank) {
     using D_t = DenseMatrix<scalar_t>;
     using DW_t = DenseMatrixWrapper<scalar_t>;
@@ -59,8 +60,7 @@ namespace strumpack {
     while (rank < rmax) {
       rowids.push_back(row);
       DW_t Vr(n, 1, V_, 0, rank);
-      for (std::size_t i=0; i<n; i++)
-        Vr(i, 0) = Aelem(row, i);
+      Arow(row, Vr.data(), 1);
       for (int l=0; l<rank; l++)
         Vr.scaled_add(-U_(row, l), DW_t(n, 1, V_, 0, l));
       if (Vr.norm() < sfmin) break;
@@ -75,8 +75,7 @@ namespace strumpack {
       colids.push_back(col);
       Vr.scale(scalar_t(1.) / Vr(col, 0));
       DW_t Ur(m, 1, U_, 0, rank);
-      for (std::size_t i=0; i<m; i++)
-        Ur(i, 0) = Aelem(i, col);
+      Acol(col, Ur.data(), 1);
       for (int l=0; l<rank; l++)
         Ur.scaled_add(-V_(col, l), DW_t(m, 1, U_, 0, l));
 
@@ -159,7 +158,30 @@ namespace strumpack {
     std::cout << "ACA abs_error = " << e
               << " ACA rel_error = " << e/Anorm << std::endl;
 #endif
+  }
 
+
+  /**
+   * ACA with element extraction routine.
+   * If possible use the ACA version with column/row extraction routines.
+   */
+  template<typename scalar_t,
+           typename real_t = typename RealType<scalar_t>::value_type>
+  void adaptive_cross_approximation
+  (DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
+   std::size_t m, std::size_t n,
+   const std::function<scalar_t(std::size_t,std::size_t)>& Aelem,
+   real_t rtol, real_t atol, int max_rank) {
+    auto Arow = [&](std::size_t r, scalar_t* B, int ldB) {
+      for (std::size_t j=0; j<n; j++)
+        B[j*ldB] = Aelem(r, j);
+    };
+    auto Acol = [&](std::size_t c, scalar_t* B, int ldB) {
+      for (std::size_t i=0; i<m; i++)
+        B[i*ldB] = Aelem(i, c);
+    };
+    adaptive_cross_approximation<scalar_t>
+      (U, V, m, n, Arow, Acol, rtol, atol, max_rank);
   }
 
 } // end namespace strumpack

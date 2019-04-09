@@ -1889,6 +1889,64 @@ namespace strumpack {
        x.data(), 1, beta, y.data(), 1, depth);
   }
 
+  /**
+   * DGEMV performs one of the matrix-vector operations
+   *
+   *    y := alpha*A*x + beta*y,   or   y := alpha*A**T*x + beta*y,
+   *
+   * where alpha and beta are scalars, x and y are vectors and A is an
+   * m by n matrix.
+   */
+  template<typename scalar_t> void
+  gemv(Trans ta, scalar_t alpha, const DenseMatrix<scalar_t>& a,
+       const scalar_t* x, int incx, scalar_t beta,
+       DenseMatrix<scalar_t>& y, int depth) {
+    assert(y.cols() == 1);
+    assert(ta != Trans::N || (a.rows() == y.rows()));
+    assert(ta == Trans::N || (a.cols() == y.rows()));
+    gemv_omp_task
+      (char(ta), a.rows(), a.cols(), alpha, a.data(), a.ld(),
+       x, incx, beta, y.data(), 1, depth);
+  }
+
+  /**
+   * DGEMV performs one of the matrix-vector operations
+   *
+   *    y := alpha*A*x + beta*y,   or   y := alpha*A**T*x + beta*y,
+   *
+   * where alpha and beta are scalars, x and y are vectors and A is an
+   * m by n matrix.
+   */
+  template<typename scalar_t> void
+  gemv(Trans ta, scalar_t alpha, const DenseMatrix<scalar_t>& a,
+       const DenseMatrix<scalar_t>& x, scalar_t beta,
+       scalar_t* y, int incy, int depth) {
+    assert(x.cols() == 1);
+    assert(ta != Trans::N || (a.cols() == x.rows()));
+    assert(ta == Trans::N || (a.rows() == x.rows()));
+    gemv_omp_task
+      (char(ta), a.rows(), a.cols(), alpha, a.data(), a.ld(),
+       x.data(), 1, beta, y, incy, depth);
+  }
+
+  /**
+   * DGEMV performs one of the matrix-vector operations
+   *
+   *    y := alpha*A*x + beta*y,   or   y := alpha*A**T*x + beta*y,
+   *
+   * where alpha and beta are scalars, x and y are vectors and A is an
+   * m by n matrix.
+   */
+  template<typename scalar_t> void
+  gemv(Trans ta, scalar_t alpha, const DenseMatrix<scalar_t>& a,
+       const scalar_t* x, int incx, scalar_t beta,
+       scalar_t* y, int incy, int depth) {
+    gemv_omp_task
+      (char(ta), a.rows(), a.cols(), alpha, a.data(), a.ld(),
+       x, incx, beta, y, incy, depth);
+  }
+
+
   /** return number of flops for LU factorization */
   template<typename scalar_t> long long int
   LU_flops(const DenseMatrix<scalar_t>& a) {
