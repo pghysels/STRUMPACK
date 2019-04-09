@@ -251,15 +251,13 @@ namespace strumpack {
           return adm_[i+j*sep_tiles_.size()]; },
          opts.BLR_options());
 #else
-
       if (opts.BLR_options().low_rank_algorithm() ==
           BLR::LowRankAlgorithm::ACA)
         F11blr_ = BLRM_t
           (dsep, sep_tiles_, [&](std::size_t i, std::size_t j) -> bool {
             return adm_[i+j*sep_tiles_.size()]; },
             [&](std::size_t i, std::size_t j) -> scalar_t {
-              return F11(i, j); },
-            piv_, opts.BLR_options());
+              return F11(i, j); }, piv_, opts.BLR_options());
       else
         F11blr_ = BLRM_t
           (sep_tiles_, [&](std::size_t i, std::size_t j) -> bool {

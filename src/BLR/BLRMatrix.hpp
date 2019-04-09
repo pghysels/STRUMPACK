@@ -211,6 +211,12 @@ namespace strumpack {
       LRTile(std::size_t m, std::size_t n,
              const std::function<scalar_t(std::size_t,std::size_t)>& Telem,
              const Opts_t& opts) {
+        // DenseM_t temp(m, n);
+        // for (std::size_t j=0; j<n; j++)
+        //   for (std::size_t i=0; i<m; i++)
+        //     temp(i, j) = Telem(i, j);
+        // temp.low_rank(U_, V_, opts.rel_tol(), opts.abs_tol(), opts.max_rank(),
+        //               params::task_recursion_cutoff_level);
         adaptive_cross_approximation<scalar_t>
           (U_, V_, m, n, Telem, opts.rel_tol(), opts.abs_tol(),
            opts.max_rank());
@@ -391,11 +397,11 @@ namespace strumpack {
         assert(rowblocks() == colblocks());
         piv.resize(rows());
         auto rb = rowblocks();
-        for (std::size_t i=0; i<rowblocks(); i++) {
+        for (std::size_t i=0; i<rb; i++) {
           create_dense_tile_left_looking(i, i, Aelem);
           auto tpiv = tile(i, i).LU();
           std::copy(tpiv.begin(), tpiv.end(), piv.begin()+tileroff(i));
-          for (std::size_t j=i+1; j<rowblocks(); j++) {
+          for (std::size_t j=i+1; j<rb; j++) {
             if (admissible(i, j))
               create_LR_tile_left_looking(i, j, Aelem, opts);
             else create_dense_tile_left_looking(i, j, Aelem);
@@ -405,14 +411,15 @@ namespace strumpack {
             tile(i, j).laswp(tpiv, true);
             trsm(Side::L, UpLo::L, Trans::N, Diag::U,
                  scalar_t(1.), tile(i, i), tile(i, j));
-            if (admissible(j, i)) create_LR_tile_left_looking(j, i, Aelem, opts);
+            if (admissible(j, i))
+              create_LR_tile_left_looking(j, i, Aelem, opts);
             else create_dense_tile_left_looking(j, i, Aelem);
             // solve with U, the blocks under the diagonal block
             trsm(Side::R, UpLo::U, Trans::N, Diag::N,
                  scalar_t(1.), tile(i, i), tile(j, i));
           }
         }
-        for (std::size_t i=0; i<rowblocks(); i++)
+        for (std::size_t i=0; i<rb; i++)
           for (std::size_t l=tileroff(i); l<tileroff(i+1); l++)
             piv[l] += tileroff(i);
       }
@@ -629,7 +636,7 @@ namespace strumpack {
        const std::function<scalar_t(std::size_t,std::size_t)>& Aelem) {
         create_dense_tile(i, j, Aelem);
         for (std::size_t k=0; k<std::min(i, j); k++)
-          gemm(Trans::N, Trans::N, scalar_t(1.), tile(i, k), tile(k, j),
+          gemm(Trans::N, Trans::N, scalar_t(-1.), tile(i, k), tile(k, j),
                scalar_t(1.), tile(i, j).D());
       }
 
@@ -650,14 +657,14 @@ namespace strumpack {
           scalar_t eij = Aelem(tileroff(i) + ii, tilecoff(j) + jj);
           // left looking Schur update
           for (std::size_t k=0; k<std::min(i, j); k++)
-            eij += get_from_Schur_update(ii, jj, tile(i, k), tile(k, j));
+            eij -= get_from_Schur_update(ii, jj, tile(i, k), tile(k, j));
           return eij;
         };
         block(i, j) = std::unique_ptr<LRTile<scalar_t>>
           (new LRTile<scalar_t>(tilerows(i), tilecols(j), e, opts));
         auto& t = tile(i, j);
         if (t.rank()*(t.rows() + t.cols()) > t.rows()*t.cols())
-          create_dense_tile(i, j, Aelem);
+          create_dense_tile_left_looking(i, j, Aelem);
       }
 
       template<typename T> friend void
