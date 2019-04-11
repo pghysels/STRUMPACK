@@ -27,483 +27,25 @@
  *
  */
 /*! \file BLRMatrix.hpp
- * \brief For Pieter to complete
+ * \brief Contains the BLRMatrix class.
  */
 #ifndef BLR_MATRIX_HPP
 #define BLR_MATRIX_HPP
 
 #include <cassert>
-
-#include "../dense/DenseMatrix.hpp"
-#include "../dense/ACA.hpp"
-#include "BLROptions.hpp"
+#include <memory>
+#include <functional>
+#include "BLRTileBLAS.hpp"
 
 namespace strumpack {
   namespace BLR {
-
-    // forward declarations
-    template<typename scalar_t> class LRTile;
-    template<typename scalar_t> class DenseTile;
-
-
-    template<typename scalar_t> class BLRTile {
-      using DenseM_t = DenseMatrix<scalar_t>;
-
-    public:
-      virtual ~BLRTile() = default;
-
-      virtual std::size_t rows() const = 0;
-      virtual std::size_t cols() const = 0;
-      virtual std::size_t rank() const = 0;
-
-      virtual std::size_t memory() const = 0;
-      virtual std::size_t nonzeros() const = 0;
-      virtual std::size_t maximum_rank() const = 0;
-      virtual bool is_low_rank() const = 0;
-      virtual void dense(DenseM_t& A) const = 0;
-
-      virtual void draw
-      (std::ostream& of, std::size_t roff, std::size_t coff) const = 0;
-
-      virtual DenseM_t& D() = 0; //{ assert(false); }
-      virtual DenseM_t& U() = 0; //{ assert(false); }
-      virtual DenseM_t& V() = 0; //{ assert(false); }
-      virtual const DenseM_t& D() const = 0; //{ assert(false); }
-      virtual const DenseM_t& U() const = 0; //{ assert(false); }
-      virtual const DenseM_t& V() const = 0; //{ assert(false); }
-
-      virtual std::vector<int> LU() { assert(false); return std::vector<int>(); };
-      virtual void laswp(const std::vector<int>& piv, bool fwd) = 0;
-
-      virtual void trsm_b(Side s, UpLo ul, Trans ta, Diag d,
-                          scalar_t alpha, const DenseM_t& a) = 0;
-      virtual void gemv_a(Trans ta, scalar_t alpha, const DenseM_t& x,
-                          scalar_t beta, DenseM_t& y) const = 0;
-      virtual void gemm_a(Trans ta, Trans tb, scalar_t alpha,
-                          const BLRTile<scalar_t>& b, scalar_t beta,
-                          DenseM_t& c) const = 0;
-      virtual void gemm_a(Trans ta, Trans tb, scalar_t alpha,
-                          const DenseM_t& b, scalar_t beta,
-                          DenseM_t& c, int task_depth) const = 0;
-      virtual void gemm_b(Trans ta, Trans tb, scalar_t alpha,
-                          const LRTile<scalar_t>& a, scalar_t beta,
-                          DenseM_t& c) const = 0;
-      virtual void gemm_b(Trans ta, Trans tb, scalar_t alpha,
-                          const DenseTile<scalar_t>& a, scalar_t beta,
-                          DenseM_t& c) const = 0;
-      virtual void gemm_b(Trans ta, Trans tb, scalar_t alpha,
-                          const DenseM_t& a, scalar_t beta,
-                          DenseM_t& c, int task_depth) const = 0;
-
-      virtual void Schur_update_col_a
-      (std::size_t i, const BLRTile<scalar_t>& b, scalar_t* c, int incc)
-        const = 0;
-      virtual void Schur_update_row_a
-      (std::size_t i, const BLRTile<scalar_t>& b, scalar_t* c, int incc)
-        const = 0;
-      virtual void Schur_update_col_b
-      (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c, int incc)
-        const = 0;
-      virtual void Schur_update_col_b
-      (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c, int incc)
-        const = 0;
-      virtual void Schur_update_row_b
-      (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c, int incc)
-        const = 0;
-      virtual void Schur_update_row_b
-      (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c, int incc)
-        const = 0;
-    };
-
-
-    template<typename scalar_t> class DenseTile
-      : public BLRTile<scalar_t> {
-      using DenseM_t = DenseMatrix<scalar_t>;
-      using DenseMW_t = DenseMatrixWrapper<scalar_t>;
-      using BLRT_t = BLRTile<scalar_t>;
-
-    public:
-      DenseTile(std::size_t m, std::size_t n) : D_(m, n) {}
-      DenseTile(const DenseM_t& D) : D_(D) {}
-
-      std::size_t rows() const override { return D_.rows(); }
-      std::size_t cols() const override { return D_.cols(); }
-      std::size_t rank() const override { return std::min(rows(), cols()); }
-
-      std::size_t memory() const override { return D_.memory(); }
-      std::size_t nonzeros() const override { return D_.nonzeros(); }
-      std::size_t maximum_rank() const override { return 0; }
-      bool is_low_rank() const override { return false; };
-
-      void dense(DenseM_t& A) const override { A = D_; }
-
-      void draw
-      (std::ostream& of, std::size_t roff, std::size_t coff) const override {
-        char prev = std::cout.fill('0');
-        of << "set obj rect from "
-           << roff << ", " << coff << " to "
-           << roff+rows() << ", " << coff+cols()
-           << " fc rgb '#FF0000'" << std::endl;
-        std::cout.fill(prev);
-      }
-
-      DenseM_t& D() override { return D_; }
-      const DenseM_t& D() const override { return D_; }
-
-      DenseM_t& U() override { assert(false); return D_; }
-      DenseM_t& V() override { assert(false); return D_; }
-      const DenseM_t& U() const override { assert(false); return D_; }
-      const DenseM_t& V() const override { assert(false); return D_; }
-
-      std::vector<int> LU() override {
-        return D_.LU(params::task_recursion_cutoff_level);
-      }
-      void laswp(const std::vector<int>& piv, bool fwd) override {
-        D_.laswp(piv, fwd);
-      }
-
-      void trsm_b(Side s, UpLo ul, Trans ta, Diag d,
-                  scalar_t alpha, const DenseM_t& a) override {
-        trsm(s, ul, ta, d, alpha, a, D_, params::task_recursion_cutoff_level);
-      }
-      void gemv_a(Trans ta, scalar_t alpha, const DenseM_t& x,
-                  scalar_t beta, DenseM_t& y) const override {
-        gemv(ta, alpha, D_, x, beta, y,
-             params::task_recursion_cutoff_level);
-      }
-      void gemm_a(Trans ta, Trans tb, scalar_t alpha, const BLRT_t& b,
-                  scalar_t beta, DenseM_t& c) const override {
-        b.gemm_b(ta, tb, alpha, *this, beta, c);
-      }
-      void gemm_a(Trans ta, Trans tb, scalar_t alpha,
-                  const DenseM_t& b, scalar_t beta,
-                  DenseM_t& c, int task_depth) const override {
-        gemm(ta, tb, alpha, D_, b, beta, c, task_depth);
-      }
-      void gemm_b(Trans ta, Trans tb, scalar_t alpha,
-                  const LRTile<scalar_t>& a, scalar_t beta,
-                  DenseM_t& c) const override {
-        DenseM_t tmp(a.rank(), tb==Trans::N ? cols() : rows());
-        gemm(ta, tb, scalar_t(1.), ta==Trans::N ? a.V() : a.U(), D_,
-             scalar_t(0.), tmp, params::task_recursion_cutoff_level);
-        gemm(ta, Trans::N, alpha, ta==Trans::N ? a.U() : a.V(), tmp,
-             beta, c, params::task_recursion_cutoff_level);
-      }
-      void gemm_b(Trans ta, Trans tb, scalar_t alpha,
-                  const DenseTile<scalar_t>& a, scalar_t beta,
-                  DenseM_t& c) const override {
-        gemm(ta, tb, alpha, a.D(), D(), beta, c);
-      }
-      void gemm_b(Trans ta, Trans tb, scalar_t alpha,
-                  const DenseM_t& a, scalar_t beta,
-                  DenseM_t& c, int task_depth) const override {
-        gemm(ta, tb, alpha, a, D_, beta, c, task_depth);
-      }
-
-      void Schur_update_col_a
-      (std::size_t i, const BLRTile<scalar_t>& b, scalar_t* c, int incc)
-        const override {
-        b.Schur_update_col_b(i, *this, c, incc);
-      }
-      virtual void Schur_update_row_a
-      (std::size_t i, const BLRTile<scalar_t>& b, scalar_t* c, int incc)
-        const override {
-        b.Schur_update_row_b(i, *this, c, incc);
-      }
-
-      virtual void Schur_update_col_b
-      (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c, int incc)
-        const override {
-        DenseM_t temp(a.rank(), 1);
-        gemv(Trans::N, scalar_t(1.), a.V(), D_.ptr(0, i), 1,
-             scalar_t(0.), temp, params::task_recursion_cutoff_level);
-        gemv(Trans::N, scalar_t(-1.), a.U(), temp,
-             scalar_t(1.), c, incc, params::task_recursion_cutoff_level);
-      }
-      virtual void Schur_update_col_b
-      (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c, int incc)
-        const override {
-        gemv(Trans::N, scalar_t(-1.), a.D(), D_.ptr(0, i), 1,
-             scalar_t(1.), c, incc, params::task_recursion_cutoff_level);
-      }
-      virtual void Schur_update_row_b
-      (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c, int incc)
-        const override {
-        DenseM_t temp(1, a.cols());
-        gemv(Trans::C, scalar_t(1.), a.V(), a.U().ptr(i, 0), a.U().ld(),
-             scalar_t(0.), temp.data(), temp.ld(),
-             params::task_recursion_cutoff_level);
-        gemv(Trans::C, scalar_t(-1.), D_, temp.data(), temp.ld(),
-             scalar_t(1.), c, incc, params::task_recursion_cutoff_level);
-      }
-      virtual void Schur_update_row_b
-      (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c, int incc)
-        const override {
-        gemv(Trans::C, scalar_t(-1.), D_, a.D().ptr(i, 0), a.D().ld(),
-             scalar_t(1), c, incc, params::task_recursion_cutoff_level);
-      }
-
-    private:
-      DenseM_t D_;
-    };
-
-
-    /**
-     * Low rank U*V tile
-     */
-    template<typename scalar_t> class LRTile
-      : public BLRTile<scalar_t> {
-      using DenseM_t = DenseMatrix<scalar_t>;
-      using DenseMW_t = DenseMatrixWrapper<scalar_t>;
-      using Opts_t = BLROptions<scalar_t>;
-
-    public:
-      LRTile(const DenseM_t& T, const Opts_t& opts) {
-        if (opts.low_rank_algorithm() == LowRankAlgorithm::RRQR) {
-          T.low_rank(U_, V_, opts.rel_tol(), opts.abs_tol(), opts.max_rank(),
-                     params::task_recursion_cutoff_level);
-        } else if (opts.low_rank_algorithm() == LowRankAlgorithm::ACA) {
-          adaptive_cross_approximation<scalar_t>
-            (U_, V_, T.rows(), T.cols(),
-             [&](std::size_t i, std::size_t j) -> scalar_t {
-              assert(i < T.rows());
-              assert(j < T.cols());
-              return T(i, j); },
-             opts.rel_tol(), opts.abs_tol(), opts.max_rank());
-        }
-      }
-      LRTile(std::size_t m, std::size_t n,
-             const std::function<scalar_t(std::size_t,std::size_t)>& Telem,
-             const Opts_t& opts) {
-        // DenseM_t temp(m, n);
-        // for (std::size_t j=0; j<n; j++)
-        //   for (std::size_t i=0; i<m; i++)
-        //     temp(i, j) = Telem(i, j);
-        // temp.low_rank(U_, V_, opts.rel_tol(), opts.abs_tol(), opts.max_rank(),
-        //               params::task_recursion_cutoff_level);
-        adaptive_cross_approximation<scalar_t>
-          (U_, V_, m, n, Telem, opts.rel_tol(), opts.abs_tol(),
-           opts.max_rank());
-      }
-      LRTile(std::size_t m, std::size_t n,
-             const std::function<void(std::size_t,scalar_t*,int)>& Trow,
-             const std::function<void(std::size_t,scalar_t*,int)>& Tcol,
-             const Opts_t& opts) {
-        adaptive_cross_approximation<scalar_t>
-          (U_, V_, m, n, Trow, Tcol, opts.rel_tol(), opts.abs_tol(),
-           opts.max_rank());
-      }
-
-      std::size_t rows() const override { return U_.rows(); }
-      std::size_t cols() const override { return V_.cols(); }
-      std::size_t rank() const override { return U_.cols(); }
-      bool is_low_rank() const override { return true; };
-
-      std::size_t memory() const override { return U_.memory() + V_.memory(); }
-      std::size_t nonzeros() const override { return U_.nonzeros() + V_.nonzeros(); }
-      std::size_t maximum_rank() const override { return U_.cols(); }
-
-      void dense(DenseM_t& A) const override {
-        gemm(Trans::N, Trans::N, scalar_t(1.), U_, V_, scalar_t(0.), A,
-             params::task_recursion_cutoff_level);
-      }
-
-      void draw
-      (std::ostream& of, std::size_t roff, std::size_t coff) const override {
-        char prev = std::cout.fill('0');
-        int minmn = std::min(rows(), cols());
-        int red = std::floor(255.0 * rank() / minmn);
-        int blue = 255 - red;
-        of << "set obj rect from "
-           << roff << ", " << coff << " to "
-           << roff+rows() << ", " << coff+cols()
-           << " fc rgb '#"
-           << std::hex << std::setw(2) << std::setfill('0') << red
-           << "00" << std::setw(2)  << std::setfill('0') << blue
-           << "'" << std::dec << std::endl;
-        std::cout.fill(prev);
-      }
-
-      DenseM_t& D() override { assert(false); return U_; }
-      DenseM_t& U() override { return U_; }
-      DenseM_t& V() override { return V_; }
-      const DenseM_t& D() const override { assert(false); return U_; }
-      const DenseM_t& U() const override { return U_; }
-      const DenseM_t& V() const override { return V_; }
-
-      void laswp(const std::vector<int>& piv, bool fwd) override {
-        U_.laswp(piv, fwd);
-      }
-
-      void trsm_b(Side s, UpLo ul, Trans ta, Diag d,
-                  scalar_t alpha, const DenseM_t& a) override {
-        strumpack::trsm
-          (s, ul, ta, d, alpha, a, (s == Side::L) ? U_ : V_,
-           params::task_recursion_cutoff_level);
-      }
-      void gemv_a(Trans ta, scalar_t alpha, const DenseM_t& x,
-                  scalar_t beta, DenseM_t& y) const override {
-        DenseM_t tmp(rank(), x.cols());
-        gemv(ta, scalar_t(1.), ta==Trans::N ? V() : U(), x, scalar_t(0.), tmp,
-             params::task_recursion_cutoff_level);
-        gemv(ta, alpha, ta==Trans::N ? U() : V(), tmp, beta, y,
-             params::task_recursion_cutoff_level);
-      }
-      void gemm_a(Trans ta, Trans tb, scalar_t alpha,
-                  const BLRTile<scalar_t>& b,
-                  scalar_t beta, DenseM_t& c) const override {
-        b.gemm_b(ta, tb, alpha, *this, beta, c);
-      }
-      void gemm_a(Trans ta, Trans tb, scalar_t alpha,
-                  const DenseM_t& b, scalar_t beta,
-                  DenseM_t& c, int task_depth) const override {
-        DenseM_t tmp(rank(), c.cols());
-        gemm(ta, tb, scalar_t(1.), ta==Trans::N ? V() : U(), b,
-             scalar_t(0.), tmp, task_depth);
-        gemm(ta, Trans::N, alpha, ta==Trans::N ? U() : V(), tmp,
-             beta, c, task_depth);
-      }
-      void gemm_b(Trans ta, Trans tb, scalar_t alpha,
-                  const LRTile<scalar_t>& a, scalar_t beta,
-                  DenseM_t& c) const override {
-        DenseM_t tmp1(a.rank(), rank());
-        gemm(ta, tb, scalar_t(1.), ta==Trans::N ? a.V() : a.U(),
-             tb==Trans::N ? U() : V(), scalar_t(0.), tmp1,
-             params::task_recursion_cutoff_level);
-        DenseM_t tmp2(c.rows(), tmp1.cols());
-        gemm(ta, Trans::N, scalar_t(1.), ta==Trans::N ? a.U() : a.V(), tmp1,
-             scalar_t(0.), tmp2, params::task_recursion_cutoff_level);
-        gemm(Trans::N, tb, alpha, tmp2, tb==Trans::N ? V() : U(),
-             beta, c, params::task_recursion_cutoff_level);
-      }
-      void gemm_b(Trans ta, Trans tb, scalar_t alpha,
-                  const DenseTile<scalar_t>& a, scalar_t beta,
-                  DenseM_t& c) const override {
-        gemm_b(ta, tb, alpha, a.D(), beta, c,
-               params::task_recursion_cutoff_level);
-      }
-      void gemm_b(Trans ta, Trans tb, scalar_t alpha,
-                  const DenseM_t& a, scalar_t beta,
-                  DenseM_t& c, int task_depth) const override {
-        DenseM_t tmp(c.rows(), rank());
-        gemm(ta, tb, scalar_t(1.), a, tb==Trans::N ? U() : V(),
-             scalar_t(0.), tmp, task_depth);
-        gemm(Trans::N, tb, alpha, tmp, tb==Trans::N ? V() : U(),
-             beta, c, task_depth);
-      }
-
-      void Schur_update_col_a
-      (std::size_t i, const BLRTile<scalar_t>& b, scalar_t* c, int incc)
-        const override {
-        b.Schur_update_col_b(i, *this, c, incc);
-      }
-      virtual void Schur_update_row_a
-      (std::size_t i, const BLRTile<scalar_t>& b, scalar_t* c, int incc)
-        const override {
-        b.Schur_update_row_b(i, *this, c, incc);
-      }
-
-      virtual void Schur_update_col_b
-      (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c, int incc)
-        const override {
-        DenseM_t temp1(rows(), 1), temp2(a.rank(), 1);
-        gemv(Trans::N, scalar_t(1.), U_, V_.ptr(0, i), 1,
-             scalar_t(0.), temp1, params::task_recursion_cutoff_level);
-        gemv(Trans::N, scalar_t(1.), a.V(), temp1, scalar_t(0.), temp2,
-             params::task_recursion_cutoff_level);
-        gemv(Trans::N, scalar_t(-1.), a.U(), temp2, scalar_t(1.), c, incc,
-             params::task_recursion_cutoff_level);
-      }
-      virtual void Schur_update_col_b
-      (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c, int incc)
-        const override {
-        DenseM_t temp(rows(), 1);
-        gemv(Trans::N, scalar_t(1.), U_, V_.ptr(0, i), 1,
-             scalar_t(0.), temp, params::task_recursion_cutoff_level);
-        gemv(Trans::N, scalar_t(-1.), a.D(), temp, scalar_t(1.), c, incc,
-             params::task_recursion_cutoff_level);
-      }
-      virtual void Schur_update_row_b
-      (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c, int incc)
-        const override {
-        DenseM_t temp1(1, a.cols()), temp2(1, rank());
-        gemv(Trans::C, scalar_t(1.), a.V(), a.U().ptr(i, 0), a.U().ld(),
-             scalar_t(0.), temp1.data(), temp1.ld(),
-             params::task_recursion_cutoff_level);
-        gemv(Trans::C, scalar_t(1.), U_, temp1.data(), temp1.ld(),
-             scalar_t(0.), temp2.data(), temp2.ld(),
-             params::task_recursion_cutoff_level);
-        gemv(Trans::C, scalar_t(-1.), V_, temp2.data(), temp2.ld(),
-             scalar_t(1.), c, incc, params::task_recursion_cutoff_level);
-      }
-      virtual void Schur_update_row_b
-      (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c, int incc)
-        const override {
-        DenseM_t temp(1, rank());
-        gemv(Trans::C, scalar_t(1.), U(), a.D().ptr(i, 0), a.D().ld(),
-             scalar_t(0.), temp.data(), temp.ld(),
-             params::task_recursion_cutoff_level);
-        gemv(Trans::C, scalar_t(-1.), V(), temp.data(), temp.ld(),
-             scalar_t(1.), c, incc, params::task_recursion_cutoff_level);
-      }
-
-    private:
-      DenseM_t U_, V_;
-    };
-
-
-    template<typename scalar_t> void
-    gemm(Trans ta, Trans tb, scalar_t alpha, const BLRTile<scalar_t>& a,
-         const BLRTile<scalar_t>& b, scalar_t beta,
-         DenseMatrix<scalar_t>& c) {
-      a.gemm_a(ta, tb, alpha, b, beta, c);
-    }
-
-    template<typename scalar_t> void
-    gemm(Trans ta, Trans tb, scalar_t alpha, const DenseMatrix<scalar_t>& a,
-         const BLRTile<scalar_t>& b, scalar_t beta,
-         DenseMatrix<scalar_t>& c, int task_depth) {
-      b.gemm_b(ta, tb, alpha, a, beta, c);
-    }
-
-    template<typename scalar_t> void
-    gemm(Trans ta, Trans tb, scalar_t alpha, const BLRTile<scalar_t>& a,
-         const DenseMatrix<scalar_t>& b, scalar_t beta,
-         DenseMatrix<scalar_t>& c, int task_depth) {
-      a.gemm_a(ta, tb, alpha, b, beta, c, task_depth);
-    }
-
-    template<typename scalar_t> void
-    trsm(Side s, UpLo ul, Trans ta, Diag d, scalar_t alpha,
-         const BLRTile<scalar_t>& a, BLRTile<scalar_t>& b) {
-      b.trsm_b(s, ul, ta, d, alpha, a.D());
-    }
-
-    template<typename scalar_t> void
-    trsm(Side s, UpLo ul, Trans ta, Diag d, scalar_t alpha,
-         const BLRTile<scalar_t>& a, DenseMatrix<scalar_t>& b,
-         int task_depth) {
-      trsm(s, ul, ta, d, alpha, a.D(), b, task_depth);
-    }
-
-
-    template<typename scalar_t> void Schur_update_col
-    (std::size_t j, const BLRTile<scalar_t>& a, const BLRTile<scalar_t>& b,
-     scalar_t* c, int incc) {
-      a.Schur_update_col_a(j, b, c, incc);
-    }
-
-    template<typename scalar_t> void Schur_update_row
-    (std::size_t i, const BLRTile<scalar_t>& a, const BLRTile<scalar_t>& b,
-     scalar_t* c, int incc) {
-      a.Schur_update_row_a(i, b, c, incc);
-    }
-
 
     template<typename scalar_t> class BLRMatrix {
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using Opts_t = BLROptions<scalar_t>;
+      using adm_t = std::function<bool(std::size_t,std::size_t)>;
+      using elem_t = std::function<scalar_t(std::size_t,std::size_t)>;
 
     public:
       BLRMatrix() {}
@@ -511,194 +53,28 @@ namespace strumpack {
       BLRMatrix(DenseM_t& A,
                 const std::vector<std::size_t>& rowtiles,
                 const std::vector<std::size_t>& coltiles,
-                const Opts_t& opts)
-        : BLRMatrix<scalar_t>(A.rows(), rowtiles, A.cols(), coltiles) {
-        for (std::size_t j=0; j<colblocks(); j++)
-          for (std::size_t i=0; i<rowblocks(); i++)
-            block(i, j) = std::unique_ptr<BLRTile<scalar_t>>
-              (new LRTile<scalar_t>(tile(A, i, j), opts));
-      }
+                const Opts_t& opts);
 
       BLRMatrix(std::size_t n, const std::vector<std::size_t>& tiles,
-                const std::function<bool(std::size_t,std::size_t)>& admissible,
-                const std::function<scalar_t(std::size_t,std::size_t)>& Aelem,
-                std::vector<int>& piv, const Opts_t& opts)
-        : BLRMatrix<scalar_t>(n, tiles, n, tiles) {
-        assert(rowblocks() == colblocks());
-        piv.resize(rows());
-        auto rb = rowblocks();
-        for (std::size_t i=0; i<rb; i++) {
-          create_dense_tile_left_looking(i, i, Aelem);
-          auto tpiv = tile(i, i).LU();
-          std::copy(tpiv.begin(), tpiv.end(), piv.begin()+tileroff(i));
-          for (std::size_t j=i+1; j<rb; j++) {
-            if (admissible(i, j))
-              create_LR_tile_left_looking(i, j, Aelem, opts);
-            else create_dense_tile_left_looking(i, j, Aelem);
-            // permute and solve with L, blocks right from the diagonal block
-            std::vector<int> tpiv
-              (piv.begin()+tileroff(i), piv.begin()+tileroff(i+1));
-            tile(i, j).laswp(tpiv, true);
-            trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-                 scalar_t(1.), tile(i, i), tile(i, j));
-            if (admissible(j, i))
-              create_LR_tile_left_looking(j, i, Aelem, opts);
-            else create_dense_tile_left_looking(j, i, Aelem);
-            // solve with U, the blocks under the diagonal block
-            trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-                 scalar_t(1.), tile(i, i), tile(j, i));
-          }
-        }
-        for (std::size_t i=0; i<rb; i++)
-          for (std::size_t l=tileroff(i); l<tileroff(i+1); l++)
-            piv[l] += tileroff(i);
-      }
+                const adm_t& admissible, const elem_t& Aelem,
+                std::vector<int>& piv, const Opts_t& opts);
 
       BLRMatrix(const std::vector<std::size_t>& tiles,
-                const std::function<bool(std::size_t,std::size_t)>& admissible,
-                DenseM_t& A, std::vector<int>& piv, const Opts_t& opts)
-        : BLRMatrix<scalar_t>(A.rows(), tiles, A.cols(), tiles) {
-        assert(rowblocks() == colblocks());
-        piv.resize(rows());
-        auto rb = rowblocks();
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-        auto B = new int[rb*rb](); // dummy for task synchronization
-#pragma omp taskgroup
-#endif
-        {
-          for (std::size_t i=0; i<rowblocks(); i++) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-            std::size_t ii = i+rb*i;
-#pragma omp task default(shared) firstprivate(i,ii) depend(inout:B[ii])
-#endif
-            {
-              create_dense_tile(i, i, A);
-              auto tpiv = tile(i, i).LU();
-              std::copy(tpiv.begin(), tpiv.end(), piv.begin()+tileroff(i));
-            }
-            for (std::size_t j=i+1; j<rowblocks(); j++) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t ij = i+rb*j;
-#pragma omp task default(shared) firstprivate(i,j,ii,ij)        \
-  depend(in:B[ii]) depend(inout:B[ij])
-#endif
-              { // these blocks have received all updates, compress now
-                if (admissible(i, j)) create_LR_tile(i, j, A, opts);
-                else create_dense_tile(i, j, A);
-                // permute and solve with L, blocks right from the diagonal block
-                std::vector<int> tpiv
-                  (piv.begin()+tileroff(i), piv.begin()+tileroff(i+1));
-                tile(i, j).laswp(tpiv, true);
-                trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-                     scalar_t(1.), tile(i, i), tile(i, j));
-              }
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t ji = j+rb*i;
-#pragma omp task default(shared) firstprivate(i,j,ji,ii)        \
-  depend(in:B[ii]) depend(inout:B[ji])
-#endif
-              {
-                if (admissible(j, i)) create_LR_tile(j, i, A, opts);
-                else create_dense_tile(j, i, A);
-                // solve with U, the blocks under the diagonal block
-                trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-                     scalar_t(1.), tile(i, i), tile(j, i));
-              }
-            }
-            for (std::size_t j=i+1; j<colblocks(); j++)
-              for (std::size_t k=i+1; k<rowblocks(); k++) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                std::size_t ij = i+rb*j, ki = k+rb*i, kj = k+rb*j;
-#pragma omp task default(shared) firstprivate(i,j,k,ij,ki,kj)   \
-  depend(in:B[ij],B[ki]) depend(inout:B[kj])
-#endif
-                { // Schur complement updates, always into full rank
-                  DenseMW_t Akj = tile(A, k, j);
-                  gemm(Trans::N, Trans::N, scalar_t(-1.),
-                       tile(k, i), tile(i, j), scalar_t(1.), Akj);
-                }
-              }
-          }
-        }
-        for (std::size_t i=0; i<rowblocks(); i++)
-          for (std::size_t l=tileroff(i); l<tileroff(i+1); l++)
-            piv[l] += tileroff(i);
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-        delete[] B;
-#endif
-      }
+                const adm_t& admissible, DenseM_t& A,
+                std::vector<int>& piv, const Opts_t& opts);
 
       std::size_t rows() const { return m_; }
       std::size_t cols() const { return n_; }
 
-      std::size_t memory() const {
-        std::size_t mem = 0;
-        for (auto& b : blocks_) mem += b->memory();
-        return mem;
-      }
-      std::size_t nonzeros() const {
-        std::size_t nnz = 0;
-        for (auto& b : blocks_) nnz += b->nonzeros();
-        return nnz;
-      }
-      std::size_t maximum_rank() const {
-        std::size_t mrank = 0;
-        for (auto& b : blocks_) mrank = std::max(mrank, b->maximum_rank());
-        return mrank;
-      }
+      std::size_t memory() const;
+      std::size_t nonzeros() const;
+      std::size_t maximum_rank() const;
 
-      DenseM_t dense() const {
-        DenseM_t A(rows(), cols());
-        auto cb = colblocks();
-        auto rb = rowblocks();
-#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
-#pragma omp taskloop collapse(2) default(shared)
-#endif
-        for (std::size_t j=0; j<cb; j++)
-          for (std::size_t i=0; i<rb; i++) {
-            DenseMW_t Aij = tile(A, i, j);
-            tile(i, j).dense(Aij);
-          }
-        return A;
-      }
+      DenseM_t dense() const;
 
-      void draw(std::ostream& of, std::size_t roff, std::size_t coff) const {
-        auto cb = colblocks();
-        auto rb = rowblocks();
-#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
-#pragma omp taskloop collapse(2) default(shared)
-#endif
-        for (std::size_t j=0; j<cb; j++)
-          for (std::size_t i=0; i<rb; i++) {
-            tile(i, j).draw(of, roff+tileroff(i), coff+tilecoff(j));
-          }
-      }
+      void draw(std::ostream& of, std::size_t roff, std::size_t coff) const;
 
-      void solve(std::vector<int>& piv, const DenseM_t& b) const {
-        // TODO test this
-        // b.laswp(piv, true);
-        // trsm();
-        // trsm();
-      }
-
-      void print(const std::string& name) {
-        std::cout << "BLR(" << name << ")="
-                  << rows() << "x" << cols() << ", "
-                  << rowblocks() << "x" << colblocks() << ", "
-                  << (float(nonzeros()) / (rows()*cols()) * 100.) << "%"
-                  << " [" << std::endl;
-        for (std::size_t i=0; i<nbrows_; i++) {
-          for (std::size_t j=0; j<nbcols_; j++) {
-            auto& tij = tile(i, j);
-            if (tij.is_low_rank())
-              std::cout << "LR:" << tij.rows() << "x"
-                        << tij.cols() << "/" << tij.rank() << " ";
-            else std::cout << "D:" << tij.rows() << "x" << tij.cols() << " ";
-          }
-          std::cout << std::endl;
-        }
-        std::cout << "];" << std::endl;
-      }
+      void print(const std::string& name) const;
 
       std::size_t rowblocks() const { return nbrows_; }
       std::size_t colblocks() const { return nbcols_; }
@@ -713,96 +89,21 @@ namespace strumpack {
       std::vector<std::unique_ptr<BLRTile<scalar_t>>> blocks_;
 
       BLRMatrix(std::size_t m, const std::vector<std::size_t>& rowtiles,
-                std::size_t n, const std::vector<std::size_t>& coltiles)
-        : m_(m), n_(n) {
-        nbrows_ = rowtiles.size();
-        nbcols_ = coltiles.size();
-        roff_.resize(nbrows_+1);
-        coff_.resize(nbcols_+1);
-        for (std::size_t i=1; i<=nbrows_; i++)
-          roff_[i] = roff_[i-1] + rowtiles[i-1];
-        for (std::size_t j=1; j<=nbcols_; j++)
-          coff_[j] = coff_[j-1] + coltiles[j-1];
-        assert(roff_[nbrows_] == m_);
-        assert(coff_[nbcols_] == n_);
-        blocks_.resize(nbrows_ * nbcols_);
-      }
+                std::size_t n, const std::vector<std::size_t>& coltiles);
 
-      BLRTile<scalar_t>& tile(std::size_t i, std::size_t j) {
-        return *blocks_[i+j*rowblocks()].get();
-      }
-      const BLRTile<scalar_t>& tile(std::size_t i, std::size_t j) const {
-        return *blocks_[i+j*rowblocks()].get();
-      }
-      std::unique_ptr<BLRTile<scalar_t>>& block(std::size_t i, std::size_t j) {
-        return blocks_[i+j*rowblocks()];
-      }
-      DenseMW_t tile(DenseM_t& A, std::size_t i, std::size_t j) const {
-        return DenseMW_t
-          (tilerows(i), tilecols(j), A, tileroff(i), tilecoff(j));
-      }
+      BLRTile<scalar_t>& tile(std::size_t i, std::size_t j);
+      const BLRTile<scalar_t>& tile(std::size_t i, std::size_t j) const;
+      std::unique_ptr<BLRTile<scalar_t>>& block(std::size_t i, std::size_t j);
+      DenseMW_t tile(DenseM_t& A, std::size_t i, std::size_t j) const;
 
-      void create_dense_tile
-      (std::size_t i, std::size_t j, DenseM_t& A) {
-        block(i, j) = std::unique_ptr<DenseTile<scalar_t>>
-          (new DenseTile<scalar_t>(tile(A, i, j)));
-      }
-
-      void create_dense_tile
-      (std::size_t i, std::size_t j,
-       const std::function<scalar_t(std::size_t,std::size_t)>& Aelem) {
-        block(i, j) = std::unique_ptr<DenseTile<scalar_t>>
-          (new DenseTile<scalar_t>(tilerows(i), tilecols(j)));
-        auto& T = tile(i, j).D();
-        for (std::size_t jj=0; jj<tilecols(j); ++jj) {
-          auto jjj = tilecoff(j) + jj;
-          for (std::size_t ii=0; ii<tilerows(i); ++ii)
-            T(ii, jj) = Aelem(tileroff(i) + ii, jjj);
-        }
-      }
-
+      void create_dense_tile(std::size_t i, std::size_t j, DenseM_t& A);
+      void create_dense_tile(std::size_t i, std::size_t j, const elem_t& Aelem);
       void create_dense_tile_left_looking
-      (std::size_t i, std::size_t j,
-       const std::function<scalar_t(std::size_t,std::size_t)>& Aelem) {
-        create_dense_tile(i, j, Aelem);
-        for (std::size_t k=0; k<std::min(i, j); k++)
-          gemm(Trans::N, Trans::N, scalar_t(-1.), tile(i, k), tile(k, j),
-               scalar_t(1.), tile(i, j).D());
-      }
-
+      (std::size_t i, std::size_t j, const elem_t& Aelem);
       void create_LR_tile
-      (std::size_t i, std::size_t j, DenseM_t& A, const Opts_t& opts) {
-        block(i, j) = std::unique_ptr<LRTile<scalar_t>>
-          (new LRTile<scalar_t>(tile(A, i, j), opts));
-        auto& t = tile(i, j);
-        if (t.rank()*(t.rows() + t.cols()) > t.rows()*t.cols())
-          create_dense_tile(i, j, A);
-      }
-
+      (std::size_t i, std::size_t j, DenseM_t& A, const Opts_t& opts);
       void create_LR_tile_left_looking
-      (std::size_t i, std::size_t j,
-       const std::function<scalar_t(std::size_t,std::size_t)>& Aelem,
-       const Opts_t& opts) {
-        auto Arow = [&](std::size_t row, scalar_t* c, int incc) {
-          auto rr = tileroff(i) + row;
-          for (std::size_t col=0; col<tilecols(j); col++)
-            c[col*incc] = Aelem(rr, tilecoff(j) + col);
-          for (std::size_t k=0; k<std::min(i, j); k++)
-            Schur_update_row(row, tile(i, k), tile(k, j), c, incc);
-        };
-        auto Acol = [&](std::size_t col, scalar_t* c, int incc) {
-          auto cc = tilecoff(j) + col;
-          for (std::size_t row=0; row<tilerows(i); row++)
-            c[row*incc] = Aelem(tileroff(i) + row, cc);
-          for (std::size_t k=0; k<std::min(i, j); k++)
-            Schur_update_col(col, tile(i, k), tile(k, j), c, incc);
-        };
-        block(i, j) = std::unique_ptr<LRTile<scalar_t>>
-          (new LRTile<scalar_t>(tilerows(i), tilecols(j), Arow, Acol, opts));
-        auto& t = tile(i, j);
-        if (t.rank()*(t.rows() + t.cols()) > t.rows()*t.cols())
-          create_dense_tile_left_looking(i, j, Aelem);
-      }
+      (std::size_t i, std::size_t j, const elem_t& Aelem, const Opts_t& opts);
 
       template<typename T> friend void
       trsm(Side s, UpLo ul, Trans ta, Diag d, T alpha,
@@ -825,8 +126,7 @@ namespace strumpack {
       (DenseMatrix<T>& A11, DenseMatrix<T>& A12, DenseMatrix<T>& A21, DenseMatrix<T>& A22,
        BLRMatrix<T>& B11, std::vector<int>& piv, BLRMatrix<T>& B12, BLRMatrix<T>& B21,
        const std::vector<std::size_t>& tiles1, const std::vector<std::size_t>& tiles2,
-       const std::function<bool(std::size_t,std::size_t)>& admissible,
-       const BLROptions<T>& opts);
+       const adm_t& admissible, const BLROptions<T>& opts);
 
       template<typename T> friend void
       BLR_trsmLNU_gemm
@@ -837,6 +137,295 @@ namespace strumpack {
       (const BLRMatrix<T>& F1, const BLRMatrix<T>& F2,
        DenseMatrix<T>& B1, DenseMatrix<T>& B2, int task_depth);
     };
+
+
+    template<typename scalar_t> BLRMatrix<scalar_t>::BLRMatrix
+    (DenseM_t& A, const std::vector<std::size_t>& rowtiles,
+     const std::vector<std::size_t>& coltiles, const Opts_t& opts)
+      : BLRMatrix<scalar_t>(A.rows(), rowtiles, A.cols(), coltiles) {
+      for (std::size_t j=0; j<colblocks(); j++)
+        for (std::size_t i=0; i<rowblocks(); i++)
+          block(i, j) = std::unique_ptr<BLRTile<scalar_t>>
+            (new LRTile<scalar_t>(tile(A, i, j), opts));
+    }
+
+    template<typename scalar_t> BLRMatrix<scalar_t>::BLRMatrix
+    (std::size_t n, const std::vector<std::size_t>& tiles,
+     const adm_t& admissible, const elem_t& Aelem,
+     std::vector<int>& piv, const Opts_t& opts)
+      : BLRMatrix<scalar_t>(n, tiles, n, tiles) {
+      assert(rowblocks() == colblocks());
+      piv.resize(rows());
+      auto rb = rowblocks();
+      for (std::size_t i=0; i<rb; i++) {
+        create_dense_tile_left_looking(i, i, Aelem);
+        auto tpiv = tile(i, i).LU();
+        std::copy(tpiv.begin(), tpiv.end(), piv.begin()+tileroff(i));
+        for (std::size_t j=i+1; j<rb; j++) {
+          if (admissible(i, j))
+            create_LR_tile_left_looking(i, j, Aelem, opts);
+          else create_dense_tile_left_looking(i, j, Aelem);
+          // permute and solve with L, blocks right from the diagonal block
+          std::vector<int> tpiv
+            (piv.begin()+tileroff(i), piv.begin()+tileroff(i+1));
+          tile(i, j).laswp(tpiv, true);
+          trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+               scalar_t(1.), tile(i, i), tile(i, j));
+          if (admissible(j, i))
+            create_LR_tile_left_looking(j, i, Aelem, opts);
+          else create_dense_tile_left_looking(j, i, Aelem);
+          // solve with U, the blocks under the diagonal block
+          trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+               scalar_t(1.), tile(i, i), tile(j, i));
+        }
+      }
+      for (std::size_t i=0; i<rb; i++)
+        for (std::size_t l=tileroff(i); l<tileroff(i+1); l++)
+          piv[l] += tileroff(i);
+    }
+
+    template<typename scalar_t> BLRMatrix<scalar_t>::BLRMatrix
+    (const std::vector<std::size_t>& tiles, const adm_t& admissible,
+     DenseM_t& A, std::vector<int>& piv, const Opts_t& opts)
+      : BLRMatrix<scalar_t>(A.rows(), tiles, A.cols(), tiles) {
+      assert(rowblocks() == colblocks());
+      piv.resize(rows());
+      auto rb = rowblocks();
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+      // dummy for task synchronization
+      std::unique_ptr<int[]> B_(new int[rb*rb]); auto B = B_.get();
+#pragma omp taskgroup
+#endif
+      {
+        for (std::size_t i=0; i<rowblocks(); i++) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+          std::size_t ii = i+rb*i;
+#pragma omp task default(shared) firstprivate(i,ii) depend(inout:B[ii])
+#endif
+          {
+            create_dense_tile(i, i, A);
+            auto tpiv = tile(i, i).LU();
+            std::copy(tpiv.begin(), tpiv.end(), piv.begin()+tileroff(i));
+          }
+          for (std::size_t j=i+1; j<rowblocks(); j++) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+            std::size_t ij = i+rb*j;
+#pragma omp task default(shared) firstprivate(i,j,ii,ij)        \
+  depend(in:B[ii]) depend(inout:B[ij])
+#endif
+            { // these blocks have received all updates, compress now
+              if (admissible(i, j)) create_LR_tile(i, j, A, opts);
+              else create_dense_tile(i, j, A);
+              // permute and solve with L, blocks right from the diagonal block
+              std::vector<int> tpiv
+                (piv.begin()+tileroff(i), piv.begin()+tileroff(i+1));
+              tile(i, j).laswp(tpiv, true);
+              trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                   scalar_t(1.), tile(i, i), tile(i, j));
+            }
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+            std::size_t ji = j+rb*i;
+#pragma omp task default(shared) firstprivate(i,j,ji,ii)        \
+  depend(in:B[ii]) depend(inout:B[ji])
+#endif
+            {
+              if (admissible(j, i)) create_LR_tile(j, i, A, opts);
+              else create_dense_tile(j, i, A);
+              // solve with U, the blocks under the diagonal block
+              trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+                   scalar_t(1.), tile(i, i), tile(j, i));
+            }
+          }
+          for (std::size_t j=i+1; j<colblocks(); j++)
+            for (std::size_t k=i+1; k<rowblocks(); k++) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+              std::size_t ij = i+rb*j, ki = k+rb*i, kj = k+rb*j;
+#pragma omp task default(shared) firstprivate(i,j,k,ij,ki,kj)   \
+  depend(in:B[ij],B[ki]) depend(inout:B[kj])
+#endif
+              { // Schur complement updates, always into full rank
+                DenseMW_t Akj = tile(A, k, j);
+                gemm(Trans::N, Trans::N, scalar_t(-1.),
+                     tile(k, i), tile(i, j), scalar_t(1.), Akj);
+              }
+            }
+        }
+      }
+      for (std::size_t i=0; i<rowblocks(); i++)
+        for (std::size_t l=tileroff(i); l<tileroff(i+1); l++)
+          piv[l] += tileroff(i);
+    }
+
+    // private constructor
+    template<typename scalar_t> BLRMatrix<scalar_t>::BLRMatrix
+    (std::size_t m, const std::vector<std::size_t>& rowtiles,
+     std::size_t n, const std::vector<std::size_t>& coltiles)
+      : m_(m), n_(n) {
+      nbrows_ = rowtiles.size();
+      nbcols_ = coltiles.size();
+      roff_.resize(nbrows_+1);
+      coff_.resize(nbcols_+1);
+      for (std::size_t i=1; i<=nbrows_; i++)
+        roff_[i] = roff_[i-1] + rowtiles[i-1];
+      for (std::size_t j=1; j<=nbcols_; j++)
+        coff_[j] = coff_[j-1] + coltiles[j-1];
+      assert(roff_[nbrows_] == m_);
+      assert(coff_[nbcols_] == n_);
+      blocks_.resize(nbrows_ * nbcols_);
+    }
+
+    template<typename scalar_t> std::size_t
+    BLRMatrix<scalar_t>::memory() const {
+      std::size_t mem = 0;
+      for (auto& b : blocks_) mem += b->memory();
+      return mem;
+    }
+
+    template<typename scalar_t> std::size_t
+    BLRMatrix<scalar_t>::nonzeros() const {
+      std::size_t nnz = 0;
+      for (auto& b : blocks_) nnz += b->nonzeros();
+      return nnz;
+    }
+
+    template<typename scalar_t> std::size_t
+    BLRMatrix<scalar_t>::maximum_rank() const {
+      std::size_t mrank = 0;
+      for (auto& b : blocks_) mrank = std::max(mrank, b->maximum_rank());
+      return mrank;
+    }
+
+    template<typename scalar_t> DenseMatrix<scalar_t>
+    BLRMatrix<scalar_t>::dense() const {
+      DenseM_t A(rows(), cols());
+      auto cb = colblocks();
+      auto rb = rowblocks();
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp taskloop collapse(2) default(shared)
+#endif
+      for (std::size_t j=0; j<cb; j++)
+        for (std::size_t i=0; i<rb; i++) {
+          DenseMW_t Aij = tile(A, i, j);
+          tile(i, j).dense(Aij);
+        }
+      return A;
+    }
+
+    template<typename scalar_t> void BLRMatrix<scalar_t>::draw
+    (std::ostream& of, std::size_t roff, std::size_t coff) const {
+      auto cb = colblocks();
+      auto rb = rowblocks();
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp taskloop collapse(2) default(shared)
+#endif
+      for (std::size_t j=0; j<cb; j++)
+        for (std::size_t i=0; i<rb; i++) {
+          tile(i, j).draw(of, roff+tileroff(i), coff+tilecoff(j));
+        }
+    }
+
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::print(const std::string& name) const {
+      std::cout << "BLR(" << name << ")="
+                << rows() << "x" << cols() << ", "
+                << rowblocks() << "x" << colblocks() << ", "
+                << (float(nonzeros()) / (rows()*cols()) * 100.) << "%"
+                << " [" << std::endl;
+      for (std::size_t i=0; i<nbrows_; i++) {
+        for (std::size_t j=0; j<nbcols_; j++) {
+          auto& tij = tile(i, j);
+          if (tij.is_low_rank())
+            std::cout << "LR:" << tij.rows() << "x"
+                      << tij.cols() << "/" << tij.rank() << " ";
+          else std::cout << "D:" << tij.rows() << "x" << tij.cols() << " ";
+        }
+        std::cout << std::endl;
+      }
+      std::cout << "];" << std::endl;
+    }
+
+
+    template<typename scalar_t> BLRTile<scalar_t>&
+    BLRMatrix<scalar_t>::tile(std::size_t i, std::size_t j) {
+      return *blocks_[i+j*rowblocks()].get();
+    }
+
+    template<typename scalar_t> const BLRTile<scalar_t>&
+    BLRMatrix<scalar_t>::tile(std::size_t i, std::size_t j) const {
+      return *blocks_[i+j*rowblocks()].get();
+    }
+
+    template<typename scalar_t> std::unique_ptr<BLRTile<scalar_t>>&
+    BLRMatrix<scalar_t>::block(std::size_t i, std::size_t j) {
+      return blocks_[i+j*rowblocks()];
+    }
+
+    template<typename scalar_t> DenseMatrixWrapper<scalar_t>
+    BLRMatrix<scalar_t>::tile(DenseM_t& A, std::size_t i, std::size_t j) const {
+      return DenseMW_t
+        (tilerows(i), tilecols(j), A, tileroff(i), tilecoff(j));
+    }
+
+    template<typename scalar_t> void BLRMatrix<scalar_t>::create_dense_tile
+    (std::size_t i, std::size_t j, DenseM_t& A) {
+      block(i, j) = std::unique_ptr<DenseTile<scalar_t>>
+        (new DenseTile<scalar_t>(tile(A, i, j)));
+    }
+
+    template<typename scalar_t> void BLRMatrix<scalar_t>::create_dense_tile
+    (std::size_t i, std::size_t j, const elem_t& Aelem) {
+      block(i, j) = std::unique_ptr<DenseTile<scalar_t>>
+        (new DenseTile<scalar_t>(tilerows(i), tilecols(j)));
+      auto& T = tile(i, j).D();
+      for (std::size_t jj=0; jj<tilecols(j); ++jj) {
+        auto jjj = tilecoff(j) + jj;
+        for (std::size_t ii=0; ii<tilerows(i); ++ii)
+          T(ii, jj) = Aelem(tileroff(i) + ii, jjj);
+      }
+    }
+
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::create_dense_tile_left_looking
+    (std::size_t i, std::size_t j, const elem_t& Aelem) {
+      create_dense_tile(i, j, Aelem);
+      for (std::size_t k=0; k<std::min(i, j); k++)
+        gemm(Trans::N, Trans::N, scalar_t(-1.), tile(i, k), tile(k, j),
+             scalar_t(1.), tile(i, j).D());
+    }
+
+    template<typename scalar_t> void BLRMatrix<scalar_t>::create_LR_tile
+    (std::size_t i, std::size_t j, DenseM_t& A, const Opts_t& opts) {
+      block(i, j) = std::unique_ptr<LRTile<scalar_t>>
+        (new LRTile<scalar_t>(tile(A, i, j), opts));
+      auto& t = tile(i, j);
+      if (t.rank()*(t.rows() + t.cols()) > t.rows()*t.cols())
+        create_dense_tile(i, j, A);
+    }
+
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::create_LR_tile_left_looking
+    (std::size_t i, std::size_t j, const elem_t& Aelem, const Opts_t& opts) {
+        auto Arow = [&](std::size_t row, scalar_t* c, int incc) {
+          auto rr = tileroff(i) + row;
+          for (std::size_t col=0; col<tilecols(j); col++)
+            c[col*incc] = Aelem(rr, tilecoff(j) + col);
+          for (std::size_t k=0; k<std::min(i, j); k++)
+            Schur_update_row(row, tile(i, k), tile(k, j), c, incc);
+        };
+        auto Acol = [&](std::size_t col, scalar_t* c, int incc) {
+          auto cc = tilecoff(j) + col;
+          for (std::size_t row=0; row<tilerows(i); row++)
+            c[row*incc] = Aelem(tileroff(i) + row, cc);
+          for (std::size_t k=0; k<std::min(i, j); k++)
+            Schur_update_col(col, tile(i, k), tile(k, j), c, incc);
+        };
+        block(i, j) = std::unique_ptr<LRTile<scalar_t>>
+          (new LRTile<scalar_t>(tilerows(i), tilecols(j), Arow, Acol, opts));
+        auto& t = tile(i, j);
+        if (t.rank()*(t.rows() + t.cols()) > t.rows()*t.cols())
+          create_dense_tile_left_looking(i, j, Aelem);
+      }
+
 
     template<typename scalar_t> inline void
     BLR_construct_and_partial_factor
@@ -857,7 +446,8 @@ namespace strumpack {
       auto rb2 = B21.rowblocks();
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
       auto lrb = rb+rb2;
-      auto B = new int[lrb*lrb](); // dummy for task synchronization
+      // dummy for task synchronization
+      std::unique_ptr<int[]> B_(new int[lrb*lrb]()); auto B = B_.get();
 #pragma omp taskgroup
 #endif
       {
@@ -987,9 +577,6 @@ namespace strumpack {
       A11.clear();
       A12.clear();
       A21.clear();
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-      delete[] B;
-#endif
     }
 
     template<typename scalar_t> void BLR_trsmLNU_gemm
@@ -1001,7 +588,7 @@ namespace strumpack {
         auto rb2 = F2.rowblocks();
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
         auto lrb = rb+rb2;
-        auto B = new int[lrb];
+        std::unique_ptr<int[]> B_(new int[lrb]()); auto B = B_.get();
 #pragma omp taskgroup
 #endif
         {
@@ -1039,9 +626,6 @@ namespace strumpack {
             }
           }
         }
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-        delete[] B;
-#endif
       } else {
         // TODO optimize by merging
         trsm(Side::L, UpLo::L, Trans::N, Diag::U,
@@ -1060,7 +644,7 @@ namespace strumpack {
         auto rb2 = F2.colblocks();
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
         auto lrb = rb+rb2;
-        auto B = new int[lrb];
+        std::unique_ptr<int[]> B_(new int[lrb]()); auto B = B_.get();
 #pragma omp taskgroup
 #endif
         {
@@ -1098,9 +682,6 @@ namespace strumpack {
             }
           }
         }
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-        delete[] B;
-#endif
       } else {
         // TODO optimize by merging
         gemm(Trans::N, Trans::N, scalar_t(-1.), F2, B2,

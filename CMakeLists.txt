@@ -518,8 +518,12 @@ install(FILES
   DESTINATION include/HSS)
 
 install(FILES
-  src/BLR/BLRMatrix.hpp
   src/BLR/BLROptions.hpp
+  src/BLR/BLRTile.hpp
+  src/BLR/DenseTile.hpp
+  src/BLR/LRTile.hpp
+  src/BLR/BLRTileBLAS.hpp
+  src/BLR/BLRMatrix.hpp
   DESTINATION include/BLR)
 
 if(TPL_ENABLE_BPACK)
