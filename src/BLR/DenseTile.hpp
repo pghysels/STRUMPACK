@@ -78,6 +78,10 @@ namespace strumpack {
       const DenseM_t& U() const override { assert(false); return D_; }
       const DenseM_t& V() const override { assert(false); return D_; }
 
+      scalar_t operator()(std::size_t i, std::size_t j) const override {
+        return D_(i, j);
+      }
+
       std::vector<int> LU() override {
         return D_.LU(params::task_recursion_cutoff_level);
       }

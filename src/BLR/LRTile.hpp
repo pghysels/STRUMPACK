@@ -67,12 +67,6 @@ namespace strumpack {
       LRTile(std::size_t m, std::size_t n,
              const std::function<scalar_t(std::size_t,std::size_t)>& Telem,
              const Opts_t& opts) {
-        // DenseM_t temp(m, n);
-        // for (std::size_t j=0; j<n; j++)
-        //   for (std::size_t i=0; i<m; i++)
-        //     temp(i, j) = Telem(i, j);
-        // temp.low_rank(U_, V_, opts.rel_tol(), opts.abs_tol(), opts.max_rank(),
-        //               params::task_recursion_cutoff_level);
         adaptive_cross_approximation<scalar_t>
           (U_, V_, m, n, Telem, opts.rel_tol(), opts.abs_tol(),
            opts.max_rank());
@@ -122,6 +116,10 @@ namespace strumpack {
       const DenseM_t& D() const override { assert(false); return U_; }
       const DenseM_t& U() const override { return U_; }
       const DenseM_t& V() const override { return V_; }
+
+      scalar_t operator()(std::size_t i, std::size_t j) const override {
+        return blas::dotu(rank(), U_.ptr(i, 0), U_.ld(), V_.ptr(0, j), 1);
+      }
 
       void laswp(const std::vector<int>& piv, bool fwd) override {
         U_.laswp(piv, fwd);

@@ -61,8 +61,9 @@ namespace strumpack {
     FrontalMatrixBLR
     (integer_t sep, integer_t sep_begin, integer_t sep_end,
      std::vector<integer_t>& upd);
+    ~FrontalMatrixBLR() {}
 
-    void release_work_memory() override { F22_.clear(); }
+    void release_work_memory() override;
     void extend_add_to_dense
     (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
      const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) override;
@@ -107,8 +108,8 @@ namespace strumpack {
      bool is_root) override;
 
   private:
+    BLRM_t F11blr_, F12blr_, F21blr_, F22blr_;
     DenseM_t F22_;
-    BLRM_t F11blr_, F12blr_, F21blr_;
     std::vector<int> piv_;
     std::vector<std::size_t> sep_tiles_, upd_tiles_;
     std::vector<bool> adm_;
@@ -129,6 +130,8 @@ namespace strumpack {
     using FrontalMatrix<scalar_t,integer_t>::rchild_;
     using FrontalMatrix<scalar_t,integer_t>::dim_sep;
     using FrontalMatrix<scalar_t,integer_t>::dim_upd;
+    using FrontalMatrix<scalar_t,integer_t>::sep_begin_;
+    using FrontalMatrix<scalar_t,integer_t>::sep_end_;
   };
 
   template<typename scalar_t,typename integer_t>
@@ -139,6 +142,12 @@ namespace strumpack {
     (nullptr, nullptr, sep, sep_begin, sep_end, upd) {}
 
   template<typename scalar_t,typename integer_t> void
+  FrontalMatrixBLR<scalar_t,integer_t>::release_work_memory() {
+    F22_.clear();
+    F22blr_.clear();
+  }
+
+  template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) {
@@ -146,6 +155,10 @@ namespace strumpack {
     const std::size_t dupd = dim_upd();
     std::size_t upd2sep;
     auto I = this->upd_to_parent(p, upd2sep);
+    // if ACA was used, a compressed version of the CB was constructed
+    // in F22blr_, so we need to expand it first into F22_
+    if (F22blr_.rows() == dupd)
+      F22blr_.dense(F22_);
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop default(shared) grainsize(64)      \
   if(task_depth < params::task_recursion_cutoff_level)
@@ -227,59 +240,96 @@ namespace strumpack {
     }
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();
-    DenseM_t F11(dsep, dsep), F12(dsep, dupd), F21(dupd, dsep);
-    F11.zero(); F12.zero(); F21.zero();
-    A.extract_front
-      (F11, F12, F21, this->sep_begin_, this->sep_end_,
-       this->upd_, task_depth);
-    if (dupd) {
-      F22_ = DenseM_t(dupd, dupd);
-      F22_.zero();
-    }
-    if (lchild_)
-      lchild_->extend_add_to_dense
-        (F11, F12, F21, F22_, this, task_depth);
-    if (rchild_)
-      rchild_->extend_add_to_dense
-        (F11, F12, F21, F22_, this, task_depth);
-    if (dsep) {
+    if (opts.BLR_options().low_rank_algorithm() ==
+        BLR::LowRankAlgorithm::RRQR) {
+      DenseM_t F11(dsep, dsep), F12(dsep, dupd), F21(dupd, dsep);
+      F11.zero(); F12.zero(); F21.zero();
+      A.extract_front(F11, F12, F21, sep_begin_, sep_end_, this->upd_, task_depth);
+      if (dupd) {
+        F22_ = DenseM_t(dupd, dupd);
+        F22_.zero();
+      }
+      if (lchild_)
+        lchild_->extend_add_to_dense(F11, F12, F21, F22_, this, task_depth);
+      if (rchild_)
+        rchild_->extend_add_to_dense(F11, F12, F21, F22_, this, task_depth);
+      if (dsep) {
 #if 1
-      BLR::BLR_construct_and_partial_factor
-        (F11, F12, F21, F22_, F11blr_, piv_, F12blr_, F21blr_,
-         sep_tiles_, upd_tiles_,
-         [&](std::size_t i, std::size_t j) -> bool {
-          return adm_[i+j*sep_tiles_.size()]; },
-         opts.BLR_options());
-#else
-      if (opts.BLR_options().low_rank_algorithm() ==
-          BLR::LowRankAlgorithm::ACA)
-        F11blr_ = BLRM_t
-          (dsep, sep_tiles_, [&](std::size_t i, std::size_t j) -> bool {
+        BLR::BLR_construct_and_partial_factor
+          (F11, F12, F21, F22_, F11blr_, piv_, F12blr_, F21blr_,
+           sep_tiles_, upd_tiles_,
+           [&](std::size_t i, std::size_t j) -> bool {
             return adm_[i+j*sep_tiles_.size()]; },
-            [&](std::size_t i, std::size_t j) -> scalar_t {
-              return F11(i, j); }, piv_, opts.BLR_options());
-      else
+           opts.BLR_options());
+#else
         F11blr_ = BLRM_t
           (sep_tiles_, [&](std::size_t i, std::size_t j) -> bool {
             return adm_[i+j*sep_tiles_.size()]; },
             F11, piv_, opts.BLR_options());
-      F11.clear();
-      if (dim_upd()) {
-        F12.laswp(piv_, true);
-        trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-             scalar_t(1.), F11blr_, F12, task_depth);
-        F12blr_ = BLRM_t(F12, sep_tiles_, upd_tiles_, opts.BLR_options());
-        F12.clear();
-        trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-             scalar_t(1.), F11blr_, F21, task_depth);
-        F21blr_ = BLRM_t(F21, upd_tiles_, sep_tiles_, opts.BLR_options());
-        F21.clear();
-        gemm(Trans::N, Trans::N, scalar_t(-1.), F21blr_, F12blr_,
-             scalar_t(1.), F22_, task_depth);
-      }
+        F11.clear();
+        if (dupd) {
+          F12.laswp(piv_, true);
+          trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+               scalar_t(1.), F11blr_, F12, task_depth);
+          F12blr_ = BLRM_t(F12, sep_tiles_, upd_tiles_, opts.BLR_options());
+          F12.clear();
+          trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+               scalar_t(1.), F11blr_, F21, task_depth);
+          F21blr_ = BLRM_t(F21, upd_tiles_, sep_tiles_, opts.BLR_options());
+          F21.clear();
+          gemm(Trans::N, Trans::N, scalar_t(-1.), F21blr_, F12blr_,
+               scalar_t(1.), F22_, task_depth);
+        }
 #endif
-      // TODO flops
+      }
+    } else {
+      auto F11elem = [&](const std::vector<std::size_t>& lI,
+                         const std::vector<std::size_t>& lJ, DenseM_t& B) {
+        auto gI = lI; auto gJ = lJ;
+        for (auto& i : gI) i += sep_begin_;
+        for (auto& j : gJ) j += sep_begin_;
+        A.extract_separator(sep_end_, gI, gJ, B, task_depth);
+        if (lchild_) lchild_->extract_CB_sub_matrix(gI, gJ, B, task_depth);
+        if (rchild_) rchild_->extract_CB_sub_matrix(gI, gJ, B, task_depth);
+      };
+      auto F12elem = [&](const std::vector<std::size_t>& lI,
+                         const std::vector<std::size_t>& lJ, DenseM_t& B) {
+        auto gI = lI; auto gJ = lJ;
+        for (auto& i : gI) i += sep_begin_;
+        for (auto& j : gJ) j = this->upd_[j];
+        A.extract_separator(sep_end_, gI, gJ, B, task_depth);
+        if (lchild_) lchild_->extract_CB_sub_matrix(gI, gJ, B, task_depth);
+        if (rchild_) rchild_->extract_CB_sub_matrix(gI, gJ, B, task_depth);
+      };
+      auto F21elem = [&](const std::vector<std::size_t>& lI,
+                         const std::vector<std::size_t>& lJ, DenseM_t& B) {
+        auto gI = lI; auto gJ = lJ;
+        for (auto& i : gI) i = this->upd_[i];
+        for (auto& j : gJ) j += sep_begin_;
+        A.extract_separator(sep_end_, gI, gJ, B, task_depth);
+        if (lchild_) lchild_->extract_CB_sub_matrix(gI, gJ, B, task_depth);
+        if (rchild_) rchild_->extract_CB_sub_matrix(gI, gJ, B, task_depth);
+      };
+      auto F22elem = [&](const std::vector<std::size_t>& lI,
+                         const std::vector<std::size_t>& lJ, DenseM_t& B) {
+        B.zero();
+        auto gI = lI; auto gJ = lJ;
+        for (auto& i : gI) i = this->upd_[i];
+        for (auto& j : gJ) j = this->upd_[j];
+        if (lchild_) lchild_->extract_CB_sub_matrix(gI, gJ, B, task_depth);
+        if (rchild_) rchild_->extract_CB_sub_matrix(gI, gJ, B, task_depth);
+      };
+      BLR::BLR_construct_and_partial_factor<scalar_t>
+        (dsep, dupd, F11elem, F12elem, F21elem, F22elem,
+         F11blr_, piv_, F12blr_, F21blr_, F22blr_,
+         sep_tiles_, upd_tiles_,
+         [&](std::size_t i, std::size_t j) -> bool {
+           return adm_[i+j*sep_tiles_.size()]; },
+         opts.BLR_options());
+      if (lchild_) lchild_->release_work_memory();
+      if (rchild_) rchild_->release_work_memory();
     }
+    // TODO flops
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -367,7 +417,7 @@ namespace strumpack {
     }
   }
 
-  template<typename scalar_t,typename integer_t> void
+template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::extract_CB_sub_matrix
   (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
    DenseM_t& B, int task_depth) const {
@@ -377,9 +427,10 @@ namespace strumpack {
     std::vector<std::size_t> lI, oI;
     this->find_upd_indices(I, lI, oI);
     if (lI.empty()) return;
+    auto T = F22blr_.extract(lI, lJ);
     for (std::size_t j=0; j<lJ.size(); j++)
       for (std::size_t i=0; i<lI.size(); i++)
-        B(oI[i], oJ[j]) += F22_(lI[i], lJ[j]);
+        B(oI[i], oJ[j]) += T(i, j);
     STRUMPACK_FLOPS((is_complex<scalar_t>() ? 2 : 1) * lJ.size() * lI.size());
   }
 

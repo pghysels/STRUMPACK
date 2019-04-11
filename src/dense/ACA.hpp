@@ -46,6 +46,17 @@ namespace strumpack {
    real_t rtol, real_t atol, int max_rank) {
     using D_t = DenseMatrix<scalar_t>;
     using DW_t = DenseMatrixWrapper<scalar_t>;
+
+    /////////////////////////////////////////////////////////
+    // TODO!! Fix ACA ///////////////////////////////////////
+    D_t temp(m, n);
+    for (std::size_t j=0; j<n; j++)
+      Acol(j, temp.ptr(0, j), 1);
+    temp.low_rank(U, V, rtol, atol, max_rank, 0);
+    return;
+    /////////////////////////////////////////////////////////
+
+
     auto sfmin = blas::lamch<real_t>('S');
     int minmn = std::min(m, n);
     int rmax = std::min(minmn, max_rank);

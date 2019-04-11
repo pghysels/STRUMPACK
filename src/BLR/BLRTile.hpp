@@ -70,6 +70,8 @@ namespace strumpack {
       virtual const DenseM_t& U() const = 0; //{ assert(false); }
       virtual const DenseM_t& V() const = 0; //{ assert(false); }
 
+      virtual scalar_t operator()(std::size_t i, std::size_t j) const = 0;
+
       virtual std::vector<int> LU() { assert(false); return std::vector<int>(); };
       virtual void laswp(const std::vector<int>& piv, bool fwd) = 0;
 

@@ -40,12 +40,17 @@
 namespace strumpack {
   namespace BLR {
 
+    template<typename T>
+    using extract_t = std::function<
+      void(const std::vector<std::size_t>&, const std::vector<std::size_t>&,
+           DenseMatrix<T>&)>;
+    using adm_t = std::function<bool(std::size_t,std::size_t)>;
+
     template<typename scalar_t> class BLRMatrix {
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using Opts_t = BLROptions<scalar_t>;
-      using adm_t = std::function<bool(std::size_t,std::size_t)>;
-      using elem_t = std::function<scalar_t(std::size_t,std::size_t)>;
+      // using elem_t = std::function<scalar_t(std::size_t,std::size_t)>;
 
     public:
       BLRMatrix() {}
@@ -55,9 +60,9 @@ namespace strumpack {
                 const std::vector<std::size_t>& coltiles,
                 const Opts_t& opts);
 
-      BLRMatrix(std::size_t n, const std::vector<std::size_t>& tiles,
-                const adm_t& admissible, const elem_t& Aelem,
-                std::vector<int>& piv, const Opts_t& opts);
+      // BLRMatrix(std::size_t n, const std::vector<std::size_t>& tiles,
+      //           const adm_t& admissible, const elem_t& Aelem,
+      //           std::vector<int>& piv, const Opts_t& opts);
 
       BLRMatrix(const std::vector<std::size_t>& tiles,
                 const adm_t& admissible, DenseM_t& A,
@@ -71,10 +76,17 @@ namespace strumpack {
       std::size_t maximum_rank() const;
 
       DenseM_t dense() const;
+      void dense(DenseM_t& A) const;
 
       void draw(std::ostream& of, std::size_t roff, std::size_t coff) const;
 
       void print(const std::string& name) const;
+
+      void clear();
+
+      scalar_t operator()(std::size_t i, std::size_t j) const;
+      DenseM_t extract(const std::vector<std::size_t>& I,
+                       const std::vector<std::size_t>& J) const;
 
       std::size_t rowblocks() const { return nbrows_; }
       std::size_t colblocks() const { return nbcols_; }
@@ -97,13 +109,24 @@ namespace strumpack {
       DenseMW_t tile(DenseM_t& A, std::size_t i, std::size_t j) const;
 
       void create_dense_tile(std::size_t i, std::size_t j, DenseM_t& A);
-      void create_dense_tile(std::size_t i, std::size_t j, const elem_t& Aelem);
+      void create_dense_tile
+      (std::size_t i, std::size_t j, const extract_t<scalar_t>& Aelem);
+
       void create_dense_tile_left_looking
-      (std::size_t i, std::size_t j, const elem_t& Aelem);
+      (std::size_t i, std::size_t j, const extract_t<scalar_t>& Aelem);
+      void create_dense_tile_left_looking
+      (std::size_t i, std::size_t j, std::size_t k,
+       const extract_t<scalar_t>& Aelem, const BLRMatrix<scalar_t>& B21,
+       const BLRMatrix<scalar_t>& B12);
       void create_LR_tile
       (std::size_t i, std::size_t j, DenseM_t& A, const Opts_t& opts);
       void create_LR_tile_left_looking
-      (std::size_t i, std::size_t j, const elem_t& Aelem, const Opts_t& opts);
+      (std::size_t i, std::size_t j, const extract_t<scalar_t>& Aelem,
+       const Opts_t& opts);
+      void create_LR_tile_left_looking
+      (std::size_t i, std::size_t j, std::size_t k,
+       const extract_t<scalar_t>& Aelem, const BLRMatrix<scalar_t>& B21,
+       const BLRMatrix<scalar_t>& B12, const Opts_t& opts);
 
       template<typename T> friend void
       trsm(Side s, UpLo ul, Trans ta, Diag d, T alpha,
@@ -123,9 +146,23 @@ namespace strumpack {
 
       template<typename T> friend void
       BLR_construct_and_partial_factor
-      (DenseMatrix<T>& A11, DenseMatrix<T>& A12, DenseMatrix<T>& A21, DenseMatrix<T>& A22,
-       BLRMatrix<T>& B11, std::vector<int>& piv, BLRMatrix<T>& B12, BLRMatrix<T>& B21,
-       const std::vector<std::size_t>& tiles1, const std::vector<std::size_t>& tiles2,
+      (DenseMatrix<T>& A11, DenseMatrix<T>& A12,
+       DenseMatrix<T>& A21, DenseMatrix<T>& A22,
+       BLRMatrix<T>& B11, std::vector<int>& piv,
+       BLRMatrix<T>& B12, BLRMatrix<T>& B21,
+       const std::vector<std::size_t>& tiles1,
+       const std::vector<std::size_t>& tiles2,
+       const adm_t& admissible, const BLROptions<T>& opts);
+
+      template<typename T> friend void
+      BLR_construct_and_partial_factor
+      (std::size_t n1, std::size_t n2,
+       const extract_t<T>& A11, const extract_t<T>& A12,
+       const extract_t<T>& A21, const extract_t<T>& A22,
+       BLRMatrix<T>& B11, std::vector<int>& piv,
+       BLRMatrix<T>& B12, BLRMatrix<T>& B21, BLRMatrix<T>& B22,
+       const std::vector<std::size_t>& tiles1,
+       const std::vector<std::size_t>& tiles2,
        const adm_t& admissible, const BLROptions<T>& opts);
 
       template<typename T> friend void
@@ -149,40 +186,40 @@ namespace strumpack {
             (new LRTile<scalar_t>(tile(A, i, j), opts));
     }
 
-    template<typename scalar_t> BLRMatrix<scalar_t>::BLRMatrix
-    (std::size_t n, const std::vector<std::size_t>& tiles,
-     const adm_t& admissible, const elem_t& Aelem,
-     std::vector<int>& piv, const Opts_t& opts)
-      : BLRMatrix<scalar_t>(n, tiles, n, tiles) {
-      assert(rowblocks() == colblocks());
-      piv.resize(rows());
-      auto rb = rowblocks();
-      for (std::size_t i=0; i<rb; i++) {
-        create_dense_tile_left_looking(i, i, Aelem);
-        auto tpiv = tile(i, i).LU();
-        std::copy(tpiv.begin(), tpiv.end(), piv.begin()+tileroff(i));
-        for (std::size_t j=i+1; j<rb; j++) {
-          if (admissible(i, j))
-            create_LR_tile_left_looking(i, j, Aelem, opts);
-          else create_dense_tile_left_looking(i, j, Aelem);
-          // permute and solve with L, blocks right from the diagonal block
-          std::vector<int> tpiv
-            (piv.begin()+tileroff(i), piv.begin()+tileroff(i+1));
-          tile(i, j).laswp(tpiv, true);
-          trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-               scalar_t(1.), tile(i, i), tile(i, j));
-          if (admissible(j, i))
-            create_LR_tile_left_looking(j, i, Aelem, opts);
-          else create_dense_tile_left_looking(j, i, Aelem);
-          // solve with U, the blocks under the diagonal block
-          trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-               scalar_t(1.), tile(i, i), tile(j, i));
-        }
-      }
-      for (std::size_t i=0; i<rb; i++)
-        for (std::size_t l=tileroff(i); l<tileroff(i+1); l++)
-          piv[l] += tileroff(i);
-    }
+    // template<typename scalar_t> BLRMatrix<scalar_t>::BLRMatrix
+    // (std::size_t n, const std::vector<std::size_t>& tiles,
+    //  const adm_t& admissible, const elem_t& Aelem,
+    //  std::vector<int>& piv, const Opts_t& opts)
+    //   : BLRMatrix<scalar_t>(n, tiles, n, tiles) {
+    //   assert(rowblocks() == colblocks());
+    //   piv.resize(rows());
+    //   auto rb = rowblocks();
+    //   for (std::size_t i=0; i<rb; i++) {
+    //     create_dense_tile_left_looking(i, i, Aelem);
+    //     auto tpiv = tile(i, i).LU();
+    //     std::copy(tpiv.begin(), tpiv.end(), piv.begin()+tileroff(i));
+    //     for (std::size_t j=i+1; j<rb; j++) {
+    //       if (admissible(i, j))
+    //         create_LR_tile_left_looking(i, j, Aelem, opts);
+    //       else create_dense_tile_left_looking(i, j, Aelem);
+    //       // permute and solve with L, blocks right from the diagonal block
+    //       std::vector<int> tpiv
+    //         (piv.begin()+tileroff(i), piv.begin()+tileroff(i+1));
+    //       tile(i, j).laswp(tpiv, true);
+    //       trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+    //            scalar_t(1.), tile(i, i), tile(i, j));
+    //       if (admissible(j, i))
+    //         create_LR_tile_left_looking(j, i, Aelem, opts);
+    //       else create_dense_tile_left_looking(j, i, Aelem);
+    //       // solve with U, the blocks under the diagonal block
+    //       trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+    //            scalar_t(1.), tile(i, i), tile(j, i));
+    //     }
+    //   }
+    //   for (std::size_t i=0; i<rb; i++)
+    //     for (std::size_t l=tileroff(i); l<tileroff(i+1); l++)
+    //       piv[l] += tileroff(i);
+    // }
 
     template<typename scalar_t> BLRMatrix<scalar_t>::BLRMatrix
     (const std::vector<std::size_t>& tiles, const adm_t& admissible,
@@ -298,6 +335,13 @@ namespace strumpack {
     template<typename scalar_t> DenseMatrix<scalar_t>
     BLRMatrix<scalar_t>::dense() const {
       DenseM_t A(rows(), cols());
+      dense(A);
+      return A;
+    }
+
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::dense(DenseM_t& A) const {
+      assert(A.rows() == rows() && A.cols() == cols());
       auto cb = colblocks();
       auto rb = rowblocks();
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
@@ -308,7 +352,6 @@ namespace strumpack {
           DenseMW_t Aij = tile(A, i, j);
           tile(i, j).dense(Aij);
         }
-      return A;
     }
 
     template<typename scalar_t> void BLRMatrix<scalar_t>::draw
@@ -344,6 +387,45 @@ namespace strumpack {
       std::cout << "];" << std::endl;
     }
 
+    template<typename scalar_t> void BLRMatrix<scalar_t>::clear() {
+      m_ = n_ = nbrows_ = nbcols_ = 0;
+      roff_.clear(); roff_.shrink_to_fit();
+      coff_.clear(); coff_.shrink_to_fit();
+      blocks_.clear(); blocks_.shrink_to_fit();
+    }
+
+    template<typename scalar_t> scalar_t
+    BLRMatrix<scalar_t>::operator()(std::size_t i, std::size_t j) const {
+      auto ti = std::distance
+        (roff_.begin(), std::upper_bound(roff_.begin(), roff_.end(), i)) - 1;
+      auto tj = std::distance
+        (coff_.begin(), std::upper_bound(coff_.begin(), coff_.end(), j)) - 1;
+      return tile(ti, tj)(i - roff_[ti], j - coff_[tj]);
+    }
+
+    template<typename scalar_t> DenseMatrix<scalar_t>
+    BLRMatrix<scalar_t>::extract
+    (const std::vector<std::size_t>& I,
+     const std::vector<std::size_t>& J) const {
+      auto m = I.size(); auto n = J.size();
+      DenseM_t B(m, n);
+      std::vector<int> ti(m);
+      for (std::size_t i=0; i<m; i++)
+        ti[i] = std::distance
+          (roff_.begin(),
+           std::upper_bound(roff_.begin(), roff_.end(), I[i])) - 1;
+      // TODO this should be further optimized, extracting whole
+      // blocks from tiles
+      for (std::size_t j=0; j<n; j++) {
+        auto tj = std::distance
+          (coff_.begin(),
+           std::upper_bound(coff_.begin(), coff_.end(), J[j])) - 1;
+        auto jj = J[j] - coff_[tj];
+        for (std::size_t i=0; i<m; i++)
+          B(i, j) = tile(ti[i], tj)(I[i] - roff_[ti[i]], jj);
+      }
+      return B;
+    }
 
     template<typename scalar_t> BLRTile<scalar_t>&
     BLRMatrix<scalar_t>::tile(std::size_t i, std::size_t j) {
@@ -373,24 +455,35 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void BLRMatrix<scalar_t>::create_dense_tile
-    (std::size_t i, std::size_t j, const elem_t& Aelem) {
+    (std::size_t i, std::size_t j, const extract_t<scalar_t>& Aelem) {
+      auto m = tilerows(i);
+      auto n = tilecols(j);
       block(i, j) = std::unique_ptr<DenseTile<scalar_t>>
-        (new DenseTile<scalar_t>(tilerows(i), tilecols(j)));
-      auto& T = tile(i, j).D();
-      for (std::size_t jj=0; jj<tilecols(j); ++jj) {
-        auto jjj = tilecoff(j) + jj;
-        for (std::size_t ii=0; ii<tilerows(i); ++ii)
-          T(ii, jj) = Aelem(tileroff(i) + ii, jjj);
-      }
+        (new DenseTile<scalar_t>(m, n));
+      std::vector<std::size_t> ii(m), jj(n);
+      std::iota(ii.begin(), ii.end(), tileroff(i));
+      std::iota(jj.begin(), jj.end(), tilecoff(j));
+      Aelem(ii, jj, tile(i, j).D());
     }
 
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::create_dense_tile_left_looking
-    (std::size_t i, std::size_t j, const elem_t& Aelem) {
+    (std::size_t i, std::size_t j, const extract_t<scalar_t>& Aelem) {
       create_dense_tile(i, j, Aelem);
       for (std::size_t k=0; k<std::min(i, j); k++)
         gemm(Trans::N, Trans::N, scalar_t(-1.), tile(i, k), tile(k, j),
              scalar_t(1.), tile(i, j).D());
+    }
+
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::create_dense_tile_left_looking
+    (std::size_t i, std::size_t j, std::size_t k,
+     const extract_t<scalar_t>& Aelem, const BLRMatrix<scalar_t>& B21,
+     const BLRMatrix<scalar_t>& B12) {
+      create_dense_tile(i, j, Aelem);
+      for (std::size_t l=0; l<k; l++)
+        gemm(Trans::N, Trans::N, scalar_t(-1.), B21.tile(i, l),
+             B12.tile(l, j), scalar_t(1.), tile(i, j).D());
     }
 
     template<typename scalar_t> void BLRMatrix<scalar_t>::create_LR_tile
@@ -404,28 +497,42 @@ namespace strumpack {
 
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::create_LR_tile_left_looking
-    (std::size_t i, std::size_t j, const elem_t& Aelem, const Opts_t& opts) {
-        auto Arow = [&](std::size_t row, scalar_t* c, int incc) {
-          auto rr = tileroff(i) + row;
-          for (std::size_t col=0; col<tilecols(j); col++)
-            c[col*incc] = Aelem(rr, tilecoff(j) + col);
-          for (std::size_t k=0; k<std::min(i, j); k++)
-            Schur_update_row(row, tile(i, k), tile(k, j), c, incc);
-        };
-        auto Acol = [&](std::size_t col, scalar_t* c, int incc) {
-          auto cc = tilecoff(j) + col;
-          for (std::size_t row=0; row<tilerows(i); row++)
-            c[row*incc] = Aelem(tileroff(i) + row, cc);
-          for (std::size_t k=0; k<std::min(i, j); k++)
-            Schur_update_col(col, tile(i, k), tile(k, j), c, incc);
-        };
-        block(i, j) = std::unique_ptr<LRTile<scalar_t>>
-          (new LRTile<scalar_t>(tilerows(i), tilecols(j), Arow, Acol, opts));
-        auto& t = tile(i, j);
-        if (t.rank()*(t.rows() + t.cols()) > t.rows()*t.cols())
-          create_dense_tile_left_looking(i, j, Aelem);
-      }
+    (std::size_t i, std::size_t j, const extract_t<scalar_t>& Aelem,
+     const Opts_t& opts) {
+      create_LR_tile_left_looking(i, j, std::min(i,j), Aelem, *this, *this, opts);
+    }
 
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::create_LR_tile_left_looking
+    (std::size_t i, std::size_t j, std::size_t k,
+     const extract_t<scalar_t>& Aelem, const BLRMatrix<scalar_t>& B21,
+     const BLRMatrix<scalar_t>& B12, const Opts_t& opts) {
+      auto m = tilerows(i);  auto n = tilecols(j);
+      auto dm = tileroff(i); auto dn = tilecoff(j);
+      std::vector<std::size_t> lI(m), lJ(n), idx(1);
+      std::iota(lJ.begin(), lJ.end(), dn);
+      std::iota(lI.begin(), lI.end(), dm);
+      auto Arow = [&](std::size_t row, scalar_t* c, int incc) {
+        idx[0] = dm + row;
+        DenseMW_t cr(1, n, c, std::max(1, incc));
+        Aelem(idx, lJ, cr);
+        for (std::size_t l=0; l<k; l++)
+          Schur_update_row(row, B21.tile(i, l), B12.tile(l, j), c, incc);
+      };
+      auto Acol = [&](std::size_t col, scalar_t* c, int incc) {
+        idx[0] = dn + col;
+        assert(incc == 1);
+        DenseMW_t cc(m, 1, c, m);
+        Aelem(lI, idx, cc);
+        for (std::size_t l=0; l<k; l++)
+          Schur_update_col(col, B21.tile(i, l), B12.tile(l, j), c, incc);
+      };
+      block(i, j) = std::unique_ptr<LRTile<scalar_t>>
+        (new LRTile<scalar_t>(m, n, Arow, Acol, opts));
+      auto& t = tile(i, j);
+      if (t.rank()*(m + n) > m*n)
+        create_dense_tile_left_looking(i, j, k, Aelem, B21, B12);
+    }
 
     template<typename scalar_t> inline void
     BLR_construct_and_partial_factor
@@ -440,7 +547,6 @@ namespace strumpack {
       B11 = BLRMatrix<scalar_t>(A11.rows(), tiles1, A11.cols(), tiles1);
       B12 = BLRMatrix<scalar_t>(A12.rows(), tiles1, A12.cols(), tiles2);
       B21 = BLRMatrix<scalar_t>(A21.rows(), tiles2, A21.cols(), tiles1);
-
       piv.resize(B11.rows());
       auto rb = B11.rowblocks();
       auto rb2 = B21.rowblocks();
@@ -578,6 +684,71 @@ namespace strumpack {
       A12.clear();
       A21.clear();
     }
+
+
+    template<typename scalar_t> inline void
+    BLR_construct_and_partial_factor
+    (std::size_t n1, std::size_t n2,
+     const extract_t<scalar_t>& A11, const extract_t<scalar_t>& A12,
+     const extract_t<scalar_t>& A21, const extract_t<scalar_t>& A22,
+     BLRMatrix<scalar_t>& B11, std::vector<int>& piv,
+     BLRMatrix<scalar_t>& B12, BLRMatrix<scalar_t>& B21,
+     BLRMatrix<scalar_t>& B22,
+     const std::vector<std::size_t>& tiles1,
+     const std::vector<std::size_t>& tiles2,
+     const std::function<bool(std::size_t,std::size_t)>& admissible,
+     const BLROptions<scalar_t>& opts) {
+      B11 = BLRMatrix<scalar_t>(n1, tiles1, n1, tiles1);
+      B12 = BLRMatrix<scalar_t>(n1, tiles1, n2, tiles2);
+      B21 = BLRMatrix<scalar_t>(n2, tiles2, n1, tiles1);
+      B22 = BLRMatrix<scalar_t>(n2, tiles2, n2, tiles2);
+      piv.resize(B11.rows());
+      auto rb = B11.rowblocks();
+      auto rb2 = B21.rowblocks();
+      for (std::size_t i=0; i<rb; i++) {
+        B11.create_dense_tile_left_looking(i, i, A11);
+        auto tpiv = B11.tile(i, i).LU();
+        std::copy(tpiv.begin(), tpiv.end(), piv.begin()+B11.tileroff(i));
+        for (std::size_t j=i+1; j<rb; j++) {
+          // these blocks have received all updates, compress now
+          if (admissible(i, j))
+            B11.create_LR_tile_left_looking(i, j, A11, opts);
+          else B11.create_dense_tile_left_looking(i, j, A11);
+          // permute and solve with L, blocks right from the diagonal block
+          std::vector<int> tpiv
+            (piv.begin()+B11.tileroff(i), piv.begin()+B11.tileroff(i+1));
+          B11.tile(i, j).laswp(tpiv, true);
+          trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+               scalar_t(1.), B11.tile(i, i), B11.tile(i, j));
+          if (admissible(j, i))
+            B11.create_LR_tile_left_looking(j, i, A11, opts);
+          else B11.create_dense_tile_left_looking(j, i, A11);
+          // solve with U, the blocks under the diagonal block
+          trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+               scalar_t(1.), B11.tile(i, i), B11.tile(j, i));
+        }
+        for (std::size_t j=0; j<rb2; j++) {
+          B12.create_LR_tile_left_looking(i, j, i, A12, B11, B12, opts);
+          // permute and solve with L  blocks right from the diagonal block
+          std::vector<int> tpiv
+            (piv.begin()+B11.tileroff(i), piv.begin()+B11.tileroff(i+1));
+          B12.tile(i, j).laswp(tpiv, true);
+          trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+               scalar_t(1.), B11.tile(i, i), B12.tile(i, j));
+          B21.create_LR_tile_left_looking(j, i, i, A21, B21, B11, opts);
+          // solve with U, the blocks under the diagonal block
+          trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+               scalar_t(1.), B11.tile(i, i), B21.tile(j, i));
+        }
+      }
+      for (std::size_t i=0; i<rb2; i++)
+        for (std::size_t j=0; j<rb2; j++)
+          B22.create_LR_tile_left_looking(i, j, rb, A22, B21, B12, opts);
+      for (std::size_t i=0; i<rb; i++)
+        for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
+          piv[l] += B11.tileroff(i);
+    }
+
 
     template<typename scalar_t> void BLR_trsmLNU_gemm
     (const BLRMatrix<scalar_t>& F1, const BLRMatrix<scalar_t>& F2,
