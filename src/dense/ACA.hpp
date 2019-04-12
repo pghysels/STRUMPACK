@@ -43,7 +43,8 @@ namespace strumpack {
    std::size_t m, std::size_t n,
    const std::function<void(std::size_t,scalar_t*,int)>& Arow,
    const std::function<void(std::size_t,scalar_t*,int)>& Acol,
-   real_t rtol, real_t atol, int max_rank) {
+   real_t rtol, real_t atol, int max_rank,
+   int task_depth=params::task_recursion_cutoff_level) {
     using D_t = DenseMatrix<scalar_t>;
     using DW_t = DenseMatrixWrapper<scalar_t>;
     auto sfmin = blas::lamch<real_t>('S');
@@ -51,6 +52,7 @@ namespace strumpack {
     int rmax = std::min(minmn, max_rank);
     D_t U_(m, rmax), V_(n, rmax);
     std::vector<real_t> temp(std::max(m, n));
+    std::vector<scalar_t> du(rmax), dv(rmax);
     std::mt19937 mt;
     std::uniform_int_distribution<int> rgen(0, m-1);
     int row = rgen(mt), col = 0, rank = 0;
@@ -62,10 +64,11 @@ namespace strumpack {
       rowids.push_back(row);
       DW_t Vr(n, 1, V_, 0, rank);
       Arow(row, Vr.data(), 1);
-      for (int l=0; l<rank; l++)
-        Vr.scaled_add(-U_(row, l), DW_t(n, 1, V_, 0, l));
-      for (std::size_t i=0; i<n; i++)
-        temp[i] = std::abs(Vr(i, 0));
+      gemv(Trans::N, scalar_t(-1.), DW_t(n, rank, V_, 0, 0),
+           U_.ptr(row, 0), U_.ld(), scalar_t(1.), Vr.ptr(0, 0), 1,
+           task_depth);
+
+      for (std::size_t i=0; i<n; i++) temp[i] = std::abs(Vr(i, 0));
       // avoid already selected cols
       for (auto c : colids) temp[c] = real_t(-1);
       col = std::distance
@@ -75,57 +78,27 @@ namespace strumpack {
       Vr.scale(scalar_t(1.) / Vr(col, 0));
       DW_t Ur(m, 1, U_, 0, rank);
       Acol(col, Ur.data(), 1);
-      for (int l=0; l<rank; l++)
-        Ur.scaled_add(-V_(col, l), DW_t(m, 1, U_, 0, l));
+      gemv(Trans::N, scalar_t(-1.), DW_t(m, rank, U_, 0, 0),
+           V_.ptr(col, 0), V_.ld(), scalar_t(1.), Ur.ptr(0, 0), 1,
+           task_depth);
 
-      scalar_t cross_products(0.);
-      for (int k=0; k<rank; k++) {
-        scalar_t dot_u(0.), dot_v(0.);
-        for (std::size_t i=0; i<m; i++)
-          dot_u += Ur(i, 0) * U_(i, k);
-        for (std::size_t i=0; i<n; i++)
-          dot_v += Vr(i, 0) * V_(i, k);
-        cross_products += dot_u * dot_v;
-      }
-      real_t normVr2(0.), normUr2(0.);
-      for (std::size_t i=0; i<n; i++)
-        normVr2 += std::real(Vr(i, 0) * Vr(i, 0));
-      for (std::size_t i=0; i<m; i++)
-        normUr2 += std::real(Ur(i, 0) * Ur(i, 0));
-      approx_norm =
-        std::sqrt(std::real(approx_norm*approx_norm +
-                            real_t(2.) * cross_products
-                            + normUr2 * normVr2));
-      real_t normVr = std::sqrt(normVr2), normUr = std::sqrt(normUr2);
+      gemv(Trans::C, scalar_t(1.), DW_t(m, rank+1, U_, 0, 0), Ur,
+           scalar_t(0.), du.data(), 1, task_depth);
+      gemv(Trans::C, scalar_t(1.), DW_t(n, rank+1, V_, 0, 0), Vr,
+           scalar_t(0.), dv.data(), 1, task_depth);
+      scalar_t cross_products = blas::dotu(rank, du.data(), 1, dv.data(), 1);
+      real_t normUV2 = std::real(du[rank] * dv[rank]);
+      approx_norm = std::sqrt
+        (std::real(approx_norm*approx_norm +
+                   real_t(2.) * cross_products + normUV2));
       rank++;
 
-#if 0
-      scalar_t FrobS(0.);
-      for (std::size_t j=0; j<n; j++)
-        for (std::size_t i=0; i<m; i++) {
-          scalar_t Sij(0.);
-          for (int k=0; k<rank; k++)
-            Sij += U_(i, k) * V_(j, k);
-          FrobS += Sij * Sij;
-        }
-      FrobS = std::sqrt(std::real(FrobS));
-      std::cout << "rank=" << rank
-                << ", ||Ur||=" << normUr
-                << ", ||Vr||=" << normVr
-                << ", ||UVt||=" << approx_norm
-                << ", ||S||=" << FrobS
-                << ", | ||UVt|| - ||S|| |="
-                << std::abs(approx_norm - FrobS)
-                << std::endl;
-#endif
-
-      if (normUr * normVr < approx_norm * rtol ||
-          normUr * normVr < atol)
+      real_t nrmUV = std::sqrt(normUV2);
+      if (nrmUV < approx_norm * rtol || nrmUV < atol)
         break;
 
       // select a new row
-      for (std::size_t i=0; i<m; i++)
-        temp[i] = std::abs(Ur(i, 0));
+      for (std::size_t i=0; i<m; i++) temp[i] = std::abs(Ur(i, 0));
       // avoid already selected rows
       for (auto r : rowids) temp[r] = real_t(-1);
       row = std::distance
@@ -143,18 +116,6 @@ namespace strumpack {
 
     U = D_t(m, rank); U.copy(U_, 0, 0);
     V = DW_t(n, rank, V_, 0, 0).transpose();
-
-#if 0
-    D_t A(m, n);
-    for (std::size_t i=0; i<m; i++)
-      for (std::size_t j=0; j<n; j++)
-        A(i, j) = Aelem(i, j);
-    auto Anorm = A.norm();
-    gemm(Trans::N, Trans::N, scalar_t(-1.), U, V, scalar_t(1.), A);
-    auto e = A.norm();
-    std::cout << "ACA abs_error = " << e
-              << " ACA rel_error = " << e/Anorm << std::endl;
-#endif
   }
 
 
