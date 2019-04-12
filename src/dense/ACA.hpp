@@ -46,21 +46,11 @@ namespace strumpack {
    real_t rtol, real_t atol, int max_rank) {
     using D_t = DenseMatrix<scalar_t>;
     using DW_t = DenseMatrixWrapper<scalar_t>;
-
-    /////////////////////////////////////////////////////////
-    // TODO!! Fix ACA ///////////////////////////////////////
-    D_t temp(m, n);
-    for (std::size_t j=0; j<n; j++)
-      Acol(j, temp.ptr(0, j), 1);
-    temp.low_rank(U, V, rtol, atol, max_rank, 0);
-    return;
-    /////////////////////////////////////////////////////////
-
-
     auto sfmin = blas::lamch<real_t>('S');
     int minmn = std::min(m, n);
     int rmax = std::min(minmn, max_rank);
     D_t U_(m, rmax), V_(n, rmax);
+    std::vector<scalar_t> temp(std::max(m, n));
     std::mt19937 mt;
     std::uniform_int_distribution<int> rgen(0, m-1);
     int row = rgen(mt), col = 0, rank = 0;
@@ -74,15 +64,13 @@ namespace strumpack {
       Arow(row, Vr.data(), 1);
       for (int l=0; l<rank; l++)
         Vr.scaled_add(-U_(row, l), DW_t(n, 1, V_, 0, l));
-      if (Vr.norm() < sfmin) break;
-      col = 0;
-      auto Vrmax = std::abs(Vr(col, 0));
-      for (std::size_t i=1; i<n; i++) {
-        if (auto absVri = std::abs(Vr(i, 0)) > Vrmax &&
-            std::find(colids.begin(), colids.end(), i) == colids.end()) {
-          col = i; Vrmax = absVri;
-        }
-      }
+      for (std::size_t i=0; i<n; i++)
+        temp[i] = std::abs(Vr(i, 0));
+      // avoid already selected cols
+      for (auto c : colids) temp[c] = scalar_t(-1);
+      col = std::distance
+        (temp.begin(), std::max_element(temp.begin(), temp.begin()+n));
+      if (std::abs(Vr(col, 0)) < sfmin) break;
       colids.push_back(col);
       Vr.scale(scalar_t(1.) / Vr(col, 0));
       DW_t Ur(m, 1, U_, 0, rank);
@@ -125,7 +113,7 @@ namespace strumpack {
                 << ", ||Ur||=" << normUr
                 << ", ||Vr||=" << normVr
                 << ", ||UVt||=" << approx_norm
-                << ", ||S||=" << FrobS << " / " << UVrank.normF()
+                << ", ||S||=" << FrobS
                 << ", | ||UVt|| - ||S|| |="
                 << std::abs(approx_norm - FrobS)
                 << std::endl;
@@ -136,14 +124,12 @@ namespace strumpack {
         break;
 
       // select a new row
-      row = 0;
-      auto Urmax = std::abs(Ur(row, 0));
-      for (std::size_t i=1; i<m; i++) {
-        if (auto absUri = std::abs(Ur(i, 0)) > Urmax &&
-            std::find(rowids.begin(), rowids.end(), i) == rowids.end()) {
-          row = i; Urmax = absUri;
-        }
-      }
+      for (std::size_t i=0; i<m; i++)
+        temp[i] = std::abs(Ur(i, 0));
+      // avoid already selected rows
+      for (auto r : rowids) temp[r] = scalar_t(-1);
+      row = std::distance
+        (temp.begin(), std::max_element(temp.begin(), temp.begin()+m));
     }
 
     // // recompression TODO what tolerance to use here??

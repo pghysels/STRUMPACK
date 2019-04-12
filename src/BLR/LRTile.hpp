@@ -187,13 +187,13 @@ namespace strumpack {
         const override {
         b.Schur_update_col_b(i, *this, c, incc);
       }
-      virtual void Schur_update_row_a
+      void Schur_update_row_a
       (std::size_t i, const BLRTile<scalar_t>& b, scalar_t* c, int incc)
         const override {
         b.Schur_update_row_b(i, *this, c, incc);
       }
 
-      virtual void Schur_update_col_b
+      void Schur_update_col_b
       (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c, int incc)
         const override {
         DenseM_t temp1(rows(), 1), temp2(a.rank(), 1);
@@ -204,7 +204,7 @@ namespace strumpack {
         gemv(Trans::N, scalar_t(-1.), a.U(), temp2, scalar_t(1.), c, incc,
              params::task_recursion_cutoff_level);
       }
-      virtual void Schur_update_col_b
+      void Schur_update_col_b
       (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c, int incc)
         const override {
         DenseM_t temp(rows(), 1);
@@ -213,7 +213,7 @@ namespace strumpack {
         gemv(Trans::N, scalar_t(-1.), a.D(), temp, scalar_t(1.), c, incc,
              params::task_recursion_cutoff_level);
       }
-      virtual void Schur_update_row_b
+      void Schur_update_row_b
       (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c, int incc)
         const override {
         DenseM_t temp1(1, a.cols()), temp2(1, rank());
@@ -226,7 +226,7 @@ namespace strumpack {
         gemv(Trans::C, scalar_t(-1.), V_, temp2.data(), temp2.ld(),
              scalar_t(1.), c, incc, params::task_recursion_cutoff_level);
       }
-      virtual void Schur_update_row_b
+      void Schur_update_row_b
       (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c, int incc)
         const override {
         DenseM_t temp(1, rank());
