@@ -50,7 +50,7 @@ namespace strumpack {
     int minmn = std::min(m, n);
     int rmax = std::min(minmn, max_rank);
     D_t U_(m, rmax), V_(n, rmax);
-    std::vector<scalar_t> temp(std::max(m, n));
+    std::vector<real_t> temp(std::max(m, n));
     std::mt19937 mt;
     std::uniform_int_distribution<int> rgen(0, m-1);
     int row = rgen(mt), col = 0, rank = 0;
@@ -67,7 +67,7 @@ namespace strumpack {
       for (std::size_t i=0; i<n; i++)
         temp[i] = std::abs(Vr(i, 0));
       // avoid already selected cols
-      for (auto c : colids) temp[c] = scalar_t(-1);
+      for (auto c : colids) temp[c] = real_t(-1);
       col = std::distance
         (temp.begin(), std::max_element(temp.begin(), temp.begin()+n));
       if (std::abs(Vr(col, 0)) < sfmin) break;
@@ -127,7 +127,7 @@ namespace strumpack {
       for (std::size_t i=0; i<m; i++)
         temp[i] = std::abs(Ur(i, 0));
       // avoid already selected rows
-      for (auto r : rowids) temp[r] = scalar_t(-1);
+      for (auto r : rowids) temp[r] = real_t(-1);
       row = std::distance
         (temp.begin(), std::max_element(temp.begin(), temp.begin()+m));
     }
