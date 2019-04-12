@@ -13,14 +13,14 @@ follows:
      -DCMAKE_INSTALL_PREFIX=/path/to/install \
      -DCMAKE_CXX_COMPILER=<C++ compiler> \       # this and below are optional, CMake will try to autodetect
      -DCMAKE_Fortran_COMPILER=<Fortran77 compiler> \
-     -DTPL_SCALAPACK_LIBRARIES="/path/to/scalapack/libscalapack.a;/path/to/blacs/libblacs.a"
-     -DTPL_METIS_INCLUDE_DIRS=/path/to/metis/include
-     -DTPL_METIS_LIBRARIES=/path/to/metis/libmetis.a
+     -DTPL_SCALAPACK_LIBRARIES="/path/to/scalapack/libscalapack.a;/path/to/blacs/libblacs.a" \
+     -DTPL_METIS_INCLUDE_DIRS=/path/to/metis/include \
+     -DTPL_METIS_LIBRARIES=/path/to/metis/libmetis.a \
      -DTPL_ENABLE_PARMETIS=ON \               # optional
-     -DTPL_PARMETIS_INCLUDE_DIRS=/path/to/parmetis/include
-     -DTPL_PARMETIS_LIBRARIES=/path/to/parmetis/libparmetis.a
+     -DTPL_PARMETIS_INCLUDE_DIRS=/path/to/parmetis/include \
+     -DTPL_PARMETIS_LIBRARIES=/path/to/parmetis/libparmetis.a \
      -DTPL_ENABLE_SCOTCH=ON \                 # optional
-     -DTPL_SCOTCH_INCLUDE_DIRS=/path/to/scotch/include
+     -DTPL_SCOTCH_INCLUDE_DIRS=/path/to/scotch/include \
      -DTPL_SCOTCH_LIBRARIES="/path/to/ptscotch/libscotch.a;...libscotcherr.a;...libptscotch.a;...libptscotcherr.a"
 > make
 > make test                                      # optional, takes a while
