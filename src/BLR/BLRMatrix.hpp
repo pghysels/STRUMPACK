@@ -176,6 +176,7 @@ namespace strumpack {
     };
 
 
+    // TODO is this used??
     template<typename scalar_t> BLRMatrix<scalar_t>::BLRMatrix
     (DenseM_t& A, const std::vector<std::size_t>& rowtiles,
      const std::vector<std::size_t>& coltiles, const Opts_t& opts)
@@ -414,8 +415,10 @@ namespace strumpack {
         ti[i] = std::distance
           (roff_.begin(),
            std::upper_bound(roff_.begin(), roff_.end(), I[i])) - 1;
+      /////////////////////////////////////////////////////////////
       // TODO this should be further optimized, extracting whole
       // blocks from tiles
+      /////////////////////////////////////////////////////////////
       for (std::size_t j=0; j<n; j++) {
         auto tj = std::distance
           (coff_.begin(),
@@ -499,7 +502,8 @@ namespace strumpack {
     BLRMatrix<scalar_t>::create_LR_tile_left_looking
     (std::size_t i, std::size_t j, const extract_t<scalar_t>& Aelem,
      const Opts_t& opts) {
-      create_LR_tile_left_looking(i, j, std::min(i,j), Aelem, *this, *this, opts);
+      create_LR_tile_left_looking
+        (i, j, std::min(i,j), Aelem, *this, *this, opts);
     }
 
     template<typename scalar_t> void
@@ -512,23 +516,46 @@ namespace strumpack {
       std::vector<std::size_t> lI(m), lJ(n), idx(1);
       std::iota(lJ.begin(), lJ.end(), dn);
       std::iota(lI.begin(), lI.end(), dm);
-      auto Arow = [&](std::size_t row, scalar_t* c, int incc) {
-        idx[0] = dm + row;
-        DenseMW_t cr(1, n, c, std::max(1, incc));
-        Aelem(idx, lJ, cr);
-        for (std::size_t l=0; l<k; l++)
-          Schur_update_row(row, B21.tile(i, l), B12.tile(l, j), c, incc);
-      };
-      auto Acol = [&](std::size_t col, scalar_t* c, int incc) {
-        idx[0] = dn + col;
-        assert(incc == 1);
-        DenseMW_t cc(m, 1, c, m);
-        Aelem(lI, idx, cc);
-        for (std::size_t l=0; l<k; l++)
-          Schur_update_col(col, B21.tile(i, l), B12.tile(l, j), c, incc);
-      };
-      block(i, j) = std::unique_ptr<LRTile<scalar_t>>
-        (new LRTile<scalar_t>(m, n, Arow, Acol, opts));
+      if (opts.low_rank_algorithm() == LowRankAlgorithm::BACA) {
+        auto Arow = [&](const std::vector<std::size_t>& rows,
+                        DenseMatrix<scalar_t>& c) {
+          assert(rows.size() == c.rows() && c.cols() == n);
+          auto grows = rows;
+          for (auto& gr : grows) gr += dm;
+          Aelem(grows, lJ, c);
+          for (std::size_t l=0; l<k; l++)
+            Schur_update_rows(rows, B21.tile(i, l), B12.tile(l, j), c);
+        };
+        auto Acol = [&](const std::vector<std::size_t>& cols,
+                        DenseMatrix<scalar_t>& c) {
+          assert(cols.size() == c.cols() && c.rows() == m);
+          auto gcols = cols;
+          for (auto& gc : gcols) gc += dn;
+          Aelem(lI, gcols, c);
+          for (std::size_t l=0; l<k; l++)
+            Schur_update_cols(cols, B21.tile(i, l), B12.tile(l, j), c);
+        };
+        block(i, j) = std::unique_ptr<LRTile<scalar_t>>
+          (new LRTile<scalar_t>(m, n, Arow, Acol, opts));
+      } else {
+        std::vector<std::size_t> idx(1);
+        auto Arow = [&](std::size_t row, scalar_t* c) {
+          idx[0] = dm + row;
+          DenseMW_t cr(1, n, c, 1);
+          Aelem(idx, lJ, cr);
+          for (std::size_t l=0; l<k; l++)
+            Schur_update_row(row, B21.tile(i, l), B12.tile(l, j), c);
+        };
+        auto Acol = [&](std::size_t col, scalar_t* c) {
+          idx[0] = dn + col;
+          DenseMW_t cc(m, 1, c, m);
+          Aelem(lI, idx, cc);
+          for (std::size_t l=0; l<k; l++)
+            Schur_update_col(col, B21.tile(i, l), B12.tile(l, j), c);
+        };
+        block(i, j) = std::unique_ptr<LRTile<scalar_t>>
+          (new LRTile<scalar_t>(m, n, Arow, Acol, opts));
+      }
       auto& t = tile(i, j);
       if (t.rank()*(m + n) > m*n)
         create_dense_tile_left_looking(i, j, k, Aelem, B21, B12);

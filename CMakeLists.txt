@@ -472,6 +472,7 @@ install(FILES
 install(FILES
   src/dense/DistributedMatrix.hpp
   src/dense/ACA.hpp
+  src/dense/BACA.hpp
   src/dense/DenseMatrix.hpp
   src/dense/BLASLAPACKOpenMPTask.hpp
   src/dense/BLASLAPACKWrapper.hpp

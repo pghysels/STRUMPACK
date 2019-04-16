@@ -30,6 +30,7 @@
 #define ADAPTIVE_CROSS_APPROXIMATION_HPP
 
 #include "DenseMatrix.hpp"
+#include <iterator>
 
 namespace strumpack {
 
@@ -41,16 +42,15 @@ namespace strumpack {
   void adaptive_cross_approximation
   (DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
    std::size_t m, std::size_t n,
-   const std::function<void(std::size_t,scalar_t*,int)>& Arow,
-   const std::function<void(std::size_t,scalar_t*,int)>& Acol,
+   const std::function<void(std::size_t,scalar_t*)>& Arow,
+   const std::function<void(std::size_t,scalar_t*)>& Acol,
    real_t rtol, real_t atol, int max_rank,
    int task_depth=params::task_recursion_cutoff_level) {
     using D_t = DenseMatrix<scalar_t>;
     using DW_t = DenseMatrixWrapper<scalar_t>;
     auto sfmin = blas::lamch<real_t>('S');
-    int minmn = std::min(m, n);
-    int rmax = std::min(minmn, max_rank);
-    D_t U_(m, rmax), V_(n, rmax);
+    int rmax = std::min(std::min(m, n), std::size_t(max_rank));
+    D_t U_(m, rmax), V_(n, rmax); // TODO store V iso V transpose
     std::vector<real_t> temp(std::max(m, n));
     std::vector<scalar_t> du(rmax), dv(rmax);
     std::mt19937 mt;
@@ -63,7 +63,7 @@ namespace strumpack {
     while (rank < rmax) {
       rowids.push_back(row);
       DW_t Vr(n, 1, V_, 0, rank);
-      Arow(row, Vr.data(), 1);
+      Arow(row, Vr.data());
       gemv(Trans::N, scalar_t(-1.), DW_t(n, rank, V_, 0, 0),
            U_.ptr(row, 0), U_.ld(), scalar_t(1.), Vr.ptr(0, 0), 1,
            task_depth);
@@ -77,7 +77,7 @@ namespace strumpack {
       colids.push_back(col);
       Vr.scale(scalar_t(1.) / Vr(col, 0));
       DW_t Ur(m, 1, U_, 0, rank);
-      Acol(col, Ur.data(), 1);
+      Acol(col, Ur.data());
       gemv(Trans::N, scalar_t(-1.), DW_t(m, rank, U_, 0, 0),
            V_.ptr(col, 0), V_.ld(), scalar_t(1.), Ur.ptr(0, 0), 1,
            task_depth);
@@ -130,13 +130,11 @@ namespace strumpack {
    std::size_t m, std::size_t n,
    const std::function<scalar_t(std::size_t,std::size_t)>& Aelem,
    real_t rtol, real_t atol, int max_rank) {
-    auto Arow = [&](std::size_t r, scalar_t* B, int ldB) {
-      for (std::size_t j=0; j<n; j++)
-        B[j*ldB] = Aelem(r, j);
+    auto Arow = [&](std::size_t r, scalar_t* B) {
+      for (std::size_t j=0; j<n; j++) B[j] = Aelem(r, j);
     };
-    auto Acol = [&](std::size_t c, scalar_t* B, int ldB) {
-      for (std::size_t i=0; i<m; i++)
-        B[i*ldB] = Aelem(i, c);
+    auto Acol = [&](std::size_t c, scalar_t* B) {
+      for (std::size_t i=0; i<m; i++) B[i] = Aelem(i, c);
     };
     adaptive_cross_approximation<scalar_t>
       (U, V, m, n, Arow, Acol, rtol, atol, max_rank);

@@ -282,7 +282,7 @@ namespace strumpack {
         }
 #endif
       }
-    } else {
+    } else { // ACA or BACA
       auto F11elem = [&](const std::vector<std::size_t>& lI,
                          const std::vector<std::size_t>& lJ, DenseM_t& B) {
         auto gI = lI; auto gJ = lJ;

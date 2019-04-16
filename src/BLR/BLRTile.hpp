@@ -34,7 +34,7 @@
 
 #include <cassert>
 
-#include "../dense/DenseMatrix.hpp"
+#include "dense/DenseMatrix.hpp"
 #include "BLROptions.hpp"
 
 namespace strumpack {
@@ -96,23 +96,36 @@ namespace strumpack {
                           DenseM_t& c, int task_depth) const = 0;
 
       virtual void Schur_update_col_a
-      (std::size_t i, const BLRTile<scalar_t>& b, scalar_t* c, int incc)
-        const = 0;
+      (std::size_t i, const BLRTile<scalar_t>& b, scalar_t* c) const = 0;
       virtual void Schur_update_row_a
-      (std::size_t i, const BLRTile<scalar_t>& b, scalar_t* c, int incc)
-        const = 0;
+      (std::size_t i, const BLRTile<scalar_t>& b, scalar_t* c) const = 0;
       virtual void Schur_update_col_b
-      (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c, int incc)
-        const = 0;
+      (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c) const = 0;
       virtual void Schur_update_col_b
-      (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c, int incc)
-        const = 0;
+      (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c) const = 0;
       virtual void Schur_update_row_b
-      (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c, int incc)
-        const = 0;
+      (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c) const = 0;
       virtual void Schur_update_row_b
-      (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c, int incc)
-        const = 0;
+      (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c) const = 0;
+
+      virtual void Schur_update_cols_a
+      (const std::vector<std::size_t>& cols,
+       const BLRTile<scalar_t>& b, DenseMatrix<scalar_t>& c) const = 0;
+      virtual void Schur_update_rows_a
+      (const std::vector<std::size_t>& rows,
+       const BLRTile<scalar_t>& b, DenseMatrix<scalar_t>& c) const = 0;
+      virtual void Schur_update_cols_b
+      (const std::vector<std::size_t>& cols,
+       const LRTile<scalar_t>& a, DenseMatrix<scalar_t>& c) const = 0;
+      virtual void Schur_update_cols_b
+      (const std::vector<std::size_t>& cols,
+       const DenseTile<scalar_t>& a, DenseMatrix<scalar_t>& c) const = 0;
+      virtual void Schur_update_rows_b
+      (const std::vector<std::size_t>& rows,
+       const LRTile<scalar_t>& a, DenseMatrix<scalar_t>& c) const = 0;
+      virtual void Schur_update_rows_b
+      (const std::vector<std::size_t>& rows,
+       const DenseTile<scalar_t>& a, DenseMatrix<scalar_t>& c) const = 0;
     };
 
   } // end namespace BLR

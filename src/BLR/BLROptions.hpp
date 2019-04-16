@@ -52,11 +52,12 @@ namespace strumpack {
       return 1e-5;
     }
 
-    enum class LowRankAlgorithm { RRQR, ACA };
+    enum class LowRankAlgorithm { RRQR, ACA, BACA };
     inline std::string get_name(LowRankAlgorithm a) {
       switch (a) {
       case LowRankAlgorithm::RRQR: return "RRQR"; break;
       case LowRankAlgorithm::ACA: return "ACA"; break;
+      case LowRankAlgorithm::BACA: return "BACA"; break;
       default: return "unknown";
       }
     }
@@ -80,6 +81,7 @@ namespace strumpack {
       int max_rank_ = 5000;
       bool verbose_ = true;
       LowRankAlgorithm lr_algo_ = LowRankAlgorithm::RRQR;
+      int BACA_blocksize_ = 4;
       Admissibility adm_ = Admissibility::STRONG;
 
     public:
@@ -110,6 +112,10 @@ namespace strumpack {
       }
       void set_admissibility(Admissibility adm) { adm_ = adm; }
       void set_verbose(bool verbose) { verbose_ = verbose; }
+      void set_BACA_blocksize(int B) {
+        assert(B > 0);
+        BACA_blocksize_ = B;
+      }
 
       real_t rel_tol() const { return rel_tol_; }
       real_t abs_tol() const { return abs_tol_; }
@@ -118,6 +124,7 @@ namespace strumpack {
       LowRankAlgorithm low_rank_algorithm() const { return lr_algo_; }
       Admissibility admissibility() const { return adm_; }
       bool verbose() const { return verbose_; }
+      int BACA_blocksize() const { return BACA_blocksize_; }
 
       void set_from_command_line(int argc, const char* const* argv) {
         std::vector<char*> argv_local(argc);
@@ -132,6 +139,7 @@ namespace strumpack {
           {"blr_max_rank",              required_argument, 0, 4},
           {"blr_low_rank_algorithm",    required_argument, 0, 5},
           {"blr_admissibility",         required_argument, 0, 6},
+          {"blr_BACA_blocksize",        required_argument, 0, 7},
           {"blr_verbose",               no_argument, 0, 'v'},
           {"blr_quiet",                 no_argument, 0, 'q'},
           {"help",                      no_argument, 0, 'h'},
@@ -164,26 +172,33 @@ namespace strumpack {
           case 5: {
             std::istringstream iss(optarg);
             std::string s; iss >> s;
-            if (s.compare("RRQR") == 0)
+            if (s == "RRQR")
               set_low_rank_algorithm(LowRankAlgorithm::RRQR);
-            else if (s.compare("ACA") == 0)
+            else if (s == "ACA")
               set_low_rank_algorithm(LowRankAlgorithm::ACA);
+            else if (s == "BACA")
+              set_low_rank_algorithm(LowRankAlgorithm::BACA);
             else
               std::cerr << "# WARNING: low-rank algorithm not"
-                        << " recognized, use 'RRQR' or 'ACA'."
+                        << " recognized, use 'RRQR', 'ACA' or 'BACA'."
                         << std::endl;
           } break;
           case 6: {
             std::istringstream iss(optarg);
             std::string s; iss >> s;
-            if (s.compare("weak") == 0)
+            if (s == "weak")
               set_admissibility(Admissibility::WEAK);
-            else if (s.compare("strong") == 0)
+            else if (s == "strong")
               set_admissibility(Admissibility::STRONG);
             else
               std::cerr << "# WARNING: admisibility not recognized"
                         << ", use 'weak' or 'strong'."
                         << std::endl;
+          } break;
+          case 7: {
+            std::istringstream iss(optarg);
+            iss >> BACA_blocksize_;
+            set_BACA_blocksize(BACA_blocksize_);
           } break;
 
           case 'v': set_verbose(true); break;
@@ -206,10 +221,12 @@ namespace strumpack {
                   << max_rank() << ")" << std::endl
                   << "#   --blr_low_rank_algorithm (default "
                   << get_name(lr_algo_) << ")" << std::endl
-                  << "#      should be RRQR (ACA not supported yet)" << std::endl
+                  << "#      should be [RRQR|ACA|BACA]" << std::endl
                   << "#   --blr_admissibility (default "
                   << get_name(adm_) << ")" << std::endl
                   << "#      should be one of [weak|strong]" << std::endl
+                  << "#   --blr_BACA_blocksize int (default "
+                  << BACA_blocksize() << ")" << std::endl
                   << "#   --blr_verbose or -v (default "
                   << verbose() << ")" << std::endl
                   << "#   --blr_quiet or -q (default "
