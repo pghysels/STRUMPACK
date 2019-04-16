@@ -709,6 +709,25 @@ namespace strumpack {
          const std::complex<double>* tau, std::complex<double>* work,
          int* lwork, int* info);
 
+      void FC_GLOBAL(sormqr,SORMQR)
+        (char* side, char* trans, int* m, int* n, int* k,
+         const float* a, int* lda, const float* tau, float* c, int* ldc,
+         float* work, int* lwork, int* info);
+      void FC_GLOBAL(dormqr,DORMQR)
+        (char* size, char* trans, int* m, int* n, int* k,
+         const double* a, int* lda, const double* tau, double* c, int* ldc,
+         double* work, int* lwork, int* info);
+      void FC_GLOBAL(cunmqr,CORMQR)
+        (char* size, char* trans, int* m, int* n, int* k,
+         const std::complex<float>* a, int* lda,
+         const std::complex<float>* tau, std::complex<float>* c, int* ldc,
+         std::complex<float>* work, int* lwork, int* info);
+      void FC_GLOBAL(zunmqr,ZORMQR)
+        (char* size, char* trans, int* m, int* n, int* k,
+         const std::complex<double>* a, int* lda,
+         const std::complex<double>* tau, std::complex<double>* c, int* ldc,
+         std::complex<double>* work, int* lwork, int* info);
+
       void FC_GLOBAL(sgesv,SGESV)
         (int* n, int* nrhs, float* a, int* lda, int* ipiv,
          float* b, int* ldb, int* info);
@@ -1471,67 +1490,80 @@ namespace strumpack {
         else return m * m * 2 / 3 * (3 * n - m);
       }
     }
-    inline void geqp3
+    inline int geqp3
     (int m, int n, float* a, int lda, int* jpvt, float* tau,
-     float* work, int lwork, int* info) {
+     float* work, int lwork) {
+      int info;
       FC_GLOBAL(sgeqp3,SGEQP3)
-        (&m, &n, a, &lda, jpvt, tau, work, &lwork, info);
+        (&m, &n, a, &lda, jpvt, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(geqp3_flops(m,n));
+      return info;
     }
-    inline void geqp3
+    inline int geqp3
     (int m, int n, double* a, int lda, int* jpvt, double* tau,
-     double* work, int lwork, int* info) {
-      dgeqp3_(&m, &n, a, &lda, jpvt, tau, work, &lwork, info);
+     double* work, int lwork) {
+      int info;
+      FC_GLOBAL(dgeqp3,DGEQP3)
+        (&m, &n, a, &lda, jpvt, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(geqp3_flops(m,n));
+      return info;
     }
-    inline void geqp3
+    inline int geqp3
     (int m, int n, std::complex<float>* a, int lda, int* jpvt,
-     std::complex<float>* tau, std::complex<float>* work,
-     int lwork, int* info) {
-      auto rwork = new std::complex<float>[std::max(1, 2*n)];
-      cgeqp3_(&m, &n, a, &lda, jpvt, tau, work, &lwork, rwork, info);
-      delete[] rwork;
+     std::complex<float>* tau, std::complex<float>* work, int lwork) {
+      int info;
+      std::unique_ptr<std::complex<float>[]> rwork
+        (new std::complex<float>[std::max(1, 2*n)]);
+      FC_GLOBAL(cgeqp3,CGEQP3)
+        (&m, &n, a, &lda, jpvt, tau, work, &lwork, rwork.get(), &info);
       STRUMPACK_FLOPS(4*geqp3_flops(m,n));
+      return info;
     }
-    inline void geqp3
+    inline int geqp3
     (int m, int n, std::complex<double>* a, int lda, int* jpvt,
      std::complex<double>* tau, std::complex<double>* work,
-     int lwork, int* info) {
-      auto rwork = new std::complex<double>[std::max(1, 2*n)];
-      zgeqp3_(&m, &n, a, &lda, jpvt, tau, work, &lwork, rwork, info);
-      delete[] rwork;
+     int lwork) {
+      int info;
+      std::unique_ptr<std::complex<double>[]> rwork
+        (new std::complex<double>[std::max(1, 2*n)]);
+      FC_GLOBAL(zgeqp3,ZGEQP3)
+        (&m, &n, a, &lda, jpvt, tau, work, &lwork, rwork.get(), &info);
       STRUMPACK_FLOPS(4*geqp3_flops(m,n));
+      return info;
     }
-    template<typename scalar> inline void geqp3
-    (int m, int n, scalar* a, int lda, int* jpvt, scalar* tau, int* info) {
+    template<typename scalar> inline int geqp3
+    (int m, int n, scalar* a, int lda, int* jpvt, scalar* tau) {
       scalar lwork;
-      geqp3(m, n, a, lda, jpvt, tau, &lwork, -1, info);
-      int ilwork = int(lwork);
-      auto work = new scalar[ilwork];
-      geqp3(m, n, a, lda, jpvt, tau, work, ilwork, info);
-      delete[] work;
+      int info = geqp3(m, n, a, lda, jpvt, tau, &lwork, -1);
+      int ilwork = int(std::real(lwork));
+      std::unique_ptr<scalar[]> work(new scalar[ilwork]);
+      return geqp3(m, n, a, lda, jpvt, tau, work.get(), ilwork);
     }
 
 
-    inline void geqp3tol
+    inline int geqp3tol
     (int m, int n, float* a, int lda, int* jpvt, float* tau, float* work,
-     int lwork, int* info, int& rank, float rtol, float atol, int depth) {
+     int lwork, int& rank, float rtol, float atol, int depth) {
+      int info;
       FC_GLOBAL(sgeqp3tol,SGEQP3TOL)
-        (&m, &n, a, &lda, jpvt, tau, work, &lwork, info,
+        (&m, &n, a, &lda, jpvt, tau, work, &lwork, &info,
          &rank, &rtol, &atol, &depth);
+      return info;
     }
-    inline void geqp3tol
+    inline int geqp3tol
     (int m, int n, double* a, int lda, int* jpvt, double* tau, double* work,
-     int lwork, int* info, int& rank, double rtol, double atol, int depth) {
+     int lwork, int& rank, double rtol, double atol, int depth) {
+      int info;
       FC_GLOBAL(dgeqp3tol,DGEQP3TOL)
-        (&m, &n, a, &lda, jpvt, tau, work, &lwork, info,
+        (&m, &n, a, &lda, jpvt, tau, work, &lwork, &info,
          &rank, &rtol, &atol, &depth);
+      return info;
     }
-    inline void geqp3tol
+    inline int geqp3tol
     (int m, int n, std::complex<float>* a, int lda, int* jpvt,
      std::complex<float>* tau, std::complex<float>* work, int lwork,
-     int* info, int& rank, float rtol, float atol, int depth) {
-      auto rwork = new float[std::max(1, 2*n)];
+     int& rank, float rtol, float atol, int depth) {
+      std::unique_ptr<float[]> rwork(new float[std::max(1, 2*n)]);
       bool tasked = depth < params::task_recursion_cutoff_level;
       if (tasked) {
         int loop_tasks = std::max(params::num_threads / (depth+1), 1);
@@ -1545,16 +1577,17 @@ namespace strumpack {
       } else
         for (int i=0; i<n; i++)
           rwork[i] = nrm2(m, &a[i*lda], 1);
+      int info;
       FC_GLOBAL(cgeqp3tol,CGEQP3TOL)
-        (&m, &n, a, &lda, jpvt, tau, work, &lwork, rwork, info,
+        (&m, &n, a, &lda, jpvt, tau, work, &lwork, rwork.get(), &info,
          &rank, &rtol, &atol, &depth);
-      delete[] rwork;
+      return info;
     }
-    inline void geqp3tol
+    inline int geqp3tol
     (int m, int n, std::complex<double>* a, int lda, int* jpvt,
      std::complex<double>* tau, std::complex<double>* work, int lwork,
-     int* info, int& rank, double rtol, double atol, int depth) {
-      auto rwork = new double[std::max(1, 2*n)];
+     int& rank, double rtol, double atol, int depth) {
+      std::unique_ptr<double[]> rwork(new double[std::max(1, 2*n)]);
       bool tasked = depth < params::task_recursion_cutoff_level;
       if (tasked) {
         int loop_tasks = std::max(params::num_threads / (depth+1), 1);
@@ -1568,20 +1601,21 @@ namespace strumpack {
       } else
         for (int i=0; i<n; i++)
           rwork[i] = nrm2(m, &a[i*lda], 1);
+      int info;
       FC_GLOBAL(zgeqp3tol,ZGEQP3TOL)
-        (&m, &n, a, &lda, jpvt, tau, work, &lwork, rwork, info,
+        (&m, &n, a, &lda, jpvt, tau, work, &lwork, rwork.get(), &info,
          &rank, &rtol, &atol, &depth);
-      delete[] rwork;
+      return info;
     }
 
-    template<typename scalar, typename real> inline void geqp3tol
-    (int m, int n, scalar* a, int lda, int* jpvt, scalar* tau, int* info,
+    template<typename scalar, typename real> inline int geqp3tol
+    (int m, int n, scalar* a, int lda, int* jpvt, scalar* tau,
      int& rank, real rtol, real atol, int depth) {
       scalar lwork;
-      geqp3tol
-        (m, n, a, lda, jpvt, tau, &lwork, -1, info, rank, rtol, atol, depth);
+      int info = geqp3tol
+        (m, n, a, lda, jpvt, tau, &lwork, -1, rank, rtol, atol, depth);
       int ilwork = int(std::real(lwork));
-      auto work = new scalar[ilwork];
+      std::unique_ptr<scalar[]> work(new scalar[ilwork]);
       if (! is_complex<scalar>()) {
         bool tasked = depth < params::task_recursion_cutoff_level;
         if (tasked) {
@@ -1597,10 +1631,8 @@ namespace strumpack {
           for (int i=0; i<n; i++)
             work[i] = nrm2(m, &a[i*lda], 1);
       }
-      geqp3tol
-        (m, n, a, lda, jpvt, tau, work, ilwork,
-         info, rank, rtol, atol, depth);
-      delete[] work;
+      return geqp3tol
+        (m, n, a, lda, jpvt, tau, work.get(), ilwork, rank, rtol, atol, depth);
     }
 
 
@@ -1612,75 +1644,86 @@ namespace strumpack {
         return m * (m * (-.5 - (1./3.) * m + n) + 2 * n + 23./6.) +
           m * (m * (-.5 - (1./3.) * m + n) + n + 5./6.);
     }
-    inline void geqrf
-    (int m, int n, float* a, int lda, float* tau,
-     float* work, int lwork, int* info) {
-      FC_GLOBAL(sgeqrf,SGEQRF)(&m, &n, a, &lda, tau, work, &lwork, info);
+    inline int geqrf
+    (int m, int n, float* a, int lda, float* tau, float* work, int lwork) {
+      int info;
+      FC_GLOBAL(sgeqrf,SGEQRF)(&m, &n, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(geqrf_flops(m,n));
+      return info;
     }
-    inline void geqrf
-    (int m, int n, double* a, int lda, double* tau,
-     double* work, int lwork, int* info) {
-      FC_GLOBAL(dgeqrf,DGEQRF)(&m, &n, a, &lda, tau, work, &lwork, info);
+    inline int geqrf
+    (int m, int n, double* a, int lda, double* tau, double* work, int lwork) {
+      int info;
+      FC_GLOBAL(dgeqrf,DGEQRF)(&m, &n, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(geqrf_flops(m,n));
+      return info;
     }
-    inline void geqrf
+    inline int geqrf
     (int m, int n, std::complex<float>* a, int lda, std::complex<float>* tau,
-     std::complex<float>* work, int lwork, int* info) {
-      FC_GLOBAL(cgeqrf,CGEQRF)(&m, &n, a, &lda, tau, work, &lwork, info);
+     std::complex<float>* work, int lwork) {
+      int info;
+      FC_GLOBAL(cgeqrf,CGEQRF)(&m, &n, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(4*geqrf_flops(m,n));
+      return info;
     }
-    inline void geqrf
+    inline int geqrf
     (int m, int n, std::complex<double>* a, int lda,
-     std::complex<double>* tau, std::complex<double>* work,
-     int lwork, int* info) {
-      FC_GLOBAL(zgeqrf,ZGEQRF)(&m, &n, a, &lda, tau, work, &lwork, info);
+     std::complex<double>* tau, std::complex<double>* work, int lwork) {
+      int info;
+      FC_GLOBAL(zgeqrf,ZGEQRF)(&m, &n, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(4*geqrf_flops(m,n));
+      return info;
     }
-    template<typename scalar> inline void geqrf
-    (int m, int n, scalar* a, int lda, scalar* tau, int* info) {
+    template<typename scalar> inline int geqrf
+    (int m, int n, scalar* a, int lda, scalar* tau) {
       scalar lwork;
-      geqrf(m, n, a, lda, tau, &lwork, -1, info);
+      int info = geqrf(m, n, a, lda, tau, &lwork, -1);
       int ilwork = int(std::real(lwork));
-      auto work = new scalar[ilwork];
-      geqrf(m, n, a, lda, tau, work, ilwork, info);
-      delete[] work;
+      std::unique_ptr<scalar[]> work(new scalar[ilwork]);
+      return geqrf(m, n, a, lda, tau, work.get(), ilwork);
     }
 
 
-    inline void geqrfmod
+    inline int geqrfmod
     (int m, int n, float* a, int lda,
-     float* tau, float* work, int lwork, int* info, int depth) {
+     float* tau, float* work, int lwork, int depth) {
+      int info;
       FC_GLOBAL(sgeqrfmod,SGEQRFMOD)
-        (&m, &n, a, &lda, tau, work, &lwork, info, &depth);
+        (&m, &n, a, &lda, tau, work, &lwork, &info, &depth);
+      return info;
     }
-    inline void geqrfmod
+    inline int geqrfmod
     (int m, int n, double* a, int lda, double* tau,
-     double* work, int lwork, int* info, int depth) {
+     double* work, int lwork, int depth) {
+      int info;
       FC_GLOBAL(dgeqrfmod,DGEQRFMOD)
-        (&m, &n, a, &lda, tau, work, &lwork, info, &depth);
+        (&m, &n, a, &lda, tau, work, &lwork, &info, &depth);
+      return info;
     }
-    inline void geqrfmod
+    inline int geqrfmod
     (int m, int n, std::complex<float>* a, int lda, std::complex<float>* tau,
-     std::complex<float>* work, int lwork, int* info, int depth) {
+     std::complex<float>* work, int lwork, int depth) {
+      int info;
       FC_GLOBAL(cgeqrfmod,CGEQRFMOD)
-        (&m, &n, a, &lda, tau, work, &lwork, info, &depth);
+        (&m, &n, a, &lda, tau, work, &lwork, &info, &depth);
+      return info;
     }
-    inline void geqrfmod
+    inline int geqrfmod
     (int m, int n, std::complex<double>* a, int lda,
      std::complex<double>* tau, std::complex<double>* work,
-     int lwork, int* info, int depth) {
+     int lwork, int depth) {
+      int info;
       FC_GLOBAL(zgeqrfmod,ZGEQRFMOD)
-        (&m, &n, a, &lda, tau, work, &lwork, info, &depth);
+        (&m, &n, a, &lda, tau, work, &lwork, &info, &depth);
+      return info;
     }
-    template<typename scalar> inline void geqrfmod
-    (int m, int n, scalar* a, int lda, scalar* tau, int* info, int depth) {
+    template<typename scalar> inline int geqrfmod
+    (int m, int n, scalar* a, int lda, scalar* tau, int depth) {
       scalar lwork;
-      geqrfmod(m, n, a, lda, tau, &lwork, -1, info, depth);
+      int info = geqrfmod(m, n, a, lda, tau, &lwork, -1, depth);
       int ilwork = int(std::real(lwork));
-      auto work = new scalar[ilwork];
-      geqrfmod(m, n, a, lda, tau, work, ilwork, info, depth);
-      delete[] work;
+      std::unique_ptr<scalar[]> work(new scalar[ilwork]);
+      return geqrfmod(m, n, a, lda, tau, work.get(), ilwork, depth);
     }
 
 
@@ -1692,39 +1735,43 @@ namespace strumpack {
         return m * (m * (-.5 - (1./3.) * m + n) + 2 * n + 29./6.) +
                               m * (m * (.5 - (1./3.) * m + n) + 5./6.);
     }
-    inline void gelqf
-    (int m, int n, float* a, int lda, float* tau,
-     float* work, int lwork, int* info) {
-      FC_GLOBAL(sgelqf,SGELQF)(&m, &n, a, &lda, tau, work, &lwork, info);
+    inline int gelqf
+    (int m, int n, float* a, int lda, float* tau, float* work, int lwork) {
+      int info;
+      FC_GLOBAL(sgelqf,SGELQF)(&m, &n, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(gelqf_flops(m,n));
+      return info;
     }
-    inline void gelqf
-    (int m, int n, double* a, int lda, double* tau,
-     double* work, int lwork, int* info) {
-      FC_GLOBAL(dgelqf,DGELQF)(&m, &n, a, &lda, tau, work, &lwork, info);
+    inline int gelqf
+    (int m, int n, double* a, int lda, double* tau, double* work, int lwork) {
+      int info;
+      FC_GLOBAL(dgelqf,DGELQF)(&m, &n, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(gelqf_flops(m,n));
+      return info;
     }
-    inline void gelqf
+    inline int gelqf
     (int m, int n, std::complex<float>* a, int lda, std::complex<float>* tau,
-     std::complex<float>* work, int lwork, int* info) {
-      FC_GLOBAL(cgelqf,CGELQF)(&m, &n, a, &lda, tau, work, &lwork, info);
+     std::complex<float>* work, int lwork) {
+      int info;
+      FC_GLOBAL(cgelqf,CGELQF)(&m, &n, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(4*gelqf_flops(m,n));
+      return info;
     }
-    inline void gelqf
+    inline int gelqf
     (int m, int n, std::complex<double>* a, int lda,
-     std::complex<double>* tau, std::complex<double>* work,
-     int lwork, int* info) {
-      FC_GLOBAL(zgelqf,ZGELQF)(&m, &n, a, &lda, tau, work, &lwork, info);
+     std::complex<double>* tau, std::complex<double>* work, int lwork) {
+      int info;
+      FC_GLOBAL(zgelqf,ZGELQF)(&m, &n, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(4*gelqf_flops(m,n));
+      return info;
     }
-    template<typename scalar> inline void gelqf
-    (int m, int n, scalar* a, int lda, scalar* tau, int* info) {
+    template<typename scalar> inline int gelqf
+    (int m, int n, scalar* a, int lda, scalar* tau) {
       scalar lwork;
-      gelqf(m, n, a, lda, tau, &lwork, -1, info);
+      int info = gelqf(m, n, a, lda, tau, &lwork, -1);
       int ilwork = int(std::real(lwork));
-      auto work = new scalar[ilwork];
-      gelqf(m, n, a, lda, tau, work, ilwork, info);
-      delete[] work;
+      std::unique_ptr<scalar[]> work(new scalar[ilwork]);
+      return gelqf(m, n, a, lda, tau, work.get(), ilwork);
     }
 
 
@@ -1959,86 +2006,140 @@ namespace strumpack {
       if (n == k) return 2 * n * n * (3 * m - n) / 3;
       else return 4 * m * n * k - 2 * (m + n) * k * k + 4 * k * k * k / 3;
     }
-    inline void xxgqr
+    inline int xxgqr
     (int m, int n, int k, float* a, int lda, const float* tau,
-     float* work, int lwork, int* info) {
+     float* work, int lwork) {
+      int info;
       FC_GLOBAL(sorgqr,SORGQR)
-        (&m, &n, &k, a, &lda, tau, work, &lwork, info);
+        (&m, &n, &k, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(xxgqr_flops(m,n,k));
+      return info;
     }
-    inline void xxgqr
+    inline int xxgqr
     (int m, int n, int k, double* a, int lda, const double* tau,
-     double* work, int lwork, int* info) {
+     double* work, int lwork) {
+      int info;
       FC_GLOBAL(dorgqr,DORGQR)
-        (&m, &n, &k, a, &lda, tau, work, &lwork, info);
+        (&m, &n, &k, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(xxgqr_flops(m,n,k));
+      return info;
     }
-    inline void xxgqr
+    inline int xxgqr
     (int m, int n, int k, std::complex<float>* a, int lda,
      const std::complex<float>* tau, std::complex<float>* work,
-     int lwork, int* info) {
-      FC_GLOBAL(cungqr,FC_GLOBAL)
-        (&m, &n, &k, a, &lda, tau, work, &lwork, info);
+     int lwork) {
+      int info;
+      FC_GLOBAL(cungqr,CUNGQR)
+        (&m, &n, &k, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(4*xxgqr_flops(m,n,k));
+      return info;
     }
-    inline void xxgqr
+    inline int xxgqr
     (int m, int n, int k, std::complex<double>* a, int lda,
      const std::complex<double>* tau, std::complex<double>* work,
-     int lwork, int* info) {
+     int lwork) {
+      int info;
       FC_GLOBAL(zungqr,ZUNGQR)
-        (&m, &n, &k, a, &lda, tau, work, &lwork, info);
+        (&m, &n, &k, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(4*xxgqr_flops(m,n,k));
+      return info;
     }
-    template<typename scalar> inline void xxgqr
-    (int m, int n, int k, scalar* a, int lda, const scalar* tau, int* info) {
+    template<typename scalar> inline int xxgqr
+    (int m, int n, int k, scalar* a, int lda, const scalar* tau) {
       scalar lwork;
-      xxgqr(m, n, k, a, lda, tau, &lwork, -1, info);
+      int info = xxgqr(m, n, k, a, lda, tau, &lwork, -1);
       int ilwork = int(std::real(lwork));
-      auto work = new scalar[ilwork];
-      xxgqr(m, n, k, a, lda, tau, work, ilwork, info);
-      delete[] work;
+      std::unique_ptr<scalar[]> work(new scalar[ilwork]);
+      return xxgqr(m, n, k, a, lda, tau, work.get(), ilwork);
+    }
+
+
+    inline long long xxmqr_flops(long long m, long long n, long long k) {
+      // TODO
+      // if (n == k) return 2 * n * n * (3 * m - n) / 3;
+      // else return 4 * m * n * k - 2 * (m + n) * k * k + 4 * k * k * k / 3;
+      return 0;
+    }
+    inline int xxmqr
+    (char side, char trans, int m, int n, int k, float* a, int lda,
+     const float* tau, float* c, int ldc, float* work, int lwork) {
+      int info;
+      FC_GLOBAL(sormqr,SORMQR)
+        (&side, &trans, &m, &n, &k, a, &lda, tau, c, &ldc, work, &lwork, &info);
+      STRUMPACK_FLOPS(xxmqr_flops(m,n,k));
+      return info;
+    }
+    inline int xxmqr
+    (char side, char trans, int m, int n, int k, double* a, int lda,
+     const double* tau, double* c, int ldc, double* work, int lwork) {
+      int info;
+      FC_GLOBAL(dormqr,DORMQR)
+        (&side, &trans, &m, &n, &k, a, &lda, tau, c, &ldc, work, &lwork, &info);
+      STRUMPACK_FLOPS(xxmqr_flops(m,n,k));
+      return info;
+    }
+    inline int xxmqr
+    (char side, char trans, int m, int n, int k, std::complex<float>* a, int lda,
+     const std::complex<float>* tau, std::complex<float>* c, int ldc,
+     std::complex<float>* work, int lwork) {
+      int info;
+      FC_GLOBAL(cunmqr,CUNMQR)
+        (&side, &trans, &m, &n, &k, a, &lda, tau, c, &ldc, work, &lwork, &info);
+      STRUMPACK_FLOPS(4*xxmqr_flops(m,n,k));
+      return info;
+    }
+    inline int xxmqr
+    (char side, char trans, int m, int n, int k, std::complex<double>* a, int lda,
+     const std::complex<double>* tau, std::complex<double>* c, int ldc,
+     std::complex<double>* work, int lwork) {
+      int info;
+      FC_GLOBAL(zunmqr,ZUNMQR)
+        (&side, &trans, &m, &n, &k, a, &lda, tau, c, &ldc, work, &lwork, &info);
+      STRUMPACK_FLOPS(4*xxmqr_flops(m,n,k));
+      return info;
+    }
+    template<typename scalar> inline int xxmqr
+    (char side, char trans, int m, int n, int k, scalar* a, int lda,
+     const scalar* tau, scalar* c, int ldc) {
+      scalar lwork;
+      int info = xxmqr(side, trans, m, n, k, a, lda, tau, c, ldc, &lwork, -1);
+      int ilwork = int(std::real(lwork));
+      std::unique_ptr<scalar[]> work(new scalar[ilwork]);
+      return xxmqr(side, trans, m, n, k, a, lda, tau, c, ldc, work.get(), ilwork);
     }
 
 
     inline float lange(char norm, int m, int n, const float *a, int lda) {
       if (norm == 'I' || norm == 'i') {
-        auto work = new float[m];
-        auto ret = FC_GLOBAL(slange,SLANGE)(&norm, &m, &n, a, &lda, work);
-        delete[] work;
-        return ret;
+        std::unique_ptr<float[]> work(new float[m]);
+        return FC_GLOBAL(slange,SLANGE)(&norm, &m, &n, a, &lda, work.get());
       } else return FC_GLOBAL(slange,SLANGE)(&norm, &m, &n, a, &lda, nullptr);
     }
     inline double lange(char norm, int m, int n, const double *a, int lda) {
       if (norm == 'I' || norm == 'i') {
-        double* work = new double[m];
-        auto ret = FC_GLOBAL(dlange,DLANGE)(&norm, &m, &n, a, &lda, work);
-        delete[] work;
-        return ret;
+        std::unique_ptr<double[]> work(new double[m]);
+        return FC_GLOBAL(dlange,DLANGE)(&norm, &m, &n, a, &lda, work.get());
       } else return FC_GLOBAL(dlange,DLANGE)(&norm, &m, &n, a, &lda, nullptr);
     }
     inline float lange
       (char norm, int m, int n, const std::complex<float> *a, int lda) {
       if (norm == 'I' || norm == 'i') {
-        auto work = new float[m];
-        auto ret = FC_GLOBAL(clange,CLANGE)(&norm, &m, &n, a, &lda, work);
-        delete[] work;
-        return ret;
+        std::unique_ptr<float[]> work(new float[m]);
+        return FC_GLOBAL(clange,CLANGE)(&norm, &m, &n, a, &lda, work.get());
       } else return FC_GLOBAL(clange,CLANGE)(&norm, &m, &n, a, &lda, nullptr);
     }
     inline double lange
       (char norm, int m, int n, const std::complex<double> *a, int lda) {
       if (norm == 'I' || norm == 'i') {
-        auto work = new double[m];
-        auto ret = FC_GLOBAL(zlange,ZLANGE)(&norm, &m, &n, a, &lda, work);
-        delete[] work;
-        return ret;
+        std::unique_ptr<double[]> work(new double[m]);
+        return FC_GLOBAL(zlange,ZLANGE)(&norm, &m, &n, a, &lda, work.get());
       } else return FC_GLOBAL(zlange,ZLANGE)(&norm, &m, &n, a, &lda, nullptr);
     }
 
 
     inline int gesvd
-      (char jobu, char jobvt, int m, int n, float* a, int lda,
-       float* s, float* u, int ldu, float* vt, int ldvt) {
+    (char jobu, char jobvt, int m, int n, float* a, int lda,
+     float* s, float* u, int ldu, float* vt, int ldvt) {
       int info;
       int lwork = -1;
       float swork;

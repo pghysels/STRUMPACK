@@ -468,6 +468,18 @@ namespace strumpack {
     (const std::vector<std::size_t>& I) const;
 
     /**
+     * Return a matrix with columns I of this matrix.
+     *
+     * \param I set of indices of columns to extract from this
+     * matrix. The elements of I should not be sorted, but they should
+     * be I[i] < cols().
+     * \params B matrix to extraxt to. B should have the correct size,
+     * ie. B.cols() == I.size() and B.rows() == rows()
+     */
+    DenseMatrix<scalar_t> extract_cols
+    (const std::vector<std::size_t>& I) const;
+
+    /**
      * Return a submatrix of this matrix defined by (I,J). The vectors
      * I and J define the row and column indices of the submatrix. The
      * extracted submatrix will be I.size() x J.size(). The extracted
@@ -1326,6 +1338,18 @@ namespace strumpack {
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>
+  DenseMatrix<scalar_t>::extract_cols
+  (const std::vector<std::size_t>& I) const {
+    DenseMatrix<scalar_t> B(rows(), I.size());
+    for (std::size_t j=0; j<I.size(); j++)
+      for (std::size_t i=0; i<rows(); i++) {
+        assert(I[i] >= 0 && I[j] < cols());
+        B(i, j) = operator()(i, I[j]);
+      }
+    return B;
+  }
+
+  template<typename scalar_t> DenseMatrix<scalar_t>
   DenseMatrix<scalar_t>::extract
   (const std::vector<std::size_t>& I,
    const std::vector<std::size_t>& J) const {
@@ -1533,10 +1557,10 @@ namespace strumpack {
   template<typename scalar_t> void DenseMatrix<scalar_t>::LQ
   (DenseMatrix<scalar_t>& L, DenseMatrix<scalar_t>& Q, int depth) const {
     auto minmn = std::min(rows(), cols());
-    auto tau = new scalar_t[minmn];
+    std::unique_ptr<scalar_t[]> tau(new scalar_t[minmn]);
     int info;
     DenseMatrix<scalar_t> tmp(std::max(rows(), cols()), cols(), *this, 0, 0);
-    blas::gelqfmod(rows(), cols(), tmp.data(), tmp.ld(), tau, &info, depth);
+    blas::gelqfmod(rows(), cols(), tmp.data(), tmp.ld(), tau.get(), &info, depth);
     if (info) {
       std::cerr << "ERROR: LQ factorization failed with info="
                 << info << std::endl;
@@ -1550,14 +1574,13 @@ namespace strumpack {
         break;
       }
     blas::xxglqmod(cols(), cols(), std::min(rows(), cols()),
-                   tmp.data(), tmp.ld(), tau, &info, depth);
+                   tmp.data(), tmp.ld(), tau.get(), &info, depth);
     Q = DenseMatrix<scalar_t>(cols(), cols(), tmp, 0, 0); // generate Q
     if (info) {
       std::cerr << "ERROR: generation of Q from LQ failed with info="
                 << info << std::endl;
       exit(1);
     }
-    delete[] tau;
   }
 
   template<typename scalar_t> void
@@ -1565,10 +1588,9 @@ namespace strumpack {
   (scalar_t& r_max, scalar_t& r_min, int depth) {
     if (!cols() || !rows()) return;
     TIMER_TIME(TaskType::QR, 1, t_qr);
-    int info;
     int minmn = std::min(rows(), cols());
-    auto tau = new scalar_t[minmn];
-    blas::geqrfmod(rows(), minmn, data(), ld(), tau, &info, depth);
+    std::unique_ptr<scalar_t[]> tau(new scalar_t[minmn]);
+    int info = blas::geqrfmod(rows(), minmn, data(), ld(), tau.get(), depth);
     real_t Rmax = std::abs(operator()(0, 0));
     real_t Rmin = Rmax;
     for (int i=0; i<minmn; i++) {
@@ -1579,13 +1601,12 @@ namespace strumpack {
     r_max = Rmax;
     r_min = Rmin;
     // TODO threading!!
-    blas::xxgqr(rows(), minmn, minmn, data(), ld(), tau, &info);
+    info = blas::xxgqr(rows(), minmn, minmn, data(), ld(), tau.get());
     if (cols() > rows()) {
       DenseMatrixWrapper<scalar_t> tmp
         (rows(), cols()-rows(), *this, 0, rows());
       tmp.zero();
     }
-    delete[] tau;
   }
 
   template<typename scalar_t> void DenseMatrix<scalar_t>::ID_row
@@ -1613,18 +1634,17 @@ namespace strumpack {
    std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
    int max_rank, int depth) {
     int m = rows(), n = cols();
-    auto tau = new scalar_t[std::max(1,std::min(m, n))];
+    std::unique_ptr<scalar_t[]> tau(new scalar_t[std::max(1,std::min(m, n))]);
     piv.resize(n);
     std::vector<int> iind(n);
     int rank = 0, info = 0;
     // TODO make geqp3tol stop at max_rank
     if (m && n)
-      blas::geqp3tol
-        (m, n, data(), ld(), iind.data(), tau, &info,
+      info = blas::geqp3tol
+        (m, n, data(), ld(), iind.data(), tau.get(),
          rank, rel_tol, abs_tol, depth);
     else std::iota(iind.begin(), iind.end(), 1);
     rank = std::min(rank, max_rank);
-    delete[] tau;
     for (int i=1; i<=n; i++) {
       int j = iind[i-1];
       assert(j-1 >= 0 && j-1 < int(iind.size()));
@@ -1709,11 +1729,12 @@ namespace strumpack {
    real_t rel_tol, real_t abs_tol, int max_rank, int depth) const {
     DenseMatrix<scalar_t> tmp(*this);
     int m = rows(), n = cols(), minmn = std::min(m, n);
-    auto tau = new scalar_t[minmn];
+    std::unique_ptr<scalar_t[]> tau(new scalar_t[minmn]);
     std::vector<int> ind(n);
-    int rank, info;
-    blas::geqp3tol(m, n, tmp.data(), tmp.ld(), ind.data(),
-                   tau, &info, rank, rel_tol, abs_tol, depth);
+    int rank;
+    int info = blas::geqp3tol
+      (m, n, tmp.data(), tmp.ld(), ind.data(),
+       tau.get(), rank, rel_tol, abs_tol, depth);
     std::vector<int> piv(n);
     for (int i=1; i<=n; i++) {
       int j = ind[i-1];
@@ -1726,9 +1747,8 @@ namespace strumpack {
       for (int r=c+1; r<rank; r++)
         V(r, c) = scalar_t(0.);
     V.lapmt(ind, false);
-    blas::xxgqr(rows(), rank, rank, tmp.data(), tmp.ld(), tau, &info);
+    info = blas::xxgqr(rows(), rank, rank, tmp.data(), tmp.ld(), tau.get());
     U = DenseMatrix<scalar_t>(rows(), rank, tmp.ptr(0, 0), tmp.ld());
-    delete[] tau;
   }
 
   template<typename scalar_t> void
