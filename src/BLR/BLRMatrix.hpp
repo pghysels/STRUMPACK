@@ -804,7 +804,9 @@ namespace strumpack {
       }
       for (std::size_t i=0; i<rb2; i++)
         for (std::size_t j=0; j<rb2; j++)
-          B22.create_LR_tile_left_looking(i, j, rb, A22, B21, B12, opts);
+          if (i==j)
+            B22.create_dense_tile_left_looking(i, j, rb, A22, B21, B12);
+          else B22.create_LR_tile_left_looking(i, j, rb, A22, B21, B12, opts);
       for (std::size_t i=0; i<rb; i++)
         for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
           piv[l] += B11.tileroff(i);
