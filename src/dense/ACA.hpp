@@ -67,7 +67,6 @@ namespace strumpack {
       gemv(Trans::N, scalar_t(-1.), DW_t(n, rank, V_, 0, 0),
            U_.ptr(row, 0), U_.ld(), scalar_t(1.), Vr.ptr(0, 0), 1,
            task_depth);
-
       for (std::size_t i=0; i<n; i++) temp[i] = std::abs(Vr(i, 0));
       // avoid already selected cols
       for (auto c : colids) temp[c] = real_t(-1);
@@ -81,7 +80,6 @@ namespace strumpack {
       gemv(Trans::N, scalar_t(-1.), DW_t(m, rank, U_, 0, 0),
            V_.ptr(col, 0), V_.ld(), scalar_t(1.), Ur.ptr(0, 0), 1,
            task_depth);
-
       gemv(Trans::C, scalar_t(1.), DW_t(m, rank+1, U_, 0, 0), Ur,
            scalar_t(0.), du.data(), 1, task_depth);
       gemv(Trans::C, scalar_t(1.), DW_t(n, rank+1, V_, 0, 0), Vr,
@@ -92,11 +90,8 @@ namespace strumpack {
         (std::real(approx_norm*approx_norm +
                    real_t(2.) * cross_products + normUV2));
       rank++;
-
       real_t nrmUV = std::sqrt(normUV2);
-      if (nrmUV < approx_norm * rtol || nrmUV < atol)
-        break;
-
+      if (nrmUV < approx_norm * rtol || nrmUV < atol) break;
       // select a new row
       for (std::size_t i=0; i<m; i++) temp[i] = std::abs(Ur(i, 0));
       // avoid already selected rows

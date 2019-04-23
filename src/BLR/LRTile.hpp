@@ -101,6 +101,7 @@ namespace strumpack {
              <void(const std::vector<std::size_t>&,
                    DenseMatrix<scalar_t>&)>& Tcol,
              const Opts_t& opts) {
+        //blocked_adaptive_cross_approximation_nodups<scalar_t>
         blocked_adaptive_cross_approximation<scalar_t>
           (U_, V_, m, n, Trow, Tcol, opts.BACA_blocksize(),
            opts.rel_tol(), opts.abs_tol(), opts.max_rank(),
@@ -146,6 +147,14 @@ namespace strumpack {
 
       scalar_t operator()(std::size_t i, std::size_t j) const override {
         return blas::dotu(rank(), U_.ptr(i, 0), U_.ld(), V_.ptr(0, j), 1);
+      }
+
+      void extract(const std::vector<std::size_t>& I,
+                   const std::vector<std::size_t>& J,
+                   DenseM_t& B) const {
+        gemm(Trans::N, Trans::N, scalar_t(1.), U_.extract_rows(I),
+             V_.extract_cols(J), scalar_t(0.), B,
+             params::task_recursion_cutoff_level);
       }
 
       void laswp(const std::vector<int>& piv, bool fwd) override {
@@ -210,20 +219,22 @@ namespace strumpack {
       }
 
       void Schur_update_col_a
-      (std::size_t i, const BLRTile<scalar_t>& b, scalar_t* c)
-        const override {
-        b.Schur_update_col_b(i, *this, c);
+      (std::size_t i, const BLRTile<scalar_t>& b, scalar_t* c,
+       scalar_t* work) const override {
+        b.Schur_update_col_b(i, *this, c, work);
       }
       void Schur_update_row_a
-      (std::size_t i, const BLRTile<scalar_t>& b, scalar_t* c)
-        const override {
-        b.Schur_update_row_b(i, *this, c);
+      (std::size_t i, const BLRTile<scalar_t>& b, scalar_t* c,
+       scalar_t* work) const override {
+        b.Schur_update_row_b(i, *this, c, work);
       }
 
+      /* work should be at least rank(a) + rows(b) */
       void Schur_update_col_b
-      (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c)
-        const override {
-        DenseM_t temp1(rows(), 1), temp2(a.rank(), 1);
+      (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c,
+       scalar_t* work) const override {
+        DenseMW_t temp1(rows(), 1, work, rows()),
+          temp2(a.rank(), 1, work+rows(), a.rank());
         gemv(Trans::N, scalar_t(1.), U_, V_.ptr(0, i), 1,
              scalar_t(0.), temp1, params::task_recursion_cutoff_level);
         gemv(Trans::N, scalar_t(1.), a.V(), temp1, scalar_t(0.), temp2,
@@ -231,19 +242,22 @@ namespace strumpack {
         gemv(Trans::N, scalar_t(-1.), a.U(), temp2, scalar_t(1.), c, 1,
              params::task_recursion_cutoff_level);
       }
+      /* work should be at least rows(b) */
       void Schur_update_col_b
-      (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c)
-        const override {
-        DenseM_t temp(rows(), 1);
+      (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c,
+       scalar_t* work) const override {
+        DenseMW_t temp(rows(), 1, work, rows());
         gemv(Trans::N, scalar_t(1.), U_, V_.ptr(0, i), 1,
              scalar_t(0.), temp, params::task_recursion_cutoff_level);
         gemv(Trans::N, scalar_t(-1.), a.D(), temp, scalar_t(1.), c, 1,
              params::task_recursion_cutoff_level);
       }
+      /* work should be at least cols(a) + rank(b) */
       void Schur_update_row_b
-      (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c)
-        const override {
-        DenseM_t temp1(1, a.cols()), temp2(1, rank());
+      (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c,
+       scalar_t* work) const override {
+        DenseMW_t temp1(1, a.cols(), work, 1),
+          temp2(1, rank(), work+a.cols(), 1);
         gemv(Trans::C, scalar_t(1.), a.V(), a.U().ptr(i, 0), a.U().ld(),
              scalar_t(0.), temp1.data(), temp1.ld(),
              params::task_recursion_cutoff_level);
@@ -253,10 +267,11 @@ namespace strumpack {
         gemv(Trans::C, scalar_t(-1.), V_, temp2.data(), temp2.ld(),
              scalar_t(1.), c, 1, params::task_recursion_cutoff_level);
       }
+      /* work should be at least rank(b) */
       void Schur_update_row_b
-      (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c)
-        const override {
-        DenseM_t temp(1, rank());
+      (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c,
+       scalar_t* work) const override {
+        DenseMW_t temp(1, rank(), work, 1);
         gemv(Trans::C, scalar_t(1.), U(), a.D().ptr(i, 0), a.D().ld(),
              scalar_t(0.), temp.data(), temp.ld(),
              params::task_recursion_cutoff_level);
@@ -267,22 +282,23 @@ namespace strumpack {
 
       void Schur_update_cols_a
       (const std::vector<std::size_t>& cols, const BLRTile<scalar_t>& b,
-       DenseMatrix<scalar_t>& c) const override {
-        b.Schur_update_cols_b(cols, *this, c);
+       DenseMatrix<scalar_t>& c, scalar_t* work) const override {
+        b.Schur_update_cols_b(cols, *this, c, work);
       }
       void Schur_update_rows_a
       (const std::vector<std::size_t>& rows, const BLRTile<scalar_t>& b,
-       DenseMatrix<scalar_t>& c) const override {
-        b.Schur_update_rows_b(rows, *this, c);
+       DenseMatrix<scalar_t>& c, scalar_t* work) const override {
+        b.Schur_update_rows_b(rows, *this, c, work);
       }
 
-      // TODO take a workarray, store temp, and the extracted
-      // rows/columns in a wrapper matrix on the work array
       void Schur_update_cols_b
       (const std::vector<std::size_t>& cols, const LRTile<scalar_t>& a,
-       DenseMatrix<scalar_t>& c) const override {
-        DenseM_t temp1(rows(), cols.size()), temp2(a.rank(), cols.size());
-        gemm(Trans::N, Trans::N, scalar_t(1.), U_, V_.extract_cols(cols),
+       DenseMatrix<scalar_t>& c, scalar_t* work) const override {
+        auto d = cols.size(); auto r = rank(); auto m = rows();
+        DenseMW_t Vc(r, d, work, r), temp1(m, d, Vc.end(), m),
+          temp2(a.rank(), d, temp1.end(), a.rank());
+        V_.extract_cols(cols, Vc);
+        gemm(Trans::N, Trans::N, scalar_t(1.), U_, Vc,
              scalar_t(0.), temp1, params::task_recursion_cutoff_level);
         gemm(Trans::N, Trans::N, scalar_t(1.), a.V(), temp1, scalar_t(0.),
              temp2, params::task_recursion_cutoff_level);
@@ -291,19 +307,24 @@ namespace strumpack {
       }
       void Schur_update_cols_b
       (const std::vector<std::size_t>& cols, const DenseTile<scalar_t>& a,
-       DenseMatrix<scalar_t>& c) const override {
-        DenseM_t temp(rows(), cols.size());
-        gemm(Trans::N, Trans::N, scalar_t(1.), U_, V_.extract_cols(cols),
+       DenseMatrix<scalar_t>& c, scalar_t* work) const override {
+        auto r = rank(); auto d = cols.size(); auto m = rows();
+        DenseMW_t Vc(r, d, work, r), temp(m, d, Vc.end(), m);
+        V_.extract_cols(cols, Vc);
+        gemm(Trans::N, Trans::N, scalar_t(1.), U_, Vc,
              scalar_t(0.), temp, params::task_recursion_cutoff_level);
         gemm(Trans::N, Trans::N, scalar_t(-1.), a.D(), temp, scalar_t(1.),
              c, params::task_recursion_cutoff_level);
       }
       void Schur_update_rows_b
       (const std::vector<std::size_t>& rows, const LRTile<scalar_t>& a,
-       DenseMatrix<scalar_t>& c) const override {
-        DenseM_t temp1(rows.size(), a.cols()), temp2(rows.size(), rank());
-        gemm(Trans::N, Trans::N, scalar_t(1.), a.U().extract_rows(rows),
-             a.V(), scalar_t(0.), temp1, params::task_recursion_cutoff_level);
+       DenseMatrix<scalar_t>& c, scalar_t* work) const override {
+        auto d = rows.size();
+        DenseMW_t aUr(d, a.rank(), work, d), temp1(d, a.cols(), aUr.end(), d),
+          temp2(d, rank(), temp1.end(), d);
+        a.U().extract_rows(rows, aUr);
+        gemm(Trans::N, Trans::N, scalar_t(1.), aUr, a.V(),
+             scalar_t(0.), temp1, params::task_recursion_cutoff_level);
         gemm(Trans::N, Trans::N, scalar_t(1.), temp1, U_, scalar_t(0.),
              temp2, params::task_recursion_cutoff_level);
         gemm(Trans::N, Trans::N, scalar_t(-1.), temp2, V_, scalar_t(1.),
@@ -311,9 +332,11 @@ namespace strumpack {
       }
       void Schur_update_rows_b
       (const std::vector<std::size_t>& rows, const DenseTile<scalar_t>& a,
-       DenseMatrix<scalar_t>& c) const override {
-        DenseM_t temp(rows.size(), rank());
-        gemm(Trans::N, Trans::N, scalar_t(1.), a.D().extract_rows(rows), U(),
+       DenseMatrix<scalar_t>& c, scalar_t* work) const override {
+        auto d = rows.size();
+        DenseMW_t aDr(d, a.cols(), work, d), temp(d, rank(), aDr.end(), rows.size());
+        a.D().extract_rows(rows, aDr);
+        gemm(Trans::N, Trans::N, scalar_t(1.), aDr, U(),
              scalar_t(0.), temp, params::task_recursion_cutoff_level);
         gemm(Trans::N, Trans::N, scalar_t(-1.), temp, V(),
              scalar_t(1.), c, params::task_recursion_cutoff_level);

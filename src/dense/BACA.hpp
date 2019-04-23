@@ -46,9 +46,15 @@ namespace strumpack {
     std::size_t d = W.rows();
     int rank = 0;
     std::fill(piv, piv+d, 0);
+#if 0
     int info = blas::geqp3tol
       (d, d, W.data(), W.ld(), piv, tau, rank, rtol, atol,
        params::task_recursion_cutoff_level);
+#else
+    int info = blas::geqp3(d, d, W.data(), W.ld(), piv, tau);
+    auto sfmin = blas::lamch<real_t>('S');
+    for (; rank<d; rank++) if (std::abs(W(rank,rank)) < sfmin) break;
+#endif
     blas::lapmt(true, C.rows(), C.cols(), C.data(), C.ld(), piv);
     // R = T^{-1} Q^T R
     info = blas::xxmqr
@@ -62,51 +68,48 @@ namespace strumpack {
 
   template<typename scalar_t,
            typename real_t = typename RealType<scalar_t>::value_type>
-  real_t LRnorm(DenseMatrix<scalar_t>& C, DenseMatrix<scalar_t>& R,
-                scalar_t* tau) {
-    using D_t = DenseMatrix<scalar_t>;
-    using DW_t = DenseMatrixWrapper<scalar_t>;
-    std::size_t k = C.cols();
-    if (k == 0) return real_t(0.);
-    std::size_t m = C.rows(), n = R.cols();
-    D_t Ctemp(C), Rtemp(R), TT(k, k);
-    int info = blas::geqrf
-      (Ctemp.rows(), Ctemp.cols(), Ctemp.data(), Ctemp.ld(), tau);
-    info = blas::gelqf
-      (Rtemp.rows(), Rtemp.cols(), Rtemp.data(), Rtemp.ld(), tau);
-    auto minmk = std::min(m, k), minnk = std::min(n, k);
-    for (std::size_t j=0; j<minmk; j++)
-      for (std::size_t i=j; i<minmk; i++)
-        Ctemp(i, j) = scalar_t(0.);
-    for (std::size_t j=0; j<minnk; j++)
-      for (std::size_t i=0; i<j; i++)
-        Rtemp(i, j) = scalar_t(0.);
-    gemm(Trans::N, Trans::C, scalar_t(1.), DW_t(minmk, k, Ctemp, 0, 0),
-         DW_t(minnk, k, Rtemp, 0, 0), scalar_t(0.), TT);
-    return TT.normF();
+  void LRnormUpCholQR
+  (const DenseMatrix<scalar_t>& U, const DenseMatrix<scalar_t>& V, real_t& mu,
+   const DenseMatrix<scalar_t>& C, const DenseMatrix<scalar_t>& R, real_t& nu,
+   scalar_t* work) {
+    real_t s = mu*mu;
+    std::size_t r = U.cols(), rb = C.cols();
+    DenseMatrixWrapper<scalar_t> VRt(r, rb, work, r),
+      CtU(rb, r, work+r*rb, rb);
+    gemm(Trans::N, Trans::C, scalar_t(1.), V, R, scalar_t(0.), VRt,
+         params::task_recursion_cutoff_level);
+    gemm(Trans::C, Trans::N, scalar_t(1.), C, U, scalar_t(0.), CtU,
+         params::task_recursion_cutoff_level);
+    for (std::size_t i=0; i<r-rb; i++)
+      for (std::size_t j=0; j<rb; j++)
+        s += real_t(2.) * std::real(VRt(i, j) * CtU(j, i));
+    DenseMatrixWrapper<scalar_t> RRt(rb, rb, VRt, r-rb, 0),
+      CtC(rb, rb, CtU, 0, r-rb);
+    int info = blas::potrf('U', CtC.rows(), CtC.data(), CtC.ld());
+    info = blas::potrf('L', RRt.rows(), RRt.data(), RRt.ld());
+    nu = real_t(0.);
+    for (std::size_t j=0; j<rb; j++)
+      for (std::size_t i=0; i<rb; i++) {
+        scalar_t RLij(0.);
+        for (std::size_t k=std::max(i,j); k<rb; k++)
+          RLij += CtC(i, k) * RRt(k,j);
+        nu += std::real(RLij*RLij);
+      }
+    mu = std::sqrt(s + nu);
+    nu = std::sqrt(nu);
   }
 
-
-  // template<typename scalar_t,
-  //          typename real_t = typename RealType<scalar_t>::value_type>
-  // real_t LRnormUp
-  // (DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V, real_t mu,
-  //  DenseMatrix<scalar_t>& C, DenseMatrix<scalar_t>& R, real_t nu) {
-  //   // TODO
-  //   return mu;
-  // }
-
-  template<typename scalar_t> std::vector<std::size_t> ID
-  (DenseMatrix<scalar_t>& X, int* piv, scalar_t* tau) {
+  template<typename scalar_t> void ID
+  (DenseMatrix<scalar_t>& X, int* piv, scalar_t* tau,
+   std::vector<std::size_t>& I) {
     auto m = X.rows();
     auto n = X.cols();
     std::fill(piv, piv+n, 0);
     int info = blas::geqp3(m, n, X.data(), X.ld(), piv, tau);
-    std::vector<std::size_t> I;
+    I.resize(std::min(m, n));
     std::transform
-      (piv, piv+std::min(m, n), std::back_inserter(I),
-       [](int pvt){ return pvt-1; });
-    return I;
+      (piv, piv+std::min(m, n), I.begin(), [](int pvt){ return pvt-1; });
+    std::sort(I.begin(), I.end());
   }
 
 
@@ -122,67 +125,175 @@ namespace strumpack {
    (const std::vector<std::size_t>&, DenseMatrix<scalar_t>&)>& Arow,
    const std::function<void
    (const std::vector<std::size_t>&, DenseMatrix<scalar_t>&)>& Acol,
-   int d, real_t rtol, real_t atol, int max_rank, int task_depth=0) {
+   std::size_t d, real_t rtol, real_t atol, std::size_t max_rank,
+   int task_depth=0) {
     using D_t = DenseMatrix<scalar_t>;
     using DW_t = DenseMatrixWrapper<scalar_t>;
-    int rmax = std::min(m, n), maxmn = std::max(m, n);
+    std::size_t rmax = std::min(max_rank, std::min(m, n)),
+      maxmn = std::max(m, n);
     d = std::min(d, rmax);
     Uout.resize(m, rmax);
     Vout.resize(rmax, n);
-    std::unique_ptr<int[]> piv_(new int[maxmn]); auto piv = piv_.get();
-    std::unique_ptr<scalar_t[]> tau_(new scalar_t[maxmn]); auto tau = tau_.get();
     std::vector<std::size_t> J, I;
     {
       std::mt19937 mt;
-      std::uniform_int_distribution<int> rgen(0, n-1);
+      std::uniform_int_distribution<std::size_t> rgen(0, n-1);
       std::unordered_set<std::size_t> unique_ids;
       while (unique_ids.size() < d)
         unique_ids.insert(rgen(mt));
       J.assign(unique_ids.begin(), unique_ids.end());
+      std::sort(J.begin(), J.end());
     }
-    int rank = 0, info;
+
+    std::unique_ptr<int[]> piv_(new int[maxmn]); auto piv = piv_.get();
+    std::size_t lwork_W_UI_VJ_Rtemp_Ctemp = d*d+2*rmax*d+maxmn*d;
+    std::unique_ptr<scalar_t[]> w_
+      (new scalar_t[maxmn + lwork_W_UI_VJ_Rtemp_Ctemp]);
+    auto tau = w_.get();
+    auto work = tau + maxmn;
+    std::size_t rank = 0;
+    int info;
     real_t mu(0.);
+
     while (rank < rmax) {
       if (rmax - rank < d) {
         d = rmax - rank;
         J.resize(d);
       }
       DW_t U(m, rank, Uout, 0, 0), V(rank, n, Vout, 0, 0),
-        C(m, d, Uout, 0, rank), R(d, n, Vout, rank, 0);
+        C(m, d, Uout, 0, rank), R(d, n, Vout, rank, 0),
+        W(d, d, work, d), UI(d, rank, W.end(), d),
+        VJ(rank, d, UI.end(), rank), Rtemp(d, n, VJ.end(), d),
+        Ct(d, m, VJ.end(), d); // Rtemp and Ct overlap
       Acol(J, C);                                      // C = A(:,J)
+      V.extract_cols(J, VJ);                           // VJ = V(:,J)
       gemm(Trans::N, Trans::N, scalar_t(-1.), U,       // C -= U*V(:,J)
-           V.extract_cols(J), scalar_t(1.), C, task_depth);
-      {
-        auto Ct = C.transpose();
-        I = ID(Ct, piv, tau);
-      }
+           VJ, scalar_t(1.), C, task_depth);
+      C.transpose(Ct);
+      ID(Ct, piv, tau, I);
       Arow(I, R);                                      // R = A(I,:)
-      auto UI = U.extract_rows(I);                     // UI = U(I,:)
+      U.extract_rows(I, UI);                           // UI = U(I,:)
       gemm(Trans::N, Trans::N, scalar_t(-1.), UI, V,   // R -= U(I,:)*V
            scalar_t(1.), R, task_depth);
-      {
-        D_t Rcopy(R);
-        J = ID(Rcopy, piv, tau);
-      }
+      Rtemp.copy(R);
+      ID(Rtemp, piv, tau, J);
       Acol(J, C);                                      // C = A(:,J)
-      auto W = C.extract_rows(I);                      // W = C(I,:) = A(I,J)
-      auto VJ = V.extract_cols(J);                     // VJ = V(:,J)
+      C.extract_rows(I, W);                            // W = C(I,:) = A(I,J)
+      V.extract_cols(J, VJ);                           // VJ = V(:,J)
       gemm(Trans::N, Trans::N, scalar_t(-1.), U, VJ,   // C -= U*V(:,J)
            scalar_t(1.), C, task_depth);
       gemm(Trans::N, Trans::N, scalar_t(-1.), UI, VJ,  // W -= U(I,:)*V(:,J)
            scalar_t(1.), W, task_depth);
-      {
-        D_t Rbar(R);            // Rbar(:,j) = R(:,j) for j not in J, else zero
-        for (auto j : J)
-          for (std::size_t i=0; i<d; i++)
-            Rbar(i, j) = scalar_t(0.);
-        J = ID(Rbar, piv, tau);
-      }
-      rank += LRID(C, W, R, rtol, atol, piv, tau);     // CR = C inv(W) R
+      Rtemp.copy(R);
+      for (auto j : J)
+        for (std::size_t i=0; i<d; i++)
+          Rtemp(i, j) = scalar_t(0.);
+      ID(Rtemp, piv, tau, J);
+      auto dr = LRID(C, W, R, rtol, atol, piv, tau);   // CR = C inv(W) R
+      if (dr == 0) break;
+      rank += dr;
+      real_t nu;
+      LRnormUpCholQR
+        (DW_t(m, rank, Uout, 0, 0), DW_t(rank, n, Vout, 0, 0), mu,
+         DW_t(m, dr, Uout, 0, rank-dr), DW_t(dr, n, Vout, rank-dr, 0),
+         nu, work);
+      if (nu < rtol * mu || nu < atol || dr == 0) break;
+    }
 
-      real_t nu = LRnorm(C, R, tau);
-      // mu = LRnormUp(U, V, mu, C, R, nu);
-      mu = LRnorm(U, V, tau);
+    // TODO recompress
+
+    Uout.resize(m, rank);
+    Vout.resize(rank, n);
+  }
+
+
+
+  /*
+   * Compute U*V ~ A
+   */
+  template<typename scalar_t,
+           typename real_t = typename RealType<scalar_t>::value_type>
+  void blocked_adaptive_cross_approximation_nodups
+  (DenseMatrix<scalar_t>& Uout, DenseMatrix<scalar_t>& Vout,
+   std::size_t m, std::size_t n,
+   const std::function<void
+   (const std::vector<std::size_t>&, DenseMatrix<scalar_t>&)>& Arow,
+   const std::function<void
+   (const std::vector<std::size_t>&, DenseMatrix<scalar_t>&)>& Acol,
+   std::size_t d, real_t rtol, real_t atol, std::size_t max_rank,
+   int task_depth=0) {
+    using D_t = DenseMatrix<scalar_t>;
+    using DW_t = DenseMatrixWrapper<scalar_t>;
+    std::size_t rmax = std::min(max_rank, std::min(m, n)),
+      maxmn = std::max(m, n);
+    d = std::min(d, rmax);
+    Uout.resize(m, rmax);
+    Vout.resize(rmax, n);
+    std::vector<std::size_t> J, I, rowids, colids;
+    rowids.reserve(rmax);
+    colids.reserve(rmax);
+    {
+      std::mt19937 mt;
+      std::uniform_int_distribution<std::size_t> rgen(0, n-1);
+      std::unordered_set<std::size_t> unique_ids;
+      while (unique_ids.size() < d)
+        unique_ids.insert(rgen(mt));
+      J.assign(unique_ids.begin(), unique_ids.end());
+      std::sort(J.begin(), J.end());
+    }
+    std::unique_ptr<int[]> piv_(new int[maxmn]); auto piv = piv_.get();
+    std::size_t lwork_W_UI_VJ_Rtemp_Ctemp = d*d+2*rmax*d+maxmn*d;
+    std::unique_ptr<scalar_t[]> w_
+      (new scalar_t[maxmn + lwork_W_UI_VJ_Rtemp_Ctemp]);
+    auto tau = w_.get();
+    auto work = tau + maxmn;
+    std::size_t rank = 0;
+    int info;
+    real_t mu(0.);
+
+    while (rank < rmax) {
+      if (rmax - rank < d) {
+        d = rmax - rank;
+        J.resize(d);
+      }
+      DW_t U(m, rank, Uout, 0, 0), V(rank, n, Vout, 0, 0),
+        C(m, d, Uout, 0, rank), R(d, n, Vout, rank, 0),
+        W(d, d, work, d), UI(d, rank, W.end(), d),
+        VJ(rank, d, UI.end(), rank), Rtemp(d, n, VJ.end(), d),
+        Ct(d, m, VJ.end(), d); // Rtemp and Ct overlap
+      colids.insert(colids.end(), J.begin(), J.end());
+      Acol(J, C);                                      // C = A(:,J)
+      V.extract_cols(J, VJ);
+      gemm(Trans::N, Trans::N, scalar_t(-1.), U,       // C -= U*V(:,J)
+           VJ, scalar_t(1.), C, task_depth);
+      C.transpose(Ct);
+      for (auto j : rowids)
+        for (std::size_t i=0; i<d; i++)
+          Ct(i, j) = scalar_t(0.);
+      ID(Ct, piv, tau, I);
+      rowids.insert(rowids.end(), I.begin(), I.end());
+      Arow(I, R);                                      // R = A(I,:)
+      R.extract_cols(J, W);                            // W = C(I,:) = A(I,J)
+      U.extract_rows(I, UI);                           // UI = U(I,:)
+      gemm(Trans::N, Trans::N, scalar_t(-1.), UI, V,   // R -= U(I,:)*V
+           scalar_t(1.), R, task_depth);
+      gemm(Trans::N, Trans::N, scalar_t(-1.), UI, VJ,  // W -= U(I,:)*V(:,J)
+           scalar_t(1.), W, task_depth);
+      Rtemp.copy(R);
+      for (auto j : colids)
+        for (std::size_t i=0; i<d; i++)
+          Rtemp(i, j) = scalar_t(0.);
+      ID(Rtemp, piv, tau, J);
+      auto dr = LRID(C, W, R, rtol, atol, piv, tau);   // CR = C inv(W) R
+      if (dr == 0) break;
+      rank += dr;
+      rowids.resize(rank);
+      colids.resize(rank);
+      real_t nu;
+      LRnormUpCholQR
+        (DW_t(m, rank, Uout, 0, 0), DW_t(rank, n, Vout, 0, 0), mu,
+         DW_t(m, dr, Uout, 0, rank-dr), DW_t(dr, n, Vout, rank-dr, 0),
+         nu, work);
       if (nu < rtol * mu || nu < atol) break;
     }
 
@@ -191,6 +302,7 @@ namespace strumpack {
     Uout.resize(m, rank);
     Vout.resize(rank, n);
   }
+
 
 } // end namespace strumpack
 

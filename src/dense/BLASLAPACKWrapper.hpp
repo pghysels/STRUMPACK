@@ -1890,32 +1890,35 @@ namespace strumpack {
 
 
     inline long long potrf_flops(long long n) {
-      std::cout << "TODO count flops for spotrf" << std::endl;
-      return 0;
+      return n*n*n/6 + n*n/2 + n/3 + n*n*n/6 - n/6;
     }
-    inline void potrf
-    (char ul, int n, float* a, int lda, int* info) {
-      FC_GLOBAL(spotrf,SPOTRF)
-        (&ul, &n, a, &lda, info);
+    inline int potrf
+    (char ul, int n, float* a, int lda) {
+      int info;
+      FC_GLOBAL(spotrf,SPOTRF)(&ul, &n, a, &lda, &info);
       STRUMPACK_FLOPS(potrf_flops(n));
+      return info;
     }
-    inline void potrf
-    (char ul, int n, double* a, int lda, int* info) {
-      FC_GLOBAL(dpotrf,DPOTRF)
-        (&ul, &n, a, &lda, info);
+    inline int potrf
+    (char ul, int n, double* a, int lda) {
+      int info;
+      FC_GLOBAL(dpotrf,DPOTRF)(&ul, &n, a, &lda, &info);
       STRUMPACK_FLOPS(potrf_flops(n));
+      return info;
     }
-    inline void potrf
-    (char ul, int n, std::complex<float>* a, int lda, int* info) {
-      FC_GLOBAL(cpotrf,CPOTRF)
-        (&ul, &n, a, &lda, info);
+    inline int potrf
+    (char ul, int n, std::complex<float>* a, int lda) {
+      int info;
+      FC_GLOBAL(cpotrf,CPOTRF)(&ul, &n, a, &lda, &info);
       STRUMPACK_FLOPS(4*potrf_flops(n));
+      return info;
     }
-    inline void potrf
-    (char ul, int n, std::complex<double>* a, int lda, int* info) {
-      FC_GLOBAL(zpotrf,ZPOTRF)
-        (&ul, &n, a, &lda, info);
+    inline int potrf
+    (char ul, int n, std::complex<double>* a, int lda) {
+      int info;
+      FC_GLOBAL(zpotrf,ZPOTRF)(&ul, &n, a, &lda, &info);
       STRUMPACK_FLOPS(4*potrf_flops(n));
+      return info;
     }
 
 

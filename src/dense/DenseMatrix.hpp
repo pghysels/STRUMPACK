@@ -233,6 +233,12 @@ namespace strumpack {
     inline scalar_t* data() { return data_; }
 
     /**
+     * Pointer to the element after the last one in this matrix.
+     * end() == data() + size()
+     */
+    inline scalar_t* end() { return data_ + ld_ * cols_; }
+
+    /**
      * Const reference to element (i,j) in the matrix. This will do a
      * bounds check with assertions, which are enabled in Debug mode,
      * disabled in Release mode.
@@ -391,6 +397,11 @@ namespace strumpack {
     DenseMatrix<scalar_t> transpose() const;
 
     /**
+     * Set X to the transpose of this matrix.
+     */
+    void transpose(DenseMatrix<scalar_t>& X) const;
+
+    /**
      * Apply the LAPACK routine xLASWP to the matrix. xLASWP performs
      * a series of row interchanges on the matrix.  One row
      * interchange is initiated for each of rows in the vector P.
@@ -453,7 +464,7 @@ namespace strumpack {
      * ie. B.cols() == cols() and B.rows() == I.size()
      */
     void extract_rows
-    (const std::vector<std::size_t>& I, const DenseMatrix<scalar_t>& B);
+    (const std::vector<std::size_t>& I, DenseMatrix<scalar_t>& B) const;
 
     /**
      * Return a matrix with rows I of this matrix.
@@ -466,6 +477,19 @@ namespace strumpack {
      */
     DenseMatrix<scalar_t> extract_rows
     (const std::vector<std::size_t>& I) const;
+
+    /**
+     * Extract columns of this matrix to a specified matrix. Column
+     * I[i] in this matrix will become column i in matrix B.
+     *
+     * \param I set of indices of columns to extract from this
+     * matrix. The elements of I should not be sorted, but they should
+     * be I[i] < cols().
+     * \params B matrix to extraxt to. B should have the correct size,
+     * ie. B.cols() == I.size() and B.rows() == rows()
+     */
+    void extract_cols
+    (const std::vector<std::size_t>& I, DenseMatrix<scalar_t>& B) const;
 
     /**
      * Return a matrix with columns I of this matrix.
@@ -1293,6 +1317,12 @@ namespace strumpack {
     return tmp;
   }
 
+  template<typename scalar_t> void
+  DenseMatrix<scalar_t>::transpose(DenseMatrix<scalar_t>& X) const {
+    assert(rows() == X.cols() && cols() == X.rows());
+    blas::omatcopy
+      ('C', rows(), cols(), data(), ld(), X.data(), X.ld());
+  }
 
   template<typename scalar_t> void
   DenseMatrix<scalar_t>::laswp(const std::vector<int>& P, bool fwd) {
@@ -1315,13 +1345,14 @@ namespace strumpack {
   }
 
   template<typename scalar_t> void DenseMatrix<scalar_t>::extract_rows
-  (const std::vector<std::size_t>& I, const DenseMatrix<scalar_t>& B) {
-    assert(rows() == I.size());
+  (const std::vector<std::size_t>& I, DenseMatrix<scalar_t>& B) const {
+    auto d = I.size();
+    assert(B.rows() == d);
     assert(cols() == B.cols());
     for (std::size_t j=0; j<cols(); j++)
-      for (std::size_t i=0; i<rows(); i++) {
-        assert(I[i] >= 0 && I[i] < B.rows());
-        operator()(i, j) = B(I[i], j);
+      for (std::size_t i=0; i<d; i++) {
+        assert(I[i] < rows());
+        B(i, j) = operator()(I[i], j);
       }
   }
 
@@ -1335,6 +1366,19 @@ namespace strumpack {
         B(i, j) = operator()(I[i], j);
       }
     return B;
+  }
+
+  template<typename scalar_t> void DenseMatrix<scalar_t>::extract_cols
+  (const std::vector<std::size_t>& I, DenseMatrix<scalar_t>& B) const {
+    auto d = I.size();
+    auto m = rows();
+    assert(B.cols() == I.size());
+    assert(m == B.rows());
+    for (std::size_t j=0; j<d; j++)
+      for (std::size_t i=0; i<m; i++) {
+        assert(I[j] < cols());
+        B(i, j) = operator()(i, I[j]);
+      }
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>

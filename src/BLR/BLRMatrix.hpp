@@ -404,28 +404,39 @@ namespace strumpack {
       return tile(ti, tj)(i - roff_[ti], j - coff_[tj]);
     }
 
+    /**
+     * I and J should be sorted!!
+     */
     template<typename scalar_t> DenseMatrix<scalar_t>
     BLRMatrix<scalar_t>::extract
     (const std::vector<std::size_t>& I,
      const std::vector<std::size_t>& J) const {
       auto m = I.size(); auto n = J.size();
       DenseM_t B(m, n);
-      std::vector<int> ti(m);
-      for (std::size_t i=0; i<m; i++)
-        ti[i] = std::distance
-          (roff_.begin(),
-           std::upper_bound(roff_.begin(), roff_.end(), I[i])) - 1;
-      /////////////////////////////////////////////////////////////
-      // TODO this should be further optimized, extracting whole
-      // blocks from tiles
-      /////////////////////////////////////////////////////////////
-      for (std::size_t j=0; j<n; j++) {
-        auto tj = std::distance
-          (coff_.begin(),
-           std::upper_bound(coff_.begin(), coff_.end(), J[j])) - 1;
-        auto jj = J[j] - coff_[tj];
-        for (std::size_t i=0; i<m; i++)
-          B(i, j) = tile(ti[i], tj)(I[i] - roff_[ti[i]], jj);
+      auto clo = coff_.begin();
+      std::vector<std::size_t> lI, lJ;
+      lI.reserve(m);
+      lJ.reserve(n);
+      for (std::size_t j=0; j<n; ) {
+        clo = std::upper_bound(clo, coff_.end(), J[j]);
+        auto tcol = std::distance(coff_.begin(), clo) - 1;
+        lJ.clear();
+        do {
+          lJ.push_back(J[j] - coff_[tcol]);
+          j++;
+        } while (j < n && J[j] < *clo);
+        auto rlo = roff_.begin();
+        for (std::size_t i=0; i<m; ) {
+          rlo = std::upper_bound(rlo, roff_.end(), I[i]);
+          auto trow = std::distance(roff_.begin(), rlo) - 1;
+          lI.clear();
+          do {
+            lI.push_back(I[i] - roff_[trow]);
+            i++;
+          } while (i < m && I[i] < *rlo);
+          DenseMW_t lB(lI.size(), lJ.size(), B, i-lI.size(), j-lJ.size());
+          tile(trow, tcol).extract(lI, lJ, lB);
+        }
       }
       return B;
     }
@@ -517,41 +528,64 @@ namespace strumpack {
       std::iota(lJ.begin(), lJ.end(), dn);
       std::iota(lI.begin(), lI.end(), dm);
       if (opts.low_rank_algorithm() == LowRankAlgorithm::BACA) {
+        std::size_t lwork = 0;
+        for (std::size_t l=0; l<k; l++) {
+          auto kk = B21.tilecols(l); // == B12.tilerows(l)
+          lwork = std::max
+            (lwork, 2*std::max(std::min(m,kk), std::min(n,kk))) + kk;
+        }
+        auto d = opts.BACA_blocksize();
+        std::unique_ptr<scalar_t[]> work_(new scalar_t[lwork*d]);
+        auto work = work_.get();
+        std::vector<std::size_t> idx;
+        idx.reserve(d);
         auto Arow = [&](const std::vector<std::size_t>& rows,
                         DenseMatrix<scalar_t>& c) {
           assert(rows.size() == c.rows() && c.cols() == n);
-          auto grows = rows;
-          for (auto& gr : grows) gr += dm;
-          Aelem(grows, lJ, c);
+          idx.resize(rows.size());
+          std::transform(rows.begin(), rows.end(), idx.begin(),
+                         [&dm](std::size_t rr){ return rr+dm; });
+          Aelem(idx, lJ, c);
           for (std::size_t l=0; l<k; l++)
-            Schur_update_rows(rows, B21.tile(i, l), B12.tile(l, j), c);
+            Schur_update_rows(rows, B21.tile(i, l), B12.tile(l, j), c, work);
         };
         auto Acol = [&](const std::vector<std::size_t>& cols,
                         DenseMatrix<scalar_t>& c) {
           assert(cols.size() == c.cols() && c.rows() == m);
-          auto gcols = cols;
-          for (auto& gc : gcols) gc += dn;
-          Aelem(lI, gcols, c);
+          idx.resize(cols.size());
+          std::transform(cols.begin(), cols.end(), idx.begin(),
+                         [&dn](std::size_t cc){ return cc+dn; });
+          Aelem(lI, idx, c);
           for (std::size_t l=0; l<k; l++)
-            Schur_update_cols(cols, B21.tile(i, l), B12.tile(l, j), c);
+            Schur_update_cols(cols, B21.tile(i, l), B12.tile(l, j), c, work);
         };
         block(i, j) = std::unique_ptr<LRTile<scalar_t>>
           (new LRTile<scalar_t>(m, n, Arow, Acol, opts));
       } else {
+        std::size_t lwork = 0;
+        for (std::size_t l=0; l<k; l++) {
+          auto kk = B21.tilecols(l); // == B12.tilerows(l)
+          lwork = std::max
+            (lwork, std::max(std::min(m,kk), std::min(n,kk))) + kk;
+        }
+        std::unique_ptr<scalar_t[]> work_(new scalar_t[lwork]);
+        auto work = work_.get();
         std::vector<std::size_t> idx(1);
         auto Arow = [&](std::size_t row, scalar_t* c) {
           idx[0] = dm + row;
           DenseMW_t cr(1, n, c, 1);
           Aelem(idx, lJ, cr);
           for (std::size_t l=0; l<k; l++)
-            Schur_update_row(row, B21.tile(i, l), B12.tile(l, j), c);
+            Schur_update_row
+              (row, B21.tile(i, l), B12.tile(l, j), c, work);
         };
         auto Acol = [&](std::size_t col, scalar_t* c) {
           idx[0] = dn + col;
           DenseMW_t cc(m, 1, c, m);
           Aelem(lI, idx, cc);
           for (std::size_t l=0; l<k; l++)
-            Schur_update_col(col, B21.tile(i, l), B12.tile(l, j), c);
+            Schur_update_col
+              (col, B21.tile(i, l), B12.tile(l, j), c, work);
         };
         block(i, j) = std::unique_ptr<LRTile<scalar_t>>
           (new LRTile<scalar_t>(m, n, Arow, Acol, opts));

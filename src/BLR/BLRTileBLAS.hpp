@@ -76,26 +76,26 @@ namespace strumpack {
 
     template<typename scalar_t> void Schur_update_col
     (std::size_t j, const BLRTile<scalar_t>& a,
-     const BLRTile<scalar_t>& b, scalar_t* c) {
-      a.Schur_update_col_a(j, b, c);
+     const BLRTile<scalar_t>& b, scalar_t* c, scalar_t* work) {
+      a.Schur_update_col_a(j, b, c, work);
     }
 
     template<typename scalar_t> void Schur_update_row
     (std::size_t i, const BLRTile<scalar_t>& a,
-     const BLRTile<scalar_t>& b, scalar_t* c) {
-      a.Schur_update_row_a(i, b, c);
+     const BLRTile<scalar_t>& b, scalar_t* c, scalar_t* work) {
+      a.Schur_update_row_a(i, b, c, work);
     }
 
     template<typename scalar_t> void Schur_update_cols
     (const std::vector<std::size_t>& cols, const BLRTile<scalar_t>& a,
-     const BLRTile<scalar_t>& b, DenseMatrix<scalar_t>& c) {
-      a.Schur_update_cols_a(cols, b, c);
+     const BLRTile<scalar_t>& b, DenseMatrix<scalar_t>& c, scalar_t* work) {
+      a.Schur_update_cols_a(cols, b, c, work);
     }
 
     template<typename scalar_t> void Schur_update_rows
     (const std::vector<std::size_t>& rows, const BLRTile<scalar_t>& a,
-     const BLRTile<scalar_t>& b, DenseMatrix<scalar_t>& c) {
-      a.Schur_update_rows_a(rows, b, c);
+     const BLRTile<scalar_t>& b, DenseMatrix<scalar_t>& c, scalar_t* work) {
+      a.Schur_update_rows_a(rows, b, c, work);
     }
 
   } // end namespace BLR
