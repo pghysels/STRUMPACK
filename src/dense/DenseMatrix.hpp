@@ -1326,22 +1326,26 @@ namespace strumpack {
 
   template<typename scalar_t> void
   DenseMatrix<scalar_t>::laswp(const std::vector<int>& P, bool fwd) {
-    blas::laswp(cols(), data(), ld(), 1, rows(), P.data(), fwd ? 1 : -1);
+    if (cols() != 0 && rows() != 0)
+      blas::laswp(cols(), data(), ld(), 1, rows(), P.data(), fwd ? 1 : -1);
   }
 
   template<typename scalar_t> void
   DenseMatrix<scalar_t>::laswp(const int* P, bool fwd) {
-    blas::laswp(cols(), data(), ld(), 1, rows(), P, fwd ? 1 : -1);
+    if (cols() != 0 && rows() != 0)
+      blas::laswp(cols(), data(), ld(), 1, rows(), P, fwd ? 1 : -1);
   }
 
   template<typename scalar_t> void
   DenseMatrix<scalar_t>::lapmr(const std::vector<int>& P, bool fwd) {
-    blas::lapmr(fwd, rows(), cols(), data(), ld(), P.data());
+    if (cols() != 0 && rows() != 0)
+      blas::lapmr(fwd, rows(), cols(), data(), ld(), P.data());
   }
 
   template<typename scalar_t> void
   DenseMatrix<scalar_t>::lapmt(const std::vector<int>& P, bool fwd) {
-    blas::lapmt(fwd, rows(), cols(), data(), ld(), P.data());
+    if (cols() != 0 && rows() != 0)
+      blas::lapmt(fwd, rows(), cols(), data(), ld(), P.data());
   }
 
   template<typename scalar_t> void DenseMatrix<scalar_t>::extract_rows
