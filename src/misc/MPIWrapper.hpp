@@ -184,7 +184,7 @@ namespace strumpack {
      * \param c will be moved from, will be reset to MPI_COMM_NULL
      * \see operator=(MPIComm&& c)
      */
-    MPIComm(MPIComm&& c) { *this = std::move(c); }
+    MPIComm(MPIComm&& c) noexcept { *this = std::move(c); }
 
     /**
      * Virtual destructor.  Free the MPI_Comm object, unless it is
@@ -211,7 +211,7 @@ namespace strumpack {
      * \param c the object ro be moved from, will be reset to
      * MPI_COMM_NULL
      */
-    MPIComm& operator=(MPIComm&& c) {
+    MPIComm& operator=(MPIComm&& c) noexcept {
       comm_ = c.comm_;
       c.comm_ = MPI_COMM_NULL;
       return *this;
@@ -280,6 +280,26 @@ namespace strumpack {
       MPI_Isend(const_cast<T*>(sbuf.data()), sbuf.size(), mpi_type<T>(),
                 dest, tag, comm_, req.req_.get());
       return std::move(req);
+    }
+
+    /**
+     * Non-blocking send of a vector to a destination process, with a
+     * certain tag.
+     *
+     * \tparam T template type of the send buffer, should have a
+     * corresponding mpi_type<T>() implementation
+     *
+     * \param sbuf buffer of type T to be send
+     * \param dest rank of destination process in this MPI communicator
+     * \param tag tag to use in MPI message
+     * \param req MPI request object
+     */
+    template<typename T>
+    void isend(const std::vector<T>& sbuf, int dest, int tag,
+               MPI_Request* req) const {
+      // const_cast is necessary for ancient openmpi version used on Travis
+      MPI_Isend(const_cast<T*>(sbuf.data()), sbuf.size(), mpi_type<T>(),
+                dest, tag, comm_, req);
     }
 
     /**
