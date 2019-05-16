@@ -348,6 +348,12 @@ namespace strumpack {
       template<typename S> friend class LRBFMatrix;
     };
 
+
+    template<typename scalar_t> struct KernelCommPtrs {
+      kernel::Kernel<scalar_t>* K;
+      MPIComm* c;
+    };
+
     /**
      * Routine used to pass to the fortran code to compute a selected
      * element of a kernel. The kernel argument needs to be a pointer
@@ -361,14 +367,38 @@ namespace strumpack {
      * \param kernel pointer to Kernel object
      */
     template<typename scalar_t> void HODLR_kernel_evaluation
-    (int* i, int* j, scalar_t* v, C2Fptr kernel) {
-      *v = static_cast<kernel::Kernel<scalar_t>*>(kernel)->eval(*i, *j);
+    (int* i, int* j, scalar_t* v, C2Fptr KC) {
+      const auto& K = *(static_cast<KernelCommPtrs<scalar_t>*>(KC)->K);
+      //*v = static_cast<kernel::Kernel<scalar_t>*>(kernel)->eval(*i, *j);
+      *v = K.eval(*i, *j);
     }
 
     template<typename scalar_t> void HODLR_element_evaluation
     (int* i, int* j, scalar_t* v, C2Fptr elem) {
       *v = static_cast<std::function<scalar_t(int,int)>*>
         (elem)->operator()(*i, *j);
+    }
+
+    template<typename scalar_t> void HODLR_kernel_block_evaluation
+    (int* Ninter, int* allrows, int* allcols, scalar_t* local_data,
+     int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
+     C2Fptr KC) {
+      auto temp = static_cast<KernelCommPtrs<scalar_t>*>(KC);
+      const auto& K = *(temp->K);
+      const auto& comm = *(temp->c);
+      for (int isec=0, r0=0, c0=0; isec<*Ninter; isec++) {
+        auto m = rowids[isec];
+        auto n = colids[isec];
+        auto p0 = pmaps[3*(*Npmap)+isec];
+        assert(pmaps[(*Npmap)+isec] == 1);   // prows == 1
+        assert(2*pmaps[(*Npmap)+isec] == 1); // pcols == 1
+        if (comm.rank() == p0)
+          for (int c=0; c<n; c++)
+            for (int r=0; r<m; r++)
+              local_data[r+c*m] = K.eval(allrows[r0+r], allcols[c0+c]);
+        r0 += m;
+        c0 += n;
+      }
     }
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
@@ -411,6 +441,9 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "ErrFillFull", 0);
       HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", 100);
       HODLR_set_I_option<scalar_t>(options_, "rank0", opts.rank_guess());
+      // 0: extract one element, 1: extract blocks
+      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 0);
+      HODLR_set_I_option<scalar_t>(options_, "cpp", 1);
       HODLR_set_D_option<scalar_t>(options_, "rankrate", opts.rank_rate());
       if (opts.butterfly_levels() > 0)
         HODLR_set_I_option<scalar_t>(options_, "LRlevel", opts.butterfly_levels());
@@ -419,11 +452,13 @@ namespace strumpack {
       HODLR_set_D_option<scalar_t>(options_, "tol_Rdetect", 0.1*opts.rel_tol());
 
       perm_.resize(rows_);
+      KernelCommPtrs<scalar_t> KC{&K, &c_};
       // construct HODLR with geometrical points
       HODLR_construct_element
         (rows_, d, K.data().data(), lvls-1, leafs.data(),
          perm_.data(), lrows_, ho_bf_, options_, stats_, msh_, kerquant_,
-         ptree_, &(HODLR_kernel_evaluation<scalar_t>), &K, Fcomm_);
+         ptree_, &(HODLR_kernel_evaluation<scalar_t>),
+         &(HODLR_kernel_block_evaluation<scalar_t>), &KC, Fcomm_);
 
       //---- NOT NECESSARY ?? --------------------------------------------
       iperm_.resize(rows_);

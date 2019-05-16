@@ -145,7 +145,7 @@ namespace strumpack {
       F2Cptr Aoptions = const_cast<F2Cptr>(A.options_);
       HODLR_copyoptions<scalar_t>(Aoptions, options_);
 
-      LRBF_construct_matvec_init<scalar_t>
+      LRBF_construct_init<scalar_t>
         (rows_, cols_, lrows_, lcols_, A.msh_, B.msh_, lr_bf_, options_,
          stats_, msh_, kerquant_, ptree_);
 

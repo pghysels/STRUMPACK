@@ -103,23 +103,27 @@ namespace strumpack {
      int& lrows, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, double*, C2Fptr),
+     void (*C_FuncZmnBlock)(int*, int*, int*, double*,
+                            int*, int*, int*, int*, int*, C2Fptr),
      C2Fptr K, MPI_Fint comm) {
       d_c_bpack_construct_element
         (&n, &d, data, &lvls, leafs, perm, &lrows, &ho_bf, &options,
          &stats, &msh, &kerquant, &ptree,
-         C_FuncZmn, K, &comm);
+         C_FuncZmn, C_FuncZmnBlock, K, &comm);
     }
     template<> void HODLR_construct_element<std::complex<double>>
     (int n, int d, std::complex<double>* data, int lvls, int* leafs,
      int* perm, int& lrows, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, std::complex<double>*, C2Fptr),
+     void (*C_FuncZmnBlock)(int*, int*, int*, std::complex<double>*,
+                            int*, int*, int*, int*, int*, C2Fptr),
      C2Fptr K, MPI_Fint comm) {
       //TODO, data should be double??
       // z_c_bpack_construct_element
       //   (&n, &d, data, &lvls, leafs, perm, &lrows, &ho_bf, &options,
       //    &stats, &msh, &kerquant, &ptree,
-      //    C_FuncZmn, K, &comm);
+      //    C_FuncZmn, C_FuncZmnBlock, K, &comm);
     }
 
 
@@ -160,19 +164,19 @@ namespace strumpack {
               _Complex double*, C2Fptr)>(matvec), fdata);
     }
 
-    template<> void LRBF_construct_matvec_init<double>
+    template<> void LRBF_construct_init<double>
     (int M, int N, int& lrows, int& lcols, F2Cptr rmsh, F2Cptr cmsh,
      F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
      F2Cptr& kerquant, F2Cptr& ptree) {
-      d_c_bf_construct_matvec_init
+      d_c_bf_construct_init
         (&M, &N, &lrows, &lcols, &rmsh, &cmsh, &lr_bf, &options,
          &stats, &msh, &kerquant, &ptree);
     }
-    template<> void LRBF_construct_matvec_init<std::complex<double>>
+    template<> void LRBF_construct_init<std::complex<double>>
     (int M, int N, int& lrows, int& lcols, F2Cptr rmsh, F2Cptr cmsh,
      F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
      F2Cptr& kerquant, F2Cptr& ptree) {
-      z_c_bf_construct_matvec_init
+      z_c_bf_construct_init
         (&M, &N, &lrows, &lcols, &rmsh, &cmsh, &lr_bf, &options,
          &stats, &msh, &kerquant, &ptree);
     }

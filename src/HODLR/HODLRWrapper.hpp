@@ -116,7 +116,10 @@ namespace strumpack {
      int& lrows, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, scalar_t*, C2Fptr),
-     C2Fptr K, MPI_Fint comm) {
+     void (*C_FuncZmnBlock)
+     (int* Ninter, int* allrows, int* allcols, scalar_t* local_data,
+      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
+      C2Fptr elems), C2Fptr K, MPI_Fint comm) {
       std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
     }
     template<> void HODLR_construct_element<double>
@@ -124,14 +127,19 @@ namespace strumpack {
      int& lrows, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, double*, C2Fptr),
-     C2Fptr K, MPI_Fint comm);
+     void (*C_FuncZmnBlock)
+     (int* Ninter, int* allrows, int* allcols, double* local_data,
+      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
+      C2Fptr elems), C2Fptr K, MPI_Fint comm);
     template<> void HODLR_construct_element<std::complex<double>>
     (int n, int d, std::complex<double>* data, int lvls, int* leafs,
      int* perm, int& lrows, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, std::complex<double>*, C2Fptr),
-     C2Fptr K, MPI_Fint comm);
-
+     void (*C_FuncZmnBlock)
+     (int* Ninter, int* allrows, int* allcols, std::complex<double>* local_data,
+      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
+      C2Fptr elems), C2Fptr K, MPI_Fint comm);
 
     template<typename scalar_t> void HODLR_construct_matvec_init
     (int N, int lvls, int* tree, int* perm, int& lrow,
@@ -166,17 +174,17 @@ namespace strumpack {
      (char const*, int*, int*, int*, const std::complex<double>*,
       std::complex<double>*, C2Fptr), C2Fptr& fdata);
 
-    template<typename scalar_t> void LRBF_construct_matvec_init
+    template<typename scalar_t> void LRBF_construct_init
     (int M, int N, int& lrows, int& lcols, F2Cptr rmsh, F2Cptr cmsh,
      F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
      F2Cptr& kerquant, F2Cptr& ptree) {
       std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
     }
-    template<> void LRBF_construct_matvec_init<double>
+    template<> void LRBF_construct_init<double>
     (int M, int N, int& lrows, int& lcols, F2Cptr rmsh, F2Cptr cmsh,
      F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
      F2Cptr& kerquant, F2Cptr& ptree);
-    template<> void LRBF_construct_matvec_init<std::complex<double>>
+    template<> void LRBF_construct_init<std::complex<double>>
     (int M, int N, int& lrows, int& lcols, F2Cptr rmsh, F2Cptr cmsh,
      F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
      F2Cptr& kerquant, F2Cptr& ptree);
