@@ -237,6 +237,7 @@ namespace strumpack {
       int P1active = this->_ch[1]->Pactive();
       std::vector<MPIRequest> sreq;
       std::vector<std::size_t> sbuf0, sbuf1;
+      std::vector<scalar_t> sbuf0_scalar, sbuf1_scalar;
       assert(sizeof(typename decltype(w.ids_scores)::value_type::second_type)
              == sizeof(std::size_t));
       if (rank < P0active) {
@@ -246,7 +247,8 @@ namespace strumpack {
           // are not active on child0, ie the ones in [P0active,P)
           sbuf0.reserve(7+w.c[0].Ir.size()+w.c[0].Ic.size()+
                         w.c[0].Jr.size()+w.c[0].Jc.size()+
-                        2*w.c[0].ids_scores.size());
+                        w.c[0].ids_scores.size());
+          sbuf0_scalar.reserve(w.c[0].ids_scores.size());
           sbuf0.push_back(std::size_t(this->_ch[0]->_U_state));
           sbuf0.push_back(std::size_t(this->_ch[0]->_V_state));
           sbuf0.push_back(this->_ch[0]->_U_rank);
@@ -258,12 +260,15 @@ namespace strumpack {
           for (auto i : w.c[0].Ic) sbuf0.push_back(i);
           for (auto i : w.c[0].Jr) sbuf0.push_back(i);
           for (auto i : w.c[0].Jc) sbuf0.push_back(i);
-          for (auto i : w.c[0].ids_scores) sbuf0.push_back(i.first);
-          for (auto i : w.c[0].ids_scores)
-            sbuf0.push_back(reinterpret_cast<std::size_t&>(i.second));
+          for (auto i : w.c[0].ids_scores) {
+            sbuf0.push_back(i.first);
+            sbuf0_scalar.push_back(i.second);
+          }
           for (int p=P0active; p<P; p++)
-            if (rank == (p - P0active) % P0active)
+            if (rank == (p - P0active) % P0active) {
               sreq.emplace_back(Comm().isend(sbuf0, p, 0));
+              sreq.emplace_back(Comm().isend(sbuf0_scalar, p, 2));
+            }
         }
       }
       if (rank >= root1 && rank < root1+P1active) {
@@ -274,7 +279,8 @@ namespace strumpack {
           // [root1+P1active,P)
           sbuf1.reserve(7+w.c[1].Ir.size()+w.c[1].Ic.size()+
                         w.c[1].Jr.size()+w.c[1].Jc.size()+
-                        2*w.c[1].ids_scores.size());
+                        w.c[1].ids_scores.size());
+          sbuf1_scalar.reserve(w.c[1].ids_scores.size());
           sbuf1.push_back(std::size_t(this->_ch[1]->_U_state));
           sbuf1.push_back(std::size_t(this->_ch[1]->_V_state));
           sbuf1.push_back(this->_ch[1]->_U_rank);
@@ -286,15 +292,20 @@ namespace strumpack {
           for (auto i : w.c[1].Ic) sbuf1.push_back(i);
           for (auto i : w.c[1].Jr) sbuf1.push_back(i);
           for (auto i : w.c[1].Jc) sbuf1.push_back(i);
-          for (auto i : w.c[1].ids_scores) sbuf1.push_back(i.first);
-          for (auto i : w.c[1].ids_scores)
-            sbuf1.push_back(reinterpret_cast<std::size_t&>(i.second));
+          for (auto i : w.c[1].ids_scores) {
+            sbuf1.push_back(i.first);
+            sbuf1_scalar.push_back(i.second);
+          }
           for (int p=0; p<root1; p++)
-            if (rank - root1 == p % P1active)
+            if (rank - root1 == p % P1active) {
               sreq.emplace_back(Comm().isend(sbuf1, p, 1));
+              sreq.emplace_back(Comm().isend(sbuf1_scalar, p, 3));
+            }
           for (int p=root1+P1active; p<P; p++)
-            if (rank - root1 == (p - P1active) % P1active)
+            if (rank - root1 == (p - P1active) % P1active) {
               sreq.emplace_back(Comm().isend(sbuf1, p, 1));
+              sreq.emplace_back(Comm().isend(sbuf1_scalar, p, 3));
+            }
         }
       }
       if (!(rank < P0active)) {
@@ -304,7 +315,9 @@ namespace strumpack {
           if (p == (rank - P0active) % P0active) { dest = p; break; }
         assert(dest >= 0);
         auto buf = Comm().template recv<std::size_t>(dest, 0);
+        auto buf_scalar = Comm().template recv<scalar_t>(dest, 2);
         auto ptr = buf.begin();
+        auto ptr_scalar = buf_scalar.begin();
         this->_ch[0]->_U_state = State(*ptr++);
         this->_ch[0]->_V_state = State(*ptr++);
         this->_ch[0]->_U_rank = *ptr++;
@@ -321,9 +334,10 @@ namespace strumpack {
         for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Ic[i] = *ptr++;
         for (int i=0; i<this->_ch[0]->_U_rank; i++) w.c[0].Jr[i] = *ptr++;
         for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Jc[i] = *ptr++;
-        for (std::size_t i=0; i<d; i++) w.c[0].ids_scores[i].first = *ptr++;
-        for (std::size_t i=0; i<d; i++)
-          w.c[0].ids_scores[i].second = reinterpret_cast<double&>(*ptr++);
+        for (std::size_t i=0; i<d; i++) {
+          w.c[0].ids_scores[i].first = *ptr++;
+          w.c[0].ids_scores[i].second = *ptr_scalar++;
+        }
         //assert(msgsize == std::distance(buf, ptr));
       }
       if (!(rank >= root1 && rank < root1+P1active)) {
@@ -338,7 +352,9 @@ namespace strumpack {
         }
         assert(dest >= 0);
         auto buf = Comm().template recv<std::size_t>(dest, 1);
+        auto buf_scalar = Comm().template recv<scalar_t>(dest, 3);
         auto ptr = buf.begin();
+        auto ptr_scalar = buf_scalar.begin();
         this->_ch[1]->_U_state = State(*ptr++);
         this->_ch[1]->_V_state = State(*ptr++);
         this->_ch[1]->_U_rank = *ptr++;
@@ -355,9 +371,10 @@ namespace strumpack {
         for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Ic[i] = *ptr++;
         for (int i=0; i<this->_ch[1]->_U_rank; i++) w.c[1].Jr[i] = *ptr++;
         for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Jc[i] = *ptr++;
-        for (std::size_t i=0; i<d; i++) w.c[1].ids_scores[i].first = *ptr++;
-        for (std::size_t i=0; i<d; i++)
-          w.c[1].ids_scores[i].second = reinterpret_cast<double&>(*ptr++);
+        for (std::size_t i=0; i<d; i++) {
+          w.c[1].ids_scores[i].first = *ptr++;
+          w.c[1].ids_scores[i].second = *ptr_scalar++;
+        }
         //assert(msgsize == std::distance(buf, ptr));
       }
       wait_all(sreq);
