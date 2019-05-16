@@ -2050,7 +2050,7 @@ INCLUDE_FILE_PATTERNS  =
 
 PREDEFINED             = protected=private \
                        DOXYGEN_SHOULD_SKIP_THIS \
-                       STRUMPACK_USE_HODLRBF \
+                       STRUMPACK_USE_BPACK \
                        STRUMPACK_USE_MPI
 
 # If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then this

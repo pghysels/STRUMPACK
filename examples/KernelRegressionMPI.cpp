@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
     check(prediction);
   }
 
-#if defined(STRUMPACK_USE_HODLRBF)
+#if defined(STRUMPACK_USE_BPACK)
   {
     HODLR::HODLROptions<scalar_t> opts;
     opts.set_verbose(true);
