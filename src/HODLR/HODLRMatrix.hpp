@@ -75,11 +75,16 @@ namespace strumpack {
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using DistM_t = DistributedMatrix<scalar_t>;
+      using DistMW_t = DistributedMatrixWrapper<scalar_t>;
       using opts_t = HODLROptions<scalar_t>;
       using mult_t = typename std::function<
         void(Trans,const DenseM_t&,DenseM_t&)>;
       using elem_t = typename std::function<
         scalar_t(std::size_t i, std::size_t j)>;
+      using delem_blocks_t = typename std::function
+        <void(const std::vector<std::vector<std::size_t>>& I,
+              const std::vector<std::vector<std::size_t>>& J,
+              std::vector<DistMW_t>& B)>;
 
     public:
       /**
@@ -251,6 +256,14 @@ namespace strumpack {
       (const std::function<void(Trans op,const DenseM_t& R,DenseM_t& S)>& Amult,
        int rank_guess);
 
+      /**
+       * Construct the compressed HODLR representation of the matrix,
+       * using only a matrix-(multiple)vector multiplication routine.
+       *
+       * \param Aelem Element extraction routine, extracting multiple
+       * blocks at once.
+       */
+      void compress(const delem_blocks_t& Aelem);
 
       /**
        * Multiply this HODLR matrix with a dense matrix: Y = op(X),
@@ -369,7 +382,6 @@ namespace strumpack {
     template<typename scalar_t> void HODLR_kernel_evaluation
     (int* i, int* j, scalar_t* v, C2Fptr KC) {
       const auto& K = *(static_cast<KernelCommPtrs<scalar_t>*>(KC)->K);
-      //*v = static_cast<kernel::Kernel<scalar_t>*>(kernel)->eval(*i, *j);
       *v = K.eval(*i, *j);
     }
 
@@ -380,7 +392,8 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void HODLR_kernel_block_evaluation
-    (int* Ninter, int* allrows, int* allcols, scalar_t* local_data,
+    (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+     int* allrows, int* allcols, scalar_t* alldat_loc,
      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
      C2Fptr KC) {
       auto temp = static_cast<KernelCommPtrs<scalar_t>*>(KC);
@@ -389,13 +402,13 @@ namespace strumpack {
       for (int isec=0, r0=0, c0=0; isec<*Ninter; isec++) {
         auto m = rowids[isec];
         auto n = colids[isec];
-        auto p0 = pmaps[3*(*Npmap)+isec];
-        assert(pmaps[(*Npmap)+isec] == 1);   // prows == 1
-        assert(2*pmaps[(*Npmap)+isec] == 1); // pcols == 1
+        auto p0 = pmaps[2*(*Npmap)+pgids[isec]];
+        assert(pmaps[pgids[isec]] == 1);          // prows == 1
+        assert(pmaps[(*Npmap)+pgids[isec]] == 1); // pcols == 1
         if (comm.rank() == p0)
           for (int c=0; c<n; c++)
             for (int r=0; r<m; r++)
-              local_data[r+c*m] = K.eval(allrows[r0+r], allcols[c0+c]);
+              alldat_loc[r+c*m] = K.eval(allrows[r0+r], allcols[c0+c]);
         r0 += m;
         c0 += n;
       }
@@ -442,7 +455,7 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", 100);
       HODLR_set_I_option<scalar_t>(options_, "rank0", opts.rank_guess());
       // 0: extract one element, 1: extract blocks
-      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 0);
+      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 1);
       HODLR_set_I_option<scalar_t>(options_, "cpp", 1);
       HODLR_set_D_option<scalar_t>(options_, "rankrate", opts.rank_rate());
       if (opts.butterfly_levels() > 0)
@@ -516,6 +529,9 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "ErrFillFull", 0);
       HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", 100);
       HODLR_set_I_option<scalar_t>(options_, "rank0", opts.rank_guess());
+      // 0: extract one element, 1: extract blocks
+      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 0);
+      HODLR_set_I_option<scalar_t>(options_, "cpp", 1);
       HODLR_set_D_option<scalar_t>(options_, "rankrate", opts.rank_rate());
       if (opts.butterfly_levels() > 0)
         HODLR_set_I_option<scalar_t>(options_, "LRlevel", opts.butterfly_levels());
@@ -672,6 +688,14 @@ namespace strumpack {
     (const mult_t& Amult, int rank_guess) {
       HODLR_set_I_option<scalar_t>(options_, "rank0", rank_guess);
       compress(Amult);
+    }
+
+    template<typename scalar_t> void
+    HODLRMatrix<scalar_t>::compress(const delem_blocks_t& Aelem) {
+      //compress(Amult);
+
+
+      
     }
 
     template<typename scalar_t> void

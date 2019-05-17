@@ -117,7 +117,8 @@ namespace strumpack {
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, scalar_t*, C2Fptr),
      void (*C_FuncZmnBlock)
-     (int* Ninter, int* allrows, int* allcols, scalar_t* local_data,
+     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+      int* allrows, int* allcols, scalar_t* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr K, MPI_Fint comm) {
       std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
@@ -128,7 +129,8 @@ namespace strumpack {
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, double*, C2Fptr),
      void (*C_FuncZmnBlock)
-     (int* Ninter, int* allrows, int* allcols, double* local_data,
+     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+      int* allrows, int* allcols, double* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr K, MPI_Fint comm);
     template<> void HODLR_construct_element<std::complex<double>>
@@ -137,7 +139,8 @@ namespace strumpack {
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, std::complex<double>*, C2Fptr),
      void (*C_FuncZmnBlock)
-     (int* Ninter, int* allrows, int* allcols, std::complex<double>* local_data,
+     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+      int* allrows, int* allcols, std::complex<double>* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr K, MPI_Fint comm);
 

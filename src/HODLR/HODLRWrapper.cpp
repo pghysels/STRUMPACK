@@ -103,9 +103,11 @@ namespace strumpack {
      int& lrows, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, double*, C2Fptr),
-     void (*C_FuncZmnBlock)(int*, int*, int*, double*,
-                            int*, int*, int*, int*, int*, C2Fptr),
-     C2Fptr K, MPI_Fint comm) {
+     void (*C_FuncZmnBlock)
+     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+      int* allrows, int* allcols, double* alldat_loc,
+      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
+      C2Fptr elems), C2Fptr K, MPI_Fint comm) {
       d_c_bpack_construct_element
         (&n, &d, data, &lvls, leafs, perm, &lrows, &ho_bf, &options,
          &stats, &msh, &kerquant, &ptree,
@@ -116,9 +118,11 @@ namespace strumpack {
      int* perm, int& lrows, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, std::complex<double>*, C2Fptr),
-     void (*C_FuncZmnBlock)(int*, int*, int*, std::complex<double>*,
-                            int*, int*, int*, int*, int*, C2Fptr),
-     C2Fptr K, MPI_Fint comm) {
+     void (*C_FuncZmnBlock)
+     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+      int* allrows, int* allcols, std::complex<double>* alldat_loc,
+      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
+      C2Fptr elems), C2Fptr K, MPI_Fint comm) {
       //TODO, data should be double??
       // z_c_bpack_construct_element
       //   (&n, &d, data, &lvls, leafs, perm, &lrows, &ho_bf, &options,
