@@ -109,24 +109,6 @@ namespace strumpack {
        std::vector<int>& perm, const opts_t& opts);
 
       /**
-       * Construct an HODLR approximation using a routine to evaluate
-       * individual matrix elements.
-       *
-       * \param c MPI communicator, this communicator is copied
-       * internally.
-       * \param t tree specifying the HODLR matrix partitioning
-       * \param Aelem Routine, std::function, which can also be a
-       * lambda function or a functor (class object implementing the
-       * member "scalar_t operator()(int i, int j)"), that
-       * evaluates/returns the matrix element A(i,j)
-       * \param opts object containing a number of HODLR options
-       */
-      HODLRMatrix
-      (const MPIComm& c, const HSS::HSSPartitionTree& tree,
-       const std::function<scalar_t(int i, int j)>& Aelem,
-       const opts_t& opts);
-
-      /**
        * Construct an HODLR matrix using a specified HODLR tree and
        * matrix-vector multiplication routine.
        *
@@ -354,9 +336,15 @@ namespace strumpack {
       F2Cptr ptree_ = nullptr;     // process tree returned by Fortran code
       MPI_Fint Fcomm_;             // the fortran MPI communicator
       MPIComm c_;
-      int rows_ = 0, cols_ = 0, lrows_ = 0;
+      int rows_ = 0, cols_ = 0, lrows_ = 0, lvls_ = 0;
       std::vector<int> perm_, iperm_; // permutation used by the HODLR code
       std::vector<int> dist_;         // begin rows of each rank
+      std::vector<int> leafs_;        // leaf sizes of the tree
+
+      void options_init(const opts_t& opts);
+      // void matvec_init();
+      void perm_init();
+      void dist_init();
 
       template<typename S> friend class LRBFMatrix;
     };
@@ -385,12 +373,6 @@ namespace strumpack {
       *v = K.eval(*i, *j);
     }
 
-    template<typename scalar_t> void HODLR_element_evaluation
-    (int* i, int* j, scalar_t* v, C2Fptr elem) {
-      *v = static_cast<std::function<scalar_t(int,int)>*>
-        (elem)->operator()(*i, *j);
-    }
-
     template<typename scalar_t> void HODLR_kernel_block_evaluation
     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
      int* allrows, int* allcols, scalar_t* alldat_loc,
@@ -399,19 +381,62 @@ namespace strumpack {
       auto temp = static_cast<KernelCommPtrs<scalar_t>*>(KC);
       const auto& K = *(temp->K);
       const auto& comm = *(temp->c);
+      auto data = alldat_loc;
       for (int isec=0, r0=0, c0=0; isec<*Ninter; isec++) {
         auto m = rowids[isec];
         auto n = colids[isec];
         auto p0 = pmaps[2*(*Npmap)+pgids[isec]];
         assert(pmaps[pgids[isec]] == 1);          // prows == 1
         assert(pmaps[(*Npmap)+pgids[isec]] == 1); // pcols == 1
-        if (comm.rank() == p0)
+        if (comm.rank() == p0) {
           for (int c=0; c<n; c++)
             for (int r=0; r<m; r++)
-              alldat_loc[r+c*m] = K.eval(allrows[r0+r], allcols[c0+c]);
+              data[r+c*m] = K.eval(allrows[r0+r], allcols[c0+c]);
+          data += m*n;
+        }
         r0 += m;
         c0 += n;
       }
+    }
+
+    template<typename scalar_t> void HODLR_element_evaluation
+    (int* i, int* j, scalar_t* v, C2Fptr elem) {
+      *v = static_cast<std::function<scalar_t(int,int)>*>
+        (elem)->operator()(*i, *j);
+    }
+
+    template<typename scalar_t> struct AelemCommPtrs {
+      std::function<
+        void(const std::vector<std::vector<std::size_t>>&,
+             const std::vector<std::vector<std::size_t>>&,
+             std::vector<DistributedMatrixWrapper<scalar_t>>&
+             )>* Aelem;
+      MPIComm* c;
+    };
+
+    template<typename scalar_t> void HODLR_block_evaluation
+    (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+     int* allrows, int* allcols, scalar_t* alldat_loc,
+     int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
+     C2Fptr AC) {
+      using DistMW_t = DistributedMatrixWrapper<scalar_t>;
+      auto temp = static_cast<AelemCommPtrs<scalar_t>*>(AC);
+      std::vector<std::vector<std::size_t>> I(*Ninter), J(*Ninter);
+      std::vector<DistMW_t> B(*Ninter);
+      BLACSGrid g(MPI_COMM_SELF), g_none(*(temp->c));
+      auto data = alldat_loc;
+      for (int isec=0, r0=0, c0=0; isec<*Ninter; isec++) {
+        auto m = rowids[isec];
+        auto n = colids[isec];
+        I[isec].assign(allrows+r0, allrows+r0+m);
+        J[isec].assign(allcols+c0, allcols+c0+n);
+        auto p0 = pmaps[2*(*Npmap)+pgids[isec]];
+        B[isec] = DistMW_t(temp->c->rank() == p0 ? &g : &g_none, m, n, data);
+        r0 += m;
+        c0 += n;
+        data += m*n;
+      }
+      temp->Aelem(I, J, B);
     }
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
@@ -419,147 +444,29 @@ namespace strumpack {
      std::vector<int>& perm, const opts_t& opts) {
       int d = K.d();
       rows_ = cols_ = K.n();
-
       auto tree = binary_tree_clustering
         (opts.clustering_algorithm(), K.data(), perm, opts.leaf_size());
       int min_lvl = 2 + std::ceil(std::log2(c.size()));
-      int lvls = std::max(min_lvl, tree.levels());
-      tree.expand_complete_levels(lvls);
-      auto leafs = tree.leaf_sizes();
-
+      lvls_ = std::max(min_lvl, tree.levels());
+      tree.expand_complete_levels(lvls_);
+      leafs_ = tree.leaf_sizes();
       c_ = c;
       Fcomm_ = MPI_Comm_c2f(c_.comm());
-      int P = c_.size();
-      int rank = c_.rank();
-
-      std::vector<int> groups(P);
-      std::iota(groups.begin(), groups.end(), 0);
-
-      // create hodlr data structures
-      HODLR_createptree<scalar_t>(P, groups.data(), Fcomm_, ptree_);
-      HODLR_createoptions<scalar_t>(options_);
-      HODLR_createstats<scalar_t>(stats_);
-
-      // set hodlr options
-      int com_opt = 4;   // compression option 1:SVD 2:RRQR 3:ACA 4:BACA
-      int sort_opt = 0;  // 0:natural order, 1:kd-tree, 2:cobble-like ordering
-                         // 3:gram distance-based cobble-like ordering
-      HODLR_set_D_option<scalar_t>(options_, "tol_comp", opts.rel_tol());
-      HODLR_set_I_option<scalar_t>(options_, "verbosity", opts.verbose() ? 0 : -1);
-      HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
-      //HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", opts.leaf_size());
-      HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
-      HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", com_opt);
-      HODLR_set_I_option<scalar_t>(options_, "xyzsort", sort_opt);
-      HODLR_set_I_option<scalar_t>(options_, "ErrFillFull", 0);
-      HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", 100);
-      HODLR_set_I_option<scalar_t>(options_, "rank0", opts.rank_guess());
-      // 0: extract one element, 1: extract blocks
-      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 1);
-      HODLR_set_I_option<scalar_t>(options_, "cpp", 1);
-      HODLR_set_D_option<scalar_t>(options_, "rankrate", opts.rank_rate());
-      if (opts.butterfly_levels() > 0)
-        HODLR_set_I_option<scalar_t>(options_, "LRlevel", opts.butterfly_levels());
-      HODLR_set_D_option<scalar_t>(options_, "tol_comp", opts.rel_tol());
-      HODLR_set_D_option<scalar_t>(options_, "tol_rand", opts.rel_tol());
-      HODLR_set_D_option<scalar_t>(options_, "tol_Rdetect", 0.1*opts.rel_tol());
+      options_init(opts);
+      HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", 4);   // BACA
+      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 1); // block extraction
 
       perm_.resize(rows_);
       KernelCommPtrs<scalar_t> KC{&K, &c_};
       // construct HODLR with geometrical points
       HODLR_construct_element
-        (rows_, d, K.data().data(), lvls-1, leafs.data(),
+        (rows_, d, K.data().data(), lvls_-1, leafs_.data(),
          perm_.data(), lrows_, ho_bf_, options_, stats_, msh_, kerquant_,
          ptree_, &(HODLR_kernel_evaluation<scalar_t>),
          &(HODLR_kernel_block_evaluation<scalar_t>), &KC, Fcomm_);
 
-      //---- NOT NECESSARY ?? --------------------------------------------
-      iperm_.resize(rows_);
-      for (auto& i : perm_) i--; // Fortran to C
-      MPI_Bcast(perm_.data(), perm_.size(), MPI_INT, 0, c_.comm());
-      for (int i=0; i<rows_; i++)
-        iperm_[perm_[i]] = i;
-      //------------------------------------------------------------------
-
-      dist_.resize(P+1);
-      dist_[rank+1] = lrows_;
-      MPI_Allgather
-        (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
-         dist_.data()+1, 1, MPI_INT, c_.comm());
-      for (int p=0; p<P; p++)
-        dist_[p+1] += dist_[p];
-    }
-
-
-    template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
-    (const MPIComm& c, const HSS::HSSPartitionTree& tree,
-     const std::function<scalar_t(int i, int j)>& Aelem,
-     const opts_t& opts) {
-      rows_ = cols_ = tree.size;
-
-      HSS::HSSPartitionTree full_tree(tree);
-      int min_lvl = 2 + std::ceil(std::log2(c.size()));
-      int lvls = std::max(min_lvl, full_tree.levels());
-      full_tree.expand_complete_levels(lvls);
-      auto leafs = full_tree.leaf_sizes();
-
-      c_ = c;
-      Fcomm_ = MPI_Comm_c2f(c_.comm());
-      int P = c_.size();
-      int rank = c_.rank();
-
-      std::vector<int> groups(P);
-      std::iota(groups.begin(), groups.end(), 0);
-
-      // create hodlr data structures
-      HODLR_createptree<scalar_t>(P, groups.data(), Fcomm_, ptree_);
-      HODLR_createoptions<scalar_t>(options_);
-      HODLR_createstats<scalar_t>(stats_);
-
-      // set hodlr options
-      int com_opt = 4;   // compression option 1:SVD 2:RRQR 3:ACA 4:BACA
-      int sort_opt = 0;  // 0:natural order, 1:kd-tree, 2:cobble-like ordering
-                         // 3:gram distance-based cobble-like ordering
-      HODLR_set_D_option<scalar_t>(options_, "tol_comp", opts.rel_tol());
-      HODLR_set_I_option<scalar_t>(options_, "verbosity", opts.verbose() ? 0 : -1);
-      HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
-      HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
-      HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", com_opt);
-      HODLR_set_I_option<scalar_t>(options_, "xyzsort", sort_opt);
-      HODLR_set_I_option<scalar_t>(options_, "ErrFillFull", 0);
-      HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", 100);
-      HODLR_set_I_option<scalar_t>(options_, "rank0", opts.rank_guess());
-      // 0: extract one element, 1: extract blocks
-      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 0);
-      HODLR_set_I_option<scalar_t>(options_, "cpp", 1);
-      HODLR_set_D_option<scalar_t>(options_, "rankrate", opts.rank_rate());
-      if (opts.butterfly_levels() > 0)
-        HODLR_set_I_option<scalar_t>(options_, "LRlevel", opts.butterfly_levels());
-      HODLR_set_D_option<scalar_t>(options_, "tol_comp", opts.rel_tol());
-      HODLR_set_D_option<scalar_t>(options_, "tol_rand", opts.rel_tol());
-      HODLR_set_D_option<scalar_t>(options_, "tol_Rdetect", 0.1*opts.rel_tol());
-
-      perm_.resize(rows_);
-      HODLR_construct_element
-        (rows_, 0, NULL, lvls-1, leafs.data(),
-         perm_.data(), lrows_, ho_bf_, options_, stats_, msh_, kerquant_,
-         ptree_, &(HODLR_element_evaluation<scalar_t>), &Aelem, Fcomm_);
-
-      //---- NOT NECESSARY ?? --------------------------------------------
-      iperm_.resize(rows_);
-      for (auto& i : perm_) i--; // Fortran to C
-      MPI_Bcast(perm_.data(), perm_.size(), MPI_INT, 0, c_.comm());
-      for (int i=0; i<rows_; i++)
-        iperm_[perm_[i]] = i;
-      //------------------------------------------------------------------
-
-      dist_.resize(P+1);
-      dist_[rank+1] = lrows_;
-      MPI_Allgather
-        (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
-         dist_.data()+1, 1, MPI_INT, c_.comm());
-      for (int p=0; p<P; p++)
-        dist_[p+1] += dist_[p];
+      perm_init();
+      dist_init();
     }
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
@@ -573,19 +480,29 @@ namespace strumpack {
     (const MPIComm& c, const HSS::HSSPartitionTree& tree,
      const opts_t& opts) {
       rows_ = cols_ = tree.size;
-
       HSS::HSSPartitionTree full_tree(tree);
       int min_lvl = 2 + std::ceil(std::log2(c.size()));
-      int lvls = std::max(min_lvl, full_tree.levels());
-      full_tree.expand_complete_levels(lvls);
-      auto leafs = full_tree.leaf_sizes();
-
+      lvls_ = std::max(min_lvl, full_tree.levels());
+      full_tree.expand_complete_levels(lvls_);
+      leafs_ = full_tree.leaf_sizes();
       c_ = c;
       if (c_.is_null()) return;
       Fcomm_ = MPI_Comm_c2f(c_.comm());
-      int P = c_.size();
-      int rank = c_.rank();
+      options_init(opts);
 
+      perm_.resize(rows_);
+      //if (opts.compression_algorithm() ==
+      //CompressionAlgorithm::RANDOM_SAMPLING)
+      HODLR_construct_matvec_init<scalar_t>
+        (rows_, lvls_-1, leafs_.data(), perm_.data(), lrows_, ho_bf_,
+         options_, stats_, msh_, kerquant_, ptree_);
+      perm_init();
+      dist_init();
+    }
+
+    template<typename scalar_t> void
+    HODLRMatrix<scalar_t>::options_init(const opts_t& opts) {
+      auto P = c_.size();
       std::vector<int> groups(P);
       std::iota(groups.begin(), groups.end(), 0);
 
@@ -595,44 +512,38 @@ namespace strumpack {
       HODLR_createstats<scalar_t>(stats_);
 
       // set hodlr options
-      int com_opt = 2;   // compression option 1:SVD 2:RRQR 3:ACA 4:BACA
-      int sort_opt = 0;  // 0:natural order, 1:kd-tree, 2:cobble-like ordering
-                         // 3:gram distance-based cobble-like ordering
       HODLR_set_I_option<scalar_t>(options_, "verbosity", opts.verbose() ? 2 : -1);
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
       HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
       //HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", com_opt);
-      HODLR_set_I_option<scalar_t>(options_, "xyzsort", sort_opt);
+      HODLR_set_I_option<scalar_t>(options_, "xyzsort", 0);
       HODLR_set_I_option<scalar_t>(options_, "ErrFillFull", 0);
       HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", 100);
       HODLR_set_I_option<scalar_t>(options_, "rank0", opts.rank_guess());
+      HODLR_set_I_option<scalar_t>(options_, "cpp", 1);
       HODLR_set_D_option<scalar_t>(options_, "rankrate", opts.rank_rate());
       if (opts.butterfly_levels() > 0)
         HODLR_set_I_option<scalar_t>(options_, "LRlevel", opts.butterfly_levels());
       HODLR_set_D_option<scalar_t>(options_, "tol_comp", opts.rel_tol());
       HODLR_set_D_option<scalar_t>(options_, "tol_rand", opts.rel_tol());
       HODLR_set_D_option<scalar_t>(options_, "tol_Rdetect", 0.1*opts.rel_tol());
+    }
 
-      perm_.resize(rows_);
-      HODLR_construct_matvec_init<scalar_t>
-        (rows_, lvls-1, leafs.data(), perm_.data(), lrows_, ho_bf_, options_,
-         stats_, msh_, kerquant_, ptree_);
-
-      //---- NOT NECESSARY ?? --------------------------------------------
+    template<typename scalar_t> void HODLRMatrix<scalar_t>::perm_init() {
       iperm_.resize(rows_);
       for (auto& i : perm_) i--; // Fortran to C
       MPI_Bcast(perm_.data(), perm_.size(), MPI_INT, 0, c_.comm());
-      for (int i=0; i<rows_; i++)
-        iperm_[perm_[i]] = i;
-      //------------------------------------------------------------------
+      for (int i=0; i<rows_; i++) iperm_[perm_[i]] = i;
+    }
 
+    template<typename scalar_t> void HODLRMatrix<scalar_t>::dist_init() {
+      auto P = c_.size();
+      auto rank = c_.rank();
       dist_.resize(P+1);
       dist_[rank+1] = lrows_;
-      MPI_Allgather
-        (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
-         dist_.data()+1, 1, MPI_INT, c_.comm());
-      for (int p=0; p<P; p++)
-        dist_[p+1] += dist_[p];
+      MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
+                    dist_.data()+1, 1, MPI_INT, c_.comm());
+      for (int p=0; p<P; p++) dist_[p+1] += dist_[p];
     }
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::~HODLRMatrix() {
@@ -676,6 +587,12 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::compress(const mult_t& Amult) {
+      perm_.resize(rows_);
+      HODLR_construct_matvec_init<scalar_t>
+        (rows_, lvls_-1, leafs_.data(), perm_.data(), lrows_, ho_bf_,
+         options_, stats_, msh_, kerquant_, ptree_);
+      perm_init();
+      dist_init();
       if (c_.is_null()) return;
       C2Fptr f = static_cast<void*>(const_cast<mult_t*>(&Amult));
       HODLR_construct_matvec_compute
@@ -692,10 +609,13 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::compress(const delem_blocks_t& Aelem) {
-      //compress(Amult);
-
-
-      
+      AelemCommPtrs<scalar_t> AC = {&Aelem, &c_};
+      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 1);
+      HODLR_construct_element
+        (rows_, 0, nullptr, lvls_-1, leafs_.data(),
+         perm_.data(), lrows_, ho_bf_, options_, stats_, msh_, kerquant_,
+         ptree_, &(HODLR_element_evaluation<scalar_t>),
+         &(HODLR_block_evaluation<scalar_t>), &AC, Fcomm_);
     }
 
     template<typename scalar_t> void
