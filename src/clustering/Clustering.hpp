@@ -80,11 +80,11 @@ namespace strumpack {
    */
   inline ClusteringAlgorithm
   get_clustering_algorithm(const std::string& c) {
-    if (c.compare("natural") == 0)     return ClusteringAlgorithm::NATURAL;
-    else if (c.compare("2means") == 0) return ClusteringAlgorithm::TWO_MEANS;
-    else if (c.compare("kdtree") == 0) return ClusteringAlgorithm::KD_TREE;
-    else if (c.compare("pca") == 0)    return ClusteringAlgorithm::PCA;
-    else if (c.compare("cobble") == 0) return ClusteringAlgorithm::COBBLE;
+    if (c == "natural")     return ClusteringAlgorithm::NATURAL;
+    else if (c == "2means") return ClusteringAlgorithm::TWO_MEANS;
+    else if (c == "kdtree") return ClusteringAlgorithm::KD_TREE;
+    else if (c == "pca")    return ClusteringAlgorithm::PCA;
+    else if (c == "cobble") return ClusteringAlgorithm::COBBLE;
     else {
       std::cerr << "WARNING: binary tree clustering not recognized,"
                 << " setting to recursive 2 means (2means)."

@@ -396,10 +396,8 @@ namespace strumpack {
      * returned.
      */
     inline KernelType kernel_type(const std::string& k) {
-      if (k.compare("Gauss") == 0)
-        return KernelType::GAUSS;
-      else if (k.compare("Laplace"))
-        return KernelType::LAPLACE;
+      if (k == "Gauss") return KernelType::GAUSS;
+      else if (k == "Laplace") return KernelType::LAPLACE;
       std::cerr << "ERROR: Kernel type not recogonized, "
                 << " setting kernel type to GAUSS."
                 << std::endl;

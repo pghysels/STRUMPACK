@@ -1200,23 +1200,15 @@ namespace strumpack {
         } break;
         case 4: {
           std::string s; std::istringstream iss(optarg); iss >> s;
-          if (s.compare("auto") == 0)
-            set_Krylov_solver(KrylovSolver::AUTO);
-          else if (s.compare("direct") == 0)
-            set_Krylov_solver(KrylovSolver::DIRECT);
-          else if (s.compare("refinement") == 0)
-            set_Krylov_solver(KrylovSolver::REFINE);
-          else if (s.compare("pgmres") == 0)
-            set_Krylov_solver(KrylovSolver::PREC_GMRES);
-          else if (s.compare("gmres") == 0)
-            set_Krylov_solver(KrylovSolver::GMRES);
-          else if (s.compare("pbicgstab") == 0)
-            set_Krylov_solver(KrylovSolver::PREC_BICGSTAB);
-          else if (s.compare("bicgstab") == 0)
-            set_Krylov_solver(KrylovSolver::BICGSTAB);
-          else
-            std::cerr << "# WARNING: Krylov solver not recognized,"
-              " using default" << std::endl;
+          if (s == "auto") set_Krylov_solver(KrylovSolver::AUTO);
+          else if (s == "direct") set_Krylov_solver(KrylovSolver::DIRECT);
+          else if (s == "refinement") set_Krylov_solver(KrylovSolver::REFINE);
+          else if (s == "pgmres") set_Krylov_solver(KrylovSolver::PREC_GMRES);
+          else if (s == "gmres") set_Krylov_solver(KrylovSolver::GMRES);
+          else if (s == "pbicgstab") set_Krylov_solver(KrylovSolver::PREC_BICGSTAB);
+          else if (s == "bicgstab") set_Krylov_solver(KrylovSolver::BICGSTAB);
+          else std::cerr << "# WARNING: Krylov solver not recognized,"
+                 " using default" << std::endl;
         } break;
         case 5: {
           std::istringstream iss(optarg);
@@ -1225,34 +1217,32 @@ namespace strumpack {
         case 6: {
           std::string s;
           std::istringstream iss(optarg); iss >> s;
-          if (s.compare("modified") == 0)
+          if (s == "modified")
             set_GramSchmidt_type(GramSchmidtType::MODIFIED);
-          else if (s.compare("classical") == 0)
+          else if (s == "classical")
             set_GramSchmidt_type(GramSchmidtType::CLASSICAL);
-          else
-            std::cerr << "# WARNING: Gram-Schmidt type not recognized,"
-              " use 'modified' or classical" << std::endl;
+          else std::cerr << "# WARNING: Gram-Schmidt type not recognized,"
+                 " use 'modified' or classical" << std::endl;
         } break;
         case 7: {
           std::string s; std::istringstream iss(optarg); iss >> s;
-          if (s.compare("natural") == 0)
+          if (s == "natural")
             set_reordering_method(ReorderingStrategy::NATURAL);
-          else if (s.compare("metis") == 0)
+          else if (s == "metis")
             set_reordering_method(ReorderingStrategy::METIS);
-          else if (s.compare("parmetis") == 0)
+          else if (s == "parmetis")
             set_reordering_method(ReorderingStrategy::PARMETIS);
-          else if (s.compare("scotch") == 0)
+          else if (s == "scotch")
             set_reordering_method(ReorderingStrategy::SCOTCH);
-          else if (s.compare("ptscotch") == 0)
+          else if (s == "ptscotch")
             set_reordering_method(ReorderingStrategy::PTSCOTCH);
-          else if (s.compare("geometric") == 0)
+          else if (s == "geometric")
             set_reordering_method(ReorderingStrategy::GEOMETRIC);
-          else if (s.compare("rcm") == 0)
+          else if (s == "rcm")
             set_reordering_method(ReorderingStrategy::RCM);
-          else
-            std::cerr << "# WARNING: matrix reordering strategy not"
-              " recognized, use 'metis', 'parmetis', 'scotch', 'ptscotch',"
-              " 'geometric' or 'rcm'" << std::endl;
+          else std::cerr << "# WARNING: matrix reordering strategy not"
+                 " recognized, use 'metis', 'parmetis', 'scotch', 'ptscotch',"
+                 " 'geometric' or 'rcm'" << std::endl;
         } break;
         case 8: {
           std::istringstream iss(optarg);
@@ -1313,18 +1303,13 @@ namespace strumpack {
         case 32: {
           std::string s; std::istringstream iss(optarg); iss >> s;
           for (auto& c : s) c = std::toupper(c);
-          if (s.compare("NONE") == 0)
-            set_compression(CompressionType::NONE);
-          else if (s.compare("HSS") == 0)
-            set_compression(CompressionType::HSS);
-          else if (s.compare("BLR") == 0)
-            set_compression(CompressionType::BLR);
-          else if (s.compare("HODLR") == 0)
-            set_compression(CompressionType::HODLR);
-          else
-            std::cerr << "# WARNING: compression type not"
-              " recognized, use 'NONE', 'HSS', 'BLR' or 'HODLR'"
-                      << std::endl;
+          if (s == "NONE") set_compression(CompressionType::NONE);
+          else if (s == "HSS") set_compression(CompressionType::HSS);
+          else if (s == "BLR") set_compression(CompressionType::BLR);
+          else if (s == "HODLR") set_compression(CompressionType::HODLR);
+          else std::cerr << "# WARNING: compression type not"
+                 " recognized, use 'NONE', 'HSS', 'BLR' or 'HODLR'"
+                         << std::endl;
         } break;
         case 33: {
           std::istringstream iss(optarg);
