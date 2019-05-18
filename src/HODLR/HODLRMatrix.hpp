@@ -458,12 +458,14 @@ namespace strumpack {
 
       perm_.resize(rows_);
       KernelCommPtrs<scalar_t> KC{&K, &c_};
-      // construct HODLR with geometrical points
-      HODLR_construct_element
-        (rows_, d, K.data().data(), lvls_-1, leafs_.data(),
+      HODLR_construct_init<scalar_t>
+        (rows_, /*d, K.data().data(),*/ 0, nullptr, lvls_-1, leafs_.data(),
          perm_.data(), lrows_, ho_bf_, options_, stats_, msh_, kerquant_,
+         ptree_ /*Fcomm_*/);
+      HODLR_construct_element_compute
+        (ho_bf_, options_, stats_, msh_, kerquant_,
          ptree_, &(HODLR_kernel_evaluation<scalar_t>),
-         &(HODLR_kernel_block_evaluation<scalar_t>), &KC, Fcomm_);
+         &(HODLR_kernel_block_evaluation<scalar_t>), &KC /*, Fcomm_*/);
 
       perm_init();
       dist_init();
@@ -491,11 +493,9 @@ namespace strumpack {
       options_init(opts);
 
       perm_.resize(rows_);
-      //if (opts.compression_algorithm() ==
-      //CompressionAlgorithm::RANDOM_SAMPLING)
-      HODLR_construct_matvec_init<scalar_t>
-        (rows_, lvls_-1, leafs_.data(), perm_.data(), lrows_, ho_bf_,
-         options_, stats_, msh_, kerquant_, ptree_);
+      HODLR_construct_init<scalar_t>
+        (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
+         lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_);
       perm_init();
       dist_init();
     }
@@ -531,7 +531,7 @@ namespace strumpack {
 
     template<typename scalar_t> void HODLRMatrix<scalar_t>::perm_init() {
       iperm_.resize(rows_);
-      for (auto& i : perm_) i--; // Fortran to C
+      //for (auto& i : perm_) i--; // Fortran to C
       MPI_Bcast(perm_.data(), perm_.size(), MPI_INT, 0, c_.comm());
       for (int i=0; i<rows_; i++) iperm_[perm_[i]] = i;
     }
@@ -587,12 +587,6 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::compress(const mult_t& Amult) {
-      perm_.resize(rows_);
-      HODLR_construct_matvec_init<scalar_t>
-        (rows_, lvls_-1, leafs_.data(), perm_.data(), lrows_, ho_bf_,
-         options_, stats_, msh_, kerquant_, ptree_);
-      perm_init();
-      dist_init();
       if (c_.is_null()) return;
       C2Fptr f = static_cast<void*>(const_cast<mult_t*>(&Amult));
       HODLR_construct_matvec_compute

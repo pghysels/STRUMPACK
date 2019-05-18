@@ -98,54 +98,47 @@ namespace strumpack {
       return val;
     }
 
-    template<> void HODLR_construct_element<double>
-    (int n, int d, double* data, int lvls, int* leafs, int* perm,
-     int& lrows, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
+    template<> void HODLR_construct_init<double>
+    (int N, int d, double* data, int lvls, int* tree, int* perm,
+     int& lrow, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
+     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree) {
+      d_c_bpack_construct_init
+        (&N, &d, data, &lvls, tree, perm, &lrow, &ho_bf, &options,
+         &stats, &msh, &kerquant, &ptree);
+    }
+    template<> void HODLR_construct_init<std::complex<double>>
+    (int N, int d, std::complex<double>* data, int lvls, int* tree,
+     int* perm, int& lrow, F2Cptr& ho_bf, F2Cptr& options,
+     F2Cptr& stats, F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree) {
+      // TODO there is no version taking complex data points?
+      // z_c_bpack_construct_init
+      //   (&N, &d, data, &lvls, tree, perm, &lrow, &ho_bf, &options,
+      //    &stats, &msh, &kerquant, &ptree);
+    }
+
+    template<> void HODLR_construct_element_compute<double>
+    (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, double*, C2Fptr),
      void (*C_FuncZmnBlock)
      (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
       int* allrows, int* allcols, double* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
-      C2Fptr elems), C2Fptr K, MPI_Fint comm) {
-      d_c_bpack_construct_element
-        (&n, &d, data, &lvls, leafs, perm, &lrows, &ho_bf, &options,
-         &stats, &msh, &kerquant, &ptree,
-         C_FuncZmn, C_FuncZmnBlock, K, &comm);
+      C2Fptr elems), C2Fptr fdata) {
+      d_c_bpack_construct_element_compute
+        (&ho_bf, &options, &stats, &msh, &kerquant, &ptree,
+         C_FuncZmn, C_FuncZmnBlock, fdata);
     }
-    template<> void HODLR_construct_element<std::complex<double>>
-    (int n, int d, std::complex<double>* data, int lvls, int* leafs,
-     int* perm, int& lrows, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
+    template<> void HODLR_construct_element_compute<std::complex<double>>
+    (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, std::complex<double>*, C2Fptr),
      void (*C_FuncZmnBlock)
      (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
       int* allrows, int* allcols, std::complex<double>* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
-      C2Fptr elems), C2Fptr K, MPI_Fint comm) {
+      C2Fptr elems), C2Fptr fdata) {
       //TODO, data should be double??
-      // z_c_bpack_construct_element
-      //   (&n, &d, data, &lvls, leafs, perm, &lrows, &ho_bf, &options,
-      //    &stats, &msh, &kerquant, &ptree,
-      //    C_FuncZmn, C_FuncZmnBlock, K, &comm);
-    }
-
-
-    template<> void HODLR_construct_matvec_init<double>
-    (int N, int lvls, int* tree, int* perm, int& lrow,
-     F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
-     F2Cptr& kerquant, F2Cptr& ptree) {
-      d_c_bpack_construct_matvec_init
-        (&N, &lvls, tree, perm, &lrow, &ho_bf, &options,
-         &stats, &msh, &kerquant, &ptree);
-    }
-    template<> void HODLR_construct_matvec_init<std::complex<double>>
-    (int N, int lvls, int* tree, int* perm, int& lrow,
-     F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
-     F2Cptr& kerquant, F2Cptr& ptree) {
-      z_c_bpack_construct_matvec_init
-        (&N, &lvls, tree, perm, &lrow, &ho_bf, &options,
-         &stats, &msh, &kerquant, &ptree);
     }
 
     template<> void HODLR_construct_matvec_compute<double>
