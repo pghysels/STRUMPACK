@@ -78,6 +78,46 @@ namespace strumpack {
       return 1e-5;
     }
 
+    /**
+     * Enumeration of possible compressions, through randomized
+     * sampling or via element extraction.
+     * \ingroup Enumerations
+     */
+    enum class CompressionAlgorithm {
+      RANDOM_SAMPLING,     /*!< Random sampling. */
+      ELEMENT_EXTRACTION   /*!< Element extraction. */
+    };
+
+    /**
+     * Return a string with the name of the compression algorithm.
+     * \param a type of the compression algorihtm
+     * \return name, string with a short description
+     */
+    inline std::string get_name(CompressionAlgorithm a) {
+      switch (a) {
+      case CompressionAlgorithm::RANDOM_SAMPLING: return "sampling"; break;
+      case CompressionAlgorithm::ELEMENT_EXTRACTION: return "extraction"; break;
+      default: return "unknown";
+      }
+    }
+
+    /**
+     * Return a CompressionAlgorithm enum based on the input string.
+     *
+     * \param c String, possible values are 'natural', '2means',
+     * 'kdtree', 'pca' and 'cobble'. This is case sensitive.
+     */
+    inline CompressionAlgorithm
+    get_compression_algorithm(const std::string& c) {
+      if (c == "sampling") return CompressionAlgorithm::RANDOM_SAMPLING;
+      else if (c == "extraction") return CompressionAlgorithm::ELEMENT_EXTRACTION;
+      else {
+        std::cerr << "WARNING: Compression algorithm not recognized,"
+                  << " setting to 'sampling'."
+                  << std::endl;
+        return CompressionAlgorithm::RANDOM_SAMPLING;
+      }
+    }
 
     /**
      * \class HODLROptions
@@ -167,7 +207,14 @@ namespace strumpack {
        * constructing a kernel matrix approximation.
        */
       void set_clustering_algorithm(ClusteringAlgorithm a) {
-        _clustering_algo = a;
+        clustering_algo_ = a;
+      }
+
+      /**
+       * Specify the compression algorithm to be used.
+       */
+      void set_compression_algorithm(CompressionAlgorithm a) {
+        compression_algo_ = a;
       }
 
       /**
@@ -231,7 +278,16 @@ namespace strumpack {
        * \see set_clustering_algorithm
        */
       ClusteringAlgorithm clustering_algorithm() const {
-        return _clustering_algo;
+        return clustering_algo_;
+      }
+
+      /**
+       * Get the compression algorithm to be used.
+       * \return compression algorithm
+       * \see set_compression_algorithm
+       */
+      CompressionAlgorithm compression_algorithm() const {
+        return compression_algo_;
       }
 
       /**
@@ -270,7 +326,8 @@ namespace strumpack {
           {"hodlr_rank_guess",            required_argument, 0, 5},
           {"hodlr_rank_rate",             required_argument, 0, 6},
           {"hodlr_clustering_algorithm",  required_argument, 0, 7},
-          {"hodlr_butterfly_levels",      required_argument, 0, 8},
+          {"hodlr_compression_algorithm", required_argument, 0, 8},
+          {"hodlr_butterfly_levels",      required_argument, 0, 9},
           {"hodlr_verbose",               no_argument, 0, 'v'},
           {"hodlr_quiet",                 no_argument, 0, 'q'},
           {"help",                        no_argument, 0, 'h'},
@@ -317,6 +374,11 @@ namespace strumpack {
           } break;
           case 8: {
             std::istringstream iss(optarg);
+            std::string s; iss >> s;
+            set_compression_algorithm(get_compression_algorithm(s));
+          } break;
+          case 9: {
+            std::istringstream iss(optarg);
             iss >> butterfly_levels_;
             set_butterfly_levels(butterfly_levels_);
           } break;
@@ -347,9 +409,11 @@ namespace strumpack {
                   << "#   --hodlr_rank_rate double (default "
                   << rank_rate() << ")" << std::endl
                   << "#   --hodlr_clustering_algorithm natural|2means|kdtree|pca|cobble (default "
-                  << get_name(clustering_algorithm())<< ")" << std::endl
+                  << get_name(clustering_algorithm()) << ")" << std::endl
                   << "#   --hodlr_butterfly_levels (default "
                   << butterfly_levels() << ")" << std::endl
+                  << "#   --hodlr_compression sampling|extraction (default "
+                  << get_name(compression_algorithm()) << ")" << std::endl
                   << "#   --hodlr_verbose or -v (default "
                   << verbose() << ")" << std::endl
                   << "#   --hodlr_quiet or -q (default "
@@ -364,8 +428,9 @@ namespace strumpack {
       int rank_guess_ = 128;
       double rank_rate_ = 2.;
       int max_rank_ = 5000;
-      ClusteringAlgorithm _clustering_algo = ClusteringAlgorithm::COBBLE;
+      ClusteringAlgorithm clustering_algo_ = ClusteringAlgorithm::COBBLE;
       int butterfly_levels_ = 0;
+      CompressionAlgorithm compression_algo_ = CompressionAlgorithm::RANDOM_SAMPLING;
       bool verbose_ = true;
     };
 
