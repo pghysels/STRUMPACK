@@ -50,11 +50,15 @@ namespace strumpack {
     template<typename scalar_t> class LRBFMatrix {
       using DenseM_t = DenseMatrix<scalar_t>;
       using DistM_t = DistributedMatrix<scalar_t>;
+      using DistMW_t = DistributedMatrixWrapper<scalar_t>;
       using opts_t = HODLROptions<scalar_t>;
-      using mult_t = typename std::function<
-        void(Trans,scalar_t,const DenseM_t&,scalar_t,DenseM_t&)>;
+      using VecVec_t = std::vector<std::vector<std::size_t>>;
+      using elem_blocks_t = typename HODLRMatrix<scalar_t>::elem_blocks_t;
 
     public:
+      using mult_t = typename std::function
+        <void(Trans,scalar_t,const DenseM_t&,scalar_t,DenseM_t&)>;
+
       LRBFMatrix() {}
       /**
        * Construct the block X, subblock of the matrix [A X; Y B]
@@ -83,6 +87,7 @@ namespace strumpack {
 
       void compress(const mult_t& Amult);
       void compress(const mult_t& Amult, int rank_guess);
+      void compress(const elem_blocks_t& Aelem);
 
       void mult(Trans op, const DenseM_t& X, DenseM_t& Y) const;
 
@@ -100,6 +105,10 @@ namespace strumpack {
        * \see mult
        */
       void mult(Trans op, const DistM_t& X, DistM_t& Y) const;
+
+      void extract_elements(ExtractionMeta<scalar_t>& e);
+      void extract_elements
+      (const VecVec_t& I, const VecVec_t& J, std::vector<DistMW_t>& B);
 
       double get_stat(const std::string& name) const {
         if (!stats_) return 0;
@@ -123,7 +132,7 @@ namespace strumpack {
       F2Cptr ptree_ = nullptr;     // process tree returned by Fortran code
       MPI_Fint Fcomm_;             // the fortran MPI communicator
       MPIComm c_;
-      int rows_, cols_, lrows_, lcols_;
+      int rows_ = 0, cols_ = 0, lrows_ = 0, lcols_ = 0;
       std::vector<int> rdist_, cdist_;  // begin rows/cols of each rank
     };
 
@@ -196,9 +205,7 @@ namespace strumpack {
     template<typename scalar_t> void LRBF_matvec_routine
     (const char* op, int* nin, int* nout, int* nvec,
      const scalar_t* X, scalar_t* Y, C2Fptr func, scalar_t* a, scalar_t* b) {
-      auto A = static_cast<std::function<
-        void(Trans,scalar_t,const DenseMatrix<scalar_t>&,
-             scalar_t,DenseMatrix<scalar_t>&)>*>(func);
+      auto A = static_cast<typename LRBFMatrix<scalar_t>::mult_t*>(func);
       DenseMatrixWrapper<scalar_t> Yw(*nout, *nvec, Y, *nout),
         Xw(*nin, *nvec, const_cast<scalar_t*>(X), *nin);
       (*A)(c2T(*op), *a, Xw, *b, Yw);
@@ -219,6 +226,15 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
+    LRBFMatrix<scalar_t>::compress(const elem_blocks_t& Aelem) {
+      AelemCommPtrs<scalar_t> AC{&Aelem, &c_};
+      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 1);
+      LRBF_construct_element_compute<scalar_t>
+        (lr_bf_, options_, stats_, msh_, kerquant_, ptree_,
+         &(HODLR_block_evaluation<scalar_t>), &AC);
+    }
+
+    template<typename scalar_t> void
     LRBFMatrix<scalar_t>::mult
     (Trans op, const DenseM_t& X, DenseM_t& Y) const {
       assert(Y.cols() == X.cols());
@@ -234,18 +250,61 @@ namespace strumpack {
     LRBFMatrix<scalar_t>::mult
     (Trans op, const DistM_t& X, DistM_t& Y) const {
       DenseM_t Y1D(lrows_, X.cols());
-      {
-        if (op == Trans::N) {
-          auto X1D = redistribute_2D_to_1D(X, cdist_);
-          LRBF_mult(char(op), X1D.data(), Y1D.data(), lcols_, lrows_,
-                    X1D.cols(), lr_bf_, options_, stats_, ptree_);
-          redistribute_1D_to_2D(Y1D, Y, rdist_);
-        } else {
-          auto X1D = redistribute_2D_to_1D(X, rdist_);
-          LRBF_mult(char(op), X1D.data(), Y1D.data(), lrows_, lcols_,
-                    X1D.cols(), lr_bf_, options_, stats_, ptree_);
-          redistribute_1D_to_2D(Y1D, Y, cdist_);
-        }
+      if (op == Trans::N) {
+        auto X1D = redistribute_2D_to_1D(X, cdist_);
+        LRBF_mult(char(op), X1D.data(), Y1D.data(), lcols_, lrows_,
+                  X1D.cols(), lr_bf_, options_, stats_, ptree_);
+        redistribute_1D_to_2D(Y1D, Y, rdist_);
+      } else {
+        auto X1D = redistribute_2D_to_1D(X, rdist_);
+        LRBF_mult(char(op), X1D.data(), Y1D.data(), lrows_, lcols_,
+                  X1D.cols(), lr_bf_, options_, stats_, ptree_);
+        redistribute_1D_to_2D(Y1D, Y, cdist_);
+      }
+    }
+
+    template<typename scalar_t> void LRBFMatrix<scalar_t>::extract_elements
+    (ExtractionMeta<scalar_t>& e) {
+      LRBF_extract_elements<scalar_t>
+        (lr_bf_, options_, msh_, stats_, ptree_, e.Ninter,
+         e.Nallrows, e.Nallcols, e.Nalldat_loc, e.allrows, e.allcols,
+         e.alldat_loc, e.rowids, e.colids, e.pgids, e.Npmap, e.pmaps);
+    }
+
+    template<typename scalar_t> void LRBFMatrix<scalar_t>::extract_elements
+    (const VecVec_t& I, const VecVec_t& J, std::vector<DistMW_t>& B) {
+      if (I.empty()) return;
+      assert(I.size() == J.size() && I.size() == B.size());
+      int Ninter = I.size(), total_rows = 0, total_cols = 0, total_dat;
+      int Npmap = 1, pgids = 0;
+      int pmaps[3] = {B[0].nprows(), B[0].npcols(), 0};
+      for (auto Ik : I) total_rows += Ik.size();
+      for (auto Jk : I) total_cols += Jk.size();
+      std::unique_ptr<int[]> iwork
+        (new int[total_rows + total_cols + 2*Ninter]);
+      auto allrows = iwork.get();
+      auto allcols = allrows + total_rows;
+      auto rowidx = allcols + total_cols;
+      auto colidx = rowidx + Ninter;
+      for (int k=0, i=0, j=0; k<Ninter; k++) {
+        assert(B[k].nprows() == pmaps[0]);
+        assert(B[k].npcols() == pmaps[1]);
+        total_dat += B[k].lrows()*B[k].lcols();
+        rowidx[k] = I[k].size();
+        colidx[k] = J[k].size();
+        for (auto l : I[k]) allrows[i++] = l;
+        for (auto l : J[k]) allcols[j++] = l;
+      }
+      std::unique_ptr<scalar_t[]> alldat_loc(new scalar_t[total_dat]);
+      auto ptr = alldat_loc.get();
+      LRBF_extract_elements<scalar_t>
+        (lr_bf_, options_, msh_, stats_, ptree_, Ninter,
+         total_rows, total_cols, total_dat, allrows, allcols,
+         ptr, rowidx, colidx, &pgids, Npmap, pmaps);
+      for (auto& Bk : B) {
+        auto Nloc = Bk.lrows() * Bk.lcols();
+        std::copy(ptr, ptr+Nloc, Bk.data());
+        ptr += Nloc;
       }
     }
 

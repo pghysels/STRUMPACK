@@ -145,7 +145,7 @@ namespace strumpack {
     (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
      F2Cptr& kerquant, F2Cptr& ptree, void (*matvec)
      (char const*, int*, int*, int*, const double*, double*, C2Fptr),
-     C2Fptr& fdata) {
+     C2Fptr fdata) {
       d_c_bpack_construct_matvec_compute
         (&ho_bf, &options, &stats, &msh, &kerquant, &ptree, matvec, fdata);
     }
@@ -153,7 +153,7 @@ namespace strumpack {
     (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
      F2Cptr& kerquant, F2Cptr& ptree, void (*matvec)
      (char const*, int*, int*, int*, const std::complex<double>*,
-      std::complex<double>*, C2Fptr), C2Fptr& fdata) {
+      std::complex<double>*, C2Fptr), C2Fptr fdata) {
       z_c_bpack_construct_matvec_compute
         (&ho_bf, &options, &stats, &msh, &kerquant, &ptree,
          reinterpret_cast<
@@ -182,7 +182,7 @@ namespace strumpack {
     (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
      F2Cptr& kerquant, F2Cptr& ptree, void (*matvec)
      (const char*, int*, int*, int*, const double*,
-      double*, C2Fptr, double*, double*), C2Fptr& fdata) {
+      double*, C2Fptr, double*, double*), C2Fptr fdata) {
       d_c_bf_construct_matvec_compute
         (&lr_bf, &options, &stats, &msh, &kerquant, &ptree,
          matvec, fdata);
@@ -192,13 +192,83 @@ namespace strumpack {
      F2Cptr& kerquant, F2Cptr& ptree, void (*matvec)
      (char const*, int*, int*, int*, const std::complex<double>*,
       std::complex<double>*, C2Fptr, std::complex<double>*,
-      std::complex<double>*), C2Fptr& fdata) {
+      std::complex<double>*), C2Fptr fdata) {
       z_c_bf_construct_matvec_compute
         (&lr_bf, &options, &stats, &msh, &kerquant, &ptree,
          reinterpret_cast<void(*)
          (char const*, int*, int*, int*, const _Complex double*,
           _Complex double*, C2Fptr, _Complex double*,
           _Complex double*)>(matvec), fdata);
+    }
+
+    template<> void LRBF_construct_element_compute<double>
+    (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
+     F2Cptr& kerquant, F2Cptr& ptree, void (*C_FuncZmnBlock)
+     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+      int* allrows, int* allcols, double* alldat_loc,
+      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
+      C2Fptr elems), C2Fptr fdata) {
+      d_c_bf_construct_element_compute
+        (&lr_bf, &options, &stats, &msh, &kerquant, &ptree,
+         C_FuncZmnBlock, fdata);
+    }
+    template<> void LRBF_construct_element_compute<std::complex<double>>
+    (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
+     F2Cptr& kerquant, F2Cptr& ptree, void (*C_FuncZmnBlock)
+     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+      int* allrows, int* allcols, std::complex<double>* alldat_loc,
+      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
+      C2Fptr elems), C2Fptr fdata) {
+      z_c_bf_construct_element_compute
+        (&lr_bf, &options, &stats, &msh, &kerquant, &ptree,
+         reinterpret_cast<void(*)
+         (int*, int*, int*, int*, int*, int*, _Complex double*,
+          int*, int*, int*, int*, int*, C2Fptr)>(C_FuncZmnBlock), fdata);
+    }
+
+    template<> void HODLR_extract_elements<double>
+    (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
+     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, int Nalldat_loc,
+     int* allrows, int* allcols, double* alldat_loc, int* rowidx, int* colidx,
+     int* pgidx, int Npmap, int* pmaps) {
+      d_c_bpack_extractelement
+        (&ho_bf, &options, &msh, &stats, &ptree, &Ninter, &Nallrows,
+         &Nallcols, &Nalldat_loc, allrows, allcols, alldat_loc,
+         rowidx, colidx, pgidx, &Npmap, pmaps);
+    }
+    template<> void HODLR_extract_elements<std::complex<double>>
+    (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
+     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, int Nalldat_loc,
+     int* allrows, int* allcols, std::complex<double>* alldat_loc,
+     int* rowidx, int* colidx, int* pgidx, int Npmap, int* pmaps) {
+      z_c_bpack_extractelement
+        (&ho_bf, &options, &msh, &stats, &ptree,
+         &Ninter, &Nallrows, &Nallcols, &Nalldat_loc,
+         allrows, allcols, reinterpret_cast<_Complex double*>(alldat_loc),
+         rowidx, colidx, pgidx, &Npmap, pmaps);
+    }
+
+    template<> void LRBF_extract_elements<double>
+    (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
+     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, int Nalldat_loc,
+     int* allrows, int* allcols, double* alldat_loc, int* rowidx, int* colidx,
+     int* pgidx, int Npmap, int* pmaps) {
+      d_c_bf_extractelement
+        (&lr_bf, &options, &msh, &stats, &ptree,
+         &Ninter, &Nallrows, &Nallcols, &Nalldat_loc,
+         allrows, allcols, alldat_loc,
+         rowidx, colidx, pgidx, &Npmap, pmaps);
+    }
+    template<> void LRBF_extract_elements<std::complex<double>>
+    (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
+     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, int Nalldat_loc,
+     int* allrows, int* allcols, std::complex<double>* alldat_loc,
+     int* rowidx, int* colidx, int* pgidx, int Npmap, int* pmaps) {
+      z_c_bf_extractelement
+        (&lr_bf, &options, &msh, &stats, &ptree,
+         &Ninter, &Nallrows, &Nallcols, &Nalldat_loc,
+         allrows, allcols, reinterpret_cast<_Complex double*>(alldat_loc),
+         rowidx, colidx, pgidx, &Npmap, pmaps);
     }
 
     template<> void HODLR_deletestats<float>(F2Cptr& stats) { std::cout << "TODO: HODLR_deletestats" << std::endl; }

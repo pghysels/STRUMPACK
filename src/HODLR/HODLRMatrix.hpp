@@ -52,6 +52,12 @@ namespace strumpack {
    */
   namespace HODLR {
 
+    template<typename scalar_t> struct ExtractionMeta {
+      int Ninter, Nallrows, Nallcols, Nalldat_loc,
+        *allrows, *allcols, *rowids, *colids, *pgids, Npmap, *pmaps;
+      scalar_t* alldat_loc;
+    };
+
     /**
      * \class HODLRMatrix
      *
@@ -77,16 +83,15 @@ namespace strumpack {
       using DistM_t = DistributedMatrix<scalar_t>;
       using DistMW_t = DistributedMatrixWrapper<scalar_t>;
       using opts_t = HODLROptions<scalar_t>;
-      using mult_t = typename std::function<
-        void(Trans,const DenseM_t&,DenseM_t&)>;
-      using elem_t = typename std::function<
-        scalar_t(std::size_t i, std::size_t j)>;
-      using delem_blocks_t = typename std::function
-        <void(const std::vector<std::vector<std::size_t>>& I,
-              const std::vector<std::vector<std::size_t>>& J,
-              std::vector<DistMW_t>& B)>;
+      using VecVec_t = std::vector<std::vector<std::size_t>>;
 
     public:
+      using mult_t = typename std::function
+        <void(Trans, const DenseM_t&, DenseM_t&)>;
+      using elem_blocks_t = typename std::function
+        <void(VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
+              ExtractionMeta<scalar_t>&)>;
+
       /**
        * Default constructor, makes an empty 0 x 0 matrix.
        */
@@ -245,7 +250,7 @@ namespace strumpack {
        * \param Aelem Element extraction routine, extracting multiple
        * blocks at once.
        */
-      void compress(const delem_blocks_t& Aelem);
+      void compress(const elem_blocks_t& Aelem);
 
       /**
        * Multiply this HODLR matrix with a dense matrix: Y = op(X),
@@ -323,6 +328,9 @@ namespace strumpack {
        */
       void inv_mult(Trans op, const DenseM_t& B, DenseM_t& X) const;
 
+      void extract_elements
+      (const VecVec_t& I, const VecVec_t& J, std::vector<DistM_t>& B);
+
       DenseM_t redistribute_2D_to_1D(const DistM_t& R) const;
       void redistribute_2D_to_1D(const DistM_t& R2D, DenseM_t& R1D) const;
       void redistribute_1D_to_2D(const DenseM_t& S1D, DistM_t& S2D) const;
@@ -342,7 +350,6 @@ namespace strumpack {
       std::vector<int> leafs_;        // leaf sizes of the tree
 
       void options_init(const opts_t& opts);
-      // void matvec_init();
       void perm_init();
       void dist_init();
 
@@ -351,8 +358,8 @@ namespace strumpack {
 
 
     template<typename scalar_t> struct KernelCommPtrs {
-      kernel::Kernel<scalar_t>* K;
-      MPIComm* c;
+      const kernel::Kernel<scalar_t>* K;
+      const MPIComm* c;
     };
 
     /**
@@ -406,12 +413,8 @@ namespace strumpack {
     }
 
     template<typename scalar_t> struct AelemCommPtrs {
-      std::function<
-        void(const std::vector<std::vector<std::size_t>>&,
-             const std::vector<std::vector<std::size_t>>&,
-             std::vector<DistributedMatrixWrapper<scalar_t>>&
-             )>* Aelem;
-      MPIComm* c;
+      const typename HODLRMatrix<scalar_t>::elem_blocks_t* Aelem;
+      const MPIComm* c;
     };
 
     template<typename scalar_t> void HODLR_block_evaluation
@@ -423,7 +426,11 @@ namespace strumpack {
       auto temp = static_cast<AelemCommPtrs<scalar_t>*>(AC);
       std::vector<std::vector<std::size_t>> I(*Ninter), J(*Ninter);
       std::vector<DistMW_t> B(*Ninter);
-      BLACSGrid g(MPI_COMM_SELF), g_none(*(temp->c));
+      auto& comm = *(temp->c);
+      auto P = comm.size();
+      auto rank = comm.rank();
+      std::vector<BLACSGrid> grids;
+      grids.reserve(*Ninter);
       auto data = alldat_loc;
       for (int isec=0, r0=0, c0=0; isec<*Ninter; isec++) {
         auto m = rowids[isec];
@@ -431,12 +438,19 @@ namespace strumpack {
         I[isec].assign(allrows+r0, allrows+r0+m);
         J[isec].assign(allcols+c0, allcols+c0+n);
         auto p0 = pmaps[2*(*Npmap)+pgids[isec]];
-        B[isec] = DistMW_t(temp->c->rank() == p0 ? &g : &g_none, m, n, data);
+        assert(pmaps[pgids[isec]] == 1);          // prows == 1
+        assert(pmaps[(*Npmap)+pgids[isec]] == 1); // pcols == 1
+        grids.emplace_back(BLACSGrid(comm.sub(p0, 1), 1));
+        B[isec] = DistMW_t(&grids[isec], m, n, data);
         r0 += m;
         c0 += n;
-        data += m*n;
+        if (rank == p0) data += m*n;
       }
-      temp->Aelem(I, J, B);
+      ExtractionMeta<scalar_t> e
+        {*Ninter, *Nallrows, *Nallcols, *Nalldat_loc,
+            allrows, allcols, rowids, colids, pgids,
+            *Npmap, pmaps, alldat_loc};
+      temp->Aelem->operator()(I, J, B, e);
     }
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
@@ -459,14 +473,12 @@ namespace strumpack {
       perm_.resize(rows_);
       KernelCommPtrs<scalar_t> KC{&K, &c_};
       HODLR_construct_init<scalar_t>
-        (rows_, /*d, K.data().data(),*/ 0, nullptr, lvls_-1, leafs_.data(),
-         perm_.data(), lrows_, ho_bf_, options_, stats_, msh_, kerquant_,
-         ptree_ /*Fcomm_*/);
-      HODLR_construct_element_compute
+        (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
+         lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_ );
+      HODLR_construct_element_compute<scalar_t>
         (ho_bf_, options_, stats_, msh_, kerquant_,
          ptree_, &(HODLR_kernel_evaluation<scalar_t>),
-         &(HODLR_kernel_block_evaluation<scalar_t>), &KC /*, Fcomm_*/);
-
+         &(HODLR_kernel_block_evaluation<scalar_t>), &KC);
       perm_init();
       dist_init();
     }
@@ -531,7 +543,6 @@ namespace strumpack {
 
     template<typename scalar_t> void HODLRMatrix<scalar_t>::perm_init() {
       iperm_.resize(rows_);
-      //for (auto& i : perm_) i--; // Fortran to C
       MPI_Bcast(perm_.data(), perm_.size(), MPI_INT, 0, c_.comm());
       for (int i=0; i<rows_; i++) iperm_[perm_[i]] = i;
     }
@@ -577,9 +588,7 @@ namespace strumpack {
     template<typename scalar_t> void HODLR_matvec_routine
     (const char* op, int* nin, int* nout, int* nvec,
      const scalar_t* X, scalar_t* Y, C2Fptr func) {
-      auto A = static_cast<std::function<
-        void(Trans,const DenseMatrix<scalar_t>&,
-             DenseMatrix<scalar_t>&)>*>(func);
+      auto A = static_cast<typename HODLRMatrix<scalar_t>::mult_t*>(func);
       DenseMatrixWrapper<scalar_t> Yw(*nout, *nvec, Y, *nout),
         Xw(*nin, *nvec, const_cast<scalar_t*>(X), *nin);
       (*A)(c2T(*op), Xw, Yw);
@@ -589,7 +598,7 @@ namespace strumpack {
     HODLRMatrix<scalar_t>::compress(const mult_t& Amult) {
       if (c_.is_null()) return;
       C2Fptr f = static_cast<void*>(const_cast<mult_t*>(&Amult));
-      HODLR_construct_matvec_compute
+      HODLR_construct_matvec_compute<scalar_t>
         (ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
          &(HODLR_matvec_routine<scalar_t>), f);
     }
@@ -602,14 +611,13 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    HODLRMatrix<scalar_t>::compress(const delem_blocks_t& Aelem) {
-      AelemCommPtrs<scalar_t> AC = {&Aelem, &c_};
+    HODLRMatrix<scalar_t>::compress(const elem_blocks_t& Aelem) {
+      AelemCommPtrs<scalar_t> AC{&Aelem, &c_};
       HODLR_set_I_option<scalar_t>(options_, "elem_extract", 1);
-      HODLR_construct_element
-        (rows_, 0, nullptr, lvls_-1, leafs_.data(),
-         perm_.data(), lrows_, ho_bf_, options_, stats_, msh_, kerquant_,
-         ptree_, &(HODLR_element_evaluation<scalar_t>),
-         &(HODLR_block_evaluation<scalar_t>), &AC, Fcomm_);
+      HODLR_construct_element_compute<scalar_t>
+        (ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
+         &(HODLR_element_evaluation<scalar_t>),
+         &(HODLR_block_evaluation<scalar_t>), &AC);
     }
 
     template<typename scalar_t> void
@@ -667,6 +675,42 @@ namespace strumpack {
       redistribute_1D_to_2D(X1D, X);
     }
 
+    template<typename scalar_t> void HODLRMatrix<scalar_t>::extract_elements
+    (const VecVec_t& I, const VecVec_t& J, std::vector<DistM_t>& B) {
+      if (I.empty()) return;
+      assert(I.size() == J.size() && I.size() == B.size());
+      int Ninter = I.size(), total_rows = 0, total_cols = 0, total_dat;
+      int Npmap = 1, pgids = 0;
+      int pmaps[3] = {B[0].nprows(), B[0].npcols(), 0};
+      for (auto Ik : I) total_rows += Ik.size();
+      for (auto Jk : I) total_cols += Jk.size();
+      std::unique_ptr<int[]> iwork
+        (new int[total_rows + total_cols + 2*Ninter]);
+      auto allrows = iwork.get();
+      auto allcols = allrows + total_rows;
+      auto rowidx = allcols + total_cols;
+      auto colidx = rowidx + Ninter;
+      for (int k=0, i=0, j=0; k<Ninter; k++) {
+        total_dat += B[k].lrows()*B[k].lcols();
+        rowidx[k] = I[k].size();
+        colidx[k] = J[k].size();
+        for (auto l : I[k]) allrows[i++] = l;
+        for (auto l : J[k]) allcols[j++] = l;
+      }
+      for (int k=0; k<Ninter; k++)
+        total_dat += B[k].lrows()*B[k].lcols();
+      std::unique_ptr<scalar_t[]> alldat_loc(new scalar_t[total_dat]);
+      HODLR_extract_elements<scalar_t>
+        (ho_bf_, options_, msh_, stats_, ptree_, Ninter,
+         total_rows, total_cols, total_dat, allrows, allcols,
+         alldat_loc.get(), rowidx, colidx, &pgids, Npmap, pmaps);
+      auto ptr = alldat_loc.get();
+      for (int k=0; k<Ninter; k++) {
+        auto Nloc = B[k].lrows() * B[k].lcols();
+        std::copy(ptr, ptr+Nloc, B[k].data());
+        ptr += Nloc;
+      }
+    }
 
     template<typename scalar_t> DenseMatrix<scalar_t>
     HODLRMatrix<scalar_t>::redistribute_2D_to_1D(const DistM_t& R2D) const {

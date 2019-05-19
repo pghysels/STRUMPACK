@@ -54,6 +54,7 @@ namespace strumpack {
     using DistMW_t = DistributedMatrixWrapper<scalar_t>;
     using ExtAdd = ExtendAdd<scalar_t,integer_t>;
     using Opts = SPOptions<scalar_t>;
+    using VecVec_t = std::vector<std::vector<std::size_t>>;
     template<typename _scalar_t,typename _integer_t> friend class ExtendAdd;
 
   public:
@@ -86,6 +87,11 @@ namespace strumpack {
     integer_t maximum_rank(int task_depth) const;
     std::string type() const override { return "FrontalMatrixHODLRMPI"; }
 
+    void extract_CB_sub_matrix_2d
+    (const std::vector<std::vector<std::size_t>>& I,
+     const std::vector<std::vector<std::size_t>>& J,
+     std::vector<DistM_t>& B) const override;
+
     void set_HODLR_partitioning
     (const Opts& opts, const HSS::HSSPartitionTree& sep_tree,
      bool is_root) override;
@@ -94,6 +100,13 @@ namespace strumpack {
     HODLR::HODLRMatrix<scalar_t> F11_;
     HODLR::LRBFMatrix<scalar_t> F12_, F21_;
     std::unique_ptr<HODLR::HODLRMatrix<scalar_t>> F22_;
+
+    void compress_sampling(const SpMat_t& A, const Opts& opts);
+    void compress_extraction(const SpMat_t& A, const Opts& opts);
+    void compress_flops_F11();
+    void compress_flops_F12_F21();
+    void compress_flops_F22();
+    void compress_flops_Schur();
 
     using FrontalMatrix<scalar_t,integer_t>::lchild_;
     using FrontalMatrix<scalar_t,integer_t>::rchild_;
@@ -126,7 +139,6 @@ namespace strumpack {
     S = DistM_t(grid(), dim_upd(), R.cols());
     TIMER_TIME(TaskType::F22_MULT, 2, t_sprod);
     F22_->mult(op, R, S);
-    TIMER_STOP(t_sprod);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -160,21 +172,131 @@ namespace strumpack {
         (S, pbuf.data()+this->master(rchild_), this);
   }
 
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
+  (const VecVec_t& I, const VecVec_t& J, std::vector<DistM_t>& B) const {
+    if (Comm().is_null() || !dim_upd()) return;
+    TIMER_TIME(TaskType::HSS_EXTRACT_SCHUR, 3, t_ex_schur);
+    auto nB = I.size();
+    std::vector<std::vector<std::size_t>> lI(nB), lJ(nB), oI(nB), oJ(nB);
+    std::vector<DistM_t> Bloc(nB);
+    for (std::size_t i=0; i<nB; i++) {
+      this->find_upd_indices(I[i], lI[i], oI[i]);
+      this->find_upd_indices(J[i], lJ[i], oJ[i]);
+      Bloc[i] = DistM_t(grid(), lI[i].size(), lJ[i].size());
+    }
+    F22_->extract_elements(lI, lJ, Bloc);
+    std::vector<std::vector<scalar_t>> sbuf(this->P());
+    for (std::size_t i=0; i<nB; i++)
+      ExtAdd::extend_copy_to_buffers(Bloc[i], oI[i], oJ[i], B[i], sbuf);
+    std::vector<scalar_t> rbuf;
+    std::vector<scalar_t*> pbuf;
+    Comm().all_to_all_v(sbuf, rbuf, pbuf);
+    for (std::size_t i=0; i<nB; i++)
+      ExtAdd::extend_copy_from_buffers(B[i], oI[i], oJ[i], Bloc[i], pbuf);
+  }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts& opts, int etree_level, int task_depth) {
     if (visit(lchild_))
-      lchild_->multifrontal_factorization
-        (A, opts, etree_level+1, task_depth);
+      lchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
     if (visit(rchild_))
-      rchild_->multifrontal_factorization
-        (A, opts, etree_level+1, task_depth);
+      rchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
     if (!dim_blk()) return;
+    switch (opts.HODLR_options().compression_algorithm()) {
+    case HODLR::CompressionAlgorithm::RANDOM_SAMPLING:
+      compress_sampling(A, opts); break;
+    case HODLR::CompressionAlgorithm::ELEMENT_EXTRACTION:
+      compress_extraction(A, opts); break;
+    }
+    if (lchild_) lchild_->release_work_memory();
+    if (rchild_) rchild_->release_work_memory();
+  }
 
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::compress_extraction
+  (const SpMat_t& A, const Opts& opts) {
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();
+    auto extract_F11 =
+      [&](VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
+          HODLR::ExtractionMeta<scalar_t>&) {
+        for (auto& Ik : I) for (auto& i : Ik) i += this->sep_begin_;
+        for (auto& Jk : J) for (auto& j : Jk) j += this->sep_begin_;
+        this->extract_2d(A, I, J, B);
+      };
+    { TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_f11_compress);
+      F11_.compress(extract_F11); }
+    { TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
+      F11_.factor(); }
+    compress_flops_F11();
+    if (dupd) {
+      auto extract_F12 =
+        [&](VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
+            HODLR::ExtractionMeta<scalar_t>&) {
+          for (auto& Ik : I) for (auto& i : Ik) i += this->sep_begin_;
+          for (auto& Jk : J) for (auto& j : Jk) j = this->upd_[j-dsep];
+          this->extract_2d(A, I, J, B);
+        };
+      auto extract_F21 =
+        [&](VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
+            HODLR::ExtractionMeta<scalar_t>&) {
+          for (auto& Ik : I) for (auto& i : Ik) i = this->upd_[i-dsep];
+          for (auto& Jk : J) for (auto& j : Jk) j += this->sep_begin_;
+          this->extract_2d(A, I, J, B);
+        };
+      { TIMER_TIME(TaskType::LRBF_COMPRESS, 0, t_lrbf_compress);
+        F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_);
+        F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
+        F12_.compress(extract_F12);
+        F21_.compress(extract_F21); }
+      compress_flops_F12_F21();
 
+      // first construct S=-F21*inv(F11)*F12 using matvecs, then
+      // construct F22+S using element extraction
+      auto sample_Schur =
+        [&](Trans op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
+          TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
+          TIMER_TIME(TaskType::HSS_SCHUR_PRODUCT, 2, t_sprod);
+          DenseM_t F12R(F12_.lrows(), R.cols()),
+            invF11F12R(F11_.lrows(), R.cols()),
+            Stmp(S.rows(), S.cols());
+          if (op == Trans::N) {
+            F12_.mult(op, R, F12R);
+            F11_.inv_mult(op, F12R, invF11F12R);
+            //F11_.solve(F12R, invF11F12R);
+            F21_.mult(op, invF11F12R, S);
+          } else {
+            F21_.mult(op, R, F12R);
+            F11_.inv_mult(op, F12R, invF11F12R);
+            F12_.mult(op, invF11F12R, S);
+          }
+          S.scale(scalar_t(-1.));
+          compress_flops_Schur();
+        };
+      HODLR::LRBFMatrix<scalar_t> Schur(*F22_, *F22_);
+      Schur.compress(sample_Schur);
+      auto extract_F22 =
+        [&](VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
+            HODLR::ExtractionMeta<scalar_t>& e) {
+          //Schur.extract_elements(I, J, B);
+          Schur.extract_elements(e);
+          for (auto& Ik : I) for (auto& i : Ik) i = this->upd_[i-dsep];
+          for (auto& Jk : J) for (auto& j : Jk) j = this->upd_[j-dsep];
+          this->extract_2d(A, I, J, B); // adds to B
+        };
+      TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_f22_compress);
+      F22_->compress(extract_F22);
+      compress_flops_F22();
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::compress_sampling
+  (const SpMat_t& A, const Opts& opts) {
+    const auto dsep = dim_sep();
+    const auto dupd = dim_upd();
     auto sample_front = [&](Trans op, const DistM_t& R, DistM_t& S) {
       S.zero();
       TIMER_TIME(TaskType::FRONT_MULTIPLY_2D, 1, t_fmult);
@@ -185,7 +307,6 @@ namespace strumpack {
       sample_children_CB(op, R, S);
       TIMER_STOP(t_UUtxR);
     };
-
     auto sample_F11 = [&](Trans op, const DenseM_t& R1, DenseM_t& S1) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
       auto n = R1.cols();
@@ -196,20 +317,11 @@ namespace strumpack {
       sample_front(op, R, S);
       F11_.redistribute_2D_to_1D(DistMW_t(dsep, n, S, 0, 0), S1);
     };
-    TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_f11_compress);
-    F11_.compress(sample_F11);
-    TIMER_STOP(t_f11_compress);
-    TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
-    F11_.factor();
-    TIMER_STOP(t_fact);
-#if defined(STRUMPACK_COUNT_FLOPS)
-    long long int f11_fill_flops = F11_.get_stat("Flop_Fill");
-    long long int f11_factor_flops = F11_.get_stat("Flop_Factor");
-    STRUMPACK_HODLR_F11_FILL_FLOPS(f11_fill_flops);
-    STRUMPACK_ULV_FACTOR_FLOPS(f11_factor_flops);
-    STRUMPACK_FLOPS(f11_fill_flops + f11_factor_flops);
-#endif
-
+    { TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_f11_compress);
+      F11_.compress(sample_F11); }
+    { TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
+      F11_.factor(); }
+    compress_flops_F11();
     if (dupd) {
       auto sample_F12 = [&]
         (Trans op, scalar_t a, const DenseM_t& Rl, scalar_t b, DenseM_t& Sl) {
@@ -253,19 +365,12 @@ namespace strumpack {
             (a, DistMW_t(dsep, n, S, 0, 0), b, Sl, F21_.cdist());
         }
       };
-      TIMER_TIME(TaskType::LRBF_COMPRESS, 0, t_lrbf_compress);
-      F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_);
-      F12_.compress(sample_F12);
-      F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
-      F21_.compress(sample_F21, F12_.get_stat("Rank_max")+10);
-      TIMER_STOP(t_lrbf_compress);
-#if defined(STRUMPACK_COUNT_FLOPS)
-      long long int f12_fill_flops = F12_.get_stat("Flop_Fill");
-      long long int f21_fill_flops = F21_.get_stat("Flop_Fill");
-      STRUMPACK_HODLR_F12_FILL_FLOPS(f12_fill_flops);
-      STRUMPACK_HODLR_F21_FILL_FLOPS(f21_fill_flops);
-      STRUMPACK_FLOPS(f12_fill_flops + f21_fill_flops);
-#endif
+      { TIMER_TIME(TaskType::LRBF_COMPRESS, 0, t_lrbf_compress);
+        F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_);
+        F12_.compress(sample_F12);
+        F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
+        F21_.compress(sample_F21, F12_.get_stat("Rank_max")+10); }
+      compress_flops_F12_F21();
 
       auto sample_F22 = [&](Trans op, const DenseM_t& R2, DenseM_t& S2) {
         TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
@@ -290,32 +395,60 @@ namespace strumpack {
           F12_.mult(op, invF11F12R2, S2tmp);
         }
         S2.scaled_add(scalar_t(-1.), S2tmp);
-        TIMER_STOP(t_sprod);
-#if defined(STRUMPACK_COUNT_FLOPS)
-        long long int f21_mult_flops = F21_.get_stat("Flop_C_Mult"),
-        invf11_mult_flops = F11_.get_stat("Flop_C_Mult"),
-        f12_mult_flops = F12_.get_stat("Flop_C_Mult"),
-        schur_flops = f21_mult_flops + invf11_mult_flops
-        + f12_mult_flops + S.rows()*S.cols();
-        STRUMPACK_SCHUR_FLOPS(schur_flops);
-        STRUMPACK_FLOPS(schur_flops);
-        STRUMPACK_HODLR_F21_MULT_FLOPS(f21_mult_flops);
-        STRUMPACK_HODLR_F12_MULT_FLOPS(f12_mult_flops);
-        STRUMPACK_HODLR_INVF11_MULT_FLOPS(invf11_mult_flops);
-#endif
+        compress_flops_Schur();
       };
-      TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_f22_compress);
-      F22_->compress(sample_F22, std::max(F12_.get_stat("Rank_max"),
-                                          F21_.get_stat("Rank_max")));
-      TIMER_STOP(t_f22_compress);
-#if defined(STRUMPACK_COUNT_FLOPS)
-      long long int f22_fill_flops = F22_->get_stat("Flop_Fill");
-      STRUMPACK_HODLR_F22_FILL_FLOPS(f22_fill_flops);
-      STRUMPACK_FLOPS(f22_fill_flops);
-#endif
+      { TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_f22_compress);
+        F22_->compress(sample_F22, std::max(F12_.get_stat("Rank_max"),
+                                            F21_.get_stat("Rank_max"))); }
+      compress_flops_F22();
     }
-    if (lchild_) lchild_->release_work_memory();
-    if (rchild_) rchild_->release_work_memory();
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::compress_flops_F11() {
+#if defined(STRUMPACK_COUNT_FLOPS)
+    long long int f11_fill_flops = F11_.get_stat("Flop_Fill");
+    long long int f11_factor_flops = F11_.get_stat("Flop_Factor");
+    STRUMPACK_HODLR_F11_FILL_FLOPS(f11_fill_flops);
+    STRUMPACK_ULV_FACTOR_FLOPS(f11_factor_flops);
+    STRUMPACK_FLOPS(f11_fill_flops + f11_factor_flops);
+#endif
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::compress_flops_F12_F21() {
+#if defined(STRUMPACK_COUNT_FLOPS)
+    long long int f12_fill_flops = F12_.get_stat("Flop_Fill");
+    long long int f21_fill_flops = F21_.get_stat("Flop_Fill");
+    STRUMPACK_HODLR_F12_FILL_FLOPS(f12_fill_flops);
+    STRUMPACK_HODLR_F21_FILL_FLOPS(f21_fill_flops);
+    STRUMPACK_FLOPS(f12_fill_flops + f21_fill_flops);
+#endif
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::compress_flops_F22() {
+#if defined(STRUMPACK_COUNT_FLOPS)
+    long long int f22_fill_flops = F22_->get_stat("Flop_Fill");
+    STRUMPACK_HODLR_F22_FILL_FLOPS(f22_fill_flops);
+    STRUMPACK_FLOPS(f22_fill_flops);
+#endif
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::compress_flops_Schur() {
+#if defined(STRUMPACK_COUNT_FLOPS)
+    long long int f21_mult_flops = F21_.get_stat("Flop_C_Mult"),
+      invf11_mult_flops = F11_.get_stat("Flop_C_Mult"),
+      f12_mult_flops = F12_.get_stat("Flop_C_Mult"),
+      schur_flops = f21_mult_flops + invf11_mult_flops
+      + f12_mult_flops; // + S.rows()*S.cols(); // extra scaling?
+    STRUMPACK_SCHUR_FLOPS(schur_flops);
+    STRUMPACK_FLOPS(schur_flops);
+    STRUMPACK_HODLR_F21_MULT_FLOPS(f21_mult_flops);
+    STRUMPACK_HODLR_F12_MULT_FLOPS(f12_mult_flops);
+    STRUMPACK_HODLR_INVF11_MULT_FLOPS(invf11_mult_flops);
+#endif
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -346,7 +479,6 @@ namespace strumpack {
         STRUMPACK_FLOPS(F21_.get_stat("Flop_C_Mult") +
                         2*bupd.rows()*bupd.cols());
       }
-      TIMER_STOP(t_s);
     }
   }
 
@@ -364,7 +496,6 @@ namespace strumpack {
       STRUMPACK_FLOPS(F12_.get_stat("Flop_C_Mult") +
                       F11_.get_stat("Flop_Solve") +
                       2*yloc.rows()*yloc.cols());
-      TIMER_STOP(t_s);
     }
     DistM_t CBl, CBr;
     DenseM_t seqCBl, seqCBr;

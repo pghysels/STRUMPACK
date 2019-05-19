@@ -50,8 +50,7 @@ namespace strumpack {
         Ad.lranges(rlo, rhi, clo, chi);
         // destination rank is:
         //  dest + ((r / B) % prows) + ((c / B) % pcols) * prows
-        std::vector<int> destr(rhi-rlo);
-        std::vector<int> destc(chi-clo);
+        std::vector<int> destr(rhi-rlo), destc(chi-clo);
         for (int r=rlo; r<rhi; r++)
           destr[r-rlo] = dest + (Ad.rowl2g_fixed(r) / B) % nprows;
         for (int c=clo; c<chi; c++)
@@ -86,10 +85,8 @@ namespace strumpack {
         A10.lranges(A10rlo, A10rhi, A10clo, A10chi);
         // destination rank is:
         //  dest + ((r / B) % prows) + ((c / B) % pcols) * prows
-        std::vector<int> destrA01(A01rhi-A01rlo);
-        std::vector<int> destcA01(A01chi-A01clo);
-        std::vector<int> destrA10(A10rhi-A10rlo);
-        std::vector<int> destcA10(A10chi-A10clo);
+        std::vector<int> destrA01(A01rhi-A01rlo), destcA01(A01chi-A01clo),
+          destrA10(A10rhi-A10rlo), destcA10(A10chi-A10clo);
         for (int r=A01rlo; r<A01rhi; r++)
           destrA01[r-A01rlo] = dest + (A01.rowl2g_fixed(r) / B) % nprows;
         for (int c=A01clo; c<A01chi; c++)
