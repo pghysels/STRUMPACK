@@ -52,6 +52,8 @@ namespace strumpack {
     using DistM_t = DistributedMatrix<scalar_t>;
     using DistMW_t = DistributedMatrixWrapper<scalar_t>;
     using ExtAdd = ExtendAdd<scalar_t,integer_t>;
+    using Vec_t = std::vector<std::size_t>;
+    using VecVec_t = std::vector<std::vector<std::size_t>>;
     template<typename _scalar_t,typename _integer_t> friend class ExtendAdd;
 
   public:
@@ -80,30 +82,18 @@ namespace strumpack {
     }
 
     void extract_2d
-    (const SpMat_t& A, const std::vector<std::size_t>& I,
-     const std::vector<std::size_t>& J, DistM_t& B) const;
-    void extract_2d
-    (const SpMat_t& A,
-     const std::vector<std::vector<std::size_t>>& I,
-     const std::vector<std::vector<std::size_t>>& J,
+    (const SpMat_t& A, const VecVec_t& I, const VecVec_t& J,
      std::vector<DistMW_t>& B) const;
     void get_submatrix_2d
-    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-     DistM_t& Bdist, DenseM_t& Bseq) const override;
-    void get_submatrix_2d
-    (const std::vector<std::vector<std::size_t>>& I,
-     const std::vector<std::vector<std::size_t>>& J,
+    (const VecVec_t& I, const VecVec_t& J,
      std::vector<DistM_t>& Bdist, std::vector<DenseM_t>& Bseq) const override;
     void extract_CB_sub_matrix
-    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+    (const Vec_t& I, const Vec_t& J,
      DenseM_t& B, int task_depth) const override {};
     virtual void extract_CB_sub_matrix_2d
-    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-     DistM_t& B) const {};
+    (const Vec_t& I, const Vec_t& J, DistM_t& B) const {};
     virtual void extract_CB_sub_matrix_2d
-    (const std::vector<std::vector<std::size_t>>& I,
-     const std::vector<std::vector<std::size_t>>& J,
-     std::vector<DistM_t>& B) const;
+    (const VecVec_t& I, const VecVec_t& J, std::vector<DistM_t>& B) const;
 
     void extend_add_b
     (DistM_t& b, DistM_t& bupd, const DistM_t& CBl, const DistM_t& CBr,
@@ -192,61 +182,59 @@ namespace strumpack {
       blacs_grid_(comm, P) {
   }
 
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMPI<scalar_t,integer_t>::extract_2d
-  (const SpMat_t& A, const std::vector<std::size_t>& I,
-   const std::vector<std::size_t>& J, DistM_t& B) const {
-    auto m = I.size();
-    auto n = J.size();
-    TIMER_TIME(TaskType::EXTRACT_SEP_2D, 2, t_ex_sep);
-    {
-      DistM_t tmp(grid(), m, n);
-      A.extract_separator_2d(this->sep_end_, I, J, tmp);
-      // TODO why this copy???
-      copy(m, n, tmp, 0, 0, B, 0, 0, grid()->ctxt_all());
-    }
-    TIMER_STOP(t_ex_sep);
-    TIMER_TIME(TaskType::GET_SUBMATRIX_2D, 2, t_getsub);
-    DistM_t Bl, Br;
-    DenseM_t Blseq, Brseq;
-    if (visit(lchild_)) lchild_->get_submatrix_2d(I, J, Bl, Blseq);
-    if (visit(rchild_)) rchild_->get_submatrix_2d(I, J, Br, Brseq);
-    DistM_t tmp(B.grid(), m, n);
-    if (lchild_) {
-      if (lchild_->isMPI())
-        copy(m, n, Bl, 0, 0, tmp, 0, 0, grid()->ctxt_all());
-      else copy(m, n, Blseq, master(lchild_), tmp, 0, 0, grid()->ctxt_all());
-    }
-    B.add(tmp);
-    if (rchild_) {
-      if (rchild_->isMPI())
-        copy(m, n, Br, 0, 0, tmp, 0, 0, grid()->ctxt_all());
-      else copy(m, n, Brseq, master(rchild_), tmp, 0, 0, grid()->ctxt_all());
-    }
-    B.add(tmp);
-    TIMER_STOP(t_getsub);
-  }
+  // template<typename scalar_t,typename integer_t> void
+  // FrontalMatrixMPI<scalar_t,integer_t>::extract_2d
+  // (const SpMat_t& A, const Vec_t& I,
+  //  const Vec_t& J, DistM_t& B) const {
+  //   TIMER_TIME(TaskType::EXTRACT_2D, 1, t_ex);
+  //   auto m = I.size();
+  //   auto n = J.size();
+  //   {
+  //     TIMER_TIME(TaskType::EXTRACT_SEP_2D, 2, t_ex_sep);
+  //     DistM_t tmp(grid(), m, n);
+  //     A.extract_separator_2d(this->sep_end_, I, J, tmp);
+  //     // TODO why this copy???
+  //     copy(m, n, tmp, 0, 0, B, 0, 0, grid()->ctxt_all());
+  //   }
+  //   TIMER_TIME(TaskType::GET_SUBMATRIX_2D, 2, t_getsub);
+  //   DistM_t Bl, Br;
+  //   DenseM_t Blseq, Brseq;
+  //   if (visit(lchild_)) lchild_->get_submatrix_2d(I, J, Bl, Blseq);
+  //   if (visit(rchild_)) rchild_->get_submatrix_2d(I, J, Br, Brseq);
+  //   DistM_t tmp(B.grid(), m, n);
+  //   if (lchild_) {
+  //     if (lchild_->isMPI())
+  //       copy(m, n, Bl, 0, 0, tmp, 0, 0, grid()->ctxt_all());
+  //     else copy(m, n, Blseq, master(lchild_), tmp, 0, 0, grid()->ctxt_all());
+  //   }
+  //   B.add(tmp);
+  //   if (rchild_) {
+  //     if (rchild_->isMPI())
+  //       copy(m, n, Br, 0, 0, tmp, 0, 0, grid()->ctxt_all());
+  //     else copy(m, n, Brseq, master(rchild_), tmp, 0, 0, grid()->ctxt_all());
+  //   }
+  //   B.add(tmp);
+  // }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMPI<scalar_t,integer_t>::extract_2d
-  (const SpMat_t& A,
-   const std::vector<std::vector<std::size_t>>& I,
-   const std::vector<std::vector<std::size_t>>& J,
+  (const SpMat_t& A, const VecVec_t& I, const VecVec_t& J,
    std::vector<DistMW_t>& B) const {
-    TIMER_TIME(TaskType::EXTRACT_SEP_2D, 2, t_ex_sep);
-    for (std::size_t i=0; i<I.size(); i++) {
-      DistM_t tmp(grid(), I[i].size(), J[i].size());
-      A.extract_separator_2d(this->sep_end_, I[i], J[i], tmp);
-      // TODO why this copy???
-      copy(I[i].size(), J[i].size(), tmp, 0, 0, B[i], 0, 0, grid()->ctxt_all());
+    TIMER_TIME(TaskType::EXTRACT_2D, 1, t_ex);
+    {
+      TIMER_TIME(TaskType::EXTRACT_SEP_2D, 2, t_ex_sep);
+      for (std::size_t i=0; i<I.size(); i++) {
+        DistM_t tmp(grid(), I[i].size(), J[i].size());
+        A.extract_separator_2d(this->sep_end_, I[i], J[i], tmp);
+        // TODO why this copy???
+        copy(I[i].size(), J[i].size(), tmp, 0, 0, B[i], 0, 0, grid()->ctxt_all());
+      }
     }
-    TIMER_STOP(t_ex_sep);
     TIMER_TIME(TaskType::GET_SUBMATRIX_2D, 2, t_getsub);
     std::vector<DistM_t> Bl, Br;
     std::vector<DenseM_t> Blseq, Brseq;
     if (visit(lchild_)) lchild_->get_submatrix_2d(I, J, Bl, Blseq);
     if (visit(rchild_)) rchild_->get_submatrix_2d(I, J, Br, Brseq);
-
     DistM_t d;
     DenseM_t d2;
     for (std::size_t i=0; i<I.size(); i++) {
@@ -270,22 +258,11 @@ namespace strumpack {
       }
       B[i].add(tmp);
     }
-    TIMER_STOP(t_getsub);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMPI<scalar_t,integer_t>::get_submatrix_2d
-  (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-   DistM_t& Bdist, DenseM_t&) const {
-    Bdist = DistM_t(grid(), I.size(), J.size());
-    Bdist.zero();
-    extract_CB_sub_matrix_2d(I, J, Bdist);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMPI<scalar_t,integer_t>::get_submatrix_2d
-  (const std::vector<std::vector<std::size_t>>& I,
-   const std::vector<std::vector<std::size_t>>& J,
+  (const VecVec_t& I, const VecVec_t& J,
    std::vector<DistM_t>& Bdist, std::vector<DenseM_t>&) const {
     // TODO add timer here???
     for (std::size_t i=0; i<I.size(); i++) {
@@ -297,9 +274,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
-  (const std::vector<std::vector<std::size_t>>& I,
-   const std::vector<std::vector<std::size_t>>& J,
-   std::vector<DistM_t>& B) const {
+  (const VecVec_t& I, const VecVec_t& J, std::vector<DistM_t>& B) const {
     for (std::size_t i=0; i<I.size(); i++)
       extract_CB_sub_matrix_2d(I[i], J[i], B[i]);
   }
@@ -334,13 +309,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> int
-  FrontalMatrixMPI<scalar_t,integer_t>::master
-  (const F_t* ch) const {
-    // int ch_master;
-    // if (auto mpi_ch = dynamic_cast<const FMPI_t*>(ch))
-    //   ch_master = (ch == lchild_) ? 0 : P() - mpi_ch->P();
-    // else ch_master = (ch == lchild_) ? 0 : P() - 1;
-    // return ch_master;
+  FrontalMatrixMPI<scalar_t,integer_t>::master(const F_t* ch) const {
     return (ch == lchild_.get()) ? 0 : P() - ch->P();
   }
 
