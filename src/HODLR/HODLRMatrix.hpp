@@ -46,7 +46,7 @@
 namespace strumpack {
 
   /**
-   * Code in this namespace is a wrapper aroung Yang Liu's Fortran
+   * Code in this namespace is a wrapper around Yang Liu's Fortran
    * code:
    *    https://github.com/liuyangzhuan/ButterflyPACK
    */
@@ -425,32 +425,36 @@ namespace strumpack {
       using DistMW_t = DistributedMatrixWrapper<scalar_t>;
       auto temp = static_cast<AelemCommPtrs<scalar_t>*>(AC);
       std::vector<std::vector<std::size_t>> I(*Ninter), J(*Ninter);
-      std::vector<DistMW_t> B(*Ninter);
-      auto& comm = *(temp->c);
-      auto P = comm.size();
-      auto rank = comm.rank();
+      // grid should still exist when calling B destructors
       std::vector<BLACSGrid> grids;
-      grids.reserve(*Ninter);
-      auto data = alldat_loc;
-      for (int isec=0, r0=0, c0=0; isec<*Ninter; isec++) {
-        auto m = rowids[isec];
-        auto n = colids[isec];
-        I[isec].assign(allrows+r0, allrows+r0+m);
-        J[isec].assign(allcols+c0, allcols+c0+n);
-        auto p0 = pmaps[2*(*Npmap)+pgids[isec]];
-        assert(pmaps[pgids[isec]] == 1);          // prows == 1
-        assert(pmaps[(*Npmap)+pgids[isec]] == 1); // pcols == 1
-        grids.emplace_back(BLACSGrid(comm.sub(p0, 1), 1));
-        B[isec] = DistMW_t(&grids[isec], m, n, data);
-        r0 += m;
-        c0 += n;
-        if (rank == p0) data += m*n;
+      {
+        std::vector<DistMW_t> B(*Ninter);
+        auto& comm = *(temp->c);
+        auto P = comm.size();
+        auto rank = comm.rank();
+        grids.reserve(*Ninter);
+        //std::fill(alldat_loc, alldat_loc+*Nalldat_loc, scalar_t(0.));
+        auto data = alldat_loc;
+        for (int isec=0, r0=0, c0=0; isec<*Ninter; isec++) {
+          auto m = rowids[isec];
+          auto n = colids[isec];
+          I[isec].assign(allrows+r0, allrows+r0+m);
+          J[isec].assign(allcols+c0, allcols+c0+n);
+          auto p0 = pmaps[2*(*Npmap)+pgids[isec]];
+          assert(pmaps[pgids[isec]] == 1);          // prows == 1
+          assert(pmaps[(*Npmap)+pgids[isec]] == 1); // pcols == 1
+          grids.emplace_back(BLACSGrid(comm.sub(p0, 1), 1));
+          B[isec] = DistMW_t(&grids[isec], m, n, data);
+          r0 += m;
+          c0 += n;
+          if (rank == p0) data += m*n;
+        }
+        ExtractionMeta<scalar_t> e
+          {*Ninter, *Nallrows, *Nallcols, *Nalldat_loc,
+              allrows, allcols, rowids, colids, pgids,
+              *Npmap, pmaps, alldat_loc};
+        temp->Aelem->operator()(I, J, B, e);
       }
-      ExtractionMeta<scalar_t> e
-        {*Ninter, *Nallrows, *Nallcols, *Nalldat_loc,
-            allrows, allcols, rowids, colids, pgids,
-            *Npmap, pmaps, alldat_loc};
-      temp->Aelem->operator()(I, J, B, e);
     }
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
@@ -679,23 +683,25 @@ namespace strumpack {
     (const VecVec_t& I, const VecVec_t& J, std::vector<DistM_t>& B) {
       if (I.empty()) return;
       assert(I.size() == J.size() && I.size() == B.size());
-      int Ninter = I.size(), total_rows = 0, total_cols = 0, total_dat;
-      int Npmap = 1, pgids = 0;
+      int Ninter = I.size(), Npmap = 1,
+        total_rows = 0, total_cols = 0, total_dat = 0;
       int pmaps[3] = {B[0].nprows(), B[0].npcols(), 0};
       for (auto Ik : I) total_rows += Ik.size();
-      for (auto Jk : I) total_cols += Jk.size();
+      for (auto Jk : J) total_cols += Jk.size();
       std::unique_ptr<int[]> iwork
-        (new int[total_rows + total_cols + 2*Ninter]);
+        (new int[total_rows + total_cols + 3*Ninter]);
       auto allrows = iwork.get();
       auto allcols = allrows + total_rows;
       auto rowidx = allcols + total_cols;
       auto colidx = rowidx + Ninter;
+      auto pgids = colidx + Ninter;
       for (int k=0, i=0, j=0; k<Ninter; k++) {
         total_dat += B[k].lrows()*B[k].lcols();
         rowidx[k] = I[k].size();
         colidx[k] = J[k].size();
-        for (auto l : I[k]) allrows[i++] = l;
-        for (auto l : J[k]) allcols[j++] = l;
+        pgids[k] = 0;
+        for (auto l : I[k]) { assert(l < rows_); allrows[i++] = l; }
+        for (auto l : J[k]) { assert(l < cols_); allcols[j++] = l; }
       }
       for (int k=0; k<Ninter; k++)
         total_dat += B[k].lrows()*B[k].lcols();
@@ -703,7 +709,7 @@ namespace strumpack {
       HODLR_extract_elements<scalar_t>
         (ho_bf_, options_, msh_, stats_, ptree_, Ninter,
          total_rows, total_cols, total_dat, allrows, allcols,
-         alldat_loc.get(), rowidx, colidx, &pgids, Npmap, pmaps);
+         alldat_loc.get(), rowidx, colidx, pgids, Npmap, pmaps);
       auto ptr = alldat_loc.get();
       for (int k=0; k<Ninter; k++) {
         auto Nloc = B[k].lrows() * B[k].lcols();

@@ -107,8 +107,11 @@ namespace strumpack {
       void mult(Trans op, const DistM_t& X, DistM_t& Y) const;
 
       void extract_elements(ExtractionMeta<scalar_t>& e);
-      void extract_elements
+      void extract_add_elements
       (const VecVec_t& I, const VecVec_t& J, std::vector<DistMW_t>& B);
+      void extract_add_elements
+      (const VecVec_t& I, const VecVec_t& J, std::vector<DistMW_t>& B,
+       ExtractionMeta<scalar_t>& e);
 
       double get_stat(const std::string& name) const {
         if (!stats_) return 0;
@@ -271,40 +274,65 @@ namespace strumpack {
          e.alldat_loc, e.rowids, e.colids, e.pgids, e.Npmap, e.pmaps);
     }
 
-    template<typename scalar_t> void LRBFMatrix<scalar_t>::extract_elements
+    template<typename scalar_t> void
+    LRBFMatrix<scalar_t>::extract_add_elements
+    (const VecVec_t& I, const VecVec_t& J, std::vector<DistMW_t>& B,
+     ExtractionMeta<scalar_t>& e) {
+      std::unique_ptr<scalar_t[]> alldat_loc(new scalar_t[e.Nalldat_loc]);
+      auto ptr = alldat_loc.get();
+      LRBF_extract_elements<scalar_t>
+        (lr_bf_, options_, msh_, stats_, ptree_, e.Ninter,
+         e.Nallrows, e.Nallcols, e.Nalldat_loc, e.allrows, e.allcols,
+         ptr, e.rowids, e.colids, e.pgids, e.Npmap, e.pmaps);
+      for (auto& Bk : B) {
+        auto Nloc = Bk.lrows() * Bk.lcols();
+        auto Bdata = Bk.data();
+        for (std::size_t i=0; i<Nloc; i++, Bdata++, ptr++)
+          *Bdata += *ptr;
+      }
+    }
+
+
+    /**
+     * All the matrices in B should have the same BLACSGrid!!!
+     */
+    template<typename scalar_t> void
+    LRBFMatrix<scalar_t>::extract_add_elements
     (const VecVec_t& I, const VecVec_t& J, std::vector<DistMW_t>& B) {
       if (I.empty()) return;
       assert(I.size() == J.size() && I.size() == B.size());
-      int Ninter = I.size(), total_rows = 0, total_cols = 0, total_dat;
-      int Npmap = 1, pgids = 0;
+      int Ninter = I.size(), Npmap = 1,
+        total_rows = 0, total_cols = 0, total_dat = 0;
       int pmaps[3] = {B[0].nprows(), B[0].npcols(), 0};
       for (auto Ik : I) total_rows += Ik.size();
-      for (auto Jk : I) total_cols += Jk.size();
+      for (auto Jk : J) total_cols += Jk.size();
       std::unique_ptr<int[]> iwork
-        (new int[total_rows + total_cols + 2*Ninter]);
+        (new int[total_rows + total_cols + 3*Ninter]);
       auto allrows = iwork.get();
       auto allcols = allrows + total_rows;
       auto rowidx = allcols + total_cols;
       auto colidx = rowidx + Ninter;
+      auto pgids = colidx + Ninter;
       for (int k=0, i=0, j=0; k<Ninter; k++) {
-        assert(B[k].nprows() == pmaps[0]);
-        assert(B[k].npcols() == pmaps[1]);
+        assert(B[k].grid() == B[0].grid());
         total_dat += B[k].lrows()*B[k].lcols();
         rowidx[k] = I[k].size();
         colidx[k] = J[k].size();
-        for (auto l : I[k]) allrows[i++] = l;
-        for (auto l : J[k]) allcols[j++] = l;
+        pgids[k] = 0;
+        for (auto l : I[k]) { assert(l < rows_); allrows[i++] = l; }
+        for (auto l : J[k]) { assert(l < cols_); allcols[j++] = l; }
       }
       std::unique_ptr<scalar_t[]> alldat_loc(new scalar_t[total_dat]);
       auto ptr = alldat_loc.get();
       LRBF_extract_elements<scalar_t>
         (lr_bf_, options_, msh_, stats_, ptree_, Ninter,
          total_rows, total_cols, total_dat, allrows, allcols,
-         ptr, rowidx, colidx, &pgids, Npmap, pmaps);
+         ptr, rowidx, colidx, pgids, Npmap, pmaps);
       for (auto& Bk : B) {
         auto Nloc = Bk.lrows() * Bk.lcols();
-        std::copy(ptr, ptr+Nloc, Bk.data());
-        ptr += Nloc;
+        auto Bdata = Bk.data();
+        for (std::size_t i=0; i<Nloc; i++, Bdata++, ptr++)
+          *Bdata += *ptr;
       }
     }
 

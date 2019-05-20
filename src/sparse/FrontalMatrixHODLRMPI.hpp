@@ -236,13 +236,13 @@ namespace strumpack {
         [&](VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
             HODLR::ExtractionMeta<scalar_t>&) {
           for (auto& Ik : I) for (auto& i : Ik) i += this->sep_begin_;
-          for (auto& Jk : J) for (auto& j : Jk) j = this->upd_[j-dsep];
+          for (auto& Jk : J) for (auto& j : Jk) j = this->upd_[j];
           this->extract_2d(A, I, J, B);
         };
       auto extract_F21 =
         [&](VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
             HODLR::ExtractionMeta<scalar_t>&) {
-          for (auto& Ik : I) for (auto& i : Ik) i = this->upd_[i-dsep];
+          for (auto& Ik : I) for (auto& i : Ik) i = this->upd_[i];
           for (auto& Jk : J) for (auto& j : Jk) j += this->sep_begin_;
           this->extract_2d(A, I, J, B);
         };
@@ -257,6 +257,7 @@ namespace strumpack {
       // construct F22+S using element extraction
       auto sample_Schur =
         [&](Trans op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
+          // TODO use a and b???
           TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
           TIMER_TIME(TaskType::HSS_SCHUR_PRODUCT, 2, t_sprod);
           DenseM_t F12R(F12_.lrows(), R.cols()),
@@ -280,11 +281,10 @@ namespace strumpack {
       auto extract_F22 =
         [&](VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
             HODLR::ExtractionMeta<scalar_t>& e) {
-          //Schur.extract_elements(I, J, B);
-          Schur.extract_elements(e);
-          for (auto& Ik : I) for (auto& i : Ik) i = this->upd_[i-dsep];
-          for (auto& Jk : J) for (auto& j : Jk) j = this->upd_[j-dsep];
-          this->extract_2d(A, I, J, B); // adds to B
+          for (auto& Ik : I) for (auto& i : Ik) i = this->upd_[i];
+          for (auto& Jk : J) for (auto& j : Jk) j = this->upd_[j];
+          this->extract_2d(A, I, J, B);
+          Schur.extract_add_elements(I, J, B, e);
         };
       TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_f22_compress);
       F22_->compress(extract_F22);
