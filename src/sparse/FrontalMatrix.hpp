@@ -137,7 +137,7 @@ namespace strumpack {
 
     virtual void extract_CB_sub_matrix
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-     DenseM_t& B, int task_depth) const {};
+     DenseM_t& B, int task_depth) const = 0;
 
     void extend_add_b
     (DenseM_t& b, DenseM_t& bupd, const DenseM_t& CB, const F_t* pa) const;

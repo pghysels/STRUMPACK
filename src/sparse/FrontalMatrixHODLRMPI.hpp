@@ -221,7 +221,7 @@ namespace strumpack {
     const auto dupd = dim_upd();
     auto extract_F11 =
       [&](VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
-          HODLR::ExtractionMeta<scalar_t>&) {
+          HODLR::ExtractionMeta&) {
         for (auto& Ik : I) for (auto& i : Ik) i += this->sep_begin_;
         for (auto& Jk : J) for (auto& j : Jk) j += this->sep_begin_;
         this->extract_2d(A, I, J, B);
@@ -234,14 +234,14 @@ namespace strumpack {
     if (dupd) {
       auto extract_F12 =
         [&](VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
-            HODLR::ExtractionMeta<scalar_t>&) {
+            HODLR::ExtractionMeta&) {
           for (auto& Ik : I) for (auto& i : Ik) i += this->sep_begin_;
           for (auto& Jk : J) for (auto& j : Jk) j = this->upd_[j];
           this->extract_2d(A, I, J, B);
         };
       auto extract_F21 =
         [&](VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
-            HODLR::ExtractionMeta<scalar_t>&) {
+            HODLR::ExtractionMeta&) {
           for (auto& Ik : I) for (auto& i : Ik) i = this->upd_[i];
           for (auto& Jk : J) for (auto& j : Jk) j += this->sep_begin_;
           this->extract_2d(A, I, J, B);
@@ -257,34 +257,36 @@ namespace strumpack {
       // construct F22+S using element extraction
       auto sample_Schur =
         [&](Trans op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
-          // TODO use a and b???
           TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
           TIMER_TIME(TaskType::HSS_SCHUR_PRODUCT, 2, t_sprod);
           DenseM_t F12R(F12_.lrows(), R.cols()),
-            invF11F12R(F11_.lrows(), R.cols()),
-            Stmp(S.rows(), S.cols());
-          if (op == Trans::N) {
-            F12_.mult(op, R, F12R);
-            F11_.inv_mult(op, F12R, invF11F12R);
-            //F11_.solve(F12R, invF11F12R);
-            F21_.mult(op, invF11F12R, S);
-          } else {
-            F21_.mult(op, R, F12R);
-            F11_.inv_mult(op, F12R, invF11F12R);
-            F12_.mult(op, invF11F12R, S);
-          }
-          S.scale(scalar_t(-1.));
+            invF11F12R(F11_.lrows(), R.cols());
+          auto& F1 = (op == Trans::N) ? F12_ : F21_;
+          auto& F2 = (op == Trans::N) ? F21_ : F12_;
+          a = -a; // construct S=-F21*inv(F11)*F12
+          if (a != scalar_t(1.)) {
+            DenseM_t Rtmp(R);
+            Rtmp.scale(a);
+            F1.mult(op, Rtmp, F12R);
+          } else F1.mult(op, R, F12R);
+          F11_.inv_mult(op, F12R, invF11F12R);
+          //F11_.solve(F12R, invF11F12R);
+          if (b != scalar_t(0.)) {
+            DenseM_t Stmp(S.rows(), S.cols());
+            F2.mult(op, invF11F12R, Stmp);
+            S.scale_and_add(b, Stmp);
+          } else F2.mult(op, invF11F12R, S);
           compress_flops_Schur();
         };
       HODLR::LRBFMatrix<scalar_t> Schur(*F22_, *F22_);
       Schur.compress(sample_Schur);
       auto extract_F22 =
         [&](VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
-            HODLR::ExtractionMeta<scalar_t>& e) {
+            HODLR::ExtractionMeta& e) {
           for (auto& Ik : I) for (auto& i : Ik) i = this->upd_[i];
           for (auto& Jk : J) for (auto& j : Jk) j = this->upd_[j];
           this->extract_2d(A, I, J, B);
-          Schur.extract_add_elements(I, J, B, e);
+          Schur.extract_add_elements(e, B);
         };
       TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_f22_compress);
       F22_->compress(extract_F22);

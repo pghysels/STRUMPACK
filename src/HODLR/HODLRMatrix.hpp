@@ -52,10 +52,10 @@ namespace strumpack {
    */
   namespace HODLR {
 
-    template<typename scalar_t> struct ExtractionMeta {
+    struct ExtractionMeta {
+      std::unique_ptr<int[]> iwork;
       int Ninter, Nallrows, Nallcols, Nalldat_loc,
         *allrows, *allcols, *rowids, *colids, *pgids, Npmap, *pmaps;
-      scalar_t* alldat_loc;
     };
 
     /**
@@ -83,14 +83,18 @@ namespace strumpack {
       using DistM_t = DistributedMatrix<scalar_t>;
       using DistMW_t = DistributedMatrixWrapper<scalar_t>;
       using opts_t = HODLROptions<scalar_t>;
+      using Vec_t = std::vector<std::size_t>;
       using VecVec_t = std::vector<std::vector<std::size_t>>;
 
     public:
       using mult_t = typename std::function
         <void(Trans, const DenseM_t&, DenseM_t&)>;
-      using elem_blocks_t = typename std::function
+      using delem_blocks_t = typename std::function
         <void(VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
-              ExtractionMeta<scalar_t>&)>;
+              ExtractionMeta&)>;
+      using elem_blocks_t = typename std::function
+        <void(VecVec_t& I, VecVec_t& J, std::vector<DenseMW_t>& B,
+              ExtractionMeta&)>;
 
       /**
        * Default constructor, makes an empty 0 x 0 matrix.
@@ -245,19 +249,28 @@ namespace strumpack {
 
       /**
        * Construct the compressed HODLR representation of the matrix,
-       * using only a matrix-(multiple)vector multiplication routine.
+       * using only a element evaluation (multiple blocks at once).
        *
-       * \param Aelem Element extraction routine, extracting multiple
+       * \param Aelem element extraction routine, extracting multiple
+       * blocks at once.
+       */
+      void compress(const delem_blocks_t& Aelem);
+
+      /**
+       * Construct the compressed HODLR representation of the matrix,
+       * using only a element evaluation (multiple blocks at once).
+       *
+       * \param Aelem element extraction routine, extracting multiple
        * blocks at once.
        */
       void compress(const elem_blocks_t& Aelem);
 
       /**
-       * Multiply this HODLR matrix with a dense matrix: Y = op(X),
-       * where op can be none, transpose or complex conjugate. X and Y
-       * are the local parts of block-row distributed matrices. The
-       * number of rows in X and Y should correspond to the
-       * distribution of this HODLR matrix.
+       * Multiply this HODLR matrix with a dense matrix: Y =
+       * op(this)*X, where op can be none, transpose or complex
+       * conjugate. X and Y are the local parts of block-row
+       * distributed matrices. The number of rows in X and Y should
+       * correspond to the distribution of this HODLR matrix.
        *
        * \param op Transpose, conjugate, or none.
        * \param X Right-hand side matrix. This is the local part of
@@ -269,9 +282,9 @@ namespace strumpack {
       void mult(Trans op, const DenseM_t& X, DenseM_t& Y) const;
 
       /**
-       * Multiply this HODLR matrix with a dense matrix: Y = op(X),
-       * where op can be none, transpose or complex conjugate. X and Y
-       * are in 2D block cyclic distribution.
+       * Multiply this HODLR matrix with a dense matrix: Y =
+       * op(this)*X, where op can be none, transpose or complex
+       * conjugate. X and Y are in 2D block cyclic distribution.
        *
        * \param op Transpose, conjugate, or none.
        * \param X Right-hand side matrix. Should be X.rows() ==
@@ -330,6 +343,9 @@ namespace strumpack {
 
       void extract_elements
       (const VecVec_t& I, const VecVec_t& J, std::vector<DistM_t>& B);
+      void extract_elements(const Vec_t& I, const Vec_t& J, DenseM_t& B);
+
+      DistM_t dense(const BLACSGrid* g) const;
 
       DenseM_t redistribute_2D_to_1D(const DistM_t& R) const;
       void redistribute_2D_to_1D(const DistM_t& R2D, DenseM_t& R1D) const;
@@ -413,7 +429,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> struct AelemCommPtrs {
-      const typename HODLRMatrix<scalar_t>::elem_blocks_t* Aelem;
+      const typename HODLRMatrix<scalar_t>::delem_blocks_t* Aelem;
       const MPIComm* c;
     };
 
@@ -433,7 +449,6 @@ namespace strumpack {
         auto P = comm.size();
         auto rank = comm.rank();
         grids.reserve(*Ninter);
-        //std::fill(alldat_loc, alldat_loc+*Nalldat_loc, scalar_t(0.));
         auto data = alldat_loc;
         for (int isec=0, r0=0, c0=0; isec<*Ninter; isec++) {
           auto m = rowids[isec];
@@ -449,12 +464,37 @@ namespace strumpack {
           c0 += n;
           if (rank == p0) data += m*n;
         }
-        ExtractionMeta<scalar_t> e
-          {*Ninter, *Nallrows, *Nallcols, *Nalldat_loc,
-              allrows, allcols, rowids, colids, pgids,
-              *Npmap, pmaps, alldat_loc};
+        ExtractionMeta e
+          {nullptr, *Ninter, *Nallrows, *Nallcols, *Nalldat_loc,
+              allrows, allcols, rowids, colids, pgids, *Npmap, pmaps};
         temp->Aelem->operator()(I, J, B, e);
       }
+    }
+
+    template<typename scalar_t> void HODLR_block_evaluation_seq
+    (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+     int* allrows, int* allcols, scalar_t* alldat_loc,
+     int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
+     C2Fptr f) {
+      using DenseMW_t = DenseMatrixWrapper<scalar_t>;
+      std::vector<std::vector<std::size_t>> I(*Ninter), J(*Ninter);
+      std::vector<DenseMW_t> B(*Ninter);
+      auto data = alldat_loc;
+      for (int isec=0, r0=0, c0=0; isec<*Ninter; isec++) {
+        auto m = rowids[isec];
+        auto n = colids[isec];
+        I[isec].assign(allrows+r0, allrows+r0+m);
+        J[isec].assign(allcols+c0, allcols+c0+n);
+        B[isec] = DenseMW_t(m, n, data, m);
+        r0 += m;
+        c0 += n;
+        data += m*n;
+      }
+      ExtractionMeta e
+        {nullptr, *Ninter, *Nallrows, *Nallcols, *Nalldat_loc,
+            allrows, allcols, rowids, colids, pgids, *Npmap, pmaps};
+      static_cast<typename HODLRMatrix<scalar_t>::elem_blocks_t*>
+        (f)->operator()(I, J, B, e);
     }
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
@@ -471,9 +511,6 @@ namespace strumpack {
       c_ = c;
       Fcomm_ = MPI_Comm_c2f(c_.comm());
       options_init(opts);
-      HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", 4);   // BACA
-      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 1); // block extraction
-
       perm_.resize(rows_);
       KernelCommPtrs<scalar_t> KC{&K, &c_};
       HODLR_construct_init<scalar_t>
@@ -531,10 +568,11 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "verbosity", opts.verbose() ? 2 : -1);
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
       HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
-      //HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", com_opt);
+      HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", 5); // 5 = new version of BACA
+      //HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", 100); // TODO set option
       HODLR_set_I_option<scalar_t>(options_, "xyzsort", 0);
+      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 1); // block extraction
       HODLR_set_I_option<scalar_t>(options_, "ErrFillFull", 0);
-      HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", 100);
       HODLR_set_I_option<scalar_t>(options_, "rank0", opts.rank_guess());
       HODLR_set_I_option<scalar_t>(options_, "cpp", 1);
       HODLR_set_D_option<scalar_t>(options_, "rankrate", opts.rank_rate());
@@ -615,13 +653,21 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    HODLRMatrix<scalar_t>::compress(const elem_blocks_t& Aelem) {
+    HODLRMatrix<scalar_t>::compress(const delem_blocks_t& Aelem) {
       AelemCommPtrs<scalar_t> AC{&Aelem, &c_};
-      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 1);
       HODLR_construct_element_compute<scalar_t>
         (ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
          &(HODLR_element_evaluation<scalar_t>),
          &(HODLR_block_evaluation<scalar_t>), &AC);
+    }
+
+    template<typename scalar_t> void
+    HODLRMatrix<scalar_t>::compress(const elem_blocks_t& Aelem) {
+      C2Fptr f = static_cast<void*>(const_cast<elem_blocks_t*>(&Aelem));
+      HODLR_construct_element_compute<scalar_t>
+        (ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
+         &(HODLR_element_evaluation<scalar_t>),
+         &(HODLR_block_evaluation_seq<scalar_t>), f);
     }
 
     template<typename scalar_t> void
@@ -683,8 +729,7 @@ namespace strumpack {
     (const VecVec_t& I, const VecVec_t& J, std::vector<DistM_t>& B) {
       if (I.empty()) return;
       assert(I.size() == J.size() && I.size() == B.size());
-      int Ninter = I.size(), Npmap = 1,
-        total_rows = 0, total_cols = 0, total_dat = 0;
+      int Ninter = I.size(), total_rows = 0, total_cols = 0, total_dat = 0;
       int pmaps[3] = {B[0].nprows(), B[0].npcols(), 0};
       for (auto Ik : I) total_rows += Ik.size();
       for (auto Jk : J) total_cols += Jk.size();
@@ -706,16 +751,42 @@ namespace strumpack {
       for (int k=0; k<Ninter; k++)
         total_dat += B[k].lrows()*B[k].lcols();
       std::unique_ptr<scalar_t[]> alldat_loc(new scalar_t[total_dat]);
+      auto ptr = alldat_loc.get();
       HODLR_extract_elements<scalar_t>
         (ho_bf_, options_, msh_, stats_, ptree_, Ninter,
          total_rows, total_cols, total_dat, allrows, allcols,
-         alldat_loc.get(), rowidx, colidx, pgids, Npmap, pmaps);
-      auto ptr = alldat_loc.get();
-      for (int k=0; k<Ninter; k++) {
-        auto Nloc = B[k].lrows() * B[k].lcols();
-        std::copy(ptr, ptr+Nloc, B[k].data());
-        ptr += Nloc;
+         ptr, rowidx, colidx, pgids, 1, pmaps);
+      for (auto& Bk : B) {
+        auto m = Bk.lcols();
+        auto n = Bk.lrows();
+        auto Bdata = Bk.data();
+        auto Bld = Bk.ld();
+        for (std::size_t j=0; j<m; j++)
+          for (std::size_t i=0; i<n; i++)
+            Bdata[i+j*Bld] = *ptr++;
       }
+    }
+
+    template<typename scalar_t> void HODLRMatrix<scalar_t>::extract_elements
+    (const Vec_t& I, const Vec_t& J, DenseM_t& B) {
+      int m = I.size(), n = J.size(), pgids = 0;
+      if (m == 0 || n == 0) return;
+      assert(m == B.rows() && n == B.cols());
+      int pmaps[3] = {1, 1, 0};
+      std::vector<int> Ii, Ji;
+      Ii.assign(I.begin(), I.end());
+      Ji.assign(J.begin(), J.end());
+      HODLR_extract_elements<scalar_t>
+        (ho_bf_, options_, msh_, stats_, ptree_, 1, m, n, m*n,
+         Ii.data(), Ji.data(), B.data(), &m, &n, &pgids, 1, pmaps);
+    }
+
+    template<typename scalar_t> DistributedMatrix<scalar_t>
+    HODLRMatrix<scalar_t>::dense(const BLACSGrid* g) const {
+      DistM_t A(g, rows_, cols_), I(g, rows_, cols_);
+      I.eye();
+      mult(Trans::N, I, A);
+      return A;
     }
 
     template<typename scalar_t> DenseMatrix<scalar_t>

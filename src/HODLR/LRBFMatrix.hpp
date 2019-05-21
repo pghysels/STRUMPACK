@@ -49,10 +49,12 @@ namespace strumpack {
 
     template<typename scalar_t> class LRBFMatrix {
       using DenseM_t = DenseMatrix<scalar_t>;
+      using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using DistM_t = DistributedMatrix<scalar_t>;
       using DistMW_t = DistributedMatrixWrapper<scalar_t>;
       using opts_t = HODLROptions<scalar_t>;
       using VecVec_t = std::vector<std::vector<std::size_t>>;
+      using delem_blocks_t = typename HODLRMatrix<scalar_t>::delem_blocks_t;
       using elem_blocks_t = typename HODLRMatrix<scalar_t>::elem_blocks_t;
 
     public:
@@ -87,6 +89,7 @@ namespace strumpack {
 
       void compress(const mult_t& Amult);
       void compress(const mult_t& Amult, int rank_guess);
+      void compress(const delem_blocks_t& Aelem);
       void compress(const elem_blocks_t& Aelem);
 
       void mult(Trans op, const DenseM_t& X, DenseM_t& Y) const;
@@ -106,17 +109,19 @@ namespace strumpack {
        */
       void mult(Trans op, const DistM_t& X, DistM_t& Y) const;
 
-      void extract_elements(ExtractionMeta<scalar_t>& e);
       void extract_add_elements
       (const VecVec_t& I, const VecVec_t& J, std::vector<DistMW_t>& B);
       void extract_add_elements
-      (const VecVec_t& I, const VecVec_t& J, std::vector<DistMW_t>& B,
-       ExtractionMeta<scalar_t>& e);
+      (const VecVec_t& I, const VecVec_t& J, std::vector<DenseMW_t>& B);
+      void extract_add_elements(ExtractionMeta& e, std::vector<DistMW_t>& B);
+      void extract_add_elements(ExtractionMeta& e, std::vector<DenseMW_t>& B);
 
       double get_stat(const std::string& name) const {
         if (!stats_) return 0;
         return BPACK_get_stat<scalar_t>(stats_, name);
       }
+
+      DistM_t dense(const BLACSGrid* g) const;
 
       DenseM_t redistribute_2D_to_1D
       (const DistM_t& R2D, const std::vector<int>& dist) const;
@@ -137,6 +142,10 @@ namespace strumpack {
       MPIComm c_;
       int rows_ = 0, cols_ = 0, lrows_ = 0, lcols_ = 0;
       std::vector<int> rdist_, cdist_;  // begin rows/cols of each rank
+
+      void set_extraction_meta_1grid
+      (const VecVec_t& I, const VecVec_t& J, ExtractionMeta& e,
+       int Nalldat_loc, int* pmaps) const;
     };
 
     template<typename scalar_t> LRBFMatrix<scalar_t>::LRBFMatrix
@@ -229,12 +238,19 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    LRBFMatrix<scalar_t>::compress(const elem_blocks_t& Aelem) {
+    LRBFMatrix<scalar_t>::compress(const delem_blocks_t& Aelem) {
       AelemCommPtrs<scalar_t> AC{&Aelem, &c_};
-      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 1);
       LRBF_construct_element_compute<scalar_t>
         (lr_bf_, options_, stats_, msh_, kerquant_, ptree_,
          &(HODLR_block_evaluation<scalar_t>), &AC);
+    }
+
+    template<typename scalar_t> void
+    LRBFMatrix<scalar_t>::compress(const elem_blocks_t& Aelem) {
+      C2Fptr f = static_cast<void*>(const_cast<elem_blocks_t*>(&Aelem));
+      LRBF_construct_element_compute<scalar_t>
+        (lr_bf_, options_, stats_, msh_, kerquant_, ptree_,
+         &(HODLR_block_evaluation_seq<scalar_t>), f);
     }
 
     template<typename scalar_t> void
@@ -266,18 +282,9 @@ namespace strumpack {
       }
     }
 
-    template<typename scalar_t> void LRBFMatrix<scalar_t>::extract_elements
-    (ExtractionMeta<scalar_t>& e) {
-      LRBF_extract_elements<scalar_t>
-        (lr_bf_, options_, msh_, stats_, ptree_, e.Ninter,
-         e.Nallrows, e.Nallcols, e.Nalldat_loc, e.allrows, e.allcols,
-         e.alldat_loc, e.rowids, e.colids, e.pgids, e.Npmap, e.pmaps);
-    }
-
     template<typename scalar_t> void
     LRBFMatrix<scalar_t>::extract_add_elements
-    (const VecVec_t& I, const VecVec_t& J, std::vector<DistMW_t>& B,
-     ExtractionMeta<scalar_t>& e) {
+    (ExtractionMeta& e, std::vector<DistMW_t>& B) {
       std::unique_ptr<scalar_t[]> alldat_loc(new scalar_t[e.Nalldat_loc]);
       auto ptr = alldat_loc.get();
       LRBF_extract_elements<scalar_t>
@@ -285,13 +292,15 @@ namespace strumpack {
          e.Nallrows, e.Nallcols, e.Nalldat_loc, e.allrows, e.allcols,
          ptr, e.rowids, e.colids, e.pgids, e.Npmap, e.pmaps);
       for (auto& Bk : B) {
-        auto Nloc = Bk.lrows() * Bk.lcols();
+        auto m = Bk.lcols();
+        auto n = Bk.lrows();
         auto Bdata = Bk.data();
-        for (std::size_t i=0; i<Nloc; i++, Bdata++, ptr++)
-          *Bdata += *ptr;
+        auto Bld = Bk.ld();
+        for (std::size_t j=0; j<m; j++)
+          for (std::size_t i=0; i<n; i++)
+            Bdata[i+j*Bld] += *ptr++;
       }
     }
-
 
     /**
      * All the matrices in B should have the same BLACSGrid!!!
@@ -301,39 +310,97 @@ namespace strumpack {
     (const VecVec_t& I, const VecVec_t& J, std::vector<DistMW_t>& B) {
       if (I.empty()) return;
       assert(I.size() == J.size() && I.size() == B.size());
-      int Ninter = I.size(), Npmap = 1,
-        total_rows = 0, total_cols = 0, total_dat = 0;
+      ExtractionMeta e;
       int pmaps[3] = {B[0].nprows(), B[0].npcols(), 0};
-      for (auto Ik : I) total_rows += Ik.size();
-      for (auto Jk : J) total_cols += Jk.size();
-      std::unique_ptr<int[]> iwork
-        (new int[total_rows + total_cols + 3*Ninter]);
-      auto allrows = iwork.get();
-      auto allcols = allrows + total_rows;
-      auto rowidx = allcols + total_cols;
-      auto colidx = rowidx + Ninter;
-      auto pgids = colidx + Ninter;
-      for (int k=0, i=0, j=0; k<Ninter; k++) {
-        assert(B[k].grid() == B[0].grid());
-        total_dat += B[k].lrows()*B[k].lcols();
-        rowidx[k] = I[k].size();
-        colidx[k] = J[k].size();
-        pgids[k] = 0;
-        for (auto l : I[k]) { assert(l < rows_); allrows[i++] = l; }
-        for (auto l : J[k]) { assert(l < cols_); allcols[j++] = l; }
+      int Nalldat_loc = 0;
+      for (auto& Bk : B) {
+        assert(Bk.grid() == B[0].grid());
+        Nalldat_loc += Bk.rows() * Bk.cols();
       }
-      std::unique_ptr<scalar_t[]> alldat_loc(new scalar_t[total_dat]);
+      set_extraction_meta_1grid(I, J, e, Nalldat_loc, pmaps);
+      extract_add_elements(I, J, B, e);
+    }
+
+    template<typename scalar_t> void
+    LRBFMatrix<scalar_t>::extract_add_elements
+    (const VecVec_t& I, const VecVec_t& J, std::vector<DenseMW_t>& B) {
+      if (I.empty()) return;
+      assert(I.size() == J.size() && I.size() == B.size());
+      ExtractionMeta e;
+      int pmaps[3] = {1, 1, 0};
+      int Nalldat_loc = 0;
+      for (auto& Bk : B) Nalldat_loc += Bk.rows() * Bk.cols();
+      set_extraction_meta_1grid(I, J, e, Nalldat_loc, pmaps);
+      // extract_add_elements(I, J, B, e);
+      std::unique_ptr<scalar_t[]> alldat_loc(new scalar_t[e.Nalldat_loc]);
       auto ptr = alldat_loc.get();
       LRBF_extract_elements<scalar_t>
-        (lr_bf_, options_, msh_, stats_, ptree_, Ninter,
-         total_rows, total_cols, total_dat, allrows, allcols,
-         ptr, rowidx, colidx, pgids, Npmap, pmaps);
+        (lr_bf_, options_, msh_, stats_, ptree_, e.Ninter,
+         e.Nallrows, e.Nallcols, e.Nalldat_loc, e.allrows, e.allcols,
+         ptr, e.rowids, e.colids, e.pgids, e.Npmap, e.pmaps);
       for (auto& Bk : B) {
-        auto Nloc = Bk.lrows() * Bk.lcols();
+        auto m = Bk.cols();
+        auto n = Bk.rows();
         auto Bdata = Bk.data();
-        for (std::size_t i=0; i<Nloc; i++, Bdata++, ptr++)
-          *Bdata += *ptr;
+        auto Bld = Bk.ld();
+        for (std::size_t j=0; j<m; j++)
+          for (std::size_t i=0; i<n; i++)
+            Bdata[i+j*Bld] += *ptr++;
       }
+    }
+
+    template<typename scalar_t> void
+    LRBFMatrix<scalar_t>::extract_add_elements
+    (ExtractionMeta& e, std::vector<DenseMW_t>& B) {
+      std::unique_ptr<scalar_t[]> alldat_loc(new scalar_t[e.Nalldat_loc]);
+      auto ptr = alldat_loc.get();
+      LRBF_extract_elements<scalar_t>
+        (lr_bf_, options_, msh_, stats_, ptree_, e.Ninter,
+         e.Nallrows, e.Nallcols, e.Nalldat_loc, e.allrows, e.allcols,
+         ptr, e.rowids, e.colids, e.pgids, e.Npmap, e.pmaps);
+      for (auto& Bk : B) {
+        auto m = Bk.cols();
+        auto n = Bk.rows();
+        auto Bdata = Bk.data();
+        auto Bld = Bk.ld();
+        for (std::size_t j=0; j<m; j++)
+          for (std::size_t i=0; i<n; i++)
+            Bdata[i+j*Bld] += *ptr++;
+      }
+    }
+
+    template<typename scalar_t> void
+    LRBFMatrix<scalar_t>::set_extraction_meta_1grid
+    (const VecVec_t& I, const VecVec_t& J,
+     ExtractionMeta& e, int Nalldat_loc, int* pmaps) const {
+      e.Ninter = I.size();
+      e.Npmap = 1;
+      e.pmaps = pmaps;
+      e.Nalldat_loc = Nalldat_loc;
+      e.Nallrows = e.Nallcols = e.Nalldat_loc = 0;
+      for (auto Ik : I) e.Nallrows += Ik.size();
+      for (auto Jk : J) e.Nallcols += Jk.size();
+      e.iwork.reset(new int[e.Nallrows + e.Nallcols + 3*e.Ninter]);
+      e.allrows = e.iwork.get();
+      e.allcols = e.allrows + e.Nallrows;
+      e.rowids = e.allcols + e.Nallcols;
+      e.colids = e.rowids + e.Ninter;
+      e.pgids = e.colids + e.Ninter;
+      for (int k=0, i=0, j=0; k<e.Ninter; k++) {
+        e.rowids[k] = I[k].size();
+        e.colids[k] = J[k].size();
+        e.pgids[k] = 0;
+        for (auto l : I[k]) { assert(l < rows_); e.allrows[i++] = l; }
+        for (auto l : J[k]) { assert(l < cols_); e.allcols[j++] = l; }
+      }
+    }
+
+    template<typename scalar_t> DistributedMatrix<scalar_t>
+    LRBFMatrix<scalar_t>::dense(const BLACSGrid* g) const {
+      DistM_t A(g, rows_, cols_), I(g, rows_, cols_);
+      I.eye();
+      mult(Trans::N, I, A);
+      return A;
     }
 
     template<typename scalar_t> DenseMatrix<scalar_t>
