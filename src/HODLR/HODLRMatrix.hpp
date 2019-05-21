@@ -575,6 +575,7 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "ErrFillFull", 0);
       HODLR_set_I_option<scalar_t>(options_, "rank0", opts.rank_guess());
       HODLR_set_I_option<scalar_t>(options_, "cpp", 1);
+      HODLR_set_I_option<scalar_t>(options_, "forwardN15flag", 0);
       HODLR_set_D_option<scalar_t>(options_, "rankrate", opts.rank_rate());
       if (opts.butterfly_levels() > 0)
         HODLR_set_I_option<scalar_t>(options_, "LRlevel", opts.butterfly_levels());
