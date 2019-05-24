@@ -475,7 +475,7 @@ namespace strumpack {
       ClusteringAlgorithm clustering_algo_ = ClusteringAlgorithm::COBBLE;
       int butterfly_levels_ = 0;
       CompressionAlgorithm compression_algo_ = CompressionAlgorithm::RANDOM_SAMPLING;
-      int BACA_block_size_ = 64;
+      int BACA_block_size_ = 16;
       double BF_sampling_parameter_ = 2.0;
       bool verbose_ = true;
     };
