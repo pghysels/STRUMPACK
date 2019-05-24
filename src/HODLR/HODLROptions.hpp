@@ -222,7 +222,25 @@ namespace strumpack {
        * matrix.
        */
       void set_butterfly_levels(int bfl) {
+        assert(bfl >= 0);
         butterfly_levels_ = bfl;
+      }
+
+      /**
+       * Set the BACA block size.
+       */
+      void set_BACA_block_size(int BACA) {
+        assert(BACA > 0);
+        BACA_block_size_ = BACA;
+      }
+
+      /**
+       * Set sampling parameter for use in linear complexity butterfly compression,
+       * higher for more robust sampling.
+       */
+      void set_BF_sampling_parameter(double param) {
+        assert(param > 0);
+        BF_sampling_parameter_ = param;
       }
 
       /**
@@ -297,6 +315,16 @@ namespace strumpack {
       int butterfly_levels() const { return butterfly_levels_; }
 
       /**
+       * Get the BACA block size.
+       */
+      int BACA_block_size() const { return BACA_block_size_; }
+
+      /**
+       * Get butterfly sampling parameter.
+       */
+      double BF_sampling_parameter() const { return BF_sampling_parameter_; }
+
+      /**
        * Verbose or quiet?
        * \return True if we want output from the HODLR algorithms,
        * else False.
@@ -328,6 +356,8 @@ namespace strumpack {
           {"hodlr_clustering_algorithm",  required_argument, 0, 7},
           {"hodlr_compression_algorithm", required_argument, 0, 8},
           {"hodlr_butterfly_levels",      required_argument, 0, 9},
+          {"hodlr_BACA_block_size",       required_argument, 0, 10},
+          {"hodlr_BF_sampling_parameter", required_argument, 0, 11},
           {"hodlr_verbose",               no_argument, 0, 'v'},
           {"hodlr_quiet",                 no_argument, 0, 'q'},
           {"help",                        no_argument, 0, 'h'},
@@ -382,6 +412,16 @@ namespace strumpack {
             iss >> butterfly_levels_;
             set_butterfly_levels(butterfly_levels_);
           } break;
+          case 10: {
+            std::istringstream iss(optarg);
+            iss >> BACA_block_size_;
+            set_BACA_block_size(BACA_block_size_);
+          } break;
+          case 11: {
+            std::istringstream iss(optarg);
+            iss >> BF_sampling_parameter_;
+            set_BF_sampling_parameter(BF_sampling_parameter_);
+          } break;
           case 'v': set_verbose(true); break;
           case 'q': set_verbose(false); break;
           case 'h': describe_options(); break;
@@ -410,10 +450,14 @@ namespace strumpack {
                   << rank_rate() << ")" << std::endl
                   << "#   --hodlr_clustering_algorithm natural|2means|kdtree|pca|cobble (default "
                   << get_name(clustering_algorithm()) << ")" << std::endl
-                  << "#   --hodlr_butterfly_levels (default "
+                  << "#   --hodlr_butterfly_levels int (default "
                   << butterfly_levels() << ")" << std::endl
                   << "#   --hodlr_compression sampling|extraction (default "
                   << get_name(compression_algorithm()) << ")" << std::endl
+                  << "#   --hodlr_BACA_block_size int (default "
+                  << BACA_block_size() << ")" << std::endl
+                  << "#   --hodlr_BF_sampling_parameter (default "
+                  << BF_sampling_parameter() << ")" << std::endl
                   << "#   --hodlr_verbose or -v (default "
                   << verbose() << ")" << std::endl
                   << "#   --hodlr_quiet or -q (default "
@@ -431,6 +475,8 @@ namespace strumpack {
       ClusteringAlgorithm clustering_algo_ = ClusteringAlgorithm::COBBLE;
       int butterfly_levels_ = 0;
       CompressionAlgorithm compression_algo_ = CompressionAlgorithm::RANDOM_SAMPLING;
+      int BACA_block_size_ = 64;
+      double BF_sampling_parameter_ = 2.0;
       bool verbose_ = true;
     };
 

@@ -569,7 +569,8 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
       HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
       HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", 5); // 5 = new version of BACA
-      //HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", 100); // TODO set option
+      HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", opts.BACA_block_size());
+      HODLR_set_I_option<scalar_t>(options_, "sample_para", opts.BF_sampling_parameter());
       HODLR_set_I_option<scalar_t>(options_, "xyzsort", 0);
       HODLR_set_I_option<scalar_t>(options_, "elem_extract", 1); // block extraction
       HODLR_set_I_option<scalar_t>(options_, "ErrFillFull", 0);
