@@ -89,6 +89,8 @@ namespace strumpack {
     public:
       using mult_t = typename std::function
         <void(Trans, const DenseM_t&, DenseM_t&)>;
+      using elem_t = typename std::function
+        <scalar_t(std::size_t i, std::size_t j)>;
       using delem_blocks_t = typename std::function
         <void(VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
               ExtractionMeta&)>;
@@ -116,6 +118,24 @@ namespace strumpack {
       HODLRMatrix
       (const MPIComm& c, kernel::Kernel<scalar_t>& K,
        std::vector<int>& perm, const opts_t& opts);
+
+      /**
+       * Construct an HODLR approximation using a routine to evaluate
+       * individual matrix elements.
+       *
+       * \param c MPI communicator, this communicator is copied
+       * internally.
+       * \param t tree specifying the HODLR matrix partitioning
+       * \param Aelem Routine, std::function, which can also be a
+       * lambda function or a functor (class object implementing the
+       * member "scalar_t operator()(int i, int j)"), that
+       * evaluates/returns the matrix element A(i,j)
+       * \param opts object containing a number of HODLR options
+       */
+      HODLRMatrix
+      (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+       const std::function<scalar_t(int i, int j)>& Aelem,
+       const opts_t& opts);
 
       /**
        * Construct an HODLR matrix using a specified HODLR tree and
@@ -520,6 +540,34 @@ namespace strumpack {
         (ho_bf_, options_, stats_, msh_, kerquant_,
          ptree_, &(HODLR_kernel_evaluation<scalar_t>),
          &(HODLR_kernel_block_evaluation<scalar_t>), &KC);
+      perm_init();
+      dist_init();
+    }
+
+    template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
+    (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+     const std::function<scalar_t(int i, int j)>& Aelem,
+     const opts_t& opts) {
+      rows_ = cols_ = tree.size;
+      HSS::HSSPartitionTree full_tree(tree);
+      int min_lvl = 2 + std::ceil(std::log2(c.size()));
+      lvls_ = std::max(min_lvl, full_tree.levels());
+      full_tree.expand_complete_levels(lvls_);
+      leafs_ = full_tree.leaf_sizes();
+      c_ = c;
+      Fcomm_ = MPI_Comm_c2f(c_.comm());
+      options_init(opts);
+      perm_.resize(rows_);
+      //KernelCommPtrs<scalar_t> KC{&K, &c_};
+      HODLR_construct_init<scalar_t>
+        (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
+         lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_ );
+      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 0); // block extraction
+      HODLR_construct_element_compute<scalar_t>
+        (ho_bf_, options_, stats_, msh_, kerquant_,
+         ptree_, &(HODLR_element_evaluation<scalar_t>),
+         &(HODLR_block_evaluation<scalar_t>),
+         const_cast<std::function<scalar_t(int i, int j)>*>(&Aelem));
       perm_init();
       dist_init();
     }
