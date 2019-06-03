@@ -60,13 +60,14 @@ namespace strumpack {
                 const std::vector<std::size_t>& coltiles,
                 const Opts_t& opts);
 
+      // implement and test, separate from factorization
       // BLRMatrix(std::size_t n, const std::vector<std::size_t>& tiles,
       //           const adm_t& admissible, const elem_t& Aelem,
       //           std::vector<int>& piv, const Opts_t& opts);
 
-      BLRMatrix(const std::vector<std::size_t>& tiles,
-                const adm_t& admissible, DenseM_t& A,
-                std::vector<int>& piv, const Opts_t& opts);
+      BLRMatrix(DenseM_t& A, const std::vector<std::size_t>& tiles,
+                const adm_t& admissible, std::vector<int>& piv,
+                const Opts_t& opts);
 
       std::size_t rows() const { return m_; }
       std::size_t cols() const { return n_; }
@@ -111,7 +112,6 @@ namespace strumpack {
       void create_dense_tile(std::size_t i, std::size_t j, DenseM_t& A);
       void create_dense_tile
       (std::size_t i, std::size_t j, const extract_t<scalar_t>& Aelem);
-
       void create_dense_tile_left_looking
       (std::size_t i, std::size_t j, const extract_t<scalar_t>& Aelem);
       void create_dense_tile_left_looking
@@ -176,7 +176,6 @@ namespace strumpack {
     };
 
 
-    // TODO is this used??
     template<typename scalar_t> BLRMatrix<scalar_t>::BLRMatrix
     (DenseM_t& A, const std::vector<std::size_t>& rowtiles,
      const std::vector<std::size_t>& coltiles, const Opts_t& opts)
@@ -223,8 +222,8 @@ namespace strumpack {
     // }
 
     template<typename scalar_t> BLRMatrix<scalar_t>::BLRMatrix
-    (const std::vector<std::size_t>& tiles, const adm_t& admissible,
-     DenseM_t& A, std::vector<int>& piv, const Opts_t& opts)
+    (DenseM_t& A, const std::vector<std::size_t>& tiles,
+     const adm_t& admissible, std::vector<int>& piv, const Opts_t& opts)
       : BLRMatrix<scalar_t>(A.rows(), tiles, A.cols(), tiles) {
       assert(rowblocks() == colblocks());
       piv.resize(rows());
@@ -235,7 +234,7 @@ namespace strumpack {
 #pragma omp taskgroup
 #endif
       {
-        for (std::size_t i=0; i<rowblocks(); i++) {
+        for (std::size_t i=0; i<rb; i++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
           std::size_t ii = i+rb*i;
 #pragma omp task default(shared) firstprivate(i,ii) depend(inout:B[ii])
@@ -245,7 +244,7 @@ namespace strumpack {
             auto tpiv = tile(i, i).LU();
             std::copy(tpiv.begin(), tpiv.end(), piv.begin()+tileroff(i));
           }
-          for (std::size_t j=i+1; j<rowblocks(); j++) {
+          for (std::size_t j=i+1; j<rb; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
             std::size_t ij = i+rb*j;
 #pragma omp task default(shared) firstprivate(i,j,ii,ij)        \
@@ -274,8 +273,8 @@ namespace strumpack {
                    scalar_t(1.), tile(i, i), tile(j, i));
             }
           }
-          for (std::size_t j=i+1; j<colblocks(); j++)
-            for (std::size_t k=i+1; k<rowblocks(); k++) {
+          for (std::size_t j=i+1; j<rb; j++)
+            for (std::size_t k=i+1; k<rb; k++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
               std::size_t ij = i+rb*j, ki = k+rb*i, kj = k+rb*j;
 #pragma omp task default(shared) firstprivate(i,j,k,ij,ki,kj)   \

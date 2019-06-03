@@ -263,9 +263,9 @@ namespace strumpack {
            opts.BLR_options());
 #else
         F11blr_ = BLRM_t
-          (sep_tiles_, [&](std::size_t i, std::size_t j) -> bool {
-            return adm_[i+j*sep_tiles_.size()]; },
-            F11, piv_, opts.BLR_options());
+          (F11, sep_tiles_, [&](std::size_t i, std::size_t j) -> bool {
+                              return adm_[i+j*sep_tiles_.size()]; },
+            piv_, opts.BLR_options());
         F11.clear();
         if (dupd) {
           F12.laswp(piv_, true);
