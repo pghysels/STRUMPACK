@@ -54,22 +54,22 @@ int main(int argc, char* argv[]) {
   integer N = n * n;
   integer nnz = 5 * N - 4 * n;
   CSRMatrix<scalar,integer> A(N, nnz);
-  integer* col_ptr = A.ptr();
-  integer* row_ind = A.ind();
+  integer* ptr = A.ptr();
+  integer* ind = A.ind();
   scalar* val = A.val();
 
   nnz = 0;
-  col_ptr[0] = 0;
+  ptr[0] = 0;
   for (integer row=0; row<n; row++) {
     for (integer col=0; col<n; col++) {
       integer ind = col+n*row;
       val[nnz] = 4.0;
-      row_ind[nnz++] = ind;
-      if (col > 0)  { val[nnz] = -1.0; row_ind[nnz++] = ind-1; } // left
-      if (col < n-1){ val[nnz] = -1.0; row_ind[nnz++] = ind+1; } // right
-      if (row > 0)  { val[nnz] = -1.0; row_ind[nnz++] = ind-n; } // up
-      if (row < n-1){ val[nnz] = -1.0; row_ind[nnz++] = ind+n; } // down
-      col_ptr[ind+1] = nnz;
+      ind[nnz++] = ind;
+      if (col > 0)  { val[nnz] = -1.0; ind[nnz++] = ind-1; } // left
+      if (col < n-1){ val[nnz] = -1.0; ind[nnz++] = ind+1; } // right
+      if (row > 0)  { val[nnz] = -1.0; ind[nnz++] = ind-n; } // up
+      if (row < n-1){ val[nnz] = -1.0; ind[nnz++] = ind+n; } // down
+      ptr[ind+1] = nnz;
     }
   }
   A.set_symm_sparse();
@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
   x_exact.random();
   A.spmv(x_exact, b);
 
-  spss.set_csr_matrix(N, col_ptr, row_ind, val, true);
+  spss.set_csr_matrix(N, ptr, ind, val, true);
   spss.reorder(n, n);
   // spss.factor();   // not really necessary, called if needed by solve
 
