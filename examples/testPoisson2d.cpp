@@ -62,14 +62,14 @@ int main(int argc, char* argv[]) {
   ptr[0] = 0;
   for (integer row=0; row<n; row++) {
     for (integer col=0; col<n; col++) {
-      integer ind = col+n*row;
+      integer i = col+n*row;
       val[nnz] = 4.0;
-      ind[nnz++] = ind;
-      if (col > 0)  { val[nnz] = -1.0; ind[nnz++] = ind-1; } // left
-      if (col < n-1){ val[nnz] = -1.0; ind[nnz++] = ind+1; } // right
-      if (row > 0)  { val[nnz] = -1.0; ind[nnz++] = ind-n; } // up
-      if (row < n-1){ val[nnz] = -1.0; ind[nnz++] = ind+n; } // down
-      ptr[ind+1] = nnz;
+      ind[nnz++] = i;
+      if (col > 0)  { val[nnz] = -1.0; ind[nnz++] = i-1; } // left
+      if (col < n-1){ val[nnz] = -1.0; ind[nnz++] = i+1; } // right
+      if (row > 0)  { val[nnz] = -1.0; ind[nnz++] = i-n; } // up
+      if (row < n-1){ val[nnz] = -1.0; ind[nnz++] = i+n; } // down
+      ptr[i+1] = nnz;
     }
   }
   A.set_symm_sparse();
