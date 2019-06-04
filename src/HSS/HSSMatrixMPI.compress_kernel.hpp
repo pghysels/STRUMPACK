@@ -39,17 +39,6 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compress
     (const kernel::Kernel<scalar_t>& K, const opts_t& opts) {
       TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_compress);
-      DenseMatrix<std::uint32_t> ann;
-      DenseMatrix<real_t> scores;
-      std::mt19937 gen(1); // reproducible
-      TaskTimer timer("approximate_neighbors");
-      timer.start();
-      find_approximate_neighbors
-        (K.data(), opts.ann_iterations(),
-         opts.approximate_neighbors(), ann, scores, gen);
-      if (opts.verbose() && Comm().is_root())
-        std::cout << "# approximate neighbor search time = "
-                  << timer.elapsed() << std::endl;
       auto Aelemw = [&]
         (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
          DistM_t& B, const DistM_t& A, std::size_t rlo, std::size_t clo,
@@ -66,8 +55,23 @@ namespace strumpack {
         auto lB = B.dense_wrapper();
         K(lI, lJ, lB);
       };
-      WorkCompressMPIANN<scalar_t> w;
-      compress_recursive_ann(ann, scores, Aelemw, w, opts, grid_local());
+      int ann_number = std::min(int(K.n()), opts.approximate_neighbors());
+      std::mt19937 gen(1); // reproducible
+      while (!this->is_compressed()) {
+        DenseMatrix<std::uint32_t> ann;
+        DenseMatrix<real_t> scores;
+        TaskTimer timer("approximate_neighbors");
+        timer.start();
+        find_approximate_neighbors
+          (K.data(), opts.ann_iterations(), ann_number, ann, scores, gen);
+        if (opts.verbose() && Comm().is_root())
+          std::cout << "# k-ANN=" << ann_number
+                    << " approximate neighbor search time = "
+                    << timer.elapsed() << std::endl;
+        WorkCompressMPIANN<scalar_t> w;
+        compress_recursive_ann(ann, scores, Aelemw, w, opts, grid_local());
+        ann_number = std::min(2*ann_number, int(K.n()));
+      }
     }
 
     template<typename scalar_t> void
@@ -97,20 +101,25 @@ namespace strumpack {
         communicate_child_data_ann(w);
         if (!this->_ch[0]->is_compressed() ||
             !this->_ch[1]->is_compressed()) return;
-        if (this->is_untouched()) {
-          _B01 = DistM_t(grid(), w.c[0].Ir.size(), w.c[1].Ic.size());
-          Aelem(w.c[0].Ir, w.c[1].Ic, _B01, _A01, 0, 0, comm());
-          _B10 = _B01.transpose();
-        }
+        // TODO do not re-extract if children are not re-compressed
+        // if (this->is_untouched()) {
+        _B01 = DistM_t(grid(), w.c[0].Ir.size(), w.c[1].Ic.size());
+        Aelem(w.c[0].Ir, w.c[1].Ic, _B01, _A01, 0, 0, comm());
+        _B10 = _B01.transpose();
+        //}
       }
       if (w.lvl == 0)
         this->_U_state = this->_V_state = State::COMPRESSED;
       else {
+        // TODO only do this if not already compressed
+        //if (!this->is_compressed()) {
         compute_local_samples_ann(ann, scores, w, Aelem, opts);
-        compute_U_V_bases_ann(w.S, opts, w);
-        this->_U_state = this->_V_state = State::COMPRESSED;
+        if (compute_U_V_bases_ann(w.S, opts, w))
+          this->_U_state = this->_V_state = State::COMPRESSED;
         w.c.clear();
       }
+      w.c.clear();
+      w.c.shrink_to_fit();
     }
 
     template<typename scalar_t> void
@@ -159,26 +168,30 @@ namespace strumpack {
       // of the above sort
       w.ids_scores.erase
         (std::unique(w.ids_scores.begin(), w.ids_scores.end(),
-                     [](const std::pair<std::size_t,double>& a,
-                        const std::pair<std::size_t,double>& b) {
+                     [](const std::pair<std::size_t,real_t>& a,
+                        const std::pair<std::size_t,real_t>& b) {
                        return a.first == b.first; }), w.ids_scores.end());
 
+#if 0 // drop some columns
       // maximum number of samples
       std::size_t d_max = this->leaf() ?
         I.size() + opts.dd() :   // leaf size + some oversampling
         w.c[0].Ir.size() + w.c[1].Ir.size() + opts.dd();
       auto d = std::min(w.ids_scores.size(), d_max);
 
-      std::vector<std::size_t> Scolids;
       if (d < w.ids_scores.size()) {
         // sort based on scores, keep only d closest
         std::nth_element
           (w.ids_scores.begin(), w.ids_scores.begin()+d, w.ids_scores.end(),
-           [](const std::pair<std::size_t,double>& a,
-              const std::pair<std::size_t,double>& b) {
+           [](const std::pair<std::size_t,real_t>& a,
+              const std::pair<std::size_t,real_t>& b) {
             return a.second < b.second; });
         w.ids_scores.resize(d);
       }
+#else
+      auto d = w.ids_scores.size();
+#endif
+      std::vector<std::size_t> Scolids;
       Scolids.reserve(d);
       for (std::size_t j=0; j<d; j++)
         Scolids.push_back(w.ids_scores[j].first);
@@ -197,18 +210,16 @@ namespace strumpack {
       _V.E() = _U.E();
       _V.P() = _U.P();
       w.Jc = w.Jr;
-      STRUMPACK_ID_FLOPS(ID_row_flops(S, w.Jr.size()));
-      STRUMPACK_ID_FLOPS(ID_row_flops(S, w.Jc.size()));
       notify_inactives_J(w);
-      bool accurate = true;
+      STRUMPACK_ID_FLOPS(ID_row_flops(S, w.Jr.size()));
       int d = S.cols();
-      if (!(d - opts.p() >= opts.max_rank() ||
-            (int(w.Jr.size()) <= d - opts.p() &&
-             int(w.Jc.size()) <= d - opts.p()))) {
-        accurate = false;
-        std::cout << "WARNING: ID did not reach required accuracy:"
-                  << "\t increase k (number of ANN's), or Delta_d."
-                  << std::endl;
+      if (!(d >= this->cols() || d >= opts.max_rank() ||
+            (int(w.Jr.size()) + opts.p() < d  &&
+             int(w.Jc.size()) + opts.p() < d))) {
+        // std::cout << "WARNING: ID did not reach required accuracy:"
+        //           << "\t increase k (number of ANN's), or Delta_d."
+        //           << std::endl;
+        return false;
       }
       this->_U_rank = w.Jr.size();  this->_U_rows = S.rows();
       this->_V_rank = w.Jc.size();  this->_V_rows = S.rows();
@@ -226,7 +237,7 @@ namespace strumpack {
           w.Ic.push_back((j < r0) ? w.c[0].Ic[j] : w.c[1].Ic[j-r0]);
       }
       // TODO clear w.c[0].Ir, w.c[1].Ir, w.c[0].Ic, w.c[1].Ic
-      return accurate;
+      return true;
     }
 
     template<typename scalar_t> void
@@ -238,8 +249,6 @@ namespace strumpack {
       std::vector<MPIRequest> sreq;
       std::vector<std::size_t> sbuf0, sbuf1;
       std::vector<real_t> sbuf0_scalar, sbuf1_scalar;
-      assert(sizeof(typename decltype(w.ids_scores)::value_type::second_type)
-             == sizeof(std::size_t));
       if (rank < P0active) {
         if (rank < (P-P0active)) {
           // I'm one of the first P-P0active processes that are active
