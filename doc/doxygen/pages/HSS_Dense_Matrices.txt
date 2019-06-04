@@ -141,7 +141,7 @@ std::function<void(
     strumpack::DenseMatrix<scalar_t>& Rr,  // input, set by compression code
     strumpack::DenseMatrix<scalar_t>& Rc,  // input, set by compression code
     strumpack::DenseMatrix<scalar_t>& Sr,  // output, compute as A * Rr
-    strumpack::DenseMatrix<scalar_t>& Sc   // output, compute as A^c * Rr or A^T * Rc
+    strumpack::DenseMatrix<scalar_t>& Sc   // output, compute as A^c * Rc or A^T * Rc
 )>;
 \endcode
 
@@ -152,8 +152,8 @@ computed by the matrix-(multiple)vector multiplication routine as
 A*Rr. The Sr matrix will aready be allocated by the compression
 routine and should satisfy Sr.rows() == A.rows() and Sr.cols() ==
 Rr.cols(). The random sample matrix Sc should be computed by the
-matrix-(multiple)vector multiplication routine as A^T*Rr, or
-A^C*Rr. This will aready be allocated by the compression routine and
+matrix-(multiple)vector multiplication routine as A^T*Rc, or
+A^C*Rc. This will aready be allocated by the compression routine and
 should be Sc.rows() == A.cols() and Sc.cols() == Rc.cols().
 
 And the element extraction routine should have the signature:
@@ -175,8 +175,8 @@ The HSS construction would look as follows:
 \code {.cpp}
 using DenseM_t = strumpack::DenseMatrix<double>;
 auto Amult = [&](DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
-  // TODO compute Rr = A * Sr
-  // TODO compute Rc = A^c * Sr
+  // TODO compute Sr = A * Rr
+  // TODO compute Sc = A^c * Rc
 };
 auto Aelem = [&](const std::vector<std::size_t>& I,
                  const std::vector<std::size_t>& J,
