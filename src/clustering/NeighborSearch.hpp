@@ -125,10 +125,21 @@ namespace strumpack {
     std::vector<int_t> idx(cur_node_size);
     std::iota(idx.begin(), idx.end(), 0);
     int_t half_size = (int_t)cur_node_size / 2;
-    std::nth_element
-      (idx.begin(), idx.begin()+half_size, idx.end(),
+    // std::nth_element
+    //   (idx.begin(), idx.begin()+half_size, idx.end(),
+    //    [&](const int_t& a, const int_t& b) {
+    //      return (relative_coordinates[a] < relative_coordinates[b]) ||
+    //        ((relative_coordinates[a] == relative_coordinates[b])
+    //         && (a < b)); });
+    std::sort
+      (idx.begin(), idx.end(),
        [&](const int_t& a, const int_t& b) {
-        return relative_coordinates[a] < relative_coordinates[b]; });
+         return (relative_coordinates[a] < relative_coordinates[b]) ||
+           ((relative_coordinates[a] == relative_coordinates[b]) && (a < b)); });
+    // std::stable_sort
+    //   (idx.begin(), idx.end(),
+    //    [&](const int_t& a, const int_t& b) {
+    //      return relative_coordinates[a] < relative_coordinates[b]; });
     std::vector<int_t> cur_indices_sorted(cur_node_size, 0);
     for (std::size_t i=0; i<cur_node_size; i++)
       cur_indices_sorted[i] = cur_indices[start+idx[i]];
@@ -167,9 +178,15 @@ namespace strumpack {
       std::vector<int_t> idx(cur_leaf_size);
       for (std::size_t i=0; i<cur_leaf_size; i++) {
         std::iota(idx.begin(), idx.end(), 0);
-        std::partial_sort(idx.begin(), idx.begin()+ann_number, idx.end(),
-                          [&](const int_t& i1, const int_t& i2) {
-                            return leaf_dists(i,i1) < leaf_dists(i,i2); });
+        std::partial_sort
+          (idx.begin(), idx.begin()+ann_number, idx.end(),
+           [&](const int_t& i1, const int_t& i2) {
+             return (leaf_dists(i,i1) < leaf_dists(i,i2)) ||
+               ((leaf_dists(i,i1) == leaf_dists(i,i2)) && (i1 < i2)); });
+        // std::stable_sort
+        //   (idx.begin(), idx.end(),
+        //    [&](const int_t& i1, const int_t& i2) {
+        //      return leaf_dists(i,i1) < leaf_dists(i,i2); });
         for (std::size_t j=0; j<ann_number; j++) {
           neighbors(j, index_subset[i]) = leaves[leaf_sizes[leaf] + idx[j]];
           scores(j, index_subset[i]) = leaf_dists(i, idx[j]);
@@ -264,7 +281,12 @@ namespace strumpack {
       std::partial_sort
         (idx.begin(), idx.begin()+ann_number, idx.end(),
          [&](const int_t& i1, const int& i2) {
-          return sample_dists(i, i1) < sample_dists(i, i2); });
+           return (sample_dists(i, i1) < sample_dists(i, i2)) ||
+             ((sample_dists(i, i1) == sample_dists(i, i2)) && (i1 < i2)); });
+      // std::stable_sort
+      //   (idx.begin(), idx.end(),
+      //    [&](const int_t& i1, const int& i2) {
+      //      return sample_dists(i, i1) < sample_dists(i, i2); });
       for (int j=0; j<ann_number; j++) {
         neighbors(j, i) = idx[j];
         scores(j, i) = sample_dists(i, idx[j]);
@@ -325,15 +347,13 @@ namespace strumpack {
     neighbors.zero();
     scores.zero();
     find_ann_candidates(data, neighbors, scores, generator);
+    double quality = check_quality(data, neighbors, generator);
     // construct several random projection trees to find approximate
     // nearest neighbors
-    DenseMatrix<int_t> new_neighbors(ann_number, n);
-    DenseMatrix<real_t> new_scores(ann_number, n);
-    double quality = check_quality(data, neighbors, generator);
-    int iter = 1;
-    while (quality < 0.99 && iter++ < num_iters) {
-      new_neighbors.zero();
-      new_scores.zero();
+    int iter = 0;
+    for (; iter<num_iters && quality<0.99; iter++) {
+      DenseMatrix<int_t> new_neighbors(ann_number, n);
+      DenseMatrix<real_t> new_scores(ann_number, n);
       find_ann_candidates(data, new_neighbors, new_scores, generator);
       choose_best_neighbors(neighbors, scores, new_neighbors, new_scores);
       quality = check_quality(data, neighbors, generator);
