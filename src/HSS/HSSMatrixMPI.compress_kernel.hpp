@@ -66,7 +66,7 @@ namespace strumpack {
           (K.data(), opts.ann_iterations(), ann_number, ann, scores, gen);
         if (opts.verbose() && Comm().is_root())
           std::cout << "# k-ANN=" << ann_number
-                    << " approximate neighbor search time = "
+                    << ", approximate neighbor search time = "
                     << timer.elapsed() << std::endl;
         WorkCompressMPIANN<scalar_t> w;
         compress_recursive_ann(ann, scores, Aelemw, w, opts, grid_local());

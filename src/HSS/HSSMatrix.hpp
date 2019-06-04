@@ -142,14 +142,12 @@ namespace strumpack {
        *
        * \param K Kernel matrix object. The data associated with this
        * kernel will be permuted according to the clustering algorithm
-       * selected by the HSSOptions objects.
-       * \param perm Will be set to the permutation. This will be
-       * resized.
+       * selected by the HSSOptions objects. The permutation will be
+       * stored in the kernel object.
        * \param opts object containing a number of HSS options
        */
       HSSMatrix
-      (kernel::Kernel<scalar_t>& K, std::vector<int>& perm,
-       const opts_t& opts);
+      (kernel::Kernel<scalar_t>& K, const opts_t& opts);
 
 
       /**
@@ -246,8 +244,8 @@ namespace strumpack {
        * by the compression routine and should be Sr.rows() ==
        * this->rows() and Sr.cols() == Rr.cols().
        * \param Sc random sample matrix, to be computed by the
-       * matrix-(multiple)vector multiplication routine as A^T*Rr, or
-       * A^C*Rr. This will aready be allocated by the compression
+       * matrix-(multiple)vector multiplication routine as A^T*Rc, or
+       * A^C*Rc. This will aready be allocated by the compression
        * routine and should be Sc.rows() == this->cols() and Sc.cols()
        * == Rc.cols().
        *
@@ -651,12 +649,13 @@ namespace strumpack {
 
     template<typename scalar_t>
     HSSMatrix<scalar_t>::HSSMatrix
-    (kernel::Kernel<scalar_t>& K, std::vector<int>& perm, const opts_t& opts)
+    (kernel::Kernel<scalar_t>& K, const opts_t& opts)
       : HSSMatrixBase<scalar_t>(K.n(), K.n(), true) {
       TaskTimer timer("clustering");
       timer.start();
       auto t = binary_tree_clustering
-        (opts.clustering_algorithm(), K.data(), perm, opts.leaf_size());
+        (opts.clustering_algorithm(), K.data(), K.permutation(), opts.leaf_size());
+      K.permute();
       if (opts.verbose())
         std::cout << "# clustering (" << get_name(opts.clustering_algorithm())
                   << ") time = " << timer.elapsed() << std::endl;

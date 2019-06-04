@@ -110,14 +110,12 @@ namespace strumpack {
        * internally.
        * \param K Kernel matrix object. The data associated with this
        * kernel will be permuted according to the clustering algorithm
-       * selected by the HODLROptions objects.
-       * \param perm Will be set to the permutation. This will be
-       * resized.
+       * selected by the HODLROptions objects. The permutation will be
+       * stored in the kernel object.
        * \param opts object containing a number of HODLR options
        */
       HODLRMatrix
-      (const MPIComm& c, kernel::Kernel<scalar_t>& K,
-       std::vector<int>& perm, const opts_t& opts);
+      (const MPIComm& c, kernel::Kernel<scalar_t>& K, const opts_t& opts);
 
       /**
        * Construct an HODLR approximation using a routine to evaluate
@@ -518,12 +516,11 @@ namespace strumpack {
     }
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
-    (const MPIComm& c, kernel::Kernel<scalar_t>& K,
-     std::vector<int>& perm, const opts_t& opts) {
+    (const MPIComm& c, kernel::Kernel<scalar_t>& K, const opts_t& opts) {
       int d = K.d();
       rows_ = cols_ = K.n();
       auto tree = binary_tree_clustering
-        (opts.clustering_algorithm(), K.data(), perm, opts.leaf_size());
+        (opts.clustering_algorithm(), K.data(), K.permutation(), opts.leaf_size());
       int min_lvl = 2 + std::ceil(std::log2(c.size()));
       lvls_ = std::max(min_lvl, tree.levels());
       tree.expand_complete_levels(lvls_);

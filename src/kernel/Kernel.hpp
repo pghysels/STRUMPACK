@@ -118,7 +118,7 @@ namespace strumpack {
        * \param j column coordinate of entry to evaluate
        * \return the value K(i, j) of the kernel
        */
-      scalar_t eval(std::size_t i, std::size_t j) const {
+      virtual scalar_t eval(std::size_t i, std::size_t j) const {
         return eval_kernel_function(data_.ptr(0, i), data_.ptr(0, j))
           + ((i == j) ? lambda_ : scalar_t(0.));
       }
@@ -258,9 +258,15 @@ namespace strumpack {
        */
       DenseM_t& data() { return data_; }
 
+      std::vector<int>& permutation() { return perm_; }
+      const std::vector<int>& permutation() const { return perm_; }
+
+      virtual void permute() {}
+
     protected:
       DenseM_t& data_;
       scalar_t lambda_;
+      std::vector<int> perm_;
 
       /**
        * Purely virtual function that needs to be defined in the
@@ -369,12 +375,59 @@ namespace strumpack {
     };
 
 
+    /**
+     * \class DenseKernel
+     *
+     * \brief Arbitrary dense matrix, with underlying geometry.
+     *
+     * This is a subclass of Kernel. It overrides the eval routine,
+     * unlike other kernel classes (Gauss and Laplace), which only
+     * implement the kernel function.
+     *
+     * \see Kernel, GaussKernel, LaplaceKernel
+     */
+    template<typename scalar_t>
+    class DenseKernel : public Kernel<scalar_t> {
+    public:
+      /**
+       * Constructor of the dense matrix kernel object.
+       *
+       * \param data Coordinates of the points used to generate the
+       * matrix.
+       *
+       * \param A The actual dense matrix
+       *
+       * \param lambda Regularization parameter, added to the diagonal
+       */
+      DenseKernel(DenseMatrix<scalar_t>& data,
+                  DenseMatrix<scalar_t>& A, scalar_t lambda)
+        : Kernel<scalar_t>(data, lambda), A_(A) {}
+
+      scalar_t eval(std::size_t i, std::size_t j) const override {
+        return A_(i, j) + ((i == j) ? this->lambda_ : scalar_t(0.));
+      }
+
+      void permute() override {
+        A_.lapmt(this->perm_, true);
+        A_.lapmr(this->perm_, true);
+      }
+
+    protected:
+      DenseMatrix<scalar_t>& A_; // kernel matrix
+
+      scalar_t eval_kernel_function
+      (const scalar_t* x, const scalar_t* y) const override {
+        assert(false);
+      }
+    };
+
 
     /**
      * Enumeration of Kernel types.
      * \ingroup Enumerations
      */
     enum class KernelType {
+      DENSE,   /*!< Arbitrary dense matrix                */
       GAUSS,   /*!< Gauss or radial basis function kernel */
       LAPLACE  /*!< Laplace kernel                        */
     };
@@ -384,6 +437,7 @@ namespace strumpack {
      */
     inline std::string get_name(KernelType k) {
       switch (k) {
+      case KernelType::DENSE: return "dense"; break;
       case KernelType::GAUSS: return "Gauss"; break;
       case KernelType::LAPLACE: return "Laplace"; break;
       default: return "UNKNOWN";
@@ -396,10 +450,11 @@ namespace strumpack {
      * returned.
      */
     inline KernelType kernel_type(const std::string& k) {
-      if (k == "Gauss") return KernelType::GAUSS;
+      if (k == "dense") return KernelType::DENSE;
+      else if (k == "Gauss") return KernelType::GAUSS;
       else if (k == "Laplace") return KernelType::LAPLACE;
       std::cerr << "ERROR: Kernel type not recogonized, "
-                << " setting kernel type to GAUSS."
+                << " setting kernel type to Gauss."
                 << std::endl;
       return KernelType::GAUSS;
     }
@@ -420,6 +475,9 @@ namespace strumpack {
     std::unique_ptr<Kernel<scalar_t>> create_kernel
     (KernelType k, Args& ... args) {
       switch (k) {
+      // case KernelType::DENSE:
+      //   return std::unique_ptr<Kernel<scalar_t>>
+      //     (new DenseKernel<scalar_t>(args ...));
       case KernelType::GAUSS:
         return std::unique_ptr<Kernel<scalar_t>>
           (new GaussKernel<scalar_t>(args ...));

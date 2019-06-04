@@ -84,8 +84,7 @@ namespace strumpack {
       (const HSSPartitionTree& t, const BLACSGrid* Agrid,
        const dmult_t& Amult, const delem_t& Aelem, const opts_t& opts);
       HSSMatrixMPI
-      (kernel::Kernel<scalar_t>& K, const BLACSGrid* Agrid,
-       std::vector<int>& perm, const opts_t& opts);
+      (kernel::Kernel<scalar_t>& K, const BLACSGrid* Agrid, const opts_t& opts);
       HSSMatrixMPI(const HSSMatrixMPI<scalar_t>& other);
       HSSMatrixMPI(HSSMatrixMPI<scalar_t>&& other) = default;
       virtual ~HSSMatrixMPI() {}
@@ -439,13 +438,12 @@ namespace strumpack {
     }
 
     template<typename scalar_t> HSSMatrixMPI<scalar_t>::HSSMatrixMPI
-    (kernel::Kernel<scalar_t>& K, const BLACSGrid* Kgrid,
-     std::vector<int>& perm, const opts_t& opts)
+    (kernel::Kernel<scalar_t>& K, const BLACSGrid* Kgrid, const opts_t& opts)
       : HSSMatrixBase<scalar_t>(K.n(), K.n(), true), blacs_grid_(Kgrid) {
       TaskTimer timer("clustering");
       timer.start();
       auto t = binary_tree_clustering
-        (opts.clustering_algorithm(), K.data(), perm, opts.leaf_size());
+        (opts.clustering_algorithm(), K.data(), K.permutation(), opts.leaf_size());
       if (opts.verbose() && Comm().is_root())
         std::cout << "# clustering (" << get_name(opts.clustering_algorithm())
                   << ") time = " << timer.elapsed() << std::endl;
