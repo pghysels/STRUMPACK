@@ -100,6 +100,15 @@ namespace strumpack {
     N='N'   /*!< Non-unit diagonal */
   };
 
+  /**
+   * Job for eigenvalue/vector computations
+   * \ingroup Enumerations
+   */
+  enum class Jobz : char {
+    N='N', /*!< Compute eigenvalues only             */
+    V='V'  /*!< Compute eigenvalues and eigenvectors */
+  };
+
 
   /**
    * \class DenseMatrix
@@ -790,6 +799,23 @@ namespace strumpack {
      * \param sigma scalar value to add to diagonal
      */
     void shift(scalar_t sigma);
+
+
+    /**
+     * SYEV computes all eigenvalues and, optionally, eigenvectors of
+     * this matrix. If job is N, the matrix is destroyed. If job is V,
+     * on exit the matrix will contain all eigenvectors.
+     *
+     * \param job
+     *   N:  Compute eigenvalues only,
+     *   V:  Compute eigenvalues and eigenvectors.
+     * \param ul
+     *   U:  Upper triangle is stored,
+     *   L:  Lower triangle is stored.
+     * \param lambda
+     *   on exit this will contain all eigenvalues of this matrix.
+     */
+    int syev(Jobz job, UpLo ul, std::vector<scalar_t>& lambda);
 
   private:
     void ID_column_MGS
@@ -1839,6 +1865,14 @@ namespace strumpack {
       std::cout << "ERROR in gesvd: info = " << info << std::endl;
     return S;
   }
+
+  template<typename scalar_t> int DenseMatrix<scalar_t>::syev
+  (Jobz job, UpLo ul, std::vector<scalar_t>& lambda) {
+    assert(rows() == cols());
+    lambda.resize(rows());
+    return syev(char(job), char(ul), rows(), data(), ld(), lambda.data());
+  }
+
 
   /**
    * GEMM, defined for DenseMatrix objects (or DenseMatrixWrapper).
