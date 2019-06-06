@@ -640,7 +640,7 @@ namespace strumpack {
      * pivoting with row interchanges. The factorization has the form
      * A = P * L * U, where P is a permutation matrix, L is lower
      * triangular with unit diagonal elements, and U is upper
-     * triangular. This call the LAPACK routine DGETRF. The L and U
+     * triangular. This calls the LAPACK routine DGETRF. The L and U
      * factors are stored in place, the permutation is returned, and
      * can be applied with the laswp() routine.
      *
@@ -648,6 +648,17 @@ namespace strumpack {
      * \see laswp, solve
      */
     std::vector<int> LU(int depth);
+
+    /**
+     * Compute a Cholesky factorization of this matrix in-place. This
+     * calls the LAPACK routine DPOTRF. Only the lower triangle is
+     * written.
+     *
+     * \param depth current OpenMP task recursion depth
+     * \return info from xpotrf
+     * \see LU
+     */
+    int Cholesky(int depth);
 
     /**
      * Solve a linear system with this matrix, factored in its LU
@@ -1582,6 +1593,17 @@ namespace strumpack {
       exit(1);
     }
     return piv;
+  }
+
+  template<typename scalar_t> int
+  DenseMatrix<scalar_t>::Cholesky(int depth) {
+    assert(rows() == cols());
+    // TODO openmp tasking ?
+    int info = potrf('L', rows(), data(), ld());
+    if (info)
+      std::cerr << "ERROR: Cholesky factorization failed with info="
+                << info << std::endl;
+    return info;
   }
 
   // TODO do in-place??!! to avoid copy
