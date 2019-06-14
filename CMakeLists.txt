@@ -416,8 +416,8 @@ set(LIBSRCSPARSE
 
 if(STRUMPACK_USE_MPI)
   list(APPEND LIBSRCDENSE
-    src/dense/lapack/pcgeqpfmod.f src/dense/lapack/pdgeqpfmod.f
-    src/dense/lapack/psgeqpfmod.f src/dense/lapack/pzgeqpfmod.f)
+    src/dense/lapack/pcgeqpftol.f src/dense/lapack/pdgeqpftol.f
+    src/dense/lapack/psgeqpftol.f src/dense/lapack/pzgeqpftol.f)
 
   list(APPEND LIBSRCSPARSE
     src/sparse/MUMPS/ana_orderings.F)

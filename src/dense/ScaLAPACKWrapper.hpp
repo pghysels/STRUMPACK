@@ -398,19 +398,19 @@ namespace strumpack {
          std::complex<double> *, std::complex<double> *,
          int *, int *, const int *);
 
-      void FC_GLOBAL(psgeqpfmod,PSGEQPFMOD)
+      void FC_GLOBAL(psgeqpftol,PSGEQPFTOL)
         (int *, int *, float *, int *, int *, const int *, int *,
          float *, float *, int *, int *, int *, int *, int *,
          float *, float*);
-      void FC_GLOBAL(pdgeqpfmod,PDGEQPFMOD)
+      void FC_GLOBAL(pdgeqpftol,PDGEQPFTOL)
         (int *, int *, double *, int *, int *, const int *, int *,
          double *, double *, int *, int *, int *, int *, int *,
          double *, double *);
-      void FC_GLOBAL(pcgeqpfmod,PCGEQPFMOD)
+      void FC_GLOBAL(pcgeqpftol,PCGEQPFTOL)
         (int *, int *, std::complex<float> *, int *, int *, const int *,
          int *, std::complex<float> *, std::complex<float> *, int *, float *,
          int *, int *, int *, int *, int *, float *, float *);
-      void FC_GLOBAL(pzgeqpfmod,PZGEQPFMOD)
+      void FC_GLOBAL(pzgeqpftol,PZGEQPFTOL)
         (int *, int *, std::complex<double> *, int *, int *, const int *,
          int *, std::complex<double> *, std::complex<double> *, int *,
          double *, int *, int *, int *, int *, int *, double *, double *);
@@ -1168,7 +1168,7 @@ namespace strumpack {
         (&m, &n, &alpha, a, &ia, &ja, desca, &beta, c, &ic, &jc, descc);
     }
 
-    inline void pgeqpfmod
+    inline void pgeqpftol
     (int m, int n, float* a, int ia, int ja, const int *desca,
      int *J, int *piv, int *r, float rtol, float atol) {
       int mb = desca[BLACSmb], nb = desca[BLACSnb];
@@ -1181,13 +1181,13 @@ namespace strumpack {
       auto tau = twork + lwork;
       auto ipiv = new int[n];
       int IONE = 1;
-      FC_GLOBAL(psgeqpfmod,PSGEQPFMOD)
+      FC_GLOBAL(psgeqpftol,PSGEQPFTOL)
         (&m, &n, a, &IONE, &IONE, desca, ipiv, tau,
          twork, &lwork, &info, J, piv, r, &rtol, &atol);
       delete[] twork;
       delete[] ipiv;
     }
-    inline void pgeqpfmod
+    inline void pgeqpftol
     (int m, int n, double* a, int ia, int ja, const int *desca,
      int *J, int *piv, int *r, double rtol, double atol) {
       int mb = desca[BLACSmb], nb = desca[BLACSnb];
@@ -1200,13 +1200,13 @@ namespace strumpack {
       auto tau = twork + lwork;
       auto ipiv = new int[n];
       int IONE = 1;
-      FC_GLOBAL(pdgeqpfmod,PDGEQPFMOD)
+      FC_GLOBAL(pdgeqpftol,PDGEQPFTOL)
         (&m, &n, a, &IONE, &IONE, desca, ipiv, tau,
          twork, &lwork, &info, J, piv, r, &rtol, &atol);
       delete[] twork;
       delete[] ipiv;
     }
-    inline void pgeqpfmod
+    inline void pgeqpftol
     (int m, int n, std::complex<float>* a, int ia, int ja, const int *desca,
      int *J, int *piv, int *r, float rtol, float atol) {
       int mb = desca[BLACSmb], nb = desca[BLACSnb];
@@ -1221,7 +1221,7 @@ namespace strumpack {
       auto rwork = new float[lrwork];
       auto ipiv = new int[n];
       int IONE = 1;
-      FC_GLOBAL(pcgeqpfmod,PCGEQPFMOD)
+      FC_GLOBAL(pcgeqpftol,PCGEQPFTOL)
         (&m, &n, a, &IONE, &IONE, desca, ipiv, tau,
          twork, &lwork, rwork, &lrwork, &info, J, piv, r,
          &rtol, &atol);
@@ -1229,7 +1229,7 @@ namespace strumpack {
       delete[] rwork;
       delete[] ipiv;
     }
-    inline void pgeqpfmod
+    inline void pgeqpftol
     (int m, int n, std::complex<double>* a, int ia, int ja, const int *desca,
      int *J, int *piv, int *r, double rtol, double atol) {
       int mb = desca[BLACSmb], nb = desca[BLACSnb];
@@ -1244,7 +1244,7 @@ namespace strumpack {
       auto rwork = new double[lrwork];
       auto ipiv = new int[n];
       int IONE = 1;
-      FC_GLOBAL(pzgeqpfmod,PZGEQPFMOD)
+      FC_GLOBAL(pzgeqpftol,PZGEQPFTOL)
         (&m, &n, a, &IONE, &IONE, desca, ipiv, tau,
          twork, &lwork, rwork, &lrwork, &info, J, piv, r,
          &rtol, &atol);

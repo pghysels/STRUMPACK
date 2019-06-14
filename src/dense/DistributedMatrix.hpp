@@ -1355,7 +1355,7 @@ namespace strumpack {
     int rank = 0;
     // Step 1: RRQR
     if (rows() && cols())
-      scalapack::pgeqpfmod
+      scalapack::pgeqpftol
         (rows(), cols(), data(), I(), J(), desc(),
          _J.data(), gpiv.data(), &rank, rel_tol, abs_tol);
     else std::iota(gpiv.begin(), gpiv.end(), 1);

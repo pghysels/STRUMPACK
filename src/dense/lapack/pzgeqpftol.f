@@ -1,5 +1,6 @@
-      SUBROUTINE PSGEQPFmod( M, N, A, IA, JA, DESCA, IPIV, TAU, WORK,
-     $                    LWORK, INFO, JPERM, JPIV, RANK, RTOL, ATOL )
+      SUBROUTINE PZGEQPFTOL( M, N, A, IA, JA, DESCA, IPIV, TAU, WORK,
+     $                    LWORK, RWORK, LRWORK, INFO, JPERM, JPIV, RANK,
+     $                    RTOL, ATOL )
 *
 *  -- ScaLAPACK routine (version 1.7) --
 *     University of Tennessee, Knoxville, Oak Ridge National Laboratory,
@@ -10,17 +11,18 @@
 *
       IMPLICIT NONE
 *     .. Scalar Arguments ..
-      INTEGER            IA, JA, INFO, LWORK, M, N, RANK
+      INTEGER            IA, JA, INFO, LRWORK, LWORK, M, N, RANK
 *     ..
 *     .. Array Arguments ..
-      INTEGER            DESCA( * ), IPIV( * ), JPERM( *), JPIV( * )
-      REAL               A( * ), TAU( * ), WORK( * ), RTOL, ATOL
+      INTEGER            DESCA( * ), IPIV( * ), JPERM( * ), JPIV ( * )
+      DOUBLE PRECISION   RWORK( * ), RTOL, ATOL
+      COMPLEX*16         A( * ), TAU( * ), WORK( * )
 *     ..
 *
 *  Purpose
 *  =======
 *
-*  PSGEQPF computes a QR factorization with column pivoting of a
+*  PZGEQPF computes a QR factorization with column pivoting of a
 *  M-by-N distributed matrix sub( A ) = A(IA:IA+M-1,JA:JA+N-1):
 *
 *                         sub( A ) * P = Q * R.
@@ -90,14 +92,14 @@
 *          The number of columns to be operated on, i.e. the number of
 *          columns of the distributed submatrix sub( A ). N >= 0.
 *
-*  A       (local input/local output) REAL pointer into the
+*  A       (local input/local output) COMPLEX*16 pointer into the
 *          local memory to an array of dimension (LLD_A, LOCc(JA+N-1)).
 *          On entry, the local pieces of the M-by-N distributed matrix
 *          sub( A ) which is to be factored. On exit, the elements on
 *          and above the diagonal of sub( A ) contain the min(M,N) by N
 *          upper trapezoidal matrix R (R is upper triangular if M >= N);
 *          the elements below the diagonal, with the array TAU, repre-
-*          sent the orthogonal matrix Q as a product of elementary
+*          sent the unitary matrix Q as a product of elementary
 *          reflectors (see Further Details).
 *
 *  IA      (global input) INTEGER
@@ -116,19 +118,34 @@
 *          was the global K-th column of sub( A ). IPIV is tied to the
 *          distributed matrix A.
 *
-*  TAU     (local output) REAL, array, dimension
+*  TAU     (local output) COMPLEX*16, array, dimension
 *          LOCc(JA+MIN(M,N)-1). This array contains the scalar factors
 *          TAU of the elementary reflectors. TAU is tied to the
 *          distributed matrix A.
 *
-*  WORK    (local workspace/local output) REAL array,
-*                                                   dimension (LWORK)
+*  WORK    (local workspace/local output) COMPLEX*16 array,
+*                                                    dimension (LWORK)
 *          On exit, WORK(1) returns the minimal and optimal LWORK.
 *
 *  LWORK   (local or global input) INTEGER
 *          The dimension of the array WORK.
 *          LWORK is local input and must be at least
-*          LWORK >= MAX(3,Mp0 + Nq0) + LOCc(JA+N-1)+Nq0.
+*          LWORK >= MAX(3,Mp0 + Nq0).
+*
+*          If LWORK = -1, then LWORK is global input and a workspace
+*          query is assumed; the routine only calculates the minimum
+*          and optimal size for all work arrays. Each of these
+*          values is returned in the first entry of the corresponding
+*          work array, and no error message is issued by PXERBLA.
+*
+*  RWORK   (local workspace/local output) DOUBLE PRECISION array,
+*                                                 dimension (LRWORK)
+*          On exit, RWORK(1) returns the minimal and optimal LRWORK.
+*
+*  LRWORK  (local or global input) INTEGER
+*          The dimension of the array RWORK.
+*          LRWORK is local input and must be at least
+*          LRWORK >= LOCc(JA+N-1)+Nq0.
 *
 *          IROFF = MOD( IA-1, MB_A ), ICOFF = MOD( JA-1, NB_A ),
 *          IAROW = INDXG2P( IA, MB_A, MYROW, RSRC_A, NPROW ),
@@ -141,7 +158,7 @@
 *          MYROW, MYCOL, NPROW and NPCOL can be determined by calling
 *          the subroutine BLACS_GRIDINFO.
 *
-*          If LWORK = -1, then LWORK is global input and a workspace
+*          If LRWORK = -1, then LRWORK is global input and a workspace
 *          query is assumed; the routine only calculates the minimum
 *          and optimal size for all work arrays. Each of these
 *          values is returned in the first entry of the corresponding
@@ -166,8 +183,9 @@
 *
 *     H = I - tau * v * v'
 *
-*  where tau is a real scalar, and v is a real vector with v(1:i-1) = 0
-*  and v(i) = 1; v(i+1:m) is stored on exit in A(ia+i-1:ia+m-1,ja+i-1).
+*  where tau is a complex scalar, and v is a complex vector with
+*  v(1:i-1) = 0 and v(i) = 1; v(i+1:m) is stored on exit in
+*  A(ia+i-1:ia+m-1,ja+i-1).
 *
 *  The matrix P is represented in jpvt as follows: If
 *     jpvt(j) = i
@@ -181,34 +199,36 @@
       PARAMETER          ( BLOCK_CYCLIC_2D = 1, DLEN_ = 9, DTYPE_ = 1,
      $                     CTXT_ = 2, M_ = 3, N_ = 4, MB_ = 5, NB_ = 6,
      $                     RSRC_ = 7, CSRC_ = 8, LLD_ = 9 )
-      REAL               ONE, ZERO
-      PARAMETER          ( ONE = 1.0E+0, ZERO = 0.0E+0 )
+      DOUBLE PRECISION   ONE, ZERO
+      PARAMETER          ( ONE = 1.0D+0, ZERO = 0.0D+0 )
 *     ..
 *     .. Local Scalars ..
       LOGICAL            LQUERY
       INTEGER            I, IACOL, IAROW, ICOFF, ICTXT, ICURROW,
-     $                   ICURCOL, II, IIA, IOFFA, IPN, IPCOL, IPW,
-     $                   IROFF, ITEMP, J, JB, JJ, JJA, JJPVT, JN, KB,
-     $                   K, KK, KSTART, KSTEP, LDA, LL, LWMIN, MN, MP,
-     $                   MYCOL, MYROW, NPCOL, NPROW, NQ, NQ0, PVT
-      REAL               AJJ, ALPHA, TEMP, TEMP2, A11
+     $                   ICURCOL, II, IIA, IOFFA, IPCOL, IROFF, ITEMP,
+     $                   J, JB, JJ, JJA, JJPVT, JN, KB, K, KK, KSTART,
+     $                   KSTEP, LDA, LL, LRWMIN, LWMIN, MN, MP, MYCOL,
+     $                   MYROW, NPCOL, NPROW, NQ, NQ0, PVT
+      DOUBLE PRECISION   TEMP, TEMP2, A11
+      COMPLEX*16         AJJ, ALPHA
 *     ..
 *     .. Local Arrays ..
-      INTEGER            DESCN( DLEN_ ), IDUM1( 1 ), IDUM2( 1 )
+      INTEGER            DESCN( DLEN_ ), IDUM1( 2 ), IDUM2( 2 )
 *     ..
 *     .. External Subroutines ..
       EXTERNAL           BLACS_GRIDINFO, CHK1MAT, DESCSET, IGERV2D,
-     $                   IGESD2D, INFOG1L, INFOG2L, PCHK1MAT, PSAMAX,
-     $                   PSELSET, PSLARF, PSLARFG, PSNRM2,
-     $                   PXERBLA, SCOPY, SGEBR2D, SGEBS2D,
-     $                   SGERV2D, SGESD2D, SLARFG, SSWAP
+     $                   IGESD2D, INFOG1L, INFOG2L, PCHK1MAT, PDAMAX,
+     $                   PDZNRM2, PXERBLA, PZELSET,
+     $                   PZLARFC, PZLARFG, ZCOPY, ZGEBR2D,
+     $                   ZGEBS2D, ZGERV2D, ZGESD2D, ZLARFG,
+     $                   ZSWAP
 *     ..
 *     .. External Functions ..
       INTEGER            ICEIL, INDXG2P, NUMROC
       EXTERNAL           ICEIL, INDXG2P, NUMROC
 *     ..
 *     .. Intrinsic Functions ..
-      INTRINSIC          ABS, IFIX, MAX, MIN, MOD, REAL, SQRT
+      INTRINSIC          ABS, DCMPLX, DCONJG, IDINT, MAX, MIN, MOD, SQRT
 *     ..
 *     .. Executable Statements ..
 *
@@ -235,12 +255,17 @@
             NQ = NUMROC( N+ICOFF, DESCA( NB_ ), MYCOL, IACOL, NPCOL )
             NQ0 = NUMROC( JA+N-1, DESCA( NB_ ), MYCOL, DESCA( CSRC_ ),
      $                    NPCOL )
-            LWMIN = MAX( 3, MP + NQ ) + NQ0 + NQ
+            LWMIN = MAX( 3, MP + NQ )
+            LRWMIN = NQ0 + NQ
 *
-            WORK( 1 ) = REAL( LWMIN )
-            LQUERY = ( LWORK.EQ.-1 )
-            IF( LWORK.LT.LWMIN .AND. .NOT.LQUERY )
-     $         INFO = -10
+            WORK( 1 ) = DCMPLX( DBLE( LWMIN ) )
+            RWORK( 1 ) = DBLE( LRWMIN )
+            LQUERY = ( LWORK.EQ.-1 .OR. LRWORK.EQ.-1 )
+            IF( LWORK.LT.LWMIN .AND. .NOT.LQUERY ) THEN
+               INFO = -10
+            ELSE IF( LRWORK.LT.LRWMIN .AND. .NOT.LQUERY ) THEN
+               INFO = -12
+            END IF
          END IF
          IF( LWORK.EQ.-1 ) THEN
             IDUM1( 1 ) = -1
@@ -248,12 +273,18 @@
             IDUM1( 1 ) = 1
          END IF
          IDUM2( 1 ) = 10
-         CALL PCHK1MAT( M, 1, N, 2, IA, JA, DESCA, 6, 1, IDUM1, IDUM2,
+         IF( LRWORK.EQ.-1 ) THEN
+            IDUM1( 2 ) = -1
+         ELSE
+            IDUM1( 2 ) = 1
+         END IF
+         IDUM2( 2 ) = 12
+         CALL PCHK1MAT( M, 1, N, 2, IA, JA, DESCA, 6, 2, IDUM1, IDUM2,
      $                  INFO )
       END IF
 *
       IF( INFO.NE.0 ) THEN
-         CALL PXERBLA( ICTXT, 'PSGEQPF', -INFO )
+         CALL PXERBLA( ICTXT, 'PZGEQPF', -INFO )
          RETURN
       ELSE IF( LQUERY ) THEN
          RETURN
@@ -314,13 +345,11 @@
       CALL DESCSET( DESCN, 1, DESCA( N_ ), 1, DESCA( NB_ ), MYROW,
      $              DESCA( CSRC_ ), ICTXT, 1 )
 *
-      IPN = 1
-      IPW = IPN + NQ0 + NQ
-      JJ = IPN + JJA - 1
+      JJ = JJA
       IF( MYCOL.EQ.IACOL ) THEN
          DO 60 KK = 0, JB-1
-            CALL PSNRM2( M, WORK( JJ+KK ), A, IA, JA+KK, DESCA, 1 )
-            WORK( NQ+JJ+KK ) = WORK( JJ+KK )
+            CALL PDZNRM2( M, RWORK( JJ+KK ), A, IA, JA+KK, DESCA, 1 )
+            RWORK( NQ+JJ+KK ) = RWORK( JJ+KK )
    60    CONTINUE
          JJ = JJ + JB
       END IF
@@ -333,8 +362,8 @@
 *
          IF( MYCOL.EQ.ICURCOL ) THEN
             DO 70 KK = 0, JB-1
-               CALL PSNRM2( M, WORK( JJ+KK ), A, IA, J+KK, DESCA, 1 )
-               WORK( NQ+JJ+KK ) = WORK( JJ+KK )
+               CALL PDZNRM2( M, RWORK( JJ+KK ), A, IA, J+KK, DESCA, 1 )
+               RWORK( NQ+JJ+KK ) = RWORK( JJ+KK )
    70       CONTINUE
             JJ = JJ + JB
          END IF
@@ -351,10 +380,10 @@
      $                 JJ, ICURCOL )
          K = JA + N - J
          IF( K.GT.1 ) THEN
-            CALL PSAMAX( K, TEMP, PVT, WORK( IPN ), 1, J, DESCN,
+            CALL PDAMAX( K, TEMP, PVT, RWORK, 1, J, DESCN,
      $                   DESCN( M_ ) )
-            CALL PSNRM2( M-J+1, TEMP, A, J, PVT, DESCA, 1 )
-            CALL SGAMX2D( ICTXT, 'A', ' ', 1, 1, TEMP, 1, 1, 1,
+            CALL PDZNRM2( M-J+1, TEMP, A, J, PVT, DESCA, 1 )
+            CALL DGAMX2D( ICTXT, 'A', ' ', 1, 1, TEMP, 1, 1, 1,
      $                    -1, -1, -1)
             IF(J.EQ.JA) THEN
               IF(ABS(TEMP)<ATOL) THEN
@@ -379,44 +408,42 @@
      $                    DESCA( CSRC_ ), JJPVT, IPCOL )
             IF( ICURCOL.EQ.IPCOL ) THEN
                IF( MYCOL.EQ.ICURCOL ) THEN
-                  CALL SSWAP( MP, A( IIA+(JJ-1)*LDA ), 1,
+                  CALL ZSWAP( MP, A( IIA+(JJ-1)*LDA ), 1,
      $                        A( IIA+(JJPVT-1)*LDA ), 1 )
                   ITEMP = IPIV( JJPVT )
                   IPIV( JJPVT ) = IPIV( JJ )
                   IPIV( JJ ) = ITEMP
-                  WORK( IPN+JJPVT-1 ) = WORK( IPN+JJ-1 )
-                  WORK( IPN+NQ+JJPVT-1 ) = WORK( IPN+NQ+JJ-1 )
+                  RWORK( JJPVT ) = RWORK( JJ )
+                  RWORK( NQ+JJPVT ) = RWORK( NQ+JJ )
                END IF
             ELSE
                IF( MYCOL.EQ.ICURCOL ) THEN
 *
-                  CALL SGESD2D( ICTXT, MP, 1, A( IIA+(JJ-1)*LDA ), LDA,
+                  CALL ZGESD2D( ICTXT, MP, 1, A( IIA+(JJ-1)*LDA ), LDA,
      $                          MYROW, IPCOL )
-                  WORK( IPW )   = REAL( IPIV( JJ ) )
-                  WORK( IPW+1 ) = WORK( IPN + JJ - 1 )
-                  WORK( IPW+2 ) = WORK( IPN + NQ + JJ - 1 )
-                  CALL SGESD2D( ICTXT, 3, 1, WORK( IPW ), 3, MYROW,
-     $                          IPCOL )
+                  WORK( 1 ) = DCMPLX( DBLE( IPIV( JJ ) ) )
+                  WORK( 2 ) = DCMPLX( RWORK( JJ ) )
+                  WORK( 3 ) = DCMPLX( RWORK( JJ + NQ ) )
+                  CALL ZGESD2D( ICTXT, 3, 1, WORK, 3, MYROW, IPCOL )
 *
-                  CALL SGERV2D( ICTXT, MP, 1, A( IIA+(JJ-1)*LDA ), LDA,
+                  CALL ZGERV2D( ICTXT, MP, 1, A( IIA+(JJ-1)*LDA ), LDA,
      $                          MYROW, IPCOL )
                   CALL IGERV2D( ICTXT, 1, 1, IPIV( JJ ), 1, MYROW,
      $                          IPCOL )
 *
                ELSE IF( MYCOL.EQ.IPCOL ) THEN
 *
-                  CALL SGESD2D( ICTXT, MP, 1, A( IIA+(JJPVT-1)*LDA ),
+                  CALL ZGESD2D( ICTXT, MP, 1, A( IIA+(JJPVT-1)*LDA ),
      $                          LDA, MYROW, ICURCOL )
                   CALL IGESD2D( ICTXT, 1, 1, IPIV( JJPVT ), 1, MYROW,
      $                          ICURCOL )
 *
-                  CALL SGERV2D( ICTXT, MP, 1, A( IIA+(JJPVT-1)*LDA ),
+                  CALL ZGERV2D( ICTXT, MP, 1, A( IIA+(JJPVT-1)*LDA ),
      $                          LDA, MYROW, ICURCOL )
-                  CALL SGERV2D( ICTXT, 3, 1, WORK( IPW ), 3, MYROW,
-     $                          ICURCOL )
-                  IPIV( JJPVT ) = IFIX( WORK( IPW ) )
-                  WORK( IPN+JJPVT-1 )= WORK( IPW+1 )
-                  WORK( IPN+NQ+JJPVT-1 ) = WORK( IPW+2 )
+                  CALL ZGERV2D( ICTXT, 3, 1, WORK, 3, MYROW, ICURCOL )
+                  IPIV( JJPVT ) = IDINT( DBLE( WORK( 1 ) ) )
+                  RWORK( JJPVT ) = DBLE( WORK( 2 ) )
+                  RWORK( JJPVT+NQ ) = DBLE( WORK( 3 ) )
 *
                END IF
 *
@@ -433,42 +460,42 @@
                IF( MYCOL.EQ.ICURCOL ) THEN
                   IOFFA = II+(JJ-1)*DESCA( LLD_ )
                   AJJ = A( IOFFA )
-                  CALL SLARFG( 1, AJJ, A( IOFFA ), 1, TAU( JJ ) )
+                  CALL ZLARFG( 1, AJJ, A( IOFFA ), 1, TAU( JJ ) )
                   IF( N.GT.1 ) THEN
-                     ALPHA = ONE - TAU( JJ )
-                     CALL SGEBS2D( ICTXT, 'Rowwise', ' ', 1, 1, ALPHA,
+                     ALPHA = DCMPLX( ONE ) - DCONJG( TAU( JJ ) )
+                     CALL ZGEBS2D( ICTXT, 'Rowwise', ' ', 1, 1, ALPHA,
      $                                  1 )
-                     CALL SSCAL( NQ-JJ, ALPHA, A( IOFFA+DESCA( LLD_ ) ),
+                     CALL ZSCAL( NQ-JJ, ALPHA, A( IOFFA+DESCA( LLD_ ) ),
      $                           DESCA( LLD_ ) )
                   END IF
-                  CALL SGEBS2D( ICTXT, 'Columnwise', ' ', 1, 1,
+                  CALL ZGEBS2D( ICTXT, 'Columnwise', ' ', 1, 1,
      $                          TAU( JJ ), 1 )
                   A( IOFFA ) = AJJ
                ELSE
                   IF( N.GT.1 ) THEN
-                     CALL SGEBR2D( ICTXT, 'Rowwise', ' ', 1, 1, ALPHA,
+                     CALL ZGEBR2D( ICTXT, 'Rowwise', ' ', 1, 1, ALPHA,
      $                             1, ICURROW, ICURCOL )
-                     CALL SSCAL( NQ-JJ+1, ALPHA, A( I ), DESCA( LLD_ ) )
+                     CALL ZSCAL( NQ-JJ+1, ALPHA, A( I ), DESCA( LLD_ ) )
                   END IF
                END IF
             ELSE IF( MYCOL.EQ.ICURCOL ) THEN
-               CALL SGEBR2D( ICTXT, 'Columnwise', ' ', 1, 1, TAU( JJ ),
+               CALL ZGEBR2D( ICTXT, 'Columnwise', ' ', 1, 1, TAU( JJ ),
      $                       1, ICURROW, ICURCOL )
             END IF
 *
          ELSE
 *
-            CALL PSLARFG( M-J+JA, AJJ, I, J, A, MIN( I+1, IA+M-1 ), J,
+            CALL PZLARFG( M-J+JA, AJJ, I, J, A, MIN( I+1, IA+M-1 ), J,
      $                    DESCA, 1, TAU )
             IF( J.LT.JA+N-1 ) THEN
 *
 *              Apply H(i) to A(ia+j-ja:ia+m-1,j+1:ja+n-1) from the left
 *
-               CALL PSELSET( A, I, J, DESCA, ONE )
-               CALL PSLARF( 'Left', M-J+JA, JA+N-1-J, A, I, J, DESCA,
-     $                      1, TAU, A, I, J+1, DESCA, WORK( IPW ) )
+               CALL PZELSET( A, I, J, DESCA, DCMPLX( ONE ) )
+               CALL PZLARFC( 'Left', M-J+JA, JA+N-1-J, A, I, J, DESCA,
+     $                       1, TAU, A, I, J+1, DESCA, WORK )
             END IF
-            CALL PSELSET( A, I, J, DESCA, AJJ )
+            CALL PZELSET( A, I, J, DESCA, AJJ )
 *
          END IF
 *
@@ -480,40 +507,39 @@
      $      ICURCOL = MOD( ICURCOL+1, NPCOL )
          IF( (JJA+NQ-JJ).GT.0 ) THEN
             IF( MYROW.EQ.ICURROW ) THEN
-               CALL SGEBS2D( ICTXT, 'Columnwise', ' ', 1, JJA+NQ-JJ,
+               CALL ZGEBS2D( ICTXT, 'Columnwise', ' ', 1, JJA+NQ-JJ,
      $                       A( II+( MIN( JJA+NQ-1, JJ )-1 )*LDA ),
      $                       LDA )
-               CALL SCOPY( JJA+NQ-JJ, A( II+( MIN( JJA+NQ-1, JJ )
-     $                     -1)*LDA ), LDA, WORK( IPW+MIN( JJA+NQ-1,
-     $                    JJ )-1 ), 1 )
+               CALL ZCOPY( JJA+NQ-JJ, A( II+( MIN( JJA+NQ-1, JJ )
+     $                     -1)*LDA ), LDA, WORK( MIN( JJA+NQ-1, JJ ) ),
+     $                     1 )
             ELSE
-               CALL SGEBR2D( ICTXT, 'Columnwise', ' ', JJA+NQ-JJ, 1,
-     $                       WORK( IPW+MIN( JJA+NQ-1, JJ )-1 ),
-     $                       MAX( 1, NQ ), ICURROW, MYCOL )
+               CALL ZGEBR2D( ICTXT, 'Columnwise', ' ', JJA+NQ-JJ, 1,
+     $                       WORK( MIN( JJA+NQ-1, JJ ) ), MAX( 1, NQ ),
+     $                       ICURROW, MYCOL )
             END IF
          END IF
 *
          JN = MIN( ICEIL( J+1, DESCA( NB_ ) ) * DESCA( NB_ ),
      $                    JA + N - 1 )
          IF( MYCOL.EQ.ICURCOL ) THEN
-            DO 90 LL = JJ-1, JJ + JN - J - 2
-               IF( WORK( IPN+LL ).NE.ZERO ) THEN
-                  TEMP = ONE-( ABS( WORK( IPW+LL ) ) /
-     $                         WORK( IPN+LL ) )**2
+            DO 90 LL = JJ, JJ + JN - J - 1
+               IF( RWORK( LL ).NE.ZERO ) THEN
+                  TEMP = ONE-( ABS( WORK( LL ) ) / RWORK( LL ) )**2
                   TEMP = MAX( TEMP, ZERO )
-                  TEMP2 = ONE + 0.05E+0*TEMP*
-     $                    ( WORK( IPN+LL ) / WORK( IPN+NQ+LL ) )**2
+                  TEMP2 = ONE + 0.05D+0*TEMP*
+     $                    ( RWORK( LL ) / RWORK( NQ+LL ) )**2
                   IF( TEMP2.EQ.ONE ) THEN
                      IF( IA+M-1.GT.I ) THEN
-                        CALL PSNRM2( IA+M-I-1, WORK( IPN+LL ), A, I+1,
-     $                               J+LL-JJ+2, DESCA, 1 )
-                        WORK( IPN+NQ+LL ) = WORK( IPN+LL )
+                        CALL PDZNRM2( IA+M-I-1, RWORK( LL ), A,
+     $                                I+1, J+LL-JJ, DESCA, 1 )
+                        RWORK( NQ+LL ) = RWORK( LL )
                      ELSE
-                        WORK( IPN+LL ) = ZERO
-                        WORK( IPN+NQ+LL ) = ZERO
+                        RWORK( LL ) = ZERO
+                        RWORK( NQ+LL ) = ZERO
                      END IF
                   ELSE
-                     WORK( IPN+LL ) = WORK( IPN+LL ) * SQRT( TEMP )
+                     RWORK( LL ) = RWORK( LL ) * SQRT( TEMP )
                   END IF
                END IF
    90       CONTINUE
@@ -525,24 +551,23 @@
             KB = MIN( JA+N-K, DESCA( NB_ ) )
 *
             IF( MYCOL.EQ.ICURCOL ) THEN
-               DO 100 LL = JJ-1, JJ+KB-2
-                  IF( WORK( IPN+LL ).NE.ZERO ) THEN
-                     TEMP = ONE-( ABS( WORK( IPW+LL ) ) /
-     $                            WORK( IPN+LL ) )**2
+               DO 100 LL = JJ, JJ+KB-1
+                  IF( RWORK(LL).NE.ZERO ) THEN
+                     TEMP = ONE-( ABS( WORK( LL ) ) / RWORK( LL ) )**2
                      TEMP = MAX( TEMP, ZERO )
-                     TEMP2 = ONE + 0.05E+0*TEMP*
-     $                     ( WORK( IPN+LL ) / WORK( IPN+NQ+LL ) )**2
+                     TEMP2 = ONE + 0.05D+0*TEMP*
+     $                       ( RWORK( LL ) / RWORK( NQ+LL ) )**2
                      IF( TEMP2.EQ.ONE ) THEN
                         IF( IA+M-1.GT.I ) THEN
-                           CALL PSNRM2( IA+M-I-1, WORK( IPN+LL ), A,
-     $                                  I+1, K+LL-JJ+1, DESCA, 1 )
-                           WORK( IPN+NQ+LL ) = WORK( IPN+LL )
+                           CALL PDZNRM2( IA+M-I-1, RWORK( LL ), A,
+     $                                   I+1, K+LL-JJ, DESCA, 1 )
+                           RWORK( NQ+LL ) = RWORK( LL )
                         ELSE
-                           WORK( IPN+LL ) = ZERO
-                           WORK( IPN+NQ+LL ) = ZERO
+                           RWORK( LL ) = ZERO
+                           RWORK( NQ+LL ) = ZERO
                         END IF
                      ELSE
-                        WORK( IPN+LL ) = WORK( IPN+LL ) * SQRT( TEMP )
+                        RWORK( LL ) = RWORK( LL ) * SQRT( TEMP )
                      END IF
                   END IF
   100          CONTINUE
@@ -554,11 +579,12 @@
 *
   120 CONTINUE
 *
-      WORK( 1 ) = REAL( LWMIN )
+      WORK( 1 ) = DCMPLX( DBLE( LWMIN ) )
+      RWORK( 1 ) = DBLE( LRWMIN )
 *
    99 CONTINUE
       RETURN
 *
-*     End of PSGEQPF
+*     End of PZGEQPF
 *
       END
