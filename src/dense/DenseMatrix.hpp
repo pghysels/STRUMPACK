@@ -1637,6 +1637,8 @@ namespace strumpack {
   DenseMatrix<scalar_t>::solve
   (const DenseMatrix<scalar_t>& b,
    const std::vector<int>& piv, int depth) const {
+    assert(b.rows() == cols());
+    assert(piv.size() == b.rows());
     int info = 0;
     DenseMatrix<scalar_t> x(b);
     if (!rows()) return x;

@@ -788,6 +788,8 @@ namespace strumpack {
       auto colidx = rowidx + Ninter;
       auto pgids = colidx + Ninter;
       for (int k=0, i=0, j=0; k<Ninter; k++) {
+        assert(B[k].nprows() == pmaps[0]);
+        assert(B[k].npcols() == pmaps[1]);
         total_dat += B[k].lrows()*B[k].lcols();
         rowidx[k] = I[k].size();
         colidx[k] = J[k].size();
