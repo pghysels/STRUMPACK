@@ -38,28 +38,31 @@ namespace strumpack {
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::compress
     (const kernel::Kernel<scalar_t>& K, const opts_t& opts) {
-      DenseMatrix<std::uint32_t> ann;
-      DenseMatrix<real_t> scores;
-      std::mt19937 gen(1); // reproducible
-      TaskTimer timer("approximate_neighbors");
-      timer.start();
-      find_approximate_neighbors
-        (K.data(), opts.ann_iterations(),
-         opts.approximate_neighbors(), ann, scores, gen);
-      if (opts.verbose())
-        std::cout << "# approximate neighbor search time = "
-                  << timer.elapsed() << std::endl;
-      WorkCompressANN<scalar_t> w;
       auto Aelem = [&K]
         (const std::vector<std::size_t>& I,
          const std::vector<std::size_t>& J, DenseM_t& B){
         K(I,J,B);
       };
-      // TODO just use K iso Aelem
+      int ann_number = std::min(int(K.n()), opts.approximate_neighbors());
+      std::mt19937 gen(1); // reproducible
+      while (!this->is_compressed()) {
+        DenseMatrix<std::uint32_t> ann;
+        DenseMatrix<real_t> scores;
+        TaskTimer timer("approximate_neighbors");
+        timer.start();
+        find_approximate_neighbors
+          (K.data(), opts.ann_iterations(), ann_number, ann, scores, gen);
+        if (opts.verbose())
+          std::cout << "# k-ANN=" << ann_number
+                    << ", approximate neighbor search time = "
+                    << timer.elapsed() << std::endl;
+        WorkCompressANN<scalar_t> w;
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
-      compress_recursive_ann
-        (ann, scores, Aelem, opts, w, this->_openmp_task_depth);
+        compress_recursive_ann
+          (ann, scores, Aelem, opts, w, this->_openmp_task_depth);
+        ann_number = std::min(2*ann_number, int(K.n()));
+      }
     }
 
     template<typename scalar_t> void
@@ -101,18 +104,26 @@ namespace strumpack {
         if (!this->_ch[0]->is_compressed() ||
             !this->_ch[1]->is_compressed())
           return;
-        if (this->is_untouched()) {
-          _B01 = DenseM_t(this->_ch[0]->U_rank(), this->_ch[1]->V_rank());
-          Aelem(w.c[0].Ir, w.c[1].Ic, _B01);
-          _B10 = _B01.transpose();
-        }
+        // TODO do not re-extract if children are not re-compressed
+        //if (this->is_untouched()) {
+        _B01 = DenseM_t(this->_ch[0]->U_rank(), this->_ch[1]->V_rank());
+        Aelem(w.c[0].Ir, w.c[1].Ic, _B01);
+        _B10 = _B01.transpose();
+        //}
       }
       if (w.lvl == 0)
         this->_U_state = this->_V_state = State::COMPRESSED;
       else {
+        // TODO only do this if not already compressed
+        //if (!this->is_compressed()) {
         compute_local_samples_ann(ann, scores, w, Aelem, opts);
-        compute_U_V_bases_ann(w.S, opts, w, depth);
-        this->_U_state = this->_V_state = State::COMPRESSED;
+        if (compute_U_V_bases_ann(w.S, opts, w, depth))
+          this->_U_state = this->_V_state = State::COMPRESSED;
+        // TODO
+        // else
+        //     this->_U_state = this->_V_state = State::PARTIALLY_COMPRESSED;
+        //}
+        w.c.clear();
       }
       w.c.clear();
       w.c.shrink_to_fit();
@@ -167,6 +178,7 @@ namespace strumpack {
                         const std::pair<std::size_t,real_t>& b) {
                        return a.first == b.first; }), w.ids_scores.end());
 
+#if 0 // drop some columns
       // maximum number of samples
       std::size_t d_max = this->leaf() ?
         I.size() + opts.dd() :   // leaf size + some oversampling
@@ -182,6 +194,9 @@ namespace strumpack {
             return a.second < b.second; });
         w.ids_scores.resize(d);
       }
+#else
+      auto d = w.ids_scores.size();
+#endif
 
       // sort based on ids; this is needed in the parent, see below
       std::sort(w.ids_scores.begin(), w.ids_scores.end());
@@ -241,13 +256,13 @@ namespace strumpack {
       _V.check();  assert(_V.cols() == w.Jc.size());
       bool accurate = true;
       int d = S.cols();
-      if (!(d - opts.p() >= opts.max_rank() ||
-            (int(_U.cols()) < d - opts.p() &&
-             int(_V.cols()) < d - opts.p()))) {
-        accurate = false;
-        std::cout << "WARNING: ID did not reach required accuracy:"
-                  << "\t increase k (number of ANN's), or Delta_d."
-                  << std::endl;
+      if (!(d >= this->cols() || d >= opts.max_rank() ||
+          (int(_U.cols()) + opts.p() < d  &&
+           int(_V.cols()) + opts.p() < d))) {
+        // std::cout << "WARNING: ID did not reach required accuracy:"
+        //           << "\t increase k (number of ANN's), or Delta_d."
+        //           << std::endl;
+        return false;
       }
       this->_U_rank = _U.cols();  this->_U_rows = _U.rows();
       this->_V_rank = _V.cols();  this->_V_rows = _V.rows();
@@ -264,7 +279,7 @@ namespace strumpack {
         for (auto j : w.Jc)
           w.Ic.push_back((j < r0) ? w.c[0].Ic[j] : w.c[1].Ic[j-r0]);
       }
-      return accurate;
+      return true;
     }
 
   } // end namespace HSS

@@ -100,6 +100,15 @@ namespace strumpack {
     N='N'   /*!< Non-unit diagonal */
   };
 
+  /**
+   * Job for eigenvalue/vector computations
+   * \ingroup Enumerations
+   */
+  enum class Jobz : char {
+    N='N', /*!< Compute eigenvalues only             */
+    V='V'  /*!< Compute eigenvalues and eigenvectors */
+  };
+
 
   /**
    * \class DenseMatrix
@@ -640,7 +649,7 @@ namespace strumpack {
      * pivoting with row interchanges. The factorization has the form
      * A = P * L * U, where P is a permutation matrix, L is lower
      * triangular with unit diagonal elements, and U is upper
-     * triangular. This call the LAPACK routine DGETRF. The L and U
+     * triangular. This calls the LAPACK routine DGETRF. The L and U
      * factors are stored in place, the permutation is returned, and
      * can be applied with the laswp() routine.
      *
@@ -648,6 +657,17 @@ namespace strumpack {
      * \see laswp, solve
      */
     std::vector<int> LU(int depth);
+
+    /**
+     * Compute a Cholesky factorization of this matrix in-place. This
+     * calls the LAPACK routine DPOTRF. Only the lower triangle is
+     * written.
+     *
+     * \param depth current OpenMP task recursion depth
+     * \return info from xpotrf
+     * \see LU
+     */
+    int Cholesky(int depth);
 
     /**
      * Solve a linear system with this matrix, factored in its LU
@@ -779,6 +799,23 @@ namespace strumpack {
      * \param sigma scalar value to add to diagonal
      */
     void shift(scalar_t sigma);
+
+
+    /**
+     * SYEV computes all eigenvalues and, optionally, eigenvectors of
+     * this matrix. If job is N, the matrix is destroyed. If job is V,
+     * on exit the matrix will contain all eigenvectors.
+     *
+     * \param job
+     *   N:  Compute eigenvalues only,
+     *   V:  Compute eigenvalues and eigenvectors.
+     * \param ul
+     *   U:  Upper triangle is stored,
+     *   L:  Lower triangle is stored.
+     * \param lambda
+     *   on exit this will contain all eigenvalues of this matrix.
+     */
+    int syev(Jobz job, UpLo ul, std::vector<scalar_t>& lambda);
 
   private:
     void ID_column_MGS
@@ -1584,6 +1621,17 @@ namespace strumpack {
     return piv;
   }
 
+  template<typename scalar_t> int
+  DenseMatrix<scalar_t>::Cholesky(int depth) {
+    assert(rows() == cols());
+    // TODO openmp tasking ?
+    int info = potrf('L', rows(), data(), ld());
+    if (info)
+      std::cerr << "ERROR: Cholesky factorization failed with info="
+                << info << std::endl;
+    return info;
+  }
+
   // TODO do in-place??!! to avoid copy
   template<typename scalar_t> DenseMatrix<scalar_t>
   DenseMatrix<scalar_t>::solve
@@ -1817,6 +1865,14 @@ namespace strumpack {
       std::cout << "ERROR in gesvd: info = " << info << std::endl;
     return S;
   }
+
+  template<typename scalar_t> int DenseMatrix<scalar_t>::syev
+  (Jobz job, UpLo ul, std::vector<scalar_t>& lambda) {
+    assert(rows() == cols());
+    lambda.resize(rows());
+    return syev(char(job), char(ul), rows(), data(), ld(), lambda.data());
+  }
+
 
   /**
    * GEMM, defined for DenseMatrix objects (or DenseMatrixWrapper).

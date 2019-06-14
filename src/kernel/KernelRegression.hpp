@@ -58,11 +58,10 @@ namespace strumpack {
       if (opts.verbose())
         std::cout << "# starting HSS compression..." << std::endl;
       timer.start();
-      std::vector<int> perm;
-      HSS::HSSMatrix<scalar_t> H(*this, perm, opts);
+      HSS::HSSMatrix<scalar_t> H(*this, opts);
       DenseMW_t B(1, n(), labels.data(), 1);
-      B.lapmt(perm, true);
-      perm.clear();
+      B.lapmt(perm_, true);
+      //perm_.clear(); // TODO not needed anymore??
       if (opts.verbose()) {
         std::cout << "# HSS compression time = "
                   << timer.elapsed() << std::endl;
@@ -133,11 +132,10 @@ namespace strumpack {
       bool verb = opts.verbose() && c.is_root();
       if (verb) std::cout << "# starting HSS compression..." << std::endl;
       timer.start();
-      std::vector<int> perm;
-      HSS::HSSMatrixMPI<scalar_t> H(*this, &grid, perm, opts);
+      HSS::HSSMatrixMPI<scalar_t> H(*this, &grid, opts);
       DenseMW_t B(1, n(), labels.data(), 1);
-      B.lapmt(perm, true);
-      perm.clear();
+      B.lapmt(perm_, true);
+      //perm.clear(); // TODO not needed anymore??
       if (opts.verbose()) {
         const auto lvls = H.max_levels();
         const auto rank = H.max_rank();
@@ -218,11 +216,10 @@ namespace strumpack {
       bool verb = opts.verbose() && c.is_root();
       if (verb) std::cout << "# starting HODLR compression..." << std::endl;
       timer.start();
-      std::vector<int> perm;
-      HODLR::HODLRMatrix<scalar_t> H(c, *this, perm, opts);
+      HODLR::HODLRMatrix<scalar_t> H(c, *this, opts);
       DenseMW_t B(1, n(), labels.data(), 1);
-      B.lapmt(perm, true);
-      perm.clear();
+      B.lapmt(perm_, true);
+      //perm_.clear(); // TODO not needed anymore??
       if (verb)
         std::cout << "# HODLR compression time = "
                   << timer.elapsed() << std::endl;

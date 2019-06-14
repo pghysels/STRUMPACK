@@ -780,6 +780,13 @@ namespace strumpack {
          double* a, int* lda, double* vl, double* vu, int* il, int* iu,
          double* abstol, int* m, double* w, double* z, int* ldz,
          double* work, int* lwork, int* iwork, int* ifail, int* info);
+
+      void FC_GLOBAL(ssyev,SSYEV)
+        (char* jobz, char* uplo, int* n, float* a, int* lda, float* w,
+         float* work, int* lwork, int* info);
+      void FC_GLOBAL(dsyev,DSYEV)
+        (char* jobz, char* uplo, int* n, double* a, int* lda, double* w,
+         double* work, int* lwork, int* info);
     }
 
     inline int ilaenv
@@ -2225,6 +2232,31 @@ namespace strumpack {
       FC_GLOBAL(dsyevx,DSYEVX)
         (&jobz, &range, &uplo, &n, a, &lda, &vl, &vu, &il, &iu, &abstol, &m,
          w, z, &ldz, work.get(), &lwork, iwork.get(), ifail, &info);
+      return info;
+    }
+
+    inline int syev(char jobz, char uplo, int n, float* a, int lda, float* w) {
+      int info;
+      int lwork = -1;
+      float swork;
+      FC_GLOBAL(ssyev,SSYEV)
+        (&jobz, &uplo, &n, a, &lda, w, &swork, &lwork, &info);
+      lwork = int(swork);
+      std::unique_ptr<float[]> work(new float[lwork]);
+      FC_GLOBAL(ssyev,SSYEV)
+        (&jobz, &uplo, &n, a, &lda, w, work.get(), &lwork, &info);
+      return info;
+    }
+    inline int syev(char jobz, char uplo, int n, double* a, int lda, double* w) {
+      int info;
+      int lwork = -1;
+      double swork;
+      FC_GLOBAL(dsyev,DSYEV)
+        (&jobz, &uplo, &n, a, &lda, w, &swork, &lwork, &info);
+      lwork = int(swork);
+      std::unique_ptr<double[]> work(new double[lwork]);
+      FC_GLOBAL(dsyev,DSYEV)
+        (&jobz, &uplo, &n, a, &lda, w, work.get(), &lwork, &info);
       return info;
     }
 
