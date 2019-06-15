@@ -670,7 +670,7 @@ namespace strumpack {
     int Cholesky(int depth);
 
     /**
-     * Solve a linear system with this matrix, factored in its LU
+     * Solve a linear system Ax=b with this matrix, factored in its LU
      * factors (in place), using a call to this->LU. There can be
      * multiple right hand side vectors. The solution is returned by
      * value.
@@ -678,10 +678,27 @@ namespace strumpack {
      * \param b input, right hand side vector/matrix
      * \param piv pivot vector returned by LU factorization
      * \param depth current OpenMP task recursion depth
+     * \return the solution x
      * \see LU
      */
     DenseMatrix<scalar_t> solve
     (const DenseMatrix<scalar_t>& b,
+     const std::vector<int>& piv, int depth) const;
+
+    /**
+     * Solve a linear system Ax=b with this matrix, factored in its LU
+     * factors (in place), using a call to this->LU. There can be
+     * multiple right hand side vectors. The solution is returned by
+     * value.
+     *
+     * \param b input, right hand side vector/matrix
+     * \param x output solution, should be allocated to correct size
+     * \param piv pivot vector returned by LU factorization
+     * \param depth current OpenMP task recursion depth
+     * \see LU
+     */
+    void solve
+    (const DenseMatrix<scalar_t>& b, DenseMatrix<scalar_t>& x,
      const std::vector<int>& piv, int depth) const;
 
     /**
@@ -1632,13 +1649,12 @@ namespace strumpack {
     return info;
   }
 
-  // TODO do in-place??!! to avoid copy
   template<typename scalar_t> DenseMatrix<scalar_t>
   DenseMatrix<scalar_t>::solve
   (const DenseMatrix<scalar_t>& b,
    const std::vector<int>& piv, int depth) const {
-    assert(b.rows() == cols());
-    assert(piv.size() == b.rows());
+    assert(b.rows() == rows());
+    assert(piv.size() >= rows());
     int info = 0;
     DenseMatrix<scalar_t> x(b);
     if (!rows()) return x;
@@ -1650,6 +1666,25 @@ namespace strumpack {
       exit(1);
     }
     return x;
+  }
+
+  template<typename scalar_t> void
+  DenseMatrix<scalar_t>::solve
+  (const DenseMatrix<scalar_t>& b, DenseMatrix<scalar_t>& x,
+   const std::vector<int>& piv, int depth) const {
+    assert(x.rows() == cols());
+    assert(x.cols() == b.cols());
+    assert(b.rows() == rows());
+    assert(piv.size() >= rows());
+    int info = 0;
+    if (!rows()) return;
+    getrs_omp_task
+      (char(Trans::N), rows(), b.cols(), data(), ld(), piv.data(),
+       x.data(), x.ld(), &info, depth);
+    if (info) {
+      std::cerr << "ERROR: LU solve failed with info=" << info << std::endl;
+      exit(1);
+    }
   }
 
   template<typename scalar_t> void DenseMatrix<scalar_t>::LQ
