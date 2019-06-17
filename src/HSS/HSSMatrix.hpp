@@ -274,6 +274,39 @@ namespace strumpack {
 
 
       /**
+       * Initialize this HSS matrix as the compressed HSS
+       * representation. The compression uses nearest neighbor
+       * information (coordinates provided by the user).  The HSS
+       * matrix should have been constructed with the proper sizes,
+       * i.e., rows() == A.rows() and cols() == A.cols().
+       *
+       * \param coords matrix with coordinates for the underlying
+       * geometry that defined the HSS matrix. This should be a d x n
+       * matrix (d rows, n columns), where d is the dimension of the
+       * coordinates and n is rows() and cols() of this matrix.
+       * \param Aelem element extraction routine. This can be a
+       * functor, or a lambda function for instance.
+       * \param I Parameter in the element extraction routine. Set of
+       * row indices of elements to extract.
+       * \param J Parameter in the element extraction routine. Set of
+       * column indices of elements to extract.
+       * \param B Parameter in the element extraction routine. Matrix
+       * where to place extracted elements. This matrix will already
+       * be allocated. It will have B.rows() == I.size() and B.cols()
+       * == J.size().
+       * \param opts object containing a number of options for HSS
+       * compression
+       * \see DenseMatrix
+       * \see HSSOptions
+       */
+      void compress_with_coordinates
+      (const DenseMatrix<scalar_t>& coords,
+       const std::function
+       <void(const std::vector<std::size_t>& I,
+             const std::vector<std::size_t>& J, DenseM_t& B)>& Aelem,
+       const opts_t& opts);
+
+      /**
        * Reset the matrix to an empty, 0 x 0 matrix, freeing up all
        * it's memory.
        */

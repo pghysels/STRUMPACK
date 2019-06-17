@@ -43,7 +43,18 @@ namespace strumpack {
          const std::vector<std::size_t>& J, DenseM_t& B){
         K(I,J,B);
       };
-      int ann_number = std::min(int(K.n()), opts.approximate_neighbors());
+      compress_with_coordinates(K.data(), Aelem, opts);
+    }
+
+    template<typename scalar_t> void
+    HSSMatrix<scalar_t>::compress_with_coordinates
+    (const DenseMatrix<scalar_t>& coords,
+     const std::function
+     <void(const std::vector<std::size_t>& I,
+           const std::vector<std::size_t>& J, DenseM_t& B)>& Aelem,
+     const opts_t& opts) {
+      int n = coords.cols();
+      int ann_number = std::min(n, opts.approximate_neighbors());
       std::mt19937 gen(1); // reproducible
       while (!this->is_compressed()) {
         DenseMatrix<std::uint32_t> ann;
@@ -51,7 +62,7 @@ namespace strumpack {
         TaskTimer timer("approximate_neighbors");
         timer.start();
         find_approximate_neighbors
-          (K.data(), opts.ann_iterations(), ann_number, ann, scores, gen);
+          (coords, opts.ann_iterations(), ann_number, ann, scores, gen);
         if (opts.verbose())
           std::cout << "# k-ANN=" << ann_number
                     << ", approximate neighbor search time = "
@@ -61,7 +72,7 @@ namespace strumpack {
 #pragma omp single nowait
         compress_recursive_ann
           (ann, scores, Aelem, opts, w, this->_openmp_task_depth);
-        ann_number = std::min(2*ann_number, int(K.n()));
+        ann_number = std::min(2*ann_number, n);
       }
     }
 
