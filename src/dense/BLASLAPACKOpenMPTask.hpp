@@ -575,8 +575,7 @@ namespace strumpack {
         depth>=params::task_recursion_cutoff_level)
       blas::trsm(s, ul, ta, d, m, n, alpha, a, lda, b, ldb);
     else {
-      if ((s=='L' || s=='l') &&
-          (ul=='L' || ul=='l') &&
+      if ((s=='L' || s=='l') && (ul=='L' || ul=='l') &&
           (ta=='N' || ta=='n')) {
         if (n >= m) {
 #pragma omp task final(depth >= params::task_recursion_cutoff_level-1)  \
@@ -645,9 +644,10 @@ namespace strumpack {
             (s, ul, ta, d, m/2, n, scalar(1.), a, lda, b, ldb, depth);
         }
       } else {
-        std::cerr << "trsm_omp_task not implemented with this combination of"
-                  << " side, uplo and transpose" << std::endl;
-        abort();
+        // std::cerr << "trsm_omp_task not implemented with this combination of"
+        //           << " side, uplo and transpose" << std::endl;
+        blas::trsm(s, ul, ta, d, m, n, alpha, a, lda, b, ldb);
+        //abort();
       }
     }
   }
