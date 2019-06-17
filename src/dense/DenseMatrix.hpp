@@ -656,7 +656,7 @@ namespace strumpack {
      * \param depth current OpenMP task recursion depth
      * \see laswp, solve
      */
-    std::vector<int> LU(int depth);
+    std::vector<int> LU(int depth=0);
 
     /**
      * Compute a Cholesky factorization of this matrix in-place. This
@@ -667,7 +667,7 @@ namespace strumpack {
      * \return info from xpotrf
      * \see LU
      */
-    int Cholesky(int depth);
+    int Cholesky(int depth=0);
 
     /**
      * Solve a linear system Ax=b with this matrix, factored in its LU
@@ -1642,7 +1642,7 @@ namespace strumpack {
   DenseMatrix<scalar_t>::Cholesky(int depth) {
     assert(rows() == cols());
     // TODO openmp tasking ?
-    int info = potrf('L', rows(), data(), ld());
+    int info = blas::potrf('L', rows(), data(), ld());
     if (info)
       std::cerr << "ERROR: Cholesky factorization failed with info="
                 << info << std::endl;
@@ -1907,7 +1907,8 @@ namespace strumpack {
   (Jobz job, UpLo ul, std::vector<scalar_t>& lambda) {
     assert(rows() == cols());
     lambda.resize(rows());
-    return syev(char(job), char(ul), rows(), data(), ld(), lambda.data());
+    return blas::syev
+      (char(job), char(ul), rows(), data(), ld(), lambda.data());
   }
 
 
@@ -1939,10 +1940,20 @@ namespace strumpack {
            (ta!=Trans::N && tb==Trans::N && a.rows()==b.rows()) ||
            (ta==Trans::N && tb!=Trans::N && a.cols()==b.cols()) ||
            (ta!=Trans::N && tb!=Trans::N && a.rows()==b.cols()));
-    gemm_omp_task
-      (char(ta), char(tb), c.rows(), c.cols(),
-       (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
-       b.data(), b.ld(), beta, c.data(), c.ld(), depth);
+#if defined(_OPENMP)
+    bool in_par = omp_in_parallel();
+#else
+    bool in_par = false;
+#endif
+    if (in_par)
+      gemm_omp_task
+        (char(ta), char(tb), c.rows(), c.cols(),
+         (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
+         b.data(), b.ld(), beta, c.data(), c.ld(), depth);
+    else
+      blas::gemm(char(ta), char(tb), c.rows(), c.cols(),
+                 (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
+                 b.data(), b.ld(), beta, c.data(), c.ld());
   }
 
   template<typename scalar_t> void
@@ -1951,10 +1962,21 @@ namespace strumpack {
        DenseMatrix<scalar_t>& c, int depth=0) {
     assert((ta==Trans::N && a.rows()==c.rows()) ||
            (ta!=Trans::N && a.cols()==c.rows()));
-    gemm_omp_task
-      (char(ta), char(tb), c.rows(), c.cols(),
-       (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(),
-       a.ld(), b, ldb, beta, c.data(), c.ld(), depth);
+#if defined(_OPENMP)
+    bool in_par = omp_in_parallel();
+#else
+    bool in_par = false;
+#endif
+    if (in_par)
+      gemm_omp_task
+        (char(ta), char(tb), c.rows(), c.cols(),
+         (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(),
+         a.ld(), b, ldb, beta, c.data(), c.ld(), depth);
+    else
+      blas::gemm
+        (char(ta), char(tb), c.rows(), c.cols(),
+         (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(),
+         a.ld(), b, ldb, beta, c.data(), c.ld());
   }
 
   template<typename scalar_t> void
@@ -1965,11 +1987,23 @@ namespace strumpack {
            (ta!=Trans::N && tb==Trans::N && a.rows()==b.rows()) ||
            (ta==Trans::N && tb!=Trans::N && a.cols()==b.cols()) ||
            (ta!=Trans::N && tb!=Trans::N && a.rows()==b.cols()));
-    gemm_omp_task
-      (char(ta), char(tb), (ta==Trans::N) ? a.rows() : a.cols(),
-       (tb==Trans::N) ? b.cols() : b.rows(),
-       (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
-       b.data(), b.ld(), beta, c, ldc, depth);
+#if defined(_OPENMP)
+    bool in_par = omp_in_parallel();
+#else
+    bool in_par = false;
+#endif
+    if (in_par)
+      gemm_omp_task
+        (char(ta), char(tb), (ta==Trans::N) ? a.rows() : a.cols(),
+         (tb==Trans::N) ? b.cols() : b.rows(),
+         (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
+         b.data(), b.ld(), beta, c, ldc, depth);
+    else
+      blas::gemm
+        (char(ta), char(tb), (ta==Trans::N) ? a.rows() : a.cols(),
+         (tb==Trans::N) ? b.cols() : b.rows(),
+         (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
+         b.data(), b.ld(), beta, c, ldc);
   }
 
   /**
@@ -1983,10 +2017,20 @@ namespace strumpack {
    */
   template<typename scalar_t> void
   trmm(Side s, UpLo ul, Trans ta, Diag d, scalar_t alpha,
-       const DenseMatrix<scalar_t>& a, DenseMatrix<scalar_t>& b, int depth) {
-    trmm_omp_task
-      (char(s), char(ul), char(ta), char(d), b.rows(), b.cols(),
-       alpha, a.data(), a.ld(), b.data(), b.ld(), depth);
+       const DenseMatrix<scalar_t>& a, DenseMatrix<scalar_t>& b,
+       int depth=0) {
+    bool in_par = false;
+#if defined(_OPENMP)
+    in_par = omp_in_parallel();
+#endif
+    if (in_par)
+      trmm_omp_task
+        (char(s), char(ul), char(ta), char(d), b.rows(), b.cols(),
+         alpha, a.data(), a.ld(), b.data(), b.ld(), depth);
+    else
+      blas::trmm
+        (char(s), char(ul), char(ta), char(d), b.rows(), b.cols(),
+         alpha, a.data(), a.ld(), b.data(), b.ld());
   }
 
   /**
@@ -2004,11 +2048,20 @@ namespace strumpack {
    */
   template<typename scalar_t> void
   trsm(Side s, UpLo ul, Trans ta, Diag d, scalar_t alpha,
-       const DenseMatrix<scalar_t>& a, DenseMatrix<scalar_t>& b, int depth) {
-    // TODO assertions
-    trsm_omp_task
-      (char(s), char(ul), char(ta), char(d), b.rows(), b.cols(),
-       alpha, a.data(), a.ld(), b.data(), b.ld(), depth);
+       const DenseMatrix<scalar_t>& a, DenseMatrix<scalar_t>& b,
+       int depth=0) {
+#if defined(_OPENMP)
+    bool in_par = omp_in_parallel();
+#else
+    bool in_par = false;
+#endif
+    if (in_par)
+      trsm_omp_task
+        (char(s), char(ul), char(ta), char(d), b.rows(), b.cols(),
+         alpha, a.data(), a.ld(), b.data(), b.ld(), depth);
+    else
+      blas::trsm(char(s), char(ul), char(ta), char(d), b.rows(), b.cols(),
+                 alpha, a.data(), a.ld(), b.data(), b.ld());
   }
 
   /**
@@ -2021,12 +2074,20 @@ namespace strumpack {
    */
   template<typename scalar_t> void
   trsv(UpLo ul, Trans ta, Diag d, const DenseMatrix<scalar_t>& a,
-       DenseMatrix<scalar_t>& b, int depth) {
+       DenseMatrix<scalar_t>& b, int depth=0) {
     assert(b.cols() == 1);
     assert(a.rows() == a.cols() && a.cols() == b.rows());
-    trsv_omp_task
-      (char(ul), char(ta), char(d), a.rows(),
-       a.data(), a.ld(), b.data(), 1, depth);
+#if defined(_OPENMP)
+    bool in_par = omp_in_parallel();
+#else
+    bool in_par = false;
+#endif
+    if (in_par)
+      trsv_omp_task(char(ul), char(ta), char(d), a.rows(),
+                    a.data(), a.ld(), b.data(), 1, depth);
+    else
+      blas::trsv(char(ul), char(ta), char(d), a.rows(),
+                 a.data(), a.ld(), b.data(), 1);
   }
 
   /**
@@ -2040,14 +2101,23 @@ namespace strumpack {
   template<typename scalar_t> void
   gemv(Trans ta, scalar_t alpha, const DenseMatrix<scalar_t>& a,
        const DenseMatrix<scalar_t>& x, scalar_t beta,
-       DenseMatrix<scalar_t>& y, int depth) {
+       DenseMatrix<scalar_t>& y, int depth=0) {
     assert(x.cols() == 1);
     assert(y.cols() == 1);
     assert(ta != Trans::N || (a.rows() == y.rows() && a.cols() == x.rows()));
     assert(ta == Trans::N || (a.cols() == y.rows() && a.rows() == x.rows()));
-    gemv_omp_task
-      (char(ta), a.rows(), a.cols(), alpha, a.data(), a.ld(),
-       x.data(), 1, beta, y.data(), 1, depth);
+#if defined(_OPENMP)
+    bool in_par = omp_in_parallel();
+#else
+    bool in_par = false;
+#endif
+    if (in_par)
+      gemv_omp_task
+        (char(ta), a.rows(), a.cols(), alpha, a.data(), a.ld(),
+         x.data(), 1, beta, y.data(), 1, depth);
+    else
+      blas::gemv(char(ta), a.rows(), a.cols(), alpha, a.data(), a.ld(),
+                 x.data(), 1, beta, y.data(), 1);
   }
 
   /**
@@ -2061,14 +2131,23 @@ namespace strumpack {
   template<typename scalar_t> void
   gemv(Trans ta, scalar_t alpha, const DenseMatrix<scalar_t>& a,
        const scalar_t* x, int incx, scalar_t beta,
-       DenseMatrix<scalar_t>& y, int depth) {
+       DenseMatrix<scalar_t>& y, int depth=0) {
     assert(y.cols() == 1);
     assert(ta != Trans::N || (a.rows() == y.rows()));
     assert(ta == Trans::N || (a.cols() == y.rows()));
-    gemv_omp_task
-      (char(ta), a.rows(), a.cols(), alpha, a.data(), a.ld(),
-       x, incx, beta, y.data(), 1, depth);
-  }
+#if defined(_OPENMP)
+    bool in_par = omp_in_parallel();
+#else
+    bool in_par = false;
+#endif
+    if (in_par)
+      gemv_omp_task
+        (char(ta), a.rows(), a.cols(), alpha, a.data(), a.ld(),
+         x, incx, beta, y.data(), 1, depth);
+    else
+      blas::gemv(char(ta), a.rows(), a.cols(), alpha, a.data(), a.ld(),
+                 x, incx, beta, y.data(), 1);
+ }
 
   /**
    * DGEMV performs one of the matrix-vector operations
@@ -2081,13 +2160,22 @@ namespace strumpack {
   template<typename scalar_t> void
   gemv(Trans ta, scalar_t alpha, const DenseMatrix<scalar_t>& a,
        const DenseMatrix<scalar_t>& x, scalar_t beta,
-       scalar_t* y, int incy, int depth) {
+       scalar_t* y, int incy, int depth=0) {
     assert(x.cols() == 1);
     assert(ta != Trans::N || (a.cols() == x.rows()));
     assert(ta == Trans::N || (a.rows() == x.rows()));
-    gemv_omp_task
-      (char(ta), a.rows(), a.cols(), alpha, a.data(), a.ld(),
-       x.data(), 1, beta, y, incy, depth);
+#if defined(_OPENMP)
+    bool in_par = omp_in_parallel();
+#else
+    bool in_par = false;
+#endif
+    if (in_par)
+      gemv_omp_task
+        (char(ta), a.rows(), a.cols(), alpha, a.data(), a.ld(),
+         x.data(), 1, beta, y, incy, depth);
+    else
+      blas::gemv(char(ta), a.rows(), a.cols(), alpha, a.data(), a.ld(),
+                 x.data(), 1, beta, y, incy);
   }
 
   /**
@@ -2101,10 +2189,19 @@ namespace strumpack {
   template<typename scalar_t> void
   gemv(Trans ta, scalar_t alpha, const DenseMatrix<scalar_t>& a,
        const scalar_t* x, int incx, scalar_t beta,
-       scalar_t* y, int incy, int depth) {
-    gemv_omp_task
-      (char(ta), a.rows(), a.cols(), alpha, a.data(), a.ld(),
-       x, incx, beta, y, incy, depth);
+       scalar_t* y, int incy, int depth=0) {
+#if defined(_OPENMP)
+    bool in_par = omp_in_parallel();
+#else
+    bool in_par = false;
+#endif
+    if (in_par)
+      gemv_omp_task
+        (char(ta), a.rows(), a.cols(), alpha, a.data(), a.ld(),
+         x, incx, beta, y, incy, depth);
+    else
+      blas::gemv(char(ta), a.rows(), a.cols(), alpha, a.data(), a.ld(),
+                 x, incx, beta, y, incy);
   }
 
 
