@@ -2357,7 +2357,7 @@ namespace strumpack {
       int info = sytrf(s, n, a, lda, ipiv, &lwork, -1);
       int ilwork = int(std::real(lwork));
       std::unique_ptr<scalar[]> work(new scalar[ilwork]);
-      info = sytrf(s, n, a, lda, ipiv, work, ilwork);
+      info = sytrf(s, n, a, lda, ipiv, work.get(), ilwork);
       return info;
     }
 
@@ -2404,7 +2404,7 @@ namespace strumpack {
       int info = sytrf_rook(s, n, a, lda, ipiv, &lwork, -1);
       int ilwork = int(std::real(lwork));
       std::unique_ptr<scalar[]> work(new scalar[ilwork]);
-      info = sytrf_rook(s, n, a, lda, ipiv, work, ilwork);
+      info = sytrf_rook(s, n, a, lda, ipiv, work.get(), ilwork);
       return info;
     }
 
