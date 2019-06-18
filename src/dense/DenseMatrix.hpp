@@ -706,7 +706,7 @@ namespace strumpack {
      */
     DenseMatrix<scalar_t> solve
     (const DenseMatrix<scalar_t>& b,
-     const std::vector<int>& piv, int depth) const;
+     const std::vector<int>& piv, int depth=0) const;
 
     /**
      * Solve a linear system Ax=b with this matrix, factored in its LU
@@ -720,7 +720,7 @@ namespace strumpack {
      * \see LU, solve_LU_in_place, solve_LDLt_in_place, solve_LDLt_rook_in_place
      */
     void solve_LU_in_place
-    (DenseMatrix<scalar_t>& b, const std::vector<int>& piv, int depth) const;
+    (DenseMatrix<scalar_t>& b, const std::vector<int>& piv, int depth=0) const;
 
     /**
      * Solve a linear system Ax=b with this matrix, factored in its
@@ -734,7 +734,7 @@ namespace strumpack {
      * \see LDLt, LDLt_rook, solve_LDLt_rook_in_place, LU, solve_LU_in_place
      */
     void solve_LDLt_in_place
-    (DenseMatrix<scalar_t>& b, const std::vector<int>& piv, int depth) const;
+    (DenseMatrix<scalar_t>& b, const std::vector<int>& piv, int depth=0) const;
 
     /**
      * Solve a linear system Ax=b with this matrix, factored in its
@@ -748,7 +748,7 @@ namespace strumpack {
      * \see LDLt_rook, LDLt, solve_LDLt_in_place, LU, solve_LU_in_place
      */
     void solve_LDLt_rook_in_place
-    (DenseMatrix<scalar_t>& b, const std::vector<int>& piv, int depth) const;
+    (DenseMatrix<scalar_t>& b, const std::vector<int>& piv, int depth=0) const;
 
     /**
      * Compute an LQ (lower triangular, unitary) factorization of this
