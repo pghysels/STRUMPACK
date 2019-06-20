@@ -776,6 +776,7 @@ WARN_LOGFILE           =
 	@CMAKE_CURRENT_SOURCE_DIR@/src/sparse/CompressedSparseMatrix.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/sparse/CSRMatrix.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/sparse/CSRMatrixMPI.hpp \
+	@CMAKE_CURRENT_SOURCE_DIR@/src/sparse/IterativeRefinement.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/dense/DenseMatrix.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/dense/DistributedMatrix.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/dense/BLACSGrid.hpp \

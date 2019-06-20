@@ -26,6 +26,10 @@
  *             Division).
  *
  */
+/*!
+ * \file IterativeRefinement.hpp
+ * \brief Contains the iterative refinement implementation.
+ */
 #ifndef ITERATIVE_REFINEMENT_HPP
 #define ITERATIVE_REFINEMENT_HPP
 #include <iostream>
@@ -37,9 +41,26 @@
 
 namespace strumpack {
 
-  /*
-   * This is iterative refinement
-   *  Input vectors x and b have stride 1, length n
+  /**
+   * Iterative refinement, with a sparse matrix, to solve a linear
+   * system M^{-1}Ax=M^{-1}b.
+   *
+   * \tparam scalar_t scalar type
+   * \tparam integer_t integer type used in A
+   * \tparam real_t real type, can be derived from the scalar_t type
+   *
+   * \param A dense matrix A
+   * \param direct_solve routine to apply M^{-1} to a matrix
+   * \param x on output this contains the solution, on input this can
+   * be the initial guess. This always has to be allocated to the
+   * correct size (A.rows() x b.cols())
+   * \param b the right hand side, should have A.rows() rows
+   * \param rtol relative stopping tolerance
+   * \param atol absolute stopping tolerance
+   * \param totit on output this will contain the number of iterations
+   * that were performed
+   * \param maxit maximum number of iterations
+   * \param non_zero_guess x use x as an initial guess
    */
   template<typename scalar_t,typename integer_t,
            typename real_t = typename RealType<scalar_t>::value_type>
@@ -82,6 +103,65 @@ namespace strumpack {
                   << std::setw(12) << res_norm
                   << "\trel.res = " << std::setw(12) << rel_res_norm
                   << "\tbw.error = " << std::setw(12) << bw_error
+                  << std::endl;
+    }
+  }
+
+
+  /**
+   * Iterative refinement, with a dense matrix, to solve a linear
+   * system M^{-1}Ax=M^{-1}b.
+   *
+   * \tparam scalar_t scalar type
+   * \tparam real_t real type, can be derived from the scalar_t type
+   *
+   * \param A dense matrix A
+   * \param direct_solve routine to apply M^{-1} to a matrix
+   * \param x on output this contains the solution, on input this can
+   * be the initial guess. This always has to be allocated to the
+   * correct size (A.rows() x b.cols())
+   * \param b the right hand side, should have A.rows() rows
+   * \param rtol relative stopping tolerance
+   * \param atol absolute stopping tolerance
+   * \param totit on output this will contain the number of iterations
+   * that were performed
+   * \param maxit maximum number of iterations
+   * \param non_zero_guess x use x as an initial guess
+   */
+  template<typename scalar_t,
+           typename real_t = typename RealType<scalar_t>::value_type>
+  void IterativeRefinement
+  (const DenseMatrix<scalar_t>& A,
+   const std::function<void(DenseMatrix<scalar_t>&)>& direct_solve,
+   DenseMatrix<scalar_t>& x, const DenseMatrix<scalar_t>& b,
+   real_t rtol, real_t atol, int& totit, int maxit,
+   bool non_zero_guess, bool verbose) {
+    DenseMatrix<scalar_t> r(b);
+    if (non_zero_guess)
+      gemm(Trans::N, Trans::N, scalar_t(-1.), A, x, scalar_t(1.), r);
+    else
+      x.zero();
+    auto res_norm = r.norm();
+    auto res0 = res_norm;
+    auto rel_res_norm = real_t(1.);
+    totit = 0;
+    if (verbose)
+      std::cout << "REFINEMENT it. " << totit
+                << "\tres = " << std::setw(12) << res_norm
+                << "\trel.res = " << std::setw(12) << rel_res_norm
+                << std::endl;
+    while (res_norm > atol && rel_res_norm > rtol &&
+           totit++ < maxit) {
+      direct_solve(r);
+      x.add(r);
+      r.copy(b);
+      gemm(Trans::N, Trans::N, scalar_t(-1.), A, x, scalar_t(1.), r);
+      res_norm = r.norm();
+      rel_res_norm = res_norm / res0;
+      if (verbose)
+        std::cout << "REFINEMENT it. " << totit << "\tres = "
+                  << std::setw(12) << res_norm
+                  << "\trel.res = " << std::setw(12) << rel_res_norm
                   << std::endl;
     }
   }
