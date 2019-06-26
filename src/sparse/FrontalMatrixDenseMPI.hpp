@@ -102,8 +102,6 @@ namespace strumpack {
     DistM_t F11_, F12_, F21_, F22_;
     std::vector<int> piv;
 
-    long long node_factor_nonzeros() const override;
-
     using FrontalMatrix<scalar_t,integer_t>::lchild_;
     using FrontalMatrix<scalar_t,integer_t>::rchild_;
     using FrontalMatrixMPI<scalar_t,integer_t>::visit;
@@ -321,11 +319,6 @@ namespace strumpack {
       STRUMPACK_CB_SAMPLE_FLOPS
         (gemm_flops(op, Trans::N, scalar_t(1.), F22_, R, scalar_t(0.)));
     }
-  }
-
-  template<typename scalar_t,typename integer_t> long long
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::node_factor_nonzeros() const {
-    return F11_.nonzeros() + F12_.nonzeros() + F21_.nonzeros();
   }
 
 } // end namespace strumpack

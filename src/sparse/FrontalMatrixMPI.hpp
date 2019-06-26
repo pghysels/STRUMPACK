@@ -160,6 +160,7 @@ namespace strumpack {
     const BLACSGrid* grid() const { return &blacs_grid_; }
     int P() const override { return grid()->P(); }
 
+    virtual long long factor_nonzeros(int task_depth=0) const override;
     virtual long long dense_factor_nonzeros(int task_depth=0) const override;
     virtual std::string type() const override { return "FrontalMatrixMPI"; }
     virtual bool isMPI() const override { return true; }
@@ -172,6 +173,9 @@ namespace strumpack {
 
     using FrontalMatrix<scalar_t,integer_t>::lchild_;
     using FrontalMatrix<scalar_t,integer_t>::rchild_;
+
+  private:
+    long long node_factor_nonzeros() const override;
   };
 
   template<typename scalar_t,typename integer_t>
@@ -376,6 +380,17 @@ namespace strumpack {
     return nnz;
   }
 
+  template<typename scalar_t,typename integer_t> long long
+  FrontalMatrixMPI<scalar_t,integer_t>::factor_nonzeros
+  (int task_depth) const {
+    long long nnz = node_factor_nonzeros();
+    if (visit(lchild_))
+      nnz += lchild_->dense_factor_nonzeros(task_depth);
+    if (visit(rchild_))
+      nnz += rchild_->dense_factor_nonzeros(task_depth);
+    return nnz;
+  }
+
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMPI<scalar_t,integer_t>::bisection_partitioning
   (const SPOptions<scalar_t>& opts, integer_t* sorder,
@@ -386,6 +401,12 @@ namespace strumpack {
       lchild_->bisection_partitioning(opts, sorder, false, task_depth);
     if (visit(rchild_))
       rchild_->bisection_partitioning(opts, sorder, false, task_depth);
+  }
+
+  template<typename scalar_t,typename integer_t> long long
+  FrontalMatrixMPI<scalar_t,integer_t>::node_factor_nonzeros() const {
+    return Comm().is_root() ?
+      this->dim_sep() * (this->dim_sep() + 2 * this->dim_upd()) : 0;
   }
 
 } // end namespace strumpack

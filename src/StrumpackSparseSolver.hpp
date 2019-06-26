@@ -369,9 +369,6 @@ namespace strumpack {
     inline long long dense_factor_nonzeros() const {
       return tree()->dense_factor_nonzeros();
     }
-    inline long long dense_factor_memory() const {
-      return tree()->dense_factor_nonzeros() * sizeof(scalar_t);
-    }
     void print_solve_stats(TaskTimer& t) const;
     virtual void perf_counters_start();
     virtual void perf_counters_stop(const std::string& s);
@@ -816,11 +813,11 @@ namespace strumpack {
     }
     float dfnnz = 0.;
     if (opts_.verbose()) {
-      dfnnz = dense_factor_memory();
+      dfnnz = dense_factor_nonzeros();
       if (is_root_) {
         std::cout << "# multifrontal factorization:" << std::endl;
         std::cout << "#   - estimated memory usage (exact solver) = "
-                  << dfnnz / 1e6 << " MB" << std::endl;
+                  << dfnnz * sizeof(scalar_t) / 1.e6 << " MB" << std::endl;
       }
     }
     perf_counters_start();
@@ -837,7 +834,7 @@ namespace strumpack {
         std::cout << "#   - factor nonzeros = "
                   << number_format_with_commas(fnnz) << std::endl;
         std::cout << "#   - factor memory = "
-                  << fnnz * sizeof(scalar_t) / 1e6 << " MB" << std::endl;
+                  << float(fnnz) * sizeof(scalar_t) / 1.e6 << " MB" << std::endl;
 #if defined(STRUMPACK_COUNT_FLOPS)
         std::cout << "#   - total flops = " << double(ftot_) << ", min = "
                   << double(fmin_) << ", max = " << double(fmax_)
@@ -846,7 +843,7 @@ namespace strumpack {
                   << " GFlop/s" << std::endl;
 #endif
         std::cout << "#   - factor memory/nonzeros = "
-                  << float(fnnz * sizeof(scalar_t)) / dfnnz * 100.0
+                  << float(fnnz) / dfnnz * 100.0
                   << " % of multifrontal" << std::endl;
         std::cout << "#   - compression = " << std::boolalpha
                   << get_name(opts_.compression()) << std::endl;

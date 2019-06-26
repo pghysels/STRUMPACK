@@ -276,15 +276,16 @@ namespace strumpack {
     std::vector<integer_t> upd_;
     std::unique_ptr<F_t> lchild_, rchild_;
 
+    virtual long long node_factor_nonzeros() const {
+      return dense_node_factor_nonzeros();
+    }
+
   private:
     FrontalMatrix(const FrontalMatrix&) = delete;
     FrontalMatrix& operator=(FrontalMatrix const&) = delete;
 
     virtual void draw_node(std::ostream& of, bool is_root) const;
 
-    virtual long long node_factor_nonzeros() const {
-      return dense_node_factor_nonzeros();
-    }
     virtual long long dense_node_factor_nonzeros() const {
       long long dsep = dim_sep();
       long long dupd = dim_upd();
