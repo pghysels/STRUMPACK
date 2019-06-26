@@ -176,6 +176,7 @@ namespace strumpack {
   FrontalMatrixDense<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
+    TaskTimer t("");
     if (task_depth == 0) {
       // use tasking for children and for extend-add parallelism
 #pragma omp parallel if(!omp_in_parallel()) default(shared)
@@ -183,10 +184,18 @@ namespace strumpack {
       factor_phase1(A, opts, etree_level, task_depth);
       // do not use tasking for blas/lapack parallelism (use system
       // blas threading!)
+      if (etree_level == 0 && opts.print_root_front_stats()) t.start();
       factor_phase2(A, opts, etree_level, params::task_recursion_cutoff_level);
     } else {
       factor_phase1(A, opts, etree_level, task_depth);
+      if (etree_level == 0 && opts.print_root_front_stats()) t.start();
       factor_phase2(A, opts, etree_level, task_depth);
+    }
+    if (etree_level == 0 && opts.print_root_front_stats()) {
+      auto time = t.elapsed();
+      std::cout << "#   - dense root front: N = " << dim_sep()
+                << " , N^2 = " << dim_sep() * dim_sep()
+                << " time = " << time << " sec" << std::endl;
     }
   }
 

@@ -230,6 +230,8 @@ namespace strumpack {
         (A, opts, etree_level+1, task_depth);
     if (!dim_blk()) return;
 
+    TaskTimer t("");
+    if (etree_level == 0 && opts.print_root_front_stats()) t.start();
     auto mult = [&](DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
       random_sampling(A, opts, R, Sr, Sc);
@@ -272,6 +274,19 @@ namespace strumpack {
         TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
         ULV_ = H_->factor();
       }
+    }
+    if (etree_level == 0 && opts.print_root_front_stats()) {
+      auto time = t.elapsed();
+      auto rank = H_->max_rank();
+      auto nnz = H_->total_nonzeros();
+      if (Comm().is_root())
+        std::cout << "#   - HSSMPI root front: N = " << dim_sep()
+                  << " , N^2 = " << dim_sep() * dim_sep()
+                  << " , nnz = " << nnz
+                  << " , maxrank = " << rank
+                  << " , " << float(nnz) / (dim_sep()*dim_sep()) * 100.
+                  << " % compression, time = " << time
+                  << " sec" << std::endl;
     }
   }
 

@@ -805,8 +805,18 @@ namespace strumpack {
      */
     void disable_replace_tiny_pivots() { _replace_tiny_pivots = false; }
 
+    /**
+     * Dump the root front to a set of files, one for each rank. This
+     * will only have affect when running with more than one MPI rank,
+     * and without compression.
+     */
     void set_write_root_front(bool b)  { _write_root_front = b; }
 
+    /**
+     * Print statistics, about ranks, memory etc, for the root front
+     * only.
+     */
+    void set_print_root_front_stats(bool b)  { _print_root_front_stats = b; }
 
     /**
      * Check if verbose output is enabled.
@@ -1063,6 +1073,12 @@ namespace strumpack {
     bool write_root_front() const { return _write_root_front; }
 
     /**
+     * Info about the stats of the root front will be printed to
+     * std::cout
+     */
+    bool print_root_front_stats() const { return _print_root_front_stats; }
+
+    /**
      * Get a (const) reference to an object holding various options
      * pertaining to the HSS code, and data structures.
      */
@@ -1171,6 +1187,7 @@ namespace strumpack {
         {"sp_components",                required_argument, 0, 43},
         {"sp_separator_width",           required_argument, 0, 44},
         {"sp_write_root_front",          no_argument, 0, 45},
+        {"sp_print_root_front_stats",    no_argument, 0, 46},
         {"sp_verbose",                   no_argument, 0, 'v'},
         {"sp_quiet",                     no_argument, 0, 'q'},
         {"help",                         no_argument, 0, 'h'},
@@ -1358,6 +1375,7 @@ namespace strumpack {
           set_separator_width(_separator_width);
         } break;
         case 45: set_write_root_front(true); break;
+        case 46: set_print_root_front_stats(true); break;
         case 'h': { describe_options(); } break;
         case 'v': set_verbose(true); break;
         case 'q': set_verbose(false); break;
@@ -1496,6 +1514,7 @@ namespace strumpack {
       std::cout << "#   --sp_enable_replace_tiny_pivots" << std::endl;
       std::cout << "#   --sp_disable_replace_tiny_pivots" << std::endl;
       std::cout << "#   --sp_write_root_front" << std::endl;
+      std::cout << "#   --sp_print_root_front_stats" << std::endl;
       std::cout << "#   --sp_verbose or -v (default " << verbose() << ")"
                 << std::endl;
       std::cout << "#   --sp_quiet or -q (default " << !verbose() << ")"
@@ -1529,6 +1548,7 @@ namespace strumpack {
     bool _log_assembly_tree = false;
     bool _replace_tiny_pivots = false;
     bool _write_root_front = false;
+    bool _print_root_front_stats = false;
 
     /** compression options */
     CompressionType _comp = CompressionType::NONE;

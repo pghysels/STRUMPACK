@@ -195,6 +195,8 @@ namespace strumpack {
       lchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
     if (visit(rchild_))
       rchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
+    TaskTimer t("");
+    if (etree_level == 0 && opts.print_root_front_stats()) t.start();
     build_front(A);
     if (etree_level == 0 && opts.write_root_front()) {
       F11_.print_to_files("Froot");
@@ -203,6 +205,13 @@ namespace strumpack {
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
     partial_factorization();
+    if (etree_level == 0 && opts.print_root_front_stats()) {
+      auto time = t.elapsed();
+      if (Comm().is_root())
+        std::cout << "#   - DenseMPI root front: N = " << this->dim_sep()
+                  << " , N^2 = " << this->dim_sep() * this->dim_sep()
+                  << " , time = " << time << " sec" << std::endl;
+    }
   }
 
   template<typename scalar_t,typename integer_t> void

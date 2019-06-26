@@ -204,11 +204,27 @@ namespace strumpack {
     if (visit(rchild_))
       rchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
     if (!dim_blk()) return;
+    TaskTimer t("");
+    if (etree_level == 0 && opts.print_root_front_stats()) t.start();
     switch (opts.HODLR_options().compression_algorithm()) {
     case HODLR::CompressionAlgorithm::RANDOM_SAMPLING:
       compress_sampling(A, opts); break;
     case HODLR::CompressionAlgorithm::ELEMENT_EXTRACTION:
       compress_extraction(A, opts); break;
+    }
+    if (etree_level == 0 && opts.print_root_front_stats()) {
+      auto time = t.elapsed();
+      auto rank = F11_.get_stat("Rank_max");
+      auto nnz = F11_.get_stat("Mem_Fill") * 1.0e6 / sizeof(scalar_t);
+      nnz = Comm().reduce(nnz, MPI_SUM);
+      if (Comm().is_root())
+        std::cout << "#   - HODLRMPI root front: N = " << dim_sep()
+                  << " , N^2 = " << dim_sep() * dim_sep()
+                  << " , nnz = " << nnz
+                  << " , maxrank = " << rank
+                  << " , " << float(nnz) / (dim_sep()*dim_sep()) * 100.
+                  << " % compression, time = " << time
+                  << " sec" << std::endl;
     }
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();

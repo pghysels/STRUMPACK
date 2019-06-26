@@ -238,6 +238,8 @@ namespace strumpack {
         rchild_->multifrontal_factorization
           (A, opts, etree_level+1, task_depth);
     }
+    TaskTimer t("");
+    if (etree_level == 0 && opts.print_root_front_stats()) t.start();
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();
     if (opts.BLR_options().low_rank_algorithm() ==
@@ -330,6 +332,16 @@ namespace strumpack {
       if (rchild_) rchild_->release_work_memory();
     }
     // TODO flops
+    if (etree_level == 0 && opts.print_root_front_stats()) {
+      auto time = t.elapsed();
+      auto nnz = F11blr_.nonzeros();
+      std::cout << "#   - BLR root front: N = " << dim_sep()
+                << " , N^2 = " << dim_sep() * dim_sep()
+                << " , nnz = " << nnz
+                << " , " << float(nnz) / (dim_sep()*dim_sep()) * 100.
+                << " % compression, time = " << time
+                << " sec" << std::endl;
+    }
   }
 
   template<typename scalar_t,typename integer_t> void
