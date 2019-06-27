@@ -215,7 +215,8 @@ namespace strumpack {
     if (etree_level == 0 && opts.print_root_front_stats()) {
       auto time = t.elapsed();
       auto rank = F11_.get_stat("Rank_max");
-      auto nnz = F11_.get_stat("Mem_Fill") * 1.0e6 / sizeof(scalar_t);
+      auto nnz = (F11_.get_stat("Mem_Fill") + F11_.get_stat("Mem_Factor"))
+        * 1.0e6 / sizeof(scalar_t);
       nnz = Comm().reduce(nnz, MPI_SUM);
       if (Comm().is_root())
         std::cout << "#   - HODLRMPI root front: N = " << dim_sep()
