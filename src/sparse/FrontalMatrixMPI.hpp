@@ -385,9 +385,9 @@ namespace strumpack {
   (int task_depth) const {
     long long nnz = node_factor_nonzeros();
     if (visit(lchild_))
-      nnz += lchild_->dense_factor_nonzeros(task_depth);
+      nnz += lchild_->factor_nonzeros(task_depth);
     if (visit(rchild_))
-      nnz += rchild_->dense_factor_nonzeros(task_depth);
+      nnz += rchild_->factor_nonzeros(task_depth);
     return nnz;
   }
 
