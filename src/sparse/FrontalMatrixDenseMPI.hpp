@@ -208,9 +208,8 @@ namespace strumpack {
     if (etree_level == 0 && opts.print_root_front_stats()) {
       auto time = t.elapsed();
       if (Comm().is_root())
-        std::cout << "#   - DenseMPI root front: N = " << this->dim_sep()
-                  << " , N^2 = " << this->dim_sep() * this->dim_sep()
-                  << " , time = " << time << " sec" << std::endl;
+        std::cout << "#   - DenseMPI root front: Nsep= " << this->dim_sep()
+                  << " , time= " << time << " sec" << std::endl;
     }
   }
 

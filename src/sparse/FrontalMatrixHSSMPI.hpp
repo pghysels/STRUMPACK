@@ -231,7 +231,7 @@ namespace strumpack {
     if (!dim_blk()) return;
 
     TaskTimer t("");
-    if (etree_level == 0 && opts.print_root_front_stats()) t.start();
+    if (/*etree_level == 0 && */opts.print_root_front_stats()) t.start();
     auto mult = [&](DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
       random_sampling(A, opts, R, Sr, Sc);
@@ -275,17 +275,24 @@ namespace strumpack {
         ULV_ = H_->factor();
       }
     }
-    if (etree_level == 0 && opts.print_root_front_stats()) {
+    if (/*etree_level == 0 && */opts.print_root_front_stats()) {
       auto time = t.elapsed();
       auto rank = H_->max_rank();
-      auto nnz = H_->total_nonzeros();
+      std::size_t nnzH = (H_ ? H_->total_nonzeros() : 0);
+      std::size_t nnzULV = ULV_.total_nonzeros(Comm().comm());
+      std::size_t nnzT = theta_.total_nonzeros();
+      std::size_t nnzP = phi_.total_nonzeros();
+      std::size_t nnzV = Vhat_.total_nonzeros();
       if (Comm().is_root())
-        std::cout << "#   - HSSMPI root front: N = " << dim_sep()
-                  << " , N^2 = " << dim_sep() * dim_sep()
-                  << " , nnz = " << nnz
-                  << " , maxrank = " << rank
-                  << " , " << float(nnz) / (dim_sep()*dim_sep()) * 100.
-                  << " % compression, time = " << time
+        std::cout << "#   - HSSMPI front: Nsep= " << dim_sep()
+                  << " , Nupd= " << dim_upd()
+                  << " , nnz(H)= " << nnzH
+                  << " , nnz(ULV)= " << nnzULV
+                  << " , nnz(Schur)= " << (nnzT + nnzP + nnzV)
+                  << " , maxrank= " << rank
+                  << " , " << (float(nnzH + nnzULV + nnzT + nnzP + nnzV)
+                               / (dim_blk()*dim_blk()) * 100.)
+                  << " %compression, time= " << time
                   << " sec" << std::endl;
     }
   }

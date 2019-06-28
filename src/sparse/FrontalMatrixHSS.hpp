@@ -157,6 +157,7 @@ namespace strumpack {
     using FrontalMatrix<scalar_t,integer_t>::rchild_;
     using FrontalMatrix<scalar_t,integer_t>::dim_sep;
     using FrontalMatrix<scalar_t,integer_t>::dim_upd;
+    using FrontalMatrix<scalar_t,integer_t>::dim_blk;
     using FrontalMatrix<scalar_t,integer_t>::sep_begin_;
     using FrontalMatrix<scalar_t,integer_t>::sep_end_;
   };
@@ -486,7 +487,7 @@ namespace strumpack {
           (A, opts, etree_level+1, task_depth);
     }
     TaskTimer t("");
-    if (etree_level == 0 && opts.print_root_front_stats()) t.start();
+    if (/*etree_level == 0 && */opts.print_root_front_stats()) t.start();
     _H.set_openmp_task_depth(task_depth);
     auto mult = [&](DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
@@ -537,15 +538,22 @@ namespace strumpack {
         TIMER_STOP(t_fact);
       }
     }
-    if (etree_level == 0 && opts.print_root_front_stats()) {
+    if (/*etree_level == 0 && */opts.print_root_front_stats()) {
       auto time = t.elapsed();
-      auto nnz = _H.nonzeros();
-      std::cout << "#   - HSS root front: N = " << dim_sep()
-                << " , N^2 = " << dim_sep() * dim_sep()
-                << " , nnz = " << nnz
-                << " , maxrank = " << _H.rank()
-                << " , " << float(nnz) / (dim_sep()*dim_sep()) * 100.
-                << " % compression, time = " << time
+      auto rank = _H.rank();
+      std::size_t nnzH = _H.nonzeros();
+      std::size_t nnzULV = _ULV.nonzeros();
+      std::size_t nnzSchur = _Theta.nonzeros()
+        + _Phi.nonzeros() + _ThetaVhatC_or_VhatCPhiC.nonzeros();
+      std::cout << "#   - HSSMPI front: Nsep= " << dim_sep()
+                << " , Nupd= " << dim_upd()
+                << " , nnz(H)= " << nnzH
+                << " , nnz(ULV)= " << nnzULV
+                << " , nnz(Schur)= " << nnzSchur
+                << " , maxrank= " << rank
+                << " , " << (float(nnzH + nnzULV + nnzSchur)
+                             / (dim_blk()*dim_blk()) * 100.)
+                << " %compression, time= " << time
                 << " sec" << std::endl;
     }
   }

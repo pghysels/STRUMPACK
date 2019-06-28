@@ -205,26 +205,51 @@ namespace strumpack {
       rchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
     if (!dim_blk()) return;
     TaskTimer t("");
-    if (etree_level == 0 && opts.print_root_front_stats()) t.start();
+    if (/*etree_level == 0 && */opts.print_root_front_stats()) t.start();
     switch (opts.HODLR_options().compression_algorithm()) {
     case HODLR::CompressionAlgorithm::RANDOM_SAMPLING:
       compress_sampling(A, opts); break;
     case HODLR::CompressionAlgorithm::ELEMENT_EXTRACTION:
       compress_extraction(A, opts); break;
     }
-    if (etree_level == 0 && opts.print_root_front_stats()) {
+    if (/*etree_level == 0 && */opts.print_root_front_stats()) {
       auto time = t.elapsed();
-      auto rank = F11_.get_stat("Rank_max");
-      auto nnz = (F11_.get_stat("Mem_Fill") + F11_.get_stat("Mem_Factor"))
-        * 1.0e6 / sizeof(scalar_t);
-      nnz = Comm().reduce(nnz, MPI_SUM);
+      float perbyte = 1.0e6 / sizeof(scalar_t);
+      float tmp[8];
+      float& F11nnzH = tmp[0]; float& F11nnzFactors = tmp[4];
+      float& F12nnzH = tmp[1]; float& F12nnzFactors = tmp[5];
+      float& F21nnzH = tmp[2]; float& F21nnzFactors = tmp[6];
+      float& F22nnzH = tmp[3]; float& F22nnzFactors = tmp[7];
+      auto F11rank = F11_.get_stat("Rank_max");
+      F11nnzH = F11_.get_stat("Mem_Fill") * perbyte;
+      F11nnzFactors = F11_.get_stat("Mem_Factor") * perbyte;
+      auto F12rank = F12_.get_stat("Rank_max");
+      F12nnzH = F12_.get_stat("Mem_Fill") * perbyte;
+      F12nnzFactors = F12_.get_stat("Mem_Factor") * perbyte;
+      auto F21rank = F21_.get_stat("Rank_max");
+      F21nnzH = F21_.get_stat("Mem_Fill") * perbyte;
+      F21nnzFactors = F21_.get_stat("Mem_Factor") * perbyte;
+      int F22rank = 0;
+      if (F22_) {
+        F22rank = F22_->get_stat("Rank_max");
+        F22nnzH = F22_->get_stat("Mem_Fill") * perbyte;
+        F22nnzFactors = F22_->get_stat("Mem_Factor") * perbyte;
+      } else F22nnzH = F22nnzFactors = 0.;
+      Comm().reduce(tmp, 8, MPI_SUM);
       if (Comm().is_root())
-        std::cout << "#   - HODLRMPI root front: N = " << dim_sep()
-                  << " , N^2 = " << dim_sep() * dim_sep()
-                  << " , nnz = " << nnz
-                  << " , maxrank = " << rank
-                  << " , " << float(nnz) / (dim_sep()*dim_sep()) * 100.
-                  << " % compression, time = " << time
+        std::cout << "#   - HODLRMPI front: Nsep= " << dim_sep()
+                  << " , Nupd= " << dim_upd() << "\n#       "
+                  << " nnz(F11)= " << F11nnzH << " , nnz(factor(F11))= "
+                  << F11nnzFactors << " , rank(F11)= " << F11rank << " ,\n#       "
+                  << " nnz(F12)= " << F12nnzH << " , nnz(factor(F12))= "
+                  << F12nnzFactors << " , rank(F12)= " << F12rank << " ,\n#       "
+                  << " nnz(F21)= " << F21nnzH << " , nnz(factor(F21))= "
+                  << F21nnzFactors << " , rank(F21)= " << F21rank << " ,\n#       "
+                  << " nnz(F22)= " << F22nnzH << " , nnz(factor(F22))= "
+                  << F22nnzFactors << " , rank(F22)= " << F22rank << " ,\n#       "
+                  << (float(tmp[0]+tmp[1]+tmp[2]+tmp[3]+tmp[4]+tmp[5]+tmp[6]+tmp[7])
+                               / (dim_blk()*dim_blk()) * 100.)
+                  << " %compression, time= " << time
                   << " sec" << std::endl;
     }
     if (lchild_) lchild_->release_work_memory();

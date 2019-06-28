@@ -140,6 +140,7 @@ namespace strumpack {
     using FrontalMatrix<scalar_t,integer_t>::rchild_;
     using FrontalMatrix<scalar_t,integer_t>::dim_sep;
     using FrontalMatrix<scalar_t,integer_t>::dim_upd;
+    using FrontalMatrix<scalar_t,integer_t>::dim_blk;
     using FrontalMatrix<scalar_t,integer_t>::sep_begin_;
     using FrontalMatrix<scalar_t,integer_t>::sep_end_;
   };
@@ -414,23 +415,44 @@ namespace strumpack {
     }
     if (!this->dim_blk()) return;
     TaskTimer t("");
-    if (etree_level == 0 && opts.print_root_front_stats()) t.start();
+    if (/*etree_level == 0 && */opts.print_root_front_stats()) t.start();
     switch (opts.HODLR_options().compression_algorithm()) {
     case HODLR::CompressionAlgorithm::RANDOM_SAMPLING:
       compress_sampling(A, opts, task_depth); break;
     case HODLR::CompressionAlgorithm::ELEMENT_EXTRACTION:
       compress_extraction(A, opts, task_depth); break;
     }
-    if (etree_level == 0 && opts.print_root_front_stats()) {
+    if (/*etree_level == 0 && */opts.print_root_front_stats()) {
       auto time = t.elapsed();
-      auto rank = F11_.get_stat("Rank_max");
-      auto nnz = F11_.get_stat("Mem_Fill") * 1.0e6 / sizeof(scalar_t);
-      std::cout << "#   - HODLR root front: N = " << dim_sep()
-                << " , N^2 = " << dim_sep() * dim_sep()
-                << " , nnz = " << nnz
-                << " , maxrank = " << rank
-                << " , " << float(nnz) / (dim_sep()*dim_sep()) * 100.
-                << " % compression, time = " << time
+      float perbyte = 1.0e6 / sizeof(scalar_t);
+      auto F11rank = F11_.get_stat("Rank_max");
+      float F11nnzH = F11_.get_stat("Mem_Fill") * perbyte;
+      float F11nnzFactors = F11_.get_stat("Mem_Factor") * perbyte;
+      auto F12rank = F12_.get_stat("Rank_max");
+      float F12nnzH = F12_.get_stat("Mem_Fill") * perbyte;
+      float F12nnzFactors = F12_.get_stat("Mem_Factor") * perbyte;
+      auto F21rank = F21_.get_stat("Rank_max");
+      float F21nnzH = F21_.get_stat("Mem_Fill") * perbyte;
+      float F21nnzFactors = F21_.get_stat("Mem_Factor") * perbyte;
+      int F22rank = 0;
+      float F22nnzH = 0, F22nnzFactors = 0;
+      if (F22_) {
+        F22rank = F22_->get_stat("Rank_max");
+        F22nnzH = F22_->get_stat("Mem_Fill") * perbyte;
+        F22nnzFactors = F22_->get_stat("Mem_Factor") * perbyte;
+      }
+      std::cout << "#   - HODLR front: Nsep= " << dim_sep()
+                << " Nupd= " << dim_upd() << "\n#       "
+                << " nnz(F11)= " << F11nnzH << " , nnz(factor(F11))= "
+                << F11nnzFactors << " , rank(F11)= " << F11rank << " ,\n#       "
+                << " nnz(F12)= " << F12nnzH << " , nnz(factor(F12))= "
+                << F12nnzFactors << " , rank(F11)= " << F11rank << " ,\n#       "
+                << " nnz(F21)= " << F21nnzH << " , nnz(factor(F21))= "
+                << F21nnzFactors << " , rank(F11)= " << F11rank << " ,\n#       "
+                << (float(F11nnzH + F11nnzFactors + F12nnzH + F12nnzFactors +
+                          F21nnzH + F21nnzFactors + F22nnzH + F22nnzFactors)
+                    / (dim_blk()*dim_blk()) * 100.)
+                << " %compression, time= " << time
                 << " sec" << std::endl;
     }
     if (lchild_) lchild_->release_work_memory();
