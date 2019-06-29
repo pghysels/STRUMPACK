@@ -552,7 +552,7 @@ namespace strumpack {
                 << " , nnz(Schur)= " << nnzSchur
                 << " , maxrank= " << rank
                 << " , " << (float(nnzH + nnzULV + nnzSchur)
-                             / (dim_blk()*dim_blk()) * 100.)
+                             / (float(dim_blk())*dim_blk()) * 100.)
                 << " %compression, time= " << time
                 << " sec" << std::endl;
     }

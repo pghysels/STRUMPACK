@@ -291,7 +291,7 @@ namespace strumpack {
                   << " , nnz(Schur)= " << (nnzT + nnzP + nnzV)
                   << " , maxrank= " << rank
                   << " , " << (float(nnzH + nnzULV + nnzT + nnzP + nnzV)
-                               / (dim_blk()*dim_blk()) * 100.)
+                               / (float(dim_blk())*dim_blk()) * 100.)
                   << " %compression, time= " << time
                   << " sec" << std::endl;
     }

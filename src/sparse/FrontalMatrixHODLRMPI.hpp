@@ -215,40 +215,35 @@ namespace strumpack {
     if (/*etree_level == 0 && */opts.print_root_front_stats()) {
       auto time = t.elapsed();
       float perbyte = 1.0e6 / sizeof(scalar_t);
-      float tmp[8];
-      float& F11nnzH = tmp[0]; float& F11nnzFactors = tmp[4];
-      float& F12nnzH = tmp[1]; float& F12nnzFactors = tmp[5];
-      float& F21nnzH = tmp[2]; float& F21nnzFactors = tmp[6];
-      float& F22nnzH = tmp[3]; float& F22nnzFactors = tmp[7];
+      float tmp[5];
+      float& F11nnzH = tmp[0];
+      float& F11nnzFactors = tmp[1];
+      float& F12nnzH = tmp[2];
+      float& F21nnzH = tmp[3];
+      float& F22nnzH = tmp[4];
       auto F11rank = F11_.get_stat("Rank_max");
       F11nnzH = F11_.get_stat("Mem_Fill") * perbyte;
       F11nnzFactors = F11_.get_stat("Mem_Factor") * perbyte;
       auto F12rank = F12_.get_stat("Rank_max");
       F12nnzH = F12_.get_stat("Mem_Fill") * perbyte;
-      F12nnzFactors = F12_.get_stat("Mem_Factor") * perbyte;
       auto F21rank = F21_.get_stat("Rank_max");
       F21nnzH = F21_.get_stat("Mem_Fill") * perbyte;
-      F21nnzFactors = F21_.get_stat("Mem_Factor") * perbyte;
       int F22rank = 0;
       if (F22_) {
         F22rank = F22_->get_stat("Rank_max");
         F22nnzH = F22_->get_stat("Mem_Fill") * perbyte;
-        F22nnzFactors = F22_->get_stat("Mem_Factor") * perbyte;
-      } else F22nnzH = F22nnzFactors = 0.;
-      Comm().reduce(tmp, 8, MPI_SUM);
+      } else F22nnzH = 0.;
+      Comm().reduce(tmp, 5, MPI_SUM);
       if (Comm().is_root())
         std::cout << "#   - HODLRMPI front: Nsep= " << dim_sep()
                   << " , Nupd= " << dim_upd() << "\n#       "
                   << " nnz(F11)= " << F11nnzH << " , nnz(factor(F11))= "
                   << F11nnzFactors << " , rank(F11)= " << F11rank << " ,\n#       "
-                  << " nnz(F12)= " << F12nnzH << " , nnz(factor(F12))= "
-                  << F12nnzFactors << " , rank(F12)= " << F12rank << " ,\n#       "
-                  << " nnz(F21)= " << F21nnzH << " , nnz(factor(F21))= "
-                  << F21nnzFactors << " , rank(F21)= " << F21rank << " ,\n#       "
-                  << " nnz(F22)= " << F22nnzH << " , nnz(factor(F22))= "
-                  << F22nnzFactors << " , rank(F22)= " << F22rank << " ,\n#       "
-                  << (float(tmp[0]+tmp[1]+tmp[2]+tmp[3]+tmp[4]+tmp[5]+tmp[6]+tmp[7])
-                               / (dim_blk()*dim_blk()) * 100.)
+                  << " nnz(F12)= " << F12nnzH << " , rank(F12)= " << F12rank << " , "
+                  << " nnz(F21)= " << F21nnzH << " , rank(F21)= " << F21rank << " ,\n#       "
+                  << " nnz(F22)= " << F22nnzH << " , rank(F22)= " << F22rank << " , "
+                  << (float(tmp[0]+tmp[1]+tmp[2]+tmp[3]+tmp[4])
+                      / (float(dim_blk())*dim_blk()) * 100.)
                   << " %compression, time= " << time
                   << " sec" << std::endl;
     }

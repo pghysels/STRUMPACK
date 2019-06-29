@@ -430,28 +430,23 @@ namespace strumpack {
       float F11nnzFactors = F11_.get_stat("Mem_Factor") * perbyte;
       auto F12rank = F12_.get_stat("Rank_max");
       float F12nnzH = F12_.get_stat("Mem_Fill") * perbyte;
-      float F12nnzFactors = F12_.get_stat("Mem_Factor") * perbyte;
       auto F21rank = F21_.get_stat("Rank_max");
       float F21nnzH = F21_.get_stat("Mem_Fill") * perbyte;
-      float F21nnzFactors = F21_.get_stat("Mem_Factor") * perbyte;
       int F22rank = 0;
-      float F22nnzH = 0, F22nnzFactors = 0;
+      float F22nnzH = 0;
       if (F22_) {
         F22rank = F22_->get_stat("Rank_max");
         F22nnzH = F22_->get_stat("Mem_Fill") * perbyte;
-        F22nnzFactors = F22_->get_stat("Mem_Factor") * perbyte;
       }
       std::cout << "#   - HODLR front: Nsep= " << dim_sep()
                 << " Nupd= " << dim_upd() << "\n#       "
                 << " nnz(F11)= " << F11nnzH << " , nnz(factor(F11))= "
                 << F11nnzFactors << " , rank(F11)= " << F11rank << " ,\n#       "
-                << " nnz(F12)= " << F12nnzH << " , nnz(factor(F12))= "
-                << F12nnzFactors << " , rank(F11)= " << F11rank << " ,\n#       "
-                << " nnz(F21)= " << F21nnzH << " , nnz(factor(F21))= "
-                << F21nnzFactors << " , rank(F11)= " << F11rank << " ,\n#       "
-                << (float(F11nnzH + F11nnzFactors + F12nnzH + F12nnzFactors +
-                          F21nnzH + F21nnzFactors + F22nnzH + F22nnzFactors)
-                    / (dim_blk()*dim_blk()) * 100.)
+                << " nnz(F12)= " << F12nnzH << " , rank(F12)= " << F12rank << " , "
+                << " nnz(F21)= " << F21nnzH << " , rank(F21)= " << F21rank << " ,\n#       "
+                << " nnz(F22)= " << F22nnzH << " , rank(F22)= " << F22rank << " , "
+                << (float(F11nnzH + F11nnzFactors + F12nnzH + F21nnzH + F22nnzH)
+                    / (float(dim_blk())*dim_blk()) * 100.)
                 << " %compression, time= " << time
                 << " sec" << std::endl;
     }

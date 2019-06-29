@@ -405,8 +405,9 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> long long
   FrontalMatrixMPI<scalar_t,integer_t>::node_factor_nonzeros() const {
-    return Comm().is_root() ?
-      this->dim_sep() * (this->dim_sep() + 2 * this->dim_upd()) : 0;
+    long long dsep = this->dim_sep();
+    long long dupd = this->dim_upd();
+    return Comm().is_root() ? dsep * (dsep + 2 * dupd) : 0;
   }
 
 } // end namespace strumpack
