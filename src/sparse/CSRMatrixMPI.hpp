@@ -763,24 +763,20 @@ namespace strumpack {
   CSRMatrixMPI<scalar_t,integer_t>::gather() const {
     auto rank = mpi_rank(_comm);
     auto P = mpi_nprocs(_comm);
-    std::unique_ptr<CSRMatrix<scalar_t,integer_t>> Aseq;
-    int* rcnts = nullptr;
-    int* displs = nullptr;
-    if (rank==0) {
-      Aseq = std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
-        (new CSRMatrix<scalar_t,integer_t>(n_, nnz_));
-      rcnts = new int[2*P];
-      displs = rcnts + P;
+    if (rank == 0) {
+      std::unique_ptr<int[]> iwork(new int[2*P]);
+      auto rcnts = iwork.get();
+      auto displs = rcnts + P;
       for (int p=0; p<P; p++) {
         rcnts[p] = dist_[p+1]-dist_[p];
-        displs[p] = dist_[p]+1;
+        displs[p] = dist_[p];
       }
-    }
-    MPI_Gatherv
-      (const_cast<integer_t*>(this->ptr())+1, local_rows_,
-       mpi_type<integer_t>(), rank ? NULL : Aseq->ptr(), rcnts, displs,
-       mpi_type<integer_t>(), 0, _comm);
-    if (rank==0) {
+      std::unique_ptr<CSRMatrix<scalar_t,integer_t>> Aseq
+        (new CSRMatrix<scalar_t,integer_t>(n_, nnz_));
+      MPI_Gatherv
+        (const_cast<integer_t*>(this->ptr())+1, local_rows_,
+         mpi_type<integer_t>(), Aseq->ptr()+1, rcnts, displs,
+         mpi_type<integer_t>(), 0, _comm);
       Aseq->ptr(0) = 0;
       for (int p=1; p<P; p++) {
         if (dist_[p] > 0) {
@@ -793,17 +789,30 @@ namespace strumpack {
         rcnts[p] = Aseq->ptr(dist_[p+1])-Aseq->ptr(dist_[p]);
         displs[p] = Aseq->ptr(dist_[p]);
       }
+      MPI_Gatherv
+        (const_cast<integer_t*>(this->ind()), local_nnz_,
+         mpi_type<integer_t>(), Aseq->ind(), rcnts, displs,
+         mpi_type<integer_t>(), 0, _comm);
+      MPI_Gatherv
+        (const_cast<scalar_t*>(this->val()), local_nnz_,
+         mpi_type<scalar_t>(), Aseq->val(), rcnts, displs,
+         mpi_type<scalar_t>(), 0, _comm);
+      return Aseq;
+    } else {
+      MPI_Gatherv
+        (const_cast<integer_t*>(this->ptr())+1, local_rows_,
+         mpi_type<integer_t>(), NULL, NULL, NULL,
+         mpi_type<integer_t>(), 0, _comm);
+      MPI_Gatherv
+        (const_cast<integer_t*>(this->ind()), local_nnz_,
+         mpi_type<integer_t>(), NULL, NULL, NULL,
+         mpi_type<integer_t>(), 0, _comm);
+      MPI_Gatherv
+        (const_cast<scalar_t*>(this->val()), local_nnz_,
+         mpi_type<scalar_t>(), NULL, NULL, NULL,
+         mpi_type<scalar_t>(), 0, _comm);
+      return std::unique_ptr<CSRMatrix<scalar_t,integer_t>>();
     }
-    MPI_Gatherv
-      (const_cast<integer_t*>(this->ind()), local_nnz_, mpi_type<integer_t>(),
-       rank ? NULL : Aseq->ind(), rcnts, displs,
-       mpi_type<integer_t>(), 0, _comm);
-    MPI_Gatherv
-      (const_cast<scalar_t*>(this->val()), local_nnz_, mpi_type<scalar_t>(),
-       rank ? NULL : Aseq->val(), rcnts, displs,
-       mpi_type<scalar_t>(), 0, _comm);
-    delete[] rcnts;
-    return Aseq;
   }
 
   template<typename scalar_t,typename integer_t> int
