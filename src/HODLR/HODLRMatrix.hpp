@@ -517,7 +517,6 @@ namespace strumpack {
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
     (const MPIComm& c, kernel::Kernel<scalar_t>& K, const opts_t& opts) {
-      int d = K.d();
       rows_ = cols_ = K.n();
       auto tree = binary_tree_clustering
         (opts.clustering_algorithm(), K.data(), K.permutation(), opts.leaf_size());

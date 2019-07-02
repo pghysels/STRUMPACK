@@ -138,8 +138,8 @@ namespace strumpack {
                       const std::vector<std::size_t>& J,
                       DenseM_t& B) const {
         assert(B.rows() == I.size() && B.cols() == J.size());
-        for (auto j=0; j<J.size(); j++)
-          for (auto i=0; i<I.size(); i++) {
+        for (std::size_t j=0; j<J.size(); j++)
+          for (std::size_t i=0; i<I.size(); i++) {
             assert(I[i] < n() && J[j] < n());
             B(i, j) = eval(I[i], J[j]);
           }

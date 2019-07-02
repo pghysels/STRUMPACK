@@ -265,7 +265,6 @@ namespace strumpack {
       w.Jc = w.Jr;
       _U.check();  assert(_U.cols() == w.Jr.size());
       _V.check();  assert(_V.cols() == w.Jc.size());
-      bool accurate = true;
       int d = S.cols();
       if (!(d >= this->cols() || d >= opts.max_rank() ||
           (int(_U.cols()) + opts.p() < d  &&
