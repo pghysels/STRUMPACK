@@ -304,9 +304,8 @@ namespace strumpack {
   (const DenseMatrix<scalar_t>& data, const DenseMatrix<int_t>& neighbors,
    std::mt19937& generator) {
     auto n = data.cols();
-    auto d = data.rows();
     auto ann_number = neighbors.rows();
-    int nr_samples = 100;
+    std::size_t nr_samples = 100;
     std::vector<std::size_t> samples(nr_samples);
     {
       std::uniform_int_distribution<std::size_t> uni_int(0, n);
@@ -350,7 +349,7 @@ namespace strumpack {
     double quality = check_quality(data, neighbors, generator);
     // construct several random projection trees to find approximate
     // nearest neighbors
-    int iter = 0;
+    std::size_t iter = 0;
     for (; iter<num_iters && quality<0.99; iter++) {
       DenseMatrix<int_t> new_neighbors(ann_number, n);
       DenseMatrix<real_t> new_scores(ann_number, n);

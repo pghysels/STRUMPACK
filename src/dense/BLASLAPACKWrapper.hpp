@@ -1594,7 +1594,7 @@ namespace strumpack {
     template<typename scalar> inline int geqp3
     (int m, int n, scalar* a, int lda, int* jpvt, scalar* tau) {
       scalar lwork;
-      int info = geqp3(m, n, a, lda, jpvt, tau, &lwork, -1);
+      geqp3(m, n, a, lda, jpvt, tau, &lwork, -1);
       int ilwork = int(std::real(lwork));
       std::unique_ptr<scalar[]> work(new scalar[ilwork]);
       return geqp3(m, n, a, lda, jpvt, tau, work.get(), ilwork);
@@ -1672,7 +1672,7 @@ namespace strumpack {
     (int m, int n, scalar* a, int lda, int* jpvt, scalar* tau,
      int& rank, real rtol, real atol, int depth) {
       scalar lwork;
-      int info = geqp3tol
+      geqp3tol
         (m, n, a, lda, jpvt, tau, &lwork, -1, rank, rtol, atol, depth);
       int ilwork = int(std::real(lwork));
       std::unique_ptr<scalar[]> work(new scalar[ilwork]);
@@ -1737,7 +1737,7 @@ namespace strumpack {
     template<typename scalar> inline int geqrf
     (int m, int n, scalar* a, int lda, scalar* tau) {
       scalar lwork;
-      int info = geqrf(m, n, a, lda, tau, &lwork, -1);
+      geqrf(m, n, a, lda, tau, &lwork, -1);
       int ilwork = int(std::real(lwork));
       std::unique_ptr<scalar[]> work(new scalar[ilwork]);
       return geqrf(m, n, a, lda, tau, work.get(), ilwork);
@@ -1780,7 +1780,7 @@ namespace strumpack {
     template<typename scalar> inline int geqrfmod
     (int m, int n, scalar* a, int lda, scalar* tau, int depth) {
       scalar lwork;
-      int info = geqrfmod(m, n, a, lda, tau, &lwork, -1, depth);
+      geqrfmod(m, n, a, lda, tau, &lwork, -1, depth);
       int ilwork = int(std::real(lwork));
       std::unique_ptr<scalar[]> work(new scalar[ilwork]);
       return geqrfmod(m, n, a, lda, tau, work.get(), ilwork, depth);
@@ -1828,7 +1828,7 @@ namespace strumpack {
     template<typename scalar> inline int gelqf
     (int m, int n, scalar* a, int lda, scalar* tau) {
       scalar lwork;
-      int info = gelqf(m, n, a, lda, tau, &lwork, -1);
+      gelqf(m, n, a, lda, tau, &lwork, -1);
       int ilwork = int(std::real(lwork));
       std::unique_ptr<scalar[]> work(new scalar[ilwork]);
       return gelqf(m, n, a, lda, tau, work.get(), ilwork);
@@ -2110,7 +2110,7 @@ namespace strumpack {
     template<typename scalar> inline int xxgqr
     (int m, int n, int k, scalar* a, int lda, const scalar* tau) {
       scalar lwork;
-      int info = xxgqr(m, n, k, a, lda, tau, &lwork, -1);
+      xxgqr(m, n, k, a, lda, tau, &lwork, -1);
       int ilwork = int(std::real(lwork));
       std::unique_ptr<scalar[]> work(new scalar[ilwork]);
       return xxgqr(m, n, k, a, lda, tau, work.get(), ilwork);
@@ -2165,7 +2165,7 @@ namespace strumpack {
     (char side, char trans, int m, int n, int k, scalar* a, int lda,
      const scalar* tau, scalar* c, int ldc) {
       scalar lwork;
-      int info = xxmqr(side, trans, m, n, k, a, lda, tau, c, ldc, &lwork, -1);
+      xxmqr(side, trans, m, n, k, a, lda, tau, c, ldc, &lwork, -1);
       int ilwork = int(std::real(lwork));
       std::unique_ptr<scalar[]> work(new scalar[ilwork]);
       return xxmqr(side, trans, m, n, k, a, lda, tau, c, ldc, work.get(), ilwork);
@@ -2354,11 +2354,10 @@ namespace strumpack {
     template<typename scalar> inline int sytrf
     (char s, int n, scalar* a, int lda, int* ipiv) {
       scalar lwork;
-      int info = sytrf(s, n, a, lda, ipiv, &lwork, -1);
+      sytrf(s, n, a, lda, ipiv, &lwork, -1);
       int ilwork = int(std::real(lwork));
       std::unique_ptr<scalar[]> work(new scalar[ilwork]);
-      info = sytrf(s, n, a, lda, ipiv, work.get(), ilwork);
-      return info;
+      return sytrf(s, n, a, lda, ipiv, work.get(), ilwork);
     }
 
     inline long long sytrf_rook_flops(long long n) {
@@ -2401,11 +2400,10 @@ namespace strumpack {
     template<typename scalar> inline int sytrf_rook
     (char s, int n, scalar* a, int lda, int* ipiv) {
       scalar lwork;
-      int info = sytrf_rook(s, n, a, lda, ipiv, &lwork, -1);
+      sytrf_rook(s, n, a, lda, ipiv, &lwork, -1);
       int ilwork = int(std::real(lwork));
       std::unique_ptr<scalar[]> work(new scalar[ilwork]);
-      info = sytrf_rook(s, n, a, lda, ipiv, work.get(), ilwork);
-      return info;
+      return sytrf_rook(s, n, a, lda, ipiv, work.get(), ilwork);
     }
 
 

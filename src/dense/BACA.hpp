@@ -47,17 +47,17 @@ namespace strumpack {
     int rank = 0;
     std::fill(piv, piv+d, 0);
 #if 0
-    int info = blas::geqp3tol
+    blas::geqp3tol
       (d, d, W.data(), W.ld(), piv, tau, rank, rtol, atol,
        params::task_recursion_cutoff_level);
 #else
-    int info = blas::geqp3(d, d, W.data(), W.ld(), piv, tau);
+    blas::geqp3(d, d, W.data(), W.ld(), piv, tau);
     auto sfmin = blas::lamch<real_t>('S');
     for (; rank<d; rank++) if (std::abs(W(rank,rank)) < sfmin) break;
 #endif
     blas::lapmt(true, C.rows(), C.cols(), C.data(), C.ld(), piv);
     // R = T^{-1} Q^T R
-    info = blas::xxmqr
+    blas::xxmqr
       ('L', 'T', d, R.cols(), rank, W.data(), W.ld(), tau,
        R.data(), R.ld());
     blas::trsm
@@ -85,8 +85,8 @@ namespace strumpack {
         s += real_t(2.) * std::real(VRt(i, j) * CtU(j, i));
     DenseMatrixWrapper<scalar_t> RRt(rb, rb, VRt, r-rb, 0),
       CtC(rb, rb, CtU, 0, r-rb);
-    int info = blas::potrf('U', CtC.rows(), CtC.data(), CtC.ld());
-    info = blas::potrf('L', RRt.rows(), RRt.data(), RRt.ld());
+    blas::potrf('U', CtC.rows(), CtC.data(), CtC.ld());
+    blas::potrf('L', RRt.rows(), RRt.data(), RRt.ld());
     nu = real_t(0.);
     for (std::size_t j=0; j<rb; j++)
       for (std::size_t i=0; i<rb; i++) {
@@ -105,7 +105,7 @@ namespace strumpack {
     auto m = X.rows();
     auto n = X.cols();
     std::fill(piv, piv+n, 0);
-    int info = blas::geqp3(m, n, X.data(), X.ld(), piv, tau);
+    blas::geqp3(m, n, X.data(), X.ld(), piv, tau);
     I.resize(std::min(m, n));
     std::transform
       (piv, piv+std::min(m, n), I.begin(), [](int pvt){ return pvt-1; });
@@ -152,7 +152,6 @@ namespace strumpack {
     auto tau = w_.get();
     auto work = tau + maxmn;
     std::size_t rank = 0;
-    int info;
     real_t mu(0.);
 
     while (rank < rmax) {
@@ -248,7 +247,6 @@ namespace strumpack {
     auto tau = w_.get();
     auto work = tau + maxmn;
     std::size_t rank = 0;
-    int info;
     real_t mu(0.);
 
     while (rank < rmax) {
