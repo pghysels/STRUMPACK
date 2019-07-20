@@ -38,16 +38,7 @@
 #include "ProportionallyDistributedSparseMatrix.hpp"
 #include "CSRMatrixMPI.hpp"
 #include "MatrixReorderingMPI.hpp"
-#include "FrontalMatrixHSS.hpp"
-#include "FrontalMatrixDense.hpp"
-#include "FrontalMatrixDenseMPI.hpp"
-#include "FrontalMatrixHSSMPI.hpp"
-#include "FrontalMatrixBLRMPI.hpp"
-#if defined(STRUMPACK_USE_BPACK)
-#include "FrontalMatrixHODLRMPI.hpp"
-#endif
 #include "Redistribute.hpp"
-#include "HSS/HSSPartitionTree.hpp"
 
 namespace strumpack {
 
@@ -57,17 +48,7 @@ namespace strumpack {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
-    using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
-    using FHSS_t = FrontalMatrixHSS<scalar_t,integer_t>;
-    using FBLR_t = FrontalMatrixBLR<scalar_t,integer_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
-    using FDMPI_t = FrontalMatrixDenseMPI<scalar_t,integer_t>;
-    using FHSSMPI_t = FrontalMatrixHSSMPI<scalar_t,integer_t>;
-    using FBLRMPI_t = FrontalMatrixBLRMPI<scalar_t,integer_t>;
-#if defined(STRUMPACK_USE_BPACK)
-    using FHODLR_t = FrontalMatrixHODLR<scalar_t,integer_t>;
-    using FHODLRMPI_t = FrontalMatrixHODLRMPI<scalar_t,integer_t>;
-#endif
     using DistM_t = DistributedMatrix<scalar_t>;
     using SepRange = std::pair<std::size_t,std::size_t>;
 
@@ -190,7 +171,7 @@ namespace strumpack {
       std::vector<float> sbuf(2*P_);
       // initialize buffer or valgrind will complain about MPI sending
       // uninitialized data
-      sbuf[2*rank_] = sbuf[2*rank_+1] = 0.0;
+      //sbuf[2*rank_] = sbuf[2*rank_+1] = 0.0;
       for (integer_t dsep=0; dsep<nd_.tree().separators(); dsep++)
         if (rank_ == nd_.proc_dist_sep[dsep]) {
           if (nd_.tree().lch(dsep) == -1)
@@ -281,18 +262,18 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPIDist<scalar_t,integer_t>::get_all_pfronts() {
-    auto nr_par_fronts = new integer_t[P_];
+    std::unique_ptr<int[]> iwork(new int[3*P_]);
+    auto nr_par_fronts = iwork.get();
+    auto rcnts = nr_par_fronts + P_;
+    auto rdispls = rcnts + P_;
     nr_par_fronts[rank_] = 0;
     for (auto& f : local_pfronts_)
       if (f.P0 == rank_) nr_par_fronts[rank_]++;
     MPI_Allgather
       (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, nr_par_fronts, 1,
-       mpi_type<integer_t>(), comm_.comm());
-    integer_t total_pfronts = std::accumulate
-      (nr_par_fronts, nr_par_fronts+P_, 0);
+       mpi_type<int>(), comm_.comm());
+    int total_pfronts = std::accumulate(nr_par_fronts, nr_par_fronts+P_, 0);
     all_pfronts_.resize(total_pfronts);
-    auto rcnts = new int[2*P_];
-    auto rdispls = rcnts + P_;
     rdispls[0] = 0;
     auto fbytes = sizeof(ParallelFront);
     for (int p=0; p<P_; p++)
@@ -305,11 +286,9 @@ namespace strumpack {
         if (f.P0 == rank_)
           all_pfronts_[i++] = f;
     }
-    delete[] nr_par_fronts;
     MPI_Allgatherv
       (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
        all_pfronts_.data(), rcnts, rdispls, MPI_BYTE, comm_.comm());
-    delete[] rcnts;
   }
 
   /**
@@ -384,18 +363,21 @@ namespace strumpack {
     const std::size_t lo = dist[rank_];
     const std::size_t m = dist[rank_+1] - lo;
     const std::size_t n = x.cols();
-    auto ibuf = new int[4*P_];
+    std::unique_ptr<int[]> iwork(new int[4*P_]);
+    auto ibuf = iwork.get();
     auto scnts = ibuf;
     auto rcnts = ibuf + P_;
     auto sdispls = ibuf + 2*P_;
     auto rdispls = ibuf + 3*P_;
     // TODO use Triplet / std::tuple
     struct RCVal { int r, c; scalar_t v; };
-    auto sbuf = new RCVal[m*n];
-    // since some C++ pad the struct IdxVal must zero the array or
+    std::unique_ptr<RCVal[]> sbufwork(new RCVal[m*n]);
+    auto sbuf = sbufwork.get();
+    // since some C++ pad the struct, IdxVal must zero the array or
     // will get valgrind warnings about MPI sending uninitialized data
     memset(sbuf,0,m*n*sizeof(RCVal));
-    auto pp = new RCVal*[P_];
+    std::unique_ptr<RCVal*[]> pp(new RCVal*[P_]);
+    //auto pp = ppwork.get();
     std::fill(scnts, scnts+P_, 0);
     if (n == 1) {
       for (std::size_t r=0; r<m; r++)
@@ -459,7 +441,8 @@ namespace strumpack {
       rdispls[p] = rdispls[p-1] + rcnts[p-1];
       rsize += rcnts[p];
     }
-    auto rbuf = new RCVal[rsize];
+    std::unique_ptr<RCVal[]> rbufwork(new RCVal[rsize]);
+    auto rbuf = rbufwork.get();
     MPI_Datatype RCVal_mpi_type;
     MPI_Type_contiguous(sizeof(RCVal), MPI_BYTE, &RCVal_mpi_type);
     MPI_Type_commit(&RCVal_mpi_type);
@@ -525,18 +508,13 @@ namespace strumpack {
         }
       }
     }
-    delete[] pp;
     MPI_Alltoallv
       (rbuf, scnts, sdispls, RCVal_mpi_type, sbuf, rcnts,
        rdispls, RCVal_mpi_type, comm_.comm());
     MPI_Type_free(&RCVal_mpi_type);
-    delete[] rbuf;
-    delete[] ibuf;
 #pragma omp parallel for
     for (std::size_t i=0; i<m*n; i++)
       x(sbuf[i].r-lo,sbuf[i].c) = sbuf[i].v;
-    delete[] sbuf;
-    delete[] xdist;
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -762,30 +740,30 @@ namespace strumpack {
    integer_t& dsep_begin, integer_t& dsep_end,
    std::vector<integer_t>& dsep_upd, int P0, int P,
    int P0_sibling, int P_sibling, int owner, bool bcast_dim_sep) {
-    integer_t* sbuf = NULL;
+    std::unique_ptr<integer_t[]> sbuf;
     std::vector<MPI_Request> sreq;
     int dest0 = std::min(P0, P0_sibling);
     int dest1 = std::max(P0+P, P0_sibling+P_sibling);
     if (rank_ == owner) {
-      sbuf = new integer_t[2+dist_upd.size()];
+      sbuf.reset(new integer_t[2+dist_upd.size()]);
       sbuf[0] = nd_.dist_sep_range.first;
       sbuf[1] = nd_.dist_sep_range.second;
-      std::copy(dist_upd.begin(), dist_upd.end(), sbuf+2);
+      std::copy(dist_upd.begin(), dist_upd.end(), sbuf.get()+2);
       if (bcast_dim_sep) sreq.resize(P_);
       else sreq.resize(dest1-dest0);
       int msg = 0;
       for (int dest=dest0; dest<dest1; dest++)
-        MPI_Isend(sbuf, 2 + dist_upd.size(), mpi_type<integer_t>(),
+        MPI_Isend(sbuf.get(), 2 + dist_upd.size(), mpi_type<integer_t>(),
                   dest, 0, comm_.comm(), &sreq[msg++]);
       if (bcast_dim_sep) {
         // when using HSS compression, every process needs to know the
         // size of this front, because you need to know if your parent
         // is HSS
         for (int dest=0; dest<dest0; dest++)
-          MPI_Isend(sbuf, 2, mpi_type<integer_t>(), dest, 0,
+          MPI_Isend(sbuf.get(), 2, mpi_type<integer_t>(), dest, 0,
                     comm_.comm(), &sreq[msg++]);
         for (int dest=dest1; dest<P_; dest++)
-          MPI_Isend(sbuf, 2, mpi_type<integer_t>(), dest, 0,
+          MPI_Isend(sbuf.get(), 2, mpi_type<integer_t>(), dest, 0,
                     comm_.comm(), &sreq[msg++]);
       }
     }
@@ -794,13 +772,12 @@ namespace strumpack {
       MPI_Probe(owner, 0, comm_.comm(), &stat);
       int msg_size;
       MPI_Get_count(&stat, mpi_type<integer_t>(), &msg_size);
-      auto rbuf = new integer_t[msg_size];
-      MPI_Recv(rbuf, msg_size, mpi_type<integer_t>(),
+      std::unique_ptr<integer_t[]> rbuf(new integer_t[msg_size]);
+      MPI_Recv(rbuf.get(), msg_size, mpi_type<integer_t>(),
                owner, 0, comm_.comm(), &stat);
       dsep_begin = rbuf[0];
       dsep_end = rbuf[1];
-      dsep_upd.assign(rbuf+2, rbuf+msg_size);
-      delete[] rbuf;
+      dsep_upd.assign(rbuf.get()+2, rbuf.get()+msg_size);
     } else if (bcast_dim_sep) {
       integer_t rbuf[2];
       MPI_Recv(rbuf, 2, mpi_type<integer_t>(), owner,
@@ -808,10 +785,8 @@ namespace strumpack {
       dsep_begin = rbuf[0];
       dsep_end = rbuf[1];
     }
-    if (rank_ == owner) {
+    if (rank_ == owner)
       MPI_Waitall(sreq.size(), sreq.data(), MPI_STATUSES_IGNORE);
-      delete[] sbuf;
-    }
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -890,49 +865,27 @@ namespace strumpack {
        (opts.use_HSS() || opts.use_HODLR()) && parent_compression);
 
     auto dim_dsep = dsep_end - dsep_begin;
-    bool is_hss = opts.use_HSS() && parent_compression &&
-      (dim_dsep >= opts.HSS_min_sep_size());
-    bool is_blr = opts.use_BLR() && (dim_dsep >= opts.BLR_min_sep_size());
-#if defined(STRUMPACK_USE_BPACK)
-    bool is_hodlr = opts.use_HODLR() && (dim_dsep >= opts.HODLR_min_sep_size());
-#else
-    bool is_hodlr = false;
-#endif
-    bool use_compression = is_hss || is_blr || is_hodlr;
+
+    bool use_compression = is_compressed(dim_dsep, parent_compression, opts);
     HSS::HSSPartitionTree hss_tree(dim_dsep);
     if (use_compression)
       communicate_hss_tree(hss_tree, dsep, P0, P, owner);
     std::vector<bool> adm;
-    if (is_blr) communicate_admissibility(adm, dsep, P0, P, owner);
+    if (is_BLR(dim_dsep, parent_compression, opts))
+      communicate_admissibility(adm, dsep, P0, P, owner);
 
-    if (rank_ == P0) {
-      if (is_hss) this->nr_HSS_fronts_++;
-      else if (is_blr) this->nr_BLR_fronts_++;
-      else if (is_hodlr) this->nr_HODLR_fronts_++;
-      else this->nr_dense_fronts_++;
-    }
     std::unique_ptr<F_t> front;
     // only store fronts you work on and their siblings (needed for
     // extend-add operation)
     if ((rank_ >= P0 && rank_ < P0+P) ||
         (rank_ >= P0_sibling && rank_ < P0_sibling+P_sibling)) {
       if (P == 1) {
-        if (is_hss) {
-          front = std::unique_ptr<F_t>
-            (new FHSS_t(dsep, dsep_begin, dsep_end, dsep_upd));
-          front->set_HSS_partitioning(opts, hss_tree, level == 0);
-        } else if (is_blr) {
-          front = std::unique_ptr<F_t>
-            (new FBLR_t(dsep, dsep_begin, dsep_end, dsep_upd));
-          front->set_BLR_partitioning(opts, hss_tree, adm, level == 0);
-        } else if (is_hodlr) {
-#if defined(STRUMPACK_USE_BPACK)
-          front = std::unique_ptr<F_t>
-            (new FHODLR_t(dsep, dsep_begin, dsep_end, dsep_upd));
-          front->set_HODLR_partitioning(opts, hss_tree, level == 0);
-#endif
-        } else front = std::unique_ptr<F_t>
-                 (new FD_t(dsep, dsep_begin, dsep_end, dsep_upd));
+        front = create_frontal_matrix
+          (opts, dsep, dsep_begin, dsep_end, dsep_upd,
+           [&hss_tree]() -> const HSS::HSSPartitionTree& { return hss_tree; },
+           [&adm]() -> const std::vector<bool>& { return adm; },
+           parent_compression, level,
+           this->nr_fronts_, rank_ == P0);
         if (P0 == rank_) {
           local_range_.first = std::min
             (local_range_.first, std::size_t(dsep_begin));
@@ -940,28 +893,12 @@ namespace strumpack {
             (local_range_.second, std::size_t(dsep_end));
         }
       } else {
-        if (is_hss) {
-          front = std::unique_ptr<F_t>
-            (new FHSSMPI_t(local_pfronts_.size(), dsep_begin, dsep_end,
-                           dsep_upd, fcomm, P));
-          front->set_HSS_partitioning(opts, hss_tree, level == 0);
-        } else if (is_blr) {
-          front = std::unique_ptr<F_t>
-            (new FBLRMPI_t(local_pfronts_.size(), dsep_begin, dsep_end,
-                           dsep_upd, fcomm, P));
-          front->set_BLR_partitioning(opts, hss_tree, adm, level == 0);
-        } else if (is_hodlr) {
-#if defined(STRUMPACK_USE_BPACK)
-          front = std::unique_ptr<F_t>
-            (new FHODLRMPI_t(local_pfronts_.size(), dsep_begin, dsep_end,
-                             dsep_upd, fcomm, P));
-          front->set_HODLR_partitioning(opts, hss_tree, level == 0);
-#endif
-        } else {
-          front = std::unique_ptr<F_t>
-            (new FDMPI_t(local_pfronts_.size(), dsep_begin, dsep_end,
-                         dsep_upd, fcomm, P));
-        }
+        front = create_frontal_matrix<scalar_t,integer_t>
+          (opts, local_pfronts_.size(), dsep_begin, dsep_end, dsep_upd,
+           [&hss_tree]() -> const HSS::HSSPartitionTree& { return hss_tree; },
+           [&adm]() -> const std::vector<bool>& { return adm; },
+           parent_compression, level, this->nr_fronts_,
+           fcomm, P, rank_ == P0);
         if (rank_ >= P0 && rank_ < P0+P) {
           auto fpar = static_cast<FMPI_t*>(front.get());
           local_pfronts_.emplace_back
@@ -969,7 +906,6 @@ namespace strumpack {
         }
       }
     }
-
     // here we should still continue, to send the local subgraph
     auto wl = dist_subtree_work[chl];
     auto wr = dist_subtree_work[chr];
@@ -1004,41 +940,18 @@ namespace strumpack {
     auto sep_end = tree.sep_ptr[sep+1];
     auto dim_sep = sep_end - sep_begin;
     auto dim_upd = tree.dim_upd[sep];
-    std::vector<integer_t> upd(tree.upd[sep], tree.upd[sep]+dim_upd);
     std::unique_ptr<F_t> front;
-
-    bool is_hss = opts.use_HSS() && parent_compression &&
-      (dim_sep >= opts.HSS_min_sep_size());
-    bool is_blr = opts.use_BLR() && (dim_sep >= opts.BLR_min_sep_size());
-#if defined(STRUMPACK_USE_BPACK)
-    bool is_hodlr = opts.use_HODLR() && (dim_sep >= opts.HODLR_min_sep_size());
-#else
-    bool is_hodlr = false;
-#endif
-    bool use_compression = is_hss || is_blr || is_hodlr;
-    if (rank_ == P0) {
-      if (is_hss) this->nr_HSS_fronts_++;
-      else if (is_blr) this->nr_BLR_fronts_++;
-      else if (is_hodlr) this->nr_HODLR_fronts_++;
-      else this->nr_dense_fronts_++;
-    }
     if ((rank_ >= P0 && rank_ < P0+P) ||
         (rank_ >= P0_sibling && rank_ < P0_sibling+P_sibling)) {
+      std::vector<integer_t> upd(tree.upd[sep], tree.upd[sep]+dim_upd);
       if (P == 1) {
-        if (is_hss) {
-          front = std::unique_ptr<F_t>(new FHSS_t(sep, sep_begin, sep_end, upd));
-          front->set_HSS_partitioning(opts, tree.HSS_tree[sep], level == 0);
-        } else if (is_blr) {
-          front = std::unique_ptr<F_t>(new FBLR_t(sep, sep_begin, sep_end, upd));
-          front->set_BLR_partitioning
-            (opts, tree.HSS_tree[sep], tree.admissibility[sep], level == 0);
-        } else if (is_hodlr) {
-#if defined(STRUMPACK_USE_BPACK)
-          front = std::unique_ptr<F_t>(new FHODLR_t(sep, sep_begin, sep_end, upd));
-          front->set_HODLR_partitioning
-            (opts, tree.HSS_tree[sep], level == 0);
-#endif
-        } else front = std::unique_ptr<F_t>(new FD_t(sep, sep_begin, sep_end, upd));
+        front = create_frontal_matrix
+          (opts, sep, sep_begin, sep_end, upd,
+           [&tree,&sep]() -> const HSS::HSSPartitionTree&
+           { return tree.HSS_tree[sep]; },
+           [&tree,&sep]() -> const std::vector<bool>&
+             { return tree.admissibility[sep]; },
+           parent_compression, level, this->nr_fronts_, rank_ == P0);
         if (P0 == rank_) {
           local_range_.first = std::min
             (local_range_.first, std::size_t(sep_begin));
@@ -1046,28 +959,14 @@ namespace strumpack {
             (local_range_.second, std::size_t(sep_end));
         }
       } else {
-        if (is_hss) {
-          front = std::unique_ptr<F_t>
-            (new FHSSMPI_t
-             (local_pfronts_.size(), sep_begin, sep_end, upd, fcomm, P));
-          front->set_HSS_partitioning(opts, tree.HSS_tree[sep], level == 0);
-        } else if (is_blr) {
-          front = std::unique_ptr<F_t>
-            (new FBLRMPI_t
-             (local_pfronts_.size(), sep_begin, sep_end, upd, fcomm, P));
-          front->set_BLR_partitioning
-            (opts, tree.HSS_tree[sep], tree.admissibility[sep], level == 0);
-        } else if (is_hodlr) {
-#if defined(STRUMPACK_USE_BPACK)
-          front = std::unique_ptr<F_t>
-            (new FHODLRMPI_t
-             (local_pfronts_.size(), sep_begin, sep_end, upd, fcomm, P));
-          front->set_HODLR_partitioning(opts, tree.HSS_tree[sep], level == 0);
-#endif
-        } else
-          front = std::unique_ptr<F_t>
-            (new FDMPI_t
-             (local_pfronts_.size(), sep_begin, sep_end, upd, fcomm, P));
+        front = create_frontal_matrix<scalar_t,integer_t>
+          (opts, local_pfronts_.size(), sep_begin, sep_end, upd,
+           [&tree,&sep]() -> const HSS::HSSPartitionTree&
+           { return tree.HSS_tree[sep]; },
+           [&tree,&sep]() -> const std::vector<bool>&
+             { return tree.admissibility[sep]; },
+           parent_compression, level, this->nr_fronts_,
+           fcomm, P, rank_ == P0);
         if (rank_ >= P0 && rank_ < P0+P) {
           auto fpar = static_cast<FMPI_t*>(front.get());
           local_pfronts_.emplace_back
@@ -1084,14 +983,15 @@ namespace strumpack {
       int Pl = std::max
         (1, std::min(int(std::round(P * wl / (wl + wr))), P-1));
       int Pr = std::max(1, P - Pl);
+      bool use_compression = is_compressed(dim_sep, parent_compression, opts);
       front->set_lchild
         (proportional_mapping_sub_graphs
          (opts, tree, dsep, chl, P0, Pl, P0+P-Pr, Pr,
-          fcomm.sub(0, Pl), is_hss || is_hodlr, level+1));
+          fcomm.sub(0, Pl), use_compression, level+1));
       front->set_rchild
         (proportional_mapping_sub_graphs
          (opts, tree, dsep, chr, P0+P-Pr, Pr, P0, Pl,
-          fcomm.sub(P-Pr, Pr), is_hss || is_hodlr, level+1));
+          fcomm.sub(P-Pr, Pr), use_compression, level+1));
     }
     return front;
   }

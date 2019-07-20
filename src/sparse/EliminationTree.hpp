@@ -31,14 +31,7 @@
 
 #include <iostream>
 #include <algorithm>
-#include "StrumpackParameters.hpp"
-#include "CompressedSparseMatrix.hpp"
-#include "FrontalMatrixDense.hpp"
-#include "FrontalMatrixHSS.hpp"
-#include "FrontalMatrixBLR.hpp"
-#if defined(STRUMPACK_USE_BPACK)
-#include "FrontalMatrixHODLR.hpp"
-#endif
+#include "FrontFactory.hpp"
 
 namespace strumpack {
 
@@ -68,38 +61,25 @@ namespace strumpack {
     void print_rank_statistics(std::ostream &out) const {
       root_->print_rank_statistics(out);
     }
-    virtual int nr_HSS_fronts() const { return nr_HSS_fronts_; }
-    virtual int nr_BLR_fronts() const { return nr_BLR_fronts_; }
-    virtual int nr_HODLR_fronts() const { return nr_HODLR_fronts_; }
-    virtual int nr_dense_fronts() const { return nr_dense_fronts_; }
-
+    virtual FrontCounter front_counter() const { return nr_fronts_; }
     void draw(const SpMat_t& A, const std::string& name) const;
 
   protected:
     using F_t = FrontalMatrix<scalar_t,integer_t>;
-    using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
-    using FHSS_t = FrontalMatrixHSS<scalar_t,integer_t>;
-    using FBLR_t = FrontalMatrixBLR<scalar_t,integer_t>;
-#if defined(STRUMPACK_USE_BPACK)
-    using FHODLR_t = FrontalMatrixHODLR<scalar_t,integer_t>;
-#endif
-
-    int nr_HSS_fronts_ = 0;
-    int nr_BLR_fronts_ = 0;
-    int nr_HODLR_fronts_ = 0;
-    int nr_dense_fronts_ = 0;
+    FrontCounter nr_fronts_;
     std::unique_ptr<F_t> root_;
 
   private:
     std::unique_ptr<F_t> setup_tree
     (const SPOptions<scalar_t>& opts, const SpMat_t& A,
      const SeparatorTree<integer_t>& sep_tree,
-     std::vector<integer_t>* upd, integer_t sep,
+     std::vector<std::vector<integer_t>>& upd, integer_t sep,
      bool hss_parent, int level);
 
     void symbolic_factorization
     (const SpMat_t& A, const SeparatorTree<integer_t>& sep_tree,
-     integer_t sep, std::vector<integer_t>* upd, int depth=0) const;
+     integer_t sep, std::vector<std::vector<integer_t>>& upd,
+     int depth=0) const;
   };
 
 
@@ -107,20 +87,17 @@ namespace strumpack {
   EliminationTree<scalar_t,integer_t>::EliminationTree
   (const SPOptions<scalar_t>& opts, const SpMat_t& A,
    const SeparatorTree<integer_t>& sep_tree) {
-    auto upd = new std::vector<integer_t>[sep_tree.separators()];
-
+    std::vector<std::vector<integer_t>> upd(sep_tree.separators());
 #pragma omp parallel default(shared)
 #pragma omp single
     symbolic_factorization(A, sep_tree, sep_tree.root(), upd);
-
     root_ = setup_tree(opts, A, sep_tree, upd, sep_tree.root(), true, 0);
-    delete[] upd;
   }
 
   template<typename scalar_t,typename integer_t> void
   EliminationTree<scalar_t,integer_t>::symbolic_factorization
   (const SpMat_t& A, const SeparatorTree<integer_t>& sep_tree,
-   integer_t sep, std::vector<integer_t>* upd, int depth) const {
+   integer_t sep, std::vector<std::vector<integer_t>>& upd, int depth) const {
     auto chl = sep_tree.lch(sep);
     auto chr = sep_tree.rch(sep);
     if (depth < params::task_recursion_cutoff_level) {
@@ -151,7 +128,7 @@ namespace strumpack {
         upd[sep].erase
           (std::unique(upd[sep].begin(), upd[sep].end()), upd[sep].end());
       }
-      auto dim_sep = sep_end-sep_begin;
+      auto dim_sep = sep_end - sep_begin;
       if (chl != -1) {
         auto icb = dim_sep ?
           std::lower_bound(upd[chl].begin(), upd[chl].end(), sep_end) :
@@ -182,7 +159,7 @@ namespace strumpack {
   EliminationTree<scalar_t,integer_t>::setup_tree
   (const SPOptions<scalar_t>& opts, const SpMat_t& A,
    const SeparatorTree<integer_t>& sep_tree,
-   std::vector<integer_t>* upd, integer_t sep,
+   std::vector<std::vector<integer_t>>& upd, integer_t sep,
    bool hss_parent, int level) {
     auto sep_begin = sep_tree.sizes(sep);
     auto sep_end = sep_tree.sizes(sep+1);
@@ -190,54 +167,24 @@ namespace strumpack {
     // dummy nodes added at the end of the separator tree have
     // dim_sep==0, but they have sep_begin=sep_end=N, which is wrong
     // So fix this here!
-    if (dim_sep==0 && sep_tree.lch(sep) != -1)
+    if (dim_sep == 0 && sep_tree.lch(sep) != -1)
       sep_begin = sep_end = sep_tree.sizes(sep_tree.rch(sep)+1);
-    // bool is_hss = opts.use_HSS() && (dim_sep >= opts.HSS_min_sep_size()) &&
-    //   (dim_sep + upd[sep].size() >= opts.HSS_min_front_size());
-    bool is_hss = opts.use_HSS() && hss_parent &&
-      (dim_sep >= opts.HSS_min_sep_size());
-    bool is_blr = opts.use_BLR() && (dim_sep >= opts.BLR_min_sep_size());
-#if defined(STRUMPACK_USE_BPACK)
-    bool is_hodlr = opts.use_HODLR() && (dim_sep >= opts.HODLR_min_sep_size());
-#else
-    bool is_hodlr = false;
-#endif
-    std::unique_ptr<F_t> front;
-    if (is_hss) {
-      front = std::unique_ptr<F_t>
-        (new FHSS_t(sep, sep_begin, sep_end, upd[sep]));
-      front->set_HSS_partitioning
-        (opts, sep_tree.HSS_tree(sep), level == 0);
-      nr_HSS_fronts_++;
-    } else {
-      if (is_blr) {
-        front = std::unique_ptr<F_t>
-          (new FBLR_t(sep, sep_begin, sep_end, upd[sep]));
-        front->set_BLR_partitioning
-          (opts, sep_tree.HSS_tree(sep), sep_tree.admissibility(sep), level == 0);
-        nr_BLR_fronts_++;
-      } else {
-        if (is_hodlr) {
-#if defined(STRUMPACK_USE_BPACK)
-          front = std::unique_ptr<F_t>
-            (new FHODLR_t(sep, sep_begin, sep_end, upd[sep]));
-          front->set_HODLR_partitioning
-            (opts, sep_tree.HSS_tree(sep), level == 0);
-          nr_HODLR_fronts_++;
-#endif
-        } else {
-          front = std::unique_ptr<F_t>
-            (new FD_t(sep, sep_begin, sep_end, upd[sep]));
-          nr_dense_fronts_++;
-        }
-      }
-    }
+    auto front = create_frontal_matrix<scalar_t,integer_t>
+      (opts, sep, sep_begin, sep_end, upd[sep],
+       [&sep_tree,&sep]() -> const HSS::HSSPartitionTree&
+       { return sep_tree.HSS_tree(sep); },
+       [&sep_tree,&sep]() -> const std::vector<bool>&
+       { return sep_tree.admissibility(sep); },
+       hss_parent, level, nr_fronts_);
+    bool compressed = is_compressed(dim_sep, hss_parent, opts);
     if (sep_tree.lch(sep) != -1)
       front->set_lchild
-        (setup_tree(opts, A, sep_tree, upd, sep_tree.lch(sep), is_hss, level+1));
+        (setup_tree(opts, A, sep_tree, upd, sep_tree.lch(sep),
+                    compressed, level+1));
     if (sep_tree.rch(sep) != -1)
       front->set_rchild
-        (setup_tree(opts, A, sep_tree, upd, sep_tree.rch(sep), is_hss, level+1));
+        (setup_tree(opts, A, sep_tree, upd, sep_tree.rch(sep),
+                    compressed, level+1));
     return front;
   }
 

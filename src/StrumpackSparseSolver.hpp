@@ -680,21 +680,17 @@ namespace strumpack {
     TaskTimer t0("symbolic-factorization", [&](){ setup_tree(); });
     reordering()->clear_tree_data();
     if (opts_.verbose()) {
-      // this might require a reduction
-      auto nr_dense = tree()->nr_dense_fronts();
-      auto nr_HSS = tree()->nr_HSS_fronts();
-      auto nr_BLR = tree()->nr_BLR_fronts();
-      auto nr_HODLR = tree()->nr_HODLR_fronts();
+      auto fc = tree()->front_counter();
       if (is_root_) {
         std::cout << "# symbolic factorization:" << std::endl;
         std::cout << "#   - nr of dense Frontal matrices = "
-                  << number_format_with_commas(nr_dense) << std::endl;
+                  << number_format_with_commas(fc.dense) << std::endl;
         std::cout << "#   - nr of HSS Frontal matrices = "
-                  << number_format_with_commas(nr_HSS) << std::endl;
+                  << number_format_with_commas(fc.HSS) << std::endl;
         std::cout << "#   - nr of BLR Frontal matrices = "
-                  << number_format_with_commas(nr_BLR) << std::endl;
+                  << number_format_with_commas(fc.BLR) << std::endl;
         std::cout << "#   - nr of HODLR Frontal matrices = "
-                  << number_format_with_commas(nr_HODLR) << std::endl;
+                  << number_format_with_commas(fc.HODLR) << std::endl;
         std::cout << "#   - symb-factor time = " << t0.elapsed() << std::endl;
       }
     }

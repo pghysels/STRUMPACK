@@ -485,6 +485,7 @@ install(FILES
   src/sparse/CompressedSparseMatrix.hpp
   src/sparse/ETree.hpp
   src/sparse/EliminationTree.hpp
+  src/sparse/FrontFactory.hpp
   src/sparse/FrontalMatrix.hpp
   src/sparse/FrontalMatrixDense.hpp
   src/sparse/FrontalMatrixHSS.hpp

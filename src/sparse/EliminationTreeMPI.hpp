@@ -58,17 +58,7 @@ namespace strumpack {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
-    using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
-    using FBLR_t = FrontalMatrixBLR<scalar_t,integer_t>;
-    using FHSS_t = FrontalMatrixHSS<scalar_t,integer_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
-    using FDMPI_t = FrontalMatrixDenseMPI<scalar_t,integer_t>;
-    using FHSSMPI_t = FrontalMatrixHSSMPI<scalar_t,integer_t>;
-    using FBLRMPI_t = FrontalMatrixBLRMPI<scalar_t,integer_t>;
-#if defined(STRUMPACK_USE_BPACK)
-    using FHODLR_t = FrontalMatrixHODLR<scalar_t,integer_t>;
-    using FHODLRMPI_t = FrontalMatrixHODLRMPI<scalar_t,integer_t>;
-#endif
     using SepRange = std::pair<std::size_t,std::size_t>;
 
   public:
@@ -90,25 +80,14 @@ namespace strumpack {
     const MPIComm& comm_;
     int rank_, P_;
 
-    virtual int nr_HSS_fronts() const override {
-      return comm_.all_reduce(this->nr_HSS_fronts_, MPI_SUM);
-    }
-    virtual int nr_BLR_fronts() const override {
-      return comm_.all_reduce(this->nr_BLR_fronts_, MPI_SUM);
-    }
-    virtual int nr_HODLR_fronts() const override {
-      return comm_.all_reduce(this->nr_HODLR_fronts_, MPI_SUM);
-    }
-    virtual int nr_dense_fronts() const override {
-      return comm_.all_reduce(this->nr_dense_fronts_, MPI_SUM);
-    }
+    virtual FrontCounter front_counter() const override
+    { return this->nr_fronts_.reduce(comm_); }
 
   private:
     struct ParFront {
       // TODO store a pointer to the actual front??
-      ParFront
-      (integer_t _sep_begin, integer_t _dim_sep,
-       int _P0, int _P, BLACSGrid* g)
+      ParFront(integer_t _sep_begin, integer_t _dim_sep,
+               int _P0, int _P, BLACSGrid* g)
         : sep_begin(_sep_begin), dim_sep(_dim_sep),
           P0(_P0), P(_P), grid(g) {}
       integer_t sep_begin, dim_sep;
@@ -120,16 +99,18 @@ namespace strumpack {
 
     void symbolic_factorization
     (const SpMat_t& A, const Tree_t& tree, integer_t sep,
-     std::vector<integer_t>* upd, float* subtree_work, int depth=0) const;
+     std::vector<std::vector<integer_t>>& upd,
+     std::vector<float>& subtree_work, int depth=0) const;
 
     std::unique_ptr<F_t> proportional_mapping
     (const Tree_t& tree, const SPOptions<scalar_t>& opts,
-     std::vector<integer_t>* upd, float* subtree_work, SepRange& local_range,
+     std::vector<std::vector<integer_t>>& upd,
+     std::vector<float>& subtree_work, SepRange& local_range,
      integer_t sep, int P0, int P, const MPIComm& fcomm,
      bool keep, bool is_hss, int level=0);
 
-    void sequential_to_block_cyclic(DenseM_t& x, DistM_t*& x_dist) const;
-    void block_cyclic_to_sequential(DenseM_t& x, DistM_t*& x_dist) const;
+    std::unique_ptr<DistM_t[]> sequential_to_block_cyclic(DenseM_t& x) const;
+    void block_cyclic_to_sequential(DenseM_t& x, const DistM_t* x_dist) const;
   };
 
   template<typename scalar_t,typename integer_t>
@@ -145,37 +126,31 @@ namespace strumpack {
     : EliminationTree<scalar_t,integer_t>(),
     comm_(comm), rank_(comm.rank()), P_(comm.size()), active_pfronts_(0) {
     auto& tree = nd.tree();
-
-    // use vector instead? problem with OpenMP??
-    auto upd = new std::vector<integer_t>[tree.separators()];
-    auto subtree_work = new float[tree.separators()];
-
+    std::vector<std::vector<integer_t>> upd(tree.separators());
+    std::vector<float> subtree_work(tree.separators());
 #pragma omp parallel default(shared)
 #pragma omp single
     symbolic_factorization(A, tree, tree.root(), upd, subtree_work);
-
     SepRange local_range{A.size(), 0};
     this->root_ = proportional_mapping
       (tree, opts, upd, subtree_work, local_range, tree.root(),
        0, comm_.size(), comm_, true, true, 0);
-
     subtree_ranges.resize(P_);
     MPI_Allgather
       (&local_range, sizeof(SepRange), MPI_BYTE, subtree_ranges.data(),
        sizeof(SepRange), MPI_BYTE, comm_.comm());
     nd.clear_tree_data();
-    delete[] upd;
-    delete[] subtree_work;
   }
 
   // TODO: rewrite this with a single alltoallv/allgatherv
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t>
+  std::unique_ptr<DistributedMatrix<scalar_t>[]>
   EliminationTreeMPI<scalar_t,integer_t>::sequential_to_block_cyclic
-  (DenseM_t& x, DistM_t*& x_dist) const {
+  (DenseM_t& x) const {
     size_t pos = 0;
     for (auto& pf : parallel_fronts_)
       if (rank_ >= pf.P0 && rank_ < pf.P0+pf.P) pos++;
-    x_dist = new DistM_t[pos];
+    std::unique_ptr<DistM_t[]> x_dist(new DistM_t[pos]);
     pos = 0;
     for (auto& pf : parallel_fronts_)
       if (rank_ >= pf.P0 && rank_ < pf.P0+pf.P) {
@@ -185,13 +160,15 @@ namespace strumpack {
         x_dist[pos].scatter(xloc);
         pos++;
       }
+    return x_dist;
   }
 
   // TODO: rewrite this with a single alltoallv/allgatherv
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPI<scalar_t,integer_t>::block_cyclic_to_sequential
-  (DenseM_t& x, DistM_t*& x_dist) const {
-    auto cnts = new int[2*P_];
+  (DenseM_t& x, const DistM_t* x_dist) const {
+    auto iwork = std::unique_ptr<int[]>(new int[2*P_]);
+    auto cnts = iwork.get();
     auto disp = cnts + P_;
     for (int p=0; p<P_; p++) {
       cnts[p] = std::max
@@ -202,8 +179,6 @@ namespace strumpack {
       MPI_Allgatherv
         (MPI_IN_PLACE, 0, mpi_type<scalar_t>(), x.ptr(0, c),
          cnts, disp, mpi_type<scalar_t>(), comm_.comm());
-    delete[] cnts;
-
     auto xd = x_dist;
     for (auto& pf : parallel_fronts_) {
       if (rank_ >= pf.P0 && rank_ < pf.P0+pf.P) {
@@ -221,17 +196,16 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPI<scalar_t,integer_t>::multifrontal_solve
   (DenseM_t& x) const {
-    DistM_t* x_dist;
-    sequential_to_block_cyclic(x, x_dist);
-    this->root_->multifrontal_solve(x, x_dist);
-    block_cyclic_to_sequential(x, x_dist);
-    delete[] x_dist;
+    auto x_dist = sequential_to_block_cyclic(x);
+    this->root_->multifrontal_solve(x, x_dist.get());
+    block_cyclic_to_sequential(x, x_dist.get());
   }
 
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPI<scalar_t,integer_t>::symbolic_factorization
   (const SpMat_t& A, const Tree_t& tree, const integer_t sep,
-   std::vector<integer_t>* upd, float* subtree_work, int depth) const {
+   std::vector<std::vector<integer_t>>& upd,
+   std::vector<float>& subtree_work, int depth) const {
     auto chl = tree.lch(sep);
     auto chr = tree.rch(sep);
     if (depth < params::task_recursion_cutoff_level) {
@@ -298,48 +272,22 @@ namespace strumpack {
   std::unique_ptr<FrontalMatrix<scalar_t,integer_t>>
   EliminationTreeMPI<scalar_t,integer_t>::proportional_mapping
   (const Tree_t& tree, const SPOptions<scalar_t>& opts,
-   std::vector<integer_t>* upd, float* subtree_work, SepRange& local_range,
-   integer_t sep, int P0, int P, const MPIComm& fcomm,
+   std::vector<std::vector<integer_t>>& upd, std::vector<float>& subtree_work,
+   SepRange& local_range, integer_t sep, int P0, int P, const MPIComm& fcomm,
    bool keep, bool hss_parent, int level) {
     auto sep_begin = tree.sizes(sep);
     auto sep_end = tree.sizes(sep+1);
     auto dim_sep = sep_end - sep_begin;
     std::unique_ptr<F_t> front;
-    bool is_hss = opts.use_HSS() && hss_parent &&
-      (dim_sep >= opts.HSS_min_front_size());
-    bool is_blr = opts.use_BLR() && (dim_sep >= opts.BLR_min_front_size());
-#if defined(STRUMPACK_USE_BPACK)
-    bool is_hodlr = opts.use_HODLR() && (dim_sep >= opts.HODLR_min_front_size());
-#else
-    bool is_hodlr = false;
-#endif
-    if (rank_ == P0) {
-      if (is_hss) this->nr_HSS_fronts_++;
-      else if (is_blr) this->nr_BLR_fronts_++;
-      else if (is_hodlr) this->nr_HODLR_fronts_++;
-      else this->nr_dense_fronts_++;
-    }
     if (P == 1) {
       if (keep) {
-        if (is_hss) {
-          front = std::unique_ptr<F_t>
-            (new FHSS_t(sep, sep_begin, sep_end, upd[sep]));
-          front->set_HSS_partitioning(opts, tree.HSS_tree(sep), level == 0);
-        } else if (is_blr) {
-          front = std::unique_ptr<F_t>
-            (new FBLR_t(sep, sep_begin, sep_end, upd[sep]));
-          front->set_BLR_partitioning
-            (opts, tree.HSS_tree(sep), tree.admissibility(sep), level == 0);
-        } else if (is_hodlr) {
-#if defined(STRUMPACK_USE_BPACK)
-          front = std::unique_ptr<F_t>
-            (new FHODLR_t(sep, sep_begin, sep_end, upd[sep]));
-          front->set_HODLR_partitioning
-            (opts, tree.HSS_tree(sep), level == 0);
-#endif
-        } else
-          front = std::unique_ptr<F_t>
-            (new FD_t(sep, sep_begin, sep_end, upd[sep]));
+        front = create_frontal_matrix
+          (opts, sep, sep_begin, sep_end, upd[sep],
+           [&tree,&sep]() -> const HSS::HSSPartitionTree&
+           { return tree.HSS_tree(sep); },
+           [&tree,&sep]() -> const std::vector<bool>&
+             { return tree.admissibility(sep); },
+           hss_parent, level, this->nr_fronts_, rank_ == P0);
       }
       if (P0 == rank_) {
         local_range.first  = std::min
@@ -349,25 +297,14 @@ namespace strumpack {
       }
     } else {
       if (keep) {
-        if (is_hss) {
-          front = std::unique_ptr<F_t>
-            (new FHSSMPI_t(active_pfronts_, sep_begin, sep_end, upd[sep], fcomm, P));
-          front->set_HSS_partitioning(opts, tree.HSS_tree(sep), level == 0);
-        } else if (is_blr) {
-          front = std::unique_ptr<F_t>
-            (new FBLRMPI_t(active_pfronts_, sep_begin, sep_end, upd[sep], fcomm, P));
-          front->set_BLR_partitioning
-            (opts, tree.HSS_tree(sep), tree.admissibility(sep), level == 0);
-        } else if (is_hodlr) {
-#if defined(STRUMPACK_USE_BPACK)
-          front = std::unique_ptr<F_t>
-            (new FHODLRMPI_t(active_pfronts_, sep_begin, sep_end, upd[sep], fcomm, P));
-          front->set_HODLR_partitioning
-            (opts, tree.HSS_tree(sep), level == 0);
-#endif
-        } else
-          front = std::unique_ptr<F_t>
-            (new FDMPI_t(active_pfronts_, sep_begin, sep_end, upd[sep], fcomm, P));
+        front = create_frontal_matrix<scalar_t,integer_t>
+          (opts, active_pfronts_, sep_begin, sep_end, upd[sep],
+           [&tree,&sep]() -> const HSS::HSSPartitionTree&
+           { return tree.HSS_tree(sep); },
+           [&tree,&sep]() -> const std::vector<bool>&
+             { return tree.admissibility(sep); },
+           hss_parent, level, this->nr_fronts_,
+           fcomm, P, rank_ == P0);
         if (rank_ >= P0 && rank_ < P0+P) active_pfronts_++;
       }
       auto g = front ? static_cast<FMPI_t*>(front.get())->grid() : nullptr;
@@ -382,6 +319,7 @@ namespace strumpack {
 
     auto chl = tree.lch(sep);
     auto chr = tree.rch(sep);
+    bool use_compression = is_compressed(dim_sep, hss_parent, opts);
     if (chl != -1) {
       float wl = subtree_work[chl];
       float wr = (chr != -1) ? subtree_work[chr] : 0.;
@@ -389,19 +327,19 @@ namespace strumpack {
       int Pr = std::max(1, P - Pl);
       auto fl = proportional_mapping
         (tree, opts, upd, subtree_work, local_range, chl, P0, Pl,
-         fcomm.sub(0, Pl), keep, is_hss, level+1);
+         fcomm.sub(0, Pl), keep, use_compression, level+1);
       if (front) front->set_lchild(std::move(fl));
       if (chr != -1) {
         auto fr = proportional_mapping
           (tree, opts, upd, subtree_work, local_range, chr, P0+P-Pr, Pr,
-           fcomm.sub(P-Pr, Pr), keep, is_hss, level+1);
+           fcomm.sub(P-Pr, Pr), keep, use_compression, level+1);
         if (front) front->set_rchild(std::move(fr));
       }
     } else {
       if (chr != -1) {
         auto fr = proportional_mapping
           (tree, opts, upd, subtree_work, local_range, chr, P0, P,
-           fcomm, keep, is_hss, level+1);
+           fcomm, keep, use_compression, level+1);
         if (front) front->set_rchild(std::move(fr));
       }
     }
