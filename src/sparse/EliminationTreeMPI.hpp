@@ -38,14 +38,7 @@
 #include "CompressedSparseMatrix.hpp"
 #include "CSRMatrixMPI.hpp"
 #include "MatrixReorderingMPI.hpp"
-#include "FrontalMatrix.hpp"
-#include "FrontalMatrixMPI.hpp"
-#include "FrontalMatrixDenseMPI.hpp"
-#include "FrontalMatrixHSSMPI.hpp"
-#include "FrontalMatrixBLRMPI.hpp"
-#if defined(STRUMPACK_USE_BPACK)
-#include "FrontalMatrixHODLRMPI.hpp"
-#endif
+#include "EliminationTree.hpp"
 
 namespace strumpack {
 
@@ -74,14 +67,21 @@ namespace strumpack {
     integer_t maximum_rank() const override;
     long long factor_nonzeros() const override;
     long long dense_factor_nonzeros() const override;
-    std::vector<SepRange> subtree_ranges;
 
   protected:
     const MPIComm& comm_;
     int rank_, P_;
 
+    std::vector<SepRange> subtree_ranges_;
+    SepRange local_range_;
+
     virtual FrontCounter front_counter() const override
     { return this->nr_fronts_.reduce(comm_); }
+
+    void update_local_ranges(std::size_t lo, std::size_t hi) {
+      local_range_.first  = std::min(local_range_.first, lo);
+      local_range_.second = std::max(local_range_.second, hi);
+    }
 
   private:
     struct ParFront {
@@ -103,9 +103,9 @@ namespace strumpack {
      std::vector<float>& subtree_work, int depth=0) const;
 
     std::unique_ptr<F_t> proportional_mapping
-    (const Tree_t& tree, const SPOptions<scalar_t>& opts,
+    (Tree_t& tree, const SPOptions<scalar_t>& opts,
      std::vector<std::vector<integer_t>>& upd,
-     std::vector<float>& subtree_work, SepRange& local_range,
+     std::vector<float>& subtree_work,
      integer_t sep, int P0, int P, const MPIComm& fcomm,
      bool keep, bool is_hss, int level=0);
 
@@ -131,13 +131,13 @@ namespace strumpack {
 #pragma omp parallel default(shared)
 #pragma omp single
     symbolic_factorization(A, tree, tree.root(), upd, subtree_work);
-    SepRange local_range{A.size(), 0};
+    local_range_ = {A.size(), 0};
     this->root_ = proportional_mapping
-      (tree, opts, upd, subtree_work, local_range, tree.root(),
+      (tree, opts, upd, subtree_work, tree.root(),
        0, comm_.size(), comm_, true, true, 0);
-    subtree_ranges.resize(P_);
+    subtree_ranges_.resize(P_);
     MPI_Allgather
-      (&local_range, sizeof(SepRange), MPI_BYTE, subtree_ranges.data(),
+      (&local_range_, sizeof(SepRange), MPI_BYTE, subtree_ranges_.data(),
        sizeof(SepRange), MPI_BYTE, comm_.comm());
     nd.clear_tree_data();
   }
@@ -172,8 +172,8 @@ namespace strumpack {
     auto disp = cnts + P_;
     for (int p=0; p<P_; p++) {
       cnts[p] = std::max
-        (std::size_t(0), subtree_ranges[p].second - subtree_ranges[p].first);
-      disp[p] = subtree_ranges[p].first;
+        (std::size_t(0), subtree_ranges_[p].second - subtree_ranges_[p].first);
+      disp[p] = subtree_ranges_[p].first;
     }
     for (std::size_t c=0; c<x.cols(); c++)
       MPI_Allgatherv
@@ -271,9 +271,9 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t>
   std::unique_ptr<FrontalMatrix<scalar_t,integer_t>>
   EliminationTreeMPI<scalar_t,integer_t>::proportional_mapping
-  (const Tree_t& tree, const SPOptions<scalar_t>& opts,
+  (Tree_t& tree, const SPOptions<scalar_t>& opts,
    std::vector<std::vector<integer_t>>& upd, std::vector<float>& subtree_work,
-   SepRange& local_range, integer_t sep, int P0, int P, const MPIComm& fcomm,
+   integer_t sep, int P0, int P, const MPIComm& fcomm,
    bool keep, bool hss_parent, int level) {
     auto sep_begin = tree.sizes(sep);
     auto sep_end = tree.sizes(sep+1);
@@ -281,30 +281,16 @@ namespace strumpack {
     std::unique_ptr<F_t> front;
     if (P == 1) {
       if (keep) {
-        front = create_frontal_matrix
-          (opts, sep, sep_begin, sep_end, upd[sep],
-           [&tree,&sep]() -> const HSS::HSSPartitionTree&
-           { return tree.HSS_tree(sep); },
-           [&tree,&sep]() -> const std::vector<bool>&
-             { return tree.admissibility(sep); },
+        front = create_frontal_matrix<scalar_t,integer_t,Tree_t>
+          (opts, sep, sep_begin, sep_end, upd[sep], tree,
            hss_parent, level, this->nr_fronts_, rank_ == P0);
       }
-      if (P0 == rank_) {
-        local_range.first  = std::min
-          (local_range.first, std::size_t(sep_begin));
-        local_range.second = std::max
-          (local_range.second, std::size_t(sep_end));
-      }
+      if (P0 == rank_) update_local_ranges(sep_begin, sep_end);
     } else {
       if (keep) {
-        front = create_frontal_matrix<scalar_t,integer_t>
-          (opts, active_pfronts_, sep_begin, sep_end, upd[sep],
-           [&tree,&sep]() -> const HSS::HSSPartitionTree&
-           { return tree.HSS_tree(sep); },
-           [&tree,&sep]() -> const std::vector<bool>&
-             { return tree.admissibility(sep); },
-           hss_parent, level, this->nr_fronts_,
-           fcomm, P, rank_ == P0);
+        front = create_frontal_matrix<scalar_t,integer_t,Tree_t>
+          (opts, active_pfronts_, sep_begin, sep_end, upd[sep], tree, sep,
+           hss_parent, level, this->nr_fronts_, fcomm, P, rank_ == P0);
         if (rank_ >= P0 && rank_ < P0+P) active_pfronts_++;
       }
       auto g = front ? static_cast<FMPI_t*>(front.get())->grid() : nullptr;
@@ -326,19 +312,19 @@ namespace strumpack {
       int Pl = std::max(1, std::min(int(std::round(P * wl / (wl + wr))), P-1));
       int Pr = std::max(1, P - Pl);
       auto fl = proportional_mapping
-        (tree, opts, upd, subtree_work, local_range, chl, P0, Pl,
+        (tree, opts, upd, subtree_work, chl, P0, Pl,
          fcomm.sub(0, Pl), keep, use_compression, level+1);
       if (front) front->set_lchild(std::move(fl));
       if (chr != -1) {
         auto fr = proportional_mapping
-          (tree, opts, upd, subtree_work, local_range, chr, P0+P-Pr, Pr,
+          (tree, opts, upd, subtree_work, chr, P0+P-Pr, Pr,
            fcomm.sub(P-Pr, Pr), keep, use_compression, level+1);
         if (front) front->set_rchild(std::move(fr));
       }
     } else {
       if (chr != -1) {
         auto fr = proportional_mapping
-          (tree, opts, upd, subtree_work, local_range, chr, P0, P,
+          (tree, opts, upd, subtree_work, chr, P0, P,
            fcomm, keep, use_compression, level+1);
         if (front) front->set_rchild(std::move(fr));
       }

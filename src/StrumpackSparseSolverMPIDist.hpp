@@ -350,8 +350,7 @@ namespace strumpack {
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::
   setup_reordering() {
     nd_mpi_ = std::unique_ptr<MatrixReorderingMPI<scalar_t,integer_t>>
-      (new MatrixReorderingMPI<scalar_t,integer_t>
-       (mat_mpi_->size(), comm_.comm()));
+      (new MatrixReorderingMPI<scalar_t,integer_t>(mat_mpi_->size(), comm_));
   }
 
   template<typename scalar_t,typename integer_t> int
@@ -364,7 +363,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::
   compute_separator_reordering() {
-    return nd_mpi_->separator_reordering
+    nd_mpi_->separator_reordering
       (opts_, *mat_mpi_, opts_.verbose() && is_root_);
   }
 

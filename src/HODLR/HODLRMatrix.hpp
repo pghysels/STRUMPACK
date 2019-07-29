@@ -42,6 +42,7 @@
 #include "dense/DistributedMatrix.hpp"
 #include "HODLROptions.hpp"
 #include "HODLRWrapper.hpp"
+#include "sparse/CSRGraph.hpp"
 
 namespace strumpack {
 
@@ -172,6 +173,26 @@ namespace strumpack {
       HODLRMatrix
       (const MPIComm& c, const HSS::HSSPartitionTree& tree,
        const opts_t& opts);
+
+      /**
+       * Construct an HODLR matrix using a specified HODLR tree. After
+       * construction, the HODLR matrix will be empty, and can be filled
+       * by calling one of the compress member routines.
+       *
+       * \param c MPI communicator, this communicator is copied
+       * internally.
+       * \param t tree specifying the HODLR matrix partitioning
+       * \param admissibility matrix of size tree.leaf_sizes().size()
+       * ^2 with admissibility info
+       * \param graph connectivity info for the dofs
+       * \param opts object containing a number of options for HODLR
+       * compression
+       * \see compress, HODLROptions
+       */
+      template<typename integer_t> HODLRMatrix
+      (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+       const DenseMatrix<bool>& admissibility,
+       const CSRGraph<integer_t>& graph, const opts_t& opts);
 
       /**
        * Copy constructor is not supported.
@@ -531,7 +552,8 @@ namespace strumpack {
       KernelCommPtrs<scalar_t> KC{&K, &c_};
       HODLR_construct_init<scalar_t>
         (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
-         lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_ );
+         lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
+         nullptr, nullptr, nullptr);
       HODLR_construct_element_compute<scalar_t>
         (ho_bf_, options_, stats_, msh_, kerquant_,
          ptree_, &(HODLR_kernel_evaluation<scalar_t>),
@@ -557,7 +579,8 @@ namespace strumpack {
       //KernelCommPtrs<scalar_t> KC{&K, &c_};
       HODLR_construct_init<scalar_t>
         (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
-         lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_ );
+         lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
+         nullptr, nullptr, nullptr);
       HODLR_set_I_option<scalar_t>(options_, "elem_extract", 0); // block extraction
       HODLR_construct_element_compute<scalar_t>
         (ho_bf_, options_, stats_, msh_, kerquant_,
@@ -588,11 +611,105 @@ namespace strumpack {
       if (c_.is_null()) return;
       Fcomm_ = MPI_Comm_c2f(c_.comm());
       options_init(opts);
-
       perm_.resize(rows_);
       HODLR_construct_init<scalar_t>
         (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
-         lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_);
+         lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
+         nullptr, nullptr, nullptr);
+      perm_init();
+      dist_init();
+    }
+
+    template<typename integer_t> struct AdmInfo {
+      std::pair<std::vector<int>,std::vector<int>> maps;
+      const DenseMatrix<bool>* adm;
+      const CSRGraph<integer_t>* graph;
+    };
+
+    template<typename scalar_t, typename integer_t>
+    void HODLR_distance_query(int* m, int* n, scalar_t* dist, C2Fptr fdata) {
+      int i = *m, j = *n;
+      if (i == j) { *dist = scalar_t(0.); return; }
+      auto& info = *static_cast<AdmInfo<integer_t>*>(fdata);
+      auto& g = *(info.graph);
+      // auto hic = g.ind() + g.ptr(i+1);
+      // for (auto pc=g.ind()+g.ptr(i); pc!=hic; pc++)
+      //   if (*pc == j) { *dist = scalar_t(1.); return; }
+      assert(i < g.nvert());
+      assert(j < g.nvert());
+      for (integer_t k=g.ptr(i); k<g.ptr(i+1); k++) {
+        assert(k < g.nedge());
+        if (g.ind(k) == j) {
+          *dist = scalar_t(1.);
+          return;
+        }
+      }
+      for (integer_t k=g.ptr(i); k<g.ptr(i+1); k++) {
+        assert(k < g.nedge());
+        for (integer_t l=g.ptr(k); l<g.ptr(k+1); l++) {
+          assert(l < g.nedge());
+          if (g.ind(k) == j) {
+            *dist = scalar_t(2.);
+            return;
+          }
+        }
+      }
+      *dist = scalar_t(3.);
+    }
+
+    template<typename integer_t> void HODLR_admissibility_query
+    (int* m, int* n, int* admissible, C2Fptr fdata) {
+      auto& info = *static_cast<AdmInfo<integer_t>*>(fdata);
+      auto& adm = *(info.adm);
+      auto& map0 = info.maps.first;
+      auto& map1 = info.maps.second;
+      int r = *m - 1, c = *n - 1;
+      bool a = true;
+      for (int j=map0[c]; j<=map1[c] && a; j++)
+        for (int i=map0[r]; i<=map1[r] && a; i++) {
+          assert(i < adm.rows());
+          assert(j < adm.cols());
+          a = a && adm(i, j);
+        }
+      *admissible = a;
+    }
+
+    template<typename scalar_t> template<typename integer_t>
+    HODLRMatrix<scalar_t>::HODLRMatrix
+    (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+     const DenseMatrix<bool>& adm, const CSRGraph<integer_t>& graph,
+     const opts_t& opts) {
+      rows_ = cols_ = tree.size;
+      HSS::HSSPartitionTree full_tree(tree);
+      int min_lvl = 2 + std::ceil(std::log2(c.size()));
+      lvls_ = std::max(min_lvl, full_tree.levels());
+      full_tree.expand_complete_levels(lvls_);
+      AdmInfo<integer_t> info;
+      info.maps = tree.map_from_complete_to_leafs(lvls_);
+      info.adm = &adm;
+      info.graph = &graph;
+      leafs_ = full_tree.leaf_sizes();
+      c_ = c;
+      if (c_.is_null()) return;
+      Fcomm_ = MPI_Comm_c2f(c_.comm());
+      options_init(opts);
+      perm_.resize(rows_);
+      // use the distance and admissibility functions
+      HODLR_set_I_option<scalar_t>(options_, "nogeo", 2);
+      // nedge/nvert is the average degree, but since we also consider
+      // length 2 connections, we need to consider more than that, 5
+      // is just a heuristic.  For instance for a 2d 9-point stencil,
+      // there are 3^2=9 points in the stencil and 5^2=25 points in
+      // the extended (length 2 connections) stencil.
+      HODLR_set_I_option<scalar_t>
+        (options_, "knn", 5 * graph.nedge() / graph.nvert());
+      // HODLR_printoptions<scalar_t>(options_, ptree_);
+      HODLR_construct_init<scalar_t>
+        (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
+         lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
+         // nullptr, nullptr, nullptr);
+         &(HODLR_distance_query<scalar_t,integer_t>),
+         &(HODLR_admissibility_query<integer_t>), &info);
       perm_init();
       dist_init();
     }

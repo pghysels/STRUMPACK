@@ -90,26 +90,22 @@ namespace strumpack {
 
   // this is used in separator reordering
   template<typename integer_t> inline int WRAPPER_METIS_PartGraphRecursive
-  (idx_t nvtxs, idx_t ncon, std::vector<integer_t>& csr_ptr,
-   std::vector<integer_t>& csr_ind, idx_t nparts,
-   idx_t& edge_cut, std::vector<idx_t>& partitioning) {
-    std::vector<idx_t> ptr(csr_ptr.size());
-    std::vector<idx_t> ind(csr_ind.size());
-    ptr.assign(csr_ptr.begin(), csr_ptr.end());
-    ind.assign(csr_ind.begin(), csr_ind.end());
+  (idx_t nvtxs, idx_t ncon, integer_t* ptr, integer_t* ind,
+   idx_t nparts, idx_t& edge_cut, std::vector<idx_t>& partitioning) {
+    std::vector<idx_t> ptr_, ind_;
+    ptr_.assign(ptr, ptr+nvtxs+1);
+    ind_.assign(ind, ind+ptr[nvtxs]);
     int ierr = METIS_PartGraphRecursive
-      (&nvtxs, &ncon, ptr.data(), ind.data(), NULL, NULL, NULL,
+      (&nvtxs, &ncon, ptr_.data(), ind_.data(), NULL, NULL, NULL,
        &nparts, NULL, NULL, NULL, &edge_cut, partitioning.data());
     return ierr;
   }
   template<> inline int WRAPPER_METIS_PartGraphRecursive
-  (idx_t nvtxs, idx_t ncon, std::vector<idx_t>& csr_ptr,
-   std::vector<idx_t>& csr_ind, idx_t nparts,
+  (idx_t nvtxs, idx_t ncon, idx_t* ptr, idx_t* ind, idx_t nparts,
    idx_t& edge_cut, std::vector<idx_t>& partitioning) {
     return METIS_PartGraphRecursive
-      (&nvtxs, &ncon, csr_ptr.data(), csr_ind.data(),
-       NULL, NULL, NULL, &nparts, NULL, NULL, NULL,
-       &edge_cut, partitioning.data());
+      (&nvtxs, &ncon, ptr, ind, NULL, NULL, NULL, &nparts,
+       NULL, NULL, NULL, &edge_cut, partitioning.data());
   }
 
 

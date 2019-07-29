@@ -203,7 +203,7 @@ namespace strumpack {
     std::unique_ptr<SeparatorTree<integer_t>> stree
       (new SeparatorTree<integer_t>(tree));
     if (gd.separator_reordering)
-      stree->HSS_trees() = std::move(gd.trees);
+      stree->partition_tree = std::move(gd.trees);
     return stree;
   }
 

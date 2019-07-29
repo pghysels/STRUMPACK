@@ -260,6 +260,23 @@ namespace strumpack {
      */
     void barrier() const { MPI_Barrier(comm_); }
 
+    template<typename T> void
+    broadcast(std::vector<T>& sbuf, int src=0) const {
+      MPI_Bcast(sbuf.data(), sbuf.size(), mpi_type<T>(), src, comm_);
+    }
+    template<typename T, std::size_t N> void
+    broadcast(std::array<T,N>& sbuf, int src=0) const {
+      MPI_Bcast(sbuf.data(), sbuf.size(), mpi_type<T>(), src, comm_);
+    }
+    template<typename T> void
+    broadcast(T& data, int src=0) const {
+      MPI_Bcast(&data, 1, mpi_type<T>(), src, comm_);
+    }
+    template<typename T> void
+    broadcast(T* sbuf, std::size_t ssize, int src=0) const {
+      MPI_Bcast(sbuf, ssize, mpi_type<T>(), src, comm_);
+    }
+
     /**
      * Non-blocking send of a vector to a destination process, with a
      * certain tag.

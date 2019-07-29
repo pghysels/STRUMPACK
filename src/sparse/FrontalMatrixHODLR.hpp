@@ -105,8 +105,8 @@ namespace strumpack {
     std::string type() const override { return "FrontalMatrixHODLR"; }
 
     void set_HODLR_partitioning
-    (const SPOptions<scalar_t>& opts,
-     const HSS::HSSPartitionTree& sep_tree, bool is_root) override;
+    (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
+     DenseMatrix<bool>& adm, CSRGraph<integer_t>& graph, bool is_root) override;
 
   private:
     HODLR::HODLRMatrix<scalar_t> F11_;
@@ -791,11 +791,18 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLR<scalar_t,integer_t>::set_HODLR_partitioning
   (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
-   bool is_root) {
+   DenseMatrix<bool>& adm, CSRGraph<integer_t>& graph, bool is_root) {
     assert(sep_tree.size == dim_sep());
+    // std::cout << " adm=[" << std::endl;
+    // for (int j=0; j<adm.cols(); j++) {
+    //   for (int i=0; i<adm.rows(); i++)
+    //     std::cout << adm(i,j) << " ";
+    //   std::cout << std::endl;
+    // }
+    // std::cout << "];" << std::endl;
     F11_ = std::move
       (HODLR::HODLRMatrix<scalar_t>
-       (commself_, sep_tree, opts.HODLR_options()));
+       (commself_, sep_tree, adm, graph, opts.HODLR_options()));
     if (!is_root && dim_upd()) {
       HSS::HSSPartitionTree CB_tree(dim_upd());
       CB_tree.refine(opts.HODLR_options().leaf_size());

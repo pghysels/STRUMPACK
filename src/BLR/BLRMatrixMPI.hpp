@@ -114,7 +114,8 @@ namespace strumpack {
       BLRMatrixMPI
       (const ProcessorGrid2D& grid,
        const std::vector<std::size_t>& tiles,
-       const std::function<bool(std::size_t,std::size_t)>& admissible,
+       //const std::function<bool(std::size_t,std::size_t)>& admissible,
+       const DenseMatrix<bool>& admissible,
        DistM_t& A, std::vector<int>& piv, const Opts_t& opts)
         : BLRMatrixMPI<scalar_t>
         (grid, A.rows(), tiles, A.cols(), tiles, opts) {

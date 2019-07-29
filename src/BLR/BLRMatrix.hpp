@@ -44,7 +44,7 @@ namespace strumpack {
     using extract_t = std::function<
       void(const std::vector<std::size_t>&, const std::vector<std::size_t>&,
            DenseMatrix<T>&)>;
-    using adm_t = std::function<bool(std::size_t,std::size_t)>;
+    using adm_t = DenseMatrix<bool>;
 
     template<typename scalar_t> class BLRMatrix {
       using DenseM_t = DenseMatrix<scalar_t>;
@@ -602,7 +602,7 @@ namespace strumpack {
      BLRMatrix<scalar_t>& B12, BLRMatrix<scalar_t>& B21,
      const std::vector<std::size_t>& tiles1,
      const std::vector<std::size_t>& tiles2,
-     const std::function<bool(std::size_t,std::size_t)>& admissible,
+     const DenseMatrix<bool>& admissible,
      const BLROptions<scalar_t>& opts) {
       B11 = BLRMatrix<scalar_t>(A11.rows(), tiles1, A11.cols(), tiles1);
       B12 = BLRMatrix<scalar_t>(A12.rows(), tiles1, A12.cols(), tiles2);
@@ -756,7 +756,7 @@ namespace strumpack {
      BLRMatrix<scalar_t>& B22,
      const std::vector<std::size_t>& tiles1,
      const std::vector<std::size_t>& tiles2,
-     const std::function<bool(std::size_t,std::size_t)>& admissible,
+     const DenseMatrix<bool>& admissible,
      const BLROptions<scalar_t>& opts) {
       B11 = BLRMatrix<scalar_t>(n1, tiles1, n1, tiles1);
       B12 = BLRMatrix<scalar_t>(n1, tiles1, n2, tiles2);

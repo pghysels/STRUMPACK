@@ -87,7 +87,7 @@ namespace strumpack {
 
   public:
 
-    MatrixReorderingMPI(integer_t n, MPI_Comm c);
+    MatrixReorderingMPI(integer_t n, const MPIComm& c);
 
     virtual ~MatrixReorderingMPI() {}
 
@@ -126,6 +126,7 @@ namespace strumpack {
      * sub_graph_A.
      */
     CSRGraph<integer_t> my_sub_graph;
+
     /**
      * Every process is responsible for one separator from the
      * distributed part of nested dissection.  The graph of the
@@ -154,23 +155,34 @@ namespace strumpack {
     const SeparatorTree<integer_t>& local_tree() const { return *local_tree_; }
 
   private:
-
+    const MPIComm* comm_;
     std::unique_ptr<SeparatorTree<integer_t>> local_tree_;
-
-    // TODO store an MPIComm pointer
-    MPI_Comm _comm;
 
     void get_local_graphs(const CSRMatrixMPI<scalar_t,integer_t>& Ampi);
 
     void build_local_tree(const CSRMatrixMPI<scalar_t,integer_t>& Ampi);
 
     void distributed_separator_reordering
-    (const SPOptions<scalar_t>& opts,
-     std::vector<integer_t>& global_sep_order);
+    (const SPOptions<scalar_t>& opts, std::vector<integer_t>& gorder);
 
     void local_separator_reordering
-    (const SPOptions<scalar_t>& opts,
-     std::vector<integer_t>& global_sep_order);
+    (const SPOptions<scalar_t>& opts, std::vector<integer_t>& gorder);
+
+    void local_separator_reordering_recursive
+    (const SPOptions<scalar_t>& opts, integer_t sep, bool compressed_parent,
+     std::vector<integer_t>& lorder, std::vector<integer_t>& liorder);
+
+    void split_recursive_local
+    (const SPOptions<scalar_t>& opts, integer_t sep,
+     std::vector<integer_t>& lorder, HSS::HSSPartitionTree& partition_tree,
+     integer_t& nr_parts, integer_t part, integer_t count,
+     const Length2Edges<integer_t>& l2);
+
+    void split_recursive_dist
+    (const SPOptions<scalar_t>& opts, std::vector<integer_t>& dorder,
+     HSS::HSSPartitionTree& partition_tree,
+     integer_t& nr_parts, integer_t part, integer_t count,
+     const Length2Edges<integer_t>& l2);
 
     void nested_dissection_print
     (const SPOptions<scalar_t>& opts, integer_t nnz) const;
@@ -182,9 +194,9 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   MatrixReorderingMPI<scalar_t,integer_t>::MatrixReorderingMPI
-  (integer_t n, MPI_Comm c)
+  (integer_t n, const MPIComm& c)
     : MatrixReordering<scalar_t,integer_t>(n), dsep_internal(0),
-    dsep_leaf(0), _comm(c) {
+    dsep_leaf(0), comm_(&c) {
   }
 
   template<typename scalar_t,typename integer_t> int
@@ -192,8 +204,8 @@ namespace strumpack {
   (const SPOptions<scalar_t>& opts, const CSRMatrixMPI<scalar_t,integer_t>& A,
    int nx, int ny, int nz, int components, int width) {
     if (!is_parallel(opts.reordering_method())) {
-      auto rank = mpi_rank(_comm);
-      auto P = mpi_nprocs(_comm);
+      auto rank = comm_->rank();
+      auto P = comm_->size();
       // TODO only gather the graph? without the values or the diagonal
       auto Aseq = A.gather();
       std::unique_ptr<SeparatorTree<integer_t>> global_sep_tree;
@@ -206,7 +218,8 @@ namespace strumpack {
           break;
         }
         case ReorderingStrategy::METIS: {
-          global_sep_tree = metis_nested_dissection(*Aseq, perm_, iperm_, opts);
+          global_sep_tree = metis_nested_dissection
+            (*Aseq, perm_, iperm_, opts);
           break;
         }
         case ReorderingStrategy::SCOTCH: {
@@ -229,15 +242,15 @@ namespace strumpack {
         Aseq.reset();
         global_sep_tree->check();
       }
-      MPI_Bcast(perm_.data(), perm_.size(), mpi_type<integer_t>(), 0, _comm);
-      MPI_Bcast(iperm_.data(), iperm_.size(), mpi_type<integer_t>(), 0, _comm);
+      comm_->broadcast(perm_);
+      comm_->broadcast(iperm_);
       integer_t nbsep;
       if (!rank) nbsep = global_sep_tree->separators();
-      MPI_Bcast(&nbsep, 1, mpi_type<integer_t>(), 0, _comm);
+      comm_->broadcast(nbsep);
       if (rank)
         global_sep_tree = std::unique_ptr<SeparatorTree<integer_t>>
           (new SeparatorTree<integer_t>(nbsep));
-      global_sep_tree->broadcast(_comm);
+      global_sep_tree->broadcast(comm_->comm());
       local_tree_ = global_sep_tree->subtree(rank, P);
       sep_tree_ = global_sep_tree->toptree(P);
       local_tree_->check();
@@ -265,13 +278,14 @@ namespace strumpack {
         std::tie(sep_tree_, local_tree_) =
           geometric_nested_dissection_dist
           (nx, ny, nz, components, width, A.begin_row(), A.end_row(),
-           _comm, perm_, iperm_, opts.nd_param(),
+           comm_->comm(), perm_, iperm_, opts.nd_param(),
            opts.compression_leaf_size(), opts.compression_min_sep_size());
         break;
       }
       case ReorderingStrategy::PARMETIS: {
 #if defined(STRUMPACK_USE_PARMETIS)
-        sep_tree_ = parmetis_nested_dissection(A, _comm, true, perm_, opts);
+        sep_tree_ = parmetis_nested_dissection
+          (A, comm_->comm(), true, perm_, opts);
 #else
         std::cerr << "ERROR: STRUMPACK was not configured with ParMetis support"
                   << std::endl;
@@ -281,7 +295,8 @@ namespace strumpack {
       }
       case ReorderingStrategy::PTSCOTCH: {
 #if defined(STRUMPACK_USE_SCOTCH)
-        sep_tree_ = ptscotch_nested_dissection(A, _comm, true, perm_, opts);
+        sep_tree_ = ptscotch_nested_dissection
+          (A, comm_->comm(), true, perm_, opts);
 #else
         std::cerr << "ERROR: STRUMPACK was not configured with Scotch support"
                   << std::endl;
@@ -306,137 +321,198 @@ namespace strumpack {
   MatrixReorderingMPI<scalar_t,integer_t>::separator_reordering
   (const SPOptions<scalar_t>& opts, const CSRMatrixMPI<scalar_t,integer_t>& A,
    bool verbose) {
-    if (opts.reordering_method() == ReorderingStrategy::GEOMETRIC)
+    // if (opts.reordering_method() == ReorderingStrategy::GEOMETRIC ||
+    //     opts.compression() == CompressionType::NONE)
+    //   return;
+
+    if (opts.compression() == CompressionType::NONE)
       return;
     auto n = A.size();
-    std::vector<integer_t> global_sep_order(n);
-    for (integer_t i=0; i<n; i++)
-      global_sep_order[i] = i;
-    distributed_separator_reordering(opts, global_sep_order);
-    local_separator_reordering(opts, global_sep_order);
-    for (integer_t i=0; i<n; i++)
-      perm_[global_sep_order[i]] = iperm_[i];
-    for (integer_t i=0; i<n; i++)
-      iperm_[perm_[i]] = i;
-    for (integer_t i=0; i<n; i++) {
-      auto tmp = perm_[i];
-      perm_[i] = iperm_[i];
-      iperm_[i] = tmp;
-    }
+    std::vector<integer_t> gorder(n);
+    std::iota(gorder.begin(), gorder.end(), 0);
+    distributed_separator_reordering(opts, gorder);
+    local_separator_reordering(opts, gorder);
+    for (integer_t i=0; i<n; i++) perm_[gorder[i]] = iperm_[i];
+    for (integer_t i=0; i<n; i++) iperm_[perm_[i]] = i;
+    std::swap(perm_, iperm_);
   }
 
   template<typename scalar_t,typename integer_t> void
   MatrixReorderingMPI<scalar_t,integer_t>::separator_reordering
   (const SPOptions<scalar_t>& opts, const CSRMatrixMPI<scalar_t,integer_t>& A,
    FrontalMatrix<scalar_t,integer_t>& F) {
-    if (opts.reordering_method() == ReorderingStrategy::GEOMETRIC)
+    if (opts.reordering_method() == ReorderingStrategy::GEOMETRIC ||
+        opts.compression() == CompressionType::NONE)
       return;
-
     std::vector<integer_t> sorder(A.size());
 #pragma omp parallel
 #pragma omp single
     F.bisection_partitioning(opts, sorder.data());
     std::cout << "TODO MatrixReorderingMPI::separator_reordering"
               << std::endl;
+  }
 
-//     auto iwork = iperm_;
-//     for (integer_t i=0; i<N; i++) sorder[i] = -sorder[i];
-//     for (integer_t i=0; i<N; i++) iwork[sorder[i]] = i;
-//     A.permute(iwork, sorder);
 
-//     // product of perm and sep_order
-//     for (integer_t i=0; i<N; i++) iwork[i] = sorder[perm_[i]];
-//     for (integer_t i=0; i<N; i++) perm_[i] = iwork[i];
-//     for (integer_t i=0; i<N; i++) iperm_[perm_[i]] = i;
+  template<typename scalar_t,typename integer_t> void
+  MatrixReorderingMPI<scalar_t,integer_t>::split_recursive_local
+  (const SPOptions<scalar_t>& opts, integer_t sep,
+   std::vector<integer_t>& lorder, HSS::HSSPartitionTree& partition_tree,
+   integer_t& nr_parts, integer_t part, integer_t count,
+   const Length2Edges<integer_t>& l2) {
+    auto sep_begin = local_tree_->sizes(sep);
+    auto sep_end = local_tree_->sizes(sep+1);
+    auto dim_sep = sep_end - sep_begin;
+    auto sg = my_sub_graph.extract_subgraph
+      (opts.separator_ordering_level(), sub_graph_range.first,
+       sep_begin, sep_end, part, &lorder[sep_begin], l2);
+    idx_t edge_cut = 0, nvtxs = sg.size();
+    std::vector<idx_t> partitioning(nvtxs);
+    int info = WRAPPER_METIS_PartGraphRecursive
+      (nvtxs, 1, sg.ptr(), sg.ind(), 2, edge_cut, partitioning);
+    if (info !=  METIS_OK) {
+      std::cerr << "METIS_PartGraphRecursive for separator"
+        " reordering returned: " << info << std::endl;
+      exit(1);
+    }
+    partition_tree.c.resize(2);
+    for (integer_t i=sep_begin, j=0; i<sep_end; i++)
+      if (lorder[i] == part) {
+        auto p = partitioning[j++];
+        lorder[i] = -count - p;
+        partition_tree.c[p].size++;
+      }
+    for (integer_t p=0; p<2; p++) {
+      if (partition_tree.c[p].size > 2 * opts.compression_leaf_size())
+        split_recursive_local(opts, sep, lorder, partition_tree.c[p],
+                              nr_parts, -count-p, count+2, l2);
+      else
+        std::replace(&lorder[sep_begin], &lorder[sep_end],
+                     -count-p, nr_parts++);
+    }
+  }
 
-// #pragma omp parallel
-// #pragma omp single
-//     F.permute_upd_indices(sorder);
+  template<typename scalar_t,typename integer_t> void
+  MatrixReorderingMPI<scalar_t,integer_t>::split_recursive_dist
+  (const SPOptions<scalar_t>& opts, std::vector<integer_t>& dorder,
+   HSS::HSSPartitionTree& partition_tree,
+   integer_t& nr_parts, integer_t part, integer_t count,
+   const Length2Edges<integer_t>& l2) {
+    auto dsep_begin = dist_sep_range.first;
+    auto dsep_end = dist_sep_range.second;
+    auto dim_dsep = dsep_end - dsep_begin;
+    auto sg = my_dist_sep.extract_subgraph
+      (opts.separator_ordering_level(), dsep_begin, 0, dim_dsep,
+       part, dorder.data(), l2);
+    idx_t edge_cut = 0, nvtxs = sg.size();
+    std::vector<idx_t> partitioning(dim_dsep);
+    int info = WRAPPER_METIS_PartGraphRecursive
+      (nvtxs, 1, sg.ptr(), sg.ind(), 2, edge_cut, partitioning);
+    if (info !=  METIS_OK) {
+      std::cerr << "METIS_PartGraphRecursive for separator"
+        " reordering returned: " << info << std::endl;
+      exit(1);
+    }
+    partition_tree.c.resize(2);
+    for (integer_t i=0, j=0; i<dim_dsep; i++)
+      if (dorder[i] == part) {
+        auto p = partitioning[j++];
+        dorder[i] = -count - p;
+        partition_tree.c[p].size++;
+      }
+    for (integer_t p=0; p<2; p++)
+      if (partition_tree.c[p].size > 2 * opts.compression_leaf_size())
+        split_recursive_dist
+          (opts, dorder, partition_tree.c[p], nr_parts, -count-p, count+2, l2);
+      else
+        std::replace
+          (dorder.begin(), dorder.end(), -count-p, nr_parts++);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  MatrixReorderingMPI<scalar_t,integer_t>::local_separator_reordering_recursive
+  (const SPOptions<scalar_t>& opts, integer_t sep, bool compressed_parent,
+   std::vector<integer_t>& lorder, std::vector<integer_t>& liorder) {
+    auto sep_begin = local_tree_->sizes(sep);
+    auto sep_end = local_tree_->sizes(sep+1);
+    auto dim_sep = sep_end - sep_begin;
+    bool compressed = is_compressed(dim_sep, compressed_parent, opts);
+    if (compressed) {
+      HSS::HSSPartitionTree tree(dim_sep);
+      int leaf = opts.compression_leaf_size();
+      if (dim_sep > 2 * leaf) {
+        std::fill(&lorder[sep_begin], &lorder[sep_end], integer_t(0));
+        integer_t parts = 0;
+        auto l2 = my_sub_graph.length_2_edges(sub_graph_range.first);
+        split_recursive_local(opts, sep, lorder, tree, parts, 0, 1, l2);
+        for (integer_t part=0, count=sep_begin+sub_graph_range.first;
+             part<parts; part++)
+          for (integer_t i=sep_begin; i<sep_end; i++)
+            if (lorder[i] == part)
+              lorder[i] = -count++;
+        for (integer_t i=sep_begin; i<sep_end; i++) {
+          lorder[i] = -lorder[i];
+          liorder[lorder[i]-sub_graph_range.first] = i;
+        }
+      }
+      if (opts.use_BLR() || opts.use_HODLR()) {
+        auto tiles = tree.leaf_sizes();
+        integer_t nt = tiles.size();
+        DenseMatrix<bool> adm(nt, nt);
+        adm.fill(true);
+        for (integer_t t=0; t<nt; t++)
+          adm(t, t) = false;
+        if (opts.use_HODLR() ||
+            opts.BLR_options().admissibility() ==
+            BLR::Admissibility::STRONG) {
+          std::vector<integer_t> ts(nt+1);
+          for (integer_t i=0; i<nt; i++)
+            ts[i+1] = tiles[i] + ts[i];
+          auto& G = my_sub_graph;
+          for (integer_t t=0; t<nt; t++) {
+            for (integer_t i=ts[t]; i<ts[t+1]; i++) {
+              auto Gi = liorder[i+sep_begin];
+              auto hij = G.ind() + G.ptr(Gi+1);
+              for (auto pj=G.ind()+G.ptr(Gi); pj!=hij; pj++) {
+                auto Gj = *pj - sub_graph_range.first;
+                if (Gj < sep_begin || Gj >= sep_end) continue;
+                integer_t tj = std::distance
+                  (ts.begin(), std::upper_bound
+                   (ts.begin(), ts.end(),
+                    lorder[Gj]-sub_graph_range.first-sep_begin)) - 1;
+                if (t != tj) adm(t, tj) = adm(tj, t) = false;
+              }
+            }
+          }
+        }
+        local_tree_->admissibility[sep] = std::move(adm);
+      }
+      local_tree_->partition_tree[sep] = std::move(tree);
+      if (opts.use_HODLR())
+        local_tree_->separator_graph[sep] =
+          my_sub_graph.extract_subgraph
+          (sub_graph_range.first, sep_begin, sep_end);
+    }
+    if (local_tree_->lch(sep) != -1)
+      local_separator_reordering_recursive
+        (opts, local_tree_->lch(sep), compressed, lorder, liorder);
+    if (local_tree_->rch(sep) != -1)
+      local_separator_reordering_recursive
+        (opts, local_tree_->rch(sep), compressed, lorder, liorder);
   }
 
   template<typename scalar_t,typename integer_t> void
   MatrixReorderingMPI<scalar_t,integer_t>::local_separator_reordering
-  (const SPOptions<scalar_t>& opts, std::vector<integer_t>& global_sep_order) {
-    auto rank = mpi_rank(_comm);
-    auto P = mpi_nprocs(_comm);
+  (const SPOptions<scalar_t>& opts, std::vector<integer_t>& gorder) {
+    auto P = comm_->size();
     auto n_local = my_sub_graph.size();
-    std::vector<integer_t> local_sep_order(n_local);
-    std::vector<integer_t> local_sep_iorder(n_local);
-    for (integer_t i=0; i<n_local; i++)
-      local_sep_order[i] = i + sub_graph_range.first;
-    std::vector<integer_t> sep_csr_ptr, sep_csr_ind;
-
-    int min_sep = opts.compression_min_sep_size();
-    int leaf = opts.compression_leaf_size();
-    std::function<void(integer_t)> reorder_separator = [&](integer_t sep) {
-      auto sep_begin = local_tree_->sizes(sep);
-      auto sep_end = local_tree_->sizes(sep+1);
-      auto dim_sep = sep_end - sep_begin;
-      // this front (and its descendants) are not HSS
-      if (dim_sep >= min_sep) {
-        HSS::HSSPartitionTree tree(dim_sep);
-        if (dim_sep > 2 * leaf) {
-          std::function<void(HSS::HSSPartitionTree&, integer_t&,
-                             integer_t, integer_t)> split =
-            [&](HSS::HSSPartitionTree& hss_tree, integer_t& nr_parts,
-                integer_t part, integer_t count) {
-            my_sub_graph.extract_separator_subgraph
-            (opts.separator_ordering_level(), sub_graph_range.first,
-             sep_begin, sep_end, part, &local_sep_order[sep_begin],
-             sep_csr_ptr, sep_csr_ind);
-            idx_t edge_cut = 0, nvtxs = sep_csr_ptr.size()-1;
-            std::vector<idx_t> partitioning(nvtxs);
-            int info = WRAPPER_METIS_PartGraphRecursive
-            (nvtxs, 1, sep_csr_ptr, sep_csr_ind, 2, edge_cut, partitioning);
-            if (info !=  METIS_OK) {
-              std::cerr << "METIS_PartGraphRecursive for separator"
-                " reordering returned: " << info << std::endl;
-              exit(1);
-            }
-            hss_tree.c.resize(2);
-            for (integer_t i=sep_begin, j=0; i<sep_end; i++)
-              if (local_sep_order[i] == part) {
-                auto p = partitioning[j++];
-                local_sep_order[i] = -count - p;
-                hss_tree.c[p].size++;
-              }
-            for (integer_t p=0; p<2; p++)
-              if (hss_tree.c[p].size > 2 * leaf)
-                split(hss_tree.c[p], nr_parts, -count-p, count+2);
-              else
-                std::replace(&local_sep_order[sep_begin],
-                             &local_sep_order[sep_end], -count-p, nr_parts++);
-          };
-          std::fill(&local_sep_order[sep_begin],
-                    &local_sep_order[sep_end], integer_t(0));
-          integer_t parts = 0;
-          split(tree, parts, 0, 1);
-          for (integer_t part=0, count=sep_begin+sub_graph_range.first;
-               part<parts; part++)
-            for (integer_t i=sep_begin; i<sep_end; i++)
-              if (local_sep_order[i] == part)
-                local_sep_order[i] = -count++;
-          for (integer_t i=sep_begin; i<sep_end; i++)
-            local_sep_order[i] = -local_sep_order[i];
-        }
-        local_tree_->HSS_tree(sep) = tree;
-      }
-      // this stops the recursion, so a parent of an HSS/HODLR front
-      // is always also HSS/HODLR
-      if ((opts.use_HSS() || opts.use_HODLR()) && dim_sep < min_sep) return;
-      if (local_tree_->lch(sep) != -1)
-        reorder_separator(local_tree_->lch(sep));
-      if (local_tree_->rch(sep) != -1)
-        reorder_separator(local_tree_->rch(sep));
-    };
+    std::vector<integer_t> lorder(n_local), liorder(n_local);
+    std::iota(lorder.begin(), lorder.end(), sub_graph_range.first);
+    std::iota(liorder.begin(), liorder.end(), 0);
     if (local_tree_->separators() > 0)
-      reorder_separator(local_tree_->root());
-    my_sub_graph.clear_temp_data();
-    for (integer_t i=0; i<n_local; i++)
-      local_sep_iorder[local_sep_order[i]-sub_graph_range.first] = i;
+      local_separator_reordering_recursive
+        (opts, local_tree_->root(), true, lorder, liorder);
     my_sub_graph.permute_local
-      (local_sep_order, local_sep_iorder,
-       sub_graph_range.first, sub_graph_range.second);
+      (lorder, liorder, sub_graph_range.first, sub_graph_range.second);
     std::unique_ptr<int[]> rcnts(new int[2*P]);
     auto displs = rcnts.get() + P;
     for (int p=0; p<P; p++) {
@@ -444,74 +520,74 @@ namespace strumpack {
       displs[p] = sub_graph_ranges[p].first;
     }
     MPI_Allgatherv
-      (local_sep_order.data(), rcnts[rank], mpi_type<integer_t>(),
-       global_sep_order.data(), rcnts.get(), displs,
-       mpi_type<integer_t>(), _comm);
+      (lorder.data(), rcnts[comm_->rank()], mpi_type<integer_t>(),
+       gorder.data(), rcnts.get(), displs, mpi_type<integer_t>(),
+       comm_->comm());
   }
 
   template<typename scalar_t,typename integer_t> void
   MatrixReorderingMPI<scalar_t,integer_t>::distributed_separator_reordering
-  (const SPOptions<scalar_t>& opts, std::vector<integer_t>& global_sep_order) {
-    auto rank = mpi_rank(_comm);
-    auto P = mpi_nprocs(_comm);
+  (const SPOptions<scalar_t>& opts, std::vector<integer_t>& gorder) {
+    auto rank = comm_->rank();
+    auto P = comm_->size();
     auto dsep_begin = dist_sep_range.first;
     auto dsep_end = dist_sep_range.second;
     auto dim_dsep = dsep_end - dsep_begin;
-    std::vector<integer_t> dsep_order(dim_dsep), dsep_iorder(dim_dsep);
-
-    int min_sep = opts.compression_min_sep_size();
-    int leaf = opts.compression_leaf_size();
+    std::vector<integer_t> dorder(dim_dsep), diorder(dim_dsep);
     if (dim_dsep) {
+      int min_sep = opts.compression_min_sep_size();
+      int leaf = opts.compression_leaf_size();
       HSS::HSSPartitionTree tree(dim_dsep);
-      if ((dim_dsep >= min_sep) &&
-          (dim_dsep > 2 * leaf)) {
-        std::vector<integer_t> sep_csr_ptr, sep_csr_ind;
-        std::function<void(HSS::HSSPartitionTree&, integer_t&,
-                           integer_t, integer_t)> split =
-          [&](HSS::HSSPartitionTree& hss_tree, integer_t& nr_parts,
-              integer_t part, integer_t count) {
-          my_dist_sep.extract_separator_subgraph
-          (opts.separator_ordering_level(), dsep_begin, 0, dim_dsep,
-           part, dsep_order.data(), sep_csr_ptr, sep_csr_ind);
-          idx_t edge_cut = 0, nvtxs = sep_csr_ptr.size()-1;
-          std::vector<idx_t> partitioning(dim_dsep);
-          int info = WRAPPER_METIS_PartGraphRecursive
-          (nvtxs, 1, sep_csr_ptr, sep_csr_ind, 2, edge_cut, partitioning);
-          if (info !=  METIS_OK) {
-            std::cerr << "METIS_PartGraphRecursive for separator"
-              " reordering returned: " << info << std::endl;
-            exit(1);
-          }
-          hss_tree.c.resize(2);
-          for (integer_t i=0, j=0; i<dim_dsep; i++)
-            if (dsep_order[i] == part) {
-              auto p = partitioning[j++];
-              dsep_order[i] = -count - p;
-              hss_tree.c[p].size++;
-            }
-          for (integer_t p=0; p<2; p++)
-            if (hss_tree.c[p].size > 2 * leaf)
-              split(hss_tree.c[p], nr_parts, -count-p, count+2);
-            else
-              std::replace
-                (dsep_order.begin(), dsep_order.end(), -count-p, nr_parts++);
-        };
-        std::fill(dsep_order.begin(), dsep_order.end(), integer_t(0));
+      if ((dim_dsep >= min_sep) && (dim_dsep > 2 * leaf)) {
+        std::fill(dorder.begin(), dorder.end(), integer_t(0));
         integer_t parts = 0;
-        split(tree, parts, 0, 1);
-        my_dist_sep.clear_temp_data();
+        auto l2 = my_dist_sep.length_2_edges(dist_sep_range.first);
+        split_recursive_dist(opts, dorder, tree, parts, 0, 1, l2);
         for (integer_t part=0, count=dsep_begin; part<parts; part++)
           for (integer_t i=0; i<dim_dsep; i++)
-            if (dsep_order[i] == part)
-              dsep_order[i] = -count++;
+            if (dorder[i] == part) dorder[i] = -count++;
         for (integer_t i=0; i<dim_dsep; i++)
-          dsep_order[i] = -dsep_order[i];
+          dorder[i] = -dorder[i];
       } else
         for (integer_t i=0; i<dim_dsep; i++)
-          dsep_order[i] = i+dsep_begin;
-      sep_tree_->HSS_tree(dsep_internal) = tree;
+          dorder[i] = i+dsep_begin;
       for (integer_t i=0; i<dim_dsep; i++)
-        dsep_iorder[dsep_order[i]-dsep_begin] = i;
+        diorder[dorder[i]-dsep_begin] = i;
+      if (opts.use_BLR() || opts.use_HODLR()) {
+        auto tiles = tree.leaf_sizes();
+        integer_t nt = tiles.size();
+        DenseMatrix<bool> adm(nt, nt);
+        adm.fill(true);
+        for (integer_t t=0; t<nt; t++)
+          adm(t, t) = false;
+        if (opts.use_HODLR() ||
+            opts.BLR_options().admissibility() ==
+            BLR::Admissibility::STRONG) {
+          std::vector<integer_t> ts(nt+1);
+          for (integer_t i=0; i<nt; i++)
+            ts[i+1] = tiles[i] + ts[i];
+          auto& G = my_dist_sep;
+          for (integer_t t=0; t<nt; t++) {
+            for (integer_t i=ts[t]; i<ts[t+1]; i++) {
+              auto Gi = diorder[i];
+              auto hij = G.ind() + G.ptr(Gi+1);
+              for (auto pj=G.ind()+G.ptr(Gi); pj!=hij; pj++) {
+                auto Gj = *pj - dsep_begin;
+                if (Gj < 0 || Gj >= dim_dsep) continue;
+                integer_t tj = std::distance
+                  (ts.begin(), std::upper_bound
+                   (ts.begin(), ts.end(), dorder[Gj]-dsep_begin)) - 1;
+                if (t != tj) adm(t, tj) = adm(tj, t) = false;
+              }
+            }
+          }
+        }
+        sep_tree_->admissibility[dsep_internal] = std::move(adm);
+      }
+      sep_tree_->partition_tree[dsep_internal] = std::move(tree);
+      if (opts.use_HODLR())
+        sep_tree_->separator_graph[dsep_internal] =
+          my_dist_sep.extract_subgraph(dsep_begin, 0, dim_dsep);
     }
     std::unique_ptr<int[]> rcnts(new int[2*P]);
     auto displs = rcnts.get() + P;
@@ -520,19 +596,18 @@ namespace strumpack {
       displs[p] = dist_sep_ranges[p].first;
     }
     MPI_Allgatherv
-      (dsep_order.data(), rcnts[rank], mpi_type<integer_t>(),
-       global_sep_order.data(), rcnts.get(), displs,
-       mpi_type<integer_t>(), _comm);
+      (dorder.data(), rcnts[rank], mpi_type<integer_t>(), gorder.data(),
+       rcnts.get(), displs, mpi_type<integer_t>(), comm_->comm());
     my_dist_sep.permute_rows_local_cols_global
-      (global_sep_order, dsep_iorder, dsep_begin, dsep_end);
-    my_sub_graph.permute_columns(global_sep_order);
+      (gorder, diorder, dsep_begin, dsep_end);
+    my_sub_graph.permute_columns(gorder);
   }
 
   template<typename scalar_t,typename integer_t> void
   MatrixReorderingMPI<scalar_t,integer_t>::get_local_graphs
   (const CSRMatrixMPI<scalar_t,integer_t>& A) {
-    auto P = mpi_nprocs(_comm);
-    auto rank = mpi_rank(_comm);
+    auto P = comm_->size();
+    auto rank = comm_->rank();
     sub_graph_ranges.resize(P);
     dist_sep_ranges.resize(P);
     proc_dist_sep.resize(sep_tree_->separators());
@@ -540,14 +615,14 @@ namespace strumpack {
          sep<sep_tree_->separators(); sep++) {
       if (sep_tree_->lch(sep) == -1) {
         // sep is a leaf, so it is the local graph of proces p
-        if (p_local==rank) dsep_leaf = sep;
+        if (p_local == rank) dsep_leaf = sep;
         sub_graph_ranges[p_local] =
           std::make_pair(sep_tree_->sizes(sep), sep_tree_->sizes(sep+1));
         proc_dist_sep[sep] = p_local++;
       } else {
         // sep was computed using distributed nested dissection,
         // assign it to process p_dist
-        if (p_dist==rank)
+        if (p_dist == rank)
           dsep_internal = sep;
         dist_sep_ranges[p_dist] =
           std::make_pair(sep_tree_->sizes(sep), sep_tree_->sizes(sep+1));
@@ -563,32 +638,29 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   MatrixReorderingMPI<scalar_t,integer_t>::build_local_tree
   (const CSRMatrixMPI<scalar_t,integer_t>& A) {
-    auto P = mpi_nprocs(_comm);
-    auto rank = mpi_rank(_comm);
+    auto P = comm_->size();
+    auto rank = comm_->rank();
     auto n = A.size();
     auto sub_n = my_sub_graph.size();
-    auto sub_graph_etree =
+    auto sub_etree =
       spsymetree(my_sub_graph.ptr(), my_sub_graph.ptr()+1,
-                 my_sub_graph.ind(),
-                 sub_n, sub_graph_range.first);
-    auto post_order = etree_postorder(sub_graph_etree);
+                 my_sub_graph.ind(), sub_n, sub_graph_range.first);
+    auto post = etree_postorder(sub_etree);
     std::vector<integer_t> iwork(sub_n);
     for (integer_t i=0; i<sub_n; ++i)
-      iwork[post_order[i]] = post_order[sub_graph_etree[i]];
+      iwork[post[i]] = post[sub_etree[i]];
     for (integer_t i=0; i<sub_n; ++i)
-      sub_graph_etree[i] = iwork[i];
+      sub_etree[i] = iwork[i];
     local_tree_ = std::unique_ptr<SeparatorTree<integer_t>>
-      (new SeparatorTree<integer_t>(sub_graph_etree));
+      (new SeparatorTree<integer_t>(sub_etree));
     for (integer_t i=0; i<sub_n; i++) {
-      iwork[post_order[i]] = i;
-      post_order[i] += sub_graph_range.first;
+      iwork[post[i]] = i;
+      post[i] += sub_graph_range.first;
     }
     my_sub_graph.permute_local
-      (post_order, iwork, sub_graph_range.first, sub_graph_range.second);
-
-    std::vector<integer_t> global_post_order(n);
-    for (integer_t i=0; i<n; i++)
-      global_post_order[i] = i;
+      (post, iwork, sub_graph_range.first, sub_graph_range.second);
+    std::vector<integer_t> gpost(n);
+    std::iota(gpost.begin(), gpost.end(), 0);
     std::unique_ptr<int[]> rcnts(new int[2*P]);
     auto displs = rcnts.get() + P;
     for (int p=0; p<P; p++) {
@@ -596,15 +668,12 @@ namespace strumpack {
       displs[p] = sub_graph_ranges[p].first;
     }
     MPI_Allgatherv
-      (post_order.data(), rcnts[rank], mpi_type<integer_t>(),
-       global_post_order.data(), rcnts.get(), displs,
-       mpi_type<integer_t>(), _comm);
-    for (integer_t i=0; i<n; i++)
-      iperm_[perm_[i]] = i;
-    for (integer_t i=0; i<n; i++)
-      perm_[global_post_order[i]] = iperm_[i];
+      (post.data(), rcnts[rank], mpi_type<integer_t>(), gpost.data(),
+       rcnts.get(), displs, mpi_type<integer_t>(), comm_->comm());
     for (integer_t i=0; i<n; i++) iperm_[perm_[i]] = i;
-    for (integer_t i=0; i<n; i++) std::swap(perm_[i], iperm_[i]);
+    for (integer_t i=0; i<n; i++) perm_[gpost[i]] = iperm_[i];
+    for (integer_t i=0; i<n; i++) iperm_[perm_[i]] = i;
+    std::swap(perm_, iperm_);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -619,16 +688,12 @@ namespace strumpack {
   MatrixReorderingMPI<scalar_t,integer_t>::nested_dissection_print
   (const SPOptions<scalar_t>& opts, integer_t nnz) const {
     if (opts.verbose()) {
-      auto total_separators = local_tree_->separators();
-      MPI_Allreduce(MPI_IN_PLACE, &total_separators, 1,
-                    mpi_type<integer_t>(), MPI_SUM, _comm);
-      total_separators +=
-        std::max(integer_t(0), sep_tree_->separators() - mpi_nprocs(_comm));
-      auto max_level = local_tree_->levels() +
-        sep_tree_->level(dsep_leaf) - 1;
-      MPI_Allreduce
-        (MPI_IN_PLACE, &max_level, 1, mpi_type<integer_t>(), MPI_MAX, _comm);
-      if (!mpi_rank(_comm))
+      auto total_separators =
+        comm_->all_reduce(local_tree_->separators(), MPI_SUM) +
+        std::max(integer_t(0), sep_tree_->separators() - comm_->size());
+      auto max_level = comm_->all_reduce
+        (local_tree_->levels() + sep_tree_->level(dsep_leaf) - 1, MPI_MAX);
+      if (comm_->is_root())
         MatrixReordering<scalar_t,integer_t>::nested_dissection_print
           (opts, nnz, max_level, total_separators, true);
     }

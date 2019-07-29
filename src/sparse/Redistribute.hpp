@@ -119,8 +119,9 @@ namespace strumpack {
     integer_t* dim_upd = nullptr;
     std::vector<integer_t*> upd;
     float* work = nullptr;
-    std::unordered_map<integer_t, HSS::HSSPartitionTree> HSS_tree;
-    std::unordered_map<integer_t, std::vector<bool>> admissibility;
+    std::unordered_map<integer_t, HSS::HSSPartitionTree> partition_tree;
+    std::unordered_map<integer_t, DenseMatrix<bool>> admissibility;
+    std::unordered_map<integer_t, CSRGraph<integer_t>> separator_graph;
 
     // send the symbolic info of the entire tree belonging to dist_sep
     // owned by owner to [P0,P0+P) send only the root of the sub tree
@@ -140,8 +141,9 @@ namespace strumpack {
       std::vector<MPIRequest> sreq;
       if (rank == owner) {
         auto nbsep = nd.local_tree().separators();
-        const auto& trees = nd.local_tree().HSS_trees();
-        const auto& adm = nd.local_tree().admissibilities();
+        const auto& trees = nd.local_tree().partition_tree;
+        const auto& adm = nd.local_tree().admissibility;
+        const auto& graph = nd.local_tree().separator_graph;
 
         sbufi.push_back(nbsep);
         sbufi.insert(sbufi.end(), nd.local_tree().lch(), nd.local_tree().lch()+nbsep);
@@ -163,8 +165,17 @@ namespace strumpack {
         sbufi.push_back(adm.size());
         for (auto& a : adm) {
           sbufi.push_back(a.first);
-          sbufi.push_back(a.second.size());
-          sbufi.insert(sbufi.end(), a.second.begin(), a.second.end());
+          sbufi.push_back(a.second.rows());
+          for (std::size_t j=0; j<a.second.cols(); j++)
+            for (std::size_t i=0; i<a.second.rows(); i++)
+              sbufi.push_back(a.second(i,j));
+        }
+        sbufi.push_back(graph.size());
+        for (auto& g : graph) {
+          sbufi.push_back(g.first);
+          auto gserial = g.second.serialize();
+          sbufi.push_back(gserial.size());
+          sbufi.insert(sbufi.end(), gserial.begin(), gserial.end());
         }
 
         sbuff.reserve(nbsep);
@@ -197,13 +208,13 @@ namespace strumpack {
         sbufi.clear(); sbufi.shrink_to_fit();
       }
       if (receiver) {
-        auto pi = rbufi.begin();
+        auto pi = rbufi.data();
         nr_sep = *pi++;
-        lchild = &*pi;   pi += nr_sep;
-        rchild = &*pi;   pi += nr_sep;
+        lchild = pi;   pi += nr_sep;
+        rchild = pi;   pi += nr_sep;
         root = *pi++;
-        sep_ptr = &*pi;  pi += nr_sep + 1;
-        dim_upd = &*pi;  pi += nr_sep;
+        sep_ptr = pi;  pi += nr_sep + 1;
+        dim_upd = pi;  pi += nr_sep;
         upd = std::vector<integer_t*>(nr_sep);
         upd[0] = &*pi;   pi += dim_upd[0];
         for (integer_t sep=0; sep<nr_sep-1; sep++) {
@@ -211,23 +222,30 @@ namespace strumpack {
           pi += dim_upd[sep+1];
         }
         auto nr_trees = *pi++;
-        HSS_tree.reserve(nr_trees);
+        partition_tree.reserve(nr_trees);
         for (integer_t t=0; t<nr_trees; t++) {
           auto sep = *pi++;
           auto size = *pi++;
-          std::vector<int> hss(size);
-          std::copy(pi, pi+size, hss.begin());
+          partition_tree[sep] = HSS::HSSPartitionTree::deserialize(pi);
           pi += size;
-          HSS_tree[sep] = std::move(HSS::HSSPartitionTree(hss));
         }
         auto nr_adm = *pi++;
         admissibility.reserve(nr_adm);
         for (integer_t a=0; a<nr_adm; a++) {
           auto sep = *pi++;
-          auto size = *pi++;
-          std::vector<bool> adm(size);
-          std::copy(pi, pi+size, adm.begin());
+          auto m = *pi++;
+          DenseMatrix<bool> adm(m, m);
+          for (std::size_t j=0; j<m; j++)
+            for (std::size_t i=0; i<m; i++)
+              adm(i, j) = *pi++;
           admissibility[sep] = std::move(adm);
+        }
+        auto nr_g = *pi++;
+        for (integer_t g=0; g<nr_g; g++) {
+          auto sep = *pi++;
+          auto gsize = *pi++;
+          separator_graph[sep] = CSRGraph<integer_t>::deserialize(pi);
+          pi += gsize;
         }
         work = rbuff.data();
       }

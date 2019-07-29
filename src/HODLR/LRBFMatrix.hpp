@@ -165,6 +165,8 @@ namespace strumpack {
 
       F2Cptr Aoptions = const_cast<F2Cptr>(A.options_);
       HODLR_copyoptions<scalar_t>(Aoptions, options_);
+      HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
+      HODLR_set_I_option<scalar_t>(options_, "knn", 0);
 
       LRBF_construct_init<scalar_t>
         (rows_, cols_, lrows_, lcols_, A.msh_, B.msh_, lr_bf_, options_,

@@ -93,21 +93,6 @@ namespace strumpack {
       HSSPartitionTree(int n) : size(n) {}
 
       /**
-       * Constructor, taking a vector desribing an entire tree. This
-       * is used for deserialization. The constructor argument buf
-       * should be one obtained from calling serialize on an
-       * HSSPartitionTree object.
-       *
-       * \param buf Serialized HSSPartitionTree
-       * \see serialize
-       */
-      HSSPartitionTree(std::vector<int>& buf) {
-        int n = buf.size() / 3;
-        int pid = n-1;
-        de_serialize_rec(buf.data(), buf.data()+n, buf.data()+2*n, pid);
-      }
-
-      /**
        * Copy constructor, makes a deep copy of the entire tree.
        */
       HSSPartitionTree(const HSSPartitionTree& h)
@@ -209,6 +194,38 @@ namespace strumpack {
       }
 
       /**
+       * Constructor, taking a vector desribing an entire tree. This
+       * is used for deserialization. The constructor argument buf
+       * should be one obtained from calling serialize on an
+       * HSSPartitionTree object.
+       *
+       * \param buf Serialized HSSPartitionTree
+       * \see serialize
+       */
+      template<typename integer_t> static HSSPartitionTree
+      deserialize(const std::vector<integer_t>& buf) {
+        return deserialize(buf.data());
+      }
+
+      /**
+       * Constructor, taking a vector desribing an entire tree. This
+       * is used for deserialization. The constructor argument buf
+       * should be one obtained from calling serialize on an
+       * HSSPartitionTree object.
+       *
+       * \param buf Serialized HSSPartitionTree
+       * \see serialize
+       */
+      template<typename integer_t> static HSSPartitionTree
+      deserialize(const integer_t* buf) {
+        HSSPartitionTree t;
+        int n = buf[0];
+        int pid = n-1;
+        t.de_serialize_rec(buf+1, buf+n+1, buf+2*n+1, pid);
+        return t;
+      }
+
+      /**
        * Serialize the entire tree to a single vector storing size and
        * child/parent info. This can be used to communicate the tree
        * with MPI for instance.  A new tree can be constructed at the
@@ -220,8 +237,9 @@ namespace strumpack {
        */
       std::vector<int> serialize() const {
         int n = nodes(), pid = 0;
-        std::vector<int> buf(3*n);
-        serialize_rec(buf.data(), buf.data()+n, buf.data()+2*n, pid);
+        std::vector<int> buf(3*n+1);
+        buf[0] = n;
+        serialize_rec(buf.data()+1, buf.data()+n+1, buf.data()+2*n+1, pid);
         return buf;
       }
 
@@ -245,6 +263,31 @@ namespace strumpack {
         std::vector<int> lf;
         leaf_sizes_rec(lf);
         return lf;
+      }
+
+      /**
+       * Return a map from nodes in a complete tree, with lvls levels,
+       * numbered by level, with the root being 1, to leafs of the
+       * original tree before it was made complete.  Note that in the
+       * level by level ordering, a node with number id has children
+       * 2*id and 2*id+1.
+       */
+      std::pair<std::vector<int>,std::vector<int>>
+      map_from_complete_to_leafs(int lvls) const {
+        int n = (1 << lvls) - 1;
+        std::vector<int> map0(n, -1), map1(n, -1);
+        int leaf = 0;
+        complete_to_orig_rec(1, map0, map1, leaf);
+        for (int i=0; i<n; i++) {
+          if (map0[i] == -1) map0[i] = map0[(i+1)/2-1];
+          if (map1[i] == -1) map1[i] = map1[(i+1)/2-1];
+        }
+        // std::cout << "nodes=" << nodes() << " levels()=" << levels()
+        //           << " lvls=" << lvls << " map0/map1 = [";
+        // for (int i=0; i<n; i++)
+        //   std::cout << map0[i] << "/" << map1[i] << " ";
+        // std::cout << std::endl;
+        return {map0, map1};
       }
 
     private:
@@ -279,8 +322,20 @@ namespace strumpack {
           for (auto& ch : c)
             ch.expand_complete_rec(lvl+1, lvls, allow_zero_nodes);
       }
-      void expand_complete_levels_rec
-      (int lvl, int lvls) {
+
+      void complete_to_orig_rec
+      (int id, std::vector<int>& map0, std::vector<int>& map1,
+       int& leaf) const {
+        if (c.empty()) map0[id-1] = map1[id-1] = leaf++;
+        else {
+          c[0].complete_to_orig_rec(id*2, map0, map1, leaf);
+          c[1].complete_to_orig_rec(id*2+1, map0, map1, leaf);
+          map0[id-1] = map0[id*2-1];
+          map1[id-1] = map1[id*2];
+        }
+      }
+
+      void expand_complete_levels_rec(int lvl, int lvls) {
         if (c.empty()) {
           if (lvl != lvls) {
             c.resize(2);
@@ -309,7 +364,10 @@ namespace strumpack {
         } else lchild[pid] = rchild[pid] = -1;
         sizes[pid++] = size;
       }
-      void de_serialize_rec(int* sizes, int* lchild, int* rchild, int& pid) {
+
+      template<typename integer_t> void de_serialize_rec
+      (const integer_t* sizes, const integer_t* lchild,
+       const integer_t* rchild, int& pid) {
         size = sizes[pid--];
         if (rchild[pid+1] != -1) {
           c.resize(2);

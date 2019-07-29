@@ -37,18 +37,31 @@
 
 namespace strumpack {
 
+  template<class integer_t>
+  using Length2Edges = std::unordered_map<integer_t, std::vector<integer_t>>;
+
   /**
-   * TODO comment
+   * Compressed sparse row representation of a graph.
+   *
+   * This is also used as to store the local part of a 1-D block-row
+   * distributed graph. So the column indices might not map to valid
+   * nodes in this graph, ie, this graph contains outgoing edges to
+   * nodes not part of this graph.
    */
   template<typename integer_t> class CSRGraph {
   public:
-    CSRGraph();
+    CSRGraph() = default;
     CSRGraph(integer_t n, integer_t nvert);
 
+    static CSRGraph<integer_t> deserialize(const std::vector<integer_t>& buf);
+    static CSRGraph<integer_t> deserialize(const integer_t* buf);
+
+    std::vector<integer_t> serialize() const;
+
     void print();
-    integer_t size() const { return n_vert_; }
-    integer_t nvert() const { return n_vert_; }
-    integer_t nedge() const { return n_edge_; }
+    integer_t size() const { return ptr_.size()-1; }
+    integer_t nvert() const { return ptr_.size()-1; }
+    integer_t nedge() const { return ind_.size(); }
 
     const integer_t* ptr() const { return ptr_.data(); }
     const integer_t* ind() const { return ind_.data(); }
@@ -73,44 +86,68 @@ namespace strumpack {
      const std::vector<integer_t>& iorder,
      integer_t clo, integer_t chi);
 
-    void extract_separator_subgraph
-    (int sep_order_level, integer_t lo,
-     integer_t sep_begin, integer_t sep_end,
-     integer_t part, integer_t* order,
-     std::vector<integer_t>& sep_csr_ptr,
-     std::vector<integer_t>& sep_csr_ind);
+    /**
+     * Extract the separator from sep_begin to sep_end. Also add extra
+     * length-2 edges if sep_order_level > 0.
+     *
+     * This only extracts the nodes i for which order[i] == part.
+     *
+     * This stores some work info for the lenght 2 edges, so it is not
+     * thread safe!!
+     */
+    CSRGraph<integer_t> extract_subgraph
+    (int order_level, integer_t lo, integer_t begin, integer_t end,
+     integer_t part, const integer_t* order,
+     const Length2Edges<integer_t>& o) const;
 
-    void clear_temp_data() { _o.clear(); }
+    CSRGraph<integer_t> extract_subgraph
+    (integer_t lo, integer_t begin, integer_t end) const;
+
+    Length2Edges<integer_t> length_2_edges(integer_t lo) const;
 
   private:
-    integer_t n_vert_;
-    integer_t n_edge_;
-    std::vector<integer_t> ptr_;
-    std::vector<integer_t> ind_;
-
-    /* This (unordered_)map is used to find length-2 edges that go
-       outside the local graph. This avoids a quadratic search */
-    std::unordered_map<integer_t, std::vector<integer_t>> _o;
+    std::vector<integer_t> ptr_, ind_;
   };
-
-  template<typename integer_t> CSRGraph<integer_t>::CSRGraph()
-    : n_vert_(0), n_edge_(0) {}
 
   template<typename integer_t>
   CSRGraph<integer_t>::CSRGraph(integer_t nr_vert, integer_t nr_edge)
-    : n_vert_(nr_vert), n_edge_(nr_edge), ptr_(nr_vert+1), ind_(nr_edge) {
+    : ptr_(nr_vert+1), ind_(nr_edge) {
+  }
+
+  template<typename integer_t> CSRGraph<integer_t>
+  CSRGraph<integer_t>::deserialize(const std::vector<integer_t>& buf) {
+    return CSRGraph<integer_t>::deserialize(buf.data());
+  }
+
+  template<typename integer_t> CSRGraph<integer_t>
+  CSRGraph<integer_t>::deserialize(const integer_t* buf) {
+    CSRGraph<integer_t> g(buf[0], buf[1]);
+    std::copy(buf+2, buf+2+buf[0], g.ptr_.begin());
+    std::copy(buf+2+buf[0], buf+2+buf[0]+buf[1], g.ind_.begin());
+    return g;
+  }
+
+  template<typename integer_t> std::vector<integer_t>
+  CSRGraph<integer_t>::serialize() const {
+    std::vector<integer_t> buf(2+ptr_.size()+ind_.size());
+    buf[0] = ptr_.size();
+    buf[1] = ind_.size();
+    std::copy(ptr_.begin(), ptr_.end(), buf.begin()+2);
+    std::copy(ind_.begin(), ind_.end(), buf.begin()+2+ptr_.size());
+    return buf;
   }
 
   template<typename integer_t> void
   CSRGraph<integer_t>::sort_rows() {
+    auto n = size();
 #pragma omp parallel for
-    for (integer_t r=0; r<n_vert_; r++)
+    for (integer_t r=0; r<n; r++)
       std::sort(&ind_[ptr_[r]], &ind_[ptr_[r+1]]);
   }
 
   template<typename integer_t> void
   CSRGraph<integer_t>::print() {
-    for (integer_t i=0; i<n_vert_; i++) {
+    for (integer_t i=0; i<size(); i++) {
       std::cout << "r=" << i << ", ";
       for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
         std::cout << ind_[j] << " ";
@@ -120,7 +157,7 @@ namespace strumpack {
   }
 
   /**
-   * order and iorder are of size this->size() == this->n_vert() == chi-clo.
+   * order and iorder are of size this->size() == this->nvert() == chi-clo.
    * order has elements in the range [clo, chi).
    * iorder had elements in the range [0, chi-clo).
    *
@@ -134,25 +171,25 @@ namespace strumpack {
   CSRGraph<integer_t>::permute_local
   (const std::vector<integer_t>& order, const std::vector<integer_t>& iorder,
    integer_t clo, integer_t chi) {
-    std::vector<integer_t> new_ptr(n_vert_+1);
-    std::vector<integer_t> new_ind(n_edge_);
+    std::vector<integer_t> ptr(ptr_.size()), ind(ind_.size());
     integer_t nnz = 0;
-    new_ptr[0] = 0;
-    for (integer_t i=0; i<n_vert_; i++) {
+    auto n = size();
+    ptr[0] = 0;
+    for (integer_t i=0; i<n; i++) {
       auto lb = ptr_[iorder[i]];
       auto ub = ptr_[iorder[i]+1];
       for (integer_t j=lb; j<ub; j++) {
         auto c = ind_[j];
-        new_ind[nnz++] = (c >= clo && c < chi) ? order[c-clo] : c;
+        ind[nnz++] = (c >= clo && c < chi) ? order[c-clo] : c;
       }
-      new_ptr[i+1] = nnz;
+      ptr[i+1] = nnz;
     }
-    std::swap(ptr_, new_ptr);
-    std::swap(ind_, new_ind);
+    std::swap(ptr_, ptr);
+    std::swap(ind_, ind);
   }
 
   /**
-   * iorder is of size this->size() == this->n_vert().
+   * iorder is of size this->size() == this->nvert().
    * iorder had elements in the range [0, chi-clo).
    * order is of the global size.
    */
@@ -161,93 +198,125 @@ namespace strumpack {
   (const std::vector<integer_t>& order,
    const std::vector<integer_t>& iorder,
    integer_t clo, integer_t chi) {
-    std::vector<integer_t> new_ptr(n_vert_+1);
-    std::vector<integer_t> new_ind(n_edge_);
+    std::vector<integer_t> ptr(ptr_.size()), ind(ind_.size());
     integer_t nnz = 0;
-    new_ptr[0] = 0;
-    for (integer_t i=0; i<n_vert_; i++) {
+    auto n = size();
+    ptr[0] = 0;
+    for (integer_t i=0; i<n; i++) {
       auto lb = ptr_[iorder[i]];
       auto ub = ptr_[iorder[i]+1];
       for (integer_t j=lb; j<ub; j++)
-        new_ind[nnz++] = order[ind_[j]];
-      new_ptr[i+1] = nnz;
+        ind[nnz++] = order[ind_[j]];
+      ptr[i+1] = nnz;
     }
-    std::swap(ptr_, new_ptr);
-    std::swap(ind_, new_ind);
+    std::swap(ptr_, ptr);
+    std::swap(ind_, ind);
   }
 
   template<typename integer_t> void
   CSRGraph<integer_t>::permute_columns
   (const std::vector<integer_t>& order) {
-    for (integer_t i=0; i<n_vert_; i++)
+    auto n = size();
+    for (integer_t i=0; i<n; i++)
       for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
         ind_[j] = order[ind_[j]];
   }
 
-  template<typename integer_t> void
-  CSRGraph<integer_t>::extract_separator_subgraph
-  (int sep_order_level, integer_t lo, integer_t sep_begin, integer_t sep_end,
-   integer_t part, integer_t* order, std::vector<integer_t>& sep_csr_ptr,
-   std::vector<integer_t>& sep_csr_ind) {
-    assert(sep_order_level == 0 || sep_order_level == 1);
+  template<typename integer_t> CSRGraph<integer_t>
+  CSRGraph<integer_t>::extract_subgraph
+  (integer_t lo, integer_t begin, integer_t end) const {
+    auto n = size();
+    auto dim = end - begin;
+    integer_t e = 0;
+    for (integer_t r=begin; r<end; r++)
+      for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++) {
+        auto c = ind_[j] - lo;
+        if (c != r && c >= begin && c < end)
+          e++;
+      }
+    CSRGraph<integer_t> g(n, e);
+    e = 0;
+    for (integer_t r=begin; r<end; r++) {
+      g.ptr(r-begin) = e;
+      for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++) {
+        auto c = ind_[j] - lo;
+        if (c != r) {
+          auto lc = c - begin;
+          if (lc >= 0 && lc < dim)
+            g.ind(e++) = c - begin;
+        }
+      }
+    }
+    return g;
+  }
 
+
+  template<typename integer_t> Length2Edges<integer_t>
+  CSRGraph<integer_t>::length_2_edges(integer_t lo) const {
     // for all nodes not in this graph to which there is an outgoing
     //   edge, we keep a list of edges to/from that node
-    if (_o.empty()) {
-      auto hi = lo + n_vert_;
-      for (integer_t r=0; r<n_vert_; r++)
-        for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++) {
-          auto c = ind_[j];
-          if (c < lo || c >= hi) _o[c].push_back(r);
-        }
-    }
+    Length2Edges<integer_t> o;
+    auto n = size();
+    auto hi = lo + n;
+    for (integer_t r=0; r<n; r++)
+      for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++) {
+        auto c = ind_[j];
+        if (c < lo || c >= hi) o[c].push_back(r);
+      }
+    return o;
+  }
 
-    sep_csr_ptr.clear();
-    sep_csr_ind.clear();
-    auto dim_sep = sep_end - sep_begin;
-    std::vector<bool> mark(dim_sep);
-    std::unique_ptr<integer_t[]> ind_to_part(new integer_t[dim_sep]);
+  template<typename integer_t> CSRGraph<integer_t>
+  CSRGraph<integer_t>::extract_subgraph
+  (int order_level, integer_t lo, integer_t begin, integer_t end,
+   integer_t part, const integer_t* order,
+   const Length2Edges<integer_t>& o) const {
+    CSRGraph<integer_t> g;
+    assert(order_level == 0 || order_level == 1);
+    auto n = size();
+    auto dim = end - begin;
+    std::vector<bool> mark(dim);
+    std::unique_ptr<integer_t[]> ind_to_part(new integer_t[dim]);
     integer_t count = 0;
-    for (integer_t r=0; r<dim_sep; r++)
+    for (integer_t r=0; r<dim; r++)
       ind_to_part[r] = (order[r] == part) ? count++ : -1;
-    sep_csr_ptr.reserve(count+1);
-
-    for (integer_t r=sep_begin, sep_edges=0; r<sep_end; r++) {
-      if (order[r-sep_begin] == part) {
-        sep_csr_ptr.push_back(sep_edges);
+    g.ptr_.reserve(count+1);
+    for (integer_t r=begin, edges=0; r<end; r++) {
+      if (order[r-begin] == part) {
+        g.ptr_.push_back(edges);
         std::fill(mark.begin(), mark.end(), false);
         for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++) {
           auto c = ind_[j] - lo;
           if (c == r) continue;
-          if (c >= 0 && c < n_vert_) {
-            auto lc = c - sep_begin;
-            if (lc >= 0 && lc < dim_sep && order[lc] == part && !mark[lc]) {
+          if (c >= 0 && c < n) {
+            auto lc = c - begin;
+            if (lc >= 0 && lc < dim && order[lc] == part && !mark[lc]) {
               mark[lc] = true;
-              sep_csr_ind.push_back(ind_to_part[lc]);
-              sep_edges++;
+              g.ind_.push_back(ind_to_part[lc]);
+              edges++;
             } else {
-              if (sep_order_level > 0) {
+              if (order_level > 0) {
                 for (integer_t k=ptr_[c]; k<ptr_[c+1]; k++) {
                   auto cc = ind_[k] - lo;
-                  auto lcc = cc - sep_begin;
-                  if (cc != r && lcc >= 0 && lcc < dim_sep &&
+                  auto lcc = cc - begin;
+                  if (cc != r && lcc >= 0 && lcc < dim &&
                       order[lcc] == part && !mark[lcc]) {
                     mark[lcc] = true;
-                    sep_csr_ind.push_back(ind_to_part[lcc]);
-                    sep_edges++;
+                    g.ind_.push_back(ind_to_part[lcc]);
+                    edges++;
                   }
                 }
               }
             }
           } else {
-            if (sep_order_level > 0) {
-              for (auto cc : _o[c+lo]) {
-                auto lcc = cc - sep_begin;
+            if (order_level > 0) {
+              for (auto cc : o.at(c+lo)) {
+                auto lcc = cc - begin;
                 if (cc != r && lcc >= 0 &&
-                    lcc < dim_sep && order[lcc] == part && !mark[lcc]) {
+                    lcc < dim && order[lcc] == part && !mark[lcc]) {
                   mark[lcc] = true;
-                  sep_csr_ind.push_back(ind_to_part[lcc]);
-                  sep_edges++;
+                  g.ind_.push_back(ind_to_part[lcc]);
+                  edges++;
                 }
               }
             }
@@ -255,7 +324,8 @@ namespace strumpack {
         }
       }
     }
-    sep_csr_ptr.push_back(sep_csr_ind.size());
+    g.ptr_.push_back(g.ind_.size());
+    return g;
   }
 
 } // end namespace strumpack

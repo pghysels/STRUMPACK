@@ -93,10 +93,7 @@ namespace strumpack {
 
     void set_BLR_partitioning
     (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
-     const std::vector<bool>& adm, bool is_root) override;
-    void set_HSS_partitioning
-    (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
-     bool is_root) override;
+     DenseMatrix<bool>& adm, bool is_root) override;
 
   private:
     DistM_t F11_, F12_, F21_, F22_;
@@ -104,7 +101,7 @@ namespace strumpack {
     std::vector<int> piv_;
     std::vector<std::size_t> sep_tiles_;
     std::vector<std::size_t> upd_tiles_;
-    std::vector<bool> adm_;
+    DenseMatrix<bool> adm_;
     BLR::ProcessorGrid2D blr_grid_;
 
     long long node_factor_nonzeros() const override;
@@ -187,9 +184,9 @@ namespace strumpack {
   FrontalMatrixBLRMPI<scalar_t,integer_t>::partial_factorization
   (const SPOptions<scalar_t>& opts) {
     if (dim_sep() && grid()->active()) {
-      F11blr_ = BLRMPI_t(blr_grid_, sep_tiles_,
-                         [&](std::size_t i, std::size_t j) -> bool {
-                           return adm_[i+j*sep_tiles_.size()]; },
+      F11blr_ = BLRMPI_t(blr_grid_, sep_tiles_, adm_,
+                         // [&](std::size_t i, std::size_t j) -> bool {
+                         //   return adm_(i,j); },
                          F11_, piv_, opts.BLR_options());
       // TODO flops?
       F11_.clear();
@@ -330,33 +327,14 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::set_HSS_partitioning
-  (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
-   bool is_root) {
-    std::cout << "set admissibility condition!!" << std::endl;
-    if (dim_sep()) {
-      assert(sep_tree.size == dim_sep());
-      auto lf = sep_tree.leaf_sizes();
-      sep_tiles_.assign(lf.begin(), lf.end());
-      adm_.resize(sep_tiles_.size()*sep_tiles_.size(), true);
-    }
-    if (dim_upd()) {
-      auto leaf = opts.BLR_options().leaf_size();
-      auto nt = std::ceil(float(dim_upd()) / leaf);
-      upd_tiles_.resize(nt, leaf);
-      upd_tiles_.back() = dim_upd() - leaf*(nt-1);
-    }
-  }
-
-  template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLRMPI<scalar_t,integer_t>::set_BLR_partitioning
   (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
-   const std::vector<bool>& adm, bool is_root) {
+   DenseMatrix<bool>& adm, bool is_root) {
     if (dim_sep()) {
       assert(sep_tree.size == dim_sep());
       auto lf = sep_tree.leaf_sizes();
       sep_tiles_.assign(lf.begin(), lf.end());
-      adm_ = adm;
+      adm_ = std::move(adm);
     }
     if (dim_upd()) {
       auto leaf = opts.BLR_options().leaf_size();

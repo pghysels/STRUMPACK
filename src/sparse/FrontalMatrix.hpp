@@ -38,7 +38,7 @@
 #include "StrumpackParameters.hpp"
 #include "CompressedSparseMatrix.hpp"
 #include "MatrixReordering.hpp"
-#include "HSS/HSSMatrix.hpp"
+#include "CSRGraph.hpp"
 #if defined(STRUMPACK_USE_MPI)
 #include "ExtendAdd.hpp"
 #endif
@@ -158,13 +158,13 @@ namespace strumpack {
 
     virtual void set_BLR_partitioning
     (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
-     const std::vector<bool>& adm, bool is_root) {}
+     DenseMatrix<bool>& adm, bool is_root) {}
     virtual void set_HSS_partitioning
     (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
      bool is_root) {}
     virtual void set_HODLR_partitioning
     (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
-     bool is_root) {}
+     DenseMatrix<bool>& adm, CSRGraph<integer_t>& graph, bool is_root) {}
 
     int levels() const {
       int ll = 0, lr = 0;

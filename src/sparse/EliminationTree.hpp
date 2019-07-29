@@ -46,7 +46,7 @@ namespace strumpack {
 
     EliminationTree
     (const SPOptions<scalar_t>& opts, const SpMat_t& A,
-     const SeparatorTree<integer_t>& sep_tree);
+     SeparatorTree<integer_t>& sep_tree);
 
     virtual ~EliminationTree() = default;
 
@@ -72,7 +72,7 @@ namespace strumpack {
   private:
     std::unique_ptr<F_t> setup_tree
     (const SPOptions<scalar_t>& opts, const SpMat_t& A,
-     const SeparatorTree<integer_t>& sep_tree,
+     SeparatorTree<integer_t>& sep_tree,
      std::vector<std::vector<integer_t>>& upd, integer_t sep,
      bool hss_parent, int level);
 
@@ -86,7 +86,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t>
   EliminationTree<scalar_t,integer_t>::EliminationTree
   (const SPOptions<scalar_t>& opts, const SpMat_t& A,
-   const SeparatorTree<integer_t>& sep_tree) {
+   SeparatorTree<integer_t>& sep_tree) {
     std::vector<std::vector<integer_t>> upd(sep_tree.separators());
 #pragma omp parallel default(shared)
 #pragma omp single
@@ -158,7 +158,7 @@ namespace strumpack {
   std::unique_ptr<FrontalMatrix<scalar_t,integer_t>>
   EliminationTree<scalar_t,integer_t>::setup_tree
   (const SPOptions<scalar_t>& opts, const SpMat_t& A,
-   const SeparatorTree<integer_t>& sep_tree,
+   SeparatorTree<integer_t>& sep_tree,
    std::vector<std::vector<integer_t>>& upd, integer_t sep,
    bool hss_parent, int level) {
     auto sep_begin = sep_tree.sizes(sep);
@@ -169,12 +169,9 @@ namespace strumpack {
     // So fix this here!
     if (dim_sep == 0 && sep_tree.lch(sep) != -1)
       sep_begin = sep_end = sep_tree.sizes(sep_tree.rch(sep)+1);
-    auto front = create_frontal_matrix<scalar_t,integer_t>
-      (opts, sep, sep_begin, sep_end, upd[sep],
-       [&sep_tree,&sep]() -> const HSS::HSSPartitionTree&
-       { return sep_tree.HSS_tree(sep); },
-       [&sep_tree,&sep]() -> const std::vector<bool>&
-       { return sep_tree.admissibility(sep); },
+    auto front = create_frontal_matrix
+      <scalar_t,integer_t,SeparatorTree<integer_t>>
+      (opts, sep, sep_begin, sep_end, upd[sep], sep_tree,
        hss_parent, level, nr_fronts_);
     bool compressed = is_compressed(dim_sep, hss_parent, opts);
     if (sep_tree.lch(sep) != -1)

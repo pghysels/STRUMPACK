@@ -62,6 +62,12 @@ namespace strumpack {
     template<> void HODLR_copyoptions<double>(F2Cptr& in, F2Cptr& out);
     template<> void HODLR_copyoptions<std::complex<double>>(F2Cptr& in, F2Cptr& out);
 
+    template<typename scalar_t> void HODLR_printoptions(F2Cptr& options, F2Cptr& ptree) {
+      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
+    }
+    template<> void HODLR_printoptions<double>(F2Cptr& options, F2Cptr& ptree);
+    template<> void HODLR_printoptions<std::complex<double>>(F2Cptr& options, F2Cptr& ptree);
+
     template<typename scalar_t> void HODLR_createstats(F2Cptr& stats) {
       std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
     }
@@ -115,17 +121,26 @@ namespace strumpack {
     template<typename scalar_t> void HODLR_construct_init
     (int N, int d, scalar_t* data, int lvls, int* tree, int* perm,
      int& lrow, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
-     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree) {
+     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
+     void (*C_FuncDistmn)(int*, int*, scalar_t*, C2Fptr),
+     void (*C_FuncNearFar)(int*, int*, int*, C2Fptr),
+     C2Fptr fdata) {
       std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
     }
     template<> void HODLR_construct_init<double>
     (int N, int d, double* data, int lvls, int* tree, int* perm,
      int& lrow, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
-     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree);
+     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
+     void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
+     void (*C_FuncNearFar)(int*, int*, int*, C2Fptr),
+     C2Fptr fdata);
     template<> void HODLR_construct_init<std::complex<double>>
     (int N, int d, std::complex<double>* data, int lvls, int* tree,
      int* perm, int& lrow, F2Cptr& ho_bf, F2Cptr& options,
-     F2Cptr& stats, F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree);
+     F2Cptr& stats, F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
+     void (*C_FuncDistmn)(int*, int*, std::complex<double>*, C2Fptr),
+     void (*C_FuncNearFar)(int*, int*, int*, C2Fptr),
+     C2Fptr fdata);
 
     template<typename scalar_t> void HODLR_construct_element_compute
     (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,

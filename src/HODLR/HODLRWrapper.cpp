@@ -60,6 +60,13 @@ namespace strumpack {
       z_c_bpack_copyoption(&in, &out);
     }
 
+    template<> void HODLR_printoptions<double>(F2Cptr& options, F2Cptr& ptree) {
+      d_c_bpack_printoption(&options, &ptree);
+    }
+    template<> void HODLR_printoptions<std::complex<double>>(F2Cptr& options, F2Cptr& ptree) {
+      z_c_bpack_printoption(&options, &ptree);
+    }
+
     template<> void HODLR_createstats<double>(F2Cptr& stats) {
       d_c_bpack_createstats(&stats);
     }
@@ -101,15 +108,20 @@ namespace strumpack {
     template<> void HODLR_construct_init<double>
     (int N, int d, double* data, int lvls, int* tree, int* perm,
      int& lrow, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
-     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree) {
+     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
+     void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
+     void (*C_FuncNearFar)(int*, int*, int*, C2Fptr), C2Fptr fdata) {
       d_c_bpack_construct_init
         (&N, &d, data, &lvls, tree, perm, &lrow, &ho_bf, &options,
-         &stats, &msh, &kerquant, &ptree);
+         &stats, &msh, &kerquant, &ptree, C_FuncDistmn, C_FuncNearFar,
+         fdata);
     }
     template<> void HODLR_construct_init<std::complex<double>>
     (int N, int d, std::complex<double>* data, int lvls, int* tree,
      int* perm, int& lrow, F2Cptr& ho_bf, F2Cptr& options,
-     F2Cptr& stats, F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree) {
+     F2Cptr& stats, F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
+     void (*C_FuncDistmn)(int*, int*, std::complex<double>*, C2Fptr),
+     void (*C_FuncNearFar)(int*, int*, int*, C2Fptr), C2Fptr fdata) {
       // TODO there is no version taking complex data points?
       // z_c_bpack_construct_init
       //   (&N, &d, data, &lvls, tree, perm, &lrow, &ho_bf, &options,

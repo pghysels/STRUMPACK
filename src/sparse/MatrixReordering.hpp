@@ -70,7 +70,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_MPI)
     int nested_dissection
     (SPOptions<scalar_t>& opts, const CSRMatrix<scalar_t,integer_t>& A,
-     MPI_Comm comm, int nx, int ny, int nz, int components, int width);
+     const MPIComm& comm, int nx, int ny, int nz, int components, int width);
 #endif
 
     void separator_reordering
@@ -87,6 +87,7 @@ namespace strumpack {
     const std::vector<integer_t>& iperm() const { return iperm_; }
 
     const SeparatorTree<integer_t>& tree() const { return *sep_tree_; }
+    SeparatorTree<integer_t>& tree() { return *sep_tree_; }
 
   protected:
     virtual void separator_reordering_print
@@ -96,8 +97,7 @@ namespace strumpack {
     (const SPOptions<scalar_t>& opts, integer_t nnz, int max_level,
      int total_separators, bool verbose) const;
 
-    std::vector<integer_t> perm_;
-    std::vector<integer_t> iperm_;
+    std::vector<integer_t> perm_, iperm_;
 
     std::unique_ptr<SeparatorTree<integer_t>> sep_tree_;
 
@@ -180,10 +180,9 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> int
   MatrixReordering<scalar_t,integer_t>::nested_dissection
   (SPOptions<scalar_t>& opts, const CSRMatrix<scalar_t,integer_t>& A,
-   MPI_Comm comm, int nx, int ny, int nz, int components, int width) {
+   const MPIComm& comm, int nx, int ny, int nz, int components, int width) {
     if (!is_parallel(opts.reordering_method())) {
-      auto rank = mpi_rank(comm);
-      if (!rank) {
+      if (comm.is_root()) {
         switch (opts.reordering_method()) {
         case ReorderingStrategy::NATURAL: {
           for (integer_t i=0; i<A.size(); i++) perm_[i] = i;
@@ -212,26 +211,26 @@ namespace strumpack {
         default: assert(false);
         }
       }
-      MPI_Bcast(perm_.data(), perm_.size(), mpi_type<integer_t>(), 0, comm);
-      MPI_Bcast(iperm_.data(), iperm_.size(), mpi_type<integer_t>(), 0, comm);
+      comm.broadcast(perm_);
+      comm.broadcast(iperm_);
       integer_t nbsep;
-      if (!rank) nbsep = sep_tree_->separators();
-      MPI_Bcast(&nbsep, 1, mpi_type<integer_t>(), 0, comm);
-      if (rank)
+      if (comm.is_root()) nbsep = sep_tree_->separators();
+      comm.broadcast(nbsep);
+      if (comm.is_root())
         sep_tree_ = std::unique_ptr<SeparatorTree<integer_t>>
           (new SeparatorTree<integer_t>(nbsep));
-      sep_tree_->broadcast(comm);
+      sep_tree_->broadcast(comm.comm());
     } else {
       if (opts.reordering_method() == ReorderingStrategy::GEOMETRIC) {
         sep_tree_ = geometric_nested_dissection
           (A, nx, ny, nz, components, width, perm_, iperm_, opts);
         if (!sep_tree_) return 1;
       } else {
-        CSRMatrixMPI<scalar_t,integer_t> Ampi(&A, comm, false);
+        CSRMatrixMPI<scalar_t,integer_t> Ampi(&A, comm.comm(), false);
         switch (opts.reordering_method()) {
         case ReorderingStrategy::PARMETIS: {
 #if defined(STRUMPACK_USE_PARMETIS)
-          parmetis_nested_dissection(Ampi, comm, false, perm_, opts);
+          parmetis_nested_dissection(Ampi, comm.comm(), false, perm_, opts);
 #else
           std::cerr << "ERROR: STRUMPACK was not configured with ParMetis support"
                     << std::endl;
@@ -241,7 +240,7 @@ namespace strumpack {
         }
         case ReorderingStrategy::PTSCOTCH: {
 #if defined(STRUMPACK_USE_SCOTCH)
-          ptscotch_nested_dissection(Ampi, comm, false, perm_, opts);
+          ptscotch_nested_dissection(Ampi, comm.comm(), false, perm_, opts);
 #else
           std::cerr << "ERROR: STRUMPACK was not configured with Scotch support"
                     << std::endl;
@@ -255,7 +254,7 @@ namespace strumpack {
       }
     }
     nested_dissection_print
-      (opts, A.nnz(), opts.verbose() && !mpi_rank(comm));
+      (opts, A.nnz(), opts.verbose() && comm.is_root());
     return 0;
   }
 #endif
@@ -290,37 +289,41 @@ namespace strumpack {
       for (integer_t i=0; i<N; i++) iperm_[perm_[i]] = i;
     }
 
-    if (opts.use_BLR()) {
+    if (opts.use_BLR() || opts.use_HODLR()) {
       // find which blocks are admissible:
       //  loop over all edges in the separator [sep_begin,sep_end)
       //  if the 2 end vertices of this edge belong to different leafs in
       //  the HSS tree, then the interaction between the corresponding BLR
       //  blocks is not admissible
-      for (auto& s : sep_tree_->HSS_trees()) {
+      for (auto& s : sep_tree_->partition_tree) {
         auto sep = s.first;
         auto& hss_tree = s.second;
         auto sep_begin = sep_tree_->sizes(sep);
         auto sep_end = sep_tree_->sizes(sep + 1);
         auto tiles = hss_tree.leaf_sizes();
-        integer_t nr_tiles = tiles.size();
-        std::vector<bool> adm(nr_tiles * nr_tiles, true);
-        for (integer_t t=0; t<nr_tiles; t++)
-          adm[t+t*nr_tiles] = false;
-        if (opts.BLR_options().admissibility() == BLR::Admissibility::STRONG) {
-          std::vector<integer_t> tile_sizes(nr_tiles+1);
-          tile_sizes[0] = sep_begin;
-          for (integer_t i=0; i<nr_tiles; i++)
-            tile_sizes[i+1] = tiles[i] + tile_sizes[i];
-          for (integer_t t=0; t<nr_tiles; t++) {
-            for (integer_t i=tile_sizes[t]; i<tile_sizes[t+1]; i++) {
+        integer_t nt = tiles.size();
+        DenseMatrix<bool> adm(nt, nt);
+        adm.fill(true);
+        for (integer_t t=0; t<nt; t++)
+          adm(t, t) = false;
+        if (opts.use_HODLR() ||
+            opts.BLR_options().admissibility() ==
+            BLR::Admissibility::STRONG) {
+          std::vector<integer_t> ts(nt+1);
+          ts[0] = sep_begin;
+          for (integer_t i=0; i<nt; i++)
+            ts[i+1] = tiles[i] + ts[i];
+          for (integer_t t=0; t<nt; t++) {
+            for (integer_t i=ts[t]; i<ts[t+1]; i++) {
               auto Ai = iperm_[i];
-              for (integer_t j=A.ptr(Ai); j<A.ptr(Ai+1); j++) {
-                auto Aj = perm_[A.ind(j)];
+              auto hij = A.ind() + A.ptr(Ai+1);
+              for (auto pj=A.ind()+A.ptr(Ai); pj!=hij; pj++) {
+                auto Aj = perm_[*pj];
                 if (Aj < sep_begin || Aj >= sep_end) continue;
                 integer_t tj = std::distance
-                  (tile_sizes.begin(), std::upper_bound
-                   (tile_sizes.begin(), tile_sizes.end(), Aj)) - 1;
-                if (t != tj) adm[t+nr_tiles*tj] = adm[tj+nr_tiles*t] = false;
+                  (ts.begin(), std::upper_bound
+                   (ts.begin(), ts.end(), Aj)) - 1;
+                if (t != tj) adm(t, tj) = adm(tj, t) = false;
               }
             }
           }
@@ -330,15 +333,15 @@ namespace strumpack {
           std::cout << "root_adm_"
                     << BLR::get_name(opts.BLR_options().admissibility())
                     << " = [" << std::endl;
-          for (integer_t ti=0; ti<nr_tiles; ti++) {
-            for (integer_t tj=0; tj<nr_tiles; tj++)
-              std::cout << adm[ti+nr_tiles*tj] << " ";
+          for (integer_t ti=0; ti<nt; ti++) {
+            for (integer_t tj=0; tj<nt; tj++)
+              std::cout << adm(ti, tj) << " ";
             std::cout << std::endl;
           }
           std::cout << "];" << std::endl;
         }
 #endif
-        sep_tree_->admissibility(sep) = std::move(adm);
+        sep_tree_->admissibility[sep] = std::move(adm);
       }
     }
   }
@@ -350,25 +353,21 @@ namespace strumpack {
     auto sep_begin = sep_tree_->sizes(sep);
     auto sep_end = sep_tree_->sizes(sep + 1);
     auto dim_sep = sep_end - sep_begin;
-    int min_sep = opts.compression_min_sep_size();
-    int leaf = opts.compression_leaf_size();
-    bool is_hss = compressed_parent && (dim_sep >= min_sep);
-    bool is_hodlr = compressed_parent && (dim_sep >= min_sep);
-    bool is_blr = opts.use_BLR() && (dim_sep >= min_sep);
-    if (is_hss || is_blr || is_hodlr) {
-      if (sep_tree_->lch(sep) != -1) {
+    bool compressed = is_compressed(dim_sep, compressed_parent, opts);
+    if (sep_tree_->lch(sep) != -1) {
 #pragma omp task firstprivate(sep) default(shared)
-        separator_reordering_recursive
-          (opts, A, is_hss || is_hodlr, sep_tree_->lch(sep), sorder);
-      }
-      if (sep_tree_->rch(sep) != -1) {
+      separator_reordering_recursive
+        (opts, A, compressed, sep_tree_->lch(sep), sorder);
+    }
+    if (sep_tree_->rch(sep) != -1) {
 #pragma omp task firstprivate(sep) default(shared)
-        separator_reordering_recursive
-          (opts, A, is_hss || is_hodlr, sep_tree_->rch(sep), sorder);
-      }
+      separator_reordering_recursive
+        (opts, A, compressed, sep_tree_->rch(sep), sorder);
+    }
 #pragma omp taskwait
+    if (compressed) {
       HSS::HSSPartitionTree hss_tree(dim_sep);
-      if (dim_sep > 2 * min_sep) {
+      if (dim_sep > 2 * opts.compression_min_sep_size()) {
         integer_t nr_parts = 0;
         split_separator(opts, hss_tree, nr_parts, sep, A, 0, 1, sorder);
         auto count = sep_begin;
@@ -376,19 +375,15 @@ namespace strumpack {
           for (integer_t i=sep_begin; i<sep_end; i++)
             if (sorder[i] == part) sorder[i] = -count++;
       } else for (integer_t i=sep_begin; i<sep_end; i++) sorder[i] = -i;
+
+      // TODO get the admissibility info here??
+
 #pragma omp critical
       {  // not thread safe!
-        sep_tree_->HSS_tree(sep) = std::move(hss_tree);
+        sep_tree_->partition_tree[sep] = std::move(hss_tree);
       }
-    } else {
-      if (sep_tree_->lch(sep) != -1)
-        separator_reordering_recursive
-          (opts, A, is_hss || is_hodlr, sep_tree_->lch(sep), sorder);
-      if (sep_tree_->rch(sep) != -1)
-        separator_reordering_recursive
-          (opts, A, is_hss || is_hodlr, sep_tree_->rch(sep), sorder);
+    } else
       for (integer_t i=sep_begin; i<sep_end; i++) sorder[i] = -i;
-    }
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -403,7 +398,7 @@ namespace strumpack {
     idx_t edge_cut = 0, nvtxs=xadj.size()-1;
     std::vector<idx_t> partitioning(nvtxs);
     int info = WRAPPER_METIS_PartGraphRecursive
-      (nvtxs, 1, xadj, adjncy, 2, edge_cut, partitioning);
+      (nvtxs, 1, xadj.data(), adjncy.data(), 2, edge_cut, partitioning);
     if (info != METIS_OK) {
       std::cerr << "METIS_PartGraphRecursive for separator"
                 << " reordering returned: " << info << std::endl;

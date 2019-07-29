@@ -178,8 +178,8 @@ namespace strumpack {
       (new SeparatorTree<integer_t>(local_tree));
     std::unique_ptr<SeparatorTree<integer_t>> dist_stree
       (new SeparatorTree<integer_t>(dist_tree));
-    local_stree->HSS_trees() = local_HSS_trees;
-    dist_stree->HSS_trees() = dist_HSS_trees;
+    local_stree->partition_tree = std::move(local_HSS_trees);
+    dist_stree->partition_tree = std::move(dist_HSS_trees);
     return std::make_pair
       <std::unique_ptr<SeparatorTree<integer_t>>,
        std::unique_ptr<SeparatorTree<integer_t>>>
