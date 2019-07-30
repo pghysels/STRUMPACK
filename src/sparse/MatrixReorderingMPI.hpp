@@ -672,7 +672,7 @@ namespace strumpack {
        rcnts.get(), displs, mpi_type<integer_t>(), comm_->comm());
     for (integer_t i=0; i<n; i++) iperm_[perm_[i]] = i;
     for (integer_t i=0; i<n; i++) perm_[gpost[i]] = iperm_[i];
-    for (integer_t i=0; i<n; i++) iperm_[perm_[i]] = i;
+    //for (integer_t i=0; i<n; i++) iperm_[perm_[i]] = i;
     std::swap(perm_, iperm_);
   }
 

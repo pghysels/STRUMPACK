@@ -347,8 +347,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::
-  setup_reordering() {
+  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::setup_reordering() {
     nd_mpi_ = std::unique_ptr<MatrixReorderingMPI<scalar_t,integer_t>>
       (new MatrixReorderingMPI<scalar_t,integer_t>(mat_mpi_->size(), comm_));
   }
