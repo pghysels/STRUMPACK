@@ -140,8 +140,9 @@ namespace strumpack {
      std::vector<integer_t>& dsep_upd, int P0, int P,
      int P0_sibling, int P_sibling, int owner, bool use_hss);
 
-    HSS::HSSPartitionTree communicate_hss_tree
-    (integer_t dsep, int P0, int P, int owner) const;
+    void communicate_hss_tree
+    (HSS::HSSPartitionTree& hss_tree, integer_t dsep,
+     int P0, int P, int owner) const;
 
     DenseMatrix<bool> communicate_admissibility
     (integer_t dsep, int P0, int P, int owner) const;
@@ -189,7 +190,6 @@ namespace strumpack {
           sbuf[2*nd_.proc_dist_sep[dsep]] : sbuf[2*nd_.proc_dist_sep[dsep]+1];
     }
 
-    //local_range_ = std::make_pair(A.size(), 0);
     local_range_ = {A.size(), 0};
     MPIComm::control_start("proportional_mapping");
     this->root_ = proportional_mapping
@@ -795,10 +795,10 @@ namespace strumpack {
       MPI_Waitall(sreq.size(), sreq.data(), MPI_STATUSES_IGNORE);
   }
 
-  template<typename scalar_t,typename integer_t> HSS::HSSPartitionTree
+  template<typename scalar_t,typename integer_t> void
   EliminationTreeMPIDist<scalar_t,integer_t>::communicate_hss_tree
-  (integer_t dsep, int P0, int P, int owner) const {
-    HSS::HSSPartitionTree hss_tree;
+  (HSS::HSSPartitionTree& hss_tree, integer_t dsep,
+   int P0, int P, int owner) const {
     std::vector<MPIRequest> sreq;
     std::vector<int> sbuf;
     if (rank_ == owner) {
@@ -811,7 +811,6 @@ namespace strumpack {
       hss_tree = HSS::HSSPartitionTree::deserialize
         (comm_.template recv<int>(owner, 0));
     if (rank_ == owner) wait_all(sreq);
-    return hss_tree;
   }
 
   template<typename scalar_t,typename integer_t> DenseMatrix<bool>
@@ -898,7 +897,7 @@ namespace strumpack {
     bool use_compression = is_compressed(dim_dsep, parent_compression, opts);
     HSS::HSSPartitionTree hss_tree(dim_dsep);
     if (use_compression)
-      hss_tree = communicate_hss_tree(dsep, P0, P, owner);
+      communicate_hss_tree(hss_tree, dsep, P0, P, owner);
     DenseMatrix<bool> adm;
     if (is_BLR(dim_dsep, parent_compression, opts) ||
         is_HODLR(dim_dsep, parent_compression, opts))
