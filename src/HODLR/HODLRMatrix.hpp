@@ -694,22 +694,27 @@ namespace strumpack {
       Fcomm_ = MPI_Comm_c2f(c_.comm());
       options_init(opts);
       perm_.resize(rows_);
-      // use the distance and admissibility functions
-      HODLR_set_I_option<scalar_t>(options_, "nogeo", 2);
-      // nedge/nvert is the average degree, but since we also consider
-      // length 2 connections, we need to consider more than that, 5
-      // is just a heuristic.  For instance for a 2d 9-point stencil,
-      // there are 3^2=9 points in the stencil and 5^2=25 points in
-      // the extended (length 2 connections) stencil.
-      HODLR_set_I_option<scalar_t>
-        (options_, "knn", 5 * graph.nedge() / graph.nvert());
-      // HODLR_printoptions<scalar_t>(options_, ptree_);
-      HODLR_construct_init<scalar_t>
-        (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
-         lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
-         // nullptr, nullptr, nullptr);
-         &(HODLR_distance_query<scalar_t,integer_t>),
-         &(HODLR_admissibility_query<integer_t>), &info);
+      if (opts.geo() == 2) {
+        // use the distance and admissibility functions
+        HODLR_set_I_option<scalar_t>(options_, "nogeo", 2);
+        // nedge/nvert is the average degree, but since we also consider
+        // length 2 connections, we need to consider more than that, 5
+        // is just a heuristic.  For instance for a 2d 9-point stencil,
+        // there are 3^2=9 points in the stencil and 5^2=25 points in
+        // the extended (length 2 connections) stencil.
+        HODLR_set_I_option<scalar_t>
+          (options_, "knn", 5 * graph.nedge() / graph.nvert());
+        HODLR_construct_init<scalar_t>
+          (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
+           lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
+           &(HODLR_distance_query<scalar_t,integer_t>),
+           &(HODLR_admissibility_query<integer_t>), &info);
+      } else {
+        HODLR_construct_init<scalar_t>
+          (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
+           lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
+           nullptr, nullptr, nullptr);
+      }
       perm_init();
       dist_init();
     }

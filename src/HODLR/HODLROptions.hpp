@@ -244,6 +244,16 @@ namespace strumpack {
       }
 
       /**
+       * geo should be 0, 1 or 2. 0 means use point geometry, 1 means
+       * do not use any geometry. 2 means use the graph connectivity
+       * for the distance and admissibility info.
+       */
+      void set_geo(int geo) {
+        assert(geo == 0 || geo == 1 || geo == 2);
+        geo_ = geo;
+      }
+
+      /**
        * Enable or disable verbose output (only by the root process)
        * to stdout.
        */
@@ -325,6 +335,11 @@ namespace strumpack {
       double BF_sampling_parameter() const { return BF_sampling_parameter_; }
 
       /**
+       * Use geometry information? 0, 1 or 2
+       */
+      int geo() const { return geo_; }
+
+      /**
        * Verbose or quiet?
        * \return True if we want output from the HODLR algorithms,
        * else False.
@@ -358,6 +373,7 @@ namespace strumpack {
           {"hodlr_butterfly_levels",      required_argument, 0, 9},
           {"hodlr_BACA_block_size",       required_argument, 0, 10},
           {"hodlr_BF_sampling_parameter", required_argument, 0, 11},
+          {"hodlr_geo",                   required_argument, 0, 12},
           {"hodlr_verbose",               no_argument, 0, 'v'},
           {"hodlr_quiet",                 no_argument, 0, 'q'},
           {"help",                        no_argument, 0, 'h'},
@@ -422,6 +438,11 @@ namespace strumpack {
             iss >> BF_sampling_parameter_;
             set_BF_sampling_parameter(BF_sampling_parameter_);
           } break;
+          case 12: {
+            std::istringstream iss(optarg);
+            iss >> geo_;
+            set_geo(geo_);
+          } break;
           case 'v': set_verbose(true); break;
           case 'q': set_verbose(false); break;
           case 'h': describe_options(); break;
@@ -477,6 +498,7 @@ namespace strumpack {
       CompressionAlgorithm compression_algo_ = CompressionAlgorithm::RANDOM_SAMPLING;
       int BACA_block_size_ = 16;
       double BF_sampling_parameter_ = 2.0;
+      int geo_ = 2;
       bool verbose_ = true;
     };
 
