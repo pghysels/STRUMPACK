@@ -765,8 +765,8 @@ namespace strumpack {
     assert(opts.separator_ordering_level() == 0 ||
            opts.separator_ordering_level() == 1);
     auto dsep = dim_sep();
-    auto mark = new bool[dsep];
-    auto ind_to_part = new integer_t[dsep];
+    std::unique_ptr<bool[]> mark(new bool[dsep]);
+    std::unique_ptr<integer_t[]> ind_to_part(new integer_t[dsep]);
     integer_t nvtxs = 0;
     for (integer_t r=0; r<dsep; r++)
       ind_to_part[r] = (sorder[r+sep_begin_] == part) ? nvtxs++ : -1;
@@ -804,8 +804,6 @@ namespace strumpack {
       }
     }
     xadj.push_back(adjncy.size());
-    delete[] mark;
-    delete[] ind_to_part;
   }
 
 } // end namespace strumpack
