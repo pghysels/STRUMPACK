@@ -487,10 +487,6 @@ namespace strumpack {
         local_tree_->admissibility[sep] = std::move(adm);
       }
       local_tree_->partition_tree[sep] = std::move(tree);
-      if (opts.use_HODLR())
-        local_tree_->separator_graph[sep] =
-          my_sub_graph.extract_subgraph
-          (sub_graph_range.first, sep_begin, sep_end);
     }
     if (local_tree_->lch(sep) != -1)
       local_separator_reordering_recursive
@@ -513,6 +509,19 @@ namespace strumpack {
         (opts, local_tree_->root(), true, lorder, liorder);
     my_sub_graph.permute_local
       (lorder, liorder, sub_graph_range.first, sub_graph_range.second);
+
+    if (opts.use_HODLR()) {
+      for (auto& s : local_tree_->partition_tree) {
+        auto sep = s.first;
+        std::cout << "LOCAL SEP GRAPH!!! sep=" << sep << std::endl;
+        auto sep_begin = local_tree_->sizes(sep);
+        auto sep_end = local_tree_->sizes(sep+1);
+        local_tree_->separator_graph[sep] =
+          my_sub_graph.extract_subgraph
+          (sub_graph_range.first, sep_begin, sep_end);
+      }
+    }
+
     std::unique_ptr<int[]> rcnts(new int[2*P]);
     auto displs = rcnts.get() + P;
     for (int p=0; p<P; p++) {
@@ -585,9 +594,9 @@ namespace strumpack {
         sep_tree_->admissibility[dsep_internal] = std::move(adm);
       }
       sep_tree_->partition_tree[dsep_internal] = std::move(tree);
-      if (opts.use_HODLR())
-        sep_tree_->separator_graph[dsep_internal] =
-          my_dist_sep.extract_subgraph(dsep_begin, 0, dim_dsep);
+      // if (opts.use_HODLR())
+      //   sep_tree_->separator_graph[dsep_internal] =
+      //     my_dist_sep.extract_subgraph(dsep_begin, 0, dim_dsep);
     }
     std::unique_ptr<int[]> rcnts(new int[2*P]);
     auto displs = rcnts.get() + P;
@@ -600,6 +609,14 @@ namespace strumpack {
        rcnts.get(), displs, mpi_type<integer_t>(), comm_->comm());
     my_dist_sep.permute_rows_local_cols_global
       (gorder, diorder, dsep_begin, dsep_end);
+
+    if (opts.use_HODLR()) {
+      std::cout << "DISTRIBUTED SEP GRAPH!!! dsep_internal="
+                << dsep_internal << std::endl;
+      sep_tree_->separator_graph[dsep_internal] =
+        my_dist_sep.extract_subgraph(dsep_begin, 0, dim_dsep);
+    }
+
     my_sub_graph.permute_columns(gorder);
   }
 
@@ -672,7 +689,6 @@ namespace strumpack {
        rcnts.get(), displs, mpi_type<integer_t>(), comm_->comm());
     for (integer_t i=0; i<n; i++) iperm_[perm_[i]] = i;
     for (integer_t i=0; i<n; i++) perm_[gpost[i]] = iperm_[i];
-    //for (integer_t i=0; i<n; i++) iperm_[perm_[i]] = i;
     std::swap(perm_, iperm_);
   }
 

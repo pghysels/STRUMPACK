@@ -51,7 +51,7 @@ namespace strumpack {
   template<typename integer_t> class CSRGraph {
   public:
     CSRGraph() = default;
-    CSRGraph(integer_t n, integer_t nvert);
+    CSRGraph(integer_t nr_vert, integer_t nr_edge);
 
     static CSRGraph<integer_t> deserialize(const std::vector<integer_t>& buf);
     static CSRGraph<integer_t> deserialize(const integer_t* buf);
@@ -73,6 +73,9 @@ namespace strumpack {
     integer_t& ind(integer_t i) { assert(i < nedge()); return ind_[i]; }
 
     void sort_rows();
+
+    void permute
+    (const integer_t* order, const integer_t* iorder);
 
     void permute_local
     (const std::vector<integer_t>& order,
@@ -121,7 +124,7 @@ namespace strumpack {
 
   template<typename integer_t> CSRGraph<integer_t>
   CSRGraph<integer_t>::deserialize(const integer_t* buf) {
-    CSRGraph<integer_t> g(buf[0], buf[1]);
+    CSRGraph<integer_t> g(buf[0]-1, buf[1]);
     std::copy(buf+2, buf+2+buf[0], g.ptr_.begin());
     std::copy(buf+2+buf[0], buf+2+buf[0]+buf[1], g.ind_.begin());
     return g;
@@ -155,6 +158,24 @@ namespace strumpack {
     }
     std::cout << std::endl;
   }
+
+  template<typename integer_t> void
+  CSRGraph<integer_t>::permute
+  (const integer_t* iorder, const integer_t* order) {
+    auto n = nvert();
+    std::vector<integer_t> ptr(ptr_.size()), ind(ind_.size());
+    integer_t nnz = 0;
+    for (integer_t i=0; i<n; i++) {
+      auto lb = ptr_[iorder[i]];
+      auto ub = ptr_[iorder[i]+1];
+      for (integer_t j=lb; j<ub; j++)
+        ind[nnz] = order[ind_[j]];
+      ptr[i+1] = nnz;
+    }
+    std::swap(ptr_, ptr);
+    std::swap(ind_, ind);
+  }
+
 
   /**
    * order and iorder are of size this->size() == this->nvert() == chi-clo.
@@ -234,10 +255,9 @@ namespace strumpack {
         if (c != r && c >= begin && c < end)
           e++;
       }
-    CSRGraph<integer_t> g(n, e);
+    CSRGraph<integer_t> g(dim, e);
     e = 0;
     for (integer_t r=begin; r<end; r++) {
-      g.ptr(r-begin) = e;
       for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++) {
         auto c = ind_[j] - lo;
         if (c != r) {
@@ -245,6 +265,15 @@ namespace strumpack {
           if (lc >= 0 && lc < dim)
             g.ind(e++) = c - begin;
         }
+      }
+      g.ptr(r-begin+1) = e;
+    }
+    for (integer_t i=0; i<g.nvert(); i++) {
+      for (integer_t j=g.ptr(i); j<g.ptr(i+1); j++) {
+        assert(j >= 0);
+        assert(j < g.nedge());
+        assert(g.ind(j) >= 0);
+        assert(g.ind(j) < g.nvert());
       }
     }
     return g;

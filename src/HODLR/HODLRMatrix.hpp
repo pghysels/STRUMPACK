@@ -632,23 +632,16 @@ namespace strumpack {
       if (i == j) { *dist = scalar_t(0.); return; }
       auto& info = *static_cast<AdmInfo<integer_t>*>(fdata);
       auto& g = *(info.graph);
-      // auto hic = g.ind() + g.ptr(i+1);
-      // for (auto pc=g.ind()+g.ptr(i); pc!=hic; pc++)
-      //   if (*pc == j) { *dist = scalar_t(1.); return; }
-      assert(i < g.nvert());
-      assert(j < g.nvert());
       for (integer_t k=g.ptr(i); k<g.ptr(i+1); k++) {
-        assert(k < g.nedge());
         if (g.ind(k) == j) {
           *dist = scalar_t(1.);
           return;
         }
       }
       for (integer_t k=g.ptr(i); k<g.ptr(i+1); k++) {
-        assert(k < g.nedge());
-        for (integer_t l=g.ptr(k); l<g.ptr(k+1); l++) {
-          assert(l < g.nedge());
-          if (g.ind(k) == j) {
+        auto ck = g.ind(k);
+        for (integer_t l=g.ptr(ck); l<g.ptr(ck+1); l++) {
+          if (g.ind(l) == j) {
             *dist = scalar_t(2.);
             return;
           }
@@ -704,12 +697,17 @@ namespace strumpack {
         // the extended (length 2 connections) stencil.
         HODLR_set_I_option<scalar_t>
           (options_, "knn", 5 * graph.nedge() / graph.nvert());
+        if (opts.verbose())
+          std::cout << "HODLR compression with KNN = "
+                    << (5 * graph.nedge() / graph.nvert()) << std::endl;
         HODLR_construct_init<scalar_t>
           (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
            lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
            &(HODLR_distance_query<scalar_t,integer_t>),
            &(HODLR_admissibility_query<integer_t>), &info);
       } else {
+        if (opts.verbose())
+          std::cout << "HODLR compression without KNN" << std::endl;
         HODLR_construct_init<scalar_t>
           (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
            lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
@@ -740,7 +738,8 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "xyzsort", 0);
       HODLR_set_I_option<scalar_t>(options_, "elem_extract", 1); // block extraction
       // set ErrFillFull to 1 to check acc for extraction code
-      HODLR_set_I_option<scalar_t>(options_, "ErrFillFull", opts.verbose() ? 1 : 0);
+      //HODLR_set_I_option<scalar_t>(options_, "ErrFillFull", opts.verbose() ? 1 : 0);
+      HODLR_set_I_option<scalar_t>(options_, "ErrFillFull", 0);
       HODLR_set_I_option<scalar_t>(options_, "rank0", opts.rank_guess());
       HODLR_set_I_option<scalar_t>(options_, "cpp", 1);
       HODLR_set_I_option<scalar_t>(options_, "forwardN15flag", 0);
