@@ -697,22 +697,16 @@ namespace strumpack {
         // the extended (length 2 connections) stencil.
         HODLR_set_I_option<scalar_t>
           (options_, "knn", 5 * graph.nedge() / graph.nvert());
-        if (opts.verbose())
-          std::cout << "HODLR compression with KNN = "
-                    << (5 * graph.nedge() / graph.nvert()) << std::endl;
         HODLR_construct_init<scalar_t>
           (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
            lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
            &(HODLR_distance_query<scalar_t,integer_t>),
            &(HODLR_admissibility_query<integer_t>), &info);
-      } else {
-        if (opts.verbose())
-          std::cout << "HODLR compression without KNN" << std::endl;
+      } else
         HODLR_construct_init<scalar_t>
           (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
            lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
            nullptr, nullptr, nullptr);
-      }
       perm_init();
       dist_init();
     }
