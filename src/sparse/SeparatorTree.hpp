@@ -38,6 +38,7 @@
 
 namespace strumpack {
 
+  template<typename integer_t> class CSRGraph;
 
   template<typename integer_t> class Separator {
   public:

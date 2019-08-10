@@ -108,11 +108,9 @@ namespace strumpack {
      const CSRMatrix<scalar_t,integer_t>& A, integer_t part, integer_t count,
      std::vector<integer_t>& sorder);
 
-    void extract_separator
-    (const SPOptions<scalar_t>& opts, integer_t part,
-     integer_t sep_beg, integer_t sep_end,
-     const CSRMatrix<scalar_t,integer_t>& A, std::vector<idx_t>& xadj,
-     std::vector<idx_t>& adjncy, std::vector<integer_t>& sorder);
+    CSRGraph<integer_t> extract_separator
+    (const SPOptions<scalar_t>& opts, integer_t sep_beg, integer_t sep_end,
+     const CSRMatrix<scalar_t,integer_t>& A) const;
 
     void separator_reordering_recursive
     (const SPOptions<scalar_t>& opts, const CSRMatrix<scalar_t,integer_t>& A,
@@ -279,14 +277,12 @@ namespace strumpack {
 #pragma omp single
       separator_reordering_recursive(opts, A, true, root, sorder);
 
-      auto& iwork = iperm_;
-      for (integer_t i=0; i<N; i++) sorder[i] = -sorder[i];
-      for (integer_t i=0; i<N; i++) iwork[sorder[i]] = i;
-      A.permute(iwork, sorder);
+      for (integer_t i=0; i<N; i++) iperm_[sorder[i]] = i;
+      A.permute(iperm_, sorder);
       // product of perm_ and sep_order
-      for (integer_t i=0; i<N; i++) iwork[i] = sorder[perm_[i]];
-      for (integer_t i=0; i<N; i++) perm_[i] = iwork[i];
-      for (integer_t i=0; i<N; i++) iperm_[perm_[i]] = i;
+      for (integer_t i=0; i<N; i++) iperm_[i] = sorder[perm_[i]];
+      for (integer_t i=0; i<N; i++) perm_[iperm_[i]] = i;
+      std::swap(perm_, iperm_);
     }
 
     if (opts.use_BLR() || opts.use_HODLR()) {
@@ -366,101 +362,54 @@ namespace strumpack {
     }
 #pragma omp taskwait
     if (compressed) {
-      HSS::HSSPartitionTree hss_tree(dim_sep);
-      if (dim_sep > 2 * opts.compression_min_sep_size()) {
-        integer_t nr_parts = 0;
-        split_separator(opts, hss_tree, nr_parts, sep, A, 0, 1, sorder);
-        auto count = sep_begin;
-        for (integer_t part=0; part<nr_parts; part++)
-          for (integer_t i=sep_begin; i<sep_end; i++)
-            if (sorder[i] == part) sorder[i] = -count++;
-      } else for (integer_t i=sep_begin; i<sep_end; i++) sorder[i] = -i;
-
-      // TODO get the admissibility info here??
+      auto g = extract_separator(opts, sep_begin, sep_end, A);
+      auto tree = g.recursive_bisection
+        (opts.compression_leaf_size(), 0,
+         &sorder[sep_begin], nullptr, 0, 0, dim_sep);
+      for (integer_t i=sep_begin; i<sep_end; i++)
+        sorder[i] = sorder[i] + sep_begin;
 
 #pragma omp critical
       {  // not thread safe!
-        sep_tree_->partition_tree[sep] = std::move(hss_tree);
+        sep_tree_->partition_tree[sep] = std::move(tree);
       }
     } else
-      for (integer_t i=sep_begin; i<sep_end; i++) sorder[i] = -i;
+      for (integer_t i=sep_begin; i<sep_end; i++)
+        sorder[i] = i;
   }
 
-  template<typename scalar_t,typename integer_t> void
-  MatrixReordering<scalar_t,integer_t>::split_separator
-  (const SPOptions<scalar_t>& opts, HSS::HSSPartitionTree& hss_tree,
-   integer_t& nr_parts, integer_t sep, const CSRMatrix<scalar_t,integer_t>& A,
-   integer_t part, integer_t count, std::vector<integer_t>& sorder) {
-    auto sep_begin = sep_tree_->sizes(sep);
-    auto sep_end = sep_tree_->sizes(sep+1);
-    std::vector<idx_t> xadj, adjncy;
-    extract_separator(opts, part, sep_begin, sep_end, A, xadj, adjncy, sorder);
-    idx_t edge_cut = 0, nvtxs=xadj.size()-1;
-    std::vector<idx_t> partitioning(nvtxs);
-    int info = WRAPPER_METIS_PartGraphRecursive
-      (nvtxs, 1, xadj.data(), adjncy.data(), 2, edge_cut, partitioning);
-    if (info != METIS_OK) {
-      std::cerr << "METIS_PartGraphRecursive for separator"
-                << " reordering returned: " << info << std::endl;
-      exit(1);
-    }
-    hss_tree.c.resize(2);
-    for (integer_t i=sep_begin, j=0; i<sep_end; i++)
-      if (sorder[i] == part) {
-        auto p = partitioning[j++];
-        sorder[i] = -count - p;
-        hss_tree.c[p].size++;
-      }
-    int leaf = opts.compression_leaf_size();
-    for (integer_t p=0; p<2; p++)
-      if (hss_tree.c[p].size > 2 * leaf)
-        split_separator(opts, hss_tree.c[p], nr_parts, sep, A,
-                        -count-p, count+2, sorder);
-      else
-        std::replace
-          (&sorder[sep_begin], &sorder[sep_end], -count-p, nr_parts++);
-  }
-
-  template<typename scalar_t,typename integer_t> void
+  // TODO put in CSRMatrix
+  template<typename scalar_t,typename integer_t> CSRGraph<integer_t>
   MatrixReordering<scalar_t,integer_t>::extract_separator
-  (const SPOptions<scalar_t>& opts, integer_t part,
-   integer_t sep_begin, integer_t sep_end,
-   const CSRMatrix<scalar_t,integer_t>& A,
-   std::vector<idx_t>& xadj, std::vector<idx_t>& adjncy,
-   std::vector<integer_t>& sorder) {
+  (const SPOptions<scalar_t>& opts, integer_t sep_begin, integer_t sep_end,
+   const CSRMatrix<scalar_t,integer_t>& A) const {
     assert(opts.separator_ordering_level() == 0 ||
            opts.separator_ordering_level() == 1);
     auto dim_sep = sep_end - sep_begin;
     std::vector<bool> mark(dim_sep);
-    std::vector<integer_t> ind_to_part(dim_sep);
-    integer_t nvtxs = 0;
-    for (integer_t r=0; r<dim_sep; r++)
-      ind_to_part[r] = (sorder[r+sep_begin] == part) ? nvtxs++ : -1;
-    xadj.reserve(nvtxs+1);
-    adjncy.reserve(5*nvtxs);
+    std::vector<integer_t> xadj, adjncy;
+    xadj.reserve(dim_sep+1);
+    adjncy.reserve(5*dim_sep);
     for (integer_t i=sep_begin, e=0; i<sep_end; i++) {
-      if (sorder[i] == part) {
-        xadj.push_back(e);
-        std::fill(mark.begin(), mark.end(), false);
-        for (integer_t j=A.ptr(i); j<A.ptr(i+1); j++) {
-          auto c = A.ind(j);
-          if (c == i) continue;
-          auto lc = c - sep_begin;
-          if (lc >= 0 && lc < dim_sep && sorder[c]==part && !mark[lc]) {
-            mark[lc] = true;
-            adjncy.push_back(ind_to_part[lc]);
-            e++;
-          } else {
-            if (opts.separator_ordering_level() > 0) {
-              for (integer_t k=A.ptr(c); k<A.ptr(c+1); k++) {
-                auto cc = A.ind(k);
-                auto lcc = cc - sep_begin;
-                if (cc!=i && lcc >= 0 && lcc < dim_sep &&
-                    sorder[cc]==part && !mark[lcc]) {
-                  mark[lcc] = true;
-                  adjncy.push_back(ind_to_part[lcc]);
-                  e++;
-                }
+      xadj.push_back(e);
+      std::fill(mark.begin(), mark.end(), false);
+      for (integer_t j=A.ptr(i); j<A.ptr(i+1); j++) {
+        auto c = A.ind(j);
+        if (c == i) continue;
+        auto lc = c - sep_begin;
+        if (lc >= 0 && lc < dim_sep && !mark[lc]) {
+          mark[lc] = true;
+          adjncy.push_back(lc);
+          e++;
+        } else {
+          if (opts.separator_ordering_level() > 0) {
+            for (integer_t k=A.ptr(c); k<A.ptr(c+1); k++) {
+              auto cc = A.ind(k);
+              auto lcc = cc - sep_begin;
+              if (cc!=i && lcc >= 0 && lcc < dim_sep && !mark[lcc]) {
+                mark[lcc] = true;
+                adjncy.push_back(lcc);
+                e++;
               }
             }
           }
@@ -468,6 +417,7 @@ namespace strumpack {
       }
     }
     xadj.push_back(adjncy.size());
+    return CSRGraph<integer_t>(std::move(xadj), std::move(adjncy));
   }
 
 
@@ -561,7 +511,7 @@ namespace strumpack {
         << "# As a remedy, you can try to increase the stack size," << std::endl
         << "# or try a different ordering (metis, scotch, ..)." << std::endl
         << "# When using metis, it often helps to use --sp_enable_METIS_NodeNDP," << std::endl
-        << "# (enabled by default) iso --sp_enable_METIS_NodeND." << std::endl
+        << "# iso --sp_enable_METIS_NodeND." << std::endl
         << "# ******************************************************************"
         << std::endl;
     if (opts.log_assembly_tree()) {

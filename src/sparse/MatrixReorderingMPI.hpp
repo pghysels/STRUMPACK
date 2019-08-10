@@ -172,18 +172,6 @@ namespace strumpack {
     (const SPOptions<scalar_t>& opts, integer_t sep, bool compressed_parent,
      std::vector<integer_t>& lorder, std::vector<integer_t>& liorder);
 
-    void split_recursive_local
-    (const SPOptions<scalar_t>& opts, integer_t sep,
-     std::vector<integer_t>& lorder, HSS::HSSPartitionTree& partition_tree,
-     integer_t& nr_parts, integer_t part, integer_t count,
-     const Length2Edges<integer_t>& l2);
-
-    void split_recursive_dist
-    (const SPOptions<scalar_t>& opts, std::vector<integer_t>& dorder,
-     HSS::HSSPartitionTree& partition_tree,
-     integer_t& nr_parts, integer_t part, integer_t count,
-     const Length2Edges<integer_t>& l2);
-
     void nested_dissection_print
     (const SPOptions<scalar_t>& opts, integer_t nnz) const;
 
@@ -352,82 +340,6 @@ namespace strumpack {
               << std::endl;
   }
 
-
-  template<typename scalar_t,typename integer_t> void
-  MatrixReorderingMPI<scalar_t,integer_t>::split_recursive_local
-  (const SPOptions<scalar_t>& opts, integer_t sep,
-   std::vector<integer_t>& lorder, HSS::HSSPartitionTree& partition_tree,
-   integer_t& nr_parts, integer_t part, integer_t count,
-   const Length2Edges<integer_t>& l2) {
-    auto sep_begin = local_tree_->sizes(sep);
-    auto sep_end = local_tree_->sizes(sep+1);
-    auto dim_sep = sep_end - sep_begin;
-    auto sg = my_sub_graph.extract_subgraph
-      (opts.separator_ordering_level(), sub_graph_range.first,
-       sep_begin, sep_end, part, &lorder[sep_begin], l2);
-    idx_t edge_cut = 0, nvtxs = sg.size();
-    std::vector<idx_t> partitioning(nvtxs);
-    int info = WRAPPER_METIS_PartGraphRecursive
-      (nvtxs, 1, sg.ptr(), sg.ind(), 2, edge_cut, partitioning);
-    if (info !=  METIS_OK) {
-      std::cerr << "METIS_PartGraphRecursive for separator"
-        " reordering returned: " << info << std::endl;
-      exit(1);
-    }
-    partition_tree.c.resize(2);
-    for (integer_t i=sep_begin, j=0; i<sep_end; i++)
-      if (lorder[i] == part) {
-        auto p = partitioning[j++];
-        lorder[i] = -count - p;
-        partition_tree.c[p].size++;
-      }
-    for (integer_t p=0; p<2; p++) {
-      if (partition_tree.c[p].size > 2 * opts.compression_leaf_size())
-        split_recursive_local(opts, sep, lorder, partition_tree.c[p],
-                              nr_parts, -count-p, count+2, l2);
-      else
-        std::replace(&lorder[sep_begin], &lorder[sep_end],
-                     -count-p, nr_parts++);
-    }
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  MatrixReorderingMPI<scalar_t,integer_t>::split_recursive_dist
-  (const SPOptions<scalar_t>& opts, std::vector<integer_t>& dorder,
-   HSS::HSSPartitionTree& partition_tree,
-   integer_t& nr_parts, integer_t part, integer_t count,
-   const Length2Edges<integer_t>& l2) {
-    auto dsep_begin = dist_sep_range.first;
-    auto dsep_end = dist_sep_range.second;
-    auto dim_dsep = dsep_end - dsep_begin;
-    auto sg = my_dist_sep.extract_subgraph
-      (opts.separator_ordering_level(), dsep_begin, 0, dim_dsep,
-       part, dorder.data(), l2);
-    idx_t edge_cut = 0, nvtxs = sg.size();
-    std::vector<idx_t> partitioning(dim_dsep);
-    int info = WRAPPER_METIS_PartGraphRecursive
-      (nvtxs, 1, sg.ptr(), sg.ind(), 2, edge_cut, partitioning);
-    if (info !=  METIS_OK) {
-      std::cerr << "METIS_PartGraphRecursive for separator"
-        " reordering returned: " << info << std::endl;
-      exit(1);
-    }
-    partition_tree.c.resize(2);
-    for (integer_t i=0, j=0; i<dim_dsep; i++)
-      if (dorder[i] == part) {
-        auto p = partitioning[j++];
-        dorder[i] = -count - p;
-        partition_tree.c[p].size++;
-      }
-    for (integer_t p=0; p<2; p++)
-      if (partition_tree.c[p].size > 2 * opts.compression_leaf_size())
-        split_recursive_dist
-          (opts, dorder, partition_tree.c[p], nr_parts, -count-p, count+2, l2);
-      else
-        std::replace
-          (dorder.begin(), dorder.end(), -count-p, nr_parts++);
-  }
-
   template<typename scalar_t,typename integer_t> void
   MatrixReorderingMPI<scalar_t,integer_t>::local_separator_reordering_recursive
   (const SPOptions<scalar_t>& opts, integer_t sep, bool compressed_parent,
@@ -437,23 +349,10 @@ namespace strumpack {
     auto dim_sep = sep_end - sep_begin;
     bool compressed = is_compressed(dim_sep, compressed_parent, opts);
     if (compressed) {
-      HSS::HSSPartitionTree tree(dim_sep);
-      int leaf = opts.compression_leaf_size();
-      if (dim_sep > 2 * leaf) {
-        std::fill(&lorder[sep_begin], &lorder[sep_end], integer_t(0));
-        integer_t parts = 0;
-        auto l2 = my_sub_graph.length_2_edges(sub_graph_range.first);
-        split_recursive_local(opts, sep, lorder, tree, parts, 0, 1, l2);
-        for (integer_t part=0, count=sep_begin+sub_graph_range.first;
-             part<parts; part++)
-          for (integer_t i=sep_begin; i<sep_end; i++)
-            if (lorder[i] == part)
-              lorder[i] = -count++;
-        for (integer_t i=sep_begin; i<sep_end; i++) {
-          lorder[i] = -lorder[i];
-          liorder[lorder[i]-sub_graph_range.first] = i;
-        }
-      }
+      auto tree = my_sub_graph.recursive_bisection
+        (opts.compression_leaf_size(), opts.separator_ordering_level(),
+         lorder.data(), liorder.data(), sub_graph_range.first,
+         sep_begin, sep_end);
       if (opts.use_BLR() || opts.use_HODLR()) {
         auto tiles = tree.leaf_sizes();
         integer_t nt = tiles.size();
@@ -541,24 +440,9 @@ namespace strumpack {
     auto dim_dsep = dsep_end - dsep_begin;
     std::vector<integer_t> dorder(dim_dsep), diorder(dim_dsep);
     if (dim_dsep) {
-      int min_sep = opts.compression_min_sep_size();
-      int leaf = opts.compression_leaf_size();
-      HSS::HSSPartitionTree tree(dim_dsep);
-      if ((dim_dsep >= min_sep) && (dim_dsep > 2 * leaf)) {
-        std::fill(dorder.begin(), dorder.end(), integer_t(0));
-        integer_t parts = 0;
-        auto l2 = my_dist_sep.length_2_edges(dist_sep_range.first);
-        split_recursive_dist(opts, dorder, tree, parts, 0, 1, l2);
-        for (integer_t part=0, count=dsep_begin; part<parts; part++)
-          for (integer_t i=0; i<dim_dsep; i++)
-            if (dorder[i] == part) dorder[i] = -count++;
-        for (integer_t i=0; i<dim_dsep; i++)
-          dorder[i] = -dorder[i];
-      } else
-        for (integer_t i=0; i<dim_dsep; i++)
-          dorder[i] = i+dsep_begin;
-      for (integer_t i=0; i<dim_dsep; i++)
-        diorder[dorder[i]-dsep_begin] = i;
+      auto tree = my_dist_sep.recursive_bisection
+        (opts.compression_leaf_size(), opts.separator_ordering_level(),
+         dorder.data(), diorder.data(), dsep_begin, 0, dim_dsep);
       if (opts.use_BLR() || opts.use_HODLR()) {
         auto tiles = tree.leaf_sizes();
         integer_t nt = tiles.size();

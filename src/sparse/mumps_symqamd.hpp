@@ -30,6 +30,8 @@
 #define STRUMPACK_MUMPS_SYMQAMD_HPP
 
 #include "StrumpackFortranCInterface.h"
+#include "CompressedSparseMatrix.hpp"
+#include "StrumpackOptions.hpp"
 
 #define MUMPS_SYMQAMD_FC FC_GLOBAL_(mumps_symqamd, MUMPS_SYMQAMD)
 

@@ -34,6 +34,8 @@
 #include <tuple>
 #include <unordered_map>
 #include "misc/MPIWrapper.hpp"
+#include "HSS/HSSPartitionTree.hpp"
+#include "MetisReordering.hpp"
 
 namespace strumpack {
 
@@ -52,6 +54,7 @@ namespace strumpack {
   public:
     CSRGraph() = default;
     CSRGraph(integer_t nr_vert, integer_t nr_edge);
+    CSRGraph(std::vector<integer_t>&& nr_vert, std::vector<integer_t>&& nr_edge);
 
     static CSRGraph<integer_t> deserialize(const std::vector<integer_t>& buf);
     static CSRGraph<integer_t> deserialize(const integer_t* buf);
@@ -74,9 +77,6 @@ namespace strumpack {
 
     void sort_rows();
 
-    void permute
-    (const integer_t* order, const integer_t* iorder);
-
     void permute_local
     (const std::vector<integer_t>& order,
      const std::vector<integer_t>& iorder,
@@ -94,9 +94,6 @@ namespace strumpack {
      * length-2 edges if sep_order_level > 0.
      *
      * This only extracts the nodes i for which order[i] == part.
-     *
-     * This stores some work info for the lenght 2 edges, so it is not
-     * thread safe!!
      */
     CSRGraph<integer_t> extract_subgraph
     (int order_level, integer_t lo, integer_t begin, integer_t end,
@@ -106,15 +103,31 @@ namespace strumpack {
     CSRGraph<integer_t> extract_subgraph
     (integer_t lo, integer_t begin, integer_t end) const;
 
+    HSS::HSSPartitionTree recursive_bisection
+    (int leaf, int conn_level, integer_t* order, integer_t* iorder,
+     integer_t lo, integer_t sep_begin, integer_t sep_end) const;
+
+ private:
+    std::vector<integer_t> ptr_, ind_;
+
     Length2Edges<integer_t> length_2_edges(integer_t lo) const;
 
-  private:
-    std::vector<integer_t> ptr_, ind_;
+    void split_recursive
+    (int leaf, int conn_level, integer_t lo,
+     integer_t sep_begin, integer_t sep_end, integer_t* order,
+     HSS::HSSPartitionTree& tree, integer_t& parts, integer_t part,
+     integer_t count, const Length2Edges<integer_t>& l2) const;
   };
 
   template<typename integer_t>
   CSRGraph<integer_t>::CSRGraph(integer_t nr_vert, integer_t nr_edge)
     : ptr_(nr_vert+1), ind_(nr_edge) {
+  }
+
+  template<typename integer_t>
+  CSRGraph<integer_t>::CSRGraph
+  (std::vector<integer_t>&& ptr, std::vector<integer_t>&& ind)
+    : ptr_(std::move(ptr)), ind_(std::move(ind)) {
   }
 
   template<typename integer_t> CSRGraph<integer_t>
@@ -158,24 +171,6 @@ namespace strumpack {
     }
     std::cout << std::endl;
   }
-
-  template<typename integer_t> void
-  CSRGraph<integer_t>::permute
-  (const integer_t* iorder, const integer_t* order) {
-    auto n = nvert();
-    std::vector<integer_t> ptr(ptr_.size()), ind(ind_.size());
-    integer_t nnz = 0;
-    for (integer_t i=0; i<n; i++) {
-      auto lb = ptr_[iorder[i]];
-      auto ub = ptr_[iorder[i]+1];
-      for (integer_t j=lb; j<ub; j++)
-        ind[nnz] = order[ind_[j]];
-      ptr[i+1] = nnz;
-    }
-    std::swap(ptr_, ptr);
-    std::swap(ind_, ind);
-  }
-
 
   /**
    * order and iorder are of size this->size() == this->nvert() == chi-clo.
@@ -279,27 +274,88 @@ namespace strumpack {
     return g;
   }
 
+  template<typename integer_t> HSS::HSSPartitionTree
+  CSRGraph<integer_t>::recursive_bisection
+  (int leaf, int conn_level, integer_t* order, integer_t* iorder,
+   integer_t lo, integer_t sep_begin, integer_t sep_end) const {
+    integer_t dim_sep = sep_end - sep_begin;
+    HSS::HSSPartitionTree tree(dim_sep);
+    if (dim_sep > 2 * leaf) {
+      std::fill(&order[sep_begin], &order[sep_end], integer_t(0));
+      integer_t parts = 0;
+      Length2Edges<integer_t> l2;
+      if (conn_level == 1) l2 = length_2_edges(lo);
+      split_recursive
+        (leaf, conn_level, lo, sep_begin, sep_end, order,
+         tree, parts, 0, 1, l2);
+      for (integer_t part=0, count=sep_begin+lo;
+           part<parts; part++)
+        for (integer_t i=sep_begin; i<sep_end; i++)
+          if (order[i] == part)
+            order[i] = -count++;
+      for (integer_t i=sep_begin; i<sep_end; i++)
+        order[i] = -order[i];
+    } else
+      std::iota(order+sep_begin, order+sep_end, sep_begin+lo);
+    if (iorder)
+      for (integer_t i=sep_begin; i<sep_end; i++)
+        iorder[order[i]-lo] = i;
+    return tree;
+  }
+
+  template<typename integer_t> void CSRGraph<integer_t>::split_recursive
+  (int leaf, int conn_level, integer_t lo,
+   integer_t sep_begin, integer_t sep_end, integer_t* order,
+   HSS::HSSPartitionTree& tree, integer_t& parts, integer_t part,
+   integer_t count, const Length2Edges<integer_t>& l2) const {
+    auto sg = extract_subgraph
+      (conn_level, lo, sep_begin, sep_end, part, order+sep_begin, l2);
+    idx_t edge_cut = 0, nvtxs = sg.size();
+    std::vector<idx_t> partitioning(nvtxs);
+    int info = WRAPPER_METIS_PartGraphRecursive
+      (nvtxs, 1, sg.ptr(), sg.ind(), 2, edge_cut, partitioning);
+    if (info != METIS_OK) {
+      std::cerr << "METIS_PartGraphRecursive for separator"
+        " reordering returned: " << info << std::endl;
+      exit(1);
+    }
+    tree.c.resize(2);
+    for (integer_t i=sep_begin, j=0; i<sep_end; i++)
+      if (order[i] == part) {
+        auto p = partitioning[j++];
+        order[i] = -count - p;
+        tree.c[p].size++;
+      }
+    for (integer_t p=0; p<2; p++) {
+      if (tree.c[p].size > 2 * leaf)
+        split_recursive
+          (leaf, conn_level, lo, sep_begin, sep_end, order,
+           tree.c[p], parts, -count-p, count+2, l2);
+      else
+        std::replace(order+sep_begin, order+sep_end, -count-p, parts++);
+    }
+  }
 
   template<typename integer_t> Length2Edges<integer_t>
   CSRGraph<integer_t>::length_2_edges(integer_t lo) const {
     // for all nodes not in this graph to which there is an outgoing
     //   edge, we keep a list of edges to/from that node
-    Length2Edges<integer_t> o;
+    Length2Edges<integer_t> l2;
     auto n = size();
     auto hi = lo + n;
     for (integer_t r=0; r<n; r++)
       for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++) {
         auto c = ind_[j];
-        if (c < lo || c >= hi) o[c].push_back(r);
+        if (c < lo || c >= hi) l2[c].push_back(r);
       }
-    return o;
+    return l2;
   }
 
   template<typename integer_t> CSRGraph<integer_t>
   CSRGraph<integer_t>::extract_subgraph
   (int order_level, integer_t lo, integer_t begin, integer_t end,
    integer_t part, const integer_t* order,
-   const Length2Edges<integer_t>& o) const {
+   const Length2Edges<integer_t>& l2) const {
     CSRGraph<integer_t> g;
     assert(order_level == 0 || order_level == 1);
     auto n = size();
@@ -339,7 +395,7 @@ namespace strumpack {
             }
           } else {
             if (order_level > 0) {
-              for (auto cc : o.at(c+lo)) {
+              for (auto cc : l2.at(c+lo)) {
                 auto lcc = cc - begin;
                 if (cc != r && lcc >= 0 &&
                     lcc < dim && order[lcc] == part && !mark[lcc]) {

@@ -171,7 +171,6 @@ namespace strumpack {
       (local_upd, dist_upd, local_subtree_work, dsep_work);
     MPIComm::control_stop("symbolic_factorization");
 
-
     {// communicate dist_subtree_work to everyone
       std::vector<float> sbuf(2*P_);
       // initialize buffer or valgrind will complain about MPI sending
