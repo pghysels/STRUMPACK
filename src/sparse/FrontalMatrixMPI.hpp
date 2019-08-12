@@ -164,9 +164,6 @@ namespace strumpack {
     virtual long long dense_factor_nonzeros(int task_depth=0) const override;
     virtual std::string type() const override { return "FrontalMatrixMPI"; }
     virtual bool isMPI() const override { return true; }
-    virtual void bisection_partitioning
-    (const SPOptions<scalar_t>& opts, integer_t* sorder,
-     bool isroot=true, int task_depth=0) override;
 
   protected:
     BLACSGrid blacs_grid_;     // 2D processor grid
@@ -185,40 +182,6 @@ namespace strumpack {
     : F_t(nullptr, nullptr, sep, sep_begin, sep_end, upd),
       blacs_grid_(comm, P) {
   }
-
-  // template<typename scalar_t,typename integer_t> void
-  // FrontalMatrixMPI<scalar_t,integer_t>::extract_2d
-  // (const SpMat_t& A, const Vec_t& I,
-  //  const Vec_t& J, DistM_t& B) const {
-  //   TIMER_TIME(TaskType::EXTRACT_2D, 1, t_ex);
-  //   auto m = I.size();
-  //   auto n = J.size();
-  //   {
-  //     TIMER_TIME(TaskType::EXTRACT_SEP_2D, 2, t_ex_sep);
-  //     DistM_t tmp(grid(), m, n);
-  //     A.extract_separator_2d(this->sep_end_, I, J, tmp);
-  //     // TODO why this copy???
-  //     copy(m, n, tmp, 0, 0, B, 0, 0, grid()->ctxt_all());
-  //   }
-  //   TIMER_TIME(TaskType::GET_SUBMATRIX_2D, 2, t_getsub);
-  //   DistM_t Bl, Br;
-  //   DenseM_t Blseq, Brseq;
-  //   if (visit(lchild_)) lchild_->get_submatrix_2d(I, J, Bl, Blseq);
-  //   if (visit(rchild_)) rchild_->get_submatrix_2d(I, J, Br, Brseq);
-  //   DistM_t tmp(B.grid(), m, n);
-  //   if (lchild_) {
-  //     if (lchild_->isMPI())
-  //       copy(m, n, Bl, 0, 0, tmp, 0, 0, grid()->ctxt_all());
-  //     else copy(m, n, Blseq, master(lchild_), tmp, 0, 0, grid()->ctxt_all());
-  //   }
-  //   B.add(tmp);
-  //   if (rchild_) {
-  //     if (rchild_->isMPI())
-  //       copy(m, n, Br, 0, 0, tmp, 0, 0, grid()->ctxt_all());
-  //     else copy(m, n, Brseq, master(rchild_), tmp, 0, 0, grid()->ctxt_all());
-  //   }
-  //   B.add(tmp);
-  // }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMPI<scalar_t,integer_t>::extract_2d
@@ -389,18 +352,6 @@ namespace strumpack {
     if (visit(rchild_))
       nnz += rchild_->factor_nonzeros(task_depth);
     return nnz;
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMPI<scalar_t,integer_t>::bisection_partitioning
-  (const SPOptions<scalar_t>& opts, integer_t* sorder,
-   bool isroot, int task_depth) {
-    for (integer_t i=this->sep_begin_; i<this->sep_end_; i++) sorder[i] = -i;
-
-    if (visit(lchild_))
-      lchild_->bisection_partitioning(opts, sorder, false, task_depth);
-    if (visit(rchild_))
-      rchild_->bisection_partitioning(opts, sorder, false, task_depth);
   }
 
   template<typename scalar_t,typename integer_t> long long

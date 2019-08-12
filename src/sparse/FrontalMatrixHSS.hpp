@@ -94,14 +94,10 @@ namespace strumpack {
     std::string type() const override { return "FrontalMatrixHSS"; }
 
     int random_samples() const override { return R1.cols(); };
-    void bisection_partitioning
-    (const SPOptions<scalar_t>& opts, integer_t* sorder,
-     bool isroot=true, int task_depth=0) override;
 
     void set_HSS_partitioning
     (const SPOptions<scalar_t>& opts,
      const HSS::HSSPartitionTree& sep_tree, bool is_root) override;
-
 
     // TODO make private?
     HSS::HSSMatrix<scalar_t> _H;
@@ -677,133 +673,6 @@ namespace strumpack {
       hss_tree.c.back().refine(opts.HSS_options().leaf_size());
       _H = HSS::HSSMatrix<scalar_t>(hss_tree, opts.HSS_options());
     }
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSS<scalar_t,integer_t>::bisection_partitioning
-  (const SPOptions<scalar_t>& opts, integer_t* sorder,
-   bool isroot, int task_depth) {
-    if (lchild_)
-#pragma omp task default(shared)                        \
-  if(task_depth < params::task_recursion_cutoff_level)
-      lchild_->bisection_partitioning(opts, sorder, false, task_depth+1);
-    if (rchild_)
-#pragma omp task default(shared)                        \
-  if(task_depth < params::task_recursion_cutoff_level)
-      rchild_->bisection_partitioning(opts, sorder, false, task_depth+1);
-#pragma omp taskwait
-
-    std::cout << "TODO FrontalMatrixHSS::bisection_partitioning" << std::endl;
-
-    for (integer_t i=sep_begin_; i<sep_end_; i++)
-      sorder[i] = -i;
-    HSS::HSSPartitionTree sep_tree(dim_sep());
-    sep_tree.refine(opts.HSS_options().leaf_size());
-
-    // TODO this still needs to work when the sparse matrix is a
-    // ProportionallyMappedSparseMatrix!!!
-    // if (this->dim_sep >= 2 * opts.HSS_options().leaf_size()) {
-    //   integer_t nrparts = 0;
-    //   split_separator(opts, sep_tree, nrparts, 0, 1, sorder);
-    //   auto count = sep_begin_;
-    //   for (integer_t part=0; part<nrparts; part++)
-    //          for (integer_t i=sep_begin_; i<sep_end_; i++)
-    //            if (sorder[i] == part) sorder[i] = -count++;
-    // } else for (integer_t i=sep_begin_; i<sep_end_; i++) sorder[i] = -i;
-
-    if (isroot)
-      _H = HSS::HSSMatrix<scalar_t>(sep_tree, opts.HSS_options());
-    else {
-      HSS::HSSPartitionTree hss_tree(this->dim_blk());
-      hss_tree.c.reserve(2);
-      hss_tree.c.push_back(sep_tree);
-      hss_tree.c.emplace_back(dim_upd());
-      hss_tree.c.back().refine(opts.HSS_options().leaf_size());
-      _H = HSS::HSSMatrix<scalar_t>(hss_tree, opts.HSS_options());
-    }
-  }
-
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSS<scalar_t,integer_t>::split_separator
-  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
-   HSS::HSSPartitionTree& hss_tree, integer_t& nr_parts, integer_t part,
-   integer_t count, integer_t* sorder) {
-    std::vector<idx_t> xadj, adjncy;
-    extract_separator(A, opts, part, xadj, adjncy, sorder);
-    idx_t ncon = 1, edge_cut = 0, two = 2, nvtxs=xadj.size()-1;
-    auto partitioning = new idx_t[nvtxs];
-    int info = METIS_PartGraphRecursive
-      (&nvtxs, &ncon, xadj.data(), adjncy.data(), NULL, NULL, NULL,
-       &two, NULL, NULL, NULL, &edge_cut, partitioning);
-    if (info != METIS_OK) {
-      std::cerr << "METIS_PartGraphRecursive for separator reordering"
-                << " returned: " << info << std::endl;
-      exit(1);
-    }
-    hss_tree.c.resize(2);
-    for (integer_t i=sep_begin_, j=0; i<sep_end_; i++)
-      if (sorder[i] == part) {
-        auto p = partitioning[j++];
-        sorder[i] = -count - p;
-        hss_tree.c[p].size++;
-      }
-    delete[] partitioning;
-    for (integer_t p=0; p<2; p++)
-      if (hss_tree.c[p].size >= 2 * opts.HSS_options().leaf_size())
-        split_separator
-          (A, opts, hss_tree.c[p], nr_parts, -count-p, count+2, sorder);
-      else std::replace
-             (sorder+sep_begin_, sorder+sep_end_,
-              -count-p, nr_parts++);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSS<scalar_t,integer_t>::extract_separator
-  (const SpMat_t& A, const SPOptions<scalar_t>& opts, integer_t part,
-   std::vector<idx_t>& xadj, std::vector<idx_t>& adjncy, integer_t* sorder) {
-    assert(opts.separator_ordering_level() == 0 ||
-           opts.separator_ordering_level() == 1);
-    auto dsep = dim_sep();
-    std::unique_ptr<bool[]> mark(new bool[dsep]);
-    std::unique_ptr<integer_t[]> ind_to_part(new integer_t[dsep]);
-    integer_t nvtxs = 0;
-    for (integer_t r=0; r<dsep; r++)
-      ind_to_part[r] = (sorder[r+sep_begin_] == part) ? nvtxs++ : -1;
-    xadj.reserve(nvtxs+1);
-    adjncy.reserve(5*nvtxs);
-    for (integer_t i=sep_begin_, e=0; i<sep_end_; i++) {
-      if (sorder[i] == part) {
-        xadj.push_back(e);
-        std::fill(mark, mark+dsep, false);
-        for (integer_t j=A.ptr(i);
-             j<A.ptr(i+1); j++) {
-          auto c = A.ind(j);
-          if (c == i) continue;
-          auto lc = c - sep_begin_;
-          if (lc >= 0 && lc < dsep && sorder[c]==part && !mark[lc]) {
-            mark[lc] = true;
-            adjncy.push_back(ind_to_part[lc]);
-            e++;
-          } else {
-            if (opts.separator_ordering_level() > 0) {
-              for (integer_t k=A.ptr(c);
-                   k<A.ptr(c+1); k++) {
-                auto cc = A.ind(k);
-                auto lcc = cc - sep_begin_;
-                if (cc!=i && lcc >= 0 && lcc < dsep &&
-                    sorder[cc]==part && !mark[lcc]) {
-                  mark[lcc] = true;
-                  adjncy.push_back(ind_to_part[lcc]);
-                  e++;
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    xadj.push_back(adjncy.size());
   }
 
 } // end namespace strumpack

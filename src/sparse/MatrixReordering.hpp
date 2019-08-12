@@ -75,10 +75,6 @@ namespace strumpack {
 
     void separator_reordering
     (const SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>& A,
-     FrontalMatrix<scalar_t,integer_t>& F);
-
-    void separator_reordering
-    (const SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>& A,
      bool verbose);
 
     virtual void clear_tree_data();
@@ -418,35 +414,6 @@ namespace strumpack {
     }
     xadj.push_back(adjncy.size());
     return CSRGraph<integer_t>(std::move(xadj), std::move(adjncy));
-  }
-
-
-  // reorder the vertices in the separator to get a better rank structure
-  template<typename scalar_t,typename integer_t> void
-  MatrixReordering<scalar_t,integer_t>::separator_reordering
-  (const SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>& A,
-   FrontalMatrix<scalar_t,integer_t>& F) {
-    auto N = A.size();
-    std::vector<integer_t> sorder(N);
-    std::fill(sorder.begin(), sorder.end(), integer_t(0));
-
-#pragma omp parallel
-#pragma omp single
-    F.bisection_partitioning(opts, sorder.data());
-
-    auto& iwork = iperm_;
-    for (integer_t i=0; i<N; i++) sorder[i] = -sorder[i];
-    for (integer_t i=0; i<N; i++) iwork[sorder[i]] = i;
-    A.permute(iwork, sorder);
-
-    // product of perm_ and sep_order
-    for (integer_t i=0; i<N; i++) iwork[i] = sorder[perm_[i]];
-    for (integer_t i=0; i<N; i++) perm_[i] = iwork[i];
-    for (integer_t i=0; i<N; i++) iperm_[perm_[i]] = i;
-
-#pragma omp parallel
-#pragma omp single
-    F.permute_upd_indices(sorder.data());
   }
 
   template<typename scalar_t,typename integer_t> void

@@ -151,10 +151,6 @@ namespace strumpack {
     virtual bool isMPI() const { return false; }
     virtual void print_rank_statistics(std::ostream &out) const {}
     virtual std::string type() const { return "FrontalMatrix"; }
-    virtual void bisection_partitioning
-    (const SPOptions<scalar_t>& opts, integer_t* sorder,
-     bool isroot=true, int task_depth=0);
-    void permute_upd_indices(const integer_t* perm, int task_depth=0);
 
     virtual void set_BLR_partitioning
     (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
@@ -560,49 +556,6 @@ namespace strumpack {
 #pragma omp taskwait
     return nnz + nnzl + nnzr;
   }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::bisection_partitioning
-  (const SPOptions<scalar_t>& opts, integer_t* sorder,
-   bool isroot, int task_depth) {
-    auto lch = lchild_.get();
-    auto rch = rchild_.get();
-    if (lch)
-#pragma omp task default(shared) firstprivate(sorder,task_depth,lch)    \
-  if(task_depth < params::task_recursion_cutoff_level)
-      lch->bisection_partitioning(opts, sorder, false, task_depth+1);
-    if (rch)
-#pragma omp task default(shared) firstprivate(sorder,task_depth,rch)    \
-  if(task_depth < params::task_recursion_cutoff_level)
-      rch->bisection_partitioning(opts, sorder, false, task_depth+1);
-#pragma omp taskwait
-
-    // default is to do nothing, see FrontalMatrixHSS for an actual
-    // implementation
-    for (integer_t i=sep_begin_; i<sep_end_; i++)
-      sorder[i] = -i;
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::permute_upd_indices
-  (const integer_t* perm, int task_depth) {
-    auto lch = lchild_.get();
-    auto rch = rchild_.get();
-    if (lch)
-#pragma omp task default(shared) firstprivate(perm,task_depth,lch)      \
-  if(task_depth < params::task_recursion_cutoff_level)
-      lch->permute_upd_indices(perm, task_depth+1);
-    if (rch)
-#pragma omp task default(shared) firstprivate(perm,task_depth,rch)      \
-  if(task_depth < params::task_recursion_cutoff_level)
-      rch->permute_upd_indices(perm, task_depth+1);
-
-    for (integer_t i=0; i<dim_upd(); i++)
-      upd_[i] = perm[upd_[i]];
-    std::sort(upd_.begin(), upd_.end());
-#pragma omp taskwait
-  }
-
 
 #if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t,typename integer_t> void

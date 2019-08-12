@@ -95,9 +95,6 @@ namespace strumpack {
     bool isHSS() const override { return true; };
     std::string type() const override { return "FrontalMatrixHSSMPI"; }
 
-    void bisection_partitioning
-    (const Opts& opts, integer_t* sorder, bool isroot=true,
-     int task_depth=0) override;
     void set_HSS_partitioning
     (const Opts& opts, const HSS::HSSPartitionTree& sep_tree,
      bool is_root) override;
@@ -483,40 +480,6 @@ namespace strumpack {
     if (Comm().is_null()) return;
     assert(sep_tree.size == dim_sep());
     if (is_root)
-      H_ = std::unique_ptr<HSS::HSSMatrixMPI<scalar_t>>
-        (new HSS::HSSMatrixMPI<scalar_t>
-         (sep_tree, grid(), opts.HSS_options()));
-    else {
-      HSS::HSSPartitionTree hss_tree(dim_blk());
-      hss_tree.c.reserve(2);
-      hss_tree.c.push_back(sep_tree);
-      hss_tree.c.emplace_back(dim_upd());
-      hss_tree.c.back().refine(opts.HSS_options().leaf_size());
-      H_ = std::unique_ptr<HSS::HSSMatrixMPI<scalar_t>>
-        (new HSS::HSSMatrixMPI<scalar_t>
-         (hss_tree, grid(), opts.HSS_options()));
-    }
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSSMPI<scalar_t,integer_t>::bisection_partitioning
-  (const Opts& opts, integer_t* sorder, bool isroot, int task_depth) {
-    if (visit(lchild_))
-      lchild_->bisection_partitioning(opts, sorder, false, task_depth);
-    if (visit(rchild_))
-      rchild_->bisection_partitioning(opts, sorder, false, task_depth);
-
-    HSS::HSSPartitionTree sep_tree(dim_sep());
-    sep_tree.refine(opts.HSS_options().leaf_size());
-
-    std::cout << "TODO FrontalMatrixHSSMPI::bisection_partitioning"
-              << std::endl;
-    for (integer_t i=this->sep_begin_; i<this->sep_end_; i++) sorder[i] = -i;
-
-    // TODO also communicate the tree to everyone working on this front!!
-    // see code in EliminationTreeMPIDist
-
-    if (isroot)
       H_ = std::unique_ptr<HSS::HSSMatrixMPI<scalar_t>>
         (new HSS::HSSMatrixMPI<scalar_t>
          (sep_tree, grid(), opts.HSS_options()));
