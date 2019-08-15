@@ -30,10 +30,8 @@
 #define SEPARATOR_TREE_HPP
 
 #include <vector>
-#include <unordered_map>
 #include <stack>
 #include <fstream>
-#include "HSS/HSSPartitionTree.hpp"
 #include "ETree.hpp"
 
 namespace strumpack {
@@ -92,10 +90,6 @@ namespace strumpack {
     integer_t& pa(integer_t sep) { return parent_[sep]; }
     integer_t& lch(integer_t sep) { return lchild_[sep]; }
     integer_t& rch(integer_t sep) { return rchild_[sep]; }
-
-    std::unordered_map<integer_t,HSS::HSSPartitionTree> partition_tree;
-    std::unordered_map<integer_t,DenseMatrix<bool>> admissibility;
-    std::unordered_map<integer_t,CSRGraph<integer_t>> separator_graph;
 
 #if defined(STRUMPACK_USE_MPI)
     void broadcast(MPI_Comm comm) const;
@@ -206,7 +200,7 @@ namespace strumpack {
       }
     }
     std::vector<Separator<integer_t>> seps;
-    std::stack<integer_t,std::vector<integer_t> > s, l;
+    std::stack<integer_t,std::vector<integer_t>> s, l;
     s.push(std::distance(etree.begin(),
                          std::find(etree.begin(), etree.end(),
                                    integer_t(-1))));
@@ -267,7 +261,6 @@ namespace strumpack {
   template<typename integer_t> void
   SeparatorTree<integer_t>::broadcast(MPI_Comm comm) const {
     MPI_Bcast(sep_sizes_, size(), mpi_type<integer_t>(), 0, comm);
-    // TODO broadcast the HSS_trees?
   }
 #endif
 

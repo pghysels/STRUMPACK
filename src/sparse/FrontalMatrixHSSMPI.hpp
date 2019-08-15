@@ -48,7 +48,7 @@ namespace strumpack {
     using DistM_t = DistributedMatrix<scalar_t>;
     using DistMW_t = DistributedMatrixWrapper<scalar_t>;
     using ExtAdd = ExtendAdd<scalar_t,integer_t>;
-    using Opts = SPOptions<scalar_t>;
+    using Opts_t = SPOptions<scalar_t>;
     template<typename _scalar_t,typename _integer_t> friend class ExtendAdd;
 
   public:
@@ -70,7 +70,8 @@ namespace strumpack {
      DistM_t& Sr, DistM_t& Sc);
 
     void multifrontal_factorization
-    (const SpMat_t& A, const Opts& opts, int etree_level=0, int task_depth=0) override;
+    (const SpMat_t& A, const Opts_t& opts, int etree_level=0,
+     int task_depth=0) override;
 
     void forward_multifrontal_solve
     (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
@@ -95,9 +96,9 @@ namespace strumpack {
     bool isHSS() const override { return true; };
     std::string type() const override { return "FrontalMatrixHSSMPI"; }
 
-    void set_HSS_partitioning
-    (const Opts& opts, const HSS::HSSPartitionTree& sep_tree,
-     bool is_root) override;
+    void partition
+    (const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
+     bool is_root=true, int task_depth=0) override;
 
   private:
     std::unique_ptr<HSS::HSSMatrixMPI<scalar_t>> H_;
@@ -114,6 +115,8 @@ namespace strumpack {
 
     using FrontalMatrix<scalar_t,integer_t>::lchild_;
     using FrontalMatrix<scalar_t,integer_t>::rchild_;
+    using FrontalMatrix<scalar_t,integer_t>::sep_begin_;
+    using FrontalMatrix<scalar_t,integer_t>::sep_end_;
     using FrontalMatrix<scalar_t,integer_t>::dim_sep;
     using FrontalMatrix<scalar_t,integer_t>::dim_upd;
     using FrontalMatrix<scalar_t,integer_t>::dim_blk;
@@ -147,8 +150,7 @@ namespace strumpack {
     Sc.zero();
     {
       TIMER_TIME(TaskType::FRONT_MULTIPLY_2D, 1, t_fmult);
-      A.front_multiply_2d
-        (this->sep_begin_, this->sep_end_, this->upd_, R, Sr, Sc, 0);
+      A.front_multiply_2d(sep_begin_, sep_end_, this->upd_, R, Sr, Sc, 0);
     }
     TIMER_TIME(TaskType::UUTXR, 1, t_UUtxR);
     sample_children_CB(opts, R, Sr, Sc);
@@ -218,7 +220,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSSMPI<scalar_t,integer_t>::multifrontal_factorization
-  (const SpMat_t& A, const Opts& opts, int etree_level, int task_depth) {
+  (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
     if (visit(lchild_))
       lchild_->multifrontal_factorization
         (A, opts, etree_level+1, task_depth);
@@ -393,11 +395,11 @@ namespace strumpack {
       gJ[j].reserve(J[j].size());
       for (auto i : I[j]) {
         assert(i < std::size_t(dim_blk()));
-        gI[j].push_back((i < dsep) ? i+this->sep_begin_ : this->upd_[i-dsep]);
+        gI[j].push_back((i < dsep) ? i+sep_begin_ : this->upd_[i-dsep]);
       }
       for (auto i : J[j]) {
         assert(i < std::size_t(dim_blk()));
-        gJ[j].push_back((i < dsep) ? i+this->sep_begin_ : this->upd_[i-dsep]);
+        gJ[j].push_back((i < dsep) ? i+sep_begin_ : this->upd_[i-dsep]);
       }
     }
     this->extract_2d(A, gI, gJ, B);
@@ -474,11 +476,17 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSSMPI<scalar_t,integer_t>::set_HSS_partitioning
-  (const Opts& opts, const HSS::HSSPartitionTree& sep_tree, bool is_root) {
-    //if (!this->active()) return;
+  FrontalMatrixHSSMPI<scalar_t,integer_t>::partition
+  (const Opts_t& opts, const SpMat_t& A,
+   integer_t* sorder, bool is_root, int task_depth) {
     if (Comm().is_null()) return;
-    assert(sep_tree.size == dim_sep());
+    auto g = A.extract_graph
+      (opts.separator_ordering_level(), sep_begin_, sep_end_);
+    auto sep_tree = g.recursive_bisection
+      (opts.compression_leaf_size(), 0,
+       sorder+sep_begin_, nullptr, 0, 0, dim_sep());
+    for (integer_t i=sep_begin_; i<sep_end_; i++)
+      sorder[i] = sorder[i] + sep_begin_;
     if (is_root)
       H_ = std::unique_ptr<HSS::HSSMatrixMPI<scalar_t>>
         (new HSS::HSSMatrixMPI<scalar_t>

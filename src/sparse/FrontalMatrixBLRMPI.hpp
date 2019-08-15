@@ -55,6 +55,7 @@ namespace strumpack {
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
     using FBLRMPI_t = FrontalMatrixBLRMPI<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
+    using Opts_t = SPOptions<scalar_t>;
     using ExtAdd = ExtendAdd<scalar_t,integer_t>;
     template<typename _scalar_t,typename _integer_t> friend class ExtendAdd;
 
@@ -65,7 +66,7 @@ namespace strumpack {
 
     void release_work_memory() override;
     void build_front(const SpMat_t& A);
-    void partial_factorization(const SPOptions<scalar_t>& opts);
+    void partial_factorization(const Opts_t& opts);
 
     void extend_add();
     void extend_add_copy_to_buffers
@@ -75,7 +76,7 @@ namespace strumpack {
     (const DistM_t& R, DistM_t& Sr, DistM_t& Sc, F_t* pa) const override;
 
     void multifrontal_factorization
-    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+    (const SpMat_t& A, const Opts_t& opts,
      int etree_level=0, int task_depth=0) override;
 
     void forward_multifrontal_solve
@@ -91,9 +92,9 @@ namespace strumpack {
 
     std::string type() const override { return "FrontalMatrixBLRMPI"; }
 
-    void set_BLR_partitioning
-    (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
-     DenseMatrix<bool>& adm, bool is_root) override;
+    void partition
+    (const Opts_t& opts, const SpMat_t& A,
+     integer_t* sorder, bool is_root, int task_depth) override;
 
   private:
     DistM_t F11_, F12_, F21_, F22_;
@@ -108,6 +109,8 @@ namespace strumpack {
 
     using FrontalMatrix<scalar_t,integer_t>::lchild_;
     using FrontalMatrix<scalar_t,integer_t>::rchild_;
+    using FrontalMatrix<scalar_t,integer_t>::sep_begin_;
+    using FrontalMatrix<scalar_t,integer_t>::sep_end_;
     using FrontalMatrix<scalar_t,integer_t>::dim_sep;
     using FrontalMatrix<scalar_t,integer_t>::dim_upd;
     using FrontalMatrixMPI<scalar_t,integer_t>::visit;
@@ -163,14 +166,12 @@ namespace strumpack {
     if (dsep) {
       F11_ = DistM_t(grid(), dsep, dsep);
       using ExFront = ExtractFront<scalar_t,integer_t>;
-      ExFront::extract_F11(F11_, A, this->sep_begin_, dsep);
+      ExFront::extract_F11(F11_, A, sep_begin_, dsep);
       if (dim_upd()) {
         F12_ = DistM_t(grid(), dsep, dupd);
-        ExFront::extract_F12
-          (F12_, A, this->sep_begin_, this->sep_end_, this->upd_);
+        ExFront::extract_F12(F12_, A, sep_begin_, sep_end_, this->upd_);
         F21_ = DistM_t(grid(), dupd, dsep);
-        ExFront::extract_F21
-          (F21_, A, this->sep_end_, this->sep_begin_, this->upd_);
+        ExFront::extract_F21(F21_, A, sep_end_, sep_begin_, this->upd_);
       }
     }
     if (dupd) {
@@ -182,7 +183,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLRMPI<scalar_t,integer_t>::partial_factorization
-  (const SPOptions<scalar_t>& opts) {
+  (const Opts_t& opts) {
     if (dim_sep() && grid()->active()) {
       F11blr_ = BLRMPI_t(blr_grid_, sep_tiles_, adm_,
                          // [&](std::size_t i, std::size_t j) -> bool {
@@ -206,8 +207,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLRMPI<scalar_t,integer_t>::multifrontal_factorization
-  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
-   int etree_level, int task_depth) {
+  (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
     if (visit(lchild_))
       lchild_->multifrontal_factorization
         (A, opts, etree_level+1, task_depth);
@@ -327,14 +327,24 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::set_BLR_partitioning
-  (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
-   DenseMatrix<bool>& adm, bool is_root) {
+  FrontalMatrixBLRMPI<scalar_t,integer_t>::partition
+  (const Opts_t& opts, const SpMat_t& A,
+   integer_t* sorder, bool is_root, int task_depth) {
+    if (Comm().is_null()) return;
     if (dim_sep()) {
-      assert(sep_tree.size == dim_sep());
-      auto lf = sep_tree.leaf_sizes();
-      sep_tiles_.assign(lf.begin(), lf.end());
-      adm_ = std::move(adm);
+      auto g = A.extract_graph
+        (opts.separator_ordering_level(), sep_begin_, sep_end_);
+      auto sep_tree = g.recursive_bisection
+        (opts.compression_leaf_size(), 0,
+         sorder+sep_begin_, nullptr, 0, 0, dim_sep());
+      std::vector<integer_t> siorder(dim_sep());
+      for (integer_t i=sep_begin_; i<sep_end_; i++)
+        siorder[sorder[i]] = i - sep_begin_;
+      g.permute(sorder+sep_begin_, siorder.data());
+      for (integer_t i=sep_begin_; i<sep_end_; i++)
+        sorder[i] += sep_begin_;
+      sep_tiles_ = sep_tree.template leaf_sizes<std::size_t>();
+      adm_ = g.admissibility(sep_tiles_);
     }
     if (dim_upd()) {
       auto leaf = opts.BLR_options().leaf_size();

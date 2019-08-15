@@ -40,6 +40,7 @@ namespace strumpack {
   class EliminationTree {
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
+    using F_t = FrontalMatrix<scalar_t,integer_t>;
 
   public:
     EliminationTree() {}
@@ -64,8 +65,9 @@ namespace strumpack {
     virtual FrontCounter front_counter() const { return nr_fronts_; }
     void draw(const SpMat_t& A, const std::string& name) const;
 
+    F_t* root() { return root_.get(); }
+
   protected:
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
     FrontCounter nr_fronts_;
     std::unique_ptr<F_t> root_;
 
@@ -169,9 +171,8 @@ namespace strumpack {
     // So fix this here!
     if (dim_sep == 0 && sep_tree.lch(sep) != -1)
       sep_begin = sep_end = sep_tree.sizes(sep_tree.rch(sep)+1);
-    auto front = create_frontal_matrix
-      <scalar_t,integer_t,SeparatorTree<integer_t>>
-      (opts, sep, sep_begin, sep_end, upd[sep], sep_tree,
+    auto front = create_frontal_matrix<scalar_t,integer_t>
+      (opts, sep, sep_begin, sep_end, upd[sep],
        hss_parent, level, nr_fronts_);
     bool compressed = is_compressed(dim_sep, hss_parent, opts);
     if (sep_tree.lch(sep) != -1)

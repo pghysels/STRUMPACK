@@ -54,7 +54,7 @@ namespace strumpack {
   public:
     CSRGraph() = default;
     CSRGraph(integer_t nr_vert, integer_t nr_edge);
-    CSRGraph(std::vector<integer_t>&& nr_vert, std::vector<integer_t>&& nr_edge);
+    CSRGraph(std::vector<integer_t>&& ptr, std::vector<integer_t>&& ind);
 
     static CSRGraph<integer_t> deserialize(const std::vector<integer_t>& buf);
     static CSRGraph<integer_t> deserialize(const integer_t* buf);
@@ -63,19 +63,21 @@ namespace strumpack {
 
     void print();
     integer_t size() const { return ptr_.size()-1; }
-    integer_t nvert() const { return ptr_.size()-1; }
-    integer_t nedge() const { return ind_.size(); }
+    integer_t vertices() const { return ptr_.size()-1; }
+    integer_t edges() const { return ind_.size(); }
 
     const integer_t* ptr() const { return ptr_.data(); }
     const integer_t* ind() const { return ind_.data(); }
     integer_t* ptr() { return ptr_.data(); }
     integer_t* ind() { return ind_.data(); }
-    const integer_t& ptr(integer_t i) const { assert(i <= nvert()); return ptr_[i]; }
-    const integer_t& ind(integer_t i) const { assert(i < nedge()); return ind_[i]; }
-    integer_t& ptr(integer_t i) { assert(i <= nvert()); return ptr_[i]; }
-    integer_t& ind(integer_t i) { assert(i < nedge()); return ind_[i]; }
+    const integer_t& ptr(integer_t i) const { assert(i <= vertices()); return ptr_[i]; }
+    const integer_t& ind(integer_t i) const { assert(i < edges()); return ind_[i]; }
+    integer_t& ptr(integer_t i) { assert(i <= vertices()); return ptr_[i]; }
+    integer_t& ind(integer_t i) { assert(i < edges()); return ind_[i]; }
 
     void sort_rows();
+
+    void permute(const integer_t* order, const integer_t* iorder);
 
     void permute_local
     (const std::vector<integer_t>& order,
@@ -107,7 +109,12 @@ namespace strumpack {
     (int leaf, int conn_level, integer_t* order, integer_t* iorder,
      integer_t lo, integer_t sep_begin, integer_t sep_end) const;
 
- private:
+    template<typename int_t>
+    DenseMatrix<bool> admissibility(const std::vector<int_t>& tiles) const;
+
+    void print_dense(const std::string& name) const;
+
+  private:
     std::vector<integer_t> ptr_, ind_;
 
     Length2Edges<integer_t> length_2_edges(integer_t lo) const;
@@ -173,7 +180,7 @@ namespace strumpack {
   }
 
   /**
-   * order and iorder are of size this->size() == this->nvert() == chi-clo.
+   * order and iorder are of size this->size() == chi-clo.
    * order has elements in the range [clo, chi).
    * iorder had elements in the range [0, chi-clo).
    *
@@ -190,7 +197,6 @@ namespace strumpack {
     std::vector<integer_t> ptr(ptr_.size()), ind(ind_.size());
     integer_t nnz = 0;
     auto n = size();
-    ptr[0] = 0;
     for (integer_t i=0; i<n; i++) {
       auto lb = ptr_[iorder[i]];
       auto ub = ptr_[iorder[i]+1];
@@ -204,8 +210,23 @@ namespace strumpack {
     std::swap(ind_, ind);
   }
 
+  template<typename integer_t> void CSRGraph<integer_t>::permute
+  (const integer_t* order, const integer_t* iorder) {
+    std::vector<integer_t> ptr(ptr_.size()), ind(ind_.size());
+    integer_t nnz = 0;
+    auto n = size();
+    for (integer_t i=0; i<n; i++) {
+      auto ub = ptr_[iorder[i]+1];
+      for (integer_t j=ptr_[iorder[i]]; j<ub; j++)
+        ind[nnz++] = order[ind_[j]];
+      ptr[i+1] = nnz;
+    }
+    std::swap(ptr_, ptr);
+    std::swap(ind_, ind);
+  }
+
   /**
-   * iorder is of size this->size() == this->nvert().
+   * iorder is of size this->size() == this->vertices().
    * iorder had elements in the range [0, chi-clo).
    * order is of the global size.
    */
@@ -263,12 +284,12 @@ namespace strumpack {
       }
       g.ptr(r-begin+1) = e;
     }
-    for (integer_t i=0; i<g.nvert(); i++) {
+    for (integer_t i=0; i<g.vertices(); i++) {
       for (integer_t j=g.ptr(i); j<g.ptr(i+1); j++) {
         assert(j >= 0);
-        assert(j < g.nedge());
+        assert(j < g.edges());
         assert(g.ind(j) >= 0);
-        assert(g.ind(j) < g.nvert());
+        assert(g.ind(j) < g.vertices());
       }
     }
     return g;
@@ -411,6 +432,47 @@ namespace strumpack {
     }
     g.ptr_.push_back(g.ind_.size());
     return g;
+  }
+
+  template<typename integer_t> template<typename int_t> DenseMatrix<bool>
+  CSRGraph<integer_t>::admissibility(const std::vector<int_t>& tiles) const {
+    integer_t nt = tiles.size();
+    DenseMatrix<bool> adm(nt, nt);
+    adm.fill(true);
+    for (integer_t t=0; t<nt; t++)
+      adm(t, t) = false;
+    std::vector<integer_t> ts(nt+1);
+    for (integer_t i=0; i<nt; i++)
+      ts[i+1] = tiles[i] + ts[i];
+    for (integer_t t=0; t<nt; t++) {
+      for (integer_t i=ts[t]; i<ts[t+1]; i++) {
+        auto hij = ind() + ptr_[i+1];
+        for (auto pj=ind()+ptr_[i]; pj!=hij; pj++) {
+          integer_t tj = std::distance
+            (ts.begin(), std::upper_bound
+             (ts.begin(), ts.end(), *pj)) - 1;
+          if (t != tj) adm(t, tj) = adm(tj, t) = false;
+        }
+      }
+    }
+    return adm;
+  }
+
+  template<typename integer_t> void
+  CSRGraph<integer_t>::print_dense(const std::string& name) const {
+    auto n = size();
+    std::unique_ptr<char[]> M(new char[n*n]);
+    std::fill(M.get(), M.get()+n*n, '0');
+    for (integer_t row=0; row<n; row++)
+      for (integer_t j=ptr_[row]; j<ptr_[row+1]; j++)
+        M[row + ind_[j]*n] = '1';
+    std::cout << name << " = [" << std::endl;
+    for (integer_t row=0; row<n; row++) {
+      for (integer_t col=0; col<n; col++)
+        std::cout << M[row + n*col] << " ";
+      std::cout << ";" << std::endl;
+    }
+    std::cout << "];" << std::endl;
   }
 
 } // end namespace strumpack

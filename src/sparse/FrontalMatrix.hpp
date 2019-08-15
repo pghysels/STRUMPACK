@@ -57,6 +57,7 @@ namespace strumpack {
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
+    using Opts_t = SPOptions<scalar_t>;
 #if defined(STRUMPACK_USE_MPI)
     using DistM_t = DistributedMatrix<scalar_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
@@ -89,7 +90,7 @@ namespace strumpack {
     virtual void release_work_memory() = 0;
 
     virtual void multifrontal_factorization
-    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+    (const SpMat_t& A, const Opts_t& opts,
      int etree_level=0, int task_depth=0) = 0;
 
     void multifrontal_solve(DenseM_t& b) const;
@@ -115,9 +116,8 @@ namespace strumpack {
 
     // TODO why not const? HSS problem?
     virtual void sample_CB
-    (const SPOptions<scalar_t>& opts, const DenseM_t& R,
-     DenseM_t& Sr, DenseM_t& Sc, F_t* parent, int task_depth=0)
-    { assert(false); }
+    (const Opts_t& opts, const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc,
+     F_t* parent, int task_depth=0) { assert(false); }
     virtual void sample_CB
     (Trans op, const DenseM_t& R, DenseM_t& S, F_t* parent,
      int task_depth=0) const { assert(false); }
@@ -152,15 +152,10 @@ namespace strumpack {
     virtual void print_rank_statistics(std::ostream &out) const {}
     virtual std::string type() const { return "FrontalMatrix"; }
 
-    virtual void set_BLR_partitioning
-    (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
-     DenseMatrix<bool>& adm, bool is_root) {}
-    virtual void set_HSS_partitioning
-    (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
-     bool is_root) {}
-    virtual void set_HODLR_partitioning
-    (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
-     DenseMatrix<bool>& adm, CSRGraph<integer_t>& graph, bool is_root) {}
+    virtual void partition_fronts
+    (const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
+     bool is_root=true, int task_depth=0);
+    void permute_CB(const integer_t* perm, int task_depth=0);
 
     int levels() const {
       int ll = 0, lr = 0;
@@ -200,7 +195,7 @@ namespace strumpack {
       sample_CB(op, seqR, seqS, pa);
     };
     virtual void sample_CB
-    (const SPOptions<scalar_t>& opts, const DistM_t& R,
+    (const Opts_t& opts, const DistM_t& R,
      DistM_t& Sr, DistM_t& Sc, const DenseM_t& seqR,
      DenseM_t& seqSr, DenseM_t& seqSc, F_t* pa) {
       sample_CB(opts, seqR, seqSr, seqSc, pa, 0);
@@ -275,6 +270,10 @@ namespace strumpack {
     virtual long long node_factor_nonzeros() const {
       return dense_node_factor_nonzeros();
     }
+
+    virtual void partition
+    (const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
+     bool is_root=true, int task_depth=0);
 
   private:
     FrontalMatrix(const FrontalMatrix&) = delete;
@@ -621,6 +620,52 @@ namespace strumpack {
     }
   }
 #endif
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrix<scalar_t,integer_t>::partition_fronts
+  (const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
+   bool is_root, int task_depth) {
+    auto lch = lchild_.get();
+    auto rch = rchild_.get();
+    if (lch)
+#pragma omp task default(shared) firstprivate(sorder,task_depth,lch)    \
+  if(task_depth < params::task_recursion_cutoff_level)
+      lch->partition_fronts(opts, A, sorder, false, task_depth+1);
+    if (rch)
+#pragma omp task default(shared) firstprivate(sorder,task_depth,rch)    \
+  if(task_depth < params::task_recursion_cutoff_level)
+      rch->partition_fronts(opts, A, sorder, false, task_depth+1);
+#pragma omp taskwait
+    partition(opts, A, sorder, is_root, task_depth);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrix<scalar_t,integer_t>::partition
+  (const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
+   bool is_root, int task_depth) {
+    // default is to do nothing, see FrontalMatrixHSS for an actual
+    // implementation
+    std::iota(sorder+sep_begin_, sorder+sep_end_, sep_begin_);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrix<scalar_t,integer_t>::permute_CB
+  (const integer_t* perm, int task_depth) {
+    auto lch = lchild_.get();
+    auto rch = rchild_.get();
+    if (lch)
+#pragma omp task default(shared) firstprivate(perm,task_depth,lch)      \
+  if(task_depth < params::task_recursion_cutoff_level)
+      lch->permute_CB(perm, task_depth+1);
+    if (rch)
+#pragma omp task default(shared) firstprivate(perm,task_depth,rch)      \
+  if(task_depth < params::task_recursion_cutoff_level)
+      rch->permute_CB(perm, task_depth+1);
+    for (integer_t i=0; i<dim_upd(); i++)
+      upd_[i] = perm[upd_[i]];
+    std::sort(upd_.begin(), upd_.end());
+#pragma omp taskwait
+  }
 
 } // end namespace strumpack
 

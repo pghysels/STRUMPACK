@@ -259,8 +259,9 @@ namespace strumpack {
        *
        * \return vector with the sizes of the leafs.
        */
-      std::vector<int> leaf_sizes() const {
-        std::vector<int> lf;
+      template<typename integer_t>
+      std::vector<integer_t> leaf_sizes() const {
+        std::vector<integer_t> lf;
         leaf_sizes_rec(lf);
         return lf;
       }
@@ -348,7 +349,8 @@ namespace strumpack {
           for (auto& ch : c)
             ch.expand_complete_levels_rec(lvl+1, lvls);
       }
-      void leaf_sizes_rec(std::vector<int>& lf) const {
+      template<typename integer_t>
+      void leaf_sizes_rec(std::vector<integer_t>& lf) const {
         for (auto& ch : c)
           ch.leaf_sizes_rec(lf);
         if (c.empty())

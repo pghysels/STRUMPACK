@@ -53,7 +53,7 @@ namespace strumpack {
     using DistM_t = DistributedMatrix<scalar_t>;
     using DistMW_t = DistributedMatrixWrapper<scalar_t>;
     using ExtAdd = ExtendAdd<scalar_t,integer_t>;
-    using Opts = SPOptions<scalar_t>;
+    using Opts_t = SPOptions<scalar_t>;
     using VecVec_t = std::vector<std::vector<std::size_t>>;
     template<typename _scalar_t,typename _integer_t> friend class ExtendAdd;
 
@@ -73,7 +73,7 @@ namespace strumpack {
     void skinny_extend_add(DistM_t& cSl, DistM_t& cSr, DistM_t& S);
 
     void multifrontal_factorization
-    (const SpMat_t& A, const Opts& opts,
+    (const SpMat_t& A, const Opts_t& opts,
      int etree_level=0, int task_depth=0) override;
 
     void forward_multifrontal_solve
@@ -92,17 +92,17 @@ namespace strumpack {
      const std::vector<std::vector<std::size_t>>& J,
      std::vector<DistM_t>& B) const override;
 
-    void set_HODLR_partitioning
-    (const Opts& opts, const HSS::HSSPartitionTree& sep_tree,
-     DenseMatrix<bool>& adm, CSRGraph<integer_t>& graph, bool is_root) override;
+    void partition
+    (const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
+     bool is_root=true, int task_depth=0) override;
 
   private:
     HODLR::HODLRMatrix<scalar_t> F11_;
     HODLR::LRBFMatrix<scalar_t> F12_, F21_;
     std::unique_ptr<HODLR::HODLRMatrix<scalar_t>> F22_;
 
-    void compress_sampling(const SpMat_t& A, const Opts& opts);
-    void compress_extraction(const SpMat_t& A, const Opts& opts);
+    void compress_sampling(const SpMat_t& A, const Opts_t& opts);
+    void compress_extraction(const SpMat_t& A, const Opts_t& opts);
     void compress_flops_F11();
     void compress_flops_F12_F21();
     void compress_flops_F22();
@@ -110,6 +110,8 @@ namespace strumpack {
 
     using FrontalMatrix<scalar_t,integer_t>::lchild_;
     using FrontalMatrix<scalar_t,integer_t>::rchild_;
+    using FrontalMatrix<scalar_t,integer_t>::sep_begin_;
+    using FrontalMatrix<scalar_t,integer_t>::sep_end_;
     using FrontalMatrix<scalar_t,integer_t>::dim_sep;
     using FrontalMatrix<scalar_t,integer_t>::dim_upd;
     using FrontalMatrix<scalar_t,integer_t>::dim_blk;
@@ -198,7 +200,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::multifrontal_factorization
-  (const SpMat_t& A, const Opts& opts, int etree_level, int task_depth) {
+  (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
     if (visit(lchild_))
       lchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
     if (visit(rchild_))
@@ -253,14 +255,14 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::compress_extraction
-  (const SpMat_t& A, const Opts& opts) {
+  (const SpMat_t& A, const Opts_t& opts) {
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();
     auto extract_F11 =
       [&](VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
           HODLR::ExtractionMeta&) {
-        for (auto& Ik : I) for (auto& i : Ik) i += this->sep_begin_;
-        for (auto& Jk : J) for (auto& j : Jk) j += this->sep_begin_;
+        for (auto& Ik : I) for (auto& i : Ik) i += sep_begin_;
+        for (auto& Jk : J) for (auto& j : Jk) j += sep_begin_;
         this->extract_2d(A, I, J, B);
       };
     { TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_f11_compress);
@@ -272,7 +274,7 @@ namespace strumpack {
       auto extract_F12 =
         [&](VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
             HODLR::ExtractionMeta&) {
-          for (auto& Ik : I) for (auto& i : Ik) i += this->sep_begin_;
+          for (auto& Ik : I) for (auto& i : Ik) i += sep_begin_;
           for (auto& Jk : J) for (auto& j : Jk) j = this->upd_[j];
           this->extract_2d(A, I, J, B);
         };
@@ -280,7 +282,7 @@ namespace strumpack {
         [&](VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
             HODLR::ExtractionMeta&) {
           for (auto& Ik : I) for (auto& i : Ik) i = this->upd_[i];
-          for (auto& Jk : J) for (auto& j : Jk) j += this->sep_begin_;
+          for (auto& Jk : J) for (auto& j : Jk) j += sep_begin_;
           this->extract_2d(A, I, J, B);
         };
       { TIMER_TIME(TaskType::LRBF_COMPRESS, 0, t_lrbf_compress);
@@ -333,14 +335,13 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::compress_sampling
-  (const SpMat_t& A, const Opts& opts) {
+  (const SpMat_t& A, const Opts_t& opts) {
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();
     auto sample_front = [&](Trans op, const DistM_t& R, DistM_t& S) {
       S.zero();
       TIMER_TIME(TaskType::FRONT_MULTIPLY_2D, 1, t_fmult);
-      A.front_multiply_2d
-      (op, this->sep_begin_, this->sep_end_, this->upd_, R, S, 0);
+      A.front_multiply_2d(op, sep_begin_, sep_end_, this->upd_, R, S, 0);
       TIMER_STOP(t_fmult);
       TIMER_TIME(TaskType::UUTXR, 1, t_UUtxR);
       sample_children_CB(op, R, S);
@@ -568,24 +569,25 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::set_HODLR_partitioning
-  (const Opts& opts, const HSS::HSSPartitionTree& sep_tree,
-   DenseMatrix<bool>& adm, CSRGraph<integer_t>& graph, bool is_root) {
-    //if (!this->active()) return;
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::partition
+  (const Opts_t& opts, const SpMat_t& A,
+   integer_t* sorder, bool is_root, int task_depth) {
     if (Comm().is_null()) return;
-    // if (Comm().is_root()) {
-    //   std::cout << " par_adm=[" << std::endl;
-    //   for (int j=0; j<adm.cols(); j++) {
-    //     for (int i=0; i<adm.rows(); i++)
-    //       std::cout << adm(i,j) << " ";
-    //     std::cout << std::endl;
-    //   }
-    //   std::cout << "];" << std::endl;
-    // }
-    assert(sep_tree.size == dim_sep());
+    auto g = A.extract_graph
+      (opts.separator_ordering_level(), sep_begin_, sep_end_);
+    auto sep_tree = g.recursive_bisection
+      (opts.compression_leaf_size(), 0,
+       sorder+sep_begin_, nullptr, 0, 0, dim_sep());
+    std::vector<integer_t> siorder(dim_sep());
+    for (integer_t i=sep_begin_; i<sep_end_; i++)
+      siorder[sorder[i]] = i - sep_begin_;
+    g.permute(sorder+sep_begin_, siorder.data());
+    for (integer_t i=sep_begin_; i<sep_end_; i++)
+      sorder[i] += sep_begin_;
+    auto adm = g.admissibility(sep_tree.template leaf_sizes<int>());
     F11_ = std::move
       (HODLR::HODLRMatrix<scalar_t>
-       (Comm(), sep_tree, adm, graph, opts.HODLR_options()));
+       (Comm(), sep_tree, adm, g, opts.HODLR_options()));
     if (!is_root && dim_upd()) {
       HSS::HSSPartitionTree CB_tree(dim_upd());
       CB_tree.refine(opts.HODLR_options().leaf_size());

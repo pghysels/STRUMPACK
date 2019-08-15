@@ -202,8 +202,11 @@ namespace strumpack {
       (pbegin, nbsep, {{0, 0, 0}}, {{nx, ny, nz}}, {{nx, ny, nz}}, tree, gd);
     std::unique_ptr<SeparatorTree<integer_t>> stree
       (new SeparatorTree<integer_t>(tree));
-    if (gd.separator_reordering)
-      stree->partition_tree = std::move(gd.trees);
+
+    if (gd.separator_reordering) {
+      // TODO this tree is not used right now
+      //stree->partition_tree = std::move(gd.trees);
+    }
     return stree;
   }
 

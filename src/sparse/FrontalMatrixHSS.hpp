@@ -47,6 +47,7 @@ namespace strumpack {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
+    using Opts_t = SPOptions<scalar_t>;
 
   public:
     FrontalMatrixHSS
@@ -58,8 +59,8 @@ namespace strumpack {
      const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) override;
 
     void sample_CB
-    (const SPOptions<scalar_t>& opts, const DenseM_t& R,
-     DenseM_t& Sr, DenseM_t& Sc, F_t* pa, int task_depth) override;
+    (const Opts_t& opts, const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc,
+     F_t* pa, int task_depth) override;
 
     void sample_CB_direct
     (const DenseM_t& cR, DenseM_t& Sr, DenseM_t& Sc,
@@ -67,7 +68,7 @@ namespace strumpack {
 
     void release_work_memory() override;
     void random_sampling
-    (const SpMat_t& A, const SPOptions<scalar_t>& opts, DenseM_t& Rr,
+    (const SpMat_t& A, const Opts_t& opts, DenseM_t& Rr,
      DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc, int etree_level,
      int task_depth); // TODO const?
     void element_extraction
@@ -78,7 +79,7 @@ namespace strumpack {
      DenseM_t& B, int task_depth) const override;
 
     void multifrontal_factorization
-    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+    (const SpMat_t& A, const Opts_t& opts,
      int etree_level=0, int task_depth=0) override;
 
     void forward_multifrontal_solve
@@ -95,9 +96,10 @@ namespace strumpack {
 
     int random_samples() const override { return R1.cols(); };
 
-    void set_HSS_partitioning
-    (const SPOptions<scalar_t>& opts,
-     const HSS::HSSPartitionTree& sep_tree, bool is_root) override;
+    void partition
+    (const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
+     bool is_root=true, int task_depth=0) override;
+
 
     // TODO make private?
     HSS::HSSMatrix<scalar_t> _H;
@@ -109,9 +111,7 @@ namespace strumpack {
     /** Schur complement update:
      *    S = F22 - _Theta * Vhat^C * _Phi^C
      **/
-    DenseM_t _Theta;
-    DenseM_t _Phi;
-    DenseM_t _ThetaVhatC_or_VhatCPhiC;
+    DenseM_t _Theta, _Phi, _ThetaVhatC_or_VhatCPhiC;
     DenseM_t _DUB01;
 
     /** these are saved during/after randomized compression and are
@@ -130,8 +130,7 @@ namespace strumpack {
     void draw_node(std::ostream& of, bool is_root) const override;
 
     void multifrontal_factorization_node
-    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
-     int etree_level, int task_depth);
+    (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth);
 
     void fwd_solve_node
     (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const;
@@ -139,15 +138,6 @@ namespace strumpack {
     (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const;
 
     long long node_factor_nonzeros() const override;
-
-    void split_separator
-    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
-     HSS::HSSPartitionTree& hss_tree, integer_t& nr_parts, integer_t part,
-     integer_t count, integer_t* sorder);
-    void extract_separator
-    (const SpMat_t& A, const SPOptions<scalar_t>& opts, integer_t part,
-     std::vector<idx_t>& xadj, std::vector<idx_t>& adjncy,
-     integer_t* sorder);
 
     using FrontalMatrix<scalar_t,integer_t>::lchild_;
     using FrontalMatrix<scalar_t,integer_t>::rchild_;
@@ -277,7 +267,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::sample_CB
-  (const SPOptions<scalar_t>& opts, const DenseM_t& R,
+  (const Opts_t& opts, const DenseM_t& R,
    DenseM_t& Sr, DenseM_t& Sc, F_t* pa, int task_depth) {
     if (!dim_upd()) return;
     auto I = this->upd_to_parent(pa);
@@ -354,7 +344,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::multifrontal_factorization
-  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+  (const SpMat_t& A, const Opts_t& opts,
    int etree_level, int task_depth) {
     if (task_depth == 0)
 #pragma omp parallel if(!omp_in_parallel())
@@ -365,7 +355,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::random_sampling
-  (const SpMat_t& A, const SPOptions<scalar_t>& opts, DenseM_t& Rr,
+  (const SpMat_t& A, const Opts_t& opts, DenseM_t& Rr,
    DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc, int etree_level,
    int task_depth) {
     Sr.zero();
@@ -459,7 +449,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::multifrontal_factorization_node
-  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+  (const SpMat_t& A, const Opts_t& opts,
    int etree_level, int task_depth) {
     bool tasked = task_depth < params::task_recursion_cutoff_level;
     if (tasked) {
@@ -659,19 +649,25 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSS<scalar_t,integer_t>::set_HSS_partitioning
-  (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
-   bool is_root) {
-    assert(sep_tree.size == dim_sep());
+  FrontalMatrixHSS<scalar_t,integer_t>::partition
+  (const Opts_t& opts, const SpMat_t& A,
+   integer_t* sorder, bool is_root, int task_depth) {
+    auto g = A.extract_graph
+      (opts.separator_ordering_level(), sep_begin_, sep_end_);
+    auto sep_tree = g.recursive_bisection
+      (opts.compression_leaf_size(), 0,
+       sorder+sep_begin_, nullptr, 0, 0, dim_sep());
+    for (integer_t i=sep_begin_; i<sep_end_; i++)
+      sorder[i] += sep_begin_;
     if (is_root)
       _H = HSS::HSSMatrix<scalar_t>(sep_tree, opts.HSS_options());
     else {
-      HSS::HSSPartitionTree hss_tree(this->dim_blk());
-      hss_tree.c.reserve(2);
-      hss_tree.c.push_back(sep_tree);
-      hss_tree.c.emplace_back(dim_upd());
-      hss_tree.c.back().refine(opts.HSS_options().leaf_size());
-      _H = HSS::HSSMatrix<scalar_t>(hss_tree, opts.HSS_options());
+      HSS::HSSPartitionTree tree(this->dim_blk());
+      tree.c.reserve(2);
+      tree.c.push_back(sep_tree);
+      tree.c.emplace_back(dim_upd());
+      tree.c.back().refine(opts.HSS_options().leaf_size());
+      _H = HSS::HSSMatrix<scalar_t>(tree, opts.HSS_options());
     }
   }
 

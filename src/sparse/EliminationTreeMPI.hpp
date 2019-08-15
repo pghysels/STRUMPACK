@@ -281,15 +281,15 @@ namespace strumpack {
     std::unique_ptr<F_t> front;
     if (P == 1) {
       if (keep) {
-        front = create_frontal_matrix<scalar_t,integer_t,Tree_t>
-          (opts, sep, sep_begin, sep_end, upd[sep], tree,
-           hss_parent, level, this->nr_fronts_, rank_ == P0);
+        front = create_frontal_matrix<scalar_t,integer_t>
+          (opts, sep, sep_begin, sep_end, upd[sep], hss_parent,
+           level, this->nr_fronts_, rank_ == P0);
       }
       if (P0 == rank_) update_local_ranges(sep_begin, sep_end);
     } else {
       if (keep) {
-        front = create_frontal_matrix<scalar_t,integer_t,Tree_t>
-          (opts, active_pfronts_, sep_begin, sep_end, upd[sep], tree, sep,
+        front = create_frontal_matrix<scalar_t,integer_t>
+          (opts, active_pfronts_, sep_begin, sep_end, upd[sep],
            hss_parent, level, this->nr_fronts_, fcomm, P, rank_ == P0);
         if (rank_ >= P0 && rank_ < P0+P) active_pfronts_++;
       }

@@ -75,7 +75,7 @@ namespace strumpack {
 
     void separator_reordering
     (const SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>& A,
-     bool verbose);
+     FrontalMatrix<scalar_t,integer_t>* F);
 
     virtual void clear_tree_data();
 
@@ -98,20 +98,6 @@ namespace strumpack {
     std::unique_ptr<SeparatorTree<integer_t>> sep_tree_;
 
   private:
-    void split_separator
-    (const SPOptions<scalar_t>& opts, HSS::HSSPartitionTree& hss_tree,
-     integer_t& nr_parts, integer_t sep,
-     const CSRMatrix<scalar_t,integer_t>& A, integer_t part, integer_t count,
-     std::vector<integer_t>& sorder);
-
-    CSRGraph<integer_t> extract_separator
-    (const SPOptions<scalar_t>& opts, integer_t sep_beg, integer_t sep_end,
-     const CSRMatrix<scalar_t,integer_t>& A) const;
-
-    void separator_reordering_recursive
-    (const SPOptions<scalar_t>& opts, const CSRMatrix<scalar_t,integer_t>& A,
-     bool compressed_parent, integer_t sep, std::vector<integer_t>& sorder);
-
     void nested_dissection_print
     (const SPOptions<scalar_t>& opts, integer_t nnz, bool verbose) const;
   };
@@ -262,158 +248,21 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   MatrixReordering<scalar_t,integer_t>::separator_reordering
   (const SPOptions<scalar_t>& opts, CSRMatrix<scalar_t,integer_t>& A,
-   bool verbose) {
-    if (opts.reordering_method() != ReorderingStrategy::GEOMETRIC) {
-      auto N = A.size();
-      std::vector<integer_t> sorder(N);
-      std::fill(sorder.begin(), sorder.end(), integer_t(0));
-      integer_t root = sep_tree_->root();
-
+   FrontalMatrix<scalar_t,integer_t>* F) {
+    auto N = A.size();
+    std::vector<integer_t> sorder(N);
 #pragma omp parallel
 #pragma omp single
-      separator_reordering_recursive(opts, A, true, root, sorder);
-
-      for (integer_t i=0; i<N; i++) iperm_[sorder[i]] = i;
-      A.permute(iperm_, sorder);
-      // product of perm_ and sep_order
-      for (integer_t i=0; i<N; i++) iperm_[i] = sorder[perm_[i]];
-      for (integer_t i=0; i<N; i++) perm_[iperm_[i]] = i;
-      std::swap(perm_, iperm_);
-    }
-
-    if (opts.use_BLR() || opts.use_HODLR()) {
-      // find which blocks are admissible:
-      //  loop over all edges in the separator [sep_begin,sep_end)
-      //  if the 2 end vertices of this edge belong to different leafs in
-      //  the HSS tree, then the interaction between the corresponding BLR
-      //  blocks is not admissible
-      for (auto& s : sep_tree_->partition_tree) {
-        auto sep = s.first;
-        auto& hss_tree = s.second;
-        auto sep_begin = sep_tree_->sizes(sep);
-        auto sep_end = sep_tree_->sizes(sep + 1);
-        auto tiles = hss_tree.leaf_sizes();
-        integer_t nt = tiles.size();
-        DenseMatrix<bool> adm(nt, nt);
-        adm.fill(true);
-        for (integer_t t=0; t<nt; t++)
-          adm(t, t) = false;
-        if (opts.use_HODLR() ||
-            opts.BLR_options().admissibility() ==
-            BLR::Admissibility::STRONG) {
-          std::vector<integer_t> ts(nt+1);
-          ts[0] = sep_begin;
-          for (integer_t i=0; i<nt; i++)
-            ts[i+1] = tiles[i] + ts[i];
-          for (integer_t t=0; t<nt; t++) {
-            for (integer_t i=ts[t]; i<ts[t+1]; i++) {
-              auto Ai = iperm_[i];
-              auto hij = A.ind() + A.ptr(Ai+1);
-              for (auto pj=A.ind()+A.ptr(Ai); pj!=hij; pj++) {
-                auto Aj = perm_[*pj];
-                if (Aj < sep_begin || Aj >= sep_end) continue;
-                integer_t tj = std::distance
-                  (ts.begin(), std::upper_bound
-                   (ts.begin(), ts.end(), Aj)) - 1;
-                if (t != tj) adm(t, tj) = adm(tj, t) = false;
-              }
-            }
-          }
-        }
-#if 0
-        if (sep == sep_tree_->root()) {
-          std::cout << "root_adm_"
-                    << BLR::get_name(opts.BLR_options().admissibility())
-                    << " = [" << std::endl;
-          for (integer_t ti=0; ti<nt; ti++) {
-            for (integer_t tj=0; tj<nt; tj++)
-              std::cout << adm(ti, tj) << " ";
-            std::cout << std::endl;
-          }
-          std::cout << "];" << std::endl;
-        }
-#endif
-        sep_tree_->admissibility[sep] = std::move(adm);
-      }
-    }
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  MatrixReordering<scalar_t,integer_t>::separator_reordering_recursive
-  (const SPOptions<scalar_t>& opts, const CSRMatrix<scalar_t,integer_t>& A,
-   bool compressed_parent, integer_t sep, std::vector<integer_t>& sorder) {
-    auto sep_begin = sep_tree_->sizes(sep);
-    auto sep_end = sep_tree_->sizes(sep + 1);
-    auto dim_sep = sep_end - sep_begin;
-    bool compressed = is_compressed(dim_sep, compressed_parent, opts);
-    if (sep_tree_->lch(sep) != -1) {
-#pragma omp task firstprivate(sep) default(shared)
-      separator_reordering_recursive
-        (opts, A, compressed, sep_tree_->lch(sep), sorder);
-    }
-    if (sep_tree_->rch(sep) != -1) {
-#pragma omp task firstprivate(sep) default(shared)
-      separator_reordering_recursive
-        (opts, A, compressed, sep_tree_->rch(sep), sorder);
-    }
-#pragma omp taskwait
-    if (compressed) {
-      auto g = extract_separator(opts, sep_begin, sep_end, A);
-      auto tree = g.recursive_bisection
-        (opts.compression_leaf_size(), 0,
-         &sorder[sep_begin], nullptr, 0, 0, dim_sep);
-      for (integer_t i=sep_begin; i<sep_end; i++)
-        sorder[i] = sorder[i] + sep_begin;
-
-#pragma omp critical
-      {  // not thread safe!
-        sep_tree_->partition_tree[sep] = std::move(tree);
-      }
-    } else
-      for (integer_t i=sep_begin; i<sep_end; i++)
-        sorder[i] = i;
-  }
-
-  // TODO put in CSRMatrix
-  template<typename scalar_t,typename integer_t> CSRGraph<integer_t>
-  MatrixReordering<scalar_t,integer_t>::extract_separator
-  (const SPOptions<scalar_t>& opts, integer_t sep_begin, integer_t sep_end,
-   const CSRMatrix<scalar_t,integer_t>& A) const {
-    assert(opts.separator_ordering_level() == 0 ||
-           opts.separator_ordering_level() == 1);
-    auto dim_sep = sep_end - sep_begin;
-    std::vector<bool> mark(dim_sep);
-    std::vector<integer_t> xadj, adjncy;
-    xadj.reserve(dim_sep+1);
-    adjncy.reserve(5*dim_sep);
-    for (integer_t i=sep_begin, e=0; i<sep_end; i++) {
-      xadj.push_back(e);
-      std::fill(mark.begin(), mark.end(), false);
-      for (integer_t j=A.ptr(i); j<A.ptr(i+1); j++) {
-        auto c = A.ind(j);
-        if (c == i) continue;
-        auto lc = c - sep_begin;
-        if (lc >= 0 && lc < dim_sep && !mark[lc]) {
-          mark[lc] = true;
-          adjncy.push_back(lc);
-          e++;
-        } else {
-          if (opts.separator_ordering_level() > 0) {
-            for (integer_t k=A.ptr(c); k<A.ptr(c+1); k++) {
-              auto cc = A.ind(k);
-              auto lcc = cc - sep_begin;
-              if (cc!=i && lcc >= 0 && lcc < dim_sep && !mark[lcc]) {
-                mark[lcc] = true;
-                adjncy.push_back(lcc);
-                e++;
-              }
-            }
-          }
-        }
-      }
-    }
-    xadj.push_back(adjncy.size());
-    return CSRGraph<integer_t>(std::move(xadj), std::move(adjncy));
+    F->partition_fronts(opts, A, sorder.data());
+    for (integer_t i=0; i<N; i++) iperm_[sorder[i]] = i;
+    A.permute(iperm_, sorder);
+    // product of perm_ and sep_order
+    for (integer_t i=0; i<N; i++) iperm_[i] = sorder[perm_[i]];
+    for (integer_t i=0; i<N; i++) perm_[iperm_[i]] = i;
+    std::swap(perm_, iperm_);
+#pragma omp parallel
+#pragma omp single
+    F->permute_CB(sorder.data());
   }
 
   template<typename scalar_t,typename integer_t> void

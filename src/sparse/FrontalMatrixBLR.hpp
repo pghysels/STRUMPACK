@@ -51,6 +51,7 @@ namespace strumpack {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
+    using Opts_t = SPOptions<scalar_t>;
     using BLRM_t = BLR::BLRMatrix<scalar_t>;
 #if defined(STRUMPACK_USE_MPI)
     using ExtAdd = ExtendAdd<scalar_t,integer_t>;
@@ -68,14 +69,14 @@ namespace strumpack {
     (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
      const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) override;
     void sample_CB
-    (const SPOptions<scalar_t>& opts, const DenseM_t& R, DenseM_t& Sr,
+    (const Opts_t& opts, const DenseM_t& R, DenseM_t& Sr,
      DenseM_t& Sc, FrontalMatrix<scalar_t,integer_t>* pa,
      int task_depth) override;
     void multifrontal_factorization
-    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+    (const SpMat_t& A, const Opts_t& opts,
      int etree_level=0, int task_depth=0) override;
     void factor_node
-    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+    (const SpMat_t& A, const Opts_t& opts,
      int etree_level=0, int task_depth=0);
 
     void forward_multifrontal_solve
@@ -98,10 +99,9 @@ namespace strumpack {
     }
 #endif
 
-    void set_BLR_partitioning
-    (const SPOptions<scalar_t>& opts,
-     const HSS::HSSPartitionTree& sep_tree,
-     DenseMatrix<bool>& adm, bool is_root) override;
+    void partition
+    (const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
+     bool is_root=true, int task_depth=0) override;
 
   private:
     BLRM_t F11blr_, F12blr_, F21blr_, F22blr_;
@@ -180,7 +180,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::sample_CB
-  (const SPOptions<scalar_t>& opts, const DenseM_t& R, DenseM_t& Sr,
+  (const Opts_t& opts, const DenseM_t& R, DenseM_t& Sr,
    DenseM_t& Sc, FrontalMatrix<scalar_t,integer_t>* pa, int task_depth) {
     auto I = this->upd_to_parent(pa);
     auto cR = R.extract_rows(I);
@@ -200,8 +200,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::multifrontal_factorization
-  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
-   int etree_level, int task_depth) {
+  (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
     if (task_depth == 0) {
       // use tasking for children and for extend-add parallelism
 #pragma omp parallel if(!omp_in_parallel()) default(shared)
@@ -212,8 +211,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::factor_node
-  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
-   int etree_level, int task_depth) {
+  (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
     if (task_depth < params::task_recursion_cutoff_level) {
       if (lchild_)
 #pragma omp task default(shared)                                        \
@@ -440,16 +438,19 @@ template<typename scalar_t,typename integer_t> void
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLR<scalar_t,integer_t>::set_BLR_partitioning
-  (const SPOptions<scalar_t>& opts, const HSS::HSSPartitionTree& sep_tree,
-   DenseMatrix<bool>& adm, bool is_root) {
+  FrontalMatrixBLR<scalar_t,integer_t>::partition
+  (const Opts_t& opts, const SpMat_t& A,
+   integer_t* sorder, bool is_root, int task_depth) {
     if (dim_sep()) {
-      assert(sep_tree.size == dim_sep());
-      auto lf = sep_tree.leaf_sizes();
-      sep_tiles_.assign(lf.begin(), lf.end());
-      auto t = sep_tiles_.size();
-      assert(adm.rows() == t && adm.cols() == t);
-      admissibility_ = std::move(adm);
+      auto g = A.extract_graph
+        (opts.separator_ordering_level(), sep_begin_, sep_end_);
+      auto sep_tree = g.recursive_bisection
+        (opts.compression_leaf_size(), 0,
+         sorder+sep_begin_, nullptr, 0, 0, dim_sep());
+      for (integer_t i=sep_begin_; i<sep_end_; i++)
+        sorder[i] = sorder[i] + sep_begin_;
+      sep_tiles_ = sep_tree.template leaf_sizes<std::size_t>();
+      admissibility_ = g.admissibility(sep_tiles_);
     }
     if (dim_upd()) {
       auto leaf = opts.BLR_options().leaf_size();

@@ -91,9 +91,11 @@ namespace strumpack {
     int read_matrix_market(const std::string& filename) override;
     int read_binary(const std::string& filename);
     void print_dense(const std::string& name) const override;
-    void print_MM(const std::string& filename) const override;
+    void print_matrix_market(const std::string& filename) const override;
     void print_binary(const std::string& filename) const;
 
+    CSRGraph<integer_t> extract_graph
+    (int ordering_level, integer_t lo, integer_t hi) const override;
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
     // TODO implement these outside of this class
@@ -162,23 +164,16 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::print_dense(const std::string& name) const {
-    auto M = new scalar_t[n_ * n_];
-    std::fill(M, M+(n_*n_), scalar_t(0.));
-    for (integer_t row=0; row<n_; row++)
-      for (integer_t j=ptr_[row]; j<ptr_[row+1]; j++)
-        M[row + ind_[j]*n_] = val_[j];
-    std::cout << name << " = [";
-    for (integer_t row=0; row<n_; row++) {
-      for (integer_t col=0; col<n_; col++)
-        std::cout << M[row + n_ * col] << " ";
-      std::cout << ";" << std::endl;
-    }
-    std::cout << "];" << std::endl;
-    delete[] M;
+    DenseMatrix<scalar_t> M(n_, n_);
+    M.fill(scalar_t(0.));
+    for (integer_t i=0; i<n_; i++)
+      for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
+        M(i, ind_[j]) = val_[j];
+    M.print(name);
   }
 
   template<typename scalar_t,typename integer_t> void
-  CSRMatrix<scalar_t,integer_t>::print_MM
+  CSRMatrix<scalar_t,integer_t>::print_matrix_market
   (const std::string& filename) const {
     std::fstream fs(filename, std::fstream::out);
     if (is_complex<scalar_t>())
@@ -383,34 +378,34 @@ namespace strumpack {
    double* dw, int_t* icntl, int_t* info) {
     int_t n = n_;
     int_t nnz = nnz_;
-    double* dval = new double[nnz];
-    int_t* col_ptr = new int_t[n+1+nnz+n+n];
-    int_t* row_ind = col_ptr + n + 1;
-    int_t* permutation = row_ind + nnz;
-    int_t* rowsums = permutation + n;
-    for (int_t i=0; i<n; i++) rowsums[i] = 0;
+    std::unique_ptr<double[]> dwork(new double[nnz]);
+    std::unique_ptr<int_t[]> iwork(new int_t[n+1+nnz+n+n]);
+    auto dval = dwork.get();
+    auto cptr = iwork.get();
+    auto rind = cptr + n + 1;
+    auto permutation = rind + nnz;
+    auto rsums = permutation + n;
+    for (int_t i=0; i<n; i++) rsums[i] = 0;
     for (int_t col=0; col<n; col++)
       for (int_t i=ptr_[col]; i<ptr_[col+1]; i++)
-        rowsums[ind_[i]]++;
-    col_ptr[0] = 1;  // start from 1, because mc64 is fortran!
-    for (int_t r=0; r<n; r++) col_ptr[r+1] = col_ptr[r] + rowsums[r];
-    for (int_t i=0; i<n; i++) rowsums[i] = 0;
+        rsums[ind_[i]]++;
+    cptr[0] = 1;  // start from 1, because mc64 is fortran!
+    for (int_t r=0; r<n; r++) cptr[r+1] = cptr[r] + rsums[r];
+    for (int_t i=0; i<n; i++) rsums[i] = 0;
     for (int_t col=0; col<n; col++) {
       for (int_t i=ptr_[col]; i<ptr_[col+1]; i++) {
         int_t row = ind_[i];
-        int_t j = col_ptr[row] - 1 + rowsums[row]++;
+        int_t j = cptr[row] - 1 + rsums[row]++;
         if (is_complex<scalar_t>())
           dval[j] = static_cast<double>(std::abs(val_[i]));
         else dval[j] = static_cast<double>(std::real(val_[i]));
-        row_ind[j] = col + 1;
+        rind[j] = col + 1;
       }
     }
     strumpack_mc64ad_
-      (&job, &n, &nnz, col_ptr, row_ind, dval, num,
+      (&job, &n, &nnz, cptr, rind, dval, num,
        permutation, &liw, iw, &ldw, dw, icntl, info);
     for (int_t i=0; i<n; i++) perm[i] = permutation[i] - 1;
-    delete[] col_ptr;
-    delete[] dval;
   }
 
   // TODO tasked!!
@@ -831,6 +826,45 @@ namespace strumpack {
     }
   }
 #endif
+
+  template<typename scalar_t,typename integer_t> CSRGraph<integer_t>
+  CSRMatrix<scalar_t,integer_t>::extract_graph
+  (int ordering_level, integer_t lo, integer_t hi) const {
+    assert(ordering_level == 0 || ordering_level == 1);
+    auto dim = hi - lo;
+    std::vector<bool> mark(dim);
+    std::vector<integer_t> xadj, adjncy;
+    xadj.reserve(dim+1);
+    adjncy.reserve(5*dim);
+    for (integer_t i=lo, e=0; i<hi; i++) {
+      xadj.push_back(e);
+      std::fill(mark.begin(), mark.end(), false);
+      for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++) {
+        auto c = ind_[j];
+        if (c == i) continue;
+        auto lc = c - lo;
+        if (lc >= 0 && lc < dim && !mark[lc]) {
+          mark[lc] = true;
+          adjncy.push_back(lc);
+          e++;
+        } else {
+          if (ordering_level > 0) {
+            for (integer_t k=ptr_[c]; k<ptr_[c+1]; k++) {
+              auto cc = ind_[k];
+              auto lcc = cc - lo;
+              if (cc != i && lcc >= 0 && lcc < dim && !mark[lcc]) {
+                mark[lcc] = true;
+                adjncy.push_back(lcc);
+                e++;
+              }
+            }
+          }
+        }
+      }
+    }
+    xadj.push_back(adjncy.size());
+    return CSRGraph<integer_t>(std::move(xadj), std::move(adjncy));
+  }
 
 } // end namespace strumpack
 

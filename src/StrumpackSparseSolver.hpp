@@ -356,7 +356,7 @@ namespace strumpack {
     virtual void setup_reordering();
     virtual int compute_reordering
     (int nx, int ny, int nz, int components, int width);
-    virtual void compute_separator_reordering();
+    virtual void separator_reordering();
 
     virtual SpMat_t* matrix() { return mat_.get(); }
     virtual Reord_t* reordering() { return nd_.get(); }
@@ -474,9 +474,8 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolver<scalar_t,integer_t>::compute_separator_reordering() {
-    nd_->separator_reordering
-      (opts_, *mat_, opts_.verbose() && is_root_);
+  StrumpackSparseSolver<scalar_t,integer_t>::separator_reordering() {
+    nd_->separator_reordering(opts_, *mat_, tree_->root());
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -665,17 +664,6 @@ namespace strumpack {
     }
     perf_counters_stop("nested dissection");
 
-    if (opts_.compression() != CompressionType::NONE) {
-      perf_counters_start();
-      TaskTimer t4("separator-reordering", [&](){
-          compute_separator_reordering();
-          // TODO also broadcast this?? is computed with scotch
-        });
-      if (opts_.verbose() && is_root_)
-        std::cout << "#   - sep-reorder time = " << t4.elapsed() << std::endl;
-      perf_counters_stop("separator reordering");
-    }
-
     perf_counters_start();
     TaskTimer t0("symbolic-factorization", [&](){ setup_tree(); });
     reordering()->clear_tree_data();
@@ -696,17 +684,15 @@ namespace strumpack {
     }
     perf_counters_stop("symbolic factorization");
 
-    // if (opts_.use_HSS()) {
-    //   perf_counters_start();
-    //   TaskTimer t4("separator-reordering", [&](){
-    //            compute_separator_reordering();
-    //            // TODO also broadcast this?? is computed with scotch
-    //          });
-    // if (opts_.verbose() && is_root_)
-    //   std::cout << "#   - sep-reorder time = "
-    //             << t4.elapsed() << std::endl;
-    //   perf_counters_stop("separator reordering");
-    // }
+    if (opts_.compression() != CompressionType::NONE) {
+      perf_counters_start();
+      // TODO also broadcast this?? is computed with metis
+      TaskTimer t4("separator-reordering", [&](){ separator_reordering(); });
+      if (opts_.verbose() && is_root_)
+        std::cout << "#   - sep-reorder time = "
+                  << t4.elapsed() << std::endl;
+      perf_counters_stop("separator reordering");
+    }
 
     reordered_ = true;
     return ReturnCode::SUCCESS;

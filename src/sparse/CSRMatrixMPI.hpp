@@ -140,7 +140,7 @@ namespace strumpack {
 
     void print() const override;
     void print_dense(const std::string& name) const override;
-    void print_MM(const std::string& filename) const override;
+    void print_matrix_market(const std::string& filename) const override;
     void check() const;
 
 
@@ -432,10 +432,10 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  CSRMatrixMPI<scalar_t,integer_t>::print_MM
+  CSRMatrixMPI<scalar_t,integer_t>::print_matrix_market
   (const std::string& filename) const {
     auto Aseq = gather();
-    if (Aseq) Aseq->print_MM(filename);
+    if (Aseq) Aseq->print_matrix_market(filename);
   }
 
   template<typename scalar_t,typename integer_t> void

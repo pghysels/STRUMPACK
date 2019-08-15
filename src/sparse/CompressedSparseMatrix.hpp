@@ -55,6 +55,8 @@
 
 namespace strumpack {
 
+  template<typename integer_t> class CSRGraph;
+
   /**
    * \class CompressedSparseMatrix
    * \brief Abstract base class for compressed sparse matrix storage.
@@ -270,8 +272,8 @@ namespace strumpack {
       std::cerr << "print_dense not implemented for this matrix type"
                 << std::endl;
     }
-    virtual void print_MM(const std::string& filename) const {
-      std::cerr << "print_MM not implemented for this matrix type"
+    virtual void print_matrix_market(const std::string& filename) const {
+      std::cerr << "print_matrix_market not implemented for this matrix type"
                 << std::endl;
     }
     virtual int read_matrix_market(const std::string& filename) = 0;
@@ -282,6 +284,9 @@ namespace strumpack {
     virtual void strumpack_mc64
     (int_t job, int_t* num, integer_t* perm, int_t liw, int_t* iw, int_t ldw,
      double* dw, int_t* icntl, int_t* info) {}
+
+    virtual CSRGraph<integer_t> extract_graph
+    (int ordering_level, integer_t lo, integer_t hi) const { assert(false); }
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
     // TODO implement these outside of this class
@@ -683,30 +688,24 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   CompressedSparseMatrix<scalar_t,integer_t>::permute
   (const integer_t* iorder, const integer_t* order) {
-    std::vector<integer_t> new_ptr(n_+1);
-    std::vector<integer_t> new_ind(nnz_);
-    std::vector<scalar_t> new_val(nnz_);
+    std::vector<integer_t> ptr(n_+1), ind(nnz_);
+    std::vector<scalar_t> val(nnz_);
     integer_t nnz = 0;
-    new_ptr[0] = 0;
     for (integer_t i=0; i<n_; i++) {
-      auto lb = ptr_[iorder[i]];
       auto ub = ptr_[iorder[i]+1];
-      for (integer_t j=lb; j<ub; j++) {
-        new_ind[nnz] = order[ind_[j]];
-        new_val[nnz++] = val_[j];
+      for (integer_t j=ptr_[iorder[i]]; j<ub; j++) {
+        ind[nnz] = order[ind_[j]];
+        val[nnz++] = val_[j];
       }
-      new_ptr[i+1] = nnz;
+      ptr[i+1] = nnz;
     }
 #pragma omp parallel for
-    for (integer_t i=0; i<n_; i++) {
-      auto lb = new_ptr[i];
-      auto ub = new_ptr[i+1];
+    for (integer_t i=0; i<n_; i++)
       sort_indices_values
-        (new_ind.data()+lb, new_val.data()+lb, integer_t(0), ub-lb);
-    }
-    std::swap(ptr_, new_ptr);
-    std::swap(ind_, new_ind);
-    std::swap(val_, new_val);
+        (ind.data()+ptr[i], val.data()+ptr[i], integer_t(0), ptr[i+1]-ptr[i]);
+    std::swap(ptr_, ptr);
+    std::swap(ind_, ind);
+    std::swap(val_, val);
   }
 
 } //end namespace strumpack

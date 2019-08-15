@@ -91,52 +91,11 @@ namespace strumpack {
       is_HODLR(dim_sep, compressed_parent, opts);
   }
 
-
   template<typename scalar_t, typename integer_t>
   std::unique_ptr<FrontalMatrix<scalar_t,integer_t>> create_frontal_matrix
-  (const SPOptions<scalar_t>& opts, integer_t sep,
-   integer_t sep_begin, integer_t sep_end, std::vector<integer_t>& upd,
-   const HSS::HSSPartitionTree& partition_tree,
-   DenseMatrix<bool>& admissibility, CSRGraph<integer_t>& separator_graph,
-   bool compressed_parent, int level, FrontCounter& fc, bool root=true) {
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
-    using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
-    using FHSS_t = FrontalMatrixHSS<scalar_t,integer_t>;
-    using FBLR_t = FrontalMatrixBLR<scalar_t,integer_t>;
-#if defined(STRUMPACK_USE_BPACK)
-    using FHODLR_t = FrontalMatrixHODLR<scalar_t,integer_t>;
-#endif
-    auto dim_sep = sep_end - sep_begin;
-    std::unique_ptr<F_t> front;
-    if (is_HSS(dim_sep, compressed_parent, opts)) {
-      front.reset(new FHSS_t(sep, sep_begin, sep_end, upd));
-      front->set_HSS_partitioning(opts, partition_tree, level == 0);
-      if (root) fc.HSS++;
-    } else if (is_BLR(dim_sep, compressed_parent, opts)) {
-      front.reset(new FBLR_t(sep, sep_begin, sep_end, upd));
-      front->set_BLR_partitioning
-        (opts, partition_tree, admissibility, level == 0);
-      if (root) fc.BLR++;
-    } else if (is_HODLR(dim_sep, compressed_parent, opts)) {
-#if defined(STRUMPACK_USE_BPACK)
-      front.reset(new FHODLR_t(sep, sep_begin, sep_end, upd));
-      front->set_HODLR_partitioning
-        (opts, partition_tree, admissibility, separator_graph, level == 0);
-      if (root) fc.HODLR++;
-#endif
-    } else {
-      front.reset(new FD_t(sep, sep_begin, sep_end, upd));
-      if (root) fc.dense++;
-    }
-    return front;
-  }
-
-
-  template<typename scalar_t, typename integer_t, typename Tree>
-  std::unique_ptr<FrontalMatrix<scalar_t,integer_t>> create_frontal_matrix
   (const SPOptions<scalar_t>& opts, integer_t sep, integer_t sep_begin,
-   integer_t sep_end, std::vector<integer_t>& upd, Tree& tree,
-   bool compressed_parent, int level, FrontCounter& fc, bool root=true) {
+   integer_t sep_end, std::vector<integer_t>& upd, bool compressed_parent,
+   int level, FrontCounter& fc, bool root=true) {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
     using FHSS_t = FrontalMatrixHSS<scalar_t,integer_t>;
@@ -148,19 +107,13 @@ namespace strumpack {
     std::unique_ptr<F_t> front;
     if (is_HSS(dim_sep, compressed_parent, opts)) {
       front.reset(new FHSS_t(sep, sep_begin, sep_end, upd));
-      front->set_HSS_partitioning(opts, tree.partition_tree[sep], level == 0);
       if (root) fc.HSS++;
     } else if (is_BLR(dim_sep, compressed_parent, opts)) {
       front.reset(new FBLR_t(sep, sep_begin, sep_end, upd));
-      front->set_BLR_partitioning
-        (opts, tree.partition_tree[sep], tree.admissibility[sep], level == 0);
       if (root) fc.BLR++;
     } else if (is_HODLR(dim_sep, compressed_parent, opts)) {
 #if defined(STRUMPACK_USE_BPACK)
       front.reset(new FHODLR_t(sep, sep_begin, sep_end, upd));
-      front->set_HODLR_partitioning
-        (opts, tree.partition_tree[sep], tree.admissibility[sep],
-         tree.separator_graph[sep], level == 0);
       if (root) fc.HODLR++;
 #endif
     } else {
@@ -175,8 +128,6 @@ namespace strumpack {
   std::unique_ptr<FrontalMatrix<scalar_t,integer_t>> create_frontal_matrix
   (const SPOptions<scalar_t>& opts, integer_t dsep,
    integer_t sep_begin, integer_t sep_end, std::vector<integer_t>& upd,
-   const HSS::HSSPartitionTree& partition_tree,
-   DenseMatrix<bool>& admissibility, CSRGraph<integer_t>& separator_graph,
    bool compressed_parent, int level, FrontCounter& fc,
    const MPIComm& comm, int P, bool root) {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
@@ -190,57 +141,13 @@ namespace strumpack {
     std::unique_ptr<F_t> front;
     if (is_HSS(dim_sep, compressed_parent, opts)) {
       front.reset(new FHSSMPI_t(dsep, sep_begin, sep_end, upd, comm, P));
-      front->set_HSS_partitioning(opts, partition_tree, level == 0);
       if (root) fc.HSS++;
     } else if (is_BLR(dim_sep, compressed_parent, opts)) {
       front.reset(new FBLRMPI_t(dsep, sep_begin, sep_end, upd, comm, P));
-      front->set_BLR_partitioning
-        (opts, partition_tree, admissibility, level == 0);
       if (root) fc.BLR++;
     } else if (is_HODLR(dim_sep, compressed_parent, opts)) {
 #if defined(STRUMPACK_USE_BPACK)
       front.reset(new FHODLRMPI_t(dsep, sep_begin, sep_end, upd, comm, P));
-      front->set_HODLR_partitioning
-        (opts, partition_tree, admissibility, separator_graph, level == 0);
-      if (root) fc.HODLR++;
-#endif
-    } else {
-      front.reset(new FDMPI_t(dsep, sep_begin, sep_end, upd, comm, P));
-      if (root) fc.dense++;
-    }
-    return front;
-  }
-
-  template<typename scalar_t, typename integer_t, typename Tree>
-  std::unique_ptr<FrontalMatrix<scalar_t,integer_t>> create_frontal_matrix
-  (const SPOptions<scalar_t>& opts, integer_t dsep,
-   integer_t sep_begin, integer_t sep_end, std::vector<integer_t>& upd,
-   Tree& tree, integer_t sep, bool compressed_parent, int level, FrontCounter& fc,
-   const MPIComm& comm, int P, bool root) {
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
-    using FDMPI_t = FrontalMatrixDenseMPI<scalar_t,integer_t>;
-    using FHSSMPI_t = FrontalMatrixHSSMPI<scalar_t,integer_t>;
-    using FBLRMPI_t = FrontalMatrixBLRMPI<scalar_t,integer_t>;
-#if defined(STRUMPACK_USE_BPACK)
-    using FHODLRMPI_t = FrontalMatrixHODLRMPI<scalar_t,integer_t>;
-#endif
-    auto dim_sep = sep_end - sep_begin;
-    std::unique_ptr<F_t> front;
-    if (is_HSS(dim_sep, compressed_parent, opts)) {
-      front.reset(new FHSSMPI_t(dsep, sep_begin, sep_end, upd, comm, P));
-      front->set_HSS_partitioning(opts, tree.partition_tree[sep], level == 0);
-      if (root) fc.HSS++;
-    } else if (is_BLR(dim_sep, compressed_parent, opts)) {
-      front.reset(new FBLRMPI_t(dsep, sep_begin, sep_end, upd, comm, P));
-      front->set_BLR_partitioning
-        (opts, tree.partition_tree[sep], tree.admissibility[sep], level == 0);
-      if (root) fc.BLR++;
-    } else if (is_HODLR(dim_sep, compressed_parent, opts)) {
-#if defined(STRUMPACK_USE_BPACK)
-      front.reset(new FHODLRMPI_t(dsep, sep_begin, sep_end, upd, comm, P));
-      front->set_HODLR_partitioning
-        (opts, tree.partition_tree[sep], tree.admissibility[sep],
-         tree.separator_graph[sep], level == 0);
       if (root) fc.HODLR++;
 #endif
     } else {

@@ -35,7 +35,7 @@
 
 #include "StrumpackParameters.hpp"
 #include "CompressedSparseMatrix.hpp"
-#include "ProportionallyDistributedSparseMatrix.hpp"
+#include "PropMapSparseMatrix.hpp"
 #include "CSRMatrixMPI.hpp"
 #include "EliminationTreeMPI.hpp"
 #include "Redistribute.hpp"
@@ -50,18 +50,17 @@ namespace strumpack {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
+    using Opts_t = SPOptions<scalar_t>;
     using SepRange = std::pair<std::size_t,std::size_t>;
 
   public:
     EliminationTreeMPIDist
-    (const SPOptions<scalar_t>& opts,
-     const CSRMatrixMPI<scalar_t,integer_t>& A,
-     MatrixReorderingMPI<scalar_t,integer_t>& nd,
-     const MPIComm& comm);
+    (const Opts_t& opts, const CSRMatrixMPI<scalar_t,integer_t>& A,
+     MatrixReorderingMPI<scalar_t,integer_t>& nd, const MPIComm& comm);
 
     void multifrontal_factorization
     (const CompressedSparseMatrix<scalar_t,integer_t>& A,
-     const SPOptions<scalar_t>& opts) override;
+     const Opts_t& opts) override;
 
     void multifrontal_solve_dist
     (DenseM_t& x, const std::vector<integer_t>& dist) override;
@@ -69,6 +68,9 @@ namespace strumpack {
     std::tuple<int,int,int> get_sparse_mapped_destination
     (const CSRMatrixMPI<scalar_t,integer_t>& A,
      std::size_t i, std::size_t j, bool duplicate_fronts) const;
+
+    void separator_reordering
+    (const Opts_t& opts, const CSRMatrixMPI<scalar_t,integer_t>& A);
 
   private:
     using EliminationTreeMPI<scalar_t,integer_t>::comm_;
@@ -78,7 +80,7 @@ namespace strumpack {
     using EliminationTreeMPI<scalar_t,integer_t>::subtree_ranges_;
 
     MatrixReorderingMPI<scalar_t,integer_t>& nd_;
-    ProportionallyDistributedSparseMatrix<scalar_t,integer_t> Aprop_;
+    PropMapSparseMatrix<scalar_t,integer_t> Aprop_;
 
     /**
      * vector with _A.local_rows() elements, storing for each row
@@ -122,15 +124,14 @@ namespace strumpack {
      std::vector<float>& subtree_work, int depth);
 
     std::unique_ptr<F_t> proportional_mapping
-    (const SPOptions<scalar_t>& opts,
-     std::vector<std::vector<integer_t>>& upd,
+    (const Opts_t& opts, std::vector<std::vector<integer_t>>& upd,
      std::vector<integer_t>& dist_upd,
      std::vector<float>& subtree_work, std::vector<float>& dist_subtree_work,
      integer_t dsep, int P0, int P, int P0_sibling, int P_sibling,
      const MPIComm& fcomm, bool parent_compression, int level);
 
     std::unique_ptr<F_t> proportional_mapping_sub_graphs
-    (const SPOptions<scalar_t>& opts, RedistSubTree<integer_t>& tree,
+    (const Opts_t& opts, RedistSubTree<integer_t>& tree,
      integer_t dsep, integer_t sep, int P0, int P, int P0_sibling,
      int P_sibling, const MPIComm& fcomm, bool parent_compression, int level);
 
@@ -139,36 +140,25 @@ namespace strumpack {
      integer_t& dsep_begin, integer_t& dsep_end,
      std::vector<integer_t>& dsep_upd, int P0, int P,
      int P0_sibling, int P_sibling, int owner, bool use_hss);
-
-    void communicate_hss_tree
-    (HSS::HSSPartitionTree& hss_tree, integer_t dsep,
-     int P0, int P, int owner) const;
-
-    DenseMatrix<bool> communicate_admissibility
-    (integer_t dsep, int P0, int P, int owner) const;
-
-    CSRGraph<integer_t> communicate_separator_graph
-    (integer_t dsep, int P0, int P, int owner) const;
   };
 
 
   template<typename scalar_t,typename integer_t>
   EliminationTreeMPIDist<scalar_t,integer_t>::EliminationTreeMPIDist
-  (const SPOptions<scalar_t>& opts, const CSRMatrixMPI<scalar_t,integer_t>& A,
+  (const Opts_t& opts, const CSRMatrixMPI<scalar_t,integer_t>& A,
    MatrixReorderingMPI<scalar_t,integer_t>& nd, const MPIComm& comm)
     : EliminationTreeMPI<scalar_t,integer_t>(comm), nd_(nd) {
-    std::vector<std::vector<integer_t>> local_upd(nd_.local_tree().separators());
 
+    std::vector<std::vector<integer_t>> lupd(nd_.local_tree().separators());
     // every process is responsible for 1 distributed separator, so
     // store only 1 dist_upd
-    std::vector<integer_t> dist_upd;
-    std::vector<float> local_subtree_work(nd_.local_tree().separators()),
-      dist_subtree_work(nd_.tree().separators());
+    std::vector<integer_t> dupd;
+    std::vector<float> ltree_work(nd_.local_tree().separators()),
+      dtree_work(nd_.tree().separators());
 
     float dsep_work;
     MPIComm::control_start("symbolic_factorization");
-    symbolic_factorization
-      (local_upd, dist_upd, local_subtree_work, dsep_work);
+    symbolic_factorization(lupd, dupd, ltree_work, dsep_work);
     MPIComm::control_stop("symbolic_factorization");
 
     {// communicate dist_subtree_work to everyone
@@ -179,24 +169,24 @@ namespace strumpack {
       for (integer_t dsep=0; dsep<nd_.tree().separators(); dsep++)
         if (rank_ == nd_.proc_dist_sep[dsep]) {
           if (nd_.tree().lch(dsep) == -1)
-            sbuf[2*rank_] = local_subtree_work[nd_.local_tree().root()];
+            sbuf[2*rank_] = ltree_work[nd_.local_tree().root()];
           else sbuf[2*rank_+1] = dsep_work;
         }
       MPI_Allgather
         (MPI_IN_PLACE, 2, MPI_FLOAT, sbuf.data(), 2, MPI_FLOAT, comm_.comm());
       for (integer_t dsep=0; dsep<nd_.tree().separators(); dsep++)
-        dist_subtree_work[dsep] = (nd_.tree().lch(dsep) == -1) ?
+        dtree_work[dsep] = (nd_.tree().lch(dsep) == -1) ?
           sbuf[2*nd_.proc_dist_sep[dsep]] : sbuf[2*nd_.proc_dist_sep[dsep]+1];
     }
 
     local_range_ = {A.size(), 0};
     MPIComm::control_start("proportional_mapping");
     this->root_ = proportional_mapping
-      (opts, local_upd, dist_upd, local_subtree_work, dist_subtree_work,
+      (opts, lupd, dupd, ltree_work, dtree_work,
        nd_.tree().root(), 0, P_, 0, 0, comm_, true, 0);
     MPIComm::control_stop("proportional_mapping");
 
-    MPI_Pcontrol(1, "block_row_A_to_prop_A");
+    MPIComm::control_start("block_row_A_to_prop_A");
     if (local_range_.first > local_range_.second)
       local_range_.first = local_range_.second = 0;
     subtree_ranges_.resize(P_);
@@ -207,10 +197,26 @@ namespace strumpack {
     get_all_pfronts();
     find_row_owner(A);
     find_row_front(A);
-    Aprop_.setup(A, nd_, *this, opts.use_HSS() || opts.use_HODLR());
-    MPI_Pcontrol(-1, "block_row_A_to_prop_A");
+    Aprop_.setup(A, nd_, *this, opts.compression() != CompressionType::NONE);
+    MPIComm::control_stop("block_row_A_to_prop_A");
   }
 
+  template<typename scalar_t,typename integer_t> void
+  EliminationTreeMPIDist<scalar_t,integer_t>::separator_reordering
+  (const Opts_t& opts, const CSRMatrixMPI<scalar_t,integer_t>& A) {
+    nd_.separator_reordering(opts, Aprop_, this->root());
+    // the permutation vector has changed, so reconstruct the
+    // distributed sparse matrix
+    // TODO avoid this, instead just locally permute Aprop_
+    find_row_owner(A);
+    //find_row_front(A);
+    Aprop_ = PropMapSparseMatrix<scalar_t,integer_t>();
+    Aprop_.setup
+      (A, nd_, *this, opts.compression() != CompressionType::NONE);
+    // opts.use_HSS() ||
+    //   (opts.use_HODLR() && opts.HODLR_options().compression_algorithm() ==
+    //    HODLR::CompressionAlgorithm::RANDOM_SAMPLING));
+  }
 
   /**
    * Figure out on which processor element i,j of the sparse matrix
@@ -234,31 +240,22 @@ namespace strumpack {
     int pfront =
       (all_pfronts_[fi].sep_begin < all_pfronts_[fj].sep_begin) ? fi : fj;
     auto& f = all_pfronts_[pfront];
+    if (duplicate_fronts)
+      return std::make_tuple(f.P0, f.P, 1);
     if (i < f.sep_end) {
-      if (j < f.sep_end) { // F11
-        if (duplicate_fronts)
-          return std::make_tuple(f.P0, f.P, 1);
-        else
-          return std::make_tuple
-            (f.P0 + (((i - f.sep_begin) / B) % f.prows)
-             + (((j-f.sep_begin) / B) % f.pcols) * f.prows, 1, 1);
-      } else { // F12
-        if (duplicate_fronts)
-          return std::make_tuple(f.P0, f.P, 1);
-        else
-          return std::make_tuple
-            (f.P0 + (((i-f.sep_begin) / B) % f.prows),
-             f.prows * f.pcols, f.prows);
-      }
+      if (j < f.sep_end) // F11
+        return std::make_tuple
+          (f.P0 + (((i - f.sep_begin) / B) % f.prows)
+           + (((j-f.sep_begin) / B) % f.pcols) * f.prows, 1, 1);
+      else // F12
+        return std::make_tuple
+          (f.P0 + (((i-f.sep_begin) / B) % f.prows),
+           f.prows * f.pcols, f.prows);
     } else {
-      if (j < f.sep_end) { // F21
-        if (duplicate_fronts)
-          return std::make_tuple(f.P0, f.P, 1);
-        else
-          return std::make_tuple
-            (f.P0 + (((j - f.sep_begin) / B) % f.pcols) * f.prows,
-             f.prows, 1);
-      }
+      if (j < f.sep_end) // F21
+        return std::make_tuple
+          (f.P0 + (((j - f.sep_begin) / B) % f.pcols) * f.prows,
+           f.prows, 1);
     }
     assert(false);
     return std::make_tuple(0, P_, 1);
@@ -356,7 +353,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPIDist<scalar_t,integer_t>::multifrontal_factorization
   (const CompressedSparseMatrix<scalar_t,integer_t>& A,
-   const SPOptions<scalar_t>& opts) {
+   const Opts_t& opts) {
     this->root_->multifrontal_factorization(Aprop_, opts);
   }
 
@@ -794,78 +791,13 @@ namespace strumpack {
       MPI_Waitall(sreq.size(), sreq.data(), MPI_STATUSES_IGNORE);
   }
 
-  template<typename scalar_t,typename integer_t> void
-  EliminationTreeMPIDist<scalar_t,integer_t>::communicate_hss_tree
-  (HSS::HSSPartitionTree& hss_tree, integer_t dsep,
-   int P0, int P, int owner) const {
-    std::vector<MPIRequest> sreq;
-    std::vector<int> sbuf;
-    if (rank_ == owner) {
-      sbuf = nd_.tree().partition_tree.at(dsep).serialize();
-      sreq.reserve(P);
-      for (int dest=P0; dest<P0+P; dest++)
-        sreq.emplace_back(comm_.isend(sbuf, dest, 0));
-    }
-    if (rank_ >= P0 && rank_ < P0+P)
-      hss_tree = HSS::HSSPartitionTree::deserialize
-        (comm_.template recv<int>(owner, 0));
-    if (rank_ == owner) wait_all(sreq);
-  }
 
-  template<typename scalar_t,typename integer_t> DenseMatrix<bool>
-  EliminationTreeMPIDist<scalar_t,integer_t>::communicate_admissibility
-  (integer_t dsep, int P0, int P, int owner) const {
-    DenseMatrix<bool> adm;
-    std::vector<MPIRequest> sreq;
-    std::vector<int> sbuf;
-    if (rank_ == owner) {
-      auto& a = nd_.tree().admissibility.at(dsep);
-      // TODO add a serialize routine in DenseMatrix
-      sbuf.reserve(1+a.rows()*a.cols());
-      sbuf.push_back(a.rows());
-      for (std::size_t j=0; j<a.cols(); j++)
-        for (std::size_t i=0; i<a.rows(); i++)
-          sbuf.push_back(a(i,j));
-      sreq.reserve(P);
-      for (int dest=P0; dest<P0+P; dest++)
-        sreq.emplace_back(comm_.isend(sbuf, dest, 0));
-    }
-    if (rank_ >= P0 && rank_ < P0+P) {
-      auto rbuf = comm_.template recv<int>(owner, 0);
-      adm.resize(rbuf[0], rbuf[0]);
-      auto pb = rbuf.begin()+1;
-      for (std::size_t j=0; j<adm.cols(); j++)
-        for (std::size_t i=0; i<adm.rows(); i++)
-          adm(i, j) = *pb++;
-    }
-    if (rank_ == owner) wait_all(sreq);
-    return adm;
-  }
 
-  template<typename scalar_t,typename integer_t> CSRGraph<integer_t>
-  EliminationTreeMPIDist<scalar_t,integer_t>::communicate_separator_graph
-  (integer_t dsep, int P0, int P, int owner) const {
-    CSRGraph<integer_t> g;
-    std::vector<MPIRequest> sreq;
-    std::vector<integer_t> sbuf;
-    if (rank_ == owner) {
-      sbuf = nd_.tree().separator_graph.at(dsep).serialize();
-      sreq.reserve(P);
-      for (int dest=P0; dest<P0+P; dest++)
-        sreq.emplace_back(comm_.isend(sbuf, dest, 0));
-    }
-    if (rank_ >= P0 && rank_ < P0+P)
-      g = CSRGraph<integer_t>::deserialize
-        (comm_.template recv<integer_t>(owner, 0));
-    if (rank_ == owner) wait_all(sreq);
-    return g;
-  }
 
   template<typename scalar_t,typename integer_t>
   std::unique_ptr<FrontalMatrix<scalar_t,integer_t>>
   EliminationTreeMPIDist<scalar_t,integer_t>::proportional_mapping
-  (const SPOptions<scalar_t>& opts,
-   std::vector<std::vector<integer_t>>& local_upd,
+  (const Opts_t& opts, std::vector<std::vector<integer_t>>& local_upd,
    std::vector<integer_t>& dist_upd, std::vector<float>& local_subtree_work,
    std::vector<float>& dist_subtree_work, integer_t dsep,
    int P0, int P, int P0_sibling, int P_sibling,
@@ -894,16 +826,6 @@ namespace strumpack {
     auto dim_dsep = dsep_end - dsep_begin;
 
     bool use_compression = is_compressed(dim_dsep, parent_compression, opts);
-    HSS::HSSPartitionTree hss_tree(dim_dsep);
-    if (use_compression)
-      communicate_hss_tree(hss_tree, dsep, P0, P, owner);
-    DenseMatrix<bool> adm;
-    if (is_BLR(dim_dsep, parent_compression, opts) ||
-        is_HODLR(dim_dsep, parent_compression, opts))
-      adm = communicate_admissibility(dsep, P0, P, owner);
-    CSRGraph<integer_t> graph;
-    if (is_HODLR(dim_dsep, parent_compression, opts))
-      graph = communicate_separator_graph(dsep, P0, P, owner);
 
     std::unique_ptr<F_t> front;
     // only store fronts you work on and their siblings (needed for
@@ -912,15 +834,13 @@ namespace strumpack {
         (rank_ >= P0_sibling && rank_ < P0_sibling+P_sibling)) {
       if (P == 1) {
         front = create_frontal_matrix<scalar_t,integer_t>
-          (opts, dsep, dsep_begin, dsep_end, dsep_upd,
-           hss_tree, adm, graph, parent_compression, level,
-           this->nr_fronts_, rank_ == P0);
+          (opts, dsep, dsep_begin, dsep_end, dsep_upd, parent_compression,
+           level, this->nr_fronts_, rank_ == P0);
         if (P0 == rank_) this->update_local_ranges(dsep_begin, dsep_end);
       } else {
         front = create_frontal_matrix<scalar_t,integer_t>
           (opts, local_pfronts_.size(), dsep_begin, dsep_end, dsep_upd,
-           hss_tree, adm, graph, parent_compression, level,
-           this->nr_fronts_, fcomm, P, rank_ == P0);
+           parent_compression, level, this->nr_fronts_, fcomm, P, rank_ == P0);
         if (rank_ >= P0 && rank_ < P0+P) {
           auto fpar = static_cast<FMPI_t*>(front.get());
           local_pfronts_.emplace_back
@@ -953,7 +873,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t>
   std::unique_ptr<FrontalMatrix<scalar_t,integer_t>>
   EliminationTreeMPIDist<scalar_t,integer_t>::proportional_mapping_sub_graphs
-  (const SPOptions<scalar_t>& opts, RedistSubTree<integer_t>& tree,
+  (const Opts_t& opts, RedistSubTree<integer_t>& tree,
    integer_t dsep, integer_t sep, int P0, int P,
    int P0_sibling, int P_sibling, const MPIComm& fcomm,
    bool parent_compression, int level) {
@@ -967,17 +887,14 @@ namespace strumpack {
         (rank_ >= P0_sibling && rank_ < P0_sibling+P_sibling)) {
       std::vector<integer_t> upd(tree.upd[sep], tree.upd[sep]+dim_upd);
       if (P == 1) {
-        front = create_frontal_matrix
-          <scalar_t,integer_t,RedistSubTree<integer_t>>
-          (opts, sep, sep_begin, sep_end, upd, tree,
-           parent_compression, level, this->nr_fronts_, rank_ == P0);
+        front = create_frontal_matrix<scalar_t,integer_t>
+          (opts, sep, sep_begin, sep_end, upd, parent_compression,
+           level, this->nr_fronts_, rank_ == P0);
         if (P0 == rank_) this->update_local_ranges(sep_begin, sep_end);
       } else {
-        front = create_frontal_matrix
-          <scalar_t,integer_t,RedistSubTree<integer_t>>
+        front = create_frontal_matrix<scalar_t,integer_t>
           (opts, local_pfronts_.size(), sep_begin, sep_end, upd,
-           tree, sep, parent_compression, level, this->nr_fronts_,
-           fcomm, P, rank_ == P0);
+           parent_compression, level, this->nr_fronts_, fcomm, P, rank_ == P0);
         if (rank_ >= P0 && rank_ < P0+P) {
           auto fpar = static_cast<FMPI_t*>(front.get());
           local_pfronts_.emplace_back

@@ -544,7 +544,7 @@ namespace strumpack {
       int min_lvl = 2 + std::ceil(std::log2(c.size()));
       lvls_ = std::max(min_lvl, tree.levels());
       tree.expand_complete_levels(lvls_);
-      leafs_ = tree.leaf_sizes();
+      leafs_ = tree.template leaf_sizes<int>();
       c_ = c;
       Fcomm_ = MPI_Comm_c2f(c_.comm());
       options_init(opts);
@@ -571,7 +571,7 @@ namespace strumpack {
       int min_lvl = 2 + std::ceil(std::log2(c.size()));
       lvls_ = std::max(min_lvl, full_tree.levels());
       full_tree.expand_complete_levels(lvls_);
-      leafs_ = full_tree.leaf_sizes();
+      leafs_ = full_tree.template leaf_sizes<int>();
       c_ = c;
       Fcomm_ = MPI_Comm_c2f(c_.comm());
       options_init(opts);
@@ -606,7 +606,7 @@ namespace strumpack {
       int min_lvl = 2 + std::ceil(std::log2(c.size()));
       lvls_ = std::max(min_lvl, full_tree.levels());
       full_tree.expand_complete_levels(lvls_);
-      leafs_ = full_tree.leaf_sizes();
+      leafs_ = full_tree.template leaf_sizes<int>();
       c_ = c;
       if (c_.is_null()) return;
       Fcomm_ = MPI_Comm_c2f(c_.comm());
@@ -681,7 +681,7 @@ namespace strumpack {
       info.maps = tree.map_from_complete_to_leafs(lvls_);
       info.adm = &adm;
       info.graph = &graph;
-      leafs_ = full_tree.leaf_sizes();
+      leafs_ = full_tree.template leaf_sizes<int>();
       c_ = c;
       if (c_.is_null()) return;
       Fcomm_ = MPI_Comm_c2f(c_.comm());
@@ -696,7 +696,7 @@ namespace strumpack {
         // there are 3^2=9 points in the stencil and 5^2=25 points in
         // the extended (length 2 connections) stencil.
         HODLR_set_I_option<scalar_t>
-          (options_, "knn", 5 * graph.nedge() / graph.nvert());
+          (options_, "knn", 5 * graph.edges() / graph.vertices());
         HODLR_construct_init<scalar_t>
           (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
            lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,

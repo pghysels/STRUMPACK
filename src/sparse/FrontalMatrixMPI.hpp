@@ -52,6 +52,7 @@ namespace strumpack {
     using DistM_t = DistributedMatrix<scalar_t>;
     using DistMW_t = DistributedMatrixWrapper<scalar_t>;
     using ExtAdd = ExtendAdd<scalar_t,integer_t>;
+    using Opts_t = SPOptions<scalar_t>;
     using Vec_t = std::vector<std::size_t>;
     using VecVec_t = std::vector<std::vector<std::size_t>>;
     template<typename _scalar_t,typename _integer_t> friend class ExtendAdd;
@@ -68,7 +69,7 @@ namespace strumpack {
     virtual void sample_CB
     (const DistM_t& R, DistM_t& Sr, DistM_t& Sc, F_t* pa) const {}
     void sample_CB
-    (const SPOptions<scalar_t>& opts, const DistM_t& R,
+    (const Opts_t& opts, const DistM_t& R,
      DistM_t& Sr, DistM_t& Sc, const DenseM_t& seqR, DenseM_t& seqSr,
      DenseM_t& seqSc, F_t* pa) override {
       sample_CB(R, Sr, Sc, pa);
@@ -164,6 +165,10 @@ namespace strumpack {
     virtual long long dense_factor_nonzeros(int task_depth=0) const override;
     virtual std::string type() const override { return "FrontalMatrixMPI"; }
     virtual bool isMPI() const override { return true; }
+
+    void partition_fronts
+    (const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
+     bool is_root=true, int task_depth=0) override;
 
   protected:
     BLACSGrid blacs_grid_;     // 2D processor grid
@@ -359,6 +364,17 @@ namespace strumpack {
     long long dsep = this->dim_sep();
     long long dupd = this->dim_upd();
     return Comm().is_root() ? dsep * (dsep + 2 * dupd) : 0;
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixMPI<scalar_t,integer_t>::partition_fronts
+  (const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
+   bool is_root, int task_depth) {
+    if (visit(lchild_))
+      lchild_->partition_fronts(opts, A, sorder, false, task_depth+1);
+    if (visit(rchild_))
+      rchild_->partition_fronts(opts, A, sorder, false, task_depth+1);
+    this->partition(opts, A, sorder, is_root, task_depth);
   }
 
 } // end namespace strumpack

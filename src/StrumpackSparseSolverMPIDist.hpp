@@ -272,7 +272,7 @@ namespace strumpack {
     virtual void setup_reordering() override;
     virtual int compute_reordering
     (int nx, int ny, int nz, int components, int width) override;
-    virtual void compute_separator_reordering() override;
+    virtual void separator_reordering() override;
 
   private:
     std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>> mat_mpi_;
@@ -360,10 +360,8 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::
-  compute_separator_reordering() {
-    nd_mpi_->separator_reordering
-      (opts_, *mat_mpi_, opts_.verbose() && is_root_);
+  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::separator_reordering() {
+    tree_mpi_dist_->separator_reordering(opts_, *mat_mpi_);
   }
 
   template<typename scalar_t,typename integer_t> void

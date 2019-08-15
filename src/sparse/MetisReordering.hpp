@@ -45,8 +45,7 @@ namespace strumpack {
    idx_t* vwgt, idx_t seps, idx_t* options, std::vector<integer_t>& perm,
    std::vector<integer_t>& iperm, std::vector<idx_t>& sizes) {
     idx_t n = perm.size();
-    std::vector<idx_t> order(n);
-    std::vector<idx_t> iorder(n);
+    std::vector<idx_t> order(n), iorder(n);
     int ierr = METIS_NodeNDP
       (n, xadj.data(), adjncy.data(), vwgt, seps, options,
        order.data(), iorder.data(), sizes.data());
@@ -69,8 +68,7 @@ namespace strumpack {
    idx_t* vwgt, idx_t* options, std::vector<integer_t>& perm,
    std::vector<integer_t>& iperm) {
     idx_t n = perm.size();
-    std::vector<idx_t> order(n);
-    std::vector<idx_t> iorder(n);
+    std::vector<idx_t> order(n), iorder(n);
     int ierr = METIS_NodeND
       (&n, xadj.data(), adjncy.data(), vwgt, options,
        order.data(), iorder.data());

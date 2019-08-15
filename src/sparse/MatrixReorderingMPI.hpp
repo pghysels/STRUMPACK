@@ -82,28 +82,20 @@ namespace strumpack {
    *            0   1
    */
   template<typename scalar_t,typename integer_t>
-  class MatrixReorderingMPI
-    : public MatrixReordering<scalar_t,integer_t> {
+  class MatrixReorderingMPI : public MatrixReordering<scalar_t,integer_t> {
+    using Opts_t = SPOptions<scalar_t>;
 
   public:
-
     MatrixReorderingMPI(integer_t n, const MPIComm& c);
-
-    virtual ~MatrixReorderingMPI() {}
+    virtual ~MatrixReorderingMPI() = default;
 
     int nested_dissection
-    (const SPOptions<scalar_t>& opts,
-     const CSRMatrixMPI<scalar_t,integer_t>& A,
+    (const Opts_t& opts, const CSRMatrixMPI<scalar_t,integer_t>& A,
      int nx, int ny, int nz, int components, int width);
 
     void separator_reordering
-    (const SPOptions<scalar_t>& opts,
-     const CSRMatrixMPI<scalar_t,integer_t>& A,
-     FrontalMatrix<scalar_t,integer_t>& F);
-
-    void separator_reordering
-    (const SPOptions<scalar_t>& opts,
-     const CSRMatrixMPI<scalar_t,integer_t>& A, bool verbose);
+    (const Opts_t& opts, CompressedSparseMatrix<scalar_t,integer_t>& A,
+     FrontalMatrix<scalar_t,integer_t>* F);
 
     void clear_tree_data();
 
@@ -162,16 +154,6 @@ namespace strumpack {
 
     void build_local_tree(const CSRMatrixMPI<scalar_t,integer_t>& Ampi);
 
-    void distributed_separator_reordering
-    (const SPOptions<scalar_t>& opts, std::vector<integer_t>& gorder);
-
-    void local_separator_reordering
-    (const SPOptions<scalar_t>& opts, std::vector<integer_t>& gorder);
-
-    void local_separator_reordering_recursive
-    (const SPOptions<scalar_t>& opts, integer_t sep, bool compressed_parent,
-     std::vector<integer_t>& lorder, std::vector<integer_t>& liorder);
-
     void nested_dissection_print
     (const SPOptions<scalar_t>& opts, integer_t nnz) const;
 
@@ -189,7 +171,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> int
   MatrixReorderingMPI<scalar_t,integer_t>::nested_dissection
-  (const SPOptions<scalar_t>& opts, const CSRMatrixMPI<scalar_t,integer_t>& A,
+  (const Opts_t& opts, const CSRMatrixMPI<scalar_t,integer_t>& A,
    int nx, int ny, int nz, int components, int width) {
     if (!is_parallel(opts.reordering_method())) {
       auto rank = comm_->rank();
@@ -307,190 +289,25 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   MatrixReorderingMPI<scalar_t,integer_t>::separator_reordering
-  (const SPOptions<scalar_t>& opts, const CSRMatrixMPI<scalar_t,integer_t>& A,
-   bool verbose) {
-    // if (opts.reordering_method() == ReorderingStrategy::GEOMETRIC ||
-    //     opts.compression() == CompressionType::NONE)
-    //   return;
-
+  (const Opts_t& opts, CompressedSparseMatrix<scalar_t,integer_t>& A,
+   FrontalMatrix<scalar_t,integer_t>* F) {
     if (opts.compression() == CompressionType::NONE)
       return;
     auto n = A.size();
-    std::vector<integer_t> gorder(n);
-    std::iota(gorder.begin(), gorder.end(), 0);
-    distributed_separator_reordering(opts, gorder);
-    local_separator_reordering(opts, gorder);
-    for (integer_t i=0; i<n; i++) perm_[gorder[i]] = iperm_[i];
-    for (integer_t i=0; i<n; i++) iperm_[perm_[i]] = i;
-    std::swap(perm_, iperm_);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  MatrixReorderingMPI<scalar_t,integer_t>::separator_reordering
-  (const SPOptions<scalar_t>& opts, const CSRMatrixMPI<scalar_t,integer_t>& A,
-   FrontalMatrix<scalar_t,integer_t>& F) {
-    if (opts.reordering_method() == ReorderingStrategy::GEOMETRIC ||
-        opts.compression() == CompressionType::NONE)
-      return;
-    std::vector<integer_t> sorder(A.size());
+    std::vector<integer_t> sorder(n, -1);
 #pragma omp parallel
 #pragma omp single
-    F.bisection_partitioning(opts, sorder.data());
-    std::cout << "TODO MatrixReorderingMPI::separator_reordering"
-              << std::endl;
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  MatrixReorderingMPI<scalar_t,integer_t>::local_separator_reordering_recursive
-  (const SPOptions<scalar_t>& opts, integer_t sep, bool compressed_parent,
-   std::vector<integer_t>& lorder, std::vector<integer_t>& liorder) {
-    auto sep_begin = local_tree_->sizes(sep);
-    auto sep_end = local_tree_->sizes(sep+1);
-    auto dim_sep = sep_end - sep_begin;
-    bool compressed = is_compressed(dim_sep, compressed_parent, opts);
-    if (compressed) {
-      auto tree = my_sub_graph.recursive_bisection
-        (opts.compression_leaf_size(), opts.separator_ordering_level(),
-         lorder.data(), liorder.data(), sub_graph_range.first,
-         sep_begin, sep_end);
-      if (opts.use_BLR() || opts.use_HODLR()) {
-        auto tiles = tree.leaf_sizes();
-        integer_t nt = tiles.size();
-        DenseMatrix<bool> adm(nt, nt);
-        adm.fill(true);
-        for (integer_t t=0; t<nt; t++)
-          adm(t, t) = false;
-        if (opts.use_HODLR() ||
-            opts.BLR_options().admissibility() ==
-            BLR::Admissibility::STRONG) {
-          std::vector<integer_t> ts(nt+1);
-          for (integer_t i=0; i<nt; i++)
-            ts[i+1] = tiles[i] + ts[i];
-          auto& G = my_sub_graph;
-          for (integer_t t=0; t<nt; t++) {
-            for (integer_t i=ts[t]; i<ts[t+1]; i++) {
-              auto Gi = liorder[i+sep_begin];
-              auto hij = G.ind() + G.ptr(Gi+1);
-              for (auto pj=G.ind()+G.ptr(Gi); pj!=hij; pj++) {
-                auto Gj = *pj - sub_graph_range.first;
-                if (Gj < sep_begin || Gj >= sep_end) continue;
-                integer_t tj = std::distance
-                  (ts.begin(), std::upper_bound
-                   (ts.begin(), ts.end(),
-                    lorder[Gj]-sub_graph_range.first-sep_begin)) - 1;
-                if (t != tj) adm(t, tj) = adm(tj, t) = false;
-              }
-            }
-          }
-        }
-        local_tree_->admissibility[sep] = std::move(adm);
-      }
-      local_tree_->partition_tree[sep] = std::move(tree);
-    }
-    if (local_tree_->lch(sep) != -1)
-      local_separator_reordering_recursive
-        (opts, local_tree_->lch(sep), compressed, lorder, liorder);
-    if (local_tree_->rch(sep) != -1)
-      local_separator_reordering_recursive
-        (opts, local_tree_->rch(sep), compressed, lorder, liorder);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  MatrixReorderingMPI<scalar_t,integer_t>::local_separator_reordering
-  (const SPOptions<scalar_t>& opts, std::vector<integer_t>& gorder) {
-    auto P = comm_->size();
-    auto n_local = my_sub_graph.size();
-    std::vector<integer_t> lorder(n_local), liorder(n_local);
-    std::iota(lorder.begin(), lorder.end(), sub_graph_range.first);
-    std::iota(liorder.begin(), liorder.end(), 0);
-    if (local_tree_->separators() > 0)
-      local_separator_reordering_recursive
-        (opts, local_tree_->root(), true, lorder, liorder);
-    my_sub_graph.permute_local
-      (lorder, liorder, sub_graph_range.first, sub_graph_range.second);
-    if (opts.use_HODLR()) {
-      for (auto& s : local_tree_->partition_tree) {
-        auto sep = s.first;
-        auto sep_begin = local_tree_->sizes(sep);
-        auto sep_end = local_tree_->sizes(sep+1);
-        local_tree_->separator_graph[sep] =
-          my_sub_graph.extract_subgraph
-          (sub_graph_range.first, sep_begin, sep_end);
-      }
-    }
-    std::unique_ptr<int[]> rcnts(new int[2*P]);
-    auto displs = rcnts.get() + P;
-    for (int p=0; p<P; p++) {
-      rcnts[p] = sub_graph_ranges[p].second - sub_graph_ranges[p].first;
-      displs[p] = sub_graph_ranges[p].first;
-    }
-    MPI_Allgatherv
-      (lorder.data(), rcnts[comm_->rank()], mpi_type<integer_t>(),
-       gorder.data(), rcnts.get(), displs, mpi_type<integer_t>(),
-       comm_->comm());
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  MatrixReorderingMPI<scalar_t,integer_t>::distributed_separator_reordering
-  (const SPOptions<scalar_t>& opts, std::vector<integer_t>& gorder) {
-    auto rank = comm_->rank();
-    auto P = comm_->size();
-    auto dsep_begin = dist_sep_range.first;
-    auto dsep_end = dist_sep_range.second;
-    auto dim_dsep = dsep_end - dsep_begin;
-    std::vector<integer_t> dorder(dim_dsep), diorder(dim_dsep);
-    if (dim_dsep) {
-      auto tree = my_dist_sep.recursive_bisection
-        (opts.compression_leaf_size(), opts.separator_ordering_level(),
-         dorder.data(), diorder.data(), dsep_begin, 0, dim_dsep);
-      if (opts.use_BLR() || opts.use_HODLR()) {
-        auto tiles = tree.leaf_sizes();
-        integer_t nt = tiles.size();
-        DenseMatrix<bool> adm(nt, nt);
-        adm.fill(true);
-        for (integer_t t=0; t<nt; t++)
-          adm(t, t) = false;
-        if (opts.use_HODLR() ||
-            opts.BLR_options().admissibility() ==
-            BLR::Admissibility::STRONG) {
-          std::vector<integer_t> ts(nt+1);
-          for (integer_t i=0; i<nt; i++)
-            ts[i+1] = tiles[i] + ts[i];
-          auto& G = my_dist_sep;
-          for (integer_t t=0; t<nt; t++) {
-            for (integer_t i=ts[t]; i<ts[t+1]; i++) {
-              auto Gi = diorder[i];
-              auto hij = G.ind() + G.ptr(Gi+1);
-              for (auto pj=G.ind()+G.ptr(Gi); pj!=hij; pj++) {
-                auto Gj = *pj - dsep_begin;
-                if (Gj < 0 || Gj >= dim_dsep) continue;
-                integer_t tj = std::distance
-                  (ts.begin(), std::upper_bound
-                   (ts.begin(), ts.end(), dorder[Gj]-dsep_begin)) - 1;
-                if (t != tj) adm(t, tj) = adm(tj, t) = false;
-              }
-            }
-          }
-        }
-        sep_tree_->admissibility[dsep_internal] = std::move(adm);
-      }
-      sep_tree_->partition_tree[dsep_internal] = std::move(tree);
-    }
-    std::unique_ptr<int[]> rcnts(new int[2*P]);
-    auto displs = rcnts.get() + P;
-    for (int p=0; p<P; p++) {
-      rcnts[p] = dist_sep_ranges[p].second - dist_sep_ranges[p].first;
-      displs[p] = dist_sep_ranges[p].first;
-    }
-    MPI_Allgatherv
-      (dorder.data(), rcnts[rank], mpi_type<integer_t>(), gorder.data(),
-       rcnts.get(), displs, mpi_type<integer_t>(), comm_->comm());
-    my_dist_sep.permute_rows_local_cols_global
-      (gorder, diorder, dsep_begin, dsep_end);
-    if (opts.use_HODLR())
-      sep_tree_->separator_graph[dsep_internal] =
-        my_dist_sep.extract_subgraph(dsep_begin, 0, dim_dsep);
-    my_sub_graph.permute_columns(gorder);
+    F->partition_fronts(opts, A, sorder.data());
+    // not all processes have all fronts, so the sorder vector needs
+    // to be communicated
+    comm_->all_reduce(sorder.data(), sorder.size(), MPI_MAX);
+    // product of perm_ and sep_order
+    for (integer_t i=0; i<n; i++) iperm_[i] = sorder[perm_[i]];
+    for (integer_t i=0; i<n; i++) perm_[iperm_[i]] = i;
+    std::swap(perm_, iperm_);
+#pragma omp parallel
+#pragma omp single
+    F->permute_CB(sorder.data());
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -562,6 +379,7 @@ namespace strumpack {
        rcnts.get(), displs, mpi_type<integer_t>(), comm_->comm());
     for (integer_t i=0; i<n; i++) iperm_[perm_[i]] = i;
     for (integer_t i=0; i<n; i++) perm_[gpost[i]] = iperm_[i];
+    for (integer_t i=0; i<n; i++) iperm_[perm_[i]] = i;
     std::swap(perm_, iperm_);
   }
 
@@ -575,7 +393,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   MatrixReorderingMPI<scalar_t,integer_t>::nested_dissection_print
-  (const SPOptions<scalar_t>& opts, integer_t nnz) const {
+  (const Opts_t& opts, integer_t nnz) const {
     if (opts.verbose()) {
       auto total_separators =
         comm_->all_reduce(local_tree_->separators(), MPI_SUM) +

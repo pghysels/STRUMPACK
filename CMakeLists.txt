@@ -573,7 +573,7 @@ if(STRUMPACK_USE_MPI)
     src/sparse/MatrixReorderingMPI.hpp
     src/sparse/PTScotchReordering.hpp
     src/sparse/ParMetisReordering.hpp
-    src/sparse/ProportionallyDistributedSparseMatrix.hpp
+    src/sparse/PropMapSparseMatrix.hpp
     src/sparse/Redistribute.hpp
     src/sparse/ExtendAdd.hpp
     src/sparse/mumps_symqamd.hpp

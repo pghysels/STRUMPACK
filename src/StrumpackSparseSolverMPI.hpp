@@ -172,7 +172,7 @@ namespace strumpack {
     virtual void setup_reordering() override;
     virtual int compute_reordering
     (int nx, int ny, int nz, int components, int width) override;
-    virtual void compute_separator_reordering() override;
+    virtual void separator_reordering() override;
     void perf_counters_stop(const std::string& s) override;
     virtual void synchronize() override { comm_.barrier(); }
     virtual void reduce_flop_counters() const override;
@@ -238,10 +238,8 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPI<scalar_t,integer_t>::
-  compute_separator_reordering() {
-    nd_->separator_reordering
-      (opts_, *mat_, opts_.verbose() && is_root_);
+  StrumpackSparseSolverMPI<scalar_t,integer_t>::separator_reordering() {
+    nd_->separator_reordering(opts_, *mat_, tree_mpi_->root());
   }
 
   template<typename scalar_t,typename integer_t> void
