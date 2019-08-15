@@ -42,6 +42,7 @@
 #endif
 #include "dense/DenseMatrix.hpp"
 #include "CompressedSparseMatrix.hpp"
+#include "CSRGraph.hpp"
 
 namespace strumpack {
 

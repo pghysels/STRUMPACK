@@ -41,10 +41,10 @@
 #include <string.h>
 #include "StrumpackOptions.hpp"
 #include "misc/Tools.hpp"
+#include "dense/DenseMatrix.hpp"
 #if defined(STRUMPACK_USE_MPI)
-#include "../dense/DistributedMatrix.hpp"
+#include "dense/DistributedMatrix.hpp"
 #endif
-#include "../dense/DenseMatrix.hpp"
 
 // where is this used?? in MC64?
 #ifdef _LONGINT
@@ -286,7 +286,7 @@ namespace strumpack {
      double* dw, int_t* icntl, int_t* info) {}
 
     virtual CSRGraph<integer_t> extract_graph
-    (int ordering_level, integer_t lo, integer_t hi) const { assert(false); }
+    (int ordering_level, integer_t lo, integer_t hi) const = 0;
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
     // TODO implement these outside of this class

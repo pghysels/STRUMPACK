@@ -138,6 +138,12 @@ namespace strumpack {
     (const std::vector<integer_t>& perm,
      const std::vector<std::pair<integer_t,integer_t>>& graph_ranges) const;
 
+    CSRGraph<integer_t> extract_graph
+    (int ordering_level, integer_t lo, integer_t hi) const override {
+      assert(false);
+      return CSRGraph<integer_t>();
+    }
+
     void print() const override;
     void print_dense(const std::string& name) const override;
     void print_matrix_market(const std::string& filename) const override;

@@ -32,6 +32,7 @@
 #include "misc/MPIWrapper.hpp"
 #include "dense/BLASLAPACKWrapper.hpp"
 #include "CompressedSparseMatrix.hpp"
+#include "CSRGraph.hpp"
 #include <cstddef>
 #if 0 // TODO check for compiler support, use C++17?
       // std::experimental::parallel?
