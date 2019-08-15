@@ -1,3 +1,11 @@
+
+Version 3.2.0 Released August 15, 2019
+======================================
+ - Added interface to Hierarchically Off-Diagonal Low-Rank and
+   Butterfly matrix codes from ButterflyPACK, see
+     https://github.com/liuyangzhuan/ButterflyPACK
+
+
 Version 3.1.1 Released October 25, 2018
 =======================================
  - Fix check for libatomic, needs to be linked explicitly on some

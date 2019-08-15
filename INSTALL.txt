@@ -3,7 +3,7 @@ Build Instructions
 
 See the online documentation for more detailed instructions:
 http://portal.nersc.gov/project/sparse/strumpack/master/index.html
-http://portal.nersc.gov/project/sparse/strumpack/v3.1.1/index.html
+http://portal.nersc.gov/project/sparse/strumpack/v3.2.0/index.html
 
 Or see example_build.sh for examples on how to call CMake.
 
@@ -155,6 +155,26 @@ https://people.eecs.berkeley.edu/~aydin/CombBLAS/html/
 Enable this feature by adding -DTPL_ENABLE_COMBBLAS to the CMake
 command. Then specify -DTPL_COMBBLAS_INCLUDE_DIRS=".." and
 -DTPL_COMBBLAS_LIBRARIES="..".
+
+
+ButterflyPACK (optional)
+========================
+See: https://github.com/liuyangzhuan/ButterflyPACK
+
+ButterflyPACK provides support for Hierarchically Off-Diagonal
+Low-Rank and Butterfly matrix compression. ButterflyPACK is written in
+Fortran. STRUMPACK provides C++ interfaces to the functionality of
+ButterflyPACK and STRUMPACK uses ButterflyPACK in the sparse
+preconditioner.
+
+Enable support for ButterflyPACK using:
+    -DTPL_ENABLE_BPACK=ON
+
+And then set
+> export BPACKHOME=/path/to/butterflypack
+and add the following to the CMake invocation:
+    -DTPL_BPACK_INCLUDE_DIRS="$BPACKHOME/SRC_DOUBLE/;$BPACKHOME/SRC_DOUBLECOMPLEX" \
+    -DTPL_BPACK_LIBRARIES="$BPACKHOME/build/SRC_DOUBLE/libdbutterflypack.a;$BPACKHOME/build/SRC_DOUBLECOMPLEX/libzbutterflypack.a"
 
 
 Usage Instructions
