@@ -213,7 +213,7 @@ namespace strumpack {
       notify_inactives_J(w);
       STRUMPACK_ID_FLOPS(ID_row_flops(S, w.Jr.size()));
       int d = S.cols();
-      if (!(d >= this->cols() || d >= opts.max_rank() ||
+      if (!(d >= int(this->cols()) || d >= opts.max_rank() ||
             (int(w.Jr.size()) + opts.p() < d  &&
              int(w.Jc.size()) + opts.p() < d))) {
         // std::cout << "WARNING: ID did not reach required accuracy:"

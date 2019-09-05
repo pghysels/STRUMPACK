@@ -884,11 +884,6 @@ namespace strumpack {
     int syev(Jobz job, UpLo ul, std::vector<scalar_t>& lambda);
 
   private:
-    void ID_column_MGS
-    (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
-     std::vector<std::size_t>& ind, real_t rel_tol,
-     real_t abs_tol, int max_rank, int depth);
-
     void ID_column_GEQP3
     (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
      std::vector<std::size_t>& ind, real_t rel_tol,
@@ -1813,14 +1808,13 @@ namespace strumpack {
     }
   }
 
-  template<typename scalar_t> void
-  DenseMatrix<scalar_t>::orthogonalize
+  template<typename scalar_t> void DenseMatrix<scalar_t>::orthogonalize
   (scalar_t& r_max, scalar_t& r_min, int depth) {
     if (!cols() || !rows()) return;
     TIMER_TIME(TaskType::QR, 1, t_qr);
     int minmn = std::min(rows(), cols());
     std::unique_ptr<scalar_t[]> tau(new scalar_t[minmn]);
-    int info = blas::geqrfmod(rows(), minmn, data(), ld(), tau.get(), depth);
+    blas::geqrfmod(rows(), minmn, data(), ld(), tau.get(), depth);
     real_t Rmax = std::abs(operator()(0, 0));
     real_t Rmin = Rmax;
     for (int i=0; i<minmn; i++) {
@@ -1831,7 +1825,7 @@ namespace strumpack {
     r_max = Rmax;
     r_min = Rmin;
     // TODO threading!!
-    info = blas::xxgqr(rows(), minmn, minmn, data(), ld(), tau.get());
+    blas::xxgqr(rows(), minmn, minmn, data(), ld(), tau.get());
     if (cols() > rows()) {
       DenseMatrixWrapper<scalar_t> tmp
         (rows(), cols()-rows(), *this, 0, rows());
@@ -1854,9 +1848,7 @@ namespace strumpack {
   (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
    std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
    int max_rank, int depth) {
-    // GEQP3 is much more accurate!!
     ID_column_GEQP3(X, piv, ind, rel_tol, abs_tol, max_rank, depth);
-    //ID_column_MGS(X, piv, ind, rel_tol, abs_tol, max_rank, depth);
   }
 
   template<typename scalar_t> void DenseMatrix<scalar_t>::ID_column_GEQP3
@@ -1888,72 +1880,6 @@ namespace strumpack {
     X = DenseMatrix<scalar_t>(rank, n-rank, ptr(0, rank), ld());
   }
 
-  template<typename scalar_t> void DenseMatrix<scalar_t>::ID_column_MGS
-  (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
-   std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
-   int max_rank, int depth) {
-    int m = rows(), n = cols();
-    piv.resize(n);
-    ind.resize(n);
-    DenseMatrix<scalar_t> R(m, n);
-    auto cnrms = new real_t[n];
-#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
-#pragma omp taskloop grainsize(32) default(shared)  \
-  if(depth < params::task_recursion_cutoff_level)                       \
-  final(depth >= params::task_recursion_cutoff_level-1) mergeable
-#endif
-    for (std::size_t i=0; i<n; i++) {
-      cnrms[i] = blas::nrm2(m, ptr(0, i), 1);
-      cnrms[i] *= cnrms[i];
-      ind[i] = i;
-      piv[i] = i+1;
-    }
-    auto R00 = real_t(1.);
-    int i = 0, NB = 32, mn = std::min(m, n);
-    bool conv = false;
-    for (int j=0; j<mn && !conv; j+=NB) {
-      for (i=j; i<std::min(mn,j+NB); i++) {
-        auto cmax = std::max_element(cnrms+i, cnrms+n) - cnrms;
-        if (cmax != i) {
-          piv[i] = cmax+1;
-          std::swap(ind[i], ind[cmax]);
-          std::swap(cnrms[i], cnrms[cmax]);
-          blas::swap(m, ptr(0, i), 1, ptr(0, cmax), 1);
-          blas::swap(i, &R(0, i), 1, R.ptr(0, cmax), 1);
-        }
-        gemv_omp_task('N', m, i-j, scalar_t(-1.), ptr(0, j), ld(),
-                      R.ptr(j, i), 1, scalar_t(1.), ptr(0, i), 1, depth);
-        auto Rii = blas::nrm2(m, ptr(0, i), 1);
-        if (i == 0) R00 = Rii;
-        if (Rii/R00 <= rel_tol || Rii <= abs_tol || i == max_rank) {
-          conv = true;
-          break;
-        }
-        R(i, i) = Rii;
-        blas::scal(m, scalar_t(1.)/Rii, ptr(0, i), 1);
-        if (i < n-1) {
-          gemv_omp_task('C', m, n-(i+1), scalar_t(1.), ptr(0, i+1), ld(),
-                        ptr(0, i), 1, scalar_t(0.),
-                        R.ptr(i, i+1), R.ld(), depth);
-          blas::lacgv(n-(i+1), R.ptr(i, i+1), R.ld());
-          for (int k=i+1; k<n; k++)
-            cnrms[k] -= std::real(std::conj(R(i, k))*R(i, k));
-        }
-      }
-      if (i < n-1)
-        gemm_omp_task('N', 'N', m, n-(i+1), i-j, scalar_t(-1.),
-                      ptr(0, j), ld(), R.ptr(j, i+1), R.ld(),
-                      scalar_t(1.), ptr(0, i+1), ld(), depth);
-    }
-    delete[] cnrms;
-    ind.resize(i);
-    trsm_omp_task('L', 'U', 'N', 'N', i, n-i, scalar_t(1.),
-                  R.ptr(0, 0), R.ld(), R.ptr(0, i), R.ld(), depth);
-    X = DenseMatrix<scalar_t>(i, n-i, R.ptr(0, i), R.ld());
-    std::cout << "TODO count flops for ID_column_MGS,"
-              << " note that this routine is not stable!" << std::endl;
-  }
-
   template<typename scalar_t> void DenseMatrix<scalar_t>::low_rank
   (DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
    real_t rel_tol, real_t abs_tol, int max_rank, int depth) const {
@@ -1962,7 +1888,7 @@ namespace strumpack {
     std::unique_ptr<scalar_t[]> tau(new scalar_t[minmn]);
     std::vector<int> ind(n);
     int rank;
-    int info = blas::geqp3tol
+    blas::geqp3tol
       (m, n, tmp.data(), tmp.ld(), ind.data(),
        tau.get(), rank, rel_tol, abs_tol, depth);
     std::vector<int> piv(n);
@@ -1977,7 +1903,7 @@ namespace strumpack {
       for (int r=c+1; r<rank; r++)
         V(r, c) = scalar_t(0.);
     V.lapmt(ind, false);
-    info = blas::xxgqr(rows(), rank, rank, tmp.data(), tmp.ld(), tau.get());
+    blas::xxgqr(rows(), rank, rank, tmp.data(), tmp.ld(), tau.get());
     U = DenseMatrix<scalar_t>(rows(), rank, tmp.ptr(0, 0), tmp.ld());
   }
 

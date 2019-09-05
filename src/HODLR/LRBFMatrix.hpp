@@ -298,8 +298,8 @@ namespace strumpack {
         auto n = Bk.lrows();
         auto Bdata = Bk.data();
         auto Bld = Bk.ld();
-        for (std::size_t j=0; j<m; j++)
-          for (std::size_t i=0; i<n; i++)
+        for (int j=0; j<m; j++)
+          for (int i=0; i<n; i++)
             Bdata[i+j*Bld] += *ptr++;
       }
     }
@@ -428,11 +428,10 @@ namespace strumpack {
       const auto Rcols = R2D.cols();
       int R2Drlo, R2Drhi, R2Dclo, R2Dchi;
       R2D.lranges(R2Drlo, R2Drhi, R2Dclo, R2Dchi);
-      const auto Rlcols = R2Dchi - R2Dclo;
-      const auto Rlrows = R2Drhi - R2Drlo;
-      const auto nprows = R2D.nprows();
-      const auto B = DistM_t::default_MB;
-      const auto lrows = R1D.rows();
+      const int Rlcols = R2Dchi - R2Dclo;
+      const int Rlrows = R2Drhi - R2Drlo;
+      const int nprows = R2D.nprows();
+      const int lrows = R1D.rows();
       assert(lrows == dist[rank+1] - dist[rank]);
       std::vector<std::vector<scalar_t>> sbuf(P);
       if (R2D.active()) {
@@ -482,14 +481,13 @@ namespace strumpack {
     LRBFMatrix<scalar_t>::redistribute_1D_to_2D
     (const DenseM_t& S1D, DistM_t& S2D, const std::vector<int>& dist) const {
       TIMER_TIME(TaskType::REDIST_2D_TO_HSS, 0, t_redist);
-      const auto rank = c_.rank();
-      const auto P = c_.size();
-      const auto B = DistM_t::default_MB;
-      const auto cols = S1D.cols();
+      const int rank = c_.rank();
+      const int P = c_.size();
+      const int cols = S1D.cols();
       int S2Drlo, S2Drhi, S2Dclo, S2Dchi;
       S2D.lranges(S2Drlo, S2Drhi, S2Dclo, S2Dchi);
-      const auto nprows = S2D.nprows();
-      const auto lrows = dist[rank+1] - dist[rank];
+      const int nprows = S2D.nprows();
+      const int lrows = dist[rank+1] - dist[rank];
       std::vector<std::vector<scalar_t>> sbuf(P);
       if (lrows) {
         std::vector<std::tuple<int,int,int>> glp(lrows);

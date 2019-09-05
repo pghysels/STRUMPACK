@@ -430,7 +430,6 @@ namespace strumpack {
    const DenseM_t& R, DenseM_t& S, int depth) const {
     const std::size_t clo = find_global(slo);
     const std::size_t chi = find_global(shi);
-    const auto ds = shi - slo;
     const auto nbvec = R.cols();
     const auto B = 4; // blocking parameter
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
@@ -441,7 +440,6 @@ namespace strumpack {
       long long int local_flops = 0;
       for (std::size_t c=clo; c<chi; c++) {
         const auto col = global_col_[c];
-        integer_t row_upd = 0;
         const auto hij = ptr_[c+1];
         for (auto j=ptr_[c]; j<hij; j++) {
           const auto row = ind_[j];
@@ -474,7 +472,6 @@ namespace strumpack {
     const integer_t dupd = upd.size();
     const std::size_t clo = find_global(slo);
     const std::size_t chi = find_global(shi);
-    const auto ds = shi - slo;
     const auto nbvec = R.cols();
     const auto B = 4; // blocking parameter
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)

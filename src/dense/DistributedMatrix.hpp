@@ -861,8 +861,8 @@ namespace strumpack {
        << prow() << " " << pcol()
        << std::endl;
     fs << std::setprecision(precision) << std::setw(20);
-    for (std::size_t i=0; i<lrows_; i++) {
-      for (std::size_t j=0; j<lcols_; j++)
+    for (int i=0; i<lrows_; i++) {
+      for (int j=0; j<lcols_; j++)
         fs << operator()(i,j) << " ";
       fs << std::endl;
     }
@@ -898,11 +898,9 @@ namespace strumpack {
     TIMER_TIME(TaskType::DISTMAT_EXTRACT_ROWS, 1, t_dist_mat_extract_rows);
     DistributedMatrix<scalar_t> tmp(grid(), Ir.size(), cols());
     if (!active()) return tmp;
-    std::vector<std::vector<scalar_t>> sbuf(nprows());
-    std::vector<std::vector<scalar_t>> rbuf(nprows());
+    std::vector<std::vector<scalar_t>> sbuf(nprows()), rbuf(nprows());
     {
-      std::vector<std::size_t> rsizes(nprows());
-      std::vector<std::size_t> ssizes(nprows());
+      std::vector<std::size_t> rsizes(nprows()), ssizes(nprows());
       for (std::size_t r=0; r<Ir.size(); r++) {
         auto gr = Ir[r];
         auto owner = rowg2p(gr);
@@ -970,11 +968,9 @@ namespace strumpack {
     DistributedMatrix<scalar_t> tmp(grid(), rows(), Jc.size());
     if (!active()) return tmp;
     assert(I() == 1 && J() == 1);
-    std::vector<std::vector<scalar_t>> sbuf(npcols());
-    std::vector<std::vector<scalar_t>> rbuf(npcols());
+    std::vector<std::vector<scalar_t>> sbuf(npcols()), rbuf(npcols());
     {
-      std::vector<std::size_t> rsizes(npcols());
-      std::vector<std::size_t> ssizes(npcols());
+      std::vector<std::size_t> rsizes(npcols()), ssizes(npcols());
       for (std::size_t c=0; c<Jc.size(); c++) {
         auto gc = Jc[c];
         auto owner = colg2p(gc);

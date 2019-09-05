@@ -522,8 +522,8 @@ namespace strumpack {
       const auto prows = pa->grid()->nprows();
       const auto pcols = pa->grid()->npcols();
       const auto B = DistM_t::default_MB;
-      const auto rows = cS.rows();
-      const auto cols = cS.cols();
+      const int rows = cS.rows();
+      const int cols = cS.cols();
       auto destr = new int[rows+cols];
       auto destc = destr + rows;
       for (int r=0; r<rows; r++)

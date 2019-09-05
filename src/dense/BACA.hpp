@@ -43,8 +43,7 @@ namespace strumpack {
            int* piv, scalar_t* tau) {
     assert(W.rows() == W.cols() && W.rows() == C.cols() &&
            W.cols() == R.rows());
-    std::size_t d = W.rows();
-    int rank = 0;
+    int d = W.rows(), rank = 0;
     std::fill(piv, piv+d, 0);
 #if 0
     blas::geqp3tol
@@ -127,7 +126,6 @@ namespace strumpack {
    (const std::vector<std::size_t>&, DenseMatrix<scalar_t>&)>& Acol,
    std::size_t d, real_t rtol, real_t atol, std::size_t max_rank,
    int task_depth=0) {
-    using D_t = DenseMatrix<scalar_t>;
     using DW_t = DenseMatrixWrapper<scalar_t>;
     std::size_t rmax = std::min(max_rank, std::min(m, n)),
       maxmn = std::max(m, n);
@@ -221,7 +219,6 @@ namespace strumpack {
    (const std::vector<std::size_t>&, DenseMatrix<scalar_t>&)>& Acol,
    std::size_t d, real_t rtol, real_t atol, std::size_t max_rank,
    int task_depth=0) {
-    using D_t = DenseMatrix<scalar_t>;
     using DW_t = DenseMatrixWrapper<scalar_t>;
     std::size_t rmax = std::min(max_rank, std::min(m, n)),
       maxmn = std::max(m, n);

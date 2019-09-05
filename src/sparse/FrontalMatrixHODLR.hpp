@@ -457,8 +457,6 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLR<scalar_t,integer_t>::compress_extraction
   (const SpMat_t& A, const Opts_t& opts, int task_depth) {
-    const auto dsep = dim_sep();
-    const auto dupd = dim_upd();
     auto extract_F11 =
       [&](VecVec_t& I, VecVec_t& J, std::vector<DenseMW_t>& B,
           HODLR::ExtractionMeta& e) {
@@ -472,7 +470,7 @@ namespace strumpack {
     { TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
       F11_.factor(); }
     compress_flops_F11();
-    if (dupd) {
+    if (dim_upd()) {
       auto extract_F12 =
         [&](VecVec_t& I, VecVec_t& J, std::vector<DenseMW_t>& B,
             HODLR::ExtractionMeta& e) {

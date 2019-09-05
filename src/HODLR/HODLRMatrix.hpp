@@ -485,7 +485,6 @@ namespace strumpack {
       {
         std::vector<DistMW_t> B(*Ninter);
         auto& comm = *(temp->c);
-        auto P = comm.size();
         auto rank = comm.rank();
         grids.reserve(*Ninter);
         auto data = alldat_loc;
@@ -659,11 +658,8 @@ namespace strumpack {
       int r = *m - 1, c = *n - 1;
       bool a = true;
       for (int j=map0[c]; j<=map1[c] && a; j++)
-        for (int i=map0[r]; i<=map1[r] && a; i++) {
-          assert(i < adm.rows());
-          assert(j < adm.cols());
+        for (int i=map0[r]; i<=map1[r] && a; i++)
           a = a && adm(i, j);
-        }
       *admissible = a;
     }
 
@@ -910,8 +906,8 @@ namespace strumpack {
         rowidx[k] = I[k].size();
         colidx[k] = J[k].size();
         pgids[k] = 0;
-        for (auto l : I[k]) { assert(l < rows_); allrows[i++] = l; }
-        for (auto l : J[k]) { assert(l < cols_); allcols[j++] = l; }
+        for (auto l : I[k]) { assert(int(l) < rows_); allrows[i++] = l; }
+        for (auto l : J[k]) { assert(int(l) < cols_); allcols[j++] = l; }
       }
       for (int k=0; k<Ninter; k++)
         total_dat += B[k].lrows()*B[k].lcols();
@@ -926,8 +922,8 @@ namespace strumpack {
         auto n = Bk.lrows();
         auto Bdata = Bk.data();
         auto Bld = Bk.ld();
-        for (std::size_t j=0; j<m; j++)
-          for (std::size_t i=0; i<n; i++)
+        for (int j=0; j<m; j++)
+          for (int i=0; i<n; i++)
             Bdata[i+j*Bld] = *ptr++;
       }
     }
@@ -936,7 +932,6 @@ namespace strumpack {
     (const Vec_t& I, const Vec_t& J, DenseM_t& B) {
       int m = I.size(), n = J.size(), pgids = 0;
       if (m == 0 || n == 0) return;
-      assert(m == B.rows() && n == B.cols());
       int pmaps[3] = {1, 1, 0};
       std::vector<int> Ii, Ji;
       Ii.assign(I.begin(), I.end());
@@ -978,7 +973,6 @@ namespace strumpack {
       const auto Rlcols = R2Dchi - R2Dclo;
       const auto Rlrows = R2Drhi - R2Drlo;
       const auto nprows = R2D.nprows();
-      const auto B = DistM_t::default_MB;
       std::vector<std::vector<scalar_t>> sbuf(P);
       if (R2D.active()) {
         // global, local, proc
@@ -1005,7 +999,7 @@ namespace strumpack {
       std::vector<scalar_t> rbuf;
       std::vector<scalar_t*> pbuf;
       c_.all_to_all_v(sbuf, rbuf, pbuf);
-      assert(R1D.rows() == lrows_ && R1D.cols() == Rcols);
+      assert(int(R1D.rows()) == lrows_ && int(R1D.cols()) == Rcols);
       if (lrows_) {
         std::vector<int> src_c(Rcols);
         for (int c=0; c<Rcols; c++)
@@ -1024,16 +1018,15 @@ namespace strumpack {
     (const DenseM_t& S1D, DistM_t& S2D) const {
       TIMER_TIME(TaskType::REDIST_2D_TO_HSS, 0, t_redist);
       if (c_.is_null()) return;
-      const auto rank = c_.rank();
-      const auto P = c_.size();
-      const auto B = DistM_t::default_MB;
-      const auto cols = S1D.cols();
+      const int rank = c_.rank();
+      const int P = c_.size();
+      const int cols = S1D.cols();
       int S2Drlo, S2Drhi, S2Dclo, S2Dchi;
       S2D.lranges(S2Drlo, S2Drhi, S2Dclo, S2Dchi);
       const auto nprows = S2D.nprows();
       std::vector<std::vector<scalar_t>> sbuf(P);
-      assert(S1D.rows() == lrows_);
-      assert(S1D.rows() == dist_[rank+1] - dist_[rank]);
+      assert(int(S1D.rows()) == lrows_);
+      assert(int(S1D.rows()) == dist_[rank+1] - dist_[rank]);
       if (lrows_) {
         std::vector<std::tuple<int,int,int>> glp(lrows_);
         for (int r=0; r<lrows_; r++) {

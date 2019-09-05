@@ -265,10 +265,10 @@ namespace strumpack {
       w.Jc = w.Jr;
       _U.check();  assert(_U.cols() == w.Jr.size());
       _V.check();  assert(_V.cols() == w.Jc.size());
-      int d = S.cols();
-      if (!(d >= this->cols() || d >= opts.max_rank() ||
-          (int(_U.cols()) + opts.p() < d  &&
-           int(_V.cols()) + opts.p() < d))) {
+      auto d = S.cols();
+      if (!(d >= this->cols() || int(d) >= opts.max_rank() ||
+          (_U.cols() + opts.p() < d  &&
+           _V.cols() + opts.p() < d))) {
         // std::cout << "WARNING: ID did not reach required accuracy:"
         //           << "\t increase k (number of ANN's), or Delta_d."
         //           << std::endl;
