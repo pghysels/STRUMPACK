@@ -891,30 +891,47 @@ namespace strumpack {
     perf_counters_start();
     t.start();
 
-    integer_t N = matrix()->size();
+    integer_t N = matrix()->size(), d = b.cols();
     assert(N < std::numeric_limits<int>::max());
-    std::vector<int> intIP(N);
-    for (integer_t i=0; i<N; i++)
-      intIP[i] = reordering()->iperm()[i] + 1;
-    std::vector<int> int_matching_cperm;
-    if (opts_.matching() != MatchingJob::NONE) {
-      int_matching_cperm.resize(N);
-      for (integer_t i=0; i<N; i++)
-        int_matching_cperm[i] = matching_cperm_[i] + 1;
-    }
 
-    auto bloc = b;
-    if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-      bloc.scale_rows(matching_Dr_);
-    bloc.lapmr(intIP, true);
-
+    DenseM_t bloc(b.rows(), b.cols());
+    auto iperm = reordering()->iperm();
     if (use_initial_guess &&
         opts_.Krylov_solver() != KrylovSolver::DIRECT) {
-      if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-        x.div_rows(matching_Dc_);
-      if (opts_.matching() != MatchingJob::NONE)
-        x.lapmr(int_matching_cperm, true);
-      x.lapmr(intIP, true);
+      if (opts_.matching() != MatchingJob::NONE) {
+        if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) {
+          for (integer_t j=0; j<d; j++)
+#pragma omp parallel for simd
+            for (integer_t i=0; i<N; i++) {
+              auto pi = iperm[matching_cperm_[i]];
+              bloc(i, j) = x(pi, j) / matching_Dc_[pi];
+            }
+        } else {
+          for (integer_t j=0; j<d; j++)
+#pragma omp parallel for simd
+            for (integer_t i=0; i<N; i++)
+              bloc(i, j) = x(iperm[matching_cperm_[i]], j);
+        }
+      } else {
+        for (integer_t j=0; j<d; j++)
+#pragma omp parallel for simd
+          for (integer_t i=0; i<N; i++)
+            bloc(i, j) = x(iperm[matching_cperm_[i]], j);
+      }
+      x.copy(bloc);
+    }
+    if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) {
+      for (integer_t j=0; j<d; j++)
+#pragma omp parallel for simd
+        for (integer_t i=0; i<N; i++) {
+          auto pi = iperm[i];
+          bloc(i, j) = matching_Dr_[pi] * b(pi, j);
+        }
+    } else {
+      for (integer_t j=0; j<d; j++)
+#pragma omp parallel for simd
+        for (integer_t i=0; i<N; i++)
+          bloc(i, j) = b(iperm[i], j);
     }
 
     Krylov_its_ = 0;
@@ -980,11 +997,28 @@ namespace strumpack {
     }; break;
     }
 
-    x.lapmr(intIP, false);
-    if (opts_.matching() != MatchingJob::NONE)
-      x.lapmr(int_matching_cperm, false);
-    if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-      x.scale_rows(matching_Dc_);
+    if (opts_.matching() != MatchingJob::NONE) {
+      if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) {
+        for (integer_t j=0; j<d; j++)
+#pragma omp parallel for simd
+          for (integer_t i=0; i<N; i++) {
+            auto ipi = matching_cperm_[iperm[i]];
+            bloc(ipi, j) = x(i, j) * matching_Dc_[ipi];
+          }
+      } else {
+        for (integer_t j=0; j<d; j++)
+#pragma omp parallel for simd
+          for (integer_t i=0; i<N; i++)
+            bloc(matching_cperm_[iperm[i]], j) = x(i, j);
+      }
+    } else {
+      auto perm = reordering()->perm();
+      for (integer_t j=0; j<d; j++)
+#pragma omp parallel for simd
+        for (integer_t i=0; i<N; i++)
+          bloc(i, j) = x(perm[i], j);
+    }
+    x.copy(bloc);
 
     t.stop();
     perf_counters_stop("DIRECT/GMRES solve");
