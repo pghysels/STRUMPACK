@@ -483,7 +483,8 @@ namespace strumpack {
      std::vector<T*>& pbuf, const MPI_Datatype Ttype) const {
       assert(sbuf.size() == std::size_t(size()));
       auto P = size();
-      auto ssizes = new int[4*P];
+      std::unique_ptr<int[]> iwork(new int[4*P]);
+      auto ssizes = iwork.get();
       auto rsizes = ssizes + P;
       auto sdispl = ssizes + 2*P;
       auto rdispl = ssizes + 3*P;
@@ -499,26 +500,43 @@ namespace strumpack {
       std::size_t totrsize = std::accumulate(rsizes, rsizes+P, 0);
       if (totrsize > std::numeric_limits<int>::max() ||
           totssize > std::numeric_limits<int>::max()) {
-        std::cerr << "# ERROR: 32bit integer overflow in all_to_all_v!!" << std::endl;
-        MPI_Abort(comm_, 1);
+        // This case will probably cause an overflow in the
+        // rdispl/sdispl elements. Here we do the all_to_all_v
+        // manually by just using Isend/Irecv. This might be slower
+        // than splitting into multiple calls to MPI_Alltoallv
+        // (although it avoids a copy from the sbuf).
+        rbuf.resize(totrsize);
+        std::unique_ptr<MPI_Request[]> reqs(new MPI_Request[2*P]);
+        std::size_t displ = 0;
+        pbuf.resize(P);
+        for (int p=0; p<P; p++) {
+          pbuf[p] = rbuf.data() + displ;
+          MPI_Irecv(pbuf[p], rsizes[p], Ttype, p, 0, comm_, reqs.get()+p);
+          displ += rsizes[p];
+        }
+        for (int p=0; p<P; p++)
+          MPI_Isend
+            (sbuf[p].data(), ssizes[p], Ttype, p, 0, comm_, reqs.get()+P+p);
+        MPI_Waitall(2*P, reqs.get(), MPI_STATUSES_IGNORE);
+        std::vector<std::vector<T>>().swap(sbuf);
+      } else {
+        std::unique_ptr<T[]> sendbuf_(new T[totssize]);
+        auto sendbuf = sendbuf_.get();
+        sdispl[0] = rdispl[0] = 0;
+        for (int p=1; p<P; p++) {
+          sdispl[p] = sdispl[p-1] + ssizes[p-1];
+          rdispl[p] = rdispl[p-1] + rsizes[p-1];
+        }
+        for (int p=0; p<P; p++)
+          std::copy(sbuf[p].begin(), sbuf[p].end(), sendbuf+sdispl[p]);
+        std::vector<std::vector<T>>().swap(sbuf);
+        rbuf.resize(totrsize);
+        MPI_Alltoallv(sendbuf, ssizes, sdispl, Ttype,
+                      rbuf.data(), rsizes, rdispl, Ttype, comm_);
+        pbuf.resize(P);
+        for (int p=0; p<P; p++)
+          pbuf[p] = rbuf.data() + rdispl[p];
       }
-      T* sendbuf = new T[totssize];
-      sdispl[0] = rdispl[0] = 0;
-      for (int p=1; p<P; p++) {
-        sdispl[p] = sdispl[p-1] + ssizes[p-1];
-        rdispl[p] = rdispl[p-1] + rsizes[p-1];
-      }
-      for (int p=0; p<P; p++)
-        std::copy(sbuf[p].begin(), sbuf[p].end(), sendbuf+sdispl[p]);
-      std::vector<std::vector<T>>().swap(sbuf);
-      rbuf.resize(totrsize);
-      MPI_Alltoallv(sendbuf, ssizes, sdispl, Ttype,
-                    rbuf.data(), rsizes, rdispl, Ttype, comm_);
-      pbuf.resize(P);
-      for (int p=0; p<P; p++)
-        pbuf[p] = rbuf.data() + rdispl[p];
-      delete[] ssizes;
-      delete[] sendbuf;
     }
 
 
