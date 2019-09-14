@@ -289,7 +289,15 @@ namespace strumpack {
     (int ordering_level, integer_t lo, integer_t hi) const = 0;
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
-    // TODO implement these outside of this class
+    virtual CSRGraph<integer_t> extract_graph_sep_CB
+    (int ordering_level, integer_t lo, integer_t hi,
+     const std::vector<integer_t>& upd) const = 0;
+    virtual CSRGraph<integer_t> extract_graph_CB_sep
+    (int ordering_level, integer_t lo, integer_t hi,
+     const std::vector<integer_t>& upd) const = 0;
+    virtual CSRGraph<integer_t> extract_graph_CB
+    (int ordering_level, const std::vector<integer_t>& upd) const = 0;
+
     virtual void extract_separator
     (integer_t sep_end, const std::vector<std::size_t>& I,
      const std::vector<std::size_t>& J, DenseM_t& B, int depth) const = 0;
@@ -300,6 +308,16 @@ namespace strumpack {
     virtual void front_multiply
     (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
      const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const = 0;
+
+    virtual void front_multiply_F11
+    (Trans op, integer_t slo, integer_t shi,
+     const DenseM_t& R, DenseM_t& S, int depth) const = 0;
+    virtual void front_multiply_F12
+    (Trans op, integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+     const DenseM_t& R, DenseM_t& S, int depth) const = 0;
+    virtual void front_multiply_F21
+    (Trans op, integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+     const DenseM_t& R, DenseM_t& S, int depth) const = 0;
 
 #if defined(STRUMPACK_USE_MPI)
     virtual void extract_F11_block
@@ -324,16 +342,6 @@ namespace strumpack {
     (Trans op, integer_t sep_begin, integer_t sep_end,
      const std::vector<integer_t>& upd, const DistM_t& R,
      DistM_t& S, int depth) const = 0;
-
-    virtual void front_multiply_F11
-    (Trans op, integer_t slo, integer_t shi,
-     const DenseM_t& R, DenseM_t& S, int depth) const {};
-    virtual void front_multiply_F12
-    (Trans op, integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
-     const DenseM_t& R, DenseM_t& S, int depth) const {};
-    virtual void front_multiply_F21
-    (Trans op, integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
-     const DenseM_t& R, DenseM_t& S, int depth) const {};
 #endif //STRUMPACK_USE_MPI
 #endif //DOXYGEN_SHOULD_SKIP_THIS
 

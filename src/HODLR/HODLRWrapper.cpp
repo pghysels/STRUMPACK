@@ -176,18 +176,24 @@ namespace strumpack {
     template<> void LRBF_construct_init<double>
     (int M, int N, int& lrows, int& lcols, F2Cptr rmsh, F2Cptr cmsh,
      F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
-     F2Cptr& kerquant, F2Cptr& ptree) {
+     F2Cptr& kerquant, F2Cptr& ptree,
+     void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
+     void (*C_FuncNearFar)(int*, int*, int*, C2Fptr), C2Fptr fdata) {
       d_c_bf_construct_init
         (&M, &N, &lrows, &lcols, &rmsh, &cmsh, &lr_bf, &options,
-         &stats, &msh, &kerquant, &ptree);
+         &stats, &msh, &kerquant, &ptree, C_FuncDistmn, C_FuncNearFar,
+         fdata);
     }
     template<> void LRBF_construct_init<std::complex<double>>
     (int M, int N, int& lrows, int& lcols, F2Cptr rmsh, F2Cptr cmsh,
      F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
-     F2Cptr& kerquant, F2Cptr& ptree) {
+     F2Cptr& kerquant, F2Cptr& ptree,
+     void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
+     void (*C_FuncNearFar)(int*, int*, int*, C2Fptr), C2Fptr fdata) {
       z_c_bf_construct_init
         (&M, &N, &lrows, &lcols, &rmsh, &cmsh, &lr_bf, &options,
-         &stats, &msh, &kerquant, &ptree);
+         &stats, &msh, &kerquant, &ptree, C_FuncDistmn, C_FuncNearFar,
+         fdata);
     }
 
     template<> void LRBF_construct_matvec_compute<double>
@@ -391,7 +397,11 @@ namespace strumpack {
          &Xlrows, &Blrows, &rhs, &ho_bf, &options, &stats, &ptree);
     }
 
-
+    int LRBF_treeindex_merged2child(int idx_merge) {
+      int idx_child;
+      d_c_bpack_treeindex_merged2child(&idx_merge, &idx_child);
+      return idx_child;
+    }
 
   } // end namespace HODLR
 } // end namespace strumpack

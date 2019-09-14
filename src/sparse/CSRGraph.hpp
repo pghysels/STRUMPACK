@@ -112,6 +112,9 @@ namespace strumpack {
     template<typename int_t>
     DenseMatrix<bool> admissibility(const std::vector<int_t>& tiles) const;
 
+    template<typename int_t> DenseMatrix<bool> admissibility
+    (const std::vector<int_t>& rtiles, const std::vector<int_t>& ctiles) const;
+
     void print_dense(const std::string& name) const;
 
   private:
@@ -174,7 +177,7 @@ namespace strumpack {
       std::cout << "r=" << i << ", ";
       for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
         std::cout << ind_[j] << " ";
-      std::cout << std::endl;
+      //std::cout << std::endl;
     }
     std::cout << std::endl;
   }
@@ -453,6 +456,29 @@ namespace strumpack {
              (ts.begin(), ts.end(), *pj)) - 1;
           if (t != tj) adm(t, tj) = adm(tj, t) = false;
         }
+      }
+    }
+    return adm;
+  }
+
+  template<typename integer_t> template<typename int_t>
+  DenseMatrix<bool> CSRGraph<integer_t>::admissibility
+  (const std::vector<int_t>& rtiles, const std::vector<int_t>& ctiles) const {
+    integer_t nrt = rtiles.size(), nct = ctiles.size();
+    DenseMatrix<bool> adm(nrt, nct);
+    adm.fill(true);
+    std::vector<integer_t> rts(nrt+1), cts(nct+1);
+    for (integer_t i=0; i<nrt; i++)
+      rts[i+1] = rtiles[i] + rts[i];
+    for (integer_t i=0; i<nct; i++)
+      cts[i+1] = ctiles[i] + cts[i];
+    for (integer_t t=0; t<nrt; t++) {
+      for (integer_t i=rts[t]; i<rts[t+1]; i++) {
+        auto hij = ind() + ptr_[i+1];
+        for (auto pj=ind()+ptr_[i]; pj!=hij; pj++)
+          adm(t, std::distance
+              (cts.begin(), std::upper_bound
+               (cts.begin(), cts.end(), *pj)) - 1) = false;
       }
     }
     return adm;

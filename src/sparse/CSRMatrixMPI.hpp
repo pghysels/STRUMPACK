@@ -179,6 +179,28 @@ namespace strumpack {
     void front_multiply_2d
     (Trans op, integer_t, integer_t, const std::vector<integer_t>&,
      const DistM_t&, DistM_t&, int) const override {}
+
+    CSRGraph<integer_t> extract_graph_sep_CB
+    (int ordering_level, integer_t lo, integer_t hi,
+     const std::vector<integer_t>& upd) const override {
+      return CSRGraph<integer_t>(); };
+    CSRGraph<integer_t> extract_graph_CB_sep
+    (int ordering_level, integer_t lo, integer_t hi,
+     const std::vector<integer_t>& upd) const override {
+      return CSRGraph<integer_t>(); };
+    CSRGraph<integer_t> extract_graph_CB
+    (int ordering_level, const std::vector<integer_t>& upd) const override {
+      return CSRGraph<integer_t>(); };
+
+    void front_multiply_F11
+    (Trans op, integer_t slo, integer_t shi,
+     const DenseM_t& R, DenseM_t& S, int depth) const override {};
+    void front_multiply_F12
+    (Trans op, integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+     const DenseM_t& R, DenseM_t& S, int depth) const override {};
+    void front_multiply_F21
+    (Trans op, integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+     const DenseM_t& R, DenseM_t& S, int depth) const override {};
 #endif //DOXYGEN_SHOULD_SKIP_THIS
 
   protected:

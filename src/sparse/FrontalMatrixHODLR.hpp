@@ -474,22 +474,32 @@ namespace strumpack {
       auto extract_F12 =
         [&](VecVec_t& I, VecVec_t& J, std::vector<DenseMW_t>& B,
             HODLR::ExtractionMeta& e) {
-          for (auto& Ik : I) for (auto& i : Ik) i += this->sep_begin_;
-          for (auto& Jk : J) for (auto& j : Jk) j = this->upd_[j];
+          for (auto& Ik : I) for (auto& i : Ik) {
+              assert(i < this->dim_sep());
+              i += this->sep_begin_;
+            }
+          for (auto& Jk : J) for (auto& j : Jk) {
+              assert(j < this->dim_upd());
+              j = this->upd_[j];
+            }
           for (std::size_t k=0; k<I.size(); k++)
             element_extraction(A, I[k], J[k], B[k], task_depth);
         };
       auto extract_F21 =
         [&](VecVec_t& I, VecVec_t& J, std::vector<DenseMW_t>& B,
             HODLR::ExtractionMeta& e) {
-          for (auto& Ik : I) for (auto& i : Ik) i = this->upd_[i];
-          for (auto& Jk : J) for (auto& j : Jk) j += this->sep_begin_;
+          for (auto& Ik : I) for (auto& i : Ik) {
+              assert(i < this->dim_upd());
+              i = this->upd_[i];
+            }
+          for (auto& Jk : J) for (auto& j : Jk) {
+              assert(j < this->dim_sep());
+              j += this->sep_begin_;
+            }
           for (std::size_t k=0; k<I.size(); k++)
             element_extraction(A, I[k], J[k], B[k], task_depth);
         };
       { TIMER_TIME(TaskType::LRBF_COMPRESS, 0, t_lrbf_compress);
-        F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_);
-        F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
         F12_.compress(extract_F12);
         F21_.compress(extract_F21); }
       compress_flops_F12_F21();
@@ -583,8 +593,6 @@ namespace strumpack {
         if (rchild_) rchild_->sample_CB_to_F21(op, lR, S, this, task_depth);
       };
       { TIMER_TIME(TaskType::LRBF_COMPRESS, 0, t_lrbf_compress);
-        F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_);
-        F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
         F12_.compress(sample_F12);
         F21_.compress(sample_F21, F12_.get_stat("Rank_max")+10); }
       compress_flops_F12_F21();
@@ -807,9 +815,34 @@ namespace strumpack {
     if (!is_root && dim_upd()) {
       HSS::HSSPartitionTree CB_tree(dim_upd());
       CB_tree.refine(opts.HODLR_options().leaf_size());
+      auto gCB = A.extract_graph_CB(opts.separator_ordering_level(), this->upd());
+      auto admCB = gCB.admissibility(CB_tree.template leaf_sizes<int>());
       F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
         (new HODLR::HODLRMatrix<scalar_t>
-         (commself_, CB_tree, opts.HODLR_options()));
+         (commself_, CB_tree, admCB, gCB, opts.HODLR_options()));
+      if (opts.HODLR_options().compression_algorithm() ==
+          HODLR::CompressionAlgorithm::ELEMENT_EXTRACTION &&
+          opts.HODLR_options().geo() == 2) {{
+          auto g12 = A.extract_graph_sep_CB
+            (opts.separator_ordering_level(), sep_begin_, sep_end_, this->upd());
+          auto adm12 = g12.admissibility
+            (sep_tree.template leaf_sizes<int>(),
+             CB_tree.template leaf_sizes<int>());
+          F12_ = HODLR::LRBFMatrix<scalar_t>
+            (F11_, sep_tree, *F22_, CB_tree, adm12, g12, opts.HODLR_options());
+        } {
+          auto g21 = A.extract_graph_CB_sep
+            (opts.separator_ordering_level(), sep_begin_, sep_end_, this->upd());
+          auto adm21 = g21.admissibility
+            (CB_tree.template leaf_sizes<int>(),
+             sep_tree.template leaf_sizes<int>());
+          F21_ = HODLR::LRBFMatrix<scalar_t>
+            (*F22_, CB_tree, F11_, sep_tree, adm21, g21, opts.HODLR_options());
+        }
+      } else {
+       F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_);
+       F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
+      }
     }
   }
 

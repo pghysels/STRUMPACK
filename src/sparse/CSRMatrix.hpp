@@ -97,6 +97,14 @@ namespace strumpack {
 
     CSRGraph<integer_t> extract_graph
     (int ordering_level, integer_t lo, integer_t hi) const override;
+    CSRGraph<integer_t> extract_graph_sep_CB
+    (int ordering_level, integer_t lo, integer_t hi,
+     const std::vector<integer_t>& upd) const override;
+    CSRGraph<integer_t> extract_graph_CB_sep
+    (int ordering_level, integer_t lo, integer_t hi,
+     const std::vector<integer_t>& upd) const override;
+    CSRGraph<integer_t> extract_graph_CB
+    (int ordering_level, const std::vector<integer_t>& upd) const override;
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
     // TODO implement these outside of this class
@@ -111,6 +119,16 @@ namespace strumpack {
     (DenseM_t& F11, DenseM_t& F12, DenseM_t& F21, integer_t sep_begin,
      integer_t sep_end, const std::vector<integer_t>& upd,
      int depth) const override;
+
+    void front_multiply_F11
+    (Trans op, integer_t slo, integer_t shi,
+     const DenseM_t& R, DenseM_t& S, int depth) const override;
+    void front_multiply_F12
+    (Trans op, integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+     const DenseM_t& R, DenseM_t& S, int depth) const override;
+    void front_multiply_F21
+    (Trans op, integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+     const DenseM_t& R, DenseM_t& S, int depth) const override;
 
 #if defined(STRUMPACK_USE_MPI)
     void extract_F11_block
@@ -483,7 +501,6 @@ namespace strumpack {
     integer_t dupd = upd.size();
     const integer_t nbvec = R.cols();
     const integer_t ds = shi - slo;
-
     const auto B = 4; // blocking parameter
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop default(shared)                    \
@@ -551,6 +568,194 @@ namespace strumpack {
       STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
     }
   }
+
+  template<typename scalar_t,typename integer_t> void
+  CSRMatrix<scalar_t,integer_t>::front_multiply_F11
+  (Trans op, integer_t slo, integer_t shi,
+   const DenseM_t& R, DenseM_t& S, int depth) const {
+    const integer_t nbvec = R.cols();
+    const integer_t ds = shi - slo;
+    const auto B = 4; // blocking parameter
+    long long int local_flops = 0;
+    if (op == Trans::N) {
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp taskloop default(shared)                    \
+  if(depth < params::task_recursion_cutoff_level)
+#endif
+      for (integer_t c=0; c<nbvec; c+=B)
+        for (auto row=slo; row<shi; row++) { // separator rows
+          integer_t upd_ptr = 0;
+          const auto hij = ptr_[row+1];
+          for (auto j=ptr_[row]; j<hij; j++) {
+            const auto col = ind_[j];
+            if (col >= slo) {
+              const auto hicc = std::min(c+B, nbvec);
+              const auto vj = val_[j];
+              if (col < shi) {
+                for (integer_t cc=c; cc<hicc; cc++)
+                  S(row-slo, cc) += vj * R(col-slo, cc);
+                local_flops += 4*(hicc-c);
+              }
+            }
+          }
+        }
+    } else {
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp taskloop default(shared)                    \
+  if(depth < params::task_recursion_cutoff_level)
+#endif
+      for (integer_t c=0; c<nbvec; c+=B) {
+        long long int local_flops = 0;
+        for (auto row=slo; row<shi; row++) { // separator rows
+          integer_t upd_ptr = 0;
+          const auto hij = ptr_[row+1];
+          for (auto j=ptr_[row]; j<hij; j++) {
+            const auto col = ind_[j];
+            if (col >= slo) {
+              const auto hicc = std::min(c+B, nbvec);
+              const auto vj = val_[j];
+              if (col < shi) {
+                for (integer_t cc=c; cc<hicc; cc++)
+                  S(col-slo, cc) += blas::my_conj(vj) * R(row-slo, cc);
+                local_flops += 4*(hicc-c);
+              }
+            }
+          }
+        }
+      }
+    }
+    STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+    STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  CSRMatrix<scalar_t,integer_t>::front_multiply_F12
+  (Trans op, integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+   const DenseM_t& R, DenseM_t& S, int depth) const {
+    integer_t dupd = upd.size();
+    const integer_t nbvec = R.cols();
+    const integer_t ds = shi - slo;
+    long long int local_flops = 0;
+    const auto B = 4; // blocking parameter
+    if (op == Trans::N) {
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp taskloop default(shared)                    \
+  if(depth < params::task_recursion_cutoff_level)
+#endif
+      for (integer_t c=0; c<nbvec; c+=B) {
+        for (auto row=slo; row<shi; row++) { // separator rows
+          integer_t upd_ptr = 0;
+          const auto hij = ptr_[row+1];
+          for (auto j=ptr_[row]; j<hij; j++) {
+            const auto col = ind_[j];
+            if (col >= slo) {
+              const auto hicc = std::min(c+B, nbvec);
+              const auto vj = val_[j];
+              if (col >= shi) {
+                while (upd_ptr<dupd && upd[upd_ptr]<col) upd_ptr++;
+                if (upd_ptr == dupd) break;
+                if (upd[upd_ptr] == col) {
+                  for (integer_t cc=c; cc<hicc; cc++)
+                    S(row-slo, cc) += vj * R(upd_ptr, cc);
+                  local_flops += 4*(hicc-c);
+                }
+              }
+            }
+          }
+        }
+      }
+    } else {
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp taskloop default(shared)                    \
+  if(depth < params::task_recursion_cutoff_level)
+#endif
+      for (integer_t c=0; c<nbvec; c+=B) {
+        for (auto row=slo; row<shi; row++) { // separator rows
+          integer_t upd_ptr = 0;
+          const auto hij = ptr_[row+1];
+          for (auto j=ptr_[row]; j<hij; j++) {
+            const auto col = ind_[j];
+            if (col >= slo) {
+              const auto hicc = std::min(c+B, nbvec);
+              const auto vj = val_[j];
+              if (col >= shi) {
+                while (upd_ptr<dupd && upd[upd_ptr]<col) upd_ptr++;
+                if (upd_ptr == dupd) break;
+                if (upd[upd_ptr] == col) {
+                  for (integer_t cc=c; cc<hicc; cc++)
+                    S(upd_ptr, cc) += blas::my_conj(vj) * R(row-slo, cc);
+                  local_flops += 4*(hicc-c);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+    STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  CSRMatrix<scalar_t,integer_t>::front_multiply_F21
+  (Trans op, integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+   const DenseM_t& R, DenseM_t& S, int depth) const {
+    integer_t dupd = upd.size();
+    const integer_t nbvec = R.cols();
+    const integer_t ds = shi - slo;
+    long long int local_flops = 0;
+    const auto B = 4; // blocking parameter
+    if (op == Trans::N) {
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp taskloop default(shared)                    \
+  if(depth < params::task_recursion_cutoff_level)
+#endif
+      for (integer_t c=0; c<nbvec; c+=B) {
+        for (integer_t i=0; i<dupd; i++) { // remaining rows
+          auto row = upd[i];
+          const auto hij = ptr_[row+1];
+          for (auto j=ptr_[row]; j<hij; j++) {
+            auto col = ind_[j];
+            if (col >= slo) {
+              if (col < shi) {
+                const auto vj = val_[j];
+                const auto hicc = std::min(c+B, nbvec);
+                for (integer_t cc=c; cc<hicc; cc++)
+                  S(i, cc) += vj * R(col-slo, cc);
+                local_flops += 4*(hicc-c);
+              } else break;
+            }
+          }
+        }
+      }
+    } else {
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp taskloop default(shared)                    \
+  if(depth < params::task_recursion_cutoff_level)
+#endif
+      for (integer_t c=0; c<nbvec; c+=B) {
+        for (integer_t i=0; i<dupd; i++) { // remaining rows
+          auto row = upd[i];
+          const auto hij = ptr_[row+1];
+          for (auto j=ptr_[row]; j<hij; j++) {
+            auto col = ind_[j];
+            if (col >= slo) {
+              if (col < shi) {
+                const auto vj = val_[j];
+                const auto hicc = std::min(c+B, nbvec);
+                for (integer_t cc=c; cc<hicc; cc++)
+                  S(col-slo, cc) += vj * R(i, cc);
+                local_flops += 4*(hicc-c);
+              } else break;
+            }
+          }
+        }
+      }
+    }
+    STRUMPACK_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+    STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
+  }
+
 
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::apply_scaling
@@ -865,6 +1070,78 @@ namespace strumpack {
     }
     xadj.push_back(adjncy.size());
     return CSRGraph<integer_t>(std::move(xadj), std::move(adjncy));
+  }
+
+  template<typename scalar_t,typename integer_t> CSRGraph<integer_t>
+  CSRMatrix<scalar_t,integer_t>::extract_graph_sep_CB
+  (int ordering_level, integer_t lo, integer_t hi,
+   const std::vector<integer_t>& upd) const {
+    integer_t dupd = upd.size(), dsep = hi - lo;
+    std::vector<integer_t> gptr, gind;
+    gptr.reserve(dsep+1);
+    gptr.push_back(0);
+    for (integer_t i=lo; i<hi; i++) {
+      gptr.push_back(gptr.back());
+      for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++) {
+        integer_t uj = ind_[j];
+        // TODO this search is not necessary? just check range?
+        auto lb = std::lower_bound(upd.begin(), upd.end(), uj);
+        if (lb != upd.end() && *lb == uj) {
+          auto ij = std::distance(upd.begin(), lb);
+          assert(ij < dupd && ij >= 0);
+          gind.push_back(ij);
+          gptr.back()++;
+        }
+      }
+    }
+    return CSRGraph<integer_t>(std::move(gptr), std::move(gind));
+  }
+
+  template<typename scalar_t,typename integer_t> CSRGraph<integer_t>
+  CSRMatrix<scalar_t,integer_t>::extract_graph_CB_sep
+  (int ordering_level, integer_t lo, integer_t hi,
+   const std::vector<integer_t>& upd) const {
+    integer_t dupd = upd.size(), dsep = hi - lo;
+    std::vector<integer_t> gptr, gind;
+    gptr.reserve(dsep+1);
+    gptr.push_back(0);
+    for (integer_t ii=0; ii<dupd; ii++) {
+      gptr.push_back(gptr.back());
+      integer_t i = upd[ii];
+      for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++) {
+        integer_t uj = ind_[j];
+        if (uj >= lo && uj < hi) {
+          gind.push_back(uj-lo);
+          gptr.back()++;
+        }
+      }
+    }
+    return CSRGraph<integer_t>(std::move(gptr), std::move(gind));
+  }
+
+  template<typename scalar_t,typename integer_t> CSRGraph<integer_t>
+  CSRMatrix<scalar_t,integer_t>::extract_graph_CB
+  (int ordering_level, const std::vector<integer_t>& upd) const {
+    integer_t dupd = upd.size();
+    std::vector<integer_t> gptr, gind;
+    gptr.reserve(dupd+1);
+    gptr.push_back(0);
+    for (integer_t ii=0; ii<dupd; ii++) {
+      gptr.push_back(gptr.back());
+      integer_t i = upd[ii];
+      for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++) {
+        integer_t uj = ind_[j];
+        // TODO this search is not necessary? just check range?
+        auto lb = std::lower_bound(upd.begin(), upd.end(), uj);
+        if (lb != upd.end() && *lb == uj) {
+          auto ij = std::distance(upd.begin(), lb);
+          assert(ij < dupd && ij >= 0);
+          gind.push_back(ij);
+          gptr.back()++;
+        }
+      }
+    }
+    return CSRGraph<integer_t>(std::move(gptr), std::move(gind));
   }
 
 } // end namespace strumpack

@@ -128,6 +128,18 @@ namespace strumpack {
       else front_multiply_2d_TC(sep_begin, sep_end, upd, R, S, depth);
     }
 
+    CSRGraph<integer_t> extract_graph_sep_CB
+    (int ordering_level, integer_t lo, integer_t hi,
+     const std::vector<integer_t>& upd) const override {
+      return CSRGraph<integer_t>(); };
+    CSRGraph<integer_t> extract_graph_CB_sep
+    (int ordering_level, integer_t lo, integer_t hi,
+     const std::vector<integer_t>& upd) const override {
+      return CSRGraph<integer_t>(); };
+    CSRGraph<integer_t> extract_graph_CB
+    (int ordering_level, const std::vector<integer_t>& upd) const override {
+      return CSRGraph<integer_t>(); };
+
     void spmv(const DenseM_t& x, DenseM_t& y) const override {};
     void spmv(const scalar_t* x, scalar_t* y) const override {};
 

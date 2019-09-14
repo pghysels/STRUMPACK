@@ -432,7 +432,7 @@ namespace strumpack {
     template<typename scalar_t> void HODLR_kernel_evaluation
     (int* i, int* j, scalar_t* v, C2Fptr KC) {
       const auto& K = *(static_cast<KernelCommPtrs<scalar_t>*>(KC)->K);
-      *v = K.eval(*i, *j);
+      *v = K.eval(*i-1, *j-1);
     }
 
     template<typename scalar_t> void HODLR_kernel_block_evaluation
@@ -453,7 +453,7 @@ namespace strumpack {
         if (comm.rank() == p0) {
           for (int c=0; c<n; c++)
             for (int r=0; r<m; r++)
-              data[r+c*m] = K.eval(allrows[r0+r], allcols[c0+c]);
+              data[r+c*m] = K.eval(allrows[r0+r]-1, allcols[c0+c]-1);
           data += m*n;
         }
         r0 += m;
@@ -464,7 +464,7 @@ namespace strumpack {
     template<typename scalar_t> void HODLR_element_evaluation
     (int* i, int* j, scalar_t* v, C2Fptr elem) {
       *v = static_cast<std::function<scalar_t(int,int)>*>
-        (elem)->operator()(*i, *j);
+        (elem)->operator()(*i-1, *j-1);
     }
 
     template<typename scalar_t> struct AelemCommPtrs {
@@ -491,8 +491,10 @@ namespace strumpack {
         for (int isec=0, r0=0, c0=0; isec<*Ninter; isec++) {
           auto m = rowids[isec];
           auto n = colids[isec];
-          I[isec].assign(allrows+r0, allrows+r0+m);
-          J[isec].assign(allcols+c0, allcols+c0+n);
+          for (int i=0; i<m; i++)
+            I[isec].push_back(allrows[r0+i]-1);
+          for (int i=0; i<n; i++)
+            J[isec].push_back(std::abs(allcols[c0+i])-1);
           auto p0 = pmaps[2*(*Npmap)+pgids[isec]];
           assert(pmaps[pgids[isec]] == 1);          // prows == 1
           assert(pmaps[(*Npmap)+pgids[isec]] == 1); // pcols == 1
@@ -521,8 +523,12 @@ namespace strumpack {
       for (int isec=0, r0=0, c0=0; isec<*Ninter; isec++) {
         auto m = rowids[isec];
         auto n = colids[isec];
-        I[isec].assign(allrows+r0, allrows+r0+m);
-        J[isec].assign(allcols+c0, allcols+c0+n);
+        I[isec].reserve(m);
+        J[isec].reserve(n);
+        for (int i=0; i<m; i++)
+          I[isec].push_back(allrows[r0+i]-1);
+        for (int i=0; i<n; i++)
+          J[isec].push_back(std::abs(allcols[c0+i])-1);
         B[isec] = DenseMW_t(m, n, data, m);
         r0 += m;
         c0 += n;
@@ -625,28 +631,24 @@ namespace strumpack {
       const CSRGraph<integer_t>* graph;
     };
 
-    template<typename scalar_t, typename integer_t>
-    void HODLR_distance_query(int* m, int* n, scalar_t* dist, C2Fptr fdata) {
-      int i = *m, j = *n;
-      if (i == j) { *dist = scalar_t(0.); return; }
+    template<typename scalar_t, typename integer_t,
+             typename real_t = typename RealType<scalar_t>::value_type>
+    void HODLR_distance_query(int* m, int* n, real_t* dist, C2Fptr fdata) {
+      int i = *m - 1, j = *n - 1;
+      if (i == j) { *dist = real_t(0.); return; }
       auto& info = *static_cast<AdmInfo<integer_t>*>(fdata);
       auto& g = *(info.graph);
-      for (integer_t k=g.ptr(i); k<g.ptr(i+1); k++) {
-        if (g.ind(k) == j) {
-          *dist = scalar_t(1.);
-          return;
-        }
+      *dist = real_t(1.);
+      auto pkhi = g.ind() + g.ptr(i+1);
+      for (auto pk=g.ind() + g.ptr(i); pk!=pkhi; pk++)
+        if (*pk == j) return;
+      *dist = real_t(2.);
+      for (auto pk=g.ind() + g.ptr(i); pk!=pkhi; pk++) {
+        auto plhi = g.ind() + g.ptr(*pk+1);
+        for (auto pl=g.ind() + g.ptr(*pk); pl!=plhi; pl++)
+          if (*pl == j) return;
       }
-      for (integer_t k=g.ptr(i); k<g.ptr(i+1); k++) {
-        auto ck = g.ind(k);
-        for (integer_t l=g.ptr(ck); l<g.ptr(ck+1); l++) {
-          if (g.ind(l) == j) {
-            *dist = scalar_t(2.);
-            return;
-          }
-        }
-      }
-      *dist = scalar_t(3.);
+      *dist = real_t(3.);
     }
 
     template<typename integer_t> void HODLR_admissibility_query
@@ -673,10 +675,6 @@ namespace strumpack {
       int min_lvl = 2 + std::ceil(std::log2(c.size()));
       lvls_ = std::max(min_lvl, full_tree.levels());
       full_tree.expand_complete_levels(lvls_);
-      AdmInfo<integer_t> info;
-      info.maps = tree.map_from_complete_to_leafs(lvls_);
-      info.adm = &adm;
-      info.graph = &graph;
       leafs_ = full_tree.template leaf_sizes<int>();
       c_ = c;
       if (c_.is_null()) return;
@@ -684,6 +682,10 @@ namespace strumpack {
       options_init(opts);
       perm_.resize(rows_);
       if (opts.geo() == 2) {
+        AdmInfo<integer_t> info;
+        info.maps = tree.map_from_complete_to_leafs(lvls_);
+        info.adm = &adm;
+        info.graph = &graph;
         // use the distance and admissibility functions
         HODLR_set_I_option<scalar_t>(options_, "nogeo", 2);
         // nedge/nvert is the average degree, but since we also consider
@@ -745,7 +747,10 @@ namespace strumpack {
     template<typename scalar_t> void HODLRMatrix<scalar_t>::perm_init() {
       iperm_.resize(rows_);
       MPI_Bcast(perm_.data(), perm_.size(), MPI_INT, 0, c_.comm());
-      for (int i=0; i<rows_; i++) iperm_[perm_[i]] = i;
+      for (int i=0; i<rows_; i++) {
+        perm_[i]--;
+        iperm_[perm_[i]] = i;
+      }
     }
 
     template<typename scalar_t> void HODLRMatrix<scalar_t>::dist_init() {
@@ -906,8 +911,8 @@ namespace strumpack {
         rowidx[k] = I[k].size();
         colidx[k] = J[k].size();
         pgids[k] = 0;
-        for (auto l : I[k]) { assert(int(l) < rows_); allrows[i++] = l; }
-        for (auto l : J[k]) { assert(int(l) < cols_); allcols[j++] = l; }
+        for (auto l : I[k]) { assert(int(l) < rows_); allrows[i++] = l+1; }
+        for (auto l : J[k]) { assert(int(l) < cols_); allcols[j++] = l+1; }
       }
       for (int k=0; k<Ninter; k++)
         total_dat += B[k].lrows()*B[k].lcols();
@@ -936,6 +941,8 @@ namespace strumpack {
       std::vector<int> Ii, Ji;
       Ii.assign(I.begin(), I.end());
       Ji.assign(J.begin(), J.end());
+      for (auto& i : Ii) i++;
+      for (auto& j : Ji) j++;
       HODLR_extract_elements<scalar_t>
         (ho_bf_, options_, msh_, stats_, ptree_, 1, m, n, m*n,
          Ii.data(), Ji.data(), B.data(), &m, &n, &pgids, 1, pmaps);

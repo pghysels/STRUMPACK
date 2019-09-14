@@ -69,6 +69,12 @@ namespace strumpack {
       LRBFMatrix
       (const HODLRMatrix<scalar_t>& A, const HODLRMatrix<scalar_t>& B);
 
+      template<typename integer_t> LRBFMatrix
+      (const HODLRMatrix<scalar_t>& A, const HSS::HSSPartitionTree& Atree,
+       const HODLRMatrix<scalar_t>& B, const HSS::HSSPartitionTree& Btree,
+       const DenseMatrix<bool>& admissibility,
+       const CSRGraph<integer_t>& graph, const opts_t& opts);
+
       LRBFMatrix(const LRBFMatrix<scalar_t>& h) = delete;
       LRBFMatrix(LRBFMatrix<scalar_t>&& h) { *this = h; }
       virtual ~LRBFMatrix();
@@ -158,20 +164,129 @@ namespace strumpack {
       int rank = c_.rank();
       std::vector<int> groups(P);
       std::iota(groups.begin(), groups.end(), 0);
-
       // create hodlr data structures
       HODLR_createptree<scalar_t>(P, groups.data(), Fcomm_, ptree_);
       HODLR_createstats<scalar_t>(stats_);
-
       F2Cptr Aoptions = const_cast<F2Cptr>(A.options_);
       HODLR_copyoptions<scalar_t>(Aoptions, options_);
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
       HODLR_set_I_option<scalar_t>(options_, "knn", 0);
-
       LRBF_construct_init<scalar_t>
         (rows_, cols_, lrows_, lcols_, A.msh_, B.msh_, lr_bf_, options_,
-         stats_, msh_, kerquant_, ptree_);
+         stats_, msh_, kerquant_, ptree_, nullptr, nullptr, nullptr);
+      rdist_.resize(P+1);
+      cdist_.resize(P+1);
+      rdist_[rank+1] = lrows_;
+      cdist_[rank+1] = lcols_;
+      MPI_Allgather
+        (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
+         rdist_.data()+1, 1, MPI_INT, c_.comm());
+      MPI_Allgather
+        (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
+         cdist_.data()+1, 1, MPI_INT, c_.comm());
+      for (int p=0; p<P; p++) {
+        rdist_[p+1] += rdist_[p];
+        cdist_[p+1] += cdist_[p];
+      }
+    }
 
+    template<typename integer_t> struct AdmInfoLRBF {
+      std::pair<std::vector<int>,std::vector<int>> rmaps, cmaps;
+      const DenseMatrix<bool>* adm;
+      const CSRGraph<integer_t>* graph;
+      integer_t rows, cols;
+    };
+
+    template<typename scalar_t, typename integer_t,
+             typename real_t = typename RealType<scalar_t>::value_type>
+    void LRBF_distance_query(int* m, int* n, real_t* dist, C2Fptr fdata) {
+      auto& info = *static_cast<AdmInfoLRBF<integer_t>*>(fdata);
+      auto& g = *(info.graph);
+      int i = *m, j = *n;
+      if (i < 0) {
+        i = -i;
+        std::swap(i, j);
+      } else j = -j;
+      i--;
+      j--;
+      assert(i >= 0 && j >= 0 && i < info.rows && j < info.cols);
+      *dist = real_t(1.);
+      auto pkhi = g.ind() + g.ptr(i+1);
+      for (auto pk=g.ind() + g.ptr(i); pk!=pkhi; pk++)
+        if (*pk == j) return;
+      *dist = real_t(2.);
+    }
+
+    template<typename integer_t> void LRBF_admissibility_query
+    (int* m, int* n, int* admissible, C2Fptr fdata) {
+      auto& info = *static_cast<AdmInfoLRBF<integer_t>*>(fdata);
+      auto& adm = *(info.adm);
+      auto& rmap0 = info.rmaps.first;
+      auto& rmap1 = info.rmaps.second;
+      auto& cmap0 = info.cmaps.first;
+      auto& cmap1 = info.cmaps.second;
+      int r = LRBF_treeindex_merged2child(*m);
+      int c = LRBF_treeindex_merged2child(*n);
+      if (r < 0) {
+        r = -r;
+        std::swap(r, c);
+      } else c = -c;
+      r--;
+      c--;
+      assert(r < int(rmap0.size()) && r < int(rmap1.size()));
+      assert(c < int(cmap0.size()) && c < int(cmap1.size()));
+      bool a = true;
+      for (int j=cmap0[c]; j<=cmap1[c] && a; j++)
+        for (int i=rmap0[r]; i<=rmap1[r] && a; i++)
+          a = a && adm(i, j);
+      *admissible = a;
+    }
+
+    template<typename scalar_t> template<typename integer_t>
+    LRBFMatrix<scalar_t>::LRBFMatrix
+    (const HODLRMatrix<scalar_t>& A, const HSS::HSSPartitionTree& Atree,
+     const HODLRMatrix<scalar_t>& B, const HSS::HSSPartitionTree& Btree,
+     const DenseMatrix<bool>& adm, const CSRGraph<integer_t>& graph,
+     const opts_t& opts)
+      : c_(A.c_) {
+      rows_ = A.rows();
+      cols_ = B.cols();
+      Fcomm_ = A.Fcomm_;
+      int P = c_.size(), rank = c_.rank();
+      std::vector<int> groups(P);
+      std::iota(groups.begin(), groups.end(), 0);
+      // create hodlr data structures
+      HODLR_createptree<scalar_t>(P, groups.data(), Fcomm_, ptree_);
+      HODLR_createstats<scalar_t>(stats_);
+      F2Cptr Aoptions = const_cast<F2Cptr>(A.options_);
+      HODLR_copyoptions<scalar_t>(Aoptions, options_);
+      if (opts.geo() == 2) {
+        AdmInfoLRBF<integer_t> info;
+        int min_lvl = 2 + std::ceil(std::log2(c_.size()));
+        info.rmaps = Atree.map_from_complete_to_leafs
+          (std::max(min_lvl, Atree.levels()));
+        info.cmaps = Btree.map_from_complete_to_leafs
+          (std::max(min_lvl, Btree.levels()));
+        info.adm = &adm;
+        info.graph = &graph;
+        info.rows = rows_;
+        info.cols = cols_;
+        HODLR_set_I_option<scalar_t>(options_, "nogeo", 2);
+        HODLR_set_I_option<scalar_t>
+          (options_, "knn", int(std::ceil(float(graph.edges())/graph.vertices())));
+        LRBF_construct_init<scalar_t>
+          (rows_, cols_, lrows_, lcols_, A.msh_, B.msh_, lr_bf_, options_,
+           stats_, msh_, kerquant_, ptree_,
+           &(LRBF_distance_query<scalar_t,integer_t>),
+           &(LRBF_admissibility_query<integer_t>), &info);
+      } else {
+        std::cout << "geo = 1" << std::endl;
+        HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
+        HODLR_set_I_option<scalar_t>(options_, "knn", 0);
+        LRBF_construct_init<scalar_t>
+          (rows_, cols_, lrows_, lcols_, A.msh_, B.msh_, lr_bf_, options_,
+           stats_, msh_, kerquant_, ptree_, nullptr, nullptr, nullptr);
+      }
       rdist_.resize(P+1);
       cdist_.resize(P+1);
       rdist_[rank+1] = lrows_;
@@ -392,8 +507,8 @@ namespace strumpack {
         e.rowids[k] = I[k].size();
         e.colids[k] = J[k].size();
         e.pgids[k] = 0;
-        for (auto l : I[k]) { assert(l < rows_); e.allrows[i++] = l; }
-        for (auto l : J[k]) { assert(l < cols_); e.allcols[j++] = l; }
+        for (auto l : I[k]) { assert(l < rows_); e.allrows[i++] = l+1; }
+        for (auto l : J[k]) { assert(l < cols_); e.allcols[j++] = l+1; }
       }
     }
 
