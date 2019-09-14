@@ -52,18 +52,6 @@ discretization of a partial differential equation, but is not limited
 to any particular type of problem. STRUMPACK also provides
 preconditioned GMRES and BiCGStab iterative solvers.
 
-##  Components
- - The sparse solver is documented in doc/manual.pdf. STRUMPACK-sparse
-   can be used as a direct solver for sparse linear systems or as a
-   preconditioner. It also includes GMRes and BiCGStab iterative
-   solvers that can use the preconditioner. The preconditioning
-   strategy is based on applying low-rank approximations to the
-   fill-in of a sparse multifrontal LU factorization.  The code uses
-   MPI+OpenMP for hybrid distributed and shared memory parallelism.
-   The main point of contact is: Pieter Ghysels (pghysels@lbl.gov).
- - The dense distributed-memory package can be found in the src/HSS
-   directory. This is currently not well documented.
-
 If you have questions about your rights to use or distribute this
 software, please contact Berkeley Lab's Technology Transfer Department
 at TTD@lbl.gov.
