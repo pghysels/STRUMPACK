@@ -130,15 +130,12 @@ namespace strumpack {
 
     CSRGraph<integer_t> extract_graph_sep_CB
     (int ordering_level, integer_t lo, integer_t hi,
-     const std::vector<integer_t>& upd) const override {
-      return CSRGraph<integer_t>(); };
+     const std::vector<integer_t>& upd) const override;
     CSRGraph<integer_t> extract_graph_CB_sep
     (int ordering_level, integer_t lo, integer_t hi,
-     const std::vector<integer_t>& upd) const override {
-      return CSRGraph<integer_t>(); };
+     const std::vector<integer_t>& upd) const override;
     CSRGraph<integer_t> extract_graph_CB
-    (int ordering_level, const std::vector<integer_t>& upd) const override {
-      return CSRGraph<integer_t>(); };
+    (int ordering_level, const std::vector<integer_t>& upd) const override;
 
     void spmv(const DenseM_t& x, DenseM_t& y) const override {};
     void spmv(const scalar_t* x, scalar_t* y) const override {};
@@ -1515,10 +1512,75 @@ namespace strumpack {
           g.ind(e++) = row;
         }
       }
+      // TODO just use c-clo+1 ??
       g.ptr(global_col_[c]-lo+1) = e;
     }
     return g;
   }
+
+  template<typename scalar_t,typename integer_t> CSRGraph<integer_t>
+  PropMapSparseMatrix<scalar_t,integer_t>::extract_graph_sep_CB
+  (int ordering_level, integer_t lo, integer_t hi,
+   const std::vector<integer_t>& upd) const {
+    if (upd.empty()) return CSRGraph<integer_t>(hi-lo, 0);
+    // const std::size_t clo = find_global(hi);
+    // const std::size_t chi = find_global(hi+upd.back());
+    // const auto n = hi - lo;
+    // std::size_t e = 0;
+    // for (std::size_t c=clo; c<chi; c++) {
+    //   const auto hij = ptr_[c+1];
+    //   for (auto j=ptr_[c]; j<hij; j++) {
+    //     const auto row = ind_[j] - lo;
+    //     if (row >= 0 && row < n) e++;
+    //   }
+    // }
+    // CSRGraph<integer_t> g(n, e);
+    // e = 0;
+    // for (std::size_t c=clo; c<chi; c++) {
+    //   const auto hij = ptr_[c+1];
+    //   for (auto j=ptr_[c]; j<hij; j++) {
+    //     const auto row = ind_[j] - lo;
+    //     if (row >= 0 && row < n) {
+    //       g.ind(e++) = row;
+    //     }
+    //   }
+    //   g.ptr(c+1) = e;
+    // }
+    // return g;
+
+
+    // // from extract_F12_block
+    // if (nr_cols == 0 || nr_rows == 0) return;
+    // auto c = find_global(upd[0]);
+    // for (integer_t i=0; i<nr_cols; i++) {
+    //   //while (c < local_cols_ && global_col_[c] < upd[i]) c++;
+    //   if (i > 0)
+    //     c = find_global(upd[i], c);
+    //   if (c == local_cols_ || global_col_[c] != upd[i]) continue;
+    //   for (integer_t j=ptr_[c]; j<ptr_[c+1]; j++) {
+    //     auto r = ind_[j];
+    //     if (r >= row) {
+    //       if (r < row+nr_rows) F[r-row + i*ldF] = val_[j];
+    //       else break;
+    //     }
+    //   }
+    // }
+
+    return CSRGraph<integer_t>(hi-lo, 0);
+  };
+
+  template<typename scalar_t,typename integer_t> CSRGraph<integer_t>
+  PropMapSparseMatrix<scalar_t,integer_t>::extract_graph_CB_sep
+  (int ordering_level, integer_t lo, integer_t hi,
+   const std::vector<integer_t>& upd) const {
+    return CSRGraph<integer_t>(upd.size(), hi-lo);
+  };
+
+  template<typename scalar_t,typename integer_t> CSRGraph<integer_t>
+  PropMapSparseMatrix<scalar_t,integer_t>::extract_graph_CB
+  (int ordering_level, const std::vector<integer_t>& upd) const override {
+    return CSRGraph<integer_t>(upd.size(), upd.size());
+  };
 
   template<typename scalar_t,typename integer_t> void
   PropMapSparseMatrix<scalar_t,integer_t>::permute
