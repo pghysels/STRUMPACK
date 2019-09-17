@@ -1578,7 +1578,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> CSRGraph<integer_t>
   PropMapSparseMatrix<scalar_t,integer_t>::extract_graph_CB
-  (int ordering_level, const std::vector<integer_t>& upd) const override {
+  (int ordering_level, const std::vector<integer_t>& upd) const {
     return CSRGraph<integer_t>(upd.size(), upd.size());
   };
 
