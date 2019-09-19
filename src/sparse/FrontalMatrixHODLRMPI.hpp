@@ -589,14 +589,16 @@ namespace strumpack {
     if (!is_root && dim_upd()) {
       HSS::HSSPartitionTree CB_tree(dim_upd());
       CB_tree.refine(opts.HODLR_options().leaf_size());
-      auto gCB = A.extract_graph_CB(opts.separator_ordering_level(), this->upd());
-      auto admCB = gCB.admissibility(CB_tree.template leaf_sizes<int>());
-      F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
-        (new HODLR::HODLRMatrix<scalar_t>
-         (Comm(), CB_tree, admCB, gCB, opts.HODLR_options()));
       if (opts.HODLR_options().compression_algorithm() ==
           HODLR::CompressionAlgorithm::ELEMENT_EXTRACTION &&
-          opts.HODLR_options().geo() == 2) {{
+          opts.HODLR_options().geo() == 2) {
+        {
+          auto gCB = A.extract_graph_CB(opts.separator_ordering_level(), this->upd());
+          auto admCB = gCB.admissibility(CB_tree.template leaf_sizes<int>());
+          F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
+            (new HODLR::HODLRMatrix<scalar_t>
+             (Comm(), CB_tree, admCB, gCB, opts.HODLR_options()));
+        } {
           auto g12 = A.extract_graph_sep_CB
             (opts.separator_ordering_level(), sep_begin_, sep_end_, this->upd());
           auto adm12 = g12.admissibility
@@ -614,8 +616,11 @@ namespace strumpack {
             (*F22_, CB_tree, F11_, sep_tree, adm21, g21, opts.HODLR_options());
         }
       } else {
-       F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_);
-       F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
+        F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
+          (new HODLR::HODLRMatrix<scalar_t>
+           (Comm(), CB_tree, opts.HODLR_options()));
+        F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_);
+        F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
       }
     }
   }
