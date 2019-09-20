@@ -916,7 +916,7 @@ namespace strumpack {
         for (integer_t j=0; j<d; j++)
 #pragma omp parallel for simd
           for (integer_t i=0; i<N; i++)
-            bloc(i, j) = x(iperm[matching_cperm_[i]], j);
+            bloc(i, j) = x(iperm[i], j);
       }
       x.copy(bloc);
     }
