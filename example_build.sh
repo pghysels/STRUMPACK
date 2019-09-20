@@ -56,6 +56,50 @@ if [[ $NERSC_HOST = "cori" ]]; then
           -DTPL_SCOTCH_LIBRARIES="$SCOTCHHOME/lib/libscotch.a;$SCOTCHHOME/lib/libscotcherr.a;$SCOTCHHOME/lib/libptscotch.a;$SCOTCHHOME/lib/libptscotcherr.a"
 fi
 
+
+if [[ $(dnsdomainname) = "summit.olcf.ornl.gov" ]]; then
+    found_host=true
+
+    module swap xl gcc/9.1.0
+    module load mercurial
+    module load cmake
+    module load essl
+    module load cuda
+    module load netlib-lapack
+    module load netlib-scalapack
+
+    PARMETISHOME=$HOME/local/parmetis-4.0.3/
+    BPACKHOME=$HOME/ButterflyPACK/
+
+    cmake ../ \
+	-DCMAKE_BUILD_TYPE=Debug \
+	-DCMAKE_INSTALL_PREFIX=../install \
+	-DCMAKE_CXX_COMPILER=mpiCC \
+	-DCMAKE_C_COMPILER=mpicc \
+	-DCMAKE_Fortran_COMPILER=mpif90 \
+	-DSTRUMPACK_USE_OPENMP=ON \
+	-DTPL_ENABLE_CUBLAS=ON \
+	-DTPL_CUBLAS_LIBRARIES="${CUDA_DIR}/lib64/libcudart.so;${CUDA_DIR}/lib64/libcublas.so;${CUDA_DIR}/lib64/libcusolver.so" \
+	-DTPL_CUBLAS_INCLUDE_DIRS="${CUDA_DIR}/include" \
+	-DTPL_BLAS_LIBRARIES="${OLCF_ESSL_ROOT}/lib64/libessl.so;${OLCF_NETLIB_LAPACK_ROOT}/lib64/libblas.so" \
+	-DTPL_LAPACK_LIBRARIES="${OLCF_ESSL_ROOT}/lib64/libessl.so;${OLCF_NETLIB_LAPACK_ROOT}/lib64/liblapack.so" \
+	-DTPL_SCALAPACK_LIBRARIES="${OLCF_NETLIB_SCALAPACK_ROOT}/lib/libscalapack.so" \
+	-DSTRUMPACK_DEV_TESTING=OFF \
+	-DSTRUMPACK_BUILD_TESTS=OFF \
+	-DSTRUMPACK_C_INTERFACE=OFF \
+	-DSTRUMPACK_COUNT_FLOPS=ON \
+	-DSTRUMPACK_TASK_TIMERS=OFF \
+	-DTPL_METIS_INCLUDE_DIRS=${PARMETISHOME}/metis/include \
+	-DTPL_METIS_LIBRARIES=${PARMETISHOME}/build/Linux-ppc64le/libmetis/libmetis.a \
+	-DTPL_ENABLE_PARMETIS=OFF \
+	-DTPL_ENABLE_SCOTCH=OFF
+	# -DTPL_ENABLE_BPACK=ON \
+	# -DTPL_BPACK_INCLUDE_DIRS="$BPACKHOME/SRC_DOUBLE/;$BPACKHOME/SRC_DOUBLECOMPLEX" \
+	# -DTPL_BPACK_LIBRARIES="$BPACKHOME/build/SRC_DOUBLE/libdbutterflypack.a;$BPACKHOME/build/SRC_DOUBLECOMPLEX/libzbutterflypack.a"
+fi
+
+
+
 if [[ $(hostname -s) = "xps13" ]]; then
     found_host=true
     cmake ../ \

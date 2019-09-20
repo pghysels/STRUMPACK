@@ -179,6 +179,7 @@ namespace strumpack {
 
     virtual int P() const { return 1; }
 
+    void get_level_fronts(std::vector<F_t*>& ldata, int elvl, int l=0);
 
 #if defined(STRUMPACK_USE_MPI)
     void multifrontal_solve(DenseM_t& bloc, DistM_t* bdist) const;
@@ -665,6 +666,17 @@ namespace strumpack {
       upd_[i] = perm[upd_[i]];
     std::sort(upd_.begin(), upd_.end());
 #pragma omp taskwait
+  }
+  
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrix<scalar_t,integer_t>::get_level_fronts
+  (std::vector<F_t*>& ldata, int elvl, int l) {
+    if (l < elvl) {
+      if (lchild_)
+        lchild_->get_level_fronts(ldata, elvl, l+1);
+      if (rchild_)
+        rchild_->get_level_fronts(ldata, elvl, l+1);
+    } else ldata.push_back(this);
   }
 
 } // end namespace strumpack

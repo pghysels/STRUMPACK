@@ -813,6 +813,28 @@ namespace strumpack {
     void set_write_root_front(bool b)  { _write_root_front = b; }
 
     /**
+     * Enable off-loading to the GPU. This only works when STRUMPACK
+     * was configured with GPU support (through CUDA, MAGMA or SLATE)
+     */
+    void enable_gpu()  { use_gpu_ = true; }
+
+    /**
+     * Disable GPU off-loading.
+     */
+    void disable_gpu()  { use_gpu_ = false; }
+
+    /**
+     * Set the minimum dense matrix size for dense matrix operations
+     * to be off-loaded to the GPU.
+     */
+    void set_cuda_cutoff(int c) { cuda_cutoff_ = c; }
+
+    /**
+     * Set the the number of (CUDA) streams to be used in the code.
+     */
+    void set_cuda_streams(int s) { cuda_streams_ = s; }
+
+    /**
      * Print statistics, about ranks, memory etc, for the root front
      * only.
      */
@@ -1073,6 +1095,21 @@ namespace strumpack {
     bool write_root_front() const { return _write_root_front; }
 
     /**
+     * Check wheter or not to use GPU off-loading.
+     */
+    bool use_gpu() const { return use_gpu_; }
+
+    /**
+     * Returns the minimum size of a dense matrix for GPU off-loading.
+     */
+    int cuda_cutoff() const { return cuda_cutoff_; }
+
+    /**
+     * Returns the number of CUDA streams to use.
+     */
+    int cuda_streams() const { return cuda_streams_; }
+
+    /**
      * Info about the stats of the root front will be printed to
      * std::cout
      */
@@ -1188,6 +1225,10 @@ namespace strumpack {
         {"sp_separator_width",           required_argument, 0, 44},
         {"sp_write_root_front",          no_argument, 0, 45},
         {"sp_print_root_front_stats",    no_argument, 0, 46},
+        {"sp_enable_gpu",                no_argument, 0, 47},
+        {"sp_disable_gpu",               no_argument, 0, 48},
+        {"sp_cuda_cutoff",               required_argument, 0, 49},
+        {"sp_cuda_streams",              required_argument, 0, 50},
         {"sp_verbose",                   no_argument, 0, 'v'},
         {"sp_quiet",                     no_argument, 0, 'q'},
         {"help",                         no_argument, 0, 'h'},
@@ -1376,6 +1417,18 @@ namespace strumpack {
         } break;
         case 45: set_write_root_front(true); break;
         case 46: set_print_root_front_stats(true); break;
+        case 47: enable_gpu(); break;
+        case 48: disable_gpu(); break;
+        case 49: {
+          std::istringstream iss(optarg);
+          iss >> cuda_cutoff_;
+          set_cuda_cutoff(cuda_cutoff_);
+        } break;
+        case 50: {
+          std::istringstream iss(optarg);
+          iss >> cuda_streams_;
+          set_cuda_streams(cuda_streams_);
+        } break;
         case 'h': { describe_options(); } break;
         case 'v': set_verbose(true); break;
         case 'q': set_verbose(false); break;
@@ -1515,6 +1568,14 @@ namespace strumpack {
       std::cout << "#   --sp_disable_replace_tiny_pivots" << std::endl;
       std::cout << "#   --sp_write_root_front" << std::endl;
       std::cout << "#   --sp_print_root_front_stats" << std::endl;
+      // std::cout << "#   --sp_enable_gpu" << std::endl;
+      // std::cout << "#   --sp_disable_gpu" << std::endl;
+      std::cout << "#   --sp_cuda_cutoff (default "
+                << cuda_cutoff() << ")" << std::endl
+                << "#          CUDA kernel/CUBLAS cutoff size" << std::endl;
+      std::cout << "#   --sp_cuda_streams (default "
+                << cuda_streams() << ")" << std::endl
+                << "#          number of CUDA streams " << std::endl;
       std::cout << "#   --sp_verbose or -v (default " << verbose() << ")"
                 << std::endl;
       std::cout << "#   --sp_quiet or -q (default " << !verbose() << ")"
@@ -1549,6 +1610,11 @@ namespace strumpack {
     bool _replace_tiny_pivots = false;
     bool _write_root_front = false;
     bool _print_root_front_stats = false;
+
+    /** GPU options */
+    bool use_gpu_ = true;
+    int cuda_cutoff_ = 500;
+    int cuda_streams_ = 10;
 
     /** compression options */
     CompressionType _comp = CompressionType::NONE;

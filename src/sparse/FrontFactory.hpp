@@ -46,6 +46,9 @@
 #include "FrontalMatrixHODLRMPI.hpp"
 #endif
 #endif
+#if defined(STRUMPACK_USE_CUBLAS)
+#include "FrontalMatrixCUBLAS.hpp"
+#endif
 
 namespace strumpack {
 
@@ -62,7 +65,14 @@ namespace strumpack {
 #endif
   };
 
-
+  template<typename scalar_t> bool is_CUBLAS
+  (const SPOptions<scalar_t>& opts) {
+#if defined(STRUMPACK_USE_CUBLAS)
+    return opts.use_gpu();
+#else
+    return false;
+#endif
+  }
   template<typename scalar_t, typename integer_t> bool is_HSS
   (integer_t dim_sep, bool compressed_parent,
    const SPOptions<scalar_t>& opts) {
@@ -97,26 +107,30 @@ namespace strumpack {
    integer_t sep_end, std::vector<integer_t>& upd, bool compressed_parent,
    int level, FrontCounter& fc, bool root=true) {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
-    using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
-    using FHSS_t = FrontalMatrixHSS<scalar_t,integer_t>;
-    using FBLR_t = FrontalMatrixBLR<scalar_t,integer_t>;
-#if defined(STRUMPACK_USE_BPACK)
-    using FHODLR_t = FrontalMatrixHODLR<scalar_t,integer_t>;
-#endif
     auto dim_sep = sep_end - sep_begin;
     std::unique_ptr<F_t> front;
-    if (is_HSS(dim_sep, compressed_parent, opts)) {
+    if (is_CUBLAS(opts)) {
+#if defined(STRUMPACK_USE_CUBLAS)
+      using FCUBLAS_t = FrontalMatrixCUBLAS<scalar_t,integer_t>;
+      front.reset(new FCUBLAS_t(sep, sep_begin, sep_end, upd));
+      if (root) fc.HSS++;
+#endif
+    } else if (is_HSS(dim_sep, compressed_parent, opts)) {
+      using FHSS_t = FrontalMatrixHSS<scalar_t,integer_t>;
       front.reset(new FHSS_t(sep, sep_begin, sep_end, upd));
       if (root) fc.HSS++;
     } else if (is_BLR(dim_sep, compressed_parent, opts)) {
+      using FBLR_t = FrontalMatrixBLR<scalar_t,integer_t>;
       front.reset(new FBLR_t(sep, sep_begin, sep_end, upd));
       if (root) fc.BLR++;
     } else if (is_HODLR(dim_sep, compressed_parent, opts)) {
 #if defined(STRUMPACK_USE_BPACK)
+      using FHODLR_t = FrontalMatrixHODLR<scalar_t,integer_t>;
       front.reset(new FHODLR_t(sep, sep_begin, sep_end, upd));
       if (root) fc.HODLR++;
 #endif
     } else {
+      using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
       front.reset(new FD_t(sep, sep_begin, sep_end, upd));
       if (root) fc.dense++;
     }

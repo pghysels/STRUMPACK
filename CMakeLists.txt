@@ -8,6 +8,10 @@ project(STRUMPACK CXX C Fortran)
 option(STRUMPACK_USE_MPI "Build with MPI support" ON)
 option(STRUMPACK_USE_OPENMP "Use OpenMP for on-node threading tasking" ON)
 
+## we don't have any CUDA kernels yet, see also TPL_ENABLE_CUBLAS
+# option(STRUMPACK_USE_CUDA "Use CUDA (language) for GPU support" OFF)
+
+option(TPL_ENABLE_CUBLAS "Build with support for cuBLAS/cuSOLVER" OFF)
 option(TPL_ENABLE_PARMETIS "Build with support for ParMetis" OFF)
 option(TPL_ENABLE_SCOTCH "Build with support for Scotch/PTScotch" OFF)
 option(TPL_ENABLE_PAPI "Build with support for PAPI monitoring" OFF)
@@ -325,6 +329,12 @@ if(TPL_ENABLE_BPACK)
   include_directories(${TPL_BPACK_INCLUDE_DIRS})
 endif()
 
+if(TPL_ENABLE_CUBLAS)
+  option(STRUMPACK_USE_CUBLAS "" ON)
+  set(LIBS ${LIBS} ${TPL_CUBLAS_LIBRARIES})
+  include_directories(${TPL_CUBLAS_INCLUDE_DIRS})
+endif()
+
 message(STATUS "Linking with: " "${LIBS}")
 message(STATUS "Implicit C libs: " "${CMAKE_C_IMPLICIT_LINK_LIBRARIES}")
 message(STATUS "Implicit CXX libs: " "${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES}")
@@ -501,6 +511,15 @@ install(FILES
   src/sparse/RCMReordering.hpp
   src/sparse/SeparatorTree.hpp
   DESTINATION include/sparse)
+
+if(TPL_ENABLE_CUBLAS)
+  install(FILES
+    src/dense/CUDAWrapper.hpp
+    DESTINATION include/dense)
+  install(FILES
+    src/sparse/FrontalMatrixCUBLAS.hpp
+    DESTINATION include/sparse)
+endif()
 
 install(FILES
   src/HSS/HSSMatrix.hpp
