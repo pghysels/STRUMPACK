@@ -667,7 +667,7 @@ namespace strumpack {
     std::sort(upd_.begin(), upd_.end());
 #pragma omp taskwait
   }
-  
+
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::get_level_fronts
   (std::vector<F_t*>& ldata, int elvl, int l) {

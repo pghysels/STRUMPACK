@@ -50,7 +50,7 @@ namespace strumpack {
   template<typename scalar_t, typename integer_t> class LevelInfo {
   public:
     std::vector<FrontalMatrixCUBLAS<scalar_t,integer_t>*> f;
-    std::size_t factor_mem_size = 0, schur_mem_size = 0, piv_mem_size = 0, 
+    std::size_t factor_mem_size = 0, schur_mem_size = 0, piv_mem_size = 0,
       total_work_mem_size = 0, nnodes_small = 0;
     scalar_t* dev_getrf_work = nullptr;
     int* dev_getrf_err = nullptr;
@@ -224,7 +224,7 @@ namespace strumpack {
       ldata[l].f.reserve(fp.size());
       using FC_t = FrontalMatrixCUBLAS<scalar_t,integer_t>;
       for (auto f : fp)
-	ldata[l].f.push_back(dynamic_cast<FC_t*>(f));
+        ldata[l].f.push_back(dynamic_cast<FC_t*>(f));
       auto nnodes = ldata[l].f.size();
       int max_dsep = 0, node_max_dsep = 0;
       std::size_t avg_size_sep = 0, avg_size_upd = 0;
@@ -233,34 +233,34 @@ namespace strumpack {
         const auto dsep = f.dim_sep();
         const auto dupd = f.dim_upd();
         const auto size = dsep + dupd;
-	avg_size_sep += dsep;
-	avg_size_upd += dupd;
-	ldata[l].factor_mem_size += dsep*dsep + 2*dsep*dupd;
+        avg_size_sep += dsep;
+        avg_size_upd += dupd;
+        ldata[l].factor_mem_size += dsep*dsep + 2*dsep*dupd;
         ldata[l].schur_mem_size += dupd*dupd;
-	ldata[l].piv_mem_size += dsep;
+        ldata[l].piv_mem_size += dsep;
         if (size < cutoff_size)
-	  ldata[l].nnodes_small++;
+          ldata[l].nnodes_small++;
         if (dsep > max_dsep) {
-	  node_max_dsep = n;
-	  max_dsep = dsep;
+          node_max_dsep = n;
+          max_dsep = dsep;
         }
       }
       // if (opts.verbose())
-      // 	std::cout << "# level " << l << " avg size = "
-      // 		  << (avg_size_sep+avg_size_upd) / nnodes 
-      // 		  << " = " << avg_size_sep / nnodes << " + "
-      // 		  << avg_size_upd / nnodes << std::endl;
+      //        std::cout << "# level " << l << " avg size = "
+      //                  << (avg_size_sep+avg_size_upd) / nnodes
+      //                  << " = " << avg_size_sep / nnodes << " + "
+      //                  << avg_size_upd / nnodes << std::endl;
       cuda::cusolverDngetrf_bufferSize
-	(solver_handle[0], max_dsep, max_dsep, 
-	 /*f.F11_.data()*/ static_cast<scalar_t*>(nullptr),
-	 max_dsep, &(ldata[l].getrf_work_size));
-      ldata[l].total_work_mem_size = 
-	sizeof(scalar_t) * ldata[l].schur_mem_size + 
-	sizeof(int) * (ldata[l].piv_mem_size) +
-	// CUDA getrf work size and CUDA getrf error code	
-	max_streams * (sizeof(scalar_t) * ldata[l].getrf_work_size + sizeof(int));
+        (solver_handle[0], max_dsep, max_dsep,
+         /*f.F11_.data()*/ static_cast<scalar_t*>(nullptr),
+         max_dsep, &(ldata[l].getrf_work_size));
+      ldata[l].total_work_mem_size =
+        sizeof(scalar_t) * ldata[l].schur_mem_size +
+        sizeof(int) * (ldata[l].piv_mem_size) +
+        // CUDA getrf work size and CUDA getrf error code
+        max_streams * (sizeof(scalar_t) * ldata[l].getrf_work_size + sizeof(int));
       max_level_work_mem_size = std::max
-	(max_level_work_mem_size, ldata[l].total_work_mem_size);
+        (max_level_work_mem_size, ldata[l].total_work_mem_size);
     }
     // ensure alignment?
     max_level_work_mem_size += max_level_work_mem_size % 8;
@@ -307,8 +307,8 @@ namespace strumpack {
       ldata[l].dev_getrf_work = static_cast<scalar_t*>(wmem);
       wmem = static_cast<scalar_t*>(wmem) + max_streams * ldata[l].getrf_work_size;
       for (std::size_t n=0, idx=0; n<nnodes; n++) {
-	ldata[l].dev_piv[n] = static_cast<int*>(wmem);
-	wmem = static_cast<int*>(wmem) + ldata[l].f[n]->dim_sep();
+        ldata[l].dev_piv[n] = static_cast<int*>(wmem);
+        wmem = static_cast<int*>(wmem) + ldata[l].f[n]->dim_sep();
       }
       ldata[l].dev_getrf_err = static_cast<int*>(wmem);
       wmem = static_cast<int*>(wmem) + max_streams;
@@ -328,24 +328,24 @@ namespace strumpack {
             (f.F11_, f.F12_, f.F21_, f.F22_, &f, 0);
         if (f.rchild_)
           f.rchild_->extend_add_to_dense
-	    (f.F11_, f.F12_, f.F21_, f.F22_, &f, 0);
+            (f.F11_, f.F12_, f.F21_, f.F22_, &f, 0);
       }
 
       // prefetch to GPU
       cudaMemPrefetchAsync
-      	(work_mem[l % 2], max_level_work_mem_size, device_id, 0);  
+        (work_mem[l % 2], max_level_work_mem_size, device_id, 0);
       cudaMemPrefetchAsync
-      	(ldata[l].f[0]->factor_mem_.get(),
-      	 ldata[l].factor_mem_size*sizeof(scalar_t), device_id, 0);
+        (ldata[l].f[0]->factor_mem_.get(),
+         ldata[l].factor_mem_size*sizeof(scalar_t), device_id, 0);
 
       // count flops
       long long level_flops = 0;
       for (std::size_t n=0; n<nnodes; n++) {
         auto& f = *(ldata[l].f[n]);
-	level_flops += LU_flops(f.F11_) +
-	  gemm_flops(Trans::N, Trans::N, scalar_t(-1.), f.F21_, f.F12_, scalar_t(1.)) +
-	  trsm_flops(Side::L, scalar_t(1.), f.F11_, f.F12_) +
-	  trsm_flops(Side::R, scalar_t(1.), f.F11_, f.F21_);
+        level_flops += LU_flops(f.F11_) +
+          gemm_flops(Trans::N, Trans::N, scalar_t(-1.), f.F21_, f.F12_, scalar_t(1.)) +
+          trsm_flops(Side::L, scalar_t(1.), f.F11_, f.F12_) +
+          trsm_flops(Side::R, scalar_t(1.), f.F11_, f.F21_);
       }
       STRUMPACK_FULL_RANK_FLOPS(level_flops);
       STRUMPACK_FLOPS(level_flops);
@@ -354,68 +354,68 @@ namespace strumpack {
       cudaDeviceSynchronize();
 
       for (std::size_t n=0; n<nnodes; n++) {
-	auto& f = *(ldata[l].f[n]);
-	auto stream = n % max_streams;
-	const auto dsep = f.dim_sep(); 
-	const auto dupd = f.dim_upd();
-	const auto size = dsep + dupd;
-	if (size >= cutoff_size) {
-	  if (dsep) {
-	    auto LU_stat = cuda::cusolverDngetrf
-	      (solver_handle[stream], dsep, dsep, f.F11_.data(), dsep,
-	       ldata[l].dev_getrf_work + stream * ldata[l].getrf_work_size,
-	       ldata[l].dev_piv[n], ldata[l].dev_getrf_err + stream);
-	    // TODO if (opts.replace_tiny_pivots()) { ...
-	    if (dupd) {
-	      auto LU_stat = cuda::cusolverDngetrs
-	      	(solver_handle[stream], CUBLAS_OP_N, dsep, dupd, 
-	      	 f.F11_.data(), dsep, ldata[l].dev_piv[n], f.F12_.data(), dsep, 
-	      	 ldata[l].dev_getrf_err + stream);
-	      auto stat = cuda::cublasgemm
-		(blas_handle[stream], CUBLAS_OP_N, CUBLAS_OP_N,
-		 dupd, dupd, dsep, scalar_t(-1.), f.F21_.data(), dupd,
-		 f.F12_.data(), dsep, scalar_t(1.), f.F22_.data(), dupd);
-	    } 
-	  }
-	}
+        auto& f = *(ldata[l].f[n]);
+        auto stream = n % max_streams;
+        const auto dsep = f.dim_sep();
+        const auto dupd = f.dim_upd();
+        const auto size = dsep + dupd;
+        if (size >= cutoff_size) {
+          if (dsep) {
+            auto LU_stat = cuda::cusolverDngetrf
+              (solver_handle[stream], dsep, dsep, f.F11_.data(), dsep,
+               ldata[l].dev_getrf_work + stream * ldata[l].getrf_work_size,
+               ldata[l].dev_piv[n], ldata[l].dev_getrf_err + stream);
+            // TODO if (opts.replace_tiny_pivots()) { ...
+            if (dupd) {
+              auto LU_stat = cuda::cusolverDngetrs
+                (solver_handle[stream], CUBLAS_OP_N, dsep, dupd,
+                 f.F11_.data(), dsep, ldata[l].dev_piv[n], f.F12_.data(), dsep,
+                 ldata[l].dev_getrf_err + stream);
+              auto stat = cuda::cublasgemm
+                (blas_handle[stream], CUBLAS_OP_N, CUBLAS_OP_N,
+                 dupd, dupd, dsep, scalar_t(-1.), f.F21_.data(), dupd,
+                 f.F12_.data(), dsep, scalar_t(1.), f.F22_.data(), dupd);
+            }
+          }
+        }
       }
       if (nnodes_small) {
-	for (std::size_t n=0; n<nnodes; n++) {
-	  auto& f = *(ldata[l].f[n]);
-	  auto stream = n % max_streams;
-	  const auto dsep = f.dim_sep(); 
-	  const auto dupd = f.dim_upd();
-	  const auto size = dsep + dupd;
-	  if (size < cutoff_size) {
-	    if (dsep) {
-	      f.piv = f.F11_.LU(0);
-	      // TODO if (opts.replace_tiny_pivots()) { ...
-	      if (dupd) {
-		f.F11_.solve_LU_in_place(f.F12_, f.piv, 0);
-		gemm(Trans::N, Trans::N, scalar_t(-1.), f.F21_, f.F12_,
-		     scalar_t(1.), f.F22_, 0);
-	      }
-	    }
-	  }
-	}
+        for (std::size_t n=0; n<nnodes; n++) {
+          auto& f = *(ldata[l].f[n]);
+          auto stream = n % max_streams;
+          const auto dsep = f.dim_sep();
+          const auto dupd = f.dim_upd();
+          const auto size = dsep + dupd;
+          if (size < cutoff_size) {
+            if (dsep) {
+              f.piv = f.F11_.LU(0);
+              // TODO if (opts.replace_tiny_pivots()) { ...
+              if (dupd) {
+                f.F11_.solve_LU_in_place(f.F12_, f.piv, 0);
+                gemm(Trans::N, Trans::N, scalar_t(-1.), f.F21_, f.F12_,
+                     scalar_t(1.), f.F22_, 0);
+              }
+            }
+          }
+        }
       }
       cudaDeviceSynchronize();
 
       // prefetch from device
       cudaMemPrefetchAsync
-      	(ldata[l].f[0]->factor_mem_.get(),
-      	 ldata[l].factor_mem_size*sizeof(scalar_t), cudaCpuDeviceId, 0);
+        (ldata[l].f[0]->factor_mem_.get(),
+         ldata[l].factor_mem_size*sizeof(scalar_t), cudaCpuDeviceId, 0);
 
       // copy pivot vectors back from the device
       for (std::size_t n=0, idx=0; n<nnodes; n++) {
         auto& f = *(ldata[l].f[n]);
-	const auto dsep = f.dim_sep(); 
-	const auto dupd = f.dim_upd();
-	const auto size = dsep + dupd;
-	if (size >= cutoff_size) {
-	  f.piv.resize(dsep);
-	  std::copy(ldata[l].dev_piv[n], ldata[l].dev_piv[n]+dsep, f.piv.data());
-	}
+        const auto dsep = f.dim_sep();
+        const auto dupd = f.dim_upd();
+        const auto size = dsep + dupd;
+        if (size >= cutoff_size) {
+          f.piv.resize(dsep);
+          std::copy(ldata[l].dev_piv[n], ldata[l].dev_piv[n]+dsep, f.piv.data());
+        }
       }
 
       // copy the factor memory from managed memory to regular memory,
@@ -436,12 +436,12 @@ namespace strumpack {
       }
 
       if (opts.verbose()) {
-	auto level_time = tl.elapsed();
-	std::cout << "#   GPU Factorization complete, took: " 
-		  << level_time << " seconds, " 
-		  << level_flops / 1.e9 << " GFLOPS, "
-		  << (float(level_flops) / level_time) / 1.e9 
-		  << " GFLOP/s" << std::endl;
+        auto level_time = tl.elapsed();
+        std::cout << "#   GPU Factorization complete, took: "
+                  << level_time << " seconds, "
+                  << level_flops / 1.e9 << " GFLOPS, "
+                  << (float(level_flops) / level_time) / 1.e9
+                  << " GFLOP/s" << std::endl;
       }
     }
 
@@ -479,12 +479,12 @@ namespace strumpack {
       bloc.laswp(piv, true);
       F11_.solve_LU_in_place(bloc, piv, task_depth);
       if (dim_upd()) {
-	if (b.cols() == 1)
-	  gemv(Trans::N, scalar_t(-1.), F21_, bloc,
-	       scalar_t(1.), bupd, task_depth);
-	else 
-	  gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, bloc,
-	       scalar_t(1.), bupd, task_depth);
+        if (b.cols() == 1)
+          gemv(Trans::N, scalar_t(-1.), F21_, bloc,
+               scalar_t(1.), bupd, task_depth);
+        else
+          gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, bloc,
+               scalar_t(1.), bupd, task_depth);
       }
     }
   }
