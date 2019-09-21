@@ -100,7 +100,9 @@ namespace strumpack {
     HODLR::HODLRMatrix<scalar_t> F11_;
     HODLR::LRBFMatrix<scalar_t> F12_, F21_;
     std::unique_ptr<HODLR::HODLRMatrix<scalar_t>> F22_;
+    HSS::HSSPartitionTree sep_tree_;
 
+    void construct_hierarchy(const SpMat_t& A, const Opts_t& opts);
     void compress_sampling(const SpMat_t& A, const Opts_t& opts);
     void compress_extraction(const SpMat_t& A, const Opts_t& opts);
     void compress_flops_F11();
@@ -208,6 +210,7 @@ namespace strumpack {
     if (!dim_blk()) return;
     TaskTimer t("");
     if (/*etree_level == 0 && */opts.print_root_front_stats()) t.start();
+    construct_hierarchy(A, opts);
     switch (opts.HODLR_options().compression_algorithm()) {
     case HODLR::CompressionAlgorithm::RANDOM_SAMPLING:
       compress_sampling(A, opts); break;
@@ -573,20 +576,26 @@ namespace strumpack {
     if (Comm().is_null()) return;
     auto g = A.extract_graph
       (opts.separator_ordering_level(), sep_begin_, sep_end_);
-    auto sep_tree = g.recursive_bisection
+    sep_tree_ = g.recursive_bisection
       (opts.compression_leaf_size(), 0,
        sorder+sep_begin_, nullptr, 0, 0, dim_sep());
     std::vector<integer_t> siorder(dim_sep());
     for (integer_t i=sep_begin_; i<sep_end_; i++)
       siorder[sorder[i]] = i - sep_begin_;
-    g.permute(sorder+sep_begin_, siorder.data());
     for (integer_t i=sep_begin_; i<sep_end_; i++)
       sorder[i] += sep_begin_;
-    auto adm = g.admissibility(sep_tree.template leaf_sizes<int>());
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::construct_hierarchy
+  (const SpMat_t& A, const Opts_t& opts) {
+    auto g = A.extract_graph
+      (opts.separator_ordering_level(), sep_begin_, sep_end_);
+    auto adm = g.admissibility(sep_tree_.template leaf_sizes<int>());
     F11_ = std::move
       (HODLR::HODLRMatrix<scalar_t>
-       (Comm(), sep_tree, adm, g, opts.HODLR_options()));
-    if (!is_root && dim_upd()) {
+       (Comm(), sep_tree_, adm, g, opts.HODLR_options()));
+    if (dim_upd()) {
       HSS::HSSPartitionTree CB_tree(dim_upd());
       CB_tree.refine(opts.HODLR_options().leaf_size());
       if (opts.HODLR_options().compression_algorithm() ==
@@ -602,18 +611,18 @@ namespace strumpack {
           auto g12 = A.extract_graph_sep_CB
             (opts.separator_ordering_level(), sep_begin_, sep_end_, this->upd());
           auto adm12 = g12.admissibility
-            (sep_tree.template leaf_sizes<int>(),
+            (sep_tree_.template leaf_sizes<int>(),
              CB_tree.template leaf_sizes<int>());
           F12_ = HODLR::LRBFMatrix<scalar_t>
-            (F11_, sep_tree, *F22_, CB_tree, adm12, g12, opts.HODLR_options());
+            (F11_, sep_tree_, *F22_, CB_tree, adm12, g12, opts.HODLR_options());
         } {
           auto g21 = A.extract_graph_CB_sep
             (opts.separator_ordering_level(), sep_begin_, sep_end_, this->upd());
           auto adm21 = g21.admissibility
             (CB_tree.template leaf_sizes<int>(),
-             sep_tree.template leaf_sizes<int>());
+             sep_tree_.template leaf_sizes<int>());
           F21_ = HODLR::LRBFMatrix<scalar_t>
-            (*F22_, CB_tree, F11_, sep_tree, adm21, g21, opts.HODLR_options());
+            (*F22_, CB_tree, F11_, sep_tree_, adm21, g21, opts.HODLR_options());
         }
       } else {
         F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>

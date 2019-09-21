@@ -84,8 +84,6 @@ namespace strumpack {
      const std::vector<integer_t>& iorder,
      integer_t clo, integer_t chi);
 
-    void permute_columns(const std::vector<integer_t>& order);
-
     void permute_rows_local_cols_global
     (const std::vector<integer_t>& order,
      const std::vector<integer_t>& iorder,
@@ -173,12 +171,14 @@ namespace strumpack {
 
   template<typename integer_t> void
   CSRGraph<integer_t>::print() {
-    for (integer_t i=0; i<size(); i++) {
-      std::cout << "r=" << i << ", ";
-      for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
-        std::cout << ind_[j] << " ";
-      //std::cout << std::endl;
-    }
+    std::cout << "n=" << size() << " ";
+    for (integer_t i=0; i<size(); i++)
+      if (ptr_[i+1] != ptr_[i]) {
+        std::cout << "r=" << i << ", ";
+        for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
+          std::cout << ind_[j] << " ";
+        std::cout << "| ";
+      }
     std::cout << std::endl;
   }
 
@@ -243,23 +243,13 @@ namespace strumpack {
     auto n = size();
     ptr[0] = 0;
     for (integer_t i=0; i<n; i++) {
-      auto lb = ptr_[iorder[i]];
       auto ub = ptr_[iorder[i]+1];
-      for (integer_t j=lb; j<ub; j++)
+      for (integer_t j=ptr_[iorder[i]]; j<ub; j++)
         ind[nnz++] = order[ind_[j]];
       ptr[i+1] = nnz;
     }
     std::swap(ptr_, ptr);
     std::swap(ind_, ind);
-  }
-
-  template<typename integer_t> void
-  CSRGraph<integer_t>::permute_columns
-  (const std::vector<integer_t>& order) {
-    auto n = size();
-    for (integer_t i=0; i<n; i++)
-      for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
-        ind_[j] = order[ind_[j]];
   }
 
   template<typename integer_t> CSRGraph<integer_t>
