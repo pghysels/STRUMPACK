@@ -574,7 +574,6 @@ namespace strumpack {
   (Trans op, integer_t slo, integer_t shi,
    const DenseM_t& R, DenseM_t& S, int depth) const {
     const integer_t nbvec = R.cols();
-    const integer_t ds = shi - slo;
     const auto B = 4; // blocking parameter
     long long int local_flops = 0;
     if (op == Trans::N) {
@@ -584,7 +583,6 @@ namespace strumpack {
 #endif
       for (integer_t c=0; c<nbvec; c+=B)
         for (auto row=slo; row<shi; row++) { // separator rows
-          integer_t upd_ptr = 0;
           const auto hij = ptr_[row+1];
           for (auto j=ptr_[row]; j<hij; j++) {
             const auto col = ind_[j];
@@ -607,7 +605,6 @@ namespace strumpack {
       for (integer_t c=0; c<nbvec; c+=B) {
         long long int local_flops = 0;
         for (auto row=slo; row<shi; row++) { // separator rows
-          integer_t upd_ptr = 0;
           const auto hij = ptr_[row+1];
           for (auto j=ptr_[row]; j<hij; j++) {
             const auto col = ind_[j];
@@ -634,7 +631,6 @@ namespace strumpack {
    const DenseM_t& R, DenseM_t& S, int depth) const {
     integer_t dupd = upd.size();
     const integer_t nbvec = R.cols();
-    const integer_t ds = shi - slo;
     long long int local_flops = 0;
     const auto B = 4; // blocking parameter
     if (op == Trans::N) {
@@ -702,7 +698,6 @@ namespace strumpack {
    const DenseM_t& R, DenseM_t& S, int depth) const {
     integer_t dupd = upd.size();
     const integer_t nbvec = R.cols();
-    const integer_t ds = shi - slo;
     long long int local_flops = 0;
     const auto B = 4; // blocking parameter
     if (op == Trans::N) {
