@@ -113,7 +113,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_CUBLAS)
       using FCUBLAS_t = FrontalMatrixCUBLAS<scalar_t,integer_t>;
       front.reset(new FCUBLAS_t(sep, sep_begin, sep_end, upd));
-      if (root) fc.HSS++;
+      if (root) fc.dense++;
 #endif
     } else if (is_HSS(dim_sep, compressed_parent, opts)) {
       using FHSS_t = FrontalMatrixHSS<scalar_t,integer_t>;
