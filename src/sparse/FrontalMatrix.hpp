@@ -179,6 +179,7 @@ namespace strumpack {
 
     virtual int P() const { return 1; }
 
+    void get_level_fronts(std::vector<const F_t*>& ldata, int elvl, int l=0) const;
     void get_level_fronts(std::vector<F_t*>& ldata, int elvl, int l=0);
 
 #if defined(STRUMPACK_USE_MPI)
@@ -391,13 +392,12 @@ namespace strumpack {
         bupd(I[r]-pa->dim_sep(), c) += CB(r, c);
       }
     }
-    // TODO adjust flops for multiple columns
     STRUMPACK_FLOPS
       ((is_complex<scalar_t>()?2:1)*
-       static_cast<long long int>(CB.rows()));
+       static_cast<long long int>(CB.rows())*b.cols());
     STRUMPACK_BYTES
-      (sizeof(scalar_t)*static_cast<long long int>
-       (3*CB.rows())+sizeof(integer_t)*(CB.rows()+bupd.rows()));
+      (b.cols()*(sizeof(scalar_t)*static_cast<long long int>(3*CB.rows())+
+		 sizeof(integer_t)*(CB.rows()+bupd.rows())));
   }
 
   /**
@@ -670,12 +670,19 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::get_level_fronts
+  (std::vector<const F_t*>& ldata, int elvl, int l) const {
+    if (l < elvl) {
+      if (lchild_) lchild_->get_level_fronts(ldata, elvl, l+1);
+      if (rchild_) rchild_->get_level_fronts(ldata, elvl, l+1);
+    } else ldata.push_back(this);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrix<scalar_t,integer_t>::get_level_fronts
   (std::vector<F_t*>& ldata, int elvl, int l) {
     if (l < elvl) {
-      if (lchild_)
-        lchild_->get_level_fronts(ldata, elvl, l+1);
-      if (rchild_)
-        rchild_->get_level_fronts(ldata, elvl, l+1);
+      if (lchild_) lchild_->get_level_fronts(ldata, elvl, l+1);
+      if (rchild_) rchild_->get_level_fronts(ldata, elvl, l+1);
     } else ldata.push_back(this);
   }
 
