@@ -295,7 +295,7 @@ namespace strumpack {
         info.cols = cols_;
         HODLR_set_I_option<scalar_t>(options_, "nogeo", 2);
         HODLR_set_I_option<scalar_t>
-          (options_, "knn", int(std::ceil(float(graph.edges())/graph.vertices())));
+          (options_, "knn", 5 * graph.edges() / graph.vertices());
         LRBF_construct_init<scalar_t>
           (rows_, cols_, lrows_, lcols_, A.msh_, B.msh_, lr_bf_, options_,
            stats_, msh_, kerquant_, ptree_,
