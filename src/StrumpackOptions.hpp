@@ -241,6 +241,9 @@ namespace strumpack {
   template<> inline float default_rel_tol() { return 1.e-4; }
   template<> inline float default_abs_tol() { return 1.e-6; }
 
+  inline int default_cuda_cutoff() { return 200; }
+  inline int default_cuda_streams() { return 10; }
+
   /**
    * \class SPOptions
    * \brief Options for the sparse solver.
@@ -1613,8 +1616,8 @@ namespace strumpack {
 
     /** GPU options */
     bool use_gpu_ = true;
-    int cuda_cutoff_ = 500;
-    int cuda_streams_ = 10;
+    int cuda_cutoff_ = default_cuda_cutoff();
+    int cuda_streams_ = default_cuda_streams();
 
     /** compression options */
     CompressionType _comp = CompressionType::NONE;
