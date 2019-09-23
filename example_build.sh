@@ -72,7 +72,7 @@ if [[ $(dnsdomainname) = "summit.olcf.ornl.gov" ]]; then
     BPACKHOME=$HOME/ButterflyPACK/
 
     cmake ../ \
-        -DCMAKE_BUILD_TYPE=Debug \
+        -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=../install \
         -DCMAKE_CXX_COMPILER=mpiCC \
         -DCMAKE_C_COMPILER=mpicc \
