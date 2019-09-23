@@ -71,7 +71,9 @@ namespace strumpack {
 
       template<typename integer_t> LRBFMatrix
       (const HODLRMatrix<scalar_t>& A, const HSS::HSSPartitionTree& Atree,
+       const CSRGraph<integer_t>& Agraph,
        const HODLRMatrix<scalar_t>& B, const HSS::HSSPartitionTree& Btree,
+       const CSRGraph<integer_t>& Bgraph,
        const DenseMatrix<bool>& admissibility,
        const CSRGraph<integer_t>& graph, const opts_t& opts);
 
@@ -193,7 +195,7 @@ namespace strumpack {
     template<typename integer_t> struct AdmInfoLRBF {
       std::pair<std::vector<int>,std::vector<int>> rmaps, cmaps;
       const DenseMatrix<bool>* adm;
-      const CSRGraph<integer_t>* graph;
+      const CSRGraph<integer_t> *graph, *row_graph, *col_graph;
       integer_t rows, cols;
     };
 
@@ -202,6 +204,8 @@ namespace strumpack {
     void LRBF_distance_query(int* m, int* n, real_t* dist, C2Fptr fdata) {
       auto& info = *static_cast<AdmInfoLRBF<integer_t>*>(fdata);
       auto& g = *(info.graph);
+      auto& gr = *(info.row_graph);
+      auto& gc = *(info.col_graph);
       int i = *m, j = *n;
       if (i < 0) {
         i = -i;
@@ -211,10 +215,25 @@ namespace strumpack {
       j--;
       assert(i >= 0 && j >= 0 && i < info.rows && j < info.cols);
       *dist = real_t(1.);
-      auto pkhi = g.ind() + g.ptr(i+1);
-      for (auto pk=g.ind() + g.ptr(i); pk!=pkhi; pk++)
+      auto hik = g.ind() + g.ptr(i+1);
+      for (auto pk=g.ind()+g.ptr(i); pk!=hik; pk++)
         if (*pk == j) return;
       *dist = real_t(2.);
+      hik = gr.ind() + gr.ptr(i+1);
+      for (auto pk=gr.ind()+gr.ptr(i); pk!=hik; pk++) {
+        auto k = *pk;
+        auto hil = g.ind() + g.ptr(k+1);
+        for (auto pl=g.ind()+g.ptr(k); pl!=hil; pl++)
+          if (*pl == j) return;
+      }
+      hik = gc.ind() + gc.ptr(j+1);
+      for (auto pk=gc.ind()+gc.ptr(j); pk!=hik; pk++) {
+        auto k = *pk;
+        auto hil = g.ind() + g.ptr(i+1);
+        for (auto pl=g.ind()+g.ptr(i); pl!=hil; pl++)
+          if (*pl == k) return;
+      }
+      *dist = real_t(3.);
     }
 
     template<typename integer_t> void LRBF_admissibility_query
@@ -245,10 +264,11 @@ namespace strumpack {
     template<typename scalar_t> template<typename integer_t>
     LRBFMatrix<scalar_t>::LRBFMatrix
     (const HODLRMatrix<scalar_t>& A, const HSS::HSSPartitionTree& Atree,
+     const CSRGraph<integer_t>& Agraph,
      const HODLRMatrix<scalar_t>& B, const HSS::HSSPartitionTree& Btree,
+     const CSRGraph<integer_t>& Bgraph,
      const DenseMatrix<bool>& adm, const CSRGraph<integer_t>& graph,
-     const opts_t& opts)
-      : c_(A.c_) {
+     const opts_t& opts) : c_(A.c_) {
       rows_ = A.rows();
       cols_ = B.cols();
       Fcomm_ = A.Fcomm_;
@@ -269,6 +289,8 @@ namespace strumpack {
           (std::max(min_lvl, Btree.levels()));
         info.adm = &adm;
         info.graph = &graph;
+        info.row_graph = &Agraph;
+        info.col_graph = &Bgraph;
         info.rows = rows_;
         info.cols = cols_;
         HODLR_set_I_option<scalar_t>(options_, "nogeo", 2);
@@ -280,7 +302,6 @@ namespace strumpack {
            &(LRBF_distance_query<scalar_t,integer_t>),
            &(LRBF_admissibility_query<integer_t>), &info);
       } else {
-        std::cout << "geo = 1" << std::endl;
         HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
         HODLR_set_I_option<scalar_t>(options_, "knn", 0);
         LRBF_construct_init<scalar_t>

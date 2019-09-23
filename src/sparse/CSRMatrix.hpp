@@ -1049,10 +1049,12 @@ namespace strumpack {
         auto c = ind_[j];
         if (c == i) continue;
         auto lc = c - lo;
-        if (lc >= 0 && lc < dim && !mark[lc]) {
-          mark[lc] = true;
-          adjncy.push_back(lc);
-          e++;
+        if (lc >= 0 && lc < dim) {
+          if (!mark[lc]) {
+            mark[lc] = true;
+            adjncy.push_back(lc);
+            e++;
+          }
         } else {
           if (ordering_level > 0) {
             for (integer_t k=ptr_[c]; k<ptr_[c+1]; k++) {

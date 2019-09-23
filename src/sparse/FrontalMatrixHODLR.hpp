@@ -462,7 +462,8 @@ namespace strumpack {
   (const SpMat_t& A, const Opts_t& opts, int task_depth) {
     auto g = A.extract_graph
       (opts.separator_ordering_level(), sep_begin_, sep_end_);
-    auto adm = g.admissibility(sep_tree_.template leaf_sizes<int>());
+    auto sep_leafs = sep_tree_.template leaf_sizes<int>();
+    auto adm = g.admissibility(sep_leafs);
     F11_ = std::move
       (HODLR::HODLRMatrix<scalar_t>
        (commself_, sep_tree_, adm, g, opts.HODLR_options()));
@@ -472,29 +473,27 @@ namespace strumpack {
       if (opts.HODLR_options().compression_algorithm() ==
           HODLR::CompressionAlgorithm::ELEMENT_EXTRACTION &&
           opts.HODLR_options().geo() == 2) {
+        auto gCB = A.extract_graph_CB(opts.separator_ordering_level(), this->upd());
+        auto CB_leafs = CB_tree.template leaf_sizes<int>();
         {
-          auto gCB = A.extract_graph_CB(opts.separator_ordering_level(), this->upd());
-          auto admCB = gCB.admissibility(CB_tree.template leaf_sizes<int>());
+          auto admCB = gCB.admissibility(CB_leafs);
           F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
             (new HODLR::HODLRMatrix<scalar_t>
              (commself_, CB_tree, admCB, gCB, opts.HODLR_options()));
-        } {
-          auto g12 = A.extract_graph_sep_CB
-            (opts.separator_ordering_level(), sep_begin_, sep_end_, this->upd());
-          auto adm12 = g12.admissibility
-            (sep_tree_.template leaf_sizes<int>(),
-             CB_tree.template leaf_sizes<int>());
-          F12_ = HODLR::LRBFMatrix<scalar_t>
-            (F11_, sep_tree_, *F22_, CB_tree, adm12, g12, opts.HODLR_options());
-        } {
-          auto g21 = A.extract_graph_CB_sep
-            (opts.separator_ordering_level(), sep_begin_, sep_end_, this->upd());
-          auto adm21 = g21.admissibility
-            (CB_tree.template leaf_sizes<int>(),
-             sep_tree_.template leaf_sizes<int>());
-          F21_ = HODLR::LRBFMatrix<scalar_t>
-            (*F22_, CB_tree, F11_, sep_tree_, adm21, g21, opts.HODLR_options());
+
         }
+        auto g12 = A.extract_graph_sep_CB
+          (opts.separator_ordering_level(), sep_begin_, sep_end_, this->upd());
+        auto g21 = A.extract_graph_CB_sep
+          (opts.separator_ordering_level(), sep_begin_, sep_end_, this->upd());
+        auto adm12 = admissibility(g, g12, gCB, sep_leafs, CB_leafs);
+        auto adm21 = adm12.transpose();
+        F12_ = HODLR::LRBFMatrix<scalar_t>
+          (F11_, sep_tree_, g, *F22_, CB_tree, gCB,
+           adm12, g12, opts.HODLR_options());
+        F21_ = HODLR::LRBFMatrix<scalar_t>
+          (*F22_, CB_tree, gCB, F11_, sep_tree_, g,
+           adm21, g21, opts.HODLR_options());
       } else {
         F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
           (new HODLR::HODLRMatrix<scalar_t>

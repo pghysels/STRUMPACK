@@ -89,29 +89,12 @@ namespace strumpack {
      const std::vector<integer_t>& iorder,
      integer_t clo, integer_t chi);
 
-    /**
-     * Extract the separator from sep_begin to sep_end. Also add extra
-     * length-2 edges if sep_order_level > 0.
-     *
-     * This only extracts the nodes i for which order[i] == part.
-     */
-    CSRGraph<integer_t> extract_subgraph
-    (int order_level, integer_t lo, integer_t begin, integer_t end,
-     integer_t part, const integer_t* order,
-     const Length2Edges<integer_t>& o) const;
-
-    CSRGraph<integer_t> extract_subgraph
-    (integer_t lo, integer_t begin, integer_t end) const;
-
     HSS::HSSPartitionTree recursive_bisection
     (int leaf, int conn_level, integer_t* order, integer_t* iorder,
      integer_t lo, integer_t sep_begin, integer_t sep_end) const;
 
     template<typename int_t>
     DenseMatrix<bool> admissibility(const std::vector<int_t>& tiles) const;
-
-    template<typename int_t> DenseMatrix<bool> admissibility
-    (const std::vector<int_t>& rtiles, const std::vector<int_t>& ctiles) const;
 
     void print_dense(const std::string& name) const;
 
@@ -125,6 +108,17 @@ namespace strumpack {
      integer_t sep_begin, integer_t sep_end, integer_t* order,
      HSS::HSSPartitionTree& tree, integer_t& parts, integer_t part,
      integer_t count, const Length2Edges<integer_t>& l2) const;
+
+    /**
+     * Extract the separator from sep_begin to sep_end. Also add extra
+     * length-2 edges if sep_order_level > 0.
+     *
+     * This only extracts the nodes i for which order[i] == part.
+     */
+    CSRGraph<integer_t> extract_subgraph
+    (int order_level, integer_t lo, integer_t begin, integer_t end,
+     integer_t part, const integer_t* order,
+     const Length2Edges<integer_t>& o) const;
   };
 
   template<typename integer_t>
@@ -252,42 +246,6 @@ namespace strumpack {
     std::swap(ind_, ind);
   }
 
-  template<typename integer_t> CSRGraph<integer_t>
-  CSRGraph<integer_t>::extract_subgraph
-  (integer_t lo, integer_t begin, integer_t end) const {
-    auto n = size();
-    auto dim = end - begin;
-    integer_t e = 0;
-    for (integer_t r=begin; r<end; r++)
-      for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++) {
-        auto c = ind_[j] - lo;
-        if (c != r && c >= begin && c < end)
-          e++;
-      }
-    CSRGraph<integer_t> g(dim, e);
-    e = 0;
-    for (integer_t r=begin; r<end; r++) {
-      for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++) {
-        auto c = ind_[j] - lo;
-        if (c != r) {
-          auto lc = c - begin;
-          if (lc >= 0 && lc < dim)
-            g.ind(e++) = c - begin;
-        }
-      }
-      g.ptr(r-begin+1) = e;
-    }
-    for (integer_t i=0; i<g.vertices(); i++) {
-      for (integer_t j=g.ptr(i); j<g.ptr(i+1); j++) {
-        assert(j >= 0);
-        assert(j < g.edges());
-        assert(g.ind(j) >= 0);
-        assert(g.ind(j) < g.vertices());
-      }
-    }
-    return g;
-  }
-
   template<typename integer_t> HSS::HSSPartitionTree
   CSRGraph<integer_t>::recursive_bisection
   (int leaf, int conn_level, integer_t* order, integer_t* iorder,
@@ -389,10 +347,12 @@ namespace strumpack {
           if (c == r) continue;
           if (c >= 0 && c < n) {
             auto lc = c - begin;
-            if (lc >= 0 && lc < dim && order[lc] == part && !mark[lc]) {
-              mark[lc] = true;
-              g.ind_.push_back(ind_to_part[lc]);
-              edges++;
+            if (lc >= 0 && lc < dim && order[lc] == part) {
+              if (!mark[lc]) {
+                mark[lc] = true;
+                g.ind_.push_back(ind_to_part[lc]);
+                edges++;
+              }
             } else {
               if (order_level > 0) {
                 for (integer_t k=ptr_[c]; k<ptr_[c+1]; k++) {
@@ -429,49 +389,68 @@ namespace strumpack {
 
   template<typename integer_t> template<typename int_t> DenseMatrix<bool>
   CSRGraph<integer_t>::admissibility(const std::vector<int_t>& tiles) const {
-    integer_t nt = tiles.size();
+    integer_t nt = tiles.size(), n = size();
     DenseMatrix<bool> adm(nt, nt);
     adm.fill(true);
     for (integer_t t=0; t<nt; t++)
       adm(t, t) = false;
-    std::vector<integer_t> ts(nt+1);
-    for (integer_t i=0; i<nt; i++)
-      ts[i+1] = tiles[i] + ts[i];
-    for (integer_t t=0; t<nt; t++) {
-      for (integer_t i=ts[t]; i<ts[t+1]; i++) {
-        auto hij = ind() + ptr_[i+1];
-        for (auto pj=ind()+ptr_[i]; pj!=hij; pj++) {
-          integer_t tj = std::distance
-            (ts.begin(), std::upper_bound
-             (ts.begin(), ts.end(), *pj)) - 1;
-          if (t != tj) adm(t, tj) = adm(tj, t) = false;
+    std::vector<integer_t> tile(n);
+    for (integer_t t=0, ts=0; t<nt; t++) {
+      for (integer_t i=ts; i<ts+tiles[t]; i++)
+        tile[i] = t;
+      ts += tiles[t];
+    }
+    for (integer_t i=0; i<n; i++) {
+      auto ti = tile[i];
+      auto hij = ind() + ptr_[i+1];
+      for (auto pj=ind()+ptr_[i]; pj!=hij; pj++) {
+        auto j = *pj;
+        auto tj = tile[j];
+        if (ti != tj) adm(ti, tj) = adm(tj, ti) = false;
+        auto hik = ind() + ptr_[j+1];
+        for (auto pk=ind()+ptr_[j]; pk!=hik; pk++) {
+          auto tk = tile[*pk];
+          if (ti != tk) adm(ti, tk) = adm(tk, ti) = false;
         }
       }
     }
     return adm;
   }
 
-  template<typename integer_t> template<typename int_t>
-  DenseMatrix<bool> CSRGraph<integer_t>::admissibility
-  (const std::vector<int_t>& rtiles, const std::vector<int_t>& ctiles) const {
+  template<typename integer_t, typename int_t>
+  DenseMatrix<bool> admissibility
+  (const CSRGraph<integer_t>& g11, const CSRGraph<integer_t>& g12,
+   const CSRGraph<integer_t>& g22,
+   const std::vector<int_t>& rtiles, const std::vector<int_t>& ctiles) {
     integer_t nrt = rtiles.size(), nct = ctiles.size();
-    DenseMatrix<bool> adm(nrt, nct);
-    adm.fill(true);
-    std::vector<integer_t> rts(nrt+1), cts(nct+1);
-    for (integer_t i=0; i<nrt; i++)
-      rts[i+1] = rtiles[i] + rts[i];
-    for (integer_t i=0; i<nct; i++)
-      cts[i+1] = ctiles[i] + cts[i];
-    for (integer_t t=0; t<nrt; t++) {
-      for (integer_t i=rts[t]; i<rts[t+1]; i++) {
-        auto hij = ind() + ptr_[i+1];
-        for (auto pj=ind()+ptr_[i]; pj!=hij; pj++)
-          adm(t, std::distance
-              (cts.begin(), std::upper_bound
-               (cts.begin(), cts.end(), *pj)) - 1) = false;
+    integer_t nr = g12.size(), nc = g22.size();
+    DenseMatrix<bool> adm12(nrt, nct);
+    adm12.fill(true);
+    std::vector<integer_t> rtile(nr), ctile(nc);
+    for (integer_t t=0, ts=0; t<nrt; t++) {
+      for (integer_t i=ts; i<ts+rtiles[t]; i++) rtile[i] = t;
+      ts += rtiles[t];
+    }
+    for (integer_t t=0, ts=0; t<nct; t++) {
+      for (integer_t i=ts; i<ts+ctiles[t]; i++) ctile[i] = t;
+      ts += ctiles[t];
+    }
+    for (integer_t i=0; i<nr; i++) {
+      auto rti = rtile[i];
+      auto hij = g12.ind() + g12.ptr(i+1);
+      for (auto pj=g12.ind()+g12.ptr(i); pj!=hij; pj++) {
+        auto j = *pj;
+        auto ctj = ctile[j];
+        adm12(rti, ctj) = false;
+        auto hik = g22.ind() + g22.ptr(j+1);
+        for (auto pk=g22.ind()+g22.ptr(j); pk!=hik; pk++)
+          adm12(rti, ctile[*pk]) = false;
+        hik = g11.ind() + g11.ptr(i+1);
+        for (auto pk=g11.ind()+g11.ptr(i); pk!=hik; pk++)
+          adm12(rtile[*pk], ctj) = false;
       }
     }
-    return adm;
+    return adm12;
   }
 
   template<typename integer_t> void

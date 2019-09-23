@@ -58,6 +58,7 @@ namespace strumpack {
 
   namespace blas {
 
+    inline bool my_conj(bool a) { return a; }
     inline float my_conj(float a) { return a; }
     inline double my_conj(double a) { return a; }
     inline std::complex<float> my_conj(std::complex<float> a) {

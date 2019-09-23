@@ -128,6 +128,8 @@ namespace strumpack {
       else front_multiply_2d_TC(sep_begin, sep_end, upd, R, S, depth);
     }
 
+    CSRGraph<integer_t> extract_graph
+    (int ordering_level, integer_t lo, integer_t hi) const override;
     CSRGraph<integer_t> extract_graph_sep_CB
     (int ordering_level, integer_t lo, integer_t hi,
      const std::vector<integer_t>& upd) const override;
@@ -153,9 +155,6 @@ namespace strumpack {
     real_t max_scaled_residual
     (const DenseM_t& x, const DenseM_t& b) const override
     { return real_t(1.); };
-
-    CSRGraph<integer_t> extract_graph
-    (int ordering_level, integer_t lo, integer_t hi) const override;
 
     void permute(const integer_t* iorder, const integer_t* order) override;
 
@@ -1500,8 +1499,9 @@ namespace strumpack {
     for (integer_t c=clo; c<chi; c++) {
       gptr.push_back(gptr.back());
       const auto phij = ind_.data() + ptr_[c+1];
-      for (auto pj=ind_.data() + ptr_[c]; pj!=phij; pj++) {
-        const auto row = *pj - lo;
+      for (auto pj=ind_.data()+ptr_[c]; pj!=phij; pj++) {
+        auto j = *pj;
+        const auto row = j - lo;
         if (row >= 0 && row < n) {
           gind.push_back(row);
           gptr.back()++;
