@@ -50,9 +50,9 @@ namespace strumpack {
   template<typename scalar_t, typename integer_t> class LevelInfo {
   public:
     std::vector<FrontalMatrixCUBLAS<scalar_t,integer_t>*> f;
-    std::size_t factor_mem_size = 0, schur_mem_size = 0, piv_mem_size = 0,
-      total_work_mem_size = 0, nnodes_small = 0, 
-      bloc_mem_size = 0, bupd_mem_size = 0;
+    std::size_t factor_size = 0, schur_size = 0, piv_size = 0,
+      total_work_bytes = 0, nnodes_small = 0, 
+      bloc_size = 0, bupd_size = 0;
     scalar_t* dev_getrf_work = nullptr;
     int* dev_getrf_err = nullptr;
     std::vector<int*> dev_piv;
@@ -107,13 +107,7 @@ namespace strumpack {
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,
      int etree_level=0, int task_depth=0) override;
 
-    void forward_multifrontal_solve
-    (DenseM_t& b, DenseM_t* work, int etree_level=0,
-     int task_depth=0) const override;
-
-    void backward_multifrontal_solve
-    (DenseM_t& y, DenseM_t* work, int etree_level=0,
-     int task_depth=0) const override;
+    void multifrontal_solve(DenseM_t& b) const override;
 
     void extract_CB_sub_matrix
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
@@ -206,7 +200,7 @@ namespace strumpack {
     }
     int lvls = this->levels();
     std::vector<LevelInfo_t> ldata(lvls);
-    std::size_t max_level_work_mem_size = 0;
+    std::size_t max_level_work_bytes = 0;
     for (int lvl=0; lvl<lvls; lvl++) {
       int l = lvls - lvl - 1;
       std::vector<F_t*> fp;
@@ -226,9 +220,9 @@ namespace strumpack {
         const auto size = dsep + dupd;
         avg_size_sep += dsep;
         avg_size_upd += dupd;
-        ldata[l].factor_mem_size += dsep*dsep + 2*dsep*dupd;
-        ldata[l].schur_mem_size += dupd*dupd;
-        ldata[l].piv_mem_size += dsep;
+        ldata[l].factor_size += dsep*dsep + 2*dsep*dupd;
+        ldata[l].schur_size += dupd*dupd;
+        ldata[l].piv_size += dsep;
         if (size < cutoff_size)
           ldata[l].nnodes_small++;
         if (dsep > max_dsep) {
@@ -245,20 +239,20 @@ namespace strumpack {
         (solver_handle[0], max_dsep, max_dsep,
          /*f.F11_.data()*/ static_cast<scalar_t*>(nullptr),
          max_dsep, &(ldata[l].getrf_work_size));
-      ldata[l].total_work_mem_size =
-        sizeof(scalar_t) * ldata[l].schur_mem_size +
-        sizeof(int) * (ldata[l].piv_mem_size) +
+      ldata[l].total_work_bytes =
+        sizeof(scalar_t) * ldata[l].schur_size +
+        sizeof(int) * (ldata[l].piv_size) +
         // CUDA getrf work size and CUDA getrf error code
         max_streams * (sizeof(scalar_t) * ldata[l].getrf_work_size + sizeof(int));
-      max_level_work_mem_size = std::max
-        (max_level_work_mem_size, ldata[l].total_work_mem_size);
+      max_level_work_bytes = std::max
+        (max_level_work_bytes, ldata[l].total_work_bytes);
     }
     // ensure alignment?
-    max_level_work_mem_size += max_level_work_mem_size % 8;
+    max_level_work_bytes += max_level_work_bytes % 8;
 
     void* all_work_mem = nullptr;
-    cudaMallocManaged(&all_work_mem, max_level_work_mem_size*2);
-    void* work_mem[2] = {all_work_mem, (char*)all_work_mem + max_level_work_mem_size};
+    cudaMallocManaged(&all_work_mem, 2 * max_level_work_bytes);
+    void* work_mem[2] = {all_work_mem, (char*)all_work_mem + max_level_work_bytes};
 
     for (int lvl=0; lvl<lvls; lvl++) {
       TaskTimer tl("");
@@ -270,13 +264,13 @@ namespace strumpack {
         std::cout << "#  level " << l << " of " << lvls
                   << " has " << ldata[l].f.size() << " nodes and "
                   << ldata[l].nnodes_small << " small nodes, needs "
-                  << ldata[l].factor_mem_size * sizeof(scalar_t) / 1.e6
+                  << ldata[l].factor_size * sizeof(scalar_t) / 1.e6
                   << " MB for factors, "
-                  << ldata[l].schur_mem_size * sizeof(scalar_t) / 1.e6
+                  << ldata[l].schur_size * sizeof(scalar_t) / 1.e6
                   << " MB for Schur complements" << std::endl;
 
       scalar_t* fmem = nullptr;
-      cudaMallocManaged(&fmem, ldata[l].factor_mem_size*sizeof(scalar_t));
+      cudaMallocManaged(&fmem, ldata[l].factor_size*sizeof(scalar_t));
       ldata[l].f[0]->factor_mem_ = uniq_scalar_t(fmem, cuda_deleter);
       auto wmem = work_mem[l % 2];
 
@@ -324,10 +318,10 @@ namespace strumpack {
       // prefetch to GPU
       if (nnodes_small < nnodes) {
 	cudaMemPrefetchAsync
-	  (work_mem[l % 2], max_level_work_mem_size, device_id, 0);
+	  (work_mem[l % 2], max_level_work_bytes, device_id, 0);
 	cudaMemPrefetchAsync
 	  (ldata[l].f[0]->factor_mem_.get(),
-	   ldata[l].factor_mem_size*sizeof(scalar_t), device_id, 0);
+	   ldata[l].factor_size*sizeof(scalar_t), device_id, 0);
       }
 
       // count flops
@@ -350,21 +344,22 @@ namespace strumpack {
           const auto size = dsep + dupd;
           if (size < cutoff_size) {
             if (dsep) {
-              f.piv = f.F11_.LU(0);
+	      f.piv.resize(dsep);
+	      int flag;
+	      blas::getrf(dsep, dsep, f.F11_.data(), dsep, f.piv.data(), &flag);
               // TODO if (opts.replace_tiny_pivots()) { ...
               if (dupd) {
-                f.F11_.solve_LU_in_place(f.F12_, f.piv, 0);
-                gemm(Trans::N, Trans::N, scalar_t(-1.), f.F21_, f.F12_,
-                     scalar_t(1.), f.F22_, 0);
+		blas::getrs
+		  ('N', dsep, dupd, f.F11_.data(), dsep,
+		   f.piv.data(), f.F12_.data(), dsep, &flag);
+		blas::gemm
+		  ('N', 'N', dupd, dupd, dsep, scalar_t(-1.), f.F21_.data(), dupd,
+		   f.F12_.data(), dsep, scalar_t(1.), f.F22_.data(), dupd);
               }
             }
           }
         }
       }
-
-      // TODO why the synchronize? after the prefetch??
-      //cudaDeviceSynchronize();
-
       for (std::size_t n=0; n<nnodes; n++) {
         auto& f = *(ldata[l].f[n]);
         auto stream = n % max_streams;
@@ -373,17 +368,17 @@ namespace strumpack {
         const auto size = dsep + dupd;
         if (size >= cutoff_size) {
           if (dsep) {
-            auto LU_stat = cuda::cusolverDngetrf
+            cuda::cusolverDngetrf
               (solver_handle[stream], dsep, dsep, f.F11_.data(), dsep,
                ldata[l].dev_getrf_work + stream * ldata[l].getrf_work_size,
                ldata[l].dev_piv[n], ldata[l].dev_getrf_err + stream);
             // TODO if (opts.replace_tiny_pivots()) { ...
             if (dupd) {
-              auto LU_stat = cuda::cusolverDngetrs
+              cuda::cusolverDngetrs
                 (solver_handle[stream], CUBLAS_OP_N, dsep, dupd,
                  f.F11_.data(), dsep, ldata[l].dev_piv[n], f.F12_.data(), dsep,
                  ldata[l].dev_getrf_err + stream);
-              auto stat = cuda::cublasgemm
+              cuda::cublasgemm
                 (blas_handle[stream], CUBLAS_OP_N, CUBLAS_OP_N,
                  dupd, dupd, dsep, scalar_t(-1.), f.F21_.data(), dupd,
                  f.F12_.data(), dsep, scalar_t(1.), f.F22_.data(), dupd);
@@ -397,7 +392,7 @@ namespace strumpack {
       if (nnodes_small < nnodes)
 	cudaMemPrefetchAsync
 	  (ldata[l].f[0]->factor_mem_.get(),
-	   ldata[l].factor_mem_size*sizeof(scalar_t), cudaCpuDeviceId, 0);
+	   ldata[l].factor_size*sizeof(scalar_t), cudaCpuDeviceId, 0);
 
       // copy pivot vectors back from the device
 #pragma omp parallel for
@@ -415,9 +410,9 @@ namespace strumpack {
       // copy the factor memory from managed memory to regular memory,
       // free the managed memory.
       auto def_deleter = [](scalar_t* ptr) { delete[] ptr; };
-      scalar_t* fmem_reg = new scalar_t[ldata[l].factor_mem_size];
+      scalar_t* fmem_reg = new scalar_t[ldata[l].factor_size];
       fmem = ldata[l].f[0]->factor_mem_.get();
-      std::copy(fmem, fmem+ldata[l].factor_mem_size, fmem_reg);
+      std::copy(fmem, fmem+ldata[l].factor_size, fmem_reg);
       ldata[l].f[0]->factor_mem_ = uniq_scalar_t(fmem_reg, def_deleter);
       fmem = ldata[l].f[0]->factor_mem_.get();
       for (std::size_t n=0; n<nnodes; n++) {
@@ -449,13 +444,13 @@ namespace strumpack {
 
   // using F22 for bupd makes this not const!!!!
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::forward_multifrontal_solve
-  (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const {
+  FrontalMatrixCUBLAS<scalar_t,integer_t>::multifrontal_solve
+  (DenseM_t& b) const {
     // TODO get the options in here
-    int cutoff_size = default_cuda_cutoff(); //opts.cuda_cutoff();
+    const int cutoff_size = default_cuda_cutoff(); //opts.cuda_cutoff();
+    const int max_streams = default_cuda_streams(); //opts.cuda_streams();
     int device_id;
     cudaGetDevice(&device_id);
-    const int max_streams = default_cuda_streams(); //opts.cuda_streams();
     std::vector<cudaStream_t> streams(max_streams);
     std::vector<cublasHandle_t> blas_handle(max_streams);
     std::vector<cusolverDnHandle_t> solver_handle(max_streams);
@@ -468,9 +463,9 @@ namespace strumpack {
     int nrhs = b.cols();
     int lvls = this->levels();
     std::vector<LevelInfo_t> ldata(lvls);
-    std::size_t max_level_work_mem_size = 0;
-    for (int lvl=0; lvl<lvls; lvl++) {
-      int l = lvls - lvl - 1;
+    std::size_t max_level_work_bytes = 0, 
+      max_level_factor_size = 0;
+    for (int l=lvls-1; l>=0; l--) {
       std::vector<const F_t*> fp;
       fp.reserve(2 << (l-1));
       this->get_level_fronts(fp, l);
@@ -478,46 +473,67 @@ namespace strumpack {
       for (auto f : fp)
         ldata[l].f.push_back(dynamic_cast<FC_t*>(const_cast<F_t*>(f)));
       auto nnodes = ldata[l].f.size();
+      ldata[l].dev_piv.resize(nnodes);
+      ldata[l].bloc.resize(nnodes);
       for (std::size_t n=0; n<nnodes; n++) {
         auto& f = *(ldata[l].f[n]);
         const auto dsep = f.dim_sep();
         const auto dupd = f.dim_upd();
         const auto size = dsep + dupd;
-        ldata[l].bloc_mem_size += dsep*nrhs;
-        ldata[l].bupd_mem_size += dupd*nrhs;
-        ldata[l].piv_mem_size += dsep;
+        if (size >= cutoff_size)
+	  ldata[l].factor_size += dsep*dsep + 2*dsep*dupd;
+        ldata[l].bloc_size += dsep*nrhs;
+        ldata[l].bupd_size += dupd*nrhs;
+        ldata[l].piv_size += dsep;
         if (size < cutoff_size)
           ldata[l].nnodes_small++;
       }
-      ldata[l].total_work_mem_size =
-        sizeof(scalar_t) * (ldata[l].bloc_mem_size + ldata[l].bupd_mem_size) +
-        sizeof(int) * (ldata[l].piv_mem_size) +
+      ldata[l].total_work_bytes =
+        sizeof(scalar_t) * (ldata[l].bloc_size + ldata[l].bupd_size) +
+        sizeof(int) * (ldata[l].piv_size) +
         max_streams * sizeof(int);  // CUDA getrs error code
-      max_level_work_mem_size = std::max
-        (max_level_work_mem_size, ldata[l].total_work_mem_size);
+      max_level_work_bytes = std::max
+        (max_level_work_bytes, ldata[l].total_work_bytes);
+      max_level_factor_size = std::max
+        (max_level_factor_size, ldata[l].factor_size);
     }
     // ensure alignment?
-    max_level_work_mem_size += max_level_work_mem_size % 8;
+    max_level_work_bytes += max_level_work_bytes % 8;
 
     void* all_work_mem = nullptr;
-    cudaMallocManaged(&all_work_mem, max_level_work_mem_size*2);
-    void* work_mem[2] = {all_work_mem, (char*)all_work_mem + max_level_work_mem_size};
+    cudaMallocManaged
+      (&all_work_mem, 2 * max_level_work_bytes 
+       + sizeof(scalar_t) * max_level_factor_size);
+    void* work_mem[2] = {all_work_mem, (char*)all_work_mem + max_level_work_bytes};
+    scalar_t* factor_mem = 
+      static_cast<scalar_t*>
+      (static_cast<void*>((char*)all_work_mem + 2 * max_level_work_bytes));
 
-    for (int lvl=0; lvl<lvls; lvl++) {
-      int l = lvls - lvl - 1;
+    ////////////////////////////////////////////////////////////////
+    //////////////     forward solve      //////////////////////////
+    ////////////////////////////////////////////////////////////////
+    for (int l=lvls-1; l>=0; l--) {
       auto nnodes = ldata[l].f.size();
       auto nnodes_small = ldata[l].nnodes_small;
       auto wmem = work_mem[l % 2];
+      auto fmem = factor_mem;
+      if (nnodes_small != nnodes)
+	std::copy
+	  (ldata[l].f[0]->factor_mem_.get(), 
+	   ldata[l].f[0]->factor_mem_.get()+ldata[l].factor_size, fmem);
 
       // initialize pointers to data for frontal matrices
-      ldata[l].dev_piv.resize(nnodes);
-      ldata[l].bloc.resize(nnodes);
       for (std::size_t n=0; n<nnodes; n++) {
         auto& f = *(ldata[l].f[n]);
         const int dsep = f.dim_sep();
         const int dupd = f.dim_upd();
 	ldata[l].bloc[n] = DenseMW_t(dsep, nrhs, static_cast<scalar_t*>(wmem), dsep);
 	wmem = static_cast<scalar_t*>(wmem) + dsep*nrhs;
+	if (nnodes_small != nnodes) {
+	  f.F11_ = DenseMW_t(dsep, dsep, fmem, dsep); fmem += dsep*dsep;
+	  f.F12_ = DenseMW_t(dsep, dupd, fmem, dsep); fmem += dsep*dupd;
+	  f.F21_ = DenseMW_t(dupd, dsep, fmem, dupd); fmem += dupd*dsep;
+	}
 	if (dupd) {
 	  f.F22_ = DenseMW_t(dupd, nrhs, static_cast<scalar_t*>(wmem), dupd);
 	  wmem = static_cast<scalar_t*>(wmem) + dupd*nrhs;
@@ -552,11 +568,6 @@ namespace strumpack {
 	copy(f.dim_sep(), nrhs, b, f.sep_begin_, 0, ldata[l].bloc[n], 0, 0);
       }
 
-      // prefetch to GPU
-      if (nnodes_small < nnodes)
-	cudaMemPrefetchAsync
-	  (work_mem[l % 2], max_level_work_mem_size, device_id, 0);
-
       if (nnodes_small) {
 #pragma omp parallel for
         for (std::size_t n=0; n<nnodes; n++) {
@@ -565,16 +576,26 @@ namespace strumpack {
           const auto dupd = f.dim_upd();
           const auto size = dsep + dupd;
           if (size < cutoff_size) {
-	    f.F11_.solve_LU_in_place(ldata[l].bloc[n], f.piv, task_depth);
-	    if (dupd) {
-	      if (nrhs == 1)
-		gemv(Trans::N, scalar_t(-1.), f.F21_, ldata[l].bloc[n],
-		     scalar_t(1.), f.F22_, task_depth);
-	      else
-		gemm(Trans::N, Trans::N, scalar_t(-1.), f.F21_, 
-		     ldata[l].bloc[n], scalar_t(1.), f.F22_, task_depth);
+	    // call the blas/lapack routines directly to avoid
+	    // overhead of tasking/checking whether in parallel region
+	    if (dsep) {
+	      int flag;
+	      blas::getrs
+		('N', dsep, nrhs, f.F11_.data(), dsep,
+		 f.piv.data(), ldata[l].bloc[n].data(), dsep, &flag);
+	      if (dupd) {
+		if (nrhs == 1)
+		  blas::gemv
+		    ('N', dupd, dsep, scalar_t(-1.), f.F21_.data(), dupd,
+		     ldata[l].bloc[n].data(), 1, scalar_t(1.),
+		     f.F22_.data(), 1);
+		else
+		  blas::gemm
+		    ('N', 'N', dupd, nrhs, dsep, scalar_t(-1.), f.F21_.data(), dupd, 
+		     ldata[l].bloc[n].data(), dsep, scalar_t(1.), f.F22_.data(), dupd);
+	      }
 	    }
-          }
+	  }
         }
       }
       for (std::size_t n=0; n<nnodes; n++) {
@@ -585,26 +606,27 @@ namespace strumpack {
         const auto size = dsep + dupd;
         if (size >= cutoff_size) {
           if (dsep) {
-	    auto LU_stat = cuda::cusolverDngetrs
+	    cuda::cusolverDngetrs
 	      (solver_handle[stream], CUBLAS_OP_N, dsep, nrhs,
 	       f.F11_.data(), dsep, ldata[l].dev_piv[n], 
 	       ldata[l].bloc[n].data(), dsep,
 	       ldata[l].dev_getrf_err + stream);
             if (dupd) {
-	      // if (nrhs == 1) {
-	      // } else {
-	      auto stat = cuda::cublasgemm
-		(blas_handle[stream], CUBLAS_OP_N, CUBLAS_OP_N,
-		 dupd, nrhs, dsep, scalar_t(-1.), f.F21_.data(), dupd,
-		 ldata[l].bloc[n].data(), dsep, scalar_t(1.), f.F22_.data(), dupd);
-	      // }
+	      if (nrhs == 1)
+	      	cuda::cublasgemv
+	      	  (blas_handle[stream], CUBLAS_OP_N,
+	      	   dupd, dsep, scalar_t(-1.), f.F21_.data(), dupd,
+	      	   ldata[l].bloc[n].data(), 1, scalar_t(1.), f.F22_.data(), 1);
+	      else
+		cuda::cublasgemm
+		  (blas_handle[stream], CUBLAS_OP_N, CUBLAS_OP_N,
+		   dupd, nrhs, dsep, scalar_t(-1.), f.F21_.data(), dupd,
+		   ldata[l].bloc[n].data(), dsep, scalar_t(1.), f.F22_.data(), dupd);
 	    }
-          }
-        }
+	  }
+	}
       }
       cudaDeviceSynchronize();
-
-      // TODO prefetch from device
 
       // copy right hand side back from (managed) device memory
 #pragma omp parallel for
@@ -613,67 +635,19 @@ namespace strumpack {
 	copy(f.dim_sep(), nrhs, ldata[l].bloc[n], 0, 0, b, f.sep_begin_, 0);
       }
     }
-
-    cudaFree(all_work_mem);
-    for (int i=0; i<max_streams; i++) {
-      cudaStreamDestroy(streams[i]);
-      cublasDestroy(blas_handle[i]);
-      cusolverDnDestroy(solver_handle[i]);
-    }
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::backward_multifrontal_solve
-  (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const {
-    // TODO get the options in here
-    int cutoff_size = default_cuda_cutoff(); //opts.cuda_cutoff();
-    int device_id;
-    cudaGetDevice(&device_id);
-    const int max_streams = default_cuda_streams(); //opts.cuda_streams();
-    std::vector<cudaStream_t> streams(max_streams);
-    std::vector<cublasHandle_t> blas_handle(max_streams);
-    for (int i=0; i<max_streams; i++) {
-      cudaStreamCreate(&streams[i]);
-      cublasCreate(&blas_handle[i]);
-    }
-    int nrhs = b.cols();
-    int lvls = this->levels();
-    std::vector<LevelInfo_t> ldata(lvls);
-    std::size_t max_level_work_mem_size = 0;
-    for (int l=0; l<lvls; l++) {
-      std::vector<const F_t*> fp;
-      fp.reserve(2 << (l-1));
-      this->get_level_fronts(fp, l);
-      ldata[l].f.reserve(fp.size());
-      for (auto f : fp)
-        ldata[l].f.push_back(dynamic_cast<FC_t*>(const_cast<F_t*>(f)));
-      auto nnodes = ldata[l].f.size();
-      for (std::size_t n=0; n<nnodes; n++) {
-        auto& f = *(ldata[l].f[n]);
-        const auto dsep = f.dim_sep();
-        const auto dupd = f.dim_upd();
-        const auto size = dsep + dupd;
-        ldata[l].bloc_mem_size += dsep*nrhs;
-        ldata[l].bupd_mem_size += dupd*nrhs;
-        if (size < cutoff_size)
-          ldata[l].nnodes_small++;
-      }
-      ldata[l].total_work_mem_size =
-        sizeof(scalar_t) * (ldata[l].bloc_mem_size + ldata[l].bupd_mem_size);
-      max_level_work_mem_size = std::max
-        (max_level_work_mem_size, ldata[l].total_work_mem_size);
-    }
-    // ensure alignment?
-    max_level_work_mem_size += max_level_work_mem_size % 8;
-
-    void* all_work_mem = nullptr;
-    cudaMallocManaged(&all_work_mem, max_level_work_mem_size*2);
-    void* work_mem[2] = {all_work_mem, (char*)all_work_mem + max_level_work_mem_size};
-
+    
+    ////////////////////////////////////////////////////////////////
+    //////////////     backward solve     //////////////////////////
+    ////////////////////////////////////////////////////////////////
     for (int l=0; l<lvls; l++) {
       auto nnodes = ldata[l].f.size();
       auto nnodes_small = ldata[l].nnodes_small;
       auto wmem = work_mem[l % 2];
+      if (nnodes_small != nnodes)
+	std::copy
+	  (ldata[l].f[0]->factor_mem_.get(), 
+	   ldata[l].f[0]->factor_mem_.get()+ldata[l].factor_size, factor_mem);
+
 
       // initialize pointers to data for frontal matrices
       ldata[l].bloc.resize(nnodes);
@@ -710,11 +684,6 @@ namespace strumpack {
 	copy(f.dim_sep(), nrhs, b, f.sep_begin_, 0, ldata[l].bloc[n], 0, 0);
       }
 
-      // prefetch to GPU
-      if (nnodes_small < nnodes)
-	cudaMemPrefetchAsync
-	  (work_mem[l % 2], max_level_work_mem_size, device_id, 0);
-
       if (nnodes_small) {
 #pragma omp parallel for
         for (std::size_t n=0; n<nnodes; n++) {
@@ -725,11 +694,13 @@ namespace strumpack {
           if (size < cutoff_size) {
 	    if (dsep && dupd) {
 	      if (nrhs == 1)
-		gemv(Trans::N, scalar_t(-1.), f.F12_, f.F22_, 
-		     scalar_t(1.), ldata[l].bloc[n], task_depth);
+		blas::gemv
+		  ('N', dsep, dupd, scalar_t(-1.), f.F12_.data(), dsep, 
+		   f.F22_.data(), 1, scalar_t(1.), ldata[l].bloc[n].data(), 1);
 	      else
-		gemm(Trans::N, Trans::N, scalar_t(-1.), f.F12_, f.F22_,
-		     scalar_t(1.), ldata[l].bloc[n], task_depth);
+		blas::gemm
+		  ('N', 'N', dsep, nrhs, dupd, scalar_t(-1.), f.F12_.data(), dsep,
+		   f.F22_.data(), dupd, scalar_t(1.), ldata[l].bloc[n].data(), dsep);
 	    }
 	  }
 	}
@@ -742,31 +713,50 @@ namespace strumpack {
         const auto size = dsep + dupd;
         if (size >= cutoff_size) {
 	  if (dsep && dupd) {
-	    // if (nrhs == 1) {
-	    // } else {
-	    auto stat = cuda::cublasgemm
-	      (blas_handle[stream], CUBLAS_OP_N, CUBLAS_OP_N, 
-	       dsep, nrhs, dupd, scalar_t(-1.), f.F12_.data(), dsep, 
-	       f.F22_.data(), dupd, scalar_t(1.),
-	       ldata[l].bloc[n].data(), dsep);
-	    // }
+	    if (nrhs == 1)
+	      cuda::cublasgemv
+	    	(blas_handle[stream], CUBLAS_OP_N, 
+	    	 dsep, dupd, scalar_t(-1.), f.F12_.data(), dsep, 
+	    	 f.F22_.data(), 1, scalar_t(1.),
+	    	 ldata[l].bloc[n].data(), 1);
+	    else
+	      cuda::cublasgemm
+		(blas_handle[stream], CUBLAS_OP_N, CUBLAS_OP_N, 
+		 dsep, nrhs, dupd, scalar_t(-1.), f.F12_.data(), dsep, 
+		 f.F22_.data(), dupd, scalar_t(1.),
+		 ldata[l].bloc[n].data(), dsep);
 	  }
 	}
       }
       cudaDeviceSynchronize();
 
-      // TODO prefetch from device, only large ones?
       // copy right hand side back from (managed) device memory
 #pragma omp parallel for
       for (std::size_t n=0; n<nnodes; n++) {
         auto& f = *(ldata[l].f[n]);
 	copy(f.dim_sep(), nrhs, ldata[l].bloc[n], 0, 0, b, f.sep_begin_, 0);
       }
+
+      // revert pointers to the original (not managed)
+      // memory
+      if (nnodes_small != nnodes) {
+	auto fmem = ldata[l].f[0]->factor_mem_.get();
+	for (std::size_t n=0; n<nnodes; n++) {
+	  auto& f = *(ldata[l].f[n]);
+	  const int dsep = f.dim_sep();
+	  const int dupd = f.dim_upd();
+	  f.F11_ = DenseMW_t(dsep, dsep, fmem, dsep); fmem += dsep*dsep;
+	  f.F12_ = DenseMW_t(dsep, dupd, fmem, dsep); fmem += dsep*dupd;
+	  f.F21_ = DenseMW_t(dupd, dsep, fmem, dupd); fmem += dupd*dsep;
+	}
+      }
     }
+
     cudaFree(all_work_mem);
     for (int i=0; i<max_streams; i++) {
       cudaStreamDestroy(streams[i]);
       cublasDestroy(blas_handle[i]);
+      cusolverDnDestroy(solver_handle[i]);
     }
   }
 

@@ -93,7 +93,7 @@ namespace strumpack {
     (const SpMat_t& A, const Opts_t& opts,
      int etree_level=0, int task_depth=0) = 0;
 
-    void multifrontal_solve(DenseM_t& b) const;
+    virtual void multifrontal_solve(DenseM_t& b) const;
     virtual void forward_multifrontal_solve
     (DenseM_t& b, DenseM_t* work, int etree_level=0,
      int task_depth=0) const {};
@@ -416,9 +416,9 @@ namespace strumpack {
         CB(r,c) = yupd(I[r]-pa->dim_sep(), c);
     }
     // TODO adjust flops for multiple columns
-    STRUMPACK_FLOPS
-      ((is_complex<scalar_t>()?2:1)*
-       static_cast<long long int>(CB.rows()));
+    // STRUMPACK_FLOPS
+    //   ((is_complex<scalar_t>()?2:1)*
+    //    static_cast<long long int>(CB.rows()));
     STRUMPACK_BYTES
       (sizeof(scalar_t)*static_cast<long long int>
        (3*CB.rows())+sizeof(integer_t)*(CB.rows()+yupd.rows()));

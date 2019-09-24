@@ -100,6 +100,60 @@ namespace strumpack {
     }
 
 
+    inline cublasStatus_t cublasgemv
+    (cublasHandle_t handle, cublasOperation_t transa,
+     int m, int n, float alpha,
+     const float* A, int lda, const float* B, int incb,
+     float beta, float* C, int incc) {
+      STRUMPACK_FLOPS(blas::gemv_flops(m,n,alpha,beta));
+      STRUMPACK_BYTES(4*blas::gemv_moves(m,n));
+      return cublasSgemv
+        (handle, transa, m, n, &alpha, A, lda, B, incb, &beta, C, incc);
+    }
+    inline cublasStatus_t cublasgemv
+    (cublasHandle_t handle, cublasOperation_t transa,
+     int m, int n, double alpha,
+     const double* A, int lda, const double* B, int incb,
+     double beta, double* C, int incc) {
+      STRUMPACK_FLOPS(blas::gemv_flops(m,n,alpha,beta));
+      STRUMPACK_BYTES(8*blas::gemv_moves(m,n));
+      return cublasDgemv
+        (handle, transa, m, n, &alpha, A, lda, B, incb, &beta, C, incc);
+    }
+    inline cublasStatus_t cublasgemv
+    (cublasHandle_t handle, cublasOperation_t transa,
+     int m, int n, std::complex<float> alpha,
+     const std::complex<float>* A, int lda,
+     const std::complex<float>* B, int incb,
+     std::complex<float> beta, std::complex<float> *C, int incc) {
+      STRUMPACK_FLOPS(4*blas::gemv_flops(m,n,alpha,beta));
+      STRUMPACK_BYTES(2*4*blas::gemv_moves(m,n));
+      return cublasCgemv
+        (handle, transa, m, n,
+         reinterpret_cast<cuComplex*>(&alpha),
+         reinterpret_cast<const cuComplex*>(A), lda,
+         reinterpret_cast<const cuComplex*>(B), incb,
+         reinterpret_cast<cuComplex*>(&beta),
+         reinterpret_cast<cuComplex*>(C), incc);
+    }
+    inline cublasStatus_t cublasgemv
+    (cublasHandle_t handle, cublasOperation_t transa,
+     int m, int n, std::complex<double> alpha, 
+     const std::complex<double> *A, int lda,
+     const std::complex<double> *B, int incb, std::complex<double> beta,
+     std::complex<double> *C, int incc) {
+      STRUMPACK_FLOPS(4*blas::gemv_flops(m,n,alpha,beta));
+      STRUMPACK_BYTES(2*8*blas::gemv_moves(m,n));
+      return cublasZgemv
+        (handle, transa, m, n,
+         reinterpret_cast<cuDoubleComplex*>(&alpha),
+         reinterpret_cast<const cuDoubleComplex*>(A), lda,
+         reinterpret_cast<const cuDoubleComplex*>(B), incb,
+         reinterpret_cast<cuDoubleComplex*>(&beta),
+         reinterpret_cast<cuDoubleComplex*>(C), incc);
+    }
+
+
     inline cusolverStatus_t cusolverDngetrf_bufferSize
     (cusolverDnHandle_t handle, int m, int n, float* A, int lda, int* Lwork) {
       return cusolverDnSgetrf_bufferSize(handle, m, n, A, lda, Lwork);
