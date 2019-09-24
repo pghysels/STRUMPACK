@@ -51,7 +51,7 @@ namespace strumpack {
   public:
     std::vector<FrontalMatrixCUBLAS<scalar_t,integer_t>*> f;
     std::size_t factor_size = 0, schur_size = 0, piv_size = 0,
-      total_work_bytes = 0, nnodes_small = 0, 
+      total_work_bytes = 0, nnodes_small = 0,
       bloc_size = 0, bupd_size = 0;
     scalar_t* dev_getrf_work = nullptr;
     int* dev_getrf_err = nullptr;
@@ -68,6 +68,8 @@ namespace strumpack {
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using LevelInfo_t = LevelInfo<scalar_t,integer_t>;
+    using uniq_scalar_t = std::unique_ptr
+      <scalar_t[], std::function<void(scalar_t*)>>;
 #if defined(STRUMPACK_USE_MPI)
     using ExtAdd = ExtendAdd<scalar_t,integer_t>;
 #endif
@@ -124,7 +126,7 @@ namespace strumpack {
 #endif
 
   private:
-    std::unique_ptr<scalar_t[], std::function<void(scalar_t*)>> factor_mem_;
+    uniq_scalar_t factor_mem_;
     DenseMW_t F11_, F12_, F21_, F22_;
     std::vector<int> piv; // regular int because it is passed to BLAS
 
@@ -184,7 +186,6 @@ namespace strumpack {
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
     int cutoff_size = opts.cuda_cutoff();
-    using uniq_scalar_t = std::unique_ptr<scalar_t[],std::function<void(scalar_t*)>>;
     auto cuda_deleter = [](void* ptr) { cudaFree(ptr); };
     int device_id;
     cudaGetDevice(&device_id);
@@ -252,7 +253,8 @@ namespace strumpack {
 
     void* all_work_mem = nullptr;
     cudaMallocManaged(&all_work_mem, 2 * max_level_work_bytes);
-    void* work_mem[2] = {all_work_mem, (char*)all_work_mem + max_level_work_bytes};
+    void* work_mem[2] =
+      {all_work_mem, (char*)all_work_mem + max_level_work_bytes};
 
     for (int lvl=0; lvl<lvls; lvl++) {
       TaskTimer tl("");
@@ -289,7 +291,8 @@ namespace strumpack {
         }
       }
       ldata[l].dev_getrf_work = static_cast<scalar_t*>(wmem);
-      wmem = static_cast<scalar_t*>(wmem) + max_streams * ldata[l].getrf_work_size;
+      wmem = static_cast<scalar_t*>(wmem) +
+        max_streams * ldata[l].getrf_work_size;
       for (std::size_t n=0; n<nnodes; n++) {
         ldata[l].dev_piv[n] = static_cast<int*>(wmem);
         wmem = static_cast<int*>(wmem) + ldata[l].f[n]->dim_sep();
@@ -317,11 +320,11 @@ namespace strumpack {
 
       // prefetch to GPU
       if (nnodes_small < nnodes) {
-	cudaMemPrefetchAsync
-	  (work_mem[l % 2], max_level_work_bytes, device_id, 0);
-	cudaMemPrefetchAsync
-	  (ldata[l].f[0]->factor_mem_.get(),
-	   ldata[l].factor_size*sizeof(scalar_t), device_id, 0);
+        cudaMemPrefetchAsync
+          (work_mem[l % 2], max_level_work_bytes, device_id, 0);
+        cudaMemPrefetchAsync
+          (ldata[l].f[0]->factor_mem_.get(),
+           ldata[l].factor_size*sizeof(scalar_t), device_id, 0);
       }
 
       // count flops
@@ -344,17 +347,17 @@ namespace strumpack {
           const auto size = dsep + dupd;
           if (size < cutoff_size) {
             if (dsep) {
-	      f.piv.resize(dsep);
-	      int flag;
-	      blas::getrf(dsep, dsep, f.F11_.data(), dsep, f.piv.data(), &flag);
+              f.piv.resize(dsep);
+              int flag;
+              blas::getrf(dsep, dsep, f.F11_.data(), dsep, f.piv.data(), &flag);
               // TODO if (opts.replace_tiny_pivots()) { ...
               if (dupd) {
-		blas::getrs
-		  ('N', dsep, dupd, f.F11_.data(), dsep,
-		   f.piv.data(), f.F12_.data(), dsep, &flag);
-		blas::gemm
-		  ('N', 'N', dupd, dupd, dsep, scalar_t(-1.), f.F21_.data(), dupd,
-		   f.F12_.data(), dsep, scalar_t(1.), f.F22_.data(), dupd);
+                blas::getrs
+                  ('N', dsep, dupd, f.F11_.data(), dsep,
+                   f.piv.data(), f.F12_.data(), dsep, &flag);
+                blas::gemm
+                  ('N', 'N', dupd, dupd, dsep, scalar_t(-1.), f.F21_.data(), dupd,
+                   f.F12_.data(), dsep, scalar_t(1.), f.F22_.data(), dupd);
               }
             }
           }
@@ -390,9 +393,9 @@ namespace strumpack {
 
       // prefetch from device
       if (nnodes_small < nnodes)
-	cudaMemPrefetchAsync
-	  (ldata[l].f[0]->factor_mem_.get(),
-	   ldata[l].factor_size*sizeof(scalar_t), cudaCpuDeviceId, 0);
+        cudaMemPrefetchAsync
+          (ldata[l].f[0]->factor_mem_.get(),
+           ldata[l].factor_size*sizeof(scalar_t), cudaCpuDeviceId, 0);
 
       // copy pivot vectors back from the device
 #pragma omp parallel for
@@ -463,8 +466,7 @@ namespace strumpack {
     int nrhs = b.cols();
     int lvls = this->levels();
     std::vector<LevelInfo_t> ldata(lvls);
-    std::size_t max_level_work_bytes = 0, 
-      max_level_factor_size = 0;
+    std::size_t max_level_work_bytes = 0, max_level_factor_size = 0;
     for (int l=lvls-1; l>=0; l--) {
       std::vector<const F_t*> fp;
       fp.reserve(2 << (l-1));
@@ -481,7 +483,7 @@ namespace strumpack {
         const auto dupd = f.dim_upd();
         const auto size = dsep + dupd;
         ldata[l].factor_size += dsep*dsep + 2*dsep*dupd;
-	ldata[l].bloc_size += dsep*nrhs;
+        ldata[l].bloc_size += dsep*nrhs;
         ldata[l].bupd_size += dupd*nrhs;
         ldata[l].piv_size += dsep;
         if (size < cutoff_size)
@@ -501,10 +503,11 @@ namespace strumpack {
 
     void* all_work_mem = nullptr;
     cudaMallocManaged
-      (&all_work_mem, 2 * max_level_work_bytes 
+      (&all_work_mem, 2 * max_level_work_bytes
        + sizeof(scalar_t) * max_level_factor_size);
-    void* work_mem[2] = {all_work_mem, (char*)all_work_mem + max_level_work_bytes};
-    scalar_t* factor_mem = 
+    void* work_mem[2] =
+      {all_work_mem, (char*)all_work_mem + max_level_work_bytes};
+    scalar_t* factor_mem =
       static_cast<scalar_t*>
       (static_cast<void*>((char*)all_work_mem + 2 * max_level_work_bytes));
 
@@ -517,32 +520,33 @@ namespace strumpack {
       auto wmem = work_mem[l % 2];
       auto fmem = factor_mem;
       if (nnodes_small != nnodes)
-	std::copy
-	  (ldata[l].f[0]->factor_mem_.get(), 
-	   ldata[l].f[0]->factor_mem_.get()+ldata[l].factor_size, fmem);
+        std::copy
+          (ldata[l].f[0]->factor_mem_.get(),
+           ldata[l].f[0]->factor_mem_.get()+ldata[l].factor_size, fmem);
 
       // initialize pointers to data for frontal matrices
       for (std::size_t n=0; n<nnodes; n++) {
         auto& f = *(ldata[l].f[n]);
         const int dsep = f.dim_sep();
         const int dupd = f.dim_upd();
-	ldata[l].bloc[n] = DenseMW_t(dsep, nrhs, static_cast<scalar_t*>(wmem), dsep);
-	wmem = static_cast<scalar_t*>(wmem) + dsep*nrhs;
-	if (nnodes_small != nnodes) {
-	  f.F11_ = DenseMW_t(dsep, dsep, fmem, dsep); fmem += dsep*dsep;
-	  f.F12_ = DenseMW_t(dsep, dupd, fmem, dsep); fmem += dsep*dupd;
-	  f.F21_ = DenseMW_t(dupd, dsep, fmem, dupd); fmem += dupd*dsep;
-	}
-	if (dupd) {
-	  f.F22_ = DenseMW_t(dupd, nrhs, static_cast<scalar_t*>(wmem), dupd);
-	  wmem = static_cast<scalar_t*>(wmem) + dupd*nrhs;
-	}
+        ldata[l].bloc[n] =
+          DenseMW_t(dsep, nrhs, static_cast<scalar_t*>(wmem), dsep);
+        wmem = static_cast<scalar_t*>(wmem) + dsep*nrhs;
+        if (nnodes_small != nnodes) {
+          f.F11_ = DenseMW_t(dsep, dsep, fmem, dsep); fmem += dsep*dsep;
+          f.F12_ = DenseMW_t(dsep, dupd, fmem, dsep); fmem += dsep*dupd;
+          f.F21_ = DenseMW_t(dupd, dsep, fmem, dupd); fmem += dupd*dsep;
+        }
+        if (dupd) {
+          f.F22_ = DenseMW_t(dupd, nrhs, static_cast<scalar_t*>(wmem), dupd);
+          wmem = static_cast<scalar_t*>(wmem) + dupd*nrhs;
+        }
       }
       for (std::size_t n=0; n<nnodes; n++) {
         auto& f = *(ldata[l].f[n]);
         ldata[l].dev_piv[n] = static_cast<int*>(wmem);
         wmem = static_cast<int*>(wmem) + f.dim_sep();
-	std::copy(f.piv.begin(), f.piv.end(), ldata[l].dev_piv[n]);
+        std::copy(f.piv.begin(), f.piv.end(), ldata[l].dev_piv[n]);
       }
       ldata[l].dev_getrf_err = static_cast<int*>(wmem);
       wmem = static_cast<int*>(wmem) + max_streams;
@@ -551,20 +555,20 @@ namespace strumpack {
 #pragma omp parallel for
       for (std::size_t n=0; n<nnodes; n++) {
         auto& f = *(ldata[l].f[n]);
-	f.F22_.zero();
-	if (f.lchild_)
-	  f.lchild_->extend_add_b
-	    (b, f.F22_, dynamic_cast<FC_t*>(f.lchild_.get())->F22_, &f);
-	if (f.rchild_)
-	  f.rchild_->extend_add_b
-	    (b, f.F22_, dynamic_cast<FC_t*>(f.rchild_.get())->F22_, &f);
+        f.F22_.zero();
+        if (f.lchild_)
+          f.lchild_->extend_add_b
+            (b, f.F22_, dynamic_cast<FC_t*>(f.lchild_.get())->F22_, &f);
+        if (f.rchild_)
+          f.rchild_->extend_add_b
+            (b, f.F22_, dynamic_cast<FC_t*>(f.rchild_.get())->F22_, &f);
       }
 
       // copy right hand side to (managed) device memory
 #pragma omp parallel for
       for (std::size_t n=0; n<nnodes; n++) {
         auto& f = *(ldata[l].f[n]);
-	copy(f.dim_sep(), nrhs, b, f.sep_begin_, 0, ldata[l].bloc[n], 0, 0);
+        copy(f.dim_sep(), nrhs, b, f.sep_begin_, 0, ldata[l].bloc[n], 0, 0);
       }
 
       if (nnodes_small) {
@@ -575,26 +579,27 @@ namespace strumpack {
           const auto dupd = f.dim_upd();
           const auto size = dsep + dupd;
           if (size < cutoff_size) {
-	    // call the blas/lapack routines directly to avoid
-	    // overhead of tasking/checking whether in parallel region
-	    if (dsep) {
-	      int flag;
-	      blas::getrs
-		('N', dsep, nrhs, f.F11_.data(), dsep,
-		 f.piv.data(), ldata[l].bloc[n].data(), dsep, &flag);
-	      if (dupd) {
-		if (nrhs == 1)
-		  blas::gemv
-		    ('N', dupd, dsep, scalar_t(-1.), f.F21_.data(), dupd,
-		     ldata[l].bloc[n].data(), 1, scalar_t(1.),
-		     f.F22_.data(), 1);
-		else
-		  blas::gemm
-		    ('N', 'N', dupd, nrhs, dsep, scalar_t(-1.), f.F21_.data(), dupd, 
-		     ldata[l].bloc[n].data(), dsep, scalar_t(1.), f.F22_.data(), dupd);
-	      }
-	    }
-	  }
+            // call the blas/lapack routines directly to avoid
+            // overhead of tasking/checking whether in parallel region
+            if (dsep) {
+              int flag;
+              blas::getrs
+                ('N', dsep, nrhs, f.F11_.data(), dsep,
+                 f.piv.data(), ldata[l].bloc[n].data(), dsep, &flag);
+              if (dupd) {
+                if (nrhs == 1)
+                  blas::gemv
+                    ('N', dupd, dsep, scalar_t(-1.), f.F21_.data(), dupd,
+                     ldata[l].bloc[n].data(), 1, scalar_t(1.),
+                     f.F22_.data(), 1);
+                else
+                  blas::gemm
+                    ('N', 'N', dupd, nrhs, dsep, scalar_t(-1.),
+                     f.F21_.data(), dupd, ldata[l].bloc[n].data(), dsep,
+                     scalar_t(1.), f.F22_.data(), dupd);
+              }
+            }
+          }
         }
       }
       for (std::size_t n=0; n<nnodes; n++) {
@@ -605,25 +610,27 @@ namespace strumpack {
         const auto size = dsep + dupd;
         if (size >= cutoff_size) {
           if (dsep) {
-	    cuda::cusolverDngetrs
-	      (solver_handle[stream], CUBLAS_OP_N, dsep, nrhs,
-	       f.F11_.data(), dsep, ldata[l].dev_piv[n], 
-	       ldata[l].bloc[n].data(), dsep,
-	       ldata[l].dev_getrf_err + stream);
+            cuda::cusolverDngetrs
+              (solver_handle[stream], CUBLAS_OP_N, dsep, nrhs,
+               f.F11_.data(), dsep, ldata[l].dev_piv[n],
+               ldata[l].bloc[n].data(), dsep,
+               ldata[l].dev_getrf_err + stream);
             if (dupd) {
-	      if (nrhs == 1)
-	      	cuda::cublasgemv
-	      	  (blas_handle[stream], CUBLAS_OP_N,
-	      	   dupd, dsep, scalar_t(-1.), f.F21_.data(), dupd,
-	      	   ldata[l].bloc[n].data(), 1, scalar_t(1.), f.F22_.data(), 1);
-	      else
-		cuda::cublasgemm
-		  (blas_handle[stream], CUBLAS_OP_N, CUBLAS_OP_N,
-		   dupd, nrhs, dsep, scalar_t(-1.), f.F21_.data(), dupd,
-		   ldata[l].bloc[n].data(), dsep, scalar_t(1.), f.F22_.data(), dupd);
-	    }
-	  }
-	}
+              if (nrhs == 1)
+                cuda::cublasgemv
+                  (blas_handle[stream], CUBLAS_OP_N,
+                   dupd, dsep, scalar_t(-1.), f.F21_.data(), dupd,
+                   ldata[l].bloc[n].data(), 1,
+                   scalar_t(1.), f.F22_.data(), 1);
+              else
+                cuda::cublasgemm
+                  (blas_handle[stream], CUBLAS_OP_N, CUBLAS_OP_N,
+                   dupd, nrhs, dsep, scalar_t(-1.), f.F21_.data(), dupd,
+                   ldata[l].bloc[n].data(), dsep,
+                   scalar_t(1.), f.F22_.data(), dupd);
+            }
+          }
+        }
       }
       cudaDeviceSynchronize();
 
@@ -631,10 +638,10 @@ namespace strumpack {
 #pragma omp parallel for
       for (std::size_t n=0; n<nnodes; n++) {
         auto& f = *(ldata[l].f[n]);
-	copy(f.dim_sep(), nrhs, ldata[l].bloc[n], 0, 0, b, f.sep_begin_, 0);
+        copy(f.dim_sep(), nrhs, ldata[l].bloc[n], 0, 0, b, f.sep_begin_, 0);
       }
     }
-    
+
     ////////////////////////////////////////////////////////////////
     //////////////     backward solve     //////////////////////////
     ////////////////////////////////////////////////////////////////
@@ -643,9 +650,9 @@ namespace strumpack {
       auto nnodes_small = ldata[l].nnodes_small;
       auto wmem = work_mem[l % 2];
       if (nnodes_small != nnodes)
-	std::copy
-	  (ldata[l].f[0]->factor_mem_.get(), 
-	   ldata[l].f[0]->factor_mem_.get()+ldata[l].factor_size, factor_mem);
+        std::copy
+          (ldata[l].f[0]->factor_mem_.get(),
+           ldata[l].f[0]->factor_mem_.get()+ldata[l].factor_size, factor_mem);
 
 
       // initialize pointers to data for frontal matrices
@@ -654,33 +661,34 @@ namespace strumpack {
         auto& f = *(ldata[l].f[n]);
         const int dsep = f.dim_sep();
         const int dupd = f.dim_upd();
-	ldata[l].bloc[n] = DenseMW_t(dsep, nrhs, static_cast<scalar_t*>(wmem), dsep);
-	wmem = static_cast<scalar_t*>(wmem) + dsep*nrhs;
-	if (dupd) {
-	  f.F22_ = DenseMW_t(dupd, nrhs, static_cast<scalar_t*>(wmem), dupd);
-	  wmem = static_cast<scalar_t*>(wmem) + dupd*nrhs;
-	}
+        ldata[l].bloc[n] =
+          DenseMW_t(dsep, nrhs, static_cast<scalar_t*>(wmem), dsep);
+        wmem = static_cast<scalar_t*>(wmem) + dsep*nrhs;
+        if (dupd) {
+          f.F22_ = DenseMW_t(dupd, nrhs, static_cast<scalar_t*>(wmem), dupd);
+          wmem = static_cast<scalar_t*>(wmem) + dupd*nrhs;
+        }
       }
 
       // extract from parent nodes
       if (l > 0) {
 #pragma omp parallel for
-	for (std::size_t n=0; n<ldata[l-1].f.size(); n++) {
-	  auto& f = *(ldata[l-1].f[n]);
-	  if (f.lchild_)
-	    f.lchild_->extract_b
-	      (b, f.F22_, dynamic_cast<FC_t*>(f.lchild_.get())->F22_, &f);
-	  if (f.rchild_)
-	    f.rchild_->extract_b
-	      (b, f.F22_, dynamic_cast<FC_t*>(f.rchild_.get())->F22_, &f);
-	}
+        for (std::size_t n=0; n<ldata[l-1].f.size(); n++) {
+          auto& f = *(ldata[l-1].f[n]);
+          if (f.lchild_)
+            f.lchild_->extract_b
+              (b, f.F22_, dynamic_cast<FC_t*>(f.lchild_.get())->F22_, &f);
+          if (f.rchild_)
+            f.rchild_->extract_b
+              (b, f.F22_, dynamic_cast<FC_t*>(f.rchild_.get())->F22_, &f);
+        }
       }
 
       // copy right hand side to (managed) device memory
 #pragma omp parallel for
       for (std::size_t n=0; n<nnodes; n++) {
         auto& f = *(ldata[l].f[n]);
-	copy(f.dim_sep(), nrhs, b, f.sep_begin_, 0, ldata[l].bloc[n], 0, 0);
+        copy(f.dim_sep(), nrhs, b, f.sep_begin_, 0, ldata[l].bloc[n], 0, 0);
       }
 
       if (nnodes_small) {
@@ -691,18 +699,20 @@ namespace strumpack {
           const auto dupd = f.dim_upd();
           const auto size = dsep + dupd;
           if (size < cutoff_size) {
-	    if (dsep && dupd) {
-	      if (nrhs == 1)
-		blas::gemv
-		  ('N', dsep, dupd, scalar_t(-1.), f.F12_.data(), dsep, 
-		   f.F22_.data(), 1, scalar_t(1.), ldata[l].bloc[n].data(), 1);
-	      else
-		blas::gemm
-		  ('N', 'N', dsep, nrhs, dupd, scalar_t(-1.), f.F12_.data(), dsep,
-		   f.F22_.data(), dupd, scalar_t(1.), ldata[l].bloc[n].data(), dsep);
-	    }
-	  }
-	}
+            if (dsep && dupd) {
+              if (nrhs == 1)
+                blas::gemv
+                  ('N', dsep, dupd, scalar_t(-1.), f.F12_.data(), dsep,
+                   f.F22_.data(), 1, scalar_t(1.),
+                   ldata[l].bloc[n].data(), 1);
+              else
+                blas::gemm
+                  ('N', 'N', dsep, nrhs, dupd, scalar_t(-1.),
+                   f.F12_.data(), dsep, f.F22_.data(), dupd,
+                   scalar_t(1.), ldata[l].bloc[n].data(), dsep);
+            }
+          }
+        }
       }
       for (std::size_t n=0; n<nnodes; n++) {
         auto& f = *(ldata[l].f[n]);
@@ -711,21 +721,21 @@ namespace strumpack {
         const auto dupd = f.dim_upd();
         const auto size = dsep + dupd;
         if (size >= cutoff_size) {
-	  if (dsep && dupd) {
-	    if (nrhs == 1)
-	      cuda::cublasgemv
-	    	(blas_handle[stream], CUBLAS_OP_N, 
-	    	 dsep, dupd, scalar_t(-1.), f.F12_.data(), dsep, 
-	    	 f.F22_.data(), 1, scalar_t(1.),
-	    	 ldata[l].bloc[n].data(), 1);
-	    else
-	      cuda::cublasgemm
-		(blas_handle[stream], CUBLAS_OP_N, CUBLAS_OP_N, 
-		 dsep, nrhs, dupd, scalar_t(-1.), f.F12_.data(), dsep, 
-		 f.F22_.data(), dupd, scalar_t(1.),
-		 ldata[l].bloc[n].data(), dsep);
-	  }
-	}
+          if (dsep && dupd) {
+            if (nrhs == 1)
+              cuda::cublasgemv
+                (blas_handle[stream], CUBLAS_OP_N,
+                 dsep, dupd, scalar_t(-1.), f.F12_.data(), dsep,
+                 f.F22_.data(), 1, scalar_t(1.),
+                 ldata[l].bloc[n].data(), 1);
+            else
+              cuda::cublasgemm
+                (blas_handle[stream], CUBLAS_OP_N, CUBLAS_OP_N,
+                 dsep, nrhs, dupd, scalar_t(-1.), f.F12_.data(), dsep,
+                 f.F22_.data(), dupd, scalar_t(1.),
+                 ldata[l].bloc[n].data(), dsep);
+          }
+        }
       }
       cudaDeviceSynchronize();
 
@@ -733,21 +743,21 @@ namespace strumpack {
 #pragma omp parallel for
       for (std::size_t n=0; n<nnodes; n++) {
         auto& f = *(ldata[l].f[n]);
-	copy(f.dim_sep(), nrhs, ldata[l].bloc[n], 0, 0, b, f.sep_begin_, 0);
+        copy(f.dim_sep(), nrhs, ldata[l].bloc[n], 0, 0, b, f.sep_begin_, 0);
       }
 
       // revert pointers to the original (not managed)
       // memory
       if (nnodes_small != nnodes) {
-	auto fmem = ldata[l].f[0]->factor_mem_.get();
-	for (std::size_t n=0; n<nnodes; n++) {
-	  auto& f = *(ldata[l].f[n]);
-	  const int dsep = f.dim_sep();
-	  const int dupd = f.dim_upd();
-	  f.F11_ = DenseMW_t(dsep, dsep, fmem, dsep); fmem += dsep*dsep;
-	  f.F12_ = DenseMW_t(dsep, dupd, fmem, dsep); fmem += dsep*dupd;
-	  f.F21_ = DenseMW_t(dupd, dsep, fmem, dupd); fmem += dupd*dsep;
-	}
+        auto fmem = ldata[l].f[0]->factor_mem_.get();
+        for (std::size_t n=0; n<nnodes; n++) {
+          auto& f = *(ldata[l].f[n]);
+          const int dsep = f.dim_sep();
+          const int dupd = f.dim_upd();
+          f.F11_ = DenseMW_t(dsep, dsep, fmem, dsep); fmem += dsep*dsep;
+          f.F12_ = DenseMW_t(dsep, dupd, fmem, dsep); fmem += dsep*dupd;
+          f.F21_ = DenseMW_t(dupd, dsep, fmem, dupd); fmem += dupd*dsep;
+        }
       }
     }
 
