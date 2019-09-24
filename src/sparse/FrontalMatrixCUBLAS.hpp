@@ -480,9 +480,8 @@ namespace strumpack {
         const auto dsep = f.dim_sep();
         const auto dupd = f.dim_upd();
         const auto size = dsep + dupd;
-        if (size >= cutoff_size)
-	  ldata[l].factor_size += dsep*dsep + 2*dsep*dupd;
-        ldata[l].bloc_size += dsep*nrhs;
+        ldata[l].factor_size += dsep*dsep + 2*dsep*dupd;
+	ldata[l].bloc_size += dsep*nrhs;
         ldata[l].bupd_size += dupd*nrhs;
         ldata[l].piv_size += dsep;
         if (size < cutoff_size)
