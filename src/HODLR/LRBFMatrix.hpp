@@ -280,6 +280,9 @@ namespace strumpack {
       HODLR_createstats<scalar_t>(stats_);
       F2Cptr Aoptions = const_cast<F2Cptr>(A.options_);
       HODLR_copyoptions<scalar_t>(Aoptions, options_);
+      HODLR_set_D_option<scalar_t>
+        (options_, "sample_para",
+         std::min(2.0, opts.BF_sampling_parameter()));
       if (opts.geo() == 2) {
         AdmInfoLRBF<integer_t> info;
         int min_lvl = 2 + std::ceil(std::log2(c_.size()));
@@ -295,7 +298,8 @@ namespace strumpack {
         info.cols = cols_;
         HODLR_set_I_option<scalar_t>(options_, "nogeo", 2);
         HODLR_set_I_option<scalar_t>
-          (options_, "knn", 5 * graph.edges() / graph.vertices());
+          (options_, "knn",
+           10 * std::ceil(float(graph.edges()) / graph.vertices()));
         LRBF_construct_init<scalar_t>
           (rows_, cols_, lrows_, lcols_, A.msh_, B.msh_, lr_bf_, options_,
            stats_, msh_, kerquant_, ptree_,
