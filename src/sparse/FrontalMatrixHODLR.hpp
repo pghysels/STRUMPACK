@@ -480,7 +480,6 @@ namespace strumpack {
           F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
             (new HODLR::HODLRMatrix<scalar_t>
              (commself_, CB_tree, admCB, gCB, opts.HODLR_options()));
-
         }
         auto g12 = A.extract_graph_sep_CB
           (opts.separator_ordering_level(), sep_begin_, sep_end_, this->upd());
@@ -521,54 +520,25 @@ namespace strumpack {
       F11_.factor(); }
     compress_flops_F11();
     if (dim_upd()) {
-      // auto extract_F12 =
-      //   [&](VecVec_t& I, VecVec_t& J, std::vector<DenseMW_t>& B,
-      //       HODLR::ExtractionMeta& e) {
-      //     for (auto& Ik : I) for (auto& i : Ik) i += this->sep_begin_;
-      //     for (auto& Jk : J) for (auto& j : Jk) j = this->upd_[j];
-      //     for (std::size_t k=0; k<I.size(); k++)
-      //       element_extraction(A, I[k], J[k], B[k], task_depth);
-      //   };
-      // auto extract_F21 =
-      //   [&](VecVec_t& I, VecVec_t& J, std::vector<DenseMW_t>& B,
-      //       HODLR::ExtractionMeta& e) {
-      //     for (auto& Ik : I) for (auto& i : Ik) i = this->upd_[i];
-      //     for (auto& Jk : J) for (auto& j : Jk) j += this->sep_begin_;
-      //     for (std::size_t k=0; k<I.size(); k++)
-      //       element_extraction(A, I[k], J[k], B[k], task_depth);
-      //   };
-      // { TIMER_TIME(TaskType::LRBF_COMPRESS, 0, t_lrbf_compress);
-      //   F12_.compress(extract_F12);
-      //   F21_.compress(extract_F21); }
-      auto sample_F12 = [&]
-        (Trans op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
-        TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-        DenseM_t lR(R);
-        lR.scale(a);
-        if (b == scalar_t(0.)) S.zero();
-        else S.scale(b);
-        { TIMER_TIME(TaskType::FRONT_MULTIPLY_2D, 1, t_fmult);
-          A.front_multiply_F12(op, sep_begin_, sep_end_, this->upd_, R, S, 0); }
-        TIMER_TIME(TaskType::UUTXR, 1, t_UUtxR);
-        if (lchild_) lchild_->sample_CB_to_F12(op, lR, S, this, task_depth);
-        if (rchild_) rchild_->sample_CB_to_F12(op, lR, S, this, task_depth);
-      };
-      auto sample_F21 = [&]
-        (Trans op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
-        TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
-        DenseM_t lR(R), lS(S);
-        lR.scale(a);
-        if (b == scalar_t(0.)) S.zero();
-        else S.scale(b);
-        { TIMER_TIME(TaskType::FRONT_MULTIPLY_2D, 1, t_fmult);
-          A.front_multiply_F21(op, sep_begin_, sep_end_, this->upd_, R, S, 0); }
-        TIMER_TIME(TaskType::UUTXR, 1, t_UUtxR);
-        if (lchild_) lchild_->sample_CB_to_F21(op, lR, S, this, task_depth);
-        if (rchild_) rchild_->sample_CB_to_F21(op, lR, S, this, task_depth);
-      };
+      auto extract_F12 =
+        [&](VecVec_t& I, VecVec_t& J, std::vector<DenseMW_t>& B,
+            HODLR::ExtractionMeta& e) {
+          for (auto& Ik : I) for (auto& i : Ik) i += this->sep_begin_;
+          for (auto& Jk : J) for (auto& j : Jk) j = this->upd_[j];
+          for (std::size_t k=0; k<I.size(); k++)
+            element_extraction(A, I[k], J[k], B[k], task_depth);
+        };
+      auto extract_F21 =
+        [&](VecVec_t& I, VecVec_t& J, std::vector<DenseMW_t>& B,
+            HODLR::ExtractionMeta& e) {
+          for (auto& Ik : I) for (auto& i : Ik) i = this->upd_[i];
+          for (auto& Jk : J) for (auto& j : Jk) j += this->sep_begin_;
+          for (std::size_t k=0; k<I.size(); k++)
+            element_extraction(A, I[k], J[k], B[k], task_depth);
+        };
       { TIMER_TIME(TaskType::LRBF_COMPRESS, 0, t_lrbf_compress);
-        F12_.compress(sample_F12);
-        F21_.compress(sample_F21, F12_.get_stat("Rank_max")+10); }
+        F12_.compress(extract_F12);
+        F21_.compress(extract_F21); }
       compress_flops_F12_F21();
 
       // first construct S=-F21*inv(F11)*F12 using matvecs, then
