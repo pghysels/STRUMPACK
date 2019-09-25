@@ -287,8 +287,6 @@ namespace strumpack {
           this->extract_2d(A, I, J, B);
         };
       { TIMER_TIME(TaskType::LRBF_COMPRESS, 0, t_lrbf_compress);
-        F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_);
-        F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
         F12_.compress(extract_F12);
         F21_.compress(extract_F21); }
       compress_flops_F12_F21();
@@ -407,9 +405,7 @@ namespace strumpack {
         }
       };
       { TIMER_TIME(TaskType::LRBF_COMPRESS, 0, t_lrbf_compress);
-        F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_);
         F12_.compress(sample_F12);
-        F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
         F21_.compress(sample_F21, F12_.get_stat("Rank_max")+10); }
       compress_flops_F12_F21();
 
