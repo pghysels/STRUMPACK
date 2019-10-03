@@ -112,9 +112,9 @@ namespace strumpack {
   inline std::string get_name(CompressionType comp) {
     switch (comp) {
     case CompressionType::NONE: return "none";
-    case CompressionType::HSS: return "HSS";
-    case CompressionType::BLR: return "BLR";
-    case CompressionType::HODLR: return "HODLR";
+    case CompressionType::HSS: return "hss";
+    case CompressionType::BLR: return "blr";
+    case CompressionType::HODLR: return "hodlr";
     }
     return "UNKNOWN";
   }
@@ -1369,7 +1369,7 @@ namespace strumpack {
           else if (s == "BLR") set_compression(CompressionType::BLR);
           else if (s == "HODLR") set_compression(CompressionType::HODLR);
           else std::cerr << "# WARNING: compression type not"
-                 " recognized, use 'NONE', 'HSS', 'BLR' or 'HODLR'"
+                 " recognized, use 'none', 'hss', 'blr' or 'hodlr'"
                          << std::endl;
         } break;
         case 33: {
@@ -1552,7 +1552,7 @@ namespace strumpack {
                 << HODLR_min_sep_size() << ")" << std::endl;
       std::cout << "#          minimum size of the separator for HODLR"
                 << " compression of the front" << std::endl;
-      std::cout << "#   --sp_compression [NONE|HSS|BLR|HODLR]" << std::endl
+      std::cout << "#   --sp_compression [none|hss|blr|hodlr]" << std::endl
                 << "#          type of rank-structured compression to use"
                 << std::endl;
       std::cout << "#   --sp_compression_min_sep_size (default "
@@ -1571,14 +1571,14 @@ namespace strumpack {
       std::cout << "#   --sp_disable_replace_tiny_pivots" << std::endl;
       std::cout << "#   --sp_write_root_front" << std::endl;
       std::cout << "#   --sp_print_root_front_stats" << std::endl;
-      // std::cout << "#   --sp_enable_gpu" << std::endl;
-      // std::cout << "#   --sp_disable_gpu" << std::endl;
+      std::cout << "#   --sp_enable_gpu" << std::endl;
+      std::cout << "#   --sp_disable_gpu" << std::endl;
       std::cout << "#   --sp_cuda_cutoff (default "
                 << cuda_cutoff() << ")" << std::endl
                 << "#          CUDA kernel/CUBLAS cutoff size" << std::endl;
       std::cout << "#   --sp_cuda_streams (default "
                 << cuda_streams() << ")" << std::endl
-                << "#          number of CUDA streams " << std::endl;
+                << "#          number of CUDA streams" << std::endl;
       std::cout << "#   --sp_verbose or -v (default " << verbose() << ")"
                 << std::endl;
       std::cout << "#   --sp_quiet or -q (default " << !verbose() << ")"
