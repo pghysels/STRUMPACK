@@ -8,20 +8,24 @@ HSS matrix, but this will only be beneficial (compared to storing the
 frontal as a standard dense matrix and operating on it with
 BLAS/LAPACK routines) if the frontal matrix is large enough.
 
-\link scalar_interface Figure 3\endlink illustrates the HSS matrix
-format. The matrix is partitioned as a 2 × 2 block matrix, with the
-partitioning recursively applied on the diagonal blocks, until
-diagonal blocks are smaller than a specified leaf size. The
-off-diagonal block on each level of the hierarchy are approximated by
-a low-rank product. This low-rank storage format asymptotically
-reduces memory usage and floating point operations, while introducing
-approximation errors. HSS compression is not used by default in the
-STRUMPACK sparse solver (the default is to perform exact LU
-factorization), but can be turned on/off via the command line:
+\image html SPOptions_Interface.png width=23%
+
+__Figure 3__ illustrates the HSS matrix format. The matrix is
+partitioned as a 2 × 2 block matrix, with the partitioning recursively
+applied on the diagonal blocks, until diagonal blocks are smaller than
+a specified leaf size. The off-diagonal block on each level of the
+hierarchy are approximated by a low-rank product. This low-rank
+storage format asymptotically reduces memory usage and floating point
+operations, while introducing approximation errors. HSS compression is
+not used by default in the STRUMPACK sparse solver (the default is to
+perform exact LU factorization), but can be turned on/off via the
+command line:
 
 \code {.bash}
 --sp_enable_hss   (no argument)
 --sp_disable_hss  (no argument)
+--sp_compression hss
+--sp_compression none
 \endcode
 
 or via the C++ API as follows
@@ -29,7 +33,11 @@ or via the C++ API as follows
 \code {.cpp}
 void strumpack::SPOptions::enable_HSS();
 void strumpack::SPOptions::disable_HSS();
-bool strumpack::SPOptions::use_HSS();      // check whether HSS compression is enabled
+bool strumpack::SPOptions::use_HSS() const;    // check whether HSS compression is enabled
+
+void strumpack::SPOptions::set_compression(CompressionType::HSS);
+void strumpack::SPOptions::set_compression(CompressionType::NONE);
+CompressionType strumpack::SPOptions::set_compression() const;  // get compression type (none/hss/blr/hodlr)
 \endcode
 
 When HSS compression is enabled, the default STRUMPACK behavior is to
@@ -46,7 +54,8 @@ compression. The minimum dense matrix size for HSS compression is set
 via the command line via
 
 \code {.bash}
---sp_hss_min_sep_size int (default 256)
+--sp_hss_min_sep_size int
+--sp_compression_min_sep_size int
 \endcode
 
 or via the C++ API as follows
@@ -54,6 +63,9 @@ or via the C++ API as follows
 \code {.cpp}
 void strumpack::SPOptions::set_HSS_min_sep_size(int s);
 int strumpack::SPOptions::HSS_min_sep_size() const;       // get the current value
+
+void strumpack::SPOptions::set_compression_min_sep_size(int s);
+int strumpack::SPOptions::compression_min_sep_size() const;
 \endcode
 
 The routine \link strumpack::SPOptions::set_HSS_min_sep_size(int s)
@@ -111,84 +123,35 @@ or via the C++ API
 \endcode
 ____
 
-- \subpage HSS_scalar_interface
-- \subpage HSS_Command_Options
+Other options are available to tune for instance the initial number of
+random vectors \f$d_0\f$, the increment \f$\Delta d\f$, the random
+number generator or the random number distribution. See the
+documentation of \link strumpack::HSS::HSSOptions
+HSSOptions<scalar>\endlink for more detailed information.
+The corresponding HSS specific command line options are:
 
-*/
-
-/*! \page HSS_scalar_interface HSSOptions<scalar> Interface
-
-Other options are available to tune for instance the initial number of random vectors \f$d_0\f$, the increment \f$\Delta d\f$, the random number generator or the random number distribution. The complete public interface for the \link strumpack::HSS::HSSOptions HSSOptions<scalar>\endlink class is:
-
-\code {.cpp}
-template<typename scalar> class HSSOptions {
-public:
-    /* relative compression tolerance */
-    void set_rel_tol(real rel_tol);          real rel_tol() const;
-    /* absolute compression tolerance */
-    void set_abs_tol(real abs_tol);          real abs_tol() const;
-    /* size of the smallest blocks in the HSS hierarchy */
-    void set_leaf_size(int leaf_size);       int leaf_size() const;
-    /* initial number of random vectors used in the adaptive randomized compression algorithm */
-    void set_d0(int d0);                     int d0() const;
-    /* number of random vectors added in each step of the adaptive randomized HSS compression algorithm */
-    void set_dd(int dd);                     int dd() const;
-    /* currently not used */
-    void set_q(int q);                       int q() const;
-    /* maximum rank in the HSS representation */
-    void set_max_rank(int max_rank);         int max_rank() const;
-    /* random engine/generator to use, see below            */
-    void set_random_engine(random::RandomEngine random_engine);
-    random::RandomEngine random_engine() const;
-    /* the random number distribution, see below */
-    void set_random_distribution
-    (random::RandomDistribution random_distribution);
-    random::RandomDistribution random_distribution() const;
-    /* the compression algorithm to use */
-    void set_compression_algorithm(CompressionAlgorithm a);
-    CompressionAlgorithm compression_algorithm() const;
-    /* for expert users */
-    void set_user_defined_random(bool user_defined_random);
-    bool user_defined_random() const;
-    /* for expert users */
-    void set_synchronized_compression(bool sync);
-    bool synchronized_compression() const;
-    /* currently not used */
-    void set_log_ranks(bool log_ranks);      bool log_ranks() const;
-    /* print statistics? */
-    void set_verbose(bool verbose);          bool verbose() const;
-
-    /* parse options in argc/argv */
-    void set_from_command_line(int argc, char* argv[]);
-    /* print description of command line options */
-    void describe_options() const;
-};
-\endcode
-
-*/
-
-/*! \page HSS_Command_Options HSS Command Line Options
-
-The HSS specific command line options are:
-
-\code {.cpp}
---hss_rel_tol real (default 0.01)
---hss_abs_tol real (default 1e-08)
---hss_leaf_size int (default 128)
---hss_d0 int (default 128)
---hss_dd int (default 32)
---hss_q int (default 0)
---hss_max_rank int (default 5000)
---hss_random_distribution normal|uniform (default normal(0,1))
---hss_random_engine linear|mersenne (default minstd_rand)
---hss_compression_algorithm original|stable (default stable)
---hss_user_defined_random (default false)
---hss_enable_sync (default true)
---hss_disable_sync (default false)
---hss_log_ranks (default false)
---hss_verbose or -v (default false)
---hss_quiet or -q (default true)
---help or -h
+\code {.bash}
+# HSS Options:
+#   --hss_rel_tol real_t (default 0.01)
+#   --hss_abs_tol real_t (default 1e-08)
+#   --hss_leaf_size int (default 128)
+#   --hss_d0 int (default 128)
+#   --hss_dd int (default 64)
+#   --hss_p int (default 10)
+#   --hss_max_rank int (default 5000)
+#   --hss_random_distribution normal|uniform (default normal(0,1))
+#   --hss_random_engine linear|mersenne (default minstd_rand)
+#   --hss_compression_algorithm original|stable|hard_restart (default stable)
+#   --hss_clustering_algorithm natural|2means|kdtree|pca|cobble (default 2means)
+#   --hss_user_defined_random (default false)
+#   --hss_approximate_neighbors int (default 64)
+#   --hss_ann_iterations int (default 5)
+#   --hss_enable_sync (default true)
+#   --hss_disable_sync (default false)
+#   --hss_log_ranks (default false)
+#   --hss_verbose or -v (default false)
+#   --hss_quiet or -q (default true)
+#   --help or -h
 \endcode
 
 */

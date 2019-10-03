@@ -1,5 +1,11 @@
 /*! \page dense_matrices HSS Approximation of Dense Matrices
 
+\image html SPOptions_Interface.png width=23%
+
+__Figure 3__: Illustration of a Hierarchically Semi-Separable (HSS)
+matrix. Gray blocks are dense matrices. Off- diagonal blocks, on
+different levels of the HSS hierarchy, are low-rank. The low-rank
+factors of off-diagonal blocks of different levels are related.
 
 The HSS include files are installed in the __include/HSS/__
 subdirectory, or in __src/HSS/__. All HSS code is in the namespace
