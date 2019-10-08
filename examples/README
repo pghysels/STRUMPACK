@@ -21,6 +21,21 @@ performance.
 The examples (for now) include:
 ===============================
 
+- KernelRegression: an example on how to use HSS for kernel matrices
+    as used in certain machine learning applications. This requires 4
+    input files, the training and testing data (of dimension d), and
+    the corresponding labels. See the data/susy_10Kn* files for an
+    example.
+
+    OMP_NUM_THREADS=4 ./KernelRegression data/susy_10Kn 8 1.3 3.11 Gauss test --hss_rel_tol 1e-2
+
+- KernelRegressionMPI: an MPI version of KernelRegression. This also
+  runs HODLR compression of the kernel matrix, if STRUMPACK was
+  configured with HODLR support:
+
+    OMP_NUM_THREADS=1 mpirun -n 4 ./KernelRegressionMPI data/susy_10Kn 8 1.3 3.11 Gauss test --hss_rel_tol 1e-2
+
+
 - testPoisson2d: A double precision C++ example, solving the 2D
     Poisson problem with the sequential or multithreaded solver.  Run
     as follows, for a 1000x1000 Poisson problem with Dirichlet BCs:
@@ -50,9 +65,9 @@ The examples (for now) include:
 - testMMdouble: A double precision C++ example, solving a linear
     system with a matrix given in a file in the matrix-market format,
     using the sequential or multithreaded solver. Run as follows with
-    a matrix specified in the file pde900.mtx (provided):
+    a matrix specified in the file data/pde900.mtx (provided):
 
-      ./testMMdouble pde900.mtx
+      ./testMMdouble data/pde900.mtx
 
 - testMMdoubleMPI: A double precision C++ example, solving a linear
     system with a matrix given in a file in the matrix-market format,
@@ -60,14 +75,15 @@ The examples (for now) include:
     solution vector replicated over all MPI processes.  Run as follows
     with a matrix specified in the file pde900.mtx:
 
-      mpirun -n 4 ./testMMdoubleMPI pde900.mtx
+      mpirun -n 4 ./testMMdoubleMPI data/pde900.mtx
 
 - testMMdoubleMPIDist: A double precision C++ example, solving a
     linear system with a matrix given in a file in the matrix-market
     format, using the fully distributed MPI solver. Run as follows
     with a matrix specified in the file pde900.mtx:
 
-      mpirun -n 4 ./testMMdoubleMPIDist pde900.mtx
+      mpirun -n 4 ./testMMdoubleMPIDist m data/pde900.mtx
+      mpirun -n 4 ./testMMdoubleMPIDist b data/pde900.bin # see mtx2bin
 
 - testMMdouble64: A double precision C++ example using 64 bit integers
     for the sparse matrix, solving a linear system with a matrix given
@@ -75,7 +91,7 @@ The examples (for now) include:
     multithreaded solver. Run as follows with
     a matrix specified in the file pde900.mtx (provided):
 
-      ./testMMdouble64 pde900.mtx
+      ./testMMdouble64 data/pde900.mtx
 
 - testMMdoubleMPIDist64: A double precision C++ example using 64 bit
     integers for the sparse matrix, solving a linear system with a
@@ -83,22 +99,18 @@ The examples (for now) include:
     fully distributed MPI solver. Run as follows with a matrix
     specified in the file pde900.mtx:
 
-      mpirun -n 4 ./testMMdoubleMPIDist64 pde900.mtx
+      mpirun -n 4 ./testMMdoubleMPIDist64 data/pde900.mtx
 
 
 - mtx2bin: Read a matrix in matrix market format, and print it out
    again in binary format. Run as
 
-      ./mtx2bin pde900.mtx pde900.bin
+      ./mtx2bin data/pde900.mtx pde900.bin
 
    Run as ./mtx2bin (without arguments) to see a description of the
    binary output format.
 
 - bin2mtx: opposite of mtx2bin
-
-
-- MLkernel: an example on how to use HSS for kernel matrices as used
-    in certain machine learning applications.
 
 
 - sexample:
