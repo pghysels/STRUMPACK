@@ -610,7 +610,8 @@ namespace strumpack {
           (opts.separator_ordering_level(), sep_begin_, sep_end_, this->upd());
         auto g21 = A.extract_graph_CB_sep
           (opts.separator_ordering_level(), sep_begin_, sep_end_, this->upd());
-        auto adm12 = admissibility(g, g12, gCB, sep_leafs, CB_leafs);
+        auto adm12 = admissibility
+          (g, g12, gCB, sep_leafs, CB_leafs, opts.HODLR_options().knn_lrbf());
         auto adm21 = adm12.transpose();
         F12_ = HODLR::LRBFMatrix<scalar_t>
           (F11_, sep_tree_, g, *F22_, CB_tree, gCB,

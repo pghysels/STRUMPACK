@@ -254,6 +254,24 @@ namespace strumpack {
       }
 
       /**
+       * Set the number of neighbors to use in construction of the
+       * HODLR or HODBF matrices.
+       */
+      void set_knn_hodlrbf(int k) {
+        assert(k >= 0);
+        knn_hodlrbf_ = k;
+      }
+
+      /**
+       * Set the number of neighbors to use in construction of the
+       * LR or Butterfly blocks.
+       */
+      void set_knn_lrbf(int k) {
+        assert(k >= 0);
+        knn_lrbf_ = k;
+      }
+
+      /**
        * Enable or disable verbose output (only by the root process)
        * to stdout.
        */
@@ -340,6 +358,18 @@ namespace strumpack {
       int geo() const { return geo_; }
 
       /**
+       * The number of neighbors to use in the HODLR or HODBF
+       * construction.
+       */
+      int knn_hodlrbf() const { return knn_hodlrbf_; }
+
+      /**
+       * The number of neighbors to use in the LR or Butterfly block
+       * construction.
+       */
+      int knn_lrbf() const { return knn_lrbf_; }
+
+      /**
        * Verbose or quiet?
        * \return True if we want output from the HODLR algorithms,
        * else False.
@@ -374,6 +404,8 @@ namespace strumpack {
           {"hodlr_BACA_block_size",       required_argument, 0, 10},
           {"hodlr_BF_sampling_parameter", required_argument, 0, 11},
           {"hodlr_geo",                   required_argument, 0, 12},
+          {"hodlr_knn_hodlrbf",           required_argument, 0, 13},
+          {"hodlr_knn_lrbf",              required_argument, 0, 14},
           {"hodlr_verbose",               no_argument, 0, 'v'},
           {"hodlr_quiet",                 no_argument, 0, 'q'},
           {"help",                        no_argument, 0, 'h'},
@@ -443,6 +475,16 @@ namespace strumpack {
             iss >> geo_;
             set_geo(geo_);
           } break;
+          case 13: {
+            std::istringstream iss(optarg);
+            iss >> knn_hodlrbf_;
+            set_knn_hodlrbf(knn_hodlrbf_);
+          } break;
+          case 14: {
+            std::istringstream iss(optarg);
+            iss >> knn_lrbf_;
+            set_knn_lrbf(knn_lrbf_);
+          } break;
           case 'v': set_verbose(true); break;
           case 'q': set_verbose(false); break;
           case 'h': describe_options(); break;
@@ -479,6 +521,12 @@ namespace strumpack {
                   << BACA_block_size() << ")" << std::endl
                   << "#   --hodlr_BF_sampling_parameter (default "
                   << BF_sampling_parameter() << ")" << std::endl
+                  << "#   --hodlr_geo 1|2 (1: no neighbor info, 2: use neighbor info) (default "
+                  << geo() << ")" << std::endl
+                  << "#   --hodlr_knn_hodlrbf (default "
+                  << knn_hodlrbf() << ")" << std::endl
+                  << "#   --hodlr_knn_lrbf (default "
+                  << knn_lrbf() << ")" << std::endl
                   << "#   --hodlr_verbose or -v (default "
                   << verbose() << ")" << std::endl
                   << "#   --hodlr_quiet or -q (default "
@@ -499,6 +547,8 @@ namespace strumpack {
       int BACA_block_size_ = 16;
       double BF_sampling_parameter_ = 1.2;
       int geo_ = 2;
+      int knn_hodlrbf_ = 2;
+      int knn_lrbf_ = 2;
       bool verbose_ = true;
     };
 
