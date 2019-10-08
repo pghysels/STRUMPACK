@@ -100,6 +100,43 @@ fi
 
 
 
+
+if [[ $(hostname -s) = "TR4-workstation" ]]; then
+    found_host=true
+    PARMETIS_ROOT=/home/administrator/Desktop/software/parmetis-4.0.3-intel
+    PARMETIS_BUILD_DIR=${PARMETIS_ROOT}/build_static/Linux-x86_64
+    BPACKHOME=/home/administrator/Desktop/research/ButterflyPACK_noarpack/
+    cmake ../ \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DCMAKE_INSTALL_PREFIX=../install \
+          -DSTRUMPACK_USE_MPI=ON \
+          -DSTRUMPACK_BUILD_TESTS=OFF \
+          -DSTRUMPACK_USE_OPENMP=ON \
+	  -DTPL_BLAS_LIBRARIES="" \
+	  -DTPL_LAPACK_LIBRARIES="/opt/intel/compilers_and_libraries_2019.1.144/linux/mkl/lib/intel64/libmkl_intel_lp64.a;/opt/intel/compilers_and_libraries_2019.1.144/linux/mkl/lib/intel64/libmkl_intel_thread.a;/opt/intel/compilers_and_libraries_2019.1.144/linux/mkl/lib/intel64/libmkl_core.a;/opt/intel/compilers_and_libraries_2019.1.144/linux/compiler/lib/intel64/libiomp5.a" \
+	  -DTPL_SCALAPACK_LIBRARIES="/opt/intel/compilers_and_libraries_2019.1.144/linux/mkl/lib/intel64/libmkl_blacs_intelmpi_lp64.a;/opt/intel/compilers_and_libraries_2019.1.144/linux/mkl/lib/intel64/libmkl_scalapack_lp64.a" \
+	  -DCMAKE_Fortran_COMPILER=mpiifort \
+	  -DCMAKE_EXE_LINKER_FLAGS="-qopenmp -lmkl_scalapack_lp64 -lmkl_blacs_intelmpi_lp64 -lmkl_intel_thread -lmkl_intel_lp64 -lmkl_core" \
+	  -DCMAKE_CXX_COMPILER=mpiicpc \
+	  -DCMAKE_C_COMPILER=mpiicc \
+	  -DMPI_CXX_COMPILER=/opt/intel/compilers_and_libraries_2019.1.144/linux/mpi/intel64/bin/mpiicpc \
+	  -DMPI_C_COMPILER=/opt/intel/compilers_and_libraries_2019.1.144/linux/mpi/intel64/bin/mpiicc \
+	  -DMPI_Fortran_COMPILER=/opt/intel/compilers_and_libraries_2019.1.144/linux/mpi/intel64/bin/mpiifort \
+	  -DSTRUMPACK_C_INTERFACE=OFF \
+          -DTPL_ENABLE_PARMETIS=ON \
+          -DTPL_METIS_INCLUDE_DIRS=${PARMETIS_ROOT}/metis/include \
+          -DTPL_METIS_LIBRARIES=${PARMETIS_BUILD_DIR}/libmetis/libmetis.a \
+          -DTPL_PARMETIS_INCLUDE_DIRS=${PARMETIS_ROOT}/include \
+          -DTPL_PARMETIS_LIBRARIES=${PARMETIS_BUILD_DIR}/libparmetis/libparmetis.a \
+          -DTPL_ENABLE_SCOTCH=OFF \
+          -DTPL_ENABLE_BPACK=ON \
+          -DTPL_BPACK_INCLUDE_DIRS="$BPACKHOME/SRC_DOUBLE/;$BPACKHOME/SRC_DOUBLECOMPLEX" \
+          -DTPL_BPACK_LIBRARIES="$BPACKHOME/build/SRC_DOUBLE/libdbutterflypack.a;$BPACKHOME/build/SRC_DOUBLECOMPLEX/libzbutterflypack.a;/home/administrator/Desktop/software/arpack-ng-intel/build/lib/libparpack.a;/home/administrator/Desktop/software/arpack-ng-intel/build/lib/libarpack.a"
+fi
+
+
+
+
 if [[ $(hostname -s) = "xps13" ]]; then
     found_host=true
     cmake ../ \

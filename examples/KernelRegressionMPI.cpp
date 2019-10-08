@@ -138,19 +138,34 @@ int main(int argc, char *argv[]) {
   }
 
 #if defined(STRUMPACK_USE_BPACK)
+  // {
+    // HODLR::HODLROptions<scalar_t> opts;
+    // opts.set_verbose(true);
+    // opts.set_from_command_line(argc, argv);
+    // if (c.is_root()) opts.describe_options();
+
+    // auto weights = K->fit_HODLR(c, train_labels, opts);
+    // if (c.is_root()) cout << endl << "# HODLR prediction start..." << endl;
+    // timer.start();
+    // auto prediction = K->predict(test_points, weights);
+    // if (c.is_root()) cout << "# prediction took " << timer.elapsed() << endl;
+    // check(prediction);
+  // }
+  
   {
     HODLR::HODLROptions<scalar_t> opts;
     opts.set_verbose(true);
     opts.set_from_command_line(argc, argv);
     if (c.is_root()) opts.describe_options();
 
-    auto weights = K->fit_HODLR(c, train_labels, opts);
+    auto weights = K->fit_HODLR_geo(c, d, training, train_labels, opts);
     if (c.is_root()) cout << endl << "# HODLR prediction start..." << endl;
     timer.start();
     auto prediction = K->predict(test_points, weights);
     if (c.is_root()) cout << "# prediction took " << timer.elapsed() << endl;
     check(prediction);
   }
+  
 #endif
 
   MPI_Finalize();

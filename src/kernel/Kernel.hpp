@@ -241,6 +241,9 @@ namespace strumpack {
       DenseM_t fit_HODLR
       (const MPIComm& c, std::vector<scalar_t>& labels,
        const HODLR::HODLROptions<scalar_t>& opts);
+      DenseM_t fit_HODLR_geo
+      (const MPIComm& c, int dim, std::vector<scalar_t>& geos, std::vector<scalar_t>& labels,
+       const HODLR::HODLROptions<scalar_t>& opts);	   
 #endif
 #endif
 

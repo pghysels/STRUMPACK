@@ -246,6 +246,47 @@ namespace strumpack {
         std::cout << "# solve time = " << timer.elapsed() << std::endl;
       return weights;
     }
+	
+    template<typename scalar_t>
+    DenseMatrix<scalar_t> Kernel<scalar_t>::fit_HODLR_geo
+    (const MPIComm& c, int dim, std::vector<scalar_t>& geos, std::vector<scalar_t>& labels,
+     const HODLR::HODLROptions<scalar_t>& opts) {
+      TaskTimer timer("HODLRcompression");
+      bool verb = opts.verbose() && c.is_root();
+      if (verb) std::cout << "# starting HODLR compression..." << std::endl;
+      timer.start();
+      HODLR::HODLRMatrix<scalar_t> H(c, *this, dim, geos, opts);
+      DenseMW_t B(1, n(), labels.data(), 1);
+      B.lapmt(perm_, true);
+      //perm_.clear(); // TODO not needed anymore??
+      if (verb)
+        std::cout << "# HODLR compression time = "
+                  << timer.elapsed() << std::endl;
+      timer.start();
+      H.factor();
+      if (verb)
+        std::cout << "# factorization time = "
+                  << timer.elapsed() << std::endl
+                  << "# solution start..." << std::endl;
+      int lrows = H.lrows();
+      DenseMW_t lB(lrows, 1, &labels[H.begin_row()], lrows);
+      DenseM_t lw(lB);
+      H.solve(lB, lw);
+      std::vector<int> rcnts(c.size()), displ(c.size());
+      MPI_Allgather(&lrows, 1, mpi_type<int>(),
+                    rcnts.data(), 1, mpi_type<int>(), c.comm());
+      for (std::size_t i=1; i<displ.size(); i++)
+        displ[i] = displ[i-1] + rcnts[i-1];
+      DenseM_t weights(n(), 1);
+      MPI_Allgatherv
+        (lw.data(), lrows, mpi_type<scalar_t>(), weights.data(),
+         rcnts.data(), displ.data(), mpi_type<scalar_t>(), c.comm());
+      if (verb)
+        std::cout << "# solve time = " << timer.elapsed() << std::endl;
+      return weights;
+    }	
+	
+	
 #endif
 #endif
 

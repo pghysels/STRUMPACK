@@ -118,6 +118,21 @@ namespace strumpack {
       HODLRMatrix
       (const MPIComm& c, kernel::Kernel<scalar_t>& K, const opts_t& opts);
 
+	  
+      /**
+       * Construct an HODLR approximation for the kernel matrix K using geometries.
+       *
+       * \param c MPI communicator, this communicator is copied
+       * internally.
+       * \param K Kernel matrix object. The data associated with this
+       * kernel will be permuted according to the clustering algorithm
+       * selected by the HODLROptions objects. The permutation will be
+       * stored in the kernel object.
+       * \param opts object containing a number of HODLR options
+       */
+      HODLRMatrix
+	  (const MPIComm& c, kernel::Kernel<scalar_t>& K, int dim, std::vector<scalar_t>& geos, const opts_t& opts);
+	  
       /**
        * Construct an HODLR approximation using a routine to evaluate
        * individual matrix elements.
@@ -541,6 +556,37 @@ namespace strumpack {
         (f)->operator()(I, J, B, e);
     }
 
+	
+    template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
+    (const MPIComm& c, kernel::Kernel<scalar_t>& K, int dim, std::vector<scalar_t>& geos, const opts_t& opts) {
+      rows_ = cols_ = K.n();
+      auto tree = binary_tree_clustering
+        (opts.clustering_algorithm(), K.data(), K.permutation(), opts.leaf_size());
+      int min_lvl = 2 + std::ceil(std::log2(c.size()));
+      lvls_ = std::max(min_lvl, tree.levels());
+      tree.expand_complete_levels(lvls_);
+      leafs_ = tree.template leaf_sizes<int>();
+      c_ = c;
+      Fcomm_ = MPI_Comm_c2f(c_.comm());
+      options_init(opts);
+      perm_.resize(rows_);
+      KernelCommPtrs<scalar_t> KC{&K, &c_};
+	  HODLR_set_I_option<scalar_t>(options_, "nogeo", 0);
+	  // HODLR_set_I_option<scalar_t>(options_, "xyzsort", 2);
+	  HODLR_set_I_option<scalar_t>(options_, "knn", 10);
+      HODLR_construct_init<scalar_t>
+        (rows_, dim, geos.data(), lvls_-1, leafs_.data(), perm_.data(),
+         lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
+         nullptr, nullptr, nullptr);
+      HODLR_construct_element_compute<scalar_t>
+        (ho_bf_, options_, stats_, msh_, kerquant_,
+         ptree_, &(HODLR_kernel_evaluation<scalar_t>),
+         &(HODLR_kernel_block_evaluation<scalar_t>), &KC);
+      perm_init();
+      dist_init();
+    }	
+	
+	
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
     (const MPIComm& c, kernel::Kernel<scalar_t>& K, const opts_t& opts) {
       rows_ = cols_ = K.n();
