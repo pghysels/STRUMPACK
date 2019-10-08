@@ -33,6 +33,7 @@
 #define STRUMPACK_LRBF_MATRIX_HPP
 
 #include <cassert>
+#include <queue>
 
 #include "HSS/HSSPartitionTree.hpp"
 #include "dense/DistributedMatrix.hpp"
@@ -197,6 +198,7 @@ namespace strumpack {
       const DenseMatrix<bool>* adm;
       const CSRGraph<integer_t> *graph, *row_graph, *col_graph;
       integer_t rows, cols;
+      integer_t knn;
     };
 
     template<typename scalar_t, typename integer_t,
@@ -214,26 +216,90 @@ namespace strumpack {
       i--;
       j--;
       assert(i >= 0 && j >= 0 && i < info.rows && j < info.cols);
-      *dist = real_t(1.);
-      auto hik = g.ind() + g.ptr(i+1);
-      for (auto pk=g.ind()+g.ptr(i); pk!=hik; pk++)
-        if (*pk == j) return;
-      *dist = real_t(2.);
-      hik = gr.ind() + gr.ptr(i+1);
-      for (auto pk=gr.ind()+gr.ptr(i); pk!=hik; pk++) {
-        auto k = *pk;
-        auto hil = g.ind() + g.ptr(k+1);
-        for (auto pl=g.ind()+g.ptr(k); pl!=hil; pl++)
-          if (*pl == j) return;
+      int max_dist = info.knn;
+      if (max_dist <= 2) {
+        *dist = real_t(1.);
+        auto hik = g.ind() + g.ptr(i+1);
+        for (auto pk=g.ind()+g.ptr(i); pk!=hik; pk++)
+          if (*pk == j) return;
+        *dist = real_t(2.);
+        if (max_dist == 1) return;
+        hik = gr.ind() + gr.ptr(i+1);
+        for (auto pk=gr.ind()+gr.ptr(i); pk!=hik; pk++) {
+          auto k = *pk;
+          auto hil = g.ind() + g.ptr(k+1);
+          for (auto pl=g.ind()+g.ptr(k); pl!=hil; pl++)
+            if (*pl == j) return;
+        }
+        hik = gc.ind() + gc.ptr(j+1);
+        for (auto pk=gc.ind()+gc.ptr(j); pk!=hik; pk++) {
+          auto k = *pk;
+          auto hil = g.ind() + g.ptr(i+1);
+          for (auto pl=g.ind()+g.ptr(i); pl!=hil; pl++)
+            if (*pl == k) return;
+        }
+        *dist = real_t(3.);
+      } else {
+        // the same number should be used in CSRGraph to check for
+        // admissible blocks
+        std::queue<int> rq, cq;
+        int nr = gr.size(), nc = gc.size();
+        std::vector<int> rmark(nr, -1), cmark(nc, -1);
+        // A BFS from node i, trying to find node j.
+        rq.push(i);
+        rmark[i] = 0;
+        while (!rq.empty() || !cq.empty()) {
+          if (!rq.empty()) {
+            auto k = rq.front();
+            rq.pop();
+            if (rmark[k] == max_dist) {
+              *dist = real_t(max_dist + 1);
+              return;
+            }
+            auto hi = g.ind() + g.ptr(k+1);
+            for (auto pl=g.ind()+g.ptr(k); pl!=hi; pl++) {
+              auto l = *pl;
+              if (cmark[l] == -1) {
+                if (l == j) {
+                  *dist = real_t(rmark[k] + 1);
+                  return;
+                }
+                cq.push(l);
+                cmark[l] = rmark[k] + 1;
+              }
+            }
+            hi = gr.ind() + gr.ptr(k+1);
+            for (auto pl=gr.ind()+gr.ptr(k); pl!=hi; pl++) {
+              auto l = *pl;
+              if (rmark[l] == -1) {
+                rq.push(l);
+                rmark[l] = rmark[k] + 1;
+              }
+            }
+          }
+          if (!cq.empty()) {
+            auto k = cq.front();
+            cq.pop();
+            if (cmark[k] == max_dist) {
+              *dist = real_t(max_dist + 1);
+              return;
+            }
+            auto hi = gc.ind() + gc.ptr(k+1);
+            for (auto pl=gc.ind()+gc.ptr(k); pl!=hi; pl++) {
+              auto l = *pl;
+              if (l == j) {
+                *dist = real_t(cmark[k] + 1);
+                return;
+              }
+              if (cmark[l] == -1) {
+                cq.push(l);
+                cmark[l] = cmark[k] + 1;
+              }
+            }
+          }
+        }
+        *dist = max_dist + 1;
       }
-      hik = gc.ind() + gc.ptr(j+1);
-      for (auto pk=gc.ind()+gc.ptr(j); pk!=hik; pk++) {
-        auto k = *pk;
-        auto hil = g.ind() + g.ptr(i+1);
-        for (auto pl=g.ind()+g.ptr(i); pl!=hil; pl++)
-          if (*pl == k) return;
-      }
-      *dist = real_t(3.);
     }
 
     template<typename integer_t> void LRBF_admissibility_query
@@ -296,10 +362,12 @@ namespace strumpack {
         info.col_graph = &Bgraph;
         info.rows = rows_;
         info.cols = cols_;
+        info.knn = opts.knn_lrbf();
         HODLR_set_I_option<scalar_t>(options_, "nogeo", 2);
         HODLR_set_I_option<scalar_t>
           (options_, "knn",
-           10 * std::ceil(float(graph.edges()) / graph.vertices()));
+           (opts.knn_lrbf()*2+1)*(opts.knn_lrbf()*2+1) *
+           std::ceil(float(graph.edges()) / graph.vertices()));
         LRBF_construct_init<scalar_t>
           (rows_, cols_, lrows_, lcols_, A.msh_, B.msh_, lr_bf_, options_,
            stats_, msh_, kerquant_, ptree_,

@@ -35,6 +35,7 @@
 
 #include <cassert>
 #include <algorithm>
+#include <queue>
 
 #include "HSS/HSSPartitionTree.hpp"
 #include "kernel/Kernel.hpp"
@@ -675,6 +676,7 @@ namespace strumpack {
       std::pair<std::vector<int>,std::vector<int>> maps;
       const DenseMatrix<bool>* adm;
       const CSRGraph<integer_t>* graph;
+      int knn;
     };
 
     template<typename scalar_t, typename integer_t,
@@ -684,17 +686,49 @@ namespace strumpack {
       if (i == j) { *dist = real_t(0.); return; }
       auto& info = *static_cast<AdmInfo<integer_t>*>(fdata);
       auto& g = *(info.graph);
-      *dist = real_t(1.);
-      auto pkhi = g.ind() + g.ptr(i+1);
-      for (auto pk=g.ind() + g.ptr(i); pk!=pkhi; pk++)
-        if (*pk == j) return;
-      *dist = real_t(2.);
-      for (auto pk=g.ind() + g.ptr(i); pk!=pkhi; pk++) {
-        auto plhi = g.ind() + g.ptr(*pk+1);
-        for (auto pl=g.ind() + g.ptr(*pk); pl!=plhi; pl++)
-          if (*pl == j) return;
+      const int max_dist = info.knn;
+      if (max_dist <= 2) {
+        *dist = real_t(1.);
+        auto pkhi = g.ind() + g.ptr(i+1);
+        for (auto pk=g.ind() + g.ptr(i); pk!=pkhi; pk++)
+          if (*pk == j) return;
+        *dist = real_t(2.);
+        if (max_dist == 1) return;
+        for (auto pk=g.ind() + g.ptr(i); pk!=pkhi; pk++) {
+          auto plhi = g.ind() + g.ptr(*pk+1);
+          for (auto pl=g.ind() + g.ptr(*pk); pl!=plhi; pl++)
+            if (*pl == j) return;
+        }
+        *dist = real_t(3.);
+      } else {
+        auto gn = g.size();
+        std::vector<int> mark(gn, -1);
+        std::queue<int> q;
+        // start a breadth-first search from node i
+        q.push(i);
+        // mark will hold the distance to node i,
+        // or -1 if not yet visited
+        mark[i] = 0;
+        *dist = real_t(max_dist + 1);
+        while (!q.empty()) {
+          auto k = q.front();
+          q.pop();
+          if (mark[k] == max_dist) return;
+          const auto hi = g.ind() + g.ptr(k+1);
+          for (auto pl=g.ind()+g.ptr(k); pl!=hi; pl++) {
+            auto l = *pl;
+            if (mark[l] == -1) {
+              if (l == j) {
+                *dist = real_t(mark[k] + 1);
+                return;
+              }
+              q.push(l);
+              mark[l] = mark[k] + 1;
+            }
+          }
+        }
+        *dist = real_t(max_dist + 1);
       }
-      *dist = real_t(3.);
     }
 
     template<typename integer_t> void HODLR_admissibility_query
@@ -732,6 +766,7 @@ namespace strumpack {
         info.maps = tree.map_from_complete_to_leafs(lvls_);
         info.adm = &adm;
         info.graph = &graph;
+        info.knn = opts.knn_hodlrbf();
         // use the distance and admissibility functions
         HODLR_set_I_option<scalar_t>(options_, "nogeo", 2);
         // nedge/nvert is the average degree, but since we also consider
@@ -740,7 +775,9 @@ namespace strumpack {
         // there are 3^2=9 points in the stencil and 5^2=25 points in
         // the extended (length 2 connections) stencil.
         HODLR_set_I_option<scalar_t>
-          (options_, "knn", 5 * graph.edges() / graph.vertices());
+          (options_, "knn",
+           (opts.knn_hodlrbf()*2+1)*(opts.knn_hodlrbf()*2+1) *
+           graph.edges() / graph.vertices());
         HODLR_construct_init<scalar_t>
           (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
            lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,

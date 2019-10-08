@@ -33,6 +33,8 @@
 #include <vector>
 #include <tuple>
 #include <unordered_map>
+#include <queue>
+
 #include "misc/MPIWrapper.hpp"
 #include "HSS/HSSPartitionTree.hpp"
 #include "MetisReordering.hpp"
@@ -401,6 +403,7 @@ namespace strumpack {
       ts += tiles[t];
     }
     for (integer_t i=0; i<n; i++) {
+      // TODO do a BFS!!
       auto ti = tile[i];
       auto hij = ind() + ptr_[i+1];
       for (auto pj=ind()+ptr_[i]; pj!=hij; pj++) {
@@ -417,11 +420,12 @@ namespace strumpack {
     return adm;
   }
 
-  template<typename integer_t, typename int_t>
-  DenseMatrix<bool> admissibility
-  (const CSRGraph<integer_t>& g11, const CSRGraph<integer_t>& g12,
-   const CSRGraph<integer_t>& g22,
-   const std::vector<int_t>& rtiles, const std::vector<int_t>& ctiles) {
+  template<typename integer_t, typename int_t> DenseMatrix<bool>
+  admissibility(const CSRGraph<integer_t>& g11,
+                const CSRGraph<integer_t>& g12,
+                const CSRGraph<integer_t>& g22,
+                const std::vector<int_t>& rtiles,
+                const std::vector<int_t>& ctiles, int knn) {
     integer_t nrt = rtiles.size(), nct = ctiles.size();
     integer_t nr = g12.size(), nc = g22.size();
     DenseMatrix<bool> adm12(nrt, nct);
@@ -435,19 +439,71 @@ namespace strumpack {
       for (integer_t i=ts; i<ts+ctiles[t]; i++) ctile[i] = t;
       ts += ctiles[t];
     }
-    for (integer_t i=0; i<nr; i++) {
-      auto rti = rtile[i];
-      auto hij = g12.ind() + g12.ptr(i+1);
-      for (auto pj=g12.ind()+g12.ptr(i); pj!=hij; pj++) {
-        auto j = *pj;
-        auto ctj = ctile[j];
-        adm12(rti, ctj) = false;
-        auto hik = g22.ind() + g22.ptr(j+1);
-        for (auto pk=g22.ind()+g22.ptr(j); pk!=hik; pk++)
-          adm12(rti, ctile[*pk]) = false;
-        hik = g11.ind() + g11.ptr(i+1);
-        for (auto pk=g11.ind()+g11.ptr(i); pk!=hik; pk++)
-          adm12(rtile[*pk], ctj) = false;
+    if (knn <= 2) {
+      for (integer_t i=0; i<nr; i++) {
+        auto rti = rtile[i];
+        auto hij = g12.ind() + g12.ptr(i+1);
+        for (auto pj=g12.ind()+g12.ptr(i); pj!=hij; pj++) {
+          auto j = *pj;
+          auto ctj = ctile[j];
+          adm12(rti, ctj) = false;
+          if (knn == 2) {
+            auto hik = g22.ind() + g22.ptr(j+1);
+            for (auto pk=g22.ind()+g22.ptr(j); pk!=hik; pk++)
+              adm12(rti, ctile[*pk]) = false;
+            hik = g11.ind() + g11.ptr(i+1);
+            for (auto pk=g11.ind()+g11.ptr(i); pk!=hik; pk++)
+              adm12(rtile[*pk], ctj) = false;
+          }
+        }
+      }
+    } else {
+      const int max_dist = knn;
+      std::vector<int> rmark(nr, -1), cmark(nc, -1);
+      std::queue<int> rq, cq;
+      for (integer_t i=0; i<nr; i++) {
+        std::fill(rmark.begin(), rmark.end(), -1);
+        std::fill(cmark.begin(), cmark.end(), -1);
+        rq.push(i);
+        rmark[i] = 0;
+        while (!rq.empty() || !cq.empty()) {
+          if (!rq.empty()) {
+            auto k = rq.front();
+            rq.pop();
+            if (rmark[k] == max_dist) continue;
+            auto hi = g12.ind() + g12.ptr(k+1);
+            for (auto pl=g12.ind()+g12.ptr(k); pl!=hi; pl++) {
+              auto l = *pl;
+              if (cmark[l] == -1) {
+                adm12(rtile[i], ctile[l]) = false;
+                cq.push(l);
+                cmark[l] = rmark[k] + 1;
+              }
+            }
+            hi = g11.ind() + g11.ptr(k+1);
+            for (auto pl=g11.ind()+g11.ptr(k); pl!=hi; pl++) {
+              auto l = *pl;
+              if (rmark[l] == -1) {
+                rq.push(l);
+                rmark[l] = rmark[k] + 1;
+              }
+            }
+          }
+          if (!cq.empty()) {
+            auto k = cq.front();
+            cq.pop();
+            if (cmark[k] == max_dist) continue;
+            auto hi = g22.ind() + g22.ptr(k+1);
+            for (auto pl=g22.ind()+g22.ptr(k); pl!=hi; pl++) {
+              auto l = *pl;
+              adm12(rtile[i], ctile[l]) = false;
+              if (cmark[l] == -1) {
+                cq.push(l);
+                cmark[l] = cmark[k] + 1;
+              }
+            }
+          }
+        }
       }
     }
     return adm12;
