@@ -229,19 +229,14 @@ namespace strumpack {
         std::cout << "# factorization time = "
                   << timer.elapsed() << std::endl
                   << "# solution start..." << std::endl;
-      int lrows = H.lrows();
-      DenseMW_t lB(lrows, 1, &labels[H.begin_row()], lrows);
-      DenseM_t lw(lB);
-      H.solve(lB, lw);
-      std::vector<int> rcnts(c.size()), displ(c.size());
-      MPI_Allgather(&lrows, 1, mpi_type<int>(),
-                    rcnts.data(), 1, mpi_type<int>(), c.comm());
-      for (std::size_t i=1; i<displ.size(); i++)
-        displ[i] = displ[i-1] + rcnts[i-1];
+      DenseMW_t wB(n(), 1, labels.data(), n());
+      BLACSGrid g(c);
+      DistM_t B2d(&g, n(), 1), w2d(&g, n(), 1);
+      copy(n(), 1, wB, 0, B2d, 0, 0, g.ctxt_all());
+      H.solve(B2d, w2d);
       DenseM_t weights(n(), 1);
-      MPI_Allgatherv
-        (lw.data(), lrows, mpi_type<scalar_t>(), weights.data(),
-         rcnts.data(), displ.data(), mpi_type<scalar_t>(), c.comm());
+      copy(n(), 1, w2d, 0, 0, weights, 0, g.ctxt_all());
+      c.broadcast(weights.data(), n());
       if (verb)
         std::cout << "# solve time = " << timer.elapsed() << std::endl;
       return weights;
