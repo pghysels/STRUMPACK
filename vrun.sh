@@ -27,7 +27,8 @@ if [ ! -f ${EXEC} ]; then
 fi
 
 # Kernel and dimension
-kernel=Gauss
+# kernel=Gauss
+kernel=ANOVA
 
 # Compression parameters
 LEAF=128
@@ -55,6 +56,8 @@ ${MPIRUN} ${EXEC} ${DATA} ${dim} ${hval} ${lval} ${kernel} test \
 --hss_scratch_folder ${FOLDER} \
 --hss_verbose \
 --hodlr_rel_tol ${RTOL} \
+--hodlr_geo 0 \
+--hodlr_knn_hodlrbf ${k_ann} \
 2>&1 | tee z_log_run_1e-2.out
 
 

@@ -241,9 +241,6 @@ namespace strumpack {
       DenseM_t fit_HODLR
       (const MPIComm& c, std::vector<scalar_t>& labels,
        const HODLR::HODLROptions<scalar_t>& opts);
-      DenseM_t fit_HODLR_geo
-      (const MPIComm& c, int dim, std::vector<scalar_t>& geos, std::vector<scalar_t>& labels,
-       const HODLR::HODLROptions<scalar_t>& opts);	   
 #endif
 #endif
 
@@ -377,6 +374,81 @@ namespace strumpack {
       }
     };
 
+	
+	
+    /**
+     * \class ANOVAKernel
+     *
+     * \brief ANOVA kernel.
+     *
+     * Implements the kernel: \f$ \sum_{1\leq k_1<...<k_p\leq n}k(x^{k_1},y^{k_1})\times...\times k(x^{k_p},y^{k_p}), with k(x,y)=\exp \left( -\frac{\|x-y\|_2^2}{2
+     * h^2} \right)\f$, with an extra regularization parameter lambda on
+     * the diagonal. The kernel is implemented efficiently due to the recurrence relation in "Support Vector Regression with ANOVA Decomposition Kernels", 1999.
+     *
+     * This is a subclass of Kernel. It only implements the
+     * (protected) eval_kernel_function routine, the rest of the
+     * functionality is inherited. To create your own kernel, simply
+     * copy this class, rename and change the eval_kernel_function
+     * implementation.
+     *
+     * \see Kernel, GaussKernel
+     */
+    template<typename scalar_t>
+    class ANOVAKernel : public Kernel<scalar_t> {
+    public:
+      /**
+       * Constructor of the kernel object.
+       *
+       * \param data Data defining the kernel matrix. data.rows() is
+       * the number of features, and data.cols() is the number of data
+       * points, ie, the dimension of the kernel matrix.
+       *
+       * \param h Kernel width
+       * \param lambda Regularization parameter, added to the diagonal
+	   * \param p Kernel degree
+       */
+      ANOVAKernel(DenseMatrix<scalar_t>& data, scalar_t h, scalar_t lambda)
+        : Kernel<scalar_t>(data, lambda), h_(h){}
+
+    protected:
+      scalar_t h_; // kernel width parameter
+      int p_=1; // kernel degree parameter 1<=p_<=this->d()   // warning: this is hard coded now
+
+      scalar_t eval_kernel_function
+      (const scalar_t* x, const scalar_t* y) const override {
+	    scalar_t Ks[p_];
+	    scalar_t Kss[p_];
+		scalar_t Kpp[p_+1];
+		Kpp[0]=1;
+		for(int j=0;j<p_;j++){
+			Kss[j]=0;
+		}
+
+		for(int i=0;i<this->d();i++){
+			scalar_t tmp = std::exp
+			  (-Euclidean_distance_squared(this->d(), &x[i], &y[i])
+			   / (scalar_t(2.) * h_ * h_));
+			Ks[0]=tmp;
+			Kss[0]+=Ks[0];	
+			for(int j=1;j<p_;j++){
+				Ks[j]=Ks[j-1]*tmp;
+				Kss[j]+=Ks[j];		
+			}
+		}
+		
+		for(int i=1;i<=p_;i++){
+			Kpp[i]=0;
+			for(int s=1;s<=i;s++){
+				Kpp[i]+=pow(-1,s+1)*Kpp[i-s]*Kss[s-1];
+			}
+			Kpp[i]/=i;
+		}
+        return Kpp[p_];
+      }
+    };	
+	
+	
+	
 
     /**
      * \class DenseKernel
@@ -432,7 +504,8 @@ namespace strumpack {
     enum class KernelType {
       DENSE,   /*!< Arbitrary dense matrix                */
       GAUSS,   /*!< Gauss or radial basis function kernel */
-      LAPLACE  /*!< Laplace kernel                        */
+      LAPLACE,  /*!< Laplace kernel                        */
+      ANOVA  /*!< ANOVA kernel                        */
     };
 
     /**
@@ -443,6 +516,7 @@ namespace strumpack {
       case KernelType::DENSE: return "dense"; break;
       case KernelType::GAUSS: return "Gauss"; break;
       case KernelType::LAPLACE: return "Laplace"; break;
+      case KernelType::ANOVA: return "ANOVA"; break;
       default: return "UNKNOWN";
       }
     }
@@ -456,6 +530,7 @@ namespace strumpack {
       if (k == "dense") return KernelType::DENSE;
       else if (k == "Gauss") return KernelType::GAUSS;
       else if (k == "Laplace") return KernelType::LAPLACE;
+      else if (k == "ANOVA") return KernelType::ANOVA;
       std::cerr << "ERROR: Kernel type not recogonized, "
                 << " setting kernel type to Gauss."
                 << std::endl;
@@ -487,6 +562,9 @@ namespace strumpack {
       case KernelType::LAPLACE:
         return std::unique_ptr<Kernel<scalar_t>>
           (new LaplaceKernel<scalar_t>(args ...));
+      case KernelType::ANOVA:
+        return std::unique_ptr<Kernel<scalar_t>>
+          (new ANOVAKernel<scalar_t>(args ...));		  
       default:
         return std::unique_ptr<Kernel<scalar_t>>
           (new GaussKernel<scalar_t>(args ...));
