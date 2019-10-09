@@ -559,7 +559,8 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", opts.lr_leaf()); 
       if (opts.geo() == 0) {
         HODLR_set_I_option<scalar_t>(options_, "nogeo", 0);
-        // HODLR_set_I_option<scalar_t>(options_, "xyzsort", 2);
+        //HODLR_set_I_option<scalar_t>(options_, "xyzsort", 2);
+        //HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", 2); // 5 = rrqr
         HODLR_construct_init<scalar_t>
           (rows_, K.d(), K.data().data(), lvls_-1, leafs_.data(), perm_.data(),
            lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
@@ -1114,7 +1115,7 @@ namespace strumpack {
       if (S2D.active()) {
         for (int r=S2Drlo; r<S2Drhi; r++) {
           auto gr = perm_[S2D.rowl2g(r)];
-          assert(gr == S2D.rowl2g(r));
+          // assert(gr == S2D.rowl2g(r));
           auto p = -1 + std::distance
             (dist_.begin(), std::upper_bound(dist_.begin(), dist_.end(), gr));
           assert(p < P && p >= 0);
