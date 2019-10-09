@@ -37,12 +37,14 @@ k_ann=128
 # Running parameters
 hval=1.0
 lval=3.0
+# kernel degree
+p=1
 
 MAX_RANK=10001
 MPIRUN="mpirun -n 2 "
 
 RTOL=1e-2
-${MPIRUN} ${EXEC} ${DATA} ${dim} ${hval} ${lval} ${kernel} test \
+${MPIRUN} ${EXEC} ${DATA} ${dim} ${hval} ${lval} ${p} ${kernel} test \
 --hss_rel_tol ${RTOL} \
 --hss_abs_tol 1e-20 \
 --hss_max_rank ${MAX_RANK} \
@@ -67,7 +69,7 @@ ${MPIRUN} ${EXEC} ${DATA} ${dim} ${hval} ${lval} ${kernel} test \
 # do
   # echo ${EXEC}
   # echo "OMP_NUM_THREADS="${OMP_NUM_THREADS}
-  # ${EXEC} ${DATA} ${dim} ${hval} ${lval} ${kernel} test \
+  # ${EXEC} ${DATA} ${dim} ${hval} ${lval} ${p} ${kernel} test \
   # --hss_rel_tol ${RTOL} \
   # --hss_abs_tol 1e-20 \
   # --hss_max_rank ${MAX_RANK} \

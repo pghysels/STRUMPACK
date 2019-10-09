@@ -555,25 +555,23 @@ namespace strumpack {
       Fcomm_ = MPI_Comm_c2f(c_.comm());
       options_init(opts);
       perm_.resize(rows_);
-      KernelCommPtrs<scalar_t> KC{&K, &c_};
-      HODLR_set_I_option<scalar_t>(options_, "nogeo", opts.geo());
       HODLR_set_I_option<scalar_t>(options_, "knn", opts.knn_hodlrbf());
-	  // HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", 2); // 5 = rrqr
-	  
-	  if(opts.geo()==0){
-	  // HODLR_set_I_option<scalar_t>(options_, "xyzsort", 2);
-        DenseMatrix<scalar_t> * geos = &(K.data());	  
+      // HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", 2); // 5 = rrqr
+      if (opts.geo() == 0) {
+        HODLR_set_I_option<scalar_t>(options_, "nogeo", 0);
+        // HODLR_set_I_option<scalar_t>(options_, "xyzsort", 2);
         HODLR_construct_init<scalar_t>
-        (rows_, K.d(), (*geos).data(), lvls_-1, leafs_.data(), perm_.data(),
-         lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
-         nullptr, nullptr, nullptr);	  
-      }else{
-      HODLR_construct_init<scalar_t>
-        (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
-         lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
-         nullptr, nullptr, nullptr);	  
+          (rows_, K.d(), K.data().data(), lvls_-1, leafs_.data(), perm_.data(),
+           lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
+           nullptr, nullptr, nullptr);
+      } else {
+        HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
+        HODLR_construct_init<scalar_t>
+          (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
+           lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
+           nullptr, nullptr, nullptr);
       }
-
+      KernelCommPtrs<scalar_t> KC{&K, &c_};
       HODLR_construct_element_compute<scalar_t>
         (ho_bf_, options_, stats_, msh_, kerquant_,
          ptree_, &(HODLR_kernel_evaluation<scalar_t>),

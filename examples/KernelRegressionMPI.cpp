@@ -69,23 +69,26 @@ int main(int argc, char *argv[]) {
   int d = 2;
   scalar_t h = 3.;
   scalar_t lambda = 1.;
+  int p = 1;  // kernel degree
   KernelType ktype = KernelType::GAUSS;
   string mode("test");
   TaskTimer timer("prediction");
 
   if (c.is_root())
-    cout << "# usage: ./KernelRegression file d h lambda "
-         << "kernel(Gauss, Laplace) mode(valid, test)" << endl;
+    cout << "# usage: ./KernelRegression file d h lambda degree "
+         << "kernel(Gauss, Laplace, ANOVA) mode(valid, test)" << endl;
   if (argc > 1) filename = string(argv[1]);
   if (argc > 2) d = stoi(argv[2]);
   if (argc > 3) h = stof(argv[3]);
   if (argc > 4) lambda = stof(argv[4]);
-  if (argc > 5) ktype = kernel_type(string(argv[5]));
-  if (argc > 6) mode = string(argv[6]);
+  if (argc > 5) p = stoi(argv[5]);
+  if (argc > 6) ktype = kernel_type(string(argv[6]));
+  if (argc > 7) mode = string(argv[7]);
   if (c.is_root())
     cout << "# data dimension  = " << d << endl
          << "# kernel h        = " << h << endl
          << "# lambda          = " << lambda << endl
+         << "# p               = " << p << endl
          << "# kernel type     = " << get_name(ktype) << endl
          << "# validation/test = " << mode << endl;
 
@@ -120,7 +123,7 @@ int main(int argc, char *argv[]) {
     }
   };
 
-  auto K = create_kernel<scalar_t>(ktype, training_points, h, lambda);
+  auto K = create_kernel<scalar_t>(ktype, training_points, h, lambda, p);
 
   {
     HSSOptions<scalar_t> opts;
