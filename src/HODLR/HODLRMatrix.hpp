@@ -559,6 +559,7 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", opts.lr_leaf()); 
       if (opts.geo() == 0) {
         HODLR_set_I_option<scalar_t>(options_, "nogeo", 0);
+        HODLR_set_I_option<scalar_t>(options_, "verbosity", 0);
         //HODLR_set_I_option<scalar_t>(options_, "xyzsort", 2);
         //HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", 2); // 5 = rrqr
         HODLR_construct_init<scalar_t>

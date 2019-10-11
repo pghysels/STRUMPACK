@@ -60,27 +60,30 @@ read_from_file(string filename) {
 
 
 int main(int argc, char *argv[]) {
-  using scalar_t = float;
+  using scalar_t = double;
   string filename("smalltest.dat");
   size_t d = 2;
   scalar_t h = 3.;
   scalar_t lambda = 1.;
+  int p = 1;  // kernel degree							  
   KernelType ktype = KernelType::GAUSS;
   string mode("test");
 
-  cout << "# usage: ./KernelRegression file d h lambda "
+  cout << "# usage: ./KernelRegression file d h lambda degree"
        << "kernel(Gauss, Laplace) mode(valid, test)" << endl;
   if (argc > 1) filename = string(argv[1]);
   if (argc > 2) d = stoi(argv[2]);
   if (argc > 3) h = stof(argv[3]);
   if (argc > 4) lambda = stof(argv[4]);
-  if (argc > 5) ktype = kernel_type(string(argv[5]));
-  if (argc > 6) mode = string(argv[6]);
+  if (argc > 5) p = stoi(argv[5]);
+  if (argc > 6) ktype = kernel_type(string(argv[6]));
+  if (argc > 7) mode = string(argv[7]);
+  
   cout << endl;
   cout << "# data dimension  = " << d << endl;
   cout << "# kernel h        = " << h << endl;
   cout << "# lambda          = " << lambda << endl;
-  cout << "# kernel type     = " << get_name(ktype) << endl;
+  cout << "# p               = " << p << endl;		cout << "# kernel type     = " << get_name(ktype) << endl;
   cout << "# validation/test = " << mode << endl << endl;
 
   HSSOptions<scalar_t> hss_opts;
@@ -108,7 +111,7 @@ int main(int argc, char *argv[]) {
     training_points(d, n, training.data(), d),
     test_points(d, m, testing.data(), d);
 
-  auto K = create_kernel<scalar_t>(ktype, training_points, h, lambda);
+  auto K = create_kernel<scalar_t>(ktype, training_points, h, lambda,p);
 
   auto weights = K->fit_HSS(train_labels, hss_opts);
 
