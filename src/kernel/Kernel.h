@@ -41,9 +41,9 @@ extern "C" {
 #endif
 
   STRUMPACKKernel STRUMPACK_create_kernel_double
-  (int n, int d, double* train, double h, double lambda, int type);
+  (int n, int d, double* train, double h, double lambda, int p, int type);
   STRUMPACKKernel STRUMPACK_create_kernel_float
-  (int n, int d, float* train, float h, float lambda, int type);
+  (int n, int d, float* train, float h, float lambda, int p, int type);
 
   void STRUMPACK_destroy_kernel_double(STRUMPACKKernel K);
   void STRUMPACK_destroy_kernel_float(STRUMPACKKernel K);

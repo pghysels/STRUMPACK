@@ -50,7 +50,7 @@ public:
 };
 
 template<typename scalar_t> STRUMPACKKernel STRUMPACK_create_kernel
-(int n, int d, scalar_t* train, scalar_t h, scalar_t lambda, int type) {
+(int n, int d, scalar_t* train, scalar_t h, scalar_t lambda, int p, int type) {
   int rank = 0;
 #if defined(STRUMPACK_USE_MPI)
   int initialized;
@@ -68,6 +68,9 @@ template<typename scalar_t> STRUMPACKKernel STRUMPACK_create_kernel
     break;
   case 1:
     kernel->K_.reset(new LaplaceKernel<scalar_t>(kernel->training_, h, lambda));
+    break;
+  case 2:
+    kernel->K_.reset(new ANOVAKernel<scalar_t>(kernel->training_, h, lambda, p));
     break;
   default: std::cout << "ERROR: Kernel type not recognized!" << std::endl;
   }
@@ -138,12 +141,12 @@ extern "C" {
 #endif
 
   STRUMPACKKernel STRUMPACK_create_kernel_double
-  (int n, int d, double* train, double h, double lambda, int type) {
-    return STRUMPACK_create_kernel<double>(n, d, train, h, lambda, type);
+  (int n, int d, double* train, double h, double lambda, int p, int type) {
+    return STRUMPACK_create_kernel<double>(n, d, train, h, lambda, p, type);
   }
   STRUMPACKKernel STRUMPACK_create_kernel_float
-  (int n, int d, float* train, float h, float lambda, int type) {
-    return STRUMPACK_create_kernel<float>(n, d, train, h, lambda, type);
+  (int n, int d, float* train, float h, float lambda, int p, int type) {
+    return STRUMPACK_create_kernel<float>(n, d, train, h, lambda, p, type);
   }
 
   void STRUMPACK_destroy_kernel_double(STRUMPACKKernel kernel) {
