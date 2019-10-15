@@ -33,6 +33,7 @@ kernel=ANOVA
 # Compression parameters
 LEAF=128
 k_ann=128
+lr_leaf=2
 
 # Running parameters
 hval=1.0
@@ -53,13 +54,12 @@ ${MPIRUN} ${EXEC} ${DATA} ${dim} ${hval} ${lval} ${p} ${kernel} test \
 --hss_dd ${k_ann} \
 --hss_approximate_neighbors ${k_ann} \
 --hss_ann_iterations 10 \
---hss_p 1 \
---hss_d0 1 \
 --hss_scratch_folder ${FOLDER} \
 --hss_verbose \
 --hodlr_rel_tol ${RTOL} \
 --hodlr_geo 0 \
 --hodlr_knn_hodlrbf ${k_ann} \
+--hodlr_lr_leaf ${lr_leaf}
 2>&1 | tee z_log_run_1e-2.out
 
 

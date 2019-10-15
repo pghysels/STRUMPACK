@@ -254,6 +254,15 @@ namespace strumpack {
       }
 
       /**
+       * lr_leaf should be 1, 2, 3, 4, 5. 1 means svd, 2 means rrqr, 3 means baseline aca, 4 means baca original version, 5 means baca improved version.
+       */
+      void set_lr_leaf(int lr_leaf) {
+        assert(lr_leaf == 1 || lr_leaf == 2 || lr_leaf == 3 || lr_leaf == 4 || lr_leaf == 5);
+        lr_leaf_ = lr_leaf;
+      }	  
+	  
+	  
+      /**
        * Set the number of neighbors to use in construction of the
        * HODLR or HODBF matrices.
        */
@@ -358,6 +367,11 @@ namespace strumpack {
       int geo() const { return geo_; }
 
       /**
+       * Bottom level compression algorithms in H-BACA 1, 2, 3, 4, or 5
+       */
+      int lr_leaf() const { return lr_leaf_; }	  
+	  
+      /**
        * The number of neighbors to use in the HODLR or HODBF
        * construction.
        */
@@ -406,6 +420,7 @@ namespace strumpack {
           {"hodlr_geo",                   required_argument, 0, 12},
           {"hodlr_knn_hodlrbf",           required_argument, 0, 13},
           {"hodlr_knn_lrbf",              required_argument, 0, 14},
+          {"hodlr_lr_leaf",               required_argument, 0, 15},
           {"hodlr_verbose",               no_argument, 0, 'v'},
           {"hodlr_quiet",                 no_argument, 0, 'q'},
           {"help",                        no_argument, 0, 'h'},
@@ -485,6 +500,11 @@ namespace strumpack {
             iss >> knn_lrbf_;
             set_knn_lrbf(knn_lrbf_);
           } break;
+          case 15: {
+            std::istringstream iss(optarg);
+            iss >> lr_leaf_;
+            set_lr_leaf(lr_leaf_);
+          } break;		  
           case 'v': set_verbose(true); break;
           case 'q': set_verbose(false); break;
           case 'h': describe_options(); break;
@@ -547,6 +567,7 @@ namespace strumpack {
       int BACA_block_size_ = 16;
       double BF_sampling_parameter_ = 1.2;
       int geo_ = 2;
+      int lr_leaf_ = 5;
       int knn_hodlrbf_ = 2;
       int knn_lrbf_ = 2;
       bool verbose_ = true;
