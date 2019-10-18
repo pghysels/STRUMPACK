@@ -11,7 +11,7 @@ target_link_libraries(test_BLR_seq strumpack ${LIB})
 
 add_test("user_test_HSS_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 100)
 add_test("user_test_sparse_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq
-  ../examples/pde900.mtx)
+  ../examples/data/pde900.mtx)
 
 if(STRUMPACK_USE_MPI)
   add_executable(test_HSS_mpi test_HSS_mpi)
@@ -28,7 +28,7 @@ if(STRUMPACK_USE_MPI)
   add_test("user_test_sparse_mpi" ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2
     ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
     ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi m
-    ../examples/pde900.mtx)
+    ../examples/data/pde900.mtx)
 endif()
 
 set(test_name "HSS_seq_1")
