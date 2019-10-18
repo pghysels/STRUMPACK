@@ -119,7 +119,7 @@ namespace strumpack {
 
 
     template<typename scalar_t> void HODLR_construct_init
-    (int N, int d, scalar_t* data, int lvls, int* tree, int* perm,
+    (int N, int d, scalar_t* data, int* nns, int lvls, int* tree, int* perm,
      int& lrow, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncDistmn)(int*, int*, scalar_t*, C2Fptr),
@@ -128,14 +128,14 @@ namespace strumpack {
       std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
     }
     template<> void HODLR_construct_init<double>
-    (int N, int d, double* data, int lvls, int* tree, int* perm,
+    (int N, int d, double* data, int* nns, int lvls, int* tree, int* perm,
      int& lrow, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
      void (*C_FuncNearFar)(int*, int*, int*, C2Fptr),
      C2Fptr fdata);
     template<> void HODLR_construct_init<std::complex<double>>
-    (int N, int d, std::complex<double>* data, int lvls, int* tree,
+    (int N, int d, std::complex<double>* data, int* nns, int lvls, int* tree,
      int* perm, int& lrow, F2Cptr& ho_bf, F2Cptr& options,
      F2Cptr& stats, F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncDistmn)(int*, int*, std::complex<double>*, C2Fptr),
@@ -194,23 +194,23 @@ namespace strumpack {
       std::complex<double>*, C2Fptr), C2Fptr fdata);
 
     template<typename scalar_t> void LRBF_construct_init
-    (int M, int N, int& lrows, int& lcols, F2Cptr rmsh, F2Cptr cmsh,
-     F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
-     F2Cptr& kerquant, F2Cptr& ptree,
+    (int M, int N, int& lrows, int& lcols, int* nsr, int* nnsc,
+     F2Cptr rmsh, F2Cptr cmsh, F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats,
+     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
      void (*C_FuncNearFar)(int*, int*, int*, C2Fptr), C2Fptr fdata) {
       std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
     }
     template<> void LRBF_construct_init<double>
-    (int M, int N, int& lrows, int& lcols, F2Cptr rmsh, F2Cptr cmsh,
-     F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
-     F2Cptr& kerquant, F2Cptr& ptree,
+    (int M, int N, int& lrows, int& lcols, int* nsr, int* nnsc,
+     F2Cptr rmsh, F2Cptr cmsh, F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats,
+     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
      void (*C_FuncNearFar)(int*, int*, int*, C2Fptr), C2Fptr fdata);
     template<> void LRBF_construct_init<std::complex<double>>
-    (int M, int N, int& lrows, int& lcols, F2Cptr rmsh, F2Cptr cmsh,
-     F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
-     F2Cptr& kerquant, F2Cptr& ptree,
+    (int M, int N, int& lrows, int& lcols, int* nsr, int* nnsc,
+     F2Cptr rmsh, F2Cptr cmsh, F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats,
+     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
      void (*C_FuncNearFar)(int*, int*, int*, C2Fptr), C2Fptr fdata);
 

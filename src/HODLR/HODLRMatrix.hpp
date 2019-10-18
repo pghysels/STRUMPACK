@@ -183,8 +183,6 @@ namespace strumpack {
        * \param c MPI communicator, this communicator is copied
        * internally.
        * \param t tree specifying the HODLR matrix partitioning
-       * \param admissibility matrix of size tree.leaf_sizes().size()
-       * ^2 with admissibility info
        * \param graph connectivity info for the dofs
        * \param opts object containing a number of options for HODLR
        * compression
@@ -192,7 +190,6 @@ namespace strumpack {
        */
       template<typename integer_t> HODLRMatrix
       (const MPIComm& c, const HSS::HSSPartitionTree& tree,
-       const DenseMatrix<bool>& admissibility,
        const CSRGraph<integer_t>& graph, const opts_t& opts);
 
       /**
@@ -556,20 +553,35 @@ namespace strumpack {
       options_init(opts);
       perm_.resize(rows_);
       HODLR_set_I_option<scalar_t>(options_, "knn", opts.knn_hodlrbf());
-      HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", opts.lr_leaf()); 
+      HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", opts.lr_leaf());
+      HODLR_set_I_option<scalar_t>(options_, "nogeo", opts.geo());
       if (opts.geo() == 0) {
-        HODLR_set_I_option<scalar_t>(options_, "nogeo", 0);
+        // pass the data points to the HODLR code, let the HODLR code
+        // figure out the permutation etc
+
+        // TODO the permutation is not handled correctly ??!!
+
         HODLR_set_I_option<scalar_t>(options_, "verbosity", 0);
         //HODLR_set_I_option<scalar_t>(options_, "xyzsort", 2);
         //HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", 2); // 5 = rrqr
         HODLR_construct_init<scalar_t>
-          (rows_, K.d(), K.data().data(), lvls_-1, leafs_.data(), perm_.data(),
+          (rows_, K.d(), K.data().data(), nullptr, lvls_-1, leafs_.data(),
+           perm_.data(), lrows_, ho_bf_, options_, stats_, msh_,
+           kerquant_, ptree_, nullptr, nullptr, nullptr);
+      } else if (opts.geo() == 2) {
+        // do not pass any neighbor info to the HODLR code??
+        HODLR_construct_init<scalar_t>
+          (rows_, 0, nullptr, nullptr, lvls_-1, leafs_.data(), perm_.data(),
            lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
            nullptr, nullptr, nullptr);
-      } else {
-        HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
+      } else if (opts.geo() == 3) {
+        DenseMatrix<int> nns(opts.knn_hodlrbf(), rows_);
+        nns.fill(0);
+
+        // TODO pass a list of neighbors to the HODLR code!!!
+
         HODLR_construct_init<scalar_t>
-          (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
+          (rows_, 0, nullptr, nns.data(), lvls_-1, leafs_.data(), perm_.data(),
            lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
            nullptr, nullptr, nullptr);
       }
@@ -598,7 +610,7 @@ namespace strumpack {
       perm_.resize(rows_);
       //KernelCommPtrs<scalar_t> KC{&K, &c_};
       HODLR_construct_init<scalar_t>
-        (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
+        (rows_, 0, nullptr, nullptr, lvls_-1, leafs_.data(), perm_.data(),
          lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
          nullptr, nullptr, nullptr);
       HODLR_set_I_option<scalar_t>(options_, "elem_extract", 0); // block extraction
@@ -633,7 +645,7 @@ namespace strumpack {
       options_init(opts);
       perm_.resize(rows_);
       HODLR_construct_init<scalar_t>
-        (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
+        (rows_, 0, nullptr, nullptr, lvls_-1, leafs_.data(), perm_.data(),
          lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
          nullptr, nullptr, nullptr);
       perm_init();
@@ -643,61 +655,7 @@ namespace strumpack {
     template<typename integer_t> struct AdmInfo {
       std::pair<std::vector<int>,std::vector<int>> maps;
       const DenseMatrix<bool>* adm;
-      const CSRGraph<integer_t>* graph;
-      int knn;
     };
-
-    template<typename scalar_t, typename integer_t,
-             typename real_t = typename RealType<scalar_t>::value_type>
-    void HODLR_distance_query(int* m, int* n, real_t* dist, C2Fptr fdata) {
-      int i = *m - 1, j = *n - 1;
-      if (i == j) { *dist = real_t(0.); return; }
-      auto& info = *static_cast<AdmInfo<integer_t>*>(fdata);
-      auto& g = *(info.graph);
-      const int max_dist = info.knn;
-      if (max_dist <= 2) {
-        *dist = real_t(1.);
-        auto pkhi = g.ind() + g.ptr(i+1);
-        for (auto pk=g.ind() + g.ptr(i); pk!=pkhi; pk++)
-          if (*pk == j) return;
-        *dist = real_t(2.);
-        if (max_dist == 1) return;
-        for (auto pk=g.ind() + g.ptr(i); pk!=pkhi; pk++) {
-          auto plhi = g.ind() + g.ptr(*pk+1);
-          for (auto pl=g.ind() + g.ptr(*pk); pl!=plhi; pl++)
-            if (*pl == j) return;
-        }
-        *dist = real_t(3.);
-      } else {
-        auto gn = g.size();
-        std::vector<int> mark(gn, -1);
-        std::queue<int> q;
-        // start a breadth-first search from node i
-        q.push(i);
-        // mark will hold the distance to node i,
-        // or -1 if not yet visited
-        mark[i] = 0;
-        *dist = real_t(max_dist + 1);
-        while (!q.empty()) {
-          auto k = q.front();
-          q.pop();
-          if (mark[k] == max_dist) return;
-          const auto hi = g.ind() + g.ptr(k+1);
-          for (auto pl=g.ind()+g.ptr(k); pl!=hi; pl++) {
-            auto l = *pl;
-            if (mark[l] == -1) {
-              if (l == j) {
-                *dist = real_t(mark[k] + 1);
-                return;
-              }
-              q.push(l);
-              mark[l] = mark[k] + 1;
-            }
-          }
-        }
-        *dist = real_t(max_dist + 1);
-      }
-    }
 
     template<typename integer_t> void HODLR_admissibility_query
     (int* m, int* n, int* admissible, C2Fptr fdata) {
@@ -716,7 +674,7 @@ namespace strumpack {
     template<typename scalar_t> template<typename integer_t>
     HODLRMatrix<scalar_t>::HODLRMatrix
     (const MPIComm& c, const HSS::HSSPartitionTree& tree,
-     const DenseMatrix<bool>& adm, const CSRGraph<integer_t>& graph,
+     const CSRGraph<integer_t>& graph,
      const opts_t& opts) {
       rows_ = cols_ = tree.size;
       HSS::HSSPartitionTree full_tree(tree);
@@ -729,33 +687,37 @@ namespace strumpack {
       Fcomm_ = MPI_Comm_c2f(c_.comm());
       options_init(opts);
       perm_.resize(rows_);
-      if (opts.geo() == 2) {
-        AdmInfo<integer_t> info;
-        info.maps = tree.map_from_complete_to_leafs(lvls_);
-        info.adm = &adm;
-        info.graph = &graph;
-        info.knn = opts.knn_hodlrbf();
-        // use the distance and admissibility functions
-        HODLR_set_I_option<scalar_t>(options_, "nogeo", 2);
-        // nedge/nvert is the average degree, but since we also consider
-        // length 2 connections, we need to consider more than that, 5
-        // is just a heuristic.  For instance for a 2d 9-point stencil,
-        // there are 3^2=9 points in the stencil and 5^2=25 points in
-        // the extended (length 2 connections) stencil.
-        HODLR_set_I_option<scalar_t>
-          (options_, "knn",
-           (opts.knn_hodlrbf()*2+1)*(opts.knn_hodlrbf()*2+1) *
-           graph.edges() / graph.vertices());
-        HODLR_construct_init<scalar_t>
-          (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
-           lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
-           &(HODLR_distance_query<scalar_t,integer_t>),
-           &(HODLR_admissibility_query<integer_t>), &info);
-      } else
-        HODLR_construct_init<scalar_t>
-          (rows_, 0, nullptr, lvls_-1, leafs_.data(), perm_.data(),
-           lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
-           nullptr, nullptr, nullptr);
+      HODLR_set_I_option<scalar_t>(options_, "nogeo", 3);
+      int knn = opts.knn_hodlrbf();
+      HODLR_set_I_option<scalar_t>(options_, "knn", knn);
+      DenseMatrix<int> nns(knn, rows_);
+      nns.fill(0);
+      std::vector<bool> mark(rows_, false);
+      for (int i=0; i<rows_; i++) {
+        std::queue<int> q;
+        std::fill(mark.begin(), mark.end(), false);
+        q.push(i);  // start a breadth-first search from node i
+        mark[i] = true;
+        int ki = 0;
+        while (ki < knn && !q.empty()) {
+          auto k = q.front();
+          q.pop();
+          const auto hi = graph.ind() + graph.ptr(k+1);
+          for (auto pl=graph.ind()+graph.ptr(k); pl!=hi; pl++) {
+            auto l = *pl;
+            if (!mark[l]) {
+              nns(ki++, i) = l+1; // found a new neighbor
+              if (ki == knn) break;
+              q.push(l);
+              mark[l] = true;
+            }
+          }
+        }
+      }
+      HODLR_construct_init<scalar_t>
+        (rows_, 0, nullptr, nns.data(), lvls_-1, leafs_.data(), perm_.data(),
+         lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
+         nullptr, nullptr, nullptr);
       perm_init();
       dist_init();
     }

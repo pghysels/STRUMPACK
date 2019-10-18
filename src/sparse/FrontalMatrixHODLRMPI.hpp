@@ -587,38 +587,28 @@ namespace strumpack {
   (const SpMat_t& A, const Opts_t& opts) {
     auto g = A.extract_graph
       (opts.separator_ordering_level(), sep_begin_, sep_end_);
-    auto sep_leafs = sep_tree_.template leaf_sizes<int>();
-    auto adm = g.admissibility(sep_leafs);
-    F11_ = std::move
-      (HODLR::HODLRMatrix<scalar_t>
-       (Comm(), sep_tree_, adm, g, opts.HODLR_options()));
+    F11_ = HODLR::HODLRMatrix<scalar_t>
+      (Comm(), sep_tree_, g, opts.HODLR_options());
     if (dim_upd()) {
       HSS::HSSPartitionTree CB_tree(dim_upd());
       CB_tree.refine(opts.HODLR_options().leaf_size());
       if (opts.HODLR_options().compression_algorithm() ==
-          HODLR::CompressionAlgorithm::ELEMENT_EXTRACTION &&
-          opts.HODLR_options().geo() == 2) {
+          HODLR::CompressionAlgorithm::ELEMENT_EXTRACTION) {
         auto gCB = A.extract_graph_CB(opts.separator_ordering_level(), this->upd());
-        auto CB_leafs = CB_tree.template leaf_sizes<int>();
-        {
-          auto admCB = gCB.admissibility(CB_leafs);
-          F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
-            (new HODLR::HODLRMatrix<scalar_t>
-             (Comm(), CB_tree, admCB, gCB, opts.HODLR_options()));
-        }
+        F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
+          (new HODLR::HODLRMatrix<scalar_t>
+           (Comm(), CB_tree, gCB, opts.HODLR_options()));
         auto g12 = A.extract_graph_sep_CB
           (opts.separator_ordering_level(), sep_begin_, sep_end_, this->upd());
         auto g21 = A.extract_graph_CB_sep
           (opts.separator_ordering_level(), sep_begin_, sep_end_, this->upd());
-        auto adm12 = admissibility
-          (g, g12, gCB, sep_leafs, CB_leafs, opts.HODLR_options().knn_lrbf());
-        auto adm21 = adm12.transpose();
+        auto knn = opts.HODLR_options().knn_lrbf();
+        auto nns12 = HODLR::get_odiag_neighbors(knn, g12, g, gCB);
+        auto nns21 = HODLR::get_odiag_neighbors(knn, g21, gCB, g);
         F12_ = HODLR::LRBFMatrix<scalar_t>
-          (F11_, sep_tree_, g, *F22_, CB_tree, gCB,
-           adm12, g12, opts.HODLR_options());
+          (F11_, *F22_, nns12, nns21, opts.HODLR_options());
         F21_ = HODLR::LRBFMatrix<scalar_t>
-          (*F22_, CB_tree, gCB, F11_, sep_tree_, g,
-           adm21, g21, opts.HODLR_options());
+          (*F22_, F11_, nns21, nns12, opts.HODLR_options());
       } else {
         F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
           (new HODLR::HODLRMatrix<scalar_t>

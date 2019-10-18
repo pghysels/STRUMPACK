@@ -235,8 +235,8 @@ namespace strumpack {
       }
 
       /**
-       * Set sampling parameter for use in linear complexity butterfly compression,
-       * higher for more robust sampling.
+       * Set sampling parameter for use in linear complexity butterfly
+       * compression, higher for more robust sampling.
        */
       void set_BF_sampling_parameter(double param) {
         assert(param > 0);
@@ -244,24 +244,27 @@ namespace strumpack {
       }
 
       /**
-       * geo should be 0, 1 or 2. 0 means use point geometry, 1 means
-       * do not use any geometry. 2 means use the graph connectivity
-       * for the distance and admissibility info.
+       * geo should be 0, 1, 2 or 3. 0 means use point geometry, 1
+       * means do not use any geometry. 2 means use the graph
+       * connectivity for the distance and admissibility info, 3 means
+       * use the graph to directly find closest neighbors.
        */
       void set_geo(int geo) {
-        assert(geo == 0 || geo == 1 || geo == 2);
+        assert(geo == 0 || geo == 1 || geo == 2 || geo == 3);
         geo_ = geo;
       }
 
       /**
-       * lr_leaf should be 1, 2, 3, 4, 5. 1 means svd, 2 means rrqr, 3 means baseline aca, 4 means baca original version, 5 means baca improved version.
+       * lr_leaf should be 1, 2, 3, 4, 5. 1 means svd, 2 means rrqr, 3
+       * means baseline aca, 4 means baca original version, 5 means
+       * baca improved version.
        */
       void set_lr_leaf(int lr_leaf) {
-        assert(lr_leaf == 1 || lr_leaf == 2 || lr_leaf == 3 || lr_leaf == 4 || lr_leaf == 5);
+        assert(lr_leaf == 1 || lr_leaf == 2 || lr_leaf == 3 ||
+               lr_leaf == 4 || lr_leaf == 5);
         lr_leaf_ = lr_leaf;
-      }	  
-	  
-	  
+      }
+
       /**
        * Set the number of neighbors to use in construction of the
        * HODLR or HODBF matrices.
@@ -369,8 +372,8 @@ namespace strumpack {
       /**
        * Bottom level compression algorithms in H-BACA 1, 2, 3, 4, or 5
        */
-      int lr_leaf() const { return lr_leaf_; }	  
-	  
+      int lr_leaf() const { return lr_leaf_; }
+
       /**
        * The number of neighbors to use in the HODLR or HODBF
        * construction.
@@ -504,7 +507,7 @@ namespace strumpack {
             std::istringstream iss(optarg);
             iss >> lr_leaf_;
             set_lr_leaf(lr_leaf_);
-          } break;		  
+          } break;
           case 'v': set_verbose(true); break;
           case 'q': set_verbose(false); break;
           case 'h': describe_options(); break;
@@ -568,8 +571,8 @@ namespace strumpack {
       double BF_sampling_parameter_ = 1.2;
       int geo_ = 2;
       int lr_leaf_ = 5;
-      int knn_hodlrbf_ = 2;
-      int knn_lrbf_ = 2;
+      int knn_hodlrbf_ = 16;
+      int knn_lrbf_ = 128;
       bool verbose_ = true;
     };
 

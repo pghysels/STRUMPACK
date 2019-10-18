@@ -106,18 +106,18 @@ namespace strumpack {
     }
 
     template<> void HODLR_construct_init<double>
-    (int N, int d, double* data, int lvls, int* tree, int* perm,
+    (int N, int d, double* data, int* nns, int lvls, int* tree, int* perm,
      int& lrow, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
      void (*C_FuncNearFar)(int*, int*, int*, C2Fptr), C2Fptr fdata) {
       d_c_bpack_construct_init
-        (&N, &d, data, &lvls, tree, perm, &lrow, &ho_bf, &options,
+        (&N, &d, data, nns, &lvls, tree, perm, &lrow, &ho_bf, &options,
          &stats, &msh, &kerquant, &ptree, C_FuncDistmn, C_FuncNearFar,
          fdata);
     }
     template<> void HODLR_construct_init<std::complex<double>>
-    (int N, int d, std::complex<double>* data, int lvls, int* tree,
+    (int N, int d, std::complex<double>* data, int* nns, int lvls, int* tree,
      int* perm, int& lrow, F2Cptr& ho_bf, F2Cptr& options,
      F2Cptr& stats, F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncDistmn)(int*, int*, std::complex<double>*, C2Fptr),
@@ -174,24 +174,24 @@ namespace strumpack {
     }
 
     template<> void LRBF_construct_init<double>
-    (int M, int N, int& lrows, int& lcols, F2Cptr rmsh, F2Cptr cmsh,
-     F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
-     F2Cptr& kerquant, F2Cptr& ptree,
+    (int M, int N, int& lrows, int& lcols, int* nnsr, int* nnsc,
+     F2Cptr rmsh, F2Cptr cmsh, F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats,
+     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
      void (*C_FuncNearFar)(int*, int*, int*, C2Fptr), C2Fptr fdata) {
       d_c_bf_construct_init
-        (&M, &N, &lrows, &lcols, &rmsh, &cmsh, &lr_bf, &options,
+        (&M, &N, &lrows, &lcols, nnsr, nnsc, &rmsh, &cmsh, &lr_bf, &options,
          &stats, &msh, &kerquant, &ptree, C_FuncDistmn, C_FuncNearFar,
          fdata);
     }
     template<> void LRBF_construct_init<std::complex<double>>
-    (int M, int N, int& lrows, int& lcols, F2Cptr rmsh, F2Cptr cmsh,
-     F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
-     F2Cptr& kerquant, F2Cptr& ptree,
+    (int M, int N, int& lrows, int& lcols, int* nnsr, int* nnsc,
+     F2Cptr rmsh, F2Cptr cmsh, F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats,
+     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
      void (*C_FuncNearFar)(int*, int*, int*, C2Fptr), C2Fptr fdata) {
       z_c_bf_construct_init
-        (&M, &N, &lrows, &lcols, &rmsh, &cmsh, &lr_bf, &options,
+        (&M, &N, &lrows, &lcols, nnsr, nnsc, &rmsh, &cmsh, &lr_bf, &options,
          &stats, &msh, &kerquant, &ptree, C_FuncDistmn, C_FuncNearFar,
          fdata);
     }
