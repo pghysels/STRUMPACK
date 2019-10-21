@@ -297,7 +297,7 @@ namespace strumpack {
       HODLR_copyoptions<scalar_t>(Aoptions, options_);
       HODLR_set_D_option<scalar_t>
         (options_, "sample_para",
-         std::min(2.0, opts.BF_sampling_parameter()));
+         std::max(2.0, opts.BF_sampling_parameter()));
       assert(neighbors_rows.rows() == opts.knn_lrbf() &&
              neighbors_rows.cols() == rows_ &&
              neighbors_cols.rows() == opts.knn_lrbf() &&
