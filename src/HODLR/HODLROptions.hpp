@@ -571,8 +571,8 @@ namespace strumpack {
       double BF_sampling_parameter_ = 1.2;
       int geo_ = 2;
       int lr_leaf_ = 5;
-      int knn_hodlrbf_ = 16;
-      int knn_lrbf_ = 128;
+      int knn_hodlrbf_ = 64;
+      int knn_lrbf_ = 256;
       bool verbose_ = true;
     };
 
