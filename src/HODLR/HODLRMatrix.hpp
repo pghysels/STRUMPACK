@@ -875,6 +875,19 @@ namespace strumpack {
       HODLR_inv_mult
         (char(op), X.data(), Y.data(), lrows_, lrows_, X.cols(),
          ho_bf_, options_, stats_, ptree_);
+#if 0
+      DenseM_t R(X.rows(), X.cols()), E(X.rows(), X.cols());
+      mult(op, Y, R);                     // R = A*Y
+      R.scale_and_add(scalar_t(-1.), X);  // R = X - A*Y, residual
+      //std::cout << "Iteration 0: ||X-A*Y||=" << R.norm() << std::endl;
+      HODLR_inv_mult
+        (char(op), R.data(), E.data(), lrows_, lrows_, X.cols(),
+         ho_bf_, options_, stats_, ptree_);
+      Y.add(E);
+      mult(op, Y, R);                     // R = A*Y
+      R.scale_and_add(scalar_t(-1.), X);  // R = X - A*Y, residual
+      //std::cout << "Iteration 1: ||X-A*Y||=" << R.norm() << std::endl;
+#endif
     }
 
     template<typename scalar_t> void
@@ -886,8 +899,9 @@ namespace strumpack {
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::solve(const DenseM_t& B, DenseM_t& X) const {
       if (c_.is_null()) return;
-      HODLR_solve(X.data(), B.data(), lrows_, X.cols(),
-                  ho_bf_, options_, stats_, ptree_);
+      // HODLR_solve(X.data(), B.data(), lrows_, X.cols(),
+      //             ho_bf_, options_, stats_, ptree_);
+      inv_mult(Trans::N, B, X);
     }
 
     template<typename scalar_t> void
@@ -896,8 +910,9 @@ namespace strumpack {
       DenseM_t X1D(lrows_, X.cols());
       {
         auto B1D = redistribute_2D_to_1D(B);
-        HODLR_solve(X1D.data(), B1D.data(), lrows_, X.cols(),
-                    ho_bf_, options_, stats_, ptree_);
+        // HODLR_solve(X1D.data(), B1D.data(), lrows_, X.cols(),
+        //             ho_bf_, options_, stats_, ptree_);
+        inv_mult(Trans::N, B1D, X1D);
       }
       redistribute_1D_to_2D(X1D, X);
     }
