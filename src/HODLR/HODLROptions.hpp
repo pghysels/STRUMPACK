@@ -568,7 +568,7 @@ namespace strumpack {
       int butterfly_levels_ = 0;
       CompressionAlgorithm compression_algo_ = CompressionAlgorithm::ELEMENT_EXTRACTION;
       int BACA_block_size_ = 16;
-      double BF_sampling_parameter_ = 1.2;
+      double BF_sampling_parameter_ = 2.0;
       int geo_ = 2;
       int lr_leaf_ = 5;
       int knn_hodlrbf_ = 64;
