@@ -108,7 +108,7 @@ namespace strumpack {
     void compress_flops_F11();
     void compress_flops_F12_F21();
     void compress_flops_F22();
-    void compress_flops_Schur();
+    void compress_flops_Schur(long long int invf11_mult_flops);
 
     using FrontalMatrix<scalar_t,integer_t>::lchild_;
     using FrontalMatrix<scalar_t,integer_t>::rchild_;
@@ -293,6 +293,7 @@ namespace strumpack {
 
       // first construct S=-F21*inv(F11)*F12 using matvecs, then
       // construct F22+S using element extraction
+      long long int invf11_mult_flops = 0;
       auto sample_Schur =
         [&](Trans op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
           TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
@@ -307,14 +308,13 @@ namespace strumpack {
             Rtmp.scale(a);
             F1.mult(op, Rtmp, F12R);
           } else F1.mult(op, R, F12R);
-          F11_.inv_mult(op, F12R, invF11F12R);
-          //F11_.solve(F12R, invF11F12R);
+          invf11_mult_flops = F11_.inv_mult(op, F12R, invF11F12R);
           if (b != scalar_t(0.)) {
             DenseM_t Stmp(S.rows(), S.cols());
             F2.mult(op, invF11F12R, Stmp);
             S.scale_and_add(b, Stmp);
           } else F2.mult(op, invF11F12R, S);
-          compress_flops_Schur();
+          compress_flops_Schur(invf11_mult_flops);
         };
       HODLR::LRBFMatrix<scalar_t> Schur(*F22_, *F22_);
       Schur.compress(sample_Schur);
@@ -409,6 +409,7 @@ namespace strumpack {
         F21_.compress(sample_F21, F12_.get_stat("Rank_max")+10); }
       compress_flops_F12_F21();
 
+      long long int invf11_mult_flops = 0;
       auto sample_F22 = [&](Trans op, const DenseM_t& R2, DenseM_t& S2) {
         TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
         auto n = R2.cols();
@@ -423,16 +424,15 @@ namespace strumpack {
         invF11F12R2(F11_.lrows(), R2.cols()), S2tmp(S2.rows(), S2.cols());
         if (op == Trans::N) {
           F12_.mult(op, R2, F12R2);
-          F11_.inv_mult(op, F12R2, invF11F12R2);
-          //F11_.solve(F12R, invF11F12R);
+          invf11_mult_flops = F11_.inv_mult(op, F12R2, invF11F12R2);
           F21_.mult(op, invF11F12R2, S2tmp);
         } else {
           F21_.mult(op, R2, F12R2);
-          F11_.inv_mult(op, F12R2, invF11F12R2);
+          invf11_mult_flops = F11_.inv_mult(op, F12R2, invF11F12R2);
           F12_.mult(op, invF11F12R2, S2tmp);
         }
         S2.scaled_add(scalar_t(-1.), S2tmp);
-        compress_flops_Schur();
+        compress_flops_Schur(invf11_mult_flops);
       };
       { TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_f22_compress);
         F22_->compress(sample_F22, std::max(F12_.get_stat("Rank_max"),
@@ -473,12 +473,12 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::compress_flops_Schur() {
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::compress_flops_Schur
+  (long long int invf11_mult_flops) {
 #if defined(STRUMPACK_COUNT_FLOPS)
     long long int f21_mult_flops = F21_.get_stat("Flop_C_Mult"),
-      invf11_mult_flops = F11_.get_stat("Flop_C_Mult"),
-      f12_mult_flops = F12_.get_stat("Flop_C_Mult"),
-      schur_flops = f21_mult_flops + invf11_mult_flops
+      f12_mult_flops = F12_.get_stat("Flop_C_Mult");
+    long long int schur_flops = f21_mult_flops + invf11_mult_flops
       + f12_mult_flops; // + S.rows()*S.cols(); // extra scaling?
     STRUMPACK_SCHUR_FLOPS(schur_flops);
     STRUMPACK_FLOPS(schur_flops);
@@ -507,8 +507,8 @@ namespace strumpack {
     if (this->dim_sep()) {
       TIMER_TIME(TaskType::SOLVE_LOWER, 0, t_s);
       DistM_t rhs(b);
-      F11_.solve(rhs, b);
-      STRUMPACK_FLOPS(F11_.get_stat("Flop_Solve"));
+      auto solve_flops = F11_.solve(rhs, b);
+      STRUMPACK_FLOPS(solve_flops);
       if (this->dim_upd()) {
         DistM_t tmp(bupd.grid(), bupd.rows(), bupd.cols());
         F21_.mult(Trans::N, b, tmp);
@@ -528,11 +528,10 @@ namespace strumpack {
       TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_s);
       DistM_t tmp(y.grid(), y.rows(), y.cols()), tmp2(y.grid(), y.rows(), y.cols());
       F12_.mult(Trans::N, yupd, tmp);
-      F11_.solve(tmp, tmp2);
+      auto solve_flops = F11_.solve(tmp, tmp2);
       y.scaled_add(scalar_t(-1.), tmp2);
       STRUMPACK_FLOPS(F12_.get_stat("Flop_C_Mult") +
-                      F11_.get_stat("Flop_Solve") +
-                      2*yloc.rows()*yloc.cols());
+                      solve_flops + 2*yloc.rows()*yloc.cols());
     }
     DistM_t CBl, CBr;
     DenseM_t seqCBl, seqCBr;

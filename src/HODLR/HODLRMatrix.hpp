@@ -348,9 +348,10 @@ namespace strumpack {
        * the distributed matrix B. Should be B.rows() == this.lrows().
        * \param X Result, should be X.cols() == B.cols(), X.rows() ==
        * this.lrows(). X should be allocated.
+       * \return number of flops
        * \see factor, lrows, begin_row, end_row, inv_mult
        */
-      void solve(const DenseM_t& B, DenseM_t& X) const;
+      long long int solve(const DenseM_t& B, DenseM_t& X) const;
 
       /**
        * Solve a system of linear equations A*X=B, with possibly
@@ -361,9 +362,10 @@ namespace strumpack {
        * the distributed matrix B. Should be B.rows() == this.rows().
        * \param X Result, should be X.cols() == B.cols(), X.rows() ==
        * this.rows(). X should be allocated.
+       * \return number of flops
        * \see factor, lrows, begin_row, end_row, inv_mult
        */
-      void solve(const DistM_t& B, DistM_t& X) const;
+      long long int solve(const DistM_t& B, DistM_t& X) const;
 
       /**
        * Solve a system of linear equations op(A)*X=B, with possibly
@@ -374,9 +376,10 @@ namespace strumpack {
        * the distributed matrix B. Should be B.rows() == this.lrows().
        * \param X Result, should be X.cols() == B.cols(), X.rows() ==
        * this.lrows(). X should be allocated.
+       * \return number of flops
        * \see factor, solve, lrows, begin_row, end_row
        */
-      void inv_mult(Trans op, const DenseM_t& B, DenseM_t& X) const;
+      long long int inv_mult(Trans op, const DenseM_t& B, DenseM_t& X) const;
 
       void extract_elements
       (const VecVec_t& I, const VecVec_t& J, std::vector<DistM_t>& B);
@@ -868,26 +871,26 @@ namespace strumpack {
       redistribute_1D_to_2D(Y1D, Y);
     }
 
-    template<typename scalar_t> void
+    template<typename scalar_t> long long int
     HODLRMatrix<scalar_t>::inv_mult
     (Trans op, const DenseM_t& X, DenseM_t& Y) const {
-      if (c_.is_null()) return;
+      if (c_.is_null()) return 0;
       HODLR_inv_mult
         (char(op), X.data(), Y.data(), lrows_, lrows_, X.cols(),
          ho_bf_, options_, stats_, ptree_);
-#if 0
+      long long int flops = get_stat("Flop_C_Mult");
+#if 1
       DenseM_t R(X.rows(), X.cols()), E(X.rows(), X.cols());
       mult(op, Y, R);                     // R = A*Y
+      flops += get_stat("Flop_C_Mult");
       R.scale_and_add(scalar_t(-1.), X);  // R = X - A*Y, residual
-      //std::cout << "Iteration 0: ||X-A*Y||=" << R.norm() << std::endl;
+      flops += R.rows() * R.cols();
       HODLR_inv_mult
         (char(op), R.data(), E.data(), lrows_, lrows_, X.cols(),
          ho_bf_, options_, stats_, ptree_);
-      Y.add(E);
-      mult(op, Y, R);                     // R = A*Y
-      R.scale_and_add(scalar_t(-1.), X);  // R = X - A*Y, residual
-      //std::cout << "Iteration 1: ||X-A*Y||=" << R.norm() << std::endl;
+      flops += get_stat("Flop_C_Mult");
 #endif
+      return flops;
     }
 
     template<typename scalar_t> void
@@ -896,25 +899,23 @@ namespace strumpack {
       HODLR_factor<scalar_t>(ho_bf_, options_, stats_, ptree_, msh_);
     }
 
-    template<typename scalar_t> void
+    template<typename scalar_t> long long int
     HODLRMatrix<scalar_t>::solve(const DenseM_t& B, DenseM_t& X) const {
-      if (c_.is_null()) return;
-      // HODLR_solve(X.data(), B.data(), lrows_, X.cols(),
-      //             ho_bf_, options_, stats_, ptree_);
-      inv_mult(Trans::N, B, X);
+      if (c_.is_null()) return 0;
+      return inv_mult(Trans::N, B, X);
     }
 
-    template<typename scalar_t> void
+    template<typename scalar_t> long long int
     HODLRMatrix<scalar_t>::solve(const DistM_t& B, DistM_t& X) const {
-      if (c_.is_null()) return;
+      if (c_.is_null()) return 0;
       DenseM_t X1D(lrows_, X.cols());
+      long long int flops = 0;
       {
         auto B1D = redistribute_2D_to_1D(B);
-        // HODLR_solve(X1D.data(), B1D.data(), lrows_, X.cols(),
-        //             ho_bf_, options_, stats_, ptree_);
-        inv_mult(Trans::N, B1D, X1D);
+        flops = inv_mult(Trans::N, B1D, X1D);
       }
       redistribute_1D_to_2D(X1D, X);
+      return flops;
     }
 
     template<typename scalar_t> void HODLRMatrix<scalar_t>::extract_elements

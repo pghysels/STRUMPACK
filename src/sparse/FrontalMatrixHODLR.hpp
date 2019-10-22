@@ -138,7 +138,7 @@ namespace strumpack {
     void compress_flops_F11();
     void compress_flops_F12_F21();
     void compress_flops_F22();
-    void compress_flops_Schur();
+    void compress_flops_Schur(long long int invf11_mult_flops);
 
     using FrontalMatrix<scalar_t,integer_t>::lchild_;
     using FrontalMatrix<scalar_t,integer_t>::rchild_;
@@ -534,6 +534,7 @@ namespace strumpack {
 
       // first construct S=-F21*inv(F11)*F12 using matvecs, then
       // construct F22+S using element extraction
+      long long int invf11_mult_flops = 0;
       auto sample_Schur =
         [&](Trans op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
           TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
@@ -548,14 +549,13 @@ namespace strumpack {
             Rtmp.scale(a);
             F1.mult(op, Rtmp, F12R);
           } else F1.mult(op, R, F12R);
-          F11_.inv_mult(op, F12R, invF11F12R);
-          //F11_.solve(F12R, invF11F12R);
+          invf11_mult_flops += F11_.inv_mult(op, F12R, invF11F12R);
           if (b != scalar_t(0.)) {
             DenseM_t Stmp(S.rows(), S.cols());
             F2.mult(op, invF11F12R, Stmp);
             S.scale_and_add(b, Stmp);
           } else F2.mult(op, invF11F12R, S);
-          compress_flops_Schur();
+          compress_flops_Schur(invf11_mult_flops);
         };
       HODLR::LRBFMatrix<scalar_t> Schur(*F22_, *F22_);
       Schur.compress(sample_Schur);
@@ -624,6 +624,7 @@ namespace strumpack {
         F12_.compress(sample_F12);
         F21_.compress(sample_F21, F12_.get_stat("Rank_max")+10); }
       compress_flops_F12_F21();
+      long long int invf11_mult_flops = 0;
       auto sample_CB =
         [&](Trans op, const DenseM_t& R, DenseM_t& S) {
           TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
@@ -632,17 +633,16 @@ namespace strumpack {
           DenseM_t F12R(dsep, R.cols()), invF11F12R(dsep, R.cols());
           if (op == Trans::N) {
             F12_.mult(op, R, F12R);
-            F11_.inv_mult(op, F12R, invF11F12R);
-            //F11_.solve(F12R, invF11F12R);
+            invf11_mult_flops += F11_.inv_mult(op, F12R, invF11F12R);
             F21_.mult(op, invF11F12R, S);
           } else {
             F21_.mult(op, R, F12R);
-            F11_.inv_mult(op, F12R, invF11F12R);
+            invf11_mult_flops += F11_.inv_mult(op, F12R, invF11F12R);
             F12_.mult(op, invF11F12R, S);
           }
           TIMER_STOP(t_sprod);
           S.scale(-1.);
-          compress_flops_Schur();
+          compress_flops_Schur(invf11_mult_flops);
           if (lchild_) lchild_->sample_CB_to_F22(op, R, S, this, task_depth);
           if (rchild_) rchild_->sample_CB_to_F22(op, R, S, this, task_depth);
         };
@@ -685,12 +685,13 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLR<scalar_t,integer_t>::compress_flops_Schur() {
+  FrontalMatrixHODLR<scalar_t,integer_t>::compress_flops_Schur
+  (long long int invf11_mult_flops) {
 #if defined(STRUMPACK_COUNT_FLOPS)
     long long int f21_mult_flops = F21_.get_stat("Flop_C_Mult"),
-      invf11_mult_flops = F11_.get_stat("Flop_C_Mult"),
-      f12_mult_flops = F12_.get_stat("Flop_C_Mult"),
-      schur_flops = f21_mult_flops + invf11_mult_flops
+      //invf11_mult_flops = F11_.get_stat("Flop_C_Mult"),
+      f12_mult_flops = F12_.get_stat("Flop_C_Mult");
+    long long int schur_flops = f21_mult_flops + invf11_mult_flops
       + f12_mult_flops; // + S.rows()*S.cols(); // extra scaling?
     STRUMPACK_SCHUR_FLOPS(schur_flops);
     STRUMPACK_FLOPS(schur_flops);
@@ -740,8 +741,8 @@ namespace strumpack {
     if (dim_sep()) {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
       DenseM_t rhs(bloc);
-      F11_.solve(rhs, bloc);
-      STRUMPACK_FLOPS(F11_.get_stat("Flop_Solve"));
+      long long int solve_flops = F11_.solve(rhs, bloc);
+      STRUMPACK_FLOPS(solve_flops);
       if (dim_upd()) {
         DenseM_t tmp(bupd.rows(), bupd.cols());
         F21_.mult(Trans::N, bloc, tmp);
@@ -769,12 +770,11 @@ namespace strumpack {
     if (dim_sep() && dim_upd()) {
       DenseM_t tmp(dim_sep(), y.cols()), tmp2(dim_sep(), y.cols());
       F12_.mult(Trans::N, yupd, tmp);
-      F11_.solve(tmp, tmp2);
+      long long int solve_flops = F11_.solve(tmp, tmp2);
       DenseMW_t yloc(dim_sep(), y.cols(), y, this->sep_begin_, 0);
       yloc.scaled_add(scalar_t(-1.), tmp2);
       STRUMPACK_FLOPS(F12_.get_stat("Flop_C_Mult") +
-                      F11_.get_stat("Flop_Solve") +
-                      2*yloc.rows()*yloc.cols());
+                      solve_flops + 2*yloc.rows()*yloc.cols());
     }
     this->bwd_solve_phase2(y, yupd, work, etree_level, task_depth);
   }
