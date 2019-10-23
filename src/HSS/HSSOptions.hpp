@@ -628,11 +628,11 @@ namespace strumpack {
     private:
       real_t _rel_tol = default_HSS_rel_tol<real_t>();
       real_t _abs_tol = default_HSS_abs_tol<real_t>();
-      int _leaf_size = 128;
+      int _leaf_size = 512;
       int _d0 = 128;
       int _dd = 64;
       int _p = 10;
-      int _max_rank = 5000;
+      int _max_rank = 50000;
       random::RandomEngine _random_engine =
         random::RandomEngine::LINEAR;
       random::RandomDistribution _random_distribution =
