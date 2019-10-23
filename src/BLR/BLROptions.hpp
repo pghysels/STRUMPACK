@@ -33,6 +33,9 @@
 
 #include <cstring>
 #include <getopt.h>
+#if defined(STRUMPACK_USE_MPI)
+#include "misc/MPIWrapper.hpp"
+#endif
 
 namespace strumpack {
 
@@ -210,6 +213,10 @@ namespace strumpack {
       }
 
       void describe_options() const {
+#if defined(STRUMPACK_USE_MPI)
+        MPIComm c;
+        if (!c.is_root()) return;
+#endif
         std::cout << "# BLR Options:" << std::endl
                   << "#   --blr_rel_tol real_t (default "
                   << rel_tol() << ")" << std::endl

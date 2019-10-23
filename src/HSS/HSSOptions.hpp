@@ -36,6 +36,9 @@
 #include <cstring>
 #include <getopt.h>
 #include "clustering/Clustering.hpp"
+#if defined(STRUMPACK_USE_MPI)
+#include "misc/MPIWrapper.hpp"
+#endif
 
 namespace strumpack {
 
@@ -579,6 +582,10 @@ namespace strumpack {
        * their current values.
        */
       void describe_options() const {
+#if defined(STRUMPACK_USE_MPI)
+        MPIComm c;
+        if (!c.is_root()) return;
+#endif
         std::cout << "# HSS Options:" << std::endl
                   << "#   --hss_rel_tol real_t (default "
                   << rel_tol() << ")" << std::endl
