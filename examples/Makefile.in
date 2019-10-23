@@ -1,5 +1,5 @@
 all: @C_EXAMPLES@ \
-	testPoisson2d testPoisson3d \
+	testHelmholtz testPoisson2d testPoisson3d \
 	testMMdouble testMMdouble64 testMMfloat \
 	mtx2bin bin2mtx KernelRegression \
 	@MPI_EXAMPLES@
@@ -29,6 +29,14 @@ zexample: zexample.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o zexample.o
 	$(CXX) $(LDFLAGS) zexample.o -o $@ $(LIBS)
 	$(RM) zexample.o
+
+
+testHelmholtz: testHelmholtz.cpp genmatrix3D_core.f
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c testHelmholtz.cpp -o testHelmholtz.o
+	$(FC) $(CPPFLAGS) $(CFLAGS) -c genmatrix3D_core.f -o genmatrix3D_core.o
+	$(CXX) $(LDFLAGS) testHelmholtz.o genmatrix3D_core.o -o $@ $(LIBS)
+	$(RM) testHelmholtz.o genmatrix3D_core.o
+
 
 testPoisson2d: testPoisson2d.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testPoisson2d.o
@@ -105,9 +113,9 @@ KernelRegressionMPI: KernelRegressionMPI.cpp
 
 clean:
 	rm -f *~ *o @C_EXAMPLES@ \
-	testPoisson2d testPoisson3d \
-	testMMdouble testMMdouble64 testMMfloat \
-	mtx2bin bin2mtx KernelRegression \
-	@MPI_EXAMPLES@
+		testHelmholtz testPoisson2d testPoisson3d \
+		testMMdouble testMMdouble64 testMMfloat \
+		mtx2bin bin2mtx KernelRegression \
+		@MPI_EXAMPLES@
 
 

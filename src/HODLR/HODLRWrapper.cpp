@@ -120,12 +120,14 @@ namespace strumpack {
     (int N, int d, std::complex<double>* data, int* nns, int lvls, int* tree,
      int* perm, int& lrow, F2Cptr& ho_bf, F2Cptr& options,
      F2Cptr& stats, F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
-     void (*C_FuncDistmn)(int*, int*, std::complex<double>*, C2Fptr),
+     void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
      void (*C_FuncNearFar)(int*, int*, int*, C2Fptr), C2Fptr fdata) {
       // TODO there is no version taking complex data points?
-      // z_c_bpack_construct_init
-      //   (&N, &d, data, &lvls, tree, perm, &lrow, &ho_bf, &options,
-      //    &stats, &msh, &kerquant, &ptree);
+      assert(data == nullptr);
+      z_c_bpack_construct_init
+        (&N, &d, nullptr, nns, &lvls, tree, perm, &lrow, &ho_bf, &options,
+         &stats, &msh, &kerquant, &ptree, C_FuncDistmn,
+         C_FuncNearFar, fdata);
     }
 
     template<> void HODLR_construct_element_compute<double>
@@ -150,7 +152,16 @@ namespace strumpack {
       int* allrows, int* allcols, std::complex<double>* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr fdata) {
-      //TODO, data should be double??
+      z_c_bpack_construct_element_compute
+        (&ho_bf, &options, &stats, &msh, &kerquant, &ptree,
+         reinterpret_cast<
+         void(*)(int*, int*, _Complex double*, C2Fptr)>(C_FuncZmn),
+         reinterpret_cast<
+         void(*)(int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+                 int* allrows, int* allcols, _Complex double* alldat_loc,
+                 int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
+                 C2Fptr elems)>(C_FuncZmnBlock),
+         fdata);
     }
 
     template<> void HODLR_construct_matvec_compute<double>

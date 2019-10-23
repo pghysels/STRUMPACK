@@ -122,7 +122,7 @@ namespace strumpack {
     (int N, int d, scalar_t* data, int* nns, int lvls, int* tree, int* perm,
      int& lrow, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
-     void (*C_FuncDistmn)(int*, int*, scalar_t*, C2Fptr),
+     void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
      void (*C_FuncNearFar)(int*, int*, int*, C2Fptr),
      C2Fptr fdata) {
       std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
@@ -138,7 +138,7 @@ namespace strumpack {
     (int N, int d, std::complex<double>* data, int* nns, int lvls, int* tree,
      int* perm, int& lrow, F2Cptr& ho_bf, F2Cptr& options,
      F2Cptr& stats, F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
-     void (*C_FuncDistmn)(int*, int*, std::complex<double>*, C2Fptr),
+     void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
      void (*C_FuncNearFar)(int*, int*, int*, C2Fptr),
      C2Fptr fdata);
 
