@@ -577,9 +577,9 @@ namespace strumpack {
                 << Krylov_its_ << std::endl;
       std::cout << "#   - solve time = " << tel << std::endl;
 #if defined(STRUMPACK_COUNT_FLOPS)
-      std::cout << "#   - total flops = " << double(ftot_) << ", min = "
-                << double(fmin_) << ", max = " << double(fmax_) << std::endl;
-      std::cout << "#   - flop rate = " << ftot_ / tel / 1e9 << " GFlop/s"
+      std::cout << "#   - solve flops = " << double(ftot_) << " min = "
+                << double(fmin_) << " max = " << double(fmax_) << std::endl;
+      std::cout << "#   - solve flop rate = " << ftot_ / tel / 1e9 << " GFlop/s"
                 << std::endl;
       std::cout << "#   - bytes moved = " << double(btot_) / 1e6
                 << " MB, min = "<< double(bmin_) / 1e6
@@ -818,10 +818,10 @@ namespace strumpack {
         std::cout << "#   - factor memory = "
                   << float(fnnz) * sizeof(scalar_t) / 1.e6 << " MB" << std::endl;
 #if defined(STRUMPACK_COUNT_FLOPS)
-        std::cout << "#   - total flops = " << double(ftot_) << ", min = "
-                  << double(fmin_) << ", max = " << double(fmax_)
+        std::cout << "#   - factor flops = " << double(ftot_) << " min = "
+                  << double(fmin_) << " max = " << double(fmax_)
                   << std::endl;
-        std::cout << "#   - flop rate = " << ftot_ / t1.elapsed() / 1e9
+        std::cout << "#   - factor flop rate = " << ftot_ / t1.elapsed() / 1e9
                   << " GFlop/s" << std::endl;
 #endif
         std::cout << "#   - factor memory/nonzeros = "
