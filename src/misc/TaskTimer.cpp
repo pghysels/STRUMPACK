@@ -232,6 +232,7 @@ void TimerList::Finalize() {
 }
 
 void TimerList::finalize() {
+#if defined(STRUMPACK_TASK_TIMERS)
 #if !defined(STRUMPACK_USE_MPI)
   std::ofstream log;
   log.open("time.log", std::ofstream::out);
@@ -280,7 +281,8 @@ void TimerList::finalize() {
   for (int p=rank; p<=P; p++) MPI_Barrier(MPI_COMM_WORLD);
 
   int timers = int(TaskType::EXPLICITLY_NAMED_TASK);
-  auto t = new double[4*timers];
+  std::unique_ptr<double[]> t_(new double[4*timers]);
+  auto t = t_.get();
   auto t_sum = t+timers;
   auto t_min = t+2*timers;
   auto t_max = t+3*timers;
@@ -366,7 +368,7 @@ void TimerList::finalize() {
               << "======================+";
     std::cout << std::endl;
   }
-  delete[] t;
+#endif
 #endif
 }
 
