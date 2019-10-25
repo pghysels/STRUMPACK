@@ -262,6 +262,9 @@ namespace strumpack {
     (const std::vector<std::vector<std::size_t>>& I,
      const std::vector<std::vector<std::size_t>>& J,
      std::vector<DistM_t>& Bdist, std::vector<DenseM_t>& Bseq) const;
+
+    virtual BLACSGrid* grid() { return nullptr; }
+    virtual const BLACSGrid* grid() const { return nullptr; }
 #endif
 
   protected:
@@ -397,7 +400,7 @@ namespace strumpack {
        static_cast<long long int>(CB.rows())*b.cols());
     STRUMPACK_BYTES
       (b.cols()*(sizeof(scalar_t)*static_cast<long long int>(3*CB.rows())+
-		 sizeof(integer_t)*(CB.rows()+bupd.rows())));
+                 sizeof(integer_t)*(CB.rows()+bupd.rows())));
   }
 
   /**

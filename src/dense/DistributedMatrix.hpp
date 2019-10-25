@@ -317,7 +317,7 @@ namespace strumpack {
     (const BLACSGrid* g, std::size_t m, std::size_t n,
      int MB, int NB, scalar_t* A);
     DistributedMatrixWrapper
-    (const BLACSGrid* g, int rsrc, int csrc, std::size_t m, std::size_t n,
+    (const BLACSGrid* g, std::size_t m, std::size_t n,
      DenseMatrix<scalar_t>& A);
     DistributedMatrixWrapper
     (const DistributedMatrixWrapper<scalar_t>& A);
@@ -496,19 +496,20 @@ namespace strumpack {
 
   template<typename scalar_t>
   DistributedMatrixWrapper<scalar_t>::DistributedMatrixWrapper
-  (const BLACSGrid* g, int rsrc, int csrc, std::size_t m,
-   std::size_t n, DenseMatrix<scalar_t>& A)
-    : _rows(m), _cols(n), _i(0), _j(0) {
+  (const BLACSGrid* g, std::size_t m, std::size_t n,
+   DenseMatrix<scalar_t>& A) : _rows(m), _cols(n), _i(0), _j(0) {
+    // assert(rsrc == 0 && csrc == 0);
+    assert(g->nprows() == 1 && g->npcols() == 1);
     int MB = std::max(1, _rows);
     int NB = std::max(1, _cols);
     this->grid_ = g;
-    if (this->prow() == rsrc && this->pcol() == csrc) {
+    if (this->prow() == 0 && this->pcol() == 0) {
       this->lrows_ = _rows;
       this->lcols_ = _cols;
       this->data_ = A.data();
       if (scalapack::descinit
           (this->desc_, _rows, _cols, MB, NB,
-           rsrc, csrc, this->ctxt(), std::max(_rows, 1))) {
+           0, 0, this->ctxt(), std::max(_rows, 1))) {
         std::cerr << "ERROR: Could not create DistributedMatrixWrapper"
                   << " descriptor!" << std::endl;
         abort();
@@ -517,7 +518,7 @@ namespace strumpack {
       this->lrows_ = this->lcols_ = 0;
       this->data_ = nullptr;
       scalapack::descset
-        (this->desc_, _rows, _cols, MB, NB, rsrc, csrc, this->ctxt(), 1);
+        (this->desc_, _rows, _cols, MB, NB, 0, 0, this->ctxt(), 1);
     }
   }
 
@@ -1549,7 +1550,87 @@ namespace strumpack {
   }
 
 
+  template<typename scalar_t> void subgrid_copy_to_buffers
+  (const DistributedMatrix<scalar_t>& a, const DistributedMatrix<scalar_t>& b,
+   int p0, int npr, int npc, std::vector<std::vector<scalar_t>>& sbuf) {
+    if (!a.active()) return;
+    assert(b.fixed() || (b.MB() >= b.rows() && b.NB() >= b.cols()));
+    assert(a.fixed());
+    const int arows = a.lrows();
+    const int acols = a.lcols();
+    if (npr == 1 && npc == 1) {
+      for (int c=0; c<acols; c++)
+        for (int r=0; r<arows; r++)
+          sbuf[p0].push_back(a(r, c));
+    } else {
+      const auto B = DistributedMatrix<scalar_t>::default_MB;
+      std::unique_ptr<int[]> pr(new int[arows]);
+      for (int r=0; r<arows; r++)
+        pr[r] = (a.rowl2g_fixed(r) / B) % npr;
+      for (int c=0; c<acols; c++) {
+        auto pc = p0 + ((a.coll2g_fixed(c) / B) % npc) * npr;
+        for (int r=0; r<arows; r++)
+          sbuf[pr[r]+pc].push_back(a(r, c));
+      }
+    }
+  }
 
+  template<typename scalar_t> void subproc_copy_to_buffers
+  (const DenseMatrix<scalar_t>& a, const DistributedMatrix<scalar_t>& b,
+   int p0, int npr, int npc, std::vector<std::vector<scalar_t>>& sbuf) {
+    assert(b.fixed() || (b.MB() >= b.rows() && b.NB() >= b.cols()));
+    const int arows = a.rows();
+    const int acols = a.cols();
+    if (npr == 1 && npc == 1) {
+      for (int c=0; c<acols; c++)
+        for (int r=0; r<arows; r++)
+          sbuf[p0].push_back(a(r, c));
+    } else {
+      const auto B = DistributedMatrix<scalar_t>::default_MB;
+      std::unique_ptr<int[]> pr(new int[arows]);
+      for (int r=0; r<arows; r++)
+        pr[r] = (r / B) % npr;
+      for (int c=0; c<acols; c++) {
+        auto pc = p0 + ((c / B) % npc) * npr;
+        for (int r=0; r<arows; r++)
+          sbuf[pr[r]+pc].push_back(a(r, c));
+      }
+    }
+  }
+
+  template<typename scalar_t> void subgrid_add_from_buffers
+  (const BLACSGrid* subg, int master, DistributedMatrix<scalar_t>& b,
+   std::vector<scalar_t*>& pbuf) {
+    assert(b.fixed() || (b.MB() >= b.rows() && b.NB() >= b.cols()));
+    const int lrows = b.lrows();
+    const int lcols = b.lcols();
+    if (!subg || subg->P() == 1) {
+      for (int c=0; c<lcols; c++)
+        for (int r=0; r<lrows; r++)
+          b(r, c) += *(pbuf[master]++);
+    } else {
+      const auto B = DistributedMatrix<scalar_t>::default_MB;
+      const auto prows = subg->nprows();
+      const auto pcols = subg->npcols();
+      std::unique_ptr<int[]> work(new int[lrows+lcols]);
+      auto pr = work.get();
+      auto pc = pr + lrows;
+      if (b.fixed()) {
+        for (int r=0; r<lrows; r++)
+          pr[r] = (b.rowl2g_fixed(r) / B) % prows;
+        for (int c=0; c<lcols; c++)
+          pc[c] = master + ((b.coll2g_fixed(c) / B) % pcols) * prows;
+      } else {
+        for (int r=0; r<lrows; r++)
+          pr[r] = (b.rowl2g(r) / B) % prows;
+        for (int c=0; c<lcols; c++)
+          pc[c] = master + ((b.coll2g(c) / B) % pcols) * prows;
+      }
+      for (int c=0; c<lcols; c++)
+        for (int r=0; r<lrows; r++)
+          b(r, c) += *(pbuf[pr[r]+pc[c]]++);
+    }
+  }
 
 } // end namespace strumpack
 

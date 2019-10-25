@@ -800,7 +800,6 @@ namespace strumpack {
     }
 
 
-
     // TODO optimize loops!!
     static void extract_copy_to_buffers
     (const DistM_t& F, const std::vector<std::size_t>& I,

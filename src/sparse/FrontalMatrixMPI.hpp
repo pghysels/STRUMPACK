@@ -157,8 +157,8 @@ namespace strumpack {
 
     MPIComm& Comm() { return grid()->Comm(); }
     const MPIComm& Comm() const { return grid()->Comm(); }
-    BLACSGrid* grid() { return &blacs_grid_; }
-    const BLACSGrid* grid() const { return &blacs_grid_; }
+    BLACSGrid* grid() override { return &blacs_grid_; }
+    const BLACSGrid* grid() const override { return &blacs_grid_; }
     int P() const override { return grid()->P(); }
 
     virtual long long factor_nonzeros(int task_depth=0) const override;
@@ -193,12 +193,13 @@ namespace strumpack {
   (const SpMat_t& A, const VecVec_t& I, const VecVec_t& J,
    std::vector<DistMW_t>& B) const {
     TIMER_TIME(TaskType::EXTRACT_2D, 1, t_ex);
+#if 0
     {
       TIMER_TIME(TaskType::EXTRACT_SEP_2D, 2, t_ex_sep);
       for (std::size_t i=0; i<I.size(); i++) {
         DistM_t tmp(grid(), I[i].size(), J[i].size());
         A.extract_separator_2d(this->sep_end_, I[i], J[i], tmp);
-        // TODO why this copy???
+        // TODO why this copy???, because B[i] can be on a subgrid
         copy(I[i].size(), J[i].size(), tmp, 0, 0, B[i], 0, 0, grid()->ctxt_all());
       }
     }
@@ -214,7 +215,6 @@ namespace strumpack {
       auto n = J[i].size();
       if (!m || !n) continue;
       DistM_t tmp(B[i].grid(), m, n);
-      // TODO combine all these copies???!!
       if (lchild_) {
         if (lchild_->isMPI())
           copy(m, n, visit(lchild_) ? Bl[i] : d, 0, 0, tmp, 0, 0, grid()->ctxt_all());
@@ -230,6 +230,68 @@ namespace strumpack {
       }
       B[i].add(tmp);
     }
+#else
+    TIMER_TIME(TaskType::GET_SUBMATRIX_2D, 2, t_getsub);
+    int rank = Comm().rank(), nprocs = P();
+    std::vector<DistM_t> Bl, Br;
+    std::vector<DenseM_t> Blseq, Brseq;
+    if (visit(lchild_)) lchild_->get_submatrix_2d(I, J, Bl, Blseq);
+    if (visit(rchild_)) rchild_->get_submatrix_2d(I, J, Br, Brseq);
+    std::vector<int> bgrid(3*I.size(), -1);
+    for (std::size_t i=0; i<I.size(); i++)
+      if (B[i].grid() && B[i].prow() == 0 && B[i].pcol() == 0) {
+        bgrid[3*i] = rank;
+        bgrid[3*i+1] = B[i].nprows();
+        bgrid[3*i+2] = B[i].npcols();
+      }
+    Comm().all_reduce(bgrid.data(), bgrid.size(), MPI_MAX);
+    std::vector<std::vector<scalar_t>> sbuf(nprocs);
+    std::size_t ssize = 0;
+    for (std::size_t i=0; i<I.size(); i++)
+      ssize += I[i].size() * J[i].size();
+    for (std::size_t p=0; p<nprocs; p++)
+      sbuf[p].reserve(std::round(1.2*float(ssize)/nprocs));
+    bool vl = visit(lchild_), vr = visit(rchild_);
+    for (std::size_t i=0; i<I.size(); i++) {
+      {
+        TIMER_TIME(TaskType::EXTRACT_SEP_2D, 2, t_ex_sep);
+        DistM_t tmp(grid(), I[i].size(), J[i].size());
+        A.extract_separator_2d(this->sep_end_, I[i], J[i], tmp);
+        subgrid_copy_to_buffers
+          (tmp, B[i], bgrid[3*i], bgrid[3*i+1], bgrid[3*i+2], sbuf);
+      }
+      if (vl) {
+        if (lchild_->isMPI())
+          subgrid_copy_to_buffers
+            (Bl[i], B[i], bgrid[3*i], bgrid[3*i+1], bgrid[3*i+2], sbuf);
+        else
+          subproc_copy_to_buffers
+            (Blseq[i], B[i], bgrid[3*i], bgrid[3*i+1], bgrid[3*i+2], sbuf);
+      }
+      if (vr) {
+        if (rchild_->isMPI())
+          subgrid_copy_to_buffers
+            (Br[i], B[i], bgrid[3*i], bgrid[3*i+1], bgrid[3*i+2], sbuf);
+        else
+          subproc_copy_to_buffers
+            (Brseq[i], B[i], bgrid[3*i], bgrid[3*i+1], bgrid[3*i+2], sbuf);
+      }
+    }
+    std::vector<scalar_t> rbuf;
+    std::vector<scalar_t*> pbuf;
+    Comm().all_to_all_v(sbuf, rbuf, pbuf);
+    BLACSGrid *gl = nullptr, *gr = nullptr;
+    if (lchild_) gl = lchild_->grid();
+    if (rchild_) gr = rchild_->grid();
+    int ml = master(lchild_), mr = master(rchild_);
+    for (std::size_t i=0; i<I.size(); i++) {
+      if (!B[i].active()) continue;
+      B[i].zero();
+      subgrid_add_from_buffers(grid(), 0, B[i], pbuf);
+      if (lchild_) subgrid_add_from_buffers(gl, ml, B[i], pbuf);
+      if (rchild_) subgrid_add_from_buffers(gr, mr, B[i], pbuf);
+    }
+#endif
   }
 
   template<typename scalar_t,typename integer_t> void

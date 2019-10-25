@@ -115,7 +115,7 @@ namespace strumpack {
           std::vector<std::size_t> gI(I), gJ(J);
           for (auto& i : gI) i += offset_.first;
           for (auto& j : gJ) j += offset_.second;
-          DistMW_t dB(grid_local_, 0, 0, I.size(), J.size(), B);
+          DistMW_t dB(grid_local_, I.size(), J.size(), B);
           DistM_t dA;
           dAelem_(gI, gJ, dB, dA, 0, 0, MPI_COMM_NULL);
         }

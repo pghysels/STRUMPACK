@@ -926,7 +926,7 @@ namespace strumpack {
       std::vector<DenseM_t*> Bdense;
       get_extraction_indices(I, J, Bdense, w.offset, *w.w_seq, self, lvl);
       for (auto& Bd : Bdense)
-        B.emplace_back(lg, 0, 0, Bd->rows(), Bd->cols(), *Bd);
+        B.emplace_back(lg, Bd->rows(), Bd->cols(), *Bd);
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::extract_D_B
