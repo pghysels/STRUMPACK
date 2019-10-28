@@ -6,10 +6,12 @@ all: @C_EXAMPLES@ \
 
 CC=@STRUMPACK_C_COMPILER@
 CXX=@STRUMPACK_CXX_COMPILER@
+FC=@CMAKE_Fortran_COMPILER@
 CPPFLAGS=@STRUMPACK_ALL_INCLUDE_DIRS@
 
 CFLAGS=@STRUMPACK_ALL_C_FLAGS@
 CXXFLAGS=@STRUMPACK_ALL_CXX_FLAGS@
+FFLAGS=@STRUMPACK_ALL_Fortran_FLAGS@
 LIBS=-L@CMAKE_INSTALL_PREFIX@/lib/ -lstrumpack @STRUMPACK_ALL_LIBS@
 LDFLAGS=@OpenMP_CXX_FLAGS@ @CMAKE_EXE_LINKER_FLAGS@
 
@@ -33,7 +35,7 @@ zexample: zexample.c
 
 testHelmholtz: testHelmholtz.cpp genmatrix3D_core.f
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c testHelmholtz.cpp -o testHelmholtz.o
-	$(FC) $(CPPFLAGS) $(CFLAGS) -c genmatrix3D_core.f -o genmatrix3D_core.o
+	$(FC) $(CPPFLAGS) $(FFLAGS) -c genmatrix3D_core.f -o genmatrix3D_core.o
 	$(CXX) $(LDFLAGS) testHelmholtz.o genmatrix3D_core.o -o $@ $(LIBS)
 	$(RM) testHelmholtz.o genmatrix3D_core.o
 
