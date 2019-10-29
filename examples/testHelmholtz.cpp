@@ -143,6 +143,8 @@ int main(int argc, char* argv[]) {
       std::cout << "# RELATIVE ERROR = "
                 << (nrm_error/nrm_x_exact) << std::endl;
   }
+  TimerList::Finalize();
+  scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return 0;
 }
