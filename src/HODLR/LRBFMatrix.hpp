@@ -375,7 +375,9 @@ namespace strumpack {
 
     template<typename scalar_t> void
     LRBFMatrix<scalar_t>::compress(const delem_blocks_t& Aelem) {
-      AelemCommPtrs<scalar_t> AC{&Aelem, &c_};
+      BLACSGrid gloc(MPIComm(MPI_COMM_SELF), 1),
+	gnull(MPIComm(MPI_COMM_NULL), 1);
+      AelemCommPtrs<scalar_t> AC{&Aelem, &c_, &gloc, &gnull};
       LRBF_construct_element_compute<scalar_t>
         (lr_bf_, options_, stats_, msh_, kerquant_, ptree_,
          &(HODLR_block_evaluation<scalar_t>), &AC);

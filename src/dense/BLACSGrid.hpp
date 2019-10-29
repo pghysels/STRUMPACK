@@ -89,7 +89,7 @@ namespace strumpack {
      * \param comm MPIComm used to initialize the grid, this will be
      * moved (reset to MPI_COMM_NULL)
      */
-    BLACSGrid(MPIComm&& comm) : BLACSGrid(comm, comm.size()) { }
+    BLACSGrid(MPIComm&& comm) : BLACSGrid(std::move(comm), comm.size()) { }
 
     /**
      * Construct a BLACSGrid from an MPIComm object. The MPIComm will
@@ -118,7 +118,7 @@ namespace strumpack {
      * \param P total number of ranks in the new grid (P ==
      * comm.size() or comm.is_null())
      */
-    BLACSGrid(MPIComm&& comm, int P) : comm_(comm), P_(P) { setup(); }
+    BLACSGrid(MPIComm&& comm, int P) : comm_(std::move(comm)), P_(P) { setup(); }
 
     /**
      * Destructor, this will free all resources associated with this

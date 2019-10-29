@@ -471,6 +471,8 @@ namespace strumpack {
     template<typename scalar_t> struct AelemCommPtrs {
       const typename HODLRMatrix<scalar_t>::delem_blocks_t* Aelem;
       const MPIComm* c;
+      const BLACSGrid* gl;
+      const BLACSGrid* g0;
     };
 
     template<typename scalar_t> void HODLR_block_evaluation
@@ -481,35 +483,31 @@ namespace strumpack {
       using DistMW_t = DistributedMatrixWrapper<scalar_t>;
       auto temp = static_cast<AelemCommPtrs<scalar_t>*>(AC);
       std::vector<std::vector<std::size_t>> I(*Ninter), J(*Ninter);
-      // grid should still exist when calling B destructors
-      std::vector<BLACSGrid> grids;
-      {
-        std::vector<DistMW_t> B(*Ninter);
-        auto& comm = *(temp->c);
-        auto rank = comm.rank();
-        grids.reserve(*Ninter);
-        auto data = alldat_loc;
-        for (int isec=0, r0=0, c0=0; isec<*Ninter; isec++) {
-          auto m = rowids[isec];
-          auto n = colids[isec];
-          for (int i=0; i<m; i++)
-            I[isec].push_back(allrows[r0+i]-1);
-          for (int i=0; i<n; i++)
-            J[isec].push_back(std::abs(allcols[c0+i])-1);
-          auto p0 = pmaps[2*(*Npmap)+pgids[isec]];
-          assert(pmaps[pgids[isec]] == 1);          // prows == 1
-          assert(pmaps[(*Npmap)+pgids[isec]] == 1); // pcols == 1
-          grids.emplace_back(BLACSGrid(comm.sub(p0, 1), 1));
-          B[isec] = DistMW_t(&grids[isec], m, n, data);
-          r0 += m;
-          c0 += n;
-          if (rank == p0) data += m*n;
-        }
-        ExtractionMeta e
-          {nullptr, *Ninter, *Nallrows, *Nallcols, *Nalldat_loc,
-              allrows, allcols, rowids, colids, pgids, *Npmap, pmaps};
-        temp->Aelem->operator()(I, J, B, e);
+      std::vector<DistMW_t> B(*Ninter);
+      auto& comm = *(temp->c);
+      auto rank = comm.rank();
+      auto data = alldat_loc;
+      for (int isec=0, r0=0, c0=0; isec<*Ninter; isec++) {
+	auto m = rowids[isec];
+	auto n = colids[isec];
+	I[isec].reserve(m);
+	J[isec].reserve(n);
+	for (int i=0; i<m; i++)
+	  I[isec].push_back(allrows[r0+i]-1);
+	for (int i=0; i<n; i++)
+	  J[isec].push_back(std::abs(allcols[c0+i])-1);
+	auto p0 = pmaps[2*(*Npmap)+pgids[isec]];
+	assert(pmaps[pgids[isec]] == 1);          // prows == 1
+	assert(pmaps[(*Npmap)+pgids[isec]] == 1); // pcols == 1
+	B[isec] = DistMW_t(rank == p0 ? temp->gl : temp->g0, m, n, data);
+	r0 += m;
+	c0 += n;
+	if (rank == p0) data += m*n;
       }
+      ExtractionMeta e
+        {nullptr, *Ninter, *Nallrows, *Nallcols, *Nalldat_loc,
+            allrows, allcols, rowids, colids, pgids, *Npmap, pmaps};
+      temp->Aelem->operator()(I, J, B, e);
     }
 
     template<typename scalar_t> void HODLR_block_evaluation_seq
@@ -834,7 +832,9 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::compress(const delem_blocks_t& Aelem) {
-      AelemCommPtrs<scalar_t> AC{&Aelem, &c_};
+      BLACSGrid gloc(MPIComm(MPI_COMM_SELF), 1),
+	gnull(MPIComm(MPI_COMM_NULL), 1);
+      AelemCommPtrs<scalar_t> AC{&Aelem, &c_, &gloc, &gnull};
       HODLR_construct_element_compute<scalar_t>
         (ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
          &(HODLR_element_evaluation<scalar_t>),
