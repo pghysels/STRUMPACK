@@ -65,10 +65,10 @@ int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
   MPIComm c;
 
-  string filename("smalltest.dat");
-  int d = 2;
-  scalar_t h = 3.;
-  scalar_t lambda = 1.;
+  string filename("./data/susy_10Kn");
+  int d = 8;
+  scalar_t h = 1.3;
+  scalar_t lambda = 3.11;
   int p = 1;  // kernel degree
   KernelType ktype = KernelType::GAUSS;
   string mode("test");
@@ -85,7 +85,8 @@ int main(int argc, char *argv[]) {
   if (argc > 6) ktype = kernel_type(string(argv[6]));
   if (argc > 7) mode = string(argv[7]);
   if (c.is_root())
-    cout << "# data dimension  = " << d << endl
+    cout << "# file            = " << filename << endl
+         << "# data dimension  = " << d << endl
          << "# kernel h        = " << h << endl
          << "# lambda          = " << lambda << endl
          << "# p               = " << p << endl
