@@ -227,12 +227,14 @@ namespace strumpack {
     template<typename integer_t> DenseMatrix<int> get_odiag_neighbors
     (int knn, const CSRGraph<integer_t>& gAB,
      const CSRGraph<integer_t>& gA, const CSRGraph<integer_t>& gB) {
+      //TIMER_TIME(TaskType::NEIGHBOR_SEARCH, 0, t_knn);
       int rows = gA.size();
       DenseMatrix<int> nns(knn, rows);
       std::vector<bool> rmark(rows), cmark(gB.size());
+      std::vector<int> rmarked, cmarked;
+      rmarked.reserve(knn);
+      cmarked.reserve(knn);
       for (int i=0; i<rows; i++) {
-        std::fill(rmark.begin(), rmark.end(), false);
-        std::fill(cmark.begin(), cmark.end(), false);
         std::queue<int> rq, cq;
         int ki = 0;
         rq.push(i);
@@ -249,6 +251,7 @@ namespace strumpack {
                 if (ki == knn) break;
                 cq.push(l);
                 cmark[l] = true;
+                cmarked.push_back(l);
               }
             }
             if (ki == knn) break;
@@ -258,6 +261,7 @@ namespace strumpack {
               if (!rmark[l]) {
                 rq.push(l);
                 rmark[l] = true;
+                rmarked.push_back(l);
               }
             }
           }
@@ -272,10 +276,16 @@ namespace strumpack {
                 if (ki == knn) break;
                 cq.push(l);
                 cmark[l] = true;
+                cmarked.push_back(l);
               }
             }
           }
         }
+        rmark[i] = false;
+        for (auto l : rmarked) rmark[l] = false;
+        for (auto l : cmarked) cmark[l] = false;
+        rmarked.clear();
+        cmarked.clear();
       }
       return nns;
     }
@@ -301,11 +311,13 @@ namespace strumpack {
              neighbors_cols.cols() == cols_);
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 3);
       HODLR_set_I_option<scalar_t>(options_, "knn", opts.knn_lrbf());
-      LRBF_construct_init<scalar_t>
-        (rows_, cols_, lrows_, lcols_,
-         neighbors_rows.data(), neighbors_cols.data(),
-         A.msh_, B.msh_, lr_bf_, options_, stats_, msh_,
-         kerquant_, ptree_, nullptr, nullptr, nullptr);
+      { TIMER_TIME(TaskType::CONSTRUCT_INIT, 0, t_construct_h);
+	LRBF_construct_init<scalar_t>
+	  (rows_, cols_, lrows_, lcols_,
+	   neighbors_rows.data(), neighbors_cols.data(),
+	   A.msh_, B.msh_, lr_bf_, options_, stats_, msh_,
+	   kerquant_, ptree_, nullptr, nullptr, nullptr);
+      }
       rdist_.resize(P+1);
       cdist_.resize(P+1);
       rdist_[rank+1] = lrows_;

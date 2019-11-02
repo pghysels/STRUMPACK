@@ -675,8 +675,7 @@ namespace strumpack {
     template<typename scalar_t> template<typename integer_t>
     HODLRMatrix<scalar_t>::HODLRMatrix
     (const MPIComm& c, const HSS::HSSPartitionTree& tree,
-     const CSRGraph<integer_t>& graph,
-     const opts_t& opts) {
+     const CSRGraph<integer_t>& graph, const opts_t& opts) {
       rows_ = cols_ = tree.size;
       HSS::HSSPartitionTree full_tree(tree);
       int min_lvl = 2 + std::ceil(std::log2(c.size()));
@@ -692,33 +691,42 @@ namespace strumpack {
       int knn = opts.knn_hodlrbf();
       HODLR_set_I_option<scalar_t>(options_, "knn", knn);
       DenseMatrix<int> nns(knn, rows_);
-      nns.fill(0);
-      std::vector<bool> mark(rows_, false);
-      for (int i=0; i<rows_; i++) {
-        std::queue<int> q;
-        std::fill(mark.begin(), mark.end(), false);
-        q.push(i);  // start a breadth-first search from node i
-        mark[i] = true;
-        int ki = 0;
-        while (ki < knn && !q.empty()) {
-          auto k = q.front();
-          q.pop();
-          const auto hi = graph.ind() + graph.ptr(k+1);
-          for (auto pl=graph.ind()+graph.ptr(k); pl!=hi; pl++) {
-            auto l = *pl;
-            if (!mark[l]) {
-              nns(ki++, i) = l+1; // found a new neighbor
-              if (ki == knn) break;
-              q.push(l);
-              mark[l] = true;
+      { //TIMER_TIME(TaskType::NEIGHBOR_SEARCH, 0, t_knn);
+        nns.fill(0);
+        std::vector<bool> mark(rows_, false);
+        std::vector<int> marked;
+        marked.reserve(knn+1);	
+        for (int i=0; i<rows_; i++) {
+          std::queue<int> q;
+          q.push(i);  // start a breadth-first search from node i
+          mark[i] = true;
+          marked.push_back(i);
+          int ki = 0;
+          while (ki < knn && !q.empty()) {
+            auto k = q.front();
+            q.pop();
+            const auto hi = graph.ind() + graph.ptr(k+1);
+            for (auto pl=graph.ind()+graph.ptr(k); pl!=hi; pl++) {
+              auto l = *pl;
+              if (!mark[l]) {
+                nns(ki++, i) = l+1; // found a new neighbor
+                if (ki == knn) break;
+                q.push(l);
+                mark[l] = true;
+                marked.push_back(l);
+              }
             }
           }
+          for (auto l : marked) mark[l] = false;
+          marked.clear();
         }
       }
-      HODLR_construct_init<scalar_t>
-        (rows_, 0, nullptr, nns.data(), lvls_-1, leafs_.data(), perm_.data(),
-         lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
-         nullptr, nullptr, nullptr);
+      { //TIMER_TIME(TaskType::CONSTRUCT_INIT, 0, t_construct_h);
+        HODLR_construct_init<scalar_t>
+          (rows_, 0, nullptr, nns.data(), lvls_-1, leafs_.data(), perm_.data(),
+           lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
+           nullptr, nullptr, nullptr);
+      }
       perm_init();
       dist_init();
     }
