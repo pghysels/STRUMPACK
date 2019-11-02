@@ -34,7 +34,7 @@ zexample: zexample.c
 
 
 testHelmholtz: testHelmholtz.cpp genmatrix3D_core.f
-	$(CXX) $(CPPFLAGS) $(CFLAGS) -c testHelmholtz.cpp -o testHelmholtz.o
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c testHelmholtz.cpp -o testHelmholtz.o
 	$(FC) $(CPPFLAGS) $(FFLAGS) -c genmatrix3D_core.f -o genmatrix3D_core.o
 	$(CXX) $(LDFLAGS) testHelmholtz.o genmatrix3D_core.o -o $@ $(LIBS)
 	$(RM) testHelmholtz.o genmatrix3D_core.o

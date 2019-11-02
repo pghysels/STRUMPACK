@@ -215,7 +215,7 @@ namespace strumpack {
       void describe_options() const {
 #if defined(STRUMPACK_USE_MPI)
         MPIComm c;
-        if (!c.is_root()) return;
+        if (MPIComm::initialized() && !c.is_root()) return;
 #endif
         std::cout << "# BLR Options:" << std::endl
                   << "#   --blr_rel_tol real_t (default "

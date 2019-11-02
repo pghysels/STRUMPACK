@@ -1458,7 +1458,7 @@ namespace strumpack {
     void describe_options() const {
 #if defined(STRUMPACK_USE_MPI)
       MPIComm c;
-      if (!c.is_root()) return;
+      if (MPIComm::initialized() && !c.is_root()) return;
 #endif
       std::cout << "# STRUMPACK options:" << std::endl;
       std::cout << "#   --sp_maxit int (default " << maxit() << ")" << std::endl;

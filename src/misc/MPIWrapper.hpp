@@ -610,6 +610,12 @@ namespace strumpack {
       MPI_Pcontrol(-1, name.c_str());
     }
 
+    static bool initialized() {
+      int flag;
+      MPI_Initialized(&flag);
+      return static_cast<bool>(flag);
+    }
+
   private:
     MPI_Comm comm_ = MPI_COMM_WORLD;
 

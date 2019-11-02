@@ -1,5 +1,4 @@
-#!/bin/python3
-
+#!/usr/bin/env python
 ##
 ## Read data points for training and test sets, and corresponding
 ## labels, from comma separated files. Then construct the kernel
@@ -26,27 +25,31 @@ rank = comm.Get_rank()
 
 if rank == 0:
     print("""\
-    Usage: python3 KernelRegression.py filename h lambda
+    Usage: python3 KernelRegression.py filename h lambda degree
        - 'filename' should refer to 4 files:
            filename_train.csv
            filename_train_label.csv
            filename_test.csv
            filename_test_label.csv
        - h: kernel width
-       - lambda: regularization parameter\
+       - lambda: regularization parameter
+       - degree: ANOVA kernel degree
+\
     """)
 
 # parse input parameters
-fname = '/home/pieterg/LBL/STRUMPACK/data/cov10k_good/covtype_10Kn'
-h = 1.0
-lam = 4.0
+fname = './data/susy_10Kn'
+h = 1.3
+lam = 3.11
+degree = 1
 nargs = len(sys.argv)
 if (nargs > 1): fname = sys.argv[1]
 if (nargs > 2): h = float(sys.argv[2]);
 if (nargs > 3): lam = float(sys.argv[3]);
+if (nargs > 4): degree = float(sys.argv[4]);
 
 # read data
-prec = np.float32
+prec = np.float64
 train_points = np.genfromtxt(fname + '_train.csv', delimiter=",", dtype=prec)
 train_labels = np.genfromtxt(fname + '_train_label.csv', delimiter=",", dtype=prec)
 test_points = np.genfromtxt(fname + '_test.csv', delimiter=",", dtype=prec)
@@ -62,7 +65,7 @@ def quality(p, l):
 # Kernel ridge regression classification
 # using HSS approximation of the kernel
 K_HSS = sp.STRUMPACKKernel(
-    h, lam, kernel='rbf', approximation='HSS', mpi=True, argv=sys.argv)
+    h, lam, degree, kernel='rbf', approximation='HSS', mpi=True, argv=sys.argv)
 K_HSS.fit(train_points, train_labels)
 pred = K_HSS.predict(test_points)
 # check quality, labels are -1 or +1

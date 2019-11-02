@@ -61,10 +61,10 @@ read_from_file(string filename) {
 
 int main(int argc, char *argv[]) {
   using scalar_t = double;
-  string filename("smalltest.dat");
-  size_t d = 2;
-  scalar_t h = 3.;
-  scalar_t lambda = 1.;
+  string filename("./data/susy_10Kn");
+  size_t d = 8;
+  scalar_t h = 1.3;
+  scalar_t lambda = 3.11;
   int p = 1;  // kernel degree
   KernelType ktype = KernelType::GAUSS;
   string mode("test");
@@ -80,6 +80,7 @@ int main(int argc, char *argv[]) {
   if (argc > 7) mode = string(argv[7]);
 
   cout << endl;
+  cout << "# file            = " << filename << endl;
   cout << "# data dimension  = " << d << endl;
   cout << "# kernel h        = " << h << endl;
   cout << "# lambda          = " << lambda << endl;
