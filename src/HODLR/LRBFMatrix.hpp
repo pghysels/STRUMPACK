@@ -311,12 +311,12 @@ namespace strumpack {
              neighbors_cols.cols() == cols_);
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 3);
       HODLR_set_I_option<scalar_t>(options_, "knn", opts.knn_lrbf());
-      { TIMER_TIME(TaskType::CONSTRUCT_INIT, 0, t_construct_h);
-	LRBF_construct_init<scalar_t>
-	  (rows_, cols_, lrows_, lcols_,
-	   neighbors_rows.data(), neighbors_cols.data(),
-	   A.msh_, B.msh_, lr_bf_, options_, stats_, msh_,
-	   kerquant_, ptree_, nullptr, nullptr, nullptr);
+      { //TIMER_TIME(TaskType::CONSTRUCT_INIT, 0, t_construct_h);
+        LRBF_construct_init<scalar_t>
+          (rows_, cols_, lrows_, lcols_,
+           neighbors_rows.data(), neighbors_cols.data(),
+           A.msh_, B.msh_, lr_bf_, options_, stats_, msh_,
+           kerquant_, ptree_, nullptr, nullptr, nullptr);
       }
       rdist_.resize(P+1);
       cdist_.resize(P+1);
@@ -388,7 +388,7 @@ namespace strumpack {
     template<typename scalar_t> void
     LRBFMatrix<scalar_t>::compress(const delem_blocks_t& Aelem) {
       BLACSGrid gloc(MPIComm(MPI_COMM_SELF), 1),
-	gnull(MPIComm(MPI_COMM_NULL), 1);
+        gnull(MPIComm(MPI_COMM_NULL), 1);
       AelemCommPtrs<scalar_t> AC{&Aelem, &c_, &gloc, &gnull};
       LRBF_construct_element_compute<scalar_t>
         (lr_bf_, options_, stats_, msh_, kerquant_, ptree_,

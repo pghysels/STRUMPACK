@@ -488,21 +488,21 @@ namespace strumpack {
       auto rank = comm.rank();
       auto data = alldat_loc;
       for (int isec=0, r0=0, c0=0; isec<*Ninter; isec++) {
-	auto m = rowids[isec];
-	auto n = colids[isec];
-	I[isec].reserve(m);
-	J[isec].reserve(n);
-	for (int i=0; i<m; i++)
-	  I[isec].push_back(allrows[r0+i]-1);
-	for (int i=0; i<n; i++)
-	  J[isec].push_back(std::abs(allcols[c0+i])-1);
-	auto p0 = pmaps[2*(*Npmap)+pgids[isec]];
-	assert(pmaps[pgids[isec]] == 1);          // prows == 1
-	assert(pmaps[(*Npmap)+pgids[isec]] == 1); // pcols == 1
-	B[isec] = DistMW_t(rank == p0 ? temp->gl : temp->g0, m, n, data);
-	r0 += m;
-	c0 += n;
-	if (rank == p0) data += m*n;
+        auto m = rowids[isec];
+        auto n = colids[isec];
+        I[isec].reserve(m);
+        J[isec].reserve(n);
+        for (int i=0; i<m; i++)
+          I[isec].push_back(allrows[r0+i]-1);
+        for (int i=0; i<n; i++)
+          J[isec].push_back(std::abs(allcols[c0+i])-1);
+        auto p0 = pmaps[2*(*Npmap)+pgids[isec]];
+        assert(pmaps[pgids[isec]] == 1);          // prows == 1
+        assert(pmaps[(*Npmap)+pgids[isec]] == 1); // pcols == 1
+        B[isec] = DistMW_t(rank == p0 ? temp->gl : temp->g0, m, n, data);
+        r0 += m;
+        c0 += n;
+        if (rank == p0) data += m*n;
       }
       ExtractionMeta e
         {nullptr, *Ninter, *Nallrows, *Nallcols, *Nalldat_loc,
@@ -695,7 +695,7 @@ namespace strumpack {
         nns.fill(0);
         std::vector<bool> mark(rows_, false);
         std::vector<int> marked;
-        marked.reserve(knn+1);	
+        marked.reserve(knn+1);
         for (int i=0; i<rows_; i++) {
           std::queue<int> q;
           q.push(i);  // start a breadth-first search from node i
@@ -841,7 +841,7 @@ namespace strumpack {
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::compress(const delem_blocks_t& Aelem) {
       BLACSGrid gloc(MPIComm(MPI_COMM_SELF), 1),
-	gnull(MPIComm(MPI_COMM_NULL), 1);
+        gnull(MPIComm(MPI_COMM_NULL), 1);
       AelemCommPtrs<scalar_t> AC{&Aelem, &c_, &gloc, &gnull};
       HODLR_construct_element_compute<scalar_t>
         (ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
