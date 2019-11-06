@@ -68,7 +68,7 @@ namespace strumpack {
   template<typename scalar_t> bool is_CUBLAS
   (const SPOptions<scalar_t>& opts) {
 #if defined(STRUMPACK_USE_CUBLAS)
-    return opts.use_gpu();
+    return opts.use_gpu() && opts.compression() == CompressionType::NONE;
 #else
     return false;
 #endif
