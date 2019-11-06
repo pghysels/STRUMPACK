@@ -452,9 +452,11 @@ namespace strumpack {
         assert(pmaps[pgids[isec]] == 1);          // prows == 1
         assert(pmaps[(*Npmap)+pgids[isec]] == 1); // pcols == 1
         if (comm.rank() == p0) {
-          for (int c=0; c<n; c++)
+          for (int c=0; c<n; c++) {
+            auto col = std::abs(allcols[c0+c])-1;
             for (int r=0; r<m; r++)
-              data[r+c*m] = K.eval(allrows[r0+r]-1, allcols[c0+c]-1);
+              data[r+c*m] = K.eval(allrows[r0+r]-1, col);
+          }
           data += m*n;
         }
         r0 += m;
@@ -555,44 +557,29 @@ namespace strumpack {
       perm_.resize(rows_);
       HODLR_set_I_option<scalar_t>(options_, "knn", opts.knn_hodlrbf());
       HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", opts.lr_leaf());
-      HODLR_set_I_option<scalar_t>(options_, "nogeo", opts.geo());
-      if (opts.geo() == 0) {
-        // pass the data points to the HODLR code, let the HODLR code
-        // figure out the permutation etc
-
-        // TODO the permutation is not handled correctly ??!!
-
-        HODLR_set_I_option<scalar_t>(options_, "verbosity", 0);
-        //HODLR_set_I_option<scalar_t>(options_, "xyzsort", 2);
-        //HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", 2); // 5 = rrqr
-        HODLR_construct_init<scalar_t>
-          (rows_, K.d(), K.data().data(), nullptr, lvls_-1, leafs_.data(),
-           perm_.data(), lrows_, ho_bf_, options_, stats_, msh_,
-           kerquant_, ptree_, nullptr, nullptr, nullptr);
-      } else if (opts.geo() == 2) {
-        // do not pass any neighbor info to the HODLR code??
+      if (opts.geo() == 1) {
+        // do not pass any neighbor info to the HODLR code
+        HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
         HODLR_construct_init<scalar_t>
           (rows_, 0, nullptr, nullptr, lvls_-1, leafs_.data(), perm_.data(),
            lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
            nullptr, nullptr, nullptr);
-      } else if (opts.geo() == 3) {
-        DenseMatrix<int> nns(opts.knn_hodlrbf(), rows_);
-        nns.fill(0);
-
-        // TODO pass a list of neighbors to the HODLR code!!!
-
+      } else {
+        HODLR_set_I_option<scalar_t>(options_, "nogeo", 0);
+        // pass the data points to the HODLR code, let the HODLR code
+        // figure out the permutation etc
         HODLR_construct_init<scalar_t>
-          (rows_, 0, nullptr, nns.data(), lvls_-1, leafs_.data(), perm_.data(),
-           lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
-           nullptr, nullptr, nullptr);
+          (rows_, K.d(), K.data().data(), nullptr, lvls_-1, leafs_.data(),
+           perm_.data(), lrows_, ho_bf_, options_, stats_, msh_,
+           kerquant_, ptree_, nullptr, nullptr, nullptr);
       }
+      perm_init();
+      dist_init();
       KernelCommPtrs<scalar_t> KC{&K, &c_};
       HODLR_construct_element_compute<scalar_t>
         (ho_bf_, options_, stats_, msh_, kerquant_,
          ptree_, &(HODLR_kernel_evaluation<scalar_t>),
          &(HODLR_kernel_block_evaluation<scalar_t>), &KC);
-      perm_init();
-      dist_init();
     }
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
