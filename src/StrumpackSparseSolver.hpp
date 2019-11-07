@@ -901,20 +901,20 @@ namespace strumpack {
       if (opts_.matching() != MatchingJob::NONE) {
         if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) {
           for (integer_t j=0; j<d; j++)
-#pragma omp parallel for simd
+#pragma omp parallel for
             for (integer_t i=0; i<N; i++) {
               auto pi = iperm[matching_cperm_[i]];
               bloc(i, j) = x(pi, j) / matching_Dc_[pi];
             }
         } else {
           for (integer_t j=0; j<d; j++)
-#pragma omp parallel for simd
+#pragma omp parallel for
             for (integer_t i=0; i<N; i++)
               bloc(i, j) = x(iperm[matching_cperm_[i]], j);
         }
       } else {
         for (integer_t j=0; j<d; j++)
-#pragma omp parallel for simd
+#pragma omp parallel for
           for (integer_t i=0; i<N; i++)
             bloc(i, j) = x(iperm[i], j);
       }
@@ -922,14 +922,14 @@ namespace strumpack {
     }
     if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) {
       for (integer_t j=0; j<d; j++)
-#pragma omp parallel for simd
+#pragma omp parallel for
         for (integer_t i=0; i<N; i++) {
           auto pi = iperm[i];
           bloc(i, j) = matching_Dr_[pi] * b(pi, j);
         }
     } else {
       for (integer_t j=0; j<d; j++)
-#pragma omp parallel for simd
+#pragma omp parallel for
         for (integer_t i=0; i<N; i++)
           bloc(i, j) = b(iperm[i], j);
     }
@@ -1000,21 +1000,21 @@ namespace strumpack {
     if (opts_.matching() != MatchingJob::NONE) {
       if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) {
         for (integer_t j=0; j<d; j++)
-#pragma omp parallel for simd
+#pragma omp parallel for
           for (integer_t i=0; i<N; i++) {
             auto ipi = matching_cperm_[iperm[i]];
             bloc(ipi, j) = x(i, j) * matching_Dc_[ipi];
           }
       } else {
         for (integer_t j=0; j<d; j++)
-#pragma omp parallel for simd
+#pragma omp parallel for
           for (integer_t i=0; i<N; i++)
             bloc(matching_cperm_[iperm[i]], j) = x(i, j);
       }
     } else {
       auto perm = reordering()->perm();
       for (integer_t j=0; j<d; j++)
-#pragma omp parallel for simd
+#pragma omp parallel for
         for (integer_t i=0; i<N; i++)
           bloc(i, j) = x(perm[i], j);
     }
