@@ -1,5 +1,5 @@
 # STRUMPACK
-STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014-2017, The
+STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014-2019, The
 Regents of the University of California, through Lawrence Berkeley
 National Laboratory (subject to receipt of any required approvals from
 the U.S. Dept. of Energy).  All rights reserved.
@@ -8,7 +8,7 @@ the U.S. Dept. of Energy).  All rights reserved.
 
 ## Documentation & Installation instructions
    [http://portal.nersc.gov/project/sparse/strumpack/master/](http://portal.nersc.gov/project/sparse/strumpack/master/)  
-   [http://portal.nersc.gov/project/sparse/strumpack/v3.2.0/](http://portal.nersc.gov/project/sparse/strumpack/v3.2.0/)
+   [http://portal.nersc.gov/project/sparse/strumpack/v3.3.0/](http://portal.nersc.gov/project/sparse/strumpack/v3.3.0/)
 
 
 ## Website

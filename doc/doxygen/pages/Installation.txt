@@ -138,7 +138,7 @@ libraries: libscotch, libscotcherr, libptscotch and libptscotcherr.
 At the moment, the rank structured preconditioners do
 not work when cuda acceleration is enabled.
 
-- __ButterflyPACK__: \link
+- __ButterflyPACK__ (>= 1.1.0): \link
   https://github.com/liuyangzhuan/ButterflyPACK
   https://github.com/liuyangzhuan/ButterflyPACK \endlink STRUMPACK
   supports the HODLR (Hierarchically Off-Diagonal Low-Rank) and

@@ -3,7 +3,7 @@ Build Instructions
 
 See the online documentation for more detailed instructions:
 http://portal.nersc.gov/project/sparse/strumpack/master/index.html
-http://portal.nersc.gov/project/sparse/strumpack/v3.2.0/index.html
+http://portal.nersc.gov/project/sparse/strumpack/v3.3.0/index.html
 
 Or see example_build.sh for examples on how to call CMake.
 
@@ -116,6 +116,18 @@ specify the paths directly when calling CMake as follows:
     -DTPL_METIS_LIBRARIES=/usr/local/metis/lib/libmetis.a
 
 
+cuBLAS and cuSOLVER (optional)
+==============================
+Can be used to accelerate the sparse direct solver.
+
+> cmake ../  \
+     -DTPL_ENABLE_CUBLAS=ON \
+     -DTPL_CUBLAS_LIBRARIES="${CUDA_DIR}/lib64/libcudart.so;${CUDA_DIR}/lib64/libcublas.so;${CUDA_DIR}/lib64/libcusolver.so" \
+     -DTPL_CUBLAS_INCLUDE_DIRS="${CUDA_DIR}/include"
+
+At the moment, the rank structured preconditioners do not work when
+cuda acceleration is enabled.
+
 
 ParMETIS and (PT)Scotch (optional)
 ==================================
@@ -157,8 +169,8 @@ command. Then specify -DTPL_COMBBLAS_INCLUDE_DIRS=".." and
 -DTPL_COMBBLAS_LIBRARIES="..".
 
 
-ButterflyPACK (optional)
-========================
+ButterflyPACK (optional, needs >= 1.1.0)
+========================================
 See: https://github.com/liuyangzhuan/ButterflyPACK
 
 ButterflyPACK provides support for Hierarchically Off-Diagonal

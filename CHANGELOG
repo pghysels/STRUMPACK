@@ -1,3 +1,17 @@
+Version 3.3.0 Released November 7, 2019
+======================================
+ - Initial support for cuBLAS and cuSOLVER.
+ - Improved performance in the HODLR (+ butterfly) preconditioner
+ - Added a Helmholtz example
+ - Change default HSS and HODLR leaf sizes to 512 (from 128)
+ - Only print command line option descriptions from the root (of
+   MPI_COMM_WORLD)
+ - Add ANOVA kernel support
+ - Fix 32 bit overflow when calling MPI_Alltoall
+ - Rewrite permutations using xlapmr, using manual loops, for
+   faster solve
+ - Many other fixes and improvements
+
 
 Version 3.2.0 Released August 15, 2019
 ======================================
