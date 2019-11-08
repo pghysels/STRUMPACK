@@ -249,6 +249,14 @@ namespace strumpack {
        */
       const MPIComm& Comm() const { return c_; }
 
+      /**
+       * Get certain statistics about the HODLR matrix.  See the HODLR
+       * code at https://github.com/liuyangzhuan/ButterflyPACK for
+       * more info.
+       *
+       * \param name fi : Rank_max, Mem_Factor, Mem_Fill, Flop_Fill,
+       * Flop_Factor, Flop_C_Mult
+       */
       double get_stat(const std::string& name) const {
         if (!stats_) return 0;
         return BPACK_get_stat<scalar_t>(stats_, name);
@@ -383,8 +391,29 @@ namespace strumpack {
 
       void extract_elements
       (const VecVec_t& I, const VecVec_t& J, std::vector<DistM_t>& B);
+
+      /**
+       * Extract a submatrix defined by index sets I (rows) and J
+       * (columns), and put the result in matrix B (only on the
+       * root!).
+       *
+       * \param I set of row indices, needs to be specified on all
+       * ranks!
+       * \param J set of column indices, needs to be specified on all
+       * ranks!
+       * \param B output, the extracted elements. B should have the
+       * correct size B.rows() == I.size() and B.cols() == J.size()
+       */
       void extract_elements(const Vec_t& I, const Vec_t& J, DenseM_t& B);
 
+      /**
+       * Create a dense matrix from this HODLR compressed matrix. This
+       * is mainly for debugging.
+       *
+       * \param g BLACSFGrid to be used for the output
+       * \return dense matrix representation of *this, in 2D bloc
+       * cyclic format.
+       */
       DistM_t dense(const BLACSGrid* g) const;
 
       DenseM_t redistribute_2D_to_1D(const DistM_t& R) const;
