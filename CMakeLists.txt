@@ -696,6 +696,9 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/data/susy_10Kn_test.csv
 configure_file(${CMAKE_SOURCE_DIR}/examples/data/susy_10Kn_test_label.csv
   ${CMAKE_BINARY_DIR}/examples/data/susy_10Kn_test_label.csv COPYONLY)
 
+configure_file(${CMAKE_SOURCE_DIR}/examples/testHODLR.cpp
+  ${CMAKE_BINARY_DIR}/examples/testHODLR.cpp COPYONLY)
+
 configure_file(${CMAKE_SOURCE_DIR}/examples/testHelmholtz.cpp
   ${CMAKE_BINARY_DIR}/examples/testHelmholtz.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/genmatrix3D_core.f

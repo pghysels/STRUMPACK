@@ -1,6 +1,7 @@
 all: @C_EXAMPLES@ \
 	testHelmholtz testPoisson2d testPoisson3d \
 	testMMdouble mtx2bin bin2mtx KernelRegression \
+	testHODLR \
 	@MPI_EXAMPLES@
 
 CC=@STRUMPACK_C_COMPILER@
@@ -30,6 +31,12 @@ zexample: zexample.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o zexample.o
 	$(CXX) $(LDFLAGS) zexample.o -o $@ $(LIBS)
 	$(RM) zexample.o
+
+
+testHODLR: testHODLR.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testHODLR.o
+	$(CXX) $(LDFLAGS) testHODLR.o -o $@ $(LIBS)
+	$(RM) testHODLR.o
 
 
 testHelmholtz: testHelmholtz.cpp genmatrix3D_core.f
@@ -94,6 +101,7 @@ clean:
 	rm -f *~ *o @C_EXAMPLES@ \
 		testHelmholtz testPoisson2d testPoisson3d \
 		testMMdouble mtx2bin bin2mtx KernelRegression \
+		testHODLR \
 		@MPI_EXAMPLES@
 
 
