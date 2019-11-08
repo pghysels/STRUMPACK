@@ -14,7 +14,7 @@ class STRUMPACKKernel(BaseEstimator, ClassifierMixin):
                  approximation='HSS', mpi=False, argv=None):
         self.h = h
         self.lam = lam
-        self.degree = degree
+        self.degree = int(degree)
         self.kernel = kernel
         self.approximation = approximation
         self.mpi = mpi
