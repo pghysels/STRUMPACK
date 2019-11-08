@@ -671,7 +671,7 @@ endif()
 if(STRUMPACK_USE_MPI)
   set(STRUMPACK_C_COMPILER "${MPI_C_COMPILER}")
   set(STRUMPACK_CXX_COMPILER "${MPI_CXX_COMPILER}")
-  set(MPI_EXAMPLES "KernelRegressionMPI testPoisson2dMPI testPoisson2dMPIDist testPoisson3dMPIDist testMMdouble testMMdoubleMPI testMMdoubleMPIDist testMMdouble64 testMMdoubleMPIDist64 testMMfloat testMMfloatMPIDist")
+  set(MPI_EXAMPLES "KernelRegressionMPI testPoisson2dMPIDist testPoisson3dMPIDist testMMdouble testMMdoubleMPIDist testMMdoubleMPIDist64")
 else()
   set(STRUMPACK_C_COMPILER "${CMAKE_C_COMPILER}")
   set(STRUMPACK_CXX_COMPILER "${CMAKE_CXX_COMPILER}")
@@ -707,10 +707,6 @@ configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson3d.cpp
   ${CMAKE_BINARY_DIR}/examples/testPoisson3d.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdouble.cpp
   ${CMAKE_BINARY_DIR}/examples/testMMdouble.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdouble64.cpp
-  ${CMAKE_BINARY_DIR}/examples/testMMdouble64.cpp COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/examples/testMMfloat.cpp
-  ${CMAKE_BINARY_DIR}/examples/testMMfloat.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/mtx2bin.cpp
   ${CMAKE_BINARY_DIR}/examples/mtx2bin.cpp COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/examples/bin2mtx.cpp
@@ -734,20 +730,14 @@ if(STRUMPACK_C_INTERFACE)
 endif()
 
 if(STRUMPACK_USE_MPI)
-  configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2dMPI.cpp
-    ${CMAKE_BINARY_DIR}/examples/testPoisson2dMPI.cpp COPYONLY)
   configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson2dMPIDist.cpp
     ${CMAKE_BINARY_DIR}/examples/testPoisson2dMPIDist.cpp COPYONLY)
   configure_file(${CMAKE_SOURCE_DIR}/examples/testPoisson3dMPIDist.cpp
     ${CMAKE_BINARY_DIR}/examples/testPoisson3dMPIDist.cpp COPYONLY)
-  configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPI.cpp
-    ${CMAKE_BINARY_DIR}/examples/testMMdoubleMPI.cpp COPYONLY)
   configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPIDist.cpp
     ${CMAKE_BINARY_DIR}/examples/testMMdoubleMPIDist.cpp COPYONLY)
   configure_file(${CMAKE_SOURCE_DIR}/examples/testMMdoubleMPIDist64.cpp
     ${CMAKE_BINARY_DIR}/examples/testMMdoubleMPIDist64.cpp COPYONLY)
-  configure_file(${CMAKE_SOURCE_DIR}/examples/testMMfloatMPIDist.cpp
-    ${CMAKE_BINARY_DIR}/examples/testMMfloatMPIDist.cpp COPYONLY)
   configure_file(${CMAKE_SOURCE_DIR}/examples/KernelRegressionMPI.cpp
     ${CMAKE_BINARY_DIR}/examples/KernelRegressionMPI.cpp COPYONLY)
 endif()

@@ -1,7 +1,6 @@
 all: @C_EXAMPLES@ \
 	testHelmholtz testPoisson2d testPoisson3d \
-	testMMdouble testMMdouble64 testMMfloat \
-	mtx2bin bin2mtx KernelRegression \
+	testMMdouble mtx2bin bin2mtx KernelRegression \
 	@MPI_EXAMPLES@
 
 CC=@STRUMPACK_C_COMPILER@
@@ -48,10 +47,6 @@ testPoisson3d: testPoisson3d.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testPoisson3d.o
 	$(CXX) $(LDFLAGS) testPoisson3d.o -o $@ $(LIBS)
 	$(RM) testPoisson3d.o
-testPoisson2dMPI: testPoisson2dMPI.cpp
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testPoisson2dMPI.o
-	$(CXX) $(LDFLAGS) testPoisson2dMPI.o -o $@ $(LIBS)
-	$(RM) testPoisson2dMPI.o
 testPoisson2dMPIDist: testPoisson2dMPIDist.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testPoisson2dMPIDist.o
 	$(CXX) $(LDFLAGS) testPoisson2dMPIDist.o -o $@ $(LIBS)
@@ -65,33 +60,15 @@ testMMdouble: testMMdouble.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMdouble.o
 	$(CXX) $(LDFLAGS) testMMdouble.o -o $@ $(LIBS)
 	$(RM) testMMdouble.o
-testMMdoubleMPI: testMMdoubleMPI.cpp
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMdoubleMPI.o
-	$(CXX) $(LDFLAGS) testMMdoubleMPI.o -o $@ $(LIBS)
-	$(RM) testMMdoubleMPI.o
 testMMdoubleMPIDist: testMMdoubleMPIDist.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMdoubleMPIDist.o
 	$(CXX) $(LDFLAGS) testMMdoubleMPIDist.o -o $@ $(LIBS)
 	$(RM) testMMdoubleMPIDist.o
 
-testMMdouble64: testMMdouble64.cpp
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMdouble64.o
-	$(CXX) $(LDFLAGS) testMMdouble64.o -o $@ $(LIBS)
-	$(RM) testMMdouble64.o
 testMMdoubleMPIDist64: testMMdoubleMPIDist64.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMdoubleMPIDist64.o
 	$(CXX) $(LDFLAGS) testMMdoubleMPIDist64.o -o $@ $(LIBS)
 	$(RM) testMMdoubleMPIDist64.o
-
-testMMfloat: testMMfloat.cpp
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMfloat.o
-	$(CXX) $(LDFLAGS) testMMfloat.o -o $@ $(LIBS)
-	$(RM) testMMfloat.o
-
-testMMfloatMPIDist: testMMfloatMPIDist.cpp
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o testMMfloatMPIDist.o
-	$(CXX) $(LDFLAGS) testMMfloatMPIDist.o -o $@ $(LIBS)
-	$(RM) testMMfloatMPIDist.o
 
 mtx2bin: mtx2bin.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o mtx2bin.o
@@ -116,8 +93,7 @@ KernelRegressionMPI: KernelRegressionMPI.cpp
 clean:
 	rm -f *~ *o @C_EXAMPLES@ \
 		testHelmholtz testPoisson2d testPoisson3d \
-		testMMdouble testMMdouble64 testMMfloat \
-		mtx2bin bin2mtx KernelRegression \
+		testMMdouble mtx2bin bin2mtx KernelRegression \
 		@MPI_EXAMPLES@
 
 

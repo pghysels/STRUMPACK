@@ -37,37 +37,28 @@ The examples (for now) include:
 
 - KernelRegression.py: an example showing the use of the Python,
   scikit-learn compatible interface for the kernel ridge regression
-  functionality.
+  functionality. This requires you build strumpack as a shared
+  library.
 
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${STRUMPACKROOT}/lib/
     export PYTHONPATH=$PYTHONPATH:${STRUMPACKROOT}/include/python/
     OMP_NUM_THREADS=1 python KernelRegression.py data/susy_10Kn 1.3 3.11 1 Gauss test --hss_rel_tol 1e-2
 
-- testPoisson2d: A double precision C++ example, solving the 2D
-    Poisson problem with the sequential or multithreaded solver.  Run
-    as follows, for a 1000x1000 Poisson problem with Dirichlet BCs:
-
-      ./testPoisson2d 1000
-
-- testPoisson2d: A double precision C++ example, solving the 3D
-    Poisson problem with the sequential or multithreaded solver.  Run
-    as follows, for a 100x100x100 Poisson problem with Dirichlet BCs:
-
-      ./testPoisson3d 100
-
-- testPoisson2dMPI: A double precision C++ example, solving the 2D
-    Poisson problem with the MPI solver with the input matrix,
-    right-hand side and solution vector replicated over all MPI
-    processes. Run as follows, for a 1000x1000 Poisson problem with
+- testPoisson2d/testPoisson3d: A double precision C++ example, solving
+    the 2D/3D Poisson problem with the sequential or multithreaded
+    solver.  Run as follows, for a 1000x1000 Poisson problem with
     Dirichlet BCs:
 
-      mpirun -n 4 ./testPoisson2dMPI 1000
+      ./testPoisson2d 1000
+      ./testPoisson3d 100
 
-- testPoisson2dMPIDist: A double precision C++ example, solving the 2D
-    Poisson problem with the fully distributed MPI solver.  Run as
-    follows, for a 1000x1000 Poisson problem with Dirichlet BCs:
+- testPoisson2dMPIDist/testPoisson3dMPIDist: A double precision C++
+    example, solving the 2D/3D Poisson problem with the fully
+    distributed MPI solver.  Run as follows, for a 1000x1000 Poisson
+    problem with Dirichlet BCs:
 
       mpirun -n 4 ./testPoisson2dMPIDist 1000
+      mpirun -n 4 ./testPoisson3dMPIDist 100
 
 - testMMdouble: A double precision C++ example, solving a linear
     system with a matrix given in a file in the matrix-market format,
@@ -75,14 +66,6 @@ The examples (for now) include:
     a matrix specified in the file data/pde900.mtx (provided):
 
       ./testMMdouble data/pde900.mtx
-
-- testMMdoubleMPI: A double precision C++ example, solving a linear
-    system with a matrix given in a file in the matrix-market format,
-    using the MPI solver with the input matrix, right-hand side and
-    solution vector replicated over all MPI processes.  Run as follows
-    with a matrix specified in the file pde900.mtx:
-
-      mpirun -n 4 ./testMMdoubleMPI data/pde900.mtx
 
 - testMMdoubleMPIDist: A double precision C++ example, solving a
     linear system with a matrix given in a file in the matrix-market
@@ -92,14 +75,6 @@ The examples (for now) include:
       mpirun -n 4 ./testMMdoubleMPIDist m data/pde900.mtx
       mpirun -n 4 ./testMMdoubleMPIDist b data/pde900.bin # see mtx2bin
 
-- testMMdouble64: A double precision C++ example using 64 bit integers
-    for the sparse matrix, solving a linear system with a matrix given
-    in a file in the matrix-market format, using the sequential or
-    multithreaded solver. Run as follows with
-    a matrix specified in the file pde900.mtx (provided):
-
-      ./testMMdouble64 data/pde900.mtx
-
 - testMMdoubleMPIDist64: A double precision C++ example using 64 bit
     integers for the sparse matrix, solving a linear system with a
     matrix given in a file in the matrix-market format, using the
@@ -107,7 +82,6 @@ The examples (for now) include:
     specified in the file pde900.mtx:
 
       mpirun -n 4 ./testMMdoubleMPIDist64 data/pde900.mtx
-
 
 - mtx2bin: Read a matrix in matrix market format, and print it out
    again in binary format. Run as
@@ -128,6 +102,8 @@ The examples (for now) include:
     (sexample), real double precision (dexample), complex single
     precision (cexample) and complex double precision (zexample). They
     all solve the same problem as the testPoisson2d C++ example, also
-    with the sequential/multithreaded interface.
+    with the sequential/multithreaded interface. The C interface
+    should be enabled during the STRUMPACK configure step
+    (-DSTRUMPACK_C_INTERFACE=ON).
 
       ./sexample 1000
