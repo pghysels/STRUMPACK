@@ -56,6 +56,7 @@ namespace strumpack {
     using FDMPI_t = FrontalMatrixDenseMPI<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using ExtAdd = ExtendAdd<scalar_t,integer_t>;
+    using VecVec_t = std::vector<std::vector<std::size_t>>;
     template<typename _scalar_t,typename _integer_t> friend class ExtendAdd;
 
   public:
@@ -93,8 +94,8 @@ namespace strumpack {
      int etree_level=0) const override;
 
     void extract_CB_sub_matrix_2d
-    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-     DistM_t& B) const override;
+    (const VecVec_t& I, const VecVec_t& J,
+     std::vector<DistM_t>& B) const override;
 
     std::string type() const override { return "FrontalMatrixDenseMPI"; }
 
@@ -280,18 +281,24 @@ namespace strumpack {
    */
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
-  (const std::vector<std::size_t>& I,
-   const std::vector<std::size_t>& J, DistM_t& B) const {
-    if (Comm().is_null()) return;
-    std::vector<std::size_t> lJ, oJ, lI, oI;
-    this->find_upd_indices(J, lJ, oJ);
-    this->find_upd_indices(I, lI, oI);
+  (const VecVec_t& I, const VecVec_t& J, std::vector<DistM_t>& B) const {
+    if (Comm().is_null() || !this->dim_upd()) return;
+    TIMER_TIME(TaskType::HSS_EXTRACT_SCHUR, 3, t_ex_schur);
+    auto nB = I.size();
+    std::vector<std::vector<std::size_t>> lI(nB), lJ(nB), oI(nB), oJ(nB);
     std::vector<std::vector<scalar_t>> sbuf(this->P());
-    ExtAdd::extract_copy_to_buffers(F22_, lI, lJ, oI, oJ, B, sbuf);
+    for (std::size_t i=0; i<nB; i++) {
+      this->find_upd_indices(I[i], lI[i], oI[i]);
+      this->find_upd_indices(J[i], lJ[i], oJ[i]);
+      ExtAdd::extract_copy_to_buffers
+        (F22_, lI[i], lJ[i], oI[i], oJ[i], B[i], sbuf);
+    }
     std::vector<scalar_t> rbuf;
     std::vector<scalar_t*> pbuf;
     Comm().all_to_all_v(sbuf, rbuf, pbuf);
-    ExtAdd::extract_copy_from_buffers(B, lI, lJ, oI, oJ, F22_, pbuf);
+    for (std::size_t i=0; i<nB; i++)
+      ExtAdd::extract_copy_from_buffers
+        (B[i], lI[i], lJ[i], oI[i], oJ[i], F22_, pbuf);
   }
 
   /**
