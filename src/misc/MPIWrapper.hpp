@@ -455,11 +455,12 @@ namespace strumpack {
      * received from different ranks start
      * \see all_to_all_v
      */
-    template<typename T> void all_to_all_v
-    (std::vector<std::vector<T>>& sbuf, std::vector<T>& rbuf,
+    template<typename T, typename A=std::allocator<T>> void all_to_all_v
+    (std::vector<std::vector<T>>& sbuf, std::vector<T,A>& rbuf,
      std::vector<T*>& pbuf) const {
       all_to_all_v(sbuf, rbuf, pbuf, mpi_type<T>());
     }
+
 
     /**
      * Perform an MPI_Alltoallv. Each rank sends sbuf[i] to process
@@ -478,8 +479,9 @@ namespace strumpack {
      * parameter T
      * \see all_to_all_v
      */
-    template<typename T> void all_to_all_v
-    (std::vector<std::vector<T>>& sbuf, std::vector<T>& rbuf,
+    template<typename T, typename A=std::allocator<T>>
+    void all_to_all_v
+    (std::vector<std::vector<T>>& sbuf, std::vector<T,A>& rbuf,
      std::vector<T*>& pbuf, const MPI_Datatype Ttype) const {
       assert(sbuf.size() == std::size_t(size()));
       auto P = size();
@@ -538,7 +540,6 @@ namespace strumpack {
           pbuf[p] = rbuf.data() + rdispl[p];
       }
     }
-
 
     /**
      * Return a subcommunicator with P ranks, starting from rank P0,

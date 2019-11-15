@@ -140,7 +140,7 @@ namespace strumpack {
         delete[] destr;
         MPI_Datatype triplet_type;
         create_triplet_mpi_type<scalar_t>(&triplet_type);
-        std::vector<Triplet<scalar_t>> rbuf;
+        std::vector<Triplet<scalar_t>,NoInit<Triplet<scalar_t>>> rbuf;
         std::vector<Triplet<scalar_t>*> pbuf;
         comm.all_to_all_v(sbuf, rbuf, pbuf, triplet_type);
         MPI_Type_free(&triplet_type);
@@ -233,7 +233,7 @@ namespace strumpack {
         }
         MPI_Datatype triplet_type;
         create_triplet_mpi_type<scalar_t>(&triplet_type);
-        std::vector<Triplet<scalar_t>> rbuf;
+        std::vector<Triplet<scalar_t>,NoInit<Triplet<scalar_t>>> rbuf;
         std::vector<Triplet<scalar_t>*> pbuf;
         comm.all_to_all_v(sbuf, rbuf, pbuf, triplet_type);
         MPI_Type_free(&triplet_type);

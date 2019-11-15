@@ -595,7 +595,7 @@ namespace strumpack {
                  p=std::get<2>(glp[r-R2Drlo]); c<R2Dchi; c++)
             sbuf[p].push_back(R2D(lr,c));
       }
-      std::vector<scalar_t> rbuf;
+      std::vector<scalar_t,NoInit<scalar_t>> rbuf;
       std::vector<scalar_t*> pbuf;
       c_.all_to_all_v(sbuf, rbuf, pbuf);
       if (lrows) {
@@ -650,7 +650,7 @@ namespace strumpack {
                  pr=std::get<2>(glp[r]); c<cols; c++)
             sbuf[pr+pc[c]].push_back(S1D(lr,c));
       }
-      std::vector<scalar_t> rbuf;
+      std::vector<scalar_t,NoInit<scalar_t>> rbuf;
       std::vector<scalar_t*> pbuf;
       c_.all_to_all_v(sbuf, rbuf, pbuf);
       if (S2D.active()) {

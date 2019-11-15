@@ -43,6 +43,7 @@
 #include <omp.h>
 #endif
 
+#include "misc/Tools.hpp"
 #include "misc/RandomWrapper.hpp"
 #include "misc/TaskTimer.hpp"
 #include "BLASLAPACKWrapper.hpp"

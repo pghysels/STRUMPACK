@@ -203,7 +203,7 @@ namespace strumpack {
       rchild_->skinny_ea_to_buffers(cSrr, seqSrr, sbuf, this);
       rchild_->skinny_ea_to_buffers(cScr, seqScr, sbuf, this);
     }
-    std::vector<scalar_t> rbuf;
+    std::vector<scalar_t,NoInit<scalar_t>> rbuf;
     std::vector<scalar_t*> pbuf;
     Comm().all_to_all_v(sbuf, rbuf, pbuf);
     if (lchild_) {
@@ -451,7 +451,7 @@ namespace strumpack {
       }
       ExtAdd::extend_copy_to_buffers(e_vec[i], oI[i], oJ[i], B[i], sbuf);
     }
-    std::vector<scalar_t> rbuf;
+    std::vector<scalar_t,NoInit<scalar_t>> rbuf;
     std::vector<scalar_t*> pbuf;
     Comm().all_to_all_v(sbuf, rbuf, pbuf);
     for (std::size_t i=0; i<nB; i++)

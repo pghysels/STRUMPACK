@@ -277,7 +277,7 @@ namespace strumpack {
             (Brseq[i], B[i], bgrid[3*i], bgrid[3*i+1], bgrid[3*i+2], sbuf);
       }
     }
-    std::vector<scalar_t> rbuf;
+    std::vector<scalar_t,NoInit<scalar_t>> rbuf;
     std::vector<scalar_t*> pbuf;
     Comm().all_to_all_v(sbuf, rbuf, pbuf);
     BLACSGrid *gl = nullptr, *gr = nullptr;
@@ -360,7 +360,7 @@ namespace strumpack {
       lchild_->extend_add_column_copy_to_buffers(CBl, seqCBl, sbuf, this);
     if (visit(rchild_))
       rchild_->extend_add_column_copy_to_buffers(CBr, seqCBr, sbuf, this);
-    std::vector<scalar_t> rbuf;
+    std::vector<scalar_t,NoInit<scalar_t>> rbuf;
     std::vector<scalar_t*> pbuf;
     Comm().all_to_all_v(sbuf, rbuf, pbuf);
     for (auto& ch : {lchild_.get(), rchild_.get()})
@@ -385,7 +385,7 @@ namespace strumpack {
     for (auto ch : {lchild_.get(), rchild_.get()})
       if (ch) ch->extract_column_copy_to_buffers
                 (b, bupd, master(ch), sbuf, this);
-    std::vector<scalar_t> rbuf;
+    std::vector<scalar_t,NoInit<scalar_t>> rbuf;
     std::vector<scalar_t*> pbuf;
     Comm().all_to_all_v(sbuf, rbuf, pbuf);
     if (visit(lchild_))

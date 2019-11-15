@@ -185,7 +185,7 @@ namespace strumpack {
       {
         std::vector<std::vector<scalar_t>> sbuf(Comm().size());
         redistribute_to_tree_to_buffers(A, 0, 0, sbuf);
-        std::vector<scalar_t> rbuf;
+        std::vector<scalar_t,NoInit<scalar_t>> rbuf;
         std::vector<scalar_t*> pbuf;
         Comm().all_to_all_v(sbuf, rbuf, pbuf);
         redistribute_to_tree_from_buffers(A, 0, 0, pbuf);

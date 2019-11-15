@@ -133,7 +133,7 @@ namespace strumpack {
       MPI_Datatype quadlet_type;
       MPI_Type_contiguous(sizeof(Quadlet), MPI_BYTE, &quadlet_type);
       MPI_Type_commit(&quadlet_type);
-      std::vector<Quadlet> rbuf;
+      std::vector<Quadlet,NoInit<Quadlet>> rbuf;
       std::vector<Quadlet*> pbuf;
       Comm().all_to_all_v(sbuf, rbuf, pbuf, quadlet_type);
       MPI_Type_free(&quadlet_type);

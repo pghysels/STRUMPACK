@@ -40,6 +40,7 @@
 
 namespace strumpack {
 
+  // TODO remove this
   inline bool mpi_root() {
 #if defined(STRUMPACK_USE_MPI)
     int flag;
@@ -50,6 +51,19 @@ namespace strumpack {
     return true;
 #endif
   }
+
+  template<typename T> class NoInit {
+  public:
+    using value_type = T;
+    value_type* allocate(std::size_t n)
+    { return static_cast<value_type*>(::operator new(n*sizeof(value_type))); }
+    void deallocate(T* p, std::size_t) noexcept { ::operator delete(p); }
+    template <class U, class ...Args> void construct(U* /*p*/) { }
+    template <class U, class ...Args> void construct(U* p, Args&& ...args) {
+      ::new(p) U(std::forward<Args>(args)...);
+    }
+  };
+
 
   // this sorts both indices and values at the same time
   template<typename scalar_t,typename integer_t> void
