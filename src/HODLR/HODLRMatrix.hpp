@@ -35,7 +35,6 @@
 
 #include <cassert>
 #include <algorithm>
-#include <queue>
 
 #include "HSS/HSSPartitionTree.hpp"
 #include "kernel/Kernel.hpp"
@@ -710,31 +709,25 @@ namespace strumpack {
       { //TIMER_TIME(TaskType::NEIGHBOR_SEARCH, 0, t_knn);
         nns.fill(0);
         std::vector<bool> mark(rows_, false);
-        std::vector<int> marked;
-        marked.reserve(knn+1);
+        std::vector<int> q(knn);
         for (int i=0; i<rows_; i++) {
-          std::queue<int> q;
-          q.push(i);  // start a breadth-first search from node i
+          int qfront = 0, qback = 0;
+          q[qback] = i;
           mark[i] = true;
-          marked.push_back(i);
-          int ki = 0;
-          while (ki < knn && !q.empty()) {
-            auto k = q.front();
-            q.pop();
+          while (qback < knn && qfront != qback+1) {
+            auto k = q[qfront++];
             const auto hi = graph.ind() + graph.ptr(k+1);
             for (auto pl=graph.ind()+graph.ptr(k); pl!=hi; pl++) {
               auto l = *pl;
               if (!mark[l]) {
-                nns(ki++, i) = l+1; // found a new neighbor
-                if (ki == knn) break;
-                q.push(l);
+                nns(qback++, i) = l+1; // found a new neighbor
+                if (qback == knn) break;
+                q[qback] = l;
                 mark[l] = true;
-                marked.push_back(l);
               }
             }
           }
-          for (auto l : marked) mark[l] = false;
-          marked.clear();
+          for (int l=0; l<qback; l++) mark[q[l]] = false;
         }
       }
       { //TIMER_TIME(TaskType::CONSTRUCT_INIT, 0, t_construct_h);

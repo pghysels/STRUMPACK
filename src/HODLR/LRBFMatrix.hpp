@@ -33,7 +33,6 @@
 #define STRUMPACK_LRBF_MATRIX_HPP
 
 #include <cassert>
-#include <queue>
 
 #include "HSS/HSSPartitionTree.hpp"
 #include "dense/DistributedMatrix.hpp"
@@ -230,62 +229,53 @@ namespace strumpack {
       //TIMER_TIME(TaskType::NEIGHBOR_SEARCH, 0, t_knn);
       int rows = gA.size();
       DenseMatrix<int> nns(knn, rows);
+      nns.fill(0);
       std::vector<bool> rmark(rows), cmark(gB.size());
-      std::vector<int> rmarked, cmarked;
-      rmarked.reserve(knn);
-      cmarked.reserve(knn);
+      std::vector<int> rq(rows), cq(knn);
       for (int i=0; i<rows; i++) {
-        std::queue<int> rq, cq;
-        int ki = 0;
-        rq.push(i);
+        int rqfront = 0, rqback = 0, cqfront = 0, cqback = 0;
+        rq[rqback] = i;
         rmark[i] = true;
-        while (ki < knn && (!rq.empty() || !cq.empty())) {
-          if (!rq.empty()) {
-            auto k = rq.front();
-            rq.pop();
+        while (cqback < knn && (rqfront != rqback+1 || cqfront != cqback+1)) {
+          if (rqfront != rqback+1) {
+            auto k = rq[rqfront++];
             auto hi = gAB.ind() + gAB.ptr(k+1);
             for (auto pl=gAB.ind()+gAB.ptr(k); pl!=hi; pl++) {
               auto l = *pl;
               if (!cmark[l]) {
-                nns(ki++, i) = l+1;
-                if (ki == knn) break;
-                cq.push(l);
+                nns(cqback++, i) = l+1;
+                if (cqback == knn) break;
                 cmark[l] = true;
-                cmarked.push_back(l);
+                cq[cqback] = l;
               }
             }
-            if (ki == knn) break;
+            if (cqback == knn) break;
             hi = gA.ind() + gA.ptr(k+1);
             for (auto pl=gA.ind()+gA.ptr(k); pl!=hi; pl++) {
               auto l = *pl;
               if (!rmark[l]) {
-                rq.push(l);
                 rmark[l] = true;
-                rmarked.push_back(l);
+                rqback++;
+                rq[rqback] = l;
               }
             }
           }
-          if (!cq.empty()) {
-            auto k = cq.front();
-            cq.pop();
+          if (cqfront != cqback+1) {
+            auto k = cq[cqfront++];
             auto hi = gB.ind() + gB.ptr(k+1);
             for (auto pl=gB.ind()+gB.ptr(k); pl!=hi; pl++) {
               auto l = *pl;
               if (!cmark[l]) {
-                nns(ki++, i) = l+1;
-                if (ki == knn) break;
-                cq.push(l);
+                nns(cqback++, i) = l+1;
+                if (cqback == knn) break;
                 cmark[l] = true;
-                cmarked.push_back(l);
+                cq[cqback] = l;
               }
             }
           }
         }
-        rmark[i] = false;
-        for (auto l : rmarked) rmark[l] = false;
-        for (auto l : cmarked) cmark[l] = false;
-        rmarked.clear();
-        cmarked.clear();
+        for (int l=0; l<cqback; l++) cmark[cq[l]] = false;
+        for (int l=0; l<rqback; l++) rmark[rq[l]] = false;
       }
       return nns;
     }
