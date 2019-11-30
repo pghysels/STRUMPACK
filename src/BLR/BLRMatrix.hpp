@@ -173,6 +173,9 @@ namespace strumpack {
       BLR_gemm_trsmUNN
       (const BLRMatrix<T>& F1, const BLRMatrix<T>& F2,
        DenseMatrix<T>& B1, DenseMatrix<T>& B2, int task_depth);
+
+      template<typename T> friend void draw
+      (const BLRMatrix<T>& H, const std::string& name);
     };
 
 
@@ -941,15 +944,27 @@ namespace strumpack {
                  scalar_t(1.), bj, task_depth);
           trsm(s, ul, ta, d, alpha, a.tile(j, j), bj, task_depth);
         }
-      } else if (s == Side::L && ul == UpLo::L) {
-        for (std::size_t j=0; j<a.colblocks(); j++) {
-          DMW_t bj(a.tilecols(j), b.cols(), b, a.tilecoff(j), 0);
-          for (std::size_t k=0; k<j; k++)
-            gemm(ta, Trans::N, scalar_t(-1.),
-                 ta==Trans::N ? a.tile(j, k) : a.tile(k, j),
-                 DMW_t(a.tilecols(k), b.cols(), b, a.tilecoff(k), 0),
-                 scalar_t(1.), bj, task_depth);
-          trsm(s, ul, ta, d, alpha, a.tile(j, j), bj, task_depth);
+      } else if (s == Side::L) {
+        if (ul == UpLo::L) {
+          for (std::size_t j=0; j<a.colblocks(); j++) {
+            DMW_t bj(a.tilecols(j), b.cols(), b, a.tilecoff(j), 0);
+            for (std::size_t k=0; k<j; k++)
+              gemm(ta, Trans::N, scalar_t(-1.),
+                   ta==Trans::N ? a.tile(j, k) : a.tile(k, j),
+                   DMW_t(a.tilecols(k), b.cols(), b, a.tilecoff(k), 0),
+                   scalar_t(1.), bj, task_depth);
+            trsm(s, ul, ta, d, alpha, a.tile(j, j), bj, task_depth);
+          }
+        } else {
+          for (int j=a.colblocks()-1; j>=0; j--) {
+            DMW_t bj(a.tilecols(j), b.cols(), b, a.tilecoff(j), 0);
+            for (std::size_t k=j+1; k<a.colblocks(); k++)
+              gemm(ta, Trans::N, scalar_t(-1.),
+                   ta==Trans::N ? a.tile(j, k) : a.tile(k, j),
+                   DMW_t(a.tilecols(k), b.cols(), b, a.tilecoff(k), 0),
+                   scalar_t(1.), bj, task_depth);
+            trsm(s, ul, ta, d, alpha, a.tile(j, j), bj, task_depth);
+          }
         }
       } else { assert(false); }
     }
@@ -1047,6 +1062,18 @@ namespace strumpack {
          const DenseMatrix<scalar_t>& B, scalar_t beta,
          DenseMatrix<scalar_t>& C, int task_depth) {
       std::cout << "TODO gemm BLR*Dense+Dense" << std::endl;
+    }
+
+    template<typename scalar_t>
+    void draw(const BLRMatrix<scalar_t>& B, const std::string& name) {
+      std::ofstream of("plot" + name + ".gnuplot");
+      of << "set terminal pdf enhanced color size 5,4" << std::endl;
+      of << "set output '" << name << ".pdf'" << std::endl;
+      B.draw(of, 0, 0);
+      of << "set xrange [0:" << B.cols() << "]" << std::endl;
+      of << "set yrange [" << B.rows() << ":0]" << std::endl;
+      of << "plot x lt -1 notitle" << std::endl;
+      of.close();
     }
 
   } // end namespace BLR
