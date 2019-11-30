@@ -11,6 +11,7 @@ option(STRUMPACK_USE_OPENMP "Use OpenMP for on-node threading tasking" ON)
 ## we don't have any CUDA kernels yet, see also TPL_ENABLE_CUBLAS
 # option(STRUMPACK_USE_CUDA "Use CUDA (language) for GPU support" OFF)
 
+option(TPL_ENABLE_SLATE "Use SLATE, the ECP ScaLAPACK replacement" OFF)
 option(TPL_ENABLE_CUBLAS "Build with support for cuBLAS/cuSOLVER" OFF)
 option(TPL_ENABLE_PARMETIS "Build with support for ParMetis" OFF)
 option(TPL_ENABLE_SCOTCH "Build with support for Scotch/PTScotch" OFF)
@@ -277,6 +278,24 @@ if(TPL_ENABLE_PAPI)
   endif()
 else()
   message(STATUS "Building STRUMPACK without PAPI support.")
+endif()
+
+if(TPL_ENABLE_SLATE)
+  message(STATUS "Enabling SLATE")
+  # option(STRUMPACK_USE_SLATE_LAPACK "" ON)
+  # option(STRUMPACK_USE_SLATE_SCALAPACK "" ON)
+  if(DEFINED TPL_SLATE_LIBRARIES)
+    set(LIBS ${LIBS} ${TPL_SLATE_LIBRARIES})
+    include_directories(${TPL_SLATE_INCLUDE_DIRS})
+    ## TODO do we need to add other definitions???
+    # if(STRUMPACK_USE_MPI)
+    #   add_definitions(-DSLATE_WITH_MPI)
+    #   message(STATUS "compile definitions" "${COMPILE_DEFINITIONS}")
+    # endif()
+  else()
+    message(WARNING "Could not find SLATE,"
+     " please define TPL_SLATE_LIBRARIES and TPL_SLATE_INCLUDE_DIRS")
+  endif()
 endif()
 
 if(STRUMPACK_USE_MPI)

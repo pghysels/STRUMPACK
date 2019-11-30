@@ -317,7 +317,9 @@ namespace strumpack {
           compress_flops_Schur(invf11_mult_flops);
         };
       HODLR::LRBFMatrix<scalar_t> Schur(*F22_, *F22_);
-      Schur.compress(sample_Schur);
+      { TIMER_TIME(TaskType::HSS_COMPUTE_SCHUR, 0, t_schur_compress);
+	Schur.compress(sample_Schur);
+      }
       auto extract_F22 =
         [&](VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
             HODLR::ExtractionMeta& e) {
@@ -326,7 +328,7 @@ namespace strumpack {
           this->extract_2d(A, I, J, B);
           Schur.extract_add_elements(e, B);
         };
-      TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_f22_compress);
+      TIMER_TIME(TaskType::HSS_COMPRESS_22, 0, t_f22_compress);
       F22_->compress(extract_F22);
       compress_flops_F22();
     }
@@ -584,8 +586,11 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::construct_hierarchy
   (const SpMat_t& A, const Opts_t& opts) {
+    TIMER_TIME(TaskType::CONSTRUCT_HIERARCHY, 0, t_construct_h);
+    TIMER_TIME(TaskType::EXTRACT_GRAPH, 0, t_graph_11);
     auto g = A.extract_graph
       (opts.separator_ordering_level(), sep_begin_, sep_end_);
+    TIMER_STOP(t_graph_11);
     F11_ = HODLR::HODLRMatrix<scalar_t>
       (Comm(), sep_tree_, g, opts.HODLR_options());
     if (dim_upd()) {
@@ -593,14 +598,18 @@ namespace strumpack {
       CB_tree.refine(opts.HODLR_options().leaf_size());
       if (opts.HODLR_options().compression_algorithm() ==
           HODLR::CompressionAlgorithm::ELEMENT_EXTRACTION) {
+	TIMER_TIME(TaskType::EXTRACT_GRAPH, 0, t_graph_22);
         auto gCB = A.extract_graph_CB(opts.separator_ordering_level(), this->upd());
+	TIMER_STOP(t_graph_22);
         F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
           (new HODLR::HODLRMatrix<scalar_t>
            (Comm(), CB_tree, gCB, opts.HODLR_options()));
+	TIMER_TIME(TaskType::EXTRACT_GRAPH, 0, t_graph_1221);
         auto g12 = A.extract_graph_sep_CB
           (opts.separator_ordering_level(), sep_begin_, sep_end_, this->upd());
         auto g21 = A.extract_graph_CB_sep
           (opts.separator_ordering_level(), sep_begin_, sep_end_, this->upd());
+        TIMER_STOP(t_graph_1221);
         auto knn = opts.HODLR_options().knn_lrbf();
         auto nns12 = HODLR::get_odiag_neighbors(knn, g12, g, gCB);
         auto nns21 = HODLR::get_odiag_neighbors(knn, g21, gCB, g);

@@ -115,18 +115,18 @@ void TaskTimer::print_name(std::ostream& os) {
     case TaskType::FRONT_MULTIPLY_2D:     os << "FRONT_MULTIPLY_2D"; break;
     case TaskType::UUTXR:                 os << "UUTXR"; break;
     case TaskType::F22_MULT:              os << "F22_MULT"; break;
-    case TaskType::HSS_SCHUR_PRODUCT:
-      os << "HSS_SCHUR_PRODUCT"; break;
-    case TaskType::SKINNY_EXTEND_ADD_SEQSEQ:
-      os << "SKINNY_EXTEND_ADD_SEQSEQ"; break;
-    case TaskType::SKINNY_EXTEND_ADD_SEQ1:
-      os << "SKINNY_EXTEND_ADD_SEQ1"; break;
-    case TaskType::SKINNY_EXTEND_ADD_MPIMPI:
-      os << "SKINNY_EXTEND_ADD_MPIMPI"; break;
-    case TaskType::SKINNY_EXTEND_ADD_MPI1:
-      os << "SKINNY_EXTEND_ADD_MPI1"; break;
+    case TaskType::HSS_SCHUR_PRODUCT:     os << "HSS_SCHUR_PRODUCT"; break;
+    case TaskType::SKINNY_EXTEND_ADD_SEQSEQ: os << "SKINNY_EXTEND_ADD_SEQSEQ"; break;
+    case TaskType::SKINNY_EXTEND_ADD_SEQ1:   os << "SKINNY_EXTEND_ADD_SEQ1"; break;
+    case TaskType::SKINNY_EXTEND_ADD_MPIMPI: os << "SKINNY_EXTEND_ADD_MPIMPI"; break;
+    case TaskType::SKINNY_EXTEND_ADD_MPI1:   os << "SKINNY_EXTEND_ADD_MPI1"; break;
     case TaskType::HSS_COMPRESS:          os << "HSS_COMPRESS"; break;
+    case TaskType::HSS_COMPRESS_22:       os << "HSS_COMPRESS_22"; break;
     case TaskType::LRBF_COMPRESS:         os << "LRBF_COMPRESS"; break;
+    case TaskType::CONSTRUCT_HIERARCHY:   os << "CONSTRUCT_HIERARCHY"; break;
+    case TaskType::CONSTRUCT_INIT:        os << "CONSTRUCT_INIT"; break;
+    case TaskType::CONSTRUCT_PTREE:       os << "CONSTRUCT_PTREE"; break;
+    case TaskType::NEIGHBOR_SEARCH:       os << "NEIGHBOR_SEARCH"; break;
     case TaskType::HSS_PARHQRINTERPOL:    os << "HSS_PARHQRINTERPOL"; break;
     case TaskType::HSS_SEQHQRINTERPOL:    os << "HSS_SEQHQRINTERPOL"; break;
     case TaskType::EXTRACT_2D:            os << "EXTRACT_2D"; break;
@@ -331,7 +331,13 @@ void TimerList::finalize() {
     // print_line("       skinny_extend_add_m  ",
     //            TaskType::SKINNY_EXTEND_ADD_MPI1);
     std::cout << hline;
-    print_line(" HSS_compress               ", TaskType::HSS_COMPRESS);
+    print_line(" H_compress                 ", TaskType::HSS_COMPRESS);
+    print_line(" H_compress_22              ", TaskType::HSS_COMPRESS_22);
+    print_line(" Construct_hierarchy        ", TaskType::CONSTRUCT_HIERARCHY);
+    print_line("    Extract_graph           ", TaskType::EXTRACT_GRAPH);
+    print_line("    Neighbor_search         ", TaskType::NEIGHBOR_SEARCH);
+    print_line("    Construct_ptree         ", TaskType::CONSTRUCT_PTREE);
+    print_line("    Construct_init          ", TaskType::CONSTRUCT_INIT);
     print_line(" LRBF_compress              ", TaskType::LRBF_COMPRESS);
     print_line("    HSS_parHQRInterpol      ", TaskType::HSS_PARHQRINTERPOL);
     print_line("    HSS_seqHQRInterpol      ", TaskType::HSS_SEQHQRINTERPOL);
@@ -343,7 +349,7 @@ void TimerList::finalize() {
     print_line("    extract_2d              ", TaskType::EXTRACT_2D);
     print_line("       extract_sep_2d       ", TaskType::EXTRACT_SEP_2D);
     print_line("       get_submatrix_2d     ", TaskType::GET_SUBMATRIX_2D);
-    print_line("          HSS_extract_Schur ", TaskType::HSS_EXTRACT_SCHUR);
+    print_line("       HSS_extract_Schur    ", TaskType::HSS_EXTRACT_SCHUR);
     print_line("       get_submatrix        ", TaskType::GET_SUBMATRIX);
     std::cout << hline;
     print_line(" Partial_factor             ",

@@ -39,10 +39,12 @@ namespace strumpack {
 
     template<> void HODLR_createptree<double>
     (int& P, int* groups, MPI_Fint comm, F2Cptr& ptree) {
+      TIMER_TIME(TaskType::CONSTRUCT_PTREE, 0, t_construct_h);
       d_c_bpack_createptree(&P, groups, &comm, &ptree);
     }
     template<> void HODLR_createptree<std::complex<double>>
     (int& P, int* groups, MPI_Fint comm, F2Cptr& ptree) {
+      TIMER_TIME(TaskType::CONSTRUCT_PTREE, 0, t_construct_h);
       z_c_bpack_createptree(&P, groups, &comm, &ptree);
     }
 
