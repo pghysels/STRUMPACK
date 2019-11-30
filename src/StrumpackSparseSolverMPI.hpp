@@ -270,17 +270,13 @@ namespace strumpack {
       }
 #endif
 #if defined(STRUMPACK_COUNT_FLOPS)
-      long long int flopsbytes[2] = { params::flops - this->f0_,
-                                      params::bytes - this->b0_ };
+      auto df = params::flops - this->f0_;
+      long long int flopsbytes[2] = {df, params::bytes - this->b0_};
       comm_.all_reduce(flopsbytes, 2, MPI_SUM);
       this->ftot_ = flopsbytes[0];
       this->btot_ = flopsbytes[1];
-      flopsbytes[0] = params::flops - this->f0_;
-      comm_.all_reduce(flopsbytes, 2, MPI_MIN);
-      this->fmin_ = flopsbytes[0];
-      flopsbytes[0] = params::flops - this->f0_;
-      comm_.all_reduce(flopsbytes, 2, MPI_MAX);
-      this->fmax_ = flopsbytes[0];
+      this->fmin_ = comm_.all_reduce(df, MPI_MIN);
+      this->fmax_ = comm_.all_reduce(df, MPI_MAX);
 #endif
     }
   }
