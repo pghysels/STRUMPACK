@@ -261,6 +261,11 @@ namespace strumpack {
         return BPACK_get_stat<scalar_t>(stats_, name);
       }
 
+      void print_stats() {
+        if (!stats_) return;
+        HODLR_printstats<scalar_t>(stats_, ptree_);
+      }
+
       /**
        * Construct the compressed HODLR representation of the matrix,
        * using only a matrix-(multiple)vector multiplication routine.
@@ -752,7 +757,7 @@ namespace strumpack {
       HODLR_createstats<scalar_t>(stats_);
 
       // set hodlr options
-      HODLR_set_I_option<scalar_t>(options_, "verbosity", opts.verbose() ? 2 : -1);
+      HODLR_set_I_option<scalar_t>(options_, "verbosity", opts.verbose() ? 2 : -2);
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
       HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
       // set RecLR_leaf to 2 for RRQR at bottom level of Hierarchical BACA

@@ -68,6 +68,12 @@ namespace strumpack {
     template<> void HODLR_printoptions<double>(F2Cptr& options, F2Cptr& ptree);
     template<> void HODLR_printoptions<std::complex<double>>(F2Cptr& options, F2Cptr& ptree);
 
+    template<typename scalar_t> void HODLR_printstats(F2Cptr& stats, F2Cptr& ptree) {
+      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
+    }
+    template<> void HODLR_printstats<double>(F2Cptr& stats, F2Cptr& ptree);
+    template<> void HODLR_printstats<std::complex<double>>(F2Cptr& stats, F2Cptr& ptree);
+
     template<typename scalar_t> void HODLR_createstats(F2Cptr& stats) {
       std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
     }

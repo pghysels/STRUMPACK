@@ -126,6 +126,11 @@ namespace strumpack {
         return BPACK_get_stat<scalar_t>(stats_, name);
       }
 
+      void print_stats() {
+        if (!stats_) return;
+        HODLR_printstats<scalar_t>(stats_, ptree_);
+      }
+
       DistM_t dense(const BLACSGrid* g) const;
 
       DenseM_t redistribute_2D_to_1D

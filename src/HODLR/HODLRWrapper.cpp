@@ -67,6 +67,13 @@ namespace strumpack {
       z_c_bpack_printoption(&options, &ptree);
     }
 
+    template<> void HODLR_printstats<double>(F2Cptr& stats, F2Cptr& ptree) {
+      d_c_bpack_printstats(&stats, &ptree);
+    }
+    template<> void HODLR_printstats<std::complex<double>>(F2Cptr& stats, F2Cptr& ptree) {
+      z_c_bpack_printstats(&stats, &ptree);
+    }
+
     template<> void HODLR_createstats<double>(F2Cptr& stats) {
       d_c_bpack_createstats(&stats);
     }
