@@ -711,7 +711,7 @@ namespace strumpack {
       int knn = opts.knn_hodlrbf();
       HODLR_set_I_option<scalar_t>(options_, "knn", knn);
       DenseMatrix<int> nns(knn, rows_);
-      { //TIMER_TIME(TaskType::NEIGHBOR_SEARCH, 0, t_knn);
+      { TIMER_TIME(TaskType::NEIGHBOR_SEARCH, 0, t_knn);
         nns.fill(0);
         std::vector<bool> mark(rows_, false);
         std::vector<int> q(knn);
@@ -735,7 +735,7 @@ namespace strumpack {
           for (int l=0; l<qback; l++) mark[q[l]] = false;
         }
       }
-      { //TIMER_TIME(TaskType::CONSTRUCT_INIT, 0, t_construct_h);
+      { TIMER_TIME(TaskType::CONSTRUCT_INIT, 0, t_construct_h);
         HODLR_construct_init<scalar_t>
           (rows_, 0, nullptr, nns.data(), lvls_-1, leafs_.data(), perm_.data(),
            lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,

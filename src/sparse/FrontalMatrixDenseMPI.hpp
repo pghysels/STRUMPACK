@@ -42,6 +42,11 @@
 #include "FrontalMatrixDense.hpp"
 #include "FrontalMatrixBLR.hpp"
 
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+#define LAPACK_COMPLEX_CPP
+#include <slate/slate.hh>
+#endif
+
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t> class ExtractFront;
@@ -102,6 +107,16 @@ namespace strumpack {
   private:
     DistM_t F11_, F12_, F21_, F22_;
     std::vector<int> piv;
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+    slate::Matrix<scalar_t> slateF11_, slateF12_, slateF21_, slateF22_;
+    slate::Pivots slate_piv_;
+    //#if defined(STRUMPACK_USE_CUDA)
+    // std::map<slate::Option, slate::Value> slate_opts_ =
+    //   {{slate::Option::Target, slate::Target::Devices}};
+    //#else
+    std::map<slate::Option, slate::Value> slate_opts_;
+    //#endif
+#endif
 
     using FrontalMatrix<scalar_t,integer_t>::lchild_;
     using FrontalMatrix<scalar_t,integer_t>::rchild_;
@@ -115,7 +130,11 @@ namespace strumpack {
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd, const MPIComm& comm, int P)
     : FrontalMatrixMPI<scalar_t,integer_t>
-    (sep, sep_begin, sep_end, upd, comm, P) {}
+    (sep, sep_begin, sep_end, upd, comm, P) {
+    // slate_opts_.insert({slate::Option::Target, slate::Target::Devices});
+    // auto it_bool = slate_opts_.insert({slate::Option::Lookahead, slate::Value(1)});
+    // std::cout << "insertion success " << (it_bool.second ? " YES" : "NO") << std::endl;
+  }
 
 
   template<typename scalar_t,typename integer_t> void
@@ -168,18 +187,50 @@ namespace strumpack {
       F22_.zero();
     }
     extend_add();
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+    if (Comm().is_root())
+      std::cout << "creating slate, dsep=" << dsep << " dupd=" << dupd << std::endl;
+    if (dsep) {
+      slateF11_ = slate::Matrix<scalar_t>::fromScaLAPACK
+        (F11_.rows(), F11_.cols(), F11_.data(), F11_.ld(),
+         F11_.MB(), F11_.nprows(), F11_.npcols(), F11_.comm());
+      if (dupd) {
+        slateF12_ = slate::Matrix<scalar_t>::fromScaLAPACK
+          (F12_.rows(), F12_.cols(), F12_.data(), F12_.ld(),
+           F12_.MB(), F12_.nprows(), F12_.npcols(), F12_.comm());
+        slateF21_ = slate::Matrix<scalar_t>::fromScaLAPACK
+          (F21_.rows(), F21_.cols(), F21_.data(), F21_.ld(),
+           F21_.MB(), F21_.nprows(), F21_.npcols(), F21_.comm());
+      }
+    }
+    if (dupd)
+      slateF22_ = slate::Matrix<scalar_t>::fromScaLAPACK
+        (F22_.rows(), F22_.cols(), F22_.data(), F22_.ld(),
+         F22_.MB(), F22_.nprows(), F22_.npcols(), F22_.comm());
+#endif
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::partial_factorization() {
     if (this->dim_sep() && grid()->active()) {
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+      slate::getrf(slateF11_, slate_piv_, slate_opts_);
+#else
       piv = F11_.LU();
+#endif
       STRUMPACK_FULL_RANK_FLOPS(LU_flops(F11_));
       if (this->dim_upd()) {
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+	slate::getrs(slateF11_, slate_piv_, slateF12_, slate_opts_);
+	STRUMPACK_FULL_RANK_FLOPS(LU_flops(F11_));
+	slate::gemm(scalar_t(-1.), slateF21_, slateF12_,
+                    scalar_t(1.), slateF22_, slate_opts_);
+#else
         F12_.laswp(piv, true);
         trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11_, F12_);
         trsm(Side::R, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11_, F21_);
         gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.), F22_);
+#endif
         STRUMPACK_FULL_RANK_FLOPS
           (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.)) +
            trsm_flops(Side::L, scalar_t(1.), F11_, F12_) +
@@ -232,6 +283,21 @@ namespace strumpack {
     this->extend_add_b(b, bupd, CBl, CBr, seqCBl, seqCBr);
     if (this->dim_sep()) {
       TIMER_TIME(TaskType::SOLVE_LOWER, 0, t_s);
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+      auto sbloc = slate::Matrix<scalar_t>::fromScaLAPACK
+	(b.rows(), b.cols(), b.data(), b.ld(),
+	 b.MB(), b.nprows(), b.npcols(), b.comm());
+      slate::getrs(const_cast<slate::Matrix<scalar_t>&>(slateF11_),
+		   const_cast<slate::Pivots&>(slate_piv_), sbloc, slate_opts_);
+      if (this->dim_upd()) {
+	auto sbupd = slate::Matrix<scalar_t>::fromScaLAPACK
+	  (bupd.rows(), bupd.cols(), bupd.data(), bupd.ld(),
+	   bupd.MB(), bupd.nprows(), bupd.npcols(), bupd.comm());
+	slate::gemm
+	  (scalar_t(-1.), const_cast<slate::Matrix<scalar_t>&>(slateF21_),
+	   sbloc, scalar_t(1.), sbupd, slate_opts_);
+      }
+#else
       b.laswp(piv, true);
       if (b.cols() == 1) {
         trsv(UpLo::L, Trans::N, Diag::U, F11_, b);
@@ -242,6 +308,7 @@ namespace strumpack {
         if (this->dim_upd())
           gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, b, scalar_t(1.), bupd);
       }
+#endif
       TIMER_STOP(t_s);
     }
   }
@@ -253,6 +320,19 @@ namespace strumpack {
     DistM_t& y = ydist[this->sep_];
     if (this->dim_sep()) {
       TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_s);
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+      if (this->dim_upd()) {
+	auto sy = slate::Matrix<scalar_t>::fromScaLAPACK
+	  (y.rows(), y.cols(), y.data(), y.ld(), y.MB(),
+	   y.nprows(), y.npcols(), y.comm());
+	auto syupd = slate::Matrix<scalar_t>::fromScaLAPACK
+	  (yupd.rows(), yupd.cols(), yupd.data(), yupd.ld(), yupd.MB(),
+	   yupd.nprows(), yupd.npcols(), yupd.comm());
+	slate::gemm
+	  (scalar_t(-1.), const_cast<slate::Matrix<scalar_t>&>(slateF12_),
+	   syupd, scalar_t(1.), sy, slate_opts_);
+      }
+#else
       if (y.cols() == 1) {
         if (this->dim_upd())
           gemv(Trans::N, scalar_t(-1.), F12_, yupd, scalar_t(1.), y);
@@ -262,6 +342,7 @@ namespace strumpack {
           gemm(Trans::N, Trans::N, scalar_t(-1.), F12_, yupd, scalar_t(1.), y);
         trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11_, y);
       }
+#endif
       TIMER_STOP(t_s);
     }
     DistM_t CBl, CBr;

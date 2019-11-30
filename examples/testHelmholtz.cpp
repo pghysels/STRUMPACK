@@ -135,7 +135,7 @@ int main(int argc, char* argv[]) {
       std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
                 << scaled_res << std::endl;
 
-    blas::axpy
+    strumpack::blas::axpy
       (n_local, std::complex<realt>(-1.), x_exact.data(), 1, x.data(), 1);
     auto nrm_error = norm2(x, MPIComm());
     auto nrm_x_exact = norm2(x_exact, MPIComm());
