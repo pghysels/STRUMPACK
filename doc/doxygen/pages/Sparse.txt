@@ -98,15 +98,15 @@ indices need not be sorted by column (within a row).
     double* x = new double[N];        // will hold the solution vector
     double* b = ...;                  // set a right-hand side b
 
-    StrumpackSparseSolver<double> sp;                 // create solver object
-    sp.options().set_rel_tol(1e-10);                  // set options
-    sp.options().set_gmres_restart(10);               // ...
-    sp.options().enable_HSS();                        // enable HSS compression, see HSS Preconditioning
-    sp.options().set_from_command_line(argc, argv);   // parse command line options
-    sp.set_csr_matrix(N, row_ptr, col_ind, val);      // set the matrix (copy)
-    sp.reorder();                                     // reorder matrix
-    sp.factor();                                      // numerical factorization
-    sp.solve(b, x);                                   // solve Ax=b
+    StrumpackSparseSolver<double> sp;                   // create solver object
+    sp.options().set_rel_tol(1e-10);                    // set options
+    sp.options().set_gmres_restart(10);                 // ...
+    sp.options().set_compression(CompressionType::HSS); // enable HSS compression, see HSS Preconditioning
+    sp.options().set_from_command_line(argc, argv);     // parse command line options
+    sp.set_csr_matrix(N, row_ptr, col_ind, val);        // set the matrix (copy)
+    sp.reorder();                                       // reorder matrix
+    sp.factor();                                        // numerical factorization
+    sp.solve(b, x);                                     // solve Ax=b
     ... // check residual/error and cleanup
  }
 \endcode
@@ -136,19 +136,19 @@ similar:
 
  int main(int argc, char* argv[ ])&nbsp;&nbsp; {
      int thread_level, rank;
-     // StrumpackSparseSolverMPI uses OpenMP so we should ask for MPI_THREAD_FUNNELED at least    
+     // StrumpackSparseSolverMPI uses OpenMP so we should ask for MPI_THREAD_FUNNELED at least
      MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &thread_level);
      MPI_Comm_rank(MPI_COMM_WORLD, &rank);
      if (thread_level != MPI_THREAD_FUNNELED && rank == 0)
-        std::cout << "MPI␣implementation␣does␣not␣support␣MPI_THREAD_FUNNELED" << std::endl;    
+        std::cout << "MPI␣implementation␣does␣not␣support␣MPI_THREAD_FUNNELED" << std::endl;
 
      {
          // define the same CSR matrix as for StrumpackSparseSolver
-         int N=...;                    // construct an NxN CSR matrix with nnz nonzeros    
+         int N=...;                    // construct an NxN CSR matrix with nnz nonzeros
          int* row_ptr = ...;           // N+1 integers
          int* col_ind = ...;           // nnz integers
          double* val = ...;            // nnz scalars
-         // allocate entire solution and right-hand side vectors on each MPI process    
+         // allocate entire solution and right-hand side vectors on each MPI process
          double* x = new double[N];    // will hold the solution vector
          double* b = ...;              // set a right-hand side b
 
@@ -192,7 +192,7 @@ as input. This matrix format is illustrated in Figure 2 (below).
      {
          // define a block-row distributed CSR matrix
          int* dist = new int[P];
-         // set dist such that processor p owns rows [dist[p], dist[p+1]) of the sparse matrix     
+         // set dist such that processor p owns rows [dist[p], dist[p+1]) of the sparse matrix
          for (int p=0; p<P; p++) dist[p] = .. ;
          // local_n is the number of rows of the input matrix assigned to me
          int local_n   = dist[rank+1] - dist[rank];
@@ -362,7 +362,7 @@ can also be used, where the integers are defined as:
 - 2: MC64(2): maximize the smallest diagonal value
 - 3: MC64(3): maximize the smallest diagonal value, different strategy
 - 4: MC64(4): maximize sum of diagonal values
-- 5: MC64(5): maximize product of diagonal values and apply row and column scaling 
+- 5: MC64(5): maximize product of diagonal values and apply row and column scaling
 - 6: Combinatorial BLAS: approximate weight perfect matching
 
 The MC64 code is sequential, so when using this option in parallel,
@@ -422,18 +422,19 @@ also be specified via the command line option
 Factorization
 =============
 
-Compute the factorization by calling
-\code {.cpp} ReturnCode strumpack::StrumpackSparseSolver::factor(); \endcode
-where the possible return values are the same as for \link
+Compute the factorization by calling \code {.cpp} ReturnCode
+strumpack::StrumpackSparseSolver::factor(); \endcode where the
+possible return values are the same as for \link
 strumpack::StrumpackSparseSolver::reorder() Sp::reorder()\endlink. If
 \link strumpack::StrumpackSparseSolver::reorder()
 Sp::reorder()\endlink was not called already, it is called
 automatically. When compression is not enabled, this will compute an
 exact LU factorization of the (permuted) sparse input matrix. If
 HSS/HODLR/BLR compression is enabled (for instance with \link
-strumpack::SPOptions::enable_HSS() SPOptions::enable_HSS\endlink or
-\--sp_enable_HSS, see \link HSS_Preconditioning HSS
-Preconditioning\endlink), the factorization is only approximate.
+strumpack::SPOptions::set_compression(CompressionType::HSS)
+SPOptions::set_compression()\endlink or \--sp_compression HSS, see
+\link HSS_Preconditioning HSS Preconditioning\endlink), the
+factorization is only approximate.
 
 Solve
 =====
@@ -544,18 +545,6 @@ STRUMPACK sparse solver options:
 #      4 maximum sum of diagonal values
 #      5 maximum matching with row and column scaling
 #      6 approximate weigthed perfect matching, from CombBLAS
-#   --sp_enable_hss (default false)
-#   --sp_disable_hss (default true)
-#   --sp_hss_min_sep_size int (default 256)
-#          minimum size of the separator for HSS compression of the front
-#   --sp_enable_blr (default false)
-#   --sp_disable_blr (default true)
-#   --sp_blr_min_sep_size int (default 256)
-#          minimum size of the separator for BLR compression of the front
-#   --sp_enable_hodlr (default false)
-#   --sp_disable_hodlr (default true)
-#   --sp_hodlr_min_sep_size int (default 256)
-#          minimum size of the separator for HODLR compression of the front
 #   --sp_compression [none|hss|blr|hodlr]
 #          type of rank-structured compression to use
 #   --sp_compression_min_sep_size (default 2147483647)

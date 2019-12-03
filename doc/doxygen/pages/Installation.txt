@@ -151,12 +151,24 @@ not work when cuda acceleration is enabled.
      -DTPL_BPACK_LIBRARIES="$BPACKHOME/build/SRC_DOUBLE/libdbutterflypack.a;$BPACKHOME/build/SRC_DOUBLECOMPLEX/libzbutterflypack.a"
 \endcode
 
+- __ZFP__ (>= 0.5.5) \link
+  https://computing.llnl.gov/projects/floating-point-compression
+  https://computing.llnl.gov/projects/floating-point-compression
+  \endlink: ZFP is used for lossy compression in the sparse solver
+  (preconditioner).
+\code {.bash}
+> cmake ../  \
+     -DTPL_ENABLE_ZFP=ON \
+     -DTPL_ZFP_INCLUDE_DIRS=$ZFPHOME/include \
+     -DTPL_ZFP_LIBRARIES="$ZFPHOME/lib/libzfp.so"
+\endcode
+
 - __Combinatorial BLAS__ [1] (optional) can be used for parallel
-reordering for stability, i.e., to get nonzeros on the diagonal of the
-matrix, as an alternative to the sequential MC64 (included). Get it
-from: https://people.eecs.berkeley.edu/~aydin/CombBLAS/html/ Enable by
-specifying -DTPL_ENABLE_COMBBLAS and set TPL_COMBBLAS_INCLUDE_DIRS
-and TPL_COMBBLAS_LIBRARIES.
+  reordering for stability, i.e., to get nonzeros on the diagonal of
+  the matrix, as an alternative to the sequential MC64 (included). Get
+  it from: https://people.eecs.berkeley.edu/~aydin/CombBLAS/html/
+  Enable by specifying -DTPL_ENABLE_COMBBLAS and set
+  TPL_COMBBLAS_INCLUDE_DIRS and TPL_COMBBLAS_LIBRARIES.
 
 The code was tested on GNU/Linux with the GNU and Intel® compilers and
 the OpenBLAS, Intel® MKL® and Cray® LibSci® numerical libraries. If

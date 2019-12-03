@@ -1,0 +1,50 @@
+/*! \page Lossy_Preconditioning Lossy Compression Preconditioning
+
+Lossy compression of the sparse triangular factors is implemented
+using the __ZFP__ library (>= 0.5.5) (\link
+https://computing.llnl.gov/projects/floating-point-compression
+\endlink).
+
+STRUMPACK needs to be configured with __ZFP__ support:
+\code {.bash}
+> cmake ../ \
+      -DTPL_ENABLE_ZFP=ON \
+      -DTPL_ZFP_INCLUDE_DIRS=$ZFPHOME/include \
+      -DTPL_ZFP_LIBRARIES="$ZFPHOME/lib/libzfp.so" \endcode
+\endcode
+
+When enabled, lossy compression will compress the sparse triangular
+factors, hence reducing the overall memory requirements of the solver
+and allowing users to solver larger problems. Because compression is
+lossy, the solver will be approximate (a preconditioner), and the
+default outer iterative solver will in this case be preconditioned
+GMRES. All computations will still be performed in the original
+precision specified by the user, so one should not expect any speedup
+from this compression.
+
+Lossy compression can be enabled/disabled via the command line options:
+\code {.bash}
+--sp_compression lossy
+--sp_compression none
+\endcode
+or via the C++ API as follows
+\code {.cpp}
+void strumpack::SPOptions::set_compression(CompressionType::LOSSY);
+void strumpack::SPOptions::set_compression(CompressionType::NONE);   // disable
+CompressionType strumpack::SPOptions::compression() const;  // get compression type (none/hss/blr/hodlr)
+\endcode
+
+The lossy compression uses fixed precision (see \link
+https://zfp.readthedocs.io/en/release0.5.4/modes.html#modes \endlink).
+The precision is specified in number of bit planes, and can be set
+with:
+\code {.bash}
+--sp_lossy_precision [1-64] (default 16)
+\endcode
+or via the C++ API as follows
+\code {.cpp}
+void strumpack::SPOptions::set_lossy_precision(int p);
+int strumpack::SPOptions::lossy_precision() const;  // get precision
+\endcode
+
+*/

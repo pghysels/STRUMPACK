@@ -22,22 +22,16 @@ perform exact LU factorization), but can be turned on/off via the
 command line:
 
 \code {.bash}
---sp_enable_hss   (no argument)
---sp_disable_hss  (no argument)
 --sp_compression hss
---sp_compression none
+--sp_compression none    (disable HSS)
 \endcode
 
 or via the C++ API as follows
 
 \code {.cpp}
-void strumpack::SPOptions::enable_HSS();
-void strumpack::SPOptions::disable_HSS();
-bool strumpack::SPOptions::use_HSS() const;    // check whether HSS compression is enabled
-
 void strumpack::SPOptions::set_compression(CompressionType::HSS);
 void strumpack::SPOptions::set_compression(CompressionType::NONE);
-CompressionType strumpack::SPOptions::set_compression() const;  // get compression type (none/hss/blr/hodlr)
+CompressionType strumpack::SPOptions::compression() const;  // get compression type (none/hss/blr/hodlr)
 \endcode
 
 When HSS compression is enabled, the default STRUMPACK behavior is to
@@ -54,16 +48,12 @@ compression. The minimum dense matrix size for HSS compression is set
 via the command line via
 
 \code {.bash}
---sp_hss_min_sep_size int
 --sp_compression_min_sep_size int
 \endcode
 
 or via the C++ API as follows
 
 \code {.cpp}
-void strumpack::SPOptions::set_HSS_min_sep_size(int s);
-int strumpack::SPOptions::HSS_min_sep_size() const;       // get the current value
-
 void strumpack::SPOptions::set_compression_min_sep_size(int s);
 int strumpack::SPOptions::compression_min_sep_size() const;
 \endcode
@@ -88,9 +78,9 @@ StrumpackSparseSolver\endlink. It can be accessed via the
 HSS_options() routine as follows:
 
 \code {.cpp}
-strumpack::StrumpackSparseSolver<double> sp;    // create solver object
-sp.options().enable_HSS();                      // enable HSS compression in the multifrontal solver
-sp.options().HSS_options().set_leaf_size(256);  // set the HSS leaf size
+strumpack::StrumpackSparseSolver<double> sp;        // create solver object
+sp.options().set_compression(CompressionType::HSS); // enable HSS compression in the multifrontal solver
+sp.options().HSS_options().set_leaf_size(256);      // set the HSS leaf size
 \endcode
 
 In STRUMPACK, HSS matrices are constructed using a randomized sampling

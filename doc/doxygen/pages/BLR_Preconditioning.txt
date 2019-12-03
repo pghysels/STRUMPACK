@@ -17,22 +17,16 @@ sparse solver (the default is to perform exact LU factorization), but
 BLR compression can be turned on/off via the command line:
 
 \code {.bash}
---sp_enable_blr   (no argument)
---sp_disable_blr  (no argument)
---sp_compression hss
+--sp_compression blr
 --sp_compression none
 \endcode
 
 or via the C++ API as follows
 
 \code {.cpp}
-void strumpack::SPOptions::enable_BLR();
-void strumpack::SPOptions::disable_BLR();
-bool strumpack::SPOptions::use_BLR();      // check whether BLR compression is enabled
-
 void strumpack::SPOptions::set_compression(CompressionType::BLR);
 void strumpack::SPOptions::set_compression(CompressionType::NONE);
-CompressionType strumpack::SPOptions::set_compression() const;  // get compression type (none/hss/blr/hodlr)
+CompressionType strumpack::SPOptions::compression() const;  // get compression type (none/hss/blr/hodlr)
 \endcode
 
 When BLR compression is enabled, the default STRUMPACK behavior is to
@@ -47,23 +41,20 @@ considered a candidate for HSS compression. The minimum dense matrix
 size for BLR compression is set via the command line via
 
 \code {.bash}
---sp_blr_min_sep_size int
 --sp_compression_min_sep_size int
 \endcode
 
 or via the C++ API as follows
 
 \code {.cpp}
-void strumpack::SPOptions::set_BLR_min_sep_size(int s);
-int strumpack::SPOptions::BLR_min_sep_size() const;       // get the current value
-
 void strumpack::SPOptions::set_compression_min_sep_size(int s);
 int strumpack::SPOptions::compression_min_sep_size() const;
 \endcode
 
-The routine \link strumpack::SPOptions::set_BLR_min_sep_size(int s)
-set_BLR_min_sep_size(int s)\endlink refers to the size of the top-left
-block of the front only. This top-left block is the part that
+The routine \link
+strumpack::SPOptions::set_compression_min_sep_size(int s)
+set_compression_min_sep_size(int s)\endlink refers to the size of the
+top-left block of the front only. This top-left block is the part that
 corresponds to a separator, as given by the nested dissection
 reordering algorithm. This top-left block is also referred to as the
 block containing the fully-summed variable. Factorization is only
@@ -81,9 +72,9 @@ StrumpackSparseSolver\endlink. It can be accessed via the
 BLR_options() routine as follows:
 
 \code {.cpp}
-strumpack::StrumpackSparseSolver<double> sp;      // create solver object
-sp.options().enable_BLR();                        // enable BLR compression in the multifrontal solver
-sp.options().BLR_options().set_leaf_size(256);    // set the BLR leaf size
+strumpack::StrumpackSparseSolver<double> sp;         // create solver object
+sp.options().set_compression(CompressionType::BLR);  // enable BLR compression in the multifrontal solver
+sp.options().BLR_options().set_leaf_size(256);       // set the BLR leaf size
 \endcode
 
  __The compression tolerances can greatly impact performance.__ They
