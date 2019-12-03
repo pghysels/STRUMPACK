@@ -509,13 +509,13 @@ extern "C" {
 
   /* set HSS specific options */
   void STRUMPACK_enable_HSS(STRUMPACK_SparseSolver S)
-  { switch_precision(options().enable_HSS()); }
+  { switch_precision(options().set_compression(CompressionType::HSS)); }
   void STRUMPACK_disable_HSS(STRUMPACK_SparseSolver S)
-  { switch_precision(options().disable_HSS()); }
+  { switch_precision(options().set_compression(CompressionType::NONE)); }
   void STRUMPACK_set_HSS_min_front_size(STRUMPACK_SparseSolver S, int size)
-  { switch_precision(options().set_HSS_min_front_size(size)); }
+  { switch_precision(options().set_compression_min_front_size(size)); }
   void STRUMPACK_set_HSS_min_sep_size(STRUMPACK_SparseSolver S, int size)
-  { switch_precision(options().set_HSS_min_sep_size(size)); }
+  { switch_precision(options().set_compression_min_sep_size(size)); }
   void STRUMPACK_set_HSS_max_rank(STRUMPACK_SparseSolver S, int max_rank)
   { switch_precision(options().HSS_options().set_max_rank(max_rank)); }
   void STRUMPACK_set_HSS_leaf_size(STRUMPACK_SparseSolver S, int leaf_size)
@@ -587,18 +587,18 @@ extern "C" {
 
   /* get HSS specific options */
   int STRUMPACK_use_HSS(STRUMPACK_SparseSolver S) {
-    int u = 0;
-    switch_precision_return(options().use_HSS(), u);
-    return u;
+    CompressionType c;
+    switch_precision_return(options().compression(), c);
+    return c == CompressionType::HSS;
   }
   int STRUMPACK_HSS_min_front_size(STRUMPACK_SparseSolver S) {
     int size = 0;
-    switch_precision_return(options().HSS_min_front_size(), size);
+    switch_precision_return(options().compression_min_front_size(), size);
     return size;
   }
   int STRUMPACK_HSS_min_sep_size(STRUMPACK_SparseSolver S) {
     int size = 0;
-    switch_precision_return(options().HSS_min_sep_size(), size);
+    switch_precision_return(options().compression_min_sep_size(), size);
     return size;
   }
   int STRUMPACK_HSS_max_rank(STRUMPACK_SparseSolver S) {

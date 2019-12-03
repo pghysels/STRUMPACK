@@ -174,7 +174,8 @@ namespace strumpack {
     auto front = create_frontal_matrix<scalar_t,integer_t>
       (opts, sep, sep_begin, sep_end, upd[sep],
        hss_parent, level, nr_fronts_);
-    bool compressed = is_compressed(dim_sep, hss_parent, opts);
+    bool compressed =
+      is_compressed(dim_sep, upd[sep].size(), hss_parent, opts);
     if (sep_tree.lch(sep) != -1)
       front->set_lchild
         (setup_tree(opts, A, sep_tree, upd, sep_tree.lch(sep),

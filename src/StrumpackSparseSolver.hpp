@@ -673,12 +673,18 @@ namespace strumpack {
         std::cout << "# symbolic factorization:" << std::endl;
         std::cout << "#   - nr of dense Frontal matrices = "
                   << number_format_with_commas(fc.dense) << std::endl;
-        std::cout << "#   - nr of HSS Frontal matrices = "
-                  << number_format_with_commas(fc.HSS) << std::endl;
-        std::cout << "#   - nr of BLR Frontal matrices = "
-                  << number_format_with_commas(fc.BLR) << std::endl;
-        std::cout << "#   - nr of HODLR Frontal matrices = "
-                  << number_format_with_commas(fc.HODLR) << std::endl;
+        if (fc.HSS)
+          std::cout << "#   - nr of HSS Frontal matrices = "
+                    << number_format_with_commas(fc.HSS) << std::endl;
+        if (fc.BLR)
+          std::cout << "#   - nr of BLR Frontal matrices = "
+                    << number_format_with_commas(fc.BLR) << std::endl;
+        if (fc.HODLR)
+          std::cout << "#   - nr of HODLR Frontal matrices = "
+                    << number_format_with_commas(fc.HODLR) << std::endl;
+        if (fc.lossy)
+          std::cout << "#   - nr of lossy Frontal matrices = "
+                    << number_format_with_commas(fc.lossy) << std::endl;
         std::cout << "#   - symb-factor time = " << t0.elapsed() << std::endl;
       }
     }
@@ -829,7 +835,7 @@ namespace strumpack {
                   << " % of multifrontal" << std::endl;
         std::cout << "#   - compression = " << std::boolalpha
                   << get_name(opts_.compression()) << std::endl;
-        if (opts_.use_HSS()) {
+        if (opts_.compression() == CompressionType::HSS) {
           std::cout << "#   - maximum HSS rank = " << max_rank << std::endl;
           std::cout << "#   - relative compression tolerance = "
                     << opts_.HSS_options().rel_tol() << std::endl;
@@ -841,14 +847,14 @@ namespace strumpack {
                     << get_name(opts_.HSS_options().random_engine())
                     << " engine" << std::endl;
         }
-        if (opts_.use_BLR()) {
+        if (opts_.compression() == CompressionType::BLR) {
           std::cout << "#   - relative compression tolerance = "
                     << opts_.BLR_options().rel_tol() << std::endl;
           std::cout << "#   - absolute compression tolerance = "
                     << opts_.BLR_options().abs_tol() << std::endl;
         }
 #if defined(STRUMPACK_USE_BPACK)
-        if (opts_.use_HODLR()) {
+        if (opts_.compression() == CompressionType::HODLR) {
           std::cout << "#   - maximum HODLR rank = " << max_rank << std::endl;
           std::cout << "#   - relative compression tolerance = "
                     << opts_.HODLR_options().rel_tol() << std::endl;
@@ -857,8 +863,10 @@ namespace strumpack {
         }
 #endif
       }
-      if (opts_.use_HSS()) print_flop_breakdown_HSS();
-      if (opts_.use_HODLR()) print_flop_breakdown_HODLR();
+      if (opts_.compression() == CompressionType::HSS)
+        print_flop_breakdown_HSS();
+      if (opts_.compression() == CompressionType::HODLR)
+        print_flop_breakdown_HODLR();
     }
     if (rank_out_) tree()->print_rank_statistics(*rank_out_);
     factored_ = true;

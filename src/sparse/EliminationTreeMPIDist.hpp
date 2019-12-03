@@ -139,7 +139,7 @@ namespace strumpack {
     (integer_t dsep, std::vector<integer_t>& dist_upd,
      integer_t& dsep_begin, integer_t& dsep_end,
      std::vector<integer_t>& dsep_upd, int P0, int P,
-     int P0_sibling, int P_sibling, int owner, bool use_hss);
+     int P0_sibling, int P_sibling, int owner, bool bcast_dim_sep);
   };
 
 
@@ -820,12 +820,12 @@ namespace strumpack {
     std::vector<integer_t> dsep_upd;
     communicate_distributed_separator
       (dsep, dist_upd, dsep_begin, dsep_end, dsep_upd,
-       P0, P, P0_sibling, P_sibling, owner,
-       (opts.use_HSS() || opts.use_HODLR()) && parent_compression);
+       P0, P, P0_sibling, P_sibling, owner, parent_compression);
 
     auto dim_dsep = dsep_end - dsep_begin;
 
-    bool use_compression = is_compressed(dim_dsep, parent_compression, opts);
+    bool use_compression = is_compressed
+      (dim_dsep, dsep_upd.size(), parent_compression, opts);
 
     std::unique_ptr<F_t> front;
     // only store fronts you work on and their siblings (needed for
@@ -911,7 +911,8 @@ namespace strumpack {
       int Pl = std::max
         (1, std::min(int(std::round(P * wl / (wl + wr))), P-1));
       int Pr = std::max(1, P - Pl);
-      bool use_compression = is_compressed(dim_sep, parent_compression, opts);
+      bool use_compression = is_compressed
+        (dim_sep, dim_upd, parent_compression, opts);
       front->set_lchild
         (proportional_mapping_sub_graphs
          (opts, tree, dsep, chl, P0, Pl, P0+P-Pr, Pr,

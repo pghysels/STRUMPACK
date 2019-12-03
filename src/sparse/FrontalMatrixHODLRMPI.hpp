@@ -318,7 +318,7 @@ namespace strumpack {
         };
       HODLR::LRBFMatrix<scalar_t> Schur(*F22_, *F22_);
       { TIMER_TIME(TaskType::HSS_COMPUTE_SCHUR, 0, t_schur_compress);
-	Schur.compress(sample_Schur);
+        Schur.compress(sample_Schur);
       }
       auto extract_F22 =
         [&](VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
@@ -598,13 +598,13 @@ namespace strumpack {
       CB_tree.refine(opts.HODLR_options().leaf_size());
       if (opts.HODLR_options().compression_algorithm() ==
           HODLR::CompressionAlgorithm::ELEMENT_EXTRACTION) {
-	TIMER_TIME(TaskType::EXTRACT_GRAPH, 0, t_graph_22);
+        TIMER_TIME(TaskType::EXTRACT_GRAPH, 0, t_graph_22);
         auto gCB = A.extract_graph_CB(opts.separator_ordering_level(), this->upd());
-	TIMER_STOP(t_graph_22);
+        TIMER_STOP(t_graph_22);
         F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
           (new HODLR::HODLRMatrix<scalar_t>
            (Comm(), CB_tree, gCB, opts.HODLR_options()));
-	TIMER_TIME(TaskType::EXTRACT_GRAPH, 0, t_graph_1221);
+        TIMER_TIME(TaskType::EXTRACT_GRAPH, 0, t_graph_1221);
         auto g12 = A.extract_graph_sep_CB
           (opts.separator_ordering_level(), sep_begin_, sep_end_, this->upd());
         auto g21 = A.extract_graph_CB_sep

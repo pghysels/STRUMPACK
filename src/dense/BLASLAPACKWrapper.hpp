@@ -39,22 +39,12 @@
 
 namespace strumpack {
 
-  template<typename scalar> inline bool is_complex() {
-    return false;
-  }
-  template<> inline bool is_complex<std::complex<float>>() {
-    return true;
-  }
-  template<> inline bool is_complex<std::complex<double>>() {
-    return true;
-  }
+  template<typename scalar> bool is_complex() { return false; }
+  template<> inline bool is_complex<std::complex<float>>() { return true; }
+  template<> inline bool is_complex<std::complex<double>>() { return true; }
 
-  template<class T> struct RealType {
-    typedef T value_type;
-  };
-  template<class T> struct RealType<std::complex<T>> {
-    typedef T value_type;
-  };
+  template<class T> struct RealType { typedef T value_type; };
+  template<class T> struct RealType<std::complex<T>> { typedef T value_type; };
 
   namespace blas {
 

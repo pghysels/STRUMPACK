@@ -305,7 +305,8 @@ namespace strumpack {
 
     auto chl = tree.lch(sep);
     auto chr = tree.rch(sep);
-    bool use_compression = is_compressed(dim_sep, hss_parent, opts);
+    bool use_compression = is_compressed
+      (dim_sep, upd[sep].size(), hss_parent, opts);
     if (chl != -1) {
       float wl = subtree_work[chl];
       float wr = (chr != -1) ? subtree_work[chr] : 0.;

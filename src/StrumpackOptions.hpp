@@ -99,11 +99,13 @@ namespace strumpack {
    * \ingroup Enumerations
    */
   enum class CompressionType {
-    NONE,   /*!< No compression, purely direct solver  */
-    HSS,    /*!< HSS compression of frontal matrices   */
-    BLR,    /*!< Block low-rank compression of fronts  */
-    HODLR   /*!< Hierarchically Off-diagonal Low-Rank
-                 compression of frontal matrices,      */
+    NONE,     /*!< No compression, purely direct solver  */
+    HSS,      /*!< HSS compression of frontal matrices   */
+    BLR,      /*!< Block low-rank compression of fronts  */
+    HODLR,    /*!< Hierarchically Off-diagonal Low-Rank
+                   compression of frontal matrices       */
+    LOSSLESS, /*!< Lossless cmpresssion                  */
+    LOSSY     /*!< Lossy cmpresssion                     */
   };
 
   /**
@@ -115,6 +117,7 @@ namespace strumpack {
     case CompressionType::HSS: return "hss";
     case CompressionType::BLR: return "blr";
     case CompressionType::HODLR: return "hodlr";
+    case CompressionType::LOSSY: return "lossy";
     }
     return "UNKNOWN";
   }
@@ -336,7 +339,7 @@ namespace strumpack {
      * factorization.
      *
      * \param s outer, iterative solver to use
-     * \see enable_HSS(), enable_BLR(), enable_HODLR()
+     * \see set_compression()
      */
     void set_Krylov_solver(KrylovSolver s) { _Krylov_solver = s; }
 
@@ -571,179 +574,48 @@ namespace strumpack {
     void disable_assembly_tree_log() { _log_assembly_tree = false; }
 
     /**
-     * Enable HSS compression in the sparse solver. See the relevant
-     * section in the online manual for tuning of the HSS enabled
-     * preconditioner. Enabling HSS compression will also change the
-     * iterative solver from iterative refinement to GMRES (this is
-     * the AUTO solver setting, but can be manually overwritten).
-     *
-     * \see disable_HSS(), HSS_options(), set_HSS_min_sep_size(),
-     * enable_BLR(), enable_HODLR()
-     */
-    void enable_HSS() { _comp = CompressionType::HSS; }
-
-    /**
-     * Do not use HSS compression in the sparse solver. The type of
-     * compression will be reset to NONE, and the solver will act as a
-     * direct solver without compression.
-     *
-     * \see enable_HSS(), enable_BLR(), enable_HODLR()
-     */
-    void disable_HSS() { _comp = CompressionType::NONE; }
-
-
-    /**
      * Set the type of rank-structured compression to use.
      *
      * \param c compression type
      *
-     * \see enable_HSS(), disable_HSS(), enable_BLR(), disable_BLR(),
-     * enable_HODLR(), disable_HODLR()
+     * \see set_compression_min_sep_size(),
+     * set_compression_min_front_size()
      */
     void set_compression(CompressionType c) { _comp = c; }
-
-    /**
-     * Set the minimum size of frontal matrices (dense submatrices of
-     * the sparse triangular factors) for which to use HSS compression
-     * (when HSS compression has been enabled by the user using
-     * enable_HSS()). Most fronts will be quite small, and will not
-     * have benefit from HSS compression.
-     *
-     * __This is currently ignored!! Use set_HSS_min_sep_size
-     * instead__
-     *
-     * \see HSS_options(), set_HSS_min_sep_size()
-     */
-    void set_HSS_min_front_size(int s)
-    { assert(s >= 0); _hss_min_front_size = s; }
-
-    /**
-     * Set the minimum size of the top left part of frontal matrices
-     * (dense submatrices of the sparse triangular factors), ie, the
-     * part corresponding to the separators, for which to use HSS
-     * compression (when HSS compression has been enabled by the user
-     * using enable_HSS()). Most fronts will be quite small, and will
-     * not have benefit from HSS compression.
-     *
-     * \see HSS_options(), set_HSS_min_front_size()
-     */
-    void set_HSS_min_sep_size(int s)
-    { assert(_hss_min_sep_size >= 0); _hss_min_sep_size = s; }
-
-    /**
-     * Enable Block Low-Rank compression inside the sparse solver. If
-     * HSS compression was previously enabled, this will be disabled,
-     * and changed to BLR compression. We refer to the manual for a
-     * description, and tips on tuning the BLR enabled
-     * preconditioner. Enabling BLR compression will change the
-     * default iterative solver from iterative refinement to GMRES
-     * (this is the AUTO solver strategy).
-     *
-     * \see disable_BLR(), set_BLR_min_sep_size(), BLR_options()
-     */
-    void enable_BLR() { _comp = CompressionType::BLR; }
-
-    /**
-     * Disable BLR compression in the sparse solver.
-     *
-     * \see enable_BLR()
-     */
-    void disable_BLR() { _comp = CompressionType::NONE; }
-
-    /**
-     * Set the minimum size of frontal matrices (dense submatrices of
-     * the sparse triangular factors) for which to use BLR compression
-     * (when BLR compression has been enabled by the user using
-     * enable_BLR()). Most fronts will be quite small, and will not
-     * have benefit from BLR compression.
-     *
-     * __This is currently ignored!! Use set_BLR_min_sep_size
-     * instead__
-     *
-     * \see BLR_options(), set_BLR_min_sep_size()
-     */
-    void set_BLR_min_front_size(int s)
-    { assert(s >= 0); _blr_min_front_size = s; }
-
-    /**
-     * Set the minimum size of the top left part of frontal matrices
-     * (dense submatrices of the sparse triangular factors), ie, the
-     * part corresponding to the separators, for which to use BLR
-     * compression (when BLR compression has been enabled by the user
-     * using enable_BLR()). Most fronts will be quite small, and will
-     * not have benefit from BLR compression.
-     *
-     * \see BLR_options(), set_BLR_min_front_size()
-     */
-    void set_BLR_min_sep_size(int s)
-    { assert(_blr_min_sep_size >= 0); _blr_min_sep_size = s; }
-
-
-    /**
-     * Enable HODLR compression inside the sparse solver. If HSS/BLR
-     * compression was previously enabled, this will be disabled, and
-     * changed to HODLR compression. We refer to the manual for a
-     * description, and tips on tuning the HODLR enabled
-     * preconditioner. Enabling HODLR compression will change the
-     * default iterative solver from iterative refinement to GMRES
-     * (this is the AUTO solver strategy).
-     *
-     * \see disable_HODLR(), set_HODLR_min_sep_size(), HODLR_options()
-     */
-    void enable_HODLR() { _comp = CompressionType::HODLR; }
-
-    /**
-     * Disable HODLR compression in the sparse solver.
-     *
-     * \see enable_HODLR()
-     */
-    void disable_HODLR() { _comp = CompressionType::NONE; }
-
-    /**
-     * Set the minimum size of frontal matrices (dense submatrices of
-     * the sparse triangular factors) for which to use HODLR compression
-     * (when HODLR compression has been enabled by the user using
-     * enable_HODLR()). Most fronts will be quite small, and will not
-     * have benefit from HODLR compression.
-     *
-     * __This is currently ignored!! Use set_HODLR_min_sep_size
-     * instead__
-     *
-     * \see HODLR_options(), set_HODLR_min_sep_size()
-     */
-    void set_HODLR_min_front_size(int s)
-    { assert(s >= 0); _hodlr_min_front_size = s; }
-
-    /**
-     * Set the minimum size of the top left part of frontal matrices
-     * (dense submatrices of the sparse triangular factors), ie, the
-     * part corresponding to the separators, for which to use HODLR
-     * compression (when HODLR compression has been enabled by the
-     * user using enable_HODLR()). Most fronts will be quite small,
-     * and will not have benefit from HODLR compression.
-     *
-     * \see HODLR_options(), set_HODLR_min_front_size()
-     */
-    void set_HODLR_min_sep_size(int s)
-    { assert(s >= 0); _hodlr_min_sep_size = s; }
 
     /**
      * Set the minimum size of the top left part of frontal matrices
      * (dense submatrices of the sparse triangular factors), ie, the
      * part corresponding to the separators, for which to use
-     * compression (when HSS/BLR/HODLR compression has been enabled by
-     * the user using either enable_HSS(), enable_BLR() or
-     * enable_HODLR()). Most fronts will be quite small, and will not
-     * have benefit from compression.
+     * compression (when HSS/BLR/HODLR/LOSSY compression has been
+     * enabled by the user. Most fronts will be quite small, and will
+     * not have benefit from compression.
      *
-     * \see set_HSS_min_front_size(), set_BLR_min_front_size(),
-     * set_HODLR_min_front_size()
+     * \see set_compression(), set_compression_min_front_size()
      */
     void set_compression_min_sep_size(int s) {
       assert(s >= 0);
       _hss_min_sep_size = s;
       _blr_min_sep_size = s;
       _hodlr_min_sep_size = s;
+      _lossy_min_sep_size = s;
+    }
+
+    /**
+     * Set the minimum size of frontal matrices (dense submatrices of
+     * the sparse triangular factors), for which to use compression
+     * (when HSS/BLR/HODLR/LOSSY compression has been enabled by the
+     * user. Most fronts will be quite small, and will not have
+     * benefit from compression.
+     *
+     * \see set_compression(), set_compression_min_front_size()
+     */
+    void set_compression_min_front_size(int s) {
+      assert(s >= 0);
+      _hss_min_front_size = s;
+      _blr_min_front_size = s;
+      _hodlr_min_front_size = s;
+      _lossy_min_front_size = s;
     }
 
     /**
@@ -833,9 +705,14 @@ namespace strumpack {
     void set_cuda_cutoff(int c) { cuda_cutoff_ = c; }
 
     /**
-     * Set the the number of (CUDA) streams to be used in the code.
+     * Set the number of (CUDA) streams to be used in the code.
      */
     void set_cuda_streams(int s) { cuda_streams_ = s; }
+
+    /**
+     * Set the precision for lossy compression.
+     */
+    void set_lossy_precision(int p) { _lossy_precision = p; }
 
     /**
      * Print statistics, about ranks, memory etc, for the root front
@@ -966,89 +843,41 @@ namespace strumpack {
     bool log_assembly_tree() const { return _log_assembly_tree; }
 
     /**
-     * Is HSS compression enabled?
-     * \see enable_HSS()
-     */
-    bool use_HSS() const { return _comp == CompressionType::HSS; }
-
-    /**
-     * Get the minimum front size for HSS compression.
-     *
-     *__Not used at the moment!!, Use set_HSS_min_sep_size()
-     * instead.__
-     *
-     * \see set_HSS_min_sep_size(), set_HSS_min_front_size()
-     */
-    int HSS_min_front_size() const { return _hss_min_front_size; }
-
-    /**
-     * Get the minimum size of a separator to enable HSS compression.
-     * \see set_HSS_min_sep_size()
-     */
-    int HSS_min_sep_size() const { return _hss_min_sep_size; }
-
-    /**
-     * Is BLR compression enabled?
-     * \see enable_BLR()
-     */
-    bool use_BLR() const { return _comp == CompressionType::BLR; }
-
-    /**
-     * Get the minimum front size for BLR compression.
-     *
-     *__Not used at the moment!!, Use set_BLR_min_sep_size()
-     * instead.__
-     *
-     * \see set_BLR_min_sep_size(), set_BLR_min_front_size()
-     */
-    int BLR_min_front_size() const { return _blr_min_front_size; }
-
-    /**
-     * Get the minimum size of a separator to enable BLR compression.
-     * \see set_BLR_min_sep_size()
-     */
-    int BLR_min_sep_size() const { return _blr_min_sep_size; }
-
-    /**
-     * Is HODLR compression enabled?
-     * \see enable_BLR()
-     */
-    bool use_HODLR() const { return _comp == CompressionType::HODLR; }
-
-    /**
-     * Get the minimum front size for HODLR compression.
-     *
-     *__Not used at the moment!!, Use set_HODLR_min_sep_size()
-     * instead.__
-     *
-     * \see set_HODLR_min_sep_size(), set_HODLR_min_front_size()
-     */
-    int HODLR_min_front_size() const { return _hodlr_min_front_size; }
-
-    /**
-     * Get the minimum size of a separator to enable HODLR compression.
-     * \see set_HODLR_min_sep_size()
-     */
-    int HODLR_min_sep_size() const { return _hodlr_min_sep_size; }
-
-    /**
      * Get the type of compression to use.
      */
     CompressionType compression() const { return _comp; }
 
     /**
-     * Get the minimum size of a separator to enable HSS, BLR or HODLR
-     * compression. This will depend on which type of compression is
-     * selected.
+     * Get the minimum size of a separator to enable compression. This
+     * will depend on which type of compression is selected.
      *
-     * \see HSS_min_sep_size(), BLR_min_sep_size(), HODLR_min_sep_size(),
-     * enable_HSS(), enable_BLR(), enable_HODLR()
+     * \see set_compression(), set_compression_min_sep_size(),
+     * compression_min_front_size()
      */
     int compression_min_sep_size() const {
       switch (_comp) {
       case CompressionType::HSS: return _hss_min_sep_size;
       case CompressionType::BLR: return _blr_min_sep_size;
       case CompressionType::HODLR: return _hodlr_min_sep_size;
+      case CompressionType::LOSSY: return _lossy_min_sep_size;
+      case CompressionType::NONE:
+      default: return std::numeric_limits<int>::max();
+      }
+    }
+
+    /**
+     * Get the minimum size of a front to enable compression. This
+     * will depend on which type of compression is selected.
+     *
+     * \see set_compression(), set_compression_min_sep_size(),
+     * compression_min_front_size()
+     */
+    int compression_min_front_size() const {
+      switch (_comp) {
+      case CompressionType::HSS: return _hss_min_front_size;
+      case CompressionType::BLR: return _blr_min_front_size;
+      case CompressionType::HODLR: return _hodlr_min_front_size;
+      case CompressionType::LOSSY: return _lossy_min_front_size;
       case CompressionType::NONE:
       default: return std::numeric_limits<int>::max();
       }
@@ -1059,8 +888,8 @@ namespace strumpack {
      * compression. This will depend on which type of compression is
      * selected.
      *
-     * \see HSS_min_sep_size(), BLR_min_sep_size(), HODLR_min_sep_size(),
-     * enable_HSS(), enable_BLR(), enable_HODLR()
+     * \see set_compression(), set_compression_leaf_size(),
+     * compression_min_sep_size()
      */
     int compression_leaf_size() const {
       switch (_comp) {
@@ -1070,6 +899,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_BPACK)
         return _hodlr_opts.leaf_size();
 #endif
+      case CompressionType::LOSSY: return 4;
       case CompressionType::NONE:
       default: return std::numeric_limits<int>::max();
       }
@@ -1111,6 +941,11 @@ namespace strumpack {
      * Returns the number of CUDA streams to use.
      */
     int cuda_streams() const { return cuda_streams_; }
+
+    /**
+     * Returns the precision for lossy compression.
+     */
+    int lossy_precision() const { return _lossy_precision; }
 
     /**
      * Info about the stats of the root front will be printed to
@@ -1201,37 +1036,27 @@ namespace strumpack {
         {"sp_matching",                  required_argument, 0, 17},
         {"sp_enable_assembly_tree_log",  no_argument, 0, 18},
         {"sp_disable_assembly_tree_log", no_argument, 0, 19},
-        {"sp_enable_hss",                no_argument, 0, 20},
-        {"sp_disable_hss",               no_argument, 0, 21},
-        {"sp_hss_min_front_size",        required_argument, 0, 22},
-        {"sp_hss_min_sep_size",          required_argument, 0, 23},
-        {"sp_enable_blr",                no_argument, 0, 24},
-        {"sp_disable_blr",               no_argument, 0, 25},
-        {"sp_blr_min_front_size",        required_argument, 0, 26},
-        {"sp_blr_min_sep_size",          required_argument, 0, 27},
-        {"sp_enable_hodlr",              no_argument, 0, 28},
-        {"sp_disable_hodlr",             no_argument, 0, 29},
-        {"sp_hodlr_min_front_size",      required_argument, 0, 30},
-        {"sp_hodlr_min_sep_size",        required_argument, 0, 31},
-        {"sp_compression",               required_argument, 0, 32},
-        {"sp_compression_min_sep_size",  required_argument, 0, 33},
-        {"sp_compression_leaf_size",     required_argument, 0, 34},
-        {"sp_separator_ordering_level",  required_argument, 0, 35},
-        {"sp_enable_indirect_sampling",  no_argument, 0, 36},
-        {"sp_disable_indirect_sampling", no_argument, 0, 37},
-        {"sp_enable_replace_tiny_pivots", no_argument, 0, 38},
-        {"sp_disable_replace_tiny_pivots", no_argument, 0, 39},
-        {"sp_nx",                        required_argument, 0, 40},
-        {"sp_ny",                        required_argument, 0, 41},
-        {"sp_nz",                        required_argument, 0, 42},
-        {"sp_components",                required_argument, 0, 43},
-        {"sp_separator_width",           required_argument, 0, 44},
-        {"sp_write_root_front",          no_argument, 0, 45},
-        {"sp_print_root_front_stats",    no_argument, 0, 46},
-        {"sp_enable_gpu",                no_argument, 0, 47},
-        {"sp_disable_gpu",               no_argument, 0, 48},
-        {"sp_cuda_cutoff",               required_argument, 0, 49},
-        {"sp_cuda_streams",              required_argument, 0, 50},
+        {"sp_compression",               required_argument, 0, 20},
+        {"sp_compression_min_sep_size",  required_argument, 0, 21},
+        {"sp_compression_min_front_size", required_argument, 0, 22},
+        {"sp_compression_leaf_size",     required_argument, 0, 23},
+        {"sp_separator_ordering_level",  required_argument, 0, 24},
+        {"sp_enable_indirect_sampling",  no_argument, 0, 25},
+        {"sp_disable_indirect_sampling", no_argument, 0, 26},
+        {"sp_enable_replace_tiny_pivots", no_argument, 0, 27},
+        {"sp_disable_replace_tiny_pivots", no_argument, 0, 28},
+        {"sp_nx",                        required_argument, 0, 29},
+        {"sp_ny",                        required_argument, 0, 30},
+        {"sp_nz",                        required_argument, 0, 31},
+        {"sp_components",                required_argument, 0, 32},
+        {"sp_separator_width",           required_argument, 0, 33},
+        {"sp_write_root_front",          no_argument, 0, 34},
+        {"sp_print_root_front_stats",    no_argument, 0, 35},
+        {"sp_enable_gpu",                no_argument, 0, 36},
+        {"sp_disable_gpu",               no_argument, 0, 37},
+        {"sp_cuda_cutoff",               required_argument, 0, 38},
+        {"sp_cuda_streams",              required_argument, 0, 39},
+        {"sp_lossy_precision",           required_argument, 0, 40},
         {"sp_verbose",                   no_argument, 0, 'v'},
         {"sp_quiet",                     no_argument, 0, 'q'},
         {"help",                         no_argument, 0, 'h'},
@@ -1287,20 +1112,13 @@ namespace strumpack {
         } break;
         case 7: {
           std::string s; std::istringstream iss(optarg); iss >> s;
-          if (s == "natural")
-            set_reordering_method(ReorderingStrategy::NATURAL);
-          else if (s == "metis")
-            set_reordering_method(ReorderingStrategy::METIS);
-          else if (s == "parmetis")
-            set_reordering_method(ReorderingStrategy::PARMETIS);
-          else if (s == "scotch")
-            set_reordering_method(ReorderingStrategy::SCOTCH);
-          else if (s == "ptscotch")
-            set_reordering_method(ReorderingStrategy::PTSCOTCH);
-          else if (s == "geometric")
-            set_reordering_method(ReorderingStrategy::GEOMETRIC);
-          else if (s == "rcm")
-            set_reordering_method(ReorderingStrategy::RCM);
+          if (s == "natural") set_reordering_method(ReorderingStrategy::NATURAL);
+          else if (s == "metis") set_reordering_method(ReorderingStrategy::METIS);
+          else if (s == "parmetis") set_reordering_method(ReorderingStrategy::PARMETIS);
+          else if (s == "scotch") set_reordering_method(ReorderingStrategy::SCOTCH);
+          else if (s == "ptscotch") set_reordering_method(ReorderingStrategy::PTSCOTCH);
+          else if (s == "geometric") set_reordering_method(ReorderingStrategy::GEOMETRIC);
+          else if (s == "rcm") set_reordering_method(ReorderingStrategy::RCM);
           else std::cerr << "# WARNING: matrix reordering strategy not"
                  " recognized, use 'metis', 'parmetis', 'scotch', 'ptscotch',"
                  " 'geometric' or 'rcm'" << std::endl;
@@ -1325,112 +1143,88 @@ namespace strumpack {
         } break;
         case 18: { enable_assembly_tree_log(); } break;
         case 19: { disable_assembly_tree_log(); } break;
-        case 20: { enable_HSS(); } break;
-        case 21: { disable_HSS(); } break;
-        case 22: {
-          std::istringstream iss(optarg);
-          iss >> _hss_min_front_size;
-          set_HSS_min_front_size(_hss_min_front_size);
-        } break;
-        case 23: {
-          std::istringstream iss(optarg);
-          iss >> _hss_min_sep_size;
-          set_HSS_min_sep_size(_hss_min_sep_size);
-        } break;
-        case 24: { enable_BLR(); } break;
-        case 25: { disable_BLR(); } break;
-        case 26: {
-          std::istringstream iss(optarg);
-          iss >> _blr_min_front_size;
-          set_BLR_min_front_size(_blr_min_front_size);
-        } break;
-        case 27: {
-          std::istringstream iss(optarg);
-          iss >> _blr_min_sep_size;
-          set_BLR_min_sep_size(_blr_min_sep_size);
-        } break;
-        case 28: { enable_HODLR(); } break;
-        case 29: { disable_HODLR(); } break;
-        case 30: {
-          std::istringstream iss(optarg);
-          iss >> _hodlr_min_front_size;
-          set_HODLR_min_front_size(_hodlr_min_front_size);
-        } break;
-        case 31: {
-          std::istringstream iss(optarg);
-          iss >> _hodlr_min_sep_size;
-          set_HODLR_min_sep_size(_hodlr_min_sep_size);
-        } break;
-        case 32: {
+        case 20: {
           std::string s; std::istringstream iss(optarg); iss >> s;
           for (auto& c : s) c = std::toupper(c);
           if (s == "NONE") set_compression(CompressionType::NONE);
           else if (s == "HSS") set_compression(CompressionType::HSS);
           else if (s == "BLR") set_compression(CompressionType::BLR);
           else if (s == "HODLR") set_compression(CompressionType::HODLR);
+          else if (s == "LOSSY") set_compression(CompressionType::LOSSY);
           else std::cerr << "# WARNING: compression type not"
-                 " recognized, use 'none', 'hss', 'blr' or 'hodlr'"
+                 " recognized, use 'none', 'hss', 'blr', 'hodlr' or 'lossy'"
                          << std::endl;
         } break;
-        case 33: {
+        case 21: {
           std::istringstream iss(optarg);
           int min_sep;
           iss >> min_sep;
           set_compression_min_sep_size(min_sep);
         } break;
-        case 34: {
+        case 22: {
+          std::istringstream iss(optarg);
+          int min_front;
+          iss >> min_front;
+          set_compression_min_front_size(min_front);
+        } break;
+        case 23: {
           std::istringstream iss(optarg);
           int ls;
           iss >> ls;
           set_compression_leaf_size(ls);
         } break;
-        case 35: {
+        case 24: {
           std::istringstream iss(optarg);
           iss >> _sep_order_level;
           set_separator_ordering_level(_sep_order_level);
         } break;
-        case 36: { enable_indirect_sampling(); } break;
-        case 37: { disable_indirect_sampling(); } break;
-        case 38: { enable_replace_tiny_pivots(); } break;
-        case 39: { disable_replace_tiny_pivots(); } break;
-        case 40: {
+        case 25: { enable_indirect_sampling(); } break;
+        case 26: { disable_indirect_sampling(); } break;
+        case 27: { enable_replace_tiny_pivots(); } break;
+        case 28: { disable_replace_tiny_pivots(); } break;
+        case 29: {
           std::istringstream iss(optarg);
           iss >> _nx;
           set_nx(_nx);
         } break;
-        case 41: {
+        case 30: {
           std::istringstream iss(optarg);
           iss >> _ny;
           set_ny(_ny);
         } break;
-        case 42: {
+        case 31: {
           std::istringstream iss(optarg);
           iss >> _nz;
           set_nz(_nz);
         } break;
-        case 43: {
+        case 32: {
           std::istringstream iss(optarg);
           iss >> _components;
           set_components(_components);
         } break;
-        case 44: {
+        case 33: {
           std::istringstream iss(optarg);
           iss >> _separator_width;
           set_separator_width(_separator_width);
         } break;
-        case 45: set_write_root_front(true); break;
-        case 46: set_print_root_front_stats(true); break;
-        case 47: enable_gpu(); break;
-        case 48: disable_gpu(); break;
-        case 49: {
+        case 34: set_write_root_front(true); break;
+        case 35: set_print_root_front_stats(true); break;
+        case 36: enable_gpu(); break;
+        case 37: disable_gpu(); break;
+        case 38: {
           std::istringstream iss(optarg);
           iss >> cuda_cutoff_;
           set_cuda_cutoff(cuda_cutoff_);
         } break;
-        case 50: {
+        case 39: {
           std::istringstream iss(optarg);
           iss >> cuda_streams_;
           set_cuda_streams(cuda_streams_);
+        } break;
+        case 40: {
+          std::istringstream iss(optarg);
+          iss >> _lossy_precision;
+          set_lossy_precision(_lossy_precision);
         } break;
         case 'h': { describe_options(); } break;
         case 'v': set_verbose(true); break;
@@ -1528,35 +1322,7 @@ namespace strumpack {
       for (int i=0; i<7; i++)
         std::cout << "#      " << i << " " <<
           get_description(get_matching(i)) << std::endl;
-      std::cout << "#   --sp_enable_hss (default " << std::boolalpha
-                << use_HSS() << ")" << std::endl;
-      std::cout << "#   --sp_disable_hss (default " << std::boolalpha
-                << !use_HSS() << ")" << std::endl;
-      // std::cout << "#   --sp_hss_min_front_size int (default "
-      //           << HSS_min_front_size() << ")" << std::endl;
-      // std::cout << "#          minimum size of front for HSS compression"
-      //           << std::endl;
-      std::cout << "#   --sp_hss_min_sep_size int (default "
-                << HSS_min_sep_size() << ")" << std::endl;
-      std::cout << "#          minimum size of the separator for HSS"
-                << " compression of the front" << std::endl;
-      std::cout << "#   --sp_enable_blr (default " << std::boolalpha
-                << use_BLR() << ")" << std::endl;
-      std::cout << "#   --sp_disable_blr (default " << std::boolalpha
-                << !use_BLR() << ")" << std::endl;
-      std::cout << "#   --sp_blr_min_sep_size int (default "
-                << BLR_min_sep_size() << ")" << std::endl;
-      std::cout << "#          minimum size of the separator for BLR"
-                << " compression of the front" << std::endl;
-      std::cout << "#   --sp_enable_hodlr (default " << std::boolalpha
-                << use_HODLR() << ")" << std::endl;
-      std::cout << "#   --sp_disable_hodlr (default " << std::boolalpha
-                << !use_HODLR() << ")" << std::endl;
-      std::cout << "#   --sp_hodlr_min_sep_size int (default "
-                << HODLR_min_sep_size() << ")" << std::endl;
-      std::cout << "#          minimum size of the separator for HODLR"
-                << " compression of the front" << std::endl;
-      std::cout << "#   --sp_compression [none|hss|blr|hodlr]" << std::endl
+      std::cout << "#   --sp_compression [none|hss|blr|hodlr|lossy]" << std::endl
                 << "#          type of rank-structured compression to use"
                 << std::endl;
       std::cout << "#   --sp_compression_min_sep_size (default "
@@ -1583,6 +1349,9 @@ namespace strumpack {
       std::cout << "#   --sp_cuda_streams (default "
                 << cuda_streams() << ")" << std::endl
                 << "#          number of CUDA streams" << std::endl;
+      std::cout << "#   --sp_lossy_precision [1-64] (default "
+                << lossy_precision() << ")" << std::endl
+                << "#          lossy compression precicion" << std::endl;
       std::cout << "#   --sp_verbose or -v (default " << verbose() << ")"
                 << std::endl;
       std::cout << "#   --sp_quiet or -q (default " << !verbose() << ")"
@@ -1644,6 +1413,11 @@ namespace strumpack {
 #endif
     int _hodlr_min_front_size = 1000;
     int _hodlr_min_sep_size = 256;
+
+    /** LOSSY options */
+    int _lossy_min_front_size = 16;
+    int _lossy_min_sep_size = 8;
+    int _lossy_precision = 16;
 
     int _argc = 0;
     char** _argv = nullptr;

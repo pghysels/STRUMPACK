@@ -560,16 +560,13 @@ namespace strumpack {
     symm_sparse_ = true;
   }
 
-  template<typename scalar_t> scalar_t
-  get_scalar(double vr, double vi) {
+  template<typename scalar_t> scalar_t get_scalar(double vr, double vi) {
     return scalar_t(vr);
   }
-  template<> inline std::complex<double>
-  get_scalar(double vr, double vi) {
+  template<> inline std::complex<double> get_scalar(double vr, double vi) {
     return std::complex<double>(vr, vi);
   }
-  template<> inline std::complex<float>
-  get_scalar(double vr, double vi) {
+  template<> inline std::complex<float> get_scalar(double vr, double vi) {
     return std::complex<float>(vr, vi);
   }
 

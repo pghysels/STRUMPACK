@@ -85,7 +85,7 @@ namespace strumpack {
     (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
      int task_depth=0) const override;
 
-    void multifrontal_factorization
+    virtual void multifrontal_factorization
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,
      int etree_level=0, int task_depth=0) override;
 
@@ -110,7 +110,7 @@ namespace strumpack {
     }
 #endif
 
-  private:
+  protected:
     DenseM_t F11_, F12_, F21_, F22_;
     std::vector<int> piv; // regular int because it is passed to BLAS
 
@@ -124,15 +124,15 @@ namespace strumpack {
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,
      int etree_level, int task_depth);
 
-    void fwd_solve_phase2
+    virtual void fwd_solve_phase2
     (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const;
-    void bwd_solve_phase1
+    virtual void bwd_solve_phase1
     (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const;
 
     using F_t::lchild_;
-    using FrontalMatrix<scalar_t,integer_t>::rchild_;
-    using FrontalMatrix<scalar_t,integer_t>::dim_sep;
-    using FrontalMatrix<scalar_t,integer_t>::dim_upd;
+    using F_t::rchild_;
+    using F_t::dim_sep;
+    using F_t::dim_upd;
   };
 
   template<typename scalar_t,typename integer_t>
@@ -176,7 +176,6 @@ namespace strumpack {
   FrontalMatrixDense<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
-    TaskTimer t("");
     if (task_depth == 0) {
       // use tasking for children and for extend-add parallelism
 #pragma omp parallel if(!omp_in_parallel()) default(shared)
@@ -184,18 +183,10 @@ namespace strumpack {
       factor_phase1(A, opts, etree_level, task_depth);
       // do not use tasking for blas/lapack parallelism (use system
       // blas threading!)
-      if (etree_level == 0 && opts.print_root_front_stats()) t.start();
       factor_phase2(A, opts, etree_level, params::task_recursion_cutoff_level);
     } else {
       factor_phase1(A, opts, etree_level, task_depth);
-      if (etree_level == 0 && opts.print_root_front_stats()) t.start();
       factor_phase2(A, opts, etree_level, task_depth);
-    }
-    if (etree_level == 0 && opts.print_root_front_stats()) {
-      auto time = t.elapsed();
-      std::cout << "#   - dense root front: N = " << dim_sep()
-                << " , N^2 = " << dim_sep() * dim_sep()
-                << " time = " << time << " sec" << std::endl;
     }
   }
 
@@ -249,6 +240,8 @@ namespace strumpack {
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
     if (dim_sep()) {
+      TaskTimer t("");
+      if (etree_level == 0 && opts.print_root_front_stats()) t.start();
       piv = F11_.LU(task_depth);
       if (opts.replace_tiny_pivots()) {
         // TODO consider other values for thresh
@@ -266,6 +259,12 @@ namespace strumpack {
              scalar_t(1.), F11_, F21_, task_depth);
         gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_,
              scalar_t(1.), F22_, task_depth);
+      }
+      if (etree_level == 0 && opts.print_root_front_stats()) {
+        auto time = t.elapsed();
+        std::cout << "#   - dense root front: N = " << dim_sep()
+                  << " , N^2 = " << dim_sep() * dim_sep()
+                  << " time = " << time << " sec" << std::endl;
       }
     }
     STRUMPACK_FULL_RANK_FLOPS

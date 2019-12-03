@@ -18,6 +18,7 @@ option(TPL_ENABLE_SCOTCH "Build with support for Scotch/PTScotch" OFF)
 option(TPL_ENABLE_PAPI "Build with support for PAPI monitoring" OFF)
 option(TPL_ENABLE_COMBBLAS "Use CombBLAS for weighted matching" OFF)
 option(TPL_ENABLE_BPACK "Use BPACK (ButterflyPACK) code by Yang Liu" OFF)
+option(TPL_ENABLE_ZFP "Build with support for ZFP compression" OFF)
 
 option(STRUMPACK_COUNT_FLOPS "Build with flop counters" ON)
 option(STRUMPACK_TASK_TIMERS "Build with timers for internal routines" OFF)
@@ -298,6 +299,13 @@ if(TPL_ENABLE_SLATE)
   endif()
 endif()
 
+if(TPL_ENABLE_ZFP)
+  message(STATUS "Enabling ZFP support")
+  option(STRUMPACK_USE_ZFP "" ON)
+  set(LIBS ${TPL_ZFP_LIBRARIES} ${LIBS})
+  include_directories(${TPL_ZFP_INCLUDE_DIRS})
+endif()
+
 if(STRUMPACK_USE_MPI)
   if(TPL_ENABLE_COMBBLAS)
     option(STRUMPACK_USE_COMBBLAS "" ON)
@@ -533,6 +541,7 @@ install(FILES
   src/sparse/FrontalMatrixHSS.hpp
   src/sparse/FrontalMatrixBLR.hpp
   src/sparse/FrontalMatrixHODLR.hpp
+  src/sparse/FrontalMatrixLossy.hpp
   src/sparse/GMRes.hpp
   src/sparse/GeometricReordering.hpp
   src/sparse/IterativeRefinement.hpp
