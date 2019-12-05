@@ -145,9 +145,11 @@ fi
 
 if [[ $(hostname -s) = "pieterg-X8DA3" ]]; then
     found_host=true
-    BPACKHOME=/home/pieterg/LBL/STRUMPACK/ButterflyPACK/
+    BPACKHOME=$HOME/LBL/STRUMPACK/ButterflyPACK/
+    PARMETISHOME=$HOME/local/parmetis-4.0.3/
+    ZFPHOME=/home/pieterg/local/zfp-0.5.5/install/
     cmake ../ \
-          -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_INSTALL_PREFIX=../install \
           -DBUILD_SHARED_LIBS=ON \
           -DSTRUMPACK_USE_MPI=ON \
@@ -165,9 +167,15 @@ if [[ $(hostname -s) = "pieterg-X8DA3" ]]; then
           -DTPL_SCOTCH_LIBRARIES="$HOME/local/scotch_6.0.4/lib/libscotch.a;$HOME/local/scotch_6.0.4/lib/libscotcherr.a;$HOME/local/scotch_6.0.4/lib/libptscotch.a;$HOME/local/scotch_6.0.4/lib/libptscotcherr.a" \
           -DTPL_ENABLE_BPACK=ON \
           -DTPL_BPACK_INCLUDE_DIRS="$BPACKHOME/SRC_DOUBLE/;$BPACKHOME/SRC_DOUBLECOMPLEX" \
-          -DTPL_BPACK_LIBRARIES="-L$BPACKHOME/build/SRC_DOUBLE/ -ldbutterflypack -L$BPACKHOME/build/SRC_DOUBLECOMPLEX/ -lzbutterflypack"
+          -DTPL_BPACK_LIBRARIES="-L$BPACKHOME/build/SRC_DOUBLE/ -ldbutterflypack -L$BPACKHOME/build/SRC_DOUBLECOMPLEX/ -lzbutterflypack" \
+          -DTPL_ENABLE_ZFP=ON \
+          -DTPL_ZFP_INCLUDE_DIRS=$ZFPHOME/include \
+          -DTPL_ZFP_LIBRARIES="$ZFPHOME/lib/libzfp.so"
 
-#    -DTPL_BPACK_LIBRARIES="$BPACKHOME/build/SRC_DOUBLE/libdbutterflypack.a;$BPACKHOME/build/SRC_DOUBLECOMPLEX/libzbutterflypack.a"
+
+    #-DCMAKE_CXX_FLAGS="-pg" \
+    #-DTPL_BPACK_LIBRARIES="$BPACKHOME/build/SRC_DOUBLE/libdbutterflypack.a;$BPACKHOME/build/SRC_DOUBLECOMPLEX/libzbutterflypack.a"
+
 fi
 
 

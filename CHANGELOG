@@ -1,5 +1,15 @@
-Version 3.3.0 Released November 7, 2019
+Version 3.xx In Progress
 ======================================
+ - Added Lossy compression: --sp_compression lossy, using ZFP.
+   Make sure to configure with ZFP support!
+ - Removed some options: --sp_enable HSS, --sp_HSS_min_sep_size,
+   etc..  Now one should use: --sp_compression HSS,
+   --sp_compression_min_sep_size ...
+ - Several bug fixes and performance improvements
+
+
+Version 3.3.0 Released November 7, 2019
+=======================================
  - Initial support for cuBLAS and cuSOLVER.
  - Improved performance in the HODLR (+ butterfly) preconditioner
  - Added a Helmholtz example
