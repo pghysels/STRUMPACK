@@ -62,10 +62,14 @@ namespace strumpack {
       zfp_stream_close(stream);
       stream_close(bstream);
     }
-
     DenseMatrix<T> decompress() const {
       DenseMatrix<T> F(rows_, cols_);
-      if (!rows_ || !cols_) return F;
+      decompress(F);
+      return F;
+    }
+    void decompress(DenseMatrix<T>& F) const {
+      assert(F.rows() == rows_ && F.cols() == cols_);
+      if (!rows_ || !cols_) return;
       zfp_field* f = zfp_field_2d
         (static_cast<void*>(F.data()), get_zfp_type<T>(), rows_, cols_);
       zfp_stream* destream = zfp_stream_open(NULL);
@@ -79,14 +83,16 @@ namespace strumpack {
       zfp_field_free(f);
       zfp_stream_close(destream);
       stream_close(bstream);
-      return F;
+      return;
     }
     std::size_t compressed_size() const {
       return buffer_.size();
     }
+    std::size_t rows() const { return rows_; }
+    std::size_t cols() const { return cols_; }
   private:
-    int rows_ = 0, cols_ = 0;
-    uint prec_;
+    std::size_t rows_ = 0, cols_ = 0;
+    uint prec_ = 16;
     std::vector<uchar> buffer_;
   };
 
@@ -105,18 +111,24 @@ namespace strumpack {
       Fimag_ = LossyMatrix<T>(Fimag, prec);
     }
     DenseMatrix<std::complex<T>> decompress() const {
+      DenseMatrix<std::complex<T>> F(rows(), cols());
+      decompress(F);
+      return F;
+    }
+    void decompress(DenseMatrix<std::complex<T>>& F) const {
       auto Freal = Freal_.decompress();
       auto Fimag = Fimag_.decompress();
-      int rows = Freal.rows(), cols = Freal.cols();
-      DenseMatrix<std::complex<T>> F(rows, cols);
+      int rows = Freal_.rows(), cols = Freal_.cols();
       for (int j=0; j<cols; j++)
         for (int i=0; i<rows; i++)
           F(i, j) = std::complex<T>(Freal(i,j), Fimag(i,j));
-      return F;
+      return;
     }
     std::size_t compressed_size() const {
       return Freal_.compressed_size() + Fimag_.compressed_size();
     }
+    std::size_t rows() const { return Freal_.rows(); }
+    std::size_t cols() const { return Freal_.cols(); }
   private:
     LossyMatrix<T> Freal_, Fimag_;
   };

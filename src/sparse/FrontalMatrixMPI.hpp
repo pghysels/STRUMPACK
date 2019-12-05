@@ -176,8 +176,8 @@ namespace strumpack {
     using FrontalMatrix<scalar_t,integer_t>::lchild_;
     using FrontalMatrix<scalar_t,integer_t>::rchild_;
 
-  private:
-    long long node_factor_nonzeros() const override;
+  protected:
+    virtual long long node_factor_nonzeros() const override;
   };
 
   template<typename scalar_t,typename integer_t>

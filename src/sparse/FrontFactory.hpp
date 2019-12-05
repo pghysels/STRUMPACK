@@ -195,37 +195,40 @@ namespace strumpack {
     switch (opts.compression()) {
     case CompressionType::HSS: {
       if (is_HSS(dsep, dupd, compressed_parent, opts)) {
-        using FHSSMPI_t = FrontalMatrixHSSMPI<scalar_t,integer_t>;
-        front.reset(new FHSSMPI_t(s, sbegin, send, upd, comm, P));
+        front.reset
+          (new FrontalMatrixHSSMPI<scalar_t,integer_t>
+           (s, sbegin, send, upd, comm, P));
         if (root) fc.HSS++;
       }
     } break;
     case CompressionType::BLR: {
       if (is_BLR(dsep, dupd, compressed_parent, opts)) {
-        using FBLRMPI_t = FrontalMatrixBLRMPI<scalar_t,integer_t>;
-        front.reset(new FBLRMPI_t(s, sbegin, send, upd, comm, P));
+        front.reset
+          (new FrontalMatrixBLRMPI<scalar_t,integer_t>
+           (s, sbegin, send, upd, comm, P));
         if (root) fc.BLR++;
       }
     } break;
     case CompressionType::HODLR: {
       if (is_HODLR(dsep, dupd, compressed_parent, opts)) {
 #if defined(STRUMPACK_USE_BPACK)
-        using FHODLRMPI_t = FrontalMatrixHODLRMPI<scalar_t,integer_t>;
-        front.reset(new FHODLRMPI_t(s, sbegin, send, upd, comm, P));
+        front.reset
+          (new FrontalMatrixHODLRMPI<scalar_t,integer_t>
+           (s, sbegin, send, upd, comm, P));
         if (root) fc.HODLR++;
 #endif
       }
     } break;
-      //case CompressionType::LOSSY: // TODO not implemented yet!
+      //case CompressionType::LOSSY:
+      // this is handled in FrontalMatrixDenseMPI
+      //case CompressionType::NONE:
     }
     if (!front) {
-      using FDMPI_t = FrontalMatrixDenseMPI<scalar_t,integer_t>;
-      front.reset(new FDMPI_t(s, sbegin, send, upd, comm, P));
+      front.reset
+        (new FrontalMatrixDenseMPI<scalar_t,integer_t>
+         (s, sbegin, send, upd, comm, P));
       if (root) fc.dense++;
     }
-
-    // TODO add lossy/lossless compression!!
-
     return front;
   }
 #endif

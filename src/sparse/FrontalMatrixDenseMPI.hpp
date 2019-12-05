@@ -34,14 +34,12 @@
 #include <algorithm>
 #include <cmath>
 #include "misc/TaskTimer.hpp"
-#include "misc/MPIWrapper.hpp"
 #include "dense/DistributedMatrix.hpp"
 #include "CompressedSparseMatrix.hpp"
-#include "MatrixReordering.hpp"
 #include "FrontalMatrixMPI.hpp"
-#include "FrontalMatrixDense.hpp"
-#include "FrontalMatrixBLR.hpp"
-
+#if defined(STRUMPACK_USE_ZFP)
+#include "FrontalMatrixLossy.hpp"
+#endif
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
 #define LAPACK_COMPLEX_CPP
 #include <slate/slate.hh>
@@ -72,8 +70,6 @@ namespace strumpack {
     FrontalMatrixDenseMPI& operator=(FDMPI_t const&) = delete;
 
     void release_work_memory() override;
-    void build_front(const SpMat_t& A);
-    void partial_factorization();
 
     void extend_add();
     void extend_add_copy_to_buffers
@@ -104,11 +100,24 @@ namespace strumpack {
 
     std::string type() const override { return "FrontalMatrixDenseMPI"; }
 
+    long long node_factor_nonzeros() const override;
+
   private:
     DistM_t F11_, F12_, F21_, F22_;
     std::vector<int> piv;
+
+    void build_front(const SpMat_t& A);
+    void partial_factorization();
+
+    void fwd_solve_phase2
+    (const DistM_t& F11, const DistM_t& F12, const DistM_t& F21,
+     DistM_t& b, DistM_t& bupd) const;
+    void bwd_solve_phase1
+    (const DistM_t& F11, const DistM_t& F12, const DistM_t& F21,
+     DistM_t& y, DistM_t& yupd) const;
+
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
-    slate::Matrix<scalar_t> slateF11_, slateF12_, slateF21_, slateF22_;
+    //slate::Matrix<scalar_t> slateF11_, slateF12_, slateF21_, slateF22_;
     slate::Pivots slate_piv_;
     //#if defined(STRUMPACK_USE_CUDA)
     // std::map<slate::Option, slate::Value> slate_opts_ =
@@ -116,6 +125,16 @@ namespace strumpack {
     //#else
     std::map<slate::Option, slate::Value> slate_opts_;
     //#endif
+
+    slate::Matrix<scalar_t> slate_matrix(DistM_t& M) const;
+#endif
+
+#if defined(STRUMPACK_USE_ZFP)
+    LossyMatrix<scalar_t> F11c_, F12c_, F21c_;
+    bool compressed_ = false;
+
+    void compress(const SPOptions<scalar_t>& opts);
+    void decompress(DistM_t& F11, DistM_t& F12, DistM_t& F21) const;
 #endif
 
     using FrontalMatrix<scalar_t,integer_t>::lchild_;
@@ -140,6 +159,17 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::release_work_memory() {
     F22_.clear(); // remove the update block
+  }
+
+  template<typename scalar_t,typename integer_t> long long
+  FrontalMatrixDenseMPI<scalar_t,integer_t>::node_factor_nonzeros() const {
+#if defined(STRUMPACK_USE_ZFP)
+    if (compressed_)
+      return (F11c_.compressed_size() + F12c_.compressed_size() +
+              F21c_.compressed_size()) / sizeof(scalar_t);
+    else
+#endif
+      return FMPI_t::node_factor_nonzeros();
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -187,44 +217,26 @@ namespace strumpack {
       F22_.zero();
     }
     extend_add();
-#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
-    if (Comm().is_root())
-      std::cout << "creating slate, dsep=" << dsep << " dupd=" << dupd << std::endl;
-    if (dsep) {
-      slateF11_ = slate::Matrix<scalar_t>::fromScaLAPACK
-        (F11_.rows(), F11_.cols(), F11_.data(), F11_.ld(),
-         F11_.MB(), F11_.nprows(), F11_.npcols(), F11_.comm());
-      if (dupd) {
-        slateF12_ = slate::Matrix<scalar_t>::fromScaLAPACK
-          (F12_.rows(), F12_.cols(), F12_.data(), F12_.ld(),
-           F12_.MB(), F12_.nprows(), F12_.npcols(), F12_.comm());
-        slateF21_ = slate::Matrix<scalar_t>::fromScaLAPACK
-          (F21_.rows(), F21_.cols(), F21_.data(), F21_.ld(),
-           F21_.MB(), F21_.nprows(), F21_.npcols(), F21_.comm());
-      }
-    }
-    if (dupd)
-      slateF22_ = slate::Matrix<scalar_t>::fromScaLAPACK
-        (F22_.rows(), F22_.cols(), F22_.data(), F22_.ld(),
-         F22_.MB(), F22_.nprows(), F22_.npcols(), F22_.comm());
-#endif
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::partial_factorization() {
     if (this->dim_sep() && grid()->active()) {
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
-      slate::getrf(slateF11_, slate_piv_, slate_opts_);
+      auto slateF11 = slate_matrix(F11_);
+      slate::getrf(slateF11, slate_piv_, slate_opts_);
 #else
       piv = F11_.LU();
 #endif
       STRUMPACK_FULL_RANK_FLOPS(LU_flops(F11_));
       if (this->dim_upd()) {
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
-	slate::getrs(slateF11_, slate_piv_, slateF12_, slate_opts_);
-	STRUMPACK_FULL_RANK_FLOPS(LU_flops(F11_));
-	slate::gemm(scalar_t(-1.), slateF21_, slateF12_,
-                    scalar_t(1.), slateF22_, slate_opts_);
+        auto slateF12 = slate_matrix(F12_);
+        auto slateF21 = slate_matrix(F21_);
+        auto slateF22 = slate_matrix(F22_);
+        slate::getrs(slateF11, slate_piv_, slateF12, slate_opts_);
+        slate::gemm(scalar_t(-1.), slateF21, slateF12,
+                    scalar_t(1.), slateF22, slate_opts_);
 #else
         F12_.laswp(piv, true);
         trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11_, F12_);
@@ -238,6 +250,15 @@ namespace strumpack {
       }
     }
   }
+
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+  template<typename scalar_t,typename integer_t> slate::Matrix<scalar_t>
+  FrontalMatrixDenseMPI<scalar_t,integer_t>::slate_matrix(DistM_t& M) const {
+    return slate::Matrix<scalar_t>::fromScaLAPACK
+      (M.rows(), M.cols(), M.data(), M.ld(), M.MB(),
+       M.nprows(), M.npcols(), M.comm());
+  }
+#endif
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::multifrontal_factorization
@@ -257,6 +278,9 @@ namespace strumpack {
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
     partial_factorization();
+#if defined(STRUMPACK_USE_ZFP)
+    compress(opts);
+#endif
     if (etree_level == 0 && opts.print_root_front_stats()) {
       auto time = t.elapsed();
       if (Comm().is_root())
@@ -265,9 +289,75 @@ namespace strumpack {
     }
   }
 
+#if defined(STRUMPACK_USE_ZFP)
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixDenseMPI<scalar_t,integer_t>::compress
+  (const SPOptions<scalar_t>& opts) {
+    if (opts.compression() == CompressionType::LOSSY) {
+      auto prec = opts.lossy_precision();
+      F11c_ = LossyMatrix<scalar_t>(F11_.dense_wrapper(), prec);
+      F12c_ = LossyMatrix<scalar_t>(F12_.dense_wrapper(), prec);
+      F21c_ = LossyMatrix<scalar_t>(F21_.dense_wrapper(), prec);
+      F11_.clear();
+      F12_.clear();
+      F21_.clear();
+      compressed_ = true;
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixDenseMPI<scalar_t,integer_t>::decompress
+  (DistM_t& F11, DistM_t& F12, DistM_t& F21) const {
+    if (this->dim_sep()) {
+      auto wF11 = F11.dense_wrapper();
+      F11c_.decompress(wF11);
+      if (this->dim_upd()) {
+        auto wF12 = F12.dense_wrapper();
+        F12c_.decompress(wF12);
+        auto wF21 = F21.dense_wrapper();
+        F21c_.decompress(wF21);
+      }
+    }
+  }
+#endif
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixDenseMPI<scalar_t,integer_t>::fwd_solve_phase2
+  (const DistM_t& F11, const DistM_t& F12, const DistM_t& F21,
+   DistM_t& b, DistM_t& bupd) const {
+    TIMER_TIME(TaskType::SOLVE_LOWER, 0, t_s);
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+    if (this->dim_sep()) {
+      auto sbloc = slate_matrix(b);
+      auto slateF11 = slate_matrix(F11);
+      slate::getrs(slateF11, const_cast<slate::Pivots&>(slate_piv_),
+                   sbloc, slate_opts_);
+      if (this->dim_upd()) {
+        auto sbupd = slate_matrix(bupd);
+        auto slateF21 = slate_matrix(F21);
+        slate::gemm
+          (scalar_t(-1.), slateF21, sbloc, scalar_t(1.), sbupd, slate_opts_);
+      }
+    }
+#else
+    if (this->dim_sep()) {
+      b.laswp(piv, true);
+      if (b.cols() == 1) {
+        trsv(UpLo::L, Trans::N, Diag::U, F11, b);
+        if (this->dim_upd())
+          gemv(Trans::N, scalar_t(-1.), F21, b, scalar_t(1.), bupd);
+      } else {
+        trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11, b);
+        if (this->dim_upd())
+          gemm(Trans::N, Trans::N, scalar_t(-1.), F21, b, scalar_t(1.), bupd);
+      }
+    }
+#endif
+  }
+
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::forward_multifrontal_solve
-  (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
+  (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t&,
    int etree_level) const {
     DistM_t CBl, CBr;
     DenseM_t seqCBl, seqCBr;
@@ -281,70 +371,66 @@ namespace strumpack {
     bupd = DistM_t(grid(), this->dim_upd(), b.cols());
     bupd.zero();
     this->extend_add_b(b, bupd, CBl, CBr, seqCBl, seqCBr);
-    if (this->dim_sep()) {
-      TIMER_TIME(TaskType::SOLVE_LOWER, 0, t_s);
-#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
-      auto sbloc = slate::Matrix<scalar_t>::fromScaLAPACK
-	(b.rows(), b.cols(), b.data(), b.ld(),
-	 b.MB(), b.nprows(), b.npcols(), b.comm());
-      slate::getrs(const_cast<slate::Matrix<scalar_t>&>(slateF11_),
-		   const_cast<slate::Pivots&>(slate_piv_), sbloc, slate_opts_);
-      if (this->dim_upd()) {
-	auto sbupd = slate::Matrix<scalar_t>::fromScaLAPACK
-	  (bupd.rows(), bupd.cols(), bupd.data(), bupd.ld(),
-	   bupd.MB(), bupd.nprows(), bupd.npcols(), bupd.comm());
-	slate::gemm
-	  (scalar_t(-1.), const_cast<slate::Matrix<scalar_t>&>(slateF21_),
-	   sbloc, scalar_t(1.), sbupd, slate_opts_);
-      }
-#else
-      b.laswp(piv, true);
-      if (b.cols() == 1) {
-        trsv(UpLo::L, Trans::N, Diag::U, F11_, b);
-        if (this->dim_upd())
-          gemv(Trans::N, scalar_t(-1.), F21_, b, scalar_t(1.), bupd);
-      } else {
-        trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11_, b);
-        if (this->dim_upd())
-          gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, b, scalar_t(1.), bupd);
-      }
+#if defined(STRUMPACK_USE_ZFP)
+    if (compressed_) {
+      const auto dupd = this->dim_upd();
+      const auto dsep = this->dim_sep();
+      DistM_t F11(grid(), dsep, dsep), F12(grid(), dsep, dupd),
+        F21(grid(), dupd, dsep);
+      decompress(F11, F12, F21);
+      fwd_solve_phase2(F11, F12, F21, b, bupd);
+    } else
 #endif
-      TIMER_STOP(t_s);
+      fwd_solve_phase2(F11_, F12_, F21_, b, bupd);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixDenseMPI<scalar_t,integer_t>::bwd_solve_phase1
+  (const DistM_t& F11, const DistM_t& F12, const DistM_t& F21,
+   DistM_t& y, DistM_t& yupd) const {
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+    if (this->dim_sep()) {
+      if (this->dim_upd()) {
+        TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_s);
+        auto sy = slate_matrix(y);
+        auto syupd = slate_matrix(yupd);
+        auto slateF12 = slate_matrix(F12);
+        slate::gemm
+          (scalar_t(-1.), slateF12, syupd, scalar_t(1.), sy, slate_opts_);
+      }
     }
+#else
+    if (this->dim_sep()) {
+      TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_s);
+      if (y.cols() == 1) {
+        if (this->dim_upd())
+          gemv(Trans::N, scalar_t(-1.), F12, yupd, scalar_t(1.), y);
+        trsv(UpLo::U, Trans::N, Diag::N, F11, y);
+      } else {
+        if (this->dim_upd())
+          gemm(Trans::N, Trans::N, scalar_t(-1.), F12, yupd, scalar_t(1.), y);
+        trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11, y);
+      }
+    }
+#endif
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::backward_multifrontal_solve
-  (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
+  (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t&,
    int etree_level) const {
     DistM_t& y = ydist[this->sep_];
-    if (this->dim_sep()) {
-      TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_s);
-#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
-      if (this->dim_upd()) {
-	auto sy = slate::Matrix<scalar_t>::fromScaLAPACK
-	  (y.rows(), y.cols(), y.data(), y.ld(), y.MB(),
-	   y.nprows(), y.npcols(), y.comm());
-	auto syupd = slate::Matrix<scalar_t>::fromScaLAPACK
-	  (yupd.rows(), yupd.cols(), yupd.data(), yupd.ld(), yupd.MB(),
-	   yupd.nprows(), yupd.npcols(), yupd.comm());
-	slate::gemm
-	  (scalar_t(-1.), const_cast<slate::Matrix<scalar_t>&>(slateF12_),
-	   syupd, scalar_t(1.), sy, slate_opts_);
-      }
-#else
-      if (y.cols() == 1) {
-        if (this->dim_upd())
-          gemv(Trans::N, scalar_t(-1.), F12_, yupd, scalar_t(1.), y);
-        trsv(UpLo::U, Trans::N, Diag::N, F11_, y);
-      } else {
-        if (this->dim_upd())
-          gemm(Trans::N, Trans::N, scalar_t(-1.), F12_, yupd, scalar_t(1.), y);
-        trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11_, y);
-      }
+#if defined(STRUMPACK_USE_ZFP)
+    if (compressed_) {
+      const auto dupd = this->dim_upd();
+      const auto dsep = this->dim_sep();
+      DistM_t F11(grid(), dsep, dsep), F12(grid(), dsep, dupd),
+        F21(grid(), dupd, dsep);
+      decompress(F11, F12, F21);
+      bwd_solve_phase1(F11, F12, F21, y, yupd);
+    } else
 #endif
-      TIMER_STOP(t_s);
-    }
+      bwd_solve_phase1(F11_, F12_, F21_, y, yupd);
     DistM_t CBl, CBr;
     DenseM_t seqCBl, seqCBr;
     this->extract_b(y, yupd, CBl, CBr, seqCBl, seqCBr);

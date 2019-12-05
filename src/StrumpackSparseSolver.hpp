@@ -862,6 +862,11 @@ namespace strumpack {
                     << opts_.HODLR_options().abs_tol() << std::endl;
         }
 #endif
+#if defined(STRUMPACK_USE_ZFP)
+        if (opts_.compression() == CompressionType::LOSSY)
+          std::cout << "#   - lossy compression precision = "
+                    << opts_.lossy_precision() << " bitplanes" << std::endl;
+#endif
       }
       if (opts_.compression() == CompressionType::HSS)
         print_flop_breakdown_HSS();
