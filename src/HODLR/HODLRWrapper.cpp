@@ -139,6 +139,44 @@ namespace strumpack {
          C_FuncNearFar, fdata);
     }
 
+    template<> void HODLR_construct_init_Gram<double>
+    (int N, int d, double* data, int* nns, int lvls, int* tree, int* perm,
+     int& lrow, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
+     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
+     void (*C_FuncZmn)(int*, int*, double*, C2Fptr),
+     void (*C_FuncZmnBlock)
+     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+      int* allrows, int* allcols, double* alldat_loc,
+      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
+      C2Fptr elems), C2Fptr fdata) {
+      d_c_bpack_construct_init_gram
+        (&N, &d, data, nns, &lvls, tree, perm, &lrow, &ho_bf, &options,
+         &stats, &msh, &kerquant, &ptree, C_FuncZmn, C_FuncZmnBlock, fdata);
+    }
+    template<> void HODLR_construct_init_Gram<std::complex<double>>
+    (int N, int d, std::complex<double>* data, int* nns, int lvls, int* tree,
+     int* perm, int& lrow, F2Cptr& ho_bf, F2Cptr& options,
+     F2Cptr& stats, F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
+     void (*C_FuncZmn)(int*, int*, std::complex<double>*, C2Fptr),
+     void (*C_FuncZmnBlock)
+     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+      int* allrows, int* allcols, std::complex<double>* alldat_loc,
+      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
+      C2Fptr elems), C2Fptr fdata) {
+      assert(data == nullptr);
+      z_c_bpack_construct_init_gram
+        (&N, &d, nullptr, nns, &lvls, tree, perm, &lrow, &ho_bf, &options,
+         &stats, &msh, &kerquant, &ptree,
+         reinterpret_cast<
+         void(*)(int*, int*, _Complex double*, C2Fptr)>(C_FuncZmn),
+         reinterpret_cast<
+         void(*)(int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+                 int* allrows, int* allcols, _Complex double* alldat_loc,
+                 int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
+                 C2Fptr elems)>(C_FuncZmnBlock), fdata);
+    }
+
+
     template<> void HODLR_construct_element_compute<double>
     (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,

@@ -73,6 +73,7 @@ int main(int argc, char *argv[]) {
   KernelType ktype = KernelType::GAUSS;
   string mode("test");
   TaskTimer timer("prediction");
+  double rtol = 1e-2;
 
   if (c.is_root())
     cout << "# usage: ./KernelRegression file d h lambda degree "
@@ -129,6 +130,7 @@ int main(int argc, char *argv[]) {
   {
     HSSOptions<scalar_t> opts;
     opts.set_verbose(true);
+    opts.set_rel_tol(rtol);
     opts.set_from_command_line(argc, argv);
     if (c.is_root()) opts.describe_options();
 
@@ -145,6 +147,7 @@ int main(int argc, char *argv[]) {
   {
     HODLR::HODLROptions<scalar_t> opts;
     opts.set_verbose(true);
+    opts.set_rel_tol(rtol);
     opts.set_from_command_line(argc, argv);
     if (c.is_root()) opts.describe_options();
 

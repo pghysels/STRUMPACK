@@ -219,7 +219,6 @@ namespace strumpack {
       HODLR::HODLRMatrix<scalar_t> H(c, *this, opts);
       DenseMW_t B(1, n(), labels.data(), 1);
       B.lapmt(perm_, true);
-      //perm_.clear(); // TODO not needed anymore??
       if (verb)
         std::cout << "# HODLR compression time = "
                   << timer.elapsed() << std::endl;
@@ -229,14 +228,11 @@ namespace strumpack {
         std::cout << "# factorization time = "
                   << timer.elapsed() << std::endl
                   << "# solution start..." << std::endl;
-      DenseMW_t wB(n(), 1, labels.data(), n());
-      BLACSGrid g(c);
-      DistM_t B2d(&g, n(), 1), w2d(&g, n(), 1);
-      copy(n(), 1, wB, 0, B2d, 0, 0, g.ctxt_all());
-      H.solve(B2d, w2d);
-      DenseM_t weights(n(), 1);
-      copy(n(), 1, w2d, 0, 0, weights, 0, g.ctxt_all());
-      c.broadcast(weights.data(), n());
+      int lrows = H.lrows();
+      DenseMW_t lB(lrows, 1, &labels[H.begin_row()], lrows);
+      DenseM_t lw(lrows, 1);
+      H.solve(lB, lw);
+      auto weights = H.all_gather_from_1D(lw);
       if (verb)
         std::cout << "# solve time = " << timer.elapsed() << std::endl;
       return weights;

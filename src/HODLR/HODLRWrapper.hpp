@@ -148,6 +148,40 @@ namespace strumpack {
      void (*C_FuncNearFar)(int*, int*, int*, C2Fptr),
      C2Fptr fdata);
 
+    template<typename scalar_t> void HODLR_construct_init_Gram
+    (int N, int d, scalar_t* data, int* nns, int lvls, int* tree, int* perm,
+     int& lrow, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
+     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
+     void (*C_FuncZmn)(int*, int*, scalar_t*, C2Fptr),
+     void (*C_FuncZmnBlock)
+     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+      int* allrows, int* allcols, scalar_t* alldat_loc,
+      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
+      C2Fptr elems), C2Fptr fdata) {
+      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
+    }
+    template<> void HODLR_construct_init_Gram<double>
+    (int N, int d, double* data, int* nns, int lvls, int* tree, int* perm,
+     int& lrow, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
+     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
+     void (*C_FuncZmn)(int*, int*, double*, C2Fptr),
+     void (*C_FuncZmnBlock)
+     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+      int* allrows, int* allcols, double* alldat_loc,
+      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
+      C2Fptr elems), C2Fptr fdata);
+    template<> void HODLR_construct_init_Gram<std::complex<double>>
+    (int N, int d, std::complex<double>* data, int* nns, int lvls, int* tree,
+     int* perm, int& lrow, F2Cptr& ho_bf, F2Cptr& options,
+     F2Cptr& stats, F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
+     void (*C_FuncZmn)(int*, int*, std::complex<double>*, C2Fptr),
+     void (*C_FuncZmnBlock)
+     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+      int* allrows, int* allcols, std::complex<double>* alldat_loc,
+      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
+      C2Fptr elems), C2Fptr fdata);
+
+
     template<typename scalar_t> void HODLR_construct_element_compute
     (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,

@@ -498,10 +498,10 @@ namespace strumpack {
      * \ingroup Enumerations
      */
     enum class KernelType {
-      DENSE,   /*!< Arbitrary dense matrix                */
-      GAUSS,   /*!< Gauss or radial basis function kernel */
+      DENSE,    /*!< Arbitrary dense matrix                */
+      GAUSS,    /*!< Gauss or radial basis function kernel */
       LAPLACE,  /*!< Laplace kernel                        */
-      ANOVA  /*!< ANOVA kernel                        */
+      ANOVA     /*!< ANOVA kernel                          */
     };
 
     /**

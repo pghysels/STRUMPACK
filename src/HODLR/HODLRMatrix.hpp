@@ -120,7 +120,11 @@ namespace strumpack {
 
       /**
        * Construct an HODLR approximation using a routine to evaluate
-       * individual matrix elements.
+       * individual matrix elements. This will construct an
+       * approximation of a permuted matrix, with the permutation
+       * available through this->perm() (and it's inverse
+       * this->iperm()). This permutation is applied symmetrically to
+       * rows and columns.
        *
        * \param c MPI communicator, this communicator is copied
        * internally.
@@ -135,6 +139,32 @@ namespace strumpack {
       (const MPIComm& c, const HSS::HSSPartitionTree& tree,
        const std::function<scalar_t(int i, int j)>& Aelem,
        const opts_t& opts);
+
+
+      /**
+       * Construct an HODLR approximation using a routine to evaluate
+       * multiple sub-blocks of the matrix at once. This will
+       * construct an approximation of a permuted matrix, with the
+       * permutation available through this->perm() (and it's inverse
+       * this->iperm()). This permutation is applied symmetrically to
+       * rows and columns.
+       *
+       * \param c MPI communicator, this communicator is copied
+       * internally.
+       * \param t tree specifying the HODLR matrix partitioning
+       * \param Aelem Routine, std::function, which can also be a
+       * lambda function or a functor. This should have the signature:
+       * void(std::vector<std::vector<std::size_t>>& I,
+       *       std::vector<std::vector<std::size_t>>& J,
+       *       std::vector<DenseMatrixWrapper<scalar_t>>& B,
+       *       ExtractionMeta&);
+       * The ExtractionMeta object can be ignored.
+       * \param opts object containing a number of HODLR options
+       */
+      HODLRMatrix
+      (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+       const elem_blocks_t& Aelem, const opts_t& opts);
+
 
       /**
        * Construct an HODLR matrix using a specified HODLR tree and
@@ -424,6 +454,21 @@ namespace strumpack {
       void redistribute_2D_to_1D(const DistM_t& R2D, DenseM_t& R1D) const;
       void redistribute_1D_to_2D(const DenseM_t& S1D, DistM_t& S2D) const;
 
+      DenseMatrix<scalar_t> gather_from_1D(const DenseM_t& A) const;
+      DenseMatrix<scalar_t> all_gather_from_1D(const DenseM_t& A) const;
+      DenseMatrix<scalar_t> scatter_to_1D(const DenseM_t& A) const;
+
+      /**
+       * The permutation for the matrix, which is applied to both rows
+       * and columns. This is 1-based!.
+       */
+      const std::vector<int>& perm() const { return perm_; }
+      /**
+       * The inverse permutation for the matrix, which is applied to
+       * both rows and columns. This is 1-based!.
+       */
+      const std::vector<int>& iperm() const { return iperm_; }
+
     private:
       F2Cptr ho_bf_ = nullptr;     // HODLR handle returned by Fortran code
       F2Cptr options_ = nullptr;   // options structure returned by Fortran code
@@ -578,8 +623,12 @@ namespace strumpack {
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
     (const MPIComm& c, kernel::Kernel<scalar_t>& K, const opts_t& opts) {
       rows_ = cols_ = K.n();
-      auto tree = binary_tree_clustering
-        (opts.clustering_algorithm(), K.data(), K.permutation(), opts.leaf_size());
+      HSS::HSSPartitionTree tree(rows_);
+      if (opts.geo() == 1)
+        tree = binary_tree_clustering
+          (opts.clustering_algorithm(), K.data(),
+           K.permutation(), opts.leaf_size());
+      else tree.refine(opts.leaf_size());
       int min_lvl = 2 + std::ceil(std::log2(c.size()));
       lvls_ = std::max(min_lvl, tree.levels());
       tree.expand_complete_levels(lvls_);
@@ -613,6 +662,10 @@ namespace strumpack {
         (ho_bf_, options_, stats_, msh_, kerquant_,
          ptree_, &(HODLR_kernel_evaluation<scalar_t>),
          &(HODLR_kernel_block_evaluation<scalar_t>), &KC);
+      if (opts.geo() != 1) {
+        K.permutation() = perm();
+        K.data().lapmr(perm(), true);
+      }
     }
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
@@ -629,19 +682,47 @@ namespace strumpack {
       Fcomm_ = MPI_Comm_c2f(c_.comm());
       options_init(opts);
       perm_.resize(rows_);
-      //KernelCommPtrs<scalar_t> KC{&K, &c_};
-      HODLR_construct_init<scalar_t>
+      HODLR_set_I_option<scalar_t>(options_, "xyzsort", 3);
+      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 0); // 1 = block extraction, 0 = element
+      HODLR_construct_init_Gram<scalar_t>
         (rows_, 0, nullptr, nullptr, lvls_-1, leafs_.data(), perm_.data(),
          lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
-         nullptr, nullptr, nullptr);
-      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 0); // block extraction
-      HODLR_construct_element_compute<scalar_t>
-        (ho_bf_, options_, stats_, msh_, kerquant_,
-         ptree_, &(HODLR_element_evaluation<scalar_t>),
-         &(HODLR_block_evaluation<scalar_t>),
+         &(HODLR_element_evaluation<scalar_t>), nullptr,
          const_cast<std::function<scalar_t(int i, int j)>*>(&Aelem));
       perm_init();
       dist_init();
+      HODLR_construct_element_compute<scalar_t>
+        (ho_bf_, options_, stats_, msh_, kerquant_,
+         ptree_, &(HODLR_element_evaluation<scalar_t>), nullptr,
+         const_cast<std::function<scalar_t(int i, int j)>*>(&Aelem));
+    }
+
+    template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
+    (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+     const elem_blocks_t& Aelem, const opts_t& opts) {
+      rows_ = cols_ = tree.size;
+      HSS::HSSPartitionTree full_tree(tree);
+      int min_lvl = 2 + std::ceil(std::log2(c.size()));
+      lvls_ = std::max(min_lvl, full_tree.levels());
+      full_tree.expand_complete_levels(lvls_);
+      leafs_ = full_tree.template leaf_sizes<int>();
+      c_ = c;
+      Fcomm_ = MPI_Comm_c2f(c_.comm());
+      options_init(opts);
+      perm_.resize(rows_);
+      HODLR_set_I_option<scalar_t>(options_, "xyzsort", 3);
+      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 1); // 1 = block extraction, 0 = element
+      HODLR_construct_init_Gram<scalar_t>
+        (rows_, 0, nullptr, nullptr, lvls_-1, leafs_.data(), perm_.data(),
+         lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
+         nullptr, &(HODLR_block_evaluation_seq<scalar_t>),
+         const_cast<elem_blocks_t*>(&Aelem));
+      perm_init();
+      dist_init();
+      HODLR_construct_element_compute<scalar_t>
+        (ho_bf_, options_, stats_, msh_, kerquant_,
+         ptree_, nullptr, &(HODLR_block_evaluation_seq<scalar_t>),
+         const_cast<elem_blocks_t*>(&Aelem));
     }
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
@@ -783,10 +864,8 @@ namespace strumpack {
     template<typename scalar_t> void HODLRMatrix<scalar_t>::perm_init() {
       iperm_.resize(rows_);
       MPI_Bcast(perm_.data(), perm_.size(), MPI_INT, 0, c_.comm());
-      for (int i=0; i<rows_; i++) {
-        perm_[i]--;
-        iperm_[perm_[i]] = i;
-      }
+      for (int i=1; i<=rows_; i++)
+        iperm_[perm_[i-1]-1] = i;
     }
 
     template<typename scalar_t> void HODLRMatrix<scalar_t>::dist_init() {
@@ -1008,6 +1087,36 @@ namespace strumpack {
     }
 
     template<typename scalar_t> DenseMatrix<scalar_t>
+    HODLRMatrix<scalar_t>::gather_from_1D(const DenseM_t& A) const {
+      // TODO avoid going through 2D
+      assert(A.rows() == lrows());
+      BLACSGrid g(c_);
+      DistM_t A2D(&g, rows_, A.cols());
+      redistribute_1D_to_2D(A, A2D);
+      return A2D.gather();
+    }
+
+    template<typename scalar_t> DenseMatrix<scalar_t>
+    HODLRMatrix<scalar_t>::all_gather_from_1D(const DenseM_t& A) const {
+      // TODO avoid going through 2D
+      assert(A.rows() == lrows());
+      BLACSGrid g(c_);
+      DistM_t A2D(&g, rows_, A.cols());
+      redistribute_1D_to_2D(A, A2D);
+      return A2D.all_gather();
+    }
+
+    template<typename scalar_t> DenseMatrix<scalar_t>
+    HODLRMatrix<scalar_t>::scatter_to_1D(const DenseM_t& A) const {
+      // TODO avoid going through 2D
+      assert(A.rows() == rows());
+      BLACSGrid g(c_);
+      DistM_t A2D(&g, rows_, A.cols());
+      copy(rows_, A.cols(), A, 0, A2D, 0, 0, A2D.ctxt_all());
+      return redistribute_2D_to_1D(A2D);
+    }
+
+    template<typename scalar_t> DenseMatrix<scalar_t>
     HODLRMatrix<scalar_t>::redistribute_2D_to_1D(const DistM_t& R2D) const {
       DenseM_t R1D(lrows_, R2D.cols());
       redistribute_2D_to_1D(R2D, R1D);
@@ -1038,7 +1147,7 @@ namespace strumpack {
         {
           std::vector<std::size_t> count(P);
           for (int r=R2Drlo; r<R2Drhi; r++) {
-            auto gr = perm_[R2D.rowl2g(r)];
+            auto gr = R2D.rowl2g(r);
             auto p = -1 + std::distance
               (dist_.begin(), std::upper_bound
                (dist_.begin(), dist_.end(), gr));
@@ -1063,7 +1172,7 @@ namespace strumpack {
         for (int c=0; c<Rcols; c++)
           src_c[c] = R2D.colg2p_fixed(c)*nprows;
         for (int r=0; r<lrows_; r++) {
-          auto gr = perm_[r + dist_[rank]];
+          auto gr = r + dist_[rank];
           auto src_r = R2D.rowg2p_fixed(gr);
           for (int c=0; c<Rcols; c++)
             R1D(r, c) = *(pbuf[src_r + src_c[c]]++);
@@ -1088,8 +1197,7 @@ namespace strumpack {
       if (lrows_) {
         std::vector<std::tuple<int,int,int>> glp(lrows_);
         for (int r=0; r<lrows_; r++) {
-          auto gr = iperm_[r + dist_[rank]];
-          // assert(gr == r + dist_[rank]);
+          auto gr = r + dist_[rank];
           assert(gr >= 0 && gr < S2D.rows());
           glp[r] = std::tuple<int,int,int>{gr,r,S2D.rowg2p_fixed(gr)};
         }
@@ -1115,8 +1223,7 @@ namespace strumpack {
       c_.all_to_all_v(sbuf, rbuf, pbuf);
       if (S2D.active()) {
         for (int r=S2Drlo; r<S2Drhi; r++) {
-          auto gr = perm_[S2D.rowl2g(r)];
-          // assert(gr == S2D.rowl2g(r));
+          auto gr = S2D.rowl2g(r);
           auto p = -1 + std::distance
             (dist_.begin(), std::upper_bound(dist_.begin(), dist_.end(), gr));
           assert(p < P && p >= 0);
