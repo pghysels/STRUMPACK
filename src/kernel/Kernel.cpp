@@ -77,6 +77,51 @@ template<typename scalar_t> STRUMPACKKernel STRUMPACK_create_kernel
   return kernel;
 }
 
+template<typename scalar_t> STRUMPACKKernel STRUMPACK_create_Gauss_kernel
+(int n, int d, scalar_t* train, scalar_t h, scalar_t lambda) {
+  auto kernel = new STRUMPACKKernelRegression<scalar_t>();
+  kernel->training_ = DenseMatrix<scalar_t>(d, n, train, d);
+  kernel->K_.reset(new GaussKernel<scalar_t>(kernel->training_, h, lambda));
+  return kernel;
+}
+template<typename scalar_t> STRUMPACKKernel STRUMPACK_create_Laplace_kernel
+(int n, int d, scalar_t* train, scalar_t h, scalar_t lambda) {
+  auto kernel = new STRUMPACKKernelRegression<scalar_t>();
+  kernel->training_ = DenseMatrix<scalar_t>(d, n, train, d);
+  kernel->K_.reset(new LaplaceKernel<scalar_t>(kernel->training_, h, lambda));
+  return kernel;
+}
+template<typename scalar_t> STRUMPACKKernel STRUMPACK_create_ANOVA_kernel
+(int n, int d, scalar_t* train, scalar_t h, scalar_t lambda, int p) {
+  auto kernel = new STRUMPACKKernelRegression<scalar_t>();
+  kernel->training_ = DenseMatrix<scalar_t>(d, n, train, d);
+  kernel->K_.reset(new ANOVAKernel<scalar_t>(kernel->training_, h, lambda, p));
+  return kernel;
+}
+template<typename scalar_t> STRUMPACKKernel STRUMPACK_create_general_kernel
+(int n, int d, scalar_t* train,
+ void(*Kx)(std::size_t, const std::size_t*,
+           std::size_t, const std::size_t*,
+           scalar_t*, std::size_t, void*),
+ void* data, scalar_t lambda) {
+  auto kernel = new STRUMPACKKernelRegression<scalar_t>();
+  auto Kelem =
+    [Kx,data](const std::vector<std::size_t>& I,
+              const std::vector<std::size_t>& J,
+              DenseMatrix<scalar_t>& B) -> void {
+      Kx(I.size(), I.data(), J.size(), J.data(),
+         B.data(), B.ld(), data); };
+  if (train) {
+    kernel->training_ = DenseMatrix<scalar_t>(d, n, train, d);
+    kernel->K_.reset
+      (new GeneralKernel<scalar_t>
+       (kernel->training_, Kelem, lambda));
+  } else
+    kernel->K_.reset
+      (new GeneralKernel<scalar_t>(n, Kelem, lambda));
+  return kernel;
+}
+
 template<typename scalar_t> void STRUMPACK_kernel_fit_HSS
 (STRUMPACKKernel kernel, scalar_t* labels, int argc, char* argv[]) {
   auto KR = static_cast<STRUMPACKKernelRegression<scalar_t>*>(kernel);
@@ -135,6 +180,30 @@ template<typename scalar_t> void STRUMPACK_kernel_predict
   }
 }
 
+template<typename scalar_t> void STRUMPACK_general_kernel_predict
+(STRUMPACKKernel kernel, int m,
+ void(*Kxy)(std::size_t, const std::size_t*,
+            std::size_t, const std::size_t*,
+            scalar_t*, std::size_t, void*),
+ void* data, scalar_t* prediction) {
+  auto KR = static_cast<STRUMPACKKernelRegression<scalar_t>*>(kernel);
+  auto Kelem =
+    [Kxy,data]
+    (const std::vector<std::size_t>& I,
+     const std::vector<std::size_t>& J,
+     DenseMatrix<scalar_t>& B) -> void {
+      Kxy(I.size(), I.data(), J.size(), J.data(),
+          B.data(), B.ld(), data); };
+  if (KR->dist_) {
+#if defined(STRUMPACK_USE_MPI)
+    auto pred = KR->K_->predict(m, Kelem, KR->dweights_);
+    std::copy(pred.begin(), pred.end(), prediction);
+#endif
+  } else {
+    auto pred = KR->K_->predict(m, Kelem, KR->weights_);
+    std::copy(pred.begin(), pred.end(), prediction);
+  }
+}
 
 #ifdef __cplusplus
 extern "C" {
@@ -147,6 +216,50 @@ extern "C" {
   STRUMPACKKernel STRUMPACK_create_kernel_float
   (int n, int d, float* train, float h, float lambda, int p, int type) {
     return STRUMPACK_create_kernel<float>(n, d, train, h, lambda, p, type);
+  }
+
+  STRUMPACKKernel STRUMPACK_create_Gauss_kernel_double
+  (int n, int d, double* train, double h, double lambda) {
+    return STRUMPACK_create_Gauss_kernel<double>(n, d, train, h, lambda);
+  }
+  STRUMPACKKernel STRUMPACK_create_Laplace_kernel_double
+  (int n, int d, double* train, double h, double lambda, int p) {
+    return STRUMPACK_create_Laplace_kernel<double>(n, d, train, h, lambda);
+  }
+  STRUMPACKKernel STRUMPACK_create_ANOVA_kernel_double
+  (int n, int d, double* train, double h, double lambda, int p) {
+    return STRUMPACK_create_ANOVA_kernel<double>(n, d, train, h, lambda, p);
+  }
+  STRUMPACKKernel STRUMPACK_create_general_kernel_double
+  (int n, int d, double* train,
+   void(*Kx)(std::size_t, const std::size_t*,
+             std::size_t, const std::size_t*,
+             double*, std::size_t, void*),
+   void* data, double lambda) {
+    return STRUMPACK_create_general_kernel<double>
+      (n, d, train, Kx, data, lambda);
+  }
+
+  STRUMPACKKernel STRUMPACK_create_Gauss_kernel_float
+  (int n, int d, float* train, float h, float lambda) {
+    return STRUMPACK_create_Gauss_kernel<float>(n, d, train, h, lambda);
+  }
+  STRUMPACKKernel STRUMPACK_create_Laplace_kernel_float
+  (int n, int d, float* train, float h, float lambda, int p) {
+    return STRUMPACK_create_Laplace_kernel<float>(n, d, train, h, lambda);
+  }
+  STRUMPACKKernel STRUMPACK_create_ANOVA_kernel_float
+  (int n, int d, float* train, float h, float lambda, int p) {
+    return STRUMPACK_create_ANOVA_kernel<float>(n, d, train, h, lambda, p);
+  }
+  STRUMPACKKernel STRUMPACK_create_general_kernel_float
+  (int n, int d, float* train,
+   void(*Kx)(std::size_t, const std::size_t*,
+             std::size_t, const std::size_t*,
+             float*, std::size_t, void*),
+   void* f, float lambda) {
+    return STRUMPACK_create_general_kernel<float>
+      (n, d, train, Kx, f, lambda);
   }
 
   void STRUMPACK_destroy_kernel_double(STRUMPACKKernel kernel) {
@@ -192,6 +305,25 @@ extern "C" {
   void STRUMPACK_kernel_predict_float
   (STRUMPACKKernel kernel, int m, float* test, float* prediction) {
     STRUMPACK_kernel_predict<float>(kernel, m, test, prediction);
+  }
+
+  void STRUMPACK_general_kernel_predict_double
+  (STRUMPACKKernel kernel, int m,
+   void(*Kxy)(std::size_t, const std::size_t*,
+              std::size_t, const std::size_t*,
+              double*, std::size_t, void*),
+   void* data, double* prediction) {
+    STRUMPACK_general_kernel_predict<double>
+      (kernel, m, Kxy, data, prediction);
+  }
+  void STRUMPACK_general_kernel_predict_float
+  (STRUMPACKKernel kernel, int m,
+   void(*Kxy)(std::size_t, const std::size_t*,
+              std::size_t, const std::size_t*,
+              float*, std::size_t, void*),
+   void* data, float* prediction) {
+    STRUMPACK_general_kernel_predict<float>
+      (kernel, m, Kxy, data, prediction);
   }
 
 #ifdef __cplusplus

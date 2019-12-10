@@ -19,6 +19,7 @@ import sys
 import numpy as np
 import STRUMPACKKernel as sp
 from mpi4py import MPI
+from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -62,30 +63,19 @@ if rank == 0:
 def quality(p, l):
     return 100.*(m - sum(p[i]*l[i] < 0 for i in range(m))) / m
 
-# Kernel ridge regression classification
-# using HSS approximation of the kernel
-K_HSS = sp.STRUMPACKKernel(
-    h, lam, degree, kernel='rbf', approximation='HSS', mpi=True, argv=sys.argv)
-K_HSS.fit(train_points, train_labels)
-pred = K_HSS.predict(test_points)
-# check quality, labels are -1 or +1
-
-if rank == 0:
-    print('HSS KernelRR quality =', quality(pred, test_labels), '%')
-    print("classes:", K_HSS.classes_)
-
-
-# read these again because they were permuted, which shouldn't really
-# be an issue
-train_points = np.genfromtxt(fname + '_train.csv', delimiter=",")
-train_labels = np.genfromtxt(fname + '_train_label.csv', delimiter=",")
+RBFkernel = C(1.0, constant_value_bounds="fixed") \
+    * RBF(h, length_scale_bounds="fixed")
 
 # Kernel ridge regression classification
 # using HODLR approximation of the kernel
-K_HODLR = sp.STRUMPACKKernel(
-    h, lam, kernel='rbf', approximation='HODLR', mpi=True, argv=sys.argv)
+K_HODLR = sp.STRUMPACKGaussianProcessRegressor(
+    kernel=RBFkernel, alpha=lam,
+    approximation='HODLR', mpi=True, argv=sys.argv)
+#    h, lam, kernel='rbf', approximation='HODLR', mpi=True, argv=sys.argv)
 K_HODLR.fit(train_points, train_labels)
-pred = K_HODLR.predict(test_points)
+
+pred = K_HODLR.predict_classify(test_points)
+
 # check quality, labels are -1 or +1
 if rank == 0:
     print('HODLR KernelRR quality =', quality(pred, test_labels), '%')

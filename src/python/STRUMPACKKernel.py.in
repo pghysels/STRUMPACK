@@ -1,21 +1,35 @@
 import numpy as np
 import ctypes
-from sklearn.base import BaseEstimator, ClassifierMixin
+#from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.base import BaseEstimator, RegressorMixin, clone
+from sklearn.base import MultiOutputMixin
+from sklearn.utils import check_random_state
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
+
+# TODO remove this is for classification
 from sklearn.utils.multiclass import unique_labels
+
+from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
+from sklearn.gaussian_process import GaussianProcessRegressor
 sp = ctypes.cdll.LoadLibrary(
     '@CMAKE_INSTALL_PREFIX@/lib/libstrumpack.so')
 
 
-class STRUMPACKKernel(BaseEstimator, ClassifierMixin):
+#class STRUMPACKKernel(BaseEstimator, ClassifierMixin):
+class STRUMPACKGaussianProcessRegressor(GaussianProcessRegressor):
 
-    # kernel can be 'rbf'/'Gauss', 'Laplace' or 'ANOVA'
-    def __init__(self, h=1., lam=4., degree=1, kernel='rbf',
-                 approximation='HSS', mpi=False, argv=None):
-        self.h = h
-        self.lam = lam
-        self.degree = int(degree)
+    def __init__(self, kernel=None, alpha=1e-10,
+                 approximation='HSS', mpi=False, argv=None,
+                 optimizer="fmin_l_bfgs_b", n_restarts_optimizer=0,
+                 normalize_y=False, copy_X_train=True, random_state=None):
         self.kernel = kernel
+        self.alpha = alpha
+        self.optimizer = optimizer
+        self.n_restarts_optimizer = n_restarts_optimizer
+        self.normalize_y = normalize_y
+        self.copy_X_train = copy_X_train
+        self.random_state = random_state
+
         self.approximation = approximation
         self.mpi = mpi
         self.argv = argv
@@ -32,36 +46,146 @@ class STRUMPACKKernel(BaseEstimator, ClassifierMixin):
             print(X.dtype)
             raise ValueError("precision", X.dtype, "not supported")
 
-        if self.approximation is 'HODLR' and self.mpi is False:
-            raise ValueError("HODLR approximation requires mpi=True")
-        ktype = 0
-        if self.kernel == 'rbf' or self.kernel == 'Gauss': ktype = 0
-        elif self.kernel == 'Laplace': ktype = 1
-        elif self.kernel == 'ANOVA': ktype = 2
-        else:
-            raise ValueError("Kernel type", self.kernel, "not recognized")
         if self.approximation is not 'HSS' and \
            self.approximation is not 'HODLR':
             raise ValueError("Approximation type not recognized,"
                              "should be 'HSS' or 'HODLR'")
+        if self.approximation is 'HODLR' and self.mpi is False:
+            raise ValueError("HODLR approximation requires mpi=True")
+        if self.approximation is 'HSS' and \
+           self.kernel_.requires_vector_input is False:
+            self.approximation = 'HODLR'
+            print("HSS approximation requires vector input,"
+                  "using HODLR instead")
+            # raise ValueError("HSS approximation requires vector input")
 
-        # check that X and y have correct shape
-        X, y = check_X_y(X, y)
+        if self.kernel is None:  # Use an RBF kernel as default
+            self.kernel_ = C(1.0, constant_value_bounds="fixed") \
+                * RBF(1.0, length_scale_bounds="fixed")
+        else:
+            self.kernel_ = clone(self.kernel)
+
+        self._rng = check_random_state(self.random_state)
+
+        ## TODO what are those extra options to check_X_y???
+        if self.kernel_.requires_vector_input:
+            X, y = check_X_y(X, y, multi_output=True, y_numeric=True,
+                             ensure_2d=True, dtype="numeric")
+        else:
+            X, y = check_X_y(X, y, multi_output=True, y_numeric=True,
+                             ensure_2d=False, dtype=None)
+
+        # Normalize target value
+        if self.normalize_y:
+            self._y_train_mean = np.mean(y, axis=0)
+            # demean y
+            y = y - self._y_train_mean
+        else:
+            self._y_train_mean = np.zeros(1)
+
+        if np.iterable(self.alpha) \
+           and self.alpha.shape[0] != y.shape[0]:
+            if self.alpha.shape[0] == 1:
+                self.alpha = self.alpha[0]
+            else:
+                raise ValueError("alpha must be a scalar or an array"
+                                 " with same number of entries as y.(%d != %d)"
+                                 % (self.alpha.shape[0], y.shape[0]))
+
+        self.X_train_ = np.copy(X) if self.copy_X_train else X
+        self.y_train_ = np.copy(y) if self.copy_X_train else y
+
+        if self.optimizer is not None and self.kernel_.n_dims > 0:
+            # Choose hyperparameters based on maximizing the log-marginal
+            # likelihood (potentially starting from several initial values)
+            def obj_func(theta, eval_gradient=True):
+                if eval_gradient:
+                    lml, grad = self.log_marginal_likelihood(
+                        theta, eval_gradient=True, clone_kernel=False)
+                    return -lml, -grad
+                else:
+                    return -self.log_marginal_likelihood(theta,
+                                                         clone_kernel=False)
+
+            # First optimize starting from theta specified in kernel
+            optima = [(self._constrained_optimization(obj_func,
+                                                      self.kernel_.theta,
+                                                      self.kernel_.bounds))]
+
+            # Additional runs are performed from log-uniform chosen initial
+            # theta
+            if self.n_restarts_optimizer > 0:
+                if not np.isfinite(self.kernel_.bounds).all():
+                    raise ValueError(
+                        "Multiple optimizer restarts (n_restarts_optimizer>0) "
+                        "requires that all bounds are finite.")
+                bounds = self.kernel_.bounds
+                for iteration in range(self.n_restarts_optimizer):
+                    theta_initial = \
+                        self._rng.uniform(bounds[:, 0], bounds[:, 1])
+                    optima.append(
+                        self._constrained_optimization(obj_func, theta_initial,
+                                                       bounds))
+            # Select result from run with minimal (negative) log-marginal
+            # likelihood
+            lml_values = list(map(itemgetter(1), optima))
+            self.kernel_.theta = optima[np.argmin(lml_values)][0]
+            self.log_marginal_likelihood_value_ = -np.min(lml_values)
+        else:
+            self.log_marginal_likelihood_value_ = \
+                self.log_marginal_likelihood(self.kernel_.theta,
+                                             clone_kernel=False)
+
+
+        # TODO remove, this is for classification
         # store the classes seen during fit
         self.classes_ = unique_labels(y)
 
+
+        # callback function for STRUMPACK kernel evaluation
+        def Kx_block(m, I, n, J, B, ldB, f):
+            Ksub = self.kernel_(
+                self.X_train_[[I[i] for i in range(m)],:],
+                self.X_train_[[J[j] for j in range(n)],:])
+            for j in range(n):
+                for i in range(m):
+                    B[i+j*ldB] = Ksub[i,j]
+
+        ELEMBLOCKFUNCf64 = ctypes.CFUNCTYPE(None,
+            ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t),
+            ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t),
+            ctypes.POINTER(ctypes.c_double), ctypes.c_size_t,
+            ctypes.c_int)
+        ELEMBLOCKFUNCf32 = ctypes.CFUNCTYPE(None,
+            ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t),
+            ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t),
+            ctypes.POINTER(ctypes.c_float), ctypes.c_size_t,
+            ctypes.c_int)
+        Kx_block_fptr_f64 = ELEMBLOCKFUNCf64(Kx_block)
+        Kx_block_fptr_f32 = ELEMBLOCKFUNCf32(Kx_block)
         if X.dtype == np.float64:
-            self.K_ = sp.STRUMPACK_create_kernel_double(
-                ctypes.c_int(X.shape[0]), ctypes.c_int(X.shape[1]),
-                ctypes.c_void_p(X.ctypes.data),
-                ctypes.c_double(self.h), ctypes.c_double(self.lam),
-                ctypes.c_int(self.degree), ctypes.c_int(ktype))
+            if self.kernel_.requires_vector_input:
+                self.K_ = sp.STRUMPACK_create_general_kernel_double(
+                    ctypes.c_int(X.shape[0]), ctypes.c_int(X.shape[1]),
+                    ctypes.c_void_p(X.ctypes.data), Kx_block_fptr_f64,
+                    ctypes.c_void_p(None), ctypes.c_double(self.alpha))
+            else:
+                self.K_ = sp.STRUMPACK_create_general_kernel_double(
+                    ctypes.c_int(X.shape[0]), ctypes.c_int(0),
+                    ctypes.c_void_p(None), Kx_block_fptr_f64,
+                    ctypes.c_void_p(None), ctypes.c_double(self.alpha))
+
         elif X.dtype == np.float32:
-            self.K_ = sp.STRUMPACK_create_kernel_float(
-                ctypes.c_int(X.shape[0]), ctypes.c_int(X.shape[1]),
-                ctypes.c_void_p(X.ctypes.data),
-                ctypes.c_float(self.h), ctypes.c_float(self.lam),
-                ctypes.c_int(self.degree), ctypes.c_int(ktype))
+            if self.kernel_.requires_vector_input:
+                self.K_ = sp.STRUMPACK_create_general_kernel_float(
+                    ctypes.c_int(X.shape[0]), ctypes.c_int(X.shape[1]),
+                    ctypes.c_void_p(X.ctypes.data), Kx_block_fptr_f32,
+                    ctypes.c_void_p(None), ctypes.c_float(self.alpha))
+            else:
+                self.K_ = sp.STRUMPACK_create_general_kernel_float(
+                    ctypes.c_int(X.shape[0]), ctypes.c_int(X.shape[1]),
+                    ctypes.c_void_p(X.ctypes.data), Kx_block_fptr_f32,
+                    ctypes.c_void_p(None), ctypes.c_float(self.alpha))
 
         if self.argv is None: self.argv=[]
         LP_c_char = ctypes.POINTER(ctypes.c_char)
@@ -103,34 +227,151 @@ class STRUMPACKKernel(BaseEstimator, ClassifierMixin):
         return self
 
 
-    def predict(self, X):
+    def predict(self, X, return_std=False, return_cov=False):
+        if return_std and return_cov:
+            raise RuntimeError(
+                "Not returning standard deviation of predictions when "
+                "returning full covariance.")
+
+        if self.kernel is None or self.kernel.requires_vector_input:
+            X = check_array(X, ensure_2d=True, dtype="numeric")
+        else:
+            X = check_array(X, ensure_2d=False, dtype=None)
+
+        if not hasattr(self, "X_train_"):  # Unfitted;predict based on GP prior
+            if self.kernel is None:
+                kernel = (C(1.0, constant_value_bounds="fixed") *
+                          RBF(1.0, length_scale_bounds="fixed"))
+            else:
+                kernel = self.kernel
+            y_mean = np.zeros(X.shape[0])
+            if return_cov:
+                y_cov = kernel(X)
+                return y_mean, y_cov
+            elif return_std:
+                y_var = kernel.diag(X)
+                return y_mean, np.sqrt(y_var)
+            else:
+                return y_mean
+        else:  # Predict based on GP posterior
+            # K_trans = self.kernel_(X, self.X_train_)
+            # y_mean = K_trans.dot(self.alpha_)  # Line 4 (y_mean = f_star)
+            y_mean = np.zeros((X.shape[0],1), dtype=X.dtype)
+            # callback function for STRUMPACK kernel evaluation
+            def Kxy_block(m, I, n, J, B, ldB, f):
+                Ksub = self.kernel_(
+                    self.X_train_[[I[i] for i in range(m)],:],
+                    X[[J[j] for j in range(n)],:])
+                for j in range(n):
+                    for i in range(m):
+                        B[i+j*ldB] = Ksub[i,j]
+
+            ELEMBLOCKFUNCf64 = ctypes.CFUNCTYPE(
+                None,
+                ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t),
+                ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t),
+                ctypes.POINTER(ctypes.c_double), ctypes.c_size_t,
+                ctypes.c_int)
+            ELEMBLOCKFUNCf32 = ctypes.CFUNCTYPE(
+                None,
+                ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t),
+                ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t),
+                ctypes.POINTER(ctypes.c_float), ctypes.c_size_t,
+                ctypes.c_int)
+            Kxy_block_fptr_f64 = ELEMBLOCKFUNCf64(Kxy_block)
+            Kxy_block_fptr_f32 = ELEMBLOCKFUNCf32(Kxy_block)
+            if X.dtype == np.float64:
+                sp.STRUMPACK_general_kernel_predict_double(
+                    self.K_, ctypes.c_int(X.shape[0]),
+                    Kxy_block_fptr_f64, ctypes.c_void_p(None),
+                    ctypes.c_void_p(y_mean.ctypes.data))
+            elif X.dtype == np.float32:
+                sp.STRUMPACK_general_kernel_predict_float(
+                    self.K_, ctypes.c_int(X.shape[0]),
+                    Kxy_block_fptr_f32, ctypes.c_void_p(None),
+                    ctypes.c_void_p(y_mean.ctypes.data))
+
+            y_mean = self._y_train_mean + y_mean  # undo normal.
+            if return_cov:
+                v = cho_solve((self.L_, True), K_trans.T)  # Line 5
+                y_cov = self.kernel_(X) - K_trans.dot(v)  # Line 6
+                return y_mean, y_cov
+            elif return_std:
+                # cache result of K_inv computation
+                if self._K_inv is None:
+                    # compute inverse K_inv of K based on its Cholesky
+                    # decomposition L and its inverse L_inv
+                    L_inv = solve_triangular(self.L_.T,
+                                             np.eye(self.L_.shape[0]))
+                    self._K_inv = L_inv.dot(L_inv.T)
+
+                # Compute variance of predictive distribution
+                y_var = self.kernel_.diag(X)
+                y_var -= np.einsum("ij,ij->i",
+                                   np.dot(K_trans, self._K_inv), K_trans)
+
+                # Check if any of the variances is negative because of
+                # numerical issues. If yes: set the variance to 0.
+                y_var_negative = y_var < 0
+                if np.any(y_var_negative):
+                    warnings.warn("Predicted variances smaller than 0. "
+                                  "Setting those variances to 0.")
+                    y_var[y_var_negative] = 0.0
+                return y_mean, np.sqrt(y_var)
+            else:
+                return y_mean
+
+    def predict_classify(self, X):
         # TODO make sure there are only 2 classes?
         check_is_fitted(self, 'K_')
         prediction = np.zeros((X.shape[0],1), dtype=X.dtype)
+
+        # callback function for STRUMPACK kernel evaluation
+        def Kxy_block(m, I, n, J, B, ldB, f):
+            Ksub = self.kernel_(
+                self.X_train_[[I[i] for i in range(m)],:],
+                X[[J[j] for j in range(n)],:])
+            for j in range(n):
+                for i in range(m):
+                    B[i+j*ldB] = Ksub[i,j]
+
+        ELEMBLOCKFUNCf64 = ctypes.CFUNCTYPE(None,
+            ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t),
+            ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t),
+            ctypes.POINTER(ctypes.c_double), ctypes.c_size_t,
+            ctypes.c_int)
+        ELEMBLOCKFUNCf32 = ctypes.CFUNCTYPE(None,
+            ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t),
+            ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t),
+            ctypes.POINTER(ctypes.c_float), ctypes.c_size_t,
+            ctypes.c_int)
+        Kxy_block_fptr_f64 = ELEMBLOCKFUNCf64(Kxy_block)
+        Kxy_block_fptr_f32 = ELEMBLOCKFUNCf32(Kxy_block)
+
         if X.dtype == np.float64:
-            sp.STRUMPACK_kernel_predict_double(
+            sp.STRUMPACK_general_kernel_predict_double(
                 self.K_, ctypes.c_int(X.shape[0]),
-                ctypes.c_void_p(X.ctypes.data),
+                Kxy_block_fptr_f64, ctypes.c_void_p(None),
                 ctypes.c_void_p(prediction.ctypes.data))
         elif X.dtype == np.float32:
-            sp.STRUMPACK_kernel_predict_float(
+            sp.STRUMPACK_general_kernel_predict_float(
                 self.K_, ctypes.c_int(X.shape[0]),
-                ctypes.c_void_p(X.ctypes.data),
+                Kxy_block_fptr_f32, ctypes.c_void_p(None),
                 ctypes.c_void_p(prediction.ctypes.data))
         return [self.classes_[0] if prediction[i] < 0.0 else self.classes_[1]
                 for i in range(X.shape[0])]
 
-    def decision_function(self, X):
-        check_is_fitted(self, 'K_')
-        prediction = np.zeros((X.shape[0],1), dtype=X.dtype)
-        if X.dtype == np.float64:
-            sp.STRUMPACK_kernel_predict_double(
-                self.K_, ctypes.c_int(X.shape[0]),
-                ctypes.c_void_p(X.ctypes.data),
-                ctypes.c_void_p(prediction.ctypes.data))
-        elif X.dtype == np.float32:
-            sp.STRUMPACK_kernel_predict_float(
-                self.K_, ctypes.c_int(X.shape[0]),
-                ctypes.c_void_p(X.ctypes.data),
-                ctypes.c_void_p(prediction.ctypes.data))
-        return prediction
+    # def decision_function(self, X):
+    #     check_is_fitted(self, 'K_')
+    #     prediction = np.zeros((X.shape[0],1), dtype=X.dtype)
+    #     if X.dtype == np.float64:
+    #         sp.STRUMPACK_kernel_predict_double(
+    #             self.K_, ctypes.c_int(X.shape[0]),
+    #             ctypes.c_void_p(X.ctypes.data),
+    #             ctypes.c_void_p(prediction.ctypes.data))
+    #     elif X.dtype == np.float32:
+    #         sp.STRUMPACK_kernel_predict_float(
+    #             self.K_, ctypes.c_int(X.shape[0]),
+    #             ctypes.c_void_p(X.ctypes.data),
+    #             ctypes.c_void_p(prediction.ctypes.data))
+    #     return prediction

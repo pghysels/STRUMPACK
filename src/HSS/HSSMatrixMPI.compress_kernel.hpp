@@ -63,7 +63,7 @@ namespace strumpack {
         TaskTimer timer("approximate_neighbors");
         timer.start();
         find_approximate_neighbors
-          (K.data(), opts.ann_iterations(), ann_number, ann, scores, gen);
+          (*(K.data()), opts.ann_iterations(), ann_number, ann, scores, gen);
         if (opts.verbose() && Comm().is_root())
           std::cout << "# k-ANN=" << ann_number
                     << ", approximate neighbor search time = "

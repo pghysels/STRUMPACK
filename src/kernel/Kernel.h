@@ -45,6 +45,32 @@ extern "C" {
   STRUMPACKKernel STRUMPACK_create_kernel_float
   (int n, int d, float* train, float h, float lambda, int p, int type);
 
+  STRUMPACKKernel STRUMPACK_create_Gauss_kernel_double
+  (int n, int d, double* train, double h, double lambda);
+  STRUMPACKKernel STRUMPACK_create_Laplace_kernel_double
+  (int n, int d, double* train, double h, double lambda, int p);
+  STRUMPACKKernel STRUMPACK_create_ANOVA_kernel_double
+  (int n, int d, double* train, double h, double lambda, int p);
+  STRUMPACKKernel STRUMPACK_create_general_kernel_double
+  (int n, int d, double* train,
+   void(*Kx)(std::size_t, const std::size_t*,
+             std::size_t, const std::size_t*,
+             double*, std::size_t, void*),
+   void* data, double lambda);
+
+  STRUMPACKKernel STRUMPACK_create_Gauss_kernel_float
+  (int n, int d, float* train, float h, float lambda);
+  STRUMPACKKernel STRUMPACK_create_Laplace_kernel_float
+  (int n, int d, float* train, float h, float lambda, int p);
+  STRUMPACKKernel STRUMPACK_create_ANOVA_kernel_float
+  (int n, int d, float* train, float h, float lambda, int p);
+  STRUMPACKKernel STRUMPACK_create_general_kernel_float
+  (int n, int d, float* train,
+   void(*Kx)(std::size_t, const std::size_t*,
+             std::size_t, const std::size_t*,
+             float*, std::size_t, void*),
+   void* f, float lambda);
+
   void STRUMPACK_destroy_kernel_double(STRUMPACKKernel K);
   void STRUMPACK_destroy_kernel_float(STRUMPACKKernel K);
 
@@ -78,6 +104,19 @@ extern "C" {
   (STRUMPACKKernel K, int m, double* test, double* prediction);
   void STRUMPACK_kernel_predict_float
   (STRUMPACKKernel K, int m, float* test, float* prediction);
+
+  void STRUMPACK_general_kernel_predict_double
+  (STRUMPACKKernel kernel, int m,
+   void(*Kxy)(std::size_t, const std::size_t*,
+              std::size_t, const std::size_t*,
+              double*, std::size_t, void*),
+   void* data, double* prediction);
+  void STRUMPACK_general_kernel_predict_float
+  (STRUMPACKKernel kernel, int m,
+   void(*Kxy)(std::size_t, const std::size_t*,
+              std::size_t, const std::size_t*,
+              float*, std::size_t, void*),
+   void* data, float* prediction);
 
 #ifdef __cplusplus
 }

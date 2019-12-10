@@ -61,7 +61,6 @@ namespace strumpack {
       HSS::HSSMatrix<scalar_t> H(*this, opts);
       DenseMW_t B(1, n(), labels.data(), 1);
       B.lapmt(perm_, true);
-      //perm_.clear(); // TODO not needed anymore??
       if (opts.verbose()) {
         std::cout << "# HSS compression time = "
                   << timer.elapsed() << std::endl;
@@ -112,15 +111,44 @@ namespace strumpack {
     std::vector<scalar_t> Kernel<scalar_t>::predict
     (const DenseM_t& test, const DenseM_t& weights) const {
       assert(test.rows() == d());
-      std::vector<scalar_t> prediction(test.cols());
+      return predict
+        (test.cols(),
+         [this,&test](int r, int c) -> scalar_t {
+           return eval_kernel_function(data_->ptr(0, r), test.ptr(0, c));
+         }, weights);
+    }
+
+    template<typename scalar_t>
+    std::vector<scalar_t> Kernel<scalar_t>::predict
+    (int m, const std::function<scalar_t(int,int)>& Kxy,
+     const DenseM_t& weights) const {
+      std::vector<scalar_t> prediction(m);
 #pragma omp parallel for
-      for (std::size_t c=0; c<test.cols(); c++)
+      for (std::size_t c=0; c<m; c++)
         for (std::size_t r=0; r<n(); r++)
-          prediction[c] += weights(r, 0) *
-            eval_kernel_function(data_.ptr(0, r), test.ptr(0, c));
+          prediction[c] += weights(r, 0) * Kxy(r, c);
       return prediction;
     }
 
+    template<typename scalar_t>
+    std::vector<scalar_t> Kernel<scalar_t>::predict
+    (int m, const std::function
+     <void(const std::vector<std::size_t>&,
+           const std::vector<std::size_t>&, DenseMatrix<scalar_t>&)>& Kxy,
+     const DenseM_t& weights) const {
+      std::vector<scalar_t> prediction(m);
+      DenseMatrix<scalar_t> K(n(), m);
+      std::vector<std::size_t> I(n()), J(m);
+      for (std::size_t i=0; i<n(); i++)
+        I[i] = perm_[i]-1;
+      std::iota(J.begin(), J.end(), 0);
+      Kxy(I, J, K);
+#pragma omp parallel for
+      for (std::size_t c=0; c<m; c++)
+        for (std::size_t r=0; r<n(); r++)
+          prediction[c] += weights(r, 0) * K(r, c);
+      return prediction;
+    }
 
 #if defined(STRUMPACK_USE_MPI)
     template<typename scalar_t>
@@ -191,15 +219,49 @@ namespace strumpack {
     template<typename scalar_t>
     std::vector<scalar_t> Kernel<scalar_t>::predict
     (const DenseM_t& test, const DistM_t& weights) const {
-      std::vector<scalar_t> prediction(test.cols());
+      return predict
+        (test.cols(),
+         [this,&test](int r, int c) -> scalar_t {
+           return eval_kernel_function
+             (data_->ptr(0, r), test.ptr(0, c));
+         }, weights);
+    }
+
+    template<typename scalar_t>
+    std::vector<scalar_t> Kernel<scalar_t>::predict
+    (int m, const std::function<scalar_t(int,int)>& Kxy,
+     const DistM_t& weights) const {
+      std::vector<scalar_t> prediction(m);
       if (weights.active() && weights.lcols()) {
 #pragma omp parallel for
-        for (std::size_t c=0; c<test.cols(); c++)
-          for (std::size_t r=0; r<weights.lrows(); r++) {
-            prediction[c] += weights(r, 0) *
-              eval_kernel_function
-              (data_.ptr(0, weights.rowl2g(r)), test.ptr(0, c));
-          }
+        for (std::size_t c=0; c<m; c++)
+          for (std::size_t r=0; r<weights.lrows(); r++)
+            prediction[c] += weights(r, 0) * Kxy(weights.rowl2g(r), c);
+      }
+      // reduce the local sums to the global vector
+      weights.Comm().all_reduce
+        (prediction.data(), prediction.size(), MPI_SUM);
+      return prediction;
+    }
+
+    template<typename scalar_t>
+    std::vector<scalar_t> Kernel<scalar_t>::predict
+    (int m, const std::function
+     <void(const std::vector<std::size_t>&,
+           const std::vector<std::size_t>&, DenseMatrix<scalar_t>&)>& Kxy,
+     const DistM_t& weights) const {
+      std::vector<scalar_t> prediction(m);
+      DenseMatrix<scalar_t> K(weights.lrows(), m);
+      std::vector<std::size_t> I(weights.lrows()), J(m);
+      for (std::size_t r=0; r<weights.lrows(); r++)
+        I[r] = weights.rowl2g(r);
+      std::iota(J.begin(), J.end(), 0);
+      Kxy(I, J, K);
+      if (weights.active() && weights.lcols()) {
+#pragma omp parallel for
+        for (std::size_t c=0; c<m; c++)
+          for (std::size_t r=0; r<weights.lrows(); r++)
+            prediction[c] += weights(r, 0) * K(r, c);
       }
       // reduce the local sums to the global vector
       weights.Comm().all_reduce
@@ -217,6 +279,7 @@ namespace strumpack {
       if (verb) std::cout << "# starting HODLR compression..." << std::endl;
       timer.start();
       HODLR::HODLRMatrix<scalar_t> H(c, *this, opts);
+      //H.print_stats();
       DenseMW_t B(1, n(), labels.data(), 1);
       B.lapmt(perm_, true);
       if (verb)

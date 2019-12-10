@@ -686,8 +686,14 @@ namespace strumpack {
       : HSSMatrixBase<scalar_t>(K.n(), K.n(), true) {
       TaskTimer timer("clustering");
       timer.start();
+      if (!K.data()) {
+        std::cerr << "ERROR: HSS compression requires point coordinates."
+                  << std::endl;
+        abort();
+      }
       auto t = binary_tree_clustering
-        (opts.clustering_algorithm(), K.data(), K.permutation(), opts.leaf_size());
+        (opts.clustering_algorithm(), *(K.data()),
+         K.permutation(), opts.leaf_size());
       K.permute();
       if (opts.verbose())
         std::cout << "# clustering (" << get_name(opts.clustering_algorithm())

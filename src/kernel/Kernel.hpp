@@ -84,12 +84,15 @@ namespace strumpack {
        * \param data Contains the data points, 1 datapoint per column.
        * So the number of rows of data is the number of features, the
        * number of columns of data will be the size of the kernel
-       * matrix.
+       * matrix. The Kernel object will keep a pointer to this data.
        * \param lambda regularization parameter, added to the
        * diagonal.
        */
       Kernel(DenseM_t& data, scalar_t lambda)
-        : data_(data), lambda_(lambda) { }
+        : n_(data.cols()), data_(&data), lambda_(lambda) { }
+
+      Kernel(std::size_t n, scalar_t lambda)
+        : n_(n), data_(nullptr), lambda_(lambda) { }
 
       /**
        * Default constructor.
@@ -102,14 +105,15 @@ namespace strumpack {
        *
        * \see d(), data()
        */
-      std::size_t n() const { return data_.cols(); }
+      std::size_t n() const { return n_; }
 
       /**
        * Return the dimension of the datapoints defining the kernel.
-       * \return dimension of the datapoints
+       * \return dimension of the datapoints, or 0 if no points are
+       * specified.
        * \see n(), data()
        */
-      std::size_t d() const { return data_.rows(); }
+      std::size_t d() const { return data_ ? data_->rows() : 0; }
 
       /**
        * Evaluate an entry of the kernel matrix.
@@ -119,7 +123,7 @@ namespace strumpack {
        * \return the value K(i, j) of the kernel
        */
       virtual scalar_t eval(std::size_t i, std::size_t j) const {
-        return eval_kernel_function(data_.ptr(0, i), data_.ptr(0, j))
+        return eval_kernel_function(data_->ptr(0, i), data_->ptr(0, j))
           + ((i == j) ? lambda_ : scalar_t(0.));
       }
 
@@ -134,9 +138,9 @@ namespace strumpack {
        * correct size, ie., B.rows() == I.size() and B.cols() ==
        * J.size()
        */
-      void operator()(const std::vector<std::size_t>& I,
-                      const std::vector<std::size_t>& J,
-                      DenseM_t& B) const {
+      virtual void operator()
+      (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+       DenseM_t& B) const {
         assert(B.rows() == I.size() && B.cols() == J.size());
         for (std::size_t j=0; j<J.size(); j++)
           for (std::size_t i=0; i<I.size(); i++) {
@@ -180,6 +184,16 @@ namespace strumpack {
       std::vector<scalar_t> predict
       (const DenseM_t& test, const DenseM_t& weights) const;
 
+      std::vector<scalar_t> predict
+      (int m, const std::function<scalar_t(int,int)>& Kxy,
+       const DenseM_t& weights) const;
+
+      std::vector<scalar_t> predict
+      (int m, const std::function
+       <void(const std::vector<std::size_t>&,
+             const std::vector<std::size_t>&, DenseMatrix<scalar_t>&)>& Kxy,
+       const DenseM_t& weights) const;
+
 #if defined(STRUMPACK_USE_MPI)
       /**
        * Compute weights for kernel ridge regression
@@ -219,6 +233,17 @@ namespace strumpack {
       std::vector<scalar_t> predict
       (const DenseM_t& test, const DistM_t& weights) const;
 
+      std::vector<scalar_t> predict
+      (int m, const std::function<scalar_t(int,int)>& Kxy,
+       const DistM_t& weights) const;
+
+      std::vector<scalar_t> predict
+      (int m, const std::function
+       <void(const std::vector<std::size_t>&,
+             const std::vector<std::size_t>&, DenseMatrix<scalar_t>&)>& Kxy,
+       const DistM_t& weights) const;
+
+
 #if defined(STRUMPACK_USE_BPACK)
       /**
        * Compute weights for kernel ridge regression
@@ -245,18 +270,17 @@ namespace strumpack {
 #endif
 
       /**
-       * Returns a (const) reference to the data used to define this
+       * Returns a (const) pointer to the data used to define this
        * kernel.
-       * \return const reference to the datapoint, a matrix of size d
+       * \return const pointer to the datapoints, a matrix of size d
        * x n.
        */
-      const DenseM_t& data() const { return data_; }
+      const DenseM_t* data() const { return data_; }
       /**
-       * Returns a reference to the data used to define this
-       * kernel.
-       * \return reference to the datapoint, a matrix of size d x n.
+       * Returns a pointer to the data used to define this kernel.
+       * \return Pointer to the datapoints, a matrix of size d x n.
        */
-      DenseM_t& data() { return data_; }
+      DenseM_t* data() { return data_; }
 
       std::vector<int>& permutation() { return perm_; }
       const std::vector<int>& permutation() const { return perm_; }
@@ -264,8 +288,9 @@ namespace strumpack {
       virtual void permute() {}
 
     protected:
-      DenseM_t& data_;
-      scalar_t lambda_;
+      std::size_t n_ = 0;
+      DenseM_t* data_ = nullptr;
+      scalar_t lambda_ = 0;
       std::vector<int> perm_;
 
       /**
@@ -489,6 +514,51 @@ namespace strumpack {
       scalar_t eval_kernel_function
       (const scalar_t* x, const scalar_t* y) const override {
         assert(false);
+        return scalar_t(0.);
+      }
+    };
+
+
+    template<typename scalar_t>
+    class GeneralKernel : public Kernel<scalar_t> {
+    public:
+      GeneralKernel
+      (int n, std::function
+       <void(const std::vector<std::size_t>&, const std::vector<std::size_t>&,
+             DenseMatrix<scalar_t>&)> elem,
+       scalar_t lambda)
+        : Kernel<scalar_t>(n, lambda), Kelem_(elem) { }
+
+      GeneralKernel
+      (DenseMatrix<scalar_t>& data, std::function
+       <void(const std::vector<std::size_t>&, const std::vector<std::size_t>&,
+             DenseMatrix<scalar_t>&)> elem,
+       scalar_t lambda)
+        : Kernel<scalar_t>(data, lambda), Kelem_(elem) { }
+
+      scalar_t eval(std::size_t i, std::size_t j) const override {
+        std::cout << "THIS SHOULD NOT BE CALLED, USE BLOCK FUNCTION INSTEAD!!" << std::endl;
+        std::vector<std::size_t> I(1, i), J(1, j);
+        DenseMatrix<scalar_t> b(1, 1);
+        Kelem_(I, J, b);
+        return b(0, 0) + ((i == j) ? this->lambda_ : scalar_t(0.));
+      }
+
+      void operator()
+      (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
+       DenseMatrix<scalar_t>& B) const override {
+        Kelem_(I, J, B);
+      }
+
+    protected:
+      std::function
+      <void(const std::vector<std::size_t>&, const std::vector<std::size_t>&,
+            DenseMatrix<scalar_t>&)> Kelem_;
+
+      scalar_t eval_kernel_function
+      (const scalar_t* x, const scalar_t* y) const override {
+        assert(false);
+        return scalar_t(0.);
       }
     };
 

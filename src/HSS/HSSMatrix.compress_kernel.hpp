@@ -43,7 +43,8 @@ namespace strumpack {
          const std::vector<std::size_t>& J, DenseM_t& B){
         K(I,J,B);
       };
-      compress_with_coordinates(K.data(), Aelem, opts);
+      assert(K.data());
+      compress_with_coordinates(*(K.data()), Aelem, opts);
     }
 
     template<typename scalar_t> void

@@ -529,12 +529,12 @@ namespace strumpack {
         auto p0 = pmaps[2*(*Npmap)+pgids[isec]];
         assert(pmaps[pgids[isec]] == 1);          // prows == 1
         assert(pmaps[(*Npmap)+pgids[isec]] == 1); // pcols == 1
+        std::vector<std::size_t> I(m), J(n);
         if (comm.rank() == p0) {
-          for (int c=0; c<n; c++) {
-            auto col = std::abs(allcols[c0+c])-1;
-            for (int r=0; r<m; r++)
-              data[r+c*m] = K.eval(allrows[r0+r]-1, col);
-          }
+          for (int c=0; c<n; c++) J[c] = std::abs(allcols[c0+c]) - 1;
+          for (int r=0; r<m; r++) I[r] = allrows[r0+r] - 1;
+          DenseMatrixWrapper<scalar_t> B(m, n, data, m);
+          K(I, J, B);
           data += m*n;
         }
         r0 += m;
@@ -623,49 +623,45 @@ namespace strumpack {
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
     (const MPIComm& c, kernel::Kernel<scalar_t>& K, const opts_t& opts) {
       rows_ = cols_ = K.n();
+      // let the HODLR code refine the tree
       HSS::HSSPartitionTree tree(rows_);
-      if (opts.geo() == 1)
-        tree = binary_tree_clustering
-          (opts.clustering_algorithm(), K.data(),
-           K.permutation(), opts.leaf_size());
-      else tree.refine(opts.leaf_size());
-      int min_lvl = 2 + std::ceil(std::log2(c.size()));
-      lvls_ = std::max(min_lvl, tree.levels());
-      tree.expand_complete_levels(lvls_);
+      lvls_ = tree.levels();
       leafs_ = tree.template leaf_sizes<int>();
       c_ = c;
       Fcomm_ = MPI_Comm_c2f(c_.comm());
       options_init(opts);
       perm_.resize(rows_);
       HODLR_set_I_option<scalar_t>(options_, "knn", opts.knn_hodlrbf());
-      HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", opts.lr_leaf());
-      if (opts.geo() == 1) {
-        // do not pass any neighbor info to the HODLR code
-        HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
-        HODLR_construct_init<scalar_t>
-          (rows_, 0, nullptr, nullptr, lvls_-1, leafs_.data(), perm_.data(),
-           lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
-           nullptr, nullptr, nullptr);
-      } else {
+      HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", opts.leaf_size());
+      KernelCommPtrs<scalar_t> KC{&K, &c_};
+      if (K.data()) {
         HODLR_set_I_option<scalar_t>(options_, "nogeo", 0);
+        HODLR_set_I_option<scalar_t>(options_, "xyzsort", 2);
         // pass the data points to the HODLR code, let the HODLR code
         // figure out the permutation etc
         HODLR_construct_init<scalar_t>
-          (rows_, K.d(), K.data().data(), nullptr, lvls_-1, leafs_.data(),
+          (rows_, K.d(), K.data()->data(), nullptr, lvls_-1, leafs_.data(),
            perm_.data(), lrows_, ho_bf_, options_, stats_, msh_,
            kerquant_, ptree_, nullptr, nullptr, nullptr);
+      } else {
+        // no coordinates are available
+        HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
+        HODLR_set_I_option<scalar_t>(options_, "xyzsort", 3);
+        HODLR_construct_init_Gram<scalar_t>
+          (rows_, 0, nullptr, nullptr, lvls_-1, leafs_.data(), perm_.data(),
+           lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
+           &(HODLR_kernel_evaluation<scalar_t>),
+           &(HODLR_kernel_block_evaluation<scalar_t>), &KC);
       }
       perm_init();
       dist_init();
-      KernelCommPtrs<scalar_t> KC{&K, &c_};
       HODLR_construct_element_compute<scalar_t>
         (ho_bf_, options_, stats_, msh_, kerquant_,
          ptree_, &(HODLR_kernel_evaluation<scalar_t>),
          &(HODLR_kernel_block_evaluation<scalar_t>), &KC);
-      if (opts.geo() != 1) {
-        K.permutation() = perm();
-        K.data().lapmr(perm(), true);
-      }
+      K.permutation() = perm();
+      if (K.data())
+        K.data()->lapmr(perm(), true);
     }
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
@@ -682,8 +678,9 @@ namespace strumpack {
       Fcomm_ = MPI_Comm_c2f(c_.comm());
       options_init(opts);
       perm_.resize(rows_);
+      HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
       HODLR_set_I_option<scalar_t>(options_, "xyzsort", 3);
-      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 0); // 1 = block extraction, 0 = element
+      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 0);
       HODLR_construct_init_Gram<scalar_t>
         (rows_, 0, nullptr, nullptr, lvls_-1, leafs_.data(), perm_.data(),
          lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
@@ -710,8 +707,9 @@ namespace strumpack {
       Fcomm_ = MPI_Comm_c2f(c_.comm());
       options_init(opts);
       perm_.resize(rows_);
+      HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
       HODLR_set_I_option<scalar_t>(options_, "xyzsort", 3);
-      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 1); // 1 = block extraction, 0 = element
+      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 1);
       HODLR_construct_init_Gram<scalar_t>
         (rows_, 0, nullptr, nullptr, lvls_-1, leafs_.data(), perm_.data(),
          lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
@@ -842,7 +840,7 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
       HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
       // set RecLR_leaf to 2 for RRQR at bottom level of Hierarchical BACA
-      HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", 5); // 5 = new version of BACA
+      HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", opts.lr_leaf()); // 5 = new version of BACA
       HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", opts.BACA_block_size());
       HODLR_set_I_option<scalar_t>(options_, "xyzsort", 0);
       HODLR_set_I_option<scalar_t>(options_, "elem_extract", 1); // block extraction

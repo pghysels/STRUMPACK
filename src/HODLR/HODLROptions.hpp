@@ -247,14 +247,17 @@ namespace strumpack {
       }
 
       /**
-       * geo should be 0, 1, 2 or 3. 0 means use point geometry, 1
-       * means do not use any geometry. 2 means use the graph
-       * connectivity for the distance and admissibility info, 3 means
-       * use the graph to directly find closest neighbors.
+       * nogeo should be 0, 1, 2 or 3.
+       *   0: pass point coordinates/geometry to the HODLR code
+       *   1: do not pass geometry to HODLR code
+       *   2: do not pass geometry information to HODLR, but pass an
+       *      admissibility and distance function to HODLR code
+       *   3: do not pass geometry, but pass a list of KNN*N nearest
+       *      neighbors
        */
-      void set_geo(int geo) {
-        assert(geo == 0 || geo == 1 || geo == 2 || geo == 3);
-        geo_ = geo;
+      void set_nogeo(int nogeo) {
+        assert(nogeo == 0 || nogeo == 1 || nogeo == 2 || nogeo == 3);
+        nogeo_ = nogeo;
       }
 
       /**
@@ -370,7 +373,7 @@ namespace strumpack {
       /**
        * Use geometry information? 0, 1 or 2
        */
-      int geo() const { return geo_; }
+      int nogeo() const { return nogeo_; }
 
       /**
        * Bottom level compression algorithms in H-BACA 1, 2, 3, 4, or 5
@@ -423,7 +426,7 @@ namespace strumpack {
           {"hodlr_butterfly_levels",      required_argument, 0, 9},
           {"hodlr_BACA_block_size",       required_argument, 0, 10},
           {"hodlr_BF_sampling_parameter", required_argument, 0, 11},
-          {"hodlr_geo",                   required_argument, 0, 12},
+          {"hodlr_nogeo",                   required_argument, 0, 12},
           {"hodlr_knn_hodlrbf",           required_argument, 0, 13},
           {"hodlr_knn_lrbf",              required_argument, 0, 14},
           {"hodlr_lr_leaf",               required_argument, 0, 15},
@@ -493,8 +496,8 @@ namespace strumpack {
           } break;
           case 12: {
             std::istringstream iss(optarg);
-            iss >> geo_;
-            set_geo(geo_);
+            iss >> nogeo_;
+            set_nogeo(nogeo_);
           } break;
           case 13: {
             std::istringstream iss(optarg);
@@ -551,8 +554,13 @@ namespace strumpack {
                   << BACA_block_size() << ")" << std::endl
                   << "#   --hodlr_BF_sampling_parameter (default "
                   << BF_sampling_parameter() << ")" << std::endl
-                  << "#   --hodlr_geo 1|2 (1: no neighbor info, 2: use neighbor info) (default "
-                  << geo() << ")" << std::endl
+                  << "#   --hodlr_nogeo 0|1|2|3 (" << nogeo() << ")" << std::endl
+                  << "#      0: pass point coordinates/geometry to the HODLR code" << std::endl
+                  << "#      1: do not pass geometry to HODLR code" << std::endl
+                  << "#      2: do not pass geometry information to HODLR, but pass an" << std::endl
+                  << "#         admissibility and distance function to HODLR code" << std::endl
+                  << "#      3: do not pass geometry, but pass a list of KNN*N nearest" << std::endl
+                  << "#         neighbors" << std::endl
                   << "#   --hodlr_knn_hodlrbf (default "
                   << knn_hodlrbf() << ")" << std::endl
                   << "#   --hodlr_knn_lrbf (default "
@@ -576,7 +584,7 @@ namespace strumpack {
       CompressionAlgorithm compression_algo_ = CompressionAlgorithm::ELEMENT_EXTRACTION;
       int BACA_block_size_ = 32;
       double BF_sampling_parameter_ = 2.0;
-      int geo_ = 2;
+      int nogeo_ = 0;
       int lr_leaf_ = 5;
       int knn_hodlrbf_ = 64;
       int knn_lrbf_ = 256;
