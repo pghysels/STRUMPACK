@@ -107,7 +107,7 @@ namespace strumpack {
     std::vector<int> piv;
 
     void build_front(const SpMat_t& A);
-    void partial_factorization();
+    void partial_factorization(const SPOptions<scalar_t>& opts);
 
     void fwd_solve_phase2
     (const DistM_t& F11, const DistM_t& F12, const DistM_t& F21,
@@ -117,16 +117,10 @@ namespace strumpack {
      DistM_t& y, DistM_t& yupd) const;
 
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
-    //slate::Matrix<scalar_t> slateF11_, slateF12_, slateF21_, slateF22_;
     slate::Pivots slate_piv_;
-    //#if defined(STRUMPACK_USE_CUDA)
-    // std::map<slate::Option, slate::Value> slate_opts_ =
-    //   {{slate::Option::Target, slate::Target::Devices}};
-    //#else
     std::map<slate::Option, slate::Value> slate_opts_;
-    //#endif
 
-    slate::Matrix<scalar_t> slate_matrix(DistM_t& M) const;
+    slate::Matrix<scalar_t> slate_matrix(const DistM_t& M) const;
 #endif
 
 #if defined(STRUMPACK_USE_ZFP)
@@ -150,9 +144,6 @@ namespace strumpack {
    std::vector<integer_t>& upd, const MPIComm& comm, int P)
     : FrontalMatrixMPI<scalar_t,integer_t>
     (sep, sep_begin, sep_end, upd, comm, P) {
-    // slate_opts_.insert({slate::Option::Target, slate::Target::Devices});
-    // auto it_bool = slate_opts_.insert({slate::Option::Lookahead, slate::Value(1)});
-    // std::cout << "insertion success " << (it_bool.second ? " YES" : "NO") << std::endl;
   }
 
 
@@ -220,15 +211,20 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::partial_factorization() {
+  FrontalMatrixDenseMPI<scalar_t,integer_t>::partial_factorization
+  (const SPOptions<scalar_t>& opts) {
     if (this->dim_sep() && grid()->active()) {
+      TaskTimer pf("");
+      pf.start();
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+      if (opts.use_gpu())
+      	slate_opts_.insert({slate::Option::Target, slate::Target::Devices});
       auto slateF11 = slate_matrix(F11_);
       slate::getrf(slateF11, slate_piv_, slate_opts_);
 #else
       piv = F11_.LU();
 #endif
-      STRUMPACK_FULL_RANK_FLOPS(LU_flops(F11_));
+      long long flops = LU_flops(F11_);
       if (this->dim_upd()) {
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
         auto slateF12 = slate_matrix(F12_);
@@ -243,20 +239,33 @@ namespace strumpack {
         trsm(Side::R, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11_, F21_);
         gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.), F22_);
 #endif
-        STRUMPACK_FULL_RANK_FLOPS
-          (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.)) +
-           trsm_flops(Side::L, scalar_t(1.), F11_, F12_) +
-           trsm_flops(Side::R, scalar_t(1.), F11_, F21_));
+	flops += gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.)) +
+	  trsm_flops(Side::L, scalar_t(1.), F11_, F12_) +
+	  trsm_flops(Side::R, scalar_t(1.), F11_, F21_);
       }
+      if (Comm().is_root() && opts.verbose()) {
+	auto time = pf.elapsed();
+	std::cout << "# DenseMPI factorization complete, GPU=" << opts.use_gpu()
+		  << ", P=" << Comm().size() << ", T=" << params::num_threads
+		  << ": " << time << " seconds, "
+		  << flops / 1.e9  << " GFLOPS, " 
+		  << (float(flops) / time) / 1.e9 << " GFLOP/s, "
+		  << " ds=" << this->dim_sep()
+		  << ", du=" << this->dim_upd() << std::endl;
+      }
+      STRUMPACK_FULL_RANK_FLOPS(flops);
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+      STRUMPACK_FLOPS(flops);
+#endif
     }
   }
 
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
   template<typename scalar_t,typename integer_t> slate::Matrix<scalar_t>
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::slate_matrix(DistM_t& M) const {
+  FrontalMatrixDenseMPI<scalar_t,integer_t>::slate_matrix(const DistM_t& M) const {
     return slate::Matrix<scalar_t>::fromScaLAPACK
-      (M.rows(), M.cols(), M.data(), M.ld(), M.MB(),
-       M.nprows(), M.npcols(), M.comm());
+      (M.rows(), M.cols(), const_cast<scalar_t*>(M.data()), M.ld(),
+       M.MB(), M.nprows(), M.npcols(), M.comm());
   }
 #endif
 
@@ -277,7 +286,7 @@ namespace strumpack {
     }
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
-    partial_factorization();
+    partial_factorization(opts);
 #if defined(STRUMPACK_USE_ZFP)
     compress(opts);
 #endif
@@ -332,11 +341,13 @@ namespace strumpack {
       auto slateF11 = slate_matrix(F11);
       slate::getrs(slateF11, const_cast<slate::Pivots&>(slate_piv_),
                    sbloc, slate_opts_);
+      // TODO count flops
       if (this->dim_upd()) {
         auto sbupd = slate_matrix(bupd);
         auto slateF21 = slate_matrix(F21);
         slate::gemm
           (scalar_t(-1.), slateF21, sbloc, scalar_t(1.), sbupd, slate_opts_);
+	// TODO count flops
       }
     }
 #else
@@ -397,6 +408,7 @@ namespace strumpack {
         auto slateF12 = slate_matrix(F12);
         slate::gemm
           (scalar_t(-1.), slateF12, syupd, scalar_t(1.), sy, slate_opts_);
+	// TODO count flops
       }
     }
 #else

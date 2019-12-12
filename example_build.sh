@@ -60,16 +60,17 @@ fi
 if [[ $(dnsdomainname) = "summit.olcf.ornl.gov" ]]; then
     found_host=true
 
-    module swap xl gcc/9.1.0
-    module load mercurial
-    module load cmake
-    module load essl
-    module load cuda
-    module load netlib-lapack
-    module load netlib-scalapack
+    # module swap xl gcc/9.1.0
+    # module load mercurial
+    # module load cmake
+    # module load essl
+    # module load cuda
+    # module load netlib-lapack
+    # module load netlib-scalapack
 
     PARMETISHOME=$HOME/local/parmetis-4.0.3/
     BPACKHOME=$HOME/ButterflyPACK/
+    SLATEHOME=$HOME/local/slate
 
     cmake ../ \
         -DCMAKE_BUILD_TYPE=Release \
@@ -78,9 +79,12 @@ if [[ $(dnsdomainname) = "summit.olcf.ornl.gov" ]]; then
         -DCMAKE_C_COMPILER=mpicc \
         -DCMAKE_Fortran_COMPILER=mpif90 \
         -DSTRUMPACK_USE_OPENMP=ON \
-        -DTPL_ENABLE_CUBLAS=OFF \
+        -DTPL_ENABLE_CUBLAS=ON \
         -DTPL_CUBLAS_LIBRARIES="${CUDA_DIR}/lib64/libcudart.so;${CUDA_DIR}/lib64/libcublas.so;${CUDA_DIR}/lib64/libcusolver.so" \
         -DTPL_CUBLAS_INCLUDE_DIRS="${CUDA_DIR}/include" \
+        -DTPL_ENABLE_SLATE=ON \
+        -DTPL_SLATE_INCLUDE_DIRS="$SLATEHOME/include/;$SLATEHOME/blaspp/include;$SLATEHOME/lapackpp/include" \
+        -DTPL_SLATE_LIBRARIES="$SLATEHOME/lib/libslate_scalapack_api.a;$SLATEHOME/lib/libslate.a;$SLATEHOME/blaspp/lib/libblaspp.a;$SLATEHOME/lapackpp/lib/liblapackpp.a" \
         -DTPL_BLAS_LIBRARIES="${OLCF_ESSL_ROOT}/lib64/libessl.so;${OLCF_NETLIB_LAPACK_ROOT}/lib64/libblas.so" \
         -DTPL_LAPACK_LIBRARIES="${OLCF_ESSL_ROOT}/lib64/libessl.so;${OLCF_NETLIB_LAPACK_ROOT}/lib64/liblapack.so" \
         -DTPL_SCALAPACK_LIBRARIES="${OLCF_NETLIB_SCALAPACK_ROOT}/lib/libscalapack.so" \
@@ -188,5 +192,5 @@ fi
 make install VERBOSE=1
 make test
 cd examples
-make -k
+make -k testPoisson3dMPIDist testHelmholtz
 cd ../../
