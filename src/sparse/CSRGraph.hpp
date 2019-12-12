@@ -35,7 +35,6 @@
 #include <unordered_map>
 #include <queue>
 
-#include "misc/MPIWrapper.hpp"
 #include "HSS/HSSPartitionTree.hpp"
 #include "MetisReordering.hpp"
 

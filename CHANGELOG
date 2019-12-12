@@ -5,6 +5,7 @@ Version 3.xx In Progress
  - Removed some options: --sp_enable HSS, --sp_HSS_min_sep_size,
    etc..  Now one should use: --sp_compression HSS,
    --sp_compression_min_sep_size ...
+ - Fix for compilation without MPI
  - Several bug fixes and performance improvements
 
 
