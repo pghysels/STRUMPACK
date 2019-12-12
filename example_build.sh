@@ -192,5 +192,5 @@ fi
 make install VERBOSE=1
 make test
 cd examples
-make -k testPoisson3dMPIDist testHelmholtz
+make -k
 cd ../../
