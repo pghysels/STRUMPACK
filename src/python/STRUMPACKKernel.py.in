@@ -166,25 +166,29 @@ class STRUMPACKGaussianProcessRegressor(GaussianProcessRegressor):
         if X.dtype == np.float64:
             if self.kernel_.requires_vector_input:
                 self.K_ = sp.STRUMPACK_create_general_kernel_double(
-                    ctypes.c_int(X.shape[0]), ctypes.c_int(X.shape[1]),
-                    ctypes.c_void_p(X.ctypes.data), Kx_block_fptr_f64,
-                    ctypes.c_void_p(None), ctypes.c_double(self.alpha))
+                    ctypes.c_int(self.X_train_.shape[0]),
+                    ctypes.c_int(self.X_train_.shape[1]),
+                    ctypes.c_void_p(self.X_train_.ctypes.data),
+                    Kx_block_fptr_f64, ctypes.c_void_p(None),
+                    ctypes.c_double(self.alpha))
             else:
                 self.K_ = sp.STRUMPACK_create_general_kernel_double(
-                    ctypes.c_int(X.shape[0]), ctypes.c_int(0),
+                    ctypes.c_int(self.X_train_.shape[0]), ctypes.c_int(0),
                     ctypes.c_void_p(None), Kx_block_fptr_f64,
                     ctypes.c_void_p(None), ctypes.c_double(self.alpha))
 
         elif X.dtype == np.float32:
             if self.kernel_.requires_vector_input:
                 self.K_ = sp.STRUMPACK_create_general_kernel_float(
-                    ctypes.c_int(X.shape[0]), ctypes.c_int(X.shape[1]),
-                    ctypes.c_void_p(X.ctypes.data), Kx_block_fptr_f32,
-                    ctypes.c_void_p(None), ctypes.c_float(self.alpha))
+                    ctypes.c_int(self.X_train_.shape[0]),
+                    ctypes.c_int(self.X_train_.shape[1]),
+                    ctypes.c_void_p(self.X_train_.ctypes.data),
+                    Kx_block_fptr_f32, ctypes.c_void_p(None),
+                    ctypes.c_float(self.alpha))
             else:
                 self.K_ = sp.STRUMPACK_create_general_kernel_float(
                     ctypes.c_int(X.shape[0]), ctypes.c_int(X.shape[1]),
-                    ctypes.c_void_p(X.ctypes.data), Kx_block_fptr_f32,
+                    ctypes.c_void_p(None), Kx_block_fptr_f32,
                     ctypes.c_void_p(None), ctypes.c_float(self.alpha))
 
         if self.argv is None: self.argv=[]
