@@ -142,6 +142,8 @@ class STRUMPACKGaussianProcessRegressor(GaussianProcessRegressor):
         self.classes_ = unique_labels(y)
 
 
+        D = self.kernel_.diag(self.X_train_)
+
         # callback function for STRUMPACK kernel evaluation
         def Kx_block(m, I, n, J, B, ldB, f):
             Ksub = self.kernel_(
@@ -176,6 +178,8 @@ class STRUMPACKGaussianProcessRegressor(GaussianProcessRegressor):
                     ctypes.c_int(self.X_train_.shape[0]), ctypes.c_int(0),
                     ctypes.c_void_p(None), Kx_block_fptr_f64,
                     ctypes.c_void_p(None), ctypes.c_double(self.alpha))
+            sp.STRUMPACK_kernel_set_diagonal_double(
+                self.K_, ctypes.c_void_p(D.ctypes.data));
 
         elif X.dtype == np.float32:
             if self.kernel_.requires_vector_input:
@@ -190,6 +194,8 @@ class STRUMPACKGaussianProcessRegressor(GaussianProcessRegressor):
                     ctypes.c_int(X.shape[0]), ctypes.c_int(X.shape[1]),
                     ctypes.c_void_p(None), Kx_block_fptr_f32,
                     ctypes.c_void_p(None), ctypes.c_float(self.alpha))
+            sp.STRUMPACK_kernel_set_diagonal_float(
+                self.K_, ctypes.c_void_p(D.ctypes.data));
 
         if self.argv is None: self.argv=[]
         LP_c_char = ctypes.POINTER(ctypes.c_char)

@@ -41,6 +41,7 @@ class STRUMPACKKernelRegression {
 public:
   STRUMPACKKernelRegression() {}
   std::unique_ptr<Kernel<scalar_t>> K_;
+  scalar_t* diag_ = nullptr;
   bool dist_ = false;
   DenseMatrix<scalar_t> training_, weights_;
 #if defined(STRUMPACK_USE_MPI)
@@ -122,6 +123,12 @@ template<typename scalar_t> STRUMPACKKernel STRUMPACK_create_general_kernel
   return kernel;
 }
 
+template<typename scalar_t> void STRUMPACK_kernel_set_diagonal
+(STRUMPACKKernel kernel, scalar_t* D) {
+  auto KR = static_cast<STRUMPACKKernelRegression<scalar_t>*>(kernel);
+  KR->diag_ = D;
+}
+
 template<typename scalar_t> void STRUMPACK_kernel_fit_HSS
 (STRUMPACKKernel kernel, scalar_t* labels, int argc, char* argv[]) {
   auto KR = static_cast<STRUMPACKKernelRegression<scalar_t>*>(kernel);
@@ -187,13 +194,18 @@ template<typename scalar_t> void STRUMPACK_general_kernel_predict
             scalar_t*, std::size_t, void*),
  void* data, scalar_t* prediction) {
   auto KR = static_cast<STRUMPACKKernelRegression<scalar_t>*>(kernel);
-  auto Kelem =
-    [Kxy,data]
+  auto D = KR->diag_;
+  auto Kelem = [Kxy,data,D]
     (const std::vector<std::size_t>& I,
      const std::vector<std::size_t>& J,
      DenseMatrix<scalar_t>& B) -> void {
-      Kxy(I.size(), I.data(), J.size(), J.data(),
-          B.data(), B.ld(), data); };
+                 if (D && I.size()==1 && J.size()==1 && I[0]==J[0]) {
+                   B(0, 0) = D[I[0]];
+                   return;
+                 }
+                 Kxy(I.size(), I.data(), J.size(), J.data(),
+                     B.data(), B.ld(), data);
+               };
   if (KR->dist_) {
 #if defined(STRUMPACK_USE_MPI)
     auto pred = KR->K_->predict(m, Kelem, KR->dweights_);
@@ -267,6 +279,15 @@ extern "C" {
   }
   void STRUMPACK_destroy_kernel_float(STRUMPACKKernel kernel) {
     delete static_cast<STRUMPACKKernelRegression<float>*>(kernel);
+  }
+
+  void STRUMPACK_kernel_set_diagonal_double
+  (STRUMPACKKernel kernel, double* D) {
+    STRUMPACK_kernel_set_diagonal<double>(kernel, D);
+  }
+  void STRUMPACK_kernel_set_diagonal_float
+  (STRUMPACKKernel kernel, float* D) {
+    STRUMPACK_kernel_set_diagonal<float>(kernel, D);
   }
 
   void STRUMPACK_kernel_fit_HSS_double

@@ -74,6 +74,11 @@ extern "C" {
   void STRUMPACK_destroy_kernel_double(STRUMPACKKernel K);
   void STRUMPACK_destroy_kernel_float(STRUMPACKKernel K);
 
+  void STRUMPACK_kernel_set_diagonal_double
+  (STRUMPACKKernel kernel, double* D);
+  void STRUMPACK_kernel_set_diagonal_float
+  (STRUMPACKKernel kernel, float* D);
+
   void STRUMPACK_kernel_fit_HSS_double
   (STRUMPACKKernel K, double* labels, int argc, char* argv[]);
   void STRUMPACK_kernel_fit_HSS_float
