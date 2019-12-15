@@ -140,6 +140,10 @@ namespace strumpack {
     reqs.clear();
   }
 
+  inline void wait_all(std::vector<MPI_Request>& reqs) {
+    MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
+  }
+
 
   /**
    * \class MPIComm
@@ -299,6 +303,21 @@ namespace strumpack {
       return std::move(req);
     }
 
+    template<typename T>
+    void isend(const T* sbuf, std::size_t ssize, int dest,
+               int tag, MPI_Request* req) const {
+      // const_cast is necessary for ancient openmpi version used on Travis
+      MPI_Isend(const_cast<T*>(sbuf), ssize, mpi_type<T>(),
+                dest, tag, comm_, req);
+    }
+
+    template<typename T>
+    void isend(const T& buf, int dest, int tag, MPI_Request* req) const {
+      // const_cast is necessary for ancient openmpi version used on Travis
+      MPI_Isend(const_cast<T*>(&buf), 1, mpi_type<T>(),
+                dest, tag, comm_, req);
+    }
+
     /**
      * Non-blocking send of a vector to a destination process, with a
      * certain tag.
@@ -350,16 +369,34 @@ namespace strumpack {
      * \return std::vector<T> with the data to be received.
      * \see isend, send
      */
-    template<typename T>
-    std::vector<T> recv(int src, int tag) const {
+    template<typename T> std::vector<T> recv(int src, int tag) const {
       MPI_Status stat;
       MPI_Probe(src, tag, comm_, &stat);
       int msgsize;
       MPI_Get_count(&stat, mpi_type<T>(), &msgsize);
+      //std::vector<T,NoInit<T>> rbuf(msgsize);
       std::vector<T> rbuf(msgsize);
       MPI_Recv(rbuf.data(), msgsize, mpi_type<T>(), src, tag,
                comm_, MPI_STATUS_IGNORE);
       return rbuf;
+    }
+
+    template<typename T>
+    std::pair<int,std::vector<T>> recv_any_src(int tag) const {
+      MPI_Status stat;
+      MPI_Probe(MPI_ANY_SOURCE, tag, comm_, &stat);
+      int msgsize;
+      MPI_Get_count(&stat, mpi_type<T>(), &msgsize);
+      std::vector<T> rbuf(msgsize);
+      MPI_Recv(rbuf.data(), msgsize, mpi_type<T>(), stat.MPI_SOURCE,
+               tag, comm_, MPI_STATUS_IGNORE);
+      return {stat.MPI_SOURCE, std::move(rbuf)};
+    }
+
+    template<typename T> T recv_one(int src, int tag) const {
+      T t;
+      MPI_Recv(&t, 1, mpi_type<T>(), src, tag, comm_, MPI_STATUS_IGNORE);
+      return t;
     }
 
     /**
@@ -440,6 +477,33 @@ namespace strumpack {
       else MPI_Reduce(t, t, ssize, mpi_type<T>(), op, 0, comm_);
     }
 
+    template<typename T>
+    void all_to_all(const T* sbuf, int scnt, T* rbuf) const {
+      MPI_Alltoall
+        (sbuf, scnt, mpi_type<T>(), rbuf, scnt, mpi_type<T>(), comm_);
+    }
+
+    template<typename T, typename A=std::allocator<T>>
+    std::vector<T,A> all_to_allv
+    (const T* sbuf, int* scnts, int* sdispls,
+     int* rcnts, int* rdispls, const MPI_Datatype type) const {
+        std::size_t rsize = 0;
+      for (int p=0; p<size(); p++)
+        rsize += rcnts[p];
+      std::vector<T,A> rbuf(rsize);
+      MPI_Alltoallv
+        (sbuf, scnts, sdispls, type,
+         rbuf.data(), rcnts, rdispls, type, comm_);
+      return rbuf;
+    }
+
+    template<typename T> void all_to_allv
+    (const T* sbuf, int* scnts, int* sdispls, T* rbuf, int* rcnts,
+     int* rdispls, const MPI_Datatype type) const {
+      MPI_Alltoallv
+        (sbuf, scnts, sdispls, type, rbuf, rcnts, rdispls, type, comm_);
+    }
+
     /**
      * Perform an MPI_Alltoallv. Each rank sends sbuf[i] to process
      * i. The results are recieved in a single contiguous vector
@@ -460,7 +524,6 @@ namespace strumpack {
      std::vector<T*>& pbuf) const {
       all_to_all_v(sbuf, rbuf, pbuf, mpi_type<T>());
     }
-
 
     /**
      * Perform an MPI_Alltoallv. Each rank sends sbuf[i] to process

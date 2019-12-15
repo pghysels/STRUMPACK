@@ -32,6 +32,7 @@
 #include <iostream>
 #include <algorithm>
 #include <random>
+#include <stddef.h>
 
 #include "StrumpackParameters.hpp"
 #include "CompressedSparseMatrix.hpp"
@@ -67,7 +68,8 @@ namespace strumpack {
 
     std::tuple<int,int,int> get_sparse_mapped_destination
     (const CSRMatrixMPI<scalar_t,integer_t>& A,
-     std::size_t i, std::size_t j, bool duplicate_fronts) const;
+     std::size_t oi, std::size_t oj, std::size_t i, std::size_t j,
+     bool duplicate_fronts) const;
 
     void separator_reordering
     (const Opts_t& opts, const CSRMatrixMPI<scalar_t,integer_t>& A);
@@ -140,6 +142,10 @@ namespace strumpack {
      integer_t& dsep_begin, integer_t& dsep_end,
      std::vector<integer_t>& dsep_upd, int P0, int P,
      int P0_sibling, int P_sibling, int owner, bool bcast_dim_sep);
+
+    template<typename It> void merge_if_larger
+    (const It u0, const It u1,
+     std::vector<integer_t>& out, integer_t s) const;
   };
 
 
@@ -161,11 +167,9 @@ namespace strumpack {
     symbolic_factorization(lupd, dupd, ltree_work, dsep_work);
     MPIComm::control_stop("symbolic_factorization");
 
-    {// communicate dist_subtree_work to everyone
+    {
+      // communicate dist_subtree_work to everyone
       std::vector<float> sbuf(2*P_);
-      // initialize buffer or valgrind will complain about MPI sending
-      // uninitialized data
-      //sbuf[2*rank_] = sbuf[2*rank_+1] = 0.0;
       for (integer_t dsep=0; dsep<nd_.tree().separators(); dsep++)
         if (rank_ == nd_.proc_dist_sep[dsep]) {
           if (nd_.tree().lch(dsep) == -1)
@@ -195,8 +199,8 @@ namespace strumpack {
        subtree_ranges_.data(), sizeof(SepRange),
        MPI_BYTE, comm_.comm());
     get_all_pfronts();
-    find_row_owner(A);
     find_row_front(A);
+    find_row_owner(A);
     Aprop_.setup(A, nd_, *this, opts.compression() != CompressionType::NONE);
     MPIComm::control_stop("block_row_A_to_prop_A");
   }
@@ -209,13 +213,9 @@ namespace strumpack {
     // distributed sparse matrix
     // TODO avoid this, instead just locally permute Aprop_
     find_row_owner(A);
-    //find_row_front(A);
     Aprop_ = PropMapSparseMatrix<scalar_t,integer_t>();
     Aprop_.setup
       (A, nd_, *this, opts.compression() != CompressionType::NONE);
-    // opts.use_HSS() ||
-    //   (opts.use_HODLR() && opts.HODLR_options().compression_algorithm() ==
-    //    HODLR::CompressionAlgorithm::RANDOM_SAMPLING));
   }
 
   /**
@@ -231,7 +231,8 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> std::tuple<int,int,int>
   EliminationTreeMPIDist<scalar_t,integer_t>::get_sparse_mapped_destination
   (const CSRMatrixMPI<scalar_t,integer_t>& A,
-   std::size_t i, std::size_t j, bool duplicate_fronts) const {
+   std::size_t oi, std::size_t oj, std::size_t i, std::size_t j,
+   bool duplicate_fronts) const {
     auto fi = row_pfront_[i];
     if (fi < 0) return std::make_tuple(-fi-1, 1, 1);
     auto fj = row_pfront_[j];
@@ -245,17 +246,14 @@ namespace strumpack {
     if (i < f.sep_end) {
       if (j < f.sep_end) // F11
         return std::make_tuple
-          (f.P0 + (((i - f.sep_begin) / B) % f.prows)
-           + (((j-f.sep_begin) / B) % f.pcols) * f.prows, 1, 1);
+          (row_owner_[oi] + (((j-f.sep_begin) / B) % f.pcols) * f.prows, 1, 1);
       else // F12
-        return std::make_tuple
-          (f.P0 + (((i-f.sep_begin) / B) % f.prows),
-           f.prows * f.pcols, f.prows);
+        return
+          std::make_tuple(row_owner_[oi], f.prows * f.pcols, f.prows);
     } else {
       if (j < f.sep_end) // F21
         return std::make_tuple
-          (f.P0 + (((j - f.sep_begin) / B) % f.pcols) * f.prows,
-           f.prows, 1);
+          (f.P0 + (((j-f.sep_begin) / B) % f.pcols) * f.prows, f.prows, 1);
     }
     assert(false);
     return std::make_tuple(0, P_, 1);
@@ -309,28 +307,19 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPIDist<scalar_t,integer_t>::find_row_owner
   (const CSRMatrixMPI<scalar_t,integer_t>& A) {
-    std::size_t lo = A.begin_row();
-    std::size_t hi = A.end_row();
+    std::size_t lo = A.begin_row(), hi = A.end_row();
     std::size_t n_loc = hi - lo;
     const std::size_t B = DistM_t::default_MB;
     row_owner_.assign(n_loc, -1);
 #pragma omp parallel for
     for (std::size_t r=0; r<n_loc; r++) {
       std::size_t pr = nd_.perm()[r+lo];
-      for (int p=0; p<P_; p++) // local separators
-        if (pr >= subtree_ranges_[p].first &&
-            pr < subtree_ranges_[p].second) {
-          row_owner_[r] = p;
-          break;
-        }
-      if (row_owner_[r] != -1) continue;
-      // distributed separators
-      for (std::size_t i=0; i<all_pfronts_.size(); i++) {
-        auto& f = all_pfronts_[i];
-        if (pr >= f.sep_begin && pr < f.sep_end) {
-          row_owner_[r] = f.P0 + (((pr - f.sep_begin) / B) % f.prows);
-          break;
-        }
+      auto rf = row_pfront_[pr];
+      if (rf < 0)
+        row_owner_[r] = -rf-1;
+      else {
+        auto& f = all_pfronts_[rf];
+        row_owner_[r] = f.P0 + (((pr - f.sep_begin) / B) % f.prows);
       }
     }
   }
@@ -360,10 +349,10 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPIDist<scalar_t,integer_t>::multifrontal_solve_dist
   (DenseM_t& x, const std::vector<integer_t>& dist) {
-    const std::size_t B = DistM_t::default_MB;
-    const std::size_t lo = dist[rank_];
-    const std::size_t m = dist[rank_+1] - lo;
-    const std::size_t n = x.cols();
+    integer_t B = DistM_t::default_MB;
+    integer_t lo = dist[rank_];
+    integer_t m = dist[rank_+1] - lo;
+    integer_t n = x.cols();
     std::unique_ptr<int[]> iwork(new int[4*P_]);
     auto ibuf = iwork.get();
     auto scnts = ibuf;
@@ -371,27 +360,25 @@ namespace strumpack {
     auto sdispls = ibuf + 2*P_;
     auto rdispls = ibuf + 3*P_;
     // TODO use Triplet / std::tuple
-    struct RCVal { int r, c; scalar_t v; };
+    struct RCVal { integer_t r, c; scalar_t v; };
     std::unique_ptr<RCVal[]> sbufwork(new RCVal[m*n]);
     auto sbuf = sbufwork.get();
     // since some C++ pad the struct, IdxVal must zero the array or
     // will get valgrind warnings about MPI sending uninitialized data
-    memset(sbuf,0,m*n*sizeof(RCVal));
+    //memset(sbuf,0,m*n*sizeof(RCVal));
     std::unique_ptr<RCVal*[]> pp(new RCVal*[P_]);
-    //auto pp = ppwork.get();
     std::fill(scnts, scnts+P_, 0);
     if (n == 1) {
-      for (std::size_t r=0; r<m; r++)
+      for (integer_t r=0; r<m; r++)
         scnts[row_owner_[r]]++;
     } else {
-      for (std::size_t r=0; r<m; r++) {
+      for (integer_t r=0; r<m; r++) {
         auto permr = nd_.perm()[r+lo];
         int pf = row_pfront_[permr];
-        if (pf < 0)
-          scnts[row_owner_[r]] += n;
+        if (pf < 0) scnts[row_owner_[r]] += n;
         else {
           auto& f = all_pfronts_[pf];
-          for (std::size_t c=0; c<n; c++)
+          for (integer_t c=0; c<n; c++)
             scnts[row_owner_[r] + ((c / B) % f.pcols) * f.prows]++;
         }
       }
@@ -403,65 +390,63 @@ namespace strumpack {
       pp[p] = sbuf + sdispls[p];
     }
     if (n == 1) {
-      for (std::size_t r=0; r<m; r++) {
+      const auto perm = nd_.perm().data() + lo;
+      for (integer_t r=0; r<m; r++) {
         auto dest = row_owner_[r];
-        pp[dest]->r = nd_.perm()[r+lo];
-        pp[dest]->c = 0;
-        pp[dest]->v = x(r,0);
+        *pp[dest] = {perm[r], 0, x(r,0)};
         pp[dest]++;
       }
     } else {
-      for (std::size_t r=0; r<m; r++) {
+      for (integer_t r=0; r<m; r++) {
         auto destr = row_owner_[r];
         auto permr = nd_.perm()[r+lo];
         int pf = row_pfront_[permr];
         if (pf < 0) {
-          for (std::size_t c=0; c<n; c++) {
-            pp[destr]->r = permr;
-            pp[destr]->c = c;
-            pp[destr]->v = x(r,c);
+          for (integer_t c=0; c<n; c++) {
+            *pp[destr] = {permr, c, x(r,c)};
             pp[destr]++;
           }
         } else {
           auto& f = all_pfronts_[pf];
-          for (std::size_t c=0; c<n; c++) {
+          for (integer_t c=0; c<n; c++) {
             auto dest = destr + ((c / B) % f.pcols) * f.prows;
-            pp[dest]->r = permr;
-            pp[dest]->c = c;
-            pp[dest]->v = x(r,c);
+            *pp[dest] = {permr, c, x(r,c)};
             pp[dest]++;
           }
         }
       }
     }
-    MPI_Alltoall
-      (scnts, 1, mpi_type<int>(), rcnts, 1, mpi_type<int>(), comm_.comm());
+    comm_.all_to_all(scnts, 1, rcnts);
     rdispls[0] = 0;
-    std::size_t rsize = rcnts[0];
-    for (int p=1; p<P_; p++) {
+    for (int p=1; p<P_; p++)
       rdispls[p] = rdispls[p-1] + rcnts[p-1];
-      rsize += rcnts[p];
-    }
-    std::unique_ptr<RCVal[]> rbufwork(new RCVal[rsize]);
-    auto rbuf = rbufwork.get();
-    MPI_Datatype RCVal_mpi_type;
-    MPI_Type_contiguous(sizeof(RCVal), MPI_BYTE, &RCVal_mpi_type);
-    MPI_Type_commit(&RCVal_mpi_type);
-    MPI_Alltoallv
-      (sbuf, scnts, sdispls, RCVal_mpi_type, rbuf, rcnts, rdispls,
-       RCVal_mpi_type, comm_.comm());
+
+    MPI_Datatype RCVal_mpi_t;
+    int blocklengths[3] = {1, 1, 1};
+    MPI_Datatype types[3] =
+      {mpi_type<integer_t>(), mpi_type<integer_t>(), mpi_type<scalar_t>()};
+    MPI_Aint offsets[3] =
+      {offsetof(RCVal, r), offsetof(RCVal, c), offsetof(RCVal, v)};
+    MPI_Type_create_struct(3, blocklengths, offsets, types, &RCVal_mpi_t);
+    MPI_Type_commit(&RCVal_mpi_t);
+    // MPI_Type_contiguous(sizeof(RCVal), MPI_BYTE, &RCVal_mpi_t);
+    // MPI_Type_commit(&RCVal_mpi_t);
+
+    auto rbuf = comm_.all_to_allv
+      (sbuf, scnts, sdispls, rcnts, rdispls, RCVal_mpi_t);
+
     DenseM_t xloc(local_range_.second - local_range_.first, n);
     DenseMW_t Xloc
       (Aprop_.size(), n, xloc.data()-local_range_.first, xloc.ld());
-    auto xdist = new DistM_t[local_pfronts_.size()];
+    std::vector<DistM_t> xdist(local_pfronts_.size());
 
     for (std::size_t f=0; f<local_pfronts_.size(); f++)
       xdist[f] = DistM_t
         (local_pfronts_[f].grid, local_pfronts_[f].dim_sep(), n);
+    auto rsize = rbuf.size();
 #pragma omp parallel for
     for (std::size_t i=0; i<rsize; i++) {
-      std::size_t r = rbuf[i].r;
-      std::size_t c = rbuf[i].c;
+      integer_t r = rbuf[i].r, c = rbuf[i].c;
       if (r >= local_range_.first && r < local_range_.second)
         Xloc(r, c) = rbuf[i].v;
       else {
@@ -474,22 +459,20 @@ namespace strumpack {
       }
     }
 
-    this->root_->multifrontal_solve(Xloc, xdist);
+    this->root_->multifrontal_solve(Xloc, xdist.data());
 
     rcnts = ibuf;
     scnts = ibuf + P_;
     rdispls = ibuf + 2*P_;
     sdispls = ibuf + 3*P_;
     for (int p=0; p<P_; p++)
-      pp[p] = rbuf + sdispls[p];
+      pp[p] = rbuf.data() + sdispls[p];
     for (std::size_t r=local_range_.first; r<local_range_.second; r++) {
       auto dest = std::upper_bound
         (dist.begin(), dist.end(), nd_.iperm()[r])-dist.begin()-1;
       auto permgr = nd_.iperm()[r];
-      for (std::size_t c=0; c<n; c++) {
-        pp[dest]->r = permgr;
-        pp[dest]->c = c;
-        pp[dest]->v = Xloc(r,c);
+      for (integer_t c=0; c<n; c++) {
+        *pp[dest] = {permgr, c, Xloc(r,c)};
         pp[dest]++;
       }
     }
@@ -502,17 +485,14 @@ namespace strumpack {
         auto dest = std::upper_bound
           (dist.begin(), dist.end(), permgr)-dist.begin()-1;
         for (int c=0; c<xdist[i].lcols(); c++) {
-          pp[dest]->r = permgr;
-          pp[dest]->c = xdist[i].coll2g(c);
-          pp[dest]->v = xdist[i](r,c);
+          *pp[dest] = {permgr, xdist[i].coll2g(c), xdist[i](r,c)};
           pp[dest]++;
         }
       }
     }
-    MPI_Alltoallv
-      (rbuf, scnts, sdispls, RCVal_mpi_type, sbuf, rcnts,
-       rdispls, RCVal_mpi_type, comm_.comm());
-    MPI_Type_free(&RCVal_mpi_type);
+    comm_.all_to_allv
+      (rbuf.data(), scnts, sdispls, sbuf, rcnts, rdispls, RCVal_mpi_t);
+    MPI_Type_free(&RCVal_mpi_t);
 #pragma omp parallel for
     for (std::size_t i=0; i<m*n; i++)
       x(sbuf[i].r-lo,sbuf[i].c) = sbuf[i].v;
@@ -545,42 +525,34 @@ namespace strumpack {
     auto sep_end = nd_.local_tree().sizes(sep+1) +
       nd_.sub_graph_range.first;
     for (integer_t r=nd_.local_tree().sizes(sep);
-         r<nd_.local_tree().sizes(sep+1); r++) {
-      auto ice = nd_.my_sub_graph.ind() + nd_.my_sub_graph.ptr(r+1);
-      auto icb = std::lower_bound
-        (nd_.my_sub_graph.ind() + nd_.my_sub_graph.ptr(r), ice, sep_end);
-      auto mid = upd[sep].size();
-      std::copy(icb, ice, std::back_inserter(upd[sep]));
-      std::inplace_merge
-        (upd[sep].begin(), upd[sep].begin() + mid, upd[sep].end());
-      upd[sep].erase
-        (std::unique(upd[sep].begin(), upd[sep].end()), upd[sep].end());
-    }
-    if (chl != -1) {
-      auto icb = std::lower_bound(upd[chl].begin(), upd[chl].end(), sep_end);
-      auto mid = upd[sep].size();
-      std::copy(icb, upd[chl].end(), std::back_inserter(upd[sep]));
-      std::inplace_merge
-        (upd[sep].begin(), upd[sep].begin() + mid, upd[sep].end());
-      upd[sep].erase
-        (std::unique(upd[sep].begin(), upd[sep].end()), upd[sep].end());
-    }
-    if (chr != -1) {
-      auto icb = std::lower_bound(upd[chr].begin(), upd[chr].end(), sep_end);
-      auto mid = upd[sep].size();
-      std::copy(icb, upd[chr].end(), std::back_inserter(upd[sep]));
-      std::inplace_merge
-        (upd[sep].begin(), upd[sep].begin() + mid, upd[sep].end());
-      upd[sep].erase
-        (std::unique(upd[sep].begin(), upd[sep].end()), upd[sep].end());
-    }
+         r<nd_.local_tree().sizes(sep+1); r++)
+      merge_if_larger
+        (nd_.my_sub_graph.ind() + nd_.my_sub_graph.ptr(r),
+         nd_.my_sub_graph.ind() + nd_.my_sub_graph.ptr(r+1),
+         upd[sep], sep_end);
+    if (chl != -1)
+      merge_if_larger(upd[chl].begin(), upd[chl].end(), upd[sep], sep_end);
+    if (chr != -1)
+      merge_if_larger(upd[chr].begin(), upd[chr].end(), upd[sep], sep_end);
     upd[sep].shrink_to_fit();
-    integer_t dim_blk = (sep_end - sep_begin) + upd[sep].size();
     // assume amount of work per front is N^3, work per subtree is
     // work on front plus children
-    float wl = (chl != -1) ? subtree_work[chl] : 0.;
-    float wr = (chr != -1) ? subtree_work[chr] : 0.;
-    subtree_work[sep] = (float(dim_blk)*dim_blk*dim_blk) + wl + wr;
+    float dim_blk = (sep_end - sep_begin) + upd[sep].size();
+    subtree_work[sep] = std::pow(dim_blk, 3);
+    if (chl != -1) subtree_work[sep] += subtree_work[chl];
+    if (chr != -1) subtree_work[sep] += subtree_work[chr];
+  }
+
+  template<typename scalar_t,typename integer_t>
+  template<typename It> void
+  EliminationTreeMPIDist<scalar_t,integer_t>::merge_if_larger
+  (const It u0, const It u1, std::vector<integer_t>& out,
+   integer_t s) const {
+    auto b = std::lower_bound(u0, u1, s);
+    auto m = out.size();
+    std::copy(b, u1, std::back_inserter(out));
+    std::inplace_merge(out.begin(), out.begin() + m, out.end());
+    out.erase(std::unique(out.begin(), out.end()), out.end());
   }
 
   /**
@@ -611,11 +583,9 @@ namespace strumpack {
         (nd_.local_tree().root(), local_upd, local_subtree_work, 0);
     }
 
-    /* initialize dsep_work so valgrind does not complain, as it is
-       not always set below */
     dsep_work = 0.0;
     nd_.my_dist_sep.sort_rows();
-    std::vector<MPI_Request> send_req;
+    std::vector<MPI_Request> sreq;
     for (integer_t dsep=0; dsep<nd_.tree().separators(); dsep++) {
       // only consider the distributed separator owned by this
       // process: 1 leaf and 1 non-leaf
@@ -632,94 +602,47 @@ namespace strumpack {
         // local_upd[this->nbsep-1], or local_upd.back()
         if (nd_.tree().pa(pa) == -1)
           continue; // do not send to parent if parent is root
-        send_req.emplace_back();
-        int tag = (dsep == nd_.tree().lch(pa)) ? 1 : 2;
-        MPI_Isend
-          (local_upd[nd_.local_tree().root()].data(),
-           local_upd[nd_.local_tree().root()].size(),
-           mpi_type<integer_t>(), pa_rank, tag, comm_.comm(),
-           &send_req.back());
+        sreq.emplace_back();
+        comm_.isend
+          (local_upd[nd_.local_tree().root()], pa_rank, 1, &sreq.back());
         dsep_work = local_subtree_work[nd_.local_tree().root()];
-        send_req.emplace_back();
-        MPI_Isend(&dsep_work, 1, MPI_FLOAT, pa_rank, tag+2,
-                  comm_.comm(), &send_req.back());
+        sreq.emplace_back();
+        comm_.isend(dsep_work, pa_rank, 2, &sreq.back());
       } else {
         auto sep_begin = nd_.dist_sep_range.first;
         auto sep_end = nd_.dist_sep_range.second;
-        for (integer_t r=0; r<sep_end-sep_begin; r++) {
-          auto ice = nd_.my_dist_sep.ind() + nd_.my_dist_sep.ptr(r+1);
-          auto icb = std::lower_bound
-            (nd_.my_dist_sep.ind() + nd_.my_dist_sep.ptr(r), ice, sep_end);
-          auto mid = dist_upd.size();
-          std::copy(icb, ice, std::back_inserter(dist_upd));
-          std::inplace_merge
-            (dist_upd.begin(), dist_upd.begin() + mid, dist_upd.end());
-          dist_upd.erase
-            (std::unique(dist_upd.begin(), dist_upd.end()), dist_upd.end());
+        for (integer_t r=0; r<sep_end-sep_begin; r++)
+          merge_if_larger
+            (nd_.my_dist_sep.ind() + nd_.my_dist_sep.ptr(r),
+             nd_.my_dist_sep.ind() + nd_.my_dist_sep.ptr(r+1),
+             dist_upd, sep_end);
+
+        for (int i=0; i<2; i++) {
+          // receive dist_upd from left/right child,
+          auto du = comm_.template recv_any_src<integer_t>(1);
+          // then merge elements larger than sep_end
+          merge_if_larger
+            (du.second.begin(), du.second.end(), dist_upd, sep_end);
+        }
+        if (nd_.tree().pa(pa) != -1) { // do not send to root
+          sreq.emplace_back();     // send dist_upd to parent
+          comm_.isend(dist_upd, pa_rank, 1, &sreq.back());
         }
 
-        auto chl = nd_.proc_dist_sep[nd_.tree().lch(dsep)];
-        auto chr = nd_.proc_dist_sep[nd_.tree().rch(dsep)];
-        // receive dist_upd from left child
-        MPI_Status stat;
-        int msg_size;
-        // TODO probe both left and right, take the first
-        MPI_Probe(chl, 1, comm_.comm(), &stat);
-        MPI_Get_count(&stat, mpi_type<integer_t>(), &msg_size);
-        std::vector<integer_t> dist_upd_lch(msg_size);
-        MPI_Recv(dist_upd_lch.data(), msg_size, mpi_type<integer_t>(), chl, 1,
-                 comm_.comm(), &stat);
-        // merge dist_upd from left child into dist_upd
-        auto icb = std::lower_bound
-          (dist_upd_lch.begin(), dist_upd_lch.end(), sep_end);
-        auto mid = dist_upd.size();
-        std::copy(icb, dist_upd_lch.end(), std::back_inserter(dist_upd));
-        std::inplace_merge
-          (dist_upd.begin(), dist_upd.begin() + mid, dist_upd.end());
-        dist_upd.erase
-          (std::unique(dist_upd.begin(), dist_upd.end()), dist_upd.end());
-
-        // receive dist_upd from right child
-        MPI_Probe(chr, 2, comm_.comm(), &stat);
-        MPI_Get_count(&stat, mpi_type<integer_t>(), &msg_size);
-        std::vector<integer_t> dist_upd_rch(msg_size);
-        MPI_Recv
-          (dist_upd_rch.data(), msg_size, mpi_type<integer_t>(),
-           chr, 2, comm_.comm(), &stat);
-        // merge dist_upd from right child into dist_upd
-        icb = std::lower_bound
-          (dist_upd_rch.begin(), dist_upd_rch.end(), sep_end);
-        mid = dist_upd.size();
-        std::copy(icb, dist_upd_rch.end(), std::back_inserter(dist_upd));
-        std::inplace_merge
-          (dist_upd.begin(), dist_upd.begin() + mid, dist_upd.end());
-        dist_upd.erase
-          (std::unique(dist_upd.begin(), dist_upd.end()), dist_upd.end());
-
-        // receive work estimates for left and right subtrees
-        float dsep_left_work, dsep_right_work;
-        MPI_Recv(&dsep_left_work,  1, MPI_FLOAT, chl, 3, comm_.comm(), &stat);
-        MPI_Recv(&dsep_right_work, 1, MPI_FLOAT, chr, 4, comm_.comm(), &stat);
-        integer_t dim_blk = (sep_end - sep_begin) + dist_upd.size();
-        dsep_work = (float(dim_blk)*dim_blk*dim_blk) + dsep_left_work +
-          dsep_right_work;
-
-        // send dist_upd and work estimate to parent
+        float dim_blk = (sep_end - sep_begin) + dist_upd.size();
+        dsep_work = std::pow(dim_blk, 3);
+        for (int i=0; i<2; i++) {
+          // receive work estimates for left and right subtrees
+          auto w = comm_.template recv_any_src<float>(2);
+          dsep_work += w.second[0];
+        }
         if (nd_.tree().pa(pa) != -1) {
-          // do not send to parent if parent is root
-          send_req.emplace_back();
-          int tag = (dsep == nd_.tree().lch(pa)) ? 1 : 2;
-          MPI_Isend
-            (dist_upd.data(), dist_upd.size(), mpi_type<integer_t>(),
-             pa_rank, tag, comm_.comm(), &send_req.back());
-          send_req.emplace_back();
-          MPI_Isend
-            (&dsep_work, 1, MPI_FLOAT, pa_rank, tag+2,
-             comm_.comm(), &send_req.back());
+          sreq.emplace_back();    // send work estimate to parent
+          comm_.isend(dsep_work, pa_rank, 2, &sreq.back());
         }
       }
     }
-    MPI_Waitall(send_req.size(), send_req.data(), MPI_STATUSES_IGNORE);
+    wait_all(sreq);
   }
 
   /**
@@ -741,57 +664,44 @@ namespace strumpack {
    integer_t& dsep_begin, integer_t& dsep_end,
    std::vector<integer_t>& dsep_upd, int P0, int P,
    int P0_sibling, int P_sibling, int owner, bool bcast_dim_sep) {
-    std::unique_ptr<integer_t[]> sbuf;
+    std::vector<integer_t> sbuf;
     std::vector<MPI_Request> sreq;
-    int dest0 = std::min(P0, P0_sibling);
-    int dest1 = std::max(P0+P, P0_sibling+P_sibling);
+    int dest0 = std::min(P0, P0_sibling),
+      dest1 = std::max(P0+P, P0_sibling+P_sibling);
     if (rank_ == owner) {
-      sbuf.reset(new integer_t[2+dist_upd.size()]);
-      sbuf[0] = nd_.dist_sep_range.first;
-      sbuf[1] = nd_.dist_sep_range.second;
-      std::copy(dist_upd.begin(), dist_upd.end(), sbuf.get()+2);
-      if (bcast_dim_sep) sreq.resize(P_);
-      else sreq.resize(dest1-dest0);
+      sreq.resize(dest1-dest0);
       int msg = 0;
-      // TODO use the MPIWrapper as below
-      for (int dest=dest0; dest<dest1; dest++)
-        MPI_Isend(sbuf.get(), 2 + dist_upd.size(), mpi_type<integer_t>(),
-                  dest, 0, comm_.comm(), &sreq[msg++]);
       if (bcast_dim_sep) {
-        // when using HSS compression, every process needs to know the
-        // size of this front, because you need to know if your parent
-        // is HSS
-        for (int dest=0; dest<dest0; dest++)
-          MPI_Isend(sbuf.get(), 2, mpi_type<integer_t>(), dest, 0,
-                    comm_.comm(), &sreq[msg++]);
-        for (int dest=dest1; dest<P_; dest++)
-          MPI_Isend(sbuf.get(), 2, mpi_type<integer_t>(), dest, 0,
-                    comm_.comm(), &sreq[msg++]);
+        for (int dest=dest0; dest<dest1; dest++)
+          comm_.isend(dist_upd, dest, 0, &sreq[msg++]);
+      } else {
+        sbuf.reserve(2+dist_upd.size());
+        sbuf.push_back(nd_.dist_sep_range.first);
+        sbuf.push_back(nd_.dist_sep_range.second);
+        sbuf.insert(sbuf.end(), dist_upd.begin(), dist_upd.end());
+        for (int dest=dest0; dest<dest1; dest++)
+          comm_.isend(sbuf, dest, 0, &sreq[msg++]);
       }
     }
-    if (rank_ >= dest0 && rank_ < dest1) {
-      MPI_Status stat;
-      MPI_Probe(owner, 0, comm_.comm(), &stat);
-      int msg_size;
-      MPI_Get_count(&stat, mpi_type<integer_t>(), &msg_size);
-      std::unique_ptr<integer_t[]> rbuf(new integer_t[msg_size]);
-      MPI_Recv(rbuf.get(), msg_size, mpi_type<integer_t>(),
-               owner, 0, comm_.comm(), &stat);
-      dsep_begin = rbuf[0];
-      dsep_end = rbuf[1];
-      dsep_upd.assign(rbuf.get()+2, rbuf.get()+msg_size);
-    } else if (bcast_dim_sep) {
-      integer_t rbuf[2];
-      MPI_Recv(rbuf, 2, mpi_type<integer_t>(), owner,
-               0, comm_.comm(), MPI_STATUS_IGNORE);
-      dsep_begin = rbuf[0];
-      dsep_end = rbuf[1];
+    if (bcast_dim_sep) {
+      std::vector<integer_t> buf
+        ({nd_.dist_sep_range.first, nd_.dist_sep_range.second});
+      comm_.broadcast(buf, owner);
+      dsep_begin = buf[0];
+      dsep_end = buf[1];
     }
-    if (rank_ == owner)
-      MPI_Waitall(sreq.size(), sreq.data(), MPI_STATUSES_IGNORE);
+    if (rank_ >= dest0 && rank_ < dest1) {
+      if (bcast_dim_sep)
+        dsep_upd = comm_.template recv<integer_t>(owner, 0);
+      else {
+        auto rbuf = comm_.template recv<integer_t>(owner, 0);
+        dsep_begin = rbuf[0];
+        dsep_end = rbuf[1];
+        dsep_upd.assign(rbuf.begin()+2, rbuf.end());
+      }
+    }
+    if (rank_ == owner) wait_all(sreq);
   }
-
-
 
 
   template<typename scalar_t,typename integer_t>
