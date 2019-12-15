@@ -1073,7 +1073,7 @@ namespace strumpack {
   CSRMatrix<scalar_t,integer_t>::extract_graph_sep_CB
   (int ordering_level, integer_t lo, integer_t hi,
    const std::vector<integer_t>& upd) const {
-    integer_t dupd = upd.size(), dsep = hi - lo;
+    integer_t dsep = hi - lo;
     std::vector<integer_t> gptr, gind;
     gptr.reserve(dsep+1);
     gptr.push_back(0);
@@ -1085,7 +1085,7 @@ namespace strumpack {
         auto lb = std::lower_bound(upd.begin(), upd.end(), uj);
         if (lb != upd.end() && *lb == uj) {
           auto ij = std::distance(upd.begin(), lb);
-          assert(ij < dupd && ij >= 0);
+          assert(ij < upd.size() && ij >= 0);
           gind.push_back(ij);
           gptr.back()++;
         }

@@ -587,7 +587,7 @@ extern "C" {
 
   /* get HSS specific options */
   int STRUMPACK_use_HSS(STRUMPACK_SparseSolver S) {
-    CompressionType c;
+    CompressionType c = CompressionType::NONE;
     switch_precision_return(options().compression(), c);
     return c == CompressionType::HSS;
   }

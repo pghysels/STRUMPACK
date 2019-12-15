@@ -1539,7 +1539,7 @@ namespace strumpack {
       }
     }
     return CSRGraph<integer_t>(std::move(gptr), std::move(gind));
-  };
+  }
 
   template<typename scalar_t,typename integer_t> CSRGraph<integer_t>
   PropMapSparseMatrix<scalar_t,integer_t>::extract_graph_CB_sep
@@ -1565,7 +1565,7 @@ namespace strumpack {
       }
     }
     return CSRGraph<integer_t>(std::move(gptr), std::move(gind));
-  };
+  }
 
   template<typename scalar_t,typename integer_t> CSRGraph<integer_t>
   PropMapSparseMatrix<scalar_t,integer_t>::extract_graph_CB
@@ -1592,7 +1592,7 @@ namespace strumpack {
       }
     }
     return CSRGraph<integer_t>(std::move(gptr), std::move(gind));
-  };
+  }
 
   template<typename scalar_t,typename integer_t> void
   PropMapSparseMatrix<scalar_t,integer_t>::permute

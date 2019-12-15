@@ -93,13 +93,6 @@ namespace strumpack {
       HSSPartitionTree(int n) : size(n) {}
 
       /**
-       * Copy constructor, makes a deep copy of the entire tree.
-       */
-      HSSPartitionTree(const HSSPartitionTree& h)
-        : size(h.size), c(h.c) {
-      }
-
-      /**
        * Refine the tree to a given leaf size. This just splits the
        * nodes into equal parts (+/- 1) as long as a node is larger
        * than 2*leaf_size.

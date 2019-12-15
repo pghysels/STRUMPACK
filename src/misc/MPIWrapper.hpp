@@ -300,7 +300,7 @@ namespace strumpack {
       // const_cast is necessary for ancient openmpi version used on Travis
       MPI_Isend(const_cast<T*>(sbuf.data()), sbuf.size(), mpi_type<T>(),
                 dest, tag, comm_, req.req_.get());
-      return std::move(req);
+      return req;
     }
 
     template<typename T>
