@@ -46,6 +46,12 @@ class STRUMPACKGaussianProcessRegressor(GaussianProcessRegressor):
             print(X.dtype)
             raise ValueError("precision", X.dtype, "not supported")
 
+        if self.kernel is None:  # Use an RBF kernel as default
+            self.kernel_ = C(1.0, constant_value_bounds="fixed") \
+                * RBF(1.0, length_scale_bounds="fixed")
+        else:
+            self.kernel_ = clone(self.kernel)
+
         if self.approximation is not 'HSS' and \
            self.approximation is not 'HODLR':
             raise ValueError("Approximation type not recognized,"
@@ -58,12 +64,6 @@ class STRUMPACKGaussianProcessRegressor(GaussianProcessRegressor):
             print("HSS approximation requires vector input,"
                   "using HODLR instead")
             # raise ValueError("HSS approximation requires vector input")
-
-        if self.kernel is None:  # Use an RBF kernel as default
-            self.kernel_ = C(1.0, constant_value_bounds="fixed") \
-                * RBF(1.0, length_scale_bounds="fixed")
-        else:
-            self.kernel_ = clone(self.kernel)
 
         self._rng = check_random_state(self.random_state)
 
@@ -139,7 +139,7 @@ class STRUMPACKGaussianProcessRegressor(GaussianProcessRegressor):
 
         # TODO remove, this is for classification
         # store the classes seen during fit
-        self.classes_ = unique_labels(y)
+        # self.classes_ = unique_labels(y)
 
 
         D = self.kernel_.diag(self.X_train_)
