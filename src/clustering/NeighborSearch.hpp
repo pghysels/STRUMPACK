@@ -308,7 +308,7 @@ namespace strumpack {
     std::size_t nr_samples = 100;
     std::vector<std::size_t> samples(nr_samples);
     {
-      std::uniform_int_distribution<std::size_t> uni_int(0, n);
+      std::uniform_int_distribution<std::size_t> uni_int(0, n-1);
       for (std::size_t i=0; i<samples.size(); i++)
         samples[i] = uni_int(generator);
     }
