@@ -424,9 +424,9 @@ namespace strumpack {
         std::vector<scalar_t> Ks(p_), Kss(p_), Kpp(p_+1);
         Kpp[0] = 1;
         for (int j=0; j<p_; j++) Kss[j] = 0;
-        for (int i=0; i<this->d(); i++) {
+        for (std::size_t i=0; i<this->d(); i++) {
           scalar_t tmp = std::exp
-            (-Euclidean_distance_squared(this->d(), &x[i], &y[i])
+            (-Euclidean_distance_squared(1, x+i, y+i)
              / (scalar_t(2.) * h_ * h_));
           Ks[0] = tmp;
           Kss[0] += Ks[0];
