@@ -36,7 +36,8 @@ class STRUMPACKGaussianProcessRegressor(GaussianProcessRegressor):
 
 
     def __del__(self):
-        try: sp.STRUMPACK_destroy_kernel_double(self.K_)
+        try: sp.STRUMPACK_destroy_kernel_double(
+                ctypes.c_void_p(self.K_))
         except: pass
 
 
@@ -166,6 +167,7 @@ class STRUMPACKGaussianProcessRegressor(GaussianProcessRegressor):
         Kx_block_fptr_f64 = ELEMBLOCKFUNCf64(Kx_block)
         Kx_block_fptr_f32 = ELEMBLOCKFUNCf32(Kx_block)
         if X.dtype == np.float64:
+            sp.STRUMPACK_create_general_kernel_double.restype = ctypes.c_void_p
             if self.kernel_.requires_vector_input:
                 self.K_ = sp.STRUMPACK_create_general_kernel_double(
                     ctypes.c_int(self.X_train_.shape[0]),
@@ -179,9 +181,11 @@ class STRUMPACKGaussianProcessRegressor(GaussianProcessRegressor):
                     ctypes.c_void_p(None), Kx_block_fptr_f64,
                     ctypes.c_void_p(None), ctypes.c_double(self.alpha))
             sp.STRUMPACK_kernel_set_diagonal_double(
-                self.K_, ctypes.c_void_p(D.ctypes.data));
+                ctypes.c_void_p(self.K_),
+                ctypes.c_void_p(D.ctypes.data));
 
         elif X.dtype == np.float32:
+            sp.STRUMPACK_create_general_kernel_float.restype = ctypes.c_void_p
             if self.kernel_.requires_vector_input:
                 self.K_ = sp.STRUMPACK_create_general_kernel_float(
                     ctypes.c_int(self.X_train_.shape[0]),
@@ -195,7 +199,8 @@ class STRUMPACKGaussianProcessRegressor(GaussianProcessRegressor):
                     ctypes.c_void_p(None), Kx_block_fptr_f32,
                     ctypes.c_void_p(None), ctypes.c_float(self.alpha))
             sp.STRUMPACK_kernel_set_diagonal_float(
-                self.K_, ctypes.c_void_p(D.ctypes.data));
+                ctypes.c_void_p(self.K_),
+                ctypes.c_void_p(D.ctypes.data));
 
         if self.argv is None: self.argv=[]
         LP_c_char = ctypes.POINTER(ctypes.c_char)
@@ -209,29 +214,35 @@ class STRUMPACKGaussianProcessRegressor(GaussianProcessRegressor):
             if self.mpi:
                 if X.dtype == np.float64:
                     sp.STRUMPACK_kernel_fit_HSS_MPI_double(
-                        self.K_, ctypes.c_void_p(y.ctypes.data),
+                        ctypes.c_void_p(self.K_),
+                        ctypes.c_void_p(y.ctypes.data),
                         ctypes.c_int(argc), argv)
                 elif X.dtype == np.float32:
                     sp.STRUMPACK_kernel_fit_HSS_MPI_float(
-                        self.K_, ctypes.c_void_p(y.ctypes.data),
+                        ctypes.c_void_p(self.K_),
+                        ctypes.c_void_p(y.ctypes.data),
                         ctypes.c_int(argc), argv)
             else:
                 if X.dtype == np.float64:
                     sp.STRUMPACK_kernel_fit_HSS_double(
-                        self.K_, ctypes.c_void_p(y.ctypes.data),
+                        ctypes.c_void_p(self.K_),
+                        ctypes.c_void_p(y.ctypes.data),
                         ctypes.c_int(argc), argv)
                 elif X.dtype == np.float32:
                     sp.STRUMPACK_kernel_fit_HSS_float(
-                        self.K_, ctypes.c_void_p(y.ctypes.data),
+                        ctypes.c_void_p(self.K_),
+                        ctypes.c_void_p(y.ctypes.data),
                         ctypes.c_int(argc), argv)
         elif self.approximation is 'HODLR':
             if X.dtype == np.float64:
                 sp.STRUMPACK_kernel_fit_HODLR_MPI_double(
-                    self.K_, ctypes.c_void_p(y.ctypes.data),
+                    ctypes.c_void_p(self.K_),
+                    ctypes.c_void_p(y.ctypes.data),
                     ctypes.c_int(argc), argv)
             elif X.dtype == np.float32:
                 sp.STRUMPACK_kernel_fit_HODLR_MPI_float(
-                    self.K_, ctypes.c_void_p(y.ctypes.data),
+                    ctypes.c_void_p(self.K_),
+                    ctypes.c_void_p(y.ctypes.data),
                     ctypes.c_int(argc), argv)
         # return the classifier
         return self
@@ -292,12 +303,14 @@ class STRUMPACKGaussianProcessRegressor(GaussianProcessRegressor):
             Kxy_block_fptr_f32 = ELEMBLOCKFUNCf32(Kxy_block)
             if X.dtype == np.float64:
                 sp.STRUMPACK_general_kernel_predict_double(
-                    self.K_, ctypes.c_int(X.shape[0]),
+                    ctypes.c_void_p(self.K_),
+                    ctypes.c_int(X.shape[0]),
                     Kxy_block_fptr_f64, ctypes.c_void_p(None),
                     ctypes.c_void_p(y_mean.ctypes.data))
             elif X.dtype == np.float32:
                 sp.STRUMPACK_general_kernel_predict_float(
-                    self.K_, ctypes.c_int(X.shape[0]),
+                    ctypes.c_void_p(self.K_),
+                    ctypes.c_int(X.shape[0]),
                     Kxy_block_fptr_f32, ctypes.c_void_p(None),
                     ctypes.c_void_p(y_mean.ctypes.data))
 
