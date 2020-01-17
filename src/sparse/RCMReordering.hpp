@@ -54,18 +54,15 @@ namespace strumpack {
    std::vector<int>& perm) {
     int n = perm.size();
     std::vector<int> mask(2*n), xls(2*n);
-    GENRCM_FC
-      (&n, xadj.data(), adjncy.data(), perm.data(), mask.data(), xls.data());
+    GENRCM_FC(&n, xadj.data(), adjncy.data(), perm.data(),
+              mask.data(), xls.data());
     for (int i=0; i<n; i++) perm[i]--;
   }
 
-  template<typename scalar_t,typename integer_t>
+  template<typename integer_t>
   std::unique_ptr<SeparatorTree<integer_t>> rcm_reordering
-  (const CompressedSparseMatrix<scalar_t,integer_t>& A,
+  (integer_t n, const integer_t* ptr, const integer_t* ind,
    std::vector<integer_t>& perm, std::vector<integer_t>& iperm) {
-    auto n = A.size();
-    auto ptr = A.ptr();
-    auto ind = A.ind();
     std::vector<int> xadj(n+1), adjncy(ptr[n]);
     integer_t e = 0;
     for (integer_t j=0; j<n; j++) {
@@ -79,6 +76,12 @@ namespace strumpack {
         std::cerr << "# WARNING: matrix seems to be diagonal!" << std::endl;
     WRAPPER_rcm(xadj, adjncy, perm);
     return build_sep_tree_from_perm(ptr, ind, perm, iperm);
+  }
+
+  template<typename integer_t,typename G>
+  std::unique_ptr<SeparatorTree<integer_t>> rcm_reordering
+  (const G& A, std::vector<integer_t>& perm, std::vector<integer_t>& iperm) {
+    return rcm_reordering<integer_t>(A.size(), A.ptr(), A.ind(), perm, iperm);
   }
 
 } // end namespace strumpack

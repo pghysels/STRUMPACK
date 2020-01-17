@@ -156,14 +156,10 @@ namespace strumpack {
 
   // TODO throw exception on error
   template<typename scalar_t,typename integer_t>
-  std::unique_ptr<SeparatorTree<integer_t>>
-  scotch_nested_dissection
-  (const CompressedSparseMatrix<scalar_t,integer_t>& A,
+  std::unique_ptr<SeparatorTree<integer_t>> scotch_nested_dissection
+  (integer_t n, const integer_t* ptr, const integer_t* ind,
    std::vector<integer_t>& perm, std::vector<integer_t>& iperm,
    const SPOptions<scalar_t>& opts) {
-    auto n = A.size();
-    auto ptr = A.ptr();
-    auto ind = A.ind();
     SCOTCH_Graph graph;
     SCOTCH_graphInit(&graph);
     std::vector<SCOTCH_Num> ptr_nodiag(n+1), ind_nodiag(ptr[n]-ptr[0]);
@@ -206,6 +202,14 @@ namespace strumpack {
     scotch_tree.resize(nbsep);
     scotch_sizes.resize(nbsep+1);
     return sep_tree_from_scotch_tree<integer_t>(scotch_tree, scotch_sizes);
+  }
+
+  template<typename scalar_t, typename integer_t, typename G>
+  std::unique_ptr<SeparatorTree<integer_t>> scotch_nested_dissection
+  (const G& A, std::vector<integer_t>& perm, std::vector<integer_t>& iperm,
+   const SPOptions<scalar_t>& opts) {
+    return scotch_nested_dissection
+      (A.size(), A.ptr(), A.ind(), perm, iperm, opts);
   }
 
 } // end namespace strumpack

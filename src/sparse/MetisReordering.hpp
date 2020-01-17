@@ -186,14 +186,10 @@ namespace strumpack {
 
   // TODO throw an exception
   template<typename scalar_t,typename integer_t>
-  std::unique_ptr<SeparatorTree<integer_t>>
-  metis_nested_dissection
-  (const CompressedSparseMatrix<scalar_t,integer_t>& A,
+  std::unique_ptr<SeparatorTree<integer_t>> metis_nested_dissection
+  (integer_t n, const integer_t* ptr, const integer_t* ind,
    std::vector<integer_t>& perm, std::vector<integer_t>& iperm,
    const SPOptions<scalar_t>& opts) {
-    auto n = A.size();
-    auto ptr = A.ptr();
-    auto ind = A.ind();
     std::vector<idx_t> xadj(n+1), adjncy(ptr[n]);
     integer_t e = 0;
     for (integer_t j=0; j<n; j++) {
@@ -213,25 +209,21 @@ namespace strumpack {
       integer_t separators = nodes / 2;
       std::vector<idx_t> sizes(nodes + 1);
       ierr = WRAPPER_METIS_NodeNDP
-        (xadj, adjncy, NULL, separators + 1, NULL, iperm, perm, sizes);
+        (xadj, adjncy, nullptr, separators + 1, nullptr, iperm, perm, sizes);
 #if defined(STRUMPACK_USE_MPI)
       if (opts.use_MUMPS_SYMQAMD())
-        sep_tree = aggressive_amalgamation(A, perm, iperm, opts);
+        sep_tree = aggressive_amalgamation(n, ptr, ind, perm, iperm, opts);
       else
+#endif
         sep_tree = sep_tree_from_metis_sizes(nodes, separators, sizes);
-#else
-      sep_tree = sep_tree_from_metis_sizes(nodes, separators, sizes);
-#endif
     } else {
-      ierr = WRAPPER_METIS_NodeND(xadj, adjncy, NULL, NULL, iperm, perm);
+      ierr = WRAPPER_METIS_NodeND(xadj, adjncy, nullptr, nullptr, iperm, perm);
 #if defined(STRUMPACK_USE_MPI)
       if (opts.use_MUMPS_SYMQAMD())
-        sep_tree = aggressive_amalgamation(A, perm, iperm, opts);
+        sep_tree = aggressive_amalgamation(n, ptr, ind, perm, iperm, opts);
       else
-        sep_tree = build_sep_tree_from_perm(ptr, ind, perm, iperm);
-#else
-      sep_tree = build_sep_tree_from_perm(ptr, ind, perm, iperm);
 #endif
+        sep_tree = build_sep_tree_from_perm(ptr, ind, perm, iperm);
     }
     if (ierr != METIS_OK) {
       std::cerr << "# ERROR: Metis nested dissection reordering failed"
@@ -239,6 +231,14 @@ namespace strumpack {
       // TODO throw an exception
     }
     return sep_tree;
+  }
+
+  template<typename scalar_t,typename integer_t,typename G>
+  std::unique_ptr<SeparatorTree<integer_t>> metis_nested_dissection
+  (const G& A, std::vector<integer_t>& perm, std::vector<integer_t>& iperm,
+   const SPOptions<scalar_t>& opts) {
+    return metis_nested_dissection
+      (A.size(), A.ptr(), A.ind(), perm, iperm, opts);
   }
 
 } // end namespace strumpack

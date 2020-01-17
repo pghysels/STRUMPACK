@@ -51,16 +51,8 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> class SPMVBuffers {
   public:
     bool initialized = false;
-    std::vector<integer_t> sranks;
-    // ranks of the process from which I need to receive something
-    std::vector<integer_t> rranks;
-    std::vector<integer_t> soff;
-    std::vector<integer_t> roffs;
-    // indices to receive from each rank from which I need to receive
-    std::vector<integer_t> sind;
-    // indices to receive from each rank from which I need to receive
-    std::vector<scalar_t> sbuf;
-    std::vector<scalar_t> rbuf;
+    std::vector<integer_t> sranks, rranks, soff, roffs, sind;
+    std::vector<scalar_t> sbuf, rbuf;
     // for each off-diagonal entry spmv_prbuf stores the
     // corresponding index in the receive buffer
     std::vector<integer_t> prbuf;
@@ -114,8 +106,12 @@ namespace strumpack {
     void apply_scaling
     (const std::vector<scalar_t>& Dr,
      const std::vector<scalar_t>& Dc) override;
+
     void permute(const integer_t* iorder, const integer_t* order) override;
+
     std::unique_ptr<CSRMatrix<scalar_t,integer_t>> gather() const;
+    std::unique_ptr<CSRGraph<integer_t>> gather_graph() const;
+
     int permute_and_scale
     (MatchingJob job, std::vector<integer_t>& perm,
      std::vector<scalar_t>& Dr,
@@ -391,7 +387,7 @@ namespace strumpack {
           sdisp[p] = dist_[p];
         }
       MPI_Scatterv
-        (rank ? NULL : const_cast<integer_t*>(A->ptr()), scnts, sdisp,
+        (rank ? nullptr : const_cast<integer_t*>(A->ptr()), scnts, sdisp,
          mpi_type<integer_t>(), ptr_.data(), local_rows_+1,
          mpi_type<integer_t>(), 0, c);
       if (rank == 0)
@@ -400,11 +396,11 @@ namespace strumpack {
           sdisp[p] = A->ptr(dist_[p]);
         }
       MPI_Scatterv
-        (rank ? NULL : const_cast<integer_t*>(A->ind()), scnts, sdisp,
+        (rank ? nullptr : const_cast<integer_t*>(A->ind()), scnts, sdisp,
          mpi_type<integer_t>(), ind_.data(), local_nnz_,
          mpi_type<integer_t>(), 0, c);
       MPI_Scatterv
-        (rank ? NULL : const_cast<scalar_t*>(A->val()), scnts, sdisp,
+        (rank ? nullptr : const_cast<scalar_t*>(A->val()), scnts, sdisp,
          mpi_type<scalar_t>(),  val_.data(), local_nnz_,
          mpi_type<scalar_t>(), 0, c);
       delete[] scnts;
@@ -829,17 +825,66 @@ namespace strumpack {
     } else {
       MPI_Gatherv
         (const_cast<integer_t*>(this->ptr())+1, local_rows_,
-         mpi_type<integer_t>(), NULL, NULL, NULL,
+         mpi_type<integer_t>(), nullptr, nullptr, nullptr,
          mpi_type<integer_t>(), 0, _comm);
       MPI_Gatherv
         (const_cast<integer_t*>(this->ind()), local_nnz_,
-         mpi_type<integer_t>(), NULL, NULL, NULL,
+         mpi_type<integer_t>(), nullptr, nullptr, nullptr,
          mpi_type<integer_t>(), 0, _comm);
       MPI_Gatherv
         (const_cast<scalar_t*>(this->val()), local_nnz_,
-         mpi_type<scalar_t>(), NULL, NULL, NULL,
+         mpi_type<scalar_t>(), nullptr, nullptr, nullptr,
          mpi_type<scalar_t>(), 0, _comm);
       return std::unique_ptr<CSRMatrix<scalar_t,integer_t>>();
+    }
+  }
+
+  template<typename scalar_t,typename integer_t>
+  std::unique_ptr<CSRGraph<integer_t>>
+  CSRMatrixMPI<scalar_t,integer_t>::gather_graph() const {
+    auto rank = mpi_rank(_comm);
+    auto P = mpi_nprocs(_comm);
+    if (rank == 0) {
+      std::unique_ptr<int[]> iwork(new int[2*P]);
+      auto rcnts = iwork.get();
+      auto displs = rcnts + P;
+      for (int p=0; p<P; p++) {
+        rcnts[p] = dist_[p+1]-dist_[p];
+        displs[p] = dist_[p];
+      }
+      std::unique_ptr<CSRGraph<integer_t>> Aseq
+        (new CSRGraph<integer_t>(n_, nnz_));
+      MPI_Gatherv
+        (const_cast<integer_t*>(this->ptr())+1, local_rows_,
+         mpi_type<integer_t>(), Aseq->ptr()+1, rcnts, displs,
+         mpi_type<integer_t>(), 0, _comm);
+      Aseq->ptr(0) = 0;
+      for (int p=1; p<P; p++) {
+        if (dist_[p] > 0) {
+          integer_t p_start = Aseq->ptr(dist_[p]);
+          for (int r=dist_[p]; r<dist_[p+1]; r++)
+            Aseq->ptr(r+1) += p_start;
+        }
+      }
+      for (int p=0; p<P; p++) {
+        rcnts[p] = Aseq->ptr(dist_[p+1])-Aseq->ptr(dist_[p]);
+        displs[p] = Aseq->ptr(dist_[p]);
+      }
+      MPI_Gatherv
+        (const_cast<integer_t*>(this->ind()), local_nnz_,
+         mpi_type<integer_t>(), Aseq->ind(), rcnts, displs,
+         mpi_type<integer_t>(), 0, _comm);
+      return Aseq;
+    } else {
+      MPI_Gatherv
+        (const_cast<integer_t*>(this->ptr())+1, local_rows_,
+         mpi_type<integer_t>(), nullptr, nullptr, nullptr,
+         mpi_type<integer_t>(), 0, _comm);
+      MPI_Gatherv
+        (const_cast<integer_t*>(this->ind()), local_nnz_,
+         mpi_type<integer_t>(), nullptr, nullptr, nullptr,
+         mpi_type<integer_t>(), 0, _comm);
+      return std::unique_ptr<CSRGraph<integer_t>>();
     }
   }
 
@@ -885,8 +930,7 @@ namespace strumpack {
       return 1;
     }
     auto Aseq = gather();
-    std::vector<scalar_t> Dr_global;
-    std::vector<scalar_t> Dc_global;
+    std::vector<scalar_t> Dr_global, Dc_global;
     int ierr = 0;
     if (Aseq) {
       ierr = Aseq->permute_and_scale
@@ -912,7 +956,7 @@ namespace strumpack {
       }
       Dr.resize(local_rows_);
       MPI_Scatterv
-        (rank ? NULL : Dr_global.data(), scnts, sdispls, mpi_type<scalar_t>(),
+        (rank ? nullptr : Dr_global.data(), scnts, sdispls, mpi_type<scalar_t>(),
          Dr.data(), local_rows_, mpi_type<scalar_t>(), 0, _comm);
       delete[] scnts;
       Dr_global.clear();

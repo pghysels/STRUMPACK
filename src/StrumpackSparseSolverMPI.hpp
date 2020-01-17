@@ -171,7 +171,8 @@ namespace strumpack {
     virtual void setup_tree() override;
     virtual void setup_reordering() override;
     virtual int compute_reordering
-    (int nx, int ny, int nz, int components, int width) override;
+    (const int* p, int base, int nx, int ny, int nz,
+     int components, int width) override;
     virtual void separator_reordering() override;
     void perf_counters_stop(const std::string& s) override;
     virtual void synchronize() override { comm_.barrier(); }
@@ -232,9 +233,11 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> int
   StrumpackSparseSolverMPI<scalar_t,integer_t>::compute_reordering
-  (int nx, int ny, int nz, int components, int width) {
+  (const int* p, int base, int nx, int ny, int nz,
+   int components, int width) {
+    if (p) return nd_->set_permutation(opts_, *mat_, comm_, p, base);
     return nd_->nested_dissection
-      (opts_, *mat_, comm_.comm(), nx, ny, nz, components, width);
+      (opts_, *mat_, comm_, nx, ny, nz, components, width);
   }
 
   template<typename scalar_t,typename integer_t> void

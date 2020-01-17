@@ -84,18 +84,22 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t>
   class MatrixReorderingMPI : public MatrixReordering<scalar_t,integer_t> {
     using Opts_t = SPOptions<scalar_t>;
+    using CSRMatMPI_t = CSRMatrixMPI<scalar_t,integer_t>;
+    using CSMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
+    using F_t = FrontalMatrix<scalar_t,integer_t>;
 
   public:
     MatrixReorderingMPI(integer_t n, const MPIComm& c);
     virtual ~MatrixReorderingMPI() = default;
 
     int nested_dissection
-    (const Opts_t& opts, const CSRMatrixMPI<scalar_t,integer_t>& A,
+    (const Opts_t& opts, const CSRMatMPI_t& A,
      int nx, int ny, int nz, int components, int width);
 
-    void separator_reordering
-    (const Opts_t& opts, CompressedSparseMatrix<scalar_t,integer_t>& A,
-     FrontalMatrix<scalar_t,integer_t>* F);
+    int set_permutation
+    (const Opts_t& opts, const CSRMatMPI_t& A, const int* p, int base);
+
+    void separator_reordering(const Opts_t& opts, CSMat_t& A, F_t* F);
 
     void clear_tree_data();
 
@@ -150,9 +154,9 @@ namespace strumpack {
     const MPIComm* comm_;
     std::unique_ptr<SeparatorTree<integer_t>> local_tree_;
 
-    void get_local_graphs(const CSRMatrixMPI<scalar_t,integer_t>& Ampi);
+    void get_local_graphs(const CSRMatMPI_t& Ampi);
 
-    void build_local_tree(const CSRMatrixMPI<scalar_t,integer_t>& Ampi);
+    void build_local_tree(const CSRMatMPI_t& Ampi);
 
     void nested_dissection_print
     (const SPOptions<scalar_t>& opts, integer_t nnz) const;
@@ -171,18 +175,17 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> int
   MatrixReorderingMPI<scalar_t,integer_t>::nested_dissection
-  (const Opts_t& opts, const CSRMatrixMPI<scalar_t,integer_t>& A,
+  (const Opts_t& opts, const CSRMatMPI_t& A,
    int nx, int ny, int nz, int components, int width) {
     if (!is_parallel(opts.reordering_method())) {
       auto rank = comm_->rank();
       auto P = comm_->size();
-      // TODO only gather the graph? without the values or the diagonal
-      auto Aseq = A.gather();
+      auto Aseq = A.gather_graph();
       std::unique_ptr<SeparatorTree<integer_t>> global_sep_tree;
       if (Aseq) { // only root
         switch (opts.reordering_method()) {
         case ReorderingStrategy::NATURAL: {
-          for (integer_t i=0; i<A.size(); i++) perm_[i] = i;
+          std::iota(perm_.begin(), perm_.end(), 0);
           global_sep_tree = build_sep_tree_from_perm
             (Aseq->ptr(), Aseq->ind(), perm_, iperm_);
           break;
@@ -287,10 +290,40 @@ namespace strumpack {
     return 0;
   }
 
+  template<typename scalar_t,typename integer_t> int
+  MatrixReorderingMPI<scalar_t,integer_t>::set_permutation
+  (const Opts_t& opts, const CSRMatMPI_t& A, const int* p, int base) {
+    auto n = perm_.size();
+    assert(A.size() == n);
+    if (base == 0) std::copy(p, p+n, perm_.data());
+    else for (std::size_t i=0; i<n; i++) perm_[i] = p[i] - base;
+    auto Aseq = A.gather_graph();
+    std::unique_ptr<SeparatorTree<integer_t>> global_sep_tree;
+    if (Aseq) {
+      global_sep_tree = build_sep_tree_from_perm
+        (Aseq->ptr(), Aseq->ind(), perm_, iperm_);
+      Aseq.reset();
+    }
+    auto rank = comm_->rank();
+    auto P = comm_->size();
+    integer_t nbsep;
+    if (!rank) nbsep = global_sep_tree->separators();
+    comm_->broadcast(nbsep);
+    if (rank)
+      global_sep_tree = std::unique_ptr<SeparatorTree<integer_t>>
+        (new SeparatorTree<integer_t>(nbsep));
+    global_sep_tree->broadcast(comm_->comm());
+    local_tree_ = global_sep_tree->subtree(rank, P);
+    sep_tree_ = global_sep_tree->toptree(P);
+    for (std::size_t i=0; i<perm_.size(); i++) iperm_[perm_[i]] = i;
+    get_local_graphs(A);
+    nested_dissection_print(opts, A.nnz());
+    return 0;
+  }
+
   template<typename scalar_t,typename integer_t> void
   MatrixReorderingMPI<scalar_t,integer_t>::separator_reordering
-  (const Opts_t& opts, CompressedSparseMatrix<scalar_t,integer_t>& A,
-   FrontalMatrix<scalar_t,integer_t>* F) {
+  (const Opts_t& opts, CSMat_t& A, F_t* F) {
     if (opts.compression() == CompressionType::NONE)
       return;
     auto n = A.size();
@@ -312,7 +345,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   MatrixReorderingMPI<scalar_t,integer_t>::get_local_graphs
-  (const CSRMatrixMPI<scalar_t,integer_t>& A) {
+  (const CSRMatMPI_t& A) {
     auto P = comm_->size();
     auto rank = comm_->rank();
     sub_graph_ranges.resize(P);
@@ -344,7 +377,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   MatrixReorderingMPI<scalar_t,integer_t>::build_local_tree
-  (const CSRMatrixMPI<scalar_t,integer_t>& A) {
+  (const CSRMatMPI_t& A) {
     auto P = comm_->size();
     auto rank = comm_->rank();
     auto n = A.size();

@@ -203,6 +203,18 @@ namespace strumpack {
     virtual ReturnCode reorder
     (int nx=1, int ny=1, int nz=1, int components=1, int width=1);
 
+
+    /**
+     * Perform sparse matrix reordering, with a user-supplied
+     * permutation vector. Using this will ignore the reordering
+     * method selected in the options struct.
+     *
+     * \param p permutation vector, should be of size N, the size of
+     * the sparse matrix associated with this solver
+     * \param base is the permutation 0 or 1 based?
+     */
+    virtual ReturnCode reorder(const int* p, int base=0);
+
     /**
      * Perform numerical factorization of the sparse input matrix.
      *
@@ -355,7 +367,8 @@ namespace strumpack {
     virtual void setup_tree();
     virtual void setup_reordering();
     virtual int compute_reordering
-    (int nx, int ny, int nz, int components, int width);
+    (const int* p, int base, int nx, int ny, int nz,
+     int components, int width);
     virtual void separator_reordering();
 
     virtual SpMat_t* matrix() { return mat_.get(); }
@@ -378,6 +391,10 @@ namespace strumpack {
     virtual void print_flop_breakdown_HODLR() const;
     virtual void flop_breakdown_reset() const;
     virtual void reduce_flop_counters() const {}
+
+    ReturnCode internal_reorder
+    (const int* p, int base, int nx, int ny, int nz,
+     int components, int width);
 
     SPOptions<scalar_t> opts_;
     bool is_root_;
@@ -468,7 +485,9 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> int
   StrumpackSparseSolver<scalar_t,integer_t>::compute_reordering
-  (int nx, int ny, int nz, int components, int width) {
+  (const int* p, int base, int nx, int ny, int nz,
+   int components, int width) {
+    if (p) return nd_->set_permutation(opts_, *mat_, p, base);
     return nd_->nested_dissection
       (opts_, *mat_, nx, ny, nz, components, width);
   }
@@ -614,6 +633,19 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> ReturnCode
   StrumpackSparseSolver<scalar_t,integer_t>::reorder
   (int nx, int ny, int nz, int components, int width) {
+    return internal_reorder(nullptr, 0, nx, ny, nz, components, width);
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  StrumpackSparseSolver<scalar_t,integer_t>::reorder
+  (const int* p, int base) {
+    return internal_reorder(p, base, 1, 1, 1, 1, 1);
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  StrumpackSparseSolver<scalar_t,integer_t>::internal_reorder
+  (const int* p, int base, int nx, int ny, int nz,
+   int components, int width) {
     if (!matrix()) return ReturnCode::MATRIX_NOT_SET;
     TaskTimer t1("permute-scale");
     int ierr;
@@ -647,7 +679,7 @@ namespace strumpack {
     perf_counters_start();
     t3.start();
     setup_reordering();
-    ierr = compute_reordering(nx, ny, nz, components, width);
+    ierr = compute_reordering(p, base, nx, ny, nz, components, width);
     if (ierr) {
       std::cerr << "ERROR: nested dissection went wrong, ierr="
                 << ierr << std::endl;

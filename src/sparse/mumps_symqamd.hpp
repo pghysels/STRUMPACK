@@ -45,13 +45,10 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   std::unique_ptr<SeparatorTree<integer_t>> aggressive_amalgamation
-  (const CompressedSparseMatrix<scalar_t,integer_t>& A,
+  (int N, const integer_t* ptr, const integer_t* ind,
    std::vector<integer_t>& perm, std::vector<integer_t>& iperm,
    const SPOptions<scalar_t>& opts) {
-    auto ptr = A.ptr();
-    auto ind = A.ind();
-    int N = A.size();
-    int NNZ = A.nnz();
+    int NNZ = ptr[N];
 
     int TRESH = 0;              /* <= 0 Recommended value. Automatic setting will be done. */
     int* NDENSE = new int[N];   /* [N] used internally */
