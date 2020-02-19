@@ -36,9 +36,9 @@
 using namespace strumpack;
 
 extern "C" {
-  void FC_GLOBAL_(genmatrix3d_anal,GENMATRIX3D_ANAL)
+  void STRUMPACK_FC_GLOBAL_(genmatrix3d_anal,GENMATRIX3D_ANAL)
     (void*,void*,void*,void*,void*,void*,void*,void*);
-  void FC_GLOBAL(genmatrix3d,GENMATRIX3D)
+  void STRUMPACK_FC_GLOBAL(genmatrix3d,GENMATRIX3D)
     (void*,void*,void*,void*,void*,void*,void*,void*,void*,void*);
 }
 
@@ -50,13 +50,13 @@ CSRMatrix<std::complex<realt>,int> Helmholtz3D(int nx) {
   char datafile[] = "void";
   int fromfile = 0, npml = 8, nnz, n;
   nx = std::max(1, nx - 2 * npml);
-  FC_GLOBAL(genmatrix3d_anal,GENMATRIX3D_ANAL)
+  STRUMPACK_FC_GLOBAL(genmatrix3d_anal,GENMATRIX3D_ANAL)
     (&nx, &nx, &nx, &npml, &n, &nnz, &fromfile, datafile);
   std::vector<std::tuple<int,int,std::complex<realt>>> rc;
   {
     std::vector<int> rowind(nnz), colind(nnz);
     std::vector<std::complex<float>> val(nnz);
-    FC_GLOBAL(genmatrix3d,GENMATRIX3D)
+    STRUMPACK_FC_GLOBAL(genmatrix3d,GENMATRIX3D)
       (colind.data(), rowind.data(), val.data(), &nx, &nx, &nx, &npml, &nnz,
        &fromfile, datafile);
     rc.resize(nnz);

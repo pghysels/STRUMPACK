@@ -211,151 +211,151 @@ namespace strumpack {
     ///////// BLAS1 ///////////////////////////////////////////
     ///////////////////////////////////////////////////////////
     extern "C" {
-      void FC_GLOBAL(scopy,SCOPY)
+      void STRUMPACK_FC_GLOBAL(scopy,SCOPY)
         (int* n, const float* x, int* incx, float* y, int* incy);
-      void FC_GLOBAL(dcopy,DCOPY)
+      void STRUMPACK_FC_GLOBAL(dcopy,DCOPY)
         (int* n, const double* x, int* incx, double* y, int* incy);
-      void FC_GLOBAL(ccopy,CCOPY)
+      void STRUMPACK_FC_GLOBAL(ccopy,CCOPY)
         (int* n, const std::complex<float>* x, int* incx,
          std::complex<float>* y, int* incy);
-      void FC_GLOBAL(zcopy,ZCOPY)
+      void STRUMPACK_FC_GLOBAL(zcopy,ZCOPY)
         (int* n, const std::complex<double>* x, int* incx,
          std::complex<double>* y, int* incy);
 
-      void FC_GLOBAL(sscal,SSCAL)
+      void STRUMPACK_FC_GLOBAL(sscal,SSCAL)
         (int* n, float* alpha, float* x, int* incx);
-      void FC_GLOBAL(dscal,DSCAL)
+      void STRUMPACK_FC_GLOBAL(dscal,DSCAL)
         (int* n, double* alpha, double* x, int* incx);
-      void FC_GLOBAL(cscal,CSCAL)
+      void STRUMPACK_FC_GLOBAL(cscal,CSCAL)
         (int* n, std::complex<float>* alpha,
          std::complex<float>* x, int* incx);
-      void FC_GLOBAL(zscal,ZSCAL)
+      void STRUMPACK_FC_GLOBAL(zscal,ZSCAL)
         (int* n, std::complex<double>* alpha,
          std::complex<double>* x, int* incx);
 
-      int FC_GLOBAL(isamax,ISAMAX)
+      int STRUMPACK_FC_GLOBAL(isamax,ISAMAX)
         (int* n, const float* dx, int* incx);
-      int FC_GLOBAL(idamax,IDAMAX)
+      int STRUMPACK_FC_GLOBAL(idamax,IDAMAX)
         (int* n, const double* dx, int* incx);
-      int FC_GLOBAL(icamax,ICAMAX)
+      int STRUMPACK_FC_GLOBAL(icamax,ICAMAX)
         (int* n, const std::complex<float>* dx, int* incx);
-      int FC_GLOBAL(izamax,IZAMAX)
+      int STRUMPACK_FC_GLOBAL(izamax,IZAMAX)
         (int* n, const std::complex<double>* dx, int* incx);
 
-      float FC_GLOBAL(snrm2,SNRM2)
+      float STRUMPACK_FC_GLOBAL(snrm2,SNRM2)
         (int* n, const float* x, int* incx);
-      double FC_GLOBAL(dnrm2,DNRM2)
+      double STRUMPACK_FC_GLOBAL(dnrm2,DNRM2)
         (int* n, const double* x, int* incx);
-      float FC_GLOBAL(scnrm2,SCNRM2)
+      float STRUMPACK_FC_GLOBAL(scnrm2,SCNRM2)
         (int* n, const std::complex<float>* x, int* incx);
-      double FC_GLOBAL(dznrm2,DZNRM2)
+      double STRUMPACK_FC_GLOBAL(dznrm2,DZNRM2)
         (int* n, const std::complex<double>* x, int* incx);
 
-      void FC_GLOBAL(saxpy,SAXPY)
+      void STRUMPACK_FC_GLOBAL(saxpy,SAXPY)
         (int* n, float* alpha, const float* x, int* incx,
          float* y, int* incy);
-      void FC_GLOBAL(daxpy,DAXPY)
+      void STRUMPACK_FC_GLOBAL(daxpy,DAXPY)
         (int* n, double* alpha, const double* x, int* incx,
          double* y, int* incy);
-      void FC_GLOBAL(caxpy,CAXPY)
+      void STRUMPACK_FC_GLOBAL(caxpy,CAXPY)
         (int* n, std::complex<float>* alpha,
          const std::complex<float>* x, int* incx,
          std::complex<float>* y, int* incy);
-      void FC_GLOBAL(zaxpy,ZAXPY)
+      void STRUMPACK_FC_GLOBAL(zaxpy,ZAXPY)
         (int* n, std::complex<double>* alpha,
          const std::complex<double>* x, int* incx,
          std::complex<double>* y, int* incy);
 
-      void FC_GLOBAL(sswap,SSWAP)
+      void STRUMPACK_FC_GLOBAL(sswap,SSWAP)
         (int* n, float* x, int* ldx, float* y, int* ldy);
-      void FC_GLOBAL(dswap,DSWAP)
+      void STRUMPACK_FC_GLOBAL(dswap,DSWAP)
         (int* n, double* x, int* ldx, double* y, int* ldy);
-      void FC_GLOBAL(cswap,CSWAP)
+      void STRUMPACK_FC_GLOBAL(cswap,CSWAP)
         (int* n, std::complex<float>* x, int* ldx,
          std::complex<float>* y, int* ldy);
-      void FC_GLOBAL(zswap,ZSWAP)
+      void STRUMPACK_FC_GLOBAL(zswap,ZSWAP)
         (int* n, std::complex<double>* x, int* ldx,
          std::complex<double>* y, int* ldy);
 
-      float FC_GLOBAL(sdot,SDOT)
+      float STRUMPACK_FC_GLOBAL(sdot,SDOT)
         (int* n, const float* x, int* incx, const float* y, int* incy);
-      double FC_GLOBAL(ddot,DDOT)
+      double STRUMPACK_FC_GLOBAL(ddot,DDOT)
         (int* n, const double* x, int* incx, const double* y, int* incy);
 
 
       ///////////////////////////////////////////////////////////
       ///////// BLAS2 ///////////////////////////////////////////
       ///////////////////////////////////////////////////////////
-      void FC_GLOBAL(sgemv,SGEMV)
+      void STRUMPACK_FC_GLOBAL(sgemv,SGEMV)
         (char* t, int* m, int* n, float* alpha, const float *a, int* lda,
          const float* x, int* incx, float* beta, float* y, int* incy);
-      void FC_GLOBAL(dgemv,DGEMV)
+      void STRUMPACK_FC_GLOBAL(dgemv,DGEMV)
         (char* t, int* m, int* n, double* alpha, const double *a, int* lda,
          const double* x, int* incx, double* beta, double* y, int* incy);
-      void FC_GLOBAL(cgemv,CGEMV)
+      void STRUMPACK_FC_GLOBAL(cgemv,CGEMV)
         (char* t, int* m, int* n, std::complex<float>* alpha,
          const std::complex<float> *a, int* lda,
          const std::complex<float>* x, int* incx, std::complex<float>* beta,
          std::complex<float>* y, int* incy);
-      void FC_GLOBAL(zgemv,ZGEMV)
+      void STRUMPACK_FC_GLOBAL(zgemv,ZGEMV)
         (char* t, int* m, int* n, std::complex<double>* alpha,
          const std::complex<double> *a, int* lda,
          const std::complex<double>* x, int* incx, std::complex<double>* beta,
          std::complex<double>* y, int* incy);
 
-      void FC_GLOBAL(sger,SGER)
+      void STRUMPACK_FC_GLOBAL(sger,SGER)
         (int* m, int* n, float* alpha, const float* x, int* incx,
          const float* y, int* incy, float* a, int* lda);
-      void FC_GLOBAL(dger,DGER)
+      void STRUMPACK_FC_GLOBAL(dger,DGER)
         (int* m, int* n, double* alpha, const double* x, int* incx,
          const double* y, int* incy, double* a, int* lda);
-      void FC_GLOBAL(cgeru,CGERU)
+      void STRUMPACK_FC_GLOBAL(cgeru,CGERU)
         (int* m, int* n, std::complex<float>* alpha,
          const std::complex<float>* x, int* incx,
          const std::complex<float>* y, int* incy,
          std::complex<float>* a, int* lda);
-      void FC_GLOBAL(zgeru,ZGERU)
+      void STRUMPACK_FC_GLOBAL(zgeru,ZGERU)
         (int* m, int* n, std::complex<double>* alpha,
          const std::complex<double>* x, int* incx,
          const std::complex<double>* y, int* incy,
          std::complex<double>* a, int* lda);
-      void FC_GLOBAL(cgerc,CGERC)
+      void STRUMPACK_FC_GLOBAL(cgerc,CGERC)
         (int* m, int* n, std::complex<float>* alpha,
          const std::complex<float>* x, int* incx,
          const std::complex<float>* y, int* incy,
          std::complex<float>* a, int* lda);
-      void FC_GLOBAL(zgerc,ZGERC)
+      void STRUMPACK_FC_GLOBAL(zgerc,ZGERC)
         (int* m, int* n, std::complex<double>* alpha,
          const std::complex<double>* x, int* incx,
          const std::complex<double>* y, int* incy,
          std::complex<double>* a, int* lda);
 
-      void FC_GLOBAL(strmv,STRMV)
+      void STRUMPACK_FC_GLOBAL(strmv,STRMV)
         (char* ul, char* t, char* d, int* n,
          const float* a, int* lda, float* x, int* incx);
-      void FC_GLOBAL(dtrmv,DTRMV)
+      void STRUMPACK_FC_GLOBAL(dtrmv,DTRMV)
         (char* ul, char* t, char* d, int* n,
          const double* a, int* lda, double* x, int* incx);
-      void FC_GLOBAL(ctrmv,CTRMV)
+      void STRUMPACK_FC_GLOBAL(ctrmv,CTRMV)
         (char* ul, char* t, char* d, int* n,
          const std::complex<float>* a, int* lda,
          std::complex<float>* x, int* incx);
-      void FC_GLOBAL(ztrmv,ZTRMV)
+      void STRUMPACK_FC_GLOBAL(ztrmv,ZTRMV)
         (char* ul, char* t, char* d, int* n,
          const std::complex<double>* a, int* lda,
          std::complex<double>* x, int* incx);
 
-      void FC_GLOBAL(strsv,STRSV)
+      void STRUMPACK_FC_GLOBAL(strsv,STRSV)
         (char* ul, char* t, char* d, int* m, const float* a, int* lda,
          float* b, int* incb);
-      void FC_GLOBAL(dtrsv,DTRSV)
+      void STRUMPACK_FC_GLOBAL(dtrsv,DTRSV)
         (char* ul, char* t, char* d, int* m, const double* a, int* lda,
          double* b, int* incb);
-      void FC_GLOBAL(ctrsv,CTRSV)
+      void STRUMPACK_FC_GLOBAL(ctrsv,CTRSV)
         (char* ul, char* t, char* d, int* m,
          const std::complex<float>* a, int* lda,
          std::complex<float>* b, int* incb);
-      void FC_GLOBAL(ztrsv,ZTRSV)
+      void STRUMPACK_FC_GLOBAL(ztrsv,ZTRSV)
         (char* ul, char* t, char* d, int* m,
          const std::complex<double>* a, int* lda,
          std::complex<double>* b, int* incb);
@@ -364,51 +364,51 @@ namespace strumpack {
       ///////////////////////////////////////////////////////////
       ///////// BLAS3 ///////////////////////////////////////////
       ///////////////////////////////////////////////////////////
-      void FC_GLOBAL(sgemm,SGEMM)
+      void STRUMPACK_FC_GLOBAL(sgemm,SGEMM)
         (char* ta, char* tb, int* m, int* n, int* k,
          float* alpha, const float* a, int* lda, const float* b, int* ldb,
          float* beta, float* c, int* ldc);
-      void FC_GLOBAL(dgemm,DGEMM)
+      void STRUMPACK_FC_GLOBAL(dgemm,DGEMM)
         (char* ta, char* tb, int* m, int* n, int* k,
          double* alpha, const double* A, int* lda, const double* b, int* ldb,
          double* beta, double* c, int* ldc);
-      void FC_GLOBAL(cgemm,CGEMM)
+      void STRUMPACK_FC_GLOBAL(cgemm,CGEMM)
         (char* ta, char* tb, int* m, int* n, int* k,
          std::complex<float>* alpha, const std::complex<float>* a, int* lda,
          const std::complex<float>* b, int* ldb, std::complex<float>* beta,
          std::complex<float>* c, int* ldc);
-      void FC_GLOBAL(zgemm,ZGEMM)
+      void STRUMPACK_FC_GLOBAL(zgemm,ZGEMM)
         (char* ta, char* tb, int* m, int* n, int* k,
          std::complex<double>* alpha, const std::complex<double>* a, int* lda,
          const std::complex<double>* b, int* ldb, std::complex<double>* beta,
          std::complex<double>* c, int* ldc);
 
-      void FC_GLOBAL(strsm,STRSM)
+      void STRUMPACK_FC_GLOBAL(strsm,STRSM)
         (char* s, char* ul, char* t, char* d, int* m, int* n,
          float* alpha, const float* a, int* lda, float* b, int* ldb);
-      void FC_GLOBAL(dtrsm,DTRSM)
+      void STRUMPACK_FC_GLOBAL(dtrsm,DTRSM)
         (char* s, char* ul, char* t, char* d, int* m, int* n,
          double* alpha, const double* a, int* lda, double* b, int* ldb);
-      void FC_GLOBAL(ctrsm,CTRSM)
+      void STRUMPACK_FC_GLOBAL(ctrsm,CTRSM)
         (char* s, char* ul, char* t, char* d, int* m, int* n,
          std::complex<float>* alpha, const std::complex<float>* a, int* lda,
          std::complex<float>* b, int* ldb);
-      void FC_GLOBAL(ztrsm,ZTRSM)
+      void STRUMPACK_FC_GLOBAL(ztrsm,ZTRSM)
         (char* s, char* ul, char* t, char* d, int* m, int* n,
          std::complex<double>* alpha, const std::complex<double>* a, int* lda,
          std::complex<double>* b, int* ldb);
 
-      void FC_GLOBAL(strmm,STRMM)
+      void STRUMPACK_FC_GLOBAL(strmm,STRMM)
         (char* s, char* ul, char* t, char* d, int* m, int* n, float* alpha,
          const float* a, int* lda, float* b, int* ldb);
-      void FC_GLOBAL(dtrmm,DTRMM)
+      void STRUMPACK_FC_GLOBAL(dtrmm,DTRMM)
         (char* s, char* ul, char* t, char* d, int* m, int* n, double* alpha,
          const double* a, int* lda, double* b, int* ldb);
-      void FC_GLOBAL(ctrmm,CTRMM)
+      void STRUMPACK_FC_GLOBAL(ctrmm,CTRMM)
         (char* s, char* ul, char* t, char* d, int* m, int* n,
          std::complex<float>* alpha, const std::complex<float>* a, int* lda,
          std::complex<float>* b, int* ldb);
-      void FC_GLOBAL(ztrmm,ZTRMM)
+      void STRUMPACK_FC_GLOBAL(ztrmm,ZTRMM)
         (char* s, char* ul, char* t, char* d, int* m, int* n,
          std::complex<double>* alpha, const std::complex<double>* a, int* lda,
          std::complex<double>* b, int* ldb);
@@ -417,433 +417,433 @@ namespace strumpack {
       ///////////////////////////////////////////////////////////
       ///////// LAPACK //////////////////////////////////////////
       ///////////////////////////////////////////////////////////
-      float FC_GLOBAL(slamch,SLAMCH)(char* cmach);
-      double FC_GLOBAL(dlamch,DLAMCH)(char* cmach);
+      float STRUMPACK_FC_GLOBAL(slamch,SLAMCH)(char* cmach);
+      double STRUMPACK_FC_GLOBAL(dlamch,DLAMCH)(char* cmach);
 
-      int FC_GLOBAL(ilaenv,ILAENV)
+      int STRUMPACK_FC_GLOBAL(ilaenv,ILAENV)
         (int* ispec, char* name, char* opts,
          int* n1, int* n2, int* n3, int* n4);
 
-      void FC_GLOBAL(clacgv,CLACGV)
+      void STRUMPACK_FC_GLOBAL(clacgv,CLACGV)
         (int* n, std::complex<float>* x, int* incx);
-      void FC_GLOBAL(zlacgv,ZLACGV)
+      void STRUMPACK_FC_GLOBAL(zlacgv,ZLACGV)
         (int* n, std::complex<double>* x, int* incx);
 
-      int FC_GLOBAL(slacpy,SLACPY)
+      int STRUMPACK_FC_GLOBAL(slacpy,SLACPY)
         (char* uplo, int* m, int* n, const float* a, int* lda,
          float* b, int* ldb);
-      int FC_GLOBAL(dlacpy,DLACPY)
+      int STRUMPACK_FC_GLOBAL(dlacpy,DLACPY)
         (char* uplo, int* m, int* n, const double* a, int* lda,
          double* b, int* ldb);
-      int FC_GLOBAL(clacpy,CLACPY)
+      int STRUMPACK_FC_GLOBAL(clacpy,CLACPY)
         (char* uplo, int* m, int* n, const std::complex<float>* a, int* lda,
          std::complex<float>* b, int* ldb);
-      int FC_GLOBAL(zlacpy,ZLACPY)
+      int STRUMPACK_FC_GLOBAL(zlacpy,ZLACPY)
         (char* uplo, int* m, int* n, const std::complex<double>* a, int* lda,
          std::complex<double>* b, int* ldb);
 
-      void FC_GLOBAL(slaswp,SLASWP)
+      void STRUMPACK_FC_GLOBAL(slaswp,SLASWP)
         (int* n, float* a, int* lda, int* k1, int* k2,
          const int* ipiv, int* incx);
-      void FC_GLOBAL(dlaswp,DLASWP)
+      void STRUMPACK_FC_GLOBAL(dlaswp,DLASWP)
         (int* n, double* a, int* lda, int* k1, int* k2,
          const int* ipiv, int* incx);
-      void FC_GLOBAL(claswp,CLASWP)
+      void STRUMPACK_FC_GLOBAL(claswp,CLASWP)
         (int* n, std::complex<float>* a, int* lda, int* k1, int* k2,
          const int* ipiv, int* incx);
-      void FC_GLOBAL(zlaswp,ZLASWP)
+      void STRUMPACK_FC_GLOBAL(zlaswp,ZLASWP)
         (int* n, std::complex<double>* a, int* lda, int* k1, int* k2,
          const int* ipiv, int* incx);
 
-      void FC_GLOBAL(slapmr,SLAPMR)
+      void STRUMPACK_FC_GLOBAL(slapmr,SLAPMR)
         (int* fwd, int* m, int* n, float* a, int* lda, const int* ipiv);
-      void FC_GLOBAL(dlapmr,DLAPMR)
+      void STRUMPACK_FC_GLOBAL(dlapmr,DLAPMR)
         (int* fwd, int* m, int* n, double* a, int* lda, const int* ipiv);
-      void FC_GLOBAL(clapmr,CLAPMR)
+      void STRUMPACK_FC_GLOBAL(clapmr,CLAPMR)
         (int* fwd, int* m, int* n, std::complex<float>* a, int* lda,
          const int* ipiv);
-      void FC_GLOBAL(zlapmr,ZLAPMR)
+      void STRUMPACK_FC_GLOBAL(zlapmr,ZLAPMR)
         (int* fwd, int* m, int* n, std::complex<double>* a, int* lda,
          const int* ipiv);
 
-      void FC_GLOBAL(slapmt,SLAPMT)
+      void STRUMPACK_FC_GLOBAL(slapmt,SLAPMT)
         (int* fwd, int* m, int* n, float* a, int* lda, const int* ipiv);
-      void FC_GLOBAL(dlapmt,DLAPMT)
+      void STRUMPACK_FC_GLOBAL(dlapmt,DLAPMT)
         (int* fwd, int* m, int* n, double* a, int* lda, const int* ipiv);
-      void FC_GLOBAL(clapmt,CLAPMT)
+      void STRUMPACK_FC_GLOBAL(clapmt,CLAPMT)
         (int* fwd, int* m, int* n, std::complex<float>* a, int* lda,
          const int* ipiv);
-      void FC_GLOBAL(zlapmt,ZLAPMT)
+      void STRUMPACK_FC_GLOBAL(zlapmt,ZLAPMT)
         (int* fwd, int* m, int* n, std::complex<double>* a, int* lda,
          const int* ipiv);
 
-      void FC_GLOBAL(slaset,SLASET)
+      void STRUMPACK_FC_GLOBAL(slaset,SLASET)
         (char* s, int* m, int* n, float* alpha,
          float* beta, float* a, int* lda);
-      void FC_GLOBAL(dlaset,DLASET)
+      void STRUMPACK_FC_GLOBAL(dlaset,DLASET)
         (char* s, int* m, int* n, double* alpha,
          double* beta, double* a, int* lda);
-      void FC_GLOBAL(claset,CLASET)
+      void STRUMPACK_FC_GLOBAL(claset,CLASET)
         (char* s, int* m, int* n, std::complex<float>* alpha,
          std::complex<float>* beta, std::complex<float>* a, int* lda);
-      void FC_GLOBAL(zlaset,ZLASET)
+      void STRUMPACK_FC_GLOBAL(zlaset,ZLASET)
         (char* s, int* m, int* n, std::complex<double>* alpha,
          std::complex<double>* beta, std::complex<double>* a, int* lda);
 
-      void FC_GLOBAL(sgeqp3,SGEQP3)
+      void STRUMPACK_FC_GLOBAL(sgeqp3,SGEQP3)
         (int* m, int* n, float* a, int* lda, int* jpvt,
          float* tau, float* work, int* lwork, int* info);
-      void FC_GLOBAL(dgeqp3,DGEQP3)
+      void STRUMPACK_FC_GLOBAL(dgeqp3,DGEQP3)
         (int* m, int* n, double* a, int* lda, int* jpvt,
          double* tau, double* work, int* lwork, int* info);
-      void FC_GLOBAL(cgeqp3,CGEQP3)
+      void STRUMPACK_FC_GLOBAL(cgeqp3,CGEQP3)
         (int* m, int* n, std::complex<float>* a, int* lda, int* jpvt,
          std::complex<float>* tau, std::complex<float>* work, int* lwork,
          std::complex<float>* rwork, int* info);
-      void FC_GLOBAL(zgeqp3,ZGEQP3)
+      void STRUMPACK_FC_GLOBAL(zgeqp3,ZGEQP3)
         (int* m, int* n, std::complex<double>* a, int* lda, int* jpvt,
          std::complex<double>* tau, std::complex<double>* work, int* lwork,
          std::complex<double>* rwork, int* info);
 
-      void FC_GLOBAL(sgeqp3tol,SGEQP3TOL)
+      void STRUMPACK_FC_GLOBAL(sgeqp3tol,SGEQP3TOL)
         (int* m, int* n, float* a, int* lda, int* jpvt,
          float* tau, float* work, int* lwork, int* info,
          int* rank, float* rtol, float* atol, int* depth);
-      void FC_GLOBAL(dgeqp3tol,DGEQP3TOL)
+      void STRUMPACK_FC_GLOBAL(dgeqp3tol,DGEQP3TOL)
         (int* m, int* n, double* a, int* lda, int* jpvt,
          double* tau, double* work, int* lwork, int* info,
          int* rank, double* rtol, double* atol, int* depth);
-      void FC_GLOBAL(cgeqp3tol,CGEQP3TOL)
+      void STRUMPACK_FC_GLOBAL(cgeqp3tol,CGEQP3TOL)
         (int* m, int* n, std::complex<float>* a, int* lda, int* jpvt,
          std::complex<float>* tau, std::complex<float>* work, int* lwork,
          float* rwork, int* info, int* rank,
          float* rtol, float* atol, int* depth);
-      void FC_GLOBAL(zgeqp3tol,ZGEQP3TOL)
+      void STRUMPACK_FC_GLOBAL(zgeqp3tol,ZGEQP3TOL)
         (int* m, int* n, std::complex<double>* a, int* lda, int* jpvt,
          std::complex<double>* tau, std::complex<double>* work, int* lwork,
          double* rwork, int* info, int* rank,
          double* rtol, double* atol, int* depth);
 
-      void FC_GLOBAL(sgeqrf,SGEQRF)
+      void STRUMPACK_FC_GLOBAL(sgeqrf,SGEQRF)
         (int* m, int* n, float* a, int* lda, float* tau,
          float* work, int* lwork, int* info);
-      void FC_GLOBAL(dgeqrf,DGEQRF)
+      void STRUMPACK_FC_GLOBAL(dgeqrf,DGEQRF)
         (int* m, int* n, double* a, int* lda, double* tau,
          double* work, int* lwork, int* info);
-      void FC_GLOBAL(cgeqrf,CGEQRF)
+      void STRUMPACK_FC_GLOBAL(cgeqrf,CGEQRF)
         (int* m, int* n, std::complex<float>* a, int* lda,
          std::complex<float>* tau, std::complex<float>* work,
          int* lwork, int* info);
-      void FC_GLOBAL(zgeqrf,ZGEQRF)
+      void STRUMPACK_FC_GLOBAL(zgeqrf,ZGEQRF)
         (int* m, int* n, std::complex<double>* a, int* lda,
          std::complex<double>* tau, std::complex<double>* work,
          int* lwork, int* info);
 
-      void FC_GLOBAL(sgeqrfmod,SGEQRFMOD)
+      void STRUMPACK_FC_GLOBAL(sgeqrfmod,SGEQRFMOD)
         (int* m, int* n, float* a, int* lda, float* tau,
          float* work, int* lwork, int* info, int* depth);
-      void FC_GLOBAL(dgeqrfmod,DGEQRFMOD)
+      void STRUMPACK_FC_GLOBAL(dgeqrfmod,DGEQRFMOD)
         (int* m, int* n, double* a, int* lda, double* tau,
          double* work, int* lwork, int* info, int* depth);
-      void FC_GLOBAL(cgeqrfmod,CGEQRFMOD)
+      void STRUMPACK_FC_GLOBAL(cgeqrfmod,CGEQRFMOD)
         (int* m, int* n, std::complex<float>* a, int* lda,
          std::complex<float>* tau, std::complex<float>* work, int* lwork,
          int* info, int* depth);
-      void FC_GLOBAL(zgeqrfmod,ZGEQRFMOD)
+      void STRUMPACK_FC_GLOBAL(zgeqrfmod,ZGEQRFMOD)
         (int* m, int* n, std::complex<double>* a, int* lda,
          std::complex<double>* tau, std::complex<double>* work, int* lwork,
          int* info, int* depth);
 
-      void FC_GLOBAL(sgelqf,SGELQF)
+      void STRUMPACK_FC_GLOBAL(sgelqf,SGELQF)
         (int* m, int* n, float* a, int* lda, float* tau,
          float* work, int* lwork, int* info);
-      void FC_GLOBAL(dgelqf,DGELQF)
+      void STRUMPACK_FC_GLOBAL(dgelqf,DGELQF)
         (int* m, int* n, double* a, int* lda, double* tau,
          double* work, int* lwork, int* info);
-      void FC_GLOBAL(cgelqf,CGELQF)
+      void STRUMPACK_FC_GLOBAL(cgelqf,CGELQF)
         (int* m, int* n, std::complex<float>* a, int* lda,
          std::complex<float>* tau, std::complex<float>* work,
          int* lwork, int* info);
-      void FC_GLOBAL(zgelqf,ZGELQF)
+      void STRUMPACK_FC_GLOBAL(zgelqf,ZGELQF)
         (int* m, int* n, std::complex<double>* a, int* lda,
          std::complex<double>* tau, std::complex<double>* work,
          int* lwork, int* info);
 
-      void FC_GLOBAL(sgelqfmod,SGELQFMOD)
+      void STRUMPACK_FC_GLOBAL(sgelqfmod,SGELQFMOD)
         (int* m, int* n, float* a, int* lda, float* tau,
          float* work, int* lwork, int* info, int* depth);
-      void FC_GLOBAL(dgelqfmod,DGELQFMOD)
+      void STRUMPACK_FC_GLOBAL(dgelqfmod,DGELQFMOD)
         (int* m, int* n, double* a, int* lda, double* tau,
          double* work, int* lwork, int* info, int* depth);
-      void FC_GLOBAL(cgelqfmod,CGELQFMOD)
+      void STRUMPACK_FC_GLOBAL(cgelqfmod,CGELQFMOD)
         (int* m, int* n, std::complex<float>* a, int* lda,
          std::complex<float>* tau, std::complex<float>* work, int* lwork,
          int* info, int* depth);
-      void FC_GLOBAL(zgelqfmod,ZGELQFMOD)
+      void STRUMPACK_FC_GLOBAL(zgelqfmod,ZGELQFMOD)
         (int* m, int* n, std::complex<double>* a, int* lda,
          std::complex<double>* tau, std::complex<double>* work, int* lwork,
          int* info, int* depth);
 
-      void FC_GLOBAL(sgetrf,SGETRF)
+      void STRUMPACK_FC_GLOBAL(sgetrf,SGETRF)
         (int* m, int* n, float* a, int* lda, int* ipiv, int* info);
-      void FC_GLOBAL(dgetrf,DGETRF)
+      void STRUMPACK_FC_GLOBAL(dgetrf,DGETRF)
         (int* m, int* n, double* a, int* lda, int* ipiv, int* info);
-      void FC_GLOBAL(cgetrf,CGETRF)
+      void STRUMPACK_FC_GLOBAL(cgetrf,CGETRF)
         (int* m, int* n, std::complex<float>* a, int* lda,
          int* ipiv, int* info);
-      void FC_GLOBAL(zgetrf,ZGETRF)
+      void STRUMPACK_FC_GLOBAL(zgetrf,ZGETRF)
         (int* m, int* n, std::complex<double>* a, int* lda,
          int* ipiv, int* info);
 
-      void FC_GLOBAL(sgetrfmod,SGETRFMOD)
+      void STRUMPACK_FC_GLOBAL(sgetrfmod,SGETRFMOD)
         (int* m, int* n, float* a, int* lda,
          int* ipiv, int* info, int* depth);
-      void FC_GLOBAL(dgetrfmod,DGETRFMOD)
+      void STRUMPACK_FC_GLOBAL(dgetrfmod,DGETRFMOD)
         (int* m, int* n, double* a, int* lda,
          int* ipiv, int* info, int* depth);
-      void FC_GLOBAL(cgetrfmod,CGETRFMOD)
+      void STRUMPACK_FC_GLOBAL(cgetrfmod,CGETRFMOD)
         (int* m, int* n, std::complex<float>* a, int* lda,
          int* ipiv, int* info, int* depth);
-      void FC_GLOBAL(zgetrfmod,ZGETRFMOD)
+      void STRUMPACK_FC_GLOBAL(zgetrfmod,ZGETRFMOD)
         (int* m, int* n, std::complex<double>* a, int* lda,
          int* ipiv, int* info, int* depth);
 
-      void FC_GLOBAL(sgetf2,SGETF2)
+      void STRUMPACK_FC_GLOBAL(sgetf2,SGETF2)
         (int* m, int* n, float* a, int* lda, int* ipiv, int* info);
-      void FC_GLOBAL(dgetf2,DGETF2)
+      void STRUMPACK_FC_GLOBAL(dgetf2,DGETF2)
         (int* m, int* n, double* a, int* lda, int* ipiv, int* info);
-      void FC_GLOBAL(cgetf2,CGETF2)
+      void STRUMPACK_FC_GLOBAL(cgetf2,CGETF2)
         (int* m, int* n, std::complex<float>* a, int* lda,
          int* ipiv, int* info);
-      void FC_GLOBAL(zgetf2,ZGETF2)
+      void STRUMPACK_FC_GLOBAL(zgetf2,ZGETF2)
         (int* m, int* n, std::complex<double>* a, int* lda,
          int* ipiv, int* info);
 
-      void FC_GLOBAL(sgetrs,SGETRS)
+      void STRUMPACK_FC_GLOBAL(sgetrs,SGETRS)
         (char* t, int* n, int* nrhs, const float* a, int* lda,
          const int* ipiv, float* b, int* ldb, int* info);
-      void FC_GLOBAL(dgetrs,dgetrs)
+      void STRUMPACK_FC_GLOBAL(dgetrs,dgetrs)
         (char* t, int* n, int* nrhs, const double* a, int* lda,
          const int* ipiv, double* b, int* ldb, int* info);
-      void FC_GLOBAL(cgetrs,cgetrs)
+      void STRUMPACK_FC_GLOBAL(cgetrs,cgetrs)
         (char* t, int* n, int* nrhs, const std::complex<float>* a, int* lda,
          const int* ipiv, std::complex<float>* b, int* ldb, int* info);
-      void FC_GLOBAL(zgetrs,ZGETRS)
+      void STRUMPACK_FC_GLOBAL(zgetrs,ZGETRS)
         (char* t, int* n, int* nrhs, const std::complex<double>* a, int* lda,
          const int* ipiv, std::complex<double>* b, int* ldb, int* info);
 
-      void FC_GLOBAL(spotrf,SPOTRF)
+      void STRUMPACK_FC_GLOBAL(spotrf,SPOTRF)
         (char* ul, int* n, float* a, int* lda, int* info);
-      void FC_GLOBAL(dpotrf,DPOTRF)
+      void STRUMPACK_FC_GLOBAL(dpotrf,DPOTRF)
         (char* ul, int* n, double* a, int* lda, int* info);
-      void FC_GLOBAL(cpotrf,CPOTRF)
+      void STRUMPACK_FC_GLOBAL(cpotrf,CPOTRF)
         (char* ul, int* n, std::complex<float>* a, int* lda, int* info);
-      void FC_GLOBAL(zpotrf,ZPOTRF)
+      void STRUMPACK_FC_GLOBAL(zpotrf,ZPOTRF)
         (char* ul, int* n, std::complex<double>* a,
          int* lda, int* info);
 
-      void FC_GLOBAL(sgetri,SGETRI)
+      void STRUMPACK_FC_GLOBAL(sgetri,SGETRI)
         (int* n, float* a, int* lda, int* ipiv,
          float* work, int* lwork, int* info);
-      void FC_GLOBAL(dgetri,DGETRI)
+      void STRUMPACK_FC_GLOBAL(dgetri,DGETRI)
         (int* n, double* a, int* lda, int* ipiv,
          double* work, int* lwork, int* info);
-      void FC_GLOBAL(cgetri,CGETRI)
+      void STRUMPACK_FC_GLOBAL(cgetri,CGETRI)
         (int* n, std::complex<float>* a, int* lda, int* ipiv,
          std::complex<float>* work, int* lwork, int* info);
-      void FC_GLOBAL(zgetri,ZGETRI)
+      void STRUMPACK_FC_GLOBAL(zgetri,ZGETRI)
         (int* n, std::complex<double>* a, int* lda, int* ipiv,
          std::complex<double>* work, int* lwork, int* info);
 
-      void FC_GLOBAL(sorglq,SORGLQ)
+      void STRUMPACK_FC_GLOBAL(sorglq,SORGLQ)
         (int* m, int* n, int* k, float* a, int* lda, const float* tau,
          float* work, int* lwork, int* info);
-      void FC_GLOBAL(dorglq,DORGLQ)
+      void STRUMPACK_FC_GLOBAL(dorglq,DORGLQ)
         (int* m, int* n, int* k, double* a, int* lda, const double* tau,
          double* work, int* lwork, int* info);
-      void FC_GLOBAL(cunglq,CORGLQ)
+      void STRUMPACK_FC_GLOBAL(cunglq,CORGLQ)
         (int* m, int* n, int* k, std::complex<float>* a, int* lda,
          const std::complex<float>* tau, std::complex<float>* work,
          int* lwork, int* info);
-      void FC_GLOBAL(zunglq,ZORGLQ)
+      void STRUMPACK_FC_GLOBAL(zunglq,ZORGLQ)
         (int* m, int* n, int* k, std::complex<double>* a, int* lda,
          const std::complex<double>* tau, std::complex<double>* work,
          int* lwork, int* info);
 
-      void FC_GLOBAL(sorglqmod,SORQLQMOD)
+      void STRUMPACK_FC_GLOBAL(sorglqmod,SORQLQMOD)
         (int* m, int* n, int* k, float* a, int* lda, const float* tau,
          float* work, int* lwork, int* info, int* depth);
-      void FC_GLOBAL(dorglqmod,DORQLQMOD)
+      void STRUMPACK_FC_GLOBAL(dorglqmod,DORQLQMOD)
         (int* m, int* n, int* k, double* a, int* lda, const double* tau,
          double* work, int* lwork, int* info, int* depth);
-      void FC_GLOBAL(cunglqmod,CORQLQMOD)
+      void STRUMPACK_FC_GLOBAL(cunglqmod,CORQLQMOD)
         (int* m, int* n, int* k, std::complex<float>* a, int* lda,
          const std::complex<float>* tau, std::complex<float>* work,
          int* lwork, int* info, int* depth);
-      void FC_GLOBAL(zunglqmod,ZORQLQMOD)
+      void STRUMPACK_FC_GLOBAL(zunglqmod,ZORQLQMOD)
         (int* m, int* n, int* k, std::complex<double>* a, int* lda,
          const std::complex<double>* tau, std::complex<double>* work,
          int* lwork, int* info, int* depth);
 
-      void FC_GLOBAL(sorgqr,SORGQR)
+      void STRUMPACK_FC_GLOBAL(sorgqr,SORGQR)
         (int* m, int* n, int* k, float* a, int* lda, const float* tau,
          float* work, int* lwork, int* info);
-      void FC_GLOBAL(dorgqr,DORGQR)
+      void STRUMPACK_FC_GLOBAL(dorgqr,DORGQR)
         (int* m, int* n, int* k, double* a, int* lda, const double* tau,
          double* work, int* lwork, int* info);
-      void FC_GLOBAL(cungqr,CORGQR)
+      void STRUMPACK_FC_GLOBAL(cungqr,CORGQR)
         (int* m, int* n, int* k, std::complex<float>* a, int* lda,
          const std::complex<float>* tau, std::complex<float>* work,
          int* lwork, int* info);
-      void FC_GLOBAL(zungqr,ZORGQR)
+      void STRUMPACK_FC_GLOBAL(zungqr,ZORGQR)
         (int* m, int* n, int* k, std::complex<double>* a, int* lda,
          const std::complex<double>* tau, std::complex<double>* work,
          int* lwork, int* info);
 
-      void FC_GLOBAL(sormqr,SORMQR)
+      void STRUMPACK_FC_GLOBAL(sormqr,SORMQR)
         (char* side, char* trans, int* m, int* n, int* k,
          const float* a, int* lda, const float* tau, float* c, int* ldc,
          float* work, int* lwork, int* info);
-      void FC_GLOBAL(dormqr,DORMQR)
+      void STRUMPACK_FC_GLOBAL(dormqr,DORMQR)
         (char* size, char* trans, int* m, int* n, int* k,
          const double* a, int* lda, const double* tau, double* c, int* ldc,
          double* work, int* lwork, int* info);
-      void FC_GLOBAL(cunmqr,CORMQR)
+      void STRUMPACK_FC_GLOBAL(cunmqr,CORMQR)
         (char* size, char* trans, int* m, int* n, int* k,
          const std::complex<float>* a, int* lda,
          const std::complex<float>* tau, std::complex<float>* c, int* ldc,
          std::complex<float>* work, int* lwork, int* info);
-      void FC_GLOBAL(zunmqr,ZORMQR)
+      void STRUMPACK_FC_GLOBAL(zunmqr,ZORMQR)
         (char* size, char* trans, int* m, int* n, int* k,
          const std::complex<double>* a, int* lda,
          const std::complex<double>* tau, std::complex<double>* c, int* ldc,
          std::complex<double>* work, int* lwork, int* info);
 
-      void FC_GLOBAL(sgesv,SGESV)
+      void STRUMPACK_FC_GLOBAL(sgesv,SGESV)
         (int* n, int* nrhs, float* a, int* lda, int* ipiv,
          float* b, int* ldb, int* info);
-      void FC_GLOBAL(dgesv,DGESV)
+      void STRUMPACK_FC_GLOBAL(dgesv,DGESV)
         (int* n, int* nrhs, double* a, int* lda, int* ipiv,
          double* b, int* ldb, int* info);
-      void FC_GLOBAL(cgesv,CGESV)
+      void STRUMPACK_FC_GLOBAL(cgesv,CGESV)
         (int* n, int* nrhs, std::complex<float>* a, int* lda, int* ipiv,
          std::complex<float>* b, int* ldb, int* info);
-      void FC_GLOBAL(zgesv,ZGESV)
+      void STRUMPACK_FC_GLOBAL(zgesv,ZGESV)
         (int* n, int* nrhs, std::complex<double>* a, int* lda, int* ipiv,
          std::complex<double>* b, int* ldb, int* info);
 
-      void FC_GLOBAL(slarnv,SLARNV)
+      void STRUMPACK_FC_GLOBAL(slarnv,SLARNV)
         (int* idist, int* iseed, int* n, float* x);
-      void FC_GLOBAL(dlarnv,DLARNV)
+      void STRUMPACK_FC_GLOBAL(dlarnv,DLARNV)
         (int* idist, int* iseed, int* n, double* x);
-      void FC_GLOBAL(clarnv,CLARNV)
+      void STRUMPACK_FC_GLOBAL(clarnv,CLARNV)
         (int* idist, int* iseed, int* n, std::complex<float>* x);
-      void FC_GLOBAL(zlarnv,ZLARNV)
+      void STRUMPACK_FC_GLOBAL(zlarnv,ZLARNV)
         (int* idist, int* iseed, int* n, std::complex<double>* x);
 
-      float FC_GLOBAL(slange,SLANGE)
+      float STRUMPACK_FC_GLOBAL(slange,SLANGE)
         (char* norm, int* m, int* n, const float* a, int* lda, float* work);
-      double FC_GLOBAL(dlange,DLANGE)
+      double STRUMPACK_FC_GLOBAL(dlange,DLANGE)
         (char* norm, int* m, int* n, const double* a,int* lda, double* work);
-      float FC_GLOBAL(clange,CLANGE)
+      float STRUMPACK_FC_GLOBAL(clange,CLANGE)
         (char* norm, int* m, int* n,
          const std::complex<float>* a, int* lda, float* work);
-      double FC_GLOBAL(zlange,ZLANGE)
+      double STRUMPACK_FC_GLOBAL(zlange,ZLANGE)
         (char* norm, int* m, int* n,
          const std::complex<double>* a, int* lda, double* work);
 
-      void FC_GLOBAL(sgesvd,SGESVD)
+      void STRUMPACK_FC_GLOBAL(sgesvd,SGESVD)
         (char* jobu, char* jobvt, int* m, int* n, float* a, int* lda,
          float* s, float* u, int* ldu, float* vt, int* ldvt,
          float* work, int* lwork, int* info);
-      void FC_GLOBAL(dgesvd,DGESVD)
+      void STRUMPACK_FC_GLOBAL(dgesvd,DGESVD)
         (char* jobu, char* jobvt, int* m, int* n, double* a, int* lda,
          double* s, double* u, int* ldu, double* vt, int* ldvt,
          double* work, int* lwork, int* info);
 
-      void FC_GLOBAL(ssyevx,SSYEVX)
+      void STRUMPACK_FC_GLOBAL(ssyevx,SSYEVX)
         (char* jobz, char* range, char* uplo, int* n,
          float* a, int* lda, float* vl, float* vu, int* il, int* iu,
          float* abstol, int* m, float* w, float* z, int* ldz,
          float* work, int* lwork, int* iwork, int* ifail, int* info);
-      void FC_GLOBAL(dsyevx,DSYEVX)
+      void STRUMPACK_FC_GLOBAL(dsyevx,DSYEVX)
         (char* jobz, char* range, char* uplo, int* n,
          double* a, int* lda, double* vl, double* vu, int* il, int* iu,
          double* abstol, int* m, double* w, double* z, int* ldz,
          double* work, int* lwork, int* iwork, int* ifail, int* info);
 
-      void FC_GLOBAL(ssyev,SSYEV)
+      void STRUMPACK_FC_GLOBAL(ssyev,SSYEV)
         (char* jobz, char* uplo, int* n, float* a, int* lda, float* w,
          float* work, int* lwork, int* info);
-      void FC_GLOBAL(dsyev,DSYEV)
+      void STRUMPACK_FC_GLOBAL(dsyev,DSYEV)
         (char* jobz, char* uplo, int* n, double* a, int* lda, double* w,
          double* work, int* lwork, int* info);
 
 
-      void FC_GLOBAL(ssytrf,SSYTRF)
+      void STRUMPACK_FC_GLOBAL(ssytrf,SSYTRF)
          (char* s, int* n, float* a, int*lda, int* ipiv, float* work,
             int* lwork, int* info);
-      void FC_GLOBAL(dsytrf,DSYTRF)
+      void STRUMPACK_FC_GLOBAL(dsytrf,DSYTRF)
          (char* s, int* n, double* a, int*lda, int* ipiv, double* work,
             int* lwork, int* info);
-      void FC_GLOBAL(csytrf,CSYTRF)
+      void STRUMPACK_FC_GLOBAL(csytrf,CSYTRF)
          (char* s, int* n, std::complex<float>* a, int*lda, int* ipiv,
             std::complex<float>* work, int* lwork, int* info);
-      void FC_GLOBAL(zsytrf,ZSYTRF)
+      void STRUMPACK_FC_GLOBAL(zsytrf,ZSYTRF)
          (char* s, int* n, std::complex<double>* a, int*lda, int* ipiv,
             std::complex<double>* work, int* lwork, int* info);
 
-      void FC_GLOBAL_(ssytrf_rook,SSYTRF_ROOK)
+      void STRUMPACK_FC_GLOBAL_(ssytrf_rook,SSYTRF_ROOK)
          (char* s, int* n, float* a, int*lda, int* ipiv, float* work,
             int* lwork, int* info);
-      void FC_GLOBAL_(dsytrf_rook,DSYTRF_ROOK)
+      void STRUMPACK_FC_GLOBAL_(dsytrf_rook,DSYTRF_ROOK)
          (char* s, int* n, double* a, int*lda, int* ipiv, double* work,
             int* lwork, int* info);
-      void FC_GLOBAL_(csytrf_rook,CSYTRF_ROOK)
+      void STRUMPACK_FC_GLOBAL_(csytrf_rook,CSYTRF_ROOK)
          (char* s, int* n, std::complex<float>* a, int*lda, int* ipiv,
             std::complex<float>* work, int* lwork, int* info);
-      void FC_GLOBAL_(zsytrf_rook,ZSYTRF_ROOK)
+      void STRUMPACK_FC_GLOBAL_(zsytrf_rook,ZSYTRF_ROOK)
          (char* s, int* n, std::complex<double>* a, int*lda, int* ipiv,
             std::complex<double>* work, int* lwork, int* info);
 
-      void FC_GLOBAL(ssytrs,SSYTRS)
+      void STRUMPACK_FC_GLOBAL(ssytrs,SSYTRS)
         (char* s, int* n, int* nrhs, const float* a, int* lda, const int* ipiv,
          float* b, int* ldb, int* info);
-      void FC_GLOBAL(dsytrs,DSYTRS)
+      void STRUMPACK_FC_GLOBAL(dsytrs,DSYTRS)
         (char* s, int* n, int* nrhs, const double* a, int* lda, const int* ipiv,
          double* b, int* ldb, int* info);
-      void FC_GLOBAL(csytrs,CSYTRS)
+      void STRUMPACK_FC_GLOBAL(csytrs,CSYTRS)
         (char* s, int* n, int* nrhs, const std::complex<float>* a, int* lda,
          const int* ipiv, std::complex<float>* b, int* ldb, int* info);
-      void FC_GLOBAL(zsytrs,ZSYTRS)
+      void STRUMPACK_FC_GLOBAL(zsytrs,ZSYTRS)
         (char* s, int* n, int* nrhs, const std::complex<double>* a, int* lda,
          const int* ipiv, std::complex<double>* b, int* ldb, int* info);
 
-      void FC_GLOBAL_(ssytrs_rook,SSYTRS_ROOK)
+      void STRUMPACK_FC_GLOBAL_(ssytrs_rook,SSYTRS_ROOK)
         (char* s, int* n, int* nrhs, const float* a, int* lda, const int* ipiv,
          float* b, int* ldb, int* info);
-      void FC_GLOBAL_(dsytrs_rook,DSYTRS_ROOK)
+      void STRUMPACK_FC_GLOBAL_(dsytrs_rook,DSYTRS_ROOK)
         (char* s, int* n, int* nrhs, const double* a, int* lda, const int* ipiv,
          double* b, int* ldb, int* info);
-      void FC_GLOBAL_(csytrs_rook,CSYTRS_ROOK)
+      void STRUMPACK_FC_GLOBAL_(csytrs_rook,CSYTRS_ROOK)
         (char* s, int* n, int* nrhs, const std::complex<float>* a, int* lda,
          const int* ipiv, std::complex<float>* b, int* ldb, int* info);
-      void FC_GLOBAL_(zsytrs_rook,ZSYTRS_ROOK)
+      void STRUMPACK_FC_GLOBAL_(zsytrs_rook,ZSYTRS_ROOK)
         (char* s, int* n, int* nrhs, const std::complex<double>* a, int* lda,
          const int* ipiv, std::complex<double>* b, int* ldb, int* info);
     }
 
     inline int ilaenv
     (int ispec, char name[], char opts[], int n1, int n2, int n3, int n4) {
-      return FC_GLOBAL(ilaenv,ILAENV)(&ispec, name, opts, &n1, &n2, &n3, &n4);
+      return STRUMPACK_FC_GLOBAL(ilaenv,ILAENV)(&ispec, name, opts, &n1, &n2, &n3, &n4);
     }
 
     template<typename real> inline real lamch(char cmach);
     template<> inline float lamch<float>(char cmach) {
-      return FC_GLOBAL(slamch,SLAMCH)(&cmach);
+      return STRUMPACK_FC_GLOBAL(slamch,SLAMCH)(&cmach);
     }
     template<> inline double lamch<double>(char cmach) {
-      return FC_GLOBAL(dlamch,DLAMCH)(&cmach);
+      return STRUMPACK_FC_GLOBAL(dlamch,DLAMCH)(&cmach);
     }
 
 
@@ -861,7 +861,7 @@ namespace strumpack {
     (char ta, char tb, int m, int n, int k, float alpha,
      const float *a, int lda, const float *b, int ldb,
      float beta, float *c, int ldc) {
-      FC_GLOBAL(sgemm,SGEMM)
+      STRUMPACK_FC_GLOBAL(sgemm,SGEMM)
         (&ta, &tb, &m, &n, &k, &alpha, a, &lda, b, &ldb, &beta, c, &ldc);
       STRUMPACK_FLOPS(gemm_flops(m,n,k,alpha,beta));
       STRUMPACK_BYTES(4*gemm_moves(m,n,k));
@@ -870,7 +870,7 @@ namespace strumpack {
     (char ta, char tb, int m, int n, int k, double alpha,
      const double *a, int lda, const double *b, int ldb,
      double beta, double *c, int ldc) {
-      FC_GLOBAL(dgemm,DGEMM)
+      STRUMPACK_FC_GLOBAL(dgemm,DGEMM)
         (&ta, &tb, &m, &n, &k, &alpha, a, &lda, b, &ldb, &beta, c, &ldc);
       STRUMPACK_FLOPS(gemm_flops(m,n,k,alpha,beta));
       STRUMPACK_BYTES(8*gemm_moves(m,n,k));
@@ -880,7 +880,7 @@ namespace strumpack {
      const std::complex<float>* a, int lda,
      const std::complex<float>* b, int ldb, std::complex<float> beta,
      std::complex<float>* c, int ldc) {
-      FC_GLOBAL(cgemm,CGEMM)
+      STRUMPACK_FC_GLOBAL(cgemm,CGEMM)
         (&ta, &tb, &m, &n, &k, &alpha, a, &lda, b, &ldb, &beta, c, &ldc);
       STRUMPACK_FLOPS(4*gemm_flops(m,n,k,alpha,beta));
       STRUMPACK_BYTES(2*4*gemm_moves(m,n,k));
@@ -890,7 +890,7 @@ namespace strumpack {
      const std::complex<double>* a, int lda,
      const std::complex<double>* b, int ldb, std::complex<double> beta,
      std::complex<double>* c, int ldc) {
-      FC_GLOBAL(zgemm,ZGEMM)
+      STRUMPACK_FC_GLOBAL(zgemm,ZGEMM)
         (&ta, &tb, &m, &n, &k, &alpha, a, &lda, b, &ldb, &beta, c, &ldc);
       STRUMPACK_FLOPS(4*gemm_flops(m,n,k,alpha,beta));
       STRUMPACK_BYTES(2*8*gemm_moves(m,n,k));
@@ -910,7 +910,7 @@ namespace strumpack {
     inline void gemv
     (char t, int m, int n, float alpha, const float *a, int lda,
      const float *x, int incx, float beta, float *y, int incy) {
-      FC_GLOBAL(sgemv,SGEMV)
+      STRUMPACK_FC_GLOBAL(sgemv,SGEMV)
         (&t, &m, &n, &alpha, a, &lda, x, &incx, &beta, y, &incy);
       STRUMPACK_FLOPS(gemv_flops(m,n,alpha,beta));
       STRUMPACK_BYTES(4*gemv_moves(m,n));
@@ -918,7 +918,7 @@ namespace strumpack {
     inline void gemv
     (char t, int m, int n, double alpha, const double *a, int lda,
      const double *x, int incx, double beta, double *y, int incy) {
-      FC_GLOBAL(dgemv,DGEMV)
+      STRUMPACK_FC_GLOBAL(dgemv,DGEMV)
         (&t, &m, &n, &alpha, a, &lda, x, &incx, &beta, y, &incy);
       STRUMPACK_FLOPS(gemv_flops(m,n,alpha,beta));
       STRUMPACK_BYTES(8*gemv_moves(m,n));
@@ -928,7 +928,7 @@ namespace strumpack {
      const std::complex<float> *a, int lda,
      const std::complex<float> *x, int incx, std::complex<float> beta,
      std::complex<float> *y, int incy) {
-      FC_GLOBAL(cgemv,CGEMV)
+      STRUMPACK_FC_GLOBAL(cgemv,CGEMV)
         (&t, &m, &n, &alpha, a, &lda, x, &incx, &beta, y, &incy);
       STRUMPACK_FLOPS(4*gemv_flops(m,n,alpha,beta));
       STRUMPACK_BYTES(2*4*gemv_moves(m,n));
@@ -938,7 +938,7 @@ namespace strumpack {
      const std::complex<double> *a, int lda,
      const std::complex<double> *x, int incx, std::complex<double> beta,
      std::complex<double> *y, int incy) {
-      FC_GLOBAL(zgemv,ZGEMV)
+      STRUMPACK_FC_GLOBAL(zgemv,ZGEMV)
         (&t, &m, &n, &alpha, a, &lda, x, &incx, &beta, y, &incy);
       STRUMPACK_FLOPS(4*gemv_flops(m,n,alpha,beta));
       STRUMPACK_BYTES(2*8*gemv_moves(m,n));
@@ -955,13 +955,13 @@ namespace strumpack {
     inline void geru
     (int m, int n, float alpha, const float* x, int incx,
      const float* y, int incy, float* a, int lda) {
-      FC_GLOBAL(sger,SGER)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
+      STRUMPACK_FC_GLOBAL(sger,SGER)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
       STRUMPACK_FLOPS(ger_flops(m,n,alpha));
     }
     inline void geru
     (int m, int n, double alpha, const double* x, int incx,
      const double* y, int incy, double* a, int lda) {
-      FC_GLOBAL(dger,DGER)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
+      STRUMPACK_FC_GLOBAL(dger,DGER)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
       STRUMPACK_FLOPS(ger_flops(m,n,alpha));
     }
     inline void geru
@@ -969,7 +969,7 @@ namespace strumpack {
      const std::complex<float>* x, int incx,
      const std::complex<float>* y, int incy,
      std::complex<float>* a, int lda) {
-      FC_GLOBAL(cgeru,CGERU)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
+      STRUMPACK_FC_GLOBAL(cgeru,CGERU)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
       STRUMPACK_FLOPS(4*ger_flops(m,n,alpha));
     }
     inline void geru
@@ -977,7 +977,7 @@ namespace strumpack {
      const std::complex<double>* x, int incx,
      const std::complex<double>* y, int incy,
      std::complex<double>* a, int lda) {
-      FC_GLOBAL(zgeru,ZGERU)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
+      STRUMPACK_FC_GLOBAL(zgeru,ZGERU)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
       STRUMPACK_FLOPS(4*ger_flops(m,n,alpha));
     }
 
@@ -985,13 +985,13 @@ namespace strumpack {
     inline void gerc
     (int m, int n, float alpha, const float* x, int incx,
      const float* y, int incy, float* a, int lda) {
-      FC_GLOBAL(sger,SGER)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
+      STRUMPACK_FC_GLOBAL(sger,SGER)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
       STRUMPACK_FLOPS(ger_flops(m,n,alpha));
     }
     inline void gerc
     (int m, int n, double alpha, const double* x, int incx,
      const double* y, int incy, double* a, int lda) {
-      FC_GLOBAL(dger,DGER)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
+      STRUMPACK_FC_GLOBAL(dger,DGER)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
       STRUMPACK_FLOPS(ger_flops(m,n,alpha));
     }
     inline void gerc
@@ -999,7 +999,7 @@ namespace strumpack {
      const std::complex<float>* x, int incx,
      const std::complex<float>* y, int incy,
      std::complex<float>* a, int lda) {
-      FC_GLOBAL(cgerc,CGERC)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
+      STRUMPACK_FC_GLOBAL(cgerc,CGERC)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
       STRUMPACK_FLOPS(4*ger_flops(m,n,alpha));
     }
     inline void gerc
@@ -1007,7 +1007,7 @@ namespace strumpack {
      const std::complex<double>* x, int incx,
      const std::complex<double>* y, int incy,
      std::complex<double>* a, int lda) {
-      FC_GLOBAL(zgerc,ZGERC)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
+      STRUMPACK_FC_GLOBAL(zgerc,ZGERC)(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
       STRUMPACK_FLOPS(4*ger_flops(m,n,alpha));
     }
 
@@ -1015,30 +1015,30 @@ namespace strumpack {
     inline void lacgv(int, float *, int ) { }
     inline void lacgv(int, double *, int ) { } //Nothing to do.
     inline void lacgv(int n, std::complex<float> *x, int incx) {
-      FC_GLOBAL(clacgv,CLACGV)(&n, x, &incx);
+      STRUMPACK_FC_GLOBAL(clacgv,CLACGV)(&n, x, &incx);
     }
     inline void lacgv(int n, std::complex<double> *x, int incx) {
-      FC_GLOBAL(zlacgv,ZLACGV)(&n, x, &incx);
+      STRUMPACK_FC_GLOBAL(zlacgv,ZLACGV)(&n, x, &incx);
     }
 
 
     inline void lacpy
     (char ul, int m, int n, float* a, int lda, float* b, int ldb) {
-      FC_GLOBAL(slacpy,SLACPY)(&ul, &m, &n, a, &lda, b, &ldb);
+      STRUMPACK_FC_GLOBAL(slacpy,SLACPY)(&ul, &m, &n, a, &lda, b, &ldb);
     }
     inline void lacpy
     (char ul, int m, int n, double* a, int lda, double* b, int ldb) {
-      FC_GLOBAL(dlacpy,DLACPY)(&ul, &m, &n, a, &lda, b, &ldb);
+      STRUMPACK_FC_GLOBAL(dlacpy,DLACPY)(&ul, &m, &n, a, &lda, b, &ldb);
     }
     inline void lacpy
     (char ul, int m, int n, std::complex<float>* a, int lda,
      std::complex<float>* b, int ldb) {
-      FC_GLOBAL(clacpy,CLACPY)(&ul, &m, &n, a, &lda, b, &ldb);
+      STRUMPACK_FC_GLOBAL(clacpy,CLACPY)(&ul, &m, &n, a, &lda, b, &ldb);
     }
     inline void lacpy
     (char ul, int m, int n, std::complex<double>* a, int lda,
      std::complex<double>* b, int ldb) {
-      FC_GLOBAL(zlacpy,ZLACPY)(&ul, &m, &n, a, &lda, b, &ldb);
+      STRUMPACK_FC_GLOBAL(zlacpy,ZLACPY)(&ul, &m, &n, a, &lda, b, &ldb);
     }
 
 
@@ -1050,26 +1050,26 @@ namespace strumpack {
 
     inline void axpy
     (int n, float alpha, float* x, int incx, float* y, int incy) {
-      FC_GLOBAL(saxpy,SAXPY)(&n, &alpha, x, &incx, y, &incy);
+      STRUMPACK_FC_GLOBAL(saxpy,SAXPY)(&n, &alpha, x, &incx, y, &incy);
       STRUMPACK_FLOPS(axpy_flops(n,alpha));
     }
     inline void axpy
     (int n, double alpha, double* x, int incx, double* y, int incy) {
-      FC_GLOBAL(daxpy,DAXPY)(&n, &alpha, x, &incx, y, &incy);
+      STRUMPACK_FC_GLOBAL(daxpy,DAXPY)(&n, &alpha, x, &incx, y, &incy);
       STRUMPACK_FLOPS(axpy_flops(n,alpha));
     }
     inline void axpy
     (int n, std::complex<float> alpha,
      const std::complex<float>* x, int incx,
      std::complex<float>* y, int incy) {
-      FC_GLOBAL(caxpy,CAXPY)(&n, &alpha, x, &incx, y, &incy);
+      STRUMPACK_FC_GLOBAL(caxpy,CAXPY)(&n, &alpha, x, &incx, y, &incy);
       STRUMPACK_FLOPS(4*axpy_flops(n,alpha));
     }
     inline void axpy
     (int n, std::complex<double> alpha,
      const std::complex<double>* x, int incx,
      std::complex<double>* y, int incy) {
-      FC_GLOBAL(zaxpy,ZAXPY)(&n, &alpha, x, &incx, y, &incy);
+      STRUMPACK_FC_GLOBAL(zaxpy,ZAXPY)(&n, &alpha, x, &incx, y, &incy);
       STRUMPACK_FLOPS(4*axpy_flops(n,alpha));
     }
 
@@ -1077,21 +1077,21 @@ namespace strumpack {
 
     inline void copy
     (int n, const float* x, int incx, float* y, int incy) {
-      FC_GLOBAL(scopy,SCOPY)(&n, x, &incx, y, &incy);
+      STRUMPACK_FC_GLOBAL(scopy,SCOPY)(&n, x, &incx, y, &incy);
     }
     inline void copy
     (int n, const double* x, int incx, double* y, int incy) {
-      FC_GLOBAL(dcopy,DCOPY)(&n, x, &incx, y, &incy);
+      STRUMPACK_FC_GLOBAL(dcopy,DCOPY)(&n, x, &incx, y, &incy);
     }
     inline void copy
     (int n, const std::complex<float>* x, int incx,
      std::complex<float>* y, int incy) {
-      FC_GLOBAL(ccopy,CCOPY)(&n, x, &incx, y, &incy);
+      STRUMPACK_FC_GLOBAL(ccopy,CCOPY)(&n, x, &incx, y, &incy);
     }
     inline void copy
     (int n, const std::complex<double>* x, int incx,
      std::complex<double>* y, int incy) {
-      FC_GLOBAL(zcopy,ZCOPY)(&n, x, &incx, y, &incy);
+      STRUMPACK_FC_GLOBAL(zcopy,ZCOPY)(&n, x, &incx, y, &incy);
     }
 
     template<typename scalar_t> inline long long scal_flops
@@ -1105,60 +1105,60 @@ namespace strumpack {
       else return 2 * n;
     }
     inline void scal(int n, float alpha, float* x, int incx) {
-      FC_GLOBAL(sscal,SSCAL)(&n, &alpha, x, &incx);
+      STRUMPACK_FC_GLOBAL(sscal,SSCAL)(&n, &alpha, x, &incx);
       STRUMPACK_FLOPS(scal_flops(n,alpha));
     }
     inline void scal(int n, double alpha, double* x, int incx) {
-      FC_GLOBAL(dscal,DSCAL)(&n, &alpha, x, &incx);
+      STRUMPACK_FC_GLOBAL(dscal,DSCAL)(&n, &alpha, x, &incx);
       STRUMPACK_FLOPS(scal_flops(n,alpha));
     }
     inline void scal
     (int n, std::complex<float> alpha, std::complex<float>* x, int incx) {
-      FC_GLOBAL(cscal,CSCAL)(&n, &alpha, x, &incx);
+      STRUMPACK_FC_GLOBAL(cscal,CSCAL)(&n, &alpha, x, &incx);
       STRUMPACK_FLOPS(4*scal_flops(n,alpha));
     }
     inline void scal
     (int n, std::complex<double> alpha, std::complex<double>* x, int incx) {
-      FC_GLOBAL(zscal,ZSCAL)(&n, &alpha, x, &incx);
+      STRUMPACK_FC_GLOBAL(zscal,ZSCAL)(&n, &alpha, x, &incx);
       STRUMPACK_FLOPS(4*scal_flops(n,alpha));
     }
 
 
     inline int iamax
     (int n, const float* x, int incx) {
-      return FC_GLOBAL(isamax,ISAMAX)(&n, x, &incx);
+      return STRUMPACK_FC_GLOBAL(isamax,ISAMAX)(&n, x, &incx);
     }
     inline int iamax
     (int n, const double* x, int incx) {
-      return FC_GLOBAL(idamax,IDAMAX)(&n, x, &incx);
+      return STRUMPACK_FC_GLOBAL(idamax,IDAMAX)(&n, x, &incx);
     }
     inline int iamax
     (int n, const std::complex<float>* x, int incx) {
-      return FC_GLOBAL(icamax,ICAMAX)(&n, x, &incx);
+      return STRUMPACK_FC_GLOBAL(icamax,ICAMAX)(&n, x, &incx);
     }
     inline int iamax
     (int n, const std::complex<double>* x, int incx) {
-      return FC_GLOBAL(izamax,IZAMAX)(&n, x, &incx);
+      return STRUMPACK_FC_GLOBAL(izamax,IZAMAX)(&n, x, &incx);
     }
 
 
     inline void swap
     (int n, float* x, int incx, float* y, int incy) {
-      FC_GLOBAL(sswap,SSWAP)(&n, x, &incx, y, &incy);
+      STRUMPACK_FC_GLOBAL(sswap,SSWAP)(&n, x, &incx, y, &incy);
     }
     inline void swap
     (int n, double* x, int incx, double* y, int incy) {
-      FC_GLOBAL(dswap,DSWAP)(&n, x, &incx, y, &incy);
+      STRUMPACK_FC_GLOBAL(dswap,DSWAP)(&n, x, &incx, y, &incy);
     }
     inline void swap
     (int n, std::complex<float>* x, int incx,
      std::complex<float>* y, int incy) {
-      FC_GLOBAL(cswap,CSWAP)(&n, x, &incx, y, &incy);
+      STRUMPACK_FC_GLOBAL(cswap,CSWAP)(&n, x, &incx, y, &incy);
     }
     inline void swap
     (int n, std::complex<double>* x, int incx,
      std::complex<double>* y, int incy) {
-      FC_GLOBAL(zswap,ZSWAP)(&n, x, &incx, y, &incy);
+      STRUMPACK_FC_GLOBAL(zswap,ZSWAP)(&n, x, &incx, y, &incy);
     }
 
 
@@ -1167,19 +1167,19 @@ namespace strumpack {
     }
     inline float nrm2(int n, const float* x, int incx) {
       STRUMPACK_FLOPS(nrm2_flops(n));
-      return FC_GLOBAL(snrm2,SNRM2)(&n, x, &incx);
+      return STRUMPACK_FC_GLOBAL(snrm2,SNRM2)(&n, x, &incx);
     }
     inline double nrm2(int n, const double* x, int incx) {
       STRUMPACK_FLOPS(nrm2_flops(n));
-      return FC_GLOBAL(dnrm2,DNRM2)(&n, x, &incx);
+      return STRUMPACK_FC_GLOBAL(dnrm2,DNRM2)(&n, x, &incx);
     }
     inline float nrm2(int n, const std::complex<float>* x, int incx) {
       STRUMPACK_FLOPS(4*nrm2_flops(n));
-      return FC_GLOBAL(scnrm2,SCNRM2)(&n, x, &incx);
+      return STRUMPACK_FC_GLOBAL(scnrm2,SCNRM2)(&n, x, &incx);
     }
     inline double nrm2(int n, const std::complex<double>* x, int incx) {
       STRUMPACK_FLOPS(4*nrm2_flops(n));
-      return FC_GLOBAL(dznrm2,DZNRM2)(&n, x, &incx);
+      return STRUMPACK_FC_GLOBAL(dznrm2,DZNRM2)(&n, x, &incx);
     }
 
 
@@ -1189,22 +1189,22 @@ namespace strumpack {
     inline float dotu
     (int n, const float* x, int incx, const float* y, int incy) {
       STRUMPACK_FLOPS(dot_flops(n))
-      return FC_GLOBAL(sdot,SDOTU)(&n, x, &incx, y, &incy);
+      return STRUMPACK_FC_GLOBAL(sdot,SDOTU)(&n, x, &incx, y, &incy);
     }
     inline double dotu
     (int n, const double* x, int incx, const double* y, int incy) {
       STRUMPACK_FLOPS(dot_flops(n));
-      return FC_GLOBAL(ddot,DDOT)(&n, x, &incx, y, &incy);
+      return STRUMPACK_FC_GLOBAL(ddot,DDOT)(&n, x, &incx, y, &incy);
     }
     inline float dotc
     (int n, const float* x, int incx, const float* y, int incy) {
       STRUMPACK_FLOPS(dot_flops(n));
-      return FC_GLOBAL(sdot,SDOT)(&n, x, &incx, y, &incy);
+      return STRUMPACK_FC_GLOBAL(sdot,SDOT)(&n, x, &incx, y, &incy);
     }
     inline double dotc
     (int n, const double* x, int incx, const double* y, int incy) {
       STRUMPACK_FLOPS(dot_flops(n));
-      return FC_GLOBAL(ddot,DDOT)(&n, x, &incx, y, &incy);
+      return STRUMPACK_FC_GLOBAL(ddot,DDOT)(&n, x, &incx, y, &incy);
     }
 
     // MKL does not follow the fortran conventions regarding calling
@@ -1265,24 +1265,24 @@ namespace strumpack {
     }
     inline void laswp
     (int n, float* a, int lda, int k1, int k2, const int* ipiv, int incx) {
-      FC_GLOBAL(slaswp,SLASWP)(&n, a, &lda, &k1, &k2, ipiv, &incx);
+      STRUMPACK_FC_GLOBAL(slaswp,SLASWP)(&n, a, &lda, &k1, &k2, ipiv, &incx);
       STRUMPACK_BYTES(4*laswp_moves(n,k1,k2));
     }
     inline void laswp
     (int n, double* a, int lda, int k1, int k2, const int* ipiv, int incx) {
-      FC_GLOBAL(dlaswp,DLASWP)(&n, a, &lda, &k1, &k2, ipiv, &incx);
+      STRUMPACK_FC_GLOBAL(dlaswp,DLASWP)(&n, a, &lda, &k1, &k2, ipiv, &incx);
       STRUMPACK_BYTES(8*laswp_moves(n,k1,k2));
     }
     inline void laswp
     (int n, std::complex<float>* a, int lda, int k1, int k2,
      const int* ipiv, int incx) {
-      FC_GLOBAL(claswp,CLASWP)(&n, a, &lda, &k1, &k2, ipiv, &incx);
+      STRUMPACK_FC_GLOBAL(claswp,CLASWP)(&n, a, &lda, &k1, &k2, ipiv, &incx);
       STRUMPACK_BYTES(2*4*laswp_moves(n,k1,k2));
     }
     inline void laswp
     (int n, std::complex<double>* a, int lda, int k1, int k2,
      const int* ipiv, int incx) {
-      FC_GLOBAL(zlaswp,ZLASWP)(&n, a, &lda, &k1, &k2, ipiv, &incx);
+      STRUMPACK_FC_GLOBAL(zlaswp,ZLASWP)(&n, a, &lda, &k1, &k2, ipiv, &incx);
       STRUMPACK_BYTES(2*8*laswp_moves(n,k1,k2));
     }
 
@@ -1293,27 +1293,27 @@ namespace strumpack {
     inline void lapmr
     (bool fwd, int m, int n, float* a, int lda, const int* ipiv) {
       int forward = fwd ? 1 : 0;
-      FC_GLOBAL(slapmr,SLAPMR)(&forward, &m, &n, a, &lda, ipiv);
+      STRUMPACK_FC_GLOBAL(slapmr,SLAPMR)(&forward, &m, &n, a, &lda, ipiv);
       STRUMPACK_BYTES(4*lapmr_moves(n,m));
     }
     inline void lapmr
     (bool fwd, int m, int n, double* a, int lda, const int* ipiv) {
       int forward = fwd ? 1 : 0;
-      FC_GLOBAL(dlapmr,DLAPMR)(&forward, &m, &n, a, &lda, ipiv);
+      STRUMPACK_FC_GLOBAL(dlapmr,DLAPMR)(&forward, &m, &n, a, &lda, ipiv);
       STRUMPACK_BYTES(8*lapmr_moves(n,m));
     }
     inline void lapmr
     (bool fwd, int m, int n, std::complex<float>* a, int lda,
      const int* ipiv) {
       int forward = fwd ? 1 : 0;
-      FC_GLOBAL(clapmr,CLAPMR)(&forward, &m, &n, a, &lda, ipiv);
+      STRUMPACK_FC_GLOBAL(clapmr,CLAPMR)(&forward, &m, &n, a, &lda, ipiv);
       STRUMPACK_BYTES(2*4*lapmr_moves(n,m));
     }
     inline void lapmr
     (bool fwd, int m, int n, std::complex<double>* a, int lda,
      const int* ipiv) {
       int forward = fwd ? 1 : 0;
-      FC_GLOBAL(zlapmr,ZLAPMR)(&forward, &m, &n, a, &lda, ipiv);
+      STRUMPACK_FC_GLOBAL(zlapmr,ZLAPMR)(&forward, &m, &n, a, &lda, ipiv);
       STRUMPACK_BYTES(2*8*lapmr_moves(n,m));
     }
 
@@ -1323,27 +1323,27 @@ namespace strumpack {
     inline void lapmt
     (bool fwd, int m, int n, float* a, int lda, const int* ipiv) {
       int forward = fwd ? 1 : 0;
-      FC_GLOBAL(slapmt,SLAPMT)(&forward, &m, &n, a, &lda, ipiv);
+      STRUMPACK_FC_GLOBAL(slapmt,SLAPMT)(&forward, &m, &n, a, &lda, ipiv);
       STRUMPACK_BYTES(4*lapmt_moves(n,m));
     }
     inline void lapmt
     (bool fwd, int m, int n, double* a, int lda, const int* ipiv) {
       int forward = fwd ? 1 : 0;
-      FC_GLOBAL(dlapmt,DLAPMT)(&forward, &m, &n, a, &lda, ipiv);
+      STRUMPACK_FC_GLOBAL(dlapmt,DLAPMT)(&forward, &m, &n, a, &lda, ipiv);
       STRUMPACK_BYTES(8*lapmt_moves(n,m));
     }
     inline void lapmt
     (bool fwd, int m, int n, std::complex<float>* a, int lda,
      const int* ipiv) {
       int forward = fwd ? 1 : 0;
-      FC_GLOBAL(clapmt,CLAPMT)(&forward, &m, &n, a, &lda, ipiv);
+      STRUMPACK_FC_GLOBAL(clapmt,CLAPMT)(&forward, &m, &n, a, &lda, ipiv);
       STRUMPACK_BYTES(2*4*lapmt_moves(n,m));
     }
     inline void lapmt
     (bool fwd, int m, int n, std::complex<double>* a, int lda,
      const int* ipiv) {
       int forward = fwd ? 1 : 0;
-      FC_GLOBAL(zlapmt,ZLAPMT)(&forward, &m, &n, a, &lda, ipiv);
+      STRUMPACK_FC_GLOBAL(zlapmt,ZLAPMT)(&forward, &m, &n, a, &lda, ipiv);
       STRUMPACK_BYTES(2*8*lapmt_moves(n,m));
     }
 
@@ -1362,7 +1362,7 @@ namespace strumpack {
     inline void trsm
     (char s, char ul, char t, char d, int m, int n, float alpha,
      const float* a, int lda, float* b, int ldb) {
-      FC_GLOBAL(strsm,STRSM)
+      STRUMPACK_FC_GLOBAL(strsm,STRSM)
         (&s, &ul, &t, &d, &m, &n, &alpha, a, &lda, b, &ldb);
       STRUMPACK_FLOPS(trsm_flops(m, n, alpha, s));
       STRUMPACK_BYTES(4*trsm_moves(m, n));
@@ -1370,7 +1370,7 @@ namespace strumpack {
     inline void trsm
       (char s, char ul, char t, char d, int m, int n, double alpha,
        const double* a, int lda, double* b, int ldb) {
-      FC_GLOBAL(dtrsm,DTRSM)
+      STRUMPACK_FC_GLOBAL(dtrsm,DTRSM)
         (&s, &ul, &t, &d, &m, &n, &alpha, a, &lda, b, &ldb);
       STRUMPACK_FLOPS(trsm_flops(m, n, alpha, s));
       STRUMPACK_BYTES(8*trsm_moves(m, n));
@@ -1379,7 +1379,7 @@ namespace strumpack {
       (char s, char ul, char t, char d, int m, int n,
        std::complex<float> alpha, const std::complex<float>* a, int lda,
        std::complex<float>* b, int ldb) {
-      FC_GLOBAL(ctrsm,CTRSM)
+      STRUMPACK_FC_GLOBAL(ctrsm,CTRSM)
         (&s, &ul, &t, &d, &m, &n, &alpha, a, &lda, b, &ldb);
       STRUMPACK_FLOPS(4*trsm_flops(m, n, alpha, s));
       STRUMPACK_BYTES(2*4*trsm_moves(m, n));
@@ -1388,7 +1388,7 @@ namespace strumpack {
       (char s, char ul, char t, char d, int m, int n,
        std::complex<double> alpha, const std::complex<double>* a, int lda,
        std::complex<double>* b, int ldb) {
-      FC_GLOBAL(ztrsm,ZTRSM)
+      STRUMPACK_FC_GLOBAL(ztrsm,ZTRSM)
         (&s, &ul, &t, &d, &m, &n, &alpha, a, &lda, b, &ldb);
       STRUMPACK_FLOPS(4*trsm_flops(m, n, alpha, s));
       STRUMPACK_BYTES(2*8*trsm_moves(m, n));
@@ -1409,7 +1409,7 @@ namespace strumpack {
     inline void trmm
     (char s, char ul, char t, char d, int m, int n, float alpha,
      const float* a, int lda, float* b, int ldb) {
-      FC_GLOBAL(strmm,STRMM)
+      STRUMPACK_FC_GLOBAL(strmm,STRMM)
         (&s, &ul, &t, &d, &m, &n, &alpha, a, &lda, b, &ldb);
       STRUMPACK_FLOPS(trmm_flops(m,n,alpha,s));
       STRUMPACK_BYTES(4*trmm_moves(m,n));
@@ -1417,7 +1417,7 @@ namespace strumpack {
     inline void trmm
     (char s, char ul, char t, char d, int m, int n, double alpha,
      const double* a, int lda, double* b, int ldb) {
-      FC_GLOBAL(dtrmm,DTRMM)
+      STRUMPACK_FC_GLOBAL(dtrmm,DTRMM)
         (&s, &ul, &t, &d, &m, &n, &alpha, a, &lda, b, &ldb);
       STRUMPACK_FLOPS(trmm_flops(m,n,alpha,s));
       STRUMPACK_BYTES(8*trmm_moves(m,n));
@@ -1425,7 +1425,7 @@ namespace strumpack {
     inline void trmm
     (char s, char ul, char t, char d, int m, int n, std::complex<float> alpha,
      const std::complex<float>* a, int lda, std::complex<float>* b, int ldb) {
-      FC_GLOBAL(ctrmm,CTRMM)
+      STRUMPACK_FC_GLOBAL(ctrmm,CTRMM)
         (&s, &ul, &t, &d, &m, &n, &alpha, a, &lda, b, &ldb);
       STRUMPACK_FLOPS(4*trmm_flops(m,n,alpha,s));
       STRUMPACK_BYTES(2*4*trmm_moves(m,n));
@@ -1434,7 +1434,7 @@ namespace strumpack {
     (char s, char ul, char t, char d, int m, int n,
      std::complex<double> alpha, const std::complex<double>* a, int lda,
      std::complex<double>* b, int ldb) {
-      FC_GLOBAL(ztrmm,ZTRMM)
+      STRUMPACK_FC_GLOBAL(ztrmm,ZTRMM)
         (&s, &ul, &t, &d, &m, &n, &alpha, a, &lda, b, &ldb);
       STRUMPACK_FLOPS(4*trmm_flops(m,n,alpha,s));
       STRUMPACK_BYTES(2*8*trmm_moves(m,n));
@@ -1450,28 +1450,28 @@ namespace strumpack {
     inline void trmv
     (char ul, char t, char d, int n, const float* a, int lda,
      float* x, int incx) {
-      FC_GLOBAL(strmv,STRMV)(&ul, &t, &d, &n, a, &lda, x, &incx);
+      STRUMPACK_FC_GLOBAL(strmv,STRMV)(&ul, &t, &d, &n, a, &lda, x, &incx);
       STRUMPACK_FLOPS(trmv_flops(n));
       STRUMPACK_BYTES(4*trmv_moves(n));
     }
     inline void trmv
     (char ul, char t, char d, int n, const double* a, int lda,
      double* x, int incx) {
-      FC_GLOBAL(dtrmv,DTRMV)(&ul, &t, &d, &n, a, &lda, x, &incx);
+      STRUMPACK_FC_GLOBAL(dtrmv,DTRMV)(&ul, &t, &d, &n, a, &lda, x, &incx);
       STRUMPACK_FLOPS(trmv_flops(n));
       STRUMPACK_BYTES(8*trmv_moves(n));
     }
     inline void trmv
     (char ul, char t, char d, int n, const std::complex<float>* a, int lda,
      std::complex<float>* x, int incx) {
-      FC_GLOBAL(ctrmv,CTRMV)(&ul, &t, &d, &n, a, &lda, x, &incx);
+      STRUMPACK_FC_GLOBAL(ctrmv,CTRMV)(&ul, &t, &d, &n, a, &lda, x, &incx);
       STRUMPACK_FLOPS(4*trmv_flops(n));
       STRUMPACK_BYTES(2*4*trmv_moves(n));
     }
     inline void trmv
     (char ul, char t, char d, int n, const std::complex<double>* a, int lda,
      std::complex<double>* x, int incx) {
-      FC_GLOBAL(ztrmv,ZTRMV)(&ul, &t, &d, &n, a, &lda, x, &incx);
+      STRUMPACK_FC_GLOBAL(ztrmv,ZTRMV)(&ul, &t, &d, &n, a, &lda, x, &incx);
       STRUMPACK_FLOPS(4*trmv_flops(n));
       STRUMPACK_BYTES(2*8*trmv_moves(n));
     }
@@ -1487,28 +1487,28 @@ namespace strumpack {
     inline void trsv
     (char ul, char t, char d, int m, const float* a, int lda,
      float* b, int incb) {
-      FC_GLOBAL(strsv,STRSV)(&ul, &t, &d, &m, a, &lda, b, &incb);
+      STRUMPACK_FC_GLOBAL(strsv,STRSV)(&ul, &t, &d, &m, a, &lda, b, &incb);
       STRUMPACK_FLOPS(trsv_flops(m));
       STRUMPACK_BYTES(4*trsv_moves(m));
     }
     inline void trsv
     (char ul, char t, char d, int m, const double* a, int lda,
      double* b, int incb) {
-      FC_GLOBAL(dtrsv,DTRSV)(&ul, &t, &d, &m, a, &lda, b, &incb);
+      STRUMPACK_FC_GLOBAL(dtrsv,DTRSV)(&ul, &t, &d, &m, a, &lda, b, &incb);
       STRUMPACK_FLOPS(trsv_flops(m));
       STRUMPACK_BYTES(8*trsv_moves(m));
     }
     inline void trsv
     (char ul, char t, char d, int m, const std::complex<float>* a, int lda,
      std::complex<float>* b, int incb) {
-      FC_GLOBAL(ctrsv,CTRSV)(&ul, &t, &d, &m, a, &lda, b, &incb);
+      STRUMPACK_FC_GLOBAL(ctrsv,CTRSV)(&ul, &t, &d, &m, a, &lda, b, &incb);
       STRUMPACK_FLOPS(4*trsv_flops(m));
       STRUMPACK_BYTES(2*4*trsv_moves(m));
     }
     inline void trsv
     (char ul, char t, char d, int m, const std::complex<double>* a, int lda,
      std::complex<double>* b, int incb) {
-      FC_GLOBAL(ztrsv,ZTRSV)(&ul, &t, &d, &m, a, &lda, b, &incb);
+      STRUMPACK_FC_GLOBAL(ztrsv,ZTRSV)(&ul, &t, &d, &m, a, &lda, b, &incb);
       STRUMPACK_FLOPS(4*trsv_flops(m));
       STRUMPACK_BYTES(2*8*trsv_moves(m));
     }
@@ -1516,21 +1516,21 @@ namespace strumpack {
 
     inline void laset
     (char s, int m, int n, float alpha, float beta, float* x, int ldx) {
-      FC_GLOBAL(slaset,SLASET)(&s, &m, &n, &alpha, &beta, x, &ldx);
+      STRUMPACK_FC_GLOBAL(slaset,SLASET)(&s, &m, &n, &alpha, &beta, x, &ldx);
     }
     inline void laset
     (char s, int m, int n, double alpha, double beta, double* x, int ldx) {
-      FC_GLOBAL(dlaset,DLASET)(&s, &m, &n, &alpha, &beta, x, &ldx);
+      STRUMPACK_FC_GLOBAL(dlaset,DLASET)(&s, &m, &n, &alpha, &beta, x, &ldx);
     }
     inline void laset
     (char s, int m, int n, std::complex<float> alpha,
      std::complex<float> beta, std::complex<float>* x, int ldx) {
-      FC_GLOBAL(claset,CLASET)(&s, &m, &n, &alpha, &beta, x, &ldx);
+      STRUMPACK_FC_GLOBAL(claset,CLASET)(&s, &m, &n, &alpha, &beta, x, &ldx);
     }
     inline void laset
     (char s, int m, int n, std::complex<double> alpha,
      std::complex<double> beta, std::complex<double>* x, int ldx) {
-      FC_GLOBAL(zlaset,ZLASET)(&s, &m, &n, &alpha, &beta, x, &ldx);
+      STRUMPACK_FC_GLOBAL(zlaset,ZLASET)(&s, &m, &n, &alpha, &beta, x, &ldx);
     }
 
 
@@ -1545,7 +1545,7 @@ namespace strumpack {
     (int m, int n, float* a, int lda, int* jpvt, float* tau,
      float* work, int lwork) {
       int info;
-      FC_GLOBAL(sgeqp3,SGEQP3)
+      STRUMPACK_FC_GLOBAL(sgeqp3,SGEQP3)
         (&m, &n, a, &lda, jpvt, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(geqp3_flops(m,n));
       return info;
@@ -1554,7 +1554,7 @@ namespace strumpack {
     (int m, int n, double* a, int lda, int* jpvt, double* tau,
      double* work, int lwork) {
       int info;
-      FC_GLOBAL(dgeqp3,DGEQP3)
+      STRUMPACK_FC_GLOBAL(dgeqp3,DGEQP3)
         (&m, &n, a, &lda, jpvt, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(geqp3_flops(m,n));
       return info;
@@ -1565,7 +1565,7 @@ namespace strumpack {
       int info;
       std::unique_ptr<std::complex<float>[]> rwork
         (new std::complex<float>[std::max(1, 2*n)]);
-      FC_GLOBAL(cgeqp3,CGEQP3)
+      STRUMPACK_FC_GLOBAL(cgeqp3,CGEQP3)
         (&m, &n, a, &lda, jpvt, tau, work, &lwork, rwork.get(), &info);
       STRUMPACK_FLOPS(4*geqp3_flops(m,n));
       return info;
@@ -1577,7 +1577,7 @@ namespace strumpack {
       int info;
       std::unique_ptr<std::complex<double>[]> rwork
         (new std::complex<double>[std::max(1, 2*n)]);
-      FC_GLOBAL(zgeqp3,ZGEQP3)
+      STRUMPACK_FC_GLOBAL(zgeqp3,ZGEQP3)
         (&m, &n, a, &lda, jpvt, tau, work, &lwork, rwork.get(), &info);
       STRUMPACK_FLOPS(4*geqp3_flops(m,n));
       return info;
@@ -1596,7 +1596,7 @@ namespace strumpack {
     (int m, int n, float* a, int lda, int* jpvt, float* tau, float* work,
      int lwork, int& rank, float rtol, float atol, int depth) {
       int info;
-      FC_GLOBAL(sgeqp3tol,SGEQP3TOL)
+      STRUMPACK_FC_GLOBAL(sgeqp3tol,SGEQP3TOL)
         (&m, &n, a, &lda, jpvt, tau, work, &lwork, &info,
          &rank, &rtol, &atol, &depth);
       return info;
@@ -1605,7 +1605,7 @@ namespace strumpack {
     (int m, int n, double* a, int lda, int* jpvt, double* tau, double* work,
      int lwork, int& rank, double rtol, double atol, int depth) {
       int info;
-      FC_GLOBAL(dgeqp3tol,DGEQP3TOL)
+      STRUMPACK_FC_GLOBAL(dgeqp3tol,DGEQP3TOL)
         (&m, &n, a, &lda, jpvt, tau, work, &lwork, &info,
          &rank, &rtol, &atol, &depth);
       return info;
@@ -1629,7 +1629,7 @@ namespace strumpack {
         for (int i=0; i<n; i++)
           rwork[i] = nrm2(m, &a[i*lda], 1);
       int info;
-      FC_GLOBAL(cgeqp3tol,CGEQP3TOL)
+      STRUMPACK_FC_GLOBAL(cgeqp3tol,CGEQP3TOL)
         (&m, &n, a, &lda, jpvt, tau, work, &lwork, rwork.get(), &info,
          &rank, &rtol, &atol, &depth);
       return info;
@@ -1653,7 +1653,7 @@ namespace strumpack {
         for (int i=0; i<n; i++)
           rwork[i] = nrm2(m, &a[i*lda], 1);
       int info;
-      FC_GLOBAL(zgeqp3tol,ZGEQP3TOL)
+      STRUMPACK_FC_GLOBAL(zgeqp3tol,ZGEQP3TOL)
         (&m, &n, a, &lda, jpvt, tau, work, &lwork, rwork.get(), &info,
          &rank, &rtol, &atol, &depth);
       return info;
@@ -1698,14 +1698,14 @@ namespace strumpack {
     inline int geqrf
     (int m, int n, float* a, int lda, float* tau, float* work, int lwork) {
       int info;
-      FC_GLOBAL(sgeqrf,SGEQRF)(&m, &n, a, &lda, tau, work, &lwork, &info);
+      STRUMPACK_FC_GLOBAL(sgeqrf,SGEQRF)(&m, &n, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(geqrf_flops(m,n));
       return info;
     }
     inline int geqrf
     (int m, int n, double* a, int lda, double* tau, double* work, int lwork) {
       int info;
-      FC_GLOBAL(dgeqrf,DGEQRF)(&m, &n, a, &lda, tau, work, &lwork, &info);
+      STRUMPACK_FC_GLOBAL(dgeqrf,DGEQRF)(&m, &n, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(geqrf_flops(m,n));
       return info;
     }
@@ -1713,7 +1713,7 @@ namespace strumpack {
     (int m, int n, std::complex<float>* a, int lda, std::complex<float>* tau,
      std::complex<float>* work, int lwork) {
       int info;
-      FC_GLOBAL(cgeqrf,CGEQRF)(&m, &n, a, &lda, tau, work, &lwork, &info);
+      STRUMPACK_FC_GLOBAL(cgeqrf,CGEQRF)(&m, &n, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(4*geqrf_flops(m,n));
       return info;
     }
@@ -1721,7 +1721,7 @@ namespace strumpack {
     (int m, int n, std::complex<double>* a, int lda,
      std::complex<double>* tau, std::complex<double>* work, int lwork) {
       int info;
-      FC_GLOBAL(zgeqrf,ZGEQRF)(&m, &n, a, &lda, tau, work, &lwork, &info);
+      STRUMPACK_FC_GLOBAL(zgeqrf,ZGEQRF)(&m, &n, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(4*geqrf_flops(m,n));
       return info;
     }
@@ -1739,7 +1739,7 @@ namespace strumpack {
     (int m, int n, float* a, int lda,
      float* tau, float* work, int lwork, int depth) {
       int info;
-      FC_GLOBAL(sgeqrfmod,SGEQRFMOD)
+      STRUMPACK_FC_GLOBAL(sgeqrfmod,SGEQRFMOD)
         (&m, &n, a, &lda, tau, work, &lwork, &info, &depth);
       return info;
     }
@@ -1747,7 +1747,7 @@ namespace strumpack {
     (int m, int n, double* a, int lda, double* tau,
      double* work, int lwork, int depth) {
       int info;
-      FC_GLOBAL(dgeqrfmod,DGEQRFMOD)
+      STRUMPACK_FC_GLOBAL(dgeqrfmod,DGEQRFMOD)
         (&m, &n, a, &lda, tau, work, &lwork, &info, &depth);
       return info;
     }
@@ -1755,7 +1755,7 @@ namespace strumpack {
     (int m, int n, std::complex<float>* a, int lda, std::complex<float>* tau,
      std::complex<float>* work, int lwork, int depth) {
       int info;
-      FC_GLOBAL(cgeqrfmod,CGEQRFMOD)
+      STRUMPACK_FC_GLOBAL(cgeqrfmod,CGEQRFMOD)
         (&m, &n, a, &lda, tau, work, &lwork, &info, &depth);
       return info;
     }
@@ -1764,7 +1764,7 @@ namespace strumpack {
      std::complex<double>* tau, std::complex<double>* work,
      int lwork, int depth) {
       int info;
-      FC_GLOBAL(zgeqrfmod,ZGEQRFMOD)
+      STRUMPACK_FC_GLOBAL(zgeqrfmod,ZGEQRFMOD)
         (&m, &n, a, &lda, tau, work, &lwork, &info, &depth);
       return info;
     }
@@ -1789,14 +1789,14 @@ namespace strumpack {
     inline int gelqf
     (int m, int n, float* a, int lda, float* tau, float* work, int lwork) {
       int info;
-      FC_GLOBAL(sgelqf,SGELQF)(&m, &n, a, &lda, tau, work, &lwork, &info);
+      STRUMPACK_FC_GLOBAL(sgelqf,SGELQF)(&m, &n, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(gelqf_flops(m,n));
       return info;
     }
     inline int gelqf
     (int m, int n, double* a, int lda, double* tau, double* work, int lwork) {
       int info;
-      FC_GLOBAL(dgelqf,DGELQF)(&m, &n, a, &lda, tau, work, &lwork, &info);
+      STRUMPACK_FC_GLOBAL(dgelqf,DGELQF)(&m, &n, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(gelqf_flops(m,n));
       return info;
     }
@@ -1804,7 +1804,7 @@ namespace strumpack {
     (int m, int n, std::complex<float>* a, int lda, std::complex<float>* tau,
      std::complex<float>* work, int lwork) {
       int info;
-      FC_GLOBAL(cgelqf,CGELQF)(&m, &n, a, &lda, tau, work, &lwork, &info);
+      STRUMPACK_FC_GLOBAL(cgelqf,CGELQF)(&m, &n, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(4*gelqf_flops(m,n));
       return info;
     }
@@ -1812,7 +1812,7 @@ namespace strumpack {
     (int m, int n, std::complex<double>* a, int lda,
      std::complex<double>* tau, std::complex<double>* work, int lwork) {
       int info;
-      FC_GLOBAL(zgelqf,ZGELQF)(&m, &n, a, &lda, tau, work, &lwork, &info);
+      STRUMPACK_FC_GLOBAL(zgelqf,ZGELQF)(&m, &n, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(4*gelqf_flops(m,n));
       return info;
     }
@@ -1829,26 +1829,26 @@ namespace strumpack {
     inline void gelqfmod
     (int m, int n, float* a, int lda, float* tau,
      float* work, int lwork, int* info, int depth) {
-      FC_GLOBAL(sgelqfmod,SGELQFMOD)
+      STRUMPACK_FC_GLOBAL(sgelqfmod,SGELQFMOD)
         (&m, &n, a, &lda, tau, work, &lwork, info, &depth);
     }
     inline void gelqfmod
     (int m, int n, double* a, int lda, double* tau,
      double* work, int lwork, int* info, int depth) {
-      FC_GLOBAL(dgelqfmod,DGELQFMOD)
+      STRUMPACK_FC_GLOBAL(dgelqfmod,DGELQFMOD)
         (&m, &n, a, &lda, tau, work, &lwork, info, &depth);
     }
     inline void gelqfmod
     (int m, int n, std::complex<float>* a, int lda, std::complex<float>* tau,
      std::complex<float>* work, int lwork, int* info, int depth) {
-      FC_GLOBAL(cgelqfmod,CGELQFMOD)
+      STRUMPACK_FC_GLOBAL(cgelqfmod,CGELQFMOD)
         (&m, &n, a, &lda, tau, work, &lwork, info, &depth);
     }
     inline void gelqfmod
     (int m, int n, std::complex<double>* a, int lda,
      std::complex<double>* tau, std::complex<double>* work,
      int lwork, int* info, int depth) {
-      FC_GLOBAL(zgelqfmod,ZGELQFMOD)
+      STRUMPACK_FC_GLOBAL(zgelqfmod,ZGELQFMOD)
         (&m, &n, a, &lda, tau, work, &lwork, info, &depth);
     }
     template<typename scalar> inline void gelqfmod
@@ -1871,43 +1871,43 @@ namespace strumpack {
     }
     inline void getrf
     (int m, int n, float* a, int lda, int* ipiv, int* info) {
-      FC_GLOBAL(sgetrf,SGETRF)(&m, &n, a, &lda, ipiv, info);
+      STRUMPACK_FC_GLOBAL(sgetrf,SGETRF)(&m, &n, a, &lda, ipiv, info);
       STRUMPACK_FLOPS(getrf_flops(m,n));
     }
     inline void getrf
     (int m, int n, double* a, int lda, int* ipiv, int* info) {
-      FC_GLOBAL(dgetrf,DGETRF)(&m, &n, a, &lda, ipiv, info);
+      STRUMPACK_FC_GLOBAL(dgetrf,DGETRF)(&m, &n, a, &lda, ipiv, info);
       STRUMPACK_FLOPS(getrf_flops(m,n));
     }
     inline void getrf
     (int m, int n, std::complex<float>* a, int lda, int* ipiv, int* info) {
-      FC_GLOBAL(cgetrf,CGETRF)(&m, &n, a, &lda, ipiv, info);
+      STRUMPACK_FC_GLOBAL(cgetrf,CGETRF)(&m, &n, a, &lda, ipiv, info);
       STRUMPACK_FLOPS(4*getrf_flops(m,n));
     }
     inline void getrf
     (int m, int n, std::complex<double>* a, int lda, int* ipiv, int* info) {
-      FC_GLOBAL(zgetrf,ZGETRF)(&m, &n, a, &lda, ipiv, info);
+      STRUMPACK_FC_GLOBAL(zgetrf,ZGETRF)(&m, &n, a, &lda, ipiv, info);
       STRUMPACK_FLOPS(4*getrf_flops(m,n));
     }
 
 
     inline void getrfmod
     (int m, int n, float* a, int lda, int* ipiv, int* info, int depth) {
-      FC_GLOBAL(sgetrfmod,SGETRFMOD)(&m, &n, a, &lda, ipiv, info, &depth);
+      STRUMPACK_FC_GLOBAL(sgetrfmod,SGETRFMOD)(&m, &n, a, &lda, ipiv, info, &depth);
     }
     inline void getrfmod
     (int m, int n, double* a, int lda, int* ipiv, int* info, int depth) {
-      FC_GLOBAL(dgetrfmod,DGETRFMOD)(&m, &n, a, &lda, ipiv, info, &depth);
+      STRUMPACK_FC_GLOBAL(dgetrfmod,DGETRFMOD)(&m, &n, a, &lda, ipiv, info, &depth);
     }
     inline void getrfmod
     (int m, int n, std::complex<float>* a, int lda,
      int* ipiv, int* info, int depth) {
-      FC_GLOBAL(cgetrfmod,CGETRFMOD)(&m, &n, a, &lda, ipiv, info, &depth);
+      STRUMPACK_FC_GLOBAL(cgetrfmod,CGETRFMOD)(&m, &n, a, &lda, ipiv, info, &depth);
     }
     inline void getrfmod
     (int m, int n, std::complex<double>* a, int lda,
      int* ipiv, int* info, int depth) {
-      FC_GLOBAL(zgetrfmod,ZGETRFMOD)(&m, &n, a, &lda, ipiv, info, &depth);
+      STRUMPACK_FC_GLOBAL(zgetrfmod,ZGETRFMOD)(&m, &n, a, &lda, ipiv, info, &depth);
     }
 
 
@@ -1917,19 +1917,19 @@ namespace strumpack {
     inline void getrs
     (char t, int n, int nrhs, const float* a, int lda,
      const int* ipiv, float* b, int ldb, int* info) {
-      FC_GLOBAL(sgetrs,SGETRS)(&t, &n, &nrhs, a, &lda, ipiv, b, &ldb, info);
+      STRUMPACK_FC_GLOBAL(sgetrs,SGETRS)(&t, &n, &nrhs, a, &lda, ipiv, b, &ldb, info);
       STRUMPACK_FLOPS(getrs_flops(n, nrhs));
     }
     inline void getrs
     (char t, int n, int nrhs, const double* a, int lda,
      const int* ipiv, double* b, int ldb, int* info) {
-      FC_GLOBAL(dgetrs,DGETRS)(&t, &n, &nrhs, a, &lda, ipiv, b, &ldb, info);
+      STRUMPACK_FC_GLOBAL(dgetrs,DGETRS)(&t, &n, &nrhs, a, &lda, ipiv, b, &ldb, info);
       STRUMPACK_FLOPS(getrs_flops(n, nrhs));
     }
     inline void getrs
     (char t, int n, int nrhs, const std::complex<float>* a, int lda,
      const int* ipiv, std::complex<float>* b, int ldb, int* info) {
-      FC_GLOBAL(cgetrs,CGETRS)(&t, &n, &nrhs, a, &lda, ipiv, b, &ldb, info);
+      STRUMPACK_FC_GLOBAL(cgetrs,CGETRS)(&t, &n, &nrhs, a, &lda, ipiv, b, &ldb, info);
       STRUMPACK_FLOPS(4*getrs_flops(n, nrhs));
     }
     inline void getrs
@@ -1946,28 +1946,28 @@ namespace strumpack {
     inline int potrf
     (char ul, int n, float* a, int lda) {
       int info;
-      FC_GLOBAL(spotrf,SPOTRF)(&ul, &n, a, &lda, &info);
+      STRUMPACK_FC_GLOBAL(spotrf,SPOTRF)(&ul, &n, a, &lda, &info);
       STRUMPACK_FLOPS(potrf_flops(n));
       return info;
     }
     inline int potrf
     (char ul, int n, double* a, int lda) {
       int info;
-      FC_GLOBAL(dpotrf,DPOTRF)(&ul, &n, a, &lda, &info);
+      STRUMPACK_FC_GLOBAL(dpotrf,DPOTRF)(&ul, &n, a, &lda, &info);
       STRUMPACK_FLOPS(potrf_flops(n));
       return info;
     }
     inline int potrf
     (char ul, int n, std::complex<float>* a, int lda) {
       int info;
-      FC_GLOBAL(cpotrf,CPOTRF)(&ul, &n, a, &lda, &info);
+      STRUMPACK_FC_GLOBAL(cpotrf,CPOTRF)(&ul, &n, a, &lda, &info);
       STRUMPACK_FLOPS(4*potrf_flops(n));
       return info;
     }
     inline int potrf
     (char ul, int n, std::complex<double>* a, int lda) {
       int info;
-      FC_GLOBAL(zpotrf,ZPOTRF)(&ul, &n, a, &lda, &info);
+      STRUMPACK_FC_GLOBAL(zpotrf,ZPOTRF)(&ul, &n, a, &lda, &info);
       STRUMPACK_FLOPS(4*potrf_flops(n));
       return info;
     }
@@ -1980,14 +1980,14 @@ namespace strumpack {
     inline void xxglq
     (int m, int n, int k, float* a, int lda, const float* tau,
      float* work, int lwork, int* info) {
-      FC_GLOBAL(sorglq,FC_GLOBAL)
+      STRUMPACK_FC_GLOBAL(sorglq,STRUMPACK_FC_GLOBAL)
         (&m, &n, &k, a, &lda, tau, work, &lwork, info);
       STRUMPACK_FLOPS(xxglq_flops(m,n,k));
     }
     inline void xxglq
     (int m, int n, int k, double* a, int lda, const double* tau,
      double* work, int lwork, int* info) {
-      FC_GLOBAL(dorglq,DORGLQ)
+      STRUMPACK_FC_GLOBAL(dorglq,DORGLQ)
         (&m, &n, &k, a, &lda, tau, work, &lwork, info);
       STRUMPACK_FLOPS(xxglq_flops(m,n,k));
     }
@@ -1995,7 +1995,7 @@ namespace strumpack {
     (int m, int n, int k, std::complex<float>* a, int lda,
      const std::complex<float>* tau, std::complex<float>* work,
      int lwork, int* info) {
-      FC_GLOBAL(cunglq,CUNGLQ)
+      STRUMPACK_FC_GLOBAL(cunglq,CUNGLQ)
         (&m, &n, &k, a, &lda, tau, work, &lwork, info);
       STRUMPACK_FLOPS(4*xxglq_flops(m,n,k));
     }
@@ -2003,7 +2003,7 @@ namespace strumpack {
     (int m, int n, int k, std::complex<double>* a, int lda,
      const std::complex<double>* tau, std::complex<double>* work,
      int lwork, int* info) {
-      FC_GLOBAL(zunglq,ZUNGLQ)
+      STRUMPACK_FC_GLOBAL(zunglq,ZUNGLQ)
         (&m, &n, &k, a, &lda, tau, work, &lwork, info);
       STRUMPACK_FLOPS(4*xxglq_flops(m,n,k));
     }
@@ -2021,27 +2021,27 @@ namespace strumpack {
     inline void xxglqmod
     (int m, int n, int k, float* a, int lda, const float* tau,
      float* work, int lwork, int* info, int depth) {
-      FC_GLOBAL(sorglqmod,SORGLQMOD)
+      STRUMPACK_FC_GLOBAL(sorglqmod,SORGLQMOD)
         (&m, &n, &k, a, &lda, tau, work, &lwork, info, &depth);
     }
     inline void xxglqmod
     (int m, int n, int k, double* a, int lda, const double* tau,
      double* work, int lwork, int* info, int depth) {
-      FC_GLOBAL(dorglqmod,DORGLQMOD)
+      STRUMPACK_FC_GLOBAL(dorglqmod,DORGLQMOD)
         (&m, &n, &k, a, &lda, tau, work, &lwork, info, &depth);
     }
     inline void xxglqmod
     (int m, int n, int k, std::complex<float>* a, int lda,
      const std::complex<float>* tau, std::complex<float>* work,
      int lwork, int* info, int depth) {
-      FC_GLOBAL(cunglqmod,CUNGLQMOD)
+      STRUMPACK_FC_GLOBAL(cunglqmod,CUNGLQMOD)
         (&m, &n, &k, a, &lda, tau, work, &lwork, info, &depth);
     }
     inline void xxglqmod
     (int m, int n, int k, std::complex<double>* a, int lda,
      const std::complex<double>* tau, std::complex<double>* work,
      int lwork, int* info, int depth) {
-      FC_GLOBAL(zunglqmod,ZUNGLQMOD)
+      STRUMPACK_FC_GLOBAL(zunglqmod,ZUNGLQMOD)
         (&m, &n, &k, a, &lda, tau, work, &lwork, info, &depth);
     }
     template<typename scalar> inline void xxglqmod
@@ -2064,7 +2064,7 @@ namespace strumpack {
     (int m, int n, int k, float* a, int lda, const float* tau,
      float* work, int lwork) {
       int info;
-      FC_GLOBAL(sorgqr,SORGQR)
+      STRUMPACK_FC_GLOBAL(sorgqr,SORGQR)
         (&m, &n, &k, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(xxgqr_flops(m,n,k));
       return info;
@@ -2073,7 +2073,7 @@ namespace strumpack {
     (int m, int n, int k, double* a, int lda, const double* tau,
      double* work, int lwork) {
       int info;
-      FC_GLOBAL(dorgqr,DORGQR)
+      STRUMPACK_FC_GLOBAL(dorgqr,DORGQR)
         (&m, &n, &k, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(xxgqr_flops(m,n,k));
       return info;
@@ -2083,7 +2083,7 @@ namespace strumpack {
      const std::complex<float>* tau, std::complex<float>* work,
      int lwork) {
       int info;
-      FC_GLOBAL(cungqr,CUNGQR)
+      STRUMPACK_FC_GLOBAL(cungqr,CUNGQR)
         (&m, &n, &k, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(4*xxgqr_flops(m,n,k));
       return info;
@@ -2093,7 +2093,7 @@ namespace strumpack {
      const std::complex<double>* tau, std::complex<double>* work,
      int lwork) {
       int info;
-      FC_GLOBAL(zungqr,ZUNGQR)
+      STRUMPACK_FC_GLOBAL(zungqr,ZUNGQR)
         (&m, &n, &k, a, &lda, tau, work, &lwork, &info);
       STRUMPACK_FLOPS(4*xxgqr_flops(m,n,k));
       return info;
@@ -2118,7 +2118,7 @@ namespace strumpack {
     (char side, char trans, int m, int n, int k, float* a, int lda,
      const float* tau, float* c, int ldc, float* work, int lwork) {
       int info;
-      FC_GLOBAL(sormqr,SORMQR)
+      STRUMPACK_FC_GLOBAL(sormqr,SORMQR)
         (&side, &trans, &m, &n, &k, a, &lda, tau, c, &ldc, work, &lwork, &info);
       STRUMPACK_FLOPS(xxmqr_flops(m,n,k));
       return info;
@@ -2127,7 +2127,7 @@ namespace strumpack {
     (char side, char trans, int m, int n, int k, double* a, int lda,
      const double* tau, double* c, int ldc, double* work, int lwork) {
       int info;
-      FC_GLOBAL(dormqr,DORMQR)
+      STRUMPACK_FC_GLOBAL(dormqr,DORMQR)
         (&side, &trans, &m, &n, &k, a, &lda, tau, c, &ldc, work, &lwork, &info);
       STRUMPACK_FLOPS(xxmqr_flops(m,n,k));
       return info;
@@ -2137,7 +2137,7 @@ namespace strumpack {
      const std::complex<float>* tau, std::complex<float>* c, int ldc,
      std::complex<float>* work, int lwork) {
       int info;
-      FC_GLOBAL(cunmqr,CUNMQR)
+      STRUMPACK_FC_GLOBAL(cunmqr,CUNMQR)
         (&side, &trans, &m, &n, &k, a, &lda, tau, c, &ldc, work, &lwork, &info);
       STRUMPACK_FLOPS(4*xxmqr_flops(m,n,k));
       return info;
@@ -2147,7 +2147,7 @@ namespace strumpack {
      const std::complex<double>* tau, std::complex<double>* c, int ldc,
      std::complex<double>* work, int lwork) {
       int info;
-      FC_GLOBAL(zunmqr,ZUNMQR)
+      STRUMPACK_FC_GLOBAL(zunmqr,ZUNMQR)
         (&side, &trans, &m, &n, &k, a, &lda, tau, c, &ldc, work, &lwork, &info);
       STRUMPACK_FLOPS(4*xxmqr_flops(m,n,k));
       return info;
@@ -2166,28 +2166,28 @@ namespace strumpack {
     inline float lange(char norm, int m, int n, const float *a, int lda) {
       if (norm == 'I' || norm == 'i') {
         std::unique_ptr<float[]> work(new float[m]);
-        return FC_GLOBAL(slange,SLANGE)(&norm, &m, &n, a, &lda, work.get());
-      } else return FC_GLOBAL(slange,SLANGE)(&norm, &m, &n, a, &lda, nullptr);
+        return STRUMPACK_FC_GLOBAL(slange,SLANGE)(&norm, &m, &n, a, &lda, work.get());
+      } else return STRUMPACK_FC_GLOBAL(slange,SLANGE)(&norm, &m, &n, a, &lda, nullptr);
     }
     inline double lange(char norm, int m, int n, const double *a, int lda) {
       if (norm == 'I' || norm == 'i') {
         std::unique_ptr<double[]> work(new double[m]);
-        return FC_GLOBAL(dlange,DLANGE)(&norm, &m, &n, a, &lda, work.get());
-      } else return FC_GLOBAL(dlange,DLANGE)(&norm, &m, &n, a, &lda, nullptr);
+        return STRUMPACK_FC_GLOBAL(dlange,DLANGE)(&norm, &m, &n, a, &lda, work.get());
+      } else return STRUMPACK_FC_GLOBAL(dlange,DLANGE)(&norm, &m, &n, a, &lda, nullptr);
     }
     inline float lange
       (char norm, int m, int n, const std::complex<float> *a, int lda) {
       if (norm == 'I' || norm == 'i') {
         std::unique_ptr<float[]> work(new float[m]);
-        return FC_GLOBAL(clange,CLANGE)(&norm, &m, &n, a, &lda, work.get());
-      } else return FC_GLOBAL(clange,CLANGE)(&norm, &m, &n, a, &lda, nullptr);
+        return STRUMPACK_FC_GLOBAL(clange,CLANGE)(&norm, &m, &n, a, &lda, work.get());
+      } else return STRUMPACK_FC_GLOBAL(clange,CLANGE)(&norm, &m, &n, a, &lda, nullptr);
     }
     inline double lange
       (char norm, int m, int n, const std::complex<double> *a, int lda) {
       if (norm == 'I' || norm == 'i') {
         std::unique_ptr<double[]> work(new double[m]);
-        return FC_GLOBAL(zlange,ZLANGE)(&norm, &m, &n, a, &lda, work.get());
-      } else return FC_GLOBAL(zlange,ZLANGE)(&norm, &m, &n, a, &lda, nullptr);
+        return STRUMPACK_FC_GLOBAL(zlange,ZLANGE)(&norm, &m, &n, a, &lda, work.get());
+      } else return STRUMPACK_FC_GLOBAL(zlange,ZLANGE)(&norm, &m, &n, a, &lda, nullptr);
     }
 
 
@@ -2197,12 +2197,12 @@ namespace strumpack {
       int info;
       int lwork = -1;
       float swork;
-      FC_GLOBAL(sgesvd,SGESVD)
+      STRUMPACK_FC_GLOBAL(sgesvd,SGESVD)
         (&jobu, &jobvt, &m, &n, a, &lda, s, u, &ldu, vt, &ldvt,
          &swork, &lwork, &info);
       lwork = int(swork);
       auto work = new float[lwork];
-      FC_GLOBAL(sgesvd,SGESVD)
+      STRUMPACK_FC_GLOBAL(sgesvd,SGESVD)
         (&jobu, &jobvt, &m, &n, a, &lda, s, u, &ldu, vt, &ldvt,
          work, &lwork, &info);
       delete[] work;
@@ -2214,12 +2214,12 @@ namespace strumpack {
       int info;
       int lwork = -1;
       double dwork;
-      FC_GLOBAL(dgesvd,DGESVD)
+      STRUMPACK_FC_GLOBAL(dgesvd,DGESVD)
         (&jobu, &jobvt, &m, &n, a, &lda, s, u, &ldu, vt, &ldvt,
          &dwork, &lwork, &info);
       lwork = int(dwork);
       auto work = new double[lwork];
-      FC_GLOBAL(dgesvd,DGESVD)
+      STRUMPACK_FC_GLOBAL(dgesvd,DGESVD)
         (&jobu, &jobvt, &m, &n, a, &lda, s, u, &ldu, vt, &ldvt,
          work, &lwork, &info);
       delete[] work;
@@ -2249,12 +2249,12 @@ namespace strumpack {
       auto ifail = iwork.get()+5*n;
       int lwork = -1;
       float swork;
-      FC_GLOBAL(ssyevx,SSYEVX)
+      STRUMPACK_FC_GLOBAL(ssyevx,SSYEVX)
         (&jobz, &range, &uplo, &n, a, &lda, &vl, &vu, &il, &iu, &abstol, &m,
          w, z, &ldz, &swork, &lwork, iwork.get(), ifail, &info);
       lwork = int(swork);
       std::unique_ptr<float[]> work(new float[lwork]);
-      FC_GLOBAL(ssyevx,SSYEVX)
+      STRUMPACK_FC_GLOBAL(ssyevx,SSYEVX)
         (&jobz, &range, &uplo, &n, a, &lda, &vl, &vu, &il, &iu, &abstol, &m,
          w, z, &ldz, work.get(), &lwork, iwork.get(), ifail, &info);
       return info;
@@ -2268,12 +2268,12 @@ namespace strumpack {
       auto ifail = iwork.get()+5*n;
       int lwork = -1;
       double dwork;
-      FC_GLOBAL(dsyevx,DSYEVX)
+      STRUMPACK_FC_GLOBAL(dsyevx,DSYEVX)
         (&jobz, &range, &uplo, &n, a, &lda, &vl, &vu, &il, &iu, &abstol, &m,
          w, z, &ldz, &dwork, &lwork, iwork.get(), ifail, &info);
       lwork = int(dwork);
       std::unique_ptr<double[]> work(new double[lwork]);
-      FC_GLOBAL(dsyevx,DSYEVX)
+      STRUMPACK_FC_GLOBAL(dsyevx,DSYEVX)
         (&jobz, &range, &uplo, &n, a, &lda, &vl, &vu, &il, &iu, &abstol, &m,
          w, z, &ldz, work.get(), &lwork, iwork.get(), ifail, &info);
       return info;
@@ -2283,11 +2283,11 @@ namespace strumpack {
       int info;
       int lwork = -1;
       float swork;
-      FC_GLOBAL(ssyev,SSYEV)
+      STRUMPACK_FC_GLOBAL(ssyev,SSYEV)
         (&jobz, &uplo, &n, a, &lda, w, &swork, &lwork, &info);
       lwork = int(swork);
       std::unique_ptr<float[]> work(new float[lwork]);
-      FC_GLOBAL(ssyev,SSYEV)
+      STRUMPACK_FC_GLOBAL(ssyev,SSYEV)
         (&jobz, &uplo, &n, a, &lda, w, work.get(), &lwork, &info);
       return info;
     }
@@ -2295,11 +2295,11 @@ namespace strumpack {
       int info;
       int lwork = -1;
       double swork;
-      FC_GLOBAL(dsyev,DSYEV)
+      STRUMPACK_FC_GLOBAL(dsyev,DSYEV)
         (&jobz, &uplo, &n, a, &lda, w, &swork, &lwork, &info);
       lwork = int(swork);
       std::unique_ptr<double[]> work(new double[lwork]);
-      FC_GLOBAL(dsyev,DSYEV)
+      STRUMPACK_FC_GLOBAL(dsyev,DSYEV)
         (&jobz, &uplo, &n, a, &lda, w, work.get(), &lwork, &info);
       return info;
     }
@@ -2311,7 +2311,7 @@ namespace strumpack {
     inline int sytrf
     (char s, int n, float* a, int lda, int* ipiv, float* work, int lwork) {
       int info;
-      FC_GLOBAL(ssytrf,SSYTRF)
+      STRUMPACK_FC_GLOBAL(ssytrf,SSYTRF)
         (&s, &n, a, &lda, ipiv, work, &lwork, &info);
       STRUMPACK_FLOPS(sytrf_flops(n));
       return info;
@@ -2319,7 +2319,7 @@ namespace strumpack {
     inline int sytrf
     (char s, int n, double* a, int lda, int* ipiv, double* work, int lwork) {
       int info;
-      FC_GLOBAL(dsytrf,DSYTRF)
+      STRUMPACK_FC_GLOBAL(dsytrf,DSYTRF)
         (&s, &n, a, &lda, ipiv, work, &lwork, &info);
       STRUMPACK_FLOPS(sytrf_flops(n));
       return info;
@@ -2328,7 +2328,7 @@ namespace strumpack {
     (char s, int n, std::complex<float>* a, int lda, int* ipiv,
      std::complex<float>* work, int lwork) {
       int info;
-      FC_GLOBAL(csytrf,CSYTRF)
+      STRUMPACK_FC_GLOBAL(csytrf,CSYTRF)
         (&s, &n, a, &lda, ipiv, work, &lwork, &info);
       STRUMPACK_FLOPS(4*sytrf_flops(n));
       return info;
@@ -2337,7 +2337,7 @@ namespace strumpack {
     (char s, int n, std::complex<double>* a, int lda, int* ipiv,
      std::complex<double>* work, int lwork) {
       int info;
-      FC_GLOBAL(zsytrf,ZSYTRF)
+      STRUMPACK_FC_GLOBAL(zsytrf,ZSYTRF)
         (&s, &n, a, &lda, ipiv, work, &lwork, &info);
       STRUMPACK_FLOPS(4*sytrf_flops(n));
       return info;
@@ -2357,7 +2357,7 @@ namespace strumpack {
     inline int sytrf_rook
     (char s, int n, float* a, int lda, int* ipiv, float* work, int lwork) {
       int info;
-      FC_GLOBAL_(ssytrf_rook,SSYTRF_ROOK)
+      STRUMPACK_FC_GLOBAL_(ssytrf_rook,SSYTRF_ROOK)
         (&s, &n, a, &lda, ipiv, work, &lwork, &info);
       STRUMPACK_FLOPS(sytrf_rook_flops(n));
       return info;
@@ -2365,7 +2365,7 @@ namespace strumpack {
     inline int sytrf_rook
     (char s, int n, double* a, int lda, int* ipiv, double* work, int lwork) {
       int info;
-      FC_GLOBAL_(dsytrf_rook,DSYTRF_ROOK)
+      STRUMPACK_FC_GLOBAL_(dsytrf_rook,DSYTRF_ROOK)
         (&s, &n, a, &lda, ipiv, work, &lwork, &info);
       STRUMPACK_FLOPS(sytrf_rook_flops(n));
       return info;
@@ -2374,7 +2374,7 @@ namespace strumpack {
     (char s, int n, std::complex<float>* a, int lda, int* ipiv,
      std::complex<float>* work, int lwork) {
       int info;
-      FC_GLOBAL_(csytrf_rook,CSYTRF_ROOK)
+      STRUMPACK_FC_GLOBAL_(csytrf_rook,CSYTRF_ROOK)
         (&s, &n, a, &lda, ipiv, work, &lwork, &info);
       STRUMPACK_FLOPS(4*sytrf_rook_flops(n));
       return info;
@@ -2383,7 +2383,7 @@ namespace strumpack {
     (char s, int n, std::complex<double>* a, int lda, int* ipiv,
      std::complex<double>* work, int lwork){
       int info;
-      FC_GLOBAL_(zsytrf_rook,ZSYTRF_ROOK)
+      STRUMPACK_FC_GLOBAL_(zsytrf_rook,ZSYTRF_ROOK)
         (&s, &n, a, &lda, ipiv, work, &lwork, &info);
       STRUMPACK_FLOPS(4*sytrf_rook_flops(n));
       return info;
@@ -2405,7 +2405,7 @@ namespace strumpack {
     (char s, int n, int nrhs, const float* a, int lda,
      const int* ipiv, float* b, int ldb) {
       int info;
-      FC_GLOBAL(ssytrs,SSYTRS)
+      STRUMPACK_FC_GLOBAL(ssytrs,SSYTRS)
         (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, &info);
       STRUMPACK_FLOPS(sytrs_flops(n,n,nrhs));
       return info;
@@ -2414,7 +2414,7 @@ namespace strumpack {
     (char s, int n, int nrhs, const double* a, int lda,
      const int* ipiv, double* b, int ldb) {
       int info;
-      FC_GLOBAL(dsytrs,DSYTRS)
+      STRUMPACK_FC_GLOBAL(dsytrs,DSYTRS)
         (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, &info);
       STRUMPACK_FLOPS(sytrs_flops(n,n,nrhs));
       return info;
@@ -2423,7 +2423,7 @@ namespace strumpack {
     (char s, int n, int nrhs, const std::complex<float>* a, int lda,
      const int* ipiv, std::complex<float>* b, int ldb) {
       int info;
-      FC_GLOBAL(csytrs,CSYTRS)
+      STRUMPACK_FC_GLOBAL(csytrs,CSYTRS)
         (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, &info);
       STRUMPACK_FLOPS(4*sytrs_flops(n,n,nrhs));
       return info;
@@ -2432,7 +2432,7 @@ namespace strumpack {
     (char s, int n, int nrhs, const std::complex<double>* a, int lda,
      const int* ipiv, std::complex<double>* b, int ldb) {
       int info;
-      FC_GLOBAL(zsytrs,ZSYTRS)
+      STRUMPACK_FC_GLOBAL(zsytrs,ZSYTRS)
         (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, &info);
       STRUMPACK_FLOPS(4*sytrs_flops(n,n,nrhs));
       return info;
@@ -2445,7 +2445,7 @@ namespace strumpack {
     (char s, int n, int nrhs, const float* a, int lda,
      const int* ipiv, float* b, int ldb) {
       int info;
-      FC_GLOBAL_(ssytrs_rook,SSYTRS_ROOK)
+      STRUMPACK_FC_GLOBAL_(ssytrs_rook,SSYTRS_ROOK)
         (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, &info);
       STRUMPACK_FLOPS(sytrs_rook_flops(n,n,nrhs));
       return info;
@@ -2454,7 +2454,7 @@ namespace strumpack {
     (char s, int n, int nrhs, const double* a, int lda,
      const int* ipiv, double* b, int ldb) {
       int info;
-      FC_GLOBAL_(dsytrs_rook,DSYTRS_ROOK)
+      STRUMPACK_FC_GLOBAL_(dsytrs_rook,DSYTRS_ROOK)
         (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, &info);
       STRUMPACK_FLOPS(sytrs_rook_flops(n,n,nrhs));
       return info;
@@ -2463,7 +2463,7 @@ namespace strumpack {
     (char s, int n, int nrhs, const std::complex<float>* a, int lda,
      const int* ipiv, std::complex<float>* b, int ldb) {
       int info;
-      FC_GLOBAL_(csytrs_rook,CSYTRS_ROOK)
+      STRUMPACK_FC_GLOBAL_(csytrs_rook,CSYTRS_ROOK)
         (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, &info);
       STRUMPACK_FLOPS(4*sytrs_rook_flops(n,n,nrhs));
       return info;
@@ -2472,7 +2472,7 @@ namespace strumpack {
     (char s, int n, int nrhs, const std::complex<double>* a, int lda,
      const int* ipiv, std::complex<double>* b, int ldb) {
       int info;
-      FC_GLOBAL_(zsytrs_rook,ZSYTRS_ROOK)
+      STRUMPACK_FC_GLOBAL_(zsytrs_rook,ZSYTRS_ROOK)
         (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, &info);
       STRUMPACK_FLOPS(4*sytrs_rook_flops(n,n,nrhs));
       return info;

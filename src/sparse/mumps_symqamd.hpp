@@ -33,7 +33,7 @@
 #include "CompressedSparseMatrix.hpp"
 #include "StrumpackOptions.hpp"
 
-#define MUMPS_SYMQAMD_FC FC_GLOBAL_(mumps_symqamd, MUMPS_SYMQAMD)
+#define MUMPS_SYMQAMD_FC STRUMPACK_FC_GLOBAL_(mumps_symqamd, MUMPS_SYMQAMD)
 
 extern "C" void MUMPS_SYMQAMD_FC
 (int* TRESH, int* NDENSE, int* N, int* IWLEN, int* PE, int* PFREE,

@@ -7,6 +7,8 @@ Version 3.xx In Progress
    --sp_compression_min_sep_size ...
  - Fix for compilation without MPI
  - Several bug fixes and performance improvements
+ - Renamed FC_GLOBAL Fortran to C macro to STRUMPACK_FC_GLOBAL,
+   in order to avoid conflicts with SuperLU.
 
 
 Version 3.3.0 Released November 7, 2019

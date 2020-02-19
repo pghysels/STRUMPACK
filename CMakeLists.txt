@@ -106,7 +106,7 @@ endif()
 
 include(FortranCInterface)
 FortranCInterface_HEADER(${PROJECT_BINARY_DIR}/StrumpackFortranCInterface.h
-  MACRO_NAMESPACE "FC_")
+  MACRO_NAMESPACE "STRUMPACK_FC_")
 #include_directories(${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/src)
 FortranCInterface_VERIFY(CXX)
 

@@ -32,7 +32,7 @@
 #include "StrumpackFortranCInterface.h"
 
 extern "C" {
-#define GENRCM_FC FC_GLOBAL(genrcm,GENRCM)
+#define GENRCM_FC STRUMPACK_FC_GLOBAL(genrcm,GENRCM)
   void GENRCM_FC
   (int* neqns, int* xadj, int* adjncy, int* perm, int* mask, int* xls);
 }
