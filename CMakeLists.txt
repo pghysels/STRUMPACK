@@ -414,6 +414,7 @@ include_directories(${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/src)
 
 set(LIBSRC
   src/StrumpackParameters.cpp
+  src/dense/BLASLAPACKWrapper.cpp
   src/misc/TaskTimer.cpp
   src/kernel/Kernel.cpp)
 
