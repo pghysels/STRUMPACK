@@ -412,22 +412,12 @@ endif()
 
 include_directories(${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/src)
 
-set(LIBSRC
+set(LIB_STRUMPACK_SOURCES
   src/StrumpackParameters.cpp
   src/dense/BLASLAPACKWrapper.cpp
-  src/misc/TaskTimer.cpp
-  src/kernel/Kernel.cpp)
-
-if(TPL_ENABLE_BPACK)
-  list(APPEND LIBSRC src/HODLR/HODLRWrapper.cpp)
-endif()
-
-if(STRUMPACK_C_INTERFACE)
-  list(APPEND LIBSRC src/StrumpackSparseSolver.cpp)
-endif()
-
-set(LIBSRCDENSE
   src/dense/BLASLAPACKOpenMPTask.cpp
+  src/misc/TaskTimer.cpp
+  src/kernel/Kernel.cpp
   src/dense/lapack/sgeqp3tol.f src/dense/lapack/dgeqp3tol.f
   src/dense/lapack/cgeqp3tol.f src/dense/lapack/zgeqp3tol.f
   src/dense/lapack/sgeqrfmod.f src/dense/lapack/dgeqrfmod.f
@@ -450,14 +440,12 @@ set(LIBSRCDENSE
   src/dense/lapack/clarfbmod.f src/dense/lapack/zlarfbmod.f
   src/dense/lapack/slarftmod.f src/dense/lapack/dlarftmod.f
   src/dense/lapack/clarftmod.f src/dense/lapack/zlarftmod.f
-  src/dense/lapack/slarfmod.f src/dense/lapack/dlarfmod.f
-  src/dense/lapack/clarfmod.f src/dense/lapack/zlarfmod.f
+  src/dense/lapack/slarfmod.f  src/dense/lapack/dlarfmod.f
+  src/dense/lapack/clarfmod.f  src/dense/lapack/zlarfmod.f
   src/dense/lapack/sgelqfmod.f src/dense/lapack/dgelqfmod.f
   src/dense/lapack/cgelqfmod.f src/dense/lapack/zgelqfmod.f
   src/dense/lapack/sgelq2mod.f src/dense/lapack/dgelq2mod.f
-  src/dense/lapack/cgelq2mod.f src/dense/lapack/zgelq2mod.f)
-
-set(LIBSRCSPARSE
+  src/dense/lapack/cgelq2mod.f src/dense/lapack/zgelq2mod.f
   src/sparse/rcm/rcm.f
   src/sparse/rcm/degree.f
   src/sparse/rcm/fnroot.f
@@ -465,16 +453,25 @@ set(LIBSRCSPARSE
   src/sparse/rcm/rootls.f
   src/sparse/strumpack_mc64ad.c)
 
-if(STRUMPACK_USE_MPI)
-  list(APPEND LIBSRCDENSE
-    src/dense/lapack/pcgeqpftol.f src/dense/lapack/pdgeqpftol.f
-    src/dense/lapack/psgeqpftol.f src/dense/lapack/pzgeqpftol.f)
+if(TPL_ENABLE_BPACK)
+  list(APPEND LIB_STRUMPACK_SOURCES
+    src/HODLR/HODLRWrapper.cpp)
+endif()
 
-  list(APPEND LIBSRCSPARSE
+if(STRUMPACK_C_INTERFACE)
+  list(APPEND LIB_STRUMPACK_SOURCES
+    src/StrumpackSparseSolver.cpp)
+endif()
+
+if(STRUMPACK_USE_MPI)
+  list(APPEND LIB_STRUMPACK_SOURCES
+    src/dense/ScaLAPACKWrapper.cpp
+    src/dense/lapack/pcgeqpftol.f src/dense/lapack/pdgeqpftol.f
+    src/dense/lapack/psgeqpftol.f src/dense/lapack/pzgeqpftol.f
     src/sparse/MUMPS/ana_orderings.F)
 endif()
 
-add_library(strumpack ${LIBSRC} ${LIBSRCSPARSE} ${LIBSRCDENSE})
+add_library(strumpack ${LIB_STRUMPACK_SOURCES})
 target_link_libraries(strumpack ${LIBS})
 
 install(TARGETS strumpack LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
