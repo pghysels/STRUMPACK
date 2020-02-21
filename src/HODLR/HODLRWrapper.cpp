@@ -114,7 +114,7 @@ namespace strumpack {
       return val;
     }
 
-    template<> void HODLR_construct_init<double>
+    template<> void HODLR_construct_init<double, double>
     (int N, int d, double* data, int* nns, int lvls, int* tree, int* perm,
      int& lrow, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
@@ -125,21 +125,19 @@ namespace strumpack {
          &stats, &msh, &kerquant, &ptree, C_FuncDistmn, C_FuncNearFar,
          fdata);
     }
-    template<> void HODLR_construct_init<std::complex<double>>
-    (int N, int d, std::complex<double>* data, int* nns, int lvls, int* tree,
+    template<> void HODLR_construct_init<std::complex<double>, double>
+    (int N, int d, double* data, int* nns, int lvls, int* tree,
      int* perm, int& lrow, F2Cptr& ho_bf, F2Cptr& options,
      F2Cptr& stats, F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
      void (*C_FuncNearFar)(int*, int*, int*, C2Fptr), C2Fptr fdata) {
-      // TODO there is no version taking complex data points?
-      assert(data == nullptr);
       z_c_bpack_construct_init
-        (&N, &d, nullptr, nns, &lvls, tree, perm, &lrow, &ho_bf, &options,
+        (&N, &d, data, nns, &lvls, tree, perm, &lrow, &ho_bf, &options,
          &stats, &msh, &kerquant, &ptree, C_FuncDistmn,
          C_FuncNearFar, fdata);
     }
 
-    template<> void HODLR_construct_init_Gram<double>
+    template<> void HODLR_construct_init_Gram<double, double>
     (int N, int d, double* data, int* nns, int lvls, int* tree, int* perm,
      int& lrow, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
@@ -153,8 +151,8 @@ namespace strumpack {
         (&N, &d, data, nns, &lvls, tree, perm, &lrow, &ho_bf, &options,
          &stats, &msh, &kerquant, &ptree, C_FuncZmn, C_FuncZmnBlock, fdata);
     }
-    template<> void HODLR_construct_init_Gram<std::complex<double>>
-    (int N, int d, std::complex<double>* data, int* nns, int lvls, int* tree,
+    template<> void HODLR_construct_init_Gram<std::complex<double>, double>
+    (int N, int d, double* data, int* nns, int lvls, int* tree,
      int* perm, int& lrow, F2Cptr& ho_bf, F2Cptr& options,
      F2Cptr& stats, F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, std::complex<double>*, C2Fptr),
@@ -163,9 +161,8 @@ namespace strumpack {
       int* allrows, int* allcols, std::complex<double>* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr fdata) {
-      assert(data == nullptr);
       z_c_bpack_construct_init_gram
-        (&N, &d, nullptr, nns, &lvls, tree, perm, &lrow, &ho_bf, &options,
+        (&N, &d, data, nns, &lvls, tree, perm, &lrow, &ho_bf, &options,
          &stats, &msh, &kerquant, &ptree,
          reinterpret_cast<
          void(*)(int*, int*, _Complex double*, C2Fptr)>(C_FuncZmn),

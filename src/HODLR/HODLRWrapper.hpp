@@ -124,8 +124,10 @@ namespace strumpack {
     (F2Cptr stats, const std::string& name);
 
 
-    template<typename scalar_t> void HODLR_construct_init
-    (int N, int d, scalar_t* data, int* nns, int lvls, int* tree, int* perm,
+    template<typename scalar_t,
+             typename real_t = typename RealType<scalar_t>::value_type>
+    void HODLR_construct_init
+    (int N, int d, real_t* data, int* nns, int lvls, int* tree, int* perm,
      int& lrow, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
@@ -133,23 +135,25 @@ namespace strumpack {
      C2Fptr fdata) {
       std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
     }
-    template<> void HODLR_construct_init<double>
+    template<> void HODLR_construct_init<double, double>
     (int N, int d, double* data, int* nns, int lvls, int* tree, int* perm,
      int& lrow, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
      void (*C_FuncNearFar)(int*, int*, int*, C2Fptr),
      C2Fptr fdata);
-    template<> void HODLR_construct_init<std::complex<double>>
-    (int N, int d, std::complex<double>* data, int* nns, int lvls, int* tree,
+    template<> void HODLR_construct_init<std::complex<double>, double>
+    (int N, int d, double* data, int* nns, int lvls, int* tree,
      int* perm, int& lrow, F2Cptr& ho_bf, F2Cptr& options,
      F2Cptr& stats, F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
      void (*C_FuncNearFar)(int*, int*, int*, C2Fptr),
      C2Fptr fdata);
 
-    template<typename scalar_t> void HODLR_construct_init_Gram
-    (int N, int d, scalar_t* data, int* nns, int lvls, int* tree, int* perm,
+    template<typename scalar_t,
+             typename real_t = typename RealType<scalar_t>::value_type>
+    void HODLR_construct_init_Gram
+    (int N, int d, real_t* data, int* nns, int lvls, int* tree, int* perm,
      int& lrow, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, scalar_t*, C2Fptr),
@@ -160,7 +164,7 @@ namespace strumpack {
       C2Fptr elems), C2Fptr fdata) {
       std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
     }
-    template<> void HODLR_construct_init_Gram<double>
+    template<> void HODLR_construct_init_Gram<double, double>
     (int N, int d, double* data, int* nns, int lvls, int* tree, int* perm,
      int& lrow, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
@@ -170,8 +174,8 @@ namespace strumpack {
       int* allrows, int* allcols, double* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr fdata);
-    template<> void HODLR_construct_init_Gram<std::complex<double>>
-    (int N, int d, std::complex<double>* data, int* nns, int lvls, int* tree,
+    template<> void HODLR_construct_init_Gram<std::complex<double>, double>
+    (int N, int d, double* data, int* nns, int lvls, int* tree,
      int* perm, int& lrow, F2Cptr& ho_bf, F2Cptr& options,
      F2Cptr& stats, F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, std::complex<double>*, C2Fptr),

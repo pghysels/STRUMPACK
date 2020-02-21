@@ -46,8 +46,7 @@ namespace strumpack {
     // find first pca direction
     int num = 0;
     scalar_t lambda;
-    DenseMatrix<scalar_t> Z(d, 1);
-    DenseMatrix<scalar_t> ptp(d, d);
+    DenseMatrix<scalar_t> Z(d, 1), ptp(d, d);
     gemm(Trans::N, Trans::C, scalar_t(1.), p, p, scalar_t(0.), ptp);
     double abstol = 1e-5;
     blas::syevx('V', 'I', 'U', d, ptp.data(), d, scalar_t(1.),
@@ -81,8 +80,8 @@ namespace strumpack {
     std::nth_element
       (idx.begin(), idx.begin() + n/2, idx.end(),
        [&](const std::size_t& a, const std::size_t& b) {
-        return new_x_coord(a, 0) < new_x_coord(b, 0);
-      });
+         return new_x_coord(a, 0) < new_x_coord(b, 0);
+       });
     // split the data
     nc[0] = n/2;
     nc[1] = n - n/2;

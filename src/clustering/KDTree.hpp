@@ -99,8 +99,8 @@ namespace strumpack {
     std::nth_element
       (idx.begin(), idx.begin() + n/2, idx.end(),
        [&](const std::size_t& a, const std::size_t& b) {
-        return p(dim, a) < p(dim, b);
-      });
+         return p(dim, a) < p(dim, b);
+       });
     // split the data
     nc[0] = n/2;
     nc[1] = n - n/2;

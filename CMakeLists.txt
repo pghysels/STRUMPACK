@@ -455,6 +455,8 @@ set(LIB_STRUMPACK_SOURCES
 
 if(TPL_ENABLE_BPACK)
   list(APPEND LIB_STRUMPACK_SOURCES
+    src/HODLR/HODLRMatrix.cpp
+    src/HODLR/LRBFMatrix.cpp
     src/HODLR/HODLRWrapper.cpp)
 endif()
 
