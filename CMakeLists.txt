@@ -416,8 +416,6 @@ set(LIB_STRUMPACK_SOURCES
   src/StrumpackParameters.cpp
   src/dense/BLASLAPACKWrapper.cpp
   src/dense/BLASLAPACKOpenMPTask.cpp
-  src/misc/TaskTimer.cpp
-  src/kernel/Kernel.cpp
   src/dense/lapack/sgeqp3tol.f src/dense/lapack/dgeqp3tol.f
   src/dense/lapack/cgeqp3tol.f src/dense/lapack/zgeqp3tol.f
   src/dense/lapack/sgeqrfmod.f src/dense/lapack/dgeqrfmod.f
@@ -446,12 +444,18 @@ set(LIB_STRUMPACK_SOURCES
   src/dense/lapack/cgelqfmod.f src/dense/lapack/zgelqfmod.f
   src/dense/lapack/sgelq2mod.f src/dense/lapack/dgelq2mod.f
   src/dense/lapack/cgelq2mod.f src/dense/lapack/zgelq2mod.f
+  src/misc/TaskTimer.cpp
+  src/kernel/Kernel.cpp
   src/sparse/rcm/rcm.f
   src/sparse/rcm/degree.f
   src/sparse/rcm/fnroot.f
   src/sparse/rcm/genrcm.f
   src/sparse/rcm/rootls.f
-  src/sparse/strumpack_mc64ad.c)
+  src/sparse/strumpack_mc64ad.c
+  src/clustering/PCAPartitioning.cpp
+  src/clustering/CobblePartitioning.cpp
+  src/clustering/KMeans.cpp
+  src/clustering/KDTree.cpp)
 
 if(TPL_ENABLE_BPACK)
   list(APPEND LIB_STRUMPACK_SOURCES
@@ -506,10 +510,6 @@ install(FILES
 install(FILES
   src/clustering/NeighborSearch.hpp
   src/clustering/Clustering.hpp
-  src/clustering/KMeans.hpp
-  src/clustering/KDTree.hpp
-  src/clustering/PCAPartitioning.hpp
-  src/clustering/CobblePartitioning.hpp
   DESTINATION include/clustering)
 
 install(FILES

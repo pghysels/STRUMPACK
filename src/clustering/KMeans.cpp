@@ -26,15 +26,8 @@
  *             Division).
  *
  */
-#ifndef KMEANS_PARTITIONING_HPP
-#define KMEANS_PARTITIONING_HPP
-
-#include <vector>
-#include <random>
-
-#include "dense/DenseMatrix.hpp"
-#include "HSS/HSSPartitionTree.hpp"
-#include "NeighborSearch.hpp"
+#include "Clustering.hpp"
+#include "kernel/Metrics.hpp"
 
 namespace strumpack {
 
@@ -211,6 +204,14 @@ namespace strumpack {
     return tree;
   }
 
+
+  // explicit template instantiations (only for real types!)
+  template HSS::HSSPartitionTree
+  recursive_2_means(DenseMatrix<float>& p, std::size_t cluster_size,
+                    int* perm, std::mt19937& generator);
+  template HSS::HSSPartitionTree
+  recursive_2_means(DenseMatrix<double>& p, std::size_t cluster_size,
+                    int* perm, std::mt19937& generator);
+
 } // end namespace strumpack
 
-#endif //KMEANS_PARTITIONING_HPP

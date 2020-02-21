@@ -26,64 +26,62 @@
  *             Division).
  *
  */
-#ifndef COBBLE_PARTITIONING_HPP
-#define COBBLE_PARTITIONING_HPP
-
-#include <vector>
-#include <random>
-
-#include "dense/DenseMatrix.hpp"
-#include "HSS/HSSPartitionTree.hpp"
-#include "NeighborSearch.hpp"
+#include "Clustering.hpp"
 
 namespace strumpack {
 
-  template<typename scalar_t,
-           typename real_t=typename RealType<scalar_t>::value_type>
-  void cobble_partition
-  (DenseMatrix<scalar_t>& p, std::vector<std::size_t>& nc, int* perm) {
-    auto d = p.rows();
+  template<typename scalar_t> void pca_partition
+  (DenseMatrix<scalar_t>& p, std::vector<std::size_t>& nc,
+   int* perm) {
     auto n = p.cols();
-    // find centroid
-    std::vector<scalar_t> centroid(d);
-    for (std::size_t i=0; i<n; i++)
-      for (std::size_t j=0; j<d; j++)
-        centroid[j] += p(j, i);
-    for (std::size_t j=0; j<d; j++)
-      centroid[j] /= n;
+    auto d = p.rows();
+    // find first pca direction
+    int num = 0;
+    scalar_t lambda;
+    DenseMatrix<scalar_t> Z(d, 1), ptp(d, d);
+    gemm(Trans::N, Trans::C, scalar_t(1.), p, p, scalar_t(0.), ptp);
+    double abstol = 1e-5;
+    blas::syevx('V', 'I', 'U', d, ptp.data(), d, scalar_t(1.),
+                scalar_t(1.), d, d, abstol, num, &lambda, Z.data(), d);
+    if (num != 1)
+      std::cout << "ERROR PCA partitioning could not compute eigenvector."
+                << std::endl;
+    // compute pca coordinates
+    DenseMatrix<scalar_t> new_x_coord(n, 1);
+    gemv(Trans::C, scalar_t(1.), p, Z, scalar_t(0.), new_x_coord, 0);
 
-    // find farthest point from centroid
-    std::size_t first_index = 0;
-    real_t max_dist(-1);
-    for (std::size_t i=0; i<n; i++) {
-      auto dd = Euclidean_distance(d, p.ptr(0, i), centroid.data());
-      if (dd > max_dist) {
-        max_dist = dd;
-        first_index = i;
-      }
-    }
+    std::vector<std::size_t> cluster(n);
+    nc.resize(2);
+    nc[0] = nc[1] = 0;
 
-    // compute and sort distance from the firsth point
-    std::vector<real_t> dists(n);
-    for (std::size_t i=0; i<n; i++)
-      dists[i] = Euclidean_distance(d, p.ptr(0, i), p.ptr(0, first_index));
-
+#if 0 // mean
+    // find the mean
+    scalar_t mean_value(0.);
+    for (std::size_t i=0; i<n; ++i)
+      mean_value += new_x_coord[i];
+    mean_value /= n;
+    // split the data
+    for (std::size_t i=0; i<n; ++i)
+      if (p(dim, i) > mean_value) {
+        cluster[i] = 1;
+        nc[1]++;
+      } else nc[0]++;
+#else // median
     std::vector<std::size_t> idx(n);
     std::iota(idx.begin(), idx.end(), 0);
     std::nth_element
       (idx.begin(), idx.begin() + n/2, idx.end(),
        [&](const std::size_t& a, const std::size_t& b) {
-        return dists[a] < dists[b];
-      });
-
+         return new_x_coord(a, 0) < new_x_coord(b, 0);
+       });
     // split the data
     nc[0] = n/2;
     nc[1] = n - n/2;
-    std::vector<int> cluster(n);
     for (std::size_t i=0; i<n/2; i++)
       cluster[idx[i]] = 0;
     for (std::size_t i=n/2; i<n; i++)
       cluster[idx[i]] = 1;
+#endif
 
     // permute the data
     std::size_t ct = 0;
@@ -101,24 +99,34 @@ namespace strumpack {
   }
 
 
-  template<typename scalar_t> HSS::HSSPartitionTree recursive_cobble
+  template<typename scalar_t> HSS::HSSPartitionTree recursive_pca
   (DenseMatrix<scalar_t>& p, std::size_t cluster_size, int* perm) {
     auto n = p.cols();
     HSS::HSSPartitionTree tree(n);
     if (n < cluster_size) return tree;
     std::vector<std::size_t> nc(2);
-    cobble_partition(p, nc, perm);
+    pca_partition(p, nc, perm);
     if (!nc[0] || !nc[1]) return tree;
     tree.c.resize(2);
     tree.c[0].size = nc[0];
     tree.c[1].size = nc[1];
     DenseMatrixWrapper<scalar_t> p0(p.rows(), nc[0], p, 0, 0);
-    tree.c[0] = recursive_cobble(p0, cluster_size, perm);
+    tree.c[0] = recursive_pca(p0, cluster_size, perm);
     DenseMatrixWrapper<scalar_t> p1(p.rows(), nc[1], p, 0, nc[0]);
-    tree.c[1] = recursive_cobble(p1, cluster_size, perm+nc[0]);
+    tree.c[1] = recursive_pca(p1, cluster_size, perm+nc[0]);
     return tree;
   }
 
-} // end namespace strumpack
 
-#endif // COBBLE_PARTITIONING_HPP
+  // explicit template instantiations (only for real types!)
+  template void pca_partition
+  (DenseMatrix<float>& p, std::vector<std::size_t>& nc, int* perm);
+  template void pca_partition
+  (DenseMatrix<double>& p, std::vector<std::size_t>& nc, int* perm);
+
+  template HSS::HSSPartitionTree recursive_pca
+  (DenseMatrix<float>& p, std::size_t cluster_size, int* perm);
+  template HSS::HSSPartitionTree recursive_pca
+  (DenseMatrix<double>& p, std::size_t cluster_size, int* perm);
+
+} // end namespace strumpack

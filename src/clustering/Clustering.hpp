@@ -35,10 +35,11 @@
 #ifndef STRUMPACK_CLUSTERING_HPP
 #define STRUMPACK_CLUSTERING_HPP
 
-#include "KDTree.hpp"
-#include "KMeans.hpp"
-#include "PCAPartitioning.hpp"
-#include "CobblePartitioning.hpp"
+#include <random>
+#include <vector>
+
+#include "HSS/HSSPartitionTree.hpp"
+#include "dense/DenseMatrix.hpp"
 
 namespace strumpack {
 
@@ -93,6 +94,26 @@ namespace strumpack {
     }
   }
 
+
+  template<typename T> void
+  pca_partition(DenseMatrix<T>& p, std::vector<std::size_t>& nc, int* perm);
+  template<typename T> HSS::HSSPartitionTree
+  recursive_pca(DenseMatrix<T>& p, std::size_t cluster_size, int* perm);
+
+  template<typename T> void
+  cobble_partition(DenseMatrix<T>& p, std::vector<std::size_t>& nc, int* perm);
+  template<typename T> HSS::HSSPartitionTree
+  recursive_cobble(DenseMatrix<T>& p, std::size_t cluster_size, int* perm);
+
+  template<typename T> HSS::HSSPartitionTree
+  recursive_2_means(DenseMatrix<T>& p, std::size_t cluster_size,
+                    int* perm, std::mt19937& generator);
+
+  template<typename T> void
+  kd_partition(DenseMatrix<T>& p, std::vector<std::size_t>& nc,
+               std::size_t cluster_size, int* perm);
+  template<typename T> HSS::HSSPartitionTree
+  recursive_kd(DenseMatrix<T>& p, std::size_t cluster_size, int* perm);
 
   /**
    * Reorder the input data and define a (binary) cluster tree.
