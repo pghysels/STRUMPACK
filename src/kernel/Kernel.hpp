@@ -71,6 +71,7 @@ namespace strumpack {
      * std::complex<float> or std::complex<double>.
      */
     template<typename scalar_t> class Kernel {
+      using real_t = typename RealType<scalar_t>::value_type;
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
 #if defined(STRUMPACK_USE_MPI)
@@ -136,7 +137,29 @@ namespace strumpack {
        */
       void operator()(const std::vector<std::size_t>& I,
                       const std::vector<std::size_t>& J,
-                      DenseM_t& B) const {
+                      DenseMatrix<real_t>& B) const {
+        assert(B.rows() == I.size() && B.cols() == J.size());
+        for (std::size_t j=0; j<J.size(); j++)
+          for (std::size_t i=0; i<I.size(); i++) {
+            assert(I[i] < n() && J[j] < n());
+            B(i, j) = eval(I[i], J[j]);
+          }
+      }
+
+      /**
+       * Evaluate multiple entries at once: evaluate the submatrix
+       * K(I,J) and put the result in matrix B. This is used in the
+       * HSS and HODLR construction algorithms for this kernel.
+       *
+       * \param I set of row indices of elements to extract
+       * \param J set of col indices of elements to extract
+       * \param B B will be set to K(I,J). Matrix B should be the
+       * correct size, ie., B.rows() == I.size() and B.cols() ==
+       * J.size()
+       */
+      void operator()(const std::vector<std::size_t>& I,
+                      const std::vector<std::size_t>& J,
+                      DenseMatrix<std::complex<real_t>>& B) const {
         assert(B.rows() == I.size() && B.cols() == J.size());
         for (std::size_t j=0; j<J.size(); j++)
           for (std::size_t i=0; i<I.size(); i++) {

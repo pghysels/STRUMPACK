@@ -33,6 +33,7 @@
 #ifndef STRUMPACK_MPI_WRAPPER_HPP
 #define STRUMPACK_MPI_WRAPPER_HPP
 
+#include <vector>
 #include <complex>
 #include <cassert>
 #include <numeric>

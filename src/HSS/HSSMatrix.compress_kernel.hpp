@@ -37,7 +37,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::compress
-    (const kernel::Kernel<scalar_t>& K, const opts_t& opts) {
+    (const kernel::Kernel<real_t>& K, const opts_t& opts) {
       auto Aelem = [&K]
         (const std::vector<std::size_t>& I,
          const std::vector<std::size_t>& J, DenseM_t& B){
@@ -48,7 +48,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::compress_with_coordinates
-    (const DenseMatrix<scalar_t>& coords,
+    (const DenseMatrix<real_t>& coords,
      const std::function
      <void(const std::vector<std::size_t>& I,
            const std::vector<std::size_t>& J, DenseM_t& B)>& Aelem,

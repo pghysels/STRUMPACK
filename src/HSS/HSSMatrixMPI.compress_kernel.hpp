@@ -37,7 +37,7 @@ namespace strumpack {
   namespace HSS {
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::compress
-    (const kernel::Kernel<scalar_t>& K, const opts_t& opts) {
+    (const kernel::Kernel<real_t>& K, const opts_t& opts) {
       TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_compress);
       auto Aelemw = [&]
         (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,

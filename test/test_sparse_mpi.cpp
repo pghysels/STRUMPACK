@@ -32,7 +32,6 @@ using namespace std;
 
 #include <getopt.h>
 
-#define STRUMPACK_PBLAS_BLOCKSIZE 3
 #define ERROR_TOLERANCE 1e2
 #define SOLVE_TOLERANCE 1e-12
 
