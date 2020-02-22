@@ -85,7 +85,7 @@ namespace strumpack {
     PropMapSparseMatrix<scalar_t,integer_t> Aprop_;
 
     /**
-     * vector with _A.local_rows() elements, storing for each row
+     * vector with A.local_rows() elements, storing for each row
      * which process has the corresponding separator entry
      */
     std::vector<int> row_owner_;
@@ -524,12 +524,20 @@ namespace strumpack {
       nd_.sub_graph_range.first;
     auto sep_end = nd_.local_tree().sizes(sep+1) +
       nd_.sub_graph_range.first;
-    for (integer_t r=nd_.local_tree().sizes(sep);
-         r<nd_.local_tree().sizes(sep+1); r++)
-      merge_if_larger
-        (nd_.my_sub_graph.ind() + nd_.my_sub_graph.ptr(r),
-         nd_.my_sub_graph.ind() + nd_.my_sub_graph.ptr(r+1),
-         upd[sep], sep_end);
+    {
+      auto lor = nd_.local_tree().sizes(sep);
+      auto hir = nd_.local_tree().sizes(sep+1);
+      std::size_t maxest = nd_.my_sub_graph.ptr(hir) -
+        nd_.my_sub_graph.ptr(lor);
+      if (chl != -1) maxest += upd[chl].size();
+      if (chr != -1) maxest += upd[chr].size();
+      upd[sep].reserve(maxest);
+      for (integer_t r=lor; r<hir; r++)
+        merge_if_larger
+          (nd_.my_sub_graph.ind() + nd_.my_sub_graph.ptr(r),
+           nd_.my_sub_graph.ind() + nd_.my_sub_graph.ptr(r+1),
+           upd[sep], sep_end);
+    }
     if (chl != -1)
       merge_if_larger(upd[chl].begin(), upd[chl].end(), upd[sep], sep_end);
     if (chr != -1)
