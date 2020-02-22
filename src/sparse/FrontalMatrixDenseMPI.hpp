@@ -214,11 +214,11 @@ namespace strumpack {
   FrontalMatrixDenseMPI<scalar_t,integer_t>::partial_factorization
   (const SPOptions<scalar_t>& opts) {
     if (this->dim_sep() && grid()->active()) {
-      TaskTimer pf("");
+      TaskTimer pf("FrontalMatrixDenseMPI_factor");
       pf.start();
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
       if (opts.use_gpu())
-      	slate_opts_.insert({slate::Option::Target, slate::Target::Devices});
+        slate_opts_.insert({slate::Option::Target, slate::Target::Devices});
       auto slateF11 = slate_matrix(F11_);
       slate::getrf(slateF11, slate_piv_, slate_opts_);
 #else
@@ -239,19 +239,19 @@ namespace strumpack {
         trsm(Side::R, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11_, F21_);
         gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.), F22_);
 #endif
-	flops += gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.)) +
-	  trsm_flops(Side::L, scalar_t(1.), F11_, F12_) +
-	  trsm_flops(Side::R, scalar_t(1.), F11_, F21_);
+        flops += gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.)) +
+          trsm_flops(Side::L, scalar_t(1.), F11_, F12_) +
+          trsm_flops(Side::R, scalar_t(1.), F11_, F21_);
       }
       if (Comm().is_root() && opts.verbose()) {
-	auto time = pf.elapsed();
-	std::cout << "# DenseMPI factorization complete, GPU=" << opts.use_gpu()
-		  << ", P=" << Comm().size() << ", T=" << params::num_threads
-		  << ": " << time << " seconds, "
-		  << flops / 1.e9  << " GFLOPS, " 
-		  << (float(flops) / time) / 1.e9 << " GFLOP/s, "
-		  << " ds=" << this->dim_sep()
-		  << ", du=" << this->dim_upd() << std::endl;
+        auto time = pf.elapsed();
+        std::cout << "# DenseMPI factorization complete, GPU=" << opts.use_gpu()
+                  << ", P=" << Comm().size() << ", T=" << params::num_threads
+                  << ": " << time << " seconds, "
+                  << flops / 1.e9  << " GFLOPS, "
+                  << (float(flops) / time) / 1.e9 << " GFLOP/s, "
+                  << " ds=" << this->dim_sep()
+                  << ", du=" << this->dim_upd() << std::endl;
       }
       STRUMPACK_FULL_RANK_FLOPS(flops);
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
@@ -347,7 +347,7 @@ namespace strumpack {
         auto slateF21 = slate_matrix(F21);
         slate::gemm
           (scalar_t(-1.), slateF21, sbloc, scalar_t(1.), sbupd, slate_opts_);
-	// TODO count flops
+        // TODO count flops
       }
     }
 #else
@@ -408,7 +408,7 @@ namespace strumpack {
         auto slateF12 = slate_matrix(F12);
         slate::gemm
           (scalar_t(-1.), slateF12, syupd, scalar_t(1.), sy, slate_opts_);
-	// TODO count flops
+        // TODO count flops
       }
     }
 #else

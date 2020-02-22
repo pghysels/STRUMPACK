@@ -208,7 +208,7 @@ namespace strumpack {
     if (visit(rchild_))
       rchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
     if (!dim_blk()) return;
-    TaskTimer t("");
+    TaskTimer t("FrontalMatrixHODLRMPI_factor");
     if (/*etree_level == 0 && */opts.print_root_front_stats()) t.start();
     construct_hierarchy(A, opts);
     switch (opts.HODLR_options().compression_algorithm()) {
@@ -296,7 +296,7 @@ namespace strumpack {
       long long int invf11_mult_flops = 0;
       auto sample_Schur =
         [&](Trans op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
-          TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
+          TIMER_TIME(TaskType::RANDOM_SAMPLING, 1, t_sampling);
           TIMER_TIME(TaskType::HSS_SCHUR_PRODUCT, 2, t_sprod);
           DenseM_t F12R(F12_.lrows(), R.cols()),
             invF11F12R(F11_.lrows(), R.cols());
@@ -308,7 +308,9 @@ namespace strumpack {
             Rtmp.scale(a);
             F1.mult(op, Rtmp, F12R);
           } else F1.mult(op, R, F12R);
-          invf11_mult_flops = F11_.inv_mult(op, F12R, invF11F12R);
+          { TIMER_TIME(TaskType::F11INV_MULT, 3, t_f11invmult);
+            invf11_mult_flops = F11_.inv_mult(op, F12R, invF11F12R);
+          }
           if (b != scalar_t(0.)) {
             DenseM_t Stmp(S.rows(), S.cols());
             F2.mult(op, invF11F12R, Stmp);

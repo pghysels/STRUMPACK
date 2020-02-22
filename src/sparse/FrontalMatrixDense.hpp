@@ -240,8 +240,8 @@ namespace strumpack {
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
     if (dim_sep()) {
-      TaskTimer t("");
-      if (etree_level == 0 && opts.print_root_front_stats()) t.start();
+      // TaskTimer t("FrontalMatrixDense_factor");
+      // if (etree_level == 0 && opts.print_root_front_stats()) t.start();
       piv = F11_.LU(task_depth);
       if (opts.replace_tiny_pivots()) {
         // TODO consider other values for thresh
@@ -260,12 +260,12 @@ namespace strumpack {
         gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_,
              scalar_t(1.), F22_, task_depth);
       }
-      if (etree_level == 0 && opts.print_root_front_stats()) {
-        auto time = t.elapsed();
-        std::cout << "#   - dense root front: N = " << dim_sep()
-                  << " , N^2 = " << dim_sep() * dim_sep()
-                  << " time = " << time << " sec" << std::endl;
-      }
+      // if (etree_level == 0 && opts.print_root_front_stats()) {
+      //   auto time = t.elapsed();
+      //   std::cout << "#   - dense root front: N = " << dim_sep()
+      //             << " , N^2 = " << dim_sep() * dim_sep()
+      //             << " time = " << time << " sec" << std::endl;
+      // }
     }
     STRUMPACK_FULL_RANK_FLOPS
       (LU_flops(F11_) +

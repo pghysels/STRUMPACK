@@ -143,6 +143,7 @@ namespace strumpack {
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using real_t = typename RealType<scalar_t>::value_type;
+    using Opts_t = SPOptions<scalar_t>;
 
   public:
     FrontalMatrixLossy
@@ -155,9 +156,9 @@ namespace strumpack {
 
     std::string type() const override { return "FrontalMatrixLossy"; }
 
-    void compress(const SPOptions<scalar_t>& opts);
+    void compress(const Opts_t& opts);
     void decompress(DenseM_t& F11, DenseM_t& F12, DenseM_t& F21) const;
-    bool compressible(const SPOptions<scalar_t>& opts) const;
+    bool compressible(const Opts_t& opts) const;
 
     long long node_factor_nonzeros() const override;
 
@@ -186,8 +187,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixLossy<scalar_t,integer_t>::compress
-  (const SPOptions<scalar_t>& opts) {
+  FrontalMatrixLossy<scalar_t,integer_t>::compress(const Opts_t& opts) {
     uint prec = opts.lossy_precision();
     F11c_ = LossyMatrix<scalar_t>(this->F11_, prec);
     F12c_ = LossyMatrix<scalar_t>(this->F12_, prec);
@@ -207,8 +207,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixLossy<scalar_t,integer_t>::multifrontal_factorization
-  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
-   int etree_level, int task_depth) {
+  (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
     FD_t::multifrontal_factorization(A, opts, etree_level, task_depth);
     compress(opts);
   }

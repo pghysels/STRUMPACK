@@ -134,6 +134,7 @@ void TaskTimer::print_name(std::ostream& os) {
     case TaskType::GET_SUBMATRIX_2D:      os << "GET_SUBMATRIX_2D"; break;
     case TaskType::HSS_EXTRACT_SCHUR:     os << "HSS_EXTRACT_SCHUR"; break;
     case TaskType::HSS_PARTIALLY_FACTOR:  os << "HSS_PARTIALLY_FACTOR"; break;
+    case TaskType::F11INV_MULT:           os << "F11INV_MULT"; break;
     case TaskType::HSS_COMPUTE_SCHUR:     os << "HSS_COMPUTE_SCHUR"; break;
     case TaskType::HSS_FACTOR:            os << "HSS_FACTOR"; break;
     case TaskType::FORWARD_SOLVE:         os << "FORWARD_SOLVE"; break;
@@ -151,57 +152,35 @@ void TaskTimer::print_name(std::ostream& os) {
     case TaskType::COMPUTE_SAMPLES:       os << "COMPUTE_SAMPLES"; break;
     case TaskType::ORTHO:                 os << "ORTHO"; break;
     case TaskType::REDIST_2D_TO_HSS:      os << "REDIST_2D_TO_HSS"; break;
-    default: os << "SOMEOTHERTAKSNOTNAMED";
+    default: os << "OTHER_TASK";
     }
   }
 }
 
-// std::ostream& operator<<(std::ostream& os, TaskTimer& t) {
-//   //  if (t.type == EXPLICITLY_NAMED_TASK) return os;
-// #if defined(USE_OPENMP_TIMER)
-//   if (!t.stopped) t.stop();
-//   double begin_time = t.t_start - TaskTimer::t_begin;
-//   double stop_time = t.t_stop - TaskTimer::t_begin;
-//   t.print_name(os);
-//   os << " " << t.number << " [ "
-//      << std::setprecision(12) << begin_time << " , "
-//      << std::setprecision(12) << stop_time  << " ] thread: " << t.tid << "\n";
-// #else
-//   if (!t.stopped) t.stop();
-//   duration<double> begin_time = duration_cast<duration<double>>
-//     (t.t_start - TaskTimer::t_begin);
-//   duration<double> stop_time = duration_cast<duration<double>>
-//     (t.t_stop - TaskTimer::t_begin);
-//   t.print_name(os);
-//   os << " " << t.number << " [ "
-//      << std::setprecision(12) << begin_time.count() << " , "
-//      << std::setprecision(12) << stop_time.count()
-//      << " ] thread: " << t.tid << "\n";
-// #endif
-//   return os;
-// }
-
 void TaskTimer::print(std::ostream& os) {
-  //  if (t.type == EXPLICITLY_NAMED_TASK) return os;
-#if defined(USE_OPENMP_TIMER)
+  if (type == TaskType::EXPLICITLY_NAMED_TASK) return;
   if (!stopped) stop();
+#if defined(USE_OPENMP_TIMER)
   double begin_time = t_start - TaskTimer::t_begin;
   double stop_time = t_stop - TaskTimer::t_begin;
+#else
+  double begin_time = duration_cast<duration<double>>
+    (t_start - TaskTimer::t_begin).count();
+  double stop_time = duration_cast<duration<double>>
+    (t_stop - TaskTimer::t_begin).count();
+#endif
   print_name(os);
+#if !defined(STRUMPACK_USE_MPI)
   os << " " << number << " [ "
      << std::setprecision(12) << begin_time << " , "
      << std::setprecision(12) << stop_time  << " ] thread: " << tid << "\n";
 #else
-  if (!stopped) stop();
-  duration<double> begin_time = duration_cast<duration<double>>
-    (t_start - TaskTimer::t_begin);
-  duration<double> stop_time = duration_cast<duration<double>>
-    (t_stop - TaskTimer::t_begin);
-  print_name(os);
+  MPIComm c;
+  int rank = c.rank();
   os << " " << number << " [ "
-     << std::setprecision(12) << begin_time.count() << " , "
-     << std::setprecision(12) << stop_time.count()
-     << " ] thread: " << tid << "\n";
+     << std::setprecision(12) << begin_time << " , "
+     << std::setprecision(12) << stop_time  << " ] thread: " << tid
+     << " , rank: " << rank << "\n";
 #endif
 }
 
@@ -270,12 +249,9 @@ void TimerList::finalize() {
     if (mpi_rank())
       log.open("time.log", std::ofstream::out | std::ofstream::app);
     else log.open("time.log", std::ofstream::out);
-    log << "# MPI rank " << mpi_rank() << std::endl;
-    log << "# ==============" << std::endl;
     for (unsigned int thread=0; thread<list.size(); thread++)
-      for (auto timing : list[thread]) //log << timing;
+      for (auto timing : list[thread])
         timing.print(log);
-    log << std::endl;
     log.close();
   }
   for (int p=rank; p<=P; p++) MPI_Barrier(MPI_COMM_WORLD);

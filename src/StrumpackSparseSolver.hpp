@@ -842,7 +842,7 @@ namespace strumpack {
     }
     perf_counters_start();
     flop_breakdown_reset();
-    TaskTimer t1("factorization", [&]() {
+    TaskTimer t1("Sparse-factorization", [&]() {
         tree()->multifrontal_factorization(*matrix(), opts_);
       });
     perf_counters_stop("numerical factorization");
@@ -940,6 +940,9 @@ namespace strumpack {
     assert(N < std::numeric_limits<int>::max());
 
     DenseM_t bloc(b.rows(), b.cols());
+
+    // TODO this fails when the reordering was not done, for instance
+    // for iterative solvers!!!
     auto iperm = reordering()->iperm();
     if (use_initial_guess &&
         opts_.Krylov_solver() != KrylovSolver::DIRECT) {
