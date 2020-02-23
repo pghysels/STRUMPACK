@@ -40,7 +40,7 @@ using namespace strumpack::BLR;
 
 
 int run(int argc, char* argv[]) {
-  int m = 100, n = 1;
+  int m = 100; //, n = 1;
 
   BLROptions<double> blr_opts;
   blr_opts.set_verbose(false);

@@ -118,7 +118,6 @@ int main(int argc, char* argv[]) {
       Xexact.random();               // set a random X
       H.mult(Trans::N, Xexact, B);   // compute B = H*X
       auto normXexact = Xexact.normF();
-      auto normB = B.normF();
       H.solve(B, X);
       X.scaled_add(-1., Xexact);
       auto normE = X.normF();
@@ -138,9 +137,7 @@ int main(int argc, char* argv[]) {
       Xexactloc.random();
       H.mult(Trans::N, Xexactloc, Bloc);   // compute B = H*X
       auto normXexact = Xexactloc.normF();
-      auto normB = Bloc.normF();
       normXexact = sqrt(c.all_reduce(normXexact*normXexact, MPI_SUM));
-      normB = sqrt(c.all_reduce(normB*normB, MPI_SUM));
       H.solve(Bloc, Xloc);
       Xloc.scaled_add(-1., Xexactloc);
       auto normE = Xloc.normF();

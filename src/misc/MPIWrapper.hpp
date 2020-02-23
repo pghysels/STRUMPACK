@@ -39,8 +39,12 @@
 #include <numeric>
 #include <limits>
 #include <memory>
-#include "mpi.h"
+
+#define OMPI_SKIP_MPICXX 1
+#include <mpi.h>
+
 #include "StrumpackParameters.hpp"
+
 
 namespace strumpack {
 

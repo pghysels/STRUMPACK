@@ -30,6 +30,7 @@
 #ifndef SCALAPACK_HPP
 #define SCALAPACK_HPP
 
+#define OMPI_SKIP_MPICXX 1
 #include <mpi.h>
 #include "BLASLAPACKWrapper.hpp"
 

@@ -29,7 +29,10 @@
 
 #include <cassert>
 #include <complex>
+
+#define OMPI_SKIP_MPICXX 1
 #include <mpi.h>
+
 #include "HODLRWrapper.hpp"
 #include "dC_BPACK_wrapper.h"
 #include "zC_BPACK_wrapper.h"

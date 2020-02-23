@@ -172,9 +172,12 @@ namespace strumpack {
         if (root) fc.lossy++;
 #endif
       }
-    }
-    }
+    } break;
+    case CompressionType::LOSSLESS: // not implemented yet, use DenseMPI
+      break;
+    };
     if (!front) {
+      // fallback in case support for cublas/zfp/hodlr is missing
       front.reset
         (new FrontalMatrixDense<scalar_t,integer_t>(s, sbegin, send, upd));
       if (root) fc.dense++;
@@ -219,10 +222,11 @@ namespace strumpack {
 #endif
       }
     } break;
-      //case CompressionType::LOSSY:
-      // this is handled in FrontalMatrixDenseMPI
-      //case CompressionType::NONE:
-    }
+    case CompressionType::LOSSY: // handled in DenseMPI
+    case CompressionType::LOSSLESS: // not implemented yet, use DenseMPI
+    case CompressionType::NONE: break;
+    };
+    // (NONE, LOSSLESS, LOSSY or not compiled with HODLR)
     if (!front) {
       front.reset
         (new FrontalMatrixDenseMPI<scalar_t,integer_t>

@@ -118,6 +118,7 @@ namespace strumpack {
     case CompressionType::BLR: return "blr";
     case CompressionType::HODLR: return "hodlr";
     case CompressionType::LOSSY: return "lossy";
+    case CompressionType::LOSSLESS: return "lossless";
     }
     return "UNKNOWN";
   }
@@ -859,7 +860,9 @@ namespace strumpack {
       case CompressionType::HSS: return _hss_min_sep_size;
       case CompressionType::BLR: return _blr_min_sep_size;
       case CompressionType::HODLR: return _hodlr_min_sep_size;
-      case CompressionType::LOSSY: return _lossy_min_sep_size;
+      case CompressionType::LOSSY:
+      case CompressionType::LOSSLESS:
+        return _lossy_min_sep_size;
       case CompressionType::NONE:
       default: return std::numeric_limits<int>::max();
       }
@@ -877,7 +880,9 @@ namespace strumpack {
       case CompressionType::HSS: return _hss_min_front_size;
       case CompressionType::BLR: return _blr_min_front_size;
       case CompressionType::HODLR: return _hodlr_min_front_size;
-      case CompressionType::LOSSY: return _lossy_min_front_size;
+      case CompressionType::LOSSY:
+      case CompressionType::LOSSLESS:
+        return _lossy_min_front_size;
       case CompressionType::NONE:
       default: return std::numeric_limits<int>::max();
       }
@@ -899,7 +904,9 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_BPACK)
         return _hodlr_opts.leaf_size();
 #endif
-      case CompressionType::LOSSY: return 4;
+      case CompressionType::LOSSY:
+      case CompressionType::LOSSLESS:
+        return 4;
       case CompressionType::NONE:
       default: return std::numeric_limits<int>::max();
       }
@@ -1151,9 +1158,10 @@ namespace strumpack {
           else if (s == "BLR") set_compression(CompressionType::BLR);
           else if (s == "HODLR") set_compression(CompressionType::HODLR);
           else if (s == "LOSSY") set_compression(CompressionType::LOSSY);
+          else if (s == "LOSSLESS") set_compression(CompressionType::LOSSLESS);
           else std::cerr << "# WARNING: compression type not"
-                 " recognized, use 'none', 'hss', 'blr', 'hodlr' or 'lossy'"
-                         << std::endl;
+                 " recognized, use 'none', 'hss', 'blr', 'hodlr',"
+                 " 'lossy' or 'lossless'" << std::endl;
         } break;
         case 21: {
           std::istringstream iss(optarg);
@@ -1414,7 +1422,7 @@ namespace strumpack {
     int _hodlr_min_front_size = 1000;
     int _hodlr_min_sep_size = 256;
 
-    /** LOSSY options */
+    /** LOSSY/LOSSLESS options */
     int _lossy_min_front_size = 16;
     int _lossy_min_sep_size = 8;
     int _lossy_precision = 16;
