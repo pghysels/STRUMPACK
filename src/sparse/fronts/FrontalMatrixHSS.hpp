@@ -35,8 +35,8 @@
 
 #include "misc/TaskTimer.hpp"
 #include "FrontalMatrix.hpp"
-#include "CompressedSparseMatrix.hpp"
-#include "MatrixReordering.hpp"
+#include "sparse/CompressedSparseMatrix.hpp"
+#include "sparse/MatrixReordering.hpp"
 #include "HSS/HSSMatrix.hpp"
 
 namespace strumpack {

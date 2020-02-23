@@ -30,7 +30,7 @@
 #define EXTEND_ADD_HPP
 
 #include "dense/DistributedMatrix.hpp"
-#include "FrontalMatrixMPI.hpp"
+#include "fronts/FrontalMatrixMPI.hpp"
 
 namespace strumpack {
 

@@ -28,7 +28,10 @@
 
 #include "HSSMatrixMPI.hpp"
 
+#include "misc/RandomWrapper.hpp"
 #include "BlockCyclic2BlockRow.hpp"
+#include "DistSamples.hpp"
+#include "DistElemMult.hpp"
 
 #include "HSSMatrixMPI.apply.hpp"
 #include "HSSMatrixMPI.compress.hpp"

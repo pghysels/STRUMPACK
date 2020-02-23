@@ -33,14 +33,16 @@
 #include <algorithm>
 #include <random>
 #include <vector>
+#include <cmath>
 
-#include "misc/TaskTimer.hpp"
 #include "StrumpackParameters.hpp"
-#include "CompressedSparseMatrix.hpp"
-#include "MatrixReordering.hpp"
-#include "CSRGraph.hpp"
+#include "misc/TaskTimer.hpp"
+#include "dense/BLASLAPACKWrapper.hpp"
+#include "sparse/CompressedSparseMatrix.hpp"
+#include "sparse/MatrixReordering.hpp"
+#include "sparse/CSRGraph.hpp"
 #if defined(STRUMPACK_USE_MPI)
-#include "ExtendAdd.hpp"
+#include "sparse/ExtendAdd.hpp"
 #endif
 #if defined(_OPENMP)
 #include "omp.h"

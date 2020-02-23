@@ -37,11 +37,11 @@
 
 #include "misc/TaskTimer.hpp"
 #include "dense/BLASLAPACKWrapper.hpp"
-#include "CompressedSparseMatrix.hpp"
-#include "MatrixReordering.hpp"
+#include "sparse/CompressedSparseMatrix.hpp"
+#include "sparse/MatrixReordering.hpp"
 #include "BLR/BLRMatrix.hpp"
 #if defined(STRUMPACK_USE_MPI)
-#include "ExtendAdd.hpp"
+#include "sparse/ExtendAdd.hpp"
 #endif
 
 namespace strumpack {

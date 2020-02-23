@@ -28,9 +28,6 @@
 #ifndef HSS_MATRIX_MPI_COMPRESS_KERNEL_HPP
 #define HSS_MATRIX_MPI_COMPRESS_KERNEL_HPP
 
-#include "misc/RandomWrapper.hpp"
-#include "DistSamples.hpp"
-#include "DistElemMult.hpp"
 #include "clustering/NeighborSearch.hpp"
 
 namespace strumpack {

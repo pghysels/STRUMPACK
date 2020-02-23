@@ -35,7 +35,7 @@
 #include <cmath>
 #include "misc/TaskTimer.hpp"
 #include "dense/DistributedMatrix.hpp"
-#include "CompressedSparseMatrix.hpp"
+#include "sparse/CompressedSparseMatrix.hpp"
 #include "FrontalMatrixMPI.hpp"
 #if defined(STRUMPACK_USE_ZFP)
 #include "FrontalMatrixLossy.hpp"

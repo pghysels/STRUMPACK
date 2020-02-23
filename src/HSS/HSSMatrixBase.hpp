@@ -42,9 +42,7 @@
 #if defined(STRUMPACK_USE_MPI)
 #include "dense/DistributedMatrix.hpp"
 #include "HSSExtraMPI.hpp"
-#include "DistSamples.hpp"
 #include "HSSMatrixMPI.hpp"
-#include "DistElemMult.hpp"
 #endif
 
 namespace strumpack {

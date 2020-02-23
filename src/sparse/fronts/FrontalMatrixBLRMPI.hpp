@@ -37,8 +37,8 @@
 #include "misc/MPIWrapper.hpp"
 #include "dense/DistributedMatrix.hpp"
 #include "BLR/BLRMatrixMPI.hpp"
-#include "CompressedSparseMatrix.hpp"
-#include "MatrixReordering.hpp"
+#include "sparse/CompressedSparseMatrix.hpp"
+#include "sparse/MatrixReordering.hpp"
 #include "FrontalMatrixMPI.hpp"
 
 namespace strumpack {

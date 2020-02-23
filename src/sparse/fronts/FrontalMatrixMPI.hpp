@@ -36,8 +36,8 @@
 #include "misc/MPIWrapper.hpp"
 #include "misc/TaskTimer.hpp"
 #include "dense/DistributedMatrix.hpp"
-#include "CompressedSparseMatrix.hpp"
-#include "MatrixReordering.hpp"
+#include "sparse/CompressedSparseMatrix.hpp"
+#include "sparse/MatrixReordering.hpp"
 
 namespace strumpack {
 

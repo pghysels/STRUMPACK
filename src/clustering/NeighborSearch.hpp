@@ -37,8 +37,8 @@
 #include <random>
 #include <chrono>
 
-#include "../dense/DenseMatrix.hpp"
-#include "../kernel/Metrics.hpp"
+#include "dense/DenseMatrix.hpp"
+#include "kernel/Metrics.hpp"
 
 namespace strumpack {
 

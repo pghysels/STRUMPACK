@@ -545,13 +545,6 @@ install(FILES
   src/sparse/CompressedSparseMatrix.hpp
   src/sparse/ETree.hpp
   src/sparse/EliminationTree.hpp
-  src/sparse/FrontFactory.hpp
-  src/sparse/FrontalMatrix.hpp
-  src/sparse/FrontalMatrixDense.hpp
-  src/sparse/FrontalMatrixHSS.hpp
-  src/sparse/FrontalMatrixBLR.hpp
-  src/sparse/FrontalMatrixHODLR.hpp
-  src/sparse/FrontalMatrixLossy.hpp
   src/sparse/GeometricReordering.hpp
   src/sparse/MatrixReordering.hpp
   src/sparse/MetisReordering.hpp
@@ -562,6 +555,16 @@ install(FILES
   DESTINATION include/sparse)
 
 install(FILES
+  src/sparse/fronts/FrontFactory.hpp
+  src/sparse/fronts/FrontalMatrix.hpp
+  src/sparse/fronts/FrontalMatrixDense.hpp
+  src/sparse/fronts/FrontalMatrixHSS.hpp
+  src/sparse/fronts/FrontalMatrixBLR.hpp
+  src/sparse/fronts/FrontalMatrixHODLR.hpp
+  src/sparse/fronts/FrontalMatrixLossy.hpp
+  DESTINATION include/sparse/fronts)
+
+install(FILES
   src/sparse/iterative/IterativeSolvers.hpp
   DESTINATION include/sparse/iterative)
 
@@ -570,21 +573,22 @@ if(TPL_ENABLE_CUBLAS)
     src/dense/CUDAWrapper.hpp
     DESTINATION include/dense)
   install(FILES
-    src/sparse/FrontalMatrixCUBLAS.hpp
-    DESTINATION include/sparse)
+    src/sparse/fronts/FrontalMatrixCUBLAS.hpp
+    DESTINATION include/sparse/fronts)
 endif()
+
+# src/HSS/HSSMatrix.factor.hpp
+# src/HSS/HSSMatrix.compress.hpp
+# src/HSS/HSSMatrix.compress_stable.hpp
+# src/HSS/HSSMatrix.compress_kernel.hpp
+# src/HSS/HSSMatrix.extract.hpp
+# src/HSS/HSSMatrix.Schur.hpp
+# src/HSS/HSSMatrix.apply.hpp
+# src/HSS/HSSMatrix.solve.hpp
 
 install(FILES
   src/HSS/HSSMatrix.hpp
-  src/HSS/HSSMatrix.factor.hpp
-  src/HSS/HSSMatrix.compress.hpp
-  src/HSS/HSSMatrix.compress_stable.hpp
-  src/HSS/HSSMatrix.compress_kernel.hpp
-  src/HSS/HSSMatrix.extract.hpp
   src/HSS/HSSBasisID.hpp
-  src/HSS/HSSMatrix.Schur.hpp
-  src/HSS/HSSMatrix.apply.hpp
-  src/HSS/HSSMatrix.solve.hpp
   src/HSS/HSSExtra.hpp
   src/HSS/HSSMatrixBase.hpp
   src/HSS/HSSPartitionTree.hpp
@@ -609,8 +613,8 @@ if(TPL_ENABLE_BPACK)
     DESTINATION include/HODLR)
 
   install(FILES
-    src/sparse/FrontalMatrixHODLR.hpp
-    DESTINATION include/sparse)
+    src/sparse/fronts/FrontalMatrixHODLR.hpp
+    DESTINATION include/sparse/fronts)
 endif()
 
 if(STRUMPACK_USE_MPI)
@@ -634,10 +638,6 @@ if(STRUMPACK_USE_MPI)
     src/sparse/CSRMatrixMPI.hpp
     src/sparse/EliminationTreeMPI.hpp
     src/sparse/EliminationTreeMPIDist.hpp
-    src/sparse/FrontalMatrixDenseMPI.hpp
-    src/sparse/FrontalMatrixHSSMPI.hpp
-    src/sparse/FrontalMatrixMPI.hpp
-    src/sparse/FrontalMatrixBLRMPI.hpp
     src/sparse/GeometricReorderingMPI.hpp
     src/sparse/MatrixReorderingMPI.hpp
     src/sparse/PTScotchReordering.hpp
@@ -649,31 +649,39 @@ if(STRUMPACK_USE_MPI)
     DESTINATION include/sparse)
 
   install(FILES
+    src/sparse/fronts/FrontalMatrixDenseMPI.hpp
+    src/sparse/fronts/FrontalMatrixHSSMPI.hpp
+    src/sparse/fronts/FrontalMatrixMPI.hpp
+    src/sparse/fronts/FrontalMatrixBLRMPI.hpp
+    DESTINATION include/sparse/fronts)
+
+  install(FILES
     src/sparse/iterative/IterativeSolversMPI.hpp
     DESTINATION include/sparse/iterative)
 
   if(TPL_ENABLE_BPACK)
     install(FILES
-      src/sparse/FrontalMatrixHODLRMPI.hpp
-      DESTINATION include/sparse)
+      src/sparse/fronts/FrontalMatrixHODLRMPI.hpp
+      DESTINATION include/sparse/fronts)
   endif()
+
+  # src/HSS/HSSMatrixMPI.apply.hpp
+  # src/HSS/HSSMatrixMPI.compress.hpp
+  # src/HSS/HSSMatrixMPI.compress_stable.hpp
+  # src/HSS/HSSMatrixMPI.compress_kernel.hpp
+  # src/HSS/HSSMatrixMPI.factor.hpp
+  # src/HSS/HSSMatrixMPI.extract.hpp
+  # src/HSS/HSSMatrixMPI.extract_blocks.hpp
+  # src/HSS/HSSMatrixMPI.solve.hpp
+  # src/HSS/HSSMatrixMPI.Schur.hpp
+  # src/HSS/BlockCyclic2BlockRow.hpp
 
   install(FILES
     src/HSS/HSSMatrixMPI.hpp
-    src/HSS/HSSMatrixMPI.apply.hpp
-    src/HSS/HSSMatrixMPI.compress.hpp
-    src/HSS/HSSMatrixMPI.compress_stable.hpp
-    src/HSS/HSSMatrixMPI.compress_kernel.hpp
-    src/HSS/HSSMatrixMPI.factor.hpp
-    src/HSS/HSSMatrixMPI.extract.hpp
-    src/HSS/HSSMatrixMPI.extract_blocks.hpp
-    src/HSS/HSSMatrixMPI.solve.hpp
     src/HSS/HSSExtraMPI.hpp
     src/HSS/HSSBasisIDMPI.hpp
     src/HSS/DistSamples.hpp
     src/HSS/DistElemMult.hpp
-    src/HSS/HSSMatrixMPI.Schur.hpp
-    src/HSS/BlockCyclic2BlockRow.hpp
     DESTINATION include/HSS)
 
   install(FILES

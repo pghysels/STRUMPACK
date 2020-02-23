@@ -34,6 +34,7 @@
 #include "misc/MPIWrapper.hpp"
 #include "HSSExtraMPI.hpp"
 #include "DistSamples.hpp"
+#include "DistElemMult.hpp"
 #include "HSSBasisIDMPI.hpp"
 #include "kernel/Kernel.hpp"
 

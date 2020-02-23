@@ -31,7 +31,7 @@
 
 #include <iostream>
 #include <algorithm>
-#include "CSRGraph.hpp"
+#include "sparse/CSRGraph.hpp"
 #include "FrontalMatrixDense.hpp"
 #include "FrontalMatrixHSS.hpp"
 #include "FrontalMatrixBLR.hpp"

@@ -35,13 +35,7 @@
 #include <cmath>
 #include <random>
 
-#include "misc/TaskTimer.hpp"
-#include "dense/BLASLAPACKWrapper.hpp"
-#include "CompressedSparseMatrix.hpp"
-#include "MatrixReordering.hpp"
-#if defined(STRUMPACK_USE_MPI)
-#include "ExtendAdd.hpp"
-#endif
+#include "FrontalMatrix.hpp"
 
 namespace strumpack {
 
