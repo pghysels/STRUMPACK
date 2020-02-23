@@ -422,6 +422,9 @@ set(LIB_STRUMPACK_SOURCES
   src/sparse/rcm/genrcm.f
   src/sparse/rcm/rootls.f
   src/sparse/strumpack_mc64ad.c
+  src/sparse/iterative/BiCGStab.cpp
+  src/sparse/iterative/GMRes.cpp
+  src/sparse/iterative/IterativeRefinement.cpp
   src/clustering/PCAPartitioning.cpp
   src/clustering/CobblePartitioning.cpp
   src/clustering/KMeans.cpp
@@ -475,9 +478,14 @@ endif()
 if(STRUMPACK_USE_MPI)
   list(APPEND LIB_STRUMPACK_SOURCES
     src/dense/ScaLAPACKWrapper.cpp
-    src/dense/lapack/pcgeqpftol.f src/dense/lapack/pdgeqpftol.f
-    src/dense/lapack/psgeqpftol.f src/dense/lapack/pzgeqpftol.f
-    src/sparse/MUMPS/ana_orderings.F)
+    src/dense/lapack/pcgeqpftol.f
+    src/dense/lapack/pdgeqpftol.f
+    src/dense/lapack/psgeqpftol.f
+    src/dense/lapack/pzgeqpftol.f
+    src/sparse/MUMPS/ana_orderings.F
+    src/sparse/iterative/GMResMPI.cpp
+    src/sparse/iterative/BiCGStabMPI.cpp
+    src/sparse/iterative/IterativeRefinementMPI.cpp)
 endif()
 
 add_library(strumpack ${LIB_STRUMPACK_SOURCES})
@@ -532,7 +540,6 @@ install(FILES
   DESTINATION include/dense)
 
 install(FILES
-  src/sparse/BiCGStab.hpp
   src/sparse/CSRGraph.hpp
   src/sparse/CSRMatrix.hpp
   src/sparse/CompressedSparseMatrix.hpp
@@ -545,9 +552,7 @@ install(FILES
   src/sparse/FrontalMatrixBLR.hpp
   src/sparse/FrontalMatrixHODLR.hpp
   src/sparse/FrontalMatrixLossy.hpp
-  src/sparse/GMRes.hpp
   src/sparse/GeometricReordering.hpp
-  src/sparse/IterativeRefinement.hpp
   src/sparse/MatrixReordering.hpp
   src/sparse/MetisReordering.hpp
   src/sparse/Redistribute.hpp
@@ -555,6 +560,10 @@ install(FILES
   src/sparse/RCMReordering.hpp
   src/sparse/SeparatorTree.hpp
   DESTINATION include/sparse)
+
+install(FILES
+  src/sparse/iterative/IterativeSolvers.hpp
+  DESTINATION include/sparse/iterative)
 
 if(TPL_ENABLE_CUBLAS)
   install(FILES
@@ -622,7 +631,6 @@ if(STRUMPACK_USE_MPI)
     DESTINATION include/dense)
 
   install(FILES
-    src/sparse/BiCGStabMPI.hpp
     src/sparse/CSRMatrixMPI.hpp
     src/sparse/EliminationTreeMPI.hpp
     src/sparse/EliminationTreeMPIDist.hpp
@@ -630,9 +638,7 @@ if(STRUMPACK_USE_MPI)
     src/sparse/FrontalMatrixHSSMPI.hpp
     src/sparse/FrontalMatrixMPI.hpp
     src/sparse/FrontalMatrixBLRMPI.hpp
-    src/sparse/GMResMPI.hpp
     src/sparse/GeometricReorderingMPI.hpp
-    src/sparse/IterativeRefinementMPI.hpp
     src/sparse/MatrixReorderingMPI.hpp
     src/sparse/PTScotchReordering.hpp
     src/sparse/ParMetisReordering.hpp
@@ -641,6 +647,10 @@ if(STRUMPACK_USE_MPI)
     src/sparse/ExtendAdd.hpp
     src/sparse/mumps_symqamd.hpp
     DESTINATION include/sparse)
+
+  install(FILES
+    src/sparse/iterative/IterativeSolversMPI.hpp
+    DESTINATION include/sparse/iterative)
 
   if(TPL_ENABLE_BPACK)
     install(FILES

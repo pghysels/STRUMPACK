@@ -30,13 +30,12 @@
  * \brief Contains the definition of MPI distributed sparse solver
  * class with REPLICATED input.
  */
-#ifndef STRUMPACK_SPARSE_SOLVER_MPI_H
-#define STRUMPACK_SPARSE_SOLVER_MPI_H
+#ifndef STRUMPACK_SPARSE_SOLVER_MPI_HPP
+#define STRUMPACK_SPARSE_SOLVER_MPI_HPP
 
 #include "StrumpackSparseSolver.hpp"
 #include "sparse/EliminationTreeMPI.hpp"
 #include "sparse/MatrixReorderingMPI.hpp"
-#include "mpi.h"
 
 namespace strumpack {
 

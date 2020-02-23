@@ -29,16 +29,12 @@
  * \file StrumpackSparseSolverMPIDist.hpp
  * \brief Contains the definition of fully distributed sparse solver class.
  */
-#ifndef STRUMPACK_SPARSE_SOLVER_MPI_DIST_H
-#define STRUMPACK_SPARSE_SOLVER_MPI_DIST_H
+#ifndef STRUMPACK_SPARSE_SOLVER_MPI_DIST_HPP
+#define STRUMPACK_SPARSE_SOLVER_MPI_DIST_HPP
 
 #include "StrumpackSparseSolverMPI.hpp"
 #include "sparse/EliminationTreeMPIDist.hpp"
-#include "sparse/MatrixReorderingMPI.hpp"
-#include "sparse/GMResMPI.hpp"
-#include "sparse/IterativeRefinementMPI.hpp"
-#include "sparse/BiCGStabMPI.hpp"
-#include "misc/MPIWrapper.hpp"
+#include "sparse/iterative/IterativeSolversMPI.hpp"
 
 namespace strumpack {
 
@@ -401,38 +397,42 @@ namespace strumpack {
       mat_mpi_->spmv(x, y);
     };
 
-    auto gmres = [&](const std::function<void(scalar_t*)>& prec) {
-      GMResMPI<scalar_t>
-      (comm_, spmv, prec, n_local, x.data(), bloc.data(),
-       opts_.rel_tol(), opts_.abs_tol(),
-       this->Krylov_its_, opts_.maxit(),
-       opts_.gmres_restart(), opts_.GramSchmidt_type(),
-       use_initial_guess, opts_.verbose() && is_root_);
-    };
-    auto bicgstab = [&](const std::function<void(scalar_t*)>& prec) {
-      BiCGStabMPI<scalar_t>
-      (comm_, spmv, prec, n_local, x.data(), bloc.data(),
-       opts_.rel_tol(), opts_.abs_tol(),
-       this->Krylov_its_, opts_.maxit(),
-       use_initial_guess, opts_.verbose() && is_root_);
-    };
-    auto MFsolve = [&](scalar_t* w) {
-      DenseMW_t X(n_local, x.cols(), w, x.ld());
-      tree()->multifrontal_solve_dist(X, mat_mpi_->dist());
-    };
-    auto refine = [&]() {
-      IterativeRefinementMPI<scalar_t,integer_t>
-      (comm_, *mat_mpi_, [&](DenseM_t& w) {
-        tree()->multifrontal_solve_dist(w, mat_mpi_->dist()); },
-        x, bloc, opts_.rel_tol(), opts_.abs_tol(),
-        this->Krylov_its_, opts_.maxit(),
-        use_initial_guess, opts_.verbose() && is_root_);
-    };
+    auto gmres =
+      [&](const std::function<void(scalar_t*)>& prec) {
+        iterative::GMResMPI<scalar_t>
+          (comm_, spmv, prec, n_local, x.data(), bloc.data(),
+           opts_.rel_tol(), opts_.abs_tol(),
+           this->Krylov_its_, opts_.maxit(),
+           opts_.gmres_restart(), opts_.GramSchmidt_type(),
+           use_initial_guess, opts_.verbose() && is_root_);
+      };
+    auto bicgstab =
+      [&](const std::function<void(scalar_t*)>& prec) {
+        iterative::BiCGStabMPI<scalar_t>
+          (comm_, spmv, prec, n_local, x.data(), bloc.data(),
+           opts_.rel_tol(), opts_.abs_tol(),
+           this->Krylov_its_, opts_.maxit(),
+           use_initial_guess, opts_.verbose() && is_root_);
+      };
+    auto MFsolve =
+      [&](scalar_t* w) {
+        DenseMW_t X(n_local, x.cols(), w, x.ld());
+        tree()->multifrontal_solve_dist(X, mat_mpi_->dist());
+      };
+    auto refine =
+      [&]() {
+        iterative::IterativeRefinementMPI<scalar_t,integer_t>
+          (comm_, *mat_mpi_,
+           [&](DenseM_t& w) {
+             tree()->multifrontal_solve_dist(w, mat_mpi_->dist()); },
+           x, bloc, opts_.rel_tol(), opts_.abs_tol(),
+           this->Krylov_its_, opts_.maxit(),
+           use_initial_guess, opts_.verbose() && is_root_);
+      };
 
     switch (opts_.Krylov_solver()) {
     case KrylovSolver::AUTO: {
-      if (opts_.compression() != CompressionType::NONE
-          && x.cols() == 1)
+      if (opts_.compression() != CompressionType::NONE && x.cols() == 1)
         gmres(MFsolve);
       else refine();
     }; break;

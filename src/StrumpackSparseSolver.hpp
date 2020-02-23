@@ -50,9 +50,8 @@
 #include "sparse/CSRMatrix.hpp"
 #include "sparse/MatrixReordering.hpp"
 #include "sparse/EliminationTree.hpp"
-#include "sparse/GMRes.hpp"
-#include "sparse/BiCGStab.hpp"
-#include "sparse/IterativeRefinement.hpp"
+#include "sparse/iterative/IterativeSolvers.hpp"
+
 
 #if defined(STRUMPACK_USE_TBB_MALLOC)
 void* operator new(std::size_t sz) throw(std::bad_alloc) {
@@ -988,35 +987,38 @@ namespace strumpack {
       matrix()->spmv(x, y);
     };
 
-    auto gmres_solve = [&](const std::function<void(scalar_t*)>& prec) {
-      GMRes<scalar_t>
-      (spmv, prec, x.rows(), x.data(), bloc.data(),
-       opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
-       opts_.gmres_restart(), opts_.GramSchmidt_type(),
-       use_initial_guess, opts_.verbose() && is_root_);
-    };
-    auto bicgstab_solve = [&](const std::function<void(scalar_t*)>& prec) {
-      BiCGStab<scalar_t>
-      (spmv, prec, x.rows(), x.data(), bloc.data(),
-       opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
-       use_initial_guess, opts_.verbose() && is_root_);
-    };
-    auto MFsolve = [&](scalar_t* w) {
-      DenseMW_t X(x.rows(), 1, w, x.ld());
-      tree()->multifrontal_solve(X);
-    };
-    auto refine = [&]() {
-      IterativeRefinement<scalar_t,integer_t>
-      (*matrix(), [&](DenseM_t& w) { tree()->multifrontal_solve(w); },
-       x, bloc, opts_.rel_tol(), opts_.abs_tol(),
-       Krylov_its_, opts_.maxit(), use_initial_guess,
-       opts_.verbose() && is_root_);
-    };
+    auto gmres_solve =
+      [&](const std::function<void(scalar_t*)>& prec) {
+        iterative::GMRes<scalar_t>
+          (spmv, prec, x.rows(), x.data(), bloc.data(),
+           opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
+           opts_.gmres_restart(), opts_.GramSchmidt_type(),
+           use_initial_guess, opts_.verbose() && is_root_);
+      };
+    auto bicgstab_solve =
+      [&](const std::function<void(scalar_t*)>& prec) {
+        iterative::BiCGStab<scalar_t>
+          (spmv, prec, x.rows(), x.data(), bloc.data(),
+           opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
+           use_initial_guess, opts_.verbose() && is_root_);
+      };
+    auto MFsolve =
+      [&](scalar_t* w) {
+        DenseMW_t X(x.rows(), 1, w, x.ld());
+        tree()->multifrontal_solve(X);
+      };
+    auto refine =
+      [&]() {
+        iterative::IterativeRefinement<scalar_t,integer_t>
+          (*matrix(), [&](DenseM_t& w) { tree()->multifrontal_solve(w); },
+           x, bloc, opts_.rel_tol(), opts_.abs_tol(),
+           Krylov_its_, opts_.maxit(), use_initial_guess,
+           opts_.verbose() && is_root_);
+      };
 
     switch (opts_.Krylov_solver()) {
     case KrylovSolver::AUTO: {
-      if (opts_.compression() != CompressionType::NONE
-          && x.cols() == 1)
+      if (opts_.compression() != CompressionType::NONE && x.cols() == 1)
         gmres_solve(MFsolve);
       else refine();
     }; break;

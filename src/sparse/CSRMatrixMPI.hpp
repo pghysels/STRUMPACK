@@ -30,8 +30,8 @@
  * \brief Contains the CSRMatrixMPI class definition, a class
  * representing a block-row distributed compressed sparse row matrix.
  */
-#ifndef CSRMATRIXMPI_HPP
-#define CSRMATRIXMPI_HPP
+#ifndef STRUMPACK_CSRMATRIX_MPI_HPP
+#define STRUMPACK_CSRMATRIX_MPI_HPP
 #include <sstream>
 #include <fstream>
 #include <vector>
@@ -41,6 +41,7 @@
 #include "misc/MPIWrapper.hpp"
 #include "dense/BLASLAPACKWrapper.hpp"
 #include "CSRGraph.hpp"
+#include "CSRMatrix.hpp"
 #if defined(STRUMPACK_USE_COMBBLAS)
 #include "AWPMCombBLAS.hpp"
 #endif
@@ -1211,4 +1212,4 @@ namespace strumpack {
 
 } // end namespace strumpack
 
-#endif //CSRMATRIXMPI_HPP
+#endif // STRUMPACK_CSRMATRIX_MPI_HPP
