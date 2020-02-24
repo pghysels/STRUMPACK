@@ -42,18 +42,16 @@
 namespace strumpack {
   namespace HSS {
 
-    template<typename scalar_t>
-    HSSMatrix<scalar_t>::HSSMatrix() : HSSMatrixBase<scalar_t>(0, 0, true) {}
+    template<typename scalar_t> HSSMatrix<scalar_t>::HSSMatrix()
+      : HSSMatrixBase<scalar_t>(0, 0, true) {}
 
-    template<typename scalar_t>
-    HSSMatrix<scalar_t>::HSSMatrix
+    template<typename scalar_t> HSSMatrix<scalar_t>::HSSMatrix
     (const DenseMatrix<scalar_t>& A, const opts_t& opts)
       : HSSMatrix<scalar_t>(A.rows(), A.cols(), opts) {
       compress(A, opts);
     }
 
-    template<typename scalar_t>
-    HSSMatrix<scalar_t>::HSSMatrix
+    template<typename scalar_t> HSSMatrix<scalar_t>::HSSMatrix
     (std::size_t m, std::size_t n, const opts_t& opts)
       : HSSMatrix<scalar_t>(m, n, opts, true) { }
 
@@ -81,13 +79,11 @@ namespace strumpack {
       }
     }
 
-    template<typename scalar_t>
-    HSSMatrix<scalar_t>::HSSMatrix
+    template<typename scalar_t> HSSMatrix<scalar_t>::HSSMatrix
     (const HSSPartitionTree& t, const opts_t& opts)
       : HSSMatrix<scalar_t>(t, opts, true) { }
 
-    template<typename scalar_t>
-    HSSMatrix<scalar_t>::HSSMatrix
+    template<typename scalar_t> HSSMatrix<scalar_t>::HSSMatrix
     (kernel::Kernel<real_t>& K, const opts_t& opts)
       : HSSMatrixBase<scalar_t>(K.n(), K.n(), true) {
       TaskTimer timer("clustering");
@@ -392,13 +388,6 @@ namespace strumpack {
     }
 
 
-    /**
-     * Write a gnuplot script to draw this an matrix.
-     *
-     * \param H HSS matrix to draw.
-     * \param name Name of the HSS matrix. The script will be created
-     * in the file plotname.gnuplot.
-     */
     template<typename scalar_t>
     void draw(const HSSMatrix<scalar_t>& H, const std::string& name) {
       std::ofstream of("plot" + name + ".gnuplot");
@@ -411,17 +400,6 @@ namespace strumpack {
       of.close();
     }
 
-    /**
-     * Compute C = op(A) * B + beta * C, with HSS matrix A.
-     *
-     * \param op Transpose/complex conjugate or none to be applied to
-     * the HSS matrix A.
-     * \param A HSS matrix
-     * \param B Dense matrix
-     * \param beta Scalar
-     * \param C Result, should already be allocated to the appropriate
-     * size.
-     */
     template<typename scalar_t> void apply_HSS
     (Trans op, const HSSMatrix<scalar_t>& A, const DenseMatrix<scalar_t>& B,
      scalar_t beta, DenseMatrix<scalar_t>& C) {
@@ -445,6 +423,28 @@ namespace strumpack {
     template class HSSMatrix<double>;
     template class HSSMatrix<std::complex<float>>;
     template class HSSMatrix<std::complex<double>>;
+
+    template void apply_HSS
+    (Trans op, const HSSMatrix<float>& A, const DenseMatrix<float>& B,
+     float beta, DenseMatrix<float>& C);
+    template void apply_HSS
+    (Trans op, const HSSMatrix<double>& A, const DenseMatrix<double>& B,
+     double beta, DenseMatrix<double>& C);
+    template void apply_HSS
+    (Trans op, const HSSMatrix<std::complex<float>>& A,
+     const DenseMatrix<std::complex<float>>& B, std::complex<float> beta,
+     DenseMatrix<std::complex<float>>& C);
+    template void apply_HSS
+    (Trans op, const HSSMatrix<std::complex<double>>& A,
+     const DenseMatrix<std::complex<double>>& B, std::complex<double> beta,
+     DenseMatrix<std::complex<double>>& C);
+
+    template void draw(const HSSMatrix<float>& H, const std::string& name);
+    template void draw(const HSSMatrix<double>& H, const std::string& name);
+    template void draw(const HSSMatrix<std::complex<float>>& H,
+                       const std::string& name);
+    template void draw(const HSSMatrix<std::complex<double>>& H,
+                       const std::string& name);
 
   } // end namespace HSS
 } // end namespace strumpack

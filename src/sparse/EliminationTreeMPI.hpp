@@ -39,6 +39,7 @@
 #include "CSRMatrixMPI.hpp"
 #include "MatrixReorderingMPI.hpp"
 #include "EliminationTree.hpp"
+#include "fronts/FrontalMatrixMPI.hpp"
 
 namespace strumpack {
 

@@ -31,8 +31,10 @@
 #include <iostream>
 
 #include "HSSMatrixBase.hpp"
+#if defined(STRUMPACK_USE_MPI)
 #include "DistSamples.hpp"
 #include "DistElemMult.hpp"
+#endif
 
 namespace strumpack {
   namespace HSS {

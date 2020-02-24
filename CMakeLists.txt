@@ -288,11 +288,7 @@ if(TPL_ENABLE_SLATE)
   if(DEFINED TPL_SLATE_LIBRARIES)
     set(LIBS ${LIBS} ${TPL_SLATE_LIBRARIES})
     include_directories(${TPL_SLATE_INCLUDE_DIRS})
-    ## TODO do we need to add other definitions???
-    # if(STRUMPACK_USE_MPI)
-    #   add_definitions(-DSLATE_WITH_MPI)
-    #   message(STATUS "compile definitions" "${COMPILE_DEFINITIONS}")
-    # endif()
+    # add_compile_definitions(-DSTRUMPACK_PBLAS_BLOCKSIZE=256)
   else()
     message(WARNING "Could not find SLATE,"
      " please define TPL_SLATE_LIBRARIES and TPL_SLATE_INCLUDE_DIRS")
@@ -425,13 +421,16 @@ set(LIB_STRUMPACK_SOURCES
   src/sparse/iterative/BiCGStab.cpp
   src/sparse/iterative/GMRes.cpp
   src/sparse/iterative/IterativeRefinement.cpp
+  src/sparse/fronts/FrontFactory.cpp
+  src/sparse/fronts/FrontalMatrix.cpp
+  src/sparse/fronts/FrontalMatrixDense.cpp
+  src/sparse/fronts/FrontalMatrixHSS.cpp
   src/clustering/PCAPartitioning.cpp
   src/clustering/CobblePartitioning.cpp
   src/clustering/KMeans.cpp
   src/clustering/KDTree.cpp
   src/HSS/HSSMatrixBase.cpp
   src/HSS/HSSMatrix.cpp
-  src/HSS/HSSMatrixMPI.cpp
   src/dense/BLASLAPACKWrapper.cpp
   src/dense/BLASLAPACKOpenMPTask.cpp
   src/dense/lapack/sgeqp3tol.f src/dense/lapack/dgeqp3tol.f
@@ -463,11 +462,14 @@ set(LIB_STRUMPACK_SOURCES
   src/dense/lapack/sgelq2mod.f src/dense/lapack/dgelq2mod.f
   src/dense/lapack/cgelq2mod.f src/dense/lapack/zgelq2mod.f)
 
-if(TPL_ENABLE_BPACK)
+if(TPL_ENABLE_CUBLAS)
   list(APPEND LIB_STRUMPACK_SOURCES
-    src/HODLR/HODLRMatrix.cpp
-    src/HODLR/LRBFMatrix.cpp
-    src/HODLR/HODLRWrapper.cpp)
+    src/sparse/fronts/FrontalMatrixCUBLAS.cpp)
+endif()
+
+if(TPL_ENABLE_ZFP)
+  list(APPEND LIB_STRUMPACK_SOURCES
+    src/sparse/fronts/FrontalMatrixLossy.cpp)
 endif()
 
 if(STRUMPACK_C_INTERFACE)
@@ -483,9 +485,23 @@ if(STRUMPACK_USE_MPI)
     src/dense/lapack/psgeqpftol.f
     src/dense/lapack/pzgeqpftol.f
     src/sparse/MUMPS/ana_orderings.F
+    src/sparse/fronts/FrontalMatrixMPI.cpp
+    src/sparse/fronts/FrontalMatrixDenseMPI.cpp
+    src/sparse/fronts/FrontalMatrixHSSMPI.cpp
+    src/sparse/fronts/ExtendAdd.cpp
     src/sparse/iterative/GMResMPI.cpp
     src/sparse/iterative/BiCGStabMPI.cpp
-    src/sparse/iterative/IterativeRefinementMPI.cpp)
+    src/sparse/iterative/IterativeRefinementMPI.cpp
+    src/HSS/HSSMatrixMPI.cpp)
+
+  if(TPL_ENABLE_BPACK)
+    list(APPEND LIB_STRUMPACK_SOURCES
+      src/HODLR/HODLRMatrix.cpp
+      src/HODLR/LRBFMatrix.cpp
+      src/HODLR/HODLRWrapper.cpp
+      src/sparse/fronts/FrontalMatrixHODLR.cpp
+      src/sparse/fronts/FrontalMatrixHODLRMPI.cpp)
+  endif()
 endif()
 
 add_library(strumpack ${LIB_STRUMPACK_SOURCES})
@@ -557,11 +573,6 @@ install(FILES
 install(FILES
   src/sparse/fronts/FrontFactory.hpp
   src/sparse/fronts/FrontalMatrix.hpp
-  src/sparse/fronts/FrontalMatrixDense.hpp
-  src/sparse/fronts/FrontalMatrixHSS.hpp
-  src/sparse/fronts/FrontalMatrixBLR.hpp
-  src/sparse/fronts/FrontalMatrixHODLR.hpp
-  src/sparse/fronts/FrontalMatrixLossy.hpp
   DESTINATION include/sparse/fronts)
 
 install(FILES
@@ -572,19 +583,7 @@ if(TPL_ENABLE_CUBLAS)
   install(FILES
     src/dense/CUDAWrapper.hpp
     DESTINATION include/dense)
-  install(FILES
-    src/sparse/fronts/FrontalMatrixCUBLAS.hpp
-    DESTINATION include/sparse/fronts)
 endif()
-
-# src/HSS/HSSMatrix.factor.hpp
-# src/HSS/HSSMatrix.compress.hpp
-# src/HSS/HSSMatrix.compress_stable.hpp
-# src/HSS/HSSMatrix.compress_kernel.hpp
-# src/HSS/HSSMatrix.extract.hpp
-# src/HSS/HSSMatrix.Schur.hpp
-# src/HSS/HSSMatrix.apply.hpp
-# src/HSS/HSSMatrix.solve.hpp
 
 install(FILES
   src/HSS/HSSMatrix.hpp
@@ -611,10 +610,6 @@ if(TPL_ENABLE_BPACK)
     src/HODLR/HODLRWrapper.hpp
     src/HODLR/LRBFMatrix.hpp
     DESTINATION include/HODLR)
-
-  install(FILES
-    src/sparse/fronts/FrontalMatrixHODLR.hpp
-    DESTINATION include/sparse/fronts)
 endif()
 
 if(STRUMPACK_USE_MPI)
@@ -644,37 +639,16 @@ if(STRUMPACK_USE_MPI)
     src/sparse/ParMetisReordering.hpp
     src/sparse/PropMapSparseMatrix.hpp
     src/sparse/Redistribute.hpp
-    src/sparse/ExtendAdd.hpp
     src/sparse/mumps_symqamd.hpp
     DESTINATION include/sparse)
 
   install(FILES
-    src/sparse/fronts/FrontalMatrixDenseMPI.hpp
-    src/sparse/fronts/FrontalMatrixHSSMPI.hpp
     src/sparse/fronts/FrontalMatrixMPI.hpp
-    src/sparse/fronts/FrontalMatrixBLRMPI.hpp
     DESTINATION include/sparse/fronts)
 
   install(FILES
     src/sparse/iterative/IterativeSolversMPI.hpp
     DESTINATION include/sparse/iterative)
-
-  if(TPL_ENABLE_BPACK)
-    install(FILES
-      src/sparse/fronts/FrontalMatrixHODLRMPI.hpp
-      DESTINATION include/sparse/fronts)
-  endif()
-
-  # src/HSS/HSSMatrixMPI.apply.hpp
-  # src/HSS/HSSMatrixMPI.compress.hpp
-  # src/HSS/HSSMatrixMPI.compress_stable.hpp
-  # src/HSS/HSSMatrixMPI.compress_kernel.hpp
-  # src/HSS/HSSMatrixMPI.factor.hpp
-  # src/HSS/HSSMatrixMPI.extract.hpp
-  # src/HSS/HSSMatrixMPI.extract_blocks.hpp
-  # src/HSS/HSSMatrixMPI.solve.hpp
-  # src/HSS/HSSMatrixMPI.Schur.hpp
-  # src/HSS/BlockCyclic2BlockRow.hpp
 
   install(FILES
     src/HSS/HSSMatrixMPI.hpp

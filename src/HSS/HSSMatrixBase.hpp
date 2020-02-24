@@ -36,9 +36,11 @@
 
 #include <cassert>
 #include <iostream>
+#include <vector>
 
 #include "dense/DenseMatrix.hpp"
 #include "HSSOptions.hpp"
+#include "HSSExtra.hpp"
 #if defined(STRUMPACK_USE_MPI)
 #include "dense/DistributedMatrix.hpp"
 #include "HSSExtraMPI.hpp"

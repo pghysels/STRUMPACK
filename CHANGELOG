@@ -9,7 +9,8 @@ Version 3.xx In Progress
  - Several bug fixes and performance improvements
  - Renamed FC_GLOBAL Fortran to C macro to STRUMPACK_FC_GLOBAL,
    in order to avoid conflicts with SuperLU.
-
+ - Large refactoring of the headers into cpp files for faster
+   compilation
 
 Version 3.3.0 Released November 7, 2019
 =======================================

@@ -41,7 +41,7 @@
 #include "sparse/MatrixReordering.hpp"
 #include "BLR/BLRMatrix.hpp"
 #if defined(STRUMPACK_USE_MPI)
-#include "sparse/ExtendAdd.hpp"
+#include "ExtendAdd.hpp"
 #endif
 
 namespace strumpack {

@@ -29,29 +29,11 @@
 #ifndef FRONT_FACTORY_HPP
 #define FRONT_FACTORY_HPP
 
-#include <iostream>
-#include <algorithm>
-#include "sparse/CSRGraph.hpp"
-#include "FrontalMatrixDense.hpp"
-#include "FrontalMatrixHSS.hpp"
-#include "FrontalMatrixBLR.hpp"
-#if defined(STRUMPACK_USE_BPACK)
-#include "FrontalMatrixHODLR.hpp"
-#endif
 #if defined(STRUMPACK_USE_MPI)
-#include "FrontalMatrixDenseMPI.hpp"
-#include "FrontalMatrixHSSMPI.hpp"
-#include "FrontalMatrixBLRMPI.hpp"
-#if defined(STRUMPACK_USE_BPACK)
-#include "FrontalMatrixHODLRMPI.hpp"
+#include "misc/MPIWrapper.hpp"
 #endif
-#endif
-#if defined(STRUMPACK_USE_CUBLAS)
-#include "FrontalMatrixCUBLAS.hpp"
-#endif
-#if defined(STRUMPACK_USE_ZFP)
-#include "FrontalMatrixLossy.hpp"
-#endif
+#include "StrumpackOptions.hpp"
+
 
 namespace strumpack {
 
@@ -123,67 +105,15 @@ namespace strumpack {
        is_lossy(dsep, dupd, compressed_parent, opts));
   }
 
+  // forward definition
+  template<typename scalar_t,typename integer_t> class FrontalMatrix;
+
   template<typename scalar_t, typename integer_t>
   std::unique_ptr<FrontalMatrix<scalar_t,integer_t>> create_frontal_matrix
   (const SPOptions<scalar_t>& opts, integer_t s, integer_t sbegin,
    integer_t send, std::vector<integer_t>& upd, bool compressed_parent,
-   int level, FrontCounter& fc, bool root=true) {
-    auto dsep = send - sbegin;
-    auto dupd = upd.size();
-    std::unique_ptr<FrontalMatrix<scalar_t,integer_t>> front;
-    switch (opts.compression()) {
-    case CompressionType::NONE: {
-      if (is_CUBLAS(opts)) {
-#if defined(STRUMPACK_USE_CUBLAS)
-        front.reset
-          (new FrontalMatrixCUBLAS<scalar_t,integer_t>(s, sbegin, send, upd));
-        if (root) fc.dense++;
-#endif
-      }
-    } break;
-    case CompressionType::HSS: {
-      if (is_HSS(dsep, dupd, compressed_parent, opts)) {
-        front.reset
-          (new FrontalMatrixHSS<scalar_t,integer_t>(s, sbegin, send, upd));
-        if (root) fc.HSS++;
-      }
-    } break;
-    case CompressionType::BLR: {
-      if (is_BLR(dsep, dupd, compressed_parent, opts)) {
-        front.reset
-          (new FrontalMatrixBLR<scalar_t,integer_t>(s, sbegin, send, upd));
-        if (root) fc.BLR++;
-      }
-    } break;
-    case CompressionType::HODLR: {
-      if (is_HODLR(dsep, dupd, compressed_parent, opts)) {
-#if defined(STRUMPACK_USE_BPACK)
-        front.reset
-          (new FrontalMatrixHODLR<scalar_t,integer_t>(s, sbegin, send, upd));
-        if (root) fc.HODLR++;
-#endif
-      }
-    } break;
-    case CompressionType::LOSSY: {
-      if (is_lossy(dsep, dupd, compressed_parent, opts)) {
-#if defined(STRUMPACK_USE_ZFP)
-        front.reset
-          (new FrontalMatrixLossy<scalar_t,integer_t>(s, sbegin, send, upd));
-        if (root) fc.lossy++;
-#endif
-      }
-    } break;
-    case CompressionType::LOSSLESS: // not implemented yet, use DenseMPI
-      break;
-    };
-    if (!front) {
-      // fallback in case support for cublas/zfp/hodlr is missing
-      front.reset
-        (new FrontalMatrixDense<scalar_t,integer_t>(s, sbegin, send, upd));
-      if (root) fc.dense++;
-    }
-    return front;
-  }
+   int level, FrontCounter& fc, bool root=true);
+
 
 #if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t, typename integer_t>
@@ -191,50 +121,7 @@ namespace strumpack {
   (const SPOptions<scalar_t>& opts, integer_t s,
    integer_t sbegin, integer_t send, std::vector<integer_t>& upd,
    bool compressed_parent, int level, FrontCounter& fc,
-   const MPIComm& comm, int P, bool root) {
-    auto dsep = send - sbegin;
-    auto dupd = upd.size();
-    std::unique_ptr<FrontalMatrix<scalar_t,integer_t>> front;
-    switch (opts.compression()) {
-    case CompressionType::HSS: {
-      if (is_HSS(dsep, dupd, compressed_parent, opts)) {
-        front.reset
-          (new FrontalMatrixHSSMPI<scalar_t,integer_t>
-           (s, sbegin, send, upd, comm, P));
-        if (root) fc.HSS++;
-      }
-    } break;
-    case CompressionType::BLR: {
-      if (is_BLR(dsep, dupd, compressed_parent, opts)) {
-        front.reset
-          (new FrontalMatrixBLRMPI<scalar_t,integer_t>
-           (s, sbegin, send, upd, comm, P));
-        if (root) fc.BLR++;
-      }
-    } break;
-    case CompressionType::HODLR: {
-      if (is_HODLR(dsep, dupd, compressed_parent, opts)) {
-#if defined(STRUMPACK_USE_BPACK)
-        front.reset
-          (new FrontalMatrixHODLRMPI<scalar_t,integer_t>
-           (s, sbegin, send, upd, comm, P));
-        if (root) fc.HODLR++;
-#endif
-      }
-    } break;
-    case CompressionType::LOSSY: // handled in DenseMPI
-    case CompressionType::LOSSLESS: // not implemented yet, use DenseMPI
-    case CompressionType::NONE: break;
-    };
-    // (NONE, LOSSLESS, LOSSY or not compiled with HODLR)
-    if (!front) {
-      front.reset
-        (new FrontalMatrixDenseMPI<scalar_t,integer_t>
-         (s, sbegin, send, upd, comm, P));
-      if (root) fc.dense++;
-    }
-    return front;
-  }
+   const MPIComm& comm, int P, bool root);
 #endif
 
 } // end namespace strumpack

@@ -636,6 +636,31 @@ namespace strumpack {
       friend class HSSMatrixMPI<scalar_t>;
     };
 
+    /**
+     * Write a gnuplot script to draw this an matrix.
+     *
+     * \param H HSS matrix to draw.
+     * \param name Name of the HSS matrix. The script will be created
+     * in the file plotname.gnuplot.
+     */
+    template<typename scalar_t>
+    void draw(const HSSMatrix<scalar_t>& H, const std::string& name);
+
+    /**
+     * Compute C = op(A) * B + beta * C, with HSS matrix A.
+     *
+     * \param op Transpose/complex conjugate or none to be applied to
+     * the HSS matrix A.
+     * \param A HSS matrix
+     * \param B Dense matrix
+     * \param beta Scalar
+     * \param C Result, should already be allocated to the appropriate
+     * size.
+     */
+    template<typename scalar_t> void apply_HSS
+    (Trans op, const HSSMatrix<scalar_t>& A, const DenseMatrix<scalar_t>& B,
+     scalar_t beta, DenseMatrix<scalar_t>& C);
+
   } // end namespace HSS
 } // end namespace strumpack
 

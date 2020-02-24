@@ -32,6 +32,7 @@
 #include <iostream>
 #include <algorithm>
 #include "fronts/FrontFactory.hpp"
+#include "fronts/FrontalMatrix.hpp"
 
 namespace strumpack {
 
