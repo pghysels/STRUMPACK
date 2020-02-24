@@ -887,25 +887,25 @@ namespace strumpack {
       return sytrf(s, n, a, lda, ipiv, work.get(), ilwork);
     }
 
-    inline long long sytrf_rook_flops(long long n) {
-      return n * n * n / 3;
-    }
-    int sytrf_rook(char s, int n, float* a, int lda, int* ipiv,
-                   float* work, int lwork);
-    int sytrf_rook(char s, int n, double* a, int lda, int* ipiv,
-                   double* work, int lwork);
-    int sytrf_rook(char s, int n, std::complex<float>* a, int lda,
-                   int* ipiv, std::complex<float>* work, int lwork);
-    int sytrf_rook(char s, int n, std::complex<double>* a, int lda,
-                   int* ipiv, std::complex<double>* work, int lwork);
-    template<typename scalar> inline int sytrf_rook
-    (char s, int n, scalar* a, int lda, int* ipiv) {
-      scalar lwork;
-      sytrf_rook(s, n, a, lda, ipiv, &lwork, -1);
-      int ilwork = int(std::real(lwork));
-      std::unique_ptr<scalar[]> work(new scalar[ilwork]);
-      return sytrf_rook(s, n, a, lda, ipiv, work.get(), ilwork);
-    }
+    // inline long long sytrf_rook_flops(long long n) {
+    //   return n * n * n / 3;
+    // }
+    // int sytrf_rook(char s, int n, float* a, int lda, int* ipiv,
+    //                float* work, int lwork);
+    // int sytrf_rook(char s, int n, double* a, int lda, int* ipiv,
+    //                double* work, int lwork);
+    // int sytrf_rook(char s, int n, std::complex<float>* a, int lda,
+    //                int* ipiv, std::complex<float>* work, int lwork);
+    // int sytrf_rook(char s, int n, std::complex<double>* a, int lda,
+    //                int* ipiv, std::complex<double>* work, int lwork);
+    // template<typename scalar> inline int sytrf_rook
+    // (char s, int n, scalar* a, int lda, int* ipiv) {
+    //   scalar lwork;
+    //   sytrf_rook(s, n, a, lda, ipiv, &lwork, -1);
+    //   int ilwork = int(std::real(lwork));
+    //   std::unique_ptr<scalar[]> work(new scalar[ilwork]);
+    //   return sytrf_rook(s, n, a, lda, ipiv, work.get(), ilwork);
+    // }
 
 
     inline long long sytrs_flops(long long m, long long n, long long k) {

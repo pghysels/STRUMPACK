@@ -619,18 +619,18 @@ namespace strumpack {
          (char* s, int* n, std::complex<double>* a, int*lda, int* ipiv,
             std::complex<double>* work, int* lwork, int* info);
 
-      void STRUMPACK_FC_GLOBAL_(ssytrf_rook,SSYTRF_ROOK)
-         (char* s, int* n, float* a, int*lda, int* ipiv, float* work,
-            int* lwork, int* info);
-      void STRUMPACK_FC_GLOBAL_(dsytrf_rook,DSYTRF_ROOK)
-         (char* s, int* n, double* a, int*lda, int* ipiv, double* work,
-            int* lwork, int* info);
-      void STRUMPACK_FC_GLOBAL_(csytrf_rook,CSYTRF_ROOK)
-         (char* s, int* n, std::complex<float>* a, int*lda, int* ipiv,
-            std::complex<float>* work, int* lwork, int* info);
-      void STRUMPACK_FC_GLOBAL_(zsytrf_rook,ZSYTRF_ROOK)
-         (char* s, int* n, std::complex<double>* a, int*lda, int* ipiv,
-            std::complex<double>* work, int* lwork, int* info);
+      // void STRUMPACK_FC_GLOBAL_(ssytrf_rook,SSYTRF_ROOK)
+      //    (char* s, int* n, float* a, int*lda, int* ipiv, float* work,
+      //       int* lwork, int* info);
+      // void STRUMPACK_FC_GLOBAL_(dsytrf_rook,DSYTRF_ROOK)
+      //    (char* s, int* n, double* a, int*lda, int* ipiv, double* work,
+      //       int* lwork, int* info);
+      // void STRUMPACK_FC_GLOBAL_(csytrf_rook,CSYTRF_ROOK)
+      //    (char* s, int* n, std::complex<float>* a, int*lda, int* ipiv,
+      //       std::complex<float>* work, int* lwork, int* info);
+      // void STRUMPACK_FC_GLOBAL_(zsytrf_rook,ZSYTRF_ROOK)
+      //    (char* s, int* n, std::complex<double>* a, int*lda, int* ipiv,
+      //       std::complex<double>* work, int* lwork, int* info);
 
       void STRUMPACK_FC_GLOBAL(ssytrs,SSYTRS)
         (char* s, int* n, int* nrhs, const float* a, int* lda, const int* ipiv,
@@ -645,18 +645,18 @@ namespace strumpack {
         (char* s, int* n, int* nrhs, const std::complex<double>* a, int* lda,
          const int* ipiv, std::complex<double>* b, int* ldb, int* info);
 
-      void STRUMPACK_FC_GLOBAL_(ssytrs_rook,SSYTRS_ROOK)
-        (char* s, int* n, int* nrhs, const float* a, int* lda, const int* ipiv,
-         float* b, int* ldb, int* info);
-      void STRUMPACK_FC_GLOBAL_(dsytrs_rook,DSYTRS_ROOK)
-        (char* s, int* n, int* nrhs, const double* a, int* lda, const int* ipiv,
-         double* b, int* ldb, int* info);
-      void STRUMPACK_FC_GLOBAL_(csytrs_rook,CSYTRS_ROOK)
-        (char* s, int* n, int* nrhs, const std::complex<float>* a, int* lda,
-         const int* ipiv, std::complex<float>* b, int* ldb, int* info);
-      void STRUMPACK_FC_GLOBAL_(zsytrs_rook,ZSYTRS_ROOK)
-        (char* s, int* n, int* nrhs, const std::complex<double>* a, int* lda,
-         const int* ipiv, std::complex<double>* b, int* ldb, int* info);
+      // void STRUMPACK_FC_GLOBAL_(ssytrs_rook,SSYTRS_ROOK)
+      //   (char* s, int* n, int* nrhs, const float* a, int* lda, const int* ipiv,
+      //    float* b, int* ldb, int* info);
+      // void STRUMPACK_FC_GLOBAL_(dsytrs_rook,DSYTRS_ROOK)
+      //   (char* s, int* n, int* nrhs, const double* a, int* lda, const int* ipiv,
+      //    double* b, int* ldb, int* info);
+      // void STRUMPACK_FC_GLOBAL_(csytrs_rook,CSYTRS_ROOK)
+      //   (char* s, int* n, int* nrhs, const std::complex<float>* a, int* lda,
+      //    const int* ipiv, std::complex<float>* b, int* ldb, int* info);
+      // void STRUMPACK_FC_GLOBAL_(zsytrs_rook,ZSYTRS_ROOK)
+      //   (char* s, int* n, int* nrhs, const std::complex<double>* a, int* lda,
+      //    const int* ipiv, std::complex<double>* b, int* ldb, int* info);
     }
 
     int ilaenv
@@ -1898,40 +1898,40 @@ namespace strumpack {
       return info;
     }
 
-    int sytrf_rook
-    (char s, int n, float* a, int lda, int* ipiv, float* work, int lwork) {
-      int info;
-      STRUMPACK_FC_GLOBAL_(ssytrf_rook,SSYTRF_ROOK)
-        (&s, &n, a, &lda, ipiv, work, &lwork, &info);
-      STRUMPACK_FLOPS(sytrf_rook_flops(n));
-      return info;
-    }
-    int sytrf_rook
-    (char s, int n, double* a, int lda, int* ipiv, double* work, int lwork) {
-      int info;
-      STRUMPACK_FC_GLOBAL_(dsytrf_rook,DSYTRF_ROOK)
-        (&s, &n, a, &lda, ipiv, work, &lwork, &info);
-      STRUMPACK_FLOPS(sytrf_rook_flops(n));
-      return info;
-    }
-    int sytrf_rook
-    (char s, int n, std::complex<float>* a, int lda, int* ipiv,
-     std::complex<float>* work, int lwork) {
-      int info;
-      STRUMPACK_FC_GLOBAL_(csytrf_rook,CSYTRF_ROOK)
-        (&s, &n, a, &lda, ipiv, work, &lwork, &info);
-      STRUMPACK_FLOPS(4*sytrf_rook_flops(n));
-      return info;
-    }
-    int sytrf_rook
-    (char s, int n, std::complex<double>* a, int lda, int* ipiv,
-     std::complex<double>* work, int lwork){
-      int info;
-      STRUMPACK_FC_GLOBAL_(zsytrf_rook,ZSYTRF_ROOK)
-        (&s, &n, a, &lda, ipiv, work, &lwork, &info);
-      STRUMPACK_FLOPS(4*sytrf_rook_flops(n));
-      return info;
-    }
+    // int sytrf_rook
+    // (char s, int n, float* a, int lda, int* ipiv, float* work, int lwork) {
+    //   int info;
+    //   STRUMPACK_FC_GLOBAL_(ssytrf_rook,SSYTRF_ROOK)
+    //     (&s, &n, a, &lda, ipiv, work, &lwork, &info);
+    //   STRUMPACK_FLOPS(sytrf_rook_flops(n));
+    //   return info;
+    // }
+    // int sytrf_rook
+    // (char s, int n, double* a, int lda, int* ipiv, double* work, int lwork) {
+    //   int info;
+    //   STRUMPACK_FC_GLOBAL_(dsytrf_rook,DSYTRF_ROOK)
+    //     (&s, &n, a, &lda, ipiv, work, &lwork, &info);
+    //   STRUMPACK_FLOPS(sytrf_rook_flops(n));
+    //   return info;
+    // }
+    // int sytrf_rook
+    // (char s, int n, std::complex<float>* a, int lda, int* ipiv,
+    //  std::complex<float>* work, int lwork) {
+    //   int info;
+    //   STRUMPACK_FC_GLOBAL_(csytrf_rook,CSYTRF_ROOK)
+    //     (&s, &n, a, &lda, ipiv, work, &lwork, &info);
+    //   STRUMPACK_FLOPS(4*sytrf_rook_flops(n));
+    //   return info;
+    // }
+    // int sytrf_rook
+    // (char s, int n, std::complex<double>* a, int lda, int* ipiv,
+    //  std::complex<double>* work, int lwork){
+    //   int info;
+    //   STRUMPACK_FC_GLOBAL_(zsytrf_rook,ZSYTRF_ROOK)
+    //     (&s, &n, a, &lda, ipiv, work, &lwork, &info);
+    //   STRUMPACK_FLOPS(4*sytrf_rook_flops(n));
+    //   return info;
+    // }
 
 
     int sytrs
@@ -1971,42 +1971,42 @@ namespace strumpack {
       return info;
     }
 
-    int sytrs_rook
-    (char s, int n, int nrhs, const float* a, int lda,
-     const int* ipiv, float* b, int ldb) {
-      int info;
-      STRUMPACK_FC_GLOBAL_(ssytrs_rook,SSYTRS_ROOK)
-        (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, &info);
-      STRUMPACK_FLOPS(sytrs_rook_flops(n,n,nrhs));
-      return info;
-    }
-    int sytrs_rook
-    (char s, int n, int nrhs, const double* a, int lda,
-     const int* ipiv, double* b, int ldb) {
-      int info;
-      STRUMPACK_FC_GLOBAL_(dsytrs_rook,DSYTRS_ROOK)
-        (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, &info);
-      STRUMPACK_FLOPS(sytrs_rook_flops(n,n,nrhs));
-      return info;
-    }
-    int sytrs_rook
-    (char s, int n, int nrhs, const std::complex<float>* a, int lda,
-     const int* ipiv, std::complex<float>* b, int ldb) {
-      int info;
-      STRUMPACK_FC_GLOBAL_(csytrs_rook,CSYTRS_ROOK)
-        (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, &info);
-      STRUMPACK_FLOPS(4*sytrs_rook_flops(n,n,nrhs));
-      return info;
-    }
-    int sytrs_rook
-    (char s, int n, int nrhs, const std::complex<double>* a, int lda,
-     const int* ipiv, std::complex<double>* b, int ldb) {
-      int info;
-      STRUMPACK_FC_GLOBAL_(zsytrs_rook,ZSYTRS_ROOK)
-        (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, &info);
-      STRUMPACK_FLOPS(4*sytrs_rook_flops(n,n,nrhs));
-      return info;
-    }
+    // int sytrs_rook
+    // (char s, int n, int nrhs, const float* a, int lda,
+    //  const int* ipiv, float* b, int ldb) {
+    //   int info;
+    //   STRUMPACK_FC_GLOBAL_(ssytrs_rook,SSYTRS_ROOK)
+    //     (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, &info);
+    //   STRUMPACK_FLOPS(sytrs_rook_flops(n,n,nrhs));
+    //   return info;
+    // }
+    // int sytrs_rook
+    // (char s, int n, int nrhs, const double* a, int lda,
+    //  const int* ipiv, double* b, int ldb) {
+    //   int info;
+    //   STRUMPACK_FC_GLOBAL_(dsytrs_rook,DSYTRS_ROOK)
+    //     (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, &info);
+    //   STRUMPACK_FLOPS(sytrs_rook_flops(n,n,nrhs));
+    //   return info;
+    // }
+    // int sytrs_rook
+    // (char s, int n, int nrhs, const std::complex<float>* a, int lda,
+    //  const int* ipiv, std::complex<float>* b, int ldb) {
+    //   int info;
+    //   STRUMPACK_FC_GLOBAL_(csytrs_rook,CSYTRS_ROOK)
+    //     (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, &info);
+    //   STRUMPACK_FLOPS(4*sytrs_rook_flops(n,n,nrhs));
+    //   return info;
+    // }
+    // int sytrs_rook
+    // (char s, int n, int nrhs, const std::complex<double>* a, int lda,
+    //  const int* ipiv, std::complex<double>* b, int ldb) {
+    //   int info;
+    //   STRUMPACK_FC_GLOBAL_(zsytrs_rook,ZSYTRS_ROOK)
+    //     (&s, &n, &nrhs, a, &lda, ipiv, b, &ldb, &info);
+    //   STRUMPACK_FLOPS(4*sytrs_rook_flops(n,n,nrhs));
+    //   return info;
+    // }
 
   } //end namespace blas
 } // end namespace strumpack

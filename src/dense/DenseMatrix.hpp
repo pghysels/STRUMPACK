@@ -686,11 +686,14 @@ namespace strumpack {
      * calls the LAPACK routine sytrf_rook. Only the lower triangle is
      * referenced/stored.
      *
+     * Disabled for now because not supported on some systems with
+     * older LAPACK versions.
+     *
      * \param depth current OpenMP task recursion depth
      * \return info from xsytrf_rook
      * \see LU, Cholesky, solve_LDLt
      */
-    std::vector<int> LDLt_rook(int depth=0);
+    //std::vector<int> LDLt_rook(int depth=0);
 
 
     /**
@@ -742,14 +745,17 @@ namespace strumpack {
      * LDLt factors (in place), using LDLt_rook. There can be multiple
      * right hand side vectors. The solution is returned by value.
      *
+     * Disabled for now because not supported on some systems with
+     * older LAPACK versions.
+     *
      * \param b input, right hand side vector/matrix. On output this
      * will be the solution.
      * \param piv pivot vector returned by LU factorization
      * \param depth current OpenMP task recursion depth
      * \see LDLt_rook, LDLt, solve_LDLt_in_place, LU, solve_LU_in_place
      */
-    void solve_LDLt_rook_in_place
-    (DenseMatrix<scalar_t>& b, const std::vector<int>& piv, int depth=0) const;
+    // void solve_LDLt_rook_in_place
+    // (DenseMatrix<scalar_t>& b, const std::vector<int>& piv, int depth=0) const;
 
     /**
      * Compute an LQ (lower triangular, unitary) factorization of this
@@ -1705,16 +1711,16 @@ namespace strumpack {
     return piv;
   }
 
-  template<typename scalar_t> std::vector<int>
-  DenseMatrix<scalar_t>::LDLt_rook(int depth) {
-    assert(rows() == cols());
-    std::vector<int> piv(rows());
-    int info = blas::sytrf_rook('L', rows(), data(), ld(), piv.data());
-    if (info)
-      std::cerr << "ERROR: LDLt_rook factorization failed with info="
-                << info << std::endl;
-    return piv;
-  }
+  // template<typename scalar_t> std::vector<int>
+  // DenseMatrix<scalar_t>::LDLt_rook(int depth) {
+  //   assert(rows() == cols());
+  //   std::vector<int> piv(rows());
+  //   int info = blas::sytrf_rook('L', rows(), data(), ld(), piv.data());
+  //   if (info)
+  //     std::cerr << "ERROR: LDLt_rook factorization failed with info="
+  //               << info << std::endl;
+  //   return piv;
+  // }
 
   template<typename scalar_t> DenseMatrix<scalar_t>
   DenseMatrix<scalar_t>::solve
@@ -1765,19 +1771,19 @@ namespace strumpack {
     }
   }
 
-  template<typename scalar_t> void
-  DenseMatrix<scalar_t>::solve_LDLt_rook_in_place
-  (DenseMatrix<scalar_t>& b, const std::vector<int>& piv, int depth) const {
-    assert(b.rows() == rows());
-    assert(piv.size() >= rows());
-    if (!rows()) return;
-    int info = blas::sytrs_rook
-      ('L', rows(), b.cols(), data(), ld(), piv.data(), b.data(), b.ld());
-    if (info) {
-      std::cerr << "ERROR: LDLt_rook solve failed with info=" << info << std::endl;
-      exit(1);
-    }
-  }
+  // template<typename scalar_t> void
+  // DenseMatrix<scalar_t>::solve_LDLt_rook_in_place
+  // (DenseMatrix<scalar_t>& b, const std::vector<int>& piv, int depth) const {
+  //   assert(b.rows() == rows());
+  //   assert(piv.size() >= rows());
+  //   if (!rows()) return;
+  //   int info = blas::sytrs_rook
+  //     ('L', rows(), b.cols(), data(), ld(), piv.data(), b.data(), b.ld());
+  //   if (info) {
+  //     std::cerr << "ERROR: LDLt_rook solve failed with info=" << info << std::endl;
+  //     exit(1);
+  //   }
+  // }
 
 
   template<typename scalar_t> void DenseMatrix<scalar_t>::LQ
