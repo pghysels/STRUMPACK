@@ -43,9 +43,6 @@ namespace strumpack {
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using uniq_scalar_t = std::unique_ptr
       <scalar_t[], std::function<void(scalar_t*)>>;
-#if defined(STRUMPACK_USE_MPI)
-    using ExtAdd = ExtendAdd<scalar_t,integer_t>;
-#endif
 
   public:
     FrontalMatrixCUBLAS
@@ -100,9 +97,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_MPI)
     void extend_add_copy_to_buffers
     (std::vector<std::vector<scalar_t>>& sbuf,
-     const FrontalMatrixMPI<scalar_t,integer_t>* pa) const override {
-      ExtAdd::extend_add_seq_copy_to_buffers(F22_, sbuf, pa, this);
-    }
+     const FrontalMatrixMPI<scalar_t,integer_t>* pa) const override;
 #endif
 
   private:

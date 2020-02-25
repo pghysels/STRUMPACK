@@ -26,11 +26,12 @@
  *             Division).
  *
  */
-#ifndef FRONTAL_MATRIX_CUBLAS_HPP
-#define FRONTAL_MATRIX_CUBLAS_HPP
-
 #include "FrontalMatrixCUBLAS.hpp"
 #include "dense/CUDAWrapper.hpp"
+#if defined(STRUMPACK_USE_MPI)
+#include "ExtendAdd.hpp"
+#include "FrontalMatrixMPI.hpp"
+#endif
 
 namespace strumpack {
 
@@ -60,6 +61,16 @@ namespace strumpack {
     F22_.clear();
     cudaFree(all_work_mem_);
   }
+
+#if defined(STRUMPACK_USE_MPI)
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixCUBLAS<scalar_t,integer_t>::void extend_add_copy_to_buffers
+  (std::vector<std::vector<scalar_t>>& sbuf,
+   const FrontalMatrixMPI<scalar_t,integer_t>* pa) const {
+    ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers
+      (F22_, sbuf, pa, this);
+  }
+#endif
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixCUBLAS<scalar_t,integer_t>::extend_add_to_dense
