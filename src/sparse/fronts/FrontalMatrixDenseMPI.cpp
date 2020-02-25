@@ -361,7 +361,7 @@ namespace strumpack {
   FrontalMatrixDenseMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
   (const VecVec_t& I, const VecVec_t& J, std::vector<DistM_t>& B) const {
     if (Comm().is_null() || !this->dim_upd()) return;
-    TIMER_TIME(TaskType::HSS_EXTRACT_SCHUR, 3, t_ex_schur);
+    // TIMER_TIME(TaskType::HSS_EXTRACT_SCHUR, 3, t_ex_schur);
     auto nB = I.size();
     std::vector<std::vector<std::size_t>> lI(nB), lJ(nB), oI(nB), oJ(nB);
     std::vector<std::vector<scalar_t>> sbuf(this->P());
@@ -374,7 +374,11 @@ namespace strumpack {
     }
     std::vector<scalar_t,NoInit<scalar_t>> rbuf;
     std::vector<scalar_t*> pbuf;
-    Comm().all_to_all_v(sbuf, rbuf, pbuf);
+    // Comm().all_to_all_v(sbuf, rbuf, pbuf);
+    {
+      TIMER_TIME(TaskType::GET_SUBMATRIX_2D_A2A, 2, t_a2a);
+      Comm().all_to_all_v(sbuf, rbuf, pbuf);
+    }
     for (std::size_t i=0; i<nB; i++)
       ExtAdd::extract_copy_from_buffers
         (B[i], lI[i], lJ[i], oI[i], oJ[i], F22_, pbuf);

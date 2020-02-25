@@ -89,7 +89,7 @@ namespace strumpack {
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
   (const VecVec_t& I, const VecVec_t& J, std::vector<DistM_t>& B) const {
     if (Comm().is_null() || !dim_upd()) return;
-    TIMER_TIME(TaskType::HSS_EXTRACT_SCHUR, 3, t_ex_schur);
+    // TIMER_TIME(TaskType::HSS_EXTRACT_SCHUR, 3, t_ex_schur);
     auto nB = I.size();
     std::vector<std::vector<std::size_t>> lI(nB), lJ(nB), oI(nB), oJ(nB);
     std::vector<DistM_t> Bloc(nB);
@@ -98,14 +98,22 @@ namespace strumpack {
       this->find_upd_indices(J[i], lJ[i], oJ[i]);
       Bloc[i] = DistM_t(grid(), lI[i].size(), lJ[i].size());
     }
-    F22_->extract_elements(lI, lJ, Bloc);
+    {
+      TIMER_TIME(TaskType::EXTRACT_ELEMS, 2, t_a2a);
+      F22_->extract_elements(lI, lJ, Bloc);
+    }
     std::vector<std::vector<scalar_t>> sbuf(this->P());
     for (std::size_t i=0; i<nB; i++)
       ExtendAdd<scalar_t,integer_t>::extend_copy_to_buffers
         (Bloc[i], oI[i], oJ[i], B[i], sbuf);
     std::vector<scalar_t,NoInit<scalar_t>> rbuf;
     std::vector<scalar_t*> pbuf;
-    Comm().all_to_all_v(sbuf, rbuf, pbuf);
+    {
+      TIMER_TIME(TaskType::GET_SUBMATRIX_2D_BA2A, 2, t_ba2a);
+      Comm().barrier();
+      TIMER_TIME(TaskType::GET_SUBMATRIX_2D_A2A, 2, t_a2a);
+      Comm().all_to_all_v(sbuf, rbuf, pbuf);
+    }
     for (std::size_t i=0; i<nB; i++)
       ExtendAdd<scalar_t,integer_t>::extend_copy_from_buffers
         (B[i], oI[i], oJ[i], Bloc[i], pbuf);
@@ -239,6 +247,7 @@ namespace strumpack {
           for (auto& Ik : I) for (auto& i : Ik) i = this->upd_[i];
           for (auto& Jk : J) for (auto& j : Jk) j = this->upd_[j];
           this->extract_2d(A, I, J, B);
+          TIMER_TIME(TaskType::HSS_EXTRACT_SCHUR, 3, t_ex_schur);
           Schur.extract_add_elements(e, B);
         };
       TIMER_TIME(TaskType::HSS_COMPRESS_22, 0, t_f22_compress);

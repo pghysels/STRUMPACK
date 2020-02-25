@@ -130,8 +130,11 @@ void TaskTimer::print_name(std::ostream& os) {
     case TaskType::HSS_PARHQRINTERPOL:    os << "HSS_PARHQRINTERPOL"; break;
     case TaskType::HSS_SEQHQRINTERPOL:    os << "HSS_SEQHQRINTERPOL"; break;
     case TaskType::EXTRACT_2D:            os << "EXTRACT_2D"; break;
+    case TaskType::EXTRACT_2D_A2A:        os << "EXTRACT_2D_A2A"; break;
     case TaskType::EXTRACT_SEP_2D:        os << "EXTRACT_SEP_2D"; break;
+    case TaskType::EXTRACT_ELEMS:         os << "EXTRACT_ELEMS"; break;
     case TaskType::GET_SUBMATRIX_2D:      os << "GET_SUBMATRIX_2D"; break;
+    case TaskType::GET_SUBMATRIX_2D_A2A:  os << "GET_SUBMATRIX_2D_A2A"; break;
     case TaskType::HSS_EXTRACT_SCHUR:     os << "HSS_EXTRACT_SCHUR"; break;
     case TaskType::HSS_PARTIALLY_FACTOR:  os << "HSS_PARTIALLY_FACTOR"; break;
     case TaskType::F11INV_MULT:           os << "F11INV_MULT"; break;
@@ -323,9 +326,13 @@ void TimerList::finalize() {
     print_line("    ORTHO                   ", TaskType::ORTHO);
     print_line("    REDIST_2D_TO_HSS        ", TaskType::REDIST_2D_TO_HSS);
     print_line("    extract_2d              ", TaskType::EXTRACT_2D);
+    print_line("       extract_2d_a2a       ", TaskType::EXTRACT_2D_A2A);
     print_line("       extract_sep_2d       ", TaskType::EXTRACT_SEP_2D);
     print_line("       get_submatrix_2d     ", TaskType::GET_SUBMATRIX_2D);
-    print_line("       HSS_extract_Schur    ", TaskType::HSS_EXTRACT_SCHUR);
+    print_line("          extract_elems     ", TaskType::EXTRACT_ELEMS);
+    print_line("          barrier+all2all   ", TaskType::GET_SUBMATRIX_2D_BA2A);
+    print_line("             all2all        ", TaskType::GET_SUBMATRIX_2D_A2A);
+    print_line("       extract_Schur        ", TaskType::HSS_EXTRACT_SCHUR);
     print_line("       get_submatrix        ", TaskType::GET_SUBMATRIX);
     std::cout << hline;
     print_line(" Partial_factor             ",
