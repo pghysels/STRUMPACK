@@ -64,7 +64,7 @@ namespace strumpack {
 
 #if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::void extend_add_copy_to_buffers
+  FrontalMatrixCUBLAS<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf,
    const FrontalMatrixMPI<scalar_t,integer_t>* pa) const {
     ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers
