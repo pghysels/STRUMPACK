@@ -57,9 +57,9 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
   std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
             << A.max_scaled_residual(x.data(), b.data()) << std::endl;
 
-  blas::axpy(N, scalar_t(-1.), x_exact.data(), 1, x.data(), 1);
-  auto nrm_error = blas::nrm2(N, x.data(), 1);
-  auto nrm_x_exact = blas::nrm2(N, x_exact.data(), 1);
+  strumpack::blas::axpy(N, scalar_t(-1.), x_exact.data(), 1, x.data(), 1);
+  auto nrm_error = strumpack::blas::nrm2(N, x.data(), 1);
+  auto nrm_x_exact = strumpack::blas::nrm2(N, x_exact.data(), 1);
   std::cout << "# RELATIVE ERROR = " << (nrm_error/nrm_x_exact) << std::endl;
 }
 

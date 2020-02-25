@@ -79,7 +79,7 @@ test(int argc, char* argv[], CSRMatrixMPI<scalar,integer>* Adist) {
     std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
               << scaled_res << std::endl;
 
-  blas::axpy(n_local, scalar(-1.), x_exact.data(), 1, x.data(), 1);
+  strumpack::blas::axpy(n_local, scalar(-1.), x_exact.data(), 1, x.data(), 1);
 
   auto nrm_error = norm2(x, MPIComm());
   auto nrm_x_exact = norm2(x_exact, MPIComm());
