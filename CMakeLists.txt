@@ -288,7 +288,8 @@ if(TPL_ENABLE_SLATE)
   if(DEFINED TPL_SLATE_LIBRARIES)
     set(LIBS ${LIBS} ${TPL_SLATE_LIBRARIES})
     include_directories(${TPL_SLATE_INCLUDE_DIRS})
-    add_compile_definitions(STRUMPACK_PBLAS_BLOCKSIZE=256)
+    # TODO this needs to get to the manual Makefile too!!!!!
+    # add_compile_definitions(STRUMPACK_PBLAS_BLOCKSIZE=256)
   else()
     message(WARNING "Could not find SLATE,"
      " please define TPL_SLATE_LIBRARIES and TPL_SLATE_INCLUDE_DIRS")
