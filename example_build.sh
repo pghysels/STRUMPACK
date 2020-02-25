@@ -153,9 +153,10 @@ if [[ $(hostname -s) = "pieterg-X8DA3" ]]; then
     PARMETISHOME=$HOME/local/parmetis-4.0.3/
     ZFPHOME=/home/pieterg/local/zfp-0.5.5/install/
     cmake ../ \
-          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_BUILD_TYPE=Debug \
           -DCMAKE_INSTALL_PREFIX=../install \
-          -DBUILD_SHARED_LIBS=ON \
+          -DCMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -Wno-unused-parameter -Wno-sign-compare" \
+          -DBUILD_SHARED_LIBS=OFF \
           -DSTRUMPACK_USE_MPI=ON \
           -DSTRUMPACK_BUILD_TESTS=ON \
           -DSTRUMPACK_USE_OPENMP=ON \
@@ -189,7 +190,7 @@ if ! $found_host; then
     exit 1
 fi
 
-make install VERBOSE=1
+make install #VERBOSE=1
 make test
 cd examples
 make -k
