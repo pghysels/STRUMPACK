@@ -26,12 +26,10 @@
  *             Division).
  *
  */
-#ifndef GEOMETRIC_REORDERING_MPI_HPP
-#define GEOMETRIC_REORDERING_MPI_HPP
 
 #include <array>
-#include "misc/MPIWrapper.hpp"
-#include "MatrixReordering.hpp"
+#include <unordered_map>
+#include "GeometricReorderingMPI.hpp"
 
 namespace strumpack {
 
@@ -40,13 +38,13 @@ namespace strumpack {
             std::unique_ptr<SeparatorTree<integer_t>>>
   geometric_nested_dissection_dist
   (int nx, int ny, int nz, int components, int width,
-   integer_t lo, integer_t hi, MPI_Comm comm,
+   integer_t lo, integer_t hi, const MPIComm& comm,
    std::vector<integer_t>& perm, std::vector<integer_t>& iperm,
    int nd_param, int HSS_leaf, int min_HSS) {
     assert(components == 1);
     assert(width == 1);
-    auto P = mpi_nprocs(comm);
-    auto rank = mpi_rank(comm);
+    auto P = comm.size();
+    auto rank = comm.rank();
     integer_t dist_nbsep = 0, local_nbsep = 0;
     std::vector<Separator<integer_t>> dist_tree, local_tree;
     integer_t perm_begin = 0, dsep_leaf_id = 0;
@@ -189,6 +187,27 @@ namespace strumpack {
       (std::move(dist_stree), std::move(local_stree));
   }
 
-} // end namespace strumpack
+  // explicit template instantiations
+  template std::pair<std::unique_ptr<SeparatorTree<int>>,
+                     std::unique_ptr<SeparatorTree<int>>>
+  geometric_nested_dissection_dist
+  (int nx, int ny, int nz, int components, int width,
+   int lo, int hi, const MPIComm& comm,
+   std::vector<int>& perm, std::vector<int>& iperm,
+   int nd_param, int HSS_leaf, int min_HSS);
+  template std::pair<std::unique_ptr<SeparatorTree<long int>>,
+                     std::unique_ptr<SeparatorTree<long int>>>
+  geometric_nested_dissection_dist
+  (int nx, int ny, int nz, int components, int width,
+   long int lo, long int hi, const MPIComm& comm,
+   std::vector<long int>& perm, std::vector<long int>& iperm,
+   int nd_param, int HSS_leaf, int min_HSS);
+  template std::pair<std::unique_ptr<SeparatorTree<long long int>>,
+                     std::unique_ptr<SeparatorTree<long long int>>>
+  geometric_nested_dissection_dist
+  (int nx, int ny, int nz, int components, int width,
+   long long int lo, long long int hi, const MPIComm& comm,
+   std::vector<long long int>& perm, std::vector<long long int>& iperm,
+   int nd_param, int HSS_leaf, int min_HSS);
 
-#endif
+} // end namespace strumpack

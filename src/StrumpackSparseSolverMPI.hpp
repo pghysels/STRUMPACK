@@ -35,7 +35,7 @@
 
 #include "StrumpackSparseSolver.hpp"
 #include "sparse/EliminationTreeMPI.hpp"
-#include "sparse/MatrixReorderingMPI.hpp"
+#include "sparse/ordering/MatrixReorderingMPI.hpp"
 
 namespace strumpack {
 

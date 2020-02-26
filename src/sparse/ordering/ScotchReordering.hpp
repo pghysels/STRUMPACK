@@ -31,8 +31,8 @@
 
 #include <memory>
 #include <scotch.h>
-#include "SeparatorTree.hpp"
-#include "ETree.hpp"
+#include "sparse/SeparatorTree.hpp"
+#include "sparse/ETree.hpp"
 
 namespace strumpack {
 

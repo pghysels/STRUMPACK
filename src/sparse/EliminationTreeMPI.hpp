@@ -37,8 +37,8 @@
 #include "StrumpackParameters.hpp"
 #include "CompressedSparseMatrix.hpp"
 #include "CSRMatrixMPI.hpp"
-#include "MatrixReorderingMPI.hpp"
 #include "EliminationTree.hpp"
+#include "ordering/MatrixReorderingMPI.hpp"
 #include "fronts/FrontalMatrixMPI.hpp"
 
 namespace strumpack {

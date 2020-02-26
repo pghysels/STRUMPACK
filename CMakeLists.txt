@@ -413,11 +413,11 @@ set(LIB_STRUMPACK_SOURCES
   src/StrumpackParameters.cpp
   src/misc/TaskTimer.cpp
   src/kernel/Kernel.cpp
-  src/sparse/rcm/rcm.f
-  src/sparse/rcm/degree.f
-  src/sparse/rcm/fnroot.f
-  src/sparse/rcm/genrcm.f
-  src/sparse/rcm/rootls.f
+  src/sparse/ordering/rcm/rcm.f
+  src/sparse/ordering/rcm/degree.f
+  src/sparse/ordering/rcm/fnroot.f
+  src/sparse/ordering/rcm/genrcm.f
+  src/sparse/ordering/rcm/rootls.f
   src/sparse/strumpack_mc64ad.c
   src/sparse/iterative/BiCGStab.cpp
   src/sparse/iterative/GMRes.cpp
@@ -426,6 +426,8 @@ set(LIB_STRUMPACK_SOURCES
   src/sparse/fronts/FrontalMatrix.cpp
   src/sparse/fronts/FrontalMatrixDense.cpp
   src/sparse/fronts/FrontalMatrixHSS.cpp
+  src/sparse/ordering/GeometricReordering.cpp
+  src/sparse/ordering/MatrixReordering.cpp
   src/clustering/PCAPartitioning.cpp
   src/clustering/CobblePartitioning.cpp
   src/clustering/KMeans.cpp
@@ -490,6 +492,8 @@ if(STRUMPACK_USE_MPI)
     src/sparse/fronts/FrontalMatrixDenseMPI.cpp
     src/sparse/fronts/FrontalMatrixHSSMPI.cpp
     src/sparse/fronts/ExtendAdd.cpp
+    src/sparse/ordering/GeometricReorderingMPI.cpp
+    src/sparse/ordering/MatrixReorderingMPI.cpp
     src/sparse/iterative/GMResMPI.cpp
     src/sparse/iterative/BiCGStabMPI.cpp
     src/sparse/iterative/IterativeRefinementMPI.cpp
@@ -562,14 +566,14 @@ install(FILES
   src/sparse/CompressedSparseMatrix.hpp
   src/sparse/ETree.hpp
   src/sparse/EliminationTree.hpp
-  src/sparse/GeometricReordering.hpp
-  src/sparse/MatrixReordering.hpp
-  src/sparse/MetisReordering.hpp
   src/sparse/Redistribute.hpp
-  src/sparse/ScotchReordering.hpp
-  src/sparse/RCMReordering.hpp
   src/sparse/SeparatorTree.hpp
   DESTINATION include/sparse)
+
+install(FILES
+  src/sparse/ordering/MatrixReordering.hpp
+  src/sparse/ordering/MetisReordering.hpp
+  DESTINATION include/sparse/ordering)
 
 install(FILES
   src/sparse/fronts/FrontFactory.hpp
@@ -634,14 +638,14 @@ if(STRUMPACK_USE_MPI)
     src/sparse/CSRMatrixMPI.hpp
     src/sparse/EliminationTreeMPI.hpp
     src/sparse/EliminationTreeMPIDist.hpp
-    src/sparse/GeometricReorderingMPI.hpp
-    src/sparse/MatrixReorderingMPI.hpp
-    src/sparse/PTScotchReordering.hpp
-    src/sparse/ParMetisReordering.hpp
     src/sparse/PropMapSparseMatrix.hpp
     src/sparse/Redistribute.hpp
     src/sparse/mumps_symqamd.hpp
     DESTINATION include/sparse)
+
+  install(FILES
+    src/sparse/ordering/MatrixReorderingMPI.hpp
+    DESTINATION include/sparse/ordering)
 
   install(FILES
     src/sparse/fronts/FrontalMatrixMPI.hpp

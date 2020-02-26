@@ -48,7 +48,7 @@
 #include "StrumpackOptions.hpp"
 #include "sparse/CompressedSparseMatrix.hpp"
 #include "sparse/CSRMatrix.hpp"
-#include "sparse/MatrixReordering.hpp"
+#include "sparse/ordering/MatrixReordering.hpp"
 #include "sparse/EliminationTree.hpp"
 #include "sparse/iterative/IterativeSolvers.hpp"
 
@@ -141,6 +141,8 @@ namespace strumpack {
      *
      * \param A A CSRMatrix<scalar_t,integer_t> object, will
      * internally be duplicated
+     *
+     * \see set_csr_matrix
      */
     virtual void set_matrix(const CSRMatrix<scalar_t,integer_t>& A);
 
@@ -165,6 +167,8 @@ namespace strumpack {
      * \param symmetric_pattern denotes whether the sparsity
      * __pattern__ of the input matrix is symmetric, does not require
      * the matrix __values__ to be symmetric
+     *
+     * \see set_matrix
      */
     virtual void set_csr_matrix
     (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
@@ -472,14 +476,13 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::setup_tree() {
-    tree_ = std::unique_ptr<EliminationTree<scalar_t,integer_t>>
-      (new EliminationTree<scalar_t,integer_t>(opts_, *mat_, nd_->tree()));
+    tree_.reset(new EliminationTree<scalar_t,integer_t>
+                (opts_, *mat_, nd_->tree()));
   }
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::setup_reordering() {
-    nd_ = std::unique_ptr<MatrixReordering<scalar_t,integer_t>>
-      (new MatrixReordering<scalar_t,integer_t>(matrix()->size()));
+    nd_.reset(new MatrixReordering<scalar_t,integer_t>(matrix()->size()));
   }
 
   template<typename scalar_t,typename integer_t> int
@@ -614,8 +617,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::set_matrix
   (const CSRMatrix<scalar_t,integer_t>& A) {
-    mat_ = std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
-      (new CSRMatrix<scalar_t,integer_t>(A));
+    mat_.reset(new CSRMatrix<scalar_t,integer_t>(A));
     factored_ = reordered_ = false;
   }
 
@@ -623,9 +625,8 @@ namespace strumpack {
   StrumpackSparseSolver<scalar_t,integer_t>::set_csr_matrix
   (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
    const scalar_t* values, bool symmetric_pattern) {
-    mat_ = std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
-      (new CSRMatrix<scalar_t,integer_t>
-       (N, row_ptr, col_ind, values, symmetric_pattern));
+    mat_.reset(new CSRMatrix<scalar_t,integer_t>
+               (N, row_ptr, col_ind, values, symmetric_pattern));
     factored_ = reordered_ = false;
   }
 

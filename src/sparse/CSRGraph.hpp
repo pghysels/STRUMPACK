@@ -36,7 +36,7 @@
 #include <queue>
 
 #include "HSS/HSSPartitionTree.hpp"
-#include "MetisReordering.hpp"
+#include "ordering/MetisReordering.hpp"
 
 namespace strumpack {
 

@@ -32,7 +32,8 @@
 #include <ptscotch.h>
 #include <cassert>
 #include <type_traits>
-#include "CSRMatrixMPI.hpp"
+
+#include "sparse/CSRMatrixMPI.hpp"
 
 namespace strumpack {
 

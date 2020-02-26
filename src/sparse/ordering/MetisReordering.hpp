@@ -32,10 +32,12 @@
 #include <functional>
 #include <typeinfo>
 #include <memory>
-#include <metis.h>
-#include "SeparatorTree.hpp"
+#include "metis.h"
+
+#include "StrumpackOptions.hpp"
+#include "sparse/SeparatorTree.hpp"
 #if defined(STRUMPACK_USE_MPI)
-#include "mumps_symqamd.hpp"
+#include "sparse/mumps_symqamd.hpp"
 #endif
 
 namespace strumpack {

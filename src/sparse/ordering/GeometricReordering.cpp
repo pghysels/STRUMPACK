@@ -26,34 +26,25 @@
  *             Division).
  *
  */
-#ifndef GEOMETRIC_REORDERING_HPP
-#define GEOMETRIC_REORDERING_HPP
+#include <unordered_map>
 
-#include "HSS/HSSPartitionTree.hpp"
-#include "MatrixReordering.hpp"
-#include <array>
+#include "GeometricReordering.hpp"
 
 namespace strumpack {
 
   template<typename integer_t> class GeomOrderData {
   public:
-    integer_t* perm;
-    integer_t* iperm;
-    int components;
-    int width;
-    int stratpar;
-    int leaf;
-    int min_sep;
+    integer_t *perm, *iperm;
+    int components, width, stratpar, leaf, min_sep;
     bool separator_reordering;
     std::unordered_map<integer_t,HSS::HSSPartitionTree> trees;
   };
 
-  template<typename integer_t>
-  void recursive_bisection
+  template<typename integer_t> void recursive_bisection
   (integer_t* perm, integer_t* iperm, integer_t& pbegin,
    std::array<integer_t,3> n0, std::array<integer_t,3> dims,
-   std::array<integer_t,3> ld, //const GeomOrderData<integer_t>& gd,
-   int components, int leaf, HSS::HSSPartitionTree& hss_tree) {
+   std::array<integer_t,3> ld, int components, int leaf,
+   HSS::HSSPartitionTree& hss_tree) {
     std::size_t sep_size = components * dims[0]*dims[1]*dims[2];
     hss_tree.size = sep_size;
     if (sep_size <= std::size_t(leaf)) {
@@ -84,15 +75,12 @@ namespace strumpack {
     }
   }
 
-  template<typename integer_t>
-  void recursive_nested_dissection
+  template<typename integer_t> void recursive_nested_dissection
   (integer_t& pbegin, integer_t& nbsep,
    std::array<integer_t,3> n0, std::array<integer_t,3> dims,
    std::array<integer_t,3> ld, std::vector<Separator<integer_t>>& tree,
    GeomOrderData<integer_t>& gd) {
-    int comps = gd.components;
-    int width = gd.width;
-    int stratpar = gd.stratpar;
+    int comps = gd.components, width = gd.width, stratpar = gd.stratpar;
     integer_t N = comps * (dims[0]*dims[1]*dims[2]);
     // d: dimension along which to split
     int d = std::distance
@@ -121,8 +109,7 @@ namespace strumpack {
       nbsep++;
     } else {
       // part 1
-      std::array<integer_t,3> part_begin(n0);
-      std::array<integer_t,3> part_size(dims);
+      std::array<integer_t,3> part_begin(n0), part_size(dims);
       part_size[d] = dims[d]/2 - (width/2);
       recursive_nested_dissection
         (pbegin, nbsep, part_begin, part_size, ld, tree, gd);
@@ -204,12 +191,92 @@ namespace strumpack {
       (new SeparatorTree<integer_t>(tree));
 
     if (gd.separator_reordering) {
-      // TODO this tree is not used right now
+      // TODO this tree is not used right now, the separator
+      // reordering is now done after the permutation of the matrix
       //stree->partition_tree = std::move(gd.trees);
     }
     return stree;
   }
 
-} // end namespace strumpack
+  // explicit template instantiations
+  template void recursive_bisection
+  (int* perm, int* iperm, int& pbegin, std::array<int,3> n0,
+   std::array<int,3> dims, std::array<int,3> ld, int components, int leaf,
+   HSS::HSSPartitionTree& hss_tree);
+  template void recursive_bisection
+  (long int* perm, long int* iperm, long int& pbegin,
+   std::array<long int,3> n0, std::array<long int,3> dims,
+   std::array<long int,3> ld, int components, int leaf,
+   HSS::HSSPartitionTree& hss_tree);
+  template void recursive_bisection
+  (long long int* perm, long long int* iperm, long long int& pbegin,
+   std::array<long long int,3> n0, std::array<long long int,3> dims,
+   std::array<long long int,3> ld, int components, int leaf,
+   HSS::HSSPartitionTree& hss_tree);
 
-#endif
+  template std::unique_ptr<SeparatorTree<int>>
+  geometric_nested_dissection
+  (const CSRMatrix<float,int>& A, int nx, int ny, int nz,
+   int components, int width, std::vector<int>& perm,
+   std::vector<int>& iperm, const SPOptions<float>& opts);
+  template std::unique_ptr<SeparatorTree<int>>
+  geometric_nested_dissection
+  (const CSRMatrix<double,int>& A, int nx, int ny, int nz,
+   int components, int width, std::vector<int>& perm,
+   std::vector<int>& iperm, const SPOptions<double>& opts);
+  template std::unique_ptr<SeparatorTree<int>>
+  geometric_nested_dissection
+  (const CSRMatrix<std::complex<float>,int>& A, int nx, int ny, int nz,
+   int components, int width, std::vector<int>& perm,
+   std::vector<int>& iperm, const SPOptions<std::complex<float>>& opts);
+  template std::unique_ptr<SeparatorTree<int>>
+  geometric_nested_dissection
+  (const CSRMatrix<std::complex<double>,int>& A, int nx, int ny, int nz,
+   int components, int width, std::vector<int>& perm,
+   std::vector<int>& iperm, const SPOptions<std::complex<double>>& opts);
+
+  template std::unique_ptr<SeparatorTree<long int>>
+  geometric_nested_dissection
+  (const CSRMatrix<float,long int>& A, int nx, int ny, int nz,
+   int components, int width, std::vector<long int>& perm,
+   std::vector<long int>& iperm, const SPOptions<float>& opts);
+  template std::unique_ptr<SeparatorTree<long int>>
+  geometric_nested_dissection
+  (const CSRMatrix<double,long int>& A, int nx, int ny, int nz,
+   int components, int width, std::vector<long int>& perm,
+   std::vector<long int>& iperm, const SPOptions<double>& opts);
+  template std::unique_ptr<SeparatorTree<long int>>
+  geometric_nested_dissection
+  (const CSRMatrix<std::complex<float>,long int>& A, int nx, int ny, int nz,
+   int components, int width, std::vector<long int>& perm,
+   std::vector<long int>& iperm, const SPOptions<std::complex<float>>& opts);
+  template std::unique_ptr<SeparatorTree<long int>>
+  geometric_nested_dissection
+  (const CSRMatrix<std::complex<double>,long int>& A, int nx, int ny, int nz,
+   int components, int width, std::vector<long int>& perm,
+   std::vector<long int>& iperm, const SPOptions<std::complex<double>>& opts);
+
+  template std::unique_ptr<SeparatorTree<long long int>>
+  geometric_nested_dissection
+  (const CSRMatrix<float,long long int>& A, int nx, int ny, int nz,
+   int components, int width, std::vector<long long int>& perm,
+   std::vector<long long int>& iperm, const SPOptions<float>& opts);
+  template std::unique_ptr<SeparatorTree<long long int>>
+  geometric_nested_dissection
+  (const CSRMatrix<double,long long int>& A, int nx, int ny, int nz,
+   int components, int width, std::vector<long long int>& perm,
+   std::vector<long long int>& iperm, const SPOptions<double>& opts);
+  template std::unique_ptr<SeparatorTree<long long int>>
+  geometric_nested_dissection
+  (const CSRMatrix<std::complex<float>,long long int>& A,
+   int nx, int ny, int nz, int components, int width,
+   std::vector<long long int>& perm, std::vector<long long int>& iperm,
+   const SPOptions<std::complex<float>>& opts);
+  template std::unique_ptr<SeparatorTree<long long int>>
+  geometric_nested_dissection
+  (const CSRMatrix<std::complex<double>,long long int>& A,
+   int nx, int ny, int nz, int components, int width,
+   std::vector<long long int>& perm, std::vector<long long int>& iperm,
+   const SPOptions<std::complex<double>>& opts);
+
+} // end namespace strumpack

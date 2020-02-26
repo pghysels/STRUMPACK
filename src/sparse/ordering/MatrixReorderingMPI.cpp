@@ -26,145 +26,26 @@
  *             Division).
  *
  */
-#ifndef MATRIX_REORDERING_MPI_HPP
-#define MATRIX_REORDERING_MPI_HPP
+
 #include <unordered_map>
 #include <algorithm>
-#include "CSRGraph.hpp"
+
+#include "MatrixReorderingMPI.hpp"
 #include "StrumpackConfig.hpp"
+#include "sparse/CSRGraph.hpp"
+#include "sparse/fronts/FrontalMatrix.hpp"
 #if defined(STRUMPACK_USE_SCOTCH)
+#include "ScotchReordering.hpp"
 #include "PTScotchReordering.hpp"
 #endif
+#include "MetisReordering.hpp"
 #if defined(STRUMPACK_USE_PARMETIS)
 #include "ParMetisReordering.hpp"
 #endif
+#include "RCMReordering.hpp"
 #include "GeometricReorderingMPI.hpp"
 
 namespace strumpack {
-
-  /**
-   * A MatrixReorderingMPI has a distributed separator tree. This tree
-   * is stored using 2 trees, one in the base class MatrixReordering
-   * and one here in MatrixReorderingMPI. The tree in MatrixReordering
-   * (sep_tree_) is the top of the tree, corresponding to the
-   * distributed separators. The tree stored here (local_tree_)
-   * corresponds to the local subtree.
-   *
-   * The distributed tree should have P leafs.  Lets number the
-   * distributed separators level by level, root=0.  For instance: for
-   * P=5, the distributed tree will look like:
-   *                   1
-   *                  / \
-   *                 /   \
-   *                2     3
-   *               / \   / \
-   *              4   5 6   7
-   *             / \
-   *            8   9
-   *
-   * The number of the node is given by dist_sep_id, left child has
-   * id 2*dist_sep_id, right child 2*dist_sep_id+1.  Nodes for which
-   * P<=dist_sep_id<2*P, are leafs of the distributed separator tree,
-   * and they form the roots of the local subtree for process
-   * dist_sep_id-P.
-   *
-   * Furthermore, each proces has a local tree rooted at one of the
-   * leafs of the distributed tree.  To have the same convention as used
-   * for PTScotch, the leafs are assigned to procs as in a postordering
-   * of the distributed tree, hence for this example, proc_dist_sep:
-   *                   3
-   *                  / \
-   *                 /   \
-   *                1     2
-   *               / \   / \
-   *              0   2 3   4
-   *             / \
-   *            0   1
-   */
-  template<typename scalar_t,typename integer_t>
-  class MatrixReorderingMPI : public MatrixReordering<scalar_t,integer_t> {
-    using Opts_t = SPOptions<scalar_t>;
-    using CSRMatMPI_t = CSRMatrixMPI<scalar_t,integer_t>;
-    using CSMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
-
-  public:
-    MatrixReorderingMPI(integer_t n, const MPIComm& c);
-    virtual ~MatrixReorderingMPI() = default;
-
-    int nested_dissection
-    (const Opts_t& opts, const CSRMatMPI_t& A,
-     int nx, int ny, int nz, int components, int width);
-
-    int set_permutation
-    (const Opts_t& opts, const CSRMatMPI_t& A, const int* p, int base);
-
-    void separator_reordering(const Opts_t& opts, CSMat_t& A, F_t* F);
-
-    void clear_tree_data();
-
-    /**
-     * proc_dist_sep[sep] holds the rank of the process responsible
-     * for distributed separator sep
-     * - if sep is a leaf of the distributed tree, proc_dist_sep
-     *    points to the process holding that subgraph as my_sub_graph
-     * - if sep is a non-leaf, proc_dist_sep points to the process
-     *    holding the graph of the distributed separator sep as
-     *    my_dist_sep
-     */
-    std::vector<integer_t> proc_dist_sep;
-
-    /**
-     * Every process is responsible for one local subgraph of A.  The
-     * distributed nested dissection will create a separator tree with
-     * exactly P leafs.  Each process takes one of those leafs and
-     * stores the corresponding part of the permuted matrix A in
-     * sub_graph_A.
-     */
-    CSRGraph<integer_t> my_sub_graph;
-
-    /**
-     * Every process is responsible for one separator from the
-     * distributed part of nested dissection.  The graph of the
-     * distributed separator for which this rank is responsible is
-     * stored as dist_sep_A.
-     */
-    CSRGraph<integer_t> my_dist_sep;
-
-    std::vector<std::pair<integer_t,integer_t>> sub_graph_ranges;
-    std::vector<std::pair<integer_t,integer_t>> dist_sep_ranges;
-
-    std::pair<integer_t,integer_t> sub_graph_range;
-    std::pair<integer_t,integer_t> dist_sep_range;
-
-    /**
-     * Number of the node in sep_tree corresponding to the distributed
-     * separator owned by this processor.
-     */
-    integer_t dsep_internal;
-    /**
-     * Number of the node in sep_tree corresponding to the root of the
-     * local subtree.
-     */
-    integer_t dsep_leaf;
-
-    const SeparatorTree<integer_t>& local_tree() const { return *local_tree_; }
-
-  private:
-    const MPIComm* comm_;
-    std::unique_ptr<SeparatorTree<integer_t>> local_tree_;
-
-    void get_local_graphs(const CSRMatMPI_t& Ampi);
-
-    void build_local_tree(const CSRMatMPI_t& Ampi);
-
-    void nested_dissection_print
-    (const SPOptions<scalar_t>& opts, integer_t nnz) const;
-
-    using MatrixReordering<scalar_t,integer_t>::perm_;
-    using MatrixReordering<scalar_t,integer_t>::iperm_;
-    using MatrixReordering<scalar_t,integer_t>::sep_tree_;
-  };
 
   template<typename scalar_t,typename integer_t>
   MatrixReorderingMPI<scalar_t,integer_t>::MatrixReorderingMPI
@@ -175,7 +56,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> int
   MatrixReorderingMPI<scalar_t,integer_t>::nested_dissection
-  (const Opts_t& opts, const CSRMatMPI_t& A,
+  (const Opts_t& opts, const CSRMPI_t& A,
    int nx, int ny, int nz, int components, int width) {
     if (!is_parallel(opts.reordering_method())) {
       auto rank = comm_->rank();
@@ -251,7 +132,7 @@ namespace strumpack {
         std::tie(sep_tree_, local_tree_) =
           geometric_nested_dissection_dist
           (nx, ny, nz, components, width, A.begin_row(), A.end_row(),
-           comm_->comm(), perm_, iperm_, opts.nd_param(),
+           *comm_, perm_, iperm_, opts.nd_param(),
            opts.compression_leaf_size(), opts.compression_min_sep_size());
         break;
       }
@@ -292,7 +173,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> int
   MatrixReorderingMPI<scalar_t,integer_t>::set_permutation
-  (const Opts_t& opts, const CSRMatMPI_t& A, const int* p, int base) {
+  (const Opts_t& opts, const CSRMPI_t& A, const int* p, int base) {
     auto n = perm_.size();
     assert(A.size() == n);
     if (base == 0) std::copy(p, p+n, perm_.data());
@@ -323,7 +204,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   MatrixReorderingMPI<scalar_t,integer_t>::separator_reordering
-  (const Opts_t& opts, CSMat_t& A, F_t* F) {
+  (const Opts_t& opts, CSM_t& A, F_t* F) {
     if (opts.compression() == CompressionType::NONE)
       return;
     auto n = A.size();
@@ -345,7 +226,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   MatrixReorderingMPI<scalar_t,integer_t>::get_local_graphs
-  (const CSRMatMPI_t& A) {
+  (const CSRMPI_t& A) {
     auto P = comm_->size();
     auto rank = comm_->rank();
     sub_graph_ranges.resize(P);
@@ -377,7 +258,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   MatrixReorderingMPI<scalar_t,integer_t>::build_local_tree
-  (const CSRMatMPI_t& A) {
+  (const CSRMPI_t& A) {
     auto P = comm_->size();
     auto rank = comm_->rank();
     auto n = A.size();
@@ -439,6 +320,21 @@ namespace strumpack {
     }
   }
 
+  // explicit template instantiations
+  template class MatrixReorderingMPI<float,int>;
+  template class MatrixReorderingMPI<double,int>;
+  template class MatrixReorderingMPI<std::complex<float>,int>;
+  template class MatrixReorderingMPI<std::complex<double>,int>;
+
+  template class MatrixReorderingMPI<float,long int>;
+  template class MatrixReorderingMPI<double,long int>;
+  template class MatrixReorderingMPI<std::complex<float>,long int>;
+  template class MatrixReorderingMPI<std::complex<double>,long int>;
+
+  template class MatrixReorderingMPI<float,long long int>;
+  template class MatrixReorderingMPI<double,long long int>;
+  template class MatrixReorderingMPI<std::complex<float>,long long int>;
+  template class MatrixReorderingMPI<std::complex<double>,long long int>;
+
 } // end namespace strumpack
 
-#endif // MATRIX_REORDERING_MPI_HPP

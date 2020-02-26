@@ -26,90 +26,38 @@
  *             Division).
  *
  */
-#ifndef MATRIX_REORDERING_HPP
-#define MATRIX_REORDERING_HPP
-
 #include <vector>
 #include <string>
 #include <algorithm>
 #include <memory>
 
+#include "MatrixReordering.hpp"
+
 #include "HSS/HSSPartitionTree.hpp"
 #include "StrumpackOptions.hpp"
 #include "StrumpackConfig.hpp"
-#include "CSRMatrix.hpp"
+#include "sparse/fronts/FrontalMatrix.hpp"
+#include "sparse/SeparatorTree.hpp"
+#include "sparse/CSRMatrix.hpp"
 #if defined(STRUMPACK_USE_MPI)
 #include "misc/MPIWrapper.hpp"
-#include "CSRMatrixMPI.hpp"
+#include "sparse/CSRMatrixMPI.hpp"
 #endif
 #if defined(STRUMPACK_USE_SCOTCH)
 #include "ScotchReordering.hpp"
+#if defined(STRUMPACK_USE_MPI)
+#include "PTScotchReordering.hpp"
+#endif
 #endif
 #include "MetisReordering.hpp"
 #if defined(STRUMPACK_USE_PARMETIS)
 #include "ParMetisReordering.hpp"
 #endif
-#include "GeometricReordering.hpp"
 #include "RCMReordering.hpp"
+#include "GeometricReordering.hpp"
+
 
 namespace strumpack {
-
-  template<typename scalar_t,typename integer_t> class FrontalMatrix;
-
-  template<typename scalar_t,typename integer_t> class MatrixReordering {
-    using Opts_t = SPOptions<scalar_t>;
-    using CSRMat_t = CSRMatrix<scalar_t,integer_t>;
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
-
-  public:
-    MatrixReordering(integer_t  n);
-
-    virtual ~MatrixReordering() {}
-
-    int nested_dissection
-    (const Opts_t& opts, const CSRMat_t& A,
-     int nx, int ny, int nz, int components, int width);
-
-    int set_permutation
-    (const Opts_t& opts, const CSRMat_t& A, const int* p, int base);
-
-#if defined(STRUMPACK_USE_MPI)
-    int nested_dissection
-    (const Opts_t& opts, const CSRMat_t& A, const MPIComm& comm,
-     int nx, int ny, int nz, int components, int width);
-
-    int set_permutation
-    (const Opts_t& opts, const CSRMat_t& A, const MPIComm& comm,
-     const int* p, int base);
-#endif
-
-    void separator_reordering(const Opts_t& opts, CSRMat_t& A, F_t* F);
-
-    virtual void clear_tree_data();
-
-    const std::vector<integer_t>& perm() const { return perm_; }
-    const std::vector<integer_t>& iperm() const { return iperm_; }
-
-    const SeparatorTree<integer_t>& tree() const { return *sep_tree_; }
-    SeparatorTree<integer_t>& tree() { return *sep_tree_; }
-
-  protected:
-    virtual void separator_reordering_print
-    (integer_t max_nr_neighbours, integer_t max_dim_sep);
-
-    void nested_dissection_print
-    (const Opts_t& opts, integer_t nnz, int max_level,
-     int total_separators, bool verbose) const;
-
-    std::vector<integer_t> perm_, iperm_;
-
-    std::unique_ptr<SeparatorTree<integer_t>> sep_tree_;
-
-  private:
-    void nested_dissection_print
-    (const Opts_t& opts, integer_t nnz, bool verbose) const;
-  };
-
 
   template<typename scalar_t,typename integer_t>
   MatrixReordering<scalar_t,integer_t>::MatrixReordering(integer_t n)
@@ -118,7 +66,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> int
   MatrixReordering<scalar_t,integer_t>::nested_dissection
-  (const Opts_t& opts, const CSRMat_t& A,
+  (const Opts_t& opts, const CSR_t& A,
    int nx, int ny, int nz, int components, int width) {
     switch (opts.reordering_method()) {
     case ReorderingStrategy::NATURAL: {
@@ -164,7 +112,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> int
   MatrixReordering<scalar_t,integer_t>::set_permutation
-  (const Opts_t& opts, const CSRMat_t& A, const int* p, int base) {
+  (const Opts_t& opts, const CSR_t& A, const int* p, int base) {
     auto n = perm_.size();
     assert(A.size() == n);
     if (base == 0) std::copy(p, p+n, perm_.data());
@@ -178,7 +126,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t,typename integer_t> int
   MatrixReordering<scalar_t,integer_t>::nested_dissection
-  (const Opts_t& opts, const CSRMat_t& A, const MPIComm& comm,
+  (const Opts_t& opts, const CSR_t& A, const MPIComm& comm,
    int nx, int ny, int nz, int components, int width) {
     if (!is_parallel(opts.reordering_method())) {
       if (comm.is_root()) {
@@ -259,7 +207,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> int
   MatrixReordering<scalar_t,integer_t>::set_permutation
-  (const Opts_t& opts, const CSRMat_t& A, const MPIComm& comm,
+  (const Opts_t& opts, const CSR_t& A, const MPIComm& comm,
    const int* p, int base) {
     auto n = perm_.size();
     assert(A.size() == n);
@@ -280,7 +228,7 @@ namespace strumpack {
   // reorder the vertices in the separator to get a better rank structure
   template<typename scalar_t,typename integer_t> void
   MatrixReordering<scalar_t,integer_t>::separator_reordering
-  (const Opts_t& opts, CSRMat_t& A, F_t* F) {
+  (const Opts_t& opts, CSR_t& A, F_t* F) {
     auto N = A.size();
     std::vector<integer_t> sorder(N);
 #pragma omp parallel
@@ -392,6 +340,20 @@ namespace strumpack {
               << max_dim_sep << std::endl;
   }
 
-} // end namespace strumpack
+  // explicit template instantiations
+  template class MatrixReordering<float,int>;
+  template class MatrixReordering<double,int>;
+  template class MatrixReordering<std::complex<float>,int>;
+  template class MatrixReordering<std::complex<double>,int>;
 
-#endif
+  template class MatrixReordering<float,long int>;
+  template class MatrixReordering<double,long int>;
+  template class MatrixReordering<std::complex<float>,long int>;
+  template class MatrixReordering<std::complex<double>,long int>;
+
+  template class MatrixReordering<float,long long int>;
+  template class MatrixReordering<double,long long int>;
+  template class MatrixReordering<std::complex<float>,long long int>;
+  template class MatrixReordering<std::complex<double>,long long int>;
+
+} // end namespace strumpack

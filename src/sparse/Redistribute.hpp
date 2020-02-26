@@ -30,8 +30,7 @@
 #define REDISTRIBUTE_HPP
 
 #include <limits>
-#include "MatrixReorderingMPI.hpp"
-#include "../misc/MPIWrapper.hpp"
+#include "ordering/MatrixReorderingMPI.hpp"
 
 namespace strumpack {
 
