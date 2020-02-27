@@ -45,9 +45,9 @@
 #endif
 #if defined(STRUMPACK_USE_SCOTCH)
 #include "ScotchReordering.hpp"
-#if defined(STRUMPACK_USE_MPI)
-#include "PTScotchReordering.hpp"
 #endif
+#if defined(STRUMPACK_USE_PTSCOTCH)
+#include "PTScotchReordering.hpp"
 #endif
 #include "MetisReordering.hpp"
 #if defined(STRUMPACK_USE_PARMETIS)
@@ -186,7 +186,7 @@ namespace strumpack {
           break;
         }
         case ReorderingStrategy::PTSCOTCH: {
-#if defined(STRUMPACK_USE_SCOTCH)
+#if defined(STRUMPACK_USE_PTSCOTCH)
           ptscotch_nested_dissection(Ampi, comm.comm(), false, perm_, opts);
 #else
           std::cerr << "ERROR: STRUMPACK was not configured with Scotch support"

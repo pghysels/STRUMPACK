@@ -33,8 +33,10 @@
 #define STRUMPACK_HODLR_WRAPPER_HPP
 
 #include <cassert>
+#include <complex>
 
 #include "dense/DenseMatrix.hpp"
+#include "misc/MPIWrapper.hpp"
 #include "dC_BPACK_wrapper.h"
 #include "zC_BPACK_wrapper.h"
 

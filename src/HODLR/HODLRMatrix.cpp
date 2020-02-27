@@ -29,6 +29,7 @@
 #include <algorithm>
 
 #include "HODLRMatrix.hpp"
+#include "HODLRWrapper.hpp"
 #include "clustering/Clustering.hpp"
 
 namespace strumpack {
@@ -444,6 +445,18 @@ namespace strumpack {
       std::swap(iperm_, h.iperm_);
       std::swap(dist_, h.dist_);
       return *this;
+    }
+
+    template<typename scalar_t> double
+    HODLRMatrix<scalar_t>::get_stat(const std::string& name) const {
+      if (!stats_) return 0;
+      return BPACK_get_stat<scalar_t>(stats_, name);
+    }
+
+    template<typename scalar_t> void
+    HODLRMatrix<scalar_t>::print_stats() {
+      if (!stats_) return;
+      HODLR_printstats<scalar_t>(stats_, ptree_);
     }
 
     template<typename scalar_t> void HODLR_matvec_routine

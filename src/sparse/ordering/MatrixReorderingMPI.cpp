@@ -36,6 +36,8 @@
 #include "sparse/fronts/FrontalMatrix.hpp"
 #if defined(STRUMPACK_USE_SCOTCH)
 #include "ScotchReordering.hpp"
+#endif
+#if defined(STRUMPACK_USE_PTSCOTCH)
 #include "PTScotchReordering.hpp"
 #endif
 #include "MetisReordering.hpp"
@@ -148,7 +150,7 @@ namespace strumpack {
         break;
       }
       case ReorderingStrategy::PTSCOTCH: {
-#if defined(STRUMPACK_USE_SCOTCH)
+#if defined(STRUMPACK_USE_PTSCOTCH)
         sep_tree_ = ptscotch_nested_dissection
           (A, comm_->comm(), true, perm_, opts);
 #else

@@ -39,7 +39,6 @@
 #include "kernel/Kernel.hpp"
 #include "dense/DistributedMatrix.hpp"
 #include "HODLROptions.hpp"
-#include "HODLRWrapper.hpp"
 #include "sparse/CSRGraph.hpp"
 
 namespace strumpack {
@@ -83,6 +82,7 @@ namespace strumpack {
       using opts_t = HODLROptions<scalar_t>;
       using Vec_t = std::vector<std::size_t>;
       using VecVec_t = std::vector<std::vector<std::size_t>>;
+      using F2Cptr = void*;
 
     public:
       using real_t = typename RealType<scalar_t>::value_type;
@@ -284,15 +284,9 @@ namespace strumpack {
        * \param name fi : Rank_max, Mem_Factor, Mem_Fill, Flop_Fill,
        * Flop_Factor, Flop_C_Mult
        */
-      double get_stat(const std::string& name) const {
-        if (!stats_) return 0;
-        return BPACK_get_stat<scalar_t>(stats_, name);
-      }
+      double get_stat(const std::string& name) const;
 
-      void print_stats() {
-        if (!stats_) return;
-        HODLR_printstats<scalar_t>(stats_, ptree_);
-      }
+      void print_stats();
 
       /**
        * Construct the compressed HODLR representation of the matrix,
@@ -500,13 +494,13 @@ namespace strumpack {
     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
      int* allrows, int* allcols, scalar_t* alldat_loc,
      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
-     C2Fptr AC);
+     void* AC);
 
     template<typename scalar_t> void HODLR_block_evaluation_seq
     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
      int* allrows, int* allcols, scalar_t* alldat_loc,
      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
-     C2Fptr f);
+     void* f);
 
   } // end namespace HODLR
 } // end namespace strumpack

@@ -49,6 +49,7 @@ namespace strumpack {
       using DistMW_t = DistributedMatrixWrapper<scalar_t>;
       using opts_t = HODLROptions<scalar_t>;
       using VecVec_t = std::vector<std::vector<std::size_t>>;
+      using F2Cptr = void*;
 
     public:
       using mult_t = typename std::function
@@ -116,15 +117,9 @@ namespace strumpack {
       void extract_add_elements(ExtractionMeta& e, std::vector<DistMW_t>& B);
       void extract_add_elements(ExtractionMeta& e, std::vector<DenseMW_t>& B);
 
-      double get_stat(const std::string& name) const {
-        if (!stats_) return 0;
-        return BPACK_get_stat<scalar_t>(stats_, name);
-      }
+      double get_stat(const std::string& name) const;
 
-      void print_stats() {
-        if (!stats_) return;
-        HODLR_printstats<scalar_t>(stats_, ptree_);
-      }
+      void print_stats();
 
       DistM_t dense(const BLACSGrid* g) const;
 

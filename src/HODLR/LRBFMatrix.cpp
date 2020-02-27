@@ -30,6 +30,7 @@
 #include <cassert>
 
 #include "LRBFMatrix.hpp"
+#include "HODLRWrapper.hpp"
 
 namespace strumpack {
 
@@ -70,6 +71,18 @@ namespace strumpack {
         rdist_[p+1] += rdist_[p];
         cdist_[p+1] += cdist_[p];
       }
+    }
+
+    template<typename scalar_t> double
+    LRBFMatrix<scalar_t>::get_stat(const std::string& name) const {
+      if (!stats_) return 0;
+      return BPACK_get_stat<scalar_t>(stats_, name);
+    }
+
+    template<typename scalar_t> void
+    LRBFMatrix<scalar_t>::print_stats() {
+      if (!stats_) return;
+      HODLR_printstats<scalar_t>(stats_, ptree_);
     }
 
     template<typename integer_t> struct AdmInfoLRBF {

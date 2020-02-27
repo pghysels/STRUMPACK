@@ -1,23 +1,33 @@
-include_directories(${CMAKE_SOURCE_DIR}/src)
-include_directories(${CMAKE_SOURCE_DIR}/test)
+add_custom_target(tests)
 
-add_executable(test_HSS_seq test_HSS_seq)
-add_executable(test_sparse_seq test_sparse_seq)
-add_executable(test_BLR_seq test_BLR_seq)
+add_executable(test_HSS_seq    EXCLUDE_FROM_ALL test_HSS_seq.cpp)
+add_executable(test_sparse_seq EXCLUDE_FROM_ALL test_sparse_seq.cpp)
+add_executable(test_BLR_seq    EXCLUDE_FROM_ALL test_BLR_seq.cpp)
 
-target_link_libraries(test_HSS_seq strumpack ${LIB})
-target_link_libraries(test_sparse_seq strumpack ${LIB})
-target_link_libraries(test_BLR_seq strumpack ${LIB})
+target_link_libraries(test_HSS_seq strumpack)
+target_link_libraries(test_sparse_seq strumpack)
+target_link_libraries(test_BLR_seq strumpack)
+
+add_dependencies(tests
+  test_HSS_seq
+  test_sparse_seq
+  test_BLR_seq)
+
 
 add_test("user_test_HSS_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 100)
 add_test("user_test_sparse_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq
-  ../examples/data/pde900.mtx)
+  ${PROJECT_SOURCE_DIR}/examples/data/pde900.mtx)
 
 if(STRUMPACK_USE_MPI)
-  add_executable(test_HSS_mpi test_HSS_mpi)
-  add_executable(test_sparse_mpi test_sparse_mpi)
-  target_link_libraries(test_HSS_mpi strumpack ${LIB})
-  target_link_libraries(test_sparse_mpi strumpack ${LIB})
+  add_executable(test_HSS_mpi    EXCLUDE_FROM_ALL test_HSS_mpi.cpp)
+  add_executable(test_sparse_mpi EXCLUDE_FROM_ALL test_sparse_mpi.cpp)
+
+  target_link_libraries(test_HSS_mpi strumpack)
+  target_link_libraries(test_sparse_mpi strumpack)
+
+  add_dependencies(tests
+    test_HSS_mpi
+    test_sparse_mpi)
 
   # TODO check whether this is supported?
   set(OVERSUBSCRIBEFLAG "--oversubscribe")
@@ -28,7 +38,7 @@ if(STRUMPACK_USE_MPI)
   add_test("user_test_sparse_mpi" ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2
     ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
     ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi m
-    ../examples/data/pde900.mtx)
+    ${PROJECT_SOURCE_DIR}/examples/data/pde900.mtx)
 endif()
 
 set(test_name "HSS_seq_1")
