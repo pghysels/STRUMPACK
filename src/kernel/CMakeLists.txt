@@ -1,7 +1,6 @@
 target_sources(strumpack
   PRIVATE
   Kernel.cpp
-  PUBLIC
   Kernel.hpp
   KernelRegression.hpp
   Kernel.h

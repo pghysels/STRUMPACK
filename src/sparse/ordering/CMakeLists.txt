@@ -5,7 +5,6 @@ target_sources(strumpack
   MatrixReordering.cpp
   RCMReordering.hpp
   ScotchReordering.hpp
-  PUBLIC
   MatrixReordering.hpp
   MetisReordering.hpp)
 
@@ -19,10 +18,9 @@ if(STRUMPACK_USE_MPI)
     PRIVATE
     GeometricReorderingMPI.cpp
     GeometricReorderingMPI.hpp
-    ParMetisReordering.hpp  # TODO split into hpp/cpp
+    ParMetisReordering.hpp
     PTScotchReordering.hpp
     MatrixReorderingMPI.cpp
-    PUBLIC
     MatrixReorderingMPI.hpp)
 
   install(FILES

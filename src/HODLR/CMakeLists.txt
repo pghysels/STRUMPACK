@@ -5,7 +5,6 @@ if(TPL_ENABLE_BPACK)
     LRBFMatrix.cpp
     HODLRWrapper.cpp
     HODLRWrapper.hpp
-    PUBLIC
     HODLRMatrix.hpp
     LRBFMatrix.hpp
     HODLROptions.hpp)

@@ -6,15 +6,14 @@ int main() {
 #pragma omp single
   {
 #pragma omp task depend(inout:x) depend(out:y) priority(5)
-  {
-    y = x;
-    x += 3;
-  }
+    {
+      y = x;
+      x += 3;
+    }
 #pragma omp task depend(in:x) depend(out:y) priority(1)
-  {
-    y = 3 * x;
+    {
+      y = 3 * x;
+    }
   }
+  return 0;
 }
-return 0;
-}
-

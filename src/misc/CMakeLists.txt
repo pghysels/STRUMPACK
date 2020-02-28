@@ -1,7 +1,6 @@
 target_sources(strumpack
   PRIVATE
   TaskTimer.cpp
-  PUBLIC
   TaskTimer.hpp
   RandomWrapper.hpp
   Tools.hpp)
@@ -15,7 +14,7 @@ install(FILES
 
 if(STRUMPACK_USE_MPI)
   target_sources(strumpack
-    PUBLIC
+    PRIVATE
     MPIWrapper.hpp)
 
   install(FILES

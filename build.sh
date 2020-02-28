@@ -13,7 +13,12 @@ PARMETISDIR=$HOME/local/parmetis-4.0.3/install/
 METISDIR=$HOME/local/metis-5.1.0/install/
 ZFPDIR=$HOME/local/zfp-0.5.5/install
 
-cmake ../ \
+#      -DTPL_BLAS_LIBRARIES="/usr/lib/x86_64-linux-gnu/libopenblas.a" \
+#      -DTPL_LAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/liblapack.a" \
+
+
+
+cmake --debug-trycompile ../ \
       -DCMAKE_BUILD_TYPE=Debug \
       -DCMAKE_INSTALL_PREFIX=../install \
       -DSTRUMPACK_USE_MPI=ON \
@@ -26,4 +31,7 @@ cmake ../ \
       -DTPL_BPACK_INCLUDE_DIRS="$BPACKDIR/SRC_DOUBLE/;$BPACKDIR/SRC_DOUBLECOMPLEX" \
       -DTPL_BPACK_LIBRARIES="-L$BPACKDIR/build/SRC_DOUBLE/ -ldbutterflypack -L$BPACKDIR/build/SRC_DOUBLECOMPLEX/ -lzbutterflypack" \
 
-make install
+make install -j4
+make examples -j4
+make tests -j4
+# make test

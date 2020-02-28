@@ -1,31 +1,33 @@
 target_sources(strumpack
   PRIVATE
   strumpack_mc64ad.c
-  PUBLIC
   CompressedSparseMatrix.hpp
   CSRGraph.hpp
   CSRMatrix.hpp
-  EliminationTree.hpp)
+  EliminationTree.hpp
+  ETree.hpp
+  SeparatorTree.hpp)
 
 install(FILES
   CompressedSparseMatrix.hpp
   CSRGraph.hpp
   CSRMatrix.hpp
   EliminationTree.hpp
+  ETree.hpp
+  SeparatorTree.hpp
   DESTINATION include/sparse)
 
 
 if(STRUMPACK_USE_MPI)
   target_sources(strumpack
-    PUBLIC
+    PRIVATE
     CSRMatrixMPI.hpp
     ETree.hpp
     EliminationTreeMPI.hpp
     EliminationTreeMPIDist.hpp
     mumps_symqamd.hpp
     PropMapSparseMatrix.hpp
-    Redistribute.hpp
-    SeparatorTree.hpp)
+    Redistribute.hpp)
 
   install(FILES
     CSRMatrixMPI.hpp
@@ -35,7 +37,6 @@ if(STRUMPACK_USE_MPI)
     mumps_symqamd.hpp
     PropMapSparseMatrix.hpp
     Redistribute.hpp
-    SeparatorTree.hpp
     DESTINATION include/sparse)
 endif()
 

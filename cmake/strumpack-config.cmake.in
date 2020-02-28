@@ -1,0 +1,74 @@
+cmake_minimum_required(VERSION 3.11 FATAL_ERROR)
+
+get_filename_component(STRUMPACK_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+list(APPEND CMAKE_MODULE_PATH ${STRUMPACK_CMAKE_DIR})
+
+message(STATUS "CMAKE_MODULE_PATH = " ${CMAKE_MODULE_PATH})
+
+include(CMakeFindDependencyMacro)
+
+enable_language(C)
+enable_language(CXX)
+
+if(@STRUMPACK_USE_OPENMP@) # STRUMPACK_USE_OPENMP
+  find_dependency(OpenMP)
+endif()
+
+if(@STRUMPACK_USE_MPI@) # STRUMPACK_USE_MPI
+  enable_language(Fortran)
+  find_dependency(MPI)
+
+   # there is no target for ScaLAPACK
+   # find_dependency(ScaLAPACK)
+endif()
+
+# don't really need to find these because they have no targets
+# find_dependency(BLAS)
+# find_dependency(LAPACK)
+
+set(metis_PREFIX @TPL_METIS_PREFIX@)
+set(metis_INCLUDE_DIR @TPL_METIS_INCLUDE_DIRS@)
+set(metis_LIBRARY_DIR @TPL_METIS_LIBRARY_DIR@)
+set(metis_LIBRARIES @TPL_METIS_LIBRARIES@)
+find_dependency(METIS)
+
+if(@TPL_ENABLE_SCOTCH@) # TPL_ENABLE_SCOTCH
+  set(scotch_PREFIX @TPL_SCOTCH_PREFIX@)
+  set(scotch_INCLUDE_DIR @TPL_SCOTCH_INCLUDE_DIRS@)
+  set(scotch_LIBRARY_DIR @TPL_SCOTCH_LIBRARY_DIR@)
+  set(scotch_LIBRARIES @TPL_SCOTCH_LIBRARIES@)
+  find_dependency(SCOTCH)
+endif()
+
+if(@TPL_ENABLE_PTSCOTCH@) # TPL_ENABLE_PTSCOTCH
+  set(ptscotch_PREFIX @TPL_PTSCOTCH_PREFIX@)
+  set(ptscotch_INCLUDE_DIR @TPL_PTSCOTCH_INCLUDE_DIRS@)
+  set(ptscotch_LIBRARY_DIR @TPL_PTSCOTCH_LIBRARY_DIR@)
+  set(ptscotch_LIBRARIES @TPL_PTSCOTCH_LIBRARIES@)
+  find_dependency(PTSCOTCH)
+endif()
+
+if(@TPL_ENABLE_PARMETIS@) # TPL_ENABLE_PARMETIS
+  set(parmetis_PREFIX @TPL_PARMETIS_PREFIX@)
+  set(parmetis_INCLUDE_DIR @TPL_PARMETIS_INCLUDE_DIRS@)
+  set(parmetis_LIBRARY_DIR @TPL_PARMETIS_LIBRARY_DIR@)
+  set(parmetis_LIBRARIES @TPL_PARMETIS_LIBRARIES@)
+  find_dependency(ParMETIS)
+endif()
+
+if(@TPL_ENABLE_ZFP@) # TPL_ENABLE_ZFP
+  set(zfp_PREFIX @TPL_ZFP_PREFIX@)
+  set(zfp_INCLUDE_DIR @TPL_ZFP_INCLUDE_DIRS@)
+  set(zfp_LIBRARY_DIR @TPL_ZFP_LIBRARY_DIR@)
+  set(zfp_LIBRARIES @TPL_ZFP_LIBRARIES@)
+  find_dependency(ZFP)
+endif()
+
+
+list(REMOVE_AT CMAKE_MODULE_PATH -1)
+
+if(NOT TARGET STRUMPACK::strumpack)
+  include("${CMAKE_CURRENT_LIST_DIR}/strumpack-targets.cmake")
+endif()
+
+set(STRUMPACK_LIBRARIES STRUMPACK::strumpack)

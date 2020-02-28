@@ -2,7 +2,6 @@ target_sources(strumpack
   PRIVATE
   BLASLAPACKWrapper.cpp
   BLASLAPACKOpenMPTask.cpp
-  PUBLIC
   DistributedMatrix.hpp
   ACA.hpp
   BACA.hpp
@@ -24,7 +23,6 @@ if(STRUMPACK_USE_MPI)
   target_sources(strumpack
     PRIVATE
     ScaLAPACKWrapper.cpp
-    PUBLIC
     BLACSGrid.hpp
     DistributedVector.hpp
     DistributedMatrix.hpp

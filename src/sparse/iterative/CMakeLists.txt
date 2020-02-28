@@ -3,7 +3,6 @@ target_sources(strumpack
   BiCGStab.cpp
   GMRes.cpp
   IterativeRefinement.cpp
-  PUBLIC
   IterativeSolvers.hpp)
 
 install(FILES
@@ -17,7 +16,6 @@ if(STRUMPACK_USE_MPI)
     GMResMPI.cpp
     BiCGStabMPI.cpp
     IterativeRefinementMPI.cpp
-    PUBLIC
     IterativeSolversMPI.hpp)
 
   install(FILES

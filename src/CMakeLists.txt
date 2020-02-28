@@ -1,7 +1,6 @@
 target_sources(strumpack
   PRIVATE
-  StrumpackParameters.cpp
-  PUBLIC
+  StrumpackParameters.cpp #PUBLIC
   StrumpackOptions.hpp
   StrumpackParameters.hpp
   StrumpackSparseSolver.hpp)
@@ -10,12 +9,12 @@ install(FILES
   StrumpackOptions.hpp
   StrumpackParameters.hpp
   StrumpackSparseSolver.hpp
-  ${PROJECT_BINARY_DIR}/StrumpackConfig.hpp
   DESTINATION include)
+
 
 if(STRUMPACK_USE_MPI)
   target_sources(strumpack
-    PUBLIC
+    PRIVATE
     StrumpackSparseSolverMPIDist.hpp
     StrumpackSparseSolverMPI.hpp)
 
@@ -32,10 +31,22 @@ if(STRUMPACK_C_INTERFACE)
     StrumpackSparseSolver.h)
 endif()
 
+
 configure_file(StrumpackConfig.hpp.in
   ${PROJECT_BINARY_DIR}/StrumpackConfig.hpp)
 
-target_include_directories(strumpack PUBLIC ${CMAKE_CURRENT_LIST_DIR})
+install(FILES
+  ${PROJECT_BINARY_DIR}/StrumpackConfig.hpp
+  DESTINATION include)
+
+# add build folder as include dir for StrumpackConfig.hpp and
+# StrumpackFortranCInterface.h, also add the current src/ folder as
+# include dir
+target_include_directories(strumpack PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+  $<INSTALL_INTERFACE:include>
+  $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}>)
+
 
 add_subdirectory(misc)
 add_subdirectory(sparse)

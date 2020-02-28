@@ -7,7 +7,6 @@ target_sources(strumpack
   FrontalMatrixHSS.cpp
   FrontalMatrixHSS.hpp
   FrontalMatrixBLR.hpp
-  PUBLIC
   FrontFactory.hpp
   FrontalMatrix.hpp)
 
@@ -29,6 +28,10 @@ if(STRUMPACK_USE_MPI)
     FrontalMatrixBLRMPI.hpp
     ExtendAdd.cpp
     ExtendAdd.hpp)
+
+  install(FILES
+    FrontalMatrixMPI.hpp
+    DESTINATION include/sparse/fronts)
 endif()
 
 if(TPL_ENABLE_CUBLAS)

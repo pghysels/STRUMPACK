@@ -4,7 +4,6 @@ target_sources(strumpack
   CobblePartitioning.cpp
   KMeans.cpp
   KDTree.cpp
-  PUBLIC
   Clustering.hpp
   NeighborSearch.hpp)
 

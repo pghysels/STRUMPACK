@@ -10,7 +10,6 @@ target_sources(strumpack
   HSSMatrix.factor.hpp
   HSSMatrix.Schur.hpp
   HSSMatrix.solve.hpp
-  PUBLIC
   HSSMatrix.hpp
   HSSBasisID.hpp
   HSSExtra.hpp
@@ -42,7 +41,6 @@ if(STRUMPACK_USE_MPI)
     HSSMatrixMPI.factor.hpp
     HSSMatrixMPI.Schur.hpp
     HSSMatrixMPI.solve.hpp
-    PUBLIC
     HSSMatrixMPI.hpp
     HSSExtraMPI.hpp
     HSSBasisIDMPI.hpp

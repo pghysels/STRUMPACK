@@ -1,5 +1,5 @@
 target_sources(strumpack
-  PUBLIC
+  PRIVATE
   BLRMatrix.hpp
   BLRMatrixMPI.hpp
   BLROptions.hpp

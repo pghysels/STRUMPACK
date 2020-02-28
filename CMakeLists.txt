@@ -17,7 +17,6 @@ option(TPL_ENABLE_ZFP        "Build with support for ZFP compression" ON)
 
 option(STRUMPACK_COUNT_FLOPS "Build with flop counters" OFF)
 option(STRUMPACK_TASK_TIMERS "Build with timers for internal routines" OFF)
-# option(STRUMPACK_BUILD_TESTS "Build the tests" ON)
 option(STRUMPACK_DEV_TESTING "Enable extensive testing" OFF)
 option(STRUMPACK_C_INTERFACE "Build the C interface" ON)
 
@@ -33,7 +32,7 @@ if(STRUMPACK_USE_MPI)
   find_package(MPI)
   if(NOT MPI_FOUND)
     set(STRUMPACK_USE_MPI OFF)
-    message(WARNING "Configuring witout MPI support.")
+    message(WARNING "Configuring without MPI support.")
   endif()
 endif()
 if(NOT STRUMPACK_USE_MPI)
@@ -53,13 +52,13 @@ endif()
 
 
 if(STRUMPACK_USE_OPENMP)
-  include(FindOpenMP)
+  find_package(OpenMP)
   if(OpenMP_FOUND)
     set(_SCRATCH_DIR ${CMAKE_CURRENT_BINARY_DIR}/omp_compile_test)
     try_compile(STRUMPACK_USE_OPENMP_TASK_DEPEND ${_SCRATCH_DIR}
       SOURCES ${CMAKE_SOURCE_DIR}/cmake/taskdepend.cpp
       LINK_LIBRARIES OpenMP::OpenMP_CXX)
-    message(STATUS "Support for OpenMP task dependencies: "
+    message(STATUS "Support for OpenMP task depend/priority: "
       ${STRUMPACK_USE_OPENMP_TASK_DEPEND})
     try_compile(STRUMPACK_USE_OPENMP_TASKLOOP ${_SCRATCH_DIR}
       SOURCES ${CMAKE_SOURCE_DIR}/cmake/taskloop.cpp
@@ -75,17 +74,113 @@ else()
 endif()
 
 
-# TODO also look at TPL_... dirs
-find_package(BLAS REQUIRED)
-find_package(LAPACK REQUIRED)
+if(DEFINED TPL_BLAS_LIBRARIES)
+  # xSDK policies require the user be able to specify BLAS libraries
+  # through the TPL_BLAS_LIBRARIES variable. If these do not work,
+  # then an error should be generated, and we shouldn't just continue.
+  set(BLAS_LIBRARIES ${TPL_BLAS_LIBRARIES})
+  set(_SCRATCH_DIR ${CMAKE_CURRENT_BINARY_DIR}/blas_compile_test)
+  try_compile(STRUMPACK_TPL_BLAS_WORKS ${_SCRATCH_DIR}
+    SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
+    LINK_LIBRARIES ${TPL_BLAS_LIBRARIES})
+  if(STRUMPACK_TPL_BLAS_WORKS)
+    message(STATUS
+      "Using BLAS from TPL_BLAS_LIBRARIES (${TPL_BLAS_LIBRARIES})")
+  else()
+    message(STATUS
+      "Linking with TPL_BLAS_LIBRARIES did not work,"
+      " trying again with additional threading library linked in.")
+    # Compilation with TPL_BLAS_LIBRARIES failed. Perhaps we were
+    # missing a threading library? Just guessing. One more try with
+    # threading (pthreads) linked in and then we give up.
+    find_package(Threads)
+    try_compile(STRUMPACK_TPL_BLAS_WITH_THREADS_WORKS ${_SCRATCH_DIR}
+      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
+      LINK_LIBRARIES ${TPL_BLAS_LIBRARIES} Threads::Threads)
+    if(STRUMPACK_TPL_BLAS_WITH_THREADS_WORKS)
+      message(STATUS
+        "Using BLAS (${TPL_BLAS_LIBRARIES}), "
+        "with additional threading library.")
+    else()
+      message(FATAL_ERROR
+        "BLAS libraries defined in TPL_BLAS_LIBRARIES"
+        " (${TPL_BLAS_LIBRARIES}) cannot be used.")
+    endif()
+  endif()
+else()
+  find_package(BLAS)
+  if(NOT BLAS_FOUND)
+    # BLAS was not specified in TPL_BLAS_LIBRARIES, and not found
+    # elsewhere. We will still try to compile a BLAS example, because
+    # perhaps BLAS is automatically linked by the compiler wrapper, as
+    # is the case for instance on Cray machines.
+    message(STATUS
+      "A BLAS library could not be found on the system, "
+      "checking if BLAS is implicitly linked by the compiler(wrapper).")
+    set(_SCRATCH_DIR ${CMAKE_CURRENT_BINARY_DIR}/blas_compile_test)
+    try_compile(STRUMPACK_BLAS_JUST_WORKS ${_SCRATCH_DIR}
+      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
+      LINK_LIBRARIES "${TPL_BLAS_LIBRARIES}")
+    if(NOT STRUMPACK_BLAS_JUST_WORKS)
+      message(FATAL_ERROR
+        "Could not find a BLAS library.\n"
+         " You can specify a BLAS library using -DTPL_BLAS_LIBRARIES=\"...\"")
+    endif()
+  endif()
+endif()
 
-list(APPEND CMAKE_MODULE_PATH
-  "${CMAKE_SOURCE_DIR}/cmake/ModulesModern")
+
+if(DEFINED TPL_LAPACK_LIBRARIES)
+  # xSDK policies require the user be able to specify LAPACK libraries
+  # through the TPL_LAPACK_LIBRARIES variable. If these do not work,
+  # then an error should be generated, and we shouldn't just continue.
+  set(LAPACK_LIBRARIES ${LAPACK_BLAS_LIBRARIES})
+  set(_SCRATCH_DIR ${CMAKE_CURRENT_BINARY_DIR}/lapack_compile_test)
+  try_compile(STRUMPACK_TPL_LAPACK_WORKS ${_SCRATCH_DIR}
+    SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
+    LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES})
+  if(STRUMPACK_TPL_LAPACK_WORKS)
+    message(STATUS
+      "Using LAPACK from TPL_LAPACK_LIBRARIES (${TPL_LAPACK_LIBRARIES})")
+  else()
+    message(STATUS
+      "Linking with TPL_LAPACK_LIBRARIES did not work,"
+      " trying again with additional threading library linked in.")
+    # Compilation with TPL_LAPACK_LIBRARIES failed. Perhaps we were
+    # missing a threading library? Just guessing. One more try with
+    # threading (pthreads) linked in and then we give up.
+    find_package(Threads)
+    try_compile(STRUMPACK_TPL_LAPACK_WITH_THREADS_WORKS ${_SCRATCH_DIR}
+      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
+      LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES} Threads::Threads)
+    if(STRUMPACK_TPL_LAPACK_WITH_THREADS_WORKS)
+      message(STATUS
+        "Using LAPACK (${TPL_LAPACK_LIBRARIES}), "
+        "with additional threading library.")
+    else()
+      message(FATAL_ERROR
+        "LAPACK libraries defined in TPL_LAPACK_LIBRARIES"
+        " (${TPL_LAPACK_LIBRARIES}) cannot be used.")
+    endif()
+  endif()
+else()
+  if(DEFINED TPL_BLAS_LIBRARIES)
+    message(WARNING
+      "TPL_BLAS_LIBRARIES was specified. "
+      "Consider specifying TPL_LAPACK_LIBRARIES as well to ensure "
+      "compatible BLAS and LAPACK libraries.")
+  endif()
+  find_package(LAPACK REQUIRED)
+endif()
+
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules")
+
 
 if(STRUMPACK_USE_MPI)
   # TODO find a better way for this?
   if(DEFINED TPL_SCALAPACK_LIBRARIES)
-    set(LIBS ${SCALAPACK_LIBRARIES} ${TPL_SCALAPACK_LIBRARIES})
+    # set(LIBS ${SCALAPACK_LIBRARIES} ${TPL_SCALAPACK_LIBRARIES})
   else()
     find_package(SCALAPACK REQUIRED)
   endif()
@@ -127,7 +222,7 @@ if(TPL_ENABLE_PARMETIS)
   set(parmetis_LIBRARY_DIR ${TPL_PARMETIS_LIBRARY_DIR})
   set(parmetis_LIBRARIES ${TPL_PARMETIS_LIBRARIES})
   find_package(ParMETIS)
-  if(PARMETIS_FOUND)
+  if(ParMETIS_FOUND)
     option(STRUMPACK_USE_PARMETIS "" ON)
   endif()
 endif()
@@ -156,29 +251,28 @@ endif()
 add_library(strumpack "")
 add_subdirectory(src)
 
-target_include_directories(strumpack PUBLIC ${PROJECT_BINARY_DIR})
 target_sources(strumpack
   PRIVATE ${PROJECT_BINARY_DIR}/StrumpackFortranCInterface.h)
 
-target_compile_features(strumpack PUBLIC cxx_std_11)
+target_compile_features(strumpack INTERFACE cxx_std_11)
 set_target_properties(strumpack PROPERTIES CXX_EXTENSIONS OFF)
 
 if(STRUMPACK_USE_MPI)
-  target_link_libraries(strumpack PUBLIC MPI::MPI_C)
   target_link_libraries(strumpack PUBLIC MPI::MPI_CXX)
-  target_link_libraries(strumpack PUBLIC MPI::MPI_Fortran)
+  target_link_libraries(strumpack PRIVATE MPI::MPI_C)
+  target_link_libraries(strumpack PRIVATE MPI::MPI_Fortran)
 endif()
 
 if(OpenMP_FOUND)
-  if(OpenMP_C_FOUND)
-    target_link_libraries(strumpack PUBLIC OpenMP::OpenMP_C)
-  endif()
+  # if(OpenMP_C_FOUND)
+  #   target_link_libraries(strumpack PRIVATE OpenMP::OpenMP_C)
+  # endif()
   if(OpenMP_CXX_FOUND)
     target_link_libraries(strumpack PUBLIC OpenMP::OpenMP_CXX)
   endif()
-  if(OpenMP_Fortran_FOUND)
-    target_link_libraries(strumpack PUBLIC OpenMP::OpenMP_Fortran)
-  endif()
+  # if(OpenMP_Fortran_FOUND)
+  #   target_link_libraries(strumpack PRIVATE OpenMP::OpenMP_Fortran)
+  # endif()
 else()
   include(CheckCXXCompilerFlag)
   check_cxx_compiler_flag(-Wno-unknown-pragmas
@@ -199,7 +293,7 @@ endif()
 #   - ParMETIS before METIS, since ParMETIS needs METIS
 #   - (ParMETIS) before Scotch to avoid confusion with the Scotch
 #     ParMETIS compatibility layer
-if(PARMETIS_FOUND)
+if(ParMETIS_FOUND)
   target_link_libraries(strumpack PUBLIC ParMETIS::parmetis)
 endif()
 target_link_libraries(strumpack PUBLIC METIS::metis)
@@ -221,13 +315,57 @@ if(TPL_ENABLE_BPACK)
   target_include_directories(strumpack PRIVATE ${TPL_BPACK_INCLUDE_DIRS})
 endif()
 
+
+# examples
 add_subdirectory(examples)
 
+# testing
 include(CTest)
 add_subdirectory(test)
 
-install(TARGETS strumpack LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+# documentation
+find_package(Doxygen)
+if(DOXYGEN_FOUND)
+  configure_file(${CMAKE_SOURCE_DIR}/doc/doxygen/doxygen.dox.in
+    ${CMAKE_BINARY_DIR}/doxygen.dox @ONLY)
+  add_custom_target(doc
+    ${DOXYGEN_EXECUTABLE} ${CMAKE_BINARY_DIR}/doxygen.dox
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Generating API documentation with doxygen" VERBATIM)
+endif()
 
+
+# installation
 install(FILES
   ${PROJECT_BINARY_DIR}/StrumpackFortranCInterface.h
   DESTINATION include)
+
+install(TARGETS strumpack EXPORT STRUMPACKTargets
+  LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+
+
+# export targets and all
+set(ConfigPackageLocation lib/cmake/STRUMPACK)
+
+install(EXPORT STRUMPACKTargets FILE strumpack-targets.cmake
+  NAMESPACE STRUMPACK:: DESTINATION ${ConfigPackageLocation})
+
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(strumpack-config-version.cmake
+  VERSION ${STRUMPACK_VERSION} COMPATIBILITY AnyNewerVersion)
+install(FILES "${CMAKE_BINARY_DIR}/strumpack-config-version.cmake"
+  DESTINATION ${ConfigPackageLocation})
+
+# stupid CMake makes me write one more file
+configure_package_config_file(
+  ${PROJECT_SOURCE_DIR}/cmake/strumpack-config.cmake.in
+  ${CMAKE_BINARY_DIR}/strumpack-config.cmake
+  INSTALL_DESTINATION ${ConfigPackageLocation})
+
+install(FILES "${CMAKE_BINARY_DIR}/strumpack-config.cmake"
+  DESTINATION ${ConfigPackageLocation})
+
+# install the FindMETIS, etc modules for STRUMPACK users
+install(DIRECTORY cmake/Modules/
+  DESTINATION ${ConfigPackageLocation}
+  FILES_MATCHING PATTERN "*.cmake")
