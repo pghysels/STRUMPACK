@@ -12,7 +12,7 @@ option(TPL_ENABLE_SCOTCH     "Build with support for Scotch" ON)
 option(TPL_ENABLE_PTSCOTCH   "Build with support for PTScotch" ON)
 option(TPL_ENABLE_PAPI       "Build with support for PAPI monitoring" OFF)
 option(TPL_ENABLE_COMBBLAS   "Use CombBLAS for weighted matching" OFF)
-option(TPL_ENABLE_BPACK      "Use BPACK (ButterflyPACK) code by Yang Liu" OFF)
+option(TPL_ENABLE_BPACK      "Use BPACK (ButterflyPACK) code by Yang Liu" ON)
 option(TPL_ENABLE_ZFP        "Build with support for ZFP compression" ON)
 
 option(STRUMPACK_COUNT_FLOPS "Build with flop counters" OFF)
@@ -178,25 +178,49 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules")
 
 
 if(STRUMPACK_USE_MPI)
-  # TODO find a better way for this?
   if(DEFINED TPL_SCALAPACK_LIBRARIES)
-    # set(LIBS ${SCALAPACK_LIBRARIES} ${TPL_SCALAPACK_LIBRARIES})
+    check_library_exists(${TPL_SCALAPACK_LIBRARIES} pdgemm_ ""
+      TPL_SCALAPACK_WORKS)
+    if(TPL_SCALAPACK_WORKS)
+      message(STATUS
+        "Using ScaLAPACK from TPL_SCALAPACK_LIBRARIES"
+        " (${TPL_SCALAPACK_LIBRARIES})")
+      set(${SCALAPACK_LIBRARIES} ${TPL_SCALAPACK_LIBRARIES})
+    else()
+      message(FATAL_ERROR
+        "Cannot use TPL_SCALAPACK_LIBRARIES (${TPL_SCALAPACK_LIBRARIES})")
+    endif()
   else()
     find_package(SCALAPACK REQUIRED)
   endif()
 endif()
 
-set(metis_PREFIX ${TPL_METIS_PREFIX})
-set(metis_INCLUDE_DIR ${TPL_METIS_INCLUDE_DIRS})
-set(metis_LIBRARY_DIR ${TPL_METIS_LIBRARY_DIR})
-set(metis_LIBRARIES ${TPL_METIS_LIBRARIES})
+
+list(APPEND CMAKE_PREFIX_PATH
+  ${TPL_METIS_PREFIX} $ENV{METIS_DIR} $ENV{METIS_ROOT})
+if(NOT DEFINED metis_INCLUDE_DIR)
+  set(metis_INCLUDE_DIR ${TPL_METIS_INCLUDE_DIRS})
+endif()
+if(NOT DEFINED metis_LIBRARY_DIR)
+  set(metis_LIBRARY_DIR ${TPL_METIS_LIBRARY_DIR})
+endif()
+if(NOT DEFINED metis_LIBRARIES)
+  set(metis_LIBRARIES ${TPL_METIS_LIBRARIES})
+endif()
 find_package(METIS REQUIRED)
 
 if(TPL_ENABLE_SCOTCH)
-  set(scotch_PREFIX ${TPL_SCOTCH_PREFIX})
-  set(scotch_INCLUDE_DIR ${TPL_SCOTCH_INCLUDE_DIRS})
-  set(scotch_LIBRARY_DIR ${TPL_SCOTCH_LIBRARY_DIR})
-  set(scotch_LIBRARIES ${TPL_SCOTCH_LIBRARIES})
+  list(APPEND CMAKE_PREFIX_PATH
+    ${TPL_SCOTCH_PREFIX} $ENV{SCOTCH_DIR} $ENV{SCOTCH_ROOT})
+  if(NOT DEFINED scotch_INCLUDE_DIR)
+    set(scotch_INCLUDE_DIR ${TPL_SCOTCH_INCLUDE_DIRS})
+  endif()
+  if(NOT DEFINED scotch_LIBRARY_DIR)
+    set(scotch_LIBRARY_DIR ${TPL_SCOTCH_LIBRARY_DIR})
+  endif()
+  if(NOT DEFINED scotch_LIBRARIES)
+    set(scotch_LIBRARIES ${TPL_SCOTCH_LIBRARIES})
+  endif()
   find_package(SCOTCH)
   if(SCOTCH_FOUND)
     option(STRUMPACK_USE_SCOTCH "" ON)
@@ -204,12 +228,17 @@ if(TPL_ENABLE_SCOTCH)
 endif()
 
 if(TPL_ENABLE_PTSCOTCH)
-  # TODO if these TPL_PTSCOTCH_.. variables do not exist,
-  # then check TPL_SCOTCH_..
-  set(ptscotch_PREFIX ${TPL_PTSCOTCH_PREFIX})
-  set(ptscotch_INCLUDE_DIR ${TPL_PTSCOTCH_INCLUDE_DIRS})
-  set(ptscotch_LIBRARY_DIR ${TPL_PTSCOTCH_LIBRARY_DIR})
-  set(ptscotch_LIBRARIES ${TPL_PTSCOTCH_LIBRARIES})
+  list(APPEND CMAKE_PREFIX_PATH
+    ${TPL_PTSCOTCH_PREFIX} $ENV{PTSCOTCH_DIR} $ENV{PTSCOTCH_ROOT})
+  if(NOT DEFINED ptscotch_INCLUDE_DIR)
+    set(ptscotch_INCLUDE_DIR ${TPL_PTSCOTCH_INCLUDE_DIRS})
+  endif()
+  if(NOT DEFINED ptscotch_LIBRARY_DIR)
+    set(ptscotch_LIBRARY_DIR ${TPL_PTSCOTCH_LIBRARY_DIR})
+  endif()
+  if(NOT DEFINED ptscotch_LIBRARIES)
+    set(ptscotch_LIBRARIES ${TPL_PTSCOTCH_LIBRARIES})
+  endif()
   find_package(PTSCOTCH)
   if(PTSCOTCH_FOUND)
     option(STRUMPACK_USE_PTSCOTCH "" ON)
@@ -217,10 +246,18 @@ if(TPL_ENABLE_PTSCOTCH)
 endif()
 
 if(TPL_ENABLE_PARMETIS)
-  set(parmetis_PREFIX ${TPL_PARMETIS_PREFIX})
-  set(parmetis_INCLUDE_DIR ${TPL_PARMETIS_INCLUDE_DIRS})
-  set(parmetis_LIBRARY_DIR ${TPL_PARMETIS_LIBRARY_DIR})
-  set(parmetis_LIBRARIES ${TPL_PARMETIS_LIBRARIES})
+  list(APPEND CMAKE_PREFIX_PATH
+    ${TPL_PARMETIS_PREFIX} $ENV{PARMETIS_DIR} $ENV{PARMETIS_ROOT}
+    $ENV{ParMETIS_DIR} $ENV{ParMETIS_ROOT})
+  if(NOT DEFINED parmetis_INCLUDE_DIR)
+    set(parmetis_INCLUDE_DIR ${TPL_PARMETIS_INCLUDE_DIRS})
+  endif()
+  if(NOT DEFINED parmetis_LIBRARY_DIR)
+    set(parmetis_LIBRARY_DIR ${TPL_PARMETIS_LIBRARY_DIR})
+  endif()
+  if(NOT DEFINED parmetis_LIBRARIES)
+    set(parmetis_LIBRARIES ${TPL_PARMETIS_LIBRARIES})
+  endif()
   find_package(ParMETIS)
   if(ParMETIS_FOUND)
     option(STRUMPACK_USE_PARMETIS "" ON)
@@ -228,10 +265,17 @@ if(TPL_ENABLE_PARMETIS)
 endif()
 
 if(TPL_ENABLE_ZFP)
-  set(zfp_PREFIX ${TPL_ZFP_PREFIX})
-  set(zfp_INCLUDE_DIR ${TPL_ZFP_INCLUDE_DIRS})
-  set(zfp_LIBRARY_DIR ${TPL_ZFP_LIBRARY_DIR})
-  set(zfp_LIBRARIES ${TPL_ZFP_LIBRARIES})
+  list(APPEND CMAKE_PREFIX_PATH
+    ${TPL_ZFP_PREFIX} $ENV{ZFP_DIR} $ENV{ZFP_ROOT})
+  if(NOT DEFINED zfp_INCLUDE_DIR)
+    set(zfp_INCLUDE_DIR ${TPL_ZFP_INCLUDE_DIRS})
+  endif()
+  if(NOT DEFINED zfp_LIBRARY_DIR)
+    set(zfp_LIBRARY_DIR ${TPL_ZFP_LIBRARY_DIR})
+  endif()
+  if(NOT DEFINED zfp_LIBRARIES)
+    set(zfp_LIBRARIES ${TPL_ZFP_LIBRARIES})
+  endif()
   find_package(ZFP)
   if(ZFP_FOUND)
     option(STRUMPACK_USE_ZFP "" ON)
@@ -239,8 +283,13 @@ if(TPL_ENABLE_ZFP)
 endif()
 
 if(TPL_ENABLE_BPACK)
-  option(STRUMPACK_USE_BPACK "" ON)
-  # TODO in BPACK, export targets, then find his .cmake file?
+  list(APPEND CMAKE_PREFIX_PATH ${TPL_BUTTERFLYPACK_PREFIX}
+    $ENV{ButterflyPACK_DIR} $ENV{ButterflyPACK_ROOT}
+    $ENV{BUTTERFLYPACK_DIR} $ENV{BUTTERFLYPACK_ROOT})
+  find_package(ButterflyPACK)
+  if(ButterflyPACK_FOUND)
+    option(STRUMPACK_USE_BPACK "" ON)
+  endif()
 endif()
 
 # TODO CombBLAS, needs c++14
@@ -308,11 +357,9 @@ if(ZFP_FOUND)
   target_link_libraries(strumpack PUBLIC ZFP::zfp)
 endif()
 
-if(TPL_ENABLE_BPACK)
-  option(STRUMPACK_USE_BPACK "" ON)
-  # TODO export BPACK targets, then find his .cmake file?
-  target_link_libraries(strumpack PUBLIC ${TPL_BPACK_LIBRARIES})
-  target_include_directories(strumpack PRIVATE ${TPL_BPACK_INCLUDE_DIRS})
+if(ButterflyPACK_FOUND)
+  target_link_libraries(strumpack PUBLIC
+    ButterflyPACK::dbutterflypack ButterflyPACK::zbutterflypack)
 endif()
 
 

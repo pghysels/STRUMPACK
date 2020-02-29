@@ -4,32 +4,24 @@ rm -rf build
 rm -rf install
 mkdir build
 mkdir install
-
 cd build
 
-SCOTCHDIR=$HOME/local/scotch_6.0.4
-BPACKDIR=$HOME/LBL/STRUMPACK/ButterflyPACK/
-PARMETISDIR=$HOME/local/parmetis-4.0.3/install/
-METISDIR=$HOME/local/metis-5.1.0/install/
-ZFPDIR=$HOME/local/zfp-0.5.5/install
+# METIS is required
+export METIS_DIR=$HOME/local/metis-5.1.0/install
 
-#      -DTPL_BLAS_LIBRARIES="/usr/lib/x86_64-linux-gnu/libopenblas.a" \
-#      -DTPL_LAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/liblapack.a" \
+# the following are optional
+export SCOTCH_DIR=$HOME/local/scotch_6.0.4
+export ParMETIS_DIR=$HOME/local/parmetis-4.0.3/install
+export ZFP_DIR=$HOME/local/zfp-0.5.5/install
+export ButterflyPACK_DIR=$HOME/LBL/STRUMPACK/ButterflyPACK_export/install/lib/cmake/ButterflyPACK
 
+cmake ../ -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=../install
 
+## if not found automatically, you can specify BLAS/LAPACK/SCALAPACK as:
+#  -DTPL_BLAS_LIBRARIES="/usr/lib/x86_64-linux-gnu/libopenblas.a"
+#  -DTPL_LAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/liblapack.a"
+#  -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
 
-cmake --debug-trycompile ../ \
-      -DCMAKE_BUILD_TYPE=Debug \
-      -DCMAKE_INSTALL_PREFIX=../install \
-      -DSTRUMPACK_USE_MPI=ON \
-      -DTPL_METIS_PREFIX=$METISDIR \
-      -DTPL_SCOTCH_PREFIX=$SCOTCHDIR \
-      -DTPL_PTSCOTCH_PREFIX=$SCOTCHDIR \
-      -DTPL_PARMETIS_PREFIX=$PARMETISDIR \
-      -DTPL_ZFP_PREFIX=$ZFPDIR \
-      -DTPL_ENABLE_BPACK=ON \
-      -DTPL_BPACK_INCLUDE_DIRS="$BPACKDIR/SRC_DOUBLE/;$BPACKDIR/SRC_DOUBLECOMPLEX" \
-      -DTPL_BPACK_LIBRARIES="-L$BPACKDIR/build/SRC_DOUBLE/ -ldbutterflypack -L$BPACKDIR/build/SRC_DOUBLECOMPLEX/ -lzbutterflypack" \
 
 make install -j4
 make examples -j4
