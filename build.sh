@@ -14,6 +14,7 @@ export SCOTCH_DIR=$HOME/local/scotch_6.0.4
 export ParMETIS_DIR=$HOME/local/parmetis-4.0.3/install
 export ZFP_DIR=$HOME/local/zfp-0.5.5/install
 export ButterflyPACK_DIR=$HOME/LBL/STRUMPACK/ButterflyPACK_export/install/lib/cmake/ButterflyPACK
+export ButterflyPACK_DIR=$HOME/LBL/STRUMPACK/ButterflyPACK_export/install/
 
 cmake ../ -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=../install
 
@@ -26,4 +27,4 @@ cmake ../ -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=../install
 make install -j4
 make examples -j4
 make tests -j4
-# make test
+make test

@@ -20,6 +20,7 @@ option(STRUMPACK_TASK_TIMERS "Build with timers for internal routines" OFF)
 option(STRUMPACK_DEV_TESTING "Enable extensive testing" OFF)
 option(STRUMPACK_C_INTERFACE "Build the C interface" ON)
 
+include(CheckLibraryExists)
 
 # figure out Fortran/C name mangling
 include(FortranCInterface)
@@ -49,7 +50,9 @@ if(NOT STRUMPACK_USE_MPI)
     set(TPL_ENABLE_BPACK OFF)
   endif()
 endif()
-
+if(TPL_ENABLE_PTSCOTCH)
+  set(TPL_ENABLE_SCOTCH ON)
+endif()
 
 if(STRUMPACK_USE_OPENMP)
   find_package(OpenMP)
@@ -134,7 +137,7 @@ if(DEFINED TPL_LAPACK_LIBRARIES)
   # xSDK policies require the user be able to specify LAPACK libraries
   # through the TPL_LAPACK_LIBRARIES variable. If these do not work,
   # then an error should be generated, and we shouldn't just continue.
-  set(LAPACK_LIBRARIES ${LAPACK_BLAS_LIBRARIES})
+  set(LAPACK_LIBRARIES ${TPL_LAPACK_LIBRARIES})
   set(_SCRATCH_DIR ${CMAKE_CURRENT_BINARY_DIR}/lapack_compile_test)
   try_compile(STRUMPACK_TPL_LAPACK_WORKS ${_SCRATCH_DIR}
     SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
@@ -179,13 +182,15 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules")
 
 if(STRUMPACK_USE_MPI)
   if(DEFINED TPL_SCALAPACK_LIBRARIES)
-    check_library_exists(${TPL_SCALAPACK_LIBRARIES} pdgemm_ ""
-      TPL_SCALAPACK_WORKS)
-    if(TPL_SCALAPACK_WORKS)
+    check_library_exists(${TPL_SCALAPACK_LIBRARIES}
+      pdgemm_ "" TPL_SCALAPACK_WORKS_U)
+    check_library_exists(${TPL_SCALAPACK_LIBRARIES}
+      pdgemm  "" TPL_SCALAPACK_WORKS_NOU)
+    if(TPL_SCALAPACK_WORKS_U OR TPL_SCALAPACK_WORKS_NOU)
       message(STATUS
         "Using ScaLAPACK from TPL_SCALAPACK_LIBRARIES"
         " (${TPL_SCALAPACK_LIBRARIES})")
-      set(${SCALAPACK_LIBRARIES} ${TPL_SCALAPACK_LIBRARIES})
+      set(SCALAPACK_LIBRARIES ${TPL_SCALAPACK_LIBRARIES})
     else()
       message(FATAL_ERROR
         "Cannot use TPL_SCALAPACK_LIBRARIES (${TPL_SCALAPACK_LIBRARIES})")
@@ -224,24 +229,23 @@ if(TPL_ENABLE_SCOTCH)
   find_package(SCOTCH)
   if(SCOTCH_FOUND)
     option(STRUMPACK_USE_SCOTCH "" ON)
-  endif()
-endif()
-
-if(TPL_ENABLE_PTSCOTCH)
-  list(APPEND CMAKE_PREFIX_PATH
-    ${TPL_PTSCOTCH_PREFIX} $ENV{PTSCOTCH_DIR} $ENV{PTSCOTCH_ROOT})
-  if(NOT DEFINED ptscotch_INCLUDE_DIR)
-    set(ptscotch_INCLUDE_DIR ${TPL_PTSCOTCH_INCLUDE_DIRS})
-  endif()
-  if(NOT DEFINED ptscotch_LIBRARY_DIR)
-    set(ptscotch_LIBRARY_DIR ${TPL_PTSCOTCH_LIBRARY_DIR})
-  endif()
-  if(NOT DEFINED ptscotch_LIBRARIES)
-    set(ptscotch_LIBRARIES ${TPL_PTSCOTCH_LIBRARIES})
-  endif()
-  find_package(PTSCOTCH)
-  if(PTSCOTCH_FOUND)
-    option(STRUMPACK_USE_PTSCOTCH "" ON)
+    if(TPL_ENABLE_PTSCOTCH)
+      list(APPEND CMAKE_PREFIX_PATH
+        ${TPL_PTSCOTCH_PREFIX} $ENV{PTSCOTCH_DIR} $ENV{PTSCOTCH_ROOT})
+      if(NOT DEFINED ptscotch_INCLUDE_DIR)
+        set(ptscotch_INCLUDE_DIR ${TPL_PTSCOTCH_INCLUDE_DIRS})
+      endif()
+      if(NOT DEFINED ptscotch_LIBRARY_DIR)
+        set(ptscotch_LIBRARY_DIR ${TPL_PTSCOTCH_LIBRARY_DIR})
+      endif()
+      if(NOT DEFINED ptscotch_LIBRARIES)
+        set(ptscotch_LIBRARIES ${TPL_PTSCOTCH_LIBRARIES})
+      endif()
+      find_package(PTSCOTCH)
+      if(PTSCOTCH_FOUND)
+        option(STRUMPACK_USE_PTSCOTCH "" ON)
+      endif()
+    endif()
   endif()
 endif()
 
@@ -265,17 +269,7 @@ if(TPL_ENABLE_PARMETIS)
 endif()
 
 if(TPL_ENABLE_ZFP)
-  list(APPEND CMAKE_PREFIX_PATH
-    ${TPL_ZFP_PREFIX} $ENV{ZFP_DIR} $ENV{ZFP_ROOT})
-  if(NOT DEFINED zfp_INCLUDE_DIR)
-    set(zfp_INCLUDE_DIR ${TPL_ZFP_INCLUDE_DIRS})
-  endif()
-  if(NOT DEFINED zfp_LIBRARY_DIR)
-    set(zfp_LIBRARY_DIR ${TPL_ZFP_LIBRARY_DIR})
-  endif()
-  if(NOT DEFINED zfp_LIBRARIES)
-    set(zfp_LIBRARIES ${TPL_ZFP_LIBRARIES})
-  endif()
+  list(APPEND CMAKE_PREFIX_PATH ${TPL_ZFP_PREFIX} $ENV{ZFP_ROOT})
   find_package(ZFP)
   if(ZFP_FOUND)
     option(STRUMPACK_USE_ZFP "" ON)
@@ -354,7 +348,7 @@ if(PTSCOTCH_FOUND)
 endif()
 
 if(ZFP_FOUND)
-  target_link_libraries(strumpack PUBLIC ZFP::zfp)
+  target_link_libraries(strumpack PUBLIC zfp::zfp)
 endif()
 
 if(ButterflyPACK_FOUND)

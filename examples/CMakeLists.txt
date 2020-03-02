@@ -73,7 +73,7 @@ if(STRUMPACK_USE_MPI)
     testMMdoubleMPIDist
     testPoisson3dMPIDist)
 
-  if(TPL_ENABLE_BPACK)
+  if(STRUMPACK_USE_BPACK)
     add_executable(testHODLR EXCLUDE_FROM_ALL testHODLR.cpp)
     target_link_libraries(testHODLR strumpack)
 

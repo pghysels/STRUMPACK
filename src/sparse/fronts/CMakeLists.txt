@@ -34,21 +34,21 @@ if(STRUMPACK_USE_MPI)
     DESTINATION include/sparse/fronts)
 endif()
 
-if(TPL_ENABLE_CUBLAS)
+if(STRUMPACK_USE_CUBLAS)
   target_sources(strumpack
     PRIVATE
     FrontalMatrixCUBLAS.cpp
     FrontalMatrixCUBLAS.hpp)
 endif()
 
-if(TPL_ENABLE_ZFP)
+if(STRUMPACK_USE_ZFP)
   target_sources(strumpack
     PRIVATE
     FrontalMatrixLossy.cpp
     FrontalMatrixLossy.hpp)
 endif()
 
-if(TPL_ENABLE_BPACK)
+if(STRUMPACK_USE_BPACK)
   target_sources(strumpack
     PRIVATE
     FrontalMatrixHODLR.cpp

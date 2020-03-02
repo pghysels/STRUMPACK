@@ -1,4 +1,4 @@
-if(TPL_ENABLE_BPACK)
+if(STRUMPACK_USE_BPACK)
   target_sources(strumpack
     PRIVATE
     HODLRMatrix.cpp
