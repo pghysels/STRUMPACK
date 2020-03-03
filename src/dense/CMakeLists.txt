@@ -39,7 +39,7 @@ endif()
 
 if(TPL_ENABLE_CUBLAS)
   target_sources(strumpack
-    PUBLIC
+    PRIVATE
     CUDAWrapper.hpp)
 
   install(FILES

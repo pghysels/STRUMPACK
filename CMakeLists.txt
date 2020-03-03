@@ -181,6 +181,9 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules")
 
 
 if(STRUMPACK_USE_MPI)
+  # the default blocksize when using ScaLAPACK,
+  # might be changed when using SLATE, see below
+  set(STRUMPACK_PBLAS_BLOCKSIZE "32")
   if(DEFINED TPL_SCALAPACK_LIBRARIES)
     check_library_exists(${TPL_SCALAPACK_LIBRARIES}
       pdgemm_ "" TPL_SCALAPACK_WORKS_U)
@@ -286,6 +289,19 @@ if(TPL_ENABLE_BPACK)
   endif()
 endif()
 
+if(TPL_ENABLE_SLATE)
+  message(STATUS "Enabling SLATE")
+  if(DEFINED TPL_SLATE_LIBRARIES)
+    # option(STRUMPACK_USE_SLATE_LAPACK "" ON)
+    option(STRUMPACK_USE_SLATE_SCALAPACK "" ON)
+    set(STRUMPACK_PBLAS_BLOCKSIZE "256")
+  else()
+    message(WARNING "Could not find SLATE.\n"
+      "Define TPL_SLATE_LIBRARIES and TPL_SLATE_INCLUDE_DIRS")
+  endif()
+endif()
+
+
 # TODO CombBLAS, needs c++14
 # TODO PIC
 # TODO libatomic?
@@ -354,6 +370,11 @@ endif()
 if(ButterflyPACK_FOUND)
   target_link_libraries(strumpack PUBLIC
     ButterflyPACK::dbutterflypack ButterflyPACK::zbutterflypack)
+endif()
+
+if(TPL_ENABLE_SLATE)
+  target_link_libraries(strumpack PUBLIC ${TPL_SLATE_LIBRARIES})
+  target_include_directories(strumpack PRIVATE ${TPL_SLATE_INCLUDE_DIRS})
 endif()
 
 

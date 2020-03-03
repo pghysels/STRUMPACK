@@ -210,7 +210,7 @@ if( EXISTS ${SCOTCH_INCLUDE_DIR}/scotch.h )
 
   string( REGEX REPLACE ${idxwidth_pattern} 
           "${SCOTCH_IDXWIDTH_STRING}\\1"
-          SCOTCH_IDXWIDTH_STRING ${scotch_idxwidth} )
+          SCOTCH_IDXWIDTH_STRING "${scotch_idxwidth}" )
 
   if( ${SCOTCH_IDXWIDTH_STRING} MATCHES "int64_t" )
     set( SCOTCH_USES_ILP64 TRUE )

@@ -39,6 +39,7 @@
 #include "DenseMatrix.hpp"
 #include "ScaLAPACKWrapper.hpp"
 #include "BLACSGrid.hpp"
+#include "StrumpackConfig.hpp"
 
 namespace strumpack {
 
@@ -244,13 +245,8 @@ namespace strumpack {
      std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
      int max_rank, const BLACSGrid* grid_T);
 
-#ifdef STRUMPACK_PBLAS_BLOCKSIZE
     static const int default_MB = STRUMPACK_PBLAS_BLOCKSIZE;
     static const int default_NB = STRUMPACK_PBLAS_BLOCKSIZE;
-#else
-    static const int default_MB = 32;
-    static const int default_NB = 32;
-#endif
   };
 
   /**
