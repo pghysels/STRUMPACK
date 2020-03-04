@@ -13,10 +13,13 @@ export METIS_DIR=$HOME/local/metis-5.1.0/install
 export SCOTCH_DIR=$HOME/local/scotch_6.0.4
 export ParMETIS_DIR=$HOME/local/parmetis-4.0.3/install
 export ZFP_DIR=$HOME/local/zfp-0.5.5/install
-export ButterflyPACK_DIR=$HOME/LBL/STRUMPACK/ButterflyPACK_export/install/lib/cmake/ButterflyPACK
-export ButterflyPACK_DIR=$HOME/LBL/STRUMPACK/ButterflyPACK_export/install/
+export ButterflyPACK_DIR=$HOME/LBL/STRUMPACK/ButterflyPACK/install/
 
-cmake ../ -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=../install
+cmake ../ \
+      -DCMAKE_BUILD_TYPE=Debug \
+      -DCMAKE_INSTALL_PREFIX=../install \
+      -DTPL_ENABLE_BPACK=ON
+
 
 ## if not found automatically, you can specify BLAS/LAPACK/SCALAPACK as:
 #  -DTPL_BLAS_LIBRARIES="/usr/lib/x86_64-linux-gnu/libopenblas.a"

@@ -82,6 +82,7 @@ if(DEFINED TPL_BLAS_LIBRARIES)
   # through the TPL_BLAS_LIBRARIES variable. If these do not work,
   # then an error should be generated, and we shouldn't just continue.
   set(BLAS_LIBRARIES ${TPL_BLAS_LIBRARIES})
+  set(BLAS_FOUND TRUE)
   set(_SCRATCH_DIR ${CMAKE_CURRENT_BINARY_DIR}/blas_compile_test)
   try_compile(STRUMPACK_TPL_BLAS_WORKS ${_SCRATCH_DIR}
     SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
@@ -122,8 +123,7 @@ else()
       "checking if BLAS is implicitly linked by the compiler(wrapper).")
     set(_SCRATCH_DIR ${CMAKE_CURRENT_BINARY_DIR}/blas_compile_test)
     try_compile(STRUMPACK_BLAS_JUST_WORKS ${_SCRATCH_DIR}
-      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
-      LINK_LIBRARIES "${TPL_BLAS_LIBRARIES}")
+      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90)
     if(NOT STRUMPACK_BLAS_JUST_WORKS)
       message(FATAL_ERROR
         "Could not find a BLAS library.\n"
@@ -138,6 +138,7 @@ if(DEFINED TPL_LAPACK_LIBRARIES)
   # through the TPL_LAPACK_LIBRARIES variable. If these do not work,
   # then an error should be generated, and we shouldn't just continue.
   set(LAPACK_LIBRARIES ${TPL_LAPACK_LIBRARIES})
+  set(LAPACK_FOUND TRUE)
   set(_SCRATCH_DIR ${CMAKE_CURRENT_BINARY_DIR}/lapack_compile_test)
   try_compile(STRUMPACK_TPL_LAPACK_WORKS ${_SCRATCH_DIR}
     SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
@@ -173,7 +174,24 @@ else()
       "Consider specifying TPL_LAPACK_LIBRARIES as well to ensure "
       "compatible BLAS and LAPACK libraries.")
   endif()
-  find_package(LAPACK REQUIRED)
+  find_package(LAPACK)
+  if(NOT LAPACK_FOUND)
+    # LAPACK was not specified in TPL_LAPACK_LIBRARIES, and not found
+    # elsewhere. We will still try to compile a LAPACK example,
+    # because perhaps LAPACK is automatically linked by the compiler
+    # wrapper, as is the case for instance on Cray machines.
+    message(STATUS
+      "A LAPACK library could not be found on the system, "
+      "checking if LAPACK is implicitly linked by the compiler(wrapper).")
+    set(_SCRATCH_DIR ${CMAKE_CURRENT_BINARY_DIR}/lapack_compile_test)
+    try_compile(STRUMPACK_LAPACK_JUST_WORKS ${_SCRATCH_DIR}
+      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90)
+    if(NOT STRUMPACK_LAPACK_JUST_WORKS)
+      message(FATAL_ERROR
+        "Could not find a LAPACK library.\n"
+         " You can specify a LAPACK library using -DTPL_LAPACK_LIBRARIES=\"...\"")
+    endif()
+  endif()
 endif()
 
 
@@ -185,21 +203,39 @@ if(STRUMPACK_USE_MPI)
   # might be changed when using SLATE, see below
   set(STRUMPACK_PBLAS_BLOCKSIZE "32")
   if(DEFINED TPL_SCALAPACK_LIBRARIES)
-    check_library_exists(${TPL_SCALAPACK_LIBRARIES}
+    set(SCALAPACK_FOUND TRUE)
+    set(SCALAPACK_LIBRARIES ${TPL_SCALAPACK_LIBRARIES})
+    check_library_exists("${TPL_SCALAPACK_LIBRARIES}"
       pdgemm_ "" TPL_SCALAPACK_WORKS_U)
-    check_library_exists(${TPL_SCALAPACK_LIBRARIES}
+    check_library_exists("${TPL_SCALAPACK_LIBRARIES}"
       pdgemm  "" TPL_SCALAPACK_WORKS_NOU)
     if(TPL_SCALAPACK_WORKS_U OR TPL_SCALAPACK_WORKS_NOU)
       message(STATUS
         "Using ScaLAPACK from TPL_SCALAPACK_LIBRARIES"
         " (${TPL_SCALAPACK_LIBRARIES})")
-      set(SCALAPACK_LIBRARIES ${TPL_SCALAPACK_LIBRARIES})
     else()
       message(FATAL_ERROR
         "Cannot use TPL_SCALAPACK_LIBRARIES (${TPL_SCALAPACK_LIBRARIES})")
     endif()
   else()
-    find_package(SCALAPACK REQUIRED)
+    find_package(SCALAPACK)
+    if(NOT SCALAPACK_FOUND)
+      # SCALAPACK was not specified in TPL_SCALAPACK_LIBRARIES, and
+      # not found elsewhere. We will still try to compile a SCALAPACK
+      # example, because perhaps SCALAPACK is automatically linked by
+      # the compiler wrapper, as is the case for instance on Cray
+      # machines.
+      message(STATUS
+        "A SCALAPACK library could not be found on the system, "
+        "checking if SCALAPACK is implicitly linked by the compiler(wrapper).")
+      check_library_exists("" pdgemm_ "" SCALAPACK_JUST_WORKS_U)
+      check_library_exists("" pdgemm  "" SCALAPACK_JUST_WORKS_NOU)
+      if(NOT (SCALAPACK_JUST_WORKS_U OR SCALAPACK_JUST_WORKS_NOU))
+        message(FATAL_ERROR
+          "Could not find a SCALAPACK library.\n"
+          " You can specify a SCALAPACK library using -DTPL_SCALAPACK_LIBRARIES=\"...\"")
+      endif()
+    endif()
   endif()
 endif()
 
@@ -301,6 +337,12 @@ if(TPL_ENABLE_SLATE)
   endif()
 endif()
 
+if(TPL_ENABLE_CUBLAS)
+  # will be in CMake 3.17? for now we have a copy in cmake/Modules
+  find_package(CUDAToolkit REQUIRED)
+  option(STRUMPACK_USE_CUBLAS "" ON)
+endif()
+
 
 # TODO CombBLAS, needs c++14
 # TODO PIC
@@ -318,8 +360,7 @@ set_target_properties(strumpack PROPERTIES CXX_EXTENSIONS OFF)
 
 if(STRUMPACK_USE_MPI)
   target_link_libraries(strumpack PUBLIC MPI::MPI_CXX)
-  target_link_libraries(strumpack PRIVATE MPI::MPI_C)
-  target_link_libraries(strumpack PRIVATE MPI::MPI_Fortran)
+  # target_link_libraries(strumpack PRIVATE MPI::MPI_C)
 endif()
 
 if(OpenMP_FOUND)
@@ -342,10 +383,16 @@ else()
 endif()
 
 
-target_link_libraries(strumpack PUBLIC ${BLAS_LIBRARIES})
-target_link_libraries(strumpack PUBLIC ${LAPACK_LIBRARIES})
+if(BLAS_FOUND)
+  target_link_libraries(strumpack PUBLIC ${BLAS_LIBRARIES})
+endif()
+if(LAPACK_FOUND)
+  target_link_libraries(strumpack PUBLIC ${LAPACK_LIBRARIES})
+endif()
 if(STRUMPACK_USE_MPI)
-  target_link_libraries(strumpack PUBLIC ${SCALAPACK_LIBRARIES})
+  if(SCALAPACK_FOUND)
+    target_link_libraries(strumpack PUBLIC ${SCALAPACK_LIBRARIES})
+  endif()
 endif()
 
 # the order is important
@@ -369,7 +416,9 @@ endif()
 
 if(ButterflyPACK_FOUND)
   target_link_libraries(strumpack PUBLIC
-    ButterflyPACK::dbutterflypack ButterflyPACK::zbutterflypack)
+    ButterflyPACK::dbutterflypack
+    ButterflyPACK::zbutterflypack
+    MPI::MPI_Fortran)
 endif()
 
 if(TPL_ENABLE_SLATE)
@@ -377,6 +426,10 @@ if(TPL_ENABLE_SLATE)
   target_include_directories(strumpack PRIVATE ${TPL_SLATE_INCLUDE_DIRS})
 endif()
 
+if(CUDAToolkit_FOUND)
+  target_link_libraries(strumpack PUBLIC
+    CUDA::cudart CUDA::cusolver CUDA::cublas)
+endif()
 
 # examples
 add_subdirectory(examples)
