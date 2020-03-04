@@ -85,6 +85,7 @@ install:
   - wget --no-check-certificate https://gforge.inria.fr/frs/download.php/file/34618/scotch_6.0.4.tar.gz
   - tar -xf scotch_6.0.4.tar.gz
   - cd ./scotch_6.0.4
+  - export SCOTCH_DIR=`pwd`
   - mkdir build
   - cd ./src
   - cp ./Make.inc/Makefile.inc.x86-64_pc_linux2 Makefile.inc
@@ -102,33 +103,39 @@ install:
   - tar -xf parmetis-4.0.3.tar.gz
   - cd parmetis-4.0.3/
   - mkdir install
+  - export ParMETIS_DIR=$PWD/install
   - make config shared=1 cc=mpicc cxx=mpic++ prefix=$PWD/install
   - make install > make_parmetis_install.log 2>&1
   - printf "${BLUE} GC; Done installing ParMetis-4.0 from source\n"
+
+  - printf "${BLUE} GC; Installing Metis-5.1.0 from source\n"
+  - cd $TRAVIS_BUILD_DIR/installDir
+  - wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.1.0.tar.gz
+  - tar -xf metis-5.1.0.tar.gz
+  - cd metis-5.1.0/
+  - mkdir install
+  - export METIS_DIR=$PWD/install
+  - make config shared=1 cc=gcc prefix=$PWD/install
+  - make install > make_metis_install.log 2>&1
+  - printf "${BLUE} GC; Done installing Metis-5.1.0 from source\n"
 
   - printf "${BLUE} GC; Installing STRUMPACK from source\n"
   - cd $TRAVIS_BUILD_DIR
   - mkdir build
   - cd build
   - |
-    cmake .. -DCMAKE_BUILD_TYPE=Debug \
+    cmake .. \
+    -DCMAKE_BUILD_TYPE=Debug \
     -DCMAKE_INSTALL_PREFIX=. \
     -DCMAKE_C_COMPILER=mpicc \
     -DCMAKE_CXX_COMPILER=mpic++ \
     -DCMAKE_Fortran_COMPILER=mpif90 \
     -DTPL_BLAS_LIBRARIES=$BLAS_LIB \
     -DTPL_LAPACK_LIBRARIES=$LAPACK_LIB \
-    -DTPL_SCALAPACK_LIBRARIES=$SCALAPACK_LIB \
-    -DSTRUMPACK_COUNT_FLOPS=ON \
-    -DTPL_ENABLE_PARMETIS=ON \
-    -DTPL_ENABLE_SCOTCH=ON \
-    -DTPL_METIS_INCLUDE_DIRS=$TRAVIS_BUILD_DIR/installDir/parmetis-4.0.3/metis/include \
-    -DTPL_METIS_LIBRARIES=$TRAVIS_BUILD_DIR/installDir/parmetis-4.0.3/install/lib/libparmetis.so \
-    -DTPL_PARMETIS_INCLUDE_DIRS=$TRAVIS_BUILD_DIR/installDir/parmetis-4.0.3/install/include \
-    -DTPL_PARMETIS_LIBRARIES=$TRAVIS_BUILD_DIR/installDir/parmetis-4.0.3/install/lib/libparmetis.so \
-    -DTPL_SCOTCH_INCLUDE_DIRS=$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/include \
-    -DTPL_SCOTCH_LIBRARIES="$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libscotch.a;$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libscotcherr.a;$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libptscotch.a;$TRAVIS_BUILD_DIR/installDir/scotch_6.0.4/build/lib/libptscotcherr.a"
-  - make install VERBOSE=1
+    -DTPL_SCALAPACK_LIBRARIES=$SCALAPACK_LIB
+  - make install -j4
+  - make examples -j4
+  - make tests -j4
   - printf "${BLUE} GC; Done installing STRUMPACK from source\n"
 
 script:
