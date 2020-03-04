@@ -62,23 +62,21 @@ The (C++/C/Fortran) (MPI) compiler can be specified as follows:
 
 BLAS/LAPACK/ScaLAPACK
 =====================
-CMake will try to find BLAS/LAPACK/ScaLAPACK libraries
-automatically. CMake will look in the standard locations and in
-$SCALAPACKDIR and $BLACSDIR. You can set these on the command line via
-(in bash):
 
-> export SCALAPACKDIR=/path/to/scalapack/
-> export BLACSDIR=/path/to/blacs
-
-If BLACS/SCALAPACK are not installed in a standard location, you can
-also specify the libraries directly via
+CMake will try to find BLAS, LAPACK and ScaLAPACK libraries
+automatically. CMake will look in the standard locations, or you can
+specify the libraries directly using:
   -DTPL_BLAS_LIBRARIES=".." \
   -DTPL_LAPACK_LIBRARIES=".." \
-  -DTPL_SCALAPACK_LIBRARIES=".." \
+  -DTPL_SCALAPACK_LIBRARIES=".."
 as lists of ;-separated libraries, or directly via the linker flags as
 follows:
 > cmake ../ \
    -DCMAKE_EXE_LINKER_FLAGS="-L/usr/lib64/mpich/lib/ -lscalapack -lmpiblacs"
+
+or by setting the following environment variables for SCALAPACK:
+> export SCALAPACKDIR=/path/to/scalapack/
+> export BLACSDIR=/path/to/blacs
 
 In order to get good performance, one should install an optimized or
 vendor supplied BLAS implementation. Examples are Intel MKL, Cray
@@ -242,7 +240,7 @@ folder set:
 > mkdir build
 > cd build
 > cmake ../
-> make example
+> make
 
 
 How to generate the doxygen documentation

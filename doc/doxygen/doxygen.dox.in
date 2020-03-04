@@ -32,7 +32,7 @@ DOXYFILE_ENCODING      = UTF-8
 # title of most generated pages and in a few other places.
 # The default value is: My Project.
 
-PROJECT_NAME           = "STRUMPACK v3.3.0"
+PROJECT_NAME           = "STRUMPACK v@PROJECT_VERSION@"
 
 # The PROJECT_NUMBER tag can be used to enter a project or revision number. This
 # could be handy for archiving the generated documentation or if some version
@@ -776,7 +776,8 @@ WARN_LOGFILE           =
 	@CMAKE_CURRENT_SOURCE_DIR@/src/sparse/CompressedSparseMatrix.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/sparse/CSRMatrix.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/sparse/CSRMatrixMPI.hpp \
-	@CMAKE_CURRENT_SOURCE_DIR@/src/sparse/IterativeRefinement.hpp \
+	@CMAKE_CURRENT_SOURCE_DIR@/src/sparse/iterative/IterativeSolvers.hpp \
+	@CMAKE_CURRENT_SOURCE_DIR@/src/sparse/iterative/IterativeSolversMPI.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/dense/DenseMatrix.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/dense/DistributedMatrix.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/dense/BLACSGrid.hpp \

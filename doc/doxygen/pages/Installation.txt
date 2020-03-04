@@ -1,7 +1,7 @@
 /*! \page installation Installation and Requirements
 
-CMake build
------------
+CMake Based Build
+-----------------
 
 The STRUMPACK package uses the CMake build system (CMake version \>=
 3.2) . The recommended way of building the STRUMPACK library is as
@@ -11,23 +11,15 @@ follows:
 > tar-xvzf strumpack-x.y.z.tar.gz
 > cd strumpack-x.y.z
 > mkdir build
+> mkdir install
 > cd build
-> cmake ../ -DCMAKE_BUILD_TYPE=Release \
-     -DCMAKE_INSTALL_PREFIX=/path/to/install \
-     -DCMAKE_CXX_COMPILER=<C++ compiler> \       # this and below are optional, CMake will try to autodetect
-     -DCMAKE_Fortran_COMPILER=<Fortran77 compiler> \
-     -DTPL_SCALAPACK_LIBRARIES="/path/to/scalapack/libscalapack.a;/path/to/blacs/libblacs.a" \
-     -DTPL_METIS_INCLUDE_DIRS=/path/to/metis/include \
-     -DTPL_METIS_LIBRARIES=/path/to/metis/libmetis.a \
-     -DTPL_ENABLE_PARMETIS=ON \               # optional
-     -DTPL_PARMETIS_INCLUDE_DIRS=/path/to/parmetis/include \
-     -DTPL_PARMETIS_LIBRARIES=/path/to/parmetis/libparmetis.a \
-     -DTPL_ENABLE_SCOTCH=ON \                 # optional
-     -DTPL_SCOTCH_INCLUDE_DIRS=/path/to/scotch/include \
-     -DTPL_SCOTCH_LIBRARIES="/path/to/ptscotch/libscotch.a;...libscotcherr.a;...libptscotch.a;...libptscotcherr.a"
-> make
-> make test                                      # optional, takes a while
+> export METIS_DIR=/path/to/metis/install
+> cmake ../ -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../install
+> make -j4
 > make install
+> make examples -j4
+> make tests -j4
+> make test    # can fail on login nodes
 \endcode
 
 The above will only work if you have the following dependencies, and
@@ -37,10 +29,11 @@ CMake can find them:
   compilers in the standard locations, if they are installed
   elsewhere, you can specify them as follows:
 \code {.bash}
-> cmake ../ -DCMAKE_BUILD_TYPE=Release \
+> cmake ../ \
+     -DCMAKE_BUILD_TYPE=Release \
      -DCMAKE_CXX_COMPILER=g++ \
-     -DCMAKE_C_COMPILER=gcc    \
-     -DCMAKE_Fortran_COMPILER=gfortran  \
+     -DCMAKE_C_COMPILER=gcc \
+     -DCMAKE_Fortran_COMPILER=gfortran
 \endcode
 
 - __MPI__ (Message Passing Interface) library. Support for MPI is
@@ -48,7 +41,8 @@ CMake can find them:
   \code{.bash} -DSTRUMPACK_USE_MPI=OFF \endcode to the CMake
   command. You should not need to manually specify the MPI compiler
   wrappers. CMake will look for MPI options and libraries and set the
-  appropriate compiler and linker flags.
+  appropriate compiler and linker flags. When MPI is enabled,
+  STRUMPACK also requires ScaLAPACK (and BLACS), see below.
 
 - __OpenMP v3.1__ support is required in the C++ compiler to use the
   shared-memory parallelism in the code. OpenMP support can be
@@ -64,14 +58,31 @@ have at least OpenMP 3.1, and CMake will check whether your compiler
 supports task dependencies and the taskloop construct and enable those
 only if found.
 
-- __BLAS__ and __LAPACK__ libraries. For performance
-  it is crucial to use optimized BLAS/LAPACK libraries like for
-  instance Intel® MKL, AMD® ACML, Cray® LibSci or OpenBLAS. The
-  default versions of the Intel® MKL and Cray® LibSci BLAS libraries
+- __BLAS__ and __LAPACK__ libraries. For performance it is crucial to
+  use optimized BLAS/LAPACK libraries like for instance Intel® MKL,
+  AMD® ACML, Cray® LibSci, IBM ESSL or OpenBLAS.  If BLAS or LAPACK is
+  not found automatically, you can specify the libraries using
+\code {.bash}
+ > cmake ../  \
+      -DTPL_BLAS_LIBRARIES="..." \
+      -DTPL_LAPACK_LIBRARIES="..."
+\endcode
+  The default versions of the Intel® MKL and Cray® LibSci BLAS libraries
   will use multithreaded kernels, unless when they are called from
   within an OpenMP parallel region, in which case they run
   sequentially. This is the behavior STRUMPACK relies upon to achieve
   good performance when running in MPI+OpenMP hybrid mode.
+
+  The IBM ESSL library provides some highly optimizes BLAS routines,
+  but doesn't provide a complete BLAS library. So, when linking with
+  ESSL, you also need to provide another BLAS libary for the routines
+  not available in ESSL:
+\code {.bash}
+ > cmake ../  \
+      -DTPL_BLAS_LIBRARIES="${OLCF_ESSL_ROOT}/lib64/libessl.so;${OLCF_NETLIB_LAPACK_ROOT}/lib64/libblas.so" \
+      -DTPL_LAPACK_LIBRARIES="${OLCF_ESSL_ROOT}/lib64/libessl.so;${OLCF_NETLIB_LAPACK_ROOT}/lib64/liblapack.so" \
+      -DTPL_SCALAPACK_LIBRARIES="${OLCF_NETLIB_SCALAPACK_ROOT}/lib/libscalapack.so"
+\endcode
 
 - __ScaLAPACK__ (included in Intel® MKL or Cray® LibSci), is not
   required when compiling without MPI. ScaLAPACK depends on the BLACS
@@ -80,17 +91,14 @@ only if found.
   ScaLAPACK 2.0.2, the blacs library is included in the ScaLAPACK
   library file). If CMake cannot locate these libraries, you can
   specify their path by setting the environment variable $SCALAPACKDIR
-  ot by specifying the libraries manually:
+  or by specifying the libraries manually:
 \code {.bash}
- > cmake ../  \
-      -DTPL_BLAS_LIBRARIES="..." \
-      -DTPL_LAPACK_LIBRARIES="..." \
-      -DTPL_SCALAPACK_LIBRARIES="..."
+ > cmake ../ -DTPL_SCALAPACK_LIBRARIES="..."
 \endcode
-  Or one can also directly modify the linker flags to add for instance the ScaLAPACK and BLACS libraries:
+  Or one can also directly modify the linker flags to add for instance
+  the ScaLAPACK and BLACS libraries:
 \code {.bash}
- > cmake../ -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_EXE_LINKER_FLAGS="-L/usr/lib64/mpich/lib/ -lscalapack -lmpiblacs"
+ > cmake../ -DCMAKE_EXE_LINKER_FLAGS="-L/usr/lib64/mpich/lib/ -lscalapack -lmpiblacs"
 \endcode
   When using Intel MKL we recommend using the the link advisor:
   https://software.intel.com/en-us/articles/intel-mkl-link-line-advisor
@@ -99,44 +107,60 @@ only if found.
   library function.
 
 - __METIS__ (≥ 5.1.0 <b>required</b>) for the nested dissection matrix
-reordering. Metis can be obtained from:
-http://glaros.dtc.umn.edu/gkhome/metis/metis/download.  CMake looks
-for the Metis inlude files the library in the default locations as
-well as in $METISDIR/include and $METISDIR/lib. Using the Bash shell,
-the METISDIR environment variable can be set as __export__
-METISDIR=/usr/local/metis/. Alternatively, you can specify the
-location of the header and library as follows:
+  reordering. Metis can be obtained from:
+  http://glaros.dtc.umn.edu/gkhome/metis/metis/download.  CMake looks
+  for the Metis inlude files the library in the default locations as
+  well as at $METIS_DIR.
 \code {.bash}
-> cmake ../  \
-     -DTPL_METIS_INCLUDE_DIRS=/usr/local/metis/include \
-     -DTPL_METIS_LIBRARIES=/usr/local/metis/lib/libmetis.a
+ > export METIS_DIR=...
+ > cmake ../
+\endcode
+  You can download and install METIS as follows:
+\code {.bash}
+wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.1.0.tar.gz
+tar -xvzf metis-5.1.0.tar.gz
+cd metis-5.1.0
+make config cc=gcc prefix=`pwd`/install
+make install
+export METIS_DIR=`pwd`/install
+\endcode
+  Alternatively, you can specify the
+  location of the header and library as follows:
+\code {.bash}
+ > cmake ../  \
+      -DTPL_METIS_INCLUDE_DIRS=/usr/local/metis/include \
+      -DTPL_METIS_LIBRARIES=/usr/local/metis/lib/libmetis.a
 \endcode
 
 - __PARMETIS__ (optional, only used when compiling with MPI) for
 parallel nested dissection. ParMetis can be download from
 http://glaros.dtc.umn.edu/gkhome/metis/parmetis/download \n The steps
 to make sure CMake can find ParMetis are similar as for Metis. Enable
-with -DTPL_ENABLE_PARMETIS. The CMake variables are $PARMETISDIR or
-TPL_PARMETIS_INCLUDE_DIRS and TPL_PARMETIS_LIBRARIES.
+with -DTPL_ENABLE_PARMETIS. The CMake variables
+TPL_PARMETIS_INCLUDE_DIRS and TPL_PARMETIS_LIBRARIES, or set the
+environment variable ParMETIS_DIR.
 
 - __SCOTCH__ and __PT-SCOTCH__ (≥ 5.1.12) (optional) for matrix
 reordering. Scotch can be downloaded from:
 http://www.labri.fr/perso/pelegrin/scotch/ Configuring CMake to find
-(PT-)Scotch is similar to Metis. Enable with -DTPL_ENABLE_SCOTCH For
-(PT-)Scotch the CMake variables are $SCOTCHDIR or
-TPL_SCOTCH_INCLUDE_DIRS and TPL_SCOTCH_LIBRARIES. Make sure to specify all
-libraries: libscotch, libscotcherr, libptscotch and libptscotcherr.
+(PT-)Scotch is similar to Metis. Enable with -DTPL_ENABLE_SCOTCH=ON
+and -DTPL_ENABLE_PTSCOTCH=ON. For (PT-)Scotch the environment
+variables SCOTCH_DIR (PTSCOTCH_DIR) or the CMake variables
+TPL_SCOTCH_INCLUDE_DIRS, TPL_PTSCOTCH_INCLUDE_DIRS, and
+TPL_SCOTCH_LIBRARIES, TPL_PTSCOTCH_LIBRARIES (make sure to specify all
+libraries: libscotch, libscotcherr, libptscotch and libptscotcherr).
 
 - __cuBLAS__ and __cuSOLVER__ (optional) can be used to accelerate the
   sparse direct solver.
 \code {.bash}
-> cmake ../  \
-     -DTPL_ENABLE_CUBLAS=ON \
-     -DTPL_CUBLAS_LIBRARIES="${CUDA_DIR}/lib64/libcudart.so;${CUDA_DIR}/lib64/libcublas.so;${CUDA_DIR}/lib64/libcusolver.so" \
-     -DTPL_CUBLAS_INCLUDE_DIRS="${CUDA_DIR}/include"
+ > cmake ../ -DTPL_ENABLE_CUBLAS=ON -DCUDAToolkit_ROOT=/some/path
 \endcode
-At the moment, the rank structured preconditioners do
-not work when cuda acceleration is enabled.
+or set the environment variable
+\code {.bash}
+ > export CUDAToolkit_ROOT=..
+\endcode
+  At the moment, the rank structured preconditioners do
+  not work when cuda acceleration is enabled.
 
 - __ButterflyPACK__ (>= 1.1.0): \link
   https://github.com/liuyangzhuan/ButterflyPACK
@@ -145,10 +169,8 @@ not work when cuda acceleration is enabled.
   Butterfly matrix formats, see also \ref hodlr_matrices, through the
   ButterflyPACK library. To enable this from CMake, add the following:
 \code {.bash}
-> cmake ../  \
-     -DTPL_ENABLE_BPACK=ON \
-     -DTPL_BPACK_INCLUDE_DIRS="$BPACKHOME/SRC_DOUBLE/;$BPACKHOME/SRC_DOUBLECOMPLEX" \
-     -DTPL_BPACK_LIBRARIES="$BPACKHOME/build/SRC_DOUBLE/libdbutterflypack.a;$BPACKHOME/build/SRC_DOUBLECOMPLEX/libzbutterflypack.a"
+ > export ButterflyPACK_DIR=...
+ > cmake ../ -DTPL_ENABLE_BPACK=ON
 \endcode
 
 - __ZFP__ (>= 0.5.5) \link
@@ -157,10 +179,8 @@ not work when cuda acceleration is enabled.
   \endlink: ZFP is used for lossy compression in the sparse solver
   (preconditioner).
 \code {.bash}
-> cmake ../  \
-     -DTPL_ENABLE_ZFP=ON \
-     -DTPL_ZFP_INCLUDE_DIRS=$ZFPHOME/include \
-     -DTPL_ZFP_LIBRARIES="$ZFPHOME/lib/libzfp.so"
+ > export ZFP_DIR=...
+ > cmake ../ -DTPL_ENABLE_ZFP=ON
 \endcode
 
 - __Combinatorial BLAS__ [1] (optional) can be used for parallel
@@ -170,36 +190,73 @@ not work when cuda acceleration is enabled.
   Enable by specifying -DTPL_ENABLE_COMBBLAS and set
   TPL_COMBBLAS_INCLUDE_DIRS and TPL_COMBBLAS_LIBRARIES.
 
-The code was tested on GNU/Linux with the GNU and Intel® compilers and
-the OpenBLAS, Intel® MKL® and Cray® LibSci® numerical libraries. If
-you encounter issues on other platforms or with other BLAS/LAPACK
-implementations, please let us know. Successful compilation will
-create a libstrumpack.a file.
+The code was tested on GNU/Linux and Mac with the GNU and Intel®
+compilers and the OpenBLAS, Intel® MKL®, Cray® LibSci® and IBM ESSL
+numerical libraries. If you encounter issues on other platforms or
+with other BLAS/LAPACK implementations, please let us know.
 
 SPACK, xSDK \& E4S
 ------------------
 
 STRUMPACK can also be installed through Spack (\link https://spack.io
-https://spack.io \endlink), a package manager for supercomputers,
+https://spack.io\endlink), a package manager for supercomputers,
 Linux, and macOS. It makes installing scientific software easy. With
 Spack, you can build a package with multiple versions, configurations,
 platforms, and compilers, and all of these builds can coexist on the
 same machine:
 \code {.bash}
-   git clone https://github.com/spack/spack.git
-   . spack/share/spack/setup-env.sh
-   spack install strumpack
+git clone https://github.com/spack/spack.git
+. spack/share/spack/setup-env.sh
+spack install strumpack
 \endcode
 This can take a while, since by default Spack will build all
 dependencies.
 
 
 Furthermore, STRUMPACK is also part of the ECP __xSDK__ (\link
-https://xsdk.info https://xsdk.info \endlink) and __E4S__ (\link
-https://e4s-project.github.io https://e4s-project.github.io \endlink)
+https://xsdk.info https://xsdk.info\endlink) and __E4S__ (\link
+https://e4s-project.github.io https://e4s-project.github.io\endlink)
 software development kits. By installing the full xSDK, you get
 STRUMPACK, all of it's dependecies, as well as PETSc (which has a
 STRUMPACK interface) and several other scientific software libraries.
 
-*/
 
+
+Using STRUMPACK in Your Code
+----------------------------
+
+Please see the examples in the examples/ folder, which can be build using
+\code {.bash}
+ > make examples
+\endcode
+in the __build__ directory.
+
+
+Suppose you want to build your application, called myapp, which
+depends on STRUMPACK, using CMake, then you would add the following
+lines to your CMakeLists.txt file:
+
+
+\code {.bash}
+ cmake_minimum_required(VERSION 3.13)
+ project(myapp LANGUAGES CXX)
+
+ find_package(STRUMPACK REQUIRED)
+
+ add_executable(myexe main.cpp)
+ target_link_libraries(myexe PRIVATE STRUMPACK::strumpack)
+\endcode
+
+And then invoke CMake with the path to the STRUMPACK installation
+folder set:
+
+\code {.bash}
+> export STRUMPACK_DIR=/some/path/STRUMPACK/install
+> cd myapp
+> mkdir build
+> cd build
+> cmake ../
+> make
+\endcode
+
+*/
