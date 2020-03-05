@@ -64,20 +64,17 @@ install:
 
   - printf "${BLUE} GC; Installing ScaLAPACK from source\n"
   - cd $TRAVIS_BUILD_DIR/installDir
-  - wget http://www.netlib.org/scalapack/scalapack-2.0.2.tgz
-  - tar -xf scalapack-2.0.2.tgz
-  - cd scalapack-2.0.2
-  - cp SLmake.inc.example SLmake.inc
-  - sed -i "s/BLASLIB/#BLASLIB/" SLmake.inc
-  - sed -i "s/LAPACKLIB/#LAPACKLIB/" SLmake.inc
-  - sed -i "s/LIBS/#LIBS/" SLmake.inc
-  - printf "BLASLIB=$BLAS_LIB\n" >> SLmake.inc
-  - printf "LAPACKLIB=$LAPACK_LIB\n" >> SLmake.inc
-  - printf "LIBS=$BLAS_LIB $LAPACK_LIB\n" >> SLmake.inc
-  - sed -i "s/SCA#LAPACKLIB/#SCA#LAPACKLIB/" SLmake.inc
-  - printf "SCALAPACKLIB=libscalapack.a\n" >> SLmake.inc
-  - make lib  > tempMakeOutput.txt 2>&1
-  - export SCALAPACK_LIB=$TRAVIS_BUILD_DIR/installDir/scalapack-2.0.2/libscalapack.a
+  - wget http://www.netlib.org/scalapack/scalapack-2.1.0.tgz
+  - tar -xf scalapack-2.1.0.tgz
+  - cd scalapack-2.1.0
+  - mkdir build
+  - mkdir install
+  - cd build
+  - cmake ../ -DCMAKE_INSTALL_PREFIX=../install
+  - make scalapack > make_scalapack.log 2>&1
+  - make install > make_scalapack_install.log 2>&1
+  - cd ../
+  - export SCALAPACK_DIR=$PWD/install
   - printf "${BLUE} GC; Done installing ScaLAPACK from source\n"
 
   - printf "${BLUE} GC; Installing Scotch-6.0 from source\n"
@@ -131,8 +128,7 @@ install:
     -DCMAKE_CXX_COMPILER=mpic++ \
     -DCMAKE_Fortran_COMPILER=mpif90 \
     -DTPL_BLAS_LIBRARIES=$BLAS_LIB \
-    -DTPL_LAPACK_LIBRARIES=$LAPACK_LIB \
-    -DTPL_SCALAPACK_LIBRARIES=$SCALAPACK_LIB
+    -DTPL_LAPACK_LIBRARIES=$LAPACK_LIB
   - make install -j4
   - make examples -j4
   - make tests -j4

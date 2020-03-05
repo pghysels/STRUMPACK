@@ -21,6 +21,7 @@ option(STRUMPACK_DEV_TESTING "Enable extensive testing" OFF)
 option(STRUMPACK_C_INTERFACE "Build the C interface" ON)
 
 include(CheckLibraryExists)
+include(CMakePushCheckState)
 
 # figure out Fortran/C name mangling
 include(FortranCInterface)
@@ -103,8 +104,7 @@ if(DEFINED TPL_BLAS_LIBRARIES)
       LINK_LIBRARIES ${TPL_BLAS_LIBRARIES} Threads::Threads)
     if(STRUMPACK_TPL_BLAS_WITH_THREADS_WORKS)
       message(STATUS
-        "Using BLAS (${TPL_BLAS_LIBRARIES}), "
-        "with additional threading library.")
+        "Using BLAS (${TPL_BLAS_LIBRARIES}), with additional threading library.")
     else()
       message(FATAL_ERROR
         "BLAS libraries defined in TPL_BLAS_LIBRARIES"
@@ -205,18 +205,29 @@ if(STRUMPACK_USE_MPI)
   if(DEFINED TPL_SCALAPACK_LIBRARIES)
     set(SCALAPACK_FOUND TRUE)
     set(SCALAPACK_LIBRARIES ${TPL_SCALAPACK_LIBRARIES})
-    check_library_exists("${TPL_SCALAPACK_LIBRARIES}"
-      pdgemm_ "" TPL_SCALAPACK_WORKS_U)
-    check_library_exists("${TPL_SCALAPACK_LIBRARIES}"
-      pdgemm  "" TPL_SCALAPACK_WORKS_NOU)
-    if(TPL_SCALAPACK_WORKS_U OR TPL_SCALAPACK_WORKS_NOU)
-      message(STATUS
-        "Using ScaLAPACK from TPL_SCALAPACK_LIBRARIES"
-        " (${TPL_SCALAPACK_LIBRARIES})")
-    else()
-      message(FATAL_ERROR
-        "Cannot use TPL_SCALAPACK_LIBRARIES (${TPL_SCALAPACK_LIBRARIES})")
-    endif()
+    message(STATUS
+      "Using ScaLAPACK from TPL_SCALAPACK_LIBRARIES"
+      " (${TPL_SCALAPACK_LIBRARIES})")
+    ### this check doesn't work: needs MPI, BLAS, LAPACK, threads, libm, ..?
+    # cmake_push_check_state()
+    # set(CMAKE_REQUIRED_LIBRARIES MPI::MPI_C)
+    # if(BLAS_FOUND)
+    #   list(APPEND CMAKE_REQUIRED_LIBRARIES ${BLAS_LIBRARIES})
+    # endif()
+    # if(LAPACK_FOUND)
+    #   list(APPEND CMAKE_REQUIRED_LIBRARIES ${LAPACK_LIBRARIES})
+    # endif()
+    # check_library_exists("${TPL_SCALAPACK_LIBRARIES}" pdgemm_ "" TPL_SCALAPACK_WORKS_U)
+    # check_library_exists("${TPL_SCALAPACK_LIBRARIES}" pdgemm  "" TPL_SCALAPACK_WORKS_NOU)
+    # cmake_pop_check_state()
+    # if(TPL_SCALAPACK_WORKS_U OR TPL_SCALAPACK_WORKS_NOU)
+    #   message(STATUS
+    #     "Using ScaLAPACK from TPL_SCALAPACK_LIBRARIES"
+    #     " (${TPL_SCALAPACK_LIBRARIES})")
+    # else()
+    #   message(FATAL_ERROR
+    #     "Cannot use TPL_SCALAPACK_LIBRARIES (${TPL_SCALAPACK_LIBRARIES})")
+    # endif()
   else()
     find_package(SCALAPACK)
     if(NOT SCALAPACK_FOUND)
@@ -383,16 +394,16 @@ else()
 endif()
 
 
-if(BLAS_FOUND)
-  target_link_libraries(strumpack PUBLIC ${BLAS_LIBRARIES})
-endif()
-if(LAPACK_FOUND)
-  target_link_libraries(strumpack PUBLIC ${LAPACK_LIBRARIES})
-endif()
 if(STRUMPACK_USE_MPI)
   if(SCALAPACK_FOUND)
     target_link_libraries(strumpack PUBLIC ${SCALAPACK_LIBRARIES})
   endif()
+endif()
+if(LAPACK_FOUND)
+  target_link_libraries(strumpack PUBLIC ${LAPACK_LIBRARIES})
+endif()
+if(BLAS_FOUND)
+  target_link_libraries(strumpack PUBLIC ${BLAS_LIBRARIES})
 endif()
 
 # the order is important
