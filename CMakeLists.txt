@@ -18,7 +18,6 @@ option(TPL_ENABLE_ZFP        "Build with support for ZFP compression" ON)
 option(STRUMPACK_COUNT_FLOPS "Build with flop counters" OFF)
 option(STRUMPACK_TASK_TIMERS "Build with timers for internal routines" OFF)
 option(STRUMPACK_DEV_TESTING "Enable extensive testing" OFF)
-option(STRUMPACK_C_INTERFACE "Build the C interface" ON)
 
 include(CheckLibraryExists)
 include(CMakePushCheckState)

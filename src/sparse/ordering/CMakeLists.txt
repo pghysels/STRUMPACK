@@ -8,10 +8,6 @@ target_sources(strumpack
   ${CMAKE_CURRENT_LIST_DIR}/MatrixReordering.hpp
   ${CMAKE_CURRENT_LIST_DIR}/MetisReordering.hpp)
 
-install(FILES
-  MatrixReordering.hpp
-  MetisReordering.hpp
-  DESTINATION include/sparse/ordering)
 
 if(STRUMPACK_USE_MPI)
   target_sources(strumpack
@@ -22,10 +18,6 @@ if(STRUMPACK_USE_MPI)
     ${CMAKE_CURRENT_LIST_DIR}/PTScotchReordering.hpp
     ${CMAKE_CURRENT_LIST_DIR}/MatrixReorderingMPI.cpp
     ${CMAKE_CURRENT_LIST_DIR}/MatrixReorderingMPI.hpp)
-
-  install(FILES
-    MatrixReorderingMPI.hpp
-    DESTINATION include/sparse/ordering)
 endif()
 
 add_subdirectory(rcm)

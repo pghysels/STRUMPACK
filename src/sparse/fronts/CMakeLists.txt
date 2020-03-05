@@ -10,11 +10,6 @@ target_sources(strumpack
   ${CMAKE_CURRENT_LIST_DIR}/FrontFactory.hpp
   ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrix.hpp)
 
-install(FILES
-  FrontFactory.hpp
-  FrontalMatrix.hpp
-  DESTINATION include/sparse/fronts)
-
 
 if(STRUMPACK_USE_MPI)
   target_sources(strumpack
@@ -28,10 +23,6 @@ if(STRUMPACK_USE_MPI)
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixBLRMPI.hpp
     ${CMAKE_CURRENT_LIST_DIR}/ExtendAdd.cpp
     ${CMAKE_CURRENT_LIST_DIR}/ExtendAdd.hpp)
-
-  install(FILES
-    FrontalMatrixMPI.hpp
-    DESTINATION include/sparse/fronts)
 endif()
 
 if(STRUMPACK_USE_CUBLAS)

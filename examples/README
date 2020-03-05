@@ -101,9 +101,7 @@ The examples (for now) include:
     These for examples use the C interface for real single precision
     (sexample), real double precision (dexample), complex single
     precision (cexample) and complex double precision (zexample). They
-    all solve the same problem as the testPoisson2d C++ example, also
-    with the sequential/multithreaded interface. The C interface
-    should be enabled during the STRUMPACK configure step
-    (-DSTRUMPACK_C_INTERFACE=ON).
+    all solve the same problem as the testPoisson2d C++ example
+    with the sequential/multithreaded interface.
 
       ./sexample 1000

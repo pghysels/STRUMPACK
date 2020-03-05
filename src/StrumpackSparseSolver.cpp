@@ -24,626 +24,741 @@
  * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
- *
  */
-#include "StrumpackSparseSolver.h"
+
 #include "StrumpackSparseSolver.hpp"
-#if defined(STRUMPACK_USE_MPI)
-#include "StrumpackSparseSolverMPI.hpp"
-#include "StrumpackSparseSolverMPIDist.hpp"
-#endif
-#include "sparse/CSRMatrix.hpp"
 
-using namespace strumpack;
-
-#define CASTS(x) (static_cast<StrumpackSparseSolver<float,int>*>(x))
-#define CASTD(x) (static_cast<StrumpackSparseSolver<double,int>*>(x))
-#define CASTC(x) (static_cast<StrumpackSparseSolver<std::complex<float>,int>*>(x))
-#define CASTZ(x) (static_cast<StrumpackSparseSolver<std::complex<double>,int>*>(x))
-#define CASTS64(x) (static_cast<StrumpackSparseSolver<float,int64_t>*>(x))
-#define CASTD64(x) (static_cast<StrumpackSparseSolver<double,int64_t>*>(x))
-#define CASTC64(x) (static_cast<StrumpackSparseSolver<std::complex<float>,int64_t>*>(x))
-#define CASTZ64(x) (static_cast<StrumpackSparseSolver<std::complex<double>,int64_t>*>(x))
-
-#if defined(STRUMPACK_USE_MPI)
-#define CASTSMPIDIST(x) (static_cast<StrumpackSparseSolverMPIDist<float,int>*>(x))
-#define CASTDMPIDIST(x) (static_cast<StrumpackSparseSolverMPIDist<double,int>*>(x))
-#define CASTCMPIDIST(x) (static_cast<StrumpackSparseSolverMPIDist<std::complex<float>,int>*>(x))
-#define CASTZMPIDIST(x) (static_cast<StrumpackSparseSolverMPIDist<std::complex<double>,int>*>(x))
-#define CASTS64MPIDIST(x) (static_cast<StrumpackSparseSolverMPIDist<float,int64_t>*>(x))
-#define CASTD64MPIDIST(x) (static_cast<StrumpackSparseSolverMPIDist<double,int64_t>*>(x))
-#define CASTC64MPIDIST(x) (static_cast<StrumpackSparseSolverMPIDist<std::complex<float>,int64_t>*>(x))
-#define CASTZ64MPIDIST(x) (static_cast<StrumpackSparseSolverMPIDist<std::complex<double>,int64_t>*>(x))
+#if defined(STRUMPACK_USE_PAPI)
+#include <papi.h>
 #endif
 
-#define switch_precision(m)                                             \
-  switch (S.precision) {                                                \
-  case STRUMPACK_FLOAT:            CASTS(S.solver)->m;   break;         \
-  case STRUMPACK_DOUBLE:           CASTD(S.solver)->m;   break;         \
-  case STRUMPACK_FLOATCOMPLEX:     CASTC(S.solver)->m;   break;         \
-  case STRUMPACK_DOUBLECOMPLEX:    CASTZ(S.solver)->m;   break;         \
-  case STRUMPACK_FLOAT_64:         CASTS64(S.solver)->m; break;         \
-  case STRUMPACK_DOUBLE_64:        CASTD64(S.solver)->m; break;         \
-  case STRUMPACK_FLOATCOMPLEX_64:  CASTC64(S.solver)->m; break;         \
-  case STRUMPACK_DOUBLECOMPLEX_64: CASTZ64(S.solver)->m; break;         \
-  }                                                                     \
+#include "misc/Tools.hpp"
+#include "StrumpackOptions.hpp"
+#include "sparse/ordering/MatrixReordering.hpp"
+#include "sparse/EliminationTree.hpp"
+#include "sparse/iterative/IterativeSolvers.hpp"
 
-#define switch_precision_arg(m,a)                                            \
-  switch (S.precision) {                                                \
-  case STRUMPACK_FLOAT:            CASTS(S.solver)->m(a);   break;       \
-  case STRUMPACK_DOUBLE:           CASTD(S.solver)->m(a);   break;       \
-  case STRUMPACK_FLOATCOMPLEX:     CASTC(S.solver)->m(a);   break;       \
-  case STRUMPACK_DOUBLECOMPLEX:    CASTZ(S.solver)->m(a);   break;       \
-  case STRUMPACK_FLOAT_64:         CASTS64(S.solver)->m(a); break;       \
-  case STRUMPACK_DOUBLE_64:        CASTD64(S.solver)->m(a); break;       \
-  case STRUMPACK_FLOATCOMPLEX_64:  CASTC64(S.solver)->m(a); break;       \
-  case STRUMPACK_DOUBLECOMPLEX_64: CASTZ64(S.solver)->m(a); break;       \
-  }                                                                     \
+namespace strumpack {
 
-#define switch_precision_return(m,r)                                    \
-  switch (S.precision) {                                                \
-  case STRUMPACK_FLOAT:            r = CASTS(S.solver)->m;   break;     \
-  case STRUMPACK_DOUBLE:           r = CASTD(S.solver)->m;   break;     \
-  case STRUMPACK_FLOATCOMPLEX:     r = CASTC(S.solver)->m;   break;     \
-  case STRUMPACK_DOUBLECOMPLEX:    r = CASTZ(S.solver)->m;   break;     \
-  case STRUMPACK_FLOAT_64:         r = CASTS64(S.solver)->m; break;     \
-  case STRUMPACK_DOUBLE_64:        r = CASTD64(S.solver)->m; break;     \
-  case STRUMPACK_FLOATCOMPLEX_64:  r = CASTC64(S.solver)->m; break;     \
-  case STRUMPACK_DOUBLECOMPLEX_64: r = CASTZ64(S.solver)->m; break;     \
-  }                                                                     \
+  template<typename scalar_t,typename integer_t>
+  StrumpackSparseSolver<scalar_t,integer_t>::StrumpackSparseSolver
+  (bool verbose, bool root)
+    : StrumpackSparseSolver<scalar_t,integer_t>(0, nullptr, verbose, root) {
+  }
 
-#define REI(x) reinterpret_cast<int*>(x)
-#define CREI(x) reinterpret_cast<const int*>(x)
-#define RE64(x) reinterpret_cast<int64_t*>(x)
-#define CRE64(x) reinterpret_cast<const int64_t*>(x)
-#define RES(x) reinterpret_cast<float*>(x)
-#define CRES(x) reinterpret_cast<const float*>(x)
-#define RED(x) reinterpret_cast<double*>(x)
-#define CRED(x) reinterpret_cast<const double*>(x)
-#define REC(x) reinterpret_cast<std::complex<float>*>(x)
-#define CREC(x) reinterpret_cast<const std::complex<float>*>(x)
-#define REZ(x) reinterpret_cast<std::complex<double>*>(x)
-#define CREZ(x) reinterpret_cast<const std::complex<double>*>(x)
-
-extern "C" {
-
-  void STRUMPACK_init_mt
-  (STRUMPACK_SparseSolver* S, STRUMPACK_PRECISION precision,
-   STRUMPACK_INTERFACE interface, int argc, char* argv[], int verbose) {
-    S->precision = precision;
-    S->interface = interface;
-    bool v = static_cast<bool>(verbose);
-    switch (interface) {
-    case STRUMPACK_MT: {
-      switch (precision) {
-      case STRUMPACK_FLOAT:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolver<float,int>(argc, argv, v));
-        break;
-      case STRUMPACK_DOUBLE:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolver<double,int>(argc, argv, v));
-        break;
-      case STRUMPACK_FLOATCOMPLEX:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolver<std::complex<float>,int>(argc, argv, v));
-        break;
-      case STRUMPACK_DOUBLECOMPLEX:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolver<std::complex<double>,int>
-           (argc, argv, v));
-        break;
-      case STRUMPACK_FLOAT_64:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolver<float,int64_t>(argc, argv, v));
-        break;
-      case STRUMPACK_DOUBLE_64:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolver<double,int64_t>(argc, argv, v));
-        break;
-      case STRUMPACK_FLOATCOMPLEX_64:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolver<std::complex<float>,int64_t>
-           (argc, argv, v));
-        break;
-      case STRUMPACK_DOUBLECOMPLEX_64:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolver<std::complex<double>,int64_t>
-           (argc, argv, v));
-        break;
-      default: std::cerr << "ERROR: wrong precision!" << std::endl;
+  template<typename scalar_t,typename integer_t>
+  StrumpackSparseSolver<scalar_t,integer_t>::StrumpackSparseSolver
+  (int argc, char* argv[], bool verbose, bool root)
+    : opts_(argc, argv), is_root_(root) {
+    opts_.set_verbose(verbose);
+    old_handler_ = std::set_new_handler
+      ([]{ std::cerr << "STRUMPACK: out of memory!" << std::endl; abort(); });
+    papi_initialize();
+    if (opts_.verbose() && is_root_) {
+      std::cout << "# Initializing STRUMPACK" << std::endl;
+#if defined(_OPENMP)
+      if (params::num_threads == 1)
+        std::cout << "# using " << params::num_threads
+                  << " OpenMP thread" << std::endl;
+      else
+        std::cout << "# using " << params::num_threads
+                  << " OpenMP threads" << std::endl;
+#else
+      std::cout << "# running serially, no OpenMP support!" << std::endl;
+#endif
+      // a heuristic to set the recursion task cutoff level based on
+      // the number of threads
+      if (params::num_threads == 1) params::task_recursion_cutoff_level = 0;
+      else {
+        params::task_recursion_cutoff_level =
+          std::log2(params::num_threads) + 3;
+        std::cout << "# number of tasking levels = "
+                  << params::task_recursion_cutoff_level
+                  << " = log_2(#threads) + 3"<< std::endl;
       }
-    } break;
-    default: std::cerr << "ERROR: wrong interface!" << std::endl;
     }
-  }
-
-
-#if defined(STRUMPACK_USE_MPI)
-  void STRUMPACK_init
-  (STRUMPACK_SparseSolver* S, MPI_Comm comm, STRUMPACK_PRECISION precision,
-   STRUMPACK_INTERFACE interface, int argc, char* argv[], int verbose) {
-    S->precision = precision;
-    S->interface = interface;
-    bool v = static_cast<bool>(verbose);
-    switch (interface) {
-    case STRUMPACK_MT: {
-      switch (precision) {
-      case STRUMPACK_FLOAT:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolver<float,int>(argc, argv, v));
-        break;
-      case STRUMPACK_DOUBLE:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolver<double,int>(argc, argv, v));
-        break;
-      case STRUMPACK_FLOATCOMPLEX:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolver<std::complex<float>,int>(argc, argv, v));
-        break;
-      case STRUMPACK_DOUBLECOMPLEX:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolver<std::complex<double>,int>
-           (argc, argv, v));
-        break;
-      case STRUMPACK_FLOAT_64:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolver<float,int64_t>(argc, argv, v));
-        break;
-      case STRUMPACK_DOUBLE_64:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolver<double,int64_t>(argc, argv, v));
-        break;
-      case STRUMPACK_FLOATCOMPLEX_64:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolver<std::complex<float>,int64_t>
-           (argc, argv, v));
-        break;
-      case STRUMPACK_DOUBLECOMPLEX_64:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolver<std::complex<double>,int64_t>
-           (argc, argv, v));
-        break;
-      default: std::cerr << "ERROR: wrong precision!" << std::endl;
-      }
-    } break;
-    case STRUMPACK_MPI_DIST: {
-      switch (precision) {
-      case STRUMPACK_FLOAT:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolverMPIDist<float,int>(comm, argc, argv, v));
-        break;
-      case STRUMPACK_DOUBLE:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolverMPIDist<double,int>(comm, argc, argv, v));
-        break;
-      case STRUMPACK_FLOATCOMPLEX:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolverMPIDist<std::complex<float>,int>
-           (comm, argc, argv, v));
-        break;
-      case STRUMPACK_DOUBLECOMPLEX:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolverMPIDist<std::complex<double>,int>
-           (comm, argc, argv, v));
-        break;
-      case STRUMPACK_FLOAT_64:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolverMPIDist<float,int64_t>
-           (comm, argc, argv, v));
-        break;
-      case STRUMPACK_DOUBLE_64:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolverMPIDist<double,int64_t>
-           (comm, argc, argv, v));
-        break;
-      case STRUMPACK_FLOATCOMPLEX_64:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolverMPIDist<std::complex<float>,int64_t>
-           (comm, argc, argv, v));
-        break;
-      case STRUMPACK_DOUBLECOMPLEX_64:
-        S->solver = static_cast<void*>
-          (new StrumpackSparseSolverMPIDist<std::complex<double>,int64_t>
-           (comm, argc, argv, v));
-        break;
-      default: std::cerr << "ERROR: wrong precision!" << std::endl;
-      }
-    } break;
-    default: std::cerr << "ERROR: wrong interface!" << std::endl;
-    }
-  }
+#if defined(STRUMPACK_COUNT_FLOPS)
+    // if (!params::flops.is_lock_free())
+    //   std::cerr << "# WARNING: the flop counter is not lock free"
+    //             << std::endl;
 #endif
-
-  void STRUMPACK_destroy(STRUMPACK_SparseSolver* S) {
-    switch (S->precision) {
-    case STRUMPACK_FLOAT:            delete CASTS(S->solver);   break;
-    case STRUMPACK_DOUBLE:           delete CASTD(S->solver);   break;
-    case STRUMPACK_FLOATCOMPLEX:     delete CASTC(S->solver);   break;
-    case STRUMPACK_DOUBLECOMPLEX:    delete CASTZ(S->solver);   break;
-    case STRUMPACK_FLOAT_64:         delete CASTS64(S->solver); break;
-    case STRUMPACK_DOUBLE_64:        delete CASTD64(S->solver); break;
-    case STRUMPACK_FLOATCOMPLEX_64:  delete CASTC64(S->solver); break;
-    case STRUMPACK_DOUBLECOMPLEX_64: delete CASTZ64(S->solver); break;
-    }
-    S->solver = NULL;
+    opts_.HSS_options().set_synchronized_compression(true);
   }
 
-  void STRUMPACK_set_csr_matrix
-  (STRUMPACK_SparseSolver S, const void* N, const void* row_ptr,
-   const void* col_ind, const void* values, int symm) {
-    switch (S.precision) {
-    case STRUMPACK_FLOAT:
-      CASTS(S.solver)->set_csr_matrix
-        (*CREI(N), CREI(row_ptr), CREI(col_ind), CRES(values), symm);
-      break;
-    case STRUMPACK_DOUBLE:
-      CASTD(S.solver)->set_csr_matrix
-        (*CREI(N), CREI(row_ptr), CREI(col_ind), CRED(values), symm);
-      break;
-    case STRUMPACK_FLOATCOMPLEX:
-      CASTC(S.solver)->set_csr_matrix
-        (*CREI(N), CREI(row_ptr), CREI(col_ind), CREC(values), symm);
-      break;
-    case STRUMPACK_DOUBLECOMPLEX:
-      CASTZ(S.solver)->set_csr_matrix
-        (*CREI(N), CREI(row_ptr), CREI(col_ind), CREZ(values), symm);
-      break;
-    case STRUMPACK_FLOAT_64:
-      CASTS64(S.solver)->set_csr_matrix
-        (*CRE64(N), CRE64(row_ptr), CRE64(col_ind), CRES(values), symm);
-      break;
-    case STRUMPACK_DOUBLE_64:
-      CASTD64(S.solver)->set_csr_matrix
-        (*CRE64(N), CRE64(row_ptr), CRE64(col_ind), CRED(values), symm);
-      break;
-    case STRUMPACK_FLOATCOMPLEX_64:
-      CASTC64(S.solver)->set_csr_matrix
-        (*CRE64(N), CRE64(row_ptr), CRE64(col_ind), CREC(values), symm);
-      break;
-    case STRUMPACK_DOUBLECOMPLEX_64:
-      CASTZ64(S.solver)->set_csr_matrix
-        (*CRE64(N), CRE64(row_ptr), CRE64(col_ind), CREZ(values), symm);
-      break;
-    }
+  template<typename scalar_t,typename integer_t>
+  StrumpackSparseSolver<scalar_t,integer_t>::~StrumpackSparseSolver() {
+    std::set_new_handler(old_handler_);
   }
 
-#if defined(STRUMPACK_USE_MPI)
-  void STRUMPACK_set_distributed_csr_matrix
-  (STRUMPACK_SparseSolver S, const void* N, const void* row_ptr,
-   const void* col_ind, const void* values, const void* dist, int symm) {
-    if (S.interface != STRUMPACK_MPI_DIST) {
-      std::cerr << "ERROR: interface != STRUMPACK_MPI_DIST" << std::endl;
-      return;
-    }
-    switch (S.precision) {
-    case STRUMPACK_FLOAT:
-      CASTSMPIDIST(S.solver)->set_distributed_csr_matrix
-        (*CREI(N), CREI(row_ptr), CREI(col_ind), CRES(values), CREI(dist), symm);
-      break;
-    case STRUMPACK_DOUBLE:
-      CASTDMPIDIST(S.solver)->set_distributed_csr_matrix
-        (*CREI(N), CREI(row_ptr), CREI(col_ind), CRED(values), CREI(dist), symm);
-      break;
-    case STRUMPACK_FLOATCOMPLEX:
-      CASTCMPIDIST(S.solver)->set_distributed_csr_matrix
-        (*CREI(N), CREI(row_ptr), CREI(col_ind), CREC(values), CREI(dist), symm);
-      break;
-    case STRUMPACK_DOUBLECOMPLEX:
-      CASTZMPIDIST(S.solver)->set_distributed_csr_matrix
-        (*CREI(N), CREI(row_ptr), CREI(col_ind), CREZ(values), CREI(dist), symm);
-      break;
-    case STRUMPACK_FLOAT_64:
-      CASTS64MPIDIST(S.solver)->set_distributed_csr_matrix
-        (*CRE64(N), CRE64(row_ptr), CRE64(col_ind), CRES(values), CRE64(dist), symm);
-      break;
-    case STRUMPACK_DOUBLE_64:
-      CASTD64MPIDIST(S.solver)->set_distributed_csr_matrix
-        (*CRE64(N), CRE64(row_ptr), CRE64(col_ind), CRED(values), CRE64(dist), symm);
-      break;
-    case STRUMPACK_FLOATCOMPLEX_64:
-      CASTC64MPIDIST(S.solver)->set_distributed_csr_matrix
-        (*CRE64(N), CRE64(row_ptr), CRE64(col_ind), CREC(values), CRE64(dist), symm);
-      break;
-    case STRUMPACK_DOUBLECOMPLEX_64:
-      CASTZ64MPIDIST(S.solver)->set_distributed_csr_matrix
-        (*CRE64(N), CRE64(row_ptr), CRE64(col_ind), CREZ(values), CRE64(dist), symm);
-      break;
-    }
+  template<typename scalar_t,typename integer_t> SPOptions<scalar_t>&
+  StrumpackSparseSolver<scalar_t,integer_t>::options() {
+    return opts_;
   }
 
-  void STRUMPACK_set_MPIAIJ_matrix
-  (STRUMPACK_SparseSolver S, const void* n, const void* d_ptr,
-   const void* d_ind, const void* d_val, const void* o_ptr, const void* o_ind,
-   const void* o_val, const void* garray) {
-    if (S.interface != STRUMPACK_MPI_DIST) {
-      std::cerr << "ERROR: interface != STRUMPACK_MPI_DIST" << std::endl;
-      return;
-    }
-    switch (S.precision) {
-    case STRUMPACK_FLOAT:
-      CASTSMPIDIST(S.solver)->set_MPIAIJ_matrix
-        (*CREI(n), CREI(d_ptr), CREI(d_ind), CRES(d_val),
-         CREI(o_ptr), CREI(o_ind), CRES(o_val), CREI(garray));
-      break;
-    case STRUMPACK_DOUBLE:
-      CASTDMPIDIST(S.solver)->set_MPIAIJ_matrix
-        (*CREI(n), CREI(d_ptr), CREI(d_ind), CRED(d_val),
-         CREI(o_ptr), CREI(o_ind), CRED(o_val), CREI(garray));
-      break;
-    case STRUMPACK_FLOATCOMPLEX:
-      CASTCMPIDIST(S.solver)->set_MPIAIJ_matrix
-        (*CREI(n), CREI(d_ptr), CREI(d_ind), CREC(d_val),
-         CREI(o_ptr), CREI(o_ind), CREC(o_val), CREI(garray));
-      break;
-    case STRUMPACK_DOUBLECOMPLEX:
-      CASTZMPIDIST(S.solver)->set_MPIAIJ_matrix
-        (*CREI(n), CREI(d_ptr), CREI(d_ind), CREZ(d_val),
-         CREI(o_ptr), CREI(o_ind), CREZ(o_val), CREI(garray));
-      break;
-    case STRUMPACK_FLOAT_64:
-      CASTS64MPIDIST(S.solver)->set_MPIAIJ_matrix
-        (*CRE64(n), CRE64(d_ptr), CRE64(d_ind), CRES(d_val),
-         CRE64(o_ptr), CRE64(o_ind), CRES(o_val), CRE64(garray));
-      break;
-    case STRUMPACK_DOUBLE_64:
-      CASTD64MPIDIST(S.solver)->set_MPIAIJ_matrix
-        (*CRE64(n), CRE64(d_ptr), CRE64(d_ind), CRED(d_val),
-         CRE64(o_ptr), CRE64(o_ind), CRED(o_val), CRE64(garray));
-      break;
-    case STRUMPACK_FLOATCOMPLEX_64:
-      CASTC64MPIDIST(S.solver)->set_MPIAIJ_matrix
-        (*CRE64(n), CRE64(d_ptr), CRE64(d_ind), CREC(d_val),
-         CRE64(o_ptr), CRE64(o_ind), CREC(o_val), CRE64(garray));
-      break;
-    case STRUMPACK_DOUBLECOMPLEX_64:
-      CASTZ64MPIDIST(S.solver)->set_MPIAIJ_matrix
-        (*CRE64(n), CRE64(d_ptr), CRE64(d_ind), CREZ(d_val),
-         CRE64(o_ptr), CRE64(o_ind), CREZ(o_val), CRE64(garray));
-      break;
-    }
+  template<typename scalar_t,typename integer_t> const SPOptions<scalar_t>&
+  StrumpackSparseSolver<scalar_t,integer_t>::options() const {
+    return opts_;
   }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::set_from_options() {
+    opts_.set_from_command_line();
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::set_from_options
+  (int argc, char* argv[]) {
+    opts_.set_from_command_line(argc, argv);
+  }
+
+  template<typename scalar_t,typename integer_t> int
+  StrumpackSparseSolver<scalar_t,integer_t>::maximum_rank() const {
+    return tree()->maximum_rank();
+  }
+
+  template<typename scalar_t,typename integer_t> std::size_t
+  StrumpackSparseSolver<scalar_t,integer_t>::factor_nonzeros() const {
+    return tree()->factor_nonzeros();
+  }
+
+  template<typename scalar_t,typename integer_t> std::size_t
+  StrumpackSparseSolver<scalar_t,integer_t>::factor_memory() const {
+    return tree()->factor_nonzeros() * sizeof(scalar_t);
+  }
+
+  template<typename scalar_t,typename integer_t> int
+  StrumpackSparseSolver<scalar_t,integer_t>::Krylov_iterations() const {
+    return Krylov_its_;
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::draw
+  (const std::string& name) const {
+    tree()->draw(*matrix(), name);
+  }
+
+  template<typename scalar_t,typename integer_t> long long
+  StrumpackSparseSolver<scalar_t,integer_t>::dense_factor_nonzeros() const {
+    return tree()->dense_factor_nonzeros();
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::setup_tree() {
+    tree_.reset(new EliminationTree<scalar_t,integer_t>
+                (opts_, *mat_, nd_->tree()));
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::setup_reordering() {
+    nd_.reset(new MatrixReordering<scalar_t,integer_t>(matrix()->size()));
+  }
+
+  template<typename scalar_t,typename integer_t> int
+  StrumpackSparseSolver<scalar_t,integer_t>::compute_reordering
+  (const int* p, int base, int nx, int ny, int nz,
+   int components, int width) {
+    if (p) return nd_->set_permutation(opts_, *mat_, p, base);
+    return nd_->nested_dissection
+      (opts_, *mat_, nx, ny, nz, components, width);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::separator_reordering() {
+    nd_->separator_reordering(opts_, *mat_, tree_->root());
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::papi_initialize() {
+#if defined(STRUMPACK_USE_PAPI)
+    // TODO call PAPI_library_init???
+    float mflops = 0.;
+    int retval = PAPI_flops(&rtime_, &ptime_, &_flpops, &mflops);
+    if (retval != PAPI_OK) {
+      std::cerr << "# WARNING: problem starting PAPI performance counters:"
+                << std::endl;
+      switch (retval) {
+      case PAPI_EINVAL:
+        std::cerr << "#   - the counters were already started by"
+          << " something other than: PAPI_flips() or PAPI_flops()."
+          << std::endl; break;
+      case PAPI_ENOEVNT:
+        std::cerr << "#   - the floating point operations, floating point"
+                  << " instructions or total cycles event does not exist."
+                  << std::endl; break;
+      case PAPI_ENOMEM:
+        std::cerr << "#   - insufficient memory to complete the operation."
+                  << std::endl; break;
+      default:
+        std::cerr << "#   - some other error: " << retval << std::endl;
+      }
+    }
 #endif
+  }
 
-  STRUMPACK_RETURN_CODE STRUMPACK_solve
-  (STRUMPACK_SparseSolver S, const void* b, void* x,
-   int use_initial_guess) {
-    switch (S.precision) {
-    case STRUMPACK_FLOAT:
-      return static_cast<STRUMPACK_RETURN_CODE>
-        (CASTS(S.solver)->solve(CRES(b), RES(x), use_initial_guess));
-      break;
-    case STRUMPACK_DOUBLE:
-      return static_cast<STRUMPACK_RETURN_CODE>
-        (CASTD(S.solver)->solve(CRED(b), RED(x), use_initial_guess));
-      break;
-    case STRUMPACK_FLOATCOMPLEX:
-      return static_cast<STRUMPACK_RETURN_CODE>
-        (CASTC(S.solver)->solve(CREC(b), REC(x), use_initial_guess));
-      break;
-    case STRUMPACK_DOUBLECOMPLEX:
-      return static_cast<STRUMPACK_RETURN_CODE>
-        (CASTZ(S.solver)->solve(CREZ(b), REZ(x), use_initial_guess));
-      break;
-    case STRUMPACK_FLOAT_64:
-      return static_cast<STRUMPACK_RETURN_CODE>
-        (CASTS64(S.solver)->solve(CRES(b), RES(x), use_initial_guess));
-      break;
-    case STRUMPACK_DOUBLE_64:
-      return static_cast<STRUMPACK_RETURN_CODE>
-        (CASTD64(S.solver)->solve(CRED(b), RED(x), use_initial_guess));
-      break;
-    case STRUMPACK_FLOATCOMPLEX_64:
-      return static_cast<STRUMPACK_RETURN_CODE>
-        (CASTC64(S.solver)->solve(CREC(b), REC(x), use_initial_guess));
-      break;
-    case STRUMPACK_DOUBLECOMPLEX_64:
-      return static_cast<STRUMPACK_RETURN_CODE>
-        (CASTZ64(S.solver)->solve(CREZ(b), REZ(x), use_initial_guess));
-      break;
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::perf_counters_start() {
+#if defined(STRUMPACK_USE_PAPI)
+    float mflops = 0., rtime = 0., ptime = 0.;
+    long_long flpops = 0; // cannot use class variables in openmp clause
+#pragma omp parallel reduction(+:flpops) reduction(max:rtime) \
+  reduction(max:ptime)
+    PAPI_flops(&rtime, &ptime, &flpops, &mflops);
+    _flpops = flpops; rtime_ = rtime; ptime_ = ptime;
+#endif
+#if defined(STRUMPACK_COUNT_FLOPS)
+    f0_ = params::flops;
+    b0_ = params::bytes;
+#endif
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::perf_counters_stop
+  (const std::string& s) {
+#if defined(STRUMPACK_USE_PAPI)
+    float mflops = 0., rtime = 0., ptime = 0.;
+    long_long flpops = 0;
+#pragma omp parallel reduction(+:flpops) reduction(max:rtime)  \
+  reduction(max:ptime)
+    PAPI_flops(&rtime, &ptime, &flpops, &mflops);
+    PAPI_dmem_info_t dmem;
+    PAPI_get_dmem_info(&dmem);
+    if (opts_.verbose() && is_root_) {
+      std::cout << "# " << s << " PAPI stats:" << std::endl;
+      std::cout << "#   - total flops = "
+                << double(flpops-_flpops) << std::endl;
+      std::cout << "#   - flop rate = "
+                << double(flpops-_flpops)/(rtime-rtime_)/1e9
+                << " GFlops/s" << std::endl;
+      std::cout << "#   - real time = " << rtime-rtime_
+                << " sec" << std::endl;
+      std::cout << "#   - processor time = " << ptime-ptime_
+                << " sec" << std::endl;
+      std::cout << "# mem size:\t\t" << dmem.size << std::endl;
+      std::cout << "# mem resident:\t\t" << dmem.resident << std::endl;
+      std::cout << "# mem high water mark:\t" << dmem.high_water_mark
+                << std::endl;
+      std::cout << "# mem shared:\t\t" << dmem.shared << std::endl;
+      std::cout << "# mem text:\t\t" << dmem.text << std::endl;
+      std::cout << "# mem library:\t\t" << dmem.library << std::endl;
+      std::cout << "# mem heap:\t\t" << dmem.heap << std::endl;
+      std::cout << "# mem locked:\t\t" << dmem.locked << std::endl;
+      std::cout << "# mem stack:\t\t" << dmem.stack << std::endl;
+      std::cout << "# mem pagesize:\t\t" << dmem.pagesize << std::endl;
     }
-    return STRUMPACK_SUCCESS;
+#endif
+#if defined(STRUMPACK_COUNT_FLOPS)
+    fmin_ = fmax_ = ftot_ = params::flops - f0_;
+    bmin_ = bmax_ = btot_ = params::bytes - b0_;
+#endif
   }
 
-  void STRUMPACK_set_from_options(STRUMPACK_SparseSolver S) {
-    switch_precision(set_from_options());
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::print_solve_stats
+  (TaskTimer& t) const {
+    double tel = t.elapsed();
+    if (opts_.verbose() && is_root_) {
+      std::cout << "# DIRECT/GMRES solve:" << std::endl;
+      std::cout << "#   - abs_tol = " << opts_.abs_tol()
+                << ", rel_tol = " << opts_.rel_tol()
+                << ", restart = " << opts_.gmres_restart()
+                << ", maxit = " << opts_.maxit() << std::endl;
+      std::cout << "#   - number of Krylov iterations = "
+                << Krylov_its_ << std::endl;
+      std::cout << "#   - solve time = " << tel << std::endl;
+#if defined(STRUMPACK_COUNT_FLOPS)
+      std::cout << "#   - solve flops = " << double(ftot_) << " min = "
+                << double(fmin_) << " max = " << double(fmax_) << std::endl;
+      std::cout << "#   - solve flop rate = " << ftot_ / tel / 1e9 << " GFlop/s"
+                << std::endl;
+      std::cout << "#   - bytes moved = " << double(btot_) / 1e6
+                << " MB, min = "<< double(bmin_) / 1e6
+                << " MB, max = " << double(bmax_) / 1e6 << " MB" << std::endl;
+      std::cout << "#   - byte rate = " << btot_ / tel / 1e9 << " GByte/s"
+                << std::endl;
+      std::cout << "#   - solve arithmetic intensity = "
+                << double(ftot_) / btot_
+                << " flop/byte" << std::endl;
+#endif
+    }
   }
 
-  STRUMPACK_RETURN_CODE STRUMPACK_reorder(STRUMPACK_SparseSolver S) {
-    ReturnCode c = ReturnCode::SUCCESS;;
-    switch_precision_return(reorder(), c);
-    return static_cast<STRUMPACK_RETURN_CODE>(c);
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::set_matrix
+  (const CSRMatrix<scalar_t,integer_t>& A) {
+    mat_.reset(new CSRMatrix<scalar_t,integer_t>(A));
+    factored_ = reordered_ = false;
   }
 
-  STRUMPACK_RETURN_CODE STRUMPACK_reorder_regular
-  (STRUMPACK_SparseSolver S, int nx, int ny, int nz) {
-    ReturnCode c = ReturnCode::SUCCESS;;
-    switch_precision_return(reorder(nx, ny, nz), c);
-    return static_cast<STRUMPACK_RETURN_CODE>(c);
-  }
-  STRUMPACK_RETURN_CODE STRUMPACK_factor(STRUMPACK_SparseSolver S) {
-    ReturnCode c = ReturnCode::SUCCESS;
-    switch_precision_return(factor(), c);
-    return static_cast<STRUMPACK_RETURN_CODE>(c);
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::set_csr_matrix
+  (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
+   const scalar_t* values, bool symmetric_pattern) {
+    mat_.reset(new CSRMatrix<scalar_t,integer_t>
+               (N, row_ptr, col_ind, values, symmetric_pattern));
+    factored_ = reordered_ = false;
   }
 
-
-
-  /*************************************************************
-   ** Set options **********************************************
-   ************************************************************/
-  void STRUMPACK_set_verbose(STRUMPACK_SparseSolver S, int v)
-  { switch_precision(options().set_verbose(static_cast<bool>(v))); }
-  void STRUMPACK_set_maxit(STRUMPACK_SparseSolver S, int maxit)
-  { switch_precision(options().set_maxit(maxit)); }
-  void STRUMPACK_set_gmres_restart(STRUMPACK_SparseSolver S, int m)
-  { switch_precision(options().set_gmres_restart(m)); }
-  void STRUMPACK_set_rel_tol(STRUMPACK_SparseSolver S, double tol)
-  { switch_precision(options().set_rel_tol(tol)); }
-  void STRUMPACK_set_abs_tol(STRUMPACK_SparseSolver S, double tol)
-  { switch_precision(options().set_abs_tol(tol)); }
-  void STRUMPACK_set_nd_param(STRUMPACK_SparseSolver S, int nd_param)
-  { switch_precision(options().set_nd_param(nd_param)); }
-  void STRUMPACK_set_reordering_method
-  (STRUMPACK_SparseSolver S, STRUMPACK_REORDERING_STRATEGY m) {
-    switch_precision
-      (options().set_reordering_method
-       (static_cast<ReorderingStrategy>(m)));
-  }
-  void STRUMPACK_set_GramSchmidt_type
-  (STRUMPACK_SparseSolver S, STRUMPACK_GRAM_SCHMIDT_TYPE t) {
-    switch_precision
-      (options().set_GramSchmidt_type
-       (static_cast<GramSchmidtType>(t)));
-  }
-  void STRUMPACK_set_mc64job(STRUMPACK_SparseSolver S, int job)
-  { switch_precision(options().set_matching(get_matching(job))); }
-  void STRUMPACK_set_matching(STRUMPACK_SparseSolver S, int job)
-  { switch_precision(options().set_matching(get_matching(job))); }
-  void STRUMPACK_set_Krylov_solver
-  (STRUMPACK_SparseSolver S, STRUMPACK_KRYLOV_SOLVER solver_type) {
-    switch_precision
-      (options().set_Krylov_solver
-       (static_cast<KrylovSolver>(solver_type)));
+  template<typename scalar_t,typename integer_t> ReturnCode
+  StrumpackSparseSolver<scalar_t,integer_t>::reorder
+  (int nx, int ny, int nz, int components, int width) {
+    return internal_reorder(nullptr, 0, nx, ny, nz, components, width);
   }
 
-  /* set HSS specific options */
-  void STRUMPACK_enable_HSS(STRUMPACK_SparseSolver S)
-  { switch_precision(options().set_compression(CompressionType::HSS)); }
-  void STRUMPACK_disable_HSS(STRUMPACK_SparseSolver S)
-  { switch_precision(options().set_compression(CompressionType::NONE)); }
-  void STRUMPACK_set_HSS_min_front_size(STRUMPACK_SparseSolver S, int size)
-  { switch_precision(options().set_compression_min_front_size(size)); }
-  void STRUMPACK_set_HSS_min_sep_size(STRUMPACK_SparseSolver S, int size)
-  { switch_precision(options().set_compression_min_sep_size(size)); }
-  void STRUMPACK_set_HSS_max_rank(STRUMPACK_SparseSolver S, int max_rank)
-  { switch_precision(options().HSS_options().set_max_rank(max_rank)); }
-  void STRUMPACK_set_HSS_leaf_size(STRUMPACK_SparseSolver S, int leaf_size)
-  { switch_precision(options().HSS_options().set_leaf_size(leaf_size)); }
-  void STRUMPACK_set_HSS_rel_tol(STRUMPACK_SparseSolver S, double rctol)
-  { switch_precision(options().HSS_options().set_rel_tol(rctol)); }
-  void STRUMPACK_set_HSS_abs_tol(STRUMPACK_SparseSolver S, double actol)
-  { switch_precision(options().HSS_options().set_abs_tol(actol)); }
-
-
-  /*************************************************************
-   ** Get options **********************************************
-   ************************************************************/
-  int STRUMPACK_verbose(STRUMPACK_SparseSolver S) {
-    int v = 0;
-    switch_precision_return(options().verbose(), v);
-    return v;
-  }
-  int STRUMPACK_maxit(STRUMPACK_SparseSolver S) {
-    int maxit = 0;
-    switch_precision_return(options().maxit(), maxit);
-    return maxit;
-  }
-  int STRUMPACK_gmres_restart(STRUMPACK_SparseSolver S) {
-    int restart = 0;
-    switch_precision_return(options().gmres_restart(), restart);
-    return restart;
-  }
-  double STRUMPACK_rel_tol(STRUMPACK_SparseSolver S) {
-    double rtol = 0.;
-    switch_precision_return(options().rel_tol(), rtol);
-    return rtol;
-  }
-  double STRUMPACK_abs_tol(STRUMPACK_SparseSolver S) {
-    double atol = 0.;
-    switch_precision_return(options().abs_tol(), atol);
-    return atol;
-  }
-  int STRUMPACK_nd_param(STRUMPACK_SparseSolver S) {
-    int nd_param = 0;
-    switch_precision_return(options().nd_param(), nd_param);
-    return nd_param;
-  }
-  STRUMPACK_REORDERING_STRATEGY
-  STRUMPACK_reordering_method(STRUMPACK_SparseSolver S) {
-    ReorderingStrategy r = ReorderingStrategy::METIS;
-    switch_precision_return(options().reordering_method(), r);
-    return static_cast<STRUMPACK_REORDERING_STRATEGY>(r);
-  }
-  STRUMPACK_GRAM_SCHMIDT_TYPE
-  STRUMPACK_GramSchmidt_type(STRUMPACK_SparseSolver S) {
-    GramSchmidtType gs = GramSchmidtType::CLASSICAL;
-    switch_precision_return(options().GramSchmidt_type(), gs);
-    return static_cast<STRUMPACK_GRAM_SCHMIDT_TYPE>(gs);
-  }
-  int STRUMPACK_mc64job(STRUMPACK_SparseSolver S) {
-    return STRUMPACK_matching(S);
-  }
-  int STRUMPACK_matching(STRUMPACK_SparseSolver S) {
-    MatchingJob job = MatchingJob::NONE;
-    switch_precision_return(options().matching(), job);
-    return get_matching(job);
-  }
-  STRUMPACK_KRYLOV_SOLVER STRUMPACK_Krylov_solver(STRUMPACK_SparseSolver S) {
-    KrylovSolver s = KrylovSolver::AUTO;
-    switch_precision_return(options().Krylov_solver(), s);
-    return static_cast<STRUMPACK_KRYLOV_SOLVER>(s);
+  template<typename scalar_t,typename integer_t> ReturnCode
+  StrumpackSparseSolver<scalar_t,integer_t>::reorder
+  (const int* p, int base) {
+    return internal_reorder(p, base, 1, 1, 1, 1, 1);
   }
 
-  /* get HSS specific options */
-  int STRUMPACK_use_HSS(STRUMPACK_SparseSolver S) {
-    CompressionType c = CompressionType::NONE;
-    switch_precision_return(options().compression(), c);
-    return c == CompressionType::HSS;
-  }
-  int STRUMPACK_HSS_min_front_size(STRUMPACK_SparseSolver S) {
-    int size = 0;
-    switch_precision_return(options().compression_min_front_size(), size);
-    return size;
-  }
-  int STRUMPACK_HSS_min_sep_size(STRUMPACK_SparseSolver S) {
-    int size = 0;
-    switch_precision_return(options().compression_min_sep_size(), size);
-    return size;
-  }
-  int STRUMPACK_HSS_max_rank(STRUMPACK_SparseSolver S) {
-    int rank = 0;
-    switch_precision_return(options().HSS_options().max_rank(), rank);
-    return rank;
-  }
-  int STRUMPACK_HSS_leaf_size(STRUMPACK_SparseSolver S) {
-    int l = 0;
-    switch_precision_return(options().HSS_options().leaf_size(), l);
-    return l;
-  }
-  double STRUMPACK_HSS_rel_tol(STRUMPACK_SparseSolver S) {
-    double rctol = 0;
-    switch_precision_return(options().HSS_options().rel_tol(), rctol);
-    return rctol;
-  }
-  double STRUMPACK_HSS_abs_tol(STRUMPACK_SparseSolver S) {
-    double actol = 0.;
-    switch_precision_return(options().HSS_options().abs_tol(), actol);
-    return actol;
+  template<typename scalar_t,typename integer_t> ReturnCode
+  StrumpackSparseSolver<scalar_t,integer_t>::internal_reorder
+  (const int* p, int base, int nx, int ny, int nz,
+   int components, int width) {
+    if (!matrix()) return ReturnCode::MATRIX_NOT_SET;
+    TaskTimer t1("permute-scale");
+    int ierr;
+    if (opts_.matching() != MatchingJob::NONE) {
+      if (opts_.verbose() && is_root_)
+        std::cout << "# matching job: "
+                  << get_description(opts_.matching())
+                  << std::endl;
+      t1.time([&](){
+          ierr = matrix()->permute_and_scale
+            (opts_.matching(), matching_cperm_, matching_Dr_, matching_Dc_);
+        });
+      if (ierr) {
+        std::cerr << "ERROR: matching failed" << std::endl;
+        return ReturnCode::REORDERING_ERROR;
+      }
+    }
+    auto old_nnz = matrix()->nnz();
+    TaskTimer t2("sparsity-symmetrization",
+                 [&](){ matrix()->symmetrize_sparsity(); });
+    if (matrix()->nnz() != old_nnz && opts_.verbose() && is_root_) {
+      std::cout << "# Matrix padded with zeros to get symmetric pattern."
+                << std::endl;
+      std::cout << "# Number of nonzeros increased from "
+                << number_format_with_commas(old_nnz) << " to "
+                << number_format_with_commas(matrix()->nnz()) << "."
+                << std::endl;
+    }
+
+    TaskTimer t3("nested-dissection");
+    perf_counters_start();
+    t3.start();
+    setup_reordering();
+    ierr = compute_reordering(p, base, nx, ny, nz, components, width);
+    if (ierr) {
+      std::cerr << "ERROR: nested dissection went wrong, ierr="
+                << ierr << std::endl;
+      return ReturnCode::REORDERING_ERROR;
+    }
+    matrix()->permute(reordering()->iperm(), reordering()->perm());
+    t3.stop();
+    if (opts_.verbose() && is_root_) {
+      std::cout << "#   - nd time = " << t3.elapsed() << std::endl;
+      if (opts_.matching() != MatchingJob::NONE)
+        std::cout << "#   - matching time = " << t1.elapsed() << std::endl;
+      std::cout << "#   - symmetrization time = " << t2.elapsed()
+                << std::endl;
+    }
+    perf_counters_stop("nested dissection");
+
+    perf_counters_start();
+    TaskTimer t0("symbolic-factorization", [&](){ setup_tree(); });
+    reordering()->clear_tree_data();
+    if (opts_.verbose()) {
+      auto fc = tree()->front_counter();
+      if (is_root_) {
+        std::cout << "# symbolic factorization:" << std::endl;
+        std::cout << "#   - nr of dense Frontal matrices = "
+                  << number_format_with_commas(fc.dense) << std::endl;
+        if (fc.HSS)
+          std::cout << "#   - nr of HSS Frontal matrices = "
+                    << number_format_with_commas(fc.HSS) << std::endl;
+        if (fc.BLR)
+          std::cout << "#   - nr of BLR Frontal matrices = "
+                    << number_format_with_commas(fc.BLR) << std::endl;
+        if (fc.HODLR)
+          std::cout << "#   - nr of HODLR Frontal matrices = "
+                    << number_format_with_commas(fc.HODLR) << std::endl;
+        if (fc.lossy)
+          std::cout << "#   - nr of lossy Frontal matrices = "
+                    << number_format_with_commas(fc.lossy) << std::endl;
+        std::cout << "#   - symb-factor time = " << t0.elapsed() << std::endl;
+      }
+    }
+    perf_counters_stop("symbolic factorization");
+
+    if (opts_.compression() != CompressionType::NONE) {
+      perf_counters_start();
+      // TODO also broadcast this?? is computed with metis
+      TaskTimer t4("separator-reordering", [&](){ separator_reordering(); });
+      if (opts_.verbose() && is_root_)
+        std::cout << "#   - sep-reorder time = "
+                  << t4.elapsed() << std::endl;
+      perf_counters_stop("separator reordering");
+    }
+
+    reordered_ = true;
+    return ReturnCode::SUCCESS;
   }
 
-  /*************************************************************
-   ** Get solve statistics *************************************
-   ************************************************************/
-  int STRUMPACK_its(STRUMPACK_SparseSolver S) {
-    int its = 0;
-    switch_precision_return(Krylov_iterations(), its);
-    return its;
-  }
-  int STRUMPACK_rank(STRUMPACK_SparseSolver S) {
-    int rank = 0;
-    switch_precision_return(maximum_rank(), rank);
-    return rank;
-  }
-  long long STRUMPACK_factor_nonzeros(STRUMPACK_SparseSolver S) {
-    long long nz = 0;
-    switch_precision_return(factor_nonzeros(), nz);
-    return nz;
-  }
-  long long STRUMPACK_factor_memory(STRUMPACK_SparseSolver S) {
-    long long mem = 0;
-    switch_precision_return(factor_memory(), mem);
-    return mem;
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::flop_breakdown_reset() const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+    params::random_flops = 0;
+    params::ID_flops = 0;
+    params::QR_flops = 0;
+    params::ortho_flops = 0;
+    params::reduce_sample_flops = 0;
+    params::update_sample_flops = 0;
+    params::extraction_flops = 0;
+    params::CB_sample_flops = 0;
+    params::sparse_sample_flops = 0;
+    params::ULV_factor_flops = 0;
+    params::schur_flops = 0;
+    params::full_rank_flops = 0;
+    params::f11_fill_flops = 0;
+    params::f12_fill_flops = 0;
+    params::f21_fill_flops = 0;
+    params::f22_fill_flops = 0;
+    params::f21_mult_flops = 0;
+    params::invf11_mult_flops = 0;
+    params::f12_mult_flops = 0;
+#endif
   }
 
-}
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::print_flop_breakdown_HSS() const {
+    reduce_flop_counters();
+    if (!is_root_) return;
+    float sample_flops = params::CB_sample_flops + params::sparse_sample_flops;
+    float compression_flops = params::random_flops + params::ID_flops +
+      params::QR_flops + params::ortho_flops + params::reduce_sample_flops +
+      params::update_sample_flops + params::extraction_flops + sample_flops;
+    std::cout << std::endl;
+    std::cout << "# ----- FLOP BREAKDOWN ---------------------" << std::endl;
+    std::cout << "# compression           = " << compression_flops << std::endl;
+    std::cout << "#    random             = " << float(params::random_flops) << std::endl;
+    std::cout << "#    ID                 = " << float(params::ID_flops) << std::endl;
+    std::cout << "#    QR                 = " << float(params::QR_flops) << std::endl;
+    std::cout << "#    ortho              = " << float(params::ortho_flops) << std::endl;
+    std::cout << "#    reduce_samples     = " << float(params::reduce_sample_flops) << std::endl;
+    std::cout << "#    update_samples     = " << float(params::update_sample_flops) << std::endl;
+    std::cout << "#    extraction         = " << float(params::extraction_flops) << std::endl;
+    std::cout << "#    sampling           = " << sample_flops << std::endl;
+    std::cout << "#       CB_sample       = " << float(params::CB_sample_flops) << std::endl;
+    std::cout << "#       sparse_sampling = " << float(params::sparse_sample_flops) << std::endl;
+    std::cout << "# ULV_factor            = " << float(params::ULV_factor_flops) << std::endl;
+    std::cout << "# Schur                 = " << float(params::schur_flops) << std::endl;
+    std::cout << "# full_rank             = " << float(params::full_rank_flops) << std::endl;
+    std::cout << "# --------------------------------------------" << std::endl;
+    std::cout << "# total                 = "
+              << (compression_flops + params::ULV_factor_flops +
+                  params::schur_flops + params::full_rank_flops) << std::endl;
+    std::cout << "# --------------------------------------------" << std::endl << std::endl;
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::print_flop_breakdown_HODLR() const {
+    reduce_flop_counters();
+    if (!is_root_) return;
+    float sample_flops = strumpack::params::CB_sample_flops +
+      strumpack::params::schur_flops + strumpack::params::sparse_sample_flops;
+    float compression_flops = strumpack::params::f11_fill_flops +
+      strumpack::params::f12_fill_flops + strumpack::params::f21_fill_flops +
+      strumpack::params::f22_fill_flops + sample_flops;
+    std::cout << std::endl;
+    std::cout << "# ----- FLOP BREAKDOWN ---------------------" << std::endl;
+    std::cout << "# F11_compression       = " << float(params::f11_fill_flops) << std::endl;
+    std::cout << "# F12_compression       = " << float(params::f12_fill_flops) << std::endl;
+    std::cout << "# F21_compression       = " << float(params::f21_fill_flops) << std::endl;
+    std::cout << "# F22_compression       = " << float(params::f22_fill_flops) << std::endl;
+    std::cout << "# sampling              = " << sample_flops << std::endl;
+    std::cout << "#    CB_sample          = " << float(params::CB_sample_flops) << std::endl;
+    std::cout << "#    sparse_sampling    = " << float(params::sparse_sample_flops) << std::endl;
+    std::cout << "#    Schur_sampling     = " << float(params::schur_flops) << std::endl;
+    std::cout << "#       F21             = " << float(params::f21_mult_flops) << std::endl;
+    std::cout << "#       inv(F11)        = " << float(params::invf11_mult_flops) << std::endl;
+    std::cout << "#       F12             = " << float(params::f12_mult_flops) << std::endl;
+    std::cout << "# HODLR_factor          = " << float(params::ULV_factor_flops) << std::endl;
+    std::cout << "# full_rank             = " << float(params::full_rank_flops) << std::endl;
+    std::cout << "# --------------------------------------------" << std::endl;
+    std::cout << "# total                 = "
+              << (compression_flops + strumpack::params::ULV_factor_flops +
+                  strumpack::params::full_rank_flops) << std::endl;
+    std::cout << "# --------------------------------------------" << std::endl << std::endl;
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  StrumpackSparseSolver<scalar_t,integer_t>::factor() {
+    if (!matrix()) return ReturnCode::MATRIX_NOT_SET;
+    if (factored_) return ReturnCode::SUCCESS;
+    if (!reordered_) {
+      ReturnCode ierr = reorder();
+      if (ierr != ReturnCode::SUCCESS) return ierr;
+    }
+    float dfnnz = 0.;
+    if (opts_.verbose()) {
+      dfnnz = dense_factor_nonzeros();
+      if (is_root_) {
+        std::cout << "# multifrontal factorization:" << std::endl;
+        std::cout << "#   - estimated memory usage (exact solver) = "
+                  << dfnnz * sizeof(scalar_t) / 1.e6 << " MB" << std::endl;
+      }
+    }
+    perf_counters_start();
+    flop_breakdown_reset();
+    TaskTimer t1("Sparse-factorization", [&]() {
+        tree()->multifrontal_factorization(*matrix(), opts_);
+      });
+    perf_counters_stop("numerical factorization");
+    if (opts_.verbose()) {
+      auto fnnz = factor_nonzeros();
+      auto max_rank = maximum_rank();
+      if (is_root_) {
+        std::cout << "#   - factor time = " << t1.elapsed() << std::endl;
+        std::cout << "#   - factor nonzeros = "
+                  << number_format_with_commas(fnnz) << std::endl;
+        std::cout << "#   - factor memory = "
+                  << float(fnnz) * sizeof(scalar_t) / 1.e6 << " MB" << std::endl;
+#if defined(STRUMPACK_COUNT_FLOPS)
+        std::cout << "#   - factor flops = " << double(ftot_) << " min = "
+                  << double(fmin_) << " max = " << double(fmax_)
+                  << std::endl;
+        std::cout << "#   - factor flop rate = " << ftot_ / t1.elapsed() / 1e9
+                  << " GFlop/s" << std::endl;
+#endif
+        std::cout << "#   - factor memory/nonzeros = "
+                  << float(fnnz) / dfnnz * 100.0
+                  << " % of multifrontal" << std::endl;
+        std::cout << "#   - compression = " << std::boolalpha
+                  << get_name(opts_.compression()) << std::endl;
+        if (opts_.compression() == CompressionType::HSS) {
+          std::cout << "#   - maximum HSS rank = " << max_rank << std::endl;
+          std::cout << "#   - relative compression tolerance = "
+                    << opts_.HSS_options().rel_tol() << std::endl;
+          std::cout << "#   - absolute compression tolerance = "
+                    << opts_.HSS_options().abs_tol() << std::endl;
+          std::cout << "#   - "
+                    << get_name(opts_.HSS_options().random_distribution())
+                    << " distribution with "
+                    << get_name(opts_.HSS_options().random_engine())
+                    << " engine" << std::endl;
+        }
+        if (opts_.compression() == CompressionType::BLR) {
+          std::cout << "#   - relative compression tolerance = "
+                    << opts_.BLR_options().rel_tol() << std::endl;
+          std::cout << "#   - absolute compression tolerance = "
+                    << opts_.BLR_options().abs_tol() << std::endl;
+        }
+#if defined(STRUMPACK_USE_BPACK)
+        if (opts_.compression() == CompressionType::HODLR) {
+          std::cout << "#   - maximum HODLR rank = " << max_rank << std::endl;
+          std::cout << "#   - relative compression tolerance = "
+                    << opts_.HODLR_options().rel_tol() << std::endl;
+          std::cout << "#   - absolute compression tolerance = "
+                    << opts_.HODLR_options().abs_tol() << std::endl;
+        }
+#endif
+#if defined(STRUMPACK_USE_ZFP)
+        if (opts_.compression() == CompressionType::LOSSY)
+          std::cout << "#   - lossy compression precision = "
+                    << opts_.lossy_precision() << " bitplanes" << std::endl;
+#endif
+      }
+      if (opts_.compression() == CompressionType::HSS)
+        print_flop_breakdown_HSS();
+      if (opts_.compression() == CompressionType::HODLR)
+        print_flop_breakdown_HODLR();
+    }
+    if (rank_out_) tree()->print_rank_statistics(*rank_out_);
+    factored_ = true;
+    return ReturnCode::SUCCESS;
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  StrumpackSparseSolver<scalar_t,integer_t>::solve
+  (const scalar_t* b, scalar_t* x, bool use_initial_guess) {
+    auto N = matrix()->size();
+    auto B = ConstDenseMatrixWrapperPtr(N, 1, b, N);
+    DenseMW_t X(N, 1, x, N);
+    return solve(*B, X, use_initial_guess);
+  }
+
+  // TODO make this const
+  //  Krylov its and flops, bytes, time are modified!!
+  // pass those as a pointer to a struct ??
+  // this can also call factor if not already factored!!
+  template<typename scalar_t,typename integer_t> ReturnCode
+  StrumpackSparseSolver<scalar_t,integer_t>::solve
+  (const DenseM_t& b, DenseM_t& x, bool use_initial_guess) {
+    if (!this->factored_ &&
+        opts_.Krylov_solver() != KrylovSolver::GMRES &&
+        opts_.Krylov_solver() != KrylovSolver::BICGSTAB) {
+      ReturnCode ierr = factor();
+      if (ierr != ReturnCode::SUCCESS) return ierr;
+    }
+    TaskTimer t("solve");
+    perf_counters_start();
+    t.start();
+
+    integer_t N = matrix()->size(), d = b.cols();
+    assert(N < std::numeric_limits<int>::max());
+
+    DenseM_t bloc(b.rows(), b.cols());
+
+    // TODO this fails when the reordering was not done, for instance
+    // for iterative solvers!!!
+    auto iperm = reordering()->iperm();
+    if (use_initial_guess &&
+        opts_.Krylov_solver() != KrylovSolver::DIRECT) {
+      if (opts_.matching() != MatchingJob::NONE) {
+        if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) {
+          for (integer_t j=0; j<d; j++)
+#pragma omp parallel for
+            for (integer_t i=0; i<N; i++) {
+              auto pi = iperm[matching_cperm_[i]];
+              bloc(i, j) = x(pi, j) / matching_Dc_[pi];
+            }
+        } else {
+          for (integer_t j=0; j<d; j++)
+#pragma omp parallel for
+            for (integer_t i=0; i<N; i++)
+              bloc(i, j) = x(iperm[matching_cperm_[i]], j);
+        }
+      } else {
+        for (integer_t j=0; j<d; j++)
+#pragma omp parallel for
+          for (integer_t i=0; i<N; i++)
+            bloc(i, j) = x(iperm[i], j);
+      }
+      x.copy(bloc);
+    }
+    if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) {
+      for (integer_t j=0; j<d; j++)
+#pragma omp parallel for
+        for (integer_t i=0; i<N; i++) {
+          auto pi = iperm[i];
+          bloc(i, j) = matching_Dr_[pi] * b(pi, j);
+        }
+    } else {
+      for (integer_t j=0; j<d; j++)
+#pragma omp parallel for
+        for (integer_t i=0; i<N; i++)
+          bloc(i, j) = b(iperm[i], j);
+    }
+
+    Krylov_its_ = 0;
+
+    auto spmv = [&](const scalar_t* x, scalar_t* y) {
+      matrix()->spmv(x, y);
+    };
+
+    auto gmres_solve =
+      [&](const std::function<void(scalar_t*)>& prec) {
+        iterative::GMRes<scalar_t>
+          (spmv, prec, x.rows(), x.data(), bloc.data(),
+           opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
+           opts_.gmres_restart(), opts_.GramSchmidt_type(),
+           use_initial_guess, opts_.verbose() && is_root_);
+      };
+    auto bicgstab_solve =
+      [&](const std::function<void(scalar_t*)>& prec) {
+        iterative::BiCGStab<scalar_t>
+          (spmv, prec, x.rows(), x.data(), bloc.data(),
+           opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
+           use_initial_guess, opts_.verbose() && is_root_);
+      };
+    auto MFsolve =
+      [&](scalar_t* w) {
+        DenseMW_t X(x.rows(), 1, w, x.ld());
+        tree()->multifrontal_solve(X);
+      };
+    auto refine =
+      [&]() {
+        iterative::IterativeRefinement<scalar_t,integer_t>
+          (*matrix(), [&](DenseM_t& w) { tree()->multifrontal_solve(w); },
+           x, bloc, opts_.rel_tol(), opts_.abs_tol(),
+           Krylov_its_, opts_.maxit(), use_initial_guess,
+           opts_.verbose() && is_root_);
+      };
+
+    switch (opts_.Krylov_solver()) {
+    case KrylovSolver::AUTO: {
+      if (opts_.compression() != CompressionType::NONE && x.cols() == 1)
+        gmres_solve(MFsolve);
+      else refine();
+    }; break;
+    case KrylovSolver::DIRECT: {
+      x = bloc;
+      tree()->multifrontal_solve(x);
+    }; break;
+    case KrylovSolver::REFINE: {
+      refine();
+    }; break;
+    case KrylovSolver::PREC_GMRES: {
+      assert(x.cols() == 1);
+      gmres_solve(MFsolve);
+    }; break;
+    case KrylovSolver::GMRES: {
+      assert(x.cols() == 1);
+      gmres_solve([](scalar_t* x){});
+    }; break;
+    case KrylovSolver::PREC_BICGSTAB: {
+      assert(x.cols() == 1);
+      bicgstab_solve(MFsolve);
+    }; break;
+    case KrylovSolver::BICGSTAB: {
+      assert(x.cols() == 1);
+      bicgstab_solve([](scalar_t* x){});
+    }; break;
+    }
+
+    if (opts_.matching() != MatchingJob::NONE) {
+      if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) {
+        for (integer_t j=0; j<d; j++)
+#pragma omp parallel for
+          for (integer_t i=0; i<N; i++) {
+            auto ipi = matching_cperm_[iperm[i]];
+            bloc(ipi, j) = x(i, j) * matching_Dc_[ipi];
+          }
+      } else {
+        for (integer_t j=0; j<d; j++)
+#pragma omp parallel for
+          for (integer_t i=0; i<N; i++)
+            bloc(matching_cperm_[iperm[i]], j) = x(i, j);
+      }
+    } else {
+      auto perm = reordering()->perm();
+      for (integer_t j=0; j<d; j++)
+#pragma omp parallel for
+        for (integer_t i=0; i<N; i++)
+          bloc(i, j) = x(perm[i], j);
+    }
+    x.copy(bloc);
+
+    t.stop();
+    perf_counters_stop("DIRECT/GMRES solve");
+    print_solve_stats(t);
+    return ReturnCode::SUCCESS;
+  }
+
+  // explicit template instantiations
+  template class StrumpackSparseSolver<float,int>;
+  template class StrumpackSparseSolver<double,int>;
+  template class StrumpackSparseSolver<std::complex<float>,int>;
+  template class StrumpackSparseSolver<std::complex<double>,int>;
+
+  template class StrumpackSparseSolver<float,long int>;
+  template class StrumpackSparseSolver<double,long int>;
+  template class StrumpackSparseSolver<std::complex<float>,long int>;
+  template class StrumpackSparseSolver<std::complex<double>,long int>;
+
+  template class StrumpackSparseSolver<float,long long int>;
+  template class StrumpackSparseSolver<double,long long int>;
+  template class StrumpackSparseSolver<std::complex<float>,long long int>;
+  template class StrumpackSparseSolver<std::complex<double>,long long int>;
+
+} //end namespace strumpack
