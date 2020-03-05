@@ -82,7 +82,7 @@ install:
   - wget --no-check-certificate https://gforge.inria.fr/frs/download.php/file/34618/scotch_6.0.4.tar.gz
   - tar -xf scotch_6.0.4.tar.gz
   - cd ./scotch_6.0.4
-  - export SCOTCH_DIR=`pwd`
+  - export SCOTCH_DIR=`pwd`/install
   - mkdir build
   - cd ./src
   - cp ./Make.inc/Makefile.inc.x86-64_pc_linux2 Makefile.inc
@@ -91,7 +91,8 @@ install:
   - printf "CCD = mpicc\n" >> Makefile.inc
   - cat Makefile.inc
   - make ptscotch > make_scotch.log 2>&1
-  - make prefix=../build install > make_scotch_install.log 2>&1
+  - make prefix=../install install > make_scotch_install.log 2>&1
+  - ls ../install/include
   - printf "${BLUE} GC; DONE installing Scotch-6.0 from source\n"
 
   - printf "${BLUE} GC; Installing ParMetis-4.0 from source\n"
@@ -129,9 +130,9 @@ install:
     -DCMAKE_Fortran_COMPILER=mpif90 \
     -DTPL_BLAS_LIBRARIES=$BLAS_LIB \
     -DTPL_LAPACK_LIBRARIES=$LAPACK_LIB
-  - make install -j4
-  - make examples -j4
-  - make tests -j4
+  - make VERBOSE=1
+  - make install
+  - make tests
   - printf "${BLUE} GC; Done installing STRUMPACK from source\n"
 
 script:
