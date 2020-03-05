@@ -3,7 +3,9 @@ cmake_minimum_required(VERSION 3.11 FATAL_ERROR)
 get_filename_component(STRUMPACK_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
 list(APPEND CMAKE_MODULE_PATH ${STRUMPACK_CMAKE_DIR})
 
-message(STATUS "CMAKE_MODULE_PATH = " ${CMAKE_MODULE_PATH})
+# message(STATUS "CMAKE_MODULE_PATH = " ${CMAKE_MODULE_PATH})
+
+list(APPEND CMAKE_PREFIX_PATH "@CMAKE_PREFIX_PATH@")
 
 include(CMakeFindDependencyMacro)
 
@@ -19,7 +21,7 @@ if(@STRUMPACK_USE_MPI@) # STRUMPACK_USE_MPI
   find_dependency(MPI)
 
    # there is no target for ScaLAPACK
-   # find_dependency(ScaLAPACK)
+   # find_dependency(SCALAPACK)
 endif()
 
 # don't really need to find these because they have no targets
@@ -32,7 +34,7 @@ set(metis_LIBRARY_DIR @TPL_METIS_LIBRARY_DIR@)
 set(metis_LIBRARIES @TPL_METIS_LIBRARIES@)
 find_dependency(METIS)
 
-if(@TPL_ENABLE_SCOTCH@) # TPL_ENABLE_SCOTCH
+if(@STRUMPACK_USE_SCOTCH@) # STRUMPACK_USE_SCOTCH
   set(scotch_PREFIX @TPL_SCOTCH_PREFIX@)
   set(scotch_INCLUDE_DIR @TPL_SCOTCH_INCLUDE_DIRS@)
   set(scotch_LIBRARY_DIR @TPL_SCOTCH_LIBRARY_DIR@)
@@ -40,7 +42,7 @@ if(@TPL_ENABLE_SCOTCH@) # TPL_ENABLE_SCOTCH
   find_dependency(SCOTCH)
 endif()
 
-if(@TPL_ENABLE_PTSCOTCH@) # TPL_ENABLE_PTSCOTCH
+if(@STRUMPACK_USE_PTSCOTCH@) # STRUMPACK_USE_PTSCOTCH
   set(ptscotch_PREFIX @TPL_PTSCOTCH_PREFIX@)
   set(ptscotch_INCLUDE_DIR @TPL_PTSCOTCH_INCLUDE_DIRS@)
   set(ptscotch_LIBRARY_DIR @TPL_PTSCOTCH_LIBRARY_DIR@)
@@ -48,7 +50,7 @@ if(@TPL_ENABLE_PTSCOTCH@) # TPL_ENABLE_PTSCOTCH
   find_dependency(PTSCOTCH)
 endif()
 
-if(@TPL_ENABLE_PARMETIS@) # TPL_ENABLE_PARMETIS
+if(@STRUMPACK_USE_PARMETIS@) # STRUMPACK_USE_PARMETIS
   set(parmetis_PREFIX @TPL_PARMETIS_PREFIX@)
   set(parmetis_INCLUDE_DIR @TPL_PARMETIS_INCLUDE_DIRS@)
   set(parmetis_LIBRARY_DIR @TPL_PARMETIS_LIBRARY_DIR@)
@@ -56,12 +58,16 @@ if(@TPL_ENABLE_PARMETIS@) # TPL_ENABLE_PARMETIS
   find_dependency(ParMETIS)
 endif()
 
-if(@TPL_ENABLE_ZFP@) # TPL_ENABLE_ZFP
+if(@STRUMPACK_USE_ZFP@) # STRUMPACK_USE_ZFP
   set(zfp_PREFIX @TPL_ZFP_PREFIX@)
   set(zfp_INCLUDE_DIR @TPL_ZFP_INCLUDE_DIRS@)
   set(zfp_LIBRARY_DIR @TPL_ZFP_LIBRARY_DIR@)
   set(zfp_LIBRARIES @TPL_ZFP_LIBRARIES@)
   find_dependency(ZFP)
+endif()
+
+if(@STRUMPACK_USE_BPACK@) # STRUMPACK_USE_BPACK
+  find_dependency(ButterflyPACK)
 endif()
 
 

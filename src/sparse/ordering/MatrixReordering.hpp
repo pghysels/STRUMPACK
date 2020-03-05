@@ -35,7 +35,6 @@
 #include "StrumpackOptions.hpp"
 #include "StrumpackConfig.hpp"
 #include "HSS/HSSPartitionTree.hpp"
-#include "sparse/SeparatorTree.hpp"
 #if defined(STRUMPACK_USE_MPI)
 #include "misc/MPIWrapper.hpp"
 #endif
@@ -44,6 +43,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> class CSRMatrix;
   template<typename scalar_t,typename integer_t> class FrontalMatrix;
+  template<typename integer_t> class SeparatorTree;
 
   template<typename scalar_t,typename integer_t> class MatrixReordering {
     using Opts_t = SPOptions<scalar_t>;
@@ -53,7 +53,7 @@ namespace strumpack {
   public:
     MatrixReordering(integer_t  n);
 
-    virtual ~MatrixReordering() {}
+    virtual ~MatrixReordering();
 
     int nested_dissection
     (const Opts_t& opts, const CSR_t& A,

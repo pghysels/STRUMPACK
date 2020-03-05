@@ -373,9 +373,8 @@ target_compile_features(strumpack INTERFACE cxx_std_11)
 set_target_properties(strumpack PROPERTIES CXX_EXTENSIONS OFF)
 
 if(STRUMPACK_USE_MPI)
-  target_link_libraries(strumpack PUBLIC MPI::MPI_CXX)
-  target_link_libraries(strumpack PUBLIC MPI::MPI_Fortran)
-  # target_link_libraries(strumpack PRIVATE MPI::MPI_C)
+  target_link_libraries(strumpack PUBLIC
+    MPI::MPI_CXX MPI::MPI_C MPI::MPI_Fortran)
 endif()
 
 if(OpenMP_FOUND)
@@ -431,7 +430,12 @@ endif()
 
 if(ButterflyPACK_FOUND)
   target_link_libraries(strumpack PUBLIC
-    ButterflyPACK::dbutterflypack ButterflyPACK::zbutterflypack)
+    ButterflyPACK::dbutterflypack
+    ButterflyPACK::zbutterflypack
+    MPI::MPI_Fortran ${MPI_Fortran_LIBRARIES})
+  ## for some reason just adding the MPI::MPI_Fortran target only
+  ## links with the f08 module, not with the regular fortran MPI
+  ## library
 endif()
 
 if(TPL_ENABLE_SLATE)

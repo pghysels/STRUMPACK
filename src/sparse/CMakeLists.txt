@@ -5,8 +5,10 @@ target_sources(strumpack
   ${CMAKE_CURRENT_LIST_DIR}/CSRGraph.hpp
   ${CMAKE_CURRENT_LIST_DIR}/CSRMatrix.hpp
   ${CMAKE_CURRENT_LIST_DIR}/EliminationTree.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/EliminationTree.cpp
   ${CMAKE_CURRENT_LIST_DIR}/ETree.hpp
-  ${CMAKE_CURRENT_LIST_DIR}/SeparatorTree.hpp)
+  ${CMAKE_CURRENT_LIST_DIR}/SeparatorTree.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/SeparatorTree.cpp)
 
 install(FILES
   CompressedSparseMatrix.hpp
@@ -24,9 +26,12 @@ if(STRUMPACK_USE_MPI)
     ${CMAKE_CURRENT_LIST_DIR}/CSRMatrixMPI.hpp
     ${CMAKE_CURRENT_LIST_DIR}/ETree.hpp
     ${CMAKE_CURRENT_LIST_DIR}/EliminationTreeMPI.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/EliminationTreeMPI.cpp
     ${CMAKE_CURRENT_LIST_DIR}/EliminationTreeMPIDist.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/EliminationTreeMPIDist.cpp
     ${CMAKE_CURRENT_LIST_DIR}/mumps_symqamd.hpp
     ${CMAKE_CURRENT_LIST_DIR}/PropMapSparseMatrix.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/PropMapSparseMatrix.cpp
     ${CMAKE_CURRENT_LIST_DIR}/Redistribute.hpp)
 
   install(FILES

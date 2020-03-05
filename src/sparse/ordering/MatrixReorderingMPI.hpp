@@ -32,6 +32,7 @@
 #include <algorithm>
 #include "MatrixReordering.hpp"
 #include "sparse/CSRMatrixMPI.hpp"
+#include "dense/DistributedMatrix.hpp"
 
 namespace strumpack {
 
@@ -83,7 +84,7 @@ namespace strumpack {
 
   public:
     MatrixReorderingMPI(integer_t n, const MPIComm& c);
-    virtual ~MatrixReorderingMPI() = default;
+    virtual ~MatrixReorderingMPI();
 
     int nested_dissection
     (const Opts_t& opts, const CSRMPI_t& A,

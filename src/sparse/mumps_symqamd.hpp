@@ -32,6 +32,8 @@
 #include "StrumpackFortranCInterface.h"
 #include "CompressedSparseMatrix.hpp"
 #include "StrumpackOptions.hpp"
+#include "ETree.hpp"
+#include "SeparatorTree.hpp"
 
 #define MUMPS_SYMQAMD_FC STRUMPACK_FC_GLOBAL_(mumps_symqamd, MUMPS_SYMQAMD)
 

@@ -33,6 +33,7 @@
 #include "MatrixReorderingMPI.hpp"
 #include "StrumpackConfig.hpp"
 #include "sparse/CSRGraph.hpp"
+#include "sparse/SeparatorTree.hpp"
 #include "sparse/fronts/FrontalMatrix.hpp"
 #if defined(STRUMPACK_USE_SCOTCH)
 #include "ScotchReordering.hpp"
@@ -55,6 +56,9 @@ namespace strumpack {
     : MatrixReordering<scalar_t,integer_t>(n), dsep_internal(0),
     dsep_leaf(0), comm_(&c) {
   }
+
+  template<typename scalar_t,typename integer_t>
+  MatrixReorderingMPI<scalar_t,integer_t>::~MatrixReorderingMPI() = default;
 
   template<typename scalar_t,typename integer_t> int
   MatrixReorderingMPI<scalar_t,integer_t>::nested_dissection
@@ -106,7 +110,7 @@ namespace strumpack {
       if (rank)
         global_sep_tree = std::unique_ptr<SeparatorTree<integer_t>>
           (new SeparatorTree<integer_t>(nbsep));
-      global_sep_tree->broadcast(comm_->comm());
+      global_sep_tree->broadcast(*comm_);
       local_tree_ = global_sep_tree->subtree(rank, P);
       sep_tree_ = global_sep_tree->toptree(P);
       local_tree_->check();
@@ -195,7 +199,7 @@ namespace strumpack {
     if (rank)
       global_sep_tree = std::unique_ptr<SeparatorTree<integer_t>>
         (new SeparatorTree<integer_t>(nbsep));
-    global_sep_tree->broadcast(comm_->comm());
+    global_sep_tree->broadcast(*comm_);
     local_tree_ = global_sep_tree->subtree(rank, P);
     sep_tree_ = global_sep_tree->toptree(P);
     for (std::size_t i=0; i<perm_.size(); i++) iperm_[perm_[i]] = i;

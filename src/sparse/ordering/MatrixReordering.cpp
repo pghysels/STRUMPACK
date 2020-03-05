@@ -56,13 +56,15 @@
 #include "RCMReordering.hpp"
 #include "GeometricReordering.hpp"
 
-
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   MatrixReordering<scalar_t,integer_t>::MatrixReordering(integer_t n)
     : perm_(n), iperm_(n) {
   }
+
+  template<typename scalar_t,typename integer_t>
+  MatrixReordering<scalar_t,integer_t>::~MatrixReordering() = default;
 
   template<typename scalar_t,typename integer_t> int
   MatrixReordering<scalar_t,integer_t>::nested_dissection
@@ -166,7 +168,7 @@ namespace strumpack {
       if (comm.is_root())
         sep_tree_ = std::unique_ptr<SeparatorTree<integer_t>>
           (new SeparatorTree<integer_t>(nbsep));
-      sep_tree_->broadcast(comm.comm());
+      sep_tree_->broadcast(comm);
     } else {
       if (opts.reordering_method() == ReorderingStrategy::GEOMETRIC) {
         sep_tree_ = geometric_nested_dissection

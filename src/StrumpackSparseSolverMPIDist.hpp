@@ -35,6 +35,7 @@
 #include "StrumpackSparseSolverMPI.hpp"
 #include "sparse/EliminationTreeMPIDist.hpp"
 #include "sparse/iterative/IterativeSolversMPI.hpp"
+#include "sparse/Redistribute.hpp"
 
 namespace strumpack {
 

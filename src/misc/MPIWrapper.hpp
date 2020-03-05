@@ -278,12 +278,16 @@ namespace strumpack {
       MPI_Bcast(sbuf.data(), sbuf.size(), mpi_type<T>(), src, comm_);
     }
     template<typename T> void
-    broadcast(T& data, int src=0) const {
-      MPI_Bcast(&data, 1, mpi_type<T>(), src, comm_);
+    broadcast(T& data) const {
+      MPI_Bcast(&data, 1, mpi_type<T>(), 0, comm_);
     }
+    // template<typename T> void
+    // broadcast_from(T& data, int src) const {
+    //   MPI_Bcast(&data, 1, mpi_type<T>(), src, comm_);
+    // }
     template<typename T> void
-    broadcast(T* sbuf, std::size_t ssize, int src=0) const {
-      MPI_Bcast(sbuf, ssize, mpi_type<T>(), src, comm_);
+    broadcast(T* sbuf, std::size_t ssize) const {
+      MPI_Bcast(sbuf, ssize, mpi_type<T>(), 0, comm_);
     }
 
     /**
