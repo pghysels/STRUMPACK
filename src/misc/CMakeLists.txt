@@ -1,9 +1,9 @@
 target_sources(strumpack
   PRIVATE
-  TaskTimer.cpp
-  TaskTimer.hpp
-  RandomWrapper.hpp
-  Tools.hpp)
+  ${CMAKE_CURRENT_LIST_DIR}/TaskTimer.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/TaskTimer.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/RandomWrapper.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/Tools.hpp)
 
 install(FILES
   TaskTimer.hpp
@@ -15,7 +15,7 @@ install(FILES
 if(STRUMPACK_USE_MPI)
   target_sources(strumpack
     PRIVATE
-    MPIWrapper.hpp)
+    ${CMAKE_CURRENT_LIST_DIR}/MPIWrapper.hpp)
 
   install(FILES
     MPIWrapper.hpp

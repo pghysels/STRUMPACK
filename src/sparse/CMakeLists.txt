@@ -1,12 +1,12 @@
 target_sources(strumpack
   PRIVATE
-  strumpack_mc64ad.c
-  CompressedSparseMatrix.hpp
-  CSRGraph.hpp
-  CSRMatrix.hpp
-  EliminationTree.hpp
-  ETree.hpp
-  SeparatorTree.hpp)
+  ${CMAKE_CURRENT_LIST_DIR}/strumpack_mc64ad.c
+  ${CMAKE_CURRENT_LIST_DIR}/CompressedSparseMatrix.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/CSRGraph.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/CSRMatrix.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/EliminationTree.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/ETree.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/SeparatorTree.hpp)
 
 install(FILES
   CompressedSparseMatrix.hpp
@@ -21,13 +21,13 @@ install(FILES
 if(STRUMPACK_USE_MPI)
   target_sources(strumpack
     PRIVATE
-    CSRMatrixMPI.hpp
-    ETree.hpp
-    EliminationTreeMPI.hpp
-    EliminationTreeMPIDist.hpp
-    mumps_symqamd.hpp
-    PropMapSparseMatrix.hpp
-    Redistribute.hpp)
+    ${CMAKE_CURRENT_LIST_DIR}/CSRMatrixMPI.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/ETree.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/EliminationTreeMPI.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/EliminationTreeMPIDist.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/mumps_symqamd.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/PropMapSparseMatrix.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/Redistribute.hpp)
 
   install(FILES
     CSRMatrixMPI.hpp

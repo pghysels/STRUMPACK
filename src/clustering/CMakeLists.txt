@@ -1,11 +1,11 @@
 target_sources(strumpack
   PRIVATE
-  PCAPartitioning.cpp
-  CobblePartitioning.cpp
-  KMeans.cpp
-  KDTree.cpp
-  Clustering.hpp
-  NeighborSearch.hpp)
+  ${CMAKE_CURRENT_LIST_DIR}/PCAPartitioning.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/CobblePartitioning.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/KMeans.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/KDTree.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/Clustering.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/NeighborSearch.hpp)
 
 install(FILES
   Clustering.hpp

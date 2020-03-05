@@ -1,9 +1,9 @@
 target_sources(strumpack
   PRIVATE
-  StrumpackParameters.cpp #PUBLIC
-  StrumpackOptions.hpp
-  StrumpackParameters.hpp
-  StrumpackSparseSolver.hpp)
+  ${CMAKE_CURRENT_LIST_DIR}/StrumpackParameters.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/StrumpackOptions.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/StrumpackParameters.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolver.hpp)
 
 install(FILES
   StrumpackOptions.hpp
@@ -15,8 +15,8 @@ install(FILES
 if(STRUMPACK_USE_MPI)
   target_sources(strumpack
     PRIVATE
-    StrumpackSparseSolverMPIDist.hpp
-    StrumpackSparseSolverMPI.hpp)
+    ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverMPIDist.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverMPI.hpp)
 
   install(FILES
     StrumpackSparseSolverMPIDist.hpp
@@ -27,8 +27,8 @@ endif()
 if(STRUMPACK_C_INTERFACE)
   target_sources(strumpack
     PRIVATE
-    StrumpackSparseSolver.cpp
-    StrumpackSparseSolver.h)
+    ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolver.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolver.h)
 endif()
 
 

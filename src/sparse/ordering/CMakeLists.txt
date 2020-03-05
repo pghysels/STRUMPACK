@@ -1,12 +1,12 @@
 target_sources(strumpack
   PRIVATE
-  GeometricReordering.cpp
-  GeometricReordering.hpp
-  MatrixReordering.cpp
-  RCMReordering.hpp
-  ScotchReordering.hpp
-  MatrixReordering.hpp
-  MetisReordering.hpp)
+  ${CMAKE_CURRENT_LIST_DIR}/GeometricReordering.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/GeometricReordering.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/MatrixReordering.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/RCMReordering.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/ScotchReordering.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/MatrixReordering.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/MetisReordering.hpp)
 
 install(FILES
   MatrixReordering.hpp
@@ -16,12 +16,12 @@ install(FILES
 if(STRUMPACK_USE_MPI)
   target_sources(strumpack
     PRIVATE
-    GeometricReorderingMPI.cpp
-    GeometricReorderingMPI.hpp
-    ParMetisReordering.hpp
-    PTScotchReordering.hpp
-    MatrixReorderingMPI.cpp
-    MatrixReorderingMPI.hpp)
+    ${CMAKE_CURRENT_LIST_DIR}/GeometricReorderingMPI.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/GeometricReorderingMPI.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/ParMetisReordering.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/PTScotchReordering.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/MatrixReorderingMPI.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/MatrixReorderingMPI.hpp)
 
   install(FILES
     MatrixReorderingMPI.hpp

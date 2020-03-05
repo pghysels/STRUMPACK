@@ -93,6 +93,7 @@ if [[ $(hostname -s) = "pieterg-X8DA3" ]]; then
     export ParMETIS_DIR=$HOME/local/parmetis-4.0.3/install
     export ZFP_DIR=$HOME/local/zfp-0.5.5/install
     export ButterflyPACK_DIR=$HOME/LBL/STRUMPACK/ButterflyPACK/install/
+    export SCALAPACK_DIR=$HOME/local/scalapack-2.1.0/install
 
     cmake ../ \
           -DCMAKE_BUILD_TYPE=Debug \

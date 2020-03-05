@@ -1,13 +1,13 @@
 target_sources(strumpack
   PRIVATE
-  BLASLAPACKWrapper.cpp
-  BLASLAPACKOpenMPTask.cpp
-  DistributedMatrix.hpp
-  ACA.hpp
-  BACA.hpp
-  DenseMatrix.hpp
-  BLASLAPACKOpenMPTask.hpp
-  BLASLAPACKWrapper.hpp)
+  ${CMAKE_CURRENT_LIST_DIR}/BLASLAPACKWrapper.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/BLASLAPACKOpenMPTask.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/DistributedMatrix.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/ACA.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/BACA.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/DenseMatrix.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/BLASLAPACKOpenMPTask.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/BLASLAPACKWrapper.hpp)
 
 install(FILES
   DistributedMatrix.hpp
@@ -22,11 +22,11 @@ install(FILES
 if(STRUMPACK_USE_MPI)
   target_sources(strumpack
     PRIVATE
-    ScaLAPACKWrapper.cpp
-    BLACSGrid.hpp
-    DistributedVector.hpp
-    DistributedMatrix.hpp
-    ScaLAPACKWrapper.hpp)
+    ${CMAKE_CURRENT_LIST_DIR}/ScaLAPACKWrapper.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/BLACSGrid.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/DistributedVector.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/DistributedMatrix.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/ScaLAPACKWrapper.hpp)
 
   install(FILES
     BLACSGrid.hpp
@@ -40,7 +40,7 @@ endif()
 if(TPL_ENABLE_CUBLAS)
   target_sources(strumpack
     PRIVATE
-    CUDAWrapper.hpp)
+    ${CMAKE_CURRENT_LIST_DIR}/CUDAWrapper.hpp)
 
   install(FILES
     CUDAWrapper.hpp
