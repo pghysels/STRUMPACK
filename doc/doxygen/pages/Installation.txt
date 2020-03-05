@@ -90,7 +90,11 @@ only if found.
   are typically included with the ScaLAPACK installation (from
   ScaLAPACK 2.0.2, the blacs library is included in the ScaLAPACK
   library file). If CMake cannot locate these libraries, you can
-  specify their path by setting the environment variable $SCALAPACKDIR
+  specify their path by setting the environment variable $SCALAPACK_DIR
+\code {.bash}
+ > export SCALAPACK_DIR=/some/path/
+ > cmake ../
+\endcode
   or by specifying the libraries manually:
 \code {.bash}
  > cmake ../ -DTPL_SCALAPACK_LIBRARIES="..."

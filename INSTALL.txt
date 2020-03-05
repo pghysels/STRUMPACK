@@ -22,8 +22,7 @@ following steps:
     -DCMAKE_INSTALL_PREFIX=../install \
     -DCMAKE_CXX_COMPILER=<C++ (MPI) compiler> \        # optional, should be detected
     -DCMAKE_C_COMPILER=<C (MPI) compiler> \
-    -DCMAKE_Fortran_COMPILER=<Fortran77 (MPI) compiler> \
-    -DTPL_SCALAPACK_LIBRARIES="/path/to/scalapack/libscalapack.a;/path/to/blacs/libblacs.a"
+    -DCMAKE_Fortran_COMPILER=<Fortran77 (MPI) compiler>
 > make -j4
 > make install
 > # optional
@@ -74,20 +73,19 @@ follows:
 > cmake ../ \
    -DCMAKE_EXE_LINKER_FLAGS="-L/usr/lib64/mpich/lib/ -lscalapack -lmpiblacs"
 
-or by setting the following environment variables for SCALAPACK:
-> export SCALAPACKDIR=/path/to/scalapack/
-> export BLACSDIR=/path/to/blacs
+or by setting the following environment variable for SCALAPACK:
+> export SCALAPACK_DIR=/path/to/scalapack/
 
 In order to get good performance, one should install an optimized or
 vendor supplied BLAS implementation. Examples are Intel MKL, Cray
-LibSci, AMD ACML, OpenBLAS or ATLAS.
+LibSci, AMD ACML, OpenBLAS, IBM ESSL or ATLAS.
 
 On Cray systems, the compiler wrappers usually take care of linking
 BLAS/LAPACK and ScaLAPACK. In that case, nothing needs to be set
 manually. If CMake still find the wrong libraries, you can set:
--DTPL_BLAS_LIBRARIES="" \
--DTPL_LAPACK_LIBRARIES="" \
--DTPL_SCALAPACK_LIBRARIES="" \
+  -DTPL_BLAS_LIBRARIES="" \
+  -DTPL_LAPACK_LIBRARIES="" \
+  -DTPL_SCALAPACK_LIBRARIES="" \
 in order to avoid CMake from looking for the libraries.
 
 When using Intel MKL we recommend using the the link advisor:
