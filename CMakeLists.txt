@@ -246,6 +246,9 @@ if(STRUMPACK_USE_MPI)
           "Could not find a SCALAPACK library.\n"
           " You can specify a SCALAPACK library using -DTPL_SCALAPACK_LIBRARIES=\"...\"")
       endif()
+    else()
+      set(SCALAPACK_LIBRARIES scalapack)
+      message(STATUS "Found SCALAPACK " ${SCALAPACK_LIBRARIES})
     endif()
   endif()
 endif()
@@ -371,6 +374,7 @@ set_target_properties(strumpack PROPERTIES CXX_EXTENSIONS OFF)
 
 if(STRUMPACK_USE_MPI)
   target_link_libraries(strumpack PUBLIC MPI::MPI_CXX)
+  target_link_libraries(strumpack PUBLIC MPI::MPI_Fortran)
   # target_link_libraries(strumpack PRIVATE MPI::MPI_C)
 endif()
 
@@ -427,9 +431,7 @@ endif()
 
 if(ButterflyPACK_FOUND)
   target_link_libraries(strumpack PUBLIC
-    ButterflyPACK::dbutterflypack
-    ButterflyPACK::zbutterflypack
-    MPI::MPI_Fortran)
+    ButterflyPACK::dbutterflypack ButterflyPACK::zbutterflypack)
 endif()
 
 if(TPL_ENABLE_SLATE)

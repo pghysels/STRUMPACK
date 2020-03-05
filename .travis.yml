@@ -92,7 +92,6 @@ install:
   - cat Makefile.inc
   - make ptscotch > make_scotch.log 2>&1
   - make prefix=../install install > make_scotch_install.log 2>&1
-  - ls ../install/include
   - printf "${BLUE} GC; DONE installing Scotch-6.0 from source\n"
 
   - printf "${BLUE} GC; Installing ParMetis-4.0 from source\n"
@@ -130,7 +129,7 @@ install:
     -DCMAKE_Fortran_COMPILER=mpif90 \
     -DTPL_BLAS_LIBRARIES=$BLAS_LIB \
     -DTPL_LAPACK_LIBRARIES=$LAPACK_LIB
-  - make VERBOSE=1
+  - make
   - make install
   - make tests
   - printf "${BLUE} GC; Done installing STRUMPACK from source\n"
