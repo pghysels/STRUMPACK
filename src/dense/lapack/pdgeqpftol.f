@@ -1,10 +1,10 @@
       SUBROUTINE PDGEQPFTOL( M, N, A, IA, JA, DESCA, IPIV, TAU, WORK,
      $                    LWORK, INFO, JPERM, JPIV, RANK, RTOL, ATOL )
 *
-*  -- ScaLAPACK routine (version 1.7) --
+*  -- ScaLAPACK routine (version 2.1) --
 *     University of Tennessee, Knoxville, Oak Ridge National Laboratory,
 *     and University of California, Berkeley.
-*     March 14, 2000
+*     November 20, 2019
 *
 *  -- Modified by F-H Rouet, Lawrence Berkeley National Lab, August 2014
 *
@@ -173,6 +173,15 @@
 *     jpvt(j) = i
 *  then the jth column of P is the ith canonical unit vector.
 *
+*  References
+*  ==========
+*  
+*  For modifications introduced in Scalapack 2.1
+*  LAWN 295 
+*  New robust ScaLAPACK routine for computing the QR factorization with column pivoting
+*  Zvonimir Bujanovic, Zlatko Drmac
+*  http://www.netlib.org/lapack/lawnspdf/lawn295.pdf
+*
 *  =====================================================================
 *
 *     .. Parameters ..
@@ -191,7 +200,7 @@
      $                   IROFF, ITEMP, J, JB, JJ, JJA, JJPVT, JN, KB,
      $                   K, KK, KSTART, KSTEP, LDA, LL, LWMIN, MN, MP,
      $                   MYCOL, MYROW, NPCOL, NPROW, NQ, NQ0, PVT
-      DOUBLE PRECISION   AJJ, ALPHA, TEMP, TEMP2, A11
+      DOUBLE PRECISION   AJJ, ALPHA, TEMP, TEMP2, TOL3Z, A11
 *     ..
 *     .. Local Arrays ..
       INTEGER            DESCN( DLEN_ ), IDUM1( 1 ), IDUM2( 1 )
@@ -207,6 +216,8 @@
 *     .. External Functions ..
       INTEGER            ICEIL, INDXG2P, NUMROC
       EXTERNAL           ICEIL, INDXG2P, NUMROC
+      DOUBLE PRECISION   DLAMCH
+      EXTERNAL           DLAMCH
 *     ..
 *     .. Intrinsic Functions ..
       INTRINSIC          ABS, DBLE, IDINT, MAX, MIN, MOD, SQRT
@@ -272,6 +283,7 @@
       IF( MYCOL.EQ.IACOL )
      $   NQ = NQ - ICOFF
       MN = MIN( M, N )
+      TOL3Z = SQRT( DLAMCH('Epsilon') )
 *
 *     Initialize the array of pivots
 *
@@ -499,12 +511,10 @@
          IF( MYCOL.EQ.ICURCOL ) THEN
             DO 90 LL = JJ-1, JJ + JN - J - 2
                IF( WORK( IPN+LL ).NE.ZERO ) THEN
-                  TEMP = ONE-( ABS( WORK( IPW+LL ) ) /
-     $                         WORK( IPN+LL ) )**2
-                  TEMP = MAX( TEMP, ZERO )
-                  TEMP2 = ONE + 0.05D+0*TEMP*
-     $                    ( WORK( IPN+LL ) / WORK( IPN+NQ+LL ) )**2
-                  IF( TEMP2.EQ.ONE ) THEN
+                  TEMP = ABS( WORK( IPW+LL ) ) / WORK( IPN+LL )
+                  TEMP = MAX( ZERO, ( ONE+TEMP )*( ONE-TEMP ) )
+                  TEMP2 = TEMP*( WORK( IPN+LL ) / WORK( IPN+NQ+LL ) )**2
+                  IF( TEMP2.LE.TOL3Z ) THEN
                      IF( IA+M-1.GT.I ) THEN
                         CALL PDNRM2( IA+M-I-1, WORK( IPN+LL ), A, I+1,
      $                               J+LL-JJ+2, DESCA, 1 )
@@ -528,12 +538,11 @@
             IF( MYCOL.EQ.ICURCOL ) THEN
                DO 100 LL = JJ-1, JJ+KB-2
                   IF( WORK( IPN+LL ).NE.ZERO ) THEN
-                     TEMP = ONE-( ABS( WORK( IPW+LL ) ) /
-     $                            WORK( IPN+LL ) )**2
-                     TEMP = MAX( TEMP, ZERO )
-                     TEMP2 = ONE + 0.05D+0*TEMP*
-     $                     ( WORK( IPN+LL ) / WORK( IPN+NQ+LL ) )**2
-                     IF( TEMP2.EQ.ONE ) THEN
+                     TEMP = ABS( WORK( IPW+LL ) ) / WORK( IPN+LL )
+                     TEMP = MAX( ZERO, ( ONE+TEMP )*( ONE-TEMP ) )
+                     TEMP2 = TEMP*
+     $                         ( WORK( IPN+LL ) / WORK( IPN+NQ+LL ) )**2
+                     IF( TEMP2.LE.TOL3Z ) THEN
                         IF( IA+M-1.GT.I ) THEN
                            CALL PDNRM2( IA+M-I-1, WORK( IPN+LL ), A,
      $                                  I+1, K+LL-JJ+1, DESCA, 1 )

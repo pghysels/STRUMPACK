@@ -2,10 +2,10 @@
      $                    LWORK, RWORK, LRWORK, INFO, JPERM, JPIV, RANK,
      $                    RTOL, ATOL )
 *
-*  -- ScaLAPACK routine (version 1.7) --
+*  -- ScaLAPACK routine (version 2.1) --
 *     University of Tennessee, Knoxville, Oak Ridge National Laboratory,
 *     and University of California, Berkeley.
-*     March 14, 2000
+*     November 20, 2019
 *
 *  -- Modified by F-H Rouet, Lawrence Berkeley National Lab, August 2014
 *
@@ -191,6 +191,15 @@
 *     jpvt(j) = i
 *  then the jth column of P is the ith canonical unit vector.
 *
+*  References
+*  ==========
+*  
+*  For modifications introduced in Scalapack 2.1
+*  LAWN 295 
+*  New robust ScaLAPACK routine for computing the QR factorization with column pivoting
+*  Zvonimir Bujanovic, Zlatko Drmac
+*  http://www.netlib.org/lapack/lawnspdf/lawn295.pdf
+*
 *  =====================================================================
 *
 *     .. Parameters ..
@@ -209,7 +218,7 @@
      $                   J, JB, JJ, JJA, JJPVT, JN, KB, K, KK, KSTART,
      $                   KSTEP, LDA, LL, LRWMIN, LWMIN, MN, MP, MYCOL,
      $                   MYROW, NPCOL, NPROW, NQ, NQ0, PVT
-      DOUBLE PRECISION   TEMP, TEMP2, A11
+      DOUBLE PRECISION   TEMP, TEMP2, TOL3Z, A11
       COMPLEX*16         AJJ, ALPHA
 *     ..
 *     .. Local Arrays ..
@@ -226,6 +235,8 @@
 *     .. External Functions ..
       INTEGER            ICEIL, INDXG2P, NUMROC
       EXTERNAL           ICEIL, INDXG2P, NUMROC
+      DOUBLE PRECISION   DLAMCH
+      EXTERNAL           DLAMCH
 *     ..
 *     .. Intrinsic Functions ..
       INTRINSIC          ABS, DCMPLX, DCONJG, IDINT, MAX, MIN, MOD, SQRT
@@ -302,6 +313,7 @@
       IF( MYCOL.EQ.IACOL )
      $   NQ = NQ - ICOFF
       MN = MIN( M, N )
+      TOL3Z = SQRT( DLAMCH('Epsilon') )
 *
 *     Initialize the array of pivots
 *
@@ -462,7 +474,7 @@
                   AJJ = A( IOFFA )
                   CALL ZLARFG( 1, AJJ, A( IOFFA ), 1, TAU( JJ ) )
                   IF( N.GT.1 ) THEN
-                     ALPHA = DCMPLX( ONE ) - DCONJG( TAU( JJ ) )
+                     ALPHA = CMPLX( ONE ) - DCONJG( TAU( JJ ) )
                      CALL ZGEBS2D( ICTXT, 'Rowwise', ' ', 1, 1, ALPHA,
      $                                  1 )
                      CALL ZSCAL( NQ-JJ, ALPHA, A( IOFFA+DESCA( LLD_ ) ),
@@ -525,14 +537,13 @@
          IF( MYCOL.EQ.ICURCOL ) THEN
             DO 90 LL = JJ, JJ + JN - J - 1
                IF( RWORK( LL ).NE.ZERO ) THEN
-                  TEMP = ONE-( ABS( WORK( LL ) ) / RWORK( LL ) )**2
-                  TEMP = MAX( TEMP, ZERO )
-                  TEMP2 = ONE + 0.05D+0*TEMP*
-     $                    ( RWORK( LL ) / RWORK( NQ+LL ) )**2
-                  IF( TEMP2.EQ.ONE ) THEN
+                  TEMP = ABS( WORK( LL ) ) / RWORK( LL )
+                  TEMP = MAX( ZERO, ( ONE+TEMP )*( ONE-TEMP ) )
+                  TEMP2 = TEMP * ( RWORK( LL ) / RWORK( NQ+LL ) )**2
+                  IF( TEMP2.LE.TOL3Z ) THEN
                      IF( IA+M-1.GT.I ) THEN
                         CALL PDZNRM2( IA+M-I-1, RWORK( LL ), A,
-     $                                I+1, J+LL-JJ, DESCA, 1 )
+     $                                I+1, J+LL-JJ+1, DESCA, 1 )
                         RWORK( NQ+LL ) = RWORK( LL )
                      ELSE
                         RWORK( LL ) = ZERO
@@ -553,11 +564,10 @@
             IF( MYCOL.EQ.ICURCOL ) THEN
                DO 100 LL = JJ, JJ+KB-1
                   IF( RWORK(LL).NE.ZERO ) THEN
-                     TEMP = ONE-( ABS( WORK( LL ) ) / RWORK( LL ) )**2
-                     TEMP = MAX( TEMP, ZERO )
-                     TEMP2 = ONE + 0.05D+0*TEMP*
-     $                       ( RWORK( LL ) / RWORK( NQ+LL ) )**2
-                     IF( TEMP2.EQ.ONE ) THEN
+                     TEMP = ABS( WORK( LL ) ) / RWORK( LL )
+                     TEMP = MAX( ZERO, ( ONE+TEMP )*( ONE-TEMP ) )
+                     TEMP2 = TEMP * ( RWORK( LL ) / RWORK( NQ+LL ) )**2
+                     IF( TEMP2.LE.TOL3Z ) THEN
                         IF( IA+M-1.GT.I ) THEN
                            CALL PDZNRM2( IA+M-I-1, RWORK( LL ), A,
      $                                   I+1, K+LL-JJ, DESCA, 1 )
