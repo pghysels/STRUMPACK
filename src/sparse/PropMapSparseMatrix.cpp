@@ -26,18 +26,16 @@
  *             Division).
  *
  */
-#include <cstddef>
+#include <algorithm>
+#include <cmath>
+#include <tuple>
 
+#include "PropMapSparseMatrix.hpp"
 #include "dense/DistributedMatrix.hpp"
 #include "ordering/MatrixReorderingMPI.hpp"
 #include "CSRMatrixMPI.hpp"
-#include "CSRGraph.hpp"
 #include "EliminationTreeMPIDist.hpp"
 
-// #if 0 // TODO check for compiler support, use C++17?
-//       // std::experimental::parallel?
-// #include <parallel/algorithm>
-// #endif
 
 namespace strumpack {
 
@@ -53,92 +51,83 @@ namespace strumpack {
    bool duplicate_fronts) {
     n_ = Ampi.size();
     nnz_ = Ampi.nnz();
-    auto comm = Ampi.comm();
-    auto P = mpi_nprocs(comm);
+    const auto& comm = et.Comm();
+    auto P = comm.size();
     auto eps = blas::lamch<real_t>('E');
 
-    auto dest = new std::tuple<int,int,int>[Ampi.local_nnz()];
-    auto scnts = new int[4*P];
-    auto rcnts = scnts + P;
-    auto sdisp = scnts + 2*P;
-    auto rdisp = scnts + 3*P;
-    std::fill(scnts, scnts+P, 0);
+    struct Triplet {
+      integer_t r, c;
+      scalar_t a;
+    };
+    MPI_Datatype Triplet_mpi_t;
+    int blocklengths[3] = {1, 1, 1};
+    MPI_Datatype types[3] = {mpi_type<integer_t>(),
+                             mpi_type<integer_t>(),
+                             mpi_type<scalar_t>()};
+    MPI_Aint offsets[3] = {offsetof(Triplet, r),
+                           offsetof(Triplet, c),
+                           offsetof(Triplet, a)};
+    MPI_Type_create_struct(3, blocklengths, offsets, types, &Triplet_mpi_t);
+    MPI_Type_commit(&Triplet_mpi_t);
+
+    std::vector<std::tuple<int,int,int>> dest(Ampi.local_nnz());
+    std::vector<std::size_t> scnts(P);
+
 #pragma omp parallel for
     for (integer_t r=0; r<Ampi.local_rows(); r++) {
       auto r_perm = nd.perm()[r + Ampi.begin_row()];
-      auto hij = Ampi.ptr(r+1)-Ampi.ptr(0);
+      auto hij = Ampi.ptr(r+1) - Ampi.ptr(0);
       for (integer_t j=Ampi.ptr(r)-Ampi.ptr(0); j<hij; j++) {
         if (std::abs(Ampi.val(j)) > eps) {
           auto indj = Ampi.ind(j);
           auto c_perm = nd.perm()[indj];
-          auto d = dest[j] = et.get_sparse_mapped_destination
+          dest[j] = et.get_sparse_mapped_destination
             (Ampi, r, indj, r_perm, c_perm, duplicate_fronts);
-          auto hip = std::get<0>(d)+std::get<1>(d);
+          auto& d = dest[j];
+          auto hip = std::get<0>(d) + std::get<1>(d);
           for (int p=std::get<0>(d); p<hip; p+=std::get<2>(d))
 #pragma omp atomic
             scnts[p]++;
         }
       }
     }
-    struct Triplet { integer_t r; integer_t c; scalar_t a; };
-    auto sbuf = new Triplet[std::accumulate(scnts, scnts+P, 0)];
-    auto pp = new Triplet*[P];
-    pp[0] = sbuf;
-    for (int p=1; p<P; p++) pp[p] = pp[p-1] + scnts[p-1];
+
+    std::vector<std::vector<Triplet>> sbuf(P);
+    for (int p=0; p<P; p++)
+      sbuf[p].reserve(scnts[p]);
+
     for (integer_t r=0; r<Ampi.local_rows(); r++) {
-      auto r_perm = nd.perm()[r+Ampi.begin_row()];
-      auto hij = Ampi.ptr(r+1)-Ampi.ptr(0);
+      auto r_perm = nd.perm()[r + Ampi.begin_row()];
+      auto hij = Ampi.ptr(r+1) - Ampi.ptr(0);
       for (integer_t j=Ampi.ptr(r)-Ampi.ptr(0); j<hij; j++) {
         auto a = Ampi.val(j);
         if (std::abs(a) > eps) {
+          auto indj = Ampi.ind(j);
+          auto c_perm = nd.perm()[indj];
           Triplet t = {r_perm, nd.perm()[Ampi.ind(j)], a};
-          auto d = dest[j];
-          auto hip = std::get<0>(d)+std::get<1>(d);
-          for (int p=std::get<0>(d); p<hip; p+=std::get<2>(d)) {
-            *(pp[p]) = t;
-            pp[p]++;
-          }
+          auto& d = dest[j];
+          auto hip = std::get<0>(d) + std::get<1>(d);
+          for (int p=std::get<0>(d); p<hip; p+=std::get<2>(d))
+            sbuf[p].push_back(t); // do NOT use emplace
         }
       }
     }
-    delete[] dest;
-    delete[] pp;
-    for (int p=0; p<P; p++) scnts[p] *= sizeof(Triplet);
-    MPI_Alltoall(scnts, 1, MPI_INT, rcnts, 1, MPI_INT, comm);
-    sdisp[0] = rdisp[0] = 0;
-    for (int p=1; p<P; p++) {
-      sdisp[p] = sdisp[p-1] + scnts[p-1];
-      rdisp[p] = rdisp[p-1] + rcnts[p-1];
-    }
-    std::vector<Triplet> triplets
-      (std::accumulate(rcnts, rcnts+P, 0) / sizeof(Triplet));
-    MPI_Alltoallv
-      (sbuf, scnts, sdisp, MPI_BYTE, triplets.data(),
-       rcnts, rdisp, MPI_BYTE, comm);
-    delete[] scnts;
-    delete[] sbuf;
 
-    // TODO this sort can be avoided: first make the CSR/CSC
-    // representation, then sort that row per row (in openmp parallel
-    // for)!!
-#if 0 // TODO check for compiler support, use C++17?
-      // std::experimental::parallel?
-    __gnu_parallel::sort
-      (triplets.begin(), triplets.end(),
-       [](const Triplet& a, const Triplet& b) {
-        // sort according to column, then rows
-        if (a.c != b.c) return (a.c < b.c);
-        return (a.r < b.r);
-      });
-#else
+    std::vector<Triplet> triplets;
+    std::vector<Triplet*> pp;
+    comm.all_to_all_v(sbuf, triplets, pp, Triplet_mpi_t);
+    MPI_Type_free(&Triplet_mpi_t);
+
+    // TODO this sort can be avoided? first make the CSR/CSC
+    // representation, then sort that row per row in parallel
     std::sort
       (triplets.begin(), triplets.end(),
        [](const Triplet& a, const Triplet& b) {
-        // sort according to column, then rows
-        if (a.c != b.c) return (a.c < b.c);
-        return (a.r < b.r);
-      });
-#endif
+         // sort according to column, then rows
+         if (a.c != b.c) return (a.c < b.c);
+         return (a.r < b.r);
+       });
+
     integer_t _local_nnz = triplets.size();
     local_cols_ = _local_nnz ? 1 : 0;
     for (integer_t t=1; t<_local_nnz; t++)

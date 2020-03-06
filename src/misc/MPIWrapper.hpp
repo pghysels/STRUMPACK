@@ -496,7 +496,7 @@ namespace strumpack {
     std::vector<T,A> all_to_allv
     (const T* sbuf, int* scnts, int* sdispls,
      int* rcnts, int* rdispls, const MPI_Datatype type) const {
-        std::size_t rsize = 0;
+      std::size_t rsize = 0;
       for (int p=0; p<size(); p++)
         rsize += rcnts[p];
       std::vector<T,A> rbuf(rsize);
@@ -515,7 +515,7 @@ namespace strumpack {
 
     /**
      * Perform an MPI_Alltoallv. Each rank sends sbuf[i] to process
-     * i. The results are recieved in a single contiguous vector
+     * i. The results are received in a single contiguous vector
      * rbuf. pbuf has pointers into rbuf, with pbuf[i] pointing to the
      * data received from rank i.  This is collective on this MPI
      * communicator.
@@ -536,7 +536,7 @@ namespace strumpack {
 
     /**
      * Perform an MPI_Alltoallv. Each rank sends sbuf[i] to process
-     * i. The results are recieved in a single contiguous vector
+     * i. The results are received in a single contiguous vector
      * rbuf. pbuf has pointers into rbuf, with pbuf[i] pointing to the
      * data received from rank i.  This is collective on this MPI
      * communicator.

@@ -64,6 +64,7 @@ namespace strumpack {
     integer_t maximum_rank() const override;
     long long factor_nonzeros() const override;
     long long dense_factor_nonzeros() const override;
+    const MPIComm& Comm() const { return comm_; }
 
   protected:
     const MPIComm& comm_;

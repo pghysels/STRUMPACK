@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "CSRGraph.hpp"
+#include "CompressedSparseMatrix.hpp"
 
 namespace strumpack {
 
