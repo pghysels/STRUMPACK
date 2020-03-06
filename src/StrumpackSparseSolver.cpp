@@ -33,6 +33,7 @@
 #endif
 
 #include "misc/Tools.hpp"
+#include "misc/TaskTimer.hpp"
 #include "StrumpackOptions.hpp"
 #include "sparse/ordering/MatrixReordering.hpp"
 #include "sparse/EliminationTree.hpp"

@@ -29,8 +29,9 @@
 #ifndef ADAPTIVE_CROSS_APPROXIMATION_HPP
 #define ADAPTIVE_CROSS_APPROXIMATION_HPP
 
+#include <functional>
+
 #include "DenseMatrix.hpp"
-#include <iterator>
 
 namespace strumpack {
 
@@ -45,74 +46,7 @@ namespace strumpack {
    const std::function<void(std::size_t,scalar_t*)>& Arow,
    const std::function<void(std::size_t,scalar_t*)>& Acol,
    real_t rtol, real_t atol, int max_rank,
-   int task_depth=params::task_recursion_cutoff_level) {
-    using D_t = DenseMatrix<scalar_t>;
-    using DW_t = DenseMatrixWrapper<scalar_t>;
-    auto sfmin = blas::lamch<real_t>('S');
-    int rmax = std::min(std::min(m, n), std::size_t(max_rank));
-    D_t U_(m, rmax), V_(n, rmax); // TODO store V iso V transpose
-    std::vector<real_t> temp(std::max(m, n));
-    std::vector<scalar_t> du(rmax), dv(rmax);
-    std::mt19937 mt;
-    std::uniform_int_distribution<int> rgen(0, m-1);
-    int row = rgen(mt), col = 0, rank = 0;
-    std::vector<int> rowids, colids;
-    rowids.reserve(rmax);
-    colids.reserve(rmax);
-    real_t approx_norm(0.);
-    while (rank < rmax) {
-      rowids.push_back(row);
-      DW_t Vr(n, 1, V_, 0, rank);
-      Arow(row, Vr.data());
-      gemv(Trans::N, scalar_t(-1.), DW_t(n, rank, V_, 0, 0),
-           U_.ptr(row, 0), U_.ld(), scalar_t(1.), Vr.ptr(0, 0), 1,
-           task_depth);
-      for (std::size_t i=0; i<n; i++) temp[i] = std::abs(Vr(i, 0));
-      // avoid already selected cols
-      for (auto c : colids) temp[c] = real_t(-1);
-      col = std::distance
-        (temp.begin(), std::max_element(temp.begin(), temp.begin()+n));
-      if (std::abs(Vr(col, 0)) < sfmin) break;
-      colids.push_back(col);
-      Vr.scale(scalar_t(1.) / Vr(col, 0));
-      DW_t Ur(m, 1, U_, 0, rank);
-      Acol(col, Ur.data());
-      gemv(Trans::N, scalar_t(-1.), DW_t(m, rank, U_, 0, 0),
-           V_.ptr(col, 0), V_.ld(), scalar_t(1.), Ur.ptr(0, 0), 1,
-           task_depth);
-      gemv(Trans::C, scalar_t(1.), DW_t(m, rank+1, U_, 0, 0), Ur,
-           scalar_t(0.), du.data(), 1, task_depth);
-      gemv(Trans::C, scalar_t(1.), DW_t(n, rank+1, V_, 0, 0), Vr,
-           scalar_t(0.), dv.data(), 1, task_depth);
-      scalar_t cross_products = blas::dotu(rank, du.data(), 1, dv.data(), 1);
-      real_t normUV2 = std::real(du[rank] * dv[rank]);
-      approx_norm = std::sqrt
-        (std::real(approx_norm*approx_norm +
-                   real_t(2.) * cross_products + normUV2));
-      rank++;
-      real_t nrmUV = std::sqrt(normUV2);
-      if (nrmUV < approx_norm * rtol || nrmUV < atol) break;
-      // select a new row
-      for (std::size_t i=0; i<m; i++) temp[i] = std::abs(Ur(i, 0));
-      // avoid already selected rows
-      for (auto r : rowids) temp[r] = real_t(-1);
-      row = std::distance
-        (temp.begin(), std::max_element(temp.begin(), temp.begin()+m));
-    }
-
-    // // recompression TODO what tolerance to use here??
-    // // TODO also compress V
-    // D_t B;
-    // DW_t(m, rank, U_, 0, 0).low_rank(U, B, rtol, atol, rank, 0);
-    // //DW_t(m, rank, U_, 0, 0).low_rank(U, B, 1e-20, 1e-20, rank, 0);
-    // V = D_t(U.cols(), n);
-    // gemm(Trans::N, Trans::C, scalar_t(1.), B,
-    //      DW_t(n, rank, V_, 0, 0), scalar_t(0.), V);
-
-    U = D_t(m, rank); U.copy(U_, 0, 0);
-    V = DW_t(n, rank, V_, 0, 0).transpose();
-  }
-
+   int task_depth=params::task_recursion_cutoff_level);
 
   /**
    * ACA with element extraction routine.
@@ -124,16 +58,7 @@ namespace strumpack {
   (DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
    std::size_t m, std::size_t n,
    const std::function<scalar_t(std::size_t,std::size_t)>& Aelem,
-   real_t rtol, real_t atol, int max_rank) {
-    auto Arow = [&](std::size_t r, scalar_t* B) {
-      for (std::size_t j=0; j<n; j++) B[j] = Aelem(r, j);
-    };
-    auto Acol = [&](std::size_t c, scalar_t* B) {
-      for (std::size_t i=0; i<m; i++) B[i] = Aelem(i, c);
-    };
-    adaptive_cross_approximation<scalar_t>
-      (U, V, m, n, Arow, Acol, rtol, atol, max_rank);
-  }
+   real_t rtol, real_t atol, int max_rank);
 
 } // end namespace strumpack
 

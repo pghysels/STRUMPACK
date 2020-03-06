@@ -28,9 +28,11 @@
  */
 #include <algorithm>
 
+#include "misc/Tools.hpp"
+#include "misc/TaskTimer.hpp"
+#include "clustering/Clustering.hpp"
 #include "HODLRMatrix.hpp"
 #include "HODLRWrapper.hpp"
-#include "clustering/Clustering.hpp"
 
 namespace strumpack {
 

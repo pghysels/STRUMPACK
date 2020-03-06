@@ -26,9 +26,11 @@
  *             Division).
  *
  */
-
 #include <cassert>
+#include <algorithm>
 
+#include "misc/TaskTimer.hpp"
+#include "misc/Tools.hpp"
 #include "LRBFMatrix.hpp"
 #include "HODLRWrapper.hpp"
 

@@ -34,6 +34,7 @@
 #define STRUMPACK_HODLR_MATRIX_HPP
 
 #include <cassert>
+#include <functional>
 
 #include "HSS/HSSPartitionTree.hpp"
 #include "kernel/Kernel.hpp"

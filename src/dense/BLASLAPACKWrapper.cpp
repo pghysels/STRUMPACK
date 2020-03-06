@@ -1861,7 +1861,18 @@ namespace strumpack {
         (&jobz, &uplo, &n, a, &lda, w, work.get(), &lwork, &info);
       return info;
     }
-
+    int syev(char jobz, char uplo, int n, std::complex<float>* a, int lda,
+             std::complex<float>* w) {
+      std::cerr << "ERROR: STRUMPACK does not implement syev for complex"
+                << std::endl;;
+      assert(false);
+    }
+    int syev(char jobz, char uplo, int n, std::complex<double>* a, int lda,
+             std::complex<double>* w) {
+      std::cerr << "ERROR: STRUMPACK does not implement syev for complex"
+                << std::endl;;
+      assert(false);
+    }
 
     int sytrf
     (char s, int n, float* a, int lda, int* ipiv, float* work, int lwork) {

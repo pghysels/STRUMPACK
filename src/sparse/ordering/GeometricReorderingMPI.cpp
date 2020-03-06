@@ -29,6 +29,8 @@
 
 #include <array>
 #include <unordered_map>
+#include <functional>
+
 #include "GeometricReorderingMPI.hpp"
 
 namespace strumpack {

@@ -36,6 +36,7 @@
 #ifndef STRUMPACK_KERNEL_REGRESSION_HPP
 #define STRUMPACK_KERNEL_REGRESSION_HPP
 
+#include "misc/TaskTimer.hpp"
 #include "Kernel.hpp"
 #include "HSS/HSSMatrix.hpp"
 #if defined(STRUMPACK_USE_MPI)

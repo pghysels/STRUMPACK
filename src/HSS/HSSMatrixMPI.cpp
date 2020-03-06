@@ -25,10 +25,14 @@
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
  */
+#include <algorithm>
 
 #include "HSSMatrixMPI.hpp"
 
 #include "misc/RandomWrapper.hpp"
+#include "misc/TaskTimer.hpp"
+#include "misc/Tools.hpp"
+
 #include "BlockCyclic2BlockRow.hpp"
 #include "DistSamples.hpp"
 #include "DistElemMult.hpp"

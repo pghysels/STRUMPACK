@@ -42,8 +42,6 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
   StrumpackSparseSolver<scalar_t,integer_t> spss;
   spss.options().set_from_command_line(argc, argv);
 
-  TaskTimer::t_begin = GET_TIME_NOW();
-
   int N = A.size();
   vector<scalar_t> b(N), x(N), x_exact(N, scalar_t(1.)/sqrt(N));
   A.spmv(x_exact.data(), b.data());

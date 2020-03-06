@@ -96,7 +96,6 @@ int main(int argc, char* argv[]) {
       std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
                 << A.max_scaled_residual(x, b) << std::endl;
   }
-  TimerList::Finalize();
   scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return 0;

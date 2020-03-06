@@ -33,6 +33,7 @@
 #define OMPI_SKIP_MPICXX 1
 #include <mpi.h>
 
+#include "misc/TaskTimer.hpp"
 #include "HODLRWrapper.hpp"
 #include "dC_BPACK_wrapper.h"
 #include "zC_BPACK_wrapper.h"

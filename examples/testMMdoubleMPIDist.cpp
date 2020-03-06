@@ -36,11 +36,6 @@
 
 using namespace strumpack;
 
-void abort_MPI(MPI_Comm *c, int *error, ...) {
-  std::cout << "rank = " << mpi_rank() << " ABORTING!!!!!" << std::endl;
-  abort();
-}
-
 template<typename scalar,typename integer> void
 test(int argc, char* argv[], CSRMatrixMPI<scalar,integer>* Adist) {
   int rank;
@@ -48,8 +43,6 @@ test(int argc, char* argv[], CSRMatrixMPI<scalar,integer>* Adist) {
   StrumpackSparseSolverMPIDist<scalar,integer> spss(MPI_COMM_WORLD);
   spss.options().set_matching(MatchingJob::NONE);
   spss.options().set_from_command_line(argc, argv);
-
-  TaskTimer::t_begin = GET_TIME_NOW();
 
   auto N = Adist->size();
   auto n_local = Adist->local_rows();
@@ -118,10 +111,6 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  MPI_Errhandler eh;
-  MPI_Comm_create_errhandler(abort_MPI, &eh);
-  MPI_Comm_set_errhandler(MPI_COMM_WORLD, eh);
-
   bool binary_input = false;
   std::string format(argv[1]);
   if (format.compare("b") == 0) binary_input = true;
@@ -183,8 +172,6 @@ int main(int argc, char* argv[]) {
     delete Adist_c;
   }
 
-  MPI_Errhandler_free(&eh);
-  TimerList::Finalize();
   scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return 0;

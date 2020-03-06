@@ -26,6 +26,8 @@
  *             Division).
  *
  */
+#include <algorithm>
+
 #include "Clustering.hpp"
 #include "kernel/Metrics.hpp"
 

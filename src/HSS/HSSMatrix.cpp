@@ -27,8 +27,10 @@
  *
  */
 
+
 #include "HSSMatrix.hpp"
 
+#include "misc/TaskTimer.hpp"
 #include "HSSMatrix.apply.hpp"
 #include "HSSMatrix.compress.hpp"
 #include "HSSMatrix.compress_stable.hpp"

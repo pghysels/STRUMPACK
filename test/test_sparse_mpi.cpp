@@ -55,8 +55,6 @@ test(int argc, char* argv[], const CSRMatrixMPI<scalar,integer>* Adist) {
   spss.options().set_matching(MatchingJob::NONE);
   spss.options().set_from_command_line(argc, argv);
 
-  TaskTimer::t_begin = GET_TIME_NOW();
-
   auto N = Adist->size();
   auto n_local = Adist->local_rows();
   vector<scalar> b(n_local), x(n_local),
@@ -200,7 +198,6 @@ int main(int argc, char* argv[]) {
   }
 
   MPI_Errhandler_free(&eh);
-  TimerList::Finalize();
   scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return ierr;

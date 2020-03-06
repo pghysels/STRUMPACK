@@ -35,6 +35,8 @@
 #include <cassert>
 #include <memory>
 #include <functional>
+#include <algorithm>
+
 #include "BLRTileBLAS.hpp"
 
 namespace strumpack {

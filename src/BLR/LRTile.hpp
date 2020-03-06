@@ -33,6 +33,8 @@
 #define LR_TILE_HPP
 
 #include <cassert>
+#include <iostream>
+#include <iomanip>
 
 #include "BLRTile.hpp"
 #include "dense/ACA.hpp"

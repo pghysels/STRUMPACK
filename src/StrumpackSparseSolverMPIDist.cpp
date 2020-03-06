@@ -26,6 +26,7 @@
  *             Division).
  */
 #include "StrumpackSparseSolverMPIDist.hpp"
+#include "misc/TaskTimer.hpp"
 #include "sparse/EliminationTreeMPIDist.hpp"
 #include "sparse/iterative/IterativeSolversMPI.hpp"
 #include "sparse/Redistribute.hpp"

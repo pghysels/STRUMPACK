@@ -38,6 +38,7 @@
 #define HSS_MATRIX_HPP
 
 #include <cassert>
+#include <functional>
 
 #include "HSSPartitionTree.hpp"
 #include "HSSBasisID.hpp"

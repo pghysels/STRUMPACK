@@ -3,9 +3,13 @@ target_sources(strumpack
   ${CMAKE_CURRENT_LIST_DIR}/BLASLAPACKWrapper.cpp
   ${CMAKE_CURRENT_LIST_DIR}/BLASLAPACKOpenMPTask.cpp
   ${CMAKE_CURRENT_LIST_DIR}/DistributedMatrix.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/DistributedMatrix.cpp
   ${CMAKE_CURRENT_LIST_DIR}/ACA.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/ACA.cpp
   ${CMAKE_CURRENT_LIST_DIR}/BACA.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/BACA.cpp
   ${CMAKE_CURRENT_LIST_DIR}/DenseMatrix.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/DenseMatrix.cpp
   ${CMAKE_CURRENT_LIST_DIR}/BLASLAPACKOpenMPTask.hpp
   ${CMAKE_CURRENT_LIST_DIR}/BLASLAPACKWrapper.hpp)
 
@@ -14,8 +18,8 @@ install(FILES
   ACA.hpp
   BACA.hpp
   DenseMatrix.hpp
-  BLASLAPACKOpenMPTask.hpp
-  BLASLAPACKWrapper.hpp
+  BLASLAPACKOpenMPTask.hpp # TODO do not install?
+  BLASLAPACKWrapper.hpp  # TODO do not install?
   DESTINATION include/dense)
 
 

@@ -51,6 +51,7 @@ namespace strumpack {
   // forward declatations
   template<typename scalar_t,typename integer_t> class MatrixReordering;
   template<typename scalar_t,typename integer_t> class EliminationTree;
+  class TaskTimer;
 
   /**
    * \class StrumpackSparseSolver

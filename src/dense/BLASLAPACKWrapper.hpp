@@ -866,6 +866,10 @@ namespace strumpack {
 
     int syev(char jobz, char uplo, int n, float* a, int lda, float* w);
     int syev(char jobz, char uplo, int n, double* a, int lda, double* w);
+    int syev(char jobz, char uplo, int n, std::complex<float>* a, int lda,
+             std::complex<float>* w);
+    int syev(char jobz, char uplo, int n, std::complex<double>* a, int lda,
+             std::complex<double>* w);
 
     inline long long sytrf_flops(long long n) {
       return n * n * n / 3;
