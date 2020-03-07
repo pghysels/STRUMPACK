@@ -2,8 +2,6 @@ target_sources(strumpack
   PRIVATE
   ${CMAKE_CURRENT_LIST_DIR}/BLASLAPACKWrapper.cpp
   ${CMAKE_CURRENT_LIST_DIR}/BLASLAPACKOpenMPTask.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/DistributedMatrix.hpp
-  ${CMAKE_CURRENT_LIST_DIR}/DistributedMatrix.cpp
   ${CMAKE_CURRENT_LIST_DIR}/ACA.hpp
   ${CMAKE_CURRENT_LIST_DIR}/ACA.cpp
   ${CMAKE_CURRENT_LIST_DIR}/BACA.hpp
@@ -30,6 +28,7 @@ if(STRUMPACK_USE_MPI)
     ${CMAKE_CURRENT_LIST_DIR}/BLACSGrid.hpp
     ${CMAKE_CURRENT_LIST_DIR}/DistributedVector.hpp
     ${CMAKE_CURRENT_LIST_DIR}/DistributedMatrix.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/DistributedMatrix.cpp
     ${CMAKE_CURRENT_LIST_DIR}/ScaLAPACKWrapper.hpp)
 
   install(FILES

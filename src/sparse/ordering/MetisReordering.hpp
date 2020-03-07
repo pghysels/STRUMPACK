@@ -39,6 +39,7 @@
 #if defined(STRUMPACK_USE_MPI)
 #include "sparse/mumps_symqamd.hpp"
 #endif
+#include "misc/Tools.hpp"
 
 namespace strumpack {
 

@@ -33,10 +33,7 @@
 #include <cstring>
 #include <getopt.h>
 #endif
-#if defined(STRUMPACK_USE_MPI)
-#include "misc/MPIWrapper.hpp"
-#endif
-
+#include "misc/Tools.hpp"
 
 namespace strumpack {
 
@@ -192,10 +189,7 @@ namespace strumpack {
     template<typename scalar_t> void
     HSSOptions<scalar_t>::describe_options() const {
 #if defined(STRUMPACK_USE_GETOPT)
-#if defined(STRUMPACK_USE_MPI)
-      MPIComm c;
-      if (MPIComm::initialized() && !c.is_root()) return;
-#endif
+      if (!mpi_root()) return;
       std::cout << "# HSS Options:" << std::endl
                 << "#   --hss_rel_tol real_t (default "
                 << rel_tol() << ")" << std::endl

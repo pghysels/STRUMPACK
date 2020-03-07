@@ -33,9 +33,7 @@
 #include <cstring>
 #include <getopt.h>
 #endif
-#if defined(STRUMPACK_USE_MPI)
-#include "misc/MPIWrapper.hpp"
-#endif
+#include "misc/Tools.hpp"
 
 
 namespace strumpack {
@@ -372,10 +370,7 @@ namespace strumpack {
   template<typename scalar_t> void
   SPOptions<scalar_t>::describe_options() const {
 #if defined(STRUMPACK_USE_GETOPT)
-#if defined(STRUMPACK_USE_MPI)
-    MPIComm c;
-    if (MPIComm::initialized() && !c.is_root()) return;
-#endif
+    if (!mpi_root()) return;
     std::cout << "# STRUMPACK options:" << std::endl;
     std::cout << "#   --sp_maxit int (default " << maxit() << ")" << std::endl;
     std::cout << "#          maximum Krylov iterations" << std::endl;

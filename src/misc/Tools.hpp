@@ -40,16 +40,13 @@
 
 namespace strumpack {
 
-  // TODO remove this
   inline bool mpi_root() {
 #if defined(STRUMPACK_USE_MPI)
-    int flag;
-    MPI_Initialized(&flag);
-    if (flag) return mpi_rank() == 0;
-    else return true;
-#else
-    return true;
+    MPIComm c;
+    if (MPIComm::initialized())
+      return c.is_root();
 #endif
+    return true;
   }
 
   template<typename T> class NoInit {

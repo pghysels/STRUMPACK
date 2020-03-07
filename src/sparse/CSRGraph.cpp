@@ -28,6 +28,7 @@
  */
 #include <memory>
 #include <queue>
+#include <algorithm>
 
 #include "CSRGraph.hpp"
 #include "HSS/HSSPartitionTree.hpp"

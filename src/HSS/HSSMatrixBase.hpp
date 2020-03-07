@@ -37,6 +37,7 @@
 #include <cassert>
 #include <iostream>
 #include <vector>
+#include <functional>
 
 #include "dense/DenseMatrix.hpp"
 #include "HSSOptions.hpp"
