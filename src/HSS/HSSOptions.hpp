@@ -33,12 +33,8 @@
 #ifndef HSS_OPTIONS_HPP
 #define HSS_OPTIONS_HPP
 
-#include <cstring>
-#include <getopt.h>
 #include "clustering/Clustering.hpp"
-#if defined(STRUMPACK_USE_MPI)
-#include "misc/MPIWrapper.hpp"
-#endif
+
 
 namespace strumpack {
 
@@ -106,14 +102,7 @@ namespace strumpack {
      * \param a type of the randomized compression algorihtm
      * \return name, string with a short description
      */
-    inline std::string get_name(CompressionAlgorithm a) {
-      switch (a) {
-      case CompressionAlgorithm::ORIGINAL: return "original"; break;
-      case CompressionAlgorithm::STABLE: return "stable"; break;
-      case CompressionAlgorithm::HARD_RESTART: return "hard_restart"; break;
-      default: return "unknown";
-      }
-    }
+    std::string get_name(CompressionAlgorithm a);
 
     /**
      * \class HSSOptions
@@ -446,184 +435,13 @@ namespace strumpack {
        * \param argc Number of elements in argv
        * \param argv Array with options
        */
-      void set_from_command_line(int argc, const char* const* argv) {
-        std::vector<char*> argv_local(argc);
-        for (int i=0; i<argc; i++) {
-          argv_local[i] = new char[strlen(argv[i])+1];
-          strcpy(argv_local[i], argv[i]);
-        }
-        option long_options[] = {
-          {"hss_rel_tol",               required_argument, 0, 1},
-          {"hss_abs_tol",               required_argument, 0, 2},
-          {"hss_leaf_size",             required_argument, 0, 3},
-          {"hss_d0",                    required_argument, 0, 4},
-          {"hss_dd",                    required_argument, 0, 5},
-          {"hss_p",                     required_argument, 0, 6},
-          {"hss_max_rank",              required_argument, 0, 7},
-          {"hss_random_distribution",   required_argument, 0, 8},
-          {"hss_random_engine",         required_argument, 0, 9},
-          {"hss_compression_algorithm", required_argument, 0, 10},
-          {"hss_clustering_algorithm",  required_argument, 0, 11},
-          {"hss_approximate_neighbors", required_argument, 0, 12},
-          {"hss_ann_iterations",        required_argument, 0, 13},
-          {"hss_user_defined_random",   no_argument, 0, 14},
-          {"hss_enable_sync",           no_argument, 0, 15},
-          {"hss_disable_sync",          no_argument, 0, 16},
-          {"hss_log_ranks",             no_argument, 0, 17},
-          {"hss_verbose",               no_argument, 0, 'v'},
-          {"hss_quiet",                 no_argument, 0, 'q'},
-          {"help",                      no_argument, 0, 'h'},
-          {NULL, 0, NULL, 0}
-        };
-        int c, option_index = 0;
-        opterr = optind = 0;
-        while ((c = getopt_long_only
-                (argc, argv_local.data(),
-                 "hvq", long_options, &option_index)) != -1) {
-          switch (c) {
-          case 1: {
-            std::istringstream iss(optarg);
-            iss >> _rel_tol; set_rel_tol(_rel_tol);
-          } break;
-          case 2: {
-            std::istringstream iss(optarg);
-            iss >> _abs_tol; set_abs_tol(_abs_tol);
-          } break;
-          case 3: {
-            std::istringstream iss(optarg);
-            iss >> _leaf_size;
-            set_leaf_size(_leaf_size);
-          } break;
-          case 4: {
-            std::istringstream iss(optarg);
-            iss >> _d0;
-            set_d0(_d0);
-          } break;
-          case 5: {
-            std::istringstream iss(optarg);
-            iss >> _dd; set_dd(_dd);
-          } break;
-          case 6: {
-            std::istringstream iss(optarg);
-            iss >> _p;
-            set_p(_p);
-          } break;
-          case 7: {
-            std::istringstream iss(optarg);
-            iss >> _max_rank;
-            set_max_rank(_max_rank);
-          } break;
-          case 8: {
-            std::istringstream iss(optarg);
-            std::string s; iss >> s;
-            if (s.compare("normal") == 0)
-              set_random_distribution(random::RandomDistribution::NORMAL);
-            else if (s.compare("uniform") == 0)
-              set_random_distribution(random::RandomDistribution::UNIFORM);
-            else
-              std::cerr << "# WARNING: random number distribution not"
-                        << " recognized, use 'normal' or 'uniform'."
-                        << std::endl;
-          } break;
-          case 9: {
-            std::istringstream iss(optarg);
-            std::string s; iss >> s;
-            if (s.compare("linear") == 0)
-              set_random_engine(random::RandomEngine::LINEAR);
-            else if (s.compare("mersenne") == 0)
-              set_random_engine(random::RandomEngine::MERSENNE);
-            else
-              std::cerr << "# WARNING: random number engine not recognized,"
-                        << " use 'linear' or 'mersenne'." << std::endl;
-          } break;
-          case 10: {
-            std::istringstream iss(optarg);
-            std::string s; iss >> s;
-            if (s.compare("original") == 0)
-              set_compression_algorithm(CompressionAlgorithm::ORIGINAL);
-            else if (s.compare("stable") == 0)
-              set_compression_algorithm(CompressionAlgorithm::STABLE);
-            else if (s.compare("hard_restart") == 0)
-              set_compression_algorithm(CompressionAlgorithm::HARD_RESTART);
-            else
-              std::cerr << "# WARNING: compression algorithm not recognized,"
-                        << " use 'original', 'stable' or 'hard_restart'."
-                        << std::endl;
-          } break;
-          case 11: {
-            std::istringstream iss(optarg);
-            std::string s; iss >> s;
-            set_clustering_algorithm(get_clustering_algorithm(s));
-          } break;
-          case 12: {
-            std::istringstream iss(optarg);
-            iss >> _approximate_neighbors;
-            set_approximate_neighbors(_approximate_neighbors);
-          } break;
-          case 13: {
-            std::istringstream iss(optarg);
-            iss >> _ann_iterations;
-            set_ann_iterations(_ann_iterations);
-          } break;
-          case 14: { set_user_defined_random(true); } break;
-          case 15: { set_synchronized_compression(true); } break;
-          case 16: { set_synchronized_compression(false); } break;
-          case 17: { set_log_ranks(true); } break;
-          case 'v': set_verbose(true); break;
-          case 'q': set_verbose(false); break;
-          case 'h': describe_options(); break;
-          }
-        }
-        for (auto s : argv_local) delete[] s;
-      }
+      void set_from_command_line(int argc, const char* const* argv);
 
       /**
        * Print an overview of the available command line options and
        * their current values.
        */
-      void describe_options() const {
-#if defined(STRUMPACK_USE_MPI)
-        MPIComm c;
-        if (MPIComm::initialized() && !c.is_root()) return;
-#endif
-        std::cout << "# HSS Options:" << std::endl
-                  << "#   --hss_rel_tol real_t (default "
-                  << rel_tol() << ")" << std::endl
-                  << "#   --hss_abs_tol real_t (default "
-                  << abs_tol() << ")" << std::endl
-                  << "#   --hss_leaf_size int (default "
-                  << leaf_size() << ")" << std::endl
-                  << "#   --hss_d0 int (default " << d0() << ")" << std::endl
-                  << "#   --hss_dd int (default " << dd() << ")" << std::endl
-                  << "#   --hss_p int (default " << p() << ")" << std::endl
-                  << "#   --hss_max_rank int (default "
-                  << max_rank() << ")" << std::endl
-                  << "#   --hss_random_distribution normal|uniform (default "
-                  << get_name(random_distribution()) << ")" << std::endl
-                  << "#   --hss_random_engine linear|mersenne (default "
-                  << get_name(random_engine()) << ")" << std::endl
-                  << "#   --hss_compression_algorithm original|stable|hard_restart (default "
-                  << get_name(compression_algorithm())<< ")" << std::endl
-                  << "#   --hss_clustering_algorithm natural|2means|kdtree|pca|cobble (default "
-                  << get_name(clustering_algorithm())<< ")" << std::endl
-                  << "#   --hss_user_defined_random (default "
-                  << user_defined_random() << ")" << std::endl
-                  << "#   --hss_approximate_neighbors int (default "
-                  << approximate_neighbors() << ")" << std::endl
-                  << "#   --hss_ann_iterations int (default "
-                  << ann_iterations() << ")" << std::endl
-                  << "#   --hss_enable_sync (default "
-                  << synchronized_compression() << ")" << std::endl
-                  << "#   --hss_disable_sync (default "
-                  << (!synchronized_compression()) << ")" << std::endl
-                  << "#   --hss_log_ranks (default "
-                  << log_ranks() << ")" << std::endl
-                  << "#   --hss_verbose or -v (default "
-                  << verbose() << ")" << std::endl
-                  << "#   --hss_quiet or -q (default "
-                  << !verbose() << ")" << std::endl
-                  << "#   --help or -h" << std::endl << std::endl;
-      }
+      void describe_options() const;
 
     private:
       real_t _rel_tol = default_HSS_rel_tol<real_t>();

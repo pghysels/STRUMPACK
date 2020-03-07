@@ -51,6 +51,7 @@ namespace strumpack {
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using Opts_t = SPOptions<scalar_t>;
+    using F_t = FrontalMatrix<scalar_t,integer_t>;
     using BLRM_t = BLR::BLRMatrix<scalar_t>;
 #if defined(STRUMPACK_USE_MPI)
     using ExtAdd = ExtendAdd<scalar_t,integer_t>;
@@ -66,11 +67,10 @@ namespace strumpack {
     void release_work_memory() override;
     void extend_add_to_dense
     (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
-     const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) override;
+     const F_t* p, int task_depth) override;
     void sample_CB
     (const Opts_t& opts, const DenseM_t& R, DenseM_t& Sr,
-     DenseM_t& Sc, FrontalMatrix<scalar_t,integer_t>* pa,
-     int task_depth) override;
+     DenseM_t& Sc, F_t* pa, int task_depth) override;
     void multifrontal_factorization
     (const SpMat_t& A, const Opts_t& opts,
      int etree_level=0, int task_depth=0) override;
@@ -121,20 +121,19 @@ namespace strumpack {
 
     long long node_factor_nonzeros() const override;
 
-    using FrontalMatrix<scalar_t,integer_t>::lchild_;
-    using FrontalMatrix<scalar_t,integer_t>::rchild_;
-    using FrontalMatrix<scalar_t,integer_t>::dim_sep;
-    using FrontalMatrix<scalar_t,integer_t>::dim_upd;
-    using FrontalMatrix<scalar_t,integer_t>::sep_begin_;
-    using FrontalMatrix<scalar_t,integer_t>::sep_end_;
+    using F_t::lchild_;
+    using F_t::rchild_;
+    using F_t::dim_sep;
+    using F_t::dim_upd;
+    using F_t::sep_begin_;
+    using F_t::sep_end_;
   };
 
   template<typename scalar_t,typename integer_t>
   FrontalMatrixBLR<scalar_t,integer_t>::FrontalMatrixBLR
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd)
-    : FrontalMatrix<scalar_t,integer_t>
-    (nullptr, nullptr, sep, sep_begin, sep_end, upd) {}
+    : F_t(nullptr, nullptr, sep, sep_begin, sep_end, upd) {}
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::release_work_memory() {
@@ -145,7 +144,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
-   const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) {
+   const F_t* p, int task_depth) {
     const std::size_t pdsep = paF11.rows();
     const std::size_t dupd = dim_upd();
     std::size_t upd2sep;
@@ -180,7 +179,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::sample_CB
   (const Opts_t& opts, const DenseM_t& R, DenseM_t& Sr,
-   DenseM_t& Sc, FrontalMatrix<scalar_t,integer_t>* pa, int task_depth) {
+   DenseM_t& Sc, F_t* pa, int task_depth) {
     auto I = this->upd_to_parent(pa);
     auto cR = R.extract_rows(I);
     DenseM_t cS(dim_upd(), R.cols());
@@ -250,7 +249,7 @@ namespace strumpack {
         rchild_->extend_add_to_dense(F11, F12, F21, F22_, this, task_depth);
       if (dsep) {
 #if 1
-        BLR::BLR_construct_and_partial_factor
+        BLRM_t::construct_and_partial_factor
           (F11, F12, F21, F22_, F11blr_, piv_, F12blr_, F21blr_,
            sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());
 #else
@@ -309,7 +308,7 @@ namespace strumpack {
         if (lchild_) lchild_->extract_CB_sub_matrix(gI, gJ, B, task_depth);
         if (rchild_) rchild_->extract_CB_sub_matrix(gI, gJ, B, task_depth);
       };
-      BLR::BLR_construct_and_partial_factor<scalar_t>
+      BLRM_t::construct_and_partial_factor
         (dsep, dupd, F11elem, F12elem, F21elem, F22elem,
          F11blr_, piv_, F12blr_, F21blr_, F22blr_,
          sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());
@@ -354,7 +353,7 @@ namespace strumpack {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
       bloc.laswp(piv_, true);
 #if 1
-      BLR::BLR_trsmLNU_gemm(F11blr_, F21blr_, bloc, bupd, task_depth);
+      BLRM_t::trsmLNU_gemm(F11blr_, F21blr_, bloc, bupd, task_depth);
 #else
       if (b.cols() == 1) {
         trsv(UpLo::L, Trans::N, Diag::U, F11blr_, bloc, task_depth);
@@ -396,7 +395,7 @@ namespace strumpack {
     if (dim_sep()) {
       DenseMW_t yloc(dim_sep(), y.cols(), y, this->sep_begin_, 0);
 #if 1
-      BLR::BLR_gemm_trsmUNN(F11blr_, F12blr_, yloc, yupd, task_depth);
+      BLRM_t::gemm_trsmUNN(F11blr_, F12blr_, yloc, yupd, task_depth);
 #else
       if (y.cols() == 1) {
         if (dim_upd())

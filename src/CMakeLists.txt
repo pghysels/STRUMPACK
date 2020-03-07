@@ -2,6 +2,7 @@ target_sources(strumpack
   PRIVATE
   ${CMAKE_CURRENT_LIST_DIR}/StrumpackParameters.cpp
   ${CMAKE_CURRENT_LIST_DIR}/StrumpackOptions.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/StrumpackOptions.cpp
   ${CMAKE_CURRENT_LIST_DIR}/StrumpackParameters.hpp
   ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolver.hpp
   ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolver.cpp

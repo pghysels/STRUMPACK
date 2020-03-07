@@ -20,7 +20,8 @@ option(STRUMPACK_TASK_TIMERS "Build with timers for internal routines" OFF)
 option(STRUMPACK_DEV_TESTING "Enable extensive testing" OFF)
 
 include(CheckLibraryExists)
-include(CMakePushCheckState)
+# include(CMakePushCheckState)
+include(CheckCXXSourceCompiles)
 
 # figure out Fortran/C name mangling
 include(FortranCInterface)
@@ -194,6 +195,12 @@ else()
 endif()
 
 
+# check if getopt.h is available
+check_cxx_source_compiles("#include <getopt.h>
+int main(int argc, char* argv[]) { getopt_long(argc, argv, \"\", 0, 0); }"
+  STRUMPACK_USE_GETOPT)
+
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules")
 
 
@@ -321,7 +328,8 @@ if(TPL_ENABLE_PARMETIS)
 endif()
 
 if(TPL_ENABLE_ZFP)
-  list(APPEND CMAKE_PREFIX_PATH ${TPL_ZFP_PREFIX} $ENV{ZFP_ROOT})
+  list(APPEND CMAKE_PREFIX_PATH ${TPL_ZFP_PREFIX}
+    $ENV{ZFP_ROOT} $ENV{ZFP_DIR})
   find_package(ZFP)
   if(ZFP_FOUND)
     option(STRUMPACK_USE_ZFP "" ON)
