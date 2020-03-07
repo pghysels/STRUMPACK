@@ -34,8 +34,9 @@
 
 #include <cassert>
 
-#include "../dense/DistributedMatrix.hpp"
+#include "dense/DistributedMatrix.hpp"
 #include "BLRMatrix.hpp"
+#include "BLRTile.hpp" // TODO remove
 
 namespace strumpack {
   namespace BLR {

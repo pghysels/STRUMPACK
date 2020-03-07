@@ -37,10 +37,15 @@
 #include <functional>
 #include <algorithm>
 
-#include "BLRTileBLAS.hpp"
+#include "BLROptions.hpp"
+#include "BLRTileBLAS.hpp" // TODO remove
 
 namespace strumpack {
   namespace BLR {
+
+    // forward declarations
+    template<typename scalar> class BLRTile;
+
 
     template<typename T>
     using extract_t = std::function<void(const std::vector<std::size_t>&,
