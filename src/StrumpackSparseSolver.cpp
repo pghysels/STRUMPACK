@@ -53,23 +53,23 @@ namespace strumpack {
     : opts_(argc, argv), is_root_(root) {
     opts_.set_verbose(verbose);
     old_handler_ = std::set_new_handler
-      ([]{ std::cerr << "STRUMPACK: out of memory!" << std::endl; abort(); });
+      ([] {
+         std::cerr << "STRUMPACK: out of memory!" << std::endl;
+         abort();
+       });
     papi_initialize();
     if (opts_.verbose() && is_root_) {
       std::cout << "# Initializing STRUMPACK" << std::endl;
 #if defined(_OPENMP)
-      if (params::num_threads == 1)
-        std::cout << "# using " << params::num_threads
-                  << " OpenMP thread" << std::endl;
-      else
-        std::cout << "# using " << params::num_threads
-                  << " OpenMP threads" << std::endl;
+      std::cout << "# using " << params::num_threads
+                << " OpenMP thread(s)" << std::endl;
 #else
       std::cout << "# running serially, no OpenMP support!" << std::endl;
 #endif
       // a heuristic to set the recursion task cutoff level based on
       // the number of threads
-      if (params::num_threads == 1) params::task_recursion_cutoff_level = 0;
+      if (params::num_threads == 1)
+        params::task_recursion_cutoff_level = 0;
       else {
         params::task_recursion_cutoff_level =
           std::log2(params::num_threads) + 3;
@@ -299,6 +299,57 @@ namespace strumpack {
     factored_ = reordered_ = false;
   }
 
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::update_matrix_values
+  (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
+   const scalar_t* values, bool symmetric_pattern) {
+    if (!(N == matrix()->size() && row_ptr[N] <= matrix()->nnz())) {
+      // matrix() has been made symmetric, can have more nonzeros
+      print_wrong_sparsity_error();
+      return;
+    }
+    mat_.reset(new CSRMatrix<scalar_t,integer_t>
+               (N, row_ptr, col_ind, values, symmetric_pattern));
+    permute_matrix_values();
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::update_matrix_values
+  (const CSRMatrix<scalar_t,integer_t>& A) {
+    if (!(A.size() == matrix()->size() && A.nnz() <= matrix()->nnz())) {
+      // matrix() has been made symmetric, can have more nonzeros
+      print_wrong_sparsity_error();
+      return;
+    }
+    mat_.reset(new CSRMatrix<scalar_t,integer_t>(A));
+    permute_matrix_values();
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::print_wrong_sparsity_error() {
+    std::cerr
+      << "ERROR:" << std::endl
+      << "  update_matrix_values should be called with exactly" << std::endl
+      << "  the same sparsity pattern as used to set the " << std::endl
+      << "  initial matrix, using set_matrix/set_csr_matrix." << std::endl;
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::permute_matrix_values() {
+    if (reordered_) {
+      if (opts_.matching() != MatchingJob::NONE) {
+        if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+          matrix()->apply_scaling(Dr_, Dc_);
+        matrix()->apply_column_permutation(cperm_);
+      }
+      matrix()->symmetrize_sparsity();
+      matrix()->permute(reordering()->iperm(), reordering()->perm());
+      if (opts_.compression() != CompressionType::NONE)
+        separator_reordering();
+    }
+    factored_ = false;
+  }
+
   template<typename scalar_t,typename integer_t> ReturnCode
   StrumpackSparseSolver<scalar_t,integer_t>::reorder
   (int nx, int ny, int nz, int components, int width) {
@@ -316,6 +367,7 @@ namespace strumpack {
   (const int* p, int base, int nx, int ny, int nz,
    int components, int width) {
     if (!matrix()) return ReturnCode::MATRIX_NOT_SET;
+    if (reordered_) return ReturnCode::SUCCESS;
     TaskTimer t1("permute-scale");
     int ierr;
     if (opts_.matching() != MatchingJob::NONE) {
@@ -324,9 +376,9 @@ namespace strumpack {
                   << get_description(opts_.matching())
                   << std::endl;
       t1.time([&](){
-          ierr = matrix()->permute_and_scale
-            (opts_.matching(), matching_cperm_, matching_Dr_, matching_Dc_);
-        });
+                ierr = matrix()->permute_and_scale
+                  (opts_.matching(), cperm_, Dr_, Dc_);
+              });
       if (ierr) {
         std::cerr << "ERROR: matching failed" << std::endl;
         return ReturnCode::REORDERING_ERROR;
@@ -620,14 +672,14 @@ namespace strumpack {
           for (integer_t j=0; j<d; j++)
 #pragma omp parallel for
             for (integer_t i=0; i<N; i++) {
-              auto pi = iperm[matching_cperm_[i]];
-              bloc(i, j) = x(pi, j) / matching_Dc_[pi];
+              auto pi = iperm[cperm_[i]];
+              bloc(i, j) = x(pi, j) / Dc_[pi];
             }
         } else {
           for (integer_t j=0; j<d; j++)
 #pragma omp parallel for
             for (integer_t i=0; i<N; i++)
-              bloc(i, j) = x(iperm[matching_cperm_[i]], j);
+              bloc(i, j) = x(iperm[cperm_[i]], j);
         }
       } else {
         for (integer_t j=0; j<d; j++)
@@ -642,7 +694,7 @@ namespace strumpack {
 #pragma omp parallel for
         for (integer_t i=0; i<N; i++) {
           auto pi = iperm[i];
-          bloc(i, j) = matching_Dr_[pi] * b(pi, j);
+          bloc(i, j) = Dr_[pi] * b(pi, j);
         }
     } else {
       for (integer_t j=0; j<d; j++)
@@ -722,14 +774,14 @@ namespace strumpack {
         for (integer_t j=0; j<d; j++)
 #pragma omp parallel for
           for (integer_t i=0; i<N; i++) {
-            auto ipi = matching_cperm_[iperm[i]];
-            bloc(ipi, j) = x(i, j) * matching_Dc_[ipi];
+            auto ipi = cperm_[iperm[i]];
+            bloc(ipi, j) = x(i, j) * Dc_[ipi];
           }
       } else {
         for (integer_t j=0; j<d; j++)
 #pragma omp parallel for
           for (integer_t i=0; i<N; i++)
-            bloc(matching_cperm_[iperm[i]], j) = x(i, j);
+            bloc(cperm_[iperm[i]], j) = x(i, j);
       }
     } else {
       auto perm = reordering()->perm();

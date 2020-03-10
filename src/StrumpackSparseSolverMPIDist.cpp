@@ -151,7 +151,7 @@ namespace strumpack {
 
     auto bloc = b;
     if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-      bloc.scale_rows(this->matching_Dr_);
+      bloc.scale_rows(this->Dr_);
 
     auto spmv = [&](const scalar_t* x, scalar_t* y) {
       mat_mpi_->spmv(x, y);
@@ -226,9 +226,9 @@ namespace strumpack {
       // TODO do this in a single routine/comm phase
       for (std::size_t c=0; c<x.cols(); c++)
         permute_vector
-          (x.ptr(0,c), this->matching_cperm_, mat_mpi_->dist(), comm_.comm());
+          (x.ptr(0,c), this->cperm_, mat_mpi_->dist(), comm_.comm());
     if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-      x.scale_rows(this->matching_Dc_);
+      x.scale_rows(this->Dc_);
 
     t.stop();
     this->perf_counters_stop("DIRECT/GMRES solve");

@@ -372,6 +372,24 @@ namespace strumpack {
     std::swap(val_, val);
   }
 
+  template<typename scalar_t,typename integer_t> long long
+  CompressedSparseMatrix<scalar_t,integer_t>::spmv_flops() const {
+    return (is_complex<scalar_t>() ? 4 : 1 ) * (2ll * nnz_ - n_);
+  }
+
+  template<typename scalar_t,typename integer_t> long long
+  CompressedSparseMatrix<scalar_t,integer_t>::spmv_bytes() const {
+    // read   ind  nnz  integer_t
+    //        val  nnz  scalar_t
+    //        ptr  n    integer_t
+    //        x    n    scalar_t
+    //        y    n    scalar_t
+    // write  y    n    scalar_t
+    return (sizeof(scalar_t) * 3 + sizeof(integer_t)) * n_
+      + (sizeof(scalar_t) + sizeof(integer_t)) * nnz_;
+  }
+
+
   // explicit template instantiations
   template class CompressedSparseMatrix<float,int>;
   template class CompressedSparseMatrix<double,int>;

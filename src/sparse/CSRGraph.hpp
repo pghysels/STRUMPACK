@@ -77,22 +77,21 @@ namespace strumpack {
 
     void permute(const integer_t* order, const integer_t* iorder);
 
-    void permute_local
-    (const std::vector<integer_t>& order,
-     const std::vector<integer_t>& iorder,
-     integer_t clo, integer_t chi);
+    void permute_local(const std::vector<integer_t>& order,
+                       const std::vector<integer_t>& iorder,
+                       integer_t clo, integer_t chi);
 
-    void permute_rows_local_cols_global
-    (const std::vector<integer_t>& order,
-     const std::vector<integer_t>& iorder,
-     integer_t clo, integer_t chi);
+    void permute_rows_local_cols_global(const std::vector<integer_t>& order,
+                                        const std::vector<integer_t>& iorder,
+                                        integer_t clo, integer_t chi);
 
-    HSS::HSSPartitionTree recursive_bisection
-    (int leaf, int conn_level, integer_t* order, integer_t* iorder,
-     integer_t lo, integer_t sep_begin, integer_t sep_end) const;
+    HSS::HSSPartitionTree
+    recursive_bisection(int leaf, int conn_level, integer_t* order,
+                        integer_t* iorder, integer_t lo, integer_t sep_begin,
+                        integer_t sep_end) const;
 
-    template<typename int_t>
-    DenseMatrix<bool> admissibility(const std::vector<int_t>& tiles) const;
+    template<typename int_t> DenseMatrix<bool>
+    admissibility(const std::vector<int_t>& tiles) const;
 
     void print_dense(const std::string& name) const;
 
@@ -101,11 +100,11 @@ namespace strumpack {
 
     Length2Edges length_2_edges(integer_t lo) const;
 
-    void split_recursive
-    (int leaf, int conn_level, integer_t lo,
-     integer_t sep_begin, integer_t sep_end, integer_t* order,
-     HSS::HSSPartitionTree& tree, integer_t& parts, integer_t part,
-     integer_t count, const Length2Edges& l2) const;
+    void split_recursive(int leaf, int conn_level, integer_t lo,
+                         integer_t sep_begin, integer_t sep_end,
+                         integer_t* order, HSS::HSSPartitionTree& tree,
+                         integer_t& parts, integer_t part,
+                         integer_t count, const Length2Edges& l2) const;
 
     /**
      * Extract the separator from sep_begin to sep_end. Also add extra
@@ -113,9 +112,10 @@ namespace strumpack {
      *
      * This only extracts the nodes i for which order[i] == part.
      */
-    CSRGraph<integer_t> extract_subgraph
-    (int order_level, integer_t lo, integer_t begin, integer_t end,
-     integer_t part, const integer_t* order, const Length2Edges& o) const;
+    CSRGraph<integer_t>
+    extract_subgraph(int order_level, integer_t lo, integer_t begin,
+                     integer_t end, integer_t part, const integer_t* order,
+                     const Length2Edges& o) const;
   };
 
   // template<typename integer_t, typename int_t>

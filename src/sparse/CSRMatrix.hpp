@@ -30,8 +30,8 @@
  * \file CSRMatrix.hpp
  * \brief Contains the compressed sparse row matrix storage class.
  */
-#ifndef CSR_MATRIX_HPP
-#define CSR_MATRIX_HPP
+#ifndef STRUMPACK_CSR_MATRIX_HPP
+#define STRUMPACK_CSR_MATRIX_HPP
 
 #include <vector>
 
@@ -75,15 +75,11 @@ namespace strumpack {
     void apply_scaling
     (const std::vector<scalar_t>& Dr,
      const std::vector<scalar_t>& Dc) override;
-    void apply_column_permutation
-    (const std::vector<integer_t>& perm) override;
+    void apply_column_permutation(const std::vector<integer_t>& perm) override;
     real_t max_scaled_residual
     (const scalar_t* x, const scalar_t* b) const override;
     real_t max_scaled_residual
     (const DenseM_t& x, const DenseM_t& b) const override;
-    void strumpack_mc64
-    (int_t job, int_t* num, integer_t* perm, int_t liw, int_t* iw, int_t ldw,
-     double* dw, int_t* icntl, int_t* info) override;
     int read_matrix_market(const std::string& filename) override;
     int read_binary(const std::string& filename);
     void print_dense(const std::string& name) const override;
@@ -151,6 +147,11 @@ namespace strumpack {
 #endif //defined(STRUMPACK_USE_MPI)
 #endif //DOXYGEN_SHOULD_SKIP_THIS
 
+  protected:
+    void strumpack_mc64
+    (int_t job, int_t* num, integer_t* perm, int_t liw, int_t* iw, int_t ldw,
+     double* dw, int_t* icntl, int_t* info) override;
+
   private:
     using CSM_t::n_;
     using CSM_t::nnz_;
@@ -162,4 +163,4 @@ namespace strumpack {
 
 } // end namespace strumpack
 
-#endif // CSR_MATRIX_HPP
+#endif // STRUMPACK_CSR_MATRIX_HPP

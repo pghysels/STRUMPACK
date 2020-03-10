@@ -160,6 +160,29 @@ namespace strumpack {
      const scalar_t* values, bool symmetric_pattern=false);
 
     /**
+     * This can only be used to UPDATE the nonzero values of the
+     * matrix. So it should be called with exactly the same sparsity
+     * pattern (row_ptr and col_ind) as used to set the initial matrix
+     * (using set_matrix or set_csr_matrix). This routine can be
+     * called after the factorization. In that case, for the next
+     * ordering phase, the permutation previously computed will be
+     * reused to permute the updated matrix values
+     *
+     *
+     * TODO
+     */
+    void update_matrix_values
+    (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
+     const scalar_t* values, bool symmetric_pattern);
+
+    /**
+     * TODO
+     *
+     */
+    void update_matrix_values
+    (const CSRMatrix<scalar_t,integer_t>& A);
+
+    /**
      * Compute matrix reorderings for numerical stability and to
      * reduce fill-in.
      *
@@ -382,9 +405,8 @@ namespace strumpack {
 
     SPOptions<scalar_t> opts_;
     bool is_root_;
-    std::vector<integer_t> matching_cperm_;
-    std::vector<scalar_t> matching_Dr_; // row scaling
-    std::vector<scalar_t> matching_Dc_; // column scaling
+    std::vector<integer_t> cperm_;
+    std::vector<scalar_t> Dr_, Dc_; // row/col scaling
     std::new_handler old_handler_;
     std::ostream* rank_out_ = nullptr;
     bool factored_ = false;
@@ -401,6 +423,9 @@ namespace strumpack {
 #endif
 
   private:
+    void permute_matrix_values();
+    void print_wrong_sparsity_error();
+
     std::unique_ptr<CSRMatrix<scalar_t,integer_t>> mat_;
     std::unique_ptr<MatrixReordering<scalar_t,integer_t>> nd_;
     std::unique_ptr<EliminationTree<scalar_t,integer_t>> tree_;

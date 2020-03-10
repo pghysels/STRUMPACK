@@ -288,14 +288,23 @@ namespace strumpack {
     (const scalar_t* x, const scalar_t* b) const = 0;
     virtual real_t max_scaled_residual
     (const DenseM_t& x, const DenseM_t& b) const = 0;
-    virtual void strumpack_mc64
-    (int_t job, int_t* num, integer_t* perm, int_t liw,
-     int_t* iw, int_t ldw, double* dw, int_t* icntl, int_t* info) {}
+
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
+    // virtual CSRGraph<integer_t>
+    // extract_graph(int ordering_level, integer_t lo, integer_t hi) const = 0;
+    // virtual CSRGraph<integer_t>
+    // extract_graph_sep_CB(integer_t lo, integer_t hi,
+    //                      const std::vector<integer_t>& upd) const = 0;
+    // virtual CSRGraph<integer_t>
+    // extract_graph_CB_sep(integer_t lo, integer_t hi,
+    //                      const std::vector<integer_t>& upd) const = 0;
+    // virtual CSRGraph<integer_t>
+    // extract_graph_CB(int ordering_level,
+    //                  const std::vector<integer_t>& upd) const = 0;
 
     virtual CSRGraph<integer_t> extract_graph
     (int ordering_level, integer_t lo, integer_t hi) const = 0;
-
-#ifndef DOXYGEN_SHOULD_SKIP_THIS
     virtual CSRGraph<integer_t> extract_graph_sep_CB
     (int ordering_level, integer_t lo, integer_t hi,
      const std::vector<integer_t>& upd) const = 0;
@@ -370,19 +379,12 @@ namespace strumpack {
     std::vector<std::tuple<integer_t,integer_t,scalar_t>>
     read_matrix_market_entries(const std::string& filename);
 
-    long long spmv_flops() const {
-      return (is_complex<scalar_t>() ? 4 : 1 ) * (2ll * nnz_ - n_);
-    }
-    long long spmv_bytes() const {
-      // read   ind  nnz  integer_t
-      //        val  nnz  scalar_t
-      //        ptr  n    integer_t
-      //        x    n    scalar_t
-      //        y    n    scalar_t
-      // write  y    n    scalar_t
-      return (sizeof(scalar_t) * 3 + sizeof(integer_t)) * n_
-        + (sizeof(scalar_t) + sizeof(integer_t)) * nnz_;
-    }
+    virtual void strumpack_mc64
+    (int_t job, int_t* num, integer_t* perm, int_t liw,
+     int_t* iw, int_t ldw, double* dw, int_t* icntl, int_t* info) {}
+
+    long long spmv_flops() const;
+    long long spmv_bytes() const;
   };
 
 } //end namespace strumpack

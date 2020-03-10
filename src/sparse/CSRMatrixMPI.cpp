@@ -330,7 +330,7 @@ namespace strumpack {
         if (graph_ranges[p].first <= perm_row &&
             perm_row < graph_ranges[p].second) {
           dest[row] = p;
-          scnts[p] += 2 + ptr_[row+1]-ptr_[row];
+          scnts[p] += 2 + ptr_[row+1] - ptr_[row];
           break;
         }
     }
@@ -441,8 +441,6 @@ namespace strumpack {
       nr_offdiag_nnz += ptr_[r+1] - offdiag_start_[r];
 
     auto P = comm_.size();
-    auto rsizes = new int[2*P]();
-    auto ssizes = rsizes+P;
     std::vector<integer_t> spmv_rind;
     spmv_rind.reserve(nr_offdiag_nnz);
     for (integer_t r=0; r<lrows_; r++)
@@ -461,22 +459,22 @@ namespace strumpack {
             (spmv_rind.begin(), spmv_rind.end(), ind_[j])));
 
     // how much to receive from each proc
-    for (size_t p=0, j=0; p<size_t(P); p++)
+    std::vector<int> rsizes(P), ssizes(P);
+    for (std::size_t p=0, j=0; p<std::size_t(P); p++)
       while (j < spmv_rind.size() && spmv_rind[j] < dist_[p+1]) {
-        j++; rsizes[p]++;
+        j++;
+        rsizes[p]++;
       }
+    comm_.all_to_all(rsizes.data(), 1, ssizes.data());
 
-    // TODO? use MPIWrapper?
-    MPI_Alltoall(rsizes, 1, mpi_type<int>(), ssizes, 1, mpi_type<int>(), comm());
-
-    auto nr_recv_procs = std::count_if
-                 (rsizes, rsizes+P, [](int s){ return s > 0;});
-    auto nr_send_procs =
-      std::count_if(ssizes, ssizes+P, [](int s){ return s > 0;});
-    spmv_bufs_.sranks.reserve(nr_send_procs);
-    spmv_bufs_.soff.reserve(nr_send_procs+1);
-    spmv_bufs_.rranks.reserve(nr_recv_procs);
-    spmv_bufs_.roffs.reserve(nr_recv_procs+1);
+    auto npr = std::count_if(rsizes.begin(), rsizes.end(),
+                             [](int s){ return s > 0;});
+    auto nps = std::count_if(ssizes.begin(), ssizes.end(),
+                             [](int s){ return s > 0;});
+    spmv_bufs_.sranks.reserve(nps);
+    spmv_bufs_.soff.reserve(nps+1);
+    spmv_bufs_.rranks.reserve(npr);
+    spmv_bufs_.roffs.reserve(npr+1);
     int oset_recv = 0, oset_send = 0;
     for (int p=0; p<P; p++) {
       if (ssizes[p] > 0) {
@@ -490,24 +488,21 @@ namespace strumpack {
         oset_recv += rsizes[p];
       }
     }
-    delete[] rsizes;
     spmv_bufs_.soff.push_back(oset_send);
     spmv_bufs_.roffs.push_back(oset_recv);
     spmv_bufs_.sind.resize(oset_send);
-
-    std::vector<MPI_Request> req(nr_recv_procs + nr_send_procs);
-    for (int p=0; p<nr_recv_procs; p++)
+    std::vector<MPI_Request> req(npr + nps);
+    for (int p=0; p<npr; p++)
       comm_.isend(spmv_rind.data() + spmv_bufs_.roffs[p],
                   spmv_bufs_.roffs[p+1] - spmv_bufs_.roffs[p],
                   spmv_bufs_.rranks[p], 0, &req[p]);
-    for (int p=0; p<nr_send_procs; p++)
+    for (int p=0; p<nps; p++)
       comm_.irecv(spmv_bufs_.sind.data() + spmv_bufs_.soff[p],
                   spmv_bufs_.soff[p+1] - spmv_bufs_.soff[p],
-                  spmv_bufs_.sranks[p], 0, &req[nr_recv_procs+p]);
+                  spmv_bufs_.sranks[p], 0, &req[npr+p]);
     wait_all(req);
-
-    spmv_bufs_.rbuf.resize(spmv_rind.size());
-    spmv_bufs_.sbuf.resize(spmv_bufs_.sind.size());
+    spmv_bufs_.rbuf.resize(oset_recv);
+    spmv_bufs_.sbuf.resize(oset_send);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -525,18 +520,18 @@ namespace strumpack {
   (const scalar_t* x, scalar_t* y) const {
     setup_spmv_buffers();
 
-    for (size_t i=0; i<spmv_bufs_.sind.size(); i++)
+    for (std::size_t i=0; i<spmv_bufs_.sind.size(); i++)
       spmv_bufs_.sbuf[i] =
         x[spmv_bufs_.sind[i]-brow_];
 
     std::vector<MPI_Request> sreq(spmv_bufs_.sranks.size()),
       rreq(spmv_bufs_.rranks.size());
-    for (size_t p=0; p<spmv_bufs_.sranks.size(); p++)
+    for (std::size_t p=0; p<spmv_bufs_.sranks.size(); p++)
       comm_.isend(spmv_bufs_.sbuf.data() + spmv_bufs_.soff[p],
                   spmv_bufs_.soff[p+1] - spmv_bufs_.soff[p],
                   spmv_bufs_.sranks[p], 0, &sreq[p]);
 
-    for (size_t p=0; p<spmv_bufs_.rranks.size(); p++)
+    for (std::size_t p=0; p<spmv_bufs_.rranks.size(); p++)
       comm_.irecv(spmv_bufs_.rbuf.data() + spmv_bufs_.roffs[p],
                   spmv_bufs_.roffs[p+1] - spmv_bufs_.roffs[p],
                   spmv_bufs_.rranks[p], 0, &rreq[p]);
@@ -937,17 +932,17 @@ namespace strumpack {
   (const scalar_t* x, const scalar_t* b) const {
     setup_spmv_buffers();
 
-    for (size_t i=0; i<spmv_bufs_.sind.size(); i++)
+    for (std::size_t i=0; i<spmv_bufs_.sind.size(); i++)
       spmv_bufs_.sbuf[i] = x[spmv_bufs_.sind[i]-brow_];
 
     std::vector<MPI_Request> sreq(spmv_bufs_.sranks.size());
-    for (size_t p=0; p<spmv_bufs_.sranks.size(); p++)
+    for (std::size_t p=0; p<spmv_bufs_.sranks.size(); p++)
       comm_.isend(spmv_bufs_.sbuf.data() + spmv_bufs_.soff[p],
                   spmv_bufs_.soff[p+1] - spmv_bufs_.soff[p],
                   spmv_bufs_.sranks[p], 0, &sreq[p]);
 
     std::vector<MPI_Request> rreq(spmv_bufs_.rranks.size());
-    for (size_t p=0; p<spmv_bufs_.rranks.size(); p++)
+    for (std::size_t p=0; p<spmv_bufs_.rranks.size(); p++)
       comm_.irecv(spmv_bufs_.rbuf.data() + spmv_bufs_.roffs[p],
                   spmv_bufs_.roffs[p+1] - spmv_bufs_.roffs[p],
                   spmv_bufs_.rranks[p], 0, &rreq[p]);
