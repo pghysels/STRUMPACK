@@ -237,7 +237,7 @@ namespace strumpack {
           } else F2.mult(op, invF11F12R, S);
           compress_flops_Schur(invf11_mult_flops);
         };
-      HODLR::LRBFMatrix<scalar_t> Schur(*F22_, *F22_);
+      HODLR::ButterflyMatrix<scalar_t> Schur(*F22_, *F22_);
       { TIMER_TIME(TaskType::HSS_COMPUTE_SCHUR, 0, t_schur_compress);
         Schur.compress(sample_Schur);
       }
@@ -535,16 +535,16 @@ namespace strumpack {
         auto knn = opts.HODLR_options().knn_lrbf();
         auto nns12 = HODLR::get_odiag_neighbors(knn, g12, g, gCB);
         auto nns21 = HODLR::get_odiag_neighbors(knn, g21, gCB, g);
-        F12_ = HODLR::LRBFMatrix<scalar_t>
+        F12_ = HODLR::ButterflyMatrix<scalar_t>
           (F11_, *F22_, nns12, nns21, opts.HODLR_options());
-        F21_ = HODLR::LRBFMatrix<scalar_t>
+        F21_ = HODLR::ButterflyMatrix<scalar_t>
           (*F22_, F11_, nns21, nns12, opts.HODLR_options());
       } else {
         F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
           (new HODLR::HODLRMatrix<scalar_t>
            (Comm(), CB_tree, opts.HODLR_options()));
-        F12_ = HODLR::LRBFMatrix<scalar_t>(F11_, *F22_);
-        F21_ = HODLR::LRBFMatrix<scalar_t>(*F22_, F11_);
+        F12_ = HODLR::ButterflyMatrix<scalar_t>(F11_, *F22_);
+        F21_ = HODLR::ButterflyMatrix<scalar_t>(*F22_, F11_);
       }
     }
   }

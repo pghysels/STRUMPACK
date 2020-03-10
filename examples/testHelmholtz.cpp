@@ -29,6 +29,7 @@
 
 #include <iostream>
 #include <complex>
+#include <algorithm>
 
 #include "StrumpackParameters.hpp"
 #include "StrumpackFortranCInterface.h"

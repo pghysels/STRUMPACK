@@ -40,6 +40,9 @@
 #if defined(_OPENMP)
 #include "omp.h"
 #endif
+#if defined(STRUMPACK_USE_MPI)
+#include "dense/DistributedMatrix.hpp"
+#endif
 
 namespace strumpack {
 

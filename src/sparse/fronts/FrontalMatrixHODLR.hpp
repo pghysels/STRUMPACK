@@ -31,7 +31,7 @@
 
 #include "FrontalMatrix.hpp"
 #include "HODLR/HODLRMatrix.hpp"
-#include "HODLR/LRBFMatrix.hpp"
+#include "HODLR/ButterflyMatrix.hpp"
 
 namespace strumpack {
 
@@ -106,7 +106,7 @@ namespace strumpack {
 
   private:
     HODLR::HODLRMatrix<scalar_t> F11_;
-    HODLR::LRBFMatrix<scalar_t> F12_, F21_;
+    HODLR::ButterflyMatrix<scalar_t> F12_, F21_;
     std::unique_ptr<HODLR::HODLRMatrix<scalar_t>> F22_;
     MPIComm commself_;
     HSS::HSSPartitionTree sep_tree_;

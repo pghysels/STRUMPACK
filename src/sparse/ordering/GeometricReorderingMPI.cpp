@@ -26,10 +26,10 @@
  *             Division).
  *
  */
-
 #include <array>
 #include <unordered_map>
 #include <functional>
+#include <algorithm>
 
 #include "GeometricReorderingMPI.hpp"
 

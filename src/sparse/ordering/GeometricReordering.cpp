@@ -27,6 +27,7 @@
  *
  */
 #include <unordered_map>
+#include <algorithm>
 
 #include "GeometricReordering.hpp"
 

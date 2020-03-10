@@ -60,6 +60,7 @@ namespace strumpack {
     public CompressedSparseMatrix<scalar_t,integer_t> {
     using DistM_t = DistributedMatrix<scalar_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
+    using CSM_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using real_t = typename RealType<scalar_t>::value_type;
 
   public:
@@ -178,11 +179,11 @@ namespace strumpack {
      const std::vector<integer_t>& upd, const DistM_t& R,
      DistM_t& S, int depth) const;
 
-    using CompressedSparseMatrix<scalar_t,integer_t>::n_;
-    using CompressedSparseMatrix<scalar_t,integer_t>::nnz_;
-    using CompressedSparseMatrix<scalar_t,integer_t>::ptr_;
-    using CompressedSparseMatrix<scalar_t,integer_t>::ind_;
-    using CompressedSparseMatrix<scalar_t,integer_t>::val_;
+    using CSM_t::n_;
+    using CSM_t::nnz_;
+    using CSM_t::ptr_;
+    using CSM_t::ind_;
+    using CSM_t::val_;
   };
 
 } // end namespace strumpack

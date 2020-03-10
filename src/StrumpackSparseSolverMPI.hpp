@@ -35,7 +35,7 @@
 
 #include "StrumpackSparseSolver.hpp"
 #include "misc/MPIWrapper.hpp"
-
+#include "dense/ScaLAPACKWrapper.hpp"
 
 namespace strumpack {
 

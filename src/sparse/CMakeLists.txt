@@ -2,9 +2,11 @@ target_sources(strumpack
   PRIVATE
   ${CMAKE_CURRENT_LIST_DIR}/strumpack_mc64ad.c
   ${CMAKE_CURRENT_LIST_DIR}/CompressedSparseMatrix.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/CompressedSparseMatrix.cpp
   ${CMAKE_CURRENT_LIST_DIR}/CSRGraph.hpp
   ${CMAKE_CURRENT_LIST_DIR}/CSRGraph.cpp
   ${CMAKE_CURRENT_LIST_DIR}/CSRMatrix.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/CSRMatrix.cpp
   ${CMAKE_CURRENT_LIST_DIR}/EliminationTree.hpp
   ${CMAKE_CURRENT_LIST_DIR}/EliminationTree.cpp
   ${CMAKE_CURRENT_LIST_DIR}/ETree.hpp
@@ -22,6 +24,7 @@ if(STRUMPACK_USE_MPI)
   target_sources(strumpack
     PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/CSRMatrixMPI.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/CSRMatrixMPI.cpp
     ${CMAKE_CURRENT_LIST_DIR}/ETree.hpp
     ${CMAKE_CURRENT_LIST_DIR}/EliminationTreeMPI.hpp
     ${CMAKE_CURRENT_LIST_DIR}/EliminationTreeMPI.cpp

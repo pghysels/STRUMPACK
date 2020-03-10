@@ -31,14 +31,14 @@
 
 #include "misc/TaskTimer.hpp"
 #include "misc/Tools.hpp"
-#include "LRBFMatrix.hpp"
+#include "ButterflyMatrix.hpp"
 #include "HODLRWrapper.hpp"
 
 namespace strumpack {
 
   namespace HODLR {
 
-    template<typename scalar_t> LRBFMatrix<scalar_t>::LRBFMatrix
+    template<typename scalar_t> ButterflyMatrix<scalar_t>::ButterflyMatrix
     (const HODLRMatrix<scalar_t>& A, const HODLRMatrix<scalar_t>& B)
       : c_(A.c_) {
       rows_ = A.rows();
@@ -76,18 +76,18 @@ namespace strumpack {
     }
 
     template<typename scalar_t> double
-    LRBFMatrix<scalar_t>::get_stat(const std::string& name) const {
+    ButterflyMatrix<scalar_t>::get_stat(const std::string& name) const {
       if (!stats_) return 0;
       return BPACK_get_stat<scalar_t>(stats_, name);
     }
 
     template<typename scalar_t> void
-    LRBFMatrix<scalar_t>::print_stats() {
+    ButterflyMatrix<scalar_t>::print_stats() {
       if (!stats_) return;
       HODLR_printstats<scalar_t>(stats_, ptree_);
     }
 
-    template<typename integer_t> struct AdmInfoLRBF {
+    template<typename integer_t> struct AdmInfoButterfly {
       std::pair<std::vector<int>,std::vector<int>> rmaps, cmaps;
       const DenseMatrix<bool>* adm;
     };
@@ -95,9 +95,9 @@ namespace strumpack {
     /**
      * This is not used now, but could be useful for the H format.
      */
-    template<typename integer_t> void LRBF_admissibility_query
+    template<typename integer_t> void Butterfly_admissibility_query
     (int* m, int* n, int* admissible, C2Fptr fdata) {
-      auto& info = *static_cast<AdmInfoLRBF<integer_t>*>(fdata);
+      auto& info = *static_cast<AdmInfoButterfly<integer_t>*>(fdata);
       auto& adm = *(info.adm);
       auto& rmap0 = info.rmaps.first;
       auto& rmap1 = info.rmaps.second;
@@ -177,7 +177,7 @@ namespace strumpack {
       return nns;
     }
 
-    template<typename scalar_t> LRBFMatrix<scalar_t>::LRBFMatrix
+    template<typename scalar_t> ButterflyMatrix<scalar_t>::ButterflyMatrix
     (const HODLRMatrix<scalar_t>& A, const HODLRMatrix<scalar_t>& B,
      DenseMatrix<int>& neighbors_rows, DenseMatrix<int>& neighbors_cols,
      const opts_t& opts) : c_(A.c_) {
@@ -221,7 +221,7 @@ namespace strumpack {
       }
     }
 
-    template<typename scalar_t> LRBFMatrix<scalar_t>::~LRBFMatrix() {
+    template<typename scalar_t> ButterflyMatrix<scalar_t>::~ButterflyMatrix() {
       if (stats_) HODLR_deletestats<scalar_t>(stats_);
       if (ptree_) HODLR_deleteproctree<scalar_t>(ptree_);
       if (msh_) HODLR_deletemesh<scalar_t>(msh_);
@@ -230,8 +230,8 @@ namespace strumpack {
       if (lr_bf_) LRBF_deletebf<scalar_t>(lr_bf_);
     }
 
-    template<typename scalar_t> LRBFMatrix<scalar_t>&
-    LRBFMatrix<scalar_t>::operator=(LRBFMatrix<scalar_t>&& h) {
+    template<typename scalar_t> ButterflyMatrix<scalar_t>&
+    ButterflyMatrix<scalar_t>::operator=(ButterflyMatrix<scalar_t>&& h) {
       lr_bf_ = h.lr_bf_;       h.lr_bf_ = nullptr;
       options_ = h.options_;   h.options_ = nullptr;
       stats_ = h.stats_;       h.stats_ = nullptr;
@@ -252,14 +252,14 @@ namespace strumpack {
     template<typename scalar_t> void LRBF_matvec_routine
     (const char* op, int* nin, int* nout, int* nvec,
      const scalar_t* X, scalar_t* Y, C2Fptr func, scalar_t* a, scalar_t* b) {
-      auto A = static_cast<typename LRBFMatrix<scalar_t>::mult_t*>(func);
+      auto A = static_cast<typename ButterflyMatrix<scalar_t>::mult_t*>(func);
       DenseMatrixWrapper<scalar_t> Yw(*nout, *nvec, Y, *nout),
         Xw(*nin, *nvec, const_cast<scalar_t*>(X), *nin);
       (*A)(c2T(*op), *a, Xw, *b, Yw);
     }
 
     template<typename scalar_t> void
-    LRBFMatrix<scalar_t>::compress(const mult_t& Amult) {
+    ButterflyMatrix<scalar_t>::compress(const mult_t& Amult) {
       C2Fptr f = static_cast<void*>(const_cast<mult_t*>(&Amult));
       LRBF_construct_matvec_compute
         (lr_bf_, options_, stats_, msh_, kerquant_, ptree_,
@@ -267,13 +267,13 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    LRBFMatrix<scalar_t>::compress(const mult_t& Amult, int rank_guess) {
+    ButterflyMatrix<scalar_t>::compress(const mult_t& Amult, int rank_guess) {
       HODLR_set_I_option<scalar_t>(options_, "rank0", rank_guess);
       compress(Amult);
     }
 
     template<typename scalar_t> void
-    LRBFMatrix<scalar_t>::compress(const delem_blocks_t& Aelem) {
+    ButterflyMatrix<scalar_t>::compress(const delem_blocks_t& Aelem) {
       BLACSGrid gloc(MPIComm(MPI_COMM_SELF), 1),
         gnull(MPIComm(MPI_COMM_NULL), 1);
       AelemCommPtrs<scalar_t> AC{&Aelem, &c_, &gloc, &gnull};
@@ -283,7 +283,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    LRBFMatrix<scalar_t>::compress(const elem_blocks_t& Aelem) {
+    ButterflyMatrix<scalar_t>::compress(const elem_blocks_t& Aelem) {
       C2Fptr f = static_cast<void*>(const_cast<elem_blocks_t*>(&Aelem));
       LRBF_construct_element_compute<scalar_t>
         (lr_bf_, options_, stats_, msh_, kerquant_, ptree_,
@@ -291,7 +291,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    LRBFMatrix<scalar_t>::mult
+    ButterflyMatrix<scalar_t>::mult
     (Trans op, const DenseM_t& X, DenseM_t& Y) const {
       assert(Y.cols() == X.cols());
       if (op == Trans::N)
@@ -303,7 +303,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    LRBFMatrix<scalar_t>::mult
+    ButterflyMatrix<scalar_t>::mult
     (Trans op, const DistM_t& X, DistM_t& Y) const {
       DenseM_t Y1D(lrows_, X.cols());
       if (op == Trans::N) {
@@ -320,7 +320,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    LRBFMatrix<scalar_t>::extract_add_elements
+    ButterflyMatrix<scalar_t>::extract_add_elements
     (ExtractionMeta& e, std::vector<DistMW_t>& B) {
       std::unique_ptr<scalar_t[]> alldat_loc(new scalar_t[e.Nalldat_loc]);
       auto ptr = alldat_loc.get();
@@ -340,7 +340,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    LRBFMatrix<scalar_t>::extract_add_elements
+    ButterflyMatrix<scalar_t>::extract_add_elements
     (const VecVec_t& I, const VecVec_t& J, std::vector<DenseMW_t>& B) {
       if (I.empty()) return;
       assert(I.size() == J.size() && I.size() == B.size());
@@ -368,7 +368,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    LRBFMatrix<scalar_t>::extract_add_elements
+    ButterflyMatrix<scalar_t>::extract_add_elements
     (ExtractionMeta& e, std::vector<DenseMW_t>& B) {
       std::unique_ptr<scalar_t[]> alldat_loc(new scalar_t[e.Nalldat_loc]);
       auto ptr = alldat_loc.get();
@@ -388,7 +388,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    LRBFMatrix<scalar_t>::set_extraction_meta_1grid
+    ButterflyMatrix<scalar_t>::set_extraction_meta_1grid
     (const VecVec_t& I, const VecVec_t& J,
      ExtractionMeta& e, int Nalldat_loc, int* pmaps) const {
       e.Ninter = I.size();
@@ -414,7 +414,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> DistributedMatrix<scalar_t>
-    LRBFMatrix<scalar_t>::dense(const BLACSGrid* g) const {
+    ButterflyMatrix<scalar_t>::dense(const BLACSGrid* g) const {
       DistM_t A(g, rows_, cols_), I(g, rows_, cols_);
       I.eye();
       mult(Trans::N, I, A);
@@ -422,7 +422,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> DenseMatrix<scalar_t>
-    LRBFMatrix<scalar_t>::redistribute_2D_to_1D
+    ButterflyMatrix<scalar_t>::redistribute_2D_to_1D
     (const DistM_t& R2D, const std::vector<int>& dist) const {
       const auto rank = c_.rank();
       DenseM_t R1D(dist[rank+1] - dist[rank], R2D.cols());
@@ -431,7 +431,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    LRBFMatrix<scalar_t>::redistribute_2D_to_1D
+    ButterflyMatrix<scalar_t>::redistribute_2D_to_1D
     (scalar_t a, const DistM_t& R2D, scalar_t b, DenseM_t& R1D,
      const std::vector<int>& dist) const {
       TIMER_TIME(TaskType::REDIST_2D_TO_HSS, 0, t_redist);
@@ -494,7 +494,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    LRBFMatrix<scalar_t>::redistribute_1D_to_2D
+    ButterflyMatrix<scalar_t>::redistribute_1D_to_2D
     (const DenseM_t& S1D, DistM_t& S2D, const std::vector<int>& dist) const {
       TIMER_TIME(TaskType::REDIST_2D_TO_HSS, 0, t_redist);
       const int rank = c_.rank();
@@ -544,10 +544,10 @@ namespace strumpack {
     }
 
     // explicit instantiations
-    template class LRBFMatrix<float>;
-    template class LRBFMatrix<double>;
-    template class LRBFMatrix<std::complex<float>>;
-    template class LRBFMatrix<std::complex<double>>;
+    template class ButterflyMatrix<float>;
+    template class ButterflyMatrix<double>;
+    template class ButterflyMatrix<std::complex<float>>;
+    template class ButterflyMatrix<std::complex<double>>;
 
     template DenseMatrix<int>
     get_odiag_neighbors(int knn, const CSRGraph<int>& gAB,

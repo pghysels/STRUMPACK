@@ -31,6 +31,7 @@
 
 #include "EliminationTreeMPI.hpp"
 #include "PropMapSparseMatrix.hpp"
+#include "dense/DistributedMatrix.hpp"
 
 namespace strumpack {
 

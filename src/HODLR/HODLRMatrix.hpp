@@ -480,7 +480,7 @@ namespace strumpack {
       void perm_init();
       void dist_init();
 
-      template<typename S> friend class LRBFMatrix;
+      template<typename S> friend class ButterflyMatrix;
     };
 
 

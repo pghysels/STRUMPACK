@@ -30,6 +30,17 @@
 #include "ScaLAPACKWrapper.hpp"
 #include "StrumpackFortranCInterface.h"
 
+#define BLACSCTXTSIZE 9
+#define BLACSdtype    0
+#define BLACSctxt     1
+#define BLACSm        2
+#define BLACSn        3
+#define BLACSmb       4
+#define BLACSnb       5
+#define BLACSrsrc     6
+#define BLACScsrc     7
+#define BLACSlld      8
+
 
 namespace strumpack {
   namespace scalapack {

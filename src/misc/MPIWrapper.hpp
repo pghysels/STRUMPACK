@@ -57,6 +57,8 @@ namespace strumpack {
   template<typename T> MPI_Datatype mpi_type();
   /** return MPI datatype for C++ char */
   template<> inline MPI_Datatype mpi_type<char>() { return MPI_CHAR; }
+  /** return MPI datatype for C++ char */
+  template<> inline MPI_Datatype mpi_type<bool>() { return MPI_BYTE; }
   /** return MPI datatype for C++ int */
   template<> inline MPI_Datatype mpi_type<int>() { return MPI_INT; }
   /** return MPI datatype for C++ long */
@@ -406,6 +408,14 @@ namespace strumpack {
       T t;
       MPI_Recv(&t, 1, mpi_type<T>(), src, tag, comm_, MPI_STATUS_IGNORE);
       return t;
+    }
+
+    template<typename T>
+    void irecv(const T* rbuf, std::size_t rsize, int src,
+               int tag, MPI_Request* req) const {
+      // const_cast is necessary for ancient openmpi version used on Travis
+      MPI_Irecv(const_cast<T*>(rbuf), rsize, mpi_type<T>(),
+                src, tag, comm_, req);
     }
 
     /**

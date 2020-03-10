@@ -26,11 +26,11 @@
  *             Division).
  *
  */
-/*! \file LRBFMatrix.hpp
+/*! \file ButterflyMatrix.hpp
  * \brief Classes wrapping around Yang Liu's butterfly code.
  */
-#ifndef STRUMPACK_LRBF_MATRIX_HPP
-#define STRUMPACK_LRBF_MATRIX_HPP
+#ifndef STRUMPACK_BUTTERFLY_MATRIX_HPP
+#define STRUMPACK_BUTTERFLY_MATRIX_HPP
 
 #include "HODLRMatrix.hpp"
 
@@ -42,7 +42,7 @@ namespace strumpack {
    */
   namespace HODLR {
 
-    template<typename scalar_t> class LRBFMatrix {
+    template<typename scalar_t> class ButterflyMatrix {
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using DistM_t = DistributedMatrix<scalar_t>;
@@ -57,24 +57,24 @@ namespace strumpack {
       using delem_blocks_t = typename HODLRMatrix<scalar_t>::delem_blocks_t;
       using elem_blocks_t = typename HODLRMatrix<scalar_t>::elem_blocks_t;
 
-      LRBFMatrix() {}
+      ButterflyMatrix() {}
       /**
        * Construct the block X, subblock of the matrix [A X; Y B]
        * A and B should be defined on the same MPI communicator.
        */
-      LRBFMatrix
+      ButterflyMatrix
       (const HODLRMatrix<scalar_t>& A, const HODLRMatrix<scalar_t>& B);
 
-      LRBFMatrix
+      ButterflyMatrix
       (const HODLRMatrix<scalar_t>& A, const HODLRMatrix<scalar_t>& B,
        DenseMatrix<int>& neighbors_rows, DenseMatrix<int>& neighbors_cols,
        const opts_t& opts);
 
-      LRBFMatrix(const LRBFMatrix<scalar_t>& h) = delete;
-      LRBFMatrix(LRBFMatrix<scalar_t>&& h) { *this = std::move(h); }
-      virtual ~LRBFMatrix();
-      LRBFMatrix<scalar_t>& operator=(const LRBFMatrix<scalar_t>& h) = delete;
-      LRBFMatrix<scalar_t>& operator=(LRBFMatrix<scalar_t>&& h);
+      ButterflyMatrix(const ButterflyMatrix<scalar_t>& h) = delete;
+      ButterflyMatrix(ButterflyMatrix<scalar_t>&& h) { *this = std::move(h); }
+      virtual ~ButterflyMatrix();
+      ButterflyMatrix<scalar_t>& operator=(const ButterflyMatrix<scalar_t>& h) = delete;
+      ButterflyMatrix<scalar_t>& operator=(ButterflyMatrix<scalar_t>&& h);
 
       std::size_t rows() const { return rows_; }
       std::size_t cols() const { return cols_; }
@@ -132,7 +132,7 @@ namespace strumpack {
       (const DenseM_t& S1D, DistM_t& S2D, const std::vector<int>& dist) const;
 
     private:
-      F2Cptr lr_bf_ = nullptr;     // LRBF handle returned by Fortran code
+      F2Cptr lr_bf_ = nullptr;     // Butterfly handle returned by Fortran code
       F2Cptr options_ = nullptr;   // options structure returned by Fortran code
       F2Cptr stats_ = nullptr;     // statistics structure returned by Fortran code
       F2Cptr msh_ = nullptr;       // mesh structure returned by Fortran code
@@ -157,4 +157,4 @@ namespace strumpack {
   } // end namespace HODLR
 } // end namespace strumpack
 
-#endif // STRUMPACK_LRBF_MATRIX_HPP
+#endif // STRUMPACK_BUTTERFLY_MATRIX_HPP
