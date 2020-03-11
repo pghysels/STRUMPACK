@@ -25,6 +25,7 @@
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
  */
+#include <cstddef>
 #include <sstream>
 #include <fstream>
 #include <vector>
@@ -690,20 +691,10 @@ namespace strumpack {
     } else return permute_and_scale_MC64(job, perm, Dr, Dc, apply);
   }
 
-  /**
-   * This gathers the matrix to 1 process, then applies MC64
-   * sequentially.
-   *
-   * On output, the perm vector contains the GLOBAL column
-   * permutation, such that the column perm[j] of the original matrix
-   * is column j in the permuted matrix.
-   *
-   * Dr and Dc contain the LOCAL scaling vectors.
-   */
   template<typename scalar_t,typename integer_t> int
   CSRMatrixMPI<scalar_t,integer_t>::permute_and_scale_MC64
-  (MatchingJob job, std::vector<integer_t>& perm, std::vector<scalar_t>& Dr,
-   std::vector<scalar_t>& Dc, bool apply) {
+  (MatchingJob job, std::vector<integer_t>& perm, std::vector<scalar_t>& lDr,
+   std::vector<scalar_t>& gDc, bool apply) {
     if (job == MatchingJob::NONE) return 0;
     if (job == MatchingJob::COMBBLAS || job == MatchingJob::MAX_CARDINALITY) {
       if (!mpi_rank())
@@ -713,7 +704,7 @@ namespace strumpack {
       return 1;
     }
     auto Aseq = gather();
-    std::vector<scalar_t> gDr, gDc;
+    std::vector<scalar_t> gDr;
     int ierr = 0;
     if (Aseq) {
       ierr = Aseq->permute_and_scale
@@ -737,16 +728,13 @@ namespace strumpack {
         scnts[p] = dist_[p+1] - dist_[p];
         sdispls[p] = dist_[p];
       }
-      Dr.resize(lrows_);
+      lDr.resize(lrows_);
       MPI_Scatterv
         (rank ? nullptr : gDr.data(), scnts, sdispls, mpi_type<scalar_t>(),
-         Dr.data(), lrows_, mpi_type<scalar_t>(), 0, comm());
+         lDr.data(), lrows_, mpi_type<scalar_t>(), 0, comm());
       gDr.clear();
       comm_.broadcast(gDc);
-      apply_scaling(Dr, gDc);
-      Dc.resize(lrows_);
-      std::copy(gDc.data()+brow_, gDc.data()+brow_+lrows_, Dc.data());
-      gDc.clear();
+      apply_scaling(lDr, gDc);
     }
     apply_column_permutation(perm);
     symm_sparse_ = false;
@@ -756,13 +744,12 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   CSRMatrixMPI<scalar_t,integer_t>::apply_column_permutation
   (const std::vector<integer_t>& perm) {
-    integer_t* iperm = new integer_t[this->size()];
+    std::unique_ptr<integer_t[]> iperm(new integer_t[this->size()]);
     for (integer_t i=0; i<this->size(); i++) iperm[perm[i]] = i;
 #pragma omp parallel for
     for (integer_t r=0; r<this->lrows_; r++)
       for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++)
         ind_[j] = iperm[ind_[j]];
-    delete[] iperm;
     split_diag_offdiag();
   }
 
@@ -783,13 +770,13 @@ namespace strumpack {
   CSRMatrixMPI<scalar_t,integer_t>::symmetrize_sparsity() {
     if (symm_sparse_) return;
     auto P = comm_.size();
-
     struct Idxij {
       integer_t i, j;
     };
     MPI_Datatype Idxij_mpi_t;
     int blocklengths[2] = {1, 1};
-    MPI_Datatype types[2] = {mpi_type<integer_t>(), mpi_type<scalar_t>()};
+    MPI_Datatype types[2] = {mpi_type<decltype(Idxij::i)>(),
+                             mpi_type<decltype(Idxij::j)>()};
     MPI_Aint offsets[2] = {offsetof(Idxij, i), offsetof(Idxij, j)};
     MPI_Type_create_struct(2, blocklengths, offsets, types, &Idxij_mpi_t);
     MPI_Type_commit(&Idxij_mpi_t);

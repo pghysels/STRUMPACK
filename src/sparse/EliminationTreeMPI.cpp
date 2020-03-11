@@ -61,7 +61,9 @@ namespace strumpack {
     MPI_Allgather
       (&local_range_, sizeof(SepRange), MPI_BYTE, subtree_ranges_.data(),
        sizeof(SepRange), MPI_BYTE, comm_.comm());
-    nd.clear_tree_data();
+    /* do not clear the tree data, because if we update the matrix
+     * values, we want to reuse this information */
+    // nd.clear_tree_data();
   }
 
   template<typename scalar_t,typename integer_t> FrontCounter

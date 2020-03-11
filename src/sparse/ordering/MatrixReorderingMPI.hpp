@@ -95,7 +95,7 @@ namespace strumpack {
 
     void separator_reordering(const Opts_t& opts, CSM_t& A, F_t* F);
 
-    void clear_tree_data();
+    void clear_tree_data() override;
 
     /**
      * proc_dist_sep[sep] holds the rank of the process responsible

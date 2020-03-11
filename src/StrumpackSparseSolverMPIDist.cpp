@@ -56,7 +56,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::set_matrix
   (const CSRMatrix<scalar_t,integer_t>& A) {
-    mat_mpi_ = std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>>
+    mat_mpi_.reset
       (new CSRMatrixMPI<scalar_t,integer_t>(&A, comm_.comm(), true));
     this->factored_ = this->reordered_ = false;
   }
@@ -64,8 +64,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::set_matrix
   (const CSRMatrixMPI<scalar_t,integer_t>& A) {
-    mat_mpi_ = std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>>
-      (new CSRMatrixMPI<scalar_t,integer_t>(A));
+    mat_mpi_.reset(new CSRMatrixMPI<scalar_t,integer_t>(A));
     this->factored_ = this->reordered_ = false;
   }
 
@@ -75,7 +74,7 @@ namespace strumpack {
    const scalar_t* values, bool symmetric_pattern) {
     CSRMatrix<scalar_t,integer_t> mat_seq
       (N, row_ptr, col_ind, values, symmetric_pattern);
-    mat_mpi_ = std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>>
+    mat_mpi_.reset
       (new CSRMatrixMPI<scalar_t,integer_t>(&mat_seq, comm_.comm(), true));
     this->factored_ = this->reordered_ = false;
   }
@@ -84,7 +83,7 @@ namespace strumpack {
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::set_distributed_csr_matrix
   (integer_t local_rows, const integer_t* row_ptr, const integer_t* col_ind,
    const scalar_t* values, const integer_t* dist, bool symmetric_pattern) {
-    mat_mpi_ = std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>>
+    mat_mpi_.reset
       (new CSRMatrixMPI<scalar_t,integer_t>
        (local_rows, row_ptr, col_ind, values, dist,
         comm_.comm(), symmetric_pattern));
@@ -96,7 +95,7 @@ namespace strumpack {
   (integer_t local_rows, const integer_t* d_ptr, const integer_t* d_ind,
    const scalar_t* d_val, const integer_t* o_ptr, const integer_t* o_ind,
    const scalar_t* o_val, const integer_t* garray) {
-    mat_mpi_ = std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>>
+    mat_mpi_.reset
       (new CSRMatrixMPI<scalar_t,integer_t>
        (local_rows, d_ptr, d_ind, d_val, o_ptr, o_ind, o_val,
         garray, comm_.comm()));
@@ -104,9 +103,73 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::update_matrix_values
+  (const CSRMatrixMPI<scalar_t,integer_t>& A) {
+    if (!(mat_mpi_ && A.local_rows() == mat_mpi_->local_rows() &&
+          A.local_nnz() <= mat_mpi_->local_nnz())) {
+      // matrix() has been made symmetric, can have more nonzeros
+      this->print_wrong_sparsity_error();
+      return;
+    }
+    mat_mpi_.reset(new CSRMatrixMPI<scalar_t,integer_t>(A));
+    redistribute_values();
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::update_matrix_values
+  (integer_t local_rows, const integer_t* row_ptr, const integer_t* col_ind,
+   const scalar_t* values, const integer_t* dist, bool symmetric_pattern) {
+    if (!(mat_mpi_ && local_rows == mat_mpi_->local_rows() &&
+          row_ptr[local_rows]-row_ptr[0] <= mat_mpi_->local_nnz())) {
+      // matrix() has been made symmetric, can have more nonzeros
+      this->print_wrong_sparsity_error();
+      return;
+    }
+    mat_mpi_.reset
+      (new CSRMatrixMPI<scalar_t,integer_t>
+       (local_rows, row_ptr, col_ind, values, dist,
+        comm_.comm(), symmetric_pattern));
+    redistribute_values();
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::update_matrix_values
+  (integer_t local_rows, const integer_t* d_ptr, const integer_t* d_ind,
+   const scalar_t* d_val, const integer_t* o_ptr, const integer_t* o_ind,
+   const scalar_t* o_val, const integer_t* garray) {
+    if (!(mat_mpi_ && local_rows == mat_mpi_->local_rows())) {
+      // matrix() has been made symmetric, can have more nonzeros
+      this->print_wrong_sparsity_error();
+      return;
+    }
+    mat_mpi_.reset
+      (new CSRMatrixMPI<scalar_t,integer_t>
+       (local_rows, d_ptr, d_ind, d_val, o_ptr, o_ind, o_val,
+        garray, comm_.comm()));
+    redistribute_values();
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::redistribute_values() {
+    if (this->reordered_) {
+      if (opts_.matching() != MatchingJob::NONE) {
+        if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+          matrix()->apply_scaling(this->Dr_, this->Dc_);
+        matrix()->apply_column_permutation(this->cperm_);
+      }
+      matrix()->symmetrize_sparsity();
+      setup_tree();
+      if (opts_.compression() != CompressionType::NONE)
+        separator_reordering();
+    }
+    this->factored_ = false;
+  }
+
+  template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::setup_reordering() {
-    nd_mpi_ = std::unique_ptr<MatrixReorderingMPI<scalar_t,integer_t>>
-      (new MatrixReorderingMPI<scalar_t,integer_t>(mat_mpi_->size(), comm_));
+    nd_mpi_.reset
+      (new MatrixReorderingMPI<scalar_t,integer_t>
+       (mat_mpi_->size(), comm_));
   }
 
   template<typename scalar_t,typename integer_t> int
@@ -125,8 +188,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::setup_tree() {
-    tree_mpi_dist_ =
-      std::unique_ptr<EliminationTreeMPIDist<scalar_t,integer_t>>
+    tree_mpi_dist_.reset
       (new EliminationTreeMPIDist<scalar_t,integer_t>
        (opts_, *mat_mpi_, *nd_mpi_, comm_));
   }
@@ -222,13 +284,14 @@ namespace strumpack {
     }; break;
     }
 
-    if (opts_.matching() != MatchingJob::NONE)
+    if (opts_.matching() != MatchingJob::NONE) {
       // TODO do this in a single routine/comm phase
       for (std::size_t c=0; c<x.cols(); c++)
         permute_vector
           (x.ptr(0,c), this->cperm_, mat_mpi_->dist(), comm_.comm());
-    if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-      x.scale_rows(this->Dc_);
+      if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+        x.scale_rows(this->Dc_.data() + mat_mpi_->begin_row());
+    }
 
     t.stop();
     this->perf_counters_stop("DIRECT/GMRES solve");

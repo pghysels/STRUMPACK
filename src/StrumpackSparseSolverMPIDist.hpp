@@ -38,7 +38,7 @@
 
 namespace strumpack {
 
-  // forward declatations
+  // forward declarations
   template<typename scalar_t,typename integer_t> class EliminationTreeMPIDist;
 
 
@@ -200,6 +200,31 @@ namespace strumpack {
      const scalar_t* d_val, const integer_t* o_ptr, const integer_t* o_ind,
      const scalar_t* o_val, const integer_t* garray);
 
+
+    /**
+     * TODO
+     *
+     */
+    void update_matrix_values
+    (integer_t local_rows, const integer_t* row_ptr,
+     const integer_t* col_ind, const scalar_t* values,
+     const integer_t* dist, bool symmetric_pattern=false);
+
+    /**
+     * TODO
+     *
+     */
+    void update_matrix_values(const CSRMatrixMPI<scalar_t,integer_t>& A);
+
+    /**
+     * TODO
+     */
+    void update_matrix_values
+    (integer_t local_rows, const integer_t* d_ptr, const integer_t* d_ind,
+     const scalar_t* d_val, const integer_t* o_ptr, const integer_t* o_ind,
+     const scalar_t* o_val, const integer_t* garray);
+
+
     /**
      * Solve a linear system with a single right-hand side. Before
      * being able to solve a linear system, the matrix needs to be
@@ -276,6 +301,8 @@ namespace strumpack {
     virtual void separator_reordering() override;
 
   private:
+    void redistribute_values();
+
     std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>> mat_mpi_;
     std::unique_ptr<MatrixReorderingMPI<scalar_t,integer_t>> nd_mpi_;
     std::unique_ptr<EliminationTreeMPIDist<scalar_t,integer_t>> tree_mpi_dist_;

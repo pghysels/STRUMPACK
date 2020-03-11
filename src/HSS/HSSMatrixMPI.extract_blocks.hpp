@@ -93,7 +93,8 @@ namespace strumpack {
       const int Bprows = B[0].grid()->nprows();
       const int Bpcols = B[0].grid()->npcols();
       const auto nb = triplets.size();
-      struct Quadlet { int r; int c; int k; scalar_t v;
+      struct Quadlet {
+        int r; int c; int k; scalar_t v;
         Quadlet() {}
         Quadlet(Triplet<scalar_t>& t, int k_)
           : r(t._r), c(t._c), k(k_), v(t._v) {}

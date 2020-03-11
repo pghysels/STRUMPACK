@@ -291,6 +291,18 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::update_matrix_values
+  (const CSRMatrix<scalar_t,integer_t>& A) {
+    if (!(mat_ && A.size() == mat_->size() && A.nnz() <= mat_->nnz())) {
+      // matrix() has been made symmetric, can have more nonzeros
+      print_wrong_sparsity_error();
+      return;
+    }
+    mat_.reset(new CSRMatrix<scalar_t,integer_t>(A));
+    permute_matrix_values();
+  }
+
+  template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::set_csr_matrix
   (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
    const scalar_t* values, bool symmetric_pattern) {
@@ -303,7 +315,7 @@ namespace strumpack {
   StrumpackSparseSolver<scalar_t,integer_t>::update_matrix_values
   (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
    const scalar_t* values, bool symmetric_pattern) {
-    if (!(N == matrix()->size() && row_ptr[N] <= matrix()->nnz())) {
+    if (!(mat_ && N == mat_->size() && row_ptr[N] <= mat_->nnz())) {
       // matrix() has been made symmetric, can have more nonzeros
       print_wrong_sparsity_error();
       return;
@@ -313,25 +325,15 @@ namespace strumpack {
     permute_matrix_values();
   }
 
-  template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolver<scalar_t,integer_t>::update_matrix_values
-  (const CSRMatrix<scalar_t,integer_t>& A) {
-    if (!(A.size() == matrix()->size() && A.nnz() <= matrix()->nnz())) {
-      // matrix() has been made symmetric, can have more nonzeros
-      print_wrong_sparsity_error();
-      return;
-    }
-    mat_.reset(new CSRMatrix<scalar_t,integer_t>(A));
-    permute_matrix_values();
-  }
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::print_wrong_sparsity_error() {
     std::cerr
-      << "ERROR:" << std::endl
-      << "  update_matrix_values should be called with exactly" << std::endl
-      << "  the same sparsity pattern as used to set the " << std::endl
-      << "  initial matrix, using set_matrix/set_csr_matrix." << std::endl;
+      << "ERROR:\n"
+      << "  update_matrix_values should be called with exactly\n"
+      << "  the same sparsity pattern as used to set the\n"
+      << "  initial matrix, using set_matrix/set_csr_matrix."
+      << std::endl;
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -353,17 +355,17 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> ReturnCode
   StrumpackSparseSolver<scalar_t,integer_t>::reorder
   (int nx, int ny, int nz, int components, int width) {
-    return internal_reorder(nullptr, 0, nx, ny, nz, components, width);
+    return reorder_internal(nullptr, 0, nx, ny, nz, components, width);
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
   StrumpackSparseSolver<scalar_t,integer_t>::reorder
   (const int* p, int base) {
-    return internal_reorder(p, base, 1, 1, 1, 1, 1);
+    return reorder_internal(p, base, 1, 1, 1, 1, 1);
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  StrumpackSparseSolver<scalar_t,integer_t>::internal_reorder
+  StrumpackSparseSolver<scalar_t,integer_t>::reorder_internal
   (const int* p, int base, int nx, int ny, int nz,
    int components, int width) {
     if (!matrix()) return ReturnCode::MATRIX_NOT_SET;
@@ -419,7 +421,9 @@ namespace strumpack {
 
     perf_counters_start();
     TaskTimer t0("symbolic-factorization", [&](){ setup_tree(); });
-    reordering()->clear_tree_data();
+    /* do not clear the tree data, because if we update the matrix
+     * values, we want to reuse this information */
+    // reordering()->clear_tree_data();
     if (opts_.verbose()) {
       auto fc = tree()->front_counter();
       if (is_root_) {

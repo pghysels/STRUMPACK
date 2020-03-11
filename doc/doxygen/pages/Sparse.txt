@@ -12,8 +12,8 @@ Requirements\endlink.
 
 STRUMPACK is written in C++, and offers a simple C++ interface. See
 \link C_Interface C Interface \endlink if you prefer a C
-interface. STRUMPACK-sparse has three different solver classes, all
-interaction happens through objects of these classes:
+interface. The STRUMPACK sparse solver has three different solver
+classes, all interaction happens through objects of these classes:
 
 - \link strumpack::StrumpackSparseSolver
 StrumpackSparseSolver<scalar,integer=int>\endlink This class

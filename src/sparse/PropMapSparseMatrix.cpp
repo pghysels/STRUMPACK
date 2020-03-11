@@ -26,6 +26,7 @@
  *             Division).
  *
  */
+#include <cstddef>
 #include <algorithm>
 #include <cmath>
 #include <tuple>
@@ -61,9 +62,9 @@ namespace strumpack {
     };
     MPI_Datatype Triplet_mpi_t;
     int blocklengths[3] = {1, 1, 1};
-    MPI_Datatype types[3] = {mpi_type<integer_t>(),
-                             mpi_type<integer_t>(),
-                             mpi_type<scalar_t>()};
+    MPI_Datatype types[3] = {mpi_type<decltype(Triplet::r)>(),
+                             mpi_type<decltype(Triplet::c)>(),
+                             mpi_type<decltype(Triplet::a)>()};
     MPI_Aint offsets[3] = {offsetof(Triplet, r),
                            offsetof(Triplet, c),
                            offsetof(Triplet, a)};

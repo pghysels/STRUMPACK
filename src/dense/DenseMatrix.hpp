@@ -589,6 +589,16 @@ namespace strumpack {
     (const std::vector<scalar_t>& D, int depth=0);
 
     /**
+     * Scale the rows of this matrix with the scalar values from the
+     * vector D. Row i in this matrix is scaled with D[i].
+     *
+     * \param D scaling vector
+     * \param depth current OpenMP task recursion depth
+     * \see scale_rows
+     */
+    DenseMatrix<scalar_t>& scale_rows(const scalar_t* D, int depth=0);
+
+    /**
      * Scale the rows of this matrix with the inverses of the scalar
      * values in vector D, ie, this->operator()(i,j) /= D[i].
      *

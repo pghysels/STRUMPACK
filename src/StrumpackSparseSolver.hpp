@@ -171,7 +171,7 @@ namespace strumpack {
      *
      * TODO
      */
-    void update_matrix_values
+    virtual void update_matrix_values
     (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
      const scalar_t* values, bool symmetric_pattern);
 
@@ -179,7 +179,7 @@ namespace strumpack {
      * TODO
      *
      */
-    void update_matrix_values
+    virtual void update_matrix_values
     (const CSRMatrix<scalar_t,integer_t>& A);
 
     /**
@@ -399,9 +399,8 @@ namespace strumpack {
     virtual void flop_breakdown_reset() const;
     virtual void reduce_flop_counters() const {}
 
-    ReturnCode internal_reorder
-    (const int* p, int base, int nx, int ny, int nz,
-     int components, int width);
+    void permute_matrix_values();
+    void print_wrong_sparsity_error();
 
     SPOptions<scalar_t> opts_;
     bool is_root_;
@@ -423,8 +422,9 @@ namespace strumpack {
 #endif
 
   private:
-    void permute_matrix_values();
-    void print_wrong_sparsity_error();
+    ReturnCode reorder_internal
+    (const int* p, int base, int nx, int ny, int nz,
+     int components, int width);
 
     std::unique_ptr<CSRMatrix<scalar_t,integer_t>> mat_;
     std::unique_ptr<MatrixReordering<scalar_t,integer_t>> nd_;

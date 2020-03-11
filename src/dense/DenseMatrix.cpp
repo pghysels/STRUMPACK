@@ -445,6 +445,13 @@ namespace strumpack {
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::scale_rows
   (const std::vector<scalar_t>& D, int depth) {
+    assert(D.size() == rows());
+    scale_rows(D.data(), depth);
+    return *this;
+  }
+
+  template<typename scalar_t> DenseMatrix<scalar_t>&
+  DenseMatrix<scalar_t>::scale_rows(const scalar_t* D, int depth) {
     const auto m = rows();
     const auto n = cols();
 #if defined(_OPENMP) && defined(STRUMPACK_USE_OPENMP_TASKLOOP)

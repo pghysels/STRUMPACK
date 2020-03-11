@@ -126,7 +126,6 @@ namespace strumpack {
      */
     virtual void set_matrix(const CSRMatrix<scalar_t,integer_t>& A) override;
 
-
     /**
      * Set a matrix, in compressed sparse row storage, for this sparse
      * solver. Indices in the CSR storage are 0-based. This method
