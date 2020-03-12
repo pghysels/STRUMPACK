@@ -75,25 +75,6 @@ The examples (for now) include:
       mpirun -n 4 ./testMMdoubleMPIDist m data/pde900.mtx
       mpirun -n 4 ./testMMdoubleMPIDist b data/pde900.bin # see mtx2bin
 
-- testMMdoubleMPIDist64: A double precision C++ example using 64 bit
-    integers for the sparse matrix, solving a linear system with a
-    matrix given in a file in the matrix-market format, using the
-    fully distributed MPI solver. Run as follows with a matrix
-    specified in the file pde900.mtx:
-
-      mpirun -n 4 ./testMMdoubleMPIDist64 data/pde900.mtx
-
-- mtx2bin: Read a matrix in matrix market format, and print it out
-   again in binary format. Run as
-
-      ./mtx2bin data/pde900.mtx pde900.bin
-
-   Run as ./mtx2bin (without arguments) to see a description of the
-   binary output format.
-
-- bin2mtx: opposite of mtx2bin
-
-
 - sexample:
 - dexample:
 - cexample:
