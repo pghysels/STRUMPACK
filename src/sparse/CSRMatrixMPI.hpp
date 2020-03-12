@@ -105,10 +105,10 @@ namespace strumpack {
     void spmv(const scalar_t* x, scalar_t* y) const override;
 
     /**
-     * Apply row and column scaling. Dr is LOCAL, Dc is global!
+     * Apply row and column scaling. lDr is LOCAL, gDc is global!
      */
-    void apply_scaling(const std::vector<scalar_t>& Dr,
-                       const std::vector<scalar_t>& Dc) override;
+    void apply_scaling(const std::vector<scalar_t>& lDr,
+                       const std::vector<scalar_t>& gDc) override;
 
     void permute(const integer_t* iorder, const integer_t* order) override;
 
@@ -118,21 +118,21 @@ namespace strumpack {
 
     /**
      * This gathers the matrix to 1 process, then applies MC64
-     * sequentially.  Dr and Dc are only set when job ==
+     * sequentially. lDr and gDc are only set when job ==
      * MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING.
      *
      * \param job The job type.
-     * \param Dr Row scaling factors, this is local, ie, Dr.size() ==
      * \param perm Output, column permutation vector containing the
      * GLOBAL column permutation, such that the column perm[j] of the
      * original matrix is column j in the permuted matrix.
+     * \param lDr Row scaling factors, this is local, ie, Dr.size() ==
      * this->local_rows().
-     * \param Dc Col scaling factors, this is global, ie, Dc.size() ==
-     * this->size()
+     * \param gDc Col scaling factors, this is global, ie, Dc.size()
+     * == this->size()
      */
     int permute_and_scale(MatchingJob job, std::vector<integer_t>& perm,
-                          std::vector<scalar_t>& Dr,
-                          std::vector<scalar_t>& Dc,
+                          std::vector<scalar_t>& lDr,
+                          std::vector<scalar_t>& gDc,
                           bool apply=true) override;
 
     void apply_column_permutation(const std::vector<integer_t>& perm)
@@ -247,7 +247,7 @@ namespace strumpack {
 
     int permute_and_scale_MC64
     (MatchingJob job, std::vector<integer_t>& perm,
-     std::vector<scalar_t>& Dr, std::vector<scalar_t>& Dc,
+     std::vector<scalar_t>& lDr, std::vector<scalar_t>& gDc,
      bool apply=true);
 
     using CSM_t::n_;

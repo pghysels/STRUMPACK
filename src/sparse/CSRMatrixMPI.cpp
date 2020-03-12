@@ -674,8 +674,8 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> int
   CSRMatrixMPI<scalar_t,integer_t>::permute_and_scale
-  (MatchingJob job, std::vector<integer_t>& perm, std::vector<scalar_t>& Dr,
-   std::vector<scalar_t>& Dc, bool apply) {
+  (MatchingJob job, std::vector<integer_t>& perm, std::vector<scalar_t>& lDr,
+   std::vector<scalar_t>& gDc, bool apply) {
     if (job == MatchingJob::COMBBLAS) {
 #if defined(STRUMPACK_USE_COMBBLAS)
       perm.resize(this->size());
@@ -688,7 +688,7 @@ namespace strumpack {
                   << std::endl;
       return 1;
 #endif
-    } else return permute_and_scale_MC64(job, perm, Dr, Dc, apply);
+    } else return permute_and_scale_MC64(job, perm, lDr, gDc, apply);
   }
 
   template<typename scalar_t,typename integer_t> int
@@ -757,11 +757,11 @@ namespace strumpack {
   // Apply row and column scaling. Dr is LOCAL, Dc is global!
   template<typename scalar_t,typename integer_t> void
   CSRMatrixMPI<scalar_t,integer_t>::apply_scaling
-  (const std::vector<scalar_t>& Dr, const std::vector<scalar_t>& Dc) {
+  (const std::vector<scalar_t>& lDr, const std::vector<scalar_t>& gDc) {
 #pragma omp parallel for
     for (integer_t r=0; r<lrows_; r++)
       for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++)
-        val_[j] = val_[j] * Dr[r] * Dc[ind_[j]];
+        val_[j] = val_[j] * lDr[r] * gDc[ind_[j]];
     STRUMPACK_FLOPS((is_complex<scalar_t>()?6:1)*
                     static_cast<long long int>(2.*double(lnnz_)));
   }
