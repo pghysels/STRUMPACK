@@ -101,6 +101,8 @@ namespace strumpack {
      */
     CompressionAlgorithm get_compression_algorithm(const std::string& c);
 
+
+
     /**
      * \class HODLROptions
      * \brief Class containing several options for the HODLR code and
@@ -384,7 +386,7 @@ namespace strumpack {
        * \param argc Number of elements in argv
        * \param argv Array with options
        */
-      void set_from_command_line(int argc, const char* const* argv);
+      void set_from_command_line(int argc, const char* const* cargv);
 
       /**
        * Print an overview of the available command line options and

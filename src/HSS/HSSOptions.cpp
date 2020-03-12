@@ -50,12 +50,14 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSOptions<scalar_t>::set_from_command_line
-    (int argc, const char* const* argv) {
+    (int argc, const char* const* cargv) {
 #if defined(STRUMPACK_USE_GETOPT)
-      std::vector<char*> argv_local(argc);
+      std::vector<std::unique_ptr<char[]>> argv_data(argc);
+      std::vector<char*> argv(argc);
       for (int i=0; i<argc; i++) {
-        argv_local[i] = new char[strlen(argv[i])+1];
-        strcpy(argv_local[i], argv[i]);
+        argv_data[i].reset(new char[strlen(cargv[i])+1]);
+        argv[i] = argv_data[i].get();
+        strcpy(argv[i], cargv[i]);
       }
       option long_options[] =
         {{"hss_rel_tol",               required_argument, 0, 1},
@@ -83,40 +85,36 @@ namespace strumpack {
       int c, option_index = 0;
       opterr = optind = 0;
       while ((c = getopt_long_only
-              (argc, argv_local.data(),
-               "hvq", long_options, &option_index)) != -1) {
+              (argc, argv.data(), "hvq",
+               long_options, &option_index)) != -1) {
         switch (c) {
         case 1: {
           std::istringstream iss(optarg);
-          iss >> _rel_tol; set_rel_tol(_rel_tol);
+          iss >> rel_tol_; set_rel_tol(rel_tol_);
         } break;
         case 2: {
           std::istringstream iss(optarg);
-          iss >> _abs_tol; set_abs_tol(_abs_tol);
+          iss >> abs_tol_; set_abs_tol(abs_tol_);
         } break;
         case 3: {
           std::istringstream iss(optarg);
-          iss >> _leaf_size;
-          set_leaf_size(_leaf_size);
+          iss >> leaf_size_; set_leaf_size(leaf_size_);
         } break;
         case 4: {
           std::istringstream iss(optarg);
-          iss >> _d0;
-          set_d0(_d0);
+          iss >> d0_; set_d0(d0_);
         } break;
         case 5: {
           std::istringstream iss(optarg);
-          iss >> _dd; set_dd(_dd);
+          iss >> dd_; set_dd(dd_);
         } break;
         case 6: {
           std::istringstream iss(optarg);
-          iss >> _p;
-          set_p(_p);
+          iss >> p_; set_p(p_);
         } break;
         case 7: {
           std::istringstream iss(optarg);
-          iss >> _max_rank;
-          set_max_rank(_max_rank);
+          iss >> max_rank_; set_max_rank(max_rank_);
         } break;
         case 8: {
           std::istringstream iss(optarg);
@@ -162,13 +160,13 @@ namespace strumpack {
         } break;
         case 12: {
           std::istringstream iss(optarg);
-          iss >> _approximate_neighbors;
-          set_approximate_neighbors(_approximate_neighbors);
+          iss >> approximate_neighbors_;
+          set_approximate_neighbors(approximate_neighbors_);
         } break;
         case 13: {
           std::istringstream iss(optarg);
-          iss >> _ann_iterations;
-          set_ann_iterations(_ann_iterations);
+          iss >> ann_iterations_;
+          set_ann_iterations(ann_iterations_);
         } break;
         case 14: { set_user_defined_random(true); } break;
         case 15: { set_synchronized_compression(true); } break;
@@ -179,7 +177,6 @@ namespace strumpack {
         case 'h': describe_options(); break;
         }
       }
-      for (auto s : argv_local) delete[] s;
 #else
       std::cerr << "WARNING: no support for getopt.h, "
         "not parsing command line options." << std::endl;

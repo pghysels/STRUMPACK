@@ -104,6 +104,7 @@ namespace strumpack {
      */
     std::string get_name(CompressionAlgorithm a);
 
+
     /**
      * \class HSSOptions
      * \brief Class containing several options for the HSS code and
@@ -131,7 +132,7 @@ namespace strumpack {
        */
       void set_rel_tol(real_t rel_tol) {
         assert(rel_tol <= real_t(1.) && rel_tol >= real_t(0.));
-        _rel_tol = rel_tol;
+        rel_tol_ = rel_tol;
       }
 
       /**
@@ -141,7 +142,7 @@ namespace strumpack {
        */
       void set_abs_tol(real_t abs_tol) {
         assert(abs_tol >= real_t(0.));
-        _abs_tol = abs_tol;
+        abs_tol_ = abs_tol;
       }
 
       /**
@@ -152,8 +153,8 @@ namespace strumpack {
        * \param leaf_size
        */
       void set_leaf_size(int leaf_size) {
-        assert(_leaf_size > 0);
-        _leaf_size = leaf_size;
+        assert(leaf_size > 0);
+        leaf_size_ = leaf_size;
       }
 
       /**
@@ -161,7 +162,7 @@ namespace strumpack {
        * random sampling HSS construction algorithm. See the manual
        * for more information on the randomized compression algorithm.
        */
-      void set_d0(int d0) { assert(d0 > 0); _d0 = d0; }
+      void set_d0(int d0) { assert(d0 > 0); d0_ = d0; }
 
       /**
        * Set the number of random to be used to increment the random
@@ -170,20 +171,20 @@ namespace strumpack {
        * CompressionAlgorithm::STABLE. See the manual for more
        * information on the randomized compression algorithm.
        */
-      void set_dd(int dd) { assert(dd > 0); _dd = dd; }
+      void set_dd(int dd) { assert(dd > 0); dd_ = dd; }
 
       /**
        * Oversampling parameter. Used in adaptive compression, to
        * check stopping criterion.
        */
-      void set_p(int p) { assert(p >= 0); _p = p; }
+      void set_p(int p) { assert(p >= 0); p_ = p; }
 
       /**
        * Set the maximum rank allowed in HSS compression.
        */
       void set_max_rank(int max_rank) {
         assert(max_rank > 0);
-        _max_rank = max_rank;
+        max_rank_ = max_rank;
       }
 
       /**
@@ -191,7 +192,7 @@ namespace strumpack {
        * \see RandomEngine, RandomDistribution, set_random_distribution()
        */
       void set_random_engine(random::RandomEngine random_engine) {
-        _random_engine = random_engine;
+        random_engine_ = random_engine;
       }
 
       /**
@@ -200,7 +201,7 @@ namespace strumpack {
        */
       void set_random_distribution
       (random::RandomDistribution random_distribution) {
-        _random_distribution = random_distribution;
+        random_distribution_ = random_distribution;
       }
 
       /**
@@ -210,7 +211,7 @@ namespace strumpack {
        * \param a Type of (adaptive) compression scheme
        */
       void set_compression_algorithm(CompressionAlgorithm a) {
-        _compress_algo = a;
+        compress_algo_ = a;
       }
 
       /**
@@ -220,7 +221,7 @@ namespace strumpack {
        * \param a Clustering algorithm.
        */
       void set_clustering_algorithm(ClusteringAlgorithm a) {
-        _clustering_algo = a;
+        clustering_algo_ = a;
       }
 
       /**
@@ -230,7 +231,7 @@ namespace strumpack {
        * \param neighbors Number of approximate neighbors
        */
       void set_approximate_neighbors(int neighbors) {
-        _approximate_neighbors = neighbors;
+        approximate_neighbors_ = neighbors;
       }
 
       /**
@@ -243,7 +244,7 @@ namespace strumpack {
        */
       void set_ann_iterations(int iters) {
         assert(iters > 0);
-        _ann_iterations = iters;
+        ann_iterations_ = iters;
       }
 
       /**
@@ -251,7 +252,7 @@ namespace strumpack {
        * sample vectors with random values.
        */
       void set_user_defined_random(bool user_defined_random) {
-        _user_defined_random = user_defined_random;
+        user_defined_random_ = user_defined_random;
       }
 
       /**
@@ -260,41 +261,41 @@ namespace strumpack {
        * is collective, and has to be synchronized.
        */
       void set_synchronized_compression(bool sync) {
-        _sync = sync;
+        sync_ = sync;
       }
 
       /**
        * Log the HSS ranks to a file. TODO is this currently
        * supported??
        */
-      void set_log_ranks(bool log_ranks) { _log_ranks = log_ranks; }
+      void set_log_ranks(bool log_ranks) { log_ranks_ = log_ranks; }
 
       /**
        * Enable or disable verbose output (only by the root process)
        * to stdout.
        */
-      void set_verbose(bool verbose) { _verbose = verbose; }
+      void set_verbose(bool verbose) { verbose_ = verbose; }
 
       /**
        * Get the relative compression tolerance.
        * \return the relative compression tolerance
        * \see set_rel_tol(), set_abs_tol(), get_abs_tol()
        */
-      real_t rel_tol() const { return _rel_tol; }
+      real_t rel_tol() const { return rel_tol_; }
 
       /**
        * Get the absolute compression tolerance.
        * \return the absolute compression tolerance
        * \see set_abs_tol(), set_rel_tol(), rel_tol()
        */
-      real_t abs_tol() const { return _abs_tol; }
+      real_t abs_tol() const { return abs_tol_; }
 
       /**
        * Get the HSS leaf size.
        * \return the (approximate) HSS leaf size
        * \see set_leaf_size()
        */
-      int leaf_size() const { return _leaf_size; }
+      int leaf_size() const { return leaf_size_; }
 
       /**
        * Get the initial number of random vector that will be used in
@@ -305,7 +306,7 @@ namespace strumpack {
        * compression
        * \see set_d0(), set_dd(), set_p()
        */
-      int d0() const { return _d0; }
+      int d0() const { return d0_; }
 
       /**
        * Increment for the number of random vectors during adaptive
@@ -315,14 +316,14 @@ namespace strumpack {
        * be incremented
        * \see set_d0(), set_dd()
        */
-      int dd() const { return _dd; }
+      int dd() const { return dd_; }
 
       /**
        * Get the current value of the oversampling parameter.
        * \return the oversampling parameter.
        * \see set_p()
        */
-      int p() const { return _p; }
+      int p() const { return p_; }
 
       /**
        * Get the maximum allowable rank (note, this is not the actual
@@ -330,14 +331,14 @@ namespace strumpack {
        * \return maximum allowable rank
        * \see set_max_rank()
        */
-      int max_rank() const { return _max_rank; }
+      int max_rank() const { return max_rank_; }
 
       /**
        * Return the type of random engine to use.
        * \return random engine
        * \see set_random_engine
        */
-      random::RandomEngine random_engine() const { return _random_engine; }
+      random::RandomEngine random_engine() const { return random_engine_; }
 
       /**
        * Return the type of random distribution to use in the random
@@ -346,7 +347,7 @@ namespace strumpack {
        * \see set_random_distribution
        */
       random::RandomDistribution random_distribution() const {
-        return _random_distribution;
+        return random_distribution_;
       }
 
       /**
@@ -355,7 +356,7 @@ namespace strumpack {
        * \see set_compression_algorithm
        */
       CompressionAlgorithm compression_algorithm() const {
-        return _compress_algo;
+        return compress_algo_;
       }
 
       /**
@@ -365,7 +366,7 @@ namespace strumpack {
        * \see set_clustering_algorithm
        */
       ClusteringAlgorithm clustering_algorithm() const {
-        return _clustering_algo;
+        return clustering_algo_;
       }
 
       /**
@@ -375,7 +376,7 @@ namespace strumpack {
        * \return Number of approximate neighbors
        */
       int approximate_neighbors() const {
-        return _approximate_neighbors;
+        return approximate_neighbors_;
       }
 
       /**
@@ -386,9 +387,7 @@ namespace strumpack {
        *
        * \return Number of random trees to be build
        */
-      int ann_iterations() const {
-        return _ann_iterations;
-      }
+      int ann_iterations() const { return ann_iterations_; }
 
       /**
        * Will the user define its own random matrices?
@@ -398,7 +397,7 @@ namespace strumpack {
        * him/her-self.
        * \see set_user_defined_random
        */
-      bool user_defined_random() const { return _user_defined_random; }
+      bool user_defined_random() const { return user_defined_random_; }
 
       /**
        * Whether or not the synchronize the element extraction
@@ -407,7 +406,7 @@ namespace strumpack {
        * extraction routine, else False.
        * \see set_synchromized_compression
        */
-      bool synchronized_compression() const { return _sync; }
+      bool synchronized_compression() const { return sync_; }
 
       /**
        * Check if the ranks should be printed to a log file.  __NOT
@@ -417,7 +416,7 @@ namespace strumpack {
        * else False.
        * \see set_log_ranks
        */
-      bool log_ranks() const { return _log_ranks; }
+      bool log_ranks() const { return log_ranks_; }
 
       /**
        * Verbose or quiet?
@@ -425,7 +424,7 @@ namespace strumpack {
        * else False.
        * \see set_verbose
        */
-      bool verbose() const { return _verbose; }
+      bool verbose() const { return verbose_; }
 
       /**
        * Parse the command line options given by argc and argv.  The
@@ -435,7 +434,7 @@ namespace strumpack {
        * \param argc Number of elements in argv
        * \param argv Array with options
        */
-      void set_from_command_line(int argc, const char* const* argv);
+      void set_from_command_line(int argc, const char* const* cargv);
 
       /**
        * Print an overview of the available command line options and
@@ -444,25 +443,25 @@ namespace strumpack {
       void describe_options() const;
 
     private:
-      real_t _rel_tol = default_HSS_rel_tol<real_t>();
-      real_t _abs_tol = default_HSS_abs_tol<real_t>();
-      int _leaf_size = 512;
-      int _d0 = 128;
-      int _dd = 64;
-      int _p = 10;
-      int _max_rank = 50000;
-      random::RandomEngine _random_engine =
+      real_t rel_tol_ = default_HSS_rel_tol<real_t>();
+      real_t abs_tol_ = default_HSS_abs_tol<real_t>();
+      int leaf_size_ = 512;
+      int d0_ = 128;
+      int dd_ = 64;
+      int p_ = 10;
+      int max_rank_ = 50000;
+      random::RandomEngine random_engine_ =
         random::RandomEngine::LINEAR;
-      random::RandomDistribution _random_distribution =
+      random::RandomDistribution random_distribution_ =
         random::RandomDistribution::NORMAL;
-      bool _user_defined_random = false;
-      bool _log_ranks = false;
-      CompressionAlgorithm _compress_algo = CompressionAlgorithm::STABLE;
-      bool _sync = false;
-      ClusteringAlgorithm _clustering_algo = ClusteringAlgorithm::TWO_MEANS;
-      int _approximate_neighbors = 64;
-      int _ann_iterations = 5;
-      bool _verbose = true;
+      bool user_defined_random_ = false;
+      bool log_ranks_ = false;
+      CompressionAlgorithm compress_algo_ = CompressionAlgorithm::STABLE;
+      bool sync_ = false;
+      ClusteringAlgorithm clustering_algo_ = ClusteringAlgorithm::TWO_MEANS;
+      int approximate_neighbors_ = 64;
+      int ann_iterations_ = 5;
+      bool verbose_ = true;
     };
 
   } // end namespace HSS

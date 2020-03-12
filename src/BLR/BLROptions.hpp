@@ -109,7 +109,7 @@ namespace strumpack {
       bool verbose() const { return verbose_; }
       int BACA_blocksize() const { return BACA_blocksize_; }
 
-      void set_from_command_line(int argc, const char* const* argv);
+      void set_from_command_line(int argc, const char* const* cargv);
 
       void describe_options() const;
     };

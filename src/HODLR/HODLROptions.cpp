@@ -62,12 +62,14 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HODLROptions<scalar_t>::set_from_command_line
-    (int argc, const char* const* argv) {
+    (int argc, const char* const* cargv) {
 #if defined(STRUMPACK_USE_GETOPT)
-      std::vector<char*> argv_local(argc);
+      std::vector<std::unique_ptr<char[]>> argv_data(argc);
+      std::vector<char*> argv(argc);
       for (int i=0; i<argc; i++) {
-        argv_local[i] = new char[strlen(argv[i])+1];
-        strcpy(argv_local[i], argv[i]);
+        argv_data[i].reset(new char[strlen(cargv[i])+1]);
+        argv[i] = argv_data[i].get();
+        strcpy(argv[i], cargv[i]);
       }
       option long_options[] =
         {{"hodlr_rel_tol",               required_argument, 0, 1},
@@ -93,8 +95,8 @@ namespace strumpack {
       int c, option_index = 0;
       opterr = optind = 0;
       while ((c = getopt_long_only
-              (argc, argv_local.data(),
-               "hvq", long_options, &option_index)) != -1) {
+              (argc, argv.data(), "hvq",
+               long_options, &option_index)) != -1) {
         switch (c) {
         case 1: {
           std::istringstream iss(optarg);
@@ -174,7 +176,6 @@ namespace strumpack {
         case 'h': describe_options(); break;
         }
       }
-      for (auto s : argv_local) delete[] s;
 #else
       std::cerr << "WARNING: no support for getopt.h, "
         "not parsing command line options." << std::endl;
