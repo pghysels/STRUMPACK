@@ -682,7 +682,7 @@ namespace strumpack {
       GetAWPM(*this, perm.data());
       return 0;
 #else
-      if (mpi_rank()==0)
+      if (comm_.is_root())
         std::cerr << "# WARNING Matching with CombBLAS not supported.\n"
                   << "# Reconfigure STRUMPACK with CombBLAS support."
                   << std::endl;
@@ -737,7 +737,6 @@ namespace strumpack {
       apply_scaling(lDr, gDc);
     }
     apply_column_permutation(perm);
-    symm_sparse_ = false;
     return 0;
   }
 
@@ -751,6 +750,8 @@ namespace strumpack {
       for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++)
         ind_[j] = iperm[ind_[j]];
     split_diag_offdiag();
+    symm_sparse_ = false;
+    spmv_bufs_ = SPMVBuffers<scalar_t,integer_t>();
   }
 
   // Apply row and column scaling. Dr is LOCAL, Dc is global!
@@ -882,12 +883,13 @@ namespace strumpack {
       val_.swap(new_val);
     }
 
-    integer_t total_new_nnz = comm_.all_reduce(new_nnz, MPI_SUM);
+    auto total_new_nnz = comm_.all_reduce(new_nnz, MPI_SUM);
     if (total_new_nnz != nnz_) {
       split_diag_offdiag();
       nnz_ = total_new_nnz;
     }
     symm_sparse_ = true;
+    spmv_bufs_ = SPMVBuffers<scalar_t,integer_t>();
   }
 
   template<typename scalar_t,typename integer_t> int

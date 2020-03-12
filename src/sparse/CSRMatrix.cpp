@@ -268,8 +268,7 @@ namespace strumpack {
   CSRMatrix<scalar_t,integer_t>::strumpack_mc64
   (int_t job, int_t* num, integer_t* perm, int_t liw, int_t* iw, int_t ldw,
    double* dw, int_t* icntl, int_t* info) {
-    int_t n = n_;
-    int_t nnz = nnz_;
+    int_t n = n_, nnz = nnz_;
     std::unique_ptr<double[]> dwork(new double[nnz]);
     std::unique_ptr<int_t[]> iwork(new int_t[n+1+nnz+n+n]);
     auto dval = dwork.get();
