@@ -29,6 +29,7 @@
 #include <iostream>
 #include <vector>
 #include <cstring>
+#include <random>
 using namespace std;
 
 #define ERROR_TOLERANCE 1e2
@@ -41,7 +42,7 @@ using namespace std;
 
 using namespace strumpack;
 
-void abort_MPI(MPI_Comm *c, int *error, ...) {
+void abort_MPI(MPI_Comm *c, int *error, ... ) {
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   cout << "rank = " << rank << " ABORTING!!!!!" << endl;
@@ -50,7 +51,7 @@ void abort_MPI(MPI_Comm *c, int *error, ...) {
 
 template<typename scalar_t,typename integer_t>
 int test_sparse_solver(int argc, const char* const argv[],
-                       CSRMatrix<scalar_t,integer_t>& A) {
+                       const CSRMatrix<scalar_t,integer_t>& A) {
   using real_t = typename RealType<scalar_t>::value_type;
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -60,6 +61,7 @@ int test_sparse_solver(int argc, const char* const argv[],
 
   // distribute/scatter the matrix A from the root
   CSRMatrixMPI<scalar_t,integer_t> Adist(&A, MPI_COMM_WORLD, true);
+
   auto N = Adist.size();
   auto n_local = Adist.local_rows();
   vector<scalar_t> b(n_local), x(n_local),
@@ -67,7 +69,6 @@ int test_sparse_solver(int argc, const char* const argv[],
   Adist.spmv(x_exact.data(), b.data());
 
   spss.set_matrix(Adist);
-
   if (spss.reorder() != ReturnCode::SUCCESS) {
     if (!rank)
       cout << "problem with reordering of the matrix." << endl;
@@ -82,17 +83,47 @@ int test_sparse_solver(int argc, const char* const argv[],
 
   auto scaled_res = Adist.max_scaled_residual(x.data(), b.data());
   if (!rank)
-    cout << "# COMPONENTWISE SCALED RESIDUAL = " << scaled_res << endl;
-
+    cout << "# COMPONENTWISE SCALED RESIDUAL = "
+         << scaled_res << endl;
   blas::axpy(n_local, scalar_t(-1.), x_exact.data(), 1, x.data(), 1);
-
   auto nrm_error = norm2(x, MPIComm());
   auto nrm_x_exact = norm2(x_exact, MPIComm());
   if (!rank)
     cout << "# RELATIVE ERROR = " << (nrm_error/nrm_x_exact) << endl;
-
   if (scaled_res > ERROR_TOLERANCE*spss.options().rel_tol())
     MPI_Abort(MPI_COMM_WORLD, 1);
+
+
+  // modify the matrix values, but not the sparsity pattern
+  {
+    std::default_random_engine generator;
+    std::normal_distribution<real_t> distribution(1.0, .05);
+    for (int i=0; i<Adist.local_nnz(); i++)
+      Adist.val(i) = Adist.val(i) * distribution(generator);
+  }
+
+  // update the values
+  //spss.update_matrix_values(Adist);
+  spss.set_matrix(Adist);
+
+  // recompute right hand side
+  Adist.spmv(x_exact.data(), b.data());
+
+  // this new solve will reuse the permutation
+  spss.solve(b.data(), x.data());
+
+  scaled_res = Adist.max_scaled_residual(x.data(), b.data());
+  if (!rank)
+    cout << "# COMPONENTWISE SCALED RESIDUAL = "
+         << scaled_res << endl;
+  blas::axpy(n_local, scalar_t(-1.), x_exact.data(), 1, x.data(), 1);
+  nrm_error = norm2(x, MPIComm());
+  nrm_x_exact = norm2(x_exact, MPIComm());
+  if (!rank)
+    cout << "# RELATIVE ERROR = " << (nrm_error/nrm_x_exact) << endl;
+  if (scaled_res > ERROR_TOLERANCE*spss.options().rel_tol())
+    MPI_Abort(MPI_COMM_WORLD, 1);
+
   return 0;
 }
 

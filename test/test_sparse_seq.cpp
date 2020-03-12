@@ -27,6 +27,7 @@
  *
  */
 #include <iostream>
+#include <cstring>
 using namespace std;
 
 #include "StrumpackSparseSolver.hpp"
@@ -38,12 +39,14 @@ using namespace strumpack;
 #define SOLVE_TOLERANCE 1e-12
 
 template<typename scalar_t,typename integer_t> int
-test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
+test_sparse_solver(int argc, const char* const argv[],
+                   CSRMatrix<scalar_t,integer_t>& A) {
+  using real_t = typename RealType<scalar_t>::value_type;
   StrumpackSparseSolver<scalar_t,integer_t> spss;
   spss.options().set_from_command_line(argc, argv);
 
   int N = A.size();
-  vector<scalar_t> b(N), x(N), x_exact(N, scalar_t(1.)/sqrt(N));
+  vector<scalar_t> b(N), x(N), x_exact(N, real_t(1.)/sqrt(N));
   A.spmv(x_exact.data(), b.data());
 
   spss.set_matrix(A);
@@ -66,8 +69,26 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
   auto nrm_x_exact = blas::nrm2(N, x_exact.data(), 1);
   cout << "# RELATIVE ERROR = " << (nrm_error/nrm_x_exact) << endl;
 
-  if (comp_scal_res > ERROR_TOLERANCE*spss.options().rel_tol()) return 1;
+  if (comp_scal_res > ERROR_TOLERANCE*spss.options().rel_tol())
+    return 1;
   else return 0;
+}
+
+
+template<typename real_t,typename integer_t>
+int read_matrix_and_run_tests(int argc, const char* const argv[]) {
+  string f(argv[1]);
+  CSRMatrix<real_t,integer_t> A;
+  if (A.read_matrix_market(f) == 0)
+    return test_sparse_solver(argc, argv, A);
+  else {
+    CSRMatrix<complex<real_t>,integer_t> Acomplex;
+    if (Acomplex.read_matrix_market(f)) {
+      std::cerr << "Could not read matrix from file." << std::endl;
+      return 1;
+    }
+    return test_sparse_solver(argc, argv, Acomplex);
+  }
 }
 
 int main(int argc, char* argv[]) {
@@ -78,21 +99,21 @@ int main(int argc, char* argv[]) {
       << "Usage: \n\t./testMMdouble pde900.mtx" << endl;
     return 1;
   }
-  string f(argv[1]);
-
   cout << "# Running with:\n# ";
 #if defined(_OPENMP)
   cout << "OMP_NUM_THREADS=" << omp_get_max_threads() << " ";
 #endif
-  for (int i=0; i<argc; i++) cout << argv[i] << " ";
+  for (int i=0; i<argc; i++)
+    cout << argv[i] << " ";
   cout << endl;
 
-  CSRMatrix<double,int> A;
-  if (A.read_matrix_market(f) == 0)
-    return test<double,int>(argc, argv, A);
-  else {
-    CSRMatrix<complex<double>,int> A;
-    A.read_matrix_market(f);
-    return test<complex<double>,int>(argc, argv, A);
-  }
+  int ierr = 0;
+  // ierr = read_matrix_and_run_tests<float,int>(argc, argv);
+  // if (ierr) return ierr;
+  ierr = read_matrix_and_run_tests<double,int>(argc, argv);
+  if (ierr) return ierr;
+  // ierr = read_matrix_and_run_tests<float,long long int>(argc, argv);
+  // if (ierr) return ierr;
+  ierr = read_matrix_and_run_tests<double,long long int>(argc, argv);
+  return ierr;
 }
