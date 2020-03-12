@@ -164,23 +164,53 @@ namespace strumpack {
      * matrix. So it should be called with exactly the same sparsity
      * pattern (row_ptr and col_ind) as used to set the initial matrix
      * (using set_matrix or set_csr_matrix). This routine can be
-     * called after the factorization. In that case, for the next
-     * ordering phase, the permutation previously computed will be
-     * reused to permute the updated matrix values
+     * called after having performed a factorization of a different
+     * matrix with the same sparsity pattern. In that case, when this
+     * solver is used for another solve, with the updated matrix
+     * values, the permutation vector previously computed will be
+     * reused to permute the updated matrix values, instead of
+     * recomputing the permutation. The numerical factorization will
+     * automatically be redone.
      *
+     * \param N Number of rows in the matrix.
+     * \param row_ptr Row pointer array in the typical compressed
+     * sparse row representation. This should be the same as used in
+     * an earlier call to set_csr_matrix.
+     * \param col_ind Column index array in the typical compressed
+     * sparse row representation. This should be the same as used in
+     * an earlier call to set_csr_matrix.
+     * \param values Array with numerical nonzero values for the
+     * matrix, corresponding to the row_ptr and col_ind compressed
+     * sparse row representation.
+     * \param symmetric_pattern Denotes whether the sparsity
+     * __pattern__ of the input matrix is symmetric, does not require
+     * the matrix __values__ to be symmetric
      *
-     * TODO
+     * \see set_csr_matrix, set_matrix
      */
     virtual void update_matrix_values
     (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
-     const scalar_t* values, bool symmetric_pattern);
+     const scalar_t* values, bool symmetric_pattern=false);
 
     /**
-     * TODO
+     * This can only be used to UPDATE the nonzero values of the
+     * matrix. So it should be called with exactly the same sparsity
+     * pattern as used to set the initial matrix (using set_matrix or
+     * set_csr_matrix). This routine can be called after having
+     * performed a factorization of a different matrix with the same
+     * sparsity pattern. In that case, when this solver is used for
+     * another solve, with the updated matrix values, the permutation
+     * vector previously computed will be reused to permute the
+     * updated matrix values, instead of recomputing the
+     * permutation. The numerical factorization will automatically be
+     * redone.
      *
+     * \param A Sparse matrix, should have the same sparsity pattern
+     * as the matrix associated with this solver earlier.
+     *
+     * \see set_csr_matrix, set_matrix
      */
-    virtual void update_matrix_values
-    (const CSRMatrix<scalar_t,integer_t>& A);
+    virtual void update_matrix_values(const CSRMatrix<scalar_t,integer_t>& A);
 
     /**
      * Compute matrix reorderings for numerical stability and to
@@ -213,7 +243,6 @@ namespace strumpack {
      */
     virtual ReturnCode reorder
     (int nx=1, int ny=1, int nz=1, int components=1, int width=1);
-
 
     /**
      * Perform sparse matrix reordering, with a user-supplied

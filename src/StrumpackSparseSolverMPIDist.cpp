@@ -133,7 +133,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::update_matrix_values
+  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::update_MPIAIJ_matrix_values
   (integer_t local_rows, const integer_t* d_ptr, const integer_t* d_ind,
    const scalar_t* d_val, const integer_t* o_ptr, const integer_t* o_ind,
    const scalar_t* o_val, const integer_t* garray) {

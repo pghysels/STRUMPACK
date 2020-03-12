@@ -202,8 +202,37 @@ namespace strumpack {
 
 
     /**
-     * TODO
+     * This can only be used to UPDATE the nonzero values of the
+     * matrix. So it should be called with exactly the same sparsity
+     * pattern (row_ptr and col_ind) and distribution as used to set
+     * the initial matrix (using set_matrix or
+     * set_distributed_csr_matrix). This routine can be called after
+     * having performed a factorization of a different matrix with the
+     * same sparsity pattern. In that case, when this solver is used
+     * for another solve, with the updated matrix values, the
+     * permutation vector previously computed will be reused to
+     * permute the updated matrix values, instead of recomputing the
+     * permutation. The numerical factorization will automatically be
+     * redone.
      *
+     * \param local_rows Number of rows of the matrix assigned to this
+     * process.
+     * \param row_ptr Row pointer array in the typical compressed
+     * sparse row representation. This should be the same as used in
+     * an earlier call to set_csr_matrix.
+     * \param col_ind Column index array in the typical compressed
+     * sparse row representation. This should be the same as used in
+     * an earlier call to set_csr_matrix.
+     * \param values Array with numerical nonzero values for the
+     * matrix, corresponding to the row_ptr and col_ind compressed
+     * sparse row representation.
+     * \param dist Describes the processor distribution, see also
+     * set_distributed_csr_matrix
+     * \param symmetric_pattern Denotes whether the sparsity
+     * __pattern__ of the input matrix is symmetric, does not require
+     * the matrix __values__ to be symmetric
+     *
+     * \see set_csr_matrix, set_matrix
      */
     void update_matrix_values
     (integer_t local_rows, const integer_t* row_ptr,
@@ -211,15 +240,43 @@ namespace strumpack {
      const integer_t* dist, bool symmetric_pattern=false);
 
     /**
-     * TODO
+     * This can only be used to UPDATE the nonzero values of the
+     * matrix. So it should be called with exactly the same sparsity
+     * pattern (row_ptr and col_ind) and distribution as used to set
+     * the initial matrix (using set_matrix or
+     * set_distributed_csr_matrix). This routine can be called after
+     * having performed a factorization of a different matrix with the
+     * same sparsity pattern. In that case, when this solver is used
+     * for another solve, with the updated matrix values, the
+     * permutation vector previously computed will be reused to
+     * permute the updated matrix values, instead of recomputing the
+     * permutation. The numerical factorization will automatically be
+     * redone.
      *
+     * \param A Sparse matrix, should have the same sparsity pattern
+     * as the matrix associated with this solver earlier.
+     *
+     * \see set_csr_matrix, set_matrix
      */
     void update_matrix_values(const CSRMatrixMPI<scalar_t,integer_t>& A);
 
     /**
-     * TODO
+     * This can only be used to UPDATE the nonzero values of the
+     * matrix. So it should be called with exactly the same sparsity
+     * pattern (d_ptr, d_ind, o_ptr and o_ind) and distribution
+     * (garray) as used to set the initial matrix (using set_matrix or
+     * set_distributed_csr_matrix). This routine can be called after
+     * having performed a factorization of a different matrix with the
+     * same sparsity pattern. In that case, when this solver is used
+     * for another solve, with the updated matrix values, the
+     * permutation vector previously computed will be reused to
+     * permute the updated matrix values, instead of recomputing the
+     * permutation. The numerical factorization will automatically be
+     * redone.
+     *
+     * \see set_MPIAIJ_matrix
      */
-    void update_matrix_values
+    void update_MPIAIJ_matrix_values
     (integer_t local_rows, const integer_t* d_ptr, const integer_t* d_ind,
      const scalar_t* d_val, const integer_t* o_ptr, const integer_t* o_ind,
      const scalar_t* o_val, const integer_t* garray);
