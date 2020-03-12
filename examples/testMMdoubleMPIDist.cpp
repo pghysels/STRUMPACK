@@ -27,8 +27,6 @@
  *
  */
 #include <iostream>
-#include <sstream>
-#include <getopt.h>
 
 #include "StrumpackSparseSolverMPIDist.hpp"
 #include "sparse/CSRMatrix.hpp"
@@ -37,23 +35,26 @@
 using namespace strumpack;
 
 template<typename scalar,typename integer> void
-test(int argc, char* argv[], CSRMatrixMPI<scalar,integer>* Adist) {
+test(int argc, char* argv[], CSRMatrix<scalar,integer>& A) {
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   StrumpackSparseSolverMPIDist<scalar,integer> spss(MPI_COMM_WORLD);
-  spss.options().set_matching(MatchingJob::NONE);
   spss.options().set_from_command_line(argc, argv);
 
-  auto N = Adist->size();
-  auto n_local = Adist->local_rows();
+  // distribute/scatter the matrix A from the root
+  CSRMatrixMPI<scalar,integer> Adist(&A, MPI_COMM_WORLD, true);
+  auto N = Adist.size();
+  auto n_local = Adist.local_rows();
   std::vector<scalar> b(n_local), x(n_local),
     x_exact(n_local, scalar(1.)/std::sqrt(N));
-  Adist->spmv(x_exact.data(), b.data());
+  Adist.spmv(x_exact.data(), b.data());
 
-  spss.set_distributed_csr_matrix
-    (Adist->local_rows(), Adist->ptr(), Adist->ind(),
-     Adist->val(), Adist->dist().data(),
-     Adist->symm_sparse());
+  spss.set_matrix(Adist);
+  //alternative interface:
+  // spss.set_distributed_csr_matrix
+  //   (Adist.local_rows(), Adist.ptr(), Adist.ind(),
+  //    Adist.val(), Adist.dist().data(), Adist.symm_sparse());
+
   if (spss.reorder() != ReturnCode::SUCCESS) {
     if (!rank)
       std::cout << "problem with reordering of the matrix." << std::endl;
@@ -67,13 +68,11 @@ test(int argc, char* argv[], CSRMatrixMPI<scalar,integer>* Adist) {
   }
   spss.solve(b.data(), x.data());
 
-  auto scaled_res = Adist->max_scaled_residual(x.data(), b.data());
+  auto scaled_res = Adist.max_scaled_residual(x.data(), b.data());
   if (!rank)
     std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
               << scaled_res << std::endl;
-
   strumpack::blas::axpy(n_local, scalar(-1.), x_exact.data(), 1, x.data(), 1);
-
   auto nrm_error = norm2(x, MPIComm());
   auto nrm_x_exact = norm2(x_exact, MPIComm());
   if (!rank)
@@ -94,83 +93,40 @@ int main(int argc, char* argv[]) {
   //   std::cout << "MPI implementation does not support MPI_THREAD_MULTIPLE,"
   //     " which might be needed for pt-scotch!" << std::endl;
 
-  if (argc < 3) {
+  if (argc < 2) {
     if (!rank)
       std::cout
-        << "Solve a linear system with a matrix given in"
-        << " matrix market format" << std::endl
-        << "using the MPI fully distributed C++ STRUMPACK interface."
-        << std::endl << std::endl
-        << "Usage: \n\tmpirun -n 4 ./testMMdoubleMPIDist m pde900.mtx"
-        << std::endl
-        << "or\n\tmpirun -n 4 ./testMMdoubleMPIDist b pde900.bin"
-        << std::endl
-        << "Specify the matrix input file with 'm filename' if the matrix is"
-        << " in matrix-market format," << std::endl
-        << "or with 'b filename' if the matrix is in binary." << std::endl;
+        << "Solve a linear system with a matrix in matrix market format\n"
+        << "using the MPI fully distributed C++ STRUMPACK interface.\n\n"
+        << "Usage: \n\tmpirun -n 4 ./testMMdoubleMPIDist pde900.mtx"
+        << std::endl;
     return 1;
   }
 
-  bool binary_input = false;
-  std::string format(argv[1]);
-  if (format.compare("b") == 0) binary_input = true;
-  else if (format.compare("m") == 0)
-    binary_input = false;
-  else
-    std::cerr << "Error format is eiter b (binary) or m (matrix market)."
-              << std::endl;
+  std::string f(argv[1]);
 
-  std::string f(argv[2]);
+  CSRMatrix<double,int> A;
+  CSRMatrix<std::complex<double>,int> Acomplex;
+  //---- For 64bit integers use this instead: --------
+  // CSRMatrix<double,int> A;
+  // CSRMatrix<std::complex<double>,int> Acomplex;
+  //--------------------------------------------------
 
-  CSRMatrix<double,int>* A = NULL;
-  CSRMatrix<std::complex<double>,int>* A_c = NULL;
   bool is_complex = false;
-
   if (rank == 0) {
-    A = new CSRMatrix<double,int>();
-    int ierr;
-    if (binary_input) ierr = A->read_binary(f);
-    else ierr = A->read_matrix_market(f);
-    if (!ierr) {
-      is_complex = false;
-      std::vector<int> perm;
-      std::vector<double> Dr, Dc;
-      ierr = A->permute_and_scale
-        (MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING, perm, Dr, Dc);
-      if (ierr) std::cerr << "MC64 reordering failed!" << std::endl;
-      A->symmetrize_sparsity();
-    } else {
-      delete A;
+    if (A.read_matrix_market(f)) {
       is_complex = true;
-      A_c = new CSRMatrix<std::complex<double>,int>();
-      if (binary_input) ierr = A_c->read_binary(f);
-      else ierr = A_c->read_matrix_market(f);
-      if (ierr) {
+      if (Acomplex.read_matrix_market(f)) {
         std::cerr << "Could not read matrix from file." << std::endl;
         return 1;
       }
-      std::vector<int> perm;
-      std::vector<std::complex<double>> Dr, Dc;
-      ierr = A_c->permute_and_scale
-        (MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING, perm, Dr, Dc);
-      if (ierr) std::cerr << "MC64 reordering failed!" << std::endl;
-      A_c->symmetrize_sparsity();
     }
   }
   MPI_Bcast(&is_complex, sizeof(bool), MPI_BYTE, 0, MPI_COMM_WORLD);
-
-  if (!is_complex) {
-    auto Adist = new CSRMatrixMPI<double,int>(A, MPI_COMM_WORLD, true);
-    delete A;
-    test(argc, argv, Adist);
-    delete Adist;
-  } else {
-    auto Adist_c = new CSRMatrixMPI<std::complex<double>,int>
-      (A_c, MPI_COMM_WORLD, true);
-    delete A_c;
-    test(argc, argv, Adist_c);
-    delete Adist_c;
-  }
+  if (!is_complex)
+    test(argc, argv, A);
+  else
+    test(argc, argv, Acomplex);
 
   scalapack::Cblacs_exit(1);
   MPI_Finalize();
