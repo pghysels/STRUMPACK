@@ -125,12 +125,14 @@ namespace strumpack {
 
 
   template<typename scalar_t> void SPOptions<scalar_t>::set_from_command_line
-  (int argc, const char* const* argv) {
+  (int argc, const char* const* cargv) {
 #if defined(STRUMPACK_USE_GETOPT)
-    std::vector<char*> argv_local(argc);
+    std::vector<std::unique_ptr<char[]>> argv_data(argc);
+    std::vector<char*> argv(argc);
     for (int i=0; i<argc; i++) {
-      argv_local[i] = new char[strlen(argv[i])+1];
-      strcpy(argv_local[i], argv[i]);
+      argv_data[i].reset(new char[strlen(cargv[i])+1]);
+      argv[i] = argv_data[i].get();
+      strcpy(argv[i], cargv[i]);
     }
     option long_options[] =
       {{"sp_maxit",                     required_argument, 0, 1},
@@ -180,25 +182,25 @@ namespace strumpack {
       };
     int c, option_index = 0;
     // bool unrecognized_options = false;
-    opterr = 0;
+    opterr = optind = 0;
     while ((c = getopt_long_only
-            (argc, argv_local.data(),
-             "hvq", long_options, &option_index)) != -1) {
+            (argc, argv.data(), "hvq",
+             long_options, &option_index)) != -1) {
       switch (c) {
       case 1: {
         std::istringstream iss(optarg);
-        iss >> _maxit;
-        set_maxit(_maxit);
+        iss >> maxit_;
+        set_maxit(maxit_);
       } break;
       case 2: {
         std::istringstream iss(optarg);
-        iss >> _rel_tol;
-        set_rel_tol(_rel_tol);
+        iss >> rel_tol_;
+        set_rel_tol(rel_tol_);
       } break;
       case 3: {
         std::istringstream iss(optarg);
-        iss >> _abs_tol;
-        set_abs_tol(_abs_tol);
+        iss >> abs_tol_;
+        set_abs_tol(abs_tol_);
       } break;
       case 4: {
         std::string s; std::istringstream iss(optarg); iss >> s;
@@ -214,8 +216,8 @@ namespace strumpack {
       } break;
       case 5: {
         std::istringstream iss(optarg);
-        iss >> _gmres_restart;
-        set_gmres_restart(_gmres_restart); } break;
+        iss >> gmres_restart_;
+        set_gmres_restart(gmres_restart_); } break;
       case 6: {
         std::string s;
         std::istringstream iss(optarg); iss >> s;
@@ -241,8 +243,8 @@ namespace strumpack {
       } break;
       case 8: {
         std::istringstream iss(optarg);
-        iss >> _nd_param;
-        set_nd_param(_nd_param);
+        iss >> nd_param_;
+        set_nd_param(nd_param_);
       } break;
       case 9:  { enable_METIS_NodeNDP(); } break;
       case 10: { disable_METIS_NodeNDP(); } break;
@@ -292,8 +294,8 @@ namespace strumpack {
       } break;
       case 24: {
         std::istringstream iss(optarg);
-        iss >> _sep_order_level;
-        set_separator_ordering_level(_sep_order_level);
+        iss >> sep_order_level_;
+        set_separator_ordering_level(sep_order_level_);
       } break;
       case 25: { enable_indirect_sampling(); } break;
       case 26: { disable_indirect_sampling(); } break;
@@ -301,28 +303,28 @@ namespace strumpack {
       case 28: { disable_replace_tiny_pivots(); } break;
       case 29: {
         std::istringstream iss(optarg);
-        iss >> _nx;
-        set_nx(_nx);
+        iss >> nx_;
+        set_nx(nx_);
       } break;
       case 30: {
         std::istringstream iss(optarg);
-        iss >> _ny;
-        set_ny(_ny);
+        iss >> ny_;
+        set_ny(ny_);
       } break;
       case 31: {
         std::istringstream iss(optarg);
-        iss >> _nz;
-        set_nz(_nz);
+        iss >> nz_;
+        set_nz(nz_);
       } break;
       case 32: {
         std::istringstream iss(optarg);
-        iss >> _components;
-        set_components(_components);
+        iss >> components_;
+        set_components(components_);
       } break;
       case 33: {
         std::istringstream iss(optarg);
-        iss >> _separator_width;
-        set_separator_width(_separator_width);
+        iss >> separator_width_;
+        set_separator_width(separator_width_);
       } break;
       case 34: set_write_root_front(true); break;
       case 35: set_print_root_front_stats(true); break;
@@ -340,8 +342,8 @@ namespace strumpack {
       } break;
       case 40: {
         std::istringstream iss(optarg);
-        iss >> _lossy_precision;
-        set_lossy_precision(_lossy_precision);
+        iss >> lossy_precision_;
+        set_lossy_precision(lossy_precision_);
       } break;
       case 'h': { describe_options(); } break;
       case 'v': set_verbose(true); break;
@@ -350,15 +352,14 @@ namespace strumpack {
       default: break;
       }
     }
-    for (auto s : argv_local) delete[] s;
 
     // if (unrecognized_options/* && is_root*/)
     //   std::cerr << "# WARNING STRUMPACK: Unrecognized options."
     //             << std::endl;
-    HSS_options().set_from_command_line(argc, argv);
-    BLR_options().set_from_command_line(argc, argv);
+    HSS_options().set_from_command_line(argc, cargv);
+    BLR_options().set_from_command_line(argc, cargv);
 #if defined(STRUMPACK_USE_BPACK)
-    HODLR_options().set_from_command_line(argc, argv);
+    HODLR_options().set_from_command_line(argc, cargv);
 #endif
 #else
     std::cerr << "WARNING: no support for getopt.h, "
@@ -397,18 +398,18 @@ namespace strumpack {
     std::cout << "#          Code for nested dissection." << std::endl;
     std::cout << "#          Geometric only works on regular meshes and you"
               << " need to provide the sizes." << std::endl;
-    std::cout << "#   --sp_nd_param int (default " << _nd_param << ")"
+    std::cout << "#   --sp_nd_param int (default " << nd_param() << ")"
               << std::endl;
-    std::cout << "#   --sp_nx int (default " << _nx << ")"
+    std::cout << "#   --sp_nx int (default " << nx() << ")"
               << std::endl;
-    std::cout << "#   --sp_ny int (default " << _ny << ")"
+    std::cout << "#   --sp_ny int (default " << ny() << ")"
               << std::endl;
-    std::cout << "#   --sp_nz int (default " << _nz << ")"
+    std::cout << "#   --sp_nz int (default " << nz() << ")"
               << std::endl;
-    std::cout << "#   --sp_components int (default " << _components << ")"
+    std::cout << "#   --sp_components int (default " << components() << ")"
               << std::endl;
     std::cout << "#   --sp_separator_width int (default "
-              << _separator_width << ")" << std::endl;
+              << separator_width() << ")" << std::endl;
     std::cout << "#   --sp_enable_METIS_NodeNDP (default "
               << std::boolalpha << use_METIS_NodeNDP() << ")" << std::endl;
     std::cout << "#          use undocumented Metis routine NodeNDP"

@@ -198,7 +198,7 @@ namespace strumpack {
      * Default constructor, initializing all options to their default
      * values.
      */
-    SPOptions() { _hss_opts.set_verbose(false); }
+    SPOptions() { hss_opts_.set_verbose(false); }
 
     /**
      * Constructor, initializing all options to their default
@@ -211,10 +211,10 @@ namespace strumpack {
      * \param argc number of arguments (number of char* in argv)
      * \param argv inout from the command line with list of options
      */
-    SPOptions(int argc, char* argv[]) : _argc(argc), _argv(argv) {
-      _hss_opts.set_verbose(false);
-      _blr_opts.set_verbose(false);
-      _hodlr_opts.set_verbose(false);
+    SPOptions(int argc, const char* const argv[]) : argc_(argc), argv_(argv) {
+      hss_opts_.set_verbose(false);
+      blr_opts_.set_verbose(false);
+      hodlr_opts_.set_verbose(false);
     }
 
     /**
@@ -223,13 +223,13 @@ namespace strumpack {
      * usage etc. to cout. Warnings will go to cerr regardless of the
      * verbose options set here.
      */
-    void set_verbose(bool verbose) { _verbose = verbose; }
+    void set_verbose(bool verbose) { verbose_ = verbose; }
 
     /**
      * Set the maximum number of iterations to use in any of the
      * iterative solvers.
      */
-    void set_maxit(int maxit) { assert(maxit >= 1); _maxit = maxit; }
+    void set_maxit(int maxit) { assert(maxit >= 1); maxit_ = maxit; }
 
     /**
      * Set the relative tolerance to use in the iterative
@@ -239,7 +239,7 @@ namespace strumpack {
      */
     void set_rel_tol(real_t rel_tol) {
       assert(rel_tol <= real_t(1.) && rel_tol >= real_t(0.));
-      _rel_tol = rel_tol;
+      rel_tol_ = rel_tol;
     }
 
     /**
@@ -250,7 +250,7 @@ namespace strumpack {
      */
     void set_abs_tol(real_t abs_tol) {
       assert(abs_tol >= real_t(0.));
-      _abs_tol = abs_tol;
+      abs_tol_ = abs_tol;
     }
 
     /**
@@ -265,21 +265,21 @@ namespace strumpack {
      * \param s outer, iterative solver to use
      * \see set_compression()
      */
-    void set_Krylov_solver(KrylovSolver s) { _Krylov_solver = s; }
+    void set_Krylov_solver(KrylovSolver s) { Krylov_solver_ = s; }
 
     /**
      * Set the GMRES restart length
      *
      * \param m GMRES restart, should be > 0 and not too crazy big
      */
-    void set_gmres_restart(int m) { assert(m >= 1); _gmres_restart = m; }
+    void set_gmres_restart(int m) { assert(m >= 1); gmres_restart_ = m; }
 
     /**
      * Set the type of Gram-Schmidt orthogonalization to use in GMRES
      *
      * \param t Gram-Schmidt type to use in GMRES
      */
-    void set_GramSchmidt_type(GramSchmidtType t) { _Gram_Schmidt_type = t; }
+    void set_GramSchmidt_type(GramSchmidtType t) { Gram_Schmidt_type_ = t; }
 
     /**
      * Set the sparse fill-reducing reordering. This can greatly
@@ -293,7 +293,7 @@ namespace strumpack {
      *
      * \param m fill reducing reordering
      */
-    void set_reordering_method(ReorderingStrategy m) { _reordering_method = m; }
+    void set_reordering_method(ReorderingStrategy m) { reordering_method_ = m; }
 
     /**
      * Set the parameter used in nested dissection to determine when
@@ -302,7 +302,7 @@ namespace strumpack {
      * overhead, but typically leads to more fill.
      */
     void set_nd_param(int nd_param)
-    { assert(nd_param>=0); _nd_param = nd_param; }
+    { assert(nd_param>=0); nd_param_ = nd_param; }
 
     /**
      * Set the mesh dimensions. This is only useful when the sparse
@@ -325,7 +325,7 @@ namespace strumpack {
      */
     void set_dimensions(int nx, int ny=1, int nz=1) {
       assert(nx>=1 && ny>=1 && nz>=1);
-      _nx = nx; _ny = ny; _nz = nz;
+      nx_ = nx; ny_ = ny; nz_ = nz;
     }
 
     /**
@@ -337,7 +337,7 @@ namespace strumpack {
      *  set_separator_width(), ReorderingStrategy::GEOMETRIC,
      *  set_reordering_method()
      */
-    void set_nx(int nx) {assert(nx>=1); _nx = nx; }
+    void set_nx(int nx) {assert(nx>=1); nx_ = nx; }
 
     /**
      * Set the mesh dimension along the y-axis. This is only useful
@@ -349,7 +349,7 @@ namespace strumpack {
      *  set_separator_width(), ReorderingStrategy::GEOMETRIC,
      *  set_reordering_method()
      */
-    void set_ny(int ny) {assert(ny>=1); _ny = ny; }
+    void set_ny(int ny) {assert(ny>=1); ny_ = ny; }
 
     /**
      * Set the mesh dimension along the z-axis. This is only useful
@@ -361,7 +361,7 @@ namespace strumpack {
      *  set_separator_width(), ReorderingStrategy::GEOMETRIC,
      *  set_reordering_method()
      */
-    void set_nz(int nz) {assert(nz>=1); _nz = nz; }
+    void set_nz(int nz) { assert(nz>=1); nz_ = nz; }
 
     /**
      * Set the number of components per gridpoint. This is only useful
@@ -374,7 +374,7 @@ namespace strumpack {
      * ReorderingStrategy::GEOMETRIC, set_reordering_method()
      */
     void set_components(int components)
-    { assert(components>=1); _components = components; }
+    { assert(components>=1); components_ = components; }
 
     /**
      * Set the width of the separator, which depends on the width of
@@ -394,7 +394,7 @@ namespace strumpack {
      * ReorderingStrategy::GEOMETRIC, set_reordering_method()
      */
     void set_separator_width(int width)
-    { assert(width>=1); _separator_width = width; }
+    { assert(width>=1); separator_width_ = width; }
 
     /**
      * Enable use of the routine METIS_NodeNDP, instead of
@@ -405,7 +405,7 @@ namespace strumpack {
      * \see disable_METIS_NodeNDP(), enable_METIS_NodeND(),
      * disable_METIS_NodeND()
      */
-    void enable_METIS_NodeNDP() { _use_METIS_NodeNDP = true; }
+    void enable_METIS_NodeNDP() { use_METIS_NodeNDP_ = true; }
 
     /**
      * Disable use of the routine METIS_NodeNDP, and instead use
@@ -416,7 +416,7 @@ namespace strumpack {
      * \see enable_METIS_NodeNDP(), enable_METIS_NodeND(),
      * disable_METIS_NodeND()
      */
-    void disable_METIS_NodeNDP() { _use_METIS_NodeNDP = false; }
+    void disable_METIS_NodeNDP() { use_METIS_NodeNDP_ = false; }
 
 
     /**
@@ -426,7 +426,7 @@ namespace strumpack {
      * \see enable_METIS_NodeNDP(), disable_METIS_NodeNDP(),
      * disable_METIS_NodeND()
      */
-    void enable_METIS_NodeND() { _use_METIS_NodeNDP = false; }
+    void enable_METIS_NodeND() { use_METIS_NodeNDP_ = false; }
 
     /**
      * Do not use the routine METIS_NodeND, but instead use the
@@ -435,7 +435,7 @@ namespace strumpack {
      * \see enable_METIS_NodeNDP(), disable_METIS_NodeNDP(),
      * enable_METIS_NodeND()
      */
-    void disable_METIS_NodeND() { _use_METIS_NodeNDP = true; }
+    void disable_METIS_NodeND() { use_METIS_NodeNDP_ = true; }
 
     /**
      * Use the SYMQAMD routine (provided by the MUMPS folks) to
@@ -444,7 +444,7 @@ namespace strumpack {
      *
      * \see disable_MUMPS_SYMQAMD(), enable_agg_amalg(), disable_agg_amalg()
      */
-    void enable_MUMPS_SYMQAMD() { _use_MUMPS_SYMQAMD = true; }
+    void enable_MUMPS_SYMQAMD() { use_MUMPS_SYMQAMD_ = true; }
 
     /**
      * Do not use the SYMQAMD routine (provided by the MUMPS folks) to
@@ -454,7 +454,7 @@ namespace strumpack {
      *
      * \see enable_MUMPS_SYMQAMD(), enable_agg_amalg(), disable_agg_amalg()
      */
-    void disable_MUMPS_SYMQAMD() { _use_MUMPS_SYMQAMD = false; }
+    void disable_MUMPS_SYMQAMD() { use_MUMPS_SYMQAMD_ = false; }
 
     /**
      * When using MUMPS_SYMQAMD, enable aggressive amalgamation of
@@ -464,7 +464,7 @@ namespace strumpack {
      * \see disable_agg_amalg(), enable_MUMPS_SYMQAMD(),
      * disable_MUMPS_SYMQAMD()
      */
-    void enable_agg_amalg() { _use_agg_amalg = true; }
+    void enable_agg_amalg() { use_agg_amalg_ = true; }
 
     /**
      * Disbale aggressive amalgamation of nodes into supernodes inside
@@ -474,7 +474,7 @@ namespace strumpack {
      * \see enable_agg_amalg(), enable_MUMPS_SYMQAMD(),
      * disable_MUMPS_SYMQAMD()
      */
-    void disable_agg_amalg() { _use_agg_amalg = false; }
+    void disable_agg_amalg() { use_agg_amalg_ = false; }
 
     /**
      * Specify the job type for the column ordering for
@@ -485,18 +485,18 @@ namespace strumpack {
      *
      * \param job type of matching to perform
      */
-    void set_matching(MatchingJob job) { _matching_job = job; }
+    void set_matching(MatchingJob job) { matching_job_ = job; }
 
     /**
      * Log the assembly tree to a file. __Currently not supported.__
      */
-    void enable_assembly_tree_log() { _log_assembly_tree = true; }
+    void enable_assembly_tree_log() { log_assembly_tree_ = true; }
 
     /**
      * Do not log the assembly tree to a file. __Logging of the tree
      * is currently not supported.__
      */
-    void disable_assembly_tree_log() { _log_assembly_tree = false; }
+    void disable_assembly_tree_log() { log_assembly_tree_ = false; }
 
     /**
      * Set the type of rank-structured compression to use.
@@ -506,7 +506,7 @@ namespace strumpack {
      * \see set_compression_min_sep_size(),
      * set_compression_min_front_size()
      */
-    void set_compression(CompressionType c) { _comp = c; }
+    void set_compression(CompressionType c) { comp_ = c; }
 
     /**
      * Set the minimum size of the top left part of frontal matrices
@@ -520,10 +520,10 @@ namespace strumpack {
      */
     void set_compression_min_sep_size(int s) {
       assert(s >= 0);
-      _hss_min_sep_size = s;
-      _blr_min_sep_size = s;
-      _hodlr_min_sep_size = s;
-      _lossy_min_sep_size = s;
+      hss_min_sep_size_ = s;
+      blr_min_sep_size_ = s;
+      hodlr_min_sep_size_ = s;
+      lossy_min_sep_size_ = s;
     }
 
     /**
@@ -537,10 +537,10 @@ namespace strumpack {
      */
     void set_compression_min_front_size(int s) {
       assert(s >= 0);
-      _hss_min_front_size = s;
-      _blr_min_front_size = s;
-      _hodlr_min_front_size = s;
-      _lossy_min_front_size = s;
+      hss_min_front_size_ = s;
+      blr_min_front_size_ = s;
+      hodlr_min_front_size_ = s;
+      lossy_min_front_size_ = s;
     }
 
     /**
@@ -549,9 +549,9 @@ namespace strumpack {
      * \see HSS_options(), BLR_options(), HODLR_options()
      */
     void set_compression_leaf_size(int s) {
-      _hss_opts.set_leaf_size(s);
-      _blr_opts.set_leaf_size(s);
-      _hodlr_opts.set_leaf_size(s);
+      hss_opts_.set_leaf_size(s);
+      blr_opts_.set_leaf_size(s);
+      hodlr_opts_.set_leaf_size(s);
     }
 
     /**
@@ -570,11 +570,11 @@ namespace strumpack {
      * reordering takes a long time, in which case you can try 0.
      */
     void set_separator_ordering_level(int l)
-    { assert(l >= 0); _sep_order_level = l; }
+    { assert(l >= 0); sep_order_level_ = l; }
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
-    void enable_indirect_sampling() { _indirect_sampling = true; }
-    void disable_indirect_sampling() { _indirect_sampling = false; }
+    void enable_indirect_sampling() { indirect_sampling_ = true; }
+    void disable_indirect_sampling() { indirect_sampling_ = false; }
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 
     /**
@@ -594,32 +594,32 @@ namespace strumpack {
      *
      * \see disable_replace_tiny_pivots(), set_matching()
      */
-    void enable_replace_tiny_pivots() { _replace_tiny_pivots = true; }
+    void enable_replace_tiny_pivots() { replace_tiny_pivots_ = true; }
 
     /**
      * Disable replacement of tiny pivots.
      *
      * \see enable_replace_tiny_pivots()
      */
-    void disable_replace_tiny_pivots() { _replace_tiny_pivots = false; }
+    void disable_replace_tiny_pivots() { replace_tiny_pivots_ = false; }
 
     /**
      * Dump the root front to a set of files, one for each rank. This
      * will only have affect when running with more than one MPI rank,
      * and without compression.
      */
-    void set_write_root_front(bool b)  { _write_root_front = b; }
+    void set_write_root_front(bool b) { write_root_front_ = b; }
 
     /**
      * Enable off-loading to the GPU. This only works when STRUMPACK
      * was configured with GPU support (through CUDA, MAGMA or SLATE)
      */
-    void enable_gpu()  { use_gpu_ = true; }
+    void enable_gpu() { use_gpu_ = true; }
 
     /**
      * Disable GPU off-loading.
      */
-    void disable_gpu()  { use_gpu_ = false; }
+    void disable_gpu() { use_gpu_ = false; }
 
     /**
      * Set the minimum dense matrix size for dense matrix operations
@@ -635,140 +635,140 @@ namespace strumpack {
     /**
      * Set the precision for lossy compression.
      */
-    void set_lossy_precision(int p) { _lossy_precision = p; }
+    void set_lossy_precision(int p) { lossy_precision_ = p; }
 
     /**
      * Print statistics, about ranks, memory etc, for the root front
      * only.
      */
-    void set_print_root_front_stats(bool b)  { _print_root_front_stats = b; }
+    void set_print_root_front_stats(bool b) { print_root_front_stats_ = b; }
 
     /**
      * Check if verbose output is enabled.
      * \see set_verbose()
      */
-    bool verbose() const { return _verbose; }
+    bool verbose() const { return verbose_; }
 
     /**
      * Get the maximum number of allowed iterative solver iterations.
      * \see set_maxit()
      */
-    int maxit() const { return _maxit; }
+    int maxit() const { return maxit_; }
 
     /**
      * Get the relative tolerance to be used in the iterative solver.
      * \see set_rel_tol()
      */
-    real_t rel_tol() const { return _rel_tol; }
+    real_t rel_tol() const { return rel_tol_; }
 
     /**
      * Get the absolute tolerance to be used in the iterative solver.
      * \see set_abs_tol()
      */
-    real_t abs_tol() const { return _abs_tol; }
+    real_t abs_tol() const { return abs_tol_; }
 
     /**
      * Get the type of iterative solver to be used as outer solver.
      * \see set_Krylov_solver()
      */
-    KrylovSolver Krylov_solver() const { return _Krylov_solver; }
+    KrylovSolver Krylov_solver() const { return Krylov_solver_; }
 
     /**
      * Get the GMRES restart length.
      * \see set_gmres_restart()
      */
-    int gmres_restart() const { return _gmres_restart; }
+    int gmres_restart() const { return gmres_restart_; }
 
     /**
      * Get the Gram-Schmidth orthogonalization type used in GMRES.
      * \see set_GramSchmidth_type()
      */
-    GramSchmidtType GramSchmidt_type() const { return _Gram_Schmidt_type; }
+    GramSchmidtType GramSchmidt_type() const { return Gram_Schmidt_type_; }
 
     /**
      * Get the currently set fill reducing reordering method.
      * \see set_reordering_method()
      */
-    ReorderingStrategy reordering_method() const { return _reordering_method; }
+    ReorderingStrategy reordering_method() const { return reordering_method_; }
 
     /**
      * Return the nested-dissection recursion ending parameter.
      * \see set_nd_param()
      */
-    int nd_param() const { return _nd_param; }
+    int nd_param() const { return nd_param_; }
 
     /**
      * Get the specified nx mesh dimension.
      * \see set_nx()
      */
-    int nx() const { return _nx; }
+    int nx() const { return nx_; }
 
     /**
      * Get the specified ny mesh dimension.
      * \see set_ny()
      */
-    int ny() const { return _ny; }
+    int ny() const { return ny_; }
 
     /**
      * Get the specified nz mesh dimension.
      * \see set_nz()
      */
-    int nz() const { return _nz; }
+    int nz() const { return nz_; }
 
     /**
      * Get the currently specified number of components (DoF's) per
      * mesh point.
      * \see set_components()
      */
-    int components() const { return _components; }
+    int components() const { return components_; }
 
     /**
      * Get the currently specified width of a separator.
      * \see set_separator_width()
      */
-    int separator_width() const { return _separator_width; }
+    int separator_width() const { return separator_width_; }
 
     /**
      * Is use of METIS_NodeNDP enabled? (instead of METIS_NodeND)
      * \see enable_METIS_NodeNDP()
      */
-    bool use_METIS_NodeNDP() const { return _use_METIS_NodeNDP; }
+    bool use_METIS_NodeNDP() const { return use_METIS_NodeNDP_; }
 
     /**
      * Is use of METIS_NodeND enabled? (instead of METIS_NodeNDP)
      * \see enable_METIS_NodeND()
      */
-    bool use_METIS_NodeND() const { return !_use_METIS_NodeNDP; }
+    bool use_METIS_NodeND() const { return !use_METIS_NodeNDP_; }
 
     /**
      * Is MUMPS_SYMQAMD enabled?
      * \see enable_MUMPS_SYMQAMD()
      */
-    bool use_MUMPS_SYMQAMD() const { return _use_MUMPS_SYMQAMD; }
+    bool use_MUMPS_SYMQAMD() const { return use_MUMPS_SYMQAMD_; }
 
     /**
      * Is aggressive amalgamation enabled? (only used when
      * MUMPS_SYMQAMD is enabled)
      * \see enable_agg_amalg(), enable_MUMPS_SYMQAMD()
      */
-    bool use_agg_amalg() const { return _use_agg_amalg; }
+    bool use_agg_amalg() const { return use_agg_amalg_; }
 
     /**
      * Get the matching job to use for numerical stability reordering.
      * \see set_matching()
      */
-    MatchingJob matching() const { return _matching_job; }
+    MatchingJob matching() const { return matching_job_; }
 
     /**
      * Should we log the assembly tree?
      * __Currently not supported.__
      */
-    bool log_assembly_tree() const { return _log_assembly_tree; }
+    bool log_assembly_tree() const { return log_assembly_tree_; }
 
     /**
      * Get the type of compression to use.
      */
-    CompressionType compression() const { return _comp; }
+    CompressionType compression() const { return comp_; }
 
     /**
      * Get the minimum size of a separator to enable compression. This
@@ -778,16 +778,16 @@ namespace strumpack {
      * compression_min_front_size()
      */
     int compression_min_sep_size() const {
-      switch (_comp) {
+      switch (comp_) {
       case CompressionType::HSS:
-        return _hss_min_sep_size;
+        return hss_min_sep_size_;
       case CompressionType::BLR:
-        return _blr_min_sep_size;
+        return blr_min_sep_size_;
       case CompressionType::HODLR:
-        return _hodlr_min_sep_size;
+        return hodlr_min_sep_size_;
       case CompressionType::LOSSY:
       case CompressionType::LOSSLESS:
-        return _lossy_min_sep_size;
+        return lossy_min_sep_size_;
       case CompressionType::NONE:
       default:
         return std::numeric_limits<int>::max();
@@ -802,16 +802,16 @@ namespace strumpack {
      * compression_min_front_size()
      */
     int compression_min_front_size() const {
-      switch (_comp) {
+      switch (comp_) {
       case CompressionType::HSS:
-        return _hss_min_front_size;
+        return hss_min_front_size_;
       case CompressionType::BLR:
-        return _blr_min_front_size;
+        return blr_min_front_size_;
       case CompressionType::HODLR:
-        return _hodlr_min_front_size;
+        return hodlr_min_front_size_;
       case CompressionType::LOSSY:
       case CompressionType::LOSSLESS:
-        return _lossy_min_front_size;
+        return lossy_min_front_size_;
       case CompressionType::NONE:
       default:
         return std::numeric_limits<int>::max();
@@ -827,13 +827,13 @@ namespace strumpack {
      * compression_min_sep_size()
      */
     int compression_leaf_size() const {
-      switch (_comp) {
+      switch (comp_) {
       case CompressionType::HSS:
-        return _hss_opts.leaf_size();
+        return hss_opts_.leaf_size();
       case CompressionType::BLR:
-        return _blr_opts.leaf_size();
+        return blr_opts_.leaf_size();
       case CompressionType::HODLR:
-        return _hodlr_opts.leaf_size();
+        return hodlr_opts_.leaf_size();
       case CompressionType::LOSSY:
       case CompressionType::LOSSLESS:
         return 4;
@@ -848,22 +848,22 @@ namespace strumpack {
      * include in the separator before reordering.
      * \see set_separator_ordering_level()
      */
-    int separator_ordering_level() const { return _sep_order_level; }
+    int separator_ordering_level() const { return sep_order_level_; }
 
     /**
      * Is indirect sampling for HSS construction enabled?
      */
-    bool indirect_sampling() const { return _indirect_sampling; }
+    bool indirect_sampling() const { return indirect_sampling_; }
 
     /**
      * Check whether replacement of tiny pivots is enabled.
      */
-    bool replace_tiny_pivots() const { return _replace_tiny_pivots; }
+    bool replace_tiny_pivots() const { return replace_tiny_pivots_; }
 
     /**
      * The root front will be written to a file.
      */
-    bool write_root_front() const { return _write_root_front; }
+    bool write_root_front() const { return write_root_front_; }
 
     /**
      * Check wheter or not to use GPU off-loading.
@@ -883,56 +883,56 @@ namespace strumpack {
     /**
      * Returns the precision for lossy compression.
      */
-    int lossy_precision() const { return _lossy_precision; }
+    int lossy_precision() const { return lossy_precision_; }
 
     /**
      * Info about the stats of the root front will be printed to
      * std::cout
      */
-    bool print_root_front_stats() const { return _print_root_front_stats; }
+    bool print_root_front_stats() const { return print_root_front_stats_; }
 
     /**
      * Get a (const) reference to an object holding various options
      * pertaining to the HSS code, and data structures.
      */
-    const HSS::HSSOptions<scalar_t>& HSS_options() const { return _hss_opts; }
+    const HSS::HSSOptions<scalar_t>& HSS_options() const { return hss_opts_; }
 
     /**
      * Get a reference to an object holding various options pertaining
      * to the HSS code, and data structures.
      */
-    HSS::HSSOptions<scalar_t>& HSS_options() { return _hss_opts; }
+    HSS::HSSOptions<scalar_t>& HSS_options() { return hss_opts_; }
 
     /**
      * Get a (const) reference to an object holding various options
      * pertaining to the BLR code, and data structures.
      */
-    const BLR::BLROptions<scalar_t>& BLR_options() const { return _blr_opts; }
+    const BLR::BLROptions<scalar_t>& BLR_options() const { return blr_opts_; }
 
     /**
      * Get a reference to an object holding various options pertaining
      * to the BLR code, and data structures.
      */
-    BLR::BLROptions<scalar_t>& BLR_options() { return _blr_opts; }
+    BLR::BLROptions<scalar_t>& BLR_options() { return blr_opts_; }
 
     /**
      * Get a (const) reference to an object holding various options
      * pertaining to the HODLR code, and data structures.
      */
-    const HODLR::HODLROptions<scalar_t>& HODLR_options() const { return _hodlr_opts; }
+    const HODLR::HODLROptions<scalar_t>& HODLR_options() const { return hodlr_opts_; }
 
     /**
      * Get a reference to an object holding various options pertaining
      * to the HODLR code, and data structures.
      */
-    HODLR::HODLROptions<scalar_t>& HODLR_options() { return _hodlr_opts; }
+    HODLR::HODLROptions<scalar_t>& HODLR_options() { return hodlr_opts_; }
 
     /**
      * Parse the command line options that were passed to this object
      * in the constructor. Run the code with -h or --help and call
      * this routine to see a list of supported options.
      */
-    void set_from_command_line() { set_from_command_line(_argc, _argv); }
+    void set_from_command_line() { set_from_command_line(argc_, argv_); }
 
     /**
      * Parse command line options. These options will not be
@@ -946,7 +946,7 @@ namespace strumpack {
      * \param argc number of arguments in the argv array
      * \param argv list of options
      */
-    void set_from_command_line(int argc, const char* const* argv);
+    void set_from_command_line(int argc, const char* const* cargv);
 
     /**
      * Print an overview of all supported options. Not including any
@@ -955,30 +955,30 @@ namespace strumpack {
     void describe_options() const;
 
   private:
-    bool _verbose = true;
+    bool verbose_ = true;
     /** Krylov solver options */
-    int _maxit = 5000;
-    real_t _rel_tol = default_rel_tol<real_t>();
-    real_t _abs_tol = default_abs_tol<real_t>();
-    KrylovSolver _Krylov_solver = KrylovSolver::AUTO;
-    int _gmres_restart = 30;
-    GramSchmidtType _Gram_Schmidt_type = GramSchmidtType::MODIFIED;
+    int maxit_ = 5000;
+    real_t rel_tol_ = default_rel_tol<real_t>();
+    real_t abs_tol_ = default_abs_tol<real_t>();
+    KrylovSolver Krylov_solver_ = KrylovSolver::AUTO;
+    int gmres_restart_ = 30;
+    GramSchmidtType Gram_Schmidt_type_ = GramSchmidtType::MODIFIED;
     /** Reordering options */
-    ReorderingStrategy _reordering_method = ReorderingStrategy::METIS;
-    int _nd_param = 8;
-    int _nx = 1;
-    int _ny = 1;
-    int _nz = 1;
-    int _components = 1;
-    int _separator_width = 1;
-    bool _use_METIS_NodeNDP = false;
-    bool _use_MUMPS_SYMQAMD = false;
-    bool _use_agg_amalg = false;
-    MatchingJob _matching_job = MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING;
-    bool _log_assembly_tree = false;
-    bool _replace_tiny_pivots = false;
-    bool _write_root_front = false;
-    bool _print_root_front_stats = false;
+    ReorderingStrategy reordering_method_ = ReorderingStrategy::METIS;
+    int nd_param_ = 8;
+    int nx_ = 1;
+    int ny_ = 1;
+    int nz_ = 1;
+    int components_ = 1;
+    int separator_width_ = 1;
+    bool use_METIS_NodeNDP_ = false;
+    bool use_MUMPS_SYMQAMD_ = false;
+    bool use_agg_amalg_ = false;
+    MatchingJob matching_job_ = MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING;
+    bool log_assembly_tree_ = false;
+    bool replace_tiny_pivots_ = false;
+    bool write_root_front_ = false;
+    bool print_root_front_stats_ = false;
 
     /** GPU options */
     bool use_gpu_ = true;
@@ -986,32 +986,32 @@ namespace strumpack {
     int cuda_streams_ = default_cuda_streams();
 
     /** compression options */
-    CompressionType _comp = CompressionType::NONE;
+    CompressionType comp_ = CompressionType::NONE;
 
     /** HSS options */
-    int _hss_min_front_size = 1000;
-    int _hss_min_sep_size = 256;
-    int _sep_order_level = 1;
-    bool _indirect_sampling = false;
-    HSS::HSSOptions<scalar_t> _hss_opts;
+    int hss_min_front_size_ = 1000;
+    int hss_min_sep_size_ = 256;
+    int sep_order_level_ = 1;
+    bool indirect_sampling_ = false;
+    HSS::HSSOptions<scalar_t> hss_opts_;
 
     /** BLR options */
-    BLR::BLROptions<scalar_t> _blr_opts;
-    int _blr_min_front_size = 1000;
-    int _blr_min_sep_size = 256;
+    BLR::BLROptions<scalar_t> blr_opts_;
+    int blr_min_front_size_ = 1000;
+    int blr_min_sep_size_ = 256;
 
     /** HODLR options */
-    HODLR::HODLROptions<scalar_t> _hodlr_opts;
-    int _hodlr_min_front_size = 1000;
-    int _hodlr_min_sep_size = 256;
+    HODLR::HODLROptions<scalar_t> hodlr_opts_;
+    int hodlr_min_front_size_ = 1000;
+    int hodlr_min_sep_size_ = 256;
 
     /** LOSSY/LOSSLESS options */
-    int _lossy_min_front_size = 16;
-    int _lossy_min_sep_size = 8;
-    int _lossy_precision = 16;
+    int lossy_min_front_size_ = 16;
+    int lossy_min_sep_size_ = 8;
+    int lossy_precision_ = 16;
 
-    int _argc = 0;
-    char** _argv = nullptr;
+    int argc_ = 0;
+    const char* const* argv_ = nullptr;
   };
 
 } // end namespace strumpack
