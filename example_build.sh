@@ -47,31 +47,35 @@ fi
 if [[ $NERSC_HOST = "cori" ]]; then
     found_host=true
 
-    module unload cmake
-    module load cmake
-    module remove darshan
-    module swap PrgEnv-intel PrgEnv-gnu
-    module unload gcc
-    module load gcc
+    # ideally cmake would handle all this
+    if CC --version | grep -q ICC; then
+        echo "Detected Intel compiler"
 
-    ## for MKL, use the link advisor: https://software.intel.com/en-us/articles/intel-mkl-link-line-advisor
-    ## separate arguments with ;, the -Wl,--start-group ... -Wl,--end-group is a single argument
-    ## Intel compiler
-    #ScaLAPACKLIBS="${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a;-Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_intel_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_blacs_intelmpi_lp64.a -Wl,--end-group;-liomp5;-lpthread;-lm;-ldl"
+        ## for MKL, use the link advisor: https://software.intel.com/en-us/articles/intel-mkl-link-line-advisor
+        ## separate arguments with ;, the -Wl,--start-group ... -Wl,--end-group is a single argument
+        ## Intel compiler
+        #ALL_MKL_LIBS="${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a;-Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_intel_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_blacs_intelmpi_lp64.a -Wl,--end-group;-liomp5;-lpthread;-lm;-ldl"
 
-    ## GNU compiler
-    #ScaLAPACKLIBS="${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a;-Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_gnu_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_blacs_intelmpi_lp64.a -Wl,--end-group;-lgomp;-lpthread;-lm;-ldl"
+        export METIS_DIR=$HOME/local/cori/icc/metis-5.1.0/install
+    else
+        if CC --version | grep -q GCC; then
+            echo "Detected GCC compiler"
 
-    ## cray-libsci (module cray-libsci loaded) instead of MKL
+            #ALL_MKL_LIBS="${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a;-Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_gnu_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_blacs_intelmpi_lp64.a -Wl,--end-group;-lgomp;-lpthread;-lm;-ldl"
+
+            export METIS_DIR=$HOME/local/cori/gcc/metis-5.1.0/install
+
+            # optional dependencies
+            export ParMETIS_DIR=$HOME/local/cori/gcc/parmetis-4.0.3/install
+            export SCOTCH_DIR=$HOME/local/cori/gcc/scotch_6.0.9
+            export ButterflyPACK_DIR=$HOME/cori/ButterflyPACK/install
+            export ZFP_DIR=$HOME/local/cori/gcc/zfp/install/
+        fi
+    fi
+
+    ## Use cray-libsci (module cray-libsci loaded) instead of MKL.
+    ## The problem with MKL is that it uses openmpi of intel MPI.
     ScaLAPACKLIBS=""
-
-    export METIS_DIR=$HOME/local/cori/gcc/metis-5.1.0/install
-
-    # optional dependencies
-    export ParMETIS_DIR=$HOME/local/cori/gcc/parmetis-4.0.3/install
-    export SCOTCH_DIR=$HOME/local/cori/gcc/scotch_6.0.9
-    export ButterflyPACK_DIR=$HOME/cori/ButterflyPACK/install
-    export ZFP_DIR=$HOME/local/cori/gcc/zfp/install/
 
     cmake ../ \
           -DCMAKE_BUILD_TYPE=Release \
