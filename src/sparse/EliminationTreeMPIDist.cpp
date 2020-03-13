@@ -44,35 +44,38 @@ namespace strumpack {
     std::vector<std::vector<integer_t>> lupd(nd_.local_tree().separators());
     // every process is responsible for 1 distributed separator, so
     // store only 1 dist_upd
-    std::vector<integer_t> dupd;
+    std::vector<integer_t> dist_upd, dleaf_upd;
     std::vector<float> ltree_work(nd_.local_tree().separators()),
       dtree_work(nd_.tree().separators());
 
-    float dsep_work;
+    float dsep_work, dleaf_work;
     MPIComm::control_start("symbolic_factorization");
-    symbolic_factorization(lupd, dupd, ltree_work, dsep_work);
+    symbolic_factorization
+      (lupd, ltree_work, dist_upd, dsep_work, dleaf_upd, dleaf_work);
     MPIComm::control_stop("symbolic_factorization");
 
     {
-      // communicate dist_subtree_work to everyone
+      auto ndseps = nd_.tree().separators();
+      // communicate dtree_work to everyone
       std::vector<float> sbuf(2*P_);
-      for (integer_t dsep=0; dsep<nd_.tree().separators(); dsep++)
+      for (integer_t dsep=0; dsep<ndseps; dsep++)
         if (rank_ == nd_.proc_dist_sep[dsep]) {
-          if (nd_.tree().lch(dsep) == -1)
-            sbuf[2*rank_] = ltree_work[nd_.local_tree().root()];
-          else sbuf[2*rank_+1] = dsep_work;
+          sbuf[2*rank_] = dleaf_work;
+          sbuf[2*rank_+1] = dsep_work;
         }
       MPI_Allgather
-        (MPI_IN_PLACE, 2, MPI_FLOAT, sbuf.data(), 2, MPI_FLOAT, comm_.comm());
-      for (integer_t dsep=0; dsep<nd_.tree().separators(); dsep++)
-        dtree_work[dsep] = (nd_.tree().lch(dsep) == -1) ?
-          sbuf[2*nd_.proc_dist_sep[dsep]] : sbuf[2*nd_.proc_dist_sep[dsep]+1];
+        (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, sbuf.data(), 2,
+         mpi_type<decltype(dtree_work)::value_type>(), comm_.comm());
+      for (integer_t dsep=0; dsep<ndseps; dsep++) {
+        auto i = 2 * nd_.proc_dist_sep[dsep];
+        dtree_work[dsep] = nd_.tree().is_leaf(dsep) ? sbuf[i] : sbuf[i+1];
+      }
     }
 
     local_range_ = {A.size(), 0};
     MPIComm::control_start("proportional_mapping");
     this->root_ = proportional_mapping
-      (opts, lupd, dupd, ltree_work, dtree_work,
+      (opts, lupd, ltree_work, dist_upd, dleaf_upd, dtree_work,
        nd_.tree().root(), 0, P_, 0, 0, comm_, true, 0);
     MPIComm::control_stop("proportional_mapping");
 
@@ -116,9 +119,8 @@ namespace strumpack {
    */
   template<typename scalar_t,typename integer_t> std::tuple<int,int,int>
   EliminationTreeMPIDist<scalar_t,integer_t>::get_sparse_mapped_destination
-  (const CSRMPI_t& A,
-   std::size_t oi, std::size_t oj, std::size_t i, std::size_t j,
-   bool duplicate_fronts) const {
+  (const CSRMPI_t& A, std::size_t oi, std::size_t oj,
+   std::size_t i, std::size_t j, bool duplicate_fronts) const {
     auto fi = row_pfront_[i];
     if (fi < 0) return std::make_tuple(-fi-1, 1, 1);
     auto fj = row_pfront_[j];
@@ -237,8 +239,7 @@ namespace strumpack {
   (DenseM_t& x, const std::vector<integer_t>& dist) {
     integer_t B = DistM_t::default_MB;
     integer_t lo = dist[rank_];
-    integer_t m = dist[rank_+1] - lo;
-    integer_t n = x.cols();
+    integer_t m = dist[rank_+1] - lo, n = x.cols();
     std::unique_ptr<int[]> iwork(new int[4*P_]);
     auto ibuf = iwork.get();
     auto scnts = ibuf;
@@ -249,9 +250,6 @@ namespace strumpack {
     struct RCVal { integer_t r, c; scalar_t v; };
     std::unique_ptr<RCVal[]> sbufwork(new RCVal[m*n]);
     auto sbuf = sbufwork.get();
-    // since some C++ pad the struct, IdxVal must zero the array or
-    // will get valgrind warnings about MPI sending uninitialized data
-    //memset(sbuf,0,m*n*sizeof(RCVal));
     std::unique_ptr<RCVal*[]> pp(new RCVal*[P_]);
     std::fill(scnts, scnts+P_, 0);
     if (n == 1) {
@@ -467,41 +465,52 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPIDist<scalar_t,integer_t>::symbolic_factorization
   (std::vector<std::vector<integer_t>>& local_upd,
-   std::vector<integer_t>& dist_upd, std::vector<float>& local_subtree_work,
-   float& dsep_work) {
+   std::vector<float>& local_subtree_work,
+   std::vector<integer_t>& dist_upd, float& dsep_work,
+   std::vector<integer_t>& dleaf_upd, float& dleaf_work) {
     nd_.my_sub_graph.sort_rows();
-    if (nd_.local_tree().separators() > 0) {
+
+    if (!nd_.local_tree().is_empty()) {
 #pragma omp parallel
 #pragma omp single
       symbolic_factorization_local
         (nd_.local_tree().root(), local_upd, local_subtree_work, 0);
     }
 
-    dsep_work = 0.0;
+    dsep_work = dleaf_work = 0.;
     nd_.my_dist_sep.sort_rows();
     std::vector<MPI_Request> sreq;
     for (integer_t dsep=0; dsep<nd_.tree().separators(); dsep++) {
       // only consider the distributed separator owned by this
       // process: 1 leaf and 1 non-leaf
       if (nd_.proc_dist_sep[dsep] != rank_) continue;
+      if (nd_.tree().is_root(dsep)) continue; // skip the root separator
       auto pa = nd_.tree().pa(dsep);
-      if (pa == -1) continue; // skip the root separator
       auto pa_rank = nd_.proc_dist_sep[pa];
-      if (nd_.tree().lch(dsep) == -1) {
-        // leaf of distributed tree is local subgraph for process
-        // proc_dist_sep[dsep].  local_upd[dsep] was computed above,
-        // send it to the parent process
-        // proc_dist_sep[nd_.tree().pa(dsep)]. dist_upd is
-        // local_upd of the root of the local tree, which is
-        // local_upd[this->nbsep-1], or local_upd.back()
-        if (nd_.tree().pa(pa) == -1)
-          continue; // do not send to parent if parent is root
+
+      if (nd_.tree().is_leaf(dsep)) {
+        // Leaf of distributed tree is local subgraph for process
+        // proc_dist_sep[dsep], unless the local_tree is empty.
+        if (!nd_.local_tree().is_empty()) {
+          dleaf_work = local_subtree_work[nd_.local_tree().root()];
+          dleaf_upd = local_upd[nd_.local_tree().root()];
+        } else {
+          auto sep_begin = nd_.sub_graph_range.first;
+          auto sep_end = nd_.sub_graph_range.second;
+          for (integer_t r=0; r<sep_end-sep_begin; r++)
+            merge_if_larger
+              (nd_.my_sub_graph.ind() + nd_.my_sub_graph.ptr(r),
+               nd_.my_sub_graph.ind() + nd_.my_sub_graph.ptr(r+1),
+               dleaf_upd, sep_end);
+          float dim_blk = (sep_end - sep_begin) + dist_upd.size();
+          dleaf_work = std::pow(dim_blk, 3);
+        }
+        // do not send to parent if parent is root
+        if (nd_.tree().is_root(pa)) continue;
         sreq.emplace_back();
-        comm_.isend
-          (local_upd[nd_.local_tree().root()], pa_rank, 1, &sreq.back());
-        dsep_work = local_subtree_work[nd_.local_tree().root()];
+        comm_.isend(dleaf_upd, pa_rank, 1, &sreq.back());
         sreq.emplace_back();
-        comm_.isend(dsep_work, pa_rank, 2, &sreq.back());
+        comm_.isend(dleaf_work, pa_rank, 2, &sreq.back());
       } else {
         auto sep_begin = nd_.dist_sep_range.first;
         auto sep_end = nd_.dist_sep_range.second;
@@ -511,26 +520,27 @@ namespace strumpack {
              nd_.my_dist_sep.ind() + nd_.my_dist_sep.ptr(r+1),
              dist_upd, sep_end);
 
-        for (int i=0; i<2; i++) {
+        int nr_children = (nd_.tree().is_leaf(dsep) &&
+                           nd_.local_tree().is_empty()) ? 0 : 2;
+        for (int i=0; i<nr_children; i++) {
           // receive dist_upd from left/right child,
           auto du = comm_.template recv_any_src<integer_t>(1);
           // then merge elements larger than sep_end
           merge_if_larger
             (du.second.begin(), du.second.end(), dist_upd, sep_end);
         }
-        if (nd_.tree().pa(pa) != -1) { // do not send to root
+        if (!nd_.tree().is_root(pa)) { // do not send to root
           sreq.emplace_back();     // send dist_upd to parent
           comm_.isend(dist_upd, pa_rank, 1, &sreq.back());
         }
-
         float dim_blk = (sep_end - sep_begin) + dist_upd.size();
         dsep_work = std::pow(dim_blk, 3);
-        for (int i=0; i<2; i++) {
+        for (int i=0; i<nr_children; i++) {
           // receive work estimates for left and right subtrees
           auto w = comm_.template recv_any_src<float>(2);
           dsep_work += w.second[0];
         }
-        if (nd_.tree().pa(pa) != -1) {
+        if (!nd_.tree().is_root(pa)) {
           sreq.emplace_back();    // send work estimate to parent
           comm_.isend(dsep_work, pa_rank, 2, &sreq.back());
         }
@@ -554,10 +564,11 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPIDist<scalar_t,integer_t>::
   communicate_distributed_separator
-  (integer_t dsep, std::vector<integer_t>& dist_upd,
+  (integer_t dsep, const std::vector<integer_t>& dupd_send,
    integer_t& dsep_begin, integer_t& dsep_end,
-   std::vector<integer_t>& dsep_upd, int P0, int P,
-   int P0_sibling, int P_sibling, int owner, bool bcast_dim_sep) {
+   std::vector<integer_t>& dupd_recv,
+   int P0, int P, int P0_sibling, int P_sibling,
+   int owner, bool bcast_dim_sep) {
     std::vector<integer_t> sbuf;
     std::vector<MPI_Request> sreq;
     int dest0 = std::min(P0, P0_sibling),
@@ -567,31 +578,30 @@ namespace strumpack {
       int msg = 0;
       if (bcast_dim_sep) {
         for (int dest=dest0; dest<dest1; dest++)
-          comm_.isend(dist_upd, dest, 0, &sreq[msg++]);
+          comm_.isend(dupd_send, dest, 0, &sreq[msg++]);
       } else {
-        sbuf.reserve(2+dist_upd.size());
-        sbuf.push_back(nd_.dist_sep_range.first);
-        sbuf.push_back(nd_.dist_sep_range.second);
-        sbuf.insert(sbuf.end(), dist_upd.begin(), dist_upd.end());
+        sbuf.reserve(2+dupd_send.size());
+        sbuf.push_back(dsep_begin);
+        sbuf.push_back(dsep_end);
+        sbuf.insert(sbuf.end(), dupd_send.begin(), dupd_send.end());
         for (int dest=dest0; dest<dest1; dest++)
           comm_.isend(sbuf, dest, 0, &sreq[msg++]);
       }
     }
     if (bcast_dim_sep) {
-      std::vector<integer_t> buf
-        ({nd_.dist_sep_range.first, nd_.dist_sep_range.second});
+      std::vector<integer_t> buf({dsep_begin, dsep_end});
       comm_.broadcast(buf, owner);
       dsep_begin = buf[0];
       dsep_end = buf[1];
     }
     if (rank_ >= dest0 && rank_ < dest1) {
       if (bcast_dim_sep)
-        dsep_upd = comm_.template recv<integer_t>(owner, 0);
+        dupd_recv = comm_.template recv<integer_t>(owner, 0);
       else {
         auto rbuf = comm_.template recv<integer_t>(owner, 0);
         dsep_begin = rbuf[0];
         dsep_end = rbuf[1];
-        dsep_upd.assign(rbuf.begin()+2, rbuf.end());
+        dupd_recv.assign(rbuf.begin()+2, rbuf.end());
       }
     }
     if (rank_ == owner) wait_all(sreq);
@@ -602,7 +612,8 @@ namespace strumpack {
   std::unique_ptr<FrontalMatrix<scalar_t,integer_t>>
   EliminationTreeMPIDist<scalar_t,integer_t>::proportional_mapping
   (const Opts_t& opts, std::vector<std::vector<integer_t>>& local_upd,
-   std::vector<integer_t>& dist_upd, std::vector<float>& local_subtree_work,
+   std::vector<float>& local_subtree_work,
+   std::vector<integer_t>& dist_upd, std::vector<integer_t>& dleaf_upd,
    std::vector<float>& dist_subtree_work, integer_t dsep,
    int P0, int P, int P0_sibling, int P_sibling,
    const MPIComm& fcomm, bool parent_compression, int level) {
@@ -610,22 +621,35 @@ namespace strumpack {
     auto chr = nd_.tree().rch(dsep);
     auto owner = nd_.proc_dist_sep[dsep];
 
-    if (chl == -1 && chr == -1) {
-      // leaf of the distributed separator tree -> local subgraph
+    if (nd_.tree().is_leaf(dsep)) {
       RedistSubTree<integer_t> sub_tree
-        (nd_, local_upd, local_subtree_work, P0, P,
-         P0_sibling, P_sibling, owner, comm_.comm());
+        (nd_.local_tree(), nd_.sub_graph_range.first,
+         local_upd, local_subtree_work, P0, P,
+         P0_sibling, P_sibling, owner, comm_);
+      // TODO this causes deadlock?? but is wrong for very small
+      //problems??
+      // if (!nd_.local_tree().is_empty())
       return proportional_mapping_sub_graphs
-        (opts, sub_tree, dsep, sub_tree.root, P0, P, P0_sibling, P_sibling,
+        (opts, sub_tree, dsep, sub_tree.root,
+         P0, P, P0_sibling, P_sibling,
          fcomm, parent_compression, level);
     }
 
-    integer_t dsep_begin = 0, dsep_end = 0;
+    integer_t dsep_begin, dsep_end;
     std::vector<integer_t> dsep_upd;
-    communicate_distributed_separator
-      (dsep, dist_upd, dsep_begin, dsep_end, dsep_upd,
-       P0, P, P0_sibling, P_sibling, owner, parent_compression);
-
+    if (nd_.tree().is_leaf(dsep)) {
+      dsep_begin = nd_.sub_graph_range.first;
+      dsep_end = nd_.sub_graph_range.second;
+      communicate_distributed_separator
+        (dsep, dleaf_upd, dsep_begin, dsep_end, dsep_upd,
+         P0, P, P0_sibling, P_sibling, owner, parent_compression);
+    } else {
+      dsep_begin = nd_.dist_sep_range.first;
+      dsep_end = nd_.dist_sep_range.second;
+      communicate_distributed_separator
+        (dsep, dist_upd, dsep_begin, dsep_end, dsep_upd,
+         P0, P, P0_sibling, P_sibling, owner, parent_compression);
+    }
     auto dim_dsep = dsep_end - dsep_begin;
 
     bool use_compression = is_compressed
@@ -652,17 +676,22 @@ namespace strumpack {
         }
       }
     }
+
+    if (chl == -1) return front;
+
     // here we should still continue, to send the local subgraph
     auto wl = dist_subtree_work[chl];
     auto wr = dist_subtree_work[chr];
     int Pl = std::max(1, std::min(int(std::round(P * wl / (wl + wr))), P-1));
     int Pr = std::max(1, P - Pl);
     auto lch = proportional_mapping
-      (opts, local_upd, dist_upd, local_subtree_work, dist_subtree_work,
-       chl, P0, Pl, P0+P-Pr, Pr, fcomm.sub(0, Pl), use_compression, level+1);
+      (opts, local_upd, local_subtree_work, dist_upd, dleaf_upd,
+       dist_subtree_work, chl, P0, Pl, P0+P-Pr, Pr, fcomm.sub(0, Pl),
+       use_compression, level+1);
     auto rch = proportional_mapping
-      (opts, local_upd, dist_upd, local_subtree_work, dist_subtree_work,
-       chr, P0+P-Pr, Pr, P0, Pl, fcomm.sub(P-Pr, Pr), use_compression, level+1);
+      (opts, local_upd, local_subtree_work, dist_upd, dleaf_upd,
+       dist_subtree_work, chr, P0+P-Pr, Pr, P0, Pl, fcomm.sub(P-Pr, Pr),
+       use_compression, level+1);
     if (front) {
       front->set_lchild(std::move(lch));
       front->set_rchild(std::move(rch));

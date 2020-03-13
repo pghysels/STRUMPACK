@@ -53,8 +53,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t>
   MatrixReorderingMPI<scalar_t,integer_t>::MatrixReorderingMPI
   (integer_t n, const MPIComm& c)
-    : MatrixReordering<scalar_t,integer_t>(n), dsep_internal(0),
-    dsep_leaf(0), comm_(&c) {
+    : MatrixReordering<scalar_t,integer_t>(n), dsep_leaf(-1), comm_(&c) {
   }
 
   template<typename scalar_t,typename integer_t>
@@ -115,7 +114,8 @@ namespace strumpack {
       sep_tree_ = global_sep_tree->toptree(P);
       local_tree_->check();
       sep_tree_->check();
-      for (std::size_t i=0; i<perm_.size(); i++) iperm_[perm_[i]] = i;
+      for (std::size_t i=0; i<perm_.size(); i++)
+        iperm_[perm_[i]] = i;
       get_local_graphs(A);
     } else {
       switch (opts.reordering_method()) {
@@ -240,7 +240,7 @@ namespace strumpack {
     proc_dist_sep.resize(sep_tree_->separators());
     for (integer_t sep=0, p_local=0, p_dist=0;
          sep<sep_tree_->separators(); sep++) {
-      if (sep_tree_->lch(sep) == -1) {
+      if (sep_tree_->is_leaf(sep)) {
         // sep is a leaf, so it is the local graph of proces p
         if (p_local == rank) dsep_leaf = sep;
         sub_graph_ranges[p_local] =
@@ -249,8 +249,6 @@ namespace strumpack {
       } else {
         // sep was computed using distributed nested dissection,
         // assign it to process p_dist
-        if (p_dist == rank)
-          dsep_internal = sep;
         dist_sep_ranges[p_dist] =
           std::make_pair(sep_tree_->sizes(sep), sep_tree_->sizes(sep+1));
         proc_dist_sep[sep] = p_dist++;
@@ -318,8 +316,12 @@ namespace strumpack {
       auto total_separators =
         comm_->all_reduce(local_tree_->separators(), MPI_SUM) +
         std::max(integer_t(0), sep_tree_->separators() - comm_->size());
-      auto max_level = comm_->all_reduce
-        (local_tree_->levels() + sep_tree_->level(dsep_leaf) - 1, MPI_MAX);
+      integer_t local_levels;
+      if (dsep_leaf != -1)
+        local_levels = local_tree_->levels() +
+          sep_tree_->level(dsep_leaf) - 1;
+      else local_levels = sep_tree_->levels();
+      integer_t max_level = comm_->all_reduce(local_levels, MPI_MAX);
       if (comm_->is_root())
         MatrixReordering<scalar_t,integer_t>::nested_dissection_print
           (opts, nnz, max_level, total_separators, true);

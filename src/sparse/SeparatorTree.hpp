@@ -90,6 +90,16 @@ namespace strumpack {
     integer_t& lch(integer_t sep) { return lchild_[sep]; }
     integer_t& rch(integer_t sep) { return rchild_[sep]; }
 
+    bool is_leaf(integer_t sep) const {
+      return lchild_[sep] == -1;
+    }
+    bool is_root(integer_t sep) const {
+      return parent_[sep] == -1;
+    }
+    bool is_empty() const {
+      return nr_seps_ == 0;
+    }
+
 #if defined(STRUMPACK_USE_MPI)
     void broadcast(const MPIComm& c);
 #endif

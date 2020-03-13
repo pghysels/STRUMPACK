@@ -29,6 +29,7 @@
 #include "misc/TaskTimer.hpp"
 #include "sparse/EliminationTreeMPIDist.hpp"
 #include "sparse/iterative/IterativeSolversMPI.hpp"
+#include "sparse/ordering/MatrixReorderingMPI.hpp"
 #include "sparse/Redistribute.hpp"
 
 namespace strumpack {
@@ -52,6 +53,18 @@ namespace strumpack {
     // Set the default reordering to PARMETIS?
     //opts_.set_reordering_method(ReorderingStrategy::PARMETIS);
   }
+
+  template<typename scalar_t,typename integer_t>
+  MatrixReordering<scalar_t,integer_t>*
+  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::reordering() {
+    return nd_mpi_.get();
+  }
+  template<typename scalar_t,typename integer_t>
+  const MatrixReordering<scalar_t,integer_t>*
+  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::reordering() const {
+    return nd_mpi_.get();
+  }
+
 
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::set_matrix

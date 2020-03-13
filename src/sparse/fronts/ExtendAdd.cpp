@@ -239,9 +239,10 @@ namespace strumpack {
     // source rank is
     //  ((r / B) % prows) + ((c / B) % pcols) * prows
     // where r,c is the coordinate in the F22 block of the child
-    auto upd_r_1 =
-      new int[2*F11.lrows()+2*F11.lcols()+
-              2*F22.lrows()+2*F22.lcols()];
+    std::unique_ptr<int[]> iwork
+      (new int[2*F11.lrows()+2*F11.lcols()+
+               2*F22.lrows()+2*F22.lcols()]);
+    auto upd_r_1 = iwork.get();
     auto upd_c_1 = upd_r_1 + F11.lrows();
     auto upd_r_2 = upd_c_1 + F11.lcols();
     auto upd_c_2 = upd_r_2 + F22.lrows();
@@ -249,8 +250,8 @@ namespace strumpack {
     auto c_1 = r_1 + F11.lrows();
     auto r_2 = c_1 + F11.lcols();
     auto c_2 = r_2 + F22.lrows();
-    integer_t r_max_1 = 0, r_max_2 = 0;
-    integer_t c_max_1 = 0, c_max_2 = 0;
+    integer_t r_max_1 = 0, r_max_2 = 0,
+      c_max_1 = 0, c_max_2 = 0;
     for (int r=0, ur=0; r<F11.lrows(); r++) {
       auto fgr = F11.rowl2g_fixed(r) + pa_sep;
       while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
@@ -295,7 +296,6 @@ namespace strumpack {
     for (int c=0; c<c_max_2; c++)
       for (int r=0; r<r_max_2; r++)
         F22(r_2[r],c_2[c]) += *(pbuf[upd_r_2[r]+upd_c_2[c]]++);
-    delete[] upd_r_1;
   }
 
 
@@ -313,7 +313,8 @@ namespace strumpack {
     // destination rank is:
     //  ((r / B) % prows) + ((c / B) % pcols) * prows
     //  = pr[r] + pc[c]
-    auto pr = new int[CB.lrows()+CB.lcols()];
+    std::unique_ptr<int[]> iwork(new int[CB.lrows()+CB.lcols()]);
+    auto pr = iwork.get();
     auto pc = pr + CB.lrows();
     int r_upd;
     for (r_upd=0; r_upd<lrows; r_upd++) {
@@ -339,7 +340,6 @@ namespace strumpack {
     for (int c=0; c<lcols; c++) // bupd
       for (int r=r_upd; r<lrows; r++)
         sbuf[pr[r]+pc[c]].push_back(CB(r,c));
-    delete[] pr;
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -350,7 +350,8 @@ namespace strumpack {
     const std::size_t du = ch->dim_upd();
     const std::size_t ds = pa->dim_sep();
     const auto cols = CB.cols();
-    const auto pr = new int[CB.rows()+cols];
+    std::unique_ptr<int[]> iwork(new int[CB.rows()+cols]);
+    const auto pr = iwork.get();
     const auto pc = pr + CB.rows();
     const auto prows = pa->grid()->nprows();
     const auto pcols = pa->grid()->npcols();
@@ -378,7 +379,6 @@ namespace strumpack {
     for (std::size_t c=0; c<cols; c++) // bupd
       for (std::size_t r=u2s; r<du; r++)
         sbuf[pr[r]+pc[c]].push_back(CB(r,c));
-    delete[] pr;
   }
 
   template<typename scalar_t,typename integer_t> void

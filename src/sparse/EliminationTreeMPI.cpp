@@ -26,6 +26,10 @@
  *             Division).
  *
  */
+#include <algorithm>
+#include <vector>
+#include <memory>
+
 #include "EliminationTreeMPI.hpp"
 
 #include "ordering/MatrixReorderingMPI.hpp"

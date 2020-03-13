@@ -41,7 +41,6 @@ namespace strumpack {
   // forward declarations
   template<typename scalar_t,typename integer_t> class EliminationTreeMPIDist;
 
-
   /**
    * \class StrumpackSparseSolverMPIDist
    *
@@ -344,10 +343,10 @@ namespace strumpack {
     using StrumpackSparseSolverMPI<scalar_t,integer_t>::comm_;
 
     virtual SpMat_t* matrix() override { return mat_mpi_.get(); }
-    virtual Reord_t* reordering() override { return nd_mpi_.get(); }
+    virtual Reord_t* reordering() override;
     virtual Tree_t* tree() override { return tree_mpi_dist_.get(); }
     virtual const SpMat_t* matrix() const override { return mat_mpi_.get(); }
-    virtual const Reord_t* reordering() const override { return nd_mpi_.get(); }
+    virtual const Reord_t* reordering() const override;
     virtual const Tree_t* tree() const override { return tree_mpi_dist_.get(); }
 
     virtual void setup_tree() override;

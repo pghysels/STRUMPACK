@@ -114,18 +114,20 @@ namespace strumpack {
     std::vector<ParallelFront> local_pfronts_;
 
     void symbolic_factorization
-    (std::vector<std::vector<integer_t>>& upd,
-     std::vector<integer_t>& dist_upd,
-     std::vector<float>& subtree_work, float& dsep_work);
+    (std::vector<std::vector<integer_t>>& local_upd,
+     std::vector<float>& local_subtree_work,
+     std::vector<integer_t>& dsep_upd, float& dsep_work,
+     std::vector<integer_t>& dleaf_upd, float& dleaf_work);
 
     void symbolic_factorization_local
     (integer_t sep, std::vector<std::vector<integer_t>>& upd,
      std::vector<float>& subtree_work, int depth);
 
     std::unique_ptr<F_t> proportional_mapping
-    (const Opts_t& opts, std::vector<std::vector<integer_t>>& upd,
-     std::vector<integer_t>& dist_upd,
-     std::vector<float>& subtree_work, std::vector<float>& dist_subtree_work,
+    (const Opts_t& opts,
+     std::vector<std::vector<integer_t>>& upd, std::vector<float>& subtree_work,
+     std::vector<integer_t>& dist_upd, std::vector<integer_t>& dleaf_upd,
+     std::vector<float>& dist_subtree_work,
      integer_t dsep, int P0, int P, int P0_sibling, int P_sibling,
      const MPIComm& fcomm, bool parent_compression, int level);
 
@@ -135,9 +137,9 @@ namespace strumpack {
      int P_sibling, const MPIComm& fcomm, bool parent_compression, int level);
 
     void communicate_distributed_separator
-    (integer_t dsep, std::vector<integer_t>& dist_upd,
+    (integer_t dsep, const std::vector<integer_t>& dupd_send,
      integer_t& dsep_begin, integer_t& dsep_end,
-     std::vector<integer_t>& dsep_upd, int P0, int P,
+     std::vector<integer_t>& dupd_recv, int P0, int P,
      int P0_sibling, int P_sibling, int owner, bool bcast_dim_sep);
 
     template<typename It> void merge_if_larger

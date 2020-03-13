@@ -29,10 +29,11 @@
 #ifndef MATRIX_REORDERING_MPI_HPP
 #define MATRIX_REORDERING_MPI_HPP
 
-#include <algorithm>
+#include <memory>
+#include <vector>
+
 #include "MatrixReordering.hpp"
 #include "sparse/CSRMatrixMPI.hpp"
-#include "dense/DistributedMatrix.hpp"
 
 namespace strumpack {
 
@@ -45,7 +46,7 @@ namespace strumpack {
    * corresponds to the local subtree.
    *
    * The distributed tree should have P leafs.  Lets number the
-   * distributed separators level by level, root=0.  For instance: for
+   * distributed separators level by level, root=1.  For instance: for
    * P=5, the distributed tree will look like:
    *                   1
    *                  / \
@@ -131,11 +132,6 @@ namespace strumpack {
     std::pair<integer_t,integer_t> sub_graph_range;
     std::pair<integer_t,integer_t> dist_sep_range;
 
-    /**
-     * Number of the node in sep_tree corresponding to the distributed
-     * separator owned by this processor.
-     */
-    integer_t dsep_internal;
     /**
      * Number of the node in sep_tree corresponding to the root of the
      * local subtree.

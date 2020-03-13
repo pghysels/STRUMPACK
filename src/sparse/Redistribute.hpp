@@ -30,7 +30,10 @@
 #define REDISTRIBUTE_HPP
 
 #include <limits>
-#include "ordering/MatrixReorderingMPI.hpp"
+#include <algorithm>
+
+#include "SeparatorTree.hpp"
+
 
 namespace strumpack {
 
@@ -87,6 +90,8 @@ namespace strumpack {
     for (int p=1; p<P; p++)
       rdispls[p] = rdispls[p-1] + rcnts[p-1];
     IdxVal* rbuf = new IdxVal[n];
+
+    // TODO rewrite this!!
     MPI_Alltoallv
       (sbuf, scnts, sdispls, MPI_BYTE, rbuf, rcnts, rdispls, MPI_BYTE, comm);
     delete[] dest;
@@ -122,12 +127,11 @@ namespace strumpack {
     // send the symbolic info of the entire tree belonging to dist_sep
     // owned by owner to [P0,P0+P) send only the root of the sub tree
     // to [P0_brother,P0_brother+P_brother)
-    template<typename scalar_t> RedistSubTree
-    (const MatrixReorderingMPI<scalar_t,integer_t>& nd,
-     const std::vector<std::vector<integer_t>>& _upd,
-     const std::vector<float>& _work,
-     integer_t P0, integer_t P, integer_t P0_sibling,
-     integer_t P_sibling, integer_t owner, const MPIComm& comm) {
+    RedistSubTree(const SeparatorTree<integer_t>& tree, integer_t sub_begin,
+                  const std::vector<std::vector<integer_t>>& _upd,
+                  const std::vector<float>& _work,
+                  integer_t P0, integer_t P, integer_t P0_sibling,
+                  integer_t P_sibling, integer_t owner, const MPIComm& comm) {
 
       auto rank = comm.rank();
       int dest0 = std::min(P0, P0_sibling);
@@ -136,13 +140,13 @@ namespace strumpack {
       std::vector<float> sbuff;
       std::vector<MPIRequest> sreq;
       if (rank == owner) {
-        auto nbsep = nd.local_tree().separators();
+        auto nbsep = tree.separators();
         sbufi.push_back(nbsep);
-        sbufi.insert(sbufi.end(), nd.local_tree().lch(), nd.local_tree().lch()+nbsep);
-        sbufi.insert(sbufi.end(), nd.local_tree().rch(), nd.local_tree().rch()+nbsep);
-        sbufi.push_back(nd.local_tree().root());
+        sbufi.insert(sbufi.end(), tree.lch(), tree.lch()+nbsep);
+        sbufi.insert(sbufi.end(), tree.rch(), tree.rch()+nbsep);
+        sbufi.push_back(tree.root());
         for (integer_t s=0; s<nbsep+1; s++)
-          sbufi.push_back(nd.local_tree().sizes(s) + nd.sub_graph_range.first);
+          sbufi.push_back(tree.sizes(s) + sub_begin);
         for (integer_t i=0; i<nbsep; i++)
           sbufi.push_back(_upd[i].size());
         for (integer_t i=0; i<nbsep; i++)
@@ -177,16 +181,18 @@ namespace strumpack {
       if (receiver) {
         auto pi = rbufi.data();
         nr_sep = *pi++;
-        lchild = pi;   pi += nr_sep;
-        rchild = pi;   pi += nr_sep;
-        root = *pi++;
-        sep_ptr = pi;  pi += nr_sep + 1;
-        dim_upd = pi;  pi += nr_sep;
-        upd = std::vector<integer_t*>(nr_sep);
-        upd[0] = &*pi;   pi += dim_upd[0];
-        for (integer_t sep=0; sep<nr_sep-1; sep++) {
-          upd[sep+1] = upd[sep] + dim_upd[sep];
-          pi += dim_upd[sep+1];
+        if (nr_sep) {
+          lchild = pi;   pi += nr_sep;
+          rchild = pi;   pi += nr_sep;
+          root = *pi++;
+          sep_ptr = pi;  pi += nr_sep + 1;
+          dim_upd = pi;  pi += nr_sep;
+          upd = std::vector<integer_t*>(nr_sep);
+          upd[0] = &*pi;   pi += dim_upd[0];
+          for (integer_t sep=0; sep<nr_sep-1; sep++) {
+            upd[sep+1] = upd[sep] + dim_upd[sep];
+            pi += dim_upd[sep+1];
+          }
         }
         work = rbuff.data();
       }
