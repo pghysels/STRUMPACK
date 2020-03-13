@@ -116,8 +116,7 @@ namespace strumpack {
   /*
    * Compute U*V ~ A
    */
-  template<typename scalar_t,
-           typename real_t = typename RealType<scalar_t>::value_type>
+  template<typename scalar_t,typename real_t>
   void blocked_adaptive_cross_approximation
   (DenseMatrix<scalar_t>& Uout, DenseMatrix<scalar_t>& Vout,
    std::size_t m, std::size_t n,
@@ -209,8 +208,7 @@ namespace strumpack {
   /*
    * Compute U*V ~ A
    */
-  template<typename scalar_t,
-           typename real_t = typename RealType<scalar_t>::value_type>
+  template<typename scalar_t,typename real_t>
   void blocked_adaptive_cross_approximation_nodups
   (DenseMatrix<scalar_t>& Uout, DenseMatrix<scalar_t>& Vout,
    std::size_t m, std::size_t n,

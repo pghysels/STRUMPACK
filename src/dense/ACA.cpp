@@ -37,8 +37,7 @@ namespace strumpack {
   /*
    * Compute U*V ~ A
    */
-  template<typename scalar_t,
-           typename real_t = typename RealType<scalar_t>::value_type>
+  template<typename scalar_t,typename real_t>
   void adaptive_cross_approximation
   (DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
    std::size_t m, std::size_t n,
@@ -117,8 +116,7 @@ namespace strumpack {
    * ACA with element extraction routine.
    * If possible use the ACA version with column/row extraction routines.
    */
-  template<typename scalar_t,
-           typename real_t = typename RealType<scalar_t>::value_type>
+  template<typename scalar_t,typename real_t>
   void adaptive_cross_approximation
   (DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
    std::size_t m, std::size_t n,
