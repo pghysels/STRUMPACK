@@ -45,8 +45,7 @@ namespace strumpack {
      * This is iterative refinement
      *  Input vectors x and b have stride 1, length n
      */
-    template<typename scalar_t,typename integer_t,
-             typename real_t = typename RealType<scalar_t>::value_type>
+    template<typename scalar_t,typename integer_t,typename real_t>
     void IterativeRefinementMPI
     (const MPIComm& comm, const SpMat<scalar_t,integer_t>& A,
      const Prec<scalar_t>& M, DMat<scalar_t>& x, DMat<scalar_t>& b,

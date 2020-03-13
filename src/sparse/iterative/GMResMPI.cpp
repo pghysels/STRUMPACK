@@ -48,9 +48,7 @@ namespace strumpack {
      * Input vectors x and b have stride 1 and (local) length n
      *
      */
-    template<typename scalar_t,
-             typename real_t = typename RealType<scalar_t>::value_type>
-    real_t GMResMPI
+    template<typename scalar_t, typename real_t> real_t GMResMPI
     (const MPIComm& comm, const SPMV<scalar_t>& A, const PREC<scalar_t>& M,
      std::size_t n, scalar_t* x, scalar_t* b, real_t rtol, real_t atol,
      int& totit, int maxit, int restart, GramSchmidtType GStype,

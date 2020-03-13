@@ -40,9 +40,7 @@ namespace strumpack {
      *
      *  Input vectors x and b have stride 1, length n
      */
-    template<typename scalar_t,
-             typename real_t = typename RealType<scalar_t>::value_type>
-    real_t GMRes
+    template<typename scalar_t, typename real_t> real_t GMRes
     (const SPMV<scalar_t>& A, const PREC<scalar_t>& M, std::size_t n,
      scalar_t* x, const scalar_t* b, real_t rtol, real_t atol,
      int& totit, int maxit, int restart, GramSchmidtType GStype,
