@@ -399,7 +399,8 @@ else()
   check_cxx_compiler_flag(-Wno-unknown-pragmas
     COMPILER_SUPPORTS_NOPRAGMA_WARNING)
   if(COMPILER_SUPPORTS_NOPRAGMA_WARNING)
-    target_compile_options(strumpack PUBLIC -Wno-unknown-pragmas)
+    target_compile_options(strumpack PUBLIC
+      $<$<COMPILE_LANGUAGE:CXX>:-Wno-unknown-pragmas>)
   endif()
 endif()
 
