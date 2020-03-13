@@ -1866,12 +1866,14 @@ namespace strumpack {
       std::cerr << "ERROR: STRUMPACK does not implement syev for complex"
                 << std::endl;;
       assert(false);
+      return 0;
     }
     int syev(char jobz, char uplo, int n, std::complex<double>* a, int lda,
              std::complex<double>* w) {
       std::cerr << "ERROR: STRUMPACK does not implement syev for complex"
                 << std::endl;;
       assert(false);
+      return 0;
     }
 
     int sytrf
