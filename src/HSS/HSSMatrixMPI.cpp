@@ -661,6 +661,25 @@ namespace strumpack {
     template class HSSMatrixMPI<std::complex<float>>;
     template class HSSMatrixMPI<std::complex<double>>;
 
+    template void
+    apply_HSS(Trans ta, const HSSMatrixMPI<float>& a,
+              const DistributedMatrix<float>& b, float beta,
+              DistributedMatrix<float>& c);
+    template void
+    apply_HSS(Trans ta, const HSSMatrixMPI<double>& a,
+              const DistributedMatrix<double>& b, double beta,
+              DistributedMatrix<double>& c);
+    template void
+    apply_HSS(Trans ta, const HSSMatrixMPI<std::complex<float>>& a,
+              const DistributedMatrix<std::complex<float>>& b,
+              std::complex<float> beta,
+              DistributedMatrix<std::complex<float>>& c);
+    template void
+    apply_HSS(Trans ta, const HSSMatrixMPI<std::complex<double>>& a,
+              const DistributedMatrix<std::complex<double>>& b,
+              std::complex<double> beta,
+              DistributedMatrix<std::complex<double>>& c);
+
   } // end namespace HSS
 } // end namespace strumpack
 
