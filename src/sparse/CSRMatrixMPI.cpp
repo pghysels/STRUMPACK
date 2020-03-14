@@ -43,8 +43,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   CSRMatrixMPI<scalar_t,integer_t>::CSRMatrixMPI()
-    : CSM_t(), comm_(MPI_COMM_NULL),
-      lrows_(0), lnnz_(0), brow_(0) {}
+    : CSM_t(), comm_(), brow_(0), lrows_(0), lnnz_(0) {}
 
   template<typename scalar_t,typename integer_t>
   CSRMatrixMPI<scalar_t,integer_t>::CSRMatrixMPI

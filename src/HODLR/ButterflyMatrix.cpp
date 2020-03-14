@@ -192,10 +192,10 @@ namespace strumpack {
       HODLR_createstats<scalar_t>(stats_);
       F2Cptr Aoptions = const_cast<F2Cptr>(A.options_);
       HODLR_copyoptions<scalar_t>(Aoptions, options_);
-      assert(neighbors_rows.rows() == opts.knn_lrbf() &&
-             neighbors_rows.cols() == rows_ &&
-             neighbors_cols.rows() == opts.knn_lrbf() &&
-             neighbors_cols.cols() == cols_);
+      assert(neighbors_rows.rows() == std::size_t(opts.knn_lrbf()) &&
+             neighbors_rows.cols() == rows() &&
+             neighbors_cols.rows() == std::size_t(opts.knn_lrbf()) &&
+             neighbors_cols.cols() == cols());
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 3);
       HODLR_set_I_option<scalar_t>(options_, "knn", opts.knn_lrbf());
       { TIMER_TIME(TaskType::CONSTRUCT_INIT, 0, t_construct_h);
@@ -408,8 +408,8 @@ namespace strumpack {
         e.rowids[k] = I[k].size();
         e.colids[k] = J[k].size();
         e.pgids[k] = 0;
-        for (auto l : I[k]) { assert(l < rows_); e.allrows[i++] = l+1; }
-        for (auto l : J[k]) { assert(l < cols_); e.allcols[j++] = l+1; }
+        for (auto l : I[k]) { assert(l < rows()); e.allrows[i++] = l+1; }
+        for (auto l : J[k]) { assert(l < cols()); e.allcols[j++] = l+1; }
       }
     }
 

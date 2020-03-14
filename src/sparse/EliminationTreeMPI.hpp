@@ -49,7 +49,7 @@ namespace strumpack {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
-    using SepRange = std::pair<std::size_t,std::size_t>;
+    using SepRange = std::pair<integer_t,integer_t>;
 
   public:
     EliminationTreeMPI(const MPIComm& comm);
@@ -74,7 +74,7 @@ namespace strumpack {
     SepRange local_range_;
 
     virtual FrontCounter front_counter() const override;
-    void update_local_ranges(std::size_t lo, std::size_t hi);
+    void update_local_ranges(integer_t lo, integer_t hi);
 
   private:
     struct ParFront {

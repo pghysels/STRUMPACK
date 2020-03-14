@@ -119,8 +119,8 @@ namespace strumpack {
    */
   template<typename scalar_t,typename integer_t> std::tuple<int,int,int>
   EliminationTreeMPIDist<scalar_t,integer_t>::get_sparse_mapped_destination
-  (const CSRMPI_t& A, std::size_t oi, std::size_t oj,
-   std::size_t i, std::size_t j, bool duplicate_fronts) const {
+  (const CSRMPI_t& A, integer_t oi, integer_t oj,
+   integer_t i, integer_t j, bool duplicate_fronts) const {
     auto fi = row_pfront_[i];
     if (fi < 0) return std::make_tuple(-fi-1, 1, 1);
     auto fj = row_pfront_[j];
@@ -217,12 +217,12 @@ namespace strumpack {
   (const CSRMPI_t& A) {
     row_pfront_.resize(A.size());
     for (int p=0; p<P_; p++) // local separators
-      for (std::size_t r=subtree_ranges_[p].first;
+      for (integer_t r=subtree_ranges_[p].first;
            r<subtree_ranges_[p].second; r++)
         row_pfront_[r] = -p-1;
     for (std::size_t i=0; i<all_pfronts_.size(); i++) {
       auto& f = all_pfronts_[i];
-      for (std::size_t r=f.sep_begin; r<f.sep_end; r++)
+      for (integer_t r=f.sep_begin; r<f.sep_end; r++)
         row_pfront_[r] = i;
     }
   }
@@ -351,7 +351,7 @@ namespace strumpack {
     sdispls = ibuf + 3*P_;
     for (int p=0; p<P_; p++)
       pp[p] = rbuf.data() + sdispls[p];
-    for (std::size_t r=local_range_.first; r<local_range_.second; r++) {
+    for (integer_t r=local_range_.first; r<local_range_.second; r++) {
       auto dest = std::upper_bound
         (dist.begin(), dist.end(), nd_.iperm()[r])-dist.begin()-1;
       auto permgr = nd_.iperm()[r];
@@ -378,7 +378,7 @@ namespace strumpack {
       (rbuf.data(), scnts, sdispls, sbuf, rcnts, rdispls, RCVal_mpi_t);
     MPI_Type_free(&RCVal_mpi_t);
 #pragma omp parallel for
-    for (std::size_t i=0; i<m*n; i++)
+    for (std::size_t i=0; i<std::size_t(m)*n; i++)
       x(sbuf[i].r-lo,sbuf[i].c) = sbuf[i].v;
   }
 

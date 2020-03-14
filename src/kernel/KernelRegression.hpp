@@ -196,7 +196,7 @@ namespace strumpack {
       if (weights.active() && weights.lcols()) {
 #pragma omp parallel for
         for (std::size_t c=0; c<test.cols(); c++)
-          for (std::size_t r=0; r<weights.lrows(); r++) {
+          for (int r=0; r<weights.lrows(); r++) {
             prediction[c] += weights(r, 0) *
               eval_kernel_function
               (data_.ptr(0, weights.rowl2g(r)), test.ptr(0, c));

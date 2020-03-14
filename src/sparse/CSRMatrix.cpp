@@ -955,7 +955,7 @@ namespace strumpack {
         auto lb = std::lower_bound(upd.begin(), upd.end(), uj);
         if (lb != upd.end() && *lb == uj) {
           auto ij = std::distance(upd.begin(), lb);
-          assert(ij < upd.size() && ij >= 0);
+          assert(ij < static_cast<integer_t>(upd.size()) && ij >= 0);
           gind.push_back(ij);
           gptr.back()++;
         }

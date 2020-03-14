@@ -103,8 +103,6 @@ namespace strumpack {
       for (integer_t j=Ampi.ptr(r)-Ampi.ptr(0); j<hij; j++) {
         auto a = Ampi.val(j);
         if (std::abs(a) > eps) {
-          auto indj = Ampi.ind(j);
-          auto c_perm = nd.perm()[indj];
           Triplet t = {r_perm, nd.perm()[Ampi.ind(j)], a};
           auto& d = dest[j];
           auto hip = std::get<0>(d) + std::get<1>(d);

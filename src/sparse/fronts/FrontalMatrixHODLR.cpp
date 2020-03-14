@@ -623,8 +623,12 @@ namespace strumpack {
     if (dim_sep()) {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
       DenseM_t rhs(bloc);
+#if defined(STRUMPACK_COUNT_FLOPS)
       long long int solve_flops = F11_.solve(rhs, bloc);
       STRUMPACK_FLOPS(solve_flops);
+#else
+      F11_.solve(rhs, bloc);
+#endif
       if (dim_upd()) {
         DenseM_t tmp(bupd.rows(), bupd.cols());
         F21_.mult(Trans::N, bloc, tmp);
@@ -652,7 +656,11 @@ namespace strumpack {
     if (dim_sep() && dim_upd()) {
       DenseM_t tmp(dim_sep(), y.cols()), tmp2(dim_sep(), y.cols());
       F12_.mult(Trans::N, yupd, tmp);
+#if defined(STRUMPACK_COUNT_FLOPS)
       long long int solve_flops = F11_.solve(tmp, tmp2);
+#else
+      F11_.solve(tmp, tmp2);
+#endif
       DenseMW_t yloc(dim_sep(), y.cols(), y, this->sep_begin_, 0);
       yloc.scaled_add(scalar_t(-1.), tmp2);
       STRUMPACK_FLOPS(F12_.get_stat("Flop_C_Mult") +

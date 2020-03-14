@@ -62,7 +62,7 @@ namespace strumpack {
     std::size_t ssize = 0;
     for (std::size_t i=0; i<I.size(); i++)
       ssize += I[i].size() * J[i].size();
-    for (std::size_t p=0; p<nprocs; p++)
+    for (int p=0; p<nprocs; p++)
       sbuf[p].reserve(std::round(1.2*float(ssize)/nprocs));
     bool vl = visit(lchild_), vr = visit(rchild_);
     for (std::size_t i=0; i<I.size(); i++) {

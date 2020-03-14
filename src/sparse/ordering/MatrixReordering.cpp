@@ -116,7 +116,7 @@ namespace strumpack {
   MatrixReordering<scalar_t,integer_t>::set_permutation
   (const Opts_t& opts, const CSR_t& A, const int* p, int base) {
     auto n = perm_.size();
-    assert(A.size() == n);
+    assert(A.size() == integer_t(n));
     if (base == 0) std::copy(p, p+n, perm_.data());
     else for (std::size_t i=0; i<n; i++) perm_[i] = p[i] - base;
     sep_tree_ = build_sep_tree_from_perm(A.ptr(), A.ind(), perm_, iperm_);
@@ -212,7 +212,7 @@ namespace strumpack {
   (const Opts_t& opts, const CSR_t& A, const MPIComm& comm,
    const int* p, int base) {
     auto n = perm_.size();
-    assert(A.size() == n);
+    assert(A.size() == integer_t(n));
     if (base == 0) std::copy(p, p+n, perm_.data());
     else for (std::size_t i=0; i<n; i++) perm_[i] = p[i] - base;
     sep_tree_ = build_sep_tree_from_perm(A.ptr(), A.ind(), perm_, iperm_);

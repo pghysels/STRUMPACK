@@ -179,7 +179,7 @@ namespace strumpack {
        * \return Const reference to the child (HSSMatrixBase).
        */
       const HSSMatrixBase<scalar_t>& child(int c) const {
-        assert(c>=0 && c<_ch.size()); return *(_ch[c]);
+        assert(c>=0 && c<int(_ch.size())); return *(_ch[c]);
       }
 
       /**
@@ -192,7 +192,7 @@ namespace strumpack {
        * \return Reference to the child (HSSMatrixBase).
        */
       HSSMatrixBase<scalar_t>& child(int c) {
-        assert(c>=0 && c<_ch.size()); return *(_ch[c]);
+        assert(c>=0 && c<int(_ch.size())); return *(_ch[c]);
       }
 
       /**

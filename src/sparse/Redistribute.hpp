@@ -153,7 +153,8 @@ namespace strumpack {
           sbufi.insert(sbufi.end(), _upd[i].begin(), _upd[i].end());
         sbuff.reserve(nbsep);
         sbuff.insert(sbuff.end(), _work.begin(), _work.end());
-        if (sbufi.size() >= std::numeric_limits<int>::max())
+        if (sbufi.size() >=
+            static_cast<std::size_t>(std::numeric_limits<int>::max()))
           std::cerr << "ERROR: In " << __FILE__ << ", line "
                     << __LINE__ << ",\n"
                     << "\tmessage is more than "

@@ -77,7 +77,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPI<scalar_t,integer_t>::update_local_ranges
-  (std::size_t lo, std::size_t hi) {
+  (integer_t lo, integer_t hi) {
     local_range_.first  = std::min(local_range_.first, lo);
     local_range_.second = std::max(local_range_.second, hi);
   }
@@ -87,7 +87,7 @@ namespace strumpack {
   std::unique_ptr<DistributedMatrix<scalar_t>[]>
   EliminationTreeMPI<scalar_t,integer_t>::sequential_to_block_cyclic
   (DenseM_t& x) const {
-    size_t pos = 0;
+    std::size_t pos = 0;
     for (auto& pf : parallel_fronts_)
       if (rank_ >= pf.P0 && rank_ < pf.P0+pf.P) pos++;
     std::unique_ptr<DistM_t[]> x_dist(new DistM_t[pos]);
@@ -112,7 +112,7 @@ namespace strumpack {
     auto disp = cnts + P_;
     for (int p=0; p<P_; p++) {
       cnts[p] = std::max
-        (std::size_t(0), subtree_ranges_[p].second - subtree_ranges_[p].first);
+        (integer_t(0), subtree_ranges_[p].second - subtree_ranges_[p].first);
       disp[p] = subtree_ranges_[p].first;
     }
     for (std::size_t c=0; c<x.cols(); c++)

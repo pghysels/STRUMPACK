@@ -379,6 +379,11 @@ target_sources(strumpack
 target_compile_features(strumpack INTERFACE cxx_std_11)
 set_target_properties(strumpack PROPERTIES CXX_EXTENSIONS OFF)
 
+target_compile_options(strumpack PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:$<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>: -Wall>>
+  $<$<COMPILE_LANGUAGE:CXX>:$<$<CXX_COMPILER_ID:MSVC>: /W4>>)
+
+
 if(STRUMPACK_USE_MPI)
   target_link_libraries(strumpack PUBLIC
     MPI::MPI_CXX MPI::MPI_C MPI::MPI_Fortran)

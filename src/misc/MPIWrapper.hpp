@@ -573,17 +573,22 @@ namespace strumpack {
       auto sdispl = ssizes + 2*P;
       auto rdispl = ssizes + 3*P;
       for (int p=0; p<P; p++) {
-        if (sbuf[p].size() > std::numeric_limits<int>::max()) {
-          std::cerr << "# ERROR: 32bit integer overflow in all_to_all_v!!" << std::endl;
+        if (sbuf[p].size() >
+            static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+          std::cerr << "# ERROR: 32bit integer overflow in all_to_all_v!!"
+                    << std::endl;
           MPI_Abort(comm_, 1);
         }
         ssizes[p] = sbuf[p].size();
       }
-      MPI_Alltoall(ssizes, 1, mpi_type<int>(), rsizes, 1, mpi_type<int>(), comm_);
+      MPI_Alltoall
+        (ssizes, 1, mpi_type<int>(), rsizes, 1, mpi_type<int>(), comm_);
       std::size_t totssize = std::accumulate(ssizes, ssizes+P, 0);
       std::size_t totrsize = std::accumulate(rsizes, rsizes+P, 0);
-      if (totrsize > std::numeric_limits<int>::max() ||
-          totssize > std::numeric_limits<int>::max()) {
+      if (totrsize >
+          static_cast<std::size_t>(std::numeric_limits<int>::max()) ||
+          totssize >
+          static_cast<std::size_t>(std::numeric_limits<int>::max())) {
         // This case will probably cause an overflow in the
         // rdispl/sdispl elements. Here we do the all_to_all_v
         // manually by just using Isend/Irecv. This might be slower

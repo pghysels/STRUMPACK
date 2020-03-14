@@ -53,14 +53,13 @@ namespace strumpack {
         K(lI, lJ, lB);
       };
       int ann_number = std::min(int(K.n()), opts.approximate_neighbors());
-      std::mt19937 gen(1); // reproducible
       while (!this->is_compressed()) {
         DenseMatrix<std::uint32_t> ann;
         DenseMatrix<real_t> scores;
         TaskTimer timer("approximate_neighbors");
         timer.start();
         find_approximate_neighbors
-          (K.data(), opts.ann_iterations(), ann_number, ann, scores, gen);
+          (K.data(), opts.ann_iterations(), ann_number, ann, scores);
         if (opts.verbose() && Comm().is_root())
           std::cout << "# k-ANN=" << ann_number
                     << ", approximate neighbor search time = "

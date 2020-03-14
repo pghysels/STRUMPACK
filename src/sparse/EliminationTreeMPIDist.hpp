@@ -50,7 +50,7 @@ namespace strumpack {
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
     using Opts_t = SPOptions<scalar_t>;
-    using SepRange = std::pair<std::size_t,std::size_t>;
+    using SepRange = std::pair<integer_t,integer_t>;
     using CSRMPI_t = CSRMatrixMPI<scalar_t,integer_t>;
     using Reord_t = MatrixReorderingMPI<scalar_t,integer_t>;
 
@@ -66,8 +66,8 @@ namespace strumpack {
     (DenseM_t& x, const std::vector<integer_t>& dist) override;
 
     std::tuple<int,int,int> get_sparse_mapped_destination
-    (const CSRMPI_t& A, std::size_t oi, std::size_t oj,
-     std::size_t i, std::size_t j, bool duplicate_fronts) const;
+    (const CSRMPI_t& A, integer_t oi, integer_t oj,
+     integer_t i, integer_t j, bool duplicate_fronts) const;
 
     void separator_reordering(const Opts_t& opts, const CSRMPI_t& A);
 
@@ -99,11 +99,11 @@ namespace strumpack {
     struct ParallelFront {
       ParallelFront() {}
       ParallelFront
-      (std::size_t lo, std::size_t hi, int _P0, int _P, BLACSGrid* g)
+      (integer_t lo, integer_t hi, int _P0, int _P, BLACSGrid* g)
         : sep_begin(lo), sep_end(hi), P0(_P0), P(_P),
           prows(g->nprows()), pcols(g->npcols()), grid(g) {}
-      std::size_t dim_sep() const { return sep_end - sep_begin; }
-      std::size_t sep_begin, sep_end;
+      integer_t dim_sep() const { return sep_end - sep_begin; }
+      integer_t sep_begin, sep_end;
       int P0, P, prows, pcols;
       const BLACSGrid* grid;
     };

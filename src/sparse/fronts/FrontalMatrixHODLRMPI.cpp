@@ -431,8 +431,12 @@ namespace strumpack {
     if (this->dim_sep()) {
       TIMER_TIME(TaskType::SOLVE_LOWER, 0, t_s);
       DistM_t rhs(b);
+#if defined(STRUMPACK_COUNT_FLOPS)
       auto solve_flops = F11_.solve(rhs, b);
       STRUMPACK_FLOPS(solve_flops);
+#else
+      F11_.solve(rhs, b);
+#endif
       if (this->dim_upd()) {
         DistM_t tmp(bupd.grid(), bupd.rows(), bupd.cols());
         F21_.mult(Trans::N, b, tmp);
@@ -452,10 +456,15 @@ namespace strumpack {
       TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_s);
       DistM_t tmp(y.grid(), y.rows(), y.cols()), tmp2(y.grid(), y.rows(), y.cols());
       F12_.mult(Trans::N, yupd, tmp);
+#if defined(STRUMPACK_COUNT_FLOPS)
       auto solve_flops = F11_.solve(tmp, tmp2);
+      STRUMPACK_FLOPS(solve_flops);
+#else
+      F11_.solve(tmp, tmp2);
+#endif
       y.scaled_add(scalar_t(-1.), tmp2);
       STRUMPACK_FLOPS(F12_.get_stat("Flop_C_Mult") +
-                      solve_flops + 2*yloc.rows()*yloc.cols());
+                      2*yloc.rows()*yloc.cols());
     }
     DistM_t CBl, CBr;
     DenseM_t seqCBl, seqCBr;

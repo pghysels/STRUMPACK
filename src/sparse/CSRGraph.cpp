@@ -303,18 +303,18 @@ namespace strumpack {
 
   template<typename integer_t> template<typename int_t> DenseMatrix<bool>
   CSRGraph<integer_t>::admissibility(const std::vector<int_t>& tiles) const {
-    integer_t nt = tiles.size(), n = size();
+    std::size_t nt = tiles.size(), n = size();
     DenseMatrix<bool> adm(nt, nt);
     adm.fill(true);
-    for (integer_t t=0; t<nt; t++)
+    for (std::size_t t=0; t<nt; t++)
       adm(t, t) = false;
-    std::vector<integer_t> tile(n);
-    for (integer_t t=0, ts=0; t<nt; t++) {
-      for (integer_t i=ts; i<ts+tiles[t]; i++)
-        tile[i] = t;
+    std::vector<int_t> tile(n);
+    for (std::size_t t=0, ts=0; t<nt; t++) {
+      for (int_t i=ts; i<ts+tiles[t]; i++)
+        tile[i] = static_cast<int_t>(t);
       ts += tiles[t];
     }
-    for (integer_t i=0; i<n; i++) {
+    for (std::size_t i=0; i<n; i++) {
       // TODO do a BFS!!
       auto ti = tile[i];
       auto hij = ind() + ptr_[i+1];

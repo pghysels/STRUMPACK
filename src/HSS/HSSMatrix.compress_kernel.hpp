@@ -28,7 +28,8 @@
 #ifndef HSS_MATRIX_COMPRESS_KERNEL_HPP
 #define HSS_MATRIX_COMPRESS_KERNEL_HPP
 
-#include "misc/RandomWrapper.hpp"
+#include <algorithm>
+
 #include "misc/Tools.hpp"
 #include "clustering/NeighborSearch.hpp"
 
@@ -55,14 +56,13 @@ namespace strumpack {
      const opts_t& opts) {
       int n = coords.cols();
       int ann_number = std::min(n, opts.approximate_neighbors());
-      std::mt19937 gen(1); // reproducible
       while (!this->is_compressed()) {
         DenseMatrix<std::uint32_t> ann;
         DenseMatrix<real_t> scores;
         TaskTimer timer("approximate_neighbors");
         timer.start();
         find_approximate_neighbors
-          (coords, opts.ann_iterations(), ann_number, ann, scores, gen);
+          (coords, opts.ann_iterations(), ann_number, ann, scores);
         if (opts.verbose())
           std::cout << "# k-ANN=" << ann_number
                     << ", approximate neighbor search time = "

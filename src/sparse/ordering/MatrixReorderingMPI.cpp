@@ -181,7 +181,7 @@ namespace strumpack {
   MatrixReorderingMPI<scalar_t,integer_t>::set_permutation
   (const Opts_t& opts, const CSRMPI_t& A, const int* p, int base) {
     auto n = perm_.size();
-    assert(A.size() == n);
+    assert(A.size() == integer_t(n));
     if (base == 0) std::copy(p, p+n, perm_.data());
     else for (std::size_t i=0; i<n; i++) perm_[i] = p[i] - base;
     auto Aseq = A.gather_graph();

@@ -435,7 +435,7 @@ namespace strumpack {
       ANOVAKernel
       (DenseMatrix<scalar_t>& data, scalar_t h, scalar_t lambda, int p=1)
         : Kernel<scalar_t>(data, lambda), h_(h), p_(p) {
-        assert(p >= 1 && p <= this->d());
+        assert(p >= 1 && p <= int(this->d()));
       }
 
     protected:
