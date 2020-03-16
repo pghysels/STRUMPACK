@@ -40,6 +40,7 @@
 #include <functional>
 
 #include "dense/DenseMatrix.hpp"
+#include "misc/Triplet.hpp"
 #include "HSSOptions.hpp"
 #include "HSSExtra.hpp"
 #if defined(STRUMPACK_USE_MPI)

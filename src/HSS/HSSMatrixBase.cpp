@@ -81,7 +81,7 @@ namespace strumpack {
 #pragma omp parallel
 #pragma omp single nowait
       forward_solve
-        (*(ULV._factors_seq), *(w.w_seq),
+        (*(ULV.factors_seq_), *(w.w_seq),
          const_cast<DistM_t&>(b).dense_wrapper(), partial);
       w.z = DistM_t(b.grid(), std::move(w.w_seq->z));
       w.ft1 = DistM_t(b.grid(), std::move(w.w_seq->ft1));
@@ -98,7 +98,7 @@ namespace strumpack {
       w.w_seq->x = w.x.dense_and_clear();
 #pragma omp parallel
 #pragma omp single nowait
-      backward_solve(*(ULV._factors_seq), *(w.w_seq), lx);
+      backward_solve(*(ULV.factors_seq_), *(w.w_seq), lx);
       x = DistM_t(x.grid(), std::move(lx));
     }
 
@@ -493,8 +493,8 @@ namespace strumpack {
     (HSSFactorsMPI<scalar_t>& ULV, WorkFactorMPI<scalar_t>& w,
      const BLACSGrid* lg, bool isroot, bool partial) const {
       if (!active()) return;
-      if (!ULV._factors_seq)
-        ULV._factors_seq = std::unique_ptr<HSSFactors<scalar_t>>
+      if (!ULV.factors_seq_)
+        ULV.factors_seq_ = std::unique_ptr<HSSFactors<scalar_t>>
           (new HSSFactors<scalar_t>());
       if (!w.w_seq)
         w.w_seq = std::unique_ptr<WorkFactor<scalar_t>>
@@ -502,18 +502,18 @@ namespace strumpack {
 #pragma omp parallel
 #pragma omp single nowait
       factor_recursive
-        (*(ULV._factors_seq), *(w.w_seq), isroot, partial, _openmp_task_depth);
+        (*(ULV.factors_seq_), *(w.w_seq), isroot, partial, _openmp_task_depth);
       if (isroot) {
-        if (partial) ULV._Vt0 = DistM_t(lg, ULV._factors_seq->_Vt0);
-        ULV._D = DistM_t(lg, ULV._factors_seq->_D);
-        ULV._piv.resize(ULV._D.lrows() + ULV._D.MB());
-        std::copy(ULV._factors_seq->_piv.begin(),
-                  ULV._factors_seq->_piv.end(), ULV._piv.begin());
+        if (partial) ULV.Vt0_ = DistM_t(lg, ULV.factors_seq_->_Vt0);
+        ULV.D_ = DistM_t(lg, ULV.factors_seq_->_D);
+        ULV.piv_.resize(ULV.D_.lrows() + ULV.D_.MB());
+        std::copy(ULV.factors_seq_->_piv.begin(),
+                  ULV.factors_seq_->_piv.end(), ULV.piv_.begin());
       } else {
         w.Dt = DistM_t(lg, std::move(w.w_seq->Dt));
         w.Vt1 = DistM_t(lg, std::move(w.w_seq->Vt1));
-        ULV._Q = DistM_t(lg, std::move(ULV._factors_seq->_Q));
-        ULV._W1 = DistM_t(lg, std::move(ULV._factors_seq->_W1));
+        ULV.Q_ = DistM_t(lg, std::move(ULV.factors_seq_->_Q));
+        ULV.W1_ = DistM_t(lg, std::move(ULV.factors_seq_->_W1));
       }
     }
 
@@ -526,7 +526,7 @@ namespace strumpack {
           (new WorkSolve<scalar_t>());
 #pragma omp parallel
 #pragma omp single nowait
-      solve_fwd(*(ULV._factors_seq), b.sub, *(w.w_seq),
+      solve_fwd(*(ULV.factors_seq_), b.sub, *(w.w_seq),
                 partial, isroot, _openmp_task_depth);
       w.z = DistM_t(b.grid_local(), std::move(w.w_seq->z));
       w.ft1 = DistM_t(b.grid_local(), std::move(w.w_seq->ft1));
@@ -540,7 +540,7 @@ namespace strumpack {
       w.w_seq->x = w.x.dense_and_clear();
 #pragma omp parallel
 #pragma omp single nowait
-      solve_bwd(*(ULV._factors_seq), x.sub, *(w.w_seq),
+      solve_bwd(*(ULV.factors_seq_), x.sub, *(w.w_seq),
                 isroot, _openmp_task_depth);
     }
 

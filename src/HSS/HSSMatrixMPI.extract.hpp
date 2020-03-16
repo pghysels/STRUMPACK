@@ -86,14 +86,14 @@ namespace strumpack {
       std::fill(destr, destr+B.rows()+B.cols(), -1);
       std::fill(ssize, ssize+P, 0);
       for (auto& t : triplets) {
-        assert(t._r >= 0);
-        assert(t._c >= 0);
-        assert(t._r < B.rows());
-        assert(t._c < B.cols());
-        auto dr = destr[t._r];
-        if (dr == -1) dr = destr[t._r] = (t._r / MB) % Bprows;
-        auto dc = destc[t._c];
-        if (dc == -1) dc = destc[t._c] = ((t._c / MB) % Bpcols) * Bprows;
+        assert(t.r >= 0);
+        assert(t.c >= 0);
+        assert(t.r < B.rows());
+        assert(t.c < B.cols());
+        auto dr = destr[t.r];
+        if (dr == -1) dr = destr[t.r] = (t.r / MB) % Bprows;
+        auto dc = destc[t.c];
+        if (dc == -1) dc = destc[t.c] = ((t.c / MB) % Bpcols) * Bprows;
         assert(dr+dc >= 0 && dr+dc < P);
         ssize[dr+dc]++;
       }
@@ -101,23 +101,18 @@ namespace strumpack {
       for (int p=0; p<P; p++)
         sbuf[p].reserve(ssize[p]);
       for (auto& t : triplets)
-        sbuf[destr[t._r]+destc[t._c]].emplace_back(t);
-      MPI_Datatype triplet_type;
-      create_triplet_mpi_type<scalar_t>(&triplet_type);
-      std::vector<Triplet<scalar_t>> rbuf;
-      std::vector<Triplet<scalar_t>*> pbuf;
-      Comm().all_to_all_v(sbuf, rbuf, pbuf, triplet_type);
-      MPI_Type_free(&triplet_type);
+        sbuf[destr[t.r]+destc[t.c]].emplace_back(t);
+      auto rbuf = Comm().all_to_all_v(sbuf);
       if (B.active()) {
         std::fill(destr, destr+B.rows()+B.cols(), -1);
         auto lr = destr;
         auto lc = destc;
         for (auto& t : rbuf) {
-          int locr = lr[t._r];
-          if (locr == -1) locr = lr[t._r] = B.rowg2l_fixed(t._r);
-          int locc = lc[t._c];
-          if (locc == -1) locc = lc[t._c] = B.colg2l_fixed(t._c);
-          B(locr, locc) += t._v;
+          int locr = lr[t.r];
+          if (locr == -1) locr = lr[t.r] = B.rowg2l_fixed(t.r);
+          int locc = lc[t.c];
+          if (locc == -1) locc = lc[t.c] = B.colg2l_fixed(t.c);
+          B(locr, locc) += t.v;
         }
       }
       delete[] destr;

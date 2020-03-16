@@ -54,10 +54,10 @@ namespace strumpack {
       if (!this->active()) return;
       DistM_t Vh;
       if (!this->leaf()) {
-        f._ch.resize(2);
+        f.ch_.resize(2);
         w.c.resize(2);
-        this->_ch[0]->factor_recursive(f._ch[0], w.c[0], lg, false, partial);
-        this->_ch[1]->factor_recursive(f._ch[1], w.c[1], lg, false, partial);
+        this->_ch[0]->factor_recursive(f.ch_[0], w.c[0], lg, false, partial);
+        this->_ch[1]->factor_recursive(f.ch_[1], w.c[1], lg, false, partial);
         auto c0u = _B01.rows();
         auto c1u = _B10.rows();
         auto c0v = _B10.cols();
@@ -67,11 +67,11 @@ namespace strumpack {
         DistM_t c0Vt1(grid(), c0u, c0v, w.c[0].Vt1, grid()->ctxt_all());
         DistM_t c1Vt1(grid(), c1u, c1v, w.c[1].Vt1, grid()->ctxt_all());
         if (u_rows) {
-          f._D = DistM_t(grid(), u_rows, u_rows);
-          copy(c0u, c0u, w.c[0].Dt, 0, 0, f._D, 0, 0, grid()->ctxt_all());
-          copy(c1u, c1u, w.c[1].Dt, 0, 0, f._D, c0u, c0u, grid()->ctxt_all());
-          DistMW_t D01(c0u, c1u, f._D, 0, c0u);
-          DistMW_t D10(c1u, c0u, f._D, c0u, 0);
+          f.D_ = DistM_t(grid(), u_rows, u_rows);
+          copy(c0u, c0u, w.c[0].Dt, 0, 0, f.D_, 0, 0, grid()->ctxt_all());
+          copy(c1u, c1u, w.c[1].Dt, 0, 0, f.D_, c0u, c0u, grid()->ctxt_all());
+          DistMW_t D01(c0u, c1u, f.D_, 0, c0u);
+          DistMW_t D10(c1u, c0u, f.D_, c0u, 0);
           gemm(Trans::N, Trans::C, scalar_t(1.), _B01, c1Vt1, scalar_t(0.), D01);
           gemm(Trans::N, Trans::C, scalar_t(1.), _B10, c0Vt1, scalar_t(0.), D10);
           STRUMPACK_ULV_FACTOR_FLOPS
@@ -93,53 +93,53 @@ namespace strumpack {
         }
         w.c.clear();
       } else {
-        f._D = _D;
+        f.D_ = _D;
         Vh = _V.dense();
       }
       if (isroot) {
-        f._piv = f._D.LU();
-        STRUMPACK_ULV_FACTOR_FLOPS(LU_flops(f._D));
-        if (partial) f._Vt0 = std::move(Vh);
+        f.piv_ = f.D_.LU();
+        STRUMPACK_ULV_FACTOR_FLOPS(LU_flops(f.D_));
+        if (partial) f.Vt0_ = std::move(Vh);
       } else {
-        f._D.laswp(_U.P(), true); // compute P^t D
+        f.D_.laswp(_U.P(), true); // compute P^t D
         if (this->U_rows() > this->U_rank()) {
-          f._W1 = DistM_t(grid(), this->U_rank(), this->U_rows());
+          f.W1_ = DistM_t(grid(), this->U_rank(), this->U_rows());
           // set W1 <- (P^t D)_0
-          copy(this->U_rank(), this->U_rows(), f._D, 0, 0, f._W1, 0, 0, grid()->ctxt_all());
+          copy(this->U_rank(), this->U_rows(), f.D_, 0, 0, f.W1_, 0, 0, grid()->ctxt_all());
           DistM_t W0(grid(), this->U_rows()-this->U_rank(), this->U_rows());
           // set W0 <- (P^t D)_1   (bottom part of P^t D)
-          copy(W0.rows(), W0.cols(), f._D, this->U_rank(), 0, W0, 0, 0, grid()->ctxt_all());
-          f._D.clear();
+          copy(W0.rows(), W0.cols(), f.D_, this->U_rank(), 0, W0, 0, 0, grid()->ctxt_all());
+          f.D_.clear();
           // set W0 <- -E * (P^t D)_0 + W0 = -E * W1 + W0
-          gemm(Trans::N, Trans::N, scalar_t(-1.), _U.E(), f._W1, scalar_t(1.), W0);
+          gemm(Trans::N, Trans::N, scalar_t(-1.), _U.E(), f.W1_, scalar_t(1.), W0);
           STRUMPACK_ULV_FACTOR_FLOPS
-            (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), _U.E(), f._W1, scalar_t(1.)));
+            (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), _U.E(), f.W1_, scalar_t(1.)));
 
-          W0.LQ(f._L, f._Q);
+          W0.LQ(f.L_, f.Q_);
           STRUMPACK_ULV_FACTOR_FLOPS(LQ_flops(W0));
           W0.clear();
 
-          f._Vt0 = DistM_t
+          f.Vt0_ = DistM_t
             (grid(), this->U_rows()-this->U_rank(), this->V_rank());
           w.Vt1 = DistM_t(grid(), this->U_rank(), this->V_rank());
           DistMW_t Q0
-            (this->U_rows()-this->U_rank(), this->U_rows(), f._Q, 0, 0);
-          DistMW_t Q1(this->U_rank(), this->U_rows(), f._Q, Q0.rows(), 0);
+            (this->U_rows()-this->U_rank(), this->U_rows(), f.Q_, 0, 0);
+          DistMW_t Q1(this->U_rank(), this->U_rows(), f.Q_, Q0.rows(), 0);
           gemm(Trans::N, Trans::N, scalar_t(1.),
-               Q0, Vh, scalar_t(0.), f._Vt0); // Q0 * Vh
+               Q0, Vh, scalar_t(0.), f.Vt0_); // Q0 * Vh
           gemm(Trans::N, Trans::N, scalar_t(1.),
                Q1, Vh, scalar_t(0.), w.Vt1);  // Q1 * Vh
 
           w.Dt = DistM_t(grid(), this->U_rank(), this->U_rank());
           gemm(Trans::N, Trans::C, scalar_t(1.),
-               f._W1, Q1, scalar_t(0.), w.Dt); // W1 * Q1^c
+               f.W1_, Q1, scalar_t(0.), w.Dt); // W1 * Q1^c
           STRUMPACK_ULV_FACTOR_FLOPS
             (gemm_flops(Trans::N, Trans::N, scalar_t(1.), Q0, Vh, scalar_t(0.)) +
              gemm_flops(Trans::N, Trans::N, scalar_t(1.), Q1, Vh, scalar_t(0.)) +
-             gemm_flops(Trans::N, Trans::C, scalar_t(1.), f._W1, Q1, scalar_t(0.)));
+             gemm_flops(Trans::N, Trans::C, scalar_t(1.), f.W1_, Q1, scalar_t(0.)));
         } else {
           w.Vt1 = std::move(Vh);
-          w.Dt = std::move(f._D);
+          w.Dt = std::move(f.D_);
         }
       }
     }

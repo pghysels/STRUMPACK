@@ -50,21 +50,21 @@ namespace strumpack {
           dynamic_cast<const HSSMatrixMPI<scalar_t>*>(child(0))) {
         DistM_t chDU;
         if (ch0mpi->active()) {
-          chDU = f._D.solve(ch0mpi->_U.dense(), f._piv);
+          chDU = f.D_.solve(ch0mpi->_U.dense(), f.piv_);
           STRUMPACK_SCHUR_FLOPS
-            (!f._D.is_master() ? 0 :
-             blas::getrs_flops(f._D.rows(), ch0mpi->_U.cols()));
+            (!f.D_.is_master() ? 0 :
+             blas::getrs_flops(f.D_.rows(), ch0mpi->_U.cols()));
         }
         copy(ch0->U_rows(), ch0->U_rank(), chDU, 0, 0, DU, 0, 0, grid()->ctxt_all());
       } else {
         auto ch0seq = dynamic_cast<const HSSMatrix<scalar_t>*>(child(0));
         DenseM_t chDU;
         if (ch0seq->active()) {
-          chDU = f._D.gather().solve
-            (ch0seq->_U.dense(), f._piv, ch0seq->_openmp_task_depth);
+          chDU = f.D_.gather().solve
+            (ch0seq->_U.dense(), f.piv_, ch0seq->_openmp_task_depth);
           STRUMPACK_SCHUR_FLOPS
-            (!f._D.is_master() ? 0 :
-             blas::getrs_flops(f._D.rows(), ch0seq->_U.cols()));
+            (!f.D_.is_master() ? 0 :
+             blas::getrs_flops(f.D_.rows(), ch0seq->_U.cols()));
         }
         copy(ch0->U_rows(), ch0->U_rank(), chDU, 0/*rank ch0*/, DU, 0, 0, grid()->ctxt_all());
       }

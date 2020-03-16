@@ -269,16 +269,6 @@ namespace strumpack {
     };
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 
-
-#ifndef DOXYGEN_SHOULD_SKIP_THIS
-    template<typename scalar_t> class Triplet {
-    public:
-      int _r; int _c; scalar_t _v;
-      Triplet() {}
-      Triplet(int r, int c, scalar_t v): _r(r), _c(c), _v(v) {}
-    };
-#endif // DOXYGEN_SHOULD_SKIP_THIS
-
   } // end namespace HSS
 } // end namespace strumpack
 

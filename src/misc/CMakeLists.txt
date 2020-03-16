@@ -3,6 +3,8 @@ target_sources(strumpack
   ${CMAKE_CURRENT_LIST_DIR}/TaskTimer.cpp
   ${CMAKE_CURRENT_LIST_DIR}/TaskTimer.hpp
   ${CMAKE_CURRENT_LIST_DIR}/RandomWrapper.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/Triplet.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/Triplet.cpp
   ${CMAKE_CURRENT_LIST_DIR}/Tools.hpp)
 
 install(FILES

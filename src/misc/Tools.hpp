@@ -63,17 +63,15 @@ namespace strumpack {
 
 
   // this sorts both indices and values at the same time
-  template<typename scalar_t,typename integer_t> void
-  sort_indices_values
-  (integer_t *ind, scalar_t *val, integer_t begin, integer_t end) {
+  template<typename scalar_t,typename integer_t>
+  void sort_indices_values(integer_t *ind, scalar_t *val,
+                           integer_t begin, integer_t end) {
     if (end > begin) {
-      integer_t left = begin + 1;
-      integer_t right = end;
+      integer_t left = begin + 1, right = end;
       integer_t pivot = (begin+(end-begin)/2);
       std::swap(ind[begin], ind[pivot]);
       std::swap(val[begin], val[pivot]);
       pivot = ind[begin];
-
       while (left < right) {
         if (ind[left] <= pivot)
           left++;

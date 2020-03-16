@@ -485,17 +485,18 @@ namespace strumpack {
      int& before, int self, int& after) {
       const int rank = Comm().rank();
       const int P = Comm().size();
-      auto rsize = new int[P];
+      std::unique_ptr<int[]> iwork(new int[2*P]);
+      auto rsize = iwork.get();
+      auto displs = rsize + P;
       rsize[rank] = 1;
       for (auto& i : lI) rsize[rank] += i.size() + 1;
       for (auto& j : lJ) rsize[rank] += j.size() + 1;
-      MPI_Allgather(MPI_IN_PLACE, 0, mpi_type<int>(), rsize, 1,
-                    mpi_type<int>(), comm());
-      auto displs = new int[P];
+      Comm().all_gather(rsize, 1);
       displs[0] = 0;
       for (int p=1; p<P; p++) displs[p] = displs[p-1] + rsize[p-1];
-      auto sbuf = new std::size_t[std::accumulate(rsize, rsize+P, 0)];
-      auto ptr = sbuf + displs[rank];
+      std::unique_ptr<std::size_t[]> sbuf
+        (new std::size_t[std::accumulate(rsize, rsize+P, 0)]);
+      auto ptr = sbuf.get() + displs[rank];
       *ptr++ = lI.size();
       for (std::size_t i=0; i<lI.size(); i++) {
         *ptr++ = lI[i].size();
@@ -505,8 +506,7 @@ namespace strumpack {
         std::copy(lJ[i].begin(), lJ[i].end(), ptr);
         ptr += lJ[i].size();
       }
-      MPI_Allgatherv(MPI_IN_PLACE, 0, mpi_type<std::size_t>(), sbuf,
-                     rsize, displs, mpi_type<std::size_t>(), comm());
+      Comm().all_gather_v(sbuf.get(), rsize, displs);
       int total = 0;
       for (int p=0; p<P; p++) total += sbuf[displs[p]];
       after = 0;
@@ -514,7 +514,7 @@ namespace strumpack {
       before = total - self - after;
       I.resize(total);
       J.resize(total);
-      ptr = sbuf;
+      ptr = sbuf.get();
       for (std::size_t p=0, i=0; p<std::size_t(P); p++) {
         auto fromp = *ptr++;
         for (std::size_t ii=i; ii<i+fromp; ii++) {
@@ -525,9 +525,6 @@ namespace strumpack {
         }
         i += fromp;
       }
-      delete[] sbuf;
-      delete[] displs;
-      delete[] rsize;
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::extract_D_B

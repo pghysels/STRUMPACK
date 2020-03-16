@@ -32,76 +32,99 @@
 #include <limits>
 #include <algorithm>
 
+#include "dense/DenseMatrix.hpp"
 #include "SeparatorTree.hpp"
-
+#include "misc/MPIWrapper.hpp"
+#include "misc/Triplet.hpp"
 
 namespace strumpack {
 
   /**
    * Permute a vector which is distributed over a number of processes
-   * according to dist.
-   *  - x        the local vector with [dist[p],dist[p+1]) elements
-   *  - iorder   the GLOBAL inverse permutation
-   *  - dist     describes distribution of the vector, dist has P+1 elements
-   *             process p has elements [dist[p],dist[p+1])
-   *  - comm     the MPI communicator, mpi_nprocs(comm)==P
+   * according to dist. This is the special case for a single
+   * colom. There is a more general version that can handle multiple
+   * columns, but that code does 2 all-to-all calls.
+   *
+   * \param x Local vector with [dist[p],dist[p+1]) elements.
+   * \param iorder The global inverse permutation, size dist[P].
+   * \param dist Describes distribution of the vector, dist has P+1
+   * elements process p has elements [dist[p],dist[p+1])
+   * \param comm The MPI communicator, comm.size() == P
    */
   template<typename scalar_t,typename integer_t> void permute_vector
   (scalar_t* x, std::vector<integer_t>& iorder,
-   const std::vector<integer_t>& dist, MPI_Comm comm) {
-    auto rank = mpi_rank(comm);
-    auto P = mpi_nprocs(comm);
+   const std::vector<integer_t>& dist, const MPIComm& comm) {
+    auto rank = comm.rank();
+    auto P = comm.size();
     auto lo = dist[rank];
-    auto hi = dist[rank+1];
-    auto n = hi - lo;
-    struct IdxVal { integer_t idx; scalar_t val; };
-    auto dest = new int[n+4*P];
-    auto scnts = dest+n;
-    auto rcnts = scnts+P;
-    auto sdispls = rcnts+P;
-    auto rdispls = sdispls+P;
-    auto sbuf = new IdxVal[n];
-    auto pp = new IdxVal*[P];
-    std::fill(scnts, scnts+P, 0);
-    for (integer_t r=0; r<n; r++) {
+    auto m = dist[rank+1] - lo;
+    using IdxVal = IdxVal<scalar_t,integer_t>;
+    std::vector<int> scnts(P), dest(m);
+    for (integer_t r=0; r<m; r++) {
       dest[r] = std::upper_bound
         (dist.begin(), dist.end(), iorder[r+lo]) - dist.begin() - 1;
       scnts[dest[r]]++;
     }
-    sdispls[0] = 0;
-    pp[0] = sbuf;
-    for (integer_t p=1; p<P; p++) {
-      sdispls[p] = sdispls[p-1] + scnts[p-1];
-      pp[p] = sbuf + sdispls[p];
-    }
-    for (integer_t r=0; r<n; r++) {
-      auto p = dest[r];
-      pp[p]->idx = iorder[r+lo];
-      pp[p]->val = x[r];
-      pp[p]++;
-    }
-    delete[] pp;
-    for (integer_t p=0; p<P; p++) {
-      sdispls[p] *= sizeof(IdxVal); // convert to bytes
-      scnts[p] *= sizeof(IdxVal);
-    }
-    MPI_Alltoall(scnts, 1, mpi_type<int>(), rcnts, 1, mpi_type<int>(), comm);
-    rdispls[0] = 0;
-    for (int p=1; p<P; p++)
-      rdispls[p] = rdispls[p-1] + rcnts[p-1];
-    IdxVal* rbuf = new IdxVal[n];
-
-    // TODO rewrite this!!
-    MPI_Alltoallv
-      (sbuf, scnts, sdispls, MPI_BYTE, rbuf, rcnts, rdispls, MPI_BYTE, comm);
-    delete[] dest;
-    delete[] sbuf;
+    std::vector<std::vector<IdxVal>> sbuf(P);
+    for (int p=0; p<P; p++)
+      sbuf[p].reserve(scnts[p]);
+    for (integer_t r=0; r<m; r++)
+      sbuf[dest[r]].emplace_back(iorder[r+lo], x[r]);
+    auto rbuf = comm.all_to_all_v(sbuf);
 #pragma omp parallel for
-    for (integer_t i=0; i<n; i++)
-      x[rbuf[i].idx-lo] = rbuf[i].val;
-    delete[] rbuf;
+    for (integer_t i=0; i<m; i++)
+      x[rbuf[i].i-lo] = rbuf[i].v;
   }
 
+  /**
+   * Permute a vector or multiple vectors, which are distributed over
+   * a number of processes according to dist. There is a special case
+   * for a single colom, but this is a more general version that can
+   * handle multiple columns but does 2 all-to-all calls.
+   *
+   * \param x Local vectors with [dist[p],dist[p+1]) elements.
+   * \param iorder The global inverse permutation, size dist[P].
+   * \param dist Describes distribution of the vector, dist has P+1
+   * elements process p has elements [dist[p],dist[p+1])
+   * \param comm The MPI communicator, comm.size() == P
+   */
+  template<typename scalar_t,typename integer_t> void permute_vector
+  (DenseMatrix<scalar_t>& x, std::vector<integer_t>& iorder,
+   const std::vector<integer_t>& dist, const MPIComm& comm) {
+    if (x.cols() == 1)
+      permute_vector(x.data(), iorder, dist, comm);
+    else {
+      auto rank = comm.rank();
+      auto P = comm.size();
+      auto lo = dist[rank];
+      auto m = dist[rank+1] - lo;
+      integer_t n = x.cols();
+      assert(m == integer_t(x.rows()));
+      std::vector<int> scnts(P), dest(m);
+      for (integer_t r=0; r<m; r++) {
+        dest[r] = std::upper_bound
+          (dist.begin(), dist.end(), iorder[r+lo]) - dist.begin() - 1;
+        scnts[dest[r]]++;
+      }
+      std::vector<std::vector<scalar_t>> ssbuf(P);
+      std::vector<std::vector<integer_t>> isbuf(P);
+      for (int p=0; p<P; p++) {
+        ssbuf[p].reserve(scnts[p]);
+        isbuf[p].reserve(scnts[p]);
+      }
+      for (integer_t r=0; r<m; r++) {
+        for (integer_t c=0; c<n; c++)
+          ssbuf[dest[r]].push_back(x(r,c));
+        isbuf[dest[r]].push_back(iorder[r+lo]);
+      }
+      auto srbuf = comm.all_to_all_v(ssbuf);
+      auto irbuf = comm.all_to_all_v(isbuf);
+#pragma omp parallel for
+      for (integer_t r=0; r<m; r++)
+        for (integer_t c=0; c<n; c++)
+          x(irbuf[r]-lo,c) = srbuf[r*n+c];
+    }
+  }
 
   /**
    * Helper class to receive the sub graph that is owned by process

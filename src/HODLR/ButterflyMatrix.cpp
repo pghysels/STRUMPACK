@@ -45,7 +45,6 @@ namespace strumpack {
       cols_ = B.cols();
       Fcomm_ = A.Fcomm_;
       int P = c_.size();
-      int rank = c_.rank();
       std::vector<int> groups(P);
       std::iota(groups.begin(), groups.end(), 0);
       // create hodlr data structures
@@ -59,20 +58,7 @@ namespace strumpack {
         (rows_, cols_, lrows_, lcols_, nullptr, nullptr, A.msh_, B.msh_,
          lr_bf_, options_, stats_, msh_, kerquant_, ptree_,
          nullptr, nullptr, nullptr);
-      rdist_.resize(P+1);
-      cdist_.resize(P+1);
-      rdist_[rank+1] = lrows_;
-      cdist_[rank+1] = lcols_;
-      MPI_Allgather
-        (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
-         rdist_.data()+1, 1, MPI_INT, c_.comm());
-      MPI_Allgather
-        (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
-         cdist_.data()+1, 1, MPI_INT, c_.comm());
-      for (int p=0; p<P; p++) {
-        rdist_[p+1] += rdist_[p];
-        cdist_[p+1] += cdist_[p];
-      }
+      set_dist();
     }
 
     template<typename scalar_t> double
@@ -184,7 +170,7 @@ namespace strumpack {
       rows_ = A.rows();
       cols_ = B.cols();
       Fcomm_ = A.Fcomm_;
-      int P = c_.size(), rank = c_.rank();
+      int P = c_.size();
       std::vector<int> groups(P);
       std::iota(groups.begin(), groups.end(), 0);
       // create hodlr data structures
@@ -205,16 +191,17 @@ namespace strumpack {
            A.msh_, B.msh_, lr_bf_, options_, stats_, msh_,
            kerquant_, ptree_, nullptr, nullptr, nullptr);
       }
+      set_dist();
+    }
+
+    template<typename scalar_t> void ButterflyMatrix<scalar_t>::set_dist() {
+      int P = c_.size(), rank = c_.rank();
       rdist_.resize(P+1);
       cdist_.resize(P+1);
       rdist_[rank+1] = lrows_;
       cdist_[rank+1] = lcols_;
-      MPI_Allgather
-        (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
-         rdist_.data()+1, 1, MPI_INT, c_.comm());
-      MPI_Allgather
-        (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
-         cdist_.data()+1, 1, MPI_INT, c_.comm());
+      c_.all_gather(rdist_.data()+1, 1);
+      c_.all_gather(cdist_.data()+1, 1);
       for (int p=0; p<P; p++) {
         rdist_[p+1] += rdist_[p];
         cdist_[p+1] += cdist_[p];

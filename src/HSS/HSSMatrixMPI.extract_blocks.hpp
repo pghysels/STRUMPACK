@@ -93,32 +93,25 @@ namespace strumpack {
       const int Bprows = B[0].grid()->nprows();
       const int Bpcols = B[0].grid()->npcols();
       const auto nb = triplets.size();
-      struct Quadlet {
-        int r; int c; int k; scalar_t v;
-        Quadlet() {}
-        Quadlet(Triplet<scalar_t>& t, int k_)
-          : r(t._r), c(t._c), k(k_), v(t._v) {}
-      };
+
+      using Quadlet = Quadlet<scalar_t>;
       std::vector<std::vector<Quadlet>> sbuf(P);
+
       int maxBrows = 0, maxBcols = 0;
       for (auto& Bi : B) maxBrows = std::max(maxBrows, Bi.rows());
       for (auto& Bi : B) maxBcols = std::max(maxBcols, Bi.cols());
-      auto nb_destr = new int[nb*(maxBrows+maxBcols)+P];
-      auto ssize = nb_destr + nb*(maxBrows+maxBcols);
-      std::fill(nb_destr, nb_destr+nb*(maxBrows+maxBcols), -1);
-      std::fill(ssize, ssize+P, 0);
+      std::vector<int> nb_destr(nb*(maxBrows+maxBcols), -1);
+      std::vector<int> ssize(P, 0);
       for (std::size_t k=0; k<nb; k++) {
-        auto destr = nb_destr + k*(maxBrows+maxBcols);
+        auto destr = &nb_destr[k*(maxBrows+maxBcols)];
         auto destc = destr + maxBrows;
         for (auto& t : triplets[k]) {
-          assert(t._r >= 0);
-          assert(t._c >= 0);
-          assert(t._r < B[k].rows());
-          assert(t._c < B[k].cols());
-          auto dr = destr[t._r];
-          if (dr == -1) dr = destr[t._r] = (t._r / MB) % Bprows;
-          auto dc = destc[t._c];
-          if (dc == -1) dc = destc[t._c] = ((t._c / MB) % Bpcols) * Bprows;
+          assert(t.r >= 0 && t.c >= 0);
+          assert(t.r < B[k].rows() && t.c < B[k].cols());
+          auto dr = destr[t.r];
+          if (dr == -1) dr = destr[t.r] = (t.r / MB) % Bprows;
+          auto dc = destc[t.c];
+          if (dc == -1) dc = destc[t.c] = ((t.c / MB) % Bpcols) * Bprows;
           assert(dr+dc >= 0 && dr+dc < P);
           ssize[dr+dc]++;
         }
@@ -126,22 +119,16 @@ namespace strumpack {
       for (int p=0; p<P; p++)
         sbuf[p].reserve(ssize[p]);
       for (std::size_t k=0; k<nb; k++) {
-        auto destr = nb_destr + k*(maxBrows+maxBcols);
+        auto destr = &nb_destr[k*(maxBrows+maxBcols)];
         auto destc = destr + maxBrows;
         for (auto& t : triplets[k])
-          sbuf[destr[t._r]+destc[t._c]].emplace_back(t, k);
+          sbuf[destr[t.r]+destc[t.c]].emplace_back(t, k);
       }
-      MPI_Datatype quadlet_type;
-      MPI_Type_contiguous(sizeof(Quadlet), MPI_BYTE, &quadlet_type);
-      MPI_Type_commit(&quadlet_type);
-      std::vector<Quadlet,NoInit<Quadlet>> rbuf;
-      std::vector<Quadlet*> pbuf;
-      Comm().all_to_all_v(sbuf, rbuf, pbuf, quadlet_type);
-      MPI_Type_free(&quadlet_type);
-      std::fill(nb_destr, nb_destr+nb*(maxBrows+maxBcols), -1);
+      auto rbuf = Comm().all_to_all_v(sbuf);
+      std::fill(nb_destr.begin(), nb_destr.end(), -1);
       for (auto& q : rbuf) {
         auto k = q.k;
-        auto lr = nb_destr + k*(maxBrows+maxBcols);
+        auto lr = &nb_destr[k*(maxBrows+maxBcols)];
         auto lc = lr + maxBrows;
         int locr = lr[q.r];
         if (locr == -1) locr = lr[q.r] = B[k].rowg2l_fixed(q.r);
@@ -149,7 +136,6 @@ namespace strumpack {
         if (locc == -1) locc = lc[q.c] = B[k].colg2l_fixed(q.c);
         B[k](locr, locc) += q.v;
       }
-      delete[] nb_destr;
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::extract_fwd

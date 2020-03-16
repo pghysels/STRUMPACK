@@ -170,7 +170,8 @@ namespace strumpack {
       ind_.assign(A->ind() + i0, A->ind() + i1);
       val_.assign(A->val() + i0, A->val() + i1);
     } else {
-      auto scnts = new int[2*P];
+      std::unique_ptr<int[]> iwork(new int[2*P]);
+      auto scnts = iwork.get();
       auto sdisp = scnts + P;
       if (rank == 0)
         for (int p=0; p<P; p++)
@@ -204,7 +205,6 @@ namespace strumpack {
         (rank ? nullptr : const_cast<scalar_t*>(A->val()), scnts, sdisp,
          mpi_type<scalar_t>(),  val_.data(), lnnz_,
          mpi_type<scalar_t>(), 0, comm());
-      delete[] scnts;
     }
     for (integer_t r=lrows_; r>=0; r--)
       ptr_[r] -= ptr_[0];
@@ -309,21 +309,17 @@ namespace strumpack {
   /**
    * Extract part [graph_begin, graph_end) from this sparse matrix,
    * after applying the symmetric permutation perm/iperm.
+   *
+   * Perhaps this would be better implemented as a non-member
+   * function.
    */
-  // TODO move this to CSRGraph
   template<typename scalar_t,typename integer_t> CSRGraph<integer_t>
   CSRMatrixMPI<scalar_t,integer_t>::get_sub_graph
   (const std::vector<integer_t>& perm,
    const std::vector<std::pair<integer_t,integer_t>>& graph_ranges) const {
     auto rank = comm_.rank();
     auto P = comm_.size();
-    auto scnts = new int[4*P+lrows_];
-    auto rcnts = scnts + P;
-    auto sdispls = rcnts + P;
-    auto rdispls = sdispls + P;
-    auto dest = rdispls + P;
-    std::fill(scnts, scnts+P, 0);
-    std::fill(dest, dest+lrows_, -1);
+    std::vector<int> scnts(P, 0), dest(lrows_, -1);
     for (integer_t row=0; row<lrows_; row++) {
       auto perm_row = perm[row+brow_];
       for (int p=0; p<P; p++)
@@ -334,47 +330,26 @@ namespace strumpack {
           break;
         }
     }
-
-    // TODO
-    MPI_Alltoall
-      (scnts, 1, mpi_type<int>(), rcnts, 1, mpi_type<int>(), comm());
-    auto sbuf = new integer_t[std::accumulate(scnts, scnts+P, integer_t(0))];
-    auto pp = new integer_t*[P];
-    sdispls[0] = 0;
-    rdispls[0] = 0;
-    pp[0] = sbuf;
-    for (int p=1; p<P; p++) {
-      sdispls[p] = sdispls[p-1] + scnts[p-1];
-      rdispls[p] = rdispls[p-1] + rcnts[p-1];
-      pp[p] = sbuf + sdispls[p];
-    }
+    std::vector<std::vector<integer_t>> sbuf(P);
+    for (int p=0; p<P; p++)
+      sbuf[p].reserve(scnts[p]);
     for (integer_t row=0; row<lrows_; row++) {
       auto d = dest[row];
       if (d == -1) continue;
       // send the number of the permuted row (vertex)
-      *pp[d] = perm[row+brow_];  pp[d]++;
+      sbuf[d].push_back(perm[row+brow_]);
       // send the number of edges for this vertex
-      *pp[d] = ptr_[row+1] - ptr_[row];  pp[d]++;
-      for (auto j=ptr_[row]; j<ptr_[row+1]; j++) {
+      sbuf[d].push_back(ptr_[row+1] - ptr_[row]);
+      for (auto j=ptr_[row]; j<ptr_[row+1]; j++)
         // send the actual edges
-        *pp[d] = perm[ind_[j]];  pp[d]++;
-      }
+        sbuf[d].push_back(perm[ind_[j]]);
     }
-    delete[] pp;
-    auto rsize = std::accumulate(rcnts, rcnts+P, size_t(0));
-    auto rbuf = new integer_t[rsize];
-
-    // TODO
-    MPI_Alltoallv(sbuf, scnts, sdispls, mpi_type<integer_t>(),
-                  rbuf, rcnts, rdispls, mpi_type<integer_t>(), comm());
-    delete[] sbuf;
-    delete[] scnts;
-
+    auto rbuf = comm_.all_to_all_v(sbuf);
     auto n_vert = graph_ranges[rank].second - graph_ranges[rank].first;
-    auto edge_count = new integer_t[n_vert];
+    std::vector<integer_t> edge_count(n_vert);
     integer_t n_edges = 0;
-    size_t prbuf = 0;
-    while (prbuf < rsize) {
+    std::size_t prbuf = 0;
+    while (prbuf < rbuf.size()) {
       auto my_row = rbuf[prbuf] - graph_ranges[rank].first;
       edge_count[my_row] = rbuf[prbuf+1];
       n_edges += rbuf[prbuf+1];
@@ -384,15 +359,14 @@ namespace strumpack {
     g.ptr(0) = 0;
     for (integer_t i=1; i<=n_vert; i++)
       g.ptr(i) = g.ptr(i-1) + edge_count[i-1];
-    delete[] edge_count;
     prbuf = 0;
-    while (prbuf < rsize) {
+    while (prbuf < rbuf.size()) {
       auto my_row = rbuf[prbuf] - graph_ranges[rank].first;
-      std::copy(rbuf+prbuf+2, rbuf+prbuf+2+rbuf[prbuf+1],
+      std::copy(rbuf.data()+prbuf+2,
+                rbuf.data()+prbuf+2+rbuf[prbuf+1],
                 g.ind()+g.ptr(my_row));
       prbuf += 2 + rbuf[prbuf+1];
     }
-    delete[] rbuf;
     return g;
   }
 
@@ -626,8 +600,8 @@ namespace strumpack {
   std::unique_ptr<CSRGraph<integer_t>>
   CSRMatrixMPI<scalar_t,integer_t>::gather_graph() const {
     auto rank = comm_.rank();
-    auto P = comm_.size();
-    if (rank == 0) {
+    if (!rank) {
+      auto P = comm_.size();
       std::unique_ptr<int[]> iwork(new int[2*P]);
       auto rcnts = iwork.get();
       auto displs = rcnts + P;
@@ -770,34 +744,19 @@ namespace strumpack {
   CSRMatrixMPI<scalar_t,integer_t>::symmetrize_sparsity() {
     if (symm_sparse_) return;
     auto P = comm_.size();
-    struct Idxij {
-      integer_t i, j;
-    };
-    MPI_Datatype Idxij_mpi_t;
-    int blocklengths[2] = {1, 1};
-    MPI_Datatype types[2] = {mpi_type<decltype(Idxij::i)>(),
-                             mpi_type<decltype(Idxij::j)>()};
-    MPI_Aint offsets[2] = {offsetof(Idxij, i), offsetof(Idxij, j)};
-    MPI_Type_create_struct(2, blocklengths, offsets, types, &Idxij_mpi_t);
-    MPI_Type_commit(&Idxij_mpi_t);
-
-    std::vector<std::vector<Idxij>> sbuf(P);
+    using IdxIJ = IdxIJ<integer_t>;
+    std::vector<std::vector<IdxIJ>> sbuf(P);
     for (integer_t r=0; r<lrows_; r++)
       for (integer_t j=offdiag_start_[r]; j<ptr_[r+1]; j++) {
         auto col = ind_[j];
         auto row = r + brow_;
         auto dest = std::upper_bound
           (dist_.begin(), dist_.end(), col) - dist_.begin() - 1;
-        sbuf[dest].emplace_back(Idxij{col, row});
+        sbuf[dest].emplace_back(col, row);
       }
-
-    std::vector<Idxij> edges;
-    std::vector<Idxij*> pp;
-    comm_.all_to_all_v(sbuf, edges, pp, Idxij_mpi_t);
-    MPI_Type_free(&Idxij_mpi_t);
-
+    auto edges = comm_.all_to_all_v(sbuf);
     std::sort(edges.begin(), edges.end(),
-              [](const Idxij& a, const Idxij& b) {
+              [](const IdxIJ& a, const IdxIJ& b) {
                 // sort according to rows, then columns
                 if (a.i != b.i) return (a.i < b.i);
                 return (a.j < b.j);
@@ -881,7 +840,6 @@ namespace strumpack {
       ind_.swap(new_ind);
       val_.swap(new_val);
     }
-
     auto total_new_nnz = comm_.all_reduce(new_nnz, MPI_SUM);
     if (total_new_nnz != nnz_) {
       split_diag_offdiag();

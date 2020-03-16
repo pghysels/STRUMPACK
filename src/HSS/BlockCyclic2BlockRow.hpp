@@ -52,7 +52,8 @@ namespace strumpack {
           maxr = std::max(maxr, rhi - rlo);
           p += ranges.leaf_procs(p) - 1;
         }
-        auto destr = new std::size_t[2*maxr+P];
+        std::unique_ptr<std::size_t[]> iwork(new std::size_t[2*maxr+P]);
+        auto destr = iwork.get();
         auto gr = destr + maxr;
         auto ssize = gr + maxr;
         std::fill(ssize, ssize+P, 0);
@@ -137,32 +138,23 @@ namespace strumpack {
           }
         }
         for (int p=0; p<P; p++) { assert(ssize[p] == sbuf[p].size()); }
-        delete[] destr;
-        MPI_Datatype triplet_type;
-        create_triplet_mpi_type<scalar_t>(&triplet_type);
-        std::vector<Triplet<scalar_t>,NoInit<Triplet<scalar_t>>> rbuf;
-        std::vector<Triplet<scalar_t>*> pbuf;
-        comm.all_to_all_v(sbuf, rbuf, pbuf, triplet_type);
-        MPI_Type_free(&triplet_type);
+        auto rbuf = comm.all_to_all_v(sbuf);
         if (ranges.leaf_procs(rank) == 1) {
           assert((ranges.chi(rank) - ranges.clo(rank)) == int(sub.rows()));
           assert(int(sub.cols()) == dist.cols());
           for (auto& t : rbuf)
-            sub(t._r, t._c) = t._v;
+            sub(t.r, t.c) = t.v;
         } else if (leaf.active()) {
           const auto rows = leaf.rows();
           const auto cols = leaf.cols();
-          auto lr = new int[rows+cols];
-          auto lc = lr + rows;
-          std::fill(lr, lr+rows+cols, -1);
+          std::vector<int> lr(rows, -1), lc(cols, -1);
           for (auto& t : rbuf) {
-            int locr = lr[t._r];
-            if (locr == -1) locr = lr[t._r] = leaf.rowg2l_fixed(t._r);
-            int locc = lc[t._c];
-            if (locc == -1) locc = lc[t._c] = leaf.colg2l_fixed(t._c);
-            leaf(locr, locc) = t._v;
+            int locr = lr[t.r];
+            if (locr == -1) locr = lr[t.r] = leaf.rowg2l_fixed(t.r);
+            int locc = lc[t.c];
+            if (locc == -1) locc = lc[t.c] = leaf.colg2l_fixed(t.c);
+            leaf(locr, locc) = t.v;
           }
-          delete[] lr;
         }
       }
 
@@ -182,7 +174,8 @@ namespace strumpack {
         if (leaf_procs == 1) { // sub
           const auto rows = sub.rows();
           const auto cols = sub.cols();
-          auto destr = new std::size_t[rows+cols+P];
+          std::unique_ptr<std::size_t[]> iwork(new std::size_t[rows+cols+P]);
+          auto destr = iwork.get();
           auto destc = destr + rows;
           auto ssize = destc + cols;
           std::fill(ssize, ssize+P, 0);
@@ -199,12 +192,13 @@ namespace strumpack {
             for (std::size_t r=0; r<rows; r++)
               sbuf[destr[r]+destc[c]].emplace_back(r + rbegin, c, sub(r, c));
           for (int p=0; p<P; p++) { assert(sbuf[p].size() == ssize[p]); }
-          delete[] destr;
         } else { // leaf
           if (leaf.active()) {
             const auto lcols = leaf.lcols();
             const auto lrows = leaf.lrows();
-            auto destr = new std::size_t[2*lrows+2*lcols+P];
+            std::unique_ptr<std::size_t[]> iwork
+              (new std::size_t[2*lrows+2*lcols+P]);
+            auto destr = iwork.get();
             auto gr    = destr + lrows;
             auto destc = gr + lrows;
             auto gc    = destc + lcols;
@@ -228,29 +222,20 @@ namespace strumpack {
                 sbuf[destr[r]+destc[c]].emplace_back
                   (gr[r], gc[c], leaf(r, c));
             for (int p=0; p<P; p++) { assert(sbuf[p].size() == ssize[p]); }
-            delete[] destr;
           }
         }
-        MPI_Datatype triplet_type;
-        create_triplet_mpi_type<scalar_t>(&triplet_type);
-        std::vector<Triplet<scalar_t>,NoInit<Triplet<scalar_t>>> rbuf;
-        std::vector<Triplet<scalar_t>*> pbuf;
-        comm.all_to_all_v(sbuf, rbuf, pbuf, triplet_type);
-        MPI_Type_free(&triplet_type);
+        auto rbuf = comm.all_to_all_v(sbuf);
         if (dist.active()) {
           const auto rows = dist.rows();
           const auto cols = dist.cols();
-          auto lr = new int[rows+cols];
-          auto lc = lr + rows;
-          std::fill(lr, lr+rows+cols, -1);
+          std::vector<int> lr(rows, -1), lc(cols, -1);
           for (auto& t : rbuf) {
-            int locr = lr[t._r];
-            if (locr == -1) locr = lr[t._r] = dist.rowg2l_fixed(t._r);
-            int locc = lc[t._c];
-            if (locc == -1) locc = lc[t._c] = dist.colg2l_fixed(t._c);
-            dist(locr, locc) = t._v;
+            int locr = lr[t.r];
+            if (locr == -1) locr = lr[t.r] = dist.rowg2l_fixed(t.r);
+            int locc = lc[t.c];
+            if (locc == -1) locc = lc[t.c] = dist.colg2l_fixed(t.c);
+            dist(locr, locc) = t.v;
           }
-          delete[] lr;
         }
       }
 

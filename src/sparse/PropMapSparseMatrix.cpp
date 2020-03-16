@@ -33,6 +33,7 @@
 
 #include "PropMapSparseMatrix.hpp"
 #include "dense/DistributedMatrix.hpp"
+#include "misc/Triplet.hpp"
 #include "ordering/MatrixReorderingMPI.hpp"
 #include "CSRMatrixMPI.hpp"
 #include "EliminationTreeMPIDist.hpp"
@@ -56,24 +57,8 @@ namespace strumpack {
     auto P = comm.size();
     auto eps = blas::lamch<real_t>('E');
 
-    struct Triplet {
-      integer_t r, c;
-      scalar_t a;
-    };
-    MPI_Datatype Triplet_mpi_t;
-    int blocklengths[3] = {1, 1, 1};
-    MPI_Datatype types[3] = {mpi_type<decltype(Triplet::r)>(),
-                             mpi_type<decltype(Triplet::c)>(),
-                             mpi_type<decltype(Triplet::a)>()};
-    MPI_Aint offsets[3] = {offsetof(Triplet, r),
-                           offsetof(Triplet, c),
-                           offsetof(Triplet, a)};
-    MPI_Type_create_struct(3, blocklengths, offsets, types, &Triplet_mpi_t);
-    MPI_Type_commit(&Triplet_mpi_t);
-
     std::vector<std::tuple<int,int,int>> dest(Ampi.local_nnz());
     std::vector<std::size_t> scnts(P);
-
 #pragma omp parallel for
     for (integer_t r=0; r<Ampi.local_rows(); r++) {
       auto r_perm = nd.perm()[r + Ampi.begin_row()];
@@ -93,10 +78,10 @@ namespace strumpack {
       }
     }
 
+    using Triplet = Triplet<scalar_t,integer_t>;
     std::vector<std::vector<Triplet>> sbuf(P);
     for (int p=0; p<P; p++)
       sbuf[p].reserve(scnts[p]);
-
     for (integer_t r=0; r<Ampi.local_rows(); r++) {
       auto r_perm = nd.perm()[r + Ampi.begin_row()];
       auto hij = Ampi.ptr(r+1) - Ampi.ptr(0);
@@ -111,11 +96,7 @@ namespace strumpack {
         }
       }
     }
-
-    std::vector<Triplet> triplets;
-    std::vector<Triplet*> pp;
-    comm.all_to_all_v(sbuf, triplets, pp, Triplet_mpi_t);
-    MPI_Type_free(&Triplet_mpi_t);
+    auto triplets = comm.all_to_all_v(sbuf);
 
     // TODO this sort can be avoided? first make the CSR/CSC
     // representation, then sort that row per row in parallel
@@ -127,23 +108,23 @@ namespace strumpack {
          return (a.r < b.r);
        });
 
-    integer_t _local_nnz = triplets.size();
-    local_cols_ = _local_nnz ? 1 : 0;
-    for (integer_t t=1; t<_local_nnz; t++)
+    integer_t lnnz = triplets.size();
+    local_cols_ = lnnz ? 1 : 0;
+    for (integer_t t=1; t<lnnz; t++)
       if (triplets[t].c != triplets[t-1].c) local_cols_++;
     ptr_.resize(local_cols_+1);
     global_col_.resize(local_cols_);
-    ind_.resize(_local_nnz);
-    val_.resize(_local_nnz);
+    ind_.resize(lnnz);
+    val_.resize(lnnz);
     integer_t col = 0;
     ptr_[col] = 0;
     if (local_cols_) {
       ptr_[1] = 0;
       global_col_[col] = triplets[0].c;
     }
-    for (integer_t j=0; j<_local_nnz; j++) {
+    for (integer_t j=0; j<lnnz; j++) {
       ind_[j] = triplets[j].r;
-      val_[j] = triplets[j].a;
+      val_[j] = triplets[j].v;
       if (j > 0 && (triplets[j].c != triplets[j-1].c)) {
         col++;
         ptr_[col+1] = ptr_[col];
@@ -168,8 +149,7 @@ namespace strumpack {
   PropMapSparseMatrix<scalar_t,integer_t>::extract_separator
   (integer_t sep_end, const std::vector<std::size_t>& I,
    const std::vector<std::size_t>& J, DenseM_t& B, int depth) const {
-    integer_t m = I.size();
-    integer_t n = J.size();
+    integer_t m = I.size(), n = J.size();
     if (m == 0 || n == 0) return;
     for (integer_t j=0; j<n; j++) {
       integer_t c = find_global(J[j]);
@@ -511,8 +491,7 @@ namespace strumpack {
   (integer_t sep_end, const std::vector<std::size_t>& I,
    const std::vector<std::size_t>& J, DistM_t& B) const {
     if (!B.active()) return;
-    integer_t m = B.rows();
-    integer_t n = B.cols();
+    integer_t m = B.rows(), n = B.cols();
     if (m == 0 || n == 0) return;
     B.zero();
     for (integer_t j=0; j<n; j++) {

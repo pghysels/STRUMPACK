@@ -298,10 +298,7 @@ namespace strumpack {
     }
 
     if (opts_.matching() != MatchingJob::NONE) {
-      // TODO do this in a single routine/comm phase
-      for (std::size_t c=0; c<x.cols(); c++)
-        permute_vector
-          (x.ptr(0,c), this->cperm_, mat_mpi_->dist(), comm_.comm());
+      permute_vector(x, this->cperm_, mat_mpi_->dist(), comm_);
       if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
         x.scale_rows(this->Dc_.data() + mat_mpi_->begin_row());
     }

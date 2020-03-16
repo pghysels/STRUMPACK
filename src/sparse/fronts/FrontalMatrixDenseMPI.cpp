@@ -374,7 +374,6 @@ namespace strumpack {
     }
     std::vector<scalar_t,NoInit<scalar_t>> rbuf;
     std::vector<scalar_t*> pbuf;
-    // Comm().all_to_all_v(sbuf, rbuf, pbuf);
     {
       TIMER_TIME(TaskType::GET_SUBMATRIX_2D_A2A, 2, t_a2a);
       Comm().all_to_all_v(sbuf, rbuf, pbuf);

@@ -50,7 +50,7 @@ int main(int argc, char* argv[]) {
   //     " which might be needed for pt-scotch!" << std::endl;
 
   {
-    int n = 30, nrhs = 1;
+    int n = 30, nrhs = 10;
     if (argc > 1) n = atoi(argv[1]); // get grid size
     else std::cout << "# please provide grid size" << std::endl;
     // get number of right-hand sides

@@ -240,63 +240,53 @@ namespace strumpack {
     integer_t B = DistM_t::default_MB;
     integer_t lo = dist[rank_];
     integer_t m = dist[rank_+1] - lo, n = x.cols();
+
     std::unique_ptr<int[]> iwork(new int[4*P_]);
     auto ibuf = iwork.get();
     auto scnts = ibuf;
     auto rcnts = ibuf + P_;
     auto sdispls = ibuf + 2*P_;
     auto rdispls = ibuf + 3*P_;
-    // TODO use Triplet / std::tuple
-    struct RCVal { integer_t r, c; scalar_t v; };
-    std::unique_ptr<RCVal[]> sbufwork(new RCVal[m*n]);
-    auto sbuf = sbufwork.get();
-    std::unique_ptr<RCVal*[]> pp(new RCVal*[P_]);
+
+    using Triplet = Triplet<scalar_t,integer_t>;
+    std::vector<Triplet> sbuf(m*n);
     std::fill(scnts, scnts+P_, 0);
-    if (n == 1) {
+    if (n == 1)
       for (integer_t r=0; r<m; r++)
         scnts[row_owner_[r]]++;
-    } else {
+    else {
       for (integer_t r=0; r<m; r++) {
-        auto permr = nd_.perm()[r+lo];
-        int pf = row_pfront_[permr];
+        int pf = row_pfront_[nd_.perm()[r+lo]];
         if (pf < 0) scnts[row_owner_[r]] += n;
         else {
           auto& f = all_pfronts_[pf];
           for (integer_t c=0; c<n; c++)
-            scnts[row_owner_[r] + ((c / B) % f.pcols) * f.prows]++;
+            scnts[row_owner_[r]+((c/B)%f.pcols)*f.prows]++;
         }
       }
     }
+    std::vector<std::size_t> pp(P_);
     sdispls[0] = 0;
-    pp[0] = sbuf;
-    for (int p=1; p<P_; p++) {
-      sdispls[p] = sdispls[p-1] + scnts[p-1];
-      pp[p] = sbuf + sdispls[p];
-    }
+    pp[0] = 0;
+    for (int p=1; p<P_; p++)
+      pp[p] = sdispls[p] = sdispls[p-1] + scnts[p-1];
     if (n == 1) {
       const auto perm = nd_.perm().data() + lo;
-      for (integer_t r=0; r<m; r++) {
-        auto dest = row_owner_[r];
-        *pp[dest] = {perm[r], 0, x(r,0)};
-        pp[dest]++;
-      }
+      for (integer_t r=0; r<m; r++)
+        sbuf[pp[row_owner_[r]]++] = {perm[r], 0, x(r,0)};
     } else {
       for (integer_t r=0; r<m; r++) {
         auto destr = row_owner_[r];
         auto permr = nd_.perm()[r+lo];
         int pf = row_pfront_[permr];
-        if (pf < 0) {
-          for (integer_t c=0; c<n; c++) {
-            *pp[destr] = {permr, c, x(r,c)};
-            pp[destr]++;
-          }
-        } else {
+        if (pf < 0)
+          for (integer_t c=0; c<n; c++)
+            sbuf[pp[destr]++] = {permr, c, x(r,c)};
+        else {
           auto& f = all_pfronts_[pf];
-          for (integer_t c=0; c<n; c++) {
-            auto dest = destr + ((c / B) % f.pcols) * f.prows;
-            *pp[dest] = {permr, c, x(r,c)};
-            pp[dest]++;
-          }
+          for (integer_t c=0; c<n; c++)
+            sbuf[pp[destr+((c/B)%f.pcols)*f.prows]++] =
+              {permr, c, x(r,c)};
         }
       }
     }
@@ -305,19 +295,8 @@ namespace strumpack {
     for (int p=1; p<P_; p++)
       rdispls[p] = rdispls[p-1] + rcnts[p-1];
 
-    MPI_Datatype RCVal_mpi_t;
-    int blocklengths[3] = {1, 1, 1};
-    MPI_Datatype types[3] =
-      {mpi_type<integer_t>(), mpi_type<integer_t>(), mpi_type<scalar_t>()};
-    MPI_Aint offsets[3] =
-      {offsetof(RCVal, r), offsetof(RCVal, c), offsetof(RCVal, v)};
-    MPI_Type_create_struct(3, blocklengths, offsets, types, &RCVal_mpi_t);
-    MPI_Type_commit(&RCVal_mpi_t);
-    // MPI_Type_contiguous(sizeof(RCVal), MPI_BYTE, &RCVal_mpi_t);
-    // MPI_Type_commit(&RCVal_mpi_t);
-
     auto rbuf = comm_.all_to_allv
-      (sbuf, scnts, sdispls, rcnts, rdispls, RCVal_mpi_t);
+      (sbuf.data(), scnts, sdispls, rcnts, rdispls, Triplet::mpi_type());
 
     DenseM_t xloc(local_range_.second - local_range_.first, n);
     DenseMW_t Xloc
@@ -350,33 +329,29 @@ namespace strumpack {
     rdispls = ibuf + 2*P_;
     sdispls = ibuf + 3*P_;
     for (int p=0; p<P_; p++)
-      pp[p] = rbuf.data() + sdispls[p];
+      pp[p] = sdispls[p];
     for (integer_t r=local_range_.first; r<local_range_.second; r++) {
       auto dest = std::upper_bound
         (dist.begin(), dist.end(), nd_.iperm()[r])-dist.begin()-1;
       auto permgr = nd_.iperm()[r];
-      for (integer_t c=0; c<n; c++) {
-        *pp[dest] = {permgr, c, Xloc(r,c)};
-        pp[dest]++;
-      }
+      for (integer_t c=0; c<n; c++)
+        rbuf[pp[dest]++] = {permgr, c, Xloc(r,c)};
     }
     for (std::size_t i=0; i<local_pfronts_.size(); i++) {
       if (xdist[i].lcols() == 0) continue;
       auto slo = local_pfronts_[i].sep_begin;
       for (int r=0; r<xdist[i].lrows(); r++) {
-        auto gr = xdist[i].rowl2g(r) + slo;
-        auto permgr = nd_.iperm()[gr];
+        auto permgr = nd_.iperm()[xdist[i].rowl2g(r) + slo];
         auto dest = std::upper_bound
           (dist.begin(), dist.end(), permgr)-dist.begin()-1;
-        for (int c=0; c<xdist[i].lcols(); c++) {
-          *pp[dest] = {permgr, xdist[i].coll2g(c), xdist[i](r,c)};
-          pp[dest]++;
-        }
+        for (int c=0; c<xdist[i].lcols(); c++)
+          rbuf[pp[dest]++] = {permgr, xdist[i].coll2g(c), xdist[i](r,c)};
       }
     }
     comm_.all_to_allv
-      (rbuf.data(), scnts, sdispls, sbuf, rcnts, rdispls, RCVal_mpi_t);
-    MPI_Type_free(&RCVal_mpi_t);
+      (rbuf.data(), scnts, sdispls, sbuf.data(),
+       rcnts, rdispls, Triplet::mpi_type());
+
 #pragma omp parallel for
     for (std::size_t i=0; i<std::size_t(m)*n; i++)
       x(sbuf[i].r-lo,sbuf[i].c) = sbuf[i].v;
@@ -590,7 +565,7 @@ namespace strumpack {
     }
     if (bcast_dim_sep) {
       std::vector<integer_t> buf({dsep_begin, dsep_end});
-      comm_.broadcast(buf, owner);
+      comm_.broadcast_from(buf, owner);
       dsep_begin = buf[0];
       dsep_end = buf[1];
     }

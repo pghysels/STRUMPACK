@@ -143,11 +143,12 @@ namespace strumpack {
       int rows_ = 0, cols_ = 0, lrows_ = 0, lcols_ = 0;
       std::vector<int> rdist_, cdist_;  // begin rows/cols of each rank
 
+      void set_dist();
+
       void set_extraction_meta_1grid
       (const VecVec_t& I, const VecVec_t& J, ExtractionMeta& e,
        int Nalldat_loc, int* pmaps) const;
     };
-
 
     template<typename integer_t> DenseMatrix<int>
     get_odiag_neighbors(int knn, const CSRGraph<integer_t>& gAB,

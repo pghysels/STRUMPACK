@@ -39,12 +39,13 @@
 #include <numeric>
 #include <limits>
 #include <memory>
+#include <utility>
 
 #define OMPI_SKIP_MPICXX 1
 #include <mpi.h>
 
 #include "StrumpackParameters.hpp"
-
+#include "Triplet.hpp"
 
 namespace strumpack {
 
@@ -54,7 +55,7 @@ namespace strumpack {
    * \tparam T C++ type for which to return the corresponding
    * MPI_Datatype
    */
-  template<typename T> MPI_Datatype mpi_type();
+  template<typename T> MPI_Datatype mpi_type() { return T::mpi_type(); }
   /** return MPI datatype for C++ char */
   template<> inline MPI_Datatype mpi_type<char>() { return MPI_CHAR; }
   /** return MPI datatype for C++ char */
@@ -272,25 +273,46 @@ namespace strumpack {
     void barrier() const { MPI_Barrier(comm_); }
 
     template<typename T> void
-    broadcast(std::vector<T>& sbuf, int src=0) const {
+    broadcast(std::vector<T>& sbuf) const {
+      MPI_Bcast(sbuf.data(), sbuf.size(), mpi_type<T>(), 0, comm_);
+    }
+    template<typename T> void
+    broadcast_from(std::vector<T>& sbuf, int src) const {
       MPI_Bcast(sbuf.data(), sbuf.size(), mpi_type<T>(), src, comm_);
     }
+
     template<typename T, std::size_t N> void
-    broadcast(std::array<T,N>& sbuf, int src=0) const {
-      MPI_Bcast(sbuf.data(), sbuf.size(), mpi_type<T>(), src, comm_);
+    broadcast(std::array<T,N>& sbuf) const {
+      MPI_Bcast(sbuf.data(), sbuf.size(), mpi_type<T>(), 0, comm_);
     }
+
     template<typename T> void
     broadcast(T& data) const {
       MPI_Bcast(&data, 1, mpi_type<T>(), 0, comm_);
     }
-    // template<typename T> void
-    // broadcast_from(T& data, int src) const {
-    //   MPI_Bcast(&data, 1, mpi_type<T>(), src, comm_);
-    // }
+    template<typename T> void
+    broadcast_from(T& data, int src) const {
+      MPI_Bcast(&data, 1, mpi_type<T>(), src, comm_);
+    }
     template<typename T> void
     broadcast(T* sbuf, std::size_t ssize) const {
       MPI_Bcast(sbuf, ssize, mpi_type<T>(), 0, comm_);
     }
+
+    template<typename T>
+    void all_gather(T* buf, std::size_t rsize) const {
+      MPI_Allgather
+        (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
+         buf, rsize, mpi_type<T>(), comm_);
+    }
+
+    template<typename T>
+    void all_gather_v(T* buf, const int* rcnts, const int* displs) const {
+      MPI_Allgatherv
+        (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, buf, rcnts, displs,
+         mpi_type<T>(), comm_);
+    }
+
 
     /**
      * Non-blocking send of a vector to a destination process, with a
@@ -314,21 +336,6 @@ namespace strumpack {
       return req;
     }
 
-    template<typename T>
-    void isend(const T* sbuf, std::size_t ssize, int dest,
-               int tag, MPI_Request* req) const {
-      // const_cast is necessary for ancient openmpi version used on Travis
-      MPI_Isend(const_cast<T*>(sbuf), ssize, mpi_type<T>(),
-                dest, tag, comm_, req);
-    }
-
-    template<typename T>
-    void isend(const T& buf, int dest, int tag, MPI_Request* req) const {
-      // const_cast is necessary for ancient openmpi version used on Travis
-      MPI_Isend(const_cast<T*>(&buf), 1, mpi_type<T>(),
-                dest, tag, comm_, req);
-    }
-
     /**
      * Non-blocking send of a vector to a destination process, with a
      * certain tag.
@@ -346,6 +353,21 @@ namespace strumpack {
                MPI_Request* req) const {
       // const_cast is necessary for ancient openmpi version used on Travis
       MPI_Isend(const_cast<T*>(sbuf.data()), sbuf.size(), mpi_type<T>(),
+                dest, tag, comm_, req);
+    }
+
+    template<typename T>
+    void isend(const T* sbuf, std::size_t ssize, int dest,
+               int tag, MPI_Request* req) const {
+      // const_cast is necessary for ancient openmpi version used on Travis
+      MPI_Isend(const_cast<T*>(sbuf), ssize, mpi_type<T>(),
+                dest, tag, comm_, req);
+    }
+
+    template<typename T>
+    void isend(const T& buf, int dest, int tag, MPI_Request* req) const {
+      // const_cast is necessary for ancient openmpi version used on Travis
+      MPI_Isend(const_cast<T*>(&buf), 1, mpi_type<T>(),
                 dest, tag, comm_, req);
     }
 
@@ -531,7 +553,9 @@ namespace strumpack {
      * communicator.
      *
      * \tparam T type of data to send, this should have a
-     * corresponding mpi_type<T>() implementation
+     * corresponding mpi_type<T>() implementation or should define
+     * T::mpi_type()
+     * \tparam A allocator to be used for the rbuf
      * \param sbuf send buffers (should be size this->size())
      * \param rbuf receive buffer, can be empty, will be allocated
      * \param pbuf pointers (to positions in rbuf) to where data
@@ -546,13 +570,34 @@ namespace strumpack {
 
     /**
      * Perform an MPI_Alltoallv. Each rank sends sbuf[i] to process
+     * i. The results are received in a single contiguous vector which
+     * is returned. This is collective on this MPI communicator.
+     *
+     * \tparam T type of data to send, this should have a
+     * corresponding mpi_type<T>() implementation or should define
+     * T::mpi_type()
+     * \tparam A allocator to be used for the receive buffer
+     * \param sbuf send buffers (should be size this->size())
+     * \return receive buffer
+     * \see all_to_all_v
+     */
+    template<typename T, typename A=std::allocator<T>>
+    std::vector<T,A> all_to_all_v(std::vector<std::vector<T>>& sbuf) const {
+      std::vector<T,A> rbuf;
+      std::vector<T*> pbuf;
+      all_to_all_v(sbuf, rbuf, pbuf, mpi_type<T>());
+      return rbuf;
+    }
+
+    /**
+     * Perform an MPI_Alltoallv. Each rank sends sbuf[i] to process
      * i. The results are received in a single contiguous vector
      * rbuf. pbuf has pointers into rbuf, with pbuf[i] pointing to the
      * data received from rank i.  This is collective on this MPI
      * communicator.
      *
-     * \tparam T type of data to send, the corresponding MPI_Datatype
-     * should be passed as the Ttype argument
+     * \tparam T type of data to send
+     * \tparam A allocator to be used for the receive buffer
      * \param sbuf send buffers (should be size this->size())
      * \param rbuf receive buffer, can be empty, will be allocated
      * \param pbuf pointers (to positions in rbuf) to where data
@@ -561,8 +606,7 @@ namespace strumpack {
      * parameter T
      * \see all_to_all_v
      */
-    template<typename T, typename A=std::allocator<T>>
-    void all_to_all_v
+    template<typename T, typename A=std::allocator<T>> void all_to_all_v
     (std::vector<std::vector<T>>& sbuf, std::vector<T,A>& rbuf,
      std::vector<T*>& pbuf, const MPI_Datatype Ttype) const {
       assert(sbuf.size() == std::size_t(size()));
@@ -583,8 +627,8 @@ namespace strumpack {
       }
       MPI_Alltoall
         (ssizes, 1, mpi_type<int>(), rsizes, 1, mpi_type<int>(), comm_);
-      std::size_t totssize = std::accumulate(ssizes, ssizes+P, 0);
-      std::size_t totrsize = std::accumulate(rsizes, rsizes+P, 0);
+      std::size_t totssize = std::accumulate(ssizes, ssizes+P, 0),
+        totrsize = std::accumulate(rsizes, rsizes+P, 0);
       if (totrsize >
           static_cast<std::size_t>(std::numeric_limits<int>::max()) ||
           totssize >
