@@ -49,9 +49,15 @@ namespace strumpack {
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::
   StrumpackSparseSolverMPIDist
   (MPI_Comm comm, int argc, char* argv[], bool verbose) :
-    StrumpackSparseSolverMPI<scalar_t,integer_t>(comm, argc, argv, verbose) {
+    StrumpackSparseSolverBase<scalar_t,integer_t>
+    (argc, argv, verbose), comm_(comm) {
     // Set the default reordering to PARMETIS?
     //opts_.set_reordering_method(ReorderingStrategy::PARMETIS);
+  }
+
+  template<typename scalar_t,typename integer_t> MPI_Comm
+  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::comm() const {
+    return comm_.comm();
   }
 
   template<typename scalar_t,typename integer_t>
@@ -65,9 +71,8 @@ namespace strumpack {
     return nd_mpi_.get();
   }
 
-
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::set_matrix
+  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::broadcast_matrix
   (const CSRMatrix<scalar_t,integer_t>& A) {
     mat_mpi_.reset
       (new CSRMatrixMPI<scalar_t,integer_t>(&A, comm_.comm(), true));
@@ -75,20 +80,20 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::set_matrix
-  (const CSRMatrixMPI<scalar_t,integer_t>& A) {
-    mat_mpi_.reset(new CSRMatrixMPI<scalar_t,integer_t>(A));
-    this->factored_ = this->reordered_ = false;
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::set_csr_matrix
+  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::broadcast_csr_matrix
   (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
    const scalar_t* values, bool symmetric_pattern) {
     CSRMatrix<scalar_t,integer_t> mat_seq
       (N, row_ptr, col_ind, values, symmetric_pattern);
     mat_mpi_.reset
       (new CSRMatrixMPI<scalar_t,integer_t>(&mat_seq, comm_.comm(), true));
+    this->factored_ = this->reordered_ = false;
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::set_matrix
+  (const CSRMatrixMPI<scalar_t,integer_t>& A) {
+    mat_mpi_.reset(new CSRMatrixMPI<scalar_t,integer_t>(A));
     this->factored_ = this->reordered_ = false;
   }
 
@@ -207,7 +212,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::solve
+  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::solve_internal
   (const DenseM_t& b, DenseM_t& x, bool use_initial_guess) {
     if (!this->factored_ &&
         opts_.Krylov_solver() != KrylovSolver::GMRES &&
@@ -310,12 +315,98 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::solve
+  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::solve_internal
   (const scalar_t* b, scalar_t* x, bool use_initial_guess) {
     auto N = mat_mpi_->local_rows();
     auto B = ConstDenseMatrixWrapperPtr(N, 1, b, N);
     DenseMW_t X(N, 1, x, N);
-    return solve(*B, X, use_initial_guess);
+    return this->solve(*B, X, use_initial_guess);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::perf_counters_stop
+  (const std::string& s) {
+    if (opts_.verbose()) {
+#if defined(STRUMPACK_USE_PAPI)
+      float rtime1=0., ptime1=0., mflops=0.;
+      long_long flpops1=0;
+#pragma omp parallel reduction(+:flpops1) reduction(max:rtime1) \
+  reduction(max:ptime1)
+      PAPI_flops(&rtime1, &ptime1, &flpops1, &mflops);
+      float papi_total_flops = flpops1 - this->flpops_;
+      papi_total_flops = comm_.all_reduce(papi_total_flops, MPI_SUM);
+
+      // TODO memory usage with PAPI
+
+      if (is_root_) {
+        std::cout << "# " << s << " PAPI stats:" << std::endl;
+        std::cout << "#   - total flops = " << papi_total_flops << std::endl;
+        std::cout << "#   - flop rate = "
+                  <<  papi_total_flops/(rtime1-this->rtime_)/1e9
+                  << " GFlops/s" << std::endl;
+        std::cout << "#   - real time = " << rtime1-this->rtime_
+                  << " sec" << std::endl;
+        std::cout << "#   - processor time = " << ptime1-this->ptime_
+                  << " sec" << std::endl;
+      }
+#endif
+#if defined(STRUMPACK_COUNT_FLOPS)
+      auto df = params::flops - this->f0_;
+      long long int flopsbytes[2] = {df, params::bytes - this->b0_};
+      comm_.all_reduce(flopsbytes, 2, MPI_SUM);
+      this->ftot_ = flopsbytes[0];
+      this->btot_ = flopsbytes[1];
+      this->fmin_ = comm_.all_reduce(df, MPI_MIN);
+      this->fmax_ = comm_.all_reduce(df, MPI_MAX);
+#endif
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::reduce_flop_counters() const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+    std::array<long long int,19> flops = {
+      params::random_flops.load(),
+      params::ID_flops.load(),
+      params::QR_flops.load(),
+      params::ortho_flops.load(),
+      params::reduce_sample_flops.load(),
+      params::update_sample_flops.load(),
+      params::extraction_flops.load(),
+      params::CB_sample_flops.load(),
+      params::sparse_sample_flops.load(),
+      params::ULV_factor_flops.load(),
+      params::schur_flops.load(),
+      params::full_rank_flops.load(),
+      params::f11_fill_flops.load(),
+      params::f12_fill_flops.load(),
+      params::f21_fill_flops.load(),
+      params::f22_fill_flops.load(),
+      params::f21_mult_flops.load(),
+      params::invf11_mult_flops.load(),
+      params::f12_mult_flops.load()
+    };
+    comm_.reduce(flops.data(), flops.size(), MPI_SUM);
+    params::random_flops = flops[0];
+    params::ID_flops = flops[1];
+    params::QR_flops = flops[2];
+    params::ortho_flops = flops[3];
+    params::reduce_sample_flops = flops[4];
+    params::update_sample_flops = flops[5];
+    params::extraction_flops = flops[6];
+    params::CB_sample_flops = flops[7];
+    params::sparse_sample_flops = flops[8];
+    params::ULV_factor_flops = flops[9];
+    params::schur_flops = flops[10];
+    params::full_rank_flops = flops[11];
+    params::f11_fill_flops = flops[12];
+    params::f12_fill_flops = flops[13];
+    params::f21_fill_flops = flops[14];
+    params::f22_fill_flops = flops[15];
+    params::f21_mult_flops = flops[16];
+    params::invf11_mult_flops = flops[17];
+    params::f12_mult_flops = flops[18];
+#endif
   }
 
   // explicit template instantiations

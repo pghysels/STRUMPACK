@@ -129,7 +129,7 @@ namespace strumpack {
      const DistM_t& B, std::vector<scalar_t*>& pbuf);
   };
 
-  // forward declatation
+  // forward declaration
   template<typename scalar_t,typename integer_t> class CompressedSparseMatrix;
 
   template<typename scalar_t,typename integer_t> class ExtractFront {
