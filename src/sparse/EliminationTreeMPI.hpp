@@ -87,6 +87,7 @@ namespace strumpack {
       int P0, P;
       const BLACSGrid* grid;
     };
+
     std::vector<ParFront> parallel_fronts_;
     integer_t active_pfronts_;
 

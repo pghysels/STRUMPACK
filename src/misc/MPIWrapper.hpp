@@ -76,7 +76,29 @@ namespace strumpack {
   template<> inline MPI_Datatype mpi_type<std::complex<float>>() { return MPI_C_FLOAT_COMPLEX; }
   /** return MPI datatype for C++ std::complex<double> */
   template<> inline MPI_Datatype mpi_type<std::complex<double>>() { return MPI_C_DOUBLE_COMPLEX; }
+  /** return MPI datatype for C++ std::pair<int,int> */
+  template<> inline MPI_Datatype mpi_type<std::pair<int,int>>() { return MPI_2INT; }
 
+  /** return MPI datatype for C++ std::pair<long int,long int> */
+  template<> inline MPI_Datatype mpi_type<std::pair<long int,long int>>() {
+    static MPI_Datatype l_l_mpi_type = MPI_DATATYPE_NULL;
+    if (l_l_mpi_type == MPI_DATATYPE_NULL) {
+      MPI_Type_contiguous
+        (2, strumpack::mpi_type<long int>(), &l_l_mpi_type);
+      MPI_Type_commit(&l_l_mpi_type);
+    }
+    return l_l_mpi_type;
+  }
+  /** return MPI datatype for C++ std::pair<long long int,long long int> */
+  template<> inline MPI_Datatype mpi_type<std::pair<long long int,long long int>>() {
+    static MPI_Datatype ll_ll_mpi_type = MPI_DATATYPE_NULL;
+    if (ll_ll_mpi_type == MPI_DATATYPE_NULL) {
+      MPI_Type_contiguous
+        (2, strumpack::mpi_type<long long int>(), &ll_ll_mpi_type);
+      MPI_Type_commit(&ll_ll_mpi_type);
+    }
+    return ll_ll_mpi_type;
+  }
 
   /**
    * \class MPIRequest

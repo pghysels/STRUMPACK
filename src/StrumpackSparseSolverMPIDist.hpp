@@ -32,14 +32,16 @@
 #ifndef STRUMPACK_SPARSE_SOLVER_MPI_DIST_HPP
 #define STRUMPACK_SPARSE_SOLVER_MPI_DIST_HPP
 
-#include "StrumpackSparseSolverMPI.hpp"
-#include "sparse/CSRMatrixMPI.hpp"
+#include "StrumpackSparseSolverBase.hpp"
+#include "dense/ScaLAPACKWrapper.hpp"
 #include "dense/DistributedVector.hpp"
+#include "sparse/CSRMatrixMPI.hpp"
 
 namespace strumpack {
 
   // forward declarations
   template<typename scalar_t,typename integer_t> class EliminationTreeMPIDist;
+  template<typename scalar_t,typename integer_t> class MatrixReorderingMPI;
 
   /**
    * \class StrumpackSparseSolverMPIDist

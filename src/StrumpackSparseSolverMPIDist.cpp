@@ -50,7 +50,10 @@ namespace strumpack {
   StrumpackSparseSolverMPIDist
   (MPI_Comm comm, int argc, char* argv[], bool verbose) :
     StrumpackSparseSolverBase<scalar_t,integer_t>
-    (argc, argv, verbose), comm_(comm) {
+    (argc, argv, verbose, !mpi_rank(comm)), comm_(comm) {
+    if (opts_.verbose() && is_root_)
+      std::cout << "# using " << comm_.size()
+                << " MPI processes" << std::endl;
     // Set the default reordering to PARMETIS?
     //opts_.set_reordering_method(ReorderingStrategy::PARMETIS);
   }

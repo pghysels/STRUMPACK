@@ -29,6 +29,8 @@
 #ifndef ELIMINATION_TREE_MPI_DIST_HPP
 #define ELIMINATION_TREE_MPI_DIST_HPP
 
+#include <cstddef>
+
 #include "EliminationTreeMPI.hpp"
 #include "PropMapSparseMatrix.hpp"
 #include "dense/DistributedMatrix.hpp"
@@ -90,7 +92,7 @@ namespace strumpack {
     void find_row_owner(const CSRMPI_t& A);
 
     /**
-     * vector of size _A.size(), storing for each row, to which front
+     * vector of size A.size(), storing for each row, to which front
      * it belongs.
      */
     std::vector<int> row_pfront_;
@@ -103,15 +105,33 @@ namespace strumpack {
         : sep_begin(lo), sep_end(hi), P0(_P0), P(_P),
           prows(g->nprows()), pcols(g->npcols()), grid(g) {}
       integer_t dim_sep() const { return sep_end - sep_begin; }
+
+      static MPI_Datatype mpi_type() {
+        static MPI_Datatype pf_mpi_type = MPI_DATATYPE_NULL;
+        if (pf_mpi_type == MPI_DATATYPE_NULL) {
+          int b[6] = {1, 1, 1, 1, 1, 1};
+          MPI_Datatype t[6] =
+            {strumpack::mpi_type<integer_t>(), strumpack::mpi_type<integer_t>(),
+             strumpack::mpi_type<int>(), strumpack::mpi_type<int>(),
+             strumpack::mpi_type<int>(), strumpack::mpi_type<int>()};
+          using PF = ParallelFront;
+          MPI_Aint o[6] =
+            {offsetof(PF, sep_begin), offsetof(PF, sep_end), offsetof(PF, P0),
+             offsetof(PF, P), offsetof(PF, prows), offsetof(PF, pcols)};
+          MPI_Type_create_struct(6, b, o, t, &pf_mpi_type);
+          MPI_Type_commit(&pf_mpi_type);
+        }
+        return pf_mpi_type;
+      }
+
       integer_t sep_begin, sep_end;
       int P0, P, prows, pcols;
       const BLACSGrid* grid;
     };
 
-    /** all parallel fronts */
-    std::vector<ParallelFront> all_pfronts_;
-    /** all parallel fronts on which this process is active. */
-    std::vector<ParallelFront> local_pfronts_;
+    /** all parallel fronts, all parallel fronts on which this process
+        is active. */
+    std::vector<ParallelFront> all_pfronts_, local_pfronts_;
 
     void symbolic_factorization
     (std::vector<std::vector<integer_t>>& local_upd,

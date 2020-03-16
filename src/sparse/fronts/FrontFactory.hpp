@@ -108,6 +108,7 @@ namespace strumpack {
 
   // forward definition
   template<typename scalar_t,typename integer_t> class FrontalMatrix;
+  template<typename scalar_t,typename integer_t> class FrontalMatrixMPI;
 
   template<typename scalar_t, typename integer_t>
   std::unique_ptr<FrontalMatrix<scalar_t,integer_t>> create_frontal_matrix
@@ -118,7 +119,7 @@ namespace strumpack {
 
 #if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t, typename integer_t>
-  std::unique_ptr<FrontalMatrix<scalar_t,integer_t>> create_frontal_matrix
+  std::unique_ptr<FrontalMatrixMPI<scalar_t,integer_t>> create_frontal_matrix
   (const SPOptions<scalar_t>& opts, integer_t s,
    integer_t sbegin, integer_t send, std::vector<integer_t>& upd,
    bool compressed_parent, int level, FrontCounter& fc,

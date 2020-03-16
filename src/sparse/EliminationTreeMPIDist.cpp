@@ -63,9 +63,7 @@ namespace strumpack {
           sbuf[2*rank_] = dleaf_work;
           sbuf[2*rank_+1] = dsep_work;
         }
-      MPI_Allgather
-        (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, sbuf.data(), 2,
-         mpi_type<decltype(dtree_work)::value_type>(), comm_.comm());
+      comm_.all_gather(sbuf.data(), 2);
       for (integer_t dsep=0; dsep<ndseps; dsep++) {
         auto i = 2 * nd_.proc_dist_sep[dsep];
         dtree_work[dsep] = nd_.tree().is_leaf(dsep) ? sbuf[i] : sbuf[i+1];
@@ -83,10 +81,8 @@ namespace strumpack {
     if (local_range_.first > local_range_.second)
       local_range_.first = local_range_.second = 0;
     subtree_ranges_.resize(P_);
-    MPI_Allgather
-      (&local_range_, sizeof(SepRange), MPI_BYTE,
-       subtree_ranges_.data(), sizeof(SepRange),
-       MPI_BYTE, comm_.comm());
+    subtree_ranges_[comm_.rank()] = local_range_;
+    comm_.all_gather(subtree_ranges_.data(), 1);
     get_all_pfronts();
     find_row_front(A);
     find_row_owner(A);
@@ -155,10 +151,9 @@ namespace strumpack {
     auto rdispls = rcnts + P_;
     nr_par_fronts[rank_] = 0;
     for (auto& f : local_pfronts_)
-      if (f.P0 == rank_) nr_par_fronts[rank_]++;
-    MPI_Allgather
-      (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, nr_par_fronts, 1,
-       mpi_type<int>(), comm_.comm());
+      if (f.P0 == rank_)
+        nr_par_fronts[rank_]++;
+    comm_.all_gather(nr_par_fronts, 1);
     int total_pfronts = std::accumulate(nr_par_fronts, nr_par_fronts+P_, 0);
     all_pfronts_.resize(total_pfronts);
     rdispls[0] = 0;
@@ -173,6 +168,7 @@ namespace strumpack {
         if (f.P0 == rank_)
           all_pfronts_[i++] = f;
     }
+    // comm_.all_gather_v(all_pfronts_.data(), rcnts, rdispls);
     MPI_Allgatherv
       (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
        all_pfronts_.data(), rcnts, rdispls, MPI_BYTE, comm_.comm());
@@ -641,14 +637,13 @@ namespace strumpack {
            level, this->nr_fronts_, rank_ == P0);
         if (P0 == rank_) this->update_local_ranges(dsep_begin, dsep_end);
       } else {
-        front = create_frontal_matrix<scalar_t,integer_t>
+        auto fmpi = create_frontal_matrix<scalar_t,integer_t>
           (opts, local_pfronts_.size(), dsep_begin, dsep_end, dsep_upd,
            parent_compression, level, this->nr_fronts_, fcomm, P, rank_ == P0);
-        if (rank_ >= P0 && rank_ < P0+P) {
-          auto fpar = static_cast<FMPI_t*>(front.get());
+        if (rank_ >= P0 && rank_ < P0+P)
           local_pfronts_.emplace_back
-            (front->sep_begin(), front->sep_end(), P0, P, fpar->grid());
-        }
+            (fmpi->sep_begin(), fmpi->sep_end(), P0, P, fmpi->grid());
+        front = std::move(fmpi);
       }
     }
 
@@ -700,14 +695,13 @@ namespace strumpack {
            level, this->nr_fronts_, rank_ == P0);
         if (P0 == rank_) this->update_local_ranges(sep_begin, sep_end);
       } else {
-        front = create_frontal_matrix<scalar_t,integer_t>
+        auto fmpi = create_frontal_matrix<scalar_t,integer_t>
           (opts, local_pfronts_.size(), sep_begin, sep_end, upd,
            parent_compression, level, this->nr_fronts_, fcomm, P, rank_ == P0);
-        if (rank_ >= P0 && rank_ < P0+P) {
-          auto fpar = static_cast<FMPI_t*>(front.get());
+        if (rank_ >= P0 && rank_ < P0+P)
           local_pfronts_.emplace_back
-            (front->sep_begin(), front->sep_end(), P0, P, fpar->grid());
-        }
+            (fmpi->sep_begin(), fmpi->sep_end(), P0, P, fmpi->grid());
+        front = std::move(fmpi);
       }
     }
     if (rank_ < P0 || rank_ >= P0+P) return front;

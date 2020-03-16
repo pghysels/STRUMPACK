@@ -29,7 +29,6 @@
 #include "StrumpackSparseSolver.h"
 #include "StrumpackSparseSolver.hpp"
 #if defined(STRUMPACK_USE_MPI)
-#include "StrumpackSparseSolverMPI.hpp"
 #include "StrumpackSparseSolverMPIDist.hpp"
 #endif
 #include "sparse/CSRMatrix.hpp"
