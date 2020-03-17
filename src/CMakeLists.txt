@@ -28,8 +28,9 @@ if(STRUMPACK_USE_MPI)
 
   install(FILES
     StrumpackSparseSolverMPIDist.hpp
-    StrumpackSparseSolverMPI.hpp
     DESTINATION include)
+#    StrumpackSparseSolverMPI.hpp
+
 endif()
 
 
