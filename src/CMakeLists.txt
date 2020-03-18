@@ -14,6 +14,7 @@ target_sources(strumpack
 install(FILES
   StrumpackOptions.hpp
   StrumpackParameters.hpp
+  StrumpackSparseSolverBase.hpp
   StrumpackSparseSolver.hpp
   DESTINATION include)
 
