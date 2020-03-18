@@ -61,7 +61,7 @@ namespace strumpack {
       auto N = components * dims[0]*dims[1]*dims[2];
       // d: dimension along which to split
       int d = std::distance
-      (dims.begin(), std::max_element(dims.begin(), dims.end()));
+        (dims.begin(), std::max_element(dims.begin(), dims.end()));
       bool dsep = dsep_id < 2*P;
       bool dsep_leaf = dsep && dsep_id >= P;
       bool is_local = dsep_id >= P && dsep_leaf_id == rank;

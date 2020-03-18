@@ -160,7 +160,7 @@ namespace strumpack {
     (integer_t dsep, const std::vector<integer_t>& dupd_send,
      integer_t& dsep_begin, integer_t& dsep_end,
      std::vector<integer_t>& dupd_recv, int P0, int P,
-     int P0_sibling, int P_sibling, int owner, bool bcast_dim_sep);
+     int P0_sibling, int P_sibling, int owner);
 
     template<typename It> void merge_if_larger
     (const It u0, const It u1, std::vector<integer_t>& out, integer_t s) const;

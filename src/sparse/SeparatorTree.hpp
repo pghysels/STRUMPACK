@@ -37,6 +37,9 @@
 
 namespace strumpack {
 
+  /**
+   * Helper class to construct a SeparatorTree.
+   */
   template<typename integer_t> class Separator {
   public:
     Separator(integer_t separator_end, integer_t parent,
@@ -53,11 +56,20 @@ namespace strumpack {
    */
   template<typename integer_t> class SeparatorTree {
   public:
-    // construct based on number of separators
+
+    /**
+     * Construct based on number of separators.
+     */
     SeparatorTree(integer_t nr_nodes);
-    // construct from on a vector of Separators, see above
+
+    /**
+     * Construct from on a vector of Separators.
+     */
     SeparatorTree(std::vector<Separator<integer_t>>& seps);
-    // construct from an elimination tree
+
+    /**
+     * Construct from an elimination tree.
+     */
     SeparatorTree(std::vector<integer_t>& etree);
 
     integer_t levels() const;

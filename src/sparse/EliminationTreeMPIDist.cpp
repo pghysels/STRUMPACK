@@ -81,8 +81,9 @@ namespace strumpack {
     if (local_range_.first > local_range_.second)
       local_range_.first = local_range_.second = 0;
     subtree_ranges_.resize(P_);
-    subtree_ranges_[comm_.rank()] = local_range_;
+    subtree_ranges_[rank_] = local_range_;
     comm_.all_gather(subtree_ranges_.data(), 1);
+
     get_all_pfronts();
     find_row_front(A);
     find_row_owner(A);
@@ -526,20 +527,14 @@ namespace strumpack {
    * corresponding to it, and to all processes working on the sibling
    * front (needed for extend-add).  Hence this routine only needs to
    * be called by those processes (or simply by everyone in comm_).
-   *
-   * If bcast_dim_sep is set to true, the sizes of the separator are
-   * communicated to all processes in comm_.
-   * TODO I don't see why this is necessary? A process is always
-   * also part of its parent, so should always have that info?
    */
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPIDist<scalar_t,integer_t>::
   communicate_distributed_separator
   (integer_t dsep, const std::vector<integer_t>& dupd_send,
    integer_t& dsep_begin, integer_t& dsep_end,
-   std::vector<integer_t>& dupd_recv,
-   int P0, int P, int P0_sibling, int P_sibling,
-   int owner, bool bcast_dim_sep) {
+   std::vector<integer_t>& dupd_recv, int P0, int P,
+   int P0_sibling, int P_sibling, int owner) {
     std::vector<integer_t> sbuf;
     std::vector<MPI_Request> sreq;
     int dest0 = std::min(P0, P0_sibling),
@@ -547,33 +542,18 @@ namespace strumpack {
     if (rank_ == owner) {
       sreq.resize(dest1-dest0);
       int msg = 0;
-      if (bcast_dim_sep) {
-        for (int dest=dest0; dest<dest1; dest++)
-          comm_.isend(dupd_send, dest, 0, &sreq[msg++]);
-      } else {
-        sbuf.reserve(2+dupd_send.size());
-        sbuf.push_back(dsep_begin);
-        sbuf.push_back(dsep_end);
-        sbuf.insert(sbuf.end(), dupd_send.begin(), dupd_send.end());
-        for (int dest=dest0; dest<dest1; dest++)
-          comm_.isend(sbuf, dest, 0, &sreq[msg++]);
-      }
-    }
-    if (bcast_dim_sep) {
-      std::vector<integer_t> buf({dsep_begin, dsep_end});
-      comm_.broadcast_from(buf, owner);
-      dsep_begin = buf[0];
-      dsep_end = buf[1];
+      sbuf.reserve(2+dupd_send.size());
+      sbuf.push_back(dsep_begin);
+      sbuf.push_back(dsep_end);
+      sbuf.insert(sbuf.end(), dupd_send.begin(), dupd_send.end());
+      for (int dest=dest0; dest<dest1; dest++)
+        comm_.isend(sbuf, dest, 0, &sreq[msg++]);
     }
     if (rank_ >= dest0 && rank_ < dest1) {
-      if (bcast_dim_sep)
-        dupd_recv = comm_.template recv<integer_t>(owner, 0);
-      else {
-        auto rbuf = comm_.template recv<integer_t>(owner, 0);
-        dsep_begin = rbuf[0];
-        dsep_end = rbuf[1];
-        dupd_recv.assign(rbuf.begin()+2, rbuf.end());
-      }
+      auto rbuf = comm_.template recv<integer_t>(owner, 0);
+      dsep_begin = rbuf[0];
+      dsep_end = rbuf[1];
+      dupd_recv.assign(rbuf.begin()+2, rbuf.end());
     }
     if (rank_ == owner) wait_all(sreq);
   }
@@ -597,9 +577,7 @@ namespace strumpack {
         (nd_.local_tree(), nd_.sub_graph_range.first,
          local_upd, local_subtree_work, P0, P,
          P0_sibling, P_sibling, owner, comm_);
-      // TODO this causes deadlock?? but is wrong for very small
-      //problems??
-      // if (!nd_.local_tree().is_empty())
+      //if (sub_tree.nr_sep)
       return proportional_mapping_sub_graphs
         (opts, sub_tree, dsep, sub_tree.root,
          P0, P, P0_sibling, P_sibling,
@@ -613,13 +591,13 @@ namespace strumpack {
       dsep_end = nd_.sub_graph_range.second;
       communicate_distributed_separator
         (dsep, dleaf_upd, dsep_begin, dsep_end, dsep_upd,
-         P0, P, P0_sibling, P_sibling, owner, parent_compression);
+         P0, P, P0_sibling, P_sibling, owner);
     } else {
       dsep_begin = nd_.dist_sep_range.first;
       dsep_end = nd_.dist_sep_range.second;
       communicate_distributed_separator
         (dsep, dist_upd, dsep_begin, dsep_end, dsep_upd,
-         P0, P, P0_sibling, P_sibling, owner, parent_compression);
+         P0, P, P0_sibling, P_sibling, owner);
     }
     auto dim_dsep = dsep_end - dsep_begin;
 
@@ -642,12 +620,12 @@ namespace strumpack {
            parent_compression, level, this->nr_fronts_, fcomm, P, rank_ == P0);
         if (rank_ >= P0 && rank_ < P0+P)
           local_pfronts_.emplace_back
-            (fmpi->sep_begin(), fmpi->sep_end(), P0, P, fmpi->grid());
+            (dsep_begin, dsep_end, P0, P, fmpi->grid());
         front = std::move(fmpi);
       }
     }
 
-    if (chl == -1) return front;
+    //if (nd_.tree().is_leaf(dsep)) return front;
 
     // here we should still continue, to send the local subgraph
     auto wl = dist_subtree_work[chl];
@@ -723,7 +701,7 @@ namespace strumpack {
         (proportional_mapping_sub_graphs
          (opts, tree, dsep, chr, P0+P-Pr, Pr, P0, Pl,
           fcomm.sub(P-Pr, Pr), use_compression, level+1));
-    }
+    }// else this->update_local_ranges(sep_begin, sep_end);
     return front;
   }
 

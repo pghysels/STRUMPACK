@@ -312,10 +312,12 @@ namespace strumpack {
 #endif
   }
 
-  /** extract subtree p of P */
+  /**
+   * Extract subtree p of P.
+   */
   template<typename integer_t> std::unique_ptr<SeparatorTree<integer_t>>
   SeparatorTree<integer_t>::subtree(integer_t p, integer_t P) const {
-    if (nr_seps_ == 0)
+    if (!nr_seps_)
       return std::unique_ptr<SeparatorTree<integer_t>>
         (new SeparatorTree<integer_t>(0));
     std::vector<bool> mark(nr_seps_);
@@ -334,6 +336,7 @@ namespace strumpack {
         if (rchild_[i]!=-1) find_roots(rchild_[i]);
       }
     };
+    // TODO this can get in an infinite loop
     while (nr_subtrees < P && nr_subtrees < nr_seps_)
       find_roots(root());
 

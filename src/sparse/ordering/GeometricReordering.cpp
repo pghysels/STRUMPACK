@@ -155,9 +155,10 @@ namespace strumpack {
 
   template<typename integer_t,typename scalar_t>
   std::unique_ptr<SeparatorTree<integer_t>> geometric_nested_dissection
-  (const CSRMatrix<scalar_t,integer_t>& A, int nx, int ny, int nz,
-   int components, int width, std::vector<integer_t>& perm,
-   std::vector<integer_t>& iperm, const SPOptions<scalar_t>& opts) {
+  (const CompressedSparseMatrix<scalar_t,integer_t>& A,
+   int nx, int ny, int nz, int components, int width,
+   std::vector<integer_t>& perm, std::vector<integer_t>& iperm,
+   const SPOptions<scalar_t>& opts) {
     GeomOrderData<integer_t> gd;
     gd.perm = perm.data();
     gd.iperm = iperm.data();
@@ -217,65 +218,65 @@ namespace strumpack {
 
   template std::unique_ptr<SeparatorTree<int>>
   geometric_nested_dissection
-  (const CSRMatrix<float,int>& A, int nx, int ny, int nz,
+  (const CompressedSparseMatrix<float,int>& A, int nx, int ny, int nz,
    int components, int width, std::vector<int>& perm,
    std::vector<int>& iperm, const SPOptions<float>& opts);
   template std::unique_ptr<SeparatorTree<int>>
   geometric_nested_dissection
-  (const CSRMatrix<double,int>& A, int nx, int ny, int nz,
+  (const CompressedSparseMatrix<double,int>& A, int nx, int ny, int nz,
    int components, int width, std::vector<int>& perm,
    std::vector<int>& iperm, const SPOptions<double>& opts);
   template std::unique_ptr<SeparatorTree<int>>
   geometric_nested_dissection
-  (const CSRMatrix<std::complex<float>,int>& A, int nx, int ny, int nz,
+  (const CompressedSparseMatrix<std::complex<float>,int>& A, int nx, int ny, int nz,
    int components, int width, std::vector<int>& perm,
    std::vector<int>& iperm, const SPOptions<std::complex<float>>& opts);
   template std::unique_ptr<SeparatorTree<int>>
   geometric_nested_dissection
-  (const CSRMatrix<std::complex<double>,int>& A, int nx, int ny, int nz,
+  (const CompressedSparseMatrix<std::complex<double>,int>& A, int nx, int ny, int nz,
    int components, int width, std::vector<int>& perm,
    std::vector<int>& iperm, const SPOptions<std::complex<double>>& opts);
 
   template std::unique_ptr<SeparatorTree<long int>>
   geometric_nested_dissection
-  (const CSRMatrix<float,long int>& A, int nx, int ny, int nz,
+  (const CompressedSparseMatrix<float,long int>& A, int nx, int ny, int nz,
    int components, int width, std::vector<long int>& perm,
    std::vector<long int>& iperm, const SPOptions<float>& opts);
   template std::unique_ptr<SeparatorTree<long int>>
   geometric_nested_dissection
-  (const CSRMatrix<double,long int>& A, int nx, int ny, int nz,
+  (const CompressedSparseMatrix<double,long int>& A, int nx, int ny, int nz,
    int components, int width, std::vector<long int>& perm,
    std::vector<long int>& iperm, const SPOptions<double>& opts);
   template std::unique_ptr<SeparatorTree<long int>>
   geometric_nested_dissection
-  (const CSRMatrix<std::complex<float>,long int>& A, int nx, int ny, int nz,
+  (const CompressedSparseMatrix<std::complex<float>,long int>& A, int nx, int ny, int nz,
    int components, int width, std::vector<long int>& perm,
    std::vector<long int>& iperm, const SPOptions<std::complex<float>>& opts);
   template std::unique_ptr<SeparatorTree<long int>>
   geometric_nested_dissection
-  (const CSRMatrix<std::complex<double>,long int>& A, int nx, int ny, int nz,
+  (const CompressedSparseMatrix<std::complex<double>,long int>& A, int nx, int ny, int nz,
    int components, int width, std::vector<long int>& perm,
    std::vector<long int>& iperm, const SPOptions<std::complex<double>>& opts);
 
   template std::unique_ptr<SeparatorTree<long long int>>
   geometric_nested_dissection
-  (const CSRMatrix<float,long long int>& A, int nx, int ny, int nz,
+  (const CompressedSparseMatrix<float,long long int>& A, int nx, int ny, int nz,
    int components, int width, std::vector<long long int>& perm,
    std::vector<long long int>& iperm, const SPOptions<float>& opts);
   template std::unique_ptr<SeparatorTree<long long int>>
   geometric_nested_dissection
-  (const CSRMatrix<double,long long int>& A, int nx, int ny, int nz,
+  (const CompressedSparseMatrix<double,long long int>& A, int nx, int ny, int nz,
    int components, int width, std::vector<long long int>& perm,
    std::vector<long long int>& iperm, const SPOptions<double>& opts);
   template std::unique_ptr<SeparatorTree<long long int>>
   geometric_nested_dissection
-  (const CSRMatrix<std::complex<float>,long long int>& A,
+  (const CompressedSparseMatrix<std::complex<float>,long long int>& A,
    int nx, int ny, int nz, int components, int width,
    std::vector<long long int>& perm, std::vector<long long int>& iperm,
    const SPOptions<std::complex<float>>& opts);
   template std::unique_ptr<SeparatorTree<long long int>>
   geometric_nested_dissection
-  (const CSRMatrix<std::complex<double>,long long int>& A,
+  (const CompressedSparseMatrix<std::complex<double>,long long int>& A,
    int nx, int ny, int nz, int components, int width,
    std::vector<long long int>& perm, std::vector<long long int>& iperm,
    const SPOptions<std::complex<double>>& opts);
