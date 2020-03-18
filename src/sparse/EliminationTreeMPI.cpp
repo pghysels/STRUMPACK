@@ -46,6 +46,9 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t>
+  EliminationTreeMPI<scalar_t,integer_t>::~EliminationTreeMPI() {}
+
+  template<typename scalar_t,typename integer_t>
   EliminationTreeMPI<scalar_t,integer_t>::EliminationTreeMPI
   (const SPOptions<scalar_t>& opts, const SpMat_t& A,
    Reord_t& nd, const MPIComm& comm)

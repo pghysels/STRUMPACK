@@ -57,7 +57,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t>
-  MatrixReorderingMPI<scalar_t,integer_t>::~MatrixReorderingMPI() = default;
+  MatrixReorderingMPI<scalar_t,integer_t>::~MatrixReorderingMPI() {}
 
   template<typename scalar_t,typename integer_t> int
   MatrixReorderingMPI<scalar_t,integer_t>::nested_dissection

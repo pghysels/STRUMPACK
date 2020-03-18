@@ -58,7 +58,7 @@ namespace strumpack {
     (const SPOptions<scalar_t>& opts, const SpMat_t& A,
      Reord_t& nd, const MPIComm& comm);
 
-    virtual ~EliminationTreeMPI() {}
+    virtual ~EliminationTreeMPI();
 
     void multifrontal_solve(DenseM_t& x) const override;
     integer_t maximum_rank() const override;

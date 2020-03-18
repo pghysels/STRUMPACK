@@ -47,7 +47,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t>
-  EliminationTree<scalar_t,integer_t>::~EliminationTree() = default;
+  EliminationTree<scalar_t,integer_t>::~EliminationTree() {}
 
   template<typename scalar_t,typename integer_t>
   FrontalMatrix<scalar_t,integer_t>*

@@ -64,7 +64,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t>
-  MatrixReordering<scalar_t,integer_t>::~MatrixReordering() = default;
+  MatrixReordering<scalar_t,integer_t>::~MatrixReordering() {}
 
   template<typename scalar_t,typename integer_t> int
   MatrixReordering<scalar_t,integer_t>::nested_dissection
