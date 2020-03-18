@@ -64,7 +64,8 @@ CSRMatrix<std::complex<realt>,int> Helmholtz3D(int nx) {
        &fromfile, datafile);
     rc.resize(nnz);
     for (int i=0; i<nnz; i++)
-      rc[i] = {rowind[i], colind[i], val[i]};
+      rc[i] = std::tuple<int,int,std::complex<realt>>
+        (rowind[i], colind[i], val[i]);
   }
   std::sort(rc.begin(), rc.end(),
             [](const std::tuple<int,int,std::complex<realt>>& a,
