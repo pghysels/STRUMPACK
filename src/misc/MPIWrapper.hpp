@@ -59,7 +59,7 @@ namespace strumpack {
   /** return MPI datatype for C++ char */
   template<> inline MPI_Datatype mpi_type<char>() { return MPI_CHAR; }
   /** return MPI datatype for C++ char */
-  template<> inline MPI_Datatype mpi_type<bool>() { return MPI_BYTE; }
+  template<> inline MPI_Datatype mpi_type<bool>() { return MPI_CXX_BOOL; }
   /** return MPI datatype for C++ int */
   template<> inline MPI_Datatype mpi_type<int>() { return MPI_INT; }
   /** return MPI datatype for C++ long */
@@ -73,9 +73,9 @@ namespace strumpack {
   /** return MPI datatype for C++ double */
   template<> inline MPI_Datatype mpi_type<double>() { return MPI_DOUBLE; }
   /** return MPI datatype for C++ std::complex<float> */
-  template<> inline MPI_Datatype mpi_type<std::complex<float>>() { return MPI_C_FLOAT_COMPLEX; }
+  template<> inline MPI_Datatype mpi_type<std::complex<float>>() { return MPI_CXX_FLOAT_COMPLEX; }
   /** return MPI datatype for C++ std::complex<double> */
-  template<> inline MPI_Datatype mpi_type<std::complex<double>>() { return MPI_C_DOUBLE_COMPLEX; }
+  template<> inline MPI_Datatype mpi_type<std::complex<double>>() { return MPI_CXX_DOUBLE_COMPLEX; }
   /** return MPI datatype for C++ std::pair<int,int> */
   template<> inline MPI_Datatype mpi_type<std::pair<int,int>>() { return MPI_2INT; }
 

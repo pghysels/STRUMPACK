@@ -41,12 +41,15 @@ namespace strumpack {
     static MPI_Datatype triplet_mpi_type = MPI_DATATYPE_NULL;
     if (triplet_mpi_type == MPI_DATATYPE_NULL) {
       using T = Triplet<scalar_t,integer_t>;
-      int b[3] = {1, 1, 1};
-      MPI_Datatype t[3] = {strumpack::mpi_type<integer_t>(),
-                           strumpack::mpi_type<integer_t>(),
-                           strumpack::mpi_type<scalar_t>()};
-      MPI_Aint o[3] = {offsetof(T, r), offsetof(T, c), offsetof(T, v)};
-      MPI_Type_create_struct(3, b, o, t, &triplet_mpi_type);
+      int count = 3;
+      int b[count] = {1, 1, 1};
+      MPI_Datatype t[count] = {strumpack::mpi_type<integer_t>(),
+                               strumpack::mpi_type<integer_t>(),
+                               strumpack::mpi_type<scalar_t>()};
+      MPI_Aint o[count] = {offsetof(T, r), offsetof(T, c), offsetof(T, v)};
+      MPI_Datatype tmp_mpi_type;
+      MPI_Type_create_struct(count, b, o, t, &tmp_mpi_type);
+      MPI_Type_create_resized(tmp_mpi_type, 0, sizeof(T), &triplet_mpi_type);
       MPI_Type_commit(&triplet_mpi_type);
     }
     return triplet_mpi_type;
@@ -57,11 +60,14 @@ namespace strumpack {
     static MPI_Datatype idxval_mpi_type = MPI_DATATYPE_NULL;
     if (idxval_mpi_type == MPI_DATATYPE_NULL) {
       using T = IdxVal<scalar_t,integer_t>;
-      int b[2] = {1, 1};
-      MPI_Datatype t[2] = {strumpack::mpi_type<integer_t>(),
-                           strumpack::mpi_type<scalar_t>()};
-      MPI_Aint o[2] = {offsetof(T, i), offsetof(T, v)};
-      MPI_Type_create_struct(2, b, o, t, &idxval_mpi_type);
+      int count = 2;
+      int b[count] = {1, 1};
+      MPI_Datatype t[count] = {strumpack::mpi_type<integer_t>(),
+                               strumpack::mpi_type<scalar_t>()};
+      MPI_Aint o[count] = {offsetof(T, i), offsetof(T, v)};
+      MPI_Datatype tmp_mpi_type;
+      MPI_Type_create_struct(count, b, o, t, &tmp_mpi_type);
+      MPI_Type_create_resized(tmp_mpi_type, 0, sizeof(T), &idxval_mpi_type);
       MPI_Type_commit(&idxval_mpi_type);
     }
     return idxval_mpi_type;
@@ -83,14 +89,17 @@ namespace strumpack {
     static MPI_Datatype quadlet_mpi_type = MPI_DATATYPE_NULL;
     if (quadlet_mpi_type == MPI_DATATYPE_NULL) {
       using T = Quadlet<scalar_t,integer_t>;
-      int b[4] = {1, 1, 1, 1};
-      MPI_Datatype t[4] = {strumpack::mpi_type<integer_t>(),
-                           strumpack::mpi_type<integer_t>(),
-                           strumpack::mpi_type<integer_t>(),
-                           strumpack::mpi_type<scalar_t>()};
-      MPI_Aint o[4] = {offsetof(T, r), offsetof(T, c),
-                       offsetof(T, k), offsetof(T, v)};
-      MPI_Type_create_struct(4, b, o, t, &quadlet_mpi_type);
+      int count = 4;
+      int b[count] = {1, 1, 1, 1};
+      MPI_Datatype t[count] = {strumpack::mpi_type<integer_t>(),
+                               strumpack::mpi_type<integer_t>(),
+                               strumpack::mpi_type<integer_t>(),
+                               strumpack::mpi_type<scalar_t>()};
+      MPI_Aint o[count] = {offsetof(T, r), offsetof(T, c),
+                           offsetof(T, k), offsetof(T, v)};
+      MPI_Datatype tmp_mpi_type;
+      MPI_Type_create_struct(count, b, o, t, &tmp_mpi_type);
+      MPI_Type_create_resized(tmp_mpi_type, 0, sizeof(T), &quadlet_mpi_type);
       MPI_Type_commit(&quadlet_mpi_type);
     }
     return quadlet_mpi_type;
