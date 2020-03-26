@@ -174,8 +174,8 @@ namespace strumpack {
       lvls_ = std::max(min_lvl, tree.levels());
       tree.expand_complete_levels(lvls_);
       leafs_ = tree.template leaf_sizes<int>();
-      c_ = c;
-      Fcomm_ = MPI_Comm_c2f(c_.comm());
+      c_ = &c;
+      Fcomm_ = MPI_Comm_c2f(c_->comm());
       options_init(opts);
       perm_.resize(rows_);
       HODLR_set_I_option<scalar_t>(options_, "knn", opts.knn_hodlrbf());
@@ -198,7 +198,7 @@ namespace strumpack {
       }
       perm_init();
       dist_init();
-      KernelCommPtrs<real_t> KC{&K, &c_};
+      KernelCommPtrs<real_t> KC{&K, c_};
       HODLR_construct_element_compute<scalar_t>
         (ho_bf_, options_, stats_, msh_, kerquant_,
          ptree_, &(HODLR_kernel_evaluation<scalar_t>),
@@ -219,8 +219,8 @@ namespace strumpack {
       lvls_ = std::max(min_lvl, full_tree.levels());
       full_tree.expand_complete_levels(lvls_);
       leafs_ = full_tree.template leaf_sizes<int>();
-      c_ = c;
-      Fcomm_ = MPI_Comm_c2f(c_.comm());
+      c_ = &c;
+      Fcomm_ = MPI_Comm_c2f(c_->comm());
       options_init(opts);
       perm_.resize(rows_);
       HODLR_set_I_option<scalar_t>(options_, "xyzsort", 3);
@@ -247,8 +247,8 @@ namespace strumpack {
       lvls_ = std::max(min_lvl, full_tree.levels());
       full_tree.expand_complete_levels(lvls_);
       leafs_ = full_tree.template leaf_sizes<int>();
-      c_ = c;
-      Fcomm_ = MPI_Comm_c2f(c_.comm());
+      c_ = &c;
+      Fcomm_ = MPI_Comm_c2f(c_->comm());
       options_init(opts);
       perm_.resize(rows_);
       HODLR_set_I_option<scalar_t>(options_, "xyzsort", 3);
@@ -282,9 +282,9 @@ namespace strumpack {
       lvls_ = std::max(min_lvl, full_tree.levels());
       full_tree.expand_complete_levels(lvls_);
       leafs_ = full_tree.template leaf_sizes<int>();
-      c_ = c;
-      if (c_.is_null()) return;
-      Fcomm_ = MPI_Comm_c2f(c_.comm());
+      c_ = &c;
+      if (c_->is_null()) return;
+      Fcomm_ = MPI_Comm_c2f(c_->comm());
       options_init(opts);
       perm_.resize(rows_);
       HODLR_construct_init<scalar_t,real_t>
@@ -324,9 +324,9 @@ namespace strumpack {
       lvls_ = std::max(min_lvl, full_tree.levels());
       full_tree.expand_complete_levels(lvls_);
       leafs_ = full_tree.template leaf_sizes<int>();
-      c_ = c;
-      if (c_.is_null()) return;
-      Fcomm_ = MPI_Comm_c2f(c_.comm());
+      c_ = &c;
+      if (c_->is_null()) return;
+      Fcomm_ = MPI_Comm_c2f(c_->comm());
       options_init(opts);
       perm_.resize(rows_);
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 3);
@@ -370,7 +370,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::options_init(const opts_t& opts) {
-      auto P = c_.size();
+      auto P = c_->size();
       std::vector<int> groups(P);
       std::iota(groups.begin(), groups.end(), 0);
 
@@ -406,18 +406,17 @@ namespace strumpack {
 
     template<typename scalar_t> void HODLRMatrix<scalar_t>::perm_init() {
       iperm_.resize(rows_);
-      MPI_Bcast(perm_.data(), perm_.size(), MPI_INT, 0, c_.comm());
+      c_->broadcast(perm_);
       for (int i=1; i<=rows_; i++)
         iperm_[perm_[i-1]-1] = i;
     }
 
     template<typename scalar_t> void HODLRMatrix<scalar_t>::dist_init() {
-      auto P = c_.size();
-      auto rank = c_.rank();
+      auto P = c_->size();
+      auto rank = c_->rank();
       dist_.resize(P+1);
       dist_[rank+1] = lrows_;
-      MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
-                    dist_.data()+1, 1, MPI_INT, c_.comm());
+      c_->all_gather(dist_.data()+1, 1);
       for (int p=0; p<P; p++) dist_[p+1] += dist_[p];
     }
 
@@ -472,7 +471,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::compress(const mult_t& Amult) {
-      if (c_.is_null()) return;
+      if (c_->is_null()) return;
       C2Fptr f = static_cast<void*>(const_cast<mult_t*>(&Amult));
       HODLR_construct_matvec_compute<scalar_t>
         (ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
@@ -490,7 +489,7 @@ namespace strumpack {
     HODLRMatrix<scalar_t>::compress(const delem_blocks_t& Aelem) {
       BLACSGrid gloc(MPIComm(MPI_COMM_SELF), 1),
         gnull(MPIComm(MPI_COMM_NULL), 1);
-      AelemCommPtrs<scalar_t> AC{&Aelem, &c_, &gloc, &gnull};
+      AelemCommPtrs<scalar_t> AC{&Aelem, c_, &gloc, &gnull};
       HODLR_construct_element_compute<scalar_t>
         (ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
          &(HODLR_element_evaluation<scalar_t>),
@@ -509,7 +508,7 @@ namespace strumpack {
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::mult
     (Trans op, const DenseM_t& X, DenseM_t& Y) const {
-      if (c_.is_null()) return;
+      if (c_->is_null()) return;
       HODLR_mult(char(op), X.data(), Y.data(), lrows_, lrows_, X.cols(),
                  ho_bf_, options_, stats_, ptree_);
     }
@@ -517,7 +516,7 @@ namespace strumpack {
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::mult
     (Trans op, const DistM_t& X, DistM_t& Y) const {
-      if (c_.is_null()) return;
+      if (c_->is_null()) return;
       DenseM_t Y1D(lrows_, X.cols());
       {
         auto X1D = redistribute_2D_to_1D(X);
@@ -530,7 +529,7 @@ namespace strumpack {
     template<typename scalar_t> long long int
     HODLRMatrix<scalar_t>::inv_mult
     (Trans op, const DenseM_t& X, DenseM_t& Y) const {
-      if (c_.is_null()) return 0;
+      if (c_->is_null()) return 0;
       HODLR_inv_mult
         (char(op), X.data(), Y.data(), lrows_, lrows_, X.cols(),
          ho_bf_, options_, stats_, ptree_);
@@ -551,19 +550,19 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::factor() {
-      if (c_.is_null()) return;
+      if (c_->is_null()) return;
       HODLR_factor<scalar_t>(ho_bf_, options_, stats_, ptree_, msh_);
     }
 
     template<typename scalar_t> long long int
     HODLRMatrix<scalar_t>::solve(const DenseM_t& B, DenseM_t& X) const {
-      if (c_.is_null()) return 0;
+      if (c_->is_null()) return 0;
       return inv_mult(Trans::N, B, X);
     }
 
     template<typename scalar_t> long long int
     HODLRMatrix<scalar_t>::solve(const DistM_t& B, DistM_t& X) const {
-      if (c_.is_null()) return 0;
+      if (c_->is_null()) return 0;
       DenseM_t X1D(lrows_, X.cols());
       long long int flops = 0;
       {
@@ -645,7 +644,7 @@ namespace strumpack {
     HODLRMatrix<scalar_t>::gather_from_1D(const DenseM_t& A) const {
       // TODO avoid going through 2D
       assert(A.rows() == lrows());
-      BLACSGrid g(c_);
+      BLACSGrid g(*c_);
       DistM_t A2D(&g, rows_, A.cols());
       redistribute_1D_to_2D(A, A2D);
       return A2D.gather();
@@ -655,7 +654,7 @@ namespace strumpack {
     HODLRMatrix<scalar_t>::all_gather_from_1D(const DenseM_t& A) const {
       // TODO avoid going through 2D
       assert(A.rows() == lrows());
-      BLACSGrid g(c_);
+      BLACSGrid g(*c_);
       DistM_t A2D(&g, rows_, A.cols());
       redistribute_1D_to_2D(A, A2D);
       return A2D.all_gather();
@@ -665,7 +664,7 @@ namespace strumpack {
     HODLRMatrix<scalar_t>::scatter_to_1D(const DenseM_t& A) const {
       // TODO avoid going through 2D
       assert(A.rows() == rows());
-      BLACSGrid g(c_);
+      BLACSGrid g(*c_);
       DistM_t A2D(&g, rows_, A.cols());
       copy(rows_, A.cols(), A, 0, A2D, 0, 0, A2D.ctxt_all());
       return redistribute_2D_to_1D(A2D);
@@ -682,9 +681,9 @@ namespace strumpack {
     HODLRMatrix<scalar_t>::redistribute_2D_to_1D
     (const DistM_t& R2D, DenseM_t& R1D) const {
       TIMER_TIME(TaskType::REDIST_2D_TO_HSS, 0, t_redist);
-      if (c_.is_null()) return;
-      const auto P = c_.size();
-      const auto rank = c_.rank();
+      if (c_->is_null()) return;
+      const auto P = c_->size();
+      const auto rank = c_->rank();
       // for (int p=0; p<P; p++)
       //   copy(dist_[rank+1]-dist_[rank], R2D.cols(), R2D, dist_[rank], 0,
       //        R1D, p, R2D.grid()->ctxt_all());
@@ -720,7 +719,7 @@ namespace strumpack {
       }
       std::vector<scalar_t,NoInit<scalar_t>> rbuf;
       std::vector<scalar_t*> pbuf;
-      c_.all_to_all_v(sbuf, rbuf, pbuf);
+      c_->all_to_all_v(sbuf, rbuf, pbuf);
       assert(int(R1D.rows()) == lrows_ && int(R1D.cols()) == Rcols);
       if (lrows_) {
         std::vector<int> src_c(Rcols);
@@ -739,9 +738,9 @@ namespace strumpack {
     HODLRMatrix<scalar_t>::redistribute_1D_to_2D
     (const DenseM_t& S1D, DistM_t& S2D) const {
       TIMER_TIME(TaskType::REDIST_2D_TO_HSS, 0, t_redist);
-      if (c_.is_null()) return;
-      const int rank = c_.rank();
-      const int P = c_.size();
+      if (c_->is_null()) return;
+      const int rank = c_->rank();
+      const int P = c_->size();
       const int cols = S1D.cols();
       int S2Drlo, S2Drhi, S2Dclo, S2Dchi;
       S2D.lranges(S2Drlo, S2Drhi, S2Dclo, S2Dchi);
@@ -775,7 +774,7 @@ namespace strumpack {
       }
       std::vector<scalar_t,NoInit<scalar_t>> rbuf;
       std::vector<scalar_t*> pbuf;
-      c_.all_to_all_v(sbuf, rbuf, pbuf);
+      c_->all_to_all_v(sbuf, rbuf, pbuf);
       if (S2D.active()) {
         for (int r=S2Drlo; r<S2Drhi; r++) {
           auto gr = S2D.rowl2g(r);

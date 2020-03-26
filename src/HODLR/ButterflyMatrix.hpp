@@ -80,13 +80,13 @@ namespace strumpack {
       std::size_t cols() const { return cols_; }
       std::size_t lrows() const { return lrows_; }
       std::size_t lcols() const { return lcols_; }
-      std::size_t begin_row() const { return rdist_[c_.rank()]; }
-      std::size_t end_row() const { return rdist_[c_.rank()+1]; }
+      std::size_t begin_row() const { return rdist_[c_->rank()]; }
+      std::size_t end_row() const { return rdist_[c_->rank()+1]; }
       const std::vector<int>& rdist() const { return rdist_; }
-      std::size_t begin_col() const { return cdist_[c_.rank()]; }
-      std::size_t end_col() const { return cdist_[c_.rank()+1]; }
+      std::size_t begin_col() const { return cdist_[c_->rank()]; }
+      std::size_t end_col() const { return cdist_[c_->rank()+1]; }
       const std::vector<int>& cdist() const { return cdist_; }
-      const MPIComm& Comm() const { return c_; }
+      const MPIComm& Comm() const { return *c_; }
 
       void compress(const mult_t& Amult);
       void compress(const mult_t& Amult, int rank_guess);
@@ -139,7 +139,7 @@ namespace strumpack {
       F2Cptr kerquant_ = nullptr;  // kernel quantities structure returned by Fortran code
       F2Cptr ptree_ = nullptr;     // process tree returned by Fortran code
       MPI_Fint Fcomm_;             // the fortran MPI communicator
-      MPIComm c_;
+      const MPIComm* c_;
       int rows_ = 0, cols_ = 0, lrows_ = 0, lcols_ = 0;
       std::vector<int> rdist_, cdist_;  // begin rows/cols of each rank
 

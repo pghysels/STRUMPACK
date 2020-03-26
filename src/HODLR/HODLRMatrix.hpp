@@ -266,16 +266,16 @@ namespace strumpack {
        * Return the first row of the local rows owned by this process.
        * \return Return first local row
        */
-      std::size_t begin_row() const { return dist_[c_.rank()]; }
+      std::size_t begin_row() const { return dist_[c_->rank()]; }
       /**
        * Return last row (+1) of the local rows (begin_rows()+lrows())
        * \return Final local row (+1).
        */
-      std::size_t end_row() const { return dist_[c_.rank()+1]; }
+      std::size_t end_row() const { return dist_[c_->rank()+1]; }
       /**
        * Return MPI communicator wrapper object.
        */
-      const MPIComm& Comm() const { return c_; }
+      const MPIComm& Comm() const { return *c_; }
 
       /**
        * Get certain statistics about the HODLR matrix.  See the HODLR
@@ -470,7 +470,7 @@ namespace strumpack {
       F2Cptr kerquant_ = nullptr;  // kernel quantities structure returned by Fortran code
       F2Cptr ptree_ = nullptr;     // process tree returned by Fortran code
       MPI_Fint Fcomm_;             // the fortran MPI communicator
-      MPIComm c_;
+      const MPIComm* c_;
       int rows_ = 0, cols_ = 0, lrows_ = 0, lvls_ = 0;
       std::vector<int> perm_, iperm_; // permutation used by the HODLR code
       std::vector<int> dist_;         // begin rows of each rank

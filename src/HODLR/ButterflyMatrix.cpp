@@ -44,7 +44,7 @@ namespace strumpack {
       rows_ = A.rows();
       cols_ = B.cols();
       Fcomm_ = A.Fcomm_;
-      int P = c_.size();
+      int P = c_->size();
       std::vector<int> groups(P);
       std::iota(groups.begin(), groups.end(), 0);
       // create hodlr data structures
@@ -170,7 +170,7 @@ namespace strumpack {
       rows_ = A.rows();
       cols_ = B.cols();
       Fcomm_ = A.Fcomm_;
-      int P = c_.size();
+      int P = c_->size();
       std::vector<int> groups(P);
       std::iota(groups.begin(), groups.end(), 0);
       // create hodlr data structures
@@ -195,13 +195,13 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void ButterflyMatrix<scalar_t>::set_dist() {
-      int P = c_.size(), rank = c_.rank();
+      int P = c_->size(), rank = c_->rank();
       rdist_.resize(P+1);
       cdist_.resize(P+1);
       rdist_[rank+1] = lrows_;
       cdist_[rank+1] = lcols_;
-      c_.all_gather(rdist_.data()+1, 1);
-      c_.all_gather(cdist_.data()+1, 1);
+      c_->all_gather(rdist_.data()+1, 1);
+      c_->all_gather(cdist_.data()+1, 1);
       for (int p=0; p<P; p++) {
         rdist_[p+1] += rdist_[p];
         cdist_[p+1] += cdist_[p];
@@ -263,7 +263,7 @@ namespace strumpack {
     ButterflyMatrix<scalar_t>::compress(const delem_blocks_t& Aelem) {
       BLACSGrid gloc(MPIComm(MPI_COMM_SELF), 1),
         gnull(MPIComm(MPI_COMM_NULL), 1);
-      AelemCommPtrs<scalar_t> AC{&Aelem, &c_, &gloc, &gnull};
+      AelemCommPtrs<scalar_t> AC{&Aelem, c_, &gloc, &gnull};
       LRBF_construct_element_compute<scalar_t>
         (lr_bf_, options_, stats_, msh_, kerquant_, ptree_,
          &(HODLR_block_evaluation<scalar_t>), &AC);
@@ -411,7 +411,7 @@ namespace strumpack {
     template<typename scalar_t> DenseMatrix<scalar_t>
     ButterflyMatrix<scalar_t>::redistribute_2D_to_1D
     (const DistM_t& R2D, const std::vector<int>& dist) const {
-      const auto rank = c_.rank();
+      const auto rank = c_->rank();
       DenseM_t R1D(dist[rank+1] - dist[rank], R2D.cols());
       redistribute_2D_to_1D(scalar_t(1.), R2D, scalar_t(0.), R1D, dist);
       return R1D;
@@ -422,8 +422,8 @@ namespace strumpack {
     (scalar_t a, const DistM_t& R2D, scalar_t b, DenseM_t& R1D,
      const std::vector<int>& dist) const {
       TIMER_TIME(TaskType::REDIST_2D_TO_HSS, 0, t_redist);
-      const auto P = c_.size();
-      const auto rank = c_.rank();
+      const auto P = c_->size();
+      const auto rank = c_->rank();
       // for (int p=0; p<P; p++)
       //   copy(dist[rank+1]-dist[rank], R2D.cols(), R2D, dist[rank], 0,
       //        R1D, p, R2D.grid()->ctxt_all());
@@ -462,7 +462,7 @@ namespace strumpack {
       }
       std::vector<scalar_t,NoInit<scalar_t>> rbuf;
       std::vector<scalar_t*> pbuf;
-      c_.all_to_all_v(sbuf, rbuf, pbuf);
+      c_->all_to_all_v(sbuf, rbuf, pbuf);
       if (lrows) {
         std::vector<int> src_c(Rcols);
         for (int c=0; c<Rcols; c++)
@@ -484,8 +484,8 @@ namespace strumpack {
     ButterflyMatrix<scalar_t>::redistribute_1D_to_2D
     (const DenseM_t& S1D, DistM_t& S2D, const std::vector<int>& dist) const {
       TIMER_TIME(TaskType::REDIST_2D_TO_HSS, 0, t_redist);
-      const int rank = c_.rank();
-      const int P = c_.size();
+      const int rank = c_->rank();
+      const int P = c_->size();
       const int cols = S1D.cols();
       int S2Drlo, S2Drhi, S2Dclo, S2Dchi;
       S2D.lranges(S2Drlo, S2Drhi, S2Dclo, S2Dchi);
@@ -517,7 +517,7 @@ namespace strumpack {
       }
       std::vector<scalar_t,NoInit<scalar_t>> rbuf;
       std::vector<scalar_t*> pbuf;
-      c_.all_to_all_v(sbuf, rbuf, pbuf);
+      c_->all_to_all_v(sbuf, rbuf, pbuf);
       if (S2D.active()) {
         for (int r=S2Drlo; r<S2Drhi; r++) {
           auto gr = S2D.rowl2g(r);
