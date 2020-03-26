@@ -9,8 +9,8 @@ target_sources(strumpack
 
 install(FILES
   TaskTimer.hpp
-  MPIWrapper.hpp
   RandomWrapper.hpp
+  Triplet.hpp
   Tools.hpp
   DESTINATION include/misc)
 
