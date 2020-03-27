@@ -41,7 +41,7 @@ namespace strumpack {
     static MPI_Datatype triplet_mpi_type = MPI_DATATYPE_NULL;
     if (triplet_mpi_type == MPI_DATATYPE_NULL) {
       using T = Triplet<scalar_t,integer_t>;
-      int count = 3;
+      const int count = 3;
       int b[count] = {1, 1, 1};
       MPI_Datatype t[count] = {strumpack::mpi_type<integer_t>(),
                                strumpack::mpi_type<integer_t>(),
@@ -60,7 +60,7 @@ namespace strumpack {
     static MPI_Datatype idxval_mpi_type = MPI_DATATYPE_NULL;
     if (idxval_mpi_type == MPI_DATATYPE_NULL) {
       using T = IdxVal<scalar_t,integer_t>;
-      int count = 2;
+      const int count = 2;
       int b[count] = {1, 1};
       MPI_Datatype t[count] = {strumpack::mpi_type<integer_t>(),
                                strumpack::mpi_type<scalar_t>()};
@@ -89,7 +89,7 @@ namespace strumpack {
     static MPI_Datatype quadlet_mpi_type = MPI_DATATYPE_NULL;
     if (quadlet_mpi_type == MPI_DATATYPE_NULL) {
       using T = Quadlet<scalar_t,integer_t>;
-      int count = 4;
+      const int count = 4;
       int b[count] = {1, 1, 1, 1};
       MPI_Datatype t[count] = {strumpack::mpi_type<integer_t>(),
                                strumpack::mpi_type<integer_t>(),
