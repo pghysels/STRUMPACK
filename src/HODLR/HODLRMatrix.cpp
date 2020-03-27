@@ -381,6 +381,7 @@ namespace strumpack {
 
       // set hodlr options
       HODLR_set_I_option<scalar_t>(options_, "verbosity", opts.verbose() ? 2 : -2);
+      HODLR_set_I_option<scalar_t>(options_, "Nbundle", 8);
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
       HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
       // set RecLR_leaf to 2 for RRQR at bottom level of Hierarchical BACA
