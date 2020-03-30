@@ -293,7 +293,7 @@ namespace strumpack {
       rdispls[p] = rdispls[p-1] + rcnts[p-1];
 
     auto rbuf = comm_.all_to_allv
-      (sbuf.data(), scnts, sdispls, rcnts, rdispls, Triplet::mpi_type());
+      (sbuf.data(), scnts, sdispls, rcnts, rdispls);
 
     DenseM_t xloc(local_range_.second - local_range_.first, n);
     DenseMW_t Xloc
@@ -346,8 +346,7 @@ namespace strumpack {
       }
     }
     comm_.all_to_allv
-      (rbuf.data(), scnts, sdispls, sbuf.data(),
-       rcnts, rdispls, Triplet::mpi_type());
+      (rbuf.data(), scnts, sdispls, sbuf.data(), rcnts, rdispls);
 
 #pragma omp parallel for
     for (std::size_t i=0; i<std::size_t(m)*n; i++)
@@ -399,10 +398,9 @@ namespace strumpack {
     if (chr != -1)
       merge_if_larger(upd[chr].begin(), upd[chr].end(), upd[sep], sep_end);
     upd[sep].shrink_to_fit();
-    // assume amount of work per front is N^3, work per subtree is
-    // work on front plus children
-    float dim_blk = (sep_end - sep_begin) + upd[sep].size();
-    subtree_work[sep] = std::pow(dim_blk, 3);
+    float d1 = sep_end - sep_begin, d2 = upd[sep].size();
+    //                  getrf            + 2 * trsm     + gemm
+    subtree_work[sep] = 2.0/3.0*d1*d1*d1 + 2.0*d1*d1*d2 + 2.0*d2*d2*d1;
     if (chl != -1) subtree_work[sep] += subtree_work[chl];
     if (chr != -1) subtree_work[sep] += subtree_work[chr];
   }
@@ -505,8 +503,9 @@ namespace strumpack {
           sreq.emplace_back();     // send dist_upd to parent
           comm_.isend(dist_upd, pa_rank, 1, &sreq.back());
         }
-        float dim_blk = (sep_end - sep_begin) + dist_upd.size();
-        dsep_work = std::pow(dim_blk, 3);
+        float d1 = sep_end - sep_begin, d2 = dist_upd.size();
+        //          getrf            + 2 * trsm     + gemm
+        dsep_work = 2.0/3.0*d1*d1*d1 + 2.0*d1*d1*d2 + 2.0*d2*d2*d1;
         for (int i=0; i<nr_children; i++) {
           // receive work estimates for left and right subtrees
           auto w = comm_.template recv_any_src<float>(2);

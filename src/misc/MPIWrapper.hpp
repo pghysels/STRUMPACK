@@ -496,7 +496,8 @@ namespace strumpack {
      * only on the root process.
      */
     template<typename T> T reduce(T t, MPI_Op op) const {
-      if (is_root()) MPI_Reduce(MPI_IN_PLACE, &t, 1, mpi_type<T>(), op, 0, comm_);
+      if (is_root())
+        MPI_Reduce(MPI_IN_PLACE, &t, 1, mpi_type<T>(), op, 0, comm_);
       else MPI_Reduce(&t, &t, 1, mpi_type<T>(), op, 0, comm_);
       return t;
     }
@@ -536,7 +537,8 @@ namespace strumpack {
      * \param op reduction operator
      */
     template<typename T> void reduce(T* t, int ssize, MPI_Op op) const {
-      if (is_root()) MPI_Reduce(MPI_IN_PLACE, t, ssize, mpi_type<T>(), op, 0, comm_);
+      if (is_root())
+        MPI_Reduce(MPI_IN_PLACE, t, ssize, mpi_type<T>(), op, 0, comm_);
       else MPI_Reduce(t, t, ssize, mpi_type<T>(), op, 0, comm_);
     }
 
@@ -546,25 +548,25 @@ namespace strumpack {
         (sbuf, scnt, mpi_type<T>(), rbuf, scnt, mpi_type<T>(), comm_);
     }
 
-    template<typename T, typename A=std::allocator<T>>
-    std::vector<T,A> all_to_allv
-    (const T* sbuf, int* scnts, int* sdispls,
-     int* rcnts, int* rdispls, const MPI_Datatype type) const {
+    template<typename T, typename A=std::allocator<T>> std::vector<T,A>
+    all_to_allv(const T* sbuf, int* scnts, int* sdispls,
+                int* rcnts, int* rdispls) const {
       std::size_t rsize = 0;
       for (int p=0; p<size(); p++)
         rsize += rcnts[p];
       std::vector<T,A> rbuf(rsize);
       MPI_Alltoallv
-        (sbuf, scnts, sdispls, type,
-         rbuf.data(), rcnts, rdispls, type, comm_);
+        (sbuf, scnts, sdispls, mpi_type<T>(),
+         rbuf.data(), rcnts, rdispls, mpi_type<T>(), comm_);
       return rbuf;
     }
 
-    template<typename T> void all_to_allv
-    (const T* sbuf, int* scnts, int* sdispls, T* rbuf, int* rcnts,
-     int* rdispls, const MPI_Datatype type) const {
+    template<typename T> void
+    all_to_allv(const T* sbuf, int* scnts, int* sdispls,
+                T* rbuf, int* rcnts, int* rdispls) const {
       MPI_Alltoallv
-        (sbuf, scnts, sdispls, type, rbuf, rcnts, rdispls, type, comm_);
+        (sbuf, scnts, sdispls, mpi_type<T>(),
+         rbuf, rcnts, rdispls, mpi_type<T>(), comm_);
     }
 
     /**
@@ -584,9 +586,9 @@ namespace strumpack {
      * received from different ranks start
      * \see all_to_all_v
      */
-    template<typename T, typename A=std::allocator<T>> void all_to_all_v
-    (std::vector<std::vector<T>>& sbuf, std::vector<T,A>& rbuf,
-     std::vector<T*>& pbuf) const {
+    template<typename T, typename A=std::allocator<T>> void
+    all_to_all_v(std::vector<std::vector<T>>& sbuf, std::vector<T,A>& rbuf,
+                 std::vector<T*>& pbuf) const {
       all_to_all_v(sbuf, rbuf, pbuf, mpi_type<T>());
     }
 
@@ -603,8 +605,8 @@ namespace strumpack {
      * \return receive buffer
      * \see all_to_all_v
      */
-    template<typename T, typename A=std::allocator<T>>
-    std::vector<T,A> all_to_all_v(std::vector<std::vector<T>>& sbuf) const {
+    template<typename T, typename A=std::allocator<T>> std::vector<T,A>
+    all_to_all_v(std::vector<std::vector<T>>& sbuf) const {
       std::vector<T,A> rbuf;
       std::vector<T*> pbuf;
       all_to_all_v(sbuf, rbuf, pbuf, mpi_type<T>());
@@ -628,9 +630,9 @@ namespace strumpack {
      * parameter T
      * \see all_to_all_v
      */
-    template<typename T, typename A=std::allocator<T>> void all_to_all_v
-    (std::vector<std::vector<T>>& sbuf, std::vector<T,A>& rbuf,
-     std::vector<T*>& pbuf, const MPI_Datatype Ttype) const {
+    template<typename T, typename A=std::allocator<T>> void
+    all_to_all_v(std::vector<std::vector<T>>& sbuf, std::vector<T,A>& rbuf,
+                 std::vector<T*>& pbuf, const MPI_Datatype Ttype) const {
       assert(sbuf.size() == std::size_t(size()));
       auto P = size();
       std::unique_ptr<int[]> iwork(new int[4*P]);
