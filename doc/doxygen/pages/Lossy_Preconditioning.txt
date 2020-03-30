@@ -47,4 +47,6 @@ void strumpack::SPOptions::set_lossy_precision(int p);
 int strumpack::SPOptions::lossy_precision() const;  // get precision
 \endcode
 
+For lossless compression, set the precision to 0 or a negative value.
+
 */

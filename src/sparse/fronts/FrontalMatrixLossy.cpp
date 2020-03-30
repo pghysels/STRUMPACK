@@ -44,7 +44,8 @@ namespace strumpack {
       (static_cast<void*>(const_cast<T*>(F.data())),
        get_zfp_type<T>(), rows_, cols_);
     zfp_stream* stream = zfp_stream_open(NULL);
-    zfp_stream_set_precision(stream, prec_);
+    if (prec_ <= 0) zfp_stream_set_reversible(stream);
+    else zfp_stream_set_precision(stream, prec_);
     auto bufsize = zfp_stream_maximum_size(stream, f);
     buffer_.resize(bufsize);
     bitstream* bstream = stream_open(buffer_.data(), bufsize);

@@ -469,7 +469,8 @@ namespace strumpack {
               << "#          number of CUDA streams" << std::endl;
     std::cout << "#   --sp_lossy_precision [1-64] (default "
               << lossy_precision() << ")" << std::endl
-              << "#          lossy compression precicion" << std::endl;
+              << "#          lossy compression precision" << std::endl
+              << "#          (for lossless use <= 0)" << std::endl;
     std::cout << "#   --sp_verbose or -v (default " << verbose() << ")"
               << std::endl;
     std::cout << "#   --sp_quiet or -q (default " << !verbose() << ")"
