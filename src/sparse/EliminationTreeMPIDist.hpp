@@ -118,7 +118,9 @@ namespace strumpack {
           MPI_Aint o[6] =
             {offsetof(PF, sep_begin), offsetof(PF, sep_end), offsetof(PF, P0),
              offsetof(PF, P), offsetof(PF, prows), offsetof(PF, pcols)};
-          MPI_Type_create_struct(6, b, o, t, &pf_mpi_type);
+          MPI_Datatype tmp_mpi_type;
+          MPI_Type_create_struct(6, b, o, t, &tmp_mpi_type);
+          MPI_Type_create_resized(tmp_mpi_type, 0, sizeof(PF), &pf_mpi_type);
           MPI_Type_commit(&pf_mpi_type);
         }
         return pf_mpi_type;

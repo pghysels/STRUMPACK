@@ -158,21 +158,17 @@ namespace strumpack {
     int total_pfronts = std::accumulate(nr_par_fronts, nr_par_fronts+P_, 0);
     all_pfronts_.resize(total_pfronts);
     rdispls[0] = 0;
-    auto fbytes = sizeof(ParallelFront);
     for (int p=0; p<P_; p++)
-      rcnts[p] = nr_par_fronts[p] * fbytes;
+      rcnts[p] = nr_par_fronts[p];
     for (int p=1; p<P_; p++)
       rdispls[p] = rdispls[p-1] + rcnts[p-1];
     {
-      int i = rdispls[rank_] / fbytes;
+      int i = rdispls[rank_];
       for (auto& f : local_pfronts_)
         if (f.P0 == rank_)
           all_pfronts_[i++] = f;
     }
-    // comm_.all_gather_v(all_pfronts_.data(), rcnts, rdispls);
-    MPI_Allgatherv
-      (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
-       all_pfronts_.data(), rcnts, rdispls, MPI_BYTE, comm_.comm());
+    comm_.all_gather_v(all_pfronts_.data(), rcnts, rdispls);
   }
 
   /**
