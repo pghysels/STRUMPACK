@@ -50,3 +50,8 @@ if [ ! -d "cbuckle" ]; then
     tar -xvzf cbuckle.tar.gz
     rm cbuckle.tar.gz
 fi
+if [ ! -d "gemat11" ]; then
+    wget https://www.cise.ufl.edu/research/sparse/MM/HB/gemat11.tar.gz
+    tar -xvzf gemat11.tar.gz
+    rm gemat11.tar.gz
+fi

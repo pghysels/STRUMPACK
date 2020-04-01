@@ -815,6 +815,34 @@ if(STRUMPACK_USE_MPI)
     --sp_compression HSS --sp_matching 5 --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --sp_compression_min_sep_size 25)
   set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
 
+
+  # test matching, using MC64, and CombBLAS below, if available
+  set(test_name "SPARSE_mpi_matching_2")
+  add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 3 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
+    ${MPIEXEC_POSTFLAGS} gemat11/gemat11.mtx --sp_matching 2)
+  set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+  set(test_name "SPARSE_mpi_matching_3")
+  add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 5 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
+    ${MPIEXEC_POSTFLAGS} gemat11/gemat11.mtx --sp_matching 3)
+  set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+  set(test_name "SPARSE_mpi_matching_4")
+  add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
+    ${MPIEXEC_POSTFLAGS} gemat11/gemat11.mtx --sp_matching 4)
+  set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+  set(test_name "SPARSE_mpi_matching_5")
+  add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 6 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
+    ${MPIEXEC_POSTFLAGS} gemat11/gemat11.mtx --sp_matching 5)
+  set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+  # test CombBLAS
+  if(CombBLAS_FOUND)
+    set(test_name "SPARSE_mpi_CombBLAS")
+    # number of processes needs to be a power of 2
+    add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 16 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
+      ${MPIEXEC_POSTFLAGS} gemat11/gemat11.mtx --sp_matching 6)
+    set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+  endif()
+
 endif()
 
 

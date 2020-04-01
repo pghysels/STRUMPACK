@@ -50,6 +50,10 @@ if(NOT STRUMPACK_USE_MPI)
     message(STATUS "Disabling ButterflyPACK, since it requires MPI support.")
     set(TPL_ENABLE_BPACK OFF)
   endif()
+  if(TPL_ENABLE_COMBBLAS)
+    message(STATUS "Disabling CombBLAS, since it requires MPI support.")
+    set(TPL_ENABLE_COMBBLAS OFF)
+  endif()
 endif()
 if(TPL_ENABLE_PTSCOTCH)
   set(TPL_ENABLE_SCOTCH ON)
@@ -364,11 +368,21 @@ if(TPL_ENABLE_CUBLAS)
   option(STRUMPACK_USE_CUBLAS "" ON)
 endif()
 
+if(TPL_ENABLE_COMBBLAS)
+  list(APPEND CMAKE_PREFIX_PATH ${TPL_COMBBLAS_PREFIX}
+    $ENV{COMBBLAS_DIR} $ENV{COMBBLAS_ROOT}
+    $ENV{CombBLAS_DIR} $ENV{CombBLAS_ROOT})
+  find_package(CombBLAS)
+  if(CombBLAS_FOUND)
+    message(STATUS "Found CombBLAS")
+    option(STRUMPACK_USE_COMBBLAS "" ON)
+  else()
+    message(STATUS "CombBLAS not found")
+  endif()
+endif()
 
-# TODO CombBLAS, needs c++14
 # TODO PIC
 # TODO libatomic?
-
 
 add_library(strumpack "")
 add_subdirectory(src)
@@ -460,6 +474,12 @@ if(CUDAToolkit_FOUND)
   target_link_libraries(strumpack PUBLIC
     CUDA::cudart CUDA::cusolver CUDA::cublas)
 endif()
+
+if(CombBLAS_FOUND)
+  target_link_libraries(strumpack PUBLIC CombBLAS::CombBLAS)
+  target_include_directories(strumpack PRIVATE $ENV{COMBBLASAPP_DIR})
+endif()
+
 
 # examples
 add_subdirectory(examples)

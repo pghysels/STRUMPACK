@@ -11,6 +11,8 @@ Version 3.xx In Progress
    in order to avoid conflicts with SuperLU.
  - Large refactoring of the headers into cpp files for faster
    compilation
+ - Update minimum required version of CombBLAS to 2.0
+
 
 Version 3.3.0 Released November 7, 2019
 =======================================

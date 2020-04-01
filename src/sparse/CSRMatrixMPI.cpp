@@ -653,6 +653,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_COMBBLAS)
       perm.resize(this->size());
       GetAWPM(*this, perm.data());
+      apply_column_permutation(perm);
       return 0;
 #else
       if (comm_.is_root())

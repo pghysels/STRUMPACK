@@ -29,7 +29,7 @@
 #ifndef STRUMPACK_AWPM_COMBBLAS_HPP
 #define STRUMPACK_AWPM_COMBBLAS_HPP
 
-#include "CombBLAS.h"
+#include "CombBLAS/CombBLAS.h"
 #include "BipartiteMatchings/ApproxWeightPerfectMatching.h"
 
 namespace strumpack {
@@ -63,10 +63,10 @@ namespace strumpack {
   void GetAWPM(const CSRMatrixMPI<scalar_t,integer_t>& A,
                integer_t* perm_c) {
     integer_t* perm = nullptr; // placeholder for load balancing permutation for CombBLAS
-    int procs = mpi_nprocs(A.comm());
+    int procs = A.Comm().size();
     int sqrtP = (int)std::sqrt((double)procs);
     if (sqrtP * sqrtP != procs) {
-      if (!mpi_rank(A.comm()))
+      if (A.Comm().is_root())
         std::cerr << "# WARNING: Combinatorial BLAS currently only works on "
                   << "a square number of processes. (disabling)" << std::endl;
       std::iota(perm_c, perm_c+A.size(), 0);
@@ -80,17 +80,14 @@ namespace strumpack {
     // ------------------------------------------------------------
     //  INITIALIZATION.
     // ------------------------------------------------------------
-    integer_t n = A.size();
-    integer_t m_loc = A.local_rows();
-    integer_t fst_row = A.begin_row();
+    integer_t n = A.size(), m_loc = A.local_rows(), fst_row = A.begin_row();
 
     // ------------------------------------------------------------
     // FIRST PASS OF A:
     // COUNT THE NUMBER OF NONZEROS TO BE SENT TO EACH PROCESS,
     // THEN ALLOCATE SPACE.
     // ------------------------------------------------------------
-    integer_t nnz_loc = 0;
-    integer_t irow, jcol, lirow, ljcol;
+    integer_t nnz_loc = 0, irow, jcol, lirow, ljcol;
     for (integer_t i=0; i<m_loc; ++i) {
       for (integer_t j=A.ptr(i); j<A.ptr(i+1); ++j) {
         if (perm != NULL) {
@@ -115,7 +112,8 @@ namespace strumpack {
 
     // now gather the matching vector
     MPI_Comm World = mateRow2Col.getcommgrid()->GetWorld();
-    auto rdispls = new int[2*procs];
+    std::unique_ptr<int[]> iwork(new int[2*procs]);
+    auto rdispls = iwork.get();
     auto recvcnt = rdispls + procs;
     int sendcnt = mateRow2Col.LocArrSize();
     MPI_Allgather(&sendcnt, 1, MPI_INT, recvcnt, 1, MPI_INT, World);
@@ -126,7 +124,6 @@ namespace strumpack {
     MPI_Allgatherv
       (senddata, sendcnt, combblas::MPIType<integer_t>(),
        perm_c, recvcnt, rdispls, combblas::MPIType<integer_t>(), World);
-    delete[] rdispls;
   }
 
 } // end namespace strumpack

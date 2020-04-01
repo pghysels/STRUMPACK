@@ -179,6 +179,7 @@ Or, one can set -DTPL_PARMETIS_INCLUDE_DIRS, -DTPL_PARMETIS_LIBRARIES,
     -DTPL_SCOTCH_LIBRARIES="/path/to/ptscotch/libscotch.a;...libscotcherr.a;...libptscotch.a;...libptscotcherr.a"
 
 
+
 CombBLAS (optional)
 ===================
 Combinatioral BLAS can be used as an alternative for MC64, in order to
@@ -186,9 +187,15 @@ permute the matrix to get nonzeros on the diagonal.
 
 https://people.eecs.berkeley.edu/~aydin/CombBLAS/html/
 
-Enable this feature by adding -DTPL_ENABLE_COMBBLAS to the CMake
-command. Then specify -DTPL_COMBBLAS_INCLUDE_DIRS=".." and
--DTPL_COMBBLAS_LIBRARIES="..".
+Enable this feature by adding
+  -DTPL_ENABLE_COMBBLAS=ON
+to the CMake command. Also set the following environment variables:
+
+  export COMBBLAS_DIR=/path/to/combinatorial-blas-2.0/CombBLAS/install/
+  export COMBBLASAPP_DIR=/path/to/combinatorial-blas-2.0/CombBLAS/Applications/
+
+to the appropriate directories for your setup.
+
 
 
 ButterflyPACK (optional, needs >= 1.1.0)
