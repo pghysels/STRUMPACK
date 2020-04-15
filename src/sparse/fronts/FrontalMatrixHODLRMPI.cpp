@@ -41,7 +41,15 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::release_work_memory() {
-    F22_.reset(nullptr);
+    if (F22_) {
+      TaskTimer t_traverse(TaskType::BF_EXTRACT_TRAVERSE, 3),
+        t_bf(TaskType::BF_EXTRACT_ENTRY, 3),
+        t_comm(TaskType::BF_EXTRACT_COMM, 3);
+      t_traverse.set_elapsed(F22_->get_stat("Time_Entry_Traverse"));
+      t_bf.set_elapsed(F22_->get_stat("Time_Entry_BF"));
+      t_comm.set_elapsed(F22_->get_stat("Time_Entry_Comm"));
+      F22_.reset(nullptr);
+    }
   }
 
   template<typename scalar_t,typename integer_t> void

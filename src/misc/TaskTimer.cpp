@@ -133,6 +133,9 @@ void TaskTimer::print_name(std::ostream& os) {
     case TaskType::EXTRACT_2D_A2A:        os << "EXTRACT_2D_A2A"; break;
     case TaskType::EXTRACT_SEP_2D:        os << "EXTRACT_SEP_2D"; break;
     case TaskType::EXTRACT_ELEMS:         os << "EXTRACT_ELEMS"; break;
+    case TaskType::BF_EXTRACT_TRAVERSE:   os << "BF_EXTRACT_TRAVERSE"; break;
+    case TaskType::BF_EXTRACT_ENTRY:      os << "BF_EXTRACT_ENTRY"; break;
+    case TaskType::BF_EXTRACT_COMM:       os << "BF_EXTRACT_COMM"; break;
     case TaskType::GET_SUBMATRIX_2D:      os << "GET_SUBMATRIX_2D"; break;
     case TaskType::GET_SUBMATRIX_2D_A2A:  os << "GET_SUBMATRIX_2D_A2A"; break;
     case TaskType::HSS_EXTRACT_SCHUR:     os << "HSS_EXTRACT_SCHUR"; break;
@@ -196,6 +199,15 @@ void TaskTimer::stop() {
   t_stop = GET_TIME_NOW();
   stopped = true;
   time_log_list.list[tid].push_back(*this);
+}
+
+void TaskTimer::set_elapsed(double t) {
+#if defined(USE_OPENMP_TIMER)
+  started = stopped = true;
+  t_start = 0;
+  t_stop = t;
+  time_log_list.list[tid].push_back(*this);
+#endif
 }
 
 
@@ -330,6 +342,9 @@ void TimerList::finalize() {
     print_line("       extract_sep_2d       ", TaskType::EXTRACT_SEP_2D);
     print_line("       get_submatrix_2d     ", TaskType::GET_SUBMATRIX_2D);
     print_line("          extract_elems     ", TaskType::EXTRACT_ELEMS);
+    print_line("            bf_traverse     ", TaskType::BF_EXTRACT_TRAVERSE);
+    print_line("            bf_entry        ", TaskType::BF_EXTRACT_ENTRY);
+    print_line("            bf_comm         ", TaskType::BF_EXTRACT_COMM);
     print_line("          barrier+all2all   ", TaskType::GET_SUBMATRIX_2D_BA2A);
     print_line("             all2all        ", TaskType::GET_SUBMATRIX_2D_A2A);
     print_line("       extract_Schur        ", TaskType::HSS_EXTRACT_SCHUR);
