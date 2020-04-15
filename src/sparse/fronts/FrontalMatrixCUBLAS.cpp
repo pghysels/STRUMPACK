@@ -135,7 +135,7 @@ namespace strumpack {
       for (auto f : fp)
         ldata[l].f.push_back(dynamic_cast<FC_t*>(f));
       auto nnodes = ldata[l].f.size();
-      int max_dsep = 0, node_max_dsep = 0;
+      int max_dsep = 0;
       std::size_t avg_size_sep = 0, avg_size_upd = 0;
       for (std::size_t n=0; n<nnodes; n++) {
         auto& f = *(ldata[l].f[n]);
@@ -149,10 +149,8 @@ namespace strumpack {
         ldata[l].piv_size += dsep;
         if (size < cutoff_size)
           ldata[l].nnodes_small++;
-        if (dsep > max_dsep) {
-          node_max_dsep = n;
+        if (dsep > max_dsep)
           max_dsep = dsep;
-        }
       }
       // if (opts.verbose())
       //        std::cout << "# level " << l << " avg size = "
