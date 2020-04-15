@@ -989,8 +989,8 @@ namespace strumpack {
     CompressionType comp_ = CompressionType::NONE;
 
     /** HSS options */
-    int hss_min_front_size_ = 1000;
-    int hss_min_sep_size_ = 256;
+    int hss_min_front_size_ = 5000;
+    int hss_min_sep_size_ = 1000;
     int sep_order_level_ = 1;
     bool indirect_sampling_ = false;
     HSS::HSSOptions<scalar_t> hss_opts_;
@@ -1002,8 +1002,8 @@ namespace strumpack {
 
     /** HODLR options */
     HODLR::HODLROptions<scalar_t> hodlr_opts_;
-    int hodlr_min_front_size_ = 1000;
-    int hodlr_min_sep_size_ = 256;
+    int hodlr_min_front_size_ = 10000;
+    int hodlr_min_sep_size_ = 5000;
 
     /** LOSSY/LOSSLESS options */
     int lossy_min_front_size_ = 16;

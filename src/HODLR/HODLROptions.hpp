@@ -397,19 +397,19 @@ namespace strumpack {
     private:
       real_t rel_tol_ = default_HODLR_rel_tol<real_t>();
       real_t abs_tol_ = default_HODLR_abs_tol<real_t>();
-      int leaf_size_ = 512;
+      int leaf_size_ = 256;
       int rank_guess_ = 128;
       double rank_rate_ = 2.;
       int max_rank_ = 50000;
       ClusteringAlgorithm clustering_algo_ = ClusteringAlgorithm::COBBLE;
       int butterfly_levels_ = 0;
       CompressionAlgorithm compression_algo_ = CompressionAlgorithm::ELEMENT_EXTRACTION;
-      int BACA_block_size_ = 32;
-      double BF_sampling_parameter_ = 2.0;
+      int BACA_block_size_ = 16;
+      double BF_sampling_parameter_ = 1.2;
       int geo_ = 2;
       int lr_leaf_ = 5;
       int knn_hodlrbf_ = 64;
-      int knn_lrbf_ = 256;
+      int knn_lrbf_ = 128;
       bool verbose_ = true;
     };
 
