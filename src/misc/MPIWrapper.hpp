@@ -651,8 +651,8 @@ namespace strumpack {
       }
       MPI_Alltoall
         (ssizes, 1, mpi_type<int>(), rsizes, 1, mpi_type<int>(), comm_);
-      std::size_t totssize = std::accumulate(ssizes, ssizes+P, 0),
-        totrsize = std::accumulate(rsizes, rsizes+P, 0);
+      std::size_t totssize = std::accumulate(ssizes, ssizes+P, std::size_t(0)),
+        totrsize = std::accumulate(rsizes, rsizes+P, std::size_t(0));
       if (totrsize >
           static_cast<std::size_t>(std::numeric_limits<int>::max()) ||
           totssize >
