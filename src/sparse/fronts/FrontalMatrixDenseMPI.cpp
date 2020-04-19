@@ -26,6 +26,8 @@
  *             Division).
  *
  */
+#include <fstream>
+
 #include "FrontalMatrixDenseMPI.hpp"
 #include "ExtendAdd.hpp"
 
@@ -180,7 +182,16 @@ namespace strumpack {
     if (etree_level == 0 && opts.print_root_front_stats()) t.start();
     build_front(A);
     if (etree_level == 0 && opts.write_root_front()) {
-      F11_.print_to_files("Froot");
+      //F11_.print_to_files("Froot");
+      auto Fs = F11_.gather();
+      std::string fname = is_complex<scalar_t>() ?
+        "Froot_colmajor_complex_" : "Froot_colmajor_real_";
+      fname += (sizeof(typename RealType<scalar_t>::value_type) == 4) ?
+        "single_" : "double_";
+      fname += std::to_string(this->dim_sep()) + "x"
+        + std::to_string(this->dim_sep()) + ".dat";
+      std::ofstream f(fname, std::ios::out | std::ios::binary);
+      f.write((char*)Fs.data(), Fs.rows()*Fs.cols()*sizeof(scalar_t));
       Comm().barrier();
     }
     if (lchild_) lchild_->release_work_memory();
