@@ -268,6 +268,12 @@ namespace strumpack {
       }
 
       /**
+       * Enable/disable the less_adapt algorithm in randomized
+       * construction.
+       */
+      void set_less_adapt(bool l) { less_adapt_ = l; }
+
+      /**
        * Enable or disable verbose output (only by the root process)
        * to stdout.
        */
@@ -371,6 +377,12 @@ namespace strumpack {
       int knn_lrbf() const { return knn_lrbf_; }
 
       /**
+       * Returns whether or not to use less_adapt in the randomized
+       * construction algorithm.
+       */
+      bool less_adapt() const { return less_adapt_; }
+
+      /**
        * Verbose or quiet?
        * \return True if we want output from the HODLR algorithms,
        * else False.
@@ -410,6 +422,7 @@ namespace strumpack {
       int lr_leaf_ = 5;
       int knn_hodlrbf_ = 64;
       int knn_lrbf_ = 128;
+      bool less_adapt_ = true;
       bool verbose_ = true;
     };
 

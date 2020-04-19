@@ -87,6 +87,8 @@ namespace strumpack {
          {"hodlr_knn_hodlrbf",           required_argument, 0, 13},
          {"hodlr_knn_lrbf",              required_argument, 0, 14},
          {"hodlr_lr_leaf",               required_argument, 0, 15},
+         {"hodlr_enable_less_adapt",     no_argument, 0, 16},
+         {"hodlr_disable_less_adapt",    no_argument, 0, 17},
          {"hodlr_verbose",               no_argument, 0, 'v'},
          {"hodlr_quiet",                 no_argument, 0, 'q'},
          {"help",                        no_argument, 0, 'h'},
@@ -171,6 +173,8 @@ namespace strumpack {
           iss >> lr_leaf_;
           set_lr_leaf(lr_leaf_);
         } break;
+        case 16: set_less_adapt(true); break;
+        case 17: set_less_adapt(false); break;
         case 'v': set_verbose(true); break;
         case 'q': set_verbose(false); break;
         case 'h': describe_options(); break;
@@ -215,6 +219,10 @@ namespace strumpack {
                 << knn_hodlrbf() << ")" << std::endl
                 << "#   --hodlr_knn_lrbf (default "
                 << knn_lrbf() << ")" << std::endl
+                << "#   --hodlr_enable_less_adapt (default "
+                << less_adapt() << ")" << std::endl
+                << "#   --hodlr_disable_less_adapt (default "
+                << !less_adapt() << ")" << std::endl
                 << "#   --hodlr_verbose or -v (default "
                 << verbose() << ")" << std::endl
                 << "#   --hodlr_quiet or -q (default "
