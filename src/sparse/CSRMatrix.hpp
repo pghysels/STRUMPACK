@@ -63,23 +63,33 @@ namespace strumpack {
   public:
     CSRMatrix();
     CSRMatrix(integer_t n, integer_t nnz);
-    CSRMatrix
-    (integer_t n, const integer_t* ptr, const integer_t* ind,
-     const scalar_t* values, bool symm_sparsity=false);
+    CSRMatrix(integer_t n, const integer_t* ptr, const integer_t* ind,
+              const scalar_t* values, bool symm_sparsity=false);
 
     void spmv(const DenseM_t& x, DenseM_t& y) const override;
     void spmv(const scalar_t* x, scalar_t* y) const override;
 
     void spmv(Trans op, const DenseM_t& x, DenseM_t& y) const;
 
-    void apply_scaling
-    (const std::vector<scalar_t>& Dr,
-     const std::vector<scalar_t>& Dc) override;
-    void apply_column_permutation(const std::vector<integer_t>& perm) override;
-    real_t max_scaled_residual
-    (const scalar_t* x, const scalar_t* b) const override;
-    real_t max_scaled_residual
-    (const DenseM_t& x, const DenseM_t& b) const override;
+    /**
+     * TODO define in CompressedSparseMatrix, override
+     */
+    int compute_equilibration(std::vector<real_t>& R, std::vector<real_t>& C,
+                              real_t& rcond, real_t& ccond,
+                              real_t& Amax) const;
+    char equilibrate(std::vector<real_t>& R, std::vector<real_t>& C,
+                     real_t& rcond, real_t& ccond, real_t& Amax);
+
+    void apply_scaling(const std::vector<scalar_t>& Dr,
+                       const std::vector<scalar_t>& Dc) override;
+    void apply_column_permutation(const std::vector<integer_t>& perm)
+      override;
+
+    real_t max_scaled_residual(const scalar_t* x, const scalar_t* b)
+      const override;
+    real_t max_scaled_residual(const DenseM_t& x, const DenseM_t& b)
+      const override;
+
     int read_matrix_market(const std::string& filename) override;
     int read_binary(const std::string& filename);
     void print_dense(const std::string& name) const override;

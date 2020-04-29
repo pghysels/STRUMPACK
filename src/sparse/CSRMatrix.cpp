@@ -263,6 +263,97 @@ namespace strumpack {
     STRUMPACK_BYTES(x.cols()*this->spmv_bytes());
   }
 
+  template<typename scalar_t,typename integer_t> int
+  CSRMatrix<scalar_t,integer_t>::compute_equilibration
+  (std::vector<real_t>& R, std::vector<real_t>& C,
+   real_t& rcond, real_t& ccond, real_t& Amax) const {
+    R.resize(n_);
+    C.resize(n_);
+    if (n_ == 0) {
+      rcond = 1.;
+      ccond = 1.;
+      Amax = 0.;
+      return 0;
+    }
+    real_t smlnum = blas::lamch<real_t>('S');
+    real_t bignum = 1. / smlnum;
+#pragma omp parallel for
+    for (integer_t i=0; i<n_; i++) {
+      R[i] = 0;
+      for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
+        R[i] = std::max(R[i], std::abs(val_[j]));
+    }
+    auto mM = std::minmax_element(R.begin(), R.end());
+    real_t rcmin = *(mM.first), rcmax = *(mM.second);
+    Amax = rcmax;
+    if (rcmin == 0.) {
+      for (integer_t i=0; i<n_; i++)
+        if (R[i] == 0.)
+          return i+1;
+    }
+#pragma omp parallel for
+    for (integer_t i=0; i<n_; i++)
+      R[i] = 1. / std::min(std::max(R[i], smlnum), bignum);
+    rcond = std::max(rcmin, smlnum) / std::min(rcmax, bignum);
+    std::fill(C.begin(), C.end(), 0.);
+    // cannot use openmp here
+    for (integer_t i=0; i<n_; i++) {
+      C[i] = 0;
+      for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++) {
+        auto indj = ind_[j];
+        C[indj] = std::max(C[indj], std::abs(val_[j]) * R[i]);
+      }
+    }
+    mM = std::minmax_element(C.begin(), C.end());
+    rcmin = *(mM.first);
+    rcmax = *(mM.second);
+    if (rcmin == 0.) {
+      for (integer_t i=0; i<n_; i++)
+        if (C[i] == 0.)
+          return n_+i+1;
+    }
+#pragma omp parallel for
+    for (integer_t i=0; i<n_; i++)
+      C[i] = 1. / std::min(std::max(C[i], smlnum), bignum);
+    ccond = std::max(rcmin, smlnum) / std::min(rcmax, bignum);
+    return 0;
+  }
+
+  template<typename scalar_t,typename integer_t> char
+  CSRMatrix<scalar_t,integer_t>::equilibrate
+  (std::vector<real_t>& R, std::vector<real_t>& C,
+   real_t& rcond, real_t& ccond, real_t& Amax) {
+    if (n_ == 0) return 'N';
+    const real_t threshold = 0.1;
+    real_t small = blas::lamch<real_t>('S') / blas::lamch<real_t>('P');
+    real_t large = 1. / small;
+    if (rcond >= threshold && Amax >= small && Amax <= large) {
+      if (ccond >= threshold) return 'N';
+      else {
+        // Column scaling
+#pragma omp parallel for
+        for (integer_t i=0; i<n_; i++)
+          for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
+            val_[j] *= C[ind_[j]];
+        return 'C';
+      }
+    } else if (ccond >= threshold) {
+      // Row scaling, no column scaling
+#pragma omp parallel for
+      for (integer_t i=0; i<n_; i++)
+        for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
+          val_[j] *= R[i];
+      return 'R';
+    } else {
+      // Both row and column scaling
+#pragma omp parallel for
+      for (integer_t i=0; i<n_; i++)
+        for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
+          val_[j] *= R[i] * C[ind_[j]];
+      return 'B';
+    }
+    return 'N';
+  }
 
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::strumpack_mc64
