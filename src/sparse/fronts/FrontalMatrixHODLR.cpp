@@ -266,37 +266,12 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLR<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
-    if (task_depth == 0)
-#pragma omp parallel if(!omp_in_parallel())
-#pragma omp single
-      multifrontal_factorization_node(A, opts, etree_level, task_depth);
-    else multifrontal_factorization_node(A, opts, etree_level, task_depth);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLR<scalar_t,integer_t>::multifrontal_factorization_node
-  (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
-    bool tasked = task_depth < params::task_recursion_cutoff_level;
-    if (tasked) {
-      if (lchild_)
-#pragma omp task default(shared)                                        \
-  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        lchild_->multifrontal_factorization
-          (A, opts, etree_level+1, task_depth+1);
-      if (rchild_)
-#pragma omp task default(shared)                                        \
-  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        rchild_->multifrontal_factorization
-          (A, opts, etree_level+1, task_depth+1);
-#pragma omp taskwait
-    } else {
-      if (lchild_)
-        lchild_->multifrontal_factorization
-          (A, opts, etree_level+1, task_depth);
-      if (rchild_)
-        rchild_->multifrontal_factorization
-          (A, opts, etree_level+1, task_depth);
-    }
+    if (lchild_)
+      lchild_->multifrontal_factorization
+        (A, opts, etree_level+1, task_depth);
+    if (rchild_)
+      rchild_->multifrontal_factorization
+        (A, opts, etree_level+1, task_depth);
     if (!this->dim_blk()) return;
     TaskTimer t("");
     if (/*etree_level == 0 && */opts.print_root_front_stats()) t.start();
@@ -607,19 +582,20 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLR<scalar_t,integer_t>::forward_multifrontal_solve
   (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const {
-    if (task_depth == 0)
-#pragma omp parallel if(!omp_in_parallel())
-#pragma omp single
-      fwd_solve_node(b, work, etree_level, task_depth);
-    else fwd_solve_node(b, work, etree_level, task_depth);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLR<scalar_t,integer_t>::fwd_solve_node
-  (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const {
     DenseMW_t bupd(dim_upd(), b.cols(), work[0], 0, 0);
     bupd.zero();
-    this->fwd_solve_phase1(b, bupd, work, etree_level, task_depth);
+    if (lchild_) {
+      lchild_->forward_multifrontal_solve
+        (b, work+1, etree_level+1, task_depth);
+      DenseMW_t CBch(lchild_->dim_upd(), b.cols(), work[1], 0, 0);
+      lchild_->extend_add_b(b, bupd, CBch, this);
+    }
+    if (rchild_) {
+      rchild_->forward_multifrontal_solve
+        (b, work+1, etree_level+1, task_depth);
+      DenseMW_t CBch(rchild_->dim_upd(), b.cols(), work[1], 0, 0);
+      rchild_->extend_add_b(b, bupd, CBch, this);
+    }
     if (dim_sep()) {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
       DenseM_t rhs(bloc);
@@ -642,16 +618,6 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLR<scalar_t,integer_t>::backward_multifrontal_solve
   (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const {
-    if (task_depth == 0)
-#pragma omp parallel if(!omp_in_parallel())
-#pragma omp single
-      bwd_solve_node(y, work, etree_level, task_depth);
-    else bwd_solve_node(y, work, etree_level, task_depth);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLR<scalar_t,integer_t>::bwd_solve_node
-  (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const {
     DenseMW_t yupd(dim_upd(), y.cols(), work[0], 0, 0);
     if (dim_sep() && dim_upd()) {
       DenseM_t tmp(dim_sep(), y.cols()), tmp2(dim_sep(), y.cols());
@@ -666,7 +632,19 @@ namespace strumpack {
       STRUMPACK_FLOPS(F12_.get_stat("Flop_C_Mult") +
                       solve_flops + 2*yloc.rows()*yloc.cols());
     }
-    this->bwd_solve_phase2(y, yupd, work, etree_level, task_depth);
+    // this->bwd_solve_phase2(y, yupd, work, etree_level, task_depth);
+    if (lchild_) {
+      DenseMW_t CB(lchild_->dim_upd(), y.cols(), work[1], 0, 0);
+      lchild_->extract_b(y, yupd, CB, this);
+      lchild_->backward_multifrontal_solve
+        (y, work+1, etree_level+1, task_depth);
+    }
+    if (rchild_) {
+      DenseMW_t CB(rchild_->dim_upd(), y.cols(), work[1], 0, 0);
+      rchild_->extract_b(y, yupd, CB, this);
+      rchild_->backward_multifrontal_solve
+        (y, work+1, etree_level+1, task_depth);
+    }
   }
 
   template<typename scalar_t,typename integer_t> integer_t
