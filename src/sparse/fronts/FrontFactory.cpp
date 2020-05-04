@@ -90,6 +90,9 @@ namespace strumpack {
     case CompressionType::HODLR: {
       if (is_HODLR(dsep, dupd, compressed_parent, opts)) {
 #if defined(STRUMPACK_USE_BPACK)
+        // front.reset
+        //   (new FrontalMatrixBLR<scalar_t,integer_t>(s, sbegin, send, upd));
+        // if (root) fc.BLR++;
         front.reset
           (new FrontalMatrixHODLR<scalar_t,integer_t>(s, sbegin, send, upd));
         if (root) fc.HODLR++;

@@ -413,7 +413,7 @@ namespace strumpack {
     }
   }
 
-template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::extract_CB_sub_matrix
   (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
    DenseM_t& B, int task_depth) const {
@@ -423,10 +423,21 @@ template<typename scalar_t,typename integer_t> void
     std::vector<std::size_t> lI, oI;
     this->find_upd_indices(I, lI, oI);
     if (lI.empty()) return;
-    auto T = F22blr_.extract(lI, lJ);
-    for (std::size_t j=0; j<lJ.size(); j++)
-      for (std::size_t i=0; i<lI.size(); i++)
-        B(oI[i], oJ[j]) += T(i, j);
+    const std::size_t dupd = dim_upd();
+    if (F22blr_.rows() == dupd) {
+      // extract requires the indices to be sorted
+      // auto T = F22blr_.extract(lI, lJ);
+      // for (std::size_t j=0; j<lJ.size(); j++)
+      //   for (std::size_t i=0; i<lI.size(); i++)
+      //     B(oI[i], oJ[j]) += T(i, j);
+      for (std::size_t j=0; j<lJ.size(); j++)
+        for (std::size_t i=0; i<lI.size(); i++)
+          B(oI[i], oJ[j]) += F22blr_(lI[i], lJ[j]);
+    } else {
+      for (std::size_t j=0; j<lJ.size(); j++)
+        for (std::size_t i=0; i<lI.size(); i++)
+          B(oI[i], oJ[j]) += F22_(lI[i], lJ[j]);
+    }
     STRUMPACK_FLOPS((is_complex<scalar_t>() ? 2 : 1) * lJ.size() * lI.size());
   }
 
