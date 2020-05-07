@@ -113,52 +113,56 @@ namespace strumpack {
       int rows = gA.size();
       DenseMatrix<int> nns(knn, rows);
       nns.fill(0);
-      std::vector<bool> rmark(rows), cmark(gB.size());
-      std::vector<int> rq(rows), cq(knn);
-      for (int i=0; i<rows; i++) {
-        int rqfront = 0, rqback = 0, cqfront = 0, cqback = 0;
-        rq[rqback] = i;
-        rmark[i] = true;
-        while (cqback < knn && (rqfront != rqback+1 || cqfront != cqback+1)) {
-          if (rqfront != rqback+1) {
-            auto k = rq[rqfront++];
-            auto hi = gAB.ind() + gAB.ptr(k+1);
-            for (auto pl=gAB.ind()+gAB.ptr(k); pl!=hi; pl++) {
-              auto l = *pl;
-              if (!cmark[l]) {
-                nns(cqback++, i) = l+1;
-                if (cqback == knn) break;
-                cmark[l] = true;
-                cq[cqback] = l;
+      int B = std::ceil(rows / params::num_threads);
+#pragma omp parallel for schedule(static, 1)
+      for (int lo=0; lo<rows; lo+=B) {
+        std::vector<bool> rmark(rows), cmark(gB.size());
+        std::vector<int> rq(rows), cq(knn);
+        for (int i=lo; i<std::min(lo+B, rows); i++) {
+          int rqfront = 0, rqback = 0, cqfront = 0, cqback = 0;
+          rq[rqback] = i;
+          rmark[i] = true;
+          while (cqback < knn && (rqfront != rqback+1 || cqfront != cqback+1)) {
+            if (rqfront != rqback+1) {
+              auto k = rq[rqfront++];
+              auto hi = gAB.ind() + gAB.ptr(k+1);
+              for (auto pl=gAB.ind()+gAB.ptr(k); pl!=hi; pl++) {
+                auto l = *pl;
+                if (!cmark[l]) {
+                  nns(cqback++, i) = l+1;
+                  if (cqback == knn) break;
+                  cmark[l] = true;
+                  cq[cqback] = l;
+                }
+              }
+              if (cqback == knn) break;
+              hi = gA.ind() + gA.ptr(k+1);
+              for (auto pl=gA.ind()+gA.ptr(k); pl!=hi; pl++) {
+                auto l = *pl;
+                if (!rmark[l]) {
+                  rmark[l] = true;
+                  rqback++;
+                  rq[rqback] = l;
+                }
               }
             }
-            if (cqback == knn) break;
-            hi = gA.ind() + gA.ptr(k+1);
-            for (auto pl=gA.ind()+gA.ptr(k); pl!=hi; pl++) {
-              auto l = *pl;
-              if (!rmark[l]) {
-                rmark[l] = true;
-                rqback++;
-                rq[rqback] = l;
+            if (cqfront != cqback+1) {
+              auto k = cq[cqfront++];
+              auto hi = gB.ind() + gB.ptr(k+1);
+              for (auto pl=gB.ind()+gB.ptr(k); pl!=hi; pl++) {
+                auto l = *pl;
+                if (!cmark[l]) {
+                  nns(cqback++, i) = l+1;
+                  if (cqback == knn) break;
+                  cmark[l] = true;
+                  cq[cqback] = l;
+                }
               }
             }
           }
-          if (cqfront != cqback+1) {
-            auto k = cq[cqfront++];
-            auto hi = gB.ind() + gB.ptr(k+1);
-            for (auto pl=gB.ind()+gB.ptr(k); pl!=hi; pl++) {
-              auto l = *pl;
-              if (!cmark[l]) {
-                nns(cqback++, i) = l+1;
-                if (cqback == knn) break;
-                cmark[l] = true;
-                cq[cqback] = l;
-              }
-            }
-          }
+          for (int l=0; l<cqback; l++) cmark[cq[l]] = false;
+          for (int l=0; l<rqback; l++) rmark[rq[l]] = false;
         }
-        for (int l=0; l<cqback; l++) cmark[cq[l]] = false;
-        for (int l=0; l<rqback; l++) rmark[rq[l]] = false;
       }
       return nns;
     }
@@ -182,6 +186,11 @@ namespace strumpack {
              neighbors_rows.cols() == rows() &&
              neighbors_cols.rows() == std::size_t(opts.knn_lrbf()) &&
              neighbors_cols.cols() == cols());
+
+      HODLR_set_D_option<scalar_t>(options_, "tol_comp", 0.1*opts.rel_tol());
+      HODLR_set_D_option<scalar_t>(options_, "tol_rand", 0.1*opts.rel_tol());
+      HODLR_set_D_option<scalar_t>(options_, "tol_Rdetect", 0.01*opts.rel_tol());
+
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 3);
       HODLR_set_I_option<scalar_t>(options_, "knn", opts.knn_lrbf());
       { TIMER_TIME(TaskType::CONSTRUCT_INIT, 0, t_construct_h);

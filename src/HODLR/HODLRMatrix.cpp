@@ -335,26 +335,30 @@ namespace strumpack {
       DenseMatrix<int> nns(knn, rows_);
       { TIMER_TIME(TaskType::NEIGHBOR_SEARCH, 0, t_knn);
         nns.fill(0);
-        std::vector<bool> mark(rows_, false);
-        std::vector<int> q(knn);
-        for (int i=0; i<rows_; i++) {
-          int qfront = 0, qback = 0;
-          q[qback] = i;
-          mark[i] = true;
-          while (qback < knn && qfront != qback+1) {
-            auto k = q[qfront++];
-            const auto hi = graph.ind() + graph.ptr(k+1);
-            for (auto pl=graph.ind()+graph.ptr(k); pl!=hi; pl++) {
-              auto l = *pl;
-              if (!mark[l]) {
-                nns(qback++, i) = l+1; // found a new neighbor
-                if (qback == knn) break;
-                q[qback] = l;
-                mark[l] = true;
+        int B = std::ceil(rows_ / params::num_threads);
+#pragma omp parallel for schedule(static, 1)
+        for (int lo=0; lo<rows_; lo+=B) {
+          std::vector<bool> mark(rows_, false);
+          std::vector<int> q(knn);
+          for (int i=lo; i<std::min(lo+B, rows_); i++) {
+            int qfront = 0, qback = 0;
+            q[qback] = i;
+            mark[i] = true;
+            while (qback < knn && qfront != qback+1) {
+              auto k = q[qfront++];
+              const auto hi = graph.ind() + graph.ptr(k+1);
+              for (auto pl=graph.ind()+graph.ptr(k); pl!=hi; pl++) {
+                auto l = *pl;
+                if (!mark[l]) {
+                  nns(qback++, i) = l+1; // found a new neighbor
+                  if (qback == knn) break;
+                  q[qback] = l;
+                  mark[l] = true;
+                }
               }
             }
+            for (int l=0; l<qback; l++) mark[q[l]] = false;
           }
-          for (int l=0; l<qback; l++) mark[q[l]] = false;
         }
       }
       { TIMER_TIME(TaskType::CONSTRUCT_INIT, 0, t_construct_h);
