@@ -49,6 +49,7 @@ namespace strumpack {
    const F_t* p, int task_depth) {
     const std::size_t pdsep = paF11.rows();
     const std::size_t dupd = dim_upd();
+    if (!dupd) return;
     std::size_t upd2sep;
     auto I = this->upd_to_parent(p, upd2sep);
     DenseM_t CB(dupd, dupd);
