@@ -258,18 +258,18 @@ void TimerList::finalize() {
 
   MPIComm c;
   int rank = c.rank(), P = c.size();
-  for (int p=0; p<rank; p++) MPI_Barrier(MPI_COMM_WORLD);
-  {
-    std::ofstream log;
-    if (mpi_rank())
-      log.open("time.log", std::ofstream::out | std::ofstream::app);
-    else log.open("time.log", std::ofstream::out);
-    for (unsigned int thread=0; thread<list.size(); thread++)
-      for (auto timing : list[thread])
-        timing.print(log);
-    log.close();
-  }
-  for (int p=rank; p<=P; p++) MPI_Barrier(MPI_COMM_WORLD);
+  // for (int p=0; p<rank; p++) MPI_Barrier(MPI_COMM_WORLD);
+  // {
+  //   std::ofstream log;
+  //   if (mpi_rank())
+  //     log.open("time.log", std::ofstream::out | std::ofstream::app);
+  //   else log.open("time.log", std::ofstream::out);
+  //   for (unsigned int thread=0; thread<list.size(); thread++)
+  //     for (auto timing : list[thread])
+  //       timing.print(log);
+  //   log.close();
+  // }
+  // for (int p=rank; p<=P; p++) MPI_Barrier(MPI_COMM_WORLD);
 
   int timers = int(TaskType::EXPLICITLY_NAMED_TASK);
   std::unique_ptr<double[]> t_(new double[4*timers]);
