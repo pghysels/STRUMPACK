@@ -341,19 +341,19 @@ namespace strumpack {
           std::vector<bool> mark(rows_, false);
           std::vector<int> q(knn);
           for (int i=lo; i<std::min(lo+B, rows_); i++) {
-            int qfront = 0, qback = 0;
-            q[qback] = i;
+            int qfront = 0, qback = 0, nn = 0;
+            q[qback++] = i;
             mark[i] = true;
-            while (qback < knn && qfront != qback+1) {
+            while (nn < knn && qfront < qback) {
               auto k = q[qfront++];
               const auto hi = graph.ind() + graph.ptr(k+1);
               for (auto pl=graph.ind()+graph.ptr(k); pl!=hi; pl++) {
                 auto l = *pl;
                 if (!mark[l]) {
-                  nns(qback++, i) = l+1; // found a new neighbor
-                  if (qback == knn) break;
-                  q[qback] = l;
+                  nns(nn++, i) = l+1; // found a new neighbor
+                  if (nn == knn) break;
                   mark[l] = true;
+                  q[qback++] = l;
                 }
               }
             }
@@ -384,7 +384,7 @@ namespace strumpack {
       HODLR_createstats<scalar_t>(stats_);
 
       // set hodlr options
-      HODLR_set_I_option<scalar_t>(options_, "verbosity", opts.verbose() ? 2 : -2);
+      HODLR_set_I_option<scalar_t>(options_, "verbosity", opts.verbose() ? 1 : -2);
       // HODLR_set_I_option<scalar_t>(options_, "Nbundle", 8);
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
       HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
@@ -603,8 +603,6 @@ namespace strumpack {
         for (auto l : I[k]) { assert(int(l) < rows_); allrows[i++] = l+1; }
         for (auto l : J[k]) { assert(int(l) < cols_); allcols[j++] = l+1; }
       }
-      for (int k=0; k<Ninter; k++)
-        total_dat += B[k].lrows()*B[k].lcols();
       std::unique_ptr<scalar_t[]> alldat_loc(new scalar_t[total_dat]);
       auto ptr = alldat_loc.get();
       HODLR_extract_elements<scalar_t>
@@ -618,6 +616,46 @@ namespace strumpack {
         auto Bld = Bk.ld();
         for (int j=0; j<m; j++)
           for (int i=0; i<n; i++)
+            Bdata[i+j*Bld] = *ptr++;
+      }
+    }
+
+    template<typename scalar_t> void HODLRMatrix<scalar_t>::extract_elements
+    (const VecVec_t& I, const VecVec_t& J, std::vector<DenseM_t>& B) {
+      if (I.empty()) return;
+      assert(I.size() == J.size() && I.size() == B.size());
+      int Ninter = I.size(), total_rows = 0, total_cols = 0, total_dat = 0;
+      int pmaps[3] = {1, 1, 0};
+      for (auto Ik : I) total_rows += Ik.size();
+      for (auto Jk : J) total_cols += Jk.size();
+      std::unique_ptr<int[]> iwork
+        (new int[total_rows + total_cols + 3*Ninter]);
+      auto allrows = iwork.get();
+      auto allcols = allrows + total_rows;
+      auto rowidx = allcols + total_cols;
+      auto colidx = rowidx + Ninter;
+      auto pgids = colidx + Ninter;
+      for (int k=0, i=0, j=0; k<Ninter; k++) {
+        total_dat += B[k].rows()*B[k].cols();
+        rowidx[k] = I[k].size();
+        colidx[k] = J[k].size();
+        pgids[k] = 0;
+        for (auto l : I[k]) { assert(int(l) < rows_); allrows[i++] = l+1; }
+        for (auto l : J[k]) { assert(int(l) < cols_); allcols[j++] = l+1; }
+      }
+      std::unique_ptr<scalar_t[]> alldat_loc(new scalar_t[total_dat]);
+      auto ptr = alldat_loc.get();
+      HODLR_extract_elements<scalar_t>
+        (ho_bf_, options_, msh_, stats_, ptree_, Ninter,
+         total_rows, total_cols, total_dat, allrows, allcols,
+         ptr, rowidx, colidx, pgids, 1, pmaps);
+      for (auto& Bk : B) {
+        auto m = Bk.cols();
+        auto n = Bk.rows();
+        auto Bdata = Bk.data();
+        auto Bld = Bk.ld();
+        for (std::size_t j=0; j<m; j++)
+          for (std::size_t i=0; i<n; i++)
             Bdata[i+j*Bld] = *ptr++;
       }
     }
