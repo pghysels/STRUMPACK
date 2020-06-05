@@ -104,10 +104,12 @@ namespace strumpack {
     for (std::size_t i=0; i<nB; i++) {
       this->find_upd_indices(I[i], lI[i], oI[i]);
       this->find_upd_indices(J[i], lJ[i], oJ[i]);
+#if defined(STRUMPACK_PERMUTE_CB)
       if (CB_perm_.size() == std::size_t(this->dim_upd())) {
         for (auto& li : lI[i]) li = CB_perm_[li];
         for (auto& lj : lJ[i]) lj = CB_perm_[lj];
       }
+#endif
       Bloc[i] = DistM_t(grid(), lI[i].size(), lJ[i].size());
     }
     {
@@ -207,13 +209,21 @@ namespace strumpack {
         [&](VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
             HODLR::ExtractionMeta&) {
           for (auto& Ik : I) for (auto& i : Ik) i += sep_begin_;
+#if defined(STRUMPACK_PERMUTE_CB)
           for (auto& Jk : J) for (auto& j : Jk) j = this->upd_[CB_iperm_[j]];
+#else
+          for (auto& Jk : J) for (auto& j : Jk) j = this->upd_[j];
+#endif
           this->extract_2d(A, I, J, B);
         };
       auto extract_F21 =
         [&](VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
             HODLR::ExtractionMeta&) {
+#if defined(STRUMPACK_PERMUTE_CB)
           for (auto& Ik : I) for (auto& i : Ik) i = this->upd_[CB_iperm_[i]];
+#else
+          for (auto& Ik : I) for (auto& i : Ik) i = this->upd_[i];
+#endif
           for (auto& Jk : J) for (auto& j : Jk) j += sep_begin_;
           this->extract_2d(A, I, J, B);
         };
@@ -256,8 +266,13 @@ namespace strumpack {
       auto extract_F22 =
         [&](VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
             HODLR::ExtractionMeta& e) {
+#if defined(STRUMPACK_PERMUTE_CB)
           for (auto& Ik : I) for (auto& i : Ik) i = this->upd_[CB_iperm_[i]];
           for (auto& Jk : J) for (auto& j : Jk) j = this->upd_[CB_iperm_[j]];
+#else
+          for (auto& Ik : I) for (auto& i : Ik) i = this->upd_[i];
+          for (auto& Jk : J) for (auto& j : Jk) j = this->upd_[j];
+#endif
           this->extract_2d(A, I, J, B);
           TIMER_TIME(TaskType::HSS_EXTRACT_SCHUR, 3, t_ex_schur);
           Schur.extract_add_elements(e, B);
@@ -452,14 +467,14 @@ namespace strumpack {
       if (this->dim_upd()) {
         DistM_t tmp(bupd.grid(), bupd.rows(), bupd.cols());
         F21_.mult(Trans::N, b, tmp);
-
+#if defined(STRUMPACK_PERMUTE_CB)
         auto gtmp = tmp.gather();
         DenseM_t gtmp2(gtmp);
         for (std::size_t r=0; r<gtmp.rows(); r++)
           for (std::size_t c=0; c<gtmp.cols(); c++)
             gtmp2(r, c) = gtmp(CB_perm_[r], c);
         tmp.scatter(gtmp2);
-
+#endif
         bupd.scaled_add(scalar_t(-1.), tmp);
         STRUMPACK_FLOPS(F21_.get_stat("Flop_C_Mult") +
                         2*bupd.rows()*bupd.cols());
@@ -476,14 +491,14 @@ namespace strumpack {
       TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_s);
       DistM_t tmp(y.grid(), y.rows(), y.cols()),
         tmp2(y.grid(), y.rows(), y.cols());
-
+#if defined(STRUMPACK_PERMUTE_CB)
       auto gyupd = yupd.gather();
       DenseM_t gyupd2(gyupd);
       for (std::size_t r=0; r<gyupd.rows(); r++)
         for (std::size_t c=0; c<gyupd.cols(); c++)
           gyupd2(r, c) = gyupd(CB_iperm_[r], c);
       yupd.scatter(gyupd2);
-
+#endif
       F12_.mult(Trans::N, yupd, tmp);
 #if defined(STRUMPACK_COUNT_FLOPS)
       auto solve_flops = F11_.solve(tmp, tmp2);
@@ -559,47 +574,34 @@ namespace strumpack {
         TIMER_TIME(TaskType::EXTRACT_GRAPH, 0, t_graph_22);
         auto gCB = A.extract_graph_CB
           (opts.separator_ordering_level(), this->upd());
-        CB_perm_.resize(dim_upd());
-        CB_iperm_.resize(dim_upd());
-#if 0
-        HSS::HSSPartitionTree CB_tree(dim_upd());
-        CB_tree.refine(opts.HODLR_options().leaf_size());
-        std::iota(CB_perm_.begin(), CB_perm_.end(), 0);
-        std::iota(CB_iperm_.begin(), CB_iperm_.end(), 0);
-#else
-        auto CB_tree = gCB.recursive_bisection
-          (opts.compression_leaf_size(), 0,
-           CB_perm_.data(), CB_iperm_.data(), 0, 0, gCB.size());
-#endif
-        TIMER_STOP(t_graph_22);
-        auto pgCB = gCB;
-        pgCB.permute(CB_perm_.data(), CB_iperm_.data());
-        F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
-          (new HODLR::HODLRMatrix<scalar_t>
-           (Comm(), CB_tree, pgCB, opts.HODLR_options()));
-        TIMER_TIME(TaskType::EXTRACT_GRAPH, 0, t_graph_1221);
         auto g12 = A.extract_graph_sep_CB
           (opts.separator_ordering_level(), sep_begin_, sep_end_, this->upd());
         auto g21 = A.extract_graph_CB_sep
           (opts.separator_ordering_level(), sep_begin_, sep_end_, this->upd());
-        TIMER_STOP(t_graph_1221);
+#if defined(STRUMPACK_PERMUTE_CB)
+        CB_perm_.resize(dim_upd());
+        CB_iperm_.resize(dim_upd());
+        auto CB_tree = gCB.recursive_bisection
+          (opts.compression_leaf_size(), 0,
+           CB_perm_.data(), CB_iperm_.data(), 0, 0, gCB.size());
+        gCB.permute(CB_perm_.data(), CB_iperm_.data());
+        g12.permute_cols(CB_perm_.data());
+        g21.permute_rows(CB_iperm_.data());
+#else
+        HSS::HSSPartitionTree CB_tree(dim_upd());
+        CB_tree.refine(opts.HODLR_options().leaf_size());
+#endif
+        TIMER_STOP(t_graph_22);
+        F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
+          (new HODLR::HODLRMatrix<scalar_t>
+           (Comm(), CB_tree, gCB, opts.HODLR_options()));
         auto knn = opts.HODLR_options().knn_lrbf();
         auto nns12 = HODLR::get_odiag_neighbors(knn, g12, g, gCB);
         auto nns21 = HODLR::get_odiag_neighbors(knn, g21, gCB, g);
-        DenseMatrix<int> pnns12(nns12.rows(), nns12.cols()),
-          pnns21(nns21.rows(), nns21.cols());
-        for (std::size_t c=0; c<nns12.cols(); c++)
-          for (std::size_t r=0; r<nns12.rows(); r++) {
-            auto nn = nns12(r, c);
-            pnns12(r, c) = nn ? (CB_perm_[nn-1]+1) : nn;
-          }
-        for (std::size_t c=0; c<nns21.cols(); c++)
-          for (std::size_t r=0; r<nns21.rows(); r++)
-            pnns21(r, c) = nns21(r, CB_iperm_[c]);
         F12_ = HODLR::ButterflyMatrix<scalar_t>
-          (F11_, *F22_, pnns12, pnns21, opts.HODLR_options());
+          (F11_, *F22_, nns12, nns21, opts.HODLR_options());
         F21_ = HODLR::ButterflyMatrix<scalar_t>
-          (*F22_, F11_, pnns21, pnns12, opts.HODLR_options());
+          (*F22_, F11_, nns21, nns12, opts.HODLR_options());
       } else {
         HSS::HSSPartitionTree CB_tree(dim_upd());
         CB_tree.refine(opts.HODLR_options().leaf_size());

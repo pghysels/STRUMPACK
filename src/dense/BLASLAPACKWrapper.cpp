@@ -1723,6 +1723,10 @@ namespace strumpack {
     }
 
 
+    int lange(char norm, int m, int n, const int *a, int lda) { return -1; }
+    unsigned int lange(char norm, int m, int n, const unsigned int *a, int lda) { return 0; }
+    std::size_t lange(char norm, int m, int n, const std::size_t *a, int lda) { return 0; }
+    bool lange(char norm, int m, int n, const bool *a, int lda) { return false; }
     float lange(char norm, int m, int n, const float *a, int lda) {
       if (norm == 'I' || norm == 'i') {
         std::unique_ptr<float[]> work(new float[m]);

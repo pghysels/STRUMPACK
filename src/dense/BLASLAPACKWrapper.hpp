@@ -836,6 +836,10 @@ namespace strumpack {
         (side, trans, m, n, k, a, lda, tau, c, ldc, work.get(), ilwork);
     }
 
+    int lange(char norm, int m, int n, const int *a, int lda);
+    unsigned int lange(char norm, int m, int n, const unsigned int *a, int lda);
+    std::size_t lange(char norm, int m, int n, const std::size_t *a, int lda);
+    bool lange(char norm, int m, int n, const bool *a, int lda);
 
     float lange(char norm, int m, int n, const float *a, int lda);
     double lange(char norm, int m, int n, const double *a, int lda);

@@ -1099,7 +1099,10 @@ namespace strumpack {
   template void DenseMatrix<unsigned int>::resize(std::size_t, std::size_t);
   template void DenseMatrix<std::size_t>::resize(std::size_t, std::size_t);
   template void DenseMatrix<bool>::resize(std::size_t, std::size_t);
-
+  template void DenseMatrix<int>::print(std::string, bool, int) const;
+  template void DenseMatrix<unsigned int>::print(std::string, bool, int) const;
+  template void DenseMatrix<std::size_t>::print(std::string, bool, int) const;
+  template void DenseMatrix<bool>::print(std::string, bool, int) const;
 
   template void gemm
   (Trans ta, Trans tb, float alpha, const DenseMatrix<float>& a,

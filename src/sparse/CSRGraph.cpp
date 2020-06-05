@@ -137,6 +137,29 @@ namespace strumpack {
     std::swap(ind_, ind);
   }
 
+  template<typename integer_t> void CSRGraph<integer_t>::permute_rows
+  (const integer_t* iorder) {
+    std::vector<integer_t> ptr(ptr_.size()), ind(ind_.size());
+    integer_t nnz = 0;
+    auto n = size();
+    for (integer_t i=0; i<n; i++) {
+      auto ub = ptr_[iorder[i]+1];
+      for (integer_t j=ptr_[iorder[i]]; j<ub; j++)
+        ind[nnz++] = ind_[j];
+      ptr[i+1] = nnz;
+    }
+    std::swap(ptr_, ptr);
+    std::swap(ind_, ind);
+  }
+
+  template<typename integer_t> void CSRGraph<integer_t>::permute_cols
+  (const integer_t* order) {
+    auto n = size();
+    for (integer_t i=0; i<n; i++)
+      for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
+        ind_[j] = order[ind_[j]];
+  }
+
   /**
    * iorder is of size this->size() == this->vertices().
    * iorder had elements in the range [0, chi-clo).
@@ -420,18 +443,19 @@ namespace strumpack {
   //   return adm12;
   // }
 
-  template<typename integer_t> void
-  CSRGraph<integer_t>::print_dense(const std::string& name) const {
-    auto n = size();
-    std::unique_ptr<char[]> M(new char[n*n]);
-    std::fill(M.get(), M.get()+n*n, '0');
-    for (integer_t row=0; row<n; row++)
+  template<typename integer_t> void CSRGraph<integer_t>::print_dense
+  (const std::string& name, integer_t cols) const {
+    auto m = size();
+    auto n = std::max(cols, m);
+    std::unique_ptr<char[]> M(new char[m*n]);
+    std::fill(M.get(), M.get()+m*n, '0');
+    for (integer_t row=0; row<m; row++)
       for (integer_t j=ptr_[row]; j<ptr_[row+1]; j++)
-        M[row + ind_[j]*n] = '1';
+        M[row + ind_[j]*m] = '1';
     std::cout << name << " = [" << std::endl;
-    for (integer_t row=0; row<n; row++) {
+    for (integer_t row=0; row<m; row++) {
       for (integer_t col=0; col<n; col++)
-        std::cout << M[row + n*col] << " ";
+        std::cout << M[row + m*col] << " ";
       std::cout << ";" << std::endl;
     }
     std::cout << "];" << std::endl;

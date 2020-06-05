@@ -427,14 +427,30 @@ namespace strumpack {
    const std::vector<std::vector<std::size_t>>& J,
    std::vector<DistM_t>&, std::vector<DenseM_t>& Bseq) const {
     TIMER_TIME(TaskType::GET_SUBMATRIX, 2, t_getsub);
+    extract_CB_sub_matrix_blocks(I, J, Bseq, 0);
+  }
+#endif
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrix<scalar_t,integer_t>::extract_CB_sub_matrix_blocks
+  (const std::vector<std::vector<std::size_t>>& I,
+   const std::vector<std::vector<std::size_t>>& J,
+   std::vector<DenseM_t>& Bseq, int task_depth) const {
     for (std::size_t i=0; i<I.size(); i++) {
       Bseq.emplace_back(I[i].size(), J[i].size());
       Bseq[i].zero();
-      // for the threaded code, just extract block per block
       extract_CB_sub_matrix(I[i], J[i], Bseq[i], 0);
     }
   }
-#endif
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrix<scalar_t,integer_t>::extract_CB_sub_matrix_blocks
+  (const std::vector<std::vector<std::size_t>>& I,
+   const std::vector<std::vector<std::size_t>>& J,
+   std::vector<DenseMW_t>& Bseq, int task_depth) const {
+    for (std::size_t i=0; i<I.size(); i++)
+      extract_CB_sub_matrix(I[i], J[i], Bseq[i], 0);
+  }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::partition_fronts

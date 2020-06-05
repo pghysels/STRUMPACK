@@ -33,6 +33,8 @@
 #include "HODLR/HODLRMatrix.hpp"
 #include "HODLR/ButterflyMatrix.hpp"
 
+#define STRUMPACK_PERMUTE_CB
+
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
@@ -89,8 +91,10 @@ namespace strumpack {
     HODLR::HODLRMatrix<scalar_t> F11_;
     HODLR::ButterflyMatrix<scalar_t> F12_, F21_;
     std::unique_ptr<HODLR::HODLRMatrix<scalar_t>> F22_;
-    HSS::HSSPartitionTree sep_tree_, CB_tree_;
+    HSS::HSSPartitionTree sep_tree_;
+#if defined(STRUMPACK_PERMUTE_CB)
     std::vector<integer_t> CB_perm_, CB_iperm_;
+#endif
 
     void construct_hierarchy(const SpMat_t& A, const Opts_t& opts);
     void compress_sampling(const SpMat_t& A, const Opts_t& opts);

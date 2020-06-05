@@ -133,6 +133,15 @@ namespace strumpack {
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
      DenseM_t& B, int task_depth) const = 0;
 
+    virtual void extract_CB_sub_matrix_blocks
+    (const std::vector<std::vector<std::size_t>>& I,
+     const std::vector<std::vector<std::size_t>>& J,
+     std::vector<DenseM_t>& Bseq, int task_depth) const;
+    virtual void extract_CB_sub_matrix_blocks
+    (const std::vector<std::vector<std::size_t>>& I,
+     const std::vector<std::vector<std::size_t>>& J,
+     std::vector<DenseMW_t>& Bseq, int task_depth) const;
+
     void extend_add_b
     (DenseM_t& b, DenseM_t& bupd, const DenseM_t& CB, const F_t* pa) const;
     void extract_b
