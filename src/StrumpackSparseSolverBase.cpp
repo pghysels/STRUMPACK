@@ -441,13 +441,14 @@ namespace strumpack {
       strumpack::params::schur_flops + strumpack::params::sparse_sample_flops;
     float compression_flops = strumpack::params::f11_fill_flops +
       strumpack::params::f12_fill_flops + strumpack::params::f21_fill_flops +
-      strumpack::params::f22_fill_flops + sample_flops;
+      strumpack::params::f22_fill_flops + sample_flops + params::extraction_flops;
     std::cout << std::endl;
     std::cout << "# ----- FLOP BREAKDOWN ---------------------" << std::endl;
     std::cout << "# F11_compression       = " << float(params::f11_fill_flops) << std::endl;
     std::cout << "# F12_compression       = " << float(params::f12_fill_flops) << std::endl;
     std::cout << "# F21_compression       = " << float(params::f21_fill_flops) << std::endl;
     std::cout << "# F22_compression       = " << float(params::f22_fill_flops) << std::endl;
+    std::cout << "# extraction            = " << float(params::extraction_flops) << std::endl;
     std::cout << "# sampling              = " << sample_flops << std::endl;
     std::cout << "#    CB_sample          = " << float(params::CB_sample_flops) << std::endl;
     std::cout << "#    sparse_sampling    = " << float(params::sparse_sample_flops) << std::endl;
