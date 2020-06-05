@@ -110,52 +110,51 @@ namespace strumpack {
     (int knn, const CSRGraph<integer_t>& gAB,
      const CSRGraph<integer_t>& gA, const CSRGraph<integer_t>& gB) {
       TIMER_TIME(TaskType::NEIGHBOR_SEARCH, 0, t_knn);
-      int rows = gA.size();
+      int rows = gA.size(), cols = gB.size();
       DenseMatrix<int> nns(knn, rows);
       nns.fill(0);
       int B = std::ceil(rows / params::num_threads);
 #pragma omp parallel for schedule(static, 1)
       for (int lo=0; lo<rows; lo+=B) {
-        std::vector<bool> rmark(rows), cmark(gB.size());
-        std::vector<int> rq(rows), cq(knn);
+        std::vector<bool> rmark(rows), cmark(cols);
+        std::vector<int> rq(rows), cq(cols);
         for (int i=lo; i<std::min(lo+B, rows); i++) {
-          int rqfront = 0, rqback = 0, cqfront = 0, cqback = 0;
-          rq[rqback] = i;
+          int rqfront = 0, rqback = 0, cqfront = 0, cqback = 0, nn = 0;
+          rq[rqback++] = i;
           rmark[i] = true;
-          while (cqback < knn && (rqfront != rqback+1 || cqfront != cqback+1)) {
-            if (rqfront != rqback+1) {
+          while (nn < knn && (rqfront < rqback || cqfront < cqback)) {
+            if (rqfront < rqback) {
               auto k = rq[rqfront++];
               auto hi = gAB.ind() + gAB.ptr(k+1);
               for (auto pl=gAB.ind()+gAB.ptr(k); pl!=hi; pl++) {
                 auto l = *pl;
                 if (!cmark[l]) {
-                  nns(cqback++, i) = l+1;
-                  if (cqback == knn) break;
+                  nns(nn++, i) = l+1;
+                  if (nn == knn) break;
                   cmark[l] = true;
-                  cq[cqback] = l;
+                  cq[cqback++] = l;
                 }
               }
-              if (cqback == knn) break;
+              if (nn == knn) break;
               hi = gA.ind() + gA.ptr(k+1);
               for (auto pl=gA.ind()+gA.ptr(k); pl!=hi; pl++) {
                 auto l = *pl;
                 if (!rmark[l]) {
                   rmark[l] = true;
-                  rqback++;
-                  rq[rqback] = l;
+                  rq[rqback++] = l;
                 }
               }
             }
-            if (cqfront != cqback+1) {
+            if (cqfront < cqback) {
               auto k = cq[cqfront++];
               auto hi = gB.ind() + gB.ptr(k+1);
               for (auto pl=gB.ind()+gB.ptr(k); pl!=hi; pl++) {
                 auto l = *pl;
                 if (!cmark[l]) {
-                  nns(cqback++, i) = l+1;
-                  if (cqback == knn) break;
+                  nns(nn++, i) = l+1;
+                  if (nn == knn) break;
                   cmark[l] = true;
-                  cq[cqback] = l;
+                  cq[cqback++] = l;
                 }
               }
             }
