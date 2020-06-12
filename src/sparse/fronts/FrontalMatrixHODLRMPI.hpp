@@ -33,7 +33,7 @@
 #include "HODLR/HODLRMatrix.hpp"
 #include "HODLR/ButterflyMatrix.hpp"
 
-#define STRUMPACK_PERMUTE_CB
+// #define STRUMPACK_PERMUTE_CB
 
 namespace strumpack {
 
