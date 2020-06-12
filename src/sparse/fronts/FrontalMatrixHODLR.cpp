@@ -446,7 +446,6 @@ namespace strumpack {
 
       // first construct S=-F21*inv(F11)*F12 using matvecs, then
       // construct F22+S using element extraction
-      long long int invf11_mult_flops = 0;
       auto sample_Schur =
         [&](Trans op, scalar_t a, const DenseM_t& R, scalar_t b, DenseM_t& S) {
           TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
@@ -461,7 +460,7 @@ namespace strumpack {
             Rtmp.scale(a);
             F1.mult(op, Rtmp, F12R);
           } else F1.mult(op, R, F12R);
-          invf11_mult_flops += F11_.inv_mult(op, F12R, invF11F12R);
+          long long int invf11_mult_flops = F11_.inv_mult(op, F12R, invF11F12R);
           if (b != scalar_t(0.)) {
             DenseM_t Stmp(S.rows(), S.cols());
             F2.mult(op, invF11F12R, Stmp);
