@@ -789,21 +789,10 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> integer_t
-  FrontalMatrixHODLR<scalar_t,integer_t>::maximum_rank(int task_depth) const {
-    integer_t r = std::max(F11_.get_stat("Rank_max"),
-                           std::max(F12_.get_stat("Rank_max"),
-                                    F21_.get_stat("Rank_max")));
-    integer_t rl = 0, rr = 0;
-    if (lchild_)
-#pragma omp task untied default(shared)                                 \
-  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-      rl = lchild_->maximum_rank(task_depth+1);
-    if (rchild_)
-#pragma omp task untied default(shared)                                 \
-  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-      rr = rchild_->maximum_rank(task_depth+1);
-#pragma omp taskwait
-    return std::max(r, std::max(rl, rr));
+  FrontalMatrixHODLR<scalar_t,integer_t>::front_rank(int task_depth) const {
+    return std::max(F11_.get_stat("Rank_max"),
+                    std::max(F12_.get_stat("Rank_max"),
+                             F21_.get_stat("Rank_max")));
   }
 
   template<typename scalar_t,typename integer_t> void

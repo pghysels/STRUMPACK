@@ -82,7 +82,7 @@ namespace strumpack {
     (DenseM_t& y, DenseM_t* work, int etree_level=0,
      int task_depth=0) const override;
 
-    integer_t maximum_rank(int task_depth=0) const override;
+    integer_t front_rank(int task_depth=0) const override;
     void print_rank_statistics(std::ostream &out) const override;
     bool isHSS() const override { return true; };
     std::string type() const override { return "FrontalMatrixHSS"; }

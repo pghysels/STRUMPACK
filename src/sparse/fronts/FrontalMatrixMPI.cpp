@@ -40,6 +40,16 @@ namespace strumpack {
       blacs_grid_(comm, P) {
   }
 
+  template<typename scalar_t,typename integer_t> integer_t
+  FrontalMatrixMPI<scalar_t,integer_t>::maximum_rank(int task_depth) const {
+    auto mr = this->front_rank();
+    if (visit(lchild_))
+      mr = std::max(mr, lchild_->maximum_rank(task_depth));
+    if (visit(rchild_))
+      mr = std::max(mr, rchild_->maximum_rank(task_depth));
+    return mr;
+  }
+
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMPI<scalar_t,integer_t>::extract_2d
   (const SpMat_t& A, const VecVec_t& I, const VecVec_t& J,

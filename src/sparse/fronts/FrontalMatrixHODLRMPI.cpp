@@ -53,6 +53,19 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::extend_add_copy_to_buffers
+  (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
+    if (!dim_upd()) return;
+    if (Comm().is_null()) return;
+    auto dupd = dim_upd();
+    DistM_t dF22(grid(), dupd, dupd), eye(grid(), dupd, dupd);
+    eye.eye();
+    F22_->mult(Trans::N, eye, dF22);
+    ExtendAdd<scalar_t,integer_t>::extend_add_copy_to_buffers
+      (dF22, sbuf, pa, this->upd_to_parent(pa));
+  }
+
+  template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::sample_CB
   (Trans op, const DistM_t& R, DistM_t& S, F_t* pa) const {
     if (!dim_upd()) return;
@@ -61,6 +74,7 @@ namespace strumpack {
     TIMER_TIME(TaskType::F22_MULT, 2, t_sprod);
     F22_->mult(op, R, S);
   }
+
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::sample_children_CB
@@ -526,16 +540,11 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> integer_t
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::maximum_rank
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::front_rank
   (int task_depth) const {
-    integer_t mr = std::max(F11_.get_stat("Rank_max"),
-                            std::max(F12_.get_stat("Rank_max"),
-                                     F21_.get_stat("Rank_max")));
-    if (visit(lchild_))
-      mr = std::max(mr, lchild_->maximum_rank(task_depth));
-    if (visit(rchild_))
-      mr = std::max(mr, rchild_->maximum_rank(task_depth));
-    return mr;
+    return std::max(F11_.get_stat("Rank_max"),
+                    std::max(F12_.get_stat("Rank_max"),
+                             F21_.get_stat("Rank_max")));
   }
 
   template<typename scalar_t,typename integer_t> long long

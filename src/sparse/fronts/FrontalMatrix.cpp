@@ -174,6 +174,21 @@ namespace strumpack {
        (3*CB.rows())+sizeof(integer_t)*(CB.rows()+yupd.rows()));
   }
 
+  template<typename scalar_t,typename integer_t> integer_t
+  FrontalMatrix<scalar_t,integer_t>::maximum_rank(int task_depth) const {
+    integer_t r = front_rank(), rl = 0, rr = 0;
+    if (lchild_)
+#pragma omp task untied default(shared)                                 \
+  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
+      rl = lchild_->maximum_rank(task_depth+1);
+    if (rchild_)
+#pragma omp task untied default(shared)                                 \
+  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
+      rr = rchild_->maximum_rank(task_depth+1);
+#pragma omp taskwait
+    return std::max(r, std::max(rl, rr));
+  }
+
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::multifrontal_solve(DenseM_t& b) const {
     auto max_dupd = max_dim_upd();

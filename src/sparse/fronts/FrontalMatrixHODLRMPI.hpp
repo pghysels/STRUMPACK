@@ -63,6 +63,9 @@ namespace strumpack {
 
     void skinny_extend_add(DistM_t& cSl, DistM_t& cSr, DistM_t& S);
 
+    void extend_add_copy_to_buffers
+    (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override;
+
     void multifrontal_factorization
     (const SpMat_t& A, const Opts_t& opts,
      int etree_level=0, int task_depth=0) override;
@@ -75,7 +78,7 @@ namespace strumpack {
      int etree_level=0) const override;
 
     long long node_factor_nonzeros() const;
-    integer_t maximum_rank(int task_depth) const;
+    integer_t front_rank(int task_depth=0) const;
     std::string type() const override { return "FrontalMatrixHODLRMPI"; }
 
     void extract_CB_sub_matrix_2d
