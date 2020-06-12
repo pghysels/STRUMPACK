@@ -185,11 +185,9 @@ namespace strumpack {
              neighbors_rows.cols() == rows() &&
              neighbors_cols.rows() == std::size_t(opts.knn_lrbf()) &&
              neighbors_cols.cols() == cols());
-
-      HODLR_set_D_option<scalar_t>(options_, "tol_comp", 0.1*opts.rel_tol());
-      HODLR_set_D_option<scalar_t>(options_, "tol_rand", 0.1*opts.rel_tol());
-      HODLR_set_D_option<scalar_t>(options_, "tol_Rdetect", 0.01*opts.rel_tol());
-
+      // HODLR_set_D_option<scalar_t>(options_, "tol_comp", 0.1*opts.rel_tol());
+      // HODLR_set_D_option<scalar_t>(options_, "tol_rand", 0.1*opts.rel_tol());
+      // HODLR_set_D_option<scalar_t>(options_, "tol_Rdetect", 0.01*opts.rel_tol());
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 3);
       HODLR_set_I_option<scalar_t>(options_, "knn", opts.knn_lrbf());
       { TIMER_TIME(TaskType::CONSTRUCT_INIT, 0, t_construct_h);

@@ -307,8 +307,12 @@ namespace strumpack {
     switch (opts.HODLR_options().compression_algorithm()) {
     case HODLR::CompressionAlgorithm::RANDOM_SAMPLING:
       compress_sampling(A, opts, task_depth); break;
-    case HODLR::CompressionAlgorithm::ELEMENT_EXTRACTION:
-      compress_extraction(A, opts, task_depth); break;
+    case HODLR::CompressionAlgorithm::ELEMENT_EXTRACTION: {
+      auto lopts = opts;
+      lopts.HODLR_options().set_rel_tol
+        (lopts.HODLR_options().rel_tol() / (etree_level+1));
+      compress_extraction(A, lopts, task_depth);
+    } break;
     }
     if (/*etree_level == 0 && */opts.print_root_front_stats()) {
       auto time = t.elapsed();
