@@ -445,6 +445,8 @@ namespace strumpack {
        */
       DistM_t dense(const BLACSGrid* g) const;
 
+      void set_sampling_parameter(double sample_param);
+
       DenseM_t redistribute_2D_to_1D(const DistM_t& R) const;
       void redistribute_2D_to_1D(const DistM_t& R2D, DenseM_t& R1D) const;
       void redistribute_1D_to_2D(const DenseM_t& S1D, DistM_t& S2D) const;

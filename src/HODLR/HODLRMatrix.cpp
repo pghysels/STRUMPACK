@@ -409,6 +409,11 @@ namespace strumpack {
       HODLR_set_D_option<scalar_t>(options_, "tol_Rdetect", 0.1*opts.rel_tol());
     }
 
+    template<typename scalar_t> void
+    HODLRMatrix<scalar_t>::set_sampling_parameter(double sample_param) {
+      HODLR_set_D_option<scalar_t>(options_, "sample_para", sample_param);
+    }
+
     template<typename scalar_t> void HODLRMatrix<scalar_t>::perm_init() {
       iperm_.resize(rows_);
       c_->broadcast(perm_);

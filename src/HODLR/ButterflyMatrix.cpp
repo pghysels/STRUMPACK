@@ -313,6 +313,11 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
+    ButterflyMatrix<scalar_t>::set_sampling_parameter(double sample_param) {
+      HODLR_set_D_option<scalar_t>(options_, "sample_para", sample_param);
+    }
+
+    template<typename scalar_t> void
     ButterflyMatrix<scalar_t>::extract_add_elements
     (ExtractionMeta& e, std::vector<DistMW_t>& B) {
       std::unique_ptr<scalar_t[]> alldat_loc(new scalar_t[e.Nalldat_loc]);
