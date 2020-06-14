@@ -210,6 +210,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::compress_extraction
   (const SpMat_t& A, const Opts_t& opts) {
+    F11_.set_sampling_parameter(1.2);
     auto extract_F11 =
       [&](VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
           HODLR::ExtractionMeta&) {
@@ -223,6 +224,8 @@ namespace strumpack {
       F11_.factor(); }
     compress_flops_F11();
     if (dim_upd()) {
+      // F12_.set_sampling_parameter(2.0);
+      // F21_.set_sampling_parameter(2.0);
       auto extract_F12 =
         [&](VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
             HODLR::ExtractionMeta&) {
@@ -261,12 +264,10 @@ namespace strumpack {
             invF11F12R(F11_.lrows(), R.cols());
           auto& F1 = (op == Trans::N) ? F12_ : F21_;
           auto& F2 = (op == Trans::N) ? F21_ : F12_;
-          a = -a; // construct S=-F21*inv(F11)*F12
-          if (a != scalar_t(1.)) {
-            DenseM_t Rtmp(R);
-            Rtmp.scale(a);
-            F1.mult(op, Rtmp, F12R);
-          } else F1.mult(op, R, F12R);
+          a = -a; // construct S=b*S-a*F21*inv(F11)*F12
+          F1.mult(op, R, F12R);
+          if (a != scalar_t(1.))
+            F12R.scale(a);
           { TIMER_TIME(TaskType::F11INV_MULT, 3, t_f11invmult);
             invf11_mult_flops = F11_.inv_mult(op, F12R, invF11F12R);
           }
@@ -291,7 +292,7 @@ namespace strumpack {
           for (auto& Ik : I) for (auto& i : Ik) i = this->upd_[i];
           for (auto& Jk : J) for (auto& j : Jk) j = this->upd_[j];
 #endif
-          this->extract_2d(A, I, J, B);
+          this->extract_2d(A, I, J, B, true);
           TIMER_TIME(TaskType::HSS_EXTRACT_SCHUR, 3, t_ex_schur);
           Schur.extract_add_elements(e, B);
         };

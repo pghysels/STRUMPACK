@@ -278,8 +278,11 @@ namespace strumpack {
   FrontalMatrixHODLR<scalar_t,integer_t>::element_extraction
   (const SpMat_t& A, const std::vector<std::vector<std::size_t>>& I,
    const std::vector<std::vector<std::size_t>>& J,
-   std::vector<DenseMW_t>& B, int task_depth) {
-    {
+   std::vector<DenseMW_t>& B, int task_depth, bool skip_sparse) {
+    if (skip_sparse) {
+      for (std::size_t k=0; k<I.size(); k++)
+        B[k].zero();
+    } else {
       TIMER_TIME(TaskType::EXTRACT_SEP_2D, 2, t_ex_sep);
       for (std::size_t k=0; k<I.size(); k++)
         A.extract_separator(sep_end_, I[k], J[k], B[k], task_depth);
@@ -404,6 +407,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLR<scalar_t,integer_t>::compress_extraction
   (const SpMat_t& A, const Opts_t& opts, int task_depth) {
+    F11_.set_sampling_parameter(1.2);
     auto extract_F11 =
       [&](VecVec_t& I, VecVec_t& J, std::vector<DenseMW_t>& B,
           HODLR::ExtractionMeta& e) {
@@ -417,6 +421,8 @@ namespace strumpack {
       F11_.factor(); }
     compress_flops_F11();
     if (dim_upd()) {
+      // F12_.set_sampling_parameter(2.0);
+      // F21_.set_sampling_parameter(2.0);
       auto extract_F12 =
         [&](VecVec_t& I, VecVec_t& J, std::vector<DenseMW_t>& B,
             HODLR::ExtractionMeta& e) {
@@ -454,12 +460,10 @@ namespace strumpack {
             invF11F12R(F11_.rows(), R.cols());
           auto& F1 = (op == Trans::N) ? F12_ : F21_;
           auto& F2 = (op == Trans::N) ? F21_ : F12_;
-          a = -a; // construct S=-F21*inv(F11)*F12
-          if (a != scalar_t(1.)) {
-            DenseM_t Rtmp(R);
-            Rtmp.scale(a);
-            F1.mult(op, Rtmp, F12R);
-          } else F1.mult(op, R, F12R);
+          a = -a; // construct S=b*S-a*F21*inv(F11)*F12
+          F1.mult(op, R, F12R);
+          if (a != scalar_t(1.))
+            F12R.scale(a);
           long long int invf11_mult_flops = F11_.inv_mult(op, F12R, invF11F12R);
           if (b != scalar_t(0.)) {
             DenseM_t Stmp(S.rows(), S.cols());
@@ -480,7 +484,7 @@ namespace strumpack {
           for (auto& Ik : I) for (auto& i : Ik) i = this->upd_[i];
           for (auto& Jk : J) for (auto& j : Jk) j = this->upd_[j];
 #endif
-          element_extraction(A, I, J, B, task_depth);
+          element_extraction(A, I, J, B, task_depth, true);
           Schur.extract_add_elements(e, B);
         };
       TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_f22_compress);

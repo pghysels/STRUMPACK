@@ -486,8 +486,7 @@ namespace strumpack {
 
   /** mat should be defined on the same communicator as F11 */
   template<typename scalar_t,typename integer_t> void
-  PropMapSparseMatrix<scalar_t,integer_t>::
-  extract_separator_2d
+  PropMapSparseMatrix<scalar_t,integer_t>::extract_separator_2d
   (integer_t sep_end, const std::vector<std::size_t>& I,
    const std::vector<std::size_t>& J, DistM_t& B) const {
     if (!B.active()) return;

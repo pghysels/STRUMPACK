@@ -76,7 +76,7 @@ namespace strumpack {
     void element_extraction
     (const SpMat_t& A, const std::vector<std::vector<std::size_t>>& I,
      const std::vector<std::vector<std::size_t>>& J,
-     std::vector<DenseMW_t>& B, int task_depth);
+     std::vector<DenseMW_t>& B, int task_depth, bool skip_sparse=false);
 
     void extract_CB_sub_matrix
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,

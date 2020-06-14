@@ -53,7 +53,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMPI<scalar_t,integer_t>::extract_2d
   (const SpMat_t& A, const VecVec_t& I, const VecVec_t& J,
-   std::vector<DistMW_t>& B) const {
+   std::vector<DistMW_t>& B, bool skip_sparse) const {
     TIMER_TIME(TaskType::EXTRACT_2D, 1, t_ex);
     int rank = Comm().rank(), nprocs = P();
     std::vector<DistM_t> Bl, Br;
@@ -76,7 +76,7 @@ namespace strumpack {
       sbuf[p].reserve(std::round(1.2*float(ssize)/nprocs));
     bool vl = visit(lchild_), vr = visit(rchild_);
     for (std::size_t i=0; i<I.size(); i++) {
-      {
+      if (!skip_sparse) {
         TIMER_TIME(TaskType::EXTRACT_SEP_2D, 2, t_ex_sep);
         DistM_t tmp(grid(), I[i].size(), J[i].size());
         A.extract_separator_2d(this->sep_end_, I[i], J[i], tmp);
@@ -113,7 +113,7 @@ namespace strumpack {
     for (std::size_t i=0; i<I.size(); i++) {
       if (!B[i].active()) continue;
       B[i].zero();
-      subgrid_add_from_buffers(grid(), 0, B[i], pbuf);
+      if (!skip_sparse) subgrid_add_from_buffers(grid(), 0, B[i], pbuf);
       if (lchild_) subgrid_add_from_buffers(gl, ml, B[i], pbuf);
       if (rchild_) subgrid_add_from_buffers(gr, mr, B[i], pbuf);
     }
