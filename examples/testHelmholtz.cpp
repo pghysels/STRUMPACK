@@ -114,7 +114,15 @@ int main(int argc, char* argv[]) {
     spss.options().set_from_command_line(argc, argv);
 
     CSRMatrix<scalart,int> Aseq;
-    if (!rank) Aseq = Helmholtz3D<realt>(nx);
+    if (!rank) {
+      Aseq = Helmholtz3D<realt>(nx);
+      std::vector<realt> Dr, Dc;
+      realt rcond, ccond, Amax;
+      int info = Aseq.compute_equilibration(Dr, Dc, rcond, ccond, Amax);
+      char eq = Aseq.equilibrate(Dr, Dc, rcond, ccond, Amax);
+      std::cout << "A: rcond= " << rcond << ", ccond= " << ccond
+                << ", Amax= " << Amax << ", eq=" << eq << std::endl;
+    }
     CSRMatrixMPI<scalart,int> A(&Aseq, MPI_COMM_WORLD, true);
     Aseq = CSRMatrix<scalart,int>();
 
@@ -130,9 +138,23 @@ int main(int argc, char* argv[]) {
 
     auto N = A.size();
     auto n_local = A.local_rows();
-    std::vector<scalart> b(n_local), x(n_local),
-      x_exact(n_local, scalart(1.)/std::sqrt(N));
+    std::vector<scalart> b(n_local), x(n_local);
+#if 0
+    std::vector<scalart> x_exact(n_local, scalart(1.)/std::sqrt(N));
     A.spmv(x_exact.data(), b.data());
+#else
+    MPIComm c;
+    auto rank = c.rank();
+    // pick 2 sources in the domain
+    long long int sources[2] =
+      {nx/2 + nx * (nx/2) + nx*nx * (nx/3),
+       nx/2 + nx * (2*nx/3) + nx*nx * (nx/2)};
+    auto begin_row = A.dist()[rank];
+    auto end_row = A.dist()[rank+1];
+    for (auto i : sources)
+      if (i >= begin_row && i < end_row)
+        b[i - begin_row] = 1.;
+#endif
 
     spss.solve(b.data(), x.data());
 
@@ -141,13 +163,13 @@ int main(int argc, char* argv[]) {
       std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
                 << scaled_res << std::endl;
 
-    strumpack::blas::axpy
-      (n_local, std::complex<realt>(-1.), x_exact.data(), 1, x.data(), 1);
-    auto nrm_error = norm2(x, MPIComm());
-    auto nrm_x_exact = norm2(x_exact, MPIComm());
-    if (!rank)
-      std::cout << "# RELATIVE ERROR = "
-                << (nrm_error/nrm_x_exact) << std::endl;
+    // strumpack::blas::axpy
+    //   (n_local, std::complex<realt>(-1.), x_exact.data(), 1, x.data(), 1);
+    // auto nrm_error = norm2(x, MPIComm());
+    // auto nrm_x_exact = norm2(x_exact, MPIComm());
+    // if (!rank)
+    //   std::cout << "# RELATIVE ERROR = "
+    //             << (nrm_error/nrm_x_exact) << std::endl;
   }
   TimerList::Finalize();
   scalapack::Cblacs_exit(1);
