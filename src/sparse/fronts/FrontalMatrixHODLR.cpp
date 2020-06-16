@@ -28,6 +28,7 @@
  */
 
 #include "FrontalMatrixHODLR.hpp"
+#include "ExtendAdd.hpp"
 
 namespace strumpack {
 
@@ -51,43 +52,47 @@ namespace strumpack {
     }
   }
 
+  template<typename scalar_t,typename integer_t> DenseMatrix<scalar_t>
+  FrontalMatrixHODLR<scalar_t,integer_t>::get_dense_CB() const {
+    const std::size_t dupd = dim_upd();
+    DenseM_t CB(dupd, dupd), id(dupd, dupd);
+    TIMER_TIME(TaskType::F22_MULT, 1, t_f22mult);
+#if defined(STRUMPACK_PERMUTE_CB)
+    if (CB_perm_.size() == dupd) {
+      CB.eye();
+      F22_->mult(Trans::N, CB, id);
+      for (std::size_t c=0; c<dupd; c++) {
+        auto pc = CB_perm_[c];
+        for (std::size_t r=0; r<dupd; r++)
+          CB(r, c) = id(CB_perm_[r], pc);
+      }
+    } else {
+      id.eye();
+      F22_->mult(Trans::N, id, CB);
+    }
+#else
+    id.eye();
+    F22_->mult(Trans::N, id, CB);
+#endif
+    TIMER_STOP(t_f22mult);
+#if defined(STRUMPACK_COUNT_FLOPS)
+    long long int f = F22_->get_stat("Flop_C_Mult");
+    STRUMPACK_CB_SAMPLE_FLOPS(f);
+    STRUMPACK_FLOPS(f);
+#endif
+    return CB;
+  }
+
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLR<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const F_t* p, int task_depth) {
-    const std::size_t pdsep = paF11.rows();
     const std::size_t dupd = dim_upd();
     if (!dupd) return;
+    const std::size_t pdsep = paF11.rows();
     std::size_t upd2sep;
     auto I = this->upd_to_parent(p, upd2sep);
-    DenseM_t CB(dupd, dupd);
-    {
-      DenseM_t id(dupd, dupd);
-      TIMER_TIME(TaskType::F22_MULT, 1, t_f22mult);
-#if defined(STRUMPACK_PERMUTE_CB)
-      if (CB_perm_.size() == dupd) {
-        CB.eye();
-        F22_->mult(Trans::N, CB, id);
-        for (std::size_t c=0; c<dupd; c++) {
-          auto pc = CB_perm_[c];
-          for (std::size_t r=0; r<dupd; r++)
-            CB(r, c) = id(CB_perm_[r], pc);
-        }
-      } else {
-        id.eye();
-        F22_->mult(Trans::N, id, CB);
-      }
-#else
-      id.eye();
-      F22_->mult(Trans::N, id, CB);
-#endif
-      TIMER_STOP(t_f22mult);
-#if defined(STRUMPACK_COUNT_FLOPS)
-      long long int f = F22_->get_stat("Flop_C_Mult");
-      STRUMPACK_CB_SAMPLE_FLOPS(f);
-      STRUMPACK_FLOPS(f);
-#endif
-    }
+    auto CB = get_dense_CB();
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop default(shared) grainsize(64)      \
   if(task_depth < params::task_recursion_cutoff_level)
@@ -107,6 +112,17 @@ namespace strumpack {
       }
     }
     release_work_memory();
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLR<scalar_t,integer_t>::extend_add_copy_to_buffers
+  (std::vector<std::vector<scalar_t>>& sbuf,
+   const FrontalMatrixMPI<scalar_t,integer_t>* pa) const {
+    const std::size_t dupd = dim_upd();
+    if (!dupd) return;
+    auto CB = get_dense_CB();
+    ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers
+      (CB, sbuf, pa, this);
   }
 
   template<typename scalar_t,typename integer_t> void

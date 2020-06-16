@@ -57,6 +57,10 @@ namespace strumpack {
     (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
      const F_t* p, int task_depth) override;
 
+    void extend_add_copy_to_buffers
+    (std::vector<std::vector<scalar_t>>& sbuf,
+     const FrontalMatrixMPI<scalar_t,integer_t>* pa) const override;
+
     void sample_CB
     (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
      int task_depth=0) const override;
@@ -148,6 +152,8 @@ namespace strumpack {
     void compress_flops_F12_F21();
     void compress_flops_F22();
     void compress_flops_Schur(long long int invf11_mult_flops);
+
+    DenseM_t get_dense_CB() const;
 
     using F_t::lchild_;
     using F_t::rchild_;
