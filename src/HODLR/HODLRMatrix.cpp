@@ -384,7 +384,7 @@ namespace strumpack {
       HODLR_createstats<scalar_t>(stats_);
 
       // set hodlr options
-      HODLR_set_I_option<scalar_t>(options_, "verbosity", opts.verbose() ? 1 : -2);
+      HODLR_set_I_option<scalar_t>(options_, "verbosity", opts.verbose() ? 2 : -2);
       // HODLR_set_I_option<scalar_t>(options_, "Nbundle", 8);
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
       HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
@@ -401,6 +401,7 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "cpp", 1);
       HODLR_set_I_option<scalar_t>(options_, "forwardN15flag", 0);
       HODLR_set_D_option<scalar_t>(options_, "sample_para", opts.BF_sampling_parameter());
+      HODLR_set_D_option<scalar_t>(options_, "sample_para_outer", opts.BF_sampling_parameter());
       HODLR_set_D_option<scalar_t>(options_, "rankrate", opts.rank_rate());
       if (opts.butterfly_levels() > 0)
         HODLR_set_I_option<scalar_t>(options_, "LRlevel", opts.butterfly_levels());
@@ -412,6 +413,7 @@ namespace strumpack {
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::set_sampling_parameter(double sample_param) {
       HODLR_set_D_option<scalar_t>(options_, "sample_para", sample_param);
+      HODLR_set_D_option<scalar_t>(options_, "sample_para_outer", sample_param);
     }
 
     template<typename scalar_t> void HODLRMatrix<scalar_t>::perm_init() {
