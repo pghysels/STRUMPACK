@@ -375,13 +375,8 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> integer_t
-  FrontalMatrixHSSMPI<scalar_t,integer_t>::maximum_rank(int task_depth) const {
-    integer_t mr = H_->max_rank();
-    if (visit(lchild_))
-      mr = std::max(mr, lchild_->maximum_rank(task_depth));
-    if (visit(rchild_))
-      mr = std::max(mr, rchild_->maximum_rank(task_depth));
-    return mr;
+  FrontalMatrixHSSMPI<scalar_t,integer_t>::front_rank(int task_depth) const {
+    return H_->max_rank();
   }
 
   template<typename scalar_t,typename integer_t> void

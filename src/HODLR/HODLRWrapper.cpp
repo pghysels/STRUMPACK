@@ -287,7 +287,7 @@ namespace strumpack {
       C2Fptr elems), C2Fptr fdata) {
       d_c_bf_construct_element_compute
         (&lr_bf, &options, &stats, &msh, &kerquant, &ptree,
-         C_FuncZmnBlock, fdata);
+         nullptr, C_FuncZmnBlock, fdata);
     }
     template<> void LRBF_construct_element_compute<std::complex<double>>
     (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
@@ -298,7 +298,7 @@ namespace strumpack {
       C2Fptr elems), C2Fptr fdata) {
       z_c_bf_construct_element_compute
         (&lr_bf, &options, &stats, &msh, &kerquant, &ptree,
-         reinterpret_cast<void(*)
+         nullptr, reinterpret_cast<void(*)
          (int*, int*, int*, int*, int*, int*, _Complex double*,
           int*, int*, int*, int*, int*, C2Fptr)>(C_FuncZmnBlock), fdata);
     }
@@ -312,6 +312,11 @@ namespace strumpack {
         (&ho_bf, &options, &msh, &stats, &ptree, &Ninter, &Nallrows,
          &Nallcols, &Nalldat_loc, allrows, allcols, alldat_loc,
          rowidx, colidx, pgidx, &Npmap, pmaps);
+#if defined(STRUMPACK_COUNT_FLOPS)
+      long long int f = BPACK_get_stat<double>(stats, "Flop_C_Extract");
+      STRUMPACK_FLOPS(f);
+      STRUMPACK_EXTRACTION_FLOPS(f);
+#endif
     }
     template<> void HODLR_extract_elements<std::complex<double>>
     (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
@@ -323,6 +328,11 @@ namespace strumpack {
          &Ninter, &Nallrows, &Nallcols, &Nalldat_loc,
          allrows, allcols, reinterpret_cast<_Complex double*>(alldat_loc),
          rowidx, colidx, pgidx, &Npmap, pmaps);
+#if defined(STRUMPACK_COUNT_FLOPS)
+      long long int f = BPACK_get_stat<double>(stats, "Flop_C_Extract");
+      STRUMPACK_FLOPS(f);
+      STRUMPACK_EXTRACTION_FLOPS(f);
+#endif
     }
 
     template<> void LRBF_extract_elements<double>
@@ -335,6 +345,11 @@ namespace strumpack {
          &Ninter, &Nallrows, &Nallcols, &Nalldat_loc,
          allrows, allcols, alldat_loc,
          rowidx, colidx, pgidx, &Npmap, pmaps);
+#if defined(STRUMPACK_COUNT_FLOPS)
+      long long int f = BPACK_get_stat<double>(stats, "Flop_C_Extract");
+      STRUMPACK_FLOPS(f);
+      STRUMPACK_EXTRACTION_FLOPS(f);
+#endif
     }
     template<> void LRBF_extract_elements<std::complex<double>>
     (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
@@ -346,6 +361,11 @@ namespace strumpack {
          &Ninter, &Nallrows, &Nallcols, &Nalldat_loc,
          allrows, allcols, reinterpret_cast<_Complex double*>(alldat_loc),
          rowidx, colidx, pgidx, &Npmap, pmaps);
+#if defined(STRUMPACK_COUNT_FLOPS)
+      long long int f = BPACK_get_stat<double>(stats, "Flop_C_Extract");
+      STRUMPACK_FLOPS(f);
+      STRUMPACK_EXTRACTION_FLOPS(f);
+#endif
     }
 
     template<> void HODLR_deletestats<float>(F2Cptr& stats) { std::cout << "TODO: HODLR_deletestats" << std::endl; }

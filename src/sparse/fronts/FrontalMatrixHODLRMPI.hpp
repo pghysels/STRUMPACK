@@ -33,6 +33,8 @@
 #include "HODLR/HODLRMatrix.hpp"
 #include "HODLR/ButterflyMatrix.hpp"
 
+// #define STRUMPACK_PERMUTE_CB
+
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
@@ -61,6 +63,9 @@ namespace strumpack {
 
     void skinny_extend_add(DistM_t& cSl, DistM_t& cSr, DistM_t& S);
 
+    void extend_add_copy_to_buffers
+    (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override;
+
     void multifrontal_factorization
     (const SpMat_t& A, const Opts_t& opts,
      int etree_level=0, int task_depth=0) override;
@@ -73,7 +78,7 @@ namespace strumpack {
      int etree_level=0) const override;
 
     long long node_factor_nonzeros() const;
-    integer_t maximum_rank(int task_depth) const;
+    integer_t front_rank(int task_depth=0) const;
     std::string type() const override { return "FrontalMatrixHODLRMPI"; }
 
     void extract_CB_sub_matrix_2d
@@ -90,6 +95,9 @@ namespace strumpack {
     HODLR::ButterflyMatrix<scalar_t> F12_, F21_;
     std::unique_ptr<HODLR::HODLRMatrix<scalar_t>> F22_;
     HSS::HSSPartitionTree sep_tree_;
+#if defined(STRUMPACK_PERMUTE_CB)
+    std::vector<integer_t> CB_perm_, CB_iperm_;
+#endif
 
     void construct_hierarchy(const SpMat_t& A, const Opts_t& opts);
     void compress_sampling(const SpMat_t& A, const Opts_t& opts);

@@ -85,7 +85,7 @@ namespace strumpack {
      std::vector<DistM_t>& B) const override;
 
     long long node_factor_nonzeros() const override;
-    integer_t maximum_rank(int task_depth) const override;
+    integer_t front_rank(int task_depth=0) const override;
     bool isHSS() const override { return true; };
     std::string type() const override { return "FrontalMatrixHSSMPI"; }
 

@@ -418,6 +418,8 @@ namespace strumpack {
 
       void extract_elements
       (const VecVec_t& I, const VecVec_t& J, std::vector<DistM_t>& B);
+      void extract_elements
+      (const VecVec_t& I, const VecVec_t& J, std::vector<DenseM_t>& B);
 
       /**
        * Extract a submatrix defined by index sets I (rows) and J
@@ -442,6 +444,8 @@ namespace strumpack {
        * cyclic format.
        */
       DistM_t dense(const BLACSGrid* g) const;
+
+      void set_sampling_parameter(double sample_param);
 
       DenseM_t redistribute_2D_to_1D(const DistM_t& R) const;
       void redistribute_2D_to_1D(const DistM_t& R2D, DenseM_t& R1D) const;

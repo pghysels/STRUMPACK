@@ -76,6 +76,8 @@ namespace strumpack {
     void sort_rows();
 
     void permute(const integer_t* order, const integer_t* iorder);
+    void permute_rows(const integer_t* iorder);
+    void permute_cols(const integer_t* order);
 
     void permute_local(const std::vector<integer_t>& order,
                        const std::vector<integer_t>& iorder,
@@ -93,7 +95,7 @@ namespace strumpack {
     template<typename int_t> DenseMatrix<bool>
     admissibility(const std::vector<int_t>& tiles) const;
 
-    void print_dense(const std::string& name) const;
+    void print_dense(const std::string& name, integer_t cols=-1) const;
 
   private:
     std::vector<integer_t> ptr_, ind_;

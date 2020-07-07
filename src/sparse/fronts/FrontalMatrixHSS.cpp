@@ -496,18 +496,8 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> integer_t
-  FrontalMatrixHSS<scalar_t,integer_t>::maximum_rank(int task_depth) const {
-    integer_t r = _H.rank(), rl = 0, rr = 0;
-    if (lchild_)
-#pragma omp task untied default(shared)                                 \
-  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-      rl = lchild_->maximum_rank(task_depth+1);
-    if (rchild_)
-#pragma omp task untied default(shared)                                 \
-  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-      rr = rchild_->maximum_rank(task_depth+1);
-#pragma omp taskwait
-    return std::max(r, std::max(rl, rr));
+  FrontalMatrixHSS<scalar_t,integer_t>::front_rank(int task_depth) const {
+    return _H.rank();
   }
 
   template<typename scalar_t,typename integer_t> void

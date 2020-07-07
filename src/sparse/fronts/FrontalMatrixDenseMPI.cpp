@@ -146,7 +146,12 @@ namespace strumpack {
       }
       if (Comm().is_root() && opts.verbose()) {
         auto time = pf.elapsed();
-        std::cout << "# DenseMPI factorization complete, GPU=" << opts.use_gpu()
+        std::cout << "# DenseMPI factorization complete, "
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+                  << "GPU=" << opts.use_gpu()
+#else
+                  << "no GPU support"
+#endif
                   << ", P=" << Comm().size() << ", T=" << params::num_threads
                   << ": " << time << " seconds, "
                   << flops / 1.e9  << " GFLOPS, "

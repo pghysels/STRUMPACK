@@ -33,6 +33,8 @@
 #include "HODLR/HODLRMatrix.hpp"
 #include "HODLR/ButterflyMatrix.hpp"
 
+// #define STRUMPACK_PERMUTE_CB
+
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t> class FrontalMatrixHODLR
@@ -55,6 +57,10 @@ namespace strumpack {
     (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
      const F_t* p, int task_depth) override;
 
+    void extend_add_copy_to_buffers
+    (std::vector<std::vector<scalar_t>>& sbuf,
+     const FrontalMatrixMPI<scalar_t,integer_t>* pa) const override;
+
     void sample_CB
     (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
      int task_depth=0) const override;
@@ -72,12 +78,21 @@ namespace strumpack {
      int task_depth=0) const override;
 
     void element_extraction
-    (const SpMat_t& A, const std::vector<std::size_t>& gI,
-     const std::vector<std::size_t>& gJ, DenseM_t& B, int task_depth);
+    (const SpMat_t& A, const std::vector<std::vector<std::size_t>>& I,
+     const std::vector<std::vector<std::size_t>>& J,
+     std::vector<DenseMW_t>& B, int task_depth, bool skip_sparse=false);
 
     void extract_CB_sub_matrix
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
      DenseM_t& B, int task_depth) const override;
+    void extract_CB_sub_matrix_blocks
+    (const std::vector<std::vector<std::size_t>>& I,
+     const std::vector<std::vector<std::size_t>>& J,
+     std::vector<DenseM_t>& Bseq, int task_depth) const override;
+    void extract_CB_sub_matrix_blocks
+    (const std::vector<std::vector<std::size_t>>& I,
+     const std::vector<std::vector<std::size_t>>& J,
+     std::vector<DenseMW_t>& Bseq, int task_depth) const override;
 
     void release_work_memory() override;
     void random_sampling
@@ -96,7 +111,7 @@ namespace strumpack {
     (DenseM_t& y, DenseM_t* work, int etree_level=0,
      int task_depth=0) const override;
 
-    integer_t maximum_rank(int task_depth=0) const override;
+    integer_t front_rank(int task_depth=0) const override;
     void print_rank_statistics(std::ostream &out) const override;
     std::string type() const override { return "FrontalMatrixHODLR"; }
 
@@ -110,6 +125,9 @@ namespace strumpack {
     std::unique_ptr<HODLR::HODLRMatrix<scalar_t>> F22_;
     MPIComm commself_;
     HSS::HSSPartitionTree sep_tree_;
+#if defined(STRUMPACK_PERMUTE_CB)
+    std::vector<integer_t> CB_perm_, CB_iperm_;
+#endif
 
     void draw_node(std::ostream& of, bool is_root) const override;
 
@@ -134,6 +152,8 @@ namespace strumpack {
     void compress_flops_F12_F21();
     void compress_flops_F22();
     void compress_flops_Schur(long long int invf11_mult_flops);
+
+    DenseM_t get_dense_CB() const;
 
     using F_t::lchild_;
     using F_t::rchild_;

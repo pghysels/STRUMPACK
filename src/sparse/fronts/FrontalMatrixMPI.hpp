@@ -73,9 +73,11 @@ namespace strumpack {
       sample_CB(op, R, S, pa);
     }
 
+    virtual integer_t maximum_rank(int task_depth) const;
+
     void extract_2d
     (const SpMat_t& A, const VecVec_t& I, const VecVec_t& J,
-     std::vector<DistMW_t>& B) const;
+     std::vector<DistMW_t>& B, bool skip_sparse=false) const;
     void get_submatrix_2d
     (const VecVec_t& I, const VecVec_t& J,
      std::vector<DistM_t>& Bdist, std::vector<DenseM_t>& Bseq) const override;

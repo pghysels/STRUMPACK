@@ -121,6 +121,8 @@ namespace strumpack {
 
       void print_stats();
 
+      void set_sampling_parameter(double sample_param);
+
       DistM_t dense(const BLACSGrid* g) const;
 
       DenseM_t redistribute_2D_to_1D

@@ -133,12 +133,23 @@ namespace strumpack {
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
      DenseM_t& B, int task_depth) const = 0;
 
+    virtual void extract_CB_sub_matrix_blocks
+    (const std::vector<std::vector<std::size_t>>& I,
+     const std::vector<std::vector<std::size_t>>& J,
+     std::vector<DenseM_t>& Bseq, int task_depth) const;
+    virtual void extract_CB_sub_matrix_blocks
+    (const std::vector<std::vector<std::size_t>>& I,
+     const std::vector<std::vector<std::size_t>>& J,
+     std::vector<DenseMW_t>& Bseq, int task_depth) const;
+
     void extend_add_b
     (DenseM_t& b, DenseM_t& bupd, const DenseM_t& CB, const F_t* pa) const;
     void extract_b
     (const DenseM_t& y, const DenseM_t& yupd, DenseM_t& CB, const F_t* pa) const;
 
-    virtual integer_t maximum_rank(int task_depth=0) const { return 0; }
+    virtual integer_t maximum_rank(int task_depth=0) const;
+    virtual integer_t front_rank(int task_depth=0) const { return 0; }
+
     virtual long long factor_nonzeros(int task_depth=0) const;
     virtual long long dense_factor_nonzeros(int task_depth=0) const;
     virtual bool isHSS() const { return false; }
@@ -199,7 +210,11 @@ namespace strumpack {
 
     virtual void extend_add_copy_to_buffers
     (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
-      assert(false); // TODO static assert?
+      std::cerr << "FrontalMatrix::extend_add_copy_to_buffers"
+                << " not implemented for this front type!!"
+                << std::endl;
+      abort();
+      // assert(false); // TODO static assert?
     }
     virtual void extend_add_copy_from_buffers
     (DistM_t& F11, DistM_t& F12, DistM_t& F21, DistM_t& F22,

@@ -29,6 +29,7 @@
 #include <iostream>
 #include "StrumpackSparseSolverMPIDist.hpp"
 #include "sparse/CSRMatrix.hpp"
+#include "misc/TaskTimer.hpp"
 
 typedef double scalar;
 //typedef int64_t integer;
@@ -56,7 +57,7 @@ int main(int argc, char* argv[]) {
     // get number of right-hand sides
     if (argc > 2) nrhs = std::max(1, atoi(argv[2]));
     if (!myrank)
-      std::cout << "solving 3D " << n << "x" << n << " Poisson problem"
+      std::cout << "solving 3D " << n << "^3 Poisson problem"
                 << " with " << nrhs << " right hand sides" << std::endl;
 
     StrumpackSparseSolverMPIDist<scalar,integer> spss(MPI_COMM_WORLD);
@@ -99,8 +100,24 @@ int main(int argc, char* argv[]) {
     auto n_local = Adist.local_rows();
     DenseMatrix<scalar> b(n_local, nrhs), x(n_local, nrhs),
       x_exact(n_local, nrhs);
+#if 0
     x_exact.random();
     Adist.spmv(x_exact, b);
+#else
+    MPIComm c;
+    auto rank = c.rank();
+    // pick 2 sources in the domain
+    long long int sources[2] =
+      {n/2 + n * (n/2) + n*n * (n/3),
+       n/2 + n * (2*n/3) + n*n * (n/2)};
+    auto begin_row = Adist.dist()[rank];
+    auto end_row = Adist.dist()[rank+1];
+    b.zero();
+    for (auto i : sources)
+      if (i >= begin_row && i < end_row)
+        for (std::size_t j=0; j<b.cols(); j++)
+          b(i - begin_row, j) = 1.;
+#endif
 
     spss.set_matrix(Adist);
     spss.reorder(n, n, n);
@@ -117,6 +134,7 @@ int main(int argc, char* argv[]) {
                 << relerr << std::endl;
     }
   }
+  TimerList::Finalize();
   scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return 0;
