@@ -168,7 +168,7 @@ namespace strumpack {
     integer_t dim_sep = sep_end - sep_begin;
     HSS::HSSPartitionTree tree(dim_sep);
     if (dim_sep > 2 * leaf) {
-      std::fill(&order[sep_begin], &order[sep_end], integer_t(0));
+      std::fill(order+sep_begin, order+sep_end, integer_t(0));
       integer_t parts = 0;
       Length2Edges l2;
       if (conn_level == 1) l2 = length_2_edges(lo);

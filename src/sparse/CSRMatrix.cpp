@@ -372,8 +372,10 @@ namespace strumpack {
       for (int_t i=ptr_[col]; i<ptr_[col+1]; i++)
         rsums[ind_[i]]++;
     cptr[0] = 1;  // start from 1, because mc64 is fortran!
-    for (int_t r=0; r<n; r++) cptr[r+1] = cptr[r] + rsums[r];
-    for (int_t i=0; i<n; i++) rsums[i] = 0;
+    for (int_t r=0; r<n; r++) {
+      cptr[r+1] = cptr[r] + rsums[r];
+      rsums[r] = 0;
+    }
     for (int_t col=0; col<n; col++) {
       for (int_t i=ptr_[col]; i<ptr_[col+1]; i++) {
         int_t row = ind_[i];
@@ -387,7 +389,8 @@ namespace strumpack {
     strumpack_mc64ad_
       (&job, &n, &nnz, cptr, rind, dval, num,
        permutation, &liw, iw, &ldw, dw, icntl, info);
-    for (int_t i=0; i<n; i++) perm[i] = permutation[i] - 1;
+    for (int_t i=0; i<n; i++)
+      perm[i] = permutation[i] - 1;
   }
 
   // TODO tasked!!
