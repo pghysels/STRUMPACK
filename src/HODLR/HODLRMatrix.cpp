@@ -639,7 +639,7 @@ namespace strumpack {
 
     template<typename scalar_t> DistributedMatrix<scalar_t>
     HODLRMatrix<scalar_t>::dense(const BLACSGrid* g) const {
-      DistM_t A(g, rows_, cols_), I(g, rows_, cols_);
+      DistM_t A(g, rows_, cols_), I(g, cols_, cols_);
       I.eye();
       mult(Trans::N, I, A);
       return A;
