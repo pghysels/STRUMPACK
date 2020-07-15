@@ -99,7 +99,6 @@ namespace strumpack {
          reinterpret_cast<cuDoubleComplex*>(C), ldc);
     }
 
-
     inline cublasStatus_t cublasgemv
     (cublasHandle_t handle, cublasOperation_t transa,
      int m, int n, float alpha,

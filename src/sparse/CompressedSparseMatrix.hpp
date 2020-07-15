@@ -39,6 +39,7 @@
 #include <tuple>
 
 #include "misc/Tools.hpp"
+#include "misc/Triplet.hpp"
 #include "dense/DenseMatrix.hpp"
 #include "StrumpackOptions.hpp"
 
@@ -319,8 +320,17 @@ namespace strumpack {
      const std::vector<std::size_t>& J, DenseM_t& B, int depth) const = 0;
     virtual void extract_front
     (DenseM_t& F11, DenseM_t& F12, DenseM_t& F21,
-     integer_t sep_begin, integer_t sep_end,
-     const std::vector<integer_t>& upd, int depth) const = 0;
+     integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+     int depth) const = 0;
+
+    virtual void push_front_elements
+    (integer_t, integer_t, const std::vector<integer_t>&,
+     std::vector<Triplet<scalar_t>>&,
+     std::vector<Triplet<scalar_t>>&,
+     std::vector<Triplet<scalar_t>>&) const {
+      std::cout << "TODO push_front_elements!" << std::endl;
+    }
+
     virtual void front_multiply
     (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
      const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const = 0;

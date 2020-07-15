@@ -34,6 +34,8 @@
 
 namespace strumpack {
 
+  template<typename scalar_t, typename integer_t> class LevelInfo;
+
   template<typename scalar_t,typename integer_t> class FrontalMatrixCUBLAS
     : public FrontalMatrix<scalar_t,integer_t> {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
@@ -41,8 +43,8 @@ namespace strumpack {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
-    using uniq_scalar_t = std::unique_ptr
-      <scalar_t[], std::function<void(scalar_t*)>>;
+    // using uniq_scalar_t = std::unique_ptr
+    //   <scalar_t[], std::function<void(scalar_t*)>>;
 
   public:
     FrontalMatrixCUBLAS
@@ -101,11 +103,10 @@ namespace strumpack {
 #endif
 
   private:
-    uniq_scalar_t factor_mem_;
+    std::unique_ptr<scalar_t> factor_mem_;
     DenseMW_t F11_, F12_, F21_, F22_;
     std::vector<int> piv; // regular int because it is passed to BLAS
-    void* all_work_mem_ = nullptr;
-
+    void* all_work_mem_;
 
     FrontalMatrixCUBLAS(const FrontalMatrixCUBLAS&) = delete;
     FrontalMatrixCUBLAS& operator=(FrontalMatrixCUBLAS const&) = delete;
@@ -119,6 +120,8 @@ namespace strumpack {
     using F_t::rchild_;
     using F_t::dim_sep;
     using F_t::dim_upd;
+
+    template<typename T,typename I> friend class LevelInfo;
   };
 
 } // end namespace strumpack

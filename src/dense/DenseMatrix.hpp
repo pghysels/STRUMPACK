@@ -39,6 +39,10 @@
 
 #include "misc/RandomWrapper.hpp"
 #include "BLASLAPACKWrapper.hpp"
+#if defined(STRUMPACK_USE_CUBLAS)
+#include "dense/CUDAWrapper.hpp"
+#endif
+
 
 namespace strumpack {
 
@@ -248,7 +252,7 @@ namespace strumpack {
      * \param j Column index, j < cols()
      */
     inline const scalar_t& operator()(std::size_t i, std::size_t j) const
-    { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return data_[i+ld_*j]; }
+    { assert(i<=rows() && j<=cols()); return data_[i+ld_*j]; }
 
     /**
      * Const pointer to element (i,j) in the matrix. This will do a
@@ -259,7 +263,7 @@ namespace strumpack {
      * \param j Column index, j < cols()
      */
     inline const scalar_t* ptr(std::size_t i, std::size_t j) const
-    { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return data_+i+ld_*j; }
+    { assert(i<=rows() && j<=cols()); return data_+i+ld_*j; }
 
     /**
      * Reference to element (i,j) in the matrix. This will do a bounds
@@ -270,7 +274,7 @@ namespace strumpack {
      * \param j Column index, j < cols()
      */
     inline scalar_t& operator()(std::size_t i, std::size_t j)
-    { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return data_[i+ld_*j]; }
+    { assert(i<=rows() && j<=cols()); return data_[i+ld_*j]; }
 
     /**
      * Pointer to element (i,j) in the matrix. This will do a bounds
@@ -281,7 +285,7 @@ namespace strumpack {
      * \param j Column index, j < cols()
      */
     inline scalar_t* ptr(std::size_t i, std::size_t j)
-    { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return data_+i+ld_*j; }
+    { assert(i<=rows() && j<=cols()); return data_+i+ld_*j; }
 
     /**
      * Print the matrix to std::cout, in a format interpretable by
@@ -661,6 +665,13 @@ namespace strumpack {
     std::vector<int> LU(int depth=0);
 
     /**
+     * Same as LU, but will not try to do any threading.
+     *
+     * \see laswp, solve
+     */
+    std::vector<int> LU_seq();
+
+    /**
      * Compute a Cholesky factorization of this matrix in-place. This
      * calls the LAPACK routine DPOTRF. Only the lower triangle is
      * written. Only the lower triangle is referenced/stored.
@@ -726,6 +737,12 @@ namespace strumpack {
      */
     void solve_LU_in_place
     (DenseMatrix<scalar_t>& b, const std::vector<int>& piv, int depth=0) const;
+
+    /**
+     * Same as solve_LU_in_place, but will not try any threading.
+     */
+    void solve_LU_in_place_seq
+    (DenseMatrix<scalar_t>& b, const std::vector<int>& piv) const;
 
     /**
      * Solve a linear system Ax=b with this matrix, factored in its
@@ -1251,6 +1268,22 @@ namespace strumpack {
        const DenseMatrix<scalar_t>& b, scalar_t beta,
        DenseMatrix<scalar_t>& c, int depth=0);
 
+
+  /**
+   * Same as gemm, but this will not try any threading.
+   */
+  template<typename scalar_t> void
+  gemm_seq(Trans ta, Trans tb, scalar_t alpha, const DenseMatrix<scalar_t>& a,
+           const DenseMatrix<scalar_t>& b, scalar_t beta,
+           DenseMatrix<scalar_t>& c);
+
+#if defined(STRUMPACK_USE_CUBLAS)
+  template<typename scalar_t> cublasStatus_t
+  gemm_cuda(cublasHandle_t handle, cublasOperation_t ta, cublasOperation_t tb,
+            scalar_t alpha, const DenseMatrix<scalar_t>& a,
+            const DenseMatrix<scalar_t>& b, scalar_t beta,
+            DenseMatrix<scalar_t>& c);
+#endif
 
   template<typename scalar_t> void
   gemm(Trans ta, Trans tb, scalar_t alpha, const DenseMatrix<scalar_t>& a,

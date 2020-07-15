@@ -32,6 +32,13 @@ if(STRUMPACK_USE_CUBLAS)
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixCUBLAS.hpp)
 endif()
 
+if(STRUMPACK_USE_CUDA)
+  target_sources(strumpack
+    PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixCUDA.cu
+    ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixCUDA.hpp)
+endif()
+
 if(STRUMPACK_USE_ZFP)
   target_sources(strumpack
     PRIVATE
