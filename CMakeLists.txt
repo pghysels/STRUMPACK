@@ -4,10 +4,9 @@ project(STRUMPACK VERSION 3.3.0 LANGUAGES CXX C Fortran)
 
 option(STRUMPACK_USE_MPI     "Build with MPI support" ON)
 option(STRUMPACK_USE_OPENMP  "Use OpenMP for on-node threading tasking" ON)
+option(STRUMPACK_USE_CUDA    "Use CUDA for NVIDIA GPU acceleration" ON)
 
 option(TPL_ENABLE_SLATE      "Use SLATE, the ECP ScaLAPACK replacement" OFF)
-option(TPL_ENABLE_CUBLAS     "Build with support for cuBLAS/cuSOLVER" OFF)
-option(TPL_ENABLE_CUDA       "Build with support for CUDA" OFF)
 option(TPL_ENABLE_PARMETIS   "Build with support for ParMetis" ON)
 option(TPL_ENABLE_SCOTCH     "Build with support for Scotch" ON)
 option(TPL_ENABLE_PTSCOTCH   "Build with support for PTScotch" ON)
@@ -23,6 +22,8 @@ option(STRUMPACK_DEV_TESTING "Enable extensive testing" OFF)
 include(CheckLibraryExists)
 # include(CMakePushCheckState)
 include(CheckCXXSourceCompiles)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules")
 
 # figure out Fortran/C name mangling
 include(FortranCInterface)
@@ -80,6 +81,20 @@ if(STRUMPACK_USE_OPENMP)
   endif()
 else()
   message(STATUS "OpenMP support was not enabled.")
+endif()
+
+if(STRUMPACK_USE_CUDA)
+  include(CheckLanguage)
+  check_language(CUDA)
+  if(CMAKE_CUDA_COMPILER)
+    enable_language(CUDA)
+    # will be in CMake 3.17? for now we have a copy in cmake/Modules
+    find_package(CUDAToolkit REQUIRED)
+  else()
+    message(WARNING "CUDA compiler not found,"
+      "proceeding without CUDA support.")
+    set(STRUMPACK_USE_CUDA OFF)
+  endif()
 endif()
 
 
@@ -204,9 +219,6 @@ endif()
 check_cxx_source_compiles("#include <getopt.h>
 int main(int argc, char* argv[]) { getopt_long(argc, argv, \"\", 0, 0); }"
   STRUMPACK_USE_GETOPT)
-
-
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules")
 
 
 if(STRUMPACK_USE_MPI)
@@ -361,17 +373,6 @@ if(TPL_ENABLE_SLATE)
     message(WARNING "Could not find SLATE.\n"
       "Define TPL_SLATE_LIBRARIES and TPL_SLATE_INCLUDE_DIRS")
   endif()
-endif()
-
-if(TPL_ENABLE_CUDA)
-  enable_language(CUDA)
-  option(STRUMPACK_USE_CUDA "" ON)
-  set(TPL_ENABLE_CUBLAS ON)
-endif()
-if(TPL_ENABLE_CUBLAS)
-  # will be in CMake 3.17? for now we have a copy in cmake/Modules
-  find_package(CUDAToolkit REQUIRED)
-  option(STRUMPACK_USE_CUBLAS "" ON)
 endif()
 
 if(TPL_ENABLE_COMBBLAS)

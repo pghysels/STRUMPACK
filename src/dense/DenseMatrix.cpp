@@ -814,7 +814,7 @@ namespace strumpack {
   }
 
 
-#if defined(STRUMPACK_USE_CUBLAS)
+#if defined(STRUMPACK_USE_CUDA)
   template<typename scalar_t> cublasStatus_t
   gemm_cuda(cublasHandle_t handle, cublasOperation_t ta, cublasOperation_t tb,
             scalar_t alpha, const DenseMatrix<scalar_t>& a,
@@ -1146,7 +1146,7 @@ namespace strumpack {
    const DenseMatrix<std::complex<double>>& b, std::complex<double> beta,
    DenseMatrix<std::complex<double>>& c, int depth);
 
-#if defined(STRUMPACK_USE_CUBLAS)
+#if defined(STRUMPACK_USE_CUDA)
   template cublasStatus_t gemm_cuda
   (cublasHandle_t handle, cublasOperation_t ta, cublasOperation_t tb,
    float alpha, const DenseMatrix<float>& a,

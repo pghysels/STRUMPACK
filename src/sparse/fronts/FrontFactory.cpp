@@ -46,7 +46,7 @@
 #include "FrontalMatrixHODLRMPI.hpp"
 #endif
 #endif
-#if defined(STRUMPACK_USE_CUBLAS)
+#if defined(STRUMPACK_USE_CUDA)
 #include "FrontalMatrixCUBLAS.hpp"
 #endif
 #if defined(STRUMPACK_USE_ZFP)
@@ -66,7 +66,7 @@ namespace strumpack {
     switch (opts.compression()) {
     case CompressionType::NONE: {
       if (is_CUBLAS(opts)) {
-#if defined(STRUMPACK_USE_CUBLAS)
+#if defined(STRUMPACK_USE_CUDA)
         front.reset
           (new FrontalMatrixCUBLAS<scalar_t,integer_t>(s, sbegin, send, upd));
         if (root) fc.dense++;
