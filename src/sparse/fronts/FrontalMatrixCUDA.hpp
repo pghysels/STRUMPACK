@@ -38,7 +38,7 @@ namespace strumpack {
 
     template<typename T> struct AssembleData {
       AssembleData(int d1_, int d2_, T* F11_, T* F12_, T* F21_, T* F22_,
-                   int n11_, int n12_, int n21_,
+                   std::size_t n11_, std::size_t n12_, std::size_t n21_,
                    Triplet<T>* e11_, Triplet<T>* e12_, Triplet<T>* e21_)
         : d1(d1_), d2(d2_), F11(F11_), F12(F12_), F21(F21_), F22(F22_),
           n11(n11_), n12(n12_), n21(n21_), e11(e11_), e12(e12_), e21(e21_) {}
@@ -48,12 +48,23 @@ namespace strumpack {
       T *F11, *F12, *F21, *F22;
 
       // sparse matrix elements
-      int n11, n12, n21;
+      std::size_t n11, n12, n21;
       Triplet<T> *e11, *e12, *e21;
 
+      void set_ext_add_left(int dCB, T* CB, std::size_t* I) {
+        dCB1 = dCB;
+        CB1 = CB;
+        I1 = I;
+      }
+      void set_ext_add_right(int dCB, T* CB, std::size_t* I) {
+        dCB2 = dCB;
+        CB2 = CB;
+        I2 = I;
+      }
+
       // info for extend add
-      T *CB1 = nullptr, *CB2 = nullptr;
       int dCB1 = 0, dCB2 = 0;
+      T *CB1 = nullptr, *CB2 = nullptr;
       std::size_t *I1 = nullptr, *I2 = nullptr;
     };
 
@@ -68,9 +79,8 @@ namespace strumpack {
     };
 
 
-    template<typename T> void assemble(unsigned int, AssembleData<T>*);
-
-    template<typename T> void extend_add(unsigned int, AssembleData<T>*);
+    template<typename T> void
+    assemble(unsigned int, AssembleData<T>*);
 
     template<typename T, int NT=32> void
     factor_block_batch(unsigned int, FrontData<T>*);

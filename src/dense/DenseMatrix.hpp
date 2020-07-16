@@ -665,13 +665,6 @@ namespace strumpack {
     std::vector<int> LU(int depth=0);
 
     /**
-     * Same as LU, but will not try to do any threading.
-     *
-     * \see laswp, solve
-     */
-    std::vector<int> LU_seq();
-
-    /**
      * Compute a Cholesky factorization of this matrix in-place. This
      * calls the LAPACK routine DPOTRF. Only the lower triangle is
      * written. Only the lower triangle is referenced/stored.
@@ -737,12 +730,6 @@ namespace strumpack {
      */
     void solve_LU_in_place
     (DenseMatrix<scalar_t>& b, const std::vector<int>& piv, int depth=0) const;
-
-    /**
-     * Same as solve_LU_in_place, but will not try any threading.
-     */
-    void solve_LU_in_place_seq
-    (DenseMatrix<scalar_t>& b, const std::vector<int>& piv) const;
 
     /**
      * Solve a linear system Ax=b with this matrix, factored in its
@@ -1267,15 +1254,6 @@ namespace strumpack {
   gemm(Trans ta, Trans tb, scalar_t alpha, const DenseMatrix<scalar_t>& a,
        const DenseMatrix<scalar_t>& b, scalar_t beta,
        DenseMatrix<scalar_t>& c, int depth=0);
-
-
-  /**
-   * Same as gemm, but this will not try any threading.
-   */
-  template<typename scalar_t> void
-  gemm_seq(Trans ta, Trans tb, scalar_t alpha, const DenseMatrix<scalar_t>& a,
-           const DenseMatrix<scalar_t>& b, scalar_t beta,
-           DenseMatrix<scalar_t>& c);
 
 #if defined(STRUMPACK_USE_CUBLAS)
   template<typename scalar_t> cublasStatus_t

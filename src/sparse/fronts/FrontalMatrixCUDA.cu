@@ -178,28 +178,6 @@ namespace strumpack {
     }
 
 
-    template<typename T> void extend_add
-    (unsigned int nf, AssembleData<T>* dat) {
-      using T_ = typename cuda_type<T>::value_type;
-      auto dat_ = reinterpret_cast<AssembleData<T_>*>(dat);
-      unsigned int nt = 32, nb = 0;
-      for (int f=0; f<nf; f++) {
-        int b = dat[f].dCB1 / nt + (dat[f].dCB1 % nt != 0);
-        if (b > nb) nb = b;
-        b = dat[f].dCB2 / nt + (dat[f].dCB2 % nt != 0);
-        if (b > nb) nb = b;
-      }
-      dim3 block(nt, nt);
-      for (unsigned int b1=0; b1<nb; b1+=MAX_BLOCKS_Y) {
-        int nb1 = std::min(nb-b1, MAX_BLOCKS_Y);
-        for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Z) {
-          dim3 grid(nb, nb1, std::min(nf-f, MAX_BLOCKS_Z));
-          extend_add_kernel<<<grid, block>>>(b1, dat_+f);
-        }
-      }
-    }
-
-
     template<typename T> void assemble
     (unsigned int nf, AssembleData<T>* dat) {
       { // front assembly from sparse matrix
@@ -223,6 +201,25 @@ namespace strumpack {
           }
       }
       cudaDeviceSynchronize();
+      { // extend-add
+        unsigned int nt = 16, nb = 0;
+        for (int f=0; f<nf; f++) {
+          int b = dat[f].dCB1 / nt + (dat[f].dCB1 % nt != 0);
+          if (b > nb) nb = b;
+          b = dat[f].dCB2 / nt + (dat[f].dCB2 % nt != 0);
+          if (b > nb) nb = b;
+        }
+        dim3 block(nt, nt);
+        using T_ = typename cuda_type<T>::value_type;
+        auto dat_ = reinterpret_cast<AssembleData<T_>*>(dat);
+        for (unsigned int b1=0; b1<nb; b1+=MAX_BLOCKS_Y) {
+          int nb1 = std::min(nb-b1, MAX_BLOCKS_Y);
+          for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Z) {
+            dim3 grid(nb, nb1, std::min(nf-f, MAX_BLOCKS_Z));
+            extend_add_kernel<<<grid, block>>>(b1, dat_+f);
+          }
+        }
+      }
     }
 
 
@@ -479,11 +476,6 @@ namespace strumpack {
     template void assemble(unsigned int, AssembleData<double>*);
     template void assemble(unsigned int, AssembleData<std::complex<float>>*);
     template void assemble(unsigned int, AssembleData<std::complex<double>>*);
-
-    template void extend_add(unsigned int, AssembleData<float>*);
-    template void extend_add(unsigned int, AssembleData<double>*);
-    template void extend_add(unsigned int, AssembleData<std::complex<float>>*);
-    template void extend_add(unsigned int, AssembleData<std::complex<double>>*);
 
     template void factor_block_batch<float,8>(unsigned int, FrontData<float>*);
     template void factor_block_batch<double,8>(unsigned int, FrontData<double>*);

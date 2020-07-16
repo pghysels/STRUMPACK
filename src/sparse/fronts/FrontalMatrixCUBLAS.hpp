@@ -43,8 +43,6 @@ namespace strumpack {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
-    // using uniq_scalar_t = std::unique_ptr
-    //   <scalar_t[], std::function<void(scalar_t*)>>;
 
   public:
     FrontalMatrixCUBLAS
@@ -81,8 +79,6 @@ namespace strumpack {
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,
      int etree_level=0, int task_depth=0) override;
 
-    //void multifrontal_solve(DenseM_t& b) const override;
-
     void forward_multifrontal_solve
     (DenseM_t& b, DenseM_t* work, int etree_level=0,
      int task_depth=0) const override;
@@ -106,7 +102,7 @@ namespace strumpack {
     std::unique_ptr<scalar_t> factor_mem_;
     DenseMW_t F11_, F12_, F21_, F22_;
     std::vector<int> piv; // regular int because it is passed to BLAS
-    void* all_work_mem_;
+    void* dev_work_mem_ = nullptr;
 
     FrontalMatrixCUBLAS(const FrontalMatrixCUBLAS&) = delete;
     FrontalMatrixCUBLAS& operator=(FrontalMatrixCUBLAS const&) = delete;

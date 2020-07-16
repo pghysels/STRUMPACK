@@ -516,19 +516,6 @@ namespace strumpack {
     return piv;
   }
 
-  template<typename scalar_t> std::vector<int>
-  DenseMatrix<scalar_t>::LU_seq() {
-    std::vector<int> piv(rows());
-    int info = 0;
-    blas::getrf(rows(), cols(), data(), ld(), piv.data(), &info);
-    if (info) {
-      std::cerr << "ERROR: LU factorization failed with info="
-                << info << std::endl;
-      exit(1);
-    }
-    return piv;
-  }
-
   template<typename scalar_t> int
   DenseMatrix<scalar_t>::Cholesky(int depth) {
     assert(rows() == cols());
@@ -591,22 +578,6 @@ namespace strumpack {
     getrs_omp_task
       (char(Trans::N), rows(), b.cols(), data(), ld(), piv.data(),
        b.data(), b.ld(), &info, depth);
-    if (info) {
-      std::cerr << "ERROR: LU solve failed with info=" << info << std::endl;
-      exit(1);
-    }
-  }
-
-  template<typename scalar_t> void
-  DenseMatrix<scalar_t>::solve_LU_in_place_seq
-  (DenseMatrix<scalar_t>& b, const std::vector<int>& piv) const {
-    assert(b.rows() == rows());
-    assert(piv.size() >= rows());
-    int info = 0;
-    if (!rows()) return;
-    blas::getrs
-      (char(Trans::N), rows(), b.cols(), data(), ld(), piv.data(),
-       b.data(), b.ld(), &info);
     if (info) {
       std::cerr << "ERROR: LU solve failed with info=" << info << std::endl;
       exit(1);
@@ -840,24 +811,6 @@ namespace strumpack {
       blas::gemm(char(ta), char(tb), c.rows(), c.cols(),
                  (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
                  b.data(), b.ld(), beta, c.data(), c.ld());
-  }
-
-
-  template<typename scalar_t> void
-  gemm_seq(Trans ta, Trans tb, scalar_t alpha, const DenseMatrix<scalar_t>& a,
-           const DenseMatrix<scalar_t>& b, scalar_t beta,
-           DenseMatrix<scalar_t>& c) {
-    assert((ta==Trans::N && a.rows()==c.rows()) ||
-           (ta!=Trans::N && a.cols()==c.rows()));
-    assert((tb==Trans::N && b.cols()==c.cols()) ||
-           (tb!=Trans::N && b.rows()==c.cols()));
-    assert((ta==Trans::N && tb==Trans::N && a.cols()==b.rows()) ||
-           (ta!=Trans::N && tb==Trans::N && a.rows()==b.rows()) ||
-           (ta==Trans::N && tb!=Trans::N && a.cols()==b.cols()) ||
-           (ta!=Trans::N && tb!=Trans::N && a.rows()==b.cols()));
-    blas::gemm(char(ta), char(tb), c.rows(), c.cols(),
-               (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
-               b.data(), b.ld(), beta, c.data(), c.ld());
   }
 
 
@@ -1192,25 +1145,6 @@ namespace strumpack {
    const DenseMatrix<std::complex<double>>& a,
    const DenseMatrix<std::complex<double>>& b, std::complex<double> beta,
    DenseMatrix<std::complex<double>>& c, int depth);
-
-  template void gemm_seq
-  (Trans ta, Trans tb, float alpha, const DenseMatrix<float>& a,
-   const DenseMatrix<float>& b, float beta,
-   DenseMatrix<float>& c);
-  template void gemm_seq
-  (Trans ta, Trans tb, double alpha, const DenseMatrix<double>& a,
-   const DenseMatrix<double>& b, double beta,
-   DenseMatrix<double>& c);
-  template void gemm_seq
-  (Trans ta, Trans tb, std::complex<float> alpha,
-   const DenseMatrix<std::complex<float>>& a,
-   const DenseMatrix<std::complex<float>>& b, std::complex<float> beta,
-   DenseMatrix<std::complex<float>>& c);
-  template void gemm_seq
-  (Trans ta, Trans tb, std::complex<double> alpha,
-   const DenseMatrix<std::complex<double>>& a,
-   const DenseMatrix<std::complex<double>>& b, std::complex<double> beta,
-   DenseMatrix<std::complex<double>>& c);
 
 #if defined(STRUMPACK_USE_CUBLAS)
   template cublasStatus_t gemm_cuda

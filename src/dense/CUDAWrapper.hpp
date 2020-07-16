@@ -137,7 +137,7 @@ namespace strumpack {
     }
     inline cublasStatus_t cublasgemv
     (cublasHandle_t handle, cublasOperation_t transa,
-     int m, int n, std::complex<double> alpha, 
+     int m, int n, std::complex<double> alpha,
      const std::complex<double> *A, int lda,
      const std::complex<double> *B, int incb, std::complex<double> beta,
      std::complex<double> *C, int incc) {
