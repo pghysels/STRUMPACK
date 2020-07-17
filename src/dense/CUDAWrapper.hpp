@@ -50,7 +50,9 @@ namespace strumpack {
     public:
       CudaDeviceMemory() {}
       CudaDeviceMemory(std::size_t size) {
-        cudaMalloc(&data, size*sizeof(T));
+        STRUMPACK_ADD_DEVICE_MEMORY(size*sizeof(T));
+        cudaMalloc(&data_, size*sizeof(T));
+        size_ = size;
       }
       CudaDeviceMemory(const CudaDeviceMemory&) = delete;
       CudaDeviceMemory(CudaDeviceMemory<T>&& d) { *this = d;}
@@ -58,27 +60,34 @@ namespace strumpack {
       CudaDeviceMemory<T>& operator=(CudaDeviceMemory<T>&& d) {
         if (this != &d) {
           release();
-          data = d.data;
-          d.data = nullptr;
+          data_ = d.data_;
+          d.data_ = nullptr;
         }
         return *this;
       }
       ~CudaDeviceMemory() { release(); }
-      operator T*() { return data; }
-      operator void*() { return data; }
-      template<typename S> S* as() { return reinterpret_cast<S*>(data); }
+      operator T*() { return data_; }
+      operator void*() { return data_; }
+      template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
       void release() {
-        if (data) cudaFreeHost(data);
-        data = nullptr;
+        if (data_) {
+          STRUMPACK_SUB_DEVICE_MEMORY(size_*sizeof(T));
+          cudaFree(data_);
+        }
+        data_ = nullptr;
+        size_ = 0;
       }
-      T* data = nullptr;
+    private:
+      T* data_ = nullptr;
+      std::size_t size_ = 0;
     };
 
     template<typename T> class CudaHostMemory {
     public:
       CudaHostMemory() {}
       CudaHostMemory(std::size_t size) {
-        cudaMallocHost(&data, size*sizeof(T));
+        STRUMPACK_ADD_MEMORY(size*sizeof(T));
+        cudaMallocHost(&data_, size*sizeof(T));
       }
       CudaHostMemory(const CudaHostMemory&) = delete;
       CudaHostMemory(CudaHostMemory<T>&& d) { *this = d; }
@@ -86,20 +95,26 @@ namespace strumpack {
       CudaHostMemory<T>& operator=(CudaHostMemory<T>&& d) {
         if (this != & d) {
           release();
-          data = d.data;
-          d.data = nullptr;
+          data_ = d.data_;
+          d.data_ = nullptr;
         }
         return *this;
       }
       ~CudaHostMemory() { release(); }
-      operator T*() { return data; }
-      operator void*() { return data; }
-      template<typename S> S* as() { return reinterpret_cast<S*>(data); }
+      operator T*() { return data_; }
+      operator void*() { return data_; }
+      template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
       void release() {
-        if (data) cudaFreeHost(data);
-        data = nullptr;
+        if (data_) {
+          STRUMPACK_ADD_MEMORY(size_*sizeof(T));
+          cudaFreeHost(data_);
+        }
+        data_ = nullptr;
+        size_ = 0;
       }
-      T* data = nullptr;
+    private:
+      T* data_ = nullptr;
+      std::size_t size_ = 0;
     };
 
 

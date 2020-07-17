@@ -49,12 +49,15 @@ namespace strumpack {
   template<typename scalar_t> DenseMatrix<scalar_t>::DenseMatrix
   (std::size_t m, std::size_t n)
     : data_(new scalar_t[m*n]), rows_(m),
-      cols_(n), ld_(std::max(std::size_t(1), m)) { }
+      cols_(n), ld_(std::max(std::size_t(1), m)) {
+    STRUMPACK_ADD_MEMORY(rows_*cols_*sizeof(scalar_t));
+  }
 
   template<typename scalar_t> DenseMatrix<scalar_t>::DenseMatrix
   (std::size_t m, std::size_t n, const scalar_t* D, std::size_t ld)
     : data_(new scalar_t[m*n]), rows_(m), cols_(n),
       ld_(std::max(std::size_t(1), m)) {
+    STRUMPACK_ADD_MEMORY(rows_*cols_*sizeof(scalar_t));
     assert(ld >= m);
     for (std::size_t j=0; j<cols_; j++)
       for (std::size_t i=0; i<rows_; i++)
@@ -66,6 +69,7 @@ namespace strumpack {
    std::size_t i, std::size_t j)
     : data_(new scalar_t[m*n]), rows_(m), cols_(n),
       ld_(std::max(std::size_t(1), m)) {
+    STRUMPACK_ADD_MEMORY(rows_*cols_*sizeof(scalar_t));
     for (std::size_t _j=0; _j<std::min(cols_, D.cols()-j); _j++)
       for (std::size_t _i=0; _i<std::min(rows_, D.rows()-i); _i++)
         operator()(_i, _j) = D(_i+i, _j+j);
@@ -75,6 +79,7 @@ namespace strumpack {
   DenseMatrix<scalar_t>::DenseMatrix(const DenseMatrix<scalar_t>& D)
     : data_(new scalar_t[D.rows()*D.cols()]), rows_(D.rows()),
       cols_(D.cols()), ld_(std::max(std::size_t(1), D.rows())) {
+    STRUMPACK_ADD_MEMORY(rows_*cols_*sizeof(scalar_t));
     for (std::size_t j=0; j<cols_; j++)
       for (std::size_t i=0; i<rows_; i++)
         operator()(i, j) = D(i, j);
@@ -90,16 +95,23 @@ namespace strumpack {
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>::~DenseMatrix() {
-    delete[] data_;
+    if (data_) {
+      STRUMPACK_SUB_MEMORY(rows_*cols_*sizeof(scalar_t));
+      delete[] data_;
+    }
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::operator=(const DenseMatrix<scalar_t>& D) {
     if (this == &D) return *this;
     if (rows_ != D.rows() || cols_ != D.cols()) {
+      if (data_) {
+        STRUMPACK_SUB_MEMORY(rows_*cols_*sizeof(scalar_t));
+        delete[] data_;
+      }
       rows_ = D.rows();
       cols_ = D.cols();
-      delete[] data_;
+      STRUMPACK_ADD_MEMORY(rows_*cols_*sizeof(scalar_t));
       data_ = new scalar_t[rows_*cols_];
       ld_ = std::max(std::size_t(1), rows_);
     }
@@ -111,10 +123,13 @@ namespace strumpack {
 
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::operator=(DenseMatrix<scalar_t>&& D) {
+    if (data_) {
+      STRUMPACK_SUB_MEMORY(rows_*cols_*sizeof(scalar_t));
+      delete[] data_;
+    }
     rows_ = D.rows();
     cols_ = D.cols();
     ld_ = D.ld();
-    delete[] data_;
     data_ = D.data();
     D.data_ = nullptr;
     return *this;
@@ -188,20 +203,27 @@ namespace strumpack {
   }
 
   template<typename scalar_t> void DenseMatrix<scalar_t>::clear() {
+    if (data_) {
+      STRUMPACK_SUB_MEMORY(rows_*cols_*sizeof(scalar_t));
+      delete[] data_;
+    }
     rows_ = 0;
     cols_ = 0;
     ld_ = 1;
-    delete[] data_;
     data_ = nullptr;
   }
 
   template<typename scalar_t> void
   DenseMatrix<scalar_t>::resize(std::size_t m, std::size_t n) {
+    STRUMPACK_ADD_MEMORY(m*n*sizeof(scalar_t));
     auto tmp = new scalar_t[m*n];
     for (std::size_t j=0; j<std::min(cols(),n); j++)
       for (std::size_t i=0; i<std::min(rows(),m); i++)
         tmp[i+j*m] = operator()(i,j);
-    delete[] data_;
+    if (data_) {
+      STRUMPACK_SUB_MEMORY(rows_*cols_*sizeof(scalar_t));
+      delete[] data_;
+    }
     data_ = tmp;
     ld_ = std::max(std::size_t(1), m);
     rows_ = m;

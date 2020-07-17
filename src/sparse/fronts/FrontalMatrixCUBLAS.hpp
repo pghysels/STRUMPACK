@@ -48,6 +48,7 @@ namespace strumpack {
     FrontalMatrixCUBLAS
     (integer_t sep, integer_t sep_begin, integer_t sep_end,
      std::vector<integer_t>& upd);
+    ~FrontalMatrixCUBLAS();
 
     void release_work_memory() override;
 

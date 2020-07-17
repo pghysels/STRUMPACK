@@ -183,7 +183,7 @@ namespace strumpack {
 #endif
 #if defined(STRUMPACK_COUNT_FLOPS)
     f0_ = params::flops;
-    b0_ = params::bytes;
+    b0_ = params::bytes_moved;
 #endif
   }
 
@@ -224,7 +224,7 @@ namespace strumpack {
 #endif
 #if defined(STRUMPACK_COUNT_FLOPS)
     fmin_ = fmax_ = ftot_ = params::flops - f0_;
-    bmin_ = bmax_ = btot_ = params::bytes - b0_;
+    bmin_ = bmax_ = btot_ = params::bytes_moved - b0_;
 #endif
   }
 
@@ -503,44 +503,52 @@ namespace strumpack {
                   << std::endl;
         std::cout << "#   - factor flop rate = " << ftot_ / t1.elapsed() / 1e9
                   << " GFlop/s" << std::endl;
+        std::cout << "#   - factor peak memory usage (estimate) = "
+                  << double(params::peak_memory) / 1.0e6
+                  << " MB" << std::endl;
+        std::cout << "#   - factor peak device memory usage (estimate) = "
+                  << double(params::peak_device_memory)/1.e6
+                  << " MB" << std::endl;
 #endif
-        std::cout << "#   - factor memory/nonzeros = "
-                  << float(fnnz) / dfnnz * 100.0
-                  << " % of multifrontal" << std::endl;
-        std::cout << "#   - compression = " << std::boolalpha
-                  << get_name(opts_.compression()) << std::endl;
-        if (opts_.compression() == CompressionType::HSS) {
-          std::cout << "#   - maximum HSS rank = " << max_rank << std::endl;
-          std::cout << "#   - relative compression tolerance = "
-                    << opts_.HSS_options().rel_tol() << std::endl;
-          std::cout << "#   - absolute compression tolerance = "
-                    << opts_.HSS_options().abs_tol() << std::endl;
-          std::cout << "#   - "
-                    << get_name(opts_.HSS_options().random_distribution())
-                    << " distribution with "
-                    << get_name(opts_.HSS_options().random_engine())
-                    << " engine" << std::endl;
-        }
-        if (opts_.compression() == CompressionType::BLR) {
-          std::cout << "#   - relative compression tolerance = "
-                    << opts_.BLR_options().rel_tol() << std::endl;
-          std::cout << "#   - absolute compression tolerance = "
-                    << opts_.BLR_options().abs_tol() << std::endl;
-        }
+        if (opts_.compression() != CompressionType::NONE) {
+          std::cout << "#   - compression = " << std::boolalpha
+                    << get_name(opts_.compression()) << std::endl;
+          std::cout << "#   - factor memory/nonzeros = "
+                    << float(fnnz) / dfnnz * 100.0
+                    << " % of multifrontal" << std::endl;
+          if (opts_.compression() == CompressionType::HSS) {
+            std::cout << "#   - maximum HSS rank = " << max_rank << std::endl;
+            std::cout << "#   - relative compression tolerance = "
+                      << opts_.HSS_options().rel_tol() << std::endl;
+            std::cout << "#   - absolute compression tolerance = "
+                      << opts_.HSS_options().abs_tol() << std::endl;
+            std::cout << "#   - "
+                      << get_name(opts_.HSS_options().random_distribution())
+                      << " distribution with "
+                      << get_name(opts_.HSS_options().random_engine())
+                      << " engine" << std::endl;
+          }
+          if (opts_.compression() == CompressionType::BLR) {
+            std::cout << "#   - relative compression tolerance = "
+                      << opts_.BLR_options().rel_tol() << std::endl;
+            std::cout << "#   - absolute compression tolerance = "
+                      << opts_.BLR_options().abs_tol() << std::endl;
+          }
 #if defined(STRUMPACK_USE_BPACK)
-        if (opts_.compression() == CompressionType::HODLR) {
-          std::cout << "#   - maximum HODLR rank = " << max_rank << std::endl;
-          std::cout << "#   - relative compression tolerance = "
-                    << opts_.HODLR_options().rel_tol() << std::endl;
-          std::cout << "#   - absolute compression tolerance = "
-                    << opts_.HODLR_options().abs_tol() << std::endl;
-        }
+          if (opts_.compression() == CompressionType::HODLR) {
+            std::cout << "#   - maximum HODLR rank = " << max_rank << std::endl;
+            std::cout << "#   - relative compression tolerance = "
+                      << opts_.HODLR_options().rel_tol() << std::endl;
+            std::cout << "#   - absolute compression tolerance = "
+                      << opts_.HODLR_options().abs_tol() << std::endl;
+          }
 #endif
 #if defined(STRUMPACK_USE_ZFP)
-        if (opts_.compression() == CompressionType::LOSSY)
-          std::cout << "#   - lossy compression precision = "
-                    << opts_.lossy_precision() << " bitplanes" << std::endl;
+          if (opts_.compression() == CompressionType::LOSSY)
+            std::cout << "#   - lossy compression precision = "
+                      << opts_.lossy_precision() << " bitplanes" << std::endl;
 #endif
+        }
       }
       if (opts_.compression() == CompressionType::HSS)
         print_flop_breakdown_HSS();

@@ -144,6 +144,15 @@ namespace strumpack {
    std::vector<integer_t>& upd)
     : F_t(nullptr, nullptr, sep, sep_begin, sep_end, upd) {}
 
+  template<typename scalar_t,typename integer_t>
+  FrontalMatrixCUBLAS<scalar_t,integer_t>::~FrontalMatrixCUBLAS() {
+#if defined(STRUMPACK_COUNT_FLOPS)
+    const std::size_t dupd = dim_upd();
+    const std::size_t dsep = dim_sep();
+    STRUMPACK_SUB_MEMORY(dsep*(dsep+2*dupd)*sizeof(scalar_t));
+#endif
+  }
+
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixCUBLAS<scalar_t,integer_t>::release_work_memory() {
     F22_.clear();
@@ -425,6 +434,7 @@ namespace strumpack {
       }
 
       // allocate memory for the factors/pivots, on the host
+      STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
       L.f[0]->factor_mem_ = std::unique_ptr<scalar_t[]>
         (new scalar_t[L.factor_size]);
       auto fmem = L.f[0]->factor_mem_.get();

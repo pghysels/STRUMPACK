@@ -71,7 +71,11 @@ namespace strumpack { // these are all global variables
     extern int task_recursion_cutoff_level;
 
     extern std::atomic<long long int> flops;
-    extern std::atomic<long long int> bytes;
+    extern std::atomic<long long int> bytes_moved;
+    extern std::atomic<long long int> memory;
+    extern std::atomic<long long int> peak_memory;
+    extern std::atomic<long long int> device_memory;
+    extern std::atomic<long long int> peak_device_memory;
 
     extern std::atomic<long long int> CB_sample_flops;
     extern std::atomic<long long int> sparse_sample_flops;
@@ -105,7 +109,7 @@ namespace strumpack { // these are all global variables
 #define STRUMPACK_FLOPS(n)                      \
   strumpack::params::flops += n;
 #define STRUMPACK_BYTES(n)                      \
-  strumpack::params::bytes += n;
+  strumpack::params::bytes_moved += n;
 #define STRUMPACK_ID_FLOPS(n)                   \
   strumpack::params::ID_flops += n;
 #define STRUMPACK_QR_FLOPS(n)                   \
@@ -148,7 +152,32 @@ namespace strumpack { // these are all global variables
   strumpack::params::invf11_mult_flops += n
 #define STRUMPACK_HODLR_F12_MULT_FLOPS(n)       \
   strumpack::params::f12_mult_flops += n
+
+#define STRUMPACK_ADD_MEMORY(n)                                         \
+  {                                                                     \
+    strumpack::params::memory += n;                                     \
+    auto old_peak_ = strumpack::params::peak_memory.load();             \
+    while (old_peak_ < strumpack::params::memory &&                     \
+           !strumpack::params::peak_memory.compare_exchange_weak        \
+           (old_peak_, old_peak_ + strumpack::params::memory)) { }      \
+  }
+#define STRUMPACK_ADD_DEVICE_MEMORY(n)                                  \
+  {                                                                     \
+    strumpack::params::device_memory += n;                              \
+    auto old_peak_ = strumpack::params::peak_device_memory.load();      \
+    while (old_peak_ < strumpack::params::device_memory &&              \
+           !strumpack::params::peak_device_memory.compare_exchange_weak \
+           (old_peak_,                                                  \
+            old_peak_ + strumpack::params::device_memory)) { }          \
+  }
+
+#define STRUMPACK_SUB_MEMORY(n)                 \
+  strumpack::params::memory -= n;
+#define STRUMPACK_SUB_DEVICE_MEMORY(n)          \
+  strumpack::params::device_memory -= n;
+
 #else
+
 #define STRUMPACK_FLOPS(n) void(0);
 #define STRUMPACK_BYTES(n) void(0);
 #define STRUMPACK_ID_FLOPS(n) void(0);
@@ -173,6 +202,12 @@ namespace strumpack { // these are all global variables
 #define STRUMPACK_HODLR_F21_MULT_FLOPS(n) void(0);
 #define STRUMPACK_HODLR_INVF11_MULT_FLOPS(n) void(0);
 #define STRUMPACK_HODLR_F12_FILL_FLOPS(n) void(0);
+
+#define STRUMPACK_ADD_MEMORY(n) void(0);
+#define STRUMPACK_SUB_MEMORY(n) void(0);
+#define STRUMPACK_ADD_DEVICE_MEMORY(n) void(0);
+#define STRUMPACK_SUB_DEVICE_MEMORY(n) void(0);
+
 #endif
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 
