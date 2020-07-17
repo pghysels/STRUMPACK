@@ -34,10 +34,8 @@
 #include "ExtendAdd.hpp"
 #include "FrontalMatrixMPI.hpp"
 #endif
-#include <cuda_profiler_api.h>
-#if defined(STRUMPACK_USE_CUDA)
 #include "FrontalMatrixCUDA.hpp"
-#endif
+
 
 
 namespace strumpack {
@@ -265,10 +263,7 @@ namespace strumpack {
     using LevelInfo_t = LevelInfo<scalar_t,integer_t>;
 
     const int max_streams = opts.cuda_streams();
-    std::vector<cudaStream_t> stream(max_streams);
-    std::vector<cublasHandle_t> blas_handle(max_streams);
     std::vector<cusolverDnHandle_t> solver_handle(max_streams);
-    create_handles(stream, blas_handle, solver_handle);
 
     const int lvls = this->levels();
     std::vector<LevelInfo_t> ldata(lvls);
@@ -278,12 +273,12 @@ namespace strumpack {
       fp.reserve(std::pow(2, l));
       this->get_level_fronts(fp, l);
       auto& L = ldata[l];
+      // is it a problem that the solver_handle has not been created??
       L = LevelInfo_t(fp, solver_handle[0], max_streams);
       max_front_data_size = std::max
         (max_front_data_size, (L.N_8+L.N_16+L.N_32) *
          sizeof(cuda::FrontData<scalar_t>));
     }
-
     int starting_level = lvls - 1;
 
     if (!sufficient_device_memory(ldata, max_front_data_size)) {
@@ -298,6 +293,10 @@ namespace strumpack {
           (A, opts, etree_level+1, task_depth);
       starting_level = 0;
     }
+
+    std::vector<cudaStream_t> stream(max_streams);
+    std::vector<cublasHandle_t> blas_handle(max_streams);
+    create_handles(stream, blas_handle, solver_handle);
 
     cuda::FrontData<scalar_t> *host_front_data = nullptr,
       *dev_front_data = nullptr;
@@ -393,27 +392,25 @@ namespace strumpack {
       dev_work_mem_ = work_mem;
 
       if (L.N_8 || L.N_16 || L.N_32) {
-        auto f8 = host_front_data;
-        auto f16 = f8 + L.N_8;
-        auto f32 = f16 + L.N_16;
-        for (std::size_t n=0, n8=0, n16=0, n32=0; n<N; n++) {
+        for (std::size_t n=0, n8=0, n16=L.N_8, n32=L.N_8+L.N_16; n<N; n++) {
           auto& f = *(L.f[n]);
           const auto dsep = f.dim_sep();
           if (dsep <= 32) {
             cuda::FrontData<scalar_t>
               t(dsep, f.dim_upd(), f.F11_.data(), f.F12_.data(),
                 f.F21_.data(), f.F22_.data(), L.dev_piv[n]);
-            if (dsep <= 8) f8[n8++] = t;
-            else if (dsep <= 16) f16[n16++] = t;
-            else f32[n32++] = t;
+            if (dsep <= 8)       host_front_data[n8++] = t;
+            else if (dsep <= 16) host_front_data[n16++] = t;
+            else                 host_front_data[n32++] = t;
           }
         }
         cudaMemcpy(dev_front_data, host_front_data,
                    (L.N_8+L.N_16+L.N_32) * sizeof(cuda::FrontData<scalar_t>),
                    cudaMemcpyHostToDevice);
-        cuda::factor_block_batch<scalar_t,8>(L.N_8, f8);
-        cuda::factor_block_batch<scalar_t,16>(L.N_16, f16);
-        cuda::factor_block_batch<scalar_t,32>(L.N_32, f32);
+        cuda::factor_block_batch<scalar_t,8>(L.N_8, dev_front_data);
+        cuda::factor_block_batch<scalar_t,16>(L.N_16, dev_front_data + L.N_8);
+        cuda::factor_block_batch<scalar_t,32>
+          (L.N_32, dev_front_data + L.N_8 + L.N_16);
       }
 
       for (std::size_t n=0; n<N; n++) {
