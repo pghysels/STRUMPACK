@@ -436,7 +436,7 @@ namespace strumpack {
       }
 
       // allocate memory for the factors/pivots, on the host
-      L.f[0]->factor_mem_ = std::unique_ptr<scalar_t>
+      L.f[0]->factor_mem_ = std::unique_ptr<scalar_t[]>
         (new scalar_t[L.factor_size]);
       auto fmem = L.f[0]->factor_mem_.get();
       auto pmem_ = std::unique_ptr<int[]>(new int[L.piv_size]);

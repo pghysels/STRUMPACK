@@ -99,7 +99,7 @@ namespace strumpack {
 #endif
 
   private:
-    std::unique_ptr<scalar_t> factor_mem_;
+    std::unique_ptr<scalar_t[]> factor_mem_;
     DenseMW_t F11_, F12_, F21_, F22_;
     std::vector<int> piv; // regular int because it is passed to BLAS
     void* dev_work_mem_ = nullptr;
