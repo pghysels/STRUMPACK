@@ -37,9 +37,7 @@
 #include "FrontalMatrixCUDA.hpp"
 
 
-
 namespace strumpack {
-
 
   template<typename scalar_t, typename integer_t> class LevelInfo {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
@@ -149,7 +147,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixCUBLAS<scalar_t,integer_t>::release_work_memory() {
     F22_.clear();
-    if (dev_work_mem_) cudaFree(dev_work_mem_);
+    dev_work_mem_.release();
   }
 
 #if defined(STRUMPACK_USE_MPI)
@@ -298,11 +296,10 @@ namespace strumpack {
     std::vector<cublasHandle_t> blas_handle(max_streams);
     create_handles(stream, blas_handle, solver_handle);
 
-    cuda::FrontData<scalar_t> *host_front_data = nullptr,
-      *dev_front_data = nullptr;
-    // TODO check whether this works
-    cudaMallocHost(&host_front_data, max_front_data_size);
-    cudaMalloc(&dev_front_data, max_front_data_size);
+    cuda::CudaDeviceMemory<cuda::FrontData<scalar_t>>
+      dev_front_data(max_front_data_size);
+    cuda::CudaHostMemory<cuda::FrontData<scalar_t>>
+      host_front_data(max_front_data_size);
 
     for (int l=starting_level; l>=0; l--) {
       TaskTimer tl("");
@@ -311,19 +308,15 @@ namespace strumpack {
       auto N = L.f.size();
       if (opts.verbose()) L.print_info(l, lvls);
 
-      scalar_t* dev_factors = nullptr;
-      void *work_mem = nullptr;
-      // TODO check whether this works
-      cudaMalloc(&dev_factors, L.factor_size*sizeof(scalar_t));
-      cudaMalloc(&work_mem, L.work_bytes);
+      cuda::CudaDeviceMemory<scalar_t> dev_factors(L.factor_size);
+      cuda::CudaDeviceMemory<char> work_mem(L.work_bytes);
       // set all factor and schur memory to 0, on the device
       cudaMemset(dev_factors, 0, L.factor_size*sizeof(scalar_t));
       cudaMemset(work_mem, 0, L.schur_size*sizeof(scalar_t));
 
-      L.set_front_pointers(dev_factors, (scalar_t*)(work_mem), max_streams);
+      L.set_front_pointers(dev_factors, work_mem.as<scalar_t>(), max_streams);
 
-      {
-        // front assembly
+      { // front assembly
         using Trip_t = Triplet<scalar_t>;
         std::vector<Trip_t> e11, e12, e21;
         std::vector<std::array<std::size_t,3>> ne(N+1);
@@ -342,13 +335,9 @@ namespace strumpack {
         std::size_t ea_mem_size = N*sizeof(cuda::AssembleData<scalar_t>) +
           Isize*sizeof(std::size_t) +
           (e11.size()+e12.size()+e21.size())*sizeof(Trip_t);
-        void* host_ea_mem = nullptr;
-        void* dev_ea_mem = nullptr;
-        // TODO check whether this works
-        cudaMallocHost(&host_ea_mem, ea_mem_size);
-        cudaMalloc(&dev_ea_mem, ea_mem_size);
-        auto asmbl =
-          reinterpret_cast<cuda::AssembleData<scalar_t>*>(host_ea_mem);
+        cuda::CudaHostMemory<char> host_ea_mem(ea_mem_size);
+        cuda::CudaDeviceMemory<char> dev_ea_mem(ea_mem_size);
+        auto asmbl = host_ea_mem.as<cuda::AssembleData<scalar_t>>();
         auto Imem = reinterpret_cast<std::size_t*>(asmbl + N);
         auto delems = reinterpret_cast<Trip_t*>(Imem + Isize);
         auto de11 = delems;
@@ -383,13 +372,12 @@ namespace strumpack {
         cudaMemcpy(dev_ea_mem, host_ea_mem, ea_mem_size,
                    cudaMemcpyHostToDevice);
         cuda::assemble(N, asmbl);
-        cudaFreeHost(host_ea_mem);
         cudaDeviceSynchronize();
-        cudaFree(dev_ea_mem);
       }
 
-      if (dev_work_mem_) cudaFree(dev_work_mem_);
-      dev_work_mem_ = work_mem;
+      // dev_work_mem_ has the work memory of the previous level,
+      // which will be deleted
+      dev_work_mem_ = std::move(work_mem);
 
       if (L.N_8 || L.N_16 || L.N_32) {
         for (std::size_t n=0, n8=0, n16=L.N_8, n32=L.N_8+L.N_16; n<N; n++) {
@@ -408,7 +396,8 @@ namespace strumpack {
                    (L.N_8+L.N_16+L.N_32) * sizeof(cuda::FrontData<scalar_t>),
                    cudaMemcpyHostToDevice);
         cuda::factor_block_batch<scalar_t,8>(L.N_8, dev_front_data);
-        cuda::factor_block_batch<scalar_t,16>(L.N_16, dev_front_data + L.N_8);
+        cuda::factor_block_batch<scalar_t,16>
+          (L.N_16, dev_front_data + L.N_8);
         cuda::factor_block_batch<scalar_t,32>
           (L.N_32, dev_front_data + L.N_8 + L.N_16);
       }
@@ -467,25 +456,17 @@ namespace strumpack {
 
       cudaDeviceSynchronize();
 
-      // delete factors from device
-      cudaFree(dev_factors);
-
 #pragma omp parallel for
       for (std::size_t n=0; n<N; n++) {
         auto& f = *(L.f[n]);
-        const auto dsep = f.dim_sep();
-        int offset = std::distance(L.dev_piv[0], L.dev_piv[n]);
-        f.piv.assign(pmem + offset, pmem + offset + dsep);
+        auto p = pmem + std::distance(L.dev_piv[0], L.dev_piv[n]);
+        f.piv.assign(p, p + f.dim_sep());
       }
     }
 
-    // free front pointer data from device
-    cudaFreeHost(host_front_data);
-    cudaFree(dev_front_data);
-
     // if dim_upd() != 0, this is not the root node, and the
     // contribution block will still be needed by the parent
-    if (!dim_upd()) cudaFree(dev_work_mem_);
+    if (!dim_upd()) dev_work_mem_.release();
 
     destroy_handles(stream, blas_handle, solver_handle);
   }

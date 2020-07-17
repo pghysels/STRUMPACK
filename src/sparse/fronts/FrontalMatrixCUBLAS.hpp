@@ -102,7 +102,7 @@ namespace strumpack {
     std::unique_ptr<scalar_t[]> factor_mem_;
     DenseMW_t F11_, F12_, F21_, F22_;
     std::vector<int> piv; // regular int because it is passed to BLAS
-    void* dev_work_mem_ = nullptr;
+    cuda::CudaDeviceMemory<char> dev_work_mem_;
 
     FrontalMatrixCUBLAS(const FrontalMatrixCUBLAS&) = delete;
     FrontalMatrixCUBLAS& operator=(FrontalMatrixCUBLAS const&) = delete;

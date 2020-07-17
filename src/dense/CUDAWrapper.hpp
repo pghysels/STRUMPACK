@@ -46,6 +46,63 @@ namespace strumpack {
 
   namespace cuda {
 
+    template<typename T> class CudaDeviceMemory {
+    public:
+      CudaDeviceMemory() {}
+      CudaDeviceMemory(std::size_t size) {
+        cudaMalloc(&data, size*sizeof(T));
+      }
+      CudaDeviceMemory(const CudaDeviceMemory&) = delete;
+      CudaDeviceMemory(CudaDeviceMemory<T>&& d) { *this = d;}
+      CudaDeviceMemory<T>& operator=(const CudaDeviceMemory<T>&) = delete;
+      CudaDeviceMemory<T>& operator=(CudaDeviceMemory<T>&& d) {
+        if (this != &d) {
+          release();
+          data = d.data;
+          d.data = nullptr;
+        }
+        return *this;
+      }
+      ~CudaDeviceMemory() { release(); }
+      operator T*() { return data; }
+      operator void*() { return data; }
+      template<typename S> S* as() { return reinterpret_cast<S*>(data); }
+      void release() {
+        if (data) cudaFreeHost(data);
+        data = nullptr;
+      }
+      T* data = nullptr;
+    };
+
+    template<typename T> class CudaHostMemory {
+    public:
+      CudaHostMemory() {}
+      CudaHostMemory(std::size_t size) {
+        cudaMallocHost(&data, size*sizeof(T));
+      }
+      CudaHostMemory(const CudaHostMemory&) = delete;
+      CudaHostMemory(CudaHostMemory<T>&& d) { *this = d; }
+      CudaHostMemory<T>& operator=(const CudaHostMemory<T>&) = delete;
+      CudaHostMemory<T>& operator=(CudaHostMemory<T>&& d) {
+        if (this != & d) {
+          release();
+          data = d.data;
+          d.data = nullptr;
+        }
+        return *this;
+      }
+      ~CudaHostMemory() { release(); }
+      operator T*() { return data; }
+      operator void*() { return data; }
+      template<typename S> S* as() { return reinterpret_cast<S*>(data); }
+      void release() {
+        if (data) cudaFreeHost(data);
+        data = nullptr;
+      }
+      T* data = nullptr;
+    };
+
+
     inline cublasStatus_t cublasgemm
     (cublasHandle_t handle, cublasOperation_t transa,
      cublasOperation_t transb, int m, int n, int k, float alpha,
