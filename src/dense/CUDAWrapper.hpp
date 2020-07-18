@@ -106,7 +106,7 @@ namespace strumpack {
       template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
       void release() {
         if (data_) {
-          STRUMPACK_ADD_MEMORY(size_*sizeof(T));
+          STRUMPACK_SUB_MEMORY(size_*sizeof(T));
           cudaFreeHost(data_);
         }
         data_ = nullptr;
