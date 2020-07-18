@@ -39,19 +39,48 @@
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 
-#include "BLASLAPACKWrapper.hpp"
+#include "DenseMatrix.hpp"
 
 
 namespace strumpack {
 
   namespace cuda {
 
+#define cuda_check(err) {                                           \
+      strumpack::cuda::cuda_assert((err), __FILE__, __LINE__);           \
+    }
+    inline void cuda_assert
+    (cudaError_t code, const char *file, int line, bool abort=true) {
+      if (code != cudaSuccess) {
+        std::cerr << "CUDA assertion failed: "
+                  << cudaGetErrorString(code) << " "
+                  <<  file << " " << line << std::endl;
+        if (abort) exit(code);
+      }
+    }
+    inline void cuda_assert
+    (cusolverStatus_t code, const char *file, int line, bool abort=true) {
+      if (code != CUSOLVER_STATUS_SUCCESS) {
+        std::cerr << "cuSOLVER assertion failed: " << code
+                  <<  file << " " << line << std::endl;
+        if (abort) exit(code);
+      }
+    }
+    inline void cuda_assert
+    (cublasStatus_t code, const char *file, int line, bool abort=true) {
+      if (code != CUBLAS_STATUS_SUCCESS) {
+        std::cerr << "cuBLAS assertion failed: " << code
+                  <<  file << " " << line << std::endl;
+        if (abort) exit(code);
+      }
+    }
+
     template<typename T> class CudaDeviceMemory {
     public:
       CudaDeviceMemory() {}
       CudaDeviceMemory(std::size_t size) {
         STRUMPACK_ADD_DEVICE_MEMORY(size*sizeof(T));
-        cudaMalloc(&data_, size*sizeof(T));
+        cuda_check(cudaMalloc(&data_, size*sizeof(T)));
         size_ = size;
       }
       CudaDeviceMemory(const CudaDeviceMemory&) = delete;
@@ -72,7 +101,7 @@ namespace strumpack {
       void release() {
         if (data_) {
           STRUMPACK_SUB_DEVICE_MEMORY(size_*sizeof(T));
-          cudaFree(data_);
+          cuda_check(cudaFree(data_));
         }
         data_ = nullptr;
         size_ = 0;
@@ -87,7 +116,7 @@ namespace strumpack {
       CudaHostMemory() {}
       CudaHostMemory(std::size_t size) {
         STRUMPACK_ADD_MEMORY(size*sizeof(T));
-        cudaMallocHost(&data_, size*sizeof(T));
+        cuda_check(cudaMallocHost(&data_, size*sizeof(T)));
       }
       CudaHostMemory(const CudaHostMemory&) = delete;
       CudaHostMemory(CudaHostMemory<T>&& d) { *this = d; }
@@ -106,8 +135,8 @@ namespace strumpack {
       template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
       void release() {
         if (data_) {
-          STRUMPACK_ADD_MEMORY(size_*sizeof(T));
-          cudaFreeHost(data_);
+          STRUMPACK_SUB_MEMORY(size_*sizeof(T));
+          cuda_check(cudaFreeHost(data_));
         }
         data_ = nullptr;
         size_ = 0;
@@ -314,6 +343,25 @@ namespace strumpack {
         (handle, trans, n, nrhs,
          reinterpret_cast<const cuDoubleComplex*>(A), lda, devIpiv,
          reinterpret_cast<cuDoubleComplex*>(B), ldb, devInfo);
+    }
+
+    template<typename scalar_t> cublasStatus_t
+    gemm(cublasHandle_t handle, cublasOperation_t ta, cublasOperation_t tb,
+         scalar_t alpha, const DenseMatrix<scalar_t>& a,
+         const DenseMatrix<scalar_t>& b, scalar_t beta,
+         DenseMatrix<scalar_t>& c) {
+      assert((ta==CUBLAS_OP_N && a.rows()==c.rows()) ||
+             (ta!=CUBLAS_OP_N && a.cols()==c.rows()));
+      assert((tb==CUBLAS_OP_N && b.cols()==c.cols()) ||
+             (tb!=CUBLAS_OP_N && b.rows()==c.cols()));
+      assert((ta==CUBLAS_OP_N && tb==CUBLAS_OP_N && a.cols()==b.rows()) ||
+             (ta!=CUBLAS_OP_N && tb==CUBLAS_OP_N && a.rows()==b.rows()) ||
+             (ta==CUBLAS_OP_N && tb!=CUBLAS_OP_N && a.cols()==b.cols()) ||
+             (ta!=CUBLAS_OP_N && tb!=CUBLAS_OP_N && a.rows()==b.cols()));
+      return cublasgemm
+        (handle, ta, tb, c.rows(), c.cols(),
+         (ta==CUBLAS_OP_N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
+         b.data(), b.ld(), beta, c.data(), c.ld());
     }
 
   } // end namespace cuda

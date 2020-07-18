@@ -179,8 +179,9 @@ namespace strumpack {
     auto I = this->upd_to_parent(p, upd2sep);
     DenseM_t F22(dupd, dupd);
     // get the contribution block from the device
-    cudaMemcpy(F22.data(), dev_work_mem_, dupd*dupd*sizeof(scalar_t),
-               cudaMemcpyDeviceToHost);
+    cuda_check(cudaMemcpy
+               (F22.data(), dev_work_mem_, dupd*dupd*sizeof(scalar_t),
+                cudaMemcpyDeviceToHost));
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop default(shared) grainsize(64)      \
   if(task_depth < params::task_recursion_cutoff_level)
@@ -227,7 +228,7 @@ namespace strumpack {
       peak_device_mem = std::max(peak_device_mem, level_mem);
     }
     std::size_t free_device_mem, total_device_mem;
-    cudaMemGetInfo(&free_device_mem, &total_device_mem);
+    cuda_check(cudaMemGetInfo(&free_device_mem, &total_device_mem));
     // only use 90% of available memory, since we're not counting the
     // sparse elements in the peak_device_mem
     return peak_device_mem < 0.9 * free_device_mem;
@@ -238,11 +239,11 @@ namespace strumpack {
                       std::vector<cublasHandle_t>& blas_handle,
                       std::vector<cusolverDnHandle_t>& solver_handle) {
     for (std::size_t i=0; i<stream.size(); i++) {
-      cublasCreate(&blas_handle[i]);
-      cusolverDnCreate(&solver_handle[i]);
-      cudaStreamCreate(&stream[i]);
-      cublasSetStream(blas_handle[i], stream[i]);
-      cusolverDnSetStream(solver_handle[i], stream[i]);
+      cuda_check(cublasCreate(&blas_handle[i]));
+      cuda_check(cusolverDnCreate(&solver_handle[i]));
+      cuda_check(cudaStreamCreate(&stream[i]));
+      cuda_check(cublasSetStream(blas_handle[i], stream[i]));
+      cuda_check(cusolverDnSetStream(solver_handle[i], stream[i]));
     }
     if (auto err = cudaGetLastError()) {
       std::cerr << "Error in CUDA setup: "
@@ -255,9 +256,9 @@ namespace strumpack {
                        std::vector<cublasHandle_t>& blas_handle,
                        std::vector<cusolverDnHandle_t>& solver_handle) {
     for (std::size_t i=0; i<stream.size(); i++) {
-      cudaStreamDestroy(stream[i]);
-      cublasDestroy(blas_handle[i]);
-      cusolverDnDestroy(solver_handle[i]);
+      cuda_check(cudaStreamDestroy(stream[i]));
+      cuda_check(cublasDestroy(blas_handle[i]));
+      cuda_check(cusolverDnDestroy(solver_handle[i]));
     }
   }
 
@@ -320,8 +321,8 @@ namespace strumpack {
       cuda::CudaDeviceMemory<scalar_t> dev_factors(L.factor_size);
       cuda::CudaDeviceMemory<char> work_mem(L.work_bytes);
       // set all factor and schur memory to 0, on the device
-      cudaMemset(dev_factors, 0, L.factor_size*sizeof(scalar_t));
-      cudaMemset(work_mem, 0, L.schur_size*sizeof(scalar_t));
+      cuda_check(cudaMemset(dev_factors, 0, L.factor_size*sizeof(scalar_t)));
+      cuda_check(cudaMemset(work_mem, 0, L.schur_size*sizeof(scalar_t)));
 
       L.set_front_pointers(dev_factors, work_mem.as<scalar_t>(), max_streams);
 
@@ -378,10 +379,10 @@ namespace strumpack {
             Iptr += u.size();
           }
         }
-        cudaMemcpy(dev_ea_mem, host_ea_mem, ea_mem_size,
-                   cudaMemcpyHostToDevice);
+        cuda_check(cudaMemcpy(dev_ea_mem, host_ea_mem, ea_mem_size,
+                              cudaMemcpyHostToDevice));
         cuda::assemble(N, asmbl);
-        cudaDeviceSynchronize();
+        cuda_check(cudaDeviceSynchronize());
       }
 
       // dev_work_mem_ has the work memory of the previous level,
@@ -401,9 +402,10 @@ namespace strumpack {
             else                 host_front_data[n32++] = t;
           }
         }
-        cudaMemcpy(dev_front_data, host_front_data,
-                   (L.N_8+L.N_16+L.N_32) * sizeof(cuda::FrontData<scalar_t>),
-                   cudaMemcpyHostToDevice);
+        cuda_check(cudaMemcpy
+                   (dev_front_data, host_front_data,
+                    (L.N_8+L.N_16+L.N_32) * sizeof(cuda::FrontData<scalar_t>),
+                    cudaMemcpyHostToDevice));
         cuda::factor_block_batch<scalar_t,8>(L.N_8, dev_front_data);
         cuda::factor_block_batch<scalar_t,16>
           (L.N_16, dev_front_data + L.N_8);
@@ -417,18 +419,19 @@ namespace strumpack {
         const auto dsep = f.dim_sep();
         if (dsep > 32) {
           const auto dupd = f.dim_upd();
-          cuda::cusolverDngetrf
-            (solver_handle[stream], dsep, dsep, f.F11_.data(), dsep,
-             L.dev_getrf_work + stream * L.getrf_work_size,
-             L.dev_piv[n], L.dev_getrf_err + stream);
+          cuda_check(cuda::cusolverDngetrf
+                     (solver_handle[stream], dsep, dsep, f.F11_.data(), dsep,
+                      L.dev_getrf_work + stream * L.getrf_work_size,
+                      L.dev_piv[n], L.dev_getrf_err + stream));
           // TODO if (opts.replace_tiny_pivots()) { ...
           if (dupd) {
-            cuda::cusolverDngetrs
-              (solver_handle[stream], CUBLAS_OP_N, dsep, dupd,
-               f.F11_.data(), dsep, L.dev_piv[n],
-               f.F12_.data(), dsep, L.dev_getrf_err + stream);
-            gemm_cuda(blas_handle[stream], CUBLAS_OP_N, CUBLAS_OP_N,
-                      scalar_t(-1.), f.F21_, f.F12_, scalar_t(1.), f.F22_);
+            cuda_check(cuda::cusolverDngetrs
+                       (solver_handle[stream], CUBLAS_OP_N, dsep, dupd,
+                        f.F11_.data(), dsep, L.dev_piv[n],
+                        f.F12_.data(), dsep, L.dev_getrf_err + stream));
+            cuda_check(cuda::gemm
+                       (blas_handle[stream], CUBLAS_OP_N, CUBLAS_OP_N,
+                        scalar_t(-1.), f.F21_, f.F12_, scalar_t(1.), f.F22_));
           }
         }
       }
@@ -442,13 +445,14 @@ namespace strumpack {
       auto pmem = pmem_.get();
 
       // wait for device computations to complete
-      cudaDeviceSynchronize();
+      cuda_check(cudaDeviceSynchronize());
       // copy the factors from the device to the host
-      cudaMemcpyAsync(fmem, dev_factors, L.factor_size*sizeof(scalar_t),
-                      cudaMemcpyDeviceToHost, stream[1 % stream.size()]);
+      cuda_check(cudaMemcpyAsync
+                 (fmem, dev_factors, L.factor_size*sizeof(scalar_t),
+                  cudaMemcpyDeviceToHost, stream[1 % stream.size()]));
       // copy pivot vectors from the device to the host
-      cudaMemcpyAsync(pmem, L.dev_piv[0], L.piv_size*sizeof(int),
-                      cudaMemcpyDeviceToHost, stream[0]);
+      cuda_check(cudaMemcpyAsync(pmem, L.dev_piv[0], L.piv_size*sizeof(int),
+                                 cudaMemcpyDeviceToHost, stream[0]));
       // set front pointers to host memory
       L.set_front_pointers(fmem);
 
@@ -464,7 +468,7 @@ namespace strumpack {
                   << " GFLOP/s" << std::endl;
       }
 
-      cudaDeviceSynchronize();
+      cuda_check(cudaDeviceSynchronize());
 
 #pragma omp parallel for
       for (std::size_t n=0; n<N; n++) {

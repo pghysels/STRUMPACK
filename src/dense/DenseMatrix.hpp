@@ -39,9 +39,6 @@
 
 #include "misc/RandomWrapper.hpp"
 #include "BLASLAPACKWrapper.hpp"
-#if defined(STRUMPACK_USE_CUDA)
-#include "dense/CUDAWrapper.hpp"
-#endif
 
 
 namespace strumpack {
@@ -1254,14 +1251,6 @@ namespace strumpack {
   gemm(Trans ta, Trans tb, scalar_t alpha, const DenseMatrix<scalar_t>& a,
        const DenseMatrix<scalar_t>& b, scalar_t beta,
        DenseMatrix<scalar_t>& c, int depth=0);
-
-#if defined(STRUMPACK_USE_CUDA)
-  template<typename scalar_t> cublasStatus_t
-  gemm_cuda(cublasHandle_t handle, cublasOperation_t ta, cublasOperation_t tb,
-            scalar_t alpha, const DenseMatrix<scalar_t>& a,
-            const DenseMatrix<scalar_t>& b, scalar_t beta,
-            DenseMatrix<scalar_t>& c);
-#endif
 
   template<typename scalar_t> void
   gemm(Trans ta, Trans tb, scalar_t alpha, const DenseMatrix<scalar_t>& a,

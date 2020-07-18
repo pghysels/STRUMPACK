@@ -836,28 +836,6 @@ namespace strumpack {
   }
 
 
-#if defined(STRUMPACK_USE_CUDA)
-  template<typename scalar_t> cublasStatus_t
-  gemm_cuda(cublasHandle_t handle, cublasOperation_t ta, cublasOperation_t tb,
-            scalar_t alpha, const DenseMatrix<scalar_t>& a,
-            const DenseMatrix<scalar_t>& b, scalar_t beta,
-            DenseMatrix<scalar_t>& c) {
-    assert((ta==CUBLAS_OP_N && a.rows()==c.rows()) ||
-           (ta!=CUBLAS_OP_N && a.cols()==c.rows()));
-    assert((tb==CUBLAS_OP_N && b.cols()==c.cols()) ||
-           (tb!=CUBLAS_OP_N && b.rows()==c.cols()));
-    assert((ta==CUBLAS_OP_N && tb==CUBLAS_OP_N && a.cols()==b.rows()) ||
-           (ta!=CUBLAS_OP_N && tb==CUBLAS_OP_N && a.rows()==b.rows()) ||
-           (ta==CUBLAS_OP_N && tb!=CUBLAS_OP_N && a.cols()==b.cols()) ||
-           (ta!=CUBLAS_OP_N && tb!=CUBLAS_OP_N && a.rows()==b.cols()));
-    return cuda::cublasgemm
-      (handle, ta, tb, c.rows(), c.cols(),
-       (ta==CUBLAS_OP_N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
-       b.data(), b.ld(), beta, c.data(), c.ld());
-  }
-#endif
-
-
   template<typename scalar_t> void
   gemm(Trans ta, Trans tb, scalar_t alpha, const DenseMatrix<scalar_t>& a,
        const scalar_t* b, int ldb, scalar_t beta,
@@ -1167,29 +1145,6 @@ namespace strumpack {
    const DenseMatrix<std::complex<double>>& a,
    const DenseMatrix<std::complex<double>>& b, std::complex<double> beta,
    DenseMatrix<std::complex<double>>& c, int depth);
-
-#if defined(STRUMPACK_USE_CUDA)
-  template cublasStatus_t gemm_cuda
-  (cublasHandle_t handle, cublasOperation_t ta, cublasOperation_t tb,
-   float alpha, const DenseMatrix<float>& a,
-   const DenseMatrix<float>& b, float beta,
-   DenseMatrix<float>& c);
-  template cublasStatus_t gemm_cuda
-  (cublasHandle_t handle, cublasOperation_t ta, cublasOperation_t tb,
-   double alpha, const DenseMatrix<double>& a,
-   const DenseMatrix<double>& b, double beta,
-   DenseMatrix<double>& c);
-  template cublasStatus_t gemm_cuda
-  (cublasHandle_t handle, cublasOperation_t ta, cublasOperation_t tb,
-   std::complex<float> alpha, const DenseMatrix<std::complex<float>>& a,
-   const DenseMatrix<std::complex<float>>& b, std::complex<float> beta,
-   DenseMatrix<std::complex<float>>& c);
-  template cublasStatus_t gemm_cuda
-  (cublasHandle_t handle, cublasOperation_t ta, cublasOperation_t tb,
-   std::complex<double> alpha, const DenseMatrix<std::complex<double>>& a,
-   const DenseMatrix<std::complex<double>>& b, std::complex<double> beta,
-   DenseMatrix<std::complex<double>>& c);
-#endif
 
   template void gemm
   (Trans ta, Trans tb, float alpha, const DenseMatrix<float>& a,
