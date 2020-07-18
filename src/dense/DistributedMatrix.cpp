@@ -260,7 +260,7 @@ namespace strumpack {
       }
     }
     if (m.data_) {
-      STRUMPACK_SUB_MEMORY(m.lrows_*m.lcols_*sizeof(scalar_t));
+      STRUMPACK_SUB_MEMORY(m.rows_*m.cols_*sizeof(scalar_t));
       delete[] m.data_;
     }
     m.data_ = nullptr;
@@ -749,10 +749,9 @@ namespace strumpack {
       (cols()+ ((J()-1)%NB()), NB(), pcol(), IACOL, npcols());
     STRUMPACK_ADD_MEMORY(Nq0*sizeof(real_t));
     std::unique_ptr<real_t[]> work(new real_t[Nq0]);
-    auto norm = scalapack::plange
+    STRUMPACK_SUB_MEMORY(Nq0*sizeof(real_t));
+    return scalapack::plange
       ('1', rows(), cols(), data(), I(), J(), desc(), work.get());
-    STRUMPACK_SUB_MEMORY(Np0*sizeof(real_t));
-    return norm;
   }
 
   template<typename scalar_t> typename RealType<scalar_t>::value_type
@@ -763,10 +762,9 @@ namespace strumpack {
       (rows()+ ((I()-1)%MB()), MB(), prow(), IAROW, nprows());
     STRUMPACK_ADD_MEMORY(Mp0*sizeof(real_t));
     std::unique_ptr<real_t[]> work(new real_t[Mp0]);
-    auto norm = scalapack::plange
-      ('I', rows(), cols(), data(), I(), J(), desc(), work.get());
     STRUMPACK_SUB_MEMORY(Mp0*sizeof(real_t));
-    return norm;
+    return scalapack::plange
+      ('I', rows(), cols(), data(), I(), J(), desc(), work.get());
   }
 
   template<typename scalar_t> typename RealType<scalar_t>::value_type

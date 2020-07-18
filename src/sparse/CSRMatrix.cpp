@@ -422,8 +422,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::push_front_elements
   (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
-   std::vector<Triplet<scalar_t>>& e11,
-   std::vector<Triplet<scalar_t>>& e12,
+   std::vector<Triplet<scalar_t>>& e11, std::vector<Triplet<scalar_t>>& e12,
    std::vector<Triplet<scalar_t>>& e21) const {
     integer_t ds = shi - slo, du = upd.size();
     for (integer_t row=0; row<ds; row++) { // separator rows

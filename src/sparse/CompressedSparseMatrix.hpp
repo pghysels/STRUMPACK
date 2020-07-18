@@ -322,14 +322,10 @@ namespace strumpack {
     (DenseM_t& F11, DenseM_t& F12, DenseM_t& F21,
      integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
      int depth) const = 0;
-
     virtual void push_front_elements
     (integer_t, integer_t, const std::vector<integer_t>&,
-     std::vector<Triplet<scalar_t>>&,
-     std::vector<Triplet<scalar_t>>&,
-     std::vector<Triplet<scalar_t>>&) const {
-      std::cout << "TODO push_front_elements!" << std::endl;
-    }
+     std::vector<Triplet<scalar_t>>&, std::vector<Triplet<scalar_t>>&,
+     std::vector<Triplet<scalar_t>>&) const = 0;
 
     virtual void front_multiply
     (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,

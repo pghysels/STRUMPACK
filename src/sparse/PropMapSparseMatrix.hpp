@@ -79,13 +79,18 @@ namespace strumpack {
     void print_dense(const std::string& name) const override;
 
     void extract_separator
-    (integer_t sep_end, const std::vector<std::size_t>& I,
+    (integer_t shi, const std::vector<std::size_t>& I,
      const std::vector<std::size_t>& J,
      DenseM_t& B, int depth) const override;
     void extract_front
     (DenseM_t& F11, DenseM_t& F12, DenseM_t& F21,
-     integer_t sep_begin, integer_t sep_end,
+     integer_t slo, integer_t shi,
      const std::vector<integer_t>& upd, int depth) const override;
+    void push_front_elements
+    (integer_t, integer_t, const std::vector<integer_t>&,
+     std::vector<Triplet<scalar_t>>&, std::vector<Triplet<scalar_t>>&,
+     std::vector<Triplet<scalar_t>>&) const override;
+
     void extract_F11_block
     (scalar_t* F, integer_t ldF, integer_t row, integer_t nr_rows,
      integer_t col, integer_t nr_cols) const override;
@@ -98,7 +103,7 @@ namespace strumpack {
      integer_t nr_rows, integer_t col, integer_t nr_cols,
      const integer_t* upd) const override;
     void extract_separator_2d
-    (integer_t sep_end, const std::vector<std::size_t>& I,
+    (integer_t shi, const std::vector<std::size_t>& I,
      const std::vector<std::size_t>& J, DistM_t& B) const override ;
 
     void front_multiply
@@ -115,16 +120,16 @@ namespace strumpack {
      const DenseM_t& R, DenseM_t& S, int depth) const override;
 
     void front_multiply_2d
-    (integer_t sep_begin, integer_t sep_end,
+    (integer_t slo, integer_t shi,
      const std::vector<integer_t>& upd, const DistM_t& R,
      DistM_t& Srow, DistM_t& Scol, int depth) const override;
     void front_multiply_2d
-    (Trans op, integer_t sep_begin, integer_t sep_end,
+    (Trans op, integer_t slo, integer_t shi,
      const std::vector<integer_t>& upd, const DistM_t& R,
      DistM_t& S, int depth) const override {
       if (op == Trans::N)
-        front_multiply_2d_N(sep_begin, sep_end, upd, R, S, depth);
-      else front_multiply_2d_TC(sep_begin, sep_end, upd, R, S, depth);
+        front_multiply_2d_N(slo, shi, upd, R, S, depth);
+      else front_multiply_2d_TC(slo, shi, upd, R, S, depth);
     }
 
     CSRGraph<integer_t> extract_graph
@@ -171,11 +176,11 @@ namespace strumpack {
     }
 
     void front_multiply_2d_N
-    (integer_t sep_begin, integer_t sep_end,
+    (integer_t slo, integer_t shi,
      const std::vector<integer_t>& upd, const DistM_t& R,
      DistM_t& S, int depth) const;
     void front_multiply_2d_TC
-    (integer_t sep_begin, integer_t sep_end,
+    (integer_t slo, integer_t shi,
      const std::vector<integer_t>& upd, const DistM_t& R,
      DistM_t& S, int depth) const;
 

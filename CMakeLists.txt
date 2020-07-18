@@ -92,7 +92,7 @@ if(STRUMPACK_USE_CUDA)
     find_package(CUDAToolkit REQUIRED)
   else()
     message(WARNING "CUDA compiler not found,"
-      "proceeding without CUDA support.")
+      " proceeding without CUDA support.")
     set(STRUMPACK_USE_CUDA OFF)
   endif()
 endif()
