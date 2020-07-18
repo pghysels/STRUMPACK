@@ -153,22 +153,23 @@ namespace strumpack { // these are all global variables
 #define STRUMPACK_HODLR_F12_MULT_FLOPS(n)       \
   strumpack::params::f12_mult_flops += n
 
-#define STRUMPACK_ADD_MEMORY(n)                                         \
-  {                                                                     \
+#define STRUMPACK_ADD_MEMORY(n) {                                       \
     strumpack::params::memory += n;                                     \
+    auto new_peak_ = std::max(strumpack::params::memory.load(),         \
+                              strumpack::params::peak_memory.load());   \
     auto old_peak_ = strumpack::params::peak_memory.load();             \
-    while (old_peak_ < strumpack::params::memory &&                     \
+    while (new_peak_ > old_peak_ &&                                     \
            !strumpack::params::peak_memory.compare_exchange_weak        \
-           (old_peak_, old_peak_ + strumpack::params::memory)) { }      \
+           (old_peak_, new_peak_)) { }                                  \
   }
-#define STRUMPACK_ADD_DEVICE_MEMORY(n)                                  \
-  {                                                                     \
+#define STRUMPACK_ADD_DEVICE_MEMORY(n) {                                \
     strumpack::params::device_memory += n;                              \
+    auto new_peak_ = std::max(strumpack::params::device_memory.load(),  \
+                              strumpack::params::peak_device_memory.load()); \
     auto old_peak_ = strumpack::params::peak_device_memory.load();      \
-    while (old_peak_ < strumpack::params::device_memory &&              \
+    while (new_peak_ > old_peak_ &&                                     \
            !strumpack::params::peak_device_memory.compare_exchange_weak \
-           (old_peak_,                                                  \
-            old_peak_ + strumpack::params::device_memory)) { }          \
+           (old_peak_, new_peak_)) { }                                  \
   }
 
 #define STRUMPACK_SUB_MEMORY(n)                 \
