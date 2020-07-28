@@ -79,9 +79,23 @@ namespace strumpack {
     public:
       CudaDeviceMemory() {}
       CudaDeviceMemory(std::size_t size) {
-        STRUMPACK_ADD_DEVICE_MEMORY(size*sizeof(T));
-        cuda_check(cudaMalloc(&data_, size*sizeof(T)));
-        size_ = size;
+        if (size) {
+          auto e = cudaMalloc(&data_, size*sizeof(T));
+          size_ = size;
+          if (e == cudaSuccess) {
+            STRUMPACK_ADD_DEVICE_MEMORY(size*sizeof(T));
+            is_managed_ = false;
+          } else {
+            STRUMPACK_ADD_MEMORY(size*sizeof(T));
+            std::cerr << "#  cudaMalloc failed: "
+                      << cudaGetErrorString(e) << std::endl;
+            std::cerr << "#  Trying cudaMallocManaged instead ..."
+                      << std::endl;
+            cudaGetLastError(); // reset to cudaSuccess
+            cuda_check(cudaMallocManaged(&data_, size*sizeof(T)));
+            is_managed_ = true;
+          }
+        }
       }
       CudaDeviceMemory(const CudaDeviceMemory&) = delete;
       CudaDeviceMemory(CudaDeviceMemory<T>&& d) { *this = d;}
@@ -90,7 +104,10 @@ namespace strumpack {
         if (this != &d) {
           release();
           data_ = d.data_;
+          size_ = d.size_;
+          is_managed_ = d.is_managed_;
           d.data_ = nullptr;
+          d.release();
         }
         return *this;
       }
@@ -100,23 +117,42 @@ namespace strumpack {
       template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
       void release() {
         if (data_) {
-          STRUMPACK_SUB_DEVICE_MEMORY(size_*sizeof(T));
+          if (is_managed_) {
+            STRUMPACK_SUB_MEMORY(size_*sizeof(T));
+          } else {
+            STRUMPACK_SUB_DEVICE_MEMORY(size_*sizeof(T));
+          }
           cuda_check(cudaFree(data_));
         }
         data_ = nullptr;
         size_ = 0;
+        is_managed_ = false;
       }
     private:
       T* data_ = nullptr;
       std::size_t size_ = 0;
+      bool is_managed_ = false;
     };
 
     template<typename T> class CudaHostMemory {
     public:
       CudaHostMemory() {}
       CudaHostMemory(std::size_t size) {
-        STRUMPACK_ADD_MEMORY(size*sizeof(T));
-        cuda_check(cudaMallocHost(&data_, size*sizeof(T)));
+        if (size) {
+          STRUMPACK_ADD_MEMORY(size*sizeof(T));
+          auto e = cudaMallocHost(&data_, size*sizeof(T));
+          is_managed_ = false;
+          size_ = size;
+          if (e != cudaSuccess) {
+            std::cerr << "#  cudaMalloc failed: "
+                      << cudaGetErrorString(e) << std::endl;
+            std::cerr << "#  Trying cudaMallocManaged instead ..."
+                      << std::endl;
+            cudaGetLastError(); // reset to cudaSuccess
+            cuda_check(cudaMallocManaged(&data_, size*sizeof(T)));
+            is_managed_ = true;
+          }
+        }
       }
       CudaHostMemory(const CudaHostMemory&) = delete;
       CudaHostMemory(CudaHostMemory<T>&& d) { *this = d; }
@@ -125,7 +161,10 @@ namespace strumpack {
         if (this != & d) {
           release();
           data_ = d.data_;
+          size_ = d.size_;
+          is_managed_ = d.is_managed_;
           d.data_ = nullptr;
+          d.release();
         }
         return *this;
       }
@@ -136,14 +175,20 @@ namespace strumpack {
       void release() {
         if (data_) {
           STRUMPACK_SUB_MEMORY(size_*sizeof(T));
-          cuda_check(cudaFreeHost(data_));
+          if (!is_managed_) {
+            cuda_check(cudaFreeHost(data_));
+          } else {
+            cuda_check(cudaFree(data_));
+          }
         }
         data_ = nullptr;
         size_ = 0;
+        is_managed_ = false;
       }
     private:
       T* data_ = nullptr;
       std::size_t size_ = 0;
+      bool is_managed_ = false;
     };
 
 

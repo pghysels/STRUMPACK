@@ -245,11 +245,6 @@ namespace strumpack {
       cuda_check(cublasSetStream(blas_handle[i], stream[i]));
       cuda_check(cusolverDnSetStream(solver_handle[i], stream[i]));
     }
-    if (auto err = cudaGetLastError()) {
-      std::cerr << "Error in CUDA setup: "
-                << cudaGetErrorString(err) << std::endl;
-      exit(-1);
-    }
   }
 
   void destroy_handles(std::vector<cudaStream_t>& stream,
