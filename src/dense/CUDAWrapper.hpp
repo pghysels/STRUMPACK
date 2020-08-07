@@ -56,6 +56,10 @@ namespace strumpack {
     void cuda_assert(cublasStatus_t code, const char *file, int line,
                      bool abort=true);
 
+    inline void init() {
+      gpu_check(cudaFree());
+    }
+
     inline void synchronize() {
       gpu_check(cudaDeviceSynchronize());
     }
@@ -119,6 +123,40 @@ namespace strumpack {
       gpu_check(cudaMemcpyAsync(dptr, hptr, count*sizeof(T),
                                 cudaMemcpyHostToDevice, s));
     }
+
+    template<typename T> void copy_device_to_host
+    (DenseMatrix<T>& h, const DenseMatrix<T>& d) {
+      assert(d.rows() == h.rows() && d.cols() == h.cols());
+      assert(d.rows() == d.ld() && h.rows() == h.ld());
+      copy_device_to_host(h.data(), d.data(), d.rows()*d.cols());
+    }
+    template<typename T> void copy_device_to_host
+    (DenseMatrix<T>& h, const T* d) {
+      assert(h.rows() == h.ld());
+      copy_device_to_host(h.data(), d, h.rows()*h.cols());
+    }
+    template<typename T> void copy_device_to_host
+    (T* h, const DenseMatrix<T>& d) {
+      assert(d.rows() == d.ld());
+      copy_device_to_host(h, d.data(), d.rows()*d.cols());
+    }
+    template<typename T> void copy_host_to_device
+    (DenseMatrix<T>& d, const DenseMatrix<T>& h) {
+      assert(d.rows() == h.rows() && d.cols() == h.cols());
+      assert(d.rows() == d.ld() && h.rows() == h.ld());
+      copy_device_to_host(d.data(), h.data(), d.rows()*d.cols());
+    }
+    template<typename T> void copy_host_to_device
+    (DenseMatrix<T>& d, const T* h) {
+      assert(d.rows() == d.ld());
+      copy_device_to_host(d.data(), h, d.rows()*d.cols());
+    }
+    template<typename T> void copy_host_to_device
+    (T* d, const DenseMatrix<T>& h) {
+      assert(h.rows() == h.ld());
+      copy_device_to_host(d, h.data(), h.rows()*h.cols());
+    }
+
 
     inline std::size_t available_memory() {
       std::size_t free_device_mem, total_device_mem;

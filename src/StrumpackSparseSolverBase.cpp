@@ -45,6 +45,9 @@ namespace strumpack {
   (bool verbose, bool root)
     : StrumpackSparseSolverBase<scalar_t,integer_t>
     (0, nullptr, verbose, root) {
+#if defined(STRUMPACK_USE_CUDA)
+    gpu::init();
+#endif
   }
 
   template<typename scalar_t,typename integer_t>

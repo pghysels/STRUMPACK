@@ -28,7 +28,7 @@
  */
 #include <array>
 
-#include "FrontalMatrixCUBLAS.hpp"
+#include "FrontalMatrixGPU.hpp"
 #include "dense/CUDAWrapper.hpp"
 #if defined(STRUMPACK_USE_MPI)
 #include "ExtendAdd.hpp"
@@ -46,7 +46,7 @@ namespace strumpack {
 
   template<typename scalar_t, typename integer_t> class LevelInfo {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
-    using FC_t = FrontalMatrixCUBLAS<scalar_t,integer_t>;
+    using FG_t = FrontalMatrixGPU<scalar_t,integer_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
 
   public:
@@ -56,7 +56,7 @@ namespace strumpack {
               int max_streams) {
       f.reserve(fronts.size());
       for (auto& F : fronts)
-        f.push_back(dynamic_cast<FC_t*>(F));
+        f.push_back(dynamic_cast<FG_t*>(F));
       int max_dsep = 0;
       for (auto F : f) {
         auto dsep = F->dim_sep();
@@ -142,7 +142,7 @@ namespace strumpack {
       f32 = fdat;  fdat += N32;
     }
 
-    std::vector<FC_t*> f;
+    std::vector<FG_t*> f;
     std::size_t factor_size = 0, schur_size = 0, piv_size = 0,
       work_bytes = 0, N8 = 0, N16 = 0, N32 = 0;
     scalar_t* dev_getrf_work = nullptr;
@@ -153,13 +153,13 @@ namespace strumpack {
 
 
   template<typename scalar_t,typename integer_t>
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::FrontalMatrixCUBLAS
+  FrontalMatrixGPU<scalar_t,integer_t>::FrontalMatrixGPU
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd)
     : F_t(nullptr, nullptr, sep, sep_begin, sep_end, upd) {}
 
   template<typename scalar_t,typename integer_t>
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::~FrontalMatrixCUBLAS() {
+  FrontalMatrixGPU<scalar_t,integer_t>::~FrontalMatrixGPU() {
 #if defined(STRUMPACK_COUNT_FLOPS)
     const std::size_t dupd = dim_upd();
     const std::size_t dsep = dim_sep();
@@ -168,15 +168,14 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::release_work_memory() {
+  FrontalMatrixGPU<scalar_t,integer_t>::release_work_memory() {
     F22_.clear();
-    // dev_work_mem_.release();
     host_Schur_.release();
   }
 
 #if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::extend_add_copy_to_buffers
+  FrontalMatrixGPU<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf,
    const FrontalMatrixMPI<scalar_t,integer_t>* pa) const {
     ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers
@@ -185,7 +184,7 @@ namespace strumpack {
 #endif
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::extend_add_to_dense
+  FrontalMatrixGPU<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const F_t* p, int task_depth) {
     const std::size_t pdsep = paF11.rows();
@@ -242,7 +241,7 @@ namespace strumpack {
 
 
   template<typename scalar_t, typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::front_assembly
+  FrontalMatrixGPU<scalar_t,integer_t>::front_assembly
   (const SpMat_t& A, LevelInfo<scalar_t,integer_t>& L) {
     using Trip_t = Triplet<scalar_t>;
     auto N = L.f.size();
@@ -283,14 +282,14 @@ namespace strumpack {
          ne[n+1][0]-ne[n][0], ne[n+1][1]-ne[n][1], ne[n+1][2]-ne[n][2],
          de11+ne[n][0], de12+ne[n][1], de21+ne[n][2]);
       if (f.lchild_) {
-        auto c = dynamic_cast<FC_t*>(f.lchild_.get());
+        auto c = dynamic_cast<FG_t*>(f.lchild_.get());
         asmbl[n].set_ext_add_left(c->dim_upd(), c->F22_.data(), Iptr);
         auto u = c->upd_to_parent(&f);
         std::copy(u.begin(), u.end(), Iptr);
         Iptr += u.size();
       }
       if (f.rchild_) {
-        auto c = dynamic_cast<FC_t*>(f.rchild_.get());
+        auto c = dynamic_cast<FG_t*>(f.rchild_.get());
         asmbl[n].set_ext_add_right(c->dim_upd(), c->F22_.data(), Iptr);
         auto u = c->upd_to_parent(&f);
         std::copy(u.begin(), u.end(), Iptr);
@@ -304,7 +303,7 @@ namespace strumpack {
 
 
   template<typename scalar_t, typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::factor_small_fronts
+  FrontalMatrixGPU<scalar_t,integer_t>::factor_small_fronts
   (LInfo_t& L, gpu::FrontData<scalar_t>* front_data) {
     if (L.N8 || L.N16 || L.N32) {
       for (std::size_t n=0, n8=0, n16=L.N8, n32=L.N8+L.N16;
@@ -328,7 +327,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t, typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::factor_large_fronts
+  FrontalMatrixGPU<scalar_t,integer_t>::factor_large_fronts
   (LInfo_t& L, std::vector<gpu::BLASHandle>& blas_handles,
    std::vector<gpu::SOLVERHandle>& solver_handles) {
     for (std::size_t n=0; n<L.f.size(); n++) {
@@ -355,7 +354,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::split_smaller
+  FrontalMatrixGPU<scalar_t,integer_t>::split_smaller
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
     if (opts.verbose())
@@ -395,50 +394,63 @@ namespace strumpack {
     tl.start();
     if (dsep) {
       gpu::SOLVERHandle sh;
-      gpu::DeviceMemory<scalar_t> dmem
-        ((dsep+dupd)*(dsep+dupd) + gpu::getrf_buffersize<scalar_t>(sh, dsep));
+      gpu::DeviceMemory<scalar_t> dm11
+        (dsep*dsep + gpu::getrf_buffersize<scalar_t>(sh, dsep));
       gpu::DeviceMemory<int> dpiv(dsep+1); // and ierr
-
-
-      // TODO more overlapping??
-      gpu::copy_host_to_device
-        (dmem.template as<scalar_t>(), factor_mem_.get(), dsep*(dsep+2*dupd));
-      gpu::copy_host_to_device
-        (dmem+dsep*(dsep+2*dupd), host_Schur_.get(), dupd*dupd);
-      DenseMW_t F11(dsep, dsep, dmem, dsep);
-      DenseMW_t F12(dsep, dupd, dmem+dsep*dsep, dsep);
-      DenseMW_t F21(dupd, dsep, dmem+dsep*(dsep+dupd), dupd);
-      DenseMW_t F22(dupd, dupd, dmem+dsep*(dsep+2*dupd), dupd);
-      scalar_t* getrf_work = dmem+(dsep+dupd)*(dsep+dupd);
-      gpu::getrf(sh, F11, getrf_work, dpiv, dpiv+dsep);
-      // TODO if (opts.replace_tiny_pivots()) { ...
-      if (dupd) {
-        gpu::getrs(sh, CUBLAS_OP_N, F11, dpiv, F12, dpiv+dsep);
-        gpu::BLASHandle bh;
-        gpu::gemm(bh, CUBLAS_OP_N, CUBLAS_OP_N,
-                  scalar_t(-1.), F21, F12, scalar_t(1.), F22);
-      }
+      DenseMW_t dF11(dsep, dsep, dm11, dsep);
+      gpu::copy_host_to_device(dF11, F11_);
+      gpu::getrf(sh, dF11, dm11 + dsep*dsep, dpiv, dpiv+dsep);
       pivot_mem_.resize(dsep);
       piv_ = pivot_mem_.data();
       gpu::copy_device_to_host(piv_, dpiv.as<int>(), dsep);
-      gpu::copy_device_to_host
-        (factor_mem_.get(), dmem.template as<scalar_t>(), dsep*(dsep+2*dupd));
-      gpu::copy_device_to_host
-        (host_Schur_.get(), dmem+dsep*(dsep+2*dupd), dupd*dupd);
+      gpu::copy_device_to_host(F11_, dF11);
+      if (dupd) {
+        gpu::DeviceMemory<scalar_t> dm12(dsep*dupd);
+        DenseMW_t dF12(dsep, dupd, dm12, dsep);
+        gpu::copy_host_to_device(dF12, F12_);
+        gpu::getrs(sh, CUBLAS_OP_N, dF11, dpiv, dF12, dpiv+dsep);
+        gpu::copy_device_to_host(F12_, dF12);
+        dm11.release();
+        gpu::DeviceMemory<scalar_t> dm2122((dsep+dupd)*dupd);
+        DenseMW_t dF21(dupd, dsep, dm2122, dupd);
+        DenseMW_t dF22(dupd, dupd, dm2122+(dsep*dupd), dupd);
+        gpu::copy_host_to_device(dF21, F21_);
+        gpu::copy_host_to_device(dF22, host_Schur_.get());
+        gpu::BLASHandle bh;
+        gpu::gemm(bh, CUBLAS_OP_N, CUBLAS_OP_N,
+                  scalar_t(-1.), dF21, dF12, scalar_t(1.), dF22);
+        gpu::copy_device_to_host(host_Schur_.get(), dF22);
+      }
 
-
-      // pivot_mem_ = F11_.LU(params::task_recursion_cutoff_level);
-      // piv_ = pivot_mem_.data();
-      // // if (opts.replace_tiny_pivots()) {
+      // gpu::SOLVERHandle sh;
+      // gpu::DeviceMemory<scalar_t> dmem
+      //   ((dsep+dupd)*(dsep+dupd) + gpu::getrf_buffersize<scalar_t>(sh, dsep));
+      // gpu::DeviceMemory<int> dpiv(dsep+1); // and ierr
+      // // TODO more overlapping??
+      // gpu::copy_host_to_device
+      //   (dmem.template as<scalar_t>(), factor_mem_.get(), dsep*(dsep+2*dupd));
+      // gpu::copy_host_to_device
+      //   (dmem+dsep*(dsep+2*dupd), host_Schur_.get(), dupd*dupd);
+      // DenseMW_t dF11(dsep, dsep, dmem, dsep);
+      // DenseMW_t dF12(dsep, dupd, dmem+dsep*dsep, dsep);
+      // DenseMW_t dF21(dupd, dsep, dmem+dsep*(dsep+dupd), dupd);
+      // DenseMW_t dF22(dupd, dupd, dmem+dsep*(dsep+2*dupd), dupd);
+      // scalar_t* getrf_work = dmem+(dsep+dupd)*(dsep+dupd);
+      // gpu::getrf(sh, dF11, getrf_work, dpiv, dpiv+dsep);
+      // // TODO if (opts.replace_tiny_pivots()) { ...
       // if (dupd) {
-      //   F12_.laswp(piv_, true);
-      //   trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-      //        scalar_t(1.), F11_, F12_, params::task_recursion_cutoff_level);
-      //   trsm(Side::L, UpLo::U, Trans::N, Diag::N,
-      //        scalar_t(1.), F11_, F12_, params::task_recursion_cutoff_level);
-      //   gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_,
-      //        scalar_t(1.), F22_, params::task_recursion_cutoff_level);
+      //   gpu::getrs(sh, CUBLAS_OP_N, dF11, dpiv, dF12, dpiv+dsep);
+      //   gpu::BLASHandle bh;
+      //   gpu::gemm(bh, CUBLAS_OP_N, CUBLAS_OP_N,
+      //             scalar_t(-1.), dF21, dF12, scalar_t(1.), dF22);
       // }
+      // pivot_mem_.resize(dsep);
+      // piv_ = pivot_mem_.data();
+      // gpu::copy_device_to_host(piv_, dpiv.as<int>(), dsep);
+      // gpu::copy_device_to_host
+      //   (factor_mem_.get(), dmem.template as<scalar_t>(), dsep*(dsep+dupd));
+      // gpu::copy_device_to_host
+      //   (host_Schur_.get(), dmem+dsep*(dsep+2*dupd), dupd*dupd);
     }
     // count flops
     auto level_flops = LU_flops(F11_) +
@@ -457,7 +469,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::multifrontal_factorization
+  FrontalMatrixGPU<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
     using LevelInfo_t = LevelInfo<scalar_t,integer_t>;
@@ -539,7 +551,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::forward_multifrontal_solve
+  FrontalMatrixGPU<scalar_t,integer_t>::forward_multifrontal_solve
   (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const {
     DenseMW_t bupd(dim_upd(), b.cols(), work[0], 0, 0);
     bupd.zero();
@@ -557,7 +569,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::fwd_solve_phase2
+  FrontalMatrixGPU<scalar_t,integer_t>::fwd_solve_phase2
   (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
@@ -575,7 +587,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::backward_multifrontal_solve
+  FrontalMatrixGPU<scalar_t,integer_t>::backward_multifrontal_solve
   (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const {
     DenseMW_t yupd(dim_upd(), y.cols(), work[0], 0, 0);
     if (task_depth == 0) {
@@ -593,7 +605,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::bwd_solve_phase1
+  FrontalMatrixGPU<scalar_t,integer_t>::bwd_solve_phase1
   (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t yloc(dim_sep(), y.cols(), y, this->sep_begin_, 0);
@@ -610,7 +622,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::extract_CB_sub_matrix
+  FrontalMatrixGPU<scalar_t,integer_t>::extract_CB_sub_matrix
   (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
    DenseM_t& B, int task_depth) const {
     std::vector<std::size_t> lJ, oJ;
@@ -626,7 +638,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::sample_CB
+  FrontalMatrixGPU<scalar_t,integer_t>::sample_CB
   (const SPOptions<scalar_t>& opts, const DenseM_t& R, DenseM_t& Sr,
    DenseM_t& Sc, F_t* pa, int task_depth) {
     auto I = this->upd_to_parent(pa);
@@ -649,7 +661,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::sample_CB
+  FrontalMatrixGPU<scalar_t,integer_t>::sample_CB
   (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
     auto I = this->upd_to_parent(pa);
     auto cR = R.extract_rows(I);
@@ -665,7 +677,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::sample_CB_to_F11
+  FrontalMatrixGPU<scalar_t,integer_t>::sample_CB_to_F11
   (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
     const std::size_t dupd = dim_upd();
     if (!dupd) return;
@@ -686,7 +698,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::sample_CB_to_F12
+  FrontalMatrixGPU<scalar_t,integer_t>::sample_CB_to_F12
   (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
     const std::size_t dupd = dim_upd();
     if (!dupd) return;
@@ -721,7 +733,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::sample_CB_to_F21
+  FrontalMatrixGPU<scalar_t,integer_t>::sample_CB_to_F21
   (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
     const std::size_t dupd = dim_upd();
     if (!dupd) return;
@@ -756,7 +768,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixCUBLAS<scalar_t,integer_t>::sample_CB_to_F22
+  FrontalMatrixGPU<scalar_t,integer_t>::sample_CB_to_F22
   (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
     const std::size_t dupd = dim_upd();
     if (!dupd) return;
@@ -778,19 +790,19 @@ namespace strumpack {
   }
 
   // explicit template instantiations
-  template class FrontalMatrixCUBLAS<float,int>;
-  template class FrontalMatrixCUBLAS<double,int>;
-  template class FrontalMatrixCUBLAS<std::complex<float>,int>;
-  template class FrontalMatrixCUBLAS<std::complex<double>,int>;
+  template class FrontalMatrixGPU<float,int>;
+  template class FrontalMatrixGPU<double,int>;
+  template class FrontalMatrixGPU<std::complex<float>,int>;
+  template class FrontalMatrixGPU<std::complex<double>,int>;
 
-  template class FrontalMatrixCUBLAS<float,long int>;
-  template class FrontalMatrixCUBLAS<double,long int>;
-  template class FrontalMatrixCUBLAS<std::complex<float>,long int>;
-  template class FrontalMatrixCUBLAS<std::complex<double>,long int>;
+  template class FrontalMatrixGPU<float,long int>;
+  template class FrontalMatrixGPU<double,long int>;
+  template class FrontalMatrixGPU<std::complex<float>,long int>;
+  template class FrontalMatrixGPU<std::complex<double>,long int>;
 
-  template class FrontalMatrixCUBLAS<float,long long int>;
-  template class FrontalMatrixCUBLAS<double,long long int>;
-  template class FrontalMatrixCUBLAS<std::complex<float>,long long int>;
-  template class FrontalMatrixCUBLAS<std::complex<double>,long long int>;
+  template class FrontalMatrixGPU<float,long long int>;
+  template class FrontalMatrixGPU<double,long long int>;
+  template class FrontalMatrixGPU<std::complex<float>,long long int>;
+  template class FrontalMatrixGPU<std::complex<double>,long long int>;
 
 } // end namespace strumpack

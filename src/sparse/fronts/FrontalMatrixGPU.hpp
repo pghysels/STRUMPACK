@@ -26,8 +26,8 @@
  *             Division).
  *
  */
-#ifndef FRONTAL_MATRIX_CUBLAS_HPP
-#define FRONTAL_MATRIX_CUBLAS_HPP
+#ifndef FRONTAL_MATRIX_GPU_HPP
+#define FRONTAL_MATRIX_GPU_HPP
 
 #include "FrontalMatrixDense.hpp"
 #include "dense/CUDAWrapper.hpp"
@@ -40,20 +40,20 @@ namespace strumpack {
     template<typename scalar_t> class FrontData;
   }
 
-  template<typename scalar_t,typename integer_t> class FrontalMatrixCUBLAS
+  template<typename scalar_t,typename integer_t> class FrontalMatrixGPU
     : public FrontalMatrix<scalar_t,integer_t> {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
-    using FC_t = FrontalMatrixCUBLAS<scalar_t,integer_t>;
+    using FG_t = FrontalMatrixGPU<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using LInfo_t = LevelInfo<scalar_t,integer_t>;
 
   public:
-    FrontalMatrixCUBLAS
+    FrontalMatrixGPU
     (integer_t sep, integer_t sep_begin, integer_t sep_end,
      std::vector<integer_t>& upd);
-    ~FrontalMatrixCUBLAS();
+    ~FrontalMatrixGPU();
 
     void release_work_memory() override;
 
@@ -96,7 +96,7 @@ namespace strumpack {
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
      DenseM_t& B, int task_depth) const override;
 
-    std::string type() const override { return "FrontalMatrixCUBLAS"; }
+    std::string type() const override { return "FrontalMatrixGPU"; }
 
 #if defined(STRUMPACK_USE_MPI)
     void extend_add_copy_to_buffers
@@ -110,8 +110,8 @@ namespace strumpack {
     std::vector<int> pivot_mem_;
     int* piv_ = nullptr;
 
-    FrontalMatrixCUBLAS(const FrontalMatrixCUBLAS&) = delete;
-    FrontalMatrixCUBLAS& operator=(FrontalMatrixCUBLAS const&) = delete;
+    FrontalMatrixGPU(const FrontalMatrixGPU&) = delete;
+    FrontalMatrixGPU& operator=(FrontalMatrixGPU const&) = delete;
 
     void fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd,
                           int etree_level, int task_depth) const;
@@ -138,4 +138,4 @@ namespace strumpack {
 
 } // end namespace strumpack
 
-#endif // FRONTAL_MATRIX_CUBLAS_HPP
+#endif // FRONTAL_MATRIX_GPU_HPP
