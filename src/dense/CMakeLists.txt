@@ -40,9 +40,10 @@ if(STRUMPACK_USE_MPI)
 endif()
 
 
-if(TPL_ENABLE_CUBLAS)
+if(STRUMPACK_USE_CUDA)
   target_sources(strumpack
     PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/CUDAWrapper.cpp
     ${CMAKE_CURRENT_LIST_DIR}/CUDAWrapper.hpp)
 
   install(FILES

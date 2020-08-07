@@ -36,6 +36,10 @@ namespace strumpack {
 
   template<typename scalar_t, typename integer_t> class LevelInfo;
 
+  namespace gpu {
+    template<typename scalar_t> class FrontData;
+  }
+
   template<typename scalar_t,typename integer_t> class FrontalMatrixCUBLAS
     : public FrontalMatrix<scalar_t,integer_t> {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
@@ -43,6 +47,7 @@ namespace strumpack {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
+    using LInfo_t = LevelInfo<scalar_t,integer_t>;
 
   public:
     FrontalMatrixCUBLAS
@@ -100,18 +105,28 @@ namespace strumpack {
 #endif
 
   private:
-    std::unique_ptr<scalar_t[]> factor_mem_;
+    std::unique_ptr<scalar_t[]> factor_mem_, host_Schur_;
     DenseMW_t F11_, F12_, F21_, F22_;
-    std::vector<int> piv; // regular int because it is passed to BLAS
-    cuda::CudaDeviceMemory<char> dev_work_mem_;
+    std::vector<int> pivot_mem_;
+    int* piv_ = nullptr;
 
     FrontalMatrixCUBLAS(const FrontalMatrixCUBLAS&) = delete;
     FrontalMatrixCUBLAS& operator=(FrontalMatrixCUBLAS const&) = delete;
 
-    void fwd_solve_phase2
-    (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const;
-    void bwd_solve_phase1
-    (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const;
+    void fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd,
+                          int etree_level, int task_depth) const;
+    void bwd_solve_phase1(DenseM_t& y, DenseM_t& yupd,
+                          int etree_level, int task_depth) const;
+
+    void front_assembly(const SpMat_t& A, LInfo_t& L);
+    void factor_small_fronts(LInfo_t& L,
+                             gpu::FrontData<scalar_t>* front_data);
+    void factor_large_fronts(LInfo_t& L,
+                             std::vector<gpu::BLASHandle>& blas_handles,
+                             std::vector<gpu::SOLVERHandle>& solver_handles);
+
+    void split_smaller(const SpMat_t& A, const SPOptions<scalar_t>& opts,
+                       int etree_level=0, int task_depth=0);
 
     using F_t::lchild_;
     using F_t::rchild_;

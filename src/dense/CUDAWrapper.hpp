@@ -44,44 +44,104 @@
 
 namespace strumpack {
 
-  namespace cuda {
+  namespace gpu {
 
-#define cuda_check(err) {                                           \
-      strumpack::cuda::cuda_assert((err), __FILE__, __LINE__);           \
+#define gpu_check(err) {                                               \
+      strumpack::gpu::cuda_assert((err), __FILE__, __LINE__);          \
     }
-    inline void cuda_assert
-    (cudaError_t code, const char *file, int line, bool abort=true) {
-      if (code != cudaSuccess) {
-        std::cerr << "CUDA assertion failed: "
-                  << cudaGetErrorString(code) << " "
-                  <<  file << " " << line << std::endl;
-        if (abort) exit(code);
-      }
-    }
-    inline void cuda_assert
-    (cusolverStatus_t code, const char *file, int line, bool abort=true) {
-      if (code != CUSOLVER_STATUS_SUCCESS) {
-        std::cerr << "cuSOLVER assertion failed: " << code
-                  <<  file << " " << line << std::endl;
-        if (abort) exit(code);
-      }
-    }
-    inline void cuda_assert
-    (cublasStatus_t code, const char *file, int line, bool abort=true) {
-      if (code != CUBLAS_STATUS_SUCCESS) {
-        std::cerr << "cuBLAS assertion failed: " << code
-                  <<  file << " " << line << std::endl;
-        if (abort) exit(code);
-      }
+    void cuda_assert(cudaError_t code, const char *file, int line,
+                     bool abort=true);
+    void cuda_assert(cusolverStatus_t code, const char *file, int line,
+                     bool abort=true);
+    void cuda_assert(cublasStatus_t code, const char *file, int line,
+                     bool abort=true);
+
+    inline void synchronize() {
+      gpu_check(cudaDeviceSynchronize());
     }
 
-    template<typename T> class CudaDeviceMemory {
+    class Stream {
     public:
-      CudaDeviceMemory() {}
-      CudaDeviceMemory(std::size_t size) {
+      Stream() { gpu_check(cudaStreamCreate(&s_)); }
+      ~Stream() { gpu_check(cudaStreamDestroy(s_)); }
+      operator cudaStream_t&() { return s_; }
+      operator const cudaStream_t&() const { return s_; }
+    private:
+      cudaStream_t s_;
+    };
+
+    class BLASHandle {
+    public:
+      BLASHandle() { gpu_check(cublasCreate(&h_)); }
+      ~BLASHandle() { gpu_check(cublasDestroy(h_)); }
+      void set_stream(Stream& s) { gpu_check(cublasSetStream(h_, s)); }
+      void set_stream(cudaStream_t& s) { gpu_check(cublasSetStream(h_, s)); }
+      operator cublasHandle_t&() { return h_; }
+      operator const cublasHandle_t&() const { return h_; }
+    private:
+      cublasHandle_t h_;
+    };
+
+    class SOLVERHandle {
+    public:
+      SOLVERHandle() { gpu_check(cusolverDnCreate(&h_)); }
+      ~SOLVERHandle() { gpu_check(cusolverDnDestroy(h_)); }
+      void set_stream(Stream& s) { gpu_check(cusolverDnSetStream(h_, s)); }
+      void set_stream(cudaStream_t& s) { gpu_check(cusolverDnSetStream(h_, s)); }
+      operator cusolverDnHandle_t&() { return h_; }
+      operator const cusolverDnHandle_t&() const { return h_; }
+    private:
+      cusolverDnHandle_t h_;
+    };
+
+    template<typename T> void memset
+    (T* dptr, int value, std::size_t count) {
+      gpu_check(cudaMemset(dptr, value, count*sizeof(T)));
+    }
+
+    template<typename T> void copy_device_to_host
+    (T* hptr, const T* dptr, std::size_t count) {
+      gpu_check(cudaMemcpy(hptr, dptr, count*sizeof(T),
+                           cudaMemcpyDeviceToHost));
+    }
+    template<typename T> void copy_device_to_host_async
+    (T* hptr, const T* dptr, std::size_t count, const Stream& s) {
+      gpu_check(cudaMemcpyAsync(hptr, dptr, count*sizeof(T),
+                                cudaMemcpyDeviceToHost, s));
+    }
+    template<typename T> void copy_host_to_device
+    (T* dptr, const T* hptr, std::size_t count) {
+      gpu_check(cudaMemcpy(dptr, hptr, count*sizeof(T),
+                           cudaMemcpyHostToDevice));
+    }
+    template<typename T> void copy_host_to_device_async
+    (T* dptr, const T* hptr, std::size_t count, const Stream& s) {
+      gpu_check(cudaMemcpyAsync(dptr, hptr, count*sizeof(T),
+                                cudaMemcpyHostToDevice, s));
+    }
+
+    inline std::size_t available_memory() {
+      std::size_t free_device_mem, total_device_mem;
+      gpu_check(cudaMemGetInfo(&free_device_mem, &total_device_mem));
+      return free_device_mem;
+    }
+
+    template<typename T> class DeviceMemory {
+    public:
+      DeviceMemory() {}
+      DeviceMemory(std::size_t size) {
         if (size) {
-          auto e = cudaMalloc(&data_, size*sizeof(T));
           size_ = size;
+// #if 1
+//           if (cudaMalloc(&data_, size*sizeof(T)) != cudaSuccess) {
+//             std::cerr << "Failed to allocate " << size << " "
+//                       << typeid(T).name() << " objects" << std::endl;
+//             throw std::bad_alloc();
+//           }
+//           STRUMPACK_ADD_DEVICE_MEMORY(size*sizeof(T));
+//           is_managed_ = false;
+// #else
+          auto e = cudaMalloc(&data_, size*sizeof(T));
           if (e == cudaSuccess) {
             STRUMPACK_ADD_DEVICE_MEMORY(size*sizeof(T));
             is_managed_ = false;
@@ -92,15 +152,16 @@ namespace strumpack {
             std::cerr << "#  Trying cudaMallocManaged instead ..."
                       << std::endl;
             cudaGetLastError(); // reset to cudaSuccess
-            cuda_check(cudaMallocManaged(&data_, size*sizeof(T)));
+            gpu_check(cudaMallocManaged(&data_, size*sizeof(T)));
             is_managed_ = true;
           }
+// #endif
         }
       }
-      CudaDeviceMemory(const CudaDeviceMemory&) = delete;
-      CudaDeviceMemory(CudaDeviceMemory<T>&& d) { *this = d;}
-      CudaDeviceMemory<T>& operator=(const CudaDeviceMemory<T>&) = delete;
-      CudaDeviceMemory<T>& operator=(CudaDeviceMemory<T>&& d) {
+      DeviceMemory(const DeviceMemory&) = delete;
+      DeviceMemory(DeviceMemory<T>&& d) { *this = d;}
+      DeviceMemory<T>& operator=(const DeviceMemory<T>&) = delete;
+      DeviceMemory<T>& operator=(DeviceMemory<T>&& d) {
         if (this != &d) {
           release();
           data_ = d.data_;
@@ -111,9 +172,10 @@ namespace strumpack {
         }
         return *this;
       }
-      ~CudaDeviceMemory() { release(); }
+      ~DeviceMemory() { release(); }
       operator T*() { return data_; }
-      operator void*() { return data_; }
+      operator const T*() const { return data_; }
+      // operator void*() { return data_; }
       template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
       void release() {
         if (data_) {
@@ -122,7 +184,7 @@ namespace strumpack {
           } else {
             STRUMPACK_SUB_DEVICE_MEMORY(size_*sizeof(T));
           }
-          cuda_check(cudaFree(data_));
+          gpu_check(cudaFree(data_));
         }
         data_ = nullptr;
         size_ = 0;
@@ -134,10 +196,10 @@ namespace strumpack {
       bool is_managed_ = false;
     };
 
-    template<typename T> class CudaHostMemory {
+    template<typename T> class HostMemory {
     public:
-      CudaHostMemory() {}
-      CudaHostMemory(std::size_t size) {
+      HostMemory() {}
+      HostMemory(std::size_t size) {
         if (size) {
           STRUMPACK_ADD_MEMORY(size*sizeof(T));
           auto e = cudaMallocHost(&data_, size*sizeof(T));
@@ -149,15 +211,15 @@ namespace strumpack {
             std::cerr << "#  Trying cudaMallocManaged instead ..."
                       << std::endl;
             cudaGetLastError(); // reset to cudaSuccess
-            cuda_check(cudaMallocManaged(&data_, size*sizeof(T)));
+            gpu_check(cudaMallocManaged(&data_, size*sizeof(T)));
             is_managed_ = true;
           }
         }
       }
-      CudaHostMemory(const CudaHostMemory&) = delete;
-      CudaHostMemory(CudaHostMemory<T>&& d) { *this = d; }
-      CudaHostMemory<T>& operator=(const CudaHostMemory<T>&) = delete;
-      CudaHostMemory<T>& operator=(CudaHostMemory<T>&& d) {
+      HostMemory(const HostMemory&) = delete;
+      HostMemory(HostMemory<T>&& d) { *this = d; }
+      HostMemory<T>& operator=(const HostMemory<T>&) = delete;
+      HostMemory<T>& operator=(HostMemory<T>&& d) {
         if (this != & d) {
           release();
           data_ = d.data_;
@@ -168,17 +230,18 @@ namespace strumpack {
         }
         return *this;
       }
-      ~CudaHostMemory() { release(); }
+      ~HostMemory() { release(); }
       operator T*() { return data_; }
-      operator void*() { return data_; }
+      operator const T*() const { return data_; }
+      // operator void*() { return data_; }
       template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
       void release() {
         if (data_) {
           STRUMPACK_SUB_MEMORY(size_*sizeof(T));
           if (!is_managed_) {
-            cuda_check(cudaFreeHost(data_));
+            gpu_check(cudaFreeHost(data_));
           } else {
-            cuda_check(cudaFree(data_));
+            gpu_check(cudaFree(data_));
           }
         }
         data_ = nullptr;
@@ -191,223 +254,23 @@ namespace strumpack {
       bool is_managed_ = false;
     };
 
+    template<typename scalar_t>
+    int getrf_buffersize(SOLVERHandle& handle, int n);
 
-    inline cublasStatus_t cublasgemm
-    (cublasHandle_t handle, cublasOperation_t transa,
-     cublasOperation_t transb, int m, int n, int k, float alpha,
-     const float* A, int lda, const float* B, int ldb,
-     float beta, float* C, int ldc) {
-      STRUMPACK_FLOPS(blas::gemm_flops(m,n,k,alpha,beta));
-      STRUMPACK_BYTES(4*blas::gemm_moves(m,n,k));
-      return cublasSgemm
-        (handle, transa, transb, m, n, k, &alpha, A, lda, B, ldb, &beta, C, ldc);
-    }
-    inline cublasStatus_t cublasgemm
-    (cublasHandle_t handle, cublasOperation_t transa,
-     cublasOperation_t transb, int m, int n, int k, double alpha,
-     const double* A, int lda, const double* B, int ldb,
-     double beta, double* C, int ldc) {
-      STRUMPACK_FLOPS(blas::gemm_flops(m,n,k,alpha,beta));
-      STRUMPACK_BYTES(8*blas::gemm_moves(m,n,k));
-      return cublasDgemm
-        (handle, transa, transb, m, n, k, &alpha, A, lda, B, ldb, &beta, C, ldc);
-    }
-    inline cublasStatus_t cublasgemm
-    (cublasHandle_t handle, cublasOperation_t transa,
-     cublasOperation_t transb, int m, int n, int k, std::complex<float> alpha,
-     const std::complex<float>* A, int lda,
-     const std::complex<float>* B, int ldb,
-     std::complex<float> beta, std::complex<float> *C, int ldc) {
-      STRUMPACK_FLOPS(4*blas::gemm_flops(m,n,k,alpha,beta));
-      STRUMPACK_BYTES(2*4*blas::gemm_moves(m,n,k));
-      return cublasCgemm
-        (handle, transa, transb, m, n, k,
-         reinterpret_cast<cuComplex*>(&alpha),
-         reinterpret_cast<const cuComplex*>(A), lda,
-         reinterpret_cast<const cuComplex*>(B), ldb,
-         reinterpret_cast<cuComplex*>(&beta),
-         reinterpret_cast<cuComplex*>(C), ldc);
-    }
-    inline cublasStatus_t cublasgemm
-    (cublasHandle_t handle, cublasOperation_t transa,
-     cublasOperation_t transb, int m, int n, int k,
-     std::complex<double> alpha, const std::complex<double> *A, int lda,
-     const std::complex<double> *B, int ldb, std::complex<double> beta,
-     std::complex<double> *C, int ldc) {
-      STRUMPACK_FLOPS(4*blas::gemm_flops(m,n,k,alpha,beta));
-      STRUMPACK_BYTES(2*8*blas::gemm_moves(m,n,k));
-      return cublasZgemm
-        (handle, transa, transb, m, n, k,
-         reinterpret_cast<cuDoubleComplex*>(&alpha),
-         reinterpret_cast<const cuDoubleComplex*>(A), lda,
-         reinterpret_cast<const cuDoubleComplex*>(B), ldb,
-         reinterpret_cast<cuDoubleComplex*>(&beta),
-         reinterpret_cast<cuDoubleComplex*>(C), ldc);
-    }
+    template<typename scalar_t> void
+    getrf(SOLVERHandle& handle, DenseMatrix<scalar_t>& A,
+          scalar_t* Workspace, int* devIpiv, int* devInfo);
 
-    inline cublasStatus_t cublasgemv
-    (cublasHandle_t handle, cublasOperation_t transa,
-     int m, int n, float alpha,
-     const float* A, int lda, const float* B, int incb,
-     float beta, float* C, int incc) {
-      STRUMPACK_FLOPS(blas::gemv_flops(m,n,alpha,beta));
-      STRUMPACK_BYTES(4*blas::gemv_moves(m,n));
-      return cublasSgemv
-        (handle, transa, m, n, &alpha, A, lda, B, incb, &beta, C, incc);
-    }
-    inline cublasStatus_t cublasgemv
-    (cublasHandle_t handle, cublasOperation_t transa,
-     int m, int n, double alpha,
-     const double* A, int lda, const double* B, int incb,
-     double beta, double* C, int incc) {
-      STRUMPACK_FLOPS(blas::gemv_flops(m,n,alpha,beta));
-      STRUMPACK_BYTES(8*blas::gemv_moves(m,n));
-      return cublasDgemv
-        (handle, transa, m, n, &alpha, A, lda, B, incb, &beta, C, incc);
-    }
-    inline cublasStatus_t cublasgemv
-    (cublasHandle_t handle, cublasOperation_t transa,
-     int m, int n, std::complex<float> alpha,
-     const std::complex<float>* A, int lda,
-     const std::complex<float>* B, int incb,
-     std::complex<float> beta, std::complex<float> *C, int incc) {
-      STRUMPACK_FLOPS(4*blas::gemv_flops(m,n,alpha,beta));
-      STRUMPACK_BYTES(2*4*blas::gemv_moves(m,n));
-      return cublasCgemv
-        (handle, transa, m, n,
-         reinterpret_cast<cuComplex*>(&alpha),
-         reinterpret_cast<const cuComplex*>(A), lda,
-         reinterpret_cast<const cuComplex*>(B), incb,
-         reinterpret_cast<cuComplex*>(&beta),
-         reinterpret_cast<cuComplex*>(C), incc);
-    }
-    inline cublasStatus_t cublasgemv
-    (cublasHandle_t handle, cublasOperation_t transa,
-     int m, int n, std::complex<double> alpha,
-     const std::complex<double> *A, int lda,
-     const std::complex<double> *B, int incb, std::complex<double> beta,
-     std::complex<double> *C, int incc) {
-      STRUMPACK_FLOPS(4*blas::gemv_flops(m,n,alpha,beta));
-      STRUMPACK_BYTES(2*8*blas::gemv_moves(m,n));
-      return cublasZgemv
-        (handle, transa, m, n,
-         reinterpret_cast<cuDoubleComplex*>(&alpha),
-         reinterpret_cast<const cuDoubleComplex*>(A), lda,
-         reinterpret_cast<const cuDoubleComplex*>(B), incb,
-         reinterpret_cast<cuDoubleComplex*>(&beta),
-         reinterpret_cast<cuDoubleComplex*>(C), incc);
-    }
+    template<typename scalar_t> void
+    getrs(SOLVERHandle& handle, cublasOperation_t trans,
+          const DenseMatrix<scalar_t>& A, const int* devIpiv,
+          DenseMatrix<scalar_t>& B, int *devInfo);
 
-
-    inline cusolverStatus_t cusolverDngetrf_bufferSize
-    (cusolverDnHandle_t handle, int m, int n, float* A, int lda, int* Lwork) {
-      return cusolverDnSgetrf_bufferSize(handle, m, n, A, lda, Lwork);
-    }
-    inline cusolverStatus_t cusolverDngetrf_bufferSize
-    (cusolverDnHandle_t handle, int m, int n, double *A, int lda,
-     int* Lwork) {
-      return cusolverDnDgetrf_bufferSize(handle, m, n, A, lda, Lwork);
-    }
-    inline cusolverStatus_t cusolverDngetrf_bufferSize
-    (cusolverDnHandle_t handle, int m, int n, std::complex<float>* A, int lda,
-     int *Lwork) {
-      return cusolverDnCgetrf_bufferSize
-        (handle, m, n, reinterpret_cast<cuComplex*>(A), lda, Lwork);
-    }
-    inline cusolverStatus_t cusolverDngetrf_bufferSize
-    (cusolverDnHandle_t handle, int m, int n, std::complex<double>* A, int lda,
-     int *Lwork) {
-      return cusolverDnZgetrf_bufferSize
-        (handle, m, n, reinterpret_cast<cuDoubleComplex*>(A), lda, Lwork);
-    }
-
-
-    inline cusolverStatus_t cusolverDngetrf
-    (cusolverDnHandle_t handle, int m, int n, float* A, int lda,
-     float* Workspace, int* devIpiv, int* devInfo) {
-      STRUMPACK_FLOPS(blas::getrf_flops(m,n));
-      return cusolverDnSgetrf
-        (handle, m, n, A, lda, Workspace, devIpiv, devInfo);
-    }
-    inline cusolverStatus_t cusolverDngetrf
-    (cusolverDnHandle_t handle, int m, int n, double* A, int lda,
-     double* Workspace, int* devIpiv, int* devInfo) {
-      STRUMPACK_FLOPS(blas::getrf_flops(m,n));
-      return cusolverDnDgetrf
-        (handle, m, n, A, lda, Workspace, devIpiv, devInfo);
-    }
-    inline cusolverStatus_t cusolverDngetrf
-    (cusolverDnHandle_t handle, int m, int n, std::complex<float>* A, int lda,
-     std::complex<float>* Workspace, int* devIpiv, int* devInfo) {
-      STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
-      return cusolverDnCgetrf
-        (handle, m, n, reinterpret_cast<cuComplex*>(A), lda,
-         reinterpret_cast<cuComplex*>(Workspace), devIpiv, devInfo);
-    }
-    inline cusolverStatus_t cusolverDngetrf
-    (cusolverDnHandle_t handle, int m, int n, std::complex<double>* A, int lda,
-     std::complex<double>* Workspace, int* devIpiv, int* devInfo) {
-      STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
-      return cusolverDnZgetrf
-        (handle, m, n, reinterpret_cast<cuDoubleComplex*>(A), lda,
-         reinterpret_cast<cuDoubleComplex*>(Workspace), devIpiv, devInfo);
-    }
-
-
-    inline cusolverStatus_t cusolverDngetrs
-    (cusolverDnHandle_t handle, cublasOperation_t trans, int n, int nrhs,
-     const float* A, int lda, const int* devIpiv, float* B, int ldb,
-     int* devInfo) {
-      STRUMPACK_FLOPS(blas::getrs_flops(n,nrhs));
-      return cusolverDnSgetrs
-        (handle, trans, n, nrhs, A, lda, devIpiv, B, ldb, devInfo);
-    }
-    inline cusolverStatus_t cusolverDngetrs
-    (cusolverDnHandle_t handle, cublasOperation_t trans, int n, int nrhs,
-     const double* A, int lda, const int* devIpiv, double* B, int ldb,
-     int* devInfo) {
-      STRUMPACK_FLOPS(blas::getrs_flops(n,nrhs));
-      return cusolverDnDgetrs
-        (handle, trans, n, nrhs, A, lda, devIpiv, B, ldb, devInfo);
-    }
-    inline cusolverStatus_t cusolverDngetrs
-    (cusolverDnHandle_t handle, cublasOperation_t trans, int n, int nrhs,
-     const std::complex<float>* A, int lda, const int* devIpiv,
-     std::complex<float>* B, int ldb, int* devInfo) {
-      STRUMPACK_FLOPS(4*blas::getrs_flops(n,nrhs));
-      return cusolverDnCgetrs
-        (handle, trans, n, nrhs, reinterpret_cast<const cuComplex*>(A), lda,
-         devIpiv, reinterpret_cast<cuComplex*>(B), ldb, devInfo);
-    }
-    inline cusolverStatus_t cusolverDngetrs
-    (cusolverDnHandle_t handle, cublasOperation_t trans, int n, int nrhs,
-     const std::complex<double>* A, int lda, const int* devIpiv,
-     std::complex<double>* B, int ldb, int *devInfo) {
-      STRUMPACK_FLOPS(4*blas::getrs_flops(n,nrhs));
-      return cusolverDnZgetrs
-        (handle, trans, n, nrhs,
-         reinterpret_cast<const cuDoubleComplex*>(A), lda, devIpiv,
-         reinterpret_cast<cuDoubleComplex*>(B), ldb, devInfo);
-    }
-
-    template<typename scalar_t> cublasStatus_t
-    gemm(cublasHandle_t handle, cublasOperation_t ta, cublasOperation_t tb,
+    template<typename scalar_t> void
+    gemm(BLASHandle& handle, cublasOperation_t ta, cublasOperation_t tb,
          scalar_t alpha, const DenseMatrix<scalar_t>& a,
          const DenseMatrix<scalar_t>& b, scalar_t beta,
-         DenseMatrix<scalar_t>& c) {
-      assert((ta==CUBLAS_OP_N && a.rows()==c.rows()) ||
-             (ta!=CUBLAS_OP_N && a.cols()==c.rows()));
-      assert((tb==CUBLAS_OP_N && b.cols()==c.cols()) ||
-             (tb!=CUBLAS_OP_N && b.rows()==c.cols()));
-      assert((ta==CUBLAS_OP_N && tb==CUBLAS_OP_N && a.cols()==b.rows()) ||
-             (ta!=CUBLAS_OP_N && tb==CUBLAS_OP_N && a.rows()==b.rows()) ||
-             (ta==CUBLAS_OP_N && tb!=CUBLAS_OP_N && a.cols()==b.cols()) ||
-             (ta!=CUBLAS_OP_N && tb!=CUBLAS_OP_N && a.rows()==b.cols()));
-      return cublasgemm
-        (handle, ta, tb, c.rows(), c.cols(),
-         (ta==CUBLAS_OP_N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
-         b.data(), b.ld(), beta, c.data(), c.ld());
-    }
+         DenseMatrix<scalar_t>& c);
 
   } // end namespace cuda
 } // end namespace strumpack

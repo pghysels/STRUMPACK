@@ -34,7 +34,7 @@
 
 namespace strumpack {
 
-  namespace cuda {
+  namespace gpu {
 
     template<typename T> struct AssembleData {
       AssembleData(int d1_, int d2_, T* F11_, T* F12_, T* F21_, T* F22_,
@@ -69,6 +69,7 @@ namespace strumpack {
     };
 
     template<typename T> struct FrontData {
+      FrontData() {}
       FrontData(int n1_, int n2_, T* F11_, T* F12_,
                 T* F21_, T* F22_, int* piv_)
         : n1(n1_), n2(n2_), F11(F11_), F12(F12_),

@@ -39,7 +39,7 @@ const unsigned int MAX_BLOCKS_Z = 65535;
 
 
 namespace strumpack {
-  namespace cuda {
+  namespace gpu {
 
     /**
      * Get the real T type corresponding to a scalar, for instance T,
