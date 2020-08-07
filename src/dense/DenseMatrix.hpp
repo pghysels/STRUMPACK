@@ -729,6 +729,20 @@ namespace strumpack {
     (DenseMatrix<scalar_t>& b, const std::vector<int>& piv, int depth=0) const;
 
     /**
+     * Solve a linear system Ax=b with this matrix, factored in its LU
+     * factors (in place), using a call to this->LU. There can be
+     * multiple right hand side vectors.
+     *
+     * \param b input, right hand side vector/matrix. On output this
+     * will be the solution.
+     * \param piv pivot vector returned by LU factorization
+     * \param depth current OpenMP task recursion depth
+     * \see LU, solve_LU_in_place, solve_LDLt_in_place, solve_LDLt_rook_in_place
+     */
+    void solve_LU_in_place
+    (DenseMatrix<scalar_t>& b, const int* piv, int depth=0) const;
+
+    /**
      * Solve a linear system Ax=b with this matrix, factored in its
      * LDLt factors (in place). There can be multiple right hand side
      * vectors. The solution is returned by value.
