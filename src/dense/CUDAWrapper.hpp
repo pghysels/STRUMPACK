@@ -57,7 +57,7 @@ namespace strumpack {
                      bool abort=true);
 
     inline void init() {
-      gpu_check(cudaFree());
+      gpu_check(cudaFree(0));
     }
 
     inline void synchronize() {
