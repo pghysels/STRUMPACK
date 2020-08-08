@@ -130,20 +130,21 @@ as follows:
     -DTPL_METIS_LIBRARIES=/usr/local/metis/lib/libmetis.a
 
 
-cuBLAS and cuSOLVER (optional)
-==============================
-Can be used to accelerate the sparse direct solver.
+CUDA (optional)
+===============
+Can be used to accelerate the sparse direct solver, but is not used in
+the approximate factorizations.
 
-> cmake ../ -DTPL_ENABLE_CUBLAS=ON
+> cmake ../ -DSTRUMPACK_USE_CUDA=ON
 
-CMake will look for the CUDA libraries in default location or at
-CUDAToolkit_ROOT, which can be set as
+Enabled by default, but turned off if CUDA cannot be found.
+
+CMake will look for the CUDA compiler and libraries (cuBLAS and
+cuSOLVER) in the default location or at CUDAToolkit_ROOT, which can be
+set as
 > export CUDAToolkit_ROOT=..
 or passed directly to CMake
-> cmake ../ -DTPL_ENABLE_CUBLAS=ON -DCUDAToolkit_ROOT=...
-
-At the moment, the rank structured preconditioners do not work when
-cuda acceleration is enabled.
+> cmake ../ -DSTRUMPACK_USE_CUDA=ON -DCUDAToolkit_ROOT=...
 
 
 ParMETIS and (PT)Scotch (optional)
