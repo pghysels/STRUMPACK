@@ -29,6 +29,8 @@ if [[ $(dnsdomainname) = "summit.olcf.ornl.gov" ]]; then
     export ParMETIS_DIR=$HOME/local/parmetis-4.0.3/install
     export ButterflyPACK_DIR=$HOME/ButterflyPACK/install
 
+    SLATEHOME=$HOME/slate/
+
     cmake ../ \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_INSTALL_PREFIX=../install \
@@ -43,7 +45,10 @@ if [[ $(dnsdomainname) = "summit.olcf.ornl.gov" ]]; then
           -DSTRUMPACK_COUNT_FLOPS=ON \
           -DTPL_ENABLE_BPACK=OFF \
           -DTPL_ENABLE_ZFP=OFF \
-          -DTPL_ENABLE_SLATE=OFF
+          -DTPL_ENABLE_SLATE=ON \
+          -DTPL_SLATE_INCLUDE_DIRS="$SLATEHOME/include/;$SLATEHOME/blaspp/include;$SLATEHOME/lapackpp/include" \
+          -DTPL_SLATE_LIBRARIES="$SLATEHOME/lib/libslate_scalapack_api.so;$SLATEHOME/lib/libslate.so;$SLATEHOME/blaspp/lib/libblaspp.so;$SLATEHOME/lapackpp/lib/liblapackpp.so" \
+
 fi
 
 if [[ $NERSC_HOST = "cori" ]]; then
