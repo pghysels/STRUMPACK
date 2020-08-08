@@ -26,8 +26,8 @@
  *             Division).
  *
  */
-#ifndef FRONTAL_MATRIX_CUDA_HPP
-#define FRONTAL_MATRIX_CUDA_HPP
+#ifndef FRONTAL_MATRIX_HIP_HPP
+#define FRONTAL_MATRIX_HIP_HPP
 
 #include "misc/Triplet.hpp"
 
@@ -86,7 +86,7 @@ namespace strumpack {
     template<typename T, int NT=32> void
     factor_block_batch(unsigned int, FrontData<T>*);
 
-  } // end namespace cuda
+  } // end namespace gpu
 } // end namespace strumpack
 
-#endif // FRONTAL_MATRIX_CUDA_HPP
+#endif // FRONTAL_MATRIX_HIP_HPP

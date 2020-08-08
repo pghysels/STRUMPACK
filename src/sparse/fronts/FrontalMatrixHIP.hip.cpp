@@ -26,10 +26,15 @@
  *             Division).
  *
  */
+
 #include "FrontalMatrixGPUKernels.hpp"
+
+#include <hip/hip_runtime.h>
 
 #include <complex>
 #include <iostream>
+
+// is thrust available on ROCm?
 #include <thrust/complex.h>
 
 // this is valid for compute capability 3.5 -> 8.0 (and beyond?)
@@ -161,15 +166,15 @@ namespace strumpack {
         }
         for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Y) {
           dim3 grid(nb1, std::min(nf-f, MAX_BLOCKS_Y));
-          assemble_11_kernel<<<grid,nt1>>>(f, dat);
+          hipLaunchKernelGGL(HIP_KERNEL_NAME(assemble_11_kernel), dim3(grid), dim3(nt1), 0, 0, f, dat);
         }
         if (nb2)
           for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Y) {
             dim3 grid(nb2, std::min(nf-f, MAX_BLOCKS_Y));
-            assemble_12_21_kernel<<<grid,nt2>>>(f, dat);
+            hipLaunchKernelGGL(HIP_KERNEL_NAME(assemble_12_21_kernel), dim3(grid), dim3(nt2), 0, 0, f, dat);
           }
       }
-      cudaDeviceSynchronize();
+      hipDeviceSynchronize();
       { // extend-add
         unsigned int nt = 16, nb = 0;
         for (int f=0; f<nf; f++) {
@@ -185,7 +190,7 @@ namespace strumpack {
           int nb1 = std::min(nb-b1, MAX_BLOCKS_Y);
           for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Z) {
             dim3 grid(nb, nb1, std::min(nf-f, MAX_BLOCKS_Z));
-            extend_add_kernel<<<grid, block>>>(b1, dat_+f);
+            hipLaunchKernelGGL(HIP_KERNEL_NAME(extend_add_kernel), dim3(grid), dim3(block), 0, 0, b1, dat_+f);
           }
         }
       }
@@ -434,9 +439,9 @@ namespace strumpack {
       using T_ = typename cuda_type<T>::value_type;
       auto dat_ = reinterpret_cast<FrontData<T_>*>(dat);
       dim3 block(NT, NT), grid(count, 1, 1);
-      LU_block_kernel_batched<T_,NT><<<count, block>>>(dat_);
-      solve_block_kernel_batched<T_,NT><<<count, block>>>(dat_);
-      Schur_block_kernel_batched<T_,NT><<<count, block>>>(dat_);
+      hipLaunchKernelGGL(HIP_KERNEL_NAME(LU_block_kernel_batched<T_,NT>), dim3(count), dim3(block), 0, 0, dat_);
+      hipLaunchKernelGGL(HIP_KERNEL_NAME(solve_block_kernel_batched<T_,NT>), dim3(count), dim3(block), 0, 0, dat_);
+      hipLaunchKernelGGL(HIP_KERNEL_NAME(Schur_block_kernel_batched<T_,NT>), dim3(count), dim3(block), 0, 0, dat_);
     }
 
 

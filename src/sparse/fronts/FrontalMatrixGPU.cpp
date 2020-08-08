@@ -29,12 +29,12 @@
 #include <array>
 
 #include "FrontalMatrixGPU.hpp"
-#include "dense/CUDAWrapper.hpp"
+#include "FrontalMatrixGPUKernels.hpp"
+
 #if defined(STRUMPACK_USE_MPI)
 #include "ExtendAdd.hpp"
 #include "FrontalMatrixMPI.hpp"
 #endif
-#include "FrontalMatrixCUDA.hpp"
 
 
 namespace strumpack {
@@ -343,10 +343,10 @@ namespace strumpack {
         // TODO if (opts.replace_tiny_pivots()) { ...
         if (dupd) {
           gpu::getrs
-            (solver_handles[stream], CUBLAS_OP_N, f.F11_, f.piv_,
+            (solver_handles[stream], Trans::N, f.F11_, f.piv_,
              f.F12_, L.dev_getrf_err + stream);
           gpu::gemm
-            (blas_handles[stream], CUBLAS_OP_N, CUBLAS_OP_N,
+            (blas_handles[stream], Trans::N, Trans::N,
              scalar_t(-1.), f.F21_, f.F12_, scalar_t(1.), f.F22_);
         }
       }
@@ -408,7 +408,7 @@ namespace strumpack {
         gpu::DeviceMemory<scalar_t> dm12(dsep*dupd);
         DenseMW_t dF12(dsep, dupd, dm12, dsep);
         gpu::copy_host_to_device(dF12, F12_);
-        gpu::getrs(sh, CUBLAS_OP_N, dF11, dpiv, dF12, dpiv+dsep);
+        gpu::getrs(sh, Trans::N, dF11, dpiv, dF12, dpiv+dsep);
         gpu::copy_device_to_host(F12_, dF12);
         dm11.release();
         gpu::DeviceMemory<scalar_t> dm2122((dsep+dupd)*dupd);
@@ -417,8 +417,8 @@ namespace strumpack {
         gpu::copy_host_to_device(dF21, F21_);
         gpu::copy_host_to_device(dF22, host_Schur_.get());
         gpu::BLASHandle bh;
-        gpu::gemm(bh, CUBLAS_OP_N, CUBLAS_OP_N,
-                  scalar_t(-1.), dF21, dF12, scalar_t(1.), dF22);
+        gpu::gemm(bh, Trans::N, Trans::N, scalar_t(-1.),
+                  dF21, dF12, scalar_t(1.), dF22);
         gpu::copy_device_to_host(host_Schur_.get(), dF22);
       }
 
@@ -439,10 +439,10 @@ namespace strumpack {
       // gpu::getrf(sh, dF11, getrf_work, dpiv, dpiv+dsep);
       // // TODO if (opts.replace_tiny_pivots()) { ...
       // if (dupd) {
-      //   gpu::getrs(sh, CUBLAS_OP_N, dF11, dpiv, dF12, dpiv+dsep);
+      //   gpu::getrs(sh, Trans::N, dF11, dpiv, dF12, dpiv+dsep);
       //   gpu::BLASHandle bh;
-      //   gpu::gemm(bh, CUBLAS_OP_N, CUBLAS_OP_N,
-      //             scalar_t(-1.), dF21, dF12, scalar_t(1.), dF22);
+      //   gpu::gemm(bh, Trans::N, Trans::N, scalar_t(-1.),
+      //             dF21, dF12, scalar_t(1.), dF22);
       // }
       // pivot_mem_.resize(dsep);
       // piv_ = pivot_mem_.data();

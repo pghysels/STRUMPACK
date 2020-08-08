@@ -31,7 +31,7 @@ if(STRUMPACK_USE_CUDA)
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixGPU.cpp
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixGPU.hpp
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixCUDA.cu
-    ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixCUDA.hpp)
+    ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixGPUKernels.hpp)
 endif()
 
 if(STRUMPACK_USE_ZFP)
