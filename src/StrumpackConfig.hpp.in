@@ -30,7 +30,11 @@
 
 #cmakedefine STRUMPACK_USE_MPI
 #cmakedefine STRUMPACK_USE_OPENMP
+
 #cmakedefine STRUMPACK_USE_CUDA
+#cmakedefine STRUMPACK_USE_HIP
+#cmakedefine STRUMPACK_HIP_PLATFORM_HCC
+#cmakedefine STRUMPACK_HIP_PLATFORM_NVCC
 
 // #cmakedefine STRUMPACK_USE_METIS
 #cmakedefine STRUMPACK_USE_PARMETIS

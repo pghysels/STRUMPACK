@@ -117,6 +117,26 @@ if [[ $(hostname -s) = "pieterg-X8DA3" ]]; then
 fi
 
 
+if [[ $(hostname -s) = "pieter-HP-EliteDesk-800-G1-SFF" ]]; then
+    found_host=true
+
+    export HIP_PLATFORM=nvcc
+    export HIP_PATH=/opt/rocm-3.5.0/hip
+    export hipblas_DIR=/opt/rocm-3.5.0/hipblas/lib/cmake/hipblas/
+
+    # -DCMAKE_CXX_COMPILER=hipcc \
+
+    cmake ../ \
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DSTRUMPACK_USE_CUDA=ON \
+          -DSTRUMPACK_USE_HIP=ON \
+          -DSTRUMPACK_COUNT_FLOPS=ON \
+          -Dscotch_INCLUDE_DIR=/usr/include/scotch/ \
+          -Dscotch_LIBRARY_DIR=/usr/lib/x86_64-linux-gnu/ \
+          -DCMAKE_INSTALL_PREFIX=../install
+fi
+
+
 if ! $found_host; then
     echo "This machine was not recognized."
     echo "Open this file and modify the CMake command."

@@ -38,6 +38,11 @@
 #include <hipblas.h>
 #include <hip/hip_runtime.h>
 
+// TODO get rid of this when there is a hipSOLVER
+#if defined(STRUMPACK_HIP_PLATFORM_NVCC)
+#include <cusolverDn.h>
+#endif
+
 #include "DenseMatrix.hpp"
 
 namespace strumpack {
@@ -85,6 +90,7 @@ namespace strumpack {
 
 
     // TODO there is no such thing as hipSOLVER yet :(
+#if defined(STRUMPACK_HIP_PLATFORM_NVCC)
     class SOLVERHandle {
     public:
       SOLVERHandle() { gpu_check(cusolverDnCreate(&h_)); }
@@ -96,6 +102,27 @@ namespace strumpack {
     private:
       cusolverDnHandle_t h_;
     };
+#elif defined(STRUMPACK_HIP_PLATFORM_HCC)
+    class SOLVERHandle {
+    public:
+      SOLVERHandle() {
+        // TODO rocSOLVER
+      }
+      ~SOLVERHandle() {
+        // TODO rocSOLVER
+      }
+      void set_stream(Stream& s) {
+        // TODO rocSOLVER
+      }
+      // void set_stream(cudaStream_t& s) {
+      //   // TODO rocSOLVER
+      // }
+      // operator cusolverDnHandle_t&() { return h_; }
+      // operator const cusolverDnHandle_t&() const { return h_; }
+    private:
+      // cusolverDnHandle_t h_;
+    };
+#endif
 
     template<typename T> void memset
     (T* dptr, int value, std::size_t count) {

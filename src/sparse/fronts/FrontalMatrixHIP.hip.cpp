@@ -87,8 +87,8 @@ namespace strumpack {
      */
     template<typename T> __global__ void
     assemble_11_kernel(unsigned int f0, AssembleData<T>* dat) {
-      int idx = blockIdx.x * blockDim.x + threadIdx.x;
-      auto& F = dat[blockIdx.y + f0];
+      int idx = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
+      auto& F = dat[hipBlockIdx_y + f0];
       if (idx >= F.n11) return;
       auto& t = F.e11[idx];
       F.F11[t.r + t.c*F.d1] = t.v;
@@ -106,8 +106,8 @@ namespace strumpack {
      */
     template<typename T> __global__ void
     assemble_12_21_kernel(unsigned int f0, AssembleData<T>* dat) {
-      int idx = blockIdx.x * blockDim.x + threadIdx.x;
-      auto& F = dat[blockIdx.y + f0];
+      int idx = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
+      auto& F = dat[hipBlockIdx_y + f0];
       if (idx < F.n12) {
         auto& t = F.e12[idx];
         F.F12[t.r + t.c*F.d1] = t.v;
@@ -140,9 +140,9 @@ namespace strumpack {
 
     template<typename T> __global__ void
     extend_add_kernel(unsigned int by0, AssembleData<T>* dat) {
-      int x = blockIdx.x * blockDim.x + threadIdx.x,
-        y = (blockIdx.y + by0) * blockDim.y + threadIdx.y;
-      auto& F = dat[blockIdx.z];
+      int x = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x,
+        y = (hipBlockIdx_y + by0) * hipBlockDim_y + hipThreadIdx_y;
+      auto& F = dat[hipBlockIdx_z];
       if (F.CB1)
         ea_kernel(x, y, F.d1, F.d2, F.dCB1,
                   F.F11, F.F12, F.F21, F.F22, F.CB1, F.I1);
@@ -230,7 +230,7 @@ namespace strumpack {
       T* M = reinterpret_cast<T*>(M_);
       __shared__ real_t Mmax, cabs[NT];
 
-      int j = threadIdx.x, i = threadIdx.y;
+      int j = hipThreadIdx_x, i = hipThreadIdx_y;
 
       // copy F from global device storage into shared memory
       if (i < n && j < n)
@@ -313,7 +313,7 @@ namespace strumpack {
 
     template<typename T, int NT> __global__ void
     LU_block_kernel_batched(FrontData<T>* dat) {
-      FrontData<T>& A = dat[blockIdx.x];
+      FrontData<T>& A = dat[hipBlockIdx_x];
       LU_block_kernel<T,NT>(A.n1, A.F11, A.piv);
     }
 
@@ -334,7 +334,7 @@ namespace strumpack {
       __shared__ int P[NT];
       __shared__ primitive_t A_[NT*NT], B_[NT*NT];
       T *B = reinterpret_cast<T*>(B_), *A = reinterpret_cast<T*>(A_);
-      int j = threadIdx.x, i = threadIdx.y;
+      int j = hipThreadIdx_x, i = hipThreadIdx_y;
 
       if (j == 0)
         P[i] = i;
@@ -385,7 +385,7 @@ namespace strumpack {
 
     template<typename T, int NT> __global__ void
     solve_block_kernel_batched(FrontData<T>* dat) {
-      FrontData<T>& A = dat[blockIdx.x];
+      FrontData<T>& A = dat[hipBlockIdx_x];
       solve_block_kernel<T,NT>(A.n1, A.n2, A.F11, A.F12, A.piv);
     }
 
@@ -400,7 +400,7 @@ namespace strumpack {
       using cuda_primitive_t = typename primitive_type<T>::value_type;
       __shared__ cuda_primitive_t B_[NT*NT], A_[NT*NT];
       T *B = reinterpret_cast<T*>(B_), *A = reinterpret_cast<T*>(A_);
-      int j = threadIdx.x, i = threadIdx.y;
+      int j = hipThreadIdx_x, i = hipThreadIdx_y;
       A[j+i*NT] = B[j+i*NT] = 0.;
       for (int cb=0; cb<d2; cb+=NT) {
         int c = cb + j;
@@ -428,7 +428,7 @@ namespace strumpack {
 
     template<typename T, int NT> __global__ void
     Schur_block_kernel_batched(FrontData<T>* dat) {
-      FrontData<T>& A = dat[blockIdx.x];
+      FrontData<T>& A = dat[hipBlockIdx_x];
       Schur_block_kernel<T,NT>(A.n1, A.n2, A.F12, A.F21, A.F22);
     }
 

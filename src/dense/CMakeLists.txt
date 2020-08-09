@@ -41,14 +41,17 @@ endif()
 
 
 if(STRUMPACK_USE_CUDA)
-  target_sources(strumpack
-    PRIVATE
+  target_sources(strumpack PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/CUDAWrapper.cpp
     ${CMAKE_CURRENT_LIST_DIR}/CUDAWrapper.hpp)
+  install(FILES CUDAWrapper.hpp DESTINATION include/dense)
+endif()
 
-  install(FILES
-    CUDAWrapper.hpp
-    DESTINATION include/dense)
+if(STRUMPACK_USE_HIP)
+  target_sources(strumpack PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/HIPWrapper.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/HIPWrapper.hpp)
+  install(FILES HIPWrapper.hpp DESTINATION include/dense)
 endif()
 
 
