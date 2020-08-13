@@ -546,7 +546,7 @@ namespace strumpack {
         (char(op), X.data(), Y.data(), lrows_, lrows_, X.cols(),
          ho_bf_, options_, stats_, ptree_);
       long long int flops = get_stat("Flop_C_Mult");
-#if 1
+#if 0
       DenseM_t R(X.rows(), X.cols()), E(X.rows(), X.cols());
       mult(op, Y, R);                     // R = A*Y
       flops += get_stat("Flop_C_Mult");
