@@ -174,7 +174,7 @@ namespace strumpack {
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::redistribute_values() {
     if (this->reordered_) {
       matrix()->apply_matching(this->matching_);
-      //matrix()->equilibrate(equil_);
+      matrix()->equilibrate(this->equil_);
       matrix()->symmetrize_sparsity();
       setup_tree();
       if (opts_.compression() != CompressionType::NONE)
@@ -232,6 +232,15 @@ namespace strumpack {
     auto bloc = b;
     if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
       bloc.scale_rows_real(this->matching_.R);
+    if (this->equil_.type == EquilibrationType::ROW ||
+        this->equil_.type == EquilibrationType::BOTH)
+      bloc.scale_rows_real(this->equil_.R);
+
+    if (use_initial_guess &&
+        opts_.Krylov_solver() != KrylovSolver::DIRECT) {
+      // TODO scale and permute the initiall guess???
+
+    }
 
     auto spmv = [&](const scalar_t* x, scalar_t* y) {
       mat_mpi_->spmv(x, y);
@@ -307,6 +316,9 @@ namespace strumpack {
       if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
         x.scale_rows_real(this->matching_.C.data() + mat_mpi_->begin_row());
     }
+    if (this->equil_.type == EquilibrationType::COLUMN ||
+        this->equil_.type == EquilibrationType::BOTH)
+      x.scale_rows_real(this->equil_.C.data() + mat_mpi_->begin_row());
 
     t.stop();
     this->perf_counters_stop("DIRECT/GMRES solve");

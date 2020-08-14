@@ -129,7 +129,7 @@ namespace strumpack {
   StrumpackSparseSolver<scalar_t,integer_t>::permute_matrix_values() {
     if (reordered_) {
       matrix()->apply_matching(matching_);
-      //matrix()->equilibrate(equil_);
+      matrix()->equilibrate(equil_);
       matrix()->symmetrize_sparsity();
       matrix()->permute(reordering()->iperm(), reordering()->perm());
       if (opts_.compression() != CompressionType::NONE)
@@ -156,142 +156,152 @@ namespace strumpack {
     t.start();
     assert(b.cols() == x.cols());
 
+    // reordering has to be called, even for the iterative solvers
+    if (!this->reordered_) {
+      ReturnCode ierr = this->reorder();
+      if (ierr != ReturnCode::SUCCESS) return ierr;
+    }
+
+    // factor needs to be called, except for the non-preconditioned
+    // solvers
+    if (!this->factored_ &&
+        (opts_.Krylov_solver() != KrylovSolver::GMRES) &&
+        (opts_.Krylov_solver() != KrylovSolver::BICGSTAB)) {
+      ReturnCode ierr = this->factor();
+      if (ierr != ReturnCode::SUCCESS) return ierr;
+    }
+
+    integer_t N = matrix()->size(), d = b.cols();
+    assert(N < std::numeric_limits<int>::max());
+    DenseM_t bloc(b.rows(), d);
+
     auto spmv = [&](const scalar_t* x, scalar_t* y)
                 { matrix()->spmv(x, y); };
     Krylov_its_ = 0;
 
-    if (opts_.Krylov_solver() == KrylovSolver::GMRES) {
-      assert(x.cols() == 1);
-      iterative::GMRes<scalar_t>
-        (spmv, [](scalar_t* x) {}, x.rows(), x.data(), b.data(),
-         opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
-         opts_.gmres_restart(), opts_.GramSchmidt_type(),
-         use_initial_guess, opts_.verbose() && is_root_);
-    } else if (opts_.Krylov_solver() == KrylovSolver::BICGSTAB) {
-      assert(x.cols() == 1);
-      iterative::BiCGStab<scalar_t>
-        (spmv, [](scalar_t* x) {}, x.rows(), x.data(), b.data(),
-         opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
-         use_initial_guess, opts_.verbose() && is_root_);
-    } else {
-      if (!this->factored_) {
-        ReturnCode ierr = this->factor();
-        if (ierr != ReturnCode::SUCCESS) return ierr;
-      }
-      integer_t N = matrix()->size(), d = b.cols();
-      assert(N < std::numeric_limits<int>::max());
-      DenseM_t bloc(b.rows(), d);
+    auto& P = reordering()->iperm();
 
-      auto iperm = reordering()->iperm();
+    std::vector<real_t> C(N, 1.);
+    if (equil_.type == EquilibrationType::COLUMN ||
+        equil_.type == EquilibrationType::BOTH)
+      for (integer_t i=0; i<N; i++) C[i] *= equil_.C[i];
+    if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+      for (integer_t i=0; i<N; i++) C[i] *= matching_.C[i];
 
-      std::vector<real_t> C(N, 1.);
-      if (equil_.type == EquilibrationType::COLUMN ||
-          equil_.type == EquilibrationType::BOTH)
-        for (integer_t i=0; i<N; i++) C[i] *= equil_.C[i];
-      if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-        for (integer_t i=0; i<N; i++) C[i] *= matching_.C[i];
-
-      if (use_initial_guess &&
-          opts_.Krylov_solver() != KrylovSolver::DIRECT) {
-        if (opts_.matching() == MatchingJob::NONE)
-          for (integer_t j=0; j<d; j++)
-#pragma omp parallel for
-            for (integer_t i=0; i<N; i++) {
-              auto q = iperm[i];
-              bloc(i, j) = x(q, j) / C[q];
-            }
-        else
-          for (integer_t j=0; j<d; j++)
-#pragma omp parallel for
-            for (integer_t i=0; i<N; i++) {
-              auto q = iperm[matching_.Q[i]];
-              bloc(i, j) = x(q, j) / C[q];
-            }
-        x.copy(bloc);
-      }
-      {
-        std::vector<real_t> R(N, 1.);
-        if (equil_.type == EquilibrationType::ROW ||
-            equil_.type == EquilibrationType::BOTH)
-          for (integer_t i=0; i<N; i++) R[i] *= equil_.R[i];
-        if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-          for (integer_t i=0; i<N; i++) R[i] *= matching_.R[i];
+    if (use_initial_guess &&
+        opts_.Krylov_solver() != KrylovSolver::DIRECT) {
+      if (opts_.matching() == MatchingJob::NONE)
         for (integer_t j=0; j<d; j++)
 #pragma omp parallel for
           for (integer_t i=0; i<N; i++) {
-            auto pi = iperm[i];
-            bloc(i, j) = R[pi] * b(pi, j);
+            auto p = P[i];
+            bloc(i, j) = x(p, j) / C[p];
           }
-      }
+      else
+        for (integer_t j=0; j<d; j++)
+#pragma omp parallel for
+          for (integer_t i=0; i<N; i++) {
+            auto pq = P[matching_.Q[i]];
+            bloc(i, j) = x(pq, j) / C[pq];
+          }
+      x.copy(bloc);
+    }
 
-      auto MFsolve =
-        [&](scalar_t* w) {
-          DenseMW_t X(x.rows(), 1, w, x.ld());
-          tree()->multifrontal_solve(X);
-        };
+    {
+      std::vector<real_t> R(N, 1.);
+      if (equil_.type == EquilibrationType::ROW ||
+          equil_.type == EquilibrationType::BOTH)
+        for (integer_t i=0; i<N; i++) R[i] *= equil_.R[i];
+      if (this->reordered_ &&
+          opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+        for (integer_t i=0; i<N; i++) R[i] *= matching_.R[i];
+      for (integer_t j=0; j<d; j++)
+#pragma omp parallel for
+        for (integer_t i=0; i<N; i++) {
+          auto p = P[i];
+          bloc(i, j) = R[p] * b(p, j);
+        }
+    }
 
-      switch (opts_.Krylov_solver()) {
-      case KrylovSolver::AUTO: {
-        if (opts_.compression() != CompressionType::NONE && x.cols() == 1)
-          iterative::GMRes<scalar_t>
-            (spmv, MFsolve, x.rows(), x.data(), bloc.data(),
-             opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
-             opts_.gmres_restart(), opts_.GramSchmidt_type(),
-             use_initial_guess, opts_.verbose() && is_root_);
-        else
-          iterative::IterativeRefinement<scalar_t,integer_t>
-            (*matrix(), [&](DenseM_t& w) { tree()->multifrontal_solve(w); },
-             x, bloc, opts_.rel_tol(), opts_.abs_tol(),
-             Krylov_its_, opts_.maxit(), use_initial_guess,
-             opts_.verbose() && is_root_);
-      }; break;
-      case KrylovSolver::DIRECT: {
-        x = bloc;
-        tree()->multifrontal_solve(x);
-      }; break;
-      case KrylovSolver::REFINE: {
-        iterative::IterativeRefinement<scalar_t,integer_t>
-          (*matrix(), [&](DenseM_t& w) { tree()->multifrontal_solve(w); },
-           x, bloc, opts_.rel_tol(), opts_.abs_tol(),
-           Krylov_its_, opts_.maxit(), use_initial_guess,
-           opts_.verbose() && is_root_);
-      }; break;
-      case KrylovSolver::PREC_GMRES: {
-        assert(x.cols() == 1);
+    auto MFsolve =
+      [&](scalar_t* w) {
+        DenseMW_t X(x.rows(), 1, w, x.ld());
+        tree()->multifrontal_solve(X);
+      };
+
+    switch (opts_.Krylov_solver()) {
+    case KrylovSolver::AUTO: {
+      if (opts_.compression() != CompressionType::NONE && x.cols() == 1)
         iterative::GMRes<scalar_t>
           (spmv, MFsolve, x.rows(), x.data(), bloc.data(),
            opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
            opts_.gmres_restart(), opts_.GramSchmidt_type(),
            use_initial_guess, opts_.verbose() && is_root_);
-      }; break;
-      case KrylovSolver::PREC_BICGSTAB: {
-        assert(x.cols() == 1);
-        iterative::BiCGStab<scalar_t>
-          (spmv, MFsolve, x.rows(), x.data(), bloc.data(),
-           opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
-           use_initial_guess, opts_.verbose() && is_root_);
-      }; break;
-      case KrylovSolver::GMRES:  // see above
-      case KrylovSolver::BICGSTAB: {}
-      }
-
-      {
-        if (opts_.matching() == MatchingJob::NONE) {
-          auto perm = reordering()->perm();
-          for (integer_t j=0; j<d; j++)
-#pragma omp parallel for
-            for (integer_t i=0; i<N; i++)
-              bloc(i, j) = x(perm[i], j) * C[i];
-        } else
-          for (integer_t j=0; j<d; j++)
-#pragma omp parallel for
-            for (integer_t i=0; i<N; i++) {
-              auto ipi = matching_.Q[iperm[i]];
-              bloc(ipi, j) = x(i, j) * C[ipi];
-            }
-      }
-      x.copy(bloc);
+      else
+        iterative::IterativeRefinement<scalar_t,integer_t>
+          (*matrix(), [&](DenseM_t& w) { tree()->multifrontal_solve(w); },
+           x, bloc, opts_.rel_tol(), opts_.abs_tol(),
+           Krylov_its_, opts_.maxit(), use_initial_guess,
+           opts_.verbose() && is_root_);
+    }; break;
+    case KrylovSolver::DIRECT: {
+      x = bloc;
+      tree()->multifrontal_solve(x);
+    }; break;
+    case KrylovSolver::REFINE: {
+      iterative::IterativeRefinement<scalar_t,integer_t>
+        (*matrix(), [&](DenseM_t& w) { tree()->multifrontal_solve(w); },
+         x, bloc, opts_.rel_tol(), opts_.abs_tol(),
+         Krylov_its_, opts_.maxit(), use_initial_guess,
+         opts_.verbose() && is_root_);
+    }; break;
+    case KrylovSolver::PREC_GMRES: {
+      assert(x.cols() == 1);
+      iterative::GMRes<scalar_t>
+        (spmv, MFsolve, x.rows(), x.data(), bloc.data(),
+         opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
+         opts_.gmres_restart(), opts_.GramSchmidt_type(),
+         use_initial_guess, opts_.verbose() && is_root_);
+    }; break;
+    case KrylovSolver::PREC_BICGSTAB: {
+      assert(x.cols() == 1);
+      iterative::BiCGStab<scalar_t>
+        (spmv, MFsolve, x.rows(), x.data(), bloc.data(),
+         opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
+         use_initial_guess, opts_.verbose() && is_root_);
+    }; break;
+    case KrylovSolver::GMRES: { // see above
+      assert(x.cols() == 1);
+      iterative::GMRes<scalar_t>
+        (spmv, [](scalar_t* x) {}, x.rows(), x.data(), bloc.data(),
+         opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
+         opts_.gmres_restart(), opts_.GramSchmidt_type(),
+         use_initial_guess, opts_.verbose() && is_root_);
     }
+    case KrylovSolver::BICGSTAB: {
+      assert(x.cols() == 1);
+      iterative::BiCGStab<scalar_t>
+        (spmv, [](scalar_t* x) {}, x.rows(), x.data(), bloc.data(),
+         opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
+         use_initial_guess, opts_.verbose() && is_root_);
+    }
+    }
+
+    if (opts_.matching() == MatchingJob::NONE) {
+      auto& Pi = reordering()->perm();
+      for (integer_t j=0; j<d; j++)
+#pragma omp parallel for
+        for (integer_t i=0; i<N; i++)
+          bloc(i, j) = x(Pi[i], j) * C[i];
+    } else
+      for (integer_t j=0; j<d; j++)
+#pragma omp parallel for
+        for (integer_t i=0; i<N; i++) {
+          auto qp = matching_.Q[P[i]];
+          bloc(qp, j) = x(i, j) * C[qp];
+        }
+    x.copy(bloc);
+
     t.stop();
     this->perf_counters_stop("DIRECT/GMRES solve");
     this->print_solve_stats(t);
