@@ -214,19 +214,30 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> ReturnCode
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::solve_internal
   (const DenseM_t& b, DenseM_t& x, bool use_initial_guess) {
+    using real_t = typename RealType<scalar_t>::value_type;
+
+    // reordering has to be called, even for the iterative solvers
+    if (!this->reordered_) {
+      ReturnCode ierr = this->reorder();
+      if (ierr != ReturnCode::SUCCESS) return ierr;
+    }
+
+    // factor needs to be called, except for the non-preconditioned
+    // solvers
     if (!this->factored_ &&
         opts_.Krylov_solver() != KrylovSolver::GMRES &&
         opts_.Krylov_solver() != KrylovSolver::BICGSTAB) {
       ReturnCode ierr = this->factor();
       if (ierr != ReturnCode::SUCCESS) return ierr;
     }
+
     assert(std::size_t(mat_mpi_->local_rows()) == b.rows());
     assert(b.rows() == x.rows());
     assert(b.cols() == x.cols());
     TaskTimer t("solve");
     this->perf_counters_start();
     t.start();
-    auto n_local = x.rows();
+    auto nloc = x.rows();
     this->Krylov_its_ = 0;
 
     auto bloc = b;
@@ -238,8 +249,19 @@ namespace strumpack {
 
     if (use_initial_guess &&
         opts_.Krylov_solver() != KrylovSolver::DIRECT) {
-      // TODO scale and permute the initiall guess???
-
+      if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING ||
+          this->equil_.type == EquilibrationType::COLUMN ||
+          this->equil_.type == EquilibrationType::BOTH) {
+        std::vector<real_t> C(nloc, 1.);
+        if (this->equil_.type == EquilibrationType::COLUMN ||
+            this->equil_.type == EquilibrationType::BOTH)
+          for (std::size_t i=0; i<nloc; i++)
+            C[i] /= this->equil_.C[i + mat_mpi_->begin_row()];
+        if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+          for (std::size_t i=0; i<nloc; i++)
+            C[i] /= this->matching_.C[i + mat_mpi_->begin_row()];
+        x.scale_rows_real(C);
+      }
     }
 
     auto spmv = [&](const scalar_t* x, scalar_t* y) {
@@ -248,8 +270,9 @@ namespace strumpack {
 
     auto gmres =
       [&](const std::function<void(scalar_t*)>& prec) {
+        assert(x.cols() == 1);
         iterative::GMResMPI<scalar_t>
-          (comm_, spmv, prec, n_local, x.data(), bloc.data(),
+          (comm_, spmv, prec, nloc, x.data(), bloc.data(),
            opts_.rel_tol(), opts_.abs_tol(),
            this->Krylov_its_, opts_.maxit(),
            opts_.gmres_restart(), opts_.GramSchmidt_type(),
@@ -257,15 +280,16 @@ namespace strumpack {
       };
     auto bicgstab =
       [&](const std::function<void(scalar_t*)>& prec) {
+        assert(x.cols() == 1);
         iterative::BiCGStabMPI<scalar_t>
-          (comm_, spmv, prec, n_local, x.data(), bloc.data(),
+          (comm_, spmv, prec, nloc, x.data(), bloc.data(),
            opts_.rel_tol(), opts_.abs_tol(),
            this->Krylov_its_, opts_.maxit(),
            use_initial_guess, opts_.verbose() && is_root_);
       };
     auto MFsolve =
       [&](scalar_t* w) {
-        DenseMW_t X(n_local, x.cols(), w, x.ld());
+        DenseMW_t X(nloc, x.cols(), w, x.ld());
         tree()->multifrontal_solve_dist(X, mat_mpi_->dist());
       };
     auto refine =
@@ -289,19 +313,15 @@ namespace strumpack {
       refine();
     }; break;
     case KrylovSolver::GMRES: {
-      assert(x.cols() == 1);
       gmres([](scalar_t*){});
     }; break;
     case KrylovSolver::PREC_GMRES: {
-      assert(x.cols() == 1);
       gmres(MFsolve);
     }; break;
     case KrylovSolver::BICGSTAB: {
-      assert(x.cols() == 1);
       bicgstab([](scalar_t*){});
     }; break;
     case KrylovSolver::PREC_BICGSTAB: {
-      assert(x.cols() == 1);
       bicgstab(MFsolve);
     }; break;
     case KrylovSolver::DIRECT: {
