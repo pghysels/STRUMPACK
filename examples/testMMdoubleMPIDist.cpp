@@ -31,6 +31,8 @@
 #include "StrumpackSparseSolverMPIDist.hpp"
 #include "sparse/CSRMatrix.hpp"
 #include "sparse/CSRMatrixMPI.hpp"
+// to create a random vector
+#include "misc/RandomWrapper.hpp"
 
 using namespace strumpack;
 
@@ -45,8 +47,13 @@ test(int argc, char* argv[], CSRMatrix<scalar,integer>& A) {
   CSRMatrixMPI<scalar,integer> Adist(&A, MPI_COMM_WORLD, true);
   auto N = Adist.size();
   auto n_local = Adist.local_rows();
-  std::vector<scalar> b(n_local), x(n_local),
-    x_exact(n_local, scalar(1.)/std::sqrt(N));
+  std::vector<scalar> b(n_local), x(n_local), x_exact(n_local);
+  {
+    using real_t = typename RealType<scalar>::value_type;
+    auto rgen = random::make_default_random_generator<real_t>();
+    for (auto& xi : x_exact)
+      xi = scalar(rgen->get());
+  }
   Adist.spmv(x_exact.data(), b.data());
 
   spss.set_matrix(Adist);

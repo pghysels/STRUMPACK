@@ -32,6 +32,7 @@ using namespace std;
 
 #include "StrumpackSparseSolver.hpp"
 #include "sparse/CSRMatrix.hpp"
+#include "misc/RandomWrapper.hpp"
 
 using namespace strumpack;
 
@@ -46,7 +47,12 @@ test_sparse_solver(int argc, const char* const argv[],
   spss.options().set_from_command_line(argc, argv);
 
   int N = A.size();
-  vector<scalar_t> b(N), x(N), x_exact(N, real_t(1.)/sqrt(N));
+  vector<scalar_t> b(N), x(N), x_exact(N);
+  {
+    auto rgen = random::make_default_random_generator<real_t>();
+    for (auto& xi : x_exact)
+      xi = rgen->get();
+  }
   A.spmv(x_exact.data(), b.data());
 
   spss.set_matrix(A);

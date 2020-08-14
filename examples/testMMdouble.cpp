@@ -29,6 +29,8 @@
 #include <iostream>
 #include "StrumpackSparseSolver.hpp"
 #include "sparse/CSRMatrix.hpp"
+// to create a random vector
+#include "misc/RandomWrapper.hpp"
 
 using namespace strumpack;
 
@@ -38,7 +40,14 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
   spss.options().set_from_command_line(argc, argv);
 
   int N = A.size();
-  std::vector<scalar_t> b(N), x(N), x_exact(N, scalar_t(1.)/std::sqrt(N));
+  std::vector<scalar_t> b(N), x(N), x_exact(N);
+  {
+    using real_t = typename RealType<scalar_t>::value_type;
+    auto rgen = random::make_default_random_generator<real_t>();
+    for (auto& xi : x_exact)
+      xi = scalar_t(rgen->get());
+  }
+
   A.spmv(x_exact.data(), b.data());
 
   spss.set_matrix(A);

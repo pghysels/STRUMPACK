@@ -39,6 +39,7 @@ using namespace std;
 #include "sparse/CSRMatrix.hpp"
 #include "sparse/CSRMatrixMPI.hpp"
 #include "dense/DistributedVector.hpp"
+#include "misc/RandomWrapper.hpp"
 
 using namespace strumpack;
 
@@ -64,8 +65,12 @@ int test_sparse_solver(int argc, const char* const argv[],
 
   auto N = Adist.size();
   auto n_local = Adist.local_rows();
-  vector<scalar_t> b(n_local), x(n_local),
-    x_exact(n_local, real_t(1.) / sqrt(N));
+  vector<scalar_t> b(n_local), x(n_local), x_exact(n_local);
+  {
+    auto rgen = random::make_default_random_generator<real_t>();
+    for (auto& xi : x_exact)
+      xi = rgen->get();
+  }
   Adist.spmv(x_exact.data(), b.data());
 
   spss.set_matrix(Adist);

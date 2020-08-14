@@ -114,15 +114,7 @@ int main(int argc, char* argv[]) {
     spss.options().set_from_command_line(argc, argv);
 
     CSRMatrix<scalart,int> Aseq;
-    if (!rank) {
-      Aseq = Helmholtz3D<realt>(nx);
-      std::vector<realt> Dr, Dc;
-      realt rcond, ccond, Amax;
-      int info = Aseq.compute_equilibration(Dr, Dc, rcond, ccond, Amax);
-      char eq = Aseq.equilibrate(Dr, Dc, rcond, ccond, Amax);
-      std::cout << "A: rcond= " << rcond << ", ccond= " << ccond
-                << ", Amax= " << Amax << ", eq=" << eq << std::endl;
-    }
+    if (!rank) Aseq = Helmholtz3D<realt>(nx);
     CSRMatrixMPI<scalart,int> A(&Aseq, MPI_COMM_WORLD, true);
     Aseq = CSRMatrix<scalart,int>();
 
