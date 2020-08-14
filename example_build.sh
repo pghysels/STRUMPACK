@@ -13,14 +13,13 @@ found_host=false
 if [[ $(dnsdomainname) = "summit.olcf.ornl.gov" ]]; then
     found_host=true
 
-    module unload cmake
-    module swap xl gcc/9.1.0
-    module load essl
-    module load cuda
-    module load netlib-lapack
-    module load netlib-scalapack
-    module load cmake
-    module unload darshan-runtime
+    # module unload cmake
+    # module swap xl gcc/9.1.0
+    # module load essl
+    # module load cuda/11.0.2
+    # module load netlib-lapack
+    # module load netlib-scalapack
+    # module load cmake
 
     # METIS is required
     export METIS_DIR=$HOME/local/metis-5.1.0/install
@@ -30,18 +29,26 @@ if [[ $(dnsdomainname) = "summit.olcf.ornl.gov" ]]; then
     export ParMETIS_DIR=$HOME/local/parmetis-4.0.3/install
     export ButterflyPACK_DIR=$HOME/ButterflyPACK/install
 
+    SLATEHOME=$HOME/slate/
+
     cmake ../ \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_INSTALL_PREFIX=../install \
           -DCMAKE_CXX_COMPILER=mpiCC \
           -DCMAKE_C_COMPILER=mpicc \
           -DCMAKE_Fortran_COMPILER=mpif90 \
+          -DCMAKE_CUDA_COMPILER=/sw/summit/cuda/11.0.2/bin/nvcc \
+          -DSTRUMPACK_USE_CUDA=ON \
           -DTPL_BLAS_LIBRARIES="${OLCF_ESSL_ROOT}/lib64/libessl.so;${OLCF_NETLIB_LAPACK_ROOT}/lib64/libblas.so" \
           -DTPL_LAPACK_LIBRARIES="${OLCF_ESSL_ROOT}/lib64/libessl.so;${OLCF_NETLIB_LAPACK_ROOT}/lib64/liblapack.so" \
           -DTPL_SCALAPACK_LIBRARIES="${OLCF_NETLIB_SCALAPACK_ROOT}/lib/libscalapack.so" \
-          -DTPL_ENABLE_BPACK=ON \
-          -DTPL_ENABLE_CUBLAS=ON \
-          -DTPL_ENABLE_SLATE=OFF
+          -DSTRUMPACK_COUNT_FLOPS=ON \
+          -DTPL_ENABLE_BPACK=OFF \
+          -DTPL_ENABLE_ZFP=OFF \
+          -DTPL_ENABLE_SLATE=ON \
+          -DTPL_SLATE_INCLUDE_DIRS="$SLATEHOME/include/;$SLATEHOME/blaspp/include;$SLATEHOME/lapackpp/include" \
+          -DTPL_SLATE_LIBRARIES="$SLATEHOME/lib/libslate_scalapack_api.so;$SLATEHOME/lib/libslate.so;$SLATEHOME/blaspp/lib/libblaspp.so;$SLATEHOME/lapackpp/lib/liblapackpp.so" \
+
 fi
 
 if [[ $NERSC_HOST = "cori" ]]; then
@@ -107,6 +114,26 @@ if [[ $(hostname -s) = "pieterg-X8DA3" ]]; then
           -DTPL_ENABLE_COMBBLAS=OFF \
           -DSTRUMPACK_TASK_TIMERS=ON \
           -DTPL_SCALAPACK_LIBRARIES="$HOME/local/scalapack-2.1.0/install/lib/libscalapack.a"
+fi
+
+
+if [[ $(hostname -s) = "pieter-HP-EliteDesk-800-G1-SFF" ]]; then
+    found_host=true
+
+    export HIP_PLATFORM=nvcc
+    export HIP_PATH=/opt/rocm-3.5.0/hip
+    export hipblas_DIR=/opt/rocm-3.5.0/hipblas/lib/cmake/hipblas/
+
+    # -DCMAKE_CXX_COMPILER=hipcc \
+
+    cmake ../ \
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DSTRUMPACK_USE_CUDA=ON \
+          -DSTRUMPACK_USE_HIP=ON \
+          -DSTRUMPACK_COUNT_FLOPS=ON \
+          -Dscotch_INCLUDE_DIR=/usr/include/scotch/ \
+          -Dscotch_LIBRARY_DIR=/usr/lib/x86_64-linux-gnu/ \
+          -DCMAKE_INSTALL_PREFIX=../install
 fi
 
 

@@ -1,5 +1,5 @@
 # STRUMPACK
-STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014-2019, The
+STRUMPACK -- STRUctured Matrix PACKage, Copyright (c) 2014-2020, The
 Regents of the University of California, through Lawrence Berkeley
 National Laboratory (subject to receipt of any required approvals from
 the U.S. Dept. of Energy).  All rights reserved.
@@ -18,14 +18,15 @@ the U.S. Dept. of Energy).  All rights reserved.
 ## Current developers
  - Pieter Ghysels - pghysels@lbl.gov (Lawrence Berkeley National Laboratory)
  - Xiaoye S. Li - xsli@lbl.gov (Lawrence Berkeley National Laboratory)
- - Gustavo Chávez - gichavez@lbl.gov (Lawrence Berkeley National Laboratory)
  - Yang Liu - liuyangzhuan@lbl.gov (Lawrence Berkeley National Laboratory)
+ - Lisa Claus - LClaus@lbl.gov (Lawrence Berkeley National Laboratory)
 
 ## Other contributors
  - Lucy Guo - lcguo@lbl.gov
+ - Gustavo Chávez - gichavez@lbl.gov
  - Liza Rebrova - erebrova@umich.edu (University of Michigan)
  - François-Henry Rouet - fhrouet@lbl.gov,fhrouet@lstc.com (Livermore
-   Software Technology Corp., Lawrence Berkeley National Laboratory)
+   Software Technology Corp., Ansys)
  - Theo Mary - theo.mary@manchester.ac.uk (University of Manchester)
  - Christopher Gorman - (UC Santa Barbara)
  - Jonas Actor - (Rice University)

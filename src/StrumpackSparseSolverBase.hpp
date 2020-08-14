@@ -355,6 +355,10 @@ namespace strumpack {
 #if defined(STRUMPACK_COUNT_FLOPS)
     long long int f0_ = 0, ftot_ = 0, fmin_ = 0, fmax_ = 0;
     long long int b0_ = 0, btot_ = 0, bmin_ = 0, bmax_ = 0;
+    long long int m0_ = 0, mtot_ = 0, mmin_ = 0, mmax_ = 0;
+    long long int ptot_ = 0, pmin_ = 0, pmax_ = 0;
+    long long int dm0_ = 0, dmtot_ = 0, dmmin_ = 0, dmmax_ = 0;
+    long long int dptot_ = 0, dpmin_ = 0, dpmax_ = 0;
 #endif
 
   private:

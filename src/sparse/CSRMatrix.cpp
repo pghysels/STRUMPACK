@@ -418,41 +418,77 @@ namespace strumpack {
     }
   }
 
+  template<typename scalar_t,typename integer_t> void
+  CSRMatrix<scalar_t,integer_t>::push_front_elements
+  (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+   std::vector<Triplet<scalar_t>>& e11, std::vector<Triplet<scalar_t>>& e12,
+   std::vector<Triplet<scalar_t>>& e21) const {
+    integer_t ds = shi - slo, du = upd.size();
+    for (integer_t row=0; row<ds; row++) { // separator rows
+      integer_t upd_ptr = 0;
+      const auto hij = ptr_[row+slo+1];
+      for (integer_t j=ptr_[row+slo]; j<hij; j++) {
+        integer_t col = ind_[j];
+        if (col >= slo) {
+          if (col < shi)
+            e11.emplace_back(row, col-slo, val_[j]);
+          else {
+            while (upd_ptr<du && upd[upd_ptr]<col) upd_ptr++;
+            if (upd_ptr == du) break;
+            if (upd[upd_ptr] == col)
+              e12.emplace_back(row, upd_ptr, val_[j]);
+          }
+        }
+      }
+    }
+    for (integer_t i=0; i<du; i++) { // update rows
+      auto row = upd[i];
+      const auto hij = ptr_[row+1];
+      for (integer_t j=ptr_[row]; j<hij; j++) {
+        integer_t col = ind_[j];
+        if (col >= slo) {
+          if (col < shi)
+            e21.emplace_back(i, col-slo, val_[j]);
+          else break;
+        }
+      }
+    }
+  }
+
+
   // TODO parallel -> will be hard to do efficiently
   // assume F11, F12 and F21 are set to zero
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::extract_front
-  (DenseM_t& F11, DenseM_t& F12, DenseM_t& F21, integer_t sep_begin,
-   integer_t sep_end, const std::vector<integer_t>& upd, int depth) const {
-    integer_t dim_sep = sep_end - sep_begin;
-    integer_t dim_upd = upd.size();
-    for (integer_t row=0; row<dim_sep; row++) { // separator rows
+  (DenseM_t& F11, DenseM_t& F12, DenseM_t& F21, integer_t slo,
+   integer_t shi, const std::vector<integer_t>& upd, int depth) const {
+    integer_t ds = shi - slo, du = upd.size();
+    for (integer_t row=0; row<ds; row++) { // separator rows
       integer_t upd_ptr = 0;
-      const auto hij = ptr_[row+sep_begin+1];
-      for (integer_t j=ptr_[row+sep_begin];
-           j<hij; j++) {
+      const auto hij = ptr_[row+slo+1];
+      for (integer_t j=ptr_[row+slo]; j<hij; j++) {
         integer_t col = ind_[j];
-        if (col >= sep_begin) {
-          if (col < sep_end)
-            F11(row, col-sep_begin) = val_[j];
+        if (col >= slo) {
+          if (col < shi)
+            F11(row, col-slo) = val_[j];
           else {
-            while (upd_ptr<dim_upd && upd[upd_ptr]<col)
+            while (upd_ptr<du && upd[upd_ptr]<col)
               upd_ptr++;
-            if (upd_ptr == dim_upd) break;
+            if (upd_ptr == du) break;
             if (upd[upd_ptr] == col)
               F12(row, upd_ptr) = val_[j];
           }
         }
       }
     }
-    for (integer_t i=0; i<dim_upd; i++) { // update rows
+    for (integer_t i=0; i<du; i++) { // update rows
       auto row = upd[i];
       const auto hij = ptr_[row+1];
       for (integer_t j=ptr_[row]; j<hij; j++) {
         integer_t col = ind_[j];
-        if (col >= sep_begin) {
-          if (col < sep_end)
-            F21(i, col-sep_begin) = val_[j];
+        if (col >= slo) {
+          if (col < shi)
+            F21(i, col-slo) = val_[j];
           else break;
         }
       }
@@ -824,7 +860,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::extract_separator_2d
-  (integer_t sep_end, const std::vector<std::size_t>& I,
+  (integer_t shi, const std::vector<std::size_t>& I,
    const std::vector<std::size_t>& J, DistM_t& B) const {
     if (!B.active()) return;
     const integer_t m = I.size();
@@ -838,7 +874,7 @@ namespace strumpack {
       auto cmax = ind_[ptr_[r+1]-1];
       for (integer_t k=0; k<n; k++) {
         integer_t c = J[k];
-        if (c >= cmin && c <= cmax && (r < sep_end || c < sep_end)) {
+        if (c >= cmin && c <= cmax && (r < shi || c < shi)) {
           auto a_pos = ptr_[r];
           auto a_max = ptr_[r+1]-1;
           while (a_pos<a_max && ind_[a_pos]<c) a_pos++;
@@ -851,9 +887,9 @@ namespace strumpack {
   /** TODO this can be done more cleverly */
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::front_multiply_2d
-  (integer_t sep_begin, integer_t sep_end, const std::vector<integer_t>& upd,
+  (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
    const DistM_t& R, DistM_t& Srow, DistM_t& Scol, int depth) const {
-    integer_t dim_upd = upd.size();
+    integer_t du = upd.size();
     // redistribute R and Srow and Scol to 1d block cyclic column
     // distribution to avoid communication below
     DistM_t R_bc(R.grid(), R.rows(), R.cols(), R.rows(), R.NB()),
@@ -865,36 +901,36 @@ namespace strumpack {
 
     if (R.active()) {
       long long int local_flops = 0;
-      auto dim_sep = sep_end - sep_begin;
+      auto ds = shi - slo;
       auto n = R_bc.cols();
-      for (integer_t row=sep_begin; row<sep_end; row++) { // separator rows
+      for (integer_t row=slo; row<shi; row++) { // separator rows
         auto upd_ptr = 0;
         auto hij = ptr_[row+1];
         for (integer_t j=ptr_[row]; j<hij; j++) {
           auto col = ind_[j];
-          if (col >= sep_begin) {
-            if (col < sep_end) {
+          if (col >= slo) {
+            if (col < shi) {
               scalapack::pgeadd
-                ('N', 1, n, val_[j], R_bc.data(), col-sep_begin+1, 1,
-                 R_bc.desc(), scalar_t(1.), Srow_bc.data(), row-sep_begin+1,
+                ('N', 1, n, val_[j], R_bc.data(), col-slo+1, 1,
+                 R_bc.desc(), scalar_t(1.), Srow_bc.data(), row-slo+1,
                  1, Srow_bc.desc());
               scalapack::pgeadd
-                ('N', 1, n, val_[j], R_bc.data(), row-sep_begin+1, 1,
-                 R_bc.desc(), scalar_t(1.), Scol_bc.data(), col-sep_begin+1,
+                ('N', 1, n, val_[j], R_bc.data(), row-slo+1, 1,
+                 R_bc.desc(), scalar_t(1.), Scol_bc.data(), col-slo+1,
                  1, Scol_bc.desc());
               local_flops += 4 * n;
             } else {
-              while (upd_ptr<dim_upd && upd[upd_ptr]<col) upd_ptr++;
-              if (upd_ptr == dim_upd) break;
+              while (upd_ptr<du && upd[upd_ptr]<col) upd_ptr++;
+              if (upd_ptr == du) break;
               if (upd[upd_ptr] == col) {
                 scalapack::pgeadd
-                  ('N', 1, n, val_[j], R_bc.data(), dim_sep+upd_ptr+1,
+                  ('N', 1, n, val_[j], R_bc.data(), ds+upd_ptr+1,
                    1, R_bc.desc(), scalar_t(1.), Srow_bc.data(),
-                   row-sep_begin+1, 1, Srow_bc.desc());
+                   row-slo+1, 1, Srow_bc.desc());
                 scalapack::pgeadd
                              ('N', 1, n, val_[j], R_bc.data(),
-                              row-sep_begin+1, 1, R_bc.desc(), scalar_t(1.),
-                              Scol_bc.data(), dim_sep+upd_ptr+1, 1,
+                              row-slo+1, 1, R_bc.desc(), scalar_t(1.),
+                              Scol_bc.data(), ds+upd_ptr+1, 1,
                               Scol_bc.desc());
                 local_flops += 4 * n;
               }
@@ -902,20 +938,20 @@ namespace strumpack {
           }
         }
       }
-      for (integer_t i=0; i<dim_upd; i++) { // remaining rows
+      for (integer_t i=0; i<du; i++) { // remaining rows
         integer_t row = upd[i];
         auto hij = ptr_[row+1];
         for (integer_t j=ptr_[row]; j<hij; j++) {
           integer_t col = ind_[j];
-          if (col >= sep_begin) {
-            if (col < sep_end) {
+          if (col >= slo) {
+            if (col < shi) {
               scalapack::pgeadd
-                ('N', 1, n, val_[j], R_bc.data(), col-sep_begin+1, 1,
-                 R_bc.desc(), scalar_t(1.), Srow_bc.data(), dim_sep+i+1,
+                ('N', 1, n, val_[j], R_bc.data(), col-slo+1, 1,
+                 R_bc.desc(), scalar_t(1.), Srow_bc.data(), ds+i+1,
                  1, Srow_bc.desc());
               scalapack::pgeadd
-                ('N', 1, n, val_[j], R_bc.data(), dim_sep+i+1, 1,
-                 R_bc.desc(), scalar_t(1.), Scol_bc.data(), col-sep_begin+1,
+                ('N', 1, n, val_[j], R_bc.data(), ds+i+1, 1,
+                 R_bc.desc(), scalar_t(1.), Scol_bc.data(), col-slo+1,
                  1, Scol_bc.desc());
               local_flops += 4 * n;
             } else break;
@@ -933,14 +969,14 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::front_multiply_2d
-  (Trans op, integer_t sep_begin, integer_t sep_end,
+  (Trans op, integer_t slo, integer_t shi,
    const std::vector<integer_t>& upd, const DistM_t& R,
    DistM_t& S, int depth) const {
     // TODO optimize this!!
     DistM_t Sdummy(S.grid(), S.rows(), S.cols());
     if (op == Trans::N)
-      front_multiply_2d(sep_begin, sep_end, upd, R, S, Sdummy, 0);
-    else front_multiply_2d(sep_begin, sep_end, upd, R, Sdummy, S, 0);
+      front_multiply_2d(slo, shi, upd, R, S, Sdummy, 0);
+    else front_multiply_2d(slo, shi, upd, R, Sdummy, S, 0);
   }
 
   template<typename scalar_t,typename integer_t> void

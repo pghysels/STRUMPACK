@@ -26,28 +26,41 @@
  *             Division).
  *
  */
-#ifndef FRONTAL_MATRIX_CUBLAS_HPP
-#define FRONTAL_MATRIX_CUBLAS_HPP
+#ifndef FRONTAL_MATRIX_GPU_HPP
+#define FRONTAL_MATRIX_GPU_HPP
 
 #include "FrontalMatrixDense.hpp"
+
+#if defined(STRUMPACK_USE_CUDA)
 #include "dense/CUDAWrapper.hpp"
+#else
+#if defined(STRUMPACK_USE_HIP)
+#include "dense/HIPWrapper.hpp"
+#endif
+#endif
 
 namespace strumpack {
 
-  template<typename scalar_t,typename integer_t> class FrontalMatrixCUBLAS
+  template<typename scalar_t, typename integer_t> class LevelInfo;
+
+  namespace gpu {
+    template<typename scalar_t> class FrontData;
+  }
+
+  template<typename scalar_t,typename integer_t> class FrontalMatrixGPU
     : public FrontalMatrix<scalar_t,integer_t> {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
-    using FC_t = FrontalMatrixCUBLAS<scalar_t,integer_t>;
+    using FG_t = FrontalMatrixGPU<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
-    using uniq_scalar_t = std::unique_ptr
-      <scalar_t[], std::function<void(scalar_t*)>>;
+    using LInfo_t = LevelInfo<scalar_t,integer_t>;
 
   public:
-    FrontalMatrixCUBLAS
+    FrontalMatrixGPU
     (integer_t sep, integer_t sep_begin, integer_t sep_end,
      std::vector<integer_t>& upd);
+    ~FrontalMatrixGPU();
 
     void release_work_memory() override;
 
@@ -79,8 +92,6 @@ namespace strumpack {
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,
      int etree_level=0, int task_depth=0) override;
 
-    //void multifrontal_solve(DenseM_t& b) const override;
-
     void forward_multifrontal_solve
     (DenseM_t& b, DenseM_t* work, int etree_level=0,
      int task_depth=0) const override;
@@ -92,7 +103,7 @@ namespace strumpack {
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
      DenseM_t& B, int task_depth) const override;
 
-    std::string type() const override { return "FrontalMatrixCUBLAS"; }
+    std::string type() const override { return "FrontalMatrixGPU"; }
 
 #if defined(STRUMPACK_USE_MPI)
     void extend_add_copy_to_buffers
@@ -101,26 +112,37 @@ namespace strumpack {
 #endif
 
   private:
-    uniq_scalar_t factor_mem_;
+    std::unique_ptr<scalar_t[]> factor_mem_, host_Schur_;
     DenseMW_t F11_, F12_, F21_, F22_;
-    std::vector<int> piv; // regular int because it is passed to BLAS
-    void* all_work_mem_ = nullptr;
+    std::vector<int> pivot_mem_;
+    int* piv_ = nullptr;
 
+    FrontalMatrixGPU(const FrontalMatrixGPU&) = delete;
+    FrontalMatrixGPU& operator=(FrontalMatrixGPU const&) = delete;
 
-    FrontalMatrixCUBLAS(const FrontalMatrixCUBLAS&) = delete;
-    FrontalMatrixCUBLAS& operator=(FrontalMatrixCUBLAS const&) = delete;
+    void fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd,
+                          int etree_level, int task_depth) const;
+    void bwd_solve_phase1(DenseM_t& y, DenseM_t& yupd,
+                          int etree_level, int task_depth) const;
 
-    void fwd_solve_phase2
-    (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const;
-    void bwd_solve_phase1
-    (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const;
+    void front_assembly(const SpMat_t& A, LInfo_t& L);
+    void factor_small_fronts(LInfo_t& L,
+                             gpu::FrontData<scalar_t>* front_data);
+    void factor_large_fronts(LInfo_t& L,
+                             std::vector<gpu::BLASHandle>& blas_handles,
+                             std::vector<gpu::SOLVERHandle>& solver_handles);
+
+    void split_smaller(const SpMat_t& A, const SPOptions<scalar_t>& opts,
+                       int etree_level=0, int task_depth=0);
 
     using F_t::lchild_;
     using F_t::rchild_;
     using F_t::dim_sep;
     using F_t::dim_upd;
+
+    template<typename T,typename I> friend class LevelInfo;
   };
 
 } // end namespace strumpack
 
-#endif // FRONTAL_MATRIX_CUBLAS_HPP
+#endif // FRONTAL_MATRIX_GPU_HPP

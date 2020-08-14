@@ -173,6 +173,12 @@ namespace strumpack {
     void extract_front
     (DenseM_t&, DenseM_t&, DenseM_t&, integer_t,
      integer_t, const std::vector<integer_t>&, int) const override {}
+    void push_front_elements
+    (integer_t, integer_t, const std::vector<integer_t>&,
+     std::vector<Triplet<scalar_t>>&,
+     std::vector<Triplet<scalar_t>>&,
+     std::vector<Triplet<scalar_t>>&) const override {}
+
     void extract_F11_block
     (scalar_t*, integer_t, integer_t, integer_t,
      integer_t, integer_t) const override {}

@@ -49,12 +49,15 @@ namespace strumpack {
   template<typename scalar_t> DenseMatrix<scalar_t>::DenseMatrix
   (std::size_t m, std::size_t n)
     : data_(new scalar_t[m*n]), rows_(m),
-      cols_(n), ld_(std::max(std::size_t(1), m)) { }
+      cols_(n), ld_(std::max(std::size_t(1), m)) {
+    STRUMPACK_ADD_MEMORY(rows_*cols_*sizeof(scalar_t));
+  }
 
   template<typename scalar_t> DenseMatrix<scalar_t>::DenseMatrix
   (std::size_t m, std::size_t n, const scalar_t* D, std::size_t ld)
     : data_(new scalar_t[m*n]), rows_(m), cols_(n),
       ld_(std::max(std::size_t(1), m)) {
+    STRUMPACK_ADD_MEMORY(rows_*cols_*sizeof(scalar_t));
     assert(ld >= m);
     for (std::size_t j=0; j<cols_; j++)
       for (std::size_t i=0; i<rows_; i++)
@@ -66,6 +69,7 @@ namespace strumpack {
    std::size_t i, std::size_t j)
     : data_(new scalar_t[m*n]), rows_(m), cols_(n),
       ld_(std::max(std::size_t(1), m)) {
+    STRUMPACK_ADD_MEMORY(rows_*cols_*sizeof(scalar_t));
     for (std::size_t _j=0; _j<std::min(cols_, D.cols()-j); _j++)
       for (std::size_t _i=0; _i<std::min(rows_, D.rows()-i); _i++)
         operator()(_i, _j) = D(_i+i, _j+j);
@@ -75,6 +79,7 @@ namespace strumpack {
   DenseMatrix<scalar_t>::DenseMatrix(const DenseMatrix<scalar_t>& D)
     : data_(new scalar_t[D.rows()*D.cols()]), rows_(D.rows()),
       cols_(D.cols()), ld_(std::max(std::size_t(1), D.rows())) {
+    STRUMPACK_ADD_MEMORY(rows_*cols_*sizeof(scalar_t));
     for (std::size_t j=0; j<cols_; j++)
       for (std::size_t i=0; i<rows_; i++)
         operator()(i, j) = D(i, j);
@@ -90,16 +95,23 @@ namespace strumpack {
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>::~DenseMatrix() {
-    delete[] data_;
+    if (data_) {
+      STRUMPACK_SUB_MEMORY(rows_*cols_*sizeof(scalar_t));
+      delete[] data_;
+    }
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::operator=(const DenseMatrix<scalar_t>& D) {
     if (this == &D) return *this;
     if (rows_ != D.rows() || cols_ != D.cols()) {
+      if (data_) {
+        STRUMPACK_SUB_MEMORY(rows_*cols_*sizeof(scalar_t));
+        delete[] data_;
+      }
       rows_ = D.rows();
       cols_ = D.cols();
-      delete[] data_;
+      STRUMPACK_ADD_MEMORY(rows_*cols_*sizeof(scalar_t));
       data_ = new scalar_t[rows_*cols_];
       ld_ = std::max(std::size_t(1), rows_);
     }
@@ -111,10 +123,13 @@ namespace strumpack {
 
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::operator=(DenseMatrix<scalar_t>&& D) {
+    if (data_) {
+      STRUMPACK_SUB_MEMORY(rows_*cols_*sizeof(scalar_t));
+      delete[] data_;
+    }
     rows_ = D.rows();
     cols_ = D.cols();
     ld_ = D.ld();
-    delete[] data_;
     data_ = D.data();
     D.data_ = nullptr;
     return *this;
@@ -188,20 +203,27 @@ namespace strumpack {
   }
 
   template<typename scalar_t> void DenseMatrix<scalar_t>::clear() {
+    if (data_) {
+      STRUMPACK_SUB_MEMORY(rows_*cols_*sizeof(scalar_t));
+      delete[] data_;
+    }
     rows_ = 0;
     cols_ = 0;
     ld_ = 1;
-    delete[] data_;
     data_ = nullptr;
   }
 
   template<typename scalar_t> void
   DenseMatrix<scalar_t>::resize(std::size_t m, std::size_t n) {
+    STRUMPACK_ADD_MEMORY(m*n*sizeof(scalar_t));
     auto tmp = new scalar_t[m*n];
     for (std::size_t j=0; j<std::min(cols(),n); j++)
       for (std::size_t i=0; i<std::min(rows(),m); i++)
         tmp[i+j*m] = operator()(i,j);
-    delete[] data_;
+    if (data_) {
+      STRUMPACK_SUB_MEMORY(rows_*cols_*sizeof(scalar_t));
+      delete[] data_;
+    }
     data_ = tmp;
     ld_ = std::max(std::size_t(1), m);
     rows_ = m;
@@ -364,9 +386,9 @@ namespace strumpack {
     const auto m = rows();
     const auto n = cols();
 #if defined(_OPENMP) && defined(STRUMPACK_USE_OPENMP_TASKLOOP)
-#pragma omp parallel if(!omp_in_parallel())
+#pragma omp parallel if(depth < params::task_recursion_cutoff_level && !omp_in_parallel())
 #pragma omp single nowait
-#pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+#pragma omp taskloop default(shared) collapse(2)
 #endif
     for (std::size_t j=0; j<n; j++)
       for (std::size_t i=0; i<m; i++)
@@ -381,9 +403,9 @@ namespace strumpack {
     const auto m = rows();
     const auto n = cols();
 #if defined(_OPENMP) && defined(STRUMPACK_USE_OPENMP_TASKLOOP)
-#pragma omp parallel if(!omp_in_parallel())
+#pragma omp parallel if(depth < params::task_recursion_cutoff_level && !omp_in_parallel())
 #pragma omp single nowait
-#pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+#pragma omp taskloop default(shared) collapse(2)
 #endif
     for (std::size_t j=0; j<n; j++)
       for (std::size_t i=0; i<m; i++)
@@ -397,9 +419,9 @@ namespace strumpack {
     const auto m = rows();
     const auto n = cols();
 #if defined(_OPENMP) && defined(STRUMPACK_USE_OPENMP_TASKLOOP)
-#pragma omp parallel if(!omp_in_parallel())
+#pragma omp parallel if(depth < params::task_recursion_cutoff_level && !omp_in_parallel())
 #pragma omp single nowait
-#pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+#pragma omp taskloop default(shared) collapse(2)
 #endif
     for (std::size_t j=0; j<n; j++)
       for (std::size_t i=0; i<m; i++)
@@ -414,9 +436,9 @@ namespace strumpack {
     const auto m = rows();
     const auto n = cols();
 #if defined(_OPENMP) && defined(STRUMPACK_USE_OPENMP_TASKLOOP)
-#pragma omp parallel if(!omp_in_parallel())
+#pragma omp parallel if(depth < params::task_recursion_cutoff_level && !omp_in_parallel())
 #pragma omp single nowait
-#pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+#pragma omp taskloop default(shared) collapse(2)
 #endif
     for (std::size_t j=0; j<n; j++)
       for (std::size_t i=0; i<m; i++)
@@ -431,9 +453,9 @@ namespace strumpack {
     const auto m = rows();
     const auto n = cols();
 #if defined(_OPENMP) && defined(STRUMPACK_USE_OPENMP_TASKLOOP)
-#pragma omp parallel if(!omp_in_parallel())
+#pragma omp parallel if(depth < params::task_recursion_cutoff_level && !omp_in_parallel())
 #pragma omp single nowait
-#pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+#pragma omp taskloop default(shared) collapse(2)
 #endif
     for (std::size_t j=0; j<n; j++)
       for (std::size_t i=0; i<m; i++)
@@ -454,9 +476,9 @@ namespace strumpack {
     const auto m = rows();
     const auto n = cols();
 #if defined(_OPENMP) && defined(STRUMPACK_USE_OPENMP_TASKLOOP)
-#pragma omp parallel if(!omp_in_parallel())
+#pragma omp parallel if(depth < params::task_recursion_cutoff_level && !omp_in_parallel())
 #pragma omp single nowait
-#pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+#pragma omp taskloop default(shared) collapse(2)
 #endif
     for (std::size_t j=0; j<n; j++)
       for (std::size_t i=0; i<m; i++)
@@ -495,9 +517,9 @@ namespace strumpack {
     const auto m = rows();
     const auto n = cols();
 #if defined(_OPENMP) && defined(STRUMPACK_USE_OPENMP_TASKLOOP)
-#pragma omp parallel if(!omp_in_parallel())
+#pragma omp parallel if(depth < params::task_recursion_cutoff_level && !omp_in_parallel())
 #pragma omp single nowait
-#pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+#pragma omp taskloop default(shared) collapse(2)
 #endif
     for (std::size_t j=0; j<n; j++)
       for (std::size_t i=0; i<m; i++)
@@ -530,7 +552,16 @@ namespace strumpack {
   DenseMatrix<scalar_t>::LU(int depth) {
     std::vector<int> piv(rows());
     int info = 0;
-    getrf_omp_task(rows(), cols(), data(), ld(), piv.data(), &info, depth);
+#if defined(_OPENMP)
+    bool in_par = depth < params::task_recursion_cutoff_level
+                          && omp_in_parallel();
+#else
+    bool in_par = false;
+#endif
+    if (in_par)
+      getrf_omp_task(rows(), cols(), data(), ld(), piv.data(), &info, depth);
+    else
+      blas::getrf(rows(), cols(), data(), ld(), piv.data(), &info);
     if (info) {
       std::cerr << "ERROR: LU factorization failed with info="
                 << info << std::endl;
@@ -594,18 +625,25 @@ namespace strumpack {
   template<typename scalar_t> void
   DenseMatrix<scalar_t>::solve_LU_in_place
   (DenseMatrix<scalar_t>& b, const std::vector<int>& piv, int depth) const {
-    assert(b.rows() == rows());
     assert(piv.size() >= rows());
+    solve_LU_in_place(b, piv.data(), depth);
+  }
+
+  template<typename scalar_t> void
+  DenseMatrix<scalar_t>::solve_LU_in_place
+  (DenseMatrix<scalar_t>& b, const int* piv, int depth) const {
+    assert(b.rows() == rows());
     int info = 0;
     if (!rows()) return;
     getrs_omp_task
-      (char(Trans::N), rows(), b.cols(), data(), ld(), piv.data(),
+      (char(Trans::N), rows(), b.cols(), data(), ld(), piv,
        b.data(), b.ld(), &info, depth);
     if (info) {
       std::cerr << "ERROR: LU solve failed with info=" << info << std::endl;
       exit(1);
     }
   }
+
 
   template<typename scalar_t> void
   DenseMatrix<scalar_t>::solve_LDLt_in_place
@@ -821,7 +859,8 @@ namespace strumpack {
            (ta==Trans::N && tb!=Trans::N && a.cols()==b.cols()) ||
            (ta!=Trans::N && tb!=Trans::N && a.rows()==b.cols()));
 #if defined(_OPENMP)
-    bool in_par = omp_in_parallel();
+    bool in_par = depth < params::task_recursion_cutoff_level
+                          && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -836,6 +875,7 @@ namespace strumpack {
                  b.data(), b.ld(), beta, c.data(), c.ld());
   }
 
+
   template<typename scalar_t> void
   gemm(Trans ta, Trans tb, scalar_t alpha, const DenseMatrix<scalar_t>& a,
        const scalar_t* b, int ldb, scalar_t beta,
@@ -843,7 +883,8 @@ namespace strumpack {
     assert((ta==Trans::N && a.rows()==c.rows()) ||
            (ta!=Trans::N && a.cols()==c.rows()));
 #if defined(_OPENMP)
-    bool in_par = omp_in_parallel();
+    bool in_par = depth < params::task_recursion_cutoff_level
+                          && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -868,7 +909,8 @@ namespace strumpack {
            (ta==Trans::N && tb!=Trans::N && a.cols()==b.cols()) ||
            (ta!=Trans::N && tb!=Trans::N && a.rows()==b.cols()));
 #if defined(_OPENMP)
-    bool in_par = omp_in_parallel();
+    bool in_par = depth < params::task_recursion_cutoff_level
+                          && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -899,9 +941,11 @@ namespace strumpack {
   trmm(Side s, UpLo ul, Trans ta, Diag d, scalar_t alpha,
        const DenseMatrix<scalar_t>& a, DenseMatrix<scalar_t>& b,
        int depth) {
-    bool in_par = false;
 #if defined(_OPENMP)
-    in_par = omp_in_parallel();
+    bool in_par = depth < params::task_recursion_cutoff_level
+                          && omp_in_parallel();
+#else
+    bool in_par = false;
 #endif
     if (in_par)
       trmm_omp_task
@@ -931,7 +975,8 @@ namespace strumpack {
        const DenseMatrix<scalar_t>& a, DenseMatrix<scalar_t>& b,
        int depth) {
 #if defined(_OPENMP)
-    bool in_par = omp_in_parallel();
+    bool in_par = depth < params::task_recursion_cutoff_level
+                          && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -958,7 +1003,8 @@ namespace strumpack {
     assert(b.cols() == 1);
     assert(a.rows() == a.cols() && a.cols() == b.rows());
 #if defined(_OPENMP)
-    bool in_par = omp_in_parallel();
+    bool in_par = depth < params::task_recursion_cutoff_level
+                          && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -987,7 +1033,8 @@ namespace strumpack {
     assert(ta != Trans::N || (a.rows() == y.rows() && a.cols() == x.rows()));
     assert(ta == Trans::N || (a.cols() == y.rows() && a.rows() == x.rows()));
 #if defined(_OPENMP)
-    bool in_par = omp_in_parallel();
+    bool in_par = depth < params::task_recursion_cutoff_level
+                          && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -1016,7 +1063,8 @@ namespace strumpack {
     assert(ta != Trans::N || (a.rows() == y.rows()));
     assert(ta == Trans::N || (a.cols() == y.rows()));
 #if defined(_OPENMP)
-    bool in_par = omp_in_parallel();
+    bool in_par = depth < params::task_recursion_cutoff_level
+                          && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -1045,7 +1093,8 @@ namespace strumpack {
     assert(ta != Trans::N || (a.cols() == x.rows()));
     assert(ta == Trans::N || (a.rows() == x.rows()));
 #if defined(_OPENMP)
-    bool in_par = omp_in_parallel();
+    bool in_par = depth < params::task_recursion_cutoff_level
+                          && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -1071,7 +1120,8 @@ namespace strumpack {
        const scalar_t* x, int incx, scalar_t beta,
        scalar_t* y, int incy, int depth) {
 #if defined(_OPENMP)
-    bool in_par = omp_in_parallel();
+    bool in_par = depth < params::task_recursion_cutoff_level
+                          && omp_in_parallel();
 #else
     bool in_par = false;
 #endif

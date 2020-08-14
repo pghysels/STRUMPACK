@@ -147,7 +147,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   PropMapSparseMatrix<scalar_t,integer_t>::extract_separator
-  (integer_t sep_end, const std::vector<std::size_t>& I,
+  (integer_t shi, const std::vector<std::size_t>& I,
    const std::vector<std::size_t>& J, DenseM_t& B, int depth) const {
     integer_t m = I.size(), n = J.size();
     if (m == 0 || n == 0) return;
@@ -162,7 +162,7 @@ namespace strumpack {
       for (integer_t i=0; i<m; i++) {
         integer_t r = I[i];
         if (r >= rmin && r <= rmax &&
-            (global_col_[c] < sep_end || r < sep_end)) {
+            (global_col_[c] < shi || r < shi)) {
           auto a_pos = ptr_[c];
           auto a_max = ptr_[c+1];
           while (a_pos < a_max-1 && ind_[a_pos] < r) a_pos++;
@@ -387,26 +387,26 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   PropMapSparseMatrix<scalar_t,integer_t>::extract_front
-  (DenseM_t& F11, DenseM_t& F12, DenseM_t& F21, integer_t sep_begin,
-   integer_t sep_end, const std::vector<integer_t>& upd, int depth) const {
+  (DenseM_t& F11, DenseM_t& F12, DenseM_t& F21, integer_t slo,
+   integer_t shi, const std::vector<integer_t>& upd, int depth) const {
     integer_t dim_upd = upd.size();
-    auto c = find_global(sep_begin);
-    auto chi = find_global(sep_end, c);
+    auto c = find_global(slo);
+    auto chi = find_global(shi, c);
     for (; c<chi; c++) {
       auto col = global_col_[c];
       integer_t row_ptr = 0;
       auto hij = ptr_[c+1];
       for (integer_t j=ptr_[c]; j<hij; j++) {
         auto row = ind_[j];
-        if (row >= sep_begin) {
-          if (row < sep_end)
-            F11(row-sep_begin, col-sep_begin) = val_[j];
+        if (row >= slo) {
+          if (row < shi)
+            F11(row-slo, col-slo) = val_[j];
           else {
             while (row_ptr<dim_upd && upd[row_ptr]<row)
               row_ptr++;
             if (row_ptr == dim_upd) break;
             if (upd[row_ptr] == row)
-              F21(row_ptr, col-sep_begin) = val_[j];
+              F21(row_ptr, col-slo) = val_[j];
           }
         }
       }
@@ -417,9 +417,51 @@ namespace strumpack {
       if (c == local_cols_ || global_col_[c] != upd[i]) continue;
       for (integer_t j=ptr_[c]; j<ptr_[c+1]; j++) {
         auto row = ind_[j];
-        if (row >= sep_begin) {
-          if (row < sep_end)
-            F12(row-sep_begin, i) = val_[j];
+        if (row >= slo) {
+          if (row < shi)
+            F12(row-slo, i) = val_[j];
+          else break;
+        }
+      }
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  PropMapSparseMatrix<scalar_t,integer_t>::push_front_elements
+  (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+   std::vector<Triplet<scalar_t>>& e11, std::vector<Triplet<scalar_t>>& e12,
+   std::vector<Triplet<scalar_t>>& e21) const {
+    integer_t dim_upd = upd.size();
+    auto c = find_global(slo);
+    auto chi = find_global(shi, c);
+    for (; c<chi; c++) {
+      auto col = global_col_[c];
+      integer_t row_ptr = 0;
+      auto hij = ptr_[c+1];
+      for (integer_t j=ptr_[c]; j<hij; j++) {
+        auto row = ind_[j];
+        if (row >= slo) {
+          if (row < shi)
+            e11.emplace_back(row-slo, col-slo, val_[j]);
+          else {
+            while (row_ptr<dim_upd && upd[row_ptr]<row)
+              row_ptr++;
+            if (row_ptr == dim_upd) break;
+            if (upd[row_ptr] == row)
+              e21.emplace_back(row_ptr, col-slo, val_[j]);
+          }
+        }
+      }
+    }
+    for (integer_t i=0; i<dim_upd; ++i) { // update columns
+      //while (c < local_cols_ && global_col_[c] < upd[i]) c++;
+      c = find_global(upd[i], c);
+      if (c == local_cols_ || global_col_[c] != upd[i]) continue;
+      for (integer_t j=ptr_[c]; j<ptr_[c+1]; j++) {
+        auto row = ind_[j];
+        if (row >= slo) {
+          if (row < shi)
+            e12.emplace_back(row-slo, i, val_[j]);
           else break;
         }
       }
@@ -487,7 +529,7 @@ namespace strumpack {
   /** mat should be defined on the same communicator as F11 */
   template<typename scalar_t,typename integer_t> void
   PropMapSparseMatrix<scalar_t,integer_t>::extract_separator_2d
-  (integer_t sep_end, const std::vector<std::size_t>& I,
+  (integer_t shi, const std::vector<std::size_t>& I,
    const std::vector<std::size_t>& J, DistM_t& B) const {
     if (!B.active()) return;
     integer_t m = B.rows(), n = B.cols();
@@ -499,7 +541,7 @@ namespace strumpack {
       if (c == local_cols_ || global_col_[c] != jj) continue;
       for (integer_t i=0; i<m; i++) {
         integer_t ii = I[i];
-        if (jj >= sep_end && ii >= sep_end) break;
+        if (jj >= shi && ii >= shi) break;
         for (integer_t k=ptr_[c]; k<ptr_[c+1]; k++) {
           if (ind_[k] == ii) {
             B.global(i, j, val_[k]);
@@ -557,7 +599,7 @@ namespace strumpack {
    */
   template<typename scalar_t,typename integer_t> void
   PropMapSparseMatrix<scalar_t,integer_t>::front_multiply_2d
-  (integer_t sep_begin, integer_t sep_end, const std::vector<integer_t>& upd,
+  (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
    const DistM_t& R, DistM_t& Srow, DistM_t& Scol, int depth) const {
     assert(R.fixed());
     assert(Srow.fixed());
@@ -565,7 +607,7 @@ namespace strumpack {
     if (!R.active()) return;
     const integer_t dim_upd = upd.size();
     long long int local_flops = 0;
-    const auto dim_sep = sep_end - sep_begin;
+    const auto dim_sep = shi - slo;
     const auto cols = R.cols();
     const auto lcols = R.lcols();
     const auto p_rows = R.nprows();
@@ -574,18 +616,18 @@ namespace strumpack {
     auto rows_from = rows_to + p_rows;
     std::fill(rows_to, rows_to+2*p_rows, 0);
 
-    auto clo = find_global(sep_begin);
-    auto chi = find_global(sep_end);
+    auto clo = find_global(slo);
+    auto chi = find_global(shi);
 
     for (integer_t c=clo; c<chi; c++) { // separator columns
-      auto row_j_rank = R.rowg2p_fixed(global_col_[c] - sep_begin);
+      auto row_j_rank = R.rowg2p_fixed(global_col_[c] - slo);
       integer_t row_upd = 0;
       auto hij = ptr_[c+1];
       for (integer_t j=ptr_[c]; j<hij; j++) {
         auto row = ind_[j];
-        if (row >= sep_begin) {
-          if (row < sep_end) {
-            auto row_i_rank = R.rowg2p_fixed(row - sep_begin);
+        if (row >= slo) {
+          if (row < shi) {
+            auto row_i_rank = R.rowg2p_fixed(row - slo);
             if (row_j_rank == p_row) {
               rows_to[row_i_rank]++;
               rows_from[row_i_rank]++;
@@ -621,9 +663,9 @@ namespace strumpack {
       auto hij = ptr_[c+1];
       for (integer_t j=ptr_[c]; j<hij; j++) {
         integer_t row = ind_[j];
-        if (row >= sep_begin) {
-          if (row < sep_end) {
-            auto row_i_rank = R.rowg2p_fixed(row - sep_begin);
+        if (row >= slo) {
+          if (row < shi) {
+            auto row_i_rank = R.rowg2p_fixed(row - slo);
             if (row_j_rank == p_row) {
               rows_to[row_i_rank]++;
               rows_from[row_i_rank]++;
@@ -655,15 +697,15 @@ namespace strumpack {
 #pragma omp parallel for
     for (int t=0; t<p_rows; t++) {
       for (integer_t c=clo; c<chi; c++) { // separator columns
-        auto Aj = global_col_[c] - sep_begin;
+        auto Aj = global_col_[c] - slo;
         auto row_j_rank = R.rowg2p_fixed(Aj);
         integer_t row_upd = 0;
         const auto hij = ptr_[c+1];
         for (integer_t j=ptr_[c]; j<hij; j++) {
           auto row = ind_[j];
-          if (row >= sep_begin) {
-            if (row < sep_end) {
-              auto Ai = row - sep_begin;
+          if (row >= slo) {
+            if (row < shi) {
+              auto Ai = row - slo;
               auto row_i_rank = R.rowg2p_fixed(Ai);
               if (row_i_rank == t && row_j_rank == p_row) {
                 const auto a = val_[j];
@@ -712,10 +754,10 @@ namespace strumpack {
         auto hij = ptr_[c+1];
         for (integer_t j=ptr_[c]; j<hij; j++) {
           integer_t row = ind_[j];
-          if (row >= sep_begin) {
-            if (row < sep_end) {
+          if (row >= slo) {
+            if (row < shi) {
               const auto a = blas::my_conj(val_[j]);
-              auto Ai = row - sep_begin;
+              auto Ai = row - slo;
               auto row_i_rank = R.rowg2p_fixed(Ai);
               if (row_i_rank == t && row_j_rank == p_row) {
                 for (integer_t k=0, r=R.rowg2l_fixed(Aj); k<lcols; k++)
@@ -756,15 +798,15 @@ namespace strumpack {
     // wait for all incoming messages
     MPI_Waitall(p_rows, rreq, MPI_STATUSES_IGNORE);
     for (integer_t c=clo; c<chi; c++) { // separator columns
-      auto Aj = global_col_[c] - sep_begin;
+      auto Aj = global_col_[c] - slo;
       auto row_j_rank = R.rowg2p_fixed(Aj);
       integer_t row_upd = 0;
       auto hij = ptr_[c+1];
       for (integer_t j=ptr_[c]; j<hij; j++) {
         auto row = ind_[j];
-        if (row >= sep_begin) {
-          if (row < sep_end) {
-            auto Ai = row - sep_begin;
+        if (row >= slo) {
+          if (row < shi) {
+            auto Ai = row - slo;
             auto row_i_rank = R.rowg2p_fixed(Ai);
             if (row_i_rank == p_row) {
               for (integer_t k=0, r=Srow.rowg2l_fixed(Ai); k<lcols; k++)
@@ -807,9 +849,9 @@ namespace strumpack {
       auto hij = ptr_[c+1];
       for (integer_t j=ptr_[c]; j<hij; j++) {
         integer_t row = ind_[j];
-        if (row >= sep_begin) {
-          if (row < sep_end) {
-            auto Ai = row - sep_begin;
+        if (row >= slo) {
+          if (row < shi) {
+            auto Ai = row - slo;
             auto row_i_rank = R.rowg2p_fixed(Ai);
             if (row_i_rank == p_row) {
               for (integer_t k=0, r=Srow.rowg2l_fixed(Ai); k<lcols; k++)
@@ -837,10 +879,10 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   PropMapSparseMatrix<scalar_t,integer_t>::
   front_multiply_2d_N
-  (integer_t sep_begin, integer_t sep_end, const std::vector<integer_t>& upd,
+  (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
    const DistM_t& R, DistM_t& S, int depth) const {
     // DistM_t Sdummy(S.grid(), S.rows(), S.cols());
-    // front_multiply_2d(sep_begin, sep_end, upd, R, S, Sdummy, 0);
+    // front_multiply_2d(slo, shi, upd, R, S, Sdummy, 0);
     // return;
 
     assert(R.fixed());
@@ -848,7 +890,7 @@ namespace strumpack {
     if (!R.active()) return;
     const integer_t dim_upd = upd.size();
     long long int local_flops = 0;
-    const auto dim_sep = sep_end - sep_begin;
+    const auto dim_sep = shi - slo;
     const auto cols = R.cols();
     const auto lcols = R.lcols();
     const auto p_rows = R.nprows();
@@ -857,18 +899,18 @@ namespace strumpack {
     auto rows_from = rows_to + p_rows;
     std::fill(rows_to, rows_to+2*p_rows, 0);
 
-    auto clo = find_global(sep_begin);
-    auto chi = find_global(sep_end);
+    auto clo = find_global(slo);
+    auto chi = find_global(shi);
 
     for (integer_t c=clo; c<chi; c++) { // separator columns
-      auto row_j_rank = R.rowg2p_fixed(global_col_[c] - sep_begin);
+      auto row_j_rank = R.rowg2p_fixed(global_col_[c] - slo);
       integer_t row_upd = 0;
       auto hij = ptr_[c+1];
       for (integer_t j=ptr_[c]; j<hij; j++) {
         auto row = ind_[j];
-        if (row >= sep_begin) {
-          if (row < sep_end) {
-            auto row_i_rank = R.rowg2p_fixed(row - sep_begin);
+        if (row >= slo) {
+          if (row < shi) {
+            auto row_i_rank = R.rowg2p_fixed(row - slo);
             if (row_j_rank == p_row) {
               rows_to[row_i_rank]++;
               rows_from[row_i_rank]++;
@@ -896,9 +938,9 @@ namespace strumpack {
       auto hij = ptr_[c+1];
       for (integer_t j=ptr_[c]; j<hij; j++) {
         integer_t row = ind_[j];
-        if (row >= sep_begin) {
-          if (row < sep_end) {
-            auto row_i_rank = R.rowg2p_fixed(row - sep_begin);
+        if (row >= slo) {
+          if (row < shi) {
+            auto row_i_rank = R.rowg2p_fixed(row - slo);
             if (row_j_rank == p_row) {
               rows_to[row_i_rank]++;
               rows_from[row_i_rank]++;
@@ -926,15 +968,15 @@ namespace strumpack {
 #pragma omp parallel for
     for (int t=0; t<p_rows; t++) {
       for (integer_t c=clo; c<chi; c++) { // separator columns
-        auto Aj = global_col_[c] - sep_begin;
+        auto Aj = global_col_[c] - slo;
         auto row_j_rank = R.rowg2p_fixed(Aj);
         integer_t row_upd = 0;
         const auto hij = ptr_[c+1];
         for (integer_t j=ptr_[c]; j<hij; j++) {
           auto row = ind_[j];
-          if (row >= sep_begin) {
-            if (row < sep_end) {
-              auto Ai = row - sep_begin;
+          if (row >= slo) {
+            if (row < shi) {
+              auto Ai = row - slo;
               auto row_i_rank = R.rowg2p_fixed(Ai);
               if (row_i_rank == t && row_j_rank == p_row) {
                 const auto a = val_[j];
@@ -971,10 +1013,10 @@ namespace strumpack {
         auto hij = ptr_[c+1];
         for (integer_t j=ptr_[c]; j<hij; j++) {
           integer_t row = ind_[j];
-          if (row >= sep_begin) {
-            if (row < sep_end) {
+          if (row >= slo) {
+            if (row < shi) {
               auto a = val_[j];
-              auto Ai = row - sep_begin;
+              auto Ai = row - slo;
               auto row_i_rank = R.rowg2p_fixed(Ai);
               if (row_i_rank == t && row_j_rank == p_row) {
                 for (integer_t k=0, r=R.rowg2l_fixed(Aj); k<lcols; k++)
@@ -1010,15 +1052,15 @@ namespace strumpack {
     // wait for all incoming messages
     MPI_Waitall(p_rows, rreq, MPI_STATUSES_IGNORE);
     for (integer_t c=clo; c<chi; c++) { // separator columns
-      auto Aj = global_col_[c] - sep_begin;
+      auto Aj = global_col_[c] - slo;
       auto row_j_rank = R.rowg2p_fixed(Aj);
       integer_t row_upd = 0;
       auto hij = ptr_[c+1];
       for (integer_t j=ptr_[c]; j<hij; j++) {
         auto row = ind_[j];
-        if (row >= sep_begin) {
-          if (row < sep_end) {
-            auto Ai = row - sep_begin;
+        if (row >= slo) {
+          if (row < shi) {
+            auto Ai = row - slo;
             auto row_i_rank = R.rowg2p_fixed(Ai);
             if (row_i_rank == p_row) {
               for (integer_t k=0, r=S.rowg2l_fixed(Ai); k<lcols; k++)
@@ -1051,9 +1093,9 @@ namespace strumpack {
       auto hij = ptr_[c+1];
       for (integer_t j=ptr_[c]; j<hij; j++) {
         integer_t row = ind_[j];
-        if (row >= sep_begin) {
-          if (row < sep_end) {
-            auto Ai = row - sep_begin;
+        if (row >= slo) {
+          if (row < shi) {
+            auto Ai = row - slo;
             auto row_i_rank = R.rowg2p_fixed(Ai);
             if (row_i_rank == p_row) {
               for (integer_t k=0, r=S.rowg2l_fixed(Ai); k<lcols; k++)
@@ -1075,10 +1117,10 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   PropMapSparseMatrix<scalar_t,integer_t>::front_multiply_2d_TC
-  (integer_t sep_begin, integer_t sep_end, const std::vector<integer_t>& upd,
+  (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
    const DistM_t& R, DistM_t& S, int depth) const {
     // DistM_t Sdummy(S.grid(), S.rows(), S.cols());
-    // front_multiply_2d(sep_begin, sep_end, upd, R, Sdummy, S, 0);
+    // front_multiply_2d(slo, shi, upd, R, Sdummy, S, 0);
     // return;
 
     assert(R.fixed());
@@ -1086,7 +1128,7 @@ namespace strumpack {
     if (!R.active()) return;
     const integer_t dim_upd = upd.size();
     long long int local_flops = 0;
-    const auto dim_sep = sep_end - sep_begin;
+    const auto dim_sep = shi - slo;
     const auto cols = R.cols();
     const auto lcols = R.lcols();
     const auto p_rows = R.nprows();
@@ -1095,18 +1137,18 @@ namespace strumpack {
     auto rows_from = rows_to + p_rows;
     std::fill(rows_to, rows_to+2*p_rows, 0);
 
-    auto clo = find_global(sep_begin);
-    auto chi = find_global(sep_end);
+    auto clo = find_global(slo);
+    auto chi = find_global(shi);
 
     for (integer_t c=clo; c<chi; c++) { // separator columns
-      auto row_j_rank = R.rowg2p_fixed(global_col_[c] - sep_begin);
+      auto row_j_rank = R.rowg2p_fixed(global_col_[c] - slo);
       integer_t row_upd = 0;
       auto hij = ptr_[c+1];
       for (integer_t j=ptr_[c]; j<hij; j++) {
         auto row = ind_[j];
-        if (row >= sep_begin) {
-          if (row < sep_end) {
-            if (R.rowg2p_fixed(row - sep_begin) == p_row) { // transpose
+        if (row >= slo) {
+          if (row < shi) {
+            if (R.rowg2p_fixed(row - slo) == p_row) { // transpose
               rows_to[row_j_rank]++;
               rows_from[row_j_rank]++;
             }
@@ -1132,9 +1174,9 @@ namespace strumpack {
       auto hij = ptr_[c+1];
       for (integer_t j=ptr_[c]; j<hij; j++) {
         integer_t row = ind_[j];
-        if (row >= sep_begin) {
-          if (row < sep_end) {
-            if (R.rowg2p_fixed(row - sep_begin) == p_row) { // transpose
+        if (row >= slo) {
+          if (row < shi) {
+            if (R.rowg2p_fixed(row - slo) == p_row) { // transpose
               rows_to[row_j_rank]++;
               rows_from[row_j_rank]++;
             }
@@ -1161,15 +1203,15 @@ namespace strumpack {
 #pragma omp parallel for
     for (int t=0; t<p_rows; t++) {
       for (integer_t c=clo; c<chi; c++) { // separator columns
-        auto Aj = global_col_[c] - sep_begin;
+        auto Aj = global_col_[c] - slo;
         auto row_j_rank = R.rowg2p_fixed(Aj);
         integer_t row_upd = 0;
         const auto hij = ptr_[c+1];
         for (integer_t j=ptr_[c]; j<hij; j++) {
           auto row = ind_[j];
-          if (row >= sep_begin) {
-            if (row < sep_end) {
-              auto Ai = row - sep_begin;
+          if (row >= slo) {
+            if (row < shi) {
+              auto Ai = row - slo;
               auto row_i_rank = R.rowg2p_fixed(Ai);
               if (row_j_rank == t && row_i_rank == p_row) { // transpose
                 const auto a = blas::my_conj(val_[j]);
@@ -1206,10 +1248,10 @@ namespace strumpack {
         auto hij = ptr_[c+1];
         for (integer_t j=ptr_[c]; j<hij; j++) {
           integer_t row = ind_[j];
-          if (row >= sep_begin) {
-            if (row < sep_end) {
+          if (row >= slo) {
+            if (row < shi) {
               const auto a = blas::my_conj(val_[j]);
-              auto Ai = row - sep_begin;
+              auto Ai = row - slo;
               auto row_i_rank = R.rowg2p_fixed(Ai);
               if (row_j_rank == t && row_i_rank == p_row) { // transpose
                 for (integer_t k=0, r=R.rowg2l_fixed(Ai); k<lcols; k++)
@@ -1245,15 +1287,15 @@ namespace strumpack {
     // wait for all incoming messages
     MPI_Waitall(p_rows, rreq, MPI_STATUSES_IGNORE);
     for (integer_t c=clo; c<chi; c++) { // separator columns
-      auto Aj = global_col_[c] - sep_begin;
+      auto Aj = global_col_[c] - slo;
       auto row_j_rank = R.rowg2p_fixed(Aj);
       integer_t row_upd = 0;
       auto hij = ptr_[c+1];
       for (integer_t j=ptr_[c]; j<hij; j++) {
         auto row = ind_[j];
-        if (row >= sep_begin) {
-          if (row < sep_end) {
-            auto Ai = row - sep_begin;
+        if (row >= slo) {
+          if (row < shi) {
+            auto Ai = row - slo;
             auto row_i_rank = R.rowg2p_fixed(Ai);
             if (row_j_rank == p_row) { // transpose
               for (integer_t k=0, r=S.rowg2l_fixed(Aj); k<lcols; k++)
@@ -1286,9 +1328,9 @@ namespace strumpack {
       auto hij = ptr_[c+1];
       for (integer_t j=ptr_[c]; j<hij; j++) {
         integer_t row = ind_[j];
-        if (row >= sep_begin) {
-          if (row < sep_end) {
-            auto Ai = row - sep_begin;
+        if (row >= slo) {
+          if (row < shi) {
+            auto Ai = row - slo;
             auto row_i_rank = R.rowg2p_fixed(Ai);
             if (row_j_rank == p_row) { // transpose
               for (integer_t k=0, r=S.rowg2l_fixed(Aj); k<lcols; k++)

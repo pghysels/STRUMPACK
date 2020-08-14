@@ -40,6 +40,7 @@
 #include "misc/RandomWrapper.hpp"
 #include "BLASLAPACKWrapper.hpp"
 
+
 namespace strumpack {
 
   /**
@@ -248,7 +249,7 @@ namespace strumpack {
      * \param j Column index, j < cols()
      */
     inline const scalar_t& operator()(std::size_t i, std::size_t j) const
-    { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return data_[i+ld_*j]; }
+    { assert(i<=rows() && j<=cols()); return data_[i+ld_*j]; }
 
     /**
      * Const pointer to element (i,j) in the matrix. This will do a
@@ -259,7 +260,7 @@ namespace strumpack {
      * \param j Column index, j < cols()
      */
     inline const scalar_t* ptr(std::size_t i, std::size_t j) const
-    { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return data_+i+ld_*j; }
+    { assert(i<=rows() && j<=cols()); return data_+i+ld_*j; }
 
     /**
      * Reference to element (i,j) in the matrix. This will do a bounds
@@ -270,7 +271,7 @@ namespace strumpack {
      * \param j Column index, j < cols()
      */
     inline scalar_t& operator()(std::size_t i, std::size_t j)
-    { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return data_[i+ld_*j]; }
+    { assert(i<=rows() && j<=cols()); return data_[i+ld_*j]; }
 
     /**
      * Pointer to element (i,j) in the matrix. This will do a bounds
@@ -281,7 +282,7 @@ namespace strumpack {
      * \param j Column index, j < cols()
      */
     inline scalar_t* ptr(std::size_t i, std::size_t j)
-    { assert(i>=0 && i<=rows() && j>=0 && j<=cols()); return data_+i+ld_*j; }
+    { assert(i<=rows() && j<=cols()); return data_+i+ld_*j; }
 
     /**
      * Print the matrix to std::cout, in a format interpretable by
@@ -732,6 +733,20 @@ namespace strumpack {
      */
     void solve_LU_in_place
     (DenseMatrix<scalar_t>& b, const std::vector<int>& piv, int depth=0) const;
+
+    /**
+     * Solve a linear system Ax=b with this matrix, factored in its LU
+     * factors (in place), using a call to this->LU. There can be
+     * multiple right hand side vectors.
+     *
+     * \param b input, right hand side vector/matrix. On output this
+     * will be the solution.
+     * \param piv pivot vector returned by LU factorization
+     * \param depth current OpenMP task recursion depth
+     * \see LU, solve_LU_in_place, solve_LDLt_in_place, solve_LDLt_rook_in_place
+     */
+    void solve_LU_in_place
+    (DenseMatrix<scalar_t>& b, const int* piv, int depth=0) const;
 
     /**
      * Solve a linear system Ax=b with this matrix, factored in its
@@ -1256,7 +1271,6 @@ namespace strumpack {
   gemm(Trans ta, Trans tb, scalar_t alpha, const DenseMatrix<scalar_t>& a,
        const DenseMatrix<scalar_t>& b, scalar_t beta,
        DenseMatrix<scalar_t>& c, int depth=0);
-
 
   template<typename scalar_t> void
   gemm(Trans ta, Trans tb, scalar_t alpha, const DenseMatrix<scalar_t>& a,

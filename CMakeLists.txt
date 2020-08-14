@@ -4,9 +4,10 @@ project(STRUMPACK VERSION 3.3.0 LANGUAGES CXX C Fortran)
 
 option(STRUMPACK_USE_MPI     "Build with MPI support" ON)
 option(STRUMPACK_USE_OPENMP  "Use OpenMP for on-node threading tasking" ON)
+option(STRUMPACK_USE_CUDA    "Use CUDA for NVIDIA GPU acceleration" ON)
+option(STRUMPACK_USE_HIP     "Use HIP for AMD or NVIDIA GPU acceleration" ON)
 
 option(TPL_ENABLE_SLATE      "Use SLATE, the ECP ScaLAPACK replacement" OFF)
-option(TPL_ENABLE_CUBLAS     "Build with support for cuBLAS/cuSOLVER" OFF)
 option(TPL_ENABLE_PARMETIS   "Build with support for ParMetis" ON)
 option(TPL_ENABLE_SCOTCH     "Build with support for Scotch" ON)
 option(TPL_ENABLE_PTSCOTCH   "Build with support for PTScotch" ON)
@@ -22,6 +23,8 @@ option(STRUMPACK_DEV_TESTING "Enable extensive testing" OFF)
 include(CheckLibraryExists)
 # include(CMakePushCheckState)
 include(CheckCXXSourceCompiles)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules")
 
 # figure out Fortran/C name mangling
 include(FortranCInterface)
@@ -79,6 +82,56 @@ if(STRUMPACK_USE_OPENMP)
   endif()
 else()
   message(STATUS "OpenMP support was not enabled.")
+endif()
+
+if(STRUMPACK_USE_CUDA)
+  include(CheckLanguage)
+  check_language(CUDA)
+  if(CMAKE_CUDA_COMPILER)
+    enable_language(CUDA)
+    # will be in CMake 3.17? for now we have a copy in cmake/Modules
+    find_package(CUDAToolkit REQUIRED)
+  else()
+    message(WARNING "CUDA compiler not found,"
+      " proceeding without CUDA support.")
+    set(STRUMPACK_USE_CUDA OFF)
+  endif()
+endif()
+
+if(STRUMPACK_USE_HIP)
+  if(STRUMPACK_USE_CUDA)
+    message(WARNING "A CUDA compiler was found,"
+      " proceeding with CUDA support instead of HIP.")
+    set(STRUMPACK_USE_HIP OFF)
+  else()
+    include(cmake/hip_path.cmake)
+    list(APPEND CMAKE_MODULE_PATH "${HIP_PATH}/cmake")
+    find_package(HIP)
+    if(HIP_FOUND)
+      if(DEFINED ENV{HIP_PLATFORM})
+        set(STRUMPACK_HIP_PLATFORM "$ENV{HIP_PLATFORM}")
+      elseif(HIP_PATH)
+        execute_process(COMMAND ${STRUMPACK_HIPCONFIG_PATH} --platform
+          OUTPUT_VARIABLE GINKGO_HIP_PLATFORM)
+      else()
+        message(FATAL_ERROR "No platform could be found for HIP. "
+          "Set and export the environment variable HIP_PLATFORM.")
+      endif()
+      message(STATUS "HIP platform set to ${STRUMPACK_HIP_PLATFORM}")
+      if (STRUMPACK_HIP_PLATFORM STREQUAL "hcc")
+        set(STRUMPACK_HIP_PLATFORM_HCC ON)
+      elseif (STRUMPACK_HIP_PLATFORM STREQUAL "nvcc")
+        set(STRUMPACK_HIP_PLATFORM_NVCC ON)
+      endif()
+
+      find_package(hipblas REQUIRED)
+      # TODO hipSOLVER or rocSOLVER
+    else()
+      message(WARNING "HIP compiler not found,"
+        " proceeding without HIP support.")
+      set(STRUMPACK_USE_HIP OFF)
+    endif()
+  endif()
 endif()
 
 
@@ -203,9 +256,6 @@ endif()
 check_cxx_source_compiles("#include <getopt.h>
 int main(int argc, char* argv[]) { getopt_long(argc, argv, \"\", 0, 0); }"
   STRUMPACK_USE_GETOPT)
-
-
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules")
 
 
 if(STRUMPACK_USE_MPI)
@@ -362,12 +412,6 @@ if(TPL_ENABLE_SLATE)
   endif()
 endif()
 
-if(TPL_ENABLE_CUBLAS)
-  # will be in CMake 3.17? for now we have a copy in cmake/Modules
-  find_package(CUDAToolkit REQUIRED)
-  option(STRUMPACK_USE_CUBLAS "" ON)
-endif()
-
 if(TPL_ENABLE_COMBBLAS)
   list(APPEND CMAKE_PREFIX_PATH ${TPL_COMBBLAS_PREFIX}
     $ENV{COMBBLAS_DIR} $ENV{COMBBLAS_ROOT}
@@ -384,6 +428,8 @@ endif()
 # TODO PIC
 # TODO libatomic?
 
+
+# hip_add_library(strumpack "")
 add_library(strumpack "")
 add_subdirectory(src)
 
@@ -473,6 +519,15 @@ endif()
 if(CUDAToolkit_FOUND)
   target_link_libraries(strumpack PUBLIC
     CUDA::cudart CUDA::cusolver CUDA::cublas)
+endif()
+
+if(hipblas_FOUND)
+  target_link_libraries(strumpack PUBLIC roc::hipblas)
+  if(STRUMPACK_HIP_PLATFORM_HCC)
+    target_compile_definitions(strumpack PUBLIC __HIP_PLATFORM_HCC__)
+  elseif(STRUMPACK_HIP_PLATFORM_NVCC)
+    target_compile_definitions(strumpack PUBLIC __HIP_PLATFORM_NVCC__)
+  endif()
 endif()
 
 if(CombBLAS_FOUND)

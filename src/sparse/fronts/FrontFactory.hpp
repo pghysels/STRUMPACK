@@ -52,9 +52,9 @@ namespace strumpack {
 #endif
   };
 
-  template<typename scalar_t> bool is_CUBLAS
+  template<typename scalar_t> bool is_GPU
   (const SPOptions<scalar_t>& opts) {
-#if defined(STRUMPACK_USE_CUBLAS)
+#if defined(STRUMPACK_USE_CUDA)
     return opts.use_gpu() && opts.compression() == CompressionType::NONE;
 #else
     return false;

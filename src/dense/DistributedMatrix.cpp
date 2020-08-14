@@ -251,12 +251,18 @@ namespace strumpack {
       data_ = m.data_;
       m.data_ = nullptr;
     } else {
-      data_ = new scalar_t[lrows_*lcols_];
-      for (int c=0; c<lcols_; c++)
-        for (int r=0; r<lrows_; r++)
-          operator()(r, c) = m(r, c);
+      if (lrows_ && lcols_) {
+        STRUMPACK_ADD_MEMORY(lrows_*lcols_*sizeof(scalar_t));
+        data_ = new scalar_t[lrows_*lcols_];
+        for (int c=0; c<lcols_; c++)
+          for (int r=0; r<lrows_; r++)
+            operator()(r, c) = m(r, c);
+      }
     }
-    delete[] m.data_;
+    if (m.data_) {
+      STRUMPACK_SUB_MEMORY(m.rows_*m.cols_*sizeof(scalar_t));
+      delete[] m.data_;
+    }
     m.data_ = nullptr;
   }
 
@@ -271,8 +277,11 @@ namespace strumpack {
   (const DistributedMatrix<scalar_t>& m)
     : grid_(m.grid()), lrows_(m.lrows()), lcols_(m.lcols()) {
     std::copy(m.desc_, m.desc_+9, desc_);
-    data_ = new scalar_t[lrows_*lcols_];
-    std::copy(m.data_, m.data_+lrows_*lcols_, data_);
+    if (lrows_ && lcols_) {
+      STRUMPACK_ADD_MEMORY(lrows_*lcols_*sizeof(scalar_t));
+      data_ = new scalar_t[lrows_*lcols_];
+      std::copy(m.data_, m.data_+lrows_*lcols_, data_);
+    }
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix
@@ -302,7 +311,10 @@ namespace strumpack {
     } else {
       lrows_ = scalapack::numroc(M, MB, prow(), 0, nprows());
       lcols_ = scalapack::numroc(N, NB, pcol(), 0, npcols());
-      data_ = new scalar_t[lrows_*lcols_];
+      if (lrows_ && lcols_) {
+        STRUMPACK_ADD_MEMORY(lrows_*lcols_*sizeof(scalar_t));
+        data_ = new scalar_t[lrows_*lcols_];
+      }
       if (scalapack::descinit
           (desc_, M, N, MB, NB, 0, 0, ctxt(), std::max(lrows_,1))) {
         std::cerr << " ERROR: Could not create DistributedMatrix descriptor!"
@@ -323,7 +335,10 @@ namespace strumpack {
       lrows_ = scalapack::numroc(desc_[2], desc_[4], prow(), desc_[6], nprows());
       lcols_ = scalapack::numroc(desc_[3], desc_[5], pcol(), desc_[7], npcols());
       assert(lrows_==desc_[8]);
-      if (lrows_ && lcols_) data_ = new scalar_t[lrows_*lcols_];
+      if (lrows_ && lcols_) {
+        STRUMPACK_ADD_MEMORY(lrows_*lcols_*sizeof(scalar_t));
+        data_ = new scalar_t[lrows_*lcols_];
+      }
       else data_ = nullptr;
     }
   }
@@ -337,8 +352,12 @@ namespace strumpack {
   DistributedMatrix<scalar_t>::operator=
   (const DistributedMatrix<scalar_t>& m) {
     if (lrows_ != m.lrows_ || lcols_ != m.lcols_) {
+      if (data_) {
+        STRUMPACK_SUB_MEMORY(lrows_*lcols_*sizeof(scalar_t));
+        delete[] data_;
+      }
       lrows_ = m.lrows_;  lcols_ = m.lcols_;
-      delete[] data_;
+      STRUMPACK_ADD_MEMORY(lrows_*lcols_*sizeof(scalar_t));
       data_ = new scalar_t[lrows_*lcols_];
     }
     grid_ = m.grid();
@@ -350,9 +369,13 @@ namespace strumpack {
   template<typename scalar_t> DistributedMatrix<scalar_t>&
   DistributedMatrix<scalar_t>::operator=(DistributedMatrix<scalar_t>&& m) {
     grid_ = m.grid();
-    lrows_ = m.lrows_;  lcols_ = m.lcols_;
+    if (data_) {
+      STRUMPACK_SUB_MEMORY(lrows_*lcols_*sizeof(scalar_t));
+      delete[] data_;
+    }
+    lrows_ = m.lrows_;
+    lcols_ = m.lcols_;
     std::copy(m.desc_, m.desc_+9, desc_);
-    delete[] data_;
     data_ = m.data_;
     m.data_ = nullptr;
     return *this;
@@ -366,7 +389,10 @@ namespace strumpack {
   }
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::clear() {
-    delete[] data_;
+    if (data_) {
+      STRUMPACK_SUB_MEMORY(lrows_*lcols_*sizeof(scalar_t));
+      delete[] data_;
+    }
     data_ = nullptr;
     lrows_ = lcols_ = 0;
     scalapack::descset(desc_, 0, 0, MB(), NB(), 0, 0, ctxt(), 1);
@@ -570,18 +596,18 @@ namespace strumpack {
         }
       }
     }
-    auto sreq = new MPI_Request[2*(nprows()-1)];
-    auto rreq = sreq + nprows()-1;
+    std::vector<MPI_Request> sreq(nprows()-1);
+    std::vector<MPI_Request> rreq(nprows()-1);
     for (int p=0; p<nprows(); p++)
       if (p != prow()) {
         MPI_Isend(sbuf[p].data(), sbuf[p].size(), mpi_type<scalar_t>(),
                   p+pcol()*nprows(), 0, comm(),
-                  (p < prow()) ? sreq+p : sreq+p-1);
+                  (p < prow()) ? &sreq[p] : &sreq[p-1]);
         MPI_Irecv(rbuf[p].data(), rbuf[p].size(), mpi_type<scalar_t>(),
                   p+pcol()*nprows(), 0, comm(),
-                  (p < prow()) ? rreq+p : rreq+p-1);
+                  (p < prow()) ? &rreq[p] : &rreq[p-1]);
       }
-    MPI_Waitall(nprows()-1, rreq, MPI_STATUSES_IGNORE);
+    MPI_Waitall(nprows()-1, rreq.data(), MPI_STATUSES_IGNORE);
     std::vector<scalar_t*> prbuf(nprows());
     for (int p=0; p<nprows(); p++) prbuf[p] = rbuf[p].data();
     for (std::size_t r=0; r<Ir.size(); r++) {
@@ -594,8 +620,7 @@ namespace strumpack {
       for (int c=0; c<lcols_; c++)
         tmp(tmpr, c) = *(prbuf[owner]++);
     }
-    MPI_Waitall(nprows()-1, sreq, MPI_STATUSES_IGNORE);
-    delete[] sreq;
+    MPI_Waitall(nprows()-1, sreq.data(), MPI_STATUSES_IGNORE);
     return tmp;
   }
 
@@ -639,18 +664,18 @@ namespace strumpack {
             sbuf[dest].push_back(operator()(r, lc));
       }
     }
-    auto sreq = new MPI_Request[2*(npcols()-1)];
-    auto rreq = sreq + npcols()-1;
+    std::vector<MPI_Request> sreq(npcols()-1);
+    std::vector<MPI_Request> rreq(npcols()-1);
     for (int p=0; p<npcols(); p++)
       if (p != pcol()) {
         MPI_Isend(sbuf[p].data(), sbuf[p].size(), mpi_type<scalar_t>(),
                   prow()+p*nprows(), 0, comm(),
-                  (p < pcol()) ? sreq+p : sreq+p-1);
+                  (p < pcol()) ? &sreq[p] : &sreq[p-1]);
         MPI_Irecv(rbuf[p].data(), rbuf[p].size(), mpi_type<scalar_t>(),
                   prow()+p*nprows(), 0, comm(),
-                  (p < pcol()) ? rreq+p : rreq+p-1);
+                  (p < pcol()) ? &rreq[p] : &rreq[p-1]);
       }
-    MPI_Waitall(npcols()-1, rreq, MPI_STATUSES_IGNORE);
+    MPI_Waitall(npcols()-1, rreq.data(), MPI_STATUSES_IGNORE);
     std::vector<scalar_t*> prbuf(npcols());
     for (int p=0; p<npcols(); p++) prbuf[p] = rbuf[p].data();
     for (std::size_t c=0; c<Jc.size(); c++) {
@@ -663,8 +688,7 @@ namespace strumpack {
       for (int r=0; r<lrows_; r++)
         tmp(r, tmpc) = *(prbuf[owner]++);
     }
-    MPI_Waitall(npcols()-1, sreq, MPI_STATUSES_IGNORE);
-    delete[] sreq;
+    MPI_Waitall(npcols()-1, sreq.data(), MPI_STATUSES_IGNORE);
     return tmp;
   }
 
@@ -723,11 +747,11 @@ namespace strumpack {
     int IACOL = indxg2p(J(), NB(), pcol(), 0, npcols());
     int Nq0 = scalapack::numroc
       (cols()+ ((J()-1)%NB()), NB(), pcol(), IACOL, npcols());
-    real_t* work = new real_t[Nq0];
-    auto norm = scalapack::plange
-      ('1', rows(), cols(), data(), I(), J(), desc(), work);
-    delete[] work;
-    return norm;
+    STRUMPACK_ADD_MEMORY(Nq0*sizeof(real_t));
+    std::unique_ptr<real_t[]> work(new real_t[Nq0]);
+    STRUMPACK_SUB_MEMORY(Nq0*sizeof(real_t));
+    return scalapack::plange
+      ('1', rows(), cols(), data(), I(), J(), desc(), work.get());
   }
 
   template<typename scalar_t> typename RealType<scalar_t>::value_type
@@ -736,11 +760,11 @@ namespace strumpack {
     int IAROW = indxg2p(I(), MB(), prow(), 0, nprows());
     int Mp0 = scalapack::numroc
       (rows()+ ((I()-1)%MB()), MB(), prow(), IAROW, nprows());
-    real_t* work = new real_t[Mp0];
-    auto norm = scalapack::plange
-      ('I', rows(), cols(), data(), I(), J(), desc(), work);
-    delete[] work;
-    return norm;
+    STRUMPACK_ADD_MEMORY(Mp0*sizeof(real_t));
+    std::unique_ptr<real_t[]> work(new real_t[Mp0]);
+    STRUMPACK_SUB_MEMORY(Mp0*sizeof(real_t));
+    return scalapack::plange
+      ('I', rows(), cols(), data(), I(), J(), desc(), work.get());
   }
 
   template<typename scalar_t> typename RealType<scalar_t>::value_type
@@ -873,9 +897,10 @@ namespace strumpack {
     auto minmn = std::min(rows(), cols());
     auto N = J() + minmn - 1;
     auto ltau = scalapack::numroc(N, NB(), pcol(), 0, npcols());
-    auto tau = new scalar_t[ltau];
+    STRUMPACK_ADD_MEMORY(ltau*sizeof(scalar_t));
+    std::unique_ptr<scalar_t[]> tau(new scalar_t[ltau]);
     auto info = scalapack::pgeqrf
-      (rows(), minmn, data(), I(), J(), desc(), tau);
+      (rows(), minmn, data(), I(), J(), desc(), tau.get());
     if (lrows() && lcols()) {
       real_t Rmax(std::numeric_limits<real_t>::min());
       real_t Rmin(std::numeric_limits<real_t>::max());
@@ -904,7 +929,7 @@ namespace strumpack {
     scalapack::gamn2d
       (ctxt(), 'A', ' ', 1, 1, &r_min, 1, NULL, NULL, -1, -1, -1);
     info = scalapack::pxxgqr
-      (rows(), minmn, minmn, data(), I(), J(), desc(), tau);
+      (rows(), minmn, minmn, data(), I(), J(), desc(), tau.get());
     if (info) {
       std::cerr << "ERROR: Orthogonalization (pxxgqr) failed with info = "
                 << info << std::endl;
@@ -915,7 +940,7 @@ namespace strumpack {
         tmp(rows(), cols()-rows(), *this, 0, rows());
       tmp.zero();
     }
-    delete[] tau;
+    STRUMPACK_SUB_MEMORY(ltau*sizeof(scalar_t));
   }
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::LQ
@@ -927,12 +952,12 @@ namespace strumpack {
     // TODO this is not a pgemr2d, this does not require communication!!
     strumpack::copy(rows(), cols(), *this, 0, 0, tmp, 0, 0, grid()->ctxt());
     // TODO the last argument to numroc, should it be prows/pcols???
-    auto tau = new scalar_t
-      [scalapack::numroc(I()+std::min(rows(),cols())-1, MB(),
-                         prow(), 0, nprows())];
+    std::unique_ptr<scalar_t[]> tau
+      (new scalar_t[scalapack::numroc(I()+std::min(rows(),cols())-1, MB(),
+                                      prow(), 0, nprows())]);
     scalapack::pgelqf
       (rows(), tmp.cols(), tmp.data(), tmp.I(), tmp.J(),
-       tmp.desc(), tau);
+       tmp.desc(), tau.get());
     L = DistributedMatrix<scalar_t>(grid(), rows(), rows());
     // TODO this is not a pgemr2d, this does not require communication!!
     strumpack::copy(rows(), rows(), tmp, 0, 0, L, 0, 0, grid()->ctxt());
@@ -945,8 +970,7 @@ namespace strumpack {
     //   }
     scalapack::pxxglq
       (cols(), cols(), std::min(rows(), cols()),
-       tmp.data(), tmp.I(), tmp.J(), tmp.desc(), tau);
-    delete[] tau;
+       tmp.data(), tmp.I(), tmp.J(), tmp.desc(), tau.get());
     if (tmp.rows() == cols()) Q = std::move(tmp);
     else {
       Q = DistributedMatrix<scalar_t>(grid(), cols(), cols());

@@ -46,8 +46,8 @@
 #include "FrontalMatrixHODLRMPI.hpp"
 #endif
 #endif
-#if defined(STRUMPACK_USE_CUBLAS)
-#include "FrontalMatrixCUBLAS.hpp"
+#if defined(STRUMPACK_USE_CUDA)
+#include "FrontalMatrixGPU.hpp"
 #endif
 #if defined(STRUMPACK_USE_ZFP)
 #include "FrontalMatrixLossy.hpp"
@@ -65,10 +65,10 @@ namespace strumpack {
     std::unique_ptr<FrontalMatrix<scalar_t,integer_t>> front;
     switch (opts.compression()) {
     case CompressionType::NONE: {
-      if (is_CUBLAS(opts)) {
-#if defined(STRUMPACK_USE_CUBLAS)
+      if (is_GPU(opts)) {
+#if defined(STRUMPACK_USE_CUDA)
         front.reset
-          (new FrontalMatrixCUBLAS<scalar_t,integer_t>(s, sbegin, send, upd));
+          (new FrontalMatrixGPU<scalar_t,integer_t>(s, sbegin, send, upd));
         if (root) fc.dense++;
 #endif
       }

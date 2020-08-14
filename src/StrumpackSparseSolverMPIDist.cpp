@@ -384,7 +384,7 @@ namespace strumpack {
 #endif
 #if defined(STRUMPACK_COUNT_FLOPS)
       auto df = params::flops - this->f0_;
-      long long int flopsbytes[2] = {df, params::bytes - this->b0_};
+      long long int flopsbytes[2] = {df, params::bytes_moved - this->b0_};
       comm_.all_reduce(flopsbytes, 2, MPI_SUM);
       this->ftot_ = flopsbytes[0];
       this->btot_ = flopsbytes[1];
@@ -395,7 +395,8 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::reduce_flop_counters() const {
+  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::
+  reduce_flop_counters() const {
 #if defined(STRUMPACK_COUNT_FLOPS)
     std::array<long long int,19> flops = {
       params::random_flops.load(),

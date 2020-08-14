@@ -115,6 +115,12 @@ namespace strumpack {
      integer_t sep_end, const std::vector<integer_t>& upd,
      int depth) const override;
 
+    void push_front_elements
+    (integer_t, integer_t, const std::vector<integer_t>&,
+     std::vector<Triplet<scalar_t>>&,
+     std::vector<Triplet<scalar_t>>&,
+     std::vector<Triplet<scalar_t>>&) const override;
+
     void front_multiply_F11
     (Trans op, integer_t slo, integer_t shi,
      const DenseM_t& R, DenseM_t& S, int depth) const override;

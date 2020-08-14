@@ -26,8 +26,8 @@
  *             Division).
  *
  */
-#ifndef STRUMPACK_CUDA_WRAPPER_HPP
-#define STRUMPACK_CUDA_WRAPPER_HPP
+#ifndef STRUMPACK_HIP_WRAPPER_HPP
+#define STRUMPACK_HIP_WRAPPER_HPP
 
 #include <cmath>
 #include <complex>
@@ -35,93 +35,119 @@
 #include <cassert>
 #include <memory>
 
+#include <hipblas.h>
+#include <hip/hip_runtime.h>
+
+// TODO get rid of this when there is a hipSOLVER
+#if defined(STRUMPACK_HIP_PLATFORM_NVCC)
 #include <cusolverDn.h>
-#include <cublas_v2.h>
-#include <cuda_runtime.h>
+#endif
 
 #include "DenseMatrix.hpp"
 
-
 namespace strumpack {
-
   namespace gpu {
 
 #define gpu_check(err) {                                               \
-      strumpack::gpu::cuda_assert((err), __FILE__, __LINE__);          \
+      strumpack::gpu::hip_assert((err), __FILE__, __LINE__);          \
     }
-    void cuda_assert(cudaError_t code, const char *file, int line,
-                     bool abort=true);
-    void cuda_assert(cusolverStatus_t code, const char *file, int line,
-                     bool abort=true);
-    void cuda_assert(cublasStatus_t code, const char *file, int line,
-                     bool abort=true);
+    void hip_assert(hipError_t code, const char *file, int line,
+                    bool abort=true);
+    void hip_assert(cusolverStatus_t code, const char *file, int line,
+                    bool abort=true);
+    void hip_assert(hipblasStatus_t code, const char *file, int line,
+                    bool abort=true);
 
     inline void init() {
-      gpu_check(cudaFree(0));
+      gpu_check(hipFree(0));
     }
 
     inline void synchronize() {
-      gpu_check(cudaDeviceSynchronize());
+      gpu_check(hipDeviceSynchronize());
     }
 
     class Stream {
     public:
-      Stream() { gpu_check(cudaStreamCreate(&s_)); }
-      ~Stream() { gpu_check(cudaStreamDestroy(s_)); }
-      operator cudaStream_t&() { return s_; }
-      operator const cudaStream_t&() const { return s_; }
+      Stream() { gpu_check(hipStreamCreate(&s_)); }
+      ~Stream() { gpu_check(hipStreamDestroy(s_)); }
+      operator hipStream_t&() { return s_; }
+      operator const hipStream_t&() const { return s_; }
     private:
-      cudaStream_t s_;
+      hipStream_t s_;
     };
 
     class BLASHandle {
     public:
-      BLASHandle() { gpu_check(cublasCreate(&h_)); }
-      ~BLASHandle() { gpu_check(cublasDestroy(h_)); }
-      void set_stream(Stream& s) { gpu_check(cublasSetStream(h_, s)); }
-      void set_stream(cudaStream_t& s) { gpu_check(cublasSetStream(h_, s)); }
-      operator cublasHandle_t&() { return h_; }
-      operator const cublasHandle_t&() const { return h_; }
+      BLASHandle() { gpu_check(hipblasCreate(&h_)); }
+      ~BLASHandle() { gpu_check(hipblasDestroy(h_)); }
+      void set_stream(Stream& s) { gpu_check(hipblasSetStream(h_, s)); }
+      void set_stream(hipStream_t& s) { gpu_check(hipblasSetStream(h_, s)); }
+      operator hipblasHandle_t&() { return h_; }
+      operator const hipblasHandle_t&() const { return h_; }
     private:
-      cublasHandle_t h_;
+      hipblasHandle_t h_;
     };
 
+
+    // TODO there is no such thing as hipSOLVER yet :(
+#if defined(STRUMPACK_HIP_PLATFORM_NVCC)
     class SOLVERHandle {
     public:
       SOLVERHandle() { gpu_check(cusolverDnCreate(&h_)); }
       ~SOLVERHandle() { gpu_check(cusolverDnDestroy(h_)); }
       void set_stream(Stream& s) { gpu_check(cusolverDnSetStream(h_, s)); }
-      void set_stream(cudaStream_t& s) { gpu_check(cusolverDnSetStream(h_, s)); }
+      void set_stream(hipStream_t& s) { gpu_check(cusolverDnSetStream(h_, s)); }
       operator cusolverDnHandle_t&() { return h_; }
       operator const cusolverDnHandle_t&() const { return h_; }
     private:
       cusolverDnHandle_t h_;
     };
+#elif defined(STRUMPACK_HIP_PLATFORM_HCC)
+    class SOLVERHandle {
+    public:
+      SOLVERHandle() {
+        // TODO rocSOLVER
+      }
+      ~SOLVERHandle() {
+        // TODO rocSOLVER
+      }
+      void set_stream(Stream& s) {
+        // TODO rocSOLVER
+      }
+      // void set_stream(cudaStream_t& s) {
+      //   // TODO rocSOLVER
+      // }
+      // operator cusolverDnHandle_t&() { return h_; }
+      // operator const cusolverDnHandle_t&() const { return h_; }
+    private:
+      // cusolverDnHandle_t h_;
+    };
+#endif
 
     template<typename T> void memset
     (T* dptr, int value, std::size_t count) {
-      gpu_check(cudaMemset(dptr, value, count*sizeof(T)));
+      gpu_check(hipMemset(dptr, value, count*sizeof(T)));
     }
 
     template<typename T> void copy_device_to_host
     (T* hptr, const T* dptr, std::size_t count) {
-      gpu_check(cudaMemcpy(hptr, dptr, count*sizeof(T),
-                           cudaMemcpyDeviceToHost));
+      gpu_check(hipMemcpy(hptr, dptr, count*sizeof(T),
+                           hipMemcpyDeviceToHost));
     }
     template<typename T> void copy_device_to_host_async
     (T* hptr, const T* dptr, std::size_t count, const Stream& s) {
-      gpu_check(cudaMemcpyAsync(hptr, dptr, count*sizeof(T),
-                                cudaMemcpyDeviceToHost, s));
+      gpu_check(hipMemcpyAsync(hptr, dptr, count*sizeof(T),
+                                hipMemcpyDeviceToHost, s));
     }
     template<typename T> void copy_host_to_device
     (T* dptr, const T* hptr, std::size_t count) {
-      gpu_check(cudaMemcpy(dptr, hptr, count*sizeof(T),
-                           cudaMemcpyHostToDevice));
+      gpu_check(hipMemcpy(dptr, hptr, count*sizeof(T),
+                           hipMemcpyHostToDevice));
     }
     template<typename T> void copy_host_to_device_async
     (T* dptr, const T* hptr, std::size_t count, const Stream& s) {
-      gpu_check(cudaMemcpyAsync(dptr, hptr, count*sizeof(T),
-                                cudaMemcpyHostToDevice, s));
+      gpu_check(hipMemcpyAsync(dptr, hptr, count*sizeof(T),
+                                hipMemcpyHostToDevice, s));
     }
 
     template<typename T> void copy_device_to_host
@@ -160,7 +186,7 @@ namespace strumpack {
 
     inline std::size_t available_memory() {
       std::size_t free_device_mem, total_device_mem;
-      gpu_check(cudaMemGetInfo(&free_device_mem, &total_device_mem));
+      gpu_check(hipMemGetInfo(&free_device_mem, &total_device_mem));
       return free_device_mem;
     }
 
@@ -171,7 +197,7 @@ namespace strumpack {
         if (size) {
           size_ = size;
 #if 0
-          if (cudaMalloc(&data_, size*sizeof(T)) != cudaSuccess) {
+          if (hipMalloc(&data_, size*sizeof(T)) != hipSuccess) {
             std::cerr << "Failed to allocate " << size << " "
                       << typeid(T).name() << " objects" << std::endl;
             throw std::bad_alloc();
@@ -179,18 +205,18 @@ namespace strumpack {
           STRUMPACK_ADD_DEVICE_MEMORY(size*sizeof(T));
           is_managed_ = false;
 #else
-          auto e = cudaMalloc(&data_, size*sizeof(T));
-          if (e == cudaSuccess) {
+          auto e = hipMalloc(&data_, size*sizeof(T));
+          if (e == hipSuccess) {
             STRUMPACK_ADD_DEVICE_MEMORY(size*sizeof(T));
             is_managed_ = false;
           } else {
             STRUMPACK_ADD_MEMORY(size*sizeof(T));
-            std::cerr << "#  cudaMalloc failed: "
-                      << cudaGetErrorString(e) << std::endl;
-            std::cerr << "#  Trying cudaMallocManaged instead ..."
+            std::cerr << "#  hipMalloc failed: "
+                      << hipGetErrorString(e) << std::endl;
+            std::cerr << "#  Trying hipMallocManaged instead ..."
                       << std::endl;
-            cudaGetLastError(); // reset to cudaSuccess
-            gpu_check(cudaMallocManaged(&data_, size*sizeof(T)));
+            hipGetLastError(); // reset to hipSuccess
+            gpu_check(hipMallocManaged(&data_, size*sizeof(T)));
             is_managed_ = true;
           }
 #endif
@@ -222,7 +248,7 @@ namespace strumpack {
           } else {
             STRUMPACK_SUB_DEVICE_MEMORY(size_*sizeof(T));
           }
-          gpu_check(cudaFree(data_));
+          gpu_check(hipFree(data_));
         }
         data_ = nullptr;
         size_ = 0;
@@ -240,16 +266,16 @@ namespace strumpack {
       HostMemory(std::size_t size) {
         if (size) {
           STRUMPACK_ADD_MEMORY(size*sizeof(T));
-          auto e = cudaMallocHost(&data_, size*sizeof(T));
+          auto e = hipHostMalloc(&data_, size*sizeof(T));
           is_managed_ = false;
           size_ = size;
-          if (e != cudaSuccess) {
-            std::cerr << "#  cudaMalloc failed: "
-                      << cudaGetErrorString(e) << std::endl;
-            std::cerr << "#  Trying cudaMallocManaged instead ..."
+          if (e != hipSuccess) {
+            std::cerr << "#  hipMalloc failed: "
+                      << hipGetErrorString(e) << std::endl;
+            std::cerr << "#  Trying hipMallocManaged instead ..."
                       << std::endl;
-            cudaGetLastError(); // reset to cudaSuccess
-            gpu_check(cudaMallocManaged(&data_, size*sizeof(T)));
+            hipGetLastError(); // reset to hipSuccess
+            gpu_check(hipMallocManaged(&data_, size*sizeof(T)));
             is_managed_ = true;
           }
         }
@@ -277,9 +303,9 @@ namespace strumpack {
         if (data_) {
           STRUMPACK_SUB_MEMORY(size_*sizeof(T));
           if (!is_managed_) {
-            gpu_check(cudaFreeHost(data_));
+            gpu_check(hipHostFree(data_));
           } else {
-            gpu_check(cudaFree(data_));
+            gpu_check(hipFree(data_));
           }
         }
         data_ = nullptr;
@@ -313,4 +339,4 @@ namespace strumpack {
   } // end namespace gpu
 } // end namespace strumpack
 
-#endif // STRUMPACK_CUDA_WRAPPER_HPP
+#endif // STRUMPACK_HIP_WRAPPER_HPP

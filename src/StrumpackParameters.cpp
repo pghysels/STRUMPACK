@@ -51,7 +51,11 @@ namespace strumpack {
 #endif
 
     std::atomic<long long int> flops(0);
-    std::atomic<long long int> bytes(0);
+    std::atomic<long long int> bytes_moved(0);
+    std::atomic<long long int> memory(0);
+    std::atomic<long long int> peak_memory(0);
+    std::atomic<long long int> device_memory(0);
+    std::atomic<long long int> peak_device_memory(0);
 
     std::atomic<long long int> CB_sample_flops(0);
     std::atomic<long long int> sparse_sample_flops(0);
