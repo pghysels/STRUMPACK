@@ -232,6 +232,7 @@ namespace strumpack {
     using SPBase_t::opts_;
     using SPBase_t::is_root_;
     using SPBase_t::matching_;
+    using SPBase_t::equil_;
     using SPBase_t::factored_;
     using SPBase_t::reordered_;
     using SPBase_t::Krylov_its_;

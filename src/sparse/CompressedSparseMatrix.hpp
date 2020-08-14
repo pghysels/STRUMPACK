@@ -108,6 +108,7 @@ namespace strumpack {
            typename real_t = typename RealType<scalar_t>::value_type>
   class Equilibration {
   public:
+    Equilibration() {}
     Equilibration(std::size_t N) : R(N), C(N) {}
     // use this one for block-row distributed sparse matrix, with rows
     // local rows, and cols global columns

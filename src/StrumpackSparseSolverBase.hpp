@@ -96,8 +96,8 @@ namespace strumpack {
      * \param root flag to denote whether this process is the root MPI
      * process, only the root will print certain messages to cout
      */
-    StrumpackSparseSolverBase
-    (int argc, char* argv[], bool verbose=true, bool root=true);
+    StrumpackSparseSolverBase(int argc, char* argv[],
+                              bool verbose=true, bool root=true);
 
     /**
      * Constructor of the StrumpackSparseSolver class.
@@ -196,8 +196,8 @@ namespace strumpack {
      * should be allocated).
      * \return error code
      */
-    ReturnCode solve
-    (const scalar_t* b, scalar_t* x, bool use_initial_guess=false);
+    ReturnCode solve(const scalar_t* b, scalar_t* x,
+                     bool use_initial_guess=false);
 
     /**
      * Solve a linear system with a single or multiple right-hand
@@ -225,8 +225,8 @@ namespace strumpack {
      * \return error code
      * \see DenseMatrix, solve(), factor()
      */
-    ReturnCode solve
-    (const DenseM_t& b, DenseM_t& x, bool use_initial_guess=false);
+    ReturnCode solve(const DenseM_t& b, DenseM_t& x,
+                     bool use_initial_guess=false);
 
     /**
      * Return the object holding the options for this sparse solver.
@@ -306,9 +306,10 @@ namespace strumpack {
   protected:
     virtual void setup_tree() = 0;
     virtual void setup_reordering() = 0;
-    virtual int compute_reordering
-    (const int* p, int base, int nx, int ny, int nz,
-     int components, int width) = 0;
+    virtual
+    int compute_reordering(const int* p, int base,
+                           int nx, int ny, int nz,
+                           int components, int width) = 0;
     virtual void separator_reordering() = 0;
 
     virtual SpMat_t* matrix() = 0;
@@ -337,7 +338,10 @@ namespace strumpack {
 
     SPOptions<scalar_t> opts_;
     bool is_root_;
+
     MatchingData<scalar_t,integer_t> matching_;
+    Equilibration<scalar_t> equil_;
+
     std::new_handler old_handler_;
     std::ostream* rank_out_ = nullptr;
     bool factored_ = false;
@@ -354,14 +358,16 @@ namespace strumpack {
 #endif
 
   private:
-    ReturnCode reorder_internal
-    (const int* p, int base, int nx, int ny, int nz,
-     int components, int width);
+    ReturnCode reorder_internal(const int* p, int base,
+                                int nx, int ny, int nz,
+                                int components, int width);
 
-    virtual ReturnCode solve_internal
-    (const scalar_t* b, scalar_t* x, bool use_initial_guess=false) = 0;
-    virtual ReturnCode solve_internal
-    (const DenseM_t& b, DenseM_t& x, bool use_initial_guess=false) = 0;
+    virtual
+    ReturnCode solve_internal(const scalar_t* b, scalar_t* x,
+                              bool use_initial_guess=false) = 0;
+    virtual
+    ReturnCode solve_internal(const DenseM_t& b, DenseM_t& x,
+                              bool use_initial_guess=false) = 0;
   };
 
 } //end namespace strumpack

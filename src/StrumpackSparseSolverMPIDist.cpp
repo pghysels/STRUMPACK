@@ -174,6 +174,7 @@ namespace strumpack {
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::redistribute_values() {
     if (this->reordered_) {
       matrix()->apply_matching(this->matching_);
+      //matrix()->equilibrate(equil_);
       matrix()->symmetrize_sparsity();
       setup_tree();
       if (opts_.compression() != CompressionType::NONE)
