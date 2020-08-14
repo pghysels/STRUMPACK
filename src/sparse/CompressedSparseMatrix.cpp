@@ -31,6 +31,7 @@
 #include <tuple>
 #include <cstdio>
 #include <cstring>
+#include <exception>
 
 #include "CompressedSparseMatrix.hpp"
 #include "misc/Tools.hpp"
@@ -89,76 +90,40 @@ namespace strumpack {
     std::cout << std::endl;
   }
 
-  template<typename scalar_t,typename integer_t> int
-  CompressedSparseMatrix<scalar_t,integer_t>::permute_and_scale
-  (MatchingJob job, std::vector<integer_t>& perm, std::vector<scalar_t>& Dr,
-   std::vector<scalar_t>& Dc, bool apply) {
-    if (job == MatchingJob::NONE) return 1;
+  template<typename scalar_t,typename integer_t>
+  MatchingData<scalar_t,integer_t>
+  CompressedSparseMatrix<scalar_t,integer_t>::matching
+  (MatchingJob job, bool apply) {
+    Match_t M(job, n_);
     if (job == MatchingJob::COMBBLAS) {
       std::cerr << "# ERROR: CombBLAS matching only supported in parallel."
                 << std::endl;
-      return 1;
+      return M;
     }
-    perm.resize(n_);
-    int_t liw = 0;
-    switch (job) {
-    case MatchingJob::MAX_SMALLEST_DIAGONAL: liw = 4*n_; break;
-    case MatchingJob::MAX_SMALLEST_DIAGONAL_2: liw = 10*n_ + nnz_; break;
-    case MatchingJob::MAX_CARDINALITY:
-    case MatchingJob::MAX_DIAGONAL_SUM:
-    case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING:
-    default: liw = 5*n_;
-    }
-    auto iw_ = std::unique_ptr<int_t[]>(new int_t[liw]);
-    auto iw = iw_.get();
-    int_t ldw = 0;
-    switch (job) {
-    case MatchingJob::MAX_CARDINALITY: ldw = 0; break;
-    case MatchingJob::MAX_SMALLEST_DIAGONAL: ldw = n_; break;
-    case MatchingJob::MAX_SMALLEST_DIAGONAL_2: ldw = nnz_; break;
-    case MatchingJob::MAX_DIAGONAL_SUM: ldw = 2*n_ + nnz_; break;
-    case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING:
-    default: ldw = 3*n_ + nnz_; break;
-    }
-    auto dw_ = std::unique_ptr<double[]>(new double[ldw]);
-    auto dw = dw_.get();
-    int_t icntl[10], info[10];
-    int_t num;
-    strumpack_mc64id_(icntl);
-    //icntl[2] = 6; // print diagnostics
-    //icntl[3] = 1; // no checking of input should be (slightly) faster
-    strumpack_mc64(get_matching(job), &num, perm.data(),
-                   liw, iw, ldw, dw, icntl, info);
-    switch (info[0]) {
-    case  0: break;
-    case  1:
-      std::cerr << "# ERROR: matrix is structurally singular" << std::endl;
-      return 1;
-      break;
-    case  2:
-        std::cerr << "# WARNING: mc64 scaling produced"
-                  << " large scaling factors which may cause overflow!"
-                  << std::endl;
-      break;
-    default:
-      std::cerr << "# ERROR: mc64 failed with info[0]=" << info[0]
+    int info = strumpack_mc64(job, M);
+    switch (info) {
+    case 0: break;
+    case 1: throw std::runtime_error("matrix is structurally singular");
+    case 2:
+      std::cerr << "# WARNING: mc64 scaling produced"
+                << " large scaling factors which may cause overflow!"
                 << std::endl;
-      return 1;
       break;
+    default: throw std::runtime_error
+        ("mc64 failed with info[0]=" + std::to_string(info));
     }
-    if (job == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) { // scaling
-      Dr.resize(n_);
-      Dc.resize(n_);
-#pragma omp parallel for
-      for (integer_t i=0; i<n_; i++) {
-        Dr[i] = scalar_t(std::exp(dw[i]));
-        Dc[i] = scalar_t(std::exp(dw[n_+i]));
-      }
-      if (apply) apply_scaling(Dr, Dc);
-    }
-    if (apply) apply_column_permutation(perm);
-    if (apply) symm_sparse_ = false;
-    return 0;
+    if (apply) apply_matching(M);
+    return M;
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  CompressedSparseMatrix<scalar_t,integer_t>::apply_matching
+  (const Match_t& M) {
+    if (M.job == MatchingJob::NONE) return;
+    if (M.job == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+      scale_real(M.R, M.C);
+    permute_columns(M.Q);
+    symm_sparse_ = false;
   }
 
   template<typename scalar_t,typename integer_t> void

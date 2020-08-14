@@ -59,6 +59,8 @@ namespace strumpack {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using real_t = typename RealType<scalar_t>::value_type;
+    using Match_t = MatchingData<scalar_t,integer_t>;
+    using Equil_t = Equilibration<scalar_t>;
 
   public:
     CSRMatrix();
@@ -71,19 +73,11 @@ namespace strumpack {
 
     void spmv(Trans op, const DenseM_t& x, DenseM_t& y) const;
 
-    /**
-     * TODO define in CompressedSparseMatrix, override
-     */
-    int compute_equilibration(std::vector<real_t>& R, std::vector<real_t>& C,
-                              real_t& rcond, real_t& ccond,
-                              real_t& Amax) const;
-    char equilibrate(std::vector<real_t>& R, std::vector<real_t>& C,
-                     real_t& rcond, real_t& ccond, real_t& Amax);
+    Equil_t equilibration() const override;
 
-    void apply_scaling(const std::vector<scalar_t>& Dr,
-                       const std::vector<scalar_t>& Dc) override;
-    void apply_column_permutation(const std::vector<integer_t>& perm)
-      override;
+    void equilibrate(const Equil_t& eq) override;
+
+    void permute_columns(const std::vector<integer_t>& perm) override;
 
     real_t max_scaled_residual(const scalar_t* x, const scalar_t* b)
       const override;
@@ -158,9 +152,12 @@ namespace strumpack {
 #endif //DOXYGEN_SHOULD_SKIP_THIS
 
   protected:
-    void strumpack_mc64
-    (int_t job, int_t* num, integer_t* perm, int_t liw, int_t* iw, int_t ldw,
-     double* dw, int_t* icntl, int_t* info) override;
+    int strumpack_mc64(MatchingJob, Match_t&) override;
+
+    void scale(const std::vector<scalar_t>& Dr,
+               const std::vector<scalar_t>& Dc) override;
+    void scale_real(const std::vector<real_t>& Dr,
+                    const std::vector<real_t>& Dc) override;
 
   private:
     using CSM_t::n_;

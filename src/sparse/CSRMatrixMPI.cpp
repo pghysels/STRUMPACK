@@ -32,6 +32,7 @@
 #include <tuple>
 #include <memory>
 #include <algorithm>
+#include <exception>
 
 
 #include "CSRMatrixMPI.hpp"
@@ -645,53 +646,48 @@ namespace strumpack {
     }
   }
 
-  template<typename scalar_t,typename integer_t> int
-  CSRMatrixMPI<scalar_t,integer_t>::permute_and_scale
-  (MatchingJob job, std::vector<integer_t>& perm, std::vector<scalar_t>& lDr,
-   std::vector<scalar_t>& gDc, bool apply) {
+  template<typename scalar_t,typename integer_t>
+  MatchingData<scalar_t,integer_t>
+  CSRMatrixMPI<scalar_t,integer_t>::matching(MatchingJob job, bool apply) {
+    if (job == MatchingJob::MAX_CARDINALITY) {
+      if (comm_.is_root())
+        std::cerr << "# WARNING matching job not supported." << std::endl;
+      return Match_t(MatchingJob::NONE, this->size());
+    }
+    if (job == MatchingJob::NONE)
+      return Match_t(job, this->size());
+
     if (job == MatchingJob::COMBBLAS) {
 #if defined(STRUMPACK_USE_COMBBLAS)
-      perm.resize(this->size());
-      GetAWPM(*this, perm.data());
-      apply_column_permutation(perm);
-      return 0;
+      Match_t M(job, this->size());
+      GetAWPM(*this, M.Q.data());
+      if (apply) permute_columns(M.Q);
 #else
       if (comm_.is_root())
         std::cerr << "# WARNING Matching with CombBLAS not supported.\n"
                   << "# Reconfigure STRUMPACK with CombBLAS support."
                   << std::endl;
-      return 1;
+      Match_t M(MatchingJob::NONE, this->size());
 #endif
-    } else return permute_and_scale_MC64(job, perm, lDr, gDc, apply);
-  }
-
-  template<typename scalar_t,typename integer_t> int
-  CSRMatrixMPI<scalar_t,integer_t>::permute_and_scale_MC64
-  (MatchingJob job, std::vector<integer_t>& perm, std::vector<scalar_t>& lDr,
-   std::vector<scalar_t>& gDc, bool apply) {
-    if (job == MatchingJob::NONE) return 0;
-    if (job == MatchingJob::COMBBLAS || job == MatchingJob::MAX_CARDINALITY) {
-      if (!mpi_rank())
-        std::cerr << "# WARNING mc64 job not supported,"
-                  << " I'm not doing any column permutation"
-                  << " or matrix scaling!" << std::endl;
-      return 1;
+      return M;
     }
+
     auto Aseq = gather();
-    std::vector<scalar_t> gDr;
+    Match_t M;
     int ierr = 0;
     if (Aseq) {
-      ierr = Aseq->permute_and_scale
-        (job, perm, gDr, gDc, false/*do not apply perm/scaling*/);
+      try {
+        M = Aseq->matching(job, false);
+      } catch (std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        ierr = 1;
+      }
       Aseq.reset(nullptr);
-    } else {
-      perm.resize(this->size());
-      if (job == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-        gDc.resize(this->size());
-    }
+    } else M = Match_t(job, this->size());
     comm_.broadcast(ierr);
-    if (ierr) return ierr;
-    comm_.broadcast(perm);
+    if (ierr) throw std::runtime_error("Matching failed");
+    comm_.broadcast(M.Q);
+
     if (job == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) {
       auto P = comm_.size();
       auto rank = comm_.rank();
@@ -702,20 +698,105 @@ namespace strumpack {
         scnts[p] = dist_[p+1] - dist_[p];
         sdispls[p] = dist_[p];
       }
-      lDr.resize(lrows_);
+      std::vector<real_t> lR(lrows_);
       MPI_Scatterv
-        (rank ? nullptr : gDr.data(), scnts, sdispls, mpi_type<scalar_t>(),
-         lDr.data(), lrows_, mpi_type<scalar_t>(), 0, comm());
-      gDr.clear();
-      comm_.broadcast(gDc);
-      apply_scaling(lDr, gDc);
+        (rank ? nullptr : M.R.data(), scnts, sdispls, mpi_type<scalar_t>(),
+         lR.data(), lrows_, mpi_type<scalar_t>(), 0, comm());
+      M.R = std::move(lR);
+      comm_.broadcast(M.C);
+      if (apply) scale_real(M.R, M.C);
     }
-    apply_column_permutation(perm);
-    return 0;
+    if (apply) permute_columns(M.Q);
+    return M;
+  }
+
+  template<typename scalar_t,typename integer_t> Equilibration<scalar_t>
+  CSRMatrixMPI<scalar_t,integer_t>::equilibration() const {
+    Equil_t eq(lrows_, n_);
+    if (!n_) return eq;
+    real_t small = blas::lamch<real_t>('S');
+    real_t big = 1. / small;
+#pragma omp parallel for
+    for (integer_t r=0; r<lrows_; r++)
+      for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++)
+        eq.R[r] = std::max(eq.R[r], std::abs(val_[j]));
+    auto mM = std::minmax_element(eq.R.begin(), eq.R.end());
+    real_t rmin = comm_.all_reduce(*(mM.first), MPI_MIN),
+      rmax = comm_.all_reduce(*(mM.second), MPI_MAX);
+    eq.Amax = rmax;
+    if (rmin == 0.) {
+      for (integer_t r=0; r<lrows_; r++)
+        if (eq.R[r] == 0.) {
+          eq.info = begin_row() + r+1;
+          break;
+        }
+      eq.info = comm_.all_reduce(eq.info, MPI_MIN);
+      return eq;
+    }
+#pragma omp parallel for
+    for (integer_t r=0; r<lrows_; r++)
+      eq.R[r] = 1. / std::min(std::max(eq.R[r], small), big);
+    eq.rcond = std::max(rmin, small) / std::min(rmax, big);
+    // cannot use openmp here
+    for (integer_t r=0; r<lrows_; r++) {
+      for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++) {
+        auto indj = ind_[j];
+        eq.C[indj] = std::max(eq.C[indj], std::abs(val_[j]) * eq.R[r]);
+      }
+    }
+    comm_.all_reduce(eq.C, MPI_MAX);
+    mM = std::minmax_element(eq.C.begin(), eq.C.end());
+    real_t cmin = comm_.all_reduce(*(mM.first), MPI_MIN),
+      cmax = comm_.all_reduce(*(mM.second), MPI_MAX);
+    if (cmin == 0.) {
+      for (integer_t i=0; i<n_; i++)
+        if (eq.C[i] == 0.) {
+          eq.info = n_+i+1;
+          return eq;
+        }
+    }
+#pragma omp parallel for
+    for (integer_t i=0; i<n_; i++)
+      eq.C[i] = 1. / std::min(std::max(eq.C[i], small), big);
+    eq.ccond = std::max(cmin, small) / std::min(cmax, big);
+    eq.set_type();
+    return eq;
   }
 
   template<typename scalar_t,typename integer_t> void
-  CSRMatrixMPI<scalar_t,integer_t>::apply_column_permutation
+  CSRMatrixMPI<scalar_t,integer_t>::equilibrate(const Equil_t& eq) {
+    if (!lrows_) return;
+    switch (eq.type) {
+    case Equil_t::EqType::COLUMN: {
+#pragma omp parallel for
+      for (integer_t r=0; r<lrows_; r++)
+        for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++)
+          val_[j] *= eq.C[ind_[j]];
+      STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*
+                      static_cast<long long int>(double(lnnz_)));
+    } break;
+    case Equil_t::EqType::ROW: {
+#pragma omp parallel for
+      for (integer_t r=0; r<lrows_; r++)
+        for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++)
+          val_[j] *= eq.R[r];
+      STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*
+                      static_cast<long long int>(double(lnnz_)));
+    } break;
+    case Equil_t::EqType::BOTH: {
+#pragma omp parallel for
+      for (integer_t r=0; r<lrows_; r++)
+        for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++)
+          val_[j] *= eq.R[r] * eq.C[ind_[j]];
+      STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*
+                      static_cast<long long int>(2.*double(lnnz_)));
+    } break;
+    case Equil_t::EqType::NONE: {}
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  CSRMatrixMPI<scalar_t,integer_t>::permute_columns
   (const std::vector<integer_t>& perm) {
     std::unique_ptr<integer_t[]> iperm(new integer_t[this->size()]);
     for (integer_t i=0; i<this->size(); i++) iperm[perm[i]] = i;
@@ -730,13 +811,25 @@ namespace strumpack {
 
   // Apply row and column scaling. Dr is LOCAL, Dc is global!
   template<typename scalar_t,typename integer_t> void
-  CSRMatrixMPI<scalar_t,integer_t>::apply_scaling
+  CSRMatrixMPI<scalar_t,integer_t>::scale
   (const std::vector<scalar_t>& lDr, const std::vector<scalar_t>& gDc) {
 #pragma omp parallel for
     for (integer_t r=0; r<lrows_; r++)
       for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++)
-        val_[j] = val_[j] * lDr[r] * gDc[ind_[j]];
+        val_[j] *= lDr[r] * gDc[ind_[j]];
     STRUMPACK_FLOPS((is_complex<scalar_t>()?6:1)*
+                    static_cast<long long int>(2.*double(lnnz_)));
+  }
+
+  // Apply row and column scaling. Dr is LOCAL, Dc is global!
+  template<typename scalar_t,typename integer_t> void
+  CSRMatrixMPI<scalar_t,integer_t>::scale_real
+  (const std::vector<real_t>& lDr, const std::vector<real_t>& gDc) {
+#pragma omp parallel for
+    for (integer_t r=0; r<lrows_; r++)
+      for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++)
+        val_[j] *= lDr[r] * gDc[ind_[j]];
+    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*
                     static_cast<long long int>(2.*double(lnnz_)));
   }
 

@@ -231,9 +231,7 @@ namespace strumpack {
     using SPBase_t = StrumpackSparseSolverBase<scalar_t,integer_t>;
     using SPBase_t::opts_;
     using SPBase_t::is_root_;
-    using SPBase_t::cperm_;
-    using SPBase_t::Dr_;
-    using SPBase_t::Dc_;
+    using SPBase_t::matching_;
     using SPBase_t::factored_;
     using SPBase_t::reordered_;
     using SPBase_t::Krylov_its_;

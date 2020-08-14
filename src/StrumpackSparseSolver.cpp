@@ -128,11 +128,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolver<scalar_t,integer_t>::permute_matrix_values() {
     if (reordered_) {
-      if (opts_.matching() != MatchingJob::NONE) {
-        if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-          matrix()->apply_scaling(Dr_, Dc_);
-        matrix()->apply_column_permutation(cperm_);
-      }
+      matrix()->apply_matching(matching_);
       matrix()->symmetrize_sparsity();
       matrix()->permute(reordering()->iperm(), reordering()->perm());
       if (opts_.compression() != CompressionType::NONE)
@@ -182,14 +178,14 @@ namespace strumpack {
           for (integer_t j=0; j<d; j++)
 #pragma omp parallel for
             for (integer_t i=0; i<N; i++) {
-              auto pi = iperm[cperm_[i]];
-              bloc(i, j) = x(pi, j) / Dc_[pi];
+              auto pi = iperm[matching_.Q[i]];
+              bloc(i, j) = x(pi, j) / matching_.C[pi];
             }
         } else {
           for (integer_t j=0; j<d; j++)
 #pragma omp parallel for
             for (integer_t i=0; i<N; i++)
-              bloc(i, j) = x(iperm[cperm_[i]], j);
+              bloc(i, j) = x(iperm[matching_.Q[i]], j);
         }
       } else {
         for (integer_t j=0; j<d; j++)
@@ -204,7 +200,7 @@ namespace strumpack {
 #pragma omp parallel for
         for (integer_t i=0; i<N; i++) {
           auto pi = iperm[i];
-          bloc(i, j) = Dr_[pi] * b(pi, j);
+          bloc(i, j) = matching_.R[pi] * b(pi, j);
         }
     } else {
       for (integer_t j=0; j<d; j++)
@@ -284,14 +280,14 @@ namespace strumpack {
         for (integer_t j=0; j<d; j++)
 #pragma omp parallel for
           for (integer_t i=0; i<N; i++) {
-            auto ipi = cperm_[iperm[i]];
-            bloc(ipi, j) = x(i, j) * Dc_[ipi];
+            auto ipi = matching_.Q[iperm[i]];
+            bloc(ipi, j) = x(i, j) * matching_.C[ipi];
           }
       } else {
         for (integer_t j=0; j<d; j++)
 #pragma omp parallel for
           for (integer_t i=0; i<N; i++)
-            bloc(cperm_[iperm[i]], j) = x(i, j);
+            bloc(matching_.Q[iperm[i]], j) = x(i, j);
       }
     } else {
       auto perm = reordering()->perm();

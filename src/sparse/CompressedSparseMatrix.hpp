@@ -63,6 +63,80 @@ namespace strumpack {
      int_t*, int_t*, int_t*, int_t*, double*, int_t*, int_t*);
   }
 
+  template<typename scalar_t, typename integer_t,
+           typename real_t = typename RealType<scalar_t>::value_type>
+  class MatchingData {
+  public:
+    MatchingData() {}
+    MatchingData(MatchingJob j, std::size_t n) : job(j) {
+      if (job != MatchingJob::NONE)
+        Q.resize(n);
+      if (job == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) {
+        R.resize(n);
+        C.resize(n);
+      }
+    }
+
+    MatchingJob job = MatchingJob::NONE;
+    std::vector<integer_t> Q;
+    std::vector<real_t> R, C;
+
+    int_t mc64_work_int(std::size_t n, std::size_t nnz) const {
+      switch (job) {
+      case MatchingJob::MAX_SMALLEST_DIAGONAL: return 4*n; break;
+      case MatchingJob::MAX_SMALLEST_DIAGONAL_2: return 10*n + nnz; break;
+      case MatchingJob::MAX_CARDINALITY:
+      case MatchingJob::MAX_DIAGONAL_SUM:
+      case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING:
+      default: return 5*n;
+      }
+    }
+
+    int_t mc64_work_double(std::size_t n, std::size_t nnz) const {
+      switch (job) {
+      case MatchingJob::MAX_CARDINALITY: return 0; break;
+      case MatchingJob::MAX_SMALLEST_DIAGONAL: return n; break;
+      case MatchingJob::MAX_SMALLEST_DIAGONAL_2: return nnz; break;
+      case MatchingJob::MAX_DIAGONAL_SUM: return 2*n + nnz; break;
+      case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING:
+      default: return 3*n + nnz; break;
+      }
+    }
+  };
+
+  template<typename scalar_t,
+           typename real_t = typename RealType<scalar_t>::value_type>
+  class Equilibration {
+  public:
+    Equilibration(std::size_t N) : R(N), C(N) {}
+    // use this one for block-row distributed sparse matrix, with rows
+    // local rows, and cols global columns
+    Equilibration(std::size_t rows, std::size_t cols) : R(rows), C(cols) {}
+
+    enum class EqType : char { NONE='N', ROW='R', COLUMN='C', BOTH='B' };
+    int info = 0;
+    EqType type = EqType::NONE;
+    real_t rcond = 1, ccond = 1, Amax = 0;
+    std::vector<real_t> R, C;
+
+    void set_type() {
+      const real_t thres = 0.1;
+      const real_t small = blas::lamch<real_t>('S') / blas::lamch<real_t>('P');
+      const real_t large = 1. / small;
+      if (rcond >= thres && Amax >= small && Amax <= large) {
+        R.clear();
+        if (ccond >= thres) {
+          type = EqType::NONE;
+          C.clear();
+        } else type = EqType::COLUMN;
+      } else {
+        if (ccond >= thres) {
+          type = EqType::ROW;
+          C.clear();
+        } else type = EqType::BOTH;
+      }
+    }
+  };
 
   /**
    * \class CompressedSparseMatrix
@@ -91,6 +165,8 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_MPI)
     using DistM_t = DistributedMatrix<scalar_t>;
 #endif
+    using Match_t = MatchingData<scalar_t,integer_t>;
+    using Equil_t = Equilibration<scalar_t>;
 
   public:
     /**
@@ -263,17 +339,23 @@ namespace strumpack {
      * entries of IND, VAL are sorted in increasing order
      */
     virtual void permute(const integer_t* iorder, const integer_t* order);
-    virtual void permute
-    (const std::vector<integer_t>& iorder, const std::vector<integer_t>& order)
-    { permute(iorder.data(), order.data()); }
-    virtual int permute_and_scale
-    (MatchingJob job, std::vector<integer_t>& perm, std::vector<scalar_t>& Dr,
-     std::vector<scalar_t>& Dc, bool apply=true);
-    virtual void apply_scaling
-    (const std::vector<scalar_t>& Dr, const std::vector<scalar_t>& Dc) = 0;
-    virtual void apply_column_permutation
-    (const std::vector<integer_t>& perm) = 0;
+
+    virtual void permute(const std::vector<integer_t>& iorder,
+                         const std::vector<integer_t>& order) {
+      permute(iorder.data(), order.data());
+    }
+
+    virtual void permute_columns(const std::vector<integer_t>& perm) = 0;
+
+    virtual Equil_t equilibration() const { return Equil_t(this->size()); }
+    virtual void equilibrate(const Equil_t&) {}
+
+    virtual Match_t matching(MatchingJob, bool apply=true);
+
+    virtual void apply_matching(const Match_t&);
+
     virtual void symmetrize_sparsity();
+
     virtual void print() const;
     virtual void print_dense(const std::string& name) const {
       std::cerr << "print_dense not implemented for this matrix type"
@@ -283,7 +365,9 @@ namespace strumpack {
       std::cerr << "print_matrix_market not implemented for this matrix type"
                 << std::endl;
     }
+
     virtual int read_matrix_market(const std::string& filename) = 0;
+
     virtual real_t max_scaled_residual
     (const scalar_t* x, const scalar_t* b) const = 0;
     virtual real_t max_scaled_residual
@@ -291,18 +375,6 @@ namespace strumpack {
 
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
-    // virtual CSRGraph<integer_t>
-    // extract_graph(int ordering_level, integer_t lo, integer_t hi) const = 0;
-    // virtual CSRGraph<integer_t>
-    // extract_graph_sep_CB(integer_t lo, integer_t hi,
-    //                      const std::vector<integer_t>& upd) const = 0;
-    // virtual CSRGraph<integer_t>
-    // extract_graph_CB_sep(integer_t lo, integer_t hi,
-    //                      const std::vector<integer_t>& upd) const = 0;
-    // virtual CSRGraph<integer_t>
-    // extract_graph_CB(int ordering_level,
-    //                  const std::vector<integer_t>& upd) const = 0;
-
     virtual CSRGraph<integer_t> extract_graph
     (int ordering_level, integer_t lo, integer_t hi) const = 0;
     virtual CSRGraph<integer_t> extract_graph_sep_CB
@@ -379,9 +451,12 @@ namespace strumpack {
     std::vector<std::tuple<integer_t,integer_t,scalar_t>>
     read_matrix_market_entries(const std::string& filename);
 
-    virtual void strumpack_mc64
-    (int_t job, int_t* num, integer_t* perm, int_t liw,
-     int_t* iw, int_t ldw, double* dw, int_t* icntl, int_t* info) {}
+    virtual int strumpack_mc64(MatchingJob, Match_t&) { return 0; }
+
+    virtual void scale(const std::vector<scalar_t>&,
+                       const std::vector<scalar_t>&) = 0;
+    virtual void scale_real(const std::vector<real_t>&,
+                            const std::vector<real_t>&) = 0;
 
     long long spmv_flops() const;
     long long spmv_bytes() const;

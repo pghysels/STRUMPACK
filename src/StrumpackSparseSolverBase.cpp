@@ -290,15 +290,12 @@ namespace strumpack {
     int ierr;
     if (opts_.matching() != MatchingJob::NONE) {
       if (opts_.verbose() && is_root_)
-        std::cout << "# matching job: "
-                  << get_description(opts_.matching())
+        std::cout << "# matching job: " << get_description(opts_.matching())
                   << std::endl;
-      t1.time([&](){
-                ierr = matrix()->permute_and_scale
-                  (opts_.matching(), cperm_, Dr_, Dc_);
-              });
-      if (ierr) {
-        std::cerr << "ERROR: matching failed" << std::endl;
+      try {
+        t1.time([&](){ matching_ = matrix()->matching(opts_.matching()); });
+      } catch (std::exception& e) {
+        if (is_root_) std::cerr << e.what() << std::endl;
         return ReturnCode::REORDERING_ERROR;
       }
     }

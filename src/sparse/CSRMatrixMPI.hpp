@@ -74,6 +74,8 @@ namespace strumpack {
     using DenseM_t = DenseMatrix<scalar_t>;
     using CSM_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using real_t = typename RealType<scalar_t>::value_type;
+    using Match_t = MatchingData<scalar_t,integer_t>;
+    using Equil_t = Equilibration<scalar_t>;
 
   public:
     CSRMatrixMPI();
@@ -104,12 +106,6 @@ namespace strumpack {
     void spmv(const DenseM_t& x, DenseM_t& y) const override;
     void spmv(const scalar_t* x, scalar_t* y) const override;
 
-    /**
-     * Apply row and column scaling. lDr is LOCAL, gDc is global!
-     */
-    void apply_scaling(const std::vector<scalar_t>& lDr,
-                       const std::vector<scalar_t>& gDc) override;
-
     void permute(const integer_t* iorder, const integer_t* order) override;
 
     std::unique_ptr<CSRMatrix<scalar_t,integer_t>> gather() const;
@@ -130,13 +126,13 @@ namespace strumpack {
      * \param gDc Col scaling factors, this is global, ie, Dc.size()
      * == this->size()
      */
-    int permute_and_scale(MatchingJob job, std::vector<integer_t>& perm,
-                          std::vector<scalar_t>& lDr,
-                          std::vector<scalar_t>& gDc,
-                          bool apply=true) override;
+    Match_t matching(MatchingJob job, bool apply=true) override;
 
-    void apply_column_permutation(const std::vector<integer_t>& perm)
-      override;
+    Equil_t equilibration() const override;
+
+    void equilibrate(const Equil_t&) override;
+
+    void permute_columns(const std::vector<integer_t>& perm) override;
 
     void symmetrize_sparsity() override;
 
@@ -245,10 +241,14 @@ namespace strumpack {
 
     mutable SPMVBuffers<scalar_t,integer_t> spmv_bufs_;
 
-    int permute_and_scale_MC64
-    (MatchingJob job, std::vector<integer_t>& perm,
-     std::vector<scalar_t>& lDr, std::vector<scalar_t>& gDc,
-     bool apply=true);
+
+    /**
+     * Apply row and column scaling. lDr is LOCAL, gDc is global!
+     */
+    void scale(const std::vector<scalar_t>& lDr,
+               const std::vector<scalar_t>& gDc) override;
+    void scale_real(const std::vector<real_t>& lDr,
+                    const std::vector<real_t>& gDc) override;
 
     using CSM_t::n_;
     using CSM_t::nnz_;

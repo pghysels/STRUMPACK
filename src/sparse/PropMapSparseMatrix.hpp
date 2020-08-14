@@ -141,19 +141,18 @@ namespace strumpack {
     void spmv(const DenseM_t& x, DenseM_t& y) const override {};
     void spmv(const scalar_t* x, scalar_t* y) const override {};
 
-    void apply_scaling
-    (const std::vector<scalar_t>& Dr,
-     const std::vector<scalar_t>& Dc) override {};
-    void apply_column_permutation
-    (const std::vector<integer_t>& perm) override {};
+    void permute_columns(const std::vector<integer_t>& perm) override {};
+
     int read_matrix_market(const std::string& filename) override { return 1; };
 
-    real_t max_scaled_residual
-    (const scalar_t* x, const scalar_t* b) const override
-    { return real_t(1.); };
-    real_t max_scaled_residual
-    (const DenseM_t& x, const DenseM_t& b) const override
-    { return real_t(1.); };
+    real_t max_scaled_residual(const scalar_t* x,
+                               const scalar_t* b) const override {
+      return real_t(1.);
+    };
+    real_t max_scaled_residual(const DenseM_t& x,
+                               const DenseM_t& b) const override {
+      return real_t(1.);
+    };
 
     void permute(const integer_t* iorder, const integer_t* order) override;
 
@@ -169,6 +168,11 @@ namespace strumpack {
         (global_col_.begin(),
          std::lower_bound(global_col_.begin()+clo, global_col_.end(), c));
     }
+
+    void scale(const std::vector<scalar_t>& Dr,
+               const std::vector<scalar_t>& Dc) override {};
+    void scale_real(const std::vector<real_t>& Dr,
+                    const std::vector<real_t>& Dc) override {};
 
     void front_multiply_2d_N
     (integer_t sep_begin, integer_t sep_end,

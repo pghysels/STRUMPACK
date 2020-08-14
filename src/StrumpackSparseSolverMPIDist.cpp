@@ -173,11 +173,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   StrumpackSparseSolverMPIDist<scalar_t,integer_t>::redistribute_values() {
     if (this->reordered_) {
-      if (opts_.matching() != MatchingJob::NONE) {
-        if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-          matrix()->apply_scaling(this->Dr_, this->Dc_);
-        matrix()->apply_column_permutation(this->cperm_);
-      }
+      matrix()->apply_matching(this->matching_);
       matrix()->symmetrize_sparsity();
       setup_tree();
       if (opts_.compression() != CompressionType::NONE)
@@ -234,7 +230,7 @@ namespace strumpack {
 
     auto bloc = b;
     if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-      bloc.scale_rows(this->Dr_);
+      bloc.scale_rows_real(this->matching_.R);
 
     auto spmv = [&](const scalar_t* x, scalar_t* y) {
       mat_mpi_->spmv(x, y);
@@ -306,9 +302,9 @@ namespace strumpack {
     }
 
     if (opts_.matching() != MatchingJob::NONE) {
-      permute_vector(x, this->cperm_, mat_mpi_->dist(), comm_);
+      permute_vector(x, this->matching_.Q, mat_mpi_->dist(), comm_);
       if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-        x.scale_rows(this->Dc_.data() + mat_mpi_->begin_row());
+        x.scale_rows_real(this->matching_.C.data() + mat_mpi_->begin_row());
     }
 
     t.stop();

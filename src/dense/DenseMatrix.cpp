@@ -443,8 +443,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>&
-  DenseMatrix<scalar_t>::scale_rows
-  (const std::vector<scalar_t>& D, int depth) {
+  DenseMatrix<scalar_t>::scale_rows(const std::vector<scalar_t>& D, int depth) {
     assert(D.size() == rows());
     scale_rows(D.data(), depth);
     return *this;
@@ -452,6 +451,30 @@ namespace strumpack {
 
   template<typename scalar_t> DenseMatrix<scalar_t>&
   DenseMatrix<scalar_t>::scale_rows(const scalar_t* D, int depth) {
+    const auto m = rows();
+    const auto n = cols();
+#if defined(_OPENMP) && defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+#pragma omp taskloop default(shared) collapse(2) if(depth < params::task_recursion_cutoff_level)
+#endif
+    for (std::size_t j=0; j<n; j++)
+      for (std::size_t i=0; i<m; i++)
+        operator()(i, j) *= D[i];
+    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*cols()*rows());
+    return *this;
+  }
+
+  template<typename scalar_t> DenseMatrix<scalar_t>&
+  DenseMatrix<scalar_t>::scale_rows_real
+  (const std::vector<real_t>& D, int depth) {
+    assert(D.size() == rows());
+    scale_rows_real(D.data(), depth);
+    return *this;
+  }
+
+  template<typename scalar_t> DenseMatrix<scalar_t>&
+  DenseMatrix<scalar_t>::scale_rows_real(const real_t* D, int depth) {
     const auto m = rows();
     const auto n = cols();
 #if defined(_OPENMP) && defined(STRUMPACK_USE_OPENMP_TASKLOOP)

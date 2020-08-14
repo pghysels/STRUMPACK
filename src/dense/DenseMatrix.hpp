@@ -585,8 +585,12 @@ namespace strumpack {
      * \param D scaling vector, D.size() == rows()
      * \param depth current OpenMP task recursion depth
      */
-    DenseMatrix<scalar_t>& scale_rows
-    (const std::vector<scalar_t>& D, int depth=0);
+    DenseMatrix<scalar_t>&
+    scale_rows(const std::vector<scalar_t>& D, int depth=0);
+
+    DenseMatrix<scalar_t>&
+    scale_rows_real(const std::vector<real_t>& D, int depth=0);
+
 
     /**
      * Scale the rows of this matrix with the scalar values from the
@@ -597,6 +601,8 @@ namespace strumpack {
      * \see scale_rows
      */
     DenseMatrix<scalar_t>& scale_rows(const scalar_t* D, int depth=0);
+
+    DenseMatrix<scalar_t>& scale_rows_real(const real_t* D, int depth=0);
 
     /**
      * Scale the rows of this matrix with the inverses of the scalar

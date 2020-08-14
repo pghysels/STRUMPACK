@@ -521,6 +521,10 @@ namespace strumpack {
       MPI_Allreduce(MPI_IN_PLACE, t, ssize, mpi_type<T>(), op, comm_);
     }
 
+    template<typename T> void all_reduce(std::vector<T>& t, MPI_Op op) const {
+      all_reduce(t.data(), t.size(), op);
+    }
+
     /**
      * Compute the reduction of op(t[]_i) over all processes i, t[] is
      * an array, and where op can be any MPI_Op, on the root

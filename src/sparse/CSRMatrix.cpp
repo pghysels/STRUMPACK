@@ -263,107 +263,99 @@ namespace strumpack {
     STRUMPACK_BYTES(x.cols()*this->spmv_bytes());
   }
 
-  template<typename scalar_t,typename integer_t> int
-  CSRMatrix<scalar_t,integer_t>::compute_equilibration
-  (std::vector<real_t>& R, std::vector<real_t>& C,
-   real_t& rcond, real_t& ccond, real_t& Amax) const {
-    R.resize(n_);
-    C.resize(n_);
-    if (n_ == 0) {
-      rcond = 1.;
-      ccond = 1.;
-      Amax = 0.;
-      return 0;
-    }
-    real_t smlnum = blas::lamch<real_t>('S');
-    real_t bignum = 1. / smlnum;
+
+  template<typename scalar_t,typename integer_t> Equilibration<scalar_t>
+  CSRMatrix<scalar_t,integer_t>::equilibration() const {
+    Equil_t eq(n_);
+    if (!n_) return eq;
+    real_t small = blas::lamch<real_t>('S');
+    real_t big = 1. / small;
 #pragma omp parallel for
-    for (integer_t i=0; i<n_; i++) {
-      R[i] = 0;
+    for (integer_t i=0; i<n_; i++)
       for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
-        R[i] = std::max(R[i], std::abs(val_[j]));
-    }
-    auto mM = std::minmax_element(R.begin(), R.end());
-    real_t rcmin = *(mM.first), rcmax = *(mM.second);
-    Amax = rcmax;
-    if (rcmin == 0.) {
+        eq.R[i] = std::max(eq.R[i], std::abs(val_[j]));
+    auto mM = std::minmax_element(eq.R.begin(), eq.R.end());
+    real_t rmin = *(mM.first), rmax = *(mM.second);
+    eq.Amax = rmax;
+    if (rmin == 0.) {
       for (integer_t i=0; i<n_; i++)
-        if (R[i] == 0.)
-          return i+1;
+        if (eq.R[i] == 0.) {
+          eq.info = i+1;
+          return eq;
+        }
     }
 #pragma omp parallel for
     for (integer_t i=0; i<n_; i++)
-      R[i] = 1. / std::min(std::max(R[i], smlnum), bignum);
-    rcond = std::max(rcmin, smlnum) / std::min(rcmax, bignum);
-    std::fill(C.begin(), C.end(), 0.);
+      eq.R[i] = 1. / std::min(std::max(eq.R[i], small), big);
+    eq.rcond = std::max(rmin, small) / std::min(rmax, big);
     // cannot use openmp here
     for (integer_t i=0; i<n_; i++) {
-      C[i] = 0;
       for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++) {
         auto indj = ind_[j];
-        C[indj] = std::max(C[indj], std::abs(val_[j]) * R[i]);
+        eq.C[indj] = std::max(eq.C[indj], std::abs(val_[j]) * eq.R[i]);
       }
     }
-    mM = std::minmax_element(C.begin(), C.end());
-    rcmin = *(mM.first);
-    rcmax = *(mM.second);
-    if (rcmin == 0.) {
+    mM = std::minmax_element(eq.C.begin(), eq.C.end());
+    real_t cmin = *(mM.first), cmax = *(mM.second);
+    if (cmin == 0.) {
       for (integer_t i=0; i<n_; i++)
-        if (C[i] == 0.)
-          return n_+i+1;
+        if (eq.C[i] == 0.) {
+          eq.info = n_+i+1;
+          return eq;
+        }
     }
 #pragma omp parallel for
     for (integer_t i=0; i<n_; i++)
-      C[i] = 1. / std::min(std::max(C[i], smlnum), bignum);
-    ccond = std::max(rcmin, smlnum) / std::min(rcmax, bignum);
-    return 0;
-  }
-
-  template<typename scalar_t,typename integer_t> char
-  CSRMatrix<scalar_t,integer_t>::equilibrate
-  (std::vector<real_t>& R, std::vector<real_t>& C,
-   real_t& rcond, real_t& ccond, real_t& Amax) {
-    if (n_ == 0) return 'N';
-    const real_t threshold = 0.1;
-    real_t small = blas::lamch<real_t>('S') / blas::lamch<real_t>('P');
-    real_t large = 1. / small;
-    if (rcond >= threshold && Amax >= small && Amax <= large) {
-      if (ccond >= threshold) return 'N';
-      else {
-        // Column scaling
-#pragma omp parallel for
-        for (integer_t i=0; i<n_; i++)
-          for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
-            val_[j] *= C[ind_[j]];
-        return 'C';
-      }
-    } else if (ccond >= threshold) {
-      // Row scaling, no column scaling
-#pragma omp parallel for
-      for (integer_t i=0; i<n_; i++)
-        for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
-          val_[j] *= R[i];
-      return 'R';
-    } else {
-      // Both row and column scaling
-#pragma omp parallel for
-      for (integer_t i=0; i<n_; i++)
-        for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
-          val_[j] *= R[i] * C[ind_[j]];
-      return 'B';
-    }
-    return 'N';
+      eq.C[i] = 1. / std::min(std::max(eq.C[i], small), big);
+    eq.ccond = std::max(cmin, small) / std::min(cmax, big);
+    eq.set_type();
+    return eq;
   }
 
   template<typename scalar_t,typename integer_t> void
+  CSRMatrix<scalar_t,integer_t>::equilibrate(const Equil_t& eq) {
+    if (!n_) return;
+    switch (eq.type) {
+    case Equil_t::EqType::COLUMN: {
+#pragma omp parallel for
+      for (integer_t i=0; i<n_; i++)
+        for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
+          val_[j] *= eq.C[ind_[j]];
+      STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*
+                      static_cast<long long int>(double(nnz_)));
+    } break;
+    case Equil_t::EqType::ROW: {
+#pragma omp parallel for
+      for (integer_t i=0; i<n_; i++)
+        for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
+          val_[j] *= eq.R[i];
+      STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*
+                      static_cast<long long int>(double(nnz_)));
+    } break;
+    case Equil_t::EqType::BOTH: {
+#pragma omp parallel for
+      for (integer_t i=0; i<n_; i++)
+        for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
+          val_[j] *= eq.R[i] * eq.C[ind_[j]];
+      STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*
+                      static_cast<long long int>(2.*double(nnz_)));
+    } break;
+    case Equil_t::EqType::NONE: {}
+    }
+  }
+
+
+  template<typename scalar_t,typename integer_t> int
   CSRMatrix<scalar_t,integer_t>::strumpack_mc64
-  (int_t job, int_t* num, integer_t* perm, int_t liw, int_t* iw, int_t ldw,
-   double* dw, int_t* icntl, int_t* info) {
-    int_t n = n_, nnz = nnz_;
-    std::unique_ptr<double[]> dwork(new double[nnz]);
-    std::unique_ptr<int_t[]> iwork(new int_t[n+1+nnz+n+n]);
-    auto dval = dwork.get();
-    auto cptr = iwork.get();
+  (MatchingJob job, Match_t& M) {
+    int_t n = n_, nnz = nnz_, icntl[10], info[10], num,
+      ijob = get_matching(job), liw = M.mc64_work_int(n_, nnz_),
+      ldw = M.mc64_work_double(n_, nnz_);
+    std::unique_ptr<int_t[]> iw(new int_t[liw + n+1+nnz+n+n]);
+    std::unique_ptr<double[]> dw(new double[ldw + nnz]);
+    strumpack_mc64id_(icntl);
+    auto dval = dw.get() + ldw;
+    auto cptr = iw.get() + liw;
     auto rind = cptr + n + 1;
     auto permutation = rind + nnz;
     auto rsums = permutation + n;
@@ -378,8 +370,7 @@ namespace strumpack {
     }
     for (int_t col=0; col<n; col++) {
       for (int_t i=ptr_[col]; i<ptr_[col+1]; i++) {
-        int_t row = ind_[i];
-        int_t j = cptr[row] - 1 + rsums[row]++;
+        int_t row = ind_[i], j = cptr[row] - 1 + rsums[row]++;
         if (is_complex<scalar_t>())
           dval[j] = static_cast<double>(std::abs(val_[i]));
         else dval[j] = static_cast<double>(std::real(val_[i]));
@@ -387,10 +378,18 @@ namespace strumpack {
       }
     }
     strumpack_mc64ad_
-      (&job, &n, &nnz, cptr, rind, dval, num,
-       permutation, &liw, iw, &ldw, dw, icntl, info);
+      (&ijob, &n, &nnz, cptr, rind, dval, &num,
+       permutation, &liw, iw.get(), &ldw, dw.get(), icntl, info);
     for (int_t i=0; i<n; i++)
-      perm[i] = permutation[i] - 1;
+      M.Q[i] = permutation[i] - 1;
+    if (job == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) {
+#pragma omp parallel for
+      for (integer_t i=0; i<n_; i++) {
+        M.R[i] = real_t(std::exp(dw[i]));
+        M.C[i] = real_t(std::exp(dw[n_+i]));
+      }
+    }
+    return info[0];
   }
 
   // TODO tasked!!
@@ -717,9 +716,8 @@ namespace strumpack {
     STRUMPACK_SPARSE_SAMPLE_FLOPS((is_complex<scalar_t>() ? 4 : 1) * local_flops);
   }
 
-
   template<typename scalar_t,typename integer_t> void
-  CSRMatrix<scalar_t,integer_t>::apply_scaling
+  CSRMatrix<scalar_t,integer_t>::scale
   (const std::vector<scalar_t>& Dr, const std::vector<scalar_t>& Dc) {
 #pragma omp parallel for
     for (integer_t j=0; j<n_; j++)
@@ -731,7 +729,19 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  CSRMatrix<scalar_t,integer_t>::apply_column_permutation
+  CSRMatrix<scalar_t,integer_t>::scale_real
+  (const std::vector<real_t>& Dr, const std::vector<real_t>& Dc) {
+#pragma omp parallel for
+    for (integer_t j=0; j<n_; j++)
+      for (integer_t i=ptr_[j]; i<ptr_[j+1]; i++)
+        val_[i] = val_[i] * Dr[j] * Dc[ind_[i]];
+    STRUMPACK_FLOPS
+      ((is_complex<scalar_t>()?2:1)*
+       static_cast<long long int>(2.*double(this->nnz())));
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  CSRMatrix<scalar_t,integer_t>::permute_columns
   (const std::vector<integer_t>& perm) {
     std::unique_ptr<integer_t[]> iperm(new integer_t[n_]);
     for (integer_t i=0; i<n_; i++) iperm[perm[i]] = i;

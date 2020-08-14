@@ -143,8 +143,8 @@ namespace strumpack {
      * \return error code
      * \see SPOptions
      */
-    ReturnCode reorder
-    (int nx=1, int ny=1, int nz=1, int components=1, int width=1);
+    ReturnCode reorder(int nx=1, int ny=1, int nz=1,
+                       int components=1, int width=1);
 
     /**
      * Perform sparse matrix reordering, with a user-supplied
@@ -337,8 +337,7 @@ namespace strumpack {
 
     SPOptions<scalar_t> opts_;
     bool is_root_;
-    std::vector<integer_t> cperm_;
-    std::vector<scalar_t> Dr_, Dc_; // row/col scaling
+    MatchingData<scalar_t,integer_t> matching_;
     std::new_handler old_handler_;
     std::ostream* rank_out_ = nullptr;
     bool factored_ = false;
