@@ -316,7 +316,7 @@ namespace strumpack {
   CSRMatrix<scalar_t,integer_t>::equilibrate(const Equil_t& eq) {
     if (!n_) return;
     switch (eq.type) {
-    case Equil_t::EqType::COLUMN: {
+    case EquilibrationType::COLUMN: {
 #pragma omp parallel for
       for (integer_t i=0; i<n_; i++)
         for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
@@ -324,7 +324,7 @@ namespace strumpack {
       STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*
                       static_cast<long long int>(double(nnz_)));
     } break;
-    case Equil_t::EqType::ROW: {
+    case EquilibrationType::ROW: {
 #pragma omp parallel for
       for (integer_t i=0; i<n_; i++)
         for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
@@ -332,7 +332,7 @@ namespace strumpack {
       STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*
                       static_cast<long long int>(double(nnz_)));
     } break;
-    case Equil_t::EqType::BOTH: {
+    case EquilibrationType::BOTH: {
 #pragma omp parallel for
       for (integer_t i=0; i<n_; i++)
         for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
@@ -340,7 +340,7 @@ namespace strumpack {
       STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*
                       static_cast<long long int>(2.*double(nnz_)));
     } break;
-    case Equil_t::EqType::NONE: {}
+    case EquilibrationType::NONE: {}
     }
   }
 

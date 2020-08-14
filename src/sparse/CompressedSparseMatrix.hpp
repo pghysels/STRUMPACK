@@ -114,9 +114,8 @@ namespace strumpack {
     // local rows, and cols global columns
     Equilibration(std::size_t rows, std::size_t cols) : R(rows), C(cols) {}
 
-    enum class EqType : char { NONE='N', ROW='R', COLUMN='C', BOTH='B' };
     int info = 0;
-    EqType type = EqType::NONE;
+    EquilibrationType type = EquilibrationType::NONE;
     real_t rcond = 1, ccond = 1, Amax = 0;
     std::vector<real_t> R, C;
 
@@ -127,14 +126,14 @@ namespace strumpack {
       if (rcond >= thres && Amax >= small && Amax <= large) {
         R.clear();
         if (ccond >= thres) {
-          type = EqType::NONE;
+          type = EquilibrationType::NONE;
           C.clear();
-        } else type = EqType::COLUMN;
+        } else type = EquilibrationType::COLUMN;
       } else {
         if (ccond >= thres) {
-          type = EqType::ROW;
+          type = EquilibrationType::ROW;
           C.clear();
-        } else type = EqType::BOTH;
+        } else type = EquilibrationType::BOTH;
       }
     }
   };
@@ -349,6 +348,7 @@ namespace strumpack {
     virtual void permute_columns(const std::vector<integer_t>& perm) = 0;
 
     virtual Equil_t equilibration() const { return Equil_t(this->size()); }
+
     virtual void equilibrate(const Equil_t&) {}
 
     virtual Match_t matching(MatchingJob, bool apply=true);

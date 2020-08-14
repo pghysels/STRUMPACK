@@ -104,6 +104,10 @@ namespace strumpack {
     COMBBLAS                      /*!< Use AWPM from CombBLAS              */
   };
 
+  enum class EquilibrationType : char
+    { NONE='N', ROW='R', COLUMN='C', BOTH='B' };
+
+
   /**
    * Convert a job number to a MatchingJob enum type.
    */

@@ -150,6 +150,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> ReturnCode
   StrumpackSparseSolver<scalar_t,integer_t>::solve_internal
   (const DenseM_t& b, DenseM_t& x, bool use_initial_guess) {
+    using real_t = typename RealType<scalar_t>::value_type;
     TaskTimer t("solve");
     this->perf_counters_start();
     t.start();
@@ -182,43 +183,45 @@ namespace strumpack {
       DenseM_t bloc(b.rows(), d);
 
       auto iperm = reordering()->iperm();
+
+      std::vector<real_t> C(N, 1.);
+      if (equil_.type == EquilibrationType::COLUMN ||
+          equil_.type == EquilibrationType::BOTH)
+        for (integer_t i=0; i<N; i++) C[i] *= equil_.C[i];
+      if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+        for (integer_t i=0; i<N; i++) C[i] *= matching_.C[i];
+
       if (use_initial_guess &&
           opts_.Krylov_solver() != KrylovSolver::DIRECT) {
-        if (opts_.matching() == MatchingJob::NONE) {
+        if (opts_.matching() == MatchingJob::NONE)
           for (integer_t j=0; j<d; j++)
 #pragma omp parallel for
-            for (integer_t i=0; i<N; i++)
-              bloc(i, j) = x(iperm[i], j);
-        } else {
-          if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) {
-            for (integer_t j=0; j<d; j++)
+            for (integer_t i=0; i<N; i++) {
+              auto q = iperm[i];
+              bloc(i, j) = x(q, j) / C[q];
+            }
+        else
+          for (integer_t j=0; j<d; j++)
 #pragma omp parallel for
-              for (integer_t i=0; i<N; i++) {
-                auto pi = iperm[matching_.Q[i]];
-                bloc(i, j) = x(pi, j) / matching_.C[pi];
-              }
-          } else {
-            for (integer_t j=0; j<d; j++)
-#pragma omp parallel for
-              for (integer_t i=0; i<N; i++)
-                bloc(i, j) = x(iperm[matching_.Q[i]], j);
-          }
-        }
+            for (integer_t i=0; i<N; i++) {
+              auto q = iperm[matching_.Q[i]];
+              bloc(i, j) = x(q, j) / C[q];
+            }
         x.copy(bloc);
       }
-
-      if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) {
+      {
+        std::vector<real_t> R(N, 1.);
+        if (equil_.type == EquilibrationType::ROW ||
+            equil_.type == EquilibrationType::BOTH)
+          for (integer_t i=0; i<N; i++) R[i] *= equil_.R[i];
+        if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+          for (integer_t i=0; i<N; i++) R[i] *= matching_.R[i];
         for (integer_t j=0; j<d; j++)
 #pragma omp parallel for
           for (integer_t i=0; i<N; i++) {
             auto pi = iperm[i];
-            bloc(i, j) = matching_.R[pi] * b(pi, j);
+            bloc(i, j) = R[pi] * b(pi, j);
           }
-      } else {
-        for (integer_t j=0; j<d; j++)
-#pragma omp parallel for
-          for (integer_t i=0; i<N; i++)
-            bloc(i, j) = b(iperm[i], j);
       }
 
       auto MFsolve =
@@ -272,26 +275,20 @@ namespace strumpack {
       case KrylovSolver::BICGSTAB: {}
       }
 
-      if (opts_.matching() == MatchingJob::NONE) {
-        auto perm = reordering()->perm();
-        for (integer_t j=0; j<d; j++)
+      {
+        if (opts_.matching() == MatchingJob::NONE) {
+          auto perm = reordering()->perm();
+          for (integer_t j=0; j<d; j++)
 #pragma omp parallel for
-          for (integer_t i=0; i<N; i++)
-            bloc(i, j) = x(perm[i], j);
-      } else {
-        if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) {
+            for (integer_t i=0; i<N; i++)
+              bloc(i, j) = x(perm[i], j) * C[i];
+        } else
           for (integer_t j=0; j<d; j++)
 #pragma omp parallel for
             for (integer_t i=0; i<N; i++) {
               auto ipi = matching_.Q[iperm[i]];
-              bloc(ipi, j) = x(i, j) * matching_.C[ipi];
+              bloc(ipi, j) = x(i, j) * C[ipi];
             }
-        } else {
-          for (integer_t j=0; j<d; j++)
-#pragma omp parallel for
-            for (integer_t i=0; i<N; i++)
-              bloc(matching_.Q[iperm[i]], j) = x(i, j);
-        }
       }
       x.copy(bloc);
     }

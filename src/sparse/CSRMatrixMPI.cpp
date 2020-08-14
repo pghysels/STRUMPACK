@@ -713,6 +713,8 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> Equilibration<scalar_t>
   CSRMatrixMPI<scalar_t,integer_t>::equilibration() const {
     Equil_t eq(lrows_, n_);
+    return eq;
+
     if (!n_) return eq;
     real_t small = blas::lamch<real_t>('S');
     real_t big = 1. / small;
@@ -767,7 +769,7 @@ namespace strumpack {
   CSRMatrixMPI<scalar_t,integer_t>::equilibrate(const Equil_t& eq) {
     if (!lrows_) return;
     switch (eq.type) {
-    case Equil_t::EqType::COLUMN: {
+    case EquilibrationType::COLUMN: {
 #pragma omp parallel for
       for (integer_t r=0; r<lrows_; r++)
         for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++)
@@ -775,7 +777,7 @@ namespace strumpack {
       STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*
                       static_cast<long long int>(double(lnnz_)));
     } break;
-    case Equil_t::EqType::ROW: {
+    case EquilibrationType::ROW: {
 #pragma omp parallel for
       for (integer_t r=0; r<lrows_; r++)
         for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++)
@@ -783,7 +785,7 @@ namespace strumpack {
       STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*
                       static_cast<long long int>(double(lnnz_)));
     } break;
-    case Equil_t::EqType::BOTH: {
+    case EquilibrationType::BOTH: {
 #pragma omp parallel for
       for (integer_t r=0; r<lrows_; r++)
         for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++)
@@ -791,7 +793,7 @@ namespace strumpack {
       STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*
                       static_cast<long long int>(2.*double(lnnz_)));
     } break;
-    case Equil_t::EqType::NONE: {}
+    case EquilibrationType::NONE: {}
     }
   }
 

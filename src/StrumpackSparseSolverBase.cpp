@@ -299,6 +299,14 @@ namespace strumpack {
         return ReturnCode::REORDERING_ERROR;
       }
     }
+
+    equil_ = matrix()->equilibration();
+    matrix()->equilibrate(equil_);
+    if (opts_.verbose() && is_root_)
+      std::cout << "# matrix equilibration, r_cond = "
+                << equil_.rcond << " , c_cond = " << equil_.ccond
+                << " , type = " << char(equil_.type) << std::endl;
+
     auto old_nnz = matrix()->nnz();
     TaskTimer t2("sparsity-symmetrization",
                  [&](){ matrix()->symmetrize_sparsity(); });
