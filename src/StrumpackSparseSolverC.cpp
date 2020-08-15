@@ -67,16 +67,16 @@ using namespace strumpack;
   case STRUMPACK_DOUBLECOMPLEX_64: CASTZ64(S.solver)->m; break;         \
   }                                                                     \
 
-#define switch_precision_arg(m,a)                                            \
+#define switch_precision_arg(m,a)                                       \
   switch (S.precision) {                                                \
-  case STRUMPACK_FLOAT:            CASTS(S.solver)->m(a);   break;       \
-  case STRUMPACK_DOUBLE:           CASTD(S.solver)->m(a);   break;       \
-  case STRUMPACK_FLOATCOMPLEX:     CASTC(S.solver)->m(a);   break;       \
-  case STRUMPACK_DOUBLECOMPLEX:    CASTZ(S.solver)->m(a);   break;       \
-  case STRUMPACK_FLOAT_64:         CASTS64(S.solver)->m(a); break;       \
-  case STRUMPACK_DOUBLE_64:        CASTD64(S.solver)->m(a); break;       \
-  case STRUMPACK_FLOATCOMPLEX_64:  CASTC64(S.solver)->m(a); break;       \
-  case STRUMPACK_DOUBLECOMPLEX_64: CASTZ64(S.solver)->m(a); break;       \
+  case STRUMPACK_FLOAT:            CASTS(S.solver)->m(a);   break;      \
+  case STRUMPACK_DOUBLE:           CASTD(S.solver)->m(a);   break;      \
+  case STRUMPACK_FLOATCOMPLEX:     CASTC(S.solver)->m(a);   break;      \
+  case STRUMPACK_DOUBLECOMPLEX:    CASTZ(S.solver)->m(a);   break;      \
+  case STRUMPACK_FLOAT_64:         CASTS64(S.solver)->m(a); break;      \
+  case STRUMPACK_DOUBLE_64:        CASTD64(S.solver)->m(a); break;      \
+  case STRUMPACK_FLOATCOMPLEX_64:  CASTC64(S.solver)->m(a); break;      \
+  case STRUMPACK_DOUBLECOMPLEX_64: CASTZ64(S.solver)->m(a); break;      \
   }                                                                     \
 
 #define switch_precision_return(m,r)                                    \
@@ -467,7 +467,6 @@ extern "C" {
   }
 
 
-
   /*************************************************************
    ** Set options **********************************************
    ************************************************************/
@@ -483,46 +482,47 @@ extern "C" {
   { switch_precision(options().set_abs_tol(tol)); }
   void STRUMPACK_set_nd_param(STRUMPACK_SparseSolver S, int nd_param)
   { switch_precision(options().set_nd_param(nd_param)); }
-  void STRUMPACK_set_reordering_method
-  (STRUMPACK_SparseSolver S, STRUMPACK_REORDERING_STRATEGY m) {
-    switch_precision
-      (options().set_reordering_method
-       (static_cast<ReorderingStrategy>(m)));
+  void STRUMPACK_set_reordering_method(STRUMPACK_SparseSolver S,
+                                       STRUMPACK_REORDERING_STRATEGY m) {
+    switch_precision(options().set_reordering_method
+                     (static_cast<ReorderingStrategy>(m)));
   }
-  void STRUMPACK_set_GramSchmidt_type
-  (STRUMPACK_SparseSolver S, STRUMPACK_GRAM_SCHMIDT_TYPE t) {
-    switch_precision
-      (options().set_GramSchmidt_type
-       (static_cast<GramSchmidtType>(t)));
+  void STRUMPACK_set_GramSchmidt_type(STRUMPACK_SparseSolver S,
+                                      STRUMPACK_GRAM_SCHMIDT_TYPE t) {
+    switch_precision(options().set_GramSchmidt_type
+                     (static_cast<GramSchmidtType>(t)));
   }
-  void STRUMPACK_set_mc64job(STRUMPACK_SparseSolver S, int job)
-  { switch_precision(options().set_matching(get_matching(job))); }
-  void STRUMPACK_set_matching(STRUMPACK_SparseSolver S, int job)
-  { switch_precision(options().set_matching(get_matching(job))); }
-  void STRUMPACK_set_Krylov_solver
-  (STRUMPACK_SparseSolver S, STRUMPACK_KRYLOV_SOLVER solver_type) {
-    switch_precision
-      (options().set_Krylov_solver
-       (static_cast<KrylovSolver>(solver_type)));
+  void STRUMPACK_set_matching(STRUMPACK_SparseSolver S,
+                              STRUMPACK_MATCHING_JOB job) {
+    switch_precision(options().set_matching
+                     (static_cast<MatchingJob>(job)));
   }
-
-  /* set HSS specific options */
-  void STRUMPACK_enable_HSS(STRUMPACK_SparseSolver S)
-  { switch_precision(options().set_compression(CompressionType::HSS)); }
-  void STRUMPACK_disable_HSS(STRUMPACK_SparseSolver S)
-  { switch_precision(options().set_compression(CompressionType::NONE)); }
-  void STRUMPACK_set_HSS_min_front_size(STRUMPACK_SparseSolver S, int size)
+  void STRUMPACK_set_Krylov_solver(STRUMPACK_SparseSolver S,
+                                   STRUMPACK_KRYLOV_SOLVER solver_type) {
+    switch_precision(options().set_Krylov_solver
+                     (static_cast<KrylovSolver>(solver_type)));
+  }
+  void STRUMPACK_enable_gpu(STRUMPACK_SparseSolver S)
+  { switch_precision(options().enable_gpu()); }
+  void STRUMPACK_disable_gpu(STRUMPACK_SparseSolver S)
+  { switch_precision(options().disable_gpu()); }
+  void STRUMPACK_set_compression(STRUMPACK_SparseSolver S,
+                                 STRUMPACK_COMPRESSION_TYPE t) {
+    switch_precision(options().set_compression
+                     (static_cast<CompressionType>(t)));
+  }
+  void STRUMPACK_set_compression_min_front_size(STRUMPACK_SparseSolver S, int size)
   { switch_precision(options().set_compression_min_front_size(size)); }
-  void STRUMPACK_set_HSS_min_sep_size(STRUMPACK_SparseSolver S, int size)
+  void STRUMPACK_set_compression_min_sep_size(STRUMPACK_SparseSolver S, int size)
   { switch_precision(options().set_compression_min_sep_size(size)); }
-  void STRUMPACK_set_HSS_max_rank(STRUMPACK_SparseSolver S, int max_rank)
-  { switch_precision(options().HSS_options().set_max_rank(max_rank)); }
-  void STRUMPACK_set_HSS_leaf_size(STRUMPACK_SparseSolver S, int leaf_size)
-  { switch_precision(options().HSS_options().set_leaf_size(leaf_size)); }
-  void STRUMPACK_set_HSS_rel_tol(STRUMPACK_SparseSolver S, double rctol)
-  { switch_precision(options().HSS_options().set_rel_tol(rctol)); }
-  void STRUMPACK_set_HSS_abs_tol(STRUMPACK_SparseSolver S, double actol)
-  { switch_precision(options().HSS_options().set_abs_tol(actol)); }
+  void STRUMPACK_set_compression_leaf_size(STRUMPACK_SparseSolver S, int leaf_size)
+  { switch_precision(options().set_compression_leaf_size(leaf_size)); }
+  void STRUMPACK_set_compression_rel_tol(STRUMPACK_SparseSolver S, double rctol)
+  { switch_precision(options().set_compression_rel_tol(rctol)); }
+  void STRUMPACK_set_compression_abs_tol(STRUMPACK_SparseSolver S, double actol)
+  { switch_precision(options().set_compression_abs_tol(actol)); }
+  void STRUMPACK_set_compression_butterfly_levels(STRUMPACK_SparseSolver S, int l)
+  { switch_precision(options().HODLR_options().set_butterfly_levels(l)); }
 
 
   /*************************************************************
@@ -570,21 +570,114 @@ extern "C" {
     switch_precision_return(options().GramSchmidt_type(), gs);
     return static_cast<STRUMPACK_GRAM_SCHMIDT_TYPE>(gs);
   }
-  int STRUMPACK_mc64job(STRUMPACK_SparseSolver S) {
-    return STRUMPACK_matching(S);
-  }
-  int STRUMPACK_matching(STRUMPACK_SparseSolver S) {
+  STRUMPACK_MATCHING_JOB STRUMPACK_matching(STRUMPACK_SparseSolver S) {
     MatchingJob job = MatchingJob::NONE;
     switch_precision_return(options().matching(), job);
-    return get_matching(job);
+    return static_cast<STRUMPACK_MATCHING_JOB>(job);
   }
   STRUMPACK_KRYLOV_SOLVER STRUMPACK_Krylov_solver(STRUMPACK_SparseSolver S) {
     KrylovSolver s = KrylovSolver::AUTO;
     switch_precision_return(options().Krylov_solver(), s);
     return static_cast<STRUMPACK_KRYLOV_SOLVER>(s);
   }
+  int STRUMPACK_use_GPU(STRUMPACK_SparseSolver S) {
+    int g = 0;
+    switch_precision_return(options().use_gpu(), g);
+    return g;
+  }
+  /** compression options */
+  STRUMPACK_COMPRESSION_TYPE STRUMPACK_compression(STRUMPACK_SparseSolver S) {
+    CompressionType c = CompressionType::NONE;
+    switch_precision_return(options().compression(), c);
+    return static_cast<STRUMPACK_COMPRESSION_TYPE>(c);
+  }
+  int STRUMPACK_compression_min_front_size(STRUMPACK_SparseSolver S) {
+    int size = 0;
+    switch_precision_return(options().compression_min_front_size(), size);
+    return size;
+  }
+  int STRUMPACK_compression_min_sep_size(STRUMPACK_SparseSolver S) {
+    int size = 0;
+    switch_precision_return(options().compression_min_sep_size(), size);
+    return size;
+  }
+  int STRUMPACK_compression_leaf_size(STRUMPACK_SparseSolver S) {
+    int l = 0;
+    switch_precision_return(options().compression_leaf_size(), l);
+    return l;
+  }
+  double STRUMPACK_compression_rel_tol(STRUMPACK_SparseSolver S) {
+    double rctol = 0;
+    switch_precision_return(options().compression_rel_tol(), rctol);
+    return rctol;
+  }
+  double STRUMPACK_compression_abs_tol(STRUMPACK_SparseSolver S) {
+    double actol = 0.;
+    switch_precision_return(options().compression_abs_tol(), actol);
+    return actol;
+  }
+  int STRUMPACK_compression_butterfly_levels(STRUMPACK_SparseSolver S) {
+    int l = 0;
+    switch_precision_return(options().HODLR_options().butterfly_levels(), l);
+    return l;
+  }
 
-  /* get HSS specific options */
+  /*************************************************************
+   ** Get solve statistics *************************************
+   ************************************************************/
+  int STRUMPACK_its(STRUMPACK_SparseSolver S) {
+    int its = 0;
+    switch_precision_return(Krylov_iterations(), its);
+    return its;
+  }
+  int STRUMPACK_rank(STRUMPACK_SparseSolver S) {
+    int rank = 0;
+    switch_precision_return(maximum_rank(), rank);
+    return rank;
+  }
+  long long STRUMPACK_factor_nonzeros(STRUMPACK_SparseSolver S) {
+    long long nz = 0;
+    switch_precision_return(factor_nonzeros(), nz);
+    return nz;
+  }
+  long long STRUMPACK_factor_memory(STRUMPACK_SparseSolver S) {
+    long long mem = 0;
+    switch_precision_return(factor_memory(), mem);
+    return mem;
+  }
+
+
+
+
+
+  /* will be removed */
+  void STRUMPACK_set_mc64job(STRUMPACK_SparseSolver S, int job) {
+    switch_precision(options().set_matching
+                     (static_cast<MatchingJob>(job)));
+  }
+  int STRUMPACK_mc64job(STRUMPACK_SparseSolver S) {
+    return STRUMPACK_matching(S);
+  }
+
+  /* set HSS specific options, will be removed!! */
+  void STRUMPACK_enable_HSS(STRUMPACK_SparseSolver S)
+  { switch_precision(options().set_compression(CompressionType::HSS)); }
+  void STRUMPACK_disable_HSS(STRUMPACK_SparseSolver S)
+  { switch_precision(options().set_compression(CompressionType::NONE)); }
+  void STRUMPACK_set_HSS_min_front_size(STRUMPACK_SparseSolver S, int size)
+  { switch_precision(options().set_compression_min_front_size(size)); }
+  void STRUMPACK_set_HSS_min_sep_size(STRUMPACK_SparseSolver S, int size)
+  { switch_precision(options().set_compression_min_sep_size(size)); }
+  void STRUMPACK_set_HSS_max_rank(STRUMPACK_SparseSolver S, int max_rank)
+  { switch_precision(options().HSS_options().set_max_rank(max_rank)); }
+  void STRUMPACK_set_HSS_leaf_size(STRUMPACK_SparseSolver S, int leaf_size)
+  { switch_precision(options().HSS_options().set_leaf_size(leaf_size)); }
+  void STRUMPACK_set_HSS_rel_tol(STRUMPACK_SparseSolver S, double rctol)
+  { switch_precision(options().HSS_options().set_rel_tol(rctol)); }
+  void STRUMPACK_set_HSS_abs_tol(STRUMPACK_SparseSolver S, double actol)
+  { switch_precision(options().HSS_options().set_abs_tol(actol)); }
+
+  /* get HSS specific options, WILL BE REMOVED */
   int STRUMPACK_use_HSS(STRUMPACK_SparseSolver S) {
     CompressionType c = CompressionType::NONE;
     switch_precision_return(options().compression(), c);
@@ -619,30 +712,6 @@ extern "C" {
     double actol = 0.;
     switch_precision_return(options().HSS_options().abs_tol(), actol);
     return actol;
-  }
-
-  /*************************************************************
-   ** Get solve statistics *************************************
-   ************************************************************/
-  int STRUMPACK_its(STRUMPACK_SparseSolver S) {
-    int its = 0;
-    switch_precision_return(Krylov_iterations(), its);
-    return its;
-  }
-  int STRUMPACK_rank(STRUMPACK_SparseSolver S) {
-    int rank = 0;
-    switch_precision_return(maximum_rank(), rank);
-    return rank;
-  }
-  long long STRUMPACK_factor_nonzeros(STRUMPACK_SparseSolver S) {
-    long long nz = 0;
-    switch_precision_return(factor_nonzeros(), nz);
-    return nz;
-  }
-  long long STRUMPACK_factor_memory(STRUMPACK_SparseSolver S) {
-    long long mem = 0;
-    switch_precision_return(factor_memory(), mem);
-    return mem;
   }
 
 }

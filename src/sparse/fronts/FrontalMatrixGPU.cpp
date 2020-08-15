@@ -473,7 +473,7 @@ namespace strumpack {
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
     using LevelInfo_t = LevelInfo<scalar_t,integer_t>;
-    const int max_streams = opts.cuda_streams();
+    const int max_streams = opts.gpu_streams();
     std::vector<gpu::SOLVERHandle> solver_handles(max_streams);
     const int lvls = this->levels();
     std::vector<LevelInfo_t> ldata(lvls);

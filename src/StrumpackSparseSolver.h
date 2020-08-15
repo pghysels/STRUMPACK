@@ -37,26 +37,32 @@
 #include "mpi.h"
 #endif
 
-typedef enum {
-  STRUMPACK_FLOAT,
-  STRUMPACK_DOUBLE,
-  STRUMPACK_FLOATCOMPLEX,
-  STRUMPACK_DOUBLECOMPLEX,
-  STRUMPACK_FLOAT_64,
-  STRUMPACK_DOUBLE_64,
-  STRUMPACK_FLOATCOMPLEX_64,
-  STRUMPACK_DOUBLECOMPLEX_64
-} STRUMPACK_PRECISION;
+/*!
+ * Enumeration of STRUMPACK precisions, for both the scalars and the
+ * integers.
+  \ingroup Enumerations
+ */
+typedef enum
+  {
+   STRUMPACK_FLOAT,
+   STRUMPACK_DOUBLE,
+   STRUMPACK_FLOATCOMPLEX,
+   STRUMPACK_DOUBLECOMPLEX,
+   STRUMPACK_FLOAT_64,
+   STRUMPACK_DOUBLE_64,
+   STRUMPACK_FLOATCOMPLEX_64,
+   STRUMPACK_DOUBLECOMPLEX_64
+  } STRUMPACK_PRECISION;
 
 /*!
- * Enumeration of STRUMPACK interfaces, the MPI interface with
- * replicated input/output is not supported from the C interface.
+ * Enumeration of STRUMPACK interfaces.
  * \ingroup Enumerations
  */
-typedef enum {
-  STRUMPACK_MT,        /*!< sequential/multithreaded interface    */
-  STRUMPACK_MPI_DIST   /*!< fully distributed, MPI, interface     */
-} STRUMPACK_INTERFACE;
+typedef enum
+  {
+   STRUMPACK_MT,        /*!< sequential/multithreaded interface    */
+   STRUMPACK_MPI_DIST   /*!< fully distributed, MPI, interface     */
+  } STRUMPACK_INTERFACE;
 
 typedef struct {
   void* solver;
@@ -67,46 +73,73 @@ typedef struct {
 typedef struct { float r, i; } floatcomplex;
 typedef struct { double r, i; } doublecomplex;
 
-typedef enum {
-  STRUMPACK_NATURAL=0,
-  STRUMPACK_METIS=1,
-  STRUMPACK_PARMETIS=2,
-  STRUMPACK_SCOTCH=3,
-  STRUMPACK_PTSCOTCH=4,
-  STRUMPACK_RCM=5,
-  STRUMPACK_GEOMETRIC=6
-} STRUMPACK_REORDERING_STRATEGY;
+typedef enum
+  {
+   STRUMPACK_NONE=0,
+   STRUMPACK_HSS=1,
+   STRUMPACK_BLR=2,
+   STRUMPACK_HODLR=3,
+   STRUMPACK_LOSSLESS=4,
+   STRUMPACK_LOSSY=5
+  } STRUMPACK_COMPRESSION_TYPE;
 
-typedef enum {
-  STRUMPACK_CLASSICAL=0,
-  STRUMPACK_MODIFIED=1
-} STRUMPACK_GRAM_SCHMIDT_TYPE;
+typedef enum
+  {
+   STRUMPACK_MATCHING_NONE=0,
+   STRUMPACK_MATCHING_MAX_CARDINALITY=1,
+   STRUMPACK_MATCHING_MAX_SMALLEST_DIAGONAL=2,
+   STRUMPACK_MATCHING_MAX_SMALLEST_DIAGONAL_2=3,
+   STRUMPACK_MATCHING_MAX_DIAGONAL_SUM=4,
+   STRUMPACK_MATCHING_MAX_DIAGONAL_PRODUCT_SCALING=5,
+   STRUMPACK_MATCHING_COMBBLAS=6
+  } STRUMPACK_MATCHING_JOB;
 
-typedef enum {
-  STRUMPACK_NORMAL=0,
-  STRUMPACK_UNIFORM=1
-} STRUMPACK_RANDOM_DISTRIBUTION;
+typedef enum
+  {
+   STRUMPACK_NATURAL=0,
+   STRUMPACK_METIS=1,
+   STRUMPACK_PARMETIS=2,
+   STRUMPACK_SCOTCH=3,
+   STRUMPACK_PTSCOTCH=4,
+   STRUMPACK_RCM=5,
+   STRUMPACK_GEOMETRIC=6
+  } STRUMPACK_REORDERING_STRATEGY;
 
-typedef enum {
-  STRUMPACK_LINEAR=0,
-  STRUMPACK_MERSENNE=1
-} STRUMPACK_RANDOM_ENGINE;
+typedef enum
+  {
+   STRUMPACK_CLASSICAL=0,
+   STRUMPACK_MODIFIED=1
+  } STRUMPACK_GRAM_SCHMIDT_TYPE;
 
-typedef enum {
-  STRUMPACK_AUTO=0,
-  STRUMPACK_DIRECT=1,
-  STRUMPACK_REFINE=2,
-  STRUMPACK_PREC_GMRES=3,
-  STRUMPACK_GMRES=4,
-  STRUMPACK_PREC_BICGSTAB=5,
-  STRUMPACK_BICGSTAB=6
-} STRUMPACK_KRYLOV_SOLVER;
+typedef enum
+  {
+   STRUMPACK_NORMAL=0,
+   STRUMPACK_UNIFORM=1
+  } STRUMPACK_RANDOM_DISTRIBUTION;
 
-typedef enum {
-  STRUMPACK_SUCCESS=0,
-  STRUMPACK_MATRIX_NOT_SET=1,
-  STRUMPACK_REORDERING_ERROR=2
-} STRUMPACK_RETURN_CODE;
+typedef enum
+  {
+   STRUMPACK_LINEAR=0,
+   STRUMPACK_MERSENNE=1
+  } STRUMPACK_RANDOM_ENGINE;
+
+typedef enum
+  {
+   STRUMPACK_AUTO=0,
+   STRUMPACK_DIRECT=1,
+   STRUMPACK_REFINE=2,
+   STRUMPACK_PREC_GMRES=3,
+   STRUMPACK_GMRES=4,
+   STRUMPACK_PREC_BICGSTAB=5,
+   STRUMPACK_BICGSTAB=6
+  } STRUMPACK_KRYLOV_SOLVER;
+
+typedef enum
+  {
+   STRUMPACK_SUCCESS=0,
+   STRUMPACK_MATRIX_NOT_SET=1,
+   STRUMPACK_REORDERING_ERROR=2
+  } STRUMPACK_RETURN_CODE;
 
 
 #ifdef __cplusplus
@@ -153,6 +186,13 @@ extern "C" {
 
   STRUMPACK_RETURN_CODE STRUMPACK_factor(STRUMPACK_SparseSolver S);
 
+
+  /*
+    TODO add
+    - routines to update the matrix values!!!!!
+    - solve with multiple rhs??!!!
+  */
+
   /*************************************************************
    ** Set options **********************************************
    ************************************************************/
@@ -162,25 +202,19 @@ extern "C" {
   void STRUMPACK_set_rel_tol(STRUMPACK_SparseSolver S, double tol);
   void STRUMPACK_set_abs_tol(STRUMPACK_SparseSolver S, double tol);
   void STRUMPACK_set_nd_param(STRUMPACK_SparseSolver S, int nd_param);
-  void STRUMPACK_set_reordering_method
-  (STRUMPACK_SparseSolver S, STRUMPACK_REORDERING_STRATEGY m);
-  void STRUMPACK_set_GramSchmidt_type
-  (STRUMPACK_SparseSolver S, STRUMPACK_GRAM_SCHMIDT_TYPE t);
-  /** this will be deprecated! */
-  void STRUMPACK_set_mc64job(STRUMPACK_SparseSolver S, int job);
-  void STRUMPACK_set_matching(STRUMPACK_SparseSolver S, int job);
-  void STRUMPACK_set_Krylov_solver
-  (STRUMPACK_SparseSolver S, STRUMPACK_KRYLOV_SOLVER solver_type);
-  /* set HSS specific options */
-  void STRUMPACK_enable_HSS(STRUMPACK_SparseSolver S);
-  void STRUMPACK_disable_HSS(STRUMPACK_SparseSolver S);
-  void STRUMPACK_set_HSS_min_front_size(STRUMPACK_SparseSolver S, int size);
-  void STRUMPACK_set_HSS_min_sep_size(STRUMPACK_SparseSolver S, int size);
-  void STRUMPACK_set_HSS_max_rank(STRUMPACK_SparseSolver S, int max_rank);
-  void STRUMPACK_set_HSS_leaf_size(STRUMPACK_SparseSolver S, int leaf_size);
-  void STRUMPACK_set_HSS_rel_tol(STRUMPACK_SparseSolver S, double rctol);
-  void STRUMPACK_set_HSS_abs_tol(STRUMPACK_SparseSolver S, double actol);
-
+  void STRUMPACK_set_reordering_method(STRUMPACK_SparseSolver S, STRUMPACK_REORDERING_STRATEGY m);
+  void STRUMPACK_set_GramSchmidt_type(STRUMPACK_SparseSolver S, STRUMPACK_GRAM_SCHMIDT_TYPE t);
+  void STRUMPACK_set_matching(STRUMPACK_SparseSolver S, STRUMPACK_MATCHING_JOB job);
+  void STRUMPACK_set_Krylov_solver(STRUMPACK_SparseSolver S, STRUMPACK_KRYLOV_SOLVER solver_type);
+  void STRUMPACK_enable_gpu(STRUMPACK_SparseSolver S);
+  void STRUMPACK_disable_gpu(STRUMPACK_SparseSolver S);
+  void STRUMPACK_set_compression(STRUMPACK_SparseSolver S, STRUMPACK_COMPRESSION_TYPE t);
+  void STRUMPACK_set_compression_min_sep_size(STRUMPACK_SparseSolver S, int size);
+  void STRUMPACK_set_compression_min_front_size(STRUMPACK_SparseSolver S, int size);
+  void STRUMPACK_set_compression_leaf_size(STRUMPACK_SparseSolver S, int size);
+  void STRUMPACK_set_compression_rel_tol(STRUMPACK_SparseSolver S, double rctol);
+  void STRUMPACK_set_compression_abs_tol(STRUMPACK_SparseSolver S, double actol);
+  void STRUMPACK_set_compression_butterfly_levels(STRUMPACK_SparseSolver S, int l);
 
   /*************************************************************
    ** Get options **********************************************
@@ -191,23 +225,18 @@ extern "C" {
   double STRUMPACK_rel_tol(STRUMPACK_SparseSolver S);
   double STRUMPACK_abs_tol(STRUMPACK_SparseSolver S);
   int STRUMPACK_nd_param(STRUMPACK_SparseSolver S);
-  STRUMPACK_REORDERING_STRATEGY STRUMPACK_reordering_method
-  (STRUMPACK_SparseSolver S);
-  STRUMPACK_GRAM_SCHMIDT_TYPE STRUMPACK_GramSchmidt_type
-  (STRUMPACK_SparseSolver S);
-  int STRUMPACK_mc64job(STRUMPACK_SparseSolver S);
-  int STRUMPACK_matching(STRUMPACK_SparseSolver S);
+  STRUMPACK_REORDERING_STRATEGY STRUMPACK_reordering_method(STRUMPACK_SparseSolver S);
+  STRUMPACK_GRAM_SCHMIDT_TYPE STRUMPACK_GramSchmidt_type(STRUMPACK_SparseSolver S);
+  STRUMPACK_MATCHING_JOB STRUMPACK_matching(STRUMPACK_SparseSolver S);
   STRUMPACK_KRYLOV_SOLVER STRUMPACK_Krylov_solver(STRUMPACK_SparseSolver S);
-
-  /* get HSS specific options */
-  int use_HSS(STRUMPACK_SparseSolver S);
-  int STRUMPACK_HSS_min_front_size(STRUMPACK_SparseSolver S);
-  int STRUMPACK_HSS_min_sep_size(STRUMPACK_SparseSolver S);
-  int STRUMPACK_HSS_max_rank(STRUMPACK_SparseSolver S);
-  int STRUMPACK_HSS_leaf_size(STRUMPACK_SparseSolver S);
-  double STRUMPACK_HSS_rel_tol(STRUMPACK_SparseSolver S);
-  double STRUMPACK_HSS_abs_tol(STRUMPACK_SparseSolver S);
-
+  int STRUMPACK_use_gpu(STRUMPACK_SparseSolver S);
+  STRUMPACK_COMPRESSION_TYPE STRUMPACK_compression(STRUMPACK_SparseSolver S);
+  int STRUMPACK_compression_min_sep_size(STRUMPACK_SparseSolver S);
+  int STRUMPACK_compression_min_front_size(STRUMPACK_SparseSolver S);
+  int STRUMPACK_compression_leaf_size(STRUMPACK_SparseSolver S);
+  double STRUMPACK_compression_rel_tol(STRUMPACK_SparseSolver S);
+  double STRUMPACK_compression_abs_tol(STRUMPACK_SparseSolver S);
+  int STRUMPACK_compression_butterfly_levels(STRUMPACK_SparseSolver S);
 
   /*************************************************************
    ** Get solve statistics *************************************
@@ -216,6 +245,32 @@ extern "C" {
   int STRUMPACK_rank(STRUMPACK_SparseSolver S);
   long long STRUMPACK_factor_nonzeros(STRUMPACK_SparseSolver S);
   long long STRUMPACK_factor_memory(STRUMPACK_SparseSolver S);
+
+
+
+  /** WILL BE REMOVED!, now matching */
+  void STRUMPACK_set_mc64job(STRUMPACK_SparseSolver S, int job);
+  /** WILL BE REMOVED! is now matching */
+  int STRUMPACK_mc64job(STRUMPACK_SparseSolver S);
+
+  /* set HSS specific options, WILL BE REMOVED!! */
+  void STRUMPACK_enable_HSS(STRUMPACK_SparseSolver S);
+  void STRUMPACK_disable_HSS(STRUMPACK_SparseSolver S);
+  void STRUMPACK_set_HSS_min_front_size(STRUMPACK_SparseSolver S, int size);
+  void STRUMPACK_set_HSS_min_sep_size(STRUMPACK_SparseSolver S, int size);
+  void STRUMPACK_set_HSS_max_rank(STRUMPACK_SparseSolver S, int max_rank);
+  void STRUMPACK_set_HSS_leaf_size(STRUMPACK_SparseSolver S, int leaf_size);
+  void STRUMPACK_set_HSS_rel_tol(STRUMPACK_SparseSolver S, double rctol);
+  void STRUMPACK_set_HSS_abs_tol(STRUMPACK_SparseSolver S, double actol);
+
+  /** get HSS specific options, WILL BE REMOVED */
+  int use_HSS(STRUMPACK_SparseSolver S);
+  int STRUMPACK_HSS_min_front_size(STRUMPACK_SparseSolver S);
+  int STRUMPACK_HSS_min_sep_size(STRUMPACK_SparseSolver S);
+  int STRUMPACK_HSS_max_rank(STRUMPACK_SparseSolver S);
+  int STRUMPACK_HSS_leaf_size(STRUMPACK_SparseSolver S);
+  double STRUMPACK_HSS_rel_tol(STRUMPACK_SparseSolver S);
+  double STRUMPACK_HSS_abs_tol(STRUMPACK_SparseSolver S);
 
 #ifdef __cplusplus
 }

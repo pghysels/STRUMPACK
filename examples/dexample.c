@@ -31,15 +31,45 @@
 #include "StrumpackSparseSolver.h"
 
 int main(int argc, char* argv[]) {
-  int n = 30;
+  int n = 400;
   if (argc > 1) n = atoi(argv[1]); // get grid size
-  else printf("# please provide grid size\n");
+  else printf("# no grid size provided\n");
+  printf("# solving %d^2 Poisson problem with a single right hand side\n", n);
 
-  STRUMPACK_SparseSolver spss;
-  STRUMPACK_init_mt(&spss, STRUMPACK_DOUBLE, STRUMPACK_MT, argc, argv, 1);
-  STRUMPACK_set_matching(spss, 0);
-  STRUMPACK_set_reordering_method(spss, STRUMPACK_GEOMETRIC);
-  STRUMPACK_set_from_options(spss);
+  STRUMPACK_SparseSolver S;
+  STRUMPACK_init_mt(&S, STRUMPACK_DOUBLE, STRUMPACK_MT, argc, argv, 1);
+  STRUMPACK_set_matching(S, STRUMPACK_MATCHING_NONE);
+  STRUMPACK_set_reordering_method(S, STRUMPACK_GEOMETRIC);
+
+  /*
+    Set compression method. Other options include NONE, HSS, HODLR,
+    LOSSY, LOSSLESS. HODLR is only supported in parallel, and only
+    supports double precision (including complex double).
+  */
+  STRUMPACK_set_compression(S, STRUMPACK_BLR);
+
+  /*
+    Set the block size and relative compression tolerances for BLR
+    compression.
+  */
+  STRUMPACK_set_compression_leaf_size(S, 64);
+  STRUMPACK_set_compression_rel_tol(S, 1.e-2);
+
+  /*
+    Only sub-blocks in the sparse triangular factors corresponing to
+    separators larger than this minimum separator size will be
+    compressed. For performance, this value should probably be larger
+    than 128. This value should be larger for HODLR/HODBF, than for
+    BLR, since HODLR/HODBF have larger constants in the complexity.
+    For an n x n 2D domain, the largest separator will correspond to
+    an n x n sub-block in the sparse factors.
+  */
+  STRUMPACK_set_compression_min_sep_size(S, 300);
+
+  /*
+    Parse any command line options.
+  */
+  STRUMPACK_set_from_options(S);
 
   int N = n * n;
   int nnz = 5 * N - 4 * n;
@@ -69,15 +99,20 @@ int main(int argc, char* argv[]) {
     b[i] = 1.;
     x[i] = 0.;
   }
-  STRUMPACK_set_csr_matrix(spss, &N, row_ptr, col_ind, val, 1);
-  STRUMPACK_reorder_regular(spss, n, n, 1);
-  STRUMPACK_solve(spss, b, x, 0);
+
+  STRUMPACK_set_csr_matrix(S, &N, row_ptr, col_ind, val, 1);
+  STRUMPACK_reorder_regular(S, n, n, 1);
+
+  /*
+    Solve will internally call factor (and reorder if necessary).
+   */
+  STRUMPACK_solve(S, b, x, 0);
 
   free(row_ptr);
   free(col_ind);
   free(val);
   free(b);
   free(x);
-  STRUMPACK_destroy(&spss);
+  STRUMPACK_destroy(&S);
   return 0;
 }

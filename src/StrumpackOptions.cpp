@@ -79,29 +79,7 @@ namespace strumpack {
   MatchingJob get_matching(int job) {
     if (job < 0 || job > 6)
       std::cerr << "ERROR: Matching job not recognized!!" << std::endl;
-    switch (job) {
-    case 0: return MatchingJob::NONE;
-    case 1: return MatchingJob::MAX_CARDINALITY;
-    case 2: return MatchingJob::MAX_SMALLEST_DIAGONAL;
-    case 3: return MatchingJob::MAX_SMALLEST_DIAGONAL_2;
-    case 4: return MatchingJob::MAX_DIAGONAL_SUM;
-    case 5: return MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING;
-    case 6: return MatchingJob::COMBBLAS;
-    }
-    return MatchingJob::NONE;
-  }
-
-  int get_matching(MatchingJob job) {
-    switch (job) {
-    case MatchingJob::NONE: return 0;
-    case MatchingJob::MAX_CARDINALITY: return 1;
-    case MatchingJob::MAX_SMALLEST_DIAGONAL: return 2;
-    case MatchingJob::MAX_SMALLEST_DIAGONAL_2: return 3;
-    case MatchingJob::MAX_DIAGONAL_SUM: return 4;
-    case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING: return 5;
-    case MatchingJob::COMBBLAS: return 6;
-    }
-    return -1;
+    return static_cast<MatchingJob>(job);
   }
 
   std::string get_description(MatchingJob job) {
@@ -172,9 +150,8 @@ namespace strumpack {
        {"sp_print_root_front_stats",    no_argument, 0, 35},
        {"sp_enable_gpu",                no_argument, 0, 36},
        {"sp_disable_gpu",               no_argument, 0, 37},
-       {"sp_cuda_cutoff",               required_argument, 0, 38},
-       {"sp_cuda_streams",              required_argument, 0, 39},
-       {"sp_lossy_precision",           required_argument, 0, 40},
+       {"sp_gpu_streams",               required_argument, 0, 38},
+       {"sp_lossy_precision",           required_argument, 0, 49},
        {"sp_verbose",                   no_argument, 0, 'v'},
        {"sp_quiet",                     no_argument, 0, 'q'},
        {"help",                         no_argument, 0, 'h'},
@@ -332,15 +309,10 @@ namespace strumpack {
       case 37: disable_gpu(); break;
       case 38: {
         std::istringstream iss(optarg);
-        iss >> cuda_cutoff_;
-        set_cuda_cutoff(cuda_cutoff_);
+        iss >> gpu_streams_;
+        set_gpu_streams(gpu_streams_);
       } break;
       case 39: {
-        std::istringstream iss(optarg);
-        iss >> cuda_streams_;
-        set_cuda_streams(cuda_streams_);
-      } break;
-      case 40: {
         std::istringstream iss(optarg);
         iss >> lossy_precision_;
         set_lossy_precision(lossy_precision_);
@@ -436,7 +408,7 @@ namespace strumpack {
     std::cout << "#   --sp_disable_agg_amalg (default "
               << std::boolalpha << !use_agg_amalg() << ")" << std::endl;
     std::cout << "#   --sp_matching int [0-6] (default "
-              << get_matching(matching()) << ")" << std::endl;
+              << static_cast<int>(matching()) << ")" << std::endl;
     for (int i=0; i<7; i++)
       std::cout << "#      " << i << " " <<
         get_description(get_matching(i)) << std::endl;
@@ -461,12 +433,9 @@ namespace strumpack {
     std::cout << "#   --sp_print_root_front_stats" << std::endl;
     std::cout << "#   --sp_enable_gpu" << std::endl;
     std::cout << "#   --sp_disable_gpu" << std::endl;
-    std::cout << "#   --sp_cuda_cutoff (default "
-              << cuda_cutoff() << ")" << std::endl
-              << "#          CUDA kernel/CUBLAS cutoff size" << std::endl;
-    std::cout << "#   --sp_cuda_streams (default "
-              << cuda_streams() << ")" << std::endl
-              << "#          number of CUDA streams" << std::endl;
+    std::cout << "#   --sp_gpu_streams (default "
+              << gpu_streams() << ")" << std::endl
+              << "#          number of GPU streams" << std::endl;
     std::cout << "#   --sp_lossy_precision [1-64] (default "
               << lossy_precision() << ")" << std::endl
               << "#          lossy compression precision" << std::endl

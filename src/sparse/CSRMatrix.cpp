@@ -349,7 +349,7 @@ namespace strumpack {
   CSRMatrix<scalar_t,integer_t>::strumpack_mc64
   (MatchingJob job, Match_t& M) {
     int_t n = n_, nnz = nnz_, icntl[10], info[10], num,
-      ijob = get_matching(job), liw = M.mc64_work_int(n_, nnz_),
+      ijob = static_cast<int>(job), liw = M.mc64_work_int(n_, nnz_),
       ldw = M.mc64_work_double(n_, nnz_);
     std::unique_ptr<int_t[]> iw(new int_t[liw + n+1+nnz+n+n]);
     std::unique_ptr<double[]> dw(new double[ldw + nnz]);

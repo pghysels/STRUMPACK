@@ -171,8 +171,7 @@ namespace strumpack {
   template<> inline float default_rel_tol() { return 1.e-4; }
   template<> inline float default_abs_tol() { return 1.e-6; }
 
-  inline int default_cuda_cutoff() { return 500; }
-  inline int default_cuda_streams() { return 10; }
+  inline int default_gpu_streams() { return 4; }
 
   /**
    * \class SPOptions
@@ -241,9 +240,9 @@ namespace strumpack {
      *
      * \param rel_tol relative tolerance
      */
-    void set_rel_tol(real_t rel_tol) {
-      assert(rel_tol <= real_t(1.) && rel_tol >= real_t(0.));
-      rel_tol_ = rel_tol;
+    void set_rel_tol(real_t rtol) {
+      assert(rtol <= real_t(1.) && rtol >= real_t(0.));
+      rel_tol_ = rtol;
     }
 
     /**
@@ -252,9 +251,9 @@ namespace strumpack {
      *
      * \param abs_tol absolute tolerance
      */
-    void set_abs_tol(real_t abs_tol) {
-      assert(abs_tol >= real_t(0.));
-      abs_tol_ = abs_tol;
+    void set_abs_tol(real_t atol) {
+      assert(atol >= real_t(0.));
+      abs_tol_ = atol;
     }
 
     /**
@@ -513,6 +512,44 @@ namespace strumpack {
     void set_compression(CompressionType c) { comp_ = c; }
 
     /**
+     * Set the relative compression tolerance to be used for low-rank
+     * compression. This currently affects BLR, HSS, HODLR, HODBF,
+     * Butterfly. It does not affect the lossy compression, see
+     * set_lossy_precision. The same tolerances can also be set
+     * individually by calling set_rel_tol on the returned objects
+     * from either HODLR_options(), BLR_options() or HSS_options().
+     *
+     * \param rtol the relative low-rank compression tolerance
+     *
+     * \see set_compression_abs_tol, set_lossy_precision,
+     * compression_rel_tol
+     */
+    void set_compression_rel_tol(real_t rtol) {
+      hss_opts_.set_rel_tol(rtol);
+      blr_opts_.set_rel_tol(rtol);
+      hodlr_opts_.set_rel_tol(rtol);
+    }
+
+    /**
+     * Set the absolute compression tolerance to be used for low-rank
+     * compression. This currently affects BLR, HSS, HODLR, HODBF,
+     * Butterfly. It does not affect the lossy compression, see
+     * set_lossy_precision. The same tolerances can also be set
+     * individually by calling set_rel_tol on the returned objects
+     * from either HODLR_options(), BLR_options() or HSS_options().
+     *
+     * \param rtol the relative low-rank compression tolerance
+     *
+     * \see set_compression_rel_tol, set_lossy_precision,
+     * compression_abs_tol
+     */
+    void set_compression_abs_tol(real_t atol) {
+      hss_opts_.set_abs_tol(atol);
+      blr_opts_.set_abs_tol(atol);
+      hodlr_opts_.set_abs_tol(atol);
+    }
+
+    /**
      * Set the minimum size of the top left part of frontal matrices
      * (dense submatrices of the sparse triangular factors), ie, the
      * part corresponding to the separators, for which to use
@@ -626,15 +663,9 @@ namespace strumpack {
     void disable_gpu() { use_gpu_ = false; }
 
     /**
-     * Set the minimum dense matrix size for dense matrix operations
-     * to be off-loaded to the GPU.
-     */
-    void set_cuda_cutoff(int c) { cuda_cutoff_ = c; }
-
-    /**
      * Set the number of (CUDA) streams to be used in the code.
      */
-    void set_cuda_streams(int s) { cuda_streams_ = s; }
+    void set_gpu_streams(int s) { gpu_streams_ = s; }
 
     /**
      * Set the precision for lossy compression.
@@ -774,6 +805,53 @@ namespace strumpack {
      */
     CompressionType compression() const { return comp_; }
 
+
+    /**
+     * Return the relative compression tolerance used for the
+     * currently selected low-rank method, either HODLR, HSS or BLR.
+     * If NONE, LOSSY or LOSSLESS compression are selected, then this
+     * returns 0.
+     *
+     * \see set_compression_rel_tol, set_lossy_compression
+     */
+    real_t compression_rel_tol() const {
+      switch (comp_) {
+      case CompressionType::HSS:
+        return hss_opts_.rel_tol();
+      case CompressionType::BLR:
+        return blr_opts_.rel_tol();
+      case CompressionType::HODLR:
+        return hodlr_opts_.rel_tol();
+      case CompressionType::LOSSY:
+      case CompressionType::LOSSLESS:
+      case CompressionType::NONE:
+      default: return 0.;
+      }
+    }
+
+    /**
+     * Return the absolute compression tolerance used for the
+     * currently selected low-rank method, either HODLR, HSS or BLR.
+     * If NONE, LOSSY or LOSSLESS compression are selected, then this
+     * returns 0.
+     *
+     * \see set_compression_rel_tol, set_lossy_compression
+     */
+    real_t compression_abs_tol() const {
+      switch (comp_) {
+      case CompressionType::HSS:
+        return hss_opts_.abs_tol();
+      case CompressionType::BLR:
+        return blr_opts_.abs_tol();
+      case CompressionType::HODLR:
+        return hodlr_opts_.abs_tol();
+      case CompressionType::LOSSY:
+      case CompressionType::LOSSLESS:
+      case CompressionType::NONE:
+      default: return 0.;
+      }
+    }
+
     /**
      * Get the minimum size of a separator to enable compression. This
      * will depend on which type of compression is selected.
@@ -875,14 +953,9 @@ namespace strumpack {
     bool use_gpu() const { return use_gpu_; }
 
     /**
-     * Returns the minimum size of a dense matrix for GPU off-loading.
+     * Returns the number of GPU streams to use.
      */
-    int cuda_cutoff() const { return cuda_cutoff_; }
-
-    /**
-     * Returns the number of CUDA streams to use.
-     */
-    int cuda_streams() const { return cuda_streams_; }
+    int gpu_streams() const { return gpu_streams_; }
 
     /**
      * Returns the precision for lossy compression.
@@ -986,8 +1059,7 @@ namespace strumpack {
 
     /** GPU options */
     bool use_gpu_ = true;
-    int cuda_cutoff_ = default_cuda_cutoff();
-    int cuda_streams_ = default_cuda_streams();
+    int gpu_streams_ = default_gpu_streams();
 
     /** compression options */
     CompressionType comp_ = CompressionType::NONE;
