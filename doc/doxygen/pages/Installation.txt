@@ -4,7 +4,7 @@ CMake Based Build
 -----------------
 
 The STRUMPACK package uses the CMake build system (CMake version \>=
-3.2) . The recommended way of building the STRUMPACK library is as
+3.11). The recommended way of building the STRUMPACK library is as
 follows:
 
 \code {.bash}
@@ -175,7 +175,7 @@ TPL_SCOTCH_INCLUDE_DIRS, TPL_PTSCOTCH_INCLUDE_DIRS, and
 TPL_SCOTCH_LIBRARIES, TPL_PTSCOTCH_LIBRARIES (make sure to specify all
 libraries: libscotch, libscotcherr, libptscotch and libptscotcherr).
 
-- __ButterflyPACK__ (>= 1.1.0): \link
+- __ButterflyPACK__ (>= 1.2.0): \link
   https://github.com/liuyangzhuan/ButterflyPACK
   https://github.com/liuyangzhuan/ButterflyPACK \endlink STRUMPACK
   supports the HODLR (Hierarchically Off-Diagonal Low-Rank) and

@@ -7,8 +7,9 @@ http://portal.nersc.gov/project/sparse/strumpack/v3.3.0/index.html
 
 Or see example_build.sh for examples on how to call CMake.
 
-STRUMPACK uses the CMake build system. To build use the
-following steps:
+STRUMPACK uses the CMake build system. It is best to use an up to date
+version of CMake, at least CMake 3.11. To build use the following
+steps:
 
 > tar -xvzf strumpack-x.y.z.tar.gz
 > cd strumpack-x.y.z
@@ -199,7 +200,7 @@ to the appropriate directories for your setup.
 
 
 
-ButterflyPACK (optional, needs >= 1.1.0)
+ButterflyPACK (optional, needs >= 1.2.0)
 ========================================
 See: https://github.com/liuyangzhuan/ButterflyPACK
 

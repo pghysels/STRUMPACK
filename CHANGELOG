@@ -1,5 +1,11 @@
 Version 3.xx In Progress
 ======================================
+ - Improved HODLR, with butterfly, preconditioning. Now relying on
+   Butterflypack 1.2.0.
+ - Much improved CUDA support in the sparse direct solver. CUDA
+   acceleration is not working yet for the rank-structured solvers
+ - Added matrix equilibration to the sparse solver. This slightly
+   improves numerical accuracy in many cases.
  - Added Lossy compression: --sp_compression lossy, using ZFP.
    Make sure to configure with ZFP support!
  - Removed some options: --sp_enable HSS, --sp_HSS_min_sep_size,
