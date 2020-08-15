@@ -65,12 +65,12 @@ int main(int argc, char* argv[]) {
     // only a routine to evaluate individual elements
     HODLR::HODLRMatrix<double> H(c, t, Toeplitz, opts);
 
-    auto memfill = H.get_stat("Mem_Fill");
-    auto maxrank = H.get_stat("Rank_max");
+    auto memfill = H.total_memory() / 1.e6;
+    auto maxrank = H.max_rank();
     if (c.is_root())
       cout << "# H has max rank " << maxrank << " and takes "
            << memfill << " MByte (compared to "
-           << (N*N*sizeof(double) / 1.e6) << " MByte for dense storage)"
+           << (N*N / 1.e6) << " MByte for dense storage)"
            << endl;
 
     //////////////////////////////////////////////////////////////////
@@ -102,7 +102,7 @@ int main(int argc, char* argv[]) {
     // for regular matrix vector multiplication
     H.factor();
 
-    auto memfactor = H.get_stat("Mem_Factor");
+    auto memfactor = H.total_factor_memory() / 1.e6;
     if (c.is_root())
       cout << "# computed a factorization of H, which takes an additional "
            << memfactor << " MByte" << endl;

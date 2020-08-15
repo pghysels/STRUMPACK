@@ -114,8 +114,8 @@ namespace strumpack {
        * stored in the kernel object.
        * \param opts object containing a number of HODLR options
        */
-      HODLRMatrix
-      (const MPIComm& c, kernel::Kernel<real_t>& K, const opts_t& opts);
+      HODLRMatrix(const MPIComm& c, kernel::Kernel<real_t>& K,
+                  const opts_t& opts);
 
       /**
        * Construct an HODLR approximation using a routine to evaluate
@@ -134,10 +134,9 @@ namespace strumpack {
        * evaluates/returns the matrix element A(i,j)
        * \param opts object containing a number of HODLR options
        */
-      HODLRMatrix
-      (const MPIComm& c, const HSS::HSSPartitionTree& tree,
-       const std::function<scalar_t(int i, int j)>& Aelem,
-       const opts_t& opts);
+      HODLRMatrix(const MPIComm& c, const HSS::HSSPartitionTree& tree,
+                  const std::function<scalar_t(int i, int j)>& Aelem,
+                  const opts_t& opts);
 
 
       /**
@@ -160,9 +159,8 @@ namespace strumpack {
        * The ExtractionMeta object can be ignored.
        * \param opts object containing a number of HODLR options
        */
-      HODLRMatrix
-      (const MPIComm& c, const HSS::HSSPartitionTree& tree,
-       const elem_blocks_t& Aelem, const opts_t& opts);
+      HODLRMatrix(const MPIComm& c, const HSS::HSSPartitionTree& tree,
+                  const elem_blocks_t& Aelem, const opts_t& opts);
 
 
       /**
@@ -182,10 +180,10 @@ namespace strumpack {
        * compression
        * \see compress, HODLROptions
        */
-      HODLRMatrix
-      (const MPIComm& c, const HSS::HSSPartitionTree& tree,
-       const std::function<void(Trans op,const DenseM_t& R,DenseM_t& S)>& Amult,
-       const opts_t& opts);
+      HODLRMatrix(const MPIComm& c, const HSS::HSSPartitionTree& tree,
+                  const std::function<
+                  void(Trans op,const DenseM_t& R,DenseM_t& S)>& Amult,
+                  const opts_t& opts);
 
       /**
        * Construct an HODLR matrix using a specified HODLR tree. After
@@ -199,9 +197,8 @@ namespace strumpack {
        * compression
        * \see compress, HODLROptions
        */
-      HODLRMatrix
-      (const MPIComm& c, const HSS::HSSPartitionTree& tree,
-       const opts_t& opts);
+      HODLRMatrix(const MPIComm& c, const HSS::HSSPartitionTree& tree,
+                  const opts_t& opts);
 
       /**
        * Construct an HODLR matrix using a specified HODLR tree. After
@@ -216,9 +213,9 @@ namespace strumpack {
        * compression
        * \see compress, HODLROptions
        */
-      template<typename integer_t> HODLRMatrix
-      (const MPIComm& c, const HSS::HSSPartitionTree& tree,
-       const CSRGraph<integer_t>& graph, const opts_t& opts);
+      template<typename integer_t>
+      HODLRMatrix(const MPIComm& c, const HSS::HSSPartitionTree& tree,
+                  const CSRGraph<integer_t>& graph, const opts_t& opts);
 
       /**
        * Copy constructor is not supported.
@@ -276,6 +273,58 @@ namespace strumpack {
        * Return MPI communicator wrapper object.
        */
       const MPIComm& Comm() const { return *c_; }
+
+      /**
+       * Return the memory for this HODLR matrix, on this rank, in
+       * bytes.
+       */
+      std::size_t memory() const {
+        return get_stat("Mem_Fill") * 1024 * 1024;
+      }
+
+      /**
+       * Return the total memory for this HODLR matrix, summed over
+       * all ranks, in bytes.
+       */
+      std::size_t total_memory() const {
+        return c_->all_reduce(memory(), MPI_SUM);
+      }
+
+      /**
+       * Return the additional memory for the factorization of this
+       * HODLR matrix, in bytes. This memory is only for the
+       * additional storage for the factorization, not the HODLR
+       * matrix itself.
+       */
+      std::size_t factor_memory() const {
+        return get_stat("Mem_Factor") * 1.e6;
+      }
+
+      /**
+       * Return the total additional memory for the factorization of
+       * this HODLR matrix, in bytes, summed over all processes in
+       * Comm(). This call is collective on Comm(). This memory is
+       * only for the additional storage for the factorization, not
+       * the HODLR matrix itself.
+       */
+      std::size_t total_factor_memory() const {
+        return c_->all_reduce(factor_memory(), MPI_SUM);
+      }
+
+      /**
+       * Return the maximal rank encountered in this HODLR matrix.
+       */
+      std::size_t rank() const { return get_stat("Rank_max"); }
+
+      /**
+       * Return the maximal rank encountered in this HODLR matrix,
+       * taking the maximum over all processes. This is collective on
+       * Comm().
+       */
+      std::size_t max_rank() const {
+        return c_->all_reduce(rank(), MPI_MAX);
+      }
+
 
       /**
        * Get certain statistics about the HODLR matrix.  See the HODLR
