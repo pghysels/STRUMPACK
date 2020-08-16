@@ -108,6 +108,27 @@ int main(int argc, char* argv[]) {
    */
   STRUMPACK_solve(S, b, x, 0);
 
+
+  /*
+    Randomly perturbe the matrix elements.
+   */
+  for (int i=0; i<nnz; i++)
+    val[i] = val[i] * (1. + (rand() % 100 - 50) / 1000.0);
+
+  /*
+    The following will only update the matrix values. This routine
+    needs to be called with a matrix with the same sparsity pattern as
+    the previously set matrix.
+   */
+  STRUMPACK_update_csr_matrix_values(S, &N, row_ptr, col_ind, val, 1);
+
+  /*
+    Solve a linear system with the matrix with the new values. Since
+    the sparsity pattern has not changed, the fill reducing ordering
+    is not recomputed.
+   */
+  STRUMPACK_solve(S, b, x, 0);
+
   free(row_ptr);
   free(col_ind);
   free(val);

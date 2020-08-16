@@ -28,6 +28,7 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <complex.h>
 #include "StrumpackSparseSolver.h"
 
 int main(int argc, char* argv[]) {
@@ -75,7 +76,7 @@ int main(int argc, char* argv[]) {
   int nnz = 5 * N - 4 * n;
   int* row_ptr = malloc((N+1)*sizeof(int));
   int* col_ind = malloc(nnz*sizeof(int));
-  doublecomplex* val = malloc(nnz*sizeof(doublecomplex));
+  double complex* val = malloc(nnz*sizeof(double complex));
 
   nnz = 0;
   row_ptr[0] = 0;
@@ -83,21 +84,21 @@ int main(int argc, char* argv[]) {
   for (row=0; row<n; row++) {
     for (col=0; col<n; col++) {
       ind = col+n*row;
-      val[nnz].r = 4.; val[nnz].i = 0.;
+      val[nnz] = 4.0 + 0. * I;
       col_ind[nnz++] = ind;
-      if (col > 0)  { val[nnz].r = -1.; val[nnz].i = 0.; col_ind[nnz++] = ind-1; } // left
-      if (col < n-1){ val[nnz].r = -1.; val[nnz].i = 0.; col_ind[nnz++] = ind+1; } // right
-      if (row > 0)  { val[nnz].r = -1.; val[nnz].i = 0.; col_ind[nnz++] = ind-n; } // up
-      if (row < n-1){ val[nnz].r = -1.; val[nnz].i = 0.; col_ind[nnz++] = ind+n; } // down
+      if (col > 0)  { val[nnz] = -1. + 0. * I; col_ind[nnz++] = ind-1; } // left
+      if (col < n-1){ val[nnz] = -1. + 0. * I; col_ind[nnz++] = ind+1; } // right
+      if (row > 0)  { val[nnz] = -1. + 0. * I; col_ind[nnz++] = ind-n; } // up
+      if (row < n-1){ val[nnz] = -1. + 0. * I; col_ind[nnz++] = ind+n; } // down
       row_ptr[ind+1] = nnz;
     }
   }
-  doublecomplex* b = malloc(N*sizeof(doublecomplex));
-  doublecomplex* x = malloc(N*sizeof(doublecomplex));
+  double complex* b = malloc(N*sizeof(double complex));
+  double complex* x = malloc(N*sizeof(double complex));
   int i;
   for (i=0; i<N; i++) {
-    b[i].r = 1.; b[i].i = 0.;
-    x[i].r = 0.; x[i].i = 0.;
+    b[i] = 1. + 1. * I;
+    x[i] = 0. + 0. * I;
   }
 
   STRUMPACK_set_csr_matrix(S, &N, row_ptr, col_ind, val, 1);
