@@ -70,9 +70,6 @@ typedef struct {
   STRUMPACK_INTERFACE interface;
 } STRUMPACK_SparseSolver;
 
-typedef struct { float r, i; } floatcomplex;
-typedef struct { double r, i; } doublecomplex;
-
 typedef enum
   {
    STRUMPACK_NONE=0,
@@ -162,16 +159,33 @@ extern "C" {
   (STRUMPACK_SparseSolver S, const void* N, const void* row_ptr,
    const void* col_ind, const void* values, int symmetric_pattern);
 
+  void STRUMPACK_update_csr_matrix_values
+  (STRUMPACK_SparseSolver S, const void* N, const void* row_ptr,
+   const void* col_ind, const void* values, int symmetric_pattern);
+
 #if defined(STRUMPACK_USE_MPI)
   void STRUMPACK_set_distributed_csr_matrix
-  (STRUMPACK_SparseSolver S, const void* local_rows, const void* row_ptr,
-   const void* col_ind, const void* values, const void* dist,
-   int symmetric_pattern);
+  (STRUMPACK_SparseSolver S, const void* local_rows,
+   const void* row_ptr, const void* col_ind, const void* values,
+   const void* dist, int symmetric_pattern);
+
+  void STRUMPACK_update_distributed_csr_matrix_values
+  (STRUMPACK_SparseSolver S, const void* local_rows,
+   const void* row_ptr, const void* col_ind, const void* values,
+   const void* dist, int symmetric_pattern);
+
 
   void STRUMPACK_set_MPIAIJ_matrix
-  (STRUMPACK_SparseSolver S, const void* n, const void* d_ptr,
-   const void* d_ind, const void* d_val, const void* o_ptr,
-   const void* o_ind, const void* o_val, const void* garray);
+  (STRUMPACK_SparseSolver S, const void* n,
+   const void* d_ptr, const void* d_ind, const void* d_val,
+   const void* o_ptr, const void* o_ind, const void* o_val,
+   const void* garray);
+
+  void STRUMPACK_update_MPIAIJ_matrix_values
+  (STRUMPACK_SparseSolver S, const void* n,
+   const void* d_ptr, const void* d_ind, const void* d_val,
+   const void* o_ptr, const void* o_ind, const void* o_val,
+   const void* garray);
 #endif
 
   STRUMPACK_RETURN_CODE STRUMPACK_solve
@@ -248,12 +262,11 @@ extern "C" {
 
 
 
-  /** WILL BE REMOVED!, now matching */
+  /*************************************************************
+   ** Deprecated routines **************************************
+   ************************************************************/
   void STRUMPACK_set_mc64job(STRUMPACK_SparseSolver S, int job);
-  /** WILL BE REMOVED! is now matching */
   int STRUMPACK_mc64job(STRUMPACK_SparseSolver S);
-
-  /* set HSS specific options, WILL BE REMOVED!! */
   void STRUMPACK_enable_HSS(STRUMPACK_SparseSolver S);
   void STRUMPACK_disable_HSS(STRUMPACK_SparseSolver S);
   void STRUMPACK_set_HSS_min_front_size(STRUMPACK_SparseSolver S, int size);
@@ -262,8 +275,6 @@ extern "C" {
   void STRUMPACK_set_HSS_leaf_size(STRUMPACK_SparseSolver S, int leaf_size);
   void STRUMPACK_set_HSS_rel_tol(STRUMPACK_SparseSolver S, double rctol);
   void STRUMPACK_set_HSS_abs_tol(STRUMPACK_SparseSolver S, double actol);
-
-  /** get HSS specific options, WILL BE REMOVED */
   int use_HSS(STRUMPACK_SparseSolver S);
   int STRUMPACK_HSS_min_front_size(STRUMPACK_SparseSolver S);
   int STRUMPACK_HSS_min_sep_size(STRUMPACK_SparseSolver S);

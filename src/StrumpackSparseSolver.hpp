@@ -145,9 +145,9 @@ namespace strumpack {
      *
      * \see set_matrix
      */
-    void set_csr_matrix
-    (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
-     const scalar_t* values, bool symmetric_pattern=false);
+    void set_csr_matrix(integer_t N,
+                        const integer_t* row_ptr, const integer_t* col_ind,
+                        const scalar_t* values, bool symmetric_pattern=false);
 
     /**
      * This can only be used to UPDATE the nonzero values of the
@@ -178,9 +178,11 @@ namespace strumpack {
      *
      * \see set_csr_matrix, set_matrix
      */
-    void update_matrix_values
-    (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
-     const scalar_t* values, bool symmetric_pattern=false);
+    void update_matrix_values(integer_t N,
+                              const integer_t* row_ptr,
+                              const integer_t* col_ind,
+                              const scalar_t* values,
+                              bool symmetric_pattern=false);
 
     /**
      * This can only be used to UPDATE the nonzero values of the
