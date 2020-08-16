@@ -16,6 +16,7 @@ install(FILES
   StrumpackParameters.hpp
   StrumpackSparseSolverBase.hpp
   StrumpackSparseSolver.hpp
+  StrumpackSparseSolver.h
   DESTINATION include)
 
 
@@ -24,14 +25,10 @@ if(STRUMPACK_USE_MPI)
     PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverMPIDist.hpp
     ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverMPIDist.cpp)
-#    ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverMPI.hpp
-#    ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverMPI.cpp
 
   install(FILES
     StrumpackSparseSolverMPIDist.hpp
     DESTINATION include)
-#    StrumpackSparseSolverMPI.hpp
-
 endif()
 
 
@@ -60,3 +57,4 @@ add_subdirectory(dense)
 add_subdirectory(HSS)
 add_subdirectory(HODLR)
 add_subdirectory(BLR)
+add_subdirectory(fortran)
