@@ -18,31 +18,8 @@ thread affinity and thread pinning to get good and consistent
 performance.
 
 
-The examples (for now) include:
-===============================
-
-- KernelRegression: an example on how to use HSS for kernel matrices
-    as used in certain machine learning applications. This requires 4
-    input files, the training and testing data (of dimension d), and
-    the corresponding labels. See the data/susy_10Kn* files for an
-    example.
-
-    OMP_NUM_THREADS=4 ./KernelRegression data/susy_10Kn 8 1.3 3.11 1 Gauss test --hss_rel_tol 1e-2
-
-- KernelRegressionMPI: an MPI version of KernelRegression. This also
-  runs HODLR compression of the kernel matrix, if STRUMPACK was
-  configured with HODLR support:
-
-    OMP_NUM_THREADS=1 mpirun -n 4 ./KernelRegressionMPI data/susy_10Kn 8 1.3 3.11 1 Gauss test --hss_rel_tol 1e-2
-
-- KernelRegression.py: an example showing the use of the Python,
-  scikit-learn compatible interface for the kernel ridge regression
-  functionality. This requires you build strumpack as a shared
-  library.
-
-    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${STRUMPACKROOT}/lib/
-    export PYTHONPATH=$PYTHONPATH:${STRUMPACKROOT}/include/python/
-    OMP_NUM_THREADS=1 python KernelRegression.py data/susy_10Kn 1.3 3.11 1 Gauss test --hss_rel_tol 1e-2
+The examples include:
+=====================
 
 - testPoisson2d/testPoisson3d: A double precision C++ example, solving
     the 2D/3D Poisson problem with the sequential or multithreaded
@@ -75,14 +52,55 @@ The examples (for now) include:
       mpirun -n 4 ./testMMdoubleMPIDist m data/pde900.mtx
       mpirun -n 4 ./testMMdoubleMPIDist b data/pde900.bin # see mtx2bin
 
+
+
+
 - sexample:
 - dexample:
 - cexample:
 - zexample:
-    These for examples use the C interface for real single precision
+
+    These four examples use the C interface for real single precision
     (sexample), real double precision (dexample), complex single
     precision (cexample) and complex double precision (zexample). They
-    all solve the same problem as the testPoisson2d C++ example
-    with the sequential/multithreaded interface.
+    all solve the same problem as the testPoisson2d C++ example with
+    the sequential/multithreaded interface. These examples also show
+    how to enable compression. dexample.c also shows how to update the
+    matrix values, to solve two systems with two matrices with
+    different values but the same sparsity pattern.
 
-      ./sexample 1000
+      OMP_NUM_THREADS=1 ./sexample 1000 --help
+      ./dexample 1000
+
+
+- fexample: A Fortran 90 example, solving the same sparse problem as
+    the C examples. We currently do not have any Fortran interfaces
+    for the dense matrix solvers. This also shows how to enable
+    compression. This example does not parse any command line
+    arguments.
+
+      OMP_NUM_THREADS=1 ./fexample
+
+
+- KernelRegression: an example on how to use HSS for kernel matrices
+    as used in certain machine learning applications. This requires 4
+    input files, the training and testing data (of dimension d), and
+    the corresponding labels. See the data/susy_10Kn* files for an
+    example.
+
+    OMP_NUM_THREADS=4 ./KernelRegression data/susy_10Kn 8 1.3 3.11 1 Gauss test --hss_rel_tol 1e-2
+
+- KernelRegressionMPI: an MPI version of KernelRegression. This also
+  runs HODLR compression of the kernel matrix, if STRUMPACK was
+  configured with HODLR support:
+
+    OMP_NUM_THREADS=1 mpirun -n 4 ./KernelRegressionMPI data/susy_10Kn 8 1.3 3.11 1 Gauss test --hss_rel_tol 1e-2
+
+- KernelRegression.py: an example showing the use of the Python,
+  scikit-learn compatible interface for the kernel ridge regression
+  functionality. This requires you build strumpack as a shared
+  library.
+
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${STRUMPACKROOT}/lib/
+    export PYTHONPATH=$PYTHONPATH:${STRUMPACKROOT}/include/python/
+    OMP_NUM_THREADS=1 python KernelRegression.py data/susy_10Kn 1.3 3.11 1 Gauss test --hss_rel_tol 1e-2

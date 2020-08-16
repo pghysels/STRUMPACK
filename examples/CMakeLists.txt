@@ -8,6 +8,7 @@ add_executable(sexample         EXCLUDE_FROM_ALL sexample.c)
 add_executable(dexample         EXCLUDE_FROM_ALL dexample.c)
 add_executable(cexample         EXCLUDE_FROM_ALL cexample.c)
 add_executable(zexample         EXCLUDE_FROM_ALL zexample.c)
+add_executable(fexample         EXCLUDE_FROM_ALL fexample.f90)
 
 target_link_libraries(testPoisson2d strumpack)
 target_link_libraries(testMMdouble strumpack)
@@ -17,6 +18,7 @@ target_link_libraries(sexample strumpack)
 target_link_libraries(dexample strumpack)
 target_link_libraries(cexample strumpack)
 target_link_libraries(zexample strumpack)
+target_link_libraries(fexample strumpack)
 
 add_dependencies(examples
   testPoisson2d
@@ -26,7 +28,8 @@ add_dependencies(examples
   sexample
   dexample
   cexample
-  zexample)
+  zexample
+  fexample)
 
 if(STRUMPACK_USE_MPI)
   add_executable(testHelmholtz         EXCLUDE_FROM_ALL
