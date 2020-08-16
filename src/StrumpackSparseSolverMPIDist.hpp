@@ -193,9 +193,10 @@ namespace strumpack {
      * of MPIAIJ matrix format.
      */
     void set_MPIAIJ_matrix
-    (integer_t local_rows, const integer_t* d_ptr, const integer_t* d_ind,
-     const scalar_t* d_val, const integer_t* o_ptr, const integer_t* o_ind,
-     const scalar_t* o_val, const integer_t* garray);
+    (integer_t local_rows,
+     const integer_t* d_ptr, const integer_t* d_ind, const scalar_t* d_val,
+     const integer_t* o_ptr, const integer_t* o_ind, const scalar_t* o_val,
+     const integer_t* garray);
 
 
     /**

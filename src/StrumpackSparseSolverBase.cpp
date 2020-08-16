@@ -358,18 +358,27 @@ namespace strumpack {
         std::cout << "# symbolic factorization:" << std::endl;
         std::cout << "#   - nr of dense Frontal matrices = "
                   << number_format_with_commas(fc.dense) << std::endl;
-        if (fc.HSS)
+        switch (opts_.compression()) {
+        case CompressionType::HSS:
           std::cout << "#   - nr of HSS Frontal matrices = "
                     << number_format_with_commas(fc.HSS) << std::endl;
-        if (fc.BLR)
+          break;
+        case CompressionType::BLR:
           std::cout << "#   - nr of BLR Frontal matrices = "
                     << number_format_with_commas(fc.BLR) << std::endl;
-        if (fc.HODLR)
+          break;
+        case CompressionType::HODLR:
           std::cout << "#   - nr of HODLR Frontal matrices = "
                     << number_format_with_commas(fc.HODLR) << std::endl;
-        if (fc.lossy)
+          break;
+        case CompressionType::LOSSLESS:
+        case CompressionType::LOSSY:
           std::cout << "#   - nr of lossy Frontal matrices = "
                     << number_format_with_commas(fc.lossy) << std::endl;
+          break;
+        case CompressionType::NONE:
+        default: break;
+        }
         std::cout << "#   - symb-factor time = " << t0.elapsed() << std::endl;
       }
     }
