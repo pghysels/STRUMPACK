@@ -30,16 +30,17 @@
 %}
 
 
+// Translate all enums and other compile-time constants into fortran parameters
 %fortranconst;
+// Provide interfaces to functions and `struct`s rather than wrapping them
 %fortranbindc;
 
+// Allow this struct to be passed natively between C and Fortran
 %fortran_struct(STRUMPACK_SparseSolver)
 
 // The STRUMPACK_Krylov_solver accessor is the same fortran identifier as the
 // enum STRUMPACK_KRYLOV_SOLVER (since fortran is case insensitive)
 %rename("get_%s") STRUMPACK_Krylov_solver;
 
-%{
-#include "../StrumpackSparseSolver.h"
-%}
+// Process and create wrappers for the following header file
 %include "../StrumpackSparseSolver.h"
