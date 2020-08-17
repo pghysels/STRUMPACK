@@ -45,28 +45,14 @@ The HODLR and Butterfly functionality in STRUMPACK is implemented
 through interfaces to the ButterflyPACK package:
 - \link https://github.com/liuyangzhuan/ButterflyPACK \endlink
 
-The STRUMPACK project started at the Lawrence Berkeley National
-Laboratory in 2014 and is supported by the FASTMath SciDAC Institute
-funded by the Department of Energy and by the Exascale Computing
-Project (17-SC-20-SC), a collaborative effort of the U.S. Department
-of Energy Office of Science and the National Nuclear Security
-Administration.
-
 Check the STRUMPACK github page for the latest
 development version of the code, and the website for more information:
 - \link https://github.com/pghysels/STRUMPACK \endlink
 - \link http://portal.nersc.gov/project/sparse/strumpack/ \endlink
 
 
-For comments, feature requests or bug reports:
-- Open an issue on github: \n
+For comments, feature requests or bug reports, open an issue on github:
   - \link https://github.com/pghysels/STRUMPACK/issues \endlink
-- Contact the STRUMPACK developers directly:
-  - pghysels@lbl.gov
-  - liuyangzhuan@lbl.gov
-  - xsli@lbl.gov
-  - lclaus@lbl.gov
-
 
 ____
 
@@ -78,6 +64,7 @@ ____
 + \link HSS_Preconditioning HSS Preconditioning \endlink
 + \link BLR_Preconditioning BLR Preconditioning \endlink
 + \link Lossy_Preconditioning Lossy/Lossless Compression Preconditioning \endlink
++ \link GPU_Support GPU Support \endlink
 + \link dense_matrices HSS Approximation of Dense Matrices \endlink
 + \link hodlr_matrices HODLR Approximation of Dense Matrices \endlink
 + \link blr_matrices BLR Approximation of Dense Matrices \endlink
@@ -95,5 +82,14 @@ ____
  - Xiaoye S. Li - xsli@lbl.gov
  - Yang Liu - liuyangzhuan@lbl.gov
  - Lisa Claus - LClaus@lbl.gov
+
+
+
+The STRUMPACK project started at the Lawrence Berkeley National
+Laboratory in 2014 and is supported by the FASTMath SciDAC Institute
+funded by the Department of Energy and by the Exascale Computing
+Project (17-SC-20-SC), a collaborative effort of the U.S. Department
+of Energy Office of Science and the National Nuclear Security
+Administration.
 
 */

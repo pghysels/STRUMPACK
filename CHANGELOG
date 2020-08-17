@@ -1,9 +1,13 @@
-Version 3.xx In Progress
+Version 4.0.0 Released ... , 2020
 ======================================
+ - The CMake build system has been overhauled completely, now using
+   modern CMake.
+ - Added a Fortran interface for the sparse solver.
+ - Updated C interface to the sparse solver.
  - Improved HODLR, with butterfly, preconditioning. Now relying on
    Butterflypack 1.2.0.
  - Much improved CUDA support in the sparse direct solver. CUDA
-   acceleration is not working yet for the rank-structured solvers
+   acceleration is not working yet for the rank-structured solvers.
  - Added matrix equilibration to the sparse solver. This slightly
    improves numerical accuracy in many cases.
  - Added Lossy compression: --sp_compression lossy, using ZFP.
@@ -11,13 +15,13 @@ Version 3.xx In Progress
  - Removed some options: --sp_enable HSS, --sp_HSS_min_sep_size,
    etc..  Now one should use: --sp_compression HSS,
    --sp_compression_min_sep_size ...
- - Fix for compilation without MPI
+ - Fix for compilation without MPI.
  - Several bug fixes and performance improvements
  - Renamed FC_GLOBAL Fortran to C macro to STRUMPACK_FC_GLOBAL,
    in order to avoid conflicts with SuperLU.
  - Large refactoring of the headers into cpp files for faster
-   compilation
- - Update minimum required version of CombBLAS to 2.0
+   compilation.
+ - Update minimum required version of CombBLAS to 2.0.
 
 
 Version 3.3.0 Released November 7, 2019

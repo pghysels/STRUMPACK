@@ -3,7 +3,7 @@ Build Instructions
 
 See the online documentation for more detailed instructions:
 http://portal.nersc.gov/project/sparse/strumpack/master/index.html
-http://portal.nersc.gov/project/sparse/strumpack/v3.3.0/index.html
+http://portal.nersc.gov/project/sparse/strumpack/v4.0.0/index.html
 
 Or see example_build.sh for examples on how to call CMake.
 
@@ -49,7 +49,7 @@ Optional dependencies:
   Disable by adding -DSTRUMPACK_USE_OPENMP=OFF
 - ParMetis.
 - Scotch and PT-Scotch.
-- cuBLAS and cuSOLVER, introduced in CUDA 7.0.
+- CUDA, cuBLAS and cuSOLVER
 - SLATE.
 - CombBLAS.
 
@@ -146,6 +146,21 @@ set as
 > export CUDAToolkit_ROOT=..
 or passed directly to CMake
 > cmake ../ -DSTRUMPACK_USE_CUDA=ON -DCUDAToolkit_ROOT=...
+
+For full GPU support in the distributed memory sparse direct solver,
+one should also compile with support for SLATE, see below.
+
+
+SLATE (optional) for GPU accelerated ScaLAPACK
+==============================================
+SLATE is a modern ScaLAPACK alternative, bringing support for GPU
+acceleration. It can be found at: https://bitbucket.org/icl/slate
+
+Support for SLATE in STRUMPACK can be enabled with for instance:
+> export SLATEHOME=$HOME/slate/
+> cmake ../ -DTPLE_ENABLE_SLATE=ON \
+>   -DTPL_SLATE_INCLUDE_DIRS="$SLATEHOME/include/;$SLATEHOME/blaspp/include;$SLATEHOME/lapackpp/include" \
+>   -DTPL_SLATE_LIBRARIES="$SLATEHOME/lib/libslate_scalapack_api.so;$SLATEHOME/lib/libslate.so;$SLATEHOME/blaspp/lib/libblaspp.so;$SLATEHOME/lapackpp/lib/liblapackpp.so"
 
 
 ParMETIS and (PT)Scotch (optional)

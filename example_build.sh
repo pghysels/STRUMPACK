@@ -47,7 +47,7 @@ if [[ $(dnsdomainname) = "summit.olcf.ornl.gov" ]]; then
           -DTPL_ENABLE_ZFP=OFF \
           -DTPL_ENABLE_SLATE=ON \
           -DTPL_SLATE_INCLUDE_DIRS="$SLATEHOME/include/;$SLATEHOME/blaspp/include;$SLATEHOME/lapackpp/include" \
-          -DTPL_SLATE_LIBRARIES="$SLATEHOME/lib/libslate_scalapack_api.so;$SLATEHOME/lib/libslate.so;$SLATEHOME/blaspp/lib/libblaspp.so;$SLATEHOME/lapackpp/lib/liblapackpp.so" \
+          -DTPL_SLATE_LIBRARIES="$SLATEHOME/lib/libslate_scalapack_api.so;$SLATEHOME/lib/libslate.so;$SLATEHOME/blaspp/lib/libblaspp.so;$SLATEHOME/lapackpp/lib/liblapackpp.so"
 
 fi
 

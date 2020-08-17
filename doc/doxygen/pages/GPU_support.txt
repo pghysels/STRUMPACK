@@ -1,0 +1,57 @@
+/*! \page GPU_Support GPU Support
+
+
+STRUMPACK currently only supports for GPU acceleration in the sparse
+direct solver. None of the preconditioners or rank structured solvers
+currently support GPU acceleration. The GPU acceleration is only for
+NVIDIA GPUs for now.
+
+The sparse direct solver performs most of its computations using BLAS
+and LAPACK, and in the distributed memory setting also ScaLAPACK.  For
+the BLAS and LAPACK operations, we use CUDA, cuBLAS and cuSOLVER for
+acceleration using NVIDIA GPUs. As a ScaLAPACK alternative with GPU
+off-loading capabilities we use SLATE: \n
+\link https://bitbucket.org/icl/slate/src/master/ \endlink
+
+See the \link installation Installation and Requirements \endlink page
+for instructions on how to build STRUMPACK with support for CUDA, and
+optionally SLATE.
+
+______
+
+
+CUDA support will be enabled by default, if it can be detected.  The
+GPU accelerated code has the same interfaces as the CPU code, meaning
+the input and output data is always expected to reside in host memory.
+If STRUMPACK is compiled with CUDA support, GPU acceleration will be
+enabled by default in the sparse direct solver. GPU acceleration can
+still be enabled/disabled using the command line arguments:
+
+\code {.bash}
+--sp_enable_gpu
+--sp_disable_gpu
+\endcode
+or in the code:
+\code {.cpp}
+void strumpack::SPOptions::enable_gpu();
+void strumpack::SPOptions::disable_gpu();
+\endcode
+
+The number of GPU streams per MPI rank can be set with:
+\code {.bash}
+--sp_gpu_streams (default 4)
+\endcode
+or in the code:
+\code {.cpp}
+void strumpack::SPOptions::set_gpu_streams(int s);
+int strumpack::SPOptions::gpu_streams() const;
+\endcode
+
+
+## AMD Support
+
+We are currently working on porting the CUDA code to HIP in order to
+also support AMD GPU's.
+
+
+*/

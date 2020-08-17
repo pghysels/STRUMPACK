@@ -799,6 +799,7 @@ WARN_LOGFILE           =
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Installation.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Algorithm.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Sparse.txt \
+	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/GPU_support.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/HSS_Preconditioning.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/BLR_Preconditioning.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Lossy_Preconditioning.txt \
