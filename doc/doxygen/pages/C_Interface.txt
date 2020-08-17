@@ -1,7 +1,52 @@
-/*! \page C_Interface C Interface
+/*! \page C_Interface C and Fortran Interfaces
 
 
-The C interface is defined in the header file StrumpackSparseSolver.h and is very similar to the C++ interface. For example usage see the programs sexample.c, dexample.c, cexample.c and zexample.c in the examples/ directory, for simple single and double precision real and complex example programs. Note that since the STRUMPACK code is written in C++, even when using the C interface you should link with a C++ aware linker or link with the standard C++ library. For instance when using the GNU toolchain, link with g++ instead of gcc or link with gcc and include -lstdc++.
+## C Interface
+
+The C interface is defined in the header file StrumpackSparseSolver.h
+and is very similar to the C++ interface. For example usage see the
+programs sexample.c, dexample.c, cexample.c and zexample.c in the
+examples/ directory, for simple single and double precision real and
+complex example programs. Note that since the STRUMPACK code is
+written in C++, even when using the C interface you should link with a
+C++ aware linker or link with the standard C++ library. For instance
+when using the GNU toolchain, link with g++ instead of gcc or link
+with gcc and include -lstdc++.
+
+
+## Fortran Interface
+
+A fortran module file is installed in the include folder under the
+CMAKE_INSTALL_PREFIX directory.  The use of this Fortran interface is
+illustrated in examples/fexample.f90, in the examples folder.  The
+fortran module is build from the src/fortran/fortran.f90 file, which
+is generated from the C interface in src/StrumpackSparseSolver.h.
+
+To use the STRUMPACK Fortran interface and link to the Fortran library
+in an application, we recommend CMake. An example CMake project looks
+like:
+
+\code {.bash}
+cmake_minimum_required(VERSION 3.13)
+project(fexample VERSION 0.1 LANGUAGES Fortran)
+find_package(STRUMPACK REQUIRED)
+add_executable(fexample fexample.f90)
+target_link_libraries(fexample PRIVATE STRUMPACK::strumpack)
+\endcode
+
+And then invoke CMake with the path to the STRUMPACK installation
+folder set:
+
+\code {.bash}
+> export STRUMPACK_DIR=/some/path/STRUMPACK/install
+> cd myapp
+> mkdir build
+> cd build
+> cmake ../
+> make
+\endcode
+
+
 
 
 */

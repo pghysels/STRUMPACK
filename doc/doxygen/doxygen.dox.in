@@ -807,7 +807,6 @@ WARN_LOGFILE           =
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/BLR_Dense_Matrices.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Examples.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/C_Interface.txt \
-	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Adv_Usage_Tips.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/FAQ.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Acknowledgements.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Copyright.txt \

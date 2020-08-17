@@ -1,9 +1,9 @@
-/*! \page Lossy_Preconditioning Lossy Compression Preconditioning
+/*! \page Lossy_Preconditioning Lossy and Lossless Compression Preconditioning
 
-Lossy compression of the sparse triangular factors is implemented
-using the __ZFP__ library (>= 0.5.5) (\link
-https://computing.llnl.gov/projects/floating-point-compression
-\endlink).
+Compression of the sparse triangular factors is implemented using the
+__ZFP__ library (>= 0.5.5):
+
+\link https://computing.llnl.gov/projects/floating-point-compression \endlink
 
 STRUMPACK needs to be configured with __ZFP__ support:
 \code {.bash}
@@ -12,6 +12,8 @@ STRUMPACK needs to be configured with __ZFP__ support:
       -DTPL_ZFP_INCLUDE_DIRS=$ZFPHOME/include \
       -DTPL_ZFP_LIBRARIES="$ZFPHOME/lib/libzfp.so" \endcode
 \endcode
+
+## Lossy compression
 
 When enabled, lossy compression will compress the sparse triangular
 factors, hence reducing the overall memory requirements of the solver
@@ -47,6 +49,12 @@ void strumpack::SPOptions::set_lossy_precision(int p);
 int strumpack::SPOptions::lossy_precision() const;  // get precision
 \endcode
 
+## Lossless compression
+
 For lossless compression, set the precision to 0 or a negative value.
+
+The lossless compression mode will not be able to achieve much
+compression, but the solver will be exact.
+
 
 */

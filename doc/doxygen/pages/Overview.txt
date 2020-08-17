@@ -1,24 +1,49 @@
 /*! \mainpage Overview
 
-STRUMPACK – STRUctured Matrix PACKage – is a C++ library for
-computations with dense and sparse matrices. It uses so-called
-_structured matrices_, i.e., matrices that exhibit some kind of
-low-rank property, in this case with Hierarchically Semi-Separable
-matrices (HSS), to speed up linear algebra operations. This version of
-STRUMPACK unifies two main components that were separate in previous
-versions: a package for dense matrix computations
-(__STRUMPACK-dense__) and a package (__STRUMPACK-sparse__) for sparse
-linear systems. The algorithms for solving dense linear systems are
-described in \ref References "[7]" while the algorithms for solving
-sparse linear systems are described in \ref References "[5,4]".
+STRUMPACK - STRUctured Matrix PACKage - is a software library
+providing linear algebra routines and linear system solvers for sparse
+and for dense rank-structured linear systems. Many large dense
+matrices are rank structured, meaning they exhibit some kind of
+low-rank property, for instance in hierarchically defined
+sub-blocks. In sparse direct solvers based on LU factorization, the LU
+factors can often also be approximated well using rank-structured
+matrix compression, leading to robust preconditioners. The sparse
+solver in STRUMPACK can also be used as an exact direct solver, in
+which case it functions similarly as for instance
+[SuperLU](https://github.com/xiaoyeli/superlu) or
+[superlu_dist](https://github.com/xiaoyeli/superlu_dist). The
+STRUMPACK sparse direct solver delivers good performance and
+distributed memory scalability and provides excellent CUDA support.
 
-STRUMPACK can be used as a general algebraic sparse direct solver
-(based on the multifrontal factorization method), or as an efficient
-preconditioner for sparse matrices obtained by discretization of
-partial differential equations. Included in STRUMPACK are also the
-GMRES and BiCGStab iterative Krylov solvers, that use the approximate,
-HSS-accelerated, sparse solver as a preconditioner for the efficient
-solution of sparse linear systems.
+Currently, STRUMPACK has support for the Hierarchically Semi-Separable
+(HSS), Block Low Rank (BLR), Hierachically Off-Diagonal Low Rank
+(HODLR), Butterfly and Hierarchically Off-Diagonal Butterfly (HODBF)
+rank-structured matrix formats. Such matrices appear in many
+applications, e.g., the Boundary Element Method for discretization of
+integral equations, structured matrices like Toeplitz and Cauchy,
+kernel and covariance matrices etc. In the LU factorization of sparse
+linear systems arising from the discretization of partial differential
+equations, the fill-in in the triangular factors often has low-rank
+structure. Hence, the sparse linear solve algorithms in STRUMPACK
+exploit the different dense rank-structured matrix formats to compress
+the fill-in. This leads to purely algebraic, fast and scalable (both
+with problem size and compute cores) approximate direct solvers or
+preconditioners. These preconditioners are mostly aimed at large
+sparse linear systems which result from the discretization of a
+partial differential equation, but are not limited to any particular
+type of problem. STRUMPACK also provides preconditioned GMRES and
+BiCGStab iterative solvers.
+
+Apart from rank-structured compression, the STRUMPACK sparse solver
+also support compression of the factors using the
+[ZFP](https://computing.llnl.gov/projects/floating-point-compression)
+library, a general purpose compression algorithm tuned for floating
+point data. This can be used with a specified precision, or with
+lossless compression.
+
+The HODLR and Butterfly functionality in STRUMPACK is implemented
+through interfaces to the ButterflyPACK package:
+- \link https://github.com/liuyangzhuan/ButterflyPACK \endlink
 
 The STRUMPACK project started at the Lawrence Berkeley National
 Laboratory in 2014 and is supported by the FASTMath SciDAC Institute
@@ -27,28 +52,48 @@ Project (17-SC-20-SC), a collaborative effort of the U.S. Department
 of Energy Office of Science and the National Nuclear Security
 Administration.
 
-Check the STRUMPACK website for more information and for the latest
-code: http://portal.nersc.gov/project/sparse/strumpack/
+Check the STRUMPACK github page for the latest
+development version of the code, and the website for more information:
+- \link https://github.com/pghysels/STRUMPACK \endlink
+- \link http://portal.nersc.gov/project/sparse/strumpack/ \endlink
+
+
+For comments, feature requests or bug reports:
+- Open an issue on github: \n
+  - \link https://github.com/pghysels/STRUMPACK/issues \endlink
+- Contact the STRUMPACK developers directly:
+  - pghysels@lbl.gov
+  - liuyangzhuan@lbl.gov
+  - xsli@lbl.gov
+  - lclaus@lbl.gov
+
 
 ____
 
-###Table of Contents:
+## Table of Contents:
 
 + \link installation Installation and Requirements \endlink
 + \link algorithm Algorithm \endlink
 + \link sparse Using STRUMPACK Sparse \endlink
 + \link HSS_Preconditioning HSS Preconditioning \endlink
 + \link BLR_Preconditioning BLR Preconditioning \endlink
-+ \link Lossy_Preconditioning Lossy Compression Preconditioning \endlink
++ \link Lossy_Preconditioning Lossy/Lossless Compression Preconditioning \endlink
 + \link dense_matrices HSS Approximation of Dense Matrices \endlink
 + \link hodlr_matrices HODLR Approximation of Dense Matrices \endlink
 + \link blr_matrices BLR Approximation of Dense Matrices \endlink
 + \link examples Examples \endlink
-+ \link C_Interface C Interface \endlink
-+ \link tips Advanced Usage Tips \endlink
++ \link C_Interface C and Fortran Interfaces \endlink
 + \link FAQ FAQ \endlink
 + \link acknowledgements Acknowledgements \endlink
 + \link copyright Copyright Notice and License Agreement \endlink
 + \link References References\endlink
+
+____
+
+## Current developers - Lawrence Berkeley National Laboratory
+ - Pieter Ghysels - pghysels@lbl.gov
+ - Xiaoye S. Li - xsli@lbl.gov
+ - Yang Liu - liuyangzhuan@lbl.gov
+ - Lisa Claus - LClaus@lbl.gov
 
 */

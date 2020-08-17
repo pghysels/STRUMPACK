@@ -1,11 +1,23 @@
 /*! \page FAQ FAQ
 
 
-+ Help, I get this compilation error:
-\code {.bash}
-catastrophic error: cannot open source file "chrono"
-#include <chrono>
-\endcode
+### The code crashes with a segmentation fault whenever I use more than one MPI rank!?
+
+  This is most likely due to an incorrect library being linked.  When
+  using Intel MKL, make sure to use LP64 interface, and not the ILP64
+  interface. The LP64 mkl library uses 32-bit indexing, while the
+  ILP64 libraries use 64-bit integers for indexing.  In STRUMPACK we
+  use 32 bit indexing for BLAS, LAPACK and ScaLAPACK. We recommend
+  using the Intel® Math Kernel Library Link Line Advisor:
+
+  \link https://software.intel.com/content/www/us/en/develop/articles/intel-mkl-link-line-advisor.html \endlink
+
+
+### Help, the compiler cannot find the "chrono" header:
+  \code{.bash}
+  catastrophic error: cannot open source file "chrono"
+  #include <chrono>
+  \endcode
 
   You need a C++11 capable compiler, and also a __C++11 enabled
   standard library__. For instance suppose you are using the Intel
@@ -15,7 +27,7 @@ catastrophic error: cannot open source file "chrono"
   newer GCC version (or just the headers). On cray machines, this can
   be done with module unload gcc; module load gcc/4.9.3 for instance.
 
-+ When running __make test__, many of the tests fail!
+### When running "make test", many of the tests fail!
 
   The parallel execution in ctest is invoked by the MPIEXEC command as
   discovered by CMake. On many HPC clusters, this does not run unless
@@ -28,5 +40,21 @@ catastrophic error: cannot open source file "chrono"
   processes. If you have less than 19 cores in your system, and the
   mpi environment does not allow oversubscription, those tests will
   fail.
+
+  The test executables are not build by default, but can be build
+  using \code{.bash} make tests \endcode
+
+
+### Does the code keep track of the number of floating point operations performed?
+
+ To keep track of the number of floating point operations performed in
+  the STRUMPACK Sparse Solver, you can run CMake with: \code{bash}
+  -DSTRUMPACK_COUNT_FLOPS=ON \endcode Then, when running, do not set
+  the quiet flag in the StrumpackSparseSolver constructor or on the
+  command line and the solver will print some statistics. This will
+  also enable a counter for data movement in the solve phase, from
+  which the (approximately) attained bandwidth usage is derived. This
+  is done because the solve phase is typically bandwidth limited,
+  while the factorization is flop limited.
 
 */

@@ -255,10 +255,9 @@ Please see the examples in the examples/ folder, which can be build using
 in the __build__ directory.
 
 
-Suppose you want to build your application, called myapp, which
-depends on STRUMPACK, using CMake, then you would add the following
-lines to your CMakeLists.txt file:
-
+Using STRUMPACK in your code is easiest when using the CMake build
+system. Below is an example CMakeLists.txt file for a small project
+called myapp using STRUMPACK:
 
 \code {.bash}
  cmake_minimum_required(VERSION 3.13)
@@ -270,8 +269,8 @@ lines to your CMakeLists.txt file:
  target_link_libraries(myexe PRIVATE STRUMPACK::strumpack)
 \endcode
 
-And then invoke CMake with the path to the STRUMPACK installation
-folder set:
+Then invoke CMake with the path to the STRUMPACK installation folder
+set:
 
 \code {.bash}
 > export STRUMPACK_DIR=/some/path/STRUMPACK/install
