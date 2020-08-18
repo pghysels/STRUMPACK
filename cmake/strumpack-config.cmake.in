@@ -2,15 +2,17 @@ cmake_minimum_required(VERSION 3.11 FATAL_ERROR)
 
 get_filename_component(STRUMPACK_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
 list(APPEND CMAKE_MODULE_PATH ${STRUMPACK_CMAKE_DIR})
-
-# message(STATUS "CMAKE_MODULE_PATH = " ${CMAKE_MODULE_PATH})
-
 list(APPEND CMAKE_PREFIX_PATH "@CMAKE_PREFIX_PATH@")
 
 include(CMakeFindDependencyMacro)
 
 enable_language(C)
 enable_language(CXX)
+
+if(@STRUMPACK_USE_CUDA@) # STRUMPACK_USE_CUDA
+  enable_language(CUDA)
+  find_dependency(CUDAToolkit)
+endif()
 
 if(@STRUMPACK_USE_OPENMP@) # STRUMPACK_USE_OPENMP
   find_dependency(OpenMP)
