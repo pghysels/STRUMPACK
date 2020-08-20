@@ -39,6 +39,10 @@
 #include "sparse/iterative/IterativeSolvers.hpp"
 #if defined(STRUMPACK_USE_CUDA)
 #include "dense/CUDAWrapper.hpp"
+#else
+#if defined(STRUMPACK_USE_HIP)
+#include "dense/HIPWrapper.hpp"
+#endif
 #endif
 
 
@@ -49,7 +53,7 @@ namespace strumpack {
   (bool verbose, bool root)
     : StrumpackSparseSolverBase<scalar_t,integer_t>
     (0, nullptr, verbose, root) {
-#if defined(STRUMPACK_USE_CUDA)
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
     gpu::init();
 #endif
   }

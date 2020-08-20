@@ -46,7 +46,7 @@
 #include "FrontalMatrixHODLRMPI.hpp"
 #endif
 #endif
-#if defined(STRUMPACK_USE_CUDA)
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
 #include "FrontalMatrixGPU.hpp"
 #endif
 #if defined(STRUMPACK_USE_ZFP)
@@ -66,7 +66,7 @@ namespace strumpack {
     switch (opts.compression()) {
     case CompressionType::NONE: {
       if (is_GPU(opts)) {
-#if defined(STRUMPACK_USE_CUDA)
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
         front.reset
           (new FrontalMatrixGPU<scalar_t,integer_t>(s, sbegin, send, upd));
         if (root) fc.dense++;

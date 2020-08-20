@@ -78,7 +78,7 @@ if(STRUMPACK_USE_OPENMP)
       ${STRUMPACK_USE_OPENMP_TASKLOOP})
   else()
     message(WARNING "Compiler does not support OpenMP,"
-      "proceeding without OpenMP support.")
+      " proceeding without OpenMP support.")
   endif()
 else()
   message(STATUS "OpenMP support was not enabled.")
@@ -104,18 +104,20 @@ if(STRUMPACK_USE_HIP)
       " proceeding with CUDA support instead of HIP.")
     set(STRUMPACK_USE_HIP OFF)
   else()
-    include(cmake/hip_path.cmake)
-    list(APPEND CMAKE_MODULE_PATH "${HIP_PATH}/cmake")
-    find_package(HIP)
-    if(HIP_FOUND)
+    list(APPEND CMAKE_MODULE_PATH "$ENV{HIP_PATH}/lib/cmake/hip")
+    find_package(hip)
+    if(hip_FOUND)
       if(DEFINED ENV{HIP_PLATFORM})
         set(STRUMPACK_HIP_PLATFORM "$ENV{HIP_PLATFORM}")
-      elseif(HIP_PATH)
-        execute_process(COMMAND ${STRUMPACK_HIPCONFIG_PATH} --platform
-          OUTPUT_VARIABLE GINKGO_HIP_PLATFORM)
       else()
-        message(FATAL_ERROR "No platform could be found for HIP. "
-          "Set and export the environment variable HIP_PLATFORM.")
+        #execute_process(COMMAND $ENV{HIP_PATH}/hipconfig --platform
+        execute_process(COMMAND hipconfig --platform
+          OUTPUT_VARIABLE STRUMPACK_HIP_PLATFORM
+          RESULT_VARIABLE STRUMPACK_HIPCONFIG_STATUS)
+        if(STRUMPACK_HIPCONFIG_STATUS AND NOT STRUMPACK_HIPCONFIG_STATUS EQUAL 0)
+          message(FATAL_ERROR "No platform could be found for HIP. "
+            "Set and export the environment variable HIP_PLATFORM (to hcc or nvcc).")
+        endif()
       endif()
       message(STATUS "HIP platform set to ${STRUMPACK_HIP_PLATFORM}")
       if (STRUMPACK_HIP_PLATFORM STREQUAL "hcc")
@@ -123,9 +125,9 @@ if(STRUMPACK_USE_HIP)
       elseif (STRUMPACK_HIP_PLATFORM STREQUAL "nvcc")
         set(STRUMPACK_HIP_PLATFORM_NVCC ON)
       endif()
-
       find_package(hipblas REQUIRED)
-      # TODO hipSOLVER or rocSOLVER
+      find_package(rocsolver REQUIRED)
+      find_package(rocblas REQUIRED)
     else()
       message(WARNING "HIP compiler not found,"
         " proceeding without HIP support.")
@@ -429,7 +431,6 @@ endif()
 # TODO libatomic?
 
 
-# hip_add_library(strumpack "")
 add_library(strumpack "")
 add_subdirectory(src)
 
@@ -522,9 +523,20 @@ if(CUDAToolkit_FOUND)
 endif()
 
 if(hipblas_FOUND)
-  target_link_libraries(strumpack PUBLIC roc::hipblas)
+  # target_link_libraries(strumpack PUBLIC hip::hipamd64)
+  # target_link_libraries(strumpack PUBLIC hip::hip_hcc)
+  target_link_libraries(strumpack PUBLIC roc::hipblas roc::rocblas roc::rocsolver)
   if(STRUMPACK_HIP_PLATFORM_HCC)
     target_compile_definitions(strumpack PUBLIC __HIP_PLATFORM_HCC__)
+    if(DEFINED STRUMPACK_HIP_AMDGPU)
+      target_compile_options(strumpack PRIVATE 
+      $<$<COMPILE_LANGUAGE:CXX>:${STRUMPACK_HIP_AMDGPU}>)
+    else()
+      target_compile_options(strumpack PRIVATE 
+      $<$<COMPILE_LANGUAGE:CXX>:--amdgpu-target=none>)
+      message(WARNING "No AMD GPU architecture was specified,"
+        " specify -DSTRUMPACK_HIP_AMDGPU=\"--amdgpu-target=xxx\"")
+    endif()
   elseif(STRUMPACK_HIP_PLATFORM_NVCC)
     target_compile_definitions(strumpack PUBLIC __HIP_PLATFORM_NVCC__)
   endif()

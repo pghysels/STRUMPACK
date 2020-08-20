@@ -137,6 +137,29 @@ if [[ $(hostname -s) = "pieter-HP-EliteDesk-800-G1-SFF" ]]; then
 fi
 
 
+if [[ $(hostname -s) = "tulip" ]]; then
+    found_host=true
+
+    echo "Detected we are running on Tulip"
+
+    # export HIP_PLATFORM=hcc
+    export METIS_DIR=/home/users/coe0239/local/metis-5.1.0/install/
+
+    cmake ../ \
+	-DCMAKE_BUILD_TYPE=Debug \
+        -DCMAKE_CXX_COMPILER=hipcc \
+        -DSTRUMPACK_HIP_AMDGPU=--amdgpu-target=gfx906 \
+        -DCMAKE_C_COMPILER=gcc \
+        -DCMAKE_Fortran_COMPILER=gfortran \
+        -DSTRUMPACK_USE_CUDA=OFF \
+        -DSTRUMPACK_USE_HIP=ON \
+        -DTPL_ENABLE_ZFP=OFF \
+        -DSTRUMPACK_COUNT_FLOPS=ON \
+        -DCMAKE_INSTALL_PREFIX=../install
+fi
+
+
+
 if ! $found_host; then
     echo "This machine was not recognized."
     echo "Open this file and modify the CMake command."
@@ -155,7 +178,7 @@ if ! $found_host; then
     #  -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
 fi
 
-make install -j4
+make install -j4 VERBOSE=1
 make examples -j4
 make tests -j4
 # make test

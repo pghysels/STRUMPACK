@@ -166,12 +166,12 @@ namespace strumpack {
         }
         for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Y) {
           dim3 grid(nb1, std::min(nf-f, MAX_BLOCKS_Y));
-          hipLaunchKernelGGL(HIP_KERNEL_NAME(assemble_11_kernel), dim3(grid), dim3(nt1), 0, 0, f, dat);
+          hipLaunchKernelGGL(HIP_KERNEL_NAME(assemble_11_kernel), grid, dim3(nt1), 0, 0, f, dat);
         }
         if (nb2)
           for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Y) {
             dim3 grid(nb2, std::min(nf-f, MAX_BLOCKS_Y));
-            hipLaunchKernelGGL(HIP_KERNEL_NAME(assemble_12_21_kernel), dim3(grid), dim3(nt2), 0, 0, f, dat);
+            hipLaunchKernelGGL(HIP_KERNEL_NAME(assemble_12_21_kernel), grid, dim3(nt2), 0, 0, f, dat);
           }
       }
       hipDeviceSynchronize();
@@ -190,7 +190,7 @@ namespace strumpack {
           int nb1 = std::min(nb-b1, MAX_BLOCKS_Y);
           for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Z) {
             dim3 grid(nb, nb1, std::min(nf-f, MAX_BLOCKS_Z));
-            hipLaunchKernelGGL(HIP_KERNEL_NAME(extend_add_kernel), dim3(grid), dim3(block), 0, 0, b1, dat_+f);
+            hipLaunchKernelGGL(HIP_KERNEL_NAME(extend_add_kernel), grid, block, 0, 0, b1, dat_+f);
           }
         }
       }
@@ -439,9 +439,9 @@ namespace strumpack {
       using T_ = typename cuda_type<T>::value_type;
       auto dat_ = reinterpret_cast<FrontData<T_>*>(dat);
       dim3 block(NT, NT), grid(count, 1, 1);
-      hipLaunchKernelGGL(HIP_KERNEL_NAME(LU_block_kernel_batched<T_,NT>), dim3(count), dim3(block), 0, 0, dat_);
-      hipLaunchKernelGGL(HIP_KERNEL_NAME(solve_block_kernel_batched<T_,NT>), dim3(count), dim3(block), 0, 0, dat_);
-      hipLaunchKernelGGL(HIP_KERNEL_NAME(Schur_block_kernel_batched<T_,NT>), dim3(count), dim3(block), 0, 0, dat_);
+      hipLaunchKernelGGL(HIP_KERNEL_NAME(LU_block_kernel_batched<T_,NT>), dim3(count), block, 0, 0, dat_);
+      hipLaunchKernelGGL(HIP_KERNEL_NAME(solve_block_kernel_batched<T_,NT>), dim3(count), block, 0, 0, dat_);
+      hipLaunchKernelGGL(HIP_KERNEL_NAME(Schur_block_kernel_batched<T_,NT>), dim3(count), block, 0, 0, dat_);
     }
 
 

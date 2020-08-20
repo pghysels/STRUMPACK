@@ -32,10 +32,12 @@ if(STRUMPACK_USE_CUDA OR STRUMPACK_USE_HIP)
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixGPU.hpp
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixGPUKernels.hpp)
 endif()
+
 if(STRUMPACK_USE_CUDA)
   target_sources(strumpack PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixCUDA.cu)
 endif()
+
 if(STRUMPACK_USE_HIP)
   target_sources(strumpack PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixHIP.hip.cpp)

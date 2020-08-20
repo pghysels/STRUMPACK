@@ -55,43 +55,54 @@ namespace strumpack {
       }
     }
 
-    // TODO there is no such thing as hipSOLVER yet :(
+#if defined(STRUMPACK_HIP_PLATFORM_NVCC)
+    void hip_assert(cusolverStatus_t code, const char *file, int line,
+                     bool abort) {
+      if (code != CUSOLVER_STATUS_SUCCESS) {
+        std::cerr << "hipSOLVER assertion failed: " << code << " "
+                  <<  file << " " << line << std::endl;
+        switch (code) {
+        case CUSOLVER_STATUS_SUCCESS:                                 std::cerr << "CUSOLVER_STATUS_SUCCESS" << std::endl; break;
+        case CUSOLVER_STATUS_NOT_INITIALIZED:                         std::cerr << "CUSOLVER_STATUS_NOT_INITIALIZED" << std::endl; break;
+        case CUSOLVER_STATUS_ALLOC_FAILED:                            std::cerr << "CUSOLVER_STATUS_ALLOC_FAILED" << std::endl; break;
+        case CUSOLVER_STATUS_INVALID_VALUE:                           std::cerr << "CUSOLVER_STATUS_INVALID_VALUE" << std::endl; break;
+        case CUSOLVER_STATUS_ARCH_MISMATCH:                           std::cerr << "CUSOLVER_STATUS_ARCH_MISMATCH" << std::endl; break;
+        case CUSOLVER_STATUS_EXECUTION_FAILED:                        std::cerr << "CUSOLVER_STATUS_EXECUTION_FAILED" << std::endl; break;
+        case CUSOLVER_STATUS_INTERNAL_ERROR:                          std::cerr << "CUSOLVER_STATUS_INTERNAL_ERROR" << std::endl; break;
+        case CUSOLVER_STATUS_MATRIX_TYPE_NOT_SUPPORTED:               std::cerr << "CUSOLVER_STATUS_MATRIX_TYPE_NOT_SUPPORTED" << std::endl; break;
+        case CUSOLVER_STATUS_MAPPING_ERROR:                           std::cerr << "CUSOLVER_STATUS_MAPPING_ERROR" << std::endl; break;
+        case CUSOLVER_STATUS_NOT_SUPPORTED:                           std::cerr << "CUSOLVER_STATUS_NOT_SUPPORTED" << std::endl; break;
+        case CUSOLVER_STATUS_ZERO_PIVOT:                              std::cerr << "CUSOLVER_STATUS_ZERO_PIVOT" << std::endl; break;
+        case CUSOLVER_STATUS_INVALID_LICENSE:                         std::cerr << "CUSOLVER_STATUS_INVALID_LICENSE" << std::endl; break;
+        // case CUSOLVER_STATUS_IRS_PARAMS_NOT_INITIALIZED:              std::cerr << "CUSOLVER_STATUS_IRS_PARAMS_NOT_INITIALIZED" << std::endl; break;
+        // case CUSOLVER_STATUS_IRS_PARAMS_INVALID:                      std::cerr << "CUSOLVER_STATUS_IRS_PARAMS_INVALID" << std::endl; break;
+        // case CUSOLVER_STATUS_IRS_PARAMS_INVALID_PREC:                 std::cerr << "CUSOLVER_STATUS_IRS_PARAMS_INVALID_PREC" << std::endl; break;
+        // case CUSOLVER_STATUS_IRS_PARAMS_INVALID_REFINE:               std::cerr << "CUSOLVER_STATUS_IRS_PARAMS_INVALID_REFINE" << std::endl; break;
+        // case CUSOLVER_STATUS_IRS_PARAMS_INVALID_MAXITER:              std::cerr << "CUSOLVER_STATUS_IRS_PARAMS_INVALID_MAXITER" << std::endl; break;
+        // case CUSOLVER_STATUS_IRS_INTERNAL_ERROR:                      std::cerr << "CUSOLVER_STATUS_IRS_INTERNAL_ERROR" << std::endl; break;
+        // case CUSOLVER_STATUS_IRS_NOT_SUPPORTED:                       std::cerr << "CUSOLVER_STATUS_IRS_NOT_SUPPORTED" << std::endl; break;
+        // case CUSOLVER_STATUS_IRS_OUT_OF_RANGE:                        std::cerr << "CUSOLVER_STATUS_IRS_OUT_OF_RANGE" << std::endl; break;
+        // case CUSOLVER_STATUS_IRS_NRHS_NOT_SUPPORTED_FOR_REFINE_GMRES: std::cerr << "CUSOLVER_STATUS_IRS_NRHS_NOT_SUPPORTED_FOR_REFINE_GMRES" << std::endl; break;
+        // case CUSOLVER_STATUS_IRS_INFOS_NOT_INITIALIZED:               std::cerr << "CUSOLVER_STATUS_IRS_INFOS_NOT_INITIALIZED" << std::endl; break;
+        // case CUSOLVER_STATUS_IRS_INFOS_NOT_DESTROYED:                 std::cerr << "CUSOLVER_STATUS_IRS_INFOS_NOT_DESTROYED" << std::endl; break;
+        // case CUSOLVER_STATUS_IRS_MATRIX_SINGULAR:                     std::cerr << "CUSOLVER_STATUS_IRS_MATRIX_SINGULAR" << std::endl; break;
+        // case CUSOLVER_STATUS_INVALID_WORKSPACE:                       std::cerr << "CUSOLVER_STATUS_INVALID_WORKSPACE" << std::endl; break;
+        default: std::cerr << "unknown cusolver error" << std::endl;
+        }
+        if (abort) exit(code);
+      }
+    }
+#else
+    void hip_assert(rocblas_status code, const char *file, int line,
+                    bool abort) {
+      if (code != rocblas_status_success) {
+        std::cerr << "rocsolver/rocblas assertion failed: " << code << " "
+                  <<  file << " " << line << std::endl;
+        if (abort) exit(code);
+      }
+    }
+#endif
 
-    // void hip_assert(cusolverStatus_t code, const char *file, int line,
-    //                  bool abort) {
-    //   if (code != CUSOLVER_STATUS_SUCCESS) {
-    //     std::cerr << "hipSOLVER assertion failed: " << code << " "
-    //               <<  file << " " << line << std::endl;
-    //     switch (code) {
-    //     case CUSOLVER_STATUS_SUCCESS:                                 std::cerr << "CUSOLVER_STATUS_SUCCESS" << std::endl; break;
-    //     case CUSOLVER_STATUS_NOT_INITIALIZED:                         std::cerr << "CUSOLVER_STATUS_NOT_INITIALIZED" << std::endl; break;
-    //     case CUSOLVER_STATUS_ALLOC_FAILED:                            std::cerr << "CUSOLVER_STATUS_ALLOC_FAILED" << std::endl; break;
-    //     case CUSOLVER_STATUS_INVALID_VALUE:                           std::cerr << "CUSOLVER_STATUS_INVALID_VALUE" << std::endl; break;
-    //     case CUSOLVER_STATUS_ARCH_MISMATCH:                           std::cerr << "CUSOLVER_STATUS_ARCH_MISMATCH" << std::endl; break;
-    //     case CUSOLVER_STATUS_EXECUTION_FAILED:                        std::cerr << "CUSOLVER_STATUS_EXECUTION_FAILED" << std::endl; break;
-    //     case CUSOLVER_STATUS_INTERNAL_ERROR:                          std::cerr << "CUSOLVER_STATUS_INTERNAL_ERROR" << std::endl; break;
-    //     case CUSOLVER_STATUS_MATRIX_TYPE_NOT_SUPPORTED:               std::cerr << "CUSOLVER_STATUS_MATRIX_TYPE_NOT_SUPPORTED" << std::endl; break;
-    //     case CUSOLVER_STATUS_MAPPING_ERROR:                           std::cerr << "CUSOLVER_STATUS_MAPPING_ERROR" << std::endl; break;
-    //     case CUSOLVER_STATUS_NOT_SUPPORTED:                           std::cerr << "CUSOLVER_STATUS_NOT_SUPPORTED" << std::endl; break;
-    //     case CUSOLVER_STATUS_ZERO_PIVOT:                              std::cerr << "CUSOLVER_STATUS_ZERO_PIVOT" << std::endl; break;
-    //     case CUSOLVER_STATUS_INVALID_LICENSE:                         std::cerr << "CUSOLVER_STATUS_INVALID_LICENSE" << std::endl; break;
-    //     // case CUSOLVER_STATUS_IRS_PARAMS_NOT_INITIALIZED:              std::cerr << "CUSOLVER_STATUS_IRS_PARAMS_NOT_INITIALIZED" << std::endl; break;
-    //     // case CUSOLVER_STATUS_IRS_PARAMS_INVALID:                      std::cerr << "CUSOLVER_STATUS_IRS_PARAMS_INVALID" << std::endl; break;
-    //     // case CUSOLVER_STATUS_IRS_PARAMS_INVALID_PREC:                 std::cerr << "CUSOLVER_STATUS_IRS_PARAMS_INVALID_PREC" << std::endl; break;
-    //     // case CUSOLVER_STATUS_IRS_PARAMS_INVALID_REFINE:               std::cerr << "CUSOLVER_STATUS_IRS_PARAMS_INVALID_REFINE" << std::endl; break;
-    //     // case CUSOLVER_STATUS_IRS_PARAMS_INVALID_MAXITER:              std::cerr << "CUSOLVER_STATUS_IRS_PARAMS_INVALID_MAXITER" << std::endl; break;
-    //     // case CUSOLVER_STATUS_IRS_INTERNAL_ERROR:                      std::cerr << "CUSOLVER_STATUS_IRS_INTERNAL_ERROR" << std::endl; break;
-    //     // case CUSOLVER_STATUS_IRS_NOT_SUPPORTED:                       std::cerr << "CUSOLVER_STATUS_IRS_NOT_SUPPORTED" << std::endl; break;
-    //     // case CUSOLVER_STATUS_IRS_OUT_OF_RANGE:                        std::cerr << "CUSOLVER_STATUS_IRS_OUT_OF_RANGE" << std::endl; break;
-    //     // case CUSOLVER_STATUS_IRS_NRHS_NOT_SUPPORTED_FOR_REFINE_GMRES: std::cerr << "CUSOLVER_STATUS_IRS_NRHS_NOT_SUPPORTED_FOR_REFINE_GMRES" << std::endl; break;
-    //     // case CUSOLVER_STATUS_IRS_INFOS_NOT_INITIALIZED:               std::cerr << "CUSOLVER_STATUS_IRS_INFOS_NOT_INITIALIZED" << std::endl; break;
-    //     // case CUSOLVER_STATUS_IRS_INFOS_NOT_DESTROYED:                 std::cerr << "CUSOLVER_STATUS_IRS_INFOS_NOT_DESTROYED" << std::endl; break;
-    //     // case CUSOLVER_STATUS_IRS_MATRIX_SINGULAR:                     std::cerr << "CUSOLVER_STATUS_IRS_MATRIX_SINGULAR" << std::endl; break;
-    //     // case CUSOLVER_STATUS_INVALID_WORKSPACE:                       std::cerr << "CUSOLVER_STATUS_INVALID_WORKSPACE" << std::endl; break;
-    //     }
-    //     if (abort) exit(code);
-    //   }
-    // }
     void hip_assert(hipblasStatus_t code, const char *file, int line,
                      bool abort) {
       if (code != HIPBLAS_STATUS_SUCCESS) {
@@ -135,11 +146,11 @@ namespace strumpack {
       STRUMPACK_BYTES(2*4*blas::gemm_moves(m,n,k));
       gpu_check(hipblasCgemm
                 (handle, transa, transb, m, n, k,
-                 reinterpret_cast<hipComplex*>(&alpha),
-                 reinterpret_cast<const hipComplex*>(A), lda,
-                 reinterpret_cast<const hipComplex*>(B), ldb,
-                 reinterpret_cast<hipComplex*>(&beta),
-                 reinterpret_cast<hipComplex*>(C), ldc));
+                 reinterpret_cast<hipblasComplex*>(&alpha),
+                 reinterpret_cast<const hipblasComplex*>(A), lda,
+                 reinterpret_cast<const hipblasComplex*>(B), ldb,
+                 reinterpret_cast<hipblasComplex*>(&beta),
+                 reinterpret_cast<hipblasComplex*>(C), ldc));
     }
     void gemm(BLASHandle& handle, hipblasOperation_t transa,
               hipblasOperation_t transb, int m, int n, int k,
@@ -152,11 +163,11 @@ namespace strumpack {
       STRUMPACK_BYTES(2*8*blas::gemm_moves(m,n,k));
       gpu_check(hipblasZgemm
                 (handle, transa, transb, m, n, k,
-                 reinterpret_cast<hipDoubleComplex*>(&alpha),
-                 reinterpret_cast<const hipDoubleComplex*>(A), lda,
-                 reinterpret_cast<const hipDoubleComplex*>(B), ldb,
-                 reinterpret_cast<hipDoubleComplex*>(&beta),
-                 reinterpret_cast<hipDoubleComplex*>(C), ldc));
+                 reinterpret_cast<hipblasDoubleComplex*>(&alpha),
+                 reinterpret_cast<const hipblasDoubleComplex*>(A), lda,
+                 reinterpret_cast<const hipblasDoubleComplex*>(B), ldb,
+                 reinterpret_cast<hipblasDoubleComplex*>(&beta),
+                 reinterpret_cast<hipblasDoubleComplex*>(C), ldc));
     }
 
     template<typename scalar_t> void
@@ -195,6 +206,7 @@ namespace strumpack {
                        std::complex<double>,
                        DenseMatrix<std::complex<double>>&);
 
+#if defined(STRUMPACK_HIP_PLATFORM_NVCC)
     void getrf_buffersize
     (SOLVERHandle& handle, int m, int n, float* A, int lda, int* Lwork) {
       gpu_check(cusolverDnSgetrf_bufferSize(handle, m, n, A, lda, Lwork));
@@ -215,9 +227,8 @@ namespace strumpack {
      int *Lwork) {
       gpu_check(cusolverDnZgetrf_bufferSize
                 (handle, m, n,
-                 reinterpret_cast<hipDoubleComplex*>(A), lda, Lwork));
+                 reinterpret_cast<hipblasDoubleComplex*>(A), lda, Lwork));
     }
-
     template<typename scalar_t> int getrf_buffersize
     (SOLVERHandle& handle, int n) {
       int Lwork;
@@ -225,12 +236,21 @@ namespace strumpack {
         (handle, n, n, static_cast<scalar_t*>(nullptr), n, &Lwork);
       return Lwork;
     }
+#else
+    // it seems like rocsolver doesn't need work memory?
+    template<typename scalar_t> int 
+    getrf_buffersize(SOLVERHandle& handle, int n) {
+      return 0;
+    }
+#endif
+
     template int getrf_buffersize<float>(SOLVERHandle&, int);
     template int getrf_buffersize<double>(SOLVERHandle&, int);
     template int getrf_buffersize<std::complex<float>>(SOLVERHandle&, int);
     template int getrf_buffersize<std::complex<double>>(SOLVERHandle&, int);
 
 
+#if defined(STRUMPACK_HIP_PLATFORM_NVCC)
     void getrf(SOLVERHandle& handle, int m, int n, float* A, int lda,
                float* Workspace, int* devIpiv, int* devInfo) {
       STRUMPACK_FLOPS(blas::getrf_flops(m,n));
@@ -250,8 +270,8 @@ namespace strumpack {
                int* devIpiv, int* devInfo) {
       STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
       gpu_check(cusolverDnCgetrf
-                (handle, m, n, reinterpret_cast<hipComplex*>(A), lda,
-                 reinterpret_cast<hipComplex*>(Workspace), devIpiv, devInfo));
+                (handle, m, n, reinterpret_cast<cuComplex*>(A), lda,
+                 reinterpret_cast<cuComplex*>(Workspace), devIpiv, devInfo));
     }
     void getrf(SOLVERHandle& handle, int m, int n,
                std::complex<double>* A, int lda,
@@ -259,10 +279,41 @@ namespace strumpack {
                int* devIpiv, int* devInfo) {
       STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
       gpu_check(cusolverDnZgetrf
-                (handle, m, n, reinterpret_cast<hipDoubleComplex*>(A), lda,
-                 reinterpret_cast<hipDoubleComplex*>(Workspace),
+                (handle, m, n, reinterpret_cast<cuDoubleComplex*>(A), lda,
+                 reinterpret_cast<cuDoubleComplex*>(Workspace),
                  devIpiv, devInfo));
     }
+#else
+    void getrf(SOLVERHandle& handle, int m, int n, float* A, int lda,
+               float* Workspace, int* devIpiv, int* devInfo) {
+      STRUMPACK_FLOPS(blas::getrf_flops(m,n));
+      gpu_check(rocsolver_sgetrf(handle, m, n, A, lda, devIpiv, devInfo));
+    }
+    void getrf(SOLVERHandle& handle, int m, int n, double* A,
+               int lda, double* Workspace,
+               int* devIpiv, int* devInfo) {
+      STRUMPACK_FLOPS(blas::getrf_flops(m,n));
+      gpu_check(rocsolver_dgetrf(handle, m, n, A, lda, devIpiv, devInfo));
+    }
+    void getrf(SOLVERHandle& handle, int m, int n,
+               std::complex<float>* A, int lda,
+               std::complex<float>* Workspace,
+               int* devIpiv, int* devInfo) {
+      STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
+      gpu_check(rocsolver_cgetrf
+		(handle, m, n, reinterpret_cast<rocblas_float_complex*>(A),
+		 lda, devIpiv, devInfo));
+    }
+    void getrf(SOLVERHandle& handle, int m, int n,
+               std::complex<double>* A, int lda,
+               std::complex<double>* Workspace,
+               int* devIpiv, int* devInfo) {
+      STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
+      gpu_check(rocsolver_zgetrf
+		(handle, m, n, reinterpret_cast<rocblas_double_complex*>(A),
+		 lda, devIpiv, devInfo));
+    }
+#endif
 
     template<typename scalar_t> void
     getrf(SOLVERHandle& handle, DenseMatrix<scalar_t>& A,
@@ -280,6 +331,7 @@ namespace strumpack {
                         std::complex<double>*, int*, int*);
 
 
+#if defined(STRUMPACK_HIP_PLATFORM_NVCC)
     void getrs(SOLVERHandle& handle, hipblasOperation_t trans,
                int n, int nrhs, const float* A, int lda,
                const int* devIpiv, float* B, int ldb, int* devInfo) {
@@ -302,8 +354,8 @@ namespace strumpack {
       STRUMPACK_FLOPS(4*blas::getrs_flops(n,nrhs));
       gpu_check(cusolverDnCgetrs
                 (handle, trans, n, nrhs,
-                 reinterpret_cast<const hipComplex*>(A), lda,
-                 devIpiv, reinterpret_cast<hipComplex*>(B), ldb, devInfo));
+                 reinterpret_cast<const cuComplex*>(A), lda,
+                 devIpiv, reinterpret_cast<cuComplex*>(B), ldb, devInfo));
     }
     void getrs(SOLVERHandle& handle, hipblasOperation_t trans,
                int n, int nrhs, const std::complex<double>* A, int lda,
@@ -312,9 +364,39 @@ namespace strumpack {
       STRUMPACK_FLOPS(4*blas::getrs_flops(n,nrhs));
       gpu_check(cusolverDnZgetrs
                 (handle, trans, n, nrhs,
-                 reinterpret_cast<const hipDoubleComplex*>(A), lda, devIpiv,
-                 reinterpret_cast<hipDoubleComplex*>(B), ldb, devInfo));
+                 reinterpret_cast<const cuDoubleComplex*>(A), lda, devIpiv,
+                 reinterpret_cast<cuDoubleComplex*>(B), ldb, devInfo));
     }
+#else
+    void getrs(SOLVERHandle& handle, hipblasOperation_t trans,
+               int n, int nrhs, const float* A, int lda,
+               const int* devIpiv, float* B, int ldb, int* devInfo) {
+      STRUMPACK_FLOPS(blas::getrs_flops(n,nrhs));
+      // TODO
+    }
+    void getrs(SOLVERHandle& handle, hipblasOperation_t trans,
+               int n, int nrhs, const double* A, int lda,
+               const int* devIpiv, double* B, int ldb,
+               int* devInfo) {
+      STRUMPACK_FLOPS(blas::getrs_flops(n,nrhs));
+      // TODO
+    }
+    void getrs(SOLVERHandle& handle, hipblasOperation_t trans,
+               int n, int nrhs, const std::complex<float>* A, int lda,
+               const int* devIpiv, std::complex<float>* B, int ldb,
+               int* devInfo) {
+      STRUMPACK_FLOPS(4*blas::getrs_flops(n,nrhs));
+      // TODO
+    }
+    void getrs(SOLVERHandle& handle, hipblasOperation_t trans,
+               int n, int nrhs, const std::complex<double>* A, int lda,
+               const int* devIpiv, std::complex<double>* B, int ldb,
+               int *devInfo) {
+      STRUMPACK_FLOPS(4*blas::getrs_flops(n,nrhs));
+      // TODO
+    }
+#endif
+
     template<typename scalar_t> void
     getrs(SOLVERHandle& handle, Trans trans,
           const DenseMatrix<scalar_t>& A, const int* devIpiv,
@@ -364,11 +446,11 @@ namespace strumpack {
       STRUMPACK_BYTES(2*4*blas::gemv_moves(m,n));
       gpu_check(hipblasCgemv
                 (handle, transa, m, n,
-                 reinterpret_cast<hipComplex*>(&alpha),
-                 reinterpret_cast<const hipComplex*>(A), lda,
-                 reinterpret_cast<const hipComplex*>(B), incb,
-                 reinterpret_cast<hipComplex*>(&beta),
-                 reinterpret_cast<hipComplex*>(C), incc));
+                 reinterpret_cast<hipblasComplex*>(&alpha),
+                 reinterpret_cast<const hipblasComplex*>(A), lda,
+                 reinterpret_cast<const hipblasComplex*>(B), incb,
+                 reinterpret_cast<hipblasComplex*>(&beta),
+                 reinterpret_cast<hipblasComplex*>(C), incc));
     }
     void gemv(BLASHandle& handle, hipblasOperation_t transa,
               int m, int n, std::complex<double> alpha,
@@ -380,11 +462,11 @@ namespace strumpack {
       STRUMPACK_BYTES(2*8*blas::gemv_moves(m,n));
       gpu_check(hipblasZgemv
                 (handle, transa, m, n,
-                 reinterpret_cast<hipDoubleComplex*>(&alpha),
-                 reinterpret_cast<const hipDoubleComplex*>(A), lda,
-                 reinterpret_cast<const hipDoubleComplex*>(B), incb,
-                 reinterpret_cast<hipDoubleComplex*>(&beta),
-                 reinterpret_cast<hipDoubleComplex*>(C), incc));
+                 reinterpret_cast<hipblasDoubleComplex*>(&alpha),
+                 reinterpret_cast<const hipblasDoubleComplex*>(A), lda,
+                 reinterpret_cast<const hipblasDoubleComplex*>(B), incb,
+                 reinterpret_cast<hipblasDoubleComplex*>(&beta),
+                 reinterpret_cast<hipblasDoubleComplex*>(C), incc));
     }
 
 

@@ -44,7 +44,7 @@ namespace strumpack {
   template<typename scalar_t, typename integer_t> class LevelInfo;
 
   namespace gpu {
-    template<typename scalar_t> class FrontData;
+    template<typename scalar_t> struct FrontData;
   }
 
   template<typename scalar_t,typename integer_t> class FrontalMatrixGPU
