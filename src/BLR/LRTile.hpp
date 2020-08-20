@@ -104,7 +104,7 @@ namespace strumpack {
 
       void extract(const std::vector<std::size_t>& I,
                    const std::vector<std::size_t>& J,
-                   DenseM_t& B) const;
+                   DenseM_t& B) const override;
 
       void laswp(const std::vector<int>& piv, bool fwd) override;
 

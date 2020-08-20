@@ -401,9 +401,6 @@ namespace strumpack {
       (const elem_t& Aelem, const opts_t& opts,
        WorkCompress<scalar_t>& w, int lvl) {}
 
-      virtual real_t update_orthogonal_basis
-      (DenseM_t& S, int d, int dd, int depth) { return real_t(0.); }
-
       virtual void factor_recursive
       (HSSFactors<scalar_t>& ULV, WorkFactor<scalar_t>& w,
        bool isroot, bool partial, int depth) const {};

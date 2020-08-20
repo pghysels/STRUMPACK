@@ -214,7 +214,7 @@ namespace strumpack {
 
     SpMat_t* matrix() override { return mat_.get(); }
     Reord_t* reordering() override { return nd_.get(); }
-    Tree_t* tree() { return tree_.get(); }
+    Tree_t* tree() override { return tree_.get(); }
     const SpMat_t* matrix() const override { return mat_.get(); }
     const Reord_t* reordering() const override { return nd_.get(); }
     const Tree_t* tree() const override { return tree_.get(); }
