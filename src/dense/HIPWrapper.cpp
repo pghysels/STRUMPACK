@@ -44,6 +44,16 @@ namespace strumpack {
         return HIPBLAS_OP_N;
       }
     }
+    rocblas_operation T2rocOp(Trans op) {
+      switch (op) {
+      case Trans::N: return rocblas_operation_none;
+      case Trans::T: return rocblas_operation_transpose;
+      case Trans::C: return rocblas_operation_conjugate_transpose;
+      default:
+        assert(false);
+        return rocblas_operation_none;
+      }
+    }
 
     void hip_assert(hipError_t code, const char *file, int line,
                      bool abort) {
@@ -55,44 +65,6 @@ namespace strumpack {
       }
     }
 
-#if defined(STRUMPACK_HIP_PLATFORM_NVCC)
-    void hip_assert(cusolverStatus_t code, const char *file, int line,
-                     bool abort) {
-      if (code != CUSOLVER_STATUS_SUCCESS) {
-        std::cerr << "hipSOLVER assertion failed: " << code << " "
-                  <<  file << " " << line << std::endl;
-        switch (code) {
-        case CUSOLVER_STATUS_SUCCESS:                                 std::cerr << "CUSOLVER_STATUS_SUCCESS" << std::endl; break;
-        case CUSOLVER_STATUS_NOT_INITIALIZED:                         std::cerr << "CUSOLVER_STATUS_NOT_INITIALIZED" << std::endl; break;
-        case CUSOLVER_STATUS_ALLOC_FAILED:                            std::cerr << "CUSOLVER_STATUS_ALLOC_FAILED" << std::endl; break;
-        case CUSOLVER_STATUS_INVALID_VALUE:                           std::cerr << "CUSOLVER_STATUS_INVALID_VALUE" << std::endl; break;
-        case CUSOLVER_STATUS_ARCH_MISMATCH:                           std::cerr << "CUSOLVER_STATUS_ARCH_MISMATCH" << std::endl; break;
-        case CUSOLVER_STATUS_EXECUTION_FAILED:                        std::cerr << "CUSOLVER_STATUS_EXECUTION_FAILED" << std::endl; break;
-        case CUSOLVER_STATUS_INTERNAL_ERROR:                          std::cerr << "CUSOLVER_STATUS_INTERNAL_ERROR" << std::endl; break;
-        case CUSOLVER_STATUS_MATRIX_TYPE_NOT_SUPPORTED:               std::cerr << "CUSOLVER_STATUS_MATRIX_TYPE_NOT_SUPPORTED" << std::endl; break;
-        case CUSOLVER_STATUS_MAPPING_ERROR:                           std::cerr << "CUSOLVER_STATUS_MAPPING_ERROR" << std::endl; break;
-        case CUSOLVER_STATUS_NOT_SUPPORTED:                           std::cerr << "CUSOLVER_STATUS_NOT_SUPPORTED" << std::endl; break;
-        case CUSOLVER_STATUS_ZERO_PIVOT:                              std::cerr << "CUSOLVER_STATUS_ZERO_PIVOT" << std::endl; break;
-        case CUSOLVER_STATUS_INVALID_LICENSE:                         std::cerr << "CUSOLVER_STATUS_INVALID_LICENSE" << std::endl; break;
-        // case CUSOLVER_STATUS_IRS_PARAMS_NOT_INITIALIZED:              std::cerr << "CUSOLVER_STATUS_IRS_PARAMS_NOT_INITIALIZED" << std::endl; break;
-        // case CUSOLVER_STATUS_IRS_PARAMS_INVALID:                      std::cerr << "CUSOLVER_STATUS_IRS_PARAMS_INVALID" << std::endl; break;
-        // case CUSOLVER_STATUS_IRS_PARAMS_INVALID_PREC:                 std::cerr << "CUSOLVER_STATUS_IRS_PARAMS_INVALID_PREC" << std::endl; break;
-        // case CUSOLVER_STATUS_IRS_PARAMS_INVALID_REFINE:               std::cerr << "CUSOLVER_STATUS_IRS_PARAMS_INVALID_REFINE" << std::endl; break;
-        // case CUSOLVER_STATUS_IRS_PARAMS_INVALID_MAXITER:              std::cerr << "CUSOLVER_STATUS_IRS_PARAMS_INVALID_MAXITER" << std::endl; break;
-        // case CUSOLVER_STATUS_IRS_INTERNAL_ERROR:                      std::cerr << "CUSOLVER_STATUS_IRS_INTERNAL_ERROR" << std::endl; break;
-        // case CUSOLVER_STATUS_IRS_NOT_SUPPORTED:                       std::cerr << "CUSOLVER_STATUS_IRS_NOT_SUPPORTED" << std::endl; break;
-        // case CUSOLVER_STATUS_IRS_OUT_OF_RANGE:                        std::cerr << "CUSOLVER_STATUS_IRS_OUT_OF_RANGE" << std::endl; break;
-        // case CUSOLVER_STATUS_IRS_NRHS_NOT_SUPPORTED_FOR_REFINE_GMRES: std::cerr << "CUSOLVER_STATUS_IRS_NRHS_NOT_SUPPORTED_FOR_REFINE_GMRES" << std::endl; break;
-        // case CUSOLVER_STATUS_IRS_INFOS_NOT_INITIALIZED:               std::cerr << "CUSOLVER_STATUS_IRS_INFOS_NOT_INITIALIZED" << std::endl; break;
-        // case CUSOLVER_STATUS_IRS_INFOS_NOT_DESTROYED:                 std::cerr << "CUSOLVER_STATUS_IRS_INFOS_NOT_DESTROYED" << std::endl; break;
-        // case CUSOLVER_STATUS_IRS_MATRIX_SINGULAR:                     std::cerr << "CUSOLVER_STATUS_IRS_MATRIX_SINGULAR" << std::endl; break;
-        // case CUSOLVER_STATUS_INVALID_WORKSPACE:                       std::cerr << "CUSOLVER_STATUS_INVALID_WORKSPACE" << std::endl; break;
-        default: std::cerr << "unknown cusolver error" << std::endl;
-        }
-        if (abort) exit(code);
-      }
-    }
-#else
     void hip_assert(rocblas_status code, const char *file, int line,
                     bool abort) {
       if (code != rocblas_status_success) {
@@ -101,7 +73,6 @@ namespace strumpack {
         if (abort) exit(code);
       }
     }
-#endif
 
     void hip_assert(hipblasStatus_t code, const char *file, int line,
                      bool abort) {
@@ -206,84 +177,17 @@ namespace strumpack {
                        std::complex<double>,
                        DenseMatrix<std::complex<double>>&);
 
-#if defined(STRUMPACK_HIP_PLATFORM_NVCC)
-    void getrf_buffersize
-    (SOLVERHandle& handle, int m, int n, float* A, int lda, int* Lwork) {
-      gpu_check(cusolverDnSgetrf_bufferSize(handle, m, n, A, lda, Lwork));
-    }
-    void getrf_buffersize
-    (SOLVERHandle& handle, int m, int n, double *A, int lda,
-     int* Lwork) {
-      gpu_check(cusolverDnDgetrf_bufferSize(handle, m, n, A, lda, Lwork));
-    }
-    void getrf_buffersize
-    (SOLVERHandle& handle, int m, int n, std::complex<float>* A, int lda,
-     int *Lwork) {
-      gpu_check(cusolverDnCgetrf_bufferSize
-                (handle, m, n, reinterpret_cast<hipComplex*>(A), lda, Lwork));
-    }
-    void getrf_buffersize
-    (SOLVERHandle& handle, int m, int n, std::complex<double>* A, int lda,
-     int *Lwork) {
-      gpu_check(cusolverDnZgetrf_bufferSize
-                (handle, m, n,
-                 reinterpret_cast<hipblasDoubleComplex*>(A), lda, Lwork));
-    }
-    template<typename scalar_t> int getrf_buffersize
-    (SOLVERHandle& handle, int n) {
-      int Lwork;
-      getrf_buffersize
-        (handle, n, n, static_cast<scalar_t*>(nullptr), n, &Lwork);
-      return Lwork;
-    }
-#else
     // it seems like rocsolver doesn't need work memory?
     template<typename scalar_t> int 
     getrf_buffersize(SOLVERHandle& handle, int n) {
       return 0;
     }
-#endif
-
     template int getrf_buffersize<float>(SOLVERHandle&, int);
     template int getrf_buffersize<double>(SOLVERHandle&, int);
     template int getrf_buffersize<std::complex<float>>(SOLVERHandle&, int);
     template int getrf_buffersize<std::complex<double>>(SOLVERHandle&, int);
 
 
-#if defined(STRUMPACK_HIP_PLATFORM_NVCC)
-    void getrf(SOLVERHandle& handle, int m, int n, float* A, int lda,
-               float* Workspace, int* devIpiv, int* devInfo) {
-      STRUMPACK_FLOPS(blas::getrf_flops(m,n));
-      gpu_check(cusolverDnSgetrf
-                (handle, m, n, A, lda, Workspace, devIpiv, devInfo));
-    }
-    void getrf(SOLVERHandle& handle, int m, int n, double* A,
-               int lda, double* Workspace,
-               int* devIpiv, int* devInfo) {
-      STRUMPACK_FLOPS(blas::getrf_flops(m,n));
-      gpu_check(cusolverDnDgetrf
-                (handle, m, n, A, lda, Workspace, devIpiv, devInfo));
-    }
-    void getrf(SOLVERHandle& handle, int m, int n,
-               std::complex<float>* A, int lda,
-               std::complex<float>* Workspace,
-               int* devIpiv, int* devInfo) {
-      STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
-      gpu_check(cusolverDnCgetrf
-                (handle, m, n, reinterpret_cast<cuComplex*>(A), lda,
-                 reinterpret_cast<cuComplex*>(Workspace), devIpiv, devInfo));
-    }
-    void getrf(SOLVERHandle& handle, int m, int n,
-               std::complex<double>* A, int lda,
-               std::complex<double>* Workspace,
-               int* devIpiv, int* devInfo) {
-      STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
-      gpu_check(cusolverDnZgetrf
-                (handle, m, n, reinterpret_cast<cuDoubleComplex*>(A), lda,
-                 reinterpret_cast<cuDoubleComplex*>(Workspace),
-                 devIpiv, devInfo));
-    }
-#else
     void getrf(SOLVERHandle& handle, int m, int n, float* A, int lda,
                float* Workspace, int* devIpiv, int* devInfo) {
       STRUMPACK_FLOPS(blas::getrf_flops(m,n));
@@ -313,7 +217,6 @@ namespace strumpack {
 		(handle, m, n, reinterpret_cast<rocblas_double_complex*>(A),
 		 lda, devIpiv, devInfo));
     }
-#endif
 
     template<typename scalar_t> void
     getrf(SOLVERHandle& handle, DenseMatrix<scalar_t>& A,
@@ -330,78 +233,47 @@ namespace strumpack {
     template void getrf(SOLVERHandle&, DenseMatrix<std::complex<double>>& A,
                         std::complex<double>*, int*, int*);
 
-
-#if defined(STRUMPACK_HIP_PLATFORM_NVCC)
-    void getrs(SOLVERHandle& handle, hipblasOperation_t trans,
+    void getrs(SOLVERHandle& handle, rocblas_operation trans,
                int n, int nrhs, const float* A, int lda,
                const int* devIpiv, float* B, int ldb, int* devInfo) {
       STRUMPACK_FLOPS(blas::getrs_flops(n,nrhs));
-      gpu_check(cusolverDnSgetrs
-                (handle, trans, n, nrhs, A, lda, devIpiv, B, ldb, devInfo));
+      gpu_check(rocsolver_sgetrs
+                (handle, trans, n, nrhs, const_cast<float*>(A), lda, devIpiv, B, ldb));
     }
-    void getrs(SOLVERHandle& handle, hipblasOperation_t trans,
+    void getrs(SOLVERHandle& handle, rocblas_operation trans,
                int n, int nrhs, const double* A, int lda,
                const int* devIpiv, double* B, int ldb,
                int* devInfo) {
       STRUMPACK_FLOPS(blas::getrs_flops(n,nrhs));
-      gpu_check(cusolverDnDgetrs
-                (handle, trans, n, nrhs, A, lda, devIpiv, B, ldb, devInfo));
+      gpu_check(rocsolver_dgetrs
+                (handle, trans, n, nrhs, const_cast<double*>(A), lda, devIpiv, B, ldb));
     }
-    void getrs(SOLVERHandle& handle, hipblasOperation_t trans,
+    void getrs(SOLVERHandle& handle, rocblas_operation trans,
                int n, int nrhs, const std::complex<float>* A, int lda,
                const int* devIpiv, std::complex<float>* B, int ldb,
                int* devInfo) {
       STRUMPACK_FLOPS(4*blas::getrs_flops(n,nrhs));
-      gpu_check(cusolverDnCgetrs
-                (handle, trans, n, nrhs,
-                 reinterpret_cast<const cuComplex*>(A), lda,
-                 devIpiv, reinterpret_cast<cuComplex*>(B), ldb, devInfo));
+      gpu_check(rocsolver_cgetrs
+                (handle, trans, n, nrhs, 
+		 reinterpret_cast<rocblas_float_complex*>(const_cast<std::complex<float>*>(A)), lda, devIpiv,
+		 reinterpret_cast<rocblas_float_complex*>(const_cast<std::complex<float>*>(B)), ldb));
     }
-    void getrs(SOLVERHandle& handle, hipblasOperation_t trans,
+    void getrs(SOLVERHandle& handle, rocblas_operation trans,
                int n, int nrhs, const std::complex<double>* A, int lda,
                const int* devIpiv, std::complex<double>* B, int ldb,
                int *devInfo) {
       STRUMPACK_FLOPS(4*blas::getrs_flops(n,nrhs));
-      gpu_check(cusolverDnZgetrs
+      gpu_check(rocsolver_zgetrs
                 (handle, trans, n, nrhs,
-                 reinterpret_cast<const cuDoubleComplex*>(A), lda, devIpiv,
-                 reinterpret_cast<cuDoubleComplex*>(B), ldb, devInfo));
+		 reinterpret_cast<rocblas_double_complex*>(const_cast<std::complex<double>*>(A)), lda, devIpiv, 
+		 reinterpret_cast<rocblas_double_complex*>(const_cast<std::complex<double>*>(B)), ldb));
     }
-#else
-    void getrs(SOLVERHandle& handle, hipblasOperation_t trans,
-               int n, int nrhs, const float* A, int lda,
-               const int* devIpiv, float* B, int ldb, int* devInfo) {
-      STRUMPACK_FLOPS(blas::getrs_flops(n,nrhs));
-      // TODO
-    }
-    void getrs(SOLVERHandle& handle, hipblasOperation_t trans,
-               int n, int nrhs, const double* A, int lda,
-               const int* devIpiv, double* B, int ldb,
-               int* devInfo) {
-      STRUMPACK_FLOPS(blas::getrs_flops(n,nrhs));
-      // TODO
-    }
-    void getrs(SOLVERHandle& handle, hipblasOperation_t trans,
-               int n, int nrhs, const std::complex<float>* A, int lda,
-               const int* devIpiv, std::complex<float>* B, int ldb,
-               int* devInfo) {
-      STRUMPACK_FLOPS(4*blas::getrs_flops(n,nrhs));
-      // TODO
-    }
-    void getrs(SOLVERHandle& handle, hipblasOperation_t trans,
-               int n, int nrhs, const std::complex<double>* A, int lda,
-               const int* devIpiv, std::complex<double>* B, int ldb,
-               int *devInfo) {
-      STRUMPACK_FLOPS(4*blas::getrs_flops(n,nrhs));
-      // TODO
-    }
-#endif
 
     template<typename scalar_t> void
     getrs(SOLVERHandle& handle, Trans trans,
           const DenseMatrix<scalar_t>& A, const int* devIpiv,
           DenseMatrix<scalar_t>& B, int *devInfo) {
-      getrs(handle, T2hipOp(trans), A.rows(), B.cols(), A.data(), A.ld(),
+      getrs(handle, T2rocOp(trans), A.rows(), B.cols(), A.data(), A.ld(),
             devIpiv, B.data(), B.ld(), devInfo);
     }
     template void getrs(SOLVERHandle&, Trans, const DenseMatrix<float>&,

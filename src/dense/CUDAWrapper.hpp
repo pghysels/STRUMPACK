@@ -79,7 +79,6 @@ namespace strumpack {
       BLASHandle() { gpu_check(cublasCreate(&h_)); }
       ~BLASHandle() { gpu_check(cublasDestroy(h_)); }
       void set_stream(Stream& s) { gpu_check(cublasSetStream(h_, s)); }
-      // void set_stream(cudaStream_t& s) { gpu_check(cublasSetStream(h_, s)); }
       operator cublasHandle_t&() { return h_; }
       operator const cublasHandle_t&() const { return h_; }
     private:
@@ -91,7 +90,6 @@ namespace strumpack {
       SOLVERHandle() { gpu_check(cusolverDnCreate(&h_)); }
       ~SOLVERHandle() { gpu_check(cusolverDnDestroy(h_)); }
       void set_stream(Stream& s) { gpu_check(cusolverDnSetStream(h_, s)); }
-      // void set_stream(cudaStream_t& s) { gpu_check(cusolverDnSetStream(h_, s)); }
       operator cusolverDnHandle_t&() { return h_; }
       operator const cusolverDnHandle_t&() const { return h_; }
     private:

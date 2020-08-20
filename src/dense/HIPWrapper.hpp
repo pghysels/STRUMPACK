@@ -35,15 +35,9 @@
 #include <cassert>
 #include <memory>
 
-#include <hipblas.h>
 #include <hip/hip_runtime_api.h>
-
-// TODO get rid of this when there is a hipSOLVER
-#if defined(STRUMPACK_HIP_PLATFORM_NVCC)
-#include <cusolverDn.h>
-#else
+#include <hipblas.h>
 #include <rocsolver.h>
-#endif
 
 #include "DenseMatrix.hpp"
 
@@ -55,13 +49,8 @@ namespace strumpack {
     }
     void hip_assert(hipError_t code, const char *file, int line,
                     bool abort=true);
-#if defined(STRUMPACK_HIP_PLATFORM_NVCC)
-    void hip_assert(cusolverStatus_t code, const char *file, int line,
-                    bool abort=true);
-#else
     void hip_assert(rocblas_status code, const char *file, int line,
                     bool abort=true);
-#endif
     void hip_assert(hipblasStatus_t code, const char *file, int line,
                     bool abort=true);
 
@@ -89,7 +78,6 @@ namespace strumpack {
       BLASHandle() { gpu_check(hipblasCreate(&h_)); }
       ~BLASHandle() { gpu_check(hipblasDestroy(h_)); }
       void set_stream(Stream& s) { gpu_check(hipblasSetStream(h_, s)); }
-      // void set_stream(hipStream_t& s) { gpu_check(hipblasSetStream(h_, s)); }
       operator hipblasHandle_t&() { return h_; }
       operator const hipblasHandle_t&() const { return h_; }
     private:
@@ -98,31 +86,16 @@ namespace strumpack {
 
 
     // TODO there is no such thing as hipSOLVER yet :(
-#if defined(STRUMPACK_HIP_PLATFORM_NVCC)
-    class SOLVERHandle {
-    public:
-      SOLVERHandle() { gpu_check(cusolverDnCreate(&h_)); }
-      ~SOLVERHandle() { gpu_check(cusolverDnDestroy(h_)); }
-      void set_stream(Stream& s) { gpu_check(cusolverDnSetStream(h_, s)); }
-      // void set_stream(cuStream_t& s) { gpu_check(cusolverDnSetStream(h_, s)); }
-      operator cusolverDnHandle_t&() { return h_; }
-      operator const cusolverDnHandle_t&() const { return h_; }
-    private:
-      cusolverDnHandle_t h_;
-    };
-#elif defined(STRUMPACK_HIP_PLATFORM_HCC)
     class SOLVERHandle {
     public:
       SOLVERHandle() { gpu_check(rocsolver_create_handle(&h_)); }
       ~SOLVERHandle() { gpu_check(rocsolver_destroy_handle(h_)); }
       void set_stream(Stream& s) { rocsolver_set_stream(h_, s); }
-      // void set_stream(cudaStream_t& s) { }
       operator rocsolver_handle&() { return h_; }
       operator const rocsolver_handle&() const { return h_; }
     private:
       rocsolver_handle h_;
     };
-#endif
 
     template<typename T> void memset
     (T* dptr, int value, std::size_t count) {
