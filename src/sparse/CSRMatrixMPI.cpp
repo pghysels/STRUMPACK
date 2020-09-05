@@ -685,7 +685,7 @@ namespace strumpack {
       Aseq.reset(nullptr);
     } else M = Match_t(job, this->size());
     comm_.broadcast(ierr);
-    if (ierr) throw std::runtime_error("Matching failed");
+    if (ierr) throw std::runtime_error(std::string("Matching failed"));
     comm_.broadcast(M.Q);
 
     if (job == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) {
