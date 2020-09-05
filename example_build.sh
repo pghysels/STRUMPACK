@@ -141,19 +141,24 @@ if [[ $(hostname -s) = "tulip" ]]; then
     found_host=true
 
     echo "Detected we are running on Tulip"
+    # module load cmake
+    # module load blas
+    # module load lapack
+    # module load scalapack/openmpi/gcc/64/2.0.2
+    # module load openmpi/gcc/64/1.10.7
+    # module load rocm/3.7.0
 
-    # export HIP_PLATFORM=hcc
     export METIS_DIR=/home/users/coe0239/local/metis-5.1.0/install/
 
     cmake ../ \
-        -DCMAKE_BUILD_TYPE=Debug \
-        -DCMAKE_INSTALL_PREFIX=../install \
-        -DCMAKE_CXX_COMPILER=hipcc \
-        -DSTRUMPACK_HIP_AMDGPU=gfx906 \
-        -DSTRUMPACK_USE_CUDA=OFF \
-        -DSTRUMPACK_USE_HIP=ON \
-        -DSTRUMPACK_COUNT_FLOPS=ON \
-        -DTPL_SCALAPACK_LIBRARIES="${SCALAPACK_HOME}/lib64/libscalapack.a"
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_INSTALL_PREFIX=../install \
+          -DCMAKE_CXX_COMPILER=hipcc \
+          -DSTRUMPACK_HIP_AMDGPU=gfx906 \
+          -DSTRUMPACK_USE_CUDA=OFF \
+          -DSTRUMPACK_USE_HIP=ON \
+          -DSTRUMPACK_COUNT_FLOPS=ON \
+          -DTPL_SCALAPACK_LIBRARIES="${SCALAPACK_HOME}/lib64/libscalapack.a"
 fi
 
 
