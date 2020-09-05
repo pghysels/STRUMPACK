@@ -112,7 +112,7 @@ int main(int argc, char* argv[]) {
   /*
     Randomly perturbe the matrix elements.
    */
-  for (int i=0; i<nnz; i++)
+  for (i=0; i<nnz; i++)
     val[i] = val[i] * (1. + (rand() % 100 - 50) / 1000.0);
 
   /*
