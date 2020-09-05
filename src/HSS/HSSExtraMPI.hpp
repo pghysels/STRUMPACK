@@ -154,7 +154,6 @@ namespace strumpack {
       int& leaf_procs(int p) { return _ranges[5*p+4]; }
     private:
       std::vector<int> _ranges; // rlo, rhi, clo, chi, leaf_procs
-      int _ctxt = -1;
     };
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
