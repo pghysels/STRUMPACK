@@ -122,6 +122,8 @@ if(STRUMPACK_USE_HIP)
       message(STATUS "HIP platform set to ${STRUMPACK_HIP_PLATFORM}")
       if (STRUMPACK_HIP_PLATFORM STREQUAL "hcc")
         set(STRUMPACK_HIP_PLATFORM_HCC ON)
+        # set(CMAKE_CXX_COMPILER ${HIP_HIPCC_EXECUTABLE})
+        # set(CMAKE_LINKER ${HIP_HIPCC_EXECUTABLE})
       elseif (STRUMPACK_HIP_PLATFORM STREQUAL "nvcc")
         set(STRUMPACK_HIP_PLATFORM_NVCC ON)
       endif()
@@ -444,6 +446,14 @@ target_compile_options(strumpack PRIVATE
   $<$<COMPILE_LANGUAGE:CXX>:$<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>: -Wall>>
   $<$<COMPILE_LANGUAGE:CXX>:$<$<CXX_COMPILER_ID:MSVC>: /W4>>)
 
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag(-Wno-overloaded-virtual
+  COMPILER_SUPPORTS_NOOVERLOAD_WARNING)
+if(COMPILER_SUPPORTS_NOOVERLOAD_WARNING)
+  target_compile_options(strumpack PUBLIC
+    $<$<COMPILE_LANGUAGE:CXX>:-Wno-overloaded-virtual>)
+endif()
+
 
 if(STRUMPACK_USE_MPI)
   target_link_libraries(strumpack PUBLIC
@@ -527,18 +537,25 @@ if(hipblas_FOUND)
   # target_link_libraries(strumpack PUBLIC hip::hip_hcc)
   target_link_libraries(strumpack PUBLIC roc::hipblas roc::rocblas roc::rocsolver)
   if(STRUMPACK_HIP_PLATFORM_HCC)
-    target_compile_definitions(strumpack PUBLIC __HIP_PLATFORM_HCC__)
-    if(DEFINED STRUMPACK_HIP_AMDGPU)
-      target_compile_options(strumpack PRIVATE 
-      $<$<COMPILE_LANGUAGE:CXX>:${STRUMPACK_HIP_AMDGPU}>)
+    # target_compile_definitions(strumpack PUBLIC __HIP_PLATFORM_HCC__)
+    if(STRUMPACK_HIP_AMDGPU)
+      foreach(target ${STRUMPACK_HIP_AMDGPU})
+        target_compile_options(strumpack PRIVATE $<$<COMPILE_LANGUAGE:CXX>:--amdgpu-target=${target}>)
+        target_link_libraries(strumpack PRIVATE --amdgpu-target=${target})
+      endforeach()
+    # endif()
+    # if(DEFINED STRUMPACK_HIP_AMDGPU)
+    #   target_compile_options(strumpack PRIVATE 
+    #   $<$<COMPILE_LANGUAGE:CXX>:${STRUMPACK_HIP_AMDGPU}>)
     else()
       target_compile_options(strumpack PRIVATE 
       $<$<COMPILE_LANGUAGE:CXX>:--amdgpu-target=none>)
       message(WARNING "No AMD GPU architecture was specified,"
-        " specify -DSTRUMPACK_HIP_AMDGPU=\"--amdgpu-target=xxx\"")
+        " specify -DSTRUMPACK_HIP_AMDGPU=\"xxx\" "
+        " where xxx can be for instance gfx906 (or a comma separated list)")
     endif()
   elseif(STRUMPACK_HIP_PLATFORM_NVCC)
-    target_compile_definitions(strumpack PUBLIC __HIP_PLATFORM_NVCC__)
+    # target_compile_definitions(strumpack PUBLIC __HIP_PLATFORM_NVCC__)
   endif()
 endif()
 

@@ -146,16 +146,14 @@ if [[ $(hostname -s) = "tulip" ]]; then
     export METIS_DIR=/home/users/coe0239/local/metis-5.1.0/install/
 
     cmake ../ \
-	-DCMAKE_BUILD_TYPE=Debug \
+        -DCMAKE_BUILD_TYPE=Debug \
+        -DCMAKE_INSTALL_PREFIX=../install \
         -DCMAKE_CXX_COMPILER=hipcc \
-        -DSTRUMPACK_HIP_AMDGPU=--amdgpu-target=gfx906 \
-        -DCMAKE_C_COMPILER=gcc \
-        -DCMAKE_Fortran_COMPILER=gfortran \
+        -DSTRUMPACK_HIP_AMDGPU=gfx906 \
         -DSTRUMPACK_USE_CUDA=OFF \
         -DSTRUMPACK_USE_HIP=ON \
-        -DTPL_ENABLE_ZFP=OFF \
         -DSTRUMPACK_COUNT_FLOPS=ON \
-        -DCMAKE_INSTALL_PREFIX=../install
+        -DTPL_SCALAPACK_LIBRARIES="${SCALAPACK_HOME}/lib64/libscalapack.a"
 fi
 
 
@@ -178,7 +176,7 @@ if ! $found_host; then
     #  -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
 fi
 
-make install -j4 VERBOSE=1
+make install -j4
 make examples -j4
 make tests -j4
 # make test
