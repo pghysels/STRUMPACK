@@ -46,6 +46,7 @@ namespace strumpack {
 
     template<typename scalar_t> class BLRTile {
       using DenseM_t = DenseMatrix<scalar_t>;
+      using Opts_t = BLROptions<scalar_t>;
 
     public:
       virtual ~BLRTile() = default;
@@ -59,9 +60,15 @@ namespace strumpack {
       virtual std::size_t maximum_rank() const = 0;
       virtual bool is_low_rank() const = 0;
       virtual void dense(DenseM_t& A) const = 0;
+      virtual DenseM_t dense() const = 0;
 
-      virtual void draw
-      (std::ostream& of, std::size_t roff, std::size_t coff) const = 0;
+      virtual std::unique_ptr<BLRTile<scalar_t>> clone() const = 0;
+
+      virtual std::unique_ptr<LRTile<scalar_t>>
+      compress(const Opts_t& opts) const = 0;
+
+      virtual void draw(std::ostream& of,
+                        std::size_t roff, std::size_t coff) const = 0;
 
       virtual DenseM_t& D() = 0; //{ assert(false); }
       virtual DenseM_t& U() = 0; //{ assert(false); }

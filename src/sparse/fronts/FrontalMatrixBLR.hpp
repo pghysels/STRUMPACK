@@ -94,6 +94,8 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_MPI)
     void extend_add_copy_to_buffers
     (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override {
+      if (F22blr_.rows() == std::size_t(dim_upd()))
+        abort(); //F22blr_.dense(F22_);
       ExtAdd::extend_add_seq_copy_to_buffers(F22_, sbuf, pa, this);
     }
 #endif

@@ -51,6 +51,7 @@ namespace strumpack {
       using Opts_t = BLROptions<scalar_t>;
 
     public:
+      LRTile(std::size_t m, std::size_t n, std::size_t r);
 
       LRTile(const DenseM_t& T, const Opts_t& opts);
 
@@ -89,6 +90,14 @@ namespace strumpack {
       std::size_t maximum_rank() const override { return U_.cols(); }
 
       void dense(DenseM_t& A) const override;
+      DenseM_t dense() const override;
+
+      std::unique_ptr<BLRTile<scalar_t>> clone() const;
+
+      std::unique_ptr<LRTile<scalar_t>> compress(const Opts_t& opts) const {
+        assert(false);
+        return nullptr;
+      };
 
       void draw(std::ostream& of, std::size_t roff,
                 std::size_t coff) const override;

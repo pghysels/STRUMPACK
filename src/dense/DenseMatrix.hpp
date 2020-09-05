@@ -637,9 +637,9 @@ namespace strumpack {
     real_t normI() const;
 
     /**
-     * Return the (approximate) amount memory taken by this
-     * memory. Simply nonzeros()*sizeof(scalar_t). The matrix metadata
-     * is not counted in this.
+     * Return the (approximate) amount of memory taken by this matrix,
+     * in bytes. Simply nonzeros()*sizeof(scalar_t). The matrix
+     * metadata is not counted in this.
      */
     virtual std::size_t memory() const {
       return sizeof(scalar_t) * rows() * cols();

@@ -32,59 +32,53 @@
 #ifndef BLR_MATRIX_MPI_HPP
 #define BLR_MATRIX_MPI_HPP
 
-#include <cassert>
-
 #include "dense/DistributedMatrix.hpp"
 #include "BLRMatrix.hpp"
-#include "BLRTile.hpp" // TODO remove
+#include "BLRTile.hpp"
 
 namespace strumpack {
   namespace BLR {
 
     class ProcessorGrid2D {
     public:
-      ProcessorGrid2D(const MPIComm& comm) : comm_(comm) {
-        auto P = comm_.size();
-        auto rank = comm_.rank();
-        npcols_ = std::floor(std::sqrt((float)P));
-        nprows_ = P / npcols_;
-        prow_ = rank % nprows_;
-        pcol_ = rank / nprows_;
-
-        for (int i=0; i<nprows_; i++)
-          if (i == prow_) rowcomm_ = comm_.sub(i, npcols_, nprows_);
-          else comm_.sub(i, npcols_, nprows_);
-        for (int i=0; i<npcols_; i++)
-          if (i == pcol_) colcomm_ = comm_.sub(i*nprows_, nprows_, 1);
-          else comm_.sub(i*nprows_, nprows_, 1);
-      }
+      ProcessorGrid2D(const MPIComm& comm);
 
       const MPIComm& Comm() const { return comm_; }
       int nprows() const { return nprows_; }
       int npcols() const { return npcols_; }
       int prow() const { return prow_; }
       int pcol() const { return pcol_; }
-      int npactives() const { return nprows()*npcols(); }
       int rank() const { return Comm().rank(); }
+      int npactives() const { return nprows()*npcols(); }
+      bool active() const { return active_; }
 
       const MPIComm& row_comm() const { return rowcomm_; }
       const MPIComm& col_comm() const { return colcomm_; }
 
-      int rowbg2p(int i) const { return i % nprows(); }
-      int colbg2p(int j) const { return j / nprows(); }
-      int bg2p(int i, int j) const { return rowbg2p(i) + colbg2p(j) * nprows(); }
+      bool is_local_row(int i) const { return i % nprows_ == prow_; }
+      bool is_local_col(int i) const { return i % npcols_ == pcol_; }
+      bool is_local(int i, int j) const
+      { return is_local_row(i) & is_local_col(j); }
 
-      int rowbg2l(int i) const { return i / nprows() + i % nprows(); }
-      int colbg2l(int j) const { return j / npcols() + j % npcols(); }
+      int rg2p(int i) const { return i % nprows(); }
+      int cg2p(int j) const { return j % npcols(); }
+      int g2p(int i, int j) const { return rg2p(i) + cg2p(j) * nprows(); }
+
+      int rg2l(int i) const { return i / nprows() + i % nprows(); }
+      int cg2l(int j) const { return j / npcols() + j % npcols(); }
+
+      void print() const {
+        if (comm_.is_root())
+          std::cout << "# ProcessorGrid2D: "
+                    << "[" << nprows() << " x " << npcols() << "]"
+                    << std::endl;
+      }
 
     private:
-      int prow_ = 0;
-      int pcol_ = 0;
-      int nprows_ = 0;
-      int npcols_ = 0;
-      const MPIComm& comm_;
-      MPIComm rowcomm_;
-      MPIComm colcomm_;
+      bool active_ = false;
+      int prow_ = -1, pcol_ = -1;
+      int nprows_ = 0, npcols_ = 0;
+      MPIComm comm_, rowcomm_, colcomm_;
     };
 
 
@@ -93,238 +87,150 @@ namespace strumpack {
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using DistM_t = DistributedMatrix<scalar_t>;
       using DistMW_t = DistributedMatrixWrapper<scalar_t>;
+      using BLRMPI_t = BLRMatrixMPI<scalar_t>;
+      using vec_t = std::vector<std::size_t>;
+      using adm_t = DenseMatrix<bool>;
       using Opts_t = BLROptions<scalar_t>;
 
     public:
-      BLRMatrixMPI() {}
+      BLRMatrixMPI();
 
-      BLRMatrixMPI(const ProcessorGrid2D& grid,
-                   const std::vector<std::size_t>& rowtiles,
-                   const std::vector<std::size_t>& coltiles,
-                   DistM_t& A, const Opts_t& opts)
-        : BLRMatrixMPI<scalar_t>
-        (grid, A.rows(), rowtiles, A.cols(), coltiles, opts) {
-        // for (std::size_t j=0; j<colblocks(); j++)
-        //   for (std::size_t i=0; i<rowblocks(); i++)
-        //     block(i, j) = std::unique_ptr<BLRTile<scalar_t>>
-        //       (new LRTile<scalar_t>(tile(A, i, j), opts));
+      std::size_t rows() const { return rows_; }
+      std::size_t cols() const { return cols_; }
 
-        // TODO only create local tiles
-      }
+      std::size_t memory() const;
+      std::size_t nonzeros() const;
+      std::size_t rank() const;
+      std::size_t total_memory() const;
+      std::size_t total_nonzeros() const;
+      std::size_t max_rank() const;
 
-      BLRMatrixMPI
-      (const ProcessorGrid2D& grid,
-       const std::vector<std::size_t>& tiles,
-       //const std::function<bool(std::size_t,std::size_t)>& admissible,
-       const DenseMatrix<bool>& admissible,
-       DistM_t& A, std::vector<int>& piv, const Opts_t& opts)
-        : BLRMatrixMPI<scalar_t>
-        (grid, A.rows(), tiles, A.cols(), tiles, opts) {
-        assert(rowblocks() == colblocks());
-
-        // TODO
-      }
-
-      std::size_t rows() const { return m_; }
-      std::size_t cols() const { return n_; }
-
-      std::size_t memory() const {
-        std::size_t mem = 0;
-        for (auto& b : blocks_) mem += b->memory();
-        return mem;
-      }
-      std::size_t nonzeros() const {
-        std::size_t nnz = 0;
-        for (auto& b : blocks_) nnz += b->nonzeros();
-        return nnz;
-      }
-      std::size_t maximum_rank() const {
-        std::size_t mrank = 0;
-        for (auto& b : blocks_) mrank = std::max(mrank, b->maximum_rank());
-        return mrank;
-      }
-      // TODO add total_memory, etc
+      const MPIComm& Comm() const { return grid_->Comm(); }
 
       const ProcessorGrid2D* grid() const { return grid_; }
 
-      void print(const std::string& name) {
-        std::cout << "BLR(" << name << ")="
-                  << rows() << "x" << cols() << ", "
-                  << rowblocks() << "x" << colblocks() << ", "
-                  << (float(nonzeros()) / (rows()*cols()) * 100.) << "%"
-                  << " [" << std::endl;
-        for (std::size_t i=0; i<nbrows_; i++) {
-          for (std::size_t j=0; j<nbcols_; j++) {
-            auto& tij = tile(i, j);
-            if (tij.is_low_rank())
-              std::cout << "LR:" << tij.rows() << "x"
-                        << tij.cols() << "/" << tij.rank() << " ";
-            else std::cout << "D:" << tij.rows() << "x" << tij.cols() << " ";
-          }
-          std::cout << std::endl;
-        }
-        std::cout << "];" << std::endl;
-      }
+      std::vector<int> factor(const Opts_t& opts);
+      std::vector<int> factor(const adm_t& adm, const Opts_t& opts);
+
+      void laswp(const std::vector<int>& piv, bool fwd);
+
+      static
+      std::vector<int> partial_factor(BLRMPI_t& A11, BLRMPI_t& A12,
+                                      BLRMPI_t& A21, BLRMPI_t& A22,
+                                      const adm_t& adm, const Opts_t& opts);
+
+      void compress(const Opts_t& opts);
+
+      static
+      BLRMPI_t from_ScaLAPACK(const DistM_t& A, const ProcessorGrid2D& g,
+                              const Opts_t& opts);
+      static
+      BLRMPI_t from_ScaLAPACK(const DistM_t& A,
+                              const vec_t& Rt, const vec_t& Ct,
+                              const ProcessorGrid2D& g);
+      DistM_t to_ScaLAPACK(const BLACSGrid& g) const;
+      void to_ScaLAPACK(DistM_t& A) const;
+
+      void print(const std::string& name);
+
+      std::size_t rowblocks() const { return brows_; }
+      std::size_t colblocks() const { return bcols_; }
+      std::size_t rowblockslocal() const { return browsloc_; }
+      std::size_t colblockslocal() const { return bcolsloc_; }
+      std::size_t tilerows(std::size_t i) const { return roff_[i+1] - roff_[i]; }
+      std::size_t tilecols(std::size_t j) const { return coff_[j+1] - coff_[j]; }
+      std::size_t tileroff(std::size_t i) const { return roff_[i]; }
+      std::size_t tilecoff(std::size_t j) const { return coff_[j]; }
 
     private:
-      std::size_t m_;
-      std::size_t n_;
-      std::size_t nbrows_;
-      std::size_t nbcols_;
-      std::size_t nbrowslocal_;
-      std::size_t nbcolslocal_;
-      std::vector<std::size_t> roff_;
-      std::vector<std::size_t> coff_;
-      std::vector<std::size_t> rofflocal_;
-      std::vector<std::size_t> cofflocal_;
+      std::size_t rows_, cols_;
+      std::size_t brows_, bcols_;
+      std::size_t browsloc_, bcolsloc_;
+      vec_t roff_, coff_;
       std::vector<std::unique_ptr<BLRTile<scalar_t>>> blocks_;
       const ProcessorGrid2D* grid_ = nullptr;
 
       BLRMatrixMPI(const ProcessorGrid2D& grid,
-                   std::size_t m, const std::vector<std::size_t>& rowtiles,
-                   std::size_t n, const std::vector<std::size_t>& coltiles,
-                   const Opts_t& opts) : m_(m), n_(n), grid_(&grid) {
-        nbrows_ = rowtiles.size();
-        nbcols_ = coltiles.size();
-        roff_.resize(nbrows_+1);
-        coff_.resize(nbcols_+1);
-        for (std::size_t i=1; i<=nbrows_; i++)
-          roff_[i] = roff_[i-1] + rowtiles[i-1];
-        for (std::size_t j=1; j<=nbcols_; j++)
-          coff_[j] = coff_[j-1] + coltiles[j-1];
-        assert(roff_[nbrows_] == m_);
-        assert(coff_[nbcols_] == n_);
-        blocks_.resize(nbrows_ * nbcols_);
+                   const vec_t& Rt, const vec_t& Ct);
 
-        // TODO store local tiles/offsets
+      std::size_t tilerg2l(std::size_t i) const {
+        assert(int(i % grid_->nprows()) == grid_->prow());
+        return i / grid_->nprows();
+      }
+      std::size_t tilecg2l(std::size_t j) const {
+        assert(int(j % grid_->npcols()) == grid_->pcol());
+        return j / grid_->npcols();
       }
 
-      // local???
-      inline std::size_t rowblocks() const { return nbrows_; }
-      inline std::size_t colblocks() const { return nbcols_; }
-      inline std::size_t rowblockslocal() const { return nbrowslocal_; }
-      inline std::size_t colblockslocal() const { return nbcolslocal_; }
-      inline std::size_t tilerows(std::size_t i) const { return roff_[i+1] - roff_[i]; }
-      inline std::size_t tilecols(std::size_t j) const { return coff_[j+1] - coff_[j]; }
-      inline std::size_t tilerowoff(std::size_t i) const { return roff_[i]; }
-      inline std::size_t tilecoloff(std::size_t j) const { return coff_[j]; }
-
-      inline BLRTile<scalar_t>& tile(std::size_t i, std::size_t j) {
-        return *blocks_[i+j*rowblocks()].get();
+      BLRTile<scalar_t>& tile(std::size_t i, std::size_t j) {
+        assert(i < rowblocks() && j < colblocks());
+        return *blocks_[tilerg2l(i)+tilecg2l(j)*rowblockslocal()].get();
       }
-      inline const BLRTile<scalar_t>& tile(std::size_t i, std::size_t j) const {
-        return *blocks_[i+j*rowblocks()].get();
+      const BLRTile<scalar_t>& tile(std::size_t i, std::size_t j) const {
+        assert(i < rowblocks() && j < colblocks());
+        return *blocks_[tilerg2l(i)+tilecg2l(j)*rowblockslocal()].get();
       }
-      inline std::unique_ptr<BLRTile<scalar_t>>& block(std::size_t i, std::size_t j) {
-        return blocks_[i+j*rowblocks()];
+      std::unique_ptr<BLRTile<scalar_t>>&
+      block(std::size_t i, std::size_t j) {
+        assert(i < rowblocks() && j < colblocks());
+        return blocks_[tilerg2l(i)+tilecg2l(j)*rowblockslocal()];
       }
-      inline DenseMW_t tile(DenseM_t& A, std::size_t i, std::size_t j) const {
-        return DenseMW_t
-          (tilerows(i), tilecols(j), A, tilerowoff(i), tilecoloff(j));
+      const std::unique_ptr<BLRTile<scalar_t>>&
+      block(std::size_t i, std::size_t j) const {
+        assert(i < rowblocks() && j < colblocks());
+        return blocks_[tilerg2l(i)+tilecg2l(j)*rowblockslocal()];
       }
 
-      // void create_dense_tile
-      // (std::size_t i, std::size_t j, DenseM_t& A) {
-      //   block(i, j) = std::unique_ptr<DenseTile<scalar_t>>
-      //     (new DenseTile<scalar_t>(tile(A, i, j)));
-      // }
+      void compress_tile(std::size_t i, std::size_t j, const Opts_t& opts);
 
-      void create_LR_tile
-      (std::size_t i, std::size_t j, DenseM_t& A, const Opts_t& opts) {
-        block(i, j) = std::unique_ptr<LRTile<scalar_t>>
-          (new LRTile<scalar_t>(tile(A, i, j), opts));
-        auto& t = tile(i, j);
-        if (t.rank()*(t.rows() + t.cols()) > t.rows()*t.cols())
-          create_dense_tile(i, j, A);
-      }
+      DenseTile<scalar_t>
+      bcast_dense_tile_along_col(std::size_t i, std::size_t j) const;
+      DenseTile<scalar_t>
+      bcast_dense_tile_along_row(std::size_t i, std::size_t j) const;
 
-      // TODO optimize/avoid using this
-      void from_block_cyclic(const DistM_t& A) {
-        blocks_.resize(rowblockslocal()*colblockslocal());
-        for (std::size_t j=0; j<colblocks(); j++)
-          for (std::size_t i=0; i<rowblocks(); i++) {
-            int dest = grid()->b2p(i, j);
-            if (dest == grid()->rank()) {
-              auto B = std::unique_ptr<DenseTile<scalar_t>>
-                (new DenseTile<scalar_t>(tilerows(i), tilecols(j)));
-              copy(tilerows(i), tilecols(j), A, tilerowoff(i), tilecoloff(j),
-                   B.D(), dest, A.grid()->ctxt_all());
-              block(grid()->rowbg2l(i), grid()->colbg2l(j)) = B;
-            } else {
-              DenseM_t dummy;
-              copy(tilerows(i), tilecols(j), A, tilerowoff(i), tilecoloff(j),
-                   dummy, dest, A.grid()->ctxt_all());
-            }
-          }
-      }
+      std::unique_ptr<BLRTile<scalar_t>>
+      bcast_tile(std::size_t i, std::size_t j,
+                 int src, const MPIComm& c) const;
 
-      void to_block_cyclic(const DistM_t& A) {
-        for (std::size_t j=0; j<colblocks(); j++)
-          for (std::size_t i=0; i<rowblocks(); i++) {
-            int dest = grid()->b2p(i, j);
-            if (dest == grid()->rank()) {
-              auto B = block(grid()->rowbg2l(i), grid()->colbg2l(j)).dense();
-              copy(tilerows(i), tilecols(j), B, dest,
-                   A, tilerowoff(i), tilecoloff(j), A.grid()->ctxt_all());
-            } else {
-              DenseM_t dummy;
-              copy(tilerows(i), tilecols(j), dummy, dest,
-                   A, tilerowoff(i), tilecoloff(j), A.grid()->ctxt_all());
-            }
-          }
-      }
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+      bcast_row_of_tiles_along_cols
+      (std::size_t i, std::size_t j0, std::size_t j1) const;
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+      bcast_col_of_tiles_along_rows
+      (std::size_t i0, std::size_t i1, std::size_t j) const;
 
-      // template<typename T> friend void
-      // trsm(Side s, UpLo ul, Trans ta, Diag d, T alpha,
-      //      const BLRMatrix<T>& a, BLRMatrix<T>& b, int task_depth);
-      // template<typename T> friend void
-      // trsm(Side s, UpLo ul, Trans ta, Diag d, T alpha,
-      //      const BLRMatrix<T>& a, DenseMatrix<T>& b, int task_depth);
-      // template<typename T> friend void
-      // gemm(Trans ta, Trans tb, T alpha, const BLRMatrix<T>& a,
-      //      const BLRMatrix<T>& b, T beta, DenseMatrix<T>& c, int task_depth);
-      // template<typename T> friend void
-      // trsv(UpLo ul, Trans ta, Diag d, const BLRMatrix<T>& a,
-      //      DenseMatrix<T>& b, int task_depth);
-      // template<typename T> friend void
-      // gemv(Trans ta, T alpha, const BLRMatrix<T>& a, const DenseMatrix<T>& x,
-      //      T beta, DenseMatrix<T>& y, int task_depth);
+
+      template<typename T> friend void
+      trsv(UpLo ul, Trans ta, Diag d, const BLRMatrixMPI<T>& a,
+           BLRMatrixMPI<T>& b);
+      template<typename T> friend void
+      gemv(Trans ta, T alpha, const BLRMatrixMPI<T>& a,
+           const BLRMatrixMPI<T>& x, T beta, BLRMatrixMPI<T>& y);
+      template<typename T> friend void
+      trsm(Side s, UpLo ul, Trans ta, Diag d, T alpha,
+           const BLRMatrixMPI<T>& a, BLRMatrixMPI<T>& b);
+      template<typename T> friend void
+      gemm(Trans ta, Trans tb, T alpha, const BLRMatrixMPI<T>& a,
+           const BLRMatrixMPI<T>& b, T beta, BLRMatrixMPI<T>& c);
     };
+
+
+    template<typename scalar_t> void
+    trsv(UpLo ul, Trans ta, Diag d, const BLRMatrixMPI<scalar_t>& a,
+         BLRMatrixMPI<scalar_t>& b);
+    template<typename scalar_t> void
+    gemv(Trans ta, scalar_t alpha, const BLRMatrixMPI<scalar_t>& a,
+         const BLRMatrixMPI<scalar_t>& x, scalar_t beta,
+         BLRMatrixMPI<scalar_t>& y);
 
     template<typename scalar_t> void
     trsm(Side s, UpLo ul, Trans ta, Diag d,
          scalar_t alpha, const BLRMatrixMPI<scalar_t>& a,
-         DistributedMatrix<scalar_t>& b) {
-      std::cout << "trsm" << std::endl;
-    }
-
-    template<typename scalar_t> void
-    trsv(UpLo ul, Trans ta, Diag d, const BLRMatrixMPI<scalar_t>& a,
-         DistributedMatrix<scalar_t>& b) {
-      std::cout << "trsv" << std::endl;
-    }
-
-    template<typename scalar_t> void
-    gemv(Trans ta, scalar_t alpha, const BLRMatrixMPI<scalar_t>& a,
-         const DistributedMatrix<scalar_t>& x, scalar_t beta,
-         DistributedMatrix<scalar_t>& y) {
-      std::cout << "gemv" << std::endl;
-    }
-
+         BLRMatrixMPI<scalar_t>& b);
     template<typename scalar_t> void
     gemm(Trans ta, Trans tb, scalar_t alpha, const BLRMatrixMPI<scalar_t>& a,
          const BLRMatrixMPI<scalar_t>& b, scalar_t beta,
-         DistributedMatrix<scalar_t>& c) {
-      std::cout << "gemm" << std::endl;
-    }
-
-    template<typename scalar_t> void
-    gemm(Trans ta, Trans tb, scalar_t alpha, const BLRMatrixMPI<scalar_t>& A,
-         const DistributedMatrix<scalar_t>& B, scalar_t beta,
-         DistributedMatrix<scalar_t>& C) {
-      std::cout << "TODO gemm BLR*DistM+DistM" << std::endl;
-    }
-
+         BLRMatrixMPI<scalar_t>& c);
 
   } // end namespace BLR
 } // end namespace strumpack

@@ -42,8 +42,10 @@ namespace strumpack {
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using BLRT_t = BLRTile<scalar_t>;
+      using Opts_t = BLROptions<scalar_t>;
 
     public:
+      DenseTile() {}
       DenseTile(std::size_t m, std::size_t n) : D_(m, n) {}
       DenseTile(const DenseM_t& D) : D_(D) {}
 
@@ -57,6 +59,11 @@ namespace strumpack {
       bool is_low_rank() const override { return false; };
 
       void dense(DenseM_t& A) const override { A = D_; }
+      DenseM_t dense() const override { return D_; }
+
+      std::unique_ptr<BLRTile<scalar_t>> clone() const;
+
+      std::unique_ptr<LRTile<scalar_t>> compress(const Opts_t& opts) const;
 
       void draw(std::ostream& of, std::size_t roff,
                 std::size_t coff) const override;
