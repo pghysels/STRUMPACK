@@ -829,6 +829,55 @@ namespace strumpack {
       (char(job), char(ul), rows(), data(), ld(), lambda.data());
   }
 
+  template<typename scalar_t> void
+  DenseMatrix<scalar_t>::write(const std::string& fname) const {
+    std::ofstream f(fname, std::ios::out | std::ios::trunc);
+    f << *this;
+  }
+
+  template<typename scalar_t> DenseMatrix<scalar_t>
+  DenseMatrix<scalar_t>::read(const std::string& fname) {
+    std::ifstream f;
+    try {
+      f.open(fname);
+    } catch (std::ios_base::failure& e) {
+      std::cerr << e.what() << std::endl;
+    }
+    DenseMatrix<scalar_t> D;
+    f >> D;
+    return D;
+  }
+
+  template<typename scalar_t> std::ofstream&
+  operator<<(std::ofstream& os, const DenseMatrix<scalar_t>& D) {
+    int v[3];
+    get_version(v[0], v[1], v[2]);
+    os.write((const char*)v, sizeof(v));
+    os.write((const char*)(&D), sizeof(DenseMatrix<scalar_t>));
+      os.write((const char*)(D.data()), sizeof(scalar_t)*D.rows()*D.cols());
+      return os;
+  }
+
+  template<typename scalar_t> std::ifstream&
+  operator>>(std::ifstream& is, DenseMatrix<scalar_t>& D) {
+    int v[3], vf[3];
+    get_version(v[0], v[1], v[2]);
+    is.read((char*)vf, sizeof(vf));
+    if (v[0] != vf[0] || v[1] != vf[1] || v[2] != vf[2]) {
+      std::cerr << "Warning, file was created with a different"
+                << " strumpack version (v"
+                << vf[0] << "." << vf[1] << "." << vf[2]
+                << " instead of v"
+                << v[0] << "." << v[1] << "." << v[2]
+                << ")" << std::endl;
+    }
+    is.read((char*)&D, sizeof(DenseMatrix<scalar_t>));
+    D.data_ = new scalar_t[D.rows()*D.cols()];
+    is.read((char*)D.data(), sizeof(scalar_t)*D.rows()*D.cols());
+    return is;
+  }
+
+
 
   /**
    * GEMM, defined for DenseMatrix objects (or DenseMatrixWrapper).

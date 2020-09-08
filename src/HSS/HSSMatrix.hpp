@@ -39,6 +39,7 @@
 
 #include <cassert>
 #include <functional>
+#include <string>
 
 #include "HSSPartitionTree.hpp"
 #include "HSSBasisID.hpp"
@@ -147,9 +148,7 @@ namespace strumpack {
        * stored in the kernel object.
        * \param opts object containing a number of HSS options
        */
-      HSSMatrix
-      (kernel::Kernel<real_t>& K, const opts_t& opts);
-
+      HSSMatrix(kernel::Kernel<real_t>& K, const opts_t& opts);
 
       /**
        * Copy constructor. Copying an HSSMatrix can be an expensive
@@ -482,19 +481,33 @@ namespace strumpack {
 
       void shift(scalar_t sigma) override;
 
-      void draw
-      (std::ostream& of, std::size_t rlo=0, std::size_t clo=0) const override;
+      void draw(std::ostream& of,
+                std::size_t rlo=0, std::size_t clo=0) const override;
+
+      /**
+       * Write this HSSMatrix<scalar_t> to a binary file, called
+       * fname.
+       *
+       * \see read
+       */
+      void write(const std::string& fname) const;
+
+      /**
+       * Read an HSSMatrix<scalar_t> from a binary file, called
+       * fname.
+       *
+       * \see write
+       */
+      static HSSMatrix<scalar_t> read(const std::string& fname);
 
     protected:
-      HSSMatrix
-      (std::size_t m, std::size_t n, const opts_t& opts, bool active);
+      HSSMatrix(std::size_t m, std::size_t n,
+                const opts_t& opts, bool active);
       HSSMatrix(const HSSPartitionTree& t, const opts_t& opts, bool active);
+      HSSMatrix(std::ifstream& is);
 
-      HSSBasisID<scalar_t> _U;
-      HSSBasisID<scalar_t> _V;
-      DenseM_t _D;
-      DenseM_t _B01;
-      DenseM_t _B10;
+      HSSBasisID<scalar_t> _U, _V;
+      DenseM_t _D, _B01, _B10;
 
       void compress_original(const DenseM_t& A, const opts_t& opts);
       void compress_original
@@ -633,6 +646,9 @@ namespace strumpack {
        */
       template<typename T> friend void draw
       (const HSSMatrix<T>& H, const std::string& name);
+
+      void read(std::ifstream& is) override;
+      void write(std::ofstream& os) const override;
 
       friend class HSSMatrixMPI<scalar_t>;
     };

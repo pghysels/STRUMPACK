@@ -106,6 +106,12 @@ namespace strumpack {
     }
 
     template<typename scalar_t>
+    HSSMatrix<scalar_t>::HSSMatrix(std::ifstream& is)
+      : HSSMatrixBase<scalar_t>(0, 0, true) {
+      read(is);
+    }
+
+    template<typename scalar_t>
     HSSMatrix<scalar_t>::HSSMatrix(const HSSMatrix<scalar_t>& other)
       : HSSMatrixBase<scalar_t>(other) {
       _U = other._U;
@@ -418,6 +424,81 @@ namespace strumpack {
           A.applyT_bwd(B, beta, C, w, true, A._openmp_task_depth, flops);
         }
       }
+    }
+
+
+    template<typename scalar_t> void
+    HSSMatrix<scalar_t>::write(std::ofstream& os) const {
+      os.write((const char*)&this->_rows, sizeof(this->_rows));
+      os.write((const char*)&this->_cols, sizeof(this->_cols));
+      os.write((const char*)&this->_U_state, sizeof(this->_U_state));
+      os.write((const char*)&this->_V_state, sizeof(this->_V_state));
+      os.write((const char*)&this->_openmp_task_depth, sizeof(this->_openmp_task_depth));
+      os.write((const char*)&this->_active, sizeof(this->_active));
+      os.write((const char*)&this->_U_rank, sizeof(this->_U_rank));
+      os.write((const char*)&this->_U_rows, sizeof(this->_U_rows));
+      os.write((const char*)&this->_V_rank, sizeof(this->_V_rank));
+      os.write((const char*)&this->_V_rows, sizeof(this->_V_rows));
+      os << this->_Asub;
+      os << _U << _V << _D << _B01 << _B10;
+      int nc = this->_ch.size();
+      os.write((const char*)&nc, sizeof(nc));
+      for (auto& c : this->_ch)
+        c->write(os);
+    }
+
+    template<typename scalar_t> void
+    HSSMatrix<scalar_t>::read(std::ifstream& is) {
+      is.read((char*)&this->_rows, sizeof(this->_rows));
+      is.read((char*)&this->_cols, sizeof(this->_cols));
+      is.read((char*)&this->_U_state, sizeof(this->_U_state));
+      is.read((char*)&this->_V_state, sizeof(this->_V_state));
+      is.read((char*)&this->_openmp_task_depth, sizeof(this->_openmp_task_depth));
+      is.read((char*)&this->_active, sizeof(this->_active));
+      is.read((char*)&this->_U_rank, sizeof(this->_U_rank));
+      is.read((char*)&this->_U_rows, sizeof(this->_U_rows));
+      is.read((char*)&this->_V_rank, sizeof(this->_V_rank));
+      is.read((char*)&this->_V_rows, sizeof(this->_V_rows));
+      is >> this->_Asub;
+      is >> _U >> _V >> _D >> _B01 >> _B10;
+      int nc = 0;
+      is.read((char*)&nc, sizeof(nc));
+      this->_ch.resize(nc);
+      for (auto& c : this->_ch)
+        c.reset(new HSSMatrix<scalar_t>(is));
+    }
+
+    template<typename scalar_t> void
+    HSSMatrix<scalar_t>::write(const std::string& fname) const {
+      std::ofstream f(fname, std::ios::out | std::ios::trunc);
+      int v[3];
+      get_version(v[0], v[1], v[2]);
+      f.write((const char*)v, sizeof(v));
+      write(f);
+    }
+
+    template<typename scalar_t> HSSMatrix<scalar_t>
+    HSSMatrix<scalar_t>::read(const std::string& fname) {
+      std::ifstream f;
+      try {
+        f.open(fname);
+      } catch (std::ios_base::failure& e) {
+        std::cerr << e.what() << std::endl;
+      }
+      int v[3], vf[3];
+      get_version(v[0], v[1], v[2]);
+      f.read((char*)vf, sizeof(vf));
+      if (v[0] != vf[0] || v[1] != vf[1] || v[2] != vf[2]) {
+        std::cerr << "Warning, file was created with a different"
+                  << " strumpack version (v"
+                  << vf[0] << "." << vf[1] << "." << vf[2]
+                  << " instead of v"
+                  << v[0] << "." << v[1] << "." << v[2]
+                  << ")" << std::endl;
+      }
+      HSSMatrix<scalar_t> H;
+      H.read(f);
+      return H;
     }
 
     // explicit template instantiations

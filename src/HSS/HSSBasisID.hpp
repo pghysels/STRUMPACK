@@ -89,6 +89,28 @@ namespace strumpack {
 
       long long int apply_flops(std::size_t nrhs) const;
       long long int applyC_flops(std::size_t nrhs) const;
+
+      friend std::ofstream& operator<<
+      (std::ofstream& os, const HSSBasisID<scalar_t>& B) {
+        std::size_t Psize = B._P.size();
+        os.write((const char*)&Psize, sizeof(std::size_t));
+        os.write((const char*)(B._P.data()),
+                 sizeof(typename decltype(B._P)::value_type)*Psize);
+        os << B._E;
+        return os;
+      }
+      friend std::ifstream& operator>>
+      (std::ifstream& is, HSSBasisID<scalar_t>& B) {
+        std::size_t Psize;
+        is.read((char*)&Psize, sizeof(std::size_t));
+        B._P.resize(Psize);
+        is.read((char*)(B._P.data()),
+                sizeof(typename decltype(B._P)::value_type)*Psize);
+        is >> B._E;
+        B.check();
+        return is;
+      }
+
     };
 
     template<typename scalar_t>

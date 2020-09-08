@@ -36,6 +36,8 @@
 
 #include <cassert>
 #include <iostream>
+#include <fstream>
+#include <string>
 #include <vector>
 #include <functional>
 
@@ -541,6 +543,13 @@ namespace strumpack {
       (const DistM_t& A, std::size_t Arlo, std::size_t Aclo,
        std::vector<scalar_t*>& pbuf);
       virtual void delete_redistributed_input();
+
+      virtual void read(std::ifstream& os) {
+        std::cerr << "ERROR read_HSS_node not implemented" << std::endl;
+      };
+      virtual void write(std::ofstream& os) const {
+        std::cerr << "ERROR write_HSS_node not implemented" << std::endl;
+      };
 
       friend class HSSMatrixMPI<scalar_t>;
 #endif //defined(STRUMPACK_USE_MPI)

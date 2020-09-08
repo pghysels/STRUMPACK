@@ -912,6 +912,22 @@ namespace strumpack {
      */
     int syev(Jobz job, UpLo ul, std::vector<scalar_t>& lambda);
 
+    /**
+     * Write this DenseMatrix<scalar_t> to a binary file, called
+     * fname.
+     *
+     * \see read
+     */
+    void write(const std::string& fname) const;
+
+    /**
+     * Read a DenseMatrix<scalar_t> from a binary file, called
+     * fname.
+     *
+     * \see write
+     */
+    static DenseMatrix<scalar_t> read(const std::string& fname);
+
   private:
     void ID_column_GEQP3
     (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
@@ -919,6 +935,11 @@ namespace strumpack {
      real_t abs_tol, int max_rank, int depth);
 
     template<typename T> friend class DistributedMatrix;
+
+    template<typename T> friend std::ofstream&
+    operator<<(std::ofstream& os, const DenseMatrix<T>& D);
+    template<typename T> friend std::ifstream&
+    operator>>(std::ifstream& is, DenseMatrix<T>& D);
   };
 
 
