@@ -112,9 +112,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> std::vector<std::size_t>
   FrontalMatrix<scalar_t,integer_t>::upd_to_parent
   (const F_t* pa, std::size_t& upd2sep) const {
-    integer_t r = 0;
-    integer_t dupd = dim_upd();
-    integer_t pa_dsep = pa->dim_sep();
+    integer_t r = 0, dupd = dim_upd(), pa_dsep = pa->dim_sep();
     std::vector<std::size_t> I(dupd);
     for (; r<dupd; r++) {
       auto up = upd_[r];

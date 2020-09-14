@@ -308,6 +308,12 @@ namespace strumpack {
          const DenseMatrix<scalar_t>& b, scalar_t beta,
          DenseMatrix<scalar_t>& c);
 
+    template<typename scalar_t> void
+    gemv(BLASHandle& handle, Trans ta,
+         scalar_t alpha, const DenseMatrix<scalar_t>& a,
+         const DenseMatrix<scalar_t>& x, scalar_t beta,
+         DenseMatrix<scalar_t>& y);
+
   } // end namespace gpu
 } // end namespace strumpack
 

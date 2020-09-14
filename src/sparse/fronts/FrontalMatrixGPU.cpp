@@ -61,18 +61,21 @@ namespace strumpack {
       for (auto F : f) {
         auto dsep = F->dim_sep();
         auto dupd = F->dim_upd();
-        factor_size += dsep*dsep + 2*dsep*dupd;
-        schur_size += dupd*dupd;
+        L_size += dsep*dsep + dsep*dupd;
+        U_size += dsep*dupd;
+        Schur_size += dupd*dupd;
         piv_size += dsep;
+        total_upd_size += dupd;
         if (dsep <= 8)       N8++;
         else if (dsep <= 16) N16++;
         else if (dsep <= 32) N32++;
         if (dsep > max_dsep) max_dsep = dsep;
       }
+      factor_size = L_size + U_size;
       getrf_work_size = gpu::getrf_buffersize<scalar_t>(handle, max_dsep);
       work_bytes =
         round_to_8(sizeof(scalar_t) *
-                   (schur_size + getrf_work_size * max_streams)) +
+                   (Schur_size + getrf_work_size * max_streams)) +
         round_to_8(sizeof(int) * (piv_size + max_streams)) +
         round_to_8(sizeof(gpu::FrontData<scalar_t>) * (N8 + N16 + N32));
     }
@@ -84,7 +87,7 @@ namespace strumpack {
                 << N32 << " <=32, needs "
                 << factor_size * sizeof(scalar_t) / 1.e6
                 << " MB for factors, "
-                << schur_size * sizeof(scalar_t) / 1.e6
+                << Schur_size * sizeof(scalar_t) / 1.e6
                 << " MB for Schur complements" << std::endl;
     }
 
@@ -100,15 +103,58 @@ namespace strumpack {
       return level_flops;
     }
 
+    /*
+     * store the factors front per front, ie,
+     *  F11, F12, F21, F11, F12, F21, ...
+     */
+    // void set_factor_pointers(scalar_t* factors) {
+    //   for (auto F : f) {
+    //     const int dsep = F->dim_sep();
+    //     const int dupd = F->dim_upd();
+    //     F->F11_ = DenseMW_t(dsep, dsep, factors, dsep); factors += dsep*dsep;
+    //     F->F12_ = DenseMW_t(dsep, dupd, factors, dsep); factors += dsep*dupd;
+    //     F->F21_ = DenseMW_t(dupd, dsep, factors, dupd); factors += dupd*dsep;
+    //   }
+    // }
+
+
+    /*
+     * first store L factors, then U factors,
+     *  F11, F21, F11, F21, ..., F12, F12, ...
+     */
     void set_factor_pointers(scalar_t* factors) {
       for (auto F : f) {
         const int dsep = F->dim_sep();
         const int dupd = F->dim_upd();
         F->F11_ = DenseMW_t(dsep, dsep, factors, dsep); factors += dsep*dsep;
-        F->F12_ = DenseMW_t(dsep, dupd, factors, dsep); factors += dsep*dupd;
         F->F21_ = DenseMW_t(dupd, dsep, factors, dupd); factors += dupd*dsep;
       }
+      for (auto F : f) {
+        const int dsep = F->dim_sep();
+        const int dupd = F->dim_upd();
+        F->F12_ = DenseMW_t(dsep, dupd, factors, dsep); factors += dsep*dupd;
+      }
     }
+
+    // void set_L_solve_pointers
+    // (scalar_t* L, int nrhs, scalar_t* b, scalar_t* bupd) {
+    //   for (auto F : f) {
+    //     const int dsep = F->dim_sep();
+    //     const int dupd = F->dim_upd();
+    //     F->F11_ = DenseMW_t(dsep, dsep, L, dsep); L += dsep*dsep;
+    //     F->F21_ = DenseMW_t(dupd, dsep, L, dupd); L += dupd*dsep;
+    //   }
+    //   for (auto F : f) {
+    //     const int dsep = F->dim_sep();
+    //     const int dupd = F->dim_upd();
+    //     F->F11_ = DenseMW_t(dsep, dsep, L, dsep); L += dsep*dsep;
+    //     F->F21_ = DenseMW_t(dupd, dsep, L, dupd); L += dupd*dsep;
+    //   }
+    // }
+
+    // void set_U_solve_pointers
+    // (scalar_t* U, int nrhs, scalar_t* b, scalar_t* bupd) {
+    // }
 
     void set_pivot_pointers(int* pmem) {
       for (auto F : f) {
@@ -143,7 +189,8 @@ namespace strumpack {
     }
 
     std::vector<FG_t*> f;
-    std::size_t factor_size = 0, schur_size = 0, piv_size = 0,
+    std::size_t L_size = 0, U_size = 0, factor_size = 0,
+      Schur_size = 0, piv_size = 0, total_upd_size = 0,
       work_bytes = 0, N8 = 0, N16 = 0, N32 = 0;
     scalar_t* dev_getrf_work = nullptr;
     int* dev_getrf_err = nullptr;
@@ -265,15 +312,18 @@ namespace strumpack {
     gpu::HostMemory<char> host_ea_mem(ea_mem_size);
     gpu::DeviceMemory<char> dev_ea_mem(ea_mem_size);
     auto asmbl = host_ea_mem.as<gpu::AssembleData<scalar_t>>();
-    auto Imem = reinterpret_cast<std::size_t*>(asmbl + N);
-    auto delems = reinterpret_cast<Trip_t*>(Imem + Isize);
+    auto Iptr = reinterpret_cast<std::size_t*>(asmbl + N);
+    auto delems = reinterpret_cast<Trip_t*>(Iptr + Isize);
     auto de11 = delems;
     auto de12 = de11 + e11.size();
     auto de21 = de12 + e12.size();
     std::copy(e11.begin(), e11.end(), de11);
     std::copy(e12.begin(), e12.end(), de12);
     std::copy(e21.begin(), e21.end(), de21);
-    auto Iptr = Imem;
+
+    auto dIptr = reinterpret_cast<std::size_t*>
+      (dev_ea_mem.as<gpu::AssembleData<scalar_t>>() + N);
+
     for (std::size_t n=0; n<N; n++) {
       auto& f = *(L.f[n]);
       asmbl[n] = gpu::AssembleData<scalar_t>
@@ -283,17 +333,19 @@ namespace strumpack {
          de11+ne[n][0], de12+ne[n][1], de21+ne[n][2]);
       if (f.lchild_) {
         auto c = dynamic_cast<FG_t*>(f.lchild_.get());
-        asmbl[n].set_ext_add_left(c->dim_upd(), c->F22_.data(), Iptr);
+        asmbl[n].set_ext_add_left(c->dim_upd(), c->F22_.data(), dIptr);
         auto u = c->upd_to_parent(&f);
         std::copy(u.begin(), u.end(), Iptr);
         Iptr += u.size();
+        dIptr += u.size();
       }
       if (f.rchild_) {
         auto c = dynamic_cast<FG_t*>(f.rchild_.get());
-        asmbl[n].set_ext_add_right(c->dim_upd(), c->F22_.data(), Iptr);
+        asmbl[n].set_ext_add_right(c->dim_upd(), c->F22_.data(), dIptr);
         auto u = c->upd_to_parent(&f);
         std::copy(u.begin(), u.end(), Iptr);
         Iptr += u.size();
+        dIptr += u.size();
       }
     }
     gpu::copy_host_to_device<char>(dev_ea_mem, host_ea_mem, ea_mem_size);
@@ -304,7 +356,7 @@ namespace strumpack {
 
   template<typename scalar_t, typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::factor_small_fronts
-  (LInfo_t& L, gpu::FrontData<scalar_t>* front_data) {
+  (LInfo_t& L, gpu::FrontData<scalar_t>* fdata) {
     if (L.N8 || L.N16 || L.N32) {
       for (std::size_t n=0, n8=0, n16=L.N8, n32=L.N8+L.N16;
            n<L.f.size(); n++) {
@@ -314,12 +366,12 @@ namespace strumpack {
           gpu::FrontData<scalar_t>
             t(dsep, f.dim_upd(), f.F11_.data(), f.F12_.data(),
               f.F21_.data(), f.F22_.data(), f.piv_);
-          if (dsep <= 8)       front_data[n8++] = t;
-          else if (dsep <= 16) front_data[n16++] = t;
-          else                 front_data[n32++] = t;
+          if (dsep <= 8)       fdata[n8++] = t;
+          else if (dsep <= 16) fdata[n16++] = t;
+          else                 fdata[n32++] = t;
         }
       }
-      gpu::copy_host_to_device(L.f8, front_data, L.N8+L.N16+L.N32);
+      gpu::copy_host_to_device(L.f8, fdata, L.N8+L.N16+L.N32);
       gpu::factor_block_batch<scalar_t,8>(L.N8, L.f8);
       gpu::factor_block_batch<scalar_t,16>(L.N16, L.f16);
       gpu::factor_block_batch<scalar_t,32>(L.N32, L.f32);
@@ -366,6 +418,8 @@ namespace strumpack {
     if (rchild_)
       rchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
 
+    STRUMPACK_ADD_MEMORY(dsep*(dsep+2*dupd)*sizeof(scalar_t));
+    STRUMPACK_ADD_MEMORY(dupd*dupd*sizeof(scalar_t));
     factor_mem_.reset(new scalar_t[dsep*(dsep+2*dupd)]);
     host_Schur_.reset(new scalar_t[dupd*dupd]);
     {
@@ -421,36 +475,6 @@ namespace strumpack {
                   dF21, dF12, scalar_t(1.), dF22);
         gpu::copy_device_to_host(host_Schur_.get(), dF22);
       }
-
-      // gpu::SOLVERHandle sh;
-      // gpu::DeviceMemory<scalar_t> dmem
-      //   ((dsep+dupd)*(dsep+dupd) + gpu::getrf_buffersize<scalar_t>(sh, dsep));
-      // gpu::DeviceMemory<int> dpiv(dsep+1); // and ierr
-      // // TODO more overlapping??
-      // gpu::copy_host_to_device
-      //   (dmem.template as<scalar_t>(), factor_mem_.get(), dsep*(dsep+2*dupd));
-      // gpu::copy_host_to_device
-      //   (dmem+dsep*(dsep+2*dupd), host_Schur_.get(), dupd*dupd);
-      // DenseMW_t dF11(dsep, dsep, dmem, dsep);
-      // DenseMW_t dF12(dsep, dupd, dmem+dsep*dsep, dsep);
-      // DenseMW_t dF21(dupd, dsep, dmem+dsep*(dsep+dupd), dupd);
-      // DenseMW_t dF22(dupd, dupd, dmem+dsep*(dsep+2*dupd), dupd);
-      // scalar_t* getrf_work = dmem+(dsep+dupd)*(dsep+dupd);
-      // gpu::getrf(sh, dF11, getrf_work, dpiv, dpiv+dsep);
-      // // TODO if (opts.replace_tiny_pivots()) { ...
-      // if (dupd) {
-      //   gpu::getrs(sh, Trans::N, dF11, dpiv, dF12, dpiv+dsep);
-      //   gpu::BLASHandle bh;
-      //   gpu::gemm(bh, Trans::N, Trans::N, scalar_t(-1.),
-      //             dF21, dF12, scalar_t(1.), dF22);
-      // }
-      // pivot_mem_.resize(dsep);
-      // piv_ = pivot_mem_.data();
-      // gpu::copy_device_to_host(piv_, dpiv.as<int>(), dsep);
-      // gpu::copy_device_to_host
-      //   (factor_mem_.get(), dmem.template as<scalar_t>(), dsep*(dsep+dupd));
-      // gpu::copy_device_to_host
-      //   (host_Schur_.get(), dmem+dsep*(dsep+2*dupd), dupd*dupd);
     }
     // count flops
     auto level_flops = LU_flops(F11_) +
@@ -496,7 +520,7 @@ namespace strumpack {
       blas_handles[i].set_stream(streams[i]);
       solver_handles[i].set_stream(streams[i]);
     }
-    gpu::HostMemory<gpu::FrontData<scalar_t>> front_data(max_small_fronts);
+    gpu::HostMemory<gpu::FrontData<scalar_t>> fdata(max_small_fronts);
     gpu::DeviceMemory<char> old_work;
     for (int l=lvls-1; l>=0; l--) {
       TaskTimer tl("");
@@ -507,22 +531,23 @@ namespace strumpack {
         gpu::DeviceMemory<scalar_t> dev_factors(L.factor_size);
         gpu::DeviceMemory<char> work_mem(L.work_bytes);
         gpu::memset<scalar_t>(dev_factors, 0, L.factor_size);
-        gpu::memset<scalar_t>(work_mem.as<scalar_t>(), 0, L.schur_size);
+        gpu::memset<scalar_t>(work_mem.as<scalar_t>(), 0, L.Schur_size);
         L.set_factor_pointers(dev_factors);
         L.set_work_pointers(work_mem, max_streams);
         front_assembly(A, L);
         old_work = std::move(work_mem);
-        factor_small_fronts(L, front_data);
+        factor_small_fronts(L, fdata);
         factor_large_fronts(L, blas_handles, solver_handles);
         STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
         L.f[0]->factor_mem_.reset(new scalar_t[L.factor_size]);
         L.f[0]->pivot_mem_.resize(L.piv_size);
         gpu::synchronize();
+        gpu::copy_device_to_host_async
+          (L.f[0]->pivot_mem_.data(), L.f[0]->piv_,
+           L.piv_size, streams[0]);
         gpu::copy_device_to_host_async<scalar_t>
           (L.f[0]->factor_mem_.get(), dev_factors,
            L.factor_size, streams[1 % streams.size()]);
-        gpu::copy_device_to_host_async
-          (L.f[0]->pivot_mem_.data(), L.f[0]->piv_, L.piv_size, streams[0]);
         L.set_factor_pointers(L.f[0]->factor_mem_.get());
         L.set_pivot_pointers(L.f[0]->pivot_mem_.data());
         gpu::synchronize();
@@ -550,6 +575,264 @@ namespace strumpack {
     }
   }
 
+
+  // template<typename scalar_t,typename integer_t>
+  // bool sufficient_device_memory_solve
+  // (const std::vector<LevelInfo<scalar_t,integer_t>>& ldata,
+  //  bool fwd, int nrhs) {
+  //   std::size_t peak_device = 0;
+  //   for (std::size_t l=0; l<ldata.size(); l++) {
+  //     auto& L = ldata[l];
+  //     std::size_t level_mem = (fwd ? L.L_size : L.U_size)
+  //       + nrhs * (L.piv_size + L.total_upd_size);
+  //     if (l+1 < ldata.size())
+  //       level_mem += nrhs * ldata[l+1].total_upd_size;
+  //     peak_device = std::max(peak_device_mem, level_mem);
+  //   }
+  //   return peak_device_mem * sizeof(scalar_t) < gpu::available_memory();
+  // }
+
+
+  template<typename scalar_t, typename integer_t> void
+  FrontalMatrixGPU<scalar_t,integer_t>::assemble_rhs
+  (int nrhs, LInfo_t& L, scalar_t* db, scalar_t* dbupd,
+   scalar_t* old_dbupd) const {
+    auto N = L.f.size();
+    std::size_t Isize = 0;
+    for (std::size_t n=0; n<N; n++) {
+      auto& f = *(L.f[n]);
+      if (f.lchild_) Isize += f.lchild_->dim_upd();
+      if (f.rchild_) Isize += f.rchild_->dim_upd();
+    }
+    std::size_t ea_mem_size = N*sizeof(gpu::AssembleData<scalar_t>) +
+      Isize*sizeof(std::size_t);
+    gpu::HostMemory<char> host_ea_mem(ea_mem_size);
+    gpu::DeviceMemory<char> dev_ea_mem(ea_mem_size);
+    auto asmbl = host_ea_mem.as<gpu::AssembleData<scalar_t>>();
+    auto Iptr = reinterpret_cast<std::size_t*>(asmbl + N);
+    auto dIptr = reinterpret_cast<std::size_t*>
+      (dev_ea_mem.as<gpu::AssembleData<scalar_t>>() + N);
+    for (std::size_t n=0; n<N; n++) {
+      auto& f = *(L.f[n]);
+      const auto dsep = f.dim_sep();
+      const auto dupd = f.dim_upd();
+      asmbl[n] = gpu::AssembleData<scalar_t>(dsep, dupd, db, dbupd);
+      if (f.lchild_) {
+        auto c = dynamic_cast<FG_t*>(f.lchild_.get());
+        auto cdupd = c->dim_upd();
+        asmbl[n].set_ext_add_left(cdupd, old_dbupd, dIptr);
+        auto u = c->upd_to_parent(&f);
+        std::copy(u.begin(), u.end(), Iptr);
+        Iptr += cdupd;
+        dIptr += cdupd;
+        old_dbupd += cdupd*nrhs;
+      }
+      if (f.rchild_) {
+        auto c = dynamic_cast<FG_t*>(f.rchild_.get());
+        auto cdupd = c->dim_upd();
+        asmbl[n].set_ext_add_right(cdupd, old_dbupd, dIptr);
+        auto u = c->upd_to_parent(&f);
+        std::copy(u.begin(), u.end(), Iptr);
+        Iptr += cdupd;
+        dIptr += cdupd;
+        old_dbupd += cdupd*nrhs;
+      }
+      db += dsep*nrhs;
+      dbupd += dupd*nrhs;
+    }
+    gpu::copy_host_to_device<char>(dev_ea_mem, host_ea_mem, ea_mem_size);
+    gpu::extend_add_rhs(nrhs, N, asmbl);
+    gpu::synchronize();
+  }
+
+  template<typename scalar_t, typename integer_t> void
+  FrontalMatrixGPU<scalar_t,integer_t>::fwd_solve_small_fronts
+  (int nrhs, LInfo_t& L, gpu::FrontData<scalar_t>* fdata,
+   gpu::FrontData<scalar_t>* dfdata, scalar_t* dL, int* dpiv,
+   scalar_t* db, scalar_t* dbupd) const {
+    if (L.N8 || L.N16 || L.N32) {
+      for (std::size_t n=0, n8=0, n16=L.N8, n32=L.N8+L.N16;
+           n<L.f.size(); n++) {
+        auto& f = *(L.f[n]);
+        const auto dsep = f.dim_sep();
+        const auto dupd = f.dim_upd();
+        if (dsep <= 32) {
+          gpu::FrontData<scalar_t>
+            t(dsep, dupd, dL, db, dL+dsep*dsep, dbupd, dpiv);
+          if (dsep <= 8)       fdata[n8++] = t;
+          else if (dsep <= 16) fdata[n16++] = t;
+          else                 fdata[n32++] = t;
+        }
+        dpiv += dsep;
+        dL += dsep*(dsep+dupd);
+        db += dsep*nrhs;
+        dbupd += dupd*nrhs;
+      }
+      gpu::FrontData<scalar_t>* f8 = dfdata;
+      auto f16 = f8 + L.N8;
+      auto f32 = f16 + L.N16;
+      gpu::copy_host_to_device(f8, fdata, L.N8+L.N16+L.N32);
+      gpu::fwd_solve_block_batch<scalar_t,8>(nrhs, L.N8, f8);
+      gpu::fwd_solve_block_batch<scalar_t,16>(nrhs, L.N16, f16);
+      gpu::fwd_solve_block_batch<scalar_t,32>(nrhs, L.N32, f32);
+    }
+  }
+
+  template<typename scalar_t, typename integer_t> void
+  FrontalMatrixGPU<scalar_t,integer_t>::fwd_solve_large_fronts
+  (int nrhs, LInfo_t& L, scalar_t* dL, int* dpiv,
+   int* derr, scalar_t* db, scalar_t* dbupd,
+   std::vector<gpu::BLASHandle>& blas_handles,
+   std::vector<gpu::SOLVERHandle>& solver_handles) const {
+    for (std::size_t n=0; n<L.f.size(); n++) {
+      auto& f = *(L.f[n]);
+      auto stream = n % solver_handles.size();
+      const auto dsep = f.dim_sep();
+      const auto dupd = f.dim_upd();
+      if (dsep > 32) {
+        DenseMW_t b(dsep, nrhs, db, dsep),
+          bupd(dupd, nrhs, dbupd, dupd), F11(dsep, dsep, dL, dsep),
+          F21(dupd, dsep, dL+dsep*dsep, dupd);
+        gpu::getrs
+          (solver_handles[stream], Trans::N, F11, dpiv,
+           b, derr + stream);
+        if (dupd) {
+          if (nrhs == 1)
+            gpu::gemv(blas_handles[stream], Trans::N,
+                      scalar_t(-1.), F21, b, scalar_t(1.), bupd);
+          else
+            gpu::gemm(blas_handles[stream], Trans::N, Trans::N,
+                      scalar_t(-1.), F21, b, scalar_t(1.), bupd);
+        }
+      }
+      dpiv += dsep;
+      dL += dsep*(dsep+dupd);
+      db += dsep*nrhs;
+      dbupd += dupd*nrhs;
+    }
+  }
+
+#if 1
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixGPU<scalar_t,integer_t>::forward_multifrontal_solve
+  (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const {
+    using LevelInfo_t = LevelInfo<scalar_t,integer_t>;
+    const int lvls = this->levels();
+    const int d = b.cols();
+    const int max_streams = 1; //opts.gpu_streams();
+    std::vector<gpu::SOLVERHandle> solver_handles(max_streams);
+    std::vector<LevelInfo_t> ldata(lvls);
+    std::size_t max_small_fronts = 0, maxLb = 0;
+    for (int l=lvls-1; l>=0; l--) {
+      std::vector<F_t*> fp;
+      fp.reserve(std::pow(2, l));
+      const_cast<FG_t*>(this)->get_level_fronts(fp, l);
+      auto& L = ldata[l];
+      L = LevelInfo_t(fp, solver_handles[0], max_streams);
+      max_small_fronts = std::max(max_small_fronts, L.N8+L.N16+L.N32);
+      maxLb = std::max(maxLb, L.L_size + d*L.piv_size);
+    }
+
+    // TODO, if the factorization was split, then split here as well,
+    // keep a bool???
+
+    // still check if memory is sufficient, if not, then split rhs
+    // along column dimension
+
+    // if (!sufficient_device_memory_solve(ldata, true, b.cols())) {
+    //   std::cerr << "ERROR: factors do not fit in GPU" << std::endl;
+    //   abort();
+    //   // split_smaller(A, opts, etree_level, task_depth);
+    //   // return;
+    // }
+
+    std::vector<gpu::Stream> streams(max_streams);
+    std::vector<gpu::BLASHandle> blas_handles(max_streams);
+    for (int i=0; i<max_streams; i++) {
+      blas_handles[i].set_stream(streams[i]);
+      solver_handles[i].set_stream(streams[i]);
+    }
+    // use front data to also store pointers to b, bupd
+    gpu::HostMemory<gpu::FrontData<scalar_t>> fdata(max_small_fronts);
+    gpu::DeviceMemory<gpu::FrontData<scalar_t>> dfdata(max_small_fronts);
+    gpu::DeviceMemory<scalar_t> old_dev_bupd, dev_L(maxLb);
+    try {
+      for (int l=lvls-1; l>=0; l--) {
+        // TaskTimer tl("");
+        // tl.start();
+        auto& L = ldata[l];
+        gpu::DeviceMemory<scalar_t> dev_bupd(d * L.total_upd_size);
+        scalar_t* dev_b = dev_L + L.L_size;
+        gpu::DeviceMemory<int> dev_piv(L.piv_size + max_streams);
+        int* dev_err = dev_piv + L.piv_size;
+
+        gpu::copy_host_to_device<scalar_t>
+          (dev_L, L.f[0]->factor_mem_.get(), L.L_size);
+        gpu::copy_host_to_device<int>
+          (dev_piv, L.f[0]->pivot_mem_.data(), L.piv_size);
+
+        gpu::memset<scalar_t>(dev_bupd, 0, d*L.total_upd_size);
+
+        std::unique_ptr<scalar_t[]> allb(new scalar_t[d * L.piv_size]);
+        {
+          auto bptr = allb.get();
+          for (std::size_t n=0; n<L.f.size(); n++) {
+            auto& f = *(L.f[n]);
+            const auto dsep = f.dim_sep();
+            for (int i=0; i<d; i++) {
+              std::copy(b.ptr(f.sep_begin_, i),
+                        b.ptr(f.sep_end_, i), bptr);
+              bptr += dsep;
+            }
+          }
+        }
+        // copy b to device
+        gpu::copy_host_to_device<scalar_t>
+          (dev_b, allb.get(), d * L.piv_size);
+
+        if (l != lvls-1)
+          assemble_rhs(d, L, dev_b, dev_bupd, old_dev_bupd);
+
+        fwd_solve_small_fronts
+          (d, L, fdata, dfdata, dev_L, dev_piv, dev_b, dev_bupd);
+        fwd_solve_large_fronts
+          (d, L, dev_L, dev_piv, dev_err, dev_b, dev_bupd,
+           blas_handles, solver_handles);
+
+        gpu::synchronize();
+        old_dev_bupd = std::move(dev_bupd);
+
+        // copy b from device back to (contiguous) host memory
+        gpu::copy_device_to_host<scalar_t>(allb.get(), dev_b, d*L.piv_size);
+
+        { // copy back to original b matrix
+          auto bptr = allb.get();
+          for (std::size_t n=0; n<L.f.size(); n++) {
+            auto& f = *(L.f[n]);
+            const auto dsep = f.dim_sep();
+            for (int i=0; i<d; i++) {
+              std::copy(bptr, bptr+dsep, b.ptr(f.sep_begin_, i));
+              bptr += dsep;
+            }
+          }
+        }
+        // auto level_time = tl.elapsed();
+        // std::cout << "#   GPU Fwd Solve complete, took: "
+        //           << level_time << " seconds" << std::endl;
+      }
+    } catch (const std::bad_alloc& e) {
+      std::cerr << "Out of memory" << std::endl;
+      abort();
+    }
+    const std::size_t dupd = dim_upd();
+    if (dupd) { // get bupd from the device, needed by parent
+      DenseMW_t bupd(dupd, d, work[0], 0, 0);
+      gpu::copy_device_to_host(bupd, old_dev_bupd.template as<scalar_t>());
+    }
+  }
+
+#else
+
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::forward_multifrontal_solve
   (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const {
@@ -567,13 +850,13 @@ namespace strumpack {
       fwd_solve_phase2(b, bupd, etree_level, task_depth);
     }
   }
+#endif
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::fwd_solve_phase2
   (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
-      //bloc.laswp(piv, true);
       F11_.solve_LU_in_place(bloc, piv_, task_depth);
       if (dim_upd()) {
         if (b.cols() == 1)
@@ -619,174 +902,6 @@ namespace strumpack {
                scalar_t(1.), yloc, task_depth);
       }
     }
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixGPU<scalar_t,integer_t>::extract_CB_sub_matrix
-  (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-   DenseM_t& B, int task_depth) const {
-    std::vector<std::size_t> lJ, oJ;
-    this->find_upd_indices(J, lJ, oJ);
-    if (lJ.empty()) return;
-    std::vector<std::size_t> lI, oI;
-    this->find_upd_indices(I, lI, oI);
-    if (lI.empty()) return;
-    for (std::size_t j=0; j<lJ.size(); j++)
-      for (std::size_t i=0; i<lI.size(); i++)
-        B(oI[i], oJ[j]) += F22_(lI[i], lJ[j]);
-    STRUMPACK_FLOPS((is_complex<scalar_t>() ? 2 : 1) * lJ.size() * lI.size());
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixGPU<scalar_t,integer_t>::sample_CB
-  (const SPOptions<scalar_t>& opts, const DenseM_t& R, DenseM_t& Sr,
-   DenseM_t& Sc, F_t* pa, int task_depth) {
-    auto I = this->upd_to_parent(pa);
-    auto cR = R.extract_rows(I);
-    DenseM_t cS(dim_upd(), R.cols());
-    TIMER_TIME(TaskType::F22_MULT, 1, t_f22mult);
-    gemm(Trans::N, Trans::N, scalar_t(1.), F22_, cR,
-         scalar_t(0.), cS, task_depth);
-    TIMER_STOP(t_f22mult);
-    Sr.scatter_rows_add(I, cS, task_depth);
-    TIMER_TIME(TaskType::F22_MULT, 1, t_f22mult2);
-    gemm(Trans::C, Trans::N, scalar_t(1.), F22_, cR,
-         scalar_t(0.), cS, task_depth);
-    TIMER_STOP(t_f22mult2);
-    Sc.scatter_rows_add(I, cS, task_depth);
-    STRUMPACK_CB_SAMPLE_FLOPS
-      (gemm_flops(Trans::N, Trans::N, scalar_t(1.), F22_, cR, scalar_t(0.)) +
-       gemm_flops(Trans::C, Trans::N, scalar_t(1.), F22_, cR, scalar_t(0.)) +
-       cS.rows()*cS.cols()*2); // for the skinny-extend add
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixGPU<scalar_t,integer_t>::sample_CB
-  (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
-    auto I = this->upd_to_parent(pa);
-    auto cR = R.extract_rows(I);
-    DenseM_t cS(dim_upd(), R.cols());
-    TIMER_TIME(TaskType::F22_MULT, 1, t_f22mult);
-    gemm(op, Trans::N, scalar_t(1.), F22_, cR,
-         scalar_t(0.), cS, task_depth);
-    TIMER_STOP(t_f22mult);
-    S.scatter_rows_add(I, cS, task_depth);
-    STRUMPACK_CB_SAMPLE_FLOPS
-      (gemm_flops(op, Trans::N, scalar_t(1.), F22_, cR, scalar_t(0.)) +
-       cS.rows()*cS.cols()); // for the skinny-extend add
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixGPU<scalar_t,integer_t>::sample_CB_to_F11
-  (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
-    const std::size_t dupd = dim_upd();
-    if (!dupd) return;
-    std::size_t u2s;
-    auto Ir = this->upd_to_parent(pa, u2s);
-    auto Rcols = R.cols();
-    DenseM_t cR(u2s, Rcols);
-    for (std::size_t c=0; c<Rcols; c++)
-      for (std::size_t r=0; r<u2s; r++)
-        cR(r,c) = R(Ir[r],c);
-    DenseM_t cS(u2s, Rcols);
-    DenseMW_t CB11(u2s, u2s, const_cast<DenseMW_t&>(F22_), 0, 0);
-    gemm(op, Trans::N, scalar_t(1.), CB11, cR, scalar_t(0.), cS, task_depth);
-    for (std::size_t c=0; c<Rcols; c++)
-      for (std::size_t r=0; r<u2s; r++)
-        S(Ir[r],c) += cS(r,c);
-    STRUMPACK_CB_SAMPLE_FLOPS(u2s*Rcols);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixGPU<scalar_t,integer_t>::sample_CB_to_F12
-  (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
-    const std::size_t dupd = dim_upd();
-    if (!dupd) return;
-    std::size_t u2s;
-    auto Ir = this->upd_to_parent(pa, u2s);
-    auto pds = pa->dim_sep();
-    auto Rcols = R.cols();
-    DenseMW_t CB12(u2s, dupd-u2s, const_cast<DenseMW_t&>(F22_), 0, u2s);
-    if (op == Trans::N) {
-      DenseM_t cR(dupd-u2s, Rcols);
-      for (std::size_t c=0; c<Rcols; c++)
-        for (std::size_t r=u2s; r<dupd; r++)
-          cR(r-u2s,c) = R(Ir[r]-pds,c);
-      DenseM_t cS(u2s, Rcols);
-      gemm(op, Trans::N, scalar_t(1.), CB12, cR, scalar_t(0.), cS, task_depth);
-      for (std::size_t c=0; c<Rcols; c++)
-        for (std::size_t r=0; r<u2s; r++)
-          S(Ir[r],c) += cS(r,c);
-      STRUMPACK_CB_SAMPLE_FLOPS(u2s*Rcols);
-    } else {
-      DenseM_t cR(u2s, Rcols);
-      for (std::size_t c=0; c<Rcols; c++)
-        for (std::size_t r=0; r<u2s; r++)
-          cR(r,c) = R(Ir[r],c);
-      DenseM_t cS(dupd-u2s, Rcols);
-      gemm(op, Trans::N, scalar_t(1.), CB12, cR, scalar_t(0.), cS, task_depth);
-      for (std::size_t c=0; c<Rcols; c++)
-        for (std::size_t r=u2s; r<dupd; r++)
-          S(Ir[r]-pds,c) += cS(r-u2s,c);
-      STRUMPACK_CB_SAMPLE_FLOPS((dupd-u2s)*Rcols);
-    }
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixGPU<scalar_t,integer_t>::sample_CB_to_F21
-  (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
-    const std::size_t dupd = dim_upd();
-    if (!dupd) return;
-    std::size_t u2s;
-    auto Ir = this->upd_to_parent(pa, u2s);
-    auto Rcols = R.cols();
-    auto pds = pa->dim_sep();
-    DenseMW_t CB21(dupd-u2s, u2s, const_cast<DenseMW_t&>(F22_), u2s, 0);
-    if (op == Trans::N) {
-      DenseM_t cR(u2s, Rcols);
-      for (std::size_t c=0; c<Rcols; c++)
-        for (std::size_t r=0; r<u2s; r++)
-          cR(r,c) = R(Ir[r],c);
-      DenseM_t cS(dupd-u2s, Rcols);
-      gemm(op, Trans::N, scalar_t(1.), CB21, cR, scalar_t(0.), cS, task_depth);
-      for (std::size_t c=0; c<Rcols; c++)
-        for (std::size_t r=u2s; r<dupd; r++)
-          S(Ir[r]-pds,c) += cS(r-u2s,c);
-      STRUMPACK_CB_SAMPLE_FLOPS((dupd-u2s)*Rcols);
-    } else {
-      DenseM_t cR(dupd-u2s, Rcols);
-      for (std::size_t c=0; c<Rcols; c++)
-        for (std::size_t r=u2s; r<dupd; r++)
-          cR(r-u2s,c) = R(Ir[r]-pds,c);
-      DenseM_t cS(u2s, Rcols);
-      gemm(op, Trans::N, scalar_t(1.), CB21, cR, scalar_t(0.), cS, task_depth);
-      for (std::size_t c=0; c<Rcols; c++)
-        for (std::size_t r=0; r<u2s; r++)
-          S(Ir[r],c) += cS(r,c);
-      STRUMPACK_CB_SAMPLE_FLOPS(u2s*Rcols);
-    }
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixGPU<scalar_t,integer_t>::sample_CB_to_F22
-  (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
-    const std::size_t dupd = dim_upd();
-    if (!dupd) return;
-    std::size_t u2s;
-    auto Ir = this->upd_to_parent(pa, u2s);
-    auto pds = pa->dim_sep();
-    auto Rcols = R.cols();
-    DenseM_t cR(dupd-u2s, Rcols);
-    for (std::size_t c=0; c<Rcols; c++)
-      for (std::size_t r=u2s; r<dupd; r++)
-        cR(r-u2s,c) = R(Ir[r]-pds,c);
-    DenseM_t cS(dupd-u2s, Rcols);
-    DenseMW_t CB22(dupd-u2s, dupd-u2s, const_cast<DenseMW_t&>(F22_), u2s, u2s);
-    gemm(op, Trans::N, scalar_t(1.), CB22, cR, scalar_t(0.), cS, task_depth);
-    for (std::size_t c=0; c<Rcols; c++)
-      for (std::size_t r=u2s; r<dupd; r++)
-        S(Ir[r]-pds,c) += cS(r-u2s,c);
-    STRUMPACK_CB_SAMPLE_FLOPS((dupd-u2s)*Rcols);
   }
 
   // explicit template instantiations
