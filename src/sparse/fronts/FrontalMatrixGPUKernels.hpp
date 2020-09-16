@@ -90,10 +90,12 @@ namespace strumpack {
     template<typename T> void
     extend_add_rhs(int, unsigned int, AssembleData<T>*);
     template<typename T, int NT=32> void
-    fwd_solve_block_batch(int, unsigned int, FrontData<T>*);
+    fwd_block_batch(int, unsigned int, FrontData<T>*);
 
+    template<typename T> void
+    extract_rhs(int, unsigned int, AssembleData<T>*);
     template<typename T, int NT=32> void
-    bwd_solve_block_batch(int, unsigned int, FrontData<T>*);
+    bwd_block_batch(int, unsigned int, FrontData<T>*);
 
   } // end namespace gpu
 } // end namespace strumpack

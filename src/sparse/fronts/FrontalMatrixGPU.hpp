@@ -116,21 +116,36 @@ namespace strumpack {
     void bwd_solve_phase1(DenseM_t& y, DenseM_t& yupd,
                           int etree_level, int task_depth) const;
 
+
+    void rhs_to_contig(LInfo_t& L, const DenseM_t& b, scalar_t* bptr) const;
+    void rhs_from_contig(LInfo_t& L, DenseM_t& b, const scalar_t* bptr) const;
+
     void assemble_rhs(int nrhs, LInfo_t& L, scalar_t* db, scalar_t* dbupd,
                       scalar_t* old_dbupd) const;
+    void extract_rhs(int nrhs, LInfo_t& L, scalar_t* dy, scalar_t* dyupd,
+                     scalar_t* old_dyupd) const;
 
-    void
-    fwd_solve_large_fronts(int nrhs, LInfo_t& L, scalar_t* dL, int* dpiv,
-                           int* derr, scalar_t* db, scalar_t* dbupd,
-                           std::vector<gpu::BLASHandle>& blas_handles,
-                           std::vector<gpu::SOLVERHandle>& solver_handles)
+    void fwd_small_fronts(int nrhs, LInfo_t& L,
+                          gpu::FrontData<scalar_t>* fdata,
+                          gpu::FrontData<scalar_t>* dfdata,
+                          scalar_t* dL, int* dpiv,
+                          scalar_t* db, scalar_t* dbupd) const;
+    void fwd_large_fronts(int nrhs, LInfo_t& L, scalar_t* dL, int* dpiv,
+                          int* derr, scalar_t* db, scalar_t* dbupd,
+                          std::vector<gpu::BLASHandle>& blas_handles,
+                          std::vector<gpu::SOLVERHandle>& solver_handles)
       const;
-    void
-    fwd_solve_small_fronts(int nrhs, LInfo_t& L,
-                           gpu::FrontData<scalar_t>* fdata,
-                           gpu::FrontData<scalar_t>* dev_fdata,
-                           scalar_t* dL, int* dpiv,
-                           scalar_t* db, scalar_t* dbupd) const;
+
+
+    void bwd_small_fronts(int nrhs, LInfo_t& L,
+                          gpu::FrontData<scalar_t>* fdata,
+                          gpu::FrontData<scalar_t>* dfdata,
+                          scalar_t* dU, scalar_t* dy, scalar_t* dyupd) const;
+    void bwd_large_fronts(int nrhs, LInfo_t& L, scalar_t* dU,
+                          scalar_t* db, scalar_t* dbupd,
+                          std::vector<gpu::BLASHandle>& blas_handles,
+                          std::vector<gpu::SOLVERHandle>& solver_handles)
+      const;
 
     using F_t::lchild_;
     using F_t::rchild_;
