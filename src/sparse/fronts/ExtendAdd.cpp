@@ -50,8 +50,8 @@ namespace strumpack {
     // destination rank is:
     //  ((r / B) % prows) + ((c / B) % pcols) * prows
     //  = pr[r] + pc[c]
-    auto pr = new int[CB.lrows()+CB.lcols()];
-    auto pc = pr + CB.lrows();
+    std::unique_ptr<int[]> pr(new int[CB.lrows()+CB.lcols()]);
+    auto pc = pr.get() + CB.lrows();
     int r_upd, c_upd;
     for (r_upd=0; r_upd<lrows; r_upd++) {
       auto t = I[CB.rowl2g_fixed(r_upd)];
@@ -113,7 +113,6 @@ namespace strumpack {
         for (int r=r_upd, pcc=pc[c]; r<lrows; r++)
           sbuf[pr[r]+pcc].push_back(CB(r,c));
     }
-    delete[] pr;
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -124,8 +123,8 @@ namespace strumpack {
       (static_cast<const F_t*>(pa), u2s);
     const std::size_t du = ch->dim_upd();
     const std::size_t ds = pa->dim_sep();
-    const auto pr = new int[CB.rows()+CB.cols()];
-    const auto pc = pr + CB.rows();
+    std::unique_ptr<int[]> pr(new int[CB.rows()+CB.cols()]);
+    const auto pc = pr.get() + CB.rows();
     const auto prows = pa->grid()->nprows();
     const auto pcols = pa->grid()->npcols();
     const auto B = DistM_t::default_MB;
@@ -151,18 +150,17 @@ namespace strumpack {
         sbuf[p].reserve(sbuf[p].size()+cnt[p]);
     }
     for (std::size_t c=0; c<u2s; c++) // F11
-      for (std::size_t r=0; r<u2s; r++)
-        sbuf[pr[r]+pc[c]].push_back(CB(r,c));
+      for (std::size_t r=0, pcc=pc[c]; r<u2s; r++)
+        sbuf[pr[r]+pcc].push_back(CB(r,c));
     for (std::size_t c=u2s; c<du; c++) // F12
-      for (std::size_t r=0; r<u2s; r++)
-        sbuf[pr[r]+pc[c]].push_back(CB(r,c));
+      for (std::size_t r=0, pcc=pc[c]; r<u2s; r++)
+        sbuf[pr[r]+pcc].push_back(CB(r,c));
     for (std::size_t c=0; c<u2s; c++) // F21
-      for (std::size_t r=u2s; r<du; r++)
-        sbuf[pr[r]+pc[c]].push_back(CB(r,c));
+      for (std::size_t r=u2s, pcc=pc[c]; r<du; r++)
+        sbuf[pr[r]+pcc].push_back(CB(r,c));
     for (std::size_t c=u2s; c<du; c++) // F22
-      for (std::size_t r=u2s; r<du; r++)
-        sbuf[pr[r]+pc[c]].push_back(CB(r,c));
-    delete[] pr;
+      for (std::size_t r=u2s, pcc=pc[c]; r<du; r++)
+        sbuf[pr[r]+pcc].push_back(CB(r,c));
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -171,16 +169,15 @@ namespace strumpack {
    scalar_t*& pbuf, const FMPI_t* pa, const F_t* ch) {
     if (!(F11.active() || F22.active())) return;
     const auto ch_dim_upd = ch->dim_upd();
-    const auto ch_upd = ch->upd();
-    const auto pa_upd = pa->upd();
+    const auto& ch_upd = ch->upd();
+    const auto& pa_upd = pa->upd();
     const auto pa_sep = pa->sep_begin();
-    auto r_1 =
-      new int[F11.lrows()+F11.lcols()+F22.lrows()+F22.lcols()];
-    auto c_1 = r_1 + F11.lrows();
+    std::unique_ptr<int[]> r_1
+      (new int[F11.lrows()+F11.lcols()+F22.lrows()+F22.lcols()]);
+    auto c_1 = r_1.get() + F11.lrows();
     auto r_2 = c_1 + F11.lcols();
     auto c_2 = r_2 + F22.lrows();
-    integer_t r_max_1 = 0, r_max_2 = 0;
-    integer_t c_max_1 = 0, c_max_2 = 0;
+    integer_t r_max_1 = 0, r_max_2 = 0, c_max_1 = 0, c_max_2 = 0;
     for (int r=0, ur=0; r<F11.lrows(); r++) {
       auto fgr = F11.rowl2g_fixed(r) + pa_sep;
       while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
@@ -210,18 +207,17 @@ namespace strumpack {
       c_2[c_max_2++] = c;
     }
     for (int c=0; c<c_max_1; c++)
-      for (int r=0; r<r_max_1; r++)
-        F11(r_1[r],c_1[c]) += *(pbuf++);
+      for (int r=0, cc=c_1[c]; r<r_max_1; r++)
+        F11(r_1[r],cc) += *(pbuf++);
     for (int c=0; c<c_max_2; c++)
-      for (int r=0; r<r_max_1; r++)
-        F12(r_1[r],c_2[c]) += *(pbuf++);
+      for (int r=0, cc=c_2[c]; r<r_max_1; r++)
+        F12(r_1[r],cc) += *(pbuf++);
     for (int c=0; c<c_max_1; c++)
-      for (int r=0; r<r_max_2; r++)
-        F21(r_2[r],c_1[c]) += *(pbuf++);
+      for (int r=0, cc=c_1[c]; r<r_max_2; r++)
+        F21(r_2[r],cc) += *(pbuf++);
     for (int c=0; c<c_max_2; c++)
-      for (int r=0; r<r_max_2; r++)
-        F22(r_2[r],c_2[c]) += *(pbuf++);
-    delete[] r_1;
+      for (int r=0, cc=c_2[c]; r<r_max_2; r++)
+        F22(r_2[r],cc) += *(pbuf++);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -230,8 +226,8 @@ namespace strumpack {
    scalar_t** pbuf, const FMPI_t* pa, const FMPI_t* ch) {
     if (!(F11.active() || F22.active())) return;
     const auto ch_dim_upd = ch->dim_upd();
-    const auto ch_upd = ch->upd();
-    const auto pa_upd = pa->upd();
+    const auto& ch_upd = ch->upd();
+    const auto& pa_upd = pa->upd();
     const auto pa_sep = pa->sep_begin();
     const auto prows = ch->grid()->nprows();
     const auto pcols = ch->grid()->npcols();
@@ -285,17 +281,17 @@ namespace strumpack {
       upd_c_2[c_max_2++] = ((uc / B) % pcols) * prows;
     }
     for (int c=0; c<c_max_1; c++)
-      for (int r=0; r<r_max_1; r++)
-        F11(r_1[r],c_1[c]) += *(pbuf[upd_r_1[r]+upd_c_1[c]]++);
+      for (int r=0, cc=c_1[c], ucc=upd_c_1[c]; r<r_max_1; r++)
+        F11(r_1[r],cc) += *(pbuf[upd_r_1[r]+ucc]++);
     for (int c=0; c<c_max_2; c++)
-      for (int r=0; r<r_max_1; r++)
-        F12(r_1[r],c_2[c]) += *(pbuf[upd_r_1[r]+upd_c_2[c]]++);
+      for (int r=0, cc=c_2[c], ucc=upd_c_2[c]; r<r_max_1; r++)
+        F12(r_1[r],cc) += *(pbuf[upd_r_1[r]+ucc]++);
     for (int c=0; c<c_max_1; c++)
-      for (int r=0; r<r_max_2; r++)
-        F21(r_2[r],c_1[c]) += *(pbuf[upd_r_2[r]+upd_c_1[c]]++);
+      for (int r=0, cc=c_1[c], ucc=upd_c_1[c]; r<r_max_2; r++)
+        F21(r_2[r],cc) += *(pbuf[upd_r_2[r]+ucc]++);
     for (int c=0; c<c_max_2; c++)
-      for (int r=0; r<r_max_2; r++)
-        F22(r_2[r],c_2[c]) += *(pbuf[upd_r_2[r]+upd_c_2[c]]++);
+      for (int r=0, cc=c_2[c], ucc=upd_c_2[c]; r<r_max_2; r++)
+        F22(r_2[r],cc) += *(pbuf[upd_r_2[r]+ucc]++);
   }
 
 
@@ -387,12 +383,12 @@ namespace strumpack {
    const FMPI_t* pa, const F_t* ch) {
     if (!(b.active() || bupd.active())) return;
     const auto ch_dim_upd = ch->dim_upd();
-    const auto ch_upd = ch->upd();
-    const auto pa_upd = pa->upd();
+    const auto& ch_upd = ch->upd();
+    const auto& pa_upd = pa->upd();
     const auto pa_sep = pa->sep_begin();
     const auto lcols = b.lcols();
-    auto r_1 = new int[b.lrows()+bupd.lrows()];
-    auto r_2 = r_1 + b.lrows();
+    std::unique_ptr<int[]> r_1(new int[b.lrows()+bupd.lrows()]);
+    auto r_2 = r_1.get() + b.lrows();
     integer_t r_max_1 = 0, r_max_2 = 0;
     for (int r=0, ur=0; r<b.lrows(); r++) {
       auto fgr = b.rowl2g_fixed(r) + pa_sep;
@@ -414,7 +410,6 @@ namespace strumpack {
     for (int c=0; c<lcols; c++)
       for (int r=0; r<r_max_2; r++)
         bupd(r_2[r],c) += *(pbuf++);
-    delete[] r_1;
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -423,8 +418,8 @@ namespace strumpack {
    const FMPI_t* pa, const FMPI_t* ch) {
     if (!(b.active() || bupd.active())) return;
     const auto ch_dim_upd = ch->dim_upd();
-    const auto ch_upd = ch->upd();
-    const auto pa_upd = pa->upd();
+    const auto& ch_upd = ch->upd();
+    const auto& pa_upd = pa->upd();
     const auto pa_sep = pa->sep_begin();
     const auto prows = ch->grid()->nprows();
     const auto pcols = ch->grid()->npcols();
@@ -433,8 +428,8 @@ namespace strumpack {
     // source rank is
     //  ((r / B) % prows) + ((c / B) % pcols) * prows
     // where r,c is the coordinate in the F22 block of the child
-    auto upd_r_1 = new int[2*b.lrows()+2*bupd.lrows()+lcols];
-    auto upd_r_2 = upd_r_1 + b.lrows();
+    std::unique_ptr<int[]> upd_r_1(new int[2*b.lrows()+2*bupd.lrows()+lcols]);
+    auto upd_r_2 = upd_r_1.get() + b.lrows();
     auto r_1 = upd_r_2 + bupd.lrows();
     auto r_2 = r_1 + b.lrows();
     auto upd_c_1 = r_2 + bupd.lrows();
@@ -464,7 +459,6 @@ namespace strumpack {
     for (int c=0; c<lcols; c++)
       for (int r=0; r<r_max_2; r++)
         bupd(r_2[r],c) += *(pbuf[upd_r_2[r]+upd_c_1[c]]++);
-    delete[] upd_r_1;
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -477,8 +471,8 @@ namespace strumpack {
     const auto B = DistM_t::default_MB;
     const auto lrows = cS.lrows();
     const auto lcols = cS.lcols();
-    auto destr = new int[lrows+lcols];
-    auto destc = destr + lrows;
+    std::unique_ptr<int[]> destr(new int[lrows+lcols]);
+    auto destc = destr.get() + lrows;
     for (int r=0; r<lrows; r++)
       destr[r] = (I[cS.rowl2g_fixed(r)] / B) % prows;
     for (int c=0; c<lcols; c++)
@@ -486,15 +480,14 @@ namespace strumpack {
     {
       VI_t cnt(sbuf.size());
       for (int c=0; c<lcols; c++)
-        for (int r=0; r<lrows; r++)
-          cnt[destr[r]+destc[c]]++;
+        for (int r=0, dc=destc[c]; r<lrows; r++)
+          cnt[destr[r]+dc]++;
       for (std::size_t p=0; p<sbuf.size(); p++)
         sbuf[p].reserve(sbuf[p].size()+cnt[p]);
     }
     for (int c=0; c<lcols; c++)
-      for (int r=0; r<lrows; r++)
-        sbuf[destr[r]+destc[c]].push_back(cS(r,c));
-    delete[] destr;
+      for (int r=0, dc=destc[c]; r<lrows; r++)
+        sbuf[destr[r]+dc].push_back(cS(r,c));
   }
 
 
@@ -539,8 +532,8 @@ namespace strumpack {
     const auto lcols = S.lcols();
     const auto sep_begin = pa->sep_begin();
     const auto dim_sep = pa->dim_sep();
-    const auto pa_upd = pa->upd();
-    const auto ch_upd = ch->upd();
+    const auto& pa_upd = pa->upd();
+    const auto& ch_upd = ch->upd();
     const auto ch_dim_upd = ch->dim_upd();
     const auto prows = ch->grid()->nprows();
     const auto pcols = ch->grid()->npcols();
