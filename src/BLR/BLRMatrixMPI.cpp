@@ -38,15 +38,17 @@ namespace strumpack {
   namespace BLR {
 
     ProcessorGrid2D::ProcessorGrid2D(const MPIComm& comm)
+      : ProcessorGrid2D(comm, comm.size()) {}
+
+    ProcessorGrid2D::ProcessorGrid2D(const MPIComm& comm, int P)
       : comm_(comm) {
+      npcols_ = std::floor(std::sqrt((float)P));
+      nprows_ = P / npcols_;
       if (comm_.is_null()) {
         active_ = false;
         return;
       }
-      auto P = comm_.size();
       auto rank = comm_.rank();
-      npcols_ = std::floor(std::sqrt((float)P));
-      nprows_ = P / npcols_;
       active_ = rank < nprows_ * npcols_;
       if (active_) {
         prow_ = rank % nprows_;
@@ -117,8 +119,43 @@ namespace strumpack {
       std::cout << "];" << std::endl;
     }
 
-    template<typename scalar_t>
-    BLRMatrixMPI<scalar_t>::BLRMatrixMPI
+    template<typename scalar_t> int
+    BLRMatrixMPI<scalar_t>::rg2p(std::size_t i) const {
+      return grid_->rg2p
+        (std::distance(roff_.begin(),
+                       std::upper_bound(roff_.begin(), roff_.end(), i)) - 1);
+    }
+    template<typename scalar_t> int
+    BLRMatrixMPI<scalar_t>::cg2p(std::size_t j) const {
+      return grid_->cg2p
+        (std::distance(coff_.begin(),
+                       std::upper_bound(coff_.begin(), coff_.end(), j)) - 1);
+    }
+
+    template<typename scalar_t> std::size_t
+    BLRMatrixMPI<scalar_t>::rl2g(std::size_t i) const {
+      assert(i < rl2g_.size());
+      assert(rl2g_.size() == std::size_t(lrows()));
+      return rl2g_[i];
+    }
+    template<typename scalar_t> std::size_t
+    BLRMatrixMPI<scalar_t>::cl2g(std::size_t j) const {
+      assert(j < cl2g_.size());
+      assert(cl2g_.size() == std::size_t(lcols()));
+      return cl2g_[j];
+    }
+
+    template<typename scalar_t> const scalar_t&
+    BLRMatrixMPI<scalar_t>::operator()(std::size_t i, std::size_t j) const {
+      return ltile_dense(rl2t_[i], cl2t_[j]).D()(rl2l_[i], cl2l_[j]);
+    }
+
+    template<typename scalar_t> scalar_t&
+    BLRMatrixMPI<scalar_t>::operator()(std::size_t i, std::size_t j) {
+      return ltile_dense(rl2t_[i], cl2t_[j]).D()(rl2l_[i], cl2l_[j]);
+    }
+
+    template<typename scalar_t> BLRMatrixMPI<scalar_t>::BLRMatrixMPI
     (const ProcessorGrid2D& grid, const vec_t& Rt, const vec_t& Ct)
       : grid_(&grid) {
       brows_ = Rt.size();
@@ -130,11 +167,42 @@ namespace strumpack {
       rows_ = roff_.back();
       cols_ = coff_.back();
       if (grid_->active()) {
-        browsloc_ = brows_ / grid_->nprows() +
+        lbrows_ = brows_ / grid_->nprows() +
           (grid_->prow() < int(brows_ % grid_->nprows()));
-        bcolsloc_ = bcols_ / grid_->npcols() +
+        lbcols_ = bcols_ / grid_->npcols() +
           (grid_->pcol() < int(bcols_ % grid_->npcols()));
-        blocks_.resize(browsloc_ * bcolsloc_);
+        blocks_.resize(lbrows_ * lbcols_);
+      }
+      lrows_ = lcols_ = 0;
+      for (std::size_t b=grid_->prow(); b<brows_; b+=grid_->nprows())
+        lrows_ += roff_[b+1] - roff_[b];
+      for (std::size_t b=grid_->pcol(); b<bcols_; b+=grid_->npcols())
+        lcols_ += coff_[b+1] - coff_[b];
+      rl2t_.resize(lrows_);
+      cl2t_.resize(lcols_);
+      rl2l_.resize(lrows_);
+      cl2l_.resize(lcols_);
+      rl2g_.resize(lrows_);
+      cl2g_.resize(lcols_);
+      for (std::size_t b=grid_->prow(), l=0, lb=0;
+           b<brows_; b+=grid_->nprows()) {
+        for (std::size_t i=0; i<roff_[b+1]-roff_[b]; i++) {
+          rl2t_[l] = lb;
+          rl2l_[l] = i;
+          rl2g_[l] = i + roff_[b];
+          l++;
+        }
+        lb++;
+      }
+      for (std::size_t b=grid_->pcol(), l=0, lb=0;
+           b<bcols_; b+=grid_->npcols()) {
+        for (std::size_t i=0; i<coff_[b+1]-coff_[b]; i++) {
+          cl2t_[l] = lb;
+          cl2l_[l] = i;
+          cl2g_[l] = i + coff_[b];
+          l++;
+        }
+        lb++;
       }
     }
 
@@ -144,8 +212,7 @@ namespace strumpack {
       DenseTile<scalar_t> t(tilerows(i), tilecols(j));
       int src = j % grid()->npcols();
       auto& c = grid()->row_comm();
-      if (c.rank() == src)
-        t = dynamic_cast<const DenseTile<scalar_t>&>(tile(i, j));
+      if (c.rank() == src) t = tile_dense(i, j);
       c.broadcast_from(t.D().data(), t.rows()*t.cols(), src);
       return t;
     }
@@ -155,8 +222,7 @@ namespace strumpack {
       DenseTile<scalar_t> t(tilerows(i), tilecols(j));
       int src = i % grid()->nprows();
       auto& c = grid()->col_comm();
-      if (c.rank() == src)
-        t = dynamic_cast<const DenseTile<scalar_t>&>(tile(i, j));
+      if (c.rank() == src) t = tile_dense(i, j);
       c.broadcast_from(t.D().data(), t.rows()*t.cols(), src);
       return t;
     }
@@ -275,8 +341,8 @@ namespace strumpack {
             for (std::size_t j=i+1, lj=0; j<colblocks(); j++) {
               if (grid()->is_local_col(j)) {
                 // this uses .D, assuming tile(k, j) is dense
-                gemm(Trans::N, Trans::N, scalar_t(-1.),
-                     *(Tki[lk]), *(Tij[lj]), scalar_t(1.), tile(k, j).D());
+                gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tki[lk]),
+                     *(Tij[lj]), scalar_t(1.), tile_dense(k, j).D());
                 lj++;
               }
             }
@@ -368,7 +434,8 @@ namespace strumpack {
             for (std::size_t j=i+1, lj=0; j<B1; j++) {
               if (g->is_local_col(j)) {
                 gemm(Trans::N, Trans::N, scalar_t(-1.),
-                     *(Tki[lk]), *(Tij[lj]), scalar_t(1.), A11.tile(k, j).D());
+                     *(Tki[lk]), *(Tij[lj]), scalar_t(1.),
+                     A11.tile_dense(k, j).D());
                 lj++;
               }
             }
@@ -380,7 +447,8 @@ namespace strumpack {
             for (std::size_t j=i+1, lj=0; j<B1; j++) {
               if (g->is_local_col(j)) {
                 gemm(Trans::N, Trans::N, scalar_t(-1.),
-                     *(Tk2i[lk]), *(Tij[lj]), scalar_t(1.), A21.tile(k, j).D());
+                     *(Tk2i[lk]), *(Tij[lj]), scalar_t(1.),
+                     A21.tile_dense(k, j).D());
                 lj++;
               }
             }
@@ -392,7 +460,8 @@ namespace strumpack {
             for (std::size_t j=0, lj=0; j<B2; j++) {
               if (g->is_local_col(j)) {
                 gemm(Trans::N, Trans::N, scalar_t(-1.),
-                     *(Tki[lk]), *(Tij2[lj]), scalar_t(1.), A12.tile(k, j).D());
+                     *(Tki[lk]), *(Tij2[lj]), scalar_t(1.),
+                     A12.tile_dense(k, j).D());
                 lj++;
               }
             }
@@ -404,7 +473,8 @@ namespace strumpack {
             for (std::size_t j=0, lj=0; j<B2; j++) {
               if (g->is_local_col(j)) {
                 gemm(Trans::N, Trans::N, scalar_t(-1.),
-                     *(Tk2i[lk]), *(Tij2[lj]), scalar_t(1.), A22.tile(k, j).D());
+                     *(Tk2i[lk]), *(Tij2[lj]), scalar_t(1.),
+                     A22.tile_dense(k, j).D());
                 lj++;
               }
             }
@@ -485,8 +555,8 @@ namespace strumpack {
     }
 
     template<typename scalar_t> DistributedMatrix<scalar_t>
-    BLRMatrixMPI<scalar_t>::to_ScaLAPACK(const BLACSGrid& g) const {
-      DistM_t A(&g, rows(), cols());
+    BLRMatrixMPI<scalar_t>::to_ScaLAPACK(const BLACSGrid* g) const {
+      DistM_t A(g, rows(), cols());
       to_ScaLAPACK(A);
       return A;
     }
@@ -551,7 +621,7 @@ namespace strumpack {
               for (std::size_t k=0, lk=0; k<b.colblocks(); k++) {
                 if (b.grid()->is_local_col(k)) {
                   gemm(Trans::N, Trans::N, scalar_t(-1.),
-                       *(Aji[lj]), *(Bik[lk]), alpha, b.tile(j, k).D());
+                       *(Aji[lj]), *(Bik[lk]), alpha, b.tile_dense(j, k).D());
                   lk++;
                 }
               }
@@ -574,7 +644,7 @@ namespace strumpack {
               for (std::size_t k=0, lk=0; k<b.colblocks(); k++) {
                 if (b.grid()->is_local_col(k)) {
                   gemm(Trans::N, Trans::N, scalar_t(-1.),
-                       *(Aji[lj]), *(Bik[lk]), alpha, b.tile(j, k).D());
+                       *(Aji[lj]), *(Bik[lk]), alpha, b.tile_dense(j, k).D());
                   lk++;
                 }
               }
@@ -603,7 +673,7 @@ namespace strumpack {
             for (std::size_t i=0, li=0; i<c.rowblocks(); i++) {
               if (c.grid()->is_local_row(i)) {
                 gemm(ta, tb, alpha, *(Aik[li]), *(Bkj[lj]),
-                     beta, c.tile(i, j).D());
+                     beta, c.tile_dense(i, j).D());
                 li++;
               }
             }

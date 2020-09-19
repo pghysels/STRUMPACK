@@ -32,6 +32,7 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <typeinfo>
 
 #include "StrumpackParameters.hpp"
 #include "misc/TaskTimer.hpp"
@@ -42,11 +43,13 @@
 #endif
 #if defined(STRUMPACK_USE_MPI)
 #include "dense/DistributedMatrix.hpp"
+#include "BLR/BLRMatrixMPI.hpp"
 #endif
 
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t> class FrontalMatrixMPI;
+  template<typename scalar_t,typename integer_t> class FrontalMatrixBLRMPI;
 
   template<typename scalar_t,typename integer_t> class FrontalMatrix {
     using DenseM_t = DenseMatrix<scalar_t>;
@@ -57,6 +60,8 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_MPI)
     using DistM_t = DistributedMatrix<scalar_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
+    using FBLRMPI_t = FrontalMatrixBLRMPI<scalar_t,integer_t>;
+    using BLRMPI_t = BLR::BLRMatrixMPI<scalar_t>;
 #endif
 
   public:
@@ -211,14 +216,27 @@ namespace strumpack {
     virtual void extend_add_copy_to_buffers
     (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
       std::cerr << "FrontalMatrix::extend_add_copy_to_buffers"
-                << " not implemented for this front type!!"
+                << " not implemented for this front type: "
+                << typeid(*this).name()
                 << std::endl;
       abort();
-      // assert(false); // TODO static assert?
     }
     virtual void extend_add_copy_from_buffers
     (DistM_t& F11, DistM_t& F12, DistM_t& F21, DistM_t& F22,
      scalar_t** pbuf, const FMPI_t* pa) const;
+
+    virtual void extadd_blr_copy_to_buffers
+    (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa) const {
+      std::cerr << "FrontalMatrix::extadd_blr_copy_to_buffers"
+                << " not implemented for this front type: "
+                << typeid(*this).name()
+                << std::endl;
+      abort();
+    }
+    virtual void extadd_blr_copy_from_buffers
+    (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
+     scalar_t** pbuf, const FBLRMPI_t* pa) const;
+
     virtual void extend_add_column_copy_to_buffers
     (const DistM_t& CB, const DenseM_t& seqCB,
      std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const;

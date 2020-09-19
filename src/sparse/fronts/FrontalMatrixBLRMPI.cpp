@@ -34,19 +34,22 @@
 #include "FrontalMatrixBLRMPI.hpp"
 #include "sparse/CSRGraph.hpp"
 #include "ExtendAdd.hpp"
+#include "BLR/BLRExtendAdd.hpp"
 
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   FrontalMatrixBLRMPI<scalar_t,integer_t>::FrontalMatrixBLRMPI
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
-   std::vector<integer_t>& upd, const MPIComm& comm, int P)
+   std::vector<integer_t>& upd, const MPIComm& comm, int P, int leaf)
     : FrontalMatrixMPI<scalar_t,integer_t>
-    (sep, sep_begin, sep_end, upd, comm, P), pgrid_(Comm()) {}
+    (sep, sep_begin, sep_end, upd, comm, P),
+      pgrid_(Comm(), P), leaf_(leaf) {}
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLRMPI<scalar_t,integer_t>::release_work_memory() {
-    F22_.clear(); // remove the update block
+    // F22_.clear(); // remove the update block
+    F22blr_ = BLRMPI_t(); //.clear(); // remove the update block
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -59,23 +62,41 @@ namespace strumpack {
           (static_cast<long long int>(ch->dim_upd())*ch->dim_upd());
       }
       if (!visit(ch)) continue;
-      ch->extend_add_copy_to_buffers(sbuf, this);
+      ch->extadd_blr_copy_to_buffers(sbuf, this);
     }
     std::vector<scalar_t,NoInit<scalar_t>> rbuf;
     std::vector<scalar_t*> pbuf;
     Comm().all_to_all_v(sbuf, rbuf, pbuf);
     for (auto& ch : {lchild_.get(), rchild_.get()}) {
       if (!ch) continue;
-      ch->extend_add_copy_from_buffers
-        (F11_, F12_, F21_, F22_, pbuf.data()+this->master(ch), this);
+      ch->extadd_blr_copy_from_buffers
+        (F11blr_, F12blr_, F21blr_, F22blr_,
+         pbuf.data()+this->master(ch), this);
     }
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLRMPI<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
+    DistM_t F22(grid(), dim_upd(), dim_upd());
+    F22blr_.to_ScaLAPACK(F22);
     ExtendAdd<scalar_t,integer_t>::extend_add_copy_to_buffers
-      (F22_, sbuf, pa, this->upd_to_parent(pa));
+      (F22, sbuf, pa, this->upd_to_parent(pa));
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixBLRMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers
+  (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa) const {
+    BLR::BLRExtendAdd<scalar_t,integer_t>::copy_to_buffers
+      (F22blr_, sbuf, pa, this->upd_to_parent(pa));
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixBLRMPI<scalar_t,integer_t>::extadd_blr_copy_from_buffers
+  (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
+   scalar_t** pbuf, const FBLRMPI_t* pa) const {
+    BLR::BLRExtendAdd<scalar_t,integer_t>::copy_from_buffers
+      (F11, F12, F21, F22, pbuf, pa, this);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -84,19 +105,23 @@ namespace strumpack {
     const auto dupd = dim_upd();
     const auto dsep = dim_sep();
     if (dsep) {
-      F11_ = DistM_t(grid(), dsep, dsep);
+      // TODO directly to BLR matrices, as in the GPU code???
       using ExFront = ExtractFront<scalar_t,integer_t>;
-      ExFront::extract_F11(F11_, A, sep_begin_, dsep);
+      DistM_t F11(grid(), dsep, dsep);
+      ExFront::extract_F11(F11, A, sep_begin_, dsep);
+      F11blr_ = BLRMPI_t::from_ScaLAPACK(F11, sep_tiles_, sep_tiles_, pgrid_);
       if (dim_upd()) {
-        F12_ = DistM_t(grid(), dsep, dupd);
-        ExFront::extract_F12(F12_, A, sep_begin_, sep_end_, this->upd_);
-        F21_ = DistM_t(grid(), dupd, dsep);
-        ExFront::extract_F21(F21_, A, sep_end_, sep_begin_, this->upd_);
+        DistM_t F12(grid(), dsep, dupd), F21(grid(), dupd, dsep);
+        ExFront::extract_F12(F12, A, sep_begin_, sep_end_, this->upd_);
+        ExFront::extract_F21(F21, A, sep_end_, sep_begin_, this->upd_);
+        F12blr_ = BLRMPI_t::from_ScaLAPACK(F12, sep_tiles_, upd_tiles_, pgrid_);
+        F21blr_ = BLRMPI_t::from_ScaLAPACK(F21, upd_tiles_, sep_tiles_, pgrid_);
       }
     }
     if (dupd) {
-      F22_ = DistM_t(grid(), dupd, dupd);
-      F22_.zero();
+      DistM_t F22(grid(), dupd, dupd);
+      F22.zero();
+      F22blr_ = BLRMPI_t::from_ScaLAPACK(F22, upd_tiles_, upd_tiles_, pgrid_);
     }
   }
 
@@ -111,48 +136,20 @@ namespace strumpack {
         (A, opts, etree_level+1, task_depth);
     build_front(A);
     extend_add();
+
+    // if (etree_level == 0) {
+    //   auto Fd = F11blr_.to_ScaLAPACK(this->grid());
+    //   Fd.print("Froot");
+    // }
+
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
-    partial_factor(opts);
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::partial_factor
-  (const Opts_t& opts) {
-    if (dim_sep() /* && grid()->active() */ ) {
-      F11blr_ = BLRMPI_t::from_ScaLAPACK
-        (F11_, sep_tiles_, sep_tiles_, pgrid_);
-      F12blr_ = BLRMPI_t::from_ScaLAPACK
-        (F12_, sep_tiles_, upd_tiles_, pgrid_);
-      F21blr_ = BLRMPI_t::from_ScaLAPACK
-        (F21_, upd_tiles_, sep_tiles_, pgrid_);
-      auto F22blr = BLRMPI_t::from_ScaLAPACK
-        (F22_, upd_tiles_, upd_tiles_, pgrid_);
-
-      piv_ = BLRMPI_t::partial_factor
-        (F11blr_, F12blr_, F21blr_, F22blr, adm_, opts.BLR_options());
+    if (dim_sep() && grid2d().active()) {
+      if (dim_upd())
+        piv_ = BLRMPI_t::partial_factor
+          (F11blr_, F12blr_, F21blr_, F22blr_, adm_, opts.BLR_options());
+      else piv_ = F11blr_.factor(adm_, opts.BLR_options());
       // TODO flops?
-
-      // { // TODO remove this
-      //   // redistribute piv_ to ScaLAPACK distribution
-      //   std::vector<int> gpiv(F11_.rows());
-      //   for (std::size_t i=0, li=0; i<F11blr_.rowblocks(); i++)
-      //     if (F11blr_.grid()->is_local_row(i)) {
-      //       std::copy(piv_.begin()+li,
-      //                 piv_.begin()+li+F11blr_.tilerows(i),
-      //                 gpiv.begin()+F11blr_.tileroff(i));
-      //       li += F11blr_.tilerows(i);
-      //     }
-      //   Comm().all_reduce(gpiv, MPI_MAX);
-      //   piv_.resize(F11_.lrows() + F11_.MB());
-      //   for (int i=0; i<F11_.lrows(); i++)
-      //     piv_[i] = gpiv[F11_.rowl2g(i)];
-      // }
-
-      // F11blr_.to_ScaLAPACK(F11_);
-      // F12blr_.to_ScaLAPACK(F12_);
-      // F21blr_.to_ScaLAPACK(F21_);
-      F22blr.to_ScaLAPACK(F22_);
     }
   }
 
@@ -231,51 +228,8 @@ namespace strumpack {
         (yloc, ydist, CBr, seqCBr, etree_level);
   }
 
-  /**
-   * Note that B should be defined on the same context as used in this
-   * front. This simplifies communication.
-   */
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
-  (const std::vector<std::size_t>& I,
-   const std::vector<std::size_t>& J, DistM_t& B) const {
-    if (Comm().is_null()) return;
-    std::vector<std::size_t> lJ, oJ, lI, oI;
-    this->find_upd_indices(J, lJ, oJ);
-    this->find_upd_indices(I, lI, oI);
-    std::vector<std::vector<scalar_t>> sbuf(this->P());
-    ExtendAdd<scalar_t,integer_t>::extract_copy_to_buffers
-      (F22_, lI, lJ, oI, oJ, B, sbuf);
-    std::vector<scalar_t> rbuf;
-    std::vector<scalar_t*> pbuf;
-    Comm().all_to_all_v(sbuf, rbuf, pbuf);
-    ExtendAdd<scalar_t,integer_t>::extract_copy_from_buffers
-      (B, lI, lJ, oI, oJ, F22_, pbuf);
-  }
-
-  /**
-   *  Sr = F22 * R
-   *  Sc = F22^* * R
-   */
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::sample_CB
-  (const DistM_t& R, DistM_t& Sr, DistM_t& Sc,
-   FrontalMatrix<scalar_t,integer_t>* pa) const {
-    if (F11_.active() || F22_.active()) {
-      auto b = R.cols();
-      Sr = DistM_t(grid(), dim_upd(), b);
-      Sc = DistM_t(grid(), dim_upd(), b);
-      gemm(Trans::N, Trans::N, scalar_t(1.), F22_, R, scalar_t(0.), Sr);
-      gemm(Trans::C, Trans::N, scalar_t(1.), F22_, R, scalar_t(0.), Sc);
-      STRUMPACK_CB_SAMPLE_FLOPS
-        (gemm_flops(Trans::N, Trans::N, scalar_t(1.), F22_, R, scalar_t(0.)) +
-         gemm_flops(Trans::C, Trans::N, scalar_t(1.), F22_, R, scalar_t(0.)));
-    }
-  }
-
   template<typename scalar_t,typename integer_t> long long
   FrontalMatrixBLRMPI<scalar_t,integer_t>::node_factor_nonzeros() const {
-    // return F11_.nonzeros() + F12_.nonzeros() + F21_.nonzeros();
     return F11blr_.nonzeros() + F12blr_.nonzeros() + F21blr_.nonzeros();
   }
 
@@ -288,7 +242,7 @@ namespace strumpack {
       auto g = A.extract_graph
         (opts.separator_ordering_level(), sep_begin_, sep_end_);
       auto sep_tree = g.recursive_bisection
-        (opts.compression_leaf_size(), 0,
+        (opts.BLR_options().leaf_size(), 0,
          sorder+sep_begin_, nullptr, 0, 0, dim_sep());
       std::vector<integer_t> siorder(dim_sep());
       for (integer_t i=sep_begin_; i<sep_end_; i++)

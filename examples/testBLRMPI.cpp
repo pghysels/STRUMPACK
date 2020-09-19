@@ -88,7 +88,7 @@ int main(int argc, char* argv[]) {
     if (c.is_root()) std::cout << "# from_ScaLAPACK done!" << std::endl;
     auto Bpiv = B.factor(opts);
     if (c.is_root()) std::cout << "# factor done!" << std::endl;
-    auto BLU = B.to_ScaLAPACK(grid);
+    auto BLU = B.to_ScaLAPACK(&grid);
     if (c.is_root()) std::cout << "# to_ScaLAPACK done!" << std::endl;
 
     auto Apiv = A.LU();

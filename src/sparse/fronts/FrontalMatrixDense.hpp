@@ -36,8 +36,13 @@
 #include <random>
 
 #include "FrontalMatrix.hpp"
+#if defined(STRUMPACK_USE_MPI)
+#include "FrontalMatrixBLRMPI.hpp"
+#endif
 
 namespace strumpack {
+
+  template<typename scalar_t,typename integer_t> class FrontalMatrixBLRMPI;
 
   template<typename scalar_t,typename integer_t> class FrontalMatrixDense
     : public FrontalMatrix<scalar_t,integer_t> {
@@ -97,6 +102,9 @@ namespace strumpack {
     void extend_add_copy_to_buffers
     (std::vector<std::vector<scalar_t>>& sbuf,
      const FrontalMatrixMPI<scalar_t,integer_t>* pa) const override;
+    void extadd_blr_copy_to_buffers
+    (std::vector<std::vector<scalar_t>>& sbuf,
+     const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa) const override;
 #endif
 
   protected:

@@ -31,6 +31,7 @@
 
 #include "FrontalMatrixMPI.hpp"
 #include "BLR/BLRMatrixMPI.hpp"
+#include "BLR/BLRExtendAdd.hpp"
 
 namespace strumpack {
 
@@ -49,18 +50,23 @@ namespace strumpack {
   public:
     FrontalMatrixBLRMPI
     (integer_t sep, integer_t sep_begin, integer_t sep_end,
-     std::vector<integer_t>& upd, const MPIComm& comm, int P);
+     std::vector<integer_t>& upd, const MPIComm& comm, int P,
+     int leaf);
 
     void release_work_memory() override;
     void build_front(const SpMat_t& A);
+
     void extend_add();
     void extend_add_copy_to_buffers
-    (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override;
+    (std::vector<std::vector<scalar_t>>& sbuf,
+     const FMPI_t* pa) const override;
 
-    void partial_factor(const Opts_t& opts);
-
-    void sample_CB
-    (const DistM_t& R, DistM_t& Sr, DistM_t& Sc, F_t* pa) const override;
+    void extadd_blr_copy_to_buffers
+    (std::vector<std::vector<scalar_t>>& sbuf,
+     const FBLRMPI_t* pa) const override;
+    void extadd_blr_copy_from_buffers
+    (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
+     scalar_t** pbuf, const FBLRMPI_t* pa) const override;
 
     void multifrontal_factorization
     (const SpMat_t& A, const Opts_t& opts,
@@ -73,35 +79,54 @@ namespace strumpack {
     (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
      int etree_level=0) const override;
 
+    void sample_CB
+    (const DistM_t& R, DistM_t& Sr, DistM_t& Sc, F_t* pa) const override {
+      std::cout << "FrontalMatrixBLRMPI::sample_CB TODO" << std::endl;
+    }
+
     void extract_CB_sub_matrix_2d
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-     DistM_t& B) const override;
+     DistM_t& B) const override {
+      std::cout << "TODO FrontalMatrixBLRMPI::extract_CB_sub_matrix_2d"
+                << std::endl;
+    }
 
     std::string type() const override { return "FrontalMatrixBLRMPI"; }
 
-    void partition
-    (const Opts_t& opts, const SpMat_t& A,
-     integer_t* sorder, bool is_root, int task_depth) override;
+    void partition(const Opts_t& opts, const SpMat_t& A,
+                   integer_t* sorder, bool is_root, int task_depth) override;
+
+    const BLR::ProcessorGrid2D& grid2d() const { return pgrid_; }
+
+    int sep_rg2p(std::size_t i) const { return F11blr_.rg2p(i); }
+    int sep_cg2p(std::size_t j) const { return F11blr_.cg2p(j); }
+
+    // might not be active, but still need this for extadd
+    int upd_rg2p(std::size_t i) const { return (i/leaf_)%pgrid_.nprows(); }
+    int upd_cg2p(std::size_t j) const { return (j/leaf_)%pgrid_.npcols(); }
 
   private:
-    DistM_t F11_, F12_, F21_, F22_;
-    BLRMPI_t F11blr_, F12blr_, F21blr_;
+    BLRMPI_t F11blr_, F12blr_, F21blr_, F22blr_;
     std::vector<int> piv_;
     std::vector<std::size_t> sep_tiles_, upd_tiles_;
     DenseMatrix<bool> adm_;
     BLR::ProcessorGrid2D pgrid_;
+    int leaf_ = 0;
 
     long long node_factor_nonzeros() const override;
 
     using F_t::lchild_;
     using F_t::rchild_;
-    using F_t::sep_begin_;
-    using F_t::sep_end_;
     using F_t::dim_sep;
     using F_t::dim_upd;
+    using F_t::sep_begin_;
+    using F_t::sep_end_;
     using FMPI_t::visit;
     using FMPI_t::Comm;
     using FMPI_t::grid;
+
+    template<typename _scalar_t,typename _integer_t>
+    friend class BLR::BLRExtendAdd;
   };
 
 } // end namespace strumpack

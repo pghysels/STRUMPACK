@@ -205,7 +205,7 @@ namespace strumpack {
       if (is_BLR(dsep, dupd, compressed_parent, opts)) {
         front.reset
           (new FrontalMatrixBLRMPI<scalar_t,integer_t>
-           (s, sbegin, send, upd, comm, P));
+           (s, sbegin, send, upd, comm, P, opts.BLR_options().leaf_size()));
         if (root) fc.BLR++;
       }
     } break;

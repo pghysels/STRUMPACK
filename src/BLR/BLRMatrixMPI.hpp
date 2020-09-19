@@ -42,6 +42,7 @@ namespace strumpack {
     class ProcessorGrid2D {
     public:
       ProcessorGrid2D(const MPIComm& comm);
+      ProcessorGrid2D(const MPIComm& comm, int P);
 
       const MPIComm& Comm() const { return comm_; }
       int nprows() const { return nprows_; }
@@ -63,9 +64,6 @@ namespace strumpack {
       int rg2p(int i) const { return i % nprows(); }
       int cg2p(int j) const { return j % npcols(); }
       int g2p(int i, int j) const { return rg2p(i) + cg2p(j) * nprows(); }
-
-      int rg2l(int i) const { return i / nprows() + i % nprows(); }
-      int cg2l(int j) const { return j / npcols() + j % npcols(); }
 
       void print() const {
         if (comm_.is_root())
@@ -109,6 +107,8 @@ namespace strumpack {
 
       const ProcessorGrid2D* grid() const { return grid_; }
 
+      bool active() const { return grid_->active(); }
+
       std::vector<int> factor(const Opts_t& opts);
       std::vector<int> factor(const adm_t& adm, const Opts_t& opts);
 
@@ -128,25 +128,40 @@ namespace strumpack {
       BLRMPI_t from_ScaLAPACK(const DistM_t& A,
                               const vec_t& Rt, const vec_t& Ct,
                               const ProcessorGrid2D& g);
-      DistM_t to_ScaLAPACK(const BLACSGrid& g) const;
+      DistM_t to_ScaLAPACK(const BLACSGrid* g) const;
       void to_ScaLAPACK(DistM_t& A) const;
 
       void print(const std::string& name);
 
       std::size_t rowblocks() const { return brows_; }
       std::size_t colblocks() const { return bcols_; }
-      std::size_t rowblockslocal() const { return browsloc_; }
-      std::size_t colblockslocal() const { return bcolsloc_; }
+      std::size_t rowblockslocal() const { return lbrows_; }
+      std::size_t colblockslocal() const { return lbcols_; }
       std::size_t tilerows(std::size_t i) const { return roff_[i+1] - roff_[i]; }
       std::size_t tilecols(std::size_t j) const { return coff_[j+1] - coff_[j]; }
       std::size_t tileroff(std::size_t i) const { return roff_[i]; }
       std::size_t tilecoff(std::size_t j) const { return coff_[j]; }
 
+      int rg2p(std::size_t i) const;
+      int cg2p(std::size_t j) const;
+      std::size_t rl2g(std::size_t i) const;
+      std::size_t cl2g(std::size_t j) const;
+
+      std::size_t lrows() const { return lrows_; }
+      std::size_t lcols() const { return lcols_; }
+
+      /**
+       * Direct access to element with local indexing, only for dense
+       * tiles, for instance before the factorization/compression.
+       */
+      const scalar_t& operator()(std::size_t i, std::size_t j) const;
+      scalar_t& operator()(std::size_t i, std::size_t j);
+
     private:
-      std::size_t rows_, cols_;
-      std::size_t brows_, bcols_;
-      std::size_t browsloc_, bcolsloc_;
+      std::size_t rows_ = 0, cols_ = 0, lrows_ = 0, lcols_ = 0;
+      std::size_t brows_ = 0, bcols_ = 0, lbrows_ = 0, lbcols_ = 0;
       vec_t roff_, coff_;
+      vec_t rl2t_, cl2t_, rl2l_, cl2l_, rl2g_, cl2g_;
       std::vector<std::unique_ptr<BLRTile<scalar_t>>> blocks_;
       const ProcessorGrid2D* grid_ = nullptr;
 
@@ -163,13 +178,42 @@ namespace strumpack {
       }
 
       BLRTile<scalar_t>& tile(std::size_t i, std::size_t j) {
-        assert(i < rowblocks() && j < colblocks());
-        return *blocks_[tilerg2l(i)+tilecg2l(j)*rowblockslocal()].get();
+        return ltile(tilerg2l(i), tilecg2l(j));
       }
       const BLRTile<scalar_t>& tile(std::size_t i, std::size_t j) const {
-        assert(i < rowblocks() && j < colblocks());
-        return *blocks_[tilerg2l(i)+tilecg2l(j)*rowblockslocal()].get();
+        return ltile(tilerg2l(i), tilecg2l(j));
       }
+      DenseTile<scalar_t>& tile_dense(std::size_t i, std::size_t j) {
+        return ltile_dense(tilerg2l(i), tilecg2l(j));
+      }
+      const DenseTile<scalar_t>& tile_dense(std::size_t i, std::size_t j) const {
+        return ltile_dense(tilerg2l(i), tilecg2l(j));
+      }
+
+      BLRTile<scalar_t>& ltile(std::size_t i, std::size_t j) {
+        assert(i < rowblockslocal() && j < colblockslocal());
+        return *blocks_[i+j*rowblockslocal()].get();
+      }
+      const BLRTile<scalar_t>& ltile(std::size_t i, std::size_t j) const {
+        assert(i < rowblockslocal() && j < colblockslocal());
+        return *blocks_[i+j*rowblockslocal()].get();
+      }
+
+      DenseTile<scalar_t>& ltile_dense(std::size_t i, std::size_t j) {
+        assert(i < rowblockslocal() && j < colblockslocal());
+        assert(dynamic_cast<DenseTile<scalar_t>*>
+               (blocks_[i+j*rowblockslocal()].get()));
+        return *static_cast<DenseTile<scalar_t>*>
+                   (blocks_[i+j*rowblockslocal()].get());
+      }
+      const DenseTile<scalar_t>& ltile_dense(std::size_t i, std::size_t j) const {
+        assert(i < rowblockslocal() && j < colblockslocal());
+        assert(dynamic_cast<const DenseTile<scalar_t>*>
+               (blocks_[i+j*rowblockslocal()].get()));
+        return *static_cast<const DenseTile<scalar_t>*>
+                   (blocks_[i+j*rowblockslocal()].get());
+      }
+
       std::unique_ptr<BLRTile<scalar_t>>&
       block(std::size_t i, std::size_t j) {
         assert(i < rowblocks() && j < colblocks());
@@ -179,6 +223,17 @@ namespace strumpack {
       block(std::size_t i, std::size_t j) const {
         assert(i < rowblocks() && j < colblocks());
         return blocks_[tilerg2l(i)+tilecg2l(j)*rowblockslocal()];
+      }
+
+      std::unique_ptr<BLRTile<scalar_t>>&
+      lblock(std::size_t i, std::size_t j) {
+        assert(i < rowblockslocal() && j < colblockslocal());
+        return blocks_[i+j*rowblockslocal()];
+      }
+      const std::unique_ptr<BLRTile<scalar_t>>&
+      lblock(std::size_t i, std::size_t j) const {
+        assert(i < rowblockslocal() && j < colblockslocal());
+        return blocks_[i+j*rowblockslocal()];
       }
 
       void compress_tile(std::size_t i, std::size_t j, const Opts_t& opts);

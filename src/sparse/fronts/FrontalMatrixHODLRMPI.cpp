@@ -563,7 +563,7 @@ namespace strumpack {
     auto g = A.extract_graph
       (opts.separator_ordering_level(), sep_begin_, sep_end_);
     sep_tree_ = g.recursive_bisection
-      (opts.compression_leaf_size(), 0,
+      (opts.HODLR_options().leaf_size(), 0,
        sorder+sep_begin_, nullptr, 0, 0, dim_sep());
     std::vector<integer_t> siorder(dim_sep());
     for (integer_t i=sep_begin_; i<sep_end_; i++)
@@ -596,7 +596,7 @@ namespace strumpack {
         CB_perm_.resize(dim_upd());
         CB_iperm_.resize(dim_upd());
         auto CB_tree = gCB.recursive_bisection
-          (opts.compression_leaf_size(), 0,
+          (opts.HODLR_options().leaf_size(), 0,
            CB_perm_.data(), CB_iperm_.data(), 0, 0, gCB.size());
         gCB.permute(CB_perm_.data(), CB_iperm_.data());
         g12.permute_cols(CB_perm_.data());

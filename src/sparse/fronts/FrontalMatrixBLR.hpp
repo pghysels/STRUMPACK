@@ -41,9 +41,12 @@
 #include "BLR/BLRMatrix.hpp"
 #if defined(STRUMPACK_USE_MPI)
 #include "ExtendAdd.hpp"
+#include "BLR/BLRExtendAdd.hpp"
 #endif
 
 namespace strumpack {
+
+  template<typename scalar_t,typename integer_t> class FrontalMatrixBLRMPI;
 
   template<typename scalar_t,typename integer_t> class FrontalMatrixBLR
     : public FrontalMatrix<scalar_t,integer_t> {
@@ -54,8 +57,8 @@ namespace strumpack {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using BLRM_t = BLR::BLRMatrix<scalar_t>;
 #if defined(STRUMPACK_USE_MPI)
-    using ExtAdd = ExtendAdd<scalar_t,integer_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
+    using FBLRMPI_t = FrontalMatrixBLRMPI<scalar_t,integer_t>;
 #endif
 
   public:
@@ -65,6 +68,7 @@ namespace strumpack {
     ~FrontalMatrixBLR() {}
 
     void release_work_memory() override;
+
     void extend_add_to_dense
     (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
      const F_t* p, int task_depth) override;
@@ -93,10 +97,20 @@ namespace strumpack {
 
 #if defined(STRUMPACK_USE_MPI)
     void extend_add_copy_to_buffers
-    (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override {
+    (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa)
+      const override {
       if (F22blr_.rows() == std::size_t(dim_upd()))
         abort(); //F22blr_.dense(F22_);
-      ExtAdd::extend_add_seq_copy_to_buffers(F22_, sbuf, pa, this);
+      ExtendAdd<scalar_t,integer_t>::
+        extend_add_seq_copy_to_buffers(F22_, sbuf, pa, this);
+    }
+    void extadd_blr_copy_to_buffers
+    (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa)
+      const override {
+      if (F22blr_.rows() == std::size_t(dim_upd()))
+        abort(); //F22blr_.dense(F22_);
+      BLR::BLRExtendAdd<scalar_t,integer_t>::
+        seq_copy_to_buffers(F22_, sbuf, pa, this);
     }
 #endif
 
