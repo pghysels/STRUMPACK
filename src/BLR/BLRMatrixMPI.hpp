@@ -92,6 +92,8 @@ namespace strumpack {
 
     public:
       BLRMatrixMPI();
+      BLRMatrixMPI(const ProcessorGrid2D& grid,
+                   const vec_t& Rt, const vec_t& Ct);
 
       std::size_t rows() const { return rows_; }
       std::size_t cols() const { return cols_; }
@@ -109,6 +111,8 @@ namespace strumpack {
 
       bool active() const { return grid_->active(); }
 
+      void fill(scalar_t v);
+
       std::vector<int> factor(const Opts_t& opts);
       std::vector<int> factor(const adm_t& adm, const Opts_t& opts);
 
@@ -125,9 +129,8 @@ namespace strumpack {
       BLRMPI_t from_ScaLAPACK(const DistM_t& A, const ProcessorGrid2D& g,
                               const Opts_t& opts);
       static
-      BLRMPI_t from_ScaLAPACK(const DistM_t& A,
-                              const vec_t& Rt, const vec_t& Ct,
-                              const ProcessorGrid2D& g);
+      BLRMPI_t from_ScaLAPACK(const DistM_t& A, const ProcessorGrid2D& g,
+                              const vec_t& Rt, const vec_t& Ct);
       DistM_t to_ScaLAPACK(const BLACSGrid* g) const;
       void to_ScaLAPACK(DistM_t& A) const;
 
@@ -146,6 +149,8 @@ namespace strumpack {
       int cg2p(std::size_t j) const;
       std::size_t rl2g(std::size_t i) const;
       std::size_t cl2g(std::size_t j) const;
+      std::size_t rg2t(std::size_t i) const;
+      std::size_t cg2t(std::size_t j) const;
 
       std::size_t lrows() const { return lrows_; }
       std::size_t lcols() const { return lcols_; }
@@ -157,6 +162,14 @@ namespace strumpack {
       const scalar_t& operator()(std::size_t i, std::size_t j) const;
       scalar_t& operator()(std::size_t i, std::size_t j);
 
+      /**
+       * Same as operator()(std::size_t i, std::size_t j), but with
+       * global indexing. This assumes the global element is stored
+       * locally, otherwise behaviour is undefined.
+       */
+      const scalar_t& global(std::size_t i, std::size_t j) const;
+      scalar_t& global(std::size_t i, std::size_t j);
+
     private:
       std::size_t rows_ = 0, cols_ = 0, lrows_ = 0, lcols_ = 0;
       std::size_t brows_ = 0, bcols_ = 0, lbrows_ = 0, lbcols_ = 0;
@@ -164,9 +177,6 @@ namespace strumpack {
       vec_t rl2t_, cl2t_, rl2l_, cl2l_, rl2g_, cl2g_;
       std::vector<std::unique_ptr<BLRTile<scalar_t>>> blocks_;
       const ProcessorGrid2D* grid_ = nullptr;
-
-      BLRMatrixMPI(const ProcessorGrid2D& grid,
-                   const vec_t& Rt, const vec_t& Ct);
 
       std::size_t tilerg2l(std::size_t i) const {
         assert(int(i % grid_->nprows()) == grid_->prow());

@@ -64,6 +64,17 @@ namespace strumpack {
 
     template<typename scalar_t> BLRMatrixMPI<scalar_t>::BLRMatrixMPI() {}
 
+    template<typename scalar_t> void
+    BLRMatrixMPI<scalar_t>::fill(scalar_t v) {
+      for (std::size_t i=0; i<brows_; i++)
+        for (std::size_t j=0; j<bcols_; j++)
+          if (grid_->is_local(i, j)) {
+            std::unique_ptr<DenseTile<scalar_t>> t
+              (new DenseTile<scalar_t>(tilerows(i), tilecols(j)));
+            t->D().fill(v);
+            block(i, j) = std::move(t);
+          }
+    }
 
     template<typename scalar_t> std::size_t
     BLRMatrixMPI<scalar_t>::memory() const {
@@ -121,15 +132,26 @@ namespace strumpack {
 
     template<typename scalar_t> int
     BLRMatrixMPI<scalar_t>::rg2p(std::size_t i) const {
-      return grid_->rg2p
-        (std::distance(roff_.begin(),
-                       std::upper_bound(roff_.begin(), roff_.end(), i)) - 1);
+      return grid_->rg2p(rg2t(i));
+        // (std::distance(roff_.begin(),
+        //                std::upper_bound(roff_.begin(), roff_.end(), i)) - 1);
     }
     template<typename scalar_t> int
     BLRMatrixMPI<scalar_t>::cg2p(std::size_t j) const {
-      return grid_->cg2p
-        (std::distance(coff_.begin(),
-                       std::upper_bound(coff_.begin(), coff_.end(), j)) - 1);
+      return grid_->cg2p(cg2t(j));
+      // (std::distance(coff_.begin(),
+      //                std::upper_bound(coff_.begin(), coff_.end(), j)) - 1);
+    }
+
+    template<typename scalar_t> std::size_t
+    BLRMatrixMPI<scalar_t>::rg2t(std::size_t i) const {
+      return std::distance
+        (roff_.begin(), std::upper_bound(roff_.begin(), roff_.end(), i)) - 1;
+    }
+    template<typename scalar_t> std::size_t
+    BLRMatrixMPI<scalar_t>::cg2t(std::size_t j) const {
+      return std::distance
+        (coff_.begin(), std::upper_bound(coff_.begin(), coff_.end(), j)) - 1;
     }
 
     template<typename scalar_t> std::size_t
@@ -149,10 +171,20 @@ namespace strumpack {
     BLRMatrixMPI<scalar_t>::operator()(std::size_t i, std::size_t j) const {
       return ltile_dense(rl2t_[i], cl2t_[j]).D()(rl2l_[i], cl2l_[j]);
     }
-
     template<typename scalar_t> scalar_t&
     BLRMatrixMPI<scalar_t>::operator()(std::size_t i, std::size_t j) {
       return ltile_dense(rl2t_[i], cl2t_[j]).D()(rl2l_[i], cl2l_[j]);
+    }
+
+    template<typename scalar_t> const scalar_t&
+    BLRMatrixMPI<scalar_t>::global(std::size_t i, std::size_t j) const {
+      std::size_t rt = rg2t(i), ct = cg2t(j);
+      return tile_dense(rt, ct).D()(i - roff_[rt], j - coff_[ct]);
+    }
+    template<typename scalar_t> scalar_t&
+    BLRMatrixMPI<scalar_t>::global(std::size_t i, std::size_t j) {
+      std::size_t rt = rg2t(i), ct = cg2t(j);
+      return tile_dense(rt, ct).D()(i - roff_[rt], j - coff_[ct]);
     }
 
     template<typename scalar_t> BLRMatrixMPI<scalar_t>::BLRMatrixMPI
@@ -527,14 +559,14 @@ namespace strumpack {
       vec_t Rt(nrt, l), Ct(nct, l);
       Rt.back() = A.rows() - (nrt-1) * l;
       Ct.back() = A.cols() - (nct-1) * l;
-      return from_ScaLAPACK(A, Rt, Ct, g);
+      return from_ScaLAPACK(A, g, Rt, Ct);
     }
 
     // TODO optimize/avoid using this
     template<typename scalar_t> BLRMatrixMPI<scalar_t>
     BLRMatrixMPI<scalar_t>::from_ScaLAPACK
-    (const DistM_t& A, const vec_t& Rt, const vec_t& Ct,
-     const ProcessorGrid2D& g) {
+    (const DistM_t& A, const ProcessorGrid2D& g,
+     const vec_t& Rt, const vec_t& Ct) {
       BLRMPI_t B(g, Rt, Ct);
       for (std::size_t j=0; j<B.colblocks(); j++)
         for (std::size_t i=0; i<B.rowblocks(); i++) {

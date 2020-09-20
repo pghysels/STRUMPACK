@@ -105,23 +105,39 @@ namespace strumpack {
     const auto dupd = dim_upd();
     const auto dsep = dim_sep();
     if (dsep) {
-      // TODO directly to BLR matrices, as in the GPU code???
-      using ExFront = ExtractFront<scalar_t,integer_t>;
-      DistM_t F11(grid(), dsep, dsep);
-      ExFront::extract_F11(F11, A, sep_begin_, dsep);
-      F11blr_ = BLRMPI_t::from_ScaLAPACK(F11, sep_tiles_, sep_tiles_, pgrid_);
+      F11blr_ = BLRMPI_t(pgrid_, sep_tiles_, sep_tiles_);
+      F11blr_.fill(0.);
       if (dim_upd()) {
-        DistM_t F12(grid(), dsep, dupd), F21(grid(), dupd, dsep);
-        ExFront::extract_F12(F12, A, sep_begin_, sep_end_, this->upd_);
-        ExFront::extract_F21(F21, A, sep_end_, sep_begin_, this->upd_);
-        F12blr_ = BLRMPI_t::from_ScaLAPACK(F12, sep_tiles_, upd_tiles_, pgrid_);
-        F21blr_ = BLRMPI_t::from_ScaLAPACK(F21, upd_tiles_, sep_tiles_, pgrid_);
+        F12blr_ = BLRMPI_t(pgrid_, sep_tiles_, upd_tiles_);
+        F21blr_ = BLRMPI_t(pgrid_, upd_tiles_, sep_tiles_);
+        F12blr_.fill(0.);
+        F21blr_.fill(0.);
       }
     }
     if (dupd) {
-      DistM_t F22(grid(), dupd, dupd);
-      F22.zero();
-      F22blr_ = BLRMPI_t::from_ScaLAPACK(F22, upd_tiles_, upd_tiles_, pgrid_);
+      F22blr_ = BLRMPI_t(pgrid_, upd_tiles_, upd_tiles_);
+      F22blr_.fill(0.);
+    }
+    using Trip_t = Triplet<scalar_t>;
+    std::vector<Trip_t> e11, e12, e21;
+    A.push_front_elements(sep_begin_, sep_end_, this->upd(), e11, e12, e21);
+    int npr = grid2d().nprows();
+    // TODO combine these 3 all_to_all calls?
+    {
+      std::vector<std::vector<Trip_t>> sbuf(this->P());
+      for (auto& e : e11) sbuf[sep_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
+      auto rbuf = Comm().all_to_all_v(sbuf);
+      for (auto& e : rbuf) F11blr_.global(e.r, e.c) = e.v;
+    } {
+      std::vector<std::vector<Trip_t>> sbuf(this->P());
+      for (auto& e : e12) sbuf[sep_rg2p(e.r)+upd_cg2p(e.c)*npr].push_back(e);
+      auto rbuf = Comm().all_to_all_v(sbuf);
+      for (auto& e : rbuf) F12blr_.global(e.r, e.c) = e.v;
+    } {
+      std::vector<std::vector<Trip_t>> sbuf(this->P());
+      for (auto& e : e21) sbuf[upd_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
+      auto rbuf = Comm().all_to_all_v(sbuf);
+      for (auto& e : rbuf) F21blr_.global(e.r, e.c) = e.v;
     }
   }
 
@@ -136,12 +152,6 @@ namespace strumpack {
         (A, opts, etree_level+1, task_depth);
     build_front(A);
     extend_add();
-
-    // if (etree_level == 0) {
-    //   auto Fd = F11blr_.to_ScaLAPACK(this->grid());
-    //   Fd.print("Froot");
-    // }
-
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
     if (dim_sep() && grid2d().active()) {
@@ -173,9 +183,9 @@ namespace strumpack {
       TIMER_TIME(TaskType::SOLVE_LOWER, 0, t_s);
       std::vector<std::size_t> col_tiles(1, b.cols());
       auto b_blr = BLRMPI_t::from_ScaLAPACK
-        (b, sep_tiles_, col_tiles, pgrid_);
+        (b, pgrid_, sep_tiles_, col_tiles);
       auto bupd_blr = BLRMPI_t::from_ScaLAPACK
-        (bupd, upd_tiles_, col_tiles, pgrid_);
+        (bupd, pgrid_, upd_tiles_, col_tiles);
       b_blr.laswp(piv_, true);
       if (b.cols() == 1) {
         trsv(UpLo::L, Trans::N, Diag::U, F11blr_, b_blr);
@@ -201,9 +211,9 @@ namespace strumpack {
       TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_s);
       std::vector<std::size_t> col_tiles(1, y.cols());
       auto y_blr = BLRMPI_t::from_ScaLAPACK
-        (y, sep_tiles_, col_tiles, pgrid_);
+        (y, pgrid_, sep_tiles_, col_tiles);
       auto yupd_blr = BLRMPI_t::from_ScaLAPACK
-        (yupd, upd_tiles_, col_tiles, pgrid_);
+        (yupd, pgrid_, upd_tiles_, col_tiles);
       if (y.cols() == 1) {
         if (dim_upd())
           gemv(Trans::N, scalar_t(-1.), F12blr_, yupd_blr, scalar_t(1.), y_blr);

@@ -40,8 +40,7 @@ namespace strumpack {
   template<typename scalar_t, typename integer_t=int>
   class Triplet {
   public:
-    integer_t r;
-    integer_t c;
+    integer_t r, c;
     scalar_t v;
     Triplet() {}
     Triplet(integer_t row, integer_t col, scalar_t value)
