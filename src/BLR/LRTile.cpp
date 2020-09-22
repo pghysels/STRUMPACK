@@ -56,6 +56,42 @@ namespace strumpack {
       }
     }
 
+
+    template<typename scalar_t> LRTile<scalar_t>::LRTile
+    (std::size_t m, std::size_t n, std::size_t r) {
+         U_ = DenseMatrix<scalar_t>(m, r);
+         V_ = DenseMatrix<scalar_t>(r, n);
+    }
+    template<typename scalar_t> LRTile<scalar_t> LRTile<scalar_t>::multiply(const BLRTile<scalar_t>& a) const {
+         auto t=a.left_multiply(*this);
+         return t;
+    }
+    template<typename scalar_t> LRTile<scalar_t> LRTile<scalar_t>::left_multiply(const LRTile<scalar_t>& a) const {
+         DenseMatrix<scalar_t> VU(a.rank(), rank());
+         gemm(Trans::N, Trans::N, scalar_t(1.), a.V(), U_, scalar_t(0.), VU, params::task_recursion_cutoff_level);
+         if (a.rank() < rank()) {
+               // a.U*((a.V * U_)*V_)
+               LRTile<scalar_t> t(a.rows(), cols(), a.rank());
+               gemm(Trans::N, Trans::N, scalar_t(1.), VU, V_, scalar_t(0.), t.V(), params::task_recursion_cutoff_level);
+               t.U() = a.U();
+               return t;
+         } else {
+               // (a.U*(a.V * U_))*V_
+               LRTile<scalar_t> t(a.rows(), cols(), rank());
+               gemm(Trans::N, Trans::N, scalar_t(1.), a.U(), VU, scalar_t(0.), t.U(), params::task_recursion_cutoff_level);
+               t.V() = V();
+               return t;
+         }
+    }
+    template<typename scalar_t> LRTile<scalar_t> LRTile<scalar_t>::left_multiply(const DenseTile<scalar_t>& a) const {
+         // (a.D*U)*V
+         LRTile<scalar_t> t(a.rows(), cols(), rank());
+         gemm(Trans::N, Trans::N, scalar_t(1.), a.D(), U(), scalar_t(0.), t.U(), params::task_recursion_cutoff_level);
+         t.V() = V();
+         return t;
+    }
+
+
     /**
      * .. by extracting individual elements
      */
@@ -80,6 +116,7 @@ namespace strumpack {
         (U_, V_, m, n, Trow, Tcol, opts.rel_tol(), opts.abs_tol(),
          opts.max_rank());
     }
+
 
     /**
      * .. by extracting multiple columns or rows at a time

@@ -69,6 +69,10 @@ namespace strumpack {
       const DenseM_t& U() const override { assert(false); return D_; }
       const DenseM_t& V() const override { assert(false); return D_; }
 
+      LRTile<scalar_t> multiply(const BLRTile<scalar_t>& a) const override;
+      LRTile<scalar_t> left_multiply(const LRTile<scalar_t>& a) const override;
+      LRTile<scalar_t> left_multiply(const DenseTile<scalar_t>& a) const override;
+
       scalar_t operator()(std::size_t i, std::size_t j) const override {
         return D_(i, j);
       }

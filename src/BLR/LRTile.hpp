@@ -54,6 +54,9 @@ namespace strumpack {
 
       LRTile(const DenseM_t& T, const Opts_t& opts);
 
+      LRTile(std::size_t m, std::size_t n, std::size_t r);
+
+
       /**
        * .. by extracting individual elements
        */
@@ -99,6 +102,10 @@ namespace strumpack {
       const DenseM_t& D() const override { assert(false); return U_; }
       const DenseM_t& U() const override { return U_; }
       const DenseM_t& V() const override { return V_; }
+
+      LRTile<scalar_t> multiply(const BLRTile<scalar_t>& a) const override;
+      LRTile<scalar_t> left_multiply(const LRTile<scalar_t>& a) const override;
+      LRTile<scalar_t> left_multiply(const DenseTile<scalar_t>& a) const override;
 
       scalar_t operator()(std::size_t i, std::size_t j) const override;
 

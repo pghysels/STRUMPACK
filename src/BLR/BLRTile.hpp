@@ -47,6 +47,7 @@ namespace strumpack {
     template<typename scalar_t> class BLRTile {
       using DenseM_t = DenseMatrix<scalar_t>;
 
+
     public:
       virtual ~BLRTile() = default;
 
@@ -69,6 +70,10 @@ namespace strumpack {
       virtual const DenseM_t& D() const = 0; //{ assert(false); }
       virtual const DenseM_t& U() const = 0; //{ assert(false); }
       virtual const DenseM_t& V() const = 0; //{ assert(false); }
+
+      virtual LRTile<scalar_t> multiply(const BLRTile<scalar_t>& a) const=0;
+      virtual LRTile<scalar_t> left_multiply(const LRTile<scalar_t>& a) const=0;
+      virtual LRTile<scalar_t> left_multiply(const DenseTile<scalar_t>& a) const=0;
 
       virtual scalar_t operator()(std::size_t i, std::size_t j) const = 0;
       virtual void extract(const std::vector<std::size_t>& I,

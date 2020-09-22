@@ -117,6 +117,18 @@ namespace strumpack {
        const std::vector<std::size_t>& tiles2,
        const adm_t& admissible, const BLROptions<scalar_t>& opts);
 
+      void LUAR_B11
+      (std::size_t i, std::size_t j,
+       std::size_t kmax, DenseMatrix<scalar_t>&A11, const BLROptions<scalar_t>& opts);
+
+      void LUAR_B12
+      (std::size_t i, std::size_t j,
+       std::size_t kmax, BLRMatrix<scalar_t>& B11, DenseMatrix<scalar_t>&A12, const BLROptions<scalar_t>& opts);
+
+      void LUAR_B21
+      (std::size_t i, std::size_t j,
+       std::size_t kmax, BLRMatrix<scalar_t>& B11, DenseMatrix<scalar_t>&A21, const BLROptions<scalar_t>& opts);
+
       static void construct_and_partial_factor
       (std::size_t n1, std::size_t n2,
        const extract_t<scalar_t>& A11, const extract_t<scalar_t>& A12,
@@ -167,6 +179,9 @@ namespace strumpack {
       (const BLRMatrix<T>& H, const std::string& name);
     };
 
+    template<typename scalar_t> void
+    LUAR_B22(std::size_t i, std::size_t j, std::size_t kmax, BLRMatrix<scalar_t>& B12, 
+             BLRMatrix<scalar_t>& B21, DenseMatrix<scalar_t>&A22, const BLROptions<scalar_t>& opts);
 
     template<typename scalar_t> void
     trsm(Side s, UpLo ul, Trans ta, Diag d, scalar_t alpha,
