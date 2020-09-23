@@ -48,8 +48,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLRMPI<scalar_t,integer_t>::release_work_memory() {
-    // F22_.clear(); // remove the update block
-    F22blr_ = BLRMPI_t(); //.clear(); // remove the update block
+    F22blr_ = BLRMPI_t(); // remove the update block
   }
 
   template<typename scalar_t,typename integer_t> void

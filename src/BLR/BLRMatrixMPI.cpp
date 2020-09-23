@@ -133,14 +133,10 @@ namespace strumpack {
     template<typename scalar_t> int
     BLRMatrixMPI<scalar_t>::rg2p(std::size_t i) const {
       return grid_->rg2p(rg2t(i));
-        // (std::distance(roff_.begin(),
-        //                std::upper_bound(roff_.begin(), roff_.end(), i)) - 1);
     }
     template<typename scalar_t> int
     BLRMatrixMPI<scalar_t>::cg2p(std::size_t j) const {
       return grid_->cg2p(cg2t(j));
-      // (std::distance(coff_.begin(),
-      //                std::upper_bound(coff_.begin(), coff_.end(), j)) - 1);
     }
 
     template<typename scalar_t> std::size_t
@@ -259,41 +255,67 @@ namespace strumpack {
       return t;
     }
 
-    // TODO optimize??
-    template<typename scalar_t> std::unique_ptr<BLRTile<scalar_t>>
-    BLRMatrixMPI<scalar_t>::bcast_tile
-    (std::size_t i, std::size_t j, int src, const MPIComm& c) const {
-      std::unique_ptr<BLRTile<scalar_t>> t;
-      int trank = -1;
-      if (c.rank() == src) {
-        t = tile(i, j).clone();
-        if (t->is_low_rank())
-          trank = t->rank();
-      }
-      c.broadcast_from(trank, src);
-      std::size_t m = tilerows(i), n = tilecols(j);
-      if (trank == -1) {
-        if (c.rank() != src) t.reset(new DenseTile<scalar_t>(m, n));
-        c.broadcast_from(t->D().data(), m*n, src);
-      } else {
-        if (c.rank() != src) t.reset(new LRTile<scalar_t>(m, n, trank));
-        c.broadcast_from(t->U().data(), m*trank, src);
-        c.broadcast_from(t->V().data(), trank*n, src);
-      }
-      return t;
-    }
-
     template<typename scalar_t>
     std::vector<std::unique_ptr<BLRTile<scalar_t>>>
     BLRMatrixMPI<scalar_t>::bcast_row_of_tiles_along_cols
     (std::size_t i, std::size_t j0, std::size_t j1) const {
-      std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
-      Tij.reserve(j1-j0);
       int src = i % grid()->nprows();
-      for (std::size_t j=j0; j<j1; j++) {
-        if (grid()->is_local_col(j))
-          Tij.emplace_back(bcast_tile(i, j, src, grid()->col_comm()));
+      std::size_t msg_size = 0, nr_tiles = 0;;
+      std::vector<std::int64_t> ranks;
+      if (grid()->is_local_row(i)) {
+        for (std::size_t j=j0; j<j1; j++)
+          if (grid()->is_local_col(j)) {
+            msg_size += tile(i, j).nonzeros();
+            ranks.push_back(tile(i, j).is_low_rank() ?
+                            tile(i, j).rank() : -1);
+          }
+      } else {
+        for (std::size_t j=j0; j<j1; j++)
+          if (grid()->is_local_col(j))
+            nr_tiles++;
+        ranks.resize(nr_tiles);
       }
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
+      if (ranks.empty()) return Tij;
+      ranks.push_back(msg_size);
+      grid()->col_comm().broadcast_from(ranks, src);
+      msg_size = ranks.back();
+      std::vector<scalar_t> buf(msg_size);
+      auto ptr = buf.data();
+      if (grid()->is_local_row(i)) {
+        for (std::size_t j=j0; j<j1; j++)
+          if (grid()->is_local_col(j)) {
+            auto& t = tile(i, j);
+            if (tile(i, j).is_low_rank()) {
+              std::copy(t.U().data(), t.U().end(), ptr);
+              ptr += t.U().rows()*t.U().cols();
+              std::copy(t.V().data(), t.V().end(), ptr);
+              ptr += t.V().rows()*t.V().cols();
+            } else {
+              std::copy(t.D().data(), t.D().end(), ptr);
+              ptr += t.D().rows()*t.D().cols();
+            }
+          }
+      }
+      grid()->col_comm().broadcast_from(buf, src);
+      Tij.reserve(nr_tiles);
+      ptr = buf.data();
+      auto m = tilerows(i);
+      for (std::size_t j=j0; j<j1; j++)
+        if (grid()->is_local_col(j)) {
+          auto r = ranks[Tij.size()];
+          auto n = tilecols(j);
+          if (r != -1) {
+            auto t = new LRTile<scalar_t>(m, n, r);
+            std::copy(ptr, ptr+m*r, t->U().data());  ptr += m*r;
+            std::copy(ptr, ptr+r*n, t->V().data());  ptr += r*n;
+            Tij.emplace_back(t);
+          } else {
+            auto t = new DenseTile<scalar_t>(m, n);
+            std::copy(ptr, ptr+m*n, t->D().data());  ptr += m*n;
+            Tij.emplace_back(t);
+          }
+        }
       return Tij;
     }
 
@@ -301,16 +323,65 @@ namespace strumpack {
     std::vector<std::unique_ptr<BLRTile<scalar_t>>>
     BLRMatrixMPI<scalar_t>::bcast_col_of_tiles_along_rows
     (std::size_t i0, std::size_t i1, std::size_t j) const {
-      std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
-      Tij.reserve(i1-i0);
       int src = j % grid()->npcols();
-      for (std::size_t i=i0; i<i1; i++) {
-        if (grid()->is_local_row(i))
-          Tij.emplace_back(bcast_tile(i, j, src, grid()->row_comm()));
+      std::size_t msg_size = 0, nr_tiles = 0;;
+      std::vector<std::int64_t> ranks;
+      if (grid()->is_local_col(j)) {
+        for (std::size_t i=i0; i<i1; i++)
+          if (grid()->is_local_row(i)) {
+            msg_size += tile(i, j).nonzeros();
+            ranks.push_back(tile(i, j).is_low_rank() ?
+                            tile(i, j).rank() : -1);
+          }
+      } else {
+        for (std::size_t i=i0; i<i1; i++)
+          if (grid()->is_local_row(i))
+            nr_tiles++;
+        ranks.resize(nr_tiles);
       }
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
+      if (ranks.empty()) return Tij;
+      ranks.push_back(msg_size);
+      grid()->row_comm().broadcast_from(ranks, src);
+      msg_size = ranks.back();
+      std::vector<scalar_t> buf(msg_size);
+      auto ptr = buf.data();
+      if (grid()->is_local_col(j)) {
+        for (std::size_t i=i0; i<i1; i++)
+          if (grid()->is_local_row(i)) {
+            auto& t = tile(i, j);
+            if (tile(i, j).is_low_rank()) {
+              std::copy(t.U().data(), t.U().end(), ptr);
+              ptr += t.U().rows()*t.U().cols();
+              std::copy(t.V().data(), t.V().end(), ptr);
+              ptr += t.V().rows()*t.V().cols();
+            } else {
+              std::copy(t.D().data(), t.D().end(), ptr);
+              ptr += t.D().rows()*t.D().cols();
+            }
+          }
+      }
+      grid()->row_comm().broadcast_from(buf, src);
+      Tij.reserve(nr_tiles);
+      ptr = buf.data();
+      auto n = tilecols(j);
+      for (std::size_t i=i0; i<i1; i++)
+        if (grid()->is_local_row(i)) {
+          auto r = ranks[Tij.size()];
+          auto m = tilerows(i);
+          if (r != -1) {
+            auto t = new LRTile<scalar_t>(m, n, r);
+            std::copy(ptr, ptr+m*r, t->U().data());  ptr += m*r;
+            std::copy(ptr, ptr+r*n, t->V().data());  ptr += r*n;
+            Tij.emplace_back(t);
+          } else {
+            auto t = new DenseTile<scalar_t>(m, n);
+            std::copy(ptr, ptr+m*n, t->D().data());  ptr += m*n;
+            Tij.emplace_back(t);
+          }
+        }
       return Tij;
     }
-
 
     template<typename scalar_t> void
     BLRMatrixMPI<scalar_t>::compress_tile
@@ -456,7 +527,6 @@ namespace strumpack {
             }
           }
         }
-
         auto Tij = A11.bcast_row_of_tiles_along_cols(i, i+1, B1);
         auto Tij2 = A12.bcast_row_of_tiles_along_cols(i, 0, B2);
         auto Tki = A11.bcast_col_of_tiles_along_rows(i+1, B1, i);
@@ -633,6 +703,7 @@ namespace strumpack {
     trsm(Side s, UpLo ul, Trans ta, Diag d,
          scalar_t alpha, const BLRMatrixMPI<scalar_t>& a,
          BLRMatrixMPI<scalar_t>& b) {
+      if (!a.active()) return;
       if (s != Side::L) {
         std::cerr << "trsm BLRMPI operation not implemented" << std::endl;
         abort();
@@ -691,6 +762,7 @@ namespace strumpack {
     gemm(Trans ta, Trans tb, scalar_t alpha, const BLRMatrixMPI<scalar_t>& a,
          const BLRMatrixMPI<scalar_t>& b, scalar_t beta,
          BLRMatrixMPI<scalar_t>& c) {
+      if (!a.active()) return;
       if (ta != Trans::N || tb != Trans::N) {
         std::cerr << "gemm BLRMPI operations not implemented" << std::endl;
         abort();

@@ -253,10 +253,6 @@ namespace strumpack {
       DenseTile<scalar_t>
       bcast_dense_tile_along_row(std::size_t i, std::size_t j) const;
 
-      std::unique_ptr<BLRTile<scalar_t>>
-      bcast_tile(std::size_t i, std::size_t j,
-                 int src, const MPIComm& c) const;
-
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       bcast_row_of_tiles_along_cols
       (std::size_t i, std::size_t j0, std::size_t j1) const;
