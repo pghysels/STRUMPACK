@@ -25,9 +25,12 @@ install(FILES
 if(STRUMPACK_USE_MPI)
   target_sources(strumpack
     PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/BLRMatrixMPI.hpp)
+    ${CMAKE_CURRENT_LIST_DIR}/BLRMatrixMPI.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/BLRMatrixMPI.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/BLRExtendAdd.cpp)
 
   install(FILES
     BLRMatrixMPI.hpp
+    BLRExtendAdd.hpp
     DESTINATION include/BLR)
 endif()

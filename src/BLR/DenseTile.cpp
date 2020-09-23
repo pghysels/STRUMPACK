@@ -36,6 +36,17 @@
 namespace strumpack {
   namespace BLR {
 
+    template<typename scalar_t> std::unique_ptr<BLRTile<scalar_t>>
+    DenseTile<scalar_t>::clone() const {
+      return std::unique_ptr<BLRTile<scalar_t>>(new DenseTile(D_));
+    }
+
+    template<typename scalar_t> std::unique_ptr<LRTile<scalar_t>>
+    DenseTile<scalar_t>::compress(const Opts_t& opts) const {
+      return std::unique_ptr<LRTile<scalar_t>>
+        (new LRTile<scalar_t>(D_, opts));
+    }
+
     template<typename scalar_t> void DenseTile<scalar_t>::draw
     (std::ostream& of, std::size_t roff, std::size_t coff) const {
       char prev = std::cout.fill('0');

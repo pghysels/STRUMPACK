@@ -40,14 +40,21 @@
 
 namespace strumpack {
 
+  template<typename scalar_t,typename integer_t> class FrontalMatrixBLRMPI;
+  namespace BLR {
+    template<typename scalar_t> class BLRMatrixMPI;
+  }
+
   template<typename scalar_t,typename integer_t>
   class FrontalMatrixDenseMPI : public FrontalMatrixMPI<scalar_t,integer_t> {
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
     using DistMW_t = DistributedMatrixWrapper<scalar_t>;
+    using BLRMPI_t = BLR::BLRMatrixMPI<scalar_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
     using FDMPI_t = FrontalMatrixDenseMPI<scalar_t,integer_t>;
+    using FBLRMPI_t = FrontalMatrixBLRMPI<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using VecVec_t = std::vector<std::vector<std::size_t>>;
 
@@ -63,6 +70,11 @@ namespace strumpack {
     void extend_add();
     void extend_add_copy_to_buffers
     (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override;
+    void extadd_blr_copy_to_buffers
+    (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa) const override;
+    void extadd_blr_copy_from_buffers
+    (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
+     scalar_t** pbuf, const FBLRMPI_t* pa) const override;
 
     void sample_CB
     (const DistM_t& R, DistM_t& Sr, DistM_t& Sc, F_t* pa) const override;

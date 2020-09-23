@@ -36,6 +36,8 @@
 #if defined(STRUMPACK_USE_MPI)
 #include "ExtendAdd.hpp"
 #include "FrontalMatrixMPI.hpp"
+#include "BLR/BLRExtendAdd.hpp"
+#include "FrontalMatrixBLRMPI.hpp"
 #endif
 
 namespace strumpack {
@@ -367,6 +369,14 @@ namespace strumpack {
   (DistM_t& F11, DistM_t& F12, DistM_t& F21, DistM_t& F22,
    scalar_t** pbuf, const FMPI_t* pa) const {
     ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_from_buffers
+      (F11, F12, F21, F22, *pbuf, pa, this);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrix<scalar_t,integer_t>::extadd_blr_copy_from_buffers
+  (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
+   scalar_t** pbuf, const FBLRMPI_t* pa) const {
+    BLR::BLRExtendAdd<scalar_t,integer_t>::seq_copy_from_buffers
       (F11, F12, F21, F22, *pbuf, pa, this);
   }
 

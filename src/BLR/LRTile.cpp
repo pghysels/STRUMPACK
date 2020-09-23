@@ -41,6 +41,12 @@ namespace strumpack {
   namespace BLR {
 
     template<typename scalar_t> LRTile<scalar_t>::LRTile
+    (std::size_t m, std::size_t n, std::size_t r) {
+      U_ = DenseM_t(m, r);
+      V_ = DenseM_t(r, n);
+    }
+
+    template<typename scalar_t> LRTile<scalar_t>::LRTile
     (const DenseM_t& T, const Opts_t& opts) {
       if (opts.low_rank_algorithm() == LowRankAlgorithm::RRQR) {
         T.low_rank(U_, V_, opts.rel_tol(), opts.abs_tol(), opts.max_rank(),
@@ -99,10 +105,23 @@ namespace strumpack {
     }
 
 
-    template<typename scalar_t> void LRTile<scalar_t>::dense
-    (DenseM_t& A) const {
+    template<typename scalar_t> void
+    LRTile<scalar_t>::dense(DenseM_t& A) const {
+      assert(A.rows() == rows() && A.cols() == cols());
       gemm(Trans::N, Trans::N, scalar_t(1.), U_, V_, scalar_t(0.), A,
            params::task_recursion_cutoff_level);
+    }
+
+    template<typename scalar_t> DenseMatrix<scalar_t>
+    LRTile<scalar_t>::dense() const {
+      DenseM_t A(rows(), cols());
+      dense(A);
+      return A;
+    }
+
+    template<typename scalar_t> std::unique_ptr<BLRTile<scalar_t>>
+    LRTile<scalar_t>::clone() const {
+      return std::unique_ptr<BLRTile<scalar_t>>(new LRTile(*this));
     }
 
     template<typename scalar_t> void LRTile<scalar_t>::draw

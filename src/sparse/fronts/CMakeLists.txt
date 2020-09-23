@@ -20,6 +20,7 @@ if(STRUMPACK_USE_MPI)
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixDenseMPI.hpp
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixHSSMPI.cpp
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixHSSMPI.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixBLRMPI.cpp
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixBLRMPI.hpp
     ${CMAKE_CURRENT_LIST_DIR}/ExtendAdd.cpp
     ${CMAKE_CURRENT_LIST_DIR}/ExtendAdd.hpp)

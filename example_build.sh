@@ -108,11 +108,12 @@ if [[ $(hostname -s) = "pieterg-X8DA3" ]]; then
     export COMBBLASAPP_DIR=$HOME/local/combinatorial-blas-2.0/CombBLAS/Applications/
 
     cmake ../ \
-          -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_INSTALL_PREFIX=../install \
           -DTPL_ENABLE_BPACK=ON \
           -DTPL_ENABLE_COMBBLAS=OFF \
-          -DSTRUMPACK_TASK_TIMERS=ON \
+          -DSTRUMPACK_TASK_TIMERS=OFF \
+          -DSTRUMPACK_COUNT_FLOPS=ON \
           -DTPL_SCALAPACK_LIBRARIES="$HOME/local/scalapack-2.1.0/install/lib/libscalapack.a"
 fi
 
