@@ -77,8 +77,8 @@ namespace strumpack {
     (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
      int etree_level=0) const override;
 
-    long long node_factor_nonzeros() const;
-    integer_t front_rank(int task_depth=0) const;
+    long long node_factor_nonzeros() const override;
+    integer_t front_rank(int task_depth=0) const override;
     std::string type() const override { return "FrontalMatrixHODLRMPI"; }
 
     void extract_CB_sub_matrix_2d

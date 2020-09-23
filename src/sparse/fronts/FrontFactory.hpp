@@ -29,6 +29,8 @@
 #ifndef FRONT_FACTORY_HPP
 #define FRONT_FACTORY_HPP
 
+#include <array>
+
 #include "StrumpackConfig.hpp"
 #if defined(STRUMPACK_USE_MPI)
 #include "misc/MPIWrapper.hpp"

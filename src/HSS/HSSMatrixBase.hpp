@@ -454,6 +454,13 @@ namespace strumpack {
       virtual void dense_recursive
       (DenseM_t& A, WorkDense<scalar_t>& w, bool isroot, int depth) const {};
 
+      virtual void read(std::ifstream& os) {
+        std::cerr << "ERROR read_HSS_node not implemented" << std::endl;
+      };
+      virtual void write(std::ofstream& os) const {
+        std::cerr << "ERROR write_HSS_node not implemented" << std::endl;
+      };
+
       friend class HSSMatrix<scalar_t>;
 
 #if defined(STRUMPACK_USE_MPI)
@@ -543,13 +550,6 @@ namespace strumpack {
       (const DistM_t& A, std::size_t Arlo, std::size_t Aclo,
        std::vector<scalar_t*>& pbuf);
       virtual void delete_redistributed_input();
-
-      virtual void read(std::ifstream& os) {
-        std::cerr << "ERROR read_HSS_node not implemented" << std::endl;
-      };
-      virtual void write(std::ofstream& os) const {
-        std::cerr << "ERROR write_HSS_node not implemented" << std::endl;
-      };
 
       friend class HSSMatrixMPI<scalar_t>;
 #endif //defined(STRUMPACK_USE_MPI)
