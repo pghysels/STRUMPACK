@@ -134,7 +134,7 @@ int main(int argc, char* argv[]) {
                 << relerr << std::endl;
     }
   }
-  TimerList::Finalize();
+  //TimerList::Finalize();
   scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return 0;

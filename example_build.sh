@@ -108,11 +108,12 @@ if [[ $(hostname -s) = "pieterg-X8DA3" ]]; then
     export COMBBLASAPP_DIR=$HOME/local/combinatorial-blas-2.0/CombBLAS/Applications/
 
     cmake ../ \
-          -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_INSTALL_PREFIX=../install \
           -DTPL_ENABLE_BPACK=ON \
           -DTPL_ENABLE_COMBBLAS=OFF \
-          -DSTRUMPACK_TASK_TIMERS=ON \
+          -DSTRUMPACK_TASK_TIMERS=OFF \
+          -DSTRUMPACK_COUNT_FLOPS=ON \
           -DTPL_SCALAPACK_LIBRARIES="$HOME/local/scalapack-2.1.0/install/lib/libscalapack.a"
 fi
 
@@ -146,16 +147,16 @@ if [[ $(hostname -s) = "tulip" ]]; then
     export METIS_DIR=/home/users/coe0239/local/metis-5.1.0/install/
 
     cmake ../ \
-	-DCMAKE_BUILD_TYPE=Debug \
-        -DCMAKE_CXX_COMPILER=hipcc \
-        -DSTRUMPACK_HIP_AMDGPU=--amdgpu-target=gfx906 \
-        -DCMAKE_C_COMPILER=gcc \
-        -DCMAKE_Fortran_COMPILER=gfortran \
-        -DSTRUMPACK_USE_CUDA=OFF \
-        -DSTRUMPACK_USE_HIP=ON \
-        -DTPL_ENABLE_ZFP=OFF \
-        -DSTRUMPACK_COUNT_FLOPS=ON \
-        -DCMAKE_INSTALL_PREFIX=../install
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_CXX_COMPILER=hipcc \
+          -DSTRUMPACK_HIP_AMDGPU=--amdgpu-target=gfx906 \
+          -DCMAKE_C_COMPILER=gcc \
+          -DCMAKE_Fortran_COMPILER=gfortran \
+          -DSTRUMPACK_USE_CUDA=OFF \
+          -DSTRUMPACK_USE_HIP=ON \
+          -DTPL_ENABLE_ZFP=OFF \
+          -DSTRUMPACK_COUNT_FLOPS=ON \
+          -DCMAKE_INSTALL_PREFIX=../install
 fi
 
 
@@ -178,7 +179,7 @@ if ! $found_host; then
     #  -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
 fi
 
-make install -j4 VERBOSE=1
+make install -j8
 make examples -j4
 make tests -j4
 # make test
