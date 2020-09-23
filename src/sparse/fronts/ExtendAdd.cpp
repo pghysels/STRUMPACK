@@ -50,7 +50,7 @@ namespace strumpack {
     // destination rank is:
     //  ((r / B) % prows) + ((c / B) % pcols) * prows
     //  = pr[r] + pc[c]
-    std::unique_ptr<int[]> pr(new int[CB.lrows()+CB.lcols()]);
+    std::unique_ptr<int[]> pr(new int[lrows+lcols]);
     auto pc = pr.get() + CB.lrows();
     int r_upd, c_upd;
     for (r_upd=0; r_upd<lrows; r_upd++) {
@@ -309,7 +309,7 @@ namespace strumpack {
     // destination rank is:
     //  ((r / B) % prows) + ((c / B) % pcols) * prows
     //  = pr[r] + pc[c]
-    std::unique_ptr<int[]> iwork(new int[CB.lrows()+CB.lcols()]);
+    std::unique_ptr<int[]> iwork(new int[lrows+lcols]);
     auto pr = iwork.get();
     auto pc = pr + CB.lrows();
     int r_upd;

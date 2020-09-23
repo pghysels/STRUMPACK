@@ -33,6 +33,7 @@
 
 #include "BLRMatrixMPI.hpp"
 #include "BLRTileBLAS.hpp"
+#include "misc/Tools.hpp"
 
 namespace strumpack {
   namespace BLR {
@@ -632,7 +633,61 @@ namespace strumpack {
       return from_ScaLAPACK(A, g, Rt, Ct);
     }
 
-    // TODO optimize/avoid using this
+
+#if 1
+    template<typename scalar_t> BLRMatrixMPI<scalar_t>
+    BLRMatrixMPI<scalar_t>::from_ScaLAPACK
+    (const DistM_t& A, const ProcessorGrid2D& g,
+     const vec_t& Rt, const vec_t& Ct) {
+      BLRMPI_t B(g, Rt, Ct);
+      auto P = B.Comm().size();
+      std::vector<std::vector<scalar_t>> sbuf(P);
+      if (A.active()) {
+        assert(A.fixed());
+        const auto lm = A.lrows();
+        const auto ln = A.lcols();
+        const auto nprows = A.nprows();
+        std::unique_ptr<int[]> work(new int[lm+ln]);
+        auto pr = work.get();
+        auto pc = pr + lm;
+        for (int r=0; r<lm; r++)
+          pr[r] = B.rg2p(A.rowl2g_fixed(r));
+        for (int c=0; c<ln; c++)
+          pc[c] = B.cg2p(A.coll2g_fixed(c)) * nprows;
+        { // reserve space for the send buffers
+          std::vector<std::size_t> cnt(sbuf.size());
+          for (int c=0; c<ln; c++)
+            for (int r=0, pcc=pc[c]; r<lm; r++)
+              cnt[pr[r]+pcc]++;
+          for (std::size_t p=0; p<sbuf.size(); p++)
+            sbuf[p].reserve(cnt[p]);
+        }
+        for (int c=0; c<ln; c++)
+          for (int r=0, pcc=pc[c]; r<lm; r++)
+            sbuf[pr[r]+pcc].push_back(A(r,c));
+      }
+      std::vector<scalar_t,NoInit<scalar_t>> rbuf;
+      std::vector<scalar_t*> pbuf;
+      B.Comm().all_to_all_v(sbuf, rbuf, pbuf);
+      B.fill(0.);
+      if (B.active()) {
+        const auto lm = B.lrows();
+        const auto ln = B.lcols();
+        const auto nprows = A.nprows();
+        std::unique_ptr<int[]> work(new int[lm+ln]);
+        auto pr = work.get();
+        auto pc = pr + lm;
+        for (std::size_t r=0; r<lm; r++)
+          pr[r] = A.rowg2p(B.rl2g(r));
+        for (std::size_t c=0; c<ln; c++)
+          pc[c] = A.colg2p(B.cl2g(c)) * nprows;
+        for (std::size_t c=0; c<ln; c++)
+          for (std::size_t r=0, pcc=pc[c]; r<lm; r++)
+            B(r, c) = *(pbuf[pr[r]+pcc]++);
+      }
+      return B;
+    }
+#else
     template<typename scalar_t> BLRMatrixMPI<scalar_t>
     BLRMatrixMPI<scalar_t>::from_ScaLAPACK
     (const DistM_t& A, const ProcessorGrid2D& g,
@@ -655,6 +710,7 @@ namespace strumpack {
         }
       return B;
     }
+#endif
 
     template<typename scalar_t> DistributedMatrix<scalar_t>
     BLRMatrixMPI<scalar_t>::to_ScaLAPACK(const BLACSGrid* g) const {
@@ -663,6 +719,57 @@ namespace strumpack {
       return A;
     }
 
+#if 1
+    template<typename scalar_t> void
+    BLRMatrixMPI<scalar_t>::to_ScaLAPACK(DistM_t& A) const {
+      if (A.rows() != int(rows()) || A.cols() != int(cols()))
+        A.resize(rows(), cols());
+      int P = A.Comm().size();
+      std::vector<std::vector<scalar_t>> sbuf(P);
+      if (active()) {
+        assert(A.fixed());
+        const auto lm = lrows();
+        const auto ln = lcols();
+        const auto nprows = A.nprows();
+        std::unique_ptr<int[]> work(new int[lm+ln]);
+        auto pr = work.get();
+        auto pc = pr + lm;
+        for (std::size_t r=0; r<lm; r++)
+          pr[r] = A.rowg2p_fixed(rl2g(r));
+        for (std::size_t c=0; c<ln; c++)
+          pc[c] = A.colg2p_fixed(cl2g(c)) * nprows;
+        { // reserve space for the send buffers
+          std::vector<std::size_t> cnt(sbuf.size());
+          for (std::size_t c=0; c<ln; c++)
+            for (std::size_t r=0, pcc=pc[c]; r<lm; r++)
+              cnt[pr[r]+pcc]++;
+          for (std::size_t p=0; p<sbuf.size(); p++)
+            sbuf[p].reserve(cnt[p]);
+        }
+        for (std::size_t c=0; c<ln; c++)
+          for (std::size_t r=0, pcc=pc[c]; r<lm; r++)
+            sbuf[pr[r]+pcc].push_back(this->operator()(r,c));
+      }
+      std::vector<scalar_t,NoInit<scalar_t>> rbuf;
+      std::vector<scalar_t*> pbuf;
+      A.Comm().all_to_all_v(sbuf, rbuf, pbuf);
+      if (A.active()) {
+        const auto lm = A.lrows();
+        const auto ln = A.lcols();
+        const auto nprows = A.nprows();
+        std::unique_ptr<int[]> work(new int[lm+ln]);
+        auto pr = work.get();
+        auto pc = pr + lm;
+        for (int r=0; r<lm; r++)
+          pr[r] = rg2p(A.rowl2g_fixed(r));
+        for (int c=0; c<ln; c++)
+          pc[c] = cg2p(A.coll2g_fixed(c)) * nprows;
+        for (int c=0; c<ln; c++)
+          for (int r=0, pcc=pc[c]; r<lm; r++)
+            A(r,c) = *(pbuf[pr[r]+pcc]++);
+      }
+    }
+#else
     template<typename scalar_t> void
     BLRMatrixMPI<scalar_t>::to_ScaLAPACK
     (DistributedMatrix<scalar_t>& A) const {
@@ -677,6 +784,7 @@ namespace strumpack {
                A, tileroff(i), tilecoff(j), A.ctxt_all());
         }
     }
+#endif
 
     // explicit template instantiations
     template class BLRMatrixMPI<float>;

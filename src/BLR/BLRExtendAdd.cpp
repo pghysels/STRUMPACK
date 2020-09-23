@@ -42,7 +42,7 @@ namespace strumpack {
       const auto lcols = CB.lcols();
       const auto pa_sep = pa->dim_sep();
       const auto nprows = pa->grid2d().nprows();
-      std::unique_ptr<int[]> work(new int[CB.lrows()+CB.lcols()]);
+      std::unique_ptr<int[]> work(new int[lrows+lcols]);
       auto pr = work.get();
       auto pc = pr + CB.lrows();
       int r_upd, c_upd;
@@ -93,7 +93,7 @@ namespace strumpack {
       const int pa_sep = pa->dim_sep();
       const int nprows = pa->grid2d().nprows();
       // destination rank is pr[r] + pc[c]
-      std::unique_ptr<int[]> work(new int[CB.lrows()+CB.lcols()]);
+      std::unique_ptr<int[]> work(new int[lrows+lcols]);
       auto pr = work.get();
       auto pc = pr + CB.lrows();
       int r_upd, c_upd;
