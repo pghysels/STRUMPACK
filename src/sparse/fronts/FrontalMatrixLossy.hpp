@@ -102,10 +102,10 @@ namespace strumpack {
   private:
     LossyMatrix<scalar_t> F11c_, F12c_, F21c_;
 
-    void fwd_solve_phase2
-    (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const;
-    void bwd_solve_phase1
-    (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const;
+    void fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd,
+                          int etree_level, int task_depth) const override;
+    void bwd_solve_phase1(DenseM_t& y, DenseM_t& yupd,
+                          int etree_level, int task_depth) const override;
 
     FrontalMatrixLossy(const FrontalMatrixLossy&) = delete;
     FrontalMatrixLossy& operator=(FrontalMatrixLossy const&) = delete;
