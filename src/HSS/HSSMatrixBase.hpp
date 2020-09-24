@@ -232,7 +232,7 @@ namespace strumpack {
        *
        * \return True if this node is active, false otherwise.
        */
-      bool active() const { return _active; };
+      bool active() const { return _active; }
 
       /**
        * Return the maximum rank of this HSS matrix over all
@@ -320,7 +320,7 @@ namespace strumpack {
        * \see HSS::draw
        */
       virtual void draw
-      (std::ostream& of, std::size_t rlo, std::size_t clo) const {};
+      (std::ostream& of, std::size_t rlo, std::size_t clo) const {}
 
 #if defined(STRUMPACK_USE_MPI)
       virtual void forward_solve
@@ -359,8 +359,8 @@ namespace strumpack {
       int _U_rank = 0, _U_rows = 0, _V_rank = 0, _V_rows = 0;
       virtual std::size_t U_rank() const { return _U_rank; }
       virtual std::size_t V_rank() const { return _V_rank; }
-      virtual std::size_t U_rows() const { return _U_rows; };
-      virtual std::size_t V_rows() const { return _V_rows; };
+      virtual std::size_t U_rows() const { return _U_rows; }
+      virtual std::size_t V_rows() const { return _V_rows; }
 
       // Used to redistribute the original 2D block cyclic matrix
       // according to the HSS tree
@@ -369,11 +369,11 @@ namespace strumpack {
       virtual void compress_recursive_original
       (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
        const elem_t& Aelem, const opts_t& opts, WorkCompress<scalar_t>& w,
-       int dd, int depth) {};
+       int dd, int depth) {}
       virtual void compress_recursive_stable
       (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
        const elem_t& Aelem, const opts_t& opts, WorkCompress<scalar_t>& w,
-       int d, int dd, int depth) {};
+       int d, int dd, int depth) {}
       virtual void compress_level_original
       (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
        const opts_t& opts, WorkCompress<scalar_t>& w,
@@ -405,61 +405,61 @@ namespace strumpack {
 
       virtual void factor_recursive
       (HSSFactors<scalar_t>& ULV, WorkFactor<scalar_t>& w,
-       bool isroot, bool partial, int depth) const {};
+       bool isroot, bool partial, int depth) const {}
 
       virtual void apply_fwd
       (const DenseM_t& b, WorkApply<scalar_t>& w,
-       bool isroot, int depth, std::atomic<long long int>& flops) const {};
+       bool isroot, int depth, std::atomic<long long int>& flops) const {}
       virtual void apply_bwd
       (const DenseM_t& b, scalar_t beta, DenseM_t& c, WorkApply<scalar_t>& w,
-       bool isroot, int depth, std::atomic<long long int>& flops) const {};
+       bool isroot, int depth, std::atomic<long long int>& flops) const {}
       virtual void applyT_fwd
       (const DenseM_t& b, WorkApply<scalar_t>& w, bool isroot,
-       int depth, std::atomic<long long int>& flops) const {};
+       int depth, std::atomic<long long int>& flops) const {}
       virtual void applyT_bwd
       (const DenseM_t& b, scalar_t beta, DenseM_t& c, WorkApply<scalar_t>& w,
-       bool isroot, int depth, std::atomic<long long int>& flops) const {};
+       bool isroot, int depth, std::atomic<long long int>& flops) const {}
 
       virtual void forward_solve
       (const HSSFactors<scalar_t>& ULV, WorkSolve<scalar_t>& w,
-       const DenseMatrix<scalar_t>& b, bool partial) const {};
+       const DenseMatrix<scalar_t>& b, bool partial) const {}
       virtual void backward_solve
       (const HSSFactors<scalar_t>& ULV, WorkSolve<scalar_t>& w,
-       DenseMatrix<scalar_t>& b) const {};
+       DenseMatrix<scalar_t>& b) const {}
       virtual void solve_fwd
       (const HSSFactors<scalar_t>& ULV, const DenseM_t& b,
-       WorkSolve<scalar_t>& w, bool partial, bool isroot, int depth) const {};
+       WorkSolve<scalar_t>& w, bool partial, bool isroot, int depth) const {}
       virtual void solve_bwd
       (const HSSFactors<scalar_t>& ULV, DenseM_t& x, WorkSolve<scalar_t>& w,
-       bool isroot, int depth) const {};
+       bool isroot, int depth) const {}
 
       virtual void extract_fwd
-      (WorkExtract<scalar_t>& w, bool odiag, int depth) const {};
+      (WorkExtract<scalar_t>& w, bool odiag, int depth) const {}
       virtual void extract_bwd
       (DenseMatrix<scalar_t>& B, WorkExtract<scalar_t>& w,
-       int depth) const {};
+       int depth) const {}
       virtual void extract_bwd
       (std::vector<Triplet<scalar_t>>& triplets,
-       WorkExtract<scalar_t>& w, int depth) const {};
+       WorkExtract<scalar_t>& w, int depth) const {}
 
       virtual void apply_UV_big
       (DenseM_t& Theta, DenseM_t& Uop, DenseM_t& Phi, DenseM_t& Vop,
        const std::pair<std::size_t, std::size_t>& offset, int depth,
-       std::atomic<long long int>& flops) const {};
+       std::atomic<long long int>& flops) const {}
       virtual void apply_UtVt_big
       (const DenseM_t& A, DenseM_t& UtA, DenseM_t& VtA,
        const std::pair<std::size_t, std::size_t>& offset,
-       int depth, std::atomic<long long int>& flops) const {};
+       int depth, std::atomic<long long int>& flops) const {}
 
       virtual void dense_recursive
-      (DenseM_t& A, WorkDense<scalar_t>& w, bool isroot, int depth) const {};
+      (DenseM_t& A, WorkDense<scalar_t>& w, bool isroot, int depth) const {}
 
       virtual void read(std::ifstream& os) {
         std::cerr << "ERROR read_HSS_node not implemented" << std::endl;
-      };
+      }
       virtual void write(std::ofstream& os) const {
         std::cerr << "ERROR write_HSS_node not implemented" << std::endl;
-      };
+      }
 
       friend class HSSMatrix<scalar_t>;
 
