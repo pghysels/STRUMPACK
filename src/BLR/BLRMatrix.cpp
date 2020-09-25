@@ -471,17 +471,17 @@ namespace strumpack {
       piv.resize(B11.rows());
       auto rb = B11.rowblocks();
       auto rb2 = B21.rowblocks();
-/*#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
       auto lrb = rb+rb2;
       // dummy for task synchronization
       std::unique_ptr<int[]> B_(new int[lrb*lrb]()); auto B = B_.get();
 #pragma omp taskgroup
 //#else
-//      B=nullptr; //??
-#endif*/
+//      std::unique_ptr<int> B=nullptr; 
+#endif
 
 // RL-version
-#if 0
+#if 1
       {
         for (std::size_t i=0; i<rb; i++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
