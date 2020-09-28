@@ -88,13 +88,13 @@ namespace strumpack {
     // TODO there is no such thing as hipSOLVER yet :(
     class SOLVERHandle {
     public:
-      SOLVERHandle() { gpu_check(rocsolver_create_handle(&h_)); }
-      ~SOLVERHandle() { gpu_check(rocsolver_destroy_handle(h_)); }
-      void set_stream(Stream& s) { rocsolver_set_stream(h_, s); }
-      operator rocsolver_handle&() { return h_; }
-      operator const rocsolver_handle&() const { return h_; }
+      SOLVERHandle() { gpu_check(rocblas_create_handle(&h_)); }
+      ~SOLVERHandle() { gpu_check(rocblas_destroy_handle(h_)); }
+      void set_stream(Stream& s) { rocblas_set_stream(h_, s); }
+      operator rocblas_handle&() { return h_; }
+      operator const rocblas_handle&() const { return h_; }
     private:
-      rocsolver_handle h_;
+      rocblas_handle h_;
     };
 
     template<typename T> void memset
