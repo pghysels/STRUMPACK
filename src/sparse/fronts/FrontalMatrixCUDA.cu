@@ -134,13 +134,19 @@ namespace strumpack {
     }
 
     template<typename T> __global__ void
-    extend_add_kernel(unsigned int by0, AssembleData<T>* dat) {
+    extend_add_kernel_left(unsigned int by0, AssembleData<T>* dat) {
       int x = blockIdx.x * blockDim.x + threadIdx.x,
         y = (blockIdx.y + by0) * blockDim.y + threadIdx.y;
       auto& F = dat[blockIdx.z];
       if (F.CB1)
         ea_kernel(x, y, F.d1, F.d2, F.dCB1,
                   F.F11, F.F12, F.F21, F.F22, F.CB1, F.I1);
+    }
+    template<typename T> __global__ void
+    extend_add_kernel_right(unsigned int by0, AssembleData<T>* dat) {
+      int x = blockIdx.x * blockDim.x + threadIdx.x,
+        y = (blockIdx.y + by0) * blockDim.y + threadIdx.y;
+      auto& F = dat[blockIdx.z];
       if (F.CB2)
         ea_kernel(x, y, F.d1, F.d2, F.dCB2,
                   F.F11, F.F12, F.F21, F.F22, F.CB2, F.I2);
@@ -148,7 +154,8 @@ namespace strumpack {
 
 
     template<typename T> void
-    assemble(unsigned int nf, AssembleData<T>* dat) {
+    assemble(unsigned int nf, AssembleData<T>* dat,
+             AssembleData<T>* ddat) {
       { // front assembly from sparse matrix
         unsigned int nt1 = 128, nt2 = 32, nb1 = 0, nb2 = 0;
         for (int f=0; f<nf; f++) {
@@ -161,12 +168,12 @@ namespace strumpack {
         }
         for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Y) {
           dim3 grid(nb1, std::min(nf-f, MAX_BLOCKS_Y));
-          assemble_11_kernel<<<grid,nt1>>>(f, dat);
+          assemble_11_kernel<<<grid,nt1>>>(f, ddat);
         }
         if (nb2)
           for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Y) {
             dim3 grid(nb2, std::min(nf-f, MAX_BLOCKS_Y));
-            assemble_12_21_kernel<<<grid,nt2>>>(f, dat);
+            assemble_12_21_kernel<<<grid,nt2>>>(f, ddat);
           }
       }
       cudaDeviceSynchronize();
@@ -180,12 +187,20 @@ namespace strumpack {
         }
         dim3 block(nt, nt);
         using T_ = typename cuda_type<T>::value_type;
-        auto dat_ = reinterpret_cast<AssembleData<T_>*>(dat);
+        auto dat_ = reinterpret_cast<AssembleData<T_>*>(ddat);
         for (unsigned int b1=0; b1<nb; b1+=MAX_BLOCKS_Y) {
           int nb1 = std::min(nb-b1, MAX_BLOCKS_Y);
           for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Z) {
             dim3 grid(nb, nb1, std::min(nf-f, MAX_BLOCKS_Z));
-            extend_add_kernel<<<grid, block>>>(b1, dat_+f);
+            extend_add_kernel_left<<<grid, block>>>(b1, dat_+f);
+          }
+        }
+        cudaDeviceSynchronize();
+        for (unsigned int b1=0; b1<nb; b1+=MAX_BLOCKS_Y) {
+          int nb1 = std::min(nb-b1, MAX_BLOCKS_Y);
+          for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Z) {
+            dim3 grid(nb, nb1, std::min(nf-f, MAX_BLOCKS_Z));
+            extend_add_kernel_right<<<grid, block>>>(b1, dat_+f);
           }
         }
       }
@@ -330,7 +345,6 @@ namespace strumpack {
       __shared__ primitive_t A_[NT*NT], B_[NT*NT];
       T *B = reinterpret_cast<T*>(B_), *A = reinterpret_cast<T*>(A_);
       int j = threadIdx.x, i = threadIdx.y;
-
       if (j == 0)
         P[i] = i;
       __syncthreads();
@@ -530,13 +544,21 @@ namespace strumpack {
     }
 
     template<typename T> __global__ void
-    extend_add_rhs_kernel(int nrhs, unsigned int by0, AssembleData<T>* dat) {
+    extend_add_rhs_kernel_left
+    (int nrhs, unsigned int by0, AssembleData<T>* dat) {
       int x = blockIdx.x * blockDim.x + threadIdx.x,
         y = (blockIdx.y + by0) * blockDim.y + threadIdx.y;
       auto& F = dat[blockIdx.z];
       if (F.CB1)
         ea_rhs_kernel(x, y, nrhs, F.d1, F.d2, F.dCB1,
                       F.F11, F.F21, F.CB1, F.I1);
+    }
+    template<typename T> __global__ void
+    extend_add_rhs_kernel_right
+    (int nrhs, unsigned int by0, AssembleData<T>* dat) {
+      int x = blockIdx.x * blockDim.x + threadIdx.x,
+        y = (blockIdx.y + by0) * blockDim.y + threadIdx.y;
+      auto& F = dat[blockIdx.z];
       if (F.CB2)
         ea_rhs_kernel(x, y, nrhs, F.d1, F.d2, F.dCB2,
                       F.F11, F.F21, F.CB2, F.I2);
@@ -544,7 +566,8 @@ namespace strumpack {
 
 
     template<typename T> void
-    extend_add_rhs(int nrhs, unsigned int nf, AssembleData<T>* dat) {
+    extend_add_rhs(int nrhs, unsigned int nf,
+                   AssembleData<T>* dat, AssembleData<T>* ddat) {
       unsigned int nty = 64, nby = 0;
       for (int f=0; f<nf; f++) {
         int b = dat[f].dCB1 / nty + (dat[f].dCB1 % nty != 0);
@@ -556,12 +579,20 @@ namespace strumpack {
       int nbx = nrhs / ntx + (nrhs % ntx != 0);
       dim3 block(ntx, nty);
       using T_ = typename cuda_type<T>::value_type;
-      auto dat_ = reinterpret_cast<AssembleData<T_>*>(dat);
+      auto dat_ = reinterpret_cast<AssembleData<T_>*>(ddat);
       for (unsigned int by=0; by<nby; by+=MAX_BLOCKS_Y) {
         int nbyy = std::min(nby-by, MAX_BLOCKS_Y);
         for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Z) {
           dim3 grid(nbx, nbyy, std::min(nf-f, MAX_BLOCKS_Z));
-          extend_add_rhs_kernel<<<grid, block>>>(nrhs, by, dat_+f);
+          extend_add_rhs_kernel_left<<<grid, block>>>(nrhs, by, dat_+f);
+        }
+      }
+      cudaDeviceSynchronize();
+      for (unsigned int by=0; by<nby; by+=MAX_BLOCKS_Y) {
+        int nbyy = std::min(nby-by, MAX_BLOCKS_Y);
+        for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Z) {
+          dim3 grid(nbx, nbyy, std::min(nf-f, MAX_BLOCKS_Z));
+          extend_add_rhs_kernel_right<<<grid, block>>>(nrhs, by, dat_+f);
         }
       }
     }
@@ -612,7 +643,8 @@ namespace strumpack {
     }
 
     template<typename T> void
-    extract_rhs(int nrhs, unsigned int nf, AssembleData<T>* dat) {
+    extract_rhs(int nrhs, unsigned int nf, AssembleData<T>* dat,
+                AssembleData<T>* ddat) {
       unsigned int nty = 64, nby = 0;
       for (int f=0; f<nf; f++) {
         int b = dat[f].dCB1 / nty + (dat[f].dCB1 % nty != 0);
@@ -624,7 +656,7 @@ namespace strumpack {
       int nbx = nrhs / ntx + (nrhs % ntx != 0);
       dim3 block(ntx, nty);
       using T_ = typename cuda_type<T>::value_type;
-      auto dat_ = reinterpret_cast<AssembleData<T_>*>(dat);
+      auto dat_ = reinterpret_cast<AssembleData<T_>*>(ddat);
       for (unsigned int by=0; by<nby; by+=MAX_BLOCKS_Y) {
         int nbyy = std::min(nby-by, MAX_BLOCKS_Y);
         for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Z) {
@@ -733,20 +765,20 @@ namespace strumpack {
 
 
     // explicit template instantiations
-    template void assemble(unsigned int, AssembleData<float>*);
-    template void assemble(unsigned int, AssembleData<double>*);
-    template void assemble(unsigned int, AssembleData<std::complex<float>>*);
-    template void assemble(unsigned int, AssembleData<std::complex<double>>*);
+    template void assemble(unsigned int, AssembleData<float>*, AssembleData<float>*);
+    template void assemble(unsigned int, AssembleData<double>*, AssembleData<double>*);
+    template void assemble(unsigned int, AssembleData<std::complex<float>>*, AssembleData<std::complex<float>>*);
+    template void assemble(unsigned int, AssembleData<std::complex<double>>*, AssembleData<std::complex<double>>*);
 
-    template void extend_add_rhs(int, unsigned int, AssembleData<float>*);
-    template void extend_add_rhs(int, unsigned int, AssembleData<double>*);
-    template void extend_add_rhs(int, unsigned int, AssembleData<std::complex<float>>*);
-    template void extend_add_rhs(int, unsigned int, AssembleData<std::complex<double>>*);
+    template void extend_add_rhs(int, unsigned int, AssembleData<float>*, AssembleData<float>*);
+    template void extend_add_rhs(int, unsigned int, AssembleData<double>*, AssembleData<double>*);
+    template void extend_add_rhs(int, unsigned int, AssembleData<std::complex<float>>*, AssembleData<std::complex<float>>*);
+    template void extend_add_rhs(int, unsigned int, AssembleData<std::complex<double>>*, AssembleData<std::complex<double>>*);
 
-    template void extract_rhs(int, unsigned int, AssembleData<float>*);
-    template void extract_rhs(int, unsigned int, AssembleData<double>*);
-    template void extract_rhs(int, unsigned int, AssembleData<std::complex<float>>*);
-    template void extract_rhs(int, unsigned int, AssembleData<std::complex<double>>*);
+    template void extract_rhs(int, unsigned int, AssembleData<float>*, AssembleData<float>*);
+    template void extract_rhs(int, unsigned int, AssembleData<double>*, AssembleData<double>*);
+    template void extract_rhs(int, unsigned int, AssembleData<std::complex<float>>*, AssembleData<std::complex<float>>*);
+    template void extract_rhs(int, unsigned int, AssembleData<std::complex<double>>*, AssembleData<std::complex<double>>*);
 
     template void factor_block_batch<float,8>(unsigned int, FrontData<float>*);
     template void factor_block_batch<double,8>(unsigned int, FrontData<double>*);

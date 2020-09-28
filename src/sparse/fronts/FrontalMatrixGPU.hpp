@@ -48,6 +48,25 @@ namespace strumpack {
     template<typename scalar_t> struct FwdSolveData;
   }
 
+  template<typename scalar_t> class GPUFactors {
+  public:
+    bool allocated = false;
+    gpu::DeviceMemory<scalar_t> dL, dU;
+    gpu::DeviceMemory<int> dP;
+    std::vector<scalar_t*> dL_lvl, dU_lvl;
+    std::vector<int*> dP_lvl;
+
+    GPUFactors(int lvls) : dL_lvl(lvls), dU_lvl(lvls), dP_lvl(lvls) {}
+    void clear() {
+      dL.release();
+      dU.release();
+      dP.release();
+      dL_lvl.clear();
+      dU_lvl.clear();
+      dP_lvl.clear();
+    }
+  };
+
   template<typename scalar_t,typename integer_t> class FrontalMatrixGPU
     : public FrontalMatrix<scalar_t,integer_t> {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
@@ -73,6 +92,11 @@ namespace strumpack {
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,
      int etree_level=0, int task_depth=0) override;
 
+    // void move_factors_to_gpu() const override;
+    // void remove_factors_from_gpu() const override;
+
+    // void multifrontal_solve(DenseM_t& b) const override;
+
     void forward_multifrontal_solve
     (DenseM_t& b, DenseM_t* work, int etree_level=0,
      int task_depth=0) const override;
@@ -93,8 +117,7 @@ namespace strumpack {
 #endif
 
   private:
-    std::unique_ptr<scalar_t[]> factor_mem_, host_Schur_;
-    // TODO remove these, set on the fly
+    std::unique_ptr<scalar_t[]> host_factors_, host_Schur_;
     DenseMW_t F11_, F12_, F21_, F22_;
     std::vector<int> pivot_mem_;
     int* piv_ = nullptr;
@@ -121,9 +144,11 @@ namespace strumpack {
     void rhs_from_contig(LInfo_t& L, DenseM_t& b, const scalar_t* bptr) const;
 
     void assemble_rhs(int nrhs, LInfo_t& L, scalar_t* db, scalar_t* dbupd,
-                      scalar_t* old_dbupd) const;
+                      scalar_t* old_dbupd, char* dea_mem, char* hea_mem,
+                      std::size_t mem_size) const;
     void extract_rhs(int nrhs, LInfo_t& L, scalar_t* dy, scalar_t* dyupd,
-                     scalar_t* old_dyupd) const;
+                     scalar_t* old_dyupd, char* dea_mem, char* hea_mem,
+                     std::size_t mem_size) const;
 
     void fwd_small_fronts(int nrhs, LInfo_t& L,
                           gpu::FrontData<scalar_t>* fdata,

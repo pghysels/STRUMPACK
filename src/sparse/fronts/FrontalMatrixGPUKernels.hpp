@@ -82,18 +82,18 @@ namespace strumpack {
     };
 
     template<typename T> void
-    assemble(unsigned int, AssembleData<T>*);
+    assemble(unsigned int, AssembleData<T>*, AssembleData<T>*);
 
     template<typename T, int NT=32> void
     factor_block_batch(unsigned int, FrontData<T>*);
 
     template<typename T> void
-    extend_add_rhs(int, unsigned int, AssembleData<T>*);
+    extend_add_rhs(int, unsigned int, AssembleData<T>*, AssembleData<T>*);
     template<typename T, int NT=32> void
     fwd_block_batch(int, unsigned int, FrontData<T>*);
 
     template<typename T> void
-    extract_rhs(int, unsigned int, AssembleData<T>*);
+    extract_rhs(int, unsigned int, AssembleData<T>*, AssembleData<T>*);
     template<typename T, int NT=32> void
     bwd_block_batch(int, unsigned int, FrontData<T>*);
 
