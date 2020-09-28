@@ -143,17 +143,17 @@ namespace strumpack {
     (DenseMatrix<T>& d, const DenseMatrix<T>& h) {
       assert(d.rows() == h.rows() && d.cols() == h.cols());
       assert(d.rows() == d.ld() && h.rows() == h.ld());
-      copy_device_to_host(d.data(), h.data(), d.rows()*d.cols());
+      copy_host_to_device(d.data(), h.data(), d.rows()*d.cols());
     }
     template<typename T> void copy_host_to_device
     (DenseMatrix<T>& d, const T* h) {
       assert(d.rows() == d.ld());
-      copy_device_to_host(d.data(), h, d.rows()*d.cols());
+      copy_host_to_device(d.data(), h, d.rows()*d.cols());
     }
     template<typename T> void copy_host_to_device
     (T* d, const DenseMatrix<T>& h) {
       assert(h.rows() == h.ld());
-      copy_device_to_host(d, h.data(), h.rows()*h.cols());
+      copy_host_to_device(d, h.data(), h.rows()*h.cols());
     }
 
 
