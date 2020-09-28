@@ -545,10 +545,10 @@ if(hipblas_FOUND)
       endforeach()
     # endif()
     # if(DEFINED STRUMPACK_HIP_AMDGPU)
-    #   target_compile_options(strumpack PRIVATE 
+    #   target_compile_options(strumpack PRIVATE
     #   $<$<COMPILE_LANGUAGE:CXX>:${STRUMPACK_HIP_AMDGPU}>)
     else()
-      target_compile_options(strumpack PRIVATE 
+      target_compile_options(strumpack PRIVATE
       $<$<COMPILE_LANGUAGE:CXX>:--amdgpu-target=none>)
       message(WARNING "No AMD GPU architecture was specified,"
         " specify -DSTRUMPACK_HIP_AMDGPU=\"xxx\" "
