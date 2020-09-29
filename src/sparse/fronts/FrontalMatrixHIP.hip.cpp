@@ -468,7 +468,7 @@ namespace strumpack {
 
     template<typename T, int NT> __global__ void
     solve_block_kernel_batched(int nrhs, FrontData<T>* dat) {
-      FrontData<T>& A = dat[blockIdx.x];
+      FrontData<T>& A = dat[hipBlockIdx_x];
       solve_block_kernel<T,NT>(A.n1, nrhs, A.F11, A.F12, A.piv);
     }
 
@@ -716,7 +716,7 @@ namespace strumpack {
     }
     template<typename T, int NT, int alpha, int beta> __global__ void
     gemvN_block_outer_kernel_batched(FrontData<T>* dat) {
-      FrontData<T>& A = dat[blockIdx.x];
+      FrontData<T>& A = dat[hipBlockIdx_x];
       // F12 is F12, F21 holds yupd, F11 holds y
       gemvN_block_outer_kernel<T,NT,alpha,beta>
         (A.n1, A.n2, A.F12, A.F21, A.F11);
