@@ -857,6 +857,10 @@ namespace strumpack {
       os.write((const char*)(D.data()), sizeof(scalar_t)*D.rows()*D.cols());
       return os;
   }
+  template std::ofstream& operator<<(std::ofstream& os, const DenseMatrix<float>& D);
+  template std::ofstream& operator<<(std::ofstream& os, const DenseMatrix<double>& D);
+  template std::ofstream& operator<<(std::ofstream& os, const DenseMatrix<std::complex<float>>& D);
+  template std::ofstream& operator<<(std::ofstream& os, const DenseMatrix<std::complex<double>>& D);
 
   template<typename scalar_t> std::ifstream&
   operator>>(std::ifstream& is, DenseMatrix<scalar_t>& D) {
@@ -876,6 +880,10 @@ namespace strumpack {
     is.read((char*)D.data(), sizeof(scalar_t)*D.rows()*D.cols());
     return is;
   }
+  template std::ifstream& operator>>(std::ifstream& os, DenseMatrix<float>& D);
+  template std::ifstream& operator>>(std::ifstream& os, DenseMatrix<double>& D);
+  template std::ifstream& operator>>(std::ifstream& os, DenseMatrix<std::complex<float>>& D);
+  template std::ifstream& operator>>(std::ifstream& os, DenseMatrix<std::complex<double>>& D);
 
 
 

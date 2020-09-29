@@ -28,6 +28,7 @@
  */
 
 #include "FrontalMatrixMPI.hpp"
+#include "FrontalMatrixBLRMPI.hpp"
 #include "ExtendAdd.hpp"
 
 namespace strumpack {

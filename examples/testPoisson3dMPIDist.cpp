@@ -100,7 +100,7 @@ int main(int argc, char* argv[]) {
     auto n_local = Adist.local_rows();
     DenseMatrix<scalar> b(n_local, nrhs), x(n_local, nrhs),
       x_exact(n_local, nrhs);
-#if 0
+#if 1
     x_exact.random();
     Adist.spmv(x_exact, b);
 #else
@@ -134,7 +134,7 @@ int main(int argc, char* argv[]) {
                 << relerr << std::endl;
     }
   }
-  TimerList::Finalize();
+  //TimerList::Finalize();
   scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return 0;

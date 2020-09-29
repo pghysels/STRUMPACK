@@ -320,6 +320,10 @@ namespace strumpack {
     broadcast(T* sbuf, std::size_t ssize) const {
       MPI_Bcast(sbuf, ssize, mpi_type<T>(), 0, comm_);
     }
+    template<typename T> void
+    broadcast_from(T* sbuf, std::size_t ssize, int src) const {
+      MPI_Bcast(sbuf, ssize, mpi_type<T>(), src, comm_);
+    }
 
     template<typename T>
     void all_gather(T* buf, std::size_t rsize) const {

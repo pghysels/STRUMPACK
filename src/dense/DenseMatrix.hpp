@@ -241,6 +241,12 @@ namespace strumpack {
     inline scalar_t* end() { return data_ + ld_ * cols_; }
 
     /**
+     * Pointer to the element after the last one in this matrix.
+     * end() == data() + size()
+     */
+    inline const scalar_t* end() const { return data_ + ld_ * cols_; }
+
+    /**
      * Const reference to element (i,j) in the matrix. This will do a
      * bounds check with assertions, which are enabled in Debug mode,
      * disabled in Release mode.
@@ -637,9 +643,9 @@ namespace strumpack {
     real_t normI() const;
 
     /**
-     * Return the (approximate) amount memory taken by this
-     * memory. Simply nonzeros()*sizeof(scalar_t). The matrix metadata
-     * is not counted in this.
+     * Return the (approximate) amount of memory taken by this matrix,
+     * in bytes. Simply nonzeros()*sizeof(scalar_t). The matrix
+     * metadata is not counted in this.
      */
     virtual std::size_t memory() const {
       return sizeof(scalar_t) * rows() * cols();

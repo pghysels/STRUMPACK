@@ -36,14 +36,21 @@
 
 namespace strumpack {
 
+  template<typename scalar_t,typename integer_t> class FrontalMatrixBLRMPI;
+  namespace BLR {
+    template<typename scalar_t> class BLRMatrixMPI;
+  }
+
   template<typename scalar_t,typename integer_t>
   class FrontalMatrixMPI : public FrontalMatrix<scalar_t,integer_t> {
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
+    using FBLRMPI_t = FrontalMatrixBLRMPI<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
     using DistMW_t = DistributedMatrixWrapper<scalar_t>;
+    using BLRMPI_t = BLR::BLRMatrixMPI<scalar_t>;
     using Opts_t = SPOptions<scalar_t>;
     using Vec_t = std::vector<std::size_t>;
     using VecVec_t = std::vector<std::vector<std::size_t>>;
