@@ -382,7 +382,30 @@ namespace strumpack {
                  reinterpret_cast<cuDoubleComplex*>(&beta),
                  reinterpret_cast<cuDoubleComplex*>(C), incc));
     }
-
+    template<typename scalar_t> void
+    gemv(BLASHandle& handle, Trans ta,
+         scalar_t alpha, const DenseMatrix<scalar_t>& a,
+         const DenseMatrix<scalar_t>& x, scalar_t beta,
+         DenseMatrix<scalar_t>& y) {
+      gemv(handle, T2cuOp(ta), a.rows(), a.cols(), alpha, a.data(), a.ld(),
+           x.data(), 1, beta, y.data(), 1);
+    }
+    template void gemv(BLASHandle&, Trans, float,
+                       const DenseMatrix<float>&, const DenseMatrix<float>&,
+                       float, DenseMatrix<float>&);
+    template void gemv(BLASHandle&, Trans, double,
+                       const DenseMatrix<double>&, const DenseMatrix<double>&,
+                       double, DenseMatrix<double>&);
+    template void gemv(BLASHandle&, Trans, std::complex<float>,
+                       const DenseMatrix<std::complex<float>>&,
+                       const DenseMatrix<std::complex<float>>&,
+                       std::complex<float>,
+                       DenseMatrix<std::complex<float>>&);
+    template void gemv(BLASHandle&, Trans, std::complex<double>,
+                       const DenseMatrix<std::complex<double>>&,
+                       const DenseMatrix<std::complex<double>>&,
+                       std::complex<double>,
+                       DenseMatrix<std::complex<double>>&);
 
   } // end namespace gpu
 } // end namespace strumpack

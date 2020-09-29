@@ -45,7 +45,27 @@ namespace strumpack {
 
   namespace gpu {
     template<typename scalar_t> struct FrontData;
+    template<typename scalar_t> struct FwdSolveData;
   }
+
+  template<typename scalar_t> class GPUFactors {
+  public:
+    bool allocated = false;
+    gpu::DeviceMemory<scalar_t> dL, dU;
+    gpu::DeviceMemory<int> dP;
+    std::vector<scalar_t*> dL_lvl, dU_lvl;
+    std::vector<int*> dP_lvl;
+
+    GPUFactors(int lvls) : dL_lvl(lvls), dU_lvl(lvls), dP_lvl(lvls) {}
+    void clear() {
+      dL.release();
+      dU.release();
+      dP.release();
+      dL_lvl.clear();
+      dU_lvl.clear();
+      dP_lvl.clear();
+    }
+  };
 
   template<typename scalar_t,typename integer_t> class FrontalMatrixGPU
     : public FrontalMatrix<scalar_t,integer_t> {
@@ -68,29 +88,14 @@ namespace strumpack {
     (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
      const F_t* p, int task_depth) override;
 
-    void sample_CB
-    (const SPOptions<scalar_t>& opts, const DenseM_t& R,
-     DenseM_t& Sr, DenseM_t& Sc, F_t* pa, int task_depth) override;
-    void sample_CB
-    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth=0) const override;
-
-    void sample_CB_to_F11
-    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth=0) const override;
-    void sample_CB_to_F12
-    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth=0) const override;
-    void sample_CB_to_F21
-    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth=0) const override;
-    void sample_CB_to_F22
-    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth=0) const override;
-
     void multifrontal_factorization
     (const SpMat_t& A, const SPOptions<scalar_t>& opts,
      int etree_level=0, int task_depth=0) override;
+
+    // void move_factors_to_gpu() const override;
+    // void remove_factors_from_gpu() const override;
+
+    // void multifrontal_solve(DenseM_t& b) const override;
 
     void forward_multifrontal_solve
     (DenseM_t& b, DenseM_t* work, int etree_level=0,
@@ -101,7 +106,7 @@ namespace strumpack {
 
     void extract_CB_sub_matrix
     (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-     DenseM_t& B, int task_depth) const override;
+     DenseM_t& B, int task_depth) const override {}
 
     std::string type() const override { return "FrontalMatrixGPU"; }
 
@@ -112,7 +117,7 @@ namespace strumpack {
 #endif
 
   private:
-    std::unique_ptr<scalar_t[]> factor_mem_, host_Schur_;
+    std::unique_ptr<scalar_t[]> host_factors_, host_Schur_;
     DenseMW_t F11_, F12_, F21_, F22_;
     std::vector<int> pivot_mem_;
     int* piv_ = nullptr;
@@ -120,20 +125,52 @@ namespace strumpack {
     FrontalMatrixGPU(const FrontalMatrixGPU&) = delete;
     FrontalMatrixGPU& operator=(FrontalMatrixGPU const&) = delete;
 
-    void fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd,
-                          int etree_level, int task_depth) const;
-    void bwd_solve_phase1(DenseM_t& y, DenseM_t& yupd,
-                          int etree_level, int task_depth) const;
-
     void front_assembly(const SpMat_t& A, LInfo_t& L);
-    void factor_small_fronts(LInfo_t& L,
-                             gpu::FrontData<scalar_t>* front_data);
+    void factor_small_fronts(LInfo_t& L, gpu::FrontData<scalar_t>* fdata);
     void factor_large_fronts(LInfo_t& L,
                              std::vector<gpu::BLASHandle>& blas_handles,
                              std::vector<gpu::SOLVERHandle>& solver_handles);
 
     void split_smaller(const SpMat_t& A, const SPOptions<scalar_t>& opts,
                        int etree_level=0, int task_depth=0);
+
+    void fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd,
+                          int etree_level, int task_depth) const;
+    void bwd_solve_phase1(DenseM_t& y, DenseM_t& yupd,
+                          int etree_level, int task_depth) const;
+
+
+    void rhs_to_contig(LInfo_t& L, const DenseM_t& b, scalar_t* bptr) const;
+    void rhs_from_contig(LInfo_t& L, DenseM_t& b, const scalar_t* bptr) const;
+
+    void assemble_rhs(int nrhs, LInfo_t& L, scalar_t* db, scalar_t* dbupd,
+                      scalar_t* old_dbupd, char* dea_mem, char* hea_mem,
+                      std::size_t mem_size) const;
+    void extract_rhs(int nrhs, LInfo_t& L, scalar_t* dy, scalar_t* dyupd,
+                     scalar_t* old_dyupd, char* dea_mem, char* hea_mem,
+                     std::size_t mem_size) const;
+
+    void fwd_small_fronts(int nrhs, LInfo_t& L,
+                          gpu::FrontData<scalar_t>* fdata,
+                          gpu::FrontData<scalar_t>* dfdata,
+                          scalar_t* dL, int* dpiv,
+                          scalar_t* db, scalar_t* dbupd) const;
+    void fwd_large_fronts(int nrhs, LInfo_t& L, scalar_t* dL, int* dpiv,
+                          int* derr, scalar_t* db, scalar_t* dbupd,
+                          std::vector<gpu::BLASHandle>& blas_handles,
+                          std::vector<gpu::SOLVERHandle>& solver_handles)
+      const;
+
+
+    void bwd_small_fronts(int nrhs, LInfo_t& L,
+                          gpu::FrontData<scalar_t>* fdata,
+                          gpu::FrontData<scalar_t>* dfdata,
+                          scalar_t* dU, scalar_t* dy, scalar_t* dyupd) const;
+    void bwd_large_fronts(int nrhs, LInfo_t& L, scalar_t* dU,
+                          scalar_t* db, scalar_t* dbupd,
+                          std::vector<gpu::BLASHandle>& blas_handles,
+                          std::vector<gpu::SOLVERHandle>& solver_handles)
+      const;
 
     using F_t::lchild_;
     using F_t::rchild_;

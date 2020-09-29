@@ -142,10 +142,10 @@ namespace strumpack {
      const std::vector<std::vector<std::size_t>>& J,
      std::vector<DenseMW_t>& Bseq, int task_depth) const;
 
-    void extend_add_b
-    (DenseM_t& b, DenseM_t& bupd, const DenseM_t& CB, const F_t* pa) const;
-    void extract_b
-    (const DenseM_t& y, const DenseM_t& yupd, DenseM_t& CB, const F_t* pa) const;
+    void extend_add_b(DenseM_t& b, DenseM_t& bupd,
+                      const DenseM_t& CB, const F_t* pa) const;
+    void extract_b(const DenseM_t& y, const DenseM_t& yupd,
+                   DenseM_t& CB, const F_t* pa) const;
 
     virtual integer_t maximum_rank(int task_depth=0) const;
     virtual integer_t front_rank(int task_depth=0) const { return 0; }
