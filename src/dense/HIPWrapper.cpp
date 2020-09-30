@@ -178,7 +178,7 @@ namespace strumpack {
                        DenseMatrix<std::complex<double>>&);
 
     // it seems like rocsolver doesn't need work memory?
-    template<typename scalar_t> int 
+    template<typename scalar_t> int
     getrf_buffersize(SOLVERHandle& handle, int n) {
       return 0;
     }
@@ -205,8 +205,8 @@ namespace strumpack {
                int* devIpiv, int* devInfo) {
       STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
       gpu_check(rocsolver_cgetrf
-		(handle, m, n, reinterpret_cast<rocblas_float_complex*>(A),
-		 lda, devIpiv, devInfo));
+                (handle, m, n, reinterpret_cast<rocblas_float_complex*>(A),
+                 lda, devIpiv, devInfo));
     }
     void getrf(SOLVERHandle& handle, int m, int n,
                std::complex<double>* A, int lda,
@@ -214,8 +214,8 @@ namespace strumpack {
                int* devIpiv, int* devInfo) {
       STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
       gpu_check(rocsolver_zgetrf
-		(handle, m, n, reinterpret_cast<rocblas_double_complex*>(A),
-		 lda, devIpiv, devInfo));
+                (handle, m, n, reinterpret_cast<rocblas_double_complex*>(A),
+                 lda, devIpiv, devInfo));
     }
 
     template<typename scalar_t> void
@@ -238,7 +238,8 @@ namespace strumpack {
                const int* devIpiv, float* B, int ldb, int* devInfo) {
       STRUMPACK_FLOPS(blas::getrs_flops(n,nrhs));
       gpu_check(rocsolver_sgetrs
-                (handle, trans, n, nrhs, const_cast<float*>(A), lda, devIpiv, B, ldb));
+                (handle, trans, n, nrhs,
+                 const_cast<float*>(A), lda, devIpiv, B, ldb));
     }
     void getrs(SOLVERHandle& handle, rocblas_operation trans,
                int n, int nrhs, const double* A, int lda,
@@ -246,7 +247,8 @@ namespace strumpack {
                int* devInfo) {
       STRUMPACK_FLOPS(blas::getrs_flops(n,nrhs));
       gpu_check(rocsolver_dgetrs
-                (handle, trans, n, nrhs, const_cast<double*>(A), lda, devIpiv, B, ldb));
+                (handle, trans, n, nrhs,
+                 const_cast<double*>(A), lda, devIpiv, B, ldb));
     }
     void getrs(SOLVERHandle& handle, rocblas_operation trans,
                int n, int nrhs, const std::complex<float>* A, int lda,
@@ -254,9 +256,11 @@ namespace strumpack {
                int* devInfo) {
       STRUMPACK_FLOPS(4*blas::getrs_flops(n,nrhs));
       gpu_check(rocsolver_cgetrs
-                (handle, trans, n, nrhs, 
-		 reinterpret_cast<rocblas_float_complex*>(const_cast<std::complex<float>*>(A)), lda, devIpiv,
-		 reinterpret_cast<rocblas_float_complex*>(const_cast<std::complex<float>*>(B)), ldb));
+                (handle, trans, n, nrhs,
+                 reinterpret_cast<rocblas_float_complex*>
+                 (const_cast<std::complex<float>*>(A)), lda, devIpiv,
+                 reinterpret_cast<rocblas_float_complex*>
+                 (const_cast<std::complex<float>*>(B)), ldb));
     }
     void getrs(SOLVERHandle& handle, rocblas_operation trans,
                int n, int nrhs, const std::complex<double>* A, int lda,
@@ -265,8 +269,10 @@ namespace strumpack {
       STRUMPACK_FLOPS(4*blas::getrs_flops(n,nrhs));
       gpu_check(rocsolver_zgetrs
                 (handle, trans, n, nrhs,
-		 reinterpret_cast<rocblas_double_complex*>(const_cast<std::complex<double>*>(A)), lda, devIpiv, 
-		 reinterpret_cast<rocblas_double_complex*>(const_cast<std::complex<double>*>(B)), ldb));
+                 reinterpret_cast<rocblas_double_complex*>
+                 (const_cast<std::complex<double>*>(A)), lda, devIpiv,
+                 reinterpret_cast<rocblas_double_complex*>
+                 (const_cast<std::complex<double>*>(B)), ldb));
     }
 
     template<typename scalar_t> void
@@ -340,7 +346,30 @@ namespace strumpack {
                  reinterpret_cast<hipblasDoubleComplex*>(&beta),
                  reinterpret_cast<hipblasDoubleComplex*>(C), incc));
     }
-
+    template<typename scalar_t> void
+    gemv(BLASHandle& handle, Trans ta,
+         scalar_t alpha, const DenseMatrix<scalar_t>& a,
+         const DenseMatrix<scalar_t>& x, scalar_t beta,
+         DenseMatrix<scalar_t>& y) {
+      gemv(handle, T2hipOp(ta), a.rows(), a.cols(), alpha, a.data(), a.ld(),
+           x.data(), 1, beta, y.data(), 1);
+    }
+    template void gemv(BLASHandle&, Trans, float,
+                       const DenseMatrix<float>&, const DenseMatrix<float>&,
+                       float, DenseMatrix<float>&);
+    template void gemv(BLASHandle&, Trans, double,
+                       const DenseMatrix<double>&, const DenseMatrix<double>&,
+                       double, DenseMatrix<double>&);
+    template void gemv(BLASHandle&, Trans, std::complex<float>,
+                       const DenseMatrix<std::complex<float>>&,
+                       const DenseMatrix<std::complex<float>>&,
+                       std::complex<float>,
+                       DenseMatrix<std::complex<float>>&);
+    template void gemv(BLASHandle&, Trans, std::complex<double>,
+                       const DenseMatrix<std::complex<double>>&,
+                       const DenseMatrix<std::complex<double>>&,
+                       std::complex<double>,
+                       DenseMatrix<std::complex<double>>&);
 
   } // end namespace gpu
 } // end namespace strumpack

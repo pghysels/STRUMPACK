@@ -30,15 +30,21 @@
 #include "StrumpackSparseSolver.hpp"
 #include "sparse/CSRMatrix.hpp"
 
-typedef double scalar;
-typedef int64_t integer;
+typedef float scalar;
+typedef int integer;
 
 using namespace strumpack;
 
 int main(int argc, char* argv[]) {
-  int n = 30;
+  int n = 30, m = 1;
   if (argc > 1) n = atoi(argv[1]); // get grid size
   else std::cout << "# please provide grid size" << std::endl;
+  if (argc > 2) m = atoi(argv[2]); // get number of rhs
+  else std::cout << "# please provide number of right-hand sides" << std::endl;
+
+  std::cout << "# Solving 3d " << n
+            <<"^3 Poisson problem, with " << m << " right hand sides"
+            << std::endl;
 
   StrumpackSparseSolver<scalar,integer> spss;
   spss.options().set_matching(MatchingJob::NONE);
@@ -71,17 +77,15 @@ int main(int argc, char* argv[]) {
       }
   A.set_symm_sparse();
 
-  std::vector<scalar> b(N, scalar(0.)), x(N, scalar(0.)),
-    x_exact(N, scalar(1.));
+  DenseMatrix<scalar> b(N, m), x(N, m), x_exact(N, m);
 
-  A.spmv(x_exact.data(), b.data());
+  x_exact.random();
+  A.spmv(x_exact, b);
 
   spss.set_matrix(A);
   spss.reorder(n, n, n);
   spss.factor();
-  spss.solve(b.data(), x.data());
-
-  // spss.draw("P3D" + std::to_string(n));
+  spss.solve(b, x);
 
   std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
             << A.max_scaled_residual(x.data(), b.data()) << std::endl;

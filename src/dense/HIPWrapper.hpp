@@ -88,13 +88,13 @@ namespace strumpack {
     // TODO there is no such thing as hipSOLVER yet :(
     class SOLVERHandle {
     public:
-      SOLVERHandle() { gpu_check(rocsolver_create_handle(&h_)); }
-      ~SOLVERHandle() { gpu_check(rocsolver_destroy_handle(h_)); }
-      void set_stream(Stream& s) { rocsolver_set_stream(h_, s); }
-      operator rocsolver_handle&() { return h_; }
-      operator const rocsolver_handle&() const { return h_; }
+      SOLVERHandle() { gpu_check(rocblas_create_handle(&h_)); }
+      ~SOLVERHandle() { gpu_check(rocblas_destroy_handle(h_)); }
+      void set_stream(Stream& s) { rocblas_set_stream(h_, s); }
+      operator rocblas_handle&() { return h_; }
+      operator const rocblas_handle&() const { return h_; }
     private:
-      rocsolver_handle h_;
+      rocblas_handle h_;
     };
 
     template<typename T> void memset
@@ -143,17 +143,17 @@ namespace strumpack {
     (DenseMatrix<T>& d, const DenseMatrix<T>& h) {
       assert(d.rows() == h.rows() && d.cols() == h.cols());
       assert(d.rows() == d.ld() && h.rows() == h.ld());
-      copy_device_to_host(d.data(), h.data(), d.rows()*d.cols());
+      copy_host_to_device(d.data(), h.data(), d.rows()*d.cols());
     }
     template<typename T> void copy_host_to_device
     (DenseMatrix<T>& d, const T* h) {
       assert(d.rows() == d.ld());
-      copy_device_to_host(d.data(), h, d.rows()*d.cols());
+      copy_host_to_device(d.data(), h, d.rows()*d.cols());
     }
     template<typename T> void copy_host_to_device
     (T* d, const DenseMatrix<T>& h) {
       assert(h.rows() == h.ld());
-      copy_device_to_host(d, h.data(), h.rows()*h.cols());
+      copy_host_to_device(d, h.data(), h.rows()*h.cols());
     }
 
 
@@ -308,6 +308,12 @@ namespace strumpack {
          scalar_t alpha, const DenseMatrix<scalar_t>& a,
          const DenseMatrix<scalar_t>& b, scalar_t beta,
          DenseMatrix<scalar_t>& c);
+
+    template<typename scalar_t> void
+    gemv(BLASHandle& handle, Trans ta,
+         scalar_t alpha, const DenseMatrix<scalar_t>& a,
+         const DenseMatrix<scalar_t>& x, scalar_t beta,
+         DenseMatrix<scalar_t>& y);
 
   } // end namespace gpu
 } // end namespace strumpack
