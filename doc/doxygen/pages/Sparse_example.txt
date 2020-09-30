@@ -1,0 +1,539 @@
+/*! \page sparse_example_usage Example Usage
+\tableofcontents
+
+# StrumpackSparseSolver Example
+
+The following shows the typical way to use a (sequential or multithreaded) STRUMPACK sparse solver: 
+
+\image html SSSEx.png width=75%
+
+__Figure 1__: Illustration of a small 5 × 5 sparse matrix with 11
+nonzeros and its Compressed Sparse Row (CSR) or Yale format
+representation. We always use 0-based indexing! Let \f$N\f$ = 5 denote
+the number of rows. The row_ptr array has \f$N\f$ +1 elements, with
+element \f$i\f$ denoting the start of row \f$i\f$ in the col_ind and
+values arrays. Element row_ptr[N] = nnz, i.e., the total number of
+nonzero elements in the matrix. The values array holds the actual
+matrix values, ordered by row. The corresponding elements in col_ind
+give the column indices for each nonzero. There can be explicit zero
+elements in the matrix. The nonzero values and corresponding column
+indices need not be sorted by column (within a row).
+
+
+\code {.cpp}
+ #include "StrumpackSparseSolver.hpp"
+ using namespace strumpack;      // all strumpack code is in the strumpack namespace,
+
+ int main(int argc, char* argv[]) {
+    int N = ...;                      // construct an NxN CSR matrix with nnz nonzeros
+    int* row_ptr = ...;               // N+1 integers
+    int* col_ind = ...;               // nnz integers
+    double* val = ...;                // nnz scalars
+    double* x = new double[N];        // will hold the solution vector
+    double* b = ...;                  // set a right-hand side b
+
+    StrumpackSparseSolver<double> sp;                   // create solver object
+    sp.options().set_rel_tol(1e-10);                    // set options
+    sp.options().set_gmres_restart(10);                 // ...
+    sp.options().set_compression(CompressionType::HSS); // enable HSS compression, see HSS Preconditioning
+    sp.options().set_from_command_line(argc, argv);     // parse command line options
+    sp.set_csr_matrix(N, row_ptr, col_ind, val);        // set the matrix (copy)
+    sp.reorder();                                       // reorder matrix
+    sp.factor();                                        // numerical factorization
+    sp.solve(b, x);                                     // solve Ax=b
+    ... // check residual/error and cleanup
+ }
+\endcode
+
+The main steps are: create solver object, set options (parse options
+from the command line), set matrix, reorder, factor and finally
+solve. The matrix should be in the Compressed Sparse Row (CSR) format,
+also called Yale format, with 0 based indices. Figure 1 illustrates
+the CSR format. In the basic scenario, it is not necessary to
+explicitly call reorder and factor, since trying to solve with a
+StrumpackSparseSolver object that is not factored yet, will internally
+call the factor routine, which will call reorder if necessary.
+
+The above code should be linked with -lstrumpack and with the Metis,
+ParMetis, Scotch, PT-Scotch, BLAS, LAPACK, and ScaLAPACK libraries.
+
+
+<!---
+# StrumpackSparseSolverMPI Example
+
+Usage of the \link StrumpackSparseSolverMPI.hpp
+StrumpackSparseSolverMPI<scalar,integer=int> \endlink solver is very
+similar:
+
+\code {.cpp}
+ #include "StrumpackSparseSolverMPI.hpp"
+ using namespace strumpack;
+
+ int main(int argc, char* argv[ ])&nbsp;&nbsp; {
+     int thread_level, rank;
+     // StrumpackSparseSolverMPI uses OpenMP so we should ask for MPI_THREAD_FUNNELED at least
+     MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &thread_level);
+     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+     if (thread_level != MPI_THREAD_FUNNELED && rank == 0)
+        std::cout << "MPI␣implementation␣does␣not␣support␣MPI_THREAD_FUNNELED" << std::endl;
+
+     {
+         // define the same CSR matrix as for StrumpackSparseSolver
+         int N=...;                    // construct an NxN CSR matrix with nnz nonzeros
+         int* row_ptr = ...;           // N+1 integers
+         int* col_ind = ...;           // nnz integers
+         double* val = ...;            // nnz scalars
+         // allocate entire solution and right-hand side vectors on each MPI process
+         double* x = new double[N];    // will hold the solution vector
+         double* b = ...;              // set a right-hand side b
+
+         // construct solver and specify the MPI communicator
+         StrumpackSparseSolverMPI<double> sp(MPI_COMM_WORLD);
+         sp.options().set_matching(MatchingJob::NONE);
+         sp.options().set_from_command_line(argc, argv);
+         sp.set_csr_matrix(N, row_ptr, col_ind, val);
+         sp.solve(b, x);
+         ... // check residual/error, cleanup
+    }
+    Cblacs_exit(1);
+    MPI_Finalize();
+ }
+\endcode
+
+The only difference here is the use of \link
+StrumpackSparseSolverMPI.hpp
+StrumpackSparseSolverMPI<scalar,integer=int> \endlink instead of \link
+StrumpackSparseSolver.hpp StrumpackSparseSolver\endlink and the calls
+to MPI_Init_thread, Cblacs_exit and MPI_Finalize.
+
+-->
+
+
+
+# StrumpackSparseSolverMPIDist Example
+
+Finally, we illustrate the usage of \link
+StrumpackSparseSolverMPIDist.hpp
+StrumpackSparseSolverMPIDist<scalar,integer=int> \endlink solver. This
+interface takes a block-row distributed compressed sparse row matrix
+as input. This matrix format is illustrated in Figure 2 (below).
+
+\code {.cpp}
+ #include "StrumpackSparseSolverMPI.hpp"
+ using namespace strumpack;
+
+ int main(int argc, char* argv[ ]) {
+     int thread_level, rank, P;
+     MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &thread_level);
+     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+     MPI_Comm_size(MPI_COMM_WORLD, &P);
+     {
+         // define a block-row distributed CSR matrix
+         int* dist = new int[P];
+         // set dist such that processor p owns rows [dist[p], dist[p+1]) of the sparse matrix
+         for (int p=0; p<P; p++) dist[p] = .. ;
+         // local_n is the number of rows of the input matrix assigned to me
+         int local_n   = dist[rank+1] - dist[rank];
+         int* row_ptr  = new int[local_n+1];
+         .. // set the sparse matrix row pointers in row_ptr
+         int local_nnz = row_ptr[local_n+1] - row_ptr[0];
+         int* col_ind  = new int[local_nnz];
+         .. // set the sparse matrix column indices in col_ind
+         double* val   = new double[local_nnz];
+         .. // set the matrix nonzero value in val
+         double* x = new double[local_n];             // local part of solution
+         double* b = new double[local_n];             // local part of rhs
+         for (int i=0; i<local_n; i++) b[i] = ..;     // set the rhs
+
+         strumpack::StrumpackSparseSolverMPIDist<double> sp(MPI_COMM_WORLD);
+         sp.options().set_reordering_method(ReorderingStrategy::PARMETIS);
+         sp.options().set_from_command_line(argc, argv);
+         sp.set_distributed_csr_matrix(local_n, row_ptr, col_ind, val, dist);
+         sp.solve(b, x);
+         ... // check residual/error, cleanup
+     }
+     Cblacs_exit(1);
+     MPI_Finalize();
+}
+\endcode
+
+\image html SSSMPIDistEx.png width=75%
+
+__Figure 2__: Illustration of a small 5×5 sparse matrix with 11
+nonzeros and its block-row distributed compressed sparse row
+representation. We always use 0-based indexing! Process P0 owns row 0,
+process P1 has rows 1 and 2 and process P2 has rows 3 and 4. This
+distribution of rows over the processes is represented by the dist
+array. Process p owns rows [dist[p],dist[p+1]). If N = 5 is the number
+of rows in the entire matrix and P is the total number of processes,
+then dist[P]=N. The (same) dist array is stored on every process. Each
+process holds a CSR representation of only its local rows of the
+matrix, see Figure 1.
+
+
+# Initializing the Solver Object
+
+Let
+
+\code {.cpp}
+typedef strumpack::StrumpackSparseSolver<scalar,integer> Sp;
+typedef strumpack::StrumpackSparseSolverMPI<scalar,integer> SpMPI;
+typedef strumpack::StrumpackSparseSolverMPIDist<scalar,integer> SpMPIDist;
+\endcode
+
+Each of the solver classes has two constructors:
+
+\code {.cpp}
+strumpack::StrumpackSparseSolver(bool verbose=true, bool root=true);
+strumpack::StrumpackSparseSolver(int argc, char* argv[], bool verbose=true, bool root=true);
+\endcode
+
+\code {.cpp}
+strumpack::StrumpackSparseSolverMPIDist(MPI_Comm comm, bool verbose=true);
+strumpack::StrumpackSparseSolverMPIDist(MPI_Comm comm, int argc, char* argv[], bool verbose=true);
+\endcode
+
+\code {.cpp}
+strumpack::StrumpackSparseSolverMPIDist(MPI_Comm comm, bool verbose=true);
+strumpack::StrumpackSparseSolverMPIDist(MPI_Comm comm, int argc, char* argv[], bool verbose=true); 
+\endcode
+
+where argc and argv contain the command line options and the verbose
+option can be set to false to suppress output of the solver. Note that
+since \link StrumpackSparseSolverMPIDist_Example SpMPIDist\endlink is
+a subclass of \link StrumpackSparseSolverMPI_Example SpMPI\endlink,
+which is a subclass of \link StrumpackSparseSolver_Example Sp\endlink,
+all public members of \link StrumpackSparseSolver_Example Sp\endlink
+are also members of \link StrumpackSparseSolverMPI_Example
+SpMPI\endlink and \link StrumpackSparseSolverMPIDist_Example
+SpMPIDist\endlink. The public interface to the \link
+StrumpackSparseSolverMPI_Example SpMPI\endlink class is exactly the
+same as that for the \link StrumpackSparseSolver_Example Sp\endlink
+class.
+
+
+# Sparse Matrix Format
+
+The sparse matrix should be specified in compressed sparse row format [8]:
+
+\code {.cpp}
+void strumpack::StrumpackSparseSolver::set_csr_matrix(int N, int* row_ptr, int* col_ind, scalar* values, bool symmetric_pattern=false);
+\endcode
+
+Internally, the matrix is copied, so it will not be modified. Previous
+versions of STRUMPACK also supported the CSC format, but this is now
+deprecated. If the sparsity pattern of the matrix is symmetric (the
+values do not have to be symmetric), then you can set
+symmetric_pattern=true. This saves some work in the setup phase of the
+solver.
+
+For the \link StrumpackSparseSolverMPIDist_Example SpMPIDist\endlink solver the input is a block-row distributed compressed sparse row matrix (as illustrated in the example above):
+
+\code {.cpp}
+void strumpack::StrumpackSparseSolverMPIDist::set_distributed_csr_matrix (integer local_rows, integer* row_ptr, integer* col_ind, scalar* values, integer* dist, bool symmetric_pattern=false);
+\endcode
+
+Alternatively, you can also specify a sequential CSR matrix to the
+\link StrumpackSparseSolverMPIDist_Exmaple SpMPIDist\endlink solver:
+
+\code {.cpp}
+void strumpack::StrumpackSparseSolverMPIDist::set_csr_matrix (integer N, integer* row_ptr, integer* col_ind, scalar* values, bool symmetric_pattern=false);
+\endcode
+
+For this routine, the matrix only needs to be specified completely on
+the root process. Other processes can pass NULL for the arrays.
+
+
+
+# Factorization
+
+Compute the factorization by calling
+
+\code {.cpp}
+ReturnCode strumpack::StrumpackSparseSolver::factor();
+\endcode
+
+where the possible return values are the same as for \link
+strumpack::StrumpackSparseSolver::reorder() Sp::reorder()\endlink. If
+\link strumpack::StrumpackSparseSolver::reorder() Sp::reorder()
+\endlink was not called already, it is called automatically. When
+compression is not enabled, this will compute an exact LU
+factorization of the (permuted) sparse input matrix. If HSS/HODLR/BLR
+compression is enabled (for instance with \link
+strumpack::SPOptions::set_compression(CompressionType::BLR)
+SPOptions::set_compression()\endlink or \--sp_compression BLR, see
+\link prec Preconditioning Preconditioning\endlink), the factorization
+is only approximate.
+
+
+# Solve
+
+Solve the linear system \f$Ax = b\f$ by calling
+
+\code {.cpp}
+ReturnCode strumpack::StrumpackSparseSolver::solve(scalar* b, scalar* x, bool use_initial_guess=false);
+\endcode
+
+By default (bool use_initial_guess=false) the input in x is
+ignored. If bool use_initial_guess=true, x is used as initial guess
+for the iterative solver (if an iterative solver is used, for instance
+iterative refinement or GMRES). If the \link
+strumpack::StrumpackSparseSolver< scalar_t, integer_t >::factor
+Sp::factor()\endlink was not called, it is called automatically. The
+return values are the same as for \link
+strumpack::StrumpackSparseSolver::reorder() Sp::reorder()\endlink.
+
+The iterative solver can be chosen through:
+
+\code {.cpp} void strumpack::SPOptions::set_Krylov_solver(strumpack::KrylovSolver s);\endcode
+
+where \link strumpack::KrylovSolver KrylovSolver\endlink can take the
+following values:
+
+\code {.cpp}
+enum class KrylovSolver {
+    AUTO,              /*!< Use iterative refinement if no HSS compression is used, otherwise > PGMRES. */
+    DIRECT,            /*!< No outer iterative solver, just a single application of the  multifrontal solver. */
+    REFINE,            /*!< Iterative refinement. */
+    PREC_GMRES,        /*!< Preconditioned GMRES. The preconditioner is the (approx)  multifrontal solver. */
+    GMRES,             /*!< UN-preconditioned GMRES. (for testing mainly) */
+    PREC_BICGSTAB,     /*!< Preconditioned BiCGStab. The preconditioner is the (approx) > multifrontal solver. */
+    BICGSTAB           /*!< UN-preconditioned BiCGStab. (for testing mainly) */
+};
+\endcode
+
+with \link strumpack::KrylovSolver KrylovSolver::AUTO\endlink being
+the default value. The \link strumpack::KrylovSolver
+KrylovSolver::AUTO\endlink setting will use iterative refinement when
+HSS compression is not enabled, and preconditioned GMRES when HSS
+compression is enabled, see \link HSS_Preconditioning HSS
+Preconditioning\endlink. To use the solver as a preconditioner, or a
+single (approximate) solve, set the solver to \link
+strumpack::KrylovSolver KrylovSolver::DIRECT\endlink. When calling
+\link strumpack::StrumpackSparseSolverMPIDist
+SpMPIDist::solve\endlink, the right-hand side and solution vectors
+should only point to the local parts!
+
+
+
+# Reordering
+
+The STRUMPACK sparse solver applies three different matrix orderings
+- For numerical stability
+- To reduce fill-in
+- To reduce the numerical rank of certain blocks when preconditioning
+These reorderings are all performed when calling
+\code {.cpp} ReturnCode strumpack::StrumpackSparseSolver::reorder( ); \endcode
+
+
+## Reordering for Numerical Stability
+
+The reordering for numerical stability is performed using MC64 or Combinatorial BLAS. For many matrices, this reordering is not necessary and can safely be disabled! MC64 supports 5 different modes and there is one option to select the Combinatorial BLAS code:
+
+\code {.cpp}
+enum class MatchingJob {
+    NONE,                           /*!< Don’t do anything */
+    MAX_CARDINALITY,                /*!< Maximum cardinality */
+    MAX_SMALLEST_DIAGONAL,          /*!< Maximum smallest diagonal value */
+    MAX_SMALLEST_DIAGONAL_2,        /*!< Same as MAX_SMALLEST_DIAGONAL, different algorithm */
+    MAX_DIAGONAL_SUM,               /*!< Maximum sum of diagonal values */
+    MAX_DIAGONAL_PRODUCT_SCALING,   /*!< Maximum product of diagonal values and row and column scaling */
+    COMBBLAS                        /*!< Use AWPM from Combinatorial BLAS */
+};
+\endcode
+
+which can be selected via
+
+\code {.cpp}
+void strumpack::SPOptions::set_matching(MatchingJob job);
+MatchingJob strumpack::SPOptions::matching() const;
+\endcode
+
+where matching() queries the currently selected strategy (the default
+is MAX_DIAGONAL_PRODUCT_SCALING maximum product of diagonal values
+plus row and column scaling). The command line option
+
+\code {.cpp}--sp_matching [0-6] \endcode
+
+can also be used, where the integers are defined as:
+- 0: no reordering for stability, this disables MC64/matching
+- 1: MC64(1): currently not supported
+- 2: MC64(2): maximize the smallest diagonal value
+- 3: MC64(3): maximize the smallest diagonal value, different strategy
+- 4: MC64(4): maximize sum of diagonal values
+- 5: MC64(5): maximize product of diagonal values and apply row and column scaling
+- 6: Combinatorial BLAS: approximate weight perfect matching
+
+The MC64 code is sequential, so when using this option in parallel,
+the graph is first gathered to the root process. The Combinatorial
+BLAS code can currently only be used in parallel, and only with a
+square number of processes.
+
+
+## Nested Dissection Recording
+
+The STRUMPACK sparse solver supports both (Par)Metis and (PT-)Scotch
+for the matrix reordering. The following functions can set the
+preferred method or check the currently selected method:
+
+\code {.cpp}
+void strumpack::SPOptions::set_reordering_method(ReorderingStrategy m);
+ReorderingStrategy strumpack::SPOptions::reordering_method() const;
+\endcode
+
+The options for MatrixReorderingStrategy are
+
+\code {.cpp}
+enum class ReorderingStrategy {
+    NATURAL,    /*!< Do not reorder the system */
+    METIS,      /*!< Use Metis nested-dissection reordering */
+    PARMETIS,   /*!< Use ParMetis nested-dissection reordering */
+    SCOTCH,     /*!< Use Scotch nested-dissection reordering */
+    PTSCOTCH,   /*!< Use PT-Scotch nested-dissection reordering */
+    RCM,        /*!< Use RCM reordering */
+    GEOMETRIC   /*!< A simple geometric nested dissection code that only works for regular meshes. (see Sp::reorder)  */
+};
+\endcode
+
+When the solver is an object of Sp, PARMETIS or PTSCOTCH are not
+supported. When the solver is parallel, either an \link
+StrumpackSparseSolverMPI_Example SpMPI\endlink or \link
+StrumpackSparseSolverMPIDist_Example SpMPIDist\endlink object, and
+METIS, SCOTCH or RCM are chosen, then the graph of the complete matrix
+will be gathered onto the root process and the root process will call
+the (sequential) Metis, Scotch or RCM reordering routine. For large
+graphs this might fail due to insufficient memory.
+
+The GEOMETRIC option is only allowed for regular grids. In this case,
+the dimensions of the grid should be specified in the function
+
+\code {.cpp} ReturnCode strumpack::StrumpackSparseSolver::reorder(int
+nx=1, int ny=1, int nz=1); \endcode
+
+For instance for a regular 2d 2000 \f$×\f$ 4000 grid, you can call
+this as sp.reorder(2000, 4000). In the general algebraic case, the
+grid dimensions don’t have to be provided. The reordering method can
+also be specified via the command line option
+
+\code {.cpp} --sp_reordering_method [metis|parmetis|scotch|ptscotch|geometric|rcm] \endcode
+
+
+
+# Setting and Parsing Options
+
+The sparse solver options are stored in an object of class \link
+strumpack::SPOptions SPOptions\endlink, which can be accessed through:
+\code {.cpp} strumpack::SPOptions<scalar>& strumpack::SPOptions(); \endcode
+see also StrumpackOptions.hpp for several enumerations.
+
+To get a list of all available options, make sure to pass “int argc,
+char* argv[]” when initializing the \link
+strumpack::StrumpackSparseSolver() StrumpackSparseSolver\endlink or
+when calling \link strumpack::SPOptions::set_from_command_line
+SPOptions::set_from_command_line\endlink and run the application with
+--help or -h. Some default values listed here are for double precision
+and might be different when running in single precision.
+
+STRUMPACK sparse solver options:
+\code {.bash}
+# STRUMPACK options:
+#   --sp_maxit int (default 5000)
+#          maximum Krylov iterations
+#   --sp_rel_tol real_t (default 1e-06)
+#          Krylov relative (preconditioned) residual stopping tolerance
+#   --sp_abs_tol real_t (default 1e-10)
+#          Krylov absolute (preconditioned) residual stopping tolerance
+#   --sp_Krylov_solver [auto|direct|refinement|pgmres|gmres|pbicgstab|bicgstab]
+#          default: auto (refinement when no HSS, pgmres (preconditioned) with HSS compression)
+#   --sp_gmres_restart int (default 30)
+#          gmres restart length
+#   --sp_GramSchmidt_type [modified|classical]
+#          Gram-Schmidt type for GMRES
+#   --sp_reordering_method [natural|metis|scotch|parmetis|ptscotch|rcm|geometric]
+#          Code for nested dissection.
+#          Geometric only works on regular meshes and you need to provide the sizes.
+#   --sp_nd_param int (default 8)
+#   --sp_nx int (default 1)
+#   --sp_ny int (default 1)
+#   --sp_nz int (default 1)
+#   --sp_components int (default 1)
+#   --sp_separator_width int (default 1)
+#   --sp_enable_METIS_NodeNDP (default false)
+#          use undocumented Metis routine NodeNDP instead of NodeND
+#   --sp_disable_METIS_NodeNDP (default true)
+#          use Metis routine NodeND instead of the undocumented NodeNDP
+#   --sp_enable_METIS_NodeND (default true)
+#          use Metis routine NodeND instead of the undocumented NodeNDP
+#   --sp_disable_METIS_NodeND (default false)
+#          use undocumented Metis routine NodeNDP instead of NodeND
+#   --sp_enable_MUMPS_SYMQAMD (default false)
+#   --sp_disable_MUMPS_SYMQAMD (default true)
+#   --sp_enable_agg_amalg (default false)
+#   --sp_disable_agg_amalg (default true)
+#   --sp_matching int [0-6] (default 0)
+#      0 none
+#      1 maximum cardinality ! Doesn't work
+#      2 maximum smallest diagonal value, version 1
+#      3 maximum smallest diagonal value, version 2
+#      4 maximum sum of diagonal values
+#      5 maximum matching with row and column scaling
+#      6 approximate weigthed perfect matching, from CombBLAS
+#   --sp_compression [none|hss|blr|hodlr]
+#          type of rank-structured compression to use
+#   --sp_compression_min_sep_size (default 2147483647)
+#          minimum separator size for compression
+#   --sp_compression_leaf_size (default 2147483647)
+#          leaf size for rank-structured representation
+#   --sp_separator_ordering_level (default 1)
+#   --sp_enable_indirect_sampling
+#   --sp_disable_indirect_sampling
+#   --sp_enable_replace_tiny_pivots
+#   --sp_disable_replace_tiny_pivots
+#   --sp_write_root_front
+#   --sp_print_root_front_stats
+#   --sp_enable_gpu
+#   --sp_disable_gpu
+#   --sp_cuda_cutoff (default 500)
+#          CUDA kernel/CUBLAS cutoff size
+#   --sp_cuda_streams (default 10)
+#          number of CUDA streams
+#   --sp_verbose or -v (default true)
+#   --sp_quiet or -q (default false)
+#   --help or -h
+\endcode
+
+<!---
+
+The HSS specific options are stored in an object of type \link
+strumpack::HSS::HSSOptions HSSOptions<scalar>\endlink, inside the
+\link strumpack::SPOptions SPOptions\endlink object. These options are
+described in \link HSS_Preconditioning HSS Preconditioning\endlink.
+
+Likewise, the HODLR specific options are stored in an object of type \link
+strumpack::HODLR::HODLROptions HODLROptions<scalar>\endlink, inside the
+\link strumpack::SPOptions SPOptions\endlink object.
+\code {.bash}
+# HODLR Options:
+#   --hodlr_rel_tol real_t (default 0.0001)
+#   --hodlr_abs_tol real_t (default 1e-10)
+#   --hodlr_leaf_size int (default 128)
+#   --hodlr_max_rank int (default 5000)
+#   --hodlr_rank_guess int (default 128)
+#   --hodlr_rank_rate double (default 2)
+#   --hodlr_clustering_algorithm natural|2means|kdtree|pca|cobble (default cobble)
+#   --hodlr_butterfly_levels int (default 0)
+#   --hodlr_compression sampling|extraction (default extraction)
+#   --hodlr_BACA_block_size int (default 16)
+#   --hodlr_BF_sampling_parameter (default 1.2)
+#   --hodlr_verbose or -v (default false)
+#   --hodlr_quiet or -q (default true)
+#   --help or -h
+\endcode
+
+And the BLR options are stored in an object of type \link
+strumpack::BLR::BLROptions BLROptions<scalar>\endlink, inside the
+\link strumpack::SPOptions SPOptions\endlink object. These options are
+described in \link BLR_Preconditioning BLR Preconditioning\endlink.
+-->
+
+*/

@@ -1,4 +1,4 @@
-/*! \page dense_matrices HSS Approximation of Dense Matrices
+/*! \page hss_matrices HSS Approximation of Dense Matrices
 
 \image html SPOptions_Interface.png width=23%
 
@@ -24,8 +24,7 @@ more info.
 
 
 
-HSS Matrix Construction
------------------------
+# HSS Matrix Construction
 
 There are currently two ways to construct an HSS matrix:
 
@@ -64,8 +63,7 @@ matrix representation for those cases, see \link hodlr_matrices HODLR
 \endlink.
 
 
-The HSS Partition Tree
-----------------------
+# The HSS Partition Tree
 
 The clustering of the HSS matrix is defined by an
 strumpack::HSS::HSSPartitionTree. The strumpack::HSS::HSSPartitionTree
@@ -106,8 +104,7 @@ see binary_tree_clustering().
 
 
 
-Sequential/Threaded HSS Matrix Construction
--------------------------------------------
+# Sequential/Threaded HSS Matrix Construction
 
 See the class strumpack::HSS::HSSMatrix, which is a subclass of the
 abstract class strumpack::HSS::HSSMatrixBase.
@@ -202,8 +199,7 @@ H.compress(Amult, Aelem, opts);
 
 
 
-Kernel Matrix Approximation
----------------------------
+# Kernel Matrix Approximation
 
 We have an optimized HSS construction algorithm for the so called
 kernel matrices, which arise in several applications, such as kernel
@@ -235,8 +231,7 @@ __examples/KernelRegression.py__.
 
 
 
-Limitations
-------------
+# Limitations
 
 Currently the class strumpack::HSS::HSSMatrixMPI cannot be used for on
 a communicator with a single MPI process. In that case, one should use

@@ -19,6 +19,8 @@ optionally SLATE.
 
 ______
 
+# CUDA Support for NVidia GPUs
+
 
 CUDA support will be enabled by default, if it can be detected.  The
 GPU accelerated code has the same interfaces as the CPU code, meaning
@@ -48,10 +50,16 @@ int strumpack::SPOptions::gpu_streams() const;
 \endcode
 
 
-## AMD Support
+# HIP Support for AMD GPUs
 
-We are currently working on porting the CUDA code to HIP in order to
-also support AMD GPU's.
-
+There is also support for AMD GPUs through HIP and the ROCm libraries,
+rocSOLVER and hipBLAS.
+Support for HIP can be enabled through the CMake build using:
+\code {.bash}
+> cmake ../ -DSTRUMPACK_USE_HIP=ON -DCMAKE_CXX_COMPILER=hipcc -DSTRUMPACK_HIP_AMDGPU=gfx906
+\endcode
+where the user can specify the specific GPU architecture.
+If the CMake build system detects CUDA support, then HIP will be
+disabled.
 
 */

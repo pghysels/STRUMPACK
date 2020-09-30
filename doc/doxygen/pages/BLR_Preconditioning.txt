@@ -9,9 +9,6 @@ can be approximated as a BLR matrix, but this will only be beneficial
 operating on it with BLAS/LAPACK routines) if the frontal matrix is
 large enough.
 
-__Currently STRUMPACK only has some experimental sequential and
-multithreaded support for BLR compression.__
-
 Rank-structured compression is not used by default in the STRUMPACK
 sparse solver (the default is to perform exact LU factorization), but
 BLR compression can be turned on/off via the command line:

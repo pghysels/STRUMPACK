@@ -1,9 +1,12 @@
 /*! \page blr_matrices BLR Approximation of Dense Matrices
 
 The BLR code can be found in the src/BLR/ subdirectory. All BLR code
-is in a namespace called \link strumpack::BLR BLR\endlink. The class
-for a sequential/multithreaded BLR matrix is \link
-strumpack::BLR::BLRMatrix BLRMatrix<scalar>\endlink. There is
-currently no support yet for distributed memory BLR operations.
+is in a namespace called \link strumpack::BLR BLR\endlink.
+
+The class for a sequential/multithreaded BLR matrix is \link
+strumpack::BLR::BLRMatrix BLRMatrix<scalar>\endlink.
+
+Distributed memory BLR support is implemented in the \link
+strumpack::BLR::BLRMatrixMPI BLRMatrixMPI<scalar>\endlink class.
 
 */

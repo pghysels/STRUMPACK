@@ -1,0 +1,7 @@
+/*! \page dense Dense Solvers
+
+- \subpage hss_matrices "HSS Approximation of Dense Matrices"
+- \subpage hodlr_matrices "HODLR Approximation of Dense Matrices"
+- \subpage blr_matrices "BLR Approximation of Dense Matrices"
+
+*/

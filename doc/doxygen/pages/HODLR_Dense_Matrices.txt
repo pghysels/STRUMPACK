@@ -27,8 +27,7 @@ more info.
 
 
 
-HODLR Matrix Construction
-=========================
+# HODLR Matrix Construction
 
 There are currently 3 ways to construct an HODLR matrix:
 
@@ -41,8 +40,7 @@ There are currently 3 ways to construct an HODLR matrix:
 
 
 
-HODLR Construction from Element Evaluation
-------------------------------------------
+## HODLR Construction from Element Evaluation
 
 
 Use the constructor
@@ -84,8 +82,7 @@ H.factor();
 
 
 
-HODLR Construction from Matrix-Vector Multiplication
-----------------------------------------------------
+## HODLR Construction from Matrix-Vector Multiplication
 
 Use the constructor
 
@@ -107,8 +104,8 @@ The partition or cluster tree data structure is the same as for HSS
 matrices. See \ref dense_matrices for how to construct this tree.
 
 
-Kernel Matrix Approximation
----------------------------
+# Kernel Matrix Approximation
+
 
 We have an optimized HODLR construction algorithm for the so called
 kernel matrices, which arise in several applications, such as kernel
@@ -141,8 +138,7 @@ __examples/KernelRegressionMPI.py__.
 
 
 
-HODLR Matrix Operations
-=======================
+# HODLR Matrix Operations
 
 __TODO__ discuss parallel storage, mult, factor, solve, inv_mult,
 etc..

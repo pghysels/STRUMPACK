@@ -43,31 +43,34 @@ lossless compression.
 
 The HODLR and Butterfly functionality in STRUMPACK is implemented
 through interfaces to the ButterflyPACK package:
-- \link https://github.com/liuyangzhuan/ButterflyPACK \endlink
+- https://github.com/liuyangzhuan/ButterflyPACK
 
 Check the STRUMPACK github page for the latest
 development version of the code, and the website for more information:
-- \link https://github.com/pghysels/STRUMPACK \endlink
-- \link http://portal.nersc.gov/project/sparse/strumpack/ \endlink
+- https://github.com/pghysels/STRUMPACK
+- http://portal.nersc.gov/project/sparse/strumpack/
 
 
 For comments, feature requests or bug reports, open an issue on github:
-  - \link https://github.com/pghysels/STRUMPACK/issues \endlink
+  - https://github.com/pghysels/STRUMPACK/issues
 
-____
 
-## Table of Contents:
+# Table of Contents
 
 + \link installation Installation and Requirements \endlink
-+ \link algorithm Algorithm \endlink
-+ \link sparse Using STRUMPACK Sparse \endlink
-+ \link HSS_Preconditioning HSS Preconditioning \endlink
-+ \link BLR_Preconditioning BLR Preconditioning \endlink
-+ \link Lossy_Preconditioning Lossy/Lossless Compression Preconditioning \endlink
-+ \link GPU_Support GPU Support \endlink
-+ \link dense_matrices HSS Approximation of Dense Matrices \endlink
-+ \link hodlr_matrices HODLR Approximation of Dense Matrices \endlink
-+ \link blr_matrices BLR Approximation of Dense Matrices \endlink
++ \link sparse Sparse Direct Solver \endlink
+    - \link algorithm Algorithm Overview \endlink
+    - \link sparse_example_usage Example Usage \endlink
+    - \link GPU_Support GPU Support \endlink
++ \link prec Precontioning \endlink
+    - \link BLR_Preconditioning BLR Preconditioning \endlink
+    - \link HOD_Preconditioning HODLR & HODBF Preconditioning \endlink
+    - \link HSS_Preconditioning HSS Preconditioning \endlink
+    - \link Lossy_Preconditioning Lossy/Lossless Compression Preconditioning \endlink
++ \link dense Dense Solvers \endlink
+    - \link blr_matrices Block Low Rank (BLR) Approximation \endlink
+    - \link hodlr_matrices Hierarchically Off-Diagonal Low-Rank (HODLR) and Butterfly Approximation \endlink
+    - \link hss_matrices Hierarchically Semi-Separable (HSS) Matrix Approximation \endlink
 + \link examples Examples \endlink
 + \link C_Interface C and Fortran Interfaces \endlink
 + \link FAQ FAQ \endlink
@@ -75,9 +78,8 @@ ____
 + \link copyright Copyright Notice and License Agreement \endlink
 + \link References References\endlink
 
-____
 
-## Current developers - Lawrence Berkeley National Laboratory
+# Current developers - Lawrence Berkeley National Laboratory
  - Pieter Ghysels - pghysels@lbl.gov
  - Xiaoye S. Li - xsli@lbl.gov
  - Yang Liu - liuyangzhuan@lbl.gov

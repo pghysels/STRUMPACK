@@ -1,7 +1,7 @@
 /*! \page installation Installation and Requirements
+\tableofcontents
 
-CMake Based Build
------------------
+# CMake Based Build
 
 The STRUMPACK package uses the CMake build system (CMake version ≥
 3.11). The recommended way of building the STRUMPACK library is as
@@ -240,8 +240,8 @@ compilers and the OpenBLAS, Intel® MKL®, Cray® LibSci® and IBM ESSL
 numerical libraries. If you encounter issues on other platforms or
 with other BLAS/LAPACK implementations, please let us know.
 
-SPACK, xSDK \& E4S
-------------------
+# SPACK, xSDK \& E4S
+
 
 STRUMPACK can also be installed through Spack (\link https://spack.io
 \endlink), a package manager for supercomputers, Linux, and macOS. It
@@ -265,9 +265,7 @@ as well as PETSc (which has a STRUMPACK interface) and several other
 scientific software libraries.
 
 
-
-Using STRUMPACK in Your Code
-----------------------------
+# Using STRUMPACK in Your Code
 
 Please see the examples in the examples/ folder, which can be build using
 \code {.bash}

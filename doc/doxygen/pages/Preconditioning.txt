@@ -1,0 +1,8 @@
+/*! \page prec Sparse Preconditioners
+
+- \subpage BLR_Preconditioning "Block Low Rank (BLR) Preconditioning"
+- \subpage HOD_Preconditioning "HODLR & Butterfly Preconditioning"
+- \subpage HSS_Preconditioning "Hierarchically Semi-Separable (HSS) Preconditioning"
+- \subpage Lossy_Preconditioning "Lossy/Lossless Compression Preconditioning"
+
+*/

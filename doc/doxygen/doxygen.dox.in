@@ -797,12 +797,16 @@ WARN_LOGFILE           =
 	@CMAKE_CURRENT_SOURCE_DIR@/src/kernel/Metrics.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Overview.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Installation.txt \
-	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Algorithm.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Sparse.txt \
+	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Sparse_example.txt \
+	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Algorithm.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/GPU_support.txt \
-	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/HSS_Preconditioning.txt \
+	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Preconditioning.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/BLR_Preconditioning.txt \
+	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/HOD_Preconditioning.txt \
+	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/HSS_Preconditioning.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Lossy_Preconditioning.txt \
+	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Dense.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/HSS_Dense_Matrices.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/HODLR_Dense_Matrices.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/BLR_Dense_Matrices.txt \
