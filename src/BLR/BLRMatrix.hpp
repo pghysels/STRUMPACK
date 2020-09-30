@@ -119,15 +119,15 @@ namespace strumpack {
 
       void LUAR_B11
       (std::size_t i, std::size_t j,
-       std::size_t kmax, DenseMatrix<scalar_t>&A11, const BLROptions<scalar_t>& opts);
+       std::size_t kmax, DenseMatrix<scalar_t>&A11, const BLROptions<scalar_t>& opts, int* B);
 
       void LUAR_B12
       (std::size_t i, std::size_t j,
-       std::size_t kmax, BLRMatrix<scalar_t>& B11, DenseMatrix<scalar_t>&A12, const BLROptions<scalar_t>& opts);
+       std::size_t kmax, BLRMatrix<scalar_t>& B11, DenseMatrix<scalar_t>&A12, const BLROptions<scalar_t>& opts, int* B);
 
       void LUAR_B21
       (std::size_t i, std::size_t j,
-       std::size_t kmax, BLRMatrix<scalar_t>& B11, DenseMatrix<scalar_t>&A21, const BLROptions<scalar_t>& opts);
+       std::size_t kmax, BLRMatrix<scalar_t>& B11, DenseMatrix<scalar_t>&A21, const BLROptions<scalar_t>& opts, int* B);
 
       static void construct_and_partial_factor
       (std::size_t n1, std::size_t n2,
@@ -181,7 +181,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     LUAR_B22(std::size_t i, std::size_t j, std::size_t kmax, BLRMatrix<scalar_t>& B12, 
-             BLRMatrix<scalar_t>& B21, DenseMatrix<scalar_t>&A22, const BLROptions<scalar_t>& opts);
+             BLRMatrix<scalar_t>& B21, DenseMatrix<scalar_t>&A22, const BLROptions<scalar_t>& opts, int* B);
 
     template<typename scalar_t> void
     trsm(Side s, UpLo ul, Trans ta, Diag d, scalar_t alpha,

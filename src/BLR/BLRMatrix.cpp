@@ -476,12 +476,12 @@ namespace strumpack {
       // dummy for task synchronization
       std::unique_ptr<int[]> B_(new int[lrb*lrb]()); auto B = B_.get();
 #pragma omp taskgroup
-//#else
-//      std::unique_ptr<int> B=nullptr; 
+#else
+      int* B=nullptr; 
 #endif
 
 // RL-version
-#if 1
+#if 0
       {
         for (std::size_t i=0; i<rb; i++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
@@ -679,7 +679,6 @@ namespace strumpack {
 std::cout << "LL-UPDATE, rb= " << rb << ", rb2= " << rb2 << ", i= " << i << std::endl;
           for (std::size_t j=i+1; j<rb; j++){
             for (std::size_t k=0; k<i+1; k++) {
-              std::cout << "j= " << j << ", k= " << k << std::endl;
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
               std::size_t ij = (i+1)+lrb*j, ik = (i+1)+lrb*k, kj = k+lrb*j;
 #pragma omp task default(shared) firstprivate(i,j,k,ij,ik,kj)   \
@@ -704,7 +703,6 @@ std::cout << "LL-UPDATE, rb= " << rb << ", rb2= " << rb2 << ", i= " << i << std:
               }
             }
           }
-          std::cout << "B12: " << std::endl;
           if(i+1<rb){
             for (std::size_t j=0; j<rb2; j++){
               for (std::size_t k=0; k<i+1; k++) {
@@ -735,22 +733,19 @@ std::cout << "LL-UPDATE, rb= " << rb << ", rb2= " << rb2 << ", i= " << i << std:
 //LUAR-Update
 //std::cout << "LUAR-UPDATE, rb= " << rb << ", rb2= " << rb2 << ", i= " << i << std::endl;
           for (std::size_t j=i+1; j<rb; j++){
-            B11.LUAR_B11(i+1, j, i+1, A11, opts);
+            B11.LUAR_B11(i+1, j, i+1, A11, opts, B);
             if(j!=i+1){
-              B11.LUAR_B11(j, i+1, i+1, A11, opts);
+              B11.LUAR_B11(j, i+1, i+1, A11, opts, B);
             }
           }
           if(i+1<rb){
             for (std::size_t j=0; j<rb2; j++){
-              //std::cout << "B12: , j= " << j <<", i=" << i << ", kmax= " << i+1 << std::endl;
-              B12.LUAR_B12(i+1, j, i+1, B11, A12, opts);
-              //std::cout << "B21: , j= " << j <<", i=" << i << ", kmax= " << i+1 << std::endl;
-              B21.LUAR_B21(i+1, j, i+1, B11, A21, opts);
+              B12.LUAR_B12(i+1, j, i+1, B11, A12, opts, B);
+              B21.LUAR_B21(i+1, j, i+1, B11, A21, opts, B);
             }
           }
 #endif
         }
-        //std::cout << "B22: " << std::endl;
         for(std::size_t i=0; i<rb2; i++) {
           for (std::size_t j=0; j<rb2; j++) {
 #if 0
@@ -771,8 +766,7 @@ std::cout << "LL-UPDATE, rb= " << rb << ", rb2= " << rb2 << ", i= " << i << std:
             }
 #else
 //LUAR-Update
-//std::cout << "i= " << i << ", j= " << j << std::endl;
-            LUAR_B22(i, j, rb, B12, B21, A22, opts);
+            LUAR_B22(i, j, rb, B12, B21, A22, opts, B);
 #endif
           }
         }
@@ -789,7 +783,7 @@ std::cout << "LL-UPDATE, rb= " << rb << ", rb2= " << rb2 << ", i= " << i << std:
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::LUAR_B11
     (std::size_t i, std::size_t j,
-     std::size_t kmax, DenseMatrix<scalar_t>&A11, const BLROptions<scalar_t>& opts){
+     std::size_t kmax, DenseMatrix<scalar_t>&A11, const BLROptions<scalar_t>& opts, int* B){
 #if 0
 //Star Tree
 std::cout << "B11_Star" << std::endl;
@@ -968,7 +962,7 @@ std::cout << "B11_Star" << std::endl;
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::LUAR_B12
     (std::size_t i, std::size_t j,
-     std::size_t kmax, BLRMatrix<scalar_t>& B11, DenseMatrix<scalar_t>&A12, const BLROptions<scalar_t>& opts){
+     std::size_t kmax, BLRMatrix<scalar_t>& B11, DenseMatrix<scalar_t>&A12, const BLROptions<scalar_t>& opts, int* B){
 #if 0
 //Star Tree
       std::size_t rank_sum=0;
@@ -1127,7 +1121,7 @@ std::cout << "B11_Star" << std::endl;
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::LUAR_B21
     (std::size_t i, std::size_t j,
-     std::size_t kmax, BLRMatrix<scalar_t>& B11, DenseMatrix<scalar_t>&A21, const BLROptions<scalar_t>& opts){
+     std::size_t kmax, BLRMatrix<scalar_t>& B11, DenseMatrix<scalar_t>&A21, const BLROptions<scalar_t>& opts, int* B){
 #if 0
 //Star Tree
       std::size_t rank_sum=0;
@@ -1461,7 +1455,7 @@ std::cout << "B11_Star" << std::endl;
 
     template<typename scalar_t> void
     LUAR_B22(std::size_t i, std::size_t j, std::size_t kmax, BLRMatrix<scalar_t>& B12, 
-             BLRMatrix<scalar_t>& B21, DenseMatrix<scalar_t>&A22, const BLROptions<scalar_t>& opts){
+             BLRMatrix<scalar_t>& B21, DenseMatrix<scalar_t>&A22, const BLROptions<scalar_t>& opts, int* B){
                 DenseMatrixWrapper<scalar_t> Aij
                   (B21.tilerows(i), B12.tilecols(j), A22,
                    B21.tileroff(i), B12.tilecoff(j));
