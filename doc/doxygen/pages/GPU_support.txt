@@ -3,15 +3,14 @@
 
 STRUMPACK currently only supports for GPU acceleration in the sparse
 direct solver. None of the preconditioners or rank structured solvers
-currently support GPU acceleration. The GPU acceleration is only for
-NVIDIA GPUs for now.
+currently support GPU acceleration.
 
 The sparse direct solver performs most of its computations using BLAS
 and LAPACK, and in the distributed memory setting also ScaLAPACK.  For
 the BLAS and LAPACK operations, we use CUDA, cuBLAS and cuSOLVER for
 acceleration using NVIDIA GPUs. As a ScaLAPACK alternative with GPU
 off-loading capabilities we use SLATE: \n
-\link https://bitbucket.org/icl/slate/src/master/ \endlink
+https://bitbucket.org/icl/slate/src/master/
 
 See the \link installation Installation and Requirements \endlink page
 for instructions on how to build STRUMPACK with support for CUDA, and
