@@ -125,19 +125,19 @@ int run(int argc, char* argv[]) {
   if (blr_opts.verbose()) A.print("A");
   cout << "# tol = " << blr_opts.rel_tol() << endl;
 
-  //BLRMatrix<double> B(A, blr_opts);
-  // if (H.is_compressed()) {
-  //   cout << "# created H matrix of dimension "
-  //        << H.rows() << " x " << H.cols()
-  //        << " with " << H.levels() << " levels" << endl;
-  //   cout << "# compression succeeded!" << endl;
-  // } else {
-  //   cout << "# compression failed!!!!!!!!" << endl;
-  //   return 1;
-  // }
-  // cout << "# rank(H) = " << B.maximum_rank() << endl;
-  // cout << "# memory(H) = " << B.memory()/1e6 << " MB, "
-  //      << 100. * B.memory() / A.memory() << "% of dense" << endl;
+  BLRMatrix<double> B(A, blr_opts);
+  if (B.is_compressed()) {
+     cout << "# created H matrix of dimension "
+          << B.rows() << " x " << B.cols()
+          << " with " << B.levels() << " levels" << endl;
+     cout << "# compression succeeded!" << endl;
+  } else {
+     cout << "# compression failed!!!!!!!!" << endl;
+     return 1;
+  }
+  cout << "# rank(H) = " << B.maximum_rank() << endl;
+  cout << "# memory(H) = " << B.memory()/1e6 << " MB, "
+        << 100. * B.memory() / A.memory() << "% of dense" << endl;
 
   // // H.print_info();
   // auto Bdense = B.dense();

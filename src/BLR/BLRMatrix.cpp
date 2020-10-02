@@ -607,10 +607,10 @@ namespace strumpack {
 // LL-version
       { //FACTOR
         for (std::size_t i=0; i<rb; i++) {
-/*#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
           std::size_t ii = i+lrb*i;
 #pragma omp task default(shared) firstprivate(i,ii) depend(inout:B[ii])
-#endif*/
+#endif
           {
             B11.create_dense_tile(i, i, A11);
             auto tpiv = B11.tile(i, i).LU();
@@ -618,11 +618,11 @@ namespace strumpack {
           }
           //COMPRESS and SOLVE
           for (std::size_t j=i+1; j<rb; j++) {
-/*#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
             std::size_t ij = i+lrb*j;
 #pragma omp task default(shared) firstprivate(i,j,ij,ii)  \
   depend(in:B[ii]) depend(inout:B[ij]) priority(rb-j)
-#endif*/
+#endif
             { // these blocks have received all updates, compress now
               if (admissible(i, j)) B11.create_LR_tile(i, j, A11, opts);
               else B11.create_dense_tile(i, j, A11);
@@ -633,11 +633,11 @@ namespace strumpack {
               trsm(Side::L, UpLo::L, Trans::N, Diag::U,
                    scalar_t(1.), B11.tile(i, i), B11.tile(i, j));
             }
-/*#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
             std::size_t ji = j+lrb*i;
 #pragma omp task default(shared) firstprivate(i,j,ji,ii)        \
   depend(in:B[ii]) depend(inout:B[ji]) priority(rb-j)
-#endif*/
+#endif
             {
               if (admissible(j, i)) B11.create_LR_tile(j, i, A11, opts);
               else B11.create_dense_tile(j, i, A11);
@@ -647,11 +647,11 @@ namespace strumpack {
             }
           }
           for (std::size_t j=0; j<rb2; j++) {
-/*#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
             std::size_t ij2 = i+lrb*(rb+j);
 #pragma omp task default(shared) firstprivate(i,j,ij2,ii)       \
   depend(in:B[ii]) depend(inout:B[ij2])
-#endif*/
+#endif
             {
               B12.create_LR_tile(i, j, A12, opts);
               // permute and solve with L  blocks right from the diagonal block
@@ -661,11 +661,11 @@ namespace strumpack {
               trsm(Side::L, UpLo::L, Trans::N, Diag::U,
                    scalar_t(1.), B11.tile(i, i), B12.tile(i, j));
             }
-/*#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
             std::size_t j2i = (rb+j)+lrb*i;
 #pragma omp task default(shared) firstprivate(i,j,j2i,ii)       \
   depend(in:B[ii]) depend(inout:B[j2i])
-#endif*/
+#endif
             {
               B21.create_LR_tile(j, i, A21, opts);
               // solve with U, the blocks under the diagonal block
@@ -674,9 +674,8 @@ namespace strumpack {
             }
           }
           //UPDATE
-#if 0
+#if 1
 //LL-Update
-std::cout << "LL-UPDATE, rb= " << rb << ", rb2= " << rb2 << ", i= " << i << std::endl;
           for (std::size_t j=i+1; j<rb; j++){
             for (std::size_t k=0; k<i+1; k++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
@@ -731,31 +730,58 @@ std::cout << "LL-UPDATE, rb= " << rb << ", rb2= " << rb2 << ", i= " << i << std:
           }
 #else
 //LUAR-Update
-//std::cout << "LUAR-UPDATE, rb= " << rb << ", rb2= " << rb2 << ", i= " << i << std::endl;
           for (std::size_t j=i+1; j<rb; j++){
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+              std::size_t ij = (i+1)+lrb*j;
+#pragma omp task default(shared) firstprivate(i,j,ij)   \
+  depend(inout:B[ij]) priority(rb-j)
+#endif
+          {
             B11.LUAR_B11(i+1, j, i+1, A11, opts, B);
+          }
             if(j!=i+1){
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+              std::size_t ji = j+lrb*(i+1);
+#pragma omp task default(shared) firstprivate(i,j,ji)   \
+  depend(inout:B[ji]) priority(rb-j)
+#endif
+          {
               B11.LUAR_B11(j, i+1, i+1, A11, opts, B);
+          }
             }
           }
           if(i+1<rb){
             for (std::size_t j=0; j<rb2; j++){
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+              std::size_t ij2 = (i+1)+lrb*(rb+j);
+#pragma omp task default(shared) firstprivate(i,j,ij2)   \
+  depend(inout:B[ij2]) priority(rb-j)
+#endif
+          {
               B12.LUAR_B12(i+1, j, i+1, B11, A12, opts, B);
+          }
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+              std::size_t j2i = (rb+j)+lrb*(i+1);
+#pragma omp task default(shared) firstprivate(i,j,j2i)   \
+  depend(inout:B[j2i]) priority(rb-j)
+#endif
+          {
               B21.LUAR_B21(i+1, j, i+1, B11, A21, opts, B);
+          }
             }
           }
 #endif
         }
         for(std::size_t i=0; i<rb2; i++) {
           for (std::size_t j=0; j<rb2; j++) {
-#if 0
+#if 1
 //LL-Update
             for (std::size_t k=0; k<rb; k++) {
-/*#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
               std::size_t i2j2 = (rb+i)+lrb*(rb+j), i2k = (rb+i)+lrb*k, kj2 = k+lrb*(rb+j);
 #pragma omp task default(shared) firstprivate(i,j,k,i2k,kj2,i2j2)       \
   depend(in:B[i2k],B[kj2]) depend(inout:B[i2j2])
-#endif*/
+#endif
               { // Schur complement updates, always into full rank
                 DenseMatrixWrapper<scalar_t> Aij
                   (B21.tilerows(i), B12.tilecols(j), A22,
@@ -766,7 +792,15 @@ std::cout << "LL-UPDATE, rb= " << rb << ", rb2= " << rb2 << ", i= " << i << std:
             }
 #else
 //LUAR-Update
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+              std::size_t i2j2 = (rb+i)+lrb*(rb+j);
+#pragma omp task default(shared) firstprivate(i,j,i2j2)   \
+  depend(inout:B[i2j2])
+#endif
+          {
+           
             LUAR_B22(i, j, rb, B12, B21, A22, opts, B);
+          }
 #endif
           }
         }
@@ -784,9 +818,8 @@ std::cout << "LL-UPDATE, rb= " << rb << ", rb2= " << rb2 << ", i= " << i << std:
     BLRMatrix<scalar_t>::LUAR_B11
     (std::size_t i, std::size_t j,
      std::size_t kmax, DenseMatrix<scalar_t>&A11, const BLROptions<scalar_t>& opts, int* B){
-#if 0
+#if 1
 //Star Tree
-std::cout << "B11_Star" << std::endl;
       std::size_t rank_sum=0;
       auto Aij = tile(A11, i, j);
       for (std::size_t k=0; k<kmax; k++) {
@@ -832,62 +865,36 @@ std::cout << "B11_Star" << std::endl;
       }
 #else
 //Comb Tree, sort first
-//std::cout << "B11_Comb" << std::endl;
       std::vector<std::pair<size_t,size_t>> ranks_idx;
       std::size_t rank_sum=0;
       auto Aij = tile(A11, i, j);
       for (std::size_t k=0; k<kmax; k++) {
-        //std::cout << "tile1= LR?: " << tile(i, k).is_low_rank() << ", tile2= LR?: " << tile(k, j).is_low_rank() << std::endl;
         if(!(tile(i, k).is_low_rank() || tile(k, j).is_low_rank())){ //both tiles are dense, then gemm directly
-          //std::cout << "FR" << std::endl;
           gemm(Trans::N, Trans::N, scalar_t(-1.),
                      tile(i, k), tile(k, j), scalar_t(1.), Aij);
         } 
         else{ // collect size of LR matrices
-          //std::cout << "LR" << std::endl;
           ranks_idx.emplace_back(std::min(tile(i, k).rank(), tile(k, j).rank()),k);
           rank_sum += std::min(tile(i, k).rank(), tile(k, j).rank());
-          //std::cout << "rank_sum= " << rank_sum << std::endl;
         } 
       }
       if(rank_sum>0){
-        //std::cout << "rank_sum= " << rank_sum << std::endl;
         if(ranks_idx.size()>1){
-          /*std::cout << "rank_idx.size= " << ranks_idx.size() << std::endl;
-          std::cout << "unsorted ranks= [ ";
-          for(std::size_t k=0; k<ranks_idx.size(); k++){
-            std::cout << ranks_idx[k].first << " ";
-          }
-          std::cout << "]" << std::endl;*/
           //sort ranks in increasing order
           std::sort(ranks_idx.begin(),ranks_idx.end());
-          /*std::cout << "sorted ranks= [ ";
-          for(std::size_t k=0; k<ranks_idx.size(); k++){
-            std::cout << ranks_idx[k].first << " ";
-          }
-          std::cout << "]" << std::endl;*/
           std::size_t rank_tmp=0;
           DenseMatrix<scalar_t> tmpU(Aij.rows(), rank_sum);
           DenseMatrix<scalar_t> tmpV(rank_sum, Aij.cols());
           LRTile<scalar_t> tmp=tile(i,ranks_idx[0].second).multiply(tile(ranks_idx[0].second,j));
-          //std::cout << "copy_topos:" << std::endl;
           tmpU.copy_topos(tmp.U(),0,rank_tmp);
           tmpV.copy_topos(tmp.V(),rank_tmp,0);
           rank_tmp = tmp.rank();
           for (std::size_t k=1; k<ranks_idx.size(); k++) {
-            //std::cout << "k= " << k << std::endl;
             LRTile<scalar_t> t=tile(i,ranks_idx[k].second).multiply(tile(ranks_idx[k].second,j));
-            //rank_tmp += t.rank();
             DenseMatrix<scalar_t> Uall(Aij.rows(), rank_tmp+t.rank());
             DenseMatrix<scalar_t> Vall(rank_tmp+t.rank(), Aij.cols());
-            //std::cout << "copy_tillpos:" << std::endl;
             Uall.copy_tillpos(tmpU, Aij.rows(), rank_tmp);
             Vall.copy_tillpos(tmpV, rank_tmp, Aij.cols());
-            /*std::cout << "copy_topos:" << std::endl;
-            std::cout << "t.U.size= " << t.U().rows() << "x" << t.U().cols() << std::endl;
-            std::cout << "Uall.size= " << Uall.rows() << "x" << Uall.cols() << std::endl;
-            std::cout << "t.V.size= " << t.V().rows() << "x" << t.V().cols() << std::endl;
-            std::cout << "Vall.size= " << Vall.rows() << "x" << Vall.cols() << std::endl;*/
             Uall.copy_topos(t.U(),0,rank_tmp);
             Vall.copy_topos(t.V(),rank_tmp,0);
             if (ranks_idx.size()>2){
@@ -940,7 +947,6 @@ std::cout << "B11_Star" << std::endl;
               gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp2, scalar_t(1.), Aij);
 #else
               //Recompress Uall only
-              //std::cout << "RECOMPRESS" << std::endl;
               DenseMatrix<scalar_t> UU, UV;
               Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
               DenseMatrix<scalar_t> tmp1(UV.rows(), Vall.cols());
@@ -963,36 +969,28 @@ std::cout << "B11_Star" << std::endl;
     BLRMatrix<scalar_t>::LUAR_B12
     (std::size_t i, std::size_t j,
      std::size_t kmax, BLRMatrix<scalar_t>& B11, DenseMatrix<scalar_t>&A12, const BLROptions<scalar_t>& opts, int* B){
-#if 0
+#if 1
 //Star Tree
       std::size_t rank_sum=0;
       auto Aij = tile(A12, i, j);
       for (std::size_t k=0; k<kmax; k++) {
-        //std::cout << "tile1= LR?: " << B11.tile(i, k).is_low_rank() << ", tile2= LR?: " << tile(k, j).is_low_rank() << std::endl;
         if(!(B11.tile(i, k).is_low_rank() || tile(k, j).is_low_rank())){ //both tiles are dense, then gemm directly
-          //std::cout << "FR" << std::endl;
           gemm(Trans::N, Trans::N, scalar_t(-1.),
                      B11.tile(i, k), tile(k, j), scalar_t(1.), Aij);
         } 
         else{ // collect size of LR matrices
-          //std::cout << "LR" << std::endl;
           rank_sum+=std::min(B11.tile(i, k).rank(), tile(k, j).rank());
         } 
       }
       if(rank_sum>0){
-        //std::cout << "rank_sum= " << rank_sum << std::endl;
         DenseMatrix<scalar_t> Uall(Aij.rows(), rank_sum);
         DenseMatrix<scalar_t> Vall(rank_sum, Aij.cols());
         std::size_t rank_tmp=0;
         for (std::size_t k=0; k<kmax; k++) {
-          //std::cout << "k= " << k << std::endl;
           if(B11.tile(i, k).is_low_rank() || tile(k, j).is_low_rank()){ // multiply the tiles and then gemm
-            //std::cout << "LR" << std::endl;
             LRTile<scalar_t> t=B11.tile(i,k).multiply(tile(k,j));
-            //std::cout << "after multiply, rank= " << t.rank() << std::endl;
             Uall.copy_topos(t.U(),0,rank_tmp);
             Vall.copy_topos(t.V(),rank_tmp,0);
-            //std::cout << "after copy" << std::endl;
             rank_tmp+=t.rank();
           } 
         }
@@ -1010,7 +1008,6 @@ std::cout << "B11_Star" << std::endl;
 #else
         //Recompress Uall only
         DenseMatrix<scalar_t> U1, V1;
-        //std::cout << "Recom before" << std::endl;
         Uall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
         DenseMatrix<scalar_t> tmp(V1.rows(), Vall.cols());
         gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), tmp);
@@ -1122,19 +1119,16 @@ std::cout << "B11_Star" << std::endl;
     BLRMatrix<scalar_t>::LUAR_B21
     (std::size_t i, std::size_t j,
      std::size_t kmax, BLRMatrix<scalar_t>& B11, DenseMatrix<scalar_t>&A21, const BLROptions<scalar_t>& opts, int* B){
-#if 0
+#if 1
 //Star Tree
       std::size_t rank_sum=0;
       auto Aji = tile(A21, j, i);
       for (std::size_t k=0; k<kmax; k++) {
-        //std::cout << "tile1= LR?: " << tile(j, k).is_low_rank() << ", tile2= LR?: " << B11.tile(k, i).is_low_rank() << std::endl;
         if(!(tile(j, k).is_low_rank() || B11.tile(k, i).is_low_rank())){ //both tiles are dense, then gemm directly
-          //std::cout << "FR" << std::endl;
           gemm(Trans::N, Trans::N, scalar_t(-1.),
                      tile(j, k), B11.tile(k, i), scalar_t(1.), Aji);
         } 
         else{ // collect size of LR matrices
-          //std::cout << "LR" << std::endl;
           rank_sum+=std::min(tile(j, k).rank(), B11.tile(k, i).rank());
         } 
       }
@@ -1143,9 +1137,7 @@ std::cout << "B11_Star" << std::endl;
         DenseMatrix<scalar_t> Vall(rank_sum, Aji.cols());
         std::size_t rank_tmp=0;
         for (std::size_t k=0; k<kmax; k++) {
-          //std::cout << "k= " << k << std::endl;
           if(tile(j, k).is_low_rank() || B11.tile(k, i).is_low_rank()){ // multiply the tiles and then gemm
-            //std::cout << "LR" << std::endl;
             LRTile<scalar_t> t=tile(j,k).multiply(B11.tile(k,i));
             Uall.copy_topos(t.U(),0,rank_tmp);
             Vall.copy_topos(t.V(),rank_tmp,0);
@@ -1166,7 +1158,6 @@ std::cout << "B11_Star" << std::endl;
 #else
         //Recompress Uall only
         DenseMatrix<scalar_t> U1, V1;
-        //std::cout << "Recom before" << std::endl;
         Uall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
         DenseMatrix<scalar_t> tmp(V1.rows(), Vall.cols());
         gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), tmp);
@@ -1459,7 +1450,7 @@ std::cout << "B11_Star" << std::endl;
                 DenseMatrixWrapper<scalar_t> Aij
                   (B21.tilerows(i), B12.tilecols(j), A22,
                    B21.tileroff(i), B12.tilecoff(j));
-#if 0
+#if 1
 //Star Tree
                 std::size_t rank_sum=0;
                 for (std::size_t k=0; k<kmax; k++) {
