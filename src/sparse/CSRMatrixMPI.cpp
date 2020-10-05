@@ -700,8 +700,8 @@ namespace strumpack {
       }
       std::vector<real_t> lR(lrows_);
       MPI_Scatterv
-        (rank ? nullptr : M.R.data(), scnts, sdispls, mpi_type<scalar_t>(),
-         lR.data(), lrows_, mpi_type<scalar_t>(), 0, comm());
+        (rank ? nullptr : M.R.data(), scnts, sdispls, mpi_type<real_t>(),
+         lR.data(), lrows_, mpi_type<real_t>(), 0, comm());
       M.R = std::move(lR);
       comm_.broadcast(M.C);
       if (apply) scale_real(M.R, M.C);
