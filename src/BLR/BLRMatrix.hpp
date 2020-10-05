@@ -76,6 +76,8 @@ namespace strumpack {
                 const adm_t& admissible, std::vector<int>& piv,
                 const Opts_t& opts);
 
+      //BLRMatrix(DenseM_t &A11, BLRMatrix<scalar_t>& B11, const Opts_t& opts);
+
       std::size_t rows() const { return m_; }
       std::size_t cols() const { return n_; }
 
@@ -155,6 +157,8 @@ namespace strumpack {
 
       BLRMatrix(std::size_t m, const std::vector<std::size_t>& rowtiles,
                 std::size_t n, const std::vector<std::size_t>& coltiles);
+
+      BLRMatrix(std::size_t m, std::size_t n);
 
       void create_dense_tile(std::size_t i, std::size_t j, DenseM_t& A);
       void create_dense_tile
