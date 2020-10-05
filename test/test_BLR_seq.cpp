@@ -127,7 +127,7 @@ int run(int argc, char* argv[]) {
 
   BLRMatrix<double> B(A, blr_opts);
   if (B.is_compressed()) {
-     cout << "# created H matrix of dimension "
+     cout << "# created B matrix of dimension "
           << B.rows() << " x " << B.cols()
           << " with " << B.levels() << " levels" << endl;
      cout << "# compression succeeded!" << endl;
@@ -135,8 +135,8 @@ int run(int argc, char* argv[]) {
      cout << "# compression failed!!!!!!!!" << endl;
      return 1;
   }
-  cout << "# rank(H) = " << B.maximum_rank() << endl;
-  cout << "# memory(H) = " << B.memory()/1e6 << " MB, "
+  cout << "# rank(B) = " << B.maximum_rank() << endl;
+  cout << "# memory(B) = " << B.memory()/1e6 << " MB, "
         << 100. * B.memory() / A.memory() << "% of dense" << endl;
 
   // // H.print_info();
