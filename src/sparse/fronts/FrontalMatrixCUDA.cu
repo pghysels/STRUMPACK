@@ -304,11 +304,8 @@ namespace strumpack {
           }
         __syncthreads();
         // divide by the pivot element
-        if (j == k && i > k && i < n) {
-          //if (j == k && i > k) {
-          auto tmp = real_t(1.) / Mmax;
-          M[i+k*NT] *= tmp;
-        }
+        if (j == k && i > k && i < n)
+          M[i+k*NT] /= Mmax;
         __syncthreads();
         // Schur update
         if (j > k && i > k && j < n && i < n)
