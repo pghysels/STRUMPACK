@@ -125,6 +125,11 @@ int run(int argc, char* argv[]) {
   if (blr_opts.verbose()) A.print("A");
   cout << "# tol = " << blr_opts.rel_tol() << endl;
 
+  // define a partition tree for the BLR matrix
+  HSS::HSSPartitionTree t(N);
+  t.refine(blr_opts.leaf_size());
+  auto tiles=t.leaf_sizes();
+  
   BLRMatrix<double> B(A, blr_opts);
   if (B.is_compressed()) {
      cout << "# created B matrix of dimension "
