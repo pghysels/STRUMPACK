@@ -164,6 +164,9 @@ namespace strumpack {
       const;
 
 
+    void bwd_solve_gpu(DenseM_t& y, DenseM_t* work,
+                       const std::unique_ptr<GPUFactors<scalar_t>>&
+                       gpu_factors) const;
     void bwd_small_fronts(int nrhs, LInfo_t& L,
                           gpu::FrontData<scalar_t>* fdata,
                           gpu::FrontData<scalar_t>* dfdata,
