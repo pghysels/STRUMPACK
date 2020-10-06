@@ -143,8 +143,8 @@ namespace strumpack {
     if (dim_sep()) {
       // TaskTimer t("FrontalMatrixDense_factor");
       // if (etree_level == 0 && opts.print_root_front_stats()) t.start();
-      piv = F11_.LU(task_depth);
-      if (opts.replace_tiny_pivots()) {
+      int info = F11_.LU(piv, task_depth);
+      if (info || opts.replace_tiny_pivots()) {
         // TODO consider other values for thresh
         //  - sqrt(eps)*|A|_1 as in SuperLU ?
         using real_t = typename RealType<scalar_t>::value_type;

@@ -548,9 +548,22 @@ namespace strumpack {
     return blas::lange('F', rows(), cols(), data(), ld());
   }
 
+
   template<typename scalar_t> std::vector<int>
   DenseMatrix<scalar_t>::LU(int depth) {
-    std::vector<int> piv(rows());
+    std::vector<int> piv;
+    int info = LU(piv, depth);
+    if (info) {
+      std::cerr << "ERROR: LU factorization failed with info="
+                << info << std::endl;
+      exit(1);
+    }
+    return piv;
+  }
+
+  template<typename scalar_t> int
+  DenseMatrix<scalar_t>::LU(std::vector<int>& piv, int depth) {
+    piv.resize(rows());
     int info = 0;
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
@@ -562,12 +575,7 @@ namespace strumpack {
       getrf_omp_task(rows(), cols(), data(), ld(), piv.data(), &info, depth);
     else
       blas::getrf(rows(), cols(), data(), ld(), piv.data(), &info);
-    if (info) {
-      std::cerr << "ERROR: LU factorization failed with info="
-                << info << std::endl;
-      exit(1);
-    }
-    return piv;
+    return info;
   }
 
   template<typename scalar_t> int

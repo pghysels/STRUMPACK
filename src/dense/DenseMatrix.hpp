@@ -668,7 +668,24 @@ namespace strumpack {
      * factors are stored in place, the permutation is returned, and
      * can be applied with the laswp() routine.
      *
+     * \param piv pivot vector, will be resized if necessary
      * \param depth current OpenMP task recursion depth
+     * \return if nonzero, the pivot in this column was exactly zero
+     * \see laswp, solve
+     */
+    int LU(std::vector<int>& piv, int depth=0);
+
+    /**
+     * Compute an LU factorization of this matrix using partial
+     * pivoting with row interchanges. The factorization has the form
+     * A = P * L * U, where P is a permutation matrix, L is lower
+     * triangular with unit diagonal elements, and U is upper
+     * triangular. This calls the LAPACK routine DGETRF. The L and U
+     * factors are stored in place, the permutation is returned, and
+     * can be applied with the laswp() routine.
+     *
+     * \param depth current OpenMP task recursion depth
+     * \return the pivot vector
      * \see laswp, solve
      */
     std::vector<int> LU(int depth=0);
