@@ -48,6 +48,20 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> class FrontalMatrixMPI;
 
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+  // for the implementation, see FrontalMatrixGPU.cpp
+  template<typename scalar_t> class GPUFactorsImpl;
+  template<typename scalar_t> class GPUFactors {
+  public:
+    GPUFactors(int lvls);
+    ~GPUFactors();
+    std::unique_ptr<GPUFactorsImpl<scalar_t>> data_;
+  };
+#else
+  template<typename scalar_t> class GPUFactors {};
+#endif
+
+
   template<typename scalar_t,typename integer_t> class FrontalMatrix {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
@@ -74,37 +88,48 @@ namespace strumpack {
 
     void draw(std::ostream& of, int etree_level=0) const;
 
-    void find_upd_indices
-    (const std::vector<std::size_t>& I, std::vector<std::size_t>& lI,
-     std::vector<std::size_t>& oI) const;
-    std::vector<std::size_t> upd_to_parent
-    (const F_t* pa, std::size_t& upd2sep) const;
+    void find_upd_indices(const std::vector<std::size_t>& I,
+                          std::vector<std::size_t>& lI,
+                          std::vector<std::size_t>& oI) const;
+    std::vector<std::size_t> upd_to_parent(const F_t* pa,
+                                           std::size_t& upd2sep) const;
     std::vector<std::size_t> upd_to_parent(const F_t* pa) const;
 
     virtual void release_work_memory() = 0;
 
-    virtual void multifrontal_factorization
-    (const SpMat_t& A, const Opts_t& opts,
-     int etree_level=0, int task_depth=0) = 0;
+    virtual void
+    multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
+                               int etree_level=0, int task_depth=0) = 0;
 
+    virtual std::unique_ptr<GPUFactors<scalar_t>> move_to_gpu() const
+    { return nullptr; }
+    //{ return std::unique_ptr<GPUFactors<scalar_t>>(); }
+
+    virtual void
+    multifrontal_solve(DenseM_t& b, const GPUFactors<scalar_t>*) const {
+      multifrontal_solve(b);
+    }
     virtual void multifrontal_solve(DenseM_t& b) const;
-    virtual void forward_multifrontal_solve
-    (DenseM_t& b, DenseM_t* work, int etree_level=0,
-     int task_depth=0) const {};
-    virtual void backward_multifrontal_solve
-    (DenseM_t& y, DenseM_t* work, int etree_level=0,
-     int task_depth=0) const {};
 
-    void fwd_solve_phase1
-    (DenseM_t& b, DenseM_t& bupd, DenseM_t* work,
-     int etree_level, int task_depth) const;
-    void bwd_solve_phase2
-    (DenseM_t& y, DenseM_t& yupd, DenseM_t* work,
-     int etree_level, int task_depth) const;
+    virtual void
+    forward_multifrontal_solve(DenseM_t& b, DenseM_t* work,
+                               int etree_level=0,
+                               int task_depth=0) const {};
+    virtual void
+    backward_multifrontal_solve(DenseM_t& y, DenseM_t* work,
+                                int etree_level=0,
+                                int task_depth=0) const {};
 
-    virtual void extend_add_to_dense
-    (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
-     const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) {}
+    void fwd_solve_phase1(DenseM_t& b, DenseM_t& bupd, DenseM_t* work,
+                          int etree_level, int task_depth) const;
+    void bwd_solve_phase2(DenseM_t& y, DenseM_t& yupd, DenseM_t* work,
+                          int etree_level, int task_depth) const;
+
+    virtual void
+    extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
+                        DenseM_t& paF21, DenseM_t& paF22,
+                        const FrontalMatrix<scalar_t,integer_t>* p,
+                        int task_depth) {}
 
     virtual int random_samples() const { return 0; }
 

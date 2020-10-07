@@ -172,6 +172,9 @@ namespace strumpack {
      */
     ReturnCode factor();
 
+    void move_to_gpu();
+    void remove_from_gpu();
+
     /**
      * Solve a linear system with a single right-hand side. Before
      * being able to solve a linear system, the matrix needs to be

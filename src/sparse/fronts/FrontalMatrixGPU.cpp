@@ -39,6 +39,23 @@
 
 namespace strumpack {
 
+  template<typename scalar_t> class GPUFactorsImpl {
+  public:
+    GPUFactorsImpl(int lvls) : dL_lvl(lvls), dU_lvl(lvls), dP_lvl(lvls) {}
+
+    gpu::DeviceMemory<scalar_t> dL, dU;
+    gpu::DeviceMemory<int> dP;
+    std::vector<scalar_t*> dL_lvl, dU_lvl;
+    std::vector<int*> dP_lvl;
+  };
+
+  template<typename scalar_t>
+  GPUFactors<scalar_t>::GPUFactors(int lvls)
+    : data_(new GPUFactorsImpl<scalar_t>(lvls)) {}
+  template<typename scalar_t>
+  GPUFactors<scalar_t>::~GPUFactors() = default;
+
+
   uintptr_t round_to_8(uintptr_t p) { return (p + 7) & ~7; }
   uintptr_t round_to_8(void* p) {
     return round_to_8(reinterpret_cast<uintptr_t>(p));
@@ -558,21 +575,22 @@ namespace strumpack {
       Usize += L.U_size;
       Psize += L.piv_size;
     }
-    df->dL = gpu::DeviceMemory<scalar_t>(Lsize);
-    df->dU = gpu::DeviceMemory<scalar_t>(Usize);
-    df->dP = gpu::DeviceMemory<int>(Psize);
-    scalar_t *Lptr = df->dL, *Uptr = df->dU;
-    int* Pptr = df->dP;
+    df->data_->dL = gpu::DeviceMemory<scalar_t>(Lsize);
+    df->data_->dU = gpu::DeviceMemory<scalar_t>(Usize);
+    df->data_->dP = gpu::DeviceMemory<int>(Psize);
+    scalar_t *Lptr = df->data_->dL, *Uptr = df->data_->dU;
+    int* Pptr = df->data_->dP;
     for (int l=lvls-1; l>=0; l--) {
       auto& L = ldata[l];
-      df->dL_lvl[l] = Lptr;
-      df->dU_lvl[l] = Uptr;
-      df->dP_lvl[l] = Pptr;
+      df->data_->dL_lvl[l] = Lptr;
+      df->data_->dU_lvl[l] = Uptr;
+      df->data_->dP_lvl[l] = Pptr;
       gpu::copy_host_to_device<scalar_t>
-        (df->dL_lvl[l], L.f[0]->host_factors_.get(), L.L_size);
+        (df->data_->dL_lvl[l], L.f[0]->host_factors_.get(), L.L_size);
       gpu::copy_host_to_device<scalar_t>
-        (df->dU_lvl[l], L.f[0]->host_factors_.get()+L.L_size, L.U_size);
-      gpu::copy_host_to_device<int>(df->dP_lvl[l], L.f[0]->piv_, L.piv_size);
+        (df->data_->dU_lvl[l], L.f[0]->host_factors_.get()+L.L_size, L.U_size);
+      gpu::copy_host_to_device<int>
+        (df->data_->dP_lvl[l], L.f[0]->piv_, L.piv_size);
       Lptr += L.L_size;
       Uptr += L.U_size;
       Pptr += L.piv_size;
@@ -580,41 +598,12 @@ namespace strumpack {
     return df;
   }
 
-
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::multifrontal_solve
-  (DenseM_t& b) const {
-#if 1
-    auto gf = move_to_gpu();
-    TaskTimer tl("");
-    tl.start();
-    fwd_solve_gpu(b, nullptr, gf);
-    bwd_solve_gpu(b, nullptr, gf);
-    std::cout << "# solve time without fwd copy:  "
-              << tl.elapsed() << " seconds" << std::endl;
-#else
-    forward_multifrontal_solve(b, nullptr);
-    backward_multifrontal_solve(b, nullptr);
-#endif
+  (DenseM_t& b, const GPUFactors<scalar_t>* gpu_factors) const {
+    fwd_solve_gpu(b, nullptr, gpu_factors);
+    bwd_solve_gpu(b, nullptr, gpu_factors);
   }
-
-
-  // template<typename scalar_t,typename integer_t>
-  // bool sufficient_device_memory_solve
-  // (const std::vector<LevelInfo<scalar_t,integer_t>>& ldata,
-  //  bool fwd, int nrhs) {
-  //   std::size_t peak_device = 0;
-  //   for (std::size_t l=0; l<ldata.size(); l++) {
-  //     auto& L = ldata[l];
-  //     std::size_t level_mem = (fwd ? L.L_size : L.U_size)
-  //       + nrhs * (L.piv_size + L.total_upd_size);
-  //     if (l+1 < ldata.size())
-  //       level_mem += nrhs * ldata[l+1].total_upd_size;
-  //     peak_device = std::max(peak_device_mem, level_mem);
-  //   }
-  //   return peak_device_mem * sizeof(scalar_t) < gpu::available_memory();
-  // }
-
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::rhs_to_contig
@@ -779,8 +768,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::fwd_solve_gpu
-  (DenseM_t& b, DenseM_t* work,
-   const std::unique_ptr<GPUFactors<scalar_t>>& gpu_factors)
+  (DenseM_t& b, DenseM_t* work, const GPUFactors<scalar_t>* gpu_factors)
     const {
     const int lvls = this->levels();
     const int d = b.cols();
@@ -859,8 +847,8 @@ namespace strumpack {
         // tl.start();
         auto& L = ldata[l];
         if (gpu_factors) {
-          dL = gpu_factors->dL_lvl[l];
-          dpiv = gpu_factors->dP_lvl[l];
+          dL = gpu_factors->data_->dL_lvl[l];
+          dpiv = gpu_factors->data_->dP_lvl[l];
         } else {
           gpu::copy_host_to_device<scalar_t>
             (dL, L.f[0]->host_factors_.get(), L.L_size);
@@ -1045,8 +1033,8 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::bwd_solve_gpu
-  (DenseM_t& y, DenseM_t* work, const std::unique_ptr<GPUFactors<scalar_t>>&
-   gpu_factors) const {
+  (DenseM_t& y, DenseM_t* work,
+   const GPUFactors<scalar_t>* gpu_factors) const {
     const int lvls = this->levels();
     const int d = y.cols();
     const int max_streams = 1; //opts.gpu_streams();
@@ -1061,8 +1049,8 @@ namespace strumpack {
       L = LInfo_t(fp, solver_handles[0], max_streams);
       max_small_fronts = std::max(max_small_fronts, L.N8+L.N16+L.N32);
       maxupd = std::max(maxupd, L.total_upd_size);
-      if (gpu_factors) maxUy = std::max(maxUy, L.U_size + d*L.piv_size);
-      else maxUy = std::max(maxUy, d*L.piv_size);
+      if (gpu_factors) maxUy = std::max(maxUy, d*L.piv_size);
+      else maxUy = std::max(maxUy, L.U_size + d*L.piv_size);
     }
     std::size_t max_ea_size = 0;
     for (int l=0; l<lvls-1; l++)
@@ -1090,7 +1078,7 @@ namespace strumpack {
         (round_to_8(dfdata + max_small_fronts));
       auto new_dyupd = dyupd + d*maxupd;
       scalar_t *dU = nullptr, *dy = nullptr;
-      char *dea;
+      char *dea = nullptr;
       if (gpu_factors) {
         dy = new_dyupd + d*maxupd;
         dea = reinterpret_cast<char*>(round_to_8(dy + maxUy));
@@ -1103,7 +1091,7 @@ namespace strumpack {
         // tl.start();
         auto& L = ldata[l];
         if (gpu_factors)
-          dU = gpu_factors->dU_lvl[l];
+          dU = gpu_factors->data_->dU_lvl[l];
         else {
           dy = dU + L.U_size;
           gpu::copy_host_to_device<scalar_t>
