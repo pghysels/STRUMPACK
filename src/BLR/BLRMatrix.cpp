@@ -93,24 +93,27 @@ namespace strumpack {
       // dummy for task synchronization
       std::unique_ptr<int[]> B_(new int[rb*rb]); auto B = B_.get();
 #pragma omp taskgroup
+#else
+      int* B=nullptr; 
 #endif
       {
+#if 0 //RL
         for (std::size_t i=0; i<rb; i++) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+/* #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
           std::size_t ii = i+rb*i;
 #pragma omp task default(shared) firstprivate(i,ii) depend(inout:B[ii])
-#endif
+#endif */
           {
             create_dense_tile(i, i, A);
             auto tpiv = tile(i, i).LU();
             std::copy(tpiv.begin(), tpiv.end(), piv.begin()+tileroff(i));
           }
           for (std::size_t j=i+1; j<rb; j++) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+/* #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
             std::size_t ij = i+rb*j;
 #pragma omp task default(shared) firstprivate(i,j,ii,ij)        \
   depend(in:B[ii]) depend(inout:B[ij])
-#endif
+#endif */
             { // these blocks have received all updates, compress now
               if (admissible(i, j)) create_LR_tile(i, j, A, opts);
               else create_dense_tile(i, j, A);
@@ -121,11 +124,11 @@ namespace strumpack {
               trsm(Side::L, UpLo::L, Trans::N, Diag::U,
                    scalar_t(1.), tile(i, i), tile(i, j));
             }
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+/* #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
             std::size_t ji = j+rb*i;
 #pragma omp task default(shared) firstprivate(i,j,ji,ii)        \
   depend(in:B[ii]) depend(inout:B[ji])
-#endif
+#endif */
             {
               if (admissible(j, i)) create_LR_tile(j, i, A, opts);
               else create_dense_tile(j, i, A);
@@ -136,11 +139,11 @@ namespace strumpack {
           }
           for (std::size_t j=i+1; j<rb; j++)
             for (std::size_t k=i+1; k<rb; k++) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+/* #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
               std::size_t ij = i+rb*j, ki = k+rb*i, kj = k+rb*j;
 #pragma omp task default(shared) firstprivate(i,j,k,ij,ki,kj)   \
   depend(in:B[ij],B[ki]) depend(inout:B[kj])
-#endif
+#endif */
               { // Schur complement updates, always into full rank
                 DenseMW_t Akj = tile(A, k, j);
                 gemm(Trans::N, Trans::N, scalar_t(-1.),
@@ -148,85 +151,104 @@ namespace strumpack {
               }
             }
         }
+#else // LL-version
+      //FACTOR
+        for (std::size_t i=0; i<rb; i++) {
+/* #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+          std::size_t ii = i+rb*i;
+#pragma omp task default(shared) firstprivate(i,ii) depend(inout:B[ii])
+#endif */
+          {
+            create_dense_tile(i, i, A);
+            auto tpiv = tile(i, i).LU();
+            std::copy(tpiv.begin(), tpiv.end(), piv.begin()+tileroff(i));
+          }
+          //COMPRESS and SOLVE
+          for (std::size_t j=i+1; j<rb; j++) {
+/* #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+            std::size_t ij = i+rb*j;
+#pragma omp task default(shared) firstprivate(i,j,ij,ii)  \
+  depend(in:B[ii]) depend(inout:B[ij]) priority(rb-j)
+#endif */
+            { // these blocks have received all updates, compress now
+              if (admissible(i, j)) create_LR_tile(i, j, A, opts);
+              else create_dense_tile(i, j, A);
+              // permute and solve with L, blocks right from the diagonal block
+              std::vector<int> tpiv
+                (piv.begin()+tileroff(i), piv.begin()+tileroff(i+1));
+              tile(i, j).laswp(tpiv, true);
+              trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                   scalar_t(1.), tile(i, i), tile(i, j));
+            }
+/* #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+            std::size_t ji = j+rb*i;
+#pragma omp task default(shared) firstprivate(i,j,ji,ii)        \
+  depend(in:B[ii]) depend(inout:B[ji]) priority(rb-j)
+#endif */
+            {
+              if (admissible(j, i)) create_LR_tile(j, i, A, opts);
+              else create_dense_tile(j, i, A);
+              // solve with U, the blocks under the diagonal block
+              trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+                   scalar_t(1.), tile(i, i), tile(j, i));
+            }
+          }
+#if 0 //LL-Update
+          for (std::size_t j=i+1; j<rb; j++){
+            for (std::size_t k=0; k<i+1; k++) {
+/* #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+              std::size_t ij = (i+1)+rb*j, ik = (i+1)+rb*k, kj = k+rb*j;
+#pragma omp task default(shared) firstprivate(i,j,k,ij,ik,kj)   \
+  depend(in:B[ik],B[kj]) depend(inout:B[ij]) priority(rb-j)
+#endif  */
+              { // Schur complement updates, always into full rank
+                auto Aij = tile(A, i+1, j);
+                gemm(Trans::N, Trans::N, scalar_t(-1.),
+                     tile(i+1, k), tile(k, j), scalar_t(1.), Aij);
+              }
+              if(j!=i+1){
+/*#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+              std::size_t ji = j+rb*(i+1), jk = j+rb*k, ki = k+rb*(i+1);
+#pragma omp task default(shared) firstprivate(i,j,k,ji,jk,ki)   \
+  depend(in:B[jk],B[ki]) depend(inout:B[ji]) priority(rb-j)
+#endif */
+                { // Schur complement updates, always into full rank
+                  auto Aji = tile(A, j, i+1);
+                  gemm(Trans::N, Trans::N, scalar_t(-1.),
+                      tile(j, k), tile(k, i+1), scalar_t(1.), Aji);
+                }
+              }
+            }
+          }
+#else //LUAR-Update
+          for (std::size_t j=i+1; j<rb; j++){
+/*#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+              std::size_t ij = (i+1)+rb*j;
+#pragma omp task default(shared) firstprivate(i,j,ij)   \
+  depend(inout:B[ij]) priority(rb-j)
+#endif*/
+          {
+            this->LUAR_B11(i+1, j, i+1, A, opts, B);
+          }
+            if(j!=i+1){
+/*#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+              std::size_t ji = j+rb*(i+1);
+#pragma omp task default(shared) firstprivate(i,j,ji)   \
+  depend(inout:B[ji]) priority(rb-j)
+#endif*/
+          {
+              this->LUAR_B11(j, i+1, i+1, A, opts, B);
+          }
+            }
+        }
+#endif
+        }
+#endif
       }
       for (std::size_t i=0; i<rowblocks(); i++)
         for (std::size_t l=tileroff(i); l<tileroff(i+1); l++)
           piv[l] += tileroff(i);
     }
-
-/*    template<typename scalar_t> BLRMatrix<scalar_t>::BLRMatrix
-    (DenseM_t &A11, BLRMatrix<scalar_t>& B11, const Opts_t& opts)
-      : BLRMatrix<scalar_t>(A11.rows(), A11.cols()){
-        B11 = BLRMatrix<scalar_t>(A11.rows(), A11.cols());
-        piv.resize(B11.rows());
-        auto rb = B11.rowblocks();
-        auto rb2 = B21.rowblocks();
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-      auto lrb = rb+rb2;
-      // dummy for task synchronization
-      std::unique_ptr<int[]> B_(new int[lrb*lrb]()); auto B = B_.get();
-#pragma omp taskgroup
-#else
-      int* B=nullptr; 
-#endif
-
-// RL-version
-        for (std::size_t i=0; i<rb; i++) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-          std::size_t ii = i+lrb*i;
-#pragma omp task default(shared) firstprivate(i,ii) depend(inout:B[ii])
-#endif
-          {
-            B11.create_dense_tile(i, i, A11);
-            auto tpiv = B11.tile(i, i).LU();
-            std::copy(tpiv.begin(), tpiv.end(), piv.begin()+B11.tileroff(i));
-          }
-          for (std::size_t j=i+1; j<rb; j++) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-            std::size_t ij = i+lrb*j;
-#pragma omp task default(shared) firstprivate(i,j,ij,ii)  \
-  depend(in:B[ii]) depend(inout:B[ij]) priority(rb-j)
-#endif
-            { // these blocks have received all updates, compress now
-              if (admissible(i, j)) B11.create_LR_tile(i, j, A11, opts);
-              else B11.create_dense_tile(i, j, A11);
-              // permute and solve with L, blocks right from the diagonal block
-              std::vector<int> tpiv
-                (piv.begin()+B11.tileroff(i), piv.begin()+B11.tileroff(i+1));
-              B11.tile(i, j).laswp(tpiv, true);
-              trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-                   scalar_t(1.), B11.tile(i, i), B11.tile(i, j));
-            }
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-            std::size_t ji = j+lrb*i;
-#pragma omp task default(shared) firstprivate(i,j,ji,ii)        \
-  depend(in:B[ii]) depend(inout:B[ji]) priority(rb-j)
-#endif
-            {
-              if (admissible(j, i)) B11.create_LR_tile(j, i, A11, opts);
-              else B11.create_dense_tile(j, i, A11);
-              // solve with U, the blocks under the diagonal block
-              trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-                   scalar_t(1.), B11.tile(i, i), B11.tile(j, i));
-            }
-          }
-          
-          for (std::size_t j=i+1; j<rb; j++)
-            for (std::size_t k=i+1; k<rb; k++) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t ij = i+lrb*j, ki = k+lrb*i, kj = k+lrb*j;
-#pragma omp task default(shared) firstprivate(i,j,k,ij,ki,kj)   \
-  depend(in:B[ij],B[ki]) depend(inout:B[kj]) priority(rb-j)
-#endif
-              { // Schur complement updates, always into full rank
-                auto Akj = B11.tile(A11, k, j);
-                gemm(Trans::N, Trans::N, scalar_t(-1.),
-                     B11.tile(k, i), B11.tile(i, j), scalar_t(1.), Akj);
-              }
-            }
-        }
-      A11.clear();
-    }*/
 
     
     // private constructor
@@ -245,11 +267,6 @@ namespace strumpack {
       assert(roff_[nbrows_] == m_);
       assert(coff_[nbcols_] == n_);
       blocks_.resize(nbrows_ * nbcols_);
-    }
-
-    template<typename scalar_t> BLRMatrix<scalar_t>::BLRMatrix
-    (std::size_t m, std::size_t n)
-      : m_(m), n_(n) {
     }
 
     template<typename scalar_t> std::size_t
@@ -919,7 +936,7 @@ namespace strumpack {
     BLRMatrix<scalar_t>::LUAR_B11
     (std::size_t i, std::size_t j,
      std::size_t kmax, DenseMatrix<scalar_t>&A11, const BLROptions<scalar_t>& opts, int* B){
-#if 1
+#if 0
 //Star Tree
       std::size_t rank_sum=0;
       auto Aij = tile(A11, i, j);
@@ -945,7 +962,7 @@ namespace strumpack {
           } 
         }
 #if 0
-        //Recompress Uall only
+        //Recompress Uall and Vall
         DenseMatrix<scalar_t> UU, UV;
         Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
         DenseMatrix<scalar_t> VU, VV;
@@ -999,7 +1016,7 @@ namespace strumpack {
             Uall.copy_topos(t.U(),0,rank_tmp);
             Vall.copy_topos(t.V(),rank_tmp,0);
             if (ranks_idx.size()>2){
-#if 1
+#if 0
               //Recompress Uall and Vall
               DenseMatrix<scalar_t> UU, UV;
               Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);

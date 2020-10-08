@@ -30,8 +30,10 @@
 #include <random>
 using namespace std;
 
-#include "dense/DenseMatrix.hpp"
-#include "BLR/BLRMatrix.hpp"
+#include "../src/dense/DenseMatrix.hpp"
+#include "../src/BLR/BLRMatrix.hpp"
+#include "../src/HSS/HSSPartitionTree.hpp"
+#include "../src/misc/TaskTimer.hpp"
 using namespace strumpack;
 using namespace strumpack::BLR;
 
@@ -126,39 +128,43 @@ int run(int argc, char* argv[]) {
   cout << "# tol = " << blr_opts.rel_tol() << endl;
 
   // define a partition tree for the BLR matrix
-  HSS::HSSPartitionTree t(N);
-  t.refine(blr_opts.leaf_size());
-  auto tiles=t.leaf_sizes();
-  
-  BLRMatrix<double> B(A, blr_opts);
-  if (B.is_compressed()) {
-     cout << "# created B matrix of dimension "
-          << B.rows() << " x " << B.cols()
-          << " with " << B.levels() << " levels" << endl;
-     cout << "# compression succeeded!" << endl;
-  } else {
-     cout << "# compression failed!!!!!!!!" << endl;
-     return 1;
-  }
+  HSS::HSSPartitionTree tree(m);
+  tree.refine(blr_opts.leaf_size());
+  auto tiles=tree.template leaf_sizes<std::size_t>();
+  //ADMISSIBILITY -- weak
+  std::size_t nt = tiles.size();
+  DenseMatrix<bool> adm(nt, nt);
+  adm.fill(true);
+  for (std::size_t t=0; t<nt; t++)
+    adm(t, t) = false;
+  std::vector<int> piv;
+  long long int f0 = 0, ftot = 0;
+  #if defined(STRUMPACK_COUNT_FLOPS)
+    std::cout << "flop_counter_start" << std::endl;
+    f0 = params::flops;
+    std::cout << "# start flops       = " << double(f0) << double(params::flops) << std::endl;
+  #endif
+  TaskTimer t3("Compression");
+  t3.start();
+  BLRMatrix<double> B(A, tiles, adm, piv, blr_opts);
+  t3.stop();
+  #if defined(STRUMPACK_COUNT_FLOPS)
+    std::cout << "flop_counter_stop" << std::endl;
+    ftot = params::flops - f0;
+    std::cout << "# stop flops       = " << double(params::flops) << std::endl;
+  #endif
+  cout << "# created BLR matrix of dimension "
+          << B.rows() << " x " << B.cols() << endl;
+  cout << "# compression succeeded!" << endl;
   cout << "# rank(B) = " << B.maximum_rank() << endl;
   cout << "# memory(B) = " << B.memory()/1e6 << " MB, "
         << 100. * B.memory() / A.memory() << "% of dense" << endl;
-
-  // // H.print_info();
-  // auto Bdense = B.dense();
-  // Bdense.scaled_add(-1., A);
-  // cout << "# relative error = ||A-B*I||_F/||A||_F = "
-  //      << Bdense.normF() / A.normF() << endl;
-  // cout << "# absolute error = ||A-B*I||_F = " << Bdense.normF() << endl;
-  // if (Bdense.normF() / A.normF() > ERROR_TOLERANCE
-  //     * max(blr_opts.rel_tol(),blr_opts.abs_tol())) {
-  //   cout << "ERROR: compression error too big!!" << endl;
-  //   return 1;
-  // }
-
-  // cout << "# computing LU factorization .. ";
-  // B.factor();
-  // cout << " done!" << endl;
+  #if defined(STRUMPACK_COUNT_FLOPS)
+    std::cout << "# flops       = " << double(ftot) << std::endl;
+    std::cout << "# time = " << t3.elapsed() << std::endl;
+    std::cout << "# flop rate = " << ftot / t3.elapsed() / 1e9
+                  << " GFlop/s" << std::endl;
+  #endif
 
   cout << "# exiting" << endl;
   return 0;
