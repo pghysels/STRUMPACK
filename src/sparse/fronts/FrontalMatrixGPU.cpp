@@ -55,6 +55,12 @@ namespace strumpack {
   template<typename scalar_t>
   GPUFactors<scalar_t>::~GPUFactors() = default;
 
+  // explicit template specialization
+  template class GPUFactors<float>;
+  template class GPUFactors<double>;
+  template class GPUFactors<std::complex<float>>;
+  template class GPUFactors<std::complex<double>>;
+
 
   uintptr_t round_to_8(uintptr_t p) { return (p + 7) & ~7; }
   uintptr_t round_to_8(void* p) {
