@@ -151,7 +151,7 @@ namespace strumpack {
        {"sp_enable_gpu",                no_argument, 0, 36},
        {"sp_disable_gpu",               no_argument, 0, 37},
        {"sp_gpu_streams",               required_argument, 0, 38},
-       {"sp_lossy_precision",           required_argument, 0, 49},
+       {"sp_lossy_precision",           required_argument, 0, 39},
        {"sp_verbose",                   no_argument, 0, 'v'},
        {"sp_quiet",                     no_argument, 0, 'q'},
        {"help",                         no_argument, 0, 'h'},
