@@ -35,6 +35,7 @@
 #include "dense/DenseMatrix.hpp"
 #include "CompressedSparseMatrix.hpp"
 #include "fronts/FrontFactory.hpp"
+#include "fronts/FrontalMatrix.hpp"
 #include "StrumpackOptions.hpp"
 #include "SeparatorTree.hpp"
 
@@ -59,9 +60,14 @@ namespace strumpack {
 
     virtual void multifrontal_factorization
     (const SpMat_t& A, const SPOptions<scalar_t>& opts);
+
+    virtual void move_to_gpu();
+    virtual void remove_from_gpu();
+
     virtual void multifrontal_solve(DenseM_t& x) const;
     virtual void multifrontal_solve_dist
     (DenseM_t& x, const std::vector<integer_t>& dist) {} // TODO const
+
     virtual integer_t maximum_rank() const;
     virtual long long factor_nonzeros() const;
     virtual long long dense_factor_nonzeros() const;
@@ -73,18 +79,21 @@ namespace strumpack {
   protected:
     FrontCounter nr_fronts_;
     std::unique_ptr<F_t> root_;
+    std::unique_ptr<GPUFactors<scalar_t>> gpu_factors_;
 
   private:
-    std::unique_ptr<F_t> setup_tree
-    (const SPOptions<scalar_t>& opts, const SpMat_t& A,
-     SeparatorTree<integer_t>& sep_tree,
-     std::vector<std::vector<integer_t>>& upd, integer_t sep,
-     bool hss_parent, int level);
+    std::unique_ptr<F_t>
+    setup_tree(const SPOptions<scalar_t>& opts, const SpMat_t& A,
+               SeparatorTree<integer_t>& sep_tree,
+               std::vector<std::vector<integer_t>>& upd, integer_t sep,
+               bool hss_parent, int level);
 
-    void symbolic_factorization
-    (const SpMat_t& A, const SeparatorTree<integer_t>& sep_tree,
-     integer_t sep, std::vector<std::vector<integer_t>>& upd,
-     int depth=0) const;
+    void
+    symbolic_factorization(const SpMat_t& A,
+                           const SeparatorTree<integer_t>& sep_tree,
+                           integer_t sep,
+                           std::vector<std::vector<integer_t>>& upd,
+                           int depth=0) const;
   };
 
 } // end namespace strumpack

@@ -85,7 +85,10 @@ int main(int argc, char* argv[]) {
   spss.set_matrix(A);
   spss.reorder(n, n, n);
   spss.factor();
+
+  // spss.move_to_gpu();
   spss.solve(b, x);
+  // spss.remove_from_gpu();
 
   std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
             << A.max_scaled_residual(x.data(), b.data()) << std::endl;

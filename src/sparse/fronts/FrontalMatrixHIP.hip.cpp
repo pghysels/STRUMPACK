@@ -254,6 +254,7 @@ namespace strumpack {
       // copy F from global device storage into shared memory
       if (i < n && j < n)
         M[i+j*NT] = F[i+j*n];
+        __syncthreads();
 
       for (int k=0; k<n; k++) {
         // only 1 thread looks for the pivot element
@@ -304,21 +305,18 @@ namespace strumpack {
 #endif
         __syncthreads();
         // swap row k with the pivot row
-        if (j < n && i == k && p != k)
-          //if (i == k && p != k)
-          for (int l=0; l<n; l++) {
-            auto tmp = M[k+l*NT];
-            M[k+l*NT] = M[p+l*NT];
-            M[p+l*NT] = tmp;
-          }
+        if (j < n && i == k && p != k) {
+          auto tmp = M[k+j*NT];
+          M[k+j*NT] = M[p+j*NT];
+          M[p+j*NT] = tmp;
+        }
         __syncthreads();
         // divide by the pivot element
         if (j == k && i > k && i < n)
-          M[i+k*NT] /= Mmax;
+          M[i+k*NT] /= M[k+k*NT];
         __syncthreads();
         // Schur update
         if (j > k && i > k && j < n && i < n)
-          //if (j > k && i > k)
           M[i+j*NT] -= M[i+k*NT] * M[k+j*NT];
         __syncthreads();
       }

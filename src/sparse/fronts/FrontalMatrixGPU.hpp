@@ -48,24 +48,6 @@ namespace strumpack {
     template<typename scalar_t> struct FwdSolveData;
   }
 
-  template<typename scalar_t> class GPUFactors {
-  public:
-    bool allocated = false;
-    gpu::DeviceMemory<scalar_t> dL, dU;
-    gpu::DeviceMemory<int> dP;
-    std::vector<scalar_t*> dL_lvl, dU_lvl;
-    std::vector<int*> dP_lvl;
-
-    GPUFactors(int lvls) : dL_lvl(lvls), dU_lvl(lvls), dP_lvl(lvls) {}
-    void clear() {
-      dL.release();
-      dU.release();
-      dP.release();
-      dL_lvl.clear();
-      dU_lvl.clear();
-      dP_lvl.clear();
-    }
-  };
 
   template<typename scalar_t,typename integer_t> class FrontalMatrixGPU
     : public FrontalMatrix<scalar_t,integer_t> {
@@ -77,43 +59,45 @@ namespace strumpack {
     using LInfo_t = LevelInfo<scalar_t,integer_t>;
 
   public:
-    FrontalMatrixGPU
-    (integer_t sep, integer_t sep_begin, integer_t sep_end,
-     std::vector<integer_t>& upd);
+    FrontalMatrixGPU(integer_t sep, integer_t sep_begin, integer_t sep_end,
+                     std::vector<integer_t>& upd);
     ~FrontalMatrixGPU();
 
     void release_work_memory() override;
 
-    void extend_add_to_dense
-    (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
-     const F_t* p, int task_depth) override;
+    void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
+                             DenseM_t& paF21, DenseM_t& paF22,
+                             const F_t* p, int task_depth) override;
 
-    void multifrontal_factorization
-    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
-     int etree_level=0, int task_depth=0) override;
+    void multifrontal_factorization(const SpMat_t& A,
+                                    const SPOptions<scalar_t>& opts,
+                                    int etree_level=0,
+                                    int task_depth=0) override;
 
-    // void move_factors_to_gpu() const override;
-    // void remove_factors_from_gpu() const override;
+    std::unique_ptr<GPUFactors<scalar_t>> move_to_gpu() const override;
 
-    // void multifrontal_solve(DenseM_t& b) const override;
+    void multifrontal_solve(DenseM_t& b,
+                            const GPUFactors<scalar_t>* gpu_factors)
+      const override;
 
-    void forward_multifrontal_solve
-    (DenseM_t& b, DenseM_t* work, int etree_level=0,
-     int task_depth=0) const override;
-    void backward_multifrontal_solve
-    (DenseM_t& y, DenseM_t* work, int etree_level=0,
-     int task_depth=0) const override;
+    void forward_multifrontal_solve(DenseM_t& b, DenseM_t* work,
+                                    int etree_level=0, int task_depth=0)
+      const override;
+    void backward_multifrontal_solve(DenseM_t& y, DenseM_t* work,
+                                     int etree_level=0, int task_depth=0)
+      const override;
 
-    void extract_CB_sub_matrix
-    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-     DenseM_t& B, int task_depth) const override {}
+    void extract_CB_sub_matrix(const std::vector<std::size_t>& I,
+                               const std::vector<std::size_t>& J,
+                               DenseM_t& B, int task_depth) const override {}
 
     std::string type() const override { return "FrontalMatrixGPU"; }
 
 #if defined(STRUMPACK_USE_MPI)
-    void extend_add_copy_to_buffers
-    (std::vector<std::vector<scalar_t>>& sbuf,
-     const FrontalMatrixMPI<scalar_t,integer_t>* pa) const override;
+    void
+    extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
+                               const FrontalMatrixMPI<scalar_t,integer_t>* pa)
+      const override;
 #endif
 
   private:
@@ -150,6 +134,8 @@ namespace strumpack {
                      scalar_t* old_dyupd, char* dea_mem, char* hea_mem,
                      std::size_t mem_size) const;
 
+    void fwd_solve_gpu(DenseM_t& b, DenseM_t* work,
+                       const GPUFactors<scalar_t>* gpu_factors) const;
     void fwd_small_fronts(int nrhs, LInfo_t& L,
                           gpu::FrontData<scalar_t>* fdata,
                           gpu::FrontData<scalar_t>* dfdata,
@@ -162,6 +148,8 @@ namespace strumpack {
       const;
 
 
+    void bwd_solve_gpu(DenseM_t& y, DenseM_t* work,
+                       const GPUFactors<scalar_t>* gpu_factors) const;
     void bwd_small_fronts(int nrhs, LInfo_t& L,
                           gpu::FrontData<scalar_t>* fdata,
                           gpu::FrontData<scalar_t>* dfdata,

@@ -102,6 +102,18 @@ namespace strumpack {
     std::set_new_handler(old_handler_);
   }
 
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolverBase<scalar_t,integer_t>::move_to_gpu() {
+    TaskTimer t("move_to_gpu", [&](){ tree()->move_to_gpu(); });
+    if (opts_.verbose() && is_root_)
+      std::cout << "#   - move_to_gpu time = " << t.elapsed()
+                << std::endl;
+  }
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolverBase<scalar_t,integer_t>::remove_from_gpu() {
+    tree()->remove_from_gpu();
+  }
+
   template<typename scalar_t,typename integer_t> SPOptions<scalar_t>&
   StrumpackSparseSolverBase<scalar_t,integer_t>::options() {
     return opts_;
