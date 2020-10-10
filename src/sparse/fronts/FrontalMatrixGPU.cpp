@@ -607,8 +607,12 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::multifrontal_solve
   (DenseM_t& b, const GPUFactors<scalar_t>* gpu_factors) const {
+#if 0
     fwd_solve_gpu(b, nullptr, gpu_factors);
     bwd_solve_gpu(b, nullptr, gpu_factors);
+#else
+    FrontalMatrix<scalar_t,integer_t>::multifrontal_solve(b);
+#endif
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -746,7 +750,7 @@ namespace strumpack {
     }
   }
 
-#if 1
+#if 0
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::forward_multifrontal_solve
   (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const {
@@ -1011,7 +1015,7 @@ namespace strumpack {
     }
   }
 
-#if 1
+#if 0
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::backward_multifrontal_solve
   (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const {
