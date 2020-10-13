@@ -1,3 +1,13 @@
+Version 5.0.0 Release October .., 2020
+======================================
+- Added distributed memory BLR-based preconditioner. For many
+  problems, this is much more robust than the HSS or HODLR/HODBF
+  preconditioners.
+- Several bugfixes in the GPU code.
+- Added HIP support (for the direct solver).
+- Other bugfixes.
+
+
 Version 4.0.0 Released August 17, 2020
 ======================================
  - The CMake build system has been overhauled completely, now using
