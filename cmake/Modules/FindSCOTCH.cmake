@@ -240,8 +240,10 @@ if( SCOTCH_LIBRARIES )
   set( CMAKE_REQUIRED_QUIET ON )
 
   include( CheckLibraryExists )
-  check_library_exists( "" threadReduce "" 
-                        SCOTCH_USES_PTHREADS )
+  #  check_library_exists( "" threadReduce ""
+  #    SCOTCH_USES_PTHREADS )
+  check_library_exists( "" pthread_create ""
+    SCOTCH_USES_PTHREADS )
 
   cmake_pop_check_state()
 
