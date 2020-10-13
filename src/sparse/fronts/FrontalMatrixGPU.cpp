@@ -491,7 +491,6 @@ namespace strumpack {
     std::size_t max_small_fronts = 0;
     for (int l=lvls-1; l>=0; l--) {
       std::vector<F_t*> fp;
-      fp.reserve(std::pow(2, l));
       this->get_level_fronts(fp, l);
       auto& L = ldata[l];
       L = LInfo_t(fp, solver_handles[0], max_streams);
@@ -573,7 +572,6 @@ namespace strumpack {
     std::size_t Lsize = 0, Usize = 0, Psize = 0;
     for (int l=lvls-1; l>=0; l--) {
       std::vector<F_t*> fp;
-      fp.reserve(std::pow(2, l));
       const_cast<FG_t*>(this)->get_level_fronts(fp, l);
       auto& L = ldata[l];
       L = LInfo_t(fp, solver_handles[0], 1);
@@ -788,7 +786,6 @@ namespace strumpack {
     std::size_t max_small_fronts = 0, maxLb = 0, maxupd = 0, maxpiv = 0;
     for (int l=lvls-1; l>=0; l--) {
       std::vector<F_t*> fp;
-      fp.reserve(std::pow(2, l));
       const_cast<FG_t*>(this)->get_level_fronts(fp, l);
       auto& L = ldata[l];
       L = LInfo_t(fp, solver_handles[0], max_streams);
@@ -1053,7 +1050,6 @@ namespace strumpack {
     std::size_t max_small_fronts = 0, maxUy = 0, maxupd = 0;
     for (int l=lvls-1; l>=0; l--) {
       std::vector<F_t*> fp;
-      fp.reserve(std::pow(2, l));
       const_cast<FG_t*>(this)->get_level_fronts(fp, l);
       auto& L = ldata[l];
       L = LInfo_t(fp, solver_handles[0], max_streams);
