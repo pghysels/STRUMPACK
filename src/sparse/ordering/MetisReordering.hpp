@@ -206,13 +206,17 @@ namespace strumpack {
         std::cerr << "# WARNING: matrix seems to be diagonal!" << std::endl;
     int ierr;
     std::unique_ptr<SeparatorTree<integer_t>> sep_tree;
+    // idx_t options[METIS_NOPTIONS];
+    // METIS_SetDefaultOptions(options);
+    // options[METIS_OPTION_SEED] = 42;
     if (opts.use_METIS_NodeNDP()) {
       integer_t nodes =
         std::max(integer_t(3), ( n / opts.nd_param() ) / 2 * 2 + 1);
       integer_t separators = nodes / 2;
       std::vector<idx_t> sizes(nodes + 1);
       ierr = WRAPPER_METIS_NodeNDP
-        (xadj, adjncy, nullptr, separators + 1, nullptr, iperm, perm, sizes);
+        (xadj, adjncy, nullptr, separators + 1,
+         /*options*/ nullptr, iperm, perm, sizes);
 #if defined(STRUMPACK_USE_MPI)
       if (opts.use_MUMPS_SYMQAMD())
         sep_tree = aggressive_amalgamation(n, ptr, ind, perm, iperm, opts);
@@ -220,7 +224,8 @@ namespace strumpack {
 #endif
         sep_tree = sep_tree_from_metis_sizes(nodes, separators, sizes);
     } else {
-      ierr = WRAPPER_METIS_NodeND(xadj, adjncy, nullptr, nullptr, iperm, perm);
+      ierr = WRAPPER_METIS_NodeND
+        (xadj, adjncy, nullptr, /*options*/ nullptr, iperm, perm);
 #if defined(STRUMPACK_USE_MPI)
       if (opts.use_MUMPS_SYMQAMD())
         sep_tree = aggressive_amalgamation(n, ptr, ind, perm, iperm, opts);
