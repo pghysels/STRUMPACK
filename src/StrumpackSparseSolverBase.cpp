@@ -510,6 +510,9 @@ namespace strumpack {
       ReturnCode ierr = reorder();
       if (ierr != ReturnCode::SUCCESS) return ierr;
     }
+    using real_t = typename RealType<scalar_t>::value_type;
+    opts_.set_pivot_threshold
+      (std::sqrt(blas::lamch<real_t>('E')) * matrix()->norm1());
     float dfnnz = 0.;
     if (opts_.verbose()) {
       dfnnz = dense_factor_nonzeros();
@@ -517,6 +520,11 @@ namespace strumpack {
         std::cout << "# multifrontal factorization:" << std::endl;
         std::cout << "#   - estimated memory usage (exact solver) = "
                   << dfnnz * sizeof(scalar_t) / 1.e6 << " MB" << std::endl;
+        std::cout << "#   - minimum pivot, sqrt(eps)*|A|_1 = "
+                  << opts_.pivot_threshold() << std::endl;
+        std::cout << "#   - replacing of small pivots is "
+                  << (opts_.replace_tiny_pivots() ? "" : "not")
+                  << "enabled" << std::endl;
       }
     }
     perf_counters_start();

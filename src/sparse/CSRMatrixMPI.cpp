@@ -213,6 +213,21 @@ namespace strumpack {
     check();
   }
 
+  template<typename scalar_t,typename integer_t>
+  typename RealType<scalar_t>::value_type
+  CSRMatrixMPI<scalar_t,integer_t>::norm1() const {
+    std::vector<real_t> n1(n_);
+    for (integer_t i=0; i<lrows_; i++)
+      for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
+        n1[ind_[j]] += std::abs(val_[j]);
+    comm_.reduce(n1.data(), n1.size(), MPI_SUM);
+    real_t nrm1 = 0;
+    if (comm_.is_root())
+      nrm1 = *std::max_element(n1.begin(), n1.end());
+    comm_.broadcast(nrm1);
+    return nrm1;
+  }
+
   template<typename scalar_t,typename integer_t> void
   CSRMatrixMPI<scalar_t,integer_t>::print() const {
     int P = comm_.size();

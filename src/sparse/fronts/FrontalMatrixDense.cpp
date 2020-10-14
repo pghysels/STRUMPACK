@@ -145,10 +145,7 @@ namespace strumpack {
       // if (etree_level == 0 && opts.print_root_front_stats()) t.start();
       int info = F11_.LU(piv, task_depth);
       if (info || opts.replace_tiny_pivots()) {
-        // TODO consider other values for thresh
-        //  - sqrt(eps)*|A|_1 as in SuperLU ?
-        using real_t = typename RealType<scalar_t>::value_type;
-        auto thresh = std::sqrt(blas::lamch<real_t>('E')) * A.size();
+        auto thresh = opts.pivot_threshold();
         for (std::size_t i=0; i<F11_.rows(); i++)
           if (std::abs(F11_(i,i)) < thresh)
             F11_(i,i) = (std::real(F11_(i,i)) < 0) ? -thresh : thresh;

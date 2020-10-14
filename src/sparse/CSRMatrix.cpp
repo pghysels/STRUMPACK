@@ -53,6 +53,15 @@ namespace strumpack {
   CSRMatrix<scalar_t,integer_t>::CSRMatrix
   (integer_t n, integer_t nnz) : CSM_t(n, nnz) {}
 
+  template<typename scalar_t,typename integer_t>
+  typename RealType<scalar_t>::value_type
+  CSRMatrix<scalar_t,integer_t>::norm1() const {
+    std::vector<real_t> n1(n_);
+    for (integer_t i=0; i<n_; i++)
+      for (integer_t j=ptr_[i]; j<ptr_[i+1]; j++)
+        n1[ind_[j]] += std::abs(val_[j]);
+    return *std::max_element(n1.begin(), n1.end());
+  }
 
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::print_dense(const std::string& name) const {

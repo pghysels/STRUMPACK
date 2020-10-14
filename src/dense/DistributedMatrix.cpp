@@ -866,6 +866,15 @@ namespace strumpack {
     return ipiv;
   }
 
+  template<typename scalar_t> int
+  DistributedMatrix<scalar_t>::LU(std::vector<int>& piv) {
+    if (!active()) return 0;
+    STRUMPACK_FLOPS(LU_flops(*this));
+    piv.resize(lrows()+MB());
+    return scalapack::pgetrf
+      (rows(), cols(), data(), I(), J(), desc(), piv.data());
+  }
+
   // Solve a system of linear equations with B as right hand side.
   // assumption: the current matrix should have been factored using LU.
   template<typename scalar_t> DistributedMatrix<scalar_t>

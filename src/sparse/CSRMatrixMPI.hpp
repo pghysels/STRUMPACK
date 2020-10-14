@@ -103,6 +103,8 @@ namespace strumpack {
       return dist_[p];
     }
 
+    real_t norm1() const override;
+
     void spmv(const DenseM_t& x, DenseM_t& y) const override;
     void spmv(const scalar_t* x, scalar_t* y) const override;
 

@@ -135,53 +135,51 @@ namespace strumpack {
       return rowg2p(r) == prow() && colg2p(c) == pcol();
     }
 
-    inline bool fixed() const { return MB()==default_MB && NB()==default_NB; }
-    inline int rowl2g_fixed(int row) const {
+    bool fixed() const { return MB()==default_MB && NB()==default_NB; }
+    int rowl2g_fixed(int row) const {
       assert(grid() && fixed());
       return indxl2g(row+1, default_MB, prow(), 0, nprows()) - I(); }
-    inline int coll2g_fixed(int col) const {
+    int coll2g_fixed(int col) const {
       assert(grid() && fixed());
       return indxl2g(col+1, default_NB, pcol(), 0, npcols()) - J(); }
-    inline int rowg2l_fixed(int row) const {
+    int rowg2l_fixed(int row) const {
       assert(grid() && fixed());
       return indxg2l(row+I(), default_MB, prow(), 0, nprows()) - 1; }
-    inline int colg2l_fixed(int col) const {
+    int colg2l_fixed(int col) const {
       assert(grid() && fixed());
       return indxg2l(col+J(), default_NB, pcol(), 0, npcols()) - 1; }
-    inline int rowg2p_fixed(int row) const {
+    int rowg2p_fixed(int row) const {
       assert(grid() && fixed());
       return indxg2p(row+I(), default_MB, prow(), 0, nprows()); }
-    inline int colg2p_fixed(int col) const {
+    int colg2p_fixed(int col) const {
       assert(grid() && fixed());
       return indxg2p(col+J(), default_NB, pcol(), 0, npcols()); }
-    inline int rank_fixed(int r, int c) const {
+    int rank_fixed(int r, int c) const {
       assert(grid() && fixed()); return rowg2p_fixed(r) + colg2p_fixed(c) * nprows(); }
-    inline bool is_local_fixed(int r, int c) const {
+    bool is_local_fixed(int r, int c) const {
       assert(grid() && fixed());
       return rowg2p_fixed(r) == prow() && colg2p_fixed(c) == pcol(); }
 
     // TODO fixed versions??
-    inline const scalar_t& global(int r, int c) const
+    const scalar_t& global(int r, int c) const
     { assert(is_local(r, c)); return operator()(rowg2l(r),colg2l(c)); }
-    inline scalar_t& global(int r, int c)
+    scalar_t& global(int r, int c)
     { assert(is_local(r, c)); return operator()(rowg2l(r),colg2l(c)); }
-    inline scalar_t& global_fixed(int r, int c) {
+    scalar_t& global_fixed(int r, int c) {
       assert(is_local(r, c)); assert(fixed());
       return operator()(rowg2l_fixed(r),colg2l_fixed(c)); }
-    inline void global(int r, int c, scalar_t v) {
+    void global(int r, int c, scalar_t v) {
       if (active() && is_local(r, c)) operator()(rowg2l(r),colg2l(c)) = v;  }
     scalar_t all_global(int r, int c) const;
 
     void print() const { print("A"); }
     void print(std::string name, int precision=15) const;
-    void print_to_file
-    (std::string name, std::string filename, int width=8) const;
-    void print_to_files
-    (std::string name, int precision=16) const;
+    void print_to_file(std::string name, std::string filename,
+                       int width=8) const;
+    void print_to_files(std::string name, int precision=16) const;
     void random();
-    void random
-    (random::RandomGeneratorBase<typename RealType<scalar_t>::
-     value_type>& rgen);
+    void random(random::RandomGeneratorBase<typename RealType<scalar_t>::
+                value_type>& rgen);
     void zero();
     void fill(scalar_t a);
     void eye();
@@ -197,16 +195,19 @@ namespace strumpack {
     extract_rows(const std::vector<std::size_t>& Ir) const;
     DistributedMatrix<scalar_t>
     extract_cols(const std::vector<std::size_t>& Ic) const;
-    DistributedMatrix<scalar_t> extract
-    (const std::vector<std::size_t>& I,
-     const std::vector<std::size_t>& J) const;
+
+    DistributedMatrix<scalar_t>
+    extract(const std::vector<std::size_t>& I,
+            const std::vector<std::size_t>& J) const;
     DistributedMatrix<scalar_t>& add(const DistributedMatrix<scalar_t>& B);
-    DistributedMatrix<scalar_t>& scaled_add
-    (scalar_t alpha, const DistributedMatrix<scalar_t>& B);
-    typename RealType<scalar_t>::value_type norm() const;
-    typename RealType<scalar_t>::value_type normF() const;
-    typename RealType<scalar_t>::value_type norm1() const;
-    typename RealType<scalar_t>::value_type normI() const;
+    DistributedMatrix<scalar_t>&
+    scaled_add(scalar_t alpha, const DistributedMatrix<scalar_t>& B);
+
+    real_t norm() const;
+    real_t normF() const;
+    real_t norm1() const;
+    real_t normI() const;
+
     virtual std::size_t memory() const
     { return sizeof(scalar_t)*std::size_t(lrows())*std::size_t(lcols()); }
     virtual std::size_t total_memory() const
@@ -225,18 +226,23 @@ namespace strumpack {
     DenseMatrixWrapper<scalar_t> dense_wrapper();
 
     std::vector<int> LU();
-    DistributedMatrix<scalar_t> solve
-    (const DistributedMatrix<scalar_t>& b, const std::vector<int>& piv) const;
-    void LQ
-    (DistributedMatrix<scalar_t>& L, DistributedMatrix<scalar_t>& Q) const;
+    int LU(std::vector<int>&);
+
+    DistributedMatrix<scalar_t>
+    solve(const DistributedMatrix<scalar_t>& b,
+          const std::vector<int>& piv) const;
+
+    void LQ(DistributedMatrix<scalar_t>& L,
+            DistributedMatrix<scalar_t>& Q) const;
+
     void orthogonalize(scalar_t& r_max, scalar_t& r_min);
-    void ID_column
-    (DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
-     std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol, int max_rank);
-    void ID_row
-    (DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
-     std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
-     int max_rank, const BLACSGrid* grid_T);
+
+    void ID_column(DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
+                   std::vector<std::size_t>& ind,
+                   real_t rel_tol, real_t abs_tol, int max_rank);
+    void ID_row(DistributedMatrix<scalar_t>& X, std::vector<int>& piv,
+                std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
+                int max_rank, const BLACSGrid* grid_T);
 
     static const int default_MB = STRUMPACK_PBLAS_BLOCKSIZE;
     static const int default_NB = STRUMPACK_PBLAS_BLOCKSIZE;

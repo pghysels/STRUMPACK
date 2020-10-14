@@ -62,15 +62,15 @@ namespace strumpack {
     int set_permutation
     (const Opts_t& opts, const CSR_t& A, const int* p, int base);
 
-#if defined(STRUMPACK_USE_MPI)
-    int nested_dissection
-    (const Opts_t& opts, const CSR_t& A, const MPIComm& comm,
-     int nx, int ny, int nz, int components, int width);
+// #if defined(STRUMPACK_USE_MPI)
+//     int nested_dissection
+//     (const Opts_t& opts, const CSR_t& A, const MPIComm& comm,
+//      int nx, int ny, int nz, int components, int width);
 
-    int set_permutation
-    (const Opts_t& opts, const CSR_t& A, const MPIComm& comm,
-     const int* p, int base);
-#endif
+//     int set_permutation
+//     (const Opts_t& opts, const CSR_t& A, const MPIComm& comm,
+//      const int* p, int base);
+// #endif
 
     void separator_reordering(const Opts_t& opts, CSR_t& A, F_t* F);
 

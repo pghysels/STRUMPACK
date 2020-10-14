@@ -146,6 +146,8 @@ namespace strumpack {
     void spmv(const DenseM_t& x, DenseM_t& y) const override {};
     void spmv(const scalar_t* x, scalar_t* y) const override {};
 
+    real_t norm1() const override { return real_t(1.); }
+
     void permute_columns(const std::vector<integer_t>& perm) override {};
 
     int read_matrix_market(const std::string& filename) override { return 1; };

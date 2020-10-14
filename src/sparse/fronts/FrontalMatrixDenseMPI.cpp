@@ -134,14 +134,29 @@ namespace strumpack {
     if (this->dim_sep() && grid()->active()) {
       TaskTimer pf("FrontalMatrixDenseMPI_factor");
       pf.start();
+      int info = 0;
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
       if (opts.use_gpu())
         slate_opts_.insert({slate::Option::Target, slate::Target::Devices});
       auto slateF11 = slate_matrix(F11_);
+      // TODO get return value
       slate::getrf(slateF11, slate_piv_, slate_opts_);
 #else
-      piv = F11_.LU();
+      info = F11_.LU(piv);
 #endif
+      if (info || opts.replace_tiny_pivots()) {
+        auto thresh = opts.pivot_threshold();
+        int prow = F11_.prow(), pcol = F11_.pcol();
+        for (int i=0; i<F11_.rows(); i++) {
+          int pr = F11_.rowg2p_fixed(i);
+          if (pr != prow) continue;
+          int pc = F11_.colg2p_fixed(i);
+          if (pc != pcol) continue;
+          auto& Fii = F11_.global_fixed(i,i);
+          if (std::abs(Fii) < thresh)
+            Fii = (std::real(Fii) < 0) ? -thresh : thresh;
+        }
+      }
       long long flops = LU_flops(F11_);
       if (this->dim_upd()) {
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)

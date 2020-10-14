@@ -645,6 +645,17 @@ namespace strumpack {
     void disable_replace_tiny_pivots() { replace_tiny_pivots_ = false; }
 
     /**
+     * Set the minimum pivot value. If the option replace_tiny_pivots
+     * is enabled (using enable_replace_tiny_pivots()), the all pivots
+     * smaller than this threshold value will be replaced by this
+     * threshold value. This should not be set by the user directly,
+     * but is set in the solver.
+     *
+     * \see enable_replace_tiny_pivots()
+     */
+    void set_pivot_threshold(real_t thresh) { pivot_ = thresh; }
+
+    /**
      * Dump the root front to a set of files, one for each rank. This
      * will only have affect when running with more than one MPI rank,
      * and without compression.
@@ -939,8 +950,20 @@ namespace strumpack {
 
     /**
      * Check whether replacement of tiny pivots is enabled.
+     *
+     * \see enable_replace_tiny_pivots()
      */
     bool replace_tiny_pivots() const { return replace_tiny_pivots_; }
+
+    /**
+     * Get the minimum pivot value. If the option replace_tiny_pivots
+     * is enabled (using enable_replace_tiny_pivots()), the all pivots
+     * smaller than this threshold value will be replaced by this
+     * threshold value.
+     *
+     * \see enable_replace_tiny_pivots() set_pivot_threshold()
+     */
+    real_t pivot_threshold() const { return pivot_; }
 
     /**
      * The root front will be written to a file.
@@ -1054,6 +1077,7 @@ namespace strumpack {
     MatchingJob matching_job_ = MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING;
     bool log_assembly_tree_ = false;
     bool replace_tiny_pivots_ = false;
+    real_t pivot_ = std::sqrt(blas::lamch<real_t>('E'));
     bool write_root_front_ = false;
     bool print_root_front_stats_ = false;
 

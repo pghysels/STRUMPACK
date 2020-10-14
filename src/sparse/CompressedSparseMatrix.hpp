@@ -289,6 +289,8 @@ namespace strumpack {
      */
     scalar_t& val(integer_t i) { assert(i < nnz()); return val_[i]; }
 
+    virtual real_t norm1() const = 0; //{ assert(false); return -1.; };
+
     /**
      * Check whether the matrix has a symmetric sparsity pattern (as
      * specified in the constructor, will not actually check).
@@ -370,10 +372,10 @@ namespace strumpack {
 
     virtual int read_matrix_market(const std::string& filename) = 0;
 
-    virtual real_t max_scaled_residual
-    (const scalar_t* x, const scalar_t* b) const = 0;
-    virtual real_t max_scaled_residual
-    (const DenseM_t& x, const DenseM_t& b) const = 0;
+    virtual real_t max_scaled_residual(const scalar_t* x,
+                                       const scalar_t* b) const = 0;
+    virtual real_t max_scaled_residual(const DenseM_t& x,
+                                       const DenseM_t& b) const = 0;
 
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
