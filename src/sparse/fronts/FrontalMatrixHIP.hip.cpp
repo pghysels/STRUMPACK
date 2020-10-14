@@ -807,6 +807,11 @@ namespace strumpack {
     template void factor_block_batch<std::complex<float>,16>(unsigned int, FrontData<std::complex<float>>*);
     template void factor_block_batch<std::complex<double>,16>(unsigned int, FrontData<std::complex<double>>*);
 
+    template void factor_block_batch<float,24>(unsigned int, FrontData<float>*);
+    template void factor_block_batch<double,24>(unsigned int, FrontData<double>*);
+    template void factor_block_batch<std::complex<float>,24>(unsigned int, FrontData<std::complex<float>>*);
+    template void factor_block_batch<std::complex<double>,24>(unsigned int, FrontData<std::complex<double>>*);
+
     template void factor_block_batch<float,32>(unsigned int, FrontData<float>*);
     template void factor_block_batch<double,32>(unsigned int, FrontData<double>*);
     template void factor_block_batch<std::complex<float>,32>(unsigned int, FrontData<std::complex<float>>*);
@@ -823,6 +828,11 @@ namespace strumpack {
     template void fwd_block_batch<std::complex<float>,16>(int, unsigned int, FrontData<std::complex<float>>*);
     template void fwd_block_batch<std::complex<double>,16>(int, unsigned int, FrontData<std::complex<double>>*);
 
+    template void fwd_block_batch<float,24>(int, unsigned int, FrontData<float>*);
+    template void fwd_block_batch<double,24>(int, unsigned int, FrontData<double>*);
+    template void fwd_block_batch<std::complex<float>,24>(int, unsigned int, FrontData<std::complex<float>>*);
+    template void fwd_block_batch<std::complex<double>,24>(int, unsigned int, FrontData<std::complex<double>>*);
+
     template void fwd_block_batch<float,32>(int, unsigned int, FrontData<float>*);
     template void fwd_block_batch<double,32>(int, unsigned int, FrontData<double>*);
     template void fwd_block_batch<std::complex<float>,32>(int, unsigned int, FrontData<std::complex<float>>*);
@@ -838,6 +848,11 @@ namespace strumpack {
     template void bwd_block_batch<double,16>(int, unsigned int, FrontData<double>*);
     template void bwd_block_batch<std::complex<float>,16>(int, unsigned int, FrontData<std::complex<float>>*);
     template void bwd_block_batch<std::complex<double>,16>(int, unsigned int, FrontData<std::complex<double>>*);
+
+    template void bwd_block_batch<float,24>(int, unsigned int, FrontData<float>*);
+    template void bwd_block_batch<double,24>(int, unsigned int, FrontData<double>*);
+    template void bwd_block_batch<std::complex<float>,24>(int, unsigned int, FrontData<std::complex<float>>*);
+    template void bwd_block_batch<std::complex<double>,24>(int, unsigned int, FrontData<std::complex<double>>*);
 
     template void bwd_block_batch<float,32>(int, unsigned int, FrontData<float>*);
     template void bwd_block_batch<double,32>(int, unsigned int, FrontData<double>*);
