@@ -91,6 +91,7 @@ namespace strumpack {
         total_upd_size += dupd;
         if (dsep <= 8)       N8++;
         else if (dsep <= 16) N16++;
+        else if (dsep <= 24) N24++;
         else if (dsep <= 32) N32++;
         if (dsep > max_dsep) max_dsep = dsep;
       }
@@ -100,14 +101,14 @@ namespace strumpack {
         round_to_8(sizeof(scalar_t) *
                    (Schur_size + getrf_work_size * max_streams)) +
         round_to_8(sizeof(int) * (piv_size + max_streams)) +
-        round_to_8(sizeof(gpu::FrontData<scalar_t>) * (N8 + N16 + N32));
+        round_to_8(sizeof(gpu::FrontData<scalar_t>) * (N8 + N16 + N24 + N32));
     }
 
     void print_info(int l, int lvls) {
       std::cout << "#  level " << l << " of " << lvls
                 << " has " << f.size() << " nodes and "
                 << N8 << " <=8, " << N16 << " <=16, "
-                << N32 << " <=32, needs "
+                << N24 << " <=24, " << N32 << " <=32, needs "
                 << factor_size * sizeof(scalar_t) / 1.e6
                 << " MB for factors, "
                 << Schur_size * sizeof(scalar_t) / 1.e6
@@ -173,17 +174,19 @@ namespace strumpack {
         (round_to_8(imem));
       f8 = fdat;   fdat += N8;
       f16 = fdat;  fdat += N16;
+      f24 = fdat;  fdat += N24;
       f32 = fdat;  fdat += N32;
     }
 
     std::vector<FG_t*> f;
     std::size_t L_size = 0, U_size = 0, factor_size = 0,
       Schur_size = 0, piv_size = 0, total_upd_size = 0,
-      work_bytes = 0, N8 = 0, N16 = 0, N32 = 0;
+      work_bytes = 0, N8 = 0, N16 = 0, N24 = 0, N32 = 0;
     scalar_t* dev_getrf_work = nullptr;
     int* dev_getrf_err = nullptr;
     int getrf_work_size = 0;
-    gpu::FrontData<scalar_t> *f8 = nullptr, *f16 = nullptr, *f32 = nullptr;
+    gpu::FrontData<scalar_t> *f8 = nullptr, *f16 = nullptr,
+      *f24 = nullptr, *f32 = nullptr;
   };
 
 
@@ -344,9 +347,10 @@ namespace strumpack {
 
   template<typename scalar_t, typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::factor_small_fronts
-  (LInfo_t& L, gpu::FrontData<scalar_t>* fdata) {
-    if (L.N8 || L.N16 || L.N32) {
-      for (std::size_t n=0, n8=0, n16=L.N8, n32=L.N8+L.N16;
+  (LInfo_t& L, gpu::FrontData<scalar_t>* fdata,
+   const SPOptions<scalar_t>& opts) {
+    if (L.N8 || L.N16 || L.N24 || L.N32) {
+      for (std::size_t n=0, n8=0, n16=L.N8, n24=n16+L.N16, n32=n24+L.N24;
            n<L.f.size(); n++) {
         auto& f = *(L.f[n]);
         const auto dsep = f.dim_sep();
@@ -356,20 +360,27 @@ namespace strumpack {
               f.F21_.data(), f.F22_.data(), f.piv_);
           if (dsep <= 8)       fdata[n8++] = t;
           else if (dsep <= 16) fdata[n16++] = t;
+          else if (dsep <= 24) fdata[n24++] = t;
           else                 fdata[n32++] = t;
         }
       }
-      gpu::copy_host_to_device(L.f8, fdata, L.N8+L.N16+L.N32);
-      gpu::factor_block_batch<scalar_t,8>(L.N8, L.f8);
-      gpu::factor_block_batch<scalar_t,16>(L.N16, L.f16);
-      gpu::factor_block_batch<scalar_t,32>(L.N32, L.f32);
+      gpu::copy_host_to_device(L.f8, fdata, L.N8+L.N16+L.N24+L.N32);
+      auto replace = opts.replace_tiny_pivots();
+      // TODO get pivot value from the options
+      using real_t = typename RealType<scalar_t>::value_type;
+      auto thresh = std::sqrt(blas::lamch<real_t>('E')) * 100;
+      gpu::factor_block_batch<scalar_t,8>(L.N8, L.f8, replace, thresh);
+      gpu::factor_block_batch<scalar_t,16>(L.N16, L.f16, replace, thresh);
+      gpu::factor_block_batch<scalar_t,24>(L.N24, L.f24, replace, thresh);
+      gpu::factor_block_batch<scalar_t,32>(L.N32, L.f32, replace, thresh);
     }
   }
 
   template<typename scalar_t, typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::factor_large_fronts
   (LInfo_t& L, std::vector<gpu::BLASHandle>& blas_handles,
-   std::vector<gpu::SOLVERHandle>& solver_handles) {
+   std::vector<gpu::SOLVERHandle>& solver_handles,
+   const SPOptions<scalar_t>& opts) {
     for (std::size_t n=0; n<L.f.size(); n++) {
       auto& f = *(L.f[n]);
       auto stream = n % solver_handles.size();
@@ -380,7 +391,14 @@ namespace strumpack {
           (solver_handles[stream], f.F11_,
            L.dev_getrf_work + stream * L.getrf_work_size,
            f.piv_, L.dev_getrf_err + stream);
-        // TODO if (opts.replace_tiny_pivots()) { ...
+        if (opts.replace_tiny_pivots()) {
+          int info = 0;
+          gpu::copy_device_to_host(&info, L.dev_getrf_err + stream, 1);
+          if (info)
+            std::cout << "ERROR GPU LU failed with info = "
+                      << info << std::endl;
+          // TODO write GPU kernel to replace tiny pivots
+        }
         if (dupd) {
           gpu::getrs
             (solver_handles[stream], Trans::N, f.F11_, f.piv_,
@@ -494,7 +512,7 @@ namespace strumpack {
       this->get_level_fronts(fp, l);
       auto& L = ldata[l];
       L = LInfo_t(fp, solver_handles[0], max_streams);
-      max_small_fronts = std::max(max_small_fronts, L.N8+L.N16+L.N32);
+      max_small_fronts = std::max(max_small_fronts, L.N8+L.N16+L.N24+L.N32);
     }
     if (!sufficient_device_memory(ldata)) {
       split_smaller(A, opts, etree_level, task_depth);
@@ -522,8 +540,8 @@ namespace strumpack {
         L.set_work_pointers(work_mem, max_streams);
         front_assembly(A, L);
         old_work = std::move(work_mem);
-        factor_small_fronts(L, fdata);
-        factor_large_fronts(L, blas_handles, solver_handles);
+        factor_small_fronts(L, fdata, opts);
+        factor_large_fronts(L, blas_handles, solver_handles, opts);
         STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
         L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
         L.f[0]->pivot_mem_.resize(L.piv_size);
@@ -689,8 +707,8 @@ namespace strumpack {
   (int nrhs, LInfo_t& L, gpu::FrontData<scalar_t>* fdata,
    gpu::FrontData<scalar_t>* dfdata, scalar_t* dL, int* dpiv,
    scalar_t* db, scalar_t* dbupd) const {
-    if (L.N8 || L.N16 || L.N32) {
-      for (std::size_t n=0, n8=0, n16=L.N8, n32=L.N8+L.N16;
+    if (L.N8 || L.N16 || L.N24 || L.N32) {
+      for (std::size_t n=0, n8=0, n16=L.N8, n24=n16+L.N16, n32=n24+L.N24;
            n<L.f.size(); n++) {
         auto& f = *(L.f[n]);
         const auto dsep = f.dim_sep();
@@ -700,6 +718,7 @@ namespace strumpack {
             t(dsep, dupd, dL, db, dL+dsep*dsep, dbupd, dpiv);
           if (dsep <= 8)       fdata[n8++] = t;
           else if (dsep <= 16) fdata[n16++] = t;
+          else if (dsep <= 24) fdata[n24++] = t;
           else                 fdata[n32++] = t;
         }
         dpiv += dsep;
@@ -707,10 +726,11 @@ namespace strumpack {
         db += dsep*nrhs;
         dbupd += dupd*nrhs;
       }
-      gpu::copy_host_to_device(dfdata, fdata, L.N8+L.N16+L.N32);
+      gpu::copy_host_to_device(dfdata, fdata, L.N8+L.N16+L.N24+L.N32);
       gpu::fwd_block_batch<scalar_t,8>(nrhs, L.N8, dfdata);
       gpu::fwd_block_batch<scalar_t,16>(nrhs, L.N16, dfdata+L.N8);
-      gpu::fwd_block_batch<scalar_t,32>(nrhs, L.N32, dfdata+L.N8+L.N16);
+      gpu::fwd_block_batch<scalar_t,24>(nrhs, L.N24, dfdata+L.N8+L.N16);
+      gpu::fwd_block_batch<scalar_t,32>(nrhs, L.N32, dfdata+L.N8+L.N16+L.N24);
     }
   }
 
@@ -748,7 +768,7 @@ namespace strumpack {
     }
   }
 
-#if 0
+#if 1
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::forward_multifrontal_solve
   (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const {
@@ -789,7 +809,7 @@ namespace strumpack {
       const_cast<FG_t*>(this)->get_level_fronts(fp, l);
       auto& L = ldata[l];
       L = LInfo_t(fp, solver_handles[0], max_streams);
-      max_small_fronts = std::max(max_small_fronts, L.N8+L.N16+L.N32);
+      max_small_fronts = std::max(max_small_fronts, L.N8+L.N16+L.N24+L.N32);
       maxupd = std::max(maxupd, L.total_upd_size);
       if (gpu_factors) maxLb = std::max(maxLb, d*L.piv_size);
       else maxLb = std::max(maxLb, L.L_size + d*L.piv_size);
@@ -960,8 +980,8 @@ namespace strumpack {
   (int nrhs, LInfo_t& L, gpu::FrontData<scalar_t>* fdata,
    gpu::FrontData<scalar_t>* dfdata, scalar_t* dU,
    scalar_t* dy, scalar_t* dyupd) const {
-    if (L.N8 || L.N16 || L.N32) {
-      for (std::size_t n=0, n8=0, n16=L.N8, n32=L.N8+L.N16;
+    if (L.N8 || L.N16 || L.N24 || L.N32) {
+      for (std::size_t n=0, n8=0, n16=L.N8, n24=n16+L.N16, n32=n24+L.N24;
            n<L.f.size(); n++) {
         auto& f = *(L.f[n]);
         const auto dsep = f.dim_sep();
@@ -971,16 +991,18 @@ namespace strumpack {
             t(dsep, dupd, dy, dU, dyupd, nullptr, nullptr);
           if (dsep <= 8)       fdata[n8++] = t;
           else if (dsep <= 16) fdata[n16++] = t;
+          else if (dsep <= 24) fdata[n24++] = t;
           else                 fdata[n32++] = t;
         }
         dU += dsep*dupd;
         dy += dsep*nrhs;
         dyupd += dupd*nrhs;
       }
-      gpu::copy_host_to_device(dfdata, fdata, L.N8+L.N16+L.N32);
+      gpu::copy_host_to_device(dfdata, fdata, L.N8+L.N16+L.N24+L.N32);
       gpu::bwd_block_batch<scalar_t,8>(nrhs, L.N8, dfdata);
       gpu::bwd_block_batch<scalar_t,16>(nrhs, L.N16, dfdata+L.N8);
-      gpu::bwd_block_batch<scalar_t,32>(nrhs, L.N32, dfdata+L.N8+L.N16);
+      gpu::bwd_block_batch<scalar_t,24>(nrhs, L.N24, dfdata+L.N8+L.N16);
+      gpu::bwd_block_batch<scalar_t,32>(nrhs, L.N32, dfdata+L.N8+L.N16+L.N24);
     }
   }
 
@@ -1012,7 +1034,7 @@ namespace strumpack {
     }
   }
 
-#if 0
+#if 1
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::backward_multifrontal_solve
   (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const {
@@ -1053,7 +1075,7 @@ namespace strumpack {
       const_cast<FG_t*>(this)->get_level_fronts(fp, l);
       auto& L = ldata[l];
       L = LInfo_t(fp, solver_handles[0], max_streams);
-      max_small_fronts = std::max(max_small_fronts, L.N8+L.N16+L.N32);
+      max_small_fronts = std::max(max_small_fronts, L.N8+L.N16+L.N24+L.N32);
       maxupd = std::max(maxupd, L.total_upd_size);
       if (gpu_factors) maxUy = std::max(maxUy, d*L.piv_size);
       else maxUy = std::max(maxUy, L.U_size + d*L.piv_size);

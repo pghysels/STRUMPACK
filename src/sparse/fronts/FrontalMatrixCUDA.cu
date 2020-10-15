@@ -303,7 +303,7 @@ namespace strumpack {
         }
         __syncthreads();
         // divide by the pivot element
-        if (j == k && i > k && i < n)
+        if (j == k && i > k && i < n && M[k+k*NT] != T(0.))
           M[i+k*NT] /= M[k+k*NT];
         __syncthreads();
         // Schur update
@@ -316,12 +316,21 @@ namespace strumpack {
         F[i+j*n] = M[i+j*NT];
     }
 
-    template<typename T, int NT> __global__ void
-    LU_block_kernel_batched(FrontData<T>* dat) {
+    template<typename T, int NT, typename real_t> __global__ void
+    LU_block_kernel_batched(FrontData<T>* dat, bool replace,
+                            real_t thresh) {
       FrontData<T>& A = dat[blockIdx.x];
       LU_block_kernel<T,NT>(A.n1, A.F11, A.piv);
+      if (replace) {
+        int i = threadIdx.x, j = threadIdx.y;
+        if (i < A.n1 && i == j) {
+          auto absFii = abs(A.F11[i+i*A.n1]);
+          if (absFii < thresh)
+            // TODO check sign, look at real part for complex ??
+            A.F11[i+i*A.n1] = thresh;
+        }
+      }
     }
-
 
     /**
      * LU solve with matrix F factor in LU, with pivot vector piv. F
@@ -437,13 +446,14 @@ namespace strumpack {
     }
 
 
-    template<typename T, int NT> void
-    factor_block_batch(unsigned int count, FrontData<T>* dat) {
+    template<typename T, int NT, typename real_t>
+    void factor_block_batch(unsigned int count, FrontData<T>* dat,
+                            bool replace, real_t thresh) {
       if (!count) return;
       using T_ = typename cuda_type<T>::value_type;
       auto dat_ = reinterpret_cast<FrontData<T_>*>(dat);
       dim3 block(NT, NT), grid(count, 1, 1);
-      LU_block_kernel_batched<T_,NT><<<count, block>>>(dat_);
+      LU_block_kernel_batched<T_,NT,real_t><<<count, block>>>(dat_, replace, thresh);
       solve_block_kernel_batched<T_,NT><<<count, block>>>(dat_);
       Schur_block_kernel_batched<T_,NT><<<count, block>>>(dat_);
     }
@@ -775,20 +785,25 @@ namespace strumpack {
     template void extract_rhs(int, unsigned int, AssembleData<std::complex<float>>*, AssembleData<std::complex<float>>*);
     template void extract_rhs(int, unsigned int, AssembleData<std::complex<double>>*, AssembleData<std::complex<double>>*);
 
-    template void factor_block_batch<float,8>(unsigned int, FrontData<float>*);
-    template void factor_block_batch<double,8>(unsigned int, FrontData<double>*);
-    template void factor_block_batch<std::complex<float>,8>(unsigned int, FrontData<std::complex<float>>*);
-    template void factor_block_batch<std::complex<double>,8>(unsigned int, FrontData<std::complex<double>>*);
+    template void factor_block_batch<float,8,float>(unsigned int, FrontData<float>*, bool, float);
+    template void factor_block_batch<double,8,double>(unsigned int, FrontData<double>*, bool, double);
+    template void factor_block_batch<std::complex<float>,8,float>(unsigned int, FrontData<std::complex<float>>*, bool, float);
+    template void factor_block_batch<std::complex<double>,8,double>(unsigned int, FrontData<std::complex<double>>*, bool, double);
 
-    template void factor_block_batch<float,16>(unsigned int, FrontData<float>*);
-    template void factor_block_batch<double,16>(unsigned int, FrontData<double>*);
-    template void factor_block_batch<std::complex<float>,16>(unsigned int, FrontData<std::complex<float>>*);
-    template void factor_block_batch<std::complex<double>,16>(unsigned int, FrontData<std::complex<double>>*);
+    template void factor_block_batch<float,16,float>(unsigned int, FrontData<float>*, bool, float);
+    template void factor_block_batch<double,16,double>(unsigned int, FrontData<double>*, bool, double);
+    template void factor_block_batch<std::complex<float>,16,float>(unsigned int, FrontData<std::complex<float>>*, bool, float);
+    template void factor_block_batch<std::complex<double>,16,double>(unsigned int, FrontData<std::complex<double>>*, bool, double);
 
-    template void factor_block_batch<float,32>(unsigned int, FrontData<float>*);
-    template void factor_block_batch<double,32>(unsigned int, FrontData<double>*);
-    template void factor_block_batch<std::complex<float>,32>(unsigned int, FrontData<std::complex<float>>*);
-    template void factor_block_batch<std::complex<double>,32>(unsigned int, FrontData<std::complex<double>>*);
+    template void factor_block_batch<float,24,float>(unsigned int, FrontData<float>*, bool, float);
+    template void factor_block_batch<double,24,double>(unsigned int, FrontData<double>*, bool, double);
+    template void factor_block_batch<std::complex<float>,24,float>(unsigned int, FrontData<std::complex<float>>*, bool, float);
+    template void factor_block_batch<std::complex<double>,24,double>(unsigned int, FrontData<std::complex<double>>*, bool, double);
+
+    template void factor_block_batch<float,32,float>(unsigned int, FrontData<float>*, bool, float);
+    template void factor_block_batch<double,32,double>(unsigned int, FrontData<double>*, bool, double);
+    template void factor_block_batch<std::complex<float>,32,float>(unsigned int, FrontData<std::complex<float>>*, bool, float);
+    template void factor_block_batch<std::complex<double>,32,double>(unsigned int, FrontData<std::complex<double>>*, bool, double);
 
 
     template void fwd_block_batch<float,8>(int, unsigned int, FrontData<float>*);
@@ -800,6 +815,11 @@ namespace strumpack {
     template void fwd_block_batch<double,16>(int, unsigned int, FrontData<double>*);
     template void fwd_block_batch<std::complex<float>,16>(int, unsigned int, FrontData<std::complex<float>>*);
     template void fwd_block_batch<std::complex<double>,16>(int, unsigned int, FrontData<std::complex<double>>*);
+
+    template void fwd_block_batch<float,24>(int, unsigned int, FrontData<float>*);
+    template void fwd_block_batch<double,24>(int, unsigned int, FrontData<double>*);
+    template void fwd_block_batch<std::complex<float>,24>(int, unsigned int, FrontData<std::complex<float>>*);
+    template void fwd_block_batch<std::complex<double>,24>(int, unsigned int, FrontData<std::complex<double>>*);
 
     template void fwd_block_batch<float,32>(int, unsigned int, FrontData<float>*);
     template void fwd_block_batch<double,32>(int, unsigned int, FrontData<double>*);
@@ -816,6 +836,11 @@ namespace strumpack {
     template void bwd_block_batch<double,16>(int, unsigned int, FrontData<double>*);
     template void bwd_block_batch<std::complex<float>,16>(int, unsigned int, FrontData<std::complex<float>>*);
     template void bwd_block_batch<std::complex<double>,16>(int, unsigned int, FrontData<std::complex<double>>*);
+
+    template void bwd_block_batch<float,24>(int, unsigned int, FrontData<float>*);
+    template void bwd_block_batch<double,24>(int, unsigned int, FrontData<double>*);
+    template void bwd_block_batch<std::complex<float>,24>(int, unsigned int, FrontData<std::complex<float>>*);
+    template void bwd_block_batch<std::complex<double>,24>(int, unsigned int, FrontData<std::complex<double>>*);
 
     template void bwd_block_batch<float,32>(int, unsigned int, FrontData<float>*);
     template void bwd_block_batch<double,32>(int, unsigned int, FrontData<double>*);
