@@ -347,7 +347,8 @@ namespace strumpack {
 
   template<typename scalar_t, typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::factor_small_fronts
-  (LInfo_t& L, gpu::FrontData<scalar_t>* fdata) {
+  (LInfo_t& L, gpu::FrontData<scalar_t>* fdata,
+   const SPOptions<scalar_t>& opts) {
     if (L.N8 || L.N16 || L.N24 || L.N32) {
       for (std::size_t n=0, n8=0, n16=L.N8, n24=n16+L.N16, n32=n24+L.N24;
            n<L.f.size(); n++) {
@@ -364,17 +365,22 @@ namespace strumpack {
         }
       }
       gpu::copy_host_to_device(L.f8, fdata, L.N8+L.N16+L.N24+L.N32);
-      gpu::factor_block_batch<scalar_t,8>(L.N8, L.f8);
-      gpu::factor_block_batch<scalar_t,16>(L.N16, L.f16);
-      gpu::factor_block_batch<scalar_t,24>(L.N24, L.f24);
-      gpu::factor_block_batch<scalar_t,32>(L.N32, L.f32);
+      auto replace = opts.replace_tiny_pivots();
+      // TODO get pivot value from the options
+      using real_t = typename RealType<scalar_t>::value_type;
+      auto thresh = std::sqrt(blas::lamch<real_t>('E')) * 100;
+      gpu::factor_block_batch<scalar_t,8>(L.N8, L.f8, replace, thresh);
+      gpu::factor_block_batch<scalar_t,16>(L.N16, L.f16, replace, thresh);
+      gpu::factor_block_batch<scalar_t,24>(L.N24, L.f24, replace, thresh);
+      gpu::factor_block_batch<scalar_t,32>(L.N32, L.f32, replace, thresh);
     }
   }
 
   template<typename scalar_t, typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::factor_large_fronts
   (LInfo_t& L, std::vector<gpu::BLASHandle>& blas_handles,
-   std::vector<gpu::SOLVERHandle>& solver_handles) {
+   std::vector<gpu::SOLVERHandle>& solver_handles,
+   const SPOptions<scalar_t>& opts) {
     for (std::size_t n=0; n<L.f.size(); n++) {
       auto& f = *(L.f[n]);
       auto stream = n % solver_handles.size();
@@ -385,7 +391,14 @@ namespace strumpack {
           (solver_handles[stream], f.F11_,
            L.dev_getrf_work + stream * L.getrf_work_size,
            f.piv_, L.dev_getrf_err + stream);
-        // TODO if (opts.replace_tiny_pivots()) { ...
+        if (opts.replace_tiny_pivots()) {
+          int info = 0;
+          gpu::copy_device_to_host(&info, L.dev_getrf_err + stream, 1);
+          if (info)
+            std::cout << "ERROR GPU LU failed with info = "
+                      << info << std::endl;
+          // TODO write GPU kernel to replace tiny pivots
+        }
         if (dupd) {
           gpu::getrs
             (solver_handles[stream], Trans::N, f.F11_, f.piv_,
@@ -496,7 +509,6 @@ namespace strumpack {
     std::size_t max_small_fronts = 0;
     for (int l=lvls-1; l>=0; l--) {
       std::vector<F_t*> fp;
-      fp.reserve(std::pow(2, l));
       this->get_level_fronts(fp, l);
       auto& L = ldata[l];
       L = LInfo_t(fp, solver_handles[0], max_streams);
@@ -528,8 +540,8 @@ namespace strumpack {
         L.set_work_pointers(work_mem, max_streams);
         front_assembly(A, L);
         old_work = std::move(work_mem);
-        factor_small_fronts(L, fdata);
-        factor_large_fronts(L, blas_handles, solver_handles);
+        factor_small_fronts(L, fdata, opts);
+        factor_large_fronts(L, blas_handles, solver_handles, opts);
         STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
         L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
         L.f[0]->pivot_mem_.resize(L.piv_size);
@@ -578,7 +590,6 @@ namespace strumpack {
     std::size_t Lsize = 0, Usize = 0, Psize = 0;
     for (int l=lvls-1; l>=0; l--) {
       std::vector<F_t*> fp;
-      fp.reserve(std::pow(2, l));
       const_cast<FG_t*>(this)->get_level_fronts(fp, l);
       auto& L = ldata[l];
       L = LInfo_t(fp, solver_handles[0], 1);
@@ -612,7 +623,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::multifrontal_solve
   (DenseM_t& b, const GPUFactors<scalar_t>* gpu_factors) const {
-#if 1
+#if 0
     fwd_solve_gpu(b, nullptr, gpu_factors);
     bwd_solve_gpu(b, nullptr, gpu_factors);
 #else
@@ -795,7 +806,6 @@ namespace strumpack {
     std::size_t max_small_fronts = 0, maxLb = 0, maxupd = 0, maxpiv = 0;
     for (int l=lvls-1; l>=0; l--) {
       std::vector<F_t*> fp;
-      fp.reserve(std::pow(2, l));
       const_cast<FG_t*>(this)->get_level_fronts(fp, l);
       auto& L = ldata[l];
       L = LInfo_t(fp, solver_handles[0], max_streams);
@@ -1062,7 +1072,6 @@ namespace strumpack {
     std::size_t max_small_fronts = 0, maxUy = 0, maxupd = 0;
     for (int l=lvls-1; l>=0; l--) {
       std::vector<F_t*> fp;
-      fp.reserve(std::pow(2, l));
       const_cast<FG_t*>(this)->get_level_fronts(fp, l);
       auto& L = ldata[l];
       L = LInfo_t(fp, solver_handles[0], max_streams);
