@@ -115,6 +115,7 @@ namespace strumpack {
     void factor_large_fronts(LInfo_t& L,
                              std::vector<gpu::BLASHandle>& blas_handles,
                              std::vector<gpu::SOLVERHandle>& solver_handles,
+                             std::vector<gpu::Stream>& streams,
                              const SPOptions<scalar_t>& opts);
 
     void split_smaller(const SpMat_t& A, const SPOptions<scalar_t>& opts,

@@ -35,7 +35,9 @@
 #include "ExtendAdd.hpp"
 #include "FrontalMatrixMPI.hpp"
 #endif
-
+#if defined(STRUMPACK_USE_MAGMA)
+#include "dense/MAGMAWrapper.hpp"
+#endif
 
 namespace strumpack {
 
@@ -366,9 +368,7 @@ namespace strumpack {
       }
       gpu::copy_host_to_device(L.f8, fdata, L.N8+L.N16+L.N24+L.N32);
       auto replace = opts.replace_tiny_pivots();
-      // TODO get pivot value from the options
-      using real_t = typename RealType<scalar_t>::value_type;
-      auto thresh = std::sqrt(blas::lamch<real_t>('E')) * 100;
+      auto thresh = opts.pivot_threshold();
       gpu::factor_block_batch<scalar_t,8>(L.N8, L.f8, replace, thresh);
       gpu::factor_block_batch<scalar_t,16>(L.N16, L.f16, replace, thresh);
       gpu::factor_block_batch<scalar_t,24>(L.N24, L.f24, replace, thresh);
@@ -380,6 +380,7 @@ namespace strumpack {
   FrontalMatrixGPU<scalar_t,integer_t>::factor_large_fronts
   (LInfo_t& L, std::vector<gpu::BLASHandle>& blas_handles,
    std::vector<gpu::SOLVERHandle>& solver_handles,
+   std::vector<gpu::Stream>& streams,
    const SPOptions<scalar_t>& opts) {
     for (std::size_t n=0; n<L.f.size(); n++) {
       auto& f = *(L.f[n]);
@@ -387,18 +388,18 @@ namespace strumpack {
       const auto dsep = f.dim_sep();
       if (dsep > 32) {
         const auto dupd = f.dim_upd();
-        gpu::getrf
-          (solver_handles[stream], f.F11_,
-           L.dev_getrf_work + stream * L.getrf_work_size,
-           f.piv_, L.dev_getrf_err + stream);
-        if (opts.replace_tiny_pivots()) {
-          int info = 0;
-          gpu::copy_device_to_host(&info, L.dev_getrf_err + stream, 1);
-          if (info)
-            std::cout << "ERROR GPU LU failed with info = "
-                      << info << std::endl;
-          // TODO write GPU kernel to replace tiny pivots
-        }
+#if defined(STRUMPACK_USE_MAGMA)
+        if (opts.replace_tiny_pivots())
+          gpu::magma::getrf(f.F11_, f.piv_);
+        else
+#endif
+          gpu::getrf
+            (solver_handles[stream], f.F11_,
+             L.dev_getrf_work + stream * L.getrf_work_size,
+             f.piv_, L.dev_getrf_err + stream);
+        if (opts.replace_tiny_pivots())
+          gpu::replace_pivots
+            (dsep, f.F11_.data(), opts.pivot_threshold(), streams[stream]);
         if (dupd) {
           gpu::getrs
             (solver_handles[stream], Trans::N, f.F11_, f.piv_,
@@ -464,6 +465,12 @@ namespace strumpack {
       piv_ = pivot_mem_.data();
       gpu::copy_device_to_host(piv_, dpiv.as<int>(), dsep);
       gpu::copy_device_to_host(F11_, dF11);
+      if (opts.replace_tiny_pivots()) {
+        auto thresh = opts.pivot_threshold();
+        for (std::size_t i=0; i<F11_.rows(); i++)
+          if (std::abs(F11_(i,i)) < thresh)
+            F11_(i,i) = (std::real(F11_(i,i)) < 0) ? -thresh : thresh;
+      }
       if (dupd) {
         gpu::DeviceMemory<scalar_t> dm12(dsep*dupd);
         DenseMW_t dF12(dsep, dupd, dm12, dsep);
@@ -502,6 +509,10 @@ namespace strumpack {
   FrontalMatrixGPU<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
+#if defined(STRUMPACK_USE_MAGMA)
+    if (opts.replace_tiny_pivots())
+      magma_init();
+#endif
     const int max_streams = opts.gpu_streams();
     std::vector<gpu::SOLVERHandle> solver_handles(max_streams);
     const int lvls = this->levels();
@@ -541,7 +552,7 @@ namespace strumpack {
         front_assembly(A, L);
         old_work = std::move(work_mem);
         factor_small_fronts(L, fdata, opts);
-        factor_large_fronts(L, blas_handles, solver_handles, opts);
+        factor_large_fronts(L, blas_handles, solver_handles, streams, opts);
         STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
         L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
         L.f[0]->pivot_mem_.resize(L.piv_size);
@@ -577,6 +588,10 @@ namespace strumpack {
         (host_Schur_.get(), old_work.as<scalar_t>(), dupd*dupd);
       F22_ = DenseMW_t(dupd, dupd, host_Schur_.get(), dupd);
     }
+#if defined(STRUMPACK_USE_MAGMA)
+    if (opts.replace_tiny_pivots())
+      magma_finalize();
+#endif
   }
 
 
@@ -768,7 +783,7 @@ namespace strumpack {
     }
   }
 
-#if 1
+#if 0
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::forward_multifrontal_solve
   (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const {
@@ -1034,7 +1049,7 @@ namespace strumpack {
     }
   }
 
-#if 1
+#if 0
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::backward_multifrontal_solve
   (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const {

@@ -30,7 +30,12 @@
 #define FRONTAL_MATRIX_GPU_KERNELS_HPP
 
 #include "misc/Triplet.hpp"
-
+#if defined(STRUMPACK_USE_CUDA)
+#include "dense/CUDAWrapper.hpp"
+#endif
+#if defined(STRUMPACK_USE_HIP)
+#include "dense/HIPWrapper.hpp"
+#endif
 
 namespace strumpack {
 
@@ -87,6 +92,10 @@ namespace strumpack {
     template<typename T, int NT=32,
              typename real_t = typename RealType<T>::value_type>
     void factor_block_batch(unsigned int, FrontData<T>*, bool, real_t);
+
+    template<typename T,
+             typename real_t = typename RealType<T>::value_type>
+    void replace_pivots(int, T*, real_t, gpu::Stream&);
 
     template<typename T> void
     extend_add_rhs(int, unsigned int, AssembleData<T>*, AssembleData<T>*);

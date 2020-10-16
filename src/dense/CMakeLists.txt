@@ -54,5 +54,10 @@ if(STRUMPACK_USE_HIP)
   install(FILES HIPWrapper.hpp DESTINATION include/dense)
 endif()
 
+if(STRUMPACK_USE_MAGMA)
+  target_sources(strumpack PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/MAGMAWrapper.hpp)
+  install(FILES MAGMAWrapper.hpp DESTINATION include/dense)
+endif()
 
 add_subdirectory(lapack)

@@ -15,6 +15,7 @@ option(TPL_ENABLE_PAPI       "Build with support for PAPI monitoring" OFF)
 option(TPL_ENABLE_COMBBLAS   "Use CombBLAS for weighted matching" OFF)
 option(TPL_ENABLE_BPACK      "Use BPACK (ButterflyPACK) code by Yang Liu" ON)
 option(TPL_ENABLE_ZFP        "Build with support for ZFP compression" ON)
+option(TPL_ENABLE_MAGMA      "Build with support for MAGMA (requires CUDA)" ON)
 
 option(STRUMPACK_COUNT_FLOPS "Build with flop counters" OFF)
 option(STRUMPACK_TASK_TIMERS "Build with timers for internal routines" OFF)
@@ -61,6 +62,12 @@ endif()
 if(TPL_ENABLE_PTSCOTCH)
   set(TPL_ENABLE_SCOTCH ON)
 endif()
+if(NOT STRUMPACK_USE_CUDA)
+  if(TPL_ENABLE_MAGMA)
+    message(STATUS "Disabling MAGMA, it requires CUDA to be enabled.")
+  endif()
+endif()
+
 
 if(STRUMPACK_USE_OPENMP)
   find_package(OpenMP)
@@ -91,6 +98,14 @@ if(STRUMPACK_USE_CUDA)
     enable_language(CUDA)
     # will be in CMake 3.17? for now we have a copy in cmake/Modules
     find_package(CUDAToolkit REQUIRED)
+    if(TPL_ENABLE_MAGMA)
+      list(APPEND CMAKE_PREFIX_PATH
+        ${TPL_MAGMA_PREFIX} $ENV{MAGMA_DIR} $ENV{MAGMA_ROOT})
+      find_package(MAGMA)
+      if(MAGMA_FOUND)
+        option(STRUMPACK_USE_MAGMA "" ON)
+      endif()
+    endif()
   else()
     message(WARNING "CUDA compiler not found,"
       " proceeding without CUDA support.")
@@ -538,6 +553,10 @@ endif()
 if(CUDAToolkit_FOUND)
   target_link_libraries(strumpack PUBLIC
     CUDA::cudart CUDA::cusolver CUDA::cublas)
+endif()
+
+if(MAGMA_FOUND)
+  target_link_libraries(strumpack PUBLIC MAGMA::magma)
 endif()
 
 if(hipblas_FOUND)

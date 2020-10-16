@@ -26,6 +26,7 @@
  *             Division).
  *
  */
+#include <stdlib.h>
 
 #include "CUDAWrapper.hpp"
 
@@ -44,16 +45,16 @@ namespace strumpack {
     }
 
     void cuda_assert(cudaError_t code, const char *file, int line,
-                     bool abort) {
+                     bool abrt) {
       if (code != cudaSuccess) {
         std::cerr << "CUDA assertion failed: "
                   << cudaGetErrorString(code) << " "
                   <<  file << " " << line << std::endl;
-        if (abort) exit(code);
+        if (abrt) exit(code);
       }
     }
     void cuda_assert(cusolverStatus_t code, const char *file, int line,
-                     bool abort) {
+                     bool abrt) {
       if (code != CUSOLVER_STATUS_SUCCESS) {
         std::cerr << "cuSOLVER assertion failed: " << code << " "
                   <<  file << " " << line << std::endl;
@@ -85,15 +86,15 @@ namespace strumpack {
         // case CUSOLVER_STATUS_INVALID_WORKSPACE:                       std::cerr << "CUSOLVER_STATUS_INVALID_WORKSPACE" << std::endl; break;
         default: std::cerr << "unknown cusolver error" << std::endl;
         }
-        if (abort) exit(code);
+        if (abrt) exit(code);
       }
     }
     void cuda_assert(cublasStatus_t code, const char *file, int line,
-                     bool abort) {
+                     bool abrt) {
       if (code != CUBLAS_STATUS_SUCCESS) {
         std::cerr << "cuBLAS assertion failed: " << code << " "
                   <<  file << " " << line << std::endl;
-        if (abort) exit(code);
+        if (abrt) exit(code);
       }
     }
 
