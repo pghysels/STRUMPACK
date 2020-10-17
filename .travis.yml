@@ -31,20 +31,20 @@ before_install:
   - export BLUE="\033[34;1m"
   - mkdir installDir
 
-  - printf "${BLUE} GC; Installing gcc-6 via apt\n"
+  - printf "${BLUE} GC; Installing gcc-7 via apt\n"
   - sudo apt-get update
   - sudo apt-get install build-essential software-properties-common -y
   - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
   - sudo apt-get update
-  - sudo apt-get install gcc-6 g++-6 -y
-  - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-6 60 --slave /usr/bin/g++ g++ /usr/bin/g++-6
-  - export CXX="g++-6"
-  - export CC="gcc-6"
-  - printf "${BLUE} GC; Done installing gcc-6 via apt\n"
+  - sudo apt-get install gcc-7 g++-7 -y
+  - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 70 --slave /usr/bin/g++ g++ /usr/bin/g++-7
+  - export CXX="g++-7"
+  - export CC="gcc-7"
+  - printf "${BLUE} GC; Done installing gcc-7 via apt\n"
 
   - printf "${BLUE} GC; Installing gfortran via apt\n"
-  - sudo apt-get install gfortran-6 -y
-  - sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-6 60
+  - sudo apt-get install gfortran-7 -y
+  - sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-7 70
   - printf "${BLUE} GC; Done installing gfortran via apt\n"
 
   - printf "${BLUE} GC; Installing OpenMPI-1 via apt\n"
