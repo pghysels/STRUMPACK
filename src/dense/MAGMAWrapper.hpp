@@ -56,8 +56,8 @@ namespace strumpack {
       inline int getrf(DenseMatrix<double>& A, int* dpiv) {
         std::vector<int> piv(A.rows());
         int info = 0;
-        magma_dgetrf_native
-          //magma_dgetrf_gpu
+        //magma_dgetrf_native
+        magma_dgetrf_gpu
           (A.rows(), A.cols(), A.data(), A.ld(), piv.data(), &info);
         gpu::copy_host_to_device(dpiv, piv.data(), A.rows());
         return info;
