@@ -485,7 +485,7 @@ namespace strumpack {
     }
 
 
-    template<typename T, int NT> void
+    template<typename T, int NT, typename real_t> void
     factor_block_batch(unsigned int count, FrontData<T>* dat,
                        bool replace, real_t thresh) {
       if (!count) return;
