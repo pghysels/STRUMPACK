@@ -92,9 +92,10 @@ namespace strumpack {
       void dense(DenseM_t& A) const override;
       DenseM_t dense() const override;
 
-      std::unique_ptr<BLRTile<scalar_t>> clone() const;
+      std::unique_ptr<BLRTile<scalar_t>> clone() const override;
 
-      std::unique_ptr<LRTile<scalar_t>> compress(const Opts_t& opts) const {
+      std::unique_ptr<LRTile<scalar_t>>
+      compress(const Opts_t& opts) const override {
         assert(false);
         return nullptr;
       };
