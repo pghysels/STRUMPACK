@@ -76,8 +76,6 @@ namespace strumpack {
                 const adm_t& admissible, std::vector<int>& piv,
                 const Opts_t& opts);
 
-      //BLRMatrix(DenseM_t &A11, BLRMatrix<scalar_t>& B11, const Opts_t& opts);
-
       std::size_t rows() const { return m_; }
       std::size_t cols() const { return n_; }
 
@@ -93,6 +91,12 @@ namespace strumpack {
       void print(const std::string& name) const;
 
       void clear();
+
+      void solve(const std::vector<int>& P, DenseM_t& x) const {
+        x.laswp(P, true);
+        trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), *this, x, 0);
+        trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), *this, x, 0);
+      }
 
       scalar_t operator()(std::size_t i, std::size_t j) const;
       DenseM_t extract(const std::vector<std::size_t>& I,
@@ -121,7 +125,7 @@ namespace strumpack {
 
       void LUAR_B11
       (std::size_t i, std::size_t j,
-       std::size_t kmax, DenseMatrix<scalar_t>&A11, const BLROptions<scalar_t>& opts, int* B);
+       std::size_t kmax, DenseMatrix<scalar_t>&A11, const BLROptions<scalar_t>& opts, int* B, std::size_t rb);
 
       void LUAR_B12
       (std::size_t i, std::size_t j,

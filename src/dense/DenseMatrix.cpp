@@ -938,10 +938,11 @@ namespace strumpack {
         (char(ta), char(tb), c.rows(), c.cols(),
          (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
          b.data(), b.ld(), beta, c.data(), c.ld(), depth);
-    else
+    else{
       blas::gemm(char(ta), char(tb), c.rows(), c.cols(),
                  (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
                  b.data(), b.ld(), beta, c.data(), c.ld());
+    }
   }
 
 
