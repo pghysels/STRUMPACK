@@ -1072,18 +1072,17 @@ namespace strumpack {
               //Recompress Uall only
               DenseMatrix<scalar_t> UU, UV;
               Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-              LRTile<scalar_t> tmp(UU.rows(), Vall.cols(), UU.cols());
-              gemm(Trans::N, Trans::N, scalar_t(1.), UV, Vall, scalar_t(0.), tmp.V());
-              tmp.U()=UU;
+              DenseMatrix<scalar_t> tmp1(UV.rows(), Vall.cols());
+              gemm(Trans::N, Trans::N, scalar_t(1.), UV, Vall, scalar_t(0.), tmp1);
 //#endif
               if (k==ranks_idx.size()-1){
-                gemm(Trans::N, Trans::N, scalar_t(-1.), tmp.U(), tmp.V(), scalar_t(1.), Aij);
+                gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp1, scalar_t(1.), Aij);
               }
               else{
                 //std::cout << "k= " << k << ", 4." << std::endl;
-                tmpU.copy_topos(tmp.U(),0,0);
+                tmpU.copy_topos(UU,0,0);
                 //std::cout << "k= " << k << ", 5." << std::endl;
-                tmpV.copy_topos(tmp.V(),0,0);
+                tmpV.copy_topos(tmp1,0,0);
                 //std::cout << "k= " << k << ", after 5." << std::endl;
                 rank_tmp = tmp.rank();
               }
