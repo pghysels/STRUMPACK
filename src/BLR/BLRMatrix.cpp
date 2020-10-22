@@ -1026,7 +1026,7 @@ namespace strumpack {
           LRTile<scalar_t> tmp=tile(i,ranks_idx[0].second).multiply(tile(ranks_idx[0].second,j));
           //--------  COPY Densematrix tmp.U into parts of tmpU (start by 0,0) ----------//
           tmpU.copy_topos(tmp.U(),0,rank_tmp);
-          //--------  COPY Densematrix tmp.V into parts of tmpV (start by 0,0) ----------//
+          //--------  COPY Densematrix tmp.V into parts of tmpV (start by 0,0) ---------//
           tmpV.copy_topos(tmp.V(),rank_tmp,0);
           rank_tmp = tmp.rank();
           for (std::size_t k=1; k<ranks_idx.size(); k++) {
