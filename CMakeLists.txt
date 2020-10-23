@@ -145,6 +145,7 @@ if(STRUMPACK_USE_HIP)
       find_package(hipblas REQUIRED)
       find_package(rocsolver REQUIRED)
       find_package(rocblas REQUIRED)
+      find_package(rocthrust REQUIRED)
     else()
       message(WARNING "HIP compiler not found,"
         " proceeding without HIP support.")
