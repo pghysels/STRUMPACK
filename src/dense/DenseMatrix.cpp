@@ -260,7 +260,7 @@ namespace strumpack {
 
   template<typename scalar_t> void
   DenseMatrix<scalar_t>::copy_tillpos(const DenseMatrix<scalar_t>& B,
-                              std::size_t i, std::size_t j) {
+                              std::size_t i, std::size_t j) { 
     assert(i <= rows());
     assert(j <= cols());
     for (std::size_t _j=0; _j<j; _j++)

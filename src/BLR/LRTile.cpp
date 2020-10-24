@@ -92,6 +92,29 @@ namespace strumpack {
     }
 
 
+    template<typename scalar_t> void LRTile<scalar_t>::multiply(const BLRTile<scalar_t>& a, DMW_t& b, DMW_t& c) const {
+         a.left_multiply(*this, b, c);
+    }
+    template<typename scalar_t> void LRTile<scalar_t>::left_multiply(const LRTile<scalar_t>& a, DMW_t& b, DMW_t& c) const {
+         DenseMatrix<scalar_t> VU(a.rank(), rank());
+         gemm(Trans::N, Trans::N, scalar_t(1.), a.V(), U_, scalar_t(0.), VU, params::task_recursion_cutoff_level);
+         if (a.rank() < rank()) {
+               // a.U*((a.V * U_)*V_)
+               gemm(Trans::N, Trans::N, scalar_t(1.), VU, V_, scalar_t(0.), c, params::task_recursion_cutoff_level);
+               b = a.U();
+         } else {
+               // (a.U*(a.V * U_))*V_
+               gemm(Trans::N, Trans::N, scalar_t(1.), a.U(), VU, scalar_t(0.), b, params::task_recursion_cutoff_level);
+               c = V();
+         }
+    }
+    template<typename scalar_t> void LRTile<scalar_t>::left_multiply(const DenseTile<scalar_t>& a, DMW_t& b, DMW_t& c) const {
+         // (a.D*U)*V
+         gemm(Trans::N, Trans::N, scalar_t(1.), a.D(), U(), scalar_t(0.), b, params::task_recursion_cutoff_level);
+         c = V();
+    }
+
+
     /**
      * .. by extracting individual elements
      */
@@ -266,7 +289,7 @@ namespace strumpack {
     LRTile<scalar_t>::Schur_update_col_b
     (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c,
      scalar_t* work) const {
-      DenseMW_t temp1(rows(), 1, work, rows()),
+      DMW_t temp1(rows(), 1, work, rows()),
         temp2(a.rank(), 1, work+rows(), a.rank());
       gemv(Trans::N, scalar_t(1.), U_, V_.ptr(0, i), 1,
            scalar_t(0.), temp1, params::task_recursion_cutoff_level);
@@ -281,7 +304,7 @@ namespace strumpack {
     LRTile<scalar_t>::Schur_update_col_b
     (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c,
      scalar_t* work) const {
-      DenseMW_t temp(rows(), 1, work, rows());
+      DMW_t temp(rows(), 1, work, rows());
       gemv(Trans::N, scalar_t(1.), U_, V_.ptr(0, i), 1,
            scalar_t(0.), temp, params::task_recursion_cutoff_level);
       gemv(Trans::N, scalar_t(-1.), a.D(), temp, scalar_t(1.), c, 1,
@@ -293,7 +316,7 @@ namespace strumpack {
     LRTile<scalar_t>::Schur_update_row_b
     (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c,
      scalar_t* work) const {
-      DenseMW_t temp1(1, a.cols(), work, 1),
+      DMW_t temp1(1, a.cols(), work, 1),
         temp2(1, rank(), work+a.cols(), 1);
       gemv(Trans::C, scalar_t(1.), a.V(), a.U().ptr(i, 0), a.U().ld(),
            scalar_t(0.), temp1.data(), temp1.ld(),
@@ -310,7 +333,7 @@ namespace strumpack {
     LRTile<scalar_t>::Schur_update_row_b
     (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c,
      scalar_t* work) const {
-      DenseMW_t temp(1, rank(), work, 1);
+      DMW_t temp(1, rank(), work, 1);
       gemv(Trans::C, scalar_t(1.), U(), a.D().ptr(i, 0), a.D().ld(),
            scalar_t(0.), temp.data(), temp.ld(),
            params::task_recursion_cutoff_level);
@@ -339,7 +362,7 @@ namespace strumpack {
       auto d = cols.size();
       auto r = rank();
       auto m = rows();
-      DenseMW_t Vc(r, d, work, r),
+      DMW_t Vc(r, d, work, r),
         temp1(m, d, Vc.end(), m),
         temp2(a.rank(), d, temp1.end(), a.rank());
       V_.extract_cols(cols, Vc);
@@ -358,7 +381,7 @@ namespace strumpack {
       auto r = rank();
       auto d = cols.size();
       auto m = rows();
-      DenseMW_t Vc(r, d, work, r), temp(m, d, Vc.end(), m);
+      DMW_t Vc(r, d, work, r), temp(m, d, Vc.end(), m);
       V_.extract_cols(cols, Vc);
       gemm(Trans::N, Trans::N, scalar_t(1.), U_, Vc,
            scalar_t(0.), temp, params::task_recursion_cutoff_level);
@@ -371,7 +394,7 @@ namespace strumpack {
     (const std::vector<std::size_t>& rows, const LRTile<scalar_t>& a,
      DenseMatrix<scalar_t>& c, scalar_t* work) const {
       auto d = rows.size();
-      DenseMW_t aUr(d, a.rank(), work, d),
+      DMW_t aUr(d, a.rank(), work, d),
         temp1(d, a.cols(), aUr.end(), d),
         temp2(d, rank(), temp1.end(), d);
       a.U().extract_rows(rows, aUr);
@@ -388,7 +411,7 @@ namespace strumpack {
     (const std::vector<std::size_t>& rows, const DenseTile<scalar_t>& a,
      DenseMatrix<scalar_t>& c, scalar_t* work) const {
       auto d = rows.size();
-      DenseMW_t aDr(d, a.cols(), work, d),
+      DMW_t aDr(d, a.cols(), work, d),
         temp(d, rank(), aDr.end(), rows.size());
       a.D().extract_rows(rows, aDr);
       gemm(Trans::N, Trans::N, scalar_t(1.), aDr, U(),

@@ -125,7 +125,7 @@ namespace strumpack {
 
       void LUAR_B11
       (std::size_t i, std::size_t j,
-       std::size_t kmax, DenseMatrix<scalar_t>&A11, const BLROptions<scalar_t>& opts, int* B, std::size_t rb);
+       std::size_t kmax, DenseMatrix<scalar_t>&A11, const BLROptions<scalar_t>& opts, int* B);
 
       void LUAR_B12
       (std::size_t i, std::size_t j,
