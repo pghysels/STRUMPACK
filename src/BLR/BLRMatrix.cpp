@@ -838,13 +838,13 @@ namespace strumpack {
 #else
 //LUAR-Update
           for (std::size_t j=i+1; j<rb; j++){
-/*#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t ij = (i+1)+lrb*j;
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+              std::size_t ij = (i+1)+lrb*j, i0 = i+1, j0=j*lrb;
 #pragma omp task default(shared) firstprivate(i,j,ij)   \
-  depend(inout:B[ij]) priority(rb-j)
-#endif*/
+  depend(inout:B[ij]) depend(in:B[i0:i0:lrb], in:B[j0:i0:1]) priority(rb-j)
+#endif
           {
-            B11.LUAR_B11(i+1, j, i+1, A11, opts, B);
+            B11.LUAR_B11(i+1, j, i+1, A11, opts, B, lrb);
           }
             if(j!=i+1){
 /*#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
@@ -853,7 +853,7 @@ namespace strumpack {
   depend(inout:B[ji]) priority(rb-j)
 #endif*/
           {
-              B11.LUAR_B11(j, i+1, i+1, A11, opts, B);
+              B11.LUAR_B11(j, i+1, i+1, A11, opts, B, lrb);
           }
             }
           }
@@ -918,29 +918,50 @@ namespace strumpack {
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::LUAR_B11
     (std::size_t i, std::size_t j,
-     std::size_t kmax, DenseMatrix<scalar_t>&A11, const BLROptions<scalar_t>& opts, int* B){
-#if 0
+     std::size_t kmax, DenseMatrix<scalar_t>&A11, const BLROptions<scalar_t>& opts, int* B, int lrb){
+#if 1
 //Star Tree
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-#pragma omp taskwait
-#endif
+//#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+//#pragma omp taskwait
+//#endif
 {
       std::size_t rank_sum=0;
-      auto Aij = tile(A11, i, j);
+      #pragma omp taskgroup task_reduction(+:rank_sum)
+      {
       for (std::size_t k=0; k<kmax; k++) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+              std::size_t ij = i+lrb*j, ik = i+lrb*k, kj = k+lrb*j;
+          #pragma omp task default(shared) firstprivate(i,j,k,ik,kj,ij)       \
+            depend(in:B[ik],B[kj]) depend(inout:B[ij]) in_reduction(+:rank_sum)
+          #endif 
+      {
+        
         if(!(tile(i, k).is_low_rank() || tile(k, j).is_low_rank())){ //both tiles are dense, then gemm directly
-          gemm(Trans::N, Trans::N, scalar_t(-1.),
-                     tile(i, k), tile(k, j), scalar_t(1.), Aij);
+          
+            auto Aij = tile(A11, i, j);
+            gemm(Trans::N, Trans::N, scalar_t(-1.),
+                      tile(i, k), tile(k, j), scalar_t(1.), Aij);
+
         } 
         else{ // collect size of LR matrices
-          rank_sum+=std::min(tile(i, k).rank(), tile(k, j).rank());
+          std::size_t min_rank=std::min(tile(i, k).rank(), tile(k, j).rank());
+          //#pragma omp atomic
+          rank_sum+=min_rank;
         } 
       }
+      }
+      }
       if(rank_sum>0){
+        auto Aij = tile(A11, i, j);
         DenseMatrix<scalar_t> Uall(Aij.rows(), rank_sum);
         DenseMatrix<scalar_t> Vall(rank_sum, Aij.cols());
         std::size_t rank_tmp=0;
         for (std::size_t k=0; k<kmax; k++) {
+          #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+              std::size_t ij = i+lrb*j, ik = i+lrb*k, kj = k+lrb*j;
+          #pragma omp task default(shared) firstprivate(i,j,k,ik,kj,ij)       \
+            depend(in:B[ik],B[kj]) depend(inout:B[ij]) in_reduction(+:rank_sum)
+          #endif 
           if(tile(i, k).is_low_rank() || tile(k, j).is_low_rank()){ // multiply the tiles and then gemm
             //LRTile<scalar_t> t=tile(i,k).multiply(tile(k,j));
             //Uall.copy_topos(t.U(),0,rank_tmp);
