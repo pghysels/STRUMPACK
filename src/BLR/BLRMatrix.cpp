@@ -228,20 +228,20 @@ namespace strumpack {
           }
 #else //LUAR-Update
           for (std::size_t j=i+1; j<rb; j++){
-/*#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t ij = (i+1)+rb*j;
-#pragma omp task default(shared) firstprivate(i,j,ij)   \
-  depend(inout:B[ij]) priority(rb-j)
-#endif*/
+/* #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+              std::size_t ij = (i+1)+rb*j, i0=0;
+#pragma omp task default(shared) firstprivate(i,j,ij,i0)   \
+  depend(in:B[i0:ij]) depend(inout:B[ij]) 
+#endif */
           {
             this->LUAR_B11(i+1, j, i+1, A, opts, B);
           }
             if(j!=i+1){
-/*#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t ji = j+rb*(i+1);
+/* #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+              std::size_t ji = j+rb*(i+1), i0=0;
 #pragma omp task default(shared) firstprivate(i,j,ji)   \
-  depend(inout:B[ji]) priority(rb-j)
-#endif*/
+  depend(in:B[i0:ji]) depend(inout:B[ji]) 
+#endif */
           {
               this->LUAR_B11(j, i+1, i+1, A, opts, B);
           }
@@ -837,23 +837,29 @@ namespace strumpack {
           }
 #else
 //LUAR-Update
+std::cout << "LUAR" << std::endl;
           for (std::size_t j=i+1; j<rb; j++){
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t ij = (i+1)+lrb*j, i0 = i+1, j0=j*lrb;
+/*#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+              std::size_t ij = (i+1)+lrb*j, i0 = i+1, iend= lrb*lrb-i0, end=lrb*lrb, j0=j*lrb;
 #pragma omp task default(shared) firstprivate(i,j,ij)   \
-  depend(inout:B[ij]) depend(in:B[i0:i0:lrb], in:B[j0:i0:1]) priority(rb-j)
-#endif
+  depend(inout:B[ij]) depend(in:B[0:end],B[0:end]) priority(rb-j)
+#endif*/
           {
-            B11.LUAR_B11(i+1, j, i+1, A11, opts, B, lrb);
+            std::cout << "before B11" << std::endl;
+            B11.LUAR_B11(i+1, j, i+1, A11, opts, B);
+            std::cout << "after B11" << std::endl;
           }
             if(j!=i+1){
 /*#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t ji = j+lrb*(i+1);
+              std::size_t ji = j+lrb*(i+1), i0 = (i+1)*lrb, i1=i+1, jend= lrb*lrb-j, end=lrb*lrb;
 #pragma omp task default(shared) firstprivate(i,j,ji)   \
-  depend(inout:B[ji]) priority(rb-j)
+  depend(inout:B[ji]) depend(in:B[0:end],B[0:end]) priority(rb-j)
 #endif*/
+//  depend(inout:B[ji]) depend(in:B[i0:i0:lrb],B[j0:i0:1]) priority(rb-j)
           {
-              B11.LUAR_B11(j, i+1, i+1, A11, opts, B, lrb);
+              std::cout << "2. before B11" << std::endl;
+              B11.LUAR_B11(j, i+1, i+1, A11, opts, B);
+              std::cout << "2. after B11" << std::endl;
           }
             }
           }
@@ -918,50 +924,60 @@ namespace strumpack {
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::LUAR_B11
     (std::size_t i, std::size_t j,
-     std::size_t kmax, DenseMatrix<scalar_t>&A11, const BLROptions<scalar_t>& opts, int* B, int lrb){
+     std::size_t kmax, DenseMatrix<scalar_t>&A11, const BLROptions<scalar_t>& opts, int* B){
 #if 1
 //Star Tree
-//#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-//#pragma omp taskwait
-//#endif
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+#pragma omp taskwait
+#endif
+//auto rb = rowblocks();
+/* #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+              std::size_t ij = i+rb*j, end=rb*rb-1;
+#pragma omp task default(shared) firstprivate(i,j,ij)   \
+  depend(inout:B[ij]) depend(inout:B[0:end]) priority(rb-j)
+#endif */
 {
       std::size_t rank_sum=0;
-      #pragma omp taskgroup task_reduction(+:rank_sum)
-      {
-      for (std::size_t k=0; k<kmax; k++) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t ij = i+lrb*j, ik = i+lrb*k, kj = k+lrb*j;
-          #pragma omp task default(shared) firstprivate(i,j,k,ik,kj,ij)       \
-            depend(in:B[ik],B[kj]) depend(inout:B[ij]) in_reduction(+:rank_sum)
-          #endif 
-      {
+      //std::cout << "ranksum= " << rank_sum << std::endl;
+      //std::cout << "i,j= " << i  << ", " << j << std::endl;
+      //#pragma omp taskgroup
+      //{
+        for (std::size_t k=0; k<kmax; k++) {
+          //std::cout << "k= " << k << std::endl;
+          auto Aij = tile(A11, i, j);
+/* #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+         std::size_t ij = i+rb*j, ik = i+rb*k, kj = k+rb*j;
+     #pragma omp task default(shared) firstprivate(i,j,k,ik,kj,ij)      \
+            depend(in:B[ik],B[kj]) depend(inout:B[ij]) reduction(+:rank_sum)
+#endif  */
+          {
         
-        if(!(tile(i, k).is_low_rank() || tile(k, j).is_low_rank())){ //both tiles are dense, then gemm directly
-          
-            auto Aij = tile(A11, i, j);
-            gemm(Trans::N, Trans::N, scalar_t(-1.),
-                      tile(i, k), tile(k, j), scalar_t(1.), Aij);
-
-        } 
-        else{ // collect size of LR matrices
-          std::size_t min_rank=std::min(tile(i, k).rank(), tile(k, j).rank());
-          //#pragma omp atomic
-          rank_sum+=min_rank;
-        } 
-      }
-      }
-      }
+            if(!(tile(i, k).is_low_rank() || tile(k, j).is_low_rank())){ //both tiles are dense, then gemm directly
+                //std::cout << "if ranksum= " << rank_sum << std::endl;
+                gemm(Trans::N, Trans::N, scalar_t(-1.),
+                          tile(i, k), tile(k, j), scalar_t(1.), Aij);
+            } 
+            else{ // collect size of LR matrices
+              //#pragma omp atomic
+              //std::cout << "else ranksum= " << rank_sum << std::endl;
+              rank_sum+=std::min(tile(i, k).rank(), tile(k, j).rank());
+            } 
+            //std::cout << "end ranksum= " << rank_sum << std::endl;
+          }
+        }
+      //}
+      
       if(rank_sum>0){
         auto Aij = tile(A11, i, j);
         DenseMatrix<scalar_t> Uall(Aij.rows(), rank_sum);
         DenseMatrix<scalar_t> Vall(rank_sum, Aij.cols());
         std::size_t rank_tmp=0;
         for (std::size_t k=0; k<kmax; k++) {
-          #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t ij = i+lrb*j, ik = i+lrb*k, kj = k+lrb*j;
-          #pragma omp task default(shared) firstprivate(i,j,k,ik,kj,ij)       \
-            depend(in:B[ik],B[kj]) depend(inout:B[ij]) in_reduction(+:rank_sum)
-          #endif 
+          // #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+          //     std::size_t ij = i+lrb*j, ik = i+lrb*k, kj = k+lrb*j;
+          // #pragma omp task default(shared) firstprivate(i,j,k,ik,kj,ij)      
+          //   depend(in:B[ik],B[kj]) depend(inout:B[ij]) in_reduction(+:rank_sum)
+          // #endif 
           if(tile(i, k).is_low_rank() || tile(k, j).is_low_rank()){ // multiply the tiles and then gemm
             //LRTile<scalar_t> t=tile(i,k).multiply(tile(k,j));
             //Uall.copy_topos(t.U(),0,rank_tmp);
