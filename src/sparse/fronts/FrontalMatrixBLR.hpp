@@ -231,7 +231,13 @@ namespace strumpack {
           (A, opts, etree_level+1, task_depth);
     }
     TaskTimer t("");
-    if (etree_level == 0 && opts.print_root_front_stats()) t.start();
+    long long int f0 = 0, ftot = 0;
+    if (etree_level == 0 && opts.print_root_front_stats()){
+#if defined(STRUMPACK_COUNT_FLOPS)
+      f0 = params::flops;
+#endif
+      t.start();
+    }
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();
     if (opts.BLR_options().low_rank_algorithm() ==
@@ -325,6 +331,10 @@ namespace strumpack {
                 << " , " << float(nnz) / (dim_sep()*dim_sep()) * 100.
                 << " % compression, time = " << time
                 << " sec" << std::endl;
+#if defined(STRUMPACK_COUNT_FLOPS)
+      ftot = params::flops - f0;
+      std::cout << "#   - BLR root front: factor flops = " << double(ftot) << std::endl;
+#endif 
     }
   }
 
