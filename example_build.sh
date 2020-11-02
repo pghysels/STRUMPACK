@@ -47,8 +47,7 @@ if [[ $(dnsdomainname) = "summit.olcf.ornl.gov" ]]; then
           -DTPL_ENABLE_ZFP=OFF \
           -DTPL_ENABLE_SLATE=ON \
           -DTPL_SLATE_INCLUDE_DIRS="$SLATEHOME/include/;$SLATEHOME/blaspp/include;$SLATEHOME/lapackpp/include" \
-          -DTPL_SLATE_LIBRARIES="$SLATEHOME/lib/libslate_scalapack_api.so;$SLATEHOME/lib/libslate.so;$SLATEHOME/blaspp/lib/libblaspp.so;$SLATEHOME/lapackpp/lib/liblapackpp.so"
-
+          -DTPL_SLATE_LIBRARIES="$SLATEHOME/lib/libslate.so;$SLATEHOME/blaspp/lib/libblaspp.so;$SLATEHOME/lapackpp/lib/liblapackpp.so"
 fi
 
 if [[ $NERSC_HOST = "cori" ]]; then
@@ -162,6 +161,26 @@ if [[ $(hostname -s) = "tulip" ]]; then
           -DTPL_SCALAPACK_LIBRARIES="${SCALAPACK_HOME}/lib64/libscalapack.a"
 fi
 
+
+if [[ $(hostname -s) = "cs-it-7098760" ]]; then
+    export SCOTCH_DIR=$HOME/local/scotch_6.1.0
+    export ButterflyPACK_DIR=$HOME/LBL/ButterflyPACK/install/
+    export ZFP_DIR=$HOME/local/zfp/install/
+    export SLATEHOME=$HOME/local/slate/
+    export MAGMA_DIR=$HOME/local/magma-2.5.4/install/
+    cmake ../ \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX=../install \
+          -DSTRUMPACK_COUNT_FLOPS=ON \
+          -DSTRUMPACK_USE_CUDA=ON \
+          -DCMAKE_CUDA_ARCHITECTURES=75 \
+          -DSTRUMPACK_USE_HIP=OFF \
+          -DTPL_ENABLE_MAGMA=OFF \
+          -DTPL_ENABLE_SLATE=OFF \
+          -DTPL_SLATE_INCLUDE_DIRS="$SLATEHOME/include/;$SLATEHOME/blaspp/include;$SLATEHOME/lapackpp/include" \
+          -DTPL_SLATE_LIBRARIES="$SLATEHOME/lib/libslate_scalapack_api.so;$SLATEHOME/lib/libslate.so;$SLATEHOME/blaspp/lib/libblaspp.so;$SLATEHOME/lapackpp/lib/liblapackpp.so" \
+          -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
+fi
 
 
 if ! $found_host; then
