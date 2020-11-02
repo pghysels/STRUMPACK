@@ -902,10 +902,10 @@ namespace strumpack {
     return is;
   }
 
-  template std::ifstream& operator>>(std::ifstream& is, const DenseMatrix<float>& D);
-  template std::ifstream& operator>>(std::ifstream& is, const DenseMatrix<double>& D);
-  template std::ifstream& operator>>(std::ifstream& is, const DenseMatrix<std::complex<float>>& D);
-  template std::ifstream& operator>>(std::ifstream& is, const DenseMatrix<std::complex<double>>& D);
+  template std::ifstream& operator>>(std::ifstream& is, DenseMatrix<float>& D);
+  template std::ifstream& operator>>(std::ifstream& is, DenseMatrix<double>& D);
+  template std::ifstream& operator>>(std::ifstream& is, DenseMatrix<std::complex<float>>& D);
+  template std::ifstream& operator>>(std::ifstream& is, DenseMatrix<std::complex<double>>& D);
 
 
   /**
