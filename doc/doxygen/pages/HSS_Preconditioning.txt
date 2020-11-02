@@ -34,18 +34,16 @@ void strumpack::SPOptions::set_compression(CompressionType::NONE);
 CompressionType strumpack::SPOptions::compression() const;  // get compression type (none/hss/blr/hodlr)
 \endcode
 
-When HSS compression is enabled, the default STRUMPACK behavior is to
-use the HSS enabled approximate LU factorization as a preconditioner
-within GMRES. This behavior can also be changed, see \link solve
+When compression is enabled, the default STRUMPACK behavior is to use
+the approximate LU factorization as a preconditioner within
+GMRES. This behavior can also be changed, see \link solve
 Solve\endlink.
 
 However, HSS compression has a considerable overhead and only pays off
-for sufficiently large matrices.
-
-Therefore STRUMPACK has a tuning parameter to specify the minimum size
-a dense matrix needs to be to be considered a candidate for HSS
-compression. The minimum dense matrix size for HSS compression is set
-via the command line via
+for sufficiently large matrices. Therefore STRUMPACK has a tuning
+parameter to specify the minimum size a dense matrix needs to be to be
+considered a candidate for HSS compression. The minimum dense matrix
+size for HSS compression is set via the command line via
 
 \code {.bash}
 --sp_compression_min_sep_size int
@@ -58,12 +56,13 @@ void strumpack::SPOptions::set_compression_min_sep_size(int s);
 int strumpack::SPOptions::compression_min_sep_size() const;
 \endcode
 
-The routine \link strumpack::SPOptions::set_HSS_min_sep_size(int s)
-set_HSS_min_sep_size(int s)\endlink refers to the size of the top-left
-block of the front only. This top-left block is the part that
+The routine \link
+strumpack::SPOptions::set_compression_min_sep_size(int s)
+set_compression_min_sep_size(int s)\endlink refers to the size of the
+top-left block of the front only. This top-left block is the part that
 corresponds to a separator, as given by the nested dissection
 reordering algorithm. This top-left block is also referred to as the
-block containing the fully-summed variable. Factorization (LU in the
+block containing the fully-summed variables. Factorization (LU in the
 dense case, ULV in the HSS case) is only applied to this top-left
 block. __Tuning the value for the minimum separator size can have a
 big impact on performance and memory usage!__

@@ -1,6 +1,121 @@
 /*! \page HOD_Preconditioning HODLR & HODBF Preconditioning
 
 
+__HODLR__, or Hierarchically Off-Diagonal Low Rank, is a
+rank-structured format that is similar to HSS, but simpler. It uses
+the same weak admissibility, i.e, all off-diagonal blocks are low
+rank, but it does not use nested bases. Compared to HSS, HODLR
+theoretically has worse asymptotic complexity, but the algorithms
+might be faster in practice for medium sized problems.
 
+__HODBF__ stands for Hierarchically Off-Diagonal Butterfly. HODBF is
+like HODLR except that it uses Butterfly decomposition instead of low
+rank.  The HODBF format was specifically developed for dealing high
+frequency problems.
+
+For a description of the HODBF format and its use in the sparse
+multifrontal solver see:
+   \link https://arxiv.org/abs/2007.00202 https://arxiv.org/abs/2007.00202 \endlink
+
+
+STRUMPACK's HODLR code uses an external library, which can be found
+here:
+   \link https://github.com/liuyangzhuan/ButterflyPACK https://github.com/liuyangzhuan/ButterflyPACK \endlink
+
+See the \ref installation instructions for how to configure and
+compile STRUMPACK with support for HODLR.
+
+
+HODLR compression in the sparse solver can be turned on/off via the
+command line:
+
+\code {.bash}
+--sp_compression hodlr
+--sp_compression none    (disable compression)
+\endcode
+
+or via the C++ API as follows
+
+\code {.cpp}
+void strumpack::SPOptions::set_compression(CompressionType::HODLR);
+void strumpack::SPOptions::set_compression(CompressionType::NONE);
+CompressionType strumpack::SPOptions::compression() const;  // get compression type (none/hss/blr/hodlr)
+\endcode
+
+In order to enable HODBF compression one should set the compression
+type to HODLR, and additionally set
+
+\code {.bash}
+--hodlr_butterfly_levels l
+\endcode
+
+where l is the number of levels in the HODLR hierarchy for which
+butterfly compression is to be used (instead of low-rank). A value of
+1 means only the largest off-diagonal blocks are compressed using
+butterfly. To enable butterfly compression on all levels, simply use a
+large enough value, for instance 100.
+
+
+When compression is enabled, the default STRUMPACK behavior is to use
+the approximate LU factorization as a preconditioner within
+GMRES. This behavior can also be changed, see \link solve
+Solve\endlink.
+
+However, HODLR compression has a considerable overhead and only pays
+off for sufficiently large matrices. Therefore STRUMPACK has a tuning
+parameter to specify the minimum size a dense matrix needs to be to be
+considered a candidate for compression. The minimum dense matrix size
+for compression is set via the command line via
+
+\code {.bash}
+--sp_compression_min_sep_size int
+\endcode
+
+or via the C++ API as follows
+
+\code {.cpp}
+void strumpack::SPOptions::set_compression_min_sep_size(int s);
+int strumpack::SPOptions::compression_min_sep_size() const;
+\endcode
+
+
+
+The above options affect the use of HODLR within the multifrontal
+solver. There are more, HODLR specific, options which are stored in an
+object of type \link strumpack::HODLR
+HODLR::HODLROptions<scalar>\endlink. An object of this type is stored in
+the \link strumpack::SPOptions SPOptions<scalar>\endlink object stored
+in the \link strumpack::StrumpackSparseSolver
+StrumpackSparseSolver\endlink. It can be accessed via the
+HODLR_options() routine as follows:
+
+\code {.cpp}
+strumpack::StrumpackSparseSolver<double> sp;          // create solver object
+sp.options().set_compression(CompressionType::HODLR); // enable HODLR compression in the multifrontal solver
+sp.options().HODLR_options().set_leaf_size(256);      // set the HODLR leaf size
+\endcode
+
+
+__The compression tolerances can greatly impact performance.__ They
+can be set using:
+
+\code
+> --hodlr_rel_tol real (default 0.01)
+> --hodlr_abs_tol real (default 1e-08)
+\endcode
+
+or via the C++ API
+
+\code
+> void strumpack::HODLR::HODLROptions<scalar>::set_rel_tol(real rel_tol);
+> void strumpack::HODLR::HODLROptions<scalar>::set_abs_tol(real abs_tol);
+> real strumpack::HODLR::HODLROptions<scalar>::rel_tol() const;              // get the current value
+> real strumpack::HODLR::HODLROptions<scalar>::abs_tol() const;
+\endcode
+____
+
+Other options are available. See the documentation of \link
+strumpack::HODLR::HODLROptions HODLROptions<scalar>\endlink for more
+detailed information.
 
 */
