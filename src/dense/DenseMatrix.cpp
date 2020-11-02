@@ -878,6 +878,11 @@ namespace strumpack {
       return os;
   }
 
+  template std::ofstream& operator<<(std::ofstream& os, const DenseMatrix<float>& D);
+  template std::ofstream& operator<<(std::ofstream& os, const DenseMatrix<double>& D);
+  template std::ofstream& operator<<(std::ofstream& os, const DenseMatrix<std::complex<float>>& D);
+  template std::ofstream& operator<<(std::ofstream& os, const DenseMatrix<std::complex<double>>& D);
+  
   template<typename scalar_t> std::ifstream&
   operator>>(std::ifstream& is, DenseMatrix<scalar_t>& D) {
     int v[3], vf[3];
@@ -897,6 +902,10 @@ namespace strumpack {
     return is;
   }
 
+  template std::ifstream& operator>>(std::ifstream& is, const DenseMatrix<float>& D);
+  template std::ifstream& operator>>(std::ifstream& is, const DenseMatrix<double>& D);
+  template std::ifstream& operator>>(std::ifstream& is, const DenseMatrix<std::complex<float>>& D);
+  template std::ifstream& operator>>(std::ifstream& is, const DenseMatrix<std::complex<double>>& D);
 
 
   /**
