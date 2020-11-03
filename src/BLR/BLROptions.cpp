@@ -55,6 +55,16 @@ namespace strumpack {
       }
     }
 
+    std::string get_name(BlrFactorAlgorithm a) {
+      switch (a) {
+      case BlrFactorAlgorithm::RL: return "RL"; break;
+      case BlrFactorAlgorithm::LL: return "LL"; break;
+      case BlrFactorAlgorithm::Comb: return "Comb"; break;
+      case BlrFactorAlgorithm::Star: return "Star"; break;
+      default: return "unknown";
+      }
+    }
+
     template<typename scalar_t> void
     BLROptions<scalar_t>::set_from_command_line
     (int argc, const char* const* cargv) {
@@ -74,6 +84,7 @@ namespace strumpack {
          {"blr_low_rank_algorithm",    required_argument, 0, 5},
          {"blr_admissibility",         required_argument, 0, 6},
          {"blr_BACA_blocksize",        required_argument, 0, 7},
+         {"blr_factor_algorithm",      required_argument, 0, 8},
          {"blr_verbose",               no_argument, 0, 'v'},
          {"blr_quiet",                 no_argument, 0, 'q'},
          {"help",                      no_argument, 0, 'h'},
@@ -133,6 +144,22 @@ namespace strumpack {
           iss >> BACA_blocksize_;
           set_BACA_blocksize(BACA_blocksize_);
         } break;
+        case 8: {
+          std::istringstream iss(optarg);
+          std::string s; iss >> s;
+          if (s == "RL")
+            set_BLR_factor_algorithm(BlrFactorAlgorithm::RL);
+          else if (s == "LL")
+            set_BLR_factor_algorithm(BlrFactorAlgorithm::LL);
+          else if (s == "Comb")
+            set_BLR_factor_algorithm(BlrFactorAlgorithm::Comb);
+            else if (s == "Star")
+            set_BLR_factor_algorithm(BlrFactorAlgorithm::Star);
+          else
+            std::cerr << "# WARNING: BLR algorithm not"
+                      << " recognized, use 'RL', 'LL', 'Comb' or 'Star'."
+                      << std::endl;
+        } break;
 
         case 'v': set_verbose(true); break;
         case 'q': set_verbose(false); break;
@@ -164,6 +191,9 @@ namespace strumpack {
                 << "#   --blr_admissibility (default "
                 << get_name(adm_) << ")" << std::endl
                 << "#      should be one of [weak|strong]" << std::endl
+                << "#   --blr_factor_algorithm (default "
+                << get_name(blr_algo_) << ")" << std::endl
+                << "#      should be [RL|LL|Comb|Star]" << std::endl
                 << "#   --blr_BACA_blocksize int (default "
                 << BACA_blocksize() << ")" << std::endl
                 << "#   --blr_verbose or -v (default "

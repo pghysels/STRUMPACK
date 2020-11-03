@@ -60,6 +60,9 @@ namespace strumpack {
     enum class Admissibility { STRONG, WEAK };
     std::string get_name(Admissibility a);
 
+    enum class BlrFactorAlgorithm { RL, LL, Comb, Star };
+    std::string get_name(BlrFactorAlgorithm a);
+
     template<typename scalar_t> class BLROptions {
       using real_t = typename RealType<scalar_t>::value_type;
 
@@ -72,6 +75,8 @@ namespace strumpack {
       LowRankAlgorithm lr_algo_ = LowRankAlgorithm::RRQR;
       int BACA_blocksize_ = 4;
       Admissibility adm_ = Admissibility::STRONG;
+      BlrFactorAlgorithm blr_algo_ = BlrFactorAlgorithm::Star;
+
 
     public:
       void set_rel_tol(real_t rel_tol) {
@@ -99,6 +104,9 @@ namespace strumpack {
         assert(B > 0);
         BACA_blocksize_ = B;
       }
+      void set_BLR_factor_algorithm(BlrFactorAlgorithm a) {
+        blr_algo_ = a;
+      }
 
       real_t rel_tol() const { return rel_tol_; }
       real_t abs_tol() const { return abs_tol_; }
@@ -108,6 +116,7 @@ namespace strumpack {
       Admissibility admissibility() const { return adm_; }
       bool verbose() const { return verbose_; }
       int BACA_blocksize() const { return BACA_blocksize_; }
+      BlrFactorAlgorithm BLR_factor_algorithm() const { return blr_algo_; }
 
       void set_from_command_line(int argc, const char* const* cargv);
 
