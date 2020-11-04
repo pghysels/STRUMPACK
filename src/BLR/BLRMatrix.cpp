@@ -943,13 +943,27 @@ namespace strumpack {
           DenseMatrix<scalar_t> Vall(rank_sum, Aij.cols());
           std::size_t rank_tmp=0;
           for (std::size_t k=0; k<kmax; k++) {
-            if(tile(i, k).is_low_rank() || tile(k, j).is_low_rank()){
+            if(tile(i, k).is_low_rank() && tile(k, j).is_low_rank()){
               std::size_t minrank=std::min(tile(i,k).rank(), tile(k,j).rank());
               DenseMatrixWrapper<scalar_t> t1(Aij.rows(), minrank, Uall, 0, rank_tmp), 
               t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
               tile(i,k).multiply(tile(k,j), t1, t2);
               rank_tmp+=minrank;
-            } 
+            }
+            else if (tile(i, k).is_low_rank()){
+              std::size_t minrank=tile(i,k).rank();
+              DenseMatrixWrapper<scalar_t> t1(Aij.rows(), minrank, Uall, 0, rank_tmp), 
+              t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
+              tile(i,k).multiply(tile(k,j), t1, t2);
+              rank_tmp+=minrank;
+            }
+            else if (tile(k, j).is_low_rank()){
+              std::size_t minrank=tile(k,j).rank();
+              DenseMatrixWrapper<scalar_t> t1(Aij.rows(), minrank, Uall, 0, rank_tmp), 
+              t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
+              tile(i,k).multiply(tile(k,j), t1, t2);
+              rank_tmp+=minrank;
+            }
           }
           if (opts.compression_kernel() == CompressionKernel::full){
             //Recompress Uall and Vall
@@ -1142,13 +1156,27 @@ namespace strumpack {
           DenseMatrix<scalar_t> Vall(rank_sum, Aij.cols());
           std::size_t rank_tmp=0;
           for (std::size_t k=0; k<kmax; k++) {
-            if(B11.tile(i, k).is_low_rank() || tile(k, j).is_low_rank()){ // multiply the tiles and then gemm
+            if(B11.tile(i, k).is_low_rank() && tile(k, j).is_low_rank()){
               std::size_t minrank=std::min(B11.tile(i,k).rank(), tile(k,j).rank());
               DenseMatrixWrapper<scalar_t> t1(Aij.rows(), minrank, Uall, 0, rank_tmp), 
               t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
               B11.tile(i,k).multiply(tile(k,j), t1, t2);
               rank_tmp+=minrank;
-            } 
+            }
+            else if (B11.tile(i, k).is_low_rank()){
+              std::size_t minrank=B11.tile(i,k).rank();
+              DenseMatrixWrapper<scalar_t> t1(Aij.rows(), minrank, Uall, 0, rank_tmp), 
+              t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
+              B11.tile(i,k).multiply(tile(k,j), t1, t2);
+              rank_tmp+=minrank;
+            }
+            else if(tile(k, j).is_low_rank()){
+              std::size_t minrank=tile(k,j).rank();
+              DenseMatrixWrapper<scalar_t> t1(Aij.rows(), minrank, Uall, 0, rank_tmp), 
+              t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
+              B11.tile(i,k).multiply(tile(k,j), t1, t2);
+              rank_tmp+=minrank;
+            }
           }
           if (opts.compression_kernel() == CompressionKernel::full){
             //Recompress Uall and Vall
@@ -1341,13 +1369,27 @@ namespace strumpack {
           DenseMatrix<scalar_t> Vall(rank_sum, Aij.cols());
           std::size_t rank_tmp=0;
           for (std::size_t k=0; k<kmax; k++) {
-            if(tile(j, k).is_low_rank() || B11.tile(k, i).is_low_rank()){ // multiply the tiles and then gemm
+            if(tile(j, k).is_low_rank() && B11.tile(k, i).is_low_rank()){
               std::size_t minrank=std::min(tile(j,k).rank(), B11.tile(k,i).rank());
               DenseMatrixWrapper<scalar_t> t1(Aij.rows(), minrank, Uall, 0, rank_tmp), 
               t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
               tile(j,k).multiply(B11.tile(k,i), t1, t2);
               rank_tmp+=minrank;
-            } 
+            }
+            else if(tile(j, k).is_low_rank()){
+              std::size_t minrank=tile(j,k).rank();
+              DenseMatrixWrapper<scalar_t> t1(Aij.rows(), minrank, Uall, 0, rank_tmp), 
+              t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
+              tile(j,k).multiply(B11.tile(k,i), t1, t2);
+              rank_tmp+=minrank;
+            }
+            else if(B11.tile(k, i).is_low_rank()){
+              std::size_t minrank=B11.tile(k,i).rank();
+              DenseMatrixWrapper<scalar_t> t1(Aij.rows(), minrank, Uall, 0, rank_tmp), 
+              t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
+              tile(j,k).multiply(B11.tile(k,i), t1, t2);
+              rank_tmp+=minrank;
+            }
           }
           if (opts.compression_kernel() == CompressionKernel::full){
             //Recompress Uall and Vall
@@ -1720,8 +1762,22 @@ namespace strumpack {
           DenseMatrix<scalar_t> Vall(rank_sum, Aij.cols());
           std::size_t rank_tmp=0;
           for (std::size_t k=0; k<kmax; k++) {
-            if(B21.tile(i, k).is_low_rank() || B12.tile(k, j).is_low_rank()){ // multiply the tiles and then gemm
+            if(B21.tile(i, k).is_low_rank() && B12.tile(k, j).is_low_rank()){
               std::size_t minrank=std::min(B21.tile(i,k).rank(), B12.tile(k,j).rank());
+              DenseMatrixWrapper<scalar_t> t1(Aij.rows(), minrank, Uall, 0, rank_tmp), 
+              t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
+              B21.tile(i,k).multiply(B12.tile(k,j), t1, t2);
+              rank_tmp+=minrank;
+            }
+            else if (B21.tile(i, k).is_low_rank()){
+              std::size_t minrank=B21.tile(i,k).rank();
+              DenseMatrixWrapper<scalar_t> t1(Aij.rows(), minrank, Uall, 0, rank_tmp), 
+              t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
+              B21.tile(i,k).multiply(B12.tile(k,j), t1, t2);
+              rank_tmp+=minrank;
+            }
+            else if(B12.tile(k, j).is_low_rank()){
+              std::size_t minrank=B12.tile(k,j).rank();
               DenseMatrixWrapper<scalar_t> t1(Aij.rows(), minrank, Uall, 0, rank_tmp), 
               t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
               B21.tile(i,k).multiply(B12.tile(k,j), t1, t2);
