@@ -928,9 +928,15 @@ namespace strumpack {
             gemm(Trans::N, Trans::N, scalar_t(-1.),
                 tile(i, k), tile(k, j), scalar_t(1.), Aij);
           } 
-          else{ // collect size of LR matrices
+          else if(tile(i, k).is_low_rank() && tile(k, j).is_low_rank()){
             rank_sum+=std::min(tile(i, k).rank(), tile(k, j).rank());
-          } 
+          }
+          else if(tile(i, k).is_low_rank()){
+            rank_sum+=tile(i, k).rank();
+          }
+          else{
+            rank_sum+=tile(k, j).rank();
+          }
         }
         if(rank_sum>0){
           DenseMatrix<scalar_t> Uall(Aij.rows(), rank_sum);
@@ -981,13 +987,21 @@ namespace strumpack {
         std::size_t rank_sum=0;
         auto Aij = tile(A11, i, j);
         for (std::size_t k=0; k<kmax; k++) {
-          if(!(tile(i, k).is_low_rank() || tile(k, j).is_low_rank())){
+          if(!(tile(i, k).is_low_rank() || tile(k, j).is_low_rank())){ // both tiles are DenseTiles
             gemm(Trans::N, Trans::N, scalar_t(-1.),
                      tile(i, k), tile(k, j), scalar_t(1.), Aij);
           } 
-          else{ // collect size of LR matrices
+          else if(tile(i, k).is_low_rank() && tile(k, j).is_low_rank()){ // both tiles are LR, collect size of LR matrices
             ranks_idx.emplace_back(std::min(tile(i, k).rank(), tile(k, j).rank()),k);
             rank_sum += std::min(tile(i, k).rank(), tile(k, j).rank());
+          } 
+          else if(tile(i, k).is_low_rank()){ // collect size of LR matrix
+            ranks_idx.emplace_back(tile(i, k).rank(),k);
+            rank_sum += tile(i, k).rank();
+          } 
+          else{ // collect size of LR matrix
+            ranks_idx.emplace_back(tile(k, j).rank(),k);
+            rank_sum += tile(k, j).rank();
           } 
         }
         if(rank_sum>0){
@@ -1113,9 +1127,15 @@ namespace strumpack {
             gemm(Trans::N, Trans::N, scalar_t(-1.),
                       B11.tile(i, k), tile(k, j), scalar_t(1.), Aij);
           } 
-          else{ // collect size of LR matrices
+          else if(B11.tile(i, k).is_low_rank() && tile(k, j).is_low_rank()){
             rank_sum+=std::min(B11.tile(i, k).rank(), tile(k, j).rank());
-          } 
+          }
+          else if(B11.tile(i, k).is_low_rank()){
+            rank_sum+=B11.tile(i, k).rank();
+          }
+          else{
+            rank_sum+=tile(k, j).rank();
+          }
         }
         if(rank_sum>0){
           DenseMatrix<scalar_t> Uall(Aij.rows(), rank_sum);
@@ -1170,9 +1190,17 @@ namespace strumpack {
             gemm(Trans::N, Trans::N, scalar_t(-1.),
                       B11.tile(i, k), tile(k, j), scalar_t(1.), Aij);
           } 
-          else{ // collect size of LR matrices
+          else if(B11.tile(i, k).is_low_rank() && tile(k, j).is_low_rank()){ //both tiles are LR, collect size of LR matrices
             ranks_idx.emplace_back(std::min(B11.tile(i, k).rank(), tile(k, j).rank()),k);
             rank_sum += std::min(B11.tile(i, k).rank(), tile(k, j).rank());
+          } 
+          else if(B11.tile(i, k).is_low_rank()){ // collect size of LR matrix
+            ranks_idx.emplace_back(B11.tile(i, k).rank(),k);
+            rank_sum += B11.tile(i, k).rank();
+          } 
+          else{ // collect size of LR matrix
+            ranks_idx.emplace_back(tile(k, j).rank(),k);
+            rank_sum += tile(k, j).rank();
           } 
         }
         if(rank_sum>0){
@@ -1298,9 +1326,15 @@ namespace strumpack {
             gemm(Trans::N, Trans::N, scalar_t(-1.),
                       tile(j, k), B11.tile(k, i), scalar_t(1.), Aij);
           } 
-          else{ // collect size of LR matrices
+          else if(tile(j, k).is_low_rank() && B11.tile(k, i).is_low_rank()){
             rank_sum+=std::min(tile(j, k).rank(), B11.tile(k, i).rank());
-          } 
+          }
+          else if(tile(j, k).is_low_rank()){
+            rank_sum+=tile(j, k).rank();
+          }
+          else{
+            rank_sum+=B11.tile(k, i).rank();
+          }
         }
         if(rank_sum>0){
           DenseMatrix<scalar_t> Uall(Aij.rows(), rank_sum);
@@ -1355,9 +1389,17 @@ namespace strumpack {
             gemm(Trans::N, Trans::N, scalar_t(-1.),
                       tile(j, k), B11.tile(k, i), scalar_t(1.), Aij);
           } 
-          else{ // collect size of LR matrices
+          else if(tile(j, k).is_low_rank() && B11.tile(k, i).is_low_rank()){ // both tiles are LR, collect size of LR matrices
             ranks_idx.emplace_back(std::min(tile(j, k).rank(), B11.tile(k, i).rank()),k);
             rank_sum += std::min(tile(j, k).rank(), B11.tile(k, i).rank());
+          } 
+          else if(tile(j, k).is_low_rank()){ // collect size of LR matrix
+            ranks_idx.emplace_back(tile(j, k).rank(),k);
+            rank_sum += tile(j, k).rank();
+          } 
+          else{ // collect size of LR matrix
+            ranks_idx.emplace_back(B11.tile(k, i).rank(),k);
+            rank_sum += B11.tile(k, i).rank();
           } 
         }
         if(rank_sum>0){
@@ -1663,8 +1705,14 @@ namespace strumpack {
             gemm(Trans::N, Trans::N, scalar_t(-1.),
                  B21.tile(i, k), B12.tile(k, j), scalar_t(1.), Aij);  
           }
-          else{
+          else if(B21.tile(i, k).is_low_rank() && B12.tile(k, j).is_low_rank()){
             rank_sum+=std::min(B21.tile(i, k).rank(), B12.tile(k, j).rank());
+          }
+          else if(B21.tile(i, k).is_low_rank()){
+            rank_sum+=B21.tile(i, k).rank();
+          }
+          else{
+            rank_sum+=B12.tile(k, j).rank();
           }
         }
         if(rank_sum>0){
@@ -1719,10 +1767,18 @@ namespace strumpack {
             gemm(Trans::N, Trans::N, scalar_t(-1.),
                  B21.tile(i, k), B12.tile(k, j), scalar_t(1.), Aij);
           }
-          else{ // collect size of LR matrices
+          else if(B21.tile(i, k).is_low_rank() && B12.tile(k, j).is_low_rank()){ // both tiles are LR, collect size of LR matrices
             ranks_idx.emplace_back(std::min(B21.tile(i, k).rank(), B12.tile(k, j).rank()),k);
             rank_sum += std::min(B21.tile(i, k).rank(), B12.tile(k, j).rank());
-          } 
+          }
+          else if(B21.tile(i, k).is_low_rank()){
+            ranks_idx.emplace_back(B21.tile(i, k).rank(),k);
+            rank_sum += B21.tile(i, k).rank();
+          }
+          else{
+            ranks_idx.emplace_back(B12.tile(k, j).rank(),k);
+            rank_sum += B12.tile(k, j).rank();
+          }
         }
         if(rank_sum>0){
           if(ranks_idx.size()>1){
