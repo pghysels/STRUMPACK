@@ -35,7 +35,7 @@
 #include <iostream>
 
 // is thrust available on ROCm?
-#include <thrust/complex.h>
+// #include <thrust/complex.h>
 
 // this is valid for compute capability 3.5 -> 8.0 (and beyond?)
 //const unsigned int MAX_BLOCKS_X = 4294967295; // 2^32-1
@@ -52,7 +52,7 @@ namespace strumpack {
      * to compute norms or absolute value.
      */
     template<class T> struct real_type { typedef T value_type; };
-    template<class T> struct real_type<thrust::complex<T>> { typedef T value_type; };
+    // template<class T> struct real_type<thrust::complex<T>> { typedef T value_type; };
     template<class T> struct real_type<std::complex<T>> { typedef T value_type; };
 
     /**
@@ -62,8 +62,8 @@ namespace strumpack {
      * doesn't have a no-argument default constructor.
      */
     template<class T> struct primitive_type { typedef T value_type; };
-    template<> struct primitive_type<thrust::complex<float>> { typedef float2 value_type; };
-    template<> struct primitive_type<thrust::complex<double>> { typedef double2 value_type; };
+    // template<> struct primitive_type<thrust::complex<float>> { typedef float2 value_type; };
+    // template<> struct primitive_type<thrust::complex<double>> { typedef double2 value_type; };
     template<> struct primitive_type<std::complex<float>> { typedef float2 value_type; };
     template<> struct primitive_type<std::complex<double>> { typedef double2 value_type; };
 
@@ -71,7 +71,7 @@ namespace strumpack {
      * Get the corresponding thrust::complex for std::complex
      */
     template<class T> struct cuda_type { typedef T value_type; };
-    template<class T> struct cuda_type<std::complex<T>> { typedef thrust::complex<T> value_type; };
+    // template<class T> struct cuda_type<std::complex<T>> { typedef thrust::complex<T> value_type; };
 
 
     /**
@@ -333,8 +333,10 @@ namespace strumpack {
 
     __device__ float real_part(float& a) { return a; }
     __device__ double real_part(double& a) { return a; }
-    __device__ float real_part(thrust::complex<float>& a) { return a.real(); }
-    __device__ double real_part(thrust::complex<double>& a) { return a.real(); }
+    // __device__ float real_part(thrust::complex<float>& a) { return a.real(); }
+    // __device__ double real_part(thrust::complex<double>& a) { return a.real(); }
+    __device__ float real_part(std::complex<float>& a) { return a.real(); }
+    __device__ double real_part(std::complex<double>& a) { return a.real(); }
 
     template<typename T, int NT, typename real_t> __global__ void
     LU_block_kernel_batched(FrontData<T>* dat, bool replace, real_t thresh) {
