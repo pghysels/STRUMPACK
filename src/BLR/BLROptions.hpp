@@ -63,6 +63,9 @@ namespace strumpack {
     enum class BlrFactorAlgorithm { RL, LL, Comb, Star };
     std::string get_name(BlrFactorAlgorithm a);
 
+    enum class CompressionKernel { half, full };
+    std::string get_name(CompressionKernel a);
+
     template<typename scalar_t> class BLROptions {
       using real_t = typename RealType<scalar_t>::value_type;
 
@@ -76,6 +79,7 @@ namespace strumpack {
       int BACA_blocksize_ = 4;
       Admissibility adm_ = Admissibility::STRONG;
       BlrFactorAlgorithm blr_algo_ = BlrFactorAlgorithm::Star;
+      CompressionKernel crn_krnl_ = CompressionKernel::half;
 
 
     public:
@@ -107,6 +111,9 @@ namespace strumpack {
       void set_BLR_factor_algorithm(BlrFactorAlgorithm a) {
         blr_algo_ = a;
       }
+      void set_compression_kernel(CompressionKernel a) {
+        crn_krnl_ = a; 
+      }
 
       real_t rel_tol() const { return rel_tol_; }
       real_t abs_tol() const { return abs_tol_; }
@@ -117,6 +124,7 @@ namespace strumpack {
       bool verbose() const { return verbose_; }
       int BACA_blocksize() const { return BACA_blocksize_; }
       BlrFactorAlgorithm BLR_factor_algorithm() const { return blr_algo_; }
+      CompressionKernel compression_kernel() const { return crn_krnl_; }
 
       void set_from_command_line(int argc, const char* const* cargv);
 
