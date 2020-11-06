@@ -193,7 +193,9 @@ if ! $found_host; then
 
     cmake ../ \
           -DCMAKE_BUILD_TYPE=Debug \
-          -DCMAKE_INSTALL_PREFIX=../install
+          -DCMAKE_INSTALL_PREFIX=../install \
+          -DTPL_LAPACK_LIBRARIES="/usr/local/opt/lapack/lib/liblapack.dylib"
+          -DTPL_BLAS_LIBRARIES="/usr/local/opt/blas/lib/libopenblas.a"
 
     ## if not found automatically, you can specify BLAS/LAPACK/SCALAPACK as:
     #  -DTPL_BLAS_LIBRARIES="/usr/lib/x86_64-linux-gnu/libopenblas.a"
