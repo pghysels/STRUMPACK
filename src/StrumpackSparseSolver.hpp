@@ -204,7 +204,7 @@ namespace strumpack {
      */
     void update_matrix_values(const CSRMatrix<scalar_t,integer_t>& A);
 
-  private:
+  protected:
     void setup_tree() override;
     void setup_reordering() override;
     int compute_reordering(const int* p, int base,
