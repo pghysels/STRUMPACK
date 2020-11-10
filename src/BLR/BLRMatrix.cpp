@@ -1051,87 +1051,89 @@ namespace strumpack {
               DenseMatrixWrapper<scalar_t> t1(Aij.rows(), ranks_idx[k].first, Uall, 0, rank_tmp), 
               t2(ranks_idx[k].first, Aij.cols(), Vall, rank_tmp, 0);
               tile(i,ranks_idx[k].second).multiply(tile(ranks_idx[k].second,j), t1, t2);
-              if (ranks_idx.size()>2){
-                if (opts.compression_kernel() == CompressionKernel::full){
-                  //Recompress Uall and Vall
-                  DenseMatrix<scalar_t> UU, UV;
-                  Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> VU, VV;
-                  Vall.low_rank(VU, VV, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> tmp1(UV.rows(), VU.cols());
-                  gemm(Trans::N, Trans::N, scalar_t(1.), UV, VU, scalar_t(0.), tmp1);
-                  if (UU.cols() > VU.cols()) {
-                    //(UU*(UV * VU)) *VV
-                    DenseMatrix<scalar_t> tmp2(UU.rows(), tmp1.cols());
-                    gemm(Trans::N, Trans::N, scalar_t(1.), UU, tmp1, scalar_t(0.), tmp2);
-                    if (k==ranks_idx.size()-1){
-                      gemm(Trans::N, Trans::N, scalar_t(-1.), tmp2, VV, scalar_t(1.), Aij);
-                    }
-                    else{
-                      tmpU.copy_topos(tmp2,0,0);
-                      tmpV.copy_topos(VV,0,0);
-                      rank_tmp = tmp2.cols();
-                    }
+              if (opts.compression_kernel() == CompressionKernel::full){
+                //Recompress Uall and Vall
+                DenseMatrix<scalar_t> UU, UV;
+                Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
+                DenseMatrix<scalar_t> VU, VV;
+                Vall.low_rank(VU, VV, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
+                DenseMatrix<scalar_t> tmp1(UV.rows(), VU.cols());
+                gemm(Trans::N, Trans::N, scalar_t(1.), UV, VU, scalar_t(0.), tmp1);
+                if (UU.cols() > VU.cols()) {
+                  //(UU*(UV * VU)) *VV
+                  DenseMatrix<scalar_t> tmp2(UU.rows(), tmp1.cols());
+                  gemm(Trans::N, Trans::N, scalar_t(1.), UU, tmp1, scalar_t(0.), tmp2);
+                  if (k==ranks_idx.size()-1){
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), tmp2, VV, scalar_t(1.), Aij);
                   }
                   else{
-                  // UU* ((UV * VU)*VV)
-                    DenseMatrix<scalar_t> tmp2(tmp1.rows(), VV.cols());
-                    gemm(Trans::N, Trans::N, scalar_t(1.), tmp1, VV, scalar_t(0.), tmp2);
-                    if (k==ranks_idx.size()-1){
-                      gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp2, scalar_t(1.), Aij);
-                    }
-                    else{
-                      tmpU.copy_topos(UU,0,0);
-                      tmpV.copy_topos(tmp2,0,0);
-                      rank_tmp = UU.cols();
-                    }
+                    tmpU.copy_topos(tmp2,0,0);
+                    tmpV.copy_topos(VV,0,0);
+                    rank_tmp = tmp2.cols();
                   }
                 }
                 else{
-                  //Recompress Uall only
-                  DenseMatrix<scalar_t> UU, UV;
-                  Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> tmp1(UV.rows(), Vall.cols());
-                  gemm(Trans::N, Trans::N, scalar_t(1.), UV, Vall, scalar_t(0.), tmp1);
+                  // UU* ((UV * VU)*VV)
+                  DenseMatrix<scalar_t> tmp2(tmp1.rows(), VV.cols());
+                  gemm(Trans::N, Trans::N, scalar_t(1.), tmp1, VV, scalar_t(0.), tmp2);
                   if (k==ranks_idx.size()-1){
-                    gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp1, scalar_t(1.), Aij);
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp2, scalar_t(1.), Aij);
                   }
                   else{
                     tmpU.copy_topos(UU,0,0);
-                    tmpV.copy_topos(tmp1,0,0);
+                    tmpV.copy_topos(tmp2,0,0);
                     rank_tmp = UU.cols();
                   }
                 }
               }
-              else{ // rank_idx.size=2
-                if (opts.compression_kernel() == CompressionKernel::full){
-                //Recompress Uall and Vall
-                  DenseMatrix<scalar_t> UU, UV;
-                  Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> VU, VV;
-                  Vall.low_rank(VU, VV, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> tmp1(UV.rows(), VU.cols());
-                  gemm(Trans::N, Trans::N, scalar_t(1.), UV, VU, scalar_t(0.), tmp1);
-                  if (UU.cols() > VU.cols()) {
-                    //(UU*(UV * VU)) *VV
-                    DenseMatrix<scalar_t> tmp2(UU.rows(), tmp1.cols());
-                    gemm(Trans::N, Trans::N, scalar_t(1.), UU, tmp1, scalar_t(0.), tmp2);
-                    gemm(Trans::N, Trans::N, scalar_t(-1.), tmp2, VV, scalar_t(1.), Aij);
+              else{ //Recompress Uall OR Vall
+                if (Uall.rows() > Vall.cols()){
+                  // (Uall * U1) *V1
+                  DenseMatrix<scalar_t> U1, V1;
+                  Vall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
+                  if (k==ranks_idx.size()-1){
+                    DenseMatrix<scalar_t> tmp(Uall.rows(), U1.cols());
+                    gemm(Trans::N, Trans::N, scalar_t(1.), Uall, U1, scalar_t(0.), tmp);
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), tmp, V1, scalar_t(1.), Aij);
                   }
                   else{
-                    DenseMatrix<scalar_t> tmp2(tmp1.rows(), VV.cols());
-                    gemm(Trans::N, Trans::N, scalar_t(1.), tmp1, VV, scalar_t(0.), tmp2);
-                    gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp2, scalar_t(1.), Aij);
+                    DenseMatrixWrapper<scalar_t> t1(Uall.rows(), U1.cols(), tmpU, 0, 0), 
+                    t2(V1.rows(), V1.cols(), tmpV, 0, 0);
+                    gemm(Trans::N, Trans::N, scalar_t(1.), Uall, U1, scalar_t(0.), t1);
+                    t2=V1;
+                    rank_tmp = U1.cols();
                   }
                 }
                 else{
-                //Recompress Uall only
-                  DenseMatrix<scalar_t> UU, UV;
-                  Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> tmp1(UV.rows(), Vall.cols());
-                  gemm(Trans::N, Trans::N, scalar_t(1.), UV, Vall, scalar_t(0.), tmp1);
-                  gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp1, scalar_t(1.), Aij);
+                  // U1 * (V1 * Vall)
+                  DenseMatrix<scalar_t> U1, V1;
+                  Uall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
+                  if (k==ranks_idx.size()-1){
+                    DenseMatrix<scalar_t> tmp(V1.rows(), Vall.cols());
+                    gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), tmp);
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), U1, tmp, scalar_t(1.), Aij); 
+                  }
+                  else{
+                    DenseMatrixWrapper<scalar_t> t1(U1.rows(), U1.cols(), tmpU, 0, 0), 
+                    t2(V1.rows(), Vall.cols(), tmpV, 0, 0);
+                    t1=U1;
+                    gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), t2);
+                    rank_tmp = U1.cols();
+                  }
                 }
+                /* //Recompress Uall only
+                DenseMatrix<scalar_t> U1, V1;
+                Uall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
+                DenseMatrix<scalar_t> tmp(V1.rows(), Vall.cols());
+                gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), tmp);
+                if (k==ranks_idx.size()-1){
+                  gemm(Trans::N, Trans::N, scalar_t(-1.), U1, tmp, scalar_t(1.), Aij); 
+                }
+                else{
+                  tmpU.copy_topos(U1,0,0);
+                  tmpV.copy_topos(tmp,0,0);
+                  rank_tmp = U1.cols();
+                }*/
               }
             }
           }
@@ -1215,13 +1217,29 @@ namespace strumpack {
               gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp2, scalar_t(1.), Aij);
             }
           }
-          else{ 
-            //Recompress Uall only
+          else{ //Recompress Uall OR Vall
+            if (Uall.rows() > Vall.cols()){
+              // (Uall * U1) *V1
+              DenseMatrix<scalar_t> U1, V1;
+              Vall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
+              DenseMatrix<scalar_t> tmp(Uall.rows(), U1.cols());
+              gemm(Trans::N, Trans::N, scalar_t(1.), Uall, U1, scalar_t(0.), tmp);
+              gemm(Trans::N, Trans::N, scalar_t(-1.), tmp, V1, scalar_t(1.), Aij);
+            }
+            else{
+              // U1 * (V1 * Vall)
+              DenseMatrix<scalar_t> U1, V1;
+              Uall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
+              DenseMatrix<scalar_t> tmp(V1.rows(), Vall.cols());
+              gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), tmp);
+              gemm(Trans::N, Trans::N, scalar_t(-1.), U1, tmp, scalar_t(1.), Aij);
+            }
+            /* //Recompress Uall only
             DenseMatrix<scalar_t> U1, V1;
             Uall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
             DenseMatrix<scalar_t> tmp(V1.rows(), Vall.cols());
             gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), tmp);
-            gemm(Trans::N, Trans::N, scalar_t(-1.), U1, tmp, scalar_t(1.), Aij);
+            gemm(Trans::N, Trans::N, scalar_t(-1.), U1, tmp, scalar_t(1.), Aij); */
           }
         }
       }
@@ -1265,87 +1283,89 @@ namespace strumpack {
               DenseMatrixWrapper<scalar_t> t1(Aij.rows(), ranks_idx[k].first, Uall, 0, rank_tmp), 
               t2(ranks_idx[k].first, Aij.cols(), Vall, rank_tmp, 0);
               B11.tile(i,ranks_idx[k].second).multiply(tile(ranks_idx[k].second,j), t1, t2);
-              if (ranks_idx.size()>2){
-                if (opts.compression_kernel() == CompressionKernel::full){
-                  //Recompress Uall and Vall
-                  DenseMatrix<scalar_t> UU, UV;
-                  Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> VU, VV;
-                  Vall.low_rank(VU, VV, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> tmp1(UV.rows(), VU.cols());
-                  gemm(Trans::N, Trans::N, scalar_t(1.), UV, VU, scalar_t(0.), tmp1);
-                  if (UU.cols() > VU.cols()) {
-                    //(UU*(UV * VU)) *VV
-                    DenseMatrix<scalar_t> tmp2(UU.rows(), tmp1.cols());
-                    gemm(Trans::N, Trans::N, scalar_t(1.), UU, tmp1, scalar_t(0.), tmp2);
-                    if (k==ranks_idx.size()-1){
-                      gemm(Trans::N, Trans::N, scalar_t(-1.), tmp2, VV, scalar_t(1.), Aij);
-                    }
-                    else{
-                      tmpU.copy_topos(tmp2,0,0);
-                      tmpV.copy_topos(VV,0,0);
-                      rank_tmp = tmp2.cols();
-                    }
+              if (opts.compression_kernel() == CompressionKernel::full){
+                //Recompress Uall and Vall
+                DenseMatrix<scalar_t> UU, UV;
+                Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
+                DenseMatrix<scalar_t> VU, VV;
+                Vall.low_rank(VU, VV, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
+                DenseMatrix<scalar_t> tmp1(UV.rows(), VU.cols());
+                gemm(Trans::N, Trans::N, scalar_t(1.), UV, VU, scalar_t(0.), tmp1);
+                if (UU.cols() > VU.cols()) {
+                  //(UU*(UV * VU)) *VV
+                  DenseMatrix<scalar_t> tmp2(UU.rows(), tmp1.cols());
+                  gemm(Trans::N, Trans::N, scalar_t(1.), UU, tmp1, scalar_t(0.), tmp2);
+                  if (k==ranks_idx.size()-1){
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), tmp2, VV, scalar_t(1.), Aij);
                   }
                   else{
-                  // UU* ((UV * VU)*VV)
-                    DenseMatrix<scalar_t> tmp2(tmp1.rows(), VV.cols());
-                    gemm(Trans::N, Trans::N, scalar_t(1.), tmp1, VV, scalar_t(0.), tmp2);
-                    if (k==ranks_idx.size()-1){
-                      gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp2, scalar_t(1.), Aij);
-                    }
-                    else{
-                      tmpU.copy_topos(UU,0,0);
-                      tmpV.copy_topos(tmp2,0,0);
-                      rank_tmp = UU.cols();
-                    }
+                    tmpU.copy_topos(tmp2,0,0);
+                    tmpV.copy_topos(VV,0,0);
+                    rank_tmp = tmp2.cols();
                   }
                 }
                 else{
-                  //Recompress Uall only
-                  DenseMatrix<scalar_t> UU, UV;
-                  Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> tmp1(UV.rows(), Vall.cols());
-                  gemm(Trans::N, Trans::N, scalar_t(1.), UV, Vall, scalar_t(0.), tmp1);
+                // UU* ((UV * VU)*VV)
+                  DenseMatrix<scalar_t> tmp2(tmp1.rows(), VV.cols());
+                  gemm(Trans::N, Trans::N, scalar_t(1.), tmp1, VV, scalar_t(0.), tmp2);
                   if (k==ranks_idx.size()-1){
-                    gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp1, scalar_t(1.), Aij);
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp2, scalar_t(1.), Aij);
                   }
                   else{
                     tmpU.copy_topos(UU,0,0);
-                    tmpV.copy_topos(tmp1,0,0);
+                    tmpV.copy_topos(tmp2,0,0);
                     rank_tmp = UU.cols();
                   }
                 }
               }
-              else{ // rank_idx.size=2
-                if (opts.compression_kernel() == CompressionKernel::full){
-                //Recompress Uall and Vall
-                  DenseMatrix<scalar_t> UU, UV;
-                  Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> VU, VV;
-                  Vall.low_rank(VU, VV, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> tmp1(UV.rows(), VU.cols());
-                  gemm(Trans::N, Trans::N, scalar_t(1.), UV, VU, scalar_t(0.), tmp1);
-                  if (UU.cols() > VU.cols()) {
-                    //(UU*(UV * VU)) *VV
-                    DenseMatrix<scalar_t> tmp2(UU.rows(), tmp1.cols());
-                    gemm(Trans::N, Trans::N, scalar_t(1.), UU, tmp1, scalar_t(0.), tmp2);
-                    gemm(Trans::N, Trans::N, scalar_t(-1.), tmp2, VV, scalar_t(1.), Aij);
+              else{ //Recompress Uall OR Vall
+                if (Uall.rows() > Vall.cols()){
+                  // (Uall * U1) *V1
+                  DenseMatrix<scalar_t> U1, V1;
+                  Vall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
+                  if (k==ranks_idx.size()-1){
+                    DenseMatrix<scalar_t> tmp(Uall.rows(), U1.cols());
+                    gemm(Trans::N, Trans::N, scalar_t(1.), Uall, U1, scalar_t(0.), tmp);
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), tmp, V1, scalar_t(1.), Aij);
                   }
                   else{
-                    DenseMatrix<scalar_t> tmp2(tmp1.rows(), VV.cols());
-                    gemm(Trans::N, Trans::N, scalar_t(1.), tmp1, VV, scalar_t(0.), tmp2);
-                    gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp2, scalar_t(1.), Aij);
+                    DenseMatrixWrapper<scalar_t> t1(Uall.rows(), U1.cols(), tmpU, 0, 0), 
+                    t2(V1.rows(), V1.cols(), tmpV, 0, 0);
+                    gemm(Trans::N, Trans::N, scalar_t(1.), Uall, U1, scalar_t(0.), t1);
+                    t2=V1;
+                    rank_tmp = U1.cols();
                   }
                 }
                 else{
-                //Recompress Uall only
-                  DenseMatrix<scalar_t> UU, UV;
-                  Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> tmp1(UV.rows(), Vall.cols());
-                  gemm(Trans::N, Trans::N, scalar_t(1.), UV, Vall, scalar_t(0.), tmp1);
-                  gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp1, scalar_t(1.), Aij);
+                  // U1 * (V1 * Vall)
+                  DenseMatrix<scalar_t> U1, V1;
+                  Uall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
+                  if (k==ranks_idx.size()-1){
+                    DenseMatrix<scalar_t> tmp(V1.rows(), Vall.cols());
+                    gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), tmp);
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), U1, tmp, scalar_t(1.), Aij); 
+                  }
+                  else{
+                    DenseMatrixWrapper<scalar_t> t1(U1.rows(), U1.cols(), tmpU, 0, 0), 
+                    t2(V1.rows(), Vall.cols(), tmpV, 0, 0);
+                    t1=U1;
+                    gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), t2);
+                    rank_tmp = U1.cols();
+                  }
                 }
+                /* //Recompress Uall only
+                DenseMatrix<scalar_t> U1, V1;
+                Uall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
+                DenseMatrix<scalar_t> tmp(V1.rows(), Vall.cols());
+                gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), tmp);
+                if (k==ranks_idx.size()-1){
+                  gemm(Trans::N, Trans::N, scalar_t(-1.), U1, tmp, scalar_t(1.), Aij); 
+                }
+                else{
+                  tmpU.copy_topos(U1,0,0);
+                  tmpV.copy_topos(tmp,0,0);
+                  rank_tmp = U1.cols();
+                }*/
               }
             }
           }
@@ -1428,13 +1448,29 @@ namespace strumpack {
               gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp2, scalar_t(1.), Aij);
             }
           }
-          else{ 
-            //Recompress Uall only
+          else{ //Recompress Uall OR Vall
+            if (Uall.rows() > Vall.cols()){
+              // (Uall * U1) *V1
+              DenseMatrix<scalar_t> U1, V1;
+              Vall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
+              DenseMatrix<scalar_t> tmp(Uall.rows(), U1.cols());
+              gemm(Trans::N, Trans::N, scalar_t(1.), Uall, U1, scalar_t(0.), tmp);
+              gemm(Trans::N, Trans::N, scalar_t(-1.), tmp, V1, scalar_t(1.), Aij);
+            }
+            else{
+              // U1 * (V1 * Vall)
+              DenseMatrix<scalar_t> U1, V1;
+              Uall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
+              DenseMatrix<scalar_t> tmp(V1.rows(), Vall.cols());
+              gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), tmp);
+              gemm(Trans::N, Trans::N, scalar_t(-1.), U1, tmp, scalar_t(1.), Aij);
+            }
+            /* //Recompress Uall only
             DenseMatrix<scalar_t> U1, V1;
             Uall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
             DenseMatrix<scalar_t> tmp(V1.rows(), Vall.cols());
             gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), tmp);
-            gemm(Trans::N, Trans::N, scalar_t(-1.), U1, tmp, scalar_t(1.), Aij);
+            gemm(Trans::N, Trans::N, scalar_t(-1.), U1, tmp, scalar_t(1.), Aij); */
           }
         }
       }
@@ -1478,87 +1514,89 @@ namespace strumpack {
               DenseMatrixWrapper<scalar_t> t1(Aij.rows(), ranks_idx[k].first, Uall, 0, rank_tmp), 
               t2(ranks_idx[k].first, Aij.cols(), Vall, rank_tmp, 0);
               tile(j,ranks_idx[k].second).multiply(B11.tile(ranks_idx[k].second,i), t1, t2);
-              if (ranks_idx.size()>2){
-                if (opts.compression_kernel() == CompressionKernel::full){
-                  //Recompress Uall and Vall
-                  DenseMatrix<scalar_t> UU, UV;
-                  Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> VU, VV;
-                  Vall.low_rank(VU, VV, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> tmp1(UV.rows(), VU.cols());
-                  gemm(Trans::N, Trans::N, scalar_t(1.), UV, VU, scalar_t(0.), tmp1);
-                  if (UU.cols() > VU.cols()) {
-                    //(UU*(UV * VU)) *VV
-                    DenseMatrix<scalar_t> tmp2(UU.rows(), tmp1.cols());
-                    gemm(Trans::N, Trans::N, scalar_t(1.), UU, tmp1, scalar_t(0.), tmp2);
-                    if (k==ranks_idx.size()-1){
-                      gemm(Trans::N, Trans::N, scalar_t(-1.), tmp2, VV, scalar_t(1.), Aij);
-                    }
-                    else{
-                      tmpU.copy_topos(tmp2,0,0);
-                      tmpV.copy_topos(VV,0,0);
-                      rank_tmp = tmp2.cols();
-                    }
+              if (opts.compression_kernel() == CompressionKernel::full){
+                //Recompress Uall and Vall
+                DenseMatrix<scalar_t> UU, UV;
+                Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
+                DenseMatrix<scalar_t> VU, VV;
+                Vall.low_rank(VU, VV, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
+                DenseMatrix<scalar_t> tmp1(UV.rows(), VU.cols());
+                gemm(Trans::N, Trans::N, scalar_t(1.), UV, VU, scalar_t(0.), tmp1);
+                if (UU.cols() > VU.cols()) {
+                  //(UU*(UV * VU)) *VV
+                  DenseMatrix<scalar_t> tmp2(UU.rows(), tmp1.cols());
+                  gemm(Trans::N, Trans::N, scalar_t(1.), UU, tmp1, scalar_t(0.), tmp2);
+                  if (k==ranks_idx.size()-1){
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), tmp2, VV, scalar_t(1.), Aij);
                   }
                   else{
-                  // UU* ((UV * VU)*VV)
-                    DenseMatrix<scalar_t> tmp2(tmp1.rows(), VV.cols());
-                    gemm(Trans::N, Trans::N, scalar_t(1.), tmp1, VV, scalar_t(0.), tmp2);
-                    if (k==ranks_idx.size()-1){
-                      gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp2, scalar_t(1.), Aij);
-                    }
-                    else{
-                      tmpU.copy_topos(UU,0,0);
-                      tmpV.copy_topos(tmp2,0,0);
-                      rank_tmp = UU.cols();
-                    }
+                    tmpU.copy_topos(tmp2,0,0);
+                    tmpV.copy_topos(VV,0,0);
+                    rank_tmp = tmp2.cols();
                   }
                 }
                 else{
-                  //Recompress Uall only
-                  DenseMatrix<scalar_t> UU, UV;
-                  Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> tmp1(UV.rows(), Vall.cols());
-                  gemm(Trans::N, Trans::N, scalar_t(1.), UV, Vall, scalar_t(0.), tmp1);
+                // UU* ((UV * VU)*VV)
+                  DenseMatrix<scalar_t> tmp2(tmp1.rows(), VV.cols());
+                  gemm(Trans::N, Trans::N, scalar_t(1.), tmp1, VV, scalar_t(0.), tmp2);
                   if (k==ranks_idx.size()-1){
-                    gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp1, scalar_t(1.), Aij);
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp2, scalar_t(1.), Aij);
                   }
                   else{
                     tmpU.copy_topos(UU,0,0);
-                    tmpV.copy_topos(tmp1,0,0);
+                    tmpV.copy_topos(tmp2,0,0);
                     rank_tmp = UU.cols();
                   }
                 }
               }
-              else{ // rank_idx.size=2
-                if (opts.compression_kernel() == CompressionKernel::full){
-                //Recompress Uall and Vall
-                  DenseMatrix<scalar_t> UU, UV;
-                  Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> VU, VV;
-                  Vall.low_rank(VU, VV, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> tmp1(UV.rows(), VU.cols());
-                  gemm(Trans::N, Trans::N, scalar_t(1.), UV, VU, scalar_t(0.), tmp1);
-                  if (UU.cols() > VU.cols()) {
-                    //(UU*(UV * VU)) *VV
-                    DenseMatrix<scalar_t> tmp2(UU.rows(), tmp1.cols());
-                    gemm(Trans::N, Trans::N, scalar_t(1.), UU, tmp1, scalar_t(0.), tmp2);
-                    gemm(Trans::N, Trans::N, scalar_t(-1.), tmp2, VV, scalar_t(1.), Aij);
+              else{ //Recompress Uall OR Vall
+                if (Uall.rows() > Vall.cols()){
+                  // (Uall * U1) *V1
+                  DenseMatrix<scalar_t> U1, V1;
+                  Vall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
+                  if (k==ranks_idx.size()-1){
+                    DenseMatrix<scalar_t> tmp(Uall.rows(), U1.cols());
+                    gemm(Trans::N, Trans::N, scalar_t(1.), Uall, U1, scalar_t(0.), tmp);
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), tmp, V1, scalar_t(1.), Aij);
                   }
                   else{
-                    DenseMatrix<scalar_t> tmp2(tmp1.rows(), VV.cols());
-                    gemm(Trans::N, Trans::N, scalar_t(1.), tmp1, VV, scalar_t(0.), tmp2);
-                    gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp2, scalar_t(1.), Aij);
+                    DenseMatrixWrapper<scalar_t> t1(Uall.rows(), U1.cols(), tmpU, 0, 0), 
+                    t2(V1.rows(), V1.cols(), tmpV, 0, 0);
+                    gemm(Trans::N, Trans::N, scalar_t(1.), Uall, U1, scalar_t(0.), t1);
+                    t2=V1;
+                    rank_tmp = U1.cols();
                   }
                 }
                 else{
-                //Recompress Uall only
-                  DenseMatrix<scalar_t> UU, UV;
-                  Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> tmp1(UV.rows(), Vall.cols());
-                  gemm(Trans::N, Trans::N, scalar_t(1.), UV, Vall, scalar_t(0.), tmp1);
-                  gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp1, scalar_t(1.), Aij);
+                  // U1 * (V1 * Vall)
+                  DenseMatrix<scalar_t> U1, V1;
+                  Uall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
+                  if (k==ranks_idx.size()-1){
+                    DenseMatrix<scalar_t> tmp(V1.rows(), Vall.cols());
+                    gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), tmp);
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), U1, tmp, scalar_t(1.), Aij); 
+                  }
+                  else{
+                    DenseMatrixWrapper<scalar_t> t1(U1.rows(), U1.cols(), tmpU, 0, 0), 
+                    t2(V1.rows(), Vall.cols(), tmpV, 0, 0);
+                    t1=U1;
+                    gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), t2);
+                    rank_tmp = U1.cols();
+                  }
                 }
+                /* //Recompress Uall only
+                DenseMatrix<scalar_t> U1, V1;
+                Uall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
+                DenseMatrix<scalar_t> tmp(V1.rows(), Vall.cols());
+                gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), tmp);
+                if (k==ranks_idx.size()-1){
+                  gemm(Trans::N, Trans::N, scalar_t(-1.), U1, tmp, scalar_t(1.), Aij); 
+                }
+                else{
+                  tmpU.copy_topos(U1,0,0);
+                  tmpV.copy_topos(tmp,0,0);
+                  rank_tmp = U1.cols();
+                }*/
               }
             }
           }
@@ -1821,13 +1859,29 @@ namespace strumpack {
               gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp2, scalar_t(1.), Aij);
             }
           }
-          else{ 
-            //Recompress Uall only
+          else{ //Recompress Uall OR Vall
+            if (Uall.rows() > Vall.cols()){
+              // (Uall * U1) *V1
+              DenseMatrix<scalar_t> U1, V1;
+              Vall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
+              DenseMatrix<scalar_t> tmp(Uall.rows(), U1.cols());
+              gemm(Trans::N, Trans::N, scalar_t(1.), Uall, U1, scalar_t(0.), tmp);
+              gemm(Trans::N, Trans::N, scalar_t(-1.), tmp, V1, scalar_t(1.), Aij);
+            }
+            else{
+              // U1 * (V1 * Vall)
+              DenseMatrix<scalar_t> U1, V1;
+              Uall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
+              DenseMatrix<scalar_t> tmp(V1.rows(), Vall.cols());
+              gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), tmp);
+              gemm(Trans::N, Trans::N, scalar_t(-1.), U1, tmp, scalar_t(1.), Aij);
+            }
+            /* //Recompress Uall only
             DenseMatrix<scalar_t> U1, V1;
             Uall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
             DenseMatrix<scalar_t> tmp(V1.rows(), Vall.cols());
             gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), tmp);
-            gemm(Trans::N, Trans::N, scalar_t(-1.), U1, tmp, scalar_t(1.), Aij);
+            gemm(Trans::N, Trans::N, scalar_t(-1.), U1, tmp, scalar_t(1.), Aij); */
           }
         }
       }
@@ -1870,87 +1924,90 @@ namespace strumpack {
               DenseMatrixWrapper<scalar_t> t1(Aij.rows(), ranks_idx[k].first, Uall, 0, rank_tmp), 
               t2(ranks_idx[k].first, Aij.cols(), Vall, rank_tmp, 0);
               B21.tile(i,ranks_idx[k].second).multiply(B12.tile(ranks_idx[k].second,j), t1, t2);
-              if (ranks_idx.size()>2){
-                if (opts.compression_kernel() == CompressionKernel::full){
-                  //Recompress Uall and Vall
-                  DenseMatrix<scalar_t> UU, UV;
-                  Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> VU, VV;
-                  Vall.low_rank(VU, VV, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> tmp1(UV.rows(), VU.cols());
-                  gemm(Trans::N, Trans::N, scalar_t(1.), UV, VU, scalar_t(0.), tmp1);
-                  if (UU.cols() > VU.cols()) {
-                    //(UU*(UV * VU)) *VV
-                    DenseMatrix<scalar_t> tmp2(UU.rows(), tmp1.cols());
-                    gemm(Trans::N, Trans::N, scalar_t(1.), UU, tmp1, scalar_t(0.), tmp2);
-                    if (k==ranks_idx.size()-1){
-                      gemm(Trans::N, Trans::N, scalar_t(-1.), tmp2, VV, scalar_t(1.), Aij);
-                    }
-                    else{
-                      tmpU.copy_topos(tmp2,0,0);
-                      tmpV.copy_topos(VV,0,0);
-                      rank_tmp = tmp2.cols();
-                    }
+              //if (ranks_idx.size()>2){
+              if (opts.compression_kernel() == CompressionKernel::full){
+                //Recompress Uall and Vall
+                DenseMatrix<scalar_t> UU, UV;
+                Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
+                DenseMatrix<scalar_t> VU, VV;
+                Vall.low_rank(VU, VV, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
+                DenseMatrix<scalar_t> tmp1(UV.rows(), VU.cols());
+                gemm(Trans::N, Trans::N, scalar_t(1.), UV, VU, scalar_t(0.), tmp1);
+                if (UU.cols() > VU.cols()) {
+                  //(UU*(UV * VU)) *VV
+                  DenseMatrix<scalar_t> tmp2(UU.rows(), tmp1.cols());
+                  gemm(Trans::N, Trans::N, scalar_t(1.), UU, tmp1, scalar_t(0.), tmp2);
+                  if (k==ranks_idx.size()-1){
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), tmp2, VV, scalar_t(1.), Aij);
                   }
                   else{
-                  // UU* ((UV * VU)*VV)
-                    DenseMatrix<scalar_t> tmp2(tmp1.rows(), VV.cols());
-                    gemm(Trans::N, Trans::N, scalar_t(1.), tmp1, VV, scalar_t(0.), tmp2);
-                    if (k==ranks_idx.size()-1){
-                      gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp2, scalar_t(1.), Aij);
-                    }
-                    else{
-                      tmpU.copy_topos(UU,0,0);
-                      tmpV.copy_topos(tmp2,0,0);
-                      rank_tmp = UU.cols();
-                    }
+                    tmpU.copy_topos(tmp2,0,0);
+                    tmpV.copy_topos(VV,0,0);
+                    rank_tmp = tmp2.cols();
                   }
                 }
                 else{
-                  //Recompress Uall only
-                  DenseMatrix<scalar_t> UU, UV;
-                  Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> tmp1(UV.rows(), Vall.cols());
-                  gemm(Trans::N, Trans::N, scalar_t(1.), UV, Vall, scalar_t(0.), tmp1);
+                  // UU* ((UV * VU)*VV)
+                  DenseMatrix<scalar_t> tmp2(tmp1.rows(), VV.cols());
+                  gemm(Trans::N, Trans::N, scalar_t(1.), tmp1, VV, scalar_t(0.), tmp2);
                   if (k==ranks_idx.size()-1){
-                    gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp1, scalar_t(1.), Aij);
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp2, scalar_t(1.), Aij);
                   }
                   else{
                     tmpU.copy_topos(UU,0,0);
-                    tmpV.copy_topos(tmp1,0,0);
+                    tmpV.copy_topos(tmp2,0,0);
                     rank_tmp = UU.cols();
                   }
                 }
               }
-              else{ // rank_idx.size=2
-                if (opts.compression_kernel() == CompressionKernel::full){
-                //Recompress Uall and Vall
-                  DenseMatrix<scalar_t> UU, UV;
-                  Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> VU, VV;
-                  Vall.low_rank(VU, VV, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> tmp1(UV.rows(), VU.cols());
-                  gemm(Trans::N, Trans::N, scalar_t(1.), UV, VU, scalar_t(0.), tmp1);
-                  if (UU.cols() > VU.cols()) {
-                    //(UU*(UV * VU)) *VV
-                    DenseMatrix<scalar_t> tmp2(UU.rows(), tmp1.cols());
-                    gemm(Trans::N, Trans::N, scalar_t(1.), UU, tmp1, scalar_t(0.), tmp2);
-                    gemm(Trans::N, Trans::N, scalar_t(-1.), tmp2, VV, scalar_t(1.), Aij);
+              else{ //Recompress Uall OR Vall
+                if (Uall.rows() > Vall.cols()){
+                  // (Uall * U1) *V1
+                  DenseMatrix<scalar_t> U1, V1;
+                  Vall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
+                  if (k==ranks_idx.size()-1){
+                    DenseMatrix<scalar_t> tmp(Uall.rows(), U1.cols());
+                    gemm(Trans::N, Trans::N, scalar_t(1.), Uall, U1, scalar_t(0.), tmp);
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), tmp, V1, scalar_t(1.), Aij);
                   }
                   else{
-                    DenseMatrix<scalar_t> tmp2(tmp1.rows(), VV.cols());
-                    gemm(Trans::N, Trans::N, scalar_t(1.), tmp1, VV, scalar_t(0.), tmp2);
-                    gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp2, scalar_t(1.), Aij);
+                    DenseMatrixWrapper<scalar_t> t1(Uall.rows(), U1.cols(), tmpU, 0, 0), 
+                    t2(V1.rows(), V1.cols(), tmpV, 0, 0);
+                    gemm(Trans::N, Trans::N, scalar_t(1.), Uall, U1, scalar_t(0.), t1);
+                    t2=V1;
+                    rank_tmp = U1.cols();
                   }
                 }
                 else{
-                //Recompress Uall only
-                  DenseMatrix<scalar_t> UU, UV;
-                  Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-                  DenseMatrix<scalar_t> tmp1(UV.rows(), Vall.cols());
-                  gemm(Trans::N, Trans::N, scalar_t(1.), UV, Vall, scalar_t(0.), tmp1);
-                  gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp1, scalar_t(1.), Aij);
+                  // U1 * (V1 * Vall)
+                  DenseMatrix<scalar_t> U1, V1;
+                  Uall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
+                  if (k==ranks_idx.size()-1){
+                    DenseMatrix<scalar_t> tmp(V1.rows(), Vall.cols());
+                    gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), tmp);
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), U1, tmp, scalar_t(1.), Aij); 
+                  }
+                  else{
+                    DenseMatrixWrapper<scalar_t> t1(U1.rows(), U1.cols(), tmpU, 0, 0), 
+                    t2(V1.rows(), Vall.cols(), tmpV, 0, 0);
+                    t1=U1;
+                    gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), t2);
+                    rank_tmp = U1.cols();
+                  }
                 }
+                /* //Recompress Uall only
+                DenseMatrix<scalar_t> U1, V1;
+                Uall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
+                DenseMatrix<scalar_t> tmp(V1.rows(), Vall.cols());
+                gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), tmp);
+                if (k==ranks_idx.size()-1){
+                  gemm(Trans::N, Trans::N, scalar_t(-1.), U1, tmp, scalar_t(1.), Aij); 
+                }
+                else{
+                  tmpU.copy_topos(U1,0,0);
+                  tmpV.copy_topos(tmp,0,0);
+                  rank_tmp = U1.cols();
+                }*/
               }
             }
           }
