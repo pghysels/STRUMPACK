@@ -47,7 +47,7 @@ namespace strumpack {
     template<typename scalar_t> class LRTile
       : public BLRTile<scalar_t> {
       using DenseM_t = DenseMatrix<scalar_t>;
-      using DenseMW_t = DenseMatrixWrapper<scalar_t>;
+      using DMW_t = DenseMatrixWrapper<scalar_t>;
       using Opts_t = BLROptions<scalar_t>;
 
     public:
@@ -109,6 +109,14 @@ namespace strumpack {
       const DenseM_t& D() const override { assert(false); return U_; }
       const DenseM_t& U() const override { return U_; }
       const DenseM_t& V() const override { return V_; }
+
+      LRTile<scalar_t> multiply(const BLRTile<scalar_t>& a) const override;
+      LRTile<scalar_t> left_multiply(const LRTile<scalar_t>& a) const override;
+      LRTile<scalar_t> left_multiply(const DenseTile<scalar_t>& a) const override;
+
+      void multiply(const BLRTile<scalar_t>& a, DMW_t& b, DMW_t& c) const override;
+      void left_multiply(const LRTile<scalar_t>& a, DMW_t& b, DMW_t& c) const override;
+      void left_multiply(const DenseTile<scalar_t>& a, DMW_t& b, DMW_t& c) const override;
 
       scalar_t operator()(std::size_t i, std::size_t j) const override;
 
