@@ -124,12 +124,9 @@ install:
     cmake .. \
     -DCMAKE_BUILD_TYPE=Debug \
     -DCMAKE_INSTALL_PREFIX=. \
-    -DCMAKE_C_COMPILER=mpicc \
-    -DCMAKE_CXX_COMPILER=mpic++ \
-    -DCMAKE_Fortran_COMPILER=mpif90 \
     -DTPL_BLAS_LIBRARIES=$BLAS_LIB \
     -DTPL_LAPACK_LIBRARIES=$LAPACK_LIB
-  - make
+  - make VERBOSE=1
   - make install
   - make tests
   - printf "${BLUE} GC; Done installing STRUMPACK from source\n"
