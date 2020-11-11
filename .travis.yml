@@ -47,10 +47,10 @@ before_install:
   - sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-7 70
   - printf "${BLUE} GC; Done installing gfortran via apt\n"
 
-  - printf "${BLUE} GC; Installing OpenMPI-1 via apt\n"
+  - printf "${BLUE} GC; Installing MPICH via apt\n"
   - sudo apt-get update
-  - sudo apt-get install mpich #openmpi-bin libopenmpi-dev
-  - printf "${BLUE} GC; Done installing OpenMPI-1 via apt\n"
+  - sudo apt-get install mpich libmpich-dev
+  - printf "${BLUE} GC; Done installing MPICH via apt\n"
 
 install:
   - export BLUE="\033[34;1m"
