@@ -120,6 +120,9 @@ install:
   - cd $TRAVIS_BUILD_DIR
   - mkdir build
   - cd build
+  - which mpic++
+  - mpic++ --version
+  - ls -alh /etc/alternatives/mpic++
   - |
     cmake .. \
     -DCMAKE_BUILD_TYPE=Debug \
