@@ -200,6 +200,11 @@ extern "C" {
 
   STRUMPACK_RETURN_CODE STRUMPACK_factor(STRUMPACK_SparseSolver S);
 
+  void STRUMPACK_move_to_gpu(STRUMPACK_SparseSolver S);
+
+  void STRUMPACK_remove_from_gpu(STRUMPACK_SparseSolver S);
+
+  void STRUMPACK_delete_factors(STRUMPACK_SparseSolver S);
 
   /*
     TODO add

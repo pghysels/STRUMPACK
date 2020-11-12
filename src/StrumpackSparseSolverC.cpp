@@ -311,11 +311,25 @@ extern "C" {
     switch_precision_return_as(reorder(), STRUMPACK_RETURN_CODE);
   }
 
-  STRUMPACK_RETURN_CODE STRUMPACK_reorder_regular(STRUMPACK_SparseSolver S, int nx, int ny, int nz) {
+  STRUMPACK_RETURN_CODE STRUMPACK_reorder_regular(STRUMPACK_SparseSolver S,
+                                                  int nx, int ny, int nz) {
     switch_precision_return_as(reorder(nx, ny, nz), STRUMPACK_RETURN_CODE);
   }
+
   STRUMPACK_RETURN_CODE STRUMPACK_factor(STRUMPACK_SparseSolver S) {
     switch_precision_return_as(factor(), STRUMPACK_RETURN_CODE);
+  }
+
+  void STRUMPACK_move_to_gpu(STRUMPACK_SparseSolver S) {
+    switch_precision(move_to_gpu());
+  }
+
+  void STRUMPACK_remove_from_gpu(STRUMPACK_SparseSolver S) {
+    switch_precision(remove_from_gpu());
+  }
+
+  void STRUMPACK_delete_factors(STRUMPACK_SparseSolver S) {
+    switch_precision(delete_factors());
   }
 
 
