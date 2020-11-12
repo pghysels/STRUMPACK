@@ -178,13 +178,13 @@ namespace strumpack {
 
   /**
   * Casts matrix values to cast_t. Returns a CompressedSparseMatrix that is 
-  * templated on cast_t and integer_t by value.
+  * templated on cast_t and integer_t.
   * 
   * \tparam scalar_t value type of original matrix
   * \tparam integer_t integer type of original matrix
   * \tparam cast_t value type of returned matrix
   * 
-  * \param mat CSRMatrix<scalar_t,integer_t>, matrix to cast to new value type.
+  * \param mat CSRMatrix<scalar_t,integer_t>, input matrix.
   */ 
   template<typename scalar_t, typename integer_t, typename cast_t> 
   CSRMatrix<cast_t,integer_t> cast_matrix(CSRMatrix<scalar_t,integer_t> mat);
