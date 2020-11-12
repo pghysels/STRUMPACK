@@ -163,6 +163,8 @@ fi
 
 
 if [[ $(hostname -s) = "cs-it-7098760" ]]; then
+    found_host=true
+
     export SCOTCH_DIR=$HOME/local/scotch_6.1.0
     export ButterflyPACK_DIR=$HOME/LBL/ButterflyPACK/install/
     export ZFP_DIR=$HOME/local/zfp/install/
