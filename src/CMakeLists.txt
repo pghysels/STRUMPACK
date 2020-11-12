@@ -8,8 +8,6 @@ target_sources(strumpack
   ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverBase.cpp
   ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolver.hpp
   ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolver.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverMixedPrecision.hpp
-  ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverMixedPrecision.cpp
   ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverC.cpp
   ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolver.h)
 
