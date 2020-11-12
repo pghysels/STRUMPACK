@@ -1161,7 +1161,8 @@ namespace strumpack {
   }
 
   template<typename scalar_t, typename integer_t, typename cast_t> 
-  CSRMatrix<cast_t,integer_t> cast_matrix(CSRMatrix<scalar_t,integer_t> mat) {
+  CSRMatrix<cast_t,integer_t> 
+  cast_matrix(const CSRMatrix<scalar_t,integer_t>& mat) {
     const integer_t nnz = mat.nnz();
     const integer_t size = mat.size();
     CSRMatrix<cast_t,integer_t> new_mat(size, nnz);
@@ -1202,5 +1203,5 @@ namespace strumpack {
   template class CSRMatrix<std::complex<double>,long long int>;
 
   template CSRMatrix<float,int> cast_matrix<double,int,float>
-  (CSRMatrix<double,int> mat);
+  (const CSRMatrix<double,int>& mat);
 } // end namespace strumpack
