@@ -466,6 +466,15 @@ namespace strumpack {
     }
   }
 
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixDenseMPI<scalar_t,integer_t>::delete_factors() {
+    F11_ = DistM_t();
+    F12_ = DistM_t();
+    F21_ = DistM_t();
+    F22_ = DistM_t();
+    piv = std::vector<int>();
+  }
+
   // explicit template instantiations
   template class FrontalMatrixDenseMPI<float,int>;
   template class FrontalMatrixDenseMPI<double,int>;

@@ -308,6 +308,11 @@ namespace strumpack {
     return ReturnCode::SUCCESS;
   }
 
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolver<scalar_t,integer_t>::delete_factors_internal() {
+    tree_.reset(nullptr);
+  }
+
   // explicit template instantiations
   template class StrumpackSparseSolver<float,int>;
   template class StrumpackSparseSolver<double,int>;

@@ -618,6 +618,11 @@ namespace strumpack {
     return solve_internal(b, x, use_initial_guess);
   }
 
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolverBase<scalar_t,integer_t>::delete_factors() {
+    delete_factors_internal();
+    factored_ = false;
+  }
 
   // explicit template instantiations
   template class StrumpackSparseSolverBase<float,int>;

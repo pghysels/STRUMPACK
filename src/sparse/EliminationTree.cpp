@@ -169,6 +169,11 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
+  EliminationTree<scalar_t,integer_t>::delete_factors() {
+    root_->delete_factors();
+  }
+
+  template<typename scalar_t,typename integer_t> void
   EliminationTree<scalar_t,integer_t>::multifrontal_solve
   (DenseM_t& x) const {
     root_->multifrontal_solve(x, gpu_factors_.get());

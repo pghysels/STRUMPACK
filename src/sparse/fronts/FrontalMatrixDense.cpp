@@ -419,6 +419,15 @@ namespace strumpack {
     STRUMPACK_CB_SAMPLE_FLOPS((dupd-u2s)*Rcols);
   }
 
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixDense<scalar_t,integer_t>::delete_factors() {
+    F11_ = DenseM_t();
+    F12_ = DenseM_t();
+    F21_ = DenseM_t();
+    F22_ = DenseM_t();
+    piv = std::vector<int>();
+  }
+
 #if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::extend_add_copy_to_buffers

@@ -442,6 +442,12 @@ namespace strumpack {
 #endif
   }
 
+  template<typename scalar_t,typename integer_t> void
+  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::
+  delete_factors_internal() {
+    tree_mpi_dist_->delete_factors();
+  }
+
   // explicit template instantiations
   template class StrumpackSparseSolverMPIDist<float,int>;
   template class StrumpackSparseSolverMPIDist<double,int>;

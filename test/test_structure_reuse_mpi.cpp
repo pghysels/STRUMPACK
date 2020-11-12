@@ -107,9 +107,10 @@ int test_sparse_solver(int argc, const char* const argv[],
       Adist.val(i) = Adist.val(i) * distribution(generator);
   }
 
+  spss.delete_factors();
   // update the values
-  //spss.update_matrix_values(Adist);
-  spss.set_matrix(Adist);
+  spss.update_matrix_values(Adist);
+  //spss.set_matrix(Adist);
 
   // recompute right hand side
   Adist.spmv(x_exact.data(), b.data());

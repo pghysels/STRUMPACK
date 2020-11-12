@@ -226,6 +226,8 @@ namespace strumpack {
     ReturnCode solve_internal
     (const DenseM_t& b, DenseM_t& x, bool use_initial_guess=false) override;
 
+    void delete_factors_internal() override;
+
     std::unique_ptr<CSRMatrix<scalar_t,integer_t>> mat_;
     std::unique_ptr<MatrixReordering<scalar_t,integer_t>> nd_;
     std::unique_ptr<EliminationTree<scalar_t,integer_t>> tree_;

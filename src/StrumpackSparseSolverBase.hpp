@@ -306,6 +306,14 @@ namespace strumpack {
      */
     void draw(const std::string& name) const;
 
+    /**
+     * Free memory held by the factors.  This does not delete the
+     * symbolic analysis information. So after calling this routine,
+     * one can still update the sparse matrix values using for
+     * instance update_matrix_values.
+     */
+    void delete_factors();
+
   protected:
     virtual void setup_tree() = 0;
     virtual void setup_reordering() = 0;
@@ -375,6 +383,8 @@ namespace strumpack {
     virtual
     ReturnCode solve_internal(const DenseM_t& b, DenseM_t& x,
                               bool use_initial_guess=false) = 0;
+
+    virtual void delete_factors_internal() = 0;
   };
 
 } //end namespace strumpack

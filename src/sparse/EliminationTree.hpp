@@ -63,6 +63,7 @@ namespace strumpack {
 
     virtual void move_to_gpu();
     virtual void remove_from_gpu();
+    virtual void delete_factors();
 
     virtual void multifrontal_solve(DenseM_t& x) const;
     virtual void multifrontal_solve_dist

@@ -57,54 +57,55 @@ namespace strumpack {
      std::vector<integer_t>& upd);
 
     void release_work_memory() override { F22_.clear(); }
-    void extend_add_to_dense
-    (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
-     const F_t* p, int task_depth) override;
+    void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
+                             DenseM_t& paF21, DenseM_t& paF22,
+                             const F_t* p, int task_depth) override;
 
-    void sample_CB
-    (const SPOptions<scalar_t>& opts, const DenseM_t& R,
-     DenseM_t& Sr, DenseM_t& Sc, F_t* pa, int task_depth) override;
-    void sample_CB
-    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth=0) const override;
+    void sample_CB(const SPOptions<scalar_t>& opts, const DenseM_t& R,
+                   DenseM_t& Sr, DenseM_t& Sc, F_t* pa, int task_depth)
+      override;
+    void sample_CB(Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+                   int task_depth=0) const override;
 
-    void sample_CB_to_F11
-    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth=0) const override;
-    void sample_CB_to_F12
-    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth=0) const override;
-    void sample_CB_to_F21
-    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth=0) const override;
-    void sample_CB_to_F22
-    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth=0) const override;
+    void sample_CB_to_F11(Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+                          int task_depth=0) const override;
+    void sample_CB_to_F12(Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+                          int task_depth=0) const override;
+    void sample_CB_to_F21(Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+                          int task_depth=0) const override;
+    void sample_CB_to_F22(Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+                          int task_depth=0) const override;
 
-    virtual void multifrontal_factorization
-    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
-     int etree_level=0, int task_depth=0) override;
+    virtual void
+    multifrontal_factorization(const SpMat_t& A,
+                               const SPOptions<scalar_t>& opts,
+                               int etree_level=0, int task_depth=0) override;
 
-    void forward_multifrontal_solve
-    (DenseM_t& b, DenseM_t* work, int etree_level=0,
-     int task_depth=0) const override;
-    void backward_multifrontal_solve
-    (DenseM_t& y, DenseM_t* work, int etree_level=0,
-     int task_depth=0) const override;
+    void
+    forward_multifrontal_solve(DenseM_t& b, DenseM_t* work, int etree_level=0,
+                               int task_depth=0) const override;
+    void
+    backward_multifrontal_solve(DenseM_t& y, DenseM_t* work, int etree_level=0,
+                                int task_depth=0) const override;
 
-    void extract_CB_sub_matrix
-    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-     DenseM_t& B, int task_depth) const override;
+    void
+    extract_CB_sub_matrix(const std::vector<std::size_t>& I,
+                          const std::vector<std::size_t>& J,
+                          DenseM_t& B, int task_depth) const override;
+
+    void delete_factors() override;
 
     std::string type() const override { return "FrontalMatrixDense"; }
 
 #if defined(STRUMPACK_USE_MPI)
-    void extend_add_copy_to_buffers
-    (std::vector<std::vector<scalar_t>>& sbuf,
-     const FrontalMatrixMPI<scalar_t,integer_t>* pa) const override;
-    void extadd_blr_copy_to_buffers
-    (std::vector<std::vector<scalar_t>>& sbuf,
-     const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa) const override;
+    void
+    extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
+                               const FrontalMatrixMPI<scalar_t,integer_t>* pa)
+      const override;
+    void
+    extadd_blr_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
+                               const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa)
+      const override;
 #endif
 
   protected:
@@ -114,17 +115,17 @@ namespace strumpack {
     FrontalMatrixDense(const FrontalMatrixDense&) = delete;
     FrontalMatrixDense& operator=(FrontalMatrixDense const&) = delete;
 
-    void factor_phase1
-    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
-     int etree_level, int task_depth);
-    void factor_phase2
-    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
-     int etree_level, int task_depth);
+    void factor_phase1(const SpMat_t& A, const SPOptions<scalar_t>& opts,
+                       int etree_level, int task_depth);
+    void factor_phase2(const SpMat_t& A, const SPOptions<scalar_t>& opts,
+                       int etree_level, int task_depth);
 
-    virtual void fwd_solve_phase2
-    (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const;
-    virtual void bwd_solve_phase1
-    (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const;
+    virtual void
+    fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd, int etree_level,
+                     int task_depth) const;
+    virtual void
+    bwd_solve_phase1(DenseM_t& y, DenseM_t& yupd, int etree_level,
+                     int task_depth) const;
 
     using F_t::lchild_;
     using F_t::rchild_;

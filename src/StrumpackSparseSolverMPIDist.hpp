@@ -309,10 +309,14 @@ namespace strumpack {
 
     void redistribute_values();
 
-    ReturnCode solve_internal
-    (const scalar_t* b, scalar_t* x, bool use_initial_guess=false) override;
-    ReturnCode solve_internal
-    (const DenseM_t& b, DenseM_t& x, bool use_initial_guess=false) override;
+    void delete_factors_internal() override;
+
+    ReturnCode
+    solve_internal(const scalar_t* b, scalar_t* x,
+                   bool use_initial_guess=false) override;
+    ReturnCode
+    solve_internal(const DenseM_t& b, DenseM_t& x,
+                   bool use_initial_guess=false) override;
 
     std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>> mat_mpi_;
     std::unique_ptr<MatrixReorderingMPI<scalar_t,integer_t>> nd_mpi_;
