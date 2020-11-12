@@ -2,17 +2,20 @@ add_custom_target(tests)
 
 add_executable(test_HSS_seq    EXCLUDE_FROM_ALL test_HSS_seq.cpp)
 add_executable(test_sparse_seq EXCLUDE_FROM_ALL test_sparse_seq.cpp)
+add_executable(test_matrix_casting EXCLUDE_FROM_ALL test_matrix_casting.cpp)
 add_executable(test_BLR_seq    EXCLUDE_FROM_ALL test_BLR_seq.cpp)
 add_executable(test_matrix_IO  EXCLUDE_FROM_ALL test_matrix_IO.cpp)
 
 target_link_libraries(test_HSS_seq strumpack)
 target_link_libraries(test_sparse_seq strumpack)
+target_link_libraries(test_matrix_casting strumpack)
 target_link_libraries(test_BLR_seq strumpack)
 target_link_libraries(test_matrix_IO strumpack)
 
 add_dependencies(tests
   test_HSS_seq
   test_sparse_seq
+  test_matrix_casting
   test_BLR_seq
   test_matrix_IO)
 

@@ -1160,6 +1160,31 @@ namespace strumpack {
     return CSRGraph<integer_t>(std::move(gptr), std::move(gind));
   }
 
+  template<typename scalar_t, typename integer_t, typename cast_t> 
+  CSRMatrix<cast_t,integer_t> cast_matrix(CSRMatrix<scalar_t,integer_t> mat) {
+    const integer_t nnz = mat.nnz();
+    const integer_t size = mat.size();
+    CSRMatrix<cast_t,integer_t> new_mat(size, nnz);
+
+    integer_t* new_ptr = new_mat.ptr();
+    // Copy row ptrs.
+    for (int i = 0; i <= size; ++i) {
+      new_ptr[i] = mat.ptr(i);
+    }
+  
+    integer_t* new_ind = new_mat.ind();
+    cast_t* new_val = new_mat.val();
+    // Copy column ptrs and cast values to cast_t.
+    for (int i = 0; i < nnz; ++i) {
+      new_ind[i] = mat.ind(i);
+      new_val[i] = static_cast<cast_t>(mat.val(i));
+    }
+
+    // Set symm sparse.
+    new_mat.set_symm_sparse(mat.symm_sparse());
+    return new_mat;
+  }
+
   // explicit template instantiations
   template class CSRMatrix<float,int>;
   template class CSRMatrix<double,int>;
@@ -1176,4 +1201,6 @@ namespace strumpack {
   template class CSRMatrix<std::complex<float>,long long int>;
   template class CSRMatrix<std::complex<double>,long long int>;
 
+  template CSRMatrix<float,int> cast_matrix<double,int,float>
+  (CSRMatrix<double,int> mat);
 } // end namespace strumpack

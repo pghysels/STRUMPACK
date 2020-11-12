@@ -176,6 +176,19 @@ namespace strumpack {
     using CSM_t::symm_sparse_;
   };
 
+  /**
+  * Casts matrix values to cast_t. Returns a CompressedSparseMatrix that is 
+  * templated on cast_t and integer_t by value.
+  * 
+  * \tparam scalar_t value type of original matrix
+  * \tparam integer_t integer type of original matrix
+  * \tparam cast_t value type of returned matrix
+  * 
+  * \param mat CSRMatrix<scalar_t,integer_t>, matrix to cast to new value type.
+  */ 
+  template<typename scalar_t, typename integer_t, typename cast_t> 
+  CSRMatrix<cast_t,integer_t> cast_matrix(CSRMatrix<scalar_t,integer_t> mat);
+
 } // end namespace strumpack
 
 #endif // STRUMPACK_CSR_MATRIX_HPP
