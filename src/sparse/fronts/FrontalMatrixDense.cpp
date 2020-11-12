@@ -421,6 +421,8 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::delete_factors() {
+    if (lchild_) lchild_->delete_factors();
+    if (rchild_) rchild_->delete_factors();
     F11_ = DenseM_t();
     F12_ = DenseM_t();
     F21_ = DenseM_t();

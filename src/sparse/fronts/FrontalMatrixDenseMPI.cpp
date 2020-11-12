@@ -468,6 +468,8 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::delete_factors() {
+    if (visit(lchild_)) lchild_->delete_factors();
+    if (visit(rchild_)) rchild_->delete_factors();
     F11_ = DistM_t();
     F12_ = DistM_t();
     F21_ = DistM_t();
