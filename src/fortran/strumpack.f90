@@ -152,6 +152,9 @@ module strumpack
  public :: STRUMPACK_reorder
  public :: STRUMPACK_reorder_regular
  public :: STRUMPACK_factor
+ public :: STRUMPACK_move_to_gpu
+ public :: STRUMPACK_remove_from_gpu
+ public :: STRUMPACK_delete_factors
  public :: STRUMPACK_set_verbose
  public :: STRUMPACK_set_maxit
  public :: STRUMPACK_set_gmres_restart
@@ -304,6 +307,27 @@ import :: strumpack_sparsesolver
 type(STRUMPACK_SparseSolver), intent(in), value :: s
 integer(C_INT) :: fresult
 end function
+
+subroutine STRUMPACK_move_to_gpu(s) &
+bind(C, name="STRUMPACK_move_to_gpu")
+use, intrinsic :: ISO_C_BINDING
+import :: strumpack_sparsesolver
+type(STRUMPACK_SparseSolver), intent(in), value :: s
+end subroutine
+
+subroutine STRUMPACK_remove_from_gpu(s) &
+bind(C, name="STRUMPACK_remove_from_gpu")
+use, intrinsic :: ISO_C_BINDING
+import :: strumpack_sparsesolver
+type(STRUMPACK_SparseSolver), intent(in), value :: s
+end subroutine
+
+subroutine STRUMPACK_delete_factors(s) &
+bind(C, name="STRUMPACK_delete_factors")
+use, intrinsic :: ISO_C_BINDING
+import :: strumpack_sparsesolver
+type(STRUMPACK_SparseSolver), intent(in), value :: s
+end subroutine
 
 subroutine STRUMPACK_set_verbose(s, v) &
 bind(C, name="STRUMPACK_set_verbose")
