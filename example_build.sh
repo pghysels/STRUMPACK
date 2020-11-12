@@ -173,7 +173,7 @@ if [[ $(hostname -s) = "cs-it-7098760" ]]; then
           -DCMAKE_INSTALL_PREFIX=../install \
           -DSTRUMPACK_COUNT_FLOPS=ON \
           -DSTRUMPACK_USE_CUDA=ON \
-          -DCMAKE_CUDA_ARCHITECTURES=75 \
+          -DCMAKE_CUDA_FLAGS=-arch=sm_75 \
           -DSTRUMPACK_USE_HIP=OFF \
           -DTPL_ENABLE_MAGMA=OFF \
           -DTPL_ENABLE_SLATE=OFF \
