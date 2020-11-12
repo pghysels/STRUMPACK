@@ -55,6 +55,24 @@ namespace strumpack {
       }
     }
 
+    std::string get_name(BLRFactorAlgorithm a) {
+      switch (a) {
+      case BLRFactorAlgorithm::RL: return "RL"; break;
+      case BLRFactorAlgorithm::LL: return "LL"; break;
+      case BLRFactorAlgorithm::COMB: return "Comb"; break;
+      case BLRFactorAlgorithm::STAR: return "Star"; break;
+      default: return "unknown";
+      }
+    }
+
+    std::string get_name(CompressionKernel a) {
+      switch (a) {
+      case CompressionKernel::FULL: return "full"; break;
+      case CompressionKernel::HALF: return "half"; break;
+      default: return "unknown";
+      }
+    }
+
     template<typename scalar_t> void
     BLROptions<scalar_t>::set_from_command_line
     (int argc, const char* const* cargv) {
@@ -74,6 +92,8 @@ namespace strumpack {
          {"blr_low_rank_algorithm",    required_argument, 0, 5},
          {"blr_admissibility",         required_argument, 0, 6},
          {"blr_BACA_blocksize",        required_argument, 0, 7},
+         {"blr_factor_algorithm",      required_argument, 0, 8},
+         {"blr_compression_kernel",    required_argument, 0, 9},
          {"blr_verbose",               no_argument, 0, 'v'},
          {"blr_quiet",                 no_argument, 0, 'q'},
          {"help",                      no_argument, 0, 'h'},
@@ -133,6 +153,34 @@ namespace strumpack {
           iss >> BACA_blocksize_;
           set_BACA_blocksize(BACA_blocksize_);
         } break;
+        case 8: {
+          std::istringstream iss(optarg);
+          std::string s; iss >> s;
+          if (s == "RL")
+            set_BLR_factor_algorithm(BLRFactorAlgorithm::RL);
+          else if (s == "LL")
+            set_BLR_factor_algorithm(BLRFactorAlgorithm::LL);
+          else if (s == "Comb")
+            set_BLR_factor_algorithm(BLRFactorAlgorithm::COMB);
+          else if (s == "Star")
+            set_BLR_factor_algorithm(BLRFactorAlgorithm::STAR);
+          else
+            std::cerr << "# WARNING: BLR algorithm not"
+                      << " recognized, use 'RL', 'LL', 'Comb' or 'Star'."
+                      << std::endl;
+        } break;
+        case 9: {
+          std::istringstream iss(optarg);
+          std::string s; iss >> s;
+          if (s == "full")
+            set_compression_kernel(CompressionKernel::FULL);
+          else if (s == "half")
+            set_compression_kernel(CompressionKernel::HALF);
+          else
+            std::cerr << "# WARNING: compression kernel not"
+                      << " recognized, use 'full' or 'half'."
+                      << std::endl;
+        } break;
 
         case 'v': set_verbose(true); break;
         case 'q': set_verbose(false); break;
@@ -164,6 +212,12 @@ namespace strumpack {
                 << "#   --blr_admissibility (default "
                 << get_name(adm_) << ")" << std::endl
                 << "#      should be one of [weak|strong]" << std::endl
+                << "#   --blr_factor_algorithm (default "
+                << get_name(blr_algo_) << ")" << std::endl
+                << "#      should be [RL|LL|Comb|Star]" << std::endl
+                << "#   --blr_compression_kernel (default "
+                << get_name(crn_krnl_) << ")" << std::endl
+                << "#      should be [full|half]" << std::endl
                 << "#   --blr_BACA_blocksize int (default "
                 << BACA_blocksize() << ")" << std::endl
                 << "#   --blr_verbose or -v (default "

@@ -30,8 +30,10 @@
 #include <random>
 using namespace std;
 
-#include "dense/DenseMatrix.hpp"
-#include "BLR/BLRMatrix.hpp"
+#include "../src/dense/DenseMatrix.hpp"
+#include "../src/BLR/BLRMatrix.hpp"
+#include "../src/HSS/HSSPartitionTree.hpp"
+#include "../src/misc/TaskTimer.hpp"
 using namespace strumpack;
 using namespace strumpack::BLR;
 
@@ -125,35 +127,71 @@ int run(int argc, char* argv[]) {
   if (blr_opts.verbose()) A.print("A");
   cout << "# tol = " << blr_opts.rel_tol() << endl;
 
-  //BLRMatrix<double> B(A, blr_opts);
-  // if (H.is_compressed()) {
-  //   cout << "# created H matrix of dimension "
-  //        << H.rows() << " x " << H.cols()
-  //        << " with " << H.levels() << " levels" << endl;
-  //   cout << "# compression succeeded!" << endl;
-  // } else {
-  //   cout << "# compression failed!!!!!!!!" << endl;
-  //   return 1;
-  // }
-  // cout << "# rank(H) = " << B.maximum_rank() << endl;
-  // cout << "# memory(H) = " << B.memory()/1e6 << " MB, "
-  //      << 100. * B.memory() / A.memory() << "% of dense" << endl;
+  // define a partition tree for the BLR matrix
+  HSS::HSSPartitionTree tree(m);
+  tree.refine(blr_opts.leaf_size());
+  //tree.print();
+  auto tiles=tree.template leaf_sizes<std::size_t>();
+  //ADMISSIBILITY -- weak
+  std::size_t nt = tiles.size();
+  DenseMatrix<bool> adm(nt, nt);
+  adm.fill(true);
+  for (std::size_t t=0; t<nt; t++)
+    adm(t, t) = false;
+  std::vector<int> piv;
+  long long int f0 = 0, ftot = 0;
+  #if defined(STRUMPACK_COUNT_FLOPS)
+    //std::cout << "flop_counter_start" << std::endl;
+    f0 = params::flops;
+    //std::cout << "# start flops       = " << double(f0) << double(params::flops) << std::endl;
+  #endif
+  TaskTimer t3("Compression");
+  t3.start();
+  BLRMatrix<double> B(A, tiles, adm, piv, blr_opts);
+  t3.stop();
+  #if defined(STRUMPACK_COUNT_FLOPS)
+    //std::cout << "flop_counter_stop" << std::endl;
+    ftot = params::flops - f0;
+    //std::cout << "# stop flops       = " << double(params::flops) << std::endl;
+  #endif
+  cout << "# created BLR matrix of dimension "
+          << B.rows() << " x " << B.cols() << endl;
+  //B.print("B");
+  //cout << "# compression succeeded!" << endl;
+  cout << "# rank(B) = " << B.maximum_rank() << endl;
+  cout << "# memory(B) = " << B.memory()/1e6 << " MB, "
+        << 100. * B.memory() / A.memory() << "% of dense" << endl;
+  #if defined(STRUMPACK_COUNT_FLOPS)
+    std::cout << "# flops       = " << double(ftot) << std::endl;
+    std::cout << "# time = " << t3.elapsed() << std::endl;
+    //std::cout << "# flop rate = " << ftot / t3.elapsed() / 1e9
+    //              << " GFlop/s" << std::endl;
+  #endif
 
-  // // H.print_info();
-  // auto Bdense = B.dense();
-  // Bdense.scaled_add(-1., A);
-  // cout << "# relative error = ||A-B*I||_F/||A||_F = "
-  //      << Bdense.normF() / A.normF() << endl;
-  // cout << "# absolute error = ||A-B*I||_F = " << Bdense.normF() << endl;
-  // if (Bdense.normF() / A.normF() > ERROR_TOLERANCE
-  //     * max(blr_opts.rel_tol(),blr_opts.abs_tol())) {
-  //   cout << "ERROR: compression error too big!!" << endl;
-  //   return 1;
-  // }
+  //solve AX=Y
+  A = DenseMatrix<double>(m, m);
+    for (int j=0; j<m; j++)
+      for (int i=0; i<m; i++)
+        A(i,j) = (i==j) ? 1. : 1./(1+abs(i-j));
+  DenseMatrix<double> Y(m, 10), X(m, 10);//, T1(m, 10);
+  X.random();
+  // compute Y <- AX
+  gemm(Trans::N, Trans::N, 1., A, X, 0., Y);
+  /* T1 = Y;
+  auto Apiv = A.LU(0);
+  A.solve_LU_in_place(T1, Apiv); */
+  B.solve(piv, Y);
+  auto Xnorm = X.normF();
+  //Y.scaled_add(-1., X);
+  X.scaled_add(-1., Y);
+  cout << "# relative error = ||X-B\\(A*X)||_F/||X||_F = "
+       << X.normF() / Xnorm << endl;
+  //cout << "# relative error = ||B\\(A*X) - X||_F/||X||_F = "
+  //           << Y.normF() / Xnorm << endl;
+  //T1.scaled_add(-1., X);
+  //cout << "# relative error = ||B\\(A*X) - X||_F/||X||_F = "
+  //           << T1.normF() / Xnorm << endl;
 
-  // cout << "# computing LU factorization .. ";
-  // B.factor();
-  // cout << " done!" << endl;
 
   cout << "# exiting" << endl;
   return 0;

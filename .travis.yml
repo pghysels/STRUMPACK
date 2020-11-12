@@ -47,10 +47,10 @@ before_install:
   - sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-7 70
   - printf "${BLUE} GC; Done installing gfortran via apt\n"
 
-  - printf "${BLUE} GC; Installing OpenMPI-1 via apt\n"
+  - printf "${BLUE} GC; Installing MPICH via apt\n"
   - sudo apt-get update
-  - sudo apt-get install openmpi-bin libopenmpi-dev
-  - printf "${BLUE} GC; Done installing OpenMPI-1 via apt\n"
+  - sudo apt-get install mpich libmpich-dev
+  - printf "${BLUE} GC; Done installing MPICH via apt\n"
 
 install:
   - export BLUE="\033[34;1m"
@@ -120,6 +120,9 @@ install:
   - cd $TRAVIS_BUILD_DIR
   - mkdir build
   - cd build
+  - which mpic++
+  - mpic++ --version
+  - ls -alh /etc/alternatives/mpic++
   - |
     cmake .. \
     -DCMAKE_BUILD_TYPE=Debug \
@@ -129,7 +132,7 @@ install:
     -DCMAKE_Fortran_COMPILER=mpif90 \
     -DTPL_BLAS_LIBRARIES=$BLAS_LIB \
     -DTPL_LAPACK_LIBRARIES=$LAPACK_LIB
-  - make
+  - make VERBOSE=1
   - make install
   - make tests
   - printf "${BLUE} GC; Done installing STRUMPACK from source\n"

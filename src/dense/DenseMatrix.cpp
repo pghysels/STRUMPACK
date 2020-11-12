@@ -249,6 +249,26 @@ namespace strumpack {
   }
 
   template<typename scalar_t> void
+  DenseMatrix<scalar_t>::copy_topos(const DenseMatrix<scalar_t>& B,
+                              std::size_t i, std::size_t j) {
+    assert(B.rows() <= rows());
+    assert(B.cols() <= cols());
+    for (std::size_t _j=0; _j<B.cols(); _j++)
+      for (std::size_t _i=0; _i<B.rows(); _i++)
+        operator()(_i+i,_j+j) = B(_i,_j);
+  }
+
+  template<typename scalar_t> void
+  DenseMatrix<scalar_t>::copy_tillpos(const DenseMatrix<scalar_t>& B,
+                              std::size_t i, std::size_t j) { 
+    assert(i <= rows());
+    assert(j <= cols());
+    for (std::size_t _j=0; _j<j; _j++)
+      for (std::size_t _i=0; _i<i; _i++)
+        operator()(_i,_j) = B(_i,_j);
+  }
+
+  template<typename scalar_t> void
   DenseMatrix<scalar_t>::copy(const scalar_t* B, std::size_t ldb) {
     assert(ldb >= rows());
     for (std::size_t j=0; j<cols(); j++)
@@ -894,7 +914,6 @@ namespace strumpack {
   template std::ifstream& operator>>(std::ifstream& os, DenseMatrix<std::complex<double>>& D);
 
 
-
   /**
    * GEMM, defined for DenseMatrix objects (or DenseMatrixWrapper).
    *
@@ -934,10 +953,11 @@ namespace strumpack {
         (char(ta), char(tb), c.rows(), c.cols(),
          (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
          b.data(), b.ld(), beta, c.data(), c.ld(), depth);
-    else
+    else{
       blas::gemm(char(ta), char(tb), c.rows(), c.cols(),
                  (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
                  b.data(), b.ld(), beta, c.data(), c.ld());
+    }
   }
 
 

@@ -134,6 +134,7 @@ namespace strumpack {
     if (rchild_)
       rchild_->extend_add_to_dense
         (F11_, F12_, F21_, F22_, this, task_depth);
+    if (etree_level == 0 && opts.write_root_front()) F11_.write("Froot");
   }
 
   template<typename scalar_t,typename integer_t> void
