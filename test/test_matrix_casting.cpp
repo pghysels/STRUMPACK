@@ -38,10 +38,10 @@ using namespace strumpack;
 #define SOLVE_TOLERANCE 1e-12
 
 
-template<typename real_t,typename integer_t, typename cast_t> 
-int check_matrix_equality
+template<typename real_t,typename integer_t,typename cast_t> 
+int check_sparse_matrix_equality
 (CSRMatrix<real_t,integer_t> orig, CSRMatrix<cast_t,integer_t> cast) {
-    cout << "# Casting succeeded, testing matrix equality.\n";
+    cout << "# Sparse casting succeeded, testing matrix equality.\n";
     assert(orig.size() == cast.size());
     assert(orig.nnz() == cast.nnz());
     assert(orig.symm_sparse() == cast.symm_sparse());
@@ -55,19 +55,50 @@ int check_matrix_equality
       assert(orig.ind(i) == cast.ind(i));
       assert(cast.val(i) == static_cast<cast_t>(orig.val(i)));
     }
-    cout << "# Matrix equality passed.\n";
+    cout << "# Sparse matrix equality passed.\n";
     return 0;
 }
 
-template<typename real_t,typename integer_t, typename cast_t>
-int read_matrix_and_run_tests(int argc, const char* const argv[]) {
+template<typename scalar_t,typename cast_t> 
+int check_dense_matrix_equality
+(DenseMatrix<scalar_t> orig, DenseMatrix<cast_t> cast) {
+    cout << "# Dense casting succeeded, testing matrix equality.\n";
+    assert(orig.rows() == cast.rows());
+    assert(orig.cols() == cast.cols());
+    assert(orig.ld() == cast.ld());
+
+    size_t rows = orig.rows();
+    size_t cols = orig.cols();
+    for (size_t i = 0; i < rows; ++i) {
+      for (size_t j = 0; j < cols; ++j) {
+        assert(cast(i,j) == static_cast<cast_t>(orig(i,j)));
+      }
+    }
+    cout << "# Dense matrix equality passed.\n";
+    return 0;
+}
+
+template<typename real_t,typename integer_t,typename cast_t>
+int read_sparse_matrix_and_run_tests(int argc, const char* const argv[]) {
   string f(argv[1]);
   CSRMatrix<real_t,integer_t> A;
   if (A.read_matrix_market(f) != 0)
     return 1;
   CSRMatrix<cast_t,integer_t> new_mat = cast_matrix<real_t,integer_t,cast_t>(A);
-  return check_matrix_equality<real_t,integer_t,cast_t>(A, new_mat);
+  return check_sparse_matrix_equality<real_t,integer_t,cast_t>(A, new_mat);
 }
+
+template<typename scalar_t,typename cast_t>
+int create_dense_matrix_and_run_tests(int argc, const char* const argv[]) {
+  int m = 100;
+  DenseMatrix<scalar_t> A(m, m);
+  for (int j=0; j<m; j++)
+    for (int i=0; i<m; i++)
+      A(i,j) = (i==j) ? 1. : 1./(1+abs(i-j));
+  DenseMatrix<cast_t> new_mat = cast_matrix<scalar_t,cast_t>(A);
+  return check_dense_matrix_equality<scalar_t,cast_t>(A, new_mat);
+}
+
 
 int main(int argc, char* argv[]) {
   if (argc < 2) {
@@ -83,6 +114,12 @@ int main(int argc, char* argv[]) {
   cout << endl;
 
   int ierr = 0;
-  ierr = read_matrix_and_run_tests<double,int,float>(argc, argv);
+  ierr = read_sparse_matrix_and_run_tests<double,int,float>(argc, argv);
+  if (ierr) return ierr;
+
+  // Test double->float and float->double.
+  ierr = create_dense_matrix_and_run_tests<double,float>(argc, argv);
+  if (ierr) return ierr;
+  ierr = create_dense_matrix_and_run_tests<float,double>(argc, argv);
   if (ierr) return ierr;
 }

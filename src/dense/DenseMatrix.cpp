@@ -1219,6 +1219,12 @@ namespace strumpack {
                  x, incx, beta, y, incy);
   }
 
+  template<typename scalar_t,typename cast_t> DenseMatrix<cast_t> 
+  cast_matrix(const DenseMatrix<scalar_t>& mat) {
+    std::vector<cast_t> new_mat(mat.data(), mat.end());
+    return DenseMatrix<cast_t>(mat.rows(), mat.cols(), &new_mat[0], mat.ld());
+  }
+
 
   // explicit template instantiations
   //template class DenseMatrix<int>;
@@ -1441,5 +1447,10 @@ namespace strumpack {
    const DenseMatrix<std::complex<double>>& a,
    const std::complex<double>* x, int incx, std::complex<double> beta,
    std::complex<double>* y, int incy, int depth);
+
+  template DenseMatrix<float> cast_matrix<double,float>
+  (const DenseMatrix<double>& mat);
+  template DenseMatrix<double> cast_matrix<float,double>
+  (const DenseMatrix<float>& mat);
 
 } // end namespace strumpack
