@@ -64,8 +64,7 @@ namespace strumpack {
 
     template<typename scalar_t> LRTile<scalar_t>
     LRTile<scalar_t>::multiply(const BLRTile<scalar_t>& a) const {
-      auto t=a.left_multiply(*this);
-      return t;
+      return a.left_multiply(*this);
     }
     template<typename scalar_t> LRTile<scalar_t>
     LRTile<scalar_t>::left_multiply(const LRTile<scalar_t>& a) const {
