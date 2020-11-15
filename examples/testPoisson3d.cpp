@@ -30,7 +30,7 @@
 #include "StrumpackSparseSolver.hpp"
 #include "sparse/CSRMatrix.hpp"
 
-typedef float scalar;
+typedef double scalar;
 typedef int integer;
 
 using namespace strumpack;
