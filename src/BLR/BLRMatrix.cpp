@@ -989,19 +989,15 @@ namespace strumpack {
           else{ //Recompress Uall OR Vall
             if (Uall.rows() > Vall.cols()){
               // (Uall * U1) *V1
-              DenseMatrix<scalar_t> U1, V1;
-              Vall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
-              DenseMatrix<scalar_t> tmp(Uall.rows(), U1.cols());
-              gemm(Trans::N, Trans::N, scalar_t(1.), Uall, U1, scalar_t(0.), tmp);
-              gemm(Trans::N, Trans::N, scalar_t(-1.), tmp, V1, scalar_t(1.), Aij);
+              gemm(Trans::N, Trans::N, scalar_t(-1.), Uall,
+                   LRTile<scalar_t>(Vall, opts), scalar_t(1.), Aij,
+                   params::task_recursion_cutoff_level);
             }
             else{
               // U1 * (V1 * Vall)
-              DenseMatrix<scalar_t> U1, V1;
-              Uall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-              DenseMatrix<scalar_t> tmp(V1.rows(), Vall.cols());
-              gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), tmp);
-              gemm(Trans::N, Trans::N, scalar_t(-1.), U1, tmp, scalar_t(1.), Aij);
+              gemm(Trans::N, Trans::N, scalar_t(-1.),
+                   LRTile<scalar_t>(Uall, opts), Vall, scalar_t(1.), Aij,
+                   params::task_recursion_cutoff_level);
             }
             /* //Recompress Uall only
             DenseMatrix<scalar_t> U1, V1;
