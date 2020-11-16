@@ -711,9 +711,6 @@ namespace strumpack {
      * communicator.  This operation is collective on all the
      * processes in this communicator.
      *
-     * If the current communicator has size 1 or is_null(), this will
-     * return an MPIComm set to MPI_COMM_NULL.
-     *
      * \param P0 first rank in the new communicator
      * \param P number of ranks in the new communicator
      * \param stride stride between ranks in this communicator
@@ -723,8 +720,7 @@ namespace strumpack {
      * \see sub_self
      */
     MPIComm sub(int P0, int P, int stride=1) const {
-      if (is_null() || size() == 1)
-        return MPIComm(MPI_COMM_NULL);
+      if (is_null()) return MPIComm(MPI_COMM_NULL);
       assert(P0 + P <= size());
       MPIComm sub_comm;
       std::vector<int> sub_ranks(P);
