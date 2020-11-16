@@ -976,7 +976,7 @@ namespace strumpack {
                    params::task_recursion_cutoff_level);
           }
         }
-      } else if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::COMB){
+      } else if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::COMB) {
         std::vector<std::pair<size_t,size_t>> ranks_idx;
         std::size_t rank_sum = 0;
         auto Aij = tile(A11, i, j);
@@ -1010,9 +1010,8 @@ namespace strumpack {
             for (std::size_t k=1; k<ranks_idx.size(); k++) {
               DenseM_t Uall(Aij.rows(), rank_tmp+ranks_idx[k].first),
                 Vall(rank_tmp+ranks_idx[k].first, Aij.cols());
-              // TODO use copy routine
-              Uall.copy_tillpos(tmpU, Aij.rows(), rank_tmp);
-              Vall.copy_tillpos(tmpV, rank_tmp, Aij.cols());
+              copy(Aij.rows(), rank_tmp, tmpU, 0, 0, Uall, 0, 0);
+              copy(rank_tmp, Aij.cols(), tmpV, 0, 0, Vall, 0, 0);
               DenseMW_t t1(Aij.rows(), ranks_idx[k].first, Uall, 0, rank_tmp),
                 t2(ranks_idx[k].first, Aij.cols(), Vall, rank_tmp, 0);
               tile(i,ranks_idx[k].second).multiply
@@ -1028,18 +1027,16 @@ namespace strumpack {
                   gemm(Trans::N, Trans::N, scalar_t(1.),
                        Uall_lr.V(), Vall_lr.U(), scalar_t(0.), tmp1);
                   if (Uall_lr.rank() > Vall_lr.rank()) {
-                    DenseM_t tmp2(Uall_lr.rows(), tmp1.cols());
+                    DenseMW_t tmp2(Uall_lr.rows(), tmp1.cols(), tmpU, 0, 0);
                     gemm(Trans::N, Trans::N, scalar_t(1.), Uall_lr.U(), tmp1,
                          scalar_t(0.), tmp2);
-                    tmpU.copy_topos(tmp2, 0, 0);
-                    tmpV.copy_topos(Vall_lr.V());
+                    copy(Vall_lr.V(), tmpV, 0, 0);
                     rank_tmp = tmp2.cols();
                   } else {
-                    DenseM_t tmp2(tmp1.rows(), Vall_lr.cols());
+                    DenseMW_t tmp2(tmp1.rows(), Vall_lr.cols(), tmpV, 0, 0);
                     gemm(Trans::N, Trans::N, scalar_t(1.), tmp1, Vall_lr.V(),
                          scalar_t(0.), tmp2);
-                    tmpU.copy_topos(Uall_lr.U(), 0, 0);
-                    tmpV.copy_topos(tmp2, 0, 0);
+                    copy(Uall_lr.U(), tmpU, 0, 0);
                     rank_tmp = Uall_lr.rank();
                   }
                 }
