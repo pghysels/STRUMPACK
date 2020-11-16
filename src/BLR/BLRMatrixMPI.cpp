@@ -746,9 +746,28 @@ namespace strumpack {
           for (std::size_t p=0; p<sbuf.size(); p++)
             sbuf[p].reserve(cnt[p]);
         }
-        for (std::size_t c=0; c<ln; c++)
-          for (std::size_t r=0, pcc=pc[c]; r<lm; r++)
-            sbuf[pr[r]+pcc].push_back(this->operator()(r,c));
+        for (std::size_t cB=0, lcB=0, c=0; cB<colblocks(); cB++) {
+          if (grid()->is_local_col(cB)) {
+            // expand a column of blocks to dense tiles
+            std::vector<DenseTile<scalar_t>> cT;
+            cT.reserve(rowblockslocal());
+            for (std::size_t rB=0, lrB=0; rB<rowblocks(); rB++)
+              if (grid()->is_local_row(rB)) {
+                cT.emplace_back(ltile(lrB, lcB).dense());
+                lrB++;
+              }
+            for (std::size_t lc=0; lc<tilecols(cB); lc++, c++) {
+              auto pcc = pc[c];
+              for (std::size_t rB=0, lrB=0, r=0; rB<rowblocks(); rB++)
+                if (grid()->is_local_row(rB)) {
+                  for (std::size_t lr=0; lr<tilerows(rB); lr++, r++)
+                    sbuf[pr[r]+pcc].push_back(cT[lrB](lr,lc));
+                  lrB++;
+                }
+            }
+            lcB++;
+          }
+        }
       }
       std::vector<scalar_t,NoInit<scalar_t>> rbuf;
       std::vector<scalar_t*> pbuf;
