@@ -41,14 +41,21 @@ addons:
       #- liblapack-dev
       - libopenblas-dev
       - libmetis-dev
-      - libscalapack-openmpi-dev
-      - libparmetis-dev
+      #- libscalapack-openmpi-dev
+      #- libparmetis-dev
 
 before_install:
   - mkdir installDir
   - test -n $CC && unset CC
 
 install:
+  - printf "Installing openmpi\n"
+  - sudo apt-get install openmpi-bin libopenmpi-dev
+  - printf "Done installing openmpi\n"
+
+  - printf "Installing scalapack, parmetis\n"
+  - sudo apt libscalapack-openmpi-dev libparmetis-dev
+  - printf "Done installing scalapack, parmetis\n"
 
   - cd $TRAVIS_BUILD_DIR/installDir
   - wget --no-check-certificate https://gforge.inria.fr/frs/download.php/file/34618/scotch_6.0.4.tar.gz
