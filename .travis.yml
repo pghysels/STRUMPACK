@@ -37,21 +37,19 @@ addons:
       - g++
       - gcc
       - gfortran
-      - libblas-dev
-      - liblapack-dev
+      #- libblas-dev
+      #- liblapack-dev
+      - libopenblas-dev
       - libmetis-dev
       - libscalapack-openmpi-dev
       - libparmetis-dev
 
 before_install:
-  - export BLUE="\033[34;1m"
   - mkdir installDir
   - test -n $CC && unset CC
 
 install:
-  - export BLUE="\033[34;1m"
 
-  - printf "${BLUE} GC; Installing Scotch-6.0 from source\n"
   - cd $TRAVIS_BUILD_DIR/installDir
   - wget --no-check-certificate https://gforge.inria.fr/frs/download.php/file/34618/scotch_6.0.4.tar.gz
   - tar -xf scotch_6.0.4.tar.gz
@@ -66,24 +64,19 @@ install:
   - cat Makefile.inc
   - make ptscotch > make_scotch.log 2>&1
   - make prefix=../install install > make_scotch_install.log 2>&1
-  - printf "${BLUE} GC; DONE installing Scotch-6.0 from source\n"
 
-  - printf "${BLUE} GC; Installing STRUMPACK from source\n"
   - cd $TRAVIS_BUILD_DIR
   - mkdir build
   - cd build
-  - which mpic++
-  - mpic++ --version
   - ls -alh /etc/alternatives/mpic++
   - |
     cmake .. \
-    -DCMAKE_BUILD_TYPE=Debug \
+    -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=. \
     -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
   - make VERBOSE=1
   - make install
   - make tests
-  - printf "${BLUE} GC; Done installing STRUMPACK from source\n"
 
 script:
   - cd $TRAVIS_BUILD_DIR
