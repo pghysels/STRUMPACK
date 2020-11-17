@@ -40,14 +40,13 @@ addons:
       - libblas-dev
       - liblapack-dev
       - libmetis-dev
-      - mpich
-      - libmpich-dev
-      - libscalapack-mpich-dev
+      - libscalapack-openmpi-dev
       - libparmetis-dev
 
 before_install:
   - export BLUE="\033[34;1m"
   - mkdir installDir
+  - test -n $CC && unset CC
 
 install:
   - export BLUE="\033[34;1m"
@@ -80,7 +79,7 @@ install:
     cmake .. \
     -DCMAKE_BUILD_TYPE=Debug \
     -DCMAKE_INSTALL_PREFIX=. \
-    -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-mpich.so"
+    -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
   - make VERBOSE=1
   - make install
   - make tests
