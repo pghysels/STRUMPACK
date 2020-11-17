@@ -391,34 +391,6 @@ namespace strumpack {
     void copy
     (const DenseMatrix<scalar_t>& B, std::size_t i=0, std::size_t j=0);
 
-     /**
-     * Copy a matrix B of size B.rows() x B.cols(), into this matrix
-     * at position (i,j) . The following conditions should be
-     * satisfied: rows() >= B.rows() and cols() >= B.cols().
-     *
-     * \param B Matrix which to copy
-     * \param i Row-offset denoting the top of this matrix to
-     * copy into
-     * \param j Column-offset denoting the top of this matrix
-     * to copy into
-     */
-    void copy_topos
-    (const DenseMatrix<scalar_t>& B, std::size_t i=0, std::size_t j=0);
-
-    /**
-     * Copy a submatrix of matrix B of size i x j, into this matrix
-     * at position (0,0,) . The following conditions should be
-     * satisfied: rows() >= i and cols() >= j.
-     *
-     * \param B Matrix which to copy
-     * \param i Row-offset denoting the size of the submatrix to
-     * copy
-     * \param j Column-offset denoting the size of the submatrix
-     * to copy
-     */
-    void copy_tillpos
-    (const DenseMatrix<scalar_t>& B, std::size_t i=0, std::size_t j=0);
-
     /**
      * Copy a submatrix of size rows() x cols() from matrix B, with
      * leading dimension ld, into this matrix.
