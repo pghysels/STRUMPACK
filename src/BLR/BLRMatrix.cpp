@@ -963,8 +963,8 @@ namespace strumpack {
           if (opts.compression_kernel() == CompressionKernel::FULL) {
             // recompress Uall and Vall
             LRTile<scalar_t> Uall_lr(Uall, opts), Vall_lr(Vall, opts);
-            gemm(Trans::N, Trans::N, scalar_t(-1.), Uall_lr, Vall_lr,
-                 scalar_t(1.), Aij);
+            gemm(Trans::N, Trans::N, scalar_t(-1.), 
+                 Uall_lr, Vall_lr, scalar_t(1.), Aij);
           } else { // recompress Uall OR Vall
             if (Uall.rows() > Vall.cols()) // (Uall * U1) *V1
               gemm(Trans::N, Trans::N, scalar_t(-1.), Uall,
@@ -1647,101 +1647,66 @@ namespace strumpack {
     (std::size_t i, std::size_t j, std::size_t kmax, BLRMatrix<scalar_t>& B12, 
      BLRMatrix<scalar_t>& B21, DenseMatrix<scalar_t>&A22, const BLROptions<scalar_t>& opts, int* B)
     {
-      DenseMatrixWrapper<scalar_t> Aij
-        (B21.tilerows(i), B12.tilecols(j), A22,
-         B21.tileroff(i), B12.tilecoff(j));
+      using DenseMW_t = DenseMatrixWrapper<scalar_t>;
+      using DenseM_t = DenseMatrix<scalar_t>;
+      DenseMW_t Aij(B21.tilerows(i), B12.tilecols(j), A22,
+                B21.tileroff(i), B12.tilecoff(j));
       if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::STAR){
         std::size_t rank_sum=0;
         for (std::size_t k=0; k<kmax; k++) {
-          if(!(B21.tile(i, k).is_low_rank() || B12.tile(k, j).is_low_rank())){ //both tiles are dense, then gemm directly
+          if(!(B21.tile(i, k).is_low_rank() || B12.tile(k, j).is_low_rank()))
+            //both tiles are dense, then gemm directly
             gemm(Trans::N, Trans::N, scalar_t(-1.),
                  B21.tile(i, k), B12.tile(k, j), scalar_t(1.), Aij);  
-          }
-          else if(B21.tile(i, k).is_low_rank() && B12.tile(k, j).is_low_rank()){
-            rank_sum+=std::min(B21.tile(i, k).rank(), B12.tile(k, j).rank());
-          }
-          else if(B21.tile(i, k).is_low_rank()){
-            rank_sum+=B21.tile(i, k).rank();
-          }
-          else{
-            rank_sum+=B12.tile(k, j).rank();
-          }
+          else if(B21.tile(i, k).is_low_rank() && B12.tile(k, j).is_low_rank())
+            rank_sum += std::min(B21.tile(i, k).rank(), B12.tile(k, j).rank());
+          else if(B21.tile(i, k).is_low_rank())
+            rank_sum += B21.tile(i, k).rank();
+          else
+            rank_sum += B12.tile(k, j).rank();
         }
-        if(rank_sum>0){
-          DenseMatrix<scalar_t> Uall(Aij.rows(), rank_sum);
-          DenseMatrix<scalar_t> Vall(rank_sum, Aij.cols());
+        if(rank_sum > 0){
+          DenseM_t Uall(Aij.rows(), rank_sum), Vall(rank_sum, Aij.cols());
           std::size_t rank_tmp=0;
           for (std::size_t k=0; k<kmax; k++) {
             if(B21.tile(i, k).is_low_rank() && B12.tile(k, j).is_low_rank()){
-              std::size_t minrank=std::min(B21.tile(i,k).rank(), B12.tile(k,j).rank());
-              DenseMatrixWrapper<scalar_t> t1(Aij.rows(), minrank, Uall, 0, rank_tmp), 
-              t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
+              std::size_t minrank =
+                std::min(B21.tile(i,k).rank(), B12.tile(k,j).rank());
+              DenseMW_t t1(Aij.rows(), minrank, Uall, 0, rank_tmp), 
+                t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
               B21.tile(i,k).multiply(B12.tile(k,j), t1, t2);
-              rank_tmp+=minrank;
-            }
-            else if (B21.tile(i, k).is_low_rank()){
-              std::size_t minrank=B21.tile(i,k).rank();
-              DenseMatrixWrapper<scalar_t> t1(Aij.rows(), minrank, Uall, 0, rank_tmp), 
-              t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
+              rank_tmp += minrank;
+            } else if (B21.tile(i, k).is_low_rank()){
+              std::size_t minrank = B21.tile(i,k).rank();
+              DenseMW_t t1(Aij.rows(), minrank, Uall, 0, rank_tmp), 
+                t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
               B21.tile(i,k).multiply(B12.tile(k,j), t1, t2);
-              rank_tmp+=minrank;
-            }
-            else if(B12.tile(k, j).is_low_rank()){
-              std::size_t minrank=B12.tile(k,j).rank();
-              DenseMatrixWrapper<scalar_t> t1(Aij.rows(), minrank, Uall, 0, rank_tmp), 
-              t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
+              rank_tmp += minrank;
+            } else if (B12.tile(k, j).is_low_rank()){
+              std::size_t minrank = B12.tile(k,j).rank();
+              DenseMW_t t1(Aij.rows(), minrank, Uall, 0, rank_tmp), 
+                t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
               B21.tile(i,k).multiply(B12.tile(k,j), t1, t2);
-              rank_tmp+=minrank;
+              rank_tmp += minrank;
             }
           }
           if (opts.compression_kernel() == CompressionKernel::FULL){
-            //Recompress Uall and Vall
-            DenseMatrix<scalar_t> UU, UV;
-            Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-            DenseMatrix<scalar_t> VU, VV;
-            Vall.low_rank(VU, VV, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
-            DenseMatrix<scalar_t> tmp1(UV.rows(), VU.cols());
-            gemm(Trans::N, Trans::N, scalar_t(1.), UV, VU, scalar_t(0.), tmp1);
-            if (UU.cols() > VU.cols()) {
-              //(UU*(UV * VU)) *VV
-              DenseMatrix<scalar_t> tmp2(UU.rows(), tmp1.cols());
-              gemm(Trans::N, Trans::N, scalar_t(1.), UU, tmp1, scalar_t(0.), tmp2);
-              gemm(Trans::N, Trans::N, scalar_t(-1.), tmp2, VV, scalar_t(1.), Aij);
-            }
-            else{
-              // UU* ((UV * VU)*VV)
-              DenseMatrix<scalar_t> tmp2(tmp1.rows(), VV.cols());
-              gemm(Trans::N, Trans::N, scalar_t(1.), tmp1, VV, scalar_t(0.), tmp2);
-              gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp2, scalar_t(1.), Aij);
-            }
-          }
-          else{ //Recompress Uall OR Vall
-            if (Uall.rows() > Vall.cols()){
-              // (Uall * U1) *V1
-              DenseMatrix<scalar_t> U1, V1;
-              Vall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
-              DenseMatrix<scalar_t> tmp(Uall.rows(), U1.cols());
-              gemm(Trans::N, Trans::N, scalar_t(1.), Uall, U1, scalar_t(0.), tmp);
-              gemm(Trans::N, Trans::N, scalar_t(-1.), tmp, V1, scalar_t(1.), Aij);
-            }
-            else{
-              // U1 * (V1 * Vall)
-              DenseMatrix<scalar_t> U1, V1;
-              Uall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-              DenseMatrix<scalar_t> tmp(V1.rows(), Vall.cols());
-              gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), tmp);
-              gemm(Trans::N, Trans::N, scalar_t(-1.), U1, tmp, scalar_t(1.), Aij);
-            }
-            /* //Recompress Uall only
-            DenseMatrix<scalar_t> U1, V1;
-            Uall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-            DenseMatrix<scalar_t> tmp(V1.rows(), Vall.cols());
-            gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), tmp);
-            gemm(Trans::N, Trans::N, scalar_t(-1.), U1, tmp, scalar_t(1.), Aij); */
+            // recompress Uall and Vall
+            LRTile<scalar_t> Uall_lr(Uall, opts), Vall_lr(Vall, opts);
+            gemm(Trans::N, Trans::N, scalar_t(-1.), Uall_lr, Vall_lr,
+                 scalar_t(1.), Aij);
+          } else { // recompress Uall OR Vall
+            if (Uall.rows() > Vall.cols()) // (Uall * U1) *V1
+              gemm(Trans::N, Trans::N, scalar_t(-1.), Uall, 
+                   LRTile<scalar_t>(Vall, opts), scalar_t(1.), Aij, 
+                   params::task_recursion_cutoff_level);
+            else // U1 * (V1 * Vall)
+              gemm(Trans::N, Trans::N, scalar_t(-1.),  
+                   LRTile<scalar_t>(Uall, opts), Vall, scalar_t(1.), Aij, 
+                   params::task_recursion_cutoff_level);
           }
         }
-      }
-      else if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::COMB){
+      } else if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::COMB){
         std::vector<std::pair<size_t,size_t>> ranks_idx;
         std::size_t rank_sum=0;
         for (std::size_t k=0; k<kmax; k++) {
@@ -1750,7 +1715,8 @@ namespace strumpack {
                  B21.tile(i, k), B12.tile(k, j), scalar_t(1.), Aij);
           }
           else if(B21.tile(i, k).is_low_rank() && B12.tile(k, j).is_low_rank()){ // both tiles are LR, collect size of LR matrices
-            ranks_idx.emplace_back(std::min(B21.tile(i, k).rank(), B12.tile(k, j).rank()),k);
+            ranks_idx.emplace_back
+              (std::min(B21.tile(i, k).rank(), B12.tile(k, j).rank()),k);
             rank_sum += std::min(B21.tile(i, k).rank(), B12.tile(k, j).rank());
           }
           else if(B21.tile(i, k).is_low_rank()){
@@ -1762,103 +1728,86 @@ namespace strumpack {
             rank_sum += B12.tile(k, j).rank();
           }
         }
-        if(rank_sum>0){
-          if(ranks_idx.size()>1){
-            //sort ranks in increasing order
+        if(rank_sum > 0){
+          if(ranks_idx.size() > 1){
             std::sort(ranks_idx.begin(),ranks_idx.end());
-            DenseMatrix<scalar_t> tmpU(Aij.rows(), rank_sum);
-            DenseMatrix<scalar_t> tmpV(rank_sum, Aij.cols());
-            std::size_t rank_tmp=ranks_idx[0].first;
-            DenseMatrixWrapper<scalar_t> t1(Aij.rows(), rank_tmp, tmpU, 0, 0), 
-            t2(rank_tmp, Aij.cols(), tmpV, 0, 0);
-            B21.tile(i,ranks_idx[0].second).multiply(B12.tile(ranks_idx[0].second,j), t1, t2);
+            DenseM_t tmpU(Aij.rows(), rank_sum), tmpV(rank_sum, Aij.cols());
+            std::size_t rank_tmp = ranks_idx[0].first;
+            DenseMW_t t1(Aij.rows(), rank_tmp, tmpU, 0, 0), 
+              t2(rank_tmp, Aij.cols(), tmpV, 0, 0);
+            B21.tile(i,ranks_idx[0].second).multiply
+              (B12.tile(ranks_idx[0].second,j), t1, t2);
             for (std::size_t k=1; k<ranks_idx.size(); k++) {
-              DenseMatrix<scalar_t> Uall(Aij.rows(), rank_tmp+ranks_idx[k].first);
-              DenseMatrix<scalar_t> Vall(rank_tmp+ranks_idx[k].first, Aij.cols());
+              DenseM_t Uall(Aij.rows(), rank_tmp+ranks_idx[k].first),
+                Vall(rank_tmp+ranks_idx[k].first, Aij.cols());
               copy(Aij.rows(), rank_tmp, tmpU, 0, 0, Uall, 0, 0);
               copy(rank_tmp, Aij.cols(), tmpV, 0, 0, Vall, 0, 0);
-              DenseMatrixWrapper<scalar_t> t1(Aij.rows(), ranks_idx[k].first, Uall, 0, rank_tmp), 
-              t2(ranks_idx[k].first, Aij.cols(), Vall, rank_tmp, 0);
-              B21.tile(i,ranks_idx[k].second).multiply(B12.tile(ranks_idx[k].second,j), t1, t2);
-              //if (ranks_idx.size()>2){
+              DenseMW_t t1(Aij.rows(), ranks_idx[k].first, Uall, 0, rank_tmp), 
+                t2(ranks_idx[k].first, Aij.cols(), Vall, rank_tmp, 0);
+              B21.tile(i,ranks_idx[k].second).multiply
+                (B12.tile(ranks_idx[k].second,j), t1, t2);
               if (opts.compression_kernel() == CompressionKernel::FULL){
                 // recompress Uall and Vall
                 LRTile<scalar_t> Uall_lr(Uall, opts), Vall_lr(Vall, opts);
-                /* DenseMatrix<scalar_t> UU, UV;
-                Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-                DenseMatrix<scalar_t> VU, VV;
-                Vall.low_rank(VU, VV, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
-                DenseMatrix<scalar_t> tmp1(UV.rows(), VU.cols());
-                gemm(Trans::N, Trans::N, scalar_t(1.), UV, VU, scalar_t(0.), tmp1);
-                if (UU.cols() > VU.cols()) {
-                  //(UU*(UV * VU)) *VV
-                  DenseMatrix<scalar_t> tmp2(UU.rows(), tmp1.cols());
-                  gemm(Trans::N, Trans::N, scalar_t(1.), UU, tmp1, scalar_t(0.), tmp2); */
                 if (k == ranks_idx.size()-1)
                   gemm(Trans::N, Trans::N, scalar_t(-1.), Uall_lr, Vall_lr, 
                        scalar_t(1.), Aij);
                 else {
-                  DenseMatrix<scalar_t> tmp1(Uall_lr.rank(), Vall_lr.rank());
+                  DenseM_t tmp1(Uall_lr.rank(), Vall_lr.rank());
                   gemm(Trans::N, Trans::N, scalar_t(1.), 
                        Uall_lr.V(), Vall_lr.U(), scalar_t(0.), tmp1);
-                  if (Uall_lr.rank() > Vall_lr.rank()) {
-                    //(UU*(UV * VU)) *VV
-                    DenseMatrixWrapper<scalar_t> tmp2(Uall_lr.rows(), tmp1.cols(), tmpU, 0, 0);
+                  if (Uall_lr.rank() > Vall_lr.rank()) { // (UU*(UV * VU)) *VV
+                    DenseMW_t tmp2(Uall_lr.rows(), tmp1.cols(), tmpU, 0, 0);
                     gemm(Trans::N, Trans::N, scalar_t(1.), Uall_lr.U(), tmp1, 
                          scalar_t(0.), tmp2);
                     copy(Vall_lr.V(), tmpV, 0, 0);
                     rank_tmp = tmp2.cols();
-                  } else {
-                    // UU* ((UV * VU)*VV)
-                    DenseMatrixWrapper<scalar_t> tmp2(tmp1.rows(), Vall_lr.cols(), tmpV, 0, 0);
+                  } else { // UU* ((UV * VU)*VV)
+                    DenseMW_t tmp2(tmp1.rows(), Vall_lr.cols(), tmpV, 0, 0);
                     gemm(Trans::N, Trans::N, scalar_t(1.), tmp1, Vall_lr.V(), 
                          scalar_t(0.), tmp2);
                     copy(Uall_lr.U(), tmpU, 0, 0);
                     rank_tmp = Uall_lr.rank();
                   }
                 }
-              }
-              else{ //Recompress Uall OR Vall
-                if (Uall.rows() > Vall.cols()){
-                  // (Uall * U1) *V1
-                  DenseMatrix<scalar_t> U1, V1;
-                  Vall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
+              } else { //Recompress Uall OR Vall
+                if (Uall.rows() > Vall.cols()){ // (Uall * U1) *V1
+                  LRTile<scalar_t> Vall_lr(Vall, opts);
                   if (k==ranks_idx.size()-1){
-                    DenseMatrix<scalar_t> tmp(Uall.rows(), U1.cols());
-                    gemm(Trans::N, Trans::N, scalar_t(1.), Uall, U1, scalar_t(0.), tmp);
-                    gemm(Trans::N, Trans::N, scalar_t(-1.), tmp, V1, scalar_t(1.), Aij);
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), 
+                         Uall, Vall_lr, scalar_t(1.), Aij,
+                         params::task_recursion_cutoff_level);
                   }
                   else{
-                    DenseMatrixWrapper<scalar_t> t1(Uall.rows(), U1.cols(), tmpU, 0, 0), 
-                    t2(V1.rows(), V1.cols(), tmpV, 0, 0);
-                    gemm(Trans::N, Trans::N, scalar_t(1.), Uall, U1, scalar_t(0.), t1);
-                    t2=V1;
-                    rank_tmp = U1.cols();
+                    DenseMW_t t1(Uall.rows(), Vall_lr.rank(), tmpU, 0, 0), 
+                      t2(Vall_lr.rank(), Vall_lr.cols(), tmpV, 0, 0);
+                    gemm(Trans::N, Trans::N, scalar_t(1.), 
+                         Uall, Vall_lr.U(), scalar_t(0.), t1);
+                    t2 = Vall_lr.V();
+                    rank_tmp = Vall_lr.rank();
                   }
-                }
-                else{
-                  // U1 * (V1 * Vall)
-                  DenseMatrix<scalar_t> U1, V1;
-                  Uall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-                  if (k==ranks_idx.size()-1){
-                    DenseMatrix<scalar_t> tmp(V1.rows(), Vall.cols());
-                    gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), tmp);
-                    gemm(Trans::N, Trans::N, scalar_t(-1.), U1, tmp, scalar_t(1.), Aij); 
-                  }
-                  else{
-                    DenseMatrixWrapper<scalar_t> t1(U1.rows(), U1.cols(), tmpU, 0, 0), 
-                    t2(V1.rows(), Vall.cols(), tmpV, 0, 0);
-                    t1=U1;
-                    gemm(Trans::N, Trans::N, scalar_t(1.), V1, Vall, scalar_t(0.), t2);
-                    rank_tmp = U1.cols();
+                } else { // U1 * (V1 * Vall)
+                //!!!!!!!!
+                  LRTile<scalar_t> Uall_lr(Uall, opts);
+                  if (k==ranks_idx.size()-1)
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), 
+                         Uall_lr, Vall, scalar_t(1.), Aij,
+                         params::task_recursion_cutoff_level); 
+                  else {
+                    DenseMW_t t1(Uall_lr.rows(), Uall_lr.rank(), tmpU, 0, 0), 
+                     t2(Uall_lr.rank(), Vall.cols(), tmpV, 0, 0);
+                    t1 = Uall_lr.U();
+                    gemm(Trans::N, Trans::N, scalar_t(1.), Uall_lr.V(), Vall, 
+                         scalar_t(0.), t2);
+                    rank_tmp = Uall_lr.rank();
                   }
                 }
               }
             }
-          }
-          else{
-            LRTile<scalar_t> tmp=B21.tile(i,ranks_idx[0].second).multiply(B12.tile(ranks_idx[0].second,j));
-            gemm(Trans::N, Trans::N, scalar_t(-1.), tmp.U(), tmp.V(), scalar_t(1.), Aij);
+          } else {
+            gemm(Trans::N, Trans::N, scalar_t(-1.), 
+                 B21.tile(i,ranks_idx[0].second), B12.tile(ranks_idx[0].second,j), 
+                 scalar_t(1.), Aij);
           }
         }
       }
