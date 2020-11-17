@@ -1,8 +1,12 @@
 language: cpp
 
-compiler: gcc
+compiler:
+  - gcc
+  - clang
 
 os: linux
+
+dist: bionic
 
 sudo: required
 
@@ -27,55 +31,26 @@ env:
 git:
   depth: 1
 
+addons:
+  apt:
+    packages:
+      - g++
+      - gcc
+      - gfortran
+      - libblas-dev
+      - liblapack-dev
+      - libmetis-dev
+      - mpich
+      - libmpich-dev
+      - libscalapack-mpich-dev
+      - libparmetis-dev
+
 before_install:
   - export BLUE="\033[34;1m"
   - mkdir installDir
 
-  - printf "${BLUE} GC; Installing gcc-7 via apt\n"
-  - sudo apt-get update
-  - sudo apt-get install build-essential software-properties-common -y
-  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-  - sudo apt-get update
-  - sudo apt-get install gcc-7 g++-7 -y
-  - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 70 --slave /usr/bin/g++ g++ /usr/bin/g++-7
-  - export CXX="g++-7"
-  - export CC="gcc-7"
-  - printf "${BLUE} GC; Done installing gcc-7 via apt\n"
-
-  - printf "${BLUE} GC; Installing gfortran via apt\n"
-  - sudo apt-get install gfortran-7 -y
-  - sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-7 70
-  - printf "${BLUE} GC; Done installing gfortran via apt\n"
-
-  - printf "${BLUE} GC; Installing MPICH via apt\n"
-  - sudo apt-get update
-  - sudo apt-get install mpich libmpich-dev
-  - printf "${BLUE} GC; Done installing MPICH via apt\n"
-
 install:
   - export BLUE="\033[34;1m"
-
-  - printf "${BLUE} GC; Installing BLAS and LAPACK from apt\n"
-  - sudo apt-get install libblas-dev liblapack-dev
-  - export BLAS_LIB=/usr/lib/libblas/libblas.so
-  - export LAPACK_LIB=/usr/lib/lapack/liblapack.so
-  - printf $BLAS_LIB
-  - printf "${BLUE} GC; Done installing BLAS and LAPACK from apt\n"
-
-  - printf "${BLUE} GC; Installing ScaLAPACK from source\n"
-  - cd $TRAVIS_BUILD_DIR/installDir
-  - wget http://www.netlib.org/scalapack/scalapack-2.1.0.tgz
-  - tar -xf scalapack-2.1.0.tgz
-  - cd scalapack-2.1.0
-  - mkdir build
-  - mkdir install
-  - cd build
-  - cmake ../ -DCMAKE_INSTALL_PREFIX=../install
-  - make scalapack > make_scalapack.log 2>&1
-  - make install > make_scalapack_install.log 2>&1
-  - cd ../
-  - export SCALAPACK_DIR=$PWD/install
-  - printf "${BLUE} GC; Done installing ScaLAPACK from source\n"
 
   - printf "${BLUE} GC; Installing Scotch-6.0 from source\n"
   - cd $TRAVIS_BUILD_DIR/installDir
@@ -94,28 +69,6 @@ install:
   - make prefix=../install install > make_scotch_install.log 2>&1
   - printf "${BLUE} GC; DONE installing Scotch-6.0 from source\n"
 
-  - printf "${BLUE} GC; Installing ParMetis-4.0 from source\n"
-  - cd $TRAVIS_BUILD_DIR/installDir
-  - wget https://portal.nersc.gov/project/sparse/strumpack/parmetis-4.0.3.tar.gz
-  - tar -xf parmetis-4.0.3.tar.gz
-  - cd parmetis-4.0.3/
-  - mkdir install
-  - export ParMETIS_DIR=$PWD/install
-  - make config shared=1 cc=mpicc cxx=mpic++ prefix=$PWD/install
-  - make install > make_parmetis_install.log 2>&1
-  - printf "${BLUE} GC; Done installing ParMetis-4.0 from source\n"
-
-  - printf "${BLUE} GC; Installing Metis-5.1.0 from source\n"
-  - cd $TRAVIS_BUILD_DIR/installDir
-  - wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.1.0.tar.gz
-  - tar -xf metis-5.1.0.tar.gz
-  - cd metis-5.1.0/
-  - mkdir install
-  - export METIS_DIR=$PWD/install
-  - make config shared=1 cc=gcc prefix=$PWD/install
-  - make install > make_metis_install.log 2>&1
-  - printf "${BLUE} GC; Done installing Metis-5.1.0 from source\n"
-
   - printf "${BLUE} GC; Installing STRUMPACK from source\n"
   - cd $TRAVIS_BUILD_DIR
   - mkdir build
@@ -129,9 +82,7 @@ install:
     -DCMAKE_INSTALL_PREFIX=. \
     -DCMAKE_C_COMPILER=mpicc \
     -DCMAKE_CXX_COMPILER=mpic++ \
-    -DCMAKE_Fortran_COMPILER=mpif90 \
-    -DTPL_BLAS_LIBRARIES=$BLAS_LIB \
-    -DTPL_LAPACK_LIBRARIES=$LAPACK_LIB
+    -DCMAKE_Fortran_COMPILER=mpif90
   - make VERBOSE=1
   - make install
   - make tests
