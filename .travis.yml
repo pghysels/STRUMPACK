@@ -80,9 +80,7 @@ install:
     cmake .. \
     -DCMAKE_BUILD_TYPE=Debug \
     -DCMAKE_INSTALL_PREFIX=. \
-    -DCMAKE_C_COMPILER=mpicc \
-    -DCMAKE_CXX_COMPILER=mpic++ \
-    -DCMAKE_Fortran_COMPILER=mpif90
+    -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
   - make VERBOSE=1
   - make install
   - make tests
