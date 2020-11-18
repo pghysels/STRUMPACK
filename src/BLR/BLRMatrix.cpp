@@ -1010,8 +1010,8 @@ namespace strumpack {
             for (std::size_t k=1; k<ranks_idx.size(); k++) {
               DenseMW_t t1(Aij.rows(), ranks_idx[k].first, tmpU, 0, rank_tmp),
                 t2(ranks_idx[k].first, Aij.cols(), tmpV, rank_tmp, 0);
-              tile(i,ranks_idx[k].second).multiply
-                (tile(ranks_idx[k].second,j), t1, t2);
+              tile(i, ranks_idx[k].second).multiply
+                (tile(ranks_idx[k].second, j), t1, t2);
               DenseMW_t Uall(Aij.rows(), rank_tmp+ranks_idx[k].first, tmpU, 0, 0), 
                 Vall(rank_tmp+ranks_idx[k].first, Aij.cols(), tmpV, 0, 0);
               if (opts.compression_kernel() == CompressionKernel::FULL) {
@@ -1021,36 +1021,23 @@ namespace strumpack {
                   gemm(Trans::N, Trans::N, scalar_t(-1.), Uall_lr, Vall_lr,
                        scalar_t(1.), Aij);
                 else {
-                  DenseM_t tmp1(Uall_lr.rank(), Vall_lr.rank());
-                  gemm(Trans::N, Trans::N, scalar_t(1.),
-                       Uall_lr.V(), Vall_lr.U(), scalar_t(0.), tmp1);
-                  if (Uall_lr.rank() > Vall_lr.rank()) {
-                    DenseMW_t tmp2(Uall_lr.rows(), tmp1.cols(), tmpU, 0, 0);
-                    gemm(Trans::N, Trans::N, scalar_t(1.), Uall_lr.U(), tmp1,
-                         scalar_t(0.), tmp2);
-                    copy(Vall_lr.V(), tmpV, 0, 0);
-                    rank_tmp = tmp2.cols();
-                  } else {
-                    DenseMW_t tmp2(tmp1.rows(), Vall_lr.cols(), tmpV, 0, 0);
-                    gemm(Trans::N, Trans::N, scalar_t(1.), tmp1, Vall_lr.V(),
-                         scalar_t(0.), tmp2);
-                    copy(Uall_lr.U(), tmpU, 0, 0);
-                    rank_tmp = Uall_lr.rank();
-                  }
+                  rank_tmp = std::min(Uall_lr.rank(), Vall_lr.rank());
+                  DenseMW_t t1(tmpU.rows(), rank_tmp, tmpU, 0, 0),
+                    t2(rank_tmp, tmpV.cols(), tmpV, 0, 0);
+                  Uall_lr.multiply(Vall_lr, t1, t2);
                 }
               } else { // recompress Uall OR Vall
-                if (Uall.rows() > Vall.cols()){
+                if (Uall.rows() > Vall.cols()) {
                   LRTile<scalar_t> Vall_lr(Vall, opts);
                   if (k == ranks_idx.size() - 1)
-                    gemm(Trans::N, Trans::N, scalar_t(-1.), 
+                    gemm(Trans::N, Trans::N, scalar_t(-1.),
                          Uall, Vall_lr, scalar_t(1.), Aij,
                          params::task_recursion_cutoff_level);
                   else {
-                    DenseMW_t t1(Uall.rows(), Vall_lr.rank(), tmpU, 0, 0),
-                      t2(Vall_lr.rank(), Vall_lr.cols(), tmpV, 0, 0);
+                    DenseMW_t t1(Uall.rows(), Vall_lr.rank(), tmpU, 0, 0);
                     gemm(Trans::N, Trans::N, scalar_t(1.),
                          Uall, Vall_lr.U(), scalar_t(0.), t1);
-                    t2 = Vall_lr.V();
+                    copy(Vall_lr.V(), tmpV, 0, 0);
                     rank_tmp = Vall_lr.rank();
                   }
                 } else {
@@ -1060,9 +1047,8 @@ namespace strumpack {
                          Uall_lr, Vall, scalar_t(1.), Aij,
                          params::task_recursion_cutoff_level);
                   else {
-                    DenseMW_t t1(Uall.rows(), Uall_lr.rank(), tmpU, 0, 0),
-                      t2(Uall_lr.rank(), Vall.cols(), tmpV, 0, 0);
-                    t1 = Uall_lr.U();
+                    DenseMW_t t2(Uall_lr.rank(), Vall.cols(), tmpV, 0, 0);
+                    copy(Uall_lr.U(), tmpU, 0, 0);
                     gemm(Trans::N, Trans::N, scalar_t(1.), Uall_lr.V(), Vall,
                          scalar_t(0.), t2);
                     rank_tmp = Uall_lr.rank();
