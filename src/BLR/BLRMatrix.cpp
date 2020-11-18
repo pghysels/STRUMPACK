@@ -1083,21 +1083,14 @@ namespace strumpack {
             Vall(rank_sum, Aij.cols());
           std::size_t rank_tmp = 0;
           for (std::size_t k=0; k<kmax; k++) {
-            if(B11.tile(i, k).is_low_rank() && tile(k, j).is_low_rank()) {
-              std::size_t minrank =
-                std::min(B11.tile(i,k).rank(), tile(k,j).rank());
-              DenseMW_t t1(Aij.rows(), minrank, Uall, 0, rank_tmp),
-                t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
-              B11.tile(i,k).multiply(tile(k,j), t1, t2);
-              rank_tmp += minrank;
-            } else if (B11.tile(i, k).is_low_rank()) {
-              std::size_t minrank = B11.tile(i,k).rank();
-              DenseMW_t t1(Aij.rows(), minrank, Uall, 0, rank_tmp),
-                t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
-              B11.tile(i,k).multiply(tile(k,j), t1, t2);
-              rank_tmp += minrank;
-            } else if(tile(k, j).is_low_rank()) {
-              std::size_t minrank=tile(k,j).rank();
+            if(B11.tile(i, k).is_low_rank() || tile(k, j).is_low_rank()){
+              std::size_t minrank;
+              if(B11.tile(i, k).is_low_rank() && tile(k, j).is_low_rank())
+                minrank = std::min(B11.tile(i,k).rank(), tile(k,j).rank());
+              else if (B11.tile(i, k).is_low_rank())
+                minrank = B11.tile(i,k).rank();
+              else if(tile(k, j).is_low_rank())
+                minrank=tile(k,j).rank();
               DenseMW_t t1(Aij.rows(), minrank, Uall, 0, rank_tmp),
                 t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
               B11.tile(i,k).multiply(tile(k,j), t1, t2);
@@ -1152,14 +1145,16 @@ namespace strumpack {
             B11.tile(i,ranks_idx[0].second).multiply
               (tile(ranks_idx[0].second,j), t1, t2);
             for (std::size_t k=1; k<ranks_idx.size(); k++) {
-              DenseM_t Uall(Aij.rows(), rank_tmp+ranks_idx[k].first),
+              /*DenseM_t Uall(Aij.rows(), rank_tmp+ranks_idx[k].first),
                 Vall(rank_tmp+ranks_idx[k].first, Aij.cols());
               copy(Aij.rows(), rank_tmp, tmpU, 0, 0, Uall, 0, 0);
-              copy(rank_tmp, Aij.cols(), tmpV, 0, 0, Vall, 0, 0);
-              DenseMW_t t1(Aij.rows(), ranks_idx[k].first, Uall, 0, rank_tmp),
-                t2(ranks_idx[k].first, Aij.cols(), Vall, rank_tmp, 0);
+              copy(rank_tmp, Aij.cols(), tmpV, 0, 0, Vall, 0, 0);*/
+              DenseMW_t t1(Aij.rows(), ranks_idx[k].first, tmpU, 0, rank_tmp),
+                t2(ranks_idx[k].first, Aij.cols(), tmpV, rank_tmp, 0);
               B11.tile(i,ranks_idx[k].second).multiply
                 (tile(ranks_idx[k].second,j), t1, t2);
+              DenseMW_t Uall(Aij.rows(), rank_tmp+ranks_idx[k].first, tmpU, 0, 0),
+                Vall(rank_tmp+ranks_idx[k].first, Aij.cols(), tmpV, 0, 0);
               if (opts.compression_kernel() == CompressionKernel::FULL) {
                 // recompress Uall and Vall
                 LRTile<scalar_t> Uall_lr(Uall, opts), Vall_lr(Vall, opts);
@@ -1237,22 +1232,14 @@ namespace strumpack {
             Vall(rank_sum, Aij.cols());
           std::size_t rank_tmp=0;
           for (std::size_t k=0; k<kmax; k++) {
-            if(tile(j, k).is_low_rank() && B11.tile(k, i).is_low_rank()) {
-              std::size_t minrank =
-                std::min(tile(j,k).rank(), B11.tile(k,i).rank());
-              DenseMW_t t1(Aij.rows(), minrank, Uall, 0, rank_tmp),
-                t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
-              tile(j,k).multiply(B11.tile(k,i), t1, t2);
-              rank_tmp += minrank;
-            } else if (tile(j, k).is_low_rank()) {
-              std::size_t minrank = tile(j,k).rank();
-              DenseMW_t t1(Aij.rows(), minrank, Uall, 0, rank_tmp),
-                t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
-              tile(j,k).multiply(B11.tile(k,i), t1, t2);
-              rank_tmp += minrank;
-            }
-            else if(B11.tile(k, i).is_low_rank()) {
-              std::size_t minrank = B11.tile(k,i).rank();
+            if(tile(j, k).is_low_rank() || B11.tile(k, i).is_low_rank()) {
+              std::size_t minrank;
+              if(tile(j, k).is_low_rank() && B11.tile(k, i).is_low_rank())
+                minrank = std::min(tile(j,k).rank(), B11.tile(k,i).rank());
+              else if (tile(j, k).is_low_rank())
+                minrank = tile(j,k).rank();
+              else if(B11.tile(k, i).is_low_rank())
+                minrank = B11.tile(k,i).rank();
               DenseMW_t t1(Aij.rows(), minrank, Uall, 0, rank_tmp),
                 t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
               tile(j,k).multiply(B11.tile(k,i), t1, t2);
@@ -1307,14 +1294,16 @@ namespace strumpack {
             tile(j,ranks_idx[0].second).multiply
               (B11.tile(ranks_idx[0].second,i), t1, t2);
             for (std::size_t k=1; k<ranks_idx.size(); k++) {
-              DenseM_t Uall(tmpU.rows(), rank_tmp+ranks_idx[k].first),
+              /*DenseM_t Uall(tmpU.rows(), rank_tmp+ranks_idx[k].first),
                 Vall(rank_tmp+ranks_idx[k].first, tmpV.cols());
               copy(Aij.rows(), rank_tmp, tmpU, 0, 0, Uall, 0, 0);
-              copy(rank_tmp, Aij.cols(), tmpV, 0, 0, Vall, 0, 0);
-              DenseMW_t t1(Aij.rows(), ranks_idx[k].first, Uall, 0, rank_tmp),
-                t2(ranks_idx[k].first, Aij.cols(), Vall, rank_tmp, 0);
+              copy(rank_tmp, Aij.cols(), tmpV, 0, 0, Vall, 0, 0);*/
+              DenseMW_t t1(Aij.rows(), ranks_idx[k].first, tmpU, 0, rank_tmp),
+                t2(ranks_idx[k].first, Aij.cols(), tmpV, rank_tmp, 0);
               tile(j,ranks_idx[k].second).multiply
                 (B11.tile(ranks_idx[k].second,i), t1, t2);
+              DenseMW_t Uall(Aij.rows(), rank_tmp+ranks_idx[k].first, tmpU, 0, 0),
+                Vall(rank_tmp+ranks_idx[k].first, Aij.cols(), tmpV, 0, 0);
               if (opts.compression_kernel() == CompressionKernel::FULL) {
                 // recompress Uall and Vall
                 LRTile<scalar_t> Uall_lr(Uall, opts), Vall_lr(Vall, opts);
@@ -1574,21 +1563,14 @@ namespace strumpack {
           DenseM_t Uall(Aij.rows(), rank_sum), Vall(rank_sum, Aij.cols());
           std::size_t rank_tmp=0;
           for (std::size_t k=0; k<kmax; k++) {
-            if(B21.tile(i, k).is_low_rank() && B12.tile(k, j).is_low_rank()){
-              std::size_t minrank =
-                std::min(B21.tile(i,k).rank(), B12.tile(k,j).rank());
-              DenseMW_t t1(Aij.rows(), minrank, Uall, 0, rank_tmp),
-                t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
-              B21.tile(i,k).multiply(B12.tile(k,j), t1, t2);
-              rank_tmp += minrank;
-            } else if (B21.tile(i, k).is_low_rank()){
-              std::size_t minrank = B21.tile(i,k).rank();
-              DenseMW_t t1(Aij.rows(), minrank, Uall, 0, rank_tmp),
-                t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
-              B21.tile(i,k).multiply(B12.tile(k,j), t1, t2);
-              rank_tmp += minrank;
-            } else if (B12.tile(k, j).is_low_rank()){
-              std::size_t minrank = B12.tile(k,j).rank();
+            if (B21.tile(i, k).is_low_rank() || B12.tile(k, j).is_low_rank()) {
+              std::size_t minrank;
+              if(B21.tile(i, k).is_low_rank() && B12.tile(k, j).is_low_rank())
+                minrank = std::min(B21.tile(i,k).rank(), B12.tile(k,j).rank());
+              else if (B21.tile(i, k).is_low_rank())
+                minrank = B21.tile(i,k).rank();
+              else if (B12.tile(k, j).is_low_rank())
+                minrank = B12.tile(k,j).rank();
               DenseMW_t t1(Aij.rows(), minrank, Uall, 0, rank_tmp),
                 t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
               B21.tile(i,k).multiply(B12.tile(k,j), t1, t2);
@@ -1642,14 +1624,16 @@ namespace strumpack {
             B21.tile(i,ranks_idx[0].second).multiply
               (B12.tile(ranks_idx[0].second,j), t1, t2);
             for (std::size_t k=1; k<ranks_idx.size(); k++) {
-              DenseM_t Uall(Aij.rows(), rank_tmp+ranks_idx[k].first),
+              /*DenseM_t Uall(Aij.rows(), rank_tmp+ranks_idx[k].first),
                 Vall(rank_tmp+ranks_idx[k].first, Aij.cols());
               copy(Aij.rows(), rank_tmp, tmpU, 0, 0, Uall, 0, 0);
-              copy(rank_tmp, Aij.cols(), tmpV, 0, 0, Vall, 0, 0);
-              DenseMW_t t1(Aij.rows(), ranks_idx[k].first, Uall, 0, rank_tmp), 
-                t2(ranks_idx[k].first, Aij.cols(), Vall, rank_tmp, 0);
+              copy(rank_tmp, Aij.cols(), tmpV, 0, 0, Vall, 0, 0);*/
+              DenseMW_t t1(Aij.rows(), ranks_idx[k].first, tmpU, 0, rank_tmp), 
+                t2(ranks_idx[k].first, Aij.cols(), tmpV, rank_tmp, 0);
               B21.tile(i,ranks_idx[k].second).multiply
                 (B12.tile(ranks_idx[k].second,j), t1, t2);
+              DenseMW_t Uall(Aij.rows(), rank_tmp+ranks_idx[k].first, tmpU, 0, 0),
+                Vall(rank_tmp+ranks_idx[k].first, Aij.cols(), tmpV, 0, 0);
               if (opts.compression_kernel() == CompressionKernel::FULL) {
                 // recompress Uall and Vall
                 LRTile<scalar_t> Uall_lr(Uall, opts), Vall_lr(Vall, opts);
@@ -1657,24 +1641,12 @@ namespace strumpack {
                   gemm(Trans::N, Trans::N, scalar_t(-1.), Uall_lr, Vall_lr,
                        scalar_t(1.), Aij);
                 else {
-                  DenseM_t tmp1(Uall_lr.rank(), Vall_lr.rank());
-                  gemm(Trans::N, Trans::N, scalar_t(1.),
-                       Uall_lr.V(), Vall_lr.U(), scalar_t(0.), tmp1);
-                  if (Uall_lr.rank() > Vall_lr.rank()) { // (UU*(UV * VU)) *VV
-                    DenseMW_t tmp2(Uall_lr.rows(), tmp1.cols(), tmpU, 0, 0);
-                    gemm(Trans::N, Trans::N, scalar_t(1.), Uall_lr.U(), tmp1,
-                         scalar_t(0.), tmp2);
-                    copy(Vall_lr.V(), tmpV, 0, 0);
-                    rank_tmp = tmp2.cols();
-                  } else { // UU* ((UV * VU)*VV)
-                    DenseMW_t tmp2(tmp1.rows(), Vall_lr.cols(), tmpV, 0, 0);
-                    gemm(Trans::N, Trans::N, scalar_t(1.), tmp1, Vall_lr.V(),
-                         scalar_t(0.), tmp2);
-                    copy(Uall_lr.U(), tmpU, 0, 0);
-                    rank_tmp = Uall_lr.rank();
-                  }
+                  rank_tmp = std::min(Uall_lr.rank(), Vall_lr.rank());
+                  DenseMW_t t1(tmpU.rows(), rank_tmp, tmpU, 0, 0),
+                    t2(rank_tmp, tmpV.cols(), tmpV, 0, 0);
+                  Uall_lr.multiply(Vall_lr, t1, t2);
                 }
-              } else { // Recompress Uall OR Vall
+              } else { // recompress Uall OR Vall
                 if (Uall.rows() > Vall.cols()) { // (Uall * U1) *V1
                   LRTile<scalar_t> Vall_lr(Vall, opts);
                   if (k==ranks_idx.size()-1){
