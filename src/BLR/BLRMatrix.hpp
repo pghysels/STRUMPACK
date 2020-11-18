@@ -121,19 +121,19 @@ namespace strumpack {
        BLRMatrix<scalar_t>& B12, BLRMatrix<scalar_t>& B21,
        const std::vector<std::size_t>& tiles1,
        const std::vector<std::size_t>& tiles2,
-       const adm_t& admissible, const BLROptions<scalar_t>& opts);
+       const adm_t& admissible, const Opts_t& opts);
 
       void LUAR_B11
       (std::size_t i, std::size_t j,
-       std::size_t kmax, DenseM_t&A11, const BLROptions<scalar_t>& opts, int* B);
+       std::size_t kmax, DenseM_t&A11, const Opts_t& opts, int* B);
 
       void LUAR_B12
       (std::size_t i, std::size_t j,
-       std::size_t kmax, BLRMatrix<scalar_t>& B11, DenseM_t&A12, const BLROptions<scalar_t>& opts, int* B);
+       std::size_t kmax, BLRMatrix<scalar_t>& B11, DenseM_t&A12, const Opts_t& opts, int* B);
 
       void LUAR_B21
       (std::size_t i, std::size_t j,
-       std::size_t kmax, BLRMatrix<scalar_t>& B11, DenseM_t&A21, const BLROptions<scalar_t>& opts, int* B);
+       std::size_t kmax, BLRMatrix<scalar_t>& B11, DenseM_t&A21, const Opts_t& opts, int* B);
 
       static void construct_and_partial_factor
       (std::size_t n1, std::size_t n2,

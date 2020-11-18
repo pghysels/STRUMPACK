@@ -571,7 +571,7 @@ namespace strumpack {
      const std::vector<std::size_t>& tiles1,
      const std::vector<std::size_t>& tiles2,
      const DenseMatrix<bool>& admissible,
-     const BLROptions<scalar_t>& opts) {
+     const Opts_t& opts) {
       B11 = BLRMatrix<scalar_t>(A11.rows(), tiles1, A11.cols(), tiles1);
       B12 = BLRMatrix<scalar_t>(A12.rows(), tiles1, A12.cols(), tiles2);
       B21 = BLRMatrix<scalar_t>(A21.rows(), tiles2, A21.cols(), tiles1);
@@ -940,21 +940,14 @@ namespace strumpack {
             Vall(rank_sum, Aij.cols());
           std::size_t rank_tmp = 0;
           for (std::size_t k=0; k<kmax; k++) {
-            if (tile(i, k).is_low_rank() && tile(k, j).is_low_rank()) {
-              std::size_t minrank =
-                std::min(tile(i,k).rank(), tile(k,j).rank());
-              DenseMW_t t1(Aij.rows(), minrank, Uall, 0, rank_tmp),
-                t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
-              tile(i,k).multiply(tile(k,j), t1, t2);
-              rank_tmp += minrank;
-            } else if (tile(i, k).is_low_rank()) {
-              std::size_t minrank = tile(i,k).rank();
-              DenseMW_t t1(Aij.rows(), minrank, Uall, 0, rank_tmp),
-                t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
-              tile(i,k).multiply(tile(k,j), t1, t2);
-              rank_tmp += minrank;
-            } else if (tile(k, j).is_low_rank()) {
-              std::size_t minrank = tile(k,j).rank();
+            if (tile(i, k).is_low_rank() || tile(k, j).is_low_rank()) {
+              std::size_t minrank;
+              if (tile(i, k).is_low_rank() && tile(k, j).is_low_rank()) 
+                minrank = std::min(tile(i,k).rank(), tile(k,j).rank());
+              else if (tile(i, k).is_low_rank())
+                minrank = tile(i,k).rank();
+              else if (tile(k, j).is_low_rank())
+                minrank = tile(k,j).rank();
               DenseMW_t t1(Aij.rows(), minrank, Uall, 0, rank_tmp),
                 t2(minrank, Aij.cols(), Vall, rank_tmp, 0);
               tile(i,k).multiply(tile(k,j), t1, t2);
