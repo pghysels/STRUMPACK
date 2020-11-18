@@ -1008,14 +1008,12 @@ namespace strumpack {
             tile(i,ranks_idx[0].second).multiply
               (tile(ranks_idx[0].second,j), t1, t2);
             for (std::size_t k=1; k<ranks_idx.size(); k++) {
-              DenseM_t Uall(Aij.rows(), rank_tmp+ranks_idx[k].first),
-                Vall(rank_tmp+ranks_idx[k].first, Aij.cols());
-              copy(Aij.rows(), rank_tmp, tmpU, 0, 0, Uall, 0, 0);
-              copy(rank_tmp, Aij.cols(), tmpV, 0, 0, Vall, 0, 0);
-              DenseMW_t t1(Aij.rows(), ranks_idx[k].first, Uall, 0, rank_tmp),
-                t2(ranks_idx[k].first, Aij.cols(), Vall, rank_tmp, 0);
+              DenseMW_t t1(Aij.rows(), ranks_idx[k].first, tmpU, 0, rank_tmp),
+                t2(ranks_idx[k].first, Aij.cols(), tmpV, rank_tmp, 0);
               tile(i,ranks_idx[k].second).multiply
                 (tile(ranks_idx[k].second,j), t1, t2);
+              DenseMW_t Uall(Aij.rows(), rank_tmp+ranks_idx[k].first, tmpU, 0, 0), 
+                Vall(rank_tmp+ranks_idx[k].first, Aij.cols(), tmpV, 0, 0);
               if (opts.compression_kernel() == CompressionKernel::FULL) {
                 // recompress Uall and Vall
                 LRTile<scalar_t> Uall_lr(Uall, opts), Vall_lr(Vall, opts);
