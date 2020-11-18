@@ -49,13 +49,12 @@ namespace strumpack {
     template<typename scalar_t> LRTile<scalar_t>::LRTile
     (const DenseM_t& T, const Opts_t& opts) {
       if (opts.low_rank_algorithm() == LowRankAlgorithm::RRQR) {
-        if(T.rows() == 0 || T.cols() == 0){
+        if (T.rows() == 0 || T.cols() == 0) {
            U_ = DenseM_t(T.rows(), 0);
            V_ = DenseM_t(0, T.cols());
-        } else {
+        } else
           T.low_rank(U_, V_, opts.rel_tol(), opts.abs_tol(), opts.max_rank(),
                      params::task_recursion_cutoff_level);
-        }
       } else if (opts.low_rank_algorithm() == LowRankAlgorithm::ACA) {
         adaptive_cross_approximation<scalar_t>
           (U_, V_, T.rows(), T.cols(),
@@ -73,62 +72,45 @@ namespace strumpack {
     }
     template<typename scalar_t> LRTile<scalar_t>
     LRTile<scalar_t>::left_multiply(const LRTile<scalar_t>& a) const {
-      DenseMatrix<scalar_t> VU(a.rank(), rank());
-      gemm(Trans::N, Trans::N, scalar_t(1.), a.V(), U_, scalar_t(0.),
-           VU, params::task_recursion_cutoff_level);
-      if (a.rank() < rank()) {
-        // a.U*((a.V * U_)*V_)
-        LRTile<scalar_t> t(a.rows(), cols(), a.rank());
-        gemm(Trans::N, Trans::N, scalar_t(1.), VU, V_, scalar_t(0.),
-             t.V(), params::task_recursion_cutoff_level);
-        t.U() = a.U();
-        return t;
-      } else {
-        // (a.U*(a.V * U_))*V_
-        LRTile<scalar_t> t(a.rows(), cols(), rank());
-        gemm(Trans::N, Trans::N, scalar_t(1.), a.U(), VU, scalar_t(0.),
-             t.U(), params::task_recursion_cutoff_level);
-        t.V() = V();
-        return t;
-      }
+      LRTile<scalar_t> t(a.rows(), cols(), std::min(a.rank(), rank()));
+      left_multiply(a, t.U(), t.V());
+      return t;
     }
     template<typename scalar_t> LRTile<scalar_t>
     LRTile<scalar_t>::left_multiply(const DenseTile<scalar_t>& a) const {
       // (a.D*U)*V
       LRTile<scalar_t> t(a.rows(), cols(), rank());
-      gemm(Trans::N, Trans::N, scalar_t(1.), a.D(), U(), scalar_t(0.),
-           t.U(), params::task_recursion_cutoff_level);
-      t.V() = V();
+      left_multiply(a, t.U(), t.V());
       return t;
     }
 
     template<typename scalar_t> void LRTile<scalar_t>::multiply
-    (const BLRTile<scalar_t>& a, DMW_t& b, DMW_t& c) const {
+    (const BLRTile<scalar_t>& a, DenseM_t& b, DenseM_t& c) const {
       a.left_multiply(*this, b, c);
     }
     template<typename scalar_t> void LRTile<scalar_t>::left_multiply
-    (const LRTile<scalar_t>& a, DMW_t& b, DMW_t& c) const {
-      DenseMatrix<scalar_t> VU(a.rank(), rank());
+    (const LRTile<scalar_t>& a, DenseM_t& b, DenseM_t& c) const {
+      DenseM_t VU(a.rank(), rank());
       gemm(Trans::N, Trans::N, scalar_t(1.), a.V(), U_, scalar_t(0.),
            VU, params::task_recursion_cutoff_level);
       if (a.rank() < rank()) {
         // a.U*((a.V * U_)*V_)
         gemm(Trans::N, Trans::N, scalar_t(1.), VU, V_, scalar_t(0.),
              c, params::task_recursion_cutoff_level);
-        b = a.U();
+        copy(a.U(), b, 0, 0);
       } else {
         // (a.U*(a.V * U_))*V_
         gemm(Trans::N, Trans::N, scalar_t(1.), a.U(), VU, scalar_t(0.),
              b, params::task_recursion_cutoff_level);
-        c = V();
+        copy(V(), c, 0, 0);
       }
     }
     template<typename scalar_t> void LRTile<scalar_t>::left_multiply
-    (const DenseTile<scalar_t>& a, DMW_t& b, DMW_t& c) const {
+    (const DenseTile<scalar_t>& a, DenseM_t& b, DenseM_t& c) const {
       // (a.D*U)*V
       gemm(Trans::N, Trans::N, scalar_t(1.), a.D(), U(), scalar_t(0.),
            b, params::task_recursion_cutoff_level);
-      c = V();
+      copy(V(), c, 0, 0);
     }
 
 

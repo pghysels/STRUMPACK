@@ -114,9 +114,12 @@ namespace strumpack {
       LRTile<scalar_t> left_multiply(const LRTile<scalar_t>& a) const override;
       LRTile<scalar_t> left_multiply(const DenseTile<scalar_t>& a) const override;
 
-      void multiply(const BLRTile<scalar_t>& a, DMW_t& b, DMW_t& c) const override;
-      void left_multiply(const LRTile<scalar_t>& a, DMW_t& b, DMW_t& c) const override;
-      void left_multiply(const DenseTile<scalar_t>& a, DMW_t& b, DMW_t& c) const override;
+      void multiply(const BLRTile<scalar_t>& a,
+                    DenseM_t& b, DenseM_t& c) const override;
+      void left_multiply(const LRTile<scalar_t>& a,
+                         DenseM_t& b, DenseM_t& c) const override;
+      void left_multiply(const DenseTile<scalar_t>& a,
+                         DenseM_t& b, DenseM_t& c) const override;
 
       scalar_t operator()(std::size_t i, std::size_t j) const override;
 

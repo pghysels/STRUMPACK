@@ -82,9 +82,12 @@ namespace strumpack {
       virtual LRTile<scalar_t> left_multiply(const LRTile<scalar_t>& a) const=0;
       virtual LRTile<scalar_t> left_multiply(const DenseTile<scalar_t>& a) const=0;
 
-      virtual void multiply(const BLRTile<scalar_t>& a, DMW_t& b, DMW_t& c) const=0;
-      virtual void left_multiply(const LRTile<scalar_t>& a, DMW_t& b, DMW_t& c) const=0;
-      virtual void left_multiply(const DenseTile<scalar_t>& a, DMW_t& b, DMW_t& c) const=0;
+      virtual void multiply(const BLRTile<scalar_t>& a,
+                            DenseM_t& b, DenseM_t& c) const=0;
+      virtual void left_multiply(const LRTile<scalar_t>& a,
+                                 DenseM_t& b, DenseM_t& c) const=0;
+      virtual void left_multiply(const DenseTile<scalar_t>& a,
+                                 DenseM_t& b, DenseM_t& c) const=0;
 
       virtual scalar_t operator()(std::size_t i, std::size_t j) const = 0;
       virtual void extract(const std::vector<std::size_t>& I,

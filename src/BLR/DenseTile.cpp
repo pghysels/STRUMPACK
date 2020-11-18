@@ -49,16 +49,13 @@ namespace strumpack {
 
     template<typename scalar_t> LRTile<scalar_t>
     DenseTile<scalar_t>::multiply(const BLRTile<scalar_t>& a) const {
-      auto t=a.left_multiply(*this);
-      return t;
+      return a.left_multiply(*this);
     }
     template<typename scalar_t> LRTile<scalar_t>
     DenseTile<scalar_t>::left_multiply(const LRTile<scalar_t>& a) const {
       // a.U* (a.V*D)
       LRTile<scalar_t> t(a.rows(), cols(), a.rank());
-      gemm(Trans::N, Trans::N, scalar_t(1.), a.V(), D(), scalar_t(0.),
-           t.V(), params::task_recursion_cutoff_level);
-      t.U() = a.U();
+      left_multiply(a, t.U(), t.V());
       return t;
     }
 
@@ -69,21 +66,20 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void DenseTile<scalar_t>::multiply
-    (const BLRTile<scalar_t>& a, DMW_t& b, DMW_t& c) const {
+    (const BLRTile<scalar_t>& a, DenseM_t& b, DenseM_t& c) const {
       a.left_multiply(*this, b, c);
     }
 
     template<typename scalar_t> void DenseTile<scalar_t>::left_multiply
-    (const LRTile<scalar_t>& a, DMW_t& b, DMW_t& c) const {
+    (const LRTile<scalar_t>& a, DenseM_t& b, DenseM_t& c) const {
       // a.U* (a.V*D)
       gemm(Trans::N, Trans::N, scalar_t(1.), a.V(), D(), scalar_t(0.),
            c, params::task_recursion_cutoff_level);
-      b = a.U();
+      copy(a.U(), b, 0, 0);
     }
 
-    template<typename scalar_t> void
-    DenseTile<scalar_t>::left_multiply
-    (const DenseTile<scalar_t>& a, DMW_t& b, DMW_t& c) const{
+    template<typename scalar_t> void DenseTile<scalar_t>::left_multiply
+    (const DenseTile<scalar_t>& a, DenseM_t& b, DenseM_t& c) const{
       assert(false);
     }
 

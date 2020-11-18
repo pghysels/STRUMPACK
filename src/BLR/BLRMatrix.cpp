@@ -942,7 +942,7 @@ namespace strumpack {
           for (std::size_t k=0; k<kmax; k++) {
             if (tile(i, k).is_low_rank() || tile(k, j).is_low_rank()) {
               std::size_t minrank;
-              if (tile(i, k).is_low_rank() && tile(k, j).is_low_rank()) 
+              if (tile(i, k).is_low_rank() && tile(k, j).is_low_rank())
                 minrank = std::min(tile(i,k).rank(), tile(k,j).rank());
               else if (tile(i, k).is_low_rank())
                 minrank = tile(i,k).rank();
@@ -971,11 +971,11 @@ namespace strumpack {
           }
         }
       } else if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::COMB) {
-        std::vector<std::pair<size_t,size_t>> ranks_idx;
+        std::vector<std::pair<std::size_t,std::size_t>> ranks_idx;
         std::size_t rank_sum = 0;
         auto Aij = tile(A11, i, j);
         for (std::size_t k=0; k<kmax; k++) {
-          if(!(tile(i, k).is_low_rank() || tile(k, j).is_low_rank()))
+          if (!(tile(i, k).is_low_rank() || tile(k, j).is_low_rank()))
             // both tiles are DenseTiles
             gemm(Trans::N, Trans::N, scalar_t(-1.),
                  tile(i, k), tile(k, j), scalar_t(1.), Aij);
@@ -996,18 +996,29 @@ namespace strumpack {
           if (ranks_idx.size() > 1) {
             std::sort(ranks_idx.begin(), ranks_idx.end());
             DenseM_t tmpU(Aij.rows(), rank_sum), tmpV(rank_sum, Aij.cols());
-            std::size_t rank_tmp = ranks_idx[0].first;
+            auto rk = ranks_idx[0].first;
+            auto ki = ranks_idx[0].second;
+            auto rank_tmp = rk;
             DenseMW_t t1(Aij.rows(), rank_tmp, tmpU, 0, 0),
               t2(rank_tmp, Aij.cols(), tmpV, 0, 0);
-            tile(i,ranks_idx[0].second).multiply
-              (tile(ranks_idx[0].second,j), t1, t2);
+            tile(i, ki).multiply(tile(ki, j), t1, t2);
             for (std::size_t k=1; k<ranks_idx.size(); k++) {
-              DenseMW_t t1(Aij.rows(), ranks_idx[k].first, tmpU, 0, rank_tmp),
-                t2(ranks_idx[k].first, Aij.cols(), tmpV, rank_tmp, 0);
-              tile(i, ranks_idx[k].second).multiply
-                (tile(ranks_idx[k].second, j), t1, t2);
-              DenseMW_t Uall(Aij.rows(), rank_tmp+ranks_idx[k].first, tmpU, 0, 0),
-                Vall(rank_tmp+ranks_idx[k].first, Aij.cols(), tmpV, 0, 0);
+              rk = ranks_idx[k].first;
+              ki = ranks_idx[k].second;
+#if 1
+              DenseM_t Uall(Aij.rows(), rank_tmp+rk),
+                Vall(rank_tmp+rk, Aij.cols());
+              copy(Aij.rows(), rank_tmp, tmpU, 0, 0, Uall, 0, 0);
+              copy(rank_tmp, Aij.cols(), tmpV, 0, 0, Vall, 0, 0);
+#else
+              DenseMW_t Uall(Aij.rows(), rank_tmp+rk, tmpU, 0, 0),
+                Vall(rank_tmp+rk, Aij.cols(), tmpV, 0, 0);
+#endif
+              {
+                DenseMW_t t1(Aij.rows(), rk, Uall, 0, rank_tmp),
+                  t2(rk, Aij.cols(), Vall, rank_tmp, 0);
+                tile(i, ki).multiply(tile(ki, j), t1, t2);
+              }
               if (opts.compression_kernel() == CompressionKernel::FULL) {
                 // recompress Uall and Vall
                 LRTile<scalar_t> Uall_lr(Uall, opts), Vall_lr(Vall, opts);
@@ -1028,11 +1039,11 @@ namespace strumpack {
                          Uall, Vall_lr, scalar_t(1.), Aij,
                          params::task_recursion_cutoff_level);
                   else {
-                    DenseMW_t t1(Uall.rows(), Vall_lr.rank(), tmpU, 0, 0);
+                    rank_tmp = Vall_lr.rank();
+                    DenseMW_t t1(Uall.rows(), rank_tmp, tmpU, 0, 0);
                     gemm(Trans::N, Trans::N, scalar_t(1.),
                          Uall, Vall_lr.U(), scalar_t(0.), t1);
                     copy(Vall_lr.V(), tmpV, 0, 0);
-                    rank_tmp = Vall_lr.rank();
                   }
                 } else {
                   LRTile<scalar_t> Uall_lr(Uall, opts);
@@ -1041,11 +1052,11 @@ namespace strumpack {
                          Uall_lr, Vall, scalar_t(1.), Aij,
                          params::task_recursion_cutoff_level);
                   else {
-                    DenseMW_t t2(Uall_lr.rank(), Vall.cols(), tmpV, 0, 0);
-                    copy(Uall_lr.U(), tmpU, 0, 0);
+                    rank_tmp = Uall_lr.rank();
+                    DenseMW_t t2(rank_tmp, Vall.cols(), tmpV, 0, 0);
                     gemm(Trans::N, Trans::N, scalar_t(1.), Uall_lr.V(), Vall,
                          scalar_t(0.), t2);
-                    rank_tmp = Uall_lr.rank();
+                    copy(Uall_lr.U(), tmpU, 0, 0);
                   }
                 }
               }
@@ -1114,7 +1125,7 @@ namespace strumpack {
           }
         }
       } else if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::COMB) {
-        std::vector<std::pair<size_t,size_t>> ranks_idx;
+        std::vector<std::pair<std::size_t,std::size_t>> ranks_idx;
         std::size_t rank_sum = 0;
         auto Aij = tile(A12, i, j);
         for (std::size_t k=0; k<kmax; k++) {
@@ -1175,11 +1186,11 @@ namespace strumpack {
                          params::task_recursion_cutoff_level);
                   else {
                     LRTile<scalar_t> Vall_lr(Vall, opts);
-                    DenseMW_t t1(Uall.rows(), Vall_lr.rank(), tmpU, 0, 0),
-                      t2(Vall_lr.rank(), Vall_lr.cols(), tmpV, 0, 0);
+                    DenseMW_t t1(Uall.rows(), Vall_lr.rank(), tmpU, 0, 0);
+                      //t2(Vall_lr.rank(), Vall_lr.cols(), tmpV, 0, 0);
                     gemm(Trans::N, Trans::N, scalar_t(1.),
                          Uall, Vall_lr.U(), scalar_t(0.), t1);
-                    t2=Vall_lr.V();
+                    copy(Vall_lr.V(), tmpV, 0, 0);//t2=Vall_lr.V();
                     rank_tmp = Vall_lr.rank();
                   }
                 } else { // U1 * (V1 * Vall)
@@ -1189,9 +1200,10 @@ namespace strumpack {
                          params::task_recursion_cutoff_level);
                   else {
                     LRTile<scalar_t> Uall_lr(Uall, opts);
-                    DenseMW_t t1(Uall.rows(), Uall_lr.rank(), tmpU, 0, 0),
+                    DenseMW_t //t1(Uall.rows(), Uall_lr.rank(), tmpU, 0, 0),
                       t2(Uall_lr.rank(), Vall.cols(), tmpV, 0, 0);
-                    t1=Uall_lr.U();
+                    //t1=Uall_lr.U();
+                    copy(Uall_lr.U(), tmpU, 0, 0);
                     gemm(Trans::N, Trans::N, scalar_t(1.), Uall_lr.V(), Vall,
                          scalar_t(0.), t2);
                     rank_tmp = Uall_lr.rank();
@@ -1227,10 +1239,10 @@ namespace strumpack {
           else
             rank_sum += B11.tile(k, i).rank();
         }
-        if (rank_sum>0) {
+        if (rank_sum > 0) {
           DenseM_t Uall(Aij.rows(), rank_sum),
             Vall(rank_sum, Aij.cols());
-          std::size_t rank_tmp=0;
+          std::size_t rank_tmp = 0;
           for (std::size_t k=0; k<kmax; k++) {
             if(tile(j, k).is_low_rank() || B11.tile(k, i).is_low_rank()) {
               std::size_t minrank;
@@ -1263,7 +1275,7 @@ namespace strumpack {
           }
         }
       } else if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::COMB) {
-        std::vector<std::pair<size_t,size_t>> ranks_idx;
+        std::vector<std::pair<std::size_t,std::size_t>> ranks_idx;
         std::size_t rank_sum = 0;
         auto Aij = tile(A21, j, i);
         for (std::size_t k=0; k<kmax; k++) {
@@ -1324,25 +1336,23 @@ namespace strumpack {
                          Uall, Vall_lr, scalar_t(1.), Aij,
                          params::task_recursion_cutoff_level);
                   else {
-                    DenseMW_t t1(Uall.rows(), Vall_lr.rank(), tmpU, 0, 0),
-                      t2(Vall_lr.rank(), Vall_lr.cols(), tmpV, 0, 0);
+                    DenseMW_t t1(Uall.rows(), Vall_lr.rank(), tmpU, 0, 0);
                     gemm(Trans::N, Trans::N, scalar_t(1.),
                          Uall, Vall_lr.U(), scalar_t(0.), t1);
-                    t2 = Vall_lr.V();
+                    copy(Vall_lr.V(), tmpV, 0, 0);
                     rank_tmp = Vall_lr.rank();
                   }
                 } else { // U1 * (V1 * Vall)
                   LRTile<scalar_t> Uall_lr(Uall, opts);
-                  if (k==ranks_idx.size()-1)
+                  if (k == ranks_idx.size()-1)
                     gemm(Trans::N, Trans::N, scalar_t(-1.),
                          Uall_lr, Vall, scalar_t(1.), Aij,
                          params::task_recursion_cutoff_level);
-                  else{
-                    DenseMW_t t1(Uall.rows(), Uall_lr.rank(), tmpU, 0, 0),
-                      t2(Uall_lr.rank(), Vall.cols(), tmpV, 0, 0);
-                    t1 = Uall_lr.U();
+                  else {
+                    DenseMW_t t2(Uall_lr.rank(), Vall.cols(), tmpV, 0, 0);
                     gemm(Trans::N, Trans::N, scalar_t(1.), Uall_lr.V(), Vall,
                          scalar_t(0.), t2);
+                    copy(Uall_lr.U(), tmpU, 0, 0);
                     rank_tmp = Uall_lr.rank();
                   }
                 }
@@ -1594,7 +1604,7 @@ namespace strumpack {
           }
         }
       } else if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::COMB) {
-        std::vector<std::pair<size_t,size_t>> ranks_idx;
+        std::vector<std::pair<std::size_t,std::size_t>> ranks_idx;
         std::size_t rank_sum=0;
         for (std::size_t k=0; k<kmax; k++) {
           if (!(B21.tile(i, k).is_low_rank() || B12.tile(k, j).is_low_rank()))
