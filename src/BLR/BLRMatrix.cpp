@@ -1133,34 +1133,11 @@ namespace strumpack {
             LRTile<scalar_t> Uall_lr(Uall, opts), Vall_lr(Vall, opts);
             gemm(Trans::N, Trans::N, scalar_t(-1.), Uall_lr, Vall_lr, 
                  scalar_t(1.), Aij);
-            /* DenseMatrix<scalar_t> UU, UV;
-            Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-            DenseMatrix<scalar_t> VU, VV;
-            Vall.low_rank(VU, VV, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
-            DenseMatrix<scalar_t> tmp1(UV.rows(), VU.cols());
-            gemm(Trans::N, Trans::N, scalar_t(1.), UV, VU, scalar_t(0.), tmp1);
-            if (UU.cols() > VU.cols()) {
-              //(UU*(UV * VU)) *VV
-              DenseMatrix<scalar_t> tmp2(UU.rows(), tmp1.cols());
-              gemm(Trans::N, Trans::N, scalar_t(1.), UU, tmp1, scalar_t(0.), tmp2);
-              gemm(Trans::N, Trans::N, scalar_t(-1.), tmp2, VV, scalar_t(1.), Aij);
-            }
-            else{
-              // UU* ((UV * VU)*VV)
-              DenseMatrix<scalar_t> tmp2(tmp1.rows(), VV.cols());
-              gemm(Trans::N, Trans::N, scalar_t(1.), tmp1, VV, scalar_t(0.), tmp2);
-              gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp2, scalar_t(1.), Aij);
-            } */
           } else { // recompress Uall OR Vall
             if (Uall.rows() > Vall.cols()){ // (Uall * U1) *V1
               gemm(Trans::N, Trans::N, scalar_t(-1.), Uall, 
                    LRTile<scalar_t>(Vall, opts), scalar_t(1.), Aij,
                    params::task_recursion_cutoff_level);
-              /* DenseMatrix<scalar_t> U1, V1;
-              Vall.low_rank(U1, V1, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
-              DenseMatrix<scalar_t> tmp(Uall.rows(), U1.cols());
-              gemm(Trans::N, Trans::N, scalar_t(1.), Uall, U1, scalar_t(0.), tmp);
-              gemm(Trans::N, Trans::N, scalar_t(-1.), tmp, V1, scalar_t(1.), Aij); */
             }
             else // U1 * (V1 * Vall)
               gemm(Trans::N, Trans::N, scalar_t(-1.), 
@@ -1328,24 +1305,6 @@ namespace strumpack {
             LRTile<scalar_t> Uall_lr(Uall, opts), Vall_lr(Vall, opts);
             gemm(Trans::N, Trans::N, scalar_t(-1.), Uall_lr, Vall_lr,
                  scalar_t(1.), Aij);
-            /* DenseMatrix<scalar_t> UU, UV;
-            Uall.low_rank(UU, UV, opts.rel_tol(), opts.abs_tol(), std::max(Uall.rows(), Uall.cols()), params::task_recursion_cutoff_level);
-            DenseMatrix<scalar_t> VU, VV;
-            Vall.low_rank(VU, VV, opts.rel_tol(), opts.abs_tol(), std::max(Vall.rows(), Vall.cols()), params::task_recursion_cutoff_level);
-            DenseMatrix<scalar_t> tmp1(UV.rows(), VU.cols());
-            gemm(Trans::N, Trans::N, scalar_t(1.), UV, VU, scalar_t(0.), tmp1);
-            if (UU.cols() > VU.cols()) {
-              //(UU*(UV * VU)) *VV
-              DenseMatrix<scalar_t> tmp2(UU.rows(), tmp1.cols());
-              gemm(Trans::N, Trans::N, scalar_t(1.), UU, tmp1, scalar_t(0.), tmp2);
-              gemm(Trans::N, Trans::N, scalar_t(-1.), tmp2, VV, scalar_t(1.), Aij);
-            }
-            else{
-              // UU* ((UV * VU)*VV)
-              DenseMatrix<scalar_t> tmp2(tmp1.rows(), VV.cols());
-              gemm(Trans::N, Trans::N, scalar_t(1.), tmp1, VV, scalar_t(0.), tmp2);
-              gemm(Trans::N, Trans::N, scalar_t(-1.), UU, tmp2, scalar_t(1.), Aij);
-            } */
           } else{ // recompress Uall OR Vall
             if (Uall.rows() > Vall.cols()) // (Uall * U1) *V1
               gemm(Trans::N, Trans::N, scalar_t(-1.), Uall,
@@ -1787,7 +1746,6 @@ namespace strumpack {
                     rank_tmp = Vall_lr.rank();
                   }
                 } else { // U1 * (V1 * Vall)
-                //!!!!!!!!
                   LRTile<scalar_t> Uall_lr(Uall, opts);
                   if (k==ranks_idx.size()-1)
                     gemm(Trans::N, Trans::N, scalar_t(-1.), 
