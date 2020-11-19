@@ -910,9 +910,9 @@ namespace strumpack {
     std::unique_ptr<scalar_t[]> tau(new scalar_t[ltau]);
     auto info = scalapack::pgeqrf
       (rows(), minmn, data(), I(), J(), desc(), tau.get());
+    real_t Rmax(std::numeric_limits<real_t>::min()),
+      Rmin(std::numeric_limits<real_t>::max());
     if (lrows() && lcols()) {
-      real_t Rmax(std::numeric_limits<real_t>::min());
-      real_t Rmin(std::numeric_limits<real_t>::max());
       if (fixed()) {
         for (int gi=0; gi<minmn; gi++) {
           if (is_local_fixed(gi, gi)) {
@@ -930,9 +930,9 @@ namespace strumpack {
           }
         }
       }
-      r_max = Rmax;
-      r_min = Rmin;
     }
+    r_max = Rmax;
+    r_min = Rmin;
     scalapack::gamx2d
       (ctxt(), 'A', ' ', 1, 1, &r_max, 1, NULL, NULL, -1, -1, -1);
     scalapack::gamn2d
