@@ -52,7 +52,7 @@ before_install:
   - update-alternatives --display mpi
   - update-alternatives --display mpirun
   - sudo update-alternatives --set mpi /usr/include/mpich
-  - sudo update-alternatives --set mpirun /usr/include/mpich
+  - sudo update-alternatives --set mpirun /usr/bin/mpirun.mpich
   - update-alternatives --display mpi
   - update-alternatives --display mpirun
 
