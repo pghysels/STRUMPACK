@@ -95,10 +95,10 @@ install:
   - cd build
   - |
     cmake ../ \
-    -DCMAKE_INSTALL_PREFIX=../install \
-    -DCMAKE_CXX_COMPILER=$MPI_HOME/bin/mpiCC \
-    -DCMAKE_C_COMPILER=$MPI_HOME/bin/mpicc \
-    -DCMAKE_Fortran_COMPILER=$MPI_HOME/bin/mpif90
+    -DCMAKE_INSTALL_PREFIX=../install
+    # -DCMAKE_CXX_COMPILER=$MPI_HOME/bin/mpiCC \
+    # -DCMAKE_C_COMPILER=$MPI_HOME/bin/mpicc \
+    # -DCMAKE_Fortran_COMPILER=$MPI_HOME/bin/mpif90
   - make scalapack > make_scalapack.log 2>&1
   - make install > make_scalapack_install.log 2>&1
   - cd ../
