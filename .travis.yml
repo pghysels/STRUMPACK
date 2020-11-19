@@ -49,6 +49,7 @@ addons:
 before_install:
   - mkdir installDir
   # - test -n $CC && unset CC
+  - sudo update-alternatives --set mpi /usr/bin/mpicc.mpich
 
 install:
   # - printf "Installing openmpi\n"
@@ -85,6 +86,7 @@ install:
   - which clang++
   - mpic++ --version
   - ls -alh /etc/alternatives/mpic++
+  - update-alternatives --display mpi
   - |
     cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
