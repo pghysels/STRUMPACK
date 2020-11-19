@@ -49,6 +49,7 @@ addons:
 before_install:
   - mkdir installDir
   # - test -n $CC && unset CC
+  - update-alternatives --display mpi
   - sudo update-alternatives --set mpi /usr/bin/mpicc.mpich
 
 install:
