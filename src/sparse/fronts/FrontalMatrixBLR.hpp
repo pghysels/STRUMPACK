@@ -247,7 +247,9 @@ namespace strumpack {
           (A, opts, etree_level+1, task_depth);
     }
     TaskTimer t("");
+#if defined(STRUMPACK_COUNT_FLOPS)
     long long int f0 = 0, ftot = 0;
+#endif
     if (etree_level == 0 && opts.print_root_front_stats()){
 #if defined(STRUMPACK_COUNT_FLOPS)
       f0 = params::flops;
