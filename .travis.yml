@@ -90,19 +90,22 @@ install:
   - wget http://www.netlib.org/scalapack/scalapack-2.1.0.tgz
   - tar -xf scalapack-2.1.0.tgz
   - cd scalapack-2.1.0
-  - mkdir build
-  - mkdir install
-  - cd build
-  - |
-    cmake ../ \
-    -DCMAKE_INSTALL_PREFIX=../install
+  # - mkdir build
+  # - mkdir install
+  # - cd build
+  # - |
+  #  cmake ../ \
+  #  -DCMAKE_INSTALL_PREFIX=../install
     # -DCMAKE_CXX_COMPILER=$MPI_HOME/bin/mpiCC \
     # -DCMAKE_C_COMPILER=$MPI_HOME/bin/mpicc \
     # -DCMAKE_Fortran_COMPILER=$MPI_HOME/bin/mpif90
-  - make scalapack > make_scalapack.log 2>&1
-  - make install > make_scalapack_install.log 2>&1
-  - cd ../
-  - export SCALAPACK_DIR=$PWD/install
+  - sed 's+mpicc+${MPI_HOME}/bin/mpicc+' SLmake.inc.example > tmp
+  - sed 's+mpif90+${MPI_HOME}/bin/mpif90+' tmp > SLmake.inc
+  # - make scalapack > make_scalapack.log 2>&1
+  # - make install > make_scalapack_install.log 2>&1
+  - make
+  # - cd ../
+  - export SCALAPACK_DIR=$PWD
   - printf "${BLUE} GC; Done installing ScaLAPACK from source\n"
 
   - cd $TRAVIS_BUILD_DIR/installDir
@@ -138,7 +141,8 @@ install:
     cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=. \
-    -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-mpich.so"
+    -DTPL_SCALAPACK_LIBRARIES=$SCALAPACK_DIR/libscalapack.a
+  # -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-mpich.so"
   - make VERBOSE=1
   - make install
   - make tests
