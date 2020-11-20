@@ -83,6 +83,7 @@ install:
   - ls $MPI_HOME/bin
   - ls $MPI_HOME/include
   - ls $MPI_HOME/lib
+  - $MPI_HOME/bin/mpicc -compile_info
   - rm -rf mpich-3.3.2
 
   - printf "${BLUE} GC; Installing ScaLAPACK from source\n"
