@@ -51,12 +51,19 @@ namespace strumpack {
   class StrumpackSparseSolverMixedPrecision {
 
   public:
-    StrumpackSparseSolverMixedPrecision(bool verbose=true, bool root=true);
+    StrumpackSparseSolverMixedPrecision(bool verbose=false, bool root=true);
     ~StrumpackSparseSolverMixedPrecision();
 
     void solve(const DenseMatrix<refine_t>& b, DenseMatrix<refine_t>& x);
+    void factor();
+    ReturnCode reorder(int nx=1, int ny=1, int nz=1);
+
     void set_matrix(const CSRMatrix<refine_t,integer_t>& A);
-    SPOptions<refine_t> options() { return opts_; }
+
+    SPOptions<refine_t>& options() { return opts_; }
+    const SPOptions<refine_t>& options() const { return opts_; }
+    SPOptions<factor_t>& solver_options() { return solver_.options(); }
+    const SPOptions<factor_t>& solver_options() const { return solver_.options(); }
 
   private:
     CSRMatrix<refine_t,integer_t> mat_;

@@ -4,6 +4,9 @@ add_executable(testPoisson2d    EXCLUDE_FROM_ALL testPoisson2d.cpp)
 add_executable(testMMdouble     EXCLUDE_FROM_ALL testMMdouble.cpp)
 add_executable(KernelRegression EXCLUDE_FROM_ALL KernelRegression.cpp)
 add_executable(testPoisson3d    EXCLUDE_FROM_ALL testPoisson3d.cpp)
+add_executable(testPoisson3dMixedPrecision    EXCLUDE_FROM_ALL testPoisson3dMixedPrecision.cpp)
+add_executable(testPoisson3dFactorization    EXCLUDE_FROM_ALL testPoisson3dFactorization.cpp)
+add_executable(testPoisson3dMiPFactor    EXCLUDE_FROM_ALL testPoisson3dMiPFactor.cpp)
 add_executable(sexample         EXCLUDE_FROM_ALL sexample.c)
 add_executable(dexample         EXCLUDE_FROM_ALL dexample.c)
 add_executable(cexample         EXCLUDE_FROM_ALL cexample.c)
@@ -14,6 +17,9 @@ target_link_libraries(testPoisson2d strumpack)
 target_link_libraries(testMMdouble strumpack)
 target_link_libraries(KernelRegression strumpack)
 target_link_libraries(testPoisson3d strumpack)
+target_link_libraries(testPoisson3dMixedPrecision strumpack)
+target_link_libraries(testPoisson3dFactorization strumpack)
+target_link_libraries(testPoisson3dMiPFactor strumpack)
 target_link_libraries(sexample strumpack)
 target_link_libraries(dexample strumpack)
 target_link_libraries(cexample strumpack)
@@ -25,6 +31,9 @@ add_dependencies(examples
   testMMdouble
   KernelRegression
   testPoisson3d
+  testPoisson3dMixedPrecision
+  testPoisson3dFactorization
+  testPoisson3dMiPFactor
   sexample
   dexample
   cexample
