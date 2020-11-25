@@ -269,6 +269,7 @@ namespace strumpack {
             msg_size += tile(i, j).nonzeros();
             ranks.push_back(tile(i, j).is_low_rank() ?
                             tile(i, j).rank() : -1);
+            nr_tiles++;
           }
       } else {
         for (std::size_t j=j0; j<j1; j++)
