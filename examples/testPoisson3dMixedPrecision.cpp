@@ -88,8 +88,8 @@ timing_results time_mixed(int argc, char* argv[], int n, int m,
   spss_mixed.solver_options().set_reordering_method(
       ReorderingStrategy::GEOMETRIC);
   spss_mixed.solver_options().set_matching(MatchingJob::NONE);
-  spss_mixed.solver_options().set_rel_tol(1e-15);
-  spss_mixed.solver_options().set_abs_tol(1e-15);
+  spss_mixed.options().set_rel_tol(1e-15);
+  spss_mixed.options().set_abs_tol(1e-15);
   spss_mixed.options().set_from_command_line(argc, argv);
   
   // Solver setup.
