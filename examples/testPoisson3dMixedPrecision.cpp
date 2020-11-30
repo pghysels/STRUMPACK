@@ -35,9 +35,10 @@
 using namespace strumpack;
 
 struct timing_results {
-    double factor_time = 0;
-    double solve_time = 0;
-    double total_time = 0;
+  double factor_time = 0;
+  double solve_time = 0;
+  double total_time = 0;
+  int n = 0;
 };
 
 
@@ -45,63 +46,66 @@ struct timing_results {
 *  Solves Ax=b using a StrumpackSparseSolver and returns the duration elapsed
 *  during the factor and the solve.
 */
-timing_results time_non_mixed(int n, int m, const CSRMatrix<double, int>& A,
-                      const DenseMatrix<double>& b, DenseMatrix<double>& x) {
-    // Create sparse solver.
-    StrumpackSparseSolver<double,int> spss;
-    spss.options().set_matching(MatchingJob::NONE);
-    spss.options().set_reordering_method(ReorderingStrategy::GEOMETRIC);
-    spss.options().set_rel_tol(1e-15);
-    spss.options().set_abs_tol(1e-15);
-    // spss.options().set_from_command_line(argc, argv);
+timing_results time_non_mixed(int argc, char* argv[], int n, int m, 
+                              const CSRMatrix<double, int>& A, 
+                              const DenseMatrix<double>& b, 
+                              DenseMatrix<double>& x) {
+  // Create sparse solver.
+  StrumpackSparseSolver<double,int> spss;
+  spss.options().set_matching(MatchingJob::NONE);
+  spss.options().set_reordering_method(ReorderingStrategy::GEOMETRIC);
+  spss.options().set_rel_tol(1e-15);
+  spss.options().set_abs_tol(1e-15);
+  spss.options().set_from_command_line(argc, argv);
 
-    // Solver setup.
-    spss.set_matrix(A);
-    spss.reorder(n, n, n);
+  // Solver setup.
+  spss.set_matrix(A);
+  spss.reorder(n, n, n);
 
-    // Factor and solve. We time this.
-    auto start = std::chrono::steady_clock::now();
-    spss.factor();
-    auto factor = std::chrono::steady_clock::now();
-    spss.solve(b, x);
-    auto end = std::chrono::steady_clock::now();
+  // Factor and solve. We time this.
+  auto start = std::chrono::steady_clock::now();
+  spss.factor();
+  auto factor = std::chrono::steady_clock::now();
+  spss.solve(b, x);
+  auto end = std::chrono::steady_clock::now();
 
-    timing_results res;
-    res.factor_time = std::chrono::duration<double>(factor - start).count();
-    res.solve_time = std::chrono::duration<double>(end - factor).count();
-    return res;
+  timing_results res;
+  res.factor_time = std::chrono::duration<double>(factor - start).count();
+  res.solve_time = std::chrono::duration<double>(end - factor).count();
+  return res;
 }
 
 /* 
 *  Solves Ax=b using a StrumpackSparseSolverMixedPrecision and returns the 
 *  duration elapsed during the solve.
 */
-timing_results time_mixed(int n, int m, const CSRMatrix<double, int>& A,
-                      const DenseMatrix<double>& b, DenseMatrix<double>& x) {
-    // Create sparse solver.
-    StrumpackSparseSolverMixedPrecision<float,double,int> spss_mixed;
-    spss_mixed.solver_options().set_rel_tol(1e-15);
-    spss_mixed.solver_options().set_abs_tol(1e-15);
+timing_results time_mixed(int argc, char* argv[], int n, int m, 
+                          const CSRMatrix<double, int>& A, 
+                          const DenseMatrix<double>& b, 
+                          DenseMatrix<double>& x) {
+  // Create sparse solver.
+  StrumpackSparseSolverMixedPrecision<float,double,int> spss_mixed;
+  spss_mixed.solver_options().set_reordering_method(
+      ReorderingStrategy::GEOMETRIC);
+  spss_mixed.solver_options().set_matching(MatchingJob::NONE);
+  spss_mixed.solver_options().set_rel_tol(1e-15);
+  spss_mixed.solver_options().set_abs_tol(1e-15);
+  spss_mixed.options().set_from_command_line(argc, argv);
+  
+  // Solver setup.
+  spss_mixed.set_matrix(A);
+  spss_mixed.reorder(n, n, n);
 
-    spss_mixed.solver_options().set_reordering_method(
-        ReorderingStrategy::GEOMETRIC);
-    spss_mixed.solver_options().set_matching(MatchingJob::NONE);
-    // spss.options().set_from_command_line(argc, argv);
-
-    // Solver setup.
-    spss_mixed.set_matrix(A);
-    spss_mixed.reorder(n, n, n);
-
-    // Factor and solve. We time this.
-    auto start = std::chrono::steady_clock::now();
-    spss_mixed.factor();
-    auto factor = std::chrono::steady_clock::now();
-    spss_mixed.solve(b, x);
-    auto end = std::chrono::steady_clock::now();
-    timing_results res;
-    res.factor_time = std::chrono::duration<double>(factor - start).count();
-    res.solve_time = std::chrono::duration<double>(end - factor).count();
-    return res;
+  // Factor and solve. We time this.
+  auto start = std::chrono::steady_clock::now();
+  spss_mixed.factor();
+  auto factor = std::chrono::steady_clock::now();
+  spss_mixed.solve(b, x);
+  auto end = std::chrono::steady_clock::now();
+  timing_results res;
+  res.factor_time = std::chrono::duration<double>(factor - start).count();
+  res.solve_time = std::chrono::duration<double>(end - factor).count();
+  return res;
 }
 
 template <typename scalar_t>
@@ -135,7 +139,8 @@ CSRMatrix<scalar_t,int> generate_matrix(int n) {
   return A;
 }
 
-void run_trial(int n, std::vector<timing_results>& nm_results,
+void run_trial(int argc, char* argv[], int n, 
+               std::vector<timing_results>& nm_results,
                std::vector<timing_results>& mixed_results) {
   // Creating x1, x2, x_exact, and b.
   int m = 1;
@@ -148,17 +153,19 @@ void run_trial(int n, std::vector<timing_results>& nm_results,
   A.spmv(x_exact, b);
 
   auto start = std::chrono::steady_clock::now();
-  timing_results timing_mixed = time_mixed(n, m, A, b, x2);
+  timing_results timing_mixed = time_mixed(argc, argv, n, m, A, b, x2);
   auto end = std::chrono::steady_clock::now();
   timing_mixed.total_time = std::chrono::duration<double>(end - start).count();
   start = std::chrono::steady_clock::now();
-  timing_results timing_non_mixed = time_non_mixed(n, m, A, b, x1);
+  timing_results timing_non_mixed = time_non_mixed(argc, argv, n, m, A, b, x1);
   end = std::chrono::steady_clock::now();
   timing_non_mixed.total_time = std::chrono::duration<double>(end - start).count();
 
   double residual_mixed = A.max_scaled_residual(x2.data(), b.data());
   double residual_non_mixed = A.max_scaled_residual(x1.data(), b.data());
 
+  timing_non_mixed.n = n;
+  timing_mixed.n = n;
   nm_results.emplace_back(timing_non_mixed);
   mixed_results.emplace_back(timing_mixed);
 
@@ -176,14 +183,14 @@ void run_trial(int n, std::vector<timing_results>& nm_results,
 }
 
 void print_results(const std::vector<timing_results>& nm_results,
-        const std::vector<timing_results>& mix_results, int start, int reps, int stepsize) {
-    for (int i = 0; i < nm_results.size(); ++i ) {
-        timing_results nm_curr = nm_results[i];
-        timing_results mix_curr = mix_results[i];
-        printf("%d,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f\n", 
-            start+(i*stepsize), 
-            nm_curr.factor_time, nm_curr.solve_time, nm_curr.total_time,
-            mix_curr.factor_time, mix_curr.solve_time, mix_curr.total_time);
+                   const std::vector<timing_results>& mix_results) {
+  for (int i = 0; i < nm_results.size(); ++i ) {
+    timing_results nm_curr = nm_results[i];
+    timing_results mix_curr = mix_results[i];
+    printf("%d,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f\n", 
+        nm_curr.n, 
+        nm_curr.factor_time, nm_curr.solve_time, nm_curr.total_time,
+        mix_curr.factor_time, mix_curr.solve_time, mix_curr.total_time);
     }
 }
 
@@ -191,14 +198,13 @@ int main(int argc, char* argv[]) {
   std::vector<timing_results> nm_results_;
   std::vector<timing_results> mix_results_;
 
-  int start = 30;
-  int end = 81;
-  int reps = 5;
-  for (int n = start; n < end; ++n) {
+  int start = 30, end = 81, reps = 5, stepsize = 5;
+  for (int n = start; n < end; n += stepsize) {
     for (int t = 0; t < reps; ++t) {
-      run_trial(n, nm_results_, mix_results_);
-      std::cout << "n,non_factor,non_solve,non_total,mix_factor,mix_solve,mix_total\n";
-      print_results(nm_results_, mix_results_, start, reps, 10);
+      run_trial(argc, argv, n, nm_results_, mix_results_);
+      std::cout << 
+        "n,non_factor,non_solve,non_total,mix_factor,mix_solve,mix_total\n";
+      print_results(nm_results_, mix_results_);
     }
   }
   return 0;
