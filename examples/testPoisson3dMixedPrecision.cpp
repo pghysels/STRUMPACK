@@ -80,8 +80,6 @@ timing_results time_mixed(int n, int m, const CSRMatrix<double, int>& A,
                       const DenseMatrix<double>& b, DenseMatrix<double>& x) {
     // Create sparse solver.
     StrumpackSparseSolverMixedPrecision<float,double,int> spss_mixed;
-    spss_mixed.options().set_rel_tol(1e-15);
-    spss_mixed.options().set_abs_tol(1e-15);
     spss_mixed.solver_options().set_rel_tol(1e-15);
     spss_mixed.solver_options().set_abs_tol(1e-15);
     
@@ -178,12 +176,12 @@ void run_trial(int n, std::vector<timing_results>& nm_results,
 }
 
 void print_results(const std::vector<timing_results>& nm_results,
-        const std::vector<timing_results>& mix_results, int start, int reps) {
+        const std::vector<timing_results>& mix_results, int start, int reps, int stepsize) {
     for (int i = 0; i < nm_results.size(); ++i ) {
         timing_results nm_curr = nm_results[i];
         timing_results mix_curr = mix_results[i];
         printf("%d,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f\n", 
-            start+(i/reps), 
+            start+(i*stepsize), 
             nm_curr.factor_time, nm_curr.solve_time, nm_curr.total_time,
             mix_curr.factor_time, mix_curr.solve_time, mix_curr.total_time);
     }
@@ -200,7 +198,7 @@ int main(int argc, char* argv[]) {
     for (int t = 0; t < reps; ++t) {
       run_trial(n, nm_results_, mix_results_);
       std::cout << "n,non_factor,non_solve,non_total,mix_factor,mix_solve,mix_total\n";
-      print_results(nm_results_, mix_results_, start, reps);
+      print_results(nm_results_, mix_results_, start, reps, 10);
     }
   }
   return 0;
