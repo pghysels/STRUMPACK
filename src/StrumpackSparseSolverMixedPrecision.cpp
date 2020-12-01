@@ -45,8 +45,8 @@ namespace strumpack {
   StrumpackSparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
   StrumpackSparseSolverMixedPrecision(bool verbose, bool root)
     : solver_(verbose, root) {
-      solver_.options().set_Krylov_solver(KrylovSolver::DIRECT);
-    }
+    solver_.options().set_Krylov_solver(KrylovSolver::DIRECT);
+  }
 
   template<typename factor_t,typename refine_t,typename integer_t>
   StrumpackSparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
@@ -55,16 +55,18 @@ namespace strumpack {
   template<typename factor_t,typename refine_t,typename integer_t> void
   StrumpackSparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
   solve(const DenseMatrix<refine_t>& b, DenseMatrix<refine_t>& x) {
-    auto solve_func = [&](DenseMatrix<refine_t>& w) {
-        DenseMatrix<factor_t> new_x(w.rows(), w.cols());
-        DenseMatrix<factor_t> cast_b = cast_matrix<refine_t,factor_t>(w);
+    auto solve_func =
+      [&](DenseMatrix<refine_t>& w)
+      {
+        DenseMatrix<factor_t> new_x(w.rows(), w.cols()),
+          cast_b = cast_matrix<refine_t,factor_t>(w);
         solver_.solve(cast_b, new_x);
         w = cast_matrix<factor_t,refine_t>(new_x);
-    };
+      };
     int totit = 0;
-    iterative::IterativeRefinement<refine_t,integer_t>(
-        mat_, solve_func, x, b, opts_.rel_tol(), opts_.abs_tol(), totit,
-        opts_.maxit(), /*use_initial_guess=*/false, opts_.verbose());
+    iterative::IterativeRefinement<refine_t,integer_t>
+      (mat_, solve_func, x, b, opts_.rel_tol(), opts_.abs_tol(), totit,
+       opts_.maxit(), /*use_initial_guess=*/false, opts_.verbose());
   }
 
   template<typename factor_t,typename refine_t,typename integer_t> void
@@ -83,8 +85,8 @@ namespace strumpack {
   StrumpackSparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
   set_matrix(const CSRMatrix<refine_t,integer_t>& A) {
     mat_ = A;
-    CSRMatrix<factor_t,integer_t> cast_mat = 
-        cast_matrix<refine_t,integer_t,factor_t>(A);
+    CSRMatrix<factor_t,integer_t> cast_mat =
+      cast_matrix<refine_t,integer_t,factor_t>(A);
     cast_mat.set_symm_sparse(A.symm_sparse());
     solver_.set_matrix(cast_mat);
   }

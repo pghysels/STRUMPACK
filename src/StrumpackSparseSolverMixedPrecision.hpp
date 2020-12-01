@@ -27,7 +27,7 @@
  */
 /**
  * \file StrumpackSparseSolverMixedPrecision.hpp
- * \brief Contains the mixed precision definition of the 
+ * \brief Contains the mixed precision definition of the
  * sequential/multithreaded sparse solver class.
  */
 #ifndef STRUMPACK_SPARSE_SOLVER_MIXED_PRECISION_HPP

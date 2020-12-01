@@ -42,13 +42,13 @@ struct timing_results {
 };
 
 
-/* 
-*  Solves Ax=b using a StrumpackSparseSolver and returns the duration elapsed
-*  during the factor and the solve.
-*/
-timing_results time_non_mixed(int argc, char* argv[], int n, int m, 
-                              const CSRMatrix<double, int>& A, 
-                              const DenseMatrix<double>& b, 
+/*
+ *  Solves Ax=b using a StrumpackSparseSolver and returns the duration
+ *  elapsed during the factor and the solve.
+ */
+timing_results time_non_mixed(int argc, char* argv[], int n, int m,
+                              const CSRMatrix<double, int>& A,
+                              const DenseMatrix<double>& b,
                               DenseMatrix<double>& x) {
   // Create sparse solver.
   StrumpackSparseSolver<double,int> spss;
@@ -75,23 +75,23 @@ timing_results time_non_mixed(int argc, char* argv[], int n, int m,
   return res;
 }
 
-/* 
-*  Solves Ax=b using a StrumpackSparseSolverMixedPrecision and returns the 
-*  duration elapsed during the solve.
-*/
-timing_results time_mixed(int argc, char* argv[], int n, int m, 
-                          const CSRMatrix<double, int>& A, 
-                          const DenseMatrix<double>& b, 
+/*
+ *  Solves Ax=b using a StrumpackSparseSolverMixedPrecision and
+ *  returns the duration elapsed during the solve.
+ */
+timing_results time_mixed(int argc, char* argv[], int n, int m,
+                          const CSRMatrix<double, int>& A,
+                          const DenseMatrix<double>& b,
                           DenseMatrix<double>& x) {
   // Create sparse solver.
   StrumpackSparseSolverMixedPrecision<float,double,int> spss_mixed;
-  spss_mixed.solver_options().set_reordering_method(
-      ReorderingStrategy::GEOMETRIC);
+  spss_mixed.solver_options().set_reordering_method
+    (ReorderingStrategy::GEOMETRIC);
   spss_mixed.solver_options().set_matching(MatchingJob::NONE);
   spss_mixed.options().set_rel_tol(1e-15);
   spss_mixed.options().set_abs_tol(1e-15);
   spss_mixed.options().set_from_command_line(argc, argv);
-  
+
   // Solver setup.
   spss_mixed.set_matrix(A);
   spss_mixed.reorder(n, n, n);
@@ -139,7 +139,7 @@ CSRMatrix<scalar_t,int> generate_matrix(int n) {
   return A;
 }
 
-void run_trial(int argc, char* argv[], int n, 
+void run_trial(int argc, char* argv[], int n,
                std::vector<timing_results>& nm_results,
                std::vector<timing_results>& mixed_results) {
   // Creating x1, x2, x_exact, and b.
@@ -155,11 +155,14 @@ void run_trial(int argc, char* argv[], int n,
   auto start = std::chrono::steady_clock::now();
   timing_results timing_mixed = time_mixed(argc, argv, n, m, A, b, x2);
   auto end = std::chrono::steady_clock::now();
-  timing_mixed.total_time = std::chrono::duration<double>(end - start).count();
+  timing_mixed.total_time =
+    std::chrono::duration<double>(end - start).count();
   start = std::chrono::steady_clock::now();
-  timing_results timing_non_mixed = time_non_mixed(argc, argv, n, m, A, b, x1);
+  timing_results timing_non_mixed =
+    time_non_mixed(argc, argv, n, m, A, b, x1);
   end = std::chrono::steady_clock::now();
-  timing_non_mixed.total_time = std::chrono::duration<double>(end - start).count();
+  timing_non_mixed.total_time =
+    std::chrono::duration<double>(end - start).count();
 
   double residual_mixed = A.max_scaled_residual(x2.data(), b.data());
   double residual_non_mixed = A.max_scaled_residual(x1.data(), b.data());
@@ -171,15 +174,20 @@ void run_trial(int argc, char* argv[], int n,
 
   const std::string marker = std::string(50, '-') + '\n';
   std::cout << marker << marker;
-  std::cout << "solver, factor time (s), solve time (s), total time(s), residual\n";
+  std::cout <<
+    "solver, factor time (s), solve time (s), total time(s), residual\n";
   std::cout << marker;
-  printf("non mixed, %.5f, %.5f, %.5f, %.10e\n", timing_non_mixed.factor_time, 
-        timing_non_mixed.solve_time, timing_non_mixed.solve_time + timing_non_mixed.factor_time,
+  printf("non mixed, %.5f, %.5f, %.5f, %.10e\n",
+         timing_non_mixed.factor_time,
+         timing_non_mixed.solve_time,
+         timing_non_mixed.solve_time + timing_non_mixed.factor_time,
          residual_non_mixed);
-  printf("mixed, %.5f, %.5f, %.5f, %.10e\n", timing_mixed.factor_time, 
-        timing_mixed.solve_time, timing_mixed.solve_time + timing_mixed.factor_time, 
-        residual_mixed);
-  std::cout << marker << marker; 
+  printf("mixed, %.5f, %.5f, %.5f, %.10e\n",
+         timing_mixed.factor_time,
+         timing_mixed.solve_time,
+         timing_mixed.solve_time + timing_mixed.factor_time,
+         residual_mixed);
+  std::cout << marker << marker;
 }
 
 void print_results(const std::vector<timing_results>& nm_results,
@@ -187,11 +195,11 @@ void print_results(const std::vector<timing_results>& nm_results,
   for (int i = 0; i < nm_results.size(); ++i ) {
     timing_results nm_curr = nm_results[i];
     timing_results mix_curr = mix_results[i];
-    printf("%d,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f\n", 
-        nm_curr.n, 
-        nm_curr.factor_time, nm_curr.solve_time, nm_curr.total_time,
-        mix_curr.factor_time, mix_curr.solve_time, mix_curr.total_time);
-    }
+    printf("%d,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f\n",
+           nm_curr.n,
+           nm_curr.factor_time, nm_curr.solve_time, nm_curr.total_time,
+           mix_curr.factor_time, mix_curr.solve_time, mix_curr.total_time);
+  }
 }
 
 int main(int argc, char* argv[]) {
@@ -202,7 +210,7 @@ int main(int argc, char* argv[]) {
   for (int n = start; n < end; n += stepsize) {
     for (int t = 0; t < reps; ++t) {
       run_trial(argc, argv, n, nm_results_, mix_results_);
-      std::cout << 
+      std::cout <<
         "n,non_factor,non_solve,non_total,mix_factor,mix_solve,mix_total\n";
       print_results(nm_results_, mix_results_);
     }

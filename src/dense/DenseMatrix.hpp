@@ -1494,17 +1494,16 @@ namespace strumpack {
   }
 
   /**
-  * Creates a copy of a matrix templated on cast_t. Original 
-  * matrix is unmodified.
-  * 
+  * Creates a copy of a matrix templated on cast_t. Original matrix is
+  * unmodified.
+  *
   * \tparam scalar_t value type of original matrix
   * \tparam cast_t value type of returned matrix
-  * 
+  *
   * \param mat const DenseMatrix<scalar_t>&, const ref. of input matrix.
-  */ 
-  template<typename scalar_t,typename cast_t> DenseMatrix<cast_t> 
-  cast_matrix(const DenseMatrix<scalar_t>& mat);
-
+  */
+  template<typename scalar_t,typename cast_t>
+  DenseMatrix<cast_t> cast_matrix(const DenseMatrix<scalar_t>& mat);
 
 } // end namespace strumpack
 
