@@ -159,7 +159,7 @@ namespace strumpack {
    * point type.
    */
   template<typename real_t> inline real_t default_rel_tol()
-  { return real_t(1.e-6); }
+  { return real_t(1.e-8); }
   /**
    * Default absolute tolerance used when solving a linear system. For
    * iterative solvers such as GMRES and BiCGStab, this is the
@@ -167,7 +167,7 @@ namespace strumpack {
    * type.
    */
   template<typename real_t> inline real_t default_abs_tol()
-  { return real_t(1.e-10); }
+  { return real_t(1.e-12); }
   template<> inline float default_rel_tol() { return 1.e-4; }
   template<> inline float default_abs_tol() { return 1.e-6; }
 
