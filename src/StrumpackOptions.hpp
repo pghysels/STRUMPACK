@@ -77,6 +77,9 @@ namespace strumpack {
     BLR,      /*!< Block low-rank compression of fronts  */
     HODLR,    /*!< Hierarchically Off-diagonal Low-Rank
                    compression of frontal matrices       */
+    BLR_HODLR,/*!< Block low-rank compression of medium 
+                   fronts and Hierarchically Off-diagonal 
+                   Low-Rank compression of large fronts  */ 
     LOSSLESS, /*!< Lossless cmpresssion                  */
     LOSSY     /*!< Lossy cmpresssion                     */
   };
@@ -833,6 +836,8 @@ namespace strumpack {
         return blr_opts_.rel_tol();
       case CompressionType::HODLR:
         return hodlr_opts_.rel_tol();
+      case CompressionType::BLR_HODLR:
+        return blr_opts_.rel_tol();
       case CompressionType::LOSSY:
       case CompressionType::LOSSLESS:
       case CompressionType::NONE:
@@ -848,7 +853,7 @@ namespace strumpack {
      *
      * \see set_compression_rel_tol, set_lossy_compression
      */
-    real_t compression_abs_tol() const {
+    real_t compression_abs_tol(int l=0) const {
       switch (comp_) {
       case CompressionType::HSS:
         return hss_opts_.abs_tol();
@@ -856,6 +861,9 @@ namespace strumpack {
         return blr_opts_.abs_tol();
       case CompressionType::HODLR:
         return hodlr_opts_.abs_tol();
+      case CompressionType::BLR_HODLR:
+        if (l==0) return hodlr_opts_.abs_tol();
+        else return blr_opts_.abs_tol();
       case CompressionType::LOSSY:
       case CompressionType::LOSSLESS:
       case CompressionType::NONE:
@@ -870,7 +878,7 @@ namespace strumpack {
      * \see set_compression(), set_compression_min_sep_size(),
      * compression_min_front_size()
      */
-    int compression_min_sep_size() const {
+    int compression_min_sep_size(int l=0) const {
       switch (comp_) {
       case CompressionType::HSS:
         return hss_min_sep_size_;
@@ -878,6 +886,9 @@ namespace strumpack {
         return blr_min_sep_size_;
       case CompressionType::HODLR:
         return hodlr_min_sep_size_;
+      case CompressionType::BLR_HODLR:
+        if (l==0) return hodlr_min_sep_size_;
+        else return blr_min_sep_size_;
       case CompressionType::LOSSY:
       case CompressionType::LOSSLESS:
         return lossy_min_sep_size_;
@@ -894,7 +905,7 @@ namespace strumpack {
      * \see set_compression(), set_compression_min_sep_size(),
      * compression_min_front_size()
      */
-    int compression_min_front_size() const {
+    int compression_min_front_size(int l=0) const {
       switch (comp_) {
       case CompressionType::HSS:
         return hss_min_front_size_;
@@ -902,6 +913,9 @@ namespace strumpack {
         return blr_min_front_size_;
       case CompressionType::HODLR:
         return hodlr_min_front_size_;
+      case CompressionType::BLR_HODLR:
+        if (l==0) return hodlr_min_front_size_;
+        else return blr_min_front_size_;
       case CompressionType::LOSSY:
       case CompressionType::LOSSLESS:
         return lossy_min_front_size_;
@@ -919,7 +933,7 @@ namespace strumpack {
      * \see set_compression(), set_compression_leaf_size(),
      * compression_min_sep_size()
      */
-    int compression_leaf_size() const {
+    int compression_leaf_size(int l=0) const {
       switch (comp_) {
       case CompressionType::HSS:
         return hss_opts_.leaf_size();
@@ -927,6 +941,9 @@ namespace strumpack {
         return blr_opts_.leaf_size();
       case CompressionType::HODLR:
         return hodlr_opts_.leaf_size();
+      case CompressionType::BLR_HODLR:
+        if (l==0) return hodlr_opts_.leaf_size();
+        else return blr_opts_.leaf_size();
       case CompressionType::LOSSY:
       case CompressionType::LOSSLESS:
         return 4;

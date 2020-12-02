@@ -483,7 +483,7 @@ namespace strumpack {
       auto g = A.extract_graph
         (opts.separator_ordering_level(), sep_begin_, sep_end_);
       auto sep_tree = g.recursive_bisection
-        (opts.compression_leaf_size(), 0,
+        (opts.compression_leaf_size(1), 0,
          sorder+sep_begin_, nullptr, 0, 0, dim_sep());
       for (integer_t i=sep_begin_; i<sep_end_; i++)
         sorder[i] = sorder[i] + sep_begin_;

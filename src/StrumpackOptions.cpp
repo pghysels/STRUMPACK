@@ -70,6 +70,7 @@ namespace strumpack {
     case CompressionType::HSS: return "hss";
     case CompressionType::BLR: return "blr";
     case CompressionType::HODLR: return "hodlr";
+    case CompressionType::BLR_HODLR: return "blr_hodlr";
     case CompressionType::LOSSY: return "lossy";
     case CompressionType::LOSSLESS: return "lossless";
     }
@@ -245,11 +246,12 @@ namespace strumpack {
         else if (s == "HSS") set_compression(CompressionType::HSS);
         else if (s == "BLR") set_compression(CompressionType::BLR);
         else if (s == "HODLR") set_compression(CompressionType::HODLR);
+        else if (s == "BLR_HODLR") set_compression(CompressionType::BLR_HODLR);
         else if (s == "LOSSY") set_compression(CompressionType::LOSSY);
         else if (s == "LOSSLESS") set_compression(CompressionType::LOSSLESS);
         else std::cerr << "# WARNING: compression type not"
                " recognized, use 'none', 'hss', 'blr', 'hodlr',"
-               " 'lossy' or 'lossless'" << std::endl;
+               " 'blr_hodlr', 'lossy' or 'lossless'" << std::endl;
       } break;
       case 21: {
         std::istringstream iss(optarg);

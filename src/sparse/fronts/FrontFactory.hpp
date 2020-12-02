@@ -72,18 +72,20 @@ namespace strumpack {
   }
   template<typename scalar_t> bool is_BLR
   (int dsep, int dupd, bool compressed_parent,
-   const SPOptions<scalar_t>& opts) {
-    return opts.compression() == CompressionType::BLR &&
-      (dsep >= opts.compression_min_sep_size() ||
-       dsep + dupd >= opts.compression_min_front_size());
+   const SPOptions<scalar_t>& opts, int l=0) {
+    return (opts.compression() == CompressionType::BLR || 
+            opts.compression() == CompressionType::BLR_HODLR) &&
+      (dsep >= opts.compression_min_sep_size(l) ||
+       dsep + dupd >= opts.compression_min_front_size(l));
   }
   template<typename scalar_t> bool is_HODLR
   (int dsep, int dupd, bool compressed_parent,
-   const SPOptions<scalar_t>& opts) {
+   const SPOptions<scalar_t>& opts, int l=0) {
 #if defined(STRUMPACK_USE_BPACK)
-    return opts.compression() == CompressionType::HODLR &&
-      (dsep >= opts.compression_min_sep_size() ||
-       dsep + dupd >= opts.compression_min_front_size());
+    return (opts.compression() == CompressionType::HODLR || 
+            opts.compression() == CompressionType::BLR_HODLR) &&
+      (dsep >= opts.compression_min_sep_size(l) ||
+       dsep + dupd >= opts.compression_min_front_size(l));
 #else
     return false;
 #endif
@@ -103,7 +105,7 @@ namespace strumpack {
    const SPOptions<scalar_t>& opts) {
     return opts.compression() != CompressionType::NONE &&
       (is_HSS(dsep, dupd, compressed_parent, opts) ||
-       is_BLR(dsep, dupd, compressed_parent, opts) ||
+       is_BLR(dsep, dupd, compressed_parent, opts, 1) ||
        is_HODLR(dsep, dupd, compressed_parent, opts) ||
        is_lossy(dsep, dupd, compressed_parent, opts));
   }
