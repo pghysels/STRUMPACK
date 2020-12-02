@@ -50,11 +50,20 @@ namespace strumpack {
 
   template<typename factor_t,typename refine_t,typename integer_t>
   StrumpackSparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  StrumpackSparseSolverMixedPrecision
+  (int argc, char* argv[], bool verbose, bool root)
+    : solver_(argc, argv, verbose, root), opts_(argc, argv) {
+    solver_.options().set_Krylov_solver(KrylovSolver::DIRECT);
+  }
+
+  template<typename factor_t,typename refine_t,typename integer_t>
+  StrumpackSparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
   ~StrumpackSparseSolverMixedPrecision() = default;
 
-  template<typename factor_t,typename refine_t,typename integer_t> void
+  template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
   StrumpackSparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
-  solve(const DenseMatrix<refine_t>& b, DenseMatrix<refine_t>& x) {
+  solve(const DenseMatrix<refine_t>& b, DenseMatrix<refine_t>& x,
+        bool use_initial_guess) {
     auto solve_func =
       [&](DenseMatrix<refine_t>& w)
       {
@@ -67,12 +76,23 @@ namespace strumpack {
     iterative::IterativeRefinement<refine_t,integer_t>
       (mat_, solve_func, x, b, opts_.rel_tol(), opts_.abs_tol(), totit,
        opts_.maxit(), /*use_initial_guess=*/false, opts_.verbose());
+    // TODO check convergence, return whether or not this converged
+    return ReturnCode::SUCCESS;
   }
 
-  template<typename factor_t,typename refine_t,typename integer_t> void
+  template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
+  StrumpackSparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  solve(const refine_t* b, refine_t* x, bool use_initial_guess) {
+    auto N = mat_.size();
+    auto B = ConstDenseMatrixWrapperPtr(N, 1, b, N);
+    DenseMatrixWrapper<refine_t> X(N, 1, x, N);
+    return solve(*B, X, use_initial_guess);
+  }
+
+  template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
   StrumpackSparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
   factor() {
-    solver_.factor();
+    return solver_.factor();
   }
 
   template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
@@ -93,5 +113,6 @@ namespace strumpack {
 
   // explicit template instantiations
   template class StrumpackSparseSolverMixedPrecision<float,double,int>;
+  template class StrumpackSparseSolverMixedPrecision<std::complex<float>,std::complex<double>,int>;
 
 } //end namespace strumpack

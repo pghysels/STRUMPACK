@@ -46,23 +46,32 @@
 
 namespace strumpack {
 
+  // TODO put factor_t as last argument? set it by default to
+  // float/complex<float>?
   template<typename factor_t,typename refine_t,typename integer_t>
   class StrumpackSparseSolverMixedPrecision {
 
   public:
     StrumpackSparseSolverMixedPrecision(bool verbose=false, bool root=true);
+    StrumpackSparseSolverMixedPrecision(int argc, char* argv[],
+                                        bool verbose=false, bool root=true);
     ~StrumpackSparseSolverMixedPrecision();
-
-    void solve(const DenseMatrix<refine_t>& b, DenseMatrix<refine_t>& x);
-    void factor();
-    ReturnCode reorder(int nx=1, int ny=1, int nz=1);
 
     void set_matrix(const CSRMatrix<refine_t,integer_t>& A);
 
+    ReturnCode factor();
+    ReturnCode reorder(int nx=1, int ny=1, int nz=1);
+    ReturnCode solve(const DenseMatrix<refine_t>& b,
+                     DenseMatrix<refine_t>& x,
+                     bool use_initial_guess=false);
+    ReturnCode solve(const refine_t* b, refine_t* x,
+                     bool use_initial_guess=false);
+
     SPOptions<refine_t>& options() { return opts_; }
     const SPOptions<refine_t>& options() const { return opts_; }
-    SPOptions<factor_t>& solver_options() { return solver_.options(); }
-    const SPOptions<factor_t>& solver_options() const { return solver_.options(); }
+
+    StrumpackSparseSolver<factor_t,integer_t>& solver() { return solver_; }
+    const StrumpackSparseSolver<factor_t,integer_t>& solver() const { return solver_; }
 
   private:
     CSRMatrix<refine_t,integer_t> mat_;

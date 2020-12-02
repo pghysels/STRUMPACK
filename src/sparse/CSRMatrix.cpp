@@ -1187,5 +1187,8 @@ namespace strumpack {
 
   template CSRMatrix<float,int>
   cast_matrix<double,int,float>(const CSRMatrix<double,int>& mat);
+  template CSRMatrix<std::complex<float>,int>
+  cast_matrix<std::complex<double>,int,std::complex<float>>
+  (const CSRMatrix<std::complex<double>,int>& mat);
 
 } // end namespace strumpack
