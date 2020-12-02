@@ -72,16 +72,16 @@ namespace strumpack {
    * \ingroup Enumerations
    */
   enum class CompressionType {
-    NONE,     /*!< No compression, purely direct solver  */
-    HSS,      /*!< HSS compression of frontal matrices   */
-    BLR,      /*!< Block low-rank compression of fronts  */
-    HODLR,    /*!< Hierarchically Off-diagonal Low-Rank
-                   compression of frontal matrices       */
-    BLR_HODLR,/*!< Block low-rank compression of medium 
-                   fronts and Hierarchically Off-diagonal 
-                   Low-Rank compression of large fronts  */ 
-    LOSSLESS, /*!< Lossless cmpresssion                  */
-    LOSSY     /*!< Lossy cmpresssion                     */
+    NONE,      /*!< No compression, purely direct solver  */
+    HSS,       /*!< HSS compression of frontal matrices   */
+    BLR,       /*!< Block low-rank compression of fronts  */
+    HODLR,     /*!< Hierarchically Off-diagonal Low-Rank
+                    compression of frontal matrices       */
+    BLR_HODLR, /*!< Block low-rank compression of medium
+                    fronts and Hierarchically Off-diagonal
+                    Low-Rank compression of large fronts  */
+    LOSSLESS,  /*!< Lossless cmpresssion                  */
+    LOSSY      /*!< Lossy cmpresssion                     */
   };
 
   /**
