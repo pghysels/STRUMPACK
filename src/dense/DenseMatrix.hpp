@@ -172,8 +172,8 @@ namespace strumpack {
      * \param ld Leading dimension of logically 2D matrix pointed to
      * by D. Should be >= m.
      */
-    DenseMatrix
-    (std::size_t m, std::size_t n, const scalar_t* D, std::size_t ld);
+    DenseMatrix(std::size_t m, std::size_t n,
+                const scalar_t* D, std::size_t ld);
 
     /**
      * Construct a dense m x n matrix by copying a submatrix from
@@ -190,9 +190,8 @@ namespace strumpack {
      * \param j Column-offset in D, denoting left side of submatrix to
      * copy to new matrix.
      */
-    DenseMatrix
-    (std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& D,
-     std::size_t i, std::size_t j);
+    DenseMatrix(std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& D,
+                std::size_t i, std::size_t j);
 
     /** Copy constructor */
     DenseMatrix(const DenseMatrix<scalar_t>& D);
@@ -322,8 +321,8 @@ namespace strumpack {
      * \param width Number of digits to use to represent floating
      * point values, defaults to 8.
      */
-    void print_to_file
-    (std::string name, std::string filename, int width=8) const;
+    void print_to_file(std::string name,
+                       std::string filename, int width=8) const;
 
     /**
      * Fill the matrix with random numbers, using random number
@@ -336,9 +335,8 @@ namespace strumpack {
      * Fill the matrix with random numbers, using the specified random
      * number generator.
      */
-    void random
-    (random::RandomGeneratorBase<typename RealType<scalar_t>::
-     value_type>& rgen);
+    void random(random::RandomGeneratorBase<typename RealType<scalar_t>::
+                value_type>& rgen);
 
     /** Fill matrix with a constant value */
     void fill(scalar_t v);
@@ -388,8 +386,8 @@ namespace strumpack {
      * \param j Column-offset denoting the top of the submatrix of B
      * to copy
      */
-    void copy
-    (const DenseMatrix<scalar_t>& B, std::size_t i=0, std::size_t j=0);
+    void copy(const DenseMatrix<scalar_t>& B,
+              std::size_t i=0, std::size_t j=0);
 
     /**
      * Copy a submatrix of size rows() x cols() from matrix B, with
@@ -471,8 +469,8 @@ namespace strumpack {
      * \params B matrix to extraxt to. B should have the correct size,
      * ie. B.cols() == cols() and B.rows() == I.size()
      */
-    void extract_rows
-    (const std::vector<std::size_t>& I, DenseMatrix<scalar_t>& B) const;
+    void extract_rows(const std::vector<std::size_t>& I,
+                      DenseMatrix<scalar_t>& B) const;
 
     /**
      * Return a matrix with rows I of this matrix.
@@ -483,8 +481,8 @@ namespace strumpack {
      * \params B matrix to extraxt to. B should have the correct size,
      * ie. B.cols() == cols() and B.rows() == I.size()
      */
-    DenseMatrix<scalar_t> extract_rows
-    (const std::vector<std::size_t>& I) const;
+    DenseMatrix<scalar_t>
+    extract_rows(const std::vector<std::size_t>& I) const;
 
     /**
      * Extract columns of this matrix to a specified matrix. Column
@@ -496,8 +494,8 @@ namespace strumpack {
      * \params B matrix to extraxt to. B should have the correct size,
      * ie. B.cols() == I.size() and B.rows() == rows()
      */
-    void extract_cols
-    (const std::vector<std::size_t>& I, DenseMatrix<scalar_t>& B) const;
+    void extract_cols(const std::vector<std::size_t>& I,
+                      DenseMatrix<scalar_t>& B) const;
 
     /**
      * Return a matrix with columns I of this matrix.
@@ -508,8 +506,8 @@ namespace strumpack {
      * \params B matrix to extraxt to. B should have the correct size,
      * ie. B.cols() == I.size() and B.rows() == rows()
      */
-    DenseMatrix<scalar_t> extract_cols
-    (const std::vector<std::size_t>& I) const;
+    DenseMatrix<scalar_t>
+    extract_cols(const std::vector<std::size_t>& I) const;
 
     /**
      * Return a submatrix of this matrix defined by (I,J). The vectors
@@ -521,9 +519,9 @@ namespace strumpack {
      * \param I row indices of elements to extract, I[i] < rows()
      * \param J column indices of elements to extract, J[j] < cols()
      */
-    DenseMatrix<scalar_t> extract
-    (const std::vector<std::size_t>& I,
-     const std::vector<std::size_t>& J) const;
+    DenseMatrix<scalar_t>
+    extract(const std::vector<std::size_t>& I,
+            const std::vector<std::size_t>& J) const;
 
     /**
      * Add the rows of matrix B into this matrix at the rows specified
@@ -535,9 +533,9 @@ namespace strumpack {
      * \param B matrix with rows to scatter in this matrix
      * \param depth current OpenMP task recursion depth
      */
-    DenseMatrix<scalar_t>& scatter_rows_add
-    (const std::vector<std::size_t>& I,
-     const DenseMatrix<scalar_t>& B, int depth);
+    DenseMatrix<scalar_t>&
+    scatter_rows_add(const std::vector<std::size_t>& I,
+                     const DenseMatrix<scalar_t>& B, int depth);
 
     /**
      * Add matrix B to this matrix. Return a reference to this matrix.
@@ -571,8 +569,8 @@ namespace strumpack {
      * \param B matrix to add, should be the same size of this matrix
      * \param depth current OpenMP task recursion depth
      */
-    DenseMatrix<scalar_t>& scaled_add
-    (scalar_t alpha, const DenseMatrix<scalar_t>& B, int depth=0);
+    DenseMatrix<scalar_t>&
+    scaled_add(scalar_t alpha, const DenseMatrix<scalar_t>& B, int depth=0);
 
     /**
      * Scale this matrix, and add a given matrix to this matrix, ie,
@@ -1004,8 +1002,8 @@ namespace strumpack {
      * point to at least ld*n bytes of allocated memory
      * \param ld leading dimension of matrix allocated at D. ld >= m
      */
-    DenseMatrixWrapper
-    (std::size_t m, std::size_t n, scalar_t* D, std::size_t ld) {
+    DenseMatrixWrapper(std::size_t m, std::size_t n,
+                       scalar_t* D, std::size_t ld) {
       this->data_ = D; this->rows_ = m; this->cols_ = n;
       this->ld_ = std::max(std::size_t(1), ld);
     }
@@ -1023,9 +1021,8 @@ namespace strumpack {
      * \param j columns offset in D of the top left corner of the
      * submatrix
      */
-    DenseMatrixWrapper
-    (std::size_t m, std::size_t n, DenseMatrix<scalar_t>& D,
-     std::size_t i, std::size_t j)
+    DenseMatrixWrapper(std::size_t m, std::size_t n, DenseMatrix<scalar_t>& D,
+                       std::size_t i, std::size_t j)
       : DenseMatrixWrapper<scalar_t>(m, n, &D(i, j), D.ld()) {
       assert(i+m <= D.rows());
       assert(j+n <= D.cols());
@@ -1203,13 +1200,13 @@ namespace strumpack {
    * \param jb column offset of top left corner of place in b to copy
    * to
    */
-  template<typename scalar_t> void
-  copy(std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& a,
-       std::size_t ia, std::size_t ja, DenseMatrix<scalar_t>& b,
+  template<typename scalar_from_t, typename scalar_to_t> void
+  copy(std::size_t m, std::size_t n, const DenseMatrix<scalar_from_t>& a,
+       std::size_t ia, std::size_t ja, DenseMatrix<scalar_to_t>& b,
        std::size_t ib, std::size_t jb) {
     for (std::size_t j=0; j<n; j++)
       for (std::size_t i=0; i<m; i++)
-        b(ib+i, jb+j) = a(ia+i, ja+j);
+        b(ib+i, jb+j) = static_cast<scalar_to_t>(a(ia+i, ja+j));
   }
 
   /**
@@ -1222,9 +1219,9 @@ namespace strumpack {
    * \param jb column offset of top left corner of place in b to copy
    * to
    */
-  template<typename scalar_t> void
-  copy(const DenseMatrix<scalar_t>& a, DenseMatrix<scalar_t>& b,
-       std::size_t ib, std::size_t jb) {
+  template<typename scalar_from_t, typename scalar_to_t> void
+  copy(const DenseMatrix<scalar_from_t>& a, DenseMatrix<scalar_to_t>& b,
+       std::size_t ib=0, std::size_t jb=0) {
     copy(a.rows(), a.cols(), a, 0, 0, b, ib, jb);
   }
 
@@ -1492,6 +1489,18 @@ namespace strumpack {
       (blas::geqrf_flops(a.rows(), minrc) +
        blas::xxgqr_flops(a.rows(), minrc, minrc));
   }
+
+  /**
+  * Creates a copy of a matrix templated on cast_t. Original matrix is
+  * unmodified.
+  *
+  * \tparam scalar_t value type of original matrix
+  * \tparam cast_t value type of returned matrix
+  *
+  * \param mat const DenseMatrix<scalar_t>&, const ref. of input matrix.
+  */
+  template<typename scalar_t,typename cast_t>
+  DenseMatrix<cast_t> cast_matrix(const DenseMatrix<scalar_t>& mat);
 
 } // end namespace strumpack
 

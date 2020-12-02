@@ -82,7 +82,7 @@ namespace strumpack {
     STRUMPACK_ADD_MEMORY(rows_*cols_*sizeof(scalar_t));
     for (std::size_t j=0; j<cols_; j++)
       for (std::size_t i=0; i<rows_; i++)
-        operator()(i, j) = D(i, j);
+        operator()(i, j) = static_cast<scalar_t>(D(i, j));
   }
 
   template<typename scalar_t>
@@ -1199,6 +1199,16 @@ namespace strumpack {
                  x, incx, beta, y, incy);
   }
 
+  template<typename scalar_t,typename cast_t> DenseMatrix<cast_t>
+  cast_matrix(const DenseMatrix<scalar_t>& mat) {
+    auto m = mat.rows();
+    auto n = mat.cols();
+    DenseMatrix<cast_t> A(m, n);
+    for (std::size_t j=0; j<n; j++)
+      for (std::size_t i=0; i<m; i++)
+        A(i, j) = mat(i, j);
+    return A;
+  }
 
   // explicit template instantiations
   //template class DenseMatrix<int>;
@@ -1421,5 +1431,16 @@ namespace strumpack {
    const DenseMatrix<std::complex<double>>& a,
    const std::complex<double>* x, int incx, std::complex<double> beta,
    std::complex<double>* y, int incy, int depth);
+
+  template DenseMatrix<float>
+  cast_matrix<double,float>(const DenseMatrix<double>& mat);
+  template DenseMatrix<double>
+  cast_matrix<float,double>(const DenseMatrix<float>& mat);
+  template DenseMatrix<std::complex<float>>
+  cast_matrix<std::complex<double>,std::complex<float>>
+  (const DenseMatrix<std::complex<double>>& mat);
+  template DenseMatrix<std::complex<double>>
+  cast_matrix<std::complex<float>,std::complex<double>>
+  (const DenseMatrix<std::complex<float>>& mat);
 
 } // end namespace strumpack

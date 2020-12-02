@@ -772,6 +772,7 @@ WARN_LOGFILE           =
 	@CMAKE_CURRENT_SOURCE_DIR@/src/StrumpackSparseSolver.h \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/StrumpackSparseSolverBase.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/StrumpackSparseSolver.hpp \
+	@CMAKE_CURRENT_SOURCE_DIR@/src/StrumpackSparseSolverMixedPrecision.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/StrumpackSparseSolverMPIDist.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/sparse/CompressedSparseMatrix.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/sparse/CSRMatrix.hpp \

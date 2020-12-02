@@ -71,7 +71,8 @@ namespace strumpack {
    * integer_t=int64_t instead. This should be a __signed__ integer
    * type.
    *
-   * \see StrumpackSparseSolverMPIDist, StrumpackSparseSolverMPI
+   * \see StrumpackSparseSolverMPIDist,
+   * StrumpackSparseSolverMixedPrecision
    */
   template<typename scalar_t,typename integer_t=int>
   class StrumpackSparseSolverBase {
