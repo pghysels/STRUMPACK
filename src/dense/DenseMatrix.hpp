@@ -1200,13 +1200,13 @@ namespace strumpack {
    * \param jb column offset of top left corner of place in b to copy
    * to
    */
-  template<typename scalar_t> void
-  copy(std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& a,
-       std::size_t ia, std::size_t ja, DenseMatrix<scalar_t>& b,
+  template<typename scalar_from_t, typename scalar_to_t> void
+  copy(std::size_t m, std::size_t n, const DenseMatrix<scalar_from_t>& a,
+       std::size_t ia, std::size_t ja, DenseMatrix<scalar_to_t>& b,
        std::size_t ib, std::size_t jb) {
     for (std::size_t j=0; j<n; j++)
       for (std::size_t i=0; i<m; i++)
-        b(ib+i, jb+j) = a(ia+i, ja+j);
+        b(ib+i, jb+j) = static_cast<scalar_to_t>(a(ia+i, ja+j));
   }
 
   /**
@@ -1219,9 +1219,9 @@ namespace strumpack {
    * \param jb column offset of top left corner of place in b to copy
    * to
    */
-  template<typename scalar_t> void
-  copy(const DenseMatrix<scalar_t>& a, DenseMatrix<scalar_t>& b,
-       std::size_t ib, std::size_t jb) {
+  template<typename scalar_from_t, typename scalar_to_t> void
+  copy(const DenseMatrix<scalar_from_t>& a, DenseMatrix<scalar_to_t>& b,
+       std::size_t ib=0, std::size_t jb=0) {
     copy(a.rows(), a.cols(), a, 0, 0, b, ib, jb);
   }
 

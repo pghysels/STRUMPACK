@@ -82,7 +82,7 @@ namespace strumpack {
     STRUMPACK_ADD_MEMORY(rows_*cols_*sizeof(scalar_t));
     for (std::size_t j=0; j<cols_; j++)
       for (std::size_t i=0; i<rows_; i++)
-        operator()(i, j) = D(i, j);
+        operator()(i, j) = static_cast<scalar_t>(D(i, j));
   }
 
   template<typename scalar_t>

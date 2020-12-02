@@ -65,18 +65,67 @@ namespace strumpack {
   solve(const DenseMatrix<refine_t>& b, DenseMatrix<refine_t>& x,
         bool use_initial_guess) {
     auto solve_func =
-      [&](DenseMatrix<refine_t>& w)
-      {
+      [&](DenseMatrix<refine_t>& w) {
         DenseMatrix<factor_t> new_x(w.rows(), w.cols()),
           cast_b = cast_matrix<refine_t,factor_t>(w);
         solver_.solve(cast_b, new_x);
-        w = cast_matrix<factor_t,refine_t>(new_x);
+        copy(new_x, w);
       };
+    auto solve_func_ptr =
+      [&](refine_t* w) {
+        DenseMatrixWrapper<refine_t> wx(x.rows(), 1, w, x.rows());
+        solve_func(wx);
+      };
+    auto spmv = [&](const refine_t* x, refine_t* y) { mat_.spmv(x, y); };
+
+    auto old_verbose = solver_.options().verbose();
+    solver_.options().set_verbose(false);
     int totit = 0;
-    iterative::IterativeRefinement<refine_t,integer_t>
-      (mat_, solve_func, x, b, opts_.rel_tol(), opts_.abs_tol(), totit,
-       opts_.maxit(), /*use_initial_guess=*/false, opts_.verbose());
+    switch (opts_.Krylov_solver()) {
+    case KrylovSolver::AUTO: {
+      if (opts_.compression() != CompressionType::NONE && x.cols() == 1)
+        iterative::GMRes<refine_t>
+          (spmv, solve_func_ptr, x.rows(), x.data(), b.data(),
+           opts_.rel_tol(), opts_.abs_tol(), totit, opts_.maxit(),
+           opts_.gmres_restart(), opts_.GramSchmidt_type(),
+           use_initial_guess, opts_.verbose());
+      else
+        iterative::IterativeRefinement<refine_t,integer_t>
+          (mat_, solve_func, x, b, opts_.rel_tol(), opts_.abs_tol(), totit,
+           opts_.maxit(), use_initial_guess, opts_.verbose());
+    }; break;
+    case KrylovSolver::DIRECT: {
+      copy(b, x, 0, 0);
+      solve_func(x);
+    }; break;
+    case KrylovSolver::REFINE: {
+      iterative::IterativeRefinement<refine_t,integer_t>
+        (mat_, solve_func, x, b, opts_.rel_tol(), opts_.abs_tol(), totit,
+         opts_.maxit(), use_initial_guess, opts_.verbose());
+    }; break;
+    case KrylovSolver::PREC_GMRES: {
+      assert(x.cols() == 1);
+      iterative::GMRes<refine_t>
+        (spmv, solve_func_ptr, x.rows(), x.data(), b.data(),
+         opts_.rel_tol(), opts_.abs_tol(), totit, opts_.maxit(),
+         opts_.gmres_restart(), opts_.GramSchmidt_type(),
+         use_initial_guess, opts_.verbose());
+    }; break;
+    case KrylovSolver::PREC_BICGSTAB: {
+      assert(x.cols() == 1);
+      iterative::BiCGStab<refine_t>
+        (spmv, solve_func_ptr, x.rows(), x.data(), b.data(),
+         opts_.rel_tol(), opts_.abs_tol(), totit, opts_.maxit(),
+         use_initial_guess, opts_.verbose());
+    }; break;
+    case KrylovSolver::GMRES:
+    case KrylovSolver::BICGSTAB: {
+      std::cerr << "ERROR: non-preconditioned solvers not supported "
+        "as outer solver in mixed-precision solver." << std::endl;
+    }
+    }
     // TODO check convergence, return whether or not this converged
+    solver_.options().set_verbose(old_verbose);
     return ReturnCode::SUCCESS;
   }
 

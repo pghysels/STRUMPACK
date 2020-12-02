@@ -46,15 +46,64 @@
 
 namespace strumpack {
 
-  // TODO put factor_t as last argument? set it by default to
-  // float/complex<float>?
+  /**
+   * \class StrumpackSparseSolverMixedPrecision
+   *
+   * \brief StrumpackSparseSolverMixedPrecision Allows to use lower
+   * precision (float) for the preconditioner, and higher (double) for
+   * the outer iterative solver.
+   *
+   * Mixed precision solver class. The input and output (sparse
+   * matrix, right hand side, and the solution of the linear system)
+   * are expected in refine_t precision, which should be double or
+   * std::complex<double>, while factor_t is the type for the internal
+   * factorization, which should be float or std::complex<float>.
+   *
+   * There are options associated with the outer solver and with the
+   * inner solver (the lower-precision preconditioner). Make sure to
+   * set the correct ones. By default the inner solver options, such
+   * as solver tolerances, will be initialized for single precision,
+   * while the outer solver options are initialized for double
+   * precision. To change the final accuracy, access
+   * this->options().set_rel_tol(..) and
+   * this->options().set_abs_tol(..).  To set preconditioner specific
+   * options, use this->solver().options()....  By default, this will
+   * set the inner solver to be KrylovSolver::DIRECT (a single
+   * preconditioner application), and the outer solver to be
+   * KrylovSolver::AUTO (which will default to iterative refinement).
+   *
+   * \tparam factor_t can be: float or std::complex<float>
+   * \tparam refine_t can be: double or std::complex<double>
+   *
+   * \tparam integer_t defaults to a regular int. If regular int
+   * causes 32 bit integer overflows, you should switch to
+   * integer_t=int64_t instead. This should be a __signed__ integer
+   * type.
+   *
+   * \see StrumpackSparseSolver
+   */
   template<typename factor_t,typename refine_t,typename integer_t>
   class StrumpackSparseSolverMixedPrecision {
 
   public:
-    StrumpackSparseSolverMixedPrecision(bool verbose=false, bool root=true);
+    /**
+     * Constructor for the mixed precision solver class.
+     */
+    StrumpackSparseSolverMixedPrecision(bool verbose=true, bool root=true);
+
+
+    /**
+     * Constructor for the mixed precision solver class.
+     *
+     * The command line arguments will be passed to both the options
+     * for the inner and outer solvers. Note that these options are
+     * not parsed until the user explicitly calls
+     * this->options().set_from_command_line(), and/or
+     * this->solver().options().set_from_command_line() (same as
+     * this->solver().set_from_options());
+     */
     StrumpackSparseSolverMixedPrecision(int argc, char* argv[],
-                                        bool verbose=false, bool root=true);
+                                        bool verbose=true, bool root=true);
     ~StrumpackSparseSolverMixedPrecision();
 
     void set_matrix(const CSRMatrix<refine_t,integer_t>& A);

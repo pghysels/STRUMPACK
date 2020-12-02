@@ -57,15 +57,14 @@ namespace strumpack {
       auto b_prec = V + n*(restart+1);
 
       int ldh = restart+1;
-      real_t rho;
-      real_t rho0 = real_t(0.);
+      real_t rho, rho0 = real_t(0.);
       blas::copy(n, b, 1, b_prec, 1);
       M(b_prec);
 
       bool no_conv = true;
       totit = 0;
       while (no_conv) {
-        if (non_zero_guess || totit>0) {
+        if (non_zero_guess || totit > 0) {
           A(x, V);
           M(V);
           blas::axpby(n, scalar_t(1.), b_prec, 1, scalar_t(-1.), V, 1);
@@ -74,7 +73,7 @@ namespace strumpack {
           std::fill(x, x+n, scalar_t(0.));
         }
         rho = blas::nrm2(n, V, 1);
-        if (totit==0) rho0 = rho;
+        if (totit == 0) rho0 = rho;
         if (rho/rho0 < rtol || rho < atol) { no_conv = false; break; }
         blas::scal(n, scalar_t(1./rho), V, 1);
         b_[0] = rho;

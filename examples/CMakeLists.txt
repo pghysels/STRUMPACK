@@ -1,22 +1,21 @@
 add_custom_target(examples)
 
-add_executable(testPoisson2d    EXCLUDE_FROM_ALL testPoisson2d.cpp)
-add_executable(testMMdouble     EXCLUDE_FROM_ALL testMMdouble.cpp)
-add_executable(KernelRegression EXCLUDE_FROM_ALL KernelRegression.cpp)
-add_executable(testPoisson3d    EXCLUDE_FROM_ALL testPoisson3d.cpp)
-add_executable(testPoisson3dMixedPrecision
-  EXCLUDE_FROM_ALL testPoisson3dMixedPrecision.cpp)
-add_executable(sexample         EXCLUDE_FROM_ALL sexample.c)
-add_executable(dexample         EXCLUDE_FROM_ALL dexample.c)
-add_executable(cexample         EXCLUDE_FROM_ALL cexample.c)
-add_executable(zexample         EXCLUDE_FROM_ALL zexample.c)
-add_executable(fexample         EXCLUDE_FROM_ALL fexample.f90)
+add_executable(testPoisson2d      EXCLUDE_FROM_ALL testPoisson2d.cpp)
+add_executable(testMMdouble       EXCLUDE_FROM_ALL testMMdouble.cpp)
+add_executable(KernelRegression   EXCLUDE_FROM_ALL KernelRegression.cpp)
+add_executable(testPoisson3d      EXCLUDE_FROM_ALL testPoisson3d.cpp)
+add_executable(testMixedPrecision EXCLUDE_FROM_ALL testMixedPrecision.cpp)
+add_executable(sexample           EXCLUDE_FROM_ALL sexample.c)
+add_executable(dexample           EXCLUDE_FROM_ALL dexample.c)
+add_executable(cexample           EXCLUDE_FROM_ALL cexample.c)
+add_executable(zexample           EXCLUDE_FROM_ALL zexample.c)
+add_executable(fexample           EXCLUDE_FROM_ALL fexample.f90)
 
 target_link_libraries(testPoisson2d strumpack)
 target_link_libraries(testMMdouble strumpack)
 target_link_libraries(KernelRegression strumpack)
 target_link_libraries(testPoisson3d strumpack)
-target_link_libraries(testPoisson3dMixedPrecision strumpack)
+target_link_libraries(testMixedPrecision strumpack)
 target_link_libraries(sexample strumpack)
 target_link_libraries(dexample strumpack)
 target_link_libraries(cexample strumpack)
@@ -28,7 +27,7 @@ add_dependencies(examples
   testMMdouble
   KernelRegression
   testPoisson3d
-  testPoisson3dMixedPrecision
+  testMixedPrecision
   sexample
   dexample
   cexample
