@@ -91,7 +91,6 @@ namespace strumpack {
      */
     StrumpackSparseSolverMixedPrecision(bool verbose=true, bool root=true);
 
-
     /**
      * Constructor for the mixed precision solver class.
      *
@@ -104,6 +103,10 @@ namespace strumpack {
      */
     StrumpackSparseSolverMixedPrecision(int argc, char* argv[],
                                         bool verbose=true, bool root=true);
+
+    /**
+     * Destructor.
+     */
     ~StrumpackSparseSolverMixedPrecision();
 
     void set_matrix(const CSRMatrix<refine_t,integer_t>& A);
@@ -122,10 +125,17 @@ namespace strumpack {
     StrumpackSparseSolver<factor_t,integer_t>& solver() { return solver_; }
     const StrumpackSparseSolver<factor_t,integer_t>& solver() const { return solver_; }
 
+    /**
+     * Return the number of iterations performed by the outer (Krylov)
+     * iterative solver. Call this after calling the solve routine.
+     */
+    int Krylov_iterations() const { return Krylov_its_; }
+
   private:
     CSRMatrix<refine_t,integer_t> mat_;
     StrumpackSparseSolver<factor_t,integer_t> solver_;
     SPOptions<refine_t> opts_;
+    int Krylov_its_ = 0;
   };
 
 } //end namespace strumpack

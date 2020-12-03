@@ -80,19 +80,19 @@ namespace strumpack {
 
     auto old_verbose = solver_.options().verbose();
     solver_.options().set_verbose(false);
-    int totit = 0;
+    Krylov_its_ = 0;
     switch (opts_.Krylov_solver()) {
     case KrylovSolver::AUTO: {
       if (opts_.compression() != CompressionType::NONE && x.cols() == 1)
         iterative::GMRes<refine_t>
           (spmv, solve_func_ptr, x.rows(), x.data(), b.data(),
-           opts_.rel_tol(), opts_.abs_tol(), totit, opts_.maxit(),
+           opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
            opts_.gmres_restart(), opts_.GramSchmidt_type(),
            use_initial_guess, opts_.verbose());
       else
         iterative::IterativeRefinement<refine_t,integer_t>
-          (mat_, solve_func, x, b, opts_.rel_tol(), opts_.abs_tol(), totit,
-           opts_.maxit(), use_initial_guess, opts_.verbose());
+          (mat_, solve_func, x, b, opts_.rel_tol(), opts_.abs_tol(),
+           Krylov_its_, opts_.maxit(), use_initial_guess, opts_.verbose());
     }; break;
     case KrylovSolver::DIRECT: {
       copy(b, x, 0, 0);
@@ -100,14 +100,14 @@ namespace strumpack {
     }; break;
     case KrylovSolver::REFINE: {
       iterative::IterativeRefinement<refine_t,integer_t>
-        (mat_, solve_func, x, b, opts_.rel_tol(), opts_.abs_tol(), totit,
-         opts_.maxit(), use_initial_guess, opts_.verbose());
+        (mat_, solve_func, x, b, opts_.rel_tol(), opts_.abs_tol(),
+         Krylov_its_, opts_.maxit(), use_initial_guess, opts_.verbose());
     }; break;
     case KrylovSolver::PREC_GMRES: {
       assert(x.cols() == 1);
       iterative::GMRes<refine_t>
         (spmv, solve_func_ptr, x.rows(), x.data(), b.data(),
-         opts_.rel_tol(), opts_.abs_tol(), totit, opts_.maxit(),
+         opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
          opts_.gmres_restart(), opts_.GramSchmidt_type(),
          use_initial_guess, opts_.verbose());
     }; break;
@@ -115,7 +115,7 @@ namespace strumpack {
       assert(x.cols() == 1);
       iterative::BiCGStab<refine_t>
         (spmv, solve_func_ptr, x.rows(), x.data(), b.data(),
-         opts_.rel_tol(), opts_.abs_tol(), totit, opts_.maxit(),
+         opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
          use_initial_guess, opts_.verbose());
     }; break;
     case KrylovSolver::GMRES:
