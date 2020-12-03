@@ -941,7 +941,7 @@ namespace strumpack {
           std::size_t rank_tmp = 0;
           for (std::size_t k=0; k<kmax; k++) {
             if (tile(i, k).is_low_rank() || tile(k, j).is_low_rank()) {
-              std::size_t minrank;
+              std::size_t minrank = 0;
               if (tile(i, k).is_low_rank() && tile(k, j).is_low_rank())
                 minrank = std::min(tile(i,k).rank(), tile(k,j).rank());
               else if (tile(i, k).is_low_rank())
@@ -1091,7 +1091,7 @@ namespace strumpack {
           std::size_t rank_tmp = 0;
           for (std::size_t k=0; k<kmax; k++) {
             if(B11.tile(i, k).is_low_rank() || tile(k, j).is_low_rank()){
-              std::size_t minrank;
+              std::size_t minrank = 0;
               if(B11.tile(i, k).is_low_rank() && tile(k, j).is_low_rank())
                 minrank = std::min(B11.tile(i,k).rank(), tile(k,j).rank());
               else if (B11.tile(i, k).is_low_rank())
@@ -1241,7 +1241,7 @@ namespace strumpack {
           std::size_t rank_tmp = 0;
           for (std::size_t k=0; k<kmax; k++) {
             if(tile(j, k).is_low_rank() || B11.tile(k, i).is_low_rank()) {
-              std::size_t minrank;
+              std::size_t minrank = 0;
               if(tile(j, k).is_low_rank() && B11.tile(k, i).is_low_rank())
                 minrank = std::min(tile(j,k).rank(), B11.tile(k,i).rank());
               else if (tile(j, k).is_low_rank())
@@ -1573,7 +1573,7 @@ namespace strumpack {
           std::size_t rank_tmp=0;
           for (std::size_t k=0; k<kmax; k++) {
             if (B21.tile(i, k).is_low_rank() || B12.tile(k, j).is_low_rank()) {
-              std::size_t minrank;
+              std::size_t minrank = 0;
               if(B21.tile(i, k).is_low_rank() && B12.tile(k, j).is_low_rank())
                 minrank = std::min(B21.tile(i,k).rank(), B12.tile(k,j).rank());
               else if (B21.tile(i, k).is_low_rank())
