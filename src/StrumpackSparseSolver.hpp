@@ -26,7 +26,7 @@
  *             Division).
  */
 /**
- * \file StrumpackSparseSolver.hpp
+ * \file SparseSolver.hpp
  * \brief Contains the definition of the sequential/multithreaded
  * sparse solver class.
  */
@@ -38,7 +38,7 @@
 #include <vector>
 #include <string>
 
-#include "StrumpackSparseSolverBase.hpp"
+#include "SparseSolverBase.hpp"
 
 /**
  * All of STRUMPACK is contained in the strumpack namespace.
@@ -51,14 +51,14 @@ namespace strumpack {
   class TaskTimer;
 
   /**
-   * \class StrumpackSparseSolver
+   * \class SparseSolver
    *
-   * \brief StrumpackSparseSolver is the main sequential or
+   * \brief SparseSolver is the main sequential or
    * multithreaded sparse solver class.
    *
    * This is the main interface to STRUMPACK's sparse solver. Use this
    * for a sequential or multithreaded sparse solver. For the fully
-   * distributed solver, see StrumpackSparseSolverMPIDist.
+   * distributed solver, see SparseSolverMPIDist.
    *
    * \tparam scalar_t can be: float, double, std::complex<float> or
    * std::complex<double>.
@@ -68,11 +68,11 @@ namespace strumpack {
    * integer_t=int64_t instead. This should be a __signed__ integer
    * type.
    *
-   * \see StrumpackSparseSolverMPIDist
+   * \see SparseSolverMPIDist
    */
   template<typename scalar_t,typename integer_t=int>
-  class StrumpackSparseSolver :
-    public StrumpackSparseSolverBase<scalar_t,integer_t> {
+  class SparseSolver :
+    public SparseSolverBase<scalar_t,integer_t> {
 
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using Tree_t = EliminationTree<scalar_t,integer_t>;
@@ -83,8 +83,8 @@ namespace strumpack {
   public:
 
     /**
-     * Constructor of the StrumpackSparseSolver class, taking command
-     * line arguments.
+     * Constructor of the SparseSolver class, taking command line
+     * arguments.
      *
      * \param argc number of arguments, i.e, number of elements in
      * the argv array
@@ -94,23 +94,22 @@ namespace strumpack {
      * \param root flag to denote whether this process is the root MPI
      * process, only the root will print certain messages to cout
      */
-    StrumpackSparseSolver
-    (int argc, char* argv[], bool verbose=true, bool root=true);
+    SparseSolver(int argc, char* argv[], bool verbose=true, bool root=true);
 
     /**
-     * Constructor of the StrumpackSparseSolver class.
+     * Constructor of the SparseSolver class.
      *
      * \param verbose flag to enable/disable output to cout
      * \param root flag to denote whether this process is the root MPI
      * process. Only the root will print certain messages
      * \see set_from_options
      */
-    StrumpackSparseSolver(bool verbose=true, bool root=true);
+    SparseSolver(bool verbose=true, bool root=true);
 
     /**
-     * (Virtual) destructor of the StrumpackSparseSolver class.
+     * (Virtual) destructor of the SparseSolver class.
      */
-    ~StrumpackSparseSolver();
+    ~SparseSolver();
 
     /**
      * Associate a (sequential) CSRMatrix with this solver.
@@ -232,7 +231,7 @@ namespace strumpack {
     std::unique_ptr<MatrixReordering<scalar_t,integer_t>> nd_;
     std::unique_ptr<EliminationTree<scalar_t,integer_t>> tree_;
 
-    using SPBase_t = StrumpackSparseSolverBase<scalar_t,integer_t>;
+    using SPBase_t = SparseSolverBase<scalar_t,integer_t>;
     using SPBase_t::opts_;
     using SPBase_t::is_root_;
     using SPBase_t::matching_;
@@ -241,6 +240,9 @@ namespace strumpack {
     using SPBase_t::reordered_;
     using SPBase_t::Krylov_its_;
   };
+
+  template<typename scalar_t,typename integer_t>
+  using StrumpackSparseSolver = SparseSolver<scalar_t,integer_t>;
 
 } //end namespace strumpack
 

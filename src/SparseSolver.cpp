@@ -42,35 +42,33 @@
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
-  StrumpackSparseSolver<scalar_t,integer_t>::StrumpackSparseSolver
-  (bool verbose, bool root)
-    : StrumpackSparseSolverBase<scalar_t,integer_t>
+  SparseSolver<scalar_t,integer_t>::SparseSolver
+  (bool verbose, bool root) : SparseSolverBase<scalar_t,integer_t>
     (verbose, root) { }
 
   template<typename scalar_t,typename integer_t>
-  StrumpackSparseSolver<scalar_t,integer_t>::StrumpackSparseSolver
+  SparseSolver<scalar_t,integer_t>::SparseSolver
   (int argc, char* argv[], bool verbose, bool root)
-    : StrumpackSparseSolverBase<scalar_t,integer_t>
+    : SparseSolverBase<scalar_t,integer_t>
     (argc, argv, verbose, root) { }
 
   template<typename scalar_t,typename integer_t>
-  StrumpackSparseSolver<scalar_t,integer_t>::
-  ~StrumpackSparseSolver() = default;
+  SparseSolver<scalar_t,integer_t>::~SparseSolver() = default;
 
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolver<scalar_t,integer_t>::setup_tree() {
+  SparseSolver<scalar_t,integer_t>::setup_tree() {
     tree_.reset(new EliminationTree<scalar_t,integer_t>
                 (opts_, *mat_, nd_->tree()));
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolver<scalar_t,integer_t>::setup_reordering() {
+  SparseSolver<scalar_t,integer_t>::setup_reordering() {
     nd_.reset(new MatrixReordering<scalar_t,integer_t>(matrix()->size()));
   }
 
   template<typename scalar_t,typename integer_t> int
-  StrumpackSparseSolver<scalar_t,integer_t>::compute_reordering
+  SparseSolver<scalar_t,integer_t>::compute_reordering
   (const int* p, int base, int nx, int ny, int nz,
    int components, int width) {
     if (p) return nd_->set_permutation(opts_, *mat_, p, base);
@@ -79,19 +77,19 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolver<scalar_t,integer_t>::separator_reordering() {
+  SparseSolver<scalar_t,integer_t>::separator_reordering() {
     nd_->separator_reordering(opts_, *mat_, tree_->root());
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolver<scalar_t,integer_t>::set_matrix
+  SparseSolver<scalar_t,integer_t>::set_matrix
   (const CSRMatrix<scalar_t,integer_t>& A) {
     mat_.reset(new CSRMatrix<scalar_t,integer_t>(A));
     factored_ = reordered_ = false;
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolver<scalar_t,integer_t>::update_matrix_values
+  SparseSolver<scalar_t,integer_t>::update_matrix_values
   (const CSRMatrix<scalar_t,integer_t>& A) {
     if (!(mat_ && A.size() == mat_->size() && A.nnz() <= mat_->nnz())) {
       // matrix() has been made symmetric, can have more nonzeros
@@ -103,7 +101,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolver<scalar_t,integer_t>::set_csr_matrix
+  SparseSolver<scalar_t,integer_t>::set_csr_matrix
   (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
    const scalar_t* values, bool symmetric_pattern) {
     mat_.reset(new CSRMatrix<scalar_t,integer_t>
@@ -112,7 +110,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolver<scalar_t,integer_t>::update_matrix_values
+  SparseSolver<scalar_t,integer_t>::update_matrix_values
   (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
    const scalar_t* values, bool symmetric_pattern) {
     if (!(mat_ && N == mat_->size() && row_ptr[N] <= mat_->nnz())) {
@@ -126,7 +124,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolver<scalar_t,integer_t>::permute_matrix_values() {
+  SparseSolver<scalar_t,integer_t>::permute_matrix_values() {
     if (reordered_) {
       matrix()->apply_matching(matching_);
       matrix()->equilibrate(equil_);
@@ -139,7 +137,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  StrumpackSparseSolver<scalar_t,integer_t>::solve_internal
+  SparseSolver<scalar_t,integer_t>::solve_internal
   (const scalar_t* b, scalar_t* x, bool use_initial_guess) {
     auto N = matrix()->size();
     auto B = ConstDenseMatrixWrapperPtr(N, 1, b, N);
@@ -148,7 +146,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  StrumpackSparseSolver<scalar_t,integer_t>::solve_internal
+  SparseSolver<scalar_t,integer_t>::solve_internal
   (const DenseM_t& b, DenseM_t& x, bool use_initial_guess) {
     using real_t = typename RealType<scalar_t>::value_type;
     TaskTimer t("solve");
@@ -309,24 +307,24 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolver<scalar_t,integer_t>::delete_factors_internal() {
+  SparseSolver<scalar_t,integer_t>::delete_factors_internal() {
     tree_.reset(nullptr);
   }
 
   // explicit template instantiations
-  template class StrumpackSparseSolver<float,int>;
-  template class StrumpackSparseSolver<double,int>;
-  template class StrumpackSparseSolver<std::complex<float>,int>;
-  template class StrumpackSparseSolver<std::complex<double>,int>;
+  template class SparseSolver<float,int>;
+  template class SparseSolver<double,int>;
+  template class SparseSolver<std::complex<float>,int>;
+  template class SparseSolver<std::complex<double>,int>;
 
-  template class StrumpackSparseSolver<float,long int>;
-  template class StrumpackSparseSolver<double,long int>;
-  template class StrumpackSparseSolver<std::complex<float>,long int>;
-  template class StrumpackSparseSolver<std::complex<double>,long int>;
+  template class SparseSolver<float,long int>;
+  template class SparseSolver<double,long int>;
+  template class SparseSolver<std::complex<float>,long int>;
+  template class SparseSolver<std::complex<double>,long int>;
 
-  template class StrumpackSparseSolver<float,long long int>;
-  template class StrumpackSparseSolver<double,long long int>;
-  template class StrumpackSparseSolver<std::complex<float>,long long int>;
-  template class StrumpackSparseSolver<std::complex<double>,long long int>;
+  template class SparseSolver<float,long long int>;
+  template class SparseSolver<double,long long int>;
+  template class SparseSolver<std::complex<float>,long long int>;
+  template class SparseSolver<std::complex<double>,long long int>;
 
 } //end namespace strumpack

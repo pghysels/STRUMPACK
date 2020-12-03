@@ -26,7 +26,7 @@
  *             Division).
  */
 /**
- * \file StrumpackSparseSolverBase.hpp
+ * \file SparseSolverBase.hpp
  * \brief Contains the definition of the base (abstract/pure virtual)
  * sparse solver class.
  */
@@ -54,14 +54,14 @@ namespace strumpack {
   class TaskTimer;
 
   /**
-   * \class StrumpackSparseSolverBase
+   * \class SparseSolverBase
    *
-   * \brief StrumpackSparseSolver is the main sequential or
-   * multithreaded sparse solver class.
+   * \brief SparseSolverBase is the virtual base for both the
+   * sequential/multithreaded and distributed sparse solver classes.
    *
    * This is the main interface to STRUMPACK's sparse solver. Use this
    * for a sequential or multithreaded sparse solver. For the fully
-   * distributed solver, see StrumpackSparseSolverMPIDist.
+   * distributed solver, see SparseSolverMPIDist.
    *
    * \tparam scalar_t can be: float, double, std::complex<float> or
    * std::complex<double>.
@@ -71,11 +71,11 @@ namespace strumpack {
    * integer_t=int64_t instead. This should be a __signed__ integer
    * type.
    *
-   * \see StrumpackSparseSolverMPIDist,
-   * StrumpackSparseSolverMixedPrecision
+   * \see SparseSolverMPIDist,
+   * SparseSolverMixedPrecision
    */
   template<typename scalar_t,typename integer_t=int>
-  class StrumpackSparseSolverBase {
+  class SparseSolverBase {
 
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using Tree_t = EliminationTree<scalar_t,integer_t>;
@@ -86,7 +86,7 @@ namespace strumpack {
   public:
 
     /**
-     * Constructor of the StrumpackSparseSolver class, taking command
+     * Constructor of the SparseSolver class, taking command
      * line arguments.
      *
      * \param argc number of arguments, i.e, number of elements in
@@ -97,23 +97,23 @@ namespace strumpack {
      * \param root flag to denote whether this process is the root MPI
      * process, only the root will print certain messages to cout
      */
-    StrumpackSparseSolverBase(int argc, char* argv[],
-                              bool verbose=true, bool root=true);
+    SparseSolverBase(int argc, char* argv[],
+                     bool verbose=true, bool root=true);
 
     /**
-     * Constructor of the StrumpackSparseSolver class.
+     * Constructor of the SparseSolver class.
      *
      * \param verbose flag to enable/disable output to cout
      * \param root flag to denote whether this process is the root MPI
      * process. Only the root will print certain messages
      * \see set_from_options
      */
-    StrumpackSparseSolverBase(bool verbose=true, bool root=true);
+    SparseSolverBase(bool verbose=true, bool root=true);
 
     /**
-     * (Virtual) destructor of the StrumpackSparseSolver class.
+     * (Virtual) destructor of the SparseSolver class.
      */
-    virtual ~StrumpackSparseSolverBase();
+    virtual ~SparseSolverBase();
 
     /**
      * Compute matrix reorderings for numerical stability and to
@@ -184,16 +184,14 @@ namespace strumpack {
      *
      * \param b input, will not be modified. Pointer to the right-hand
      * side. Array should be lenght N, the dimension of the input
-     * matrix for StrumpackSparseSolver and
-     * StrumpackSparseSolverMPI. For StrumpackSparseSolverMPIDist, the
-     * length of b should be correspond the partitioning of the
-     * block-row distributed input matrix.
+     * matrix for SparseSolver and SparseSolverMPI. For
+     * SparseSolverMPIDist, the length of b should be correspond the
+     * partitioning of the block-row distributed input matrix.
      * \param x Output, pointer to the solution vector.  Array should
-     * be lenght N, the dimension of the input matrix for
-     * StrumpackSparseSolver and StrumpackSparseSolverMPI. For
-     * StrumpackSparseSolverMPIDist, the length of b should be
-     * correspond the partitioning of the block-row distributed input
-     * matrix.
+     * be lenght N, the dimension of the input matrix for SparseSolver
+     * and SparseSolverMPI. For SparseSolverMPIDist, the length of b
+     * should be correspond the partitioning of the block-row
+     * distributed input matrix.
      * \param use_initial_guess set to true if x contains an intial
      * guess to the solution. This is mainly useful when using an
      * iterative solver. If set to false, x should not be set (but
@@ -212,16 +210,15 @@ namespace strumpack {
      *
      * \param b input, will not be modified. DenseMatrix containgin
      * the right-hand side vector/matrix. Should have N rows, with N
-     * the dimension of the input matrix for StrumpackSparseSolver and
-     * StrumpackSparseSolverMPI. For StrumpackSparseSolverMPIDist, the
-     * number or rows of b should be correspond to the partitioning of
-     * the block-row distributed input matrix.
+     * the dimension of the input matrix for SparseSolver and
+     * SparseSolverMPI. For SparseSolverMPIDist, the number or rows of
+     * b should be correspond to the partitioning of the block-row
+     * distributed input matrix.
      * \param x Output, pointer to the solution vector.  Array should
-     * be lenght N, the dimension of the input matrix for
-     * StrumpackSparseSolver and StrumpackSparseSolverMPI. For
-     * StrumpackSparseSolverMPIDist, the length of b should be
-     * correspond the partitioning of the block-row distributed input
-     * matrix.
+     * be lenght N, the dimension of the input matrix for SparseSolver
+     * and SparseSolverMPI. For SparseSolverMPIDist, the length of b
+     * should be correspond the partitioning of the block-row
+     * distributed input matrix.
      * \param use_initial_guess set to true if x contains an intial
      * guess to the solution.  This is mainly useful when using an
      * iterative solver.  If set to false, x should not be set (but
@@ -263,19 +260,18 @@ namespace strumpack {
     /**
      * Return the maximum rank encountered in any of the HSS matrices
      * used to compress the sparse triangular factors. This should be
-     * called after the factorization phase. For the
-     * StrumpackSparseSolverMPI and StrumpackSparseSolverMPIDist
-     * distributed memory solvers, this routine is collective on the
-     * MPI communicator.
+     * called after the factorization phase. For the SparseSolverMPI
+     * and SparseSolverMPIDist distributed memory solvers, this
+     * routine is collective on the MPI communicator.
      */
     int maximum_rank() const;
 
     /**
      * Return the number of nonzeros in the (sparse) factors. This is
      * known as the fill-in. This should be called after computing the
-     * numerical factorization. For the StrumpackSparseSolverMPI and
-     * StrumpackSparseSolverMPIDist distributed memory solvers, this
-     * routine is collective on the MPI communicator.
+     * numerical factorization. For the SparseSolverMPI and
+     * SparseSolverMPIDist distributed memory solvers, this routine is
+     * collective on the MPI communicator.
      */
     std::size_t factor_nonzeros() const;
 
@@ -285,9 +281,8 @@ namespace strumpack {
      * factor_nonzeros() * sizeof(scalar_t), so it does not include
      * any overhead from the metadata for the datastructures. This
      * should be called after the factorization. For the
-     * StrumpackSparseSolverMPI and StrumpackSparseSolverMPIDist
-     * distributed memory solvers, this routine is collective on the
-     * MPI communicator.
+     * SparseSolverMPI and SparseSolverMPIDist distributed memory
+     * solvers, this routine is collective on the MPI communicator.
      */
     std::size_t factor_memory() const;
 
@@ -388,6 +383,10 @@ namespace strumpack {
     virtual void delete_factors_internal() = 0;
   };
 
+  template<typename scalar_t,typename integer_t>
+  using StrumpackSparseSolverBase =
+    SparseSolverBase<scalar_t,integer_t>;
+
 } //end namespace strumpack
 
-#endif // STRUMPACK_SPARSE_SOLVER_HPP
+#endif // STRUMPACK_SPARSE_SOLVER_BASE_HPP

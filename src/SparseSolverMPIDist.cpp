@@ -35,21 +35,21 @@
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::
-  StrumpackSparseSolverMPIDist(MPI_Comm comm, bool verbose) :
-    StrumpackSparseSolverMPIDist<scalar_t,integer_t>
+  SparseSolverMPIDist<scalar_t,integer_t>::
+  SparseSolverMPIDist(MPI_Comm comm, bool verbose) :
+    SparseSolverMPIDist<scalar_t,integer_t>
     (comm, 0, nullptr, verbose) {
   }
 
   template<typename scalar_t,typename integer_t>
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::
-  ~StrumpackSparseSolverMPIDist() = default;
+  SparseSolverMPIDist<scalar_t,integer_t>::
+  ~SparseSolverMPIDist() = default;
 
   template<typename scalar_t,typename integer_t>
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::
-  StrumpackSparseSolverMPIDist
+  SparseSolverMPIDist<scalar_t,integer_t>::
+  SparseSolverMPIDist
   (MPI_Comm comm, int argc, char* argv[], bool verbose) :
-    StrumpackSparseSolverBase<scalar_t,integer_t>
+    SparseSolverBase<scalar_t,integer_t>
     (argc, argv, verbose, !mpi_rank(comm)), comm_(comm) {
     if (opts_.verbose() && is_root_)
       std::cout << "# using " << comm_.size()
@@ -59,23 +59,23 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> MPI_Comm
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::comm() const {
+  SparseSolverMPIDist<scalar_t,integer_t>::comm() const {
     return comm_.comm();
   }
 
   template<typename scalar_t,typename integer_t>
   MatrixReordering<scalar_t,integer_t>*
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::reordering() {
+  SparseSolverMPIDist<scalar_t,integer_t>::reordering() {
     return nd_mpi_.get();
   }
   template<typename scalar_t,typename integer_t>
   const MatrixReordering<scalar_t,integer_t>*
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::reordering() const {
+  SparseSolverMPIDist<scalar_t,integer_t>::reordering() const {
     return nd_mpi_.get();
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::broadcast_matrix
+  SparseSolverMPIDist<scalar_t,integer_t>::broadcast_matrix
   (const CSRMatrix<scalar_t,integer_t>& A) {
     mat_mpi_.reset
       (new CSRMatrixMPI<scalar_t,integer_t>(&A, comm_.comm(), true));
@@ -83,7 +83,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::broadcast_csr_matrix
+  SparseSolverMPIDist<scalar_t,integer_t>::broadcast_csr_matrix
   (integer_t N, const integer_t* row_ptr, const integer_t* col_ind,
    const scalar_t* values, bool symmetric_pattern) {
     CSRMatrix<scalar_t,integer_t> mat_seq
@@ -94,14 +94,14 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::set_matrix
+  SparseSolverMPIDist<scalar_t,integer_t>::set_matrix
   (const CSRMatrixMPI<scalar_t,integer_t>& A) {
     mat_mpi_.reset(new CSRMatrixMPI<scalar_t,integer_t>(A));
     this->factored_ = this->reordered_ = false;
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::set_distributed_csr_matrix
+  SparseSolverMPIDist<scalar_t,integer_t>::set_distributed_csr_matrix
   (integer_t local_rows, const integer_t* row_ptr, const integer_t* col_ind,
    const scalar_t* values, const integer_t* dist, bool symmetric_pattern) {
     mat_mpi_.reset
@@ -112,7 +112,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::set_MPIAIJ_matrix
+  SparseSolverMPIDist<scalar_t,integer_t>::set_MPIAIJ_matrix
   (integer_t local_rows, const integer_t* d_ptr, const integer_t* d_ind,
    const scalar_t* d_val, const integer_t* o_ptr, const integer_t* o_ind,
    const scalar_t* o_val, const integer_t* garray) {
@@ -124,7 +124,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::update_matrix_values
+  SparseSolverMPIDist<scalar_t,integer_t>::update_matrix_values
   (const CSRMatrixMPI<scalar_t,integer_t>& A) {
     if (!(mat_mpi_ && A.local_rows() == mat_mpi_->local_rows() &&
           A.local_nnz() <= mat_mpi_->local_nnz())) {
@@ -137,7 +137,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::update_matrix_values
+  SparseSolverMPIDist<scalar_t,integer_t>::update_matrix_values
   (integer_t local_rows, const integer_t* row_ptr, const integer_t* col_ind,
    const scalar_t* values, const integer_t* dist, bool symmetric_pattern) {
     if (!(mat_mpi_ && local_rows == mat_mpi_->local_rows() &&
@@ -154,7 +154,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::update_MPIAIJ_matrix_values
+  SparseSolverMPIDist<scalar_t,integer_t>::update_MPIAIJ_matrix_values
   (integer_t local_rows, const integer_t* d_ptr, const integer_t* d_ind,
    const scalar_t* d_val, const integer_t* o_ptr, const integer_t* o_ind,
    const scalar_t* o_val, const integer_t* garray) {
@@ -171,7 +171,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::redistribute_values() {
+  SparseSolverMPIDist<scalar_t,integer_t>::redistribute_values() {
     if (this->reordered_) {
       matrix()->apply_matching(this->matching_);
       matrix()->equilibrate(this->equil_);
@@ -184,14 +184,14 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::setup_reordering() {
+  SparseSolverMPIDist<scalar_t,integer_t>::setup_reordering() {
     nd_mpi_.reset
       (new MatrixReorderingMPI<scalar_t,integer_t>
        (mat_mpi_->size(), comm_));
   }
 
   template<typename scalar_t,typename integer_t> int
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::compute_reordering
+  SparseSolverMPIDist<scalar_t,integer_t>::compute_reordering
   (const int* p, int base, int nx, int ny, int nz,
    int components, int width) {
     if (p) return nd_mpi_->set_permutation(opts_, *mat_mpi_, p, base);
@@ -200,19 +200,19 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::separator_reordering() {
+  SparseSolverMPIDist<scalar_t,integer_t>::separator_reordering() {
     tree_mpi_dist_->separator_reordering(opts_, *mat_mpi_);
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::setup_tree() {
+  SparseSolverMPIDist<scalar_t,integer_t>::setup_tree() {
     tree_mpi_dist_.reset
       (new EliminationTreeMPIDist<scalar_t,integer_t>
        (opts_, *mat_mpi_, *nd_mpi_, comm_));
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::solve_internal
+  SparseSolverMPIDist<scalar_t,integer_t>::solve_internal
   (const DenseM_t& b, DenseM_t& x, bool use_initial_guess) {
     using real_t = typename RealType<scalar_t>::value_type;
 
@@ -347,7 +347,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::solve_internal
+  SparseSolverMPIDist<scalar_t,integer_t>::solve_internal
   (const scalar_t* b, scalar_t* x, bool use_initial_guess) {
     auto N = mat_mpi_->local_rows();
     auto B = ConstDenseMatrixWrapperPtr(N, 1, b, N);
@@ -356,7 +356,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::perf_counters_stop
+  SparseSolverMPIDist<scalar_t,integer_t>::perf_counters_stop
   (const std::string& s) {
     if (opts_.verbose()) {
 #if defined(STRUMPACK_USE_PAPI)
@@ -395,7 +395,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::
+  SparseSolverMPIDist<scalar_t,integer_t>::
   reduce_flop_counters() const {
 #if defined(STRUMPACK_COUNT_FLOPS)
     std::array<long long int,19> flops = {
@@ -443,25 +443,25 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverMPIDist<scalar_t,integer_t>::
+  SparseSolverMPIDist<scalar_t,integer_t>::
   delete_factors_internal() {
     tree_mpi_dist_->delete_factors();
   }
 
   // explicit template instantiations
-  template class StrumpackSparseSolverMPIDist<float,int>;
-  template class StrumpackSparseSolverMPIDist<double,int>;
-  template class StrumpackSparseSolverMPIDist<std::complex<float>,int>;
-  template class StrumpackSparseSolverMPIDist<std::complex<double>,int>;
+  template class SparseSolverMPIDist<float,int>;
+  template class SparseSolverMPIDist<double,int>;
+  template class SparseSolverMPIDist<std::complex<float>,int>;
+  template class SparseSolverMPIDist<std::complex<double>,int>;
 
-  template class StrumpackSparseSolverMPIDist<float,long int>;
-  template class StrumpackSparseSolverMPIDist<double,long int>;
-  template class StrumpackSparseSolverMPIDist<std::complex<float>,long int>;
-  template class StrumpackSparseSolverMPIDist<std::complex<double>,long int>;
+  template class SparseSolverMPIDist<float,long int>;
+  template class SparseSolverMPIDist<double,long int>;
+  template class SparseSolverMPIDist<std::complex<float>,long int>;
+  template class SparseSolverMPIDist<std::complex<double>,long int>;
 
-  template class StrumpackSparseSolverMPIDist<float,long long int>;
-  template class StrumpackSparseSolverMPIDist<double,long long int>;
-  template class StrumpackSparseSolverMPIDist<std::complex<float>,long long int>;
-  template class StrumpackSparseSolverMPIDist<std::complex<double>,long long int>;
+  template class SparseSolverMPIDist<float,long long int>;
+  template class SparseSolverMPIDist<double,long long int>;
+  template class SparseSolverMPIDist<std::complex<float>,long long int>;
+  template class SparseSolverMPIDist<std::complex<double>,long long int>;
 
 } // end namespace strumpack

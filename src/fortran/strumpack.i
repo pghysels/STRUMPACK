@@ -43,4 +43,4 @@
 %rename("get_%s") STRUMPACK_Krylov_solver;
 
 // Process and create wrappers for the following header file
-%include "../StrumpackSparseSolver.h"
+%include "../SparseSolver.h"

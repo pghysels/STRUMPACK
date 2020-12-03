@@ -32,7 +32,7 @@
 #ifndef STRUMPACK_SPARSE_SOLVER_MPI_DIST_HPP
 #define STRUMPACK_SPARSE_SOLVER_MPI_DIST_HPP
 
-#include "StrumpackSparseSolverBase.hpp"
+#include "SparseSolverBase.hpp"
 #include "dense/ScaLAPACKWrapper.hpp"
 #include "dense/DistributedVector.hpp"
 #include "sparse/CSRMatrixMPI.hpp"
@@ -44,7 +44,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> class MatrixReorderingMPI;
 
   /**
-   * \class StrumpackSparseSolverMPIDist
+   * \class SparseSolverMPIDist
    *
    * \brief This is the fully distributed solver.
    *
@@ -65,11 +65,11 @@ namespace strumpack {
    * integer_t=int64_t instead. This should be a __signed__ integer
    * type.
    *
-   * \see StrumpackSparseSolver
+   * \see SparseSolver
    */
   template<typename scalar_t,typename integer_t>
-  class StrumpackSparseSolverMPIDist :
-    public StrumpackSparseSolverBase<scalar_t,integer_t> {
+  class SparseSolverMPIDist :
+    public SparseSolverBase<scalar_t,integer_t> {
 
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using Tree_t = EliminationTree<scalar_t,integer_t>;
@@ -92,11 +92,11 @@ namespace strumpack {
      * \param verb Flag to suppres/enable output.  Only the root of
      * comm will print to stdout.
      */
-    StrumpackSparseSolverMPIDist
+    SparseSolverMPIDist
     (MPI_Comm comm, int argc, char* argv[], bool verbose=true);
 
     /**
-     * Constructor of the StrumpackSparseSolver class. This routine is
+     * Constructor of the SparseSolver class. This routine is
      * collective on all ranks in the MPI communicator comm.
      *
      * \param verbose flag to enable/disable output to cout
@@ -104,12 +104,12 @@ namespace strumpack {
      * process. Only the root will print certain messages
      * \see set_from_options
      */
-    StrumpackSparseSolverMPIDist(MPI_Comm comm, bool verbose=true);
+    SparseSolverMPIDist(MPI_Comm comm, bool verbose=true);
 
     /**
      * Destructor, virtual.
      */
-    ~StrumpackSparseSolverMPIDist();
+    ~SparseSolverMPIDist();
 
     /**
      * Set a matrix for this sparse solver. __Only the matrix provided
@@ -286,8 +286,8 @@ namespace strumpack {
     MPI_Comm comm() const;
 
   private:
-    using StrumpackSparseSolverBase<scalar_t,integer_t>::is_root_;
-    using StrumpackSparseSolverBase<scalar_t,integer_t>::opts_;
+    using SparseSolverBase<scalar_t,integer_t>::is_root_;
+    using SparseSolverBase<scalar_t,integer_t>::opts_;
     MPIComm comm_;
 
     SpMat_t* matrix() override { return mat_mpi_.get(); }
@@ -322,6 +322,10 @@ namespace strumpack {
     std::unique_ptr<MatrixReorderingMPI<scalar_t,integer_t>> nd_mpi_;
     std::unique_ptr<EliminationTreeMPIDist<scalar_t,integer_t>> tree_mpi_dist_;
   };
+
+  template<typename scalar_t,typename integer_t>
+  using StrumpackSparseSolverMPIDist =
+    SparseSolverMPIDist<scalar_t,integer_t>;
 
 } // end namespace strumpack
 

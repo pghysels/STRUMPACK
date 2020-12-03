@@ -42,26 +42,26 @@
 namespace strumpack {
 
   template<typename factor_t,typename refine_t,typename integer_t>
-  StrumpackSparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
-  StrumpackSparseSolverMixedPrecision(bool verbose, bool root)
+  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  SparseSolverMixedPrecision(bool verbose, bool root)
     : solver_(verbose, root) {
     solver_.options().set_Krylov_solver(KrylovSolver::DIRECT);
   }
 
   template<typename factor_t,typename refine_t,typename integer_t>
-  StrumpackSparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
-  StrumpackSparseSolverMixedPrecision
+  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  SparseSolverMixedPrecision
   (int argc, char* argv[], bool verbose, bool root)
     : solver_(argc, argv, verbose, root), opts_(argc, argv) {
     solver_.options().set_Krylov_solver(KrylovSolver::DIRECT);
   }
 
   template<typename factor_t,typename refine_t,typename integer_t>
-  StrumpackSparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
-  ~StrumpackSparseSolverMixedPrecision() = default;
+  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  ~SparseSolverMixedPrecision() = default;
 
   template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
-  StrumpackSparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
   solve(const DenseMatrix<refine_t>& b, DenseMatrix<refine_t>& x,
         bool use_initial_guess) {
     auto solve_func =
@@ -130,7 +130,7 @@ namespace strumpack {
   }
 
   template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
-  StrumpackSparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
   solve(const refine_t* b, refine_t* x, bool use_initial_guess) {
     auto N = mat_.size();
     auto B = ConstDenseMatrixWrapperPtr(N, 1, b, N);
@@ -139,19 +139,19 @@ namespace strumpack {
   }
 
   template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
-  StrumpackSparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
   factor() {
     return solver_.factor();
   }
 
   template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
-  StrumpackSparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
   reorder(int nx, int ny, int nz) {
     return solver_.reorder(nx, ny, nz);
   }
 
   template<typename factor_t,typename refine_t,typename integer_t> void
-  StrumpackSparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
   set_matrix(const CSRMatrix<refine_t,integer_t>& A) {
     mat_ = A;
     CSRMatrix<factor_t,integer_t> cast_mat =
@@ -161,7 +161,7 @@ namespace strumpack {
   }
 
   // explicit template instantiations
-  template class StrumpackSparseSolverMixedPrecision<float,double,int>;
-  template class StrumpackSparseSolverMixedPrecision<std::complex<float>,std::complex<double>,int>;
+  template class SparseSolverMixedPrecision<float,double,int>;
+  template class SparseSolverMixedPrecision<std::complex<float>,std::complex<double>,int>;
 
 } //end namespace strumpack

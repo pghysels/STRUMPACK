@@ -25,7 +25,7 @@
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
  */
-#include "StrumpackSparseSolverBase.hpp"
+#include "SparseSolverBase.hpp"
 
 #if defined(STRUMPACK_USE_PAPI)
 #include <papi.h>
@@ -49,9 +49,9 @@
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
-  StrumpackSparseSolverBase<scalar_t,integer_t>::StrumpackSparseSolverBase
+  SparseSolverBase<scalar_t,integer_t>::SparseSolverBase
   (bool verbose, bool root)
-    : StrumpackSparseSolverBase<scalar_t,integer_t>
+    : SparseSolverBase<scalar_t,integer_t>
     (0, nullptr, verbose, root) {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
     gpu::init();
@@ -59,7 +59,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t>
-  StrumpackSparseSolverBase<scalar_t,integer_t>::StrumpackSparseSolverBase
+  SparseSolverBase<scalar_t,integer_t>::SparseSolverBase
   (int argc, char* argv[], bool verbose, bool root)
     : opts_(argc, argv), is_root_(root) {
     opts_.set_verbose(verbose);
@@ -98,76 +98,76 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t>
-  StrumpackSparseSolverBase<scalar_t,integer_t>::~StrumpackSparseSolverBase() {
+  SparseSolverBase<scalar_t,integer_t>::~SparseSolverBase() {
     std::set_new_handler(old_handler_);
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverBase<scalar_t,integer_t>::move_to_gpu() {
+  SparseSolverBase<scalar_t,integer_t>::move_to_gpu() {
     TaskTimer t("move_to_gpu", [&](){ tree()->move_to_gpu(); });
     if (opts_.verbose() && is_root_)
       std::cout << "#   - move_to_gpu time = " << t.elapsed()
                 << std::endl;
   }
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverBase<scalar_t,integer_t>::remove_from_gpu() {
+  SparseSolverBase<scalar_t,integer_t>::remove_from_gpu() {
     tree()->remove_from_gpu();
   }
 
   template<typename scalar_t,typename integer_t> SPOptions<scalar_t>&
-  StrumpackSparseSolverBase<scalar_t,integer_t>::options() {
+  SparseSolverBase<scalar_t,integer_t>::options() {
     return opts_;
   }
 
   template<typename scalar_t,typename integer_t> const SPOptions<scalar_t>&
-  StrumpackSparseSolverBase<scalar_t,integer_t>::options() const {
+  SparseSolverBase<scalar_t,integer_t>::options() const {
     return opts_;
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverBase<scalar_t,integer_t>::set_from_options() {
+  SparseSolverBase<scalar_t,integer_t>::set_from_options() {
     opts_.set_from_command_line();
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverBase<scalar_t,integer_t>::set_from_options
+  SparseSolverBase<scalar_t,integer_t>::set_from_options
   (int argc, char* argv[]) {
     opts_.set_from_command_line(argc, argv);
   }
 
   template<typename scalar_t,typename integer_t> int
-  StrumpackSparseSolverBase<scalar_t,integer_t>::maximum_rank() const {
+  SparseSolverBase<scalar_t,integer_t>::maximum_rank() const {
     return tree()->maximum_rank();
   }
 
   template<typename scalar_t,typename integer_t> std::size_t
-  StrumpackSparseSolverBase<scalar_t,integer_t>::factor_nonzeros() const {
+  SparseSolverBase<scalar_t,integer_t>::factor_nonzeros() const {
     return tree()->factor_nonzeros();
   }
 
   template<typename scalar_t,typename integer_t> std::size_t
-  StrumpackSparseSolverBase<scalar_t,integer_t>::factor_memory() const {
+  SparseSolverBase<scalar_t,integer_t>::factor_memory() const {
     return tree()->factor_nonzeros() * sizeof(scalar_t);
   }
 
   template<typename scalar_t,typename integer_t> int
-  StrumpackSparseSolverBase<scalar_t,integer_t>::Krylov_iterations() const {
+  SparseSolverBase<scalar_t,integer_t>::Krylov_iterations() const {
     return Krylov_its_;
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverBase<scalar_t,integer_t>::draw
+  SparseSolverBase<scalar_t,integer_t>::draw
   (const std::string& name) const {
     tree()->draw(*matrix(), name);
   }
 
   template<typename scalar_t,typename integer_t> long long
-  StrumpackSparseSolverBase<scalar_t,integer_t>::dense_factor_nonzeros() const {
+  SparseSolverBase<scalar_t,integer_t>::dense_factor_nonzeros() const {
     return tree()->dense_factor_nonzeros();
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverBase<scalar_t,integer_t>::papi_initialize() {
+  SparseSolverBase<scalar_t,integer_t>::papi_initialize() {
 #if defined(STRUMPACK_USE_PAPI)
     // TODO call PAPI_library_init???
     float mflops = 0.;
@@ -195,7 +195,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverBase<scalar_t,integer_t>::perf_counters_start() {
+  SparseSolverBase<scalar_t,integer_t>::perf_counters_start() {
 #if defined(STRUMPACK_USE_PAPI)
     float mflops = 0., rtime = 0., ptime = 0.;
     long_long flpops = 0; // cannot use class variables in openmp clause
@@ -211,7 +211,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverBase<scalar_t,integer_t>::perf_counters_stop
+  SparseSolverBase<scalar_t,integer_t>::perf_counters_stop
   (const std::string& s) {
 #if defined(STRUMPACK_USE_PAPI)
     float mflops = 0., rtime = 0., ptime = 0.;
@@ -252,7 +252,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverBase<scalar_t,integer_t>::print_solve_stats
+  SparseSolverBase<scalar_t,integer_t>::print_solve_stats
   (TaskTimer& t) const {
     double tel = t.elapsed();
     if (opts_.verbose() && is_root_) {
@@ -282,7 +282,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverBase<scalar_t,integer_t>::print_wrong_sparsity_error() {
+  SparseSolverBase<scalar_t,integer_t>::print_wrong_sparsity_error() {
     std::cerr
       << "ERROR:\n"
       << "  update_matrix_values should be called with exactly\n"
@@ -292,19 +292,19 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  StrumpackSparseSolverBase<scalar_t,integer_t>::reorder
+  SparseSolverBase<scalar_t,integer_t>::reorder
   (int nx, int ny, int nz, int components, int width) {
     return reorder_internal(nullptr, 0, nx, ny, nz, components, width);
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  StrumpackSparseSolverBase<scalar_t,integer_t>::reorder
+  SparseSolverBase<scalar_t,integer_t>::reorder
   (const int* p, int base) {
     return reorder_internal(p, base, 1, 1, 1, 1, 1);
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  StrumpackSparseSolverBase<scalar_t,integer_t>::reorder_internal
+  SparseSolverBase<scalar_t,integer_t>::reorder_internal
   (const int* p, int base, int nx, int ny, int nz,
    int components, int width) {
     if (!matrix()) return ReturnCode::MATRIX_NOT_SET;
@@ -421,7 +421,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverBase<scalar_t,integer_t>::flop_breakdown_reset() const {
+  SparseSolverBase<scalar_t,integer_t>::flop_breakdown_reset() const {
 #if defined(STRUMPACK_COUNT_FLOPS)
     params::random_flops = 0;
     params::ID_flops = 0;
@@ -446,7 +446,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverBase<scalar_t,integer_t>::print_flop_breakdown_HSS() const {
+  SparseSolverBase<scalar_t,integer_t>::print_flop_breakdown_HSS() const {
     reduce_flop_counters();
     if (!is_root_) return;
     float sample_flops = params::CB_sample_flops + params::sparse_sample_flops;
@@ -477,7 +477,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverBase<scalar_t,integer_t>::print_flop_breakdown_HODLR() const {
+  SparseSolverBase<scalar_t,integer_t>::print_flop_breakdown_HODLR() const {
     reduce_flop_counters();
     if (!is_root_) return;
     float sample_flops = strumpack::params::CB_sample_flops +
@@ -509,7 +509,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  StrumpackSparseSolverBase<scalar_t,integer_t>::factor() {
+  SparseSolverBase<scalar_t,integer_t>::factor() {
     if (!matrix()) return ReturnCode::MATRIX_NOT_SET;
     if (factored_) return ReturnCode::SUCCESS;
     if (!reordered_) {
@@ -623,37 +623,37 @@ namespace strumpack {
 
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  StrumpackSparseSolverBase<scalar_t,integer_t>::solve
+  SparseSolverBase<scalar_t,integer_t>::solve
   (const scalar_t* b, scalar_t* x, bool use_initial_guess) {
     return solve_internal(b, x, use_initial_guess);
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  StrumpackSparseSolverBase<scalar_t,integer_t>::solve
+  SparseSolverBase<scalar_t,integer_t>::solve
   (const DenseM_t& b, DenseM_t& x, bool use_initial_guess) {
     return solve_internal(b, x, use_initial_guess);
   }
 
   template<typename scalar_t,typename integer_t> void
-  StrumpackSparseSolverBase<scalar_t,integer_t>::delete_factors() {
+  SparseSolverBase<scalar_t,integer_t>::delete_factors() {
     delete_factors_internal();
     factored_ = false;
   }
 
   // explicit template instantiations
-  template class StrumpackSparseSolverBase<float,int>;
-  template class StrumpackSparseSolverBase<double,int>;
-  template class StrumpackSparseSolverBase<std::complex<float>,int>;
-  template class StrumpackSparseSolverBase<std::complex<double>,int>;
+  template class SparseSolverBase<float,int>;
+  template class SparseSolverBase<double,int>;
+  template class SparseSolverBase<std::complex<float>,int>;
+  template class SparseSolverBase<std::complex<double>,int>;
 
-  template class StrumpackSparseSolverBase<float,long int>;
-  template class StrumpackSparseSolverBase<double,long int>;
-  template class StrumpackSparseSolverBase<std::complex<float>,long int>;
-  template class StrumpackSparseSolverBase<std::complex<double>,long int>;
+  template class SparseSolverBase<float,long int>;
+  template class SparseSolverBase<double,long int>;
+  template class SparseSolverBase<std::complex<float>,long int>;
+  template class SparseSolverBase<std::complex<double>,long int>;
 
-  template class StrumpackSparseSolverBase<float,long long int>;
-  template class StrumpackSparseSolverBase<double,long long int>;
-  template class StrumpackSparseSolverBase<std::complex<float>,long long int>;
-  template class StrumpackSparseSolverBase<std::complex<double>,long long int>;
+  template class SparseSolverBase<float,long long int>;
+  template class SparseSolverBase<double,long long int>;
+  template class SparseSolverBase<std::complex<float>,long long int>;
+  template class SparseSolverBase<std::complex<double>,long long int>;
 
 } //end namespace strumpack

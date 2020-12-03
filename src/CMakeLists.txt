@@ -4,19 +4,19 @@ target_sources(strumpack
   ${CMAKE_CURRENT_LIST_DIR}/StrumpackOptions.hpp
   ${CMAKE_CURRENT_LIST_DIR}/StrumpackOptions.cpp
   ${CMAKE_CURRENT_LIST_DIR}/StrumpackParameters.hpp
-  ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverBase.hpp
-  ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverBase.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/SparseSolverBase.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/SparseSolverBase.cpp
   ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolver.hpp
-  ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolver.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/SparseSolver.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/SparseSolverMixedPrecision.cpp
   ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverMixedPrecision.hpp
-  ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverMixedPrecision.cpp
   ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverC.cpp
   ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolver.h)
 
 install(FILES
   StrumpackOptions.hpp
   StrumpackParameters.hpp
-  StrumpackSparseSolverBase.hpp
+  SparseSolverBase.hpp
   StrumpackSparseSolver.hpp
   StrumpackSparseSolver.h
   DESTINATION include)
@@ -25,8 +25,8 @@ install(FILES
 if(STRUMPACK_USE_MPI)
   target_sources(strumpack
     PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverMPIDist.hpp
-    ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverMPIDist.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/SparseSolverMPIDist.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverMPIDist.hpp)
 
   install(FILES
     StrumpackSparseSolverMPIDist.hpp

@@ -26,12 +26,12 @@
  *             Division).
  */
 /**
- * \file StrumpackSparseSolverMixedPrecision.hpp
+ * \file SparseSolverMixedPrecision.hpp
  * \brief Contains the mixed precision definition of the
  * sequential/multithreaded sparse solver class.
  */
-#ifndef STRUMPACK_SPARSE_SOLVER_MIXED_PRECISION_HPP
-#define STRUMPACK_SPARSE_SOLVER_MIXED_PRECISION_HPP
+#ifndef SPARSE_SOLVER_MIXED_PRECISION_HPP
+#define SPARSE_SOLVER_MIXED_PRECISION_HPP
 
 #include <new>
 #include <memory>
@@ -41,15 +41,14 @@
 #include "sparse/iterative/IterativeSolvers.hpp"
 #include "StrumpackOptions.hpp"
 #include "StrumpackSparseSolver.hpp"
-#include "StrumpackSparseSolverBase.hpp"
 
 
 namespace strumpack {
 
   /**
-   * \class StrumpackSparseSolverMixedPrecision
+   * \class SparseSolverMixedPrecision
    *
-   * \brief StrumpackSparseSolverMixedPrecision Allows to use lower
+   * \brief SparseSolverMixedPrecision Allows to use lower
    * precision (float) for the preconditioner, and higher (double) for
    * the outer iterative solver.
    *
@@ -80,16 +79,16 @@ namespace strumpack {
    * integer_t=int64_t instead. This should be a __signed__ integer
    * type.
    *
-   * \see StrumpackSparseSolver
+   * \see SparseSolver
    */
   template<typename factor_t,typename refine_t,typename integer_t>
-  class StrumpackSparseSolverMixedPrecision {
+  class SparseSolverMixedPrecision {
 
   public:
     /**
      * Constructor for the mixed precision solver class.
      */
-    StrumpackSparseSolverMixedPrecision(bool verbose=true, bool root=true);
+    SparseSolverMixedPrecision(bool verbose=true, bool root=true);
 
     /**
      * Constructor for the mixed precision solver class.
@@ -101,13 +100,13 @@ namespace strumpack {
      * this->solver().options().set_from_command_line() (same as
      * this->solver().set_from_options());
      */
-    StrumpackSparseSolverMixedPrecision(int argc, char* argv[],
-                                        bool verbose=true, bool root=true);
+    SparseSolverMixedPrecision(int argc, char* argv[],
+                               bool verbose=true, bool root=true);
 
     /**
      * Destructor.
      */
-    ~StrumpackSparseSolverMixedPrecision();
+    ~SparseSolverMixedPrecision();
 
     void set_matrix(const CSRMatrix<refine_t,integer_t>& A);
 
@@ -122,8 +121,8 @@ namespace strumpack {
     SPOptions<refine_t>& options() { return opts_; }
     const SPOptions<refine_t>& options() const { return opts_; }
 
-    StrumpackSparseSolver<factor_t,integer_t>& solver() { return solver_; }
-    const StrumpackSparseSolver<factor_t,integer_t>& solver() const { return solver_; }
+    SparseSolver<factor_t,integer_t>& solver() { return solver_; }
+    const SparseSolver<factor_t,integer_t>& solver() const { return solver_; }
 
     /**
      * Return the number of iterations performed by the outer (Krylov)
@@ -133,10 +132,14 @@ namespace strumpack {
 
   private:
     CSRMatrix<refine_t,integer_t> mat_;
-    StrumpackSparseSolver<factor_t,integer_t> solver_;
+    SparseSolver<factor_t,integer_t> solver_;
     SPOptions<refine_t> opts_;
     int Krylov_its_ = 0;
   };
+
+  template<typename factor_t,typename refine_t,typename integer_t>
+  using StrumpackSparseSolverMixedPrecision =
+    SparseSolverMixedPrecision<factor_t,refine_t,integer_t>;
 
 } //end namespace strumpack
 
