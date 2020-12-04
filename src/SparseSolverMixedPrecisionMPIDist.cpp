@@ -26,7 +26,7 @@
  *             Division).
  */
 
-#include "StrumpackSparseSolverMixedPrecision.hpp"
+#include "StrumpackSparseSolverMixedPrecisionMPIDist.hpp"
 
 #if defined(STRUMPACK_USE_PAPI)
 #include <papi.h>
@@ -37,31 +37,31 @@
 #include "StrumpackOptions.hpp"
 #include "sparse/ordering/MatrixReordering.hpp"
 #include "sparse/EliminationTree.hpp"
-#include "sparse/iterative/IterativeSolvers.hpp"
+#include "sparse/iterative/IterativeSolversMPI.hpp"
 
 namespace strumpack {
 
   template<typename factor_t,typename refine_t,typename integer_t>
-  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
-  SparseSolverMixedPrecision(bool verbose, bool root)
-    : solver_(verbose, root) {
+  SparseSolverMixedPrecisionMPIDist<factor_t,refine_t,integer_t>::
+  SparseSolverMixedPrecisionMPIDist(MPI_Comm comm, bool verbose)
+    : solver_(comm, verbose) {
     solver_.options().set_Krylov_solver(KrylovSolver::DIRECT);
   }
 
   template<typename factor_t,typename refine_t,typename integer_t>
-  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
-  SparseSolverMixedPrecision
-  (int argc, char* argv[], bool verbose, bool root)
-    : solver_(argc, argv, verbose, root), opts_(argc, argv) {
+  SparseSolverMixedPrecisionMPIDist<factor_t,refine_t,integer_t>::
+  SparseSolverMixedPrecisionMPIDist(MPI_Comm comm, int argc, char* argv[],
+                                    bool verbose)
+    : solver_(comm, argc, argv, verbose), opts_(argc, argv) {
     solver_.options().set_Krylov_solver(KrylovSolver::DIRECT);
   }
 
   template<typename factor_t,typename refine_t,typename integer_t>
-  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
-  ~SparseSolverMixedPrecision() = default;
+  SparseSolverMixedPrecisionMPIDist<factor_t,refine_t,integer_t>::
+  ~SparseSolverMixedPrecisionMPIDist() = default;
 
   template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
-  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  SparseSolverMixedPrecisionMPIDist<factor_t,refine_t,integer_t>::
   solve(const DenseMatrix<refine_t>& b, DenseMatrix<refine_t>& x,
         bool use_initial_guess) {
     auto solve_func =
@@ -81,42 +81,45 @@ namespace strumpack {
     auto old_verbose = solver_.options().verbose();
     solver_.options().set_verbose(false);
     Krylov_its_ = 0;
+    bool verbose = opts_.verbose() && solver_.Comm().is_root();
     switch (opts_.Krylov_solver()) {
     case KrylovSolver::AUTO: {
       if (opts_.compression() != CompressionType::NONE && x.cols() == 1)
-        iterative::GMRes<refine_t>
-          (spmv, solve_func_ptr, x.rows(), x.data(), b.data(),
+        iterative::GMResMPI<refine_t>
+          (solver_.Comm(), spmv, solve_func_ptr, x.rows(), x.data(), b.data(),
            opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
            opts_.gmres_restart(), opts_.GramSchmidt_type(),
-           use_initial_guess, opts_.verbose());
+           use_initial_guess, verbose);
       else
-        iterative::IterativeRefinement<refine_t,integer_t>
-          (mat_, solve_func, x, b, opts_.rel_tol(), opts_.abs_tol(),
-           Krylov_its_, opts_.maxit(), use_initial_guess, opts_.verbose());
+        iterative::IterativeRefinementMPI<refine_t,integer_t>
+          (solver_.Comm(), mat_, solve_func, x, b,
+           opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
+           use_initial_guess, verbose);
     }; break;
     case KrylovSolver::DIRECT: {
       copy(b, x, 0, 0);
       solve_func(x);
     }; break;
     case KrylovSolver::REFINE: {
-      iterative::IterativeRefinement<refine_t,integer_t>
-        (mat_, solve_func, x, b, opts_.rel_tol(), opts_.abs_tol(),
-         Krylov_its_, opts_.maxit(), use_initial_guess, opts_.verbose());
+      iterative::IterativeRefinementMPI<refine_t,integer_t>
+        (solver_.Comm(), mat_, solve_func, x, b,
+         opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
+         use_initial_guess, verbose);
     }; break;
     case KrylovSolver::PREC_GMRES: {
       assert(x.cols() == 1);
-      iterative::GMRes<refine_t>
-        (spmv, solve_func_ptr, x.rows(), x.data(), b.data(),
+      iterative::GMResMPI<refine_t>
+        (solver_.Comm(), spmv, solve_func_ptr, x.rows(), x.data(), b.data(),
          opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
          opts_.gmres_restart(), opts_.GramSchmidt_type(),
-         use_initial_guess, opts_.verbose());
+         use_initial_guess, verbose);
     }; break;
     case KrylovSolver::PREC_BICGSTAB: {
       assert(x.cols() == 1);
-      iterative::BiCGStab<refine_t>
-        (spmv, solve_func_ptr, x.rows(), x.data(), b.data(),
+      iterative::BiCGStabMPI<refine_t>
+        (solver_.Comm(), spmv, solve_func_ptr, x.rows(), x.data(), b.data(),
          opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
-         use_initial_guess, opts_.verbose());
+         use_initial_guess, verbose);
     }; break;
     case KrylovSolver::GMRES:
     case KrylovSolver::BICGSTAB: {
@@ -130,7 +133,7 @@ namespace strumpack {
   }
 
   template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
-  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  SparseSolverMixedPrecisionMPIDist<factor_t,refine_t,integer_t>::
   solve(const refine_t* b, refine_t* x, bool use_initial_guess) {
     auto N = mat_.size();
     auto B = ConstDenseMatrixWrapperPtr(N, 1, b, N);
@@ -139,26 +142,26 @@ namespace strumpack {
   }
 
   template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
-  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  SparseSolverMixedPrecisionMPIDist<factor_t,refine_t,integer_t>::
   factor() {
     return solver_.factor();
   }
 
   template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
-  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  SparseSolverMixedPrecisionMPIDist<factor_t,refine_t,integer_t>::
   reorder(int nx, int ny, int nz) {
     return solver_.reorder(nx, ny, nz);
   }
 
   template<typename factor_t,typename refine_t,typename integer_t> void
-  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
-  set_matrix(const CSRMatrix<refine_t,integer_t>& A) {
+  SparseSolverMixedPrecisionMPIDist<factor_t,refine_t,integer_t>::
+  set_matrix(const CSRMatrixMPI<refine_t,integer_t>& A) {
     mat_ = A;
     solver_.set_matrix(cast_matrix<refine_t,integer_t,factor_t>(A));
   }
 
   // explicit template instantiations
-  template class SparseSolverMixedPrecision<float,double,int>;
-  template class SparseSolverMixedPrecision<std::complex<float>,std::complex<double>,int>;
+  template class SparseSolverMixedPrecisionMPIDist<float,double,int>;
+  template class SparseSolverMixedPrecisionMPIDist<std::complex<float>,std::complex<double>,int>;
 
 } //end namespace strumpack

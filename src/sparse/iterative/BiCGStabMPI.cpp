@@ -40,7 +40,7 @@ namespace strumpack {
      */
     template<typename scalar_t,typename real_t> real_t BiCGStabMPI
     (const MPIComm& comm, const SPMV<scalar_t>& A, const PREC<scalar_t>& M,
-     std::size_t n, scalar_t* x, scalar_t* b, real_t rtol, real_t atol,
+     std::size_t n, scalar_t* x, const scalar_t* b, real_t rtol, real_t atol,
      int& totit, int maxit, bool non_zero_guess, bool verbose) {
       real_t bnrm2 = norm2(n, b, 1, comm);
       if (bnrm2 == 0.0) return real_t(0.0);
@@ -127,22 +127,22 @@ namespace strumpack {
     // explicit template instantiations
     template float BiCGStabMPI
     (const MPIComm& comm, const SPMV<float>& A, const PREC<float>& M,
-     std::size_t n, float* x, float* b, float rtol, float atol,
+     std::size_t n, float* x, const float* b, float rtol, float atol,
      int& totit, int maxit, bool non_zero_guess, bool verbose);
     template double BiCGStabMPI
     (const MPIComm& comm, const SPMV<double>& A, const PREC<double>& M,
-     std::size_t n, double* x, double* b, double rtol, double atol,
+     std::size_t n, double* x, const double* b, double rtol, double atol,
      int& totit, int maxit, bool non_zero_guess, bool verbose);
     template float BiCGStabMPI
     (const MPIComm& comm, const SPMV<std::complex<float>>& A,
      const PREC<std::complex<float>>& M, std::size_t n,
-     std::complex<float>* x, std::complex<float>* b,
+     std::complex<float>* x, const std::complex<float>* b,
      float rtol, float atol, int& totit, int maxit,
      bool non_zero_guess, bool verbose);
     template double BiCGStabMPI
     (const MPIComm& comm, const SPMV<std::complex<double>>& A,
      const PREC<std::complex<double>>& M, std::size_t n,
-     std::complex<double>* x, std::complex<double>* b,
+     std::complex<double>* x, const std::complex<double>* b,
      double rtol, double atol, int& totit, int maxit,
      bool non_zero_guess, bool verbose);
 

@@ -47,6 +47,8 @@ if(STRUMPACK_USE_MPI)
     testPoisson3dMPIDist.cpp)
   add_executable(testBLRMPI            EXCLUDE_FROM_ALL
     testBLRMPI.cpp)
+  add_executable(testMixedPrecisionMPIDist EXCLUDE_FROM_ALL
+    testMixedPrecisionMPIDist.cpp)
 
   target_link_libraries(testHelmholtz strumpack)
   target_link_libraries(testPoisson2dMPIDist strumpack)
@@ -54,6 +56,7 @@ if(STRUMPACK_USE_MPI)
   target_link_libraries(testMMdoubleMPIDist strumpack)
   target_link_libraries(testPoisson3dMPIDist strumpack)
   target_link_libraries(testBLRMPI strumpack)
+  target_link_libraries(testMixedPrecisionMPIDist strumpack)
 
   add_dependencies(examples
     testHelmholtz
@@ -61,7 +64,8 @@ if(STRUMPACK_USE_MPI)
     KernelRegressionMPI
     testMMdoubleMPIDist
     testPoisson3dMPIDist
-    testBLRMPI)
+    testBLRMPI
+    testMixedPrecisionMPIDist)
 
   if(STRUMPACK_USE_BPACK)
     add_executable(testHODLR EXCLUDE_FROM_ALL testHODLR.cpp)

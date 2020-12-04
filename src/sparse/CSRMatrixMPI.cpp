@@ -1030,6 +1030,7 @@ namespace strumpack {
     return comm_.all_reduce(m, MPI_MAX);
   }
 
+
   // explicit template instantiations
   template class CSRMatrixMPI<float,int>;
   template class CSRMatrixMPI<double,int>;
@@ -1045,5 +1046,21 @@ namespace strumpack {
   template class CSRMatrixMPI<double,long long int>;
   template class CSRMatrixMPI<std::complex<float>,long long int>;
   template class CSRMatrixMPI<std::complex<double>,long long int>;
+
+
+  template<typename scalar_t, typename integer_t, typename cast_t>
+  CSRMatrixMPI<cast_t,integer_t>
+  cast_matrix(const CSRMatrixMPI<scalar_t,integer_t>& mat) {
+    std::vector<cast_t> new_val(mat.val(), mat.val()+mat.local_nnz());
+    return CSRMatrixMPI<cast_t,integer_t>
+      (mat.local_rows(), mat.ptr(), mat.ind(), new_val.data(),
+       mat.dist().data(), mat.Comm(), mat.symm_sparse());
+  }
+
+  template CSRMatrixMPI<float,int>
+  cast_matrix<double,int,float>(const CSRMatrixMPI<double,int>& mat);
+  template CSRMatrixMPI<std::complex<float>,int>
+  cast_matrix<std::complex<double>,int,std::complex<float>>
+  (const CSRMatrixMPI<std::complex<double>,int>& mat);
 
 } // end namespace strumpack

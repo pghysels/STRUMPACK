@@ -58,7 +58,7 @@ namespace strumpack {
     (const MPIComm& comm,
      const std::function<void(const scalar_t*,scalar_t*)>& spmv,
      const std::function<void(scalar_t*)>& preconditioner,
-     std::size_t n, scalar_t* x, scalar_t* b, real_t rtol, real_t atol,
+     std::size_t n, scalar_t* x, const scalar_t* b, real_t rtol, real_t atol,
      int& totit, int maxit, int restart, GramSchmidtType GStype,
      bool non_zero_guess, bool verbose);
 
@@ -71,7 +71,7 @@ namespace strumpack {
     (const MPIComm& comm,
      const std::function<void(const scalar_t*,scalar_t*)>& spmv,
      const std::function<void(scalar_t*)>& preconditioner,
-     std::size_t n, scalar_t* x, scalar_t* b, real_t rtol, real_t atol,
+     std::size_t n, scalar_t* x, const scalar_t* b, real_t rtol, real_t atol,
      int& totit, int maxit, bool non_zero_guess, bool verbose);
 
     /*
@@ -84,7 +84,7 @@ namespace strumpack {
     (const MPIComm& comm,
      const CSRMatrixMPI<scalar_t,integer_t>& A,
      const std::function<void(DenseMatrix<scalar_t>&)>& direct_solve,
-     DenseMatrix<scalar_t>& x, DenseMatrix<scalar_t>& b, real_t rtol,
+     DenseMatrix<scalar_t>& x, const DenseMatrix<scalar_t>& b, real_t rtol,
      real_t atol, int& totit, int maxit, bool non_zero_guess, bool verbose);
 
   } // end namespace iterative

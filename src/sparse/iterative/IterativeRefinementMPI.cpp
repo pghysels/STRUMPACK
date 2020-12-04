@@ -48,7 +48,7 @@ namespace strumpack {
     template<typename scalar_t,typename integer_t,typename real_t>
     void IterativeRefinementMPI
     (const MPIComm& comm, const SpMat<scalar_t,integer_t>& A,
-     const Prec<scalar_t>& M, DMat<scalar_t>& x, DMat<scalar_t>& b,
+     const Prec<scalar_t>& M, DMat<scalar_t>& x, const DMat<scalar_t>& b,
      real_t rtol, real_t atol, int& totit, int maxit,
      bool non_zero_guess, bool verbose) {
       auto norm =
@@ -96,63 +96,63 @@ namespace strumpack {
     // explicit template instantiations
     template void IterativeRefinementMPI
     (const MPIComm& comm, const SpMat<float,int>& A, const Prec<float>& M,
-     DMat<float>& x, DMat<float>& b, float rtol, float atol,
+     DMat<float>& x, const DMat<float>& b, float rtol, float atol,
      int& totit, int maxit, bool non_zero_guess, bool verbose);
     template void IterativeRefinementMPI
     (const MPIComm& comm, const SpMat<double,int>& A, const Prec<double>& M,
-     DMat<double>& x, DMat<double>& b, double rtol, double atol,
+     DMat<double>& x, const DMat<double>& b, double rtol, double atol,
      int& totit, int maxit, bool non_zero_guess, bool verbose);
     template void IterativeRefinementMPI
     (const MPIComm& comm, const SpMat<std::complex<float>,int>& A,
      const Prec<std::complex<float>>& M, DMat<std::complex<float>>& x,
-     DMat<std::complex<float>>& b, float rtol, float atol,
+     const DMat<std::complex<float>>& b, float rtol, float atol,
      int& totit, int maxit, bool non_zero_guess, bool verbose);
     template void IterativeRefinementMPI
     (const MPIComm& comm, const SpMat<std::complex<double>,int>& A,
      const Prec<std::complex<double>>& M, DMat<std::complex<double>>& x,
-     DMat<std::complex<double>>& b, double rtol, double atol,
+     const DMat<std::complex<double>>& b, double rtol, double atol,
      int& totit, int maxit, bool non_zero_guess, bool verbose);
 
     template void IterativeRefinementMPI
     (const MPIComm& comm, const SpMat<float,long int>& A,
-     const Prec<float>& M, DMat<float>& x, DMat<float>& b,
+     const Prec<float>& M, DMat<float>& x, const DMat<float>& b,
      float rtol, float atol, int& totit, int maxit,
      bool non_zero_guess, bool verbose);
     template void IterativeRefinementMPI
     (const MPIComm& comm, const SpMat<double,long int>& A,
-     const Prec<double>& M, DMat<double>& x, DMat<double>& b,
+     const Prec<double>& M, DMat<double>& x, const DMat<double>& b,
      double rtol, double atol, int& totit, int maxit,
      bool non_zero_guess, bool verbose);
     template void IterativeRefinementMPI
     (const MPIComm& comm, const SpMat<std::complex<float>,long int>& A,
      const Prec<std::complex<float>>& M, DMat<std::complex<float>>& x,
-     DMat<std::complex<float>>& b, float rtol, float atol,
+     const DMat<std::complex<float>>& b, float rtol, float atol,
      int& totit, int maxit, bool non_zero_guess, bool verbose);
     template void IterativeRefinementMPI
     (const MPIComm& comm, const SpMat<std::complex<double>,long int>& A,
      const Prec<std::complex<double>>& M, DMat<std::complex<double>>& x,
-     DMat<std::complex<double>>& b, double rtol, double atol,
+     const DMat<std::complex<double>>& b, double rtol, double atol,
      int& totit, int maxit, bool non_zero_guess, bool verbose);
 
     template void IterativeRefinementMPI
     (const MPIComm& comm, const SpMat<float,long long int>& A,
-     const Prec<float>& M, DMat<float>& x, DMat<float>& b,
+     const Prec<float>& M, DMat<float>& x, const DMat<float>& b,
      float rtol, float atol, int& totit, int maxit,
      bool non_zero_guess, bool verbose);
     template void IterativeRefinementMPI
     (const MPIComm& comm, const SpMat<double,long long int>& A,
-     const Prec<double>& M, DMat<double>& x, DMat<double>& b,
+     const Prec<double>& M, DMat<double>& x, const DMat<double>& b,
      double rtol, double atol, int& totit, int maxit,
      bool non_zero_guess, bool verbose);
     template void IterativeRefinementMPI
     (const MPIComm& comm, const SpMat<std::complex<float>,long long int>& A,
      const Prec<std::complex<float>>& M, DMat<std::complex<float>>& x,
-     DMat<std::complex<float>>& b, float rtol, float atol,
+     const DMat<std::complex<float>>& b, float rtol, float atol,
      int& totit, int maxit, bool non_zero_guess, bool verbose);
     template void IterativeRefinementMPI
     (const MPIComm& comm, const SpMat<std::complex<double>,long long int>& A,
      const Prec<std::complex<double>>& M, DMat<std::complex<double>>& x,
-     DMat<std::complex<double>>& b, double rtol, double atol,
+     const DMat<std::complex<double>>& b, double rtol, double atol,
      int& totit, int maxit, bool non_zero_guess, bool verbose);
 
   } // end namespace iterative

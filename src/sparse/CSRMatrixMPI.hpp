@@ -266,6 +266,21 @@ namespace strumpack {
     using CSM_t::symm_sparse_;
   };
 
+  /**
+   * Creates a copy of a matrix templated on cast_t and
+   * integer_t. Original matrix is unmodified.
+   *
+   * \tparam scalar_t value type of original matrix
+   * \tparam integer_t integer type of original matrix
+   * \tparam cast_t value type of returned matrix
+   *
+   * \param mat const CSRMatrix<scalar_t,integer_t>&, const ref. of
+   * input matrix.
+   */
+  template<typename scalar_t, typename integer_t, typename cast_t>
+  CSRMatrixMPI<cast_t,integer_t>
+  cast_matrix(const CSRMatrixMPI<scalar_t,integer_t>& mat);
+
 } // end namespace strumpack
 
 #endif // STRUMPACK_CSRMATRIX_MPI_HPP

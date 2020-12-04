@@ -39,8 +39,8 @@ int main(int argc, char* argv[]) {
   int n = 30, m = 1;
   if (argc > 1) n = atoi(argv[1]); // get grid size
   else std::cout << "# please provide grid size" << std::endl;
-  if (argc > 2) m = atoi(argv[2]); // get number of rhs
-  else std::cout << "# please provide number of right-hand sides" << std::endl;
+  // if (argc > 2) m = atoi(argv[2]); // get number of rhs
+  // else std::cout << "# please provide number of right-hand sides" << std::endl;
 
   std::cout << "# Solving 3d " << n
             <<"^3 Poisson problem, with " << m << " right hand sides"

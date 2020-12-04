@@ -92,8 +92,8 @@ namespace strumpack {
      * \param verb Flag to suppres/enable output.  Only the root of
      * comm will print to stdout.
      */
-    SparseSolverMPIDist
-    (MPI_Comm comm, int argc, char* argv[], bool verbose=true);
+    SparseSolverMPIDist(MPI_Comm comm, int argc, char* argv[],
+                        bool verbose=true);
 
     /**
      * Constructor of the SparseSolver class. This routine is
@@ -284,6 +284,12 @@ namespace strumpack {
      * \return MPI_Comm object for this solver.
      */
     MPI_Comm comm() const;
+
+    /**
+     * Return the const MPIComm object associated with this solver.
+     * \return MPIComm object for this solver.
+     */
+    const MPIComm& Comm() const { return comm_; }
 
   private:
     using SparseSolverBase<scalar_t,integer_t>::is_root_;
