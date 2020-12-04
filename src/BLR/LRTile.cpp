@@ -50,8 +50,8 @@ namespace strumpack {
     (const DenseM_t& T, const Opts_t& opts) {
       if (opts.low_rank_algorithm() == LowRankAlgorithm::RRQR) {
         if (T.rows() == 0 || T.cols() == 0) {
-           U_ = DenseM_t(T.rows(), 0);
-           V_ = DenseM_t(0, T.cols());
+          U_ = DenseM_t(T.rows(), 0);
+          V_ = DenseM_t(0, T.cols());
         } else
           T.low_rank(U_, V_, opts.rel_tol(), opts.abs_tol(), opts.max_rank(),
                      params::task_recursion_cutoff_level);

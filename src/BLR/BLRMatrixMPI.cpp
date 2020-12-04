@@ -261,7 +261,7 @@ namespace strumpack {
     BLRMatrixMPI<scalar_t>::bcast_row_of_tiles_along_cols
     (std::size_t i, std::size_t j0, std::size_t j1) const {
       int src = i % grid()->nprows();
-      std::size_t msg_size = 0, nr_tiles = 0;;
+      std::size_t msg_size = 0, nr_tiles = 0;
       std::vector<std::int64_t> ranks;
       if (grid()->is_local_row(i)) {
         for (std::size_t j=j0; j<j1; j++)
@@ -288,7 +288,7 @@ namespace strumpack {
         for (std::size_t j=j0; j<j1; j++)
           if (grid()->is_local_col(j)) {
             auto& t = tile(i, j);
-            if (tile(i, j).is_low_rank()) {
+            if (t.is_low_rank()) {
               std::copy(t.U().data(), t.U().end(), ptr);
               ptr += t.U().rows()*t.U().cols();
               std::copy(t.V().data(), t.V().end(), ptr);
@@ -326,7 +326,7 @@ namespace strumpack {
     BLRMatrixMPI<scalar_t>::bcast_col_of_tiles_along_rows
     (std::size_t i0, std::size_t i1, std::size_t j) const {
       int src = j % grid()->npcols();
-      std::size_t msg_size = 0, nr_tiles = 0;;
+      std::size_t msg_size = 0, nr_tiles = 0;
       std::vector<std::int64_t> ranks;
       if (grid()->is_local_col(j)) {
         for (std::size_t i=i0; i<i1; i++)
@@ -353,7 +353,7 @@ namespace strumpack {
         for (std::size_t i=i0; i<i1; i++)
           if (grid()->is_local_row(i)) {
             auto& t = tile(i, j);
-            if (tile(i, j).is_low_rank()) {
+            if (t.is_low_rank()) {
               std::copy(t.U().data(), t.U().end(), ptr);
               ptr += t.U().rows()*t.U().cols();
               std::copy(t.V().data(), t.V().end(), ptr);

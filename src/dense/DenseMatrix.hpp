@@ -243,7 +243,10 @@ namespace strumpack {
      * Pointer to the element after the last one in this matrix.
      * end() == data() + size()
      */
-    inline const scalar_t* end() const { return data_ + ld_ * cols_; }
+    inline const scalar_t* end() const {
+      if (rows_ == 0 || cols_ == 0) return data_;
+      return data_ + ld_ * cols_;
+    }
 
     /**
      * Const reference to element (i,j) in the matrix. This will do a
