@@ -37,6 +37,10 @@
 #include "BLRTile.hpp"
 
 namespace strumpack {
+
+  // forward declaration
+  template<typename scalar_t,typename integer_t> class ExtendAdd;
+
   namespace BLR {
 
     class ProcessorGrid2D {
@@ -273,6 +277,8 @@ namespace strumpack {
       template<typename T> friend void
       gemm(Trans ta, Trans tb, T alpha, const BLRMatrixMPI<T>& a,
            const BLRMatrixMPI<T>& b, T beta, BLRMatrixMPI<T>& c);
+
+      template<typename T,typename I> friend class strumpack::ExtendAdd;
     };
 
 

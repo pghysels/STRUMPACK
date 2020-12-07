@@ -37,10 +37,14 @@ namespace strumpack {
   // forward declarations
   template<typename scalar_t,typename integer_t> class FrontalMatrix;
   template<typename scalar_t,typename integer_t> class FrontalMatrixMPI;
+  namespace BLR {
+    template<typename scalar_t> class BLRMatrixMPI;
+  }
 
   template<typename scalar_t,typename integer_t> class ExtendAdd {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
+    using BLRMPI_t = BLR::BLRMatrixMPI<scalar_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
     using VI_t = std::vector<std::size_t>;
@@ -127,6 +131,14 @@ namespace strumpack {
     static void extract_copy_from_buffers
     (DistM_t& F, const VI_t& I, const VI_t& J, const VI_t& oI, const VI_t& oJ,
      const DistM_t& B, std::vector<scalar_t*>& pbuf);
+
+    static void extract_copy_to_buffers
+    (const BLRMPI_t& F, const VI_t& I, const VI_t& J, const VI_t& oI,
+     const VI_t& oJ, const DistM_t& B, VVS_t& sbuf);
+
+    static void extract_copy_from_buffers
+    (DistM_t& F, const VI_t& I, const VI_t& J, const VI_t& oI, const VI_t& oJ,
+     const BLRMPI_t& B, std::vector<scalar_t*>& pbuf);
   };
 
   // forward declaration

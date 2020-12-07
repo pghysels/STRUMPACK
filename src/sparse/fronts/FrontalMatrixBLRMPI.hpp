@@ -46,6 +46,7 @@ namespace strumpack {
     using FBLRMPI_t = FrontalMatrixBLRMPI<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using Opts_t = SPOptions<scalar_t>;
+    using VecVec_t = std::vector<std::vector<std::size_t>>;
 
   public:
     FrontalMatrixBLRMPI
@@ -79,17 +80,13 @@ namespace strumpack {
     (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
      int etree_level=0) const override;
 
-    void sample_CB
-    (const DistM_t& R, DistM_t& Sr, DistM_t& Sc, F_t* pa) const override {
+    void sample_CB(const DistM_t& R, DistM_t& Sr, DistM_t& Sc,
+                   F_t* pa) const override {
       std::cout << "FrontalMatrixBLRMPI::sample_CB TODO" << std::endl;
     }
 
-    void extract_CB_sub_matrix_2d
-    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-     DistM_t& B) const override {
-      std::cout << "TODO FrontalMatrixBLRMPI::extract_CB_sub_matrix_2d"
-                << std::endl;
-    }
+    void extract_CB_sub_matrix_2d(const VecVec_t& I, const VecVec_t& J,
+                                  std::vector<DistM_t>& B) const override;
 
     std::string type() const override { return "FrontalMatrixBLRMPI"; }
 

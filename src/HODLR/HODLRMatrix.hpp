@@ -465,10 +465,10 @@ namespace strumpack {
        */
       long long int inv_mult(Trans op, const DenseM_t& B, DenseM_t& X) const;
 
-      void extract_elements
-      (const VecVec_t& I, const VecVec_t& J, std::vector<DistM_t>& B);
-      void extract_elements
-      (const VecVec_t& I, const VecVec_t& J, std::vector<DenseM_t>& B);
+      void extract_elements(const VecVec_t& I, const VecVec_t& J,
+                            std::vector<DistM_t>& B);
+      void extract_elements(const VecVec_t& I, const VecVec_t& J,
+                            std::vector<DenseM_t>& B);
 
       /**
        * Extract a submatrix defined by index sets I (rows) and J

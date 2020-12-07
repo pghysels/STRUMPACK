@@ -49,46 +49,45 @@ namespace strumpack {
     using VecVec_t = std::vector<std::vector<std::size_t>>;
 
   public:
-    FrontalMatrixHODLRMPI
-    (integer_t sep, integer_t sep_begin, integer_t sep_end,
-     std::vector<integer_t>& upd, const MPIComm& comm, int _total_procs);
+    FrontalMatrixHODLRMPI(integer_t sep, integer_t sep_begin,
+                          integer_t sep_end, std::vector<integer_t>& upd,
+                          const MPIComm& comm, int _total_procs);
+
     FrontalMatrixHODLRMPI(const FrontalMatrixHODLRMPI&) = delete;
+
     FrontalMatrixHODLRMPI& operator=(FrontalMatrixHODLRMPI const&) = delete;
 
     void release_work_memory() override;
 
-    void sample_CB
-    (Trans op, const DistM_t& R, DistM_t& S, F_t* pa) const override;
+    void sample_CB(Trans op, const DistM_t& R, DistM_t& S,
+                   F_t* pa) const override;
     void sample_children_CB(Trans op, const DistM_t& R, DistM_t& S);
 
     void skinny_extend_add(DistM_t& cSl, DistM_t& cSr, DistM_t& S);
 
-    void extend_add_copy_to_buffers
-    (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const override;
+    void extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
+                                    const FMPI_t* pa) const override;
 
-    void multifrontal_factorization
-    (const SpMat_t& A, const Opts_t& opts,
-     int etree_level=0, int task_depth=0) override;
+    void multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
+                                    int etree_level=0, int task_depth=0)
+      override;
 
-    void forward_multifrontal_solve
-    (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
-     int etree_level=0) const override;
-    void backward_multifrontal_solve
-    (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
-     int etree_level=0) const override;
+    void forward_multifrontal_solve(DenseM_t& bloc, DistM_t* bdist,
+                                    DistM_t& bupd, DenseM_t& seqbupd,
+                                    int etree_level=0) const override;
+    void backward_multifrontal_solve(DenseM_t& yloc, DistM_t* ydist,
+                                     DistM_t& yupd, DenseM_t& seqyupd,
+                                     int etree_level=0) const override;
 
     long long node_factor_nonzeros() const override;
     integer_t front_rank(int task_depth=0) const override;
     std::string type() const override { return "FrontalMatrixHODLRMPI"; }
 
-    void extract_CB_sub_matrix_2d
-    (const std::vector<std::vector<std::size_t>>& I,
-     const std::vector<std::vector<std::size_t>>& J,
-     std::vector<DistM_t>& B) const override;
+    void extract_CB_sub_matrix_2d(const VecVec_t& I, const VecVec_t& J,
+                                  std::vector<DistM_t>& B) const override;
 
-    void partition
-    (const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
-     bool is_root=true, int task_depth=0) override;
+    void partition(const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
+                   bool is_root=true, int task_depth=0) override;
 
   private:
     HODLR::HODLRMatrix<scalar_t> F11_;

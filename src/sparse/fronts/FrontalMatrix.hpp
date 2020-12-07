@@ -79,9 +79,9 @@ namespace strumpack {
 #endif
 
   public:
-    FrontalMatrix
-    (F_t* lchild, F_t* rchild, integer_t sep, integer_t sep_begin,
-     integer_t sep_end, std::vector<integer_t>& upd);
+    FrontalMatrix(F_t* lchild, F_t* rchild,
+                  integer_t sep, integer_t sep_begin,
+                  integer_t sep_end, std::vector<integer_t>& upd);
     virtual ~FrontalMatrix() = default;
 
     integer_t sep_begin() const { return sep_begin_; }

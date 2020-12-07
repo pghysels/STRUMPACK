@@ -270,6 +270,31 @@ namespace strumpack {
     }
   }
 
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixBLRMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
+  (const VecVec_t& I, const VecVec_t& J, std::vector<DistM_t>& B) const {
+    auto nB = I.size();
+    std::vector<std::vector<std::size_t>> lI(nB), lJ(nB), oI(nB), oJ(nB);
+    std::vector<std::vector<scalar_t>> sbuf(this->P());
+    using ExtAdd = ExtendAdd<scalar_t,integer_t>;
+    for (std::size_t i=0; i<nB; i++) {
+      this->find_upd_indices(I[i], lI[i], oI[i]);
+      this->find_upd_indices(J[i], lJ[i], oJ[i]);
+      ExtAdd::extract_copy_to_buffers
+        (F22blr_, lI[i], lJ[i], oI[i], oJ[i], B[i], sbuf);
+    }
+    std::vector<scalar_t,NoInit<scalar_t>> rbuf;
+    std::vector<scalar_t*> pbuf;
+    {
+      TIMER_TIME(TaskType::GET_SUBMATRIX_2D_A2A, 2, t_a2a);
+      Comm().all_to_all_v(sbuf, rbuf, pbuf);
+    }
+    for (std::size_t i=0; i<nB; i++)
+      ExtAdd::extract_copy_from_buffers
+        (B[i], lI[i], lJ[i], oI[i], oJ[i], F22blr_, pbuf);
+  }
+
+
   // explicit template instantiations
   template class FrontalMatrixBLRMPI<float,int>;
   template class FrontalMatrixBLRMPI<double,int>;

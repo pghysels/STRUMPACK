@@ -30,6 +30,7 @@
 #include "ExtendAdd.hpp"
 #include "FrontalMatrix.hpp"
 #include "FrontalMatrixMPI.hpp"
+#include "BLR/BLRMatrixMPI.hpp"
 
 #include "sparse/CompressedSparseMatrix.hpp"
 
@@ -776,34 +777,31 @@ namespace strumpack {
   }
 
 
-  // TODO optimize loops!!
   template<typename scalar_t,typename integer_t> void
   ExtendAdd<scalar_t,integer_t>::extract_copy_to_buffers
   (const DistM_t& F, const VI_t& I, const VI_t& J, const VI_t& oI,
    const VI_t& oJ, const DistM_t& B, VVS_t& sbuf) {
     if (!F.active()) return;
-    if (F.fixed()) {
-      for (std::size_t c=0; c<J.size(); c++) {
-        auto gc = J[c];
-        if (F.colg2p_fixed(gc) != F.pcol()) continue;
-        auto lc = F.colg2l_fixed(gc);
-        for (std::size_t r=0; r<I.size(); r++) {
-          auto gr = I[r];
-          if (F.rowg2p_fixed(gr) == F.prow())
-            sbuf[B.rank_fixed(oI[r],oJ[c])].
-              push_back(F(F.rowg2l_fixed(gr),lc));
-        }
-      }
-    } else {
-      for (std::size_t c=0; c<J.size(); c++) {
-        auto gc = J[c];
-        if (F.colg2p(gc) != F.pcol()) continue;
-        auto lc = F.colg2l(gc);
-        for (std::size_t r=0; r<I.size(); r++) {
-          auto gr = I[r];
-          if (F.rowg2p(gr) == F.prow())
-            sbuf[B.rank(oI[r],oJ[c])].push_back(F(F.rowg2l(gr),lc));
-        }
+    assert(F.fixed() && B.fixed());
+    auto prow = F.prow();
+    auto pcol = F.pcol();
+    auto nprows = B.nprows();
+    std::unique_ptr<int[]> pr(new int[2*I.size()]);
+    auto lr = pr.get() + I.size();
+    for (std::size_t r=0; r<I.size(); r++) {
+      pr[r] = B.rowg2p_fixed(oI[r]);
+      auto gr = I[r];
+      lr[r] = (F.rowg2p_fixed(gr) == prow) ?
+        F.rowg2l_fixed(gr) : -1;
+    }
+    for (std::size_t c=0; c<J.size(); c++) {
+      auto gc = J[c];
+      if (F.colg2p_fixed(gc) != pcol) continue;
+      auto lc = F.colg2l_fixed(gc);
+      auto pc = nprows * B.colg2p_fixed(oJ[c]);
+      for (std::size_t r=0; r<I.size(); r++) {
+        if (lr[r] == -1) continue;
+        sbuf[pr[r]+pc].push_back(F(lr[r],lc));
       }
     }
   }
@@ -813,33 +811,92 @@ namespace strumpack {
   (DistM_t& F, const VI_t& I, const VI_t& J, const VI_t& oI, const VI_t& oJ,
    const DistM_t& B, std::vector<scalar_t*>& pbuf) {
     if (!F.active()) return;
-    if (F.fixed()) {
-      for (std::size_t c=0; c<oJ.size(); c++) {
-        auto gc = oJ[c];
-        if (F.colg2p_fixed(gc) != F.pcol()) continue;
-        auto lc = F.colg2l_fixed(gc);
-        for (std::size_t r=0; r<oI.size(); r++) {
-          auto gr = oI[r];
-          if (F.rowg2p_fixed(gr) == F.prow())
-            F(F.rowg2l_fixed(gr),lc) += *(pbuf[B.rank_fixed(I[r], J[c])]++);
-        }
-      }
-    } else {
-      for (std::size_t c=0; c<oJ.size(); c++) {
-        auto gc = oJ[c];
-        if (F.colg2p(gc) != F.pcol()) continue;
-        auto lc = F.colg2l(gc);
-        for (std::size_t r=0; r<oI.size(); r++) {
-          auto gr = oI[r];
-          if (F.rowg2p(gr) == F.prow())
-            F(F.rowg2l(gr),lc) += *(pbuf[B.rank(I[r], J[c])]++);
-        }
+    assert(F.fixed() && B.fixed());
+    auto prow = F.prow();
+    auto pcol = F.pcol();
+    auto nprows = B.nprows();
+    std::unique_ptr<int[]> pr(new int[2*I.size()]);
+    auto lr = pr.get() + I.size();
+    for (std::size_t r=0; r<I.size(); r++) {
+      pr[r] = B.rowg2p_fixed(I[r]);
+      auto gr = oI[r];
+      lr[r] = (F.rowg2p_fixed(gr) == prow) ?
+        F.rowg2l_fixed(oI[r]) : -1;
+    }
+    for (std::size_t c=0; c<oJ.size(); c++) {
+      auto gc = oJ[c];
+      if (F.colg2p_fixed(gc) != pcol) continue;
+      auto pc = nprows * B.colg2p_fixed(J[c]);
+      auto lc = F.colg2l_fixed(gc);
+      for (std::size_t r=0; r<oI.size(); r++) {
+        if (lr[r] == -1) continue;
+        F(lr[r],lc) += *(pbuf[pr[r]+pc]++);
       }
     }
   }
 
+  template<typename scalar_t,typename integer_t> void
+  ExtendAdd<scalar_t,integer_t>::extract_copy_to_buffers
+  (const BLRMPI_t& F, const VI_t& I, const VI_t& J,
+   const VI_t& oI, const VI_t& oJ, const DistM_t& B, VVS_t& sbuf) {
+    if (!F.active()) return;
+    assert(B.fixed());
+    auto pcol = F.grid()->pcol();
+    auto prow = F.grid()->prow();
+    auto nprows = B.nprows();
+    std::unique_ptr<int[]> tr(new int[3*I.size()]);
+    auto lr = tr.get() + I.size();
+    auto pr = lr + I.size();
+    for (std::size_t r=0; r<I.size(); r++) {
+      auto gr = I[r];
+      if (F.rg2p(gr) == prow) {
+        auto t = F.rg2t(gr);
+        tr[r] = F.tilerg2l(t);
+        lr[r] = gr - F.tileroff(t);
+        pr[r] = B.rowg2p_fixed(oI[r]);
+      } else lr[r] = -1;
+    }
+    for (std::size_t c=0; c<J.size(); c++) {
+      auto gc = J[c];
+      if (F.cg2p(gc) != pcol) continue;
+      auto tc = F.cg2t(gc);
+      auto lc = gc - F.tilecoff(tc);
+      tc = F.tilecg2l(tc);
+      auto pc = nprows * B.colg2p_fixed(oJ[c]);
+      for (std::size_t r=0; r<I.size(); r++)
+        if (lr[r] != -1)
+          sbuf[pr[r]+pc].push_back(F.ltile_dense(tr[r],tc).D()(lr[r],lc));
+    }
+  }
 
-
+  template<typename scalar_t,typename integer_t> void
+  ExtendAdd<scalar_t,integer_t>::extract_copy_from_buffers
+  (DistM_t& F, const VI_t& I, const VI_t& J, const VI_t& oI, const VI_t& oJ,
+   const BLRMPI_t& B, std::vector<scalar_t*>& pbuf) {
+    if (!F.active()) return;
+    assert(F.fixed());
+    auto pcol = F.pcol();
+    auto prow = F.prow();
+    auto nprows = B.grid()->nprows();
+    std::unique_ptr<int[]> lr(new int[2*I.size()]);
+    auto pr = lr.get() + I.size();
+    for (std::size_t r=0; r<I.size(); r++) {
+      auto gr = oI[r];
+      if (F.rowg2p_fixed(gr) == prow) {
+        lr[r] = F.rowg2l_fixed(gr);
+        pr[r] = B.grid()->rg2p(B.rg2t(I[r]));
+      } else lr[r] = -1;
+    }
+    for (std::size_t c=0; c<oJ.size(); c++) {
+      auto gc = oJ[c];
+      if (F.colg2p_fixed(gc) != pcol) continue;
+      auto lc = F.colg2l_fixed(gc);
+      auto pc = nprows * B.cg2p(B.cg2t(J[c]));
+      for (std::size_t r=0; r<oI.size(); r++)
+        if (lr[r] != -1)
+          F(lr[r], lc) += *(pbuf[pr[r]+pc]++);
+    }
+  }
 
   template<typename scalar_t,typename integer_t> void
   ExtractFront<scalar_t,integer_t>::extract_F11
