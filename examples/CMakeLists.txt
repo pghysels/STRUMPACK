@@ -10,6 +10,7 @@ add_executable(dexample           EXCLUDE_FROM_ALL dexample.c)
 add_executable(cexample           EXCLUDE_FROM_ALL cexample.c)
 add_executable(zexample           EXCLUDE_FROM_ALL zexample.c)
 add_executable(fexample           EXCLUDE_FROM_ALL fexample.f90)
+set_target_properties(fexample PROPERTIES LINKER_LANGUAGE Fortran)
 
 target_link_libraries(testPoisson2d strumpack)
 target_link_libraries(testMMdouble strumpack)
