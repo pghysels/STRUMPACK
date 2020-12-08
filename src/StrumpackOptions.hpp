@@ -569,6 +569,22 @@ namespace strumpack {
       hodlr_min_sep_size_ = s;
       lossy_min_sep_size_ = s;
     }
+    void set_hss_min_sep_size(int s) {
+      assert(s >= 0);
+      hss_min_sep_size_ = s;
+    }
+    void set_hodlr_min_sep_size(int s) {
+      assert(s >= 0);
+      hodlr_min_sep_size_ = s;
+    }
+    void set_blr_min_sep_size(int s) {
+      assert(s >= 0);
+      blr_min_sep_size_ = s;
+    }
+    void set_lossy_min_sep_size(int s) {
+      assert(s >= 0);
+      lossy_min_sep_size_ = s;
+    }
 
     /**
      * Set the minimum size of frontal matrices (dense submatrices of
@@ -584,6 +600,22 @@ namespace strumpack {
       hss_min_front_size_ = s;
       blr_min_front_size_ = s;
       hodlr_min_front_size_ = s;
+      lossy_min_front_size_ = s;
+    }
+    void set_hss_min_front_size(int s) {
+      assert(s >= 0);
+      hss_min_front_size_ = s;
+    }
+    void set_hodlr_min_front_size(int s) {
+      assert(s >= 0);
+      hodlr_min_front_size_ = s;
+    }
+    void set_blr_min_front_size(int s) {
+      assert(s >= 0);
+      blr_min_front_size_ = s;
+    }
+    void set_lossy_min_front_size(int s) {
+      assert(s >= 0);
       lossy_min_front_size_ = s;
     }
 
@@ -828,7 +860,7 @@ namespace strumpack {
      *
      * \see set_compression_rel_tol, set_lossy_compression
      */
-    real_t compression_rel_tol() const {
+    real_t compression_rel_tol(int l=0) const {
       switch (comp_) {
       case CompressionType::HSS:
         return hss_opts_.rel_tol();
@@ -837,7 +869,8 @@ namespace strumpack {
       case CompressionType::HODLR:
         return hodlr_opts_.rel_tol();
       case CompressionType::BLR_HODLR:
-        return blr_opts_.rel_tol();
+        if (l==0) return hodlr_opts_.rel_tol();
+        else return blr_opts_.rel_tol();
       case CompressionType::LOSSY:
       case CompressionType::LOSSLESS:
       case CompressionType::NONE:
@@ -897,6 +930,18 @@ namespace strumpack {
         return std::numeric_limits<int>::max();
       }
     }
+    int hss_min_sep_size() const {
+      return hss_min_sep_size_;
+    }
+    int hodlr_min_sep_size() const {
+      return hodlr_min_sep_size_;
+    }
+    int blr_min_sep_size() const {
+      return blr_min_sep_size_;
+    }
+    int lossy_min_sep_size() const {
+      return lossy_min_sep_size_;
+    }
 
     /**
      * Get the minimum size of a front to enable compression. This
@@ -923,6 +968,18 @@ namespace strumpack {
       default:
         return std::numeric_limits<int>::max();
       }
+    }
+    int hss_min_front_size() const {
+      return hss_min_front_size_;
+    }
+    int hodlr_min_front_size() const {
+      return hodlr_min_front_size_;
+    }
+    int blr_min_front_size() const {
+      return blr_min_front_size_;
+    }
+    int lossy_min_front_size() const {
+      return lossy_min_front_size_;
     }
 
     /**

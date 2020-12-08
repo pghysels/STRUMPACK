@@ -153,6 +153,14 @@ namespace strumpack {
        {"sp_disable_gpu",               no_argument, 0, 37},
        {"sp_gpu_streams",               required_argument, 0, 38},
        {"sp_lossy_precision",           required_argument, 0, 39},
+       {"sp_hss_min_sep_size",          required_argument, 0, 40},
+       {"sp_hss_min_front_size",        required_argument, 0, 41},
+       {"sp_hodlr_min_sep_size",        required_argument, 0, 42},
+       {"sp_hodlr_min_front_size",      required_argument, 0, 43},
+       {"sp_blr_min_sep_size",          required_argument, 0, 44},
+       {"sp_blr_min_front_size",        required_argument, 0, 45},
+       {"sp_lossy_min_sep_size",        required_argument, 0, 46},
+       {"sp_lossy_min_front_size",      required_argument, 0, 47},
        {"sp_verbose",                   no_argument, 0, 'v'},
        {"sp_quiet",                     no_argument, 0, 'q'},
        {"help",                         no_argument, 0, 'h'},
@@ -319,6 +327,54 @@ namespace strumpack {
         iss >> lossy_precision_;
         set_lossy_precision(lossy_precision_);
       } break;
+      case 40: {
+        std::istringstream iss(optarg);
+        int min_sep;
+        iss >> min_sep;
+        set_hss_min_sep_size(min_sep);
+      } break;
+      case 41: {
+        std::istringstream iss(optarg);
+        int min_front;
+        iss >> min_front;
+        set_hss_min_front_size(min_front);
+      } break;
+      case 42: {
+        std::istringstream iss(optarg);
+        int min_sep;
+        iss >> min_sep;
+        set_hodlr_min_sep_size(min_sep);
+      } break;
+      case 43: {
+        std::istringstream iss(optarg);
+        int min_front;
+        iss >> min_front;
+        set_hodlr_min_front_size(min_front);
+      } break;
+      case 44: {
+        std::istringstream iss(optarg);
+        int min_sep;
+        iss >> min_sep;
+        set_blr_min_sep_size(min_sep);
+      } break;
+      case 45: {
+        std::istringstream iss(optarg);
+        int min_front;
+        iss >> min_front;
+        set_blr_min_front_size(min_front);
+      } break;
+      case 46: {
+        std::istringstream iss(optarg);
+        int min_sep;
+        iss >> min_sep;
+        set_lossy_min_sep_size(min_sep);
+      } break;
+      case 47: {
+        std::istringstream iss(optarg);
+        int min_front;
+        iss >> min_front;
+        set_lossy_min_front_size(min_front);
+      } break;
       case 'h': { describe_options(); } break;
       case 'v': set_verbose(true); break;
       case 'q': set_verbose(false); break;
@@ -421,6 +477,10 @@ namespace strumpack {
               << compression_min_sep_size() << ")" << std::endl
               << "#          minimum separator size for compression"
               << std::endl;
+    std::cout << "#   --sp_compression_min_front_size (default "
+              << compression_min_front_size() << ")" << std::endl
+              << "#          minimum front size for compression"
+              << std::endl;
     std::cout << "#   --sp_compression_leaf_size (default "
               << compression_leaf_size() << ")" << std::endl
               << "#          leaf size for rank-structured representation"
@@ -442,6 +502,38 @@ namespace strumpack {
               << lossy_precision() << ")" << std::endl
               << "#          lossy compression precision" << std::endl
               << "#          (for lossless use <= 0)" << std::endl;
+    std::cout << "#   --sp_hss_min_sep_size (default "
+              << hss_min_sep_size() << ")" << std::endl
+              << "#          minimum separator size for hss compression"
+              << std::endl;
+    std::cout << "#   --sp_hss_min_front_size (default "
+              << hss_min_front_size() << ")" << std::endl
+              << "#          minimum front size for hss compression"
+              << std::endl;
+    std::cout << "#   --sp_hodlr_min_sep_size (default "
+              << hodlr_min_sep_size() << ")" << std::endl
+              << "#          minimum separator size for hodlr compression"
+              << std::endl;
+    std::cout << "#   --sp_hodlr_min_front_size (default "
+              << hodlr_min_front_size() << ")" << std::endl
+              << "#          minimum front size for hodlr compression"
+              << std::endl;
+    std::cout << "#   --sp_blr_min_sep_size (default "
+              << blr_min_sep_size() << ")" << std::endl
+              << "#          minimum separator size for blr compression"
+              << std::endl;
+    std::cout << "#   --sp_blr_min_front_size (default "
+              << blr_min_front_size() << ")" << std::endl
+              << "#          minimum front size for blr compression"
+              << std::endl;
+    std::cout << "#   --sp_lossy_min_sep_size (default "
+              << lossy_min_sep_size() << ")" << std::endl
+              << "#          minimum separator size for lossy compression"
+              << std::endl;
+    std::cout << "#   --sp_lossy_min_front_size (default "
+              << lossy_min_front_size() << ")" << std::endl
+              << "#          minimum front size for lossy compression"
+              << std::endl;
     std::cout << "#   --sp_verbose or -v (default " << verbose() << ")"
               << std::endl;
     std::cout << "#   --sp_quiet or -q (default " << !verbose() << ")"
