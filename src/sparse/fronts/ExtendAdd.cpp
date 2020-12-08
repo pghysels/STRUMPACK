@@ -877,21 +877,22 @@ namespace strumpack {
     assert(F.fixed());
     auto pcol = F.pcol();
     auto prow = F.prow();
-    auto nprows = B.grid()->nprows();
+    auto g = B.grid();
+    auto nprows = g->nprows();
     std::unique_ptr<int[]> lr(new int[2*I.size()]);
     auto pr = lr.get() + I.size();
     for (std::size_t r=0; r<I.size(); r++) {
       auto gr = oI[r];
       if (F.rowg2p_fixed(gr) == prow) {
         lr[r] = F.rowg2l_fixed(gr);
-        pr[r] = B.grid()->rg2p(B.rg2t(I[r]));
+        pr[r] = g->rg2p(B.rg2t(I[r]));
       } else lr[r] = -1;
     }
     for (std::size_t c=0; c<oJ.size(); c++) {
       auto gc = oJ[c];
       if (F.colg2p_fixed(gc) != pcol) continue;
       auto lc = F.colg2l_fixed(gc);
-      auto pc = nprows * B.cg2p(B.cg2t(J[c]));
+      auto pc = nprows * g->cg2p(B.cg2t(J[c]));
       for (std::size_t r=0; r<oI.size(); r++)
         if (lr[r] != -1)
           F(lr[r], lc) += *(pbuf[pr[r]+pc]++);
