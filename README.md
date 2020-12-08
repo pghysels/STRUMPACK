@@ -21,6 +21,7 @@ the U.S. Dept. of Energy).  All rights reserved.
  - Xiaoye S. Li - xsli@lbl.gov
  - Yang Liu - liuyangzhuan@lbl.gov
  - Lisa Claus - LClaus@lbl.gov
+ - Michael Neuder - Harvard
 
 ## Past contributors
  - Lucy Guo
