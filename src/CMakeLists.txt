@@ -10,8 +10,6 @@ target_sources(strumpack
   ${CMAKE_CURRENT_LIST_DIR}/SparseSolver.cpp
   ${CMAKE_CURRENT_LIST_DIR}/SparseSolverMixedPrecision.cpp
   ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverMixedPrecision.hpp
-  ${CMAKE_CURRENT_LIST_DIR}/SparseSolverMixedPrecisionMPIDist.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverMixedPrecisionMPIDist.hpp
   ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverC.cpp
   ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolver.h)
 
@@ -28,10 +26,13 @@ if(STRUMPACK_USE_MPI)
   target_sources(strumpack
     PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/SparseSolverMPIDist.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverMPIDist.hpp)
+    ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverMPIDist.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/SparseSolverMixedPrecisionMPIDist.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/StrumpackSparseSolverMixedPrecisionMPIDist.hpp)
 
   install(FILES
     StrumpackSparseSolverMPIDist.hpp
+    StrumpackSparseSolverMixedPrecisionMPIDist.hpp
     DESTINATION include)
 endif()
 
