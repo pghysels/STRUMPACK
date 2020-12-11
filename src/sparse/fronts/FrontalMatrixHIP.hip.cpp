@@ -35,7 +35,7 @@
 #include <iostream>
 
 // is thrust available on ROCm?
-// #include <thrust/complex.h>
+//#include <thrust/complex.h>
 
 // this is valid for compute capability 3.5 -> 8.0 (and beyond?)
 //const unsigned int MAX_BLOCKS_X = 4294967295; // 2^32-1
@@ -72,6 +72,12 @@ namespace strumpack {
      */
     template<class T> struct cuda_type { typedef T value_type; };
     // template<class T> struct cuda_type<std::complex<T>> { typedef thrust::complex<T> value_type; };
+
+
+    __device__ float real(float& a) { return a; }
+    __device__ double real(double& a) { return a; }
+    __device__ float real(std::complex<float>& a) { return a.real(); }
+    __device__ double real(std::complex<double>& a) { return a.real(); }
 
 
     /**
@@ -331,13 +337,6 @@ namespace strumpack {
       return info;
     }
 
-    __device__ float real_part(float& a) { return a; }
-    __device__ double real_part(double& a) { return a; }
-    // __device__ float real_part(thrust::complex<float>& a) { return a.real(); }
-    // __device__ double real_part(thrust::complex<double>& a) { return a.real(); }
-    __device__ float real_part(std::complex<float>& a) { return a.real(); }
-    __device__ double real_part(std::complex<double>& a) { return a.real(); }
-
     template<typename T, int NT, typename real_t> __global__ void
     LU_block_kernel_batched(FrontData<T>* dat, bool replace, real_t thresh) {
       FrontData<T>& A = dat[hipBlockIdx_x];
@@ -347,7 +346,7 @@ namespace strumpack {
         if (i == j && i < A.n1) {
           std::size_t k = i + i*A.n1;
           if (abs(A.F11[k]) < thresh)
-            A.F11[k] = (real_part(A.F11[k]) < 0) ? -thresh : thresh;
+            A.F11[k] = (gpu::real(A.F11[k]) < 0) ? -thresh : thresh;
         }
       }
     }
@@ -359,7 +358,7 @@ namespace strumpack {
       if (i < n) {
         std::size_t k = i + i*n;
         if (abs(A[k]) < thresh)
-          A[k] = (real_part(A[k]) < 0) ? -thresh : thresh;
+          A[k] = (gpu::real(A[k]) < 0) ? -thresh : thresh;
       }
     }
 
