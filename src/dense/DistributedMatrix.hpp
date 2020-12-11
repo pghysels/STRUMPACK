@@ -379,6 +379,7 @@ namespace strumpack {
   template<typename scalar_t> long long int
   gemv_flops(Trans ta, const DistributedMatrix<scalar_t>& a,
              scalar_t alpha, scalar_t beta) {
+    if (!a.is_master()) return 0;
     auto m = (ta==Trans::N) ? a.rows() : a.cols();
     auto n = (ta==Trans::N) ? a.cols() : a.rows();
     return (is_complex<scalar_t>() ? 4:1) *
