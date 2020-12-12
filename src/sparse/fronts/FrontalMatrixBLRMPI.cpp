@@ -149,6 +149,8 @@ namespace strumpack {
     if (visit(rchild_))
       rchild_->multifrontal_factorization
         (A, opts, etree_level+1, task_depth);
+    TaskTimer t("FrontalMatrixBLRMPI_factor");
+    if (/*etree_level == 0 && */opts.print_root_front_stats()) t.start();
     build_front(A);
     extend_add();
     if (lchild_) lchild_->release_work_memory();
@@ -159,6 +161,13 @@ namespace strumpack {
           (F11blr_, F12blr_, F21blr_, F22blr_, adm_, opts.BLR_options());
       else piv_ = F11blr_.factor(adm_, opts.BLR_options());
       // TODO flops?
+    }
+    if (/*etree_level == 0 && */opts.print_root_front_stats()) {
+      auto time = t.elapsed();
+      if (Comm().is_root())
+        std::cout << "#   - BLRMPI front: Nsep= " << dim_sep()
+                  << ", Nupd= " << dim_upd()
+                  << " , time= " << time << " sec" << std::endl;
     }
   }
 
