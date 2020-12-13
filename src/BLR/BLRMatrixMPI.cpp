@@ -34,6 +34,7 @@
 #include "BLRMatrixMPI.hpp"
 #include "BLRTileBLAS.hpp"
 #include "misc/Tools.hpp"
+#include "misc/TaskTimer.hpp"
 
 namespace strumpack {
   namespace BLR {
@@ -861,8 +862,64 @@ namespace strumpack {
     gemv(Trans ta, scalar_t alpha, const BLRMatrixMPI<scalar_t>& a,
          const BLRMatrixMPI<scalar_t>& x, scalar_t beta,
          BLRMatrixMPI<scalar_t>& y) {
-      // std::cout << "TODO gemv" << std::endl;
+#if 0
       gemm(ta, Trans::N, alpha, a, x, beta, y);
+#else
+      if (!a.active()) return;
+      if (ta != Trans::N) {
+        std::cerr << "gemv BLRMPI operations not implemented" << std::endl;
+        abort();
+      }
+      using DenseM_t = DenseMatrix<scalar_t>;
+      using DenseMW_t = DenseMatrixWrapper<scalar_t>;
+      auto nbx = x.rowblocks();
+      auto nby = y.rowblocks();
+      auto X = x.bcast_col_of_tiles_along_rows(0, nbx, 0);
+      auto g = x.grid();
+      std::size_t mloc = 0;
+      for (std::size_t i=0; i<nby; i++)
+        if (g->is_local_row(i))
+          mloc += y.tilerows(i);
+      DenseM_t Yloc(mloc, y.cols());
+      Yloc.zero();
+      for (std::size_t j=0, lj=0; j<nbx; j++) {
+        if (g->is_local_col(j)) {
+          auto m = x.tilerows(j);
+          DenseM_t Xj(m, 1);
+          int src = j % g->nprows();
+          auto& c = g->col_comm();
+          if (c.rank() == src) copy(X[lj++]->D(), Xj);
+          c.broadcast_from(Xj.data(), m, src);
+#pragma omp parallel
+#pragma omp single
+          for (std::size_t i=0, lm=0; i<nby; i++)
+            if (g->is_local_row(i)) {
+              auto m = y.tilerows(i);
+#pragma omp task default(shared) firstprivate(m,lm,i,j)
+              {
+                DenseMW_t Yi(m, y.cols(), Yloc, lm, 0);
+                // TODO use gemv
+                gemm(Trans::N, Trans::N, scalar_t(alpha),
+                     a.tile(i, j), Xj, scalar_t(1.), Yi,
+                     params::task_recursion_cutoff_level);
+              }
+              lm += m;
+            }
+        }
+      }
+      g->row_comm().reduce(Yloc.data(), Yloc.rows()*Yloc.cols(), MPI_SUM);
+      if (g->is_local_col(0))
+#pragma omp parallel
+#pragma omp single
+        for (std::size_t i=0, lm=0; i<nby; i++)
+          if (g->is_local_row(i)) {
+            auto m = y.tilerows(i);
+#pragma omp task default(shared) firstprivate(m,lm,i)
+            y.tile(i, 0).D().scale_and_add
+              (beta, DenseMW_t(m, y.cols(), Yloc, lm, 0));
+            lm += m;
+          }
+#endif
     }
 
     template<typename scalar_t> void
