@@ -888,7 +888,7 @@ namespace strumpack {
           DenseM_t Xj(m, 1);
           int src = j % g->nprows();
           auto& c = g->col_comm();
-          if (c.rank() == src) copy(X[lj++]->D(), Xj);
+          if (c.rank() == src) copy(X[lj]->D(), Xj);
           c.broadcast_from(Xj.data(), m, src);
 #pragma omp parallel
 #pragma omp single
@@ -906,6 +906,7 @@ namespace strumpack {
               lm += m;
             }
         }
+        if (g->is_local_row(j)) lj++;
       }
       g->row_comm().reduce(Yloc.data(), Yloc.rows()*Yloc.cols(), MPI_SUM);
       if (g->is_local_col(0))
