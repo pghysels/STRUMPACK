@@ -389,6 +389,11 @@ namespace strumpack {
       MPI_Isend(const_cast<T*>(sbuf), ssize, mpi_type<T>(),
                 dest, tag, comm_, req);
     }
+    template<typename T>
+    void send(const T* sbuf, std::size_t ssize, int dest, int tag) const {
+      // const_cast is necessary for ancient openmpi version used on Travis
+      MPI_Send(const_cast<T*>(sbuf), ssize, mpi_type<T>(), dest, tag, comm_);
+    }
 
     template<typename T>
     void isend(const T& buf, int dest, int tag, MPI_Request* req) const {
@@ -464,6 +469,14 @@ namespace strumpack {
       // const_cast is necessary for ancient openmpi version used on Travis
       MPI_Irecv(const_cast<T*>(rbuf), rsize, mpi_type<T>(),
                 src, tag, comm_, req);
+    }
+
+    template<typename T>
+    void recv(const T* rbuf, std::size_t rsize, int src, int tag) const {
+      // const_cast is necessary for ancient openmpi version used on Travis
+      MPI_Status stat;
+      MPI_Recv(const_cast<T*>(rbuf), rsize, mpi_type<T>(),
+               src, tag, comm_, &stat);
     }
 
     /**
@@ -543,11 +556,13 @@ namespace strumpack {
      * \param t pointer to array of variables to reduce
      * \param ssize size of array to reduce
      * \param op reduction operator
+     * \param dest where to reduce to
      */
-    template<typename T> void reduce(T* t, int ssize, MPI_Op op) const {
-      if (is_root())
-        MPI_Reduce(MPI_IN_PLACE, t, ssize, mpi_type<T>(), op, 0, comm_);
-      else MPI_Reduce(t, t, ssize, mpi_type<T>(), op, 0, comm_);
+    template<typename T> void
+    reduce(T* t, int ssize, MPI_Op op, int dest=0) const {
+      if (rank() == dest)
+        MPI_Reduce(MPI_IN_PLACE, t, ssize, mpi_type<T>(), op, dest, comm_);
+      else MPI_Reduce(t, t, ssize, mpi_type<T>(), op, dest, comm_);
     }
 
     template<typename T>

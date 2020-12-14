@@ -854,8 +854,97 @@ namespace strumpack {
     template<typename scalar_t> void
     trsv(UpLo ul, Trans ta, Diag d, const BLRMatrixMPI<scalar_t>& a,
          BLRMatrixMPI<scalar_t>& b) {
-      // std::cout << "TODO trsv" << std::endl;
+#if 0
       trsm(Side::L, ul, ta, d, scalar_t(1.), a, b);
+#else
+      if (!a.active()) return;
+      assert(a.rows() == a.cols() && a.cols() == b.rows());
+      using DenseM_t = DenseMatrix<scalar_t>;
+      using DenseMW_t = DenseMatrixWrapper<scalar_t>;
+      auto nb = b.rowblocks();
+      auto g = a.grid();
+      std::size_t nloc = 0;
+      for (std::size_t i=0; i<nb; i++)
+        if (g->is_local_row(i))
+          nloc += b.tilerows(i);
+      DenseM_t Bloc(nloc, b.cols());
+      if (g->is_local_col(0)) {
+        for (std::size_t i=0, lm=0; i<nb; i++)
+          if (g->is_local_row(i)) {
+            copy(b.tile(i, 0).D(), Bloc, lm, 0);
+            lm += b.tilerows(i);
+          }
+      } else Bloc.zero();
+      if (ul == UpLo::L) {
+        for (std::size_t i=0, ln=0; i<nb; i++) {
+          if (!(g->is_local_row(i) || g->is_local_col(i))) continue;
+          auto n = b.tilerows(i);
+          DenseM_t Bi(n, b.cols());
+          if (g->is_local_row(i)) {
+            copy(n, b.cols(), Bloc, ln, 0, Bi, 0, 0);
+            auto& c = g->row_comm();
+            c.reduce(Bi.data(), n*b.cols(), MPI_SUM, i % g->npcols());
+            if (g->is_local_col(i)) {
+              trsm(Side::L, ul, ta, d, scalar_t(1.), a.tile(i, i).D(), Bi);
+              copy(Bi, Bloc, ln, 0);
+            }
+            ln += n;
+          }
+          if (g->is_local_col(i)) {
+            auto& c = g->col_comm();
+            c.broadcast_from(Bi.data(), n*b.cols(), i % g->nprows());
+            // TODO threading
+            for (std::size_t j=i+1, lm=ln; j<nb; j++) {
+              if (g->is_local_row(j)) {
+                auto m = b.tilerows(j);
+                DenseMW_t Bj(m, b.cols(), Bloc, lm, 0);
+                gemm(Trans::N, Trans::N, scalar_t(-1.),
+                     a.tile(j, i), Bi, scalar_t(1.), Bj,
+                     params::task_recursion_cutoff_level);
+                lm += m;
+              }
+            }
+          }
+        }
+        for (std::size_t i=0, ln=0; i<nb; i++)
+          if (g->is_local_row(i)) {
+            auto& c = g->row_comm();
+            auto n = b.tilerows(i);
+            int src = i % g->npcols();
+            if (c.rank() == src) {
+              if (c.is_root())
+                copy(n, b.cols(), Bloc, ln, 0, b.tile(i, 0).D(), 0, 0);
+              else
+                c.send(DenseM_t(n, b.cols(), Bloc, ln, 0).data(),
+                       n*b.cols(), 0, 0);
+            } else if (c.is_root())
+              c.recv(b.tile(i, 0).D().data(), n*b.cols(), src, 0);
+            ln += n;
+          }
+      } else { // ul == UpLo::U
+        for (int i=a.rowblocks()-1; i>=0; i--) {
+          if (a.grid()->is_local_row(i)) {
+            auto Aii = a.bcast_dense_tile_along_row(i, i);
+            if (b.grid()->is_local_col(0))
+              trsm(Side::L, ul, ta, d, scalar_t(1.), Aii, b.tile(i, 0));
+          }
+          auto Aji = a.bcast_col_of_tiles_along_rows(0, i, i);
+          if (b.grid()->is_local_col(0)) {
+            auto Bik = b.bcast_row_of_tiles_along_cols(i, 0, b.colblocks());
+#pragma omp parallel
+#pragma omp single
+            for (int j=0, lj=0; j<i; j++) {
+              if (b.grid()->is_local_row(j)) {
+#pragma omp task default(shared) firstprivate(j,lj)
+                gemm(Trans::N, Trans::N, scalar_t(-1.),
+                     *(Aji[lj]), *(Bik[0]), scalar_t(1.), b.tile_dense(j, 0).D());
+                lj++;
+              }
+            }
+          }
+        }
+      }
+#endif
     }
 
     template<typename scalar_t> void
