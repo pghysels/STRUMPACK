@@ -36,45 +36,9 @@ namespace strumpack {
   template<typename integer_t> class GeomOrderData {
   public:
     integer_t *perm, *iperm;
-    int components, width, stratpar, leaf, min_sep;
-    bool separator_reordering;
-    std::unordered_map<integer_t,HSS::HSSPartitionTree> trees;
+    int components, width, stratpar;
   };
 
-  template<typename integer_t> void recursive_bisection
-  (integer_t* perm, integer_t* iperm, integer_t& pbegin,
-   std::array<integer_t,3> n0, std::array<integer_t,3> dims,
-   std::array<integer_t,3> ld, int components, int leaf,
-   HSS::HSSPartitionTree& hss_tree) {
-    std::size_t sep_size = components * dims[0]*dims[1]*dims[2];
-    hss_tree.size = sep_size;
-    if (sep_size <= std::size_t(leaf)) {
-      for (integer_t z=n0[2]; z<n0[2]+dims[2]; z++)
-        for (integer_t y=n0[1]; y<n0[1]+dims[1]; y++)
-          for (integer_t x=n0[0]; x<n0[0]+dims[0]; x++) {
-            auto ind = components * (x + y*ld[0] + z*ld[0]*ld[1]);
-            for (int c=0; c<components; c++) {
-              perm[ind] = pbegin;
-              iperm[pbegin++] = ind++;
-            }
-          }
-    } else {
-      hss_tree.c.resize(2);
-      int d = std::distance
-        (dims.begin(), std::max_element(dims.begin(), dims.end()));
-      std::array<integer_t,3> part_begin(n0);
-      std::array<integer_t,3> part_size(dims);
-      part_size[d] = dims[d]/2;
-      recursive_bisection
-        (perm, iperm, pbegin, part_begin, part_size, ld,
-         components, leaf, hss_tree.c[0]);
-      part_begin[d] = n0[d] + dims[d]/2;
-      part_size[d] = dims[d] - dims[d]/2;
-      recursive_bisection
-        (perm, iperm, pbegin, part_begin, part_size, ld,
-         components, leaf, hss_tree.c[1]);
-    }
-  }
 
   template<typename integer_t> void recursive_nested_dissection
   (integer_t& pbegin, integer_t& nbsep,
@@ -88,23 +52,15 @@ namespace strumpack {
       (dims.begin(), std::max_element(dims.begin(), dims.end()));
 
     if (dims[d] < 2+width || N <= stratpar) {
-      if (gd.separator_reordering && N >= gd.min_sep) {
-        HSS::HSSPartitionTree hss_tree;
-        recursive_bisection
-          (gd.perm, gd.iperm, pbegin, n0, dims, ld,
-           gd.components, gd.leaf, hss_tree);
-        gd.trees[nbsep] = hss_tree; // Not thread safe!!
-      } else {
-        for (integer_t z=n0[2]; z<n0[2]+dims[2]; z++)
-          for (integer_t y=n0[1]; y<n0[1]+dims[1]; y++)
-            for (integer_t x=n0[0]; x<n0[0]+dims[0]; x++) {
-              auto ind = comps * (x + y*ld[0] + z*ld[0]*ld[1]);
-              for (int c=0; c<comps; c++) {
-                gd.perm[ind] = pbegin;
-                gd.iperm[pbegin++] = ind++;
-              }
+      for (integer_t z=n0[2]; z<n0[2]+dims[2]; z++)
+        for (integer_t y=n0[1]; y<n0[1]+dims[1]; y++)
+          for (integer_t x=n0[0]; x<n0[0]+dims[0]; x++) {
+            auto ind = comps * (x + y*ld[0] + z*ld[0]*ld[1]);
+            for (int c=0; c<comps; c++) {
+              gd.perm[ind] = pbegin;
+              gd.iperm[pbegin++] = ind++;
             }
-      }
+          }
       if (nbsep) tree.emplace_back(tree.back().sep_end + N, -1, -1, -1);
       else tree.emplace_back(N, -1, -1, -1);
       nbsep++;
@@ -128,23 +84,15 @@ namespace strumpack {
       part_begin[d] = n0[d] + dims[d]/2  - (width/2);
       part_size[d] = width;
       integer_t sep_size = comps * part_size[0]*part_size[1]*part_size[2];
-      if (gd.separator_reordering && sep_size >= gd.min_sep) {
-        HSS::HSSPartitionTree hss_tree;
-        recursive_bisection
-          (gd.perm, gd.iperm, pbegin, part_begin, part_size, ld,
-           gd.components, gd.leaf, hss_tree);
-        gd.trees[nbsep] = hss_tree; // Not thread safe!!
-      } else {
-        for (integer_t z=part_begin[2]; z<part_begin[2]+part_size[2]; z++)
-          for (integer_t y=part_begin[1]; y<part_begin[1]+part_size[1]; y++)
-            for (integer_t x=part_begin[0]; x<part_begin[0]+part_size[0]; x++) {
-              auto ind = comps * (x + y*ld[0] + z*ld[0]*ld[1]);
-              for (int c=0; c<comps; c++) {
-                gd.perm[ind] = pbegin;
-                gd.iperm[pbegin++] = ind++;
-              }
+      for (integer_t z=part_begin[2]; z<part_begin[2]+part_size[2]; z++)
+        for (integer_t y=part_begin[1]; y<part_begin[1]+part_size[1]; y++)
+          for (integer_t x=part_begin[0]; x<part_begin[0]+part_size[0]; x++) {
+            auto ind = comps * (x + y*ld[0] + z*ld[0]*ld[1]);
+            for (int c=0; c<comps; c++) {
+              gd.perm[ind] = pbegin;
+              gd.iperm[pbegin++] = ind++;
             }
-      }
+          }
       if (nbsep)
         tree.emplace_back
           (tree.back().sep_end + sep_size, -1, left_root_id, nbsep-1);
@@ -180,41 +128,14 @@ namespace strumpack {
         return nullptr;
       }
     }
-    gd.separator_reordering = (opts.compression() != CompressionType::NONE);
-    if (gd.separator_reordering) {
-      gd.min_sep = opts.compression_min_sep_size();
-      gd.leaf = opts.compression_leaf_size();
-    }
     std::vector<Separator<integer_t>> tree;
     integer_t nbsep = 0, pbegin = 0;
     recursive_nested_dissection
       (pbegin, nbsep, {{0, 0, 0}}, {{nx, ny, nz}}, {{nx, ny, nz}}, tree, gd);
     std::unique_ptr<SeparatorTree<integer_t>> stree
       (new SeparatorTree<integer_t>(tree));
-
-    if (gd.separator_reordering) {
-      // TODO this tree is not used right now, the separator
-      // reordering is now done after the permutation of the matrix
-      //stree->partition_tree = std::move(gd.trees);
-    }
     return stree;
   }
-
-  // explicit template instantiations
-  template void recursive_bisection
-  (int* perm, int* iperm, int& pbegin, std::array<int,3> n0,
-   std::array<int,3> dims, std::array<int,3> ld, int components, int leaf,
-   HSS::HSSPartitionTree& hss_tree);
-  template void recursive_bisection
-  (long int* perm, long int* iperm, long int& pbegin,
-   std::array<long int,3> n0, std::array<long int,3> dims,
-   std::array<long int,3> ld, int components, int leaf,
-   HSS::HSSPartitionTree& hss_tree);
-  template void recursive_bisection
-  (long long int* perm, long long int* iperm, long long int& pbegin,
-   std::array<long long int,3> n0, std::array<long long int,3> dims,
-   std::array<long long int,3> ld, int components, int leaf,
-   HSS::HSSPartitionTree& hss_tree);
 
   template std::unique_ptr<SeparatorTree<int>>
   geometric_nested_dissection

@@ -43,7 +43,7 @@ namespace strumpack {
   (int nx, int ny, int nz, int components, int width,
    integer_t lo, integer_t hi, const MPIComm& comm,
    std::vector<integer_t>& perm, std::vector<integer_t>& iperm,
-   int nd_param, int HSS_leaf, int min_HSS);
+   int nd_param, int nd_planar);
 
 } // end namespace strumpack
 

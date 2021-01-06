@@ -39,12 +39,6 @@
 
 namespace strumpack {
 
-  template<typename integer_t> void recursive_bisection
-  (integer_t* perm, integer_t* iperm, integer_t& pbegin,
-   std::array<integer_t,3> n0, std::array<integer_t,3> dims,
-   std::array<integer_t,3> ld, int components, int leaf,
-   HSS::HSSPartitionTree& hss_tree);
-
   template<typename integer_t,typename scalar_t>
   std::unique_ptr<SeparatorTree<integer_t>> geometric_nested_dissection
   (const CompressedSparseMatrix<scalar_t,integer_t>& A,

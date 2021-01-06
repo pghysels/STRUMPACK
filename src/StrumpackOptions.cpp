@@ -161,6 +161,7 @@ namespace strumpack {
        {"sp_blr_min_front_size",        required_argument, 0, 45},
        {"sp_lossy_min_sep_size",        required_argument, 0, 46},
        {"sp_lossy_min_front_size",      required_argument, 0, 47},
+       {"sp_nd_planar_levels",          required_argument, 0, 48},
        {"sp_verbose",                   no_argument, 0, 'v'},
        {"sp_quiet",                     no_argument, 0, 'q'},
        {"help",                         no_argument, 0, 'h'},
@@ -375,6 +376,11 @@ namespace strumpack {
         iss >> min_front;
         set_lossy_min_front_size(min_front);
       } break;
+      case 48: {
+        std::istringstream iss(optarg);
+        iss >> nd_planar_levels_;
+        set_nd_planar_levels(nd_planar_levels_);
+      } break;
       case 'h': { describe_options(); } break;
       case 'v': set_verbose(true); break;
       case 'q': set_verbose(false); break;
@@ -430,6 +436,8 @@ namespace strumpack {
               << " need to provide the sizes." << std::endl;
     std::cout << "#   --sp_nd_param int (default " << nd_param() << ")"
               << std::endl;
+    std::cout << "#   --sp_nd_planar_levels int (default "
+              << nd_planar_levels() << ")" << std::endl;
     std::cout << "#   --sp_nx int (default " << nx() << ")"
               << std::endl;
     std::cout << "#   --sp_ny int (default " << ny() << ")"

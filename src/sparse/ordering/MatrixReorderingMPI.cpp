@@ -138,8 +138,7 @@ namespace strumpack {
         std::tie(sep_tree_, local_tree_) =
           geometric_nested_dissection_dist
           (nx, ny, nz, components, width, A.begin_row(), A.end_row(),
-           *comm_, perm_, iperm_, opts.nd_param(),
-           opts.compression_leaf_size(), opts.compression_min_sep_size());
+           *comm_, perm_, iperm_, opts.nd_param(), opts.nd_planar_levels());
         break;
       }
       case ReorderingStrategy::PARMETIS: {
