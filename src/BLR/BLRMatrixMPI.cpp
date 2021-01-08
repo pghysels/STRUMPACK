@@ -421,16 +421,18 @@ namespace strumpack {
       std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
       //CASE 1: col j0, send to all processes in col
       std::size_t nr_tiles=0;
+      std::vector<scalar_t> buf;
+      std::vector<std::int64_t> all_ranks;
       if (grid()->is_local_col(j0)) {
         ranks.push_back(msg_size);
-        std::vector<std::size_t> rcnts(grid()->nprows());
+        std::vector<int> rcnts(grid()->nprows());
         rcnts[grid()->prow()]=ranks.size();
         grid()->col_comm().all_gather(rcnts.data(), 1);
-        std::vector<std::size_t> displs(grid()->nprows());
+        std::vector<int> displs(grid()->nprows());
         for (std::size_t i=1; i<rcnts.size(); i++){
           displs[i]=displs[i-1]+rcnts[i-1];
         }
-        std::vector<std::int64_t> all_ranks(std::accumulate(rcnts.begin(),rcnts.end(),0));
+        all_ranks.resize(std::accumulate(rcnts.begin(),rcnts.end(),0));
         nr_tiles=all_ranks.size()-rcnts.size();
         std::copy(ranks.begin(), ranks.end(), all_ranks.begin()+displs[grid()->prow()]);
         grid()->col_comm().all_gather_v(all_ranks.data(), rcnts.data(), displs.data());
@@ -438,11 +440,11 @@ namespace strumpack {
         for (std::size_t i=0; i<rcnts.size(); i++){
           total_msg_size += all_ranks[displs[i]+rcnts[i]-1];
         }
-        std::vector<scalar_t> buf(total_msg_size);
-        std::vector<std::size_t> tile_rcnts(grid()->nprows());
-        for (std::size_t i=0; i<grid()->nprows(); i++)
+        buf.resize(total_msg_size);
+        std::vector<int> tile_rcnts(grid()->nprows());
+        for (int i=0; i<grid()->nprows(); i++)
           tile_rcnts[i] = all_ranks[displs[i]+rcnts[i]-1];
-        std::vector<std::size_t> tile_displs(grid()->nprows());
+        std::vector<int> tile_displs(grid()->nprows());
         for (std::size_t i=1; i<tile_rcnts.size(); i++){
           tile_displs[i]=tile_displs[i-1]+tile_rcnts[i-1];
         }
@@ -461,10 +463,13 @@ namespace strumpack {
             }
           }
         }
-        grid()->col_comm().all_gather_v(buf.data(), tile_rcnts.data()), tile_displs.data());
+        grid()->col_comm().all_gather_v(buf.data(), tile_rcnts.data(), tile_displs.data());
       }
+      std::vector<scalar_t> buf2;
+      std::vector<std::int64_t> all_ranks2;
+      std::vector<int> rcnts;
       //CASE 2: cols i1+2:end, gather from 0:i in proc of row i1+1 only
-      for (std::size_t j=0; j<grid()->npcols(); j++){
+      for (int j=0; j<grid()->npcols(); j++){
         if (grid()->pcol() == j % grid()->npcols()) {
           std::size_t col_cnt=0;
           for (std::size_t k=j0+1; k<=j1; k++){
@@ -474,17 +479,15 @@ namespace strumpack {
             int src = j0 % grid()->nprows();
             if (!(ranks2.empty())) ranks2.push_back(msg_size2);
             if (grid()->prow() == src && ranks2.empty()) ranks2.push_back(msg_size2);
-            std::size_t scnt=0;
-            std::vector<std::size_t> rcnts;
+            int scnt=0;
             if (grid()->prow() == src){
               rcnts.resize(grid()->nprows());
               rcnts[grid()->prow()]=ranks2.size();
             } else{
               scnt=ranks2.size();
             }
-            grid()->col_comm().gather(scnt, 1, rcnts.data(), 1, src);
-            std::vector<std::int64_t> all_ranks2;
-            std::vector<std::size_t> displs;
+            grid()->col_comm().gather(&scnt, 1, rcnts.data(), 1, src);
+            std::vector<int> displs;
             if (grid()->prow() == src){
               displs.resize(grid()->nprows());
               displs[0]=0;
@@ -500,8 +503,7 @@ namespace strumpack {
               nr_tiles+=all_ranks2.size()-rcnts.size()+rcnts_empty;
             }
             grid()->col_comm().gather_v(ranks2.data(), scnt, all_ranks2.data(), rcnts.data(), displs.data(), src);
-            std::vector<scalar_t> buf2;
-            std::vector<std::size_t> tile_rcnts, tile_displs;
+            std::vector<int> tile_rcnts, tile_displs;
             if (grid()->prow() == src){
               std::size_t total_msg_size = 0;
               for (std::size_t i=0; i<rcnts.size(); i++){
@@ -513,7 +515,7 @@ namespace strumpack {
               }
               buf2.resize(total_msg_size);
               tile_rcnts.resize(grid()->nprows());
-              for (std::size_t i=0; i<grid()->nprows(); i++){
+              for (int i=0; i<grid()->nprows(); i++){
                 if (rcnts[i] == 0){
                   tile_rcnts[i] = 0;
                 } else{
@@ -552,8 +554,8 @@ namespace strumpack {
       }
       if (nr_tiles==0) return Tij;
       Tij.reserve(nr_tiles);
-      ptr = buf.data();
       if (grid()->is_local_col(j0)) {
+        auto ptr = buf.data();
         for (std::size_t i=0, i_rank=0; i<=i1; i++){
           auto m = tilerows(i);
           auto r = all_ranks[i_rank];
@@ -572,7 +574,7 @@ namespace strumpack {
         }
       }
       if (grid()->is_local_row(j0)){
-        ptr = buf2.data();
+        auto ptr = buf2.data();
         for (std::size_t j=j0+1; j<=j1; j++){
           if (grid()->is_local_col(j)) {
             std::size_t i_rank=(j-(j0+1))/grid()->npcols();
@@ -632,16 +634,18 @@ namespace strumpack {
       std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
       //CASE 1: row i0, send to all processes in row
       std::size_t nr_tiles=0;
+      std::vector<scalar_t> buf;
+      std::vector<std::int64_t> all_ranks;
       if (grid()->is_local_row(i0)) {
         ranks.push_back(msg_size);
-        std::vector<std::size_t> rcnts(grid()->npcols());
+        std::vector<int> rcnts(grid()->npcols());
         rcnts[grid()->pcol()]=ranks.size();
         grid()->row_comm().all_gather(rcnts.data(), 1);
-        std::vector<std::size_t> displs(grid()->npcols());
+        std::vector<int> displs(grid()->npcols());
         for (std::size_t j=1; j<rcnts.size(); j++){
           displs[j]=displs[j-1]+rcnts[j-1];
         }
-        std::vector<std::int64_t> all_ranks(std::accumulate(rcnts.begin(),rcnts.end(),0));
+        all_ranks.resize(std::accumulate(rcnts.begin(),rcnts.end(),0));
         nr_tiles=all_ranks.size()-rcnts.size();
         std::copy(ranks.begin(), ranks.end(), all_ranks.begin()+displs[grid()->pcol()]);
         grid()->row_comm().all_gather_v(all_ranks.data(), rcnts.data(), displs.data());
@@ -649,11 +653,11 @@ namespace strumpack {
         for (std::size_t j=0; j<rcnts.size(); j++){
           total_msg_size += all_ranks[displs[j]+rcnts[j]-1];
         }
-        std::vector<scalar_t> buf(total_msg_size);
-        std::vector<std::size_t> tile_rcnts(grid()->npcols());
-        for (std::size_t j=0; j<grid()->npcols(); j++)
+        buf.resize(total_msg_size);
+        std::vector<int> tile_rcnts(grid()->npcols());
+        for (int j=0; j<grid()->npcols(); j++)
           tile_rcnts[j] = all_ranks[displs[j]+rcnts[j]-1];
-        std::vector<std::size_t> tile_displs(grid()->npcols());
+        std::vector<int> tile_displs(grid()->npcols());
         for (std::size_t j=1; j<tile_rcnts.size(); j++){
           tile_displs[j]=tile_displs[j-1]+tile_rcnts[j-1];
         }
@@ -672,10 +676,13 @@ namespace strumpack {
             }
           }
         }
-        grid()->row_comm().all_gather_v(buf.data(), tile_rcnts.data()), tile_displs.data());
+        grid()->row_comm().all_gather_v(buf.data(), tile_rcnts.data(), tile_displs.data());
       }
       //CASE 2: rows j1+2:end, send to proc in col j1+1 only
-      for (std::size_t i=0; i<grid()->nprows(); i++){
+      std::vector<scalar_t> buf2;
+      std::vector<std::int64_t> all_ranks2;
+      std::vector<int> rcnts;
+      for (int i=0; i<grid()->nprows(); i++){
         if (grid()->prow() == i % grid()->nprows()) {
           std::size_t row_cnt=0; //TODO: easier way to check if processors owns rows 
           for (std::size_t k=i0+1; k<=i1; k++){
@@ -686,16 +693,14 @@ namespace strumpack {
             if (!(ranks2.empty())) ranks2.push_back(msg_size2);
             if (grid()->pcol() == src && ranks2.empty()) ranks2.push_back(msg_size2);
             std::size_t scnt=0;
-            std::vector<std::size_t> rcnts;
             if (grid()->pcol() == src){
               rcnts.resize(grid()->npcols());
               rcnts[grid()->pcol()]=ranks2.size();
             } else{
               scnt=ranks2.size();
             }
-            grid()->row_comm().gather(scnt, 1, rcnts.data(), 1, src);
-            std::vector<std::int64_t> all_ranks2;
-            std::vector<std::size_t> displs;
+            grid()->row_comm().gather(&scnt, 1, rcnts.data(), 1, src);
+            std::vector<int> displs;
             if (grid()->pcol() == src){
               displs.resize(grid()->npcols());
               displs[0]=0;
@@ -711,8 +716,7 @@ namespace strumpack {
               nr_tiles+=all_ranks2.size()-rcnts.size()+rcnts_empty;
             }
             grid()->row_comm().gather_v(ranks2.data(), scnt, all_ranks2.data(), rcnts.data(), displs.data(), src);
-            std::vector<scalar_t> buf2;
-            std::vector<std::size_t> tile_rcnts, tile_displs;
+            std::vector<int> tile_rcnts, tile_displs;
             if (grid()->pcol() == src){
               std::size_t total_msg_size = 0;
               for (std::size_t j=0; j<rcnts.size(); j++){
@@ -724,7 +728,7 @@ namespace strumpack {
               }
               buf2.resize(total_msg_size);
               tile_rcnts.resize(grid()->npcols());
-              for (std::size_t j=0; j<grid()->npcols(); j++){
+              for (int j=0; j<grid()->npcols(); j++){
                 if (rcnts[j] == 0){
                   tile_rcnts[j] = 0;
                 } else{
@@ -733,7 +737,7 @@ namespace strumpack {
               }
               tile_displs.resize(grid()->npcols());
               tile_displs[0]=0;
-              for (std::size_t j=1; ij<tile_rcnts.size(); j++){
+              for (std::size_t j=1; j<tile_rcnts.size(); j++){
                 tile_displs[j]=tile_displs[j-1]+tile_rcnts[j-1];
               }
             }
@@ -764,7 +768,7 @@ namespace strumpack {
       }
       if (nr_tiles==0) return Tij;
       Tij.reserve(nr_tiles);
-      ptr = buf.data();
+      auto ptr = buf.data();
       if (grid()->is_local_row(i0)) {
         for (std::size_t j=0, j_rank=0; j<=j1; j++){
           auto m = tilerows(i0);
@@ -784,7 +788,7 @@ namespace strumpack {
         }
       }
       if (grid()->is_local_col(i0)){
-        ptr = buf2.data();
+        auto ptr = buf2.data();
         for (std::size_t i=i0+1; i<=i1; i++){
           if (grid()->is_local_row(i)) {
             std::size_t j_rank=(i-(i0+1))/grid()->nprows();
