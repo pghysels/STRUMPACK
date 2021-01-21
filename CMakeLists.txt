@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.11)
-project(STRUMPACK VERSION 5.0.0 LANGUAGES CXX C Fortran)
+project(STRUMPACK VERSION 5.1.0 LANGUAGES CXX C Fortran)
 
 
 option(STRUMPACK_USE_MPI     "Build with MPI support" ON)
@@ -578,7 +578,7 @@ if(hipblas_FOUND)
     #   $<$<COMPILE_LANGUAGE:CXX>:${STRUMPACK_HIP_AMDGPU}>)
     else()
       target_compile_options(strumpack PRIVATE
-	$<$<COMPILE_LANGUAGE:CXX>:--amdgpu-target=none>)
+        $<$<COMPILE_LANGUAGE:CXX>:--amdgpu-target=none>)
       message(WARNING "No AMD GPU architecture was specified,"
         " specify -DSTRUMPACK_HIP_AMDGPU=\"xxx\" "
         " where xxx can be for instance gfx906 (or a comma separated list)")

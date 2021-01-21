@@ -45,7 +45,7 @@ int main(int argc, char* argv[]) {
 
 #if 1 /* mixed precision solver */
 
-  StrumpackSparseSolverMixedPrecision<float,double,int> spss;
+  SparseSolverMixedPrecision<float,double,int> spss;
   /** options for the outer solver */
   // spss.options().set_Krylov_solver(KrylovSolver::REFINE);
   // spss.options().set_Krylov_solver(KrylovSolver::PREC_BICGSTAB);
@@ -60,7 +60,7 @@ int main(int argc, char* argv[]) {
 
 #else /* standard solver */
 
-  StrumpackSparseSolver<double,int> spss;
+  SparseSolver<double,int> spss;
   spss.options().set_matching(MatchingJob::NONE);
   spss.options().set_reordering_method(ReorderingStrategy::GEOMETRIC);
   spss.options().set_from_command_line(argc, argv);
