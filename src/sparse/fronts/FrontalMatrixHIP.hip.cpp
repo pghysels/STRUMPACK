@@ -34,8 +34,10 @@
 #include <complex>
 #include <iostream>
 
-// is thrust available on ROCm?
-//#include <thrust/complex.h>
+//#define STRUMPACK_HIP_HAVE_ROCTHRUST
+#if defined(STRUMPACK_HIP_HAVE_ROCTHRUST)
+#include <thrust/complex.h>
+#endif
 
 // this is valid for compute capability 3.5 -> 8.0 (and beyond?)
 //const unsigned int MAX_BLOCKS_X = 4294967295; // 2^32-1
@@ -52,8 +54,10 @@ namespace strumpack {
      * to compute norms or absolute value.
      */
     template<class T> struct real_type { typedef T value_type; };
-    // template<class T> struct real_type<thrust::complex<T>> { typedef T value_type; };
     template<class T> struct real_type<std::complex<T>> { typedef T value_type; };
+#if defined(STRUMPACK_HIP_HAVE_ROCTHRUST)
+    template<class T> struct real_type<thrust::complex<T>> { typedef T value_type; };
+#endif
 
     /**
      * The types float2 and double2 are binary the same as
@@ -62,22 +66,68 @@ namespace strumpack {
      * doesn't have a no-argument default constructor.
      */
     template<class T> struct primitive_type { typedef T value_type; };
-    // template<> struct primitive_type<thrust::complex<float>> { typedef float2 value_type; };
-    // template<> struct primitive_type<thrust::complex<double>> { typedef double2 value_type; };
     template<> struct primitive_type<std::complex<float>> { typedef float2 value_type; };
     template<> struct primitive_type<std::complex<double>> { typedef double2 value_type; };
+#if defined(STRUMPACK_HIP_HAVE_ROCTHRUST)
+    template<> struct primitive_type<thrust::complex<float>> { typedef float2 value_type; };
+    template<> struct primitive_type<thrust::complex<double>> { typedef double2 value_type; };
+#endif
 
     /**
      * Get the corresponding thrust::complex for std::complex
      */
     template<class T> struct cuda_type { typedef T value_type; };
-    // template<class T> struct cuda_type<std::complex<T>> { typedef thrust::complex<T> value_type; };
+#if defined(STRUMPACK_HIP_HAVE_ROCTHRUST)
+    template<class T> struct cuda_type<std::complex<T>> { typedef thrust::complex<T> value_type; };
+#endif
 
+    __device__ float real(const float& a) { return a; }
+    __device__ double real(const double& a) { return a; }
+    __device__ float real(const std::complex<float>& a) { return a.real(); }
+    __device__ double real(const std::complex<double>& a) { return a.real(); }
+#if defined(STRUMPACK_HIP_HAVE_ROCTHRUST)
+    __device__ float real(const thrust::complex<float>& a) { return a.real(); }
+    __device__ double real(const thrust::complex<double>& a) { return a.real(); }
+#endif
 
-    __device__ float real(float& a) { return a; }
-    __device__ double real(double& a) { return a; }
-    __device__ float real(std::complex<float>& a) { return a.real(); }
-    __device__ double real(std::complex<double>& a) { return a.real(); }
+    __device__ float abs(const float& a) { return (a >= 0) ? a : -a; }
+    __device__ double abs(const double& a) { return  (a >= 0) ? a : -a; }
+    __device__ float abs(const std::complex<float>& a) {
+      return sqrtf(a.real() * a.real() + a.imag() * a.imag());
+    }
+    __device__ double abs(const std::complex<double>& a) {
+      return sqrt(a.real() * a.real() + a.imag() * a.imag());
+    }
+#if defined(STRUMPACK_HIP_HAVE_ROCTHRUST)
+    __device__ float abs(const thrust::complex<float>& a) { return thrust::abs(a); }
+    __device__ double abs(const thrust::complex<double>& a) { return thrust::abs(a); }
+#endif
+
+#if !defined(STRUMPACK_HIP_HAVE_ROCTHRUST)
+    template<typename T> __device__ std::complex<T>
+    operator+(const std::complex<T>& a, const std::complex<T>& b) {
+      return std::complex<T>(a.real() + b.real(), a.imag() + b.imag());
+    }
+    template<typename T> __device__ std::complex<T>
+    operator*(const std::complex<T>& a, const std::complex<T>& b) {
+      return std::complex<T>
+	(a.real() * b.real() - a.imag() * b.imag(),
+	 a.imag() * b.real() + a.real() * b.imag());
+    }
+    template<typename T> __device__ std::complex<T>
+    operator-=(std::complex<T>& a, const std::complex<T>& b) {
+      a = std::complex<T>(a.real() - b.real(), a.imag() - b.imag());
+      return a;
+    }
+    template<typename T> __device__ std::complex<T>
+    operator/=(std::complex<T>& a, const std::complex<T>& b) {
+      auto denom = b.real() * b.real() + b.imag() * b.imag();
+      a = std::complex<T>
+	((a.real() * b.real() + a.imag() * b.imag()) / denom,
+	 (a.imag() * b.real() - a.real() * b.imag()) / denom);
+      return a;
+    }
+#endif
 
 
     /**
