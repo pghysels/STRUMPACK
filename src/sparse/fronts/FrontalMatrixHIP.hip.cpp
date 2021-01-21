@@ -115,6 +115,11 @@ namespace strumpack {
 	 a.imag() * b.real() + a.real() * b.imag());
     }
     template<typename T> __device__ std::complex<T>
+    operator+=(std::complex<T>& a, const std::complex<T>& b) {
+      a = std::complex<T>(a.real() + b.real(), a.imag() + b.imag());
+      return a;
+    }
+    template<typename T> __device__ std::complex<T>
     operator-=(std::complex<T>& a, const std::complex<T>& b) {
       a = std::complex<T>(a.real() - b.real(), a.imag() - b.imag());
       return a;
