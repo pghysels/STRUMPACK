@@ -146,19 +146,18 @@ if [[ $(hostname -s) = "tulip" ]]; then
     # module load lapack
     # module load scalapack/openmpi/gcc/64/2.0.2
     # module load openmpi/gcc/64/1.10.7
-    # module load rocm/3.7.0
+    # module load rocm
 
     export METIS_DIR=/home/users/coe0239/local/metis-5.1.0/install/
 
     cmake ../ \
           -DCMAKE_BUILD_TYPE=Debug \
           -DCMAKE_INSTALL_PREFIX=../install \
-          -DCMAKE_CXX_COMPILER=hipcc \
-          -DSTRUMPACK_HIP_AMDGPU=gfx906 \
+	  -DSTRUMPACK_USE_MPI=OFF \
           -DSTRUMPACK_USE_CUDA=OFF \
           -DSTRUMPACK_USE_HIP=ON \
-          -DSTRUMPACK_COUNT_FLOPS=ON \
-          -DTPL_SCALAPACK_LIBRARIES="${SCALAPACK_HOME}/lib64/libscalapack.a"
+          -DHIP_HIPCC_FLAGS=--amdgpu-target=gfx906 \
+          -DSTRUMPACK_COUNT_FLOPS=ON
 fi
 
 
@@ -180,7 +179,7 @@ if [[ $(hostname -s) = "cs-it-7098760" ]]; then
           -DTPL_ENABLE_MAGMA=OFF \
           -DTPL_ENABLE_SLATE=OFF \
           -DTPL_SLATE_INCLUDE_DIRS="$SLATEHOME/include/;$SLATEHOME/blaspp/include;$SLATEHOME/lapackpp/include" \
-          -DTPL_SLATE_LIBRARIES="$SLATEHOME/lib/libslate.so;$SLATEHOME/blaspp/lib/libblaspp.so;$SLATEHOME/lapackpp/lib/liblapackpp.so" \
+          -DTPL_SLATE_LIBRARIES="$SLATEHOME/lib/libslate_scalapack_api.so;$SLATEHOME/lib/libslate.so;$SLATEHOME/blaspp/lib/libblaspp.so;$SLATEHOME/lapackpp/lib/liblapackpp.so" \
           -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
 fi
 
