@@ -108,7 +108,7 @@ int main(int argc, char* argv[]) {
     }
     nx = std::stof(argv[1]);
 
-    StrumpackSparseSolverMPIDist<scalart,int> spss(MPI_COMM_WORLD);
+    SparseSolverMPIDist<scalart,int> spss(MPI_COMM_WORLD);
     spss.options().set_matching(MatchingJob::NONE);
     spss.options().set_reordering_method(ReorderingStrategy::GEOMETRIC);
     spss.options().set_from_command_line(argc, argv);

@@ -1,5 +1,16 @@
-Version 5.0.0 Release October 12, 2020
-======================================
+Version 5.1.0 Released January 21, 2021
+=======================================
+- Improvements in the distributed BLR code, this now works very
+  well as a general purpose preconditioner.
+- Added a mixed precision solver class, taking input and output in
+  double precision, but doing the factorization in single. Thanks to
+  Michael Neuder.
+- Several bug fixes.
+- Small changes in the HIP/ROCm code.
+
+
+Version 5.0.0 Released October 12, 2020
+=======================================
 - Added distributed memory BLR-based preconditioner. For many
   problems, this is much more robust than the HSS or HODLR/HODBF
   preconditioners.
