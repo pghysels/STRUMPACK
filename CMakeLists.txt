@@ -119,29 +119,9 @@ if(STRUMPACK_USE_HIP)
       " proceeding with CUDA support instead of HIP.")
     set(STRUMPACK_USE_HIP OFF)
   else()
-    # list(APPEND CMAKE_MODULE_PATH "$ENV{HIP_PATH}/lib/cmake/hip")
-    find_package(hip)
-    if(hip_FOUND)
-      if(DEFINED ENV{HIP_PLATFORM})
-        set(STRUMPACK_HIP_PLATFORM "$ENV{HIP_PLATFORM}")
-      else()
-        #execute_process(COMMAND $ENV{HIP_PATH}/hipconfig --platform
-        execute_process(COMMAND hipconfig --platform
-          OUTPUT_VARIABLE STRUMPACK_HIP_PLATFORM
-          RESULT_VARIABLE STRUMPACK_HIPCONFIG_STATUS)
-        if(STRUMPACK_HIPCONFIG_STATUS AND NOT STRUMPACK_HIPCONFIG_STATUS EQUAL 0)
-          message(FATAL_ERROR "No platform could be found for HIP. "
-            "Set and export the environment variable HIP_PLATFORM (to hcc or nvcc).")
-        endif()
-      endif()
-      message(STATUS "HIP platform set to ${STRUMPACK_HIP_PLATFORM}")
-      if (STRUMPACK_HIP_PLATFORM STREQUAL "hcc")
-        set(STRUMPACK_HIP_PLATFORM_HCC ON)
-        # set(CMAKE_CXX_COMPILER ${HIP_HIPCC_EXECUTABLE})
-        # set(CMAKE_LINKER ${HIP_HIPCC_EXECUTABLE})
-      elseif (STRUMPACK_HIP_PLATFORM STREQUAL "nvcc")
-        set(STRUMPACK_HIP_PLATFORM_NVCC ON)
-      endif()
+    find_package(HIP MODULE)
+    if(HIP_FOUND)
+      set(STRUMPACK_HIP_PLATFORM_HCC ON)
       find_package(hipblas REQUIRED)
       find_package(rocsolver REQUIRED)
       find_package(rocblas REQUIRED)
@@ -455,7 +435,15 @@ endif()
 # TODO libatomic?
 
 
-add_library(strumpack "")
+if(STRUMPACK_USE_HIP)
+  set_source_files_properties(
+    src/sparse/fronts/FrontalMatrixHIP.hip.cpp
+    PROPERTIES HIP_SOURCE_PROPERTY_FORMAT 1)
+  hip_add_library(strumpack "src/sparse/fronts/FrontalMatrixHIP.hip.cpp")
+else()
+  add_library(strumpack "")
+endif()
+
 add_subdirectory(src)
 
 target_sources(strumpack
@@ -565,27 +553,27 @@ if(hipblas_FOUND)
   target_link_libraries(strumpack PUBLIC roc::hipblas roc::rocblas roc::rocsolver)
   # target_link_libraries(strumpack PUBLIC roc::rocprim) # roc::rocprim_hip)
   # target_link_libraries(strumpack PUBLIC roc::rocthrust)
-  if(STRUMPACK_HIP_PLATFORM_HCC)
-    # target_compile_definitions(strumpack PUBLIC __HIP_PLATFORM_HCC__)
-    if(STRUMPACK_HIP_AMDGPU)
-      foreach(target ${STRUMPACK_HIP_AMDGPU})
-        target_compile_options(strumpack PRIVATE $<$<COMPILE_LANGUAGE:CXX>:--amdgpu-target=${target}>)
-        target_link_libraries(strumpack PRIVATE --amdgpu-target=${target})
-      endforeach()
-    # endif()
-    # if(DEFINED STRUMPACK_HIP_AMDGPU)
-    #   target_compile_options(strumpack PRIVATE
-    #   $<$<COMPILE_LANGUAGE:CXX>:${STRUMPACK_HIP_AMDGPU}>)
-    else()
-      target_compile_options(strumpack PRIVATE
-	$<$<COMPILE_LANGUAGE:CXX>:--amdgpu-target=none>)
-      message(WARNING "No AMD GPU architecture was specified,"
-        " specify -DSTRUMPACK_HIP_AMDGPU=\"xxx\" "
-        " where xxx can be for instance gfx906 (or a comma separated list)")
-    endif()
-  elseif(STRUMPACK_HIP_PLATFORM_NVCC)
-    # target_compile_definitions(strumpack PUBLIC __HIP_PLATFORM_NVCC__)
-  endif()
+  # if(STRUMPACK_HIP_PLATFORM_HCC)
+  #   # target_compile_definitions(strumpack PUBLIC __HIP_PLATFORM_HCC__)
+  #   if(STRUMPACK_HIP_AMDGPU)
+  #     foreach(target ${STRUMPACK_HIP_AMDGPU})
+  #       target_compile_options(strumpack PRIVATE $<$<COMPILE_LANGUAGE:CXX>:--amdgpu-target=${target}>)
+  #       target_link_libraries(strumpack PRIVATE --amdgpu-target=${target})
+  #     endforeach()
+  #   # endif()
+  #   # if(DEFINED STRUMPACK_HIP_AMDGPU)
+  #   #   target_compile_options(strumpack PRIVATE
+  #   #   $<$<COMPILE_LANGUAGE:CXX>:${STRUMPACK_HIP_AMDGPU}>)
+  #   else()
+  #     target_compile_options(strumpack PRIVATE
+  # 	$<$<COMPILE_LANGUAGE:CXX>:--amdgpu-target=none>)
+  #     message(WARNING "No AMD GPU architecture was specified,"
+  #       " specify -DSTRUMPACK_HIP_AMDGPU=\"xxx\" "
+  #       " where xxx can be for instance gfx906 (or a comma separated list)")
+  #   endif()
+  # elseif(STRUMPACK_HIP_PLATFORM_NVCC)
+  #   # target_compile_definitions(strumpack PUBLIC __HIP_PLATFORM_NVCC__)
+  # endif()
 endif()
 
 if(CombBLAS_FOUND)
