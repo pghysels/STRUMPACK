@@ -266,11 +266,11 @@ namespace strumpack {
 
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       gather_rows
-      (std::size_t i1, std::size_t j0, std::size_t j1) const;
+      (std::size_t i0, std::size_t i1, std::size_t j0, std::size_t j1) const;
 
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       gather_cols
-      (std::size_t i0, std::size_t i1, std::size_t j1) const;
+      (std::size_t i0, std::size_t i1, std::size_t j0, std::size_t j1) const;
 
       template<typename T> friend void
       trsv(UpLo ul, Trans ta, Diag d, const BLRMatrixMPI<T>& a,
