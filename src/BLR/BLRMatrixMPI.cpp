@@ -865,7 +865,7 @@ namespace strumpack {
           //int k=0;
           std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - after Tij reserve tiles" << std::endl;
           for (std::size_t j=0; j<j0; j++){
-            int sender=grid()->cg2p(j);
+            int sender = grid()->cg2p(j);
             auto n = tilecols(j);
             auto r = all_ranks[j_ranks[sender]];
             std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - r= " << r << std::endl;
@@ -1052,90 +1052,127 @@ std::cout << "start LL Update, i= " << i << ", rowblocks()= " << rowblocks() << 
         auto Tkj = gather_cols(i+1, rowblocks(), i+1, colblocks());
         //GEMM
         std::cout << "MPI rank= " << grid()->rank() << " - GEMM, Tik.size= " << Tik.size() << ", Tkj.size= " << Tkj.size() << std::endl;
+        if (grid()->is_local_row(i+1) && grid()->is_local_col(i+1)) {
+          std::cout << "MPI rank= " << grid()->rank() << ", nprows= " << grid()->nprows() << ", col_comm().size()= " << grid()->col_comm().size() << ", npcols= " << grid()->npcols() << ", row_comm().size()= " << grid()->row_comm().size() << std::endl;
+          std::vector<std::size_t> lj(grid()->row_comm().size());
+          std::vector<std::size_t> li(grid()->col_comm().size());
+          std::vector<int> cnt_lj(grid()->row_comm().size()-1);
+          std::vector<int> cnt_li(grid()->col_comm().size()-1);
+          for (std::size_t k=0; k<i+1; k++){
+            for (int p=0; p<lj.size()-1; p++){
+              if (grid()->cg2p(k)==p) cnt_lj[p]++;
+            }
+            for (int p=0; p<li.size()-1; p++){
+              if (grid()->rg2p(k)==p) cnt_li[p]++;
+            }
+          }
+          /*for (int p=0; p<lj.size(); p++){
+            std::cout << "MPI rank= " << grid()->rank() << ", cnt_lj[ " << p << " ] = " << cnt_lj[p] << std::endl;
+          }
+          for (int p=0; p<li.size(); p++){
+            std::cout << "MPI rank= " << grid()->rank() << ", cnt_li[ " << p << " ] = " << cnt_li[p] << std::endl;
+          }*/
+          for (std::size_t p=1; p<lj.size(); p++){
+            lj[p] = lj[p-1] + cnt_lj[p-1];
+          }
+          for (std::size_t p=1; p<li.size(); p++){
+            li[p] = li[p-1] + cnt_li[p-1];
+          }
+          for (std::size_t k=0; k<i+1; k++) {
+            int sender_i=grid()->rg2p(k);
+            int sender_j=grid()->cg2p(k);
+            std::cout << "MPI rank= " << grid()->rank() << ", k= " << k << ", lj[ " << sender_j << " ] = " << lj[sender_j] << ", li[ " << sender_i << " ]= " << li[sender_i] << ", sender_j= " << sender_j << ", sender_i= " << sender_i << std::endl;
+            gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj[sender_j]]),
+                  *(Tik[li[sender_i]]), scalar_t(1.), tile_dense(i+1, i+1).D());
+            lj[sender_j]++;
+            li[sender_i]++;
+            //std::cout << "MPI rank= " << grid()->rank() << ", lj[sender_j] = " << lj[sender_j] << ", li[sender_i]= " << li[sender_i] << std::endl;
+          }
+        }
         if (grid()->is_local_row(i+1)) {
-          std::size_t li=0, li_cnt=0, lj_cnt=0, cnt=0;
-          for (std::size_t j=i+1; j<rowblocks(); j++) {
+          std::vector<std::size_t> lj(grid()->row_comm().size());
+          std::vector<std::size_t> li(grid()->col_comm().size());
+          std::vector<int> cnt_lj(grid()->row_comm().size()-1);
+          std::vector<int> cnt_li(grid()->col_comm().size()-1);
+          for (std::size_t k=0; k<i+1; k++){
+            for (int p=0; p<lj.size()-1; p++){
+              if (grid()->cg2p(k)==p) cnt_lj[p]++;
+            }
+          }
+          for (std::size_t j=i+2; j<rowblocks(); j++) {
             if (grid()->is_local_col(j)) {
-              for (std::size_t k=0, lj=0; k<i+1; k++) {
-                std::cout << "MPI rank= " << grid()->rank() << ", i= " << i << ", j= " << j << ", k= " << k << ", tile.cols= " << tile_dense(i+1, j).D().cols() << ", cnt= " << cnt << std::endl;
-                // this uses .D, assuming tile(i+1, j) is dense
-                gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj]),
-                    *(Tik[li]), scalar_t(1.), tile_dense(i+1, j).D());
-                if (grid()->nprows()==1) li++;
-                else if(j==i+1){
-                  if (li_cnt<grid()->nprows()-1){
-                    li+=std::ceil((i+1)/(double)grid()->nprows());
-                    li_cnt++;
-                    std::cout << "MPI rank= " << grid()->rank() << ", li= " << li << ", li_cnt= " << li_cnt << ", nrows= " << grid()->nprows() << ", ceil1= " << std::ceil((i+1)/grid()->nprows()) << std::endl;
-                  } else{
-                    //li+=1-std::ceil((i+1)/(double)grid()->nprows())*(grid()->nprows()-1);
-                    //li++;
-                    li+=std::ceil((i+1)/(double)grid()->nprows());
-                    li_cnt=0;
-                  }
-                } else{
-                  if(i==0) li++;
-                  else if(li_cnt<grid()->nprows()-1){
-                    li+=i*std::ceil((i+1)/(double)grid()->nprows())*std::ceil((rowblocks()-j-1)/(double)grid()->npcols())+cnt;
-                    std::cout << "MPI rank= " << grid()->rank() << ", ceil1= " << std::ceil((i+1)/(double)grid()->nprows()) << ", ceil2= " << std::ceil((rowblocks()-j-1)/(double)grid()->npcols()) << ", li= " << li << std::endl;
-                    li_cnt++;
-                  } else{
-                    li+=1-std::ceil((i+1)/(double)grid()->nprows())*std::ceil((rowblocks()-j-1)/(double)grid()->npcols())*i-cnt;
-                    li_cnt=0;
-                  }
+              for (std::size_t k=0; k<i+1; k++){
+                for (int p=0; p<li.size()-1; p++){
+                  if (grid()->rg2p(k)==p) cnt_li[p]++;
                 }
-                if (grid()->npcols()==1) lj++;
-                else if (lj_cnt<grid()->npcols()-1){
-                  lj+=std::ceil((i+1)/(double)grid()->npcols());
-                  lj_cnt++;
-                } else{
-                  lj+=1-std::ceil((i+1)/(double)grid()->npcols())*(grid()->npcols()-1);
-                  lj_cnt=0;
-                }
-                std::cout << "MPI rank= " << grid()->rank() << ", li= " << li << ", lj= " << lj << ", li_cnt= " << li_cnt << std::endl;
               }
-              cnt++;
+            }
+          }
+          if (grid()->is_local_col(i+1)) li[0] = i+1;
+          for (std::size_t p=1; p<li.size(); p++){
+            li[p] = li[p-1] + cnt_li[p-1];
+          }
+          for (std::size_t j=i+2; j<rowblocks(); j++) {
+            if (grid()->is_local_col(j)) {
+              lj[0] = 0;
+              std::cout << "MPI rank= " << grid()->rank() << ", j= " << j << ", lj[0] = " << lj[0] << std::endl;
+              for (std::size_t p=1; p<lj.size(); p++){
+                lj[p] = lj[p-1] + cnt_lj[p-1];
+                std::cout << "MPI rank= " << grid()->rank() << ", lj[p] = " << lj[p] << std::endl;
+              }
+              for (std::size_t k=0; k<i+1; k++) {
+                int sender_i=grid()->rg2p(k);
+                int sender_j=grid()->cg2p(k);
+                //std::cout << "MPI rank= " << grid()->rank() << ", j= " << j << ", k= " << k << ", sender_i= " << sender_i << ", sender_j= " << sender_j << ", li[sender_i]= " << li[sender_i] << ", lj[sender_j]= " << lj[sender_j] << std::endl;
+                std::cout << "MPI rank= " << grid()->rank() << ", j= " << j << ", k= " << k << ", lj[ " << sender_j << " ] = " << lj[sender_j] << ", li[ " << sender_i << " ]= " << li[sender_i] << ", sender_j= " << sender_j << ", sender_i= " << sender_i << std::endl;
+                // this uses .D, assuming tile(i+1, j) is dense
+                gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj[sender_j]]),
+                    *(Tik[li[sender_i]]), scalar_t(1.), tile_dense(i+1, j).D());
+                lj[sender_j]++;
+                li[sender_i]++;
+              }
             }
           }
         }
         std::cout << "MPI rank= " << grid()->rank() << " - HERE" << std::endl;
         if (grid()->is_local_col(i+1)) {
-          std::size_t lj=0, li_cnt=0;
-          if(grid()->is_local_row(i+1)) lj+=i+1;
+          std::cout << "MPI rank= " << grid()->rank() << ", nprows= " << grid()->nprows() << ", col_comm().size()= " << grid()->col_comm().size() << ", npcols= " << grid()->npcols() << ", row_comm().size()= " << grid()->row_comm().size() << std::endl;
+          std::vector<std::size_t> lj(grid()->row_comm().size());
+          std::vector<std::size_t> li(grid()->col_comm().size());
+          std::vector<int> cnt_lj(grid()->row_comm().size());
+          std::vector<int> cnt_li(grid()->col_comm().size());
+          for (std::size_t k=0; k<i+1; k++){
+            for (int p=0; p<li.size()-1; p++){
+              if (grid()->rg2p(k)==p) cnt_li[p]++;
+            }
+          }
           for (std::size_t j=i+2; j<rowblocks(); j++) {
             if (grid()->is_local_row(j)) {
-              for (std::size_t k=0, li=0; k<i+1; k++) {
-                std::cout << "MPI rank= " << grid()->rank() << ", i= " << i << ", j= " << j << ", k= " << k << ", li= " << li << ", lj= " << lj << ", grid()->npcols()= " << grid()->npcols() << ", li_cnt= " << li_cnt << std::endl;
-                // this uses .D, assuming tile(i+1, j) is dense
-                gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj]),
-                    *(Tik[li]), scalar_t(1.), tile_dense(j, i+1).D());
-                if (grid()->nprows()==1) li++;
-                else if (li_cnt<grid()->nprows()-1){
-                  li+=std::ceil((i+1)/(double)grid()->nprows());
-                  li_cnt++;
-                } else{
-                  li+=1-std::ceil((i+1)/(double)grid()->nprows())*(grid()->nprows()-1);
-                  li_cnt=0;
+              for (std::size_t k=0; k<i+1; k++){
+                for (int p=0; p<lj.size()-1; p++){
+                  if (grid()->cg2p(k)==p) cnt_lj[p]++;
                 }
-                if (grid()->npcols()==1) lj++;
-                /*else if(j==i+1){
-                  if (lj_cnt<grid()->nprows()-1){
-                    lj+=std::ceil((i+1)/grid()->nprows());
-                    lj_cnt++;
-                  } else{
-                    lj+=1-std::ceil((i+1)/grid()->nprows())*(grid()->nprows()-1);
-                    lj_cnt=0;
-                  }
-                } else{
-                  if(k==0) lj+=1;
-                  else if(lj_cnt<grid()->nprows()-1){
-                    lj+=i*std::ceil((i+1)/grid()->nprows())-cnt;
-                    lj_cnt++;
-                  } else{
-                    lj+=1-std::ceil((i+1)/grid()->nprows())*i-cnt;
-                    lj_cnt=0;
-                  }
-                }*/
+              }
+            }
+          }
+          if (grid()->is_local_row(i+1)) lj[0] = i+1;
+          for (std::size_t p=1; p<lj.size(); p++){
+            lj[p] = lj[p-1] + cnt_lj[p-1];
+          }
+          for (std::size_t j=i+2; j<rowblocks(); j++) { //check rowblocks and colblocks
+            if (grid()->is_local_row(j)) {
+              li[0] = 0;
+              for (std::size_t p=1; p<li.size(); p++){
+                li[p] = li[p-1] + cnt_li[p-1];
+              }
+              for (std::size_t k=0; k<i+1; k++) {
+                int sender_i=grid()->rg2p(k);
+                int sender_j=grid()->cg2p(k);
+                // this uses .D, assuming tile(i+1, j) is dense
+                gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj[sender_j]]),
+                    *(Tik[li[sender_i]]), scalar_t(1.), tile_dense(j, i+1).D());
+                lj[sender_j]++;
+                li[sender_i]++;
               }
             }
           }
