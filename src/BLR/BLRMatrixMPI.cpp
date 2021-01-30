@@ -391,27 +391,20 @@ namespace strumpack {
     std::vector<std::unique_ptr<BLRTile<scalar_t>>>
     BLRMatrixMPI<scalar_t>::gather_rows
     (std::size_t i0, std::size_t i1, std::size_t j0, std::size_t j1) const {
-      std::cout << "MPI rank= " << grid()->rank() << ", start gather_rows, i0= " << i0 << ", i1= " << i1 << ", j0= " << j0 << ", j1= " << j1 << std::endl;
       //TODO: avoid resending, instead gather and forward tiles after update step
       if (j1 > j0 && i1 > i0){
         std::size_t msg_size = 0;
         std::vector<std::int64_t> ranks;
-        //std::vector<std::int64_t> msg_size_vector;
         //CASE 1: send tiles of row 0:i0-1 of col j0 to all processes in col j0
-        std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - CASE 1" << std::endl;
         if (grid()->is_local_col(j0)) {
           for (std::size_t i=0; i<i0; i++){
             if (grid()->is_local_row(i)) {
-              std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - CASE 1, i0= " << i0 << ", i= " << i << std::endl;
               msg_size += tile(i, j0).nonzeros();
-              //msg_size_vector.push_back(tile(i, j0).nonzeros());
-              std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - CASE 1, msg_size= " << msg_size << std::endl;
               ranks.push_back(tile(i, j0).is_low_rank() ?
                               tile(i, j0).rank() : -1);
             } 
           }
         }
-        std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - before Tij alocate" << std::endl;
         std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
         //CASE 1: send tiles of row 0:i0-1 to all processes in col j0
         std::size_t nr_tiles=0;
@@ -421,9 +414,7 @@ namespace strumpack {
         std::vector<int> tile_displs;
         std::vector<int> displs;
         if (grid()->is_local_col(j0)) {
-          std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - local col= " << j0 << std::endl;
           ranks.push_back(msg_size);
-          //ranks.insert( ranks.end(), msg_size_vector.begin(), msg_size_vector.end() );
           rcnts.resize(grid()->nprows());
           rcnts[grid()->prow()]=ranks.size();
           grid()->col_comm().all_gather(rcnts.data(), 1);
@@ -438,7 +429,6 @@ namespace strumpack {
           std::size_t total_msg_size = 0;
           for (std::size_t i=0; i<rcnts.size(); i++){
             total_msg_size += all_ranks[displs[i]+rcnts[i]-1];
-            //total_msg_size += all_ranks[];
           }
           buf.resize(total_msg_size);
           std::vector<int> tile_rcnts(grid()->nprows());
@@ -453,12 +443,10 @@ namespace strumpack {
             if (grid()->is_local_row(i)) {
               auto& t = tile(i, j0);
               if (tile(i, j0).is_low_rank()) {
-                std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - low_rank, i= " << i << std::endl;
                 std::copy(t.U().data(), t.U().end(), ptr);
                 ptr += t.U().rows()*t.U().cols();
                 std::copy(t.V().data(), t.V().end(), ptr);
                 ptr += t.V().rows()*t.V().cols();
-                std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - U.rows= " << t.U().rows() << ", U.cols= " << t.U().cols() << ", V.rows= " << t.V().rows() << ", V.cols= " << t.V().cols() << std::endl;
               } else {
                 std::copy(t.D().data(), t.D().end(), ptr);
                 ptr += t.D().rows()*t.D().cols();
@@ -466,13 +454,10 @@ namespace strumpack {
             }
           }
           grid()->col_comm().all_gather_v(buf.data(), tile_rcnts.data(), tile_displs.data());
-          std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - buf.size= " << buf.size() << std::endl;
         }
         //CASE 2: cols j0+1:end, gather in proc in row i0
-        std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - CASE 2" << std::endl;
         std::size_t msg_size2 = 0;
         std::vector<std::int64_t> ranks2;
-        //std::vector<std::int64_t> msg_size2_vector;
         for (std::size_t j=j0+1; j<j1; j++){
           if (grid()->is_local_col(j)) {
             for (std::size_t i=0; i<i0; i++){
@@ -488,11 +473,10 @@ namespace strumpack {
         std::vector<std::int64_t> all_ranks2;
         std::vector<int> rcnts2, tile_displs2, displs2;
         std::size_t rcnts_empty=0;
+        std::size_t col_cnt=0;
         //CASE 2: cols j0+1:end, gather in proc in row i0
         for (int j=0; j<grid()->npcols(); j++){
           if (grid()->pcol() == j % grid()->npcols()) {
-            std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - npcols= " << grid()->npcols() << std::endl;
-            std::size_t col_cnt=0;
             for (std::size_t k=j0+1; k<j1; k++){
               if (grid()->is_local_col(k)) col_cnt++;
             }
@@ -510,10 +494,6 @@ namespace strumpack {
               }
               grid()->col_comm().gather(&scnt, 1, rcnts2.data(), 1, src);
               if (grid()->prow() == src){
-                std::cout << "MPI rank= " << grid()->rank() << ", rcnts2.size= " << rcnts2.size() << std::endl;
-                for (std::size_t kk=0; kk<rcnts2.size(); kk++){
-                  std::cout << "MPI rank= " << grid()->rank() << ", rcnts2[" << kk << "]= " << rcnts2[kk] << std::endl;
-                }
                 displs2.resize(grid()->nprows());
                 displs2[0]=0;
                 for (std::size_t i=1; i<rcnts2.size(); i++){
@@ -578,7 +558,6 @@ namespace strumpack {
         }
         if (nr_tiles==0) return Tij;
         Tij.reserve(nr_tiles);
-        //auto ptr = buf.data();
         if (grid()->is_local_col(j0)) {
           std::vector<scalar_t*> ptr(grid()->col_comm().size());
           std::vector<std::int64_t> i_ranks(grid()->col_comm().size());
@@ -586,23 +565,15 @@ namespace strumpack {
             ptr[p] = buf.data() + tile_displs[p];
             i_ranks[p] = displs[p];
           }
-          std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - col_comm.size()= " << grid()->col_comm().size() << ", nprows= " << grid()->nprows() << std::endl;
-          std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - after Tij reserve tiles" << std::endl;
           auto n = tilecols(j0);
           for (std::size_t i=0; i<i0; i++){
-            std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - i= " << i << ", buf.size= " << buf.size() << std::endl;
             int sender=grid()->rg2p(i); 
             auto m = tilerows(i);
             auto r = all_ranks[i_ranks[sender]];
-            std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - r= " << r << ", m= " << m << ", n= " << n << ", sender= " << sender << std::endl;
             if (r != -1) {
-              std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - r= " << r << std::endl;
               auto t = new LRTile<scalar_t>(m, n, r);
-              std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - after new LRTile " << std::endl;
               std::copy(ptr[sender], ptr[sender]+m*r, t->U().data());  ptr[sender] += m*r;
-              std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - U.rows= " << t->U().rows() << std::endl;
               std::copy(ptr[sender], ptr[sender]+r*n, t->V().data());  ptr[sender] += r*n;
-              std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - V.rows= " << t->V().rows() << std::endl;
               Tij.emplace_back(t);
             } else {
               auto t = new DenseTile<scalar_t>(m, n);
@@ -610,47 +581,39 @@ namespace strumpack {
               Tij.emplace_back(t);
             }
             i_ranks[sender]++;
-            std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - i0= " << i0 << std::endl;
-            std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - grid()->prow()= " << grid()->prow() << std::endl;
           }
-          std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - after for-loop " << std::endl;
         }
-        std::cout << "MPI rank= " << grid()->rank() << ", after Tij emplace back case 1" << std::endl;
         if (grid()->is_local_row(i0)){
-          std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - local row= " << i0 << std::endl;
-          //auto ptr = buf2.data();
-          std::vector<scalar_t*> ptr(grid()->col_comm().size());
-          std::vector<std::int64_t> i_ranks(grid()->col_comm().size());
-          for (std::size_t p=0; p<ptr.size(); p++){
-            ptr[p] = buf2.data() + tile_displs2[p];
-            i_ranks[p] = displs2[p];
-          }
-          for (std::size_t j=j0+1; j<j1; j++){
-            if (grid()->is_local_col(j)) {
-              auto n = tilecols(j);
-              for (std::size_t i=0; i<i0; i++){
-                std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - ncol= " << grid()->npcols() << std::endl;
-                int sender=grid()->rg2p(i); 
-                std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - i= " << i << std::endl;
-                auto m = tilerows(i);
-                auto r = all_ranks2[i_ranks[sender]];
-                std::cout << "MPI rank= " << grid()->rank() << ", gather_rows - n= " << n << ", m= " << m << ", r= " << r << std::endl;
-                if (r != -1) {
-                  auto t = new LRTile<scalar_t>(m, n, r);
-                  std::copy(ptr[sender], ptr[sender]+m*r, t->U().data());  ptr[sender] += m*r;
-                  std::copy(ptr[sender], ptr[sender]+r*n, t->V().data());  ptr[sender] += r*n;
-                  Tij.emplace_back(t);
-                } else {
-                  auto t = new DenseTile<scalar_t>(m, n);
-                  std::copy(ptr[sender], ptr[sender]+m*n, t->D().data());  ptr[sender] += m*n;
-                  Tij.emplace_back(t);
+          if (col_cnt!=0){
+            std::vector<scalar_t*> ptr(grid()->col_comm().size());
+            std::vector<std::int64_t> i_ranks(grid()->col_comm().size());
+            for (std::size_t p=0; p<ptr.size(); p++){
+              ptr[p] = buf2.data() + tile_displs2[p];
+              i_ranks[p] = displs2[p];
+            }
+            for (std::size_t j=j0+1; j<j1; j++){
+              if (grid()->is_local_col(j)) {
+                auto n = tilecols(j);
+                for (std::size_t i=0; i<i0; i++){
+                  int sender=grid()->rg2p(i); 
+                  auto m = tilerows(i);
+                  auto r = all_ranks2[i_ranks[sender]];
+                  if (r != -1) {
+                    auto t = new LRTile<scalar_t>(m, n, r);
+                    std::copy(ptr[sender], ptr[sender]+m*r, t->U().data());  ptr[sender] += m*r;
+                    std::copy(ptr[sender], ptr[sender]+r*n, t->V().data());  ptr[sender] += r*n;
+                    Tij.emplace_back(t);
+                  } else {
+                    auto t = new DenseTile<scalar_t>(m, n);
+                    std::copy(ptr[sender], ptr[sender]+m*n, t->D().data());  ptr[sender] += m*n;
+                    Tij.emplace_back(t);
+                  }
+                  i_ranks[sender]++;
                 }
-                i_ranks[sender]++;
               }
             }
           }
         }
-        std::cout << "MPI rank= " << grid()->rank() << ", after Tij emplace back case 2 " << std::endl;
         return Tij;
       } else{
         std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
@@ -662,25 +625,21 @@ namespace strumpack {
     std::vector<std::unique_ptr<BLRTile<scalar_t>>>
     BLRMatrixMPI<scalar_t>::gather_cols
     (std::size_t i0, std::size_t i1, std::size_t j0, std::size_t j1) const {
-      std::cout << "MPI rank= " << grid()->rank() << ", start gather_cols, j0= " << j0 << ", j1= " << j1 << ", i0= " << i0 << ", i1= " << i1 << std::endl;
       if (i1 > i0 && j1 > j0){
         //TODO: avoid resending, instead gather and forward tiles after update step
         std::size_t msg_size = 0;
         std::vector<std::int64_t> ranks;
         //CASE 1: send tiles of col 0:j0-1 of row i0 to all processes in row i0
-        std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - CASE 1" << std::endl;
         if (grid()->is_local_row(i0)) {
           for (std::size_t j=0; j<j0; j++){
             if (grid()->is_local_col(j)) {
               msg_size += tile(i0, j).nonzeros();
               ranks.push_back(tile(i0, j).is_low_rank() ?
                               tile(i0, j).rank() : -1);
-              std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - i0= " << i0 << ", j= " << j << ", msg_size= " << msg_size << ", tile(i0, j).rank()= " << tile(i0, j).rank() << std::endl;
             } 
           }
         }
         //CASE 2: rows i0+1:end, gather in proc in col j0
-        std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - CASE 2" << std::endl;
         std::size_t msg_size2 = 0;
         std::vector<std::int64_t> ranks2;
         for (std::size_t i=i0+1; i<i1; i++){
@@ -690,12 +649,10 @@ namespace strumpack {
                 msg_size2 += tile(i, j).nonzeros();
                 ranks2.push_back(tile(i, j).is_low_rank() ?
                               tile(i, j).rank() : -1);
-                std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - i= " << i << ", j= " << j << ", msg_size2= " << msg_size2 << ", tile(i, j).rank()= " << tile(i, j).rank() << std::endl;
               }
             }
           }
         }
-        std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - before Tij alocate" << std::endl;
         std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
         //CASE 1: row i0, send to all processes in row
         std::size_t nr_tiles=0;
@@ -703,7 +660,6 @@ namespace strumpack {
         std::vector<std::int64_t> all_ranks;
         std::vector<int> rcnts, tile_displs, displs;
         if (grid()->is_local_row(i0)) {
-          std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - local row= " << i0 << std::endl;
           ranks.push_back(msg_size);
           rcnts.resize(grid()->npcols());
           rcnts[grid()->pcol()]=ranks.size();
@@ -716,12 +672,10 @@ namespace strumpack {
           nr_tiles=all_ranks.size()-rcnts.size();
           std::copy(ranks.begin(), ranks.end(), all_ranks.begin()+displs[grid()->pcol()]);
           grid()->row_comm().all_gather_v(all_ranks.data(), rcnts.data(), displs.data());
-          std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - nr_tiles= " << nr_tiles << ", all_ranks.size= " << all_ranks.size() << ", all_ranks[0]= " << all_ranks[0] << std::endl;
           std::size_t total_msg_size = 0;
           for (std::size_t j=0; j<rcnts.size(); j++){
             total_msg_size += all_ranks[displs[j]+rcnts[j]-1];
           }
-          std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - total_msg_size= " << total_msg_size << std::endl;
           buf.resize(total_msg_size);
           std::vector<int> tile_rcnts(grid()->npcols());
           for (int j=0; j<grid()->npcols(); j++)
@@ -752,11 +706,10 @@ namespace strumpack {
         std::vector<std::int64_t> all_ranks2;
         std::vector<int> rcnts2, displs2, tile_displs2;
         std::size_t rcnts_empty=0;
-        std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - after all_gather " << std::endl;
+        std::size_t row_cnt=0;
         for (int i=0; i<grid()->nprows(); i++){
           if (grid()->prow() == i % grid()->nprows()) {
-            std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - nprows= " << grid()->nprows() << ", i= " << i << std::endl;
-            std::size_t row_cnt=0; //TODO: easier way to check if processor owns rows 
+            //TODO: easier way to check if processor owns rows 
             for (std::size_t k=i0+1; k<i1; k++){
               if (grid()->is_local_row(k)) row_cnt++;
             }
@@ -773,7 +726,6 @@ namespace strumpack {
                 scnt=ranks2.size();
               }
               grid()->row_comm().gather(&scnt, 1, rcnts2.data(), 1, src);
-              std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - src = " << src << ", grid()->pcol()= " << grid()->pcol() << std::endl;
               if (grid()->pcol() == src){
                 displs2.resize(grid()->npcols());
                 displs2[0]=0;
@@ -781,7 +733,6 @@ namespace strumpack {
                   displs2[j]=displs2[j-1]+rcnts2[j-1];
                 }
                 all_ranks2.resize(std::accumulate(rcnts2.begin(),rcnts2.end(),0));
-                //std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - ranks2.size= " << ranks2.size() << ", displs2[0]= " << displs2[0] << ", rcnts2.size= " << rcnts2.size() << ", rcnts2[0]= " << rcnts2[0] << ", all_ranks2.size= " << all_ranks2.size() << std::endl;
                 std::copy(ranks2.begin(), ranks2.end(), all_ranks2.begin()+displs2[grid()->pcol()]);//?? works if ranks empty??
                 for (std::size_t j=0; j<rcnts2.size(); j++){
                   if (rcnts2[j]==0) rcnts_empty++;
@@ -791,7 +742,6 @@ namespace strumpack {
               grid()->row_comm().gather_v(ranks2.data(), scnt, all_ranks2.data(), rcnts2.data(), displs2.data(), src);
               std::vector<int> tile_rcnts;
               if (grid()->pcol() == src){
-                std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - nr_tiles= " << nr_tiles << ", all_ranks2.size= " << all_ranks2.size() << ", all_ranks2[0]= " << all_ranks2[0] << std::endl;
                 std::size_t total_msg_size = 0;
                 for (std::size_t j=0; j<rcnts2.size(); j++){
                   if (rcnts2[j] == 0){
@@ -800,7 +750,6 @@ namespace strumpack {
                     total_msg_size += all_ranks2[displs2[j]+rcnts2[j]-1];
                   }
                 }
-                std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - total_msg_size= " << total_msg_size << std::endl;
                 buf2.resize(total_msg_size);
                 tile_rcnts.resize(grid()->npcols());
                 for (int j=0; j<grid()->npcols(); j++){
@@ -816,23 +765,19 @@ namespace strumpack {
                   tile_displs2[j]=tile_displs2[j-1]+tile_rcnts[j-1];
                 }
               }
-              std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - msg_size2= " << msg_size2 << std::endl;
               std::vector<scalar_t> sbuf(msg_size2);
               auto ptr = sbuf.data();
               for (std::size_t k=i0+1; k<i1; k++){
                 if (grid()->is_local_row(k)){
                   for (std::size_t j=0; j<j0; j++){
                     if (grid()->is_local_col(j)) {
-                      std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - k= " << k << ", j= " << j << std::endl;
                       auto& t = tile(k, j);
                       if (tile(k, j).is_low_rank()) { 
-                        std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - low_rank, t.U.rows= " << t.U().rows() << ", t.V.cols= " << t.V().cols() << std::endl;
                         std::copy(t.U().data(), t.U().end(), ptr);
                         ptr += t.U().rows()*t.U().cols();
                         std::copy(t.V().data(), t.V().end(), ptr);
                         ptr += t.V().rows()*t.V().cols();
                       } else {
-                        std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - full_rank " << std::endl;
                         std::copy(t.D().data(), t.D().end(), ptr);
                         ptr += t.D().rows()*t.D().cols();
                       }
@@ -840,35 +785,24 @@ namespace strumpack {
                   }
                 }
               }
-              //store sbuf of processor src in buf2 before gather? (if processor has tile to sent) also line 543
-              std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - before gather" << std::endl;
               grid()->row_comm().gather_v(sbuf.data(), msg_size2, buf2.data(), tile_rcnts.data(), tile_displs2.data(), src);
-              std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - after gather" << std::endl;
             }
           }
         }
         if (nr_tiles==0) return Tij;
         Tij.reserve(nr_tiles);
-        //auto ptr = buf.data();
         if (grid()->is_local_row(i0)) {
           std::vector<scalar_t*> ptr(grid()->row_comm().size());
           std::vector<std::int64_t> j_ranks(grid()->row_comm().size());
           for (std::size_t p=0; p<ptr.size(); p++){
-            std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - ptr.size()= " << ptr.size() << ", p= " << p << std::endl;
-            std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - tile_displs[p]= " << tile_displs[p] << std::endl;
             ptr[p] = buf.data() + tile_displs[p];
-            //std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - tile_displs[p]= " << tile_displs[p] << std::endl;
             j_ranks[p] = displs[p];
           }
-          std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - i0= " << i0 << std::endl;
           auto m = tilerows(i0);
-          //int k=0;
-          std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - after Tij reserve tiles" << std::endl;
           for (std::size_t j=0; j<j0; j++){
             int sender = grid()->cg2p(j);
             auto n = tilecols(j);
             auto r = all_ranks[j_ranks[sender]];
-            std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - r= " << r << std::endl;
             if (r != -1) {
               auto t = new LRTile<scalar_t>(m, n, r);
               std::copy(ptr[sender], ptr[sender]+m*r, t->U().data());  ptr[sender] += m*r;
@@ -880,90 +814,35 @@ namespace strumpack {
               Tij.emplace_back(t);
             }
             j_ranks[sender]++;
-            std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - i0= " << i0 << std::endl;
-            std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - grid()->prow()= " << grid()->prow() << std::endl;
-            /*if (k+1 == rcnts[j_rcnts]-1){
-              k=0;
-              j_rcnts++;
-              j_col=j_rcnts;
-              j_rank+=2;
-            } else{
-              k++;
-              j_col += grid()->npcols();
-              j_rank++;
-            }*/
           }
         }
-        std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - j0= " << j0 << std::endl;
         if (grid()->is_local_col(j0)){
-          std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - local col= " << i0 << std::endl;
-          //auto ptr = buf2.data();
-          //std::size_t nrow=grid()->nprows();
-          //for (std::size_t i=i0+1; i<i1; i++){
-          std::vector<scalar_t*> ptr(grid()->row_comm().size());
-          std::vector<std::int64_t> j_ranks(grid()->row_comm().size());
-          for (std::size_t p=0; p<ptr.size(); p++){
-            ptr[p] = buf2.data() + tile_displs2[p];
-            j_ranks[p] = displs2[p];
-          }
-          std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - nrow= " << grid()->nprows() << std::endl;
-          for (std::size_t i=i0+1; i<i1; i++){
-            if (grid()->is_local_row(i)) {
-          //for (std::size_t i=0; i<nrow; i++){
-          //  std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - i= " << i << std::endl;
-          //  if (grid()->is_local_row(i)) {
-              //std::size_t j_rank=(i-(i0+1))/grid()->nprows();
-              //std::cout << "jrank= " << j_rank << ", all_ranks2.size()= " << all_ranks2.size() << std::endl;
-              //for (std::size_t j=0; j<j0; j++){
-          //    std::size_t j_col=0, i_row=0, j_rank=0, j_rcnts=0;
-          //    int k1=0, k2=0;
-          //    if ( (j0+1)%nrow == 0) i_row=j0+1+i;
-          //    else if (i+(nrow-((j0+1)%nrow)) < nrow) i_row=j0+1+i+nrow-((j0+1)%nrow);
-          //    else i_row=j0+1+i+nrow-((j0+1)%nrow)-nrow;
-          //    std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - i= " << i << ", i_row= " << i_row << ", all_ranks2.size= " << all_ranks2.size() << ", rcnts2.size= " << rcnts2.size() << ", nrtiles= " << nr_tiles << std::endl;
-          //    std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - k1= " << k1 << ", k2= " << k2 << ", j_col= " << j_col << std::endl;
-          //    for (std::size_t j=0; j<all_ranks2.size()-rcnts2.size()+rcnts_empty; j++){
-          //      std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - j= " << j << std::endl;
-              auto m = tilerows(i);
-              for (std::size_t j=0; j<j0; j++){
-                int sender=grid()->cg2p(j); 
-                auto n = tilecols(j);
-                auto r = all_ranks2[j_ranks[sender]];
-                std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - r= " << r << ", m= " << m << ", n= " << n << std::endl;
-                if (r != -1) {
-                  auto t = new LRTile<scalar_t>(m, n, r);
-                  std::copy(ptr[sender], ptr[sender]+m*r, t->U().data());  ptr[sender] += m*r;
-                  std::copy(ptr[sender], ptr[sender]+r*n, t->V().data());  ptr[sender] += r*n;
-                  Tij.emplace_back(t);
-                } else {
-                  auto t = new DenseTile<scalar_t>(m, n);
-                  std::copy(ptr[sender], ptr[sender]+m*n, t->D().data());  ptr[sender] += m*n;
-                  Tij.emplace_back(t);
+          if (row_cnt!=0){
+            std::vector<scalar_t*> ptr(grid()->row_comm().size());
+            std::vector<std::int64_t> j_ranks(grid()->row_comm().size());
+            for (std::size_t p=0; p<ptr.size(); p++){
+              ptr[p] = buf2.data() + tile_displs2[p];
+              j_ranks[p] = displs2[p];
+            }
+            for (std::size_t i=i0+1; i<i1; i++){
+              if (grid()->is_local_row(i)) {
+                auto m = tilerows(i);
+                for (std::size_t j=0; j<j0; j++){
+                  int sender=grid()->cg2p(j); 
+                  auto n = tilecols(j);
+                  auto r = all_ranks2[j_ranks[sender]];
+                  if (r != -1) {
+                    auto t = new LRTile<scalar_t>(m, n, r);
+                    std::copy(ptr[sender], ptr[sender]+m*r, t->U().data());  ptr[sender] += m*r;
+                    std::copy(ptr[sender], ptr[sender]+r*n, t->V().data());  ptr[sender] += r*n;
+                    Tij.emplace_back(t);
+                  } else {
+                    auto t = new DenseTile<scalar_t>(m, n);
+                    std::copy(ptr[sender], ptr[sender]+m*n, t->D().data());  ptr[sender] += m*n;
+                    Tij.emplace_back(t);
+                  }
+                  j_ranks[sender]++;
                 }
-                j_ranks[sender]++;
-                //j_rank += rcnts2[j];
-                /*if (k1+1 == rcnts2[j_rcnts]-1){
-                  k1=0;
-                  k2=0;
-                  j_rcnts++;
-                  j_col=j_rcnts;
-                  j_rank+=2;
-                  if ( (j0+1)%nrow == 0) i_row=j0+1+i;
-                  else if (i+(nrow-((j0+1)%nrow)) < nrow) i_row=j0+1+i+nrow-((j0+1)%nrow);
-                  else i_row=j0+1+i+nrow-((j0+1)%nrow)-nrow;
-                } else if (k2+1 == std::ceil(j0/grid()->npcols())){
-                  k1++;
-                  k2=0;
-                  j_col=j_rcnts;
-                  i_row += nrow;
-                  j_rank++;
-                } else{
-                  k1++;
-                  k2++;
-                  j_col += grid()->npcols();
-                  j_rank++;
-                }*/
-                //std::cout << "MPI rank= " << grid()->rank() << ", gather_cols - k1= " << k1 << ", k2= " << k2 << ", j_col= " << j_col << ", i_row= " << i_row << ", j_rcnts= " << j_rcnts << std::endl;
               }
             }
           }
@@ -1046,133 +925,42 @@ namespace strumpack {
           }
         }
 #else //LL-Update
-std::cout << "start LL Update, i= " << i << ", rowblocks()= " << rowblocks() << ", colblocks()= " << colblocks() << std::endl;
         auto Tik = gather_rows(i+1, rowblocks(), i+1, colblocks());
-        std::cout << "MPI rank= " << grid()->rank() << ", after gather_rows" << std::endl;
         auto Tkj = gather_cols(i+1, rowblocks(), i+1, colblocks());
         //GEMM
-        std::cout << "MPI rank= " << grid()->rank() << " - GEMM, Tik.size= " << Tik.size() << ", Tkj.size= " << Tkj.size() << std::endl;
-        if (grid()->is_local_row(i+1) && grid()->is_local_col(i+1)) {
-          std::cout << "MPI rank= " << grid()->rank() << ", nprows= " << grid()->nprows() << ", col_comm().size()= " << grid()->col_comm().size() << ", npcols= " << grid()->npcols() << ", row_comm().size()= " << grid()->row_comm().size() << std::endl;
-          std::vector<std::size_t> lj(grid()->row_comm().size());
-          std::vector<std::size_t> li(grid()->col_comm().size());
-          std::vector<int> cnt_lj(grid()->row_comm().size()-1);
-          std::vector<int> cnt_li(grid()->col_comm().size()-1);
-          for (std::size_t k=0; k<i+1; k++){
-            for (int p=0; p<lj.size()-1; p++){
-              if (grid()->cg2p(k)==p) cnt_lj[p]++;
-            }
-            for (int p=0; p<li.size()-1; p++){
-              if (grid()->rg2p(k)==p) cnt_li[p]++;
+        if (i+1 < rowblocks()){
+          if (grid()->is_local_row(i+1) && grid()->is_local_col(i+1)) {
+            for (std::size_t k=0, lk=0; k<i+1; k++) {
+              gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lk]),
+                  *(Tik[lk]), scalar_t(1.), tile_dense(i+1, i+1).D());
+              lk++;
             }
           }
-          /*for (int p=0; p<lj.size(); p++){
-            std::cout << "MPI rank= " << grid()->rank() << ", cnt_lj[ " << p << " ] = " << cnt_lj[p] << std::endl;
-          }
-          for (int p=0; p<li.size(); p++){
-            std::cout << "MPI rank= " << grid()->rank() << ", cnt_li[ " << p << " ] = " << cnt_li[p] << std::endl;
-          }*/
-          for (std::size_t p=1; p<lj.size(); p++){
-            lj[p] = lj[p-1] + cnt_lj[p-1];
-          }
-          for (std::size_t p=1; p<li.size(); p++){
-            li[p] = li[p-1] + cnt_li[p-1];
-          }
-          for (std::size_t k=0; k<i+1; k++) {
-            int sender_i=grid()->rg2p(k);
-            int sender_j=grid()->cg2p(k);
-            std::cout << "MPI rank= " << grid()->rank() << ", k= " << k << ", lj[ " << sender_j << " ] = " << lj[sender_j] << ", li[ " << sender_i << " ]= " << li[sender_i] << ", sender_j= " << sender_j << ", sender_i= " << sender_i << std::endl;
-            gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj[sender_j]]),
-                  *(Tik[li[sender_i]]), scalar_t(1.), tile_dense(i+1, i+1).D());
-            lj[sender_j]++;
-            li[sender_i]++;
-            //std::cout << "MPI rank= " << grid()->rank() << ", lj[sender_j] = " << lj[sender_j] << ", li[sender_i]= " << li[sender_i] << std::endl;
-          }
-        }
-        if (grid()->is_local_row(i+1)) {
-          std::vector<std::size_t> lj(grid()->row_comm().size());
-          std::vector<std::size_t> li(grid()->col_comm().size());
-          std::vector<int> cnt_lj(grid()->row_comm().size()-1);
-          std::vector<int> cnt_li(grid()->col_comm().size()-1);
-          for (std::size_t k=0; k<i+1; k++){
-            for (int p=0; p<lj.size()-1; p++){
-              if (grid()->cg2p(k)==p) cnt_lj[p]++;
-            }
-          }
-          for (std::size_t j=i+2; j<rowblocks(); j++) {
-            if (grid()->is_local_col(j)) {
-              for (std::size_t k=0; k<i+1; k++){
-                for (int p=0; p<li.size()-1; p++){
-                  if (grid()->rg2p(k)==p) cnt_li[p]++;
+          if (grid()->is_local_row(i+1)) {
+            std::size_t lk=0;
+            if (grid()->is_local_col(i+1)) lk=i+1;
+            for (std::size_t j=i+2; j<rowblocks(); j++) {
+              if (grid()->is_local_col(j)) {
+                for (std::size_t k=0, lj=0; k<i+1; k++) {
+                  gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj]),
+                    *(Tik[lk]), scalar_t(1.), tile_dense(i+1, j).D());
+                  lj++;
+                  lk++;
                 }
               }
             }
           }
-          if (grid()->is_local_col(i+1)) li[0] = i+1;
-          for (std::size_t p=1; p<li.size(); p++){
-            li[p] = li[p-1] + cnt_li[p-1];
-          }
-          for (std::size_t j=i+2; j<rowblocks(); j++) {
-            if (grid()->is_local_col(j)) {
-              lj[0] = 0;
-              std::cout << "MPI rank= " << grid()->rank() << ", j= " << j << ", lj[0] = " << lj[0] << std::endl;
-              for (std::size_t p=1; p<lj.size(); p++){
-                lj[p] = lj[p-1] + cnt_lj[p-1];
-                std::cout << "MPI rank= " << grid()->rank() << ", lj[p] = " << lj[p] << std::endl;
-              }
-              for (std::size_t k=0; k<i+1; k++) {
-                int sender_i=grid()->rg2p(k);
-                int sender_j=grid()->cg2p(k);
-                //std::cout << "MPI rank= " << grid()->rank() << ", j= " << j << ", k= " << k << ", sender_i= " << sender_i << ", sender_j= " << sender_j << ", li[sender_i]= " << li[sender_i] << ", lj[sender_j]= " << lj[sender_j] << std::endl;
-                std::cout << "MPI rank= " << grid()->rank() << ", j= " << j << ", k= " << k << ", lj[ " << sender_j << " ] = " << lj[sender_j] << ", li[ " << sender_i << " ]= " << li[sender_i] << ", sender_j= " << sender_j << ", sender_i= " << sender_i << std::endl;
-                // this uses .D, assuming tile(i+1, j) is dense
-                gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj[sender_j]]),
-                    *(Tik[li[sender_i]]), scalar_t(1.), tile_dense(i+1, j).D());
-                lj[sender_j]++;
-                li[sender_i]++;
-              }
-            }
-          }
-        }
-        std::cout << "MPI rank= " << grid()->rank() << " - HERE" << std::endl;
-        if (grid()->is_local_col(i+1)) {
-          std::cout << "MPI rank= " << grid()->rank() << ", nprows= " << grid()->nprows() << ", col_comm().size()= " << grid()->col_comm().size() << ", npcols= " << grid()->npcols() << ", row_comm().size()= " << grid()->row_comm().size() << std::endl;
-          std::vector<std::size_t> lj(grid()->row_comm().size());
-          std::vector<std::size_t> li(grid()->col_comm().size());
-          std::vector<int> cnt_lj(grid()->row_comm().size());
-          std::vector<int> cnt_li(grid()->col_comm().size());
-          for (std::size_t k=0; k<i+1; k++){
-            for (int p=0; p<li.size()-1; p++){
-              if (grid()->rg2p(k)==p) cnt_li[p]++;
-            }
-          }
-          for (std::size_t j=i+2; j<rowblocks(); j++) {
-            if (grid()->is_local_row(j)) {
-              for (std::size_t k=0; k<i+1; k++){
-                for (int p=0; p<lj.size()-1; p++){
-                  if (grid()->cg2p(k)==p) cnt_lj[p]++;
+          if (grid()->is_local_col(i+1)) {
+            std::size_t lj=0;
+            if (grid()->is_local_row(i+1)) lj=i+1;
+            for (std::size_t j=i+2; j<rowblocks(); j++) { //check rowblocks and colblocks
+              if (grid()->is_local_row(j)) {
+                for (std::size_t k=0, lk=0; k<i+1; k++) {
+                  gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj]),
+                    *(Tik[lk]), scalar_t(1.), tile_dense(j, i+1).D());
+                  lj++;
+                  lk++;
                 }
-              }
-            }
-          }
-          if (grid()->is_local_row(i+1)) lj[0] = i+1;
-          for (std::size_t p=1; p<lj.size(); p++){
-            lj[p] = lj[p-1] + cnt_lj[p-1];
-          }
-          for (std::size_t j=i+2; j<rowblocks(); j++) { //check rowblocks and colblocks
-            if (grid()->is_local_row(j)) {
-              li[0] = 0;
-              for (std::size_t p=1; p<li.size(); p++){
-                li[p] = li[p-1] + cnt_li[p-1];
-              }
-              for (std::size_t k=0; k<i+1; k++) {
-                int sender_i=grid()->rg2p(k);
-                int sender_j=grid()->cg2p(k);
-                // this uses .D, assuming tile(i+1, j) is dense
-                gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj[sender_j]]),
-                    *(Tik[li[sender_i]]), scalar_t(1.), tile_dense(j, i+1).D());
-                lj[sender_j]++;
-                li[sender_i]++;
               }
             }
           }
