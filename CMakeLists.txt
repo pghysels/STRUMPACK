@@ -411,15 +411,6 @@ if(TPL_ENABLE_BPACK)
 endif()
 
 if(TPL_ENABLE_SLATE)
-  list(APPEND CMAKE_PREFIX_PATH ${TPL_BLASPP_PREFIX}
-    $ENV{blaspp_DIR} $ENV{blaspp_ROOT}
-    $ENV{BLASPP_DIR} $ENV{BLASPP_ROOT})
-  list(APPEND CMAKE_PREFIX_PATH ${TPL_LAPACKPP_PREFIX}
-    $ENV{lapackpp_DIR} $ENV{lapackpp_ROOT}
-    $ENV{LAPACKPP_DIR} $ENV{LAPACKPP_ROOT})
-  list(APPEND CMAKE_PREFIX_PATH ${TPL_SLATE_PREFIX}
-    $ENV{slate_DIR} $ENV{slate_ROOT}
-    $ENV{SLATE_DIR} $ENV{SLATE_ROOT})
   find_package(blaspp)
   find_package(lapackpp)
   find_package(slate)

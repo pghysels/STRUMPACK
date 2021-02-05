@@ -73,6 +73,9 @@ if(@STRUMPACK_USE_BPACK@) # STRUMPACK_USE_BPACK
 endif()
 
 if(@STRUMPACK_USE_SLATE@) # STRUMPACK_USE_SLATE
+  set(blaspp_DIR @blaspp_DIR@)
+  set(lapackpp_DIR @lapackpp_DIR@)
+  set(slate_DIR @slate_DIR@)
   find_dependency(blaspp)
   find_dependency(lapackpp)
   find_dependency(slate)
