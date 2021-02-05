@@ -72,6 +72,11 @@ if(@STRUMPACK_USE_BPACK@) # STRUMPACK_USE_BPACK
   find_dependency(ButterflyPACK)
 endif()
 
+if(@STRUMPACK_USE_SLATE@) # STRUMPACK_USE_SLATE
+  find_dependency(blaspp)
+  find_dependency(lapackpp)
+  find_dependency(slate)
+endif()
 
 list(REMOVE_AT CMAKE_MODULE_PATH 0)
 
