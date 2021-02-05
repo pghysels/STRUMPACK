@@ -7,7 +7,7 @@ option(STRUMPACK_USE_OPENMP  "Use OpenMP for on-node threading tasking" ON)
 option(STRUMPACK_USE_CUDA    "Use CUDA for NVIDIA GPU acceleration" ON)
 option(STRUMPACK_USE_HIP     "Use HIP for AMD or NVIDIA GPU acceleration" ON)
 
-option(TPL_ENABLE_SLATE      "Use SLATE, the ECP ScaLAPACK replacement" OFF)
+option(TPL_ENABLE_SLATE      "Use SLATE, the ECP ScaLAPACK replacement" ON)
 option(TPL_ENABLE_PARMETIS   "Build with support for ParMetis" ON)
 option(TPL_ENABLE_SCOTCH     "Build with support for Scotch" ON)
 option(TPL_ENABLE_PTSCOTCH   "Build with support for PTScotch" ON)
@@ -407,14 +407,26 @@ if(TPL_ENABLE_BPACK)
 endif()
 
 if(TPL_ENABLE_SLATE)
-  message(STATUS "Enabling SLATE")
-  if(DEFINED TPL_SLATE_LIBRARIES)
+  list(APPEND CMAKE_PREFIX_PATH ${TPL_BLASPP_PREFIX}
+    $ENV{blaspp_DIR} $ENV{blaspp_ROOT}
+    $ENV{BLASPP_DIR} $ENV{BLASPP_ROOT})
+  list(APPEND CMAKE_PREFIX_PATH ${TPL_LAPACKPP_PREFIX}
+    $ENV{lapackpp_DIR} $ENV{lapackpp_ROOT}
+    $ENV{LAPACKPP_DIR} $ENV{LAPACKPP_ROOT})
+  list(APPEND CMAKE_PREFIX_PATH ${TPL_SLATE_PREFIX}
+    $ENV{slate_DIR} $ENV{slate_ROOT}
+    $ENV{SLATE_DIR} $ENV{SLATE_ROOT})
+  find_package(blaspp)
+  find_package(lapackpp)
+  find_package(slate)
+  if(slate_FOUND)
+    message(STATUS "Found SLATE")
     # option(STRUMPACK_USE_SLATE_LAPACK "" ON)
     option(STRUMPACK_USE_SLATE_SCALAPACK "" ON)
     set(STRUMPACK_PBLAS_BLOCKSIZE "256")
   else()
-    message(WARNING "Could not find SLATE.\n"
-      "Define TPL_SLATE_LIBRARIES and TPL_SLATE_INCLUDE_DIRS")
+    message(WARNING "SLATE was not found."
+      " SLATE is required for GPU support in the distributed memory code.")
   endif()
 endif()
 
@@ -535,9 +547,12 @@ if(ButterflyPACK_FOUND)
   ## library
 endif()
 
-if(TPL_ENABLE_SLATE)
-  target_link_libraries(strumpack PUBLIC ${TPL_SLATE_LIBRARIES})
-  target_include_directories(strumpack PRIVATE ${TPL_SLATE_INCLUDE_DIRS})
+# if(TPL_ENABLE_SLATE)
+#   target_link_libraries(strumpack PUBLIC ${TPL_SLATE_LIBRARIES})
+#   target_include_directories(strumpack PRIVATE ${TPL_SLATE_INCLUDE_DIRS})
+# endif()
+if(slate_FOUND)
+  target_link_libraries(strumpack PUBLIC slate lapackpp blaspp)
 endif()
 
 if(CUDAToolkit_FOUND)

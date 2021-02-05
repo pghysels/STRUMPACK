@@ -153,7 +153,7 @@ if [[ $(hostname -s) = "tulip" ]]; then
     cmake ../ \
           -DCMAKE_BUILD_TYPE=Debug \
           -DCMAKE_INSTALL_PREFIX=../install \
-	  -DSTRUMPACK_USE_MPI=OFF \
+          -DSTRUMPACK_USE_MPI=OFF \
           -DSTRUMPACK_USE_CUDA=OFF \
           -DSTRUMPACK_USE_HIP=ON \
           -DHIP_HIPCC_FLAGS=--amdgpu-target=gfx906 \
@@ -167,8 +167,12 @@ if [[ $(hostname -s) = "cs-it-7098760" ]]; then
     export SCOTCH_DIR=$HOME/local/scotch_6.1.0
     export ButterflyPACK_DIR=$HOME/LBL/ButterflyPACK/install/
     export ZFP_DIR=$HOME/local/zfp/install/
-    export SLATEHOME=$HOME/local/slate/
     export MAGMA_DIR=$HOME/local/magma-2.5.4/install/
+
+    export blaspp_DIR=$HOME/local/spack_pghysels/opt/spack/linux-ubuntu20.04-zen2/gcc-10.2.0/blaspp-2020.10.02-tattjpyiyxzzgvasfk72auey3oawqs3i
+    export lapackpp_DIR=$HOME/local/spack_pghysels/opt/spack/linux-ubuntu20.04-zen2/gcc-10.2.0/lapackpp-2020.10.02-mk2si37eqnft2da7yiv4o2cfyxawczlk
+    export slate_DIR=$HOME/local/spack_pghysels/opt/spack/linux-ubuntu20.04-zen2/gcc-10.2.0/slate-2020.10.00-utcue2tec7ly5kx27dy6rap6oxkglbbv
+
     cmake ../ \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_INSTALL_PREFIX=../install \
@@ -177,10 +181,9 @@ if [[ $(hostname -s) = "cs-it-7098760" ]]; then
           -DCMAKE_CUDA_FLAGS=-arch=sm_75 \
           -DSTRUMPACK_USE_HIP=OFF \
           -DTPL_ENABLE_MAGMA=OFF \
-          -DTPL_ENABLE_SLATE=OFF \
-          -DTPL_SLATE_INCLUDE_DIRS="$SLATEHOME/include/;$SLATEHOME/blaspp/include;$SLATEHOME/lapackpp/include" \
-          -DTPL_SLATE_LIBRARIES="$SLATEHOME/lib/libslate_scalapack_api.so;$SLATEHOME/lib/libslate.so;$SLATEHOME/blaspp/lib/libblaspp.so;$SLATEHOME/lapackpp/lib/liblapackpp.so" \
+          -DTPL_ENABLE_SLATE=ON \
           -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
+#          -DTPL_SCALAPACK_LIBRARIES="/home/pieterg/local/dplasma/install/lib/libdplasma.so;/home/pieterg/local/dplasma/install/lib/libparsec.so;/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
 fi
 
 
