@@ -714,10 +714,10 @@ namespace strumpack {
               if (grid()->is_local_row(k)) row_cnt++;
             }
             if (row_cnt!=0){
-              int src = i0 % grid()->npcols();
+              int src = i0 % grid()->npcols(); //int sender = grid()->rg2p(i0);
               if (!(ranks2.empty())) ranks2.push_back(msg_size2);
               if (grid()->pcol() == src && ranks2.empty()) ranks2.push_back(msg_size2);
-              std::size_t scnt=0;
+              int scnt=0;
               if (grid()->pcol() == src){
                 rcnts2.resize(grid()->npcols());
                 rcnts2[grid()->pcol()]=ranks2.size();
@@ -828,7 +828,7 @@ namespace strumpack {
               if (grid()->is_local_row(i)) {
                 auto m = tilerows(i);
                 for (std::size_t j=0; j<j0; j++){
-                  int sender=grid()->cg2p(j); 
+                  int sender = grid()->cg2p(j); 
                   auto n = tilecols(j);
                   auto r = all_ranks2[j_ranks[sender]];
                   if (r != -1) {
@@ -928,39 +928,29 @@ namespace strumpack {
         auto Tik = gather_rows(i+1, rowblocks(), i+1, colblocks());
         auto Tkj = gather_cols(i+1, rowblocks(), i+1, colblocks());
         //GEMM
-        if (i+1 < rowblocks()){
-          if (grid()->is_local_row(i+1) && grid()->is_local_col(i+1)) {
-            for (std::size_t k=0, lk=0; k<i+1; k++) {
-              gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lk]),
-                  *(Tik[lk]), scalar_t(1.), tile_dense(i+1, i+1).D());
-              lk++;
-            }
-          }
-          if (grid()->is_local_row(i+1)) {
-            std::size_t lk=0;
-            if (grid()->is_local_col(i+1)) lk=i+1;
-            for (std::size_t j=i+2; j<rowblocks(); j++) {
-              if (grid()->is_local_col(j)) {
-                for (std::size_t k=0, lj=0; k<i+1; k++) {
-                  gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj]),
-                    *(Tik[lk]), scalar_t(1.), tile_dense(i+1, j).D());
-                  lj++;
-                  lk++;
-                }
+        if (grid()->is_local_row(i+1)) {
+          std::size_t lk=0;
+          for (std::size_t j=i+1; j<rowblocks(); j++) {
+            if (grid()->is_local_col(j)) {
+              for (std::size_t k=0, lj=0; k<i+1; k++) {
+                gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj]),
+                  *(Tik[lk]), scalar_t(1.), tile_dense(i+1, j).D());
+                lj++;
+                lk++;
               }
             }
           }
-          if (grid()->is_local_col(i+1)) {
-            std::size_t lj=0;
-            if (grid()->is_local_row(i+1)) lj=i+1;
-            for (std::size_t j=i+2; j<rowblocks(); j++) { //check rowblocks and colblocks
-              if (grid()->is_local_row(j)) {
-                for (std::size_t k=0, lk=0; k<i+1; k++) {
-                  gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj]),
+        }
+        if (grid()->is_local_col(i+1)) {
+          std::size_t lj=0;
+          if (grid()->is_local_row(i+1)) lj=i+1;
+          for (std::size_t j=i+2; j<rowblocks(); j++) { //check rowblocks and colblocks
+            if (grid()->is_local_row(j)) {
+              for (std::size_t k=0, lk=0; k<i+1; k++) {
+                gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj]),
                     *(Tik[lk]), scalar_t(1.), tile_dense(j, i+1).D());
-                  lj++;
-                  lk++;
-                }
+                lj++;
+                lk++;
               }
             }
           }
@@ -1069,6 +1059,7 @@ namespace strumpack {
                      scalar_t(1.), Tii, A21.tile(j, i));
           }
         }
+#if 1 //RL-Update
         auto Tij = A11.bcast_row_of_tiles_along_cols(i, i+1, B1);
         auto Tij2 = A12.bcast_row_of_tiles_along_cols(i, 0, B2);
         auto Tki = A11.bcast_col_of_tiles_along_rows(i+1, B1, i);
@@ -1133,6 +1124,12 @@ namespace strumpack {
             }
           }
         }
+#else //LL-Update
+        auto Tik = A11.gather_rows(i+1, B1, i+1, B1);
+        auto Tkj = A11.gather_cols(i+1, B1, i+1, B1);
+        auto Tik2 = A12.gather_rows(i+1, B1, 0, B1);//(i, 0, B2);
+        auto Tk2j = A21.gather_cols(0, B1, i+1, B1);
+#endif
       }
       return piv;
     }
