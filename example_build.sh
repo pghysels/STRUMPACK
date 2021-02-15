@@ -195,9 +195,26 @@ if ! $found_host; then
     # METIS is required, but might be already be installed by the system
     #export METIS_DIR=
 
+#    -DCMAKE_C_COMPILER=icc \
+#    -DCMAKE_Fortran_COMPILER=ifort \
+
+    export METIS_DIR=$HOME/local/metis-5.1.0/install
     cmake ../ \
-          -DCMAKE_BUILD_TYPE=Debug \
-          -DCMAKE_INSTALL_PREFIX=../install
+        -DCMAKE_BUILD_TYPE=Debug \
+        -DCMAKE_CXX_COMPILER=dpcpp \
+        -DCMAKE_INSTALL_PREFIX=../install \
+	-DSTRUMPACK_USE_DPCPP=ON
+
+#	-DTPL_BLAS_LIBRARIES=" -L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_gf_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl"
+	
+# -DTPL_BLAS_LIBRARIES="-L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl"
+
+
+#        -DTPL_BLAS_LIBRARIES="-L${MKLROOT}/lib/intel64 -lmkl_sycl -lmkl_intel_ilp64 -lmkl_intel_thread -lmkl_core -lsycl -lOpenCL -liomp5 -lpthread -lm -ldl "
+
+#        -DTPL_LAPACK_LIBRARIES="" \
+#        -DTPL_SCALAPACK_LIBRARIES="" \
+
 
     ## if not found automatically, you can specify BLAS/LAPACK/SCALAPACK as:
     #  -DTPL_BLAS_LIBRARIES="/usr/lib/x86_64-linux-gnu/libopenblas.a"

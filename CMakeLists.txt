@@ -6,6 +6,7 @@ option(STRUMPACK_USE_MPI     "Build with MPI support" ON)
 option(STRUMPACK_USE_OPENMP  "Use OpenMP for on-node threading tasking" ON)
 option(STRUMPACK_USE_CUDA    "Use CUDA for NVIDIA GPU acceleration" ON)
 option(STRUMPACK_USE_HIP     "Use HIP for AMD or NVIDIA GPU acceleration" ON)
+option(STRUMPACK_USE_DPCPP   "Use DPC++ for Intel GPU acceleration" OFF)
 
 option(TPL_ENABLE_SLATE      "Use SLATE, the ECP ScaLAPACK replacement" ON)
 option(TPL_ENABLE_PARMETIS   "Build with support for ParMetis" ON)
@@ -139,7 +140,15 @@ if(STRUMPACK_USE_HIP)
   endif()
 endif()
 
+if(STRUMPACK_USE_DPCPP)
+  # set(CMAKE_CXX_COMPILER "dpcpp")
+  # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -std=c++17 -I${MKLROOT}/include")
+  # set(CMAKE_EXE_LINKER_FLAGS " ${CMAKE_EXE_LINKER_FLAGS}")
+  # set(CMAKE_EXE_LINKER_FLAGS " -fsycl -lmkl_sycl -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core")
+endif()
 
+
+# set(BLA_VENDOR Intel10_64lp)
 if(DEFINED TPL_BLAS_LIBRARIES)
   # xSDK policies require the user be able to specify BLAS libraries
   # through the TPL_BLAS_LIBRARIES variable. If these do not work,

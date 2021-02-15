@@ -26,7 +26,7 @@ if(STRUMPACK_USE_MPI)
     ${CMAKE_CURRENT_LIST_DIR}/ExtendAdd.hpp)
 endif()
 
-if(STRUMPACK_USE_CUDA OR STRUMPACK_USE_HIP)
+if(STRUMPACK_USE_CUDA OR STRUMPACK_USE_HIP OR STRUMPACK_USE_DPCPP)
   target_sources(strumpack
     PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixGPU.cpp
@@ -42,7 +42,12 @@ endif()
 if(STRUMPACK_USE_HIP)
   ## this needs to be added to hip_add_library directly
   # target_sources(strumpack PRIVATE
-  #   ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixHIP.hip.cu)
+  #   ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixHIP.hip.cpp)
+endif()
+
+if(STRUMPACK_USE_DPCPP)
+  target_sources(strumpack PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixDPCPP.cpp)
 endif()
 
 if(STRUMPACK_USE_ZFP)

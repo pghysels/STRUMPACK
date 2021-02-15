@@ -30,11 +30,15 @@
 #define FRONTAL_MATRIX_GPU_KERNELS_HPP
 
 #include "misc/Triplet.hpp"
+
 #if defined(STRUMPACK_USE_CUDA)
 #include "dense/CUDAWrapper.hpp"
 #endif
 #if defined(STRUMPACK_USE_HIP)
 #include "dense/HIPWrapper.hpp"
+#endif
+#if defined(STRUMPACK_USE_DPCPP)
+#include "dense/DPCPPWrapper.hpp"
 #endif
 
 namespace strumpack {
