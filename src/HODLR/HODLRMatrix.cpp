@@ -339,7 +339,7 @@ namespace strumpack {
 #pragma omp parallel for schedule(static, 1)
         for (int lo=0; lo<rows_; lo+=B) {
           std::vector<bool> mark(rows_, false);
-          std::vector<int> q(knn);
+          std::vector<int> q(knn+1);
           for (int i=lo; i<std::min(lo+B, rows_); i++) {
             int qfront = 0, qback = 0, nn = 0;
             q[qback++] = i;
