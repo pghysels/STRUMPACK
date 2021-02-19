@@ -389,12 +389,12 @@ namespace strumpack {
 
     template<typename scalar_t>
     std::vector<std::unique_ptr<BLRTile<scalar_t>>>
-    BLRMatrixMPI<scalar_t>::gather_rows
+    BLRMatrixMPI<scalar_t>::gather_rows_A11
     (std::size_t i0, std::size_t i1, std::size_t j0, std::size_t j1) const {
       //TODO: avoid resending, instead gather and forward tiles after update step
-      if (j1 > j0 && i1 > i0){
-        std::size_t msg_size = 0;
-        std::vector<std::int64_t> ranks;
+      std::size_t msg_size = 0;
+      std::vector<std::int64_t> ranks;
+      if (j0 > 0){
         //CASE 1: send tiles of row 0:i0-1 of col j0 to all processes in col j0
         if (grid()->is_local_col(j0)) {
           for (std::size_t i=0; i<i0; i++){
@@ -405,14 +405,16 @@ namespace strumpack {
             } 
           }
         }
-        std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
-        //CASE 1: send tiles of row 0:i0-1 to all processes in col j0
-        std::size_t nr_tiles=0;
-        std::vector<scalar_t> buf;
-        std::vector<std::int64_t> all_ranks;
-        std::vector<int> rcnts;
-        std::vector<int> tile_displs;
-        std::vector<int> displs;
+      }
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
+      //CASE 1: send tiles of row 0:i0-1 to all processes in col j0
+      std::size_t nr_tiles=0;
+      std::vector<scalar_t> buf;
+      std::vector<std::int64_t> all_ranks;
+      std::vector<int> rcnts;
+      std::vector<int> tile_displs;
+      std::vector<int> displs;
+      if (j0 > 0){
         if (grid()->is_local_col(j0)) {
           ranks.push_back(msg_size);
           rcnts.resize(grid()->nprows());
@@ -455,109 +457,111 @@ namespace strumpack {
           }
           grid()->col_comm().all_gather_v(buf.data(), tile_rcnts.data(), tile_displs.data());
         }
-        //CASE 2: cols j0+1:end, gather in proc in row i0
-        std::size_t msg_size2 = 0;
-        std::vector<std::int64_t> ranks2;
-        for (std::size_t j=j0+1; j<j1; j++){
-          if (grid()->is_local_col(j)) {
-            for (std::size_t i=0; i<i0; i++){
-              if (grid()->is_local_row(i)) {
-                msg_size2 += tile(i, j).nonzeros();
-                ranks2.push_back(tile(i, j).is_low_rank() ?
-                              tile(i, j).rank() : -1);
-              }
+      }
+      //CASE 2: cols j0+1:end, gather in proc in row i0
+      std::size_t msg_size2 = 0;
+      std::vector<std::int64_t> ranks2;
+      for (std::size_t j=j0+1; j<j1; j++){
+        if (grid()->is_local_col(j)) {
+          for (std::size_t i=0; i<i0; i++){
+            if (grid()->is_local_row(i)) {
+              msg_size2 += tile(i, j).nonzeros();
+              ranks2.push_back(tile(i, j).is_low_rank() ?
+                            tile(i, j).rank() : -1);
             }
           }
         }
-        std::vector<scalar_t> buf2;
-        std::vector<std::int64_t> all_ranks2;
-        std::vector<int> rcnts2, tile_displs2, displs2;
-        std::size_t rcnts_empty=0;
-        std::size_t col_cnt=0;
-        //CASE 2: cols j0+1:end, gather in proc in row i0
-        for (int j=0; j<grid()->npcols(); j++){
-          if (grid()->pcol() == j % grid()->npcols()) {
-            for (std::size_t k=j0+1; k<j1; k++){
-              if (grid()->is_local_col(k)) col_cnt++;
+      }
+      std::vector<scalar_t> buf2;
+      std::vector<std::int64_t> all_ranks2;
+      std::vector<int> rcnts2, tile_displs2, displs2;
+      std::size_t rcnts_empty=0;
+      std::size_t col_cnt=0;
+      //CASE 2: cols j0+1:end, gather in proc in row i0
+      for (int j=0; j<grid()->npcols(); j++){//delete??
+        if (grid()->pcol() == j % grid()->npcols()) {//??
+          for (std::size_t k=j0+1; k<j1; k++){
+            if (grid()->is_local_col(k)) col_cnt++;
+          }
+          if (col_cnt!=0){
+            int src = j0 % grid()->nprows();
+            if (!(ranks2.empty())) ranks2.push_back(msg_size2);
+            if (grid()->prow() == src && ranks2.empty()) ranks2.push_back(msg_size2);
+            int scnt=0;
+            if (grid()->prow() == src){
+              rcnts2.resize(grid()->nprows());
+              rcnts2[grid()->prow()]=ranks2.size();
+              scnt=ranks2.size();
+            } else{
+              scnt=ranks2.size();
             }
-            if (col_cnt!=0){
-              int src = j0 % grid()->nprows();
-              if (!(ranks2.empty())) ranks2.push_back(msg_size2);
-              if (grid()->prow() == src && ranks2.empty()) ranks2.push_back(msg_size2);
-              int scnt=0;
-              if (grid()->prow() == src){
-                rcnts2.resize(grid()->nprows());
-                rcnts2[grid()->prow()]=ranks2.size();
-                scnt=ranks2.size();
-              } else{
-                scnt=ranks2.size();
+            grid()->col_comm().gather(&scnt, 1, rcnts2.data(), 1, src);
+            if (grid()->prow() == src){
+              displs2.resize(grid()->nprows());
+              displs2[0]=0;
+              for (std::size_t i=1; i<rcnts2.size(); i++){
+                displs2[i]=displs2[i-1]+rcnts2[i-1];
               }
-              grid()->col_comm().gather(&scnt, 1, rcnts2.data(), 1, src);
-              if (grid()->prow() == src){
-                displs2.resize(grid()->nprows());
-                displs2[0]=0;
-                for (std::size_t i=1; i<rcnts2.size(); i++){
-                  displs2[i]=displs2[i-1]+rcnts2[i-1];
-                }
-                all_ranks2.resize(std::accumulate(rcnts2.begin(),rcnts2.end(),0));
-                std::copy(ranks2.begin(), ranks2.end(), all_ranks2.begin()+displs2[grid()->prow()]);//?? works if ranks empty??
-                for (std::size_t i=0; i<rcnts2.size(); i++){
-                  if (rcnts2[i]==0) rcnts_empty++;
-                }
-                nr_tiles+=all_ranks2.size()-rcnts2.size()+rcnts_empty;
+              all_ranks2.resize(std::accumulate(rcnts2.begin(),rcnts2.end(),0));
+              std::copy(ranks2.begin(), ranks2.end(), all_ranks2.begin()+displs2[grid()->prow()]);//?? works if ranks empty??
+              for (std::size_t i=0; i<rcnts2.size(); i++){
+                if (rcnts2[i]==0) rcnts_empty++;
               }
-              grid()->col_comm().gather_v(ranks2.data(), scnt, all_ranks2.data(), rcnts2.data(), displs2.data(), src);
-              std::vector<int> tile_rcnts;
-              if (grid()->prow() == src){
-                std::size_t total_msg_size = 0;
-                for (std::size_t i=0; i<rcnts2.size(); i++){
-                  if (rcnts2[i] == 0){
-                    total_msg_size += 0;
-                  } else {
-                    total_msg_size += all_ranks2[displs2[i]+rcnts2[i]-1];
-                  }
-                }
-                buf2.resize(total_msg_size);
-                tile_rcnts.resize(grid()->nprows());
-                for (int i=0; i<grid()->nprows(); i++){
-                  if (rcnts2[i] == 0){
-                    tile_rcnts[i] = 0;
-                  } else{
-                    tile_rcnts[i] = all_ranks2[displs2[i]+rcnts2[i]-1];
-                  }
-                }
-                tile_displs2.resize(grid()->nprows());
-                tile_displs2[0]=0;
-                for (std::size_t i=1; i<tile_rcnts.size(); i++){
-                  tile_displs2[i]=tile_displs2[i-1]+tile_rcnts[i-1];
+              nr_tiles+=all_ranks2.size()-rcnts2.size()+rcnts_empty;
+            }
+            grid()->col_comm().gather_v(ranks2.data(), scnt, all_ranks2.data(), rcnts2.data(), displs2.data(), src);
+            std::vector<int> tile_rcnts;
+            if (grid()->prow() == src){
+              std::size_t total_msg_size = 0;
+              for (std::size_t i=0; i<rcnts2.size(); i++){
+                if (rcnts2[i] == 0){
+                  total_msg_size += 0;
+                } else {
+                  total_msg_size += all_ranks2[displs2[i]+rcnts2[i]-1];
                 }
               }
-              std::vector<scalar_t> sbuf(msg_size2);
-              auto ptr = sbuf.data();
-              for (std::size_t k=j0+1; k<j1; k++){
-                if (grid()->is_local_col(k)){
-                  for (std::size_t i=0; i<i0; i++){
-                    if (grid()->is_local_row(i)) {
-                      auto& t = tile(i, k);
-                      if (tile(i, k).is_low_rank()) {
-                        std::copy(t.U().data(), t.U().end(), ptr);
-                        ptr += t.U().rows()*t.U().cols();
+              buf2.resize(total_msg_size);
+              tile_rcnts.resize(grid()->nprows());
+              for (int i=0; i<grid()->nprows(); i++){
+                if (rcnts2[i] == 0){
+                  tile_rcnts[i] = 0;
+                } else{
+                  tile_rcnts[i] = all_ranks2[displs2[i]+rcnts2[i]-1];
+                }
+              }
+              tile_displs2.resize(grid()->nprows());
+              tile_displs2[0]=0;
+              for (std::size_t i=1; i<tile_rcnts.size(); i++){
+                tile_displs2[i]=tile_displs2[i-1]+tile_rcnts[i-1];
+              }
+            }
+            std::vector<scalar_t> sbuf(msg_size2);
+            auto ptr = sbuf.data();
+            for (std::size_t k=j0+1; k<j1; k++){
+              if (grid()->is_local_col(k)){
+                for (std::size_t i=0; i<i0; i++){
+                  if (grid()->is_local_row(i)) {
+                    auto& t = tile(i, k);
+                    if (tile(i, k).is_low_rank()) {
+                      std::copy(t.U().data(), t.U().end(), ptr);
+                      ptr += t.U().rows()*t.U().cols();
                         std::copy(t.V().data(), t.V().end(), ptr);
                         ptr += t.V().rows()*t.V().cols();
-                      } else {
-                        std::copy(t.D().data(), t.D().end(), ptr);
-                        ptr += t.D().rows()*t.D().cols();
-                      }
+                    } else {
+                      std::copy(t.D().data(), t.D().end(), ptr);
+                      ptr += t.D().rows()*t.D().cols();
                     }
                   }
                 }
               }
-              grid()->col_comm().gather_v(sbuf.data(), msg_size2, buf2.data(), tile_rcnts.data(), tile_displs2.data(), src);
             }
+            grid()->col_comm().gather_v(sbuf.data(), msg_size2, buf2.data(), tile_rcnts.data(), tile_displs2.data(), src);
           }
         }
-        if (nr_tiles==0) return Tij;
-        Tij.reserve(nr_tiles);
+      }
+      if (nr_tiles==0) return Tij;
+      Tij.reserve(nr_tiles);
+      if (j0 > 0){
         if (grid()->is_local_col(j0)) {
           std::vector<scalar_t*> ptr(grid()->col_comm().size());
           std::vector<std::int64_t> i_ranks(grid()->col_comm().size());
@@ -583,52 +587,50 @@ namespace strumpack {
             i_ranks[sender]++;
           }
         }
-        if (grid()->is_local_row(i0)){
-          if (col_cnt!=0){
-            std::vector<scalar_t*> ptr(grid()->col_comm().size());
-            std::vector<std::int64_t> i_ranks(grid()->col_comm().size());
-            for (std::size_t p=0; p<ptr.size(); p++){
-              ptr[p] = buf2.data() + tile_displs2[p];
-              i_ranks[p] = displs2[p];
-            }
-            for (std::size_t j=j0+1; j<j1; j++){
-              if (grid()->is_local_col(j)) {
-                auto n = tilecols(j);
-                for (std::size_t i=0; i<i0; i++){
-                  int sender=grid()->rg2p(i); 
-                  auto m = tilerows(i);
-                  auto r = all_ranks2[i_ranks[sender]];
-                  if (r != -1) {
-                    auto t = new LRTile<scalar_t>(m, n, r);
-                    std::copy(ptr[sender], ptr[sender]+m*r, t->U().data());  ptr[sender] += m*r;
-                    std::copy(ptr[sender], ptr[sender]+r*n, t->V().data());  ptr[sender] += r*n;
-                    Tij.emplace_back(t);
-                  } else {
-                    auto t = new DenseTile<scalar_t>(m, n);
-                    std::copy(ptr[sender], ptr[sender]+m*n, t->D().data());  ptr[sender] += m*n;
-                    Tij.emplace_back(t);
-                  }
-                  i_ranks[sender]++;
+      }
+      if (grid()->is_local_row(i0)){
+        if (col_cnt!=0){
+          std::vector<scalar_t*> ptr(grid()->col_comm().size());
+          std::vector<std::int64_t> i_ranks(grid()->col_comm().size());
+          for (std::size_t p=0; p<ptr.size(); p++){
+            ptr[p] = buf2.data() + tile_displs2[p];
+            i_ranks[p] = displs2[p];
+          }
+          for (std::size_t j=j0+1; j<j1; j++){
+            if (grid()->is_local_col(j)) {
+              auto n = tilecols(j);
+              for (std::size_t i=0; i<i0; i++){
+                int sender=grid()->rg2p(i); 
+                auto m = tilerows(i);
+                auto r = all_ranks2[i_ranks[sender]];
+                if (r != -1) {
+                  auto t = new LRTile<scalar_t>(m, n, r);
+                  std::copy(ptr[sender], ptr[sender]+m*r, t->U().data());  ptr[sender] += m*r;
+                  std::copy(ptr[sender], ptr[sender]+r*n, t->V().data());  ptr[sender] += r*n;
+                  Tij.emplace_back(t);
+                } else {
+                  auto t = new DenseTile<scalar_t>(m, n);
+                  std::copy(ptr[sender], ptr[sender]+m*n, t->D().data());  ptr[sender] += m*n;
+                  Tij.emplace_back(t);
                 }
+                i_ranks[sender]++;
               }
             }
           }
         }
-        return Tij;
-      } else{
-        std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
-        return Tij;
       }
+      return Tij;
     }
 
     template<typename scalar_t>
     std::vector<std::unique_ptr<BLRTile<scalar_t>>>
-    BLRMatrixMPI<scalar_t>::gather_cols
+    BLRMatrixMPI<scalar_t>::gather_cols_A11
     (std::size_t i0, std::size_t i1, std::size_t j0, std::size_t j1) const {
-      if (i1 > i0 && j1 > j0){
-        //TODO: avoid resending, instead gather and forward tiles after update step
-        std::size_t msg_size = 0;
-        std::vector<std::int64_t> ranks;
+      //if (i1 > i0 && j1 > j0){
+      //TODO: avoid resending, instead gather and forward tiles after update step
+      std::size_t msg_size = 0;
+      std::vector<std::int64_t> ranks;
+      if (i0 > 0){
         //CASE 1: send tiles of col 0:j0-1 of row i0 to all processes in row i0
         if (grid()->is_local_row(i0)) {
           for (std::size_t j=0; j<j0; j++){
@@ -639,26 +641,28 @@ namespace strumpack {
             } 
           }
         }
-        //CASE 2: rows i0+1:end, gather in proc in col j0
-        std::size_t msg_size2 = 0;
-        std::vector<std::int64_t> ranks2;
-        for (std::size_t i=i0+1; i<i1; i++){
-          if (grid()->is_local_row(i)) {
-            for (std::size_t j=0; j<j0; j++){
-              if (grid()->is_local_col(j)) {
-                msg_size2 += tile(i, j).nonzeros();
-                ranks2.push_back(tile(i, j).is_low_rank() ?
-                              tile(i, j).rank() : -1);
-              }
+      }
+      //CASE 2: rows i0+1:end, gather in proc in col j0
+      std::size_t msg_size2 = 0;
+      std::vector<std::int64_t> ranks2;
+      for (std::size_t i=i0+1; i<i1; i++){
+        if (grid()->is_local_row(i)) {
+          for (std::size_t j=0; j<j0; j++){
+            if (grid()->is_local_col(j)) {
+              msg_size2 += tile(i, j).nonzeros();
+              ranks2.push_back(tile(i, j).is_low_rank() ?
+                            tile(i, j).rank() : -1);
             }
           }
         }
-        std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
-        //CASE 1: row i0, send to all processes in row
-        std::size_t nr_tiles=0;
-        std::vector<scalar_t> buf;
-        std::vector<std::int64_t> all_ranks;
-        std::vector<int> rcnts, tile_displs, displs;
+      }
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
+      //CASE 1: row i0, send to all processes in row
+      std::size_t nr_tiles=0;
+      std::vector<scalar_t> buf;
+      std::vector<std::int64_t> all_ranks;
+      std::vector<int> rcnts, tile_displs, displs;
+      if (i0 > 0){
         if (grid()->is_local_row(i0)) {
           ranks.push_back(msg_size);
           rcnts.resize(grid()->npcols());
@@ -701,96 +705,98 @@ namespace strumpack {
           }
           grid()->row_comm().all_gather_v(buf.data(), tile_rcnts.data(), tile_displs.data());
         }
-        //CASE 2: rows i0+1:end, gather in proc in col j0
-        std::vector<scalar_t> buf2;
-        std::vector<std::int64_t> all_ranks2;
-        std::vector<int> rcnts2, displs2, tile_displs2;
-        std::size_t rcnts_empty=0;
-        std::size_t row_cnt=0;
-        for (int i=0; i<grid()->nprows(); i++){
-          if (grid()->prow() == i % grid()->nprows()) {
-            //TODO: easier way to check if processor owns rows 
-            for (std::size_t k=i0+1; k<i1; k++){
-              if (grid()->is_local_row(k)) row_cnt++;
+      }
+      //CASE 2: rows i0+1:end, gather in proc in col j0
+      std::vector<scalar_t> buf2;
+      std::vector<std::int64_t> all_ranks2;
+      std::vector<int> rcnts2, displs2, tile_displs2;
+      std::size_t rcnts_empty=0;
+      std::size_t row_cnt=0;
+      for (int i=0; i<grid()->nprows(); i++){
+        if (grid()->prow() == i % grid()->nprows()) {
+          //TODO: easier way to check if processor owns rows 
+          for (std::size_t k=i0+1; k<i1; k++){
+            if (grid()->is_local_row(k)) row_cnt++;
+          }
+          if (row_cnt!=0){
+            int src = i0 % grid()->npcols(); //?? i0
+            if (!(ranks2.empty())) ranks2.push_back(msg_size2);
+            if (grid()->pcol() == src && ranks2.empty()) ranks2.push_back(msg_size2);
+            int scnt=0;
+            if (grid()->pcol() == src){
+              rcnts2.resize(grid()->npcols());
+              rcnts2[grid()->pcol()]=ranks2.size();
+              scnt=ranks2.size();
+            } else{
+              scnt=ranks2.size();
             }
-            if (row_cnt!=0){
-              int src = i0 % grid()->npcols(); //int sender = grid()->rg2p(i0);
-              if (!(ranks2.empty())) ranks2.push_back(msg_size2);
-              if (grid()->pcol() == src && ranks2.empty()) ranks2.push_back(msg_size2);
-              int scnt=0;
-              if (grid()->pcol() == src){
-                rcnts2.resize(grid()->npcols());
-                rcnts2[grid()->pcol()]=ranks2.size();
-                scnt=ranks2.size();
-              } else{
-                scnt=ranks2.size();
+            grid()->row_comm().gather(&scnt, 1, rcnts2.data(), 1, src);
+            if (grid()->pcol() == src){
+              displs2.resize(grid()->npcols());
+              displs2[0]=0;
+              for (std::size_t j=1; j<rcnts2.size(); j++){
+                displs2[j]=displs2[j-1]+rcnts2[j-1];
               }
-              grid()->row_comm().gather(&scnt, 1, rcnts2.data(), 1, src);
-              if (grid()->pcol() == src){
-                displs2.resize(grid()->npcols());
-                displs2[0]=0;
-                for (std::size_t j=1; j<rcnts2.size(); j++){
-                  displs2[j]=displs2[j-1]+rcnts2[j-1];
-                }
-                all_ranks2.resize(std::accumulate(rcnts2.begin(),rcnts2.end(),0));
-                std::copy(ranks2.begin(), ranks2.end(), all_ranks2.begin()+displs2[grid()->pcol()]);//?? works if ranks empty??
-                for (std::size_t j=0; j<rcnts2.size(); j++){
-                  if (rcnts2[j]==0) rcnts_empty++;
-                }
-                nr_tiles+=all_ranks2.size()-rcnts2.size()+rcnts_empty;
+              all_ranks2.resize(std::accumulate(rcnts2.begin(),rcnts2.end(),0));
+              std::copy(ranks2.begin(), ranks2.end(), all_ranks2.begin()+displs2[grid()->pcol()]);//?? works if ranks empty??
+              for (std::size_t j=0; j<rcnts2.size(); j++){
+                if (rcnts2[j]==0) rcnts_empty++;
               }
-              grid()->row_comm().gather_v(ranks2.data(), scnt, all_ranks2.data(), rcnts2.data(), displs2.data(), src);
-              std::vector<int> tile_rcnts;
-              if (grid()->pcol() == src){
-                std::size_t total_msg_size = 0;
-                for (std::size_t j=0; j<rcnts2.size(); j++){
-                  if (rcnts2[j] == 0){
-                    total_msg_size += 0;
-                  } else {
-                    total_msg_size += all_ranks2[displs2[j]+rcnts2[j]-1];
-                  }
-                }
-                buf2.resize(total_msg_size);
-                tile_rcnts.resize(grid()->npcols());
-                for (int j=0; j<grid()->npcols(); j++){
-                  if (rcnts2[j] == 0){
-                    tile_rcnts[j] = 0;
-                  } else{
-                    tile_rcnts[j] = all_ranks2[displs2[j]+rcnts2[j]-1];
-                  }
-                }
-                tile_displs2.resize(grid()->npcols());
-                tile_displs2[0]=0;
-                for (std::size_t j=1; j<tile_rcnts.size(); j++){
-                  tile_displs2[j]=tile_displs2[j-1]+tile_rcnts[j-1];
+              nr_tiles+=all_ranks2.size()-rcnts2.size()+rcnts_empty;
+            }
+            grid()->row_comm().gather_v(ranks2.data(), scnt, all_ranks2.data(), rcnts2.data(), displs2.data(), src);
+            std::vector<int> tile_rcnts;
+            if (grid()->pcol() == src){
+              std::size_t total_msg_size = 0;
+              for (std::size_t j=0; j<rcnts2.size(); j++){
+                if (rcnts2[j] == 0){
+                  total_msg_size += 0;
+                } else {
+                  total_msg_size += all_ranks2[displs2[j]+rcnts2[j]-1];
                 }
               }
-              std::vector<scalar_t> sbuf(msg_size2);
-              auto ptr = sbuf.data();
-              for (std::size_t k=i0+1; k<i1; k++){
-                if (grid()->is_local_row(k)){
-                  for (std::size_t j=0; j<j0; j++){
-                    if (grid()->is_local_col(j)) {
-                      auto& t = tile(k, j);
-                      if (tile(k, j).is_low_rank()) { 
-                        std::copy(t.U().data(), t.U().end(), ptr);
-                        ptr += t.U().rows()*t.U().cols();
-                        std::copy(t.V().data(), t.V().end(), ptr);
-                        ptr += t.V().rows()*t.V().cols();
-                      } else {
-                        std::copy(t.D().data(), t.D().end(), ptr);
-                        ptr += t.D().rows()*t.D().cols();
-                      }
+              buf2.resize(total_msg_size);
+              tile_rcnts.resize(grid()->npcols());
+              for (int j=0; j<grid()->npcols(); j++){
+                if (rcnts2[j] == 0){
+                  tile_rcnts[j] = 0;
+                } else{
+                  tile_rcnts[j] = all_ranks2[displs2[j]+rcnts2[j]-1];
+                }
+              }
+              tile_displs2.resize(grid()->npcols());
+              tile_displs2[0]=0;
+              for (std::size_t j=1; j<tile_rcnts.size(); j++){
+                tile_displs2[j]=tile_displs2[j-1]+tile_rcnts[j-1];
+              }
+            }
+            std::vector<scalar_t> sbuf(msg_size2);
+            auto ptr = sbuf.data();
+            for (std::size_t k=i0+1; k<i1; k++){
+              if (grid()->is_local_row(k)){
+                for (std::size_t j=0; j<j0; j++){
+                  if (grid()->is_local_col(j)) {
+                    auto& t = tile(k, j);
+                    if (tile(k, j).is_low_rank()) { 
+                      std::copy(t.U().data(), t.U().end(), ptr);
+                      ptr += t.U().rows()*t.U().cols();
+                      std::copy(t.V().data(), t.V().end(), ptr);
+                      ptr += t.V().rows()*t.V().cols();
+                    } else {
+                      std::copy(t.D().data(), t.D().end(), ptr);
+                      ptr += t.D().rows()*t.D().cols();
                     }
                   }
                 }
               }
-              grid()->row_comm().gather_v(sbuf.data(), msg_size2, buf2.data(), tile_rcnts.data(), tile_displs2.data(), src);
             }
+            grid()->row_comm().gather_v(sbuf.data(), msg_size2, buf2.data(), tile_rcnts.data(), tile_displs2.data(), src);
           }
         }
-        if (nr_tiles==0) return Tij;
-        Tij.reserve(nr_tiles);
+      }
+      if (nr_tiles==0) return Tij;
+      Tij.reserve(nr_tiles);
+      if (i0 > 0){
         if (grid()->is_local_row(i0)) {
           std::vector<scalar_t*> ptr(grid()->row_comm().size());
           std::vector<std::int64_t> j_ranks(grid()->row_comm().size());
@@ -816,42 +822,543 @@ namespace strumpack {
             j_ranks[sender]++;
           }
         }
-        if (grid()->is_local_col(j0)){
-          if (row_cnt!=0){
-            std::vector<scalar_t*> ptr(grid()->row_comm().size());
-            std::vector<std::int64_t> j_ranks(grid()->row_comm().size());
-            for (std::size_t p=0; p<ptr.size(); p++){
-              ptr[p] = buf2.data() + tile_displs2[p];
-              j_ranks[p] = displs2[p];
+      }
+      if (grid()->is_local_col(j0)){
+        if (row_cnt!=0){
+          std::vector<scalar_t*> ptr(grid()->row_comm().size());
+          std::vector<std::int64_t> j_ranks(grid()->row_comm().size());
+          for (std::size_t p=0; p<ptr.size(); p++){
+            ptr[p] = buf2.data() + tile_displs2[p];
+            j_ranks[p] = displs2[p];
+          }
+          for (std::size_t i=i0+1; i<i1; i++){
+            if (grid()->is_local_row(i)) {
+              auto m = tilerows(i);
+              for (std::size_t j=0; j<j0; j++){
+                int sender = grid()->cg2p(j); 
+                auto n = tilecols(j);
+                auto r = all_ranks2[j_ranks[sender]];
+                if (r != -1) {
+                  auto t = new LRTile<scalar_t>(m, n, r);
+                  std::copy(ptr[sender], ptr[sender]+m*r, t->U().data());  ptr[sender] += m*r;
+                  std::copy(ptr[sender], ptr[sender]+r*n, t->V().data());  ptr[sender] += r*n;
+                  Tij.emplace_back(t);
+                } else {
+                  auto t = new DenseTile<scalar_t>(m, n);
+                  std::copy(ptr[sender], ptr[sender]+m*n, t->D().data());  ptr[sender] += m*n;
+                  Tij.emplace_back(t);
+                }
+                j_ranks[sender]++;
+              }
             }
-            for (std::size_t i=i0+1; i<i1; i++){
-              if (grid()->is_local_row(i)) {
-                auto m = tilerows(i);
+          }
+        }
+      }
+      return Tij;
+    }
+
+    template<typename scalar_t>
+    std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+    BLRMatrixMPI<scalar_t>::gather_cols
+    (std::size_t i0, std::size_t i1, std::size_t j0, std::size_t j1) const {
+      std::vector<std::int64_t> ranks;
+      //CASE 2: rows i0:end, gather in proc in col j0
+      std::size_t msg_size2 = 0;
+      std::vector<std::int64_t> ranks2;
+      for (std::size_t i=i0; i<i1; i++){
+        if (grid()->is_local_row(i)) {
+          for (std::size_t j=0; j<j0; j++){
+            if (grid()->is_local_col(j)) {
+              msg_size2 += tile(i, j).nonzeros();
+              ranks2.push_back(tile(i, j).is_low_rank() ?
+                            tile(i, j).rank() : -1);
+            }
+          }
+        }
+      }
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
+      std::size_t nr_tiles=0;
+      //CASE 2: rows i0:end, gather in proc in col j0
+      std::vector<scalar_t> buf2;
+      std::vector<std::int64_t> all_ranks2;
+      std::vector<int> rcnts2, displs2, tile_displs2;
+      std::size_t rcnts_empty=0;
+      std::size_t row_cnt=0;
+      for (int i=0; i<grid()->nprows(); i++){
+        if (grid()->prow() == i % grid()->nprows()) {
+          //TODO: easier way to check if processor owns rows 
+          for (std::size_t k=i0; k<i1; k++){
+            if (grid()->is_local_row(k)) row_cnt++;
+          }
+          if (row_cnt!=0){
+            int src = j0 % grid()->npcols();
+            if (!(ranks2.empty())) ranks2.push_back(msg_size2);
+            if (grid()->pcol() == src && ranks2.empty()) ranks2.push_back(msg_size2);
+            int scnt=0;
+            if (grid()->pcol() == src){
+              rcnts2.resize(grid()->npcols());
+              rcnts2[grid()->pcol()]=ranks2.size();
+              scnt=ranks2.size();
+            } else{
+              scnt=ranks2.size();
+            }
+            grid()->row_comm().gather(&scnt, 1, rcnts2.data(), 1, src);
+            if (grid()->pcol() == src){
+              displs2.resize(grid()->npcols());
+              displs2[0]=0;
+              for (std::size_t j=1; j<rcnts2.size(); j++){
+                displs2[j]=displs2[j-1]+rcnts2[j-1];
+              }
+              all_ranks2.resize(std::accumulate(rcnts2.begin(),rcnts2.end(),0));
+              std::copy(ranks2.begin(), ranks2.end(), all_ranks2.begin()+displs2[grid()->pcol()]);//?? works if ranks empty??
+              for (std::size_t j=0; j<rcnts2.size(); j++){
+                if (rcnts2[j]==0) rcnts_empty++;
+              }
+              nr_tiles+=all_ranks2.size()-rcnts2.size()+rcnts_empty;
+            }
+            grid()->row_comm().gather_v(ranks2.data(), scnt, all_ranks2.data(), rcnts2.data(), displs2.data(), src);
+            std::vector<int> tile_rcnts;
+            if (grid()->pcol() == src){
+              std::size_t total_msg_size = 0;
+              for (std::size_t j=0; j<rcnts2.size(); j++){
+                if (rcnts2[j] == 0){
+                  total_msg_size += 0;
+                } else {
+                  total_msg_size += all_ranks2[displs2[j]+rcnts2[j]-1];
+                }
+              }
+              buf2.resize(total_msg_size);
+              tile_rcnts.resize(grid()->npcols());
+              for (int j=0; j<grid()->npcols(); j++){
+                if (rcnts2[j] == 0){
+                  tile_rcnts[j] = 0;
+                } else{
+                  tile_rcnts[j] = all_ranks2[displs2[j]+rcnts2[j]-1];
+                }
+              }
+              tile_displs2.resize(grid()->npcols());
+              tile_displs2[0]=0;
+              for (std::size_t j=1; j<tile_rcnts.size(); j++){
+                tile_displs2[j]=tile_displs2[j-1]+tile_rcnts[j-1];
+              }
+            }
+            std::vector<scalar_t> sbuf(msg_size2);
+            auto ptr = sbuf.data();
+            for (std::size_t k=i0; k<i1; k++){
+              if (grid()->is_local_row(k)){
                 for (std::size_t j=0; j<j0; j++){
-                  int sender = grid()->cg2p(j); 
-                  auto n = tilecols(j);
-                  auto r = all_ranks2[j_ranks[sender]];
-                  if (r != -1) {
-                    auto t = new LRTile<scalar_t>(m, n, r);
-                    std::copy(ptr[sender], ptr[sender]+m*r, t->U().data());  ptr[sender] += m*r;
-                    std::copy(ptr[sender], ptr[sender]+r*n, t->V().data());  ptr[sender] += r*n;
-                    Tij.emplace_back(t);
-                  } else {
-                    auto t = new DenseTile<scalar_t>(m, n);
-                    std::copy(ptr[sender], ptr[sender]+m*n, t->D().data());  ptr[sender] += m*n;
-                    Tij.emplace_back(t);
+                  if (grid()->is_local_col(j)) {
+                    auto& t = tile(k, j);
+                    if (tile(k, j).is_low_rank()) { 
+                      std::copy(t.U().data(), t.U().end(), ptr);
+                      ptr += t.U().rows()*t.U().cols();
+                      std::copy(t.V().data(), t.V().end(), ptr);
+                      ptr += t.V().rows()*t.V().cols();
+                    } else {
+                      std::copy(t.D().data(), t.D().end(), ptr);
+                      ptr += t.D().rows()*t.D().cols();
+                    }
                   }
-                  j_ranks[sender]++;
+                }
+              }
+            }
+            grid()->row_comm().gather_v(sbuf.data(), msg_size2, buf2.data(), tile_rcnts.data(), tile_displs2.data(), src);
+          }
+        }
+      }
+      if (nr_tiles==0) return Tij;
+      Tij.reserve(nr_tiles);
+      if (grid()->is_local_col(j0)){
+        if (row_cnt!=0){
+          std::vector<scalar_t*> ptr(grid()->row_comm().size());
+          std::vector<std::int64_t> j_ranks(grid()->row_comm().size());
+          for (std::size_t p=0; p<ptr.size(); p++){
+            ptr[p] = buf2.data() + tile_displs2[p];
+            j_ranks[p] = displs2[p];
+          }
+          for (std::size_t i=i0; i<i1; i++){
+            if (grid()->is_local_row(i)) {
+              auto m = tilerows(i);
+              for (std::size_t j=0; j<j0; j++){
+                int sender = grid()->cg2p(j); 
+                auto n = tilecols(j);
+                auto r = all_ranks2[j_ranks[sender]];
+                if (r != -1) {
+                  auto t = new LRTile<scalar_t>(m, n, r);
+                  std::copy(ptr[sender], ptr[sender]+m*r, t->U().data());  ptr[sender] += m*r;
+                  std::copy(ptr[sender], ptr[sender]+r*n, t->V().data());  ptr[sender] += r*n;
+                  Tij.emplace_back(t);
+                } else {
+                  auto t = new DenseTile<scalar_t>(m, n);
+                  std::copy(ptr[sender], ptr[sender]+m*n, t->D().data());  ptr[sender] += m*n;
+                  Tij.emplace_back(t);
+                }
+                j_ranks[sender]++;
+              }
+            }
+          }
+        }
+      }
+      return Tij;
+    }
+
+
+    template<typename scalar_t>
+    std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+    BLRMatrixMPI<scalar_t>::gather_rows
+    (std::size_t i0, std::size_t i1, std::size_t j0, std::size_t j1) const {
+      std::vector<std::int64_t> ranks;
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
+      std::size_t msg_size2 = 0;
+      std::vector<std::int64_t> ranks2;
+      for (std::size_t j=j0; j<j1; j++){
+        if (grid()->is_local_col(j)) {
+          for (std::size_t i=0; i<i0; i++){
+            if (grid()->is_local_row(i)) {
+              msg_size2 += tile(i, j).nonzeros();
+              ranks2.push_back(tile(i, j).is_low_rank() ?
+                            tile(i, j).rank() : -1);
+            }
+          }
+        }
+      }
+      std::vector<scalar_t> buf2;
+      std::vector<std::int64_t> all_ranks2;
+      std::vector<int> rcnts2, tile_displs2, displs2;
+      std::size_t rcnts_empty=0;
+      std::size_t col_cnt=0;
+      std::size_t nr_tiles=0;
+      //CASE 2: cols j0:end, gather in proc in row i0
+      for (int j=0; j<grid()->npcols(); j++){
+        if (grid()->pcol() == j % grid()->npcols()) {
+          for (std::size_t k=j0; k<j1; k++){
+            if (grid()->is_local_col(k)){
+              col_cnt++;
+            }
+          }
+          if (col_cnt!=0){
+            int src = i0 % grid()->nprows();
+            if (!(ranks2.empty())) ranks2.push_back(msg_size2);
+            if (grid()->prow() == src && ranks2.empty()) ranks2.push_back(msg_size2);
+            int scnt=0;
+            if (grid()->prow() == src){
+              rcnts2.resize(grid()->nprows());
+              rcnts2[grid()->prow()]=ranks2.size();
+              scnt=ranks2.size();
+            } else{
+              scnt=ranks2.size();
+            }
+            grid()->col_comm().gather(&scnt, 1, rcnts2.data(), 1, src);
+            if (grid()->prow() == src){
+              displs2.resize(grid()->nprows());
+              displs2[0]=0;
+              for (std::size_t i=1; i<rcnts2.size(); i++){
+                displs2[i]=displs2[i-1]+rcnts2[i-1];
+              }
+              all_ranks2.resize(std::accumulate(rcnts2.begin(),rcnts2.end(),0));
+              std::copy(ranks2.begin(), ranks2.end(), all_ranks2.begin()+displs2[grid()->prow()]);//?? works if ranks empty??
+              for (std::size_t i=0; i<rcnts2.size(); i++){
+                if (rcnts2[i]==0) rcnts_empty++;
+              }
+              nr_tiles+=all_ranks2.size()-rcnts2.size()+rcnts_empty;
+            }
+            grid()->col_comm().gather_v(ranks2.data(), scnt, all_ranks2.data(), rcnts2.data(), displs2.data(), src);
+            std::vector<int> tile_rcnts;
+            if (grid()->prow() == src){
+              std::size_t total_msg_size = 0;
+              for (std::size_t i=0; i<rcnts2.size(); i++){
+                if (rcnts2[i] == 0){
+                  total_msg_size += 0;
+                } else {
+                  total_msg_size += all_ranks2[displs2[i]+rcnts2[i]-1];
+                }
+              }
+              buf2.resize(total_msg_size);
+              tile_rcnts.resize(grid()->nprows());
+              for (int i=0; i<grid()->nprows(); i++){
+                if (rcnts2[i] == 0){
+                  tile_rcnts[i] = 0;
+                } else{
+                  tile_rcnts[i] = all_ranks2[displs2[i]+rcnts2[i]-1];
+                }
+              }
+              tile_displs2.resize(grid()->nprows());
+              tile_displs2[0]=0;
+              for (std::size_t i=1; i<tile_rcnts.size(); i++){
+                tile_displs2[i]=tile_displs2[i-1]+tile_rcnts[i-1];
+              }
+            }
+            std::vector<scalar_t> sbuf(msg_size2);
+            auto ptr = sbuf.data();
+            for (std::size_t k=j0; k<j1; k++){
+              if (grid()->is_local_col(k)){
+                for (std::size_t i=0; i<i0; i++){
+                  if (grid()->is_local_row(i)) {
+                    auto& t = tile(i, k);
+                    if (tile(i, k).is_low_rank()) {
+                      std::copy(t.U().data(), t.U().end(), ptr);
+                      ptr += t.U().rows()*t.U().cols();
+                      std::copy(t.V().data(), t.V().end(), ptr);
+                      ptr += t.V().rows()*t.V().cols();
+                    } else {
+                      std::copy(t.D().data(), t.D().end(), ptr);
+                      ptr += t.D().rows()*t.D().cols();
+                    }
+                  }
+                }
+              }
+            }
+            grid()->col_comm().gather_v(sbuf.data(), msg_size2, buf2.data(), tile_rcnts.data(), tile_displs2.data(), src);
+          }
+        }
+      }
+      if (nr_tiles==0) return Tij;
+      Tij.reserve(nr_tiles);
+      if (grid()->is_local_row(i0)){
+        if (col_cnt!=0){
+          std::vector<scalar_t*> ptr(grid()->col_comm().size());
+          std::vector<std::int64_t> i_ranks(grid()->col_comm().size());
+          for (std::size_t p=0; p<ptr.size(); p++){
+            ptr[p] = buf2.data() + tile_displs2[p];
+            i_ranks[p] = displs2[p];
+          }
+          for (std::size_t j=j0; j<j1; j++){
+            if (grid()->is_local_col(j)) {
+              auto n = tilecols(j);
+              for (std::size_t i=0; i<i0; i++){
+                int sender=grid()->rg2p(i); 
+                auto m = tilerows(i);
+                auto r = all_ranks2[i_ranks[sender]];
+                if (r != -1) {
+                  auto t = new LRTile<scalar_t>(m, n, r);
+                  std::copy(ptr[sender], ptr[sender]+m*r, t->U().data());  ptr[sender] += m*r;
+                  std::copy(ptr[sender], ptr[sender]+r*n, t->V().data());  ptr[sender] += r*n;
+                  Tij.emplace_back(t);
+                } else {
+                  auto t = new DenseTile<scalar_t>(m, n);
+                  std::copy(ptr[sender], ptr[sender]+m*n, t->D().data());  ptr[sender] += m*n;
+                  Tij.emplace_back(t);
+                }
+                i_ranks[sender]++;
+              }
+            }
+          }
+        }
+      }
+      return Tij;
+    }
+
+    template<typename scalar_t>
+    std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+    BLRMatrixMPI<scalar_t>::gather_rows_A22
+    (std::size_t i1, std::size_t j1) const {
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
+      std::size_t msg_size = 0;
+      std::vector<std::int64_t> ranks;
+      for (std::size_t j=0; j<j1; j++){
+        if (grid()->is_local_col(j)) {
+          for (std::size_t i=0; i<i1; i++){
+            if (grid()->is_local_row(i)) {
+              msg_size += tile(i, j).nonzeros();
+              ranks.push_back(tile(i, j).is_low_rank() ?
+                            tile(i, j).rank() : -1);
+            }
+          }
+        }
+      }
+      std::vector<scalar_t> buf;
+      std::vector<std::int64_t> all_ranks;
+      std::vector<int> rcnts, tile_displs, displs;
+      std::size_t col_cnt=0, nr_tiles=0;
+      for (std::size_t k=0; k<j1; k++){
+        if (grid()->is_local_col(k)){
+          col_cnt++;
+        }
+      }
+      if (col_cnt!=0){
+        if (!(ranks.empty())) ranks.push_back(msg_size);
+        rcnts.resize(grid()->nprows());
+        rcnts[grid()->prow()]=ranks.size();
+        grid()->col_comm().all_gather(rcnts.data(), 1);
+        displs.resize(grid()->nprows());
+        for (std::size_t i=1; i<rcnts.size(); i++){
+          displs[i]=displs[i-1]+rcnts[i-1];
+        }
+        all_ranks.resize(std::accumulate(rcnts.begin(),rcnts.end(),0));
+        nr_tiles=all_ranks.size()-rcnts.size();
+        std::copy(ranks.begin(), ranks.end(), all_ranks.begin()+displs[grid()->prow()]);
+        grid()->col_comm().all_gather_v(all_ranks.data(), rcnts.data(), displs.data());
+        std::size_t total_msg_size = 0;
+        for (std::size_t i=0; i<rcnts.size(); i++){
+          total_msg_size += all_ranks[displs[i]+rcnts[i]-1];
+        }
+        buf.resize(total_msg_size);
+        std::vector<int> tile_rcnts(grid()->nprows());
+        for (int i=0; i<grid()->nprows(); i++)
+          tile_rcnts[i] = all_ranks[displs[i]+rcnts[i]-1];
+        tile_displs.resize(grid()->nprows());
+        for (std::size_t i=1; i<tile_rcnts.size(); i++){
+          tile_displs[i]=tile_displs[i-1]+tile_rcnts[i-1];
+        }
+        auto ptr = buf.data() + tile_displs[grid()->prow()];
+        for (std::size_t k=0; k<j1; k++){
+          if (grid()->is_local_col(k)){
+            for (std::size_t i=0; i<i1; i++){
+              if (grid()->is_local_row(i)) {
+                auto& t = tile(i, k);
+                if (tile(i, k).is_low_rank()) {
+                  std::copy(t.U().data(), t.U().end(), ptr);
+                  ptr += t.U().rows()*t.U().cols();
+                  std::copy(t.V().data(), t.V().end(), ptr);
+                  ptr += t.V().rows()*t.V().cols();
+                } else {
+                  std::copy(t.D().data(), t.D().end(), ptr);
+                  ptr += t.D().rows()*t.D().cols();
                 }
               }
             }
           }
         }
-        return Tij;
-      } else{
-        std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
-        return Tij;
+        grid()->col_comm().all_gather_v(buf.data(), tile_rcnts.data(), tile_displs.data());
       }
+      if (nr_tiles==0) return Tij;
+      Tij.reserve(nr_tiles);
+      if (col_cnt!=0){
+        std::vector<scalar_t*> ptr(grid()->col_comm().size());
+        std::vector<std::int64_t> i_ranks(grid()->col_comm().size());
+        for (std::size_t p=0; p<ptr.size(); p++){
+          ptr[p] = buf.data() + tile_displs[p];
+          i_ranks[p] = displs[p];
+        }
+        for (std::size_t j=0; j<j1; j++){
+          if (grid()->is_local_col(j)) {
+            auto n = tilecols(j);
+            for (std::size_t i=0; i<i1; i++){
+              int sender=grid()->rg2p(i); 
+              auto m = tilerows(i);
+              auto r = all_ranks[i_ranks[sender]];
+              if (r != -1) {
+                auto t = new LRTile<scalar_t>(m, n, r);
+                std::copy(ptr[sender], ptr[sender]+m*r, t->U().data());  ptr[sender] += m*r;
+                std::copy(ptr[sender], ptr[sender]+r*n, t->V().data());  ptr[sender] += r*n;
+                Tij.emplace_back(t);
+              } else {
+                auto t = new DenseTile<scalar_t>(m, n);
+                std::copy(ptr[sender], ptr[sender]+m*n, t->D().data());  ptr[sender] += m*n;
+                Tij.emplace_back(t);
+              }
+              i_ranks[sender]++;
+            }
+          }
+        }
+      }
+      return Tij;
+    }
+
+    template<typename scalar_t>
+    std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+    BLRMatrixMPI<scalar_t>::gather_cols_A22
+    (std::size_t i1, std::size_t j1) const {
+      std::size_t msg_size = 0;
+      std::vector<std::int64_t> ranks;
+      for (std::size_t i=0; i<j1; i++){
+        if (grid()->is_local_row(i)) {
+          for (std::size_t j=0; j<i1; j++){
+            if (grid()->is_local_col(j)) {
+              msg_size += tile(i, j).nonzeros();
+              ranks.push_back(tile(i, j).is_low_rank() ?
+                            tile(i, j).rank() : -1);
+            }
+          }
+        }
+      }
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
+      std::size_t nr_tiles=0;
+      std::vector<scalar_t> buf;
+      std::vector<std::int64_t> all_ranks;
+      std::vector<int> rcnts, tile_displs, displs;
+      std::size_t row_cnt=0;
+      for (std::size_t k=0; k<j1; k++){
+        if (grid()->is_local_row(k)) row_cnt++;
+      }
+      if (row_cnt!=0){
+        if (!(ranks.empty())) ranks.push_back(msg_size);
+        rcnts.resize(grid()->npcols());
+        rcnts[grid()->pcol()]=ranks.size();
+        grid()->row_comm().all_gather(rcnts.data(), 1);
+        displs.resize(grid()->npcols());
+        for (std::size_t j=1; j<rcnts.size(); j++){
+          displs[j]=displs[j-1]+rcnts[j-1];
+        }
+        all_ranks.resize(std::accumulate(rcnts.begin(),rcnts.end(),0));
+        nr_tiles=all_ranks.size()-rcnts.size();
+        std::copy(ranks.begin(), ranks.end(), all_ranks.begin()+displs[grid()->pcol()]);
+        grid()->row_comm().all_gather_v(all_ranks.data(), rcnts.data(), displs.data());
+        std::size_t total_msg_size = 0;
+        for (std::size_t j=0; j<rcnts.size(); j++){
+          total_msg_size += all_ranks[displs[j]+rcnts[j]-1];
+        }
+        buf.resize(total_msg_size);
+        std::vector<int> tile_rcnts(grid()->npcols());
+        for (int j=0; j<grid()->npcols(); j++)
+          tile_rcnts[j] = all_ranks[displs[j]+rcnts[j]-1];
+        tile_displs.resize(grid()->npcols());
+        for (std::size_t j=1; j<tile_rcnts.size(); j++){
+          tile_displs[j]=tile_displs[j-1]+tile_rcnts[j-1];
+        }
+        auto ptr = buf.data() + tile_displs[grid()->pcol()];
+        for (std::size_t k=0; k<j1; k++){
+          if (grid()->is_local_row(k)){
+            for (std::size_t j=0; j<i1; j++){
+              if (grid()->is_local_col(j)) {
+                auto& t = tile(k, j);
+                if (tile(k, j).is_low_rank()) {
+                  std::copy(t.U().data(), t.U().end(), ptr);
+                  ptr += t.U().rows()*t.U().cols();
+                  std::copy(t.V().data(), t.V().end(), ptr);
+                  ptr += t.V().rows()*t.V().cols();
+                } else {
+                  std::copy(t.D().data(), t.D().end(), ptr);
+                  ptr += t.D().rows()*t.D().cols();
+                }
+              }
+            }
+          }
+        }
+        grid()->row_comm().all_gather_v(buf.data(), tile_rcnts.data(), tile_displs.data());
+      }
+      if (nr_tiles==0) return Tij;
+      Tij.reserve(nr_tiles);
+      if (row_cnt!=0){
+        std::vector<scalar_t*> ptr(grid()->row_comm().size());
+        std::vector<std::int64_t> j_ranks(grid()->row_comm().size());
+        for (std::size_t p=0; p<ptr.size(); p++){
+          ptr[p] = buf.data() + tile_displs[p];
+          j_ranks[p] = displs[p];
+        }
+        for (std::size_t i=0; i<j1; i++){
+          if (grid()->is_local_row(i)) {
+            auto m = tilerows(i);
+            for (std::size_t j=0; j<i1; j++){
+              int sender = grid()->cg2p(j);
+              auto n = tilecols(j);
+              auto r = all_ranks[j_ranks[sender]];
+              if (r != -1) {
+                auto t = new LRTile<scalar_t>(m, n, r);
+                std::copy(ptr[sender], ptr[sender]+m*r, t->U().data());  ptr[sender] += m*r;
+                std::copy(ptr[sender], ptr[sender]+r*n, t->V().data());  ptr[sender] += r*n;
+                Tij.emplace_back(t);
+              } else {
+                auto t = new DenseTile<scalar_t>(m, n);
+                std::copy(ptr[sender], ptr[sender]+m*n, t->D().data());  ptr[sender] += m*n;
+                Tij.emplace_back(t);
+              }
+              j_ranks[sender]++;
+            }
+          }
+        }
+      }
+      return Tij;
     }
 
     template<typename scalar_t> void
@@ -925,32 +1432,34 @@ namespace strumpack {
           }
         }
 #else //LL-Update
-        auto Tik = gather_rows(i+1, rowblocks(), i+1, colblocks());
-        auto Tkj = gather_cols(i+1, rowblocks(), i+1, colblocks());
-        //GEMM
-        if (grid()->is_local_row(i+1)) {
-          std::size_t lk=0;
-          for (std::size_t j=i+1; j<rowblocks(); j++) {
-            if (grid()->is_local_col(j)) {
-              for (std::size_t k=0, lj=0; k<i+1; k++) {
-                gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj]),
-                  *(Tik[lk]), scalar_t(1.), tile_dense(i+1, j).D());
-                lj++;
-                lk++;
+        if (i+1 < rowblocks()){
+          auto Tik = gather_rows_A11(i+1, rowblocks(), i+1, colblocks());
+          auto Tkj = gather_cols_A11(i+1, rowblocks(), i+1, colblocks());
+          //GEMM
+          if (grid()->is_local_row(i+1)) {
+            std::size_t lk=0;
+            for (std::size_t j=i+1; j<rowblocks(); j++) {
+              if (grid()->is_local_col(j)) {
+                for (std::size_t k=0, lj=0; k<i+1; k++) {
+                  gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj]),
+                    *(Tik[lk]), scalar_t(1.), tile_dense(i+1, j).D());
+                  lj++;
+                  lk++;
+                }
               }
             }
           }
-        }
-        if (grid()->is_local_col(i+1)) {
-          std::size_t lj=0;
-          if (grid()->is_local_row(i+1)) lj=i+1;
-          for (std::size_t j=i+2; j<rowblocks(); j++) { //check rowblocks and colblocks
-            if (grid()->is_local_row(j)) {
-              for (std::size_t k=0, lk=0; k<i+1; k++) {
-                gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj]),
-                    *(Tik[lk]), scalar_t(1.), tile_dense(j, i+1).D());
-                lj++;
-                lk++;
+          if (grid()->is_local_col(i+1)) {
+            std::size_t lj=0;
+            if (grid()->is_local_row(i+1)) lj=i+1;
+            for (std::size_t j=i+2; j<rowblocks(); j++) { //check rowblocks and colblocks
+              if (grid()->is_local_row(j)) {
+                for (std::size_t k=0, lk=0; k<i+1; k++) {
+                  gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj]),
+                      *(Tik[lk]), scalar_t(1.), tile_dense(j, i+1).D());
+                  lj++;
+                  lk++;
+                }
               }
             }
           }
@@ -1002,26 +1511,34 @@ namespace strumpack {
           {
             if (g->is_local_row(i)) {
               // update trailing columns of A11
-              for (std::size_t j=i+1; j<B1; j++)
-                if (g->is_local_col(j) && adm(i, j))
+              for (std::size_t j=i+1; j<B1; j++) {
+                if (g->is_local_col(j) && adm(i, j)) {
 #pragma omp task default(shared) firstprivate(i,j)
                   A11.compress_tile(i, j, opts);
-              for (std::size_t j=0; j<B2; j++)
-                if (g->is_local_col(j))
+                }
+              }
+              for (std::size_t j=0; j<B2; j++) {
+                if (g->is_local_col(j)) {
 #pragma omp task default(shared) firstprivate(i,j)
                   A12.compress_tile(i, j, opts);
+                }
+              }
             }
             if (g->is_local_col(i)) {
               // update trailing rows of A11
-              for (std::size_t j=i+1; j<B1; j++)
-                if (g->is_local_row(j) && adm(j, i))
+              for (std::size_t j=i+1; j<B1; j++) {
+                if (g->is_local_row(j) && adm(j, i)) {
 #pragma omp task default(shared) firstprivate(i,j)
                   A11.compress_tile(j, i, opts);
+                }
+              }
               // update trailing rows of A21
-              for (std::size_t j=0; j<B2; j++)
-                if (g->is_local_row(j))
+              for (std::size_t j=0; j<B2; j++) {
+                if (g->is_local_row(j)) {
 #pragma omp task default(shared) firstprivate(i,j)
                   A21.compress_tile(j, i, opts);
+                }
+              }
             }
           }
         }
@@ -1029,37 +1546,45 @@ namespace strumpack {
 #pragma omp single
         {
           if (g->is_local_row(i)) {
-            for (std::size_t j=i+1; j<B1; j++)
-              if (g->is_local_col(j))
+            for (std::size_t j=i+1; j<B1; j++) {
+              if (g->is_local_col(j)) {
 #pragma omp task default(shared) firstprivate(i,j)
                 {
                   A11.tile(i, j).laswp(piv_tile, true);
                   trsm(Side::L, UpLo::L, Trans::N, Diag::U,
                        scalar_t(1.), Tii, A11.tile(i, j));
                 }
-            for (std::size_t j=0; j<B2; j++)
-              if (g->is_local_col(j))
+              }
+            }
+            for (std::size_t j=0; j<B2; j++) {
+              if (g->is_local_col(j)) {
 #pragma omp task default(shared) firstprivate(i,j)
                 {
                   A12.tile(i, j).laswp(piv_tile, true);
                   trsm(Side::L, UpLo::L, Trans::N, Diag::U,
                        scalar_t(1.), Tii, A12.tile(i, j));
                 }
+              }
+            }
           }
           if (g->is_local_col(i)) {
-            for (std::size_t j=i+1; j<B1; j++)
-              if (g->is_local_row(j))
+            for (std::size_t j=i+1; j<B1; j++) {
+              if (g->is_local_row(j)) {
 #pragma omp task default(shared) firstprivate(i,j)
                 trsm(Side::R, UpLo::U, Trans::N, Diag::N,
                      scalar_t(1.), Tii, A11.tile(j, i));
-            for (std::size_t j=0; j<B2; j++)
-              if (g->is_local_row(j))
+              }
+            }
+            for (std::size_t j=0; j<B2; j++) {
+              if (g->is_local_row(j)) {
 #pragma omp task default(shared) firstprivate(i,j)
                 trsm(Side::R, UpLo::U, Trans::N, Diag::N,
                      scalar_t(1.), Tii, A21.tile(j, i));
+              }
+            }
           }
         }
-#if 1 //RL-Update
+#if 0 //RL-Update
         auto Tij = A11.bcast_row_of_tiles_along_cols(i, i+1, B1);
         auto Tij2 = A12.bcast_row_of_tiles_along_cols(i, 0, B2);
         auto Tki = A11.bcast_col_of_tiles_along_rows(i+1, B1, i);
@@ -1125,12 +1650,93 @@ namespace strumpack {
           }
         }
 #else //LL-Update
-        auto Tik = A11.gather_rows(i+1, B1, i+1, B1);
-        auto Tkj = A11.gather_cols(i+1, B1, i+1, B1);
-        auto Tik2 = A12.gather_rows(i+1, B1, 0, B1);//(i, 0, B2);
-        auto Tk2j = A21.gather_cols(0, B1, i+1, B1);
+        if (i+1 < B1){
+          auto Tik = A11.gather_rows_A11(i+1, B1, i+1, B1);
+          auto Tkj = A11.gather_cols_A11(i+1, B1, i+1, B1);
+          auto Tik2 = A12.gather_rows(i+1, B1, 0, B2);
+          auto Tk2j = A21.gather_cols(0, B2, i+1, B1);
+          if (g->is_local_row(i+1)) {
+            std::size_t lk=0;
+            for (std::size_t j=i+1; j<B1; j++) {
+              if (g->is_local_col(j)) {
+                for (std::size_t k=0, lj=0; k<i+1; k++) {
+                  gemm(Trans::N, Trans::N, scalar_t(-1.),
+                    *(Tkj[lj]), *(Tik[lk]), scalar_t(1.),
+                    A11.tile_dense(i+1, j).D());
+                  lj++;
+                  lk++;
+                }
+              }
+            }
+          }
+          if (g->is_local_col(i+1)) {
+            std::size_t lj=0;
+            if (g->is_local_row(i+1)) lj=i+1;
+            for (std::size_t j=i+2; j<B1; j++) {
+              if (g->is_local_row(j)) {
+                for (std::size_t k=0, lk=0; k<i+1; k++) {
+                  gemm(Trans::N, Trans::N, scalar_t(-1.), 
+                    *(Tkj[lj]), *(Tik[lk]), scalar_t(1.), 
+                    A11.tile_dense(j, i+1).D());
+                  lj++;
+                  lk++;
+                }
+              }
+            }
+          }
+          if (g->is_local_row(i+1)) {
+            std::size_t lk=0;
+            for (std::size_t j=0; j<B2; j++) {
+              if (g->is_local_col(j)) {
+                for (std::size_t k=0, lj=0; k<i+1; k++) {
+                  gemm(Trans::N, Trans::N, scalar_t(-1.),
+                    *(Tkj[lj]), *(Tik2[lk]), scalar_t(1.),
+                    A12.tile_dense(i+1, j).D());
+                  lj++;
+                  lk++;
+                }
+              }
+            }
+          }
+          if (g->is_local_col(i+1)) {
+            std::size_t lj=0;
+            for (std::size_t j=0; j<B2; j++) {
+              if (g->is_local_row(j)) {
+                for (std::size_t k=0, lk=0; k<i+1; k++) {
+                  gemm(Trans::N, Trans::N, scalar_t(-1.), 
+                    *(Tk2j[lj]), *(Tik[lk]), scalar_t(1.), 
+                    A21.tile_dense(j, i+1).D());
+                  lj++;
+                  lk++;
+                }
+              }
+            }
+          }
+        }
 #endif
       }
+#if 1 //LL-Update    
+      auto Tik2 = A12.gather_rows_A22(B1, B2);
+      auto Tk2j = A21.gather_cols_A22(B1, B2);
+      std::size_t lj=0;
+      for (std::size_t i=0, li=0; i<B2; i++) {
+        if (g->is_local_row(i)) {
+          for (std::size_t j=0, lk=0; j<B2; j++) {
+            if (g->is_local_col(j)) {
+              lj=li;
+              for (std::size_t k=0; k<B1; k++) {
+                gemm(Trans::N, Trans::N, scalar_t(-1.), 
+                   *(Tk2j[lj]), *(Tik2[lk]), scalar_t(1.), 
+                   A22.tile_dense(i, j).D());
+                lj++;
+                lk++;
+              }
+            }
+          }
+          li+=B1;
+        }
+      }
+#endif  
       return piv;
     }
 
@@ -1522,10 +2128,10 @@ namespace strumpack {
         if (g->is_local_row(j)) lj++;
       }
       g->row_comm().reduce(Yloc.data(), Yloc.rows()*Yloc.cols(), MPI_SUM);
-      if (g->is_local_col(0))
+      if (g->is_local_col(0)) {
 #pragma omp parallel
 #pragma omp single
-        for (std::size_t i=0, lm=0; i<nby; i++)
+        for (std::size_t i=0, lm=0; i<nby; i++) {
           if (g->is_local_row(i)) {
             auto m = y.tilerows(i);
 #pragma omp task default(shared) firstprivate(m,lm,i)
@@ -1533,6 +2139,8 @@ namespace strumpack {
               (beta, DenseMW_t(m, y.cols(), Yloc, lm, 0));
             lm += m;
           }
+        }
+      }
 #endif
     }
 
@@ -1552,10 +2160,12 @@ namespace strumpack {
             auto Aii = a.bcast_dense_tile_along_row(i, i);
 #pragma omp parallel
 #pragma omp single
-            for (std::size_t k=0; k<b.colblocks(); k++)
-              if (b.grid()->is_local_col(k))
+            for (std::size_t k=0; k<b.colblocks(); k++) {
+              if (b.grid()->is_local_col(k)) {
 #pragma omp task default(shared) firstprivate(i,k)
                 trsm(s, ul, ta, d, alpha, Aii, b.tile(i, k));
+              }
+            }
           }
           auto Aji = a.bcast_col_of_tiles_along_rows(i+1, a.rowblocks(), i);
           auto Bik = b.bcast_row_of_tiles_along_cols(i, 0, b.colblocks());
@@ -1581,10 +2191,12 @@ namespace strumpack {
             auto Aii = a.bcast_dense_tile_along_row(i, i);
 #pragma omp parallel
 #pragma omp single
-            for (std::size_t k=0; k<b.colblocks(); k++)
-              if (b.grid()->is_local_col(k))
+            for (std::size_t k=0; k<b.colblocks(); k++) {
+              if (b.grid()->is_local_col(k)) {
 #pragma omp task default(shared) firstprivate(i,k)
                 trsm(s, ul, ta, d, alpha, Aii, b.tile(i, k));
+              }
+            }
           }
           auto Aji = a.bcast_col_of_tiles_along_rows(0, i, i);
           auto Bik = b.bcast_row_of_tiles_along_cols(i, 0, b.colblocks());
