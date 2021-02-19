@@ -398,8 +398,8 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "ErrFillFull", 0);
       HODLR_set_I_option<scalar_t>(options_, "rank0", opts.rank_guess());
       HODLR_set_I_option<scalar_t>(options_, "less_adapt", opts.less_adapt()); // 0 or 1
+      HODLR_set_I_option<scalar_t>(options_, "forwardN15flag", opts.BF_entry_n15()); // 0 or 1
       HODLR_set_I_option<scalar_t>(options_, "cpp", 1);
-      HODLR_set_I_option<scalar_t>(options_, "forwardN15flag", 0);
       HODLR_set_D_option<scalar_t>(options_, "sample_para", opts.BF_sampling_parameter());
       HODLR_set_D_option<scalar_t>(options_, "sample_para_outer", opts.BF_sampling_parameter());
       HODLR_set_D_option<scalar_t>(options_, "rankrate", opts.rank_rate());

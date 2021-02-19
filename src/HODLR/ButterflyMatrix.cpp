@@ -190,6 +190,7 @@ namespace strumpack {
       HODLR_set_D_option<scalar_t>(options_, "tol_Rdetect", 0.01*opts.rel_tol());
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 3);
       HODLR_set_I_option<scalar_t>(options_, "knn", opts.knn_lrbf());
+      HODLR_set_I_option<scalar_t>(options_, "forwardN15flag", opts.BF_entry_n15()); // 0 or 1
       { TIMER_TIME(TaskType::CONSTRUCT_INIT, 0, t_construct_h);
         LRBF_construct_init<scalar_t>
           (rows_, cols_, lrows_, lcols_,
