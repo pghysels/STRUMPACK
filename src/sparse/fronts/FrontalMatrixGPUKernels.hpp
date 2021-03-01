@@ -37,9 +37,6 @@
 #if defined(STRUMPACK_USE_HIP)
 #include "dense/HIPWrapper.hpp"
 #endif
-#if defined(STRUMPACK_USE_DPCPP)
-#include "dense/DPCPPWrapper.hpp"
-#endif
 
 namespace strumpack {
 

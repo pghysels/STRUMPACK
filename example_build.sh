@@ -203,9 +203,12 @@ if ! $found_host; then
         -DCMAKE_BUILD_TYPE=Debug \
         -DCMAKE_CXX_COMPILER=dpcpp \
         -DCMAKE_INSTALL_PREFIX=../install \
-	-DSTRUMPACK_USE_DPCPP=ON
+	-DSTRUMPACK_USE_DPCPP=ON \
+	-DTPL_ONEAPI_LIBRARIES="-L${MKLROOT}/lib/intel64;-lmkl_sycl;-lmkl_intel_ilp64;-lmkl_intel_thread;-lmkl_core;-lsycl;-lOpenCL;-liomp5;-lpthread;-lm;-ldl"
+    
+	#-DTPL_BLAS_LIBRARIES="-L${MKLROOT}/lib/intel64 -lmkl_sycl -lmkl_intel_ilp64 -lmkl_intel_thread -lmkl_core -lsycl -lOpenCL -liomp5 -lpthread -lm -ldl "
 
-#	-DTPL_BLAS_LIBRARIES=" -L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_gf_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl"
+    #	-DTPL_BLAS_LIBRARIES=" -L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_gf_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl"
 	
 # -DTPL_BLAS_LIBRARIES="-L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl"
 

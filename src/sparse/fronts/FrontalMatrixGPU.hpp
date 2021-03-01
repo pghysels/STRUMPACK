@@ -47,7 +47,7 @@ namespace strumpack {
 
   namespace gpu {
     template<typename scalar_t> struct FrontData;
-    template<typename scalar_t> struct FwdSolveData;
+    // template<typename scalar_t> struct FwdSolveData;
   }
 
 
@@ -111,6 +111,7 @@ namespace strumpack {
     FrontalMatrixGPU(const FrontalMatrixGPU&) = delete;
     FrontalMatrixGPU& operator=(FrontalMatrixGPU const&) = delete;
 
+    // TODO move these routines out of the class
     void front_assembly(const SpMat_t& A, LInfo_t& L);
     void factor_small_fronts(LInfo_t& L, gpu::FrontData<scalar_t>* fdata,
                              const SPOptions<scalar_t>& opts);

@@ -26,7 +26,7 @@ if(STRUMPACK_USE_MPI)
     ${CMAKE_CURRENT_LIST_DIR}/ExtendAdd.hpp)
 endif()
 
-if(STRUMPACK_USE_CUDA OR STRUMPACK_USE_HIP OR STRUMPACK_USE_DPCPP)
+if(STRUMPACK_USE_CUDA OR STRUMPACK_USE_HIP)
   target_sources(strumpack
     PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixGPU.cpp
@@ -47,7 +47,8 @@ endif()
 
 if(STRUMPACK_USE_DPCPP)
   target_sources(strumpack PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixDPCPP.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/FrontDPCpp.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/FrontDPCpp.cpp)
 endif()
 
 if(STRUMPACK_USE_ZFP)

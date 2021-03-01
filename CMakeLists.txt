@@ -145,10 +145,10 @@ if(STRUMPACK_USE_DPCPP)
   # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -std=c++17 -I${MKLROOT}/include")
   # set(CMAKE_EXE_LINKER_FLAGS " ${CMAKE_EXE_LINKER_FLAGS}")
   # set(CMAKE_EXE_LINKER_FLAGS " -fsycl -lmkl_sycl -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core")
+  set(ONEAPI_LIBRARIES ${TPL_ONEAPI_LIBRARIES})
 endif()
 
 
-# set(BLA_VENDOR Intel10_64lp)
 if(DEFINED TPL_BLAS_LIBRARIES)
   # xSDK policies require the user be able to specify BLAS libraries
   # through the TPL_BLAS_LIBRARIES variable. If these do not work,
@@ -518,6 +518,10 @@ if(LAPACK_FOUND)
 endif()
 if(BLAS_FOUND)
   target_link_libraries(strumpack PUBLIC ${BLAS_LIBRARIES})
+endif()
+
+if(STRUMPACK_USE_DPCPP)
+  target_link_libraries(strumpack PUBLIC ${ONEAPI_LIBRARIES})
 endif()
 
 # the order is important
