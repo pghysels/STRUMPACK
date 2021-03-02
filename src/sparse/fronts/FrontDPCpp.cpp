@@ -39,11 +39,11 @@ namespace strumpack {
 
   template<typename T> struct AssembleData {
     AssembleData(std::size_t d1_, std::size_t d2_,
-		 T* F11_, T* F12_, T* F21_, T* F22_,
-		 std::size_t n11_, std::size_t n12_, std::size_t n21_,
-		 Triplet<T>* e11_, Triplet<T>* e12_, Triplet<T>* e21_)
+                 T* F11_, T* F12_, T* F21_, T* F22_,
+                 std::size_t n11_, std::size_t n12_, std::size_t n21_,
+                 Triplet<T>* e11_, Triplet<T>* e12_, Triplet<T>* e21_)
       : d1(d1_), d2(d2_), F11(F11_), F12(F12_), F21(F21_), F22(F22_),
-	n11(n11_), n12(n12_), n21(n21_), e11(e11_), e12(e12_), e21(e21_) {}
+        n11(n11_), n12(n12_), n21(n21_), e11(e11_), e12(e12_), e21(e21_) {}
     AssembleData(int d1_, int d2_, T* F11_, T* F21_)
       : d1(d1_), d2(d2_), F11(F11_), F21(F21_) {}
 
@@ -75,9 +75,9 @@ namespace strumpack {
   template<typename T> struct FrontData {
     FrontData() {}
     FrontData(int n1_, int n2_, T* F11_, T* F12_,
-	      T* F21_, T* F22_, std::int64_t* piv_)
+              T* F21_, T* F22_, std::int64_t* piv_)
       : n1(n1_), n2(n2_), F11(F11_), F12(F12_),
-	F21(F21_), F22(F22_), piv(piv_) {}
+        F21(F21_), F22(F22_), piv(piv_) {}
     int n1, n2;
     T *F11, *F12, *F21, *F22;
     std::int64_t* piv;
@@ -97,7 +97,7 @@ namespace strumpack {
     LevelInfo() {}
 
     LevelInfo(const std::vector<F_t*>& fronts,
-	      cl::sycl::queue& q) {
+              cl::sycl::queue& q) {
       f.reserve(fronts.size());
       for (auto& F : fronts)
         f.push_back(dynamic_cast<FDPC_t*>(F));
@@ -109,12 +109,12 @@ namespace strumpack {
         Schur_size += dupd*dupd;
         piv_size += dsep;
         total_upd_size += dupd;
-	F->scratchpad_size_ =
-	  std::max(dpcpp::getrf_buffersize<scalar_t>
-		   (q, dsep, dsep, dsep),
-		   dpcpp::getrs_buffersize<scalar_t>
-		   (q, Trans::N, dsep, dupd, dsep, dsep));
-	getr_work_size += F->scratchpad_size_;
+        F->scratchpad_size_ =
+          std::max(dpcpp::getrf_buffersize<scalar_t>
+                   (q, dsep, dsep, dsep),
+                   dpcpp::getrs_buffersize<scalar_t>
+                   (q, Trans::N, dsep, dupd, dsep, dsep));
+        getr_work_size += F->scratchpad_size_;
         if (dsep <= 8)       N8++;
         else if (dsep <= 16) N16++;
         else if (dsep <= 24) N24++;
@@ -124,7 +124,7 @@ namespace strumpack {
       work_bytes =
         round_to_8(sizeof(scalar_t) * (Schur_size + getr_work_size)) +
         round_to_8(sizeof(std::int64_t) * piv_size) +
-	round_to_8(sizeof(FrontData<scalar_t>) * (N8 + N16 + N24 + N32));
+        round_to_8(sizeof(FrontData<scalar_t>) * (N8 + N16 + N24 + N32));
     }
 
     void print_info(int l, int lvls) {
@@ -182,11 +182,11 @@ namespace strumpack {
         if (dupd) {
           F->F22_ = DenseMW_t(dupd, dupd, smem, dupd);
           smem += dupd*dupd;
-	}
+        }
       }
       for (auto F : f) {
-	F->scratchpad_ = smem;
-	smem += F->scratchpad_size_;
+        F->scratchpad_ = smem;
+        smem += F->scratchpad_size_;
       }      
       auto imem = reinterpret_cast<std::int64_t*>(round_to_8(smem));
       for (auto F : f) {
@@ -300,7 +300,7 @@ namespace strumpack {
 
   template<typename T> void
   ea_kernel(int x, int y, int d1, int d2, int dCB,
-	    T* F11, T* F12, T* F21, T* F22, T* CB, std::size_t* I) {
+            T* F11, T* F12, T* F21, T* F22, T* CB, std::size_t* I) {
     if (x >= dCB || y >= dCB) return;
     auto Ix = I[x], Iy = I[y];
     if (Ix < d1) {
@@ -316,7 +316,7 @@ namespace strumpack {
   
   template <typename T>
   void assemble(cl::sycl::queue& q, std::size_t nf,
-		const AssembleData<T>* dat, AssembleData<T>* ddat) {
+                const AssembleData<T>* dat, AssembleData<T>* ddat) {
     // const unsigned int MAX_BLOCKS_Y =
     //   q.get_device().get_info<cl::sycl::info::device::max_work_group_size>();
     // const unsigned int MAX_BLOCKS_Z = MAX_BLOCKS_Y;
@@ -324,34 +324,34 @@ namespace strumpack {
       std::size_t nt1 = 128, nt2 = 32;
       std::size_t max1 = nt1, max2 = nt2; 
       for (std::size_t f=0; f<nf; f++) {
-	max1 = std::max(max1, dat[f].n11);
-	max2 = std::max(max2, std::max(dat[f].n12, dat[f].n21));
+        max1 = std::max(max1, dat[f].n11);
+        max2 = std::max(max2, std::max(dat[f].n12, dat[f].n21));
       }
       // TODO check if nf is larger than allowed max
       cl::sycl::range<2> global{nf, rnd(max1, nt1)}, local{1, nt1};
       q.parallel_for(cl::sycl::nd_range<2>{global, local},
-		     [=](cl::sycl::nd_item<2> it) {
-		       auto& F = ddat[it.get_group(0)/*+f*/];
-		       auto idx = it.get_global_id(1);
-		       if (idx >= F.n11) return;
-		       auto& t = F.e11[idx];
-		       F.F11[t.r + t.c*F.d1] = t.v;
-		     });
+                     [=](cl::sycl::nd_item<2> it) {
+                       auto& F = ddat[it.get_group(0)/*+f*/];
+                       auto idx = it.get_global_id(1);
+                       if (idx >= F.n11) return;
+                       auto& t = F.e11[idx];
+                       F.F11[t.r + t.c*F.d1] = t.v;
+                     });
       if (max2) {
-	cl::sycl::range<2> global{nf, rnd(max2, nt2)}, local{1, nt2};
-	q.parallel_for(cl::sycl::nd_range<2>{global, local},
-		       [=](cl::sycl::nd_item<2> it) {
-			 auto& F = ddat[it.get_group(0)/*+f*/];
-			 auto idx = it.get_global_id(1);
-			 if (idx < F.n12) {
-			   auto& t = F.e12[idx];
-			   F.F12[t.r + t.c*F.d1] = t.v;
-			 }
-			 if (idx < F.n21) {
-			   auto& t = F.e21[idx];
-			   F.F21[t.r + t.c*F.d2] = t.v;
-			 }
-		       });
+        cl::sycl::range<2> global{nf, rnd(max2, nt2)}, local{1, nt2};
+        q.parallel_for(cl::sycl::nd_range<2>{global, local},
+                       [=](cl::sycl::nd_item<2> it) {
+                         auto& F = ddat[it.get_group(0)/*+f*/];
+                         auto idx = it.get_global_id(1);
+                         if (idx < F.n12) {
+                           auto& t = F.e12[idx];
+                           F.F12[t.r + t.c*F.d1] = t.v;
+                         }
+                         if (idx < F.n21) {
+                           auto& t = F.e21[idx];
+                           F.F21[t.r + t.c*F.d2] = t.v;
+                         }
+                       });
       }
     }
     q.wait_and_throw();
@@ -359,26 +359,26 @@ namespace strumpack {
       std::size_t nt = 16;
       std::size_t maxCB = nt;
       for (std::size_t f=0; f<nf; f++)
-    	maxCB = std::max(maxCB, std::max(dat[f].dCB1, dat[f].dCB2));
+        maxCB = std::max(maxCB, std::max(dat[f].dCB1, dat[f].dCB2));
       auto gCB = rnd(maxCB, nt);
       cl::sycl::range<3> global{nf, gCB, gCB}, local{1, nt, nt};
       q.parallel_for(cl::sycl::nd_range<3>{global, local},
-    		     [=](cl::sycl::nd_item<3> it) {
-    		       auto& F = ddat[it.get_group(0)];
-    		       if (F.CB1)
-    			 ea_kernel(it.get_global_id(1), it.get_global_id(2),
-    				   F.d1, F.d2, F.dCB1, F.F11, F.F12, F.F21,
-    				   F.F22, F.CB1, F.I1);
-    		     });
+                     [=](cl::sycl::nd_item<3> it) {
+                       auto& F = ddat[it.get_group(0)];
+                       if (F.CB1)
+                         ea_kernel(it.get_global_id(1), it.get_global_id(2),
+                                   F.d1, F.d2, F.dCB1, F.F11, F.F12, F.F21,
+                                   F.F22, F.CB1, F.I1);
+                     });
       q.wait_and_throw();
       q.parallel_for(cl::sycl::nd_range<3>{global, local},
-      		     [=](cl::sycl::nd_item<3> it) {
-      		       auto& F = ddat[it.get_group(0)];
-      		       if (F.CB2)
-      			 ea_kernel(it.get_global_id(1), it.get_global_id(2),
-      				   F.d1, F.d2, F.dCB2, F.F11, F.F12, F.F21,
-      				   F.F22, F.CB2, F.I2);
-      		     });
+                     [=](cl::sycl::nd_item<3> it) {
+                       auto& F = ddat[it.get_group(0)];
+                       if (F.CB2)
+                         ea_kernel(it.get_global_id(1), it.get_global_id(2),
+                                   F.d1, F.d2, F.dCB2, F.F11, F.F12, F.F21,
+                                   F.F22, F.CB2, F.I2);
+                     });
       q.wait_and_throw();
     }
   }
@@ -458,7 +458,7 @@ namespace strumpack {
    const Opts_t& opts) {
     if (L.N8 || L.N16 || L.N24 || L.N32) {
       for (std::size_t n=0, n8=0, n16=L.N8,
-	     n24=n16+L.N16, n32=n24+L.N24;
+             n24=n16+L.N16, n32=n24+L.N24;
            n<L.f.size(); n++) {
         auto& f = *(L.f[n]);
         const auto dsep = f.dim_sep();
@@ -490,17 +490,17 @@ namespace strumpack {
     for (auto& front : L.f) {
       auto& f = *front;
       if (true) { // (f.dim_sep() > 32) {
-	auto e_getrf = dpcpp::getrf
-	  (q, f.F11_, f.piv_, f.scratchpad_, f.scratchpad_size_);
-	// if (opts.replace_tiny_pivots()) { } // TODO
-	if (f.dim_upd()) {
-	  auto e_getrs = dpcpp::getrs
-	    (q, Trans::N, f.F11_, f.piv_, f.F12_,
-	     f.scratchpad_, f.scratchpad_size_, {e_getrf});
-	  dpcpp::gemm
-	    (q, Trans::N, Trans::N, scalar_t(-1.),
-	     f.F21_, f.F12_, scalar_t(1.), f.F22_, {e_getrs});
-	}
+        auto e_getrf = dpcpp::getrf
+          (q, f.F11_, f.piv_, f.scratchpad_, f.scratchpad_size_);
+        // if (opts.replace_tiny_pivots()) { } // TODO
+        if (f.dim_upd()) {
+          auto e_getrs = dpcpp::getrs
+            (q, Trans::N, f.F11_, f.piv_, f.F12_,
+             f.scratchpad_, f.scratchpad_size_, {e_getrf});
+          dpcpp::gemm
+            (q, Trans::N, Trans::N, scalar_t(-1.),
+             f.F21_, f.F12_, scalar_t(1.), f.F22_, {e_getrs});
+        }
       }
     }
   }
@@ -512,14 +512,14 @@ namespace strumpack {
    int etree_level, int task_depth) {
     // const int max_streams = opts.gpu_streams();
 
-    cl::sycl::queue q(cl::sycl::default_selector{},
-		      cl::sycl::property::queue::in_order());
-    // cl::sycl::queue q(cl::sycl::host_selector{});
+    // cl::sycl::queue q(cl::sycl::default_selector{},
+    //                cl::sycl::property::queue::in_order());
+    cl::sycl::queue q(cl::sycl::host_selector{});
     // cl::sycl::property::queue::in_order());
     if (opts.verbose())
       std::cout << "# SYCL/DPC++ selected device: "
-		<< q.get_device().get_info<cl::sycl::info::device::name>()
-		<< std::endl;
+                << q.get_device().get_info<cl::sycl::info::device::name>()
+                << std::endl;
 
     const int lvls = this->levels();
     std::vector<LInfo_t> ldata(lvls);
@@ -530,7 +530,7 @@ namespace strumpack {
       auto& L = ldata[l];
       L = LInfo_t(fp, q);
       max_small_fronts =
-	std::max(max_small_fronts, L.N8+L.N16+L.N24+L.N32);
+        std::max(max_small_fronts, L.N8+L.N16+L.N24+L.N32);
     }
 
     // if (!sufficient_device_memory(ldata)) {
@@ -548,31 +548,31 @@ namespace strumpack {
       try {
         dpcpp::DeviceMemory<scalar_t> dev_factors(L.factor_size, q);
         dpcpp::DeviceMemory<char> work_mem(L.work_bytes, q);
-	auto e1 = dpcpp::fill
-	  (q, dev_factors.template as<scalar_t>(), scalar_t(0.), L.factor_size);
-	auto e2 = dpcpp::fill
-	  (q, work_mem.template as<scalar_t>(), scalar_t(0.), L.Schur_size);
-	L.set_factor_pointers(dev_factors);
+        auto e1 = dpcpp::fill
+          (q, dev_factors.template as<scalar_t>(), scalar_t(0.), L.factor_size);
+        auto e2 = dpcpp::fill
+          (q, work_mem.template as<scalar_t>(), scalar_t(0.), L.Schur_size);
+        L.set_factor_pointers(dev_factors);
         L.set_work_pointers(work_mem);
-	// e1.wait();
-	// e2.wait();
+        // e1.wait();
+        // e2.wait();
         front_assembly(q, A, L);
-	q.wait();
-	old_work = std::move(work_mem);
-	// factor_small_fronts
-	//   (q, L, fdata.template as<FrontData<scalar_t>>(), opts);
-	factor_large_fronts(q, L, opts);
-	STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
+        q.wait();
+        old_work = std::move(work_mem);
+        // factor_small_fronts
+        //   (q, L, fdata.template as<FrontData<scalar_t>>(), opts);
+        factor_large_fronts(q, L, opts);
+        STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
         L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
         L.f[0]->pivot_mem_.resize(L.piv_size);
-	q.wait();
-	dpcpp::memcpy
-	  (q, L.f[0]->pivot_mem_.data(), L.f[0]->piv_, L.piv_size);
-	dpcpp::memcpy<scalar_t>
-	  (q, L.f[0]->host_factors_.get(), dev_factors, L.factor_size);
-	L.set_factor_pointers(L.f[0]->host_factors_.get());
+        q.wait();
+        dpcpp::memcpy
+          (q, L.f[0]->pivot_mem_.data(), L.f[0]->piv_, L.piv_size);
+        dpcpp::memcpy<scalar_t>
+          (q, L.f[0]->host_factors_.get(), dev_factors, L.factor_size);
+        L.set_factor_pointers(L.f[0]->host_factors_.get());
         L.set_pivot_pointers(L.f[0]->pivot_mem_.data());
-	q.wait();
+        q.wait();
       } catch (const std::bad_alloc& e) {
         std::cerr << "Out of memory" << std::endl;
         abort();
@@ -629,9 +629,9 @@ namespace strumpack {
       std::vector<int> piv(piv_, piv_+dim_sep());
       // std::cout << "dpiv (" << dim_sep() << ")= {";
       // for (integer_t i=0; i<dim_sep(); i++)
-      // 	std::cout << piv_[i] << " ";
+      //        std::cout << piv_[i] << " ";
       // std::cout << "}" << std::endl;
-      
+
       // F11_.solve_LU_in_place(bloc, reinterpret_cast<int>(piv.data(), task_depth);
       F11_.solve_LU_in_place(bloc, reinterpret_cast<int*>(piv_), task_depth);
       if (dim_upd()) {
