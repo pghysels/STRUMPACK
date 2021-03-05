@@ -1482,6 +1482,14 @@ namespace strumpack {
       auto B1 = A11.rowblocks();
       auto B2 = A22.rowblocks();
       auto g = A11.grid();
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+      auto lrb = rb+rb2;
+      // dummy for task synchronization
+      std::unique_ptr<int[]> B_(new int[lrb*lrb]()); auto B = B_.get();
+#pragma omp taskgroup
+#else
+      int* B = nullptr;
+#endif
       std::vector<int> piv, piv_tile;
       if (!g->active()) return piv;
       DenseTile<scalar_t> Tii;
@@ -1663,7 +1671,11 @@ namespace strumpack {
               for (std::size_t j=i+1; j<B1; j++) {
                 if (g->is_local_col(j)) {
                   for (std::size_t k=0, lj=0; k<i+1; k++) {
-#pragma omp task default(shared) firstprivate(i,j,k,lk,lj)
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+                  std::size_t ij = (i+1)+lrb*j, ik = (i+1)+lrb*k, kj = k+lrb*j;
+#pragma omp task default(shared) firstprivate(i,j,k,ij,ik,kj)   \ //lk,lj??
+  depend(in:B[ik],B[kj]) depend(inout:B[ij]) priority(rb-j)
+#endif
                     gemm(Trans::N, Trans::N, scalar_t(-1.),
                       *(Tkj[lj]), *(Tik[lk]), scalar_t(1.),
                       A11.tile_dense(i+1, j).D());
@@ -1679,7 +1691,11 @@ namespace strumpack {
               for (std::size_t j=i+2; j<B1; j++) {
                 if (g->is_local_row(j)) {
                   for (std::size_t k=0, lk=0; k<i+1; k++) {
-#pragma omp task default(shared) firstprivate(i,j,k,lk,lj)
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+                    std::size_t ji = j+lrb*(i+1), jk = j+lrb*k, ki = k+lrb*(i+1);
+#pragma omp task default(shared) firstprivate(i,j,k,ji,jk,ki)   \
+  depend(in:B[jk],B[ki]) depend(inout:B[ji]) priority(rb-j)
+#endif
                     gemm(Trans::N, Trans::N, scalar_t(-1.), 
                       *(Tkj[lj]), *(Tik[lk]), scalar_t(1.), 
                       A11.tile_dense(j, i+1).D());
@@ -1694,7 +1710,11 @@ namespace strumpack {
               for (std::size_t j=0; j<B2; j++) {
                 if (g->is_local_col(j)) {
                   for (std::size_t k=0, lj=0; k<i+1; k++) {
-#pragma omp task default(shared) firstprivate(i,j,k,lk,lj)
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+                    std::size_t ik = (i+1)+lrb*k, ij2 = (i+1)+lrb*(rb+j), kj2 = k+lrb*(rb+j);
+#pragma omp task default(shared) firstprivate(i,k,j,ik,ij2,kj2) \
+  depend(in:B[ik],B[kj2]) depend(inout:B[ij2])
+#endif
                     gemm(Trans::N, Trans::N, scalar_t(-1.),
                       *(Tkj[lj]), *(Tik2[lk]), scalar_t(1.),
                       A12.tile_dense(i+1, j).D());
@@ -1709,7 +1729,11 @@ namespace strumpack {
               for (std::size_t j=0; j<B2; j++) {
                 if (g->is_local_row(j)) {
                   for (std::size_t k=0, lk=0; k<i+1; k++) {
-#pragma omp task default(shared) firstprivate(i,j,k,lk,lj)
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+                    std::size_t ki = k+lrb*(i+1), j2i = (j+rb)+lrb*(i+1), j2k = (rb+j)+lrb*k;
+#pragma omp task default(shared) firstprivate(i,k,j,ki,j2i,j2k) \
+  depend(in:B[j2k],B[ki]) depend(inout:B[j2i])
+#endif
                     gemm(Trans::N, Trans::N, scalar_t(-1.), 
                       *(Tk2j[lj]), *(Tik[lk]), scalar_t(1.), 
                       A21.tile_dense(j, i+1).D());
@@ -1736,7 +1760,11 @@ namespace strumpack {
               if (g->is_local_col(j)) {
                 lj=li;
                 for (std::size_t k=0; k<B1; k++) {
-#pragma omp task default(shared) firstprivate(i,j,k,lk,lj,li)
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+                  std::size_t i2j2 = (rb+i)+lrb*(rb+j), i2k = (rb+i)+lrb*k, kj2 = k+lrb*(rb+j);
+#pragma omp task default(shared) firstprivate(i,j,k,i2k,kj2,i2j2)       \
+  depend(in:B[i2k],B[kj2]) depend(inout:B[i2j2])
+#endif
                   gemm(Trans::N, Trans::N, scalar_t(-1.), 
                     *(Tk2j[lj]), *(Tik2[lk]), scalar_t(1.), 
                     A22.tile_dense(i, j).D());
