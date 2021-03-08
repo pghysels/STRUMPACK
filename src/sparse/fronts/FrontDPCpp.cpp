@@ -447,10 +447,68 @@ namespace strumpack {
       }
     }
     dpcpp::memcpy<char>(q, dea_mem, hea_mem, ea_mem_size);
-    q.wait();
+    q.wait_and_throw();
     assemble(q, N, hasmbl, dasmbl);
   }
 
+  template<std::size_t tile_size, typename scalar_t> void
+  factor_small_fronts_kernel(cl::sycl::queue& q, std::size_t nf,
+			     FrontData<scalar_t>* fdata) {
+    cl::sycl::range<3> global{nf, tile_size, tile_size},
+      local{1, tile_size, tile_size};
+      q.submit([&](cl::sycl::handler& h) {
+    	// constexpr int tile_size = it.get_group_range(0);
+    	// TODO local_accessor for local memory?
+    	// or use broadcasts??
+    	h.parallel_for
+    	  (cl::sycl::nd_range<3>{global, local},
+    	   [=](cl::sycl::nd_item<3> it) {
+    	     auto& F = fdata[it.get_group(0)];
+    	     int j = it.get_global_id(1), i = it.get_global_id(2);
+    	     int n = F.n1, n2 = F.n2;
+    	     auto A11 = F.F11;
+    	     auto piv = reinterpret_cast<int*>(F.piv);
+    	     for (int k=0; k<n; k++) {
+    	       if (i == 0 && j == 0)
+    	     	 piv[k] = k + 1;
+    	       // divide by the pivot element
+    	       if (j == k && i > k && i < n)
+    	     	 A11[i+j*n] /= A11[k+k*n];
+    	       it.barrier();
+    	       // Schur update
+    	       if (j > k && i > k && j < n && i < n)
+    	     	 A11[i+j*n] -= A11[i+k*n] * A11[k+j*n];
+    	       it.barrier();
+    	     }
+    	     auto A12 = F.F12;
+    	     for (int cb=0; cb<n2; cb+=tile_size) {
+    	       int c = cb + j;
+    	       bool col = c < n2;
+    	       // L trsm (unit diag)
+    	       for (int k=0; k<n; k++) {
+    	     	 if (i > k && i < n && col)
+    	     	   A12[i+c*n] -= A11[i+k*n] * A12[k+c*n];
+    	     	 it.barrier();
+    	       }
+    	       // U trsm
+    	       for (int k=n-1; k>=0; k--) {
+    	     	 if (i == k && col)
+    	     	   A12[k+c*n] /= A11[k+k*n];
+    	     	 it.barrier();
+    	     	 if (i < k && col)
+    	     	   A12[i+c*n] -= A11[i+k*n] * A12[k+c*n];
+    	     	 it.barrier();
+    	       }
+    	     }
+    	     // Schur GEMM
+    	     auto A22 = F.F22, A21 = F.F21;
+    	     for (int c=j; c<n2; c+=tile_size)
+    	       for (int r=i; r<n2; r+=tile_size)
+    		 for (int k=0; k<n; k++)
+    		   A22[r+c*n2] -= A21[r+k*n2] * A12[k+c*n];
+    	   });
+      });
+  }
 
   template<typename scalar_t, typename integer_t> void
   FrontDPCpp<scalar_t,integer_t>::factor_small_fronts
@@ -472,15 +530,13 @@ namespace strumpack {
           else                 fdata[n32++] = t;
         }
       }
-      // gpu::copy_host_to_device(L.f8, fdata, L.N8+L.N16+L.N24+L.N32);
       dpcpp::memcpy(q, L.f8, fdata, (L.N8+L.N16+L.N24+L.N32)).wait();
-      std::cout << "TODO factor_block_batch kernel!" << std::endl;
       // auto replace = opts.replace_tiny_pivots();
       // auto thresh = opts.pivot_threshold();
-      // gpu::factor_block_batch<scalar_t,8>(L.N8, L.f8, replace, thresh);
-      // gpu::factor_block_batch<scalar_t,16>(L.N16, L.f16, replace, thresh);
-      // gpu::factor_block_batch<scalar_t,24>(L.N24, L.f24, replace, thresh);
-      // gpu::factor_block_batch<scalar_t,32>(L.N32, L.f32, replace, thresh);
+      factor_small_fronts_kernel<8>(q, L.N8, L.f8);
+      factor_small_fronts_kernel<16>(q, L.N16, L.f16);
+      factor_small_fronts_kernel<24>(q, L.N24, L.f24);
+      factor_small_fronts_kernel<32>(q, L.N32, L.f32);
     }
   }
 
@@ -489,22 +545,21 @@ namespace strumpack {
   (cl::sycl::queue& q, LInfo_t& L, const Opts_t& opts) {
     for (auto& front : L.f) {
       auto& f = *front;
-      if (true) { // (f.dim_sep() > 32) {
+      if (f.dim_sep() > 32) {
         auto e_getrf = dpcpp::getrf
           (q, f.F11_, f.piv_, f.scratchpad_, f.scratchpad_size_);
-        // if (opts.replace_tiny_pivots()) { } // TODO
-        if (f.dim_upd()) {
-          auto e_getrs = dpcpp::getrs
-            (q, Trans::N, f.F11_, f.piv_, f.F12_,
-             f.scratchpad_, f.scratchpad_size_, {e_getrf});
-          dpcpp::gemm
-            (q, Trans::N, Trans::N, scalar_t(-1.),
-             f.F21_, f.F12_, scalar_t(1.), f.F22_, {e_getrs});
-        }
+        if (opts.replace_tiny_pivots()) { } // TODO
+	if (f.dim_upd()) {
+	  auto e_getrs = dpcpp::getrs
+	    (q, Trans::N, f.F11_, f.piv_, f.F12_,
+	     f.scratchpad_, f.scratchpad_size_, {e_getrf});
+	  dpcpp::gemm
+	    (q, Trans::N, Trans::N, scalar_t(-1.),
+	     f.F21_, f.F12_, scalar_t(1.), f.F22_, {e_getrs});
+	}
       }
     }
   }
-
 
   template<typename scalar_t,typename integer_t> void
   FrontDPCpp<scalar_t,integer_t>::multifrontal_factorization
@@ -512,9 +567,9 @@ namespace strumpack {
    int etree_level, int task_depth) {
     // const int max_streams = opts.gpu_streams();
 
-    // cl::sycl::queue q(cl::sycl::default_selector{},
-    //                cl::sycl::property::queue::in_order());
-    cl::sycl::queue q(cl::sycl::host_selector{});
+    cl::sycl::queue q(cl::sycl::default_selector{},
+		      cl::sycl::property::queue::in_order());
+    // cl::sycl::queue q(cl::sycl::host_selector{});
     // cl::sycl::property::queue::in_order());
     if (opts.verbose())
       std::cout << "# SYCL/DPC++ selected device: "
@@ -554,25 +609,23 @@ namespace strumpack {
           (q, work_mem.template as<scalar_t>(), scalar_t(0.), L.Schur_size);
         L.set_factor_pointers(dev_factors);
         L.set_work_pointers(work_mem);
-        // e1.wait();
-        // e2.wait();
         front_assembly(q, A, L);
-        q.wait();
+        q.wait_and_throw();
         old_work = std::move(work_mem);
-        // factor_small_fronts
-        //   (q, L, fdata.template as<FrontData<scalar_t>>(), opts);
-        factor_large_fronts(q, L, opts);
-        STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
+	factor_small_fronts
+	  (q, L, fdata.template as<FrontData<scalar_t>>(), opts);
+	factor_large_fronts(q, L, opts);
+	STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
         L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
         L.f[0]->pivot_mem_.resize(L.piv_size);
-        q.wait();
+        q.wait_and_throw();
         dpcpp::memcpy
           (q, L.f[0]->pivot_mem_.data(), L.f[0]->piv_, L.piv_size);
         dpcpp::memcpy<scalar_t>
           (q, L.f[0]->host_factors_.get(), dev_factors, L.factor_size);
         L.set_factor_pointers(L.f[0]->host_factors_.get());
         L.set_pivot_pointers(L.f[0]->pivot_mem_.data());
-        q.wait();
+        q.wait_and_throw();
       } catch (const std::bad_alloc& e) {
         std::cerr << "Out of memory" << std::endl;
         abort();
@@ -625,15 +678,11 @@ namespace strumpack {
   (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
-
-      std::vector<int> piv(piv_, piv_+dim_sep());
-      // std::cout << "dpiv (" << dim_sep() << ")= {";
-      // for (integer_t i=0; i<dim_sep(); i++)
-      //        std::cout << piv_[i] << " ";
-      // std::cout << "}" << std::endl;
-
       // F11_.solve_LU_in_place(bloc, reinterpret_cast<int>(piv.data(), task_depth);
-      F11_.solve_LU_in_place(bloc, reinterpret_cast<int*>(piv_), task_depth);
+      // F11_.solve_LU_in_place(bloc, reinterpret_cast<int*>(piv_), task_depth);
+      std::vector<int> p(dim_sep());
+      std::iota(p.begin(), p.end(), 1);
+      F11_.solve_LU_in_place(bloc, p.data(), task_depth);
       if (dim_upd()) {
         if (b.cols() == 1)
           gemv(Trans::N, scalar_t(-1.), F21_, bloc,
