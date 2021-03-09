@@ -187,7 +187,7 @@ namespace strumpack {
       for (auto F : f) {
         F->scratchpad_ = smem;
         smem += F->scratchpad_size_;
-      }      
+      }
       auto imem = reinterpret_cast<std::int64_t*>(round_to_8(smem));
       for (auto F : f) {
         F->piv_ = imem;
@@ -312,17 +312,70 @@ namespace strumpack {
     }
   }
 
+  template<typename T> struct Assemble11 {
+    AssembleData<T>* dat_;
+    Assemble11(AssembleData<T>* dat) : dat_(dat) {}
+    void operator()(cl::sycl::nd_item<2> it) const {
+      auto& F = dat_[it.get_group(0)];
+      auto idx = it.get_global_id(1);
+      if (idx >= F.n11) return;
+      auto& t = F.e11[idx];
+      F.F11[t.r + t.c*F.d1] = t.v;
+    }
+  };
+
+  template<typename T> struct Assemble1221 {
+    AssembleData<T>* dat_;
+    Assemble1221(AssembleData<T>* dat) : dat_(dat) {}
+    void operator()(cl::sycl::nd_item<2> it) const {
+      auto& F = dat_[it.get_group(0)];
+      auto idx = it.get_global_id(1);
+      if (idx < F.n12) {
+        auto& t = F.e12[idx];
+        F.F12[t.r + t.c*F.d1] = t.v;
+      }
+      if (idx < F.n21) {
+        auto& t = F.e21[idx];
+        F.F21[t.r + t.c*F.d2] = t.v;
+      }
+    }
+  };
+
+  template<typename T> struct EA1 {
+    AssembleData<T>* dat_;
+    EA1(AssembleData<T>* dat) : dat_(dat) {}
+    void operator()(cl::sycl::nd_item<3> it) const {
+      auto& F = dat_[it.get_group(0)];
+      if (F.CB1)
+        ea_kernel(it.get_global_id(1), it.get_global_id(2),
+                  F.d1, F.d2, F.dCB1, F.F11, F.F12, F.F21,
+                  F.F22, F.CB1, F.I1);
+    }
+  };
+
+  template<typename T> struct EA2 {
+    AssembleData<T>* dat_;
+    EA2(AssembleData<T>* dat) : dat_(dat) {}
+    void operator()(cl::sycl::nd_item<3> it) const {
+      auto& F = dat_[it.get_group(0)];
+      if (F.CB2)
+        ea_kernel(it.get_global_id(1), it.get_global_id(2),
+                  F.d1, F.d2, F.dCB2, F.F11, F.F12, F.F21,
+                  F.F22, F.CB2, F.I2);
+    }
+  };
+
   template<typename T> T rnd(T a, T b) { return ((a + b - 1) / b) * b; }
-  
-  template <typename T>
-  void assemble(cl::sycl::queue& q, std::size_t nf,
-                const AssembleData<T>* dat, AssembleData<T>* ddat) {
+
+  template<typename T> void
+  assemble(cl::sycl::queue& q, std::size_t nf,
+           const AssembleData<T>* dat, AssembleData<T>* ddat) {
     // const unsigned int MAX_BLOCKS_Y =
     //   q.get_device().get_info<cl::sycl::info::device::max_work_group_size>();
     // const unsigned int MAX_BLOCKS_Z = MAX_BLOCKS_Y;
     { // front assembly from sparse matrix
       std::size_t nt1 = 128, nt2 = 32;
-      std::size_t max1 = nt1, max2 = nt2; 
+      std::size_t max1 = nt1, max2 = nt2;
       for (std::size_t f=0; f<nf; f++) {
         max1 = std::max(max1, dat[f].n11);
         max2 = std::max(max2, std::max(dat[f].n12, dat[f].n21));
@@ -330,28 +383,11 @@ namespace strumpack {
       // TODO check if nf is larger than allowed max
       cl::sycl::range<2> global{nf, rnd(max1, nt1)}, local{1, nt1};
       q.parallel_for(cl::sycl::nd_range<2>{global, local},
-                     [=](cl::sycl::nd_item<2> it) {
-                       auto& F = ddat[it.get_group(0)/*+f*/];
-                       auto idx = it.get_global_id(1);
-                       if (idx >= F.n11) return;
-                       auto& t = F.e11[idx];
-                       F.F11[t.r + t.c*F.d1] = t.v;
-                     });
+                     Assemble11<T>(ddat));
       if (max2) {
         cl::sycl::range<2> global{nf, rnd(max2, nt2)}, local{1, nt2};
         q.parallel_for(cl::sycl::nd_range<2>{global, local},
-                       [=](cl::sycl::nd_item<2> it) {
-                         auto& F = ddat[it.get_group(0)/*+f*/];
-                         auto idx = it.get_global_id(1);
-                         if (idx < F.n12) {
-                           auto& t = F.e12[idx];
-                           F.F12[t.r + t.c*F.d1] = t.v;
-                         }
-                         if (idx < F.n21) {
-                           auto& t = F.e21[idx];
-                           F.F21[t.r + t.c*F.d2] = t.v;
-                         }
-                       });
+                       Assemble1221<T>(ddat));
       }
     }
     q.wait_and_throw();
@@ -362,27 +398,26 @@ namespace strumpack {
         maxCB = std::max(maxCB, std::max(dat[f].dCB1, dat[f].dCB2));
       auto gCB = rnd(maxCB, nt);
       cl::sycl::range<3> global{nf, gCB, gCB}, local{1, nt, nt};
-      q.parallel_for(cl::sycl::nd_range<3>{global, local},
-                     [=](cl::sycl::nd_item<3> it) {
-                       auto& F = ddat[it.get_group(0)];
-                       if (F.CB1)
-                         ea_kernel(it.get_global_id(1), it.get_global_id(2),
-                                   F.d1, F.d2, F.dCB1, F.F11, F.F12, F.F21,
-                                   F.F22, F.CB1, F.I1);
-                     });
+      q.parallel_for(cl::sycl::nd_range<3>{global, local}, EA1<T>(ddat));
       q.wait_and_throw();
-      q.parallel_for(cl::sycl::nd_range<3>{global, local},
-                     [=](cl::sycl::nd_item<3> it) {
-                       auto& F = ddat[it.get_group(0)];
-                       if (F.CB2)
-                         ea_kernel(it.get_global_id(1), it.get_global_id(2),
-                                   F.d1, F.d2, F.dCB2, F.F11, F.F12, F.F21,
-                                   F.F22, F.CB2, F.I2);
-                     });
+      q.parallel_for(cl::sycl::nd_range<3>{global, local}, EA2<T>(ddat));
       q.wait_and_throw();
     }
   }
 
+  template<> void assemble<std::complex<float>>
+  (cl::sycl::queue& q, std::size_t nf,
+   const AssembleData<std::complex<float>>* dat,
+   AssembleData<std::complex<float>>* ddat) {
+    std::cout << "TODO assemble<std::complex<float>>" << std::endl;
+  }
+
+  template<> void assemble<std::complex<double>>
+  (cl::sycl::queue& q, std::size_t nf,
+   const AssembleData<std::complex<double>>* dat,
+   AssembleData<std::complex<double>>* ddat) {
+    std::cout << "TODO assemble<std::complex<double>>" << std::endl;
+  }
 
   template<typename scalar_t, typename integer_t> void
   FrontDPCpp<scalar_t,integer_t>::front_assembly
@@ -451,63 +486,95 @@ namespace strumpack {
     assemble(q, N, hasmbl, dasmbl);
   }
 
-  template<std::size_t tile_size, typename scalar_t> void
+  template<std::size_t B, typename T> struct PartialFactor {
+    FrontData<T>* fdata_;
+    PartialFactor(FrontData<T>* fdata) : fdata_(fdata) {}
+    void operator()(cl::sycl::nd_item<3> it) const {
+      auto& F = fdata_[it.get_group(0)];
+      int j = it.get_global_id(1), i = it.get_global_id(2);
+      int n = F.n1, n2 = F.n2;
+      auto A11 = F.F11;
+      auto piv = reinterpret_cast<int*>(F.piv);
+      for (int k=0; k<n; k++) {
+        if (i == 0 && j == 0)
+          piv[k] = k + 1;
+        // divide by the pivot element
+        if (j == k && i > k && i < n)
+          A11[i+j*n] /= A11[k+k*n];
+        it.barrier();
+        // Schur update
+        if (j > k && i > k && j < n && i < n)
+          A11[i+j*n] -= A11[i+k*n] * A11[k+j*n];
+        it.barrier();
+      }
+      auto A12 = F.F12;
+      for (int cb=0; cb<n2; cb+=B) {
+        int c = cb + j;
+        bool col = c < n2;
+        // L trsm (unit diag)
+        for (int k=0; k<n; k++) {
+          if (i > k && i < n && col)
+            A12[i+c*n] -= A11[i+k*n] * A12[k+c*n];
+          it.barrier();
+        }
+        // U trsm
+        for (int k=n-1; k>=0; k--) {
+          if (i == k && col)
+            A12[k+c*n] /= A11[k+k*n];
+          it.barrier();
+          if (i < k && col)
+            A12[i+c*n] -= A11[i+k*n] * A12[k+c*n];
+          it.barrier();
+        }
+      }
+      // Schur GEMM
+      auto A22 = F.F22, A21 = F.F21;
+      for (int c=j; c<n2; c+=B)
+        for (int r=i; r<n2; r+=B)
+          for (int k=0; k<n; k++)
+            A22[r+c*n2] -= A21[r+k*n2] * A12[k+c*n];
+    }
+  };
+
+  template<std::size_t B, typename T> void
   factor_small_fronts_kernel(cl::sycl::queue& q, std::size_t nf,
-			     FrontData<scalar_t>* fdata) {
-    cl::sycl::range<3> global{nf, tile_size, tile_size},
-      local{1, tile_size, tile_size};
-      q.submit([&](cl::sycl::handler& h) {
-    	// constexpr int tile_size = it.get_group_range(0);
-    	// TODO local_accessor for local memory?
-    	// or use broadcasts??
-    	h.parallel_for
-    	  (cl::sycl::nd_range<3>{global, local},
-    	   [=](cl::sycl::nd_item<3> it) {
-    	     auto& F = fdata[it.get_group(0)];
-    	     int j = it.get_global_id(1), i = it.get_global_id(2);
-    	     int n = F.n1, n2 = F.n2;
-    	     auto A11 = F.F11;
-    	     auto piv = reinterpret_cast<int*>(F.piv);
-    	     for (int k=0; k<n; k++) {
-    	       if (i == 0 && j == 0)
-    	     	 piv[k] = k + 1;
-    	       // divide by the pivot element
-    	       if (j == k && i > k && i < n)
-    	     	 A11[i+j*n] /= A11[k+k*n];
-    	       it.barrier();
-    	       // Schur update
-    	       if (j > k && i > k && j < n && i < n)
-    	     	 A11[i+j*n] -= A11[i+k*n] * A11[k+j*n];
-    	       it.barrier();
-    	     }
-    	     auto A12 = F.F12;
-    	     for (int cb=0; cb<n2; cb+=tile_size) {
-    	       int c = cb + j;
-    	       bool col = c < n2;
-    	       // L trsm (unit diag)
-    	       for (int k=0; k<n; k++) {
-    	     	 if (i > k && i < n && col)
-    	     	   A12[i+c*n] -= A11[i+k*n] * A12[k+c*n];
-    	     	 it.barrier();
-    	       }
-    	       // U trsm
-    	       for (int k=n-1; k>=0; k--) {
-    	     	 if (i == k && col)
-    	     	   A12[k+c*n] /= A11[k+k*n];
-    	     	 it.barrier();
-    	     	 if (i < k && col)
-    	     	   A12[i+c*n] -= A11[i+k*n] * A12[k+c*n];
-    	     	 it.barrier();
-    	       }
-    	     }
-    	     // Schur GEMM
-    	     auto A22 = F.F22, A21 = F.F21;
-    	     for (int c=j; c<n2; c+=tile_size)
-    	       for (int r=i; r<n2; r+=tile_size)
-    		 for (int k=0; k<n; k++)
-    		   A22[r+c*n2] -= A21[r+k*n2] * A12[k+c*n];
-    	   });
-      });
+                             FrontData<T>* fdata) {
+    cl::sycl::range<3> global{nf, B, B}, local{1, B, B};
+    q.parallel_for(cl::sycl::nd_range<3>{global, local},
+                   PartialFactor<B, T>(fdata));
+  }
+
+  template<> void factor_small_fronts_kernel<8,std::complex<float>>
+  (cl::sycl::queue& q, std::size_t nf, FrontData<std::complex<float>>* fdata) {
+    std::cout << "TODO factor_small_fronts_kernel<8,std::complex<float>>" << std::endl;
+  }
+  template<> void factor_small_fronts_kernel<16,std::complex<float>>
+  (cl::sycl::queue& q, std::size_t nf, FrontData<std::complex<float>>* fdata) {
+    std::cout << "TODO factor_small_fronts_kernel<16,std::complex<float>>" << std::endl;
+  }
+  template<> void factor_small_fronts_kernel<24,std::complex<float>>
+  (cl::sycl::queue& q, std::size_t nf, FrontData<std::complex<float>>* fdata) {
+    std::cout << "TODO factor_small_fronts_kernel<24,std::complex<float>>" << std::endl;
+  }
+  template<> void factor_small_fronts_kernel<32,std::complex<float>>
+  (cl::sycl::queue& q, std::size_t nf, FrontData<std::complex<float>>* fdata) {
+    std::cout << "TODO factor_small_fronts_kernel<32,std::complex<float>>" << std::endl;
+  }
+  template<> void factor_small_fronts_kernel<8,std::complex<double>>
+  (cl::sycl::queue& q, std::size_t nf, FrontData<std::complex<double>>* fdata) {
+    std::cout << "TODO factor_small_fronts_kernel<8,std::complex<double>>" << std::endl;
+  }
+  template<> void factor_small_fronts_kernel<16,std::complex<double>>
+  (cl::sycl::queue& q, std::size_t nf, FrontData<std::complex<double>>* fdata) {
+    std::cout << "TODO factor_small_fronts_kernel<16,std::complex<double>>" << std::endl;
+  }
+  template<> void factor_small_fronts_kernel<24,std::complex<double>>
+  (cl::sycl::queue& q, std::size_t nf, FrontData<std::complex<double>>* fdata) {
+    std::cout << "TODO factor_small_fronts_kernel<24,std::complex<double>>" << std::endl;
+  }
+  template<> void factor_small_fronts_kernel<32,std::complex<double>>
+  (cl::sycl::queue& q, std::size_t nf, FrontData<std::complex<double>>* fdata) {
+    std::cout << "TODO factor_small_fronts_kernel<32,std::complex<double>>" << std::endl;
   }
 
   template<typename scalar_t, typename integer_t> void
@@ -549,14 +616,14 @@ namespace strumpack {
         auto e_getrf = dpcpp::getrf
           (q, f.F11_, f.piv_, f.scratchpad_, f.scratchpad_size_);
         if (opts.replace_tiny_pivots()) { } // TODO
-	if (f.dim_upd()) {
-	  auto e_getrs = dpcpp::getrs
-	    (q, Trans::N, f.F11_, f.piv_, f.F12_,
-	     f.scratchpad_, f.scratchpad_size_, {e_getrf});
-	  dpcpp::gemm
-	    (q, Trans::N, Trans::N, scalar_t(-1.),
-	     f.F21_, f.F12_, scalar_t(1.), f.F22_, {e_getrs});
-	}
+        if (f.dim_upd()) {
+          auto e_getrs = dpcpp::getrs
+            (q, Trans::N, f.F11_, f.piv_, f.F12_,
+             f.scratchpad_, f.scratchpad_size_, {e_getrf});
+          dpcpp::gemm
+            (q, Trans::N, Trans::N, scalar_t(-1.),
+             f.F21_, f.F12_, scalar_t(1.), f.F22_, {e_getrs});
+        }
       }
     }
   }
@@ -568,7 +635,7 @@ namespace strumpack {
     // const int max_streams = opts.gpu_streams();
 
     cl::sycl::queue q(cl::sycl::default_selector{},
-		      cl::sycl::property::queue::in_order());
+                      cl::sycl::property::queue::in_order());
     // cl::sycl::queue q(cl::sycl::host_selector{});
     // cl::sycl::property::queue::in_order());
     if (opts.verbose())
@@ -612,10 +679,10 @@ namespace strumpack {
         front_assembly(q, A, L);
         q.wait_and_throw();
         old_work = std::move(work_mem);
-	factor_small_fronts
-	  (q, L, fdata.template as<FrontData<scalar_t>>(), opts);
-	factor_large_fronts(q, L, opts);
-	STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
+        factor_small_fronts
+          (q, L, fdata.template as<FrontData<scalar_t>>(), opts);
+        factor_large_fronts(q, L, opts);
+        STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
         L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
         L.f[0]->pivot_mem_.resize(L.piv_size);
         q.wait_and_throw();
