@@ -215,6 +215,8 @@ namespace strumpack {
                 << get_name(compression_algorithm()) << ")" << std::endl
                 << "#   --hodlr_BACA_block_size int (default "
                 << BACA_block_size() << ")" << std::endl
+                << "#   --hodlr_lr_leaf int (default "
+                << lr_leaf() << ")" << std::endl
                 << "#   --hodlr_BF_sampling_parameter (default "
                 << BF_sampling_parameter() << ")" << std::endl
                 << "#   --hodlr_geo 1|2 (1: no neighbor info, 2: use neighbor info) (default "

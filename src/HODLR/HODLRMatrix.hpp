@@ -495,6 +495,7 @@ namespace strumpack {
       DistM_t dense(const BLACSGrid* g) const;
 
       void set_sampling_parameter(double sample_param);
+      void set_BACA_block(int bsize);
 
       DenseM_t redistribute_2D_to_1D(const DistM_t& R) const;
       void redistribute_2D_to_1D(const DistM_t& R2D, DenseM_t& R1D) const;
