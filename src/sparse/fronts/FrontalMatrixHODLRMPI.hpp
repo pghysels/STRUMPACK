@@ -53,6 +53,8 @@ namespace strumpack {
                           integer_t sep_end, std::vector<integer_t>& upd,
                           const MPIComm& comm, int _total_procs);
 
+    ~FrontalMatrixHODLRMPI();
+
     FrontalMatrixHODLRMPI(const FrontalMatrixHODLRMPI&) = delete;
 
     FrontalMatrixHODLRMPI& operator=(FrontalMatrixHODLRMPI const&) = delete;

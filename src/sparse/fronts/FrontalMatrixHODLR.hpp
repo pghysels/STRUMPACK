@@ -45,79 +45,76 @@ namespace strumpack {
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using VecVec_t = std::vector<std::vector<std::size_t>>;
     using Opts_t = SPOptions<scalar_t>;
+    using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
 
   public:
-    FrontalMatrixHODLR
-    (integer_t sep, integer_t sep_begin, integer_t sep_end,
-     std::vector<integer_t>& upd);
+    FrontalMatrixHODLR(integer_t sep, integer_t sep_begin, integer_t sep_end,
+                       std::vector<integer_t>& upd);
+
+    ~FrontalMatrixHODLR();
+
     FrontalMatrixHODLR(const FrontalMatrixHODLR&) = delete;
+
     FrontalMatrixHODLR& operator=(FrontalMatrixHODLR const&) = delete;
 
-    void extend_add_to_dense
-    (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
-     const F_t* p, int task_depth) override;
+    void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
+                             DenseM_t& paF21, DenseM_t& paF22,
+                             const F_t* p, int task_depth) override;
 
-    void extend_add_copy_to_buffers
-    (std::vector<std::vector<scalar_t>>& sbuf,
-     const FrontalMatrixMPI<scalar_t,integer_t>* pa) const override;
+    void
+    extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
+                               const FMPI_t* pa) const override;
 
-    void sample_CB
-    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth=0) const override;
-    void sample_CB_to_F11
-    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth=0) const override;
-    void sample_CB_to_F12
-    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth=0) const override;
-    void sample_CB_to_F21
-    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth=0) const override;
-    void sample_CB_to_F22
-    (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
-     int task_depth=0) const override;
+    void sample_CB(Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+                   int task_depth=0) const override;
+    void sample_CB_to_F11(Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+                          int task_depth=0) const override;
+    void sample_CB_to_F12(Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+                          int task_depth=0) const override;
+    void sample_CB_to_F21(Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+                          int task_depth=0) const override;
+    void sample_CB_to_F22(Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
+                          int task_depth=0) const override;
 
-    void element_extraction
-    (const SpMat_t& A, const std::vector<std::vector<std::size_t>>& I,
-     const std::vector<std::vector<std::size_t>>& J,
-     std::vector<DenseMW_t>& B, int task_depth, bool skip_sparse=false);
+    void element_extraction(const SpMat_t& A,
+                            const VecVec_t& I, const VecVec_t& J,
+                            std::vector<DenseMW_t>& B, int task_depth,
+                            bool skip_sparse=false);
 
-    void extract_CB_sub_matrix
-    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-     DenseM_t& B, int task_depth) const override;
-    void extract_CB_sub_matrix_blocks
-    (const std::vector<std::vector<std::size_t>>& I,
-     const std::vector<std::vector<std::size_t>>& J,
-     std::vector<DenseM_t>& Bseq, int task_depth) const override;
-    void extract_CB_sub_matrix_blocks
-    (const std::vector<std::vector<std::size_t>>& I,
-     const std::vector<std::vector<std::size_t>>& J,
-     std::vector<DenseMW_t>& Bseq, int task_depth) const override;
+    void extract_CB_sub_matrix(const std::vector<std::size_t>& I,
+                               const std::vector<std::size_t>& J,
+                               DenseM_t& B, int task_depth) const override;
+    void extract_CB_sub_matrix_blocks(const VecVec_t& I, const VecVec_t& J,
+                                      std::vector<DenseM_t>& Bseq,
+                                      int task_depth) const override;
+    void extract_CB_sub_matrix_blocks(const VecVec_t& I, const VecVec_t& J,
+                                      std::vector<DenseMW_t>& Bseq,
+                                      int task_depth) const override;
 
     void release_work_memory() override;
-    void random_sampling
-    (const SpMat_t& A, const Opts_t& opts, DenseM_t& Rr,
-     DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc, int etree_level,
-     int task_depth); // TODO const?
 
-    void multifrontal_factorization
-    (const SpMat_t& A, const Opts_t& opts,
-     int etree_level=0, int task_depth=0) override;
+    void random_sampling(const SpMat_t& A, const Opts_t& opts, DenseM_t& Rr,
+                         DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
+                         int etree_level, int task_depth); // TODO const?
 
-    void forward_multifrontal_solve
-    (DenseM_t& b, DenseM_t* work, int etree_level=0,
-     int task_depth=0) const override;
-    void backward_multifrontal_solve
-    (DenseM_t& y, DenseM_t* work, int etree_level=0,
-     int task_depth=0) const override;
+    void multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
+                                    int etree_level=0, int task_depth=0)
+      override;
+
+    void forward_multifrontal_solve(DenseM_t& b, DenseM_t* work,
+                                    int etree_level=0, int task_depth=0)
+      const override;
+
+    void backward_multifrontal_solve(DenseM_t& y, DenseM_t* work,
+                                     int etree_level=0, int task_depth=0)
+      const override;
 
     integer_t front_rank(int task_depth=0) const override;
     void print_rank_statistics(std::ostream &out) const override;
     std::string type() const override { return "FrontalMatrixHODLR"; }
 
-    void partition
-    (const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
-     bool is_root=true, int task_depth=0) override;
+    void partition(const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
+                   bool is_root=true, int task_depth=0) override;
 
   private:
     HODLR::HODLRMatrix<scalar_t> F11_;
@@ -131,23 +128,22 @@ namespace strumpack {
 
     void draw_node(std::ostream& of, bool is_root) const override;
 
-    void multifrontal_factorization_node
-    (const SpMat_t& A, const Opts_t& opts,
-     int etree_level, int task_depth);
+    void multifrontal_factorization_node(const SpMat_t& A, const Opts_t& opts,
+                                         int etree_level, int task_depth);
 
-    void fwd_solve_node
-    (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const;
-    void bwd_solve_node
-    (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const;
+    void fwd_solve_node(DenseM_t& b, DenseM_t* work,
+                        int etree_level, int task_depth) const;
+    void bwd_solve_node(DenseM_t& y, DenseM_t* work,
+                        int etree_level, int task_depth) const;
 
     long long node_factor_nonzeros() const override;
 
-    void construct_hierarchy
-    (const SpMat_t& A, const Opts_t& opts, int task_depth);
-    void compress_sampling
-    (const SpMat_t& A, const Opts_t& opts, int task_depth);
-    void compress_extraction
-    (const SpMat_t& A, const Opts_t& opts, int task_depth);
+    void construct_hierarchy(const SpMat_t& A, const Opts_t& opts,
+                             int task_depth);
+    void compress_sampling(const SpMat_t& A, const Opts_t& opts,
+                           int task_depth);
+    void compress_extraction(const SpMat_t& A, const Opts_t& opts,
+                             int task_depth);
     void compress_flops_F11();
     void compress_flops_F12_F21();
     void compress_flops_F22();
