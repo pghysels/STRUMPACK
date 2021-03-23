@@ -272,7 +272,7 @@ namespace strumpack {
        * construction.
        */
       void set_less_adapt(bool l) { less_adapt_ = l; }
-      
+
       /**
        * Enable/disable the N^1.5 entry evaluation-based construction.
        */

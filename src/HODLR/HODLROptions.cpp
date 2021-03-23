@@ -176,7 +176,7 @@ namespace strumpack {
           set_lr_leaf(lr_leaf_);
         } break;
         case 16: set_less_adapt(true); break;
-        case 17: set_less_adapt(false); break;        
+        case 17: set_less_adapt(false); break;
         case 18: set_BF_entry_n15(true); break;
         case 19: set_BF_entry_n15(false); break;
         case 'v': set_verbose(true); break;
@@ -230,7 +230,7 @@ namespace strumpack {
                 << "#   --hodlr_enable_BF_entry_n15 (default "
                 << BF_entry_n15() << ")" << std::endl
                 << "#   --hodlr_disable_BF_entry_n15 (default "
-                << !BF_entry_n15() << ")" << std::endl                
+                << !BF_entry_n15() << ")" << std::endl
                 << "#   --hodlr_verbose or -v (default "
                 << verbose() << ")" << std::endl
                 << "#   --hodlr_quiet or -q (default "
