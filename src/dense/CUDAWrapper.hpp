@@ -97,7 +97,7 @@ namespace strumpack {
     };
 
     template<typename T> void memset
-    (T* dptr, int value, std::size_t count) {
+    (void* dptr, int value, std::size_t count) {
       gpu_check(cudaMemset(dptr, value, count*sizeof(T)));
     }
 

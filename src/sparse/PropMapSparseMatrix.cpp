@@ -469,6 +469,43 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
+  PropMapSparseMatrix<scalar_t,integer_t>::count_front_elements
+  (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+   std::size_t& e11, std::size_t& e12, std::size_t& e21) const {
+    integer_t dim_upd = upd.size();
+    auto c = find_global(slo);
+    auto chi = find_global(shi, c);
+    for (; c<chi; c++) {
+      integer_t row_ptr = 0;
+      auto hij = ptr_[c+1];
+      for (integer_t j=ptr_[c]; j<hij; j++) {
+        auto row = ind_[j];
+        if (row >= slo) {
+          if (row < shi) e11++;
+          else {
+            while (row_ptr<dim_upd && upd[row_ptr]<row)
+              row_ptr++;
+            if (row_ptr == dim_upd) break;
+            if (upd[row_ptr] == row) e21++;
+          }
+        }
+      }
+    }
+    for (integer_t i=0; i<dim_upd; ++i) { // update columns
+      //while (c < local_cols_ && global_col_[c] < upd[i]) c++;
+      c = find_global(upd[i], c);
+      if (c == local_cols_ || global_col_[c] != upd[i]) continue;
+      for (integer_t j=ptr_[c]; j<ptr_[c+1]; j++) {
+        auto row = ind_[j];
+        if (row >= slo) {
+          if (row < shi) e12++;
+          else break;
+        }
+      }
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
   PropMapSparseMatrix<scalar_t,integer_t>::extract_F11_block
   (scalar_t* F, integer_t ldF, integer_t row, integer_t nr_rows,
    integer_t col, integer_t nr_cols) const {
