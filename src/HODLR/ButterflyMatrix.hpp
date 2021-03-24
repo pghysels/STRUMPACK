@@ -122,6 +122,7 @@ namespace strumpack {
       void print_stats();
 
       void set_sampling_parameter(double sample_param);
+      void set_BACA_block(int bsize);
 
       DistM_t dense(const BLACSGrid* g) const;
 

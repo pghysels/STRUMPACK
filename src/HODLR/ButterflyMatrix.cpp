@@ -191,6 +191,7 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 3);
       HODLR_set_I_option<scalar_t>(options_, "knn", opts.knn_lrbf());
       HODLR_set_I_option<scalar_t>(options_, "forwardN15flag", opts.BF_entry_n15()); // 0 or 1
+      HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", opts.lr_leaf());
       { TIMER_TIME(TaskType::CONSTRUCT_INIT, 0, t_construct_h);
         LRBF_construct_init<scalar_t>
           (rows_, cols_, lrows_, lcols_,
@@ -318,6 +319,12 @@ namespace strumpack {
       HODLR_set_D_option<scalar_t>(options_, "sample_para", sample_param);
       HODLR_set_D_option<scalar_t>(options_, "sample_para_outer", sample_param);
     }
+
+    template<typename scalar_t> void
+    ButterflyMatrix<scalar_t>::set_BACA_block(int bsize) {
+      HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", bsize);
+    }
+
 
     template<typename scalar_t> void
     ButterflyMatrix<scalar_t>::extract_add_elements
