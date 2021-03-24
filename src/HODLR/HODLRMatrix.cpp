@@ -690,10 +690,18 @@ namespace strumpack {
 
     template<typename scalar_t> DistributedMatrix<scalar_t>
     HODLRMatrix<scalar_t>::dense(const BLACSGrid* g) const {
-      DistM_t A(g, rows_, cols_), I(g, cols_, cols_);
-      I.eye();
+      // DistM_t A(g, rows_, cols_), I(g, cols_, cols_);
+      // I.eye();
+      // mult(Trans::N, I, A);
+      // return A;
+      DenseM_t A(lrows_, cols_), I(lrows_, cols_);
+      I.zero();
+      for (int i=0; i<lrows_; i++)
+        I(i, i+begin_row()) = scalar_t(1.);
       mult(Trans::N, I, A);
-      return A;
+      DistM_t A2D(g, rows_, cols_);
+      redistribute_1D_to_2D(A, A2D);
+      return A2D;
     }
 
     template<typename scalar_t> DenseMatrix<scalar_t>

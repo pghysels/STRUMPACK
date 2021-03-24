@@ -488,7 +488,7 @@ namespace strumpack {
        * Create a dense matrix from this HODLR compressed matrix. This
        * is mainly for debugging.
        *
-       * \param g BLACSFGrid to be used for the output
+       * \param g BLACSGrid to be used for the output
        * \return dense matrix representation of *this, in 2D bloc
        * cyclic format.
        */
@@ -501,9 +501,9 @@ namespace strumpack {
       void redistribute_2D_to_1D(const DistM_t& R2D, DenseM_t& R1D) const;
       void redistribute_1D_to_2D(const DenseM_t& S1D, DistM_t& S2D) const;
 
-      DenseMatrix<scalar_t> gather_from_1D(const DenseM_t& A) const;
-      DenseMatrix<scalar_t> all_gather_from_1D(const DenseM_t& A) const;
-      DenseMatrix<scalar_t> scatter_to_1D(const DenseM_t& A) const;
+      DenseM_t gather_from_1D(const DenseM_t& A) const;
+      DenseM_t all_gather_from_1D(const DenseM_t& A) const;
+      DenseM_t scatter_to_1D(const DenseM_t& A) const;
 
       /**
        * The permutation for the matrix, which is applied to both rows

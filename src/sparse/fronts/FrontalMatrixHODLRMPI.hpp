@@ -35,6 +35,8 @@
 
 // #define STRUMPACK_PERMUTE_CB
 
+#define EXTRACT_FROM_DENSE
+
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
@@ -95,6 +97,9 @@ namespace strumpack {
     HODLR::HODLRMatrix<scalar_t> F11_;
     HODLR::ButterflyMatrix<scalar_t> F12_, F21_;
     std::unique_ptr<HODLR::HODLRMatrix<scalar_t>> F22_;
+#if defined(EXTRACT_FROM_DENSE)
+    DistM_t F22dense_;
+#endif
     HSS::HSSPartitionTree sep_tree_;
 #if defined(STRUMPACK_PERMUTE_CB)
     std::vector<integer_t> CB_perm_, CB_iperm_;

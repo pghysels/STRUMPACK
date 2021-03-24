@@ -63,6 +63,9 @@ namespace strumpack {
       STRUMPACK_SUB_MEMORY(F22_->get_stat("Mem_Fill")*1.e6);
       F22_.reset(nullptr);
     }
+#if defined(EXTRACT_FROM_DENSE)
+    F22dense_.clear();
+#endif
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -127,6 +130,34 @@ namespace strumpack {
     // TIMER_TIME(TaskType::HSS_EXTRACT_SCHUR, 3, t_ex_schur);
     auto nB = I.size();
     std::vector<std::vector<std::size_t>> lI(nB), lJ(nB), oI(nB), oJ(nB);
+#if defined(EXTRACT_FROM_DENSE)
+    {
+      TIMER_TIME(TaskType::EXTRACT_ELEMS, 2, t_a2a);
+      std::vector<std::vector<scalar_t>> sbuf(this->P());
+      using ExtAdd = ExtendAdd<scalar_t,integer_t>;
+      for (std::size_t i=0; i<nB; i++) {
+        this->find_upd_indices(I[i], lI[i], oI[i]);
+        this->find_upd_indices(J[i], lJ[i], oJ[i]);
+#if defined(STRUMPACK_PERMUTE_CB)
+        if (CB_perm_.size() == std::size_t(this->dim_upd())) {
+          for (auto& li : lI[i]) li = CB_perm_[li];
+          for (auto& lj : lJ[i]) lj = CB_perm_[lj];
+        }
+#endif
+        ExtAdd::extract_copy_to_buffers
+          (F22dense_, lI[i], lJ[i], oI[i], oJ[i], B[i], sbuf);
+      }
+      std::vector<scalar_t,NoInit<scalar_t>> rbuf;
+      std::vector<scalar_t*> pbuf;
+      {
+        TIMER_TIME(TaskType::GET_SUBMATRIX_2D_A2A, 2, t_a2a);
+        Comm().all_to_all_v(sbuf, rbuf, pbuf);
+      }
+      for (std::size_t i=0; i<nB; i++)
+        ExtAdd::extract_copy_from_buffers
+          (B[i], lI[i], lJ[i], oI[i], oJ[i], F22dense_, pbuf);
+    }
+#else
     std::vector<DistM_t> Bloc(nB);
     for (std::size_t i=0; i<nB; i++) {
       this->find_upd_indices(I[i], lI[i], oI[i]);
@@ -156,6 +187,7 @@ namespace strumpack {
     for (std::size_t i=0; i<nB; i++)
       ExtendAdd<scalar_t,integer_t>::extend_copy_from_buffers
         (B[i], oI[i], oJ[i], Bloc[i], pbuf);
+#endif
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -179,6 +211,16 @@ namespace strumpack {
       compress_extraction(A, lopts);
     } break;
     }
+#if defined(EXTRACT_FROM_DENSE)
+    if (F22_) {
+      F22dense_ = F22_->dense(grid());
+#if defined(STRUMPACK_COUNT_FLOPS)
+      long long int dense_flops = F22_->get_stat("Flop_C_Mult");
+      STRUMPACK_FLOPS(dense_flops);
+      STRUMPACK_SCHUR_FLOPS(dense_flops);
+#endif
+    }
+#endif
 #if defined(STRUMPACK_COUNT_FLOPS)
     auto HOD_peak_mem = F11_.get_stat("Mem_Peak") +
       F12_.get_stat("Mem_Peak") + F21_.get_stat("Mem_Peak");
@@ -226,6 +268,20 @@ namespace strumpack {
                   << " %compression, time= " << time
                   << " sec" << std::endl;
     }
+
+#if defined(EXTRACT_FROM_DENSE)
+    if (F22_) {
+      TaskTimer t_traverse(TaskType::BF_EXTRACT_TRAVERSE, 3),
+        t_bf(TaskType::BF_EXTRACT_ENTRY, 3),
+        t_comm(TaskType::BF_EXTRACT_COMM, 3);
+      t_traverse.set_elapsed(F22_->get_stat("Time_Entry_Traverse"));
+      t_bf.set_elapsed(F22_->get_stat("Time_Entry_BF"));
+      t_comm.set_elapsed(F22_->get_stat("Time_Entry_Comm"));
+      STRUMPACK_SUB_MEMORY(F22_->get_stat("Mem_Fill")*1.e6);
+      F22_.reset(nullptr);
+    }
+#endif
+
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
   }
@@ -272,7 +328,6 @@ namespace strumpack {
           this->extract_2d(A, I, J, B);
         };
       { TIMER_TIME(TaskType::LRBF_COMPRESS, 0, t_lrbf_compress);
-        
         // int bsize = std::min(64.0,ceil(F11_.get_stat("Rank_max")/2.0));
         // F12_.set_BACA_block(bsize);
         F12_.compress(extract_F12);
