@@ -507,8 +507,6 @@ namespace strumpack {
     }
   }
 
-#define LESSDALLOCS 1
-
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
@@ -541,24 +539,18 @@ namespace strumpack {
       solver_handles[i].set_stream(streams[i]);
     }
     gpu::HostMemory<gpu::FrontData<scalar_t>> fdata(max_small_fronts);
-
-#if defined(LESSDALLOCS)
     std::size_t peak_hea_mem = 0;
     for (int l=lvls-1; l>=0; l--)
       peak_hea_mem = std::max(peak_hea_mem, ldata[l].ea_bytes);
     gpu::HostMemory<char> hea_mem(peak_hea_mem);
     gpu::DeviceMemory<char> all_dmem(peak_dmem);
     char* old_work = nullptr;
-#else
-    gpu::DeviceMemory<char> old_work;
-#endif
     for (int l=lvls-1; l>=0; l--) {
       TaskTimer tl("");
       tl.start();
       auto& L = ldata[l];
       if (opts.verbose()) L.print_info(l, lvls);
       try {
-#if defined(LESSDALLOCS)
         char *work_mem = nullptr, *dea_mem = nullptr;
         scalar_t* dev_factors = nullptr;
         if (l % 2) {
@@ -572,22 +564,11 @@ namespace strumpack {
             (dea_mem - round_to_8(L.factor_size * sizeof(scalar_t)));
         }
         gpu::memset<scalar_t>(work_mem, 0, L.Schur_size);
-#else
-        gpu::DeviceMemory<scalar_t> dev_factors(L.factor_size);
-        gpu::DeviceMemory<char> work_mem(L.work_bytes);
-        gpu::DeviceMemory<char> dea_mem(L.ea_bytes);
-        gpu::HostMemory<char> hea_mem(L.ea_bytes);
-        gpu::memset<scalar_t>(work_mem, 0, L.Schur_size);
-#endif
         gpu::memset<scalar_t>(dev_factors, 0, L.factor_size);
         L.set_factor_pointers(dev_factors);
         L.set_work_pointers(work_mem, max_streams);
         front_assembly(A, L, hea_mem, dea_mem);
-#if defined(LESSDALLOCS)
         old_work = work_mem;
-#else
-        old_work = std::move(work_mem);
-#endif
         factor_small_fronts(L, fdata, opts);
         factor_large_fronts(L, blas_handles, solver_handles, streams, opts);
         STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
@@ -621,13 +602,8 @@ namespace strumpack {
     const std::size_t dupd = dim_upd();
     if (dupd) { // get the contribution block from the device
       host_Schur_.reset(new scalar_t[dupd*dupd]);
-#if defined(LESSDALLOCS)
       gpu::copy_device_to_host
         (host_Schur_.get(), reinterpret_cast<scalar_t*>(old_work), dupd*dupd);
-#else
-      gpu::copy_device_to_host
-        (host_Schur_.get(), old_work.as<scalar_t>(), dupd*dupd);
-#endif
       F22_ = DenseMW_t(dupd, dupd, host_Schur_.get(), dupd);
     }
 #if defined(STRUMPACK_USE_MAGMA)
