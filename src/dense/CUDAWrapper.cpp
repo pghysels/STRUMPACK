@@ -50,7 +50,8 @@ namespace strumpack {
         std::cerr << "CUDA assertion failed: "
                   << cudaGetErrorString(code) << " "
                   <<  file << " " << line << std::endl;
-        if (abrt) exit(code);
+        abort();
+        //if (abrt) exit(code);
       }
     }
     void cuda_assert(cusolverStatus_t code, const char *file, int line,

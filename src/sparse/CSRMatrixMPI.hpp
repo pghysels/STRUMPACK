@@ -180,6 +180,9 @@ namespace strumpack {
      std::vector<Triplet<scalar_t>>&,
      std::vector<Triplet<scalar_t>>&,
      std::vector<Triplet<scalar_t>>&) const override {}
+    void count_front_elements
+    (integer_t, integer_t, const std::vector<integer_t>&,
+     std::size_t&, std::size_t&, std::size_t&) const override {}
 
     void extract_F11_block
     (scalar_t*, integer_t, integer_t, integer_t,

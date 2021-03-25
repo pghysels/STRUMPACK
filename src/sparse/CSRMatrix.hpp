@@ -105,33 +105,40 @@ namespace strumpack {
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
     // TODO implement these outside of this class
-    void front_multiply
-    (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
-     const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const override;
-    void extract_separator
-    (integer_t sep_end, const std::vector<std::size_t>& I,
-     const std::vector<std::size_t>& J,
-     DenseM_t& B, int depth) const override;
-    void extract_front
-    (DenseM_t& F11, DenseM_t& F12, DenseM_t& F21, integer_t sep_begin,
-     integer_t sep_end, const std::vector<integer_t>& upd,
-     int depth) const override;
+    void front_multiply(integer_t slo, integer_t shi,
+                        const std::vector<integer_t>& upd,
+                        const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc,
+                        int depth) const override;
+    void extract_separator(integer_t sep_end,
+                           const std::vector<std::size_t>& I,
+                           const std::vector<std::size_t>& J,
+                           DenseM_t& B, int depth) const override;
+    void extract_front(DenseM_t& F11, DenseM_t& F12, DenseM_t& F21,
+                       integer_t sep_begin, integer_t sep_end,
+                       const std::vector<integer_t>& upd,
+                       int depth) const override;
 
-    void push_front_elements
-    (integer_t, integer_t, const std::vector<integer_t>&,
-     std::vector<Triplet<scalar_t>>&,
-     std::vector<Triplet<scalar_t>>&,
-     std::vector<Triplet<scalar_t>>&) const override;
+    void push_front_elements(integer_t, integer_t,
+                             const std::vector<integer_t>&,
+                             std::vector<Triplet<scalar_t>>&,
+                             std::vector<Triplet<scalar_t>>&,
+                             std::vector<Triplet<scalar_t>>&) const override;
+    void count_front_elements(integer_t, integer_t,
+                              const std::vector<integer_t>&,
+                              std::size_t&, std::size_t&, std::size_t&)
+      const override;
 
-    void front_multiply_F11
-    (Trans op, integer_t slo, integer_t shi,
-     const DenseM_t& R, DenseM_t& S, int depth) const override;
-    void front_multiply_F12
-    (Trans op, integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
-     const DenseM_t& R, DenseM_t& S, int depth) const override;
-    void front_multiply_F21
-    (Trans op, integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
-     const DenseM_t& R, DenseM_t& S, int depth) const override;
+    void front_multiply_F11(Trans op, integer_t slo, integer_t shi,
+                            const DenseM_t& R, DenseM_t& S,
+                            int depth) const override;
+    void front_multiply_F12(Trans op, integer_t slo, integer_t shi,
+                            const std::vector<integer_t>& upd,
+                            const DenseM_t& R, DenseM_t& S,
+                            int depth) const override;
+    void front_multiply_F21(Trans op, integer_t slo, integer_t shi,
+                            const std::vector<integer_t>& upd,
+                            const DenseM_t& R, DenseM_t& S,
+                            int depth) const override;
 
 #if defined(STRUMPACK_USE_MPI)
     void extract_F11_block

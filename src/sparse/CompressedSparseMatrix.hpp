@@ -379,66 +379,83 @@ namespace strumpack {
 
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
-    virtual CSRGraph<integer_t> extract_graph
-    (int ordering_level, integer_t lo, integer_t hi) const = 0;
-    virtual CSRGraph<integer_t> extract_graph_sep_CB
-    (int ordering_level, integer_t lo, integer_t hi,
-     const std::vector<integer_t>& upd) const = 0;
-    virtual CSRGraph<integer_t> extract_graph_CB_sep
-    (int ordering_level, integer_t lo, integer_t hi,
-     const std::vector<integer_t>& upd) const = 0;
-    virtual CSRGraph<integer_t> extract_graph_CB
-    (int ordering_level, const std::vector<integer_t>& upd) const = 0;
+    virtual CSRGraph<integer_t>
+    extract_graph(int ordering_level, integer_t lo, integer_t hi) const = 0;
+    virtual CSRGraph<integer_t>
+    extract_graph_sep_CB(int ordering_level, integer_t lo, integer_t hi,
+                         const std::vector<integer_t>& upd) const = 0;
+    virtual CSRGraph<integer_t>
+    extract_graph_CB_sep(int ordering_level, integer_t lo, integer_t hi,
+                         const std::vector<integer_t>& upd) const = 0;
+    virtual CSRGraph<integer_t>
+    extract_graph_CB(int ordering_level,
+                     const std::vector<integer_t>& upd) const = 0;
 
-    virtual void extract_separator
-    (integer_t sep_end, const std::vector<std::size_t>& I,
-     const std::vector<std::size_t>& J, DenseM_t& B, int depth) const = 0;
-    virtual void extract_front
-    (DenseM_t& F11, DenseM_t& F12, DenseM_t& F21,
-     integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
-     int depth) const = 0;
-    virtual void push_front_elements
-    (integer_t, integer_t, const std::vector<integer_t>&,
-     std::vector<Triplet<scalar_t>>&, std::vector<Triplet<scalar_t>>&,
-     std::vector<Triplet<scalar_t>>&) const = 0;
+    virtual void
+    extract_separator(integer_t sep_end, const std::vector<std::size_t>& I,
+                      const std::vector<std::size_t>& J, DenseM_t& B,
+                      int depth) const = 0;
+    virtual void
+    extract_front(DenseM_t& F11, DenseM_t& F12, DenseM_t& F21,
+                  integer_t slo, integer_t shi,
+                  const std::vector<integer_t>& upd,
+                  int depth) const = 0;
+    virtual void
+    push_front_elements(integer_t, integer_t, const std::vector<integer_t>&,
+                        std::vector<Triplet<scalar_t>>&,
+                        std::vector<Triplet<scalar_t>>&,
+                        std::vector<Triplet<scalar_t>>&) const = 0;
+    virtual void
+    count_front_elements(integer_t, integer_t, const std::vector<integer_t>&,
+                         std::size_t&, std::size_t&, std::size_t&) const = 0;
 
-    virtual void front_multiply
-    (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
-     const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc, int depth) const = 0;
+    virtual void
+    front_multiply(integer_t slo, integer_t shi,
+                   const std::vector<integer_t>& upd,
+                   const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc,
+                   int depth) const = 0;
 
-    virtual void front_multiply_F11
-    (Trans op, integer_t slo, integer_t shi,
-     const DenseM_t& R, DenseM_t& S, int depth) const = 0;
-    virtual void front_multiply_F12
-    (Trans op, integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
-     const DenseM_t& R, DenseM_t& S, int depth) const = 0;
-    virtual void front_multiply_F21
-    (Trans op, integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
-     const DenseM_t& R, DenseM_t& S, int depth) const = 0;
+    virtual void
+    front_multiply_F11(Trans op, integer_t slo, integer_t shi,
+                       const DenseM_t& R, DenseM_t& S, int depth) const = 0;
+    virtual void
+    front_multiply_F12(Trans op, integer_t slo, integer_t shi,
+                       const std::vector<integer_t>& upd,
+                       const DenseM_t& R, DenseM_t& S, int depth) const = 0;
+    virtual void
+    front_multiply_F21(Trans op, integer_t slo, integer_t shi,
+                       const std::vector<integer_t>& upd,
+                       const DenseM_t& R, DenseM_t& S, int depth) const = 0;
 
 #if defined(STRUMPACK_USE_MPI)
-    virtual void extract_F11_block
-    (scalar_t* F, integer_t ldF, integer_t row, integer_t nr_rows,
-     integer_t col, integer_t nr_cols) const = 0;
-    virtual void extract_F12_block
-    (scalar_t* F, integer_t ldF, integer_t row,
-     integer_t nr_rows, integer_t col, integer_t nr_cols,
-     const integer_t* upd) const = 0;
-    virtual void extract_F21_block
-    (scalar_t* F, integer_t ldF, integer_t row,
-     integer_t nr_rows, integer_t col, integer_t nr_cols,
-     const integer_t* upd) const = 0;
-    virtual void extract_separator_2d
-    (integer_t sep_end, const std::vector<std::size_t>& I,
-     const std::vector<std::size_t>& J, DistM_t& B) const = 0;
-    virtual void front_multiply_2d
-    (integer_t sep_begin, integer_t sep_end,
-     const std::vector<integer_t>& upd, const DistM_t& R,
-     DistM_t& Srow, DistM_t& Scol, int depth) const = 0;
-    virtual void front_multiply_2d
-    (Trans op, integer_t sep_begin, integer_t sep_end,
-     const std::vector<integer_t>& upd, const DistM_t& R,
-     DistM_t& S, int depth) const = 0;
+    virtual void
+    extract_F11_block(scalar_t* F, integer_t ldF,
+                      integer_t row, integer_t nr_rows,
+                      integer_t col, integer_t nr_cols) const = 0;
+    virtual void
+    extract_F12_block(scalar_t* F, integer_t ldF,
+                      integer_t row, integer_t nr_rows,
+                      integer_t col, integer_t nr_cols,
+                      const integer_t* upd) const = 0;
+    virtual void
+    extract_F21_block(scalar_t* F, integer_t ldF,
+                      integer_t row, integer_t nr_rows,
+                      integer_t col, integer_t nr_cols,
+                      const integer_t* upd) const = 0;
+    virtual void
+    extract_separator_2d(integer_t sep_end,
+                         const std::vector<std::size_t>& I,
+                         const std::vector<std::size_t>& J,
+                         DistM_t& B) const = 0;
+    virtual void
+    front_multiply_2d(integer_t sep_begin, integer_t sep_end,
+                      const std::vector<integer_t>& upd,
+                      const DistM_t& R, DistM_t& Srow, DistM_t& Scol,
+                      int depth) const = 0;
+    virtual void
+    front_multiply_2d(Trans op, integer_t sep_begin, integer_t sep_end,
+                      const std::vector<integer_t>& upd, const DistM_t& R,
+                      DistM_t& S, int depth) const = 0;
 #endif //STRUMPACK_USE_MPI
 #endif //DOXYGEN_SHOULD_SKIP_THIS
 
@@ -451,11 +468,12 @@ namespace strumpack {
     enum MMsym {GENERAL, SYMMETRIC, SKEWSYMMETRIC, HERMITIAN};
 
     CompressedSparseMatrix();
-    CompressedSparseMatrix
-    (integer_t n, integer_t nnz, bool symm_sparse=false);
-    CompressedSparseMatrix
-    (integer_t n, const integer_t* row_ptr, const integer_t* col_ind,
-     const scalar_t* values, bool symm_sparsity);
+    CompressedSparseMatrix(integer_t n, integer_t nnz,
+                           bool symm_sparse=false);
+    CompressedSparseMatrix(integer_t n,
+                           const integer_t* row_ptr,
+                           const integer_t* col_ind,
+                           const scalar_t* values, bool symm_sparsity);
 
     std::vector<std::tuple<integer_t,integer_t,scalar_t>>
     read_matrix_market_entries(const std::string& filename);
