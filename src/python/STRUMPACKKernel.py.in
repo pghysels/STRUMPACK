@@ -54,12 +54,16 @@ class STRUMPACKKernel(BaseEstimator, ClassifierMixin):
         self.classes_ = unique_labels(y)
 
         if X.dtype == np.float64:
+            sp.STRUMPACK_create_kernel_double.restype = \
+                ctypes.POINTER(ctypes.c_void_p)
             self.K_ = sp.STRUMPACK_create_kernel_double(
                 ctypes.c_int(X.shape[0]), ctypes.c_int(X.shape[1]),
                 ctypes.c_void_p(X.ctypes.data),
                 ctypes.c_double(self.h), ctypes.c_double(self.lam),
                 ctypes.c_int(self.degree), ctypes.c_int(ktype))
         elif X.dtype == np.float32:
+            sp.STRUMPACK_create_kernel_float.restype = \
+                ctypes.POINTER(ctypes.c_void_p)
             self.K_ = sp.STRUMPACK_create_kernel_float(
                 ctypes.c_int(X.shape[0]), ctypes.c_int(X.shape[1]),
                 ctypes.c_void_p(X.ctypes.data),
@@ -94,7 +98,7 @@ class STRUMPACKKernel(BaseEstimator, ClassifierMixin):
                     sp.STRUMPACK_kernel_fit_HSS_float(
                         self.K_, ctypes.c_void_p(y.ctypes.data),
                         ctypes.c_int(argc), argv)
-        elif self.approximation is 'HODLR':
+        elif self.approximation == 'HODLR':
             if X.dtype == np.float64:
                 sp.STRUMPACK_kernel_fit_HODLR_MPI_double(
                     self.K_, ctypes.c_void_p(y.ctypes.data),
@@ -109,7 +113,7 @@ class STRUMPACKKernel(BaseEstimator, ClassifierMixin):
     def predict(self, X):
         # TODO make sure there are only 2 classes?
         check_is_fitted(self, 'K_')
-        prediction = np.zeros((X.shape[0],1), dtype=X.dtype)
+        prediction = np.zeros((X.shape[0], 1), dtype=X.dtype)
         if X.dtype == np.float64:
             sp.STRUMPACK_kernel_predict_double(
                 self.K_, ctypes.c_int(X.shape[0]),
