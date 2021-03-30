@@ -176,7 +176,7 @@ namespace strumpack {
       matrix()->apply_matching(this->matching_);
       matrix()->equilibrate(this->equil_);
       matrix()->symmetrize_sparsity();
-      setup_tree();
+      tree_mpi_dist_->update_values(opts_, *mat_mpi_, *nd_mpi_);
       if (opts_.compression() != CompressionType::NONE)
         separator_reordering();
     }

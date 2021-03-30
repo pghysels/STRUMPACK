@@ -92,6 +92,12 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
+  EliminationTreeMPIDist<scalar_t,integer_t>::update_values
+  (const Opts_t& opts, const CSRMPI_t& A, Reord_t& nd) {
+    Aprop_.setup(A, nd_, *this, opts.compression() != CompressionType::NONE);
+  }
+
+  template<typename scalar_t,typename integer_t> void
   EliminationTreeMPIDist<scalar_t,integer_t>::separator_reordering
   (const Opts_t& opts, const CSRMPI_t& A) {
     nd_.separator_reordering(opts, Aprop_, this->root());

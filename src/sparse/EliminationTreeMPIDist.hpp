@@ -57,19 +57,24 @@ namespace strumpack {
     using Reord_t = MatrixReorderingMPI<scalar_t,integer_t>;
 
   public:
-    EliminationTreeMPIDist
-    (const Opts_t& opts, const CSRMPI_t& A, Reord_t& nd, const MPIComm& comm);
+    EliminationTreeMPIDist(const Opts_t& opts, const CSRMPI_t& A,
+                           Reord_t& nd, const MPIComm& comm);
+
+    void update_values(const Opts_t& opts, const CSRMPI_t& A,
+                       Reord_t& nd);
 
     void multifrontal_factorization
     (const CompressedSparseMatrix<scalar_t,integer_t>& A,
      const Opts_t& opts) override;
 
-    void multifrontal_solve_dist
-    (DenseM_t& x, const std::vector<integer_t>& dist) override;
+    void multifrontal_solve_dist(DenseM_t& x,
+                                 const std::vector<integer_t>& dist) override;
 
-    std::tuple<int,int,int> get_sparse_mapped_destination
-    (const CSRMPI_t& A, integer_t oi, integer_t oj,
-     integer_t i, integer_t j, bool duplicate_fronts) const;
+    std::tuple<int,int,int>
+    get_sparse_mapped_destination(const CSRMPI_t& A,
+                                  integer_t oi, integer_t oj,
+                                  integer_t i, integer_t j,
+                                  bool duplicate_fronts) const;
 
     void separator_reordering(const Opts_t& opts, const CSRMPI_t& A);
 
