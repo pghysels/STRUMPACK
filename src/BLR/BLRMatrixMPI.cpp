@@ -1835,7 +1835,7 @@ namespace strumpack {
 #if 1 //LL and LUAR Update A22
       auto Tik2 = A12.gather_rows_A22(B1, B2);
       auto Tk2j = A21.gather_cols_A22(B1, B2);
-#if 1 //LL
+#if 0 //LL
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
       auto lrb = B1+B2;
       // dummy for task synchronization
@@ -1878,7 +1878,8 @@ namespace strumpack {
           for (std::size_t j=0, lk=0; j<B2; j++) {
             if (g->is_local_col(j)) {
               lj=li;
-              LUAR(i+1, lj, lk, Tk2j, Tik2, A22.tile_dense(i, j).D(), opts, 0);
+              LUAR_A22(B1, lj, lk, Tk2j, Tik2, A22.tile_dense(i, j).D(), opts);
+              lk+=B1;
             }
           }
           li+=B1;
@@ -1958,6 +1959,68 @@ namespace strumpack {
         }
       }
     }
+
+    template<typename scalar_t> void
+    LUAR_A22(std::size_t kmax, std::size_t lj, std::size_t lk, 
+         std::vector<std::unique_ptr<BLRTile<scalar_t>>>& Ti, 
+         std::vector<std::unique_ptr<BLRTile<scalar_t>>>& Tj, 
+         DenseMatrix<scalar_t>& tij, const BLROptions<scalar_t>& opts) {
+      std::size_t rank_sum = 0;
+      std::size_t lk_tmp = lk, lj_tmp = lj;
+      for (std::size_t k=0; k<kmax; k++) {
+        if (!(Ti[lj_tmp]->is_low_rank() || Tj[lk_tmp]->is_low_rank()))
+          gemm(Trans::N, Trans::N, scalar_t(-1.),
+              *Ti[lj_tmp], *Tj[lk_tmp], scalar_t(1.), tij);
+        else if (Ti[lj_tmp]->is_low_rank() && Tj[lk_tmp]->is_low_rank())
+          rank_sum += std::min(Ti[lj_tmp]->rank(), Tj[lk_tmp]->rank());
+        else if (Ti[lj_tmp]->is_low_rank())
+          rank_sum += Ti[lj_tmp]->rank();
+        else
+          rank_sum += Tj[lk_tmp]->rank();
+        lj_tmp++;
+        lk_tmp++;
+      }
+      if (rank_sum > 0) {
+        DenseMatrix<scalar_t> Uall(tij.rows(), rank_sum),
+          Vall(rank_sum, tij.cols());
+        std::size_t rank_tmp = 0;
+        for (std::size_t k=0; k<kmax; k++) {
+          if (Ti[lj]->is_low_rank() || Tj[lk]->is_low_rank()) {
+            std::size_t minrank = 0;
+            if (Ti[lj]->is_low_rank() && Tj[lk]->is_low_rank()){
+              minrank = std::min(Ti[lj]->rank(), Tj[lk]->rank());
+            } else if (Ti[lj]->is_low_rank()){
+              minrank = Ti[lj]->rank();
+            } else if (Tj[lk]->is_low_rank()){
+              minrank = Tj[lk]->rank();
+            }
+            DenseMatrixWrapper<scalar_t> t1(tij.rows(), minrank, Uall, 0, rank_tmp),
+              t2(minrank, tij.cols(), Vall, rank_tmp, 0);
+            Ti[lj]->multiply(*Tj[lk], t1, t2);
+            rank_tmp += minrank;
+          }
+          lj++;
+          lk++;
+        }
+        if (opts.compression_kernel() == CompressionKernel::FULL) {
+          // recompress Uall and Vall
+          LRTile<scalar_t> Uall_lr(Uall, opts), Vall_lr(Vall, opts);
+          gemm(Trans::N, Trans::N, scalar_t(-1.),
+               Uall_lr, Vall_lr, scalar_t(1.), tij);
+        } else { // recompress Uall OR Vall
+          if (Uall.rows() > Vall.cols()){ // (Uall * Vall_lr.U) *Vall_lr.V
+            gemm(Trans::N, Trans::N, scalar_t(-1.), Uall,
+                 LRTile<scalar_t>(Vall, opts), scalar_t(1.), tij,
+                 params::task_recursion_cutoff_level);
+          } else{ // Uall_lr.U * (Uall_lr.V * Vall)
+            gemm(Trans::N, Trans::N, scalar_t(-1.),
+                 LRTile<scalar_t>(Uall, opts), Vall, scalar_t(1.), tij,
+                 params::task_recursion_cutoff_level);
+          }
+        }
+      }
+    }
+
 
     template<typename scalar_t> void
     BLRMatrixMPI<scalar_t>::laswp(const std::vector<int>& piv, bool fwd) {

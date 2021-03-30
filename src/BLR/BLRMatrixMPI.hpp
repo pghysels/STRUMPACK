@@ -301,6 +301,12 @@ namespace strumpack {
          DenseMatrix<scalar_t>& tij, const BLROptions<scalar_t>& opts, std::size_t tmp);
     
     template<typename scalar_t> void
+    LUAR_A22(std::size_t kmax, std::size_t lj, std::size_t lk,
+         std::vector<std::unique_ptr<BLRTile<scalar_t>>>& Ti, 
+         std::vector<std::unique_ptr<BLRTile<scalar_t>>>& Tj, 
+         DenseMatrix<scalar_t>& tij, const BLROptions<scalar_t>& opts, std::size_t tmp);
+
+    template<typename scalar_t> void
     trsv(UpLo ul, Trans ta, Diag d, const BLRMatrixMPI<scalar_t>& a,
          BLRMatrixMPI<scalar_t>& b);
     template<typename scalar_t> void
