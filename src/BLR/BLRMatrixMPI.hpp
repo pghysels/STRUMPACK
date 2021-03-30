@@ -294,7 +294,12 @@ namespace strumpack {
       template<typename T,typename I> friend class strumpack::ExtendAdd;
     };
 
-
+    template<typename scalar_t> void
+    LUAR(std::size_t kmax, std::size_t lk, 
+         std::vector<std::unique_ptr<BLRTile<scalar_t>>>& Ti, 
+         std::vector<std::unique_ptr<BLRTile<scalar_t>>>& Tj, 
+         DenseMatrix<scalar_t>& tij, const BLROptions<scalar_t>& opts, std::size_t tmp);
+    
     template<typename scalar_t> void
     trsv(UpLo ul, Trans ta, Diag d, const BLRMatrixMPI<scalar_t>& a,
          BLRMatrixMPI<scalar_t>& b);

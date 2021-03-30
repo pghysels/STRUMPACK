@@ -1450,7 +1450,7 @@ namespace strumpack {
             lk++;
           }
         }
-#else //LL-Update
+#elif 0  //LL-Update
         if (i+1 < rowblocks()){
           auto Tik = gather_rows(i+1, rowblocks(), i+1, colblocks());
           auto Tkj = gather_cols(i+1, rowblocks(), i+1, colblocks());
@@ -1479,6 +1479,30 @@ namespace strumpack {
                   lj++;
                   lk++;
                 }
+              }
+            }
+          }
+        }
+#else //LUAR-Update Star
+        if (i+1 < rowblocks()){
+          auto Tik = gather_rows(i+1, rowblocks(), i+1, colblocks());
+          auto Tkj = gather_cols(i+1, rowblocks(), i+1, colblocks());
+          if (grid()->is_local_row(i+1)) {
+            std::size_t lk=0;
+            for (std::size_t j=i+1; j<rowblocks(); j++) {
+              if (grid()->is_local_col(j)) {
+                LUAR(i+1, lk, Tkj, Tik, tile_dense(i+1, j).D(), opts, 0); //on one MPI rank only
+                lk+=i+1;
+              }
+            }
+          }
+          if (grid()->is_local_col(i+1)) {
+            std::size_t lj=0;
+            if (grid()->is_local_row(i+1)) lj=i+1;
+            for (std::size_t j=i+2; j<rowblocks(); j++) {
+              if (grid()->is_local_row(j)) {
+                LUAR(i+1, lj, Tik, Tkj, tile_dense(j, i+1).D(), opts, 1);
+                lj+=i+1;
               }
             }
           }
@@ -1668,7 +1692,7 @@ namespace strumpack {
             }
           }
         }
-#else //LL-Update
+#else //LL and LUAR Update
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
       auto lrb = B1+B2;
       // dummy for task synchronization
@@ -1682,6 +1706,7 @@ namespace strumpack {
           auto Tkj = A11.gather_cols(i+1, B1, i+1, B1);
           auto Tik2 = A12.gather_rows(i+1, B1, 0, B2);
           auto Tk2j = A21.gather_cols(0, B2, i+1, B1);
+#if 0 //LL          
 #pragma omp parallel
 #pragma omp single
           {
@@ -1763,12 +1788,54 @@ namespace strumpack {
               }
             }
           }
+#else //LUAR-STAR
+          {
+            if (g->is_local_row(i+1)) {
+              std::size_t lk=0;
+              for (std::size_t j=i+1; j<B1; j++) {
+                if (g->is_local_col(j)) {
+                  LUAR(i+1, lk, Tkj, Tik, A11.tile_dense(i+1, j).D(), opts, 0); //*(Tkj[lj]), *(Tik[lk])
+                  lk+=i+1;
+                }
+              }
+            }
+            if (g->is_local_col(i+1)) {
+              std::size_t lj=0;
+              if (g->is_local_row(i+1)) lj=i+1;
+              for (std::size_t j=i+2; j<B1; j++) {
+                if (g->is_local_row(j)) {
+                  LUAR(i+1, lj, Tik, Tkj, A11.tile_dense(j, i+1).D(), opts, 1);
+                  lj+=i+1;
+                }
+              }
+            }
+            if (g->is_local_row(i+1)) {
+              std::size_t lk=0;
+              for (std::size_t j=0; j<B2; j++) {
+                if (g->is_local_col(j)) {
+                  LUAR(i+1, lk, Tkj, Tik2, A12.tile_dense(i+1, j).D(), opts, 0);
+                  lk+=i+1;
+                }
+              }
+            }
+            if (g->is_local_col(i+1)) {
+              std::size_t lj=0;
+              for (std::size_t j=0; j<B2; j++) {
+                if (g->is_local_row(j)) {
+                  LUAR(i+1, lj, Tik, Tk2j, A21.tile_dense(j, i+1).D(), opts, 1);
+                  lj+=i+1;
+                }
+              }
+            }
+          }
+#endif
         }
 #endif
       }
-#if 1 //LL-Update    
+#if 1 //LL and LUAR Update A22
       auto Tik2 = A12.gather_rows_A22(B1, B2);
       auto Tk2j = A21.gather_cols_A22(B1, B2);
+#if 1 //LL
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
       auto lrb = B1+B2;
       // dummy for task synchronization
@@ -1804,8 +1871,92 @@ namespace strumpack {
           }
         }
       }
+#else //LUAR
+      std::size_t lj=0;
+      for (std::size_t i=0, li=0; i<B2; i++) {
+        if (g->is_local_row(i)) {
+          for (std::size_t j=0, lk=0; j<B2; j++) {
+            if (g->is_local_col(j)) {
+              lj=li;
+              LUAR(i+1, lj, lk, Tk2j, Tik2, A22.tile_dense(i, j).D(), opts, 0);
+            }
+          }
+          li+=B1;
+        }
+      } 
+#endif
 #endif  
       return piv;
+    }
+
+    template<typename scalar_t> void
+    LUAR(std::size_t kmax, std::size_t lk, 
+         std::vector<std::unique_ptr<BLRTile<scalar_t>>>& Ti, 
+         std::vector<std::unique_ptr<BLRTile<scalar_t>>>& Tj, 
+         DenseMatrix<scalar_t>& tij, const BLROptions<scalar_t>& opts, std::size_t tmp) {
+      std::size_t rank_sum = 0;
+      std::size_t lk_tmp = lk;
+      for (std::size_t k=0, lj=0; k<kmax; k++) {
+        if (!(Ti[lj]->is_low_rank() || Tj[lk_tmp]->is_low_rank()))
+          if (tmp==0){
+            gemm(Trans::N, Trans::N, scalar_t(-1.),
+                *Ti[lj], *Tj[lk_tmp], scalar_t(1.), tij);
+          } else{
+            gemm(Trans::N, Trans::N, scalar_t(-1.),
+                *Tj[lk_tmp], *Ti[lj], scalar_t(1.), tij);
+          }
+        else if (Ti[lj]->is_low_rank() && Tj[lk_tmp]->is_low_rank())
+          rank_sum += std::min(Ti[lj]->rank(), Tj[lk_tmp]->rank());
+        else if (Ti[lj]->is_low_rank())
+          rank_sum += Ti[lj]->rank();
+        else
+          rank_sum += Tj[lk_tmp]->rank();
+        lj++;
+        lk_tmp++;
+      }
+      if (rank_sum > 0) {
+        DenseMatrix<scalar_t> Uall(tij.rows(), rank_sum),
+          Vall(rank_sum, tij.cols());
+        std::size_t rank_tmp = 0;
+        for (std::size_t k=0, lj=0; k<kmax; k++) {
+          if (Ti[lj]->is_low_rank() || Tj[lk]->is_low_rank()) {
+            std::size_t minrank = 0;
+            if (Ti[lj]->is_low_rank() && Tj[lk]->is_low_rank()){
+              minrank = std::min(Ti[lj]->rank(), Tj[lk]->rank());
+            } else if (Ti[lj]->is_low_rank()){
+              minrank = Ti[lj]->rank();
+            } else if (Tj[lk]->is_low_rank()){
+              minrank = Tj[lk]->rank();
+            }
+            DenseMatrixWrapper<scalar_t> t1(tij.rows(), minrank, Uall, 0, rank_tmp),
+              t2(minrank, tij.cols(), Vall, rank_tmp, 0);
+            if (tmp == 0){
+              Ti[lj]->multiply(*Tj[lk], t1, t2);
+            } else{
+              Tj[lk]->multiply(*Ti[lj], t1, t2);
+            }
+            rank_tmp += minrank;
+          }
+          lj++;
+          lk++;
+        }
+        if (opts.compression_kernel() == CompressionKernel::FULL) {
+          // recompress Uall and Vall
+          LRTile<scalar_t> Uall_lr(Uall, opts), Vall_lr(Vall, opts);
+          gemm(Trans::N, Trans::N, scalar_t(-1.),
+               Uall_lr, Vall_lr, scalar_t(1.), tij);
+        } else { // recompress Uall OR Vall
+          if (Uall.rows() > Vall.cols()){ // (Uall * Vall_lr.U) *Vall_lr.V
+            gemm(Trans::N, Trans::N, scalar_t(-1.), Uall,
+                 LRTile<scalar_t>(Vall, opts), scalar_t(1.), tij,
+                 params::task_recursion_cutoff_level);
+          } else{ // Uall_lr.U * (Uall_lr.V * Vall)
+            gemm(Trans::N, Trans::N, scalar_t(-1.),
+                 LRTile<scalar_t>(Uall, opts), Vall, scalar_t(1.), tij,
+                 params::task_recursion_cutoff_level);
+          }
+        }
+      }
     }
 
     template<typename scalar_t> void
