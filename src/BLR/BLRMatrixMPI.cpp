@@ -1789,11 +1789,18 @@ namespace strumpack {
             }
           }
 #else //LUAR-STAR
+#pragma omp parallel
+#pragma omp single
           {
             if (g->is_local_row(i+1)) {
               std::size_t lk=0;
               for (std::size_t j=i+1; j<B1; j++) {
                 if (g->is_local_col(j)) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+                std::size_t ij = (i+1)+lrb*j;
+#pragma omp task default(shared) firstprivate(i,j,ij)   \
+  depend(inout:B[ij])
+#endif
                   LUAR(i+1, lk, Tkj, Tik, A11.tile_dense(i+1, j).D(), opts, 0); //*(Tkj[lj]), *(Tik[lk])
                   lk+=i+1;
                 }
@@ -1804,6 +1811,11 @@ namespace strumpack {
               if (g->is_local_row(i+1)) lj=i+1;
               for (std::size_t j=i+2; j<B1; j++) {
                 if (g->is_local_row(j)) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+                  std::size_t ji = j+lrb*(i+1);
+#pragma omp task default(shared) firstprivate(i,j,ji)   \
+  depend(inout:B[ji])
+#endif
                   LUAR(i+1, lj, Tik, Tkj, A11.tile_dense(j, i+1).D(), opts, 1);
                   lj+=i+1;
                 }
@@ -1813,6 +1825,11 @@ namespace strumpack {
               std::size_t lk=0;
               for (std::size_t j=0; j<B2; j++) {
                 if (g->is_local_col(j)) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+                  std::size_t ij2 = (i+1)+lrb*(B1+j);
+#pragma omp task default(shared) firstprivate(i,j,ij2)  \
+  depend(inout:B[ij2])
+#endif
                   LUAR(i+1, lk, Tkj, Tik2, A12.tile_dense(i+1, j).D(), opts, 0);
                   lk+=i+1;
                 }
@@ -1822,6 +1839,11 @@ namespace strumpack {
               std::size_t lj=0;
               for (std::size_t j=0; j<B2; j++) {
                 if (g->is_local_row(j)) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+                  std::size_t j2i = (B1+j)+lrb*(i+1);
+#pragma omp task default(shared) firstprivate(i,j,j2i)  \
+  depend(inout:B[j2i])
+#endif
                   LUAR(i+1, lj, Tik, Tk2j, A21.tile_dense(j, i+1).D(), opts, 1);
                   lj+=i+1;
                 }
@@ -1835,7 +1857,7 @@ namespace strumpack {
 #if 1 //LL and LUAR Update A22
       auto Tik2 = A12.gather_rows_A22(B1, B2);
       auto Tk2j = A21.gather_cols_A22(B1, B2);
-#if 0 //LL
+
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
       auto lrb = B1+B2;
       // dummy for task synchronization
@@ -1844,6 +1866,7 @@ namespace strumpack {
 #else
       int* B = nullptr;
 #endif
+#if 0 //LL
 #pragma omp parallel
 #pragma omp single
       {
@@ -1872,19 +1895,28 @@ namespace strumpack {
         }
       }
 #else //LUAR
-      std::size_t lj=0;
-      for (std::size_t i=0, li=0; i<B2; i++) {
-        if (g->is_local_row(i)) {
-          for (std::size_t j=0, lk=0; j<B2; j++) {
-            if (g->is_local_col(j)) {
-              lj=li;
-              LUAR_A22(B1, lj, lk, Tk2j, Tik2, A22.tile_dense(i, j).D(), opts);
-              lk+=B1;
+#pragma omp parallel
+#pragma omp single
+      {
+        std::size_t lj=0;
+        for (std::size_t i=0, li=0; i<B2; i++) {
+          if (g->is_local_row(i)) {
+            for (std::size_t j=0, lk=0; j<B2; j++) {
+              if (g->is_local_col(j)) {
+                lj=li;
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+                std::size_t i2j2 = (B1+i)+lrb*(B1+j);
+#pragma omp task default(shared) firstprivate(i,j,i2j2) \
+  depend(inout:B[i2j2])
+#endif
+                LUAR_A22(B1, lj, lk, Tk2j, Tik2, A22.tile_dense(i, j).D(), opts);
+                lk+=B1;
+              }
             }
+            li+=B1;
           }
-          li+=B1;
-        }
-      } 
+        } 
+      }
 #endif
 #endif  
       return piv;
