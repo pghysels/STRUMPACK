@@ -31,6 +31,7 @@
 #include <random>
 #include "HSS/HSSPartitionTree.hpp"
 #include "BLR/BLRMatrixMPI.hpp"
+#include "../src/misc/TaskTimer.hpp"
 
 using namespace std;
 using namespace strumpack;
@@ -75,9 +76,14 @@ int main(int argc, char* argv[]) {
       for (int i=0; i<N; i++)
         A.global(i, j, Toeplitz(i, j));
 
-    if (c.is_root())
+    if (c.is_root()){
       cout << "# compressing " << N << " x " << N << " Toeplitz matrix,"
            << " with relative tolerance " << opts.rel_tol() << endl;
+      cout << "# Running with:\n# ";
+#if defined(_OPENMP)
+      cout << "OMP_NUM_THREADS=" << omp_get_max_threads() << endl;
+#endif
+    }
 
     // construct a HODLR representation for a Toeplitz matrix, using
     // only a routine to evaluate individual elements
@@ -86,7 +92,17 @@ int main(int argc, char* argv[]) {
     g.print();
     auto B = BLR::BLRMatrixMPI<double>::from_ScaLAPACK(A, g, opts);
     if (c.is_root()) std::cout << "# from_ScaLAPACK done!" << std::endl;
+    long long int f0 = 0, ftot = 0;
+#if defined(STRUMPACK_COUNT_FLOPS)
+    f0 = params::flops;
+#endif
+    TaskTimer t3("Compression");
+    t3.start();
     auto Bpiv = B.factor(opts);
+    t3.stop();
+#if defined(STRUMPACK_COUNT_FLOPS)
+    ftot = params::flops - f0;
+#endif
     if (c.is_root()) std::cout << "# factor done!" << std::endl;
     auto BLU = B.to_ScaLAPACK(&grid);
     if (c.is_root()) std::cout << "# to_ScaLAPACK done!" << std::endl;
@@ -97,13 +113,23 @@ int main(int argc, char* argv[]) {
     auto memfill = B.total_memory() / 1.e6;
     auto maxrank = B.max_rank();
     auto err = BLU.normF() / A.normF();
-    if (c.is_root())
-      cout << "# B has max rank " << maxrank << " and takes "
+    if (c.is_root()){
+      cout << "# rank(B)   = " << maxrank << endl;
+      cout << "# memory(B) = " << memfill << " MB, "
+        << 100. * memfill / (N*N*sizeof(double) / 1.e6) << "% of dense" << endl;
+#if defined(STRUMPACK_COUNT_FLOPS)
+      std::cout << "# flops     = " << double(ftot) << std::endl;
+      std::cout << "# time      = " << t3.elapsed() << std::endl;
+#endif
+      cout << "# error = || LU(A) - LU(B) ||_F / || LU(A) ||_F = "
+       << err << endl;
+      /*cout << "# B has max rank " << maxrank << " and takes "
            << memfill << " MByte (compared to "
            << (N*N*sizeof(double) / 1.e6)
            << " MByte for dense storage)" << std::endl
            << "# || LU(A) - LU(B) ||_F / || LU(A) ||_F = " << err
-           << endl;
+           << endl;*/
+    }
   }
 
   MPI_Finalize();
