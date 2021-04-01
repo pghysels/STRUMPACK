@@ -1401,111 +1401,179 @@ namespace strumpack {
       if (!grid()->active()) return piv;
       DenseTile<scalar_t> Tii;
       for (std::size_t i=0; i<rowblocks(); i++) {
-        if (grid()->is_local_row(i)) {
-          // LU factorization of diagonal tile
-          if (grid()->is_local_col(i))
-            piv_tile = tile(i, i).LU();
-          else piv_tile.resize(tilerows(i));
-          grid()->row_comm().broadcast_from(piv_tile, i % grid()->npcols());
-          int r0 = tileroff(i);
-          std::transform
-            (piv_tile.begin(), piv_tile.end(), std::back_inserter(piv),
-             [r0](int p) -> int { return p + r0; });
-          Tii = bcast_dense_tile_along_row(i, i);
-        }
-        if (grid()->is_local_col(i))
-          Tii = bcast_dense_tile_along_col(i, i);
-        if (grid()->is_local_row(i)) {
-          for (std::size_t j=i+1; j<colblocks(); j++) {
-            if (grid()->is_local_col(j)) {
-              if (adm(i, j)) compress_tile(i, j, opts);
-              tile(i, j).laswp(piv_tile, true);
-              trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-                   scalar_t(1.), Tii, tile(i, j));
+#pragma omp parallel
+        {
+#pragma omp master
+          {
+            if (grid()->is_local_row(i)) {
+              // LU factorization of diagonal tile
+              if (grid()->is_local_col(i))
+                piv_tile = tile(i, i).LU();
+              else piv_tile.resize(tilerows(i));
+              grid()->row_comm().broadcast_from(piv_tile, i % grid()->npcols());
+              int r0 = tileroff(i);
+              std::transform
+                (piv_tile.begin(), piv_tile.end(), std::back_inserter(piv),
+                [r0](int p) -> int { return p + r0; });
+              Tii = bcast_dense_tile_along_row(i, i);
+            }
+            if (grid()->is_local_col(i))
+              Tii = bcast_dense_tile_along_col(i, i);
+          }
+#pragma omp single
+          {             
+            if (grid()->is_local_row(i)) {
+              for (std::size_t j=i+1; j<colblocks(); j++) {
+                if (grid()->is_local_col(j)) {
+#pragma omp task default(shared) firstprivate(i,j)
+                  if (adm(i, j)) compress_tile(i, j, opts);
+                }
+              }
+            }
+            if (grid()->is_local_col(i)) {
+              for (std::size_t j=i+1; j<rowblocks(); j++) {
+                if (grid()->is_local_row(j)) {
+#pragma omp task default(shared) firstprivate(i,j)
+                  if (adm(j, i)) compress_tile(j, i, opts);
+                }
+              }
             }
           }
         }
-        if (grid()->is_local_col(i)) {
-          for (std::size_t j=i+1; j<rowblocks(); j++) {
-            if (grid()->is_local_row(j)) {
-              if (adm(j, i)) compress_tile(j, i, opts);
-              trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-                   scalar_t(1.), Tii, tile(j, i));
+#pragma omp parallel
+#pragma omp single
+        {
+          if (grid()->is_local_row(i)) {
+            for (std::size_t j=i+1; j<colblocks(); j++) {
+              if (grid()->is_local_col(j)) {
+#pragma omp task default(shared) firstprivate(i,j)
+                {                
+                  tile(i, j).laswp(piv_tile, true);
+                  trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                       scalar_t(1.), Tii, tile(i, j));
+                }
+              }
+            }
+          }
+          if (grid()->is_local_col(i)) {
+            for (std::size_t j=i+1; j<rowblocks(); j++) {
+              if (grid()->is_local_row(j)) {
+#pragma omp task default(shared) firstprivate(i,j)
+                trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+                     scalar_t(1.), Tii, tile(j, i));
+              }
             }
           }
         }
 #if 0 //RL-Update
         auto Tij = bcast_row_of_tiles_along_cols(i, i+1, rowblocks());
         auto Tki = bcast_col_of_tiles_along_rows(i+1, rowblocks(), i);
-        for (std::size_t k=i+1, lk=0; k<rowblocks(); k++) {
-          if (grid()->is_local_row(k)) {
-            for (std::size_t j=i+1, lj=0; j<colblocks(); j++) {
-              if (grid()->is_local_col(j)) {
-                // this uses .D, assuming tile(k, j) is dense
-                gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tki[lk]),
-                     *(Tij[lj]), scalar_t(1.), tile_dense(k, j).D());
-                lj++;
+#pragma omp parallel
+#pragma omp single
+        {
+          for (std::size_t k=i+1, lk=0; k<rowblocks(); k++) {
+            if (grid()->is_local_row(k)) {
+              for (std::size_t j=i+1, lj=0; j<colblocks(); j++) {
+                if (grid()->is_local_col(j)) {
+#pragma omp task default(shared) firstprivate(i,j,k,lk,lj)
+                  // this uses .D, assuming tile(k, j) is dense
+                  gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tki[lk]),
+                      *(Tij[lj]), scalar_t(1.), tile_dense(k, j).D());
+                  lj++;
+                }
               }
+              lk++;
             }
-            lk++;
           }
         }
-#elif 0  //LL-Update
+#else //LL- or LUAR-Update
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+      // dummy for task synchronization
+      std::unique_ptr<int[]> B_(new int[rowblocks()*colblocks()]()); auto B = B_.get();
+#pragma omp taskgroup
+#else
+      int* B = nullptr;
+#endif
         if (i+1 < rowblocks()){
           auto Tik = gather_rows(i+1, rowblocks(), i+1, colblocks());
           auto Tkj = gather_cols(i+1, rowblocks(), i+1, colblocks());
-          //GEMM
-          if (grid()->is_local_row(i+1)) {
-            std::size_t lk=0;
-            for (std::size_t j=i+1; j<rowblocks(); j++) {
-              if (grid()->is_local_col(j)) {
-                for (std::size_t k=0, lj=0; k<i+1; k++) {
-                  gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj]),
-                    *(Tik[lk]), scalar_t(1.), tile_dense(i+1, j).D());
-                  lj++;
-                  lk++;
+#if 1 //LL          
+#pragma omp parallel
+#pragma omp single
+          {
+            if (grid()->is_local_row(i+1)) {
+              std::size_t lk=0;
+              for (std::size_t j=i+1; j<rowblocks(); j++) {
+                if (grid()->is_local_col(j)) {
+                  for (std::size_t k=0, lj=0; k<i+1; k++) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+                  std::size_t ij = (i+1)+rowblocks()*j;
+#pragma omp task default(shared) firstprivate(i,j,k,ij)   \
+  depend(inout:B[ij])
+#endif                    
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj]),
+                      *(Tik[lk]), scalar_t(1.), tile_dense(i+1, j).D());
+                    lj++;
+                    lk++;
+                  }
+                }
+              }
+            }
+            if (grid()->is_local_col(i+1)) {
+              std::size_t lj=0;
+              if (grid()->is_local_row(i+1)) lj=i+1;
+              for (std::size_t j=i+2; j<rowblocks(); j++) { //check rowblocks and colblocks
+                if (grid()->is_local_row(j)) {
+                  for (std::size_t k=0, lk=0; k<i+1; k++) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+                    std::size_t ji = j+rowblocks()*(i+1);
+#pragma omp task default(shared) firstprivate(i,j,k,ji)   \
+  depend(inout:B[ji])
+#endif                    
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj]),
+                        *(Tik[lk]), scalar_t(1.), tile_dense(j, i+1).D());
+                    lj++;
+                    lk++;
+                  }
                 }
               }
             }
           }
-          if (grid()->is_local_col(i+1)) {
-            std::size_t lj=0;
-            if (grid()->is_local_row(i+1)) lj=i+1;
-            for (std::size_t j=i+2; j<rowblocks(); j++) { //check rowblocks and colblocks
-              if (grid()->is_local_row(j)) {
-                for (std::size_t k=0, lk=0; k<i+1; k++) {
-                  gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj]),
-                      *(Tik[lk]), scalar_t(1.), tile_dense(j, i+1).D());
-                  lj++;
-                  lk++;
-                }
-              }
-            }
-          }
-        }
 #else //LUAR-Update Star
-        if (i+1 < rowblocks()){
-          auto Tik = gather_rows(i+1, rowblocks(), i+1, colblocks());
-          auto Tkj = gather_cols(i+1, rowblocks(), i+1, colblocks());
-          if (grid()->is_local_row(i+1)) {
-            std::size_t lk=0;
-            for (std::size_t j=i+1; j<rowblocks(); j++) {
-              if (grid()->is_local_col(j)) {
-                LUAR(i+1, lk, Tkj, Tik, tile_dense(i+1, j).D(), opts, 0); //on one MPI rank only
-                lk+=i+1;
+#pragma omp parallel
+#pragma omp single
+          {
+            if (grid()->is_local_row(i+1)) {
+              std::size_t lk=0;
+              for (std::size_t j=i+1; j<rowblocks(); j++) {
+                if (grid()->is_local_col(j)) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+                std::size_t ij = (i+1)+rowblocks()*j;
+#pragma omp task default(shared) firstprivate(i,j,ij)   \
+  depend(inout:B[ij])
+#endif                  
+                  LUAR(i+1, lk, Tkj, Tik, tile_dense(i+1, j).D(), opts, 0); //on one MPI rank only
+                  lk+=i+1;
+                }
+              }
+            }
+            if (grid()->is_local_col(i+1)) {
+              std::size_t lj=0;
+              if (grid()->is_local_row(i+1)) lj=i+1;
+              for (std::size_t j=i+2; j<rowblocks(); j++) {
+                if (grid()->is_local_row(j)) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+                  std::size_t ji = j+rowblocks()*(i+1);
+#pragma omp task default(shared) firstprivate(i,j,ji)   \
+  depend(inout:B[ji])
+#endif                  
+                  LUAR(i+1, lj, Tik, Tkj, tile_dense(j, i+1).D(), opts, 1);
+                  lj+=i+1;
+                }
               }
             }
           }
-          if (grid()->is_local_col(i+1)) {
-            std::size_t lj=0;
-            if (grid()->is_local_row(i+1)) lj=i+1;
-            for (std::size_t j=i+2; j<rowblocks(); j++) {
-              if (grid()->is_local_row(j)) {
-                LUAR(i+1, lj, Tik, Tkj, tile_dense(j, i+1).D(), opts, 1);
-                lj+=i+1;
-              }
-            }
-          }
+#endif
         }
 #endif
       }
