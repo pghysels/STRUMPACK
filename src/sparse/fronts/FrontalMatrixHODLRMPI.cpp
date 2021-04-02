@@ -272,7 +272,6 @@ namespace strumpack {
           this->extract_2d(A, I, J, B);
         };
       { TIMER_TIME(TaskType::LRBF_COMPRESS, 0, t_lrbf_compress);
-        
         // int bsize = std::min(64.0,ceil(F11_.get_stat("Rank_max")/2.0));
         // F12_.set_BACA_block(bsize);
         F12_.compress(extract_F12);
