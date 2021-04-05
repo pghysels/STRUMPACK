@@ -189,11 +189,6 @@ if(STRUMPACK_USE_MPI)
     ${MPIEXEC_POSTFLAGS} L 500 --hss_leaf_size 8 --hss_rel_tol 1e-4 --hss_abs_tol 1e-10 --hss_disable_sync --hss_compression_algorithm stable --hss_d0 16 --hss_dd 8)
   set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
 
-  set(test_name "HSS_mpi_5")
-  add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 19 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_mpi
-    ${MPIEXEC_POSTFLAGS} L 10 --hss_leaf_size 3 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_disable_sync --hss_compression_algorithm original --hss_d0 32 --hss_dd 4)
-  set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
-
   set(test_name "HSS_mpi_6")
   add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 16 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_mpi
     ${MPIEXEC_POSTFLAGS} T 200 --hss_leaf_size 1 --hss_rel_tol 1e-5 --hss_abs_tol 1e-13 --hss_enable_sync --hss_compression_algorithm stable --hss_d0 16 --hss_dd 4)
@@ -348,11 +343,6 @@ if(STRUMPACK_USE_MPI)
     ${MPIEXEC_POSTFLAGS} T 500 --hss_leaf_size 16 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algorithm stable --hss_d0 64 --hss_dd 4)
   set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
 
-  set(test_name "HSS_mpi_37")
-  add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 19 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_mpi
-    ${MPIEXEC_POSTFLAGS} T 1 --hss_leaf_size 128 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algorithm original --hss_d0 128 --hss_dd 4)
-  set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
-
   set(test_name "HSS_mpi_38")
   add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_mpi
     ${MPIEXEC_POSTFLAGS} T 200 --hss_leaf_size 1 --hss_rel_tol 1e-1 --hss_abs_tol 1e-13 --hss_disable_sync --hss_compression_algorithm original --hss_d0 128 --hss_dd 8)
@@ -446,6 +436,21 @@ if(STRUMPACK_USE_MPI)
   set(test_name "BLR_mpi_1")
   add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 13 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_mpi
     ${MPIEXEC_POSTFLAGS} 1000 --blr_factor_algorithm RL)
+  set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+  set(test_name "BLR_mpi_2")
+  add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 13 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_mpi
+    ${MPIEXEC_POSTFLAGS} 1000 --blr_factor_algorithm LL)
+  set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+  set(test_name "BLR_mpi_3")
+  add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 13 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_mpi
+    ${MPIEXEC_POSTFLAGS} 1000 --blr_factor_algorithm Star --blr_compression_kernel full)
+  set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+  set(test_name "BLR_mpi_4")
+  add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 13 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_mpi
+    ${MPIEXEC_POSTFLAGS} 1000 --blr_factor_algorithm Star --blr_compression_kernel half)
   set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
 
 endif()

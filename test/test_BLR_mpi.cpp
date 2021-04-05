@@ -126,7 +126,7 @@ int main(int argc, char* argv[]) {
       cout << "# error = || LU(A) - LU(B) ||_F / || LU(A) ||_F = "
        << err << endl;
       if (err > ERROR_TOLERANCE
-          * max(blr_opts.rel_tol(),blr_opts.abs_tol())) {
+          * max(opts.rel_tol(),opts.abs_tol())) {
         cout << "ERROR: compression error too big!!" << endl;
         return 1;
       }
