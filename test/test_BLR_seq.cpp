@@ -49,22 +49,22 @@ int run(int argc, char* argv[]) {
 
   auto usage = [&]() {
     cout << "# Usage:\n"
-    << "#     OMP_NUM_THREADS=4 ./test1 problem options [BLR Options]\n"
-    << "# where:\n"
+    << "#     OMP_NUM_THREADS=4 ./test1 problem options [BLR Options]\n";
+    /*<< "# where:\n"
     << "#  - problem: a char that can be\n"
     << "#      'T': solve a Toeplitz problem\n"
     << "#            options: m (matrix dimension)\n"
     << "#      'U': solve an upper triangular Toeplitz problem\n"
     << "#            options: m (matrix dimension)\n"
     << "#      'f': read matrix from file (binary)\n"
-    << "#            options: filename\n";
+    << "#            options: filename\n";*/
     blr_opts.describe_options();
     exit(1);
   };
 
   DenseMatrix<double> A;
 
-  char test_problem = 'T';
+  /*char test_problem = 'T';
   if (argc > 1) test_problem = argv[1][0];
   else usage();
   switch (test_problem) {
@@ -73,12 +73,17 @@ int run(int argc, char* argv[]) {
     if (argc <= 2 || m < 0) {
       cout << "# matrix dimension should be positive integer" << endl;
       usage();
+    }*/
+    if (argc > 1) m = stoi(argv[1]);
+    if (argc <= 1 || m < 0) {
+      cout << "# matrix dimension should be positive integer" << endl;
+      usage();
     }
     A = DenseMatrix<double>(m, m);
     for (int j=0; j<m; j++)
       for (int i=0; i<m; i++)
         A(i,j) = (i==j) ? 1. : 1./(1+abs(i-j));
-  } break;
+  /*} break;
   case 'U': { // upper triangular Toeplitz
     if (argc > 2) m = stoi(argv[2]);
     if (argc <= 2 || m < 0) {
@@ -121,7 +126,7 @@ int run(int argc, char* argv[]) {
   default:
     usage();
     exit(1);
-  }
+  }*/
   blr_opts.set_from_command_line(argc, argv);
 
   if (blr_opts.verbose()) A.print("A");
@@ -168,7 +173,7 @@ int run(int argc, char* argv[]) {
     //              << " GFlop/s" << std::endl;
   #endif
 
-  //solve AX=Y
+  //solve AX=Y, A Toeplitz
   A = DenseMatrix<double>(m, m);
     for (int j=0; j<m; j++)
       for (int i=0; i<m; i++)
@@ -177,20 +182,17 @@ int run(int argc, char* argv[]) {
   X.random();
   // compute Y <- AX
   gemm(Trans::N, Trans::N, 1., A, X, 0., Y);
-  /* T1 = Y;
-  auto Apiv = A.LU(0);
-  A.solve_LU_in_place(T1, Apiv); */
   B.solve(piv, Y);
   auto Xnorm = X.normF();
   //Y.scaled_add(-1., X);
   X.scaled_add(-1., Y);
   cout << "# relative error = ||X-B\\(A*X)||_F/||X||_F = "
        << X.normF() / Xnorm << endl;
-  //cout << "# relative error = ||B\\(A*X) - X||_F/||X||_F = "
-  //           << Y.normF() / Xnorm << endl;
-  //T1.scaled_add(-1., X);
-  //cout << "# relative error = ||B\\(A*X) - X||_F/||X||_F = "
-  //           << T1.normF() / Xnorm << endl;
+  if (X.normF() / Xnorm > ERROR_TOLERANCE
+      * max(blr_opts.rel_tol(),blr_opts.abs_tol())) {
+    cout << "ERROR: compression error too big!!" << endl;
+    return 1;
+  }
 
 
   cout << "# exiting" << endl;
