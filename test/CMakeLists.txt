@@ -21,20 +21,24 @@ add_test("user_test_HSS_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 100)
 add_test("user_test_sparse_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq
   ${PROJECT_SOURCE_DIR}/examples/data/pde900.mtx)
 add_test("user_matrix_IO" ${CMAKE_CURRENT_BINARY_DIR}/test_matrix_IO T 1000)
+add_test("user_test_BLR_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_seq 300)
 
 if(STRUMPACK_USE_MPI)
   add_executable(test_HSS_mpi             EXCLUDE_FROM_ALL test_HSS_mpi.cpp)
   add_executable(test_sparse_mpi          EXCLUDE_FROM_ALL test_sparse_mpi.cpp)
   add_executable(test_structure_reuse_mpi EXCLUDE_FROM_ALL test_structure_reuse_mpi.cpp)
+  add_executable(test_BLR_mpi             EXCLUDE_FROM_ALL test_BLR_mpi.cpp)
 
   target_link_libraries(test_HSS_mpi strumpack)
   target_link_libraries(test_sparse_mpi strumpack)
   target_link_libraries(test_structure_reuse_mpi strumpack)
+  target_link_libraries(test_BLR_mpi strumpack)
 
   add_dependencies(tests
     test_HSS_mpi
     test_sparse_mpi
-    test_structure_reuse_mpi)
+    test_structure_reuse_mpi
+    test_BLR_mpi)
 
   # TODO check whether this is supported?
   set(OVERSUBSCRIBEFLAG "--oversubscribe")
@@ -50,6 +54,9 @@ if(STRUMPACK_USE_MPI)
     ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
     ${CMAKE_CURRENT_BINARY_DIR}/test_structure_reuse_mpi
     ${PROJECT_SOURCE_DIR}/examples/data/pde900.mtx)
+  add_test("user_test_BLR_mpi" ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2
+    ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
+    ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_mpi 1000)
 endif()
 
 set(test_name "HSS_seq_1")
@@ -136,6 +143,29 @@ set(test_name "HSS_seq_21")
 add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 500 --hss_leaf_size 1 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algorithm stable --hss_d0 64 --hss_dd 4)
 set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
 
+set(test_name "BLR_seq_1")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_seq 300 --blr_factor_algorithm RL)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "BLR_seq_2")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_seq 300 --blr_factor_algorithm LL)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "BLR_seq_3")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_seq 300 --blr_factor_algorithm Star --blr_compression_kernel full)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "BLR_seq_4")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_seq 300 --blr_factor_algorithm Star --blr_compression_kernel half)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "BLR_seq_5")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_seq 300 --blr_factor_algorithm Comb --blr_compression_kernel full)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "BLR_seq_6")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_seq 300 --blr_factor_algorithm Comb --blr_compression_kernel half)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
 
 if(STRUMPACK_USE_MPI)
 
@@ -412,6 +442,11 @@ if(STRUMPACK_USE_MPI)
   add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_mpi
     ${MPIEXEC_POSTFLAGS} T 200 --hss_leaf_size 3 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_disable_sync --hss_compression_algorithm original --hss_d0 16 --hss_dd 8)
   set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+  set(test_name "BLR_mpi_1")
+  add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 13 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_mpi
+    ${MPIEXEC_POSTFLAGS} 1000 --blr_factor_algorithm RL)
+  set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
 
 endif()
 
