@@ -453,6 +453,16 @@ if(STRUMPACK_USE_MPI)
     ${MPIEXEC_POSTFLAGS} 1000 --blr_factor_algorithm Star --blr_compression_kernel half)
   set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
 
+  set(test_name "BLR_mpi_5")
+  add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 13 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_mpi
+    ${MPIEXEC_POSTFLAGS} 1000 --blr_factor_algorithm Comb --blr_compression_kernel full)
+  set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+  set(test_name "BLR_mpi_6")
+  add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 13 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_mpi
+    ${MPIEXEC_POSTFLAGS} 1000 --blr_factor_algorithm Comb --blr_compression_kernel half)
+  set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
 endif()
 
 
