@@ -2587,14 +2587,14 @@ namespace strumpack {
                 }
               }
 #else
+              for (std::size_t k=0; k<i+1; k++) {
+                auto Tik = A11.gather_row(i+1, k, i+1, B1);
+                auto Tkj = A11.gather_col(i+1, B1, i+1, k);
+                auto Tik2 = A12.gather_row(i+1, k, 0, B2);
+                auto Tk2j = A21.gather_col(0, B2, i+1, k);
 #pragma omp parallel
 #pragma omp single
-              {
-                for (std::size_t k=0; k<i+1; k++) {
-                  auto Tik = A11.gather_row(i+1, k, i+1, B1);
-                  auto Tkj = A11.gather_col(i+1, B1, i+1, k);
-                  auto Tik2 = A12.gather_row(i+1, k, 0, B2); //Update gather_row for A12
-                  auto Tk2j = A21.gather_col(0, B2, i+1, k); //Update gather_col for A12
+                {
                   if (g->is_local_row(i+1)) {
                     std::size_t lk=0;
                     for (std::size_t j=i+1; j<B1; j++) {
