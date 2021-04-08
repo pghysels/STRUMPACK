@@ -2132,24 +2132,38 @@ namespace strumpack {
               for (std::size_t k=0; k<i+1; k++) {
                 auto Tik = gather_row(i+1, k, i+1, colblocks());
                 auto Tkj = gather_col(i+1, rowblocks(), i+1, k);
-                if (grid()->is_local_row(i+1)) {
-                  std::size_t lk=0;
-                  for (std::size_t j=i+1; j<rowblocks(); j++) {
-                    if (grid()->is_local_col(j)) {  
-                      gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[0]),
-                        *(Tik[lk]), scalar_t(1.), tile_dense(i+1, j).D());
-                      lk++;
+#pragma omp parallel
+#pragma omp single
+                {
+                  if (grid()->is_local_row(i+1)) {
+                    std::size_t lk=0;
+                    for (std::size_t j=i+1; j<rowblocks(); j++) {
+                      if (grid()->is_local_col(j)) {  
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+                        std::size_t ij = (i+1)+rowblocks()*j;
+#pragma omp task default(shared) firstprivate(i,j,k,ij)   \
+  depend(inout:B[ij])
+#endif   
+                        gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[0]),
+                          *(Tik[lk]), scalar_t(1.), tile_dense(i+1, j).D());
+                        lk++;
+                      }
                     }
                   }
-                }
-                if (grid()->is_local_col(i+1)) {
-                  std::size_t lj=0;
-                  if (grid()->is_local_row(i+1)) lj=1;
-                  for (std::size_t j=i+2; j<rowblocks(); j++) {
-                    if (grid()->is_local_row(j)) {
-                      gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj]),
-                          *(Tik[0]), scalar_t(1.), tile_dense(j, i+1).D());
-                      lj++;
+                  if (grid()->is_local_col(i+1)) {
+                    std::size_t lj=0;
+                    if (grid()->is_local_row(i+1)) lj=1;
+                    for (std::size_t j=i+2; j<rowblocks(); j++) {
+                      if (grid()->is_local_row(j)) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+                        std::size_t ji = j+rowblocks()*(i+1);
+#pragma omp task default(shared) firstprivate(i,j,k,ji)   \
+  depend(inout:B[ji])
+#endif   
+                        gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj]),
+                            *(Tik[0]), scalar_t(1.), tile_dense(j, i+1).D());
+                        lj++;
+                      }
                     }
                   }
                 }
@@ -2573,57 +2587,81 @@ namespace strumpack {
                 }
               }
 #else
-              for (std::size_t k=0; k<i+1; k++) {
-                auto Tik = A11.gather_row(i+1, k, i+1, B1);
-                auto Tkj = A11.gather_col(i+1, B1, i+1, k);
-                auto Tik2 = A12.gather_row(i+1, k, 0, B2); //Update gather_row for A12
-                auto Tk2j = A21.gather_col(0, B2, i+1, k); //Update gather_col for A12
-                if (g->is_local_row(i+1)) {
-                  std::size_t lk=0;
-                  for (std::size_t j=i+1; j<B1; j++) {
-                    if (g->is_local_col(j)) {
-                      //for (std::size_t k=0, lj=0; k<i+1; k++) {
-                      gemm(Trans::N, Trans::N, scalar_t(-1.),
-                        *(Tkj[0]), *(Tik[lk]), scalar_t(1.),
-                        A11.tile_dense(i+1, j).D());
-                      lk++;
+#pragma omp parallel
+#pragma omp single
+              {
+                for (std::size_t k=0; k<i+1; k++) {
+                  auto Tik = A11.gather_row(i+1, k, i+1, B1);
+                  auto Tkj = A11.gather_col(i+1, B1, i+1, k);
+                  auto Tik2 = A12.gather_row(i+1, k, 0, B2); //Update gather_row for A12
+                  auto Tk2j = A21.gather_col(0, B2, i+1, k); //Update gather_col for A12
+                  if (g->is_local_row(i+1)) {
+                    std::size_t lk=0;
+                    for (std::size_t j=i+1; j<B1; j++) {
+                      if (g->is_local_col(j)) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+                        std::size_t ij = (i+1)+lrb*j;
+#pragma omp task default(shared) firstprivate(i,j,k,ij)   \
+  depend(inout:B[ij])
+#endif
+                        //for (std::size_t k=0, lj=0; k<i+1; k++) {
+                        gemm(Trans::N, Trans::N, scalar_t(-1.),
+                          *(Tkj[0]), *(Tik[lk]), scalar_t(1.),
+                          A11.tile_dense(i+1, j).D());
+                        lk++;
+                      }
                     }
                   }
-                }
-                if (g->is_local_col(i+1)) {
-                  std::size_t lj=0;
-                  if (g->is_local_row(i+1)) lj=1;
-                  for (std::size_t j=i+2; j<B1; j++) {
-                    if (g->is_local_row(j)) {
+                  if (g->is_local_col(i+1)) {
+                    std::size_t lj=0;
+                    if (g->is_local_row(i+1)) lj=1;
+                    for (std::size_t j=i+2; j<B1; j++) {
+                      if (g->is_local_row(j)) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+                    std::size_t ji = j+lrb*(i+1);
+#pragma omp task default(shared) firstprivate(i,j,k,ji)   \
+  depend(inout:B[ji])
+#endif
                       //for (std::size_t k=0, lk=0; k<i+1; k++) {
-                      gemm(Trans::N, Trans::N, scalar_t(-1.), 
-                        *(Tkj[lj]), *(Tik[0]), scalar_t(1.), 
-                        A11.tile_dense(j, i+1).D());
-                      lj++;
+                        gemm(Trans::N, Trans::N, scalar_t(-1.), 
+                          *(Tkj[lj]), *(Tik[0]), scalar_t(1.), 
+                          A11.tile_dense(j, i+1).D());
+                        lj++;
+                      }
                     }
                   }
-                }
-                if (g->is_local_row(i+1)) {
-                  std::size_t lk=0;
-                  for (std::size_t j=0; j<B2; j++) {
-                    if (g->is_local_col(j)) {
+                  if (g->is_local_row(i+1)) {
+                    std::size_t lk=0;
+                    for (std::size_t j=0; j<B2; j++) {
+                      if (g->is_local_col(j)) {
                       //for (std::size_t k=0, lj=0; k<i+1; k++) {
-                      gemm(Trans::N, Trans::N, scalar_t(-1.),
-                        *(Tkj[0]), *(Tik2[lk]), scalar_t(1.),
-                        A12.tile_dense(i+1, j).D());
-                      lk++;
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+                        std::size_t ij2 = (i+1)+lrb*(B1+j);
+#pragma omp task default(shared) firstprivate(i,k,j,ij2) \
+  depend(inout:B[ij2])
+#endif
+                        gemm(Trans::N, Trans::N, scalar_t(-1.),
+                          *(Tkj[0]), *(Tik2[lk]), scalar_t(1.),
+                          A12.tile_dense(i+1, j).D());
+                        lk++;
+                      }
                     }
                   }
-                }
-                if (g->is_local_col(i+1)) {
-                  std::size_t lj=0;
-                  for (std::size_t j=0; j<B2; j++) {
-                    if (g->is_local_row(j)) {
-                      //for (std::size_t k=0, lk=0; k<i+1; k++) {
-                      gemm(Trans::N, Trans::N, scalar_t(-1.), 
-                        *(Tk2j[lj]), *(Tik[0]), scalar_t(1.), 
-                        A21.tile_dense(j, i+1).D());
-                      lj++;
+                  if (g->is_local_col(i+1)) {
+                    std::size_t lj=0;
+                    for (std::size_t j=0; j<B2; j++) {
+                      if (g->is_local_row(j)) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+                        std::size_t j2i = (j+B1)+lrb*(i+1);
+#pragma omp task default(shared) firstprivate(i,k,j,j2i) \
+  depend(inout:B[j2i])
+#endif
+                        //for (std::size_t k=0, lk=0; k<i+1; k++) {
+                        gemm(Trans::N, Trans::N, scalar_t(-1.), 
+                          *(Tk2j[lj]), *(Tik[0]), scalar_t(1.), 
+                          A21.tile_dense(j, i+1).D());
+                        lj++;
+                      }
                     }
                   }
                 }
