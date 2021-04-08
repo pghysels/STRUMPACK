@@ -273,6 +273,14 @@ namespace strumpack {
       (std::size_t i0, std::size_t i1, std::size_t j0, std::size_t j1) const;
 
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+      gather_row
+      (std::size_t i0, std::size_t k, std::size_t j0, std::size_t j1) const;
+
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+      gather_col
+      (std::size_t i0, std::size_t i1, std::size_t j0, std::size_t k) const;
+
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       gather_rows_A22(std::size_t i1, std::size_t j1) const;
 
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
