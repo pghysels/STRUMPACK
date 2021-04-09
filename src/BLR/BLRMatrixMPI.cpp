@@ -2084,7 +2084,7 @@ namespace strumpack {
 #endif
           if (i+1 < rowblocks()){
             if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::LL) {  
-#if 0
+#if 1
               auto Tik = gather_rows(i+1, rowblocks(), i+1, colblocks());
               auto Tkj = gather_cols(i+1, rowblocks(), i+1, colblocks());
 #pragma omp parallel
@@ -2500,7 +2500,7 @@ namespace strumpack {
 #endif
           if (i+1 < B1){
             if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::LL) {    
-#if 0
+#if 1
               auto Tik = A11.gather_rows(i+1, B1, i+1, B1);
               auto Tkj = A11.gather_cols(i+1, B1, i+1, B1);
               auto Tik2 = A12.gather_rows(i+1, B1, 0, B2);
