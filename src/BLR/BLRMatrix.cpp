@@ -155,48 +155,6 @@ namespace strumpack {
                 }
               }
             }
-//        } else { // LL, Comb or Star
-/*           for (std::size_t i=0; i<rb; i++) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-          std::size_t ii = i+rb*i;
-#pragma omp task default(shared) firstprivate(i,ii) depend(inout:B[ii])
-#endif
-            {
-              create_dense_tile(i, i, A);
-              auto tpiv = tile(i, i).LU();
-              std::copy(tpiv.begin(), tpiv.end(), piv.begin()+tileroff(i));
-            }
-            //COMPRESS and SOLVE
-            for (std::size_t j=i+1; j<rb; j++) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-            std::size_t ij = i+rb*j;
-#pragma omp task default(shared) firstprivate(i,j,ij,ii)  \
-  depend(in:B[ii]) depend(inout:B[ij]) priority(rb-j)
-#endif
-              {
-                if (admissible(i, j)) create_LR_tile(i, j, A, opts);
-                else create_dense_tile(i, j, A);
-                // permute and solve with L, blocks right from the
-                // diagonal block
-                std::vector<int> tpiv
-                  (piv.begin()+tileroff(i), piv.begin()+tileroff(i+1));
-                tile(i, j).laswp(tpiv, true);
-                trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-                    scalar_t(1.), tile(i, i), tile(i, j));
-              }
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-            std::size_t ji = j+rb*i;
-#pragma omp task default(shared) firstprivate(i,j,ji,ii)        \
-  depend(in:B[ii]) depend(inout:B[ji]) priority(rb-j)
-#endif
-              {
-                if (admissible(j, i)) create_LR_tile(j, i, A, opts);
-                else create_dense_tile(j, i, A);
-                // solve with U, the blocks under the diagonal block
-                trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-                    scalar_t(1.), tile(i, i), tile(j, i));
-              }
-            } */
           } else if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::LL) {
             // LL-Update
             for (std::size_t j=i+1; j<rb; j++){
@@ -705,77 +663,6 @@ namespace strumpack {
                 }
               }
             }
-          //} else { //LL, Comb or Star
-          
-          /* for (std::size_t i=0; i<rb; i++) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-            std::size_t ii = i+lrb*i;
-#pragma omp task default(shared) firstprivate(i,ii) depend(inout:B[ii])
-#endif
-            {
-              B11.create_dense_tile(i, i, A11);
-              auto tpiv = B11.tile(i, i).LU();
-              std::copy(tpiv.begin(), tpiv.end(), piv.begin()+B11.tileroff(i));
-            }
-            //COMPRESS and SOLVE
-            for (std::size_t j=i+1; j<rb; j++) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t ij = i+lrb*j;
-#pragma omp task default(shared) firstprivate(i,j,ij,ii)        \
-  depend(in:B[ii]) depend(inout:B[ij]) priority(rb-j)
-#endif
-              { // these blocks have received all updates, compress now
-                if (admissible(i, j)) B11.create_LR_tile(i, j, A11, opts);
-                else B11.create_dense_tile(i, j, A11);
-                // permute and solve with L, blocks right from the
-                // diagonal block
-                std::vector<int> tpiv
-                  (piv.begin()+B11.tileroff(i), piv.begin()+B11.tileroff(i+1));
-                B11.tile(i, j).laswp(tpiv, true);
-                trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-                     scalar_t(1.), B11.tile(i, i), B11.tile(i, j));
-              }
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t ji = j+lrb*i;
-#pragma omp task default(shared) firstprivate(i,j,ji,ii)        \
-  depend(in:B[ii]) depend(inout:B[ji]) priority(rb-j)
-#endif
-              {
-                if (admissible(j, i)) B11.create_LR_tile(j, i, A11, opts);
-                else B11.create_dense_tile(j, i, A11);
-                // solve with U, the blocks under the diagonal block
-                trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-                     scalar_t(1.), B11.tile(i, i), B11.tile(j, i));
-              }
-            } 
-            for (std::size_t j=0; j<rb2; j++) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t ij2 = i+lrb*(rb+j);
-#pragma omp task default(shared) firstprivate(i,j,ij2,ii)       \
-  depend(in:B[ii]) depend(inout:B[ij2])
-#endif
-              {
-                B12.create_LR_tile(i, j, A12, opts);
-                // permute and solve with L blocks right from the
-                // diagonal block
-                std::vector<int> tpiv
-                  (piv.begin()+B11.tileroff(i), piv.begin()+B11.tileroff(i+1));
-                B12.tile(i, j).laswp(tpiv, true);
-                trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-                     scalar_t(1.), B11.tile(i, i), B12.tile(i, j));
-              }
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t j2i = (rb+j)+lrb*i;
-#pragma omp task default(shared) firstprivate(i,j,j2i,ii)       \
-  depend(in:B[ii]) depend(inout:B[j2i])
-#endif
-              {
-                B21.create_LR_tile(j, i, A21, opts);
-                // solve with U, the blocks under the diagonal block
-                trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-                     scalar_t(1.), B11.tile(i, i), B21.tile(j, i));
-              }
-            }*/
           } else if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::LL) { //LL-Update
             for (std::size_t j=i+1; j<rb; j++) {
               for (std::size_t k=0; k<i+1; k++) {
