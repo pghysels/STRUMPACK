@@ -43,18 +43,6 @@ print_info(const std::unique_ptr<structured::StructuredMatrix<scalar_t>>& H,
   cout << "  - rank(H) = " << H->rank() << endl;
 }
 
-// #if defined(STRUMPACK_USE_MPI)
-// template<typename scalar_t> void
-// print_info(const MPIComm& com,
-//            const std::unique_ptr<structured::StructuredMatrix<scalar_t>>& H,
-//            const structured::StructuredOptions<scalar_t>& opts) {
-//   cout << get_name(opts.type()) << endl;
-//   cout << "  - total_nonzeros(H) = " << H->nonzeros() << endl;
-//   cout << "  - total_memory(H) = " << H->memory() / 1e6 << " MByte" << endl;
-//   cout << "  - maximum_rank(H) = " << H->rank() << endl;
-// }
-// #endif
-
 
 int main(int argc, char* argv[]) {
   int n = 1000, nrhs = 1;
@@ -168,50 +156,6 @@ int main(int argc, char* argv[]) {
            << e.what() << endl;
     }
   }
-
-
-// #if defined(STRUMPACK_USE_MPI)
-//   int thread_level;
-//   MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &thread_level);
-//   {
-//     MPIComm world;
-//     if (thread_level != MPI_THREAD_FUNNELED && world.is_root())
-//       cout << "MPI implementation does not support MPI_THREAD_FUNNELED" << endl;
-
-//     BLACSGrid grid(world);
-
-//     // create 2d block cyclicly distributed matrix, and initialize it as
-//     // a Toeplitz matrix
-//     DistributedMatrix<double> A2d(&grid, n, n, Toeplitz);
-
-//     if (world.is_root()) {
-//       cout << endl << endl;
-//       cout << "dense (2DBC) " << A.rows() << " x " << A.cols()
-//            << " matrix" << endl;
-//       cout << "  - memory(A2d) = " << A.memory() / 1e6 << " MByte"
-//            << endl << endl;
-
-//       cout << "===============================" << endl;
-//       cout << " Compression from dense matrix" << endl;
-//       cout << "===============================" << endl;
-//     }
-//     for (auto type : types) {
-//       options.set_type(type);
-//       try {
-//         auto H = structured::StructuredMatrix<double>::
-//           construct_from_dense(A2d, options);
-//         print_info(world, H, options);
-//       } catch (std::exception& e) {
-//         cout << get_name(type) << " compression failed: "
-//              << e.what() << endl;
-//       }
-//     }
-
-//   }
-//   scalapack::Cblacs_exit(1);
-//   MPI_Finalize();
-
-// #endif
 
   return 0;
 }
