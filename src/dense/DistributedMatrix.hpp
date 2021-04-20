@@ -31,6 +31,7 @@
 #include <vector>
 #include <string>
 #include <cmath>
+#include <functional>
 
 #include "misc/MPIWrapper.hpp"
 #include "misc/RandomWrapper.hpp"
@@ -60,13 +61,16 @@ namespace strumpack {
 
   public:
     DistributedMatrix();
+    DistributedMatrix(const BLACSGrid* g, int M, int N);
+    DistributedMatrix(const BLACSGrid* g, int M, int N,
+                      const std::function<scalar_t(std::size_t,
+                                                   std::size_t)>& A);
     DistributedMatrix(const BLACSGrid* g, const DenseMatrix<scalar_t>& m);
     DistributedMatrix(const BLACSGrid* g, DenseMatrix<scalar_t>&& m);
     DistributedMatrix(const BLACSGrid* g, DenseMatrixWrapper<scalar_t>&& m);
     DistributedMatrix(const BLACSGrid* g, int M, int N,
                       const DistributedMatrix<scalar_t>& m,
                       int context_all);
-    DistributedMatrix(const BLACSGrid* g, int M, int N);
     DistributedMatrix(const BLACSGrid* g, int M, int N, int MB, int NB);
     DistributedMatrix(const BLACSGrid* g, int desc[9]);
 
@@ -182,6 +186,8 @@ namespace strumpack {
                 value_type>& rgen);
     void zero();
     void fill(scalar_t a);
+    void fill(const std::function<scalar_t(std::size_t,
+                                           std::size_t)>& A);
     void eye();
     void shift(scalar_t sigma);
     void clear();

@@ -90,15 +90,18 @@ namespace strumpack {
         switch (c) {
         case 1: {
           std::istringstream iss(optarg);
-          iss >> rel_tol_; set_rel_tol(rel_tol_);
+          iss >> this->rel_tol_;
+          this->set_rel_tol(this->rel_tol_);
         } break;
         case 2: {
           std::istringstream iss(optarg);
-          iss >> abs_tol_; set_abs_tol(abs_tol_);
+          iss >> this->abs_tol_;
+          this->set_abs_tol(this->abs_tol_);
         } break;
         case 3: {
           std::istringstream iss(optarg);
-          iss >> leaf_size_; set_leaf_size(leaf_size_);
+          iss >> this->leaf_size_;
+          this->set_leaf_size(this->leaf_size_);
         } break;
         case 4: {
           std::istringstream iss(optarg);
@@ -114,7 +117,8 @@ namespace strumpack {
         } break;
         case 7: {
           std::istringstream iss(optarg);
-          iss >> max_rank_; set_max_rank(max_rank_);
+          iss >> this->max_rank_;
+          this->set_max_rank(this->max_rank_);
         } break;
         case 8: {
           std::istringstream iss(optarg);
@@ -172,8 +176,8 @@ namespace strumpack {
         case 15: { set_synchronized_compression(true); } break;
         case 16: { set_synchronized_compression(false); } break;
         case 17: { set_log_ranks(true); } break;
-        case 'v': set_verbose(true); break;
-        case 'q': set_verbose(false); break;
+        case 'v': this->set_verbose(true); break;
+        case 'q': this->set_verbose(false); break;
         case 'h': describe_options(); break;
         }
       }
@@ -189,16 +193,16 @@ namespace strumpack {
       if (!mpi_root()) return;
       std::cout << "# HSS Options:" << std::endl
                 << "#   --hss_rel_tol real_t (default "
-                << rel_tol() << ")" << std::endl
+                << this->rel_tol() << ")" << std::endl
                 << "#   --hss_abs_tol real_t (default "
-                << abs_tol() << ")" << std::endl
+                << this->abs_tol() << ")" << std::endl
                 << "#   --hss_leaf_size int (default "
-                << leaf_size() << ")" << std::endl
+                << this->leaf_size() << ")" << std::endl
                 << "#   --hss_d0 int (default " << d0() << ")" << std::endl
                 << "#   --hss_dd int (default " << dd() << ")" << std::endl
                 << "#   --hss_p int (default " << p() << ")" << std::endl
                 << "#   --hss_max_rank int (default "
-                << max_rank() << ")" << std::endl
+                << this->max_rank() << ")" << std::endl
                 << "#   --hss_random_distribution normal|uniform (default "
                 << get_name(random_distribution()) << ")" << std::endl
                 << "#   --hss_random_engine linear|mersenne (default "
@@ -220,9 +224,9 @@ namespace strumpack {
                 << "#   --hss_log_ranks (default "
                 << log_ranks() << ")" << std::endl
                 << "#   --hss_verbose or -v (default "
-                << verbose() << ")" << std::endl
+                << this->verbose() << ")" << std::endl
                 << "#   --hss_quiet or -q (default "
-                << !verbose() << ")" << std::endl
+                << !this->verbose() << ")" << std::endl
                 << "#   --help or -h" << std::endl << std::endl;
 #endif
     }

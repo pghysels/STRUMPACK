@@ -387,7 +387,7 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "verbosity", opts.verbose() ? 2 : -2);
       // HODLR_set_I_option<scalar_t>(options_, "Nbundle", 8);
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
-      HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);  
+      HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
       // set RecLR_leaf to 2 for RRQR at bottom level of Hierarchical BACA
       HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", opts.lr_leaf()); // 5 = new version of BACA
       HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", opts.BACA_block_size());

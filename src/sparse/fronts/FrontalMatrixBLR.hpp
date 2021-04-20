@@ -348,12 +348,12 @@ namespace strumpack {
                 << " , nnz = " << nnz
                 << " , " << float(nnz) / (dim_sep()*dim_sep()) * 100.
                 << " % compression, time = " << time
-                << " sec, " 
-                << " maxrank= " << F11blr_.maximum_rank() << std::endl;
+                << " sec, "
+                << " maxrank= " << F11blr_.rank() << std::endl;
 #if defined(STRUMPACK_COUNT_FLOPS)
       ftot = params::flops - f0;
       std::cout << "#   - BLR root front: factor flops = " << double(ftot) << std::endl;
-#endif 
+#endif
     }
   }
 

@@ -1,7 +1,51 @@
 /*! \page dense Dense Solvers
 
+STRUMPACK provides several rank-structured formats for dense matrix
+approximation. Included are HSS (Hierarchically Semi-Separable), BLR
+(Block Low Rank), HODLR (Hierarchically Off-Diagonal Low Rank),
+Butterfly, HODBF (Hierarchically Off-Diagonal Butterfly).
+
+
+## StructuredMatrix Interface
+
+We provide an interface to these different formats through a single
+class strumpack::structured::StructuredMatrix. See the documentation
+for this class for more information. Multiple scenarios for
+construction are supported, such as
+
+- Construction from a dense input matrix
+- Matrix-free construction, using only a matrix-vector product
+- Construction using only selected matrix entries
+
+Moreover, \link strumpack::structured::StructuredMatrix
+StructuredMatrix \endlink defines several operations, such as
+
+- Matrix-vector multiplication (and transpose product)
+- Factorization and solve
+- Query memory usage
+- Check maximum rank
+
+Example usage of this \link strumpack::structured::StructuredMatrix
+StructuredMatrix \endlink class can be found in
+examples/testStructured.cpp and examples/testStructuredMPI.cpp.
+
+
+If you require additional functionality, then \link contact \endlink
+us.
+
+
+
+## Specific Formats
+
+We recommend you use the \link strumpack::structured::StructuredMatrix
+StructuredMatrix \endlink interface. However, the following pages are
+specific for certain formats:
+
 - \subpage hss_matrices "HSS Approximation of Dense Matrices"
 - \subpage hodlr_matrices "HODLR Approximation of Dense Matrices"
 - \subpage blr_matrices "BLR Approximation of Dense Matrices"
+
+These are all implemented as sub-classes of the StructuredMatrix
+class.
 
 */

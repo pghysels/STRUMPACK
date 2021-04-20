@@ -106,21 +106,23 @@ namespace strumpack {
         switch (c) {
         case 1: {
           std::istringstream iss(optarg);
-          iss >> rel_tol_; set_rel_tol(rel_tol_);
+          iss >> this->rel_tol_;
+          this->set_rel_tol(this->rel_tol_);
         } break;
         case 2: {
           std::istringstream iss(optarg);
-          iss >> abs_tol_; set_abs_tol(abs_tol_);
+          iss >> this->abs_tol_;
+          this->set_abs_tol(this->abs_tol_);
         } break;
         case 3: {
           std::istringstream iss(optarg);
-          iss >> leaf_size_;
-          set_leaf_size(leaf_size_);
+          iss >> this->leaf_size_;
+          this->set_leaf_size(this->leaf_size_);
         } break;
         case 4: {
           std::istringstream iss(optarg);
-          iss >> max_rank_;
-          set_max_rank(max_rank_);
+          iss >> this->max_rank_;
+          this->set_max_rank(this->max_rank_);
         } break;
         case 5: {
           std::istringstream iss(optarg);
@@ -182,8 +184,8 @@ namespace strumpack {
                       << std::endl;
         } break;
 
-        case 'v': set_verbose(true); break;
-        case 'q': set_verbose(false); break;
+        case 'v': this->set_verbose(true); break;
+        case 'q': this->set_verbose(false); break;
         case 'h': describe_options(); break;
         }
       }
@@ -199,13 +201,13 @@ namespace strumpack {
       if (!mpi_root()) return;
       std::cout << "# BLR Options:" << std::endl
                 << "#   --blr_rel_tol real_t (default "
-                << rel_tol() << ")" << std::endl
+                << this->rel_tol() << ")" << std::endl
                 << "#   --blr_abs_tol real_t (default "
-                << abs_tol() << ")" << std::endl
+                << this->abs_tol() << ")" << std::endl
                 << "#   --blr_leaf_size int (default "
-                << leaf_size() << ")" << std::endl
+                << this->leaf_size() << ")" << std::endl
                 << "#   --blr_max_rank int (default "
-                << max_rank() << ")" << std::endl
+                << this->max_rank() << ")" << std::endl
                 << "#   --blr_low_rank_algorithm (default "
                 << get_name(lr_algo_) << ")" << std::endl
                 << "#      should be [RRQR|ACA|BACA]" << std::endl
@@ -221,9 +223,9 @@ namespace strumpack {
                 << "#   --blr_BACA_blocksize int (default "
                 << BACA_blocksize() << ")" << std::endl
                 << "#   --blr_verbose or -v (default "
-                << verbose() << ")" << std::endl
+                << this->verbose() << ")" << std::endl
                 << "#   --blr_quiet or -q (default "
-                << !verbose() << ")" << std::endl
+                << !this->verbose() << ")" << std::endl
                 << "#   --help or -h" << std::endl << std::endl;
 #endif
     }

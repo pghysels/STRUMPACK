@@ -298,6 +298,15 @@ namespace strumpack {
     : DistributedMatrix(g, M, N, default_MB, default_NB) {
   }
 
+  template<typename scalar_t>
+  DistributedMatrix<scalar_t>::DistributedMatrix
+  (const BLACSGrid* g, int M, int N,
+   const std::function<scalar_t(std::size_t,
+                                std::size_t)>& A)
+    : DistributedMatrix(g, M, N, default_MB, default_NB) {
+    fill(A);
+  }
+
   template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix
   (const BLACSGrid* g, int M, int N, int MB, int NB) : grid_(g) {
     assert(M >= 0 && N >= 0 && MB >= 0 && NB >= 0);
@@ -434,6 +443,19 @@ namespace strumpack {
     for (int c=clo; c<chi; c++)
       for (int r=rlo; r<rhi; r++)
         operator()(r,c) = a;
+  }
+
+  template<typename scalar_t> void
+  DistributedMatrix<scalar_t>::fill
+  (const std::function<scalar_t(std::size_t, std::size_t)>& A) {
+    if (!active()) return;
+    int rlo, rhi, clo, chi;
+    lranges(rlo, rhi, clo, chi);
+    for (int c=clo; c<chi; c++) {
+      auto cg = coll2g(c);
+      for (int r=rlo; r<rhi; r++)
+        operator()(r,c) = A(rowl2g(r), cg);
+    }
   }
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::random() {

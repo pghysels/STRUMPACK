@@ -42,6 +42,23 @@ namespace strumpack {
    */
   namespace HODLR {
 
+    /**
+     * \class ButterflyMatrix
+     *
+     * \brief Butterfly matrix representation, this includes low-rank
+     * matrix representation as a special case.
+     *
+     * This requires MPI support.
+     *
+     * There are 2 different ways to create a ButterflyMatrix
+     *  - By specifying a matrix-(multiple)vector multiplication
+     *    routine.
+     *  - By specifying an element extraction routine.
+     *
+     * \tparam scalar_t Can be double, or std::complex<double>.
+     *
+     * \see HSS::HSSMatrix, HODLR::HODLRMatrix
+     */
     template<typename scalar_t> class ButterflyMatrix {
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;

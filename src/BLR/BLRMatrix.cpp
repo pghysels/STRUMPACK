@@ -114,7 +114,7 @@ namespace strumpack {
 #pragma omp task default(shared) firstprivate(i,j,ii,ij)        \
   depend(in:B[ii]) depend(inout:B[ij])
 #endif
-            { 
+            {
               if (admissible(i, j))
                 create_LR_tile(i, j, A, opts);
               else create_dense_tile(i, j, A);
@@ -245,7 +245,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> std::size_t
-    BLRMatrix<scalar_t>::maximum_rank() const {
+    BLRMatrix<scalar_t>::rank() const {
       std::size_t mrank = 0;
       for (auto& b : blocks_) mrank = std::max(mrank, b->maximum_rank());
       return mrank;
@@ -557,7 +557,7 @@ namespace strumpack {
 #pragma omp task default(shared) firstprivate(i,j,ij,ii)  \
   depend(in:B[ii]) depend(inout:B[ij]) priority(rb-j)
 #endif
-            { 
+            {
               if (admissible(i, j)) B11.create_LR_tile(i, j, A11, opts);
               else B11.create_dense_tile(i, j, A11);
               // permute and solve with L, blocks right from the diagonal block

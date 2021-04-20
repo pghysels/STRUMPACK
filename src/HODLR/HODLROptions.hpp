@@ -33,6 +33,7 @@
 #define HODLR_OPTIONS_HPP
 
 #include "clustering/Clustering.hpp"
+#include "structured/StructuredOptions.hpp"
 
 namespace strumpack {
 
@@ -112,7 +113,8 @@ namespace strumpack {
      * std::complex<float> or std::complex<double>. This is used here
      * mainly because tolerances might depend on the precision.
      */
-    template<typename scalar_t> class HODLROptions {
+    template<typename scalar_t> class HODLROptions
+      : public structured::StructuredOptions<scalar_t> {
 
     public:
       /**
@@ -125,48 +127,14 @@ namespace strumpack {
        * Default constructor, sets all options to their default
        * values.
        */
-      HODLROptions() {}
-
-      /**
-       * Set the relative tolerance to be used for HODLR
-       * compression. Tuning this parameter is very important for
-       * performance.
-       *
-       * \param rel_tol relative compression tolerance
-       */
-      void set_rel_tol(real_t rel_tol) {
-        assert(rel_tol <= real_t(1.) && rel_tol >= real_t(0.));
-        rel_tol_ = rel_tol;
+      HODLROptions() :
+        structured::StructuredOptions<scalar_t>(structured::Type::HODLR) {
+        set_defaults();
       }
 
-      /**
-       * Set the absolute compression tolerance.
-       *
-       * \param abs_tol absolute compression tolerance
-       */
-      void set_abs_tol(real_t abs_tol) {
-        assert(abs_tol >= real_t(0.));
-        abs_tol_ = abs_tol;
-      }
-
-      /**
-       * Set the HODLR leaf size. The smallest diagonal blocks in the
-       * HODLR hierarchy will have size approximately the leaf size
-       * (within a factor 2).
-       *
-       * \param leaf_size
-       */
-      void set_leaf_size(int leaf_size) {
-        assert(leaf_size_ > 0);
-        leaf_size_ = leaf_size;
-      }
-
-      /**
-       * Set the maximum rank allowed in HODLR compression.
-       */
-      void set_max_rank(int max_rank) {
-        assert(max_rank > 0);
-        max_rank_ = max_rank;
+      HODLROptions(const structured::StructuredOptions<scalar_t>& sopts)
+        : structured::StructuredOptions<scalar_t>(sopts) {
+        this->type_ = structured::Type::HODLR;
       }
 
       /**
@@ -279,41 +247,6 @@ namespace strumpack {
       void set_BF_entry_n15(bool l) { BF_entry_n15_ = l; }
 
       /**
-       * Enable or disable verbose output (only by the root process)
-       * to stdout.
-       */
-      void set_verbose(bool verbose) { verbose_ = verbose; }
-
-      /**
-       * Get the relative compression tolerance.
-       * \return the relative compression tolerance
-       * \see set_rel_tol(), set_abs_tol(), get_abs_tol()
-       */
-      real_t rel_tol() const { return rel_tol_; }
-
-      /**
-       * Get the absolute compression tolerance.
-       * \return the absolute compression tolerance
-       * \see set_abs_tol(), set_rel_tol(), get_rel_tol()
-       */
-      real_t abs_tol() const { return abs_tol_; }
-
-      /**
-       * Get the HODLR leaf size.
-       * \return the (approximate) HODLR leaf size
-       * \see set_leaf_size()
-       */
-      int leaf_size() const { return leaf_size_; }
-
-      /**
-       * Get the maximum allowable rank (note, this is not the actual
-       * maximum computed rank).
-       * \return maximum allowable rank
-       * \see set_max_rank()
-       */
-      int max_rank() const { return max_rank_; }
-
-      /**
        * Get the initial guess for the rank.
        */
       int rank_guess() const { return rank_guess_; }
@@ -392,15 +325,6 @@ namespace strumpack {
        */
       bool BF_entry_n15() const { return BF_entry_n15_; }
 
-
-      /**
-       * Verbose or quiet?
-       * \return True if we want output from the HODLR algorithms,
-       * else False.
-       * \see set_verbose
-       */
-      bool verbose() const { return verbose_; }
-
       /**
        * Parse the command line options given by argc and argv.  The
        * options will not be modified. Run with --help to see an
@@ -409,21 +333,17 @@ namespace strumpack {
        * \param argc Number of elements in argv
        * \param argv Array with options
        */
-      void set_from_command_line(int argc, const char* const* cargv);
+      void set_from_command_line(int argc, const char* const* cargv) override;
 
       /**
        * Print an overview of the available command line options and
        * their current values.
        */
-      void describe_options() const;
+      void describe_options() const override;
 
     private:
-      real_t rel_tol_ = default_HODLR_rel_tol<real_t>();
-      real_t abs_tol_ = default_HODLR_abs_tol<real_t>();
-      int leaf_size_ = 256;
       int rank_guess_ = 128;
       double rank_rate_ = 2.;
-      int max_rank_ = 50000;
       ClusteringAlgorithm clustering_algo_ = ClusteringAlgorithm::COBBLE;
       int butterfly_levels_ = 0;
       CompressionAlgorithm compression_algo_ = CompressionAlgorithm::ELEMENT_EXTRACTION;
@@ -435,7 +355,15 @@ namespace strumpack {
       int knn_lrbf_ = 128;
       bool less_adapt_ = true;
       bool BF_entry_n15_ = false;
-      bool verbose_ = true;
+
+      void set_defaults() {
+        this->type_ = structured::Type::HODLR;
+        this->rel_tol_ = default_HODLR_rel_tol<real_t>();
+        this->abs_tol_ = default_HODLR_abs_tol<real_t>();
+        this->leaf_size_ = 256;
+        this->max_rank_ = 50000;
+      }
+
     };
 
   } // end namespace HODLR

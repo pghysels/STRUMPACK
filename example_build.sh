@@ -174,16 +174,18 @@ if [[ $(hostname -s) = "cs-it-7098760" ]]; then
     export slate_DIR=$HOME/local/spack_pghysels/opt/spack/linux-ubuntu20.04-zen2/gcc-10.2.0/slate-2020.10.00-utcue2tec7ly5kx27dy6rap6oxkglbbv
 
     cmake ../ \
-          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DBUILD_SHARED_LIBS=ON \
           -DCMAKE_INSTALL_PREFIX=../install \
           -DSTRUMPACK_COUNT_FLOPS=ON \
           -DSTRUMPACK_USE_CUDA=ON \
           -DCMAKE_CUDA_FLAGS=-arch=sm_75 \
           -DSTRUMPACK_USE_HIP=OFF \
           -DTPL_ENABLE_MAGMA=OFF \
-          -DTPL_ENABLE_SLATE=ON \
+          -DTPL_ENABLE_SLATE=OFF \
           -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
 #          -DTPL_SCALAPACK_LIBRARIES="/home/pieterg/local/dplasma/install/lib/libdplasma.so;/home/pieterg/local/dplasma/install/lib/libparsec.so;/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
+
 fi
 
 

@@ -104,21 +104,23 @@ namespace strumpack {
         switch (c) {
         case 1: {
           std::istringstream iss(optarg);
-          iss >> rel_tol_; set_rel_tol(rel_tol_);
+          iss >> this->rel_tol_;
+          this->set_rel_tol(this->rel_tol_);
         } break;
         case 2: {
           std::istringstream iss(optarg);
-          iss >> abs_tol_; set_abs_tol(abs_tol_);
+          iss >> this->abs_tol_;
+          this->set_abs_tol(this->abs_tol_);
         } break;
         case 3: {
           std::istringstream iss(optarg);
-          iss >> leaf_size_;
-          set_leaf_size(leaf_size_);
+          iss >> this->leaf_size_;
+          this->set_leaf_size(this->leaf_size_);
         } break;
         case 4: {
           std::istringstream iss(optarg);
-          iss >> max_rank_;
-          set_max_rank(max_rank_);
+          iss >> this->max_rank_;
+          this->set_max_rank(this->max_rank_);
         } break;
         case 5: {
           std::istringstream iss(optarg);
@@ -179,8 +181,8 @@ namespace strumpack {
         case 17: set_less_adapt(false); break;
         case 18: set_BF_entry_n15(true); break;
         case 19: set_BF_entry_n15(false); break;
-        case 'v': set_verbose(true); break;
-        case 'q': set_verbose(false); break;
+        case 'v': this->set_verbose(true); break;
+        case 'q': this->set_verbose(false); break;
         case 'h': describe_options(); break;
         }
       }
@@ -196,13 +198,13 @@ namespace strumpack {
       if (!mpi_root()) return;
       std::cout << "# HODLR Options:" << std::endl
                 << "#   --hodlr_rel_tol real_t (default "
-                << rel_tol() << ")" << std::endl
+                << this->rel_tol() << ")" << std::endl
                 << "#   --hodlr_abs_tol real_t (default "
-                << abs_tol() << ")" << std::endl
+                << this->abs_tol() << ")" << std::endl
                 << "#   --hodlr_leaf_size int (default "
-                << leaf_size() << ")" << std::endl
+                << this->leaf_size() << ")" << std::endl
                 << "#   --hodlr_max_rank int (default "
-                << max_rank() << ")" << std::endl
+                << this->max_rank() << ")" << std::endl
                 << "#   --hodlr_rank_guess int (default "
                 << rank_guess() << ")" << std::endl
                 << "#   --hodlr_rank_rate double (default "
@@ -234,9 +236,9 @@ namespace strumpack {
                 << "#   --hodlr_disable_BF_entry_n15 (default "
                 << !BF_entry_n15() << ")" << std::endl
                 << "#   --hodlr_verbose or -v (default "
-                << verbose() << ")" << std::endl
+                << this->verbose() << ")" << std::endl
                 << "#   --hodlr_quiet or -q (default "
-                << !verbose() << ")" << std::endl
+                << !this->verbose() << ")" << std::endl
                 << "#   --help or -h" << std::endl << std::endl;
 #endif
     }

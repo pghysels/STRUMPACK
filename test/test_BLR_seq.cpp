@@ -163,7 +163,7 @@ int run(int argc, char* argv[]) {
           << B.rows() << " x " << B.cols() << endl;
   //B.print("B");
   //cout << "# compression succeeded!" << endl;
-  cout << "# rank(B) = " << B.maximum_rank() << endl;
+  cout << "# rank(B) = " << B.rank() << endl;
   cout << "# memory(B) = " << B.memory()/1e6 << " MB, "
         << 100. * B.memory() / A.memory() << "% of dense" << endl;
   #if defined(STRUMPACK_COUNT_FLOPS)

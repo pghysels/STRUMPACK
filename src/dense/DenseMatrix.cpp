@@ -54,6 +54,13 @@ namespace strumpack {
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>::DenseMatrix
+  (std::size_t m, std::size_t n,
+   const std::function<scalar_t(std::size_t,std::size_t)>& A)
+    : DenseMatrix<scalar_t>(m, n) {
+    fill(A);
+  }
+
+  template<typename scalar_t> DenseMatrix<scalar_t>::DenseMatrix
   (std::size_t m, std::size_t n, const scalar_t* D, std::size_t ld)
     : data_(new scalar_t[m*n]), rows_(m), cols_(n),
       ld_(std::max(std::size_t(1), m)) {
@@ -193,6 +200,13 @@ namespace strumpack {
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
         operator()(i,j) = v;
+  }
+
+  template<typename scalar_t> void DenseMatrix<scalar_t>::fill
+  (const std::function<scalar_t(std::size_t,std::size_t)>& A) {
+    for (std::size_t j=0; j<cols(); j++)
+      for (std::size_t i=0; i<rows(); i++)
+        operator()(i,j) = A(i, j);
   }
 
   template<typename scalar_t> void DenseMatrix<scalar_t>::eye() {

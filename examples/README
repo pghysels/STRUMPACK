@@ -53,6 +53,16 @@ The examples include:
       mpirun -n 4 ./testMMdoubleMPIDist b data/pde900.bin # see mtx2bin
 
 
+- testStructured: Example usage of the StructuredMatrix class
+    (sequential or threaded).
+
+      OMP_NUM_THREADS=4 ./testStructured 1000 --help
+
+
+- testStructuredMPI: Example usage of the StructuredMatrix class,
+    using MPI.
+
+      OMP_NUM_THREADS=4 mpirun -n 4 ./testStructured 1000 --help
 
 
 - sexample:

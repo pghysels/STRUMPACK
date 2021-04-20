@@ -5,6 +5,7 @@ add_executable(testMMdouble       EXCLUDE_FROM_ALL testMMdouble.cpp)
 add_executable(KernelRegression   EXCLUDE_FROM_ALL KernelRegression.cpp)
 add_executable(testPoisson3d      EXCLUDE_FROM_ALL testPoisson3d.cpp)
 add_executable(testMixedPrecision EXCLUDE_FROM_ALL testMixedPrecision.cpp)
+add_executable(testStructured     EXCLUDE_FROM_ALL testStructured.cpp)
 add_executable(sexample           EXCLUDE_FROM_ALL sexample.c)
 add_executable(dexample           EXCLUDE_FROM_ALL dexample.c)
 add_executable(cexample           EXCLUDE_FROM_ALL cexample.c)
@@ -17,6 +18,7 @@ target_link_libraries(testMMdouble strumpack)
 target_link_libraries(KernelRegression strumpack)
 target_link_libraries(testPoisson3d strumpack)
 target_link_libraries(testMixedPrecision strumpack)
+target_link_libraries(testStructured strumpack)
 target_link_libraries(sexample strumpack)
 target_link_libraries(dexample strumpack)
 target_link_libraries(cexample strumpack)
@@ -29,6 +31,7 @@ add_dependencies(examples
   KernelRegression
   testPoisson3d
   testMixedPrecision
+  testStructured
   sexample
   dexample
   cexample
@@ -50,6 +53,8 @@ if(STRUMPACK_USE_MPI)
     testBLRMPI.cpp)
   add_executable(testMixedPrecisionMPIDist EXCLUDE_FROM_ALL
     testMixedPrecisionMPIDist.cpp)
+  add_executable(testStructuredMPI     EXCLUDE_FROM_ALL
+    testStructuredMPI.cpp)
 
   target_link_libraries(testHelmholtz strumpack)
   target_link_libraries(testPoisson2dMPIDist strumpack)
@@ -58,6 +63,7 @@ if(STRUMPACK_USE_MPI)
   target_link_libraries(testPoisson3dMPIDist strumpack)
   target_link_libraries(testBLRMPI strumpack)
   target_link_libraries(testMixedPrecisionMPIDist strumpack)
+  target_link_libraries(testStructuredMPI strumpack)
 
   add_dependencies(examples
     testHelmholtz
@@ -66,7 +72,8 @@ if(STRUMPACK_USE_MPI)
     testMMdoubleMPIDist
     testPoisson3dMPIDist
     testBLRMPI
-    testMixedPrecisionMPIDist)
+    testMixedPrecisionMPIDist
+    testStructuredMPI)
 
   if(STRUMPACK_USE_BPACK)
     add_executable(testHODLR EXCLUDE_FROM_ALL testHODLR.cpp)

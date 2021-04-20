@@ -97,7 +97,7 @@ namespace strumpack {
        * evenly and recursively until the leafs in the HSS tree are
        * smaller than opts.leaf_size(). Alternative constructors can
        * be used to specify a specific HSS partitioning
-       * tree. Internaly, this will call the appropriate compress
+       * tree. Internally, this will call the appropriate compress
        * routine to construct the HSS representation, using the
        * options (such as compression tolerance, adaptive compression
        * scheme etc) as specified in the HSSOptions opts object.
@@ -264,13 +264,14 @@ namespace strumpack {
        * \see DenseMatrix
        * \see HSSOptions
        */
-      void compress
-      (const std::function
-       <void(DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc)>& Amult,
-       const std::function
-       <void(const std::vector<std::size_t>& I,
-             const std::vector<std::size_t>& J, DenseM_t& B)>& Aelem,
-       const opts_t& opts);
+      void compress(const std::function<void(DenseM_t& Rr,
+                                             DenseM_t& Rc,
+                                             DenseM_t& Sr,
+                                             DenseM_t& Sc)>& Amult,
+                    const std::function<void(const std::vector<std::size_t>& I,
+                                             const std::vector<std::size_t>& J,
+                                             DenseM_t& B)>& Aelem,
+                    const opts_t& opts);
 
 
       /**

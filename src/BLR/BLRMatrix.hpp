@@ -39,6 +39,7 @@
 
 #include "BLROptions.hpp"
 #include "BLRTileBLAS.hpp" // TODO remove
+#include "structured/StructuredMatrix.hpp"
 
 namespace strumpack {
   namespace BLR {
@@ -48,16 +49,17 @@ namespace strumpack {
 
 
     template<typename T>
-    using extract_t = std::function<void(const std::vector<std::size_t>&,
-                                         const std::vector<std::size_t>&,
-                                         DenseMatrix<T>&)>;
+    using extract_t =
+      std::function<void(const std::vector<std::size_t>&,
+                         const std::vector<std::size_t>&,
+                         DenseMatrix<T>&)>;
     using adm_t = DenseMatrix<bool>;
 
-    template<typename scalar_t> class BLRMatrix {
+    template<typename scalar_t> class BLRMatrix
+      : public structured::StructuredMatrix<scalar_t> {
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using Opts_t = BLROptions<scalar_t>;
-      // using elem_t = std::function<scalar_t(std::size_t,std::size_t)>;
 
     public:
       BLRMatrix() = default;
@@ -76,12 +78,12 @@ namespace strumpack {
                 const adm_t& admissible, std::vector<int>& piv,
                 const Opts_t& opts);
 
-      std::size_t rows() const { return m_; }
-      std::size_t cols() const { return n_; }
+      std::size_t rows() const override { return m_; }
+      std::size_t cols() const override { return n_; }
 
-      std::size_t memory() const;
-      std::size_t nonzeros() const;
-      std::size_t maximum_rank() const;
+      std::size_t memory() const override;
+      std::size_t nonzeros() const override;
+      std::size_t rank() const override;
 
       DenseM_t dense() const;
       void dense(DenseM_t& A) const;

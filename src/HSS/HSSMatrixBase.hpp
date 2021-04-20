@@ -45,6 +45,7 @@
 #include "misc/Triplet.hpp"
 #include "HSSOptions.hpp"
 #include "HSSExtra.hpp"
+#include "structured/StructuredMatrix.hpp"
 #if defined(STRUMPACK_USE_MPI)
 #include "dense/DistributedMatrix.hpp"
 #include "HSSExtraMPI.hpp"
@@ -78,7 +79,8 @@ namespace strumpack {
      *
      * \see HSSMatrix, HSSMatrixMPI
      */
-    template<typename scalar_t> class HSSMatrixBase {
+    template<typename scalar_t> class HSSMatrixBase
+      : public structured::StructuredMatrix<scalar_t> {
       using real_t = typename RealType<scalar_t>::value_type;
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
@@ -158,13 +160,13 @@ namespace strumpack {
        * Return the number of rows in this HSS matrix.
        * \return number of rows
        */
-      std::size_t rows() const { return _rows; }
+      std::size_t rows() const override { return _rows; }
 
       /**
        * Return the number of columns in this HSS matrix.
        * \return number of columns
        */
-      std::size_t cols() const { return _cols; }
+      std::size_t cols() const override { return _cols; }
 
       /**
        * Check whether this node of the HSS tree is a leaf.
@@ -240,7 +242,7 @@ namespace strumpack {
        *
        * \return Maximum HSS rank.
        */
-      virtual std::size_t rank() const = 0;
+      //virtual std::size_t rank() const = 0;
 
       /**
        * Return the total amount of memory used by this HSS matrix, in
@@ -250,7 +252,7 @@ namespace strumpack {
        * \return Memory usage in bytes.
        * \see nonzeros
        */
-      virtual std::size_t memory() const = 0;
+      //virtual std::size_t memory() const = 0;
 
       /**
        * Return the total number of nonzeros stored in the HSS
@@ -259,7 +261,7 @@ namespace strumpack {
        * \return Nonzeros in the HSS representation.
        * \see memory
        */
-      virtual std::size_t nonzeros() const = 0;
+      //virtual std::size_t nonzeros() const = 0;
 
       /**
        * Return the number of levels in the HSS matrix.
@@ -305,7 +307,7 @@ namespace strumpack {
 #endif
 
       /**
-       * APply a shift to the diagonal of this matrix. Ie, this +=
+       * Apply a shift to the diagonal of this matrix. Ie, this +=
        * sigma * I, with I the identity matrix. Call this after
        * compression.
        *

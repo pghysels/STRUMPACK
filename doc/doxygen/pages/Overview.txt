@@ -74,6 +74,7 @@ For comments, feature requests or bug reports, open an issue on github:
 + \link examples Examples \endlink
 + \link C_Interface C and Fortran Interfaces \endlink
 + \link FAQ FAQ \endlink
++ \link contact Contact Authors \endlink
 + \link acknowledgements Acknowledgements \endlink
 + \link copyright Copyright Notice and License Agreement \endlink
 + \link References References\endlink

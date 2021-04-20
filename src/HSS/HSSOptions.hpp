@@ -34,7 +34,7 @@
 #define HSS_OPTIONS_HPP
 
 #include "clustering/Clustering.hpp"
-
+#include "structured/StructuredOptions.hpp"
 
 namespace strumpack {
 
@@ -114,47 +114,25 @@ namespace strumpack {
      * std::complex<float> or std::complex<double>. This is used here
      * mainly because tolerances might depend on the precision.
      */
-    template<typename scalar_t> class HSSOptions {
+    template<typename scalar_t> class HSSOptions
+      : public structured::StructuredOptions<scalar_t> {
 
     public:
+
       /**
        * real_t is the real type corresponding to the (possibly
        * complex) scalar_t template parameter
        */
       using real_t = typename RealType<scalar_t>::value_type;
 
-      /**
-       * Set the relative tolerance to be used for HSS
-       * compression. Tuning this parameter is very important for
-       * performance.
-       *
-       * \param rel_tol relative compression tolerance
-       */
-      void set_rel_tol(real_t rel_tol) {
-        assert(rel_tol <= real_t(1.) && rel_tol >= real_t(0.));
-        rel_tol_ = rel_tol;
+      HSSOptions() :
+        structured::StructuredOptions<scalar_t>(structured::Type::HSS) {
+        set_defaults();
       }
 
-      /**
-       * Set the absolute compression tolerance.
-       *
-       * \param abs_tol absolute compression tolerance
-       */
-      void set_abs_tol(real_t abs_tol) {
-        assert(abs_tol >= real_t(0.));
-        abs_tol_ = abs_tol;
-      }
-
-      /**
-       * Set the HSS leaf size. The smallest diagonal blocks in the
-       * HSS hierarchy will have size approximately the leaf size
-       * (within a factor 2).
-       *
-       * \param leaf_size
-       */
-      void set_leaf_size(int leaf_size) {
-        assert(leaf_size > 0);
-        leaf_size_ = leaf_size;
+      HSSOptions(const structured::StructuredOptions<scalar_t>& sopts)
+        : structured::StructuredOptions<scalar_t>(sopts) {
+        this->type_ = structured::Type::HSS;
       }
 
       /**
@@ -178,14 +156,6 @@ namespace strumpack {
        * check stopping criterion.
        */
       void set_p(int p) { assert(p >= 0); p_ = p; }
-
-      /**
-       * Set the maximum rank allowed in HSS compression.
-       */
-      void set_max_rank(int max_rank) {
-        assert(max_rank > 0);
-        max_rank_ = max_rank;
-      }
 
       /**
        * Set the random engine, used in randomized compression.
@@ -270,32 +240,6 @@ namespace strumpack {
        */
       void set_log_ranks(bool log_ranks) { log_ranks_ = log_ranks; }
 
-      /**
-       * Enable or disable verbose output (only by the root process)
-       * to stdout.
-       */
-      void set_verbose(bool verbose) { verbose_ = verbose; }
-
-      /**
-       * Get the relative compression tolerance.
-       * \return the relative compression tolerance
-       * \see set_rel_tol(), set_abs_tol(), get_abs_tol()
-       */
-      real_t rel_tol() const { return rel_tol_; }
-
-      /**
-       * Get the absolute compression tolerance.
-       * \return the absolute compression tolerance
-       * \see set_abs_tol(), set_rel_tol(), rel_tol()
-       */
-      real_t abs_tol() const { return abs_tol_; }
-
-      /**
-       * Get the HSS leaf size.
-       * \return the (approximate) HSS leaf size
-       * \see set_leaf_size()
-       */
-      int leaf_size() const { return leaf_size_; }
 
       /**
        * Get the initial number of random vector that will be used in
@@ -324,14 +268,6 @@ namespace strumpack {
        * \see set_p()
        */
       int p() const { return p_; }
-
-      /**
-       * Get the maximum allowable rank (note, this is not the actual
-       * maximum computed rank).
-       * \return maximum allowable rank
-       * \see set_max_rank()
-       */
-      int max_rank() const { return max_rank_; }
 
       /**
        * Return the type of random engine to use.
@@ -419,14 +355,6 @@ namespace strumpack {
       bool log_ranks() const { return log_ranks_; }
 
       /**
-       * Verbose or quiet?
-       * \return True if we want output from the HSS algorithms,
-       * else False.
-       * \see set_verbose
-       */
-      bool verbose() const { return verbose_; }
-
-      /**
        * Parse the command line options given by argc and argv.  The
        * options will not be modified. Run with --help to see an
        * overview of available options, or call describe_options().
@@ -434,22 +362,18 @@ namespace strumpack {
        * \param argc Number of elements in argv
        * \param argv Array with options
        */
-      void set_from_command_line(int argc, const char* const* cargv);
+      void set_from_command_line(int argc, const char* const* cargv) override;
 
       /**
        * Print an overview of the available command line options and
        * their current values.
        */
-      void describe_options() const;
+      void describe_options() const override;
 
     private:
-      real_t rel_tol_ = default_HSS_rel_tol<real_t>();
-      real_t abs_tol_ = default_HSS_abs_tol<real_t>();
-      int leaf_size_ = 512;
       int d0_ = 128;
       int dd_ = 64;
       int p_ = 10;
-      int max_rank_ = 50000;
       random::RandomEngine random_engine_ =
         random::RandomEngine::LINEAR;
       random::RandomDistribution random_distribution_ =
@@ -461,7 +385,14 @@ namespace strumpack {
       ClusteringAlgorithm clustering_algo_ = ClusteringAlgorithm::TWO_MEANS;
       int approximate_neighbors_ = 64;
       int ann_iterations_ = 5;
-      bool verbose_ = true;
+
+      void set_defaults() {
+        this->type_ = structured::Type::HSS;
+        this->rel_tol_ = default_HSS_rel_tol<real_t>();
+        this->abs_tol_ = default_HSS_abs_tol<real_t>();
+        this->leaf_size_ = 512;
+        this->max_rank_ = 50000;
+      }
     };
 
   } // end namespace HSS

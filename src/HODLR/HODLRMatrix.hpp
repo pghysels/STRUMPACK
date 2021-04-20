@@ -41,6 +41,7 @@
 #include "dense/DistributedMatrix.hpp"
 #include "HODLROptions.hpp"
 #include "sparse/CSRGraph.hpp"
+#include "structured/StructuredMatrix.hpp"
 
 namespace strumpack {
 
@@ -75,7 +76,8 @@ namespace strumpack {
      *
      * \see HSS::HSSMatrix
      */
-    template<typename scalar_t> class HODLRMatrix {
+    template<typename scalar_t> class HODLRMatrix
+      : public structured::StructuredMatrix<scalar_t> {
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using DistM_t = DistributedMatrix<scalar_t>;
@@ -248,12 +250,12 @@ namespace strumpack {
        * Return the number of rows in the matrix.
        * \return Global number of rows in the matrix.
        */
-      std::size_t rows() const { return rows_; }
+      std::size_t rows() const override { return rows_; }
       /**
        * Return the number of columns in the matrix.
        * \return Global number of columns in the matrix.
        */
-      std::size_t cols() const { return cols_; }
+      std::size_t cols() const override { return cols_; }
       /**
        * Return the number of local rows, owned by this process.
        * \return Number of local rows.
@@ -278,8 +280,12 @@ namespace strumpack {
        * Return the memory for this HODLR matrix, on this rank, in
        * bytes.
        */
-      std::size_t memory() const {
+      std::size_t memory() const override {
         return get_stat("Mem_Fill") * 1024 * 1024;
+      }
+
+      std::size_t nonzeros() const override {
+        return memory() / sizeof(scalar_t);
       }
 
       /**
@@ -314,7 +320,7 @@ namespace strumpack {
       /**
        * Return the maximal rank encountered in this HODLR matrix.
        */
-      std::size_t rank() const { return get_stat("Rank_max"); }
+      std::size_t rank() const override { return get_stat("Rank_max"); }
 
       /**
        * Return the maximal rank encountered in this HODLR matrix,

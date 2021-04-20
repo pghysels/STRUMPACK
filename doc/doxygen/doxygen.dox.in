@@ -779,6 +779,8 @@ WARN_LOGFILE           =
 	@CMAKE_CURRENT_SOURCE_DIR@/src/sparse/CSRMatrixMPI.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/sparse/iterative/IterativeSolvers.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/sparse/iterative/IterativeSolversMPI.hpp \
+	@CMAKE_CURRENT_SOURCE_DIR@/src/structured/StructuredMatrix.hpp \
+	@CMAKE_CURRENT_SOURCE_DIR@/src/structured/StructuredOptions.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/dense/DenseMatrix.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/dense/DistributedMatrix.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/dense/BLACSGrid.hpp \
@@ -791,6 +793,7 @@ WARN_LOGFILE           =
 	@CMAKE_CURRENT_SOURCE_DIR@/src/HSS/HSSMatrixMPI.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/HODLR/HODLROptions.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/HODLR/HODLRMatrix.hpp \
+	@CMAKE_CURRENT_SOURCE_DIR@/src/HODLR/ButterflyMatrix.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/misc/MPIWrapper.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/misc/RandomWrapper.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/clustering/Clustering.hpp \
@@ -814,6 +817,7 @@ WARN_LOGFILE           =
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Examples.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/C_Interface.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/FAQ.txt \
+	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Contact.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Acknowledgements.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Copyright.txt \
 	@CMAKE_CURRENT_SOURCE_DIR@/doc/doxygen/pages/Reference.txt \
