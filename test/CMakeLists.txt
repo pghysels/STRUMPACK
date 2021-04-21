@@ -19,7 +19,7 @@ add_dependencies(tests
 
 add_test("user_test_HSS_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 100)
 add_test("user_test_sparse_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq
-  ${PROJECT_SOURCE_DIR}/examples/data/pde900.mtx)
+  ${PROJECT_SOURCE_DIR}/examples/sparse/data/pde900.mtx)
 add_test("user_matrix_IO" ${CMAKE_CURRENT_BINARY_DIR}/test_matrix_IO T 1000)
 add_test("user_test_BLR_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_seq 300)
 
@@ -46,11 +46,11 @@ if(STRUMPACK_USE_MPI)
   add_test("user_test_sparse_mpi" ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2
     ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
     ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
-    ${PROJECT_SOURCE_DIR}/examples/data/pde900.mtx)
+    ${PROJECT_SOURCE_DIR}/examples/sparse/data/pde900.mtx)
   add_test("user_structure_reuse_mpi" ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2
     ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
     ${CMAKE_CURRENT_BINARY_DIR}/test_structure_reuse_mpi
-    ${PROJECT_SOURCE_DIR}/examples/data/pde900.mtx)
+    ${PROJECT_SOURCE_DIR}/examples/sparse/data/pde900.mtx)
 endif()
 
 set(test_name "HSS_seq_1")
@@ -819,27 +819,27 @@ if(STRUMPACK_USE_MPI)
   # test structure reuse with HSS compression enabled
   set(test_name "structure_reuse_HSS_1")
   add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 8 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_structure_reuse_mpi
-    ${MPIEXEC_POSTFLAGS} ${PROJECT_SOURCE_DIR}/examples/data/pde900.mtx
+    ${MPIEXEC_POSTFLAGS} ${PROJECT_SOURCE_DIR}/examples/sparse/data/pde900.mtx
     --sp_compression HSS --sp_matching 0 --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --sp_compression_min_sep_size 25)
   set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
   set(test_name "structure_reuse_HSS_2")
   add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 8 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_structure_reuse_mpi
-    ${MPIEXEC_POSTFLAGS} ${PROJECT_SOURCE_DIR}/examples/data/pde900.mtx
+    ${MPIEXEC_POSTFLAGS} ${PROJECT_SOURCE_DIR}/examples/sparse/data/pde900.mtx
     --sp_compression HSS --sp_matching 2 --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --sp_compression_min_sep_size 25)
   set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
   set(test_name "structure_reuse_HSS_3")
   add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 8 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_structure_reuse_mpi
-    ${MPIEXEC_POSTFLAGS} ${PROJECT_SOURCE_DIR}/examples/data/pde900.mtx
+    ${MPIEXEC_POSTFLAGS} ${PROJECT_SOURCE_DIR}/examples/sparse/data/pde900.mtx
     --sp_compression HSS --sp_matching 3 --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --sp_compression_min_sep_size 25)
   set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
   set(test_name "structure_reuse_HSS_4")
   add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 8 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_structure_reuse_mpi
-    ${MPIEXEC_POSTFLAGS} ${PROJECT_SOURCE_DIR}/examples/data/pde900.mtx
+    ${MPIEXEC_POSTFLAGS} ${PROJECT_SOURCE_DIR}/examples/sparse/data/pde900.mtx
     --sp_compression HSS --sp_matching 4 --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --sp_compression_min_sep_size 25)
   set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
   set(test_name "structure_reuse_HSS_5")
   add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 8 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_structure_reuse_mpi
-    ${MPIEXEC_POSTFLAGS} ${PROJECT_SOURCE_DIR}/examples/data/pde900.mtx
+    ${MPIEXEC_POSTFLAGS} ${PROJECT_SOURCE_DIR}/examples/sparse/data/pde900.mtx
     --sp_compression HSS --sp_matching 5 --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --sp_compression_min_sep_size 25)
   set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
 
