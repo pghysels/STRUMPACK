@@ -1253,35 +1253,21 @@ namespace strumpack {
     gemv(Trans ta, scalar_t alpha, const BLRMatrix<scalar_t>& a,
          const DenseMatrix<scalar_t>& x, scalar_t beta,
          DenseMatrix<scalar_t>& y, int task_depth) {
-      // TODO threading
-      assert(x.cols() == 1);
-      assert(y.cols() == 1);
+      assert(x.cols() == 1 && y.cols() == 1);
       using DMW_t = DenseMatrixWrapper<scalar_t>;
-      if (ta == Trans::N) {
+      const auto imax = ta == Trans::N ? a.rowblocks() : a.colblocks();
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop default(shared)
 #endif
-        for (std::size_t i=0; i<a.rowblocks(); i++) {
-          DMW_t yi(a.tilerows(i), y.cols(), y, a.tileroff(i), 0);
-          for (std::size_t j=0; j<a.colblocks(); j++) {
-            DMW_t xj(a.tilecols(j), x.cols(),
-                     const_cast<DenseMatrix<scalar_t>&>(x),
-                     a.tilecoff(j), 0);
-            a.tile(i, j).gemv_a
-              (ta, alpha, xj, j==0 ? beta : scalar_t(1.), yi);
-          }
-        }
-      } else {
-        // TODO threading
-        for (std::size_t i=0; i<a.colblocks(); i++) {
-          DMW_t yi(a.tilecols(i), y.cols(), y, a.tilecoff(i), 0);
-          for (std::size_t j=0; j<a.rowblocks(); j++) {
-            DMW_t xj(a.tilerows(j), x.cols(),
-                     const_cast<DenseMatrix<scalar_t>&>(x),
-                     a.tileroff(j), 0);
-            a.tile(j, i).gemv_a
-              (ta, alpha, xj, j==0 ? beta : scalar_t(1.), yi);
-          }
+      for (std::size_t i=0; i<imax; i++) {
+        DMW_t yi(ta==Trans::N ? a.tilerows(i) : a.tilecols(i), y.cols(), y,
+                 ta==Trans::N ? a.tileroff(i) : a.tilecoff(i), 0);
+        for (std::size_t j=0; j<a.colblocks(); j++) {
+          DMW_t xj(ta==Trans::N ? a.tilecols(j) : a.tilerows(j), x.cols(),
+                   const_cast<DenseMatrix<scalar_t>&>(x),
+                   ta==Trans::N ? a.tilecoff(j) : a.tileroff(j), 0);
+          a.tile(i, j).gemv_a
+            (ta, alpha, xj, j==0 ? beta : scalar_t(1.), yi);
         }
       }
     }
@@ -1322,23 +1308,24 @@ namespace strumpack {
          const DenseMatrix<scalar_t>& B, scalar_t beta,
          DenseMatrix<scalar_t>& C, int task_depth) {
       using DMW_t = DenseMatrixWrapper<scalar_t>;
-      if (ta == Trans::N && tb == Trans::N) {
+      const auto imax = ta == Trans::N ? A.rowblocks() : A.colblocks();
+      const auto jmax = ta == Trans::N ? A.colblocks() : A.rowblocks();
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop default(shared)
 #endif
-        for (std::size_t i=0; i<A.rowblocks(); i++) {
-          DMW_t Ci(A.tilerows(i), C.cols(), C, A.tileroff(i), 0);
-          for (std::size_t j=0; j<A.colblocks(); j++) {
-            DMW_t Bj(A.tilecols(j), B.cols(),
-                     const_cast<DenseMatrix<scalar_t>&>(B),
-                     A.tilecoff(j), 0);
-            A.tile(i, j).gemm_a
-              (ta, tb, alpha, Bj, j==0 ? beta : scalar_t(1.), Ci, 0);
-          }
+      for (std::size_t i=0; i<imax; i++) {
+        DMW_t Ci(A.tilerows(i), C.cols(), C, A.tileroff(i), 0);
+        for (std::size_t j=0; j<jmax; j++) {
+          DMW_t Bj = ta == Trans::N  ?
+            DMW_t(ta==Trans::N ? A.tilecols(j) : A.tilerows(j), B.cols(),
+                  const_cast<DenseMatrix<scalar_t>&>(B),
+                  ta==Trans::N ? A.tilecoff(j) : A.tileroff(j), 0) :
+            DMW_t(B.cols(), ta==Trans::N ? A.tilecols(j) : A.tilerows(j),
+                  const_cast<DenseMatrix<scalar_t>&>(B),
+                  0, ta==Trans::N ? A.tilecoff(j) : A.tileroff(j));
+          A.tile(i, j).gemm_a
+            (ta, tb, alpha, Bj, j==0 ? beta : scalar_t(1.), Ci, 0);
         }
-      } else {
-        throw std::invalid_argument
-          ("gemm(T/C, BLR, Dense, Dense) not implemented.");
       }
     }
 
