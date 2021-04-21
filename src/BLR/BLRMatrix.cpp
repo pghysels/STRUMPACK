@@ -1258,6 +1258,9 @@ namespace strumpack {
       assert(y.cols() == 1);
       using DMW_t = DenseMatrixWrapper<scalar_t>;
       if (ta == Trans::N) {
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp taskloop default(shared)
+#endif
         for (std::size_t i=0; i<a.rowblocks(); i++) {
           DMW_t yi(a.tilerows(i), y.cols(), y, a.tileroff(i), 0);
           for (std::size_t j=0; j<a.colblocks(); j++) {
@@ -1269,6 +1272,7 @@ namespace strumpack {
           }
         }
       } else {
+        // TODO threading
         for (std::size_t i=0; i<a.colblocks(); i++) {
           DMW_t yi(a.tilecols(i), y.cols(), y, a.tilecoff(i), 0);
           for (std::size_t j=0; j<a.rowblocks(); j++) {
@@ -1317,7 +1321,25 @@ namespace strumpack {
     gemm(Trans ta, Trans tb, scalar_t alpha, const BLRMatrix<scalar_t>& A,
          const DenseMatrix<scalar_t>& B, scalar_t beta,
          DenseMatrix<scalar_t>& C, int task_depth) {
-      std::cout << "TODO gemm BLR*Dense+Dense" << std::endl;
+      using DMW_t = DenseMatrixWrapper<scalar_t>;
+      if (ta == Trans::N && tb == Trans::N) {
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp taskloop default(shared)
+#endif
+        for (std::size_t i=0; i<A.rowblocks(); i++) {
+          DMW_t Ci(A.tilerows(i), C.cols(), C, A.tileroff(i), 0);
+          for (std::size_t j=0; j<A.colblocks(); j++) {
+            DMW_t Bj(A.tilecols(j), B.cols(),
+                     const_cast<DenseMatrix<scalar_t>&>(B),
+                     A.tilecoff(j), 0);
+            A.tile(i, j).gemm_a
+              (ta, tb, alpha, Bj, j==0 ? beta : scalar_t(1.), Ci, 0);
+          }
+        }
+      } else {
+        throw std::invalid_argument
+          ("gemm(T/C, BLR, Dense, Dense) not implemented.");
+      }
     }
 
 

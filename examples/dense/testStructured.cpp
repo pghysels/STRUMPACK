@@ -163,6 +163,7 @@ int main(int argc, char* argv[]) {
       auto H = structured::construct_partially_matrix_free<double>
         (n, n, Amult, Toeplitz, options);
       print_info(H, options);
+      check_accuracy(A, H, options);
 
     } catch (std::exception& e) {
       cout << get_name(type) << " compression failed: "
