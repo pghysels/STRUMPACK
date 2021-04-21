@@ -395,6 +395,20 @@ namespace strumpack {
       DenseM_t apply(const DenseM_t& b) const;
 
       /**
+       * Multiply this HSS matrix with a dense matrix (vector), ie,
+       * compute y = op(this) * x. Overrides from the StructuredMatrix
+       * class method.
+       *
+       * \param op Transpose or complex conjugate
+       * \param x right hand side matrix to multiply with, from the
+       * left, rows(x) == cols(op(this))
+       * \param y result of op(this) * b, cols(y) == cols(x), rows(r)
+       * = rows(op(this))
+       * \see applyC, HSS::apply_HSS
+       */
+      void mult(Trans op, const DenseM_t& x, DenseM_t& y) const override;
+
+      /**
        * Multiply the transpose or complex conjugate of this HSS
        * matrix with a dense matrix (vector), ie, compute x = this^C *
        * b.

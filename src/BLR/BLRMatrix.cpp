@@ -1282,6 +1282,13 @@ namespace strumpack {
       }
     }
 
+
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::mult(Trans op, const DenseMatrix<scalar_t>& x,
+                              DenseMatrix<scalar_t>& y) const {
+      gemm(op, Trans::N, scalar_t(1.), *this, x, scalar_t(0.), y, 0);
+    }
+
     template<typename scalar_t> void
     gemm(Trans ta, Trans tb, scalar_t alpha, const BLRMatrix<scalar_t>& a,
          const BLRMatrix<scalar_t>& b, scalar_t beta,

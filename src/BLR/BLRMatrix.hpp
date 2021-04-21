@@ -55,6 +55,21 @@ namespace strumpack {
                          DenseMatrix<T>&)>;
     using adm_t = DenseMatrix<bool>;
 
+    /**
+     * \class BLRMatrix
+     *
+     * \brief Class to represent a sequential/threaded Hierarchically
+     * Semi-Separable matrix.
+     *
+     * This is for non-symmetric matrices, but can be used with
+     * symmetric matrices as well. This class inherits from
+     * StructuredMatrix.
+     *
+     * \tparam scalar_t Can be float, double, std:complex<float> or
+     * std::complex<double>.
+     *
+     * \see structured::StructuredMatrix, BLRMatrixMPI
+     */
     template<typename scalar_t> class BLRMatrix
       : public structured::StructuredMatrix<scalar_t> {
       using DenseM_t = DenseMatrix<scalar_t>;
@@ -99,6 +114,19 @@ namespace strumpack {
         trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), *this, x, 0);
         trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), *this, x, 0);
       }
+
+      /**
+       * Multiply this BLR matrix with a dense matrix (vector), ie,
+       * compute y = op(this) * x. Overrides from the StructuredMatrix
+       * class method.
+       *
+       * \param op Transpose or complex conjugate
+       * \param x right hand side matrix to multiply with, from the
+       * left, rows(x) == cols(op(this))
+       * \param y result of op(this) * b, cols(y) == cols(x), rows(r)
+       * = rows(op(this))
+       */
+      void mult(Trans op, const DenseM_t& x, DenseM_t& y) const override;
 
       scalar_t operator()(std::size_t i, std::size_t j) const;
       DenseM_t extract(const std::vector<std::size_t>& I,

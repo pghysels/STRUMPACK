@@ -580,6 +580,15 @@ namespace strumpack {
                             const StructuredOptions<std::complex<double>>& opts);
 #endif
 
+
+    template<typename scalar_t> void
+    StructuredMatrix<scalar_t>::mult(Trans op, const DenseMatrix<scalar_t>& x,
+                                     DenseMatrix<scalar_t>& y) const {
+      throw std::invalid_argument
+        ("Operation mult not implemented for this type.");
+    }
+
+
     // explicit template instantiations
     template class StructuredMatrix<float>;
     template class StructuredMatrix<double>;

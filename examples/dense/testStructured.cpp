@@ -43,6 +43,16 @@ print_info(const std::unique_ptr<structured::StructuredMatrix<scalar_t>>& H,
   cout << "  - rank(H) = " << H->rank() << endl;
 }
 
+template<typename scalar_t> void
+check_accuracy(const DenseMatrix<scalar_t>& A,
+               const std::unique_ptr<structured::StructuredMatrix<scalar_t>>& H,
+               const structured::StructuredOptions<scalar_t>& opts) {
+  DenseMatrix<scalar_t> id(A.rows(), A.cols()), Hdense(A.rows(), A.cols());
+  id.eye();
+  H->mult(Trans::N, id, Hdense);
+  cout << "  - ||A-H||_F/||A||_F = " << Hdense.sub(A).normF() / A.norm() << endl;
+}
+
 
 int main(int argc, char* argv[]) {
   int n = 1000, nrhs = 1;
@@ -85,12 +95,14 @@ int main(int argc, char* argv[]) {
   std::vector<structured::Type> types =
     {structured::Type::BLR,
      structured::Type::HSS,
-     structured::Type::HODLR,
-     structured::Type::HODBF,
-     structured::Type::BUTTERFLY,
-     structured::Type::LR,
      structured::Type::LOSSY,
-     structured::Type::LOSSLESS};
+     structured::Type::LOSSLESS
+     // these types require MPI support, see testStructuredMPI
+     // structured::Type::HODLR,
+     // structured::Type::HODBF,
+     // structured::Type::BUTTERFLY,
+     // structured::Type::LR,
+    };
 
 
   cout << "dense " << A.rows() << " x " << A.cols() << " matrix" << endl;
@@ -103,10 +115,9 @@ int main(int argc, char* argv[]) {
   for (auto type : types) {
     options.set_type(type);
     try {
-
       auto H = structured::construct_from_dense(A, options);
       print_info(H, options);
-
+      check_accuracy(A, H, options);
     } catch (std::exception& e) {
       cout << get_name(type) << " compression failed: "
            << e.what() << endl;
@@ -126,11 +137,13 @@ int main(int argc, char* argv[]) {
       auto H1 = structured::construct_from_elements<double>
         (n, n, Toeplitz, options);
       print_info(H1, options);
+      check_accuracy(A, H1, options);
 
       // with sub-blocks (could have better performance)
       auto H2 = structured::construct_from_elements<double>
         (n, n, Toeplitz_block, options);
       print_info(H2, options);
+      check_accuracy(A, H2, options);
 
     } catch (std::exception& e) {
       cout << get_name(type) << " compression failed: "

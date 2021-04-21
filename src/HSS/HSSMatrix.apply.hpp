@@ -31,6 +31,11 @@
 namespace strumpack {
   namespace HSS {
 
+    template<typename scalar_t> void HSSMatrix<scalar_t>::mult
+    (Trans op, const DenseM_t& x, DenseM_t& y) const {
+      apply_HSS(op, *this, x, scalar_t(0.), y);
+    }
+
     template<typename scalar_t> DenseMatrix<scalar_t>
     HSSMatrix<scalar_t>::apply(const DenseM_t& b) const {
       assert(this->cols() == b.rows());

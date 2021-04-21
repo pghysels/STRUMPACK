@@ -208,8 +208,7 @@ namespace strumpack {
        * \param y matrix, y.cols() == x.cols(), y.rows() == A.rows()
        */
       virtual void mult(Trans op, const DenseMatrix<scalar_t>& x,
-                        DenseMatrix<scalar_t>& y) const {} //= 0;
-
+                        DenseMatrix<scalar_t>& y) const;
 
       /**
        * Compute a factorization (or the inverse) of this matrix, to
@@ -240,7 +239,6 @@ namespace strumpack {
        */
       virtual void solve(DenseMatrix<scalar_t>& b) const {}; //= 0;
 
-    private:
     };
 
 
