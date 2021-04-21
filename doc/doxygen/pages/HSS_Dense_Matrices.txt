@@ -14,7 +14,7 @@ strumpack::HSS::HSSMatrix, while the distributed memory HSS class is
 strumpack::HSS::HSSMatrixMPI. For examples of the usage of these
 classes, see the test code in __test/test_HSS_seq.cpp__ and
 __test/test_HSS_mpi.cpp__ respectively. There is also one sequential
-example in __examples/KernelRegression.cpp__, which uses HSS
+example in __examples/dense/KernelRegression.cpp__, which uses HSS
 compression for kernel matrices as used in certain machine learning
 applications, see below, and see for instance \ref References "[2]".
 
@@ -227,7 +227,7 @@ strumpack::kernel::Kernel::predict(const strumpack::DenseMatrix<scalar_t>& test,
 There is also a Python interface to these Kernel regression routines,
 compatibile with scikit-learn, see
 __install/python/STRUMPACKKernel.py__ and
-__examples/KernelRegression.py__.
+__examples/dense/KernelRegression.py__.
 
 
 

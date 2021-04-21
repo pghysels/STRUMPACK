@@ -62,7 +62,8 @@ namespace strumpack {
      * \return element i,j of the matrix
      */
     template<typename scalar_t>
-    using extract_t = std::function<scalar_t(std::size_t i, std::size_t j)>;
+    using extract_t = std::function
+      <scalar_t(std::size_t i, std::size_t j)>;
 
     /**
      * Type for block element extraction routine. This can be
@@ -109,7 +110,7 @@ namespace strumpack {
      *            S = A^C*R if op is Trans::C
      */
     template<typename scalar_t>
-    using mult_t = typename std::function
+    using mult_t = std::function
       <void(Trans op,
             const DenseMatrix<scalar_t>& R,
             DenseMatrix<scalar_t>& S)>;
@@ -129,7 +130,7 @@ namespace strumpack {
      *
      * \tparam scalar_t Can be float, double, std:complex<float> or
      * std::complex<double>. Some formats do not support all
-     * precisions, see StructuredMatrix::Type.
+     * precisions, see strumpack::StructuredMatrix::Type.
      *
      * For construction, use one of:
      * - structured::construct_from_dense (DENSE)

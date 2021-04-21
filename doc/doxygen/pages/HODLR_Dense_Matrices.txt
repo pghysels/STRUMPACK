@@ -134,7 +134,7 @@ strumpack::kernel::Kernel::predict(const strumpack::DenseMatrix<scalar_t>& test,
 There is also a Python interface to these Kernel regression routines,
 compatibile with scikit-learn, see
 __install/python/STRUMPACKKernel.py__ and
-__examples/KernelRegressionMPI.py__.
+__examples/dense/KernelRegressionMPI.py__.
 
 
 

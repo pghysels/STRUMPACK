@@ -27,11 +27,12 @@ StructuredMatrix \endlink defines several operations, such as
 
 Example usage of this \link strumpack::structured::StructuredMatrix
 StructuredMatrix \endlink class can be found in
-examples/testStructured.cpp and examples/testStructuredMPI.cpp.
+examples/dense/testStructured.cpp and
+examples/dense/testStructuredMPI.cpp.
 
 
-If you require additional functionality, then \link contact \endlink
-us.
+If you require additional functionality, then feel free to reach out
+and \link contact \endlink us.
 
 
 

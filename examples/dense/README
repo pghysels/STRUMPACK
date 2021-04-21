@@ -1,0 +1,55 @@
+This folder contains a number of examples showing how to use the dense
+matrix solvers in STRUMPACK.
+
+When running, also make sure to set the number of OpenMP threads
+correctly! For instance on bash, to run with 4 MPI processes and 6
+threads per MPI process:
+      export OMP_NUM_THREADS=6
+      mpirun -n 4 ./exe args
+
+Check the documentation of your MPI environment for the correct
+arguments to mpirun (or the alternative command). For instance on
+NERSC Cray machines, the aprun command is used instead and the number
+of threads needs to be specified to the aprun command as well being
+set via the OMP_NUM_THREADS variable. Also experiment with OpenMP
+thread affinity and thread pinning to get good and consistent
+performance.
+
+
+The examples include:
+=====================
+
+- testStructured: Example usage of the StructuredMatrix class
+    (sequential or threaded).
+
+      OMP_NUM_THREADS=4 ./testStructured 1000 --help
+
+- testStructuredMPI: Example usage of the StructuredMatrix class,
+    using MPI.
+
+      OMP_NUM_THREADS=4 mpirun -n 4 ./testStructured 1000 --help
+
+
+
+- KernelRegression: an example on how to use HSS for kernel matrices
+    as used in certain machine learning applications. This requires 4
+    input files, the training and testing data (of dimension d), and
+    the corresponding labels. See the data/susy_10Kn* files for an
+    example.
+
+    OMP_NUM_THREADS=4 ./KernelRegression data/susy_10Kn 8 1.3 3.11 1 Gauss test --hss_rel_tol 1e-2
+
+- KernelRegressionMPI: an MPI version of KernelRegression. This also
+  runs HODLR compression of the kernel matrix, if STRUMPACK was
+  configured with HODLR support:
+
+    OMP_NUM_THREADS=1 mpirun -n 4 ./KernelRegressionMPI data/susy_10Kn 8 1.3 3.11 1 Gauss test --hss_rel_tol 1e-2
+
+- KernelRegression.py: an example showing the use of the Python,
+  scikit-learn compatible interface for the kernel ridge regression
+  functionality. This requires you build strumpack as a shared
+  library.
+
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${STRUMPACKROOT}/lib/
+    export PYTHONPATH=$PYTHONPATH:${STRUMPACKROOT}/include/python/
+    OMP_NUM_THREADS=1 python KernelRegression.py data/susy_10Kn 1.3 3.11 1 Gauss test --hss_rel_tol 1e-2
