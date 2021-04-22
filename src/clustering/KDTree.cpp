@@ -120,10 +120,10 @@ namespace strumpack {
   }
 
 
-  template<typename scalar_t> HSS::HSSPartitionTree recursive_kd
+  template<typename scalar_t> structured::ClusterTree recursive_kd
   (DenseMatrix<scalar_t>& p, std::size_t cluster_size, int* perm) {
     auto n = p.cols();
-    HSS::HSSPartitionTree tree(n);
+    structured::ClusterTree tree(n);
     if (n < cluster_size) return tree;
     std::vector<std::size_t> nc(2);
     kd_partition(p, nc, cluster_size, perm);
@@ -139,9 +139,9 @@ namespace strumpack {
   }
 
   // explicit template instantiations (only for real!)
-  template HSS::HSSPartitionTree recursive_kd
+  template structured::ClusterTree recursive_kd
   (DenseMatrix<float>& p, std::size_t cluster_size, int* perm);
-  template HSS::HSSPartitionTree recursive_kd
+  template structured::ClusterTree recursive_kd
   (DenseMatrix<double>& p, std::size_t cluster_size, int* perm);
 
 

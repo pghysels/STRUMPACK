@@ -95,7 +95,7 @@ namespace strumpack {
     HODLR::HODLRMatrix<scalar_t> F11_;
     HODLR::ButterflyMatrix<scalar_t> F12_, F21_;
     std::unique_ptr<HODLR::HODLRMatrix<scalar_t>> F22_;
-    HSS::HSSPartitionTree sep_tree_;
+    structured::ClusterTree sep_tree_;
 #if defined(STRUMPACK_PERMUTE_CB)
     std::vector<integer_t> CB_perm_, CB_iperm_;
 #endif

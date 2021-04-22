@@ -52,7 +52,7 @@ int main(int argc, char* argv[]) {
 
 
     // define a partition tree for the HODLR matrix
-    HSS::HSSPartitionTree t(N);
+    structured::ClusterTree t(N);
     t.refine(opts.leaf_size());
 
     auto Toeplitz = [](int i, int j) { return 1./(1.+abs(i-j)); };

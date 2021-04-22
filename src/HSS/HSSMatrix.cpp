@@ -70,7 +70,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> HSSMatrix<scalar_t>::HSSMatrix
-    (const HSSPartitionTree& t, const opts_t& opts, bool active)
+    (const structured::ClusterTree& t, const opts_t& opts, bool active)
       : HSSMatrixBase<scalar_t>(t.size, t.size, active) {
       if (!active) return;
       if (!t.c.empty()) {
@@ -82,7 +82,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> HSSMatrix<scalar_t>::HSSMatrix
-    (const HSSPartitionTree& t, const opts_t& opts)
+    (const structured::ClusterTree& t, const opts_t& opts)
       : HSSMatrix<scalar_t>(t, opts, true) { }
 
     template<typename scalar_t> HSSMatrix<scalar_t>::HSSMatrix

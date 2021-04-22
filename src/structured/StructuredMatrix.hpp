@@ -39,6 +39,7 @@
 #include <algorithm>
 
 #include "StructuredOptions.hpp"
+#include "ClusterTree.hpp"
 #include "dense/DenseMatrix.hpp"
 #if defined(STRUMPACK_USE_MPI)
 #include "dense/DistributedMatrix.hpp"

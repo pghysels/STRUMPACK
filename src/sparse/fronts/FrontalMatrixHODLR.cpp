@@ -418,7 +418,7 @@ namespace strumpack {
         g12.permute_cols(CB_perm_.data());
         g21.permute_rows(CB_iperm_.data());
 #else
-        HSS::HSSPartitionTree CB_tree(dim_upd());
+        structured::ClusterTree CB_tree(dim_upd());
         CB_tree.refine(opts.HODLR_options().leaf_size());
 #endif
         TIMER_STOP(t_graph_22);
@@ -433,7 +433,7 @@ namespace strumpack {
         F21_ = HODLR::ButterflyMatrix<scalar_t>
           (*F22_, F11_, nns21, nns12, opts.HODLR_options());
       } else {
-        HSS::HSSPartitionTree CB_tree(dim_upd());
+        structured::ClusterTree CB_tree(dim_upd());
         CB_tree.refine(opts.HODLR_options().leaf_size());
         F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
           (new HODLR::HODLRMatrix<scalar_t>

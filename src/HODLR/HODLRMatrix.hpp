@@ -36,7 +36,6 @@
 #include <cassert>
 #include <functional>
 
-#include "HSS/HSSPartitionTree.hpp"
 #include "kernel/Kernel.hpp"
 #include "dense/DistributedMatrix.hpp"
 #include "HODLROptions.hpp"
@@ -136,7 +135,7 @@ namespace strumpack {
        * evaluates/returns the matrix element A(i,j)
        * \param opts object containing a number of HODLR options
        */
-      HODLRMatrix(const MPIComm& c, const HSS::HSSPartitionTree& tree,
+      HODLRMatrix(const MPIComm& c, const structured::ClusterTree& tree,
                   const std::function<scalar_t(int i, int j)>& Aelem,
                   const opts_t& opts);
 
@@ -161,7 +160,7 @@ namespace strumpack {
        * The ExtractionMeta object can be ignored.
        * \param opts object containing a number of HODLR options
        */
-      HODLRMatrix(const MPIComm& c, const HSS::HSSPartitionTree& tree,
+      HODLRMatrix(const MPIComm& c, const structured::ClusterTree& tree,
                   const elem_blocks_t& Aelem, const opts_t& opts);
 
 
@@ -182,7 +181,7 @@ namespace strumpack {
        * compression
        * \see compress, HODLROptions
        */
-      HODLRMatrix(const MPIComm& c, const HSS::HSSPartitionTree& tree,
+      HODLRMatrix(const MPIComm& c, const structured::ClusterTree& tree,
                   const std::function<
                   void(Trans op,const DenseM_t& R,DenseM_t& S)>& Amult,
                   const opts_t& opts);
@@ -199,7 +198,7 @@ namespace strumpack {
        * compression
        * \see compress, HODLROptions
        */
-      HODLRMatrix(const MPIComm& c, const HSS::HSSPartitionTree& tree,
+      HODLRMatrix(const MPIComm& c, const structured::ClusterTree& tree,
                   const opts_t& opts);
 
       /**
@@ -216,7 +215,7 @@ namespace strumpack {
        * \see compress, HODLROptions
        */
       template<typename integer_t>
-      HODLRMatrix(const MPIComm& c, const HSS::HSSPartitionTree& tree,
+      HODLRMatrix(const MPIComm& c, const structured::ClusterTree& tree,
                   const CSRGraph<integer_t>& graph, const opts_t& opts);
 
       /**

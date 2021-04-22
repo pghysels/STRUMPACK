@@ -164,7 +164,7 @@ namespace strumpack {
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
     (const MPIComm& c, kernel::Kernel<real_t>& K, const opts_t& opts) {
       rows_ = cols_ = K.n();
-      HSS::HSSPartitionTree tree(rows_);
+      structured::ClusterTree tree(rows_);
       if (opts.geo() == 1)
         tree = binary_tree_clustering
           (opts.clustering_algorithm(), K.data(),
@@ -210,11 +210,11 @@ namespace strumpack {
     }
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
-    (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+    (const MPIComm& c, const structured::ClusterTree& tree,
      const std::function<scalar_t(int i, int j)>& Aelem,
      const opts_t& opts) {
       rows_ = cols_ = tree.size;
-      HSS::HSSPartitionTree full_tree(tree);
+      structured::ClusterTree full_tree(tree);
       int min_lvl = 2 + std::ceil(std::log2(c.size()));
       lvls_ = std::max(min_lvl, full_tree.levels());
       full_tree.expand_complete_levels(lvls_);
@@ -239,10 +239,10 @@ namespace strumpack {
     }
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
-    (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+    (const MPIComm& c, const structured::ClusterTree& tree,
      const elem_blocks_t& Aelem, const opts_t& opts) {
       rows_ = cols_ = tree.size;
-      HSS::HSSPartitionTree full_tree(tree);
+      structured::ClusterTree full_tree(tree);
       int min_lvl = 2 + std::ceil(std::log2(c.size()));
       lvls_ = std::max(min_lvl, full_tree.levels());
       full_tree.expand_complete_levels(lvls_);
@@ -267,17 +267,17 @@ namespace strumpack {
     }
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
-    (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+    (const MPIComm& c, const structured::ClusterTree& tree,
      const mult_t& Amult, const opts_t& opts)
       : HODLRMatrix<scalar_t>(c, tree, opts) {
       compress(Amult);
     }
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
-    (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+    (const MPIComm& c, const structured::ClusterTree& tree,
      const opts_t& opts) {
       rows_ = cols_ = tree.size;
-      HSS::HSSPartitionTree full_tree(tree);
+      structured::ClusterTree full_tree(tree);
       int min_lvl = 2 + std::ceil(std::log2(c.size()));
       lvls_ = std::max(min_lvl, full_tree.levels());
       full_tree.expand_complete_levels(lvls_);
@@ -316,10 +316,10 @@ namespace strumpack {
 
     template<typename scalar_t> template<typename integer_t>
     HODLRMatrix<scalar_t>::HODLRMatrix
-    (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+    (const MPIComm& c, const structured::ClusterTree& tree,
      const CSRGraph<integer_t>& graph, const opts_t& opts) {
       rows_ = cols_ = tree.size;
-      HSS::HSSPartitionTree full_tree(tree);
+      structured::ClusterTree full_tree(tree);
       int min_lvl = 2 + std::ceil(std::log2(c.size()));
       lvls_ = std::max(min_lvl, full_tree.levels());
       full_tree.expand_complete_levels(lvls_);
@@ -853,42 +853,42 @@ namespace strumpack {
 
     // explicit instantiations for the integer type in the CSRGraph
     template HODLRMatrix<float>::HODLRMatrix
-    (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+    (const MPIComm& c, const structured::ClusterTree& tree,
      const CSRGraph<int>& graph, const opts_t& opts);
     template HODLRMatrix<double>::HODLRMatrix
-    (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+    (const MPIComm& c, const structured::ClusterTree& tree,
      const CSRGraph<int>& graph, const opts_t& opts);
     template HODLRMatrix<std::complex<float>>::HODLRMatrix
-    (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+    (const MPIComm& c, const structured::ClusterTree& tree,
      const CSRGraph<int>& graph, const opts_t& opts);
     template HODLRMatrix<std::complex<double>>::HODLRMatrix
-    (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+    (const MPIComm& c, const structured::ClusterTree& tree,
      const CSRGraph<int>& graph, const opts_t& opts);
 
     template HODLRMatrix<float>::HODLRMatrix
-    (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+    (const MPIComm& c, const structured::ClusterTree& tree,
      const CSRGraph<long>& graph, const opts_t& opts);
     template HODLRMatrix<double>::HODLRMatrix
-    (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+    (const MPIComm& c, const structured::ClusterTree& tree,
      const CSRGraph<long>& graph, const opts_t& opts);
     template HODLRMatrix<std::complex<float>>::HODLRMatrix
-    (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+    (const MPIComm& c, const structured::ClusterTree& tree,
      const CSRGraph<long>& graph, const opts_t& opts);
     template HODLRMatrix<std::complex<double>>::HODLRMatrix
-    (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+    (const MPIComm& c, const structured::ClusterTree& tree,
      const CSRGraph<long>& graph, const opts_t& opts);
 
     template HODLRMatrix<float>::HODLRMatrix
-    (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+    (const MPIComm& c, const structured::ClusterTree& tree,
      const CSRGraph<long long int>& graph, const opts_t& opts);
     template HODLRMatrix<double>::HODLRMatrix
-    (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+    (const MPIComm& c, const structured::ClusterTree& tree,
      const CSRGraph<long long int>& graph, const opts_t& opts);
     template HODLRMatrix<std::complex<float>>::HODLRMatrix
-    (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+    (const MPIComm& c, const structured::ClusterTree& tree,
      const CSRGraph<long long int>& graph, const opts_t& opts);
     template HODLRMatrix<std::complex<double>>::HODLRMatrix
-    (const MPIComm& c, const HSS::HSSPartitionTree& tree,
+    (const MPIComm& c, const structured::ClusterTree& tree,
      const CSRGraph<long long int>& graph, const opts_t& opts);
 
   } // end namespace HODLR

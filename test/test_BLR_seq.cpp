@@ -30,10 +30,10 @@
 #include <random>
 using namespace std;
 
-#include "../src/dense/DenseMatrix.hpp"
-#include "../src/BLR/BLRMatrix.hpp"
-#include "../src/HSS/HSSPartitionTree.hpp"
-#include "../src/misc/TaskTimer.hpp"
+#include "dense/DenseMatrix.hpp"
+#include "BLR/BLRMatrix.hpp"
+#include "structured/ClusterTree.hpp"
+#include "misc/TaskTimer.hpp"
 using namespace strumpack;
 using namespace strumpack::BLR;
 
@@ -133,7 +133,7 @@ int run(int argc, char* argv[]) {
   cout << "# tol = " << blr_opts.rel_tol() << endl;
 
   // define a partition tree for the BLR matrix
-  HSS::HSSPartitionTree tree(m);
+  structured::ClusterTree tree(m);
   tree.refine(blr_opts.leaf_size());
   //tree.print();
   auto tiles=tree.template leaf_sizes<std::size_t>();

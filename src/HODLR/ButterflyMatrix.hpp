@@ -79,13 +79,14 @@ namespace strumpack {
        * Construct the block X, subblock of the matrix [A X; Y B]
        * A and B should be defined on the same MPI communicator.
        */
-      ButterflyMatrix
-      (const HODLRMatrix<scalar_t>& A, const HODLRMatrix<scalar_t>& B);
+      ButterflyMatrix(const HODLRMatrix<scalar_t>& A,
+                      const HODLRMatrix<scalar_t>& B);
 
-      ButterflyMatrix
-      (const HODLRMatrix<scalar_t>& A, const HODLRMatrix<scalar_t>& B,
-       DenseMatrix<int>& neighbors_rows, DenseMatrix<int>& neighbors_cols,
-       const opts_t& opts);
+      ButterflyMatrix(const HODLRMatrix<scalar_t>& A,
+                      const HODLRMatrix<scalar_t>& B,
+                      DenseMatrix<int>& neighbors_rows,
+                      DenseMatrix<int>& neighbors_cols,
+                      const opts_t& opts);
 
       ButterflyMatrix(const ButterflyMatrix<scalar_t>& h) = delete;
       ButterflyMatrix(ButterflyMatrix<scalar_t>&& h) { *this = std::move(h); }
@@ -127,10 +128,8 @@ namespace strumpack {
        */
       void mult(Trans op, const DistM_t& X, DistM_t& Y) const;
 
-      // void extract_add_elements
-      // (const VecVec_t& I, const VecVec_t& J, std::vector<DistMW_t>& B);
-      void extract_add_elements
-      (const VecVec_t& I, const VecVec_t& J, std::vector<DenseMW_t>& B);
+      void extract_add_elements(const VecVec_t& I, const VecVec_t& J,
+                                std::vector<DenseMW_t>& B);
       void extract_add_elements(ExtractionMeta& e, std::vector<DistMW_t>& B);
       void extract_add_elements(ExtractionMeta& e, std::vector<DenseMW_t>& B);
 
@@ -143,13 +142,13 @@ namespace strumpack {
 
       DistM_t dense(const BLACSGrid* g) const;
 
-      DenseM_t redistribute_2D_to_1D
-      (const DistM_t& R2D, const std::vector<int>& dist) const;
-      void redistribute_2D_to_1D
-      (scalar_t a, const DistM_t& R2D, scalar_t b, DenseM_t& R1D,
-       const std::vector<int>& dist) const;
-      void redistribute_1D_to_2D
-      (const DenseM_t& S1D, DistM_t& S2D, const std::vector<int>& dist) const;
+      DenseM_t redistribute_2D_to_1D(const DistM_t& R2D,
+                                     const std::vector<int>& dist) const;
+      void redistribute_2D_to_1D(scalar_t a, const DistM_t& R2D,
+                                 scalar_t b, DenseM_t& R1D,
+                                 const std::vector<int>& dist) const;
+      void redistribute_1D_to_2D(const DenseM_t& S1D, DistM_t& S2D,
+                                 const std::vector<int>& dist) const;
 
     private:
       F2Cptr lr_bf_ = nullptr;     // Butterfly handle returned by Fortran code
@@ -165,9 +164,9 @@ namespace strumpack {
 
       void set_dist();
 
-      void set_extraction_meta_1grid
-      (const VecVec_t& I, const VecVec_t& J, ExtractionMeta& e,
-       int Nalldat_loc, int* pmaps) const;
+      void set_extraction_meta_1grid(const VecVec_t& I, const VecVec_t& J,
+                                     ExtractionMeta& e,
+                                     int Nalldat_loc, int* pmaps) const;
     };
 
     template<typename integer_t> DenseMatrix<int>

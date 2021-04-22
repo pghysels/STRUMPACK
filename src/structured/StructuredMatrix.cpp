@@ -51,7 +51,7 @@ namespace strumpack {
           (new HSS::HSSMatrix<scalar_t>(A, hss_opts));
       } break;
       case Type::BLR: {
-        HSS::HSSPartitionTree tr(A.rows()), tc(A.cols());
+        structured::ClusterTree tr(A.rows()), tc(A.cols());
         tr.refine(opts.leaf_size());
         tc.refine(opts.leaf_size());
         BLR::BLROptions<scalar_t> blr_opts(opts);
@@ -444,7 +444,7 @@ namespace strumpack {
               ExtAdd::extract_copy_from_buffers
                 (B[i], I[i], J[i], oI[i], oJ[i], A, pbuf);
           };
-        HSS::HSSPartitionTree t(A.rows());
+        structured::ClusterTree t(A.rows());
         t.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> hodlr_opts(opts);
         auto H = new HODLR::HODLRMatrix<scalar_t>
@@ -502,7 +502,7 @@ namespace strumpack {
             for (std::size_t i=0; i<I.size(); i++)
               A(I[i], J[i], B[i]);
           };
-        HSS::HSSPartitionTree t(rows);
+        structured::ClusterTree t(rows);
         t.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> hodlr_opts(opts);
         auto H = new HODLR::HODLRMatrix<scalar_t>

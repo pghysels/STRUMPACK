@@ -536,7 +536,7 @@ namespace strumpack {
     if (is_root)
       _H = HSS::HSSMatrix<scalar_t>(sep_tree, opts.HSS_options());
     else {
-      HSS::HSSPartitionTree tree(this->dim_blk());
+      structured::ClusterTree tree(this->dim_blk());
       tree.c.reserve(2);
       tree.c.push_back(sep_tree);
       tree.c.emplace_back(dim_upd());

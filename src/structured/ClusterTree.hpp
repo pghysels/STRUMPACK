@@ -27,11 +27,11 @@
  *
  */
 /**
- * \file HSSPartitionTree.hpp
- * \brief This file contains the HSSPartitionTree class definition.
+ * \file ClusterTree.hpp
+ * \brief This file contains the ClusterTree class definition.
  */
-#ifndef HSS_PARTITION_TREE_HPP
-#define HSS_PARTITION_TREE_HPP
+#ifndef CLUSTER_TREE_HPP
+#define CLUSTER_TREE_HPP
 
 #include <vector>
 #include <unordered_map>
@@ -39,35 +39,31 @@
 #include <iostream>
 
 namespace strumpack {
-  namespace HSS {
+  namespace structured {
 
     /**
-     * \class HSSPartitionTree
+     * \class ClusterTree
      *
      * \brief The cluster tree, or partition tree that represents the
-     * matrix partitioning of an HSS matrix.
+     * partitioning of the rows or columns of a hierarchical matrix.
      *
      * This uses a recursive representation, a child in the tree is
-     * also an HSSPartitionTree. A node in this tree should always
-     * have 0 or 2 children, and the size of the tree should always be
-     * the sum of the sizes of its children.
+     * also an ClusterTree. A node in this tree should always have 0
+     * or 2 children, and the size of the tree should always be the
+     * sum of the sizes of its children.
      *
-     * This class is also used to represent the HODLR and BLR
-     * partitionings!
-     *
-     * To build a whole tree use the constructor HSSPartitionTree(int n)
+     * To build a whole tree use the constructor ClusterTree(int n)
      * and then refine it, either evenly using refine(int leaf_size),
-     * or manualy by adding nodes to the child vector HSSPartitionTree::c.
+     * or manualy by adding nodes to the child vector ClusterTree::c.
      *
      * Or you can use one of the clustering algorithms, see
      * binary_tree_clustering()
      */
-    class HSSPartitionTree {
+    class ClusterTree {
     public:
       /**
-       * Size of the corresponing HSS matrix.  This should always be
-       * >= 0 and should be equal to the sum of the sizes of the
-       * children.
+       * Size of the corresponing matrix.  This should always be >= 0
+       * and should be equal to the sum of the sizes of the children.
        */
       int size;
 
@@ -76,21 +72,21 @@ namespace strumpack {
        * or c.size() == 2, for a leaf and an internal node of the tree
        * respectively.
        */
-      std::vector<HSSPartitionTree> c;
+      std::vector<ClusterTree> c;
 
       /**
        * Constructor, initializes to an empty tree, with size 0.
        */
-      HSSPartitionTree() : size(0) {}
+      ClusterTree() : size(0) {}
 
       /**
        * Constructor, initializes to a matrix with size n, only 1 node
        * (1 level), so no refinement.
        *
-       * \param n Size of the corresponding HSS matrix.
+       * \param n Size of the corresponding matrix.
        * \see n, c, refine
        */
-      HSSPartitionTree(int n) : size(n) {}
+      ClusterTree(int n) : size(n) {}
 
       /**
        * Refine the tree to a given leaf size. This just splits the
@@ -190,12 +186,12 @@ namespace strumpack {
        * Constructor, taking a vector desribing an entire tree. This
        * is used for deserialization. The constructor argument buf
        * should be one obtained from calling serialize on an
-       * HSSPartitionTree object.
+       * ClusterTree object.
        *
-       * \param buf Serialized HSSPartitionTree
+       * \param buf Serialized ClusterTree
        * \see serialize
        */
-      template<typename integer_t> static HSSPartitionTree
+      template<typename integer_t> static ClusterTree
       deserialize(const std::vector<integer_t>& buf) {
         return deserialize(buf.data());
       }
@@ -204,14 +200,14 @@ namespace strumpack {
        * Constructor, taking a vector desribing an entire tree. This
        * is used for deserialization. The constructor argument buf
        * should be one obtained from calling serialize on an
-       * HSSPartitionTree object.
+       * ClusterTree object.
        *
-       * \param buf Serialized HSSPartitionTree
+       * \param buf Serialized ClusterTree
        * \see serialize
        */
-      template<typename integer_t> static HSSPartitionTree
+      template<typename integer_t> static ClusterTree
       deserialize(const integer_t* buf) {
-        HSSPartitionTree t;
+        ClusterTree t;
         int n = buf[0];
         int pid = n-1;
         t.de_serialize_rec(buf+1, buf+n+1, buf+2*n+1, pid);
@@ -372,7 +368,7 @@ namespace strumpack {
       }
     };
 
-  } // end namespace HSS
+  } // end namespace structured
 } // end namespace strumpack
 
 #endif

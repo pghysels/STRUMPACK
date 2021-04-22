@@ -61,7 +61,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> HSSMatrixMPI<scalar_t>::HSSMatrixMPI
-    (const HSSPartitionTree& t, const BLACSGrid* g, const opts_t& opts)
+    (const structured::ClusterTree& t, const BLACSGrid* g, const opts_t& opts)
       : HSSMatrixBase<scalar_t>(t.size, t.size, true), blacs_grid_(g) {
       setup_hierarchy(t, opts, 0, 0);
       setup_local_context();
@@ -69,7 +69,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> HSSMatrixMPI<scalar_t>::HSSMatrixMPI
-    (const HSSPartitionTree& t, const DistM_t& A, const opts_t& opts)
+    (const structured::ClusterTree& t, const DistM_t& A, const opts_t& opts)
       : HSSMatrixBase<scalar_t>(A.rows(), A.cols(), true),
       blacs_grid_(A.grid()) {
       assert(t.size == A.rows() && t.size == A.cols());
@@ -90,7 +90,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> HSSMatrixMPI<scalar_t>::HSSMatrixMPI
-    (const HSSPartitionTree& t, const BLACSGrid* Agrid,
+    (const structured::ClusterTree& t, const BLACSGrid* Agrid,
      const dmult_t& Amult, const delem_t& Aelem, const opts_t& opts)
       : HSSMatrixBase<scalar_t>(t.size, t.size, true), blacs_grid_(Agrid) {
       setup_hierarchy(t, opts, 0, 0);
@@ -160,7 +160,7 @@ namespace strumpack {
 
     /** private constructor */
     template<typename scalar_t> HSSMatrixMPI<scalar_t>::HSSMatrixMPI
-    (const HSSPartitionTree& t, const opts_t& opts,
+    (const structured::ClusterTree& t, const opts_t& opts,
      const MPIComm& c, int P, std::size_t roff, std::size_t coff)
       : HSSMatrixBase<scalar_t>(t.size, t.size, !c.is_null()) {
       owned_blacs_grid_ = std::unique_ptr<const BLACSGrid>(new BLACSGrid(c, P));
@@ -289,7 +289,7 @@ namespace strumpack {
 
     // TODO this only works with 1 tree, so all blocks are square!!
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::setup_hierarchy
-    (const HSSPartitionTree& t, const opts_t& opts,
+    (const structured::ClusterTree& t, const opts_t& opts,
      std::size_t roff, std::size_t coff) {
       if (!t.c.empty()) {
         assert(t.size == t.c[0].size + t.c[1].size);

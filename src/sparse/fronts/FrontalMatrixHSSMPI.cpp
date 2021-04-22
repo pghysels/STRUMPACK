@@ -396,7 +396,7 @@ namespace strumpack {
         (new HSS::HSSMatrixMPI<scalar_t>
          (sep_tree, grid(), opts.HSS_options()));
     else {
-      HSS::HSSPartitionTree hss_tree(dim_blk());
+      structured::ClusterTree hss_tree(dim_blk());
       hss_tree.c.reserve(2);
       hss_tree.c.push_back(sep_tree);
       hss_tree.c.emplace_back(dim_upd());

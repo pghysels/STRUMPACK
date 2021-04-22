@@ -14,7 +14,6 @@ target_sources(strumpack
   ${CMAKE_CURRENT_LIST_DIR}/HSSBasisID.hpp
   ${CMAKE_CURRENT_LIST_DIR}/HSSExtra.hpp
   ${CMAKE_CURRENT_LIST_DIR}/HSSMatrixBase.hpp
-  ${CMAKE_CURRENT_LIST_DIR}/HSSPartitionTree.hpp
   ${CMAKE_CURRENT_LIST_DIR}/HSSOptions.hpp
   ${CMAKE_CURRENT_LIST_DIR}/HSSOptions.cpp)
 
@@ -23,7 +22,6 @@ install(FILES
   HSSBasisID.hpp
   HSSExtra.hpp
   HSSMatrixBase.hpp
-  HSSPartitionTree.hpp
   HSSOptions.hpp
   DESTINATION include/HSS)
 

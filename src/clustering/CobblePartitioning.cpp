@@ -94,10 +94,10 @@ namespace strumpack {
     }
   }
 
-  template<typename scalar_t> HSS::HSSPartitionTree recursive_cobble
+  template<typename scalar_t> structured::ClusterTree recursive_cobble
   (DenseMatrix<scalar_t>& p, std::size_t cluster_size, int* perm) {
     auto n = p.cols();
-    HSS::HSSPartitionTree tree(n);
+    structured::ClusterTree tree(n);
     if (n < cluster_size) return tree;
     std::vector<std::size_t> nc(2);
     cobble_partition(p, nc, perm);
@@ -119,10 +119,10 @@ namespace strumpack {
   template void cobble_partition
   (DenseMatrix<double>& p, std::vector<std::size_t>& nc, int* perm);
 
-  template HSS::HSSPartitionTree
+  template structured::ClusterTree
   recursive_cobble(DenseMatrix<float>& p, std::size_t cluster_size,
                    int* perm);
-  template HSS::HSSPartitionTree
+  template structured::ClusterTree
   recursive_cobble(DenseMatrix<double>& p, std::size_t cluster_size,
                    int* perm);
 

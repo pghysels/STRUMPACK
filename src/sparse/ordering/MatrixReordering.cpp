@@ -33,7 +33,6 @@
 
 #include "MatrixReordering.hpp"
 
-#include "HSS/HSSPartitionTree.hpp"
 #include "StrumpackOptions.hpp"
 #include "StrumpackConfig.hpp"
 #include "sparse/fronts/FrontalMatrix.hpp"
