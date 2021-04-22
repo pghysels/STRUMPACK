@@ -91,8 +91,9 @@ namespace strumpack {
       HSSMatrixMPI<scalar_t>& operator=(HSSMatrixMPI<scalar_t>&& other) = default;
       std::unique_ptr<HSSMatrixBase<scalar_t>> clone() const override;
 
-      const HSSMatrixBase<scalar_t>* child(int c) const
-      { return this->_ch[c].get(); }
+      const HSSMatrixBase<scalar_t>* child(int c) const {
+        return this->_ch[c].get();
+      }
       HSSMatrixBase<scalar_t>* child(int c) { return this->_ch[c].get(); }
 
       inline const BLACSGrid* grid() const override { return blacs_grid_; }
@@ -114,14 +115,12 @@ namespace strumpack {
                     const opts_t& opts);
       void compress(const kernel::Kernel<real_t>& K, const opts_t& opts);
 
-      HSSFactorsMPI<scalar_t> factor() const;
-      HSSFactorsMPI<scalar_t> partial_factor() const;
-      void solve(const HSSFactorsMPI<scalar_t>& ULV, DistM_t& b) const;
-      void forward_solve(const HSSFactorsMPI<scalar_t>& ULV,
-                         WorkSolveMPI<scalar_t>& w,
-                         const DistM_t& b, bool partial) const override;
-      void backward_solve(const HSSFactorsMPI<scalar_t>& ULV,
-                          WorkSolveMPI<scalar_t>& w,
+      void factor();
+      void partial_factor();
+      void solve(DistM_t& b) const;
+      void forward_solve(WorkSolveMPI<scalar_t>& w, const DistM_t& b,
+                         bool partial) const override;
+      void backward_solve(WorkSolveMPI<scalar_t>& w,
                           DistM_t& x) const override;
 
       DistM_t apply(const DistM_t& b) const;
@@ -131,17 +130,18 @@ namespace strumpack {
       DistM_t extract(const std::vector<std::size_t>& I,
                       const std::vector<std::size_t>& J,
                       const BLACSGrid* Bgrid) const;
-      std::vector<DistM_t> extract(const std::vector<std::vector<std::size_t>>& I,
-                                   const std::vector<std::vector<std::size_t>>& J,
-                                   const BLACSGrid* Bgrid) const;
+      std::vector<DistM_t>
+      extract(const std::vector<std::vector<std::size_t>>& I,
+              const std::vector<std::vector<std::size_t>>& J,
+              const BLACSGrid* Bgrid) const;
       void extract_add(const std::vector<std::size_t>& I,
                        const std::vector<std::size_t>& J, DistM_t& B) const;
       void extract_add(const std::vector<std::vector<std::size_t>>& I,
                        const std::vector<std::vector<std::size_t>>& J,
                        std::vector<DistM_t>& B) const;
 
-      void Schur_update(const HSSFactorsMPI<scalar_t>& f, DistM_t& Theta,
-                        DistM_t& Vhat, DistM_t& DUB01, DistM_t& Phi) const;
+      void Schur_update(DistM_t& Theta, DistM_t& Vhat,
+                        DistM_t& DUB01, DistM_t& Phi) const;
       void Schur_product_direct(const DistM_t& Theta,
                                 const DistM_t& Vhat,
                                 const DistM_t& DUB01,
@@ -154,10 +154,12 @@ namespace strumpack {
       std::size_t max_rank() const;        // collective on comm()
       std::size_t total_memory() const;    // collective on comm()
       std::size_t total_nonzeros() const;  // collective on comm()
+      std::size_t total_factor_nonzeros() const;  // collective on comm()
       std::size_t max_levels() const;      // collective on comm()
       std::size_t rank() const override;
       std::size_t memory() const override;
       std::size_t nonzeros() const override;
+      std::size_t factor_nonzeros() const override;
       std::size_t levels() const override;
 
       void print_info(std::ostream &out=std::cout,
@@ -197,17 +199,12 @@ namespace strumpack {
 
       TreeLocalRanges _ranges;
 
-      HSSBasisIDMPI<scalar_t> _U;
-      HSSBasisIDMPI<scalar_t> _V;
-      DistM_t _D;
-      DistM_t _B01;
-      DistM_t _B10;
+      HSSBasisIDMPI<scalar_t> _U, _V;
+      DistM_t _D, _B01, _B10;
 
       // Used to redistribute the original 2D block cyclic matrix
       // according to the HSS tree
-      DistM_t _A;
-      DistM_t _A01;
-      DistM_t _A10;
+      DistM_t _A, _A01, _A10;
 
       HSSMatrixMPI(std::size_t m, std::size_t n, const opts_t& opts,
                    const MPIComm& c, int P,
@@ -328,17 +325,14 @@ namespace strumpack {
                        const BLACSGrid* lg, const opts_t& opts,
                        WorkCompressMPI<scalar_t>& w, int lvl) override;
 
-      void factor_recursive(HSSFactorsMPI<scalar_t>& f,
-                            WorkFactorMPI<scalar_t>& w,
+      void factor_recursive(WorkFactorMPI<scalar_t>& w,
                             const BLACSGrid* lg,
-                            bool isroot, bool partial) const override;
+                            bool isroot, bool partial) override;
 
-      void solve_fwd(const HSSFactorsMPI<scalar_t>& ULV,
-                     const DistSubLeaf<scalar_t>& b,
+      void solve_fwd(const DistSubLeaf<scalar_t>& b,
                      WorkSolveMPI<scalar_t>& w,
                      bool partial, bool isroot) const override;
-      void solve_bwd(const HSSFactorsMPI<scalar_t>& ULV,
-                     DistSubLeaf<scalar_t>& x,
+      void solve_bwd(DistSubLeaf<scalar_t>& x,
                      WorkSolveMPI<scalar_t>& w, bool isroot) const override;
 
       void apply_fwd(const DistSubLeaf<scalar_t>& B,

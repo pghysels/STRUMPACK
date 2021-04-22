@@ -157,10 +157,10 @@ namespace strumpack {
       if (etree_level > 0) {
         {
           TIMER_TIME(TaskType::HSS_PARTIALLY_FACTOR, 0, t_pfact);
-          ULV_ = H_->partial_factor();
+          H_->partial_factor();
         }
         TIMER_TIME(TaskType::HSS_COMPUTE_SCHUR, 0, t_comp_schur);
-        H_->Schur_update(ULV_, theta_, Vhat_, DUB01_, phi_);
+        H_->Schur_update(theta_, Vhat_, DUB01_, phi_);
         if (theta_.cols() < phi_.cols()) {
           VhatCPhiC_ = DistM_t(phi_.grid(), Vhat_.cols(), phi_.rows());
           gemm(Trans::C, Trans::C, scalar_t(1.), Vhat_, phi_,
@@ -178,14 +178,14 @@ namespace strumpack {
         }
       } else {
         TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
-        ULV_ = H_->factor();
+        H_->factor();
       }
     }
     if (/*etree_level == 0 && */opts.print_root_front_stats()) {
       auto time = t.elapsed();
       auto rank = H_->max_rank();
       std::size_t nnzH = (H_ ? H_->total_nonzeros() : 0);
-      std::size_t nnzULV = ULV_.total_nonzeros(Comm().comm());
+      std::size_t nnzULV = H_->total_factor_nonzeros();
       std::size_t nnzT = theta_.total_nonzeros();
       std::size_t nnzP = phi_.total_nonzeros();
       std::size_t nnzV = Vhat_.total_nonzeros();
@@ -226,7 +226,7 @@ namespace strumpack {
           (new HSS::WorkSolveMPI<scalar_t>());
         DistM_t lb(H_->child(0)->grid(H_->grid_local()), b.rows(), b.cols());
         copy(b.rows(), b.cols(), b, 0, 0, lb, 0, 0, grid()->ctxt_all());
-        H_->child(0)->forward_solve(ULV_, *ULVwork_, lb, true);
+        H_->child(0)->forward_solve(*ULVwork_, lb, true);
         DistM_t rhs(H_->grid(), theta_.cols(), bupd.cols());
         copy(rhs.rows(), rhs.cols(), ULVwork_->reduced_rhs, 0, 0,
              rhs, 0, 0, grid()->ctxt_all());
@@ -241,7 +241,7 @@ namespace strumpack {
       copy(b.rows(), b.cols(), b, 0, 0, lb, 0, 0, grid()->ctxt_all());
       ULVwork_ = std::unique_ptr<HSS::WorkSolveMPI<scalar_t>>
         (new HSS::WorkSolveMPI<scalar_t>());
-      H_->forward_solve(ULV_, *ULVwork_, lb, false);
+      H_->forward_solve(*ULVwork_, lb, false);
     }
   }
 
@@ -267,14 +267,14 @@ namespace strumpack {
                  scalar_t(1.), wx);
             copy(wx.rows(), wx.cols(), wx, 0, 0, ULVwork_->x, 0, 0, grid()->ctxt_all());
           }
-          H_->child(0)->backward_solve(ULV_, *ULVwork_, ly);
+          H_->child(0)->backward_solve(*ULVwork_, ly);
           copy(y.rows(), y.cols(), ly, 0, 0, y, 0, 0, grid()->ctxt_all());
           ULVwork_.reset();
         }
       } else {
         DistM_t ly(H_->grid(), y.rows(), y.cols());
         copy(y.rows(), y.cols(), y, 0, 0, ly, 0, 0, grid()->ctxt_all());
-        H_->backward_solve(ULV_, *ULVwork_, ly);
+        H_->backward_solve(*ULVwork_, ly);
         copy(y.rows(), y.cols(), ly, 0, 0, y, 0, 0, grid()->ctxt_all());
       }
     }
@@ -370,8 +370,8 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> long long
   FrontalMatrixHSSMPI<scalar_t,integer_t>::node_factor_nonzeros() const {
     // TODO does this return only when root??
-    return (H_ ? H_->nonzeros() : 0) + ULV_.nonzeros() +
-      theta_.nonzeros() + phi_.nonzeros();
+    return (H_ ? H_->nonzeros() : 0) + H_->factor_nonzeros()
+      + theta_.nonzeros() + phi_.nonzeros();
   }
 
   template<typename scalar_t,typename integer_t> integer_t

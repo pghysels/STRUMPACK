@@ -169,11 +169,9 @@ namespace strumpack {
        * solve.
        */
       std::size_t memory() {
-        std::size_t mem = sizeof(*this) + _L.memory() + _Vt0.memory()
+        return sizeof(*this) + _L.memory() + _Vt0.memory()
           + _W1.memory() + _Q.memory() + _D.memory()
           + sizeof(int)*_piv.size();
-        for (auto& c : _ch) mem += c.memory();
-        return mem;
       }
 
       /**
@@ -183,10 +181,8 @@ namespace strumpack {
        * is still required to perform a solve.
        */
       std::size_t nonzeros() const {
-        std::size_t nnz = _L.nonzeros() + _Vt0.nonzeros() + _W1.nonzeros()
+        return _L.nonzeros() + _Vt0.nonzeros() + _W1.nonzeros()
           + _Q.nonzeros() + _D.nonzeros();
-        for (auto& c : _ch) nnz += c.nonzeros();
-        return nnz;
       }
 
       /**
@@ -199,7 +195,6 @@ namespace strumpack {
       DenseMatrix<scalar_t>& Vhat() { return _Vt0; }
 
     private:
-      std::vector<HSSFactors<scalar_t>> _ch;
       DenseMatrix<scalar_t> _L;   // (U.rows-U.cols x U.rows-U.cols),
                                   //  empty at the root
       DenseMatrix<scalar_t> _Vt0; // (U.rows-U.cols x V.cols)
@@ -223,10 +218,7 @@ namespace strumpack {
       std::vector<WorkSolve<scalar_t>> c;
 
       // do we need all these?? x only used in bwd, y only used in fwd??
-      DenseMatrix<scalar_t> z;
-      DenseMatrix<scalar_t> ft1;
-      DenseMatrix<scalar_t> y;
-      DenseMatrix<scalar_t> x;
+      DenseMatrix<scalar_t> z, ft1, y, x;
 
       // DO NOT STORE reduced_rhs here!!!
       DenseMatrix<scalar_t> reduced_rhs;

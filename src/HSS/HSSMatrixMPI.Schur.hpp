@@ -40,8 +40,7 @@ namespace strumpack {
      *       = V1big * (D0^{-1} * U0 * B01)^C
      */
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::Schur_update
-    (const HSSFactorsMPI<scalar_t>& f, DistM_t& Theta, DistM_t& Vhat,
-     DistM_t& DUB01, DistM_t& Phi) const {
+    (DistM_t& Theta, DistM_t& Vhat, DistM_t& DUB01, DistM_t& Phi) const {
       if (this->leaf()) return;
       auto ch0 = child(0);
       auto ch1 = child(1);
@@ -50,21 +49,21 @@ namespace strumpack {
           dynamic_cast<const HSSMatrixMPI<scalar_t>*>(child(0))) {
         DistM_t chDU;
         if (ch0mpi->active()) {
-          chDU = f.D_.solve(ch0mpi->_U.dense(), f.piv_);
+          chDU = ch0->ULV_mpi_.D_.solve(ch0mpi->_U.dense(), ch0->ULV_mpi_.piv_);
           STRUMPACK_SCHUR_FLOPS
-            (!f.D_.is_master() ? 0 :
-             blas::getrs_flops(f.D_.rows(), ch0mpi->_U.cols()));
+            (!ch0->ULV_mpi_.D_.is_master() ? 0 :
+             blas::getrs_flops(ch0->ULV_mpi_.D_.rows(), ch0mpi->_U.cols()));
         }
         copy(ch0->U_rows(), ch0->U_rank(), chDU, 0, 0, DU, 0, 0, grid()->ctxt_all());
       } else {
         auto ch0seq = dynamic_cast<const HSSMatrix<scalar_t>*>(child(0));
         DenseM_t chDU;
         if (ch0seq->active()) {
-          chDU = f.D_.gather().solve
-            (ch0seq->_U.dense(), f.piv_, ch0seq->_openmp_task_depth);
+          chDU = ch0->ULV_mpi_.D_.gather().solve
+            (ch0seq->_U.dense(), ch0->ULV_mpi_.piv_, ch0seq->_openmp_task_depth);
           STRUMPACK_SCHUR_FLOPS
-            (!f.D_.is_master() ? 0 :
-             blas::getrs_flops(f.D_.rows(), ch0seq->_U.cols()));
+            (!ch0->ULV_mpi_.D_.is_master() ? 0 :
+             blas::getrs_flops(ch0->ULV_mpi_.D_.rows(), ch0seq->_U.cols()));
         }
         copy(ch0->U_rows(), ch0->U_rank(), chDU, 0/*rank ch0*/, DU, 0, 0, grid()->ctxt_all());
       }
@@ -95,7 +94,7 @@ namespace strumpack {
       copy(Phi.rows(), Phi.cols(), Phi_ch, 0, 0, Phi, 0, 0, grid()->ctxt_all());
 
       Vhat = DistM_t(grid(), Phi.cols(), Theta.cols());
-      copy(Vhat.rows(), Vhat.cols(), f.Vhat(), 0, 0, Vhat, 0, 0, grid()->ctxt_all());
+      copy(Vhat.rows(), Vhat.cols(), ch0->ULV_mpi_.Vhat(), 0, 0, Vhat, 0, 0, grid()->ctxt_all());
     }
 
     /**

@@ -162,7 +162,7 @@ namespace strumpack {
       DenseM_t cSr, cSc;
       DenseMW_t cRd0(cR.rows(), dchild, cR, 0, 0);
       TIMER_TIME(TaskType::HSS_SCHUR_PRODUCT, 2, t_sprod);
-      _H.Schur_product_indirect(_ULV, _DUB01, R1, cRd0, Sr2, Sc2, cSr, cSc);
+      _H.Schur_product_indirect(_DUB01, R1, cRd0, Sr2, Sc2, cSr, cSc);
       TIMER_STOP(t_sprod);
       DenseMW_t(Sr.rows(), dchild, Sr, 0, 0)
         .scatter_rows_add(I, cSr, task_depth);
@@ -217,8 +217,7 @@ namespace strumpack {
     DenseM_t cSc(cR.rows(), cR.cols());
     TIMER_TIME(TaskType::HSS_SCHUR_PRODUCT, 2, t_sprod);
     _H.Schur_product_direct
-      (_ULV, _Theta, _DUB01, _Phi,
-       _ThetaVhatC_or_VhatCPhiC, cR, cSr, cSc);
+      (_Theta, _DUB01, _Phi, _ThetaVhatC_or_VhatCPhiC, cR, cSr, cSc);
     TIMER_STOP(t_sprod);
 #endif
     Sr.scatter_rows_add(I, cSr, task_depth);
@@ -384,11 +383,11 @@ namespace strumpack {
     if (dim_sep()) {
       if (etree_level > 0) {
         TIMER_TIME(TaskType::HSS_PARTIALLY_FACTOR, 0, t_pfact);
-        _ULV = _H.partial_factor();
+        _H.partial_factor();
         TIMER_STOP(t_pfact);
         TIMER_TIME(TaskType::HSS_COMPUTE_SCHUR, 0, t_comp_schur);
-        _H.Schur_update(_ULV, _Theta, _DUB01, _Phi);
-        DenseM_t& Vhat = _ULV.Vhat();
+        _H.Schur_update(_Theta, _DUB01, _Phi);
+        const DenseM_t& Vhat = _H.child(0)->ULV().Vhat();
         if (_Theta.cols() < _Phi.cols()) {
           _ThetaVhatC_or_VhatCPhiC = DenseM_t(Vhat.cols(), _Phi.rows());
           gemm(Trans::C, Trans::C, scalar_t(1.), Vhat, _Phi,
@@ -404,7 +403,7 @@ namespace strumpack {
         }
       } else {
         TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
-        _ULV = _H.factor();
+        _H.factor();
         TIMER_STOP(t_fact);
       }
     }
@@ -412,7 +411,7 @@ namespace strumpack {
       auto time = t.elapsed();
       auto rank = _H.rank();
       std::size_t nnzH = _H.nonzeros();
-      std::size_t nnzULV = _ULV.nonzeros();
+      std::size_t nnzULV = _H.factor_nonzeros();
       std::size_t nnzSchur = _Theta.nonzeros()
         + _Phi.nonzeros() + _ThetaVhatC_or_VhatCPhiC.nonzeros();
       std::cout << "#   - HSSMPI front: Nsep= " << dim_sep()
@@ -450,7 +449,7 @@ namespace strumpack {
         // TODO get rid of this!!!
         _ULVwork = std::unique_ptr<HSS::WorkSolve<scalar_t>>
           (new HSS::WorkSolve<scalar_t>());
-        _H.child(0)->forward_solve(_ULV, *_ULVwork, bloc, true);
+        _H.child(0)->forward_solve(*_ULVwork, bloc, true);
         if (dim_upd())
           gemm(Trans::N, Trans::N, scalar_t(-1.), _Theta,
                _ULVwork->reduced_rhs, scalar_t(1.), bupd, task_depth);
@@ -460,7 +459,7 @@ namespace strumpack {
       DenseMW_t bloc(dim_sep(), b.cols(), b, sep_begin_, 0);
       _ULVwork = std::unique_ptr<HSS::WorkSolve<scalar_t>>
         (new HSS::WorkSolve<scalar_t>());
-      _H.forward_solve(_ULV, *_ULVwork, bloc, false);
+      _H.forward_solve(*_ULVwork, bloc, false);
     }
   }
 
@@ -485,12 +484,12 @@ namespace strumpack {
                scalar_t(1.), _ULVwork->x, task_depth);
         }
         DenseMW_t yloc(dim_sep(), y.cols(), y, sep_begin_, 0);
-        _H.child(0)->backward_solve(_ULV, *_ULVwork, yloc);
+        _H.child(0)->backward_solve(*_ULVwork, yloc);
         _ULVwork.reset();
       }
     } else {
       DenseMW_t yloc(dim_sep(), y.cols(), y, sep_begin_, 0);
-      _H.backward_solve(_ULV, *_ULVwork, yloc);
+      _H.backward_solve(*_ULVwork, yloc);
     }
     this->bwd_solve_phase2(y, yupd, work, etree_level, task_depth);
   }
@@ -511,7 +510,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> long long
   FrontalMatrixHSS<scalar_t,integer_t>::node_factor_nonzeros() const {
-    return _H.nonzeros() + _ULV.nonzeros() + _Theta.nonzeros()
+    return _H.nonzeros() + _H.factor_nonzeros() + _Theta.nonzeros()
       + _Phi.nonzeros() + _ThetaVhatC_or_VhatCPhiC.nonzeros();
   }
 

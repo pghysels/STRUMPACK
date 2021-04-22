@@ -356,6 +356,18 @@ namespace strumpack {
     }
 
     template<typename scalar_t> std::size_t
+    HSSMatrixMPI<scalar_t>::total_factor_nonzeros() const {
+      return Comm().all_reduce(factor_nonzeros(), MPI_SUM);
+    }
+    template<typename scalar_t> std::size_t
+    HSSMatrixMPI<scalar_t>::factor_nonzeros() const {
+      if (!this->active()) return 0;
+      std::size_t fnnz = this->ULV_mpi_.nonzeros();
+      for (auto& c : this->_ch) fnnz += c->factor_nonzeros();
+      return fnnz;
+    }
+
+    template<typename scalar_t> std::size_t
     HSSMatrixMPI<scalar_t>::max_levels() const {
       return Comm().all_reduce(levels(), MPI_MAX);
     }

@@ -80,7 +80,8 @@ int main(int argc, char* argv[]) {
           B(i, j) = Toeplitz(I[i], J[j]);
     };
 
-  // Dense representation of the matrix.
+  // construct a dense representation of the Toeplitz matrix (for
+  // illustration purpose, this can be avoided to save memory)
   DenseMatrix<double> A(n, n, Toeplitz);
 
   // Matrix-vector multiplication routine. Ideally, user can provide a
@@ -90,6 +91,12 @@ int main(int argc, char* argv[]) {
          DenseMatrix<double>& S) {
       gemm(t, Trans::N, double(1.), A, R, double(0.), S);
     };
+
+  // construct a balanced ClusterTree. If the user has for instance
+  // spatial coordinates, then a better tree can be constructed. See
+  // the clustering algorithms in clustering/Clustering.hpp
+  structured::ClusterTree tree(n);
+  tree.refine(options.leaf_size());
 
 
   std::vector<structured::Type> types =
@@ -115,7 +122,9 @@ int main(int argc, char* argv[]) {
   for (auto type : types) {
     options.set_type(type);
     try {
-      auto H = structured::construct_from_dense(A, options);
+      // construct a StructuredMatrix from a dense matrix and an
+      // (optional) ClusterTree
+      auto H = structured::construct_from_dense(A, options, &tree);
       print_info(H, options);
       check_accuracy(A, H, options);
     } catch (std::exception& e) {

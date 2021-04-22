@@ -260,6 +260,7 @@ namespace strumpack {
      *
      * \param A Input dense matrix, will not be modified
      * \param opts Options object
+     * \param tree optional clustertree
      *
      * \return std::unique_ptr holding a pointer to a
      * StructuredMatrix of the requested StructuredMatrix::Type
@@ -274,7 +275,8 @@ namespace strumpack {
     template<typename scalar_t>
     std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_from_dense(const DenseMatrix<scalar_t>& A,
-                         const StructuredOptions<scalar_t>& opts);
+                         const StructuredOptions<scalar_t>& opts,
+                         const structured::ClusterTree* tree=nullptr);
 
     /**
      * Construct a StructuredMatrix from a DenseMatrix<scalar_t>.

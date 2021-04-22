@@ -299,12 +299,12 @@ namespace strumpack {
        * \see DenseMatrix
        * \see HSSOptions
        */
-      void compress_with_coordinates
-      (const DenseMatrix<real_t>& coords,
-       const std::function
-       <void(const std::vector<std::size_t>& I,
-             const std::vector<std::size_t>& J, DenseM_t& B)>& Aelem,
-       const opts_t& opts);
+      void compress_with_coordinates(const DenseMatrix<real_t>& coords,
+                                     const std::function
+                                     <void(const std::vector<std::size_t>& I,
+                                           const std::vector<std::size_t>& J,
+                                           DenseM_t& B)>& Aelem,
+                                     const opts_t& opts);
 
       /**
        * Reset the matrix to an empty, 0 x 0 matrix, freeing up all
@@ -313,24 +313,21 @@ namespace strumpack {
       void reset() override;
 
       /**
-       * Compute a ULV factorization of this matrix. The factors are
-       * returned as an HSSFactors object, the current HSS matrix is
-       * not modified.
+       * Compute a ULV factorization of this matrix.
        */
-      HSSFactors<scalar_t> factor() const;
+      void factor();
 
       /**
        * Compute a partial ULV factorization of this matrix. Only the
        * left child is factored. This is not similar to calling
        * child(0)->factor(), except that the HSSFactors resulting from
        * calling partial_factor can be used to compute the Schur
-       * complement. The factors are returned as an HSSFactors object,
-       * the current HSS matrix is not modified.
+       * complement.
        *
        * \see Schur_update, Schur_product_direct and
        * Schur_product_indirect
        */
-      HSSFactors<scalar_t> partial_factor() const;
+      void partial_factor();
 
       /**
        * Solve a linear system with the ULV factorization of this
@@ -343,7 +340,7 @@ namespace strumpack {
        * should be b.rows() == cols().
        * \see factor
        */
-      void solve(const HSSFactors<scalar_t>& ULV, DenseM_t& b) const;
+      void solve(DenseM_t& b) const;
 
       /**
        * Perform only the forward phase of the ULV linear solve. This
@@ -351,7 +348,6 @@ namespace strumpack {
        * with partial_factor. You should really just use factor/solve
        * when possible.
        *
-       * \param ULV  ULV factorization of this matrix
        * \param w temporary working storage, to pass information from
        * forward_solve to backward_solve
        * \param b on input, the right hand side vector, on output the
@@ -361,9 +357,8 @@ namespace strumpack {
        * partially factored
        * \see factor, partial_factor, backward_solve
        */
-      void forward_solve
-      (const HSSFactors<scalar_t>& ULV, WorkSolve<scalar_t>& w,
-       const DenseM_t& b, bool partial) const override;
+      void forward_solve(WorkSolve<scalar_t>& w, const DenseM_t& b,
+                         bool partial) const override;
 
       /**
        * Perform only the backward phase of the ULV linear solve. This
@@ -371,7 +366,6 @@ namespace strumpack {
        * with partial_factor. You should really just use factor/solve
        * when possible.
        *
-       * \param ULV  ULV factorization of this matrix
        * \param w temporary working storage, to pass information from
        * forward_solve to backward_solve
        * \param b on input, the vector obtained from forward_solve, on
@@ -379,8 +373,7 @@ namespace strumpack {
        * vector b should be b.rows() == cols().
        * \see factor, partial_factor, backward_solve
        */
-      void backward_solve(const HSSFactors<scalar_t>& ULV,
-                          WorkSolve<scalar_t>& w, DenseM_t& x) const override;
+      void backward_solve(WorkSolve<scalar_t>& w, DenseM_t& x) const override;
 
       /**
        * Multiply this HSS matrix with a dense matrix (vector), ie,
@@ -460,17 +453,16 @@ namespace strumpack {
                        DenseM_t& B) const;
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
-      void Schur_update(const HSSFactors<scalar_t>& f, DenseM_t& Theta,
-                        DenseM_t& DUB01, DenseM_t& Phi) const;
-      void Schur_product_direct(const HSSFactors<scalar_t>& f,
-                                const DenseM_t& Theta,
+      void Schur_update(DenseM_t& Theta,
+                        DenseM_t& DUB01,
+                        DenseM_t& Phi) const;
+      void Schur_product_direct(const DenseM_t& Theta,
                                 const DenseM_t& DUB01,
                                 const DenseM_t& Phi,
                                 const DenseM_t&_ThetaVhatC_or_VhatCPhiC,
                                 const DenseM_t& R,
                                 DenseM_t& Sr, DenseM_t& Sc) const;
-      void Schur_product_indirect(const HSSFactors<scalar_t>& f,
-                                  const DenseM_t& DUB01,
+      void Schur_product_indirect(const DenseM_t& DUB01,
                                   const DenseM_t& R1,
                                   const DenseM_t& R2, const DenseM_t& Sr2,
                                   const DenseM_t& Sc2,
@@ -515,6 +507,8 @@ namespace strumpack {
        * \see write
        */
       static HSSMatrix<scalar_t> read(const std::string& fname);
+
+      const HSSFactors<scalar_t>& ULV() { return this->ULV_; }
 
     protected:
       HSSMatrix(std::size_t m, std::size_t n,
@@ -613,10 +607,9 @@ namespace strumpack {
       bool compute_U_V_bases_ann(DenseM_t& S, const opts_t& opts,
                                  WorkCompressANN<scalar_t>& w, int depth);
 
-      void factor_recursive(HSSFactors<scalar_t>& ULV,
-                            WorkFactor<scalar_t>& w,
+      void factor_recursive(WorkFactor<scalar_t>& w,
                             bool isroot, bool partial,
-                            int depth) const override;
+                            int depth) override;
 
       void apply_fwd(const DenseM_t& b, WorkApply<scalar_t>& w,
                      bool isroot, int depth,
@@ -630,11 +623,9 @@ namespace strumpack {
                       WorkApply<scalar_t>& w, bool isroot, int depth,
                       std::atomic<long long int>& flops) const override;
 
-      void solve_fwd(const HSSFactors<scalar_t>& ULV, const DenseM_t& b,
-                     WorkSolve<scalar_t>& w,
+      void solve_fwd(const DenseM_t& b, WorkSolve<scalar_t>& w,
                      bool partial, bool isroot, int depth) const override;
-      void solve_bwd(const HSSFactors<scalar_t>& ULV, DenseM_t& x,
-                     WorkSolve<scalar_t>& w,
+      void solve_bwd(DenseM_t& x, WorkSolve<scalar_t>& w,
                      bool isroot, int depth) const override;
 
       void extract_fwd(WorkExtract<scalar_t>& w,

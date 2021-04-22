@@ -43,44 +43,43 @@ namespace strumpack {
     using Opts_t = SPOptions<scalar_t>;
 
   public:
-    FrontalMatrixHSS
-    (integer_t sep, integer_t sep_begin, integer_t sep_end,
-     std::vector<integer_t>& upd);
+    FrontalMatrixHSS(integer_t sep, integer_t sep_begin, integer_t sep_end,
+                     std::vector<integer_t>& upd);
 
-    void extend_add_to_dense
-    (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
-     const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) override;
+    void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
+                             DenseM_t& paF21, DenseM_t& paF22,
+                             const FrontalMatrix<scalar_t,integer_t>* p,
+                             int task_depth) override;
 
-    void sample_CB
-    (const Opts_t& opts, const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc,
-     F_t* pa, int task_depth) override;
+    void sample_CB(const Opts_t& opts, const DenseM_t& R,
+                   DenseM_t& Sr, DenseM_t& Sc,
+                   F_t* pa, int task_depth) override;
 
-    void sample_CB_direct
-    (const DenseM_t& cR, DenseM_t& Sr, DenseM_t& Sc,
-     const std::vector<std::size_t>& I, int task_depth);
+    void sample_CB_direct(const DenseM_t& cR, DenseM_t& Sr, DenseM_t& Sc,
+                          const std::vector<std::size_t>& I, int task_depth);
 
     void release_work_memory() override;
-    void random_sampling
-    (const SpMat_t& A, const Opts_t& opts, DenseM_t& Rr,
-     DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc, int etree_level,
-     int task_depth); // TODO const?
-    void element_extraction
-    (const SpMat_t& A, const std::vector<std::size_t>& I,
-     const std::vector<std::size_t>& J, DenseM_t& B, int task_depth);
-    void extract_CB_sub_matrix
-    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-     DenseM_t& B, int task_depth) const override;
+    void random_sampling(const SpMat_t& A, const Opts_t& opts, DenseM_t& Rr,
+                         DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
+                         int etree_level, int task_depth); // TODO const?
+    void element_extraction(const SpMat_t& A,
+                            const std::vector<std::size_t>& I,
+                            const std::vector<std::size_t>& J,
+                            DenseM_t& B, int task_depth);
+    void extract_CB_sub_matrix(const std::vector<std::size_t>& I,
+                               const std::vector<std::size_t>& J,
+                               DenseM_t& B, int task_depth) const override;
 
-    void multifrontal_factorization
-    (const SpMat_t& A, const Opts_t& opts,
-     int etree_level=0, int task_depth=0) override;
+    void multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
+                                    int etree_level=0,
+                                    int task_depth=0) override;
 
-    void forward_multifrontal_solve
-    (DenseM_t& b, DenseM_t* work, int etree_level=0,
-     int task_depth=0) const override;
-    void backward_multifrontal_solve
-    (DenseM_t& y, DenseM_t* work, int etree_level=0,
-     int task_depth=0) const override;
+    void forward_multifrontal_solve(DenseM_t& b, DenseM_t* work,
+                                    int etree_level=0,
+                                    int task_depth=0) const override;
+    void backward_multifrontal_solve(DenseM_t& y, DenseM_t* work,
+                                     int etree_level=0,
+                                     int task_depth=0) const override;
 
     integer_t front_rank(int task_depth=0) const override;
     void print_rank_statistics(std::ostream &out) const override;
@@ -89,14 +88,13 @@ namespace strumpack {
 
     int random_samples() const override { return R1.cols(); };
 
-    void partition
-    (const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
-     bool is_root=true, int task_depth=0) override;
+    void partition(const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
+                   bool is_root=true, int task_depth=0) override;
 
 
     // TODO make private?
     HSS::HSSMatrix<scalar_t> _H;
-    HSS::HSSFactors<scalar_t> _ULV;
+    // HSS::HSSFactors<scalar_t> _ULV;
 
     // TODO do not store this here: makes solve not thread safe!!
     mutable std::unique_ptr<HSS::WorkSolve<scalar_t>> _ULVwork;
@@ -104,8 +102,7 @@ namespace strumpack {
     /** Schur complement update:
      *    S = F22 - _Theta * Vhat^C * _Phi^C
      **/
-    DenseM_t _Theta, _Phi, _ThetaVhatC_or_VhatCPhiC;
-    DenseM_t _DUB01;
+    DenseM_t _Theta, _Phi, _ThetaVhatC_or_VhatCPhiC, _DUB01;
 
     /** these are saved during/after randomized compression and are
         then later used to sample the Schur complement when
@@ -122,13 +119,14 @@ namespace strumpack {
 
     void draw_node(std::ostream& of, bool is_root) const override;
 
-    void multifrontal_factorization_node
-    (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth);
+    void multifrontal_factorization_node(const SpMat_t& A,
+                                         const Opts_t& opts, int etree_level,
+                                         int task_depth);
 
-    void fwd_solve_node
-    (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const;
-    void bwd_solve_node
-    (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const;
+    void fwd_solve_node(DenseM_t& b, DenseM_t* work,
+                        int etree_level, int task_depth) const;
+    void bwd_solve_node(DenseM_t& y, DenseM_t* work,
+                        int etree_level, int task_depth) const;
 
     long long node_factor_nonzeros() const override;
 

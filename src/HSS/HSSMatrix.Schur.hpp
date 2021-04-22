@@ -38,15 +38,16 @@ namespace strumpack {
      *   Phi = (D0^{-1} * U0 * B01 * V1big^C)^C
      */
     template<typename scalar_t> void HSSMatrix<scalar_t>::Schur_update
-    (const HSSFactors<scalar_t>& f, DenseM_t& Theta,
-     DenseM_t& DUB01, DenseM_t& Phi) const {
+    (DenseM_t& Theta, DenseM_t& DUB01, DenseM_t& Phi) const {
       if (this->leaf()) return;
       auto depth = this->_openmp_task_depth;
       DenseM_t _theta = _B10;
-      DUB01 = f._D.solve(child(0)->_U.apply(_B01, depth), f._piv, depth);
+      auto ch0 = child(0);
+      DUB01 = ch0->ULV_._D.solve
+        (ch0->_U.apply(_B01, depth), ch0->ULV_._piv, depth);
       STRUMPACK_SCHUR_FLOPS
-        (child(0)->_U.apply_flops(_B01.cols()) +
-         blas::getrs_flops(f._D.rows(), _B01.cols()));
+        (ch0->_U.apply_flops(_B01.cols()) +
+         blas::getrs_flops(ch0->ULV_._D.rows(), _B01.cols()));
       auto _phi = DUB01.transpose();
       auto ch1 = child(1);
       Theta = DenseM_t(ch1->rows(), _theta.cols());
@@ -70,8 +71,7 @@ namespace strumpack {
      * and V1big^* R.
      */
     template<typename scalar_t> void HSSMatrix<scalar_t>::Schur_product_direct
-    (const HSSFactors<scalar_t>& f, const DenseM_t& Theta,
-     const DenseM_t& DUB01, const DenseM_t& Phi,
+    (const DenseM_t& Theta, const DenseM_t& DUB01, const DenseM_t& Phi,
      const DenseM_t& ThetaVhatC_or_VhatCPhiC,
      const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc) const {
       auto depth = this->_openmp_task_depth;
@@ -83,8 +83,8 @@ namespace strumpack {
       ch1->applyT_fwd(R, wc, false, depth, flops);
 
       if (Theta.cols() < Phi.cols()) {
-        DenseM_t VtDUB01(f.Vhat().cols(), DUB01.cols());
-        gemm(Trans::C, Trans::N, scalar_t(1.), f.Vhat(), DUB01,
+        DenseM_t VtDUB01(child(0)->ULV_.Vhat().cols(), DUB01.cols());
+        gemm(Trans::C, Trans::N, scalar_t(1.), child(0)->ULV_.Vhat(), DUB01,
              scalar_t(0.), VtDUB01, depth);
         DenseM_t tmpr(ch0->V_rank(), R.cols());
         gemm(Trans::N, Trans::N, scalar_t(1.), VtDUB01, wr.tmp1,
@@ -102,7 +102,7 @@ namespace strumpack {
         gemm(Trans::C, Trans::N, scalar_t(-1.), ThetaVhatC_or_VhatCPhiC,
              tmpc, scalar_t(1.), Sc, depth);
         STRUMPACK_CB_SAMPLE_FLOPS
-          (gemm_flops(Trans::C, Trans::N, scalar_t(1.), f.Vhat(), DUB01, scalar_t(0.)) +
+          (gemm_flops(Trans::C, Trans::N, scalar_t(1.), child(0)->ULV_.Vhat(), DUB01, scalar_t(0.)) +
            gemm_flops(Trans::N, Trans::N, scalar_t(1.), VtDUB01, wr.tmp1, scalar_t(0.)) +
            gemm_flops(Trans::C, Trans::N, scalar_t(1.), _B10, wc.tmp1, scalar_t(0.)) +
            gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Theta, tmpr, scalar_t(1.)) +
@@ -112,10 +112,10 @@ namespace strumpack {
         gemm(Trans::N, Trans::N, scalar_t(1.), DUB01, wr.tmp1,
              scalar_t(0.), tmpr, depth);
 
-        DenseM_t VB10t(f.Vhat().rows(), _B10.rows());
-        gemm(Trans::N, Trans::C, scalar_t(1.), f.Vhat(), _B10,
+        DenseM_t VB10t(child(0)->ULV_.Vhat().rows(), _B10.rows());
+        gemm(Trans::N, Trans::C, scalar_t(1.), child(0)->ULV_.Vhat(), _B10,
              scalar_t(0.), VB10t, depth);
-        DenseM_t tmpc(f.Vhat().rows(), R.cols());
+        DenseM_t tmpc(child(0)->ULV_.Vhat().rows(), R.cols());
         gemm(Trans::N, Trans::N, scalar_t(1.), VB10t, wc.tmp1,
              scalar_t(0.), tmpc, depth);
 
@@ -128,7 +128,7 @@ namespace strumpack {
              tmpc, scalar_t(1.), Sc, depth);
         STRUMPACK_CB_SAMPLE_FLOPS
           (gemm_flops(Trans::N, Trans::N, scalar_t(1.), DUB01, wr.tmp1, scalar_t(0.)) +
-           gemm_flops(Trans::N, Trans::C, scalar_t(1.), f.Vhat(), _B10, scalar_t(0.)) +
+           gemm_flops(Trans::N, Trans::C, scalar_t(1.), child(0)->ULV_.Vhat(), _B10, scalar_t(0.)) +
            gemm_flops(Trans::N, Trans::N, scalar_t(1.), VB10t, wc.tmp1, scalar_t(0.)) +
            gemm_flops(Trans::N, Trans::N, scalar_t(-1.), ThetaVhatC_or_VhatCPhiC, tmpr, scalar_t(1.)) +
            gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Phi, tmpc, scalar_t(1.)));
@@ -145,9 +145,10 @@ namespace strumpack {
      *      = Sc1 - V1big (B01^* (U0big^* R0) + B01^* (Vhat^* D00^{-1} U0)^* B10^* (U1big^* R1))
      *      = Sc1 - V1big (B01^* (U0big^* R0) + (B10 Vhat^* DU0B01)^* (U1big^* R1))
      */
-    template<typename scalar_t> void HSSMatrix<scalar_t>::Schur_product_indirect
-    (const HSSFactors<scalar_t>& f, const DenseM_t& DUB01, const DenseM_t& R0,
-     const DenseM_t& R1, const DenseM_t& Sr1, const DenseM_t& Sc1,
+    template<typename scalar_t> void
+    HSSMatrix<scalar_t>::Schur_product_indirect
+    (const DenseM_t& DUB01, const DenseM_t& R0, const DenseM_t& R1,
+     const DenseM_t& Sr1, const DenseM_t& Sc1,
      DenseM_t& Sr, DenseM_t& Sc) const {
       if (this->leaf()) return;
       auto depth = this->_openmp_task_depth;
@@ -169,14 +170,14 @@ namespace strumpack {
       std::pair<std::size_t,std::size_t> off1;
       ch1->apply_UtVt_big(R1, U1tR1, V1tR1, off1, depth, flops);
 
-      DenseM_t VtDUB01(f.Vhat().cols(), DUB01.cols());
-      gemm(Trans::C, Trans::N, scalar_t(1.), f.Vhat(), DUB01,
+      DenseM_t VtDUB01(this->ULV_.Vhat().cols(), DUB01.cols());
+      gemm(Trans::C, Trans::N, scalar_t(1.), this->ULV_.Vhat(), DUB01,
            scalar_t(0.), VtDUB01, depth);
       DenseM_t B10VtDUB01(_B10.rows(), VtDUB01.cols());
       gemm(Trans::N, Trans::N, scalar_t(1.), _B10, VtDUB01,
            scalar_t(0.), B10VtDUB01, depth);
       STRUMPACK_CB_SAMPLE_FLOPS
-        (gemm_flops(Trans::C, Trans::N, scalar_t(1.), f.Vhat(), DUB01, scalar_t(0.)) +
+        (gemm_flops(Trans::C, Trans::N, scalar_t(1.), this->ULV_.Vhat(), DUB01, scalar_t(0.)) +
          gemm_flops(Trans::N, Trans::N, scalar_t(1.), _B10, VtDUB01, scalar_t(0.)));
       VtDUB01.clear();
 

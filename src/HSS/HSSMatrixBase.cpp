@@ -70,10 +70,16 @@ namespace strumpack {
       return *this;
     }
 
+    template<typename scalar_t> std::size_t
+    HSSMatrixBase<scalar_t>::factor_nonzeros() const {
+      std::size_t fnnz = ULV_.nonzeros();
+      for (auto& c : _ch) fnnz += c->factor_nonzeros();
+      return fnnz;
+    }
+
 #if defined(STRUMPACK_USE_MPI)
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::forward_solve
-    (const HSSFactorsMPI<scalar_t>& ULV, WorkSolveMPI<scalar_t>& w,
-     const DistM_t& b, bool partial) const {
+    (WorkSolveMPI<scalar_t>& w, const DistM_t& b, bool partial) const {
       if (!this->active()) return;
       if (!w.w_seq)
         w.w_seq = std::unique_ptr<WorkSolve<scalar_t>>
@@ -81,8 +87,7 @@ namespace strumpack {
 #pragma omp parallel
 #pragma omp single nowait
       forward_solve
-        (*(ULV.factors_seq_), *(w.w_seq),
-         const_cast<DistM_t&>(b).dense_wrapper(), partial);
+        (*(w.w_seq), const_cast<DistM_t&>(b).dense_wrapper(), partial);
       w.z = DistM_t(b.grid(), std::move(w.w_seq->z));
       w.ft1 = DistM_t(b.grid(), std::move(w.w_seq->ft1));
       w.y = DistM_t(b.grid(), std::move(w.w_seq->y));
@@ -91,14 +96,13 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::backward_solve
-    (const HSSFactorsMPI<scalar_t>& ULV, WorkSolveMPI<scalar_t>& w,
-     DistM_t& x) const {
+    (WorkSolveMPI<scalar_t>& w, DistM_t& x) const {
       if (!this->active()) return;
       DenseM_t lx(x.rows(), x.cols());
       w.w_seq->x = w.x.dense_and_clear();
 #pragma omp parallel
 #pragma omp single nowait
-      backward_solve(*(ULV.factors_seq_), *(w.w_seq), lx);
+      backward_solve(*(w.w_seq), lx);
       x = DistM_t(x.grid(), std::move(lx));
     }
 
@@ -454,8 +458,7 @@ namespace strumpack {
 #pragma omp parallel
 #pragma omp single nowait
       apply_bwd
-        (B.sub, beta, C.sub, *(w.w_seq), isroot,
-         _openmp_task_depth, lflops);
+        (B.sub, beta, C.sub, *(w.w_seq), isroot, _openmp_task_depth, lflops);
       flops += lflops.load();
     }
 
@@ -490,58 +493,50 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::factor_recursive
-    (HSSFactorsMPI<scalar_t>& ULV, WorkFactorMPI<scalar_t>& w,
-     const BLACSGrid* lg, bool isroot, bool partial) const {
+    (WorkFactorMPI<scalar_t>& w, const BLACSGrid* lg,
+     bool isroot, bool partial) {
       if (!active()) return;
-      if (!ULV.factors_seq_)
-        ULV.factors_seq_ = std::unique_ptr<HSSFactors<scalar_t>>
-          (new HSSFactors<scalar_t>());
       if (!w.w_seq)
         w.w_seq = std::unique_ptr<WorkFactor<scalar_t>>
           (new WorkFactor<scalar_t>());
 #pragma omp parallel
 #pragma omp single nowait
-      factor_recursive
-        (*(ULV.factors_seq_), *(w.w_seq), isroot, partial, _openmp_task_depth);
+      factor_recursive(*(w.w_seq), isroot, partial, _openmp_task_depth);
       if (isroot) {
-        if (partial) ULV.Vt0_ = DistM_t(lg, ULV.factors_seq_->_Vt0);
-        ULV.D_ = DistM_t(lg, ULV.factors_seq_->_D);
-        ULV.piv_.resize(ULV.D_.lrows() + ULV.D_.MB());
-        std::copy(ULV.factors_seq_->_piv.begin(),
-                  ULV.factors_seq_->_piv.end(), ULV.piv_.begin());
+        if (partial) ULV_mpi_.Vt0_ = DistM_t(lg, ULV_._Vt0);
+        ULV_mpi_.D_ = DistM_t(lg, ULV_._D);
+        ULV_mpi_.piv_.resize(ULV_mpi_.D_.lrows() + ULV_mpi_.D_.MB());
+        std::copy(ULV_._piv.begin(), ULV_._piv.end(), ULV_mpi_.piv_.begin());
       } else {
         w.Dt = DistM_t(lg, std::move(w.w_seq->Dt));
         w.Vt1 = DistM_t(lg, std::move(w.w_seq->Vt1));
-        ULV.Q_ = DistM_t(lg, std::move(ULV.factors_seq_->_Q));
-        ULV.W1_ = DistM_t(lg, std::move(ULV.factors_seq_->_W1));
+        ULV_mpi_.Q_ = DistM_t(lg, std::move(ULV_._Q));
+        ULV_mpi_.W1_ = DistM_t(lg, std::move(ULV_._W1));
       }
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::solve_fwd
-    (const HSSFactorsMPI<scalar_t>& ULV, const DistSubLeaf<scalar_t>& b,
-     WorkSolveMPI<scalar_t>& w, bool partial, bool isroot) const {
+    (const DistSubLeaf<scalar_t>& b, WorkSolveMPI<scalar_t>& w,
+     bool partial, bool isroot) const {
       if (!active()) return;
       if (!w.w_seq)
         w.w_seq = std::unique_ptr<WorkSolve<scalar_t>>
           (new WorkSolve<scalar_t>());
 #pragma omp parallel
 #pragma omp single nowait
-      solve_fwd(*(ULV.factors_seq_), b.sub, *(w.w_seq),
-                partial, isroot, _openmp_task_depth);
+      solve_fwd(b.sub, *(w.w_seq), partial, isroot, _openmp_task_depth);
       w.z = DistM_t(b.grid_local(), std::move(w.w_seq->z));
       w.ft1 = DistM_t(b.grid_local(), std::move(w.w_seq->ft1));
       w.y = DistM_t(b.grid_local(), std::move(w.w_seq->y));
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::solve_bwd
-    (const HSSFactorsMPI<scalar_t>& ULV, DistSubLeaf<scalar_t>& x,
-     WorkSolveMPI<scalar_t>& w, bool isroot) const {
+    (DistSubLeaf<scalar_t>& x, WorkSolveMPI<scalar_t>& w, bool isroot) const {
       if (!active()) return;
       w.w_seq->x = w.x.dense_and_clear();
 #pragma omp parallel
 #pragma omp single nowait
-      solve_bwd(*(ULV.factors_seq_), x.sub, *(w.w_seq),
-                isroot, _openmp_task_depth);
+      solve_bwd(x.sub, *(w.w_seq), isroot, _openmp_task_depth);
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::extract_fwd

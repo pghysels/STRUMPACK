@@ -233,13 +233,13 @@ int run(int argc, char* argv[]) {
   }
 
   cout << "# computing ULV factorization of HSS matrix .." << endl;
-  auto ULV = H.factor();
+  H.factor();
   cout << "# solving linear system .." << endl;
 
   DenseMatrix<double> B(m, n);
   B.random();
   DenseMatrix<double> C(B);
-  H.solve(ULV, C);
+  H.solve(C);
   auto Bcheck = H.apply(C);
   Bcheck.scaled_add(-1., B);
   cout << "# relative error = ||B-H*(H\\B)||_F/||B||_F = "
@@ -250,10 +250,10 @@ int run(int argc, char* argv[]) {
   }
 
   if (!H.leaf()) {
-    auto partialULV = H.partial_factor();
+    H.partial_factor();
     cout << "# Computing Schur update .." << endl;
     DenseMatrix<double> Theta, Phi, DUB01;
-    H.Schur_update(partialULV, Theta, DUB01, Phi);
+    H.Schur_update(Theta, DUB01, Phi);
     // Theta.print("Theta");
     // Phi.print("Phi");
     // TODO check the Schur update

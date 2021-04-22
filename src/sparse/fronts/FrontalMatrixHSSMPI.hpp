@@ -95,7 +95,6 @@ namespace strumpack {
 
   private:
     std::unique_ptr<HSS::HSSMatrixMPI<scalar_t>> H_;
-    HSS::HSSFactorsMPI<scalar_t> ULV_;
 
     // TODO get rid of this!!!
     mutable std::unique_ptr<HSS::WorkSolveMPI<scalar_t>> ULVwork_;
