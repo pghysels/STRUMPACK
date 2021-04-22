@@ -151,6 +151,7 @@ namespace strumpack {
         (A, opts, etree_level+1, task_depth);
     TaskTimer t("FrontalMatrixBLRMPI_factor");
     if (/*etree_level == 0 && */opts.print_root_front_stats()) t.start();
+#if 1
     build_front(A);
     extend_add();
     if (lchild_) lchild_->release_work_memory();
@@ -162,6 +163,17 @@ namespace strumpack {
       else piv_ = F11blr_.factor(adm_, opts.BLR_options());
       // TODO flops?
     }
+#else // factor column-wise for memory reduction
+    if (dim_sep() && grid2d().active()) {
+      if (dim_upd()) {
+        //FActor F11
+        //lswp, apply pivots to F12
+        //trsm F11, F12
+        //TRSM F11, F21
+        //Update: Gemm F22= F22 - F21 *F12 with LuAR
+      } else piv_ = factor_colwise(adm_, opts.BLR_options());
+    }
+#endif
     if (/*etree_level == 0 && */opts.print_root_front_stats()) {
       auto time = t.elapsed();
       if (Comm().is_root())

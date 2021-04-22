@@ -2489,6 +2489,68 @@ namespace strumpack {
 
 
     template<typename scalar_t> std::vector<int>
+    BLRMatrixMPI<scalar_t>::factor_colwise(const adm_t& adm, const Opts_t& opts){
+      std::vector<int> piv, piv_tile;
+      if (!grid()->active()) return piv;
+      DenseTile<scalar_t> Tcc;
+      auto CP = grid()->npcols();
+      //construct the first CP block-columns as dense tiles
+      build_front_cols(CP);
+      extend_add_cols(CP);
+      for (std::size_t i=0; i<colblocks(); i+=CP) {
+        for (std::size_t c=i; c<std::min(i+CP,colblocks()); c++) {
+          // LU factorization of diagonal tile
+          if (grid()->is_local_col(c) && grid()->is_local_row(c)){
+            piv_tile = tile(c, c).LU();
+          else piv_tile.resize(tilerows(c));
+          if (grid()->is_local_row(c)
+            grid()->row_comm().broadcast_from(piv_tile, c % CP);
+            int r0 = tileroff(c);
+            std::transform
+              (piv_tile.begin(), piv_tile.end(), std::back_inserter(piv),
+              [r0](int p) -> int { return p + r0; });
+            Tcc = bcast_dense_tile_along_row(c, c); //??
+          }
+          if (grid()->is_local_col(c)){
+            Tcc = bcast_dense_tile_along_col(c, c); //??
+          }
+
+          if (grid()->is_local_row(c)) {
+            for (std::size_t j=c+1; j<min(i+CP,colblocks()); j++) {
+              if (grid()->is_local_col(j)) {
+                if (adm(i, j)) compress_tile(i, j, opts);
+              }
+            }
+          }
+          if (grid()->is_local_col(c)) {
+            for (std::size_t j=c+1; j<rowblocks(); j++) {
+              if (grid()->is_local_row(j)) {
+                if (adm(j, i)) compress_tile(j, i, opts);
+              }
+            }
+          }
+          if (grid()->is_local_row(c)) {
+            for (std::size_t j=c+1; j<min(i+CP,colblocks()); j++) {
+              if (grid()->is_local_col(j)) {
+                tile(c, j).laswp(piv_tile, true);
+                trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                       scalar_t(1.), Tii, tile(c, j));
+              }
+            }
+          }
+          if (grid()->is_local_col(c)) {
+            for (std::size_t j=c+1; j<rowblocks(); j++) {
+              if (grid()->is_local_row(j)) {
+                trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+                     scalar_t(1.), Tcc, tile(j, c));
+              }
+            }
+          }
+        }
+      }
+    }
+
+    template<typename scalar_t> std::vector<int>
     BLRMatrixMPI<scalar_t>::partial_factor(BLRMPI_t& A11, BLRMPI_t& A12,
                                            BLRMPI_t& A21, BLRMPI_t& A22,
                                            const adm_t& adm,
