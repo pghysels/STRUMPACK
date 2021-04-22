@@ -90,36 +90,36 @@ namespace strumpack {
             I.push_back(i+w.offset.first);
           for (std::size_t j=0; j<this->cols(); j++)
             J.push_back(j+w.offset.second);
-          _D = DenseM_t(this->rows(), this->cols());
-          Aelem(I, J, _D);
+          D_ = DenseM_t(this->rows(), this->cols());
+          Aelem(I, J, D_);
         }
       } else {
-        w.split(this->ch_[0]->dims());
+        w.split(child(0)->dims());
         bool tasked = depth < params::task_recursion_cutoff_level;
         if (tasked) {
 #pragma omp task default(shared)                                        \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-          this->ch_[0]->compress_recursive_ann
+          child(0)->compress_recursive_ann
             (ann, scores, Aelem, opts, w.c[0], depth+1);
 #pragma omp task default(shared)                                        \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-          this->ch_[1]->compress_recursive_ann
+          child(1)->compress_recursive_ann
             (ann, scores, Aelem, opts, w.c[1], depth+1);
 #pragma omp taskwait
         } else {
-          this->ch_[0]->compress_recursive_ann
+          child(0)->compress_recursive_ann
             (ann, scores, Aelem, opts, w.c[0], depth);
-          this->ch_[1]->compress_recursive_ann
+          child(1)->compress_recursive_ann
             (ann, scores, Aelem, opts, w.c[1], depth);
         }
-        if (!this->ch_[0]->is_compressed() ||
-            !this->ch_[1]->is_compressed())
+        if (!child(0)->is_compressed() ||
+            !child(1)->is_compressed())
           return;
         // TODO do not re-extract if children are not re-compressed
         //if (this->is_untouched()) {
-        _B01 = DenseM_t(this->ch_[0]->U_rank(), this->ch_[1]->V_rank());
-        Aelem(w.c[0].Ir, w.c[1].Ic, _B01);
-        _B10 = _B01.transpose();
+        B01_ = DenseM_t(child(0)->U_rank(), child(1)->V_rank());
+        Aelem(w.c[0].Ir, w.c[1].Ic, B01_);
+        B10_ = B01_.transpose();
         //}
       }
       if (w.lvl == 0)
@@ -257,27 +257,27 @@ namespace strumpack {
       auto rtol = opts.rel_tol() / w.lvl;
       auto atol = opts.abs_tol() / w.lvl;
       DenseM_t wSr(S);
-      wSr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol, opts.max_rank(), depth);
-      STRUMPACK_ID_FLOPS(ID_row_flops(wSr, _U.cols()));
+      wSr.ID_row(U_.E(), U_.P(), w.Jr, rtol, atol, opts.max_rank(), depth);
+      STRUMPACK_ID_FLOPS(ID_row_flops(wSr, U_.cols()));
       // exploit symmetry, set V = U
-      _V.E() = _U.E();
-      _V.P() = _U.P();
+      V_.E() = U_.E();
+      V_.P() = U_.P();
       w.Jc = w.Jr;
-      _U.check();  assert(_U.cols() == w.Jr.size());
-      _V.check();  assert(_V.cols() == w.Jc.size());
+      U_.check();  assert(U_.cols() == w.Jr.size());
+      V_.check();  assert(V_.cols() == w.Jc.size());
       auto d = S.cols();
       if (!(d >= this->cols() || int(d) >= opts.max_rank() ||
-          (_U.cols() + opts.p() < d  &&
-           _V.cols() + opts.p() < d))) {
+          (U_.cols() + opts.p() < d  &&
+           V_.cols() + opts.p() < d))) {
         // std::cout << "WARNING: ID did not reach required accuracy:"
         //           << "\t increase k (number of ANN's), or Delta_d."
         //           << std::endl;
         return false;
       }
-      this->U_rank_ = _U.cols();  this->U_rows_ = _U.rows();
-      this->V_rank_ = _V.cols();  this->V_rows_ = _V.rows();
-      w.Ir.reserve(_U.cols());
-      w.Ic.reserve(_V.cols());
+      this->U_rank_ = U_.cols();  this->U_rows_ = U_.rows();
+      this->V_rank_ = V_.cols();  this->V_rows_ = V_.rows();
+      w.Ir.reserve(U_.cols());
+      w.Ic.reserve(V_.cols());
       if (this->leaf()) {
         for (auto i : w.Jr) w.Ir.push_back(w.offset.first + i);
         for (auto j : w.Jc) w.Ic.push_back(w.offset.second + j);

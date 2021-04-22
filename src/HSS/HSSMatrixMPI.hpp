@@ -170,7 +170,7 @@ namespace strumpack {
 
       void shift(scalar_t sigma) override;
 
-      const TreeLocalRanges& tree_ranges() const { return _ranges; }
+      const TreeLocalRanges& tree_ranges() const { return ranges_; }
       void to_block_row(const DistM_t& A,
                         DenseM_t& sub_A,
                         DistM_t& leaf_A) const override;
@@ -197,14 +197,14 @@ namespace strumpack {
       std::unique_ptr<const BLACSGrid> owned_blacs_grid_;
       std::unique_ptr<const BLACSGrid> owned_blacs_grid_local_;
 
-      TreeLocalRanges _ranges;
+      TreeLocalRanges ranges_;
 
-      HSSBasisIDMPI<scalar_t> _U, _V;
-      DistM_t _D, _B01, _B10;
+      HSSBasisIDMPI<scalar_t> U_, V_;
+      DistM_t D_, B01_, B10_;
 
       // Used to redistribute the original 2D block cyclic matrix
       // according to the HSS tree
-      DistM_t _A, _A01, _A10;
+      DistM_t A_, A01_, A10_;
 
       HSSMatrixMPI(std::size_t m, std::size_t n, const opts_t& opts,
                    const MPIComm& c, int P,
@@ -386,12 +386,12 @@ namespace strumpack {
         return std::max(1, P - Pl(n, nl, nr, P));
       }
       int Pl() const {
-        return Pl(this->rows(), this->ch_[0]->rows(),
-                  this->ch_[1]->rows(), Ptotal());
+        return Pl(this->rows(), child(0)->rows(),
+                  child(1)->rows(), Ptotal());
       }
       int Pr() const {
-        return Pr(this->rows(), this->ch_[0]->rows(),
-                  this->ch_[1]->rows(), Ptotal());
+        return Pr(this->rows(), child(0)->rows(),
+                  child(1)->rows(), Ptotal());
       }
 
       template<typename T> friend

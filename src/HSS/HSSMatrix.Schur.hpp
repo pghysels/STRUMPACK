@@ -41,13 +41,13 @@ namespace strumpack {
     (DenseM_t& Theta, DenseM_t& DUB01, DenseM_t& Phi) const {
       if (this->leaf()) return;
       auto depth = this->openmp_task_depth_;
-      DenseM_t _theta = _B10;
+      DenseM_t _theta = B10_;
       auto ch0 = child(0);
-      DUB01 = ch0->ULV_._D.solve
-        (ch0->_U.apply(_B01, depth), ch0->ULV_._piv, depth);
+      DUB01 = ch0->ULV_.D_.solve
+        (ch0->U_.apply(B01_, depth), ch0->ULV_.piv_, depth);
       STRUMPACK_SCHUR_FLOPS
-        (ch0->_U.apply_flops(_B01.cols()) +
-         blas::getrs_flops(ch0->ULV_._D.rows(), _B01.cols()));
+        (ch0->U_.apply_flops(B01_.cols()) +
+         blas::getrs_flops(ch0->ULV_.D_.rows(), B01_.cols()));
       auto _phi = DUB01.transpose();
       auto ch1 = child(1);
       Theta = DenseM_t(ch1->rows(), _theta.cols());
@@ -90,8 +90,8 @@ namespace strumpack {
         gemm(Trans::N, Trans::N, scalar_t(1.), VtDUB01, wr.tmp1,
              scalar_t(0.), tmpr, depth);
 
-        DenseM_t tmpc(_B10.cols(), R.cols());
-        gemm(Trans::C, Trans::N, scalar_t(1.), _B10, wc.tmp1,
+        DenseM_t tmpc(B10_.cols(), R.cols());
+        gemm(Trans::C, Trans::N, scalar_t(1.), B10_, wc.tmp1,
              scalar_t(0.), tmpc, depth);
 
         ch1->apply_bwd(R, scalar_t(0.), Sr, wr, true, depth, flops);
@@ -104,7 +104,7 @@ namespace strumpack {
         STRUMPACK_CB_SAMPLE_FLOPS
           (gemm_flops(Trans::C, Trans::N, scalar_t(1.), child(0)->ULV_.Vhat(), DUB01, scalar_t(0.)) +
            gemm_flops(Trans::N, Trans::N, scalar_t(1.), VtDUB01, wr.tmp1, scalar_t(0.)) +
-           gemm_flops(Trans::C, Trans::N, scalar_t(1.), _B10, wc.tmp1, scalar_t(0.)) +
+           gemm_flops(Trans::C, Trans::N, scalar_t(1.), B10_, wc.tmp1, scalar_t(0.)) +
            gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Theta, tmpr, scalar_t(1.)) +
            gemm_flops(Trans::C, Trans::N, scalar_t(-1.), ThetaVhatC_or_VhatCPhiC, tmpc, scalar_t(1.)));
       } else {
@@ -112,8 +112,8 @@ namespace strumpack {
         gemm(Trans::N, Trans::N, scalar_t(1.), DUB01, wr.tmp1,
              scalar_t(0.), tmpr, depth);
 
-        DenseM_t VB10t(child(0)->ULV_.Vhat().rows(), _B10.rows());
-        gemm(Trans::N, Trans::C, scalar_t(1.), child(0)->ULV_.Vhat(), _B10,
+        DenseM_t VB10t(child(0)->ULV_.Vhat().rows(), B10_.rows());
+        gemm(Trans::N, Trans::C, scalar_t(1.), child(0)->ULV_.Vhat(), B10_,
              scalar_t(0.), VB10t, depth);
         DenseM_t tmpc(child(0)->ULV_.Vhat().rows(), R.cols());
         gemm(Trans::N, Trans::N, scalar_t(1.), VB10t, wc.tmp1,
@@ -128,7 +128,7 @@ namespace strumpack {
              tmpc, scalar_t(1.), Sc, depth);
         STRUMPACK_CB_SAMPLE_FLOPS
           (gemm_flops(Trans::N, Trans::N, scalar_t(1.), DUB01, wr.tmp1, scalar_t(0.)) +
-           gemm_flops(Trans::N, Trans::C, scalar_t(1.), child(0)->ULV_.Vhat(), _B10, scalar_t(0.)) +
+           gemm_flops(Trans::N, Trans::C, scalar_t(1.), child(0)->ULV_.Vhat(), B10_, scalar_t(0.)) +
            gemm_flops(Trans::N, Trans::N, scalar_t(1.), VB10t, wc.tmp1, scalar_t(0.)) +
            gemm_flops(Trans::N, Trans::N, scalar_t(-1.), ThetaVhatC_or_VhatCPhiC, tmpr, scalar_t(1.)) +
            gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Phi, tmpc, scalar_t(1.)));
@@ -173,23 +173,23 @@ namespace strumpack {
       DenseM_t VtDUB01(this->ULV_.Vhat().cols(), DUB01.cols());
       gemm(Trans::C, Trans::N, scalar_t(1.), this->ULV_.Vhat(), DUB01,
            scalar_t(0.), VtDUB01, depth);
-      DenseM_t B10VtDUB01(_B10.rows(), VtDUB01.cols());
-      gemm(Trans::N, Trans::N, scalar_t(1.), _B10, VtDUB01,
+      DenseM_t B10VtDUB01(B10_.rows(), VtDUB01.cols());
+      gemm(Trans::N, Trans::N, scalar_t(1.), B10_, VtDUB01,
            scalar_t(0.), B10VtDUB01, depth);
       STRUMPACK_CB_SAMPLE_FLOPS
         (gemm_flops(Trans::C, Trans::N, scalar_t(1.), this->ULV_.Vhat(), DUB01, scalar_t(0.)) +
-         gemm_flops(Trans::N, Trans::N, scalar_t(1.), _B10, VtDUB01, scalar_t(0.)));
+         gemm_flops(Trans::N, Trans::N, scalar_t(1.), B10_, VtDUB01, scalar_t(0.)));
       VtDUB01.clear();
 
-      DenseM_t B10V0tR0(_B10.rows(), c);
-      DenseM_t B01tU0tR0(_B01.cols(), c);
-      gemm(Trans::N, Trans::N, scalar_t(-1.), _B10, V0tR0,
+      DenseM_t B10V0tR0(B10_.rows(), c);
+      DenseM_t B01tU0tR0(B01_.cols(), c);
+      gemm(Trans::N, Trans::N, scalar_t(-1.), B10_, V0tR0,
            scalar_t(0.), B10V0tR0, depth);
-      gemm(Trans::C, Trans::N, scalar_t(-1.), _B01, U0tR0,
+      gemm(Trans::C, Trans::N, scalar_t(-1.), B01_, U0tR0,
            scalar_t(0.), B01tU0tR0, depth);
       STRUMPACK_CB_SAMPLE_FLOPS
-        (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), _B10, V0tR0, scalar_t(0.)) +
-         gemm_flops(Trans::C, Trans::N, scalar_t(-1.), _B01, U0tR0, scalar_t(0.)));
+        (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), B10_, V0tR0, scalar_t(0.)) +
+         gemm_flops(Trans::C, Trans::N, scalar_t(-1.), B01_, U0tR0, scalar_t(0.)));
       V0tR0.clear();
       U0tR0.clear();
 
@@ -221,27 +221,27 @@ namespace strumpack {
       if (this->leaf()) {
         auto Al = ConstDenseMatrixWrapperPtr
           (this->rows(), A.cols(), A, offset.first, 0);
-        UtA = _U.applyC(*Al, depth);
-        VtA = _V.applyC(*Al, depth);
-        flops += _U.applyC_flops(Al->cols());
-        flops += _V.applyC_flops(Al->cols());
+        UtA = U_.applyC(*Al, depth);
+        VtA = V_.applyC(*Al, depth);
+        flops += U_.applyC_flops(Al->cols());
+        flops += V_.applyC_flops(Al->cols());
       } else {
         DenseM_t UtA0, UtA1;
         DenseM_t VtA0, VtA1;
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->ch_[0]->apply_UtVt_big(A, UtA0, VtA0, offset, depth+1, flops);
+        child(0)->apply_UtVt_big(A, UtA0, VtA0, offset, depth+1, flops);
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->ch_[1]->apply_UtVt_big
-          (A, UtA1, VtA1, offset+this->ch_[0]->dims(), depth+1, flops);
+        child(1)->apply_UtVt_big
+          (A, UtA1, VtA1, offset+child(0)->dims(), depth+1, flops);
 #pragma omp taskwait
-        UtA = _U.applyC(vconcat(UtA0, UtA1), depth);
-        VtA = _V.applyC(vconcat(VtA0, VtA1), depth);
-        flops += _U.applyC_flops(UtA0.cols());
-        flops += _V.applyC_flops(VtA0.cols());
+        UtA = U_.applyC(vconcat(UtA0, UtA1), depth);
+        VtA = V_.applyC(vconcat(VtA0, VtA1), depth);
+        flops += U_.applyC_flops(UtA0.cols());
+        flops += V_.applyC_flops(VtA0.cols());
       }
     }
 
@@ -250,52 +250,52 @@ namespace strumpack {
      const std::pair<std::size_t, std::size_t>& offset, int depth,
      std::atomic<long long int>& flops) const {
       if (this->leaf()) {
-        DenseMW_t ltheta(_U.rows(), Theta.cols(), Theta, offset.first, 0);
-        DenseMW_t lphi(_V.rows(), Phi.cols(), Phi, offset.second, 0);
+        DenseMW_t ltheta(U_.rows(), Theta.cols(), Theta, offset.first, 0);
+        DenseMW_t lphi(V_.rows(), Phi.cols(), Phi, offset.second, 0);
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        if (_U.cols() && Uop.cols()) {
-          _U.apply(Uop, ltheta, depth);
-          flops += _U.apply_flops(Uop.cols());
+        if (U_.cols() && Uop.cols()) {
+          U_.apply(Uop, ltheta, depth);
+          flops += U_.apply_flops(Uop.cols());
         } else ltheta.zero();
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        if (_V.cols() && Vop.cols()) {
-          _V.apply(Vop, lphi, depth);
-          flops += _V.apply_flops(Vop.cols());
+        if (V_.cols() && Vop.cols()) {
+          V_.apply(Vop, lphi, depth);
+          flops += V_.apply_flops(Vop.cols());
         } else lphi.zero();
 #pragma omp taskwait
       } else {
         DenseM_t Uop0, Uop1, Vop0, Vop1;
-        Uop0 = DenseM_t(this->ch_[0]->U_rank(), Uop.cols());
-        Uop1 = DenseM_t(this->ch_[1]->U_rank(), Uop.cols());
-        Vop0 = DenseM_t(this->ch_[0]->V_rank(), Vop.cols());
-        Vop1 = DenseM_t(this->ch_[1]->V_rank(), Vop.cols());
-        if (_U.cols() && Uop.cols()) {
+        Uop0 = DenseM_t(child(0)->U_rank(), Uop.cols());
+        Uop1 = DenseM_t(child(1)->U_rank(), Uop.cols());
+        Vop0 = DenseM_t(child(0)->V_rank(), Vop.cols());
+        Vop1 = DenseM_t(child(1)->V_rank(), Vop.cols());
+        if (U_.cols() && Uop.cols()) {
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
           {
-            auto tmp = _U.apply(Uop, depth);
-            flops += _U.apply_flops(Uop.cols());
+            auto tmp = U_.apply(Uop, depth);
+            flops += U_.apply_flops(Uop.cols());
             Uop0.copy(tmp, 0, 0);
-            Uop1.copy(tmp, this->ch_[0]->U_rank(), 0);
+            Uop1.copy(tmp, child(0)->U_rank(), 0);
           }
         } else {
           Uop0.zero();
           Uop1.zero();
         }
-        if (_V.cols() && Vop.cols()) {
+        if (V_.cols() && Vop.cols()) {
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
           {
-            auto tmp = _V.apply(Vop, depth);
-            flops += _V.apply_flops(Vop.cols());
+            auto tmp = V_.apply(Vop, depth);
+            flops += V_.apply_flops(Vop.cols());
             Vop0.copy(tmp, 0, 0);
-            Vop1.copy(tmp, this->ch_[0]->V_rank(), 0);
+            Vop1.copy(tmp, child(0)->V_rank(), 0);
           }
         } else {
           Vop0.zero();
@@ -307,13 +307,13 @@ namespace strumpack {
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->ch_[0]->apply_UV_big
+        child(0)->apply_UV_big
           (Theta, Uop0, Phi, Vop0, offset, depth+1, flops);
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->ch_[1]->apply_UV_big
-          (Theta, Uop1, Phi, Vop1, offset+this->ch_[0]->dims(), depth+1, flops);
+        child(1)->apply_UV_big
+          (Theta, Uop1, Phi, Vop1, offset+child(0)->dims(), depth+1, flops);
 #pragma omp taskwait
       }
     }

@@ -77,20 +77,20 @@ namespace strumpack {
       if (!this->active()) return;
       if (this->leaf()) {
         if (!isroot) {
-          w.tmp1 = _V.applyC(B.leaf);
-          flops += _V.applyC_flops(B.leaf.cols());
+          w.tmp1 = V_.applyC(B.leaf);
+          flops += V_.applyC_flops(B.leaf.cols());
         }
       } else {
         w.c.resize(2);
         w.c[0].offset = w.offset;
-        w.c[1].offset = w.offset + this->ch_[0]->dims();
-        this->ch_[0]->apply_fwd(B, w.c[0], Comm().size()==1, flops);
-        this->ch_[1]->apply_fwd(B, w.c[1], Comm().size()==1, flops);
+        w.c[1].offset = w.offset + child(0)->dims();
+        child(0)->apply_fwd(B, w.c[0], Comm().size()==1, flops);
+        child(1)->apply_fwd(B, w.c[1], Comm().size()==1, flops);
         if (!isroot) {
-          w.tmp1 = _V.applyC
-            (vconcat(B.cols(), this->_B10.cols(), this->_B01.cols(),
+          w.tmp1 = V_.applyC
+            (vconcat(B.cols(), B10_.cols(), B01_.cols(),
                      w.c[0].tmp1, w.c[1].tmp1, grid(), grid()->ctxt_all()));
-          flops += _V.applyC_flops(B.cols());
+          flops += V_.applyC_flops(B.cols());
         }
       }
     }
@@ -101,42 +101,42 @@ namespace strumpack {
       if (!this->active()) return;
       if (this->leaf()) {
         if (this->U_rank() && !isroot) {  // c = D*b + beta*c + U*w.tmp2
-          gemm(Trans::N, Trans::N, scalar_t(1.), _D, B.leaf, beta, C.leaf);
-          C.leaf.add(_U.apply(w.tmp2));
+          gemm(Trans::N, Trans::N, scalar_t(1.), D_, B.leaf, beta, C.leaf);
+          C.leaf.add(U_.apply(w.tmp2));
           flops += C.leaf.rows() * C.leaf.cols() +
-            gemm_flops(Trans::N, Trans::N, scalar_t(1.), _D, B.leaf, beta);
+            gemm_flops(Trans::N, Trans::N, scalar_t(1.), D_, B.leaf, beta);
         } else {
-          gemm(Trans::N, Trans::N, scalar_t(1.), _D, B.leaf, beta, C.leaf);
-          flops += gemm_flops(Trans::N, Trans::N, scalar_t(1.), _D, B.leaf, beta);
+          gemm(Trans::N, Trans::N, scalar_t(1.), D_, B.leaf, beta, C.leaf);
+          flops += gemm_flops(Trans::N, Trans::N, scalar_t(1.), D_, B.leaf, beta);
         }
       } else {
         auto n = B.cols();
-        DistM_t c0tmp1(grid(), _B10.cols(), n, w.c[0].tmp1, grid()->ctxt_all());
-        DistM_t c1tmp1(grid(), _B01.cols(), n, w.c[1].tmp1, grid()->ctxt_all());
-        DistM_t c0tmp2(grid(), _B01.rows(), n);
-        DistM_t c1tmp2(grid(), _B10.rows(), n);
+        DistM_t c0tmp1(grid(), B10_.cols(), n, w.c[0].tmp1, grid()->ctxt_all());
+        DistM_t c1tmp1(grid(), B01_.cols(), n, w.c[1].tmp1, grid()->ctxt_all());
+        DistM_t c0tmp2(grid(), B01_.rows(), n);
+        DistM_t c1tmp2(grid(), B10_.rows(), n);
         if (isroot || !this->U_rank()) {
-          gemm(Trans::N, Trans::N, scalar_t(1.), _B01, c1tmp1, scalar_t(0.), c0tmp2);
-          gemm(Trans::N, Trans::N, scalar_t(1.), _B10, c0tmp1, scalar_t(0.), c1tmp2);
+          gemm(Trans::N, Trans::N, scalar_t(1.), B01_, c1tmp1, scalar_t(0.), c0tmp2);
+          gemm(Trans::N, Trans::N, scalar_t(1.), B10_, c0tmp1, scalar_t(0.), c1tmp2);
           flops +=
-            gemm_flops(Trans::N, Trans::N, scalar_t(1.), _B01, c1tmp1, scalar_t(0.)) +
-            gemm_flops(Trans::N, Trans::N, scalar_t(1.), _B10, c0tmp1, scalar_t(0.));
+            gemm_flops(Trans::N, Trans::N, scalar_t(1.), B01_, c1tmp1, scalar_t(0.)) +
+            gemm_flops(Trans::N, Trans::N, scalar_t(1.), B10_, c0tmp1, scalar_t(0.));
         } else {
-          auto tmp = _U.apply(w.tmp2);
-          copy(this->_B01.rows(), n, tmp, 0, 0, c0tmp2, 0, 0, grid()->ctxt_all());
-          copy(this->_B10.rows(), n, tmp, this->_B01.rows(), 0, c1tmp2, 0, 0, grid()->ctxt_all());
-          gemm(Trans::N, Trans::N, scalar_t(1.), _B01, c1tmp1, scalar_t(1.), c0tmp2);
-          gemm(Trans::N, Trans::N, scalar_t(1.), _B10, c0tmp1, scalar_t(1.), c1tmp2);
+          auto tmp = U_.apply(w.tmp2);
+          copy(B01_.rows(), n, tmp, 0, 0, c0tmp2, 0, 0, grid()->ctxt_all());
+          copy(B10_.rows(), n, tmp, B01_.rows(), 0, c1tmp2, 0, 0, grid()->ctxt_all());
+          gemm(Trans::N, Trans::N, scalar_t(1.), B01_, c1tmp1, scalar_t(1.), c0tmp2);
+          gemm(Trans::N, Trans::N, scalar_t(1.), B10_, c0tmp1, scalar_t(1.), c1tmp2);
           flops +=
-            gemm_flops(Trans::N, Trans::N, scalar_t(1.), _B01, c1tmp1, scalar_t(1.)) +
-            gemm_flops(Trans::N, Trans::N, scalar_t(1.), _B10, c0tmp1, scalar_t(1.));
+            gemm_flops(Trans::N, Trans::N, scalar_t(1.), B01_, c1tmp1, scalar_t(1.)) +
+            gemm_flops(Trans::N, Trans::N, scalar_t(1.), B10_, c0tmp1, scalar_t(1.));
         }
         w.c[0].tmp2 = DistM_t
-          (w.c[0].tmp1.grid(), _B01.rows(), n, c0tmp2, grid()->ctxt_all());
+          (w.c[0].tmp1.grid(), B01_.rows(), n, c0tmp2, grid()->ctxt_all());
         w.c[1].tmp2 = DistM_t
-          (w.c[1].tmp1.grid(), _B10.rows(), n, c1tmp2, grid()->ctxt_all());
-        this->ch_[0]->apply_bwd(B, beta, C, w.c[0], false, flops);
-        this->ch_[1]->apply_bwd(B, beta, C, w.c[1], false, flops);
+          (w.c[1].tmp1.grid(), B10_.rows(), n, c1tmp2, grid()->ctxt_all());
+        child(0)->apply_bwd(B, beta, C, w.c[0], false, flops);
+        child(1)->apply_bwd(B, beta, C, w.c[1], false, flops);
       }
     }
 
@@ -147,20 +147,20 @@ namespace strumpack {
       if (!this->active()) return;
       if (this->leaf()) {
         if (!isroot) {
-          w.tmp1 = _U.applyC(B.leaf);
-          flops += _U.applyC_flops(B.leaf.cols());
+          w.tmp1 = U_.applyC(B.leaf);
+          flops += U_.applyC_flops(B.leaf.cols());
         }
       } else {
         w.c.resize(2);
         w.c[0].offset = w.offset;
-        w.c[1].offset = w.offset + this->ch_[0]->dims();
-        this->ch_[0]->applyT_fwd(B, w.c[0], Comm().size()==1, flops);
-        this->ch_[1]->applyT_fwd(B, w.c[1], Comm().size()==1, flops);
+        w.c[1].offset = w.offset + child(0)->dims();
+        child(0)->applyT_fwd(B, w.c[0], Comm().size()==1, flops);
+        child(1)->applyT_fwd(B, w.c[1], Comm().size()==1, flops);
         if (!isroot) {
-          w.tmp1 = _U.applyC
-            (vconcat(B.cols(), this->_B01.rows(), this->_B10.rows(),
+          w.tmp1 = U_.applyC
+            (vconcat(B.cols(), B01_.rows(), B10_.rows(),
                      w.c[0].tmp1, w.c[1].tmp1, grid(), grid()->ctxt_all()));
-          flops += _U.applyC_flops(B.cols());
+          flops += U_.applyC_flops(B.cols());
         }
       }
     }
@@ -171,46 +171,46 @@ namespace strumpack {
       if (!this->active()) return;
       if (this->leaf()) {
         if (this->V_rank() && !isroot) {  // c = D*b + beta*c + U*w.tmp2
-          gemm(Trans::C, Trans::N, scalar_t(1.), _D, B.leaf, beta, C.leaf);
-          C.leaf.add(_V.apply(w.tmp2));
+          gemm(Trans::C, Trans::N, scalar_t(1.), D_, B.leaf, beta, C.leaf);
+          C.leaf.add(V_.apply(w.tmp2));
           flops += C.leaf.rows() * C.leaf.cols() +
-            gemm_flops(Trans::C, Trans::N, scalar_t(1.), _D, B.leaf, beta);
+            gemm_flops(Trans::C, Trans::N, scalar_t(1.), D_, B.leaf, beta);
         } else {
-          gemm(Trans::C, Trans::N, scalar_t(1.), _D, B.leaf, beta, C.leaf);
-          flops += gemm_flops(Trans::C, Trans::N, scalar_t(1.), _D, B.leaf, beta);
+          gemm(Trans::C, Trans::N, scalar_t(1.), D_, B.leaf, beta, C.leaf);
+          flops += gemm_flops(Trans::C, Trans::N, scalar_t(1.), D_, B.leaf, beta);
         }
       } else {
         auto n = B.cols();
-        DistM_t c0tmp1(grid(), _B01.rows(), n, w.c[0].tmp1, grid()->ctxt_all());
-        DistM_t c1tmp1(grid(), _B10.rows(), n, w.c[1].tmp1, grid()->ctxt_all());
-        DistM_t c0tmp2(grid(), _B10.cols(), n);
-        DistM_t c1tmp2(grid(), _B01.cols(), n);
+        DistM_t c0tmp1(grid(), B01_.rows(), n, w.c[0].tmp1, grid()->ctxt_all());
+        DistM_t c1tmp1(grid(), B10_.rows(), n, w.c[1].tmp1, grid()->ctxt_all());
+        DistM_t c0tmp2(grid(), B10_.cols(), n);
+        DistM_t c1tmp2(grid(), B01_.cols(), n);
         if (isroot || !this->V_rank()) {
-          gemm(Trans::C, Trans::N, scalar_t(1.), _B10, c1tmp1,
+          gemm(Trans::C, Trans::N, scalar_t(1.), B10_, c1tmp1,
                scalar_t(0.), c0tmp2);
-          gemm(Trans::C, Trans::N, scalar_t(1.), _B01, c0tmp1,
+          gemm(Trans::C, Trans::N, scalar_t(1.), B01_, c0tmp1,
                scalar_t(0.), c1tmp2);
           flops +=
-            gemm_flops(Trans::C, Trans::N, scalar_t(1.), _B10, c1tmp1, scalar_t(0.)) +
-            gemm_flops(Trans::C, Trans::N, scalar_t(1.), _B01, c0tmp1, scalar_t(0.));
+            gemm_flops(Trans::C, Trans::N, scalar_t(1.), B10_, c1tmp1, scalar_t(0.)) +
+            gemm_flops(Trans::C, Trans::N, scalar_t(1.), B01_, c0tmp1, scalar_t(0.));
         } else {
-          auto tmp = _V.apply(w.tmp2);
+          auto tmp = V_.apply(w.tmp2);
           copy(c0tmp2.rows(), n, tmp, 0, 0, c0tmp2, 0, 0, grid()->ctxt_all());
           copy(c1tmp2.rows(), n, tmp, c0tmp2.rows(), 0, c1tmp2, 0, 0, grid()->ctxt_all());
-          gemm(Trans::C, Trans::N, scalar_t(1.), _B10, c1tmp1,
+          gemm(Trans::C, Trans::N, scalar_t(1.), B10_, c1tmp1,
                scalar_t(1.), c0tmp2);
-          gemm(Trans::C, Trans::N, scalar_t(1.), _B01, c0tmp1,
+          gemm(Trans::C, Trans::N, scalar_t(1.), B01_, c0tmp1,
                scalar_t(1.), c1tmp2);
           flops +=
-            gemm_flops(Trans::C, Trans::N, scalar_t(1.), _B10, c1tmp1, scalar_t(1.)) +
-            gemm_flops(Trans::C, Trans::N, scalar_t(1.), _B01, c0tmp1, scalar_t(1.));
+            gemm_flops(Trans::C, Trans::N, scalar_t(1.), B10_, c1tmp1, scalar_t(1.)) +
+            gemm_flops(Trans::C, Trans::N, scalar_t(1.), B01_, c0tmp1, scalar_t(1.));
         }
         w.c[0].tmp2 = DistM_t
           (w.c[0].tmp1.grid(), c0tmp2.rows(), n, c0tmp2, grid()->ctxt_all());
         w.c[1].tmp2 = DistM_t
           (w.c[1].tmp1.grid(), c1tmp2.rows(), n, c1tmp2, grid()->ctxt_all());
-        this->ch_[0]->applyT_bwd(B, beta, C, w.c[0], false, flops);
-        this->ch_[1]->applyT_bwd(B, beta, C, w.c[1], false, flops);
+        child(0)->applyT_bwd(B, beta, C, w.c[0], false, flops);
+        child(1)->applyT_bwd(B, beta, C, w.c[1], false, flops);
       }
     }
 

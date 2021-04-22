@@ -93,16 +93,15 @@ namespace strumpack {
 
 
     // TODO make private?
-    HSS::HSSMatrix<scalar_t> _H;
-    // HSS::HSSFactors<scalar_t> _ULV;
+    HSS::HSSMatrix<scalar_t> H_;
 
     // TODO do not store this here: makes solve not thread safe!!
-    mutable std::unique_ptr<HSS::WorkSolve<scalar_t>> _ULVwork;
+    mutable std::unique_ptr<HSS::WorkSolve<scalar_t>> ULVwork_;
 
     /** Schur complement update:
      *    S = F22 - _Theta * Vhat^C * _Phi^C
      **/
-    DenseM_t _Theta, _Phi, _ThetaVhatC_or_VhatCPhiC, _DUB01;
+    DenseM_t Theta_, Phi_, ThetaVhatC_or_VhatCPhiC_, DUB01_;
 
     /** these are saved during/after randomized compression and are
         then later used to sample the Schur complement when
@@ -111,7 +110,7 @@ namespace strumpack {
                            HSS matrix of this front */
     DenseM_t Sr2, Sc2;  /* bottom of the sample matrix used to
                            construct HSS matrix of this front */
-    std::uint32_t _sampled_columns = 0;
+    std::uint32_t sampled_columns_ = 0;
 
   private:
     FrontalMatrixHSS(const FrontalMatrixHSS&) = delete;

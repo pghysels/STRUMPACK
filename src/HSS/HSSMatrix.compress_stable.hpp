@@ -99,42 +99,42 @@ namespace strumpack {
             I.push_back(i+w.offset.first);
           for (std::size_t j=0; j<this->cols(); j++)
             J.push_back(j+w.offset.second);
-          _D = DenseM_t(this->rows(), this->cols());
-          Aelem(I, J, _D);
+          D_ = DenseM_t(this->rows(), this->cols());
+          Aelem(I, J, D_);
         }
       } else {
-        w.split(this->ch_[0]->dims());
+        w.split(child(0)->dims());
         bool tasked = depth < params::task_recursion_cutoff_level;
         if (tasked) {
 #pragma omp task default(shared)                                        \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-          this->ch_[0]->compress_recursive_stable
+          child(0)->compress_recursive_stable
             (Rr, Rc, Sr, Sc, Aelem, opts, w.c[0], d, dd, depth+1);
 #pragma omp task default(shared)                                        \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-          this->ch_[1]->compress_recursive_stable
+          child(1)->compress_recursive_stable
             (Rr, Rc, Sr, Sc, Aelem, opts, w.c[1], d, dd, depth+1);
 #pragma omp taskwait
         } else {
-          this->ch_[0]->compress_recursive_stable
+          child(0)->compress_recursive_stable
             (Rr, Rc, Sr, Sc, Aelem, opts, w.c[0], d, dd, depth+1);
-          this->ch_[1]->compress_recursive_stable
+          child(1)->compress_recursive_stable
             (Rr, Rc, Sr, Sc, Aelem, opts, w.c[1], d, dd, depth+1);
         }
-        if (!this->ch_[0]->is_compressed() ||
-            !this->ch_[1]->is_compressed()) return;
+        if (!child(0)->is_compressed() ||
+            !child(1)->is_compressed()) return;
         if (this->is_untouched()) {
 #pragma omp task default(shared) if(tasked)                             \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
           {
-            _B01 = DenseM_t(this->ch_[0]->U_rank(), this->ch_[1]->V_rank());
-            Aelem(w.c[0].Ir, w.c[1].Ic, _B01);
+            B01_ = DenseM_t(child(0)->U_rank(), child(1)->V_rank());
+            Aelem(w.c[0].Ir, w.c[1].Ic, B01_);
           }
 #pragma omp task default(shared) if(tasked)                             \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
           {
-            _B10 = DenseM_t(this->ch_[1]->U_rank(), this->ch_[0]->V_rank());
-            Aelem(w.c[1].Ir, w.c[0].Ic, _B10);
+            B10_ = DenseM_t(child(1)->U_rank(), child(0)->V_rank());
+            Aelem(w.c[1].Ir, w.c[0].Ic, B10_);
           }
 #pragma omp taskwait
         }
@@ -166,23 +166,23 @@ namespace strumpack {
           if (tasked) {
 #pragma omp task default(shared)                                        \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-            this->ch_[0]->compress_level_stable
+            child(0)->compress_level_stable
               (Rr, Rc, Sr, Sc, opts, w.c[0], d, dd, lvl, depth);
 #pragma omp task default(shared)                                        \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-            this->ch_[1]->compress_level_stable
+            child(1)->compress_level_stable
               (Rr, Rc, Sr, Sc, opts, w.c[1], d, dd, lvl, depth);
 #pragma omp taskwait
           } else {
-            this->ch_[0]->compress_level_stable
+            child(0)->compress_level_stable
               (Rr, Rc, Sr, Sc, opts, w.c[0], d, dd, lvl, depth);
-            this->ch_[1]->compress_level_stable
+            child(1)->compress_level_stable
               (Rr, Rc, Sr, Sc, opts, w.c[1], d, dd, lvl, depth);
           }
           return;
         }
-        if (!this->ch_[0]->is_compressed() ||
-            !this->ch_[1]->is_compressed()) return;
+        if (!child(0)->is_compressed() ||
+            !child(1)->is_compressed()) return;
       }
       if (w.lvl==0) this->U_state_ = this->V_state_ = State::COMPRESSED;
       else {
@@ -205,7 +205,7 @@ namespace strumpack {
      int d, int dd, int depth) {
       if (this->U_state_ == State::COMPRESSED) return;
       int u_rows = this->leaf() ? this->rows() :
-        this->ch_[0]->U_rank()+this->ch_[1]->U_rank();
+        child(0)->U_rank()+child(1)->U_rank();
       DenseMW_t lSr(u_rows, d+dd, Sr, w.offset.second, 0);
       if (d+dd >= opts.max_rank() || d+dd >= int(u_rows) ||
           update_orthogonal_basis
@@ -214,11 +214,11 @@ namespace strumpack {
         w.Qr.clear();
         auto rtol = opts.rel_tol() / w.lvl;
         auto atol = opts.abs_tol() / w.lvl;
-        lSr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol, opts.max_rank(), depth);
-        STRUMPACK_ID_FLOPS(ID_row_flops(lSr, _U.cols()));
-        this->U_rank_ = _U.cols();
-        this->U_rows_ = _U.rows();
-        w.Ir.reserve(_U.cols());
+        lSr.ID_row(U_.E(), U_.P(), w.Jr, rtol, atol, opts.max_rank(), depth);
+        STRUMPACK_ID_FLOPS(ID_row_flops(lSr, U_.cols()));
+        this->U_rank_ = U_.cols();
+        this->U_rows_ = U_.rows();
+        w.Ir.reserve(U_.cols());
         if (this->leaf())
           for (auto i : w.Jr) w.Ir.push_back(w.offset.first + i);
         else {
@@ -240,7 +240,7 @@ namespace strumpack {
      int d, int dd, int depth) {
       if (this->V_state_ == State::COMPRESSED) return;
       int v_rows = this->leaf() ? this->rows() :
-        this->ch_[0]->V_rank()+this->ch_[1]->V_rank();
+        child(0)->V_rank()+child(1)->V_rank();
       DenseMW_t lSc(v_rows, d+dd, Sc, w.offset.second, 0);
       if (d+dd >= opts.max_rank() || d+dd >= v_rows ||
           update_orthogonal_basis
@@ -249,11 +249,11 @@ namespace strumpack {
         w.Qc.clear();
         auto rtol = opts.rel_tol() / w.lvl;
         auto atol = opts.abs_tol() / w.lvl;
-        lSc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol, opts.max_rank(), depth);
-        STRUMPACK_ID_FLOPS(ID_row_flops(lSc, _V.cols()));
-        this->V_rank_ = _V.cols();
-        this->V_rows_ = _V.rows();
-        w.Ic.reserve(_V.cols());
+        lSc.ID_row(V_.E(), V_.P(), w.Jc, rtol, atol, opts.max_rank(), depth);
+        STRUMPACK_ID_FLOPS(ID_row_flops(lSc, V_.cols()));
+        this->V_rank_ = V_.cols();
+        this->V_rows_ = V_.rows();
+        w.Ic.reserve(V_.cols());
         if (this->leaf())
           for (auto j : w.Jc) w.Ic.push_back(w.offset.second + j);
         else {
@@ -272,8 +272,8 @@ namespace strumpack {
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::set_U_full_rank(WorkCompress<scalar_t>& w) {
       auto u_rows = this->leaf() ? this->rows() :
-        this->ch_[0]->U_rank()+this->ch_[1]->U_rank();
-      _U = HSSBasisID<scalar_t>(u_rows);
+        child(0)->U_rank()+child(1)->U_rank();
+      U_ = HSSBasisID<scalar_t>(u_rows);
       w.Jr.reserve(u_rows);
       for (std::size_t i=0; i<u_rows; i++) w.Jr.push_back(i);
       w.Ir.reserve(u_rows);
@@ -281,9 +281,9 @@ namespace strumpack {
         for (std::size_t i=0; i<u_rows; i++)
           w.Ir.push_back(w.offset.first + i);
       else {
-        for (std::size_t i=0; i<this->ch_[0]->U_rank(); i++)
+        for (std::size_t i=0; i<child(0)->U_rank(); i++)
           w.Ir.push_back(w.c[0].Ir[i]);
-        for (std::size_t i=0; i<this->ch_[1]->U_rank(); i++)
+        for (std::size_t i=0; i<child(1)->U_rank(); i++)
           w.Ir.push_back(w.c[1].Ir[i]);
       }
       this->U_state_ = State::COMPRESSED;
@@ -292,8 +292,8 @@ namespace strumpack {
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::set_V_full_rank(WorkCompress<scalar_t>& w) {
       auto v_rows = this->leaf() ? this->rows() :
-        this->ch_[0]->V_rank()+this->ch_[1]->V_rank();
-      _V = HSSBasisID<scalar_t>(v_rows);
+        child(0)->V_rank()+child(1)->V_rank();
+      V_ = HSSBasisID<scalar_t>(v_rows);
       w.Jc.reserve(v_rows);
       for (std::size_t j=0; j<v_rows; j++) w.Jc.push_back(j);
       w.Ic.reserve(v_rows);
@@ -301,9 +301,9 @@ namespace strumpack {
         for (std::size_t j=0; j<v_rows; j++)
           w.Ic.push_back(w.offset.second + j);
       else {
-        for (std::size_t j=0; j<this->ch_[0]->V_rank(); j++)
+        for (std::size_t j=0; j<child(0)->V_rank(); j++)
           w.Ic.push_back(w.c[0].Ic[j]);
-        for (std::size_t j=0; j<this->ch_[1]->V_rank(); j++)
+        for (std::size_t j=0; j<child(1)->V_rank(); j++)
           w.Ic.push_back(w.c[1].Ic[j]);
       }
       this->V_state_ = State::COMPRESSED;

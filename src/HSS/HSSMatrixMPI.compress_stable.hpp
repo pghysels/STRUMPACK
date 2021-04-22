@@ -113,25 +113,25 @@ namespace strumpack {
             I.push_back(i+w.offset.first);
           for (std::size_t j=0; j<this->cols(); j++)
             J.push_back(j+w.offset.second);
-          _D = DistM_t(grid(), this->rows(), this->cols());
-          Aelem(I, J, _D, _A, w.offset.first, w.offset.second, comm());
+          D_ = DistM_t(grid(), this->rows(), this->cols());
+          Aelem(I, J, D_, A_, w.offset.first, w.offset.second, comm());
         }
       } else {
-        w.split(this->ch_[0]->dims());
-        this->ch_[0]->compress_recursive_stable
+        w.split(child(0)->dims());
+        child(0)->compress_recursive_stable
           (RS, Aelem, opts, w.c[0], d, dd);
-        this->ch_[1]->compress_recursive_stable
+        child(1)->compress_recursive_stable
           (RS, Aelem, opts, w.c[1], d, dd);
         communicate_child_data(w);
-        if (!this->ch_[0]->is_compressed() ||
-            !this->ch_[1]->is_compressed()) return;
+        if (!child(0)->is_compressed() ||
+            !child(1)->is_compressed()) return;
         if (this->is_untouched()) {
-          _B01 = DistM_t(grid(), w.c[0].Ir.size(), w.c[1].Ic.size());
-          _B10 = DistM_t(grid(), w.c[1].Ir.size(), w.c[0].Ic.size());
-          Aelem(w.c[0].Ir, w.c[1].Ic, _B01, _A01,
-                w.offset.first, w.offset.second+this->ch_[0]->cols(), comm());
-          Aelem(w.c[1].Ir, w.c[0].Ic, _B10, _A10,
-                w.offset.first+this->ch_[0]->rows(), w.offset.second, comm());
+          B01_ = DistM_t(grid(), w.c[0].Ir.size(), w.c[1].Ic.size());
+          B10_ = DistM_t(grid(), w.c[1].Ir.size(), w.c[0].Ic.size());
+          Aelem(w.c[0].Ir, w.c[1].Ic, B01_, A01_,
+                w.offset.first, w.offset.second+child(0)->cols(), comm());
+          Aelem(w.c[1].Ir, w.c[0].Ic, B10_, A10_,
+                w.offset.first+child(0)->rows(), w.offset.second, comm());
         }
       }
       if (w.lvl == 0) this->U_state_ = this->V_state_ = State::COMPRESSED;
@@ -157,12 +157,12 @@ namespace strumpack {
         if (w.lvl < lvl) return;
       } else {
         if (w.lvl < lvl) {
-          this->ch_[0]->compress_level_stable(RS, opts, w.c[0], d, dd, lvl);
-          this->ch_[1]->compress_level_stable(RS, opts, w.c[1], d, dd, lvl);
+          child(0)->compress_level_stable(RS, opts, w.c[0], d, dd, lvl);
+          child(1)->compress_level_stable(RS, opts, w.c[1], d, dd, lvl);
           return;
         }
-        if (!this->ch_[0]->is_compressed() ||
-            !this->ch_[1]->is_compressed()) return;
+        if (!child(0)->is_compressed() ||
+            !child(1)->is_compressed()) return;
       }
       if (w.lvl==0) this->U_state_ = this->V_state_ = State::COMPRESSED;
       else {
@@ -183,7 +183,7 @@ namespace strumpack {
     (const opts_t& opts, WorkCompressMPI<scalar_t>& w, int d, int dd) {
       if (this->U_state_ == State::COMPRESSED) return;
       int u_rows = this->leaf() ? this->rows() :
-        this->ch_[0]->U_rank()+this->ch_[1]->U_rank();
+        child(0)->U_rank()+child(1)->U_rank();
       auto gT = grid()->transpose();
       if (!w.Sr.active()) return;
       if (d+dd >= opts.max_rank() || d+dd >= u_rows ||
@@ -194,11 +194,11 @@ namespace strumpack {
         // TODO pass max_rank to ID in DistributedMatrix
         auto rtol = opts.rel_tol() / w.lvl;
         auto atol = opts.abs_tol() / w.lvl;
-        w.Sr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol, opts.max_rank(), &gT);
-        STRUMPACK_ID_FLOPS(ID_row_flops(w.Sr, _U.cols()));
-        this->U_rank_ = _U.cols();
-        this->U_rows_ = _U.rows();
-        w.Ir.reserve(_U.cols());
+        w.Sr.ID_row(U_.E(), U_.P(), w.Jr, rtol, atol, opts.max_rank(), &gT);
+        STRUMPACK_ID_FLOPS(ID_row_flops(w.Sr, U_.cols()));
+        this->U_rank_ = U_.cols();
+        this->U_rows_ = U_.rows();
+        w.Ir.reserve(U_.cols());
         if (this->leaf())
           for (auto i : w.Jr) w.Ir.push_back(w.offset.first + i);
         else {
@@ -215,7 +215,7 @@ namespace strumpack {
     (const opts_t& opts, WorkCompressMPI<scalar_t>& w, int d, int dd) {
       if (this->V_state_ == State::COMPRESSED) return;
       int v_rows = this->leaf() ? this->rows() :
-        this->ch_[0]->V_rank()+this->ch_[1]->V_rank();
+        child(0)->V_rank()+child(1)->V_rank();
       auto gT = grid()->transpose();
       if (!w.Sc.active()) return;
       if (d+dd >= opts.max_rank() || d+dd >= v_rows ||
@@ -226,11 +226,11 @@ namespace strumpack {
         // TODO pass max_rank to ID in DistributedMatrix
         auto rtol = opts.rel_tol() / w.lvl;
         auto atol = opts.abs_tol() / w.lvl;
-        w.Sc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol, opts.max_rank(), &gT);
-        STRUMPACK_ID_FLOPS(ID_row_flops(w.Sc, _V.cols()));
-        this->V_rank_ = _V.cols();
-        this->V_rows_ = _V.rows();
-        w.Ic.reserve(_V.cols());
+        w.Sc.ID_row(V_.E(), V_.P(), w.Jc, rtol, atol, opts.max_rank(), &gT);
+        STRUMPACK_ID_FLOPS(ID_row_flops(w.Sc, V_.cols()));
+        this->V_rank_ = V_.cols();
+        this->V_rows_ = V_.rows();
+        w.Ic.reserve(V_.cols());
         if (this->leaf())
           for (auto j : w.Jc) w.Ic.push_back(w.offset.second + j);
         else {

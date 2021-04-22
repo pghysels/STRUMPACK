@@ -169,9 +169,9 @@ namespace strumpack {
        * solve.
        */
       std::size_t memory() {
-        return sizeof(*this) + _L.memory() + _Vt0.memory()
-          + _W1.memory() + _Q.memory() + _D.memory()
-          + sizeof(int)*_piv.size();
+        return sizeof(*this) + L_.memory() + Vt0_.memory()
+          + W1_.memory() + Q_.memory() + D_.memory()
+          + sizeof(int)*piv_.size();
       }
 
       /**
@@ -181,33 +181,33 @@ namespace strumpack {
        * is still required to perform a solve.
        */
       std::size_t nonzeros() const {
-        return _L.nonzeros() + _Vt0.nonzeros() + _W1.nonzeros()
-          + _Q.nonzeros() + _D.nonzeros();
+        return L_.nonzeros() + Vt0_.nonzeros() + W1_.nonzeros()
+          + Q_.nonzeros() + D_.nonzeros();
       }
 
       /**
        * Used in the sparse solver to construct the Schur complement.
        */
-      const DenseMatrix<scalar_t>& Vhat() const { return _Vt0; }
+      const DenseMatrix<scalar_t>& Vhat() const { return Vt0_; }
       /**
        * Used in the sparse solver to construct the Schur complement.
        */
-      DenseMatrix<scalar_t>& Vhat() { return _Vt0; }
+      DenseMatrix<scalar_t>& Vhat() { return Vt0_; }
 
     private:
-      DenseMatrix<scalar_t> _L;   // (U.rows-U.cols x U.rows-U.cols),
+      DenseMatrix<scalar_t> L_;   // (U.rows-U.cols x U.rows-U.cols),
                                   //  empty at the root
-      DenseMatrix<scalar_t> _Vt0; // (U.rows-U.cols x V.cols)
+      DenseMatrix<scalar_t> Vt0_; // (U.rows-U.cols x V.cols)
                                   // at the root, _Vt0 stored Vhat
-      DenseMatrix<scalar_t> _W1;  // (U.cols x U.rows) bottom part of W
+      DenseMatrix<scalar_t> W1_;  // (U.cols x U.rows) bottom part of W
                                   // if (U.rows == U.cols)
                                   // then W == I and is not stored!
-      DenseMatrix<scalar_t> _Q;   // (U.rows x U.rows) Q from LQ(W0)
+      DenseMatrix<scalar_t> Q_;   // (U.rows x U.rows) Q from LQ(W0)
                                   // if (U.rows == U.cols)
                                   // then Q == I and is not stored!
-      DenseMatrix<scalar_t> _D;   // (U.rows x U.rows) at the root holds LU(D)
+      DenseMatrix<scalar_t> D_;   // (U.rows x U.rows) at the root holds LU(D)
                                   // else empty
-      std::vector<int> _piv;      // hold permutation from LU(D) at root
+      std::vector<int> piv_;      // hold permutation from LU(D) at root
       template<typename T> friend class HSSMatrix;
       template<typename T> friend class HSSMatrixBase;
     };

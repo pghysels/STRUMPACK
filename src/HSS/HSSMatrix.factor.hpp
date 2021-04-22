@@ -44,7 +44,7 @@ namespace strumpack {
     HSSMatrix<scalar_t>::partial_factor() {
       this->ULV_ = HSSFactors<scalar_t>();
       WorkFactor<scalar_t> w;
-      this->ch_[0]->factor_recursive
+      child(0)->factor_recursive
         (w, true, true, this->openmp_task_depth_);
     }
 
@@ -57,39 +57,38 @@ namespace strumpack {
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->ch_[0]->factor_recursive
+        child(0)->factor_recursive
           (w.c[0], false, partial, depth+1);
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->ch_[1]->factor_recursive
+        child(1)->factor_recursive
           (w.c[1], false, partial, depth+1);
 #pragma omp taskwait
-        auto u_rows = this->ch_[0]->U_rank() + this->ch_[1]->U_rank();
+        auto u_rows = child(0)->U_rank() + child(1)->U_rank();
         if (u_rows) {
-          this->ULV_._D = DenseM_t(u_rows, u_rows);
-          auto c0u = this->ch_[0]->U_rank();
-          copy(w.c[0].Dt, this->ULV_._D, 0, 0);
-          copy(w.c[1].Dt, this->ULV_._D, c0u, c0u);
-          gemm(Trans::N, Trans::C, scalar_t(1.), _B01, w.c[1].Vt1,
-               scalar_t(0.), this->ULV_._D.ptr(0, c0u), this->ULV_._D.ld(), depth);
-          gemm(Trans::N, Trans::C, scalar_t(1.), _B10, w.c[0].Vt1,
-               scalar_t(0.), this->ULV_._D.ptr(c0u, 0), this->ULV_._D.ld(), depth);
+          this->ULV_.D_ = DenseM_t(u_rows, u_rows);
+          auto c0u = child(0)->U_rank();
+          copy(w.c[0].Dt, this->ULV_.D_, 0, 0);
+          copy(w.c[1].Dt, this->ULV_.D_, c0u, c0u);
+          gemm(Trans::N, Trans::C, scalar_t(1.), B01_, w.c[1].Vt1,
+               scalar_t(0.), this->ULV_.D_.ptr(0, c0u), this->ULV_.D_.ld(), depth);
+          gemm(Trans::N, Trans::C, scalar_t(1.), B10_, w.c[0].Vt1,
+               scalar_t(0.), this->ULV_.D_.ptr(c0u, 0), this->ULV_.D_.ld(), depth);
           STRUMPACK_ULV_FACTOR_FLOPS
-            (gemm_flops(Trans::N, Trans::C, scalar_t(1.), _B01, w.c[1].Vt1, scalar_t(0.)) +
-             gemm_flops(Trans::N, Trans::C, scalar_t(1.), _B10, w.c[0].Vt1, scalar_t(0.)));
+            (gemm_flops(Trans::N, Trans::C, scalar_t(1.), B01_, w.c[1].Vt1, scalar_t(0.)) +
+             gemm_flops(Trans::N, Trans::C, scalar_t(1.), B10_, w.c[0].Vt1, scalar_t(0.)));
         }
         if (!isroot || partial) {
-          Vh = DenseM_t(_U.rows(), _V.cols());
-          DenseMW_t Vh0(this->ch_[0]->U_rank(), _V.cols(), Vh, 0, 0);
-          DenseMW_t Vh1
-            (this->ch_[1]->U_rank(), _V.cols(), Vh,
-             this->ch_[0]->U_rank(), 0);
-          auto V = _V.dense();
+          Vh = DenseM_t(U_.rows(), V_.cols());
+          DenseMW_t Vh0(child(0)->U_rank(), V_.cols(), Vh, 0, 0);
+          DenseMW_t Vh1(child(1)->U_rank(), V_.cols(), Vh,
+                        child(0)->U_rank(), 0);
+          auto V = V_.dense();
           gemm(Trans::N, Trans::N, scalar_t(1.),
                w.c[0].Vt1, V.ptr(0, 0), V.ld(), scalar_t(0.), Vh0, depth);
           gemm(Trans::N, Trans::N, scalar_t(1.),
-               w.c[1].Vt1, V.ptr(this->ch_[0]->V_rank(), 0), V.ld(),
+               w.c[1].Vt1, V.ptr(child(0)->V_rank(), 0), V.ld(),
                scalar_t(0.), Vh1, depth);
           STRUMPACK_ULV_FACTOR_FLOPS
             (gemm_flops(Trans::N, Trans::N, scalar_t(1.),
@@ -99,50 +98,50 @@ namespace strumpack {
         }
         w.c.clear();
       } else {
-        this->ULV_._D = _D;
-        Vh = _V.dense();
+        this->ULV_.D_ = D_;
+        Vh = V_.dense();
       }
       if (isroot) {
-        this->ULV_._piv = this->ULV_._D.LU(depth);
-        STRUMPACK_ULV_FACTOR_FLOPS(LU_flops(this->ULV_._D));
-        if (partial) this->ULV_._Vt0 = std::move(Vh);
+        this->ULV_.piv_ = this->ULV_.D_.LU(depth);
+        STRUMPACK_ULV_FACTOR_FLOPS(LU_flops(this->ULV_.D_));
+        if (partial) this->ULV_.Vt0_ = std::move(Vh);
       } else {
-        this->ULV_._D.laswp(_U.P(), true); // compute P^t D
-        if (_U.rows() > _U.cols()) {
+        this->ULV_.D_.laswp(U_.P(), true); // compute P^t D
+        if (U_.rows() > U_.cols()) {
           // set W1 <- (P^t D)_0
-          this->ULV_._W1 = DenseM_t(_U.cols(), _U.rows(), this->ULV_._D, 0, 0);
+          this->ULV_.W1_ = DenseM_t(U_.cols(), U_.rows(), this->ULV_.D_, 0, 0);
           // set W0 <- (P^t D)_1   (bottom part of P^t D)
-          DenseM_t W0(_U.rows()-_U.cols(), _U.rows(), this->ULV_._D, _U.cols(), 0);
-          this->ULV_._D.clear();
+          DenseM_t W0(U_.rows()-U_.cols(), U_.rows(), this->ULV_.D_, U_.cols(), 0);
+          this->ULV_.D_.clear();
           // set W0 <- -E * (P^t D)_0 + W0 = -E * W1 + W0
-          gemm(Trans::N, Trans::N, scalar_t(-1.), _U.E(), this->ULV_._W1,
+          gemm(Trans::N, Trans::N, scalar_t(-1.), U_.E(), this->ULV_.W1_,
                scalar_t(1.), W0, depth);
           STRUMPACK_ULV_FACTOR_FLOPS
-            (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), _U.E(), this->ULV_._W1, scalar_t(1.)));
+            (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), U_.E(), this->ULV_.W1_, scalar_t(1.)));
 
-          W0.LQ(this->ULV_._L, this->ULV_._Q, depth);
+          W0.LQ(this->ULV_.L_, this->ULV_.Q_, depth);
           STRUMPACK_ULV_FACTOR_FLOPS(LQ_flops(W0));
           W0.clear();
 
-          this->ULV_._Vt0 = DenseM_t(_U.rows()-_U.cols(), _V.cols());
-          w.Vt1 = DenseM_t(_U.cols(), _V.cols());
-          DenseMW_t Q0(_U.rows()-_U.cols(), _U.rows(), this->ULV_._Q, 0, 0);
-          DenseMW_t Q1(_U.cols(), _U.rows(), this->ULV_._Q, Q0.rows(), 0);
+          this->ULV_.Vt0_ = DenseM_t(U_.rows()-U_.cols(), V_.cols());
+          w.Vt1 = DenseM_t(U_.cols(), V_.cols());
+          DenseMW_t Q0(U_.rows()-U_.cols(), U_.rows(), this->ULV_.Q_, 0, 0);
+          DenseMW_t Q1(U_.cols(), U_.rows(), this->ULV_.Q_, Q0.rows(), 0);
           gemm(Trans::N, Trans::N, scalar_t(1.), Q0, Vh,
-               scalar_t(0.), this->ULV_._Vt0, depth); // Q0 * Vh
+               scalar_t(0.), this->ULV_.Vt0_, depth); // Q0 * Vh
           gemm(Trans::N, Trans::N, scalar_t(1.), Q1, Vh,
                scalar_t(0.), w.Vt1, depth); // Q1 * Vh
 
-          w.Dt = DenseM_t(_U.cols(), _U.cols());
-          gemm(Trans::N, Trans::C, scalar_t(1.), this->ULV_._W1, Q1,
+          w.Dt = DenseM_t(U_.cols(), U_.cols());
+          gemm(Trans::N, Trans::C, scalar_t(1.), this->ULV_.W1_, Q1,
                scalar_t(0.), w.Dt, depth); // W1 * Q1^c
           STRUMPACK_ULV_FACTOR_FLOPS
             (gemm_flops(Trans::N, Trans::N, scalar_t(1.), Q0, Vh, scalar_t(0.)) +
              gemm_flops(Trans::N, Trans::N, scalar_t(1.), Q0, Vh, scalar_t(0.)) +
-             gemm_flops(Trans::N, Trans::C, scalar_t(1.), this->ULV_._W1, Q1, scalar_t(0.)));
+             gemm_flops(Trans::N, Trans::C, scalar_t(1.), this->ULV_.W1_, Q1, scalar_t(0.)));
         } else {
           w.Vt1 = std::move(Vh);
-          w.Dt = std::move(this->ULV_._D);
+          w.Dt = std::move(this->ULV_.D_);
         }
       }
     }

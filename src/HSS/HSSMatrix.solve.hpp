@@ -38,7 +38,7 @@ namespace strumpack {
       assert(b.rows() == this->rows());
       // TODO assert that the ULV factorization has been performed and
       // is a valid one
-      // assert(ULV._D.rows() == _U.rows());
+      // assert(ULV._D.rows() == U_.rows());
       WorkSolve<scalar_t> w;
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
@@ -75,115 +75,115 @@ namespace strumpack {
       else {
         w.c.resize(2);
         w.c[0].offset = w.offset;
-        w.c[1].offset = w.offset + this->ch_[0]->dims();
+        w.c[1].offset = w.offset + child(0)->dims();
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->ch_[0]->solve_fwd(b, w.c[0], partial, false, depth+1);
+        child(0)->solve_fwd(b, w.c[0], partial, false, depth+1);
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->ch_[1]->solve_fwd(b, w.c[1], partial, false, depth+1);
+        child(1)->solve_fwd(b, w.c[1], partial, false, depth+1);
 #pragma omp taskwait
         DenseM_t& f0 = w.c[0].ft1;
         DenseM_t& f1 = w.c[1].ft1;
         gemm(Trans::N, Trans::N, scalar_t(-1.),
-             _B01, w.c[1].z, scalar_t(1.), f0, depth);
+             B01_, w.c[1].z, scalar_t(1.), f0, depth);
         gemm(Trans::N, Trans::N, scalar_t(-1.),
-             _B10, w.c[0].z, scalar_t(1.), f1, depth);
+             B10_, w.c[0].z, scalar_t(1.), f1, depth);
         STRUMPACK_HSS_SOLVE_FLOPS
           (gemm_flops(Trans::N, Trans::N, scalar_t(-1.),
-                      _B01, w.c[1].z, scalar_t(1.)) +
+                      B01_, w.c[1].z, scalar_t(1.)) +
            gemm_flops(Trans::N, Trans::N, scalar_t(-1.),
-                      _B10, w.c[0].z, scalar_t(1.)));
-        if (this->ch_[0]->U_rows() > this->ch_[0]->U_rank()) {
+                      B10_, w.c[0].z, scalar_t(1.)));
+        if (child(0)->U_rows() > child(0)->U_rank()) {
           auto Q00 = ConstDenseMatrixWrapperPtr
-            (this->ch_[0]->U_rows()-this->ch_[0]->U_rank(),
-             this->ch_[0]->U_rows(), this->ch_[0]->ULV_._Q, 0, 0);
+            (child(0)->U_rows()-child(0)->U_rank(),
+             child(0)->U_rows(), child(0)->ULV_.Q_, 0, 0);
           DenseM_t tmp0(Q00->cols(), b.cols());
           gemm(Trans::C, Trans::N, scalar_t(1.),
                *Q00, w.c[0].y, scalar_t(0.), tmp0, depth);
           gemm(Trans::N, Trans::N, scalar_t(-1.),
-               this->ch_[0]->ULV_._W1, tmp0, scalar_t(1.), f0, depth);
+               child(0)->ULV_.W1_, tmp0, scalar_t(1.), f0, depth);
           STRUMPACK_HSS_SOLVE_FLOPS
             (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
                         *Q00, w.c[0].y, scalar_t(0.)) +
              gemm_flops(Trans::N, Trans::N, scalar_t(-1.),
-                        this->ch_[0]->ULV_._W1, tmp0, scalar_t(1.)));
+                        child(0)->ULV_.W1_, tmp0, scalar_t(1.)));
         }
-        if (this->ch_[1]->U_rows() > this->ch_[1]->U_rank()) {
+        if (child(1)->U_rows() > child(1)->U_rank()) {
           auto Q10 = ConstDenseMatrixWrapperPtr
-            (this->ch_[1]->U_rows()-this->ch_[1]->U_rank(),
-             this->ch_[1]->U_rows(), this->ch_[1]->ULV_._Q, 0, 0);
+            (child(1)->U_rows()-child(1)->U_rank(),
+             child(1)->U_rows(), child(1)->ULV_.Q_, 0, 0);
           DenseM_t tmp1(Q10->cols(), b.cols());
           gemm(Trans::C, Trans::N, scalar_t(1.),
                *Q10, w.c[1].y, scalar_t(0.), tmp1, depth);
           gemm(Trans::N, Trans::N, scalar_t(-1.),
-               this->ch_[1]->ULV_._W1, tmp1, scalar_t(1.), f1, depth);
+               child(1)->ULV_.W1_, tmp1, scalar_t(1.), f1, depth);
           STRUMPACK_HSS_SOLVE_FLOPS
             (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
                         *Q10, w.c[1].y, scalar_t(0.)) +
              gemm_flops(Trans::N, Trans::N, scalar_t(-1.),
-                        this->ch_[1]->ULV_._W1, tmp1, scalar_t(1.)));
+                        child(1)->ULV_.W1_, tmp1, scalar_t(1.)));
         }
         f = vconcat(f0, f1);
         f0.clear();
         f1.clear();
       }
       if (isroot) {
-        w.x = this->ULV_._D.solve(f, this->ULV_._piv, depth);
+        w.x = this->ULV_.D_.solve(f, this->ULV_.piv_, depth);
         STRUMPACK_HSS_SOLVE_FLOPS(solve_flops(f));
         if (partial) {
           // compute reduced_rhs = \hat{V}^* y_0 + V^* [z_0; z_1]
           w.reduced_rhs = DenseM_t(this->V_rank(), w.x.cols());
           gemm(Trans::C, Trans::N, scalar_t(1.),
-               this->ULV_._Vt0, w.x, scalar_t(0.), w.reduced_rhs, depth);
+               this->ULV_.Vt0_, w.x, scalar_t(0.), w.reduced_rhs, depth);
           STRUMPACK_HSS_SOLVE_FLOPS
             (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
-                        this->ULV_._Vt0, w.x, scalar_t(0.)));
+                        this->ULV_.Vt0_, w.x, scalar_t(0.)));
           if (!this->leaf()) {
             w.reduced_rhs.add
-              (_V.applyC(vconcat(w.c[0].z, w.c[1].z), depth), depth);
+              (V_.applyC(vconcat(w.c[0].z, w.c[1].z), depth), depth);
             STRUMPACK_HSS_SOLVE_FLOPS
-              (_V.applyC_flops(w.c[0].z.cols()) +
+              (V_.applyC_flops(w.c[0].z.cols()) +
                w.reduced_rhs.rows() * w.reduced_rhs.cols());
           }
         }
       } else {
-        f.laswp(_U.P(), true);
+        f.laswp(U_.P(), true);
         if (this->U_rows() > this->U_rank()) {
           w.ft1 = DenseM_t(this->U_rank(), f.cols(), f, 0, 0);
           w.y = DenseM_t    // put ft0 in w.y
             (this->U_rows()-this->U_rank(), f.cols(), f, this->U_rank(), 0);
           gemm(Trans::N, Trans::N, scalar_t(-1.),
-               _U.E(), w.ft1, scalar_t(1.), w.y, depth);
+               U_.E(), w.ft1, scalar_t(1.), w.y, depth);
           trsm(Side::L, UpLo::L, Trans::N, Diag::N,
-               scalar_t(1.), this->ULV_._L, w.y, depth);
+               scalar_t(1.), this->ULV_.L_, w.y, depth);
           STRUMPACK_HSS_SOLVE_FLOPS
             (gemm_flops(Trans::N, Trans::N, scalar_t(-1.),
-                        _U.E(), w.ft1, scalar_t(1.)) +
-             trsm_flops(Side::L, scalar_t(1.), this->ULV_._L, w.y));
+                        U_.E(), w.ft1, scalar_t(1.)) +
+             trsm_flops(Side::L, scalar_t(1.), this->ULV_.L_, w.y));
           if (!this->leaf()) {
-            w.z = _V.applyC(vconcat(w.c[0].z, w.c[1].z), depth);
+            w.z = V_.applyC(vconcat(w.c[0].z, w.c[1].z), depth);
             gemm(Trans::C, Trans::N, scalar_t(1.),
-                 this->ULV_._Vt0, w.y, scalar_t(1.), w.z, depth);
+                 this->ULV_.Vt0_, w.y, scalar_t(1.), w.z, depth);
             STRUMPACK_HSS_SOLVE_FLOPS
-              (_V.applyC_flops(w.c[0].z.cols()) +
+              (V_.applyC_flops(w.c[0].z.cols()) +
                gemm_flops(Trans::C, Trans::N, scalar_t(1.),
-                          this->ULV_._Vt0, w.y, scalar_t(1.)));
+                          this->ULV_.Vt0_, w.y, scalar_t(1.)));
           } else {
             w.z = DenseM_t(this->V_rank(), b.cols());
             gemm(Trans::C, Trans::N, scalar_t(1.),
-                 this->ULV_._Vt0, w.y, scalar_t(0.), w.z, depth);
+                 this->ULV_.Vt0_, w.y, scalar_t(0.), w.z, depth);
             STRUMPACK_HSS_SOLVE_FLOPS
               (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
-                          this->ULV_._Vt0, w.y, scalar_t(0.)));
+                          this->ULV_.Vt0_, w.y, scalar_t(0.)));
           }
         } else {
           w.ft1 = DenseM_t(this->U_rank(), f.cols(), f, 0, 0);
           if (!this->leaf()) {
-            w.z = _V.applyC(vconcat(w.c[0].z, w.c[1].z), depth);
-            STRUMPACK_HSS_SOLVE_FLOPS(_V.applyC_flops(w.c[0].z.cols()));
+            w.z = V_.applyC(vconcat(w.c[0].z, w.c[1].z), depth);
+            STRUMPACK_HSS_SOLVE_FLOPS(V_.applyC_flops(w.c[0].z.cols()));
           } else {
             w.z = DenseM_t(this->V_rank(), b.cols());
             w.z.zero(); // TODO can this be avoided?
@@ -201,26 +201,26 @@ namespace strumpack {
      bool isroot, int depth) const {
       if (this->leaf()) copy(w.x, x.ptr(w.offset.second, 0), x.ld());
       else {
-        w.c[0].x = DenseM_t(this->ch_[0]->U_rows(), x.cols());
-        w.c[1].x = DenseM_t(this->ch_[1]->U_rows(), x.cols());
-        DenseMW_t x0(this->ch_[0]->U_rank(), x.cols(), w.x, 0, 0);
-        DenseMW_t x1(this->ch_[1]->U_rank(), x.cols(), w.x, x0.rows(), 0);
+        w.c[0].x = DenseM_t(child(0)->U_rows(), x.cols());
+        w.c[1].x = DenseM_t(child(1)->U_rows(), x.cols());
+        DenseMW_t x0(child(0)->U_rank(), x.cols(), w.x, 0, 0);
+        DenseMW_t x1(child(1)->U_rank(), x.cols(), w.x, x0.rows(), 0);
         // TODO instead of concat, use 2 separate gemms!!
-        if (this->ch_[0]->U_rows() > this->ch_[0]->U_rank()) {
+        if (child(0)->U_rows() > child(0)->U_rank()) {
           auto tmp = vconcat(w.c[0].y, x0);
-          gemm(Trans::C, Trans::N, scalar_t(1.), this->ch_[0]->ULV_._Q,
+          gemm(Trans::C, Trans::N, scalar_t(1.), child(0)->ULV_.Q_,
                tmp, scalar_t(0.), w.c[0].x, depth);
           STRUMPACK_HSS_SOLVE_FLOPS
             (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
-                        this->ch_[0]->ULV_._Q, tmp, scalar_t(0.)));
+                        child(0)->ULV_.Q_, tmp, scalar_t(0.)));
         } else w.c[0].x.copy(x0);
-        if (this->ch_[1]->U_rows() > this->ch_[1]->U_rank()) {
+        if (child(1)->U_rows() > child(1)->U_rank()) {
           auto tmp = vconcat(w.c[1].y, x1);
           gemm(Trans::C, Trans::N, scalar_t(1.),
-               this->ch_[1]->ULV_._Q, tmp, scalar_t(0.), w.c[1].x, depth);
+               child(1)->ULV_.Q_, tmp, scalar_t(0.), w.c[1].x, depth);
           STRUMPACK_HSS_SOLVE_FLOPS
             (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
-                        this->ch_[1]->ULV_._Q, tmp, scalar_t(0.)));
+                        child(1)->ULV_.Q_, tmp, scalar_t(0.)));
         } else w.c[1].x.copy(x1);
         w.x.clear();
         w.c[0].y.clear();
@@ -228,11 +228,11 @@ namespace strumpack {
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->ch_[0]->solve_bwd(x, w.c[0], false, depth+1);
+        child(0)->solve_bwd(x, w.c[0], false, depth+1);
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->ch_[1]->solve_bwd(x, w.c[1], false, depth+1);
+        child(1)->solve_bwd(x, w.c[1], false, depth+1);
 #pragma omp taskwait
       }
     }

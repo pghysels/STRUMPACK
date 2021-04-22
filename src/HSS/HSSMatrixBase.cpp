@@ -503,15 +503,15 @@ namespace strumpack {
 #pragma omp single nowait
       factor_recursive(*(w.w_seq), isroot, partial, openmp_task_depth_);
       if (isroot) {
-        if (partial) ULV_mpi_.Vt0_ = DistM_t(lg, ULV_._Vt0);
-        ULV_mpi_.D_ = DistM_t(lg, ULV_._D);
+        if (partial) ULV_mpi_.Vt0_ = DistM_t(lg, ULV_.Vt0_);
+        ULV_mpi_.D_ = DistM_t(lg, ULV_.D_);
         ULV_mpi_.piv_.resize(ULV_mpi_.D_.lrows() + ULV_mpi_.D_.MB());
-        std::copy(ULV_._piv.begin(), ULV_._piv.end(), ULV_mpi_.piv_.begin());
+        std::copy(ULV_.piv_.begin(), ULV_.piv_.end(), ULV_mpi_.piv_.begin());
       } else {
         w.Dt = DistM_t(lg, std::move(w.w_seq->Dt));
         w.Vt1 = DistM_t(lg, std::move(w.w_seq->Vt1));
-        ULV_mpi_.Q_ = DistM_t(lg, std::move(ULV_._Q));
-        ULV_mpi_.W1_ = DistM_t(lg, std::move(ULV_._W1));
+        ULV_mpi_.Q_ = DistM_t(lg, std::move(ULV_.Q_));
+        ULV_mpi_.W1_ = DistM_t(lg, std::move(ULV_.W1_));
       }
     }
 

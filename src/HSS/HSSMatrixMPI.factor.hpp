@@ -42,7 +42,7 @@ namespace strumpack {
     HSSMatrixMPI<scalar_t>::partial_factor() {
       this->ULV_mpi_ = HSSFactorsMPI<scalar_t>();
       WorkFactorMPI<scalar_t> w;
-      this->ch_[0]->factor_recursive(w, grid_local(), true, true);
+      child(0)->factor_recursive(w, grid_local(), true, true);
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::factor_recursive
@@ -53,12 +53,12 @@ namespace strumpack {
       DistM_t Vh;
       if (!this->leaf()) {
         w.c.resize(2);
-        this->ch_[0]->factor_recursive(w.c[0], lg, false, partial);
-        this->ch_[1]->factor_recursive(w.c[1], lg, false, partial);
-        auto c0u = _B01.rows();
-        auto c1u = _B10.rows();
-        auto c0v = _B10.cols();
-        auto c1v = _B01.cols();
+        child(0)->factor_recursive(w.c[0], lg, false, partial);
+        child(1)->factor_recursive(w.c[1], lg, false, partial);
+        auto c0u = B01_.rows();
+        auto c1u = B10_.rows();
+        auto c0v = B10_.cols();
+        auto c1v = B01_.cols();
         auto u_rows = c0u + c1u;
         // move w.c[x].Vt1 from the child grid to the current grid
         DistM_t c0Vt1(grid(), c0u, c0v, w.c[0].Vt1, grid()->ctxt_all());
@@ -69,17 +69,17 @@ namespace strumpack {
           copy(c1u, c1u, w.c[1].Dt, 0, 0, this->ULV_mpi_.D_, c0u, c0u, grid()->ctxt_all());
           DistMW_t D01(c0u, c1u, this->ULV_mpi_.D_, 0, c0u);
           DistMW_t D10(c1u, c0u, this->ULV_mpi_.D_, c0u, 0);
-          gemm(Trans::N, Trans::C, scalar_t(1.), _B01, c1Vt1, scalar_t(0.), D01);
-          gemm(Trans::N, Trans::C, scalar_t(1.), _B10, c0Vt1, scalar_t(0.), D10);
+          gemm(Trans::N, Trans::C, scalar_t(1.), B01_, c1Vt1, scalar_t(0.), D01);
+          gemm(Trans::N, Trans::C, scalar_t(1.), B10_, c0Vt1, scalar_t(0.), D10);
           STRUMPACK_ULV_FACTOR_FLOPS
-            (gemm_flops(Trans::N, Trans::C, scalar_t(1.), _B01, c1Vt1, scalar_t(0.)) +
-             gemm_flops(Trans::N, Trans::C, scalar_t(1.), _B10, c0Vt1, scalar_t(0.)));
+            (gemm_flops(Trans::N, Trans::C, scalar_t(1.), B01_, c1Vt1, scalar_t(0.)) +
+             gemm_flops(Trans::N, Trans::C, scalar_t(1.), B10_, c0Vt1, scalar_t(0.)));
         }
         if (!isroot || partial) {
           Vh = DistM_t(grid(), this->U_rows(), this->V_rank());
           DistMW_t Vh0(c0u, this->V_rank(), Vh, 0, 0);
           DistMW_t Vh1(c1u, this->V_rank(), Vh, c0u, 0);
-          auto V = _V.dense();
+          auto V = V_.dense();
           DistMW_t V0(c0v, this->V_rank(), V, 0, 0);
           DistMW_t V1(c1v, this->V_rank(), V, c0v, 0);
           gemm(Trans::N, Trans::N, scalar_t(1.), c0Vt1, V0, scalar_t(0.), Vh0);
@@ -90,15 +90,15 @@ namespace strumpack {
         }
         w.c.clear();
       } else {
-        this->ULV_mpi_.D_ = _D;
-        Vh = _V.dense();
+        this->ULV_mpi_.D_ = D_;
+        Vh = V_.dense();
       }
       if (isroot) {
         this->ULV_mpi_.piv_ = this->ULV_mpi_.D_.LU();
         STRUMPACK_ULV_FACTOR_FLOPS(LU_flops(this->ULV_mpi_.D_));
         if (partial) this->ULV_mpi_.Vt0_ = std::move(Vh);
       } else {
-        this->ULV_mpi_.D_.laswp(_U.P(), true); // compute P^t D
+        this->ULV_mpi_.D_.laswp(U_.P(), true); // compute P^t D
         if (this->U_rows() > this->U_rank()) {
           this->ULV_mpi_.W1_ = DistM_t(grid(), this->U_rank(), this->U_rows());
           // set W1 <- (P^t D)_0
@@ -109,9 +109,9 @@ namespace strumpack {
           copy(W0.rows(), W0.cols(), this->ULV_mpi_.D_, this->U_rank(), 0, W0, 0, 0, grid()->ctxt_all());
           this->ULV_mpi_.D_.clear();
           // set W0 <- -E * (P^t D)_0 + W0 = -E * W1 + W0
-          gemm(Trans::N, Trans::N, scalar_t(-1.), _U.E(), this->ULV_mpi_.W1_, scalar_t(1.), W0);
+          gemm(Trans::N, Trans::N, scalar_t(-1.), U_.E(), this->ULV_mpi_.W1_, scalar_t(1.), W0);
           STRUMPACK_ULV_FACTOR_FLOPS
-            (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), _U.E(), this->ULV_mpi_.W1_, scalar_t(1.)));
+            (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), U_.E(), this->ULV_mpi_.W1_, scalar_t(1.)));
 
           W0.LQ(this->ULV_mpi_.L_, this->ULV_mpi_.Q_);
           STRUMPACK_ULV_FACTOR_FLOPS(LQ_flops(W0));

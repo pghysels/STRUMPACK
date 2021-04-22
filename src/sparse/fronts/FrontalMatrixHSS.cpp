@@ -42,12 +42,12 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::release_work_memory() {
-    _ThetaVhatC_or_VhatCPhiC.clear();
-    _H.delete_trailing_block();
+    ThetaVhatC_or_VhatCPhiC_.clear();
+    H_.delete_trailing_block();
     R1.clear();
     Sr2.clear();
     Sc2.clear();
-    _DUB01.clear();
+    DUB01_.clear();
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -59,16 +59,16 @@ namespace strumpack {
     std::size_t upd2sep;
     auto I = this->upd_to_parent(p, upd2sep);
 
-    auto F22 = _H.child(1)->dense();
-    if (_Theta.cols() < _Phi.cols())
-      // S = F22 - _Theta * _ThetaVhatC_or_VhatCPhiC
-      gemm(Trans::N, Trans::N, scalar_t(-1.), _Theta,
-           _ThetaVhatC_or_VhatCPhiC,
+    auto F22 = H_.child(1)->dense();
+    if (Theta_.cols() < Phi_.cols())
+      // S = F22 - Theta_ * ThetaVhatC_or_VhatCPhiC_
+      gemm(Trans::N, Trans::N, scalar_t(-1.), Theta_,
+           ThetaVhatC_or_VhatCPhiC_,
            scalar_t(1.), F22, task_depth);
     else
-      // S = F22 - _ThetaVhatC_or_VhatCPhiC * _Phi'
+      // S = F22 - ThetaVhatC_or_VhatCPhiC_ * Phi_'
       gemm(Trans::N, Trans::C, scalar_t(-1.),
-           _ThetaVhatC_or_VhatCPhiC, _Phi,
+           ThetaVhatC_or_VhatCPhiC_, Phi_,
            scalar_t(1.), F22, task_depth);
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop default(shared)                            \
@@ -106,20 +106,19 @@ namespace strumpack {
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single
     {
-      auto M = _H.child(1)->extract(lI, lJ);
+      auto M = H_.child(1)->extract(lI, lJ);
       for (std::size_t j=0; j<lJ.size(); j++)
         for (std::size_t i=0; i<lI.size(); i++)
           B(oI[i], oJ[j]) += M(i, j);
 
-      if (_Theta.cols() < _Phi.cols()) {
+      if (Theta_.cols() < Phi_.cols()) {
         // S = F22 - _Theta * _ThetaVhatC_or_VhatCPhiC
-        auto r = _Theta.cols();
-        DenseM_t r_theta(lI.size(), r);
-        DenseM_t c_vhatphiC(r, lJ.size());
+        auto r = Theta_.cols();
+        DenseM_t r_theta(lI.size(), r), c_vhatphiC(r, lJ.size());
         for (std::size_t i=0; i<lI.size(); i++)
-          copy(1, r, _Theta, lI[i], 0, r_theta, i, 0);
+          copy(1, r, Theta_, lI[i], 0, r_theta, i, 0);
         for (std::size_t j=0; j<lJ.size(); j++)
-          copy(r, 1, _ThetaVhatC_or_VhatCPhiC, 0, lJ[j], c_vhatphiC, 0, j);
+          copy(r, 1, ThetaVhatC_or_VhatCPhiC_, 0, lJ[j], c_vhatphiC, 0, j);
         gemm(Trans::N, Trans::N, scalar_t(-1.), r_theta, c_vhatphiC,
              scalar_t(0.), M, task_depth);
         for (std::size_t j=0; j<lJ.size(); j++)
@@ -129,14 +128,13 @@ namespace strumpack {
           (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), r_theta, c_vhatphiC,
                       scalar_t(0.)) + lJ.size()*lI.size());
       } else {
-        // S = F22 - _ThetaVhatC_or_VhatCPhiC * _Phi'
-        auto r = _Phi.cols();
-        DenseM_t r_thetavhat(lI.size(), r);
-        DenseM_t r_phi(lJ.size(), r);
+        // S = F22 - ThetaVhatC_or_VhatCPhiC_ * Phi_'
+        auto r = Phi_.cols();
+        DenseM_t r_thetavhat(lI.size(), r), r_phi(lJ.size(), r);
         for (std::size_t i=0; i<lI.size(); i++)
-          copy(1, r, _ThetaVhatC_or_VhatCPhiC, lI[i], 0, r_thetavhat, i, 0);
+          copy(1, r, ThetaVhatC_or_VhatCPhiC_, lI[i], 0, r_thetavhat, i, 0);
         for (std::size_t j=0; j<lJ.size(); j++)
-          copy(1, r, _Phi, lJ[j], 0, r_phi, j, 0);
+          copy(1, r, Phi_, lJ[j], 0, r_phi, j, 0);
         gemm(Trans::N, Trans::C, scalar_t(-1.), r_thetavhat, r_phi,
              scalar_t(0.), M, task_depth);
         for (std::size_t j=0; j<lJ.size(); j++)
@@ -162,7 +160,7 @@ namespace strumpack {
       DenseM_t cSr, cSc;
       DenseMW_t cRd0(cR.rows(), dchild, cR, 0, 0);
       TIMER_TIME(TaskType::HSS_SCHUR_PRODUCT, 2, t_sprod);
-      _H.Schur_product_indirect(_DUB01, R1, cRd0, Sr2, Sc2, cSr, cSc);
+      H_.Schur_product_indirect(DUB01_, R1, cRd0, Sr2, Sc2, cSr, cSc);
       TIMER_STOP(t_sprod);
       DenseMW_t(Sr.rows(), dchild, Sr, 0, 0)
         .scatter_rows_add(I, cSr, task_depth);
@@ -186,38 +184,38 @@ namespace strumpack {
    const std::vector<std::size_t>& I, int task_depth) {
 #if 0
     // TODO count flops here
-    auto cSr = _H.child(1)->apply(cR);
-    auto cSc = _H.child(1)->applyC(cR);
-    if (_Theta.cols() < _Phi.cols()) {
+    auto cSr = H_.child(1)->apply(cR);
+    auto cSc = H_.child(1)->applyC(cR);
+    if (Theta_.cols() < Phi_.cols()) {
       // TODO 2 tasks?
-      DenseM_t tmp(_ThetaVhatC_or_VhatCPhiC.rows(), cR.cols());
-      gemm(Trans::N, Trans::N, scalar_t(1.), _ThetaVhatC_or_VhatCPhiC, cR,
+      DenseM_t tmp(ThetaVhatC_or_VhatCPhiC_.rows(), cR.cols());
+      gemm(Trans::N, Trans::N, scalar_t(1.), ThetaVhatC_or_VhatCPhiC_, cR,
            scalar_t(0.), tmp, task_depth);
-      gemm(Trans::N, Trans::N, scalar_t(-1.), _Theta, tmp,
+      gemm(Trans::N, Trans::N, scalar_t(-1.), Theta_, tmp,
            scalar_t(1.), cSr, task_depth);
       tmp = DenseM_t(_Theta.cols(), cR.cols());
-      gemm(Trans::C, Trans::N, scalar_t(1.), _Theta, cR,
+      gemm(Trans::C, Trans::N, scalar_t(1.), Theta_, cR,
            scalar_t(0.), tmp, task_depth);
-      gemm(Trans::C, Trans::N, scalar_t(-1.), _ThetaVhatC_or_VhatCPhiC, tmp,
+      gemm(Trans::C, Trans::N, scalar_t(-1.), ThetaVhatC_or_VhatCPhiC_, tmp,
            scalar_t(1.), cSc, task_depth);
     } else {
-      DenseM_t tmp(_Phi.cols(), cR.cols());
-      gemm(Trans::C, Trans::N, scalar_t(1.), _Phi, cR,
+      DenseM_t tmp(Phi.cols(), cR.cols());
+      gemm(Trans::C, Trans::N, scalar_t(1.), Phi_, cR,
            scalar_t(0.), tmp, task_depth);
-      gemm(Trans::N, Trans::N, scalar_t(-1.), _ThetaVhatC_or_VhatCPhiC, tmp,
+      gemm(Trans::N, Trans::N, scalar_t(-1.), ThetaVhatC_or_VhatCPhiC_, tmp,
            scalar_t(1.), cSr, task_depth);
       tmp = DenseM_t(_ThetaVhatC_or_VhatCPhiC.cols(), cR.cols());
-      gemm(Trans::C, Trans::N, scalar_t(1.), _ThetaVhatC_or_VhatCPhiC, cR,
+      gemm(Trans::C, Trans::N, scalar_t(1.), ThetaVhatC_or_VhatCPhiC_, cR,
            scalar_t(0.), tmp, task_depth);
-      gemm(Trans::N, Trans::N, scalar_t(-1.), _Phi, tmp,
+      gemm(Trans::N, Trans::N, scalar_t(-1.), Phi_, tmp,
            scalar_t(1.), cSc, task_depth);
     }
 #else
     DenseM_t cSr(cR.rows(), cR.cols());
     DenseM_t cSc(cR.rows(), cR.cols());
     TIMER_TIME(TaskType::HSS_SCHUR_PRODUCT, 2, t_sprod);
-    _H.Schur_product_direct
-      (_Theta, _DUB01, _Phi, _ThetaVhatC_or_VhatCPhiC, cR, cSr, cSc);
+    H_.Schur_product_direct
+      (Theta_, DUB01_, Phi_, ThetaVhatC_or_VhatCPhiC_, cR, cSr, cSc);
     TIMER_STOP(t_sprod);
 #endif
     Sr.scatter_rows_add(I, cSr, task_depth);
@@ -255,7 +253,7 @@ namespace strumpack {
       integer_t d = Rr.cols(), m = Rr.rows();
       if (d0 % dd == 0) {
         for (integer_t c=0; c<d; c+=dd) {
-          integer_t r = 0, cs = c + _sampled_columns;
+          integer_t r = 0, cs = c + sampled_columns_;
           for (; r<dsep; r++) {
             rgen->seed(std::uint32_t(r+sep_begin_), std::uint32_t(cs));
             for (integer_t cc=c; cc<c+dd; cc++)
@@ -270,7 +268,7 @@ namespace strumpack {
         }
       } else {
         for (integer_t c=0; c<d; c++) {
-          integer_t r = 0, cs = c + _sampled_columns;
+          integer_t r = 0, cs = c + sampled_columns_;
           for (; r<dsep; r++)
             Rr(r,c) = Rc(r,c) = rgen->get(r+sep_begin_, cs);
           for (; r<m; r++)
@@ -357,11 +355,11 @@ namespace strumpack {
     }
     TaskTimer t("FrontalMatrixHSS_factor");
     if (/*etree_level == 0 && */opts.print_root_front_stats()) t.start();
-    _H.set_openmp_task_depth(task_depth);
+    H_.set_openmp_task_depth(task_depth);
     auto mult = [&](DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
       random_sampling(A, opts, Rr, Rc, Sr, Sc, etree_level, task_depth);
-      _sampled_columns += Rr.cols();
+      sampled_columns_ += Rr.cols();
     };
     auto elem = [&](const std::vector<std::size_t>& I,
                     const std::vector<std::size_t>& J, DenseM_t& B) {
@@ -377,43 +375,43 @@ namespace strumpack {
     HSSopts.set_d0(std::max(child_samples - HSSopts.dd(), HSSopts.d0()));
     if (opts.indirect_sampling())
       HSSopts.set_user_defined_random(true);
-    _H.compress(mult, elem, HSSopts);
+    H_.compress(mult, elem, HSSopts);
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
     if (dim_sep()) {
       if (etree_level > 0) {
         TIMER_TIME(TaskType::HSS_PARTIALLY_FACTOR, 0, t_pfact);
-        _H.partial_factor();
+        H_.partial_factor();
         TIMER_STOP(t_pfact);
         TIMER_TIME(TaskType::HSS_COMPUTE_SCHUR, 0, t_comp_schur);
-        _H.Schur_update(_Theta, _DUB01, _Phi);
-        const DenseM_t& Vhat = _H.child(0)->ULV().Vhat();
-        if (_Theta.cols() < _Phi.cols()) {
-          _ThetaVhatC_or_VhatCPhiC = DenseM_t(Vhat.cols(), _Phi.rows());
-          gemm(Trans::C, Trans::C, scalar_t(1.), Vhat, _Phi,
-               scalar_t(0.), _ThetaVhatC_or_VhatCPhiC, task_depth);
+        H_.Schur_update(Theta_, DUB01_, Phi_);
+        const DenseM_t& Vhat = H_.child(0)->ULV().Vhat();
+        if (Theta_.cols() < Phi_.cols()) {
+          ThetaVhatC_or_VhatCPhiC_ = DenseM_t(Vhat.cols(), Phi_.rows());
+          gemm(Trans::C, Trans::C, scalar_t(1.), Vhat, Phi_,
+               scalar_t(0.), ThetaVhatC_or_VhatCPhiC_, task_depth);
           STRUMPACK_SCHUR_FLOPS
-            (gemm_flops(Trans::C, Trans::C, scalar_t(1.), Vhat, _Phi, scalar_t(0.)));
+            (gemm_flops(Trans::C, Trans::C, scalar_t(1.), Vhat, Phi_, scalar_t(0.)));
         } else {
-          _ThetaVhatC_or_VhatCPhiC = DenseM_t(_Theta.rows(), Vhat.rows());
-          gemm(Trans::N, Trans::C, scalar_t(1.), _Theta, Vhat,
-               scalar_t(0.), _ThetaVhatC_or_VhatCPhiC, task_depth);
+          ThetaVhatC_or_VhatCPhiC_ = DenseM_t(Theta_.rows(), Vhat.rows());
+          gemm(Trans::N, Trans::C, scalar_t(1.), Theta_, Vhat,
+               scalar_t(0.), ThetaVhatC_or_VhatCPhiC_, task_depth);
           STRUMPACK_SCHUR_FLOPS
-            (gemm_flops(Trans::N, Trans::C, scalar_t(1.), _Theta, Vhat, scalar_t(0.)));
+            (gemm_flops(Trans::N, Trans::C, scalar_t(1.), Theta_, Vhat, scalar_t(0.)));
         }
       } else {
         TIMER_TIME(TaskType::HSS_FACTOR, 0, t_fact);
-        _H.factor();
+        H_.factor();
         TIMER_STOP(t_fact);
       }
     }
     if (/*etree_level == 0 && */opts.print_root_front_stats()) {
       auto time = t.elapsed();
-      auto rank = _H.rank();
-      std::size_t nnzH = _H.nonzeros();
-      std::size_t nnzULV = _H.factor_nonzeros();
-      std::size_t nnzSchur = _Theta.nonzeros()
-        + _Phi.nonzeros() + _ThetaVhatC_or_VhatCPhiC.nonzeros();
+      auto rank = H_.rank();
+      std::size_t nnzH = H_.nonzeros();
+      std::size_t nnzULV = H_.factor_nonzeros();
+      std::size_t nnzSchur = Theta_.nonzeros()
+        + Phi_.nonzeros() + ThetaVhatC_or_VhatCPhiC_.nonzeros();
       std::cout << "#   - HSSMPI front: Nsep= " << dim_sep()
                 << " , Nupd= " << dim_upd()
                 << " , nnz(H)= " << nnzH
@@ -444,22 +442,22 @@ namespace strumpack {
     bupd.zero();
     this->fwd_solve_phase1(b, bupd, work, etree_level, task_depth);
     if (etree_level) {
-      if (_Theta.cols() && _Phi.cols()) {
+      if (Theta_.cols() && Phi_.cols()) {
         DenseMW_t bloc(dim_sep(), b.cols(), b, sep_begin_, 0);
         // TODO get rid of this!!!
-        _ULVwork = std::unique_ptr<HSS::WorkSolve<scalar_t>>
+        ULVwork_ = std::unique_ptr<HSS::WorkSolve<scalar_t>>
           (new HSS::WorkSolve<scalar_t>());
-        _H.child(0)->forward_solve(*_ULVwork, bloc, true);
+        H_.child(0)->forward_solve(*ULVwork_, bloc, true);
         if (dim_upd())
-          gemm(Trans::N, Trans::N, scalar_t(-1.), _Theta,
-               _ULVwork->reduced_rhs, scalar_t(1.), bupd, task_depth);
-        _ULVwork->reduced_rhs.clear();
+          gemm(Trans::N, Trans::N, scalar_t(-1.), Theta_,
+               ULVwork_->reduced_rhs, scalar_t(1.), bupd, task_depth);
+        ULVwork_->reduced_rhs.clear();
       }
     } else {
       DenseMW_t bloc(dim_sep(), b.cols(), b, sep_begin_, 0);
-      _ULVwork = std::unique_ptr<HSS::WorkSolve<scalar_t>>
+      ULVwork_ = std::unique_ptr<HSS::WorkSolve<scalar_t>>
         (new HSS::WorkSolve<scalar_t>());
-      _H.forward_solve(*_ULVwork, bloc, false);
+      H_.forward_solve(*ULVwork_, bloc, false);
     }
   }
 
@@ -478,25 +476,25 @@ namespace strumpack {
   (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const {
     DenseMW_t yupd(dim_upd(), y.cols(), work[0], 0, 0);
     if (etree_level) {
-      if (_Phi.cols() && _Theta.cols()) {
+      if (Phi_.cols() && Theta_.cols()) {
         if (dim_upd()) {
-          gemm(Trans::C, Trans::N, scalar_t(-1.), _Phi, yupd,
-               scalar_t(1.), _ULVwork->x, task_depth);
+          gemm(Trans::C, Trans::N, scalar_t(-1.), Phi_, yupd,
+               scalar_t(1.), ULVwork_->x, task_depth);
         }
         DenseMW_t yloc(dim_sep(), y.cols(), y, sep_begin_, 0);
-        _H.child(0)->backward_solve(*_ULVwork, yloc);
-        _ULVwork.reset();
+        H_.child(0)->backward_solve(*ULVwork_, yloc);
+        ULVwork_.reset();
       }
     } else {
       DenseMW_t yloc(dim_sep(), y.cols(), y, sep_begin_, 0);
-      _H.backward_solve(*_ULVwork, yloc);
+      H_.backward_solve(*ULVwork_, yloc);
     }
     this->bwd_solve_phase2(y, yupd, work, etree_level, task_depth);
   }
 
   template<typename scalar_t,typename integer_t> integer_t
   FrontalMatrixHSS<scalar_t,integer_t>::front_rank(int task_depth) const {
-    return _H.rank();
+    return H_.rank();
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -504,21 +502,21 @@ namespace strumpack {
   (std::ostream &out) const {
     if (lchild_) lchild_->print_rank_statistics(out);
     if (rchild_) rchild_->print_rank_statistics(out);
-    out << "# HSSMatrix " << _H.rows() << "x" << _H.cols() << std::endl;
-    _H.print_info(out);
+    out << "# HSSMatrix " << H_.rows() << "x" << H_.cols() << std::endl;
+    H_.print_info(out);
   }
 
   template<typename scalar_t,typename integer_t> long long
   FrontalMatrixHSS<scalar_t,integer_t>::node_factor_nonzeros() const {
-    return _H.nonzeros() + _H.factor_nonzeros() + _Theta.nonzeros()
-      + _Phi.nonzeros() + _ThetaVhatC_or_VhatCPhiC.nonzeros();
+    return H_.nonzeros() + H_.factor_nonzeros() + Theta_.nonzeros()
+      + Phi_.nonzeros() + ThetaVhatC_or_VhatCPhiC_.nonzeros();
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHSS<scalar_t,integer_t>::draw_node
   (std::ostream& of, bool is_root) const {
-    if (is_root) _H.draw(of, sep_begin_, sep_begin_);
-    else _H.child(0)->draw(of, sep_begin_, sep_begin_);
+    if (is_root) H_.draw(of, sep_begin_, sep_begin_);
+    else H_.child(0)->draw(of, sep_begin_, sep_begin_);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -533,14 +531,14 @@ namespace strumpack {
     for (integer_t i=sep_begin_; i<sep_end_; i++)
       sorder[i] += sep_begin_;
     if (is_root)
-      _H = HSS::HSSMatrix<scalar_t>(sep_tree, opts.HSS_options());
+      H_ = HSS::HSSMatrix<scalar_t>(sep_tree, opts.HSS_options());
     else {
       structured::ClusterTree tree(this->dim_blk());
       tree.c.reserve(2);
       tree.c.push_back(sep_tree);
       tree.c.emplace_back(dim_upd());
       tree.c.back().refine(opts.HSS_options().leaf_size());
-      _H = HSS::HSSMatrix<scalar_t>(tree, opts.HSS_options());
+      H_ = HSS::HSSMatrix<scalar_t>(tree, opts.HSS_options());
     }
   }
 

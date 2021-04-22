@@ -517,8 +517,8 @@ namespace strumpack {
                 const opts_t& opts, bool active);
       HSSMatrix(std::ifstream& is);
 
-      HSSBasisID<scalar_t> _U, _V;
-      DenseM_t _D, _B01, _B10;
+      HSSBasisID<scalar_t> U_, V_;
+      DenseM_t D_, B01_, B10_;
 
       void compress_original(const DenseM_t& A,
                              const opts_t& opts);
@@ -666,6 +666,8 @@ namespace strumpack {
       void write(std::ofstream& os) const override;
 
       friend class HSSMatrixMPI<scalar_t>;
+
+      using HSSMatrixBase<scalar_t>::child;
     };
 
     /**
