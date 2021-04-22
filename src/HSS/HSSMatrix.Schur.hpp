@@ -40,7 +40,7 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrix<scalar_t>::Schur_update
     (DenseM_t& Theta, DenseM_t& DUB01, DenseM_t& Phi) const {
       if (this->leaf()) return;
-      auto depth = this->_openmp_task_depth;
+      auto depth = this->openmp_task_depth_;
       DenseM_t _theta = _B10;
       auto ch0 = child(0);
       DUB01 = ch0->ULV_._D.solve
@@ -74,7 +74,7 @@ namespace strumpack {
     (const DenseM_t& Theta, const DenseM_t& DUB01, const DenseM_t& Phi,
      const DenseM_t& ThetaVhatC_or_VhatCPhiC,
      const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc) const {
-      auto depth = this->_openmp_task_depth;
+      auto depth = this->openmp_task_depth_;
       auto ch0 = child(0);
       auto ch1 = child(1);
       WorkApply<scalar_t> wr, wc;
@@ -151,7 +151,7 @@ namespace strumpack {
      const DenseM_t& Sr1, const DenseM_t& Sc1,
      DenseM_t& Sr, DenseM_t& Sc) const {
       if (this->leaf()) return;
-      auto depth = this->_openmp_task_depth;
+      auto depth = this->openmp_task_depth_;
       auto ch0 = child(0);
       auto ch1 = child(1);
 
@@ -231,12 +231,12 @@ namespace strumpack {
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->_ch[0]->apply_UtVt_big(A, UtA0, VtA0, offset, depth+1, flops);
+        this->ch_[0]->apply_UtVt_big(A, UtA0, VtA0, offset, depth+1, flops);
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->_ch[1]->apply_UtVt_big
-          (A, UtA1, VtA1, offset+this->_ch[0]->dims(), depth+1, flops);
+        this->ch_[1]->apply_UtVt_big
+          (A, UtA1, VtA1, offset+this->ch_[0]->dims(), depth+1, flops);
 #pragma omp taskwait
         UtA = _U.applyC(vconcat(UtA0, UtA1), depth);
         VtA = _V.applyC(vconcat(VtA0, VtA1), depth);
@@ -269,10 +269,10 @@ namespace strumpack {
 #pragma omp taskwait
       } else {
         DenseM_t Uop0, Uop1, Vop0, Vop1;
-        Uop0 = DenseM_t(this->_ch[0]->U_rank(), Uop.cols());
-        Uop1 = DenseM_t(this->_ch[1]->U_rank(), Uop.cols());
-        Vop0 = DenseM_t(this->_ch[0]->V_rank(), Vop.cols());
-        Vop1 = DenseM_t(this->_ch[1]->V_rank(), Vop.cols());
+        Uop0 = DenseM_t(this->ch_[0]->U_rank(), Uop.cols());
+        Uop1 = DenseM_t(this->ch_[1]->U_rank(), Uop.cols());
+        Vop0 = DenseM_t(this->ch_[0]->V_rank(), Vop.cols());
+        Vop1 = DenseM_t(this->ch_[1]->V_rank(), Vop.cols());
         if (_U.cols() && Uop.cols()) {
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
@@ -281,7 +281,7 @@ namespace strumpack {
             auto tmp = _U.apply(Uop, depth);
             flops += _U.apply_flops(Uop.cols());
             Uop0.copy(tmp, 0, 0);
-            Uop1.copy(tmp, this->_ch[0]->U_rank(), 0);
+            Uop1.copy(tmp, this->ch_[0]->U_rank(), 0);
           }
         } else {
           Uop0.zero();
@@ -295,7 +295,7 @@ namespace strumpack {
             auto tmp = _V.apply(Vop, depth);
             flops += _V.apply_flops(Vop.cols());
             Vop0.copy(tmp, 0, 0);
-            Vop1.copy(tmp, this->_ch[0]->V_rank(), 0);
+            Vop1.copy(tmp, this->ch_[0]->V_rank(), 0);
           }
         } else {
           Vop0.zero();
@@ -307,13 +307,13 @@ namespace strumpack {
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->_ch[0]->apply_UV_big
+        this->ch_[0]->apply_UV_big
           (Theta, Uop0, Phi, Vop0, offset, depth+1, flops);
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->_ch[1]->apply_UV_big
-          (Theta, Uop1, Phi, Vop1, offset+this->_ch[0]->dims(), depth+1, flops);
+        this->ch_[1]->apply_UV_big
+          (Theta, Uop1, Phi, Vop1, offset+this->ch_[0]->dims(), depth+1, flops);
 #pragma omp taskwait
       }
     }

@@ -37,15 +37,15 @@ namespace strumpack {
       WorkFactor<scalar_t> w;
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
-      factor_recursive(w, true, false, this->_openmp_task_depth);
+      factor_recursive(w, true, false, this->openmp_task_depth_);
     }
 
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::partial_factor() {
       this->ULV_ = HSSFactors<scalar_t>();
       WorkFactor<scalar_t> w;
-      this->_ch[0]->factor_recursive
-        (w, true, true, this->_openmp_task_depth);
+      this->ch_[0]->factor_recursive
+        (w, true, true, this->openmp_task_depth_);
     }
 
     template<typename scalar_t> void HSSMatrix<scalar_t>::factor_recursive
@@ -57,18 +57,18 @@ namespace strumpack {
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->_ch[0]->factor_recursive
+        this->ch_[0]->factor_recursive
           (w.c[0], false, partial, depth+1);
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->_ch[1]->factor_recursive
+        this->ch_[1]->factor_recursive
           (w.c[1], false, partial, depth+1);
 #pragma omp taskwait
-        auto u_rows = this->_ch[0]->U_rank() + this->_ch[1]->U_rank();
+        auto u_rows = this->ch_[0]->U_rank() + this->ch_[1]->U_rank();
         if (u_rows) {
           this->ULV_._D = DenseM_t(u_rows, u_rows);
-          auto c0u = this->_ch[0]->U_rank();
+          auto c0u = this->ch_[0]->U_rank();
           copy(w.c[0].Dt, this->ULV_._D, 0, 0);
           copy(w.c[1].Dt, this->ULV_._D, c0u, c0u);
           gemm(Trans::N, Trans::C, scalar_t(1.), _B01, w.c[1].Vt1,
@@ -81,15 +81,15 @@ namespace strumpack {
         }
         if (!isroot || partial) {
           Vh = DenseM_t(_U.rows(), _V.cols());
-          DenseMW_t Vh0(this->_ch[0]->U_rank(), _V.cols(), Vh, 0, 0);
+          DenseMW_t Vh0(this->ch_[0]->U_rank(), _V.cols(), Vh, 0, 0);
           DenseMW_t Vh1
-            (this->_ch[1]->U_rank(), _V.cols(), Vh,
-             this->_ch[0]->U_rank(), 0);
+            (this->ch_[1]->U_rank(), _V.cols(), Vh,
+             this->ch_[0]->U_rank(), 0);
           auto V = _V.dense();
           gemm(Trans::N, Trans::N, scalar_t(1.),
                w.c[0].Vt1, V.ptr(0, 0), V.ld(), scalar_t(0.), Vh0, depth);
           gemm(Trans::N, Trans::N, scalar_t(1.),
-               w.c[1].Vt1, V.ptr(this->_ch[0]->V_rank(), 0), V.ld(),
+               w.c[1].Vt1, V.ptr(this->ch_[0]->V_rank(), 0), V.ld(),
                scalar_t(0.), Vh1, depth);
           STRUMPACK_ULV_FACTOR_FLOPS
             (gemm_flops(Trans::N, Trans::N, scalar_t(1.),

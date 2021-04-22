@@ -34,7 +34,7 @@ namespace strumpack {
 
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
-      extract_fwd(w, false, this->_openmp_task_depth);
+      extract_fwd(w, false, this->openmp_task_depth_);
 
       w.rl2g.reserve(I.size());
       for (std::size_t r=0; r<I.size(); r++) w.rl2g.push_back(r);
@@ -47,7 +47,7 @@ namespace strumpack {
 
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
-      extract_bwd(B, w, this->_openmp_task_depth);
+      extract_bwd(B, w, this->openmp_task_depth_);
     }
 
     template<typename scalar_t> void HSSMatrix<scalar_t>::extract_fwd
@@ -57,9 +57,9 @@ namespace strumpack {
         if (odiag) w.y = _V.extract_rows(w.J).transpose();
         else w.ycols.clear();
       } else {
-        w.split_extraction_sets(this->_ch[0]->dims());
+        w.split_extraction_sets(this->ch_[0]->dims());
         for (std::size_t c=0; c<w.J.size(); c++) {
-          if (w.J[c] < this->_ch[0]->cols())
+          if (w.J[c] < this->ch_[0]->cols())
             w.c[0].ycols.push_back(w.ycols[c]);
           else w.c[1].ycols.push_back(w.ycols[c]);
         }
@@ -67,17 +67,17 @@ namespace strumpack {
         if (tasked) {
 #pragma omp task default(shared)                                        \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-          this->_ch[0]->extract_fwd
+          this->ch_[0]->extract_fwd
             (w.c[0], odiag || !w.c[1].I.empty(), depth+1);
 #pragma omp task default(shared)                                        \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-          this->_ch[1]->extract_fwd
+          this->ch_[1]->extract_fwd
             (w.c[1], odiag || !w.c[0].I.empty(), depth+1);
 #pragma omp taskwait
         } else {
-          this->_ch[0]->extract_fwd
+          this->ch_[0]->extract_fwd
             (w.c[0], odiag || !w.c[1].I.empty(), depth+1);
-          this->_ch[1]->extract_fwd
+          this->ch_[1]->extract_fwd
             (w.c[1], odiag || !w.c[0].I.empty(), depth+1);
         }
         w.ycols.clear();
@@ -91,7 +91,7 @@ namespace strumpack {
           DenseM_t y01(_V.rows(), ncols);
           y01.zero();
           copy(w.c[0].y, y01, 0, 0);
-          copy(w.c[1].y, y01, this->_ch[0]->V_rank(), w.c[0].y.cols());
+          copy(w.c[1].y, y01, this->ch_[0]->V_rank(), w.c[0].y.cols());
           // TODO get Vdense, then do two separate gemms to reduce flops!!!
           w.y = _V.applyC(y01, depth);
           STRUMPACK_EXTRACTION_FLOPS(_V.applyC_flops(y01.cols()));
@@ -136,14 +136,14 @@ namespace strumpack {
         if (tasked) {
 #pragma omp task default(shared)                                        \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-          this->_ch[0]->extract_bwd(triplets, w.c[0], depth+1);
+          this->ch_[0]->extract_bwd(triplets, w.c[0], depth+1);
 #pragma omp task default(shared)                                        \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-          this->_ch[1]->extract_bwd(triplets, w.c[1], depth+1);
+          this->ch_[1]->extract_bwd(triplets, w.c[1], depth+1);
 #pragma omp taskwait
         } else {
-          this->_ch[0]->extract_bwd(triplets, w.c[0], depth+1);
-          this->_ch[1]->extract_bwd(triplets, w.c[1], depth+1);
+          this->ch_[0]->extract_bwd(triplets, w.c[0], depth+1);
+          this->ch_[1]->extract_bwd(triplets, w.c[1], depth+1);
         }
       }
     }
@@ -173,31 +173,31 @@ namespace strumpack {
         if (tasked) {
 #pragma omp task default(shared)                                        \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-          this->_ch[0]->extract_bwd(B, w.c[0], depth+1);
+          this->ch_[0]->extract_bwd(B, w.c[0], depth+1);
 #pragma omp task default(shared)                                        \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-          this->_ch[1]->extract_bwd(B, w.c[1], depth+1);
+          this->ch_[1]->extract_bwd(B, w.c[1], depth+1);
 #pragma omp taskwait
         } else {
-          this->_ch[0]->extract_bwd(B, w.c[0], depth+1);
-          this->_ch[1]->extract_bwd(B, w.c[1], depth+1);
+          this->ch_[0]->extract_bwd(B, w.c[0], depth+1);
+          this->ch_[1]->extract_bwd(B, w.c[1], depth+1);
         }
       }
     }
 
     template<typename scalar_t> void HSSMatrix<scalar_t>::extract_bwd_internal
     (WorkExtract<scalar_t>& w, int depth) const {
-      w.split_extraction_sets(this->_ch[0]->dims());
+      w.split_extraction_sets(this->ch_[0]->dims());
       w.c[0].rl2g.reserve(w.c[0].I.size());
       w.c[1].rl2g.reserve(w.c[1].I.size());
       for (std::size_t r=0; r<w.I.size(); r++) {
-        if (w.I[r] < this->_ch[0]->rows()) w.c[0].rl2g.push_back(w.rl2g[r]);
+        if (w.I[r] < this->ch_[0]->rows()) w.c[0].rl2g.push_back(w.rl2g[r]);
         else w.c[1].rl2g.push_back(w.rl2g[r]);
       }
       w.c[0].cl2g.reserve(w.c[0].J.size());
       w.c[1].cl2g.reserve(w.c[1].J.size());
       for (std::size_t c=0; c<w.J.size(); c++) {
-        if (w.J[c] < this->_ch[0]->cols()) w.c[0].cl2g.push_back(w.cl2g[c]);
+        if (w.J[c] < this->ch_[0]->cols()) w.c[0].cl2g.push_back(w.cl2g[c]);
         else w.c[1].cl2g.push_back(w.cl2g[c]);
       }
       auto U = _U.dense();
@@ -240,7 +240,7 @@ namespace strumpack {
         }
         DenseMW_t z11(z1rows, w.z.cols(), w.c[1].z, 0, w.c[0].y.cols());
         if (U.cols()) {
-          DenseMW_t U1(z1rows, U.cols(), U, this->_ch[0]->U_rank(), 0);
+          DenseMW_t U1(z1rows, U.cols(), U, this->ch_[0]->U_rank(), 0);
           gemm(Trans::N, Trans::N, scalar_t(1.), U1, w.z,
                scalar_t(0.), z11, depth);
           STRUMPACK_EXTRACTION_FLOPS

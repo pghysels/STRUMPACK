@@ -60,7 +60,7 @@ namespace strumpack {
         DenseM_t chDU;
         if (ch0seq->active()) {
           chDU = ch0->ULV_mpi_.D_.gather().solve
-            (ch0seq->_U.dense(), ch0->ULV_mpi_.piv_, ch0seq->_openmp_task_depth);
+            (ch0seq->_U.dense(), ch0->ULV_mpi_.piv_, ch0seq->openmp_task_depth_);
           STRUMPACK_SCHUR_FLOPS
             (!ch0->ULV_mpi_.D_.is_master() ? 0 :
              blas::getrs_flops(ch0->ULV_mpi_.D_.rows(), ch0seq->_U.cols()));
@@ -215,29 +215,29 @@ namespace strumpack {
         if (this->U_rank() && Uop.cols()) {
           auto tmp = _U.apply(Uop);
           flops += _U.apply_flops(Uop.cols());
-          Uop0 = DistM_t(this->_ch[0]->grid(Theta.grid_local()),
-                         this->_ch[0]->U_rank(), Uop.cols());
-          Uop1 = DistM_t(this->_ch[1]->grid(Theta.grid_local()),
-                         this->_ch[1]->U_rank(), Uop.cols());
-          copy(this->_ch[0]->U_rank(), Uop.cols(), tmp, 0, 0, Uop0, 0, 0, grid()->ctxt_all());
-          copy(this->_ch[1]->U_rank(), Uop.cols(), tmp,
-               this->_ch[0]->U_rank(), 0, Uop1, 0, 0, grid()->ctxt_all());
+          Uop0 = DistM_t(this->ch_[0]->grid(Theta.grid_local()),
+                         this->ch_[0]->U_rank(), Uop.cols());
+          Uop1 = DistM_t(this->ch_[1]->grid(Theta.grid_local()),
+                         this->ch_[1]->U_rank(), Uop.cols());
+          copy(this->ch_[0]->U_rank(), Uop.cols(), tmp, 0, 0, Uop0, 0, 0, grid()->ctxt_all());
+          copy(this->ch_[1]->U_rank(), Uop.cols(), tmp,
+               this->ch_[0]->U_rank(), 0, Uop1, 0, 0, grid()->ctxt_all());
           Uop.clear();
         }
         if (this->V_rank() && Vop.cols()) {
           auto tmp = _V.apply(Vop);
           flops += _V.apply_flops(Vop.cols());
-          Vop0 = DistM_t(this->_ch[0]->grid(Phi.grid_local()),
-                         this->_ch[0]->V_rank(), Vop.cols());
-          Vop1 = DistM_t(this->_ch[1]->grid(Phi.grid_local()),
-                         this->_ch[1]->V_rank(), Vop.cols());
-          copy(this->_ch[0]->V_rank(), Vop.cols(), tmp, 0, 0, Vop0, 0, 0, grid()->ctxt_all());
-          copy(this->_ch[1]->V_rank(), Vop.cols(), tmp,
-               this->_ch[0]->V_rank(), 0, Vop1, 0, 0, grid()->ctxt_all());
+          Vop0 = DistM_t(this->ch_[0]->grid(Phi.grid_local()),
+                         this->ch_[0]->V_rank(), Vop.cols());
+          Vop1 = DistM_t(this->ch_[1]->grid(Phi.grid_local()),
+                         this->ch_[1]->V_rank(), Vop.cols());
+          copy(this->ch_[0]->V_rank(), Vop.cols(), tmp, 0, 0, Vop0, 0, 0, grid()->ctxt_all());
+          copy(this->ch_[1]->V_rank(), Vop.cols(), tmp,
+               this->ch_[0]->V_rank(), 0, Vop1, 0, 0, grid()->ctxt_all());
           Vop.clear();
         }
-        this->_ch[0]->apply_UV_big(Theta, Uop0, Phi, Vop0, flops);
-        this->_ch[1]->apply_UV_big(Theta, Uop1, Phi, Vop1, flops);
+        this->ch_[0]->apply_UV_big(Theta, Uop0, Phi, Vop0, flops);
+        this->ch_[1]->apply_UV_big(Theta, Uop1, Phi, Vop1, flops);
       }
     }
 

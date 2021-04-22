@@ -72,14 +72,14 @@ namespace strumpack {
         copy(this->rows(), n, b.leaf, 0, 0, f, 0, 0, grid()->ctxt_all());
       } else {
         w.c.resize(2);
-        this->_ch[0]->solve_fwd(b, w.c[0], partial, false);
-        this->_ch[1]->solve_fwd(b, w.c[1], partial, false);
-        auto c0urank = this->_ch[0]->U_rank();
-        auto c1urank = this->_ch[1]->U_rank();
-        auto c0vrank = this->_ch[0]->V_rank();
-        auto c1vrank = this->_ch[1]->V_rank();
-        auto c0urows = this->_ch[0]->U_rows();
-        auto c1urows = this->_ch[1]->U_rows();
+        this->ch_[0]->solve_fwd(b, w.c[0], partial, false);
+        this->ch_[1]->solve_fwd(b, w.c[1], partial, false);
+        auto c0urank = this->ch_[0]->U_rank();
+        auto c1urank = this->ch_[1]->U_rank();
+        auto c0vrank = this->ch_[0]->V_rank();
+        auto c1vrank = this->ch_[1]->V_rank();
+        auto c0urows = this->ch_[0]->U_rows();
+        auto c1urows = this->ch_[1]->U_rows();
         auto urows = c0urank + c1urank;
         auto vrows = c0vrank + c1vrank;
         f = DistM_t(grid(), urows, n);
@@ -108,11 +108,11 @@ namespace strumpack {
            gemm_flops(Trans::N, Trans::N, scalar_t(-1.), _B10, z0, scalar_t(1.)));
         if (c0urows > c0urank) {
           DistM_t Q00(grid(), c0urows - c0urank, c0urows);
-          copy(Q00.rows(), Q00.cols(), this->_ch[0]->ULV_mpi_.Q_, 0, 0,
+          copy(Q00.rows(), Q00.cols(), this->ch_[0]->ULV_mpi_.Q_, 0, 0,
                Q00, 0, 0, grid()->ctxt_all());
           DistM_t tmp0(grid(), c0urows, n);
           DistM_t c0W1(grid(), c0urank, c0urows);
-          copy(c0W1.rows(), c0W1.cols(), this->_ch[0]->ULV_mpi_.W1_, 0, 0,
+          copy(c0W1.rows(), c0W1.cols(), this->ch_[0]->ULV_mpi_.W1_, 0, 0,
                c0W1, 0, 0, grid()->ctxt_all());
           gemm(Trans::C, Trans::N, scalar_t(1.), Q00, y0, scalar_t(0.), tmp0);
           gemm(Trans::N, Trans::N, scalar_t(-1.),
@@ -123,11 +123,11 @@ namespace strumpack {
         }
         if (c1urows > c1urank) {
           DistM_t Q10(grid(), c1urows - c1urank, c1urows);
-          copy(c1urows - c1urank, c1urows, this->_ch[1]->ULV_mpi_.Q_, 0, 0,
+          copy(c1urows - c1urank, c1urows, this->ch_[1]->ULV_mpi_.Q_, 0, 0,
                Q10, 0, 0, grid()->ctxt_all());
           DistM_t tmp1(grid(), Q10.cols(), n);
           DistM_t c1W1(grid(), c1urank, c1urows);
-          copy(c1W1.rows(), c1W1.cols(), this->_ch[1]->ULV_mpi_.W1_, 0, 0,
+          copy(c1W1.rows(), c1W1.cols(), this->ch_[1]->ULV_mpi_.W1_, 0, 0,
                c1W1, 0, 0, grid()->ctxt_all());
           gemm(Trans::C, Trans::N, scalar_t(1.), Q10, y1, scalar_t(0.), tmp1);
           gemm(Trans::N, Trans::N, scalar_t(-1.), c1W1, tmp1, scalar_t(1.), f1);
@@ -204,10 +204,10 @@ namespace strumpack {
       if (this->leaf())
         copy(this->rows(), n, w.x, 0, 0, x.leaf, 0, 0, grid()->ctxt_all());
       else {
-        auto c0urank = this->_ch[0]->U_rank();
-        auto c1urank = this->_ch[1]->U_rank();
-        auto c0urows = this->_ch[0]->U_rows();
-        auto c1urows = this->_ch[1]->U_rows();
+        auto c0urank = this->ch_[0]->U_rank();
+        auto c1urank = this->ch_[1]->U_rank();
+        auto c0urows = this->ch_[0]->U_rows();
+        auto c1urows = this->ch_[1]->U_rows();
         {
           w.c[0].x = DistM_t(w.c[0].y.grid(), c0urows, n);
           if (c0urows > c0urank) {
@@ -216,11 +216,11 @@ namespace strumpack {
             // need communication!!
             copy(c0urows-c0urank, n, w.c[0].y, 0, 0, tmp, 0, 0, grid()->ctxt_all());
             copy(c0urank, n, w.x, 0, 0, tmp, c0urows-c0urank, 0, grid()->ctxt_all());
-            gemm(Trans::C, Trans::N, scalar_t(1.), this->_ch[0]->ULV_mpi_.Q_, tmp,
+            gemm(Trans::C, Trans::N, scalar_t(1.), this->ch_[0]->ULV_mpi_.Q_, tmp,
                  scalar_t(0.), w.c[0].x);
             STRUMPACK_HSS_SOLVE_FLOPS
               (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
-                          this->_ch[0]->ULV_mpi_.Q_, tmp, scalar_t(0.)));
+                          this->ch_[0]->ULV_mpi_.Q_, tmp, scalar_t(0.)));
           } else copy(c0urank, n, w.x, 0, 0, w.c[0].x, 0, 0, grid()->ctxt_all());
         } {
           w.c[1].x = DistM_t(w.c[1].y.grid(), c1urows, n);
@@ -230,18 +230,18 @@ namespace strumpack {
             DistM_t tmp(w.c[1].y.grid(), c1urows, n);
             copy(c1urows-c1urank, n, w.c[1].y, 0, 0, tmp, 0, 0, grid()->ctxt_all());
             copy(c1urank, n, w.x, c0urank, 0, tmp, c1urows-c1urank, 0, grid()->ctxt_all());
-            gemm(Trans::C, Trans::N, scalar_t(1.), this->_ch[1]->ULV_mpi_.Q_,
+            gemm(Trans::C, Trans::N, scalar_t(1.), this->ch_[1]->ULV_mpi_.Q_,
                  tmp, scalar_t(0.), w.c[1].x);
             STRUMPACK_HSS_SOLVE_FLOPS
               (gemm_flops(Trans::C, Trans::N, scalar_t(1.),
-                          this->_ch[1]->ULV_mpi_.Q_, tmp, scalar_t(0.)));
+                          this->ch_[1]->ULV_mpi_.Q_, tmp, scalar_t(0.)));
           } else copy(c1urank, n, w.x, c0urank, 0, w.c[1].x, 0, 0, grid()->ctxt_all());
         }
         w.x.clear();
         w.c[0].y.clear();
         w.c[1].y.clear();
-        this->_ch[0]->solve_bwd(x, w.c[0], false);
-        this->_ch[1]->solve_bwd(x, w.c[1], false);
+        this->ch_[0]->solve_bwd(x, w.c[0], false);
+        this->ch_[1]->solve_bwd(x, w.c[1], false);
       }
     }
 

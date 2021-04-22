@@ -64,13 +64,13 @@ namespace strumpack {
           for (int r=rlo; r<rhi; r++)
             sbuf[destr[r-rlo]+destc[c-clo]].push_back(Ad(r,c));
       } else {
-        auto m0 = this->_ch[0]->rows();
-        auto n0 = this->_ch[0]->cols();
-        auto m1 = this->_ch[1]->rows();
-        auto n1 = this->_ch[1]->cols();
-        this->_ch[0]->redistribute_to_tree_to_buffers
+        auto m0 = child(0)->rows();
+        auto n0 = this->ch_[0]->cols();
+        auto m1 = this->ch_[1]->rows();
+        auto n1 = this->ch_[1]->cols();
+        this->ch_[0]->redistribute_to_tree_to_buffers
           (A, Arlo, Aclo, sbuf, dest);
-        this->_ch[1]->redistribute_to_tree_to_buffers
+        this->ch_[1]->redistribute_to_tree_to_buffers
           (A, Arlo+m0, Aclo+n0, sbuf, dest+Pl());
         assert(A.MB() == DistM_t::default_MB);
         const auto B = DistM_t::default_MB;
@@ -132,13 +132,13 @@ namespace strumpack {
                  r=rlo; r<rhi; r++)
             _A(r,c) = *(pbuf[srcr[r-rlo] + srcc]++);
       } else {
-        auto m0 = this->_ch[0]->rows();
-        auto n0 = this->_ch[0]->cols();
-        auto m1 = this->_ch[1]->rows();
-        auto n1 = this->_ch[1]->cols();
-        this->_ch[0]->redistribute_to_tree_from_buffers
+        auto m0 = this->ch_[0]->rows();
+        auto n0 = this->ch_[0]->cols();
+        auto m1 = this->ch_[1]->rows();
+        auto n1 = this->ch_[1]->cols();
+        this->ch_[0]->redistribute_to_tree_from_buffers
           (A, Arlo, Aclo, pbuf);
-        this->_ch[1]->redistribute_to_tree_from_buffers
+        this->ch_[1]->redistribute_to_tree_from_buffers
           (A, Arlo+m0, Aclo+n0, pbuf);
         _A01 = DistM_t(grid(), m0, n1);
         _A10 = DistM_t(grid(), m1, n0);
@@ -168,8 +168,8 @@ namespace strumpack {
     HSSMatrixMPI<scalar_t>::delete_redistributed_input() {
       if (this->leaf()) this->_A.clear();
       else {
-        this->_ch[0]->delete_redistributed_input();
-        this->_ch[1]->delete_redistributed_input();
+        this->ch_[0]->delete_redistributed_input();
+        this->ch_[1]->delete_redistributed_input();
         this->_A01.clear();
         this->_A10.clear();
       }
@@ -411,15 +411,15 @@ namespace strumpack {
           }
         }
       } else {
-        w.split(this->_ch[0]->dims());
+        w.split(this->ch_[0]->dims());
         if (w.lvl < lvl) {
-          this->_ch[0]->get_extraction_indices(I, J, w.c[0], self, lvl);
-          this->_ch[1]->get_extraction_indices(I, J, w.c[1], self, lvl);
+          this->ch_[0]->get_extraction_indices(I, J, w.c[0], self, lvl);
+          this->ch_[1]->get_extraction_indices(I, J, w.c[1], self, lvl);
           return;
         }
         communicate_child_data(w);
-        if (!this->_ch[0]->is_compressed() ||
-            !this->_ch[1]->is_compressed()) return;
+        if (!this->ch_[0]->is_compressed() ||
+            !this->ch_[1]->is_compressed()) return;
         if (this->is_untouched()) {
           self += 2;
           if (Comm().is_root()) {
@@ -453,15 +453,15 @@ namespace strumpack {
           B.push_back(DistMW_t(_D));
         }
       } else {
-        w.split(this->_ch[0]->dims());
+        w.split(this->ch_[0]->dims());
         if (w.lvl < lvl) {
-          this->_ch[0]->get_extraction_indices(I, J, B, lg, w.c[0], self, lvl);
-          this->_ch[1]->get_extraction_indices(I, J, B, lg, w.c[1], self, lvl);
+          this->ch_[0]->get_extraction_indices(I, J, B, lg, w.c[0], self, lvl);
+          this->ch_[1]->get_extraction_indices(I, J, B, lg, w.c[1], self, lvl);
           return;
         }
         communicate_child_data(w);
-        if (!this->_ch[0]->is_compressed() ||
-            !this->_ch[1]->is_compressed()) return;
+        if (!this->ch_[0]->is_compressed() ||
+            !this->ch_[1]->is_compressed()) return;
         if (this->is_untouched()) {
           self += 2;
           if (Comm().is_root()) {
@@ -546,19 +546,19 @@ namespace strumpack {
         }
       } else {
         if (w.lvl < lvl) {
-          this->_ch[0]->extract_D_B(Aelem, lg, opts, w.c[0], lvl);
-          this->_ch[1]->extract_D_B(Aelem, lg, opts, w.c[1], lvl);
+          this->ch_[0]->extract_D_B(Aelem, lg, opts, w.c[0], lvl);
+          this->ch_[1]->extract_D_B(Aelem, lg, opts, w.c[1], lvl);
           return;
         }
-        if (!this->_ch[0]->is_compressed() ||
-            !this->_ch[1]->is_compressed()) return;
+        if (!this->ch_[0]->is_compressed() ||
+            !this->ch_[1]->is_compressed()) return;
         if (this->is_untouched()) {
           _B01 = DistM_t(grid(), w.c[0].Ir.size(), w.c[1].Ic.size());
           _B10 = DistM_t(grid(), w.c[1].Ir.size(), w.c[0].Ic.size());
           Aelem(w.c[0].Ir, w.c[1].Ic, _B01, _A01,
-                w.offset.first, w.offset.second+this->_ch[0]->cols(), comm());
+                w.offset.first, w.offset.second+this->ch_[0]->cols(), comm());
           Aelem(w.c[1].Ir, w.c[0].Ic, _B10, _A10,
-                w.offset.first+this->_ch[0]->rows(), w.offset.second, comm());
+                w.offset.first+this->ch_[0]->rows(), w.offset.second, comm());
         }
       }
     }
@@ -581,32 +581,32 @@ namespace strumpack {
           Aelem(I, J, _D, _A, w.offset.first, w.offset.second, comm());
         }
       } else {
-        w.split(this->_ch[0]->dims());
-        this->_ch[0]->compress_recursive_original
+        w.split(this->ch_[0]->dims());
+        this->ch_[0]->compress_recursive_original
           (RS, Aelem, opts, w.c[0], dd);
-        this->_ch[1]->compress_recursive_original
+        this->ch_[1]->compress_recursive_original
           (RS, Aelem, opts, w.c[1], dd);
         communicate_child_data(w);
-        if (!this->_ch[0]->is_compressed() ||
-            !this->_ch[1]->is_compressed()) return;
+        if (!this->ch_[0]->is_compressed() ||
+            !this->ch_[1]->is_compressed()) return;
         if (this->is_untouched()) {
           _B01 = DistM_t(grid(), w.c[0].Ir.size(), w.c[1].Ic.size());
           _B10 = DistM_t(grid(), w.c[1].Ir.size(), w.c[0].Ic.size());
           Aelem(w.c[0].Ir, w.c[1].Ic, _B01, _A01,
-                w.offset.first, w.offset.second+this->_ch[0]->cols(), comm());
+                w.offset.first, w.offset.second+this->ch_[0]->cols(), comm());
           Aelem(w.c[1].Ir, w.c[0].Ic, _B10, _A10,
-                w.offset.first+this->_ch[0]->rows(), w.offset.second, comm());
+                w.offset.first+this->ch_[0]->rows(), w.offset.second, comm());
         }
       }
-      if (w.lvl == 0) this->_U_state = this->_V_state = State::COMPRESSED;
+      if (w.lvl == 0) this->U_state_ = this->V_state_ = State::COMPRESSED;
       else {
         compute_local_samples(RS, w, dd);
         if (!this->is_compressed()) {
           if (compute_U_V_bases(RS.R.cols(), opts, w)) {
             reduce_local_samples(RS, w, dd, false);
-            this->_U_state = this->_V_state = State::COMPRESSED;
+            this->U_state_ = this->V_state_ = State::COMPRESSED;
           } else
-            this->_U_state = this->_V_state = State::PARTIALLY_COMPRESSED;
+            this->U_state_ = this->V_state_ = State::PARTIALLY_COMPRESSED;
         } else reduce_local_samples(RS, w, dd, true);
       }
     }
@@ -620,23 +620,23 @@ namespace strumpack {
         if (w.lvl < lvl) return;
       } else {
         if (w.lvl < lvl) {
-          this->_ch[0]->compress_level_original(RS, opts, w.c[0], dd, lvl);
-          this->_ch[1]->compress_level_original(RS, opts, w.c[1], dd, lvl);
+          this->ch_[0]->compress_level_original(RS, opts, w.c[0], dd, lvl);
+          this->ch_[1]->compress_level_original(RS, opts, w.c[1], dd, lvl);
           return;
         }
         communicate_child_data(w);
-        if (!this->_ch[0]->is_compressed() ||
-            !this->_ch[1]->is_compressed()) return;
+        if (!this->ch_[0]->is_compressed() ||
+            !this->ch_[1]->is_compressed()) return;
       }
-      if (w.lvl==0) this->_U_state = this->_V_state = State::COMPRESSED;
+      if (w.lvl==0) this->U_state_ = this->V_state_ = State::COMPRESSED;
       else {
         compute_local_samples(RS, w, dd);
         if (!this->is_compressed()) {
           if (compute_U_V_bases(RS.R.cols(), opts, w)) {
             reduce_local_samples(RS, w, dd, false);
-            this->_U_state = this->_V_state = State::COMPRESSED;
+            this->U_state_ = this->V_state_ = State::COMPRESSED;
           } else
-            this->_U_state = this->_V_state = State::PARTIALLY_COMPRESSED;
+            this->U_state_ = this->V_state_ = State::PARTIALLY_COMPRESSED;
         } else reduce_local_samples(RS, w, dd, true);
       }
     }
@@ -770,8 +770,8 @@ namespace strumpack {
       if (d-opts.p() >= opts.max_rank() ||
           (int(w.Jr.size()) <= d - opts.p() &&
            int(w.Jc.size()) <= d - opts.p())) {
-        this->_U_rank = w.Jr.size();  this->_U_rows = w.Sr.rows();
-        this->_V_rank = w.Jc.size();  this->_V_rows = w.Sc.rows();
+        this->U_rank_ = w.Jr.size();  this->U_rows_ = w.Sr.rows();
+        this->V_rank_ = w.Jc.size();  this->V_rows_ = w.Sc.rows();
         w.Ir.reserve(w.Jr.size());
         w.Ic.reserve(w.Jc.size());
         if (this->leaf()) {
@@ -830,10 +830,10 @@ namespace strumpack {
       } else {
         if (!c_old) {
           auto wRr = vconcat
-            (w.c[0].dR, this->_ch[0]->V_rank(), this->_ch[1]->V_rank(),
+            (w.c[0].dR, this->ch_[0]->V_rank(), this->ch_[1]->V_rank(),
              w.c[0].Rr, w.c[1].Rr, grid(), grid()->ctxt_all());
           auto wRc = vconcat
-            (w.c[0].dR, this->_ch[0]->U_rank(), this->_ch[1]->U_rank(),
+            (w.c[0].dR, this->ch_[0]->U_rank(), this->ch_[1]->U_rank(),
              w.c[0].Rc, w.c[1].Rc, grid(), grid()->ctxt_all());
           w.Rr = DistM_t(grid(), this->V_rank(), w.c[0].dR);
           w.Rc = DistM_t(grid(), this->U_rank(), w.c[0].dR);

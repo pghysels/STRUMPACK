@@ -42,9 +42,9 @@ namespace strumpack {
     template<typename scalar_t>
     HSSMatrixBase<scalar_t>::HSSMatrixBase
     (std::size_t m, std::size_t n, bool active)
-      : _rows(m), _cols(n), _U_state(State::UNTOUCHED),
-        _V_state(State::UNTOUCHED),
-        _openmp_task_depth(0), _active(active) { }
+      : rows_(m), cols_(n), U_state_(State::UNTOUCHED),
+        V_state_(State::UNTOUCHED),
+        openmp_task_depth_(0), active_(active) { }
 
     template<typename scalar_t>
     HSSMatrixBase<scalar_t>::HSSMatrixBase
@@ -55,25 +55,25 @@ namespace strumpack {
     template<typename scalar_t> HSSMatrixBase<scalar_t>&
     HSSMatrixBase<scalar_t>::operator=
     (const HSSMatrixBase<scalar_t>& other) {
-      _rows = other._rows;
-      _cols = other._cols;
-      for (auto& c : other._ch)
-        _ch.emplace_back(c->clone());
-      _U_state = other._U_state;
-      _V_state = other._V_state;
-      _openmp_task_depth = other._openmp_task_depth;
-      _active = other._active;
-      _U_rank = other._U_rank;
-      _U_rows = other._U_rows;
-      _V_rank = other._V_rank;
-      _V_rows = other._V_rows;
+      rows_ = other.rows_;
+      cols_ = other.cols_;
+      for (auto& c : other.ch_)
+        ch_.emplace_back(c->clone());
+      U_state_ = other.U_state_;
+      V_state_ = other.V_state_;
+      openmp_task_depth_ = other.openmp_task_depth_;
+      active_ = other.active_;
+      U_rank_ = other.U_rank_;
+      U_rows_ = other.U_rows_;
+      V_rank_ = other.V_rank_;
+      V_rows_ = other.V_rows_;
       return *this;
     }
 
     template<typename scalar_t> std::size_t
     HSSMatrixBase<scalar_t>::factor_nonzeros() const {
       std::size_t fnnz = ULV_.nonzeros();
-      for (auto& c : _ch) fnnz += c->factor_nonzeros();
+      for (auto& c : ch_) fnnz += c->factor_nonzeros();
       return fnnz;
     }
 
@@ -139,7 +139,7 @@ namespace strumpack {
       auto lg = RS.HSS().grid_local();
       std::pair<std::size_t,std::size_t> offset;
       LocalElemMult<scalar_t> lAelem
-        (Aelem, (w_mpi.lvl==0) ? offset : w_mpi.offset, lg, _Asub);
+        (Aelem, (w_mpi.lvl==0) ? offset : w_mpi.offset, lg, Asub_);
       w_mpi.create_sequential();
       WorkCompress<scalar_t>& w = *(w_mpi.w_seq);
       if (w.lvl == 0) w.offset = w_mpi.offset;
@@ -150,7 +150,7 @@ namespace strumpack {
 #pragma omp single nowait
       compress_recursive_original
         (RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
-         lAelem, opts, w, dd, _openmp_task_depth);
+         lAelem, opts, w, dd, openmp_task_depth_);
       if (is_compressed()) {
         auto lg = RS.HSS().grid_local();
         auto d = RS.sub_Rr.cols();
@@ -212,7 +212,7 @@ namespace strumpack {
 #pragma omp single nowait
       compress_level_original
         (RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
-         opts, w, dd, lvl, _openmp_task_depth);
+         opts, w, dd, lvl, openmp_task_depth_);
       if (w.lvl == lvl) {
         if (is_compressed()) {
           auto lg = RS.HSS().grid_local();
@@ -264,7 +264,7 @@ namespace strumpack {
       auto lg = RS.HSS().grid_local();
       std::pair<std::size_t,std::size_t> offset;
       LocalElemMult<scalar_t> lAelem
-        (Aelem, (w_mpi.lvl==0) ? offset : w_mpi.offset, lg, _Asub);
+        (Aelem, (w_mpi.lvl==0) ? offset : w_mpi.offset, lg, Asub_);
       w_mpi.create_sequential();
       WorkCompress<scalar_t>& w = *(w_mpi.w_seq);
       if (w.lvl == 0) w.offset = w_mpi.offset;
@@ -275,7 +275,7 @@ namespace strumpack {
 #pragma omp single nowait
       compress_recursive_stable
         (RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
-         lAelem, opts, w, d, dd, _openmp_task_depth);
+         lAelem, opts, w, d, dd, openmp_task_depth_);
       if (is_compressed()) {
         //auto lg = RS.HSS().grid_local();
         auto c = RS.sub_Rr.cols();
@@ -333,7 +333,7 @@ namespace strumpack {
 #pragma omp single nowait
       compress_level_stable
         (RS.sub_Rr, RS.sub_Rc, RS.sub_Sr, RS.sub_Sc,
-         opts, w, d, dd, lvl, _openmp_task_depth);
+         opts, w, d, dd, lvl, openmp_task_depth_);
       if (w.lvl == lvl) {
         if (is_compressed()) {
           auto lg = RS.HSS().grid_local();
@@ -385,14 +385,14 @@ namespace strumpack {
       if (!active()) return;
       std::pair<std::size_t,std::size_t> offset;
       LocalElemMult<scalar_t> lAelem
-        (Aelem, offset, lg, _Asub);
+        (Aelem, offset, lg, Asub_);
       w_mpi.create_sequential();
       WorkCompressANN<scalar_t>& w = *(w_mpi.w_seq);
       w.offset = w_mpi.offset;
 #pragma omp parallel
 #pragma omp single nowait
       compress_recursive_ann
-        (ann, scores, lAelem, opts, w, _openmp_task_depth);
+        (ann, scores, lAelem, opts, w, openmp_task_depth_);
       w_mpi.S = DistM_t(lg, std::move(w.S));
       std::swap(w.Ir, w_mpi.Ir);
       std::swap(w.Ic, w_mpi.Ic);
@@ -429,7 +429,7 @@ namespace strumpack {
     (const delemw_t& Aelem, const BLACSGrid* lg, const opts_t& opts,
      WorkCompressMPI<scalar_t>& w, int lvl) {
       if (!this->active()) return;
-      LocalElemMult<scalar_t> lAelem(Aelem, w.offset, lg, _Asub);
+      LocalElemMult<scalar_t> lAelem(Aelem, w.offset, lg, Asub_);
       extract_D_B(lAelem, opts, *w.w_seq, lvl);
     }
 
@@ -444,7 +444,7 @@ namespace strumpack {
       std::atomic<long long int> lflops(0);
 #pragma omp parallel
 #pragma omp single nowait
-      apply_fwd(B.sub, *(w.w_seq), isroot, _openmp_task_depth, lflops);
+      apply_fwd(B.sub, *(w.w_seq), isroot, openmp_task_depth_, lflops);
       flops += lflops.load();
       w.tmp1 = DistM_t(B.grid_local(), std::move(w.w_seq->tmp1));
     }
@@ -458,7 +458,7 @@ namespace strumpack {
 #pragma omp parallel
 #pragma omp single nowait
       apply_bwd
-        (B.sub, beta, C.sub, *(w.w_seq), isroot, _openmp_task_depth, lflops);
+        (B.sub, beta, C.sub, *(w.w_seq), isroot, openmp_task_depth_, lflops);
       flops += lflops.load();
     }
 
@@ -473,7 +473,7 @@ namespace strumpack {
       std::atomic<long long int> lflops(0);
 #pragma omp parallel
 #pragma omp single nowait
-      applyT_fwd(B.sub, *(w.w_seq), isroot, _openmp_task_depth, lflops);
+      applyT_fwd(B.sub, *(w.w_seq), isroot, openmp_task_depth_, lflops);
       flops += lflops.load();
       w.tmp1 = DistM_t(B.grid_local(), std::move(w.w_seq->tmp1));
     }
@@ -488,7 +488,7 @@ namespace strumpack {
 #pragma omp single nowait
       applyT_bwd
         (B.sub, beta, C.sub, *(w.w_seq), isroot,
-         _openmp_task_depth, lflops);
+         openmp_task_depth_, lflops);
       flops += lflops.load();
     }
 
@@ -501,7 +501,7 @@ namespace strumpack {
           (new WorkFactor<scalar_t>());
 #pragma omp parallel
 #pragma omp single nowait
-      factor_recursive(*(w.w_seq), isroot, partial, _openmp_task_depth);
+      factor_recursive(*(w.w_seq), isroot, partial, openmp_task_depth_);
       if (isroot) {
         if (partial) ULV_mpi_.Vt0_ = DistM_t(lg, ULV_._Vt0);
         ULV_mpi_.D_ = DistM_t(lg, ULV_._D);
@@ -524,7 +524,7 @@ namespace strumpack {
           (new WorkSolve<scalar_t>());
 #pragma omp parallel
 #pragma omp single nowait
-      solve_fwd(b.sub, *(w.w_seq), partial, isroot, _openmp_task_depth);
+      solve_fwd(b.sub, *(w.w_seq), partial, isroot, openmp_task_depth_);
       w.z = DistM_t(b.grid_local(), std::move(w.w_seq->z));
       w.ft1 = DistM_t(b.grid_local(), std::move(w.w_seq->ft1));
       w.y = DistM_t(b.grid_local(), std::move(w.w_seq->y));
@@ -536,7 +536,7 @@ namespace strumpack {
       w.w_seq->x = w.x.dense_and_clear();
 #pragma omp parallel
 #pragma omp single nowait
-      solve_bwd(x.sub, *(w.w_seq), isroot, _openmp_task_depth);
+      solve_bwd(x.sub, *(w.w_seq), isroot, openmp_task_depth_);
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::extract_fwd
@@ -551,7 +551,7 @@ namespace strumpack {
       std::swap(w.ycols, w_seq.ycols);
 #pragma omp parallel
 #pragma omp single nowait
-      extract_fwd(*(w.w_seq), odiag, _openmp_task_depth);
+      extract_fwd(*(w.w_seq), odiag, openmp_task_depth_);
       std::swap(w.I, w_seq.I);
       std::swap(w.J, w_seq.J);
       std::swap(w.ycols, w_seq.ycols);
@@ -573,7 +573,7 @@ namespace strumpack {
         std::swap(w.ycols[k], w_seq.ycols);
 #pragma omp parallel
 #pragma omp single nowait
-        extract_fwd(w_seq, odiag[k], _openmp_task_depth);
+        extract_fwd(w_seq, odiag[k], openmp_task_depth_);
         std::swap(w.I[k], w_seq.I);
         std::swap(w.J[k], w_seq.J);
         std::swap(w.ycols[k], w_seq.ycols);
@@ -598,7 +598,7 @@ namespace strumpack {
       w.w_seq->z = w.z.dense_and_clear();
 #pragma omp parallel
 #pragma omp single nowait
-      extract_bwd(triplets, w_seq, _openmp_task_depth);
+      extract_bwd(triplets, w_seq, openmp_task_depth_);
     }
 
     template<typename scalar_t> void HSSMatrixBase<scalar_t>::extract_bwd
@@ -622,7 +622,7 @@ namespace strumpack {
         w_seq.z = w.z[k].dense_and_clear();
 #pragma omp parallel
 #pragma omp single nowait
-        extract_bwd(triplets[k], w_seq, _openmp_task_depth);
+        extract_bwd(triplets[k], w_seq, openmp_task_depth_);
       }
     }
 
@@ -637,7 +637,7 @@ namespace strumpack {
 #pragma omp parallel
 #pragma omp single nowait
       apply_UV_big
-        (Theta.sub, sUop, Phi.sub, sVop, offset, _openmp_task_depth, UVflops);
+        (Theta.sub, sUop, Phi.sub, sVop, offset, openmp_task_depth_, UVflops);
       flops += UVflops.load();
     }
 
@@ -660,7 +660,7 @@ namespace strumpack {
     (const DistM_t& A, std::size_t Arlo, std::size_t Aclo,
      std::vector<scalar_t*>& pbuf) {
       if (!this->active()) return;
-      _Asub = DenseM_t(rows(), cols());
+      Asub_ = DenseM_t(rows(), cols());
       const auto B = DistM_t::default_MB;
       const auto Aprows = A.grid()->nprows();
       const auto Apcols = A.grid()->npcols();
@@ -670,12 +670,12 @@ namespace strumpack {
       for (std::size_t c=0; c<cols(); c++)
         for (std::size_t srcc=(((c+Aclo)/B)%Apcols)*Aprows,
                r=0; r<cols(); r++)
-          _Asub(r,c) = *(pbuf[srcr[r] + srcc]++);
+          Asub_(r,c) = *(pbuf[srcr[r] + srcc]++);
     }
 
     template<typename scalar_t> void
     HSSMatrixBase<scalar_t>::delete_redistributed_input() {
-      _Asub.clear();
+      Asub_.clear();
     }
 #endif //defined(STRUMPACK_USE_MPI)
 

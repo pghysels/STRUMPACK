@@ -117,24 +117,24 @@ namespace strumpack {
           Aelem(I, J, _D, _A, w.offset.first, w.offset.second, comm());
         }
       } else {
-        w.split(this->_ch[0]->dims());
-        this->_ch[0]->compress_recursive_stable
+        w.split(this->ch_[0]->dims());
+        this->ch_[0]->compress_recursive_stable
           (RS, Aelem, opts, w.c[0], d, dd);
-        this->_ch[1]->compress_recursive_stable
+        this->ch_[1]->compress_recursive_stable
           (RS, Aelem, opts, w.c[1], d, dd);
         communicate_child_data(w);
-        if (!this->_ch[0]->is_compressed() ||
-            !this->_ch[1]->is_compressed()) return;
+        if (!this->ch_[0]->is_compressed() ||
+            !this->ch_[1]->is_compressed()) return;
         if (this->is_untouched()) {
           _B01 = DistM_t(grid(), w.c[0].Ir.size(), w.c[1].Ic.size());
           _B10 = DistM_t(grid(), w.c[1].Ir.size(), w.c[0].Ic.size());
           Aelem(w.c[0].Ir, w.c[1].Ic, _B01, _A01,
-                w.offset.first, w.offset.second+this->_ch[0]->cols(), comm());
+                w.offset.first, w.offset.second+this->ch_[0]->cols(), comm());
           Aelem(w.c[1].Ir, w.c[0].Ic, _B10, _A10,
-                w.offset.first+this->_ch[0]->rows(), w.offset.second, comm());
+                w.offset.first+this->ch_[0]->rows(), w.offset.second, comm());
         }
       }
-      if (w.lvl == 0) this->_U_state = this->_V_state = State::COMPRESSED;
+      if (w.lvl == 0) this->U_state_ = this->V_state_ = State::COMPRESSED;
       else {
         if (this->is_untouched()) compute_local_samples(RS, w, d+dd);
         else compute_local_samples(RS, w, dd);
@@ -157,14 +157,14 @@ namespace strumpack {
         if (w.lvl < lvl) return;
       } else {
         if (w.lvl < lvl) {
-          this->_ch[0]->compress_level_stable(RS, opts, w.c[0], d, dd, lvl);
-          this->_ch[1]->compress_level_stable(RS, opts, w.c[1], d, dd, lvl);
+          this->ch_[0]->compress_level_stable(RS, opts, w.c[0], d, dd, lvl);
+          this->ch_[1]->compress_level_stable(RS, opts, w.c[1], d, dd, lvl);
           return;
         }
-        if (!this->_ch[0]->is_compressed() ||
-            !this->_ch[1]->is_compressed()) return;
+        if (!this->ch_[0]->is_compressed() ||
+            !this->ch_[1]->is_compressed()) return;
       }
-      if (w.lvl==0) this->_U_state = this->_V_state = State::COMPRESSED;
+      if (w.lvl==0) this->U_state_ = this->V_state_ = State::COMPRESSED;
       else {
         if (this->is_untouched()) compute_local_samples(RS, w, d+dd);
         else compute_local_samples(RS, w, dd);
@@ -181,23 +181,23 @@ namespace strumpack {
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compute_U_basis_stable
     (const opts_t& opts, WorkCompressMPI<scalar_t>& w, int d, int dd) {
-      if (this->_U_state == State::COMPRESSED) return;
+      if (this->U_state_ == State::COMPRESSED) return;
       int u_rows = this->leaf() ? this->rows() :
-        this->_ch[0]->U_rank()+this->_ch[1]->U_rank();
+        this->ch_[0]->U_rank()+this->ch_[1]->U_rank();
       auto gT = grid()->transpose();
       if (!w.Sr.active()) return;
       if (d+dd >= opts.max_rank() || d+dd >= u_rows ||
           update_orthogonal_basis
           (opts, w.U_r_max, w.Sr, w.Qr, d, dd,
-           this->_U_state == State::UNTOUCHED, w.lvl)) {
+           this->U_state_ == State::UNTOUCHED, w.lvl)) {
         w.Qr.clear();
         // TODO pass max_rank to ID in DistributedMatrix
         auto rtol = opts.rel_tol() / w.lvl;
         auto atol = opts.abs_tol() / w.lvl;
         w.Sr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol, opts.max_rank(), &gT);
         STRUMPACK_ID_FLOPS(ID_row_flops(w.Sr, _U.cols()));
-        this->_U_rank = _U.cols();
-        this->_U_rows = _U.rows();
+        this->U_rank_ = _U.cols();
+        this->U_rows_ = _U.rows();
         w.Ir.reserve(_U.cols());
         if (this->leaf())
           for (auto i : w.Jr) w.Ir.push_back(w.offset.first + i);
@@ -206,30 +206,30 @@ namespace strumpack {
           for (auto i : w.Jr)
             w.Ir.push_back((i < r0) ? w.c[0].Ir[i] : w.c[1].Ir[i-r0]);
         }
-        this->_U_state = State::COMPRESSED;
-      } else this->_U_state = State::PARTIALLY_COMPRESSED;
+        this->U_state_ = State::COMPRESSED;
+      } else this->U_state_ = State::PARTIALLY_COMPRESSED;
     }
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compute_V_basis_stable
     (const opts_t& opts, WorkCompressMPI<scalar_t>& w, int d, int dd) {
-      if (this->_V_state == State::COMPRESSED) return;
+      if (this->V_state_ == State::COMPRESSED) return;
       int v_rows = this->leaf() ? this->rows() :
-        this->_ch[0]->V_rank()+this->_ch[1]->V_rank();
+        this->ch_[0]->V_rank()+this->ch_[1]->V_rank();
       auto gT = grid()->transpose();
       if (!w.Sc.active()) return;
       if (d+dd >= opts.max_rank() || d+dd >= v_rows ||
           update_orthogonal_basis
           (opts, w.V_r_max, w.Sc, w.Qc, d, dd,
-           this->_V_state == State::UNTOUCHED, w.lvl)) {
+           this->V_state_ == State::UNTOUCHED, w.lvl)) {
         w.Qc.clear();
         // TODO pass max_rank to ID in DistributedMatrix
         auto rtol = opts.rel_tol() / w.lvl;
         auto atol = opts.abs_tol() / w.lvl;
         w.Sc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol, opts.max_rank(), &gT);
         STRUMPACK_ID_FLOPS(ID_row_flops(w.Sc, _V.cols()));
-        this->_V_rank = _V.cols();
-        this->_V_rows = _V.rows();
+        this->V_rank_ = _V.cols();
+        this->V_rows_ = _V.rows();
         w.Ic.reserve(_V.cols());
         if (this->leaf())
           for (auto j : w.Jc) w.Ic.push_back(w.offset.second + j);
@@ -238,8 +238,8 @@ namespace strumpack {
           for (auto j : w.Jc)
             w.Ic.push_back((j < r0) ? w.c[0].Ic[j] : w.c[1].Ic[j-r0]);
         }
-        this->_V_state = State::COMPRESSED;
-      } else this->_V_state = State::PARTIALLY_COMPRESSED;
+        this->V_state_ = State::COMPRESSED;
+      } else this->V_state_ = State::PARTIALLY_COMPRESSED;
     }
 
     template<typename scalar_t> bool

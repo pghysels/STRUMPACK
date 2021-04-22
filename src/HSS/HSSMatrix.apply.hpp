@@ -64,15 +64,15 @@ namespace strumpack {
       } else {
         w.c.resize(2);
         w.c[0].offset = w.offset;
-        w.c[1].offset = w.offset + this->_ch[0]->dims();
+        w.c[1].offset = w.offset + this->ch_[0]->dims();
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->_ch[0]->apply_fwd(b, w.c[0], false, depth+1, flops);
+        this->ch_[0]->apply_fwd(b, w.c[0], false, depth+1, flops);
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->_ch[1]->apply_fwd(b, w.c[1], false, depth+1, flops);
+        this->ch_[1]->apply_fwd(b, w.c[1], false, depth+1, flops);
 #pragma omp taskwait
         if (!isroot) {
           w.tmp1 = _V.applyC(vconcat(w.c[0].tmp1, w.c[1].tmp1), depth);
@@ -98,8 +98,8 @@ namespace strumpack {
           flops += gemm_flops(Trans::N, Trans::N, scalar_t(1.), _D, beta, lc);
         }
       } else {
-        w.c[0].tmp2 = DenseM_t(this->_ch[0]->U_rank(), b.cols());
-        w.c[1].tmp2 = DenseM_t(this->_ch[1]->U_rank(), b.cols());
+        w.c[0].tmp2 = DenseM_t(this->ch_[0]->U_rank(), b.cols());
+        w.c[1].tmp2 = DenseM_t(this->ch_[1]->U_rank(), b.cols());
         if (isroot || !_U.cols()) { // TODO these can be done in parallel
           gemm(Trans::N, Trans::N, scalar_t(1.), _B01, w.c[1].tmp1,
                scalar_t(0.), w.c[0].tmp2, depth);
@@ -110,10 +110,10 @@ namespace strumpack {
             gemm_flops(Trans::N, Trans::N, scalar_t(1.), _B10, w.c[0].tmp1, scalar_t(0.));
         } else {
           auto tmp = _U.apply(w.tmp2, depth);
-          copy(this->_ch[0]->U_rank(), b.cols(), tmp,
+          copy(this->ch_[0]->U_rank(), b.cols(), tmp,
                0, 0, w.c[0].tmp2, 0, 0);
-          copy(this->_ch[1]->U_rank(), b.cols(), tmp,
-               this->_ch[0]->U_rank(), 0, w.c[1].tmp2, 0, 0);
+          copy(this->ch_[1]->U_rank(), b.cols(), tmp,
+               this->ch_[0]->U_rank(), 0, w.c[1].tmp2, 0, 0);
           gemm(Trans::N, Trans::N, scalar_t(1.), _B01, w.c[1].tmp1,
                scalar_t(1.), w.c[0].tmp2, depth);
           gemm(Trans::N, Trans::N, scalar_t(1.), _B10, w.c[0].tmp1,
@@ -126,11 +126,11 @@ namespace strumpack {
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->_ch[0]->apply_bwd(b, beta, c, w.c[0], false, depth+1, flops);
+        this->ch_[0]->apply_bwd(b, beta, c, w.c[0], false, depth+1, flops);
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->_ch[1]->apply_bwd(b, beta, c, w.c[1], false, depth+1, flops);
+        this->ch_[1]->apply_bwd(b, beta, c, w.c[1], false, depth+1, flops);
 #pragma omp taskwait
       }
     }
@@ -148,15 +148,15 @@ namespace strumpack {
       } else {
         w.c.resize(2);
         w.c[0].offset = w.offset;
-        w.c[1].offset = w.offset + this->_ch[0]->dims();
+        w.c[1].offset = w.offset + this->ch_[0]->dims();
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->_ch[0]->applyT_fwd(b, w.c[0], false, depth+1, flops);
+        this->ch_[0]->applyT_fwd(b, w.c[0], false, depth+1, flops);
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->_ch[1]->applyT_fwd(b, w.c[1], false, depth+1, flops);
+        this->ch_[1]->applyT_fwd(b, w.c[1], false, depth+1, flops);
 #pragma omp taskwait
         if (!isroot) {
           w.tmp1 = _U.applyC(vconcat(w.c[0].tmp1, w.c[1].tmp1), depth);
@@ -184,8 +184,8 @@ namespace strumpack {
             gemm_flops(Trans::C, Trans::N, scalar_t(1.), _D, beta, lc);
         }
       } else {
-        w.c[0].tmp2 = DenseM_t(this->_ch[0]->V_rank(), b.cols());
-        w.c[1].tmp2 = DenseM_t(this->_ch[1]->V_rank(), b.cols());
+        w.c[0].tmp2 = DenseM_t(this->ch_[0]->V_rank(), b.cols());
+        w.c[1].tmp2 = DenseM_t(this->ch_[1]->V_rank(), b.cols());
         if (isroot || !_V.cols()) {
           gemm(Trans::C, Trans::N, scalar_t(1.), _B10, w.c[1].tmp1,
                scalar_t(0.), w.c[0].tmp2, depth);
@@ -196,9 +196,9 @@ namespace strumpack {
             gemm_flops(Trans::C, Trans::N, scalar_t(1.), _B01, w.c[0].tmp1, scalar_t(0.));
         } else {
           auto tmp = _V.apply(w.tmp2, depth);
-          copy(this->_ch[0]->V_rank(), b.cols(), tmp, 0, 0, w.c[0].tmp2, 0, 0);
-          copy(this->_ch[1]->V_rank(), b.cols(), tmp,
-               this->_ch[0]->V_rank(), 0, w.c[1].tmp2, 0, 0);
+          copy(this->ch_[0]->V_rank(), b.cols(), tmp, 0, 0, w.c[0].tmp2, 0, 0);
+          copy(this->ch_[1]->V_rank(), b.cols(), tmp,
+               this->ch_[0]->V_rank(), 0, w.c[1].tmp2, 0, 0);
           gemm(Trans::C, Trans::N, scalar_t(1.), _B10, w.c[1].tmp1,
                scalar_t(1.), w.c[0].tmp2, depth);
           gemm(Trans::C, Trans::N, scalar_t(1.), _B01, w.c[0].tmp1,
@@ -210,11 +210,11 @@ namespace strumpack {
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->_ch[0]->applyT_bwd(b, beta, c, w.c[0], false, depth+1, flops);
+        this->ch_[0]->applyT_bwd(b, beta, c, w.c[0], false, depth+1, flops);
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->_ch[1]->applyT_bwd(b, beta, c, w.c[1], false, depth+1, flops);
+        this->ch_[1]->applyT_bwd(b, beta, c, w.c[1], false, depth+1, flops);
 #pragma omp taskwait
       }
     }

@@ -183,8 +183,8 @@ namespace strumpack {
             }
           }
         } else {
-          if (this->_ch[0]->active())
-            blacs_grid_local_ = this->_ch[0]->grid_local();
+          if (this->ch_[0]->active())
+            blacs_grid_local_ = this->ch_[0]->grid_local();
         }
         if (Pr() <= 1) { // child 1 is sequential, create a local context
           if (!Comm().is_null()) {
@@ -196,8 +196,8 @@ namespace strumpack {
             }
           }
         } else {
-          if (this->_ch[1]->active())
-            blacs_grid_local_ = this->_ch[1]->grid_local();
+          if (this->ch_[1]->active())
+            blacs_grid_local_ = this->ch_[1]->grid_local();
         }
       } else blacs_grid_local_ = blacs_grid_;
     }
@@ -221,12 +221,12 @@ namespace strumpack {
           _ranges.rlo(0) = roff;
           _ranges.clo(0) = coff;
           if (P > 1) {
-            _ranges.rhi(0) = roff + this->_ch[0]->rows();
-            _ranges.chi(0) = coff + this->_ch[0]->cols();
+            _ranges.rhi(0) = roff + this->ch_[0]->rows();
+            _ranges.chi(0) = coff + this->ch_[0]->cols();
           }
           _ranges.leaf_procs(0) = 1;
         } else {
-          auto ch0 = static_cast<HSSMatrixMPI<scalar_t>*>(this->_ch[0].get());
+          auto ch0 = static_cast<HSSMatrixMPI<scalar_t>*>(this->ch_[0].get());
           for (int p=0; p<pl; p++) {
             _ranges.rlo(p) = ch0->_ranges.rlo(p);
             _ranges.rhi(p) = ch0->_ranges.rhi(p);
@@ -237,14 +237,14 @@ namespace strumpack {
         }
         if (pr <= 1) {
           if (P > 1) {
-            _ranges.rlo(pl) = roff + this->_ch[0]->rows();
-            _ranges.clo(pl) = coff + this->_ch[0]->cols();
+            _ranges.rlo(pl) = roff + this->ch_[0]->rows();
+            _ranges.clo(pl) = coff + this->ch_[0]->cols();
           }
           _ranges.rhi(pl) = roff + this->rows();
           _ranges.chi(pl) = coff + this->cols();
           _ranges.leaf_procs(pl) = 1;
         } else {
-          auto ch1 = static_cast<HSSMatrixMPI<scalar_t>*>(this->_ch[1].get());
+          auto ch1 = static_cast<HSSMatrixMPI<scalar_t>*>(this->ch_[1].get());
           for (int p=pl; p<P; p++) {
             _ranges.rlo(p) = ch1->_ranges.rlo(p-pl);
             _ranges.rhi(p) = ch1->_ranges.rhi(p-pl);
@@ -262,26 +262,26 @@ namespace strumpack {
       auto n = this->cols();
       if (m > std::size_t(opts.leaf_size()) ||
           n > std::size_t(opts.leaf_size())) {
-        this->_ch.reserve(2);
+        this->ch_.reserve(2);
         auto pl = Pl(m, m/2, m-m/2, Ptotal());
         auto pr = Pr(m, m/2, m-m/2, Ptotal());
         if (pl > 1) {
-          this->_ch.emplace_back
+          this->ch_.emplace_back
             (new HSSMatrixMPI<scalar_t>
              (m/2, n/2, opts, Comm().sub(0, pl), pl, roff, coff));
         } else {
           bool act = !Comm().is_null() && Comm().rank() == 0;
-          this->_ch.emplace_back
+          this->ch_.emplace_back
             (new HSSMatrix<scalar_t>(m/2, n/2, opts, act));
         }
         if (pr > 1) {
-          this->_ch.emplace_back
+          this->ch_.emplace_back
             (new HSSMatrixMPI<scalar_t>
              (m-m/2, n-n/2, opts, Comm().sub(pl, pr), pr,
               roff+m/2, coff+n/2));
         } else {
           bool act = !Comm().is_null() && Comm().rank() == pl;
-          this->_ch.emplace_back
+          this->ch_.emplace_back
             (new HSSMatrix<scalar_t>(m-m/2, n-n/2, opts, act));
         }
       }
@@ -296,23 +296,23 @@ namespace strumpack {
         const int P = grid()->P();
         auto pl = Pl(t.size, t.c[0].size, t.c[1].size, P);
         auto pr = Pr(t.size, t.c[0].size, t.c[1].size, P);
-        this->_ch.reserve(2);
+        this->ch_.reserve(2);
         if (pl > 1) {
-          this->_ch.emplace_back
+          this->ch_.emplace_back
             (new HSSMatrixMPI<scalar_t>
              (t.c[0], opts, Comm().sub(0, pl), pl, roff, coff));
         } else {
           bool act = !Comm().is_null() && Comm().rank() == 0;
-          this->_ch.emplace_back(new HSSMatrix<scalar_t>(t.c[0], opts, act));
+          this->ch_.emplace_back(new HSSMatrix<scalar_t>(t.c[0], opts, act));
         }
         if (pr > 1) {
-          this->_ch.emplace_back
+          this->ch_.emplace_back
             (new HSSMatrixMPI<scalar_t>
              (t.c[1], opts, Comm().sub(pl, pr), pr,
               roff+t.c[0].size, coff+t.c[0].size));
         } else {
           bool act = !Comm().is_null() && Comm().rank() == pl;
-          this->_ch.emplace_back(new HSSMatrix<scalar_t>(t.c[1], opts, act));
+          this->ch_.emplace_back(new HSSMatrix<scalar_t>(t.c[1], opts, act));
         }
       }
     }
@@ -325,7 +325,7 @@ namespace strumpack {
     HSSMatrixMPI<scalar_t>::rank() const {
       if (!this->active()) return 0;
       std::size_t rank = std::max(_U.cols(), _V.cols());
-      for (auto& c : this->_ch) rank = std::max(rank, c->rank());
+      for (auto& c : this->ch_) rank = std::max(rank, c->rank());
       return rank;
     }
 
@@ -338,7 +338,7 @@ namespace strumpack {
       if (!this->active()) return 0;
       std::size_t memory = sizeof(*this) + _U.memory() + _V.memory()
         + _D.memory() + _B01.memory() + _B10.memory();
-      for (auto& c : this->_ch) memory += c->memory();
+      for (auto& c : this->ch_) memory += c->memory();
       return memory;
     }
 
@@ -351,7 +351,7 @@ namespace strumpack {
       if (!this->active()) return 0;
       std::size_t nnz = sizeof(*this) + _U.nonzeros() + _V.nonzeros()
         + _D.nonzeros() + _B01.nonzeros() + _B10.nonzeros();
-      for (auto& c : this->_ch) nnz += c->nonzeros();
+      for (auto& c : this->ch_) nnz += c->nonzeros();
       return nnz;
     }
 
@@ -363,7 +363,7 @@ namespace strumpack {
     HSSMatrixMPI<scalar_t>::factor_nonzeros() const {
       if (!this->active()) return 0;
       std::size_t fnnz = this->ULV_mpi_.nonzeros();
-      for (auto& c : this->_ch) fnnz += c->factor_nonzeros();
+      for (auto& c : this->ch_) fnnz += c->factor_nonzeros();
       return fnnz;
     }
 
@@ -375,7 +375,7 @@ namespace strumpack {
     HSSMatrixMPI<scalar_t>::levels() const {
       if (!this->active()) return 0;
       std::size_t lvls = 0;
-      for (auto& c : this->_ch) lvls = std::max(lvls, c->levels());
+      for (auto& c : this->ch_) lvls = std::max(lvls, c->levels());
       return 1 + lvls;
     }
 
@@ -393,7 +393,7 @@ namespace strumpack {
     HSSMatrixMPI<scalar_t>::shift(scalar_t sigma) {
       if (!this->active()) return;
       if (this->leaf()) _D.shift(sigma);
-      else for (auto& c : this->_ch) c->shift(sigma);
+      else for (auto& c : this->ch_) c->shift(sigma);
     }
 
     template<typename scalar_t> void
@@ -404,8 +404,8 @@ namespace strumpack {
       w.c[1].dR = w.c[1].Rr.cols();
       w.c[1].dS = w.c[1].Sr.cols();
       int rank = Comm().rank(), P = Ptotal(), root1 = Pl();
-      int P0active = this->_ch[0]->Pactive();
-      int P1active = this->_ch[1]->Pactive();
+      int P0active = this->ch_[0]->Pactive();
+      int P1active = this->ch_[1]->Pactive();
       std::vector<MPIRequest> sreq;
       std::vector<std::size_t> sbuf0, sbuf1;
       if (rank < P0active) {
@@ -415,12 +415,12 @@ namespace strumpack {
           // are not active on child0, ie the ones in [P0active,P)
           sbuf0.reserve(8+w.c[0].Ir.size()+w.c[0].Ic.size()+
                         w.c[0].Jr.size()+w.c[0].Jc.size());
-          sbuf0.push_back(std::size_t(this->_ch[0]->_U_state));
-          sbuf0.push_back(std::size_t(this->_ch[0]->_V_state));
-          sbuf0.push_back(this->_ch[0]->_U_rank);
-          sbuf0.push_back(this->_ch[0]->_V_rank);
-          sbuf0.push_back(this->_ch[0]->_U_rows);
-          sbuf0.push_back(this->_ch[0]->_V_rows);
+          sbuf0.push_back(std::size_t(this->ch_[0]->U_state_));
+          sbuf0.push_back(std::size_t(this->ch_[0]->V_state_));
+          sbuf0.push_back(this->ch_[0]->U_rank_);
+          sbuf0.push_back(this->ch_[0]->V_rank_);
+          sbuf0.push_back(this->ch_[0]->U_rows_);
+          sbuf0.push_back(this->ch_[0]->V_rows_);
           sbuf0.push_back(w.c[0].dR);
           sbuf0.push_back(w.c[0].dS);
           for (auto i : w.c[0].Ir) sbuf0.push_back(i);
@@ -440,12 +440,12 @@ namespace strumpack {
           // [root1+P1active,P)
           sbuf1.reserve(8+w.c[1].Ir.size()+w.c[1].Ic.size()+
                         w.c[1].Jr.size()+w.c[1].Jc.size());
-          sbuf1.push_back(std::size_t(this->_ch[1]->_U_state));
-          sbuf1.push_back(std::size_t(this->_ch[1]->_V_state));
-          sbuf1.push_back(this->_ch[1]->_U_rank);
-          sbuf1.push_back(this->_ch[1]->_V_rank);
-          sbuf1.push_back(this->_ch[1]->_U_rows);
-          sbuf1.push_back(this->_ch[1]->_V_rows);
+          sbuf1.push_back(std::size_t(this->ch_[1]->U_state_));
+          sbuf1.push_back(std::size_t(this->ch_[1]->V_state_));
+          sbuf1.push_back(this->ch_[1]->U_rank_);
+          sbuf1.push_back(this->ch_[1]->V_rank_);
+          sbuf1.push_back(this->ch_[1]->U_rows_);
+          sbuf1.push_back(this->ch_[1]->V_rows_);
           sbuf1.push_back(w.c[1].dR);
           sbuf1.push_back(w.c[1].dS);
           for (auto i : w.c[1].Ir) sbuf1.push_back(i);
@@ -468,22 +468,22 @@ namespace strumpack {
         assert(dest >= 0);
         auto buf = Comm().template recv<std::size_t>(dest, 0);
         auto ptr = buf.begin();
-        this->_ch[0]->_U_state = State(*ptr++);
-        this->_ch[0]->_V_state = State(*ptr++);
-        this->_ch[0]->_U_rank = *ptr++;
-        this->_ch[0]->_V_rank = *ptr++;
-        this->_ch[0]->_U_rows = *ptr++;
-        this->_ch[0]->_V_rows = *ptr++;
+        this->ch_[0]->U_state_ = State(*ptr++);
+        this->ch_[0]->V_state_ = State(*ptr++);
+        this->ch_[0]->U_rank_ = *ptr++;
+        this->ch_[0]->V_rank_ = *ptr++;
+        this->ch_[0]->U_rows_ = *ptr++;
+        this->ch_[0]->V_rows_ = *ptr++;
         w.c[0].dR = *ptr++;
         w.c[0].dS = *ptr++;
-        w.c[0].Ir.resize(this->_ch[0]->_U_rank);
-        w.c[0].Ic.resize(this->_ch[0]->_V_rank);
-        w.c[0].Jr.resize(this->_ch[0]->_U_rank);
-        w.c[0].Jc.resize(this->_ch[0]->_V_rank);
-        for (int i=0; i<this->_ch[0]->_U_rank; i++) w.c[0].Ir[i] = *ptr++;
-        for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Ic[i] = *ptr++;
-        for (int i=0; i<this->_ch[0]->_U_rank; i++) w.c[0].Jr[i] = *ptr++;
-        for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Jc[i] = *ptr++;
+        w.c[0].Ir.resize(this->ch_[0]->U_rank_);
+        w.c[0].Ic.resize(this->ch_[0]->V_rank_);
+        w.c[0].Jr.resize(this->ch_[0]->U_rank_);
+        w.c[0].Jc.resize(this->ch_[0]->V_rank_);
+        for (int i=0; i<this->ch_[0]->U_rank_; i++) w.c[0].Ir[i] = *ptr++;
+        for (int i=0; i<this->ch_[0]->V_rank_; i++) w.c[0].Ic[i] = *ptr++;
+        for (int i=0; i<this->ch_[0]->U_rank_; i++) w.c[0].Jr[i] = *ptr++;
+        for (int i=0; i<this->ch_[0]->V_rank_; i++) w.c[0].Jc[i] = *ptr++;
         //assert(msgsize == std::distance(buf, ptr));
       }
       if (!(rank >= root1 && rank < root1+P1active)) {
@@ -499,22 +499,22 @@ namespace strumpack {
         assert(dest >= 0);
         auto buf = Comm().template recv<std::size_t>(dest, 1);
         auto ptr = buf.begin();
-        this->_ch[1]->_U_state = State(*ptr++);
-        this->_ch[1]->_V_state = State(*ptr++);
-        this->_ch[1]->_U_rank = *ptr++;
-        this->_ch[1]->_V_rank = *ptr++;
-        this->_ch[1]->_U_rows = *ptr++;
-        this->_ch[1]->_V_rows = *ptr++;
+        this->ch_[1]->U_state_ = State(*ptr++);
+        this->ch_[1]->V_state_ = State(*ptr++);
+        this->ch_[1]->U_rank_ = *ptr++;
+        this->ch_[1]->V_rank_ = *ptr++;
+        this->ch_[1]->U_rows_ = *ptr++;
+        this->ch_[1]->V_rows_ = *ptr++;
         w.c[1].dR = *ptr++;
         w.c[1].dS = *ptr++;
-        w.c[1].Ir.resize(this->_ch[1]->_U_rank);
-        w.c[1].Ic.resize(this->_ch[1]->_V_rank);
-        w.c[1].Jr.resize(this->_ch[1]->_U_rank);
-        w.c[1].Jc.resize(this->_ch[1]->_V_rank);
-        for (int i=0; i<this->_ch[1]->_U_rank; i++) w.c[1].Ir[i] = *ptr++;
-        for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Ic[i] = *ptr++;
-        for (int i=0; i<this->_ch[1]->_U_rank; i++) w.c[1].Jr[i] = *ptr++;
-        for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Jc[i] = *ptr++;
+        w.c[1].Ir.resize(this->ch_[1]->U_rank_);
+        w.c[1].Ic.resize(this->ch_[1]->V_rank_);
+        w.c[1].Jr.resize(this->ch_[1]->U_rank_);
+        w.c[1].Jc.resize(this->ch_[1]->V_rank_);
+        for (int i=0; i<this->ch_[1]->U_rank_; i++) w.c[1].Ir[i] = *ptr++;
+        for (int i=0; i<this->ch_[1]->V_rank_; i++) w.c[1].Ic[i] = *ptr++;
+        for (int i=0; i<this->ch_[1]->U_rank_; i++) w.c[1].Jr[i] = *ptr++;
+        for (int i=0; i<this->ch_[1]->V_rank_; i++) w.c[1].Jc[i] = *ptr++;
         //assert(msgsize == std::distance(buf, ptr));
       }
       wait_all(sreq);
@@ -551,12 +551,12 @@ namespace strumpack {
       if (rank < inactives) {
         std::vector<std::size_t> sbuf;
         sbuf.reserve(8+w.Ir.size()+w.Ic.size()+w.Jr.size()+w.Jc.size());
-        sbuf.push_back(std::size_t(this->_U_state));
-        sbuf.push_back(std::size_t(this->_V_state));
-        sbuf.push_back(this->_U_rank);
-        sbuf.push_back(this->_V_rank);
-        sbuf.push_back(this->_U_rows);
-        sbuf.push_back(this->_V_rows);
+        sbuf.push_back(std::size_t(this->U_state_));
+        sbuf.push_back(std::size_t(this->V_state_));
+        sbuf.push_back(this->U_rank_);
+        sbuf.push_back(this->V_rank_);
+        sbuf.push_back(this->U_rows_);
+        sbuf.push_back(this->V_rows_);
         sbuf.push_back(w.Rr.cols());
         sbuf.push_back(w.Sr.cols());
         for (auto i : w.Ir) sbuf.push_back(i);
@@ -568,22 +568,22 @@ namespace strumpack {
       if (rank >= actives) {
         auto buf = Comm().template recv<std::size_t>(rank-actives, 0);
         auto ptr = buf.begin();
-        this->_U_state = State(*ptr++);
-        this->_V_state = State(*ptr++);
-        this->_U_rank = *ptr++;
-        this->_V_rank = *ptr++;
-        this->_U_rows = *ptr++;
-        this->_V_rows = *ptr++;
+        this->U_state_ = State(*ptr++);
+        this->V_state_ = State(*ptr++);
+        this->U_rank_ = *ptr++;
+        this->V_rank_ = *ptr++;
+        this->U_rows_ = *ptr++;
+        this->V_rows_ = *ptr++;
         w.dR = *ptr++;
         w.dS = *ptr++;
-        w.Ir.resize(this->_U_rank);
-        w.Ic.resize(this->_V_rank);
-        w.Jr.resize(this->_U_rank);
-        w.Jc.resize(this->_V_rank);
-        for (int i=0; i<this->_U_rank; i++) w.Ir[i] = *ptr++;
-        for (int i=0; i<this->_V_rank; i++) w.Ic[i] = *ptr++;
-        for (int i=0; i<this->_U_rank; i++) w.Jr[i] = *ptr++;
-        for (int i=0; i<this->_V_rank; i++) w.Jc[i] = *ptr++;
+        w.Ir.resize(this->U_rank_);
+        w.Ic.resize(this->V_rank_);
+        w.Jr.resize(this->U_rank_);
+        w.Jc.resize(this->V_rank_);
+        for (int i=0; i<this->U_rank_; i++) w.Ir[i] = *ptr++;
+        for (int i=0; i<this->V_rank_; i++) w.Ic[i] = *ptr++;
+        for (int i=0; i<this->U_rank_; i++) w.Jr[i] = *ptr++;
+        for (int i=0; i<this->V_rank_; i++) w.Jc[i] = *ptr++;
       }
     }
 
@@ -658,7 +658,7 @@ namespace strumpack {
         if (this->leaf()) std::cout << " leaf" << std::endl;
         else out << " non-leaf" << std::endl;
       }
-      for (auto& c : this->_ch) {
+      for (auto& c : this->ch_) {
         Comm().barrier();
         c->print_info(out, roff, coff);
         roff += c->rows();

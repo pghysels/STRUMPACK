@@ -125,14 +125,14 @@ namespace strumpack {
         if (odiag) w.y = _V.extract_rows(w.J).transpose();
         else w.ycols.clear();
       } else {
-        w.split_extraction_sets(this->_ch[0]->dims());
+        w.split_extraction_sets(this->ch_[0]->dims());
         for (std::size_t c=0; c<w.J.size(); c++) {
-          if (w.J[c] < this->_ch[0]->cols())
+          if (w.J[c] < this->ch_[0]->cols())
             w.c[0].ycols.push_back(w.ycols[c]);
           else w.c[1].ycols.push_back(w.ycols[c]);
         }
-        this->_ch[0]->extract_fwd(w.c[0], lg, odiag || !w.c[1].I.empty());
-        this->_ch[1]->extract_fwd(w.c[1], lg, odiag || !w.c[0].I.empty());
+        this->ch_[0]->extract_fwd(w.c[0], lg, odiag || !w.c[1].I.empty());
+        this->ch_[1]->extract_fwd(w.c[1], lg, odiag || !w.c[0].I.empty());
         w.ycols.clear();
         w.communicate_child_ycols(comm(), Pl());
         if (!odiag) return;
@@ -140,10 +140,10 @@ namespace strumpack {
         if (this->V_rank()) {
           DistM_t y01(grid(), this->V_rows(), w.ycols.size());
           y01.zero();
-          copy(this->_ch[0]->V_rank(), w.c[0].ycols.size(), w.c[0].y, 0, 0,
+          copy(this->ch_[0]->V_rank(), w.c[0].ycols.size(), w.c[0].y, 0, 0,
                y01, 0, 0, grid()->ctxt_all());
-          copy(this->_ch[1]->V_rank(), w.c[1].ycols.size(), w.c[1].y, 0, 0,
-               y01, this->_ch[0]->V_rank(), w.c[0].ycols.size(),
+          copy(this->ch_[1]->V_rank(), w.c[1].ycols.size(), w.c[1].y, 0, 0,
+               y01, this->ch_[0]->V_rank(), w.c[0].ycols.size(),
                grid()->ctxt_all());
           w.y = _V.applyC(y01);
           STRUMPACK_EXTRACTION_FLOPS
@@ -181,18 +181,18 @@ namespace strumpack {
                     (w.rl2g[r], w.zcols[c], tmp.global(r,c));
         }
       } else {
-        w.split_extraction_sets(this->_ch[0]->dims());
+        w.split_extraction_sets(this->ch_[0]->dims());
         w.c[0].rl2g.reserve(w.c[0].I.size());
         w.c[1].rl2g.reserve(w.c[1].I.size());
         for (std::size_t r=0; r<w.I.size(); r++) {
-          if (w.I[r] < this->_ch[0]->rows())
+          if (w.I[r] < this->ch_[0]->rows())
             w.c[0].rl2g.push_back(w.rl2g[r]);
           else w.c[1].rl2g.push_back(w.rl2g[r]);
         }
         w.c[0].cl2g.reserve(w.c[0].J.size());
         w.c[1].cl2g.reserve(w.c[1].J.size());
         for (std::size_t c=0; c<w.J.size(); c++) {
-          if (w.J[c] < this->_ch[0]->cols())
+          if (w.J[c] < this->ch_[0]->cols())
             w.c[0].cl2g.push_back(w.cl2g[c]);
           else w.c[1].cl2g.push_back(w.cl2g[c]);
         }
@@ -200,7 +200,7 @@ namespace strumpack {
         if (!w.c[0].I.empty()) {
           auto z0cols = w.c[1].ycols.size() + w.z.cols();
           auto z0rows = _B01.rows();
-          w.c[0].z = DistM_t(this->_ch[0]->grid(lg), z0rows, z0cols);
+          w.c[0].z = DistM_t(this->ch_[0]->grid(lg), z0rows, z0cols);
           if (!w.c[1].ycols.empty()) {
             DistM_t z00(grid(), z0rows, w.c[1].ycols.size());
             DistM_t wc1y(grid(), _B01.cols(), w.c[1].ycols.size());
@@ -236,7 +236,7 @@ namespace strumpack {
         if (!w.c[1].I.empty()) {
           auto z1cols = w.c[0].ycols.size() + w.z.cols();
           auto z1rows = _B10.rows();
-          w.c[1].z = DistM_t(this->_ch[1]->grid(lg), z1rows, z1cols);
+          w.c[1].z = DistM_t(this->ch_[1]->grid(lg), z1rows, z1cols);
           if (!w.c[0].ycols.empty()) {
             DistM_t z10(grid(), z1rows, w.c[0].ycols.size());
             DistM_t wc0y(grid(), _B10.cols(), w.c[0].ycols.size());
@@ -252,7 +252,7 @@ namespace strumpack {
           }
           if (this->U_rank()) {
             DistM_t z11(grid(), z1rows, w.z.cols());
-            DistMW_t U1(z1rows, this->U_rank(), U, this->_ch[0]->U_rank(), 0);
+            DistMW_t U1(z1rows, this->U_rank(), U, this->ch_[0]->U_rank(), 0);
             gemm(Trans::N, Trans::N, scalar_t(1.),
                  U1, w.z, scalar_t(0.), z11);
             STRUMPACK_EXTRACTION_FLOPS
@@ -269,8 +269,8 @@ namespace strumpack {
           for (auto c : w.c[0].ycols) w.c[1].zcols.push_back(c);
           for (auto c : w.zcols) w.c[1].zcols.push_back(c);
         }
-        this->_ch[0]->extract_bwd(triplets, lg, w.c[0]);
-        this->_ch[1]->extract_bwd(triplets, lg, w.c[1]);
+        this->ch_[0]->extract_bwd(triplets, lg, w.c[0]);
+        this->ch_[1]->extract_bwd(triplets, lg, w.c[1]);
       }
     }
 

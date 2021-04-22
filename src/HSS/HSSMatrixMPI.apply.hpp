@@ -83,9 +83,9 @@ namespace strumpack {
       } else {
         w.c.resize(2);
         w.c[0].offset = w.offset;
-        w.c[1].offset = w.offset + this->_ch[0]->dims();
-        this->_ch[0]->apply_fwd(B, w.c[0], Comm().size()==1, flops);
-        this->_ch[1]->apply_fwd(B, w.c[1], Comm().size()==1, flops);
+        w.c[1].offset = w.offset + this->ch_[0]->dims();
+        this->ch_[0]->apply_fwd(B, w.c[0], Comm().size()==1, flops);
+        this->ch_[1]->apply_fwd(B, w.c[1], Comm().size()==1, flops);
         if (!isroot) {
           w.tmp1 = _V.applyC
             (vconcat(B.cols(), this->_B10.cols(), this->_B01.cols(),
@@ -135,8 +135,8 @@ namespace strumpack {
           (w.c[0].tmp1.grid(), _B01.rows(), n, c0tmp2, grid()->ctxt_all());
         w.c[1].tmp2 = DistM_t
           (w.c[1].tmp1.grid(), _B10.rows(), n, c1tmp2, grid()->ctxt_all());
-        this->_ch[0]->apply_bwd(B, beta, C, w.c[0], false, flops);
-        this->_ch[1]->apply_bwd(B, beta, C, w.c[1], false, flops);
+        this->ch_[0]->apply_bwd(B, beta, C, w.c[0], false, flops);
+        this->ch_[1]->apply_bwd(B, beta, C, w.c[1], false, flops);
       }
     }
 
@@ -153,9 +153,9 @@ namespace strumpack {
       } else {
         w.c.resize(2);
         w.c[0].offset = w.offset;
-        w.c[1].offset = w.offset + this->_ch[0]->dims();
-        this->_ch[0]->applyT_fwd(B, w.c[0], Comm().size()==1, flops);
-        this->_ch[1]->applyT_fwd(B, w.c[1], Comm().size()==1, flops);
+        w.c[1].offset = w.offset + this->ch_[0]->dims();
+        this->ch_[0]->applyT_fwd(B, w.c[0], Comm().size()==1, flops);
+        this->ch_[1]->applyT_fwd(B, w.c[1], Comm().size()==1, flops);
         if (!isroot) {
           w.tmp1 = _U.applyC
             (vconcat(B.cols(), this->_B01.rows(), this->_B10.rows(),
@@ -209,8 +209,8 @@ namespace strumpack {
           (w.c[0].tmp1.grid(), c0tmp2.rows(), n, c0tmp2, grid()->ctxt_all());
         w.c[1].tmp2 = DistM_t
           (w.c[1].tmp1.grid(), c1tmp2.rows(), n, c1tmp2, grid()->ctxt_all());
-        this->_ch[0]->applyT_bwd(B, beta, C, w.c[0], false, flops);
-        this->_ch[1]->applyT_bwd(B, beta, C, w.c[1], false, flops);
+        this->ch_[0]->applyT_bwd(B, beta, C, w.c[0], false, flops);
+        this->ch_[1]->applyT_bwd(B, beta, C, w.c[1], false, flops);
       }
     }
 

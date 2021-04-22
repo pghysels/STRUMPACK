@@ -153,26 +153,26 @@ namespace strumpack {
        * matrix.
        */
       std::pair<std::size_t,std::size_t> dims() const {
-        return std::make_pair(_rows, _cols);
+        return std::make_pair(rows_, cols_);
       }
 
       /**
        * Return the number of rows in this HSS matrix.
        * \return number of rows
        */
-      std::size_t rows() const override { return _rows; }
+      std::size_t rows() const override { return rows_; }
 
       /**
        * Return the number of columns in this HSS matrix.
        * \return number of columns
        */
-      std::size_t cols() const override { return _cols; }
+      std::size_t cols() const override { return cols_; }
 
       /**
        * Check whether this node of the HSS tree is a leaf.
        * \return true if this node is a leaf, false otherwise.
        */
-      bool leaf() const { return _ch.empty(); }
+      bool leaf() const { return ch_.empty(); }
 
       virtual std::size_t factor_nonzeros() const;
 
@@ -186,7 +186,7 @@ namespace strumpack {
        * \return Const reference to the child (HSSMatrixBase).
        */
       const HSSMatrixBase<scalar_t>& child(int c) const {
-        assert(c>=0 && c<int(_ch.size())); return *(_ch[c]);
+        assert(c>=0 && c<int(ch_.size())); return *(ch_[c]);
       }
 
       /**
@@ -199,7 +199,7 @@ namespace strumpack {
        * \return Reference to the child (HSSMatrixBase).
        */
       HSSMatrixBase<scalar_t>& child(int c) {
-        assert(c>=0 && c<int(_ch.size())); return *(_ch[c]);
+        assert(c>=0 && c<int(ch_.size())); return *(ch_[c]);
       }
 
       /**
@@ -211,8 +211,8 @@ namespace strumpack {
        * \see is_untouched
        */
       bool is_compressed() const {
-        return _U_state == State::COMPRESSED &&
-          _V_state == State::COMPRESSED;
+        return U_state_ == State::COMPRESSED &&
+          V_state_ == State::COMPRESSED;
       }
 
       /**
@@ -226,8 +226,8 @@ namespace strumpack {
        * \see is_compressed
        */
       bool is_untouched() const {
-        return _U_state == State::UNTOUCHED &&
-          _V_state == State::UNTOUCHED;
+        return U_state_ == State::UNTOUCHED &&
+          V_state_ == State::UNTOUCHED;
       }
 
       /**
@@ -236,7 +236,7 @@ namespace strumpack {
        *
        * \return True if this node is active, false otherwise.
        */
-      bool active() const { return _active; }
+      bool active() const { return active_; }
 
       /**
        * Return the number of levels in the HSS matrix.
@@ -270,14 +270,14 @@ namespace strumpack {
        * tasking to traverse the HSS tree and for parallelism within
        * the HSS nodes as well.
        */
-      void set_openmp_task_depth(int depth) { _openmp_task_depth = depth; }
+      void set_openmp_task_depth(int depth) { openmp_task_depth_ = depth; }
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
-      virtual void delete_trailing_block() { if (_ch.size()==2) _ch.resize(1); }
+      virtual void delete_trailing_block() { if (ch_.size()==2) ch_.resize(1); }
       virtual void reset() {
-        _U_state = _V_state = State::UNTOUCHED;
-        _U_rank = _U_rows = _V_rank = _V_rows = 0;
-        for (auto& c : _ch) c->reset();
+        U_state_ = V_state_ = State::UNTOUCHED;
+        U_rank_ = U_rows_ = V_rank_ = V_rows_ = 0;
+        for (auto& c : ch_) c->reset();
       }
 #endif
 
@@ -324,29 +324,29 @@ namespace strumpack {
 #endif //defined(STRUMPACK_USE_MPI)
 
     protected:
-      std::size_t _rows, _cols;
+      std::size_t rows_, cols_;
 
       // TODO store children array in the sub-class???
-      std::vector<std::unique_ptr<HSSMatrixBase<scalar_t>>> _ch;
-      State _U_state, _V_state;
-      int _openmp_task_depth;
-      bool _active;
+      std::vector<std::unique_ptr<HSSMatrixBase<scalar_t>>> ch_;
+      State U_state_, V_state_;
+      int openmp_task_depth_;
+      bool active_;
 
-      int _U_rank = 0, _U_rows = 0, _V_rank = 0, _V_rows = 0;
+      int U_rank_ = 0, U_rows_ = 0, V_rank_ = 0, V_rows_ = 0;
 
       // Used to redistribute the original 2D block cyclic matrix
       // according to the HSS tree
-      DenseM_t _Asub;
+      DenseM_t Asub_;
 
       HSSFactors<scalar_t> ULV_;
 #if defined(STRUMPACK_USE_MPI)
       HSSFactorsMPI<scalar_t> ULV_mpi_;
 #endif //defined(STRUMPACK_USE_MPI)
 
-      virtual std::size_t U_rank() const { return _U_rank; }
-      virtual std::size_t V_rank() const { return _V_rank; }
-      virtual std::size_t U_rows() const { return _U_rows; }
-      virtual std::size_t V_rows() const { return _V_rows; }
+      virtual std::size_t U_rank() const { return U_rank_; }
+      virtual std::size_t V_rank() const { return V_rank_; }
+      virtual std::size_t U_rows() const { return U_rows_; }
+      virtual std::size_t V_rows() const { return V_rows_; }
 
       virtual void
       compress_recursive_original(DenseM_t& Rr, DenseM_t& Rc,

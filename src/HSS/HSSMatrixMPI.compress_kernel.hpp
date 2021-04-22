@@ -89,14 +89,14 @@ namespace strumpack {
           Aelem(I, J, _D, _A, 0, 0, comm());
         }
       } else {
-        w.split(this->_ch[0]->dims());
-        this->_ch[0]->compress_recursive_ann
+        w.split(this->ch_[0]->dims());
+        this->ch_[0]->compress_recursive_ann
           (ann, scores, Aelem, w.c[0], opts, lg);
-        this->_ch[1]->compress_recursive_ann
+        this->ch_[1]->compress_recursive_ann
           (ann, scores, Aelem, w.c[1], opts, lg);
         communicate_child_data_ann(w);
-        if (!this->_ch[0]->is_compressed() ||
-            !this->_ch[1]->is_compressed()) return;
+        if (!this->ch_[0]->is_compressed() ||
+            !this->ch_[1]->is_compressed()) return;
         // TODO do not re-extract if children are not re-compressed
         // if (this->is_untouched()) {
         _B01 = DistM_t(grid(), w.c[0].Ir.size(), w.c[1].Ic.size());
@@ -105,13 +105,13 @@ namespace strumpack {
         //}
       }
       if (w.lvl == 0)
-        this->_U_state = this->_V_state = State::COMPRESSED;
+        this->U_state_ = this->V_state_ = State::COMPRESSED;
       else {
         // TODO only do this if not already compressed
         //if (!this->is_compressed()) {
         compute_local_samples_ann(ann, scores, w, Aelem, opts);
         if (compute_U_V_bases_ann(w.S, opts, w))
-          this->_U_state = this->_V_state = State::COMPRESSED;
+          this->U_state_ = this->V_state_ = State::COMPRESSED;
         w.c.clear();
       }
       w.c.clear();
@@ -217,8 +217,8 @@ namespace strumpack {
         //           << std::endl;
         return false;
       }
-      this->_U_rank = w.Jr.size();  this->_U_rows = S.rows();
-      this->_V_rank = w.Jc.size();  this->_V_rows = S.rows();
+      this->U_rank_ = w.Jr.size();  this->U_rows_ = S.rows();
+      this->V_rank_ = w.Jc.size();  this->V_rows_ = S.rows();
       w.Ir.reserve(w.Jr.size());
       w.Ic.reserve(w.Jc.size());
       if (this->leaf()) {
@@ -240,8 +240,8 @@ namespace strumpack {
     HSSMatrixMPI<scalar_t>::communicate_child_data_ann
     (WorkCompressMPIANN<scalar_t>& w) {
       int rank = Comm().rank(), P = Ptotal(), root1 = Pl();
-      int P0active = this->_ch[0]->Pactive();
-      int P1active = this->_ch[1]->Pactive();
+      int P0active = this->ch_[0]->Pactive();
+      int P1active = this->ch_[1]->Pactive();
       std::vector<MPIRequest> sreq;
       std::vector<std::size_t> sbuf0, sbuf1;
       std::vector<real_t> sbuf0_scalar, sbuf1_scalar;
@@ -254,12 +254,12 @@ namespace strumpack {
                         w.c[0].Jr.size()+w.c[0].Jc.size()+
                         w.c[0].ids_scores.size());
           sbuf0_scalar.reserve(w.c[0].ids_scores.size());
-          sbuf0.push_back(std::size_t(this->_ch[0]->_U_state));
-          sbuf0.push_back(std::size_t(this->_ch[0]->_V_state));
-          sbuf0.push_back(this->_ch[0]->_U_rank);
-          sbuf0.push_back(this->_ch[0]->_V_rank);
-          sbuf0.push_back(this->_ch[0]->_U_rows);
-          sbuf0.push_back(this->_ch[0]->_V_rows);
+          sbuf0.push_back(std::size_t(this->ch_[0]->U_state_));
+          sbuf0.push_back(std::size_t(this->ch_[0]->V_state_));
+          sbuf0.push_back(this->ch_[0]->U_rank_);
+          sbuf0.push_back(this->ch_[0]->V_rank_);
+          sbuf0.push_back(this->ch_[0]->U_rows_);
+          sbuf0.push_back(this->ch_[0]->V_rows_);
           sbuf0.push_back(w.c[0].ids_scores.size());
           for (auto i : w.c[0].Ir) sbuf0.push_back(i);
           for (auto i : w.c[0].Ic) sbuf0.push_back(i);
@@ -286,12 +286,12 @@ namespace strumpack {
                         w.c[1].Jr.size()+w.c[1].Jc.size()+
                         w.c[1].ids_scores.size());
           sbuf1_scalar.reserve(w.c[1].ids_scores.size());
-          sbuf1.push_back(std::size_t(this->_ch[1]->_U_state));
-          sbuf1.push_back(std::size_t(this->_ch[1]->_V_state));
-          sbuf1.push_back(this->_ch[1]->_U_rank);
-          sbuf1.push_back(this->_ch[1]->_V_rank);
-          sbuf1.push_back(this->_ch[1]->_U_rows);
-          sbuf1.push_back(this->_ch[1]->_V_rows);
+          sbuf1.push_back(std::size_t(this->ch_[1]->U_state_));
+          sbuf1.push_back(std::size_t(this->ch_[1]->V_state_));
+          sbuf1.push_back(this->ch_[1]->U_rank_);
+          sbuf1.push_back(this->ch_[1]->V_rank_);
+          sbuf1.push_back(this->ch_[1]->U_rows_);
+          sbuf1.push_back(this->ch_[1]->V_rows_);
           sbuf1.push_back(w.c[1].ids_scores.size());
           for (auto i : w.c[1].Ir) sbuf1.push_back(i);
           for (auto i : w.c[1].Ic) sbuf1.push_back(i);
@@ -323,22 +323,22 @@ namespace strumpack {
         auto buf_scalar = Comm().template recv<real_t>(dest, 2);
         auto ptr = buf.begin();
         auto ptr_scalar = buf_scalar.begin();
-        this->_ch[0]->_U_state = State(*ptr++);
-        this->_ch[0]->_V_state = State(*ptr++);
-        this->_ch[0]->_U_rank = *ptr++;
-        this->_ch[0]->_V_rank = *ptr++;
-        this->_ch[0]->_U_rows = *ptr++;
-        this->_ch[0]->_V_rows = *ptr++;
+        this->ch_[0]->U_state_ = State(*ptr++);
+        this->ch_[0]->V_state_ = State(*ptr++);
+        this->ch_[0]->U_rank_ = *ptr++;
+        this->ch_[0]->V_rank_ = *ptr++;
+        this->ch_[0]->U_rows_ = *ptr++;
+        this->ch_[0]->V_rows_ = *ptr++;
         auto d = *ptr++;
-        w.c[0].Ir.resize(this->_ch[0]->_U_rank);
-        w.c[0].Ic.resize(this->_ch[0]->_V_rank);
-        w.c[0].Jr.resize(this->_ch[0]->_U_rank);
-        w.c[0].Jc.resize(this->_ch[0]->_V_rank);
+        w.c[0].Ir.resize(this->ch_[0]->U_rank_);
+        w.c[0].Ic.resize(this->ch_[0]->V_rank_);
+        w.c[0].Jr.resize(this->ch_[0]->U_rank_);
+        w.c[0].Jc.resize(this->ch_[0]->V_rank_);
         w.c[0].ids_scores.resize(d);
-        for (int i=0; i<this->_ch[0]->_U_rank; i++) w.c[0].Ir[i] = *ptr++;
-        for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Ic[i] = *ptr++;
-        for (int i=0; i<this->_ch[0]->_U_rank; i++) w.c[0].Jr[i] = *ptr++;
-        for (int i=0; i<this->_ch[0]->_V_rank; i++) w.c[0].Jc[i] = *ptr++;
+        for (int i=0; i<this->ch_[0]->U_rank_; i++) w.c[0].Ir[i] = *ptr++;
+        for (int i=0; i<this->ch_[0]->V_rank_; i++) w.c[0].Ic[i] = *ptr++;
+        for (int i=0; i<this->ch_[0]->U_rank_; i++) w.c[0].Jr[i] = *ptr++;
+        for (int i=0; i<this->ch_[0]->V_rank_; i++) w.c[0].Jc[i] = *ptr++;
         for (std::size_t i=0; i<d; i++) {
           w.c[0].ids_scores[i].first = *ptr++;
           w.c[0].ids_scores[i].second = *ptr_scalar++;
@@ -360,22 +360,22 @@ namespace strumpack {
         auto buf_scalar = Comm().template recv<real_t>(dest, 3);
         auto ptr = buf.begin();
         auto ptr_scalar = buf_scalar.begin();
-        this->_ch[1]->_U_state = State(*ptr++);
-        this->_ch[1]->_V_state = State(*ptr++);
-        this->_ch[1]->_U_rank = *ptr++;
-        this->_ch[1]->_V_rank = *ptr++;
-        this->_ch[1]->_U_rows = *ptr++;
-        this->_ch[1]->_V_rows = *ptr++;
+        this->ch_[1]->U_state_ = State(*ptr++);
+        this->ch_[1]->V_state_ = State(*ptr++);
+        this->ch_[1]->U_rank_ = *ptr++;
+        this->ch_[1]->V_rank_ = *ptr++;
+        this->ch_[1]->U_rows_ = *ptr++;
+        this->ch_[1]->V_rows_ = *ptr++;
         auto d = *ptr++;
-        w.c[1].Ir.resize(this->_ch[1]->_U_rank);
-        w.c[1].Ic.resize(this->_ch[1]->_V_rank);
-        w.c[1].Jr.resize(this->_ch[1]->_U_rank);
-        w.c[1].Jc.resize(this->_ch[1]->_V_rank);
+        w.c[1].Ir.resize(this->ch_[1]->U_rank_);
+        w.c[1].Ic.resize(this->ch_[1]->V_rank_);
+        w.c[1].Jr.resize(this->ch_[1]->U_rank_);
+        w.c[1].Jc.resize(this->ch_[1]->V_rank_);
         w.c[1].ids_scores.resize(d);
-        for (int i=0; i<this->_ch[1]->_U_rank; i++) w.c[1].Ir[i] = *ptr++;
-        for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Ic[i] = *ptr++;
-        for (int i=0; i<this->_ch[1]->_U_rank; i++) w.c[1].Jr[i] = *ptr++;
-        for (int i=0; i<this->_ch[1]->_V_rank; i++) w.c[1].Jc[i] = *ptr++;
+        for (int i=0; i<this->ch_[1]->U_rank_; i++) w.c[1].Ir[i] = *ptr++;
+        for (int i=0; i<this->ch_[1]->V_rank_; i++) w.c[1].Ic[i] = *ptr++;
+        for (int i=0; i<this->ch_[1]->U_rank_; i++) w.c[1].Jr[i] = *ptr++;
+        for (int i=0; i<this->ch_[1]->V_rank_; i++) w.c[1].Jc[i] = *ptr++;
         for (std::size_t i=0; i<d; i++) {
           w.c[1].ids_scores[i].first = *ptr++;
           w.c[1].ids_scores[i].second = *ptr_scalar++;

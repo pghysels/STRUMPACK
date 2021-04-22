@@ -63,9 +63,9 @@ namespace strumpack {
       if (!active) return;
       if (m > std::size_t(opts.leaf_size()) ||
           n > std::size_t(opts.leaf_size())) {
-        this->_ch.reserve(2);
-        this->_ch.emplace_back(new HSSMatrix<scalar_t>(m/2, n/2, opts));
-        this->_ch.emplace_back(new HSSMatrix<scalar_t>(m-m/2, n-n/2, opts));
+        this->ch_.reserve(2);
+        this->ch_.emplace_back(new HSSMatrix<scalar_t>(m/2, n/2, opts));
+        this->ch_.emplace_back(new HSSMatrix<scalar_t>(m-m/2, n-n/2, opts));
       }
     }
 
@@ -75,9 +75,9 @@ namespace strumpack {
       if (!active) return;
       if (!t.c.empty()) {
         assert(t.c.size() == 2);
-        this->_ch.reserve(2);
-        this->_ch.emplace_back(new HSSMatrix<scalar_t>(t.c[0], opts));
-        this->_ch.emplace_back(new HSSMatrix<scalar_t>(t.c[1], opts));
+        this->ch_.reserve(2);
+        this->ch_.emplace_back(new HSSMatrix<scalar_t>(t.c[0], opts));
+        this->ch_.emplace_back(new HSSMatrix<scalar_t>(t.c[1], opts));
       }
     }
 
@@ -98,9 +98,9 @@ namespace strumpack {
                   << ") time = " << timer.elapsed() << std::endl;
       if (!t.c.empty()) {
         assert(t.c.size() == 2);
-        this->_ch.reserve(2);
-        this->_ch.emplace_back(new HSSMatrix<scalar_t>(t.c[0], opts));
-        this->_ch.emplace_back(new HSSMatrix<scalar_t>(t.c[1], opts));
+        this->ch_.reserve(2);
+        this->ch_.emplace_back(new HSSMatrix<scalar_t>(t.c[0], opts));
+        this->ch_.emplace_back(new HSSMatrix<scalar_t>(t.c[1], opts));
       }
       compress(K, opts);
     }
@@ -187,12 +187,10 @@ namespace strumpack {
     template<typename scalar_t> DenseMatrix<scalar_t>
     HSSMatrix<scalar_t>::dense() const {
       DenseM_t A(this->rows(), this->cols());
-      // apply_HSS(Trans::N, *this, eye<scalar_t>(this->cols(),
-      // this->cols()), scalar_t(0.), A);
       WorkDense<scalar_t> w;
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
-      dense_recursive(A, w, true, this->_openmp_task_depth);
+      dense_recursive(A, w, true, this->openmp_task_depth_);
       return A;
     }
 
@@ -205,15 +203,15 @@ namespace strumpack {
       } else {
         w.c.resize(2);
         w.c[0].offset = w.offset;
-        w.c[1].offset = w.offset + this->_ch[0]->dims();
+        w.c[1].offset = w.offset + this->ch_[0]->dims();
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->_ch[0]->dense_recursive(A, w.c[0], false, depth+1);
+        this->ch_[0]->dense_recursive(A, w.c[0], false, depth+1);
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        this->_ch[1]->dense_recursive(A, w.c[1], false, depth+1);
+        this->ch_[1]->dense_recursive(A, w.c[1], false, depth+1);
 #pragma omp taskwait
 
 #pragma omp task default(shared)                                        \
@@ -221,7 +219,7 @@ namespace strumpack {
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
         {
           DenseM_t tmp01(_B01.rows(), w.c[1].tmpV.rows());
-          DenseMW_t A01(this->_ch[0]->rows(), this->_ch[1]->cols(),
+          DenseMW_t A01(this->ch_[0]->rows(), this->ch_[1]->cols(),
                         A, w.c[0].offset.first, w.c[1].offset.second);
           gemm(Trans::N, Trans::C, scalar_t(1.), _B01, w.c[1].tmpV,
                scalar_t(0.), tmp01, depth);
@@ -233,7 +231,7 @@ namespace strumpack {
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
         {
           DenseM_t tmp10(_B10.rows(), w.c[0].tmpV.rows());
-          DenseMW_t A10(this->_ch[1]->rows(), this->_ch[0]->cols(), A,
+          DenseMW_t A10(this->ch_[1]->rows(), this->ch_[0]->cols(), A,
                         w.c[1].offset.first, w.c[0].offset.second);
           gemm(Trans::N, Trans::C, scalar_t(1.), _B10, w.c[0].tmpV,
                scalar_t(0.), tmp10, depth);
@@ -246,15 +244,15 @@ namespace strumpack {
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
           {
             w.tmpU = DenseM_t(this->rows(), this->U_rank());
-            DenseMW_t wtmpU0(this->_ch[0]->rows(), this->U_rank(),
+            DenseMW_t wtmpU0(this->ch_[0]->rows(), this->U_rank(),
                              w.tmpU, 0, 0);
-            DenseMW_t wtmpU1(this->_ch[1]->rows(), this->U_rank(), w.tmpU,
-                             this->_ch[0]->rows(), 0);
+            DenseMW_t wtmpU1(this->ch_[1]->rows(), this->U_rank(), w.tmpU,
+                             this->ch_[0]->rows(), 0);
             auto Udense = _U.dense();
-            DenseMW_t Udense0(this->_ch[0]->U_rank(), Udense.cols(),
+            DenseMW_t Udense0(this->ch_[0]->U_rank(), Udense.cols(),
                               Udense, 0, 0);
-            DenseMW_t Udense1(this->_ch[1]->U_rank(), Udense.cols(), Udense,
-                              this->_ch[0]->U_rank(), 0);
+            DenseMW_t Udense1(this->ch_[1]->U_rank(), Udense.cols(), Udense,
+                              this->ch_[0]->U_rank(), 0);
             gemm(Trans::N, Trans::N, scalar_t(1.), w.c[0].tmpU, Udense0,
                  scalar_t(0.), wtmpU0, depth);
             gemm(Trans::N, Trans::N, scalar_t(1.), w.c[1].tmpU, Udense1,
@@ -265,15 +263,15 @@ namespace strumpack {
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
           {
             w.tmpV = DenseM_t(this->cols(), this->V_rank());
-            DenseMW_t wtmpV0(this->_ch[0]->cols(), this->V_rank(),
+            DenseMW_t wtmpV0(this->ch_[0]->cols(), this->V_rank(),
                              w.tmpV, 0, 0);
-            DenseMW_t wtmpV1(this->_ch[1]->cols(), this->V_rank(),
-                             w.tmpV, this->_ch[0]->cols(), 0);
+            DenseMW_t wtmpV1(this->ch_[1]->cols(), this->V_rank(),
+                             w.tmpV, this->ch_[0]->cols(), 0);
             auto Vdense = _V.dense();
-            DenseMW_t Vdense0(this->_ch[0]->V_rank(), Vdense.cols(),
+            DenseMW_t Vdense0(this->ch_[0]->V_rank(), Vdense.cols(),
                               Vdense, 0, 0);
-            DenseMW_t Vdense1(this->_ch[1]->V_rank(), Vdense.cols(),
-                              Vdense, this->_ch[0]->V_rank(), 0);
+            DenseMW_t Vdense1(this->ch_[1]->V_rank(), Vdense.cols(),
+                              Vdense, this->ch_[0]->V_rank(), 0);
             gemm(Trans::N, Trans::N, scalar_t(1.), w.c[0].tmpV, Vdense0,
                  scalar_t(0.), wtmpV0, depth);
             gemm(Trans::N, Trans::N, scalar_t(1.), w.c[1].tmpV, Vdense1,
@@ -292,7 +290,7 @@ namespace strumpack {
     HSSMatrix<scalar_t>::rank() const {
       if (!this->active()) return 0;
       std::size_t rank = std::max(this->U_rank(), this->V_rank());
-      for (auto& c : this->_ch) rank = std::max(rank, c->rank());
+      for (auto& c : this->ch_) rank = std::max(rank, c->rank());
       return rank;
     }
 
@@ -301,7 +299,7 @@ namespace strumpack {
       if (!this->active()) return 0;
       std::size_t mem = sizeof(*this) + _U.memory() + _V.memory()
         + _D.memory() + _B01.memory() + _B10.memory();
-      for (auto& c : this->_ch) mem += c->memory();
+      for (auto& c : this->ch_) mem += c->memory();
       return mem;
     }
 
@@ -310,7 +308,7 @@ namespace strumpack {
       if (!this->active()) return 0;
       std::size_t nnz = sizeof(*this) + _U.nonzeros() + _V.nonzeros()
         + _D.nonzeros() + _B01.nonzeros() + _B10.nonzeros();
-      for (auto& c : this->_ch) nnz += c->nonzeros();
+      for (auto& c : this->ch_) nnz += c->nonzeros();
       return nnz;
     }
 
@@ -318,7 +316,7 @@ namespace strumpack {
     HSSMatrix<scalar_t>::levels() const {
       if (!this->active()) return 0;
       std::size_t lvls = 0;
-      for (auto& c : this->_ch) lvls = std::max(lvls, c->levels());
+      for (auto& c : this->ch_) lvls = std::max(lvls, c->levels());
       return 1 + lvls;
     }
 
@@ -340,7 +338,7 @@ namespace strumpack {
           << this->V_rows() << " x " << this->V_rank();
       if (this->leaf()) out << " leaf" << std::endl;
       else out << " non-leaf" << std::endl;
-      for (auto& c : this->_ch) {
+      for (auto& c : this->ch_) {
         c->print_info(out, roff, coff);
         roff += c->rows();
         coff += c->cols();
@@ -352,7 +350,7 @@ namespace strumpack {
       if (!this->active()) return;
       if (this->leaf()) _D.shift(sigma);
       else
-        for (auto& c : this->_ch)
+        for (auto& c : this->ch_)
           c->shift(sigma);
     }
 
@@ -366,8 +364,8 @@ namespace strumpack {
         int red = std::floor(255.0 * rank0 / minmn);
         int blue = 255 - red;
         of << "set obj rect from "
-           << rlo << ", " << clo+this->_ch[0]->cols() << " to "
-           << rlo+this->_ch[0]->rows()
+           << rlo << ", " << clo+this->ch_[0]->cols() << " to "
+           << rlo+this->ch_[0]->rows()
            << ", " << clo+this->cols()
            << " fc rgb '#"
            << std::hex << std::setw(2) << std::setfill('0') << red
@@ -376,17 +374,17 @@ namespace strumpack {
         red = std::floor(255.0 * rank1 / minmn);
         blue = 255 - red;
         of << "set obj rect from "
-           << rlo+this->_ch[0]->rows() << ", " << clo
+           << rlo+this->ch_[0]->rows() << ", " << clo
            << " to " << rlo+this->rows()
-           << ", " << clo+this->_ch[0]->cols()
+           << ", " << clo+this->ch_[0]->cols()
            << " fc rgb '#"
            << std::hex << std::setw(2) << std::setfill('0') << red
            << "00" << std::setw(2)  << std::setfill('0') << blue
            << "'" << std::dec << std::endl;
         std::cout.fill(prev);
-        this->_ch[0]->draw(of, rlo, clo);
-        this->_ch[1]->draw
-          (of, rlo+this->_ch[0]->rows(), clo+this->_ch[0]->cols());
+        this->ch_[0]->draw(of, rlo, clo);
+        this->ch_[1]->draw
+          (of, rlo+this->ch_[0]->rows(), clo+this->ch_[0]->cols());
       } else {
         of << "set obj rect from "
            << rlo << ", " << clo << " to "
@@ -417,11 +415,11 @@ namespace strumpack {
 #pragma omp single nowait
       {
         if (op == Trans::N) {
-          A.apply_fwd(B, w, true, A._openmp_task_depth, flops);
-          A.apply_bwd(B, beta, C, w, true, A._openmp_task_depth, flops);
+          A.apply_fwd(B, w, true, A.openmp_task_depth_, flops);
+          A.apply_bwd(B, beta, C, w, true, A.openmp_task_depth_, flops);
         } else {
-          A.applyT_fwd(B, w, true, A._openmp_task_depth, flops);
-          A.applyT_bwd(B, beta, C, w, true, A._openmp_task_depth, flops);
+          A.applyT_fwd(B, w, true, A.openmp_task_depth_, flops);
+          A.applyT_bwd(B, beta, C, w, true, A.openmp_task_depth_, flops);
         }
       }
     }
@@ -429,42 +427,42 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::write(std::ofstream& os) const {
-      os.write((const char*)&this->_rows, sizeof(this->_rows));
-      os.write((const char*)&this->_cols, sizeof(this->_cols));
-      os.write((const char*)&this->_U_state, sizeof(this->_U_state));
-      os.write((const char*)&this->_V_state, sizeof(this->_V_state));
-      os.write((const char*)&this->_openmp_task_depth, sizeof(this->_openmp_task_depth));
-      os.write((const char*)&this->_active, sizeof(this->_active));
-      os.write((const char*)&this->_U_rank, sizeof(this->_U_rank));
-      os.write((const char*)&this->_U_rows, sizeof(this->_U_rows));
-      os.write((const char*)&this->_V_rank, sizeof(this->_V_rank));
-      os.write((const char*)&this->_V_rows, sizeof(this->_V_rows));
-      os << this->_Asub;
+      os.write((const char*)&this->rows_, sizeof(this->rows_));
+      os.write((const char*)&this->cols_, sizeof(this->cols_));
+      os.write((const char*)&this->U_state_, sizeof(this->U_state_));
+      os.write((const char*)&this->V_state_, sizeof(this->V_state_));
+      os.write((const char*)&this->openmp_task_depth_, sizeof(this->openmp_task_depth_));
+      os.write((const char*)&this->active_, sizeof(this->active_));
+      os.write((const char*)&this->U_rank_, sizeof(this->U_rank_));
+      os.write((const char*)&this->U_rows_, sizeof(this->U_rows_));
+      os.write((const char*)&this->V_rank_, sizeof(this->V_rank_));
+      os.write((const char*)&this->V_rows_, sizeof(this->V_rows_));
+      os << this->Asub_;
       os << _U << _V << _D << _B01 << _B10;
-      int nc = this->_ch.size();
+      int nc = this->ch_.size();
       os.write((const char*)&nc, sizeof(nc));
-      for (auto& c : this->_ch)
+      for (auto& c : this->ch_)
         c->write(os);
     }
 
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::read(std::ifstream& is) {
-      is.read((char*)&this->_rows, sizeof(this->_rows));
-      is.read((char*)&this->_cols, sizeof(this->_cols));
-      is.read((char*)&this->_U_state, sizeof(this->_U_state));
-      is.read((char*)&this->_V_state, sizeof(this->_V_state));
-      is.read((char*)&this->_openmp_task_depth, sizeof(this->_openmp_task_depth));
-      is.read((char*)&this->_active, sizeof(this->_active));
-      is.read((char*)&this->_U_rank, sizeof(this->_U_rank));
-      is.read((char*)&this->_U_rows, sizeof(this->_U_rows));
-      is.read((char*)&this->_V_rank, sizeof(this->_V_rank));
-      is.read((char*)&this->_V_rows, sizeof(this->_V_rows));
-      is >> this->_Asub;
+      is.read((char*)&this->rows_, sizeof(this->rows_));
+      is.read((char*)&this->cols_, sizeof(this->cols_));
+      is.read((char*)&this->U_state_, sizeof(this->U_state_));
+      is.read((char*)&this->V_state_, sizeof(this->V_state_));
+      is.read((char*)&this->openmp_task_depth_, sizeof(this->openmp_task_depth_));
+      is.read((char*)&this->active_, sizeof(this->active_));
+      is.read((char*)&this->U_rank_, sizeof(this->U_rank_));
+      is.read((char*)&this->U_rows_, sizeof(this->U_rows_));
+      is.read((char*)&this->V_rank_, sizeof(this->V_rank_));
+      is.read((char*)&this->V_rows_, sizeof(this->V_rows_));
+      is >> this->Asub_;
       is >> _U >> _V >> _D >> _B01 >> _B10;
       int nc = 0;
       is.read((char*)&nc, sizeof(nc));
-      this->_ch.resize(nc);
-      for (auto& c : this->_ch)
+      this->ch_.resize(nc);
+      for (auto& c : this->ch_)
         c.reset(new HSSMatrix<scalar_t>(is));
     }
 
@@ -507,20 +505,24 @@ namespace strumpack {
     template class HSSMatrix<std::complex<float>>;
     template class HSSMatrix<std::complex<double>>;
 
-    template void apply_HSS
-    (Trans op, const HSSMatrix<float>& A, const DenseMatrix<float>& B,
-     float beta, DenseMatrix<float>& C);
-    template void apply_HSS
-    (Trans op, const HSSMatrix<double>& A, const DenseMatrix<double>& B,
-     double beta, DenseMatrix<double>& C);
-    template void apply_HSS
-    (Trans op, const HSSMatrix<std::complex<float>>& A,
-     const DenseMatrix<std::complex<float>>& B, std::complex<float> beta,
-     DenseMatrix<std::complex<float>>& C);
-    template void apply_HSS
-    (Trans op, const HSSMatrix<std::complex<double>>& A,
-     const DenseMatrix<std::complex<double>>& B, std::complex<double> beta,
-     DenseMatrix<std::complex<double>>& C);
+    template void
+    apply_HSS(Trans op, const HSSMatrix<float>& A,
+              const DenseMatrix<float>& B,
+              float beta, DenseMatrix<float>& C);
+    template void
+    apply_HSS(Trans op, const HSSMatrix<double>& A,
+              const DenseMatrix<double>& B,
+              double beta, DenseMatrix<double>& C);
+    template void
+    apply_HSS(Trans op, const HSSMatrix<std::complex<float>>& A,
+              const DenseMatrix<std::complex<float>>& B,
+              std::complex<float> beta,
+              DenseMatrix<std::complex<float>>& C);
+    template void
+    apply_HSS(Trans op, const HSSMatrix<std::complex<double>>& A,
+              const DenseMatrix<std::complex<double>>& B,
+              std::complex<double> beta,
+              DenseMatrix<std::complex<double>>& C);
 
     template void draw(const HSSMatrix<float>& H, const std::string& name);
     template void draw(const HSSMatrix<double>& H, const std::string& name);

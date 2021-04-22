@@ -71,7 +71,7 @@ namespace strumpack {
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
         compress_recursive_ann
-          (ann, scores, Aelem, opts, w, this->_openmp_task_depth);
+          (ann, scores, Aelem, opts, w, this->openmp_task_depth_);
         ann_number = std::min(2*ann_number, n);
       }
     }
@@ -94,42 +94,42 @@ namespace strumpack {
           Aelem(I, J, _D);
         }
       } else {
-        w.split(this->_ch[0]->dims());
+        w.split(this->ch_[0]->dims());
         bool tasked = depth < params::task_recursion_cutoff_level;
         if (tasked) {
 #pragma omp task default(shared)                                        \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-          this->_ch[0]->compress_recursive_ann
+          this->ch_[0]->compress_recursive_ann
             (ann, scores, Aelem, opts, w.c[0], depth+1);
 #pragma omp task default(shared)                                        \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-          this->_ch[1]->compress_recursive_ann
+          this->ch_[1]->compress_recursive_ann
             (ann, scores, Aelem, opts, w.c[1], depth+1);
 #pragma omp taskwait
         } else {
-          this->_ch[0]->compress_recursive_ann
+          this->ch_[0]->compress_recursive_ann
             (ann, scores, Aelem, opts, w.c[0], depth);
-          this->_ch[1]->compress_recursive_ann
+          this->ch_[1]->compress_recursive_ann
             (ann, scores, Aelem, opts, w.c[1], depth);
         }
-        if (!this->_ch[0]->is_compressed() ||
-            !this->_ch[1]->is_compressed())
+        if (!this->ch_[0]->is_compressed() ||
+            !this->ch_[1]->is_compressed())
           return;
         // TODO do not re-extract if children are not re-compressed
         //if (this->is_untouched()) {
-        _B01 = DenseM_t(this->_ch[0]->U_rank(), this->_ch[1]->V_rank());
+        _B01 = DenseM_t(this->ch_[0]->U_rank(), this->ch_[1]->V_rank());
         Aelem(w.c[0].Ir, w.c[1].Ic, _B01);
         _B10 = _B01.transpose();
         //}
       }
       if (w.lvl == 0)
-        this->_U_state = this->_V_state = State::COMPRESSED;
+        this->U_state_ = this->V_state_ = State::COMPRESSED;
       else {
         // TODO only do this if not already compressed
         //if (!this->is_compressed()) {
         compute_local_samples_ann(ann, scores, w, Aelem, opts);
         if (compute_U_V_bases_ann(w.S, opts, w, depth))
-          this->_U_state = this->_V_state = State::COMPRESSED;
+          this->U_state_ = this->V_state_ = State::COMPRESSED;
         // TODO
         // else
         //     this->_U_state = this->_V_state = State::PARTIALLY_COMPRESSED;
@@ -274,8 +274,8 @@ namespace strumpack {
         //           << std::endl;
         return false;
       }
-      this->_U_rank = _U.cols();  this->_U_rows = _U.rows();
-      this->_V_rank = _V.cols();  this->_V_rows = _V.rows();
+      this->U_rank_ = _U.cols();  this->U_rows_ = _U.rows();
+      this->V_rank_ = _V.cols();  this->V_rows_ = _V.rows();
       w.Ir.reserve(_U.cols());
       w.Ic.reserve(_V.cols());
       if (this->leaf()) {

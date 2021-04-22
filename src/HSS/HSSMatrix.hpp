@@ -188,7 +188,7 @@ namespace strumpack {
        * should not be a leaf!
        */
       const HSSMatrix<scalar_t>* child(int c) const {
-        return dynamic_cast<HSSMatrix<scalar_t>*>(this->_ch[c].get());
+        return dynamic_cast<HSSMatrix<scalar_t>*>(this->ch_[c].get());
       }
 
       /**
@@ -198,7 +198,7 @@ namespace strumpack {
        * be a leaf!
        */
       HSSMatrix<scalar_t>* child(int c) {
-        return dynamic_cast<HSSMatrix<scalar_t>*>(this->_ch[c].get());
+        return dynamic_cast<HSSMatrix<scalar_t>*>(this->ch_[c].get());
       }
 
       /**

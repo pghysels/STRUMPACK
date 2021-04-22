@@ -42,7 +42,7 @@ namespace strumpack {
     HSSMatrixMPI<scalar_t>::partial_factor() {
       this->ULV_mpi_ = HSSFactorsMPI<scalar_t>();
       WorkFactorMPI<scalar_t> w;
-      this->_ch[0]->factor_recursive(w, grid_local(), true, true);
+      this->ch_[0]->factor_recursive(w, grid_local(), true, true);
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::factor_recursive
@@ -53,8 +53,8 @@ namespace strumpack {
       DistM_t Vh;
       if (!this->leaf()) {
         w.c.resize(2);
-        this->_ch[0]->factor_recursive(w.c[0], lg, false, partial);
-        this->_ch[1]->factor_recursive(w.c[1], lg, false, partial);
+        this->ch_[0]->factor_recursive(w.c[0], lg, false, partial);
+        this->ch_[1]->factor_recursive(w.c[1], lg, false, partial);
         auto c0u = _B01.rows();
         auto c1u = _B10.rows();
         auto c0v = _B10.cols();

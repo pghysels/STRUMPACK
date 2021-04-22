@@ -92,9 +92,9 @@ namespace strumpack {
       std::unique_ptr<HSSMatrixBase<scalar_t>> clone() const override;
 
       const HSSMatrixBase<scalar_t>* child(int c) const {
-        return this->_ch[c].get();
+        return this->ch_[c].get();
       }
-      HSSMatrixBase<scalar_t>* child(int c) { return this->_ch[c].get(); }
+      HSSMatrixBase<scalar_t>* child(int c) { return this->ch_[c].get(); }
 
       inline const BLACSGrid* grid() const override { return blacs_grid_; }
       inline const BLACSGrid* grid(const BLACSGrid* grid) const override { return blacs_grid_; }
@@ -386,12 +386,12 @@ namespace strumpack {
         return std::max(1, P - Pl(n, nl, nr, P));
       }
       int Pl() const {
-        return Pl(this->rows(), this->_ch[0]->rows(),
-                  this->_ch[1]->rows(), Ptotal());
+        return Pl(this->rows(), this->ch_[0]->rows(),
+                  this->ch_[1]->rows(), Ptotal());
       }
       int Pr() const {
-        return Pr(this->rows(), this->_ch[0]->rows(),
-                  this->_ch[1]->rows(), Ptotal());
+        return Pr(this->rows(), this->ch_[0]->rows(),
+                  this->ch_[1]->rows(), Ptotal());
       }
 
       template<typename T> friend
@@ -399,6 +399,8 @@ namespace strumpack {
                      const DistributedMatrix<T>& b, T beta,
                      DistributedMatrix<T>& c);
       friend class DistSamples<scalar_t>;
+
+      using HSSMatrixBase<scalar_t>::child;
     };
 
   } // end namespace HSS
