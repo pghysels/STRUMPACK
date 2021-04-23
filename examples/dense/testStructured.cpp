@@ -35,7 +35,7 @@ using namespace strumpack;
 
 
 template<typename scalar_t> void
-print_info(const std::unique_ptr<structured::StructuredMatrix<scalar_t>>& H,
+print_info(const structured::StructuredMatrix<scalar_t>* H,
            const structured::StructuredOptions<scalar_t>& opts) {
   cout << get_name(opts.type()) << endl;
   cout << "  - nonzeros(H) = " << H->nonzeros() << endl;
@@ -45,17 +45,29 @@ print_info(const std::unique_ptr<structured::StructuredMatrix<scalar_t>>& H,
 
 template<typename scalar_t> void
 check_accuracy(const DenseMatrix<scalar_t>& A,
-               const std::unique_ptr<structured::StructuredMatrix<scalar_t>>& H,
-               const structured::StructuredOptions<scalar_t>& opts) {
+               const structured::StructuredMatrix<scalar_t>* H) {
   DenseMatrix<scalar_t> id(A.rows(), A.cols()), Hdense(A.rows(), A.cols());
   id.eye();
   H->mult(Trans::N, id, Hdense);
-  cout << "  - ||A-H||_F/||A||_F = " << Hdense.sub(A).normF() / A.norm() << endl;
+  cout << "  - ||A-H||_F/||A||_F = "
+       << Hdense.sub(A).normF() / A.normF() << endl;
+}
+
+template<typename scalar_t> void
+factor_and_solve(int nrhs,
+                 structured::StructuredMatrix<scalar_t>* H) {
+  DenseMatrix<scalar_t> B(H->rows(), nrhs), X(H->rows(), nrhs);
+  X.random();
+  H->mult(Trans::N, X, B);
+  H->factor();
+  H->solve(B);
+  cout << "  - ||X-H\\(H*X)||_F/||X||_F = "
+       << B.sub(X).normF() / X.normF() << endl;
 }
 
 
 int main(int argc, char* argv[]) {
-  int n = 1000, nrhs = 1;
+  int n = 1000, nrhs = 10;
   if (argc > 1) n = stoi(argv[1]);
 
   structured::StructuredOptions<double> options;
@@ -104,12 +116,9 @@ int main(int argc, char* argv[]) {
      structured::Type::HSS,
      structured::Type::LOSSY,
      structured::Type::LOSSLESS
-     // these types require MPI support, see testStructuredMPI
-     // structured::Type::HODLR,
-     // structured::Type::HODBF,
-     // structured::Type::BUTTERFLY,
-     // structured::Type::LR,
     };
+  // the HODLR, HODBF, Butterfly and LR types require MPI support, see
+  // testStructuredMPI
 
 
   cout << "dense " << A.rows() << " x " << A.cols() << " matrix" << endl;
@@ -122,13 +131,22 @@ int main(int argc, char* argv[]) {
   for (auto type : types) {
     options.set_type(type);
     try {
-      // construct a StructuredMatrix from a dense matrix and an
-      // (optional) ClusterTree
-      auto H = structured::construct_from_dense(A, options, &tree);
-      print_info(H, options);
-      check_accuracy(A, H, options);
+      {
+        // construct a StructuredMatrix from a dense matrix
+        auto H = structured::construct_from_dense(A, options);
+        print_info(H.get(), options);
+        check_accuracy(A, H.get());
+        factor_and_solve(nrhs, H.get());
+      }
+      {
+        // user can define the ClusterTree
+        auto H = structured::construct_from_dense(A, options, &tree);
+        print_info(H.get(), options);
+        check_accuracy(A, H.get());
+        factor_and_solve(nrhs, H.get());
+      }
     } catch (std::exception& e) {
-      cout << get_name(type) << " compression failed: "
+      cout << get_name(type) << " failed: "
            << e.what() << endl;
     }
   }
@@ -141,21 +159,24 @@ int main(int argc, char* argv[]) {
   for (auto type : types) {
     options.set_type(type);
     try {
-
-      // with individual elements
-      auto H1 = structured::construct_from_elements<double>
-        (n, n, Toeplitz, options);
-      print_info(H1, options);
-      check_accuracy(A, H1, options);
-
-      // with sub-blocks (could have better performance)
-      auto H2 = structured::construct_from_elements<double>
-        (n, n, Toeplitz_block, options);
-      print_info(H2, options);
-      check_accuracy(A, H2, options);
-
+      {
+        // construct from individual elements
+        auto H = structured::construct_from_elements<double>
+          (n, n, Toeplitz, options);
+        print_info(H.get(), options);
+        check_accuracy(A, H.get());
+        factor_and_solve(nrhs, H.get());
+      }
+      {
+        // constrcut from sub-blocks (could have better performance)
+        auto H = structured::construct_from_elements<double>
+          (n, n, Toeplitz_block, options);
+        print_info(H.get(), options);
+        check_accuracy(A, H.get());
+        factor_and_solve(nrhs, H.get());
+      }
     } catch (std::exception& e) {
-      cout << get_name(type) << " compression failed: "
+      cout << get_name(type) << " failed: "
            << e.what() << endl;
     }
   }
@@ -171,11 +192,12 @@ int main(int argc, char* argv[]) {
 
       auto H = structured::construct_partially_matrix_free<double>
         (n, n, Amult, Toeplitz, options);
-      print_info(H, options);
-      check_accuracy(A, H, options);
+      print_info(H.get(), options);
+      check_accuracy(A, H.get());
+      factor_and_solve(nrhs, H.get());
 
     } catch (std::exception& e) {
-      cout << get_name(type) << " compression failed: "
+      cout << get_name(type) << " failed: "
            << e.what() << endl;
     }
   }

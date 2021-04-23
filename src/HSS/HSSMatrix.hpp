@@ -315,7 +315,7 @@ namespace strumpack {
       /**
        * Compute a ULV factorization of this matrix.
        */
-      void factor();
+      void factor() override;
 
       /**
        * Compute a partial ULV factorization of this matrix. Only the
@@ -340,7 +340,7 @@ namespace strumpack {
        * should be b.rows() == cols().
        * \see factor
        */
-      void solve(DenseM_t& b) const;
+      void solve(DenseM_t& b) const override;
 
       /**
        * Perform only the forward phase of the ULV linear solve. This

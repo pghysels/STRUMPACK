@@ -217,7 +217,7 @@ namespace strumpack {
        * factorization depends on the StructuredMatrix::Type of this
        * matrix.
        **/
-      virtual void factorization() {} //= 0;
+      virtual void factor();
 
       /**
        * Solve a linear system A*x=b, with this StructuredMatrix (A).
@@ -238,7 +238,7 @@ namespace strumpack {
        * \param b right-hand side, b.rows() == A.cols(), will be
        * overwritten with the solution x.
        */
-      virtual void solve(DenseMatrix<scalar_t>& b) const {}; //= 0;
+      virtual void solve(DenseMatrix<scalar_t>& b) const;
 
     };
 

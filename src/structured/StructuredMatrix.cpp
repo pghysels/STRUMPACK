@@ -46,8 +46,9 @@ namespace strumpack {
                          const structured::ClusterTree* tree) {
       switch (opts.type()) {
       case Type::HSS: {
-        throw std::invalid_argument
-          ("HSS compression only supported for square matrices.");
+        if (A.rows() != A.cols())
+          throw std::invalid_argument
+            ("HSS compression only supported for square matrices.");
         HSS::HSSOptions<scalar_t> hss_opts(opts);
         if (!tree)
           return std::unique_ptr<StructuredMatrix<scalar_t>>
@@ -607,6 +608,16 @@ namespace strumpack {
                                      DenseMatrix<scalar_t>& y) const {
       throw std::invalid_argument
         ("Operation mult not implemented for this type.");
+    }
+    template<typename scalar_t> void
+    StructuredMatrix<scalar_t>::factor() {
+      throw std::invalid_argument
+        ("Operation factor not implemented for this type.");
+    }
+    template<typename scalar_t> void
+    StructuredMatrix<scalar_t>::solve(DenseMatrix<scalar_t>& b) const {
+      throw std::invalid_argument
+        ("Operation solve not implemented for this type.");
     }
 
 
