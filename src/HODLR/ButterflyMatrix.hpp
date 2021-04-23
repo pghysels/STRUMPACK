@@ -59,7 +59,8 @@ namespace strumpack {
      *
      * \see HSS::HSSMatrix, HODLR::HODLRMatrix
      */
-    template<typename scalar_t> class ButterflyMatrix {
+    template<typename scalar_t> class ButterflyMatrix
+      : public structured::StructuredMatrix<scalar_t> {
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using DistM_t = DistributedMatrix<scalar_t>;
@@ -75,6 +76,12 @@ namespace strumpack {
       using elem_blocks_t = typename HODLRMatrix<scalar_t>::elem_blocks_t;
 
       ButterflyMatrix() {}
+
+      ButterflyMatrix(const MPIComm& comm,
+                      const structured::ClusterTree& row_tree,
+                      const structured::ClusterTree& col_tree,
+                      const opts_t& opts);
+
       /**
        * Construct the block X, subblock of the matrix [A X; Y B]
        * A and B should be defined on the same MPI communicator.
@@ -94,8 +101,8 @@ namespace strumpack {
       ButterflyMatrix<scalar_t>& operator=(const ButterflyMatrix<scalar_t>& h) = delete;
       ButterflyMatrix<scalar_t>& operator=(ButterflyMatrix<scalar_t>&& h);
 
-      std::size_t rows() const { return rows_; }
-      std::size_t cols() const { return cols_; }
+      std::size_t rows() const override { return rows_; }
+      std::size_t cols() const override { return cols_; }
       std::size_t lrows() const { return lrows_; }
       std::size_t lcols() const { return lcols_; }
       std::size_t begin_row() const { return rdist_[c_->rank()]; }
@@ -106,12 +113,16 @@ namespace strumpack {
       const std::vector<int>& cdist() const { return cdist_; }
       const MPIComm& Comm() const { return *c_; }
 
+      std::size_t memory() const override { return get_stat("Mem_Fill") * 1e6; }
+      std::size_t nonzeros() const override { return memory() / sizeof(scalar_t); }
+      std::size_t rank() const override { return get_stat("Rank_max"); }
+
       void compress(const mult_t& Amult);
       void compress(const mult_t& Amult, int rank_guess);
       void compress(const delem_blocks_t& Aelem);
       void compress(const elem_blocks_t& Aelem);
 
-      void mult(Trans op, const DenseM_t& X, DenseM_t& Y) const;
+      void mult(Trans op, const DenseM_t& X, DenseM_t& Y) const override;
 
       /**
        * Multiply this low-rank (or butterfly) matrix with a dense
@@ -163,6 +174,8 @@ namespace strumpack {
       std::vector<int> rdist_, cdist_;  // begin rows/cols of each rank
 
       void set_dist();
+
+      void options_init(const opts_t& opts);
 
       void set_extraction_meta_1grid(const VecVec_t& I, const VecVec_t& J,
                                      ExtractionMeta& e,

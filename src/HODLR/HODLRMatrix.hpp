@@ -405,7 +405,7 @@ namespace strumpack {
        * this.lrows()
        * \see lrows, begin_row, end_row, mult
        */
-      void mult(Trans op, const DenseM_t& X, DenseM_t& Y) const;
+      void mult(Trans op, const DenseM_t& X, DenseM_t& Y) const override;
 
       /**
        * Multiply this HODLR matrix with a dense matrix: Y =
@@ -419,7 +419,7 @@ namespace strumpack {
        * this.rows()
        * \see mult
        */
-      void mult(Trans op, const DistM_t& X, DistM_t& Y) const;
+      void mult(Trans op, const DistM_t& X, DistM_t& Y) const override;
 
       /**
        * Compute the factorization of this HODLR matrix. The matrix
@@ -455,6 +455,8 @@ namespace strumpack {
        * \see factor, lrows, begin_row, end_row, inv_mult
        */
       long long int solve(const DistM_t& B, DistM_t& X) const;
+
+      void solve(DistM_t& b) const override;
 
       /**
        * Solve a system of linear equations op(A)*X=B, with possibly
@@ -506,9 +508,9 @@ namespace strumpack {
       void redistribute_2D_to_1D(const DistM_t& R2D, DenseM_t& R1D) const;
       void redistribute_1D_to_2D(const DenseM_t& S1D, DistM_t& S2D) const;
 
-      DenseMatrix<scalar_t> gather_from_1D(const DenseM_t& A) const;
-      DenseMatrix<scalar_t> all_gather_from_1D(const DenseM_t& A) const;
-      DenseMatrix<scalar_t> scatter_to_1D(const DenseM_t& A) const;
+      DenseM_t gather_from_1D(const DenseM_t& A) const;
+      DenseM_t all_gather_from_1D(const DenseM_t& A) const;
+      DenseM_t scatter_to_1D(const DenseM_t& A) const;
 
       /**
        * The permutation for the matrix, which is applied to both rows

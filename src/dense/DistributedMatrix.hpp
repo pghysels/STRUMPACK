@@ -258,21 +258,21 @@ namespace strumpack {
    * copy submatrix of a DistM_t at ia,ja of size m,n into a DenseM_t
    * b at proc dest
    */
-  template<typename scalar_t> void copy
-  (std::size_t m, std::size_t n, const DistributedMatrix<scalar_t>& a,
-   std::size_t ia, std::size_t ja, DenseMatrix<scalar_t>& b,
-   int dest, int context_all);
+  template<typename scalar_t> void
+  copy(std::size_t m, std::size_t n, const DistributedMatrix<scalar_t>& a,
+       std::size_t ia, std::size_t ja, DenseMatrix<scalar_t>& b,
+       int dest, int context_all);
 
-  template<typename scalar_t> void copy
-  (std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& a, int src,
-   DistributedMatrix<scalar_t>& b, std::size_t ib, std::size_t jb,
-   int context_all);
+  template<typename scalar_t> void
+  copy(std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& a, int src,
+       DistributedMatrix<scalar_t>& b, std::size_t ib, std::size_t jb,
+       int context_all);
 
   /** copy submatrix of a at ia,ja of size m,n into b at position ib,jb */
-  template<typename scalar_t> void copy
-  (std::size_t m, std::size_t n, const DistributedMatrix<scalar_t>& a,
-   std::size_t ia, std::size_t ja, DistributedMatrix<scalar_t>& b,
-   std::size_t ib, std::size_t jb, int context_all);
+  template<typename scalar_t> void
+  copy(std::size_t m, std::size_t n, const DistributedMatrix<scalar_t>& a,
+       std::size_t ia, std::size_t ja, DistributedMatrix<scalar_t>& b,
+       std::size_t ib, std::size_t jb, int context_all);
 
   /**
    * Wrapper class does exactly the same as a regular DistributedMatrix,

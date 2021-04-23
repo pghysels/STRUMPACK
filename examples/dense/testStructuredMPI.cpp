@@ -36,13 +36,39 @@ using namespace strumpack;
 
 template<typename scalar_t> void
 print_info(const MPIComm& comm,
-           const std::unique_ptr<structured::StructuredMatrix<scalar_t>>& H,
+           const structured::StructuredMatrix<scalar_t>* H,
            const structured::StructuredOptions<scalar_t>& opts) {
   if (comm.is_root())
     cout << get_name(opts.type()) << endl
          << "  - total_nonzeros(H) = " << H->nonzeros() << endl
          << "  - total_memory(H) = " << H->memory() / 1e6 << " MByte" << endl
          << "  - maximum_rank(H) = " << H->rank() << endl;
+}
+
+template<typename scalar_t> void
+check_accuracy(const DistributedMatrix<scalar_t>& A,
+               const structured::StructuredMatrix<scalar_t>* H) {
+  DistributedMatrix<scalar_t> id(A.grid(), A.rows(), A.cols()),
+    Hdense(A.grid(), A.rows(), A.cols());
+  id.eye();
+  H->mult(Trans::N, id, Hdense);
+  auto err = Hdense.scaled_add(scalar_t(-1.), A).normF() / A.normF();
+  if (A.Comm().is_root())
+    cout << "  - ||A-H||_F/||A||_F = " << err << endl;
+}
+
+template<typename scalar_t> void
+factor_and_solve(const MPIComm& comm, const BLACSGrid* g, int nrhs,
+                 structured::StructuredMatrix<scalar_t>* H) {
+  DistributedMatrix<scalar_t> B(g, H->rows(), nrhs), X(g, H->rows(), nrhs);
+  X.random();
+  H->mult(Trans::N, X, B);
+  H->factor();
+  H->solve(B);
+  auto err = B.scaled_add(scalar_t(-1.), X).normF() / X.normF();
+  if (comm.is_root())
+    cout << "  - ||X-H\\(H*X)||_F/||X||_F = "
+         << err << endl;
 }
 
 
@@ -54,7 +80,7 @@ int main(int argc, char* argv[]) {
     if (thread_level != MPI_THREAD_FUNNELED && world.is_root())
       cout << "MPI implementation does not support MPI_THREAD_FUNNELED" << endl;
 
-    int n = 1000, nrhs = 1;
+    int n = 1000, nrhs = 10;
     if (argc > 1) n = stoi(argv[1]);
 
     structured::StructuredOptions<double> options;
@@ -120,7 +146,9 @@ int main(int argc, char* argv[]) {
       options.set_type(type);
       try {
         auto H = structured::construct_from_dense(A2d, options);
-        print_info(world, H, options);
+        print_info(world, H.get(), options);
+        check_accuracy(A2d, H.get());
+        factor_and_solve(world, &grid, nrhs, H.get());
       } catch (std::exception& e) {
         if (world.is_root())
           cout << get_name(type) << " compression failed: "
@@ -129,7 +157,8 @@ int main(int argc, char* argv[]) {
     }
 
     if (world.is_root())
-      cout << "==================================" << endl
+      cout << endl << endl
+           << "==================================" << endl
            << " Compression from matrix elements" << endl
            << "==================================" << endl;
     for (auto type : types) {

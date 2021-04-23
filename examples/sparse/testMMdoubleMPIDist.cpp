@@ -115,8 +115,8 @@ int main(int argc, char* argv[]) {
   CSRMatrix<double,int> A;
   CSRMatrix<std::complex<double>,int> Acomplex;
   //---- For 64bit integers use this instead: --------
-  // CSRMatrix<double,int> A;
-  // CSRMatrix<std::complex<double>,int> Acomplex;
+  // CSRMatrix<double,int64_t> A;
+  // CSRMatrix<std::complex<double>,int64_t> Acomplex;
   //--------------------------------------------------
 
   bool is_complex = false;

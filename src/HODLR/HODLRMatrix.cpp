@@ -578,6 +578,15 @@ namespace strumpack {
       return inv_mult(Trans::N, B, X);
     }
 
+    template<typename scalar_t> void
+    HODLRMatrix<scalar_t>::solve(DistM_t& B) const {
+      if (c_->is_null()) return;
+      auto B1D = redistribute_2D_to_1D(B);
+      DenseM_t X1D(lrows_, B.cols());
+      inv_mult(Trans::N, B1D, X1D);
+      redistribute_1D_to_2D(X1D, B);
+    }
+
     template<typename scalar_t> long long int
     HODLRMatrix<scalar_t>::solve(const DistM_t& B, DistM_t& X) const {
       if (c_->is_null()) return 0;

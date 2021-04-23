@@ -34,6 +34,7 @@
 #include "StructuredMatrix.hpp"
 #include "HSS/HSSMatrix.hpp"
 #include "HODLR/HODLRMatrix.hpp"
+#include "HODLR/ButterflyMatrix.hpp"
 #include "sparse/fronts/FrontalMatrixLossy.hpp"
 #include "sparse/fronts/ExtendAdd.hpp"
 
@@ -168,6 +169,7 @@ namespace strumpack {
             J.reserve(B);
             Sr.zero();
             Sc.zero();
+            // TODO threading
             for (int r=0; r<rows; r+=B) {
               for (int c=0; c<cols; c+=B) {
                 int m = std::min(B, rows - r),
@@ -426,6 +428,19 @@ namespace strumpack {
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_from_dense(const DistributedMatrix<scalar_t>& A,
                          const StructuredOptions<scalar_t>& opts) {
+      auto Ablocks =
+        [&A](const std::vector<std::vector<std::size_t>>& I,
+             const std::vector<std::vector<std::size_t>>& J,
+             std::vector<DistributedMatrixWrapper<scalar_t>>& B,
+             HODLR::ExtractionMeta&) {
+          auto nB = I.size();
+          assert(I.size() == J.size());
+          for (std::size_t i=0; i<nB; i++) {
+            auto Bi = A.extract(I[i], J[i]);
+            copy(I[i].size(), J[i].size(), Bi, 0, 0,
+                 B[i], 0, 0, A.ctxt_all());
+          }
+        };
       switch (opts.type()) {
       case Type::HSS: {
         HSS::HSSOptions<scalar_t> hss_opts(opts);
@@ -438,34 +453,6 @@ namespace strumpack {
         if (A.rows() != A.cols())
           throw std::invalid_argument
             ("HODLR compression only supported for square matrices.");
-        auto Ablocks =
-          [&A](const std::vector<std::vector<std::size_t>>& I,
-               const std::vector<std::vector<std::size_t>>& J,
-               std::vector<DistributedMatrixWrapper<scalar_t>>& B,
-               HODLR::ExtractionMeta&) {
-            auto nB = I.size();
-            assert(I.size() == J.size());
-            std::vector<std::vector<std::size_t>> oI(nB), oJ(nB);
-            std::vector<std::vector<scalar_t>> sbuf(A.Comm().size());
-            using ExtAdd = ExtendAdd<scalar_t,int>;
-            for (std::size_t i=0; i<nB; i++) {
-              oI[i].resize(I[i].size());
-              oJ[i].resize(J[i].size());
-              std::iota(oI[i].begin(), oI[i].end(), 0);
-              std::iota(oJ[i].begin(), oJ[i].end(), 0);
-              assert(B[i].rows() == int(I[i].size()));
-              assert(B[i].cols() == int(J[i].size()));
-              assert(B[i].ctxt() == A.ctxt());
-              ExtAdd::extract_copy_to_buffers
-                (A, I[i], J[i], oI[i], oJ[i], B[i], sbuf);
-            }
-            std::vector<scalar_t,NoInit<scalar_t>> rbuf;
-            std::vector<scalar_t*> pbuf;
-            A.Comm().all_to_all_v(sbuf, rbuf, pbuf);
-            for (std::size_t i=0; i<nB; i++)
-              ExtAdd::extract_copy_from_buffers
-                (B[i], I[i], J[i], oI[i], oJ[i], A, pbuf);
-          };
         structured::ClusterTree t(A.rows());
         t.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> hodlr_opts(opts);
@@ -474,12 +461,41 @@ namespace strumpack {
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
       } break;
-      case Type::HODBF:
-        throw std::invalid_argument("Not implemented yet.");
-      case Type::BUTTERFLY:
-        throw std::invalid_argument("Not implemented yet.");
-      case Type::LR:
-        throw std::invalid_argument("Not implemented yet.");
+      case Type::HODBF: {
+        if (A.rows() != A.cols())
+          throw std::invalid_argument
+            ("HODBF compression only supported for square matrices.");
+        structured::ClusterTree t(A.rows());
+        t.refine(opts.leaf_size());
+        HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
+        hodbf_opts.set_butterfly_levels(1000);
+        auto H = new HODLR::HODLRMatrix<scalar_t>
+          (A.Comm(), t, hodbf_opts);
+        H->compress(Ablocks);
+        return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+      } break;
+      case Type::BUTTERFLY: {
+        structured::ClusterTree tr(A.rows()), tc(A.cols());
+        tr.refine(opts.leaf_size());
+        tc.refine(opts.leaf_size());
+        HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
+        hodbf_opts.set_butterfly_levels(1000);
+        auto H = new HODLR::ButterflyMatrix<scalar_t>
+          (A.Comm(), tr, tc, hodbf_opts);
+        H->compress(Ablocks);
+        return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+      } break;
+      case Type::LR: {
+        structured::ClusterTree tr(A.rows()), tc(A.cols());
+        // tr.refine(opts.leaf_size());
+        // tc.refine(opts.leaf_size());
+        HODLR::HODLROptions<scalar_t> lr_opts(opts);
+        lr_opts.set_butterfly_levels(0);
+        auto H = new HODLR::ButterflyMatrix<scalar_t>
+          (A.Comm(), tr, tc, lr_opts);
+        H->compress(Ablocks);
+        return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+      }
       case Type::LOSSY:
         throw std::invalid_argument("Not implemented yet.");
       case Type::LOSSLESS:
@@ -610,6 +626,13 @@ namespace strumpack {
         ("Operation mult not implemented for this type.");
     }
     template<typename scalar_t> void
+    StructuredMatrix<scalar_t>::mult(Trans op,
+                                     const DistributedMatrix<scalar_t>& x,
+                                     DistributedMatrix<scalar_t>& y) const {
+      throw std::invalid_argument
+        ("Operation mult(Dist) not implemented for this type.");
+    }
+    template<typename scalar_t> void
     StructuredMatrix<scalar_t>::factor() {
       throw std::invalid_argument
         ("Operation factor not implemented for this type.");
@@ -618,6 +641,11 @@ namespace strumpack {
     StructuredMatrix<scalar_t>::solve(DenseMatrix<scalar_t>& b) const {
       throw std::invalid_argument
         ("Operation solve not implemented for this type.");
+    }
+    template<typename scalar_t> void
+    StructuredMatrix<scalar_t>::solve(DistributedMatrix<scalar_t>& b) const {
+      throw std::invalid_argument
+        ("Operation solve(Dist) not implemented for this type.");
     }
 
 

@@ -31,6 +31,12 @@
 namespace strumpack {
   namespace HSS {
 
+    template<typename scalar_t> void
+    HSSMatrixMPI<scalar_t>::mult
+    (Trans op, const DistM_t& x, DistM_t& y) const {
+      apply_HSS(op, *this, x, scalar_t(0.), y);
+    }
+
     template<typename scalar_t> DistributedMatrix<scalar_t>
     HSSMatrixMPI<scalar_t>::apply(const DistM_t& b) const {
       assert(this->cols() == std::size_t(b.rows()));

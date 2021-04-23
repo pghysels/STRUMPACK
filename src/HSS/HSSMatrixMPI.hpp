@@ -126,6 +126,8 @@ namespace strumpack {
       DistM_t apply(const DistM_t& b) const;
       DistM_t applyC(const DistM_t& b) const;
 
+      void mult(Trans op, const DistM_t& x, DistM_t& y) const override;
+
       scalar_t get(std::size_t i, std::size_t j) const;
       DistM_t extract(const std::vector<std::size_t>& I,
                       const std::vector<std::size_t>& J,

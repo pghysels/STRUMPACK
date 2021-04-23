@@ -212,24 +212,23 @@ namespace strumpack {
                         DenseMatrix<scalar_t>& y) const;
 
       /**
+       * Multiply the StructuredMatrix (A) with a dense matrix: y =
+       * op(A)*x. x and y are 2d block cyclic.
+       *
+       * \param op take transpose/conjugate or not
+       * \param x matrix, x.rows() == op(A).cols()
+       * \param y matrix, y.cols() == x.cols(), y.rows() == A.rows()
+       */
+      virtual void mult(Trans op, const DistributedMatrix<scalar_t>& x,
+                        DistributedMatrix<scalar_t>& y) const;
+
+      /**
        * Compute a factorization (or the inverse) of this matrix, to
        * be used later for solving linear systems. The actual type of
        * factorization depends on the StructuredMatrix::Type of this
        * matrix.
        **/
       virtual void factor();
-
-      /**
-       * Solve a linear system A*x=b, with this StructuredMatrix (A).
-       * If not already done by the user, this will first call
-       * this->factor().
-       *
-       * \param b right-hand side, b.rows() == A.cols()
-       * \param x solution, should be allocated by user, x.cols() ==
-       * b.cols() and b.cols() == A.rows()
-       */
-      // virtual void solve(const DenseMatrix<scalar_t>& b,
-      //                    DenseMatrix<scalar_t>& x) const = 0;
 
       /**
        * Solve a linear system A*x=b, with this StructuredMatrix
@@ -239,6 +238,15 @@ namespace strumpack {
        * overwritten with the solution x.
        */
       virtual void solve(DenseMatrix<scalar_t>& b) const;
+
+      /**
+       * Solve a linear system A*x=b, with this StructuredMatrix
+       * (A). This solve is done in-place.
+       *
+       * \param b right-hand side, b.rows() == A.cols(), will be
+       * overwritten with the solution x.
+       */
+      virtual void solve(DistributedMatrix<scalar_t>& b) const;
 
     };
 
