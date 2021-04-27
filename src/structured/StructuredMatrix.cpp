@@ -587,15 +587,72 @@ namespace strumpack {
     construct_from_elements(const MPIComm& comm, int rows, int cols,
                             const extract_t<scalar_t>& A,
                             const StructuredOptions<scalar_t>& opts) {
-      // auto extract_block =
-      //   [&A](const std::vector<std::size_t>& I,
-      //        const std::vector<std::size_t>& J,
-      //        DenseMatrix<scalar_t>& B) {
-      //     for (std::size_t j=0; j<J.size(); j++)
-      //       for (std::size_t i=0; i<I.size(); i++)
-      //         B(i, j) = A(I[i], J[j]);
-      //   };
-      // return construct_from_elements(comm, rows, cols, extract_block, opts);
+      auto Ablocks =
+        [&A](const std::vector<std::vector<std::size_t>>& I,
+             const std::vector<std::vector<std::size_t>>& J,
+             std::vector<DistributedMatrixWrapper<scalar_t>>& B,
+             HODLR::ExtractionMeta&) {
+          for (std::size_t i=0; i<I.size(); i++) {
+            auto Afill = [&](std::size_t r, std::size_t c) -> scalar_t {
+                           return A(I[i][r], J[i][c]);
+                         };
+            B[i].fill(Afill);
+          }
+        };
+      switch (opts.type()) {
+      case Type::HSS:
+        throw std::invalid_argument("Not implemented yet.");
+      case Type::BLR:
+        throw std::invalid_argument("Not implemented yet.");
+      case Type::HODLR: {
+        if (rows != cols)
+          throw std::invalid_argument
+            ("HODLR compression only supported for square matrices.");
+        structured::ClusterTree t(rows);
+        t.refine(opts.leaf_size());
+        HODLR::HODLROptions<scalar_t> hodlr_opts(opts);
+        auto H = new HODLR::HODLRMatrix<scalar_t>(comm, t, hodlr_opts);
+        H->compress(Ablocks);
+        return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+      } break;
+      case Type::HODBF: {
+        if (rows != cols)
+          throw std::invalid_argument
+            ("HODBF compression only supported for square matrices.");
+        structured::ClusterTree t(rows);
+        t.refine(opts.leaf_size());
+        HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
+        hodbf_opts.set_butterfly_levels(1000);
+        auto H = new HODLR::HODLRMatrix<scalar_t>(comm, t, hodbf_opts);
+        H->compress(Ablocks);
+        return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+      } break;
+      case Type::BUTTERFLY: {
+        structured::ClusterTree tr(rows), tc(cols);
+        tr.refine(opts.leaf_size());
+        tc.refine(opts.leaf_size());
+        HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
+        hodbf_opts.set_butterfly_levels(1000);
+        auto H = new HODLR::ButterflyMatrix<scalar_t>
+          (comm, tr, tc, hodbf_opts);
+        H->compress(Ablocks);
+        return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+      } break;
+      case Type::LR: {
+        structured::ClusterTree tr(rows), tc(cols);
+        HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
+        auto H = new HODLR::ButterflyMatrix<scalar_t>
+          (comm, tr, tc, hodbf_opts);
+        H->compress(Ablocks);
+        return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+      } break;
+      case Type::LOSSY:
+        throw std::invalid_argument
+          ("Type LOSSY does not support compression from elements.");
+      case Type::LOSSLESS:
+        throw std::invalid_argument
+          ("Type LOSSLESS does not support compression from elements.");
+      }
       return std::unique_ptr<StructuredMatrix<scalar_t>>(nullptr);
     }
 

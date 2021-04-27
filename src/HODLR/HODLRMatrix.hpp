@@ -90,8 +90,6 @@ namespace strumpack {
       using real_t = typename RealType<scalar_t>::value_type;
       using mult_t = typename std::function
         <void(Trans, const DenseM_t&, DenseM_t&)>;
-      using elem_t = typename std::function
-        <scalar_t(std::size_t i, std::size_t j)>;
       using delem_blocks_t = typename std::function
         <void(VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
               ExtractionMeta&)>;

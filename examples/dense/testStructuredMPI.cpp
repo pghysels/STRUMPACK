@@ -164,9 +164,11 @@ int main(int argc, char* argv[]) {
     for (auto type : types) {
       options.set_type(type);
       try {
-        // auto H = structured::StructuredMatrix<double>::
-        //   construct_from_elements(world, n, n, Toeplitz, options);
-        // print_info(world, H, options);
+        auto H = structured::construct_from_elements<double>
+          (world, n, n, Toeplitz, options);
+        print_info(world, H.get(), options);
+        check_accuracy(A2d, H.get());
+        factor_and_solve(world, &grid, nrhs, H.get());
       } catch (std::exception& e) {
         if (world.is_root())
           cout << get_name(type) << " compression failed: "
