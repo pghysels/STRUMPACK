@@ -36,7 +36,6 @@
 #include "dense/DistributedVector.hpp"
 
 namespace strumpack {
-
   namespace iterative {
 
     /**
@@ -54,25 +53,29 @@ namespace strumpack {
      */
     template<typename scalar_t,
              typename real_t = typename RealType<scalar_t>::value_type>
-    real_t GMResMPI
-    (const MPIComm& comm,
-     const std::function<void(const scalar_t*,scalar_t*)>& spmv,
-     const std::function<void(scalar_t*)>& preconditioner,
-     std::size_t n, scalar_t* x, const scalar_t* b, real_t rtol, real_t atol,
-     int& totit, int maxit, int restart, GramSchmidtType GStype,
-     bool non_zero_guess, bool verbose);
+    real_t GMResMPI(const MPIComm& comm,
+                    const std::function
+                    <void(const scalar_t*,scalar_t*)>& spmv,
+                    const std::function
+                    <void(scalar_t*)>& preconditioner,
+                    std::size_t n, scalar_t* x, const scalar_t* b,
+                    real_t rtol, real_t atol, int& totit, int maxit,
+                    int restart, GramSchmidtType GStype,
+                    bool non_zero_guess, bool verbose);
 
     /**
      * http://www.netlib.org/templates/matlab/bicgstab.m
      */
     template<typename scalar_t,
              typename real_t = typename RealType<scalar_t>::value_type>
-    real_t BiCGStabMPI
-    (const MPIComm& comm,
-     const std::function<void(const scalar_t*,scalar_t*)>& spmv,
-     const std::function<void(scalar_t*)>& preconditioner,
-     std::size_t n, scalar_t* x, const scalar_t* b, real_t rtol, real_t atol,
-     int& totit, int maxit, bool non_zero_guess, bool verbose);
+    real_t BiCGStabMPI(const MPIComm& comm,
+                       const std::function
+                       <void(const scalar_t*,scalar_t*)>& spmv,
+                       const std::function
+                       <void(scalar_t*)>& preconditioner,
+                       std::size_t n, scalar_t* x, const scalar_t* b,
+                       real_t rtol, real_t atol, int& totit, int maxit,
+                       bool non_zero_guess, bool verbose);
 
     /*
      * This is iterative refinement
@@ -80,12 +83,14 @@ namespace strumpack {
      */
     template<typename scalar_t,typename integer_t,
              typename real_t = typename RealType<scalar_t>::value_type>
-    void IterativeRefinementMPI
-    (const MPIComm& comm,
-     const CSRMatrixMPI<scalar_t,integer_t>& A,
-     const std::function<void(DenseMatrix<scalar_t>&)>& direct_solve,
-     DenseMatrix<scalar_t>& x, const DenseMatrix<scalar_t>& b, real_t rtol,
-     real_t atol, int& totit, int maxit, bool non_zero_guess, bool verbose);
+    void IterativeRefinementMPI(const MPIComm& comm,
+                                const CSRMatrixMPI<scalar_t,integer_t>& A,
+                                const std::function
+                                <void(DenseMatrix<scalar_t>&)>& direct_solve,
+                                DenseMatrix<scalar_t>& x,
+                                const DenseMatrix<scalar_t>& b,
+                                real_t rtol, real_t atol, int& totit, int maxit,
+                                bool non_zero_guess, bool verbose);
 
   } // end namespace iterative
 } // end namespace strumpack

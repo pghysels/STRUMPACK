@@ -354,7 +354,10 @@ namespace strumpack {
 
   template<typename scalar_t>
   DistributedMatrix<scalar_t>::~DistributedMatrix() {
-    clear();
+    if (data_) {
+      STRUMPACK_SUB_MEMORY(lrows_*lcols_*sizeof(scalar_t));
+      delete[] data_;
+    }
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>&
@@ -564,6 +567,13 @@ namespace strumpack {
       desc(), scalar_t(0.), tmp.data(),
       tmp.I(), tmp.J(), tmp.desc());
     return tmp;
+  }
+
+  template<typename scalar_t> void
+  DistributedMatrix<scalar_t>::mult(Trans op,
+                                    const DistributedMatrix<scalar_t>& X,
+                                    DistributedMatrix<scalar_t>& Y) const {
+    gemm(op, Trans::N, scalar_t(1.), *this, X, scalar_t(0.), Y);
   }
 
   template<typename scalar_t> void

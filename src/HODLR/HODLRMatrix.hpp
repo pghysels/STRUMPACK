@@ -171,7 +171,7 @@ namespace strumpack {
        * \param t tree specifying the HODLR matrix partitioning
        * \param Amult Routine for the matrix-vector product. Trans op
        * argument will be N, T or C for none, transpose or complex
-       * conjugate. The const DenseM_t& argument is the the random
+       * conjugate. The const DenseM_t& argument is the random
        * matrix R, and the final DenseM_t& argument S is what the user
        * routine should compute as A*R, A^t*R or A^c*R. S will already
        * be allocated.
@@ -181,7 +181,7 @@ namespace strumpack {
        */
       HODLRMatrix(const MPIComm& c, const structured::ClusterTree& tree,
                   const std::function<
-                  void(Trans op,const DenseM_t& R,DenseM_t& S)>& Amult,
+                  void(Trans op, const DenseM_t& R, DenseM_t& S)>& Amult,
                   const opts_t& opts);
 
       /**
@@ -269,6 +269,14 @@ namespace strumpack {
        */
       std::size_t end_row() const { return dist_[c_->rank()+1]; }
       /**
+       * Return vector describing the 1d block row
+       * distribution. dist()[rank]==begin_row() and
+       * dist()[rank+1]==end_row()
+       * \return 1D block row distribution
+       */
+      const std::vector<int>& dist() const { return dist_; }
+
+      /**
        * Return MPI communicator wrapper object.
        */
       const MPIComm& Comm() const { return *c_; }
@@ -352,8 +360,9 @@ namespace strumpack {
        * routine should compute as A*R, A^t*R or A^c*R. S will already
        * be allocated.
        */
-      void compress
-      (const std::function<void(Trans op,const DenseM_t& R,DenseM_t& S)>& Amult);
+      void compress(const std::function
+                    <void(Trans op, const DenseM_t& R,
+                          DenseM_t& S)>& Amult);
 
       /**
        * Construct the compressed HODLR representation of the matrix,
@@ -367,9 +376,10 @@ namespace strumpack {
        * be allocated.
        * \param rank_guess Initial guess for the rank
        */
-      void compress
-      (const std::function<void(Trans op,const DenseM_t& R,DenseM_t& S)>& Amult,
-       int rank_guess);
+      void compress(const std::function
+                    <void(Trans op, const DenseM_t& R,
+                          DenseM_t& S)>& Amult,
+                    int rank_guess);
 
       /**
        * Construct the compressed HODLR representation of the matrix,

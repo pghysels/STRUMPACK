@@ -32,7 +32,6 @@
 #include "IterativeSolversMPI.hpp"
 
 namespace strumpack {
-
   namespace iterative {
 
     /**
@@ -48,11 +47,13 @@ namespace strumpack {
      * Input vectors x and b have stride 1 and (local) length n
      *
      */
-    template<typename scalar_t, typename real_t> real_t GMResMPI
-    (const MPIComm& comm, const SPMV<scalar_t>& A, const PREC<scalar_t>& M,
-     std::size_t n, scalar_t* x, const scalar_t* b, real_t rtol, real_t atol,
-     int& totit, int maxit, int restart, GramSchmidtType GStype,
-     bool non_zero_guess, bool verbose) {
+    template<typename scalar_t, typename real_t> real_t
+    GMResMPI(const MPIComm& comm, const SPMV<scalar_t>& A,
+             const PREC<scalar_t>& M,
+             std::size_t n, scalar_t* x, const scalar_t* b,
+             real_t rtol, real_t atol,
+             int& totit, int maxit, int restart, GramSchmidtType GStype,
+             bool non_zero_guess, bool verbose) {
       if (restart > maxit) restart = maxit;
       std::unique_ptr<scalar_t[]> work
         (new scalar_t[restart + restart + restart+1 +
@@ -145,34 +146,44 @@ namespace strumpack {
           }
         }
         blas::trsv('U', 'N', 'N', nrit+1, hess, ldh, b_, 1);
-        blas::gemv('N', n, nrit+1, scalar_t(1.), V, n, b_, 1, scalar_t(1.), x, 1);
+        blas::gemv('N', n, nrit+1, scalar_t(1.), V, n, b_, 1,
+                   scalar_t(1.), x, 1);
       }
       return rho;
     }
 
     // explicit template instantiations
-    template float GMResMPI
-    (const MPIComm& comm, const SPMV<float>& A, const PREC<float>& M,
-     std::size_t n, float* x, const float* b, float rtol, float atol,
-     int& totit, int maxit, int restart, GramSchmidtType GStype,
-     bool non_zero_guess, bool verbose);
-    template double GMResMPI
-    (const MPIComm& comm, const SPMV<double>& A, const PREC<double>& M,
-     std::size_t n, double* x, const double* b, double rtol, double atol,
-     int& totit, int maxit, int restart, GramSchmidtType GStype,
-     bool non_zero_guess, bool verbose);
-    template float GMResMPI
-    (const MPIComm& comm, const SPMV<std::complex<float>>& A,
-     const PREC<std::complex<float>>& M, std::size_t n,
-     std::complex<float>* x, const std::complex<float>* b,
-     float rtol, float atol, int& totit, int maxit, int restart,
-     GramSchmidtType GStype, bool non_zero_guess, bool verbose);
-    template double GMResMPI
-    (const MPIComm& comm, const SPMV<std::complex<double>>& A,
-     const PREC<std::complex<double>>& M, std::size_t n,
-     std::complex<double>* x, const std::complex<double>* b,
-     double rtol, double atol, int& totit, int maxit, int restart,
-     GramSchmidtType GStype, bool non_zero_guess, bool verbose);
+    template
+    float GMResMPI(const MPIComm& comm, const SPMV<float>& A,
+                   const PREC<float>& M,
+                   std::size_t n, float* x, const float* b,
+                   float rtol, float atol,
+                   int& totit, int maxit, int restart,
+                   GramSchmidtType GStype,
+                   bool non_zero_guess, bool verbose);
+    template
+    double GMResMPI(const MPIComm& comm, const SPMV<double>& A,
+                    const PREC<double>& M,
+                    std::size_t n, double* x, const double* b,
+                    double rtol, double atol,
+                    int& totit, int maxit, int restart,
+                    GramSchmidtType GStype,
+                    bool non_zero_guess, bool verbose);
+    template
+    float GMResMPI(const MPIComm& comm, const SPMV<std::complex<float>>& A,
+                   const PREC<std::complex<float>>& M, std::size_t n,
+                   std::complex<float>* x, const std::complex<float>* b,
+                   float rtol, float atol, int& totit, int maxit, int restart,
+                   GramSchmidtType GStype,
+                   bool non_zero_guess, bool verbose);
+    template
+    double GMResMPI(const MPIComm& comm, const SPMV<std::complex<double>>& A,
+                    const PREC<std::complex<double>>& M, std::size_t n,
+                    std::complex<double>* x, const std::complex<double>* b,
+                    double rtol, double atol,
+                    int& totit, int maxit, int restart,
+                    GramSchmidtType GStype,
+                    bool non_zero_guess, bool verbose);
 
   } // end namespace iterative
 } // end namespace strumpack

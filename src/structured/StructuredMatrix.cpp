@@ -469,6 +469,7 @@ namespace strumpack {
         t.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
         hodbf_opts.set_butterfly_levels(1000);
+        hodbf_opts.set_BF_entry_n15(true);
         auto H = new HODLR::HODLRMatrix<scalar_t>
           (A.Comm(), t, hodbf_opts);
         H->compress(Ablocks);
@@ -480,6 +481,7 @@ namespace strumpack {
         tc.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
         hodbf_opts.set_butterfly_levels(1000);
+        hodbf_opts.set_BF_entry_n15(true);
         auto H = new HODLR::ButterflyMatrix<scalar_t>
           (A.Comm(), tr, tc, hodbf_opts);
         H->compress(Ablocks);
@@ -487,10 +489,9 @@ namespace strumpack {
       } break;
       case Type::LR: {
         structured::ClusterTree tr(A.rows()), tc(A.cols());
-        // tr.refine(opts.leaf_size());
-        // tc.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> lr_opts(opts);
         lr_opts.set_butterfly_levels(0);
+        lr_opts.set_BF_entry_n15(true);
         auto H = new HODLR::ButterflyMatrix<scalar_t>
           (A.Comm(), tr, tc, lr_opts);
         H->compress(Ablocks);
@@ -543,6 +544,7 @@ namespace strumpack {
         structured::ClusterTree t(rows);
         t.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> hodlr_opts(opts);
+        hodlr_opts.set_BF_entry_n15(true);
         auto H = new HODLR::HODLRMatrix<scalar_t>
           (comm, t, hodlr_opts);
         H->compress(Ablocks);
@@ -611,6 +613,7 @@ namespace strumpack {
         structured::ClusterTree t(rows);
         t.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> hodlr_opts(opts);
+        hodlr_opts.set_BF_entry_n15(true);
         auto H = new HODLR::HODLRMatrix<scalar_t>(comm, t, hodlr_opts);
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
@@ -623,6 +626,7 @@ namespace strumpack {
         t.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
         hodbf_opts.set_butterfly_levels(1000);
+        hodbf_opts.set_BF_entry_n15(true);
         auto H = new HODLR::HODLRMatrix<scalar_t>(comm, t, hodbf_opts);
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
@@ -633,6 +637,7 @@ namespace strumpack {
         tc.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
         hodbf_opts.set_butterfly_levels(1000);
+        hodbf_opts.set_BF_entry_n15(true);
         auto H = new HODLR::ButterflyMatrix<scalar_t>
           (comm, tr, tc, hodbf_opts);
         H->compress(Ablocks);
@@ -673,6 +678,255 @@ namespace strumpack {
     construct_from_elements(const MPIComm& comm, int rows, int cols,
                             const extract_t<std::complex<double>>& A,
                             const StructuredOptions<std::complex<double>>& opts);
+
+
+
+    template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
+    construct_matrix_free(const MPIComm& comm, const BLACSGrid* g,
+                          int rows, int cols,
+                          const mult_2d_t<scalar_t>& A,
+                          const StructuredOptions<scalar_t>& opts) {
+      switch (opts.type()) {
+      case Type::HSS:
+        throw std::invalid_argument
+          ("Type HSS does not support matrix-free compression.");
+      case Type::BLR:
+        throw std::invalid_argument
+          ("Type BLR does not support matrix-free compression.");
+      case Type::HODLR: {
+        if (rows != cols)
+          throw std::invalid_argument
+            ("HODLR compression only supported for square matrices.");
+        structured::ClusterTree t(rows);
+        t.refine(opts.leaf_size());
+        HODLR::HODLROptions<scalar_t> hodlr_opts(opts);
+        hodlr_opts.set_BF_entry_n15(true);
+        auto H = new HODLR::HODLRMatrix<scalar_t>(comm, t, hodlr_opts);
+        auto Tmult = [&A, &H, &g, &rows, &cols]
+          (Trans op, const DenseMatrix<scalar_t>& R,
+           DenseMatrix<scalar_t>& S) {
+                       DistributedMatrix<scalar_t>
+                         R2d(g, op == Trans::N ? cols : rows, R.cols()),
+                         S2d(g, op == Trans::N ? rows : cols, R.cols());
+                       H->redistribute_1D_to_2D(R, R2d);
+                       A(op, R2d, S2d);
+                       H->redistribute_2D_to_1D(S2d, S);
+                     };
+        H->compress(Tmult);
+        return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+      } break;
+      case Type::HODBF: {
+        if (rows != cols)
+          throw std::invalid_argument
+            ("HODBF compression only supported for square matrices.");
+        structured::ClusterTree t(rows);
+        t.refine(opts.leaf_size());
+        HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
+        hodbf_opts.set_butterfly_levels(1000);
+        hodbf_opts.set_BF_entry_n15(true);
+        auto H = new HODLR::HODLRMatrix<scalar_t>(comm, t, hodbf_opts);
+        auto Tmult = [&A, &H, &g, &rows, &cols]
+          (Trans op, const DenseMatrix<scalar_t>& R,
+           DenseMatrix<scalar_t>& S) {
+                       DistributedMatrix<scalar_t>
+                         R2d(g, op == Trans::N ? cols : rows, R.cols()),
+                         S2d(g, op == Trans::N ? rows : cols, R.cols());
+                       H->redistribute_1D_to_2D(R, R2d);
+                       A(op, R2d, S2d);
+                       H->redistribute_2D_to_1D(S2d, S);
+                     };
+        H->compress(Tmult);
+        return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+      } break;
+      case Type::BUTTERFLY: {
+        structured::ClusterTree tr(rows), tc(cols);
+        tr.refine(opts.leaf_size());
+        tc.refine(opts.leaf_size());
+        HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
+        hodbf_opts.set_butterfly_levels(1000);
+        hodbf_opts.set_BF_entry_n15(true);
+        auto H = new HODLR::ButterflyMatrix<scalar_t>
+          (comm, tr, tc, hodbf_opts);
+        auto Tmult = [&A, &H, &g, &rows, &cols]
+          (Trans op, scalar_t alpha, const DenseMatrix<scalar_t>& R,
+           scalar_t beta, DenseMatrix<scalar_t>& S) {
+                       DistributedMatrix<scalar_t>
+                         R2d(g, op == Trans::N ? cols : rows, R.cols()),
+                         S2d(g, op == Trans::N ? rows : cols, R.cols());
+                       H->redistribute_1D_to_2D
+                         (R, R2d, op == Trans::N ? H->cdist() : H->rdist());
+                       A(op, R2d, S2d);
+                       H->redistribute_2D_to_1D
+                         (alpha, S2d, beta, S,
+                          op == Trans::N ? H->rdist() : H->cdist());
+                     };
+        H->compress(Tmult);
+        return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+      } break;
+      case Type::LR: {
+        structured::ClusterTree tr(rows), tc(cols);
+        HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
+        auto H = new HODLR::ButterflyMatrix<scalar_t>
+          (comm, tr, tc, hodbf_opts);
+        auto Tmult = [&A, &H, &g, &rows, &cols]
+          (Trans op, scalar_t alpha,
+           const DenseMatrix<scalar_t>& R,
+           scalar_t beta, DenseMatrix<scalar_t>& S) {
+                       DistributedMatrix<scalar_t>
+                         R2d(g, op == Trans::N ? cols : rows, R.cols()),
+                         S2d(g, op == Trans::N ? rows : cols, R.cols());
+                       H->redistribute_1D_to_2D
+                         (R, R2d, op == Trans::N ? H->cdist() : H->rdist());
+                       A(op, R2d, S2d);
+                       H->redistribute_2D_to_1D
+                         (alpha, S2d, beta, S,
+                          op == Trans::N ? H->rdist() : H->cdist());
+                     };
+        H->compress(Tmult);
+        return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+      } break;
+      case Type::LOSSY:
+        throw std::invalid_argument
+          ("Type LOSSY does not support matrix-free compression.");
+      case Type::LOSSLESS:
+        throw std::invalid_argument
+          ("Type LOSSLESS does not support matrix-free compression.");
+      }
+      return std::unique_ptr<StructuredMatrix<scalar_t>>(nullptr);
+    }
+
+    // explicit template instantiations
+    template std::unique_ptr<StructuredMatrix<float>>
+    construct_matrix_free(const MPIComm& comm, const BLACSGrid* g,
+                          int rows, int cols,
+                          const mult_2d_t<float>& A,
+                          const StructuredOptions<float>& opts);
+    template std::unique_ptr<StructuredMatrix<double>>
+    construct_matrix_free(const MPIComm& comm, const BLACSGrid* g,
+                          int rows, int cols,
+                          const mult_2d_t<double>& A,
+                          const StructuredOptions<double>& opts);
+    template std::unique_ptr<StructuredMatrix<std::complex<float>>>
+    construct_matrix_free(const MPIComm& comm, const BLACSGrid* g,
+                          int rows, int cols,
+                          const mult_2d_t<std::complex<float>>& A,
+                          const StructuredOptions<std::complex<float>>& opts);
+    template std::unique_ptr<StructuredMatrix<std::complex<double>>>
+    construct_matrix_free(const MPIComm& comm, const BLACSGrid* g,
+                          int rows, int cols,
+                          const mult_2d_t<std::complex<double>>& A,
+                          const StructuredOptions<std::complex<double>>& opts);
+
+
+
+    template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
+    construct_matrix_free(const MPIComm& comm, int rows, int cols,
+                          const mult_1d_t<scalar_t>& A,
+                          const StructuredOptions<scalar_t>& opts) {
+      switch (opts.type()) {
+      case Type::HSS:
+        throw std::invalid_argument
+          ("Type HSS does not support matrix-free compression.");
+      case Type::BLR:
+        throw std::invalid_argument
+          ("Type BLR does not support matrix-free compression.");
+      case Type::HODLR: {
+        if (rows != cols)
+          throw std::invalid_argument
+            ("HODLR compression only supported for square matrices.");
+        structured::ClusterTree t(rows);
+        t.refine(opts.leaf_size());
+        HODLR::HODLROptions<scalar_t> hodlr_opts(opts);
+        hodlr_opts.set_BF_entry_n15(true);
+        auto H = new HODLR::HODLRMatrix<scalar_t>(comm, t, hodlr_opts);
+        auto Tmult = [&A, &H]
+          (Trans op, const DenseMatrix<scalar_t>& R,
+           DenseMatrix<scalar_t>& S) {
+                       A(op, R, S, H->dist());
+                     };
+        H->compress(Tmult);
+        return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+      } break;
+      case Type::HODBF: {
+        if (rows != cols)
+          throw std::invalid_argument
+            ("HODBF compression only supported for square matrices.");
+        structured::ClusterTree t(rows);
+        t.refine(opts.leaf_size());
+        HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
+        hodbf_opts.set_butterfly_levels(1000);
+        hodbf_opts.set_BF_entry_n15(true);
+        auto H = new HODLR::HODLRMatrix<scalar_t>(comm, t, hodbf_opts);
+        auto Tmult = [&A, &H]
+          (Trans op, const DenseMatrix<scalar_t>& R,
+           DenseMatrix<scalar_t>& S) {
+                       A(op, R, S, H->dist());
+                     };
+        H->compress(Tmult);
+        return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+      } break;
+      case Type::BUTTERFLY: {
+        structured::ClusterTree tr(rows), tc(cols);
+        tr.refine(opts.leaf_size());
+        tc.refine(opts.leaf_size());
+        HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
+        hodbf_opts.set_butterfly_levels(1000);
+        hodbf_opts.set_BF_entry_n15(true);
+        auto H = new HODLR::ButterflyMatrix<scalar_t>
+          (comm, tr, tc, hodbf_opts);
+        auto Tmult = [&A, &H]
+          (Trans op, scalar_t alpha, const DenseMatrix<scalar_t>& R,
+           scalar_t beta, DenseMatrix<scalar_t>& S) {
+                       assert(alpha == scalar_t(1.));
+                       assert(beta == scalar_t(0.));
+                       A(op, R, S, op == Trans::N ? H->rdist() : H->cdist());
+                     };
+        H->compress(Tmult);
+        return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+      } break;
+      case Type::LR: {
+        structured::ClusterTree tr(rows), tc(cols);
+        HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
+        auto H = new HODLR::ButterflyMatrix<scalar_t>
+          (comm, tr, tc, hodbf_opts);
+        auto Tmult = [&A, &H]
+          (Trans op, scalar_t alpha,
+           const DenseMatrix<scalar_t>& R,
+           scalar_t beta, DenseMatrix<scalar_t>& S) {
+                       assert(alpha == scalar_t(1.));
+                       assert(beta == scalar_t(0.));
+                       A(op, R, S, op == Trans::N ? H->rdist() : H->cdist());
+                     };
+        H->compress(Tmult);
+        return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+      } break;
+      case Type::LOSSY:
+        throw std::invalid_argument
+          ("Type LOSSY does not support matrix-free compression.");
+      case Type::LOSSLESS:
+        throw std::invalid_argument
+          ("Type LOSSLESS does not support matrix-free compression.");
+      }
+      return std::unique_ptr<StructuredMatrix<scalar_t>>(nullptr);
+    }
+
+    // explicit template instantiations
+    template std::unique_ptr<StructuredMatrix<float>>
+    construct_matrix_free(const MPIComm& comm, int rows, int cols,
+                          const mult_1d_t<float>& A,
+                          const StructuredOptions<float>& opts);
+    template std::unique_ptr<StructuredMatrix<double>>
+    construct_matrix_free(const MPIComm& comm, int rows, int cols,
+                          const mult_1d_t<double>& A,
+                          const StructuredOptions<double>& opts);
+    template std::unique_ptr<StructuredMatrix<std::complex<float>>>
+    construct_matrix_free(const MPIComm& comm, int rows, int cols,
+                          const mult_1d_t<std::complex<float>>& A,
+                          const StructuredOptions<std::complex<float>>& opts);
+    template std::unique_ptr<StructuredMatrix<std::complex<double>>>
+    construct_matrix_free(const MPIComm& comm, int rows, int cols,
+                          const mult_1d_t<std::complex<double>>& A,
+                          const StructuredOptions<std::complex<double>>& opts);
 #endif
 
 

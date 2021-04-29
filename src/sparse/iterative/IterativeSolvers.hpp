@@ -40,11 +40,13 @@
 #include "dense/DenseMatrix.hpp"
 
 namespace strumpack {
-
   namespace iterative {
 
-    template<typename T> using SPMV = std::function<void(const T*, T*)>;
-    template<typename T> using PREC = std::function<void(T*)>;
+    template<typename T>
+    using SPMV = std::function<void(const T*, T*)>;
+
+    template<typename T>
+    using PREC = std::function<void(T*)>;
 
     /*
      * This is left preconditioned restarted GMRes.
@@ -53,11 +55,12 @@ namespace strumpack {
      */
     template<typename scalar_t,
              typename real_t = typename RealType<scalar_t>::value_type>
-    real_t GMRes
-    (const SPMV<scalar_t>& A, const PREC<scalar_t>& M, std::size_t n,
-     scalar_t* x, const scalar_t* b, real_t rtol, real_t atol,
-     int& totit, int maxit, int restart,  GramSchmidtType GStype,
-     bool non_zero_guess, bool verbose);
+    real_t GMRes(const SPMV<scalar_t>& A,
+                 const PREC<scalar_t>& M,
+                 std::size_t n, scalar_t* x, const scalar_t* b,
+                 real_t rtol, real_t atol, int& totit, int maxit,
+                 int restart, GramSchmidtType GStype,
+                 bool non_zero_guess, bool verbose);
 
 
     /**
@@ -65,10 +68,11 @@ namespace strumpack {
      */
     template<typename scalar_t,
              typename real_t = typename RealType<scalar_t>::value_type>
-    real_t BiCGStab
-    (const SPMV<scalar_t>& A, const PREC<scalar_t>& M, std::size_t n,
-     scalar_t* x, const scalar_t* b, real_t rtol, real_t atol,
-     int& totit, int maxit, bool non_zero_guess, bool verbose);
+    real_t BiCGStab(const SPMV<scalar_t>& A,
+                    const PREC<scalar_t>& M,
+                    std::size_t n, scalar_t* x, const scalar_t* b,
+                    real_t rtol, real_t atol, int& totit, int maxit,
+                    bool non_zero_guess, bool verbose);
 
     /**
      * Iterative refinement, with a sparse matrix, to solve a linear
@@ -93,12 +97,12 @@ namespace strumpack {
      */
     template<typename scalar_t,typename integer_t,
              typename real_t = typename RealType<scalar_t>::value_type>
-    void IterativeRefinement
-    (const CompressedSparseMatrix<scalar_t,integer_t>& A,
-     const std::function<void(DenseMatrix<scalar_t>&)>& M,
-     DenseMatrix<scalar_t>& x, const DenseMatrix<scalar_t>& b,
-     real_t rtol, real_t atol, int& totit, int maxit,
-     bool non_zero_guess, bool verbose);
+    void IterativeRefinement(const CompressedSparseMatrix<scalar_t,integer_t>& A,
+                             const std::function<void(DenseMatrix<scalar_t>&)>& M,
+                             DenseMatrix<scalar_t>& x,
+                             const DenseMatrix<scalar_t>& b,
+                             real_t rtol, real_t atol, int& totit, int maxit,
+                             bool non_zero_guess, bool verbose);
 
 
     /**
@@ -123,13 +127,13 @@ namespace strumpack {
      */
     template<typename scalar_t,
              typename real_t = typename RealType<scalar_t>::value_type>
-    void IterativeRefinement
-    (const DenseMatrix<scalar_t>& A,
-     const std::function<void(DenseMatrix<scalar_t>&)>& M,
-     DenseMatrix<scalar_t>& x, const DenseMatrix<scalar_t>& b,
-     real_t rtol, real_t atol, int& totit, int maxit,
-     bool non_zero_guess, bool verbose);
-
+    void IterativeRefinement(const DenseMatrix<scalar_t>& A,
+                             const std::function
+                             <void(DenseMatrix<scalar_t>&)>& M,
+                             DenseMatrix<scalar_t>& x,
+                             const DenseMatrix<scalar_t>& b,
+                             real_t rtol, real_t atol, int& totit, int maxit,
+                             bool non_zero_guess, bool verbose);
 
   } // end namespace iterative
 } // end namespace strumpack

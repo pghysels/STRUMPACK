@@ -31,6 +31,7 @@
 using namespace std;
 
 #include "structured/StructuredMatrix.hpp"
+#include "sparse/iterative/IterativeSolvers.hpp"
 using namespace strumpack;
 
 
@@ -55,6 +56,7 @@ check_accuracy(const DenseMatrix<scalar_t>& A,
 
 template<typename scalar_t> void
 factor_and_solve(int nrhs,
+                 const DenseMatrix<scalar_t>& A,
                  structured::StructuredMatrix<scalar_t>* H) {
   DenseMatrix<scalar_t> B(H->rows(), nrhs), X(H->rows(), nrhs);
   X.random();
@@ -63,7 +65,69 @@ factor_and_solve(int nrhs,
   H->solve(B);
   cout << "  - ||X-H\\(H*X)||_F/||X||_F = "
        << B.sub(X).normF() / X.normF() << endl;
+
+  gemm(Trans::N, Trans::N, scalar_t(1.), A, X, scalar_t(0.), B);
+  // H->factor(); // already called
+  H->solve(B);
+  cout << "  - ||X-H\\(A*X)||_F/||X||_F = "
+       << B.sub(X).normF() / X.normF() << endl;
 }
+
+template<typename scalar_t> void
+preconditioned_solve(const DenseMatrix<scalar_t>& A,
+                     structured::StructuredMatrix<scalar_t>* H) {
+  // Preconditioned solves only work for a single right-hand side
+  int nrhs = 1, n = A.rows();
+  DenseMatrix<scalar_t> B(n, nrhs), X(n, nrhs);
+  X.random();
+  DenseMatrix<scalar_t> Xexact(X);
+  // B = A*X
+  gemm(Trans::N, Trans::N, scalar_t(1.), A, X, scalar_t(0.), B);
+
+  // factor the structured matrix, so it can be used as a preconditioner
+  // H->factor();  // was already called
+
+  int iterations = 0, maxit = 50, restart = 50;
+  iterative::GMRes<scalar_t>
+    ([&A](const scalar_t* v, scalar_t* w) {
+       // matrix-vector product with exact matrix
+       gemv(Trans::N, scalar_t(1.), A, v, 1, scalar_t(0.), w, 1);
+     },
+      [&H, &n](scalar_t* v) { // preconditioner
+        // preconditioning with structured matrix
+        DenseMatrixWrapper<scalar_t> V(n, 1, v, n);
+        H->solve(V);
+      },
+      n, X.data(), B.data(),
+      1e-10, 1e-14, // rtol, atol
+      iterations, maxit,
+      restart, GramSchmidtType::CLASSICAL,
+      false, true);  // initial guess, verbose
+
+  cout << "  - ||X-A\\(A*X)||_F/||X||_F = "
+       << X.sub(Xexact).normF() / Xexact.normF() << endl;
+
+
+  iterative::BiCGStab<scalar_t>
+    ([&A](const scalar_t* v, scalar_t* w) {
+       // matrix-vector product with exact matrix
+       gemv(Trans::N, scalar_t(1.), A, v, 1, scalar_t(0.), w, 1);
+     },
+      [&H, &n](scalar_t* v) {
+        // preconditioning with structured matrix
+        DenseMatrixWrapper<scalar_t> V(n, 1, v, n);
+        H->solve(V);
+      },
+      n, X.data(), B.data(),
+      1e-10, 1e-14, // rtol, atol
+      iterations, maxit,
+      false, true);  // initial guess, verbose
+
+  cout << "  - ||X-A\\(A*X)||_F/||X||_F = "
+       << X.sub(Xexact).normF() / Xexact.normF() << endl;
+}
+
+
 
 
 int main(int argc, char* argv[]) {
@@ -136,18 +200,19 @@ int main(int argc, char* argv[]) {
         auto H = structured::construct_from_dense(A, options);
         print_info(H.get(), options);
         check_accuracy(A, H.get());
-        factor_and_solve(nrhs, H.get());
+        factor_and_solve(nrhs, A, H.get());
+        preconditioned_solve(A, H.get());
       }
       {
         // user can define the ClusterTree
         auto H = structured::construct_from_dense(A, options, &tree);
         print_info(H.get(), options);
         check_accuracy(A, H.get());
-        factor_and_solve(nrhs, H.get());
+        factor_and_solve(nrhs, A, H.get());
+        preconditioned_solve(A, H.get());
       }
     } catch (std::exception& e) {
-      cout << get_name(type) << " failed: "
-           << e.what() << endl;
+      cout << get_name(type) << " failed: " << e.what() << endl;
     }
   }
 
@@ -165,7 +230,8 @@ int main(int argc, char* argv[]) {
           (n, n, Toeplitz, options);
         print_info(H.get(), options);
         check_accuracy(A, H.get());
-        factor_and_solve(nrhs, H.get());
+        factor_and_solve(nrhs, A, H.get());
+        preconditioned_solve(A, H.get());
       }
       {
         // constrcut from sub-blocks (could have better performance)
@@ -173,11 +239,11 @@ int main(int argc, char* argv[]) {
           (n, n, Toeplitz_block, options);
         print_info(H.get(), options);
         check_accuracy(A, H.get());
-        factor_and_solve(nrhs, H.get());
+        factor_and_solve(nrhs, A, H.get());
+        preconditioned_solve(A, H.get());
       }
     } catch (std::exception& e) {
-      cout << get_name(type) << " failed: "
-           << e.what() << endl;
+      cout << get_name(type) << " failed: " << e.what() << endl;
     }
   }
 
@@ -194,11 +260,11 @@ int main(int argc, char* argv[]) {
         (n, n, Amult, Toeplitz, options);
       print_info(H.get(), options);
       check_accuracy(A, H.get());
-      factor_and_solve(nrhs, H.get());
+      factor_and_solve(nrhs, A, H.get());
+      preconditioned_solve(A, H.get());
 
     } catch (std::exception& e) {
-      cout << get_name(type) << " failed: "
-           << e.what() << endl;
+      cout << get_name(type) << " failed: " << e.what() << endl;
     }
   }
 

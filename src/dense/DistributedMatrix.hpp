@@ -195,6 +195,9 @@ namespace strumpack {
     virtual void hconcat(const DistributedMatrix<scalar_t>& b);
     DistributedMatrix<scalar_t> transpose() const;
 
+    void mult(Trans op, const DistributedMatrix<scalar_t>& X,
+              DistributedMatrix<scalar_t>& Y) const;
+
     void laswp(const std::vector<int>& P, bool fwd);
 
     DistributedMatrix<scalar_t>

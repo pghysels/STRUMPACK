@@ -117,6 +117,48 @@ namespace strumpack {
             DenseMatrix<scalar_t>& S)>;
 
     /**
+     * Type for matrix multiplication routine with 2D block cyclic
+     * distribution. This can be implemented as a lambda function, a
+     * functor or a funtion pointer.
+     *
+     * \param op whether to compute the transposed/conjugate product
+     * \param R random matrix passed to user code
+     * \param S sample matrix to be computed by user code: \n
+     *            S = A*R if op is Trans::N \n
+     *            S = A*T*R if op is Trans::T \n
+     *            S = A^C*R if op is Trans::C
+     */
+    template<typename scalar_t>
+    using mult_2d_t = std::function
+      <void(Trans op,
+            const DistributedMatrix<scalar_t>& R,
+            DistributedMatrix<scalar_t>& S)>;
+
+    /**
+     * Type for matrix multiplication routine with 1D block row
+     * distribution. The matrix is assumed to be distributed according
+     * to the dist vector, i.e., processor p owns rows
+     * [dist[p],dist[p+1]). Hence, processor p only computes rows
+     * [dist[p],dist[p+1]) of matrix S. This can be implemented as a
+     * lambda function, a functor or a funtion pointer.
+     *
+     * \param op whether to compute the transposed/conjugate product
+     * \param R random matrix passed to user code
+     * \param S sample matrix to be computed by user code: \n
+     *            S = A*R if op is Trans::N \n
+     *            S = A*T*R if op is Trans::T \n
+     *            S = A^C*R if op is Trans::C
+     * \param dist 1d block row distribution. This vector is the same
+     * on all ranks.
+     */
+    template<typename scalar_t>
+    using mult_1d_t = std::function
+      <void(Trans op,
+            const DenseMatrix<scalar_t>& R,
+            DenseMatrix<scalar_t>& S,
+            const std::vector<int>& dist)>;
+
+    /**
      * Type to specify admissibility of individual sub-blocks.
      */
     using admissibility_t = DenseMatrix<bool>;
@@ -425,6 +467,30 @@ namespace strumpack {
                             int rows, int cols,
                             const extract_dist_block_t<scalar_t>& A,
                             const StructuredOptions<scalar_t>& opts);
+
+    /**
+     * Construct a StructuredMatrix using only a matrix-vector
+     * multiplication routine.
+     *
+     * TODO desribe parameters
+     */
+    template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
+    construct_matrix_free(const MPIComm& comm, const BLACSGrid* g,
+                          int rows, int cols,
+                          const mult_2d_t<scalar_t>& Amult,
+                          const StructuredOptions<scalar_t>& opts);
+
+    /**
+     * Construct a StructuredMatrix using only a matrix-vector
+     * multiplication routine.
+     *
+     * TODO desribe parameters
+     */
+    template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
+    construct_matrix_free(const MPIComm& comm, int rows, int cols,
+                          const mult_1d_t<scalar_t>& Amult,
+                          const StructuredOptions<scalar_t>& opts);
+
 #endif
 
   } // end namespace structured

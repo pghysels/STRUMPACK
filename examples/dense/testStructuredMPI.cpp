@@ -72,6 +72,7 @@ factor_and_solve(const MPIComm& comm, const BLACSGrid* g, int nrhs,
 }
 
 
+
 int main(int argc, char* argv[]) {
   int thread_level;
   MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &thread_level);
@@ -107,13 +108,39 @@ int main(int argc, char* argv[]) {
             B(i, j) = Toeplitz(I[i], J[j]);
       };
 
-    // Matrix-vector multiplication routine. Ideally, user can provide a
-    // faster implementation.
-    // auto Amult =
-    //   [&A](Trans t, const DenseMatrix<double>& R,
-    //        DenseMatrix<double>& S) {
-    //     gemm(t, Trans::N, double(1.), A, R, double(0.), S);
-    //   };
+    // create 2d block cyclicly distributed matrix, and initialize it as
+    // a Toeplitz matrix
+    DistributedMatrix<double> A2d(&grid, n, n, Toeplitz);
+
+    // Matrix-vector multiplication routine, using 2d block cyclic
+    // distribution. Ideally, user can provide a faster
+    // implementation.
+    auto Tmult2d =
+      [&A2d](Trans t,
+             const DistributedMatrix<double>& R,
+             DistributedMatrix<double>& S) {
+        // simply call PxGEMM using A2d
+        // gemm(t, Trans::N, double(1.), A2d, R, double(0.), S);
+        A2d.mult(t, R, S); // same as gemm above
+      };
+
+    // Matrix-vector multiplication routine using 1d block row
+    // distribution. Ideally, user can provide a faster
+    // implementation. The block row distribution is given by the dist
+    // vector, with processor p owning rows
+    // [rdist[p],rdist[p+1]). cdist is only needed for non-square
+    // matrices. S is distributed according to rdist if t==Trans::N,
+    // else cdist. R is distributed according to cdist of t==Trans::N,
+    // else rdist.
+    auto Tmult1d =
+      [&n, &Toeplitz, &world](Trans t,
+                              const DenseMatrix<double>& R,
+                              DenseMatrix<double>& S,
+                              const std::vector<int>& rdist,
+                              const std::vector<int>& cdist) {
+        // TODO needs communication, not a trivial implementation
+      };
+
 
 
     std::vector<structured::Type> types =
@@ -122,14 +149,9 @@ int main(int argc, char* argv[]) {
        structured::Type::HODLR,
        structured::Type::HODBF,
        structured::Type::BUTTERFLY,
-       structured::Type::LR,
-       structured::Type::LOSSY,
-       structured::Type::LOSSLESS};
-
-
-    // create 2d block cyclicly distributed matrix, and initialize it as
-    // a Toeplitz matrix
-    DistributedMatrix<double> A2d(&grid, n, n, Toeplitz);
+       structured::Type::LR};
+    // structured::Type::LOSSY,
+    // structured::Type::LOSSLESS};
 
     if (world.is_root())
       cout << endl << endl
@@ -151,7 +173,7 @@ int main(int argc, char* argv[]) {
         factor_and_solve(world, &grid, nrhs, H.get());
       } catch (std::exception& e) {
         if (world.is_root())
-          cout << get_name(type) << " compression failed: "
+          cout << get_name(type) << " failed: "
                << e.what() << endl;
       }
     }
@@ -171,7 +193,36 @@ int main(int argc, char* argv[]) {
         factor_and_solve(world, &grid, nrhs, H.get());
       } catch (std::exception& e) {
         if (world.is_root())
-          cout << get_name(type) << " compression failed: "
+          cout << get_name(type) << " failed: "
+               << e.what() << endl;
+      }
+    }
+
+    if (world.is_root())
+      cout << endl << endl
+           << "========================================" << endl
+           << " Compression from matrix-vector product" << endl
+           << "========================================" << endl;
+    for (auto type : types) {
+      options.set_type(type);
+      try {
+        { // 2d block cyclic matrix product
+          auto H = structured::construct_matrix_free<double>
+            (world, &grid, n, n, Tmult2d, options);
+          print_info(world, H.get(), options);
+          check_accuracy(A2d, H.get());
+          factor_and_solve(world, &grid, nrhs, H.get());
+        }
+        { // 1d block row distribution for the product
+          auto H = structured::construct_matrix_free<double>
+            (world, n, n, Tmult1d, options);
+          print_info(world, H.get(), options);
+          check_accuracy(A2d, H.get());
+          factor_and_solve(world, &grid, nrhs, H.get());
+        }
+      } catch (std::exception& e) {
+        if (world.is_root())
+          cout << get_name(type) << " failed: "
                << e.what() << endl;
       }
     }
