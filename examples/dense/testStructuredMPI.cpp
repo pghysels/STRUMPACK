@@ -213,13 +213,13 @@ int main(int argc, char* argv[]) {
           check_accuracy(A2d, H.get());
           factor_and_solve(world, &grid, nrhs, H.get());
         }
-        { // 1d block row distribution for the product
-          auto H = structured::construct_matrix_free<double>
-            (world, n, n, Tmult1d, options);
-          print_info(world, H.get(), options);
-          check_accuracy(A2d, H.get());
-          factor_and_solve(world, &grid, nrhs, H.get());
-        }
+        // { // 1d block row distribution for the product
+        //   auto H = structured::construct_matrix_free<double>
+        //     (world, n, n, Tmult1d, options);
+        //   print_info(world, H.get(), options);
+        //   check_accuracy(A2d, H.get());
+        //   factor_and_solve(world, &grid, nrhs, H.get());
+        // }
       } catch (std::exception& e) {
         if (world.is_root())
           cout << get_name(type) << " failed: "

@@ -33,10 +33,13 @@
 
 #include "StructuredMatrix.hpp"
 #include "HSS/HSSMatrix.hpp"
-#include "HODLR/HODLRMatrix.hpp"
-#include "HODLR/ButterflyMatrix.hpp"
 #include "sparse/fronts/FrontalMatrixLossy.hpp"
 #include "sparse/fronts/ExtendAdd.hpp"
+#if defined(STRUMPACK_USE_BPACK)
+#include "HODLR/HODLRMatrix.hpp"
+#include "HODLR/ButterflyMatrix.hpp"
+#endif
+
 
 namespace strumpack {
   namespace structured {
@@ -78,7 +81,7 @@ namespace strumpack {
         return std::unique_ptr<StructuredMatrix<scalar_t>>
           (new LossyMatrix<scalar_t>(A, 16 /* TODO */));
 #else
-        throw std::exception
+        throw std::
           ("Lossy compression requires ZFP to be enabled.");
 #endif
       } break;
@@ -87,7 +90,7 @@ namespace strumpack {
         return std::unique_ptr<StructuredMatrix<scalar_t>>
           (new LossyMatrix<scalar_t>(A, 0));
 #else
-        throw std::exception
+        throw std::invalid_argument
           ("Lossless compression requires ZFP to be enabled.");
 #endif
       } break;
@@ -450,6 +453,7 @@ namespace strumpack {
       case Type::BLR:
         throw std::invalid_argument("Not implemented yet.");
       case Type::HODLR: {
+#if defined(STRUMPACK_USE_BPACK)
         if (A.rows() != A.cols())
           throw std::invalid_argument
             ("HODLR compression only supported for square matrices.");
@@ -460,8 +464,13 @@ namespace strumpack {
           (A.Comm(), t, hodlr_opts);
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+#else
+        throw std::invalid_argument
+          ("HODLR compression requires ButterflyPACK to be enabled.");
+#endif
       } break;
       case Type::HODBF: {
+#if defined(STRUMPACK_USE_BPACK)
         if (A.rows() != A.cols())
           throw std::invalid_argument
             ("HODBF compression only supported for square matrices.");
@@ -474,8 +483,13 @@ namespace strumpack {
           (A.Comm(), t, hodbf_opts);
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+#else
+        throw std::invalid_argument
+          ("HODBF compression requires ButterflyPACK to be enabled.");
+#endif
       } break;
       case Type::BUTTERFLY: {
+#if defined(STRUMPACK_USE_BPACK)
         structured::ClusterTree tr(A.rows()), tc(A.cols());
         tr.refine(opts.leaf_size());
         tc.refine(opts.leaf_size());
@@ -486,8 +500,13 @@ namespace strumpack {
           (A.Comm(), tr, tc, hodbf_opts);
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+#else
+        throw std::invalid_argument
+          ("BUTTERFLY compression requires ButterflyPACK to be enabled.");
+#endif
       } break;
       case Type::LR: {
+#if defined(STRUMPACK_USE_BPACK)
         structured::ClusterTree tr(A.rows()), tc(A.cols());
         HODLR::HODLROptions<scalar_t> lr_opts(opts);
         lr_opts.set_butterfly_levels(0);
@@ -496,6 +515,10 @@ namespace strumpack {
           (A.Comm(), tr, tc, lr_opts);
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+#else
+        throw std::invalid_argument
+          ("LR compression requires ButterflyPACK to be enabled.");
+#endif
       }
       case Type::LOSSY:
         throw std::invalid_argument("Not implemented yet.");
@@ -530,32 +553,37 @@ namespace strumpack {
       case Type::BLR:
         throw std::invalid_argument("Not implemented yet.");
       case Type::HODLR: {
+#if defined(STRUMPACK_USE_BPACK)
         if (rows != cols)
           throw std::invalid_argument
             ("HODLR compression only supported for square matrices.");
-        auto Ablocks =
-          [&A](const std::vector<std::vector<std::size_t>>& I,
-               const std::vector<std::vector<std::size_t>>& J,
-               std::vector<DistributedMatrixWrapper<scalar_t>>& B,
-               HODLR::ExtractionMeta&) {
-            for (std::size_t i=0; i<I.size(); i++)
-              A(I[i], J[i], B[i]);
-          };
-        structured::ClusterTree t(rows);
-        t.refine(opts.leaf_size());
-        HODLR::HODLROptions<scalar_t> hodlr_opts(opts);
-        hodlr_opts.set_BF_entry_n15(true);
-        auto H = new HODLR::HODLRMatrix<scalar_t>
-          (comm, t, hodlr_opts);
-        H->compress(Ablocks);
-        return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+        throw std::invalid_argument("Not implemented yet.");
+#else
+        throw std::invalid_argument
+          ("HODLR compression requires ButterflyPACK to be enabled.");
+#endif
       } break;
       case Type::HODBF:
+#if defined(STRUMPACK_USE_BPACK)
         throw std::invalid_argument("Not implemented yet.");
+#else
+        throw std::invalid_argument
+          ("HODBF compression requires ButterflyPACK to be enabled.");
+#endif
       case Type::BUTTERFLY:
+#if defined(STRUMPACK_USE_BPACK)
         throw std::invalid_argument("Not implemented yet.");
+#else
+        throw std::invalid_argument
+          ("BUTTERFLY compression requires ButterflyPACK to be enabled.");
+#endif
       case Type::LR:
+#if defined(STRUMPACK_USE_BPACK)
         throw std::invalid_argument("Not implemented yet.");
+#else
+        throw std::invalid_argument
+          ("LR compression requires ButterflyPACK to be enabled.");
+#endif
       case Type::LOSSY:
         throw std::invalid_argument
           ("Type LOSSY does not support compression from elements.");
@@ -589,6 +617,7 @@ namespace strumpack {
     construct_from_elements(const MPIComm& comm, int rows, int cols,
                             const extract_t<scalar_t>& A,
                             const StructuredOptions<scalar_t>& opts) {
+#if defined(STRUMPACK_USE_BPACK)
       auto Ablocks =
         [&A](const std::vector<std::vector<std::size_t>>& I,
              const std::vector<std::vector<std::size_t>>& J,
@@ -601,12 +630,14 @@ namespace strumpack {
             B[i].fill(Afill);
           }
         };
+#endif
       switch (opts.type()) {
       case Type::HSS:
         throw std::invalid_argument("Not implemented yet.");
       case Type::BLR:
         throw std::invalid_argument("Not implemented yet.");
       case Type::HODLR: {
+#if defined(STRUMPACK_USE_BPACK)
         if (rows != cols)
           throw std::invalid_argument
             ("HODLR compression only supported for square matrices.");
@@ -617,8 +648,13 @@ namespace strumpack {
         auto H = new HODLR::HODLRMatrix<scalar_t>(comm, t, hodlr_opts);
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+#else
+        throw std::invalid_argument
+          ("HODLR compression requires ButterflyPACK to be enabled.");
+#endif
       } break;
       case Type::HODBF: {
+#if defined(STRUMPACK_USE_BPACK)
         if (rows != cols)
           throw std::invalid_argument
             ("HODBF compression only supported for square matrices.");
@@ -630,8 +666,13 @@ namespace strumpack {
         auto H = new HODLR::HODLRMatrix<scalar_t>(comm, t, hodbf_opts);
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+#else
+        throw std::invalid_argument
+          ("HODBF compression requires ButterflyPACK to be enabled.");
+#endif
       } break;
       case Type::BUTTERFLY: {
+#if defined(STRUMPACK_USE_BPACK)
         structured::ClusterTree tr(rows), tc(cols);
         tr.refine(opts.leaf_size());
         tc.refine(opts.leaf_size());
@@ -642,14 +683,23 @@ namespace strumpack {
           (comm, tr, tc, hodbf_opts);
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+#else
+        throw std::invalid_argument
+          ("BUTTERFLY compression requires ButterflyPACK to be enabled.");
+#endif
       } break;
       case Type::LR: {
+#if defined(STRUMPACK_USE_BPACK)
         structured::ClusterTree tr(rows), tc(cols);
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
         auto H = new HODLR::ButterflyMatrix<scalar_t>
           (comm, tr, tc, hodbf_opts);
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+#else
+        throw std::invalid_argument
+          ("LR compression requires ButterflyPACK to be enabled.");
+#endif
       } break;
       case Type::LOSSY:
         throw std::invalid_argument
@@ -694,6 +744,7 @@ namespace strumpack {
         throw std::invalid_argument
           ("Type BLR does not support matrix-free compression.");
       case Type::HODLR: {
+#if defined(STRUMPACK_USE_BPACK)
         if (rows != cols)
           throw std::invalid_argument
             ("HODLR compression only supported for square matrices.");
@@ -714,8 +765,13 @@ namespace strumpack {
                      };
         H->compress(Tmult);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+#else
+        throw std::invalid_argument
+          ("HODLR compression requires ButterflyPACK to be enabled.");
+#endif
       } break;
       case Type::HODBF: {
+#if defined(STRUMPACK_USE_BPACK)
         if (rows != cols)
           throw std::invalid_argument
             ("HODBF compression only supported for square matrices.");
@@ -737,8 +793,13 @@ namespace strumpack {
                      };
         H->compress(Tmult);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+#else
+        throw std::invalid_argument
+          ("HODBF compression requires ButterflyPACK to be enabled.");
+#endif
       } break;
       case Type::BUTTERFLY: {
+#if defined(STRUMPACK_USE_BPACK)
         structured::ClusterTree tr(rows), tc(cols);
         tr.refine(opts.leaf_size());
         tc.refine(opts.leaf_size());
@@ -762,8 +823,13 @@ namespace strumpack {
                      };
         H->compress(Tmult);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+#else
+        throw std::invalid_argument
+          ("BUTTERFLY compression requires ButterflyPACK to be enabled.");
+#endif
       } break;
       case Type::LR: {
+#if defined(STRUMPACK_USE_BPACK)
         structured::ClusterTree tr(rows), tc(cols);
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
         auto H = new HODLR::ButterflyMatrix<scalar_t>
@@ -784,6 +850,10 @@ namespace strumpack {
                      };
         H->compress(Tmult);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+#else
+        throw std::invalid_argument
+          ("LR compression requires ButterflyPACK to be enabled.");
+#endif
       } break;
       case Type::LOSSY:
         throw std::invalid_argument
