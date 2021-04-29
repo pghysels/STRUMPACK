@@ -119,7 +119,7 @@ namespace strumpack {
 
       std::vector<int> factor(const Opts_t& opts);
       std::vector<int> factor(const adm_t& adm, const Opts_t& opts);
-      std::vector<int> factor_colwise(const adm_t& adm, const Opts_t& opts);
+      std::vector<int> factor_colwise(const SpMat_t& A, const adm_t& adm, const Opts_t& opts);
 
       void laswp(const std::vector<int>& piv, bool fwd);
 

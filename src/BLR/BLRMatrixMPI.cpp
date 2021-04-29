@@ -2489,52 +2489,104 @@ namespace strumpack {
 
 
     template<typename scalar_t> std::vector<int>
-    BLRMatrixMPI<scalar_t>::factor_colwise(const adm_t& adm, const Opts_t& opts){
-      std::vector<int> piv, piv_tile;
+    BLRMatrixMPI<scalar_t>::factor_colwise(const adm_t& adm, const Opts_t& opts, const SpMat_t& A){
+      std::vector<int> piv;
+      std::vector<std::vector<int> > piv_tile_global;
+      std::vector<int> piv_tile;
       if (!grid()->active()) return piv;
       DenseTile<scalar_t> Tcc;
+      std::vector<DenseTile<scalar_t> > Tcc_vec; //change Tcc to Tcc_vec when needed
       auto CP = grid()->npcols();
-      //construct the first CP block-columns as dense tiles
-      build_front_cols(CP);
-      extend_add_cols(CP);
       for (std::size_t i=0; i<colblocks(); i+=CP) {
+        std::vector<DenseTile<scalar_t> > Tkc, Tcj;
+        //construct the (i/CP+1) CP block-columns as dense tiles
+        FrontalMatrixBLRMPI<scalar_t,integer_t>::build_front_cols(A, CP, i);
+        FrontalMatrixBLRMPI<scalar_t,integer_t>::extend_add_cols(CP, i);
+        if (i > 0) {
+          for (std::size_t k=0; k<i; k++){
+            Tkc.push_back(bcast_col_of_tiles_along_rows(k+1, rowblocks(), k));
+          }
+          for (std::size_t k=0; k<std::min(i+CP, NB); k++) {
+            if (grid()->is_local_row(k)) {
+              for (std::size_t j=i; j<std::min(i+CP, NB); j++) {
+                if (grid()->is_local_col(j)) {
+	                if (k != 0) {
+                    for (std::size_t lk=0, lk<k; lk++) {
+                      if (k-lk <= grid()->nprows()) 
+                        std::size_t lj = 0;
+                      else if ((k-lk) % grid()->nprows() == 0)
+                        std::size_t lj = std::floor((k-lk-1)/grid()->nprows());
+                      else 
+                        std::size_t lj = std::floor((k-lk)/grid()->nprows());
+                      gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc[lk][lj]),
+                          *(Tcj[lk][0]), scalar_t(1.), tile_dense(k, j).D());
+                    }
+                  }
+                  if (adm(k, j)) compress_tile(k, j, opts);
+                  tile(k, j).laswp(piv_tile, true);
+                  trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                          scalar_t(1.), Tcc_vec[k], tile(k, j));
+                }
+              }
+              Tcj.push_back(bcast_row_of_tiles_along_cols(k, i, std::min(i+CP, NB)));
+            }
+          }
+          for (std::size_t r=i; r<rowblocks(); r++) {
+            if (grid()->is_local_row(r)) {
+              for (std::size_t c=i; c<std::min(i+CP, colblocks()); c++) {
+                if (grid()->is_local_col(c)) {
+	                for (std::size_t j=0; j<i; j++) {
+                    if (r-j <= grid()->nprows()) 
+                      std::size_t lj = 0;
+                    else if ((r-j) % grid()->nprows() == 0)
+                      std::size_t lj = std::floor((r-j-1)/grid()->nprows());
+                    else 
+                      std::size_t lj = std::floor((r-j)/grid()->nprows());
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc[j][lj]),
+                          *(Tcj[j][0]), scalar_t(1.), tile_dense(r, c).D());
+                  }
+                }
+              }
+            }
+          }
+        }
         for (std::size_t c=i; c<std::min(i+CP,colblocks()); c++) {
           // LU factorization of diagonal tile
-          if (grid()->is_local_col(c) && grid()->is_local_row(c)){
-            piv_tile = tile(c, c).LU();
-          else piv_tile.resize(tilerows(c));
-          if (grid()->is_local_row(c)
+          if (grid()->is_local_row(c)) {
+            if (grid()->is_local_col(c))
+              piv_tile=tile(c, c).LU();
+            else piv_tile.resize(tilerows(c));
             grid()->row_comm().broadcast_from(piv_tile, c % CP);
+            piv_tile_global.push_back(piv_tile);
             int r0 = tileroff(c);
             std::transform
               (piv_tile.begin(), piv_tile.end(), std::back_inserter(piv),
               [r0](int p) -> int { return p + r0; });
-            Tcc = bcast_dense_tile_along_row(c, c); //??
+            Tcc = bcast_dense_tile_along_row(c, c);
+            Tcc_vec.push_back(Tcc);
           }
-          if (grid()->is_local_col(c)){
-            Tcc = bcast_dense_tile_along_col(c, c); //??
-          }
-
+          if (grid()->is_local_col(c))
+            Tcc = bcast_dense_tile_along_col(c, c);
           if (grid()->is_local_row(c)) {
-            for (std::size_t j=c+1; j<min(i+CP,colblocks()); j++) {
+            for (std::size_t j=c+1; j<std::min(i+CP,colblocks()); j++) {
               if (grid()->is_local_col(j)) {
-                if (adm(i, j)) compress_tile(i, j, opts);
+                if (adm(c, j)) compress_tile(c, j, opts);
               }
             }
           }
           if (grid()->is_local_col(c)) {
             for (std::size_t j=c+1; j<rowblocks(); j++) {
               if (grid()->is_local_row(j)) {
-                if (adm(j, i)) compress_tile(j, i, opts);
+                if (adm(j, c)) compress_tile(j, c, opts);
               }
             }
           }
           if (grid()->is_local_row(c)) {
-            for (std::size_t j=c+1; j<min(i+CP,colblocks()); j++) {
+            for (std::size_t j=c+1; j<std::min(i+CP,colblocks()); j++) {
               if (grid()->is_local_col(j)) {
                 tile(c, j).laswp(piv_tile, true);
                 trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-                       scalar_t(1.), Tii, tile(c, j));
+                       scalar_t(1.), Tcc, tile(c, j));
               }
             }
           }
@@ -2546,8 +2598,27 @@ namespace strumpack {
               }
             }
           }
+          if (c != i+CP-1) {
+            auto Tcj = bcast_row_of_tiles_along_cols(c, c+1, std::min(i+CP,colblocks()));
+            auto Tkc = bcast_col_of_tiles_along_rows(c+1, rowblocks(), c);
+          }
+          // GEMM (or recompress)
+          for (std::size_t j=c+1, lj=0; j<std::min(i+CP,colblocks()); j++) {
+            if (grid()->is_local_col(j)) {
+              for (std::size_t k=c+1, lk=0; k<rowblocks(); k++) {
+                if (grid()->is_local_row(k)) {
+                  //if ((i == c+1) || (j == c+1)) {
+                  gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc[lk]),
+                      *(Tcj[lj]), scalar_t(1.), tile_dense(k, j).D());
+                  lk++;
+                }
+              }
+              lj++;
+            }
+          }
         }
       }
+      return piv;
     }
 
     template<typename scalar_t> std::vector<int>

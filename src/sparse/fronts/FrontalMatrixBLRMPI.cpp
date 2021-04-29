@@ -75,6 +75,29 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
+  FrontalMatrixBLRMPI<scalar_t,integer_t>::extend_add_cols(int CP, std::size_t i) {
+    if (!lchild_ && !rchild_) return;
+    std::vector<std::vector<scalar_t>> sbuf(this->P());
+    for (auto& ch : {lchild_.get(), rchild_.get()}) {
+      if (ch && Comm().is_root()) {
+        STRUMPACK_FLOPS
+          (static_cast<long long int>(ch->dim_upd())*ch->dim_upd());
+      }
+      if (!visit(ch)) continue;
+      ch->extadd_blr_copy_to_buffers_col(sbuf, this);//
+    }
+    std::vector<scalar_t,NoInit<scalar_t>> rbuf;
+    std::vector<scalar_t*> pbuf;
+    Comm().all_to_all_v(sbuf, rbuf, pbuf);
+    for (auto& ch : {lchild_.get(), rchild_.get()}) {
+      if (!ch) continue;
+      ch->extadd_blr_copy_from_buffers_col
+        (F11blr_, F12blr_, F21blr_, F22blr_,
+         pbuf.data()+this->master(ch), this);//
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLRMPI<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
     DistM_t F22(grid(), dim_upd(), dim_upd());
@@ -141,6 +164,48 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
+  FrontalMatrixBLRMPI<scalar_t,integer_t>::build_front_cols
+  (const SpMat_t& A, int CP, std::size_t i) {
+    //const auto dupd = dim_upd();
+    const auto dsep = dim_sep();
+    if (dsep) {
+      F11blr_ = BLRMPI_t(pgrid_, sep_tiles_, sep_tiles_);
+      F11blr_.fill(0.);
+      /*if (dim_upd()) {
+        F12blr_ = BLRMPI_t(pgrid_, sep_tiles_, upd_tiles_);
+        F21blr_ = BLRMPI_t(pgrid_, upd_tiles_, sep_tiles_);
+        F12blr_.fill(0.);
+        F21blr_.fill(0.);
+      }*/
+    }
+    /*if (dupd) {
+      F22blr_ = BLRMPI_t(pgrid_, upd_tiles_, upd_tiles_);
+      F22blr_.fill(0.);
+    }*/
+    using Trip_t = Triplet<scalar_t>;
+    std::vector<Trip_t> e11, e12, e21;
+    A.push_front_elements(sep_begin_, sep_end_, this->upd(), e11, e12, e21);
+    int npr = grid2d().nprows();
+    // TODO combine these 3 all_to_all calls?
+    {
+      std::vector<std::vector<Trip_t>> sbuf(this->P());
+      for (auto& e : e11) sbuf[sep_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
+      auto rbuf = Comm().all_to_all_v(sbuf);
+      for (auto& e : rbuf) F11blr_.global(e.r, e.c) = e.v;
+    } {
+      std::vector<std::vector<Trip_t>> sbuf(this->P());
+      for (auto& e : e12) sbuf[sep_rg2p(e.r)+upd_cg2p(e.c)*npr].push_back(e);
+      auto rbuf = Comm().all_to_all_v(sbuf);
+      for (auto& e : rbuf) F12blr_.global(e.r, e.c) = e.v;
+    } {
+      std::vector<std::vector<Trip_t>> sbuf(this->P());
+      for (auto& e : e21) sbuf[upd_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
+      auto rbuf = Comm().all_to_all_v(sbuf);
+      for (auto& e : rbuf) F21blr_.global(e.r, e.c) = e.v;
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLRMPI<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
     if (visit(lchild_))
@@ -163,15 +228,15 @@ namespace strumpack {
       else piv_ = F11blr_.factor(adm_, opts.BLR_options());
       // TODO flops?
     }
-#else // factor column-wise for memory reduction
+#else // factor column-block-wise for memory reduction
     if (dim_sep() && grid2d().active()) {
       if (dim_upd()) {
         //FActor F11
         //lswp, apply pivots to F12
         //trsm F11, F12
         //TRSM F11, F21
-        //Update: Gemm F22= F22 - F21 *F12 with LuAR
-      } else piv_ = factor_colwise(adm_, opts.BLR_options());
+        //Gemm F22= F22 - F21 *F12 with LuAR
+      } else piv_ = factor_colwise(adm_, opts.BLR_options(), A);
     }
 #endif
     if (/*etree_level == 0 && */opts.print_root_front_stats()) {
