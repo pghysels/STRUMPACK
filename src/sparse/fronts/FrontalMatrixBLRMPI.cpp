@@ -84,14 +84,14 @@ namespace strumpack {
           (static_cast<long long int>(ch->dim_upd())*ch->dim_upd());
       }
       if (!visit(ch)) continue;
-      ch->extadd_blr_copy_to_buffers_col(sbuf, this);//
+      ch->extadd_blr_copy_to_buffers(sbuf, this); //_col
     }
     std::vector<scalar_t,NoInit<scalar_t>> rbuf;
     std::vector<scalar_t*> pbuf;
     Comm().all_to_all_v(sbuf, rbuf, pbuf);
     for (auto& ch : {lchild_.get(), rchild_.get()}) {
       if (!ch) continue;
-      ch->extadd_blr_copy_from_buffers_col
+      ch->extadd_blr_copy_from_buffers //_col
         (F11blr_, F12blr_, F21blr_, F22blr_,
          pbuf.data()+this->master(ch), this);//
     }
@@ -112,6 +112,13 @@ namespace strumpack {
     BLR::BLRExtendAdd<scalar_t,integer_t>::copy_to_buffers
       (F22blr_, sbuf, pa, this->upd_to_parent(pa));
   }
+
+  /*template<typename scalar_t,typename integer_t> void
+  FrontalMatrixBLRMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
+  (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa) const {
+    BLR::BLRExtendAdd<scalar_t,integer_t>::copy_to_buffers_col
+      (F22blr_, sbuf, pa, this->upd_to_parent(pa));
+  }*/
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLRMPI<scalar_t,integer_t>::extadd_blr_copy_from_buffers

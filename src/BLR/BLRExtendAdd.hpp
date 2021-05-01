@@ -57,6 +57,8 @@ namespace strumpack {
       (const DistM_t& CB, VVS_t& sbuf, const FBLRMPI_t* pa, const VI_t& I);
       static void copy_to_buffers
       (const BLRMPI_t& CB, VVS_t& sbuf, const FBLRMPI_t* pa, const VI_t& I);
+      //static void copy_to_buffers_col
+      //(const BLRMPI_t& CB, VVS_t& sbuf, const FBLRMPI_t* pa, const VI_t& I);
 
       static void copy_from_buffers
       (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,

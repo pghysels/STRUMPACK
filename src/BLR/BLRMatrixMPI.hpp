@@ -40,6 +40,7 @@ namespace strumpack {
 
   // forward declaration
   template<typename scalar_t,typename integer_t> class ExtendAdd;
+  template<typename scalar_t,typename integer_t> class FrontalMatrixBLRMPI;
 
   namespace BLR {
 
@@ -119,7 +120,7 @@ namespace strumpack {
 
       std::vector<int> factor(const Opts_t& opts);
       std::vector<int> factor(const adm_t& adm, const Opts_t& opts);
-      std::vector<int> factor_colwise(const SpMat_t& A, const adm_t& adm, const Opts_t& opts);
+      std::vector<int> factor_colwise(const adm_t& adm, const Opts_t& opts); //const SpMat_t& A, 
 
       void laswp(const std::vector<int>& piv, bool fwd);
 

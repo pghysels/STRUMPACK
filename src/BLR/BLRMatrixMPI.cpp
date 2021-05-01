@@ -2489,7 +2489,7 @@ namespace strumpack {
 
 
     template<typename scalar_t> std::vector<int>
-    BLRMatrixMPI<scalar_t>::factor_colwise(const adm_t& adm, const Opts_t& opts, const SpMat_t& A){
+    BLRMatrixMPI<scalar_t>::factor_colwise(const adm_t& adm, const Opts_t& opts){ //, const SpMat_t& A
       std::vector<int> piv;
       std::vector<std::vector<int> > piv_tile_global;
       std::vector<int> piv_tile;
@@ -2498,28 +2498,29 @@ namespace strumpack {
       std::vector<DenseTile<scalar_t> > Tcc_vec; //change Tcc to Tcc_vec when needed
       auto CP = grid()->npcols();
       for (std::size_t i=0; i<colblocks(); i+=CP) {
-        std::vector<DenseTile<scalar_t> > Tkc, Tcj;
+        std::vector<std::vector<std::unique_ptr<BLRTile<scalar_t>>> > Tkc_vec, Tcj_vec;
         //construct the (i/CP+1) CP block-columns as dense tiles
-        FrontalMatrixBLRMPI<scalar_t,integer_t>::build_front_cols(A, CP, i);
-        FrontalMatrixBLRMPI<scalar_t,integer_t>::extend_add_cols(CP, i);
+        //FrontalMatrixBLRMPI<scalar_t,integer_t>::build_front_cols(A, CP, i);
+        //FrontalMatrixBLRMPI<scalar_t,integer_t>::extend_add_cols(CP, i);
         if (i > 0) {
           for (std::size_t k=0; k<i; k++){
-            Tkc.push_back(bcast_col_of_tiles_along_rows(k+1, rowblocks(), k));
+            Tkc_vec.push_back(bcast_col_of_tiles_along_rows(k+1, rowblocks(), k));
           }
-          for (std::size_t k=0; k<std::min(i+CP, NB); k++) {
+          for (std::size_t k=0; k<std::min(i, rowblocks()); k++) {
             if (grid()->is_local_row(k)) {
-              for (std::size_t j=i; j<std::min(i+CP, NB); j++) {
+              for (std::size_t j=i; j<std::min(i+CP, colblocks()); j++) {
                 if (grid()->is_local_col(j)) {
 	                if (k != 0) {
-                    for (std::size_t lk=0, lk<k; lk++) {
-                      if (k-lk <= grid()->nprows()) 
-                        std::size_t lj = 0;
+                    for (std::size_t lk=0; lk<k; lk++) {
+                      std::size_t lj;
+                      if ( static_cast<int>(k-lk) <= grid()->nprows()) 
+                        lj = 0;
                       else if ((k-lk) % grid()->nprows() == 0)
-                        std::size_t lj = std::floor((k-lk-1)/grid()->nprows());
+                        lj = std::floor((k-lk-1)/grid()->nprows());
                       else 
-                        std::size_t lj = std::floor((k-lk)/grid()->nprows());
-                      gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc[lk][lj]),
-                          *(Tcj[lk][0]), scalar_t(1.), tile_dense(k, j).D());
+                        lj = std::floor((k-lk)/grid()->nprows());
+                      gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc_vec[lk][lj]),
+                          *(Tcj_vec[lk][0]), scalar_t(1.), tile_dense(k, j).D());
                     }
                   }
                   if (adm(k, j)) compress_tile(k, j, opts);
@@ -2528,7 +2529,7 @@ namespace strumpack {
                           scalar_t(1.), Tcc_vec[k], tile(k, j));
                 }
               }
-              Tcj.push_back(bcast_row_of_tiles_along_cols(k, i, std::min(i+CP, NB)));
+              Tcj_vec.push_back(bcast_row_of_tiles_along_cols(k, i, std::min(i+CP, colblocks())));
             }
           }
           for (std::size_t r=i; r<rowblocks(); r++) {
@@ -2536,14 +2537,15 @@ namespace strumpack {
               for (std::size_t c=i; c<std::min(i+CP, colblocks()); c++) {
                 if (grid()->is_local_col(c)) {
 	                for (std::size_t j=0; j<i; j++) {
-                    if (r-j <= grid()->nprows()) 
-                      std::size_t lj = 0;
+                    std::size_t lj;
+                    if ( static_cast<int>(r-j) <= grid()->nprows()) 
+                      lj = 0;
                     else if ((r-j) % grid()->nprows() == 0)
-                      std::size_t lj = std::floor((r-j-1)/grid()->nprows());
+                      lj = std::floor((r-j-1)/grid()->nprows());
                     else 
-                      std::size_t lj = std::floor((r-j)/grid()->nprows());
-                    gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc[j][lj]),
-                          *(Tcj[j][0]), scalar_t(1.), tile_dense(r, c).D());
+                      lj = std::floor((r-j)/grid()->nprows());
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc_vec[j][lj]),
+                          *(Tcj_vec[j][0]), scalar_t(1.), tile_dense(r, c).D());
                   }
                 }
               }
@@ -2601,19 +2603,19 @@ namespace strumpack {
           if (c != i+CP-1) {
             auto Tcj = bcast_row_of_tiles_along_cols(c, c+1, std::min(i+CP,colblocks()));
             auto Tkc = bcast_col_of_tiles_along_rows(c+1, rowblocks(), c);
-          }
-          // GEMM (or recompress)
-          for (std::size_t j=c+1, lj=0; j<std::min(i+CP,colblocks()); j++) {
-            if (grid()->is_local_col(j)) {
-              for (std::size_t k=c+1, lk=0; k<rowblocks(); k++) {
-                if (grid()->is_local_row(k)) {
-                  //if ((i == c+1) || (j == c+1)) {
-                  gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc[lk]),
-                      *(Tcj[lj]), scalar_t(1.), tile_dense(k, j).D());
-                  lk++;
+            // GEMM (or recompress)
+            for (std::size_t j=c+1, lj=0; j<std::min(i+CP,colblocks()); j++) {
+              if (grid()->is_local_col(j)) {
+                for (std::size_t k=c+1, lk=0; k<rowblocks(); k++) {
+                  if (grid()->is_local_row(k)) {
+                    //if ((i == c+1) || (j == c+1)) {
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc[lk]),
+                        *(Tcj[lj]), scalar_t(1.), tile_dense(k, j).D());
+                    lk++;
+                  }
                 }
+                lj++;
               }
-              lj++;
             }
           }
         }
