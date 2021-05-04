@@ -43,9 +43,28 @@ namespace strumpack {
 
   namespace BLR {
 
+    /**
+     * \class ProcessorGrid2D
+     *
+     * \brief Representation of a 2D processor grid, similar to a
+     * BLACS grid, but not requiring ScaLAPACK.
+     */
     class ProcessorGrid2D {
     public:
+      /**
+       * Main constructor. This will construct a 2d processor grid, as
+       * square as possible.
+       *
+       * \param comm MPI communicator
+       */
       ProcessorGrid2D(const MPIComm& comm);
+      /**
+       * Some processes might not have a valid MPIComm (MPI_COMM_NULL)
+       * for this grid, but would still want to construct a conceptual
+       * 2D processor grid. This constructor allows this, by passing
+       * the number of processors in the communicator used to
+       * construct the grid.
+       */
       ProcessorGrid2D(const MPIComm& comm, int P);
 
       const MPIComm& Comm() const { return comm_; }
@@ -84,7 +103,21 @@ namespace strumpack {
     };
 
 
-    template<typename scalar_t> class BLRMatrixMPI {
+    /**
+     * \class BLRMatrixMPI
+     * \brief Distributed memory block low rank matrix
+     *
+     * This is for non-symmetric matrices, but can be used with
+     * symmetric matrices as well. This class inherits from
+     * StructuredMatrix.
+
+     * \tparam scalar_t Can be float, double, std:complex<float> or
+     * std::complex<double>.
+     *
+     * \see structured::StructuredMatrix, BLRMatrix
+     */
+    template<typename scalar_t> class BLRMatrixMPI
+      : public structured::StructuredMatrix<scalar_t> {
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using DistM_t = DistributedMatrix<scalar_t>;
@@ -99,12 +132,12 @@ namespace strumpack {
       BLRMatrixMPI(const ProcessorGrid2D& grid,
                    const vec_t& Rt, const vec_t& Ct);
 
-      std::size_t rows() const { return rows_; }
-      std::size_t cols() const { return cols_; }
+      std::size_t rows() const override { return rows_; }
+      std::size_t cols() const override { return cols_; }
 
-      std::size_t memory() const;
-      std::size_t nonzeros() const;
-      std::size_t rank() const;
+      std::size_t memory() const override;
+      std::size_t nonzeros() const override;
+      std::size_t rank() const override;
       std::size_t total_memory() const;
       std::size_t total_nonzeros() const;
       std::size_t max_rank() const;

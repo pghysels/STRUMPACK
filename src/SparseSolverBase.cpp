@@ -36,7 +36,7 @@
 #include "StrumpackOptions.hpp"
 #include "sparse/ordering/MatrixReordering.hpp"
 #include "sparse/EliminationTree.hpp"
-#include "sparse/iterative/IterativeSolvers.hpp"
+#include "iterative/IterativeSolvers.hpp"
 #if defined(STRUMPACK_USE_CUDA)
 #include "dense/CUDAWrapper.hpp"
 #else

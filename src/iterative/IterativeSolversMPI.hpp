@@ -57,11 +57,42 @@ namespace strumpack {
                     const std::function
                     <void(const scalar_t*,scalar_t*)>& spmv,
                     const std::function
-                    <void(scalar_t*)>& preconditioner,
+                    <void(scalar_t*)>& prec,
                     std::size_t n, scalar_t* x, const scalar_t* b,
                     real_t rtol, real_t atol, int& totit, int maxit,
                     int restart, GramSchmidtType GStype,
                     bool non_zero_guess, bool verbose);
+
+    template<typename scalar_t,
+             typename real_t = typename RealType<scalar_t>::value_type>
+    real_t GMResMPI(const MPIComm& comm,
+                    const std::function
+                    <void(const DenseMatrix<scalar_t>&,
+                          DenseMatrix<scalar_t>&)>& spmv,
+                    const std::function
+                    <void(DenseMatrix<scalar_t>&)>& prec,
+                    DenseMatrix<scalar_t>& x, const DenseMatrix<scalar_t>& b,
+                    real_t rtol, real_t atol, int& totit, int maxit,
+                    int restart, GramSchmidtType GStype,
+                    bool non_zero_guess, bool verbose) {
+      assert(x.cols() == 1 && b.cols() == 1);
+      assert(x.rows() == b.rows());
+      auto n = x.rows();
+      return GMResMPI<scalar_t,real_t>
+        (comm,
+         [&](const scalar_t* v, scalar_t* w){
+           DenseMatrixWrapper<scalar_t> W(n, 1, w, n),
+             V(n, 1, const_cast<scalar_t*>(v), n);
+           spmv(V, W);
+         },
+         [&](scalar_t* v){
+           DenseMatrixWrapper<scalar_t> V(n, 1, v, n);
+           prec(V);
+         },
+         n, x.data(), b.data(), rtol, atol, totit, maxit,
+         restart, GStype, non_zero_guess, verbose);
+    }
+
 
     /**
      * http://www.netlib.org/templates/matlab/bicgstab.m
@@ -76,6 +107,35 @@ namespace strumpack {
                        std::size_t n, scalar_t* x, const scalar_t* b,
                        real_t rtol, real_t atol, int& totit, int maxit,
                        bool non_zero_guess, bool verbose);
+
+    template<typename scalar_t,
+             typename real_t = typename RealType<scalar_t>::value_type>
+    real_t BiCGStabMPI(const MPIComm& comm,
+                       const std::function
+                       <void(const DenseMatrix<scalar_t>&,
+                             DenseMatrix<scalar_t>&)>& spmv,
+                       const std::function
+                       <void(DenseMatrix<scalar_t>&)>& prec,
+                       DenseMatrix<scalar_t>& x, const DenseMatrix<scalar_t>& b,
+                       real_t rtol, real_t atol, int& totit, int maxit,
+                       bool non_zero_guess, bool verbose) {
+      assert(x.cols() == 1 && b.cols() == 1);
+      assert(x.rows() == b.rows());
+      auto n = x.rows();
+      return BiCGStabMPI<scalar_t,real_t>
+        (comm,
+         [&](const scalar_t* v, scalar_t* w){
+           DenseMatrixWrapper<scalar_t> W(n, 1, w, n),
+             V(n, 1, const_cast<scalar_t*>(v), n);
+           spmv(V, W);
+         },
+         [&](scalar_t* v){
+           DenseMatrixWrapper<scalar_t> V(n, 1, v, n);
+           prec(V);
+         },
+         n, x.data(), b.data(), rtol, atol, totit, maxit,
+         non_zero_guess, verbose);
+    }
 
     /*
      * This is iterative refinement

@@ -58,8 +58,7 @@ namespace strumpack {
     /**
      * \class BLRMatrix
      *
-     * \brief Class to represent a sequential/threaded Hierarchically
-     * Semi-Separable matrix.
+     * \brief Class to represent a block low-rank matrix.
      *
      * This is for non-symmetric matrices, but can be used with
      * symmetric matrices as well. This class inherits from

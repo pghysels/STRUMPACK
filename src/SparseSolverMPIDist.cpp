@@ -28,7 +28,7 @@
 #include "StrumpackSparseSolverMPIDist.hpp"
 #include "misc/TaskTimer.hpp"
 #include "sparse/EliminationTreeMPIDist.hpp"
-#include "sparse/iterative/IterativeSolversMPI.hpp"
+#include "iterative/IterativeSolversMPI.hpp"
 #include "sparse/ordering/MatrixReorderingMPI.hpp"
 #include "sparse/Redistribute.hpp"
 

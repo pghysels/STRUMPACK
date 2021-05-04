@@ -784,6 +784,9 @@ WARN_LOGFILE           =
 	@CMAKE_CURRENT_SOURCE_DIR@/src/dense/DenseMatrix.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/dense/DistributedMatrix.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/dense/BLACSGrid.hpp \
+	@CMAKE_CURRENT_SOURCE_DIR@/src/BLR/BLROptions.hpp \
+	@CMAKE_CURRENT_SOURCE_DIR@/src/BLR/BLRMatrix.hpp \
+	@CMAKE_CURRENT_SOURCE_DIR@/src/BLR/BLRMatrixMPI.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/HSS/HSSOptions.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/HSS/HSSPartitionTree.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/HSS/HSSMatrixBase.hpp \

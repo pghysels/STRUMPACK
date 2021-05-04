@@ -50,8 +50,11 @@
 namespace strumpack {
   namespace HSS {
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     // forward declaration
     template<typename scalar_t> class HSSMatrixMPI;
+#endif /* DOXYGEN_SHOULD_SKIP_THIS */
+
 
     /**
      * \class HSSMatrix

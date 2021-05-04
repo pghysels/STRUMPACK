@@ -31,7 +31,7 @@
 using namespace std;
 
 #include "structured/StructuredMatrix.hpp"
-#include "sparse/iterative/IterativeSolvers.hpp"
+#include "iterative/IterativeSolvers.hpp"
 using namespace strumpack;
 
 
@@ -76,6 +76,7 @@ factor_and_solve(int nrhs,
 template<typename scalar_t> void
 preconditioned_solve(const DenseMatrix<scalar_t>& A,
                      structured::StructuredMatrix<scalar_t>* H) {
+
   // Preconditioned solves only work for a single right-hand side
   int nrhs = 1, n = A.rows();
   DenseMatrix<scalar_t> B(n, nrhs), X(n, nrhs);
@@ -93,10 +94,9 @@ preconditioned_solve(const DenseMatrix<scalar_t>& A,
        // matrix-vector product with exact matrix
        gemv(Trans::N, scalar_t(1.), A, v, 1, scalar_t(0.), w, 1);
      },
-      [&H, &n](scalar_t* v) { // preconditioner
+      [&H, &n](scalar_t* v) {
         // preconditioning with structured matrix
-        DenseMatrixWrapper<scalar_t> V(n, 1, v, n);
-        H->solve(V);
+        H->solve(1, v, n);
       },
       n, X.data(), B.data(),
       1e-10, 1e-14, // rtol, atol

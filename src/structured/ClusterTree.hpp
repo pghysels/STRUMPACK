@@ -96,7 +96,7 @@ namespace strumpack {
        * \param leaf_size Leaf size, leafs in the resulting tree will
        * be smaller or equal to this leaf_size.
        */
-      void refine(int leaf_size) {
+      const ClusterTree& refine(int leaf_size) {
         assert(c.empty());
         if (size >= 2*leaf_size) {
           c.resize(2);
@@ -105,6 +105,7 @@ namespace strumpack {
           c[1].size = size - size/2;
           c[1].refine(leaf_size);
         }
+        return *this;
       }
 
       /**

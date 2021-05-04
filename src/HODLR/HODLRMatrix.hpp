@@ -259,6 +259,11 @@ namespace strumpack {
        */
       std::size_t lrows() const { return lrows_; }
       /**
+       * Return the number of local rows, owned by this process.
+       * \return Number of local rows.
+       */
+      std::size_t local_rows() const override { return lrows(); }
+      /**
        * Return the first row of the local rows owned by this process.
        * \return Return first local row
        */
@@ -439,7 +444,8 @@ namespace strumpack {
 
       /**
        * Solve a system of linear equations A*X=B, with possibly
-       * multiple right-hand sides.
+       * multiple right-hand sides. X and B are distributed using 1D
+       * block row distribution.
        *
        * \param B Right hand side. This is the local part of
        * the distributed matrix B. Should be B.rows() == this.lrows().
@@ -452,6 +458,20 @@ namespace strumpack {
 
       /**
        * Solve a system of linear equations A*X=B, with possibly
+       * multiple right-hand sides. X and B are distributed using 1D
+       * block row distribution. The solution X will overwrite the
+       * right-hand side vector B.
+       *
+       * \param B Right hand side. This is the local part of the
+       * distributed matrix B. Should be B.rows() == this.lrows(). Wil
+       * lbe overwritten with the solution.
+       *
+       * \see factor, lrows, begin_row, end_row, inv_mult
+       */
+      void solve(DenseM_t& B) const override;
+
+      /**
+       * Solve a system of linear equations A*X=B, with possibly
        * multiple right-hand sides. X and B are in 2D block cyclic
        * distribution.
        *
@@ -460,11 +480,24 @@ namespace strumpack {
        * \param X Result, should be X.cols() == B.cols(), X.rows() ==
        * this.rows(). X should be allocated.
        * \return number of flops
-       * \see factor, lrows, begin_row, end_row, inv_mult
+       *
+       * \see factor, inv_mult
        */
       long long int solve(const DistM_t& B, DistM_t& X) const;
 
-      void solve(DistM_t& b) const override;
+      /**
+       * Solve a system of linear equations A*X=B, with possibly
+       * multiple right-hand sides. X and B are in 2D block cyclic
+       * distribution. The solution X will overwrite the righ-hand
+       * side B.
+       *
+       * \param B Right hand side. This is the local part of the
+       * distributed matrix B. Should be B.rows() == this.rows(). Will
+       * be overwritten by the solution.
+       *
+       * \see factor, inv_mult, solve
+       */
+      void solve(DistM_t& B) const override;
 
       /**
        * Solve a system of linear equations op(A)*X=B, with possibly

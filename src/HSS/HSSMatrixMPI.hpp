@@ -25,6 +25,14 @@
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
  */
+/**
+ * \file HSSMatrixMPI.hpp
+ *
+ * \brief This file contains the HSSMatrixMPI class definition as well
+ * as implementations for a number of it's member routines. Other
+ * member routines are implemented in files such as
+ * HSSMatrixMPI.apply.hpp, HSSMatrixMPI.factor.hpp etc.
+ */
 #ifndef HSS_MATRIX_MPI_HPP
 #define HSS_MATRIX_MPI_HPP
 
@@ -41,11 +49,23 @@
 namespace strumpack {
   namespace HSS {
 
-    template<typename scalar_t> class HSSMatrixBase;
-    template<typename scalar_t> class HSSMatrix;
-
-    template<typename scalar_t>
-    class HSSMatrixMPI : public HSSMatrixBase<scalar_t> {
+    /**
+     * \class HSSMatrixMPI
+     *
+     * \brief Distributed memory implementation of
+     * the HSS (Hierarchically Semi-Separable) matrix format
+     *
+     * This is for non-symmetric matrices, but can be used with
+     * symmetric matrices as well. This class inherits from
+     * StructuredMatrix.
+     *
+     * \tparam scalar_t Can be float, double, std:complex<float> or
+     * std::complex<double>.
+     *
+     * \see HSSMatrix, structured::StructuredMatrix
+     */
+    template<typename scalar_t> class HSSMatrixMPI
+      : public HSSMatrixBase<scalar_t> {
       using real_t = typename RealType<scalar_t>::value_type;
       using DistM_t = DistributedMatrix<scalar_t>;
       using DistMW_t = DistributedMatrixWrapper<scalar_t>;
@@ -96,11 +116,11 @@ namespace strumpack {
       }
       HSSMatrixBase<scalar_t>* child(int c) { return this->ch_[c].get(); }
 
-      inline const BLACSGrid* grid() const override { return blacs_grid_; }
-      inline const BLACSGrid* grid(const BLACSGrid* grid) const override { return blacs_grid_; }
-      inline const BLACSGrid* grid_local() const override { return blacs_grid_local_; }
-      inline const MPIComm& Comm() const { return grid()->Comm(); }
-      inline MPI_Comm comm() const { return Comm().comm(); }
+      const BLACSGrid* grid() const override { return blacs_grid_; }
+      const BLACSGrid* grid(const BLACSGrid* grid) const override { return blacs_grid_; }
+      const BLACSGrid* grid_local() const override { return blacs_grid_local_; }
+      const MPIComm& Comm() const { return grid()->Comm(); }
+      MPI_Comm comm() const { return Comm().comm(); }
       int Ptotal() const override { return grid()->P(); }
       int Pactive() const override { return grid()->npactives(); }
 

@@ -156,7 +156,8 @@ namespace strumpack {
       <void(Trans op,
             const DenseMatrix<scalar_t>& R,
             DenseMatrix<scalar_t>& S,
-            const std::vector<int>& dist)>;
+            const std::vector<int>& rdist,
+            const std::vector<int>& cdist)>;
 
     /**
      * Type to specify admissibility of individual sub-blocks.
@@ -243,6 +244,52 @@ namespace strumpack {
       virtual std::size_t rank() const = 0;
 
       /**
+       * For a distributed matrix, which uses a block row
+       * distribution, this gives the number of rows stored on this
+       * process.
+       *
+       * \return local rows, should be dist()[p+1]-dist()[p] for rank
+       * p
+       */
+      virtual std::size_t local_rows() const {
+        throw std::invalid_argument
+          ("1d block row distribution not supported for this format.");
+      }
+
+      /**
+       * For a distributed matrix, return the 1D block row
+       * distribution over processes. This is for square matrices, for
+       * rectagular use rdist for the rows and cdist for the columns.
+       *
+       * \return vector with P+1 elements, process with rank p will
+       * own rows [dist()[p],dist()[p+1])
+       */
+      virtual const std::vector<int>& dist() const {
+        static std::vector<int> d = {0, int(rows())};
+        return d;
+      };
+      /**
+       * For a distributed rectangular matrix, return the 1D block row
+       * distribution.
+       *
+       * \return vector with P+1 elements, process with rank p will
+       * own rows [cdist()[p],cdist()[p+1])
+       */
+      virtual const std::vector<int>& rdist() const {
+        return dist();
+      };
+      /**
+       * For a distributed rectangular matrix, return the 1D block
+       * columns distribution.
+       *
+       * \return vector with P+1 elements, process with rank p will
+       * own columns [cdist()[p],cdist()[p+1])
+       */
+      virtual const std::vector<int>& cdist() const {
+        return dist();
+      };
+
+      /**
        * Multiply the StructuredMatrix (A) with a dense matrix: y =
        * op(A)*x.
        *
@@ -285,6 +332,20 @@ namespace strumpack {
        * Solve a linear system A*x=b, with this StructuredMatrix
        * (A). This solve is done in-place.
        *
+       * \param nrhs number of right-hand sides
+       * \param b right-hand side, should have this->cols() rows, will
+       * be overwritten with the solution x.
+       * \param ldb leading dimension of b
+       */
+      virtual void solve(int nrhs, scalar_t* b, int ldb) const {
+        DenseMatrixWrapper<scalar_t> B(rows(), nrhs, b, ldb);
+        solve(B);
+      }
+
+      /**
+       * Solve a linear system A*x=b, with this StructuredMatrix
+       * (A). This solve is done in-place.
+       *
        * \param b right-hand side, b.rows() == A.cols(), will be
        * overwritten with the solution x.
        */
@@ -310,7 +371,9 @@ namespace strumpack {
      *
      * \param A Input dense matrix, will not be modified
      * \param opts Options object
-     * \param tree optional clustertree
+     * \param row_tree optional clustertree for the rows
+     * \param col_tree optional clustertree for the columns. If the
+     * matrix is square, this does not need to be specified.
      *
      * \return std::unique_ptr holding a pointer to a
      * StructuredMatrix of the requested StructuredMatrix::Type
@@ -326,7 +389,8 @@ namespace strumpack {
     std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_from_dense(const DenseMatrix<scalar_t>& A,
                          const StructuredOptions<scalar_t>& opts,
-                         const structured::ClusterTree* tree=nullptr);
+                         const structured::ClusterTree* row_tree=nullptr,
+                         const structured::ClusterTree* col_tree=nullptr);
 
     /**
      * Construct a StructuredMatrix from a DenseMatrix<scalar_t>.
@@ -348,6 +412,9 @@ namespace strumpack {
      * \param A pointer to matrix A data
      * \param ldA leading dimension of A
      * \param opts Options object
+     * \param row_tree optional clustertree for the rows
+     * \param col_tree optional clustertree for the columns. If the
+     * matrix is square, this does not need to be specified.
      *
      * \return std::unique_ptr holding a pointer to a
      * StructuredMatrix of the requested StructuredMatrix::Type
@@ -359,7 +426,9 @@ namespace strumpack {
     template<typename scalar_t>
     std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_from_dense(int rows, int cols, const scalar_t* A, int ldA,
-                         const StructuredOptions<scalar_t>& opts);
+                         const StructuredOptions<scalar_t>& opts,
+                         const structured::ClusterTree* row_tree=nullptr,
+                         const structured::ClusterTree* col_tree=nullptr);
 
     /**
      * Construct a StructuredMatrix using a routine, provided by the
@@ -384,7 +453,10 @@ namespace strumpack {
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_from_elements(int rows, int cols,
                             const extract_t<scalar_t>& A,
-                            const StructuredOptions<scalar_t>& opts);
+                            const StructuredOptions<scalar_t>& opts,
+                            const structured::ClusterTree* row_tree=nullptr,
+                            const structured::ClusterTree* col_tree=nullptr);
+
 
     /**
      * Construct a StructuredMatrix using a routine to extract a
@@ -395,7 +467,9 @@ namespace strumpack {
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_from_elements(int rows, int cols,
                             const extract_block_t<scalar_t>& A,
-                            const StructuredOptions<scalar_t>& opts);
+                            const StructuredOptions<scalar_t>& opts,
+                            const structured::ClusterTree* row_tree=nullptr,
+                            const structured::ClusterTree* col_tree=nullptr);
 
     /**
      * Construct a StructuredMatrix using only a matrix-vector
@@ -406,7 +480,9 @@ namespace strumpack {
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_matrix_free(int rows, int cols,
                           const mult_t<scalar_t>& Amult,
-                          const StructuredOptions<scalar_t>& opts);
+                          const StructuredOptions<scalar_t>& opts,
+                          const structured::ClusterTree* row_tree=nullptr,
+                          const structured::ClusterTree* col_tree=nullptr);
 
     /**
      * Construct a StructuredMatrix using both a matrix-vector
@@ -419,7 +495,10 @@ namespace strumpack {
     construct_partially_matrix_free(int rows, int cols,
                                     const mult_t<scalar_t>& Amult,
                                     const extract_block_t<scalar_t>& Aelem,
-                                    const StructuredOptions<scalar_t>& opts);
+                                    const StructuredOptions<scalar_t>& opts,
+                                    const structured::ClusterTree* row_tree=nullptr,
+                                    const structured::ClusterTree* col_tree=nullptr);
+
 
     /**
      * Construct a StructuredMatrix using both a matrix-vector
@@ -431,7 +510,10 @@ namespace strumpack {
     construct_partially_matrix_free(int rows, int cols,
                                     const mult_t<scalar_t>& Amult,
                                     const extract_t<scalar_t>& Aelem,
-                                    const StructuredOptions<scalar_t>& opts);
+                                    const StructuredOptions<scalar_t>& opts,
+                                    const structured::ClusterTree* row_tree=nullptr,
+                                    const structured::ClusterTree* col_tree=nullptr);
+
 
 #if defined(STRUMPACK_USE_MPI)
     /**
@@ -442,7 +524,9 @@ namespace strumpack {
      */
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_from_dense(const DistributedMatrix<scalar_t>& A,
-                         const StructuredOptions<scalar_t>& opts);
+                         const StructuredOptions<scalar_t>& opts,
+                         const structured::ClusterTree* row_tree=nullptr,
+                         const structured::ClusterTree* col_tree=nullptr);
 
     /**
      * Construct a StructuredMatrix using an element extraction
@@ -454,7 +538,9 @@ namespace strumpack {
     construct_from_elements(const MPIComm& comm,
                             int rows, int cols,
                             const extract_t<scalar_t>& A,
-                            const StructuredOptions<scalar_t>& opts);
+                            const StructuredOptions<scalar_t>& opts,
+                            const structured::ClusterTree* row_tree=nullptr,
+                            const structured::ClusterTree* col_tree=nullptr);
 
     /**
      * Construct a StructuredMatrix using a routine to extract a
@@ -466,7 +552,9 @@ namespace strumpack {
     construct_from_elements(const MPIComm& comm,
                             int rows, int cols,
                             const extract_dist_block_t<scalar_t>& A,
-                            const StructuredOptions<scalar_t>& opts);
+                            const StructuredOptions<scalar_t>& opts,
+                            const structured::ClusterTree* row_tree=nullptr,
+                            const structured::ClusterTree* col_tree=nullptr);
 
     /**
      * Construct a StructuredMatrix using only a matrix-vector
@@ -478,7 +566,9 @@ namespace strumpack {
     construct_matrix_free(const MPIComm& comm, const BLACSGrid* g,
                           int rows, int cols,
                           const mult_2d_t<scalar_t>& Amult,
-                          const StructuredOptions<scalar_t>& opts);
+                          const StructuredOptions<scalar_t>& opts,
+                          const structured::ClusterTree* row_tree=nullptr,
+                          const structured::ClusterTree* col_tree=nullptr);
 
     /**
      * Construct a StructuredMatrix using only a matrix-vector
@@ -489,7 +579,9 @@ namespace strumpack {
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_matrix_free(const MPIComm& comm, int rows, int cols,
                           const mult_1d_t<scalar_t>& Amult,
-                          const StructuredOptions<scalar_t>& opts);
+                          const StructuredOptions<scalar_t>& opts,
+                          const structured::ClusterTree* row_tree=nullptr,
+                          const structured::ClusterTree* col_tree=nullptr);
 
 #endif
 

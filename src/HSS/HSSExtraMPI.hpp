@@ -134,26 +134,26 @@ namespace strumpack {
     class TreeLocalRanges {
     public:
       TreeLocalRanges() {}
-      TreeLocalRanges(int P) : _ranges(5*P) {}
+      TreeLocalRanges(int P) : ranges_(5*P) {}
       void print() const {
         std::cout << "ranges=[";
-        for (std::size_t p=0; p<_ranges.size()/5; p++)
+        for (std::size_t p=0; p<ranges_.size()/5; p++)
           std::cout << rlo(p) << "," << rhi(p) << "/"
                     << clo(p) << "," << chi(p) << "/" << leaf_procs(p) << " ";
         std::cout << "];" << std::endl;
       }
-      int rlo(int p) const { return _ranges[5*p+0]; }
-      int rhi(int p) const { return _ranges[5*p+1]; }
-      int clo(int p) const { return _ranges[5*p+2]; }
-      int chi(int p) const { return _ranges[5*p+3]; }
-      int leaf_procs(int p) const { return _ranges[5*p+4]; }
-      int& rlo(int p) { return _ranges[5*p+0]; }
-      int& rhi(int p) { return _ranges[5*p+1]; }
-      int& clo(int p) { return _ranges[5*p+2]; }
-      int& chi(int p) { return _ranges[5*p+3]; }
-      int& leaf_procs(int p) { return _ranges[5*p+4]; }
+      int rlo(int p) const { return ranges_[5*p+0]; }
+      int rhi(int p) const { return ranges_[5*p+1]; }
+      int clo(int p) const { return ranges_[5*p+2]; }
+      int chi(int p) const { return ranges_[5*p+3]; }
+      int leaf_procs(int p) const { return ranges_[5*p+4]; }
+      int& rlo(int p) { return ranges_[5*p+0]; }
+      int& rhi(int p) { return ranges_[5*p+1]; }
+      int& clo(int p) { return ranges_[5*p+2]; }
+      int& chi(int p) { return ranges_[5*p+3]; }
+      int& leaf_procs(int p) { return ranges_[5*p+4]; }
     private:
-      std::vector<int> _ranges; // rlo, rhi, clo, chi, leaf_procs
+      std::vector<int> ranges_; // rlo, rhi, clo, chi, leaf_procs
     };
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS

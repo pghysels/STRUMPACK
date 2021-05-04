@@ -31,6 +31,7 @@
 using namespace std;
 
 #include "structured/StructuredMatrix.hpp"
+#include "iterative/IterativeSolversMPI.hpp"
 using namespace strumpack;
 
 
@@ -69,6 +70,68 @@ factor_and_solve(const MPIComm& comm, const BLACSGrid* g, int nrhs,
   if (comm.is_root())
     cout << "  - ||X-H\\(H*X)||_F/||X||_F = "
          << err << endl;
+}
+
+
+template<typename scalar_t> void
+preconditioned_solve(const MPIComm& comm,
+                     const structured::mult_1d_t<scalar_t>& Amult,
+                     structured::StructuredMatrix<scalar_t>* H) {
+  // Preconditioned solves only work for a single right-hand side
+  int nrhs = 1, n = H->rows();
+  int nloc = H->local_rows();
+
+  DenseMatrix<scalar_t> B(nloc, nrhs), X(nloc, nrhs);
+
+  X.random();
+  DenseMatrix<scalar_t> Xexact(X);
+
+  // B = A*X
+  Amult(Trans::N, X, B, H->rdist(), H->cdist());
+
+  // factor the structured matrix, so it can be used as a preconditioner
+  // H->factor();  // was already called
+
+  int iterations = 0, maxit = 50, restart = 50;
+  iterative::GMResMPI<scalar_t>
+    (comm,
+     [&Amult, &H](const DenseMatrix<scalar_t>& v,
+                  DenseMatrix<scalar_t>& w) {
+       // matrix-vector product with exact matrix
+       Amult(Trans::N, v, w, H->rdist(), H->cdist());
+     },
+     [&H](DenseMatrix<scalar_t>& v) {
+       // preconditioning with structured matrix
+       H->solve(v);
+     },
+     X, B, 1e-10, 1e-14, // rtol, atol
+     iterations, maxit, restart, GramSchmidtType::CLASSICAL,
+     false, comm.is_root());  // initial guess, verbose
+
+  auto err = comm.reduce(X.sub(Xexact).normF(), MPI_SUM)
+    / comm.reduce(Xexact.normF(), MPI_SUM);
+  if (comm.is_root())
+    cout << "  - ||X-A\\(A*X)||_F/||X||_F = " << err << endl;
+
+
+  iterative::BiCGStabMPI<scalar_t>
+    (comm,
+     [&Amult, &H](const DenseMatrix<scalar_t>& v,
+                  DenseMatrix<scalar_t>& w) {
+       // matrix-vector product with exact matrix
+       Amult(Trans::N, v, w, H->rdist(), H->cdist());
+     },
+     [&H](DenseMatrix<scalar_t>& v) {
+       // preconditioning with structured matrix
+       H->solve(v);
+     },
+     X, B, 1e-10, 1e-14, // rtol, atol
+     iterations, maxit, false, comm.is_root());  // initial guess, verbose
+
+  err = comm.reduce(X.sub(Xexact).normF(), MPI_SUM)
+    / comm.reduce(Xexact.normF(), MPI_SUM);
+  if (comm.is_root())
+    cout << "  - ||X-A\\(A*X)||_F/||X||_F = " << err << endl;
 }
 
 
@@ -126,21 +189,36 @@ int main(int argc, char* argv[]) {
 
     // Matrix-vector multiplication routine using 1d block row
     // distribution. Ideally, user can provide a faster
-    // implementation. The block row distribution is given by the dist
-    // vector, with processor p owning rows
-    // [rdist[p],rdist[p+1]). cdist is only needed for non-square
-    // matrices. S is distributed according to rdist if t==Trans::N,
-    // else cdist. R is distributed according to cdist of t==Trans::N,
-    // else rdist.
-    auto Tmult1d =
+    // implementation. The block row/column distribution of the matrix
+    // is given by the rdist and cdist vectors, with processor p
+    // owning rows [rdist[p],rdist[p+1]). cdist is only needed for
+    // non-square matrices. S is distributed according to rdist if
+    // t==Trans::N, else cdist. R is distributed according to cdist of
+    // t==Trans::N, else rdist.  auto
+    structured::mult_1d_t<double> Tmult1d =
       [&n, &Toeplitz, &world](Trans t,
                               const DenseMatrix<double>& R,
                               DenseMatrix<double>& S,
                               const std::vector<int>& rdist,
                               const std::vector<int>& cdist) {
-        // TODO needs communication, not a trivial implementation
+        // this broadcasts each piece of the P (number of processes)
+        // pieces of R to all processes. Then every process forms a
+        // block of the Toeplitz matrix and multiplies that with the
+        // current piece of R.
+        int rank = world.rank(), P = world.size(),
+          r0 = rdist[rank], r1 = rdist[rank+1];
+        S.zero();
+        for (int p=0; p<P; p++) {
+          DenseMatrix<double> Rp(cdist[p+1]-cdist[p], R.cols()),
+            Tp(r1 - r0, cdist[p+1]-cdist[p]);
+          if (rank == p) Rp.copy(R);
+          world.broadcast_from(Rp.data(), Rp.rows()*Rp.cols(), p);
+          Tp.fill([&](std::size_t i, std::size_t j) -> double {
+                    return Toeplitz(r0+i, cdist[p]+j);
+                  });
+          gemm(Trans::N, Trans::N, 1., Tp, Rp, 1., S);
+        }
       };
-
 
 
     std::vector<structured::Type> types =
@@ -171,6 +249,7 @@ int main(int argc, char* argv[]) {
         print_info(world, H.get(), options);
         check_accuracy(A2d, H.get());
         factor_and_solve(world, &grid, nrhs, H.get());
+        preconditioned_solve(world, Tmult1d, H.get());
       } catch (std::exception& e) {
         if (world.is_root())
           cout << get_name(type) << " failed: "
@@ -191,6 +270,7 @@ int main(int argc, char* argv[]) {
         print_info(world, H.get(), options);
         check_accuracy(A2d, H.get());
         factor_and_solve(world, &grid, nrhs, H.get());
+        preconditioned_solve(world, Tmult1d, H.get());
       } catch (std::exception& e) {
         if (world.is_root())
           cout << get_name(type) << " failed: "
@@ -212,14 +292,16 @@ int main(int argc, char* argv[]) {
           print_info(world, H.get(), options);
           check_accuracy(A2d, H.get());
           factor_and_solve(world, &grid, nrhs, H.get());
+          // preconditioned_solve(world, Tmult1d, H.get());
         }
-        // { // 1d block row distribution for the product
-        //   auto H = structured::construct_matrix_free<double>
-        //     (world, n, n, Tmult1d, options);
-        //   print_info(world, H.get(), options);
-        //   check_accuracy(A2d, H.get());
-        //   factor_and_solve(world, &grid, nrhs, H.get());
-        // }
+        { // 1d block row distribution for the product
+          auto H = structured::construct_matrix_free<double>
+            (world, n, n, Tmult1d, options);
+          print_info(world, H.get(), options);
+          check_accuracy(A2d, H.get());
+          factor_and_solve(world, &grid, nrhs, H.get());
+          preconditioned_solve(world, Tmult1d, H.get());
+        }
       } catch (std::exception& e) {
         if (world.is_root())
           cout << get_name(type) << " failed: "
