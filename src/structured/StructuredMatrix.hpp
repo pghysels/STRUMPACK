@@ -185,15 +185,15 @@ namespace strumpack {
      *
      * However, not all formats support all construction methods:
      *
-     * |          | DENSE | ELEM | MF | PMF | NN |
-     * |----------|-------|------|----|-----|----|
-     * | HSS      | X     |  -   | -  | X   | X  |
-     * | BLR      | X     |  X   | -  | -   | -  |
-     * | HODLR    | X     |  X   | X  | -   | X  |
-     * | HODBF    | X     |  X   | X  | -   | X  |
-     * | LRBF     | X     |  X   | X  | -   | X  |
-     * | LOSSY    | X     |  -   | -  | -   | -  |
-     * | LOSSLESS | X     |  -   | -  | -   | -  |
+     * |          | DENSE | ELEM | MF | PMF | NN | SEQ and/or MPI? |
+     * |----------|-------|------|----|-----|----|------------------
+     * | BLR      | X     |  X   | -  | -   | -  | SEQ & MPI       |
+     * | HSS      | X     |  -   | -  | X   | X  | SEQ & MPI       |
+     * | HODLR    | X     |  X   | X  | -   | X  | MPI only        |
+     * | HODBF    | X     |  X   | X  | -   | X  | MPI only        |
+     * | LRBF     | X     |  X   | X  | -   | X  | MPI only        |
+     * | LOSSY    | X     |  -   | -  | -   | -  | SEQ only        |
+     * | LOSSLESS | X     |  -   | -  | -   | -  | SEQ only        |
      *
      * \see HSS::HSSMatrix, BLR::BLRMatrix, HODLR::HODLRMatrix,
      * HODLR::ButterflyMatrix, ...
@@ -302,6 +302,21 @@ namespace strumpack {
 
       /**
        * Multiply the StructuredMatrix (A) with a dense matrix: y =
+       * op(A)*x.
+       *
+       * \param op take transpose/conjugate or not
+       * \param m columns in x and y
+       * \param x matrix, x should have rows == op(A).cols()
+       * \param ldx leading dimension of x
+       * \param y matrix, y should have cols == x.cols(), and rows ==
+       * A.rows()
+       * \param ldy leading dimension of y
+       */
+      void mult(Trans op, int m, const scalar_t* x, int ldx,
+                scalar_t* y, int ldy) const;
+
+      /**
+       * Multiply the StructuredMatrix (A) with a dense matrix: y =
        * op(A)*x. x and y are 2d block cyclic.
        *
        * \param op take transpose/conjugate or not
@@ -371,7 +386,8 @@ namespace strumpack {
      *
      * \param A Input dense matrix, will not be modified
      * \param opts Options object
-     * \param row_tree optional clustertree for the rows
+     * \param row_tree optional clustertree for the rows, see also
+     * strumpack::binary_tree_clustering
      * \param col_tree optional clustertree for the columns. If the
      * matrix is square, this does not need to be specified.
      *
@@ -382,7 +398,8 @@ namespace strumpack {
      * operation not supported for StructuredMatrix type, operation
      * requires MPI.
      *
-     * \see construct_from_elements, construct_matrix_free and
+     * \see strumpack::binary_tree_clustering,
+     * construct_from_elements, construct_matrix_free and
      * construct_partially_matrix_free
      */
     template<typename scalar_t>
@@ -549,8 +566,7 @@ namespace strumpack {
      * TODO desribe parameters
      */
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
-    construct_from_elements(const MPIComm& comm,
-                            int rows, int cols,
+    construct_from_elements(const MPIComm& comm, int rows, int cols,
                             const extract_dist_block_t<scalar_t>& A,
                             const StructuredOptions<scalar_t>& opts,
                             const structured::ClusterTree* row_tree=nullptr,

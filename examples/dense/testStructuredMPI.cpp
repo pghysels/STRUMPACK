@@ -35,6 +35,12 @@ using namespace std;
 using namespace strumpack;
 
 
+/**
+ * This takes a pointer to a structured::StructureMatrix and prints
+ * out the memory usage, and the maximum rank.
+ *
+ * MPIComm is a c++ wrapper around an MPI_Comm
+ */
 template<typename scalar_t> void
 print_info(const MPIComm& comm,
            const structured::StructuredMatrix<scalar_t>* H,
@@ -46,47 +52,101 @@ print_info(const MPIComm& comm,
          << "  - maximum_rank(H) = " << H->rank() << endl;
 }
 
+/**
+ * Check the accuracy of a structured::StructuredMatrix by comparing
+ * it with a DenseMatrix. This should only be used on a relatively
+ * small matrix, as the storage of the DenseMatrix will become a
+ * bottleneck for larger problems.
+ */
 template<typename scalar_t> void
 check_accuracy(const DistributedMatrix<scalar_t>& A,
                const structured::StructuredMatrix<scalar_t>* H) {
+  // Allocate 2 A.rows x A.cols matrices, use the same 2D processor
+  // grid as A
   DistributedMatrix<scalar_t> id(A.grid(), A.rows(), A.cols()),
     Hdense(A.grid(), A.rows(), A.cols());
+  // set id to the identity matrix
   id.eye();
+  // compute dense representation of H as H*I
   H->mult(Trans::N, id, Hdense);
+  // compute relative Frobenius norm of the compression error
   auto err = Hdense.scaled_add(scalar_t(-1.), A).normF() / A.normF();
   if (A.Comm().is_root())
     cout << "  - ||A-H||_F/||A||_F = " << err << endl;
 }
 
+
+/**
+ * Factor a structured::StructuredMatrix and solve a linear system
+ * with nrhs right-hand side vectors.
+ */
 template<typename scalar_t> void
-factor_and_solve(const MPIComm& comm, const BLACSGrid* g, int nrhs,
+factor_and_solve(const DistributedMatrix<scalar_t>& A, int nrhs,
+                 //const MPIComm& comm, const BLACSGrid* g,
                  structured::StructuredMatrix<scalar_t>* H) {
-  DistributedMatrix<scalar_t> B(g, H->rows(), nrhs), X(g, H->rows(), nrhs);
+  // Allocate memory for rhs and solution vectors (matrices). Use same
+  // 2D processor grid as A.
+  DistributedMatrix<scalar_t> B(A.grid(), H->rows(), nrhs),
+    X(A.grid(), H->rows(), nrhs);
+  // Pick a random exact solution
   X.random();
+  // Compute the right-hand side B as B=H*X
   H->mult(Trans::N, X, B);
+  // Compute a factorization of H. The factors are stored in H.
   H->factor();
+  // Solve a linear system H*X=B, input is the right-hand side B,
+  // which will be overwritten with the solution X.
   H->solve(B);
+  // Compute the relative error on the solution.
   auto err = B.scaled_add(scalar_t(-1.), X).normF() / X.normF();
-  if (comm.is_root())
+  if (A.Comm().is_root())
     cout << "  - ||X-H\\(H*X)||_F/||X||_F = "
+         << err << endl;
+
+  // Same as above, but now we compute the right-hand side as B=A*X
+  // (instead of B=H*X)
+  gemm(Trans::N, Trans::N, scalar_t(1.), A, X, scalar_t(0.), B);
+  // H->factor(); // already called
+  // solve a linear system H*X=B, input is the right-hand side B,
+  // which will be overwritten with the solution X.
+  H->solve(B);
+  // Compute the relative error on the solution. This now includes the
+  // compression error.
+  err = B.scaled_add(scalar_t(-1.), X).normF() / X.normF();
+  if (A.Comm().is_root())
+    cout << "  - ||X-A\\(A*X)||_F/||X||_F = "
          << err << endl;
 }
 
 
+/**
+ * Use the structured::StructuredMatrix as a preconditioner in an
+ * iterative solver. The preconditioned iterative solvers use a 1d
+ * block row distribution, so here we use the user provided
+ * matrix-vector product using the 1d block row distribution. Note
+ * that not all structured:StructuredMatrix types use the 2d block row
+ * distribution. This works only for a single right-hand side.
+ */
 template<typename scalar_t> void
 preconditioned_solve(const MPIComm& comm,
                      const structured::mult_1d_t<scalar_t>& Amult,
                      structured::StructuredMatrix<scalar_t>* H) {
   // Preconditioned solves only work for a single right-hand side
   int nrhs = 1, n = H->rows();
+  // Preconditioned solves work using a 1d block row matrix and vector
+  // distribution. nloc is the number of rows owned by this process.
   int nloc = H->local_rows();
 
+  // Allocate memory for local part of the rhs and solution vectors.
   DenseMatrix<scalar_t> B(nloc, nrhs), X(nloc, nrhs);
 
+  // Pick a random exact solution
   X.random();
+  // Keep a copy of the exact solution X
   DenseMatrix<scalar_t> Xexact(X);
 
-  // B = A*X
+  // compute the right-hand side vector B as B = A*X, using the 1d
+  // block row matrix-vector product Amult, specified by the user.
   Amult(Trans::N, X, B, H->rdist(), H->cdist());
 
   // factor the structured matrix, so it can be used as a preconditioner
@@ -97,17 +157,22 @@ preconditioned_solve(const MPIComm& comm,
     (comm,
      [&Amult, &H](const DenseMatrix<scalar_t>& v,
                   DenseMatrix<scalar_t>& w) {
-       // matrix-vector product with exact matrix
+       // matrix-vector product using 1d block row distrribution
        Amult(Trans::N, v, w, H->rdist(), H->cdist());
      },
      [&H](DenseMatrix<scalar_t>& v) {
-       // preconditioning with structured matrix
+       // Apply the preconditioner H: solve a linear system H*w=v.
        H->solve(v);
      },
-     X, B, 1e-10, 1e-14, // rtol, atol
-     iterations, maxit, restart, GramSchmidtType::CLASSICAL,
+     X, B,                    // solution (output), right-hand side
+     1e-10, 1e-14,            // rtol, atol
+     iterations, maxit,       // iterations (output), maximum iterations
+     restart,                 // GMRes restart
+     GramSchmidtType::CLASSICAL,
      false, comm.is_root());  // initial guess, verbose
 
+  // Compute the relative error (needs global reduction with all
+  // processes)
   auto err = comm.reduce(X.sub(Xexact).normF(), MPI_SUM)
     / comm.reduce(Xexact.normF(), MPI_SUM);
   if (comm.is_root())
@@ -125,9 +190,13 @@ preconditioned_solve(const MPIComm& comm,
        // preconditioning with structured matrix
        H->solve(v);
      },
-     X, B, 1e-10, 1e-14, // rtol, atol
-     iterations, maxit, false, comm.is_root());  // initial guess, verbose
+     X, B,                    // solution (output), right-hand side
+     1e-10, 1e-14,            // rtol, atol
+     iterations, maxit,       // iterations (output), maximum iterations
+     false, comm.is_root());  // initial guess, verbose
 
+  // Compute the relative error (needs global reduction with all
+  // processes)
   err = comm.reduce(X.sub(Xexact).normF(), MPI_SUM)
     / comm.reduce(Xexact.normF(), MPI_SUM);
   if (comm.is_root())
@@ -140,44 +209,54 @@ int main(int argc, char* argv[]) {
   int thread_level;
   MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &thread_level);
   {
+    // C++ wrapper around an MPI_Comm, defaults to MPI_COMM_WORLD
     MPIComm world;
+    // we need at least MPI_THREADS_FUNNELED support
     if (thread_level != MPI_THREAD_FUNNELED && world.is_root())
       cout << "MPI implementation does not support MPI_THREAD_FUNNELED" << endl;
 
+    // matrix size and number of right-hand sides
     int n = 1000, nrhs = 10;
     if (argc > 1) n = stoi(argv[1]);
 
+    // Define an options object, set to the default options.
     structured::StructuredOptions<double> options;
+    // Suppress some output
     options.set_verbose(false);
+    // Parse options passed on the command line, run with --help to see
+    // more.
     options.set_from_command_line(argc, argv);
 
+    // Create a 2D processor grid, as used in ScaLAPACK. This is only
+    // needed if you will use 2d block-cyclic input/output.
     BLACSGrid grid(world);
 
 
-    // Routine to compute individual elements of the matrix.
+    // Define the matrix through a routine to compute individual
+    // elements of the matrix. This is compatible with the
+    // structured::extract_t type, which is:
+    // std::function<scalar_t(std::size_t,std::size_t)>
     auto Toeplitz =
       [](int i, int j) {
         return 1. / (1. + abs(i-j));
       };
 
-    // routine to compute sub-block of the matrix. Often this could be
-    // implemented more efficiently than computing element per element.
-    auto Toeplitz_block =
-      [&Toeplitz](const std::vector<std::size_t>& I,
-                  const std::vector<std::size_t>& J,
-                  DenseMatrix<double>& B) {
-        for (std::size_t j=0; j<J.size(); j++)
-          for (std::size_t i=0; i<I.size(); i++)
-            B(i, j) = Toeplitz(I[i], J[j]);
-      };
 
-    // create 2d block cyclicly distributed matrix, and initialize it as
-    // a Toeplitz matrix
+    // Create 2d block cyclicly distributed matrix, and initialize it
+    // as a Toeplitz matrix. This step can be avoided. Construction of
+    // the StructuredMatrix can be done using a routine to compute
+    // individual elements and/or using a black box matrix-vector
+    // multiplication routine. Here we construct the 2D block cyclic
+    // representation explicitly mainly for illustration and to test
+    // the compression accuracy after compression.
     DistributedMatrix<double> A2d(&grid, n, n, Toeplitz);
 
-    // Matrix-vector multiplication routine, using 2d block cyclic
-    // distribution. Ideally, user can provide a faster
-    // implementation.
+
+    // Define a matrix-vector multiplication routine, using the 2d
+    // block cyclic distribution. Ideally, the user can provide a
+    // faster implementation. Instead of a 2D block cyclic
+    // distribution, one can also use a 1d block row distribution, see
+    // below.
     auto Tmult2d =
       [&A2d](Trans t,
              const DistributedMatrix<double>& R,
@@ -186,6 +265,7 @@ int main(int argc, char* argv[]) {
         // gemm(t, Trans::N, double(1.), A2d, R, double(0.), S);
         A2d.mult(t, R, S); // same as gemm above
       };
+
 
     // Matrix-vector multiplication routine using 1d block row
     // distribution. Ideally, user can provide a faster
@@ -221,6 +301,9 @@ int main(int argc, char* argv[]) {
       };
 
 
+    // In the tests below, we try all the following StructuredMatrix
+    // Types. In practice, you pick one by for instance setting:
+    //    options.set_type(structured::Type::BLR)
     std::vector<structured::Type> types =
       {structured::Type::BLR,
        structured::Type::HSS,
@@ -228,9 +311,12 @@ int main(int argc, char* argv[]) {
        structured::Type::HODBF,
        structured::Type::BUTTERFLY,
        structured::Type::LR};
-    // structured::Type::LOSSY,
-    // structured::Type::LOSSLESS};
+    // The LOSSY and LOSSLESS types do not support MPI
+    // structured::Type::LOSSY, structured::Type::LOSSLESS};
 
+
+    // Print how much memory the dense (2D block cyclic) matrix
+    // representation takes (for comparison).
     if (world.is_root())
       cout << endl << endl
            << "dense (2DBC) " << A2d.rows() << " x " << A2d.cols()
@@ -245,15 +331,23 @@ int main(int argc, char* argv[]) {
     for (auto type : types) {
       options.set_type(type);
       try {
+        // Construct a structured::StructuredMatrix from a dense
+        // matrix and given options.
         auto H = structured::construct_from_dense(A2d, options);
+        // Print the memory usage etc for H
         print_info(world, H.get(), options);
+        // Check the compression accuracy by comparing with the dense
+        // matrix
         check_accuracy(A2d, H.get());
-        factor_and_solve(world, &grid, nrhs, H.get());
+        // Factor H and (approximately) solve a linear system
+        factor_and_solve(A2d, nrhs, H.get());
+        // Solve a linear system using an iterative solver with H as
+        // the preconditioner and using A as the exact matrix vector
+        // product.
         preconditioned_solve(world, Tmult1d, H.get());
       } catch (std::exception& e) {
         if (world.is_root())
-          cout << get_name(type) << " failed: "
-               << e.what() << endl;
+          cout << get_name(type) << " failed: " << e.what() << endl;
       }
     }
 
@@ -265,16 +359,39 @@ int main(int argc, char* argv[]) {
     for (auto type : types) {
       options.set_type(type);
       try {
-        auto H = structured::construct_from_elements<double>
-          (world, n, n, Toeplitz, options);
-        print_info(world, H.get(), options);
-        check_accuracy(A2d, H.get());
-        factor_and_solve(world, &grid, nrhs, H.get());
-        preconditioned_solve(world, Tmult1d, H.get());
+
+        {
+          // Construct a structured::StructuredMatrix from individual
+          // elements. A ClusterTree for the rows (and columns) can
+          // also be provided.
+          auto H = structured::construct_from_elements<double>
+            (world, n, n, Toeplitz, options);
+          print_info(world, H.get(), options);
+          check_accuracy(A2d, H.get());
+          // factor_and_solve(world, &grid, nrhs, H.get());
+          factor_and_solve(A2d, nrhs, H.get());
+          preconditioned_solve(world, Tmult1d, H.get());
+        }
+
+        {
+          // Define a routine to compute sub-block of the
+          // matrix. Often this could be implemented more efficiently
+          // than computing element per element.
+          auto Toeplitz_block =
+            [&Toeplitz](const std::vector<std::size_t>& I,
+                        const std::vector<std::size_t>& J,
+                        DenseMatrix<double>& B) {
+              for (std::size_t j=0; j<J.size(); j++)
+                for (std::size_t i=0; i<I.size(); i++)
+                  B(i, j) = Toeplitz(I[i], J[j]);
+            };
+          // TODO construction using a sub-block instead of individual
+          // elements.
+        }
+
       } catch (std::exception& e) {
         if (world.is_root())
-          cout << get_name(type) << " failed: "
-               << e.what() << endl;
+          cout << get_name(type) << " failed: " << e.what() << endl;
       }
     }
 
@@ -286,30 +403,32 @@ int main(int argc, char* argv[]) {
     for (auto type : types) {
       options.set_type(type);
       try {
-        { // 2d block cyclic matrix product
+        {
+          // Construct a structured::StructuredMatrix using a
+          // matrix-vector product, where the (multi-)vectors are
+          // stored using a 2d block cyclic distribution.
           auto H = structured::construct_matrix_free<double>
             (world, &grid, n, n, Tmult2d, options);
           print_info(world, H.get(), options);
           check_accuracy(A2d, H.get());
-          factor_and_solve(world, &grid, nrhs, H.get());
-          // preconditioned_solve(world, Tmult1d, H.get());
+          factor_and_solve(A2d, nrhs, H.get());
         }
         { // 1d block row distribution for the product
           auto H = structured::construct_matrix_free<double>
             (world, n, n, Tmult1d, options);
           print_info(world, H.get(), options);
           check_accuracy(A2d, H.get());
-          factor_and_solve(world, &grid, nrhs, H.get());
+          factor_and_solve(A2d, nrhs, H.get());
           preconditioned_solve(world, Tmult1d, H.get());
         }
       } catch (std::exception& e) {
         if (world.is_root())
-          cout << get_name(type) << " failed: "
-               << e.what() << endl;
+          cout << get_name(type) << " failed: " << e.what() << endl;
       }
     }
 
-  }
+  } // close this scope to destroy everything before calling
+    // MPI_Finalize and Cblacs_exit
   scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return 0;

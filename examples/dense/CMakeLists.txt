@@ -1,12 +1,15 @@
 add_executable(KernelRegression   EXCLUDE_FROM_ALL KernelRegression.cpp)
 add_executable(testStructured     EXCLUDE_FROM_ALL testStructured.cpp)
+add_executable(dstructured        EXCLUDE_FROM_ALL dstructured.c)
 
 target_link_libraries(KernelRegression strumpack)
 target_link_libraries(testStructured strumpack)
+target_link_libraries(dstructured strumpack)
 
 add_dependencies(examples
   KernelRegression
-  testStructured)
+  testStructured
+  dstructured)
 
 if(STRUMPACK_USE_MPI)
   add_executable(KernelRegressionMPI   EXCLUDE_FROM_ALL
@@ -26,9 +29,13 @@ if(STRUMPACK_USE_MPI)
     testStructuredMPI)
 
   if(STRUMPACK_USE_BPACK)
-    add_executable(testHODLR EXCLUDE_FROM_ALL testHODLR.cpp)
+    add_executable(testHODLR             EXCLUDE_FROM_ALL
+      testHODLR.cpp)
+    add_executable(test_HODLR_HODBF      EXCLUDE_FROM_ALL
+      test_HODLR_HODBF.cpp)
     target_link_libraries(testHODLR strumpack)
+    target_link_libraries(test_HODLR_HODBF strumpack)
 
-    add_dependencies(examples testHODLR)
+    add_dependencies(examples testHODLR test_HODLR_HODBF)
   endif()
 endif()

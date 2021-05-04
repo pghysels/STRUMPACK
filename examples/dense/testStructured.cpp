@@ -35,6 +35,10 @@ using namespace std;
 using namespace strumpack;
 
 
+/**
+ * This takes a pointer to a structured::StructureMatrix and prints
+ * out the memory usage, and the maximum rank.
+ */
 template<typename scalar_t> void
 print_info(const structured::StructuredMatrix<scalar_t>* H,
            const structured::StructuredOptions<scalar_t>& opts) {
@@ -44,45 +48,88 @@ print_info(const structured::StructuredMatrix<scalar_t>* H,
   cout << "  - rank(H) = " << H->rank() << endl;
 }
 
+
+/**
+ * Check the accuracy of a structured::StructuredMatrix by comparing
+ * it with a DenseMatrix. This should only be used on a relatively
+ * small matrix, as the storage of the DenseMatrix will become a
+ * bottleneck for larger problems.
+ */
 template<typename scalar_t> void
 check_accuracy(const DenseMatrix<scalar_t>& A,
                const structured::StructuredMatrix<scalar_t>* H) {
-  DenseMatrix<scalar_t> id(A.rows(), A.cols()), Hdense(A.rows(), A.cols());
+  // allocate 2 A.rows x A.cols matrices
+  DenseMatrix<scalar_t> id(A.rows(), A.cols()),
+    Hdense(A.rows(), A.cols());
+  // set id to the identity matrix
   id.eye();
+  // compute dense representation of H as H*I
   H->mult(Trans::N, id, Hdense);
+  // compute relative Frobenius norm of the compression error
   cout << "  - ||A-H||_F/||A||_F = "
        << Hdense.sub(A).normF() / A.normF() << endl;
 }
 
+
+/**
+ * Factor a structured::StructuredMatrix and solve a linear system
+ * with nrhs right-hand side vectors.
+ */
 template<typename scalar_t> void
 factor_and_solve(int nrhs,
                  const DenseMatrix<scalar_t>& A,
                  structured::StructuredMatrix<scalar_t>* H) {
+  // Allocate memory for rhs and solution vectors (matrices)
   DenseMatrix<scalar_t> B(H->rows(), nrhs), X(H->rows(), nrhs);
+  // Pick a random exact solution
   X.random();
+  // Compute the right-hand side B as B=H*X
   H->mult(Trans::N, X, B);
+  // Compute a factorization of H. The factors are stored in H.
   H->factor();
+  // Solve a linear system H*X=B, input is the right-hand side B,
+  // which will be overwritten with the solution X.
   H->solve(B);
+  // Compute the relative error on the solution.
   cout << "  - ||X-H\\(H*X)||_F/||X||_F = "
        << B.sub(X).normF() / X.normF() << endl;
 
+
+  // Same as above, but now we compute the right-hand side as B=A*X
+  // (instead of B=H*X)
   gemm(Trans::N, Trans::N, scalar_t(1.), A, X, scalar_t(0.), B);
   // H->factor(); // already called
+  // solve a linear system H*X=B, input is the right-hand side B,
+  // which will be overwritten with the solution X.
   H->solve(B);
+  // Compute the relative error on the solution. This now includes the
+  // compression error.
   cout << "  - ||X-H\\(A*X)||_F/||X||_F = "
        << B.sub(X).normF() / X.normF() << endl;
 }
 
+
+/**
+ * Use the structured::StructuredMatrix as a preconditioner in an
+ * iterative solver. Here we use the dense matrix for the exact
+ * matrix-vector product. However, the user can provide a faster
+ * algorithm (f.i. using a sparse matrix, a fast transformation, ..)
+ * This works only for a single right-hans side.
+ */
 template<typename scalar_t> void
 preconditioned_solve(const DenseMatrix<scalar_t>& A,
                      structured::StructuredMatrix<scalar_t>* H) {
 
   // Preconditioned solves only work for a single right-hand side
+
   int nrhs = 1, n = A.rows();
+  // Allocate memory for rhs and solution vectors
   DenseMatrix<scalar_t> B(n, nrhs), X(n, nrhs);
+  // Pick a random exact solution
   X.random();
+  // Keep a copy of the exact solution X
   DenseMatrix<scalar_t> Xexact(X);
-  // B = A*X
+  // compute the right-hand side vector B as B = A*X
   gemm(Trans::N, Trans::N, scalar_t(1.), A, X, scalar_t(0.), B);
 
   // factor the structured matrix, so it can be used as a preconditioner
@@ -91,38 +138,48 @@ preconditioned_solve(const DenseMatrix<scalar_t>& A,
   int iterations = 0, maxit = 50, restart = 50;
   iterative::GMRes<scalar_t>
     ([&A](const scalar_t* v, scalar_t* w) {
-       // matrix-vector product with exact matrix
+       // Compute a matrix-vector product with the exact
+       // (non-compressed) matrix.  The user might have a fast
+       // matrix-vector product instead of this dense matrix
+       // multiplication.
        gemv(Trans::N, scalar_t(1.), A, v, 1, scalar_t(0.), w, 1);
      },
       [&H, &n](scalar_t* v) {
-        // preconditioning with structured matrix
+        // Apply the preconditioner H: solve a linear system H*w=v,
+        // with 1 right-hand side vector v, with leading dimension n
         H->solve(1, v, n);
       },
-      n, X.data(), B.data(),
-      1e-10, 1e-14, // rtol, atol
-      iterations, maxit,
-      restart, GramSchmidtType::CLASSICAL,
-      false, true);  // initial guess, verbose
+      n, X.data(), B.data(),  // matrix size, solution, right-hand side
+      1e-10, 1e-14,           // rtol, atol
+      iterations, maxit,      // iterations (output), maximum nr of iterations
+      restart,                // GMRes restart
+      GramSchmidtType::CLASSICAL,
+      false, true);           // use initial guess, verbose
 
+  // Compute the relative error
   cout << "  - ||X-A\\(A*X)||_F/||X||_F = "
        << X.sub(Xexact).normF() / Xexact.normF() << endl;
 
 
   iterative::BiCGStab<scalar_t>
     ([&A](const scalar_t* v, scalar_t* w) {
-       // matrix-vector product with exact matrix
+       // Compute a matrix-vector product with the exact
+       // (non-compressed) matrix.  The user might have a fast
+       // matrix-vector product instead of this dense matrix
+       // multiplication.
        gemv(Trans::N, scalar_t(1.), A, v, 1, scalar_t(0.), w, 1);
      },
       [&H, &n](scalar_t* v) {
-        // preconditioning with structured matrix
-        DenseMatrixWrapper<scalar_t> V(n, 1, v, n);
-        H->solve(V);
+        // Apply the preconditioner H: solve a linear system H*w=v,
+        // with 1 right-hand side vector v, with leading dimension n
+        H->solve(1, v, n);
       },
-      n, X.data(), B.data(),
-      1e-10, 1e-14, // rtol, atol
-      iterations, maxit,
-      false, true);  // initial guess, verbose
+      n, X.data(), B.data(),  // matrix size, solution, right-hand side
+      1e-10, 1e-14,           // rtol, atol
+      iterations, maxit,      // iterations (output), maximum nr of iterations
+      false, true);           // use initial guess, verbose
 
+  // Compute the relative error
   cout << "  - ||X-A\\(A*X)||_F/||X||_F = "
        << X.sub(Xexact).normF() / Xexact.normF() << endl;
 }
@@ -131,37 +188,39 @@ preconditioned_solve(const DenseMatrix<scalar_t>& A,
 
 
 int main(int argc, char* argv[]) {
+  // matrix size and number of right-hand sides
   int n = 1000, nrhs = 10;
   if (argc > 1) n = stoi(argv[1]);
 
+  // Define an options object, set to the default options.
   structured::StructuredOptions<double> options;
+  // Suppress some output
   options.set_verbose(false);
+  // Parse options passed on the command line, run with --help to see
+  // more.
   options.set_from_command_line(argc, argv);
 
 
-  // Routine to compute individual elements of the matrix.
+  // Define the matrix through a routine to compute individual
+  // elements of the matrix. This is compatible with the
+  // structured::extract_t type, which is:
+  // std::function<scalar_t(std::size_t,std::size_t)>
   auto Toeplitz =
     [](int i, int j) {
       return 1. / (1. + abs(i-j));
     };
 
-  // routine to compute sub-block of the matrix. Often this could be
-  // implemented more efficiently than computing element per element.
-  auto Toeplitz_block =
-    [&Toeplitz](const std::vector<std::size_t>& I,
-                const std::vector<std::size_t>& J,
-                DenseMatrix<double>& B) {
-      for (std::size_t j=0; j<J.size(); j++)
-        for (std::size_t i=0; i<I.size(); i++)
-          B(i, j) = Toeplitz(I[i], J[j]);
-    };
 
-  // construct a dense representation of the Toeplitz matrix (for
-  // illustration purpose, this can be avoided to save memory)
+  // Construct a dense representation of the Toeplitz matrix. This is
+  // mainly for illustration purposes, and to check the accuracy of
+  // the final compressed matrix. In practice it can be avoided to
+  // build the entire matrix as dense.
   DenseMatrix<double> A(n, n, Toeplitz);
 
-  // Matrix-vector multiplication routine. Ideally, user can provide a
-  // faster implementation.
+  // Define a matrix-vector multiplication routine. In this case we
+  // simply call the optimized gemm (dense matrix-matrix
+  // multiplication) algorithm. Ideally, the user would provide a
+  // faster algorithm.
   auto Amult =
     [&A](Trans t, const DenseMatrix<double>& R,
          DenseMatrix<double>& S) {
@@ -175,6 +234,9 @@ int main(int argc, char* argv[]) {
   tree.refine(options.leaf_size());
 
 
+  // In the tests below, we try all the following StructuredMatrix
+  // Types. In practice, you pick one by for instance setting:
+  //    options.set_type(structured::Type::BLR)
   std::vector<structured::Type> types =
     {structured::Type::BLR,
      structured::Type::HSS,
@@ -185,6 +247,7 @@ int main(int argc, char* argv[]) {
   // testStructuredMPI
 
 
+  // Print how much memory the dense matrix representation takes.
   cout << "dense " << A.rows() << " x " << A.cols() << " matrix" << endl;
   cout << "  - memory(A) = " << A.memory() / 1e6 << " MByte"
        << endl << endl;
@@ -192,19 +255,30 @@ int main(int argc, char* argv[]) {
   cout << "===============================" << endl;
   cout << " Compression from dense matrix" << endl;
   cout << "===============================" << endl;
+  // loop over all structured::Type
   for (auto type : types) {
     options.set_type(type);
     try {
       {
-        // construct a StructuredMatrix from a dense matrix
+        // Construct a StructuredMatrix from a dense matrix and given
+        // options.
         auto H = structured::construct_from_dense(A, options);
+        // Print the memory usage etc for H
         print_info(H.get(), options);
+        // Check the compression accuracy by comparing with the dense
+        // matrix
         check_accuracy(A, H.get());
+        // Factor H and (approximately) solve a linear system
         factor_and_solve(nrhs, A, H.get());
+        // Solve a linear system using an iterative solver with H as
+        // the preconditioner and using A as the exact matrix vector
+        // product.
         preconditioned_solve(A, H.get());
       }
       {
-        // user can define the ClusterTree
+        // exactly the same as above, but now with an additional
+        // optional argument tree, the ClusterTree, see also
+        // strumpack::binary_tree_clustering
         auto H = structured::construct_from_dense(A, options, &tree);
         print_info(H.get(), options);
         check_accuracy(A, H.get());
@@ -225,7 +299,9 @@ int main(int argc, char* argv[]) {
     options.set_type(type);
     try {
       {
-        // construct from individual elements
+        // Construct a structured::StructuredMatrix from individual
+        // elements. A ClusterTree for the rows (and columns) can also
+        // be provided.
         auto H = structured::construct_from_elements<double>
           (n, n, Toeplitz, options);
         print_info(H.get(), options);
@@ -234,7 +310,19 @@ int main(int argc, char* argv[]) {
         preconditioned_solve(A, H.get());
       }
       {
-        // constrcut from sub-blocks (could have better performance)
+        // routine to compute sub-block of the matrix. Often this could be
+        // implemented more efficiently than computing element per element.
+        auto Toeplitz_block =
+          [&Toeplitz](const std::vector<std::size_t>& I,
+                      const std::vector<std::size_t>& J,
+                      DenseMatrix<double>& B) {
+            for (std::size_t j=0; j<J.size(); j++)
+              for (std::size_t i=0; i<I.size(); i++)
+                B(i, j) = Toeplitz(I[i], J[j]);
+          };
+
+        // Construct a StructuredMatrix from matrix sub-blocks (could
+        // have better performance) instead of individual elements.
         auto H = structured::construct_from_elements<double>
           (n, n, Toeplitz_block, options);
         print_info(H.get(), options);
@@ -256,6 +344,12 @@ int main(int argc, char* argv[]) {
     options.set_type(type);
     try {
 
+      // Construct a StructuredMatrix using both a (fast)
+      // matrix-vector multiplication and an element extraction
+      // routine. This is mainly usefull for HSS construction, which
+      // requires element extraction for the diagonal blocks and
+      // random projection with the matrix-vector multiplication for
+      // the off-diagonal compression.
       auto H = structured::construct_partially_matrix_free<double>
         (n, n, Amult, Toeplitz, options);
       print_info(H.get(), options);

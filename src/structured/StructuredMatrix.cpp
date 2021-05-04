@@ -209,7 +209,9 @@ namespace strumpack {
             }
           };
         HSS::HSSOptions<scalar_t> hss_opts(opts);
-        auto H = new HSS::HSSMatrix<scalar_t>(rows, cols, hss_opts);
+        auto H = row_tree ?
+          new HSS::HSSMatrix<scalar_t>(*row_tree, hss_opts) :
+          new HSS::HSSMatrix<scalar_t>(rows, cols, hss_opts);
         H->compress(sample, A, hss_opts);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
       } break;
@@ -371,7 +373,9 @@ namespace strumpack {
       switch (opts.type()) {
       case Type::HSS: {
         HSS::HSSOptions<scalar_t> hss_opts(opts);
-        auto H = new HSS::HSSMatrix<scalar_t>(rows, cols, hss_opts);
+        auto H = row_tree ?
+          new HSS::HSSMatrix<scalar_t>(*row_tree, hss_opts) :
+          new HSS::HSSMatrix<scalar_t>(rows, cols, hss_opts);
         using DenseM_t = DenseMatrix<scalar_t>;
         auto sample =
           [&Amult](DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
@@ -496,7 +500,9 @@ namespace strumpack {
       case Type::HSS: {
         HSS::HSSOptions<scalar_t> hss_opts(opts);
         return std::unique_ptr<StructuredMatrix<scalar_t>>
-          (new HSS::HSSMatrixMPI<scalar_t>(A, hss_opts));
+          (row_tree ?
+           new HSS::HSSMatrixMPI<scalar_t>(*row_tree, A, hss_opts) :
+           new HSS::HSSMatrixMPI<scalar_t>(A, hss_opts));
       } break;
       case Type::BLR:
         throw std::invalid_argument("Not implemented yet.");
@@ -522,13 +528,14 @@ namespace strumpack {
         if (A.rows() != A.cols())
           throw std::invalid_argument
             ("HODBF compression only supported for square matrices.");
-        structured::ClusterTree t(A.rows());
-        t.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
         hodbf_opts.set_butterfly_levels(1000);
         hodbf_opts.set_BF_entry_n15(true);
         auto H = new HODLR::HODLRMatrix<scalar_t>
-          (A.Comm(), t, hodbf_opts);
+          (A.Comm(),
+           row_tree ? *row_tree :
+           structured::ClusterTree(A.rows()).refine(opts.leaf_size()),
+           hodbf_opts);
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
 #else
@@ -538,14 +545,15 @@ namespace strumpack {
       } break;
       case Type::BUTTERFLY: {
 #if defined(STRUMPACK_USE_BPACK)
-        structured::ClusterTree tr(A.rows()), tc(A.cols());
-        tr.refine(opts.leaf_size());
-        tc.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
         hodbf_opts.set_butterfly_levels(1000);
         hodbf_opts.set_BF_entry_n15(true);
         auto H = new HODLR::ButterflyMatrix<scalar_t>
-          (A.Comm(), tr, tc, hodbf_opts);
+          (A.Comm(),
+           row_tree ? *row_tree : structured::ClusterTree(A.rows()).refine(opts.leaf_size()),
+           col_tree ? *col_tree : (row_tree ? *row_tree :
+                                   structured::ClusterTree(A.cols()).refine(opts.leaf_size())),
+           hodbf_opts);
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
 #else
@@ -560,7 +568,10 @@ namespace strumpack {
         lr_opts.set_butterfly_levels(0);
         lr_opts.set_BF_entry_n15(true);
         auto H = new HODLR::ButterflyMatrix<scalar_t>
-          (A.Comm(), tr, tc, lr_opts);
+          (A.Comm(),
+           structured::ClusterTree(A.rows()),
+           structured::ClusterTree(A.cols()),
+           lr_opts);
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
 #else
@@ -709,11 +720,12 @@ namespace strumpack {
         if (rows != cols)
           throw std::invalid_argument
             ("HODLR compression only supported for square matrices.");
-        structured::ClusterTree t(rows);
-        t.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> hodlr_opts(opts);
         hodlr_opts.set_BF_entry_n15(true);
-        auto H = new HODLR::HODLRMatrix<scalar_t>(comm, t, hodlr_opts);
+        auto H = new HODLR::HODLRMatrix<scalar_t>
+          (comm, row_tree ? *row_tree :
+           structured::ClusterTree(rows).refine(opts.leaf_size()),
+           hodlr_opts);
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
 #else
@@ -726,12 +738,13 @@ namespace strumpack {
         if (rows != cols)
           throw std::invalid_argument
             ("HODBF compression only supported for square matrices.");
-        structured::ClusterTree t(rows);
-        t.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
         hodbf_opts.set_butterfly_levels(1000);
         hodbf_opts.set_BF_entry_n15(true);
-        auto H = new HODLR::HODLRMatrix<scalar_t>(comm, t, hodbf_opts);
+        auto H = new HODLR::HODLRMatrix<scalar_t>
+          (comm, row_tree ? *row_tree :
+           structured::ClusterTree(rows).refine(opts.leaf_size()),
+           hodbf_opts);
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
 #else
@@ -741,14 +754,15 @@ namespace strumpack {
       } break;
       case Type::BUTTERFLY: {
 #if defined(STRUMPACK_USE_BPACK)
-        structured::ClusterTree tr(rows), tc(cols);
-        tr.refine(opts.leaf_size());
-        tc.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
         hodbf_opts.set_butterfly_levels(1000);
         hodbf_opts.set_BF_entry_n15(true);
         auto H = new HODLR::ButterflyMatrix<scalar_t>
-          (comm, tr, tc, hodbf_opts);
+          (comm,
+           row_tree ? *row_tree : structured::ClusterTree(rows).refine(opts.leaf_size()),
+           col_tree ? *col_tree : (row_tree ? *row_tree :
+                                   structured::ClusterTree(cols).refine(opts.leaf_size())),
+           hodbf_opts);
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
 #else
@@ -761,7 +775,8 @@ namespace strumpack {
         structured::ClusterTree tr(rows), tc(cols);
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
         auto H = new HODLR::ButterflyMatrix<scalar_t>
-          (comm, tr, tc, hodbf_opts);
+          (comm, structured::ClusterTree(rows),
+           structured::ClusterTree(cols), hodbf_opts);
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
 #else
@@ -824,11 +839,12 @@ namespace strumpack {
         if (rows != cols)
           throw std::invalid_argument
             ("HODLR compression only supported for square matrices.");
-        structured::ClusterTree t(rows);
-        t.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> hodlr_opts(opts);
         hodlr_opts.set_BF_entry_n15(true);
-        auto H = new HODLR::HODLRMatrix<scalar_t>(comm, t, hodlr_opts);
+        auto H = new HODLR::HODLRMatrix<scalar_t>
+          (comm, row_tree ? *row_tree :
+           structured::ClusterTree(rows).refine(opts.leaf_size()),
+           hodlr_opts);
         auto Tmult = [&A, &H, &g, &rows, &cols]
           (Trans op, const DenseMatrix<scalar_t>& R,
            DenseMatrix<scalar_t>& S) {
@@ -851,12 +867,13 @@ namespace strumpack {
         if (rows != cols)
           throw std::invalid_argument
             ("HODBF compression only supported for square matrices.");
-        structured::ClusterTree t(rows);
-        t.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
         hodbf_opts.set_butterfly_levels(1000);
         hodbf_opts.set_BF_entry_n15(true);
-        auto H = new HODLR::HODLRMatrix<scalar_t>(comm, t, hodbf_opts);
+        auto H = new HODLR::HODLRMatrix<scalar_t>
+          (comm, row_tree ? *row_tree :
+           structured::ClusterTree(rows).refine(opts.leaf_size()),
+           hodbf_opts);
         auto Tmult = [&A, &H, &g, &rows, &cols]
           (Trans op, const DenseMatrix<scalar_t>& R,
            DenseMatrix<scalar_t>& S) {
@@ -876,14 +893,15 @@ namespace strumpack {
       } break;
       case Type::BUTTERFLY: {
 #if defined(STRUMPACK_USE_BPACK)
-        structured::ClusterTree tr(rows), tc(cols);
-        tr.refine(opts.leaf_size());
-        tc.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
         hodbf_opts.set_butterfly_levels(1000);
         hodbf_opts.set_BF_entry_n15(true);
         auto H = new HODLR::ButterflyMatrix<scalar_t>
-          (comm, tr, tc, hodbf_opts);
+          (comm,
+           row_tree ? *row_tree : structured::ClusterTree(rows).refine(opts.leaf_size()),
+           col_tree ? *col_tree : (row_tree ? *row_tree :
+                                   structured::ClusterTree(cols).refine(opts.leaf_size())),
+           hodbf_opts);
         auto Tmult = [&A, &H, &g, &rows, &cols]
           (Trans op, scalar_t alpha, const DenseMatrix<scalar_t>& R,
            scalar_t beta, DenseMatrix<scalar_t>& S) {
@@ -906,10 +924,10 @@ namespace strumpack {
       } break;
       case Type::LR: {
 #if defined(STRUMPACK_USE_BPACK)
-        structured::ClusterTree tr(rows), tc(cols);
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
         auto H = new HODLR::ButterflyMatrix<scalar_t>
-          (comm, tr, tc, hodbf_opts);
+          (comm, structured::ClusterTree(rows),
+           structured::ClusterTree(cols), hodbf_opts);
         auto Tmult = [&A, &H, &g, &rows, &cols]
           (Trans op, scalar_t alpha,
            const DenseMatrix<scalar_t>& R,
@@ -986,11 +1004,12 @@ namespace strumpack {
         if (rows != cols)
           throw std::invalid_argument
             ("HODLR compression only supported for square matrices.");
-        structured::ClusterTree t(rows);
-        t.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> hodlr_opts(opts);
         hodlr_opts.set_BF_entry_n15(true);
-        auto H = new HODLR::HODLRMatrix<scalar_t>(comm, t, hodlr_opts);
+        auto H = new HODLR::HODLRMatrix<scalar_t>
+          (comm, row_tree ? *row_tree :
+           structured::ClusterTree(rows).refine(opts.leaf_size()),
+           hodlr_opts);
         auto Tmult = [&A, &H]
           (Trans op, const DenseMatrix<scalar_t>& R,
            DenseMatrix<scalar_t>& S) {
@@ -1003,12 +1022,13 @@ namespace strumpack {
         if (rows != cols)
           throw std::invalid_argument
             ("HODBF compression only supported for square matrices.");
-        structured::ClusterTree t(rows);
-        t.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
         hodbf_opts.set_butterfly_levels(1000);
         hodbf_opts.set_BF_entry_n15(true);
-        auto H = new HODLR::HODLRMatrix<scalar_t>(comm, t, hodbf_opts);
+        auto H = new HODLR::HODLRMatrix<scalar_t>
+          (comm, row_tree ? *row_tree :
+           structured::ClusterTree(rows).refine(opts.leaf_size()),
+           hodbf_opts);
         auto Tmult = [&A, &H]
           (Trans op, const DenseMatrix<scalar_t>& R,
            DenseMatrix<scalar_t>& S) {
@@ -1018,14 +1038,15 @@ namespace strumpack {
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
       } break;
       case Type::BUTTERFLY: {
-        structured::ClusterTree tr(rows), tc(cols);
-        tr.refine(opts.leaf_size());
-        tc.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
         hodbf_opts.set_butterfly_levels(1000);
         hodbf_opts.set_BF_entry_n15(true);
         auto H = new HODLR::ButterflyMatrix<scalar_t>
-          (comm, tr, tc, hodbf_opts);
+          (comm,
+           row_tree ? *row_tree : structured::ClusterTree(rows).refine(opts.leaf_size()),
+           col_tree ? *col_tree : (row_tree ? *row_tree :
+                                   structured::ClusterTree(cols).refine(opts.leaf_size())),
+           hodbf_opts);
         auto Tmult = [&A, &H]
           (Trans op, scalar_t alpha, const DenseMatrix<scalar_t>& R,
            scalar_t beta, DenseMatrix<scalar_t>& S) {
@@ -1040,7 +1061,8 @@ namespace strumpack {
         structured::ClusterTree tr(rows), tc(cols);
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
         auto H = new HODLR::ButterflyMatrix<scalar_t>
-          (comm, tr, tc, hodbf_opts);
+          (comm, structured::ClusterTree(rows),
+           structured::ClusterTree(cols), hodbf_opts);
         auto Tmult = [&A, &H]
           (Trans op, scalar_t alpha,
            const DenseMatrix<scalar_t>& R,
@@ -1096,11 +1118,23 @@ namespace strumpack {
     }
     template<typename scalar_t> void
     StructuredMatrix<scalar_t>::mult(Trans op,
+                                     int m, const scalar_t* x, int ldx,
+                                     scalar_t* y, int ldy) const {
+      DenseMatrixWrapper<scalar_t>
+        Y(op == Trans::N ? rows() : cols(), m, y, ldy);
+      auto X = ConstDenseMatrixWrapperPtr
+        (op == Trans::N ? cols() : rows(), m, x, ldx);
+      mult(op, *X, Y);
+    }
+    template<typename scalar_t> void
+    StructuredMatrix<scalar_t>::mult(Trans op,
                                      const DistributedMatrix<scalar_t>& x,
                                      DistributedMatrix<scalar_t>& y) const {
       throw std::invalid_argument
         ("Operation mult(Dist) not implemented for this type.");
     }
+
+
     template<typename scalar_t> void
     StructuredMatrix<scalar_t>::factor() {
       throw std::invalid_argument
