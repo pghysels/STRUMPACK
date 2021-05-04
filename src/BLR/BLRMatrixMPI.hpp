@@ -117,10 +117,11 @@ namespace strumpack {
       bool active() const { return grid_->active(); }
 
       void fill(scalar_t v);
+      void fill_col(scalar_t v, int k);
 
       std::vector<int> factor(const Opts_t& opts);
       std::vector<int> factor(const adm_t& adm, const Opts_t& opts);
-      std::vector<int> factor_colwise(const adm_t& adm, const Opts_t& opts); //const SpMat_t& A, 
+      std::vector<int> factor_colwise(const adm_t& adm, const Opts_t& opts, const std::function<void(int)>& blockcol);
 
       void laswp(const std::vector<int>& piv, bool fwd);
 

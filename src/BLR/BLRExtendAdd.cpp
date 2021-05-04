@@ -134,6 +134,57 @@ namespace strumpack {
     }
 
     template<typename scalar_t,typename integer_t> void
+    BLRExtendAdd<scalar_t,integer_t>::copy_to_buffers_col
+    (const BLRMPI_t& CB, VVS_t& sbuf, const FBLRMPI_t* pa, const VI_t& I) {
+      if (!CB.active()) return;
+      // TODO expand CB to dense, per block column
+      // CB.to_dense();
+      const int lrows = CB.lrows();
+      const int lcols = CB.lcols();
+      const int pa_sep = pa->dim_sep();
+      const int nprows = pa->grid2d().nprows();
+      // destination rank is pr[r] + pc[c]
+      std::unique_ptr<int[]> work(new int[lrows+lcols]);
+      auto pr = work.get();
+      auto pc = pr + CB.lrows();
+      int r_upd, c_upd;
+      for (r_upd=0; r_upd<lrows; r_upd++) {
+        auto t = I[CB.rl2g(r_upd)];
+        if (t >= std::size_t(pa_sep)) break;
+        pr[r_upd] = pa->sep_rg2p(t);
+      }
+      for (int r=r_upd; r<lrows; r++)
+        pr[r] = pa->upd_rg2p(I[CB.rl2g(r)]-pa_sep);
+      for (c_upd=0; c_upd<lcols; c_upd++) {
+        auto t = I[CB.cl2g(c_upd)];
+        if (t >= std::size_t(pa_sep)) break;
+        pc[c_upd] = pa->sep_cg2p(t) * nprows;
+      }
+      for (int c=c_upd; c<lcols; c++)
+        pc[c] = pa->upd_cg2p(I[CB.cl2g(c)]-pa_sep) * nprows;
+      { // reserve space for the send buffers
+        VI_t cnt(sbuf.size());
+        for (int c=0; c<lcols; c++)
+          for (int r=0; r<lrows; r++)
+            cnt[pr[r]+pc[c]]++;
+        for (std::size_t p=0; p<sbuf.size(); p++)
+          sbuf[p].reserve(sbuf[p].size()+cnt[p]);
+      }
+      for (int c=0; c<c_upd; c++) // F11
+        for (int r=0, pcc=pc[c]; r<r_upd; r++)
+          sbuf[pr[r]+pcc].push_back(CB(r,c));
+      for (int c=c_upd; c<lcols; c++) // F12
+        for (int r=0, pcc=pc[c]; r<r_upd; r++)
+          sbuf[pr[r]+pcc].push_back(CB(r,c));
+      for (int c=0; c<c_upd; c++) // F21
+        for (int r=r_upd, pcc=pc[c]; r<lrows; r++)
+          sbuf[pr[r]+pcc].push_back(CB(r,c));
+      for (int c=c_upd; c<lcols; c++) // F22
+        for (int r=r_upd, pcc=pc[c]; r<lrows; r++)
+          sbuf[pr[r]+pcc].push_back(CB(r,c));
+    }
+
+    template<typename scalar_t,typename integer_t> void
     BLRExtendAdd<scalar_t,integer_t>::copy_from_buffers
     (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
      scalar_t** pbuf, const FBLRMPI_t* pa, const FBLRMPI_t* ch) {

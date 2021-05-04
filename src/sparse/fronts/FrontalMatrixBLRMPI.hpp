@@ -56,10 +56,10 @@ namespace strumpack {
 
     void release_work_memory() override;
     void build_front(const SpMat_t& A);
-    void build_front_cols(const SpMat_t& A, int CP, std::size_t i);
+    void build_front_cols(const SpMat_t& A, std::size_t i, const std::vector<Triplet<scalar_t>>& rbuf);
 
     void extend_add();
-    void extend_add_cols(int CP, std::size_t i);
+    void extend_add_cols(std::size_t i);
     void extend_add_copy_to_buffers
     (std::vector<std::vector<scalar_t>>& sbuf,
      const FMPI_t* pa) const override;
@@ -67,9 +67,9 @@ namespace strumpack {
     void extadd_blr_copy_to_buffers
     (std::vector<std::vector<scalar_t>>& sbuf,
      const FBLRMPI_t* pa) const override;
-    /*void extadd_blr_copy_to_buffers_col
+    void extadd_blr_copy_to_buffers_col
     (std::vector<std::vector<scalar_t>>& sbuf,
-     const FBLRMPI_t* pa) const override;*/
+     const FBLRMPI_t* pa) const override;
     void extadd_blr_copy_from_buffers
     (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
      scalar_t** pbuf, const FBLRMPI_t* pa) const override;

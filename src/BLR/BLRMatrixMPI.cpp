@@ -78,6 +78,18 @@ namespace strumpack {
           }
     }
 
+    template<typename scalar_t> void
+    BLRMatrixMPI<scalar_t>::fill_col(scalar_t v, int k) {
+      for (std::size_t i=0; i<brows_; i++)
+        for (std::size_t j=k; j<static_cast<std::size_t>(k+grid_->npcols()); j++)
+          if (grid_->is_local(i, j)) {
+            std::unique_ptr<DenseTile<scalar_t>> t
+              (new DenseTile<scalar_t>(tilerows(i), tilecols(j)));
+            t->D().fill(v);
+            block(i, j) = std::move(t);
+          }
+    }
+
     template<typename scalar_t> std::size_t
     BLRMatrixMPI<scalar_t>::memory() const {
       std::size_t mem = 0;
@@ -2489,65 +2501,42 @@ namespace strumpack {
 
 
     template<typename scalar_t> std::vector<int>
-    BLRMatrixMPI<scalar_t>::factor_colwise(const adm_t& adm, const Opts_t& opts){ //, const SpMat_t& A
+    BLRMatrixMPI<scalar_t>::factor_colwise(const adm_t& adm, const Opts_t& opts, const std::function<void(int)>& blockcol){
       std::vector<int> piv;
       std::vector<std::vector<int> > piv_tile_global;
       std::vector<int> piv_tile;
       if (!grid()->active()) return piv;
       DenseTile<scalar_t> Tcc;
-      std::vector<DenseTile<scalar_t> > Tcc_vec; //change Tcc to Tcc_vec when needed
+      std::vector<DenseTile<scalar_t> > Tcc_vec;
       auto CP = grid()->npcols();
       for (std::size_t i=0; i<colblocks(); i+=CP) {
-        std::vector<std::vector<std::unique_ptr<BLRTile<scalar_t>>> > Tkc_vec, Tcj_vec;
+        //std::vector<std::vector<std::unique_ptr<BLRTile<scalar_t>>> > Tkc_vec, Tcj_vec;
         //construct the (i/CP+1) CP block-columns as dense tiles
-        //FrontalMatrixBLRMPI<scalar_t,integer_t>::build_front_cols(A, CP, i);
-        //FrontalMatrixBLRMPI<scalar_t,integer_t>::extend_add_cols(CP, i);
+        blockcol(i);
         if (i > 0) {
           for (std::size_t k=0; k<i; k++){
-            Tkc_vec.push_back(bcast_col_of_tiles_along_rows(k+1, rowblocks(), k));
-          }
-          for (std::size_t k=0; k<std::min(i, rowblocks()); k++) {
             if (grid()->is_local_row(k)) {
               for (std::size_t j=i; j<std::min(i+CP, colblocks()); j++) {
                 if (grid()->is_local_col(j)) {
-	                if (k != 0) {
-                    for (std::size_t lk=0; lk<k; lk++) {
-                      std::size_t lj;
-                      if ( static_cast<int>(k-lk) <= grid()->nprows()) 
-                        lj = 0;
-                      else if ((k-lk) % grid()->nprows() == 0)
-                        lj = std::floor((k-lk-1)/grid()->nprows());
-                      else 
-                        lj = std::floor((k-lk)/grid()->nprows());
-                      gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc_vec[lk][lj]),
-                          *(Tcj_vec[lk][0]), scalar_t(1.), tile_dense(k, j).D());
-                    }
-                  }
                   if (adm(k, j)) compress_tile(k, j, opts);
                   tile(k, j).laswp(piv_tile, true);
                   trsm(Side::L, UpLo::L, Trans::N, Diag::U,
                           scalar_t(1.), Tcc_vec[k], tile(k, j));
                 }
               }
-              Tcj_vec.push_back(bcast_row_of_tiles_along_cols(k, i, std::min(i+CP, colblocks())));
             }
-          }
-          for (std::size_t r=i; r<rowblocks(); r++) {
-            if (grid()->is_local_row(r)) {
-              for (std::size_t c=i; c<std::min(i+CP, colblocks()); c++) {
-                if (grid()->is_local_col(c)) {
-	                for (std::size_t j=0; j<i; j++) {
-                    std::size_t lj;
-                    if ( static_cast<int>(r-j) <= grid()->nprows()) 
-                      lj = 0;
-                    else if ((r-j) % grid()->nprows() == 0)
-                      lj = std::floor((r-j-1)/grid()->nprows());
-                    else 
-                      lj = std::floor((r-j)/grid()->nprows());
-                    gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc_vec[j][lj]),
-                          *(Tcj_vec[j][0]), scalar_t(1.), tile_dense(r, c).D());
+            auto Tkc = bcast_col_of_tiles_along_rows(k+1, rowblocks(), k);
+            auto Tcj = bcast_row_of_tiles_along_cols(k, i, std::min(i+CP, colblocks()));
+            for (std::size_t lk=k+1, c=0; lk<rowblocks(); lk++) {
+              if (grid()->is_local_row(lk)) {
+                for (std::size_t lj=i, r=0; lj<std::min(i+CP, colblocks()); lj++) {
+                  if (grid()->is_local_col(lj)) {
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc[c]),
+                          *(Tcj[r]), scalar_t(1.), tile_dense(lk, lj).D());
+                    r++;
                   }
                 }
+                c++;
               }
             }
           }
