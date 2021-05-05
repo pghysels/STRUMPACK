@@ -28,22 +28,44 @@
  */
 #include <complex.h>
 #undef I
+#include <complex>
+#include <iostream>
 
 #include "StructuredMatrix.h"
 #include "StructuredMatrix.hpp"
 using namespace strumpack;
 using namespace strumpack::structured;
 
+template<typename scalar_t> void set_def_options(CSPOptions* opts) {
+  structured::StructuredOptions<scalar_t> o;
+  opts->type = static_cast<SP_STRUCTURED_TYPE>(o.type());
+  opts->rel_tol = o.rel_tol();
+  opts->abs_tol = o.abs_tol();
+  opts->leaf_size = o.leaf_size();
+  opts->max_rank = o.max_rank();
+  opts->verbose = o.verbose();
+}
+
+template<typename scalar_t> structured::StructuredOptions<scalar_t>
+get_options(CSPOptions* o) {
+  structured::StructuredOptions<scalar_t> opts;
+  opts.set_type(static_cast<structured::Type>(o->type));
+  opts.set_rel_tol(o->rel_tol);
+  opts.set_abs_tol(o->abs_tol);
+  opts.set_leaf_size(o->leaf_size);
+  opts.set_max_rank(o->max_rank);
+  opts.set_verbose(o->verbose);
+  return opts;
+}
+
+
 extern "C" {
 
-  void SP_s_struct_default_options(CSPOptions* opts) {
-  }
-  void SP_d_struct_default_options(CSPOptions* opts) {
-  }
-  void SP_c_struct_default_options(CSPOptions* opts) {
-  }
-  void SP_z_struct_default_options(CSPOptions* opts) {
-  }
+  void SP_s_struct_default_options(CSPOptions* opts) { set_def_options<float>(opts); }
+  void SP_d_struct_default_options(CSPOptions* opts) { set_def_options<double>(opts); }
+  void SP_c_struct_default_options(CSPOptions* opts) { set_def_options<std::complex<float>>(opts); }
+  void SP_z_struct_default_options(CSPOptions* opts) { set_def_options<std::complex<double>>(opts); }
+
 
   void SP_s_struct_destroy(CSPStructMat* S) {
     auto H = reinterpret_cast<StructuredMatrix<float>*>(*S);
@@ -66,84 +88,180 @@ extern "C" {
     H = NULL;
   }
 
+
   int SP_s_struct_from_dense(CSPStructMat* S, int rows, int cols,
                              float* A, int ldA, CSPOptions* opts) {
-    // TODO set from opts
-    StructuredOptions<float> o;
     try {
-      auto H = construct_from_dense<float>(rows, cols, A, ldA, o);
-      *S = H.release();
-    } catch (std::exception& e) { return 1; }
+      *S = construct_from_dense<float>
+        (rows, cols, A, ldA, get_options<float>(opts)).release();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+      return 1;
+    }
     return 0;
   }
   int SP_d_struct_from_dense(CSPStructMat* S, int rows, int cols,
                              double* A, int ldA, CSPOptions* opts) {
-    // TODO set from opts
-    StructuredOptions<double> o;
-    o.set_type(Type::HSS);
     try {
-      auto H = construct_from_dense<double>(rows, cols, A, ldA, o);
-      *S = H.release();
-    } catch (std::exception& e) { return 1; }
+      *S = construct_from_dense<double>
+        (rows, cols, A, ldA, get_options<double>(opts)).release();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+      return 1;
+    }
     return 0;
   }
   int SP_c_struct_from_dense(CSPStructMat* S, int rows, int cols,
                              float _Complex* A, int ldA, CSPOptions* opts) {
-    // TODO set from opts
-    StructuredOptions<std::complex<float>> o;
     try {
-      auto H = construct_from_dense<std::complex<float>>
-        (rows, cols, reinterpret_cast<std::complex<float>*>(A), ldA, o);
-      *S = H.release();
-    } catch (std::exception& e) { return 1; }
+      *S = construct_from_dense<std::complex<float>>
+        (rows, cols, reinterpret_cast<std::complex<float>*>(A), ldA,
+         get_options<std::complex<float>>(opts)).release();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+      return 1;
+    }
     return 0;
   }
   int SP_z_struct_from_dense(CSPStructMat* S, int rows, int cols,
                              double _Complex* A, int ldA, CSPOptions* opts) {
-    // TODO set from opts
-    StructuredOptions<std::complex<double>> o;
     try {
-      auto H = construct_from_dense<std::complex<double>>
-        (rows, cols, reinterpret_cast<std::complex<double>*>(A), ldA, o);
-      *S = H.release();
-    } catch (std::exception& e) { return 1; }
+      *S = construct_from_dense<std::complex<double>>
+        (rows, cols, reinterpret_cast<std::complex<double>*>(A), ldA,
+         get_options<std::complex<double>>(opts)).release();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+      return 1;
+    }
     return 0;
   }
 
 
 
-  int SP_s_struct_mult(CSPStructMat S, char trans, int m, float* B, int ldB, float* C, int ldC) {
-    auto H = reinterpret_cast<StructuredMatrix<float>*>(S);
-    H->mult(c2T(trans), m, B, ldB, C, ldC);
+  int SP_s_struct_mult(CSPStructMat S, char trans, int m, float* B, int ldB,
+                       float* C, int ldC) {
+    try {
+      reinterpret_cast<StructuredMatrix<float>*>(S)->
+        mult(c2T(trans), m, B, ldB, C, ldC);
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+      return 1;
+    }
     return 0;
   }
-  int SP_d_struct_mult(CSPStructMat S, char trans, int m, double* B, int ldB, double* C, int ldC) {
-    auto H = reinterpret_cast<StructuredMatrix<double>*>(S);
-    H->mult(c2T(trans), m, B, ldB, C, ldC);
+  int SP_d_struct_mult(CSPStructMat S, char trans, int m, double* B, int ldB,
+                       double* C, int ldC) {
+    try {
+      reinterpret_cast<StructuredMatrix<double>*>(S)->
+        mult(c2T(trans), m, B, ldB, C, ldC);
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+      return 1;
+    }
     return 0;
   }
-  int SP_c_struct_mult(CSPStructMat S, char trans, int m, float _Complex* B, int ldB, float _Complex* C, int ldC) {
-    auto H = reinterpret_cast<StructuredMatrix<std::complex<float>>*>(S);
-    H->mult(c2T(trans), m, reinterpret_cast<std::complex<float>*>(B), ldB,
-            reinterpret_cast<std::complex<float>*>(C), ldC);
+  int SP_c_struct_mult(CSPStructMat S, char trans, int m, float _Complex* B, int ldB,
+                       float _Complex* C, int ldC) {
+    try {
+      reinterpret_cast<StructuredMatrix<std::complex<float>>*>(S)->
+        mult(c2T(trans), m, reinterpret_cast<std::complex<float>*>(B), ldB,
+             reinterpret_cast<std::complex<float>*>(C), ldC);
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+      return 1;
+    }
     return 0;
   }
-  int SP_z_struct_mult(CSPStructMat S, char trans, int m, double _Complex* B, int ldB, double _Complex* C, int ldC) {
-    auto H = reinterpret_cast<StructuredMatrix<std::complex<double>>*>(S);
-    H->mult(c2T(trans), m, reinterpret_cast<std::complex<double>*>(B), ldB,
-            reinterpret_cast<std::complex<double>*>(C), ldC);
+  int SP_z_struct_mult(CSPStructMat S, char trans, int m, double _Complex* B, int ldB,
+                       double _Complex* C, int ldC) {
+    try {
+      reinterpret_cast<StructuredMatrix<std::complex<double>>*>(S)->
+        mult(c2T(trans), m, reinterpret_cast<std::complex<double>*>(B), ldB,
+             reinterpret_cast<std::complex<double>*>(C), ldC);
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+      return 1;
+    }
     return 0;
   }
 
-  int SP_s_struct_factor(CSPStructMat S) { return 0; }
-  int SP_d_struct_factor(CSPStructMat S) { return 0; }
-  int SP_c_struct_factor(CSPStructMat S) { return 0; }
-  int SP_z_struct_factor(CSPStructMat S) { return 0; }
+  int SP_s_struct_factor(CSPStructMat S) {
+    try {
+      reinterpret_cast<StructuredMatrix<float>*>(S)->factor();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+      return 1;
+    }
+    return 0;
+  }
+  int SP_d_struct_factor(CSPStructMat S) {
+    try {
+      reinterpret_cast<StructuredMatrix<double>*>(S)->factor();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+      return 1;
+    }
+    return 0;
+  }
+  int SP_c_struct_factor(CSPStructMat S) {
+    try {
+      reinterpret_cast<StructuredMatrix<std::complex<float>>*>(S)->factor();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+      return 1;
+    }
+    return 0;
+  }
+  int SP_z_struct_factor(CSPStructMat S) {
+    try {
+      reinterpret_cast<StructuredMatrix<std::complex<double>>*>(S)->factor();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+      return 1;
+    }
+    return 0;
+  }
 
-  int SP_s_struct_solve(CSPStructMat S, int nrhs, float* B, int ldB) { return 0; }
-  int SP_d_struct_solve(CSPStructMat S, int nrhs, double* B, int ldB) { return 0; }
-  int SP_c_struct_solve(CSPStructMat S, int nrhs, float _Complex* B, int ldB) { return 0; }
-  int SP_z_struct_solve(CSPStructMat S, int nrhs, double _Complex* B, int ldB) { return 0; }
+  int SP_s_struct_solve(CSPStructMat S, int nrhs, float* B, int ldB) {
+    try {
+      reinterpret_cast<StructuredMatrix<float>*>(S)->
+        solve(nrhs, reinterpret_cast<float*>(B), ldB);
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+      return 1;
+    }
+    return 0;
+  }
+  int SP_d_struct_solve(CSPStructMat S, int nrhs, double* B, int ldB) {
+    try {
+      reinterpret_cast<StructuredMatrix<double>*>(S)->
+        solve(nrhs, reinterpret_cast<double*>(B), ldB);
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+      return 1;
+    }
+    return 0;
+  }
+  int SP_c_struct_solve(CSPStructMat S, int nrhs, float _Complex* B, int ldB) {
+    try {
+      reinterpret_cast<StructuredMatrix<std::complex<float>>*>(S)->
+        solve(nrhs, reinterpret_cast<std::complex<float>*>(B), ldB);
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+      return 1;
+    }
+    return 0;
+  }
+  int SP_z_struct_solve(CSPStructMat S, int nrhs, double _Complex* B, int ldB) {
+    try {
+      reinterpret_cast<StructuredMatrix<std::complex<double>>*>(S)->
+        solve(nrhs, reinterpret_cast<std::complex<double>*>(B), ldB);
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+      return 1;
+    }
+    return 0;
+  }
 
 }
 

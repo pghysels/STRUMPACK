@@ -53,12 +53,12 @@ namespace strumpack {
     }
 
     /**
-     * Enumeration of possible sparse structured matrix types.
+     * Enumeration of possible structured matrix types.
      * \ingroup Enumerations
      */
-    enum class Type
+    enum class Type : int
       {
-       HSS,       /*!< Hierarchically Semi-Separable, see
+       HSS = 0,   /*!< Hierarchically Semi-Separable, see
                     HSS::HSSMatrix and HSS::HSSMatrixMPI */
        BLR,       /*!< Block Low Rank, see BLR::BLRMatrix
                     and BLR::BLRMatrixMPI */

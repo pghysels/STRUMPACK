@@ -26,8 +26,8 @@
  *             Division).
  *
  */
-#ifndef STRUMPACK_SPARSE_SOLVER_H
-#define STRUMPACK_SPARSE_SOLVER_H
+#ifndef STRUMPACK_STRUCTURED_C_H
+#define STRUMPACK_STRUCTURED_C_H
 
 #include <stdint.h>
 #include <complex.h>
@@ -40,13 +40,31 @@
 #include "mpi.h"
 #endif
 
+/**
+ * Enumeration of possible structured matrix types.
+ * See structured::Type
+ */
+typedef enum {
+              SP_TYPE_HSS = 0,
+              SP_TYPE_BLR,
+              SP_TYPE_HODLR,
+              SP_TYPE_HODBF,
+              SP_TYPE_BUTTERFLY,
+              SP_TYPE_LR,
+              SP_TYPE_LOSSY,
+              SP_TYPE_LOSSLESS
+} SP_STRUCTURED_TYPE;
+
 
 typedef struct CSPOptions {
+  SP_STRUCTURED_TYPE type;
   double rel_tol;
   double abs_tol;
   int leaf_size;
-  // ..
+  int max_rank;
+  int verbose;
 } CSPOptions;
+
 
 typedef void* CSPStructMat;
 
