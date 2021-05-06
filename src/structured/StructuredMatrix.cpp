@@ -84,7 +84,7 @@ namespace strumpack {
         return std::unique_ptr<StructuredMatrix<scalar_t>>
           (new LossyMatrix<scalar_t>(A, 16 /* TODO */));
 #else
-        throw std::
+        throw std::runtime_error
           ("Lossy compression requires ZFP to be enabled.");
 #endif
       } break;
@@ -93,7 +93,7 @@ namespace strumpack {
         return std::unique_ptr<StructuredMatrix<scalar_t>>
           (new LossyMatrix<scalar_t>(A, 0));
 #else
-        throw std::invalid_argument
+        throw std::runtime_error
           ("Lossless compression requires ZFP to be enabled.");
 #endif
       } break;
@@ -105,8 +105,6 @@ namespace strumpack {
         throw std::invalid_argument("Type BUTTERFLY requires MPI.");
       case Type::LR:
         throw std::invalid_argument("Type LR requires MPI.");
-      default:
-        throw std::invalid_argument("Unknown StructuredMatrix type.");
       }
       return std::unique_ptr<StructuredMatrix<scalar_t>>(nullptr);
     }
@@ -217,7 +215,8 @@ namespace strumpack {
       } break;
       case Type::BLR: {
         // TODO
-        throw std::invalid_argument("Not implemented yet.");
+        throw std::logic_error
+          ("BLR compression from elements not implemented yet.");
       } break;
       case Type::HODLR:
         throw std::invalid_argument("Type HODLR requires MPI.");
@@ -505,7 +504,7 @@ namespace strumpack {
            new HSS::HSSMatrixMPI<scalar_t>(A, hss_opts));
       } break;
       case Type::BLR:
-        throw std::invalid_argument("Not implemented yet.");
+        throw std::logic_error("Not implemented yet.");
       case Type::HODLR: {
 #if defined(STRUMPACK_USE_BPACK)
         if (A.rows() != A.cols())
@@ -519,7 +518,7 @@ namespace strumpack {
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
 #else
-        throw std::invalid_argument
+        throw std::runtime_error
           ("HODLR compression requires ButterflyPACK to be enabled.");
 #endif
       } break;
@@ -539,7 +538,7 @@ namespace strumpack {
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
 #else
-        throw std::invalid_argument
+        throw std::runtime_error
           ("HODBF compression requires ButterflyPACK to be enabled.");
 #endif
       } break;
@@ -557,7 +556,7 @@ namespace strumpack {
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
 #else
-        throw std::invalid_argument
+        throw std::runtime_error
           ("BUTTERFLY compression requires ButterflyPACK to be enabled.");
 #endif
       } break;
@@ -575,14 +574,14 @@ namespace strumpack {
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
 #else
-        throw std::invalid_argument
+        throw std::runtime_error
           ("LR compression requires ButterflyPACK to be enabled.");
 #endif
       }
       case Type::LOSSY:
-        throw std::invalid_argument("Not implemented yet.");
+        throw std::logic_error("Not implemented yet.");
       case Type::LOSSLESS:
-        throw std::invalid_argument("Not implemented yet.");
+        throw std::logic_error("Not implemented yet.");
       }
       return std::unique_ptr<StructuredMatrix<scalar_t>>(nullptr);
     }
@@ -618,39 +617,39 @@ namespace strumpack {
                             const structured::ClusterTree* col_tree) {
       switch (opts.type()) {
       case Type::HSS:
-        throw std::invalid_argument("Not implemented yet.");
+        throw std::logic_error("Not implemented yet.");
       case Type::BLR:
-        throw std::invalid_argument("Not implemented yet.");
+        throw std::logic_error("Not implemented yet.");
       case Type::HODLR: {
 #if defined(STRUMPACK_USE_BPACK)
         if (rows != cols)
           throw std::invalid_argument
             ("HODLR compression only supported for square matrices.");
-        throw std::invalid_argument("Not implemented yet.");
+        throw std::logic_error("Not implemented yet.");
 #else
-        throw std::invalid_argument
+        throw std::runtime_error
           ("HODLR compression requires ButterflyPACK to be enabled.");
 #endif
       } break;
       case Type::HODBF:
 #if defined(STRUMPACK_USE_BPACK)
-        throw std::invalid_argument("Not implemented yet.");
+        throw std::logic_error("Not implemented yet.");
 #else
-        throw std::invalid_argument
+        throw std::runtime_error
           ("HODBF compression requires ButterflyPACK to be enabled.");
 #endif
       case Type::BUTTERFLY:
 #if defined(STRUMPACK_USE_BPACK)
-        throw std::invalid_argument("Not implemented yet.");
+        throw std::logic_error("Not implemented yet.");
 #else
-        throw std::invalid_argument
+        throw std::runtime_error
           ("BUTTERFLY compression requires ButterflyPACK to be enabled.");
 #endif
       case Type::LR:
 #if defined(STRUMPACK_USE_BPACK)
-        throw std::invalid_argument("Not implemented yet.");
+        throw std::logic_error("Not implemented yet.");
 #else
-        throw std::invalid_argument
+        throw std::runtime_error
           ("LR compression requires ButterflyPACK to be enabled.");
 #endif
       case Type::LOSSY:
@@ -712,9 +711,9 @@ namespace strumpack {
 #endif
       switch (opts.type()) {
       case Type::HSS:
-        throw std::invalid_argument("Not implemented yet.");
+        throw std::logic_error("Not implemented yet.");
       case Type::BLR:
-        throw std::invalid_argument("Not implemented yet.");
+        throw std::logic_error("Not implemented yet.");
       case Type::HODLR: {
 #if defined(STRUMPACK_USE_BPACK)
         if (rows != cols)
@@ -729,7 +728,7 @@ namespace strumpack {
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
 #else
-        throw std::invalid_argument
+        throw std::runtime_error
           ("HODLR compression requires ButterflyPACK to be enabled.");
 #endif
       } break;
@@ -748,7 +747,7 @@ namespace strumpack {
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
 #else
-        throw std::invalid_argument
+        throw std::runtime_error
           ("HODBF compression requires ButterflyPACK to be enabled.");
 #endif
       } break;
@@ -766,7 +765,7 @@ namespace strumpack {
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
 #else
-        throw std::invalid_argument
+        throw std::runtime_error
           ("BUTTERFLY compression requires ButterflyPACK to be enabled.");
 #endif
       } break;
@@ -780,7 +779,7 @@ namespace strumpack {
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
 #else
-        throw std::invalid_argument
+        throw std::runtime_error
           ("LR compression requires ButterflyPACK to be enabled.");
 #endif
       } break;
@@ -858,7 +857,7 @@ namespace strumpack {
         H->compress(Tmult);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
 #else
-        throw std::invalid_argument
+        throw std::runtime_error
           ("HODLR compression requires ButterflyPACK to be enabled.");
 #endif
       } break;
@@ -887,7 +886,7 @@ namespace strumpack {
         H->compress(Tmult);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
 #else
-        throw std::invalid_argument
+        throw std::runtime_error
           ("HODBF compression requires ButterflyPACK to be enabled.");
 #endif
       } break;
@@ -918,7 +917,7 @@ namespace strumpack {
         H->compress(Tmult);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
 #else
-        throw std::invalid_argument
+        throw std::runtime_error
           ("BUTTERFLY compression requires ButterflyPACK to be enabled.");
 #endif
       } break;
@@ -945,7 +944,7 @@ namespace strumpack {
         H->compress(Tmult);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
 #else
-        throw std::invalid_argument
+        throw std::runtime_error
           ("LR compression requires ButterflyPACK to be enabled.");
 #endif
       } break;
@@ -1114,7 +1113,7 @@ namespace strumpack {
     StructuredMatrix<scalar_t>::mult(Trans op, const DenseMatrix<scalar_t>& x,
                                      DenseMatrix<scalar_t>& y) const {
       throw std::invalid_argument
-        ("Operation mult not implemented for this type.");
+        ("Operation mult not supported for this type.");
     }
     template<typename scalar_t> void
     StructuredMatrix<scalar_t>::mult(Trans op,
@@ -1131,24 +1130,24 @@ namespace strumpack {
                                      const DistributedMatrix<scalar_t>& x,
                                      DistributedMatrix<scalar_t>& y) const {
       throw std::invalid_argument
-        ("Operation mult(Dist) not implemented for this type.");
+        ("Operation mult(Dist) not supported for this type.");
     }
 
 
     template<typename scalar_t> void
     StructuredMatrix<scalar_t>::factor() {
       throw std::invalid_argument
-        ("Operation factor not implemented for this type.");
+        ("Operation factor not supported for this type.");
     }
     template<typename scalar_t> void
     StructuredMatrix<scalar_t>::solve(DenseMatrix<scalar_t>& b) const {
       throw std::invalid_argument
-        ("Operation solve not implemented for this type.");
+        ("Operation solve not supported for this type.");
     }
     template<typename scalar_t> void
     StructuredMatrix<scalar_t>::solve(DistributedMatrix<scalar_t>& b) const {
       throw std::invalid_argument
-        ("Operation solve(Dist) not implemented for this type.");
+        ("Operation solve(Dist) not supported for this type.");
     }
 
 

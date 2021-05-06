@@ -274,7 +274,7 @@ int main(int argc, char* argv[]) {
     // owning rows [rdist[p],rdist[p+1]). cdist is only needed for
     // non-square matrices. S is distributed according to rdist if
     // t==Trans::N, else cdist. R is distributed according to cdist of
-    // t==Trans::N, else rdist.  auto
+    // t==Trans::N, else rdist.
     structured::mult_1d_t<double> Tmult1d =
       [&n, &Toeplitz, &world](Trans t,
                               const DenseMatrix<double>& R,

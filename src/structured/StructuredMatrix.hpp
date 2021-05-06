@@ -54,6 +54,7 @@ namespace strumpack {
    */
   namespace structured {
 
+
     /**
      * Type for element extraction routine. This can be implemented
      * as a lambda function, a functor or a funtion pointer.
@@ -136,11 +137,12 @@ namespace strumpack {
 
     /**
      * Type for matrix multiplication routine with 1D block row
-     * distribution. The matrix is assumed to be distributed according
-     * to the dist vector, i.e., processor p owns rows
-     * [dist[p],dist[p+1]). Hence, processor p only computes rows
-     * [dist[p],dist[p+1]) of matrix S. This can be implemented as a
-     * lambda function, a functor or a funtion pointer.
+     * distribution.  The block row/column distribution of the matrix
+     * is given by the rdist and cdist vectors, with processor p
+     * owning rows [rdist[p],rdist[p+1]). cdist is only needed for
+     * non-square matrices. S is distributed according to rdist if
+     * t==Trans::N, else cdist. R is distributed according to cdist of
+     * t==Trans::N, else rdist.
      *
      * \param op whether to compute the transposed/conjugate product
      * \param R random matrix passed to user code
@@ -148,8 +150,8 @@ namespace strumpack {
      *            S = A*R if op is Trans::N \n
      *            S = A*T*R if op is Trans::T \n
      *            S = A^C*R if op is Trans::C
-     * \param dist 1d block row distribution. This vector is the same
-     * on all ranks.
+     * \param rdist Matrix row distribution, same on all ranks
+     * \param cdist Matrix column distribution, same on all ranks
      */
     template<typename scalar_t>
     using mult_1d_t = std::function
@@ -172,28 +174,32 @@ namespace strumpack {
      * \brief Class to represent a structured matrix. This is the
      * abstract base class for several types of structured matrices.
      *
-     * \tparam scalar_t Can be float, double, std:complex<float> or
+     * \tparam scalar_t Can be float, double, std::complex<float> or
      * std::complex<double>. Some formats do not support all
-     * precisions, see strumpack::StructuredMatrix::Type.
+     * precisions, see the table below.
      *
      * For construction, use one of:
      * - structured::construct_from_dense (DENSE)
      * - structured::construct_from_elements (ELEM)
      * - structured::construct_matrix_free (MF)
      * - structured::construct_partially_matrix_free (PMF)
-     * - nearest neighbors (TODO)
+     * - nearest neighbors (NN)
      *
-     * However, not all formats support all construction methods:
+     * However, not all formats support all construction methods,
+     * matrix operations, or precisions (s: float, d: double, c:
+     * std::complex<float>, z: std::complex<double>):
      *
-     * |          | DENSE | ELEM | MF | PMF | NN | SEQ and/or MPI? |
-     * |----------|-------|------|----|-----|----|------------------
-     * | BLR      | X     |  X   | -  | -   | -  | SEQ & MPI       |
-     * | HSS      | X     |  -   | -  | X   | X  | SEQ & MPI       |
-     * | HODLR    | X     |  X   | X  | -   | X  | MPI only        |
-     * | HODBF    | X     |  X   | X  | -   | X  | MPI only        |
-     * | LRBF     | X     |  X   | X  | -   | X  | MPI only        |
-     * | LOSSY    | X     |  -   | -  | -   | -  | SEQ only        |
-     * | LOSSLESS | X     |  -   | -  | -   | -  | SEQ only        |
+     * |           |  parallel? || construct from ..        ||||| operation           ||| precision  ||||
+     * |-----------|------|------|-------|------|----|-----|----|------|--------|-------|---|---|---|---|
+     * |  ^        |  seq | MPI  | DENSE | ELEM | MF | PMF | NN | mult | factor | solve | s | d | c | z |
+     * | BLR       |  X   |  X   | X     |  X   |    |     |    | X    |   X    |  X    | X | X | X | X |
+     * | HSS       |  X   |  X   | X     |      |    | X   | X  |  X   |   X    |  X    | X | X | X | X |
+     * | HODLR     |      |  X   | X     |  X   | X  |     | X  |  X   |   X    |  X    |   | X |   | X |
+     * | HODBF     |      |  X   | X     |  X   | X  |     | X  |  X   |   X    |  X    |   | X |   | X |
+     * | BUTTERFLY |      |  X   | X     |  X   | X  |     | X  |  X   |        |       |   | X |   | X |
+     * | LR        |      |  X   | X     |  X   | X  |     | X  |  X   |        |       |   | X |   | X |
+     * | LOSSY     |  X   |      | X     |      |    |     |    |      |        |       | X | X | X | X |
+     * | LOSSLESS  |  X   |      | X     |      |    |     |    |      |        |       | X | X | X | X |
      *
      * \see HSS::HSSMatrix, BLR::BLRMatrix, HODLR::HODLRMatrix,
      * HODLR::ButterflyMatrix, ...
@@ -394,11 +400,15 @@ namespace strumpack {
      * \return std::unique_ptr holding a pointer to a
      * StructuredMatrix of the requested StructuredMatrix::Type
      *
-     * \throw std::invalid_argument Operation not implemented,
-     * operation not supported for StructuredMatrix type, operation
-     * requires MPI.
+     * \throw std::invalid_argument If the operatation is not
+     * supported for the type of structured::StructuredMatrix, if the
+     * type requires a square matrix and the input is not square, if
+     * the structured::StructuredMatrix type requires MPI.
+     * \throw std::logic_error If the operation is not implemented yet
+     * \throw std::runtime_error If the operation requires a third
+     * party library which was not enabled when configuring STRUMPACK.
      *
-     * \see strumpack::binary_tree_clustering,
+     * \see strumpack::binary_tree_clustering, construct_from_dense
      * construct_from_elements, construct_matrix_free and
      * construct_partially_matrix_free
      */
@@ -429,16 +439,25 @@ namespace strumpack {
      * \param A pointer to matrix A data
      * \param ldA leading dimension of A
      * \param opts Options object
-     * \param row_tree optional clustertree for the rows
+     * \param row_tree optional clustertree for the rows, see also
+     * strumpack::binary_tree_clustering
      * \param col_tree optional clustertree for the columns. If the
      * matrix is square, this does not need to be specified.
      *
      * \return std::unique_ptr holding a pointer to a
      * StructuredMatrix of the requested StructuredMatrix::Type
      *
-     * \see StructuredMatrix::construct_from_elements,
-     * StructuredMatrix::construct_matrix_free and
-     * StructuredMatrix::construct_partially_matrix_free
+     * \throw std::invalid_argument If the operatation is not
+     * supported for the type of structured::StructuredMatrix, if the
+     * type requires a square matrix and the input is not square, if
+     * the structured::StructuredMatrix type requires MPI.
+     * \throw std::logic_error If the operation is not implemented yet
+     * \throw std::runtime_error If the operation requires a third
+     * party library which was not enabled when configuring STRUMPACK.
+     *
+     * \see strumpack::binary_tree_clustering, construct_from_dense
+     * construct_from_elements, construct_matrix_free and
+     * construct_partially_matrix_free
      */
     template<typename scalar_t>
     std::unique_ptr<StructuredMatrix<scalar_t>>
@@ -459,13 +478,25 @@ namespace strumpack {
      * \param cols number of columnss in matrix to be constructed
      * \param A element extraction routine
      * \param opts Options object
+     * \param row_tree optional clustertree for the rows, see also
+     * strumpack::binary_tree_clustering
+     * \param col_tree optional clustertree for the columns. If the
+     * matrix is square, this does not need to be specified.
      *
      * \return std::unique_ptr holding a pointer to a
      * StructuredMatrix of the requested StructuredMatrix::Type
      *
-     * \see StructuredMatrix::construct_from_dense,
-     * StructuredMatrix::construct_matrix_free and
-     * StructuredMatrix::construct_partially_matrix_free
+     * \throw std::invalid_argument If the operatation is not
+     * supported for the type of structured::StructuredMatrix, if the
+     * type requires a square matrix and the input is not square, if
+     * the structured::StructuredMatrix type requires MPI.
+     * \throw std::logic_error If the operation is not implemented yet
+     * \throw std::runtime_error If the operation requires a third
+     * party library which was not enabled when configuring STRUMPACK.
+     *
+     * \see strumpack::binary_tree_clustering, construct_from_dense
+     * construct_from_elements, construct_matrix_free and
+     * construct_partially_matrix_free
      */
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_from_elements(int rows, int cols,
@@ -479,7 +510,33 @@ namespace strumpack {
      * Construct a StructuredMatrix using a routine to extract a
      * sub-block from the matrix.
      *
-     * TODO describe parameters
+     * \tparam scalar_t precision of input matrix, and of
+     * constructed StructuredMatrix. Note that not all types support
+     * every all precisions. See StructuredMatrix::Type.
+     *
+     * \param rows Number of rows of matrix to be constructed.
+     * \param cols Number of columns of matrix to be constructed.
+     * \param A Matrix block extraction routine.
+     * \param opts Options object
+     * \param row_tree optional clustertree for the rows, see also
+     * strumpack::binary_tree_clustering
+     * \param col_tree optional clustertree for the columns. If the
+     * matrix is square, this does not need to be specified.
+     *
+     * \return std::unique_ptr holding a pointer to a
+     * StructuredMatrix of the requested StructuredMatrix::Type
+     *
+     * \throw std::invalid_argument If the operatation is not
+     * supported for the type of structured::StructuredMatrix, if the
+     * type requires a square matrix and the input is not square, if
+     * the structured::StructuredMatrix type requires MPI.
+     * \throw std::logic_error If the operation is not implemented yet
+     * \throw std::runtime_error If the operation requires a third
+     * party library which was not enabled when configuring STRUMPACK.
+     *
+     * \see strumpack::binary_tree_clustering, construct_from_dense
+     * construct_from_elements, construct_matrix_free and
+     * construct_partially_matrix_free
      */
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_from_elements(int rows, int cols,
@@ -492,7 +549,33 @@ namespace strumpack {
      * Construct a StructuredMatrix using only a matrix-vector
      * multiplication routine.
      *
-     * TODO desribe parameters
+     * \tparam scalar_t precision of input matrix, and of
+     * constructed StructuredMatrix. Note that not all types support
+     * every all precisions. See StructuredMatrix::Type.
+     *
+     * \param rows Number of rows of matrix to be constructed.
+     * \param cols Number of columns of matrix to be constructed.
+     * \param Amult Matrix-(multi)vector multiplication routine.
+     * \param opts Options object
+     * \param row_tree optional clustertree for the rows, see also
+     * strumpack::binary_tree_clustering
+     * \param col_tree optional clustertree for the columns. If the
+     * matrix is square, this does not need to be specified.
+     *
+     * \return std::unique_ptr holding a pointer to a
+     * StructuredMatrix of the requested StructuredMatrix::Type
+     *
+     * \throw std::invalid_argument If the operatation is not
+     * supported for the type of structured::StructuredMatrix, if the
+     * type requires a square matrix and the input is not square, if
+     * the structured::StructuredMatrix type requires MPI.
+     * \throw std::logic_error If the operation is not implemented yet
+     * \throw std::runtime_error If the operation requires a third
+     * party library which was not enabled when configuring STRUMPACK.
+     *
+     * \see strumpack::binary_tree_clustering, construct_from_dense
+     * construct_from_elements, construct_matrix_free and
+     * construct_partially_matrix_free
      */
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_matrix_free(int rows, int cols,
@@ -506,7 +589,34 @@ namespace strumpack {
      * multiplication routine and a routine to extract a matrix
      * sub-block.
      *
-     * TODO desribe parameters
+     * \tparam scalar_t precision of input matrix, and of
+     * constructed StructuredMatrix. Note that not all types support
+     * every all precisions. See StructuredMatrix::Type.
+     *
+     * \param rows Number of rows of matrix to be constructed.
+     * \param cols Number of columns of matrix to be constructed.
+     * \param Amult Matrix-(multi)vector multiplication routine.
+     * \param Aelem Matrix block extraction routine.
+     * \param opts Options object
+     * \param row_tree optional clustertree for the rows, see also
+     * strumpack::binary_tree_clustering
+     * \param col_tree optional clustertree for the columns. If the
+     * matrix is square, this does not need to be specified.
+     *
+     * \return std::unique_ptr holding a pointer to a
+     * StructuredMatrix of the requested StructuredMatrix::Type
+     *
+     * \throw std::invalid_argument If the operatation is not
+     * supported for the type of structured::StructuredMatrix, if the
+     * type requires a square matrix and the input is not square, if
+     * the structured::StructuredMatrix type requires MPI.
+     * \throw std::logic_error If the operation is not implemented yet
+     * \throw std::runtime_error If the operation requires a third
+     * party library which was not enabled when configuring STRUMPACK.
+     *
+     * \see strumpack::binary_tree_clustering, construct_from_dense
+     * construct_from_elements, construct_matrix_free and
+     * construct_partially_matrix_free
      */
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_partially_matrix_free(int rows, int cols,
@@ -516,12 +626,39 @@ namespace strumpack {
                                     const structured::ClusterTree* row_tree=nullptr,
                                     const structured::ClusterTree* col_tree=nullptr);
 
-
     /**
      * Construct a StructuredMatrix using both a matrix-vector
-     * multiplication routine and an element extraction routine.
+     * multiplication routine and a routine to extract individual
+     * matrix elements.
      *
-     * TODO desribe parameters
+     * \tparam scalar_t precision of input matrix, and of
+     * constructed StructuredMatrix. Note that not all types support
+     * every all precisions. See StructuredMatrix::Type.
+     *
+     * \param rows Number of rows of matrix to be constructed.
+     * \param cols Number of columns of matrix to be constructed.
+     * \param Amult Matrix-(multi)vector multiplication routine.
+     * \param Aelem Matrix element extraction routine.
+     * \param opts Options object
+     * \param row_tree optional clustertree for the rows, see also
+     * strumpack::binary_tree_clustering
+     * \param col_tree optional clustertree for the columns. If the
+     * matrix is square, this does not need to be specified.
+     *
+     * \return std::unique_ptr holding a pointer to a
+     * StructuredMatrix of the requested StructuredMatrix::Type
+     *
+     * \throw std::invalid_argument If the operatation is not
+     * supported for the type of structured::StructuredMatrix, if the
+     * type requires a square matrix and the input is not square, if
+     * the structured::StructuredMatrix type requires MPI.
+     * \throw std::logic_error If the operation is not implemented yet
+     * \throw std::runtime_error If the operation requires a third
+     * party library which was not enabled when configuring STRUMPACK.
+     *
+     * \see strumpack::binary_tree_clustering, construct_from_dense
+     * construct_from_elements, construct_matrix_free and
+     * construct_partially_matrix_free
      */
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_partially_matrix_free(int rows, int cols,
@@ -537,7 +674,31 @@ namespace strumpack {
      * Construct a StructuredMatrix from a 2D block-cyclicly
      * distributed matrix (ScaLAPACK layout).
      *
-     * TODO desribe parameters
+     * \tparam scalar_t precision of input matrix, and of
+     * constructed StructuredMatrix. Note that not all types support
+     * every all precisions. See StructuredMatrix::Type.
+     *
+     * \param A 2D block cyclic distributed matrix (ScaLAPACK layout).
+     * \param opts Options object
+     * \param row_tree optional clustertree for the rows, see also
+     * strumpack::binary_tree_clustering
+     * \param col_tree optional clustertree for the columns. If the
+     * matrix is square, this does not need to be specified.
+     *
+     * \return std::unique_ptr holding a pointer to a
+     * StructuredMatrix of the requested StructuredMatrix::Type
+     *
+     * \throw std::invalid_argument If the operatation is not
+     * supported for the type of structured::StructuredMatrix, if the
+     * type requires a square matrix and the input is not square, if
+     * the structured::StructuredMatrix type requires MPI.
+     * \throw std::logic_error If the operation is not implemented yet
+     * \throw std::runtime_error If the operation requires a third
+     * party library which was not enabled when configuring STRUMPACK.
+     *
+     * \see strumpack::binary_tree_clustering, construct_from_dense
+     * construct_from_elements, construct_matrix_free and
+     * construct_partially_matrix_free
      */
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_from_dense(const DistributedMatrix<scalar_t>& A,
@@ -549,11 +710,37 @@ namespace strumpack {
      * Construct a StructuredMatrix using an element extraction
      * routine.
      *
-     * TODO desribe parameters
+     * \tparam scalar_t precision of input matrix, and of
+     * constructed StructuredMatrix. Note that not all types support
+     * every all precisions. See StructuredMatrix::Type.
+     *
+     * \param comm MPI communicator (wrapper class)
+     * \param rows Number of rows of matrix to be constructed.
+     * \param cols Number of columns of matrix to be constructed.
+     * \param A Matrix element extraction routine.
+     * \param opts Options object
+     * \param row_tree optional clustertree for the rows, see also
+     * strumpack::binary_tree_clustering
+     * \param col_tree optional clustertree for the columns. If the
+     * matrix is square, this does not need to be specified.
+     *
+     * \return std::unique_ptr holding a pointer to a
+     * StructuredMatrix of the requested StructuredMatrix::Type
+     *
+     * \throw std::invalid_argument If the operatation is not
+     * supported for the type of structured::StructuredMatrix, if the
+     * type requires a square matrix and the input is not square, if
+     * the structured::StructuredMatrix type requires MPI.
+     * \throw std::logic_error If the operation is not implemented yet
+     * \throw std::runtime_error If the operation requires a third
+     * party library which was not enabled when configuring STRUMPACK.
+     *
+     * \see strumpack::binary_tree_clustering, construct_from_dense
+     * construct_from_elements, construct_matrix_free and
+     * construct_partially_matrix_free
      */
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
-    construct_from_elements(const MPIComm& comm,
-                            int rows, int cols,
+    construct_from_elements(const MPIComm& comm, int rows, int cols,
                             const extract_t<scalar_t>& A,
                             const StructuredOptions<scalar_t>& opts,
                             const structured::ClusterTree* row_tree=nullptr,
@@ -563,7 +750,34 @@ namespace strumpack {
      * Construct a StructuredMatrix using a routine to extract a
      * matrix sub-block.
      *
-     * TODO desribe parameters
+     * \tparam scalar_t precision of input matrix, and of
+     * constructed StructuredMatrix. Note that not all types support
+     * every all precisions. See StructuredMatrix::Type.
+     *
+     * \param comm MPI communicator (wrapper class)
+     * \param rows Number of rows of matrix to be constructed.
+     * \param cols Number of columns of matrix to be constructed.
+     * \param A Matrix sub-block extraction routine.
+     * \param opts Options object
+     * \param row_tree optional clustertree for the rows, see also
+     * strumpack::binary_tree_clustering
+     * \param col_tree optional clustertree for the columns. If the
+     * matrix is square, this does not need to be specified.
+     *
+     * \return std::unique_ptr holding a pointer to a
+     * StructuredMatrix of the requested StructuredMatrix::Type
+     *
+     * \throw std::invalid_argument If the operatation is not
+     * supported for the type of structured::StructuredMatrix, if the
+     * type requires a square matrix and the input is not square, if
+     * the structured::StructuredMatrix type requires MPI.
+     * \throw std::logic_error If the operation is not implemented yet
+     * \throw std::runtime_error If the operation requires a third
+     * party library which was not enabled when configuring STRUMPACK.
+     *
+     * \see strumpack::binary_tree_clustering, construct_from_dense
+     * construct_from_elements, construct_matrix_free and
+     * construct_partially_matrix_free
      */
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_from_elements(const MPIComm& comm, int rows, int cols,
@@ -576,7 +790,31 @@ namespace strumpack {
      * Construct a StructuredMatrix using only a matrix-vector
      * multiplication routine.
      *
-     * TODO desribe parameters
+     * \param comm MPI communicator (wrapper class)
+     * \param rows Number of rows of matrix to be constructed.
+     * \param cols Number of columns of matrix to be constructed.
+     * \param A Matrix-(multi)vector multiplication routine (using 2d
+     * block cyclic layout for vectors).
+     * \param opts Options object
+     * \param row_tree optional clustertree for the rows, see also
+     * strumpack::binary_tree_clustering
+     * \param col_tree optional clustertree for the columns. If the
+     * matrix is square, this does not need to be specified.
+     *
+     * \return std::unique_ptr holding a pointer to a
+     * StructuredMatrix of the requested StructuredMatrix::Type
+     *
+     * \throw std::invalid_argument If the operatation is not
+     * supported for the type of structured::StructuredMatrix, if the
+     * type requires a square matrix and the input is not square, if
+     * the structured::StructuredMatrix type requires MPI.
+     * \throw std::logic_error If the operation is not implemented yet
+     * \throw std::runtime_error If the operation requires a third
+     * party library which was not enabled when configuring STRUMPACK.
+     *
+     * \see strumpack::binary_tree_clustering, construct_from_dense
+     * construct_from_elements, construct_matrix_free and
+     * construct_partially_matrix_free
      */
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_matrix_free(const MPIComm& comm, const BLACSGrid* g,
@@ -590,7 +828,31 @@ namespace strumpack {
      * Construct a StructuredMatrix using only a matrix-vector
      * multiplication routine.
      *
-     * TODO desribe parameters
+     * \param comm MPI communicator (wrapper class)
+     * \param rows Number of rows of matrix to be constructed.
+     * \param cols Number of columns of matrix to be constructed.
+     * \param A Matrix-(multi)vector multiplication routine (using 1d
+     * block row distribution for vectors).
+     * \param opts Options object
+     * \param row_tree optional clustertree for the rows, see also
+     * strumpack::binary_tree_clustering
+     * \param col_tree optional clustertree for the columns. If the
+     * matrix is square, this does not need to be specified.
+     *
+     * \return std::unique_ptr holding a pointer to a
+     * StructuredMatrix of the requested StructuredMatrix::Type
+     *
+     * \throw std::invalid_argument If the operatation is not
+     * supported for the type of structured::StructuredMatrix, if the
+     * type requires a square matrix and the input is not square, if
+     * the structured::StructuredMatrix type requires MPI.
+     * \throw std::logic_error If the operation is not implemented yet
+     * \throw std::runtime_error If the operation requires a third
+     * party library which was not enabled when configuring STRUMPACK.
+     *
+     * \see strumpack::binary_tree_clustering, construct_from_dense
+     * construct_from_elements, construct_matrix_free and
+     * construct_partially_matrix_free
      */
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_matrix_free(const MPIComm& comm, int rows, int cols,

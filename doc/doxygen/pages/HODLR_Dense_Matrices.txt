@@ -1,6 +1,11 @@
 /*! \page hodlr_matrices HODLR Approximation of Dense Matrices
 
 
+We recommend to use the strumpack::structured::StructuredMatrix
+interface instead of directly using the HSS classes. See \link dense
+Dense Solvers \endlink.
+
+
 HODLR, or Hierarchically Off-Diagonal Low Rank, is a rank-structured
 format that is similar to HSS, but simpler. It uses the same weak
 admissibility, i.e, all off-diagonal blocks are low rank, but it does
@@ -48,7 +53,7 @@ Use the constructor
 \code {.cpp}
 void strumpack::HODLR::HODLRMatrix
       (const strumpack::MPIComm& c,                          // MPI_Comm wrapper
-       const strumpack::HSS::HSSPartitionTree& tree,         // partition/cluster tree
+       const strumpack::structured::ClusterTree& tree,       // partition/cluster tree
        const std::function<scalar_t(                         // return value = A(i,j)
           int i,                                             // row coordinate
           int j,                                             // column coordinate
@@ -68,7 +73,7 @@ For example, to construct an HODLR approximation of a Toeplitz matrix:
 strumpack::MPIComm c;  // defaults to MPI_COMM_WORLD
 
 int N = 1000;
-strumpack::HSS::HSSPartitionTree t(N);         // construct a tree for an NxN matrix
+strumpack::structured::ClusterTree t(N);       // construct a tree for an NxN matrix
 t.refine(32);                                  // refine the tree
 strumpack::HODLR::HODLROptions<double> opts;
 opts.set_from_command_line(argc, argv);        // optionally, parse command line options
@@ -89,7 +94,7 @@ Use the constructor
 \code {.cpp}
 void strumpack::HODLR::HODLRMatrix
       (const strumpack::MPIComm& c,                          // MPI_Comm wrapper
-       const strumpack::HSS::HSSPartitionTree& tree,         // partition/cluster tree
+       const strumpack::structured::ClusterTree& tree,       // partition/cluster tree
        const std::function<void(                             // matrix-vector multiplication routine
           strumpack::Trans op,                               // none, transpose, conjugate
           const strumpack::DenseMatrix<scalar_t>& R,         // input (random matrix)

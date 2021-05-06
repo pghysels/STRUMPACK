@@ -160,7 +160,8 @@ extern "C" {
     }
     return 0;
   }
-  int SP_c_struct_mult(CSPStructMat S, char trans, int m, float _Complex* B, int ldB,
+  int SP_c_struct_mult(CSPStructMat S, char trans, int m,
+                       float _Complex* B, int ldB,
                        float _Complex* C, int ldC) {
     try {
       reinterpret_cast<StructuredMatrix<std::complex<float>>*>(S)->
@@ -172,7 +173,8 @@ extern "C" {
     }
     return 0;
   }
-  int SP_z_struct_mult(CSPStructMat S, char trans, int m, double _Complex* B, int ldB,
+  int SP_z_struct_mult(CSPStructMat S, char trans, int m,
+                       double _Complex* B, int ldB,
                        double _Complex* C, int ldC) {
     try {
       reinterpret_cast<StructuredMatrix<std::complex<double>>*>(S)->
