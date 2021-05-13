@@ -34,6 +34,7 @@
 #include "sparse/CSRMatrixMPI.hpp"
 #include "dense/DenseMatrix.hpp"
 #include "dense/DistributedVector.hpp"
+#include "dense/DistributedMatrix.hpp"
 
 namespace strumpack {
   namespace iterative {
@@ -137,9 +138,10 @@ namespace strumpack {
          non_zero_guess, verbose);
     }
 
-    /*
-     * This is iterative refinement
-     *  Input vectors x and b have stride 1, length n
+
+    /**
+     * Iterative refinement.
+     * Input vectors x and b have stride 1, length n
      */
     template<typename scalar_t,typename integer_t,
              typename real_t = typename RealType<scalar_t>::value_type>
@@ -150,6 +152,23 @@ namespace strumpack {
                                 DenseMatrix<scalar_t>& x,
                                 const DenseMatrix<scalar_t>& b,
                                 real_t rtol, real_t atol, int& totit, int maxit,
+                                bool non_zero_guess, bool verbose);
+
+    /**
+     * Iterative refinement with the right-hand side and solution
+     * vectors in 2d block cyclic distribution.
+     */
+    template<typename scalar_t, typename real_t>
+    void IterativeRefinementMPI(const MPIComm& comm,
+                                const std::function
+                                <void(const DistributedMatrix<scalar_t>&,
+                                      DistributedMatrix<scalar_t>&)>& A,
+                                const std::function
+                                <void(DistributedMatrix<scalar_t>&)>& M,
+                                DistributedMatrix<scalar_t>& x,
+                                const DistributedMatrix<scalar_t>& b,
+                                real_t rtol, real_t atol,
+                                int& totit, int maxit,
                                 bool non_zero_guess, bool verbose);
 
   } // end namespace iterative

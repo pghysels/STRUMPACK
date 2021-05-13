@@ -1,4 +1,4 @@
-%module strumpack;
+%module strumpack_dense;
 
 %insert(fbegin)
 %{
@@ -27,8 +27,11 @@
 ! Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
 !             (Lawrence Berkeley National Lab, Computational Research
 !             Division).
-%}
-
+!
+!> @file strumpack_dense.f90
+!> @brief Fortran interface to the structured matrix functionality
+!%}
+//%include <complex.i>
 
 // Translate all enums and other compile-time constants into fortran parameters
 %fortranconst;
@@ -36,11 +39,8 @@
 %fortranbindc;
 
 // Allow this struct to be passed natively between C and Fortran
-%fortran_struct(STRUMPACK_SparseSolver)
-
-// The STRUMPACK_Krylov_solver accessor is the same fortran identifier as the
-// enum STRUMPACK_KRYLOV_SOLVER (since fortran is case insensitive)
-%rename("get_%s") STRUMPACK_Krylov_solver;
+%fortran_struct(CSPOptions)
+ // %fortran_struct(CSPStructMat)
 
 // Process and create wrappers for the following header file
-%include "../StrumpackSparseSolver.h"
+%include "../StructuredMatrix.h"

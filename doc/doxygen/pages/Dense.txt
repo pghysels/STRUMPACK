@@ -35,6 +35,29 @@ If you require additional functionality, then feel free to reach out
 and \link contact \endlink us.
 
 
+## C Interface
+
+The C interface to the \link strumpack::structured::StructuredMatrix
+StructuredMatrix \endlink class can be found in \link
+structured/StructuredMatrix.h structured/StructuredMatrix.h
+\endlink. An example is available in examples/dense/dstructured.c.
+
+
+## Fortran Interface
+
+The Fortran interface for the structured matrix functionality is based
+on the C interface (which is based on the C++ class
+strumpack::structured::StructuredMatrix), so we refer to the C and C++
+interfaces for more detailed information. The Fortran interface can be
+found in \link structured/fortran/strumpack_dense.f90
+structured/fortran/strumpack_dense.f90 \endlink. A Fortran example is
+available in examples/dense/fstructured.f90.
+
+
+Note that the HODLR, HODBF, Butterfly and Low Rank formats are
+implemented using ButterflyPACK, which is written in Fortran. So a
+Fortran user can directly use ButterflyPACK.
+
 
 ## Specific Formats
 

@@ -26,7 +26,8 @@
  *             Division).
  */
 /*! \file StructuredOptions.hpp
- * \brief For Pieter to complete
+ * \brief Contains the class definition for StructuredOptions, as well
+ * as some routines to get default options, and some enumerations,
  */
 #ifndef STRUCTURED_OPTIONS_HPP
 #define STRUCTURED_OPTIONS_HPP

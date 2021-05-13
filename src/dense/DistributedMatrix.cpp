@@ -768,6 +768,25 @@ namespace strumpack {
     return *this;
   }
 
+  template<typename scalar_t> DistributedMatrix<scalar_t>&
+  DistributedMatrix<scalar_t>::scale_and_add
+  (scalar_t alpha, const DistributedMatrix<scalar_t>& B) {
+    if (!active()) return *this;
+    assert(grid() == B.grid());
+    int rlo, rhi, clo, chi, Brlo, Brhi, Bclo, Bchi;
+    lranges(rlo, rhi, clo, chi);
+    B.lranges(Brlo, Brhi, Bclo, Bchi);
+    int lc = chi - clo;
+    int lr = rhi - rlo;
+    //#pragma omp taskloop grainsize(64) //collapse(2)
+    for (int c=0; c<lc; ++c)
+      for (int r=0; r<lr; ++r)
+        operator()(r+rlo,c+clo) = alpha * operator()(r+rlo,c+clo)
+          + B(r+Brlo,c+Bclo);
+    STRUMPACK_FLOPS((is_complex<scalar_t>()?8:2)*lc*lr);
+    return *this;
+  }
+
   template<typename scalar_t> typename RealType<scalar_t>::value_type
   DistributedMatrix<scalar_t>::norm() const {
     return normF();

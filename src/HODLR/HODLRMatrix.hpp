@@ -267,12 +267,12 @@ namespace strumpack {
        * Return the first row of the local rows owned by this process.
        * \return Return first local row
        */
-      std::size_t begin_row() const { return dist_[c_->rank()]; }
+      std::size_t begin_row() const override { return dist_[c_->rank()]; }
       /**
        * Return last row (+1) of the local rows (begin_rows()+lrows())
        * \return Final local row (+1).
        */
-      std::size_t end_row() const { return dist_[c_->rank()+1]; }
+      std::size_t end_row() const override { return dist_[c_->rank()+1]; }
       /**
        * Return vector describing the 1d block row
        * distribution. dist()[rank]==begin_row() and

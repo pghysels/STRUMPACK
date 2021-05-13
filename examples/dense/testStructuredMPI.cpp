@@ -82,7 +82,6 @@ check_accuracy(const DistributedMatrix<scalar_t>& A,
  */
 template<typename scalar_t> void
 factor_and_solve(const DistributedMatrix<scalar_t>& A, int nrhs,
-                 //const MPIComm& comm, const BLACSGrid* g,
                  structured::StructuredMatrix<scalar_t>* H) {
   // Allocate memory for rhs and solution vectors (matrices). Use same
   // 2D processor grid as A.
@@ -124,12 +123,12 @@ factor_and_solve(const DistributedMatrix<scalar_t>& A, int nrhs,
  * iterative solver. The preconditioned iterative solvers use a 1d
  * block row distribution, so here we use the user provided
  * matrix-vector product using the 1d block row distribution. Note
- * that not all structured:StructuredMatrix types use the 2d block row
- * distribution. This works only for a single right-hand side.
+ * that not all structured::StructuredMatrix types use the 2d block
+ * row distribution. This works only for a single right-hand side.
  */
 template<typename scalar_t> void
 preconditioned_solve(const MPIComm& comm,
-                     const structured::mult_1d_t<scalar_t>& Amult,
+                     const structured::mult_1d_t<scalar_t>& Amult1d,
                      structured::StructuredMatrix<scalar_t>* H) {
   // Preconditioned solves only work for a single right-hand side
   int nrhs = 1, n = H->rows();
@@ -143,11 +142,11 @@ preconditioned_solve(const MPIComm& comm,
   // Pick a random exact solution
   X.random();
   // Keep a copy of the exact solution X
-  DenseMatrix<scalar_t> Xexact(X);
+  auto Xexact = X;
 
   // compute the right-hand side vector B as B = A*X, using the 1d
-  // block row matrix-vector product Amult, specified by the user.
-  Amult(Trans::N, X, B, H->rdist(), H->cdist());
+  // block row matrix-vector product Amult1d, specified by the user.
+  Amult1d(Trans::N, X, B, H->rdist(), H->cdist());
 
   // factor the structured matrix, so it can be used as a preconditioner
   // H->factor();  // was already called
@@ -155,10 +154,10 @@ preconditioned_solve(const MPIComm& comm,
   int iterations = 0, maxit = 50, restart = 50;
   iterative::GMResMPI<scalar_t>
     (comm,
-     [&Amult, &H](const DenseMatrix<scalar_t>& v,
-                  DenseMatrix<scalar_t>& w) {
+     [&Amult1d, &H](const DenseMatrix<scalar_t>& v,
+                    DenseMatrix<scalar_t>& w) {
        // matrix-vector product using 1d block row distrribution
-       Amult(Trans::N, v, w, H->rdist(), H->cdist());
+       Amult1d(Trans::N, v, w, H->rdist(), H->cdist());
      },
      [&H](DenseMatrix<scalar_t>& v) {
        // Apply the preconditioner H: solve a linear system H*w=v.
@@ -181,10 +180,10 @@ preconditioned_solve(const MPIComm& comm,
 
   iterative::BiCGStabMPI<scalar_t>
     (comm,
-     [&Amult, &H](const DenseMatrix<scalar_t>& v,
-                  DenseMatrix<scalar_t>& w) {
+     [&Amult1d, &H](const DenseMatrix<scalar_t>& v,
+                    DenseMatrix<scalar_t>& w) {
        // matrix-vector product with exact matrix
-       Amult(Trans::N, v, w, H->rdist(), H->cdist());
+       Amult1d(Trans::N, v, w, H->rdist(), H->cdist());
      },
      [&H](DenseMatrix<scalar_t>& v) {
        // preconditioning with structured matrix
@@ -199,6 +198,63 @@ preconditioned_solve(const MPIComm& comm,
   // processes)
   err = comm.reduce(X.sub(Xexact).normF(), MPI_SUM)
     / comm.reduce(Xexact.normF(), MPI_SUM);
+  if (comm.is_root())
+    cout << "  - ||X-A\\(A*X)||_F/||X||_F = " << err << endl;
+}
+
+
+
+/**
+ * Use the structured::StructuredMatrix with an iterative refinement
+ * solver.  his version of the iterative refinement solver uses a 2d
+ * block cyclic distribution for the vectors, so here we use the user
+ * provided matrix-vector product using the 2d block cyclic
+ * distribution. This works for multiple right-hand sides.
+ */
+template<typename scalar_t> void
+iterative_refinement_2d(const MPIComm& comm, const BLACSGrid* g,
+                        const structured::mult_2d_t<scalar_t>& Amult2d,
+                        int nrhs, structured::StructuredMatrix<scalar_t>* H) {
+  // Allocate memory for the rhs and solution vectors, in 2d block
+  // cyclic format.
+  DistributedMatrix<scalar_t> B(g, H->rows(), nrhs),
+    X(g, H->rows(), nrhs);
+
+  // Pick a random exact solution
+  X.random();
+  // Keep a copy of the exact solution X
+  auto Xexact = X;
+
+  // compute the right-hand side vector B as B = A*X, using the 2d
+  // block cyclic matrix-vector product Amult2d, specified by the
+  // user.
+  Amult2d(Trans::N, X, B);
+
+  // factor the structured matrix, so it can be used as a preconditioner
+  // H->factor();  // was already called
+
+  int iterations = 0, maxit = 50;
+  iterative::IterativeRefinementMPI<scalar_t>
+    (comm,
+     [&Amult2d](const DistributedMatrix<scalar_t>& V,
+                DistributedMatrix<scalar_t>& W) -> void {
+       // matrix-vector product using 1d block row distrribution
+       Amult2d(Trans::N, V, W);
+     },
+     [&H](DistributedMatrix<scalar_t>& V) {
+       // Apply the preconditioner H: solve a linear system H*W=V,
+       // overwriting W in V, using 2d block cyclic layout for V and
+       // W.
+       H->solve(V);
+     },
+     X, B,                    // solution (output), right-hand side
+     1e-10, 1e-14,            // rtol, atol
+     iterations, maxit,       // iterations (output), maximum iterations
+     false, comm.is_root());  // initial guess, verbose
+
+  // Compute the relative error (needs global reduction with all
+  // processes)
+  auto err = X.scaled_add(-1., Xexact).norm() / Xexact.norm();
   if (comm.is_root())
     cout << "  - ||X-A\\(A*X)||_F/||X||_F = " << err << endl;
 }
@@ -368,7 +424,6 @@ int main(int argc, char* argv[]) {
             (world, n, n, Toeplitz, options);
           print_info(world, H.get(), options);
           check_accuracy(A2d, H.get());
-          // factor_and_solve(world, &grid, nrhs, H.get());
           factor_and_solve(A2d, nrhs, H.get());
           preconditioned_solve(world, Tmult1d, H.get());
         }
@@ -412,6 +467,8 @@ int main(int argc, char* argv[]) {
           print_info(world, H.get(), options);
           check_accuracy(A2d, H.get());
           factor_and_solve(A2d, nrhs, H.get());
+          iterative_refinement_2d<double>
+            (world, &grid, Tmult2d, nrhs, H.get());
         }
         { // 1d block row distribution for the product
           auto H = structured::construct_matrix_free<double>

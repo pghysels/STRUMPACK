@@ -7,8 +7,8 @@ fi
 if [ "$HOSTNAME" == "cs-it-7098760" ]; then
   export PATH=/home/pieterg/local/spack/opt/spack/linux-ubuntu20.10-zen2/gcc-10.2.0/swig-fortran-qvx2j2brtnmnpkynu3yaerzogcsxpkjm/bin:$PATH
 fi
-which swig
+which swigfortran
 
 # Since this "flat" interface simply provides fortran interface function and no
 # wrapper code, we can ignore the generated wrap.c file .
-exec swig -fortran -outdir . -o /dev/null strumpack.i
+exec swigfortran -fortran -outdir . -o /dev/null strumpack_dense.i

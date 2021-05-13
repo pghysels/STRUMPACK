@@ -779,8 +779,10 @@ WARN_LOGFILE           =
 	@CMAKE_CURRENT_SOURCE_DIR@/src/sparse/CSRMatrixMPI.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/sparse/iterative/IterativeSolvers.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/sparse/iterative/IterativeSolversMPI.hpp \
+	@CMAKE_CURRENT_SOURCE_DIR@/src/structured/fortran/strumpack_dense.f90 \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/structured/ClusterTree.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/structured/StructuredMatrix.hpp \
+	@CMAKE_CURRENT_SOURCE_DIR@/src/structured/StructuredMatrix.h \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/structured/StructuredOptions.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/dense/DenseMatrix.hpp \
 	@CMAKE_CURRENT_SOURCE_DIR@/src/dense/DistributedMatrix.hpp \

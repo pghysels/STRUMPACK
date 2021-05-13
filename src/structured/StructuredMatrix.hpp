@@ -263,6 +263,30 @@ namespace strumpack {
       }
 
       /**
+       * For a distributed matrix, which uses a block row
+       * distribution, this gives the first rows stored on this
+       * process.
+       *
+       * \return first rows, should be dist()[p] for rank p
+       */
+      virtual std::size_t begin_row() const {
+        throw std::invalid_argument
+          ("1d block row distribution not supported for this format.");
+      }
+
+      /**
+       * For a distributed matrix, which uses a block row
+       * distribution, this gives the final row (+1) stored on this
+       * process.
+       *
+       * \return last row + 1, should be dist()[p+1] for rank p
+       */
+      virtual std::size_t end_row() const {
+        throw std::invalid_argument
+          ("1d block row distribution not supported for this format.");
+      }
+
+      /**
        * For a distributed matrix, return the 1D block row
        * distribution over processes. This is for square matrices, for
        * rectagular use rdist for the rows and cdist for the columns.
@@ -359,7 +383,10 @@ namespace strumpack {
        * \param ldb leading dimension of b
        */
       virtual void solve(int nrhs, scalar_t* b, int ldb) const {
-        DenseMatrixWrapper<scalar_t> B(rows(), nrhs, b, ldb);
+        int lr = rows();
+        try { lr = local_rows(); }
+        catch(...) {}
+        DenseMatrixWrapper<scalar_t> B(lr, nrhs, b, ldb);
         solve(B);
       }
 

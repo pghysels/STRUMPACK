@@ -35,30 +35,24 @@ namespace strumpack {
   namespace iterative {
 
     template<typename scalar_t>
-    using DMat = DenseMatrix<scalar_t>;
+    using Prec = std::function<void(DenseMatrix<scalar_t>&)>;
 
-    template<typename scalar_t,typename integer_t>
-    using SpMat = CSRMatrixMPI<scalar_t,integer_t>;
-
-    template<typename scalar_t>
-    using Prec = std::function<void(DMat<scalar_t>&)>;
-
-    /*
-     * This is iterative refinement
-     *  Input vectors x and b have stride 1, length n
-     */
-    template<typename scalar_t,typename integer_t,typename real_t>
-    void IterativeRefinementMPI
-    (const MPIComm& comm, const SpMat<scalar_t,integer_t>& A,
-     const Prec<scalar_t>& M, DMat<scalar_t>& x, const DMat<scalar_t>& b,
-     real_t rtol, real_t atol, int& totit, int maxit,
-     bool non_zero_guess, bool verbose) {
+    template<typename scalar_t, typename integer_t, typename real_t>
+    void IterativeRefinementMPI(const MPIComm& comm,
+                                const CSRMatrixMPI<scalar_t,integer_t>& A,
+                                const Prec<scalar_t>& M,
+                                DenseMatrix<scalar_t>& x,
+                                const DenseMatrix<scalar_t>& b,
+                                real_t rtol, real_t atol,
+                                int& totit, int maxit,
+                                bool non_zero_guess, bool verbose) {
+      using DenseM_t = DenseMatrix<scalar_t>;
       auto norm =
-        [&](const DMat<scalar_t>& v) -> real_t {
+        [&](const DenseM_t& v) -> real_t {
           real_t vnrm = v.norm();
           return std::sqrt(comm.all_reduce(vnrm*vnrm, MPI_SUM));
         };
-      DMat<scalar_t> r(x.rows(), x.cols());
+      DenseM_t r(x.rows(), x.cols());
       if (non_zero_guess) {
         A.spmv(x, r);
         r.scale_and_add(scalar_t(-1.), b);
@@ -95,95 +89,186 @@ namespace strumpack {
       }
     }
 
+
     // explicit template instantiations
     template void
-    IterativeRefinementMPI(const MPIComm& comm, const SpMat<float,int>& A,
+    IterativeRefinementMPI(const MPIComm& comm,
+                           const CSRMatrixMPI<float,int>& A,
                            const Prec<float>& M,
-                           DMat<float>& x, const DMat<float>& b,
+                           DenseMatrix<float>& x,
+                           const DenseMatrix<float>& b,
                            float rtol, float atol, int& totit, int maxit,
                            bool non_zero_guess, bool verbose);
     template void
-    IterativeRefinementMPI(const MPIComm& comm, const SpMat<double,int>& A,
+    IterativeRefinementMPI(const MPIComm& comm,
+                           const CSRMatrixMPI<double,int>& A,
                            const Prec<double>& M,
-                           DMat<double>& x, const DMat<double>& b,
+                           DenseMatrix<double>& x,
+                           const DenseMatrix<double>& b,
                            double rtol, double atol, int& totit, int maxit,
                            bool non_zero_guess, bool verbose);
     template void
     IterativeRefinementMPI(const MPIComm& comm,
-                           const SpMat<std::complex<float>,int>& A,
+                           const CSRMatrixMPI<std::complex<float>,int>& A,
                            const Prec<std::complex<float>>& M,
-                           DMat<std::complex<float>>& x,
-                           const DMat<std::complex<float>>& b,
+                           DenseMatrix<std::complex<float>>& x,
+                           const DenseMatrix<std::complex<float>>& b,
                            float rtol, float atol, int& totit, int maxit,
                            bool non_zero_guess, bool verbose);
     template void
     IterativeRefinementMPI(const MPIComm& comm,
-                           const SpMat<std::complex<double>,int>& A,
+                           const CSRMatrixMPI<std::complex<double>,int>& A,
                            const Prec<std::complex<double>>& M,
-                           DMat<std::complex<double>>& x,
-                           const DMat<std::complex<double>>& b,
+                           DenseMatrix<std::complex<double>>& x,
+                           const DenseMatrix<std::complex<double>>& b,
                            double rtol, double atol, int& totit, int maxit,
                            bool non_zero_guess, bool verbose);
 
     template void
     IterativeRefinementMPI(const MPIComm& comm,
-                           const SpMat<float,long int>& A,
-                           const Prec<float>& M, DMat<float>& x,
-                           const DMat<float>& b,
+                           const CSRMatrixMPI<float,long int>& A,
+                           const Prec<float>& M, DenseMatrix<float>& x,
+                           const DenseMatrix<float>& b,
                            float rtol, float atol, int& totit, int maxit,
                            bool non_zero_guess, bool verbose);
     template void
     IterativeRefinementMPI(const MPIComm& comm,
-                           const SpMat<double,long int>& A,
-                           const Prec<double>& M, DMat<double>& x,
-                           const DMat<double>& b,
+                           const CSRMatrixMPI<double,long int>& A,
+                           const Prec<double>& M, DenseMatrix<double>& x,
+                           const DenseMatrix<double>& b,
                            double rtol, double atol, int& totit, int maxit,
                            bool non_zero_guess, bool verbose);
     template void
     IterativeRefinementMPI(const MPIComm& comm,
-                           const SpMat<std::complex<float>,long int>& A,
+                           const CSRMatrixMPI<std::complex<float>,long int>& A,
                            const Prec<std::complex<float>>& M,
-                           DMat<std::complex<float>>& x,
-                           const DMat<std::complex<float>>& b,
+                           DenseMatrix<std::complex<float>>& x,
+                           const DenseMatrix<std::complex<float>>& b,
                            float rtol, float atol, int& totit, int maxit,
                            bool non_zero_guess, bool verbose);
     template void
     IterativeRefinementMPI(const MPIComm& comm,
-                           const SpMat<std::complex<double>,long int>& A,
+                           const CSRMatrixMPI<std::complex<double>,long int>& A,
                            const Prec<std::complex<double>>& M,
-                           DMat<std::complex<double>>& x,
-                           const DMat<std::complex<double>>& b,
+                           DenseMatrix<std::complex<double>>& x,
+                           const DenseMatrix<std::complex<double>>& b,
                            double rtol, double atol, int& totit, int maxit,
                            bool non_zero_guess, bool verbose);
 
     template void
     IterativeRefinementMPI(const MPIComm& comm,
-                           const SpMat<float,long long int>& A,
-                           const Prec<float>& M, DMat<float>& x,
-                           const DMat<float>& b,
+                           const CSRMatrixMPI<float,long long int>& A,
+                           const Prec<float>& M, DenseMatrix<float>& x,
+                           const DenseMatrix<float>& b,
                            float rtol, float atol, int& totit, int maxit,
                            bool non_zero_guess, bool verbose);
     template void
     IterativeRefinementMPI(const MPIComm& comm,
-                           const SpMat<double,long long int>& A,
-                           const Prec<double>& M, DMat<double>& x,
-                           const DMat<double>& b,
+                           const CSRMatrixMPI<double,long long int>& A,
+                           const Prec<double>& M, DenseMatrix<double>& x,
+                           const DenseMatrix<double>& b,
                            double rtol, double atol, int& totit, int maxit,
                            bool non_zero_guess, bool verbose);
     template void
     IterativeRefinementMPI(const MPIComm& comm,
-                           const SpMat<std::complex<float>,long long int>& A,
+                           const CSRMatrixMPI<std::complex<float>,long long int>& A,
                            const Prec<std::complex<float>>& M,
-                           DMat<std::complex<float>>& x,
-                           const DMat<std::complex<float>>& b,
+                           DenseMatrix<std::complex<float>>& x,
+                           const DenseMatrix<std::complex<float>>& b,
                            float rtol, float atol, int& totit, int maxit,
                            bool non_zero_guess, bool verbose);
     template void
     IterativeRefinementMPI(const MPIComm& comm,
-                           const SpMat<std::complex<double>,long long int>& A,
+                           const CSRMatrixMPI<std::complex<double>,long long int>& A,
                            const Prec<std::complex<double>>& M,
-                           DMat<std::complex<double>>& x,
-                           const DMat<std::complex<double>>& b,
+                           DenseMatrix<std::complex<double>>& x,
+                           const DenseMatrix<std::complex<double>>& b,
+                           double rtol, double atol, int& totit, int maxit,
+                           bool non_zero_guess, bool verbose);
+
+
+
+
+    template<typename scalar_t>
+    using SpMV2d = std::function<void(const DistributedMatrix<scalar_t>&,
+                                      DistributedMatrix<scalar_t>&)>;
+    template<typename scalar_t>
+    using Prec2d = std::function<void(DistributedMatrix<scalar_t>&)>;
+
+    template<typename scalar_t, typename real_t>
+    void IterativeRefinementMPI(const MPIComm& comm,
+                                const SpMV2d<scalar_t>& A,
+                                const Prec2d<scalar_t>& M,
+                                DistributedMatrix<scalar_t>& x,
+                                const DistributedMatrix<scalar_t>& b,
+                                real_t rtol, real_t atol,
+                                int& totit, int maxit,
+                                bool non_zero_guess, bool verbose) {
+      DistributedMatrix<scalar_t> r(x.grid(), x.rows(), x.cols());
+      if (non_zero_guess) {
+        A(x, r);
+        r.scale_and_add(scalar_t(-1.), b);
+      } else {
+        r = b;
+        x.zero();
+      }
+      auto res_norm = r.norm();
+      auto res0 = res_norm;
+      auto rel_res_norm = real_t(1.);
+      auto bw_error = real_t(1.);
+      totit = 0;
+      if (verbose)
+        std::cout << "REFINEMENT it. " << totit
+                  << "\tres = " << std::setw(12) << res_norm
+                  << "\trel.res = " << std::setw(12) << rel_res_norm
+                  << "\tbw.error = " << std::setw(12) << bw_error
+                  << std::endl;
+      while (res_norm > atol && rel_res_norm > rtol &&
+             totit++ < maxit && bw_error > atol) {
+        M(r);
+        x.add(r);
+        A(x, r);
+        r.scale_and_add(scalar_t(-1.), b);
+        res_norm = r.norm();
+        rel_res_norm = res_norm / res0;
+        if (verbose)
+          std::cout << "REFINEMENT it. " << totit << "\tres = "
+                    << std::setw(12) << res_norm
+                    << "\trel.res = " << std::setw(12) << rel_res_norm
+                    << std::endl;
+      }
+    }
+    // explicit template instantiations
+    template void
+    IterativeRefinementMPI(const MPIComm& comm,
+                           const SpMV2d<float>& A,
+                           const Prec2d<float>& M,
+                           DistributedMatrix<float>& x,
+                           const DistributedMatrix<float>& b,
+                           float rtol, float atol, int& totit, int maxit,
+                           bool non_zero_guess, bool verbose);
+    template void
+    IterativeRefinementMPI(const MPIComm& comm,
+                           const SpMV2d<double>& A,
+                           const Prec2d<double>& M,
+                           DistributedMatrix<double>& x,
+                           const DistributedMatrix<double>& b,
+                           double rtol, double atol, int& totit, int maxit,
+                           bool non_zero_guess, bool verbose);
+    template void
+    IterativeRefinementMPI(const MPIComm& comm,
+                           const SpMV2d<std::complex<float>>& A,
+                           const Prec2d<std::complex<float>>& M,
+                           DistributedMatrix<std::complex<float>>& x,
+                           const DistributedMatrix<std::complex<float>>& b,
+                           float rtol, float atol, int& totit, int maxit,
+                           bool non_zero_guess, bool verbose);
+    template void
+    IterativeRefinementMPI(const MPIComm& comm,
+                           const SpMV2d<std::complex<double>>& A,
+                           const Prec2d<std::complex<double>>& M,
+                           DistributedMatrix<std::complex<double>>& x,
+                           const DistributedMatrix<std::complex<double>>& b,
                            double rtol, double atol, int& totit, int maxit,
                            bool non_zero_guess, bool verbose);
 

@@ -211,6 +211,8 @@ namespace strumpack {
     DistributedMatrix<scalar_t>& add(const DistributedMatrix<scalar_t>& B);
     DistributedMatrix<scalar_t>&
     scaled_add(scalar_t alpha, const DistributedMatrix<scalar_t>& B);
+    DistributedMatrix<scalar_t>&
+    scale_and_add(scalar_t alpha, const DistributedMatrix<scalar_t>& B);
 
     real_t norm() const;
     real_t normF() const;

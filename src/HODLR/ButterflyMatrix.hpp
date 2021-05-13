@@ -104,13 +104,14 @@ namespace strumpack {
       std::size_t rows() const override { return rows_; }
       std::size_t cols() const override { return cols_; }
       std::size_t lrows() const { return lrows_; }
+      std::size_t local_rows() const override { return lrows_; }
       std::size_t lcols() const { return lcols_; }
-      std::size_t begin_row() const { return rdist_[c_->rank()]; }
-      std::size_t end_row() const { return rdist_[c_->rank()+1]; }
-      const std::vector<int>& rdist() const { return rdist_; }
+      std::size_t begin_row() const override { return rdist_[c_->rank()]; }
+      std::size_t end_row() const override { return rdist_[c_->rank()+1]; }
+      const std::vector<int>& rdist() const override { return rdist_; }
       std::size_t begin_col() const { return cdist_[c_->rank()]; }
       std::size_t end_col() const { return cdist_[c_->rank()+1]; }
-      const std::vector<int>& cdist() const { return cdist_; }
+      const std::vector<int>& cdist() const override { return cdist_; }
       const MPIComm& Comm() const { return *c_; }
 
       std::size_t memory() const override { return get_stat("Mem_Fill") * 1e6; }

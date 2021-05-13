@@ -31,6 +31,10 @@
 #include <math.h>
 #include "structured/StructuredMatrix.h"
 
+double Toeplitz(int i, int j) {
+  return 1. / (1. + abs(i-j));
+}
+
 int main(int argc, char* argv[]) {
   int n = 1000;
   int nrhs = 10;
@@ -40,7 +44,7 @@ int main(int argc, char* argv[]) {
   double* T = malloc(n*n*sizeof(double));
   for (int j=0; j<n; j++)
     for (int i=0; i<n; i++)
-      T[i+j*n] = 1. / (1. + abs(i-j));
+      T[i+j*n] = Toeplitz(i, j);
 
   CSPOptions opts;
   SP_d_struct_default_options(&opts);
@@ -53,7 +57,8 @@ int main(int argc, char* argv[]) {
   // types HODLR, HODBF, BUTTERFLY and LR require MPI
 
   CSPStructMat H;
-  SP_d_struct_from_dense(&H, n, n, T, n, &opts);
+  //SP_d_struct_from_dense(&H, n, n, T, n, &opts);
+  SP_d_struct_from_elements(&H, n, n, Toeplitz, &opts);
 
 
   double* id = malloc(n*n*sizeof(double));

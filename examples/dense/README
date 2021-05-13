@@ -1,7 +1,13 @@
 This folder contains a number of examples showing how to use the dense
 matrix solvers in STRUMPACK. We recommend using the general
 structured::StructuredMatrix class interface to the different formats,
-see testStructured and testStructuredMPI.
+see testStructured and testStructuredMPI. There are also C and Fortran
+interfaces, see dstructured.d dstructured_mpi.c and fstructured.f90.
+
+To build all examples, run:
+      make examples
+in the build directory.
+
 
 When running, make sure to set the number of OpenMP threads
 correctly! For instance on bash, to run with 4 MPI processes and 6
@@ -39,13 +45,13 @@ The examples include:
 
 
 - test_HODLR_HODBF: similar to testStructured, but simplified to show
-  just the use for the Hierarchically Off-Diagonal Low Rank and
-  Hierarchically Off-Diagonal Butterfly formats. This illustrates
-  construction from individual matrix elements (using a routine to
-  compute matrix elements), and construction using a matrix vector
-  product (which can be distributed using either a 2d block cyclic
-  distribution or a 1d block row distribution). It also show the
-  solution of a linear system, and use as a preconditioner.
+    just the use for the Hierarchically Off-Diagonal Low Rank and
+    Hierarchically Off-Diagonal Butterfly formats. This illustrates
+    construction from individual matrix elements (using a routine to
+    compute matrix elements), and construction using a matrix vector
+    product (which can be distributed using either a 2d block cyclic
+    distribution or a 1d block row distribution). It also show the
+    solution of a linear system, and use as a preconditioner.
 
 
 - dstructured.c: Example usage of the C interface for structured
@@ -53,7 +59,21 @@ The examples include:
 
       OMP_NUM_THREADS=4 ./dstructured 1000
 
+- dstructured_mpi.c: Example usage of the C interface for structured
+    matrices using MPI.
 
+      OMP_NUM_THREADS=1 mpirun -n 4 ./dstructured_mpi 1000
+
+
+- fstructured.f90: Example usage of the C interface for structured
+    matrices using MPI.
+
+      OMP_NUM_THREADS=1 mpirun -n 4 ./dstructured_mpi 1000
+
+
+
+
+== older examples ==================================================
 
 
 
