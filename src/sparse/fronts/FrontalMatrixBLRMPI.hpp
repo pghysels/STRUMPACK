@@ -56,7 +56,10 @@ namespace strumpack {
 
     void release_work_memory() override;
     void build_front(const SpMat_t& A);
-    void build_front_cols(const SpMat_t& A, std::size_t i, const std::vector<Triplet<scalar_t>>& rbuf);
+    void build_front_cols(const SpMat_t& A, std::size_t i, 
+                          const std::vector<Triplet<scalar_t>>& r1buf,
+                          const std::vector<Triplet<scalar_t>>& r2buf,
+                          const std::vector<Triplet<scalar_t>>& r3buf);
 
     void extend_add();
     void extend_add_cols(std::size_t i);
@@ -69,10 +72,13 @@ namespace strumpack {
      const FBLRMPI_t* pa) const override;
     void extadd_blr_copy_to_buffers_col
     (std::vector<std::vector<scalar_t>>& sbuf,
-     const FBLRMPI_t* pa) const override;
+     const FBLRMPI_t* pa, integer_t begin_col, integer_t end_col) const override;
     void extadd_blr_copy_from_buffers
     (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
      scalar_t** pbuf, const FBLRMPI_t* pa) const override;
+     void extadd_blr_copy_from_buffers_col
+    (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
+     scalar_t** pbuf, const FBLRMPI_t* pa, integer_t begin_col, integer_t end_col) const override;
 
     void multifrontal_factorization
     (const SpMat_t& A, const Opts_t& opts,

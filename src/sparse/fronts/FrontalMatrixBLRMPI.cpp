@@ -84,16 +84,30 @@ namespace strumpack {
           (static_cast<long long int>(ch->dim_upd())*ch->dim_upd());
       }
       if (!visit(ch)) continue;
-      ch->extadd_blr_copy_to_buffers_col(sbuf, this); //
+      if (i < std::size_t(dim_sep())){
+        ch->extadd_blr_copy_to_buffers_col(sbuf, this, F11blr_.tileroff(i), 
+                                         F11blr_.tileroff(i+grid2d().npcols()));
+      } else{
+        ch->extadd_blr_copy_to_buffers_col(sbuf, this, F22blr_.tileroff(i-dim_sep())+dim_sep(), 
+                                         F22blr_.tileroff(i-dim_sep()+dim_upd())+dim_sep()); //??
+      }
     }
     std::vector<scalar_t,NoInit<scalar_t>> rbuf;
     std::vector<scalar_t*> pbuf;
     Comm().all_to_all_v(sbuf, rbuf, pbuf);
     for (auto& ch : {lchild_.get(), rchild_.get()}) {
       if (!ch) continue;
-      ch->extadd_blr_copy_from_buffers //_col
-        (F11blr_, F12blr_, F21blr_, F22blr_,
-         pbuf.data()+this->master(ch), this);//
+      if (i < std::size_t(dim_sep())){
+        ch->extadd_blr_copy_from_buffers_col
+          (F11blr_, F12blr_, F21blr_, F22blr_,
+          pbuf.data()+this->master(ch), this, 
+          F11blr_.tileroff(i), F11blr_.tileroff(i+grid2d().npcols()));
+      } else{
+        ch->extadd_blr_copy_from_buffers_col
+          (F11blr_, F12blr_, F21blr_, F22blr_,
+          pbuf.data()+this->master(ch), this, 
+          F22blr_.tileroff(i-dim_sep())+dim_sep(), F22blr_.tileroff(i-dim_sep()+grid2d().npcols())+dim_sep());
+      }
     }
   }
 
@@ -115,9 +129,9 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLRMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
-  (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa) const {
+  (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa, integer_t begin_col, integer_t end_col) const {
     BLR::BLRExtendAdd<scalar_t,integer_t>::copy_to_buffers_col
-      (F22blr_, sbuf, pa, this->upd_to_parent(pa));
+      (F22blr_, sbuf, pa, this->upd_to_parent(pa), begin_col, end_col);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -126,6 +140,14 @@ namespace strumpack {
    scalar_t** pbuf, const FBLRMPI_t* pa) const {
     BLR::BLRExtendAdd<scalar_t,integer_t>::copy_from_buffers
       (F11, F12, F21, F22, pbuf, pa, this);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixBLRMPI<scalar_t,integer_t>::extadd_blr_copy_from_buffers_col
+  (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
+   scalar_t** pbuf, const FBLRMPI_t* pa, integer_t begin_col, integer_t end_col) const {
+    BLR::BLRExtendAdd<scalar_t,integer_t>::copy_from_buffers_col
+      (F11, F12, F21, F22, pbuf, pa, this, begin_col, end_col);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -174,37 +196,33 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLRMPI<scalar_t,integer_t>::build_front_cols
-  (const SpMat_t& A, std::size_t i, const std::vector<Triplet<scalar_t>>& rbuf) {
-    //const auto dupd = dim_upd();
+  (const SpMat_t& A, std::size_t i, const std::vector<Triplet<scalar_t>>& r1buf, 
+   const std::vector<Triplet<scalar_t>>& r2buf, const std::vector<Triplet<scalar_t>>& r3buf) {
+    const auto dupd = dim_upd();
     const auto dsep = dim_sep();
     if (dsep) {
-      F11blr_.fill_col(0., i);
-      /*if (dim_upd()) {
-        F12blr_ = BLRMPI_t(pgrid_, sep_tiles_, upd_tiles_);
-        F21blr_ = BLRMPI_t(pgrid_, upd_tiles_, sep_tiles_);
-        F12blr_.fill(0.);
-        F21blr_.fill(0.);
-      }*/
+      if (i < std::size_t(dsep)) F11blr_.fill_col(0., i);
+      if (dupd) {
+        if (i < std::size_t(dsep)) {
+          F12blr_.fill_col(0., i);
+        } else F21blr_.fill(0.);
+      }
     }
-    /*if (dupd) {
-      F22blr_ = BLRMPI_t(pgrid_, upd_tiles_, upd_tiles_);
-      F22blr_.fill(0.);
-    }*/
-      for (auto& e : rbuf) 
+    if (dupd) {
+      if (i >= std::size_t(dsep)) F22blr_.fill(0.);
+    }
+    if (i < std::size_t(dsep)){
+      for (auto& e : r1buf) 
         if (F11blr_.cg2t(e.c) >= i && F11blr_.cg2t(e.c) < i+grid2d().npcols())
           F11blr_.global(e.r, e.c) = e.v;
-    /* {
-      std::vector<std::vector<Trip_t>> sbuf(this->P());
-      for (auto& e : e12) sbuf[sep_rg2p(e.r)+upd_cg2p(e.c)*npr].push_back(e);
-      auto rbuf = Comm().all_to_all_v(sbuf);
-      for (auto& e : rbuf) F12blr_.global(e.r, e.c) = e.v;
-    } {
-      std::vector<std::vector<Trip_t>> sbuf(this->P());
-      for (auto& e : e21) sbuf[upd_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
-      auto rbuf = Comm().all_to_all_v(sbuf);
-      for (auto& e : rbuf) F21blr_.global(e.r, e.c) = e.v;
-    } */
-    //EXTEND-ADD
+      for (auto& e : r3buf) 
+        if(F21blr_.cg2t(e.c) >= i && F21blr_.cg2t(e.c) < std::size_t(dupd))
+          F21blr_.global(e.r, e.c) = e.v;
+    } else{
+      for (auto& e : r2buf) 
+        if (F12blr_.cg2t(e.c) >= i-dsep && F12blr_.cg2t(e.c) < i+dupd)
+          F12blr_.global(e.r, e.c) = e.v;
+    }
     extend_add_cols(i);
   }
 
@@ -219,7 +237,7 @@ namespace strumpack {
         (A, opts, etree_level+1, task_depth);
     TaskTimer t("FrontalMatrixBLRMPI_factor");
     if (/*etree_level == 0 && */opts.print_root_front_stats()) t.start();
-#if 1
+#if 0
     build_front(A);
     extend_add();
     if (lchild_) lchild_->release_work_memory();
@@ -234,11 +252,26 @@ namespace strumpack {
 #else // factor column-block-wise for memory reduction
     if (dim_sep() && grid2d().active()) {
       if (dim_upd()) {
-        //FActor F11
-        //lswp, apply pivots to F12
-        //trsm F11, F12
-        //TRSM F11, F21
-        //Gemm F22= F22 - F21 *F12 with LuAR
+        F11blr_ = BLRMPI_t(pgrid_, sep_tiles_, sep_tiles_);
+        F12blr_ = BLRMPI_t(pgrid_, sep_tiles_, upd_tiles_);
+        F21blr_ = BLRMPI_t(pgrid_, upd_tiles_, sep_tiles_);
+        F22blr_ = BLRMPI_t(pgrid_, upd_tiles_, upd_tiles_);
+        using Trip_t = Triplet<scalar_t>;
+        std::vector<Trip_t> e11, e12, e21;
+        A.push_front_elements(sep_begin_, sep_end_, this->upd(), e11, e12, e21);
+        int npr = grid2d().nprows();
+        std::vector<std::vector<Trip_t>> s1buf(this->P());
+        for (auto& e : e11) s1buf[sep_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
+        auto r1buf = Comm().all_to_all_v(s1buf);
+        std::vector<std::vector<Trip_t>> s2buf(this->P());
+        for (auto& e : e12) s2buf[sep_rg2p(e.r)+upd_cg2p(e.c)*npr].push_back(e);
+        auto r2buf = Comm().all_to_all_v(s2buf);
+        std::vector<std::vector<Trip_t>> s3buf(this->P());
+        for (auto& e : e21) s3buf[upd_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
+        auto r3buf = Comm().all_to_all_v(s3buf);
+        piv_ = BLRMPI_t::factor_col(F11blr_, F12blr_, F21blr_, F22blr_, 
+                                  adm_, opts.BLR_options(), 
+                                  [&](int i){this->build_front_cols(A, i, r1buf, r2buf, r3buf);});
       } else{ 
           F11blr_ = BLRMPI_t(pgrid_, sep_tiles_, sep_tiles_);
           using Trip_t = Triplet<scalar_t>;
@@ -247,11 +280,14 @@ namespace strumpack {
           int npr = grid2d().nprows();
           std::vector<std::vector<Trip_t>> sbuf(this->P());
           for (auto& e : e11) sbuf[sep_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
-          auto rbuf = Comm().all_to_all_v(sbuf);
-          piv_ = factor_colwise(adm_, opts.BLR_options(), 
-                                  [&A, &rbuf](int i){build_front_cols(A, i, rbuf);});
+          auto r1buf = Comm().all_to_all_v(sbuf);
+          std::vector<Trip_t> r2buf, r3buf;
+          piv_ = F11blr_.factor_colwise(adm_, opts.BLR_options(), 
+                                  [&](int i){build_front_cols(A, i, r1buf, r2buf, r3buf);});
       }
     }
+    if (lchild_) lchild_->release_work_memory();
+    if (rchild_) rchild_->release_work_memory();
 #endif
     if (/*etree_level == 0 && */opts.print_root_front_stats()) {
       auto time = t.elapsed();

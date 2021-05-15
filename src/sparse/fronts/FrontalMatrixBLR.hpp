@@ -112,6 +112,15 @@ namespace strumpack {
       BLR::BLRExtendAdd<scalar_t,integer_t>::
         seq_copy_to_buffers(F22_, sbuf, pa, this);
     }
+    void extadd_blr_copy_to_buffers_col
+    (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa, 
+     integer_t begin_col, integer_t end_col)
+      const override {
+      if (F22blr_.rows() == std::size_t(dim_upd()))
+        abort(); //F22blr_.dense(F22_);
+      BLR::BLRExtendAdd<scalar_t,integer_t>::
+        seq_copy_to_buffers_col(F22_, sbuf, pa, this, begin_col, end_col);
+    }
 #endif
 
     void partition

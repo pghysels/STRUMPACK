@@ -122,6 +122,7 @@ namespace strumpack {
       std::vector<int> factor(const Opts_t& opts);
       std::vector<int> factor(const adm_t& adm, const Opts_t& opts);
       std::vector<int> factor_colwise(const adm_t& adm, const Opts_t& opts, const std::function<void(int)>& blockcol);
+      
 
       void laswp(const std::vector<int>& piv, bool fwd);
 
@@ -129,6 +130,11 @@ namespace strumpack {
       std::vector<int> partial_factor(BLRMPI_t& A11, BLRMPI_t& A12,
                                       BLRMPI_t& A21, BLRMPI_t& A22,
                                       const adm_t& adm, const Opts_t& opts);
+
+      static
+      std::vector<int> factor_col(BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, 
+                                  BLRMPI_t& F22, const adm_t& adm, const Opts_t& opts, 
+                                  const std::function<void(int)>& blockcol);
 
       void compress(const Opts_t& opts);
 

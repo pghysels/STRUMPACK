@@ -379,6 +379,14 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
+  FrontalMatrix<scalar_t,integer_t>::extadd_blr_copy_from_buffers_col
+  (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
+   scalar_t** pbuf, const FBLRMPI_t* pa, integer_t begin_col, integer_t end_col) const {
+    BLR::BLRExtendAdd<scalar_t,integer_t>::seq_copy_from_buffers_col
+      (F11, F12, F21, F22, *pbuf, pa, this, begin_col, end_col);
+  }
+
+  template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::extend_add_column_copy_to_buffers
   (const DistM_t& CB, const DenseM_t& seqCB,
    std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
