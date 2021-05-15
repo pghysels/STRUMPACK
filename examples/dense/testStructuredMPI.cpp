@@ -81,7 +81,8 @@ check_accuracy(const DistributedMatrix<scalar_t>& A,
  * with nrhs right-hand side vectors.
  */
 template<typename scalar_t> void
-factor_and_solve(const DistributedMatrix<scalar_t>& A, int nrhs,
+factor_and_solve(int nrhs,
+                 const DistributedMatrix<scalar_t>& A,
                  structured::StructuredMatrix<scalar_t>* H) {
   // Allocate memory for rhs and solution vectors (matrices). Use same
   // 2D processor grid as A.
@@ -260,6 +261,23 @@ iterative_refinement_2d(const MPIComm& comm, const BLACSGrid* g,
 }
 
 
+template<typename scalar_t> void
+test_shift(int nrhs, const DistributedMatrix<scalar_t>& A,
+           structured::StructuredMatrix<scalar_t>* H) {
+  if (A.Comm().is_root())
+    cout << "  - Adding diagonal shift" << endl;
+  auto As = A;
+  scalar_t sigma(10.);
+  As.shift(sigma);
+  H->shift(sigma);
+  // check the shifted matrix
+  check_accuracy(As, H);
+  // after applying the shift, H->factor needs to be called again!
+  factor_and_solve(nrhs, As, H);
+}
+
+
+
 
 int main(int argc, char* argv[]) {
   int thread_level;
@@ -396,11 +414,15 @@ int main(int argc, char* argv[]) {
         // matrix
         check_accuracy(A2d, H.get());
         // Factor H and (approximately) solve a linear system
-        factor_and_solve(A2d, nrhs, H.get());
+        factor_and_solve(nrhs, A2d, H.get());
         // Solve a linear system using an iterative solver with H as
         // the preconditioner and using A as the exact matrix vector
         // product.
         preconditioned_solve(world, Tmult1d, H.get());
+        // add a diagonal shift to the structured matrix, this does
+        // not require recompression. Then check the accuracy again,
+        // and solve a linear system with the shifted matrix.
+        test_shift(nrhs, A2d, H.get());
       } catch (std::exception& e) {
         if (world.is_root())
           cout << get_name(type) << " failed: " << e.what() << endl;
@@ -424,8 +446,9 @@ int main(int argc, char* argv[]) {
             (world, n, n, Toeplitz, options);
           print_info(world, H.get(), options);
           check_accuracy(A2d, H.get());
-          factor_and_solve(A2d, nrhs, H.get());
+          factor_and_solve(nrhs, A2d, H.get());
           preconditioned_solve(world, Tmult1d, H.get());
+          test_shift(nrhs, A2d, H.get());
         }
 
         {
@@ -466,17 +489,19 @@ int main(int argc, char* argv[]) {
             (world, &grid, n, n, Tmult2d, options);
           print_info(world, H.get(), options);
           check_accuracy(A2d, H.get());
-          factor_and_solve(A2d, nrhs, H.get());
+          factor_and_solve(nrhs, A2d, H.get());
           iterative_refinement_2d<double>
             (world, &grid, Tmult2d, nrhs, H.get());
+          test_shift(nrhs, A2d, H.get());
         }
         { // 1d block row distribution for the product
           auto H = structured::construct_matrix_free<double>
             (world, n, n, Tmult1d, options);
           print_info(world, H.get(), options);
           check_accuracy(A2d, H.get());
-          factor_and_solve(A2d, nrhs, H.get());
+          factor_and_solve(nrhs, A2d, H.get());
           preconditioned_solve(world, Tmult1d, H.get());
+          test_shift(nrhs, A2d, H.get());
         }
       } catch (std::exception& e) {
         if (world.is_root())

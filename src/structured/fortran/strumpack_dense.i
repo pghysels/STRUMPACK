@@ -31,7 +31,7 @@
 !> @file strumpack_dense.f90
 !> @brief Fortran interface to the structured matrix functionality
 !%}
-//%include <complex.i>
+%include <complex.i>
 
 // Translate all enums and other compile-time constants into fortran parameters
 %fortranconst;

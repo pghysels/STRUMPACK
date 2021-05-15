@@ -1151,6 +1151,13 @@ namespace strumpack {
     }
 
 
+    template<typename scalar_t> void
+    StructuredMatrix<scalar_t>::shift(scalar_t s) {
+      throw std::invalid_argument
+        ("Operation shift not supported for this type.");
+    }
+
+
     // explicit template instantiations
     template class StructuredMatrix<float>;
     template class StructuredMatrix<double>;

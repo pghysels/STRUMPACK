@@ -181,7 +181,7 @@ import :: cspoptions
 type(C_PTR) :: s
 integer(C_INT), intent(in), value :: rows
 integer(C_INT), intent(in), value :: cols
-real(C_FLOAT) :: a
+type(C_PTR), value :: a
 integer(C_INT), intent(in), value :: lda
 type(CSPOptions), intent(in) :: opts
 integer(C_INT) :: fresult
@@ -195,7 +195,7 @@ import :: cspoptions
 type(C_PTR) :: s
 integer(C_INT), intent(in), value :: rows
 integer(C_INT), intent(in), value :: cols
-real(C_DOUBLE) :: a
+type(C_PTR), value :: a
 integer(C_INT), intent(in), value :: lda
 type(CSPOptions), intent(in) :: opts
 integer(C_INT) :: fresult
@@ -288,9 +288,9 @@ use, intrinsic :: ISO_C_BINDING
 type(C_PTR), intent(in), value :: s
 character(C_CHAR), intent(in), value :: trans
 integer(C_INT), intent(in), value :: m
-real(C_FLOAT) :: b
+type(C_PTR), value :: b
 integer(C_INT), intent(in), value :: ldb
-real(C_FLOAT) :: c
+type(C_PTR), value :: c
 integer(C_INT), intent(in), value :: ldc
 integer(C_INT) :: fresult
 end function
@@ -302,9 +302,9 @@ use, intrinsic :: ISO_C_BINDING
 type(C_PTR), intent(in), value :: s
 character(C_CHAR), intent(in), value :: trans
 integer(C_INT), intent(in), value :: m
-real(C_DOUBLE) :: b
+type(C_PTR), value :: b
 integer(C_INT), intent(in), value :: ldb
-real(C_DOUBLE) :: c
+type(C_PTR), value :: c
 integer(C_INT), intent(in), value :: ldc
 integer(C_INT) :: fresult
 end function
@@ -369,7 +369,7 @@ result(fresult)
 use, intrinsic :: ISO_C_BINDING
 type(C_PTR), intent(in), value :: s
 integer(C_INT), intent(in), value :: nrhs
-real(C_FLOAT) :: b
+type(C_PTR), value :: b
 integer(C_INT), intent(in), value :: ldb
 integer(C_INT) :: fresult
 end function
@@ -380,7 +380,7 @@ result(fresult)
 use, intrinsic :: ISO_C_BINDING
 type(C_PTR), intent(in), value :: s
 integer(C_INT), intent(in), value :: nrhs
-real(C_DOUBLE) :: b
+type(C_PTR), value :: b
 integer(C_INT), intent(in), value :: ldb
 integer(C_INT) :: fresult
 end function

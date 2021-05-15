@@ -406,8 +406,6 @@ extern "C" {
   }
   int SP_d_struct_local_rows(const CSPStructMat S) {
     try {
-      // return reinterpret_cast<CStructMat_<double>*>(S)->S->
-      //   local_rows();
       return get_mat<double>(S)->local_rows();
     } catch (std::exception& e) {
       std::cerr << "Operation failed: " << e.what() << std::endl;

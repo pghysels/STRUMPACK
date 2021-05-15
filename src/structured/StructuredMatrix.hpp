@@ -189,17 +189,17 @@ namespace strumpack {
      * matrix operations, or precisions (s: float, d: double, c:
      * std::complex<float>, z: std::complex<double>):
      *
-     * |           |  parallel? || construct from ..        ||||| operation           ||| precision  ||||
-     * |-----------|------|------|-------|------|----|-----|----|------|--------|-------|---|---|---|---|
-     * |  ^        |  seq | MPI  | DENSE | ELEM | MF | PMF | NN | mult | factor | solve | s | d | c | z |
-     * | BLR       |  X   |  X   | X     |  X   |    |     |    | X    |   X    |  X    | X | X | X | X |
-     * | HSS       |  X   |  X   | X     |      |    | X   | X  |  X   |   X    |  X    | X | X | X | X |
-     * | HODLR     |      |  X   | X     |  X   | X  |     | X  |  X   |   X    |  X    |   | X |   | X |
-     * | HODBF     |      |  X   | X     |  X   | X  |     | X  |  X   |   X    |  X    |   | X |   | X |
-     * | BUTTERFLY |      |  X   | X     |  X   | X  |     | X  |  X   |        |       |   | X |   | X |
-     * | LR        |      |  X   | X     |  X   | X  |     | X  |  X   |        |       |   | X |   | X |
-     * | LOSSY     |  X   |      | X     |      |    |     |    |      |        |       | X | X | X | X |
-     * | LOSSLESS  |  X   |      | X     |      |    |     |    |      |        |       | X | X | X | X |
+     * |           |  parallel? || construct from ..        ||||| operation                  |||| precision  ||||
+     * |-----------|------|------|-------|------|----|-----|----|------|--------|-------|-------|---|---|---|---|
+     * |  ^        |  seq | MPI  | DENSE | ELEM | MF | PMF | NN | mult | factor | solve | shift | s | d | c | z |
+     * | BLR       |  X   |  X   | X     |  X   |    |     |    | X    |   X    |  X    | ?     | X | X | X | X |
+     * | HSS       |  X   |  X   | X     |      |    | X   | X  |  X   |   X    |  X    | X     | X | X | X | X |
+     * | HODLR     |      |  X   | X     |  X   | X  |     | X  |  X   |   X    |  X    | ?     |   | X |   | X |
+     * | HODBF     |      |  X   | X     |  X   | X  |     | X  |  X   |   X    |  X    | ?     |   | X |   | X |
+     * | BUTTERFLY |      |  X   | X     |  X   | X  |     | X  |  X   |        |       |       |   | X |   | X |
+     * | LR        |      |  X   | X     |  X   | X  |     | X  |  X   |        |       |       |   | X |   | X |
+     * | LOSSY     |  X   |      | X     |      |    |     |    |      |        |       |       | X | X | X | X |
+     * | LOSSLESS  |  X   |      | X     |      |    |     |    |      |        |       |       | X | X | X | X |
      *
      * \see HSS::HSSMatrix, BLR::BLRMatrix, HODLR::HODLRMatrix,
      * HODLR::ButterflyMatrix, ...
@@ -398,6 +398,18 @@ namespace strumpack {
        * overwritten with the solution x.
        */
       virtual void solve(DistributedMatrix<scalar_t>& b) const;
+
+
+      /**
+       * Apply a shift to the diagonal of this matrix. Ie, this +=
+       * s*I, with I the identity matrix. If this is called after
+       * calling factor, then the factors are not updated. To solve a
+       * linear system with the shifted matrix, you need to call
+       * factor again.
+       *
+       * \param s Shift to be applied to the diagonal.
+       */
+      virtual void shift(scalar_t s);
 
     };
 

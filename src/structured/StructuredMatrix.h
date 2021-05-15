@@ -34,8 +34,6 @@
 #define STRUMPACK_STRUCTURED_C_H
 
 #include <stdint.h>
-// #undef _Complex
-// #define _Complex
 #include <complex.h>
 #undef I
 

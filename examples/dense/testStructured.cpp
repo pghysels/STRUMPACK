@@ -185,6 +185,20 @@ preconditioned_solve(const DenseMatrix<scalar_t>& A,
 }
 
 
+template<typename scalar_t> void
+test_shift(int nrhs,
+           const DenseMatrix<scalar_t>& A,
+           structured::StructuredMatrix<scalar_t>* H) {
+  cout << "  - Adding diagonal shift" << endl;
+  auto As = A;
+  scalar_t sigma(10.);
+  As.shift(sigma);
+  H->shift(sigma);
+  // check the shifted matrix
+  check_accuracy(As, H);
+  // after applying the shift, H->factor needs to be called again!
+  factor_and_solve(nrhs, As, H);
+}
 
 
 int main(int argc, char* argv[]) {
@@ -274,6 +288,10 @@ int main(int argc, char* argv[]) {
         // the preconditioner and using A as the exact matrix vector
         // product.
         preconditioned_solve(A, H.get());
+        // add a diagonal shift to the structured matrix, this does
+        // not require recompression. Then check the accuracy again,
+        // and solve a linear system with the shifted matrix.
+        test_shift(nrhs, A, H.get());
       }
       {
         // exactly the same as above, but now with an additional
@@ -284,6 +302,7 @@ int main(int argc, char* argv[]) {
         check_accuracy(A, H.get());
         factor_and_solve(nrhs, A, H.get());
         preconditioned_solve(A, H.get());
+        test_shift(nrhs, A, H.get());
       }
     } catch (std::exception& e) {
       cout << get_name(type) << " failed: " << e.what() << endl;
@@ -308,6 +327,7 @@ int main(int argc, char* argv[]) {
         check_accuracy(A, H.get());
         factor_and_solve(nrhs, A, H.get());
         preconditioned_solve(A, H.get());
+        test_shift(nrhs, A, H.get());
       }
       {
         // routine to compute sub-block of the matrix. Often this could be
@@ -329,6 +349,7 @@ int main(int argc, char* argv[]) {
         check_accuracy(A, H.get());
         factor_and_solve(nrhs, A, H.get());
         preconditioned_solve(A, H.get());
+        test_shift(nrhs, A, H.get());
       }
     } catch (std::exception& e) {
       cout << get_name(type) << " failed: " << e.what() << endl;
@@ -343,7 +364,6 @@ int main(int argc, char* argv[]) {
   for (auto type : types) {
     options.set_type(type);
     try {
-
       // Construct a StructuredMatrix using both a (fast)
       // matrix-vector multiplication and an element extraction
       // routine. This is mainly usefull for HSS construction, which
@@ -356,7 +376,7 @@ int main(int argc, char* argv[]) {
       check_accuracy(A, H.get());
       factor_and_solve(nrhs, A, H.get());
       preconditioned_solve(A, H.get());
-
+      test_shift(nrhs, A, H.get());
     } catch (std::exception& e) {
       cout << get_name(type) << " failed: " << e.what() << endl;
     }

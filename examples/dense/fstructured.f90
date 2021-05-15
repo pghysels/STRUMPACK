@@ -35,10 +35,12 @@ program fstructured
   integer(C_INT) :: ierr
 
   ! dense Toeplitz matrix
-  real(C_DOUBLE), dimension(:,:), allocatable, target :: T
+  ! real(C_DOUBLE), dimension(:,:), allocatable, target :: T
+  COMPLEX*16, dimension(:,:), allocatable, target :: T
 
   ! solution and right hand-side vectors (matrices)
-  real(C_DOUBLE), dimension(:,:), allocatable, target :: X, B
+  !real(C_DOUBLE), dimension(:,:), allocatable, target :: X, B
+  COMPLEX*16, dimension(:,:), allocatable, target :: X, B
 
 
   ! structured matrix options structure
@@ -74,22 +76,22 @@ program fstructured
   options%type = SP_TYPE_HSS
 
   ! construct a rank-structured matrix from T
-  ierr = SP_d_struct_from_dense( S, n, n, T(1, 1), n, options )
+  ierr = SP_z_struct_from_dense( S, n, n, c_loc(T(1, 1)), n, options )
 
   ! compute the right-hand side B from X as B = H*X
-  ierr = SP_d_struct_mult( S, 'N', nrhs, X(1, 1), n, B(1, 1), n )
+  ierr = SP_z_struct_mult( S, 'N', nrhs, c_loc(X(1, 1)), n, c_loc(B(1, 1)), n )
 
   ! compute a factorization of H
-  ierr = SP_d_struct_factor( S )
+  ierr = SP_z_struct_factor( S )
 
   ! solve linear system H * X = B
   write(*,*) "# solving linear system"
-  ierr = SP_d_struct_solve( S, nrhs, B(1, 1), n )
+  ierr = SP_z_struct_solve( S, nrhs, c_loc(B(1, 1)), n )
 
 
-  ! TODO check accuracy of compressio, solve
+  ! TODO check accuracy of compression, solve
 
-  call SP_d_struct_destroy( S )
+  call SP_z_struct_destroy( S )
 
   deallocate(T)
   deallocate(X)
