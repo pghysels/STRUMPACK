@@ -786,7 +786,7 @@ namespace strumpack {
       std::unique_ptr<int[]> work
         (new int[F11.lrows()+F22.lrows()+col_dim]);
       auto r_1 = work.get();
-      if ( begin_col < F11.lcols()){
+     if ( begin_col < F11.lcols()){
         auto c_1 = r_1 + F11.lrows();
         auto r_2 = c_1 + col_dim;
         int r_max_1 = 0, r_max_2 = 0, c_max_1 = 0;

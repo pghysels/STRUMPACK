@@ -2521,7 +2521,7 @@ namespace strumpack {
                   if (adm(k, j)) compress_tile(k, j, opts);
                   tile(k, j).laswp(piv_tile, true);
                   trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-                          scalar_t(1.), Tcc_vec[k], tile(k, j));
+                          scalar_t(1.), Tcc_vec[k/grid()->nprows()], tile(k, j));
                 }
               }
             }
