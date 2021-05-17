@@ -2513,31 +2513,29 @@ namespace strumpack {
         //std::vector<std::vector<std::unique_ptr<BLRTile<scalar_t>>> > Tkc_vec, Tcj_vec;
         //construct the (i/CP+1) CP block-columns as dense tiles
         blockcol(i);
-        if (i > 0) {
-          for (std::size_t k=0; k<i; k++){
-            if (grid()->is_local_row(k)) {
-              for (std::size_t j=i; j<std::min(i+CP, colblocks()); j++) {
-                if (grid()->is_local_col(j)) {
-                  if (adm(k, j)) compress_tile(k, j, opts);
-                  tile(k, j).laswp(piv_tile, true);
-                  trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-                          scalar_t(1.), Tcc_vec[k/grid()->nprows()], tile(k, j));
-                }
+        for (std::size_t k=0; k<i; k++){
+          if (grid()->is_local_row(k)) {
+            for (std::size_t j=i; j<std::min(i+CP, colblocks()); j++) {
+              if (grid()->is_local_col(j)) {
+                if (adm(k, j)) compress_tile(k, j, opts);
+                tile(k, j).laswp(piv_tile_global[k/grid()->nprows()], true);
+                trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                        scalar_t(1.), Tcc_vec[k/grid()->nprows()], tile(k, j));
               }
             }
-            auto Tkc = bcast_col_of_tiles_along_rows(k+1, rowblocks(), k);
-            auto Tcj = bcast_row_of_tiles_along_cols(k, i, std::min(i+CP, colblocks()));
-            for (std::size_t lk=k+1, c=0; lk<rowblocks(); lk++) {
-              if (grid()->is_local_row(lk)) {
-                for (std::size_t lj=i, r=0; lj<std::min(i+CP, colblocks()); lj++) {
-                  if (grid()->is_local_col(lj)) {
-                    gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc[c]),
-                          *(Tcj[r]), scalar_t(1.), tile_dense(lk, lj).D());
-                    r++;
-                  }
+          }
+          auto Tkc = bcast_col_of_tiles_along_rows(k+1, rowblocks(), k);
+          auto Tcj = bcast_row_of_tiles_along_cols(k, i, std::min(i+CP, colblocks()));
+          for (std::size_t lk=k+1, c=0; lk<rowblocks(); lk++) {
+            if (grid()->is_local_row(lk)) {
+              for (std::size_t lj=i, r=0; lj<std::min(i+CP, colblocks()); lj++) {
+                if (grid()->is_local_col(lj)) {
+                  gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc[c]),
+                        *(Tcj[r]), scalar_t(1.), tile_dense(lk, lj).D());
+                  r++;
                 }
-                c++;
               }
+              c++;
             }
           }
         }
@@ -2631,44 +2629,42 @@ namespace strumpack {
       for (std::size_t i=0; i<B1_c; i+=CP) { //F11 and F21
         //construct the (i/CP+1) CP block-columns as dense tiles
         blockcol(i);
-        if (i > 0) {
-          for (std::size_t k=0; k<i; k++){
-            if (g->is_local_row(k)) {
-              for (std::size_t j=i; j<std::min(i+CP, B1_c); j++) {
-                if (g->is_local_col(j)) {
-                  if (adm(k, j)) F11.compress_tile(k, j, opts);
-                  F11.tile(k, j).laswp(piv_tile, true);
-                  trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-                          scalar_t(1.), Tcc_vec[k], F11.tile(k, j));
-                }
+        for (std::size_t k=0; k<i; k++){
+          if (g->is_local_row(k)) {
+            for (std::size_t j=i; j<std::min(i+CP, B1_c); j++) {
+              if (g->is_local_col(j)) {
+                if (adm(k, j)) F11.compress_tile(k, j, opts);
+                F11.tile(k, j).laswp(piv_tile_global[k/g->nprows()], true);
+                trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                        scalar_t(1.), Tcc_vec[k/g->nprows()], F11.tile(k, j));
               }
             }
-            auto Tkc = F11.bcast_col_of_tiles_along_rows(k+1, B1_r, k);
-            auto Tcj = F11.bcast_row_of_tiles_along_cols(k, i, std::min(i+CP, B1_c));
-            auto Tk2c = F21.bcast_col_of_tiles_along_rows(0, B2_r, k);//??
-            for (std::size_t lk=k+1, c=0; lk<B1_r; lk++) {
-              if (g->is_local_row(lk)) {
-                for (std::size_t lj=i, r=0; lj<std::min(i+CP, B1_c); lj++) {
-                  if (g->is_local_col(lj)) {
-                    gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc[c]),
-                          *(Tcj[r]), scalar_t(1.), F11.tile_dense(lk, lj).D());
-                    r++;
-                  }
+          }
+          auto Tkc = F11.bcast_col_of_tiles_along_rows(k+1, B1_r, k);
+          auto Tcj = F11.bcast_row_of_tiles_along_cols(k, i, std::min(i+CP, B1_c));
+          auto Tk2c = F21.bcast_col_of_tiles_along_rows(0, B2_r, k);//??
+          for (std::size_t lk=k+1, c=0; lk<B1_r; lk++) {
+            if (g->is_local_row(lk)) {
+              for (std::size_t lj=i, r=0; lj<std::min(i+CP, B1_c); lj++) {
+                if (g->is_local_col(lj)) {
+                  gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc[c]),
+                        *(Tcj[r]), scalar_t(1.), F11.tile_dense(lk, lj).D());
+                  r++;
                 }
-                c++;
               }
+              c++;
             }
-            for (std::size_t lk=0, c=0; lk<B2_r; lk++) {
-              if (g->is_local_row(lk)) {
-                for (std::size_t lj=i, r=0; lj<std::min(i+CP,B2_c); lj++) {
-                  if (g->is_local_col(lj)) {
-                    gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tk2c[c]),
-                        *(Tcj[r]), scalar_t(1.), F21.tile_dense(lk, lj).D());
-                    r++;
-                  }
+          }
+          for (std::size_t lk=0, c=0; lk<B2_r; lk++) {
+            if (g->is_local_row(lk)) {
+              for (std::size_t lj=i, r=0; lj<std::min(i+CP,B2_c); lj++) {
+                if (g->is_local_col(lj)) {
+                  gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tk2c[c]),
+                      *(Tcj[r]), scalar_t(1.), F21.tile_dense(lk, lj).D());
+                  r++;
                 }
-                c++;
               }
+              c++;
             }
           }
         }
@@ -2774,7 +2770,7 @@ namespace strumpack {
               if (adm(k, j)) F12.compress_tile(k, j, opts);
               F12.tile(k, j).laswp(piv_tile, true);
               trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-                      scalar_t(1.), Tcc_vec[k], F12.tile(k, j));
+                      scalar_t(1.), Tcc_vec[k/g->nprows()], F12.tile(k, j));
             }
           }
         }

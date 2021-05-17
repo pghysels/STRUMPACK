@@ -203,7 +203,7 @@ namespace strumpack {
     if (dsep) {
       if (i < std::size_t(dsep)) F11blr_.fill_col(0., i);
       if (dupd) {
-        if (i < std::size_t(dsep)) {
+        if (i > std::size_t(dsep)) {
           F12blr_.fill_col(0., i);
         } else F21blr_.fill(0.);
       }
@@ -273,16 +273,16 @@ namespace strumpack {
                                   adm_, opts.BLR_options(), 
                                   [&](int i){this->build_front_cols(A, i, r1buf, r2buf, r3buf);});
       } else{ 
-          F11blr_ = BLRMPI_t(pgrid_, sep_tiles_, sep_tiles_);
-          using Trip_t = Triplet<scalar_t>;
-          std::vector<Trip_t> e11, e12, e21;
-          A.push_front_elements(sep_begin_, sep_end_, this->upd(), e11, e12, e21);
-          int npr = grid2d().nprows();
-          std::vector<std::vector<Trip_t>> sbuf(this->P());
-          for (auto& e : e11) sbuf[sep_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
-          auto r1buf = Comm().all_to_all_v(sbuf);
-          std::vector<Trip_t> r2buf, r3buf;
-          piv_ = F11blr_.factor_colwise(adm_, opts.BLR_options(), 
+        F11blr_ = BLRMPI_t(pgrid_, sep_tiles_, sep_tiles_);
+        using Trip_t = Triplet<scalar_t>;
+        std::vector<Trip_t> e11, e12, e21;
+        A.push_front_elements(sep_begin_, sep_end_, this->upd(), e11, e12, e21);
+        int npr = grid2d().nprows();
+        std::vector<std::vector<Trip_t>> sbuf(this->P());
+        for (auto& e : e11) sbuf[sep_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
+        auto r1buf = Comm().all_to_all_v(sbuf);
+        std::vector<Trip_t> r2buf, r3buf;
+        piv_ = F11blr_.factor_colwise(adm_, opts.BLR_options(), 
                                   [&](int i){build_front_cols(A, i, r1buf, r2buf, r3buf);});
       }
     }
