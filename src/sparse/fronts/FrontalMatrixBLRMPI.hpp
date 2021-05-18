@@ -56,13 +56,13 @@ namespace strumpack {
 
     void release_work_memory() override;
     void build_front(const SpMat_t& A);
-    void build_front_cols(const SpMat_t& A, std::size_t i, 
+    void build_front_cols(const SpMat_t& A, std::size_t i, bool part,
                           const std::vector<Triplet<scalar_t>>& r1buf,
                           const std::vector<Triplet<scalar_t>>& r2buf,
                           const std::vector<Triplet<scalar_t>>& r3buf);
 
     void extend_add();
-    void extend_add_cols(std::size_t i);
+    void extend_add_cols(std::size_t i, bool part);
     void extend_add_copy_to_buffers
     (std::vector<std::vector<scalar_t>>& sbuf,
      const FMPI_t* pa) const override;

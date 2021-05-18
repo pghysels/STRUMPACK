@@ -79,9 +79,15 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    BLRMatrixMPI<scalar_t>::fill_col(scalar_t v, int k) {
+    BLRMatrixMPI<scalar_t>::fill_col(scalar_t v, int k, bool part) {
+      int j_end=0;
+      if (part){
+        j_end = k+grid_->npcols();
+      } else{
+        j_end = k+colblocks();
+      }
       for (std::size_t i=0; i<brows_; i++)
-        for (std::size_t j=k; j<static_cast<std::size_t>(k+grid_->npcols()); j++)
+        for (std::size_t j=k; j<static_cast<std::size_t>(j_end); j++)
           if (grid_->is_local(i, j)) {
             std::unique_ptr<DenseTile<scalar_t>> t
               (new DenseTile<scalar_t>(tilerows(i), tilecols(j)));
@@ -2501,7 +2507,7 @@ namespace strumpack {
 
 
     template<typename scalar_t> std::vector<int>
-    BLRMatrixMPI<scalar_t>::factor_colwise(const adm_t& adm, const Opts_t& opts, const std::function<void(int)>& blockcol){
+    BLRMatrixMPI<scalar_t>::factor_colwise(const adm_t& adm, const Opts_t& opts, const std::function<void(int, bool)>& blockcol){
       std::vector<int> piv;
       std::vector<std::vector<int> > piv_tile_global;
       std::vector<int> piv_tile;
@@ -2512,7 +2518,7 @@ namespace strumpack {
       for (std::size_t i=0; i<colblocks(); i+=CP) {
         //std::vector<std::vector<std::unique_ptr<BLRTile<scalar_t>>> > Tkc_vec, Tcj_vec;
         //construct the (i/CP+1) CP block-columns as dense tiles
-        blockcol(i);
+        blockcol(i, true);
         for (std::size_t k=0; k<i; k++){
           if (grid()->is_local_row(k)) {
             for (std::size_t j=i; j<std::min(i+CP, colblocks()); j++) {
@@ -2613,7 +2619,7 @@ namespace strumpack {
     template<typename scalar_t> std::vector<int>
     BLRMatrixMPI<scalar_t>::factor_col(BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22, 
                                        const adm_t& adm, const Opts_t& opts, 
-                                       const std::function<void(int)>& blockcol){
+                                       const std::function<void(int, bool)>& blockcol){
       auto B1_r = F11.rowblocks();
       auto B1_c = F11.colblocks();
       auto B2_r = F22.rowblocks();
@@ -2628,7 +2634,7 @@ namespace strumpack {
       auto CP = g->npcols();
       for (std::size_t i=0; i<B1_c; i+=CP) { //F11 and F21
         //construct the (i/CP+1) CP block-columns as dense tiles
-        blockcol(i);
+        blockcol(i, true);
         for (std::size_t k=0; k<i; k++){
           if (g->is_local_row(k)) {
             for (std::size_t j=i; j<std::min(i+CP, B1_c); j++) {
@@ -2642,7 +2648,7 @@ namespace strumpack {
           }
           auto Tkc = F11.bcast_col_of_tiles_along_rows(k+1, B1_r, k);
           auto Tcj = F11.bcast_row_of_tiles_along_cols(k, i, std::min(i+CP, B1_c));
-          auto Tk2c = F21.bcast_col_of_tiles_along_rows(0, B2_r, k);//??
+          auto Tk2c = F21.bcast_col_of_tiles_along_rows(0, B2_r, k);
           for (std::size_t lk=k+1, c=0; lk<B1_r; lk++) {
             if (g->is_local_row(lk)) {
               for (std::size_t lj=i, r=0; lj<std::min(i+CP, B1_c); lj++) {
@@ -2762,13 +2768,13 @@ namespace strumpack {
       }
       //for (std::size_t i=0; i<B2_c; i+=CP) { //F12 and F22
       //construct the B2_c CP block-columns as dense tiles
-      blockcol(B1_c);
+      blockcol(B1_c, false);
       for (std::size_t k=0; k<B1_c; k++){
         if (g->is_local_row(k)) {
           for (std::size_t j=0; j<B2_c; j++) {
             if (g->is_local_col(j)) {
-              if (adm(k, j)) F12.compress_tile(k, j, opts);
-              F12.tile(k, j).laswp(piv_tile, true);
+              F12.compress_tile(k, j, opts);
+              F12.tile(k, j).laswp(piv_tile_global[k/g->nprows()], true);
               trsm(Side::L, UpLo::L, Trans::N, Diag::U,
                       scalar_t(1.), Tcc_vec[k/g->nprows()], F12.tile(k, j));
             }

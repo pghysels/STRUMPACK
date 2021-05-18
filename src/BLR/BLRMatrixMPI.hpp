@@ -117,11 +117,11 @@ namespace strumpack {
       bool active() const { return grid_->active(); }
 
       void fill(scalar_t v);
-      void fill_col(scalar_t v, int k);
+      void fill_col(scalar_t v, int k, bool part);
 
       std::vector<int> factor(const Opts_t& opts);
       std::vector<int> factor(const adm_t& adm, const Opts_t& opts);
-      std::vector<int> factor_colwise(const adm_t& adm, const Opts_t& opts, const std::function<void(int)>& blockcol);
+      std::vector<int> factor_colwise(const adm_t& adm, const Opts_t& opts, const std::function<void(int, bool)>& blockcol);
       
 
       void laswp(const std::vector<int>& piv, bool fwd);
@@ -134,7 +134,7 @@ namespace strumpack {
       static
       std::vector<int> factor_col(BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, 
                                   BLRMPI_t& F22, const adm_t& adm, const Opts_t& opts, 
-                                  const std::function<void(int)>& blockcol);
+                                  const std::function<void(int, bool)>& blockcol);
 
       void compress(const Opts_t& opts);
 
