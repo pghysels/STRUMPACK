@@ -29,8 +29,8 @@
 #include <iostream>
 #include "StrumpackSparseSolver.hpp"
 
-typedef double scalar;
-typedef double real;
+typedef float scalar;
+typedef float real;
 //typedef int64_t integer;
 typedef int integer;
 

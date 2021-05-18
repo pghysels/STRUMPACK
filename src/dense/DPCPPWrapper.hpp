@@ -129,7 +129,7 @@ namespace strumpack {
           } else {
             STRUMPACK_SUB_DEVICE_MEMORY(size_*sizeof(T));
           }
-          free(data_, *q_);
+	  cl::sycl::free(data_, *q_);
         }
         data_ = nullptr;
         size_ = 0;
@@ -179,7 +179,7 @@ namespace strumpack {
       void release() {
         if (data_) {
           STRUMPACK_SUB_MEMORY(size_*sizeof(T));
-          free(data_, *q_);
+	  cl::sycl::free(data_, *q_);
         }
         data_ = nullptr;
         q_ = nullptr;
