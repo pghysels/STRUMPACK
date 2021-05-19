@@ -782,72 +782,68 @@ namespace strumpack {
       const auto ch_upd = ch->upd();
       const auto pa_upd = pa->upd();
       const int pa_sep = pa->sep_begin();
+      const int ds = pa->dim_sep();
       int col_dim = end_col - begin_col;
       std::unique_ptr<int[]> work
-        (new int[F11.lrows()+F22.lrows()+col_dim]);
+        (new int[F11.lrows()+F11.lcols()+F22.lrows()+F22.lcols()]);
       auto r_1 = work.get();
-      if ( begin_col < F11.lcols()){
-        auto c_1 = r_1 + F11.lrows();
-        auto r_2 = c_1 + col_dim;
-        int r_max_1 = 0, r_max_2 = 0, c_max_1 = 0;
-        for (int r=0, ur=0; r<int(F11.lrows()); r++) {
-          int fgr = F11.rl2g(r) + pa_sep;
-          while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
-          if (ur == ch_dim_upd) break;
-          if (ch_upd[ur] != fgr) continue;
-          r_1[r_max_1++] = r;
-        }
-        for (int c=begin_col, uc=0; c<end_col; c++) {
-          int fgc = F11.cl2g(c) + pa_sep;
-          while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
-          if (uc == ch_dim_upd) break;
-          if (ch_upd[uc] != fgc) continue;
+      auto c_1 = r_1 + F11.lrows();
+      auto r_2 = c_1 + F11.lcols();
+      auto c_2 = r_2 + F22.lrows();
+      int r_max_1 = 0, r_max_2 = 0, c_max_1 = 0, c_max_2 = 0;
+      for (int r=0, ur=0; r<int(F11.lrows()); r++) {
+        int fgr = F11.rl2g(r) + pa_sep;
+        while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
+        if (ur == ch_dim_upd) break;
+        if (ch_upd[ur] != fgr) continue;
+        r_1[r_max_1++] = r;
+      }
+      for (int c=0, uc=0; c<int(F11.lcols()); c++) {
+        int fgc = F11.cl2g(c) + pa_sep;
+        while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
+        if (uc == ch_dim_upd) break;
+        if (ch_upd[uc] != fgc) continue;
+        if (fgc < begin_col || fgc >= end_col)
+          c_1[c_max_1++] = -1;
+        else
           c_1[c_max_1++] = c;
-        }
-        for (int r=0, ur=0; r<int(F22.lrows()); r++) {
-          int fgr = pa_upd[F22.rl2g(r)];
-          while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
-          if (ur == ch_dim_upd) break;
-          if (ch_upd[ur] != fgr) continue;
-          r_2[r_max_2++] = r;
-        }
-        for (int c=0; c<c_max_1; c++)
-          for (int r=0, cc=c_1[c]; r<r_max_1; r++)
-            F11(r_1[r],cc) += *(pbuf++);
-        for (int c=0; c<c_max_1; c++)
-          for (int r=0, cc=c_1[c]; r<r_max_2; r++)
-            F21(r_2[r],cc) += *(pbuf++);
-      } else{
-        auto r_2 = r_1 + F11.lrows();
-        auto c_2 = r_2 + F22.lrows();
-        int r_max_1 = 0, r_max_2 = 0, c_max_2 = 0;
-        for (int r=0, ur=0; r<int(F11.lrows()); r++) {
-          int fgr = F11.rl2g(r) + pa_sep;
-          while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
-          if (ur == ch_dim_upd) break;
-          if (ch_upd[ur] != fgr) continue;
-          r_1[r_max_1++] = r;
-        }
-        for (int r=0, ur=0; r<int(F22.lrows()); r++) {
-          int fgr = pa_upd[F22.rl2g(r)];
-          while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
-          if (ur == ch_dim_upd) break;
-          if (ch_upd[ur] != fgr) continue;
-          r_2[r_max_2++] = r;
-        }
-        for (int c=begin_col-F11.lcols(), uc=0; c<end_col-F11.lcols(); c++) {
-          int fgc = pa_upd[F22.cl2g(c)];
-          while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
-          if (uc == ch_dim_upd) break;
-          if (ch_upd[uc] != fgc) continue;
+      }
+      for (int r=0, ur=0; r<int(F22.lrows()); r++) {
+        int fgr = pa_upd[F22.rl2g(r)];
+        while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
+        if (ur == ch_dim_upd) break;
+        if (ch_upd[ur] != fgr) continue;
+        r_2[r_max_2++] = r;
+      }
+      for (int c=0, uc=0; c<int(F22.lcols()); c++) {
+        int fgc = pa_upd[F22.cl2g(c)];
+        while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
+        if (uc == ch_dim_upd) break;
+        if (ch_upd[uc] != fgc) continue;
+        if (fgc + ds < begin_col || fgc + ds >= end_col)
+          c_2[c_max_2++] = -1;
+        else
           c_2[c_max_2++] = c;
-        }
-        for (int c=0; c<c_max_2; c++)
-          for (int r=0, cc=c_2[c]; r<r_max_1; r++)
-            F12(r_1[r],cc) += *(pbuf++);
-        for (int c=0; c<c_max_2; c++)
-          for (int r=0, cc=c_2[c]; r<r_max_2; r++)
-            F22(r_2[r],cc) += *(pbuf++);
+      }
+      for (int c=0; c<c_max_1; c++){
+        if (c_1[c] == -1) continue;
+        for (int r=0, cc=c_1[c]; r<r_max_1; r++)
+          F11(r_1[r],cc) += *(pbuf++);
+      }
+      for (int c=0; c<c_max_2; c++){
+      if (c_2[c] == -1) continue;
+      for (int r=0, cc=c_2[c]; r<r_max_1; r++)
+          F12(r_1[r],cc) += *(pbuf++);
+      } 
+      for (int c=0; c<c_max_1; c++){
+        if (c_1[c] == -1) continue;
+        for (int r=0, cc=c_1[c]; r<r_max_2; r++)
+          F21(r_2[r],cc) += *(pbuf++);
+      }
+      for (int c=0; c<c_max_2; c++){
+        if (c_2[c] == -1) continue;
+        for (int r=0, cc=c_2[c]; r<r_max_2; r++)
+          F22(r_2[r],cc) += *(pbuf++);
       }
     }
 

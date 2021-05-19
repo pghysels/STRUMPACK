@@ -85,11 +85,11 @@ namespace strumpack {
       }
       if (!visit(ch)) continue;
       if (part){
-        ch->extadd_blr_copy_to_buffers_col(sbuf, this, F11blr_.tileroff(i), 
-                                         F11blr_.tileroff(i+grid2d().npcols()));
+        ch->extadd_blr_copy_to_buffers_col(sbuf, this, F11blr_.tilecoff(i), 
+                                         F11blr_.tilecoff(std::min(i+grid2d().npcols(),F11blr_.colblocks())));
       } else{
-        ch->extadd_blr_copy_to_buffers_col(sbuf, this, F22blr_.tileroff(i-F11blr_.colblocks())+dim_sep(), 
-                                         F22blr_.tileroff(i-F11blr_.colblocks()+F22blr_.colblocks())+dim_sep());
+        ch->extadd_blr_copy_to_buffers_col(sbuf, this, F22blr_.tilecoff(i-F11blr_.colblocks())+dim_sep(), 
+                                         F22blr_.tilecoff(i-F11blr_.colblocks()+F22blr_.colblocks())+dim_sep());
       }
     }
     std::vector<scalar_t,NoInit<scalar_t>> rbuf;
@@ -101,12 +101,12 @@ namespace strumpack {
         ch->extadd_blr_copy_from_buffers_col
           (F11blr_, F12blr_, F21blr_, F22blr_,
           pbuf.data()+this->master(ch), this, 
-          F11blr_.tileroff(i), F11blr_.tileroff(i+grid2d().npcols()));
+          F11blr_.tilecoff(i), F11blr_.tilecoff(std::min(i+grid2d().npcols(),F11blr_.colblocks())));
       } else{
         ch->extadd_blr_copy_from_buffers_col
           (F11blr_, F12blr_, F21blr_, F22blr_,
           pbuf.data()+this->master(ch), this, 
-          F22blr_.tileroff(i-F11blr_.colblocks())+dim_sep(), F22blr_.tileroff(i-F11blr_.colblocks()+F22blr_.colblocks())+dim_sep());
+          F22blr_.tilecoff(i-F11blr_.colblocks())+dim_sep(), F22blr_.tilecoff(i-F11blr_.colblocks()+F22blr_.colblocks())+dim_sep());
       }
     }
   }

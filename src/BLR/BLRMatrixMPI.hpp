@@ -155,8 +155,14 @@ namespace strumpack {
       std::size_t colblockslocal() const { return lbcols_; }
       std::size_t tilerows(std::size_t i) const { return roff_[i+1] - roff_[i]; }
       std::size_t tilecols(std::size_t j) const { return coff_[j+1] - coff_[j]; }
-      std::size_t tileroff(std::size_t i) const { return roff_[i]; }
-      std::size_t tilecoff(std::size_t j) const { return coff_[j]; }
+      std::size_t tileroff(std::size_t i) const { 
+        assert(i <= rowblocks()); 
+        return roff_[i]; 
+      }
+      std::size_t tilecoff(std::size_t j) const { 
+        assert(j <= colblocks()); 
+        return coff_[j]; 
+      }
 
       int rg2p(std::size_t i) const;
       int cg2p(std::size_t j) const;
