@@ -100,13 +100,19 @@ namespace strumpack {
       if (part){
         ch->extadd_blr_copy_from_buffers_col
           (F11blr_, F12blr_, F21blr_, F22blr_,
-          pbuf.data()+this->master(ch), this, 
-          F11blr_.tilecoff(i), F11blr_.tilecoff(std::min(i+grid2d().npcols(),F11blr_.colblocks())));
-      } else{
+           pbuf.data()+this->master(ch), this,
+           F11blr_.tilecoff(i) + this->sep_begin(),
+           F11blr_.tilecoff(std::min(i+grid2d().npcols(),
+                                     F11blr_.colblocks()))
+           + this->sep_begin());
+      } else {
         ch->extadd_blr_copy_from_buffers_col
           (F11blr_, F12blr_, F21blr_, F22blr_,
-          pbuf.data()+this->master(ch), this, 
-          F22blr_.tilecoff(i-F11blr_.colblocks())+dim_sep(), F22blr_.tilecoff(i-F11blr_.colblocks()+F22blr_.colblocks())+dim_sep());
+           pbuf.data()+this->master(ch), this,
+           F22blr_.tilecoff(i-F11blr_.colblocks())
+           + dim_sep() + this->sep_begin(),
+           F22blr_.tilecoff(i-F11blr_.colblocks()+F22blr_.colblocks())
+           + dim_sep() + this->sep_begin());
       }
     }
   }
