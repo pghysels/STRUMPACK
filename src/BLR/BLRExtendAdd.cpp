@@ -393,11 +393,12 @@ namespace strumpack {
         upd_r_2[r_max_2++] = ch->upd_rg2p(ur);
       }
       for (int c=0, uc=0; c<int(F22.lcols()); c++) {
-        auto fgc = pa_upd[F22.cl2g(c)];
+        auto gc22 = F22.cl2g(c);
+        auto fgc = pa_upd[gc22];
         while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
         if (uc == ch_dim_upd) break;
         if (ch_upd[uc] != fgc) continue;
-        if (fgc - pa_sep < begin_col || fgc - pa_sep >= end_col){
+        if (gc22 + F11.cols() < begin_col || gc22 + F11.cols() >= end_col){
           c_2[c_max_2] = -1;
           upd_c_2[c_max_2++] = -1;
         } else{
