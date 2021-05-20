@@ -507,13 +507,6 @@ namespace strumpack {
     (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
      scalar_t** pbuf, const FBLRMPI_t* pa, const FMPI_t* ch,
      integer_t begin_col, integer_t end_col) {
-      int rr;
-      MPI_Comm_rank(MPI_COMM_WORLD, &rr);
-      std::cout << "MPI rank= " << rr
-                << ", copy_from_buffers_col, FMPI_t"
-                << " begin_col=" << begin_col
-                << " end_col=" << end_col
-                << std::endl;
       if (!pa->grid2d().active()) return;
       const auto ch_dim_upd = ch->dim_upd();
       const auto& ch_upd = ch->upd();

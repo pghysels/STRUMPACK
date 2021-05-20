@@ -230,7 +230,7 @@ namespace strumpack {
     } else{
       if (dupd) {
         for (auto& e : r2buf) 
-          if (F12blr_.cg2t(e.c) >= i-F11blr_.colblocks() && F12blr_.cg2t(e.c) < i-F11blr_.colblocks())
+          if (F12blr_.cg2t(e.c) >= i-F11blr_.colblocks())
             F12blr_.global(e.r, e.c) = e.v;
       }
     }
