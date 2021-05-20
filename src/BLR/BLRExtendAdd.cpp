@@ -205,7 +205,6 @@ namespace strumpack {
     BLRExtendAdd<scalar_t,integer_t>::copy_to_buffers_col
     (const BLRMPI_t& CB, VVS_t& sbuf, const FBLRMPI_t* pa, const VI_t& I, 
      integer_t begin_col, integer_t end_col) {
-      std::cout << "copy_to_buffers_col, BLRMPI_t" << std::endl;
       if (!CB.active()) return;
       const int lrows = CB.lrows();
       const int lcols = CB.lcols();
@@ -352,85 +351,79 @@ namespace strumpack {
       const auto& ch_upd = ch->upd();
       const auto& pa_upd = pa->upd();
       const auto pa_sep = pa->sep_begin();
-      int col_dim = end_col - begin_col;
       std::unique_ptr<int[]> iwork
-        (new int[2*F11.lrows()+
-                 2*F22.lrows()+2*col_dim]);
+        (new int[2*F11.lrows()+2*F11.lcols()+
+                 2*F22.lrows()+2*F22.lcols()]);
       auto upd_r_1 = iwork.get();
-      if ( begin_col < F11.lcols()){
-        auto upd_c_1 = upd_r_1 + F11.lrows();
-        auto upd_r_2 = upd_c_1 + col_dim;
-        auto r_1 = upd_r_2 + F22.lrows();
-        auto c_1 = r_1 + F11.lrows();
-        auto r_2 = c_1 + col_dim;
-        int r_max_1 = 0, r_max_2 = 0, c_max_1 = 0;
-        for (int r=0, ur=0; r<int(F11.lrows()); r++) {
-          integer_t fgr = F11.rl2g(r) + pa_sep;
-          while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
-          if (ur == ch_dim_upd) break;
-          if (ch_upd[ur] != fgr) continue;
-          r_1[r_max_1] = r;
-          upd_r_1[r_max_1++] = ch->upd_rg2p(ur);
-        }
-        for (int c=begin_col, uc=0; c<end_col; c++) {
-          integer_t fgc = F11.cl2g(c) + pa_sep;
-          while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
-          if (uc == ch_dim_upd) break;
-          if (ch_upd[uc] != fgc) continue;
+      auto upd_c_1 = upd_r_1 + F11.lrows();
+      auto upd_r_2 = upd_c_1 + F11.lcols();
+      auto upd_c_2 = upd_r_2 + F22.lrows();
+      auto r_1 = upd_c_2 + F22.lcols();
+      auto c_1 = r_1 + F11.lrows();
+      auto r_2 = c_1 + F11.cols();
+      auto c_2 = r_2 + F22.lrows();
+      int r_max_1 = 0, r_max_2 = 0, c_max_1 = 0, c_max_2 = 0;
+      for (int r=0, ur=0; r<int(F11.lrows()); r++) {
+        integer_t fgr = F11.rl2g(r) + pa_sep;
+        while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
+        if (ur == ch_dim_upd) break;
+        if (ch_upd[ur] != fgr) continue;
+        r_1[r_max_1] = r;
+        upd_r_1[r_max_1++] = ch->upd_rg2p(ur);
+      }
+      for (int c=0, uc=0; c<int(F11.lcols()); c++) {
+        integer_t fgc = F11.cl2g(c) + pa_sep;
+        while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
+        if (uc == ch_dim_upd) break;
+        if (ch_upd[uc] != fgc) continue;
+        if (fgc - pa_sep < begin_col || fgc - pa_sep >= end_col){
+          c_1[c_max_1] = -1;
+          upd_c_1[c_max_1++] = -1;
+        } else{
           c_1[c_max_1] = c;
           upd_c_1[c_max_1++] = ch->upd_cg2p(uc) * chprows;
         }
-        for (int r=0, ur=0; r<int(F22.lrows()); r++) {
-          auto fgr = pa_upd[F22.rl2g(r)];
-          while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
-          if (ur == ch_dim_upd) break;
-          if (ch_upd[ur] != fgr) continue;
-          r_2[r_max_2] = r;
-          upd_r_2[r_max_2++] = ch->upd_rg2p(ur);
-        }
-        for (int c=0; c<c_max_1; c++)
-          for (int r=0, cc=c_1[c], ucc=upd_c_1[c]; r<r_max_1; r++)
-            F11(r_1[r],cc) += *(pbuf[upd_r_1[r]+ucc]++);
-        for (int c=0; c<c_max_1; c++)
-          for (int r=0, cc=c_1[c], ucc=upd_c_1[c]; r<r_max_2; r++)
-            F21(r_2[r],cc) += *(pbuf[upd_r_2[r]+ucc]++);
-      } else{
-        auto upd_r_2 = upd_r_1 + F11.lrows();
-        auto upd_c_2 = upd_r_2 + F22.lrows();
-        auto r_1 = upd_c_2 + col_dim;
-        auto r_2 = r_1 + F11.lrows();
-        auto c_2 = r_2 + F22.lrows();
-        int r_max_1 = 0, r_max_2 = 0, c_max_2 = 0;
-        for (int r=0, ur=0; r<int(F11.lrows()); r++) {
-          integer_t fgr = F11.rl2g(r) + pa_sep;
-          while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
-          if (ur == ch_dim_upd) break;
-          if (ch_upd[ur] != fgr) continue;
-          r_1[r_max_1] = r;
-          upd_r_1[r_max_1++] = ch->upd_rg2p(ur);
-        }
-        for (int r=0, ur=0; r<int(F22.lrows()); r++) {
-          auto fgr = pa_upd[F22.rl2g(r)];
-          while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
-          if (ur == ch_dim_upd) break;
-          if (ch_upd[ur] != fgr) continue;
-          r_2[r_max_2] = r;
-          upd_r_2[r_max_2++] = ch->upd_rg2p(ur);
-        }
-        for (int c=begin_col-F11.lcols(), uc=0; c<end_col-F11.lcols(); c++) {
-          auto fgc = pa_upd[F22.cl2g(c)];
-          while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
-          if (uc == ch_dim_upd) break;
-          if (ch_upd[uc] != fgc) continue;
+      }
+      for (int r=0, ur=0; r<int(F22.lrows()); r++) {
+        auto fgr = pa_upd[F22.rl2g(r)];
+        while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
+        if (ur == ch_dim_upd) break;
+        if (ch_upd[ur] != fgr) continue;
+        r_2[r_max_2] = r;
+        upd_r_2[r_max_2++] = ch->upd_rg2p(ur);
+      }
+      for (int c=0, uc=0; c<int(F22.lcols()); c++) {
+        auto fgc = pa_upd[F22.cl2g(c)];
+        while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
+        if (uc == ch_dim_upd) break;
+        if (ch_upd[uc] != fgc) continue;
+        if (fgc - pa_sep < begin_col || fgc - pa_sep >= end_col){
+          c_2[c_max_2] = -1;
+          upd_c_2[c_max_2++] = -1;
+        } else{
           c_2[c_max_2] = c;
           upd_c_2[c_max_2++] = ch->upd_cg2p(uc) * chprows;
         }
-        for (int c=0; c<c_max_2; c++)
-          for (int r=0, cc=c_2[c], ucc=upd_c_2[c]; r<r_max_1; r++)
-            F12(r_1[r],cc) += *(pbuf[upd_r_1[r]+ucc]++);
-        for (int c=0; c<c_max_2; c++)
-          for (int r=0, cc=c_2[c], ucc=upd_c_2[c]; r<r_max_2; r++)
-            F22(r_2[r],cc) += *(pbuf[upd_r_2[r]+ucc]++);
+      }
+      for (int c=0; c<c_max_1; c++){
+        if (c_1[c] == -1) continue;
+        for (int r=0, cc=c_1[c], ucc=upd_c_1[c]; r<r_max_1; r++)
+          F11(r_1[r],cc) += *(pbuf[upd_r_1[r]+ucc]++);
+      }
+      for (int c=0; c<c_max_2; c++){
+        if (c_2[c] == -1) continue;
+        for (int r=0, cc=c_2[c], ucc=upd_c_2[c]; r<r_max_1; r++)
+          F12(r_1[r],cc) += *(pbuf[upd_r_1[r]+ucc]++);
+      }
+      for (int c=0; c<c_max_1; c++){
+        if (c_1[c] == -1) continue;
+        for (int r=0, cc=c_1[c], ucc=upd_c_1[c]; r<r_max_2; r++)
+          F21(r_2[r],cc) += *(pbuf[upd_r_2[r]+ucc]++);
+      }
+      for (int c=0; c<c_max_2; c++){
+        if (c_2[c] == -1) continue;
+        for (int r=0, cc=c_2[c], ucc=upd_c_2[c]; r<r_max_2; r++)
+          F22(r_2[r],cc) += *(pbuf[upd_r_2[r]+ucc]++);
       }
     }
 
@@ -513,6 +506,9 @@ namespace strumpack {
     (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
      scalar_t** pbuf, const FBLRMPI_t* pa, const FMPI_t* ch,
      integer_t begin_col, integer_t end_col) {
+      int rr;
+      MPI_Comm_rank(MPI_COMM_WORLD, &rr);
+      std::cout << "MPI rank= " << rr << ", copy_from_buffers_col, FMPI_t" << std::endl;
       if (!pa->grid2d().active()) return;
       const auto ch_dim_upd = ch->dim_upd();
       const auto& ch_upd = ch->upd();
@@ -521,88 +517,82 @@ namespace strumpack {
       const auto prows = ch->grid()->nprows();
       const auto pcols = ch->grid()->npcols();
       const auto B = DistM_t::default_MB;
-      int col_dim = end_col - begin_col;
       // source rank is
       //  ((r / B) % prows) + ((c / B) % pcols) * prows
       // where r,c is the coordinate in the F22 block of the child
       std::unique_ptr<int[]> iwork
-        (new int[2*F11.lrows()+
-                 2*F22.lrows()+2*col_dim]);
+        (new int[2*F11.lrows()+2*F11.lcols()+
+                 2*F22.lrows()+2*F22.lcols()]);
       auto upd_r_1 = iwork.get();
-      if ( begin_col < F11.lcols()){
-        auto upd_c_1 = upd_r_1 + F11.lrows();
-        auto upd_r_2 = upd_c_1 + col_dim;
-        auto r_1 = upd_r_2 + F22.lrows();
-        auto c_1 = r_1 + F11.lrows();
-        auto r_2 = c_1 + col_dim;
-        integer_t r_max_1 = 0, r_max_2 = 0, c_max_1 = 0;
-        for (int r=0, ur=0; r<int(F11.lrows()); r++) {
-          integer_t fgr = F11.rl2g(r) + pa_sep;
-          while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
-          if (ur == ch_dim_upd) break;
-          if (ch_upd[ur] != fgr) continue;
-          r_1[r_max_1] = r;
-          upd_r_1[r_max_1++] = (ur / B) % prows;
-        }
-        for (int c=begin_col, uc=0; c<end_col; c++) {
-          integer_t fgc = F11.cl2g(c) + pa_sep;
-          while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
-          if (uc == ch_dim_upd) break;
-          if (ch_upd[uc] != fgc) continue;
+      auto upd_c_1 = upd_r_1 + F11.lrows();
+      auto upd_r_2 = upd_c_1 + F11.lcols();
+      auto upd_c_2 = upd_r_2 + F22.lrows();
+      auto r_1 = upd_c_2 + F22.lcols();
+      auto c_1 = r_1 + F11.lrows();
+      auto r_2 = c_1 + F11.lcols();
+      auto c_2 = r_2 + F22.lrows();
+      integer_t r_max_1 = 0, r_max_2 = 0, c_max_1 = 0, c_max_2 = 0;
+      for (int r=0, ur=0; r<int(F11.lrows()); r++) {
+        integer_t fgr = F11.rl2g(r) + pa_sep;
+        while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
+        if (ur == ch_dim_upd) break;
+        if (ch_upd[ur] != fgr) continue;
+        r_1[r_max_1] = r;
+        upd_r_1[r_max_1++] = (ur / B) % prows;
+      }
+      for (int c=0, uc=0; c<int(F11.lcols()); c++) {
+        integer_t fgc = F11.cl2g(c) + pa_sep;
+        while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
+        if (uc == ch_dim_upd) break;
+        if (ch_upd[uc] != fgc) continue;
+        if (fgc - pa_sep < begin_col || fgc - pa_sep >= end_col){
+          c_1[c_max_1] = -1;
+          upd_c_1[c_max_1++] = -1;
+        } else{
           c_1[c_max_1] = c;
           upd_c_1[c_max_1++] = ((uc / B) % pcols) * prows;
         }
-        for (int r=0, ur=0; r<int(F22.lrows()); r++) {
-          integer_t fgr = pa_upd[F22.rl2g(r)];
-          while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
-          if (ur == ch_dim_upd) break;
-          if (ch_upd[ur] != fgr) continue;
-          r_2[r_max_2] = r;
-          upd_r_2[r_max_2++] = (ur / B) % prows;
-        }
-        for (int c=0; c<c_max_1; c++)
-          for (int r=0, cc=c_1[c], ucc=upd_c_1[c]; r<r_max_1; r++)
-            F11(r_1[r],cc) += *(pbuf[upd_r_1[r]+ucc]++);
-        for (int c=0; c<c_max_1; c++)
-          for (int r=0, cc=c_1[c], ucc=upd_c_1[c]; r<r_max_2; r++)
-            F21(r_2[r],cc) += *(pbuf[upd_r_2[r]+ucc]++);
-      } else{
-        auto upd_r_2 = upd_r_1 + F11.lrows();
-        auto upd_c_2 = upd_r_2 + F22.lrows();
-        auto r_1 = upd_c_2 + col_dim;
-        auto r_2 = r_1 + F11.lrows();
-        auto c_2 = r_2 + F22.lrows();
-        integer_t r_max_1 = 0, r_max_2 = 0, c_max_2 = 0;
-        for (int r=0, ur=0; r<int(F11.lrows()); r++) {
-          integer_t fgr = F11.rl2g(r) + pa_sep;
-          while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
-          if (ur == ch_dim_upd) break;
-          if (ch_upd[ur] != fgr) continue;
-          r_1[r_max_1] = r;
-          upd_r_1[r_max_1++] = (ur / B) % prows;
-        }
-        for (int r=0, ur=0; r<int(F22.lrows()); r++) {
-          integer_t fgr = pa_upd[F22.rl2g(r)];
-          while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
-          if (ur == ch_dim_upd) break;
-          if (ch_upd[ur] != fgr) continue;
-          r_2[r_max_2] = r;
-          upd_r_2[r_max_2++] = (ur / B) % prows;
-        }
-        for (int c=begin_col-F11.lcols(), uc=0; c<end_col-F11.lcols(); c++) {
-          auto fgc = pa_upd[F22.cl2g(c)];
-          while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
-          if (uc == ch_dim_upd) break;
-          if (ch_upd[uc] != fgc) continue;
+      }
+      for (int r=0, ur=0; r<int(F22.lrows()); r++) {
+        integer_t fgr = pa_upd[F22.rl2g(r)];
+        while (ur < ch_dim_upd && ch_upd[ur] < fgr) ur++;
+        if (ur == ch_dim_upd) break;
+        if (ch_upd[ur] != fgr) continue;
+        r_2[r_max_2] = r;
+        upd_r_2[r_max_2++] = (ur / B) % prows;
+      }
+      for (int c=0, uc=0; c<int(F22.lcols()); c++) {
+        auto fgc = pa_upd[F22.cl2g(c)];
+        while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
+        if (uc == ch_dim_upd) break;
+        if (ch_upd[uc] != fgc) continue;
+        if (fgc - pa_sep < begin_col || fgc - pa_sep >= end_col){
+          c_2[c_max_2] = -1;
+          upd_c_2[c_max_2++] = -1;
+        } else{
           c_2[c_max_2] = c;
           upd_c_2[c_max_2++] = ((uc / B) % pcols) * prows;
         }
-        for (int c=0; c<c_max_2; c++)
-          for (int r=0, cc=c_2[c], ucc=upd_c_2[c]; r<r_max_1; r++)
-            F12(r_1[r],cc) += *(pbuf[upd_r_1[r]+ucc]++);
-        for (int c=0; c<c_max_2; c++)
-          for (int r=0, cc=c_2[c], ucc=upd_c_2[c]; r<r_max_2; r++)
-            F22(r_2[r],cc) += *(pbuf[upd_r_2[r]+ucc]++);
+      }
+      for (int c=0; c<c_max_1; c++){
+        if (c_1[c] == -1) continue;
+        for (int r=0, cc=c_1[c], ucc=upd_c_1[c]; r<r_max_1; r++)
+          F11(r_1[r],cc) += *(pbuf[upd_r_1[r]+ucc]++);
+      }
+      for (int c=0; c<c_max_2; c++){
+        if (c_2[c] == -1) continue;
+        for (int r=0, cc=c_2[c], ucc=upd_c_2[c]; r<r_max_1; r++)
+          F12(r_1[r],cc) += *(pbuf[upd_r_1[r]+ucc]++);
+      }
+      for (int c=0; c<c_max_1; c++){
+        if (c_1[c] == -1) continue;
+        for (int r=0, cc=c_1[c], ucc=upd_c_1[c]; r<r_max_2; r++)
+          F21(r_2[r],cc) += *(pbuf[upd_r_2[r]+ucc]++);
+      }
+      for (int c=0; c<c_max_2; c++){
+        if (c_2[c] == -1) continue;
+        for (int r=0, cc=c_2[c], ucc=upd_c_2[c]; r<r_max_2; r++)
+          F22(r_2[r],cc) += *(pbuf[upd_r_2[r]+ucc]++);
       }
     }
 
@@ -782,8 +772,6 @@ namespace strumpack {
       const auto ch_upd = ch->upd();
       const auto pa_upd = pa->upd();
       const int pa_sep = pa->sep_begin();
-      const int ds = pa->dim_sep();
-      int col_dim = end_col - begin_col;
       std::unique_ptr<int[]> work
         (new int[F11.lrows()+F11.lcols()+F22.lrows()+F22.lcols()]);
       auto r_1 = work.get();
@@ -803,7 +791,7 @@ namespace strumpack {
         while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
         if (uc == ch_dim_upd) break;
         if (ch_upd[uc] != fgc) continue;
-        if (fgc < begin_col || fgc >= end_col)
+        if (fgc - pa_sep < begin_col || fgc - pa_sep >= end_col)
           c_1[c_max_1++] = -1;
         else
           c_1[c_max_1++] = c;
@@ -820,7 +808,7 @@ namespace strumpack {
         while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
         if (uc == ch_dim_upd) break;
         if (ch_upd[uc] != fgc) continue;
-        if (fgc < begin_col || fgc >= end_col)
+        if (fgc - pa_sep < begin_col || fgc - pa_sep >= end_col)
           c_2[c_max_2++] = -1;
         else
           c_2[c_max_2++] = c;
@@ -831,9 +819,9 @@ namespace strumpack {
           F11(r_1[r],cc) += *(pbuf++);
       }
       for (int c=0; c<c_max_2; c++){
-      if (c_2[c] == -1) continue;
-      for (int r=0, cc=c_2[c]; r<r_max_1; r++)
-          F12(r_1[r],cc) += *(pbuf++);
+        if (c_2[c] == -1) continue;
+        for (int r=0, cc=c_2[c]; r<r_max_1; r++)
+            F12(r_1[r],cc) += *(pbuf++);
       } 
       for (int c=0; c<c_max_1; c++){
         if (c_1[c] == -1) continue;
