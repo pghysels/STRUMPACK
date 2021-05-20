@@ -508,7 +508,11 @@ namespace strumpack {
      integer_t begin_col, integer_t end_col) {
       int rr;
       MPI_Comm_rank(MPI_COMM_WORLD, &rr);
-      std::cout << "MPI rank= " << rr << ", copy_from_buffers_col, FMPI_t" << std::endl;
+      std::cout << "MPI rank= " << rr
+                << ", copy_from_buffers_col, FMPI_t"
+                << " begin_col=" << begin_col
+                << " end_col=" << end_col
+                << std::endl;
       if (!pa->grid2d().active()) return;
       const auto ch_dim_upd = ch->dim_upd();
       const auto& ch_upd = ch->upd();
@@ -562,11 +566,12 @@ namespace strumpack {
         upd_r_2[r_max_2++] = (ur / B) % prows;
       }
       for (int c=0, uc=0; c<int(F22.lcols()); c++) {
-        auto fgc = pa_upd[F22.cl2g(c)];
+        auto gc22 = F22.cl2g(c);
+        auto fgc = pa_upd[gc22];
         while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
         if (uc == ch_dim_upd) break;
         if (ch_upd[uc] != fgc) continue;
-        if (fgc - pa_sep < begin_col || fgc - pa_sep >= end_col){
+        if (gc22 + F11.cols() < begin_col || gc22 + F11.cols() >= end_col){
           c_2[c_max_2] = -1;
           upd_c_2[c_max_2++] = -1;
         } else{
@@ -804,11 +809,12 @@ namespace strumpack {
         r_2[r_max_2++] = r;
       }
       for (int c=0, uc=0; c<int(F22.lcols()); c++) {
-        int fgc = pa_upd[F22.cl2g(c)];
+        auto gc22 = F22.cl2g(c);
+        int fgc = pa_upd[gc22];
         while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
         if (uc == ch_dim_upd) break;
         if (ch_upd[uc] != fgc) continue;
-        if (fgc - pa_sep < begin_col || fgc - pa_sep >= end_col)
+        if (gc22 + F11.cols() < begin_col || gc22 + F11.cols() >= end_col)
           c_2[c_max_2++] = -1;
         else
           c_2[c_max_2++] = c;
