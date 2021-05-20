@@ -398,7 +398,7 @@ namespace strumpack {
         while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
         if (uc == ch_dim_upd) break;
         if (ch_upd[uc] != fgc) continue;
-        if (gc22 + F11.cols() < begin_col || gc22 + F11.cols() >= end_col){
+        if (gc22 + F11.cols() < std::size_t(begin_col) || gc22 + F11.cols() >= std::size_t(end_col)){
           c_2[c_max_2] = -1;
           upd_c_2[c_max_2++] = -1;
         } else{
@@ -565,7 +565,7 @@ namespace strumpack {
         while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
         if (uc == ch_dim_upd) break;
         if (ch_upd[uc] != fgc) continue;
-        if (gc22 + F11.cols() < begin_col || gc22 + F11.cols() >= end_col){
+        if (gc22 + F11.cols() < std::size_t(begin_col) || gc22 + F11.cols() >= std::size_t(end_col)){
           c_2[c_max_2] = -1;
           upd_c_2[c_max_2++] = -1;
         } else{
@@ -808,7 +808,7 @@ namespace strumpack {
         while (uc < ch_dim_upd && ch_upd[uc] < fgc) uc++;
         if (uc == ch_dim_upd) break;
         if (ch_upd[uc] != fgc) continue;
-        if (gc22 + F11.cols() < begin_col || gc22 + F11.cols() >= end_col)
+        if (gc22 + F11.cols() < std::size_t(begin_col) || gc22 + F11.cols() >= std::size_t(end_col))
           c_2[c_max_2++] = -1;
         else
           c_2[c_max_2++] = c;
