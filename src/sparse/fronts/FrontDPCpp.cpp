@@ -123,9 +123,9 @@ namespace strumpack {
         if (A) {
           if (F->lchild_) Isize += F->lchild_->dim_upd();
           if (F->rchild_) Isize += F->rchild_->dim_upd();
-          // A->count_front_elements
-          //   (F->sep_begin(), F->sep_end(), F->upd(),
-          //    elems11, elems12, elems21);
+          A->count_front_elements
+            (F->sep_begin(), F->sep_end(), F->upd(),
+             elems11, elems12, elems21);
 	}
       }
       factor_size = L_size + U_size;
@@ -287,31 +287,6 @@ namespace strumpack {
     release_work_memory();
   }
 
-
-  // /**
-  //  * this doesn't count the memory used for the sparse matrix elements
-  //  * needed in the front assembly.
-  //  */
-  // template<typename scalar_t,typename integer_t>
-  // bool sufficient_device_memory
-  // (const std::vector<LevelInfo<scalar_t,integer_t>>& ldata) {
-  //   std::size_t peak_device_mem = 0;
-  //   for (std::size_t l=0; l<ldata.size(); l++) {
-  //     auto& L = ldata[l];
-  //     // memory needed on this level: factors,
-  //     // schur updates, pivot vectors, cuSOLVER work space, ...
-  //     std::size_t level_mem = L.factor_size*sizeof(scalar_t) + L.work_bytes;
-  //     // the contribution blocks of the previous level are still
-  //     // needed for the extend-add
-  //     if (l+1 < ldata.size())
-  //       level_mem += ldata[l+1].work_bytes;
-  //     peak_device_mem = std::max(peak_device_mem, level_mem);
-  //   }
-  //   // only use 90% of available memory, since we're not counting the
-  //   // sparse elements in the peak_device_mem
-  //   return peak_device_mem < 0.9 * gpu::available_memory();
-  // }
-
   template<typename scalar_t,typename integer_t>
   std::size_t peak_device_memory
   (const std::vector<LevelInfo<scalar_t,integer_t>>& ldata) {
@@ -459,27 +434,14 @@ namespace strumpack {
         (f.sep_begin_, f.sep_end_, f.upd_, e11, e12, e21);
     }
     ne[N] = std::array<std::size_t,3>{e11.size(), e12.size(), e21.size()};
-    // std::size_t ea_mem_size =
-    //   round_to_8(N*sizeof(AssembleData<scalar_t>)) +
-    //   round_to_8(Isize*sizeof(std::size_t)) +
-    //   round_to_8((e11.size()+e12.size()+e21.size())*sizeof(Trip_t));
-    // dpcpp::HostMemory<char> hea_mem(ea_mem_size, q);
-    // dpcpp::DeviceMemory<char> dea_mem(ea_mem_size, q);
-    // auto hasmbl = hea_mem.as<AssembleData<scalar_t>>();
-    // auto Iptr = reinterpret_cast<std::size_t*>(round_to_8(hasmbl + N));
-
     auto hasmbl = reinterpret_cast<AssembleData<scalar_t>*>(hea_mem);
     auto Iptr = reinterpret_cast<std::size_t*>(round_to_8(hasmbl + N));
     {
-      // auto helems = reinterpret_cast<Trip_t*>(round_to_8(Iptr + Isize));
       auto helems = reinterpret_cast<Trip_t*>(round_to_8(Iptr + L.Isize));
       std::copy(e11.begin(), e11.end(), helems);
       std::copy(e12.begin(), e12.end(), helems + e11.size());
       std::copy(e21.begin(), e21.end(), helems + e11.size() + e12.size());
     }
-    // auto dasmbl = dea_mem.as<AssembleData<scalar_t>>();
-    // auto dIptr = reinterpret_cast<std::size_t*>(round_to_8(dasmbl + N));
-    // auto delems = reinterpret_cast<Trip_t*>(round_to_8(dIptr + Isize));
     auto dasmbl = reinterpret_cast<AssembleData<scalar_t>*>(dea_mem);
     auto dIptr = reinterpret_cast<std::size_t*>(round_to_8(dasmbl + N));
     auto delems = reinterpret_cast<Trip_t*>(round_to_8(dIptr + L.Isize));
@@ -510,8 +472,6 @@ namespace strumpack {
         dIptr += u.size();
       }
     }
-    // dpcpp::memcpy<char>(q, dea_mem, hea_mem, ea_mem_size);
-    // q.wait_and_throw();
     dpcpp::memcpy<char>(q, dea_mem, hea_mem, L.ea_bytes);
     q.wait_and_throw();
     assemble(q, N, hasmbl, dasmbl);
@@ -664,9 +624,6 @@ namespace strumpack {
     dpcpp::HostMemory<char> hea_mem(peak_hea_mem, q);
     dpcpp::DeviceMemory<char> all_dmem(peak_dmem, q);
     char* old_work = nullptr;
-
-    // dpcpp::HostMemory<FrontData<scalar_t>> fdata(max_small_fronts, q);
-    // dpcpp::DeviceMemory<char> old_work;
     for (int l=lvls-1; l>=0; l--) {
       TaskTimer tl("");
       tl.start();
@@ -685,24 +642,13 @@ namespace strumpack {
           dev_factors = reinterpret_cast<scalar_t*>
             (dea_mem - round_to_8(L.factor_size * sizeof(scalar_t)));
         }
-        // gpu::memset<scalar_t>(work_mem, 0, L.Schur_size);
-        // gpu::memset<scalar_t>(dev_factors, 0, L.factor_size);
-	
-        // dpcpp::DeviceMemory<scalar_t> dev_factors(L.factor_size, q);
-        // dpcpp::DeviceMemory<char> work_mem(L.work_bytes, q);
-        // auto e1 = dpcpp::fill
-        //   (q, dev_factors.template as<scalar_t>(), scalar_t(0.), L.factor_size);
-        // auto e2 = dpcpp::fill
-        //   (q, work_mem.template as<scalar_t>(), scalar_t(0.), L.Schur_size);
-        auto e1 = dpcpp::fill<scalar_t>(q, reinterpret_cast<scalar_t*>(dev_factors), scalar_t(0.), L.factor_size);
-        auto e2 = dpcpp::fill<scalar_t>(q, reinterpret_cast<scalar_t*>(work_mem), scalar_t(0.), L.Schur_size);
-        L.set_factor_pointers(dev_factors);
+	dpcpp::fill<scalar_t>(q, reinterpret_cast<scalar_t*>(dev_factors), scalar_t(0.), L.factor_size);
+	dpcpp::fill<scalar_t>(q, reinterpret_cast<scalar_t*>(work_mem), scalar_t(0.), L.Schur_size);
+	L.set_factor_pointers(dev_factors);
         L.set_work_pointers(work_mem);
 	front_assembly(q, A, L, hea_mem, dea_mem);
-	// old_work = std::move(work_mem);
 	old_work = work_mem;
 	factor_small_fronts(q, L, fdata, opts);
-	//(q, L, fdata.template as<FrontData<scalar_t>>(), opts);
 	factor_large_fronts(q, L, opts);
         STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
         L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
