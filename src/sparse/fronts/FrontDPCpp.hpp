@@ -97,7 +97,8 @@ namespace strumpack {
     FrontDPCpp(const FrontDPCpp&) = delete;
     FrontDPCpp& operator=(FrontDPCpp const&) = delete;
 
-    void front_assembly(cl::sycl::queue& q, const SpMat_t& A, LInfo_t& L);
+    void front_assembly(cl::sycl::queue& q, const SpMat_t& A, LInfo_t& L,
+			char* hea_mem, char* dea_mem);
     void factor_small_fronts(cl::sycl::queue& q, LInfo_t& L,
     			     FrontData<scalar_t>* fdata,
     			     const Opts_t& opts);
