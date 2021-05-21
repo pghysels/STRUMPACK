@@ -2502,7 +2502,7 @@ namespace strumpack {
       std::vector<int> piv;
       std::vector<std::vector<int> > piv_tile_global;
       std::vector<int> piv_tile;
-      if (!grid()->active()) return piv;
+      //if (!grid()->active()) return piv;
       DenseTile<scalar_t> Tcc;
       std::vector<DenseTile<scalar_t> > Tcc_vec;
       auto CP = grid()->npcols();
@@ -2510,6 +2510,7 @@ namespace strumpack {
         //std::vector<std::vector<std::unique_ptr<BLRTile<scalar_t>>> > Tkc_vec, Tcj_vec;
         //construct the (i/CP+1) CP block-columns as dense tiles
         blockcol(i, true);
+        //if (!grid()->active()) return piv;
         for (std::size_t k=0; k<i; k++){
           if (grid()->is_local_row(k)) {
             for (std::size_t j=i; j<std::min(i+CP, colblocks()); j++) {
@@ -2619,7 +2620,7 @@ namespace strumpack {
       std::vector<int> piv;
       std::vector<std::vector<int> > piv_tile_global;
       std::vector<int> piv_tile;
-      if (!g->active()) return piv;
+      //if (!g->active()) return piv;
       DenseTile<scalar_t> Tcc;
       std::vector<DenseTile<scalar_t> > Tcc_vec;
       auto CP = g->npcols();
@@ -2727,7 +2728,7 @@ namespace strumpack {
           if (c != i+CP-1) {
             auto Tcj = F11.bcast_row_of_tiles_along_cols(c, c+1, std::min(i+CP,B1_c));
             auto Tkc = F11.bcast_col_of_tiles_along_rows(c+1, B1_r, c);
-            auto Tk2c = F21.bcast_col_of_tiles_along_rows(0, B2_r, c);//??
+            auto Tk2c = F21.bcast_col_of_tiles_along_rows(0, B2_r, c);
             // GEMM (or recompress)
             for (std::size_t j=c+1, lj=0; j<std::min(i+CP,B1_c); j++) {
               if (g->is_local_col(j)) {
@@ -2742,9 +2743,9 @@ namespace strumpack {
                 lj++;
               }
             }
-            for (std::size_t j=0, lj=0; j<std::min(i+CP,B2_c); j++) {
+            for (std::size_t j=c+1, lj=0; j<std::min(i+CP,B1_c); j++) {
               if (g->is_local_col(j)) {
-                for (std::size_t k=c+1, lk=0; k<B1_r; k++) {
+                for (std::size_t k=0, lk=0; k<B2_r; k++) {
                   if (g->is_local_row(k)) {
                     gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tk2c[lk]),
                         *(Tcj[lj]), scalar_t(1.), F21.tile_dense(k, j).D());
@@ -2760,6 +2761,7 @@ namespace strumpack {
       //for (std::size_t i=0; i<B2_c; i+=CP) { //F12 and F22
       //construct the B2_c CP block-columns as dense tiles
       blockcol(B1_c, false);
+      //if (!g->active()) return piv;
       for (std::size_t k=0; k<B1_c; k++){
         if (g->is_local_row(k)) {
           for (std::size_t j=0; j<B2_c; j++) {

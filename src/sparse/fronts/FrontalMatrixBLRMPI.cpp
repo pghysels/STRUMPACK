@@ -261,7 +261,8 @@ namespace strumpack {
       // TODO flops?
     }
 #else // factor column-block-wise for memory reduction
-    if (dim_sep() && grid2d().active()) {
+    //if (dim_sep() && grid2d().active()) {
+    if (dim_sep()) {
       if (dim_upd()) {
         F11blr_ = BLRMPI_t(pgrid_, sep_tiles_, sep_tiles_);
         F12blr_ = BLRMPI_t(pgrid_, sep_tiles_, upd_tiles_);
