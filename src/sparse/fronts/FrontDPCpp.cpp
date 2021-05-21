@@ -117,21 +117,21 @@ namespace strumpack {
         getr_work_size += F->scratchpad_size_;
         if (dsep <= 8)       N8++;
         else if (dsep <= 16) N16++;
-        else if (dsep <= 24) N24++;
-        else if (dsep <= 32) N32++;
+        // else if (dsep <= 24) N24++;
+        // else if (dsep <= 32) N32++;
       }
       factor_size = L_size + U_size;
       work_bytes =
         round_to_8(sizeof(scalar_t) * (Schur_size + getr_work_size)) +
         round_to_8(sizeof(std::int64_t) * piv_size) +
-        round_to_8(sizeof(FrontData<scalar_t>) * (N8 + N16 + N24 + N32));
+        round_to_8(sizeof(FrontData<scalar_t>) * (N8 + N16/* + N24 + N32*/));
     }
 
     void print_info(int l, int lvls) {
       std::cout << "#  level " << l << " of " << lvls
                 << " has " << f.size() << " nodes and "
                 << N8 << " <=8, " << N16 << " <=16, "
-                << N24 << " <=24, " << N32 << " <=32, needs "
+                // << N24 << " <=24, " << N32 << " <=32, needs "
                 << factor_size * sizeof(scalar_t) / 1.e6
                 << " MB for factors, "
                 << Schur_size * sizeof(scalar_t) / 1.e6
@@ -197,17 +197,18 @@ namespace strumpack {
         (round_to_8(imem));
       f8 = fdat;   fdat += N8;
       f16 = fdat;  fdat += N16;
-      f24 = fdat;  fdat += N24;
-      f32 = fdat;  fdat += N32;
+      // f24 = fdat;  fdat += N24;
+      // f32 = fdat;  fdat += N32;
     }
 
     std::vector<FDPC_t*> f;
     std::size_t L_size = 0, U_size = 0, factor_size = 0,
       Schur_size = 0, piv_size = 0, total_upd_size = 0,
-      work_bytes = 0, N8 = 0, N16 = 0, N24 = 0, N32 = 0;
+      work_bytes = 0, N8 = 0, N16 = 0;
+    //, N24 = 0, N32 = 0;
     std::int64_t getr_work_size = 0;
-    FrontData<scalar_t> *f8 = nullptr, *f16 = nullptr,
-      *f24 = nullptr, *f32 = nullptr;
+    FrontData<scalar_t> *f8 = nullptr, *f16 = nullptr;
+    //*f24 = nullptr, *f32 = nullptr;
   };
 
 
@@ -377,17 +378,17 @@ namespace strumpack {
       std::size_t nt1 = 128, nt2 = 32;
       std::size_t max1 = nt1, max2 = nt2;
       for (std::size_t f=0; f<nf; f++) {
-        max1 = std::max(max1, dat[f].n11);
-        max2 = std::max(max2, std::max(dat[f].n12, dat[f].n21));
+	max1 = std::max(max1, dat[f].n11);
+	max2 = std::max(max2, std::max(dat[f].n12, dat[f].n21));
       }
       // TODO check if nf is larger than allowed max
       cl::sycl::range<2> global{nf, rnd(max1, nt1)}, local{1, nt1};
       q.parallel_for(cl::sycl::nd_range<2>{global, local},
-                     Assemble11<T>(ddat));
+		     Assemble11<T>(ddat));
       if (max2) {
-        cl::sycl::range<2> global{nf, rnd(max2, nt2)}, local{1, nt2};
-        q.parallel_for(cl::sycl::nd_range<2>{global, local},
-                       Assemble1221<T>(ddat));
+	cl::sycl::range<2> global{nf, rnd(max2, nt2)}, local{1, nt2};
+	q.parallel_for(cl::sycl::nd_range<2>{global, local},
+		       Assemble1221<T>(ddat));
       }
     }
     q.wait_and_throw();
@@ -395,7 +396,7 @@ namespace strumpack {
       std::size_t nt = 16;
       std::size_t maxCB = nt;
       for (std::size_t f=0; f<nf; f++)
-        maxCB = std::max(maxCB, std::max(dat[f].dCB1, dat[f].dCB2));
+	maxCB = std::max(maxCB, std::max(dat[f].dCB1, dat[f].dCB2));
       auto gCB = rnd(maxCB, nt);
       cl::sycl::range<3> global{nf, gCB, gCB}, local{1, nt, nt};
       q.parallel_for(cl::sycl::nd_range<3>{global, local}, EA1<T>(ddat));
@@ -403,20 +404,6 @@ namespace strumpack {
       q.parallel_for(cl::sycl::nd_range<3>{global, local}, EA2<T>(ddat));
       q.wait_and_throw();
     }
-  }
-
-  template<> void assemble<std::complex<float>>
-  (cl::sycl::queue& q, std::size_t nf,
-   const AssembleData<std::complex<float>>* dat,
-   AssembleData<std::complex<float>>* ddat) {
-    std::cout << "TODO assemble<std::complex<float>>" << std::endl;
-  }
-
-  template<> void assemble<std::complex<double>>
-  (cl::sycl::queue& q, std::size_t nf,
-   const AssembleData<std::complex<double>>* dat,
-   AssembleData<std::complex<double>>* ddat) {
-    std::cout << "TODO assemble<std::complex<double>>" << std::endl;
   }
 
   template<typename scalar_t, typename integer_t> void
@@ -539,71 +526,40 @@ namespace strumpack {
   template<std::size_t B, typename T> void
   factor_small_fronts_kernel(cl::sycl::queue& q, std::size_t nf,
                              FrontData<T>* fdata) {
+    if (!nf) return;
     cl::sycl::range<3> global{nf, B, B}, local{1, B, B};
     q.parallel_for(cl::sycl::nd_range<3>{global, local},
                    PartialFactor<B, T>(fdata));
-  }
-
-  template<> void factor_small_fronts_kernel<8,std::complex<float>>
-  (cl::sycl::queue& q, std::size_t nf, FrontData<std::complex<float>>* fdata) {
-    std::cout << "TODO factor_small_fronts_kernel<8,std::complex<float>>" << std::endl;
-  }
-  template<> void factor_small_fronts_kernel<16,std::complex<float>>
-  (cl::sycl::queue& q, std::size_t nf, FrontData<std::complex<float>>* fdata) {
-    std::cout << "TODO factor_small_fronts_kernel<16,std::complex<float>>" << std::endl;
-  }
-  template<> void factor_small_fronts_kernel<24,std::complex<float>>
-  (cl::sycl::queue& q, std::size_t nf, FrontData<std::complex<float>>* fdata) {
-    std::cout << "TODO factor_small_fronts_kernel<24,std::complex<float>>" << std::endl;
-  }
-  template<> void factor_small_fronts_kernel<32,std::complex<float>>
-  (cl::sycl::queue& q, std::size_t nf, FrontData<std::complex<float>>* fdata) {
-    std::cout << "TODO factor_small_fronts_kernel<32,std::complex<float>>" << std::endl;
-  }
-  template<> void factor_small_fronts_kernel<8,std::complex<double>>
-  (cl::sycl::queue& q, std::size_t nf, FrontData<std::complex<double>>* fdata) {
-    std::cout << "TODO factor_small_fronts_kernel<8,std::complex<double>>" << std::endl;
-  }
-  template<> void factor_small_fronts_kernel<16,std::complex<double>>
-  (cl::sycl::queue& q, std::size_t nf, FrontData<std::complex<double>>* fdata) {
-    std::cout << "TODO factor_small_fronts_kernel<16,std::complex<double>>" << std::endl;
-  }
-  template<> void factor_small_fronts_kernel<24,std::complex<double>>
-  (cl::sycl::queue& q, std::size_t nf, FrontData<std::complex<double>>* fdata) {
-    std::cout << "TODO factor_small_fronts_kernel<24,std::complex<double>>" << std::endl;
-  }
-  template<> void factor_small_fronts_kernel<32,std::complex<double>>
-  (cl::sycl::queue& q, std::size_t nf, FrontData<std::complex<double>>* fdata) {
-    std::cout << "TODO factor_small_fronts_kernel<32,std::complex<double>>" << std::endl;
   }
 
   template<typename scalar_t, typename integer_t> void
   FrontDPCpp<scalar_t,integer_t>::factor_small_fronts
   (cl::sycl::queue& q, LInfo_t& L, FrontData<scalar_t>* fdata,
    const Opts_t& opts) {
-    if (L.N8 || L.N16 || L.N24 || L.N32) {
-      for (std::size_t n=0, n8=0, n16=L.N8,
-             n24=n16+L.N16, n32=n24+L.N24;
+    if (L.N8 || L.N16 /* || L.N24 || L.N32*/) {
+      for (std::size_t n=0, n8=0, n16=L.N8;
+	   //n24=n16+L.N16, n32=n24+L.N24;
            n<L.f.size(); n++) {
         auto& f = *(L.f[n]);
         const auto dsep = f.dim_sep();
-        if (dsep <= 32) {
+        //if (dsep <= 32) {
+	if (dsep <= 16) {
           FrontData<scalar_t>
             t(dsep, f.dim_upd(), f.F11_.data(), f.F12_.data(),
               f.F21_.data(), f.F22_.data(), f.piv_);
           if (dsep <= 8)       fdata[n8++] = t;
-          else if (dsep <= 16) fdata[n16++] = t;
-          else if (dsep <= 24) fdata[n24++] = t;
-          else                 fdata[n32++] = t;
+	  else if (dsep <= 16) fdata[n16++] = t;
+	  // else if (dsep <= 24) fdata[n24++] = t;
+          // else                 fdata[n32++] = t;
         }
       }
-      dpcpp::memcpy(q, L.f8, fdata, (L.N8+L.N16+L.N24+L.N32)).wait();
+      dpcpp::memcpy(q, L.f8, fdata, (L.N8+L.N16/*+L.N24+L.N32*/)).wait();
       // auto replace = opts.replace_tiny_pivots();
       // auto thresh = opts.pivot_threshold();
       factor_small_fronts_kernel<8>(q, L.N8, L.f8);
       factor_small_fronts_kernel<16>(q, L.N16, L.f16);
-      factor_small_fronts_kernel<24>(q, L.N24, L.f24);
-      factor_small_fronts_kernel<32>(q, L.N32, L.f32);
+      // factor_small_fronts_kernel<24>(q, L.N24, L.f24);
+      // factor_small_fronts_kernel<32>(q, L.N32, L.f32);
     }
   }
 
@@ -612,7 +568,8 @@ namespace strumpack {
   (cl::sycl::queue& q, LInfo_t& L, const Opts_t& opts) {
     for (auto& front : L.f) {
       auto& f = *front;
-      if (f.dim_sep() > 32) {
+      // if (f.dim_sep() > 32) {
+      if (f.dim_sep() > 16) {
         auto e_getrf = dpcpp::getrf
           (q, f.F11_, f.piv_, f.scratchpad_, f.scratchpad_size_);
         if (opts.replace_tiny_pivots()) { } // TODO
@@ -632,12 +589,7 @@ namespace strumpack {
   FrontDPCpp<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts,
    int etree_level, int task_depth) {
-    // const int max_streams = opts.gpu_streams();
-
-    cl::sycl::queue q(cl::sycl::default_selector{},
-                      cl::sycl::property::queue::in_order());
-    // cl::sycl::queue q(cl::sycl::host_selector{});
-    // cl::sycl::property::queue::in_order());
+    cl::sycl::queue q(cl::sycl::default_selector{});
     if (opts.verbose())
       std::cout << "# SYCL/DPC++ selected device: "
                 << q.get_device().get_info<cl::sycl::info::device::name>()
@@ -652,7 +604,7 @@ namespace strumpack {
       auto& L = ldata[l];
       L = LInfo_t(fp, q);
       max_small_fronts =
-        std::max(max_small_fronts, L.N8+L.N16+L.N24+L.N32);
+        std::max(max_small_fronts, L.N8+L.N16/*+L.N24+L.N32*/);
     }
 
     // if (!sufficient_device_memory(ldata)) {
@@ -676,11 +628,10 @@ namespace strumpack {
           (q, work_mem.template as<scalar_t>(), scalar_t(0.), L.Schur_size);
         L.set_factor_pointers(dev_factors);
         L.set_work_pointers(work_mem);
-        front_assembly(q, A, L);
-        q.wait_and_throw();
-        old_work = std::move(work_mem);
-        factor_small_fronts
-          (q, L, fdata.template as<FrontData<scalar_t>>(), opts);
+	front_assembly(q, A, L);
+	old_work = std::move(work_mem);
+	factor_small_fronts
+	  (q, L, fdata.template as<FrontData<scalar_t>>(), opts);
         factor_large_fronts(q, L, opts);
         STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
         L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
