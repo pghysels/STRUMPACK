@@ -126,7 +126,7 @@ namespace strumpack {
           A->count_front_elements
             (F->sep_begin(), F->sep_end(), F->upd(),
              elems11, elems12, elems21);
-	}
+        }
       }
       factor_size = L_size + U_size;
       work_bytes =
@@ -215,9 +215,10 @@ namespace strumpack {
 
     std::vector<FDPC_t*> f;
     std::size_t L_size = 0, U_size = 0, factor_size = 0,
-		   Schur_size = 0, piv_size = 0, total_upd_size = 0,
-		   work_bytes = 0, N8 = 0, N16 = 0,
-		   Isize = 0, elems11 = 0, elems12 = 0, elems21 = 0, ea_bytes = 0;
+                   Schur_size = 0, piv_size = 0, total_upd_size = 0,
+                   work_bytes = 0, N8 = 0, N16 = 0,
+                   Isize = 0, ea_bytes = 0,
+                   elems11 = 0, elems12 = 0, elems21 = 0;
     //, N24 = 0, N32 = 0;
     std::int64_t getr_work_size = 0;
     FrontData<scalar_t> *f8 = nullptr, *f16 = nullptr;
@@ -387,17 +388,17 @@ namespace strumpack {
       std::size_t nt1 = 128, nt2 = 32;
       std::size_t max1 = nt1, max2 = nt2;
       for (std::size_t f=0; f<nf; f++) {
-	max1 = std::max(max1, dat[f].n11);
-	max2 = std::max(max2, std::max(dat[f].n12, dat[f].n21));
+        max1 = std::max(max1, dat[f].n11);
+        max2 = std::max(max2, std::max(dat[f].n12, dat[f].n21));
       }
       // TODO check if nf is larger than allowed max
       cl::sycl::range<2> global{nf, rnd(max1, nt1)}, local{1, nt1};
       q.parallel_for(cl::sycl::nd_range<2>{global, local},
-		     Assemble11<T>(ddat));
+                     Assemble11<T>(ddat));
       if (max2) {
-	cl::sycl::range<2> global{nf, rnd(max2, nt2)}, local{1, nt2};
-	q.parallel_for(cl::sycl::nd_range<2>{global, local},
-		       Assemble1221<T>(ddat));
+        cl::sycl::range<2> global{nf, rnd(max2, nt2)}, local{1, nt2};
+        q.parallel_for(cl::sycl::nd_range<2>{global, local},
+                       Assemble1221<T>(ddat));
       }
     }
     q.wait_and_throw();
@@ -405,7 +406,7 @@ namespace strumpack {
       std::size_t nt = 16;
       std::size_t maxCB = nt;
       for (std::size_t f=0; f<nf; f++)
-	maxCB = std::max(maxCB, std::max(dat[f].dCB1, dat[f].dCB2));
+        maxCB = std::max(maxCB, std::max(dat[f].dCB1, dat[f].dCB2));
       auto gCB = rnd(maxCB, nt);
       cl::sycl::range<3> global{nf, gCB, gCB}, local{1, nt, nt};
       q.parallel_for(cl::sycl::nd_range<3>{global, local}, EA1<T>(ddat));
@@ -542,18 +543,18 @@ namespace strumpack {
    const Opts_t& opts) {
     if (L.N8 || L.N16 /* || L.N24 || L.N32*/) {
       for (std::size_t n=0, n8=0, n16=L.N8;
-	   //n24=n16+L.N16, n32=n24+L.N24;
+           //n24=n16+L.N16, n32=n24+L.N24;
            n<L.f.size(); n++) {
         auto& f = *(L.f[n]);
         const auto dsep = f.dim_sep();
         //if (dsep <= 32) {
-	if (dsep <= 16) {
+        if (dsep <= 16) {
           FrontData<scalar_t>
             t(dsep, f.dim_upd(), f.F11_.data(), f.F12_.data(),
               f.F21_.data(), f.F22_.data(), f.piv_);
           if (dsep <= 8)       fdata[n8++] = t;
-	  else if (dsep <= 16) fdata[n16++] = t;
-	  // else if (dsep <= 24) fdata[n24++] = t;
+          else if (dsep <= 16) fdata[n16++] = t;
+          // else if (dsep <= 24) fdata[n24++] = t;
           // else                 fdata[n32++] = t;
         }
       }
@@ -642,14 +643,16 @@ namespace strumpack {
           dev_factors = reinterpret_cast<scalar_t*>
             (dea_mem - round_to_8(L.factor_size * sizeof(scalar_t)));
         }
-	dpcpp::fill<scalar_t>(q, reinterpret_cast<scalar_t*>(dev_factors), scalar_t(0.), L.factor_size);
-	dpcpp::fill<scalar_t>(q, reinterpret_cast<scalar_t*>(work_mem), scalar_t(0.), L.Schur_size);
-	L.set_factor_pointers(dev_factors);
+        dpcpp::fill(q, reinterpret_cast<scalar_t*>(dev_factors),
+                    scalar_t(0.), L.factor_size);
+        dpcpp::fill(q, reinterpret_cast<scalar_t*>(work_mem),
+                    scalar_t(0.), L.Schur_size);
+        L.set_factor_pointers(dev_factors);
         L.set_work_pointers(work_mem);
-	front_assembly(q, A, L, hea_mem, dea_mem);
-	old_work = work_mem;
-	factor_small_fronts(q, L, fdata, opts);
-	factor_large_fronts(q, L, opts);
+        front_assembly(q, A, L, hea_mem, dea_mem);
+        old_work = work_mem;
+        factor_small_fronts(q, L, fdata, opts);
+        factor_large_fronts(q, L, opts);
         STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
         L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
         L.f[0]->pivot_mem_.resize(L.piv_size);
@@ -679,8 +682,8 @@ namespace strumpack {
     const std::size_t dupd = dim_upd();
     if (dupd) { // get the contribution block from the device
       host_Schur_.reset(new scalar_t[dupd*dupd]);
-      dpcpp::memcpy
-	(q, host_Schur_.get(), reinterpret_cast<scalar_t*>(old_work), dupd*dupd);
+      dpcpp::memcpy(q, host_Schur_.get(),
+                    reinterpret_cast<scalar_t*>(old_work), dupd*dupd);
       F22_ = DenseMW_t(dupd, dupd, host_Schur_.get(), dupd);
     }
   }
