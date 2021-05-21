@@ -478,7 +478,7 @@ namespace strumpack {
     for (int i=0; i<7; i++)
       std::cout << "#      " << i << " " <<
         get_description(get_matching(i)) << std::endl;
-    std::cout << "#   --sp_compression [none|hss|blr|hodlr|lossy]" << std::endl
+    std::cout << "#   --sp_compression [none|hss|blr|hodlr|lossy|blr_hodlr]" << std::endl
               << "#          type of rank-structured compression to use"
               << std::endl;
     std::cout << "#   --sp_compression_min_sep_size (default "

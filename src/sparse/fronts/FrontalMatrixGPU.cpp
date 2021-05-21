@@ -73,12 +73,13 @@ namespace strumpack {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using FG_t = FrontalMatrixGPU<scalar_t,integer_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
+    using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
 
   public:
     LevelInfo() {}
 
     LevelInfo(const std::vector<F_t*>& fronts, gpu::SOLVERHandle& handle,
-              int max_streams) {
+              int max_streams, const SpMat_t* A=nullptr) {
       f.reserve(fronts.size());
       for (auto& F : fronts)
         f.push_back(dynamic_cast<FG_t*>(F));
@@ -96,6 +97,13 @@ namespace strumpack {
         else if (dsep <= 24) N24++;
         else if (dsep <= 32) N32++;
         if (dsep > max_dsep) max_dsep = dsep;
+        if (A) {
+          if (F->lchild_) Isize += F->lchild_->dim_upd();
+          if (F->rchild_) Isize += F->rchild_->dim_upd();
+          A->count_front_elements
+            (F->sep_begin(), F->sep_end(), F->upd(),
+             elems11, elems12, elems21);
+        }
       }
       factor_size = L_size + U_size;
       getrf_work_size = gpu::getrf_buffersize<scalar_t>(handle, max_dsep);
@@ -104,6 +112,10 @@ namespace strumpack {
                    (Schur_size + getrf_work_size * max_streams)) +
         round_to_8(sizeof(int) * (piv_size + max_streams)) +
         round_to_8(sizeof(gpu::FrontData<scalar_t>) * (N8 + N16 + N24 + N32));
+      ea_bytes =
+        round_to_8(sizeof(gpu::AssembleData<scalar_t>) * f.size()) +
+        round_to_8(sizeof(std::size_t) * Isize) +
+        round_to_8(sizeof(Triplet<scalar_t>) * (elems11 + elems12 + elems21));
     }
 
     void print_info(int l, int lvls) {
@@ -183,7 +195,8 @@ namespace strumpack {
     std::vector<FG_t*> f;
     std::size_t L_size = 0, U_size = 0, factor_size = 0,
       Schur_size = 0, piv_size = 0, total_upd_size = 0,
-      work_bytes = 0, N8 = 0, N16 = 0, N24 = 0, N32 = 0;
+      work_bytes = 0, N8 = 0, N16 = 0, N24 = 0, N32 = 0,
+      Isize = 0, elems11 = 0, elems12 = 0, elems21 = 0, ea_bytes = 0;
     scalar_t* dev_getrf_work = nullptr;
     int* dev_getrf_err = nullptr;
     int getrf_work_size = 0;
@@ -254,66 +267,55 @@ namespace strumpack {
     release_work_memory();
   }
 
-
-  /**
-   * this doesn't count the memory used for the sparse matrix elements
-   * needed in the front assembly.
-   */
   template<typename scalar_t,typename integer_t>
-  bool sufficient_device_memory
+  std::size_t peak_device_memory
   (const std::vector<LevelInfo<scalar_t,integer_t>>& ldata) {
-    std::size_t peak_device_mem = 0;
+    std::size_t peak_dmem = 0;
     for (std::size_t l=0; l<ldata.size(); l++) {
       auto& L = ldata[l];
       // memory needed on this level: factors,
-      // schur updates, pivot vectors, cuSOLVER work space, ...
-      std::size_t level_mem = L.factor_size*sizeof(scalar_t) + L.work_bytes;
+      // schur updates, pivot vectors, cuSOLVER work space,
+      // assembly data (indices, sparse elements)
+      std::size_t level_mem =
+        round_to_8(L.factor_size*sizeof(scalar_t))
+        + L.work_bytes + L.ea_bytes;
       // the contribution blocks of the previous level are still
       // needed for the extend-add
       if (l+1 < ldata.size())
         level_mem += ldata[l+1].work_bytes;
-      peak_device_mem = std::max(peak_device_mem, level_mem);
+      peak_dmem = std::max(peak_dmem, level_mem);
     }
-    // only use 90% of available memory, since we're not counting the
-    // sparse elements in the peak_device_mem
-    return peak_device_mem < 0.9 * gpu::available_memory();
+    return peak_dmem;
   }
-
 
   template<typename scalar_t, typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::front_assembly
-  (const SpMat_t& A, LInfo_t& L) {
+  (const SpMat_t& A, LInfo_t& L, char* hea_mem, char* dea_mem) {
     using Trip_t = Triplet<scalar_t>;
     auto N = L.f.size();
     std::vector<Trip_t> e11, e12, e21;
+    e11.reserve(L.elems11);
+    e12.reserve(L.elems12);
+    e21.reserve(L.elems21);
     std::vector<std::array<std::size_t,3>> ne(N+1);
-    std::size_t Isize = 0;
     for (std::size_t n=0; n<N; n++) {
       auto& f = *(L.f[n]);
       ne[n] = std::array<std::size_t,3>{e11.size(), e12.size(), e21.size()};
       A.push_front_elements
         (f.sep_begin_, f.sep_end_, f.upd_, e11, e12, e21);
-      if (f.lchild_) Isize += f.lchild_->dim_upd();
-      if (f.rchild_) Isize += f.rchild_->dim_upd();
     }
     ne[N] = std::array<std::size_t,3>{e11.size(), e12.size(), e21.size()};
-    std::size_t ea_mem_size =
-      round_to_8(N*sizeof(gpu::AssembleData<scalar_t>)) +
-      round_to_8(Isize*sizeof(std::size_t)) +
-      round_to_8((e11.size()+e12.size()+e21.size())*sizeof(Trip_t));
-    gpu::HostMemory<char> hea_mem(ea_mem_size);
-    gpu::DeviceMemory<char> dea_mem(ea_mem_size);
-    auto hasmbl = hea_mem.as<gpu::AssembleData<scalar_t>>();
+    auto hasmbl = reinterpret_cast<gpu::AssembleData<scalar_t>*>(hea_mem);
     auto Iptr = reinterpret_cast<std::size_t*>(round_to_8(hasmbl + N));
     {
-      auto helems = reinterpret_cast<Trip_t*>(round_to_8(Iptr + Isize));
+      auto helems = reinterpret_cast<Trip_t*>(round_to_8(Iptr + L.Isize));
       std::copy(e11.begin(), e11.end(), helems);
       std::copy(e12.begin(), e12.end(), helems + e11.size());
       std::copy(e21.begin(), e21.end(), helems + e11.size() + e12.size());
     }
-    auto dasmbl = dea_mem.as<gpu::AssembleData<scalar_t>>();
+    auto dasmbl = reinterpret_cast<gpu::AssembleData<scalar_t>*>(dea_mem);
     auto dIptr = reinterpret_cast<std::size_t*>(round_to_8(dasmbl + N));
-    auto delems = reinterpret_cast<Trip_t*>(round_to_8(dIptr + Isize));
+    auto delems = reinterpret_cast<Trip_t*>(round_to_8(dIptr + L.Isize));
     auto de11 = delems;
     auto de12 = de11 + e11.size();
     auto de21 = de12 + e12.size();
@@ -341,7 +343,7 @@ namespace strumpack {
         dIptr += u.size();
       }
     }
-    gpu::copy_host_to_device<char>(dea_mem, hea_mem, ea_mem_size);
+    gpu::copy_host_to_device<char>(dea_mem, hea_mem, L.ea_bytes);
     gpu::assemble(N, hasmbl, dasmbl);
     gpu::synchronize();
   }
@@ -530,29 +532,45 @@ namespace strumpack {
       std::vector<F_t*> fp;
       this->get_level_fronts(fp, l);
       auto& L = ldata[l];
-      L = LInfo_t(fp, solver_handles[0], max_streams);
+      L = LInfo_t(fp, solver_handles[0], max_streams, &A);
       max_small_fronts = std::max(max_small_fronts, L.N8+L.N16+L.N24+L.N32);
     }
-    if (!sufficient_device_memory(ldata)) {
+    auto peak_dmem = peak_device_memory(ldata);
+    if (peak_dmem >= 0.9 * gpu::available_memory()) {
       split_smaller(A, opts, etree_level, task_depth);
       return;
     }
     gpu::HostMemory<gpu::FrontData<scalar_t>> fdata(max_small_fronts);
-    gpu::DeviceMemory<char> old_work;
+    std::size_t peak_hea_mem = 0;
+    for (int l=lvls-1; l>=0; l--)
+      peak_hea_mem = std::max(peak_hea_mem, ldata[l].ea_bytes);
+    gpu::HostMemory<char> hea_mem(peak_hea_mem);
+    gpu::DeviceMemory<char> all_dmem(peak_dmem);
+    char* old_work = nullptr;
     for (int l=lvls-1; l>=0; l--) {
       TaskTimer tl("");
       tl.start();
       auto& L = ldata[l];
       if (opts.verbose()) L.print_info(l, lvls);
       try {
-        gpu::DeviceMemory<scalar_t> dev_factors(L.factor_size);
-        gpu::DeviceMemory<char> work_mem(L.work_bytes);
+        char *work_mem = nullptr, *dea_mem = nullptr;
+        scalar_t* dev_factors = nullptr;
+        if (l % 2) {
+          work_mem = all_dmem;
+          dea_mem = work_mem + L.work_bytes;
+          dev_factors = reinterpret_cast<scalar_t*>(dea_mem + L.ea_bytes);
+        } else {
+          work_mem = all_dmem + peak_dmem - L.work_bytes;
+          dea_mem = work_mem - L.ea_bytes;
+          dev_factors = reinterpret_cast<scalar_t*>
+            (dea_mem - round_to_8(L.factor_size * sizeof(scalar_t)));
+        }
+        gpu::memset<scalar_t>(work_mem, 0, L.Schur_size);
         gpu::memset<scalar_t>(dev_factors, 0, L.factor_size);
-        gpu::memset<scalar_t>(work_mem.as<scalar_t>(), 0, L.Schur_size);
         L.set_factor_pointers(dev_factors);
         L.set_work_pointers(work_mem, max_streams);
-        front_assembly(A, L);
-        old_work = std::move(work_mem);
+        front_assembly(A, L, hea_mem, dea_mem);
+        old_work = work_mem;
         factor_small_fronts(L, fdata, opts);
         factor_large_fronts(L, blas_handles, solver_handles, streams, opts);
         STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
@@ -587,7 +605,7 @@ namespace strumpack {
     if (dupd) { // get the contribution block from the device
       host_Schur_.reset(new scalar_t[dupd*dupd]);
       gpu::copy_device_to_host
-        (host_Schur_.get(), old_work.as<scalar_t>(), dupd*dupd);
+        (host_Schur_.get(), reinterpret_cast<scalar_t*>(old_work), dupd*dupd);
       F22_ = DenseMW_t(dupd, dupd, host_Schur_.get(), dupd);
     }
 #if defined(STRUMPACK_USE_MAGMA)

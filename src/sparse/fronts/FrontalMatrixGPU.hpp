@@ -111,8 +111,8 @@ namespace strumpack {
     FrontalMatrixGPU(const FrontalMatrixGPU&) = delete;
     FrontalMatrixGPU& operator=(FrontalMatrixGPU const&) = delete;
 
-    // TODO move these routines out of the class
-    void front_assembly(const SpMat_t& A, LInfo_t& L);
+    void front_assembly(const SpMat_t& A, LInfo_t& L,
+                        char* hea_mem, char* dea_mem);
     void factor_small_fronts(LInfo_t& L, gpu::FrontData<scalar_t>* fdata,
                              const SPOptions<scalar_t>& opts);
     void factor_large_fronts(LInfo_t& L,

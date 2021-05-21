@@ -26,6 +26,7 @@
  *             Division).
  *
  */
+#include "StrumpackParameters.hpp"
 #include "FrontalMatrixHODLRMPI.hpp"
 #include "ExtendAdd.hpp"
 
@@ -39,6 +40,17 @@ namespace strumpack {
     (sep, sep_begin, sep_end, upd, comm, total_procs) {
   }
 
+  template<typename scalar_t,typename integer_t>
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::~FrontalMatrixHODLRMPI() {
+#if defined(STRUMPACK_COUNT_FLOPS)
+    auto HOD_mem =
+      F11_.get_stat("Mem_Fill") + F11_.get_stat("Mem_Factor")
+      + F12_.get_stat("Mem_Fill") + F21_.get_stat("Mem_Fill");
+    if (F22_) HOD_mem += F22_->get_stat("Mem_Fill");
+    STRUMPACK_SUB_MEMORY(HOD_mem*1.e6);
+#endif
+  }
+
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::release_work_memory() {
     if (F22_) {
@@ -48,6 +60,7 @@ namespace strumpack {
       t_traverse.set_elapsed(F22_->get_stat("Time_Entry_Traverse"));
       t_bf.set_elapsed(F22_->get_stat("Time_Entry_BF"));
       t_comm.set_elapsed(F22_->get_stat("Time_Entry_Comm"));
+      STRUMPACK_SUB_MEMORY(F22_->get_stat("Mem_Fill")*1.e6);
       F22_.reset(nullptr);
     }
   }
@@ -137,8 +150,6 @@ namespace strumpack {
     std::vector<scalar_t,NoInit<scalar_t>> rbuf;
     std::vector<scalar_t*> pbuf;
     {
-      // TIMER_TIME(TaskType::GET_SUBMATRIX_2D_BA2A, 2, t_ba2a);
-      // Comm().barrier();
       TIMER_TIME(TaskType::GET_SUBMATRIX_2D_A2A, 2, t_a2a);
       Comm().all_to_all_v(sbuf, rbuf, pbuf);
     }
@@ -168,6 +179,18 @@ namespace strumpack {
       compress_extraction(A, lopts);
     } break;
     }
+#if defined(STRUMPACK_COUNT_FLOPS)
+    auto HOD_peak_mem = F11_.get_stat("Mem_Peak") +
+      F12_.get_stat("Mem_Peak") + F21_.get_stat("Mem_Peak");
+    if (F22_) HOD_peak_mem += F22_->get_stat("Mem_Peak");
+    STRUMPACK_ADD_MEMORY(HOD_peak_mem*1.e6);
+    STRUMPACK_SUB_MEMORY(HOD_peak_mem*1.e6);
+    auto HOD_mem =
+      F11_.get_stat("Mem_Fill") + F11_.get_stat("Mem_Factor") +
+      F12_.get_stat("Mem_Fill") + F21_.get_stat("Mem_Fill");
+    if (F22_) HOD_mem += F22_->get_stat("Mem_Fill");
+    STRUMPACK_ADD_MEMORY(HOD_mem*1.e6);
+#endif
     if (/*etree_level == 0 && */opts.print_root_front_stats()) {
       auto time = t.elapsed();
       float perbyte = 1.0e6 / sizeof(scalar_t);
@@ -249,7 +272,12 @@ namespace strumpack {
           this->extract_2d(A, I, J, B);
         };
       { TIMER_TIME(TaskType::LRBF_COMPRESS, 0, t_lrbf_compress);
+        
+        // int bsize = std::min(64.0,ceil(F11_.get_stat("Rank_max")/2.0));
+        // F12_.set_BACA_block(bsize);
         F12_.compress(extract_F12);
+        // bsize = std::min(64.0,ceil(F12_.get_stat("Rank_max")/2.0));
+        // F21_.set_BACA_block(bsize);
         F21_.compress(extract_F21); }
       compress_flops_F12_F21();
 
@@ -297,6 +325,8 @@ namespace strumpack {
           Schur.extract_add_elements(e, B);
         };
       TIMER_TIME(TaskType::HSS_COMPRESS_22, 0, t_f22_compress);
+      // int bsize = std::min(64.0,ceil(Schur.get_stat("Rank_max")/2.0));
+      // F22_->set_BACA_block(bsize);
       F22_->compress(extract_F22);
       compress_flops_F22();
     }

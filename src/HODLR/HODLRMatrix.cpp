@@ -339,7 +339,7 @@ namespace strumpack {
 #pragma omp parallel for schedule(static, 1)
         for (int lo=0; lo<rows_; lo+=B) {
           std::vector<bool> mark(rows_, false);
-          std::vector<int> q(knn);
+          std::vector<int> q(knn+1);
           for (int i=lo; i<std::min(lo+B, rows_); i++) {
             int qfront = 0, qback = 0, nn = 0;
             q[qback++] = i;
@@ -387,9 +387,9 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "verbosity", opts.verbose() ? 2 : -2);
       // HODLR_set_I_option<scalar_t>(options_, "Nbundle", 8);
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
-      HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
+      HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);  
       // set RecLR_leaf to 2 for RRQR at bottom level of Hierarchical BACA
-      HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", 5); // 5 = new version of BACA
+      HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", opts.lr_leaf()); // 5 = new version of BACA
       HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", opts.BACA_block_size());
       HODLR_set_I_option<scalar_t>(options_, "xyzsort", 0);
       HODLR_set_I_option<scalar_t>(options_, "elem_extract", 1); // block extraction
@@ -398,8 +398,8 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "ErrFillFull", 0);
       HODLR_set_I_option<scalar_t>(options_, "rank0", opts.rank_guess());
       HODLR_set_I_option<scalar_t>(options_, "less_adapt", opts.less_adapt()); // 0 or 1
+      HODLR_set_I_option<scalar_t>(options_, "forwardN15flag", opts.BF_entry_n15()); // 0 or 1
       HODLR_set_I_option<scalar_t>(options_, "cpp", 1);
-      HODLR_set_I_option<scalar_t>(options_, "forwardN15flag", 0);
       HODLR_set_D_option<scalar_t>(options_, "sample_para", opts.BF_sampling_parameter());
       HODLR_set_D_option<scalar_t>(options_, "sample_para_outer", opts.BF_sampling_parameter());
       HODLR_set_D_option<scalar_t>(options_, "rankrate", opts.rank_rate());
@@ -415,6 +415,12 @@ namespace strumpack {
       HODLR_set_D_option<scalar_t>(options_, "sample_para", sample_param);
       HODLR_set_D_option<scalar_t>(options_, "sample_para_outer", sample_param);
     }
+
+    template<typename scalar_t> void
+    HODLRMatrix<scalar_t>::set_BACA_block(int bsize) {
+      HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", bsize);
+    }
+
 
     template<typename scalar_t> void HODLRMatrix<scalar_t>::perm_init() {
       iperm_.resize(rows_);

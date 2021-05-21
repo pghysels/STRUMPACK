@@ -25,7 +25,7 @@ rank = comm.Get_rank()
 
 if rank == 0:
     print("""\
-    Usage: python3 KernelRegression.py filename h lambda degree
+    Usage: OMP_NUM_THREADS=1 mpirun -n 4 python3 KernelRegression.py filename h lambda degree
        - 'filename' should refer to 4 files:
            filename_train.csv
            filename_train_label.csv
@@ -43,24 +43,38 @@ h = 1.3
 lam = 3.11
 degree = 1
 nargs = len(sys.argv)
-if (nargs > 1): fname = sys.argv[1]
-if (nargs > 2): h = float(sys.argv[2]);
-if (nargs > 3): lam = float(sys.argv[3]);
-if (nargs > 4): degree = float(sys.argv[4]);
+if (nargs > 1):
+    fname = sys.argv[1]
+if (nargs > 2):
+    h = float(sys.argv[2])
+if (nargs > 3):
+    lam = float(sys.argv[3])
+if (nargs > 4):
+    degree = float(sys.argv[4])
 
 # read data
 prec = np.float64
-train_points = np.genfromtxt(fname + '_train.csv', delimiter=",", dtype=prec)
-train_labels = np.genfromtxt(fname + '_train_label.csv', delimiter=",", dtype=prec)
-test_points = np.genfromtxt(fname + '_test.csv', delimiter=",", dtype=prec)
-test_labels = np.genfromtxt(fname + '_test_label.csv', delimiter=",", dtype=prec)
+train_points = np.genfromtxt(
+    fname + '_train.csv', delimiter=",", dtype=prec
+)
+train_labels = np.genfromtxt(
+    fname + '_train_label.csv', delimiter=",", dtype=prec
+)
+test_points = np.genfromtxt(
+    fname + '_test.csv', delimiter=",", dtype=prec
+)
+test_labels = np.genfromtxt(
+    fname + '_test_label.csv', delimiter=",", dtype=prec
+)
 n, d = train_points.shape
 m = test_points.shape[0]
 if rank == 0:
     print('n =', n, 'd =', d, 'm =', m)
 
+
 def quality(p, l):
     return 100.*(m - sum(p[i]*l[i] < 0 for i in range(m))) / m
+
 
 # Kernel ridge regression classification
 # using HSS approximation of the kernel

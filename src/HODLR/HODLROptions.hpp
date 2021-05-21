@@ -274,6 +274,11 @@ namespace strumpack {
       void set_less_adapt(bool l) { less_adapt_ = l; }
 
       /**
+       * Enable/disable the N^1.5 entry evaluation-based construction.
+       */
+      void set_BF_entry_n15(bool l) { BF_entry_n15_ = l; }
+
+      /**
        * Enable or disable verbose output (only by the root process)
        * to stdout.
        */
@@ -383,6 +388,12 @@ namespace strumpack {
       bool less_adapt() const { return less_adapt_; }
 
       /**
+       * Returns whether or not to use N^1.5 entry-evaluation-based algorithm.
+       */
+      bool BF_entry_n15() const { return BF_entry_n15_; }
+
+
+      /**
        * Verbose or quiet?
        * \return True if we want output from the HODLR algorithms,
        * else False.
@@ -423,6 +434,7 @@ namespace strumpack {
       int knn_hodlrbf_ = 64;
       int knn_lrbf_ = 128;
       bool less_adapt_ = true;
+      bool BF_entry_n15_ = false;
       bool verbose_ = true;
     };
 

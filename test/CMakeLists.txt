@@ -21,6 +21,7 @@ add_test("user_test_HSS_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 100)
 add_test("user_test_sparse_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq
   ${PROJECT_SOURCE_DIR}/examples/data/pde900.mtx)
 add_test("user_matrix_IO" ${CMAKE_CURRENT_BINARY_DIR}/test_matrix_IO T 1000)
+add_test("user_test_BLR_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_seq 300)
 
 if(STRUMPACK_USE_MPI)
   add_executable(test_HSS_mpi             EXCLUDE_FROM_ALL test_HSS_mpi.cpp)
@@ -136,6 +137,29 @@ set(test_name "HSS_seq_21")
 add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 500 --hss_leaf_size 1 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algorithm stable --hss_d0 64 --hss_dd 4)
 set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
 
+set(test_name "BLR_seq_1")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_seq 300 --blr_factor_algorithm RL)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "BLR_seq_2")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_seq 300 --blr_factor_algorithm LL)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "BLR_seq_3")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_seq 300 --blr_factor_algorithm Star --blr_compression_kernel full)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "BLR_seq_4")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_seq 300 --blr_factor_algorithm Star --blr_compression_kernel half)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "BLR_seq_5")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_seq 300 --blr_factor_algorithm Comb --blr_compression_kernel full)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "BLR_seq_6")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_seq 300 --blr_factor_algorithm Comb --blr_compression_kernel half)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
 
 if(STRUMPACK_USE_MPI)
 
