@@ -360,7 +360,7 @@ namespace strumpack {
       auto upd_c_2 = upd_r_2 + F22.lrows();
       auto r_1 = upd_c_2 + F22.lcols();
       auto c_1 = r_1 + F11.lrows();
-      auto r_2 = c_1 + F11.cols();
+      auto r_2 = c_1 + F11.lcols();
       auto c_2 = r_2 + F22.lrows();
       int r_max_1 = 0, r_max_2 = 0, c_max_1 = 0, c_max_2 = 0;
       for (int r=0, ur=0; r<int(F11.lrows()); r++) {
