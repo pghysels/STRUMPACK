@@ -2510,7 +2510,6 @@ namespace strumpack {
         //std::vector<std::vector<std::unique_ptr<BLRTile<scalar_t>>> > Tkc_vec, Tcj_vec;
         //construct the (i/CP+1) CP block-columns as dense tiles
         blockcol(i, true);
-        //if (!grid()->active()) return piv;
         for (std::size_t k=0; k<i; k++){
           if (grid()->is_local_row(k)) {
             for (std::size_t j=i; j<std::min(i+CP, colblocks()); j++) {
@@ -2655,7 +2654,7 @@ namespace strumpack {
           }
           for (std::size_t lk=0, c=0; lk<B2_r; lk++) {
             if (g->is_local_row(lk)) {
-              for (std::size_t lj=i, r=0; lj<std::min(i+CP,B2_c); lj++) {
+              for (std::size_t lj=i, r=0; lj<std::min(i+CP,B1_c); lj++) {
                 if (g->is_local_col(lj)) {
                   gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tk2c[c]),
                       *(Tcj[r]), scalar_t(1.), F21.tile_dense(lk, lj).D());
