@@ -55,6 +55,14 @@ namespace strumpack {
     }
 
     template<typename T> cl::sycl::event
+    memcpy(cl::sycl::queue& q, DenseMatrix<T>& dest,
+	   const DenseMatrix<T>& src) {
+      assert(dest.rows() == src.rows());
+      assert(dest.cols() == src.cols());
+      return memcpy(q, dest.data(), src.data(), dest.rows()*dest.cols());
+    }
+
+    template<typename T> cl::sycl::event
     fill(cl::sycl::queue& q, T* ptr, T value,
          std::size_t count) {
       return q.fill(ptr, value, count);
@@ -84,7 +92,8 @@ namespace strumpack {
     template<typename T> class DeviceMemory {
     public:
       DeviceMemory() {}
-      DeviceMemory(std::size_t size, cl::sycl::queue& q) {
+      DeviceMemory(std::size_t size, cl::sycl::queue& q,
+		   bool try_shared=true) {
         if (size) {
           data_ = cl::sycl::malloc_device<T>(size, q);
           size_ = size;
@@ -93,12 +102,14 @@ namespace strumpack {
             STRUMPACK_ADD_DEVICE_MEMORY(size*sizeof(T));
             is_managed_ = false;
           } else {
-            std::cerr << "#  Device memory allocation failed. "
-                      << "#  Trying shared memory instead ..."
-                      << std::endl;
-            data_ = cl::sycl::malloc_shared<T>(size, q);
-            STRUMPACK_ADD_MEMORY(size*sizeof(T));
-            is_managed_ = true;
+	    if (!try_shared) throw std::bad_alloc();
+	    std::cerr << "#  Device memory allocation failed. "
+		      << "#  Trying shared memory instead ..."
+		      << std::endl;
+	    data_ = cl::sycl::malloc_shared<T>(size, q);
+	    if (!data_) throw std::bad_alloc();
+	    STRUMPACK_ADD_MEMORY(size*sizeof(T));
+	    is_managed_ = true;
           }
         }
       }

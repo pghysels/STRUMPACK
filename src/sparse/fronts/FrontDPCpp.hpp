@@ -104,9 +104,8 @@ namespace strumpack {
     			     const Opts_t& opts);
     void factor_large_fronts(cl::sycl::queue& q, LInfo_t& L,
     			     const Opts_t& opts);
-
-    // void split_smaller(const SpMat_t& A, const SPOptions<scalar_t>& opts,
-    //                    int etree_level=0, int task_depth=0);
+    void split_smaller(const SpMat_t& A, const SPOptions<scalar_t>& opts,
+		       int etree_level=0, int task_depth=0);
 
     void fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd,
                           int etree_level, int task_depth) const;

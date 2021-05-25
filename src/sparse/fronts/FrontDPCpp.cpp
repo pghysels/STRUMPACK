@@ -486,18 +486,44 @@ namespace strumpack {
       int j = it.get_global_id(1), i = it.get_global_id(2);
       int n = F.n1, n2 = F.n2;
       auto A11 = F.F11;
-      auto piv = reinterpret_cast<int*>(F.piv);
+      // auto piv = reinterpret_cast<std::int64_t*>(F.piv);
       for (int k=0; k<n; k++) {
         if (i == 0 && j == 0)
-          piv[k] = k + 1;
-        // divide by the pivot element
-        if (j == k && i > k && i < n)
-          A11[i+j*n] /= A11[k+k*n];
-        it.barrier();
-        // Schur update
-        if (j > k && i > k && j < n && i < n)
-          A11[i+j*n] -= A11[i+k*n] * A11[k+j*n];
-        it.barrier();
+          F.piv[k] = k + 1;
+        // TODO make p and Amax global?
+        // auto p = k;
+        // auto Amax = abs(A11[k+k*n]);
+        // for (int l=k+1; l<n; l++) {
+        //   auto tmp = abs(A11[l+k*n]);
+        //   if (tmp > Amax) {
+        //     Amax = tmp;
+        //     p = l;
+        //   }
+        // }
+        // if (i == 0 && j == 0)
+        //   F.piv[k] = p + 1;
+        // it.barrier();
+        // if (Amax == T(0.)) {
+        //   // TODO
+        //   // if (info == 0)
+        //   //   info = k;
+        // } else {
+          // swap row k with the pivot row
+          // if (j < n && i == k && p != k) {
+          //   auto tmp = A11[k+j*n];
+          //   A11[k+j*n] = A11[p+j*n];
+          //   A11[p+j*n] = tmp;
+          // }
+          // it.barrier();
+          // divide by the pivot element
+          if (j == k && i > k && i < n)
+            A11[i+j*n] /= A11[k+k*n];
+          it.barrier();
+          // Schur update
+          if (j > k && i > k && j < n && i < n)
+            A11[i+j*n] -= A11[i+k*n] * A11[k+j*n];
+          it.barrier();
+        // }
       }
       auto A12 = F.F12;
       for (int cb=0; cb<n2; cb+=B) {
@@ -575,7 +601,7 @@ namespace strumpack {
       auto& f = *front;
       // if (f.dim_sep() > 32) {
       if (f.dim_sep() > 16) {
-        auto e_getrf = dpcpp::getrf
+	auto e_getrf = dpcpp::getrf
           (q, f.F11_, f.piv_, f.scratchpad_, f.scratchpad_size_);
         if (opts.replace_tiny_pivots()) { } // TODO
         if (f.dim_upd()) {
@@ -590,6 +616,108 @@ namespace strumpack {
     }
   }
 
+  template<typename scalar_t,typename integer_t> void
+  FrontDPCpp<scalar_t,integer_t>::split_smaller
+  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+   int etree_level, int task_depth) {
+    if (opts.verbose())
+      std::cout << "# Factorization does not fit in GPU memory, "
+        "splitting in smaller traversals." << std::endl;
+    if (lchild_)
+      lchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
+    if (rchild_)
+      rchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
+
+    const std::size_t dupd = dim_upd(), dsep = dim_sep();
+    STRUMPACK_ADD_MEMORY(dsep*(dsep+2*dupd)*sizeof(scalar_t));
+    STRUMPACK_ADD_MEMORY(dupd*dupd*sizeof(scalar_t));
+    host_factors_.reset(new scalar_t[dsep*(dsep+2*dupd)]);
+    host_Schur_.reset(new scalar_t[dupd*dupd]);
+    {
+      auto fmem = host_factors_.get();
+      F11_ = DenseMW_t(dsep, dsep, fmem, dsep); fmem += dsep*dsep;
+      F12_ = DenseMW_t(dsep, dupd, fmem, dsep); fmem += dsep*dupd;
+      F21_ = DenseMW_t(dupd, dsep, fmem, dupd);
+    }
+    F22_ = DenseMW_t(dupd, dupd, host_Schur_.get(), dupd);
+    F11_.zero(); F12_.zero();
+    F21_.zero(); F22_.zero();
+    A.extract_front
+      (F11_, F12_, F21_, this->sep_begin_, this->sep_end_,
+       this->upd_, task_depth);
+    if (lchild_) {
+#pragma omp parallel
+#pragma omp single
+      lchild_->extend_add_to_dense(F11_, F12_, F21_, F22_, this, 0);
+    }
+    if (rchild_) {
+#pragma omp parallel
+#pragma omp single
+      rchild_->extend_add_to_dense(F11_, F12_, F21_, F22_, this, 0);
+    }
+    TaskTimer tl("");
+    tl.start();
+    if (dsep) {
+      cl::sycl::queue q(cl::sycl::default_selector{});
+      auto scratchpad_size = std::max
+	(dpcpp::getrf_buffersize<scalar_t>(q, dsep, dsep, dsep),
+	 dpcpp::getrs_buffersize<scalar_t>
+	 (q, Trans::N, dsep, dupd, dsep, dsep));
+      dpcpp::DeviceMemory<scalar_t> dm11(dsep*dsep + scratchpad_size, q);
+      auto scratchpad = dm11 + dsep*dsep;
+      dpcpp::DeviceMemory<std::int64_t> dpiv(dsep, q);
+      DenseMW_t dF11(dsep, dsep, dm11, dsep);
+      dpcpp::memcpy(q, dF11, F11_).wait();
+      dpcpp::getrf(q, dF11, dpiv, scratchpad, scratchpad_size).wait();
+      pivot_mem_.resize(dsep);
+      piv_ = pivot_mem_.data();
+      dpcpp::memcpy(q, F11_, dF11);
+      dpcpp::memcpy(q, piv_, dpiv.as<std::int64_t>(), dsep);
+      q.wait();
+      if (opts.replace_tiny_pivots()) {
+	// TODO do this on the device!
+        auto thresh = opts.pivot_threshold();
+        for (std::size_t i=0; i<F11_.rows(); i++)
+          if (std::abs(F11_(i,i)) < thresh)
+            F11_(i,i) = (std::real(F11_(i,i)) < 0) ? -thresh : thresh;
+      }
+      if (dupd) {
+        dpcpp::DeviceMemory<scalar_t> dm12(dsep*dupd, q);
+        DenseMW_t dF12(dsep, dupd, dm12, dsep);
+        dpcpp::memcpy(q, dF12, F12_).wait();
+	dpcpp::getrs(q, Trans::N, dF11, dpiv, dF12,
+		     scratchpad, scratchpad_size).wait();
+        dpcpp::memcpy(q, F12_, dF12);
+        dm11.release();
+	q.wait();
+        dpcpp::DeviceMemory<scalar_t> dm2122((dsep+dupd)*dupd, q);
+        DenseMW_t dF21(dupd, dsep, dm2122, dupd),
+	  dF22(dupd, dupd, dm2122+(dsep*dupd), dupd);
+        dpcpp::memcpy(q, dF21, F21_);
+        dpcpp::memcpy(q, dF22.data(), host_Schur_.get(), dupd*dupd);
+	q.wait();
+	dpcpp::gemm
+	  (q, Trans::N, Trans::N, scalar_t(-1.),
+	   dF21, dF12, scalar_t(1.), dF22).wait();
+        dpcpp::memcpy(q, host_Schur_.get(), dF22.data(), dupd*dupd).wait();
+      }
+    }
+    // count flops
+    auto level_flops = LU_flops(F11_) +
+      gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.)) +
+      trsm_flops(Side::L, scalar_t(1.), F11_, F12_) +
+      trsm_flops(Side::R, scalar_t(1.), F11_, F21_);
+    STRUMPACK_FULL_RANK_FLOPS(level_flops);
+    if (opts.verbose()) {
+      auto level_time = tl.elapsed();
+      std::cout << "#   GPU Factorization complete, took: "
+                << level_time << " seconds, "
+                << level_flops / 1.e9 << " GFLOPS, "
+                << (float(level_flops) / level_time) / 1.e9
+                << " GFLOP/s" << std::endl;
+    }
+  }
+  
   template<typename scalar_t,typename integer_t> void
   FrontDPCpp<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts,
@@ -613,17 +741,19 @@ namespace strumpack {
     }
 
     auto peak_dmem = peak_device_memory(ldata);
-    // if (peak_dmem >= 0.9 * gpu::available_memory()) {
-    //   split_smaller(A, opts, etree_level, task_depth);
-    //   return;
-    // }
-
+    dpcpp::DeviceMemory<char> all_dmem;
+    try {
+      all_dmem = dpcpp::DeviceMemory<char>(peak_dmem, q, false);
+    } catch (std::exception& e) {
+      split_smaller(A, opts, etree_level, task_depth);
+      return;
+    }
+   
     dpcpp::HostMemory<FrontData<scalar_t>> fdata(max_small_fronts, q);
     std::size_t peak_hea_mem = 0;
     for (int l=lvls-1; l>=0; l--)
       peak_hea_mem = std::max(peak_hea_mem, ldata[l].ea_bytes);
     dpcpp::HostMemory<char> hea_mem(peak_hea_mem, q);
-    dpcpp::DeviceMemory<char> all_dmem(peak_dmem, q);
     char* old_work = nullptr;
     for (int l=lvls-1; l>=0; l--) {
       TaskTimer tl("");
@@ -684,6 +814,7 @@ namespace strumpack {
       host_Schur_.reset(new scalar_t[dupd*dupd]);
       dpcpp::memcpy(q, host_Schur_.get(),
                     reinterpret_cast<scalar_t*>(old_work), dupd*dupd);
+      q.wait_and_throw();
       F22_ = DenseMW_t(dupd, dupd, host_Schur_.get(), dupd);
     }
   }
@@ -719,8 +850,8 @@ namespace strumpack {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
       // F11_.solve_LU_in_place(bloc, reinterpret_cast<int>(piv.data(), task_depth);
       // F11_.solve_LU_in_place(bloc, reinterpret_cast<int*>(piv_), task_depth);
-      std::vector<int> p(dim_sep());
-      std::iota(p.begin(), p.end(), 1);
+      std::vector<int> p(piv_, piv_+dim_sep());
+      // std::iota(p.begin(), p.end(), 1);
       F11_.solve_LU_in_place(bloc, p.data(), task_depth);
       if (dim_upd()) {
         if (b.cols() == 1)
