@@ -601,7 +601,7 @@ namespace strumpack {
       auto& f = *front;
       // if (f.dim_sep() > 32) {
       if (f.dim_sep() > 16) {
-	auto e_getrf = dpcpp::getrf
+        auto e_getrf = dpcpp::getrf
           (q, f.F11_, f.piv_, f.scratchpad_, f.scratchpad_size_);
         if (opts.replace_tiny_pivots()) { } // TODO
         if (f.dim_upd()) {
@@ -660,9 +660,9 @@ namespace strumpack {
     if (dsep) {
       cl::sycl::queue q(cl::sycl::default_selector{});
       auto scratchpad_size = std::max
-	(dpcpp::getrf_buffersize<scalar_t>(q, dsep, dsep, dsep),
-	 dpcpp::getrs_buffersize<scalar_t>
-	 (q, Trans::N, dsep, dupd, dsep, dsep));
+        (dpcpp::getrf_buffersize<scalar_t>(q, dsep, dsep, dsep),
+         dpcpp::getrs_buffersize<scalar_t>
+         (q, Trans::N, dsep, dupd, dsep, dsep));
       dpcpp::DeviceMemory<scalar_t> dm11(dsep*dsep + scratchpad_size, q);
       auto scratchpad = dm11 + dsep*dsep;
       dpcpp::DeviceMemory<std::int64_t> dpiv(dsep, q);
@@ -675,7 +675,7 @@ namespace strumpack {
       dpcpp::memcpy(q, piv_, dpiv.as<std::int64_t>(), dsep);
       q.wait();
       if (opts.replace_tiny_pivots()) {
-	// TODO do this on the device!
+        // TODO do this on the device!
         auto thresh = opts.pivot_threshold();
         for (std::size_t i=0; i<F11_.rows(); i++)
           if (std::abs(F11_(i,i)) < thresh)
@@ -685,20 +685,20 @@ namespace strumpack {
         dpcpp::DeviceMemory<scalar_t> dm12(dsep*dupd, q);
         DenseMW_t dF12(dsep, dupd, dm12, dsep);
         dpcpp::memcpy(q, dF12, F12_).wait();
-	dpcpp::getrs(q, Trans::N, dF11, dpiv, dF12,
-		     scratchpad, scratchpad_size).wait();
+        dpcpp::getrs(q, Trans::N, dF11, dpiv, dF12,
+                     scratchpad, scratchpad_size).wait();
         dpcpp::memcpy(q, F12_, dF12);
         dm11.release();
-	q.wait();
+        q.wait();
         dpcpp::DeviceMemory<scalar_t> dm2122((dsep+dupd)*dupd, q);
         DenseMW_t dF21(dupd, dsep, dm2122, dupd),
-	  dF22(dupd, dupd, dm2122+(dsep*dupd), dupd);
+          dF22(dupd, dupd, dm2122+(dsep*dupd), dupd);
         dpcpp::memcpy(q, dF21, F21_);
         dpcpp::memcpy(q, dF22.data(), host_Schur_.get(), dupd*dupd);
-	q.wait();
-	dpcpp::gemm
-	  (q, Trans::N, Trans::N, scalar_t(-1.),
-	   dF21, dF12, scalar_t(1.), dF22).wait();
+        q.wait();
+        dpcpp::gemm
+          (q, Trans::N, Trans::N, scalar_t(-1.),
+           dF21, dF12, scalar_t(1.), dF22).wait();
         dpcpp::memcpy(q, host_Schur_.get(), dF22.data(), dupd*dupd).wait();
       }
     }
@@ -717,7 +717,7 @@ namespace strumpack {
                 << " GFLOP/s" << std::endl;
     }
   }
-  
+
   template<typename scalar_t,typename integer_t> void
   FrontDPCpp<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts,
@@ -748,7 +748,7 @@ namespace strumpack {
       split_smaller(A, opts, etree_level, task_depth);
       return;
     }
-   
+
     dpcpp::HostMemory<FrontData<scalar_t>> fdata(max_small_fronts, q);
     std::size_t peak_hea_mem = 0;
     for (int l=lvls-1; l>=0; l--)

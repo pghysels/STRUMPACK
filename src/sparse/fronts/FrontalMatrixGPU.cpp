@@ -468,7 +468,7 @@ namespace strumpack {
       gpu::copy_device_to_host(piv_, dpiv.as<int>(), dsep);
       gpu::copy_device_to_host(F11_, dF11);
       if (opts.replace_tiny_pivots()) {
-	// TODO do this on the device!
+        // TODO do this on the device!
         auto thresh = opts.pivot_threshold();
         for (std::size_t i=0; i<F11_.rows(); i++)
           if (std::abs(F11_(i,i)) < thresh)

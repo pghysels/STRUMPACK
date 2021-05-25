@@ -48,7 +48,7 @@ namespace strumpack {
 
   public:
     FrontDPCpp(integer_t sep, integer_t sep_begin, integer_t sep_end,
-	       std::vector<integer_t>& upd);
+               std::vector<integer_t>& upd);
     ~FrontDPCpp();
 
     void release_work_memory() override;
@@ -98,14 +98,14 @@ namespace strumpack {
     FrontDPCpp& operator=(FrontDPCpp const&) = delete;
 
     void front_assembly(cl::sycl::queue& q, const SpMat_t& A, LInfo_t& L,
-			char* hea_mem, char* dea_mem);
+                        char* hea_mem, char* dea_mem);
     void factor_small_fronts(cl::sycl::queue& q, LInfo_t& L,
-    			     FrontData<scalar_t>* fdata,
-    			     const Opts_t& opts);
+                             FrontData<scalar_t>* fdata,
+                             const Opts_t& opts);
     void factor_large_fronts(cl::sycl::queue& q, LInfo_t& L,
-    			     const Opts_t& opts);
+                             const Opts_t& opts);
     void split_smaller(const SpMat_t& A, const SPOptions<scalar_t>& opts,
-		       int etree_level=0, int task_depth=0);
+                       int etree_level=0, int task_depth=0);
 
     void fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd,
                           int etree_level, int task_depth) const;

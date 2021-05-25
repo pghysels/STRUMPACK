@@ -56,7 +56,7 @@ namespace strumpack {
 
     template<typename T> cl::sycl::event
     memcpy(cl::sycl::queue& q, DenseMatrix<T>& dest,
-	   const DenseMatrix<T>& src) {
+           const DenseMatrix<T>& src) {
       assert(dest.rows() == src.rows());
       assert(dest.cols() == src.cols());
       return memcpy(q, dest.data(), src.data(), dest.rows()*dest.cols());
@@ -93,7 +93,7 @@ namespace strumpack {
     public:
       DeviceMemory() {}
       DeviceMemory(std::size_t size, cl::sycl::queue& q,
-		   bool try_shared=true) {
+                   bool try_shared=true) {
         if (size) {
           data_ = cl::sycl::malloc_device<T>(size, q);
           size_ = size;
@@ -102,14 +102,14 @@ namespace strumpack {
             STRUMPACK_ADD_DEVICE_MEMORY(size*sizeof(T));
             is_managed_ = false;
           } else {
-	    if (!try_shared) throw std::bad_alloc();
-	    std::cerr << "#  Device memory allocation failed. "
-		      << "#  Trying shared memory instead ..."
-		      << std::endl;
-	    data_ = cl::sycl::malloc_shared<T>(size, q);
-	    if (!data_) throw std::bad_alloc();
-	    STRUMPACK_ADD_MEMORY(size*sizeof(T));
-	    is_managed_ = true;
+            if (!try_shared) throw std::bad_alloc();
+            std::cerr << "#  Device memory allocation failed. "
+                      << "#  Trying shared memory instead ..."
+                      << std::endl;
+            data_ = cl::sycl::malloc_shared<T>(size, q);
+            if (!data_) throw std::bad_alloc();
+            STRUMPACK_ADD_MEMORY(size*sizeof(T));
+            is_managed_ = true;
           }
         }
       }
@@ -140,7 +140,7 @@ namespace strumpack {
           } else {
             STRUMPACK_SUB_DEVICE_MEMORY(size_*sizeof(T));
           }
-	  cl::sycl::free(data_, *q_);
+          cl::sycl::free(data_, *q_);
         }
         data_ = nullptr;
         size_ = 0;
@@ -190,7 +190,7 @@ namespace strumpack {
       void release() {
         if (data_) {
           STRUMPACK_SUB_MEMORY(size_*sizeof(T));
-	  cl::sycl::free(data_, *q_);
+          cl::sycl::free(data_, *q_);
         }
         data_ = nullptr;
         q_ = nullptr;
