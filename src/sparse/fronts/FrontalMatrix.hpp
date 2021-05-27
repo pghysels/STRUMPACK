@@ -100,6 +100,14 @@ namespace strumpack {
                                            std::size_t& upd2sep) const;
     std::vector<std::size_t> upd_to_parent(const F_t* pa) const;
 
+    virtual void upd_decompress(){
+      std::cerr << "FrontalMatrix::upd_decompress"
+                << " not implemented for this front type: "
+                << typeid(*this).name()
+                << std::endl;
+      abort();
+    }
+
     virtual void release_work_memory() = 0;
 
     virtual void

@@ -2163,6 +2163,17 @@ namespace strumpack {
         block(i, j) = std::move(t);
     }
 
+    template<typename scalar_t> void
+    BLRMatrixMPI<scalar_t>::decompress() {
+      for (std::size_t i=0; i<brows_; i++)
+        for (std::size_t j=0; j<bcols_; j++)
+          if (grid_->is_local(i, j)) {
+            std::unique_ptr<DenseTile<scalar_t>> t
+              (new DenseTile<scalar_t>(tile(i, j).dense()));
+            block(i, j) = std::move(t);
+          }
+    }
+
     template<typename scalar_t> std::vector<int>
     BLRMatrixMPI<scalar_t>::factor(const Opts_t& opts) {
       adm_t adm(rowblocks(), colblocks());
@@ -2796,6 +2807,15 @@ namespace strumpack {
                 }
               }
               c++;
+            }
+          }
+        }
+        for (std::size_t k=0; k<B2_r; k++) {
+          if (g->is_local_row(k)) {
+            for (std::size_t j=i; j<std::min(i+CP, B2_c); j++) {
+              if (g->is_local_col(j)) {
+                F22.compress_tile(k, j, opts);
+              }
             }
           }
         }

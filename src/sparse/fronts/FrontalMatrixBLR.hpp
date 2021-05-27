@@ -69,6 +69,8 @@ namespace strumpack {
 
     void release_work_memory() override;
 
+    void upd_decompress() override {}
+
     void extend_add_to_dense
     (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
      const F_t* p, int task_depth) override;

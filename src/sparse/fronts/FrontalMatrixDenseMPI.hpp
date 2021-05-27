@@ -67,6 +67,8 @@ namespace strumpack {
 
     void release_work_memory() override;
 
+    void upd_decompress() override {}
+
     void extend_add();
     void
     extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,

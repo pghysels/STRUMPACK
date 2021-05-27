@@ -55,6 +55,9 @@ namespace strumpack {
      int leaf);
 
     void release_work_memory() override;
+
+    void upd_decompress() override;
+
     void build_front(const SpMat_t& A);
     void build_front_cols(const SpMat_t& A, std::size_t i, bool part,
                           const std::vector<Triplet<scalar_t>>& r1buf,

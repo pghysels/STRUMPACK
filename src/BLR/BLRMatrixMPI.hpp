@@ -138,6 +138,8 @@ namespace strumpack {
 
       void compress(const Opts_t& opts);
 
+      void decompress();
+
       static
       BLRMPI_t from_ScaLAPACK(const DistM_t& A, const ProcessorGrid2D& g,
                               const Opts_t& opts);
