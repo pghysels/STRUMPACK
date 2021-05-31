@@ -210,6 +210,7 @@ namespace strumpack {
       const int lcols = CB.lcols();
       const int pa_sep = pa->dim_sep();
       const int nprows = pa->grid2d().nprows();
+      int c_min = 0, c_max = 0;
       // destination rank is pr[r] + pc[c]
       std::unique_ptr<int[]> work(new int[lrows+lcols]);
       auto pr = work.get();
@@ -224,49 +225,70 @@ namespace strumpack {
         pr[r] = pa->upd_rg2p(I[CB.rl2g(r)]-pa_sep);
       for (c_upd=0; c_upd<lcols; c_upd++) {
         auto t = I[CB.cl2g(c_upd)];
-        if (t >= std::size_t(pa_sep)) break;
+        /*if (t >= std::size_t(pa_sep)) break;
         if (t < std::size_t(begin_col) || t >= std::size_t(end_col))
           pc[c_upd] = -1;
-        else
-          pc[c_upd] = pa->sep_cg2p(t) * nprows;
+        else*/
+        if (t < std::size_t(begin_col)) {
+          c_min = c_upd+1; continue;
+        }
+        if (t >= std::size_t(end_col) || t >= std::size_t(pa_sep)) {
+          c_max = c_upd; break;
+        }
+        pc[c_upd] = pa->sep_cg2p(t) * nprows;
       }
       for (int c=c_upd; c<lcols; c++){
         auto t = I[CB.cl2g(c)];
-        if (t < std::size_t(begin_col) || t >= std::size_t(end_col))
+        /*if (t < std::size_t(begin_col) || t >= std::size_t(end_col))
           pc[c] = -1;
-        else
-          pc[c] = pa->upd_cg2p(I[CB.cl2g(c)]-pa_sep) * nprows;
+        else*/
+        if (t < std::size_t(begin_col)) {
+          c_min = c+1; continue;
+        }
+        if (t >= std::size_t(end_col)) {
+          c_max = c; break;
+        }
+        pc[c] = pa->upd_cg2p(I[CB.cl2g(c)]-pa_sep) * nprows;
       }
       { // reserve space for the send buffers
         VI_t cnt(sbuf.size());
-        for (int c=0; c<lcols; c++){
-          if (pc[c] == -1) continue;
+        for (int c=c_min; c<c_max; c++){
+          //if (pc[c] == -1) continue;
           for (int r=0; r<lrows; r++)
             cnt[pr[r]+pc[c]]++;
         }
         for (std::size_t p=0; p<sbuf.size(); p++)
           sbuf[p].reserve(sbuf[p].size()+cnt[p]);
       }
-      for (int c=0; c<c_upd; c++)  { // F11
-        if (pc[c] == -1) continue;
+      for (int c=c_min; c<std::min(c_upd,c_max); c++)  { // F11
+        for (int r=0, pcc=pc[c]; r<r_upd; r++){
+          sbuf[pr[r]+pcc].push_back(
+            const_cast<BLRMPI_t&>(CB).get_element_and_decompress_if_needed(r,c));
+        }
+      }
+      for (int c=std::max(c_upd, c_min); c<c_max; c++) { // F12
+        //if (pc[c] == -1) continue;
         for (int r=0, pcc=pc[c]; r<r_upd; r++)
-          sbuf[pr[r]+pcc].push_back(CB(r,c));
+          //sbuf[pr[r]+pcc].push_back(CB(r,c));
+          sbuf[pr[r]+pcc].push_back(
+            const_cast<BLRMPI_t&>(CB).get_element_and_decompress_if_needed(r,c));
       }
-      for (int c=c_upd; c<lcols; c++) { // F12
-        if (pc[c] == -1) continue;
-        for (int r=0, pcc=pc[c]; r<r_upd; r++)
-          sbuf[pr[r]+pcc].push_back(CB(r,c));
-      }
-      for (int c=0; c<c_upd; c++) { // F21
-        if (pc[c] == -1) continue;
+      for (int c=c_min; c<std::min(c_upd,c_max); c++) { // F21
+        //if (pc[c] == -1) continue;
         for (int r=r_upd, pcc=pc[c]; r<lrows; r++)
-          sbuf[pr[r]+pcc].push_back(CB(r,c));
+          //sbuf[pr[r]+pcc].push_back(CB(r,c));
+          sbuf[pr[r]+pcc].push_back(
+            const_cast<BLRMPI_t&>(CB).get_element_and_decompress_if_needed(r,c));
       }
-      for (int c=c_upd; c<lcols; c++) { // F22
-        if (pc[c] == -1) continue;
+      for (int c=std::max(c_upd, c_min); c<c_max; c++) { // F22
+        //if (pc[c] == -1) continue;
         for (int r=r_upd, pcc=pc[c]; r<lrows; r++)
-          sbuf[pr[r]+pcc].push_back(CB(r,c));
+          //sbuf[pr[r]+pcc].push_back(CB(r,c));
+          sbuf[pr[r]+pcc].push_back(
+            const_cast<BLRMPI_t&>(CB).get_element_and_decompress_if_needed(r,c));
       }
+      //delete blocks that are not needed anymore
+      const_cast<BLRMPI_t&>(CB).remove_tiles_before_local_column(c_min, c_max);
     }
 
     template<typename scalar_t,typename integer_t> void

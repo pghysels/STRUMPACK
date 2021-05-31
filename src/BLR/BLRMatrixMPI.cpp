@@ -192,6 +192,26 @@ namespace strumpack {
       return ltile_dense(rl2t_[i], cl2t_[j]).D()(rl2l_[i], cl2l_[j]);
     }
 
+    template<typename scalar_t> scalar_t&
+    BLRMatrixMPI<scalar_t>::get_element_and_decompress_if_needed(std::size_t i, std::size_t j) {
+      if (grid_->is_local(rl2t_[i], cl2t_[j])) {
+        if (tile(rl2t_[i], cl2t_[j]).is_low_rank()){ 
+          std::unique_ptr<DenseTile<scalar_t>> t
+            (new DenseTile<scalar_t>(tile(rl2t_[i], cl2t_[j]).dense()));
+          block(rl2t_[i], cl2t_[j]) = std::move(t);
+        }
+      }
+      return ltile_dense(rl2t_[i], cl2t_[j]).D()(rl2l_[i], cl2l_[j]);
+    }
+
+    template<typename scalar_t> void
+    BLRMatrixMPI<scalar_t>::remove_tiles_before_local_column(int c_min, int c_max) {
+      for (int c=c_min; c<c_max; c++)
+        for (int r=0; r<int(lrows()); r++)
+          if (grid_->is_local(rl2t_[r], cl2t_[c]))
+            block(rl2t_[r],cl2t_[c]) = nullptr;
+    }
+
     template<typename scalar_t> const scalar_t&
     BLRMatrixMPI<scalar_t>::global(std::size_t i, std::size_t j) const {
       std::size_t rt = rg2t(i), ct = cg2t(j);

@@ -183,6 +183,8 @@ namespace strumpack {
       const scalar_t& operator()(std::size_t i, std::size_t j) const;
       scalar_t& operator()(std::size_t i, std::size_t j);
 
+      scalar_t& get_element_and_decompress_if_needed(std::size_t i, std::size_t j);
+      void remove_tiles_before_local_column(int c_min, int c_max);
       /**
        * Same as operator()(std::size_t i, std::size_t j), but with
        * global indexing. This assumes the global element is stored
