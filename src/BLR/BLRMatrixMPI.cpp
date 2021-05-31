@@ -183,7 +183,7 @@ namespace strumpack {
       return cl2g_[j];
     }
 
-    template<typename scalar_t> const scalar_t&
+    template<typename scalar_t> scalar_t
     BLRMatrixMPI<scalar_t>::operator()(std::size_t i, std::size_t j) const {
       return ltile_dense(rl2t_[i], cl2t_[j]).D()(rl2l_[i], cl2l_[j]);
     }
@@ -192,16 +192,16 @@ namespace strumpack {
       return ltile_dense(rl2t_[i], cl2t_[j]).D()(rl2l_[i], cl2l_[j]);
     }
 
-    template<typename scalar_t> scalar_t&
+    template<typename scalar_t> scalar_t
     BLRMatrixMPI<scalar_t>::get_element_and_decompress_if_needed(std::size_t i, std::size_t j) {
-      if (grid_->is_local(rl2t_[i], cl2t_[j])) {
-        if (tile(rl2t_[i], cl2t_[j]).is_low_rank()){ 
-          std::unique_ptr<DenseTile<scalar_t>> t
-            (new DenseTile<scalar_t>(tile(rl2t_[i], cl2t_[j]).dense()));
-          block(rl2t_[i], cl2t_[j]) = std::move(t);
-        }
+      auto ltr = rl2t_[i];
+      auto ltc = cl2t_[j];
+      if (ltile(ltr, ltc).is_low_rank()) {
+        std::unique_ptr<DenseTile<scalar_t>> t
+          (new DenseTile<scalar_t>(ltile(ltr, ltc).dense()));
+        lblock(ltr, ltc) = std::move(t);
       }
-      return ltile_dense(rl2t_[i], cl2t_[j]).D()(rl2l_[i], cl2l_[j]);
+      return ltile_dense(ltr, ltc).D()(rl2l_[i], cl2l_[j]);
     }
 
     template<typename scalar_t> void
