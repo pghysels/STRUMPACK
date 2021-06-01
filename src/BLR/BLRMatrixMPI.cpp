@@ -204,6 +204,16 @@ namespace strumpack {
       return ltile_dense(ltr, ltc).D()(rl2l_[i], cl2l_[j]);
     }
 
+    template<typename scalar_t> scalar_t
+    BLRMatrixMPI<scalar_t>::get_element_and_decompress_HODBF(int tr, int tc, int lr, int lc) {
+      if (ltile(tr, tc).is_low_rank()) {
+        std::unique_ptr<DenseTile<scalar_t>> t
+          (new DenseTile<scalar_t>(ltile(tr, tc).dense()));
+        lblock(tr, tc) = std::move(t);
+      }
+      return ltile_dense(tr,tc).D()(lr,lc);
+    }
+
     template<typename scalar_t> void
     BLRMatrixMPI<scalar_t>::remove_tiles_before_local_column(int c_min, int c_max) {
       auto ltc_max = cl2t_[c_max-1];
