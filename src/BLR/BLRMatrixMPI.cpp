@@ -210,7 +210,7 @@ namespace strumpack {
       auto ltr_max = rowblockslocal();
       for (std::size_t c=cl2t_[c_min]; c<ltc_max; c++)
         for (std::size_t r=0; r<ltr_max; r++)
-          block(r, c) = nullptr;
+          lblock(r, c) = nullptr;
     }
 
     template<typename scalar_t> const scalar_t&

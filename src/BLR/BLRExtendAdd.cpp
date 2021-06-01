@@ -225,10 +225,6 @@ namespace strumpack {
         pr[r] = pa->upd_rg2p(I[CB.rl2g(r)]-pa_sep);
       for (c_upd=0; c_upd<lcols; c_upd++) {
         auto t = I[CB.cl2g(c_upd)];
-        /*if (t >= std::size_t(pa_sep)) break;
-        if (t < std::size_t(begin_col) || t >= std::size_t(end_col))
-          pc[c_upd] = -1;
-        else*/
         if (c_min == 0 && t >= std::size_t(pa_sep)) break;
         if (t < std::size_t(begin_col)) {
           c_min = c_upd+1; 
@@ -243,9 +239,6 @@ namespace strumpack {
       if (c_max == 0 && c_upd == lcols) c_max = lcols; 
       for (int c=c_upd; c<lcols; c++){
         auto t = I[CB.cl2g(c)];
-        /*if (t < std::size_t(begin_col) || t >= std::size_t(end_col))
-          pc[c] = -1;
-        else*/
         if (t < std::size_t(begin_col)) {
           c_min = c+1; 
           continue;
@@ -260,7 +253,6 @@ namespace strumpack {
       { // reserve space for the send buffers
         VI_t cnt(sbuf.size());
         for (int c=c_min; c<c_max; c++){
-          //if (pc[c] == -1) continue;
           for (int r=0; r<lrows; r++)
             cnt[pr[r]+pc[c]]++;
         }
@@ -274,28 +266,21 @@ namespace strumpack {
         }
       }
       for (int c=std::max(c_upd, c_min); c<c_max; c++) { // F12
-        //if (pc[c] == -1) continue;
         for (int r=0, pcc=pc[c]; r<r_upd; r++)
-          //sbuf[pr[r]+pcc].push_back(CB(r,c));
           sbuf[pr[r]+pcc].push_back(
             const_cast<BLRMPI_t&>(CB).get_element_and_decompress_if_needed(r,c));
       }
       for (int c=c_min; c<std::min(c_upd,c_max); c++) { // F21
-        //if (pc[c] == -1) continue;
         for (int r=r_upd, pcc=pc[c]; r<lrows; r++)
-          //sbuf[pr[r]+pcc].push_back(CB(r,c));
           sbuf[pr[r]+pcc].push_back(
             const_cast<BLRMPI_t&>(CB).get_element_and_decompress_if_needed(r,c));
       }
       for (int c=std::max(c_upd, c_min); c<c_max; c++) { // F22
-        //if (pc[c] == -1) continue;
         for (int r=r_upd, pcc=pc[c]; r<lrows; r++)
-          //sbuf[pr[r]+pcc].push_back(CB(r,c));
           sbuf[pr[r]+pcc].push_back(
             const_cast<BLRMPI_t&>(CB).get_element_and_decompress_if_needed(r,c));
       }
-      //delete blocks that are not needed anymore
-      //const_cast<BLRMPI_t&>(CB).remove_tiles_before_local_column(c_min, c_max);
+      const_cast<BLRMPI_t&>(CB).remove_tiles_before_local_column(c_min, c_max);
     }
 
     template<typename scalar_t,typename integer_t> void
