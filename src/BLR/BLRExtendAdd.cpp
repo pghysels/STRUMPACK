@@ -229,12 +229,12 @@ namespace strumpack {
         if (t < std::size_t(begin_col) || t >= std::size_t(end_col))
           pc[c_upd] = -1;
         else*/
-        if (t >= std::size_t(pa_sep)) break;
+        if (c_min == 0 && t >= std::size_t(pa_sep)) break;
         if (t < std::size_t(begin_col)) {
           c_min = c_upd+1; 
           continue;
         }
-        if (t >= std::size_t(end_col)) {
+        if (t >= std::size_t(end_col) || t >= std::size_t(pa_sep)) {
           c_max = c_upd; 
           break;
         }
@@ -250,11 +250,12 @@ namespace strumpack {
           c_min = c+1; 
           continue;
         }
-        if (t >= std::size_t(end_col)-1) {
+        if (t >= std::size_t(end_col)) {
           c_max = c; 
           break;
         }
         pc[c] = pa->upd_cg2p(I[CB.cl2g(c)]-pa_sep) * nprows;
+        if (c == lcols-1) c_max = lcols;
       }
       { // reserve space for the send buffers
         VI_t cnt(sbuf.size());
