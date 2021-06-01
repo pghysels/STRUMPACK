@@ -229,27 +229,30 @@ namespace strumpack {
         if (t < std::size_t(begin_col) || t >= std::size_t(end_col))
           pc[c_upd] = -1;
         else*/
+        if (t >= std::size_t(pa_sep)) break;
         if (t < std::size_t(begin_col)) {
           c_min = c_upd+1; 
           continue;
         }
-        if (t >= std::size_t(end_col) || t >= std::size_t(pa_sep)) {
+        if (t >= std::size_t(end_col)) {
           c_max = c_upd; 
           break;
         }
         pc[c_upd] = pa->sep_cg2p(t) * nprows;
       }
-      if (c_max == 0 && c_upd == lcols) c_max= lcols; 
+      if (c_max == 0 && c_upd == lcols) c_max = lcols; 
       for (int c=c_upd; c<lcols; c++){
         auto t = I[CB.cl2g(c)];
         /*if (t < std::size_t(begin_col) || t >= std::size_t(end_col))
           pc[c] = -1;
         else*/
         if (t < std::size_t(begin_col)) {
-          c_min = c+1; continue;
+          c_min = c+1; 
+          continue;
         }
         if (t >= std::size_t(end_col)-1) {
-          c_max = c; break;
+          c_max = c; 
+          break;
         }
         pc[c] = pa->upd_cg2p(I[CB.cl2g(c)]-pa_sep) * nprows;
       }
@@ -291,7 +294,7 @@ namespace strumpack {
             const_cast<BLRMPI_t&>(CB).get_element_and_decompress_if_needed(r,c));
       }
       //delete blocks that are not needed anymore
-      const_cast<BLRMPI_t&>(CB).remove_tiles_before_local_column(c_min, c_max);
+      //const_cast<BLRMPI_t&>(CB).remove_tiles_before_local_column(c_min, c_max);
     }
 
     template<typename scalar_t,typename integer_t> void
