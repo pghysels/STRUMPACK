@@ -206,10 +206,11 @@ namespace strumpack {
 
     template<typename scalar_t> void
     BLRMatrixMPI<scalar_t>::remove_tiles_before_local_column(int c_min, int c_max) {
-      for (int c=c_min; c<c_max; c++)
-        for (int r=0; r<int(lrows()); r++)
-          if (grid_->is_local(rl2t_[r], cl2t_[c]))
-            block(rl2t_[r],cl2t_[c]) = nullptr;
+      auto ltc_max = cl2t_[c_max-1];
+      auto ltr_max = rowblockslocal();
+      for (std::size_t c=cl2t_[c_min]; c<ltc_max; c++)
+        for (std::size_t r=0; r<ltr_max; r++)
+          block(r, c) = nullptr;
     }
 
     template<typename scalar_t> const scalar_t&
