@@ -2840,7 +2840,8 @@ namespace strumpack {
           if (g->is_local_row(k)) {
             for (std::size_t j=i; j<std::min(i+CP, B2_c); j++) {
               if (g->is_local_col(j)) {
-                F22.compress_tile(k, j, opts);
+                if (k != j)
+                  F22.compress_tile(k, j, opts);
               }
             }
           }
