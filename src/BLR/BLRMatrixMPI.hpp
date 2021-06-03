@@ -121,8 +121,8 @@ namespace strumpack {
 
       std::vector<int> factor(const Opts_t& opts);
       std::vector<int> factor(const adm_t& adm, const Opts_t& opts);
-      std::vector<int> factor_colwise(const adm_t& adm, const Opts_t& opts, const std::function<void(int, bool)>& blockcol);
-      
+      std::vector<int> factor_colwise(const adm_t& adm, const Opts_t& opts,
+                                      const std::function<void(int, bool)>& blockcol);
 
       void laswp(const std::vector<int>& piv, bool fwd);
 
@@ -157,14 +157,8 @@ namespace strumpack {
       std::size_t colblockslocal() const { return lbcols_; }
       std::size_t tilerows(std::size_t i) const { return roff_[i+1] - roff_[i]; }
       std::size_t tilecols(std::size_t j) const { return coff_[j+1] - coff_[j]; }
-      std::size_t tileroff(std::size_t i) const { 
-        assert(i <= rowblocks()); 
-        return roff_[i]; 
-      }
-      std::size_t tilecoff(std::size_t j) const { 
-        assert(j <= colblocks()); 
-        return coff_[j]; 
-      }
+      std::size_t tileroff(std::size_t i) const { assert(i <= rowblocks()); return roff_[i]; }
+      std::size_t tilecoff(std::size_t j) const { assert(j <= colblocks()); return coff_[j]; }
 
       int rg2p(std::size_t i) const;
       int cg2p(std::size_t j) const;
@@ -183,8 +177,9 @@ namespace strumpack {
       scalar_t operator()(std::size_t i, std::size_t j) const;
       scalar_t& operator()(std::size_t i, std::size_t j);
 
-      scalar_t get_element_and_decompress_if_needed(std::size_t i, std::size_t j);
+      // scalar_t get_element_and_decompress_if_needed(std::size_t i, std::size_t j);
       scalar_t get_element_and_decompress_HODBF(int tr, int tc, int lr, int lc);
+      void decompress_local_columns(int c_min, int c_max);
       void remove_tiles_before_local_column(int c_min, int c_max);
       /**
        * Same as operator()(std::size_t i, std::size_t j), but with
@@ -278,27 +273,27 @@ namespace strumpack {
       bcast_dense_tile_along_row(std::size_t i, std::size_t j) const;
 
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
-      bcast_row_of_tiles_along_cols
-      (std::size_t i, std::size_t j0, std::size_t j1) const;
+      bcast_row_of_tiles_along_cols(std::size_t i,
+                                    std::size_t j0, std::size_t j1) const;
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
-      bcast_col_of_tiles_along_rows
-      (std::size_t i0, std::size_t i1, std::size_t j) const;
+      bcast_col_of_tiles_along_rows(std::size_t i0, std::size_t i1,
+                                    std::size_t j) const;
 
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
-      gather_rows
-      (std::size_t i0, std::size_t i1, std::size_t j0, std::size_t j1) const;
+      gather_rows(std::size_t i0, std::size_t i1,
+                  std::size_t j0, std::size_t j1) const;
 
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
-      gather_cols
-      (std::size_t i0, std::size_t i1, std::size_t j0, std::size_t j1) const;
+      gather_cols(std::size_t i0, std::size_t i1,
+                  std::size_t j0, std::size_t j1) const;
 
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
-      gather_row
-      (std::size_t i0, std::size_t k, std::size_t j0, std::size_t j1) const;
+      gather_row(std::size_t i0, std::size_t k,
+                 std::size_t j0, std::size_t j1) const;
 
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
-      gather_col
-      (std::size_t i0, std::size_t i1, std::size_t j0, std::size_t k) const;
+      gather_col(std::size_t i0, std::size_t i1,
+                 std::size_t j0, std::size_t k) const;
 
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       gather_rows_A22(std::size_t i1, std::size_t j1) const;
@@ -323,16 +318,18 @@ namespace strumpack {
     };
 
     template<typename scalar_t> void
-    LUAR(std::size_t kmax, std::size_t lk, 
-         std::vector<std::unique_ptr<BLRTile<scalar_t>>>& Ti, 
-         std::vector<std::unique_ptr<BLRTile<scalar_t>>>& Tj, 
-         DenseMatrix<scalar_t>& tij, const BLROptions<scalar_t>& opts, std::size_t tmp);
-    
+    LUAR(std::size_t kmax, std::size_t lk,
+         std::vector<std::unique_ptr<BLRTile<scalar_t>>>& Ti,
+         std::vector<std::unique_ptr<BLRTile<scalar_t>>>& Tj,
+         DenseMatrix<scalar_t>& tij, const BLROptions<scalar_t>& opts,
+         std::size_t tmp);
+
     template<typename scalar_t> void
     LUAR_A22(std::size_t kmax, std::size_t lj, std::size_t lk,
-         std::vector<std::unique_ptr<BLRTile<scalar_t>>>& Ti, 
-         std::vector<std::unique_ptr<BLRTile<scalar_t>>>& Tj, 
-         DenseMatrix<scalar_t>& tij, const BLROptions<scalar_t>& opts, std::size_t tmp);
+             std::vector<std::unique_ptr<BLRTile<scalar_t>>>& Ti,
+             std::vector<std::unique_ptr<BLRTile<scalar_t>>>& Tj,
+             DenseMatrix<scalar_t>& tij, const BLROptions<scalar_t>& opts,
+             std::size_t tmp);
 
     template<typename scalar_t> void
     trsv(UpLo ul, Trans ta, Diag d, const BLRMatrixMPI<scalar_t>& a,

@@ -193,24 +193,9 @@ namespace strumpack {
     }
 
     template<typename scalar_t> scalar_t
-    BLRMatrixMPI<scalar_t>::get_element_and_decompress_if_needed(std::size_t i, std::size_t j) {
-      auto ltr = rl2t_[i];
-      auto ltc = cl2t_[j];
-      if (ltile(ltr, ltc).is_low_rank()) {
-        std::unique_ptr<DenseTile<scalar_t>> t
-          (new DenseTile<scalar_t>(ltile(ltr, ltc).dense()));
-        lblock(ltr, ltc) = std::move(t);
-      }
-      return ltile_dense(ltr, ltc).D()(rl2l_[i], cl2l_[j]);
-    }
-
-    template<typename scalar_t> scalar_t
     BLRMatrixMPI<scalar_t>::get_element_and_decompress_HODBF(int tr, int tc, int lr, int lc) {
-      if (ltile(tr, tc).is_low_rank()) {
-        std::unique_ptr<DenseTile<scalar_t>> t
-          (new DenseTile<scalar_t>(ltile(tr, tc).dense()));
-        lblock(tr, tc) = std::move(t);
-      }
+      if (ltile(tr, tc).is_low_rank())
+        lblock(tr, tc).reset(new DenseTile<scalar_t>(ltile(tr, tc).dense()));
       return ltile_dense(tr,tc).D()(lr,lc);
     }
 
@@ -221,6 +206,16 @@ namespace strumpack {
       for (std::size_t c=cl2t_[c_min]; c<ltc_max; c++)
         for (std::size_t r=0; r<ltr_max; r++)
           lblock(r, c) = nullptr;
+    }
+
+    template<typename scalar_t> void
+    BLRMatrixMPI<scalar_t>::decompress_local_columns(int c_min, int c_max) {
+      auto ltc_max = cl2t_[c_max-1];
+      auto ltr_max = rowblockslocal();
+      for (std::size_t c=cl2t_[c_min]; c<=ltc_max; c++)
+        for (std::size_t r=0; r<ltr_max; r++)
+          if (ltile(r, c).is_low_rank())
+            lblock(r, c).reset(new DenseTile<scalar_t>(ltile(r, c).dense()));
     }
 
     template<typename scalar_t> const scalar_t&

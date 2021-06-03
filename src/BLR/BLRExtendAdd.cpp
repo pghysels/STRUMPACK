@@ -203,7 +203,7 @@ namespace strumpack {
 
     template<typename scalar_t,typename integer_t> void
     BLRExtendAdd<scalar_t,integer_t>::copy_to_buffers_col
-    (const BLRMPI_t& CB, VVS_t& sbuf, const FBLRMPI_t* pa, const VI_t& I, 
+    (const BLRMPI_t& CB, VVS_t& sbuf, const FBLRMPI_t* pa, const VI_t& I,
      integer_t begin_col, integer_t end_col) {
       if (!CB.active()) return;
       const int lrows = CB.lrows();
@@ -227,24 +227,24 @@ namespace strumpack {
         auto t = I[CB.cl2g(c_upd)];
         if (c_min == 0 && t >= std::size_t(pa_sep)) break;
         if (t < std::size_t(begin_col)) {
-          c_min = c_upd+1; 
+          c_min = c_upd+1;
           continue;
         }
         if (t >= std::size_t(end_col) || t >= std::size_t(pa_sep)) {
-          c_max = c_upd; 
+          c_max = c_upd;
           break;
         }
         pc[c_upd] = pa->sep_cg2p(t) * nprows;
       }
-      if (c_max == 0 && c_upd == lcols) c_max = lcols; 
+      if (c_max == 0 && c_upd == lcols) c_max = lcols;
       for (int c=c_upd; c<lcols; c++){
         auto t = I[CB.cl2g(c)];
         if (t < std::size_t(begin_col)) {
-          c_min = c+1; 
+          c_min = c+1;
           continue;
         }
         if (t >= std::size_t(end_col)) {
-          c_max = c; 
+          c_max = c;
           break;
         }
         pc[c] = pa->upd_cg2p(I[CB.cl2g(c)]-pa_sep) * nprows;
@@ -259,27 +259,19 @@ namespace strumpack {
         for (std::size_t p=0; p<sbuf.size(); p++)
           sbuf[p].reserve(sbuf[p].size()+cnt[p]);
       }
-      for (int c=c_min; c<std::min(c_upd,c_max); c++)  { // F11
-        for (int r=0, pcc=pc[c]; r<r_upd; r++){
-          sbuf[pr[r]+pcc].push_back(
-            const_cast<BLRMPI_t&>(CB).get_element_and_decompress_if_needed(r,c));
-        }
-      }
-      for (int c=std::max(c_upd, c_min); c<c_max; c++) { // F12
+      const_cast<BLRMPI_t&>(CB).decompress_local_columns(c_min, c_max);
+      for (int c=c_min; c<std::min(c_upd,c_max); c++) // F11
         for (int r=0, pcc=pc[c]; r<r_upd; r++)
-          sbuf[pr[r]+pcc].push_back(
-            const_cast<BLRMPI_t&>(CB).get_element_and_decompress_if_needed(r,c));
-      }
-      for (int c=c_min; c<std::min(c_upd,c_max); c++) { // F21
+          sbuf[pr[r]+pcc].push_back(CB(r,c));
+      for (int c=std::max(c_upd, c_min); c<c_max; c++) // F12
+        for (int r=0, pcc=pc[c]; r<r_upd; r++)
+          sbuf[pr[r]+pcc].push_back(CB(r,c));
+      for (int c=c_min; c<std::min(c_upd,c_max); c++) // F21
         for (int r=r_upd, pcc=pc[c]; r<lrows; r++)
-          sbuf[pr[r]+pcc].push_back(
-            const_cast<BLRMPI_t&>(CB).get_element_and_decompress_if_needed(r,c));
-      }
-      for (int c=std::max(c_upd, c_min); c<c_max; c++) { // F22
+          sbuf[pr[r]+pcc].push_back(CB(r,c));
+      for (int c=std::max(c_upd, c_min); c<c_max; c++) // F22
         for (int r=r_upd, pcc=pc[c]; r<lrows; r++)
-          sbuf[pr[r]+pcc].push_back(
-            const_cast<BLRMPI_t&>(CB).get_element_and_decompress_if_needed(r,c));
-      }
+          sbuf[pr[r]+pcc].push_back(CB(r,c));
       const_cast<BLRMPI_t&>(CB).remove_tiles_before_local_column(c_min, c_max);
     }
 
