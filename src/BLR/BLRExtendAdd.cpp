@@ -244,31 +244,33 @@ namespace strumpack {
           sbuf[p].reserve(sbuf[p].size()+cnt[p]);
       }
       const_cast<BLRMPI_t&>(CB).decompress_local_columns(c_min, c_max);
-      for (int c=c_min; c<c_max; c++) { // F11 and F12
-        auto pcc = pc[c];
-        auto lc = CB.cl2l_[c];
-        auto tc = CB.cl2t_[c];
-        auto trmax = CB.rl2t_[r_upd-1];
-        for (std::size_t tr=0, r=0; tr<=trmax; tr++) {
-          auto& tD = CB.ltile_dense(tr, tc).D();
-          auto lrmax = std::min(r_upd-r, tD.rows());
-          for (std::size_t lr=0; lr<lrmax; lr++)
-            sbuf[pr[r++]+pcc].push_back(tD(lr, lc));
+      if (r_upd)
+        for (int c=c_min; c<c_max; c++) { // F11 and F12
+          auto pcc = pc[c];
+          auto lc = CB.cl2l_[c];
+          auto tc = CB.cl2t_[c];
+          auto trmax = CB.rl2t_[r_upd-1];
+          for (std::size_t tr=0, r=0; tr<=trmax; tr++) {
+            auto& tD = CB.ltile_dense(tr, tc).D();
+            auto lrmax = std::min(r_upd-r, tD.rows());
+            for (std::size_t lr=0; lr<lrmax; lr++)
+              sbuf[pr[r++]+pcc].push_back(tD(lr, lc));
+          }
         }
-      }
-      for (int c=c_min; c<c_max; c++) { // F21 and F22
-        auto pcc = pc[c];
-        auto lc = CB.cl2l_[c];
-        auto tc = CB.cl2t_[c];
-        auto trmax = CB.rl2t_[lrows-1];
-        for (std::size_t tr=CB.rl2t_[r_upd], r=r_upd; tr<=trmax; tr++) {
-          auto& tD = CB.ltile_dense(tr, tc).D();
-          auto lrmin = CB.rl2l_[r];
-          auto lrmax = tD.rows();
-          for (std::size_t lr=lrmin; lr<lrmax; lr++)
-            sbuf[pr[r++]+pcc].push_back(tD(lr, lc));
+      if (lrows)
+        for (int c=c_min; c<c_max; c++) { // F21 and F22
+          auto pcc = pc[c];
+          auto lc = CB.cl2l_[c];
+          auto tc = CB.cl2t_[c];
+          auto trmax = CB.rl2t_[lrows-1];
+          for (std::size_t tr=CB.rl2t_[r_upd], r=r_upd; tr<=trmax; tr++) {
+            auto& tD = CB.ltile_dense(tr, tc).D();
+            auto lrmin = CB.rl2l_[r];
+            auto lrmax = tD.rows();
+            for (std::size_t lr=lrmin; lr<lrmax; lr++)
+              sbuf[pr[r++]+pcc].push_back(tD(lr, lc));
+          }
         }
-      }
       const_cast<BLRMPI_t&>(CB).remove_tiles_before_local_column(c_min, c_max);
     }
 
