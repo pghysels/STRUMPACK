@@ -257,7 +257,7 @@ namespace strumpack {
               sbuf[pr[r++]+pcc].push_back(tD(lr, lc));
           }
         }
-      if (lrows)
+      if (r_upd < lrows)
         for (int c=c_min; c<c_max; c++) { // F21 and F22
           auto pcc = pc[c];
           auto lc = CB.cl2l_[c];
