@@ -119,23 +119,17 @@ namespace strumpack {
         for (std::size_t p=0; p<sbuf.size(); p++)
           sbuf[p].reserve(sbuf[p].size()+cnt[p]);
       }
-      for (int c=0; c<c_upd; c++) // F11
+      for (int c=0; c<lcols; c++) // F11 and F12
         for (int r=0, pcc=pc[c]; r<r_upd; r++)
           sbuf[pr[r]+pcc].push_back(CB(r,c));
-      for (int c=c_upd; c<lcols; c++) // F12
-        for (int r=0, pcc=pc[c]; r<r_upd; r++)
-          sbuf[pr[r]+pcc].push_back(CB(r,c));
-      for (int c=0; c<c_upd; c++) // F21
-        for (int r=r_upd, pcc=pc[c]; r<lrows; r++)
-          sbuf[pr[r]+pcc].push_back(CB(r,c));
-      for (int c=c_upd; c<lcols; c++) // F22
+      for (int c=0; c<lcols; c++) // F21 and F22
         for (int r=r_upd, pcc=pc[c]; r<lrows; r++)
           sbuf[pr[r]+pcc].push_back(CB(r,c));
     }
 
     template<typename scalar_t,typename integer_t> void
     BLRExtendAdd<scalar_t,integer_t>::copy_to_buffers_col
-    (const DistM_t& CB, VVS_t& sbuf, const FBLRMPI_t* pa, const VI_t& I, 
+    (const DistM_t& CB, VVS_t& sbuf, const FBLRMPI_t* pa, const VI_t& I,
      integer_t begin_col, integer_t end_col) {
       if (!CB.active()) return;
       assert(CB.fixed());
@@ -179,22 +173,12 @@ namespace strumpack {
         for (std::size_t p=0; p<sbuf.size(); p++)
           sbuf[p].reserve(sbuf[p].size()+cnt[p]);
       }
-      for (int c=0; c<c_upd; c++) { // F11
+      for (int c=0; c<lcols; c++) { // F11 and F12
         if (pc[c] == -1) continue;
         for (int r=0, pcc=pc[c]; r<r_upd; r++)
           sbuf[pr[r]+pcc].push_back(CB(r,c));
       }
-      for (int c=c_upd; c<lcols; c++) { // F12
-        if (pc[c] == -1) continue;
-        for (int r=0, pcc=pc[c]; r<r_upd; r++)
-          sbuf[pr[r]+pcc].push_back(CB(r,c));
-      }
-      for (int c=0; c<c_upd; c++) { // F21
-        if (pc[c] == -1) continue;
-        for (int r=r_upd, pcc=pc[c]; r<lrows; r++)
-          sbuf[pr[r]+pcc].push_back(CB(r,c));
-      }
-      for (int c=c_upd; c<lcols; c++) { // F22
+      for (int c=0; c<lcols; c++) { // F21 and F22
         if (pc[c] == -1) continue;
         for (int r=r_upd, pcc=pc[c]; r<lrows; r++)
           sbuf[pr[r]+pcc].push_back(CB(r,c));
@@ -260,18 +244,31 @@ namespace strumpack {
           sbuf[p].reserve(sbuf[p].size()+cnt[p]);
       }
       const_cast<BLRMPI_t&>(CB).decompress_local_columns(c_min, c_max);
-      for (int c=c_min; c<std::min(c_upd,c_max); c++) // F11
-        for (int r=0, pcc=pc[c]; r<r_upd; r++)
-          sbuf[pr[r]+pcc].push_back(CB(r,c));
-      for (int c=std::max(c_upd, c_min); c<c_max; c++) // F12
-        for (int r=0, pcc=pc[c]; r<r_upd; r++)
-          sbuf[pr[r]+pcc].push_back(CB(r,c));
-      for (int c=c_min; c<std::min(c_upd,c_max); c++) // F21
-        for (int r=r_upd, pcc=pc[c]; r<lrows; r++)
-          sbuf[pr[r]+pcc].push_back(CB(r,c));
-      for (int c=std::max(c_upd, c_min); c<c_max; c++) // F22
-        for (int r=r_upd, pcc=pc[c]; r<lrows; r++)
-          sbuf[pr[r]+pcc].push_back(CB(r,c));
+      for (int c=c_min; c<c_max; c++) { // F11 and F12
+        auto pcc = pc[c];
+        auto lc = CB.cl2l_[c];
+        auto tc = CB.cl2t_[c];
+        auto trmax = CB.rl2t_[r_upd-1];
+        for (std::size_t tr=0, r=0; tr<=trmax; tr++) {
+          auto& tD = CB.ltile_dense(tr, tc).D();
+          auto lrmax = std::min(r_upd-r, tD.rows());
+          for (std::size_t lr=0; lr<lrmax; lr++)
+            sbuf[pr[r++]+pcc].push_back(tD(lr, lc));
+        }
+      }
+      for (int c=c_min; c<c_max; c++) { // F21 and F22
+        auto pcc = pc[c];
+        auto lc = CB.cl2l_[c];
+        auto tc = CB.cl2t_[c];
+        auto trmax = CB.rl2t_[lrows-1];
+        for (std::size_t tr=CB.rl2t_[r_upd], r=r_upd; tr<=trmax; tr++) {
+          auto& tD = CB.ltile_dense(tr, tc).D();
+          auto lrmin = CB.rl2l_[r];
+          auto lrmax = tD.rows();
+          for (std::size_t lr=lrmin; lr<lrmax; lr++)
+            sbuf[pr[r++]+pcc].push_back(tD(lr, lc));
+        }
+      }
       const_cast<BLRMPI_t&>(CB).remove_tiles_before_local_column(c_min, c_max);
     }
 

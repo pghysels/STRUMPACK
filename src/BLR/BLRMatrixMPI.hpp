@@ -44,6 +44,9 @@ namespace strumpack {
 
   namespace BLR {
 
+    // forward declaration
+    template<typename scalar_t,typename integer_t> class BLRExtendAdd;
+
     class ProcessorGrid2D {
     public:
       ProcessorGrid2D(const MPIComm& comm);
@@ -315,6 +318,7 @@ namespace strumpack {
            const BLRMatrixMPI<T>& b, T beta, BLRMatrixMPI<T>& c);
 
       template<typename T,typename I> friend class strumpack::ExtendAdd;
+      template<typename T,typename I> friend class BLRExtendAdd;
     };
 
     template<typename scalar_t> void
