@@ -213,9 +213,11 @@ namespace strumpack {
       auto ltc_max = cl2t_[c_max-1];
       auto ltr_max = rowblockslocal();
       for (std::size_t c=cl2t_[c_min]; c<=ltc_max; c++)
-        for (std::size_t r=0; r<ltr_max; r++)
-          if (ltile(r, c).is_low_rank())
-            lblock(r, c).reset(new DenseTile<scalar_t>(ltile(r, c).dense()));
+        for (std::size_t r=0; r<ltr_max; r++) {
+          auto& b = lblock(r, c);
+          if (b && b->is_low_rank())
+            b.reset(new DenseTile<scalar_t>(b->dense()));
+        }
     }
 
     template<typename scalar_t> const scalar_t&
