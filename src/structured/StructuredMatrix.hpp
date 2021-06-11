@@ -83,23 +83,6 @@ namespace strumpack {
             DenseMatrix<scalar_t>& B)>;
 
     /**
-     * Type for block element extraction routine. This can be
-     * implemented as a lambda function, a functor or a funtion
-     * pointer. The sub-matrix should be put into a 2d block cyclicly
-     * distributed matrix.
-     *
-     * \param I vector of row indices
-     * \param J vector of column indices
-     * \param B 2d block cyclic matrix, submatrix (I, J) to be
-     * computed by user code
-     */
-    template<typename scalar_t>
-    using extract_dist_block_t = std::function
-      <void(const std::vector<std::size_t>& I,
-            const std::vector<std::size_t>& J,
-            DistributedMatrix<scalar_t>& B)>;
-
-    /**
      * Type for matrix multiplication routine. This can be
      * implemented as a lambda function, a functor or a funtion
      * pointer.
@@ -116,6 +99,24 @@ namespace strumpack {
       <void(Trans op,
             const DenseMatrix<scalar_t>& R,
             DenseMatrix<scalar_t>& S)>;
+
+#if defined(STRUMPACK_USE_MPI)
+    /**
+     * Type for block element extraction routine. This can be
+     * implemented as a lambda function, a functor or a funtion
+     * pointer. The sub-matrix should be put into a 2d block cyclicly
+     * distributed matrix.
+     *
+     * \param I vector of row indices
+     * \param J vector of column indices
+     * \param B 2d block cyclic matrix, submatrix (I, J) to be
+     * computed by user code
+     */
+    template<typename scalar_t>
+    using extract_dist_block_t = std::function
+      <void(const std::vector<std::size_t>& I,
+            const std::vector<std::size_t>& J,
+            DistributedMatrix<scalar_t>& B)>;
 
     /**
      * Type for matrix multiplication routine with 2D block cyclic
@@ -160,6 +161,7 @@ namespace strumpack {
             DenseMatrix<scalar_t>& S,
             const std::vector<int>& rdist,
             const std::vector<int>& cdist)>;
+#endif
 
     /**
      * Type to specify admissibility of individual sub-blocks.
@@ -345,6 +347,7 @@ namespace strumpack {
       void mult(Trans op, int m, const scalar_t* x, int ldx,
                 scalar_t* y, int ldy) const;
 
+#if defined(STRUMPACK_USE_MPI)
       /**
        * Multiply the StructuredMatrix (A) with a dense matrix: y =
        * op(A)*x. x and y are 2d block cyclic.
@@ -355,6 +358,7 @@ namespace strumpack {
        */
       virtual void mult(Trans op, const DistributedMatrix<scalar_t>& x,
                         DistributedMatrix<scalar_t>& y) const;
+#endif
 
       /**
        * Compute a factorization (or the inverse) of this matrix, to
@@ -390,6 +394,7 @@ namespace strumpack {
         solve(B);
       }
 
+#if defined(STRUMPACK_USE_MPI)
       /**
        * Solve a linear system A*x=b, with this StructuredMatrix
        * (A). This solve is done in-place.
@@ -398,7 +403,7 @@ namespace strumpack {
        * overwritten with the solution x.
        */
       virtual void solve(DistributedMatrix<scalar_t>& b) const;
-
+#endif
 
       /**
        * Apply a shift to the diagonal of this matrix. Ie, this +=

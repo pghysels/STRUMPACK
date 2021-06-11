@@ -11,6 +11,7 @@ install(FILES
   StructuredMatrix.hpp
   StructuredMatrix.h
   ClusterTree.hpp
+  StructuredOptions.hpp
   DESTINATION include/structured)
 
 add_subdirectory(fortran)
