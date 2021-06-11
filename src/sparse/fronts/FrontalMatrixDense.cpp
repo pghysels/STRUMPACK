@@ -74,6 +74,38 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
+  FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_blr
+  (BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21, BLRM_t& paF22, 
+   const F_t* p, int task_depth) {
+     //extend_add from Dense to seq. BLR
+    const std::size_t pdsep = paF11.rows();
+    const std::size_t dupd = dim_upd();
+    std::size_t upd2sep;
+    auto I = this->upd_to_parent(p, upd2sep);
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp taskloop default(shared) grainsize(64)      \
+  if(task_depth < params::task_recursion_cutoff_level)
+#endif
+    for (std::size_t c=0; c<dupd; c++) {
+      auto pc = I[c];
+      if (pc < pdsep) {
+        for (std::size_t r=0; r<upd2sep; r++)
+          paF11(I[r],pc) += F22_(r,c);
+        for (std::size_t r=upd2sep; r<dupd; r++)
+          paF21(I[r]-pdsep,pc) += F22_(r,c);
+      } else {
+        for (std::size_t r=0; r<upd2sep; r++)
+          paF12(I[r],pc-pdsep) += F22_(r, c);
+        for (std::size_t r=upd2sep; r<dupd; r++)
+          paF22(I[r]-pdsep,pc-pdsep) += F22_(r,c);
+      }
+    }
+    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
+    STRUMPACK_FULL_RANK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
+    release_work_memory();
+  }
+
+  template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {

@@ -50,6 +50,7 @@ namespace strumpack {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
+    using BLRM_t = BLR::BLRMatrix<scalar_t>;
 
   public:
     FrontalMatrixDense
@@ -63,6 +64,9 @@ namespace strumpack {
     void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                              DenseM_t& paF21, DenseM_t& paF22,
                              const F_t* p, int task_depth) override;
+
+    void extend_add_to_blr(BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21, 
+                           BLRM_t& paF22, const F_t* p, int task_depth) override;
 
     void sample_CB(const SPOptions<scalar_t>& opts, const DenseM_t& R,
                    DenseM_t& Sr, DenseM_t& Sc, F_t* pa, int task_depth)

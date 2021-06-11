@@ -71,6 +71,7 @@ namespace strumpack {
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using Opts_t = SPOptions<scalar_t>;
+    using BLRM_t = BLR::BLRMatrix<scalar_t>;
 #if defined(STRUMPACK_USE_MPI)
     using DistM_t = DistributedMatrix<scalar_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
@@ -143,6 +144,12 @@ namespace strumpack {
     virtual void
     extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                         DenseM_t& paF21, DenseM_t& paF22,
+                        const FrontalMatrix<scalar_t,integer_t>* p,
+                        int task_depth) {}
+
+    virtual void
+    extend_add_to_blr(BLRM_t& paF11, BLRM_t& paF12,
+                        BLRM_t& paF21, BLRM_t& paF22,
                         const FrontalMatrix<scalar_t,integer_t>* p,
                         int task_depth) {}
 

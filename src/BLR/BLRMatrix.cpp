@@ -258,7 +258,6 @@ namespace strumpack {
           piv[l] += tileroff(i);
     }
 
-    // private constructor
     template<typename scalar_t> BLRMatrix<scalar_t>::BLRMatrix
     (std::size_t m, const std::vector<std::size_t>& rowtiles,
      std::size_t n, const std::vector<std::size_t>& coltiles)
@@ -371,6 +370,15 @@ namespace strumpack {
       return tile(ti, tj)(i - roff_[ti], j - coff_[tj]);
     }
 
+    template<typename scalar_t> scalar_t&
+    BLRMatrix<scalar_t>::operator()(std::size_t i, std::size_t j) {
+      auto ti = std::distance
+        (roff_.begin(), std::upper_bound(roff_.begin(), roff_.end(), i)) - 1;
+      auto tj = std::distance
+        (coff_.begin(), std::upper_bound(coff_.begin(), coff_.end(), j)) - 1;
+      return tile_dense(ti, tj).D()(i - roff_[ti], j - coff_[tj]);
+    }
+
     /**
      * I and J should be sorted!!
      */
@@ -408,6 +416,16 @@ namespace strumpack {
       return B;
     }
 
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::decompress() {
+      for (std::size_t i=0; i<nbrows_; i++)
+        for (std::size_t j=0; j<nbcols_; j++){
+          auto &b = block(i, j);
+          if (b && b->is_low_rank())
+            b.reset(new DenseTile<scalar_t>(b->dense()));
+        }
+    }
+
     template<typename scalar_t> BLRTile<scalar_t>&
     BLRMatrix<scalar_t>::tile(std::size_t i, std::size_t j) {
       return *blocks_[i+j*rowblocks()].get();
@@ -427,6 +445,14 @@ namespace strumpack {
     BLRMatrix<scalar_t>::tile(DenseM_t& A, std::size_t i, std::size_t j) const {
       return DenseMW_t
         (tilerows(i), tilecols(j), A, tileroff(i), tilecoff(j));
+    }
+
+    template<typename scalar_t> DenseTile<scalar_t>& 
+    BLRMatrix<scalar_t>::tile_dense(std::size_t i, std::size_t j) {
+      assert(dynamic_cast<DenseTile<scalar_t>*>
+             (blocks_[i+j*rowblocks()].get()));
+      return *static_cast<DenseTile<scalar_t>*>
+                   (blocks_[i+j*rowblocks()].get());
     }
 
     template<typename scalar_t> void BLRMatrix<scalar_t>::create_dense_tile
@@ -560,6 +586,25 @@ namespace strumpack {
       auto& t = tile(i, j);
       if (t.rank()*(m + n) > m*n)
         create_dense_tile_left_looking(i, j, k, Aelem, B21, B12);
+    }
+
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::compress_tile
+    (std::size_t i, std::size_t j, const Opts_t& opts) {
+      auto t = tile(i, j).compress(opts);
+      if (t->rank()*(t->rows() + t->cols()) < t->rows()*t->cols())
+        block(i, j) = std::move(t);
+    }
+
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::fill(scalar_t v) {
+      for (std::size_t i=0; i<nbrows_; i++)
+        for (std::size_t j=0; j<nbcols_; j++){
+            std::unique_ptr<DenseTile<scalar_t>> t
+              (new DenseTile<scalar_t>(tilerows(i), tilecols(j)));
+            t->D().fill(v);
+            block(i, j) = std::move(t);
+        }
     }
 
     template<typename scalar_t> void
@@ -1111,6 +1156,148 @@ namespace strumpack {
       LUAR(Ti, Tj, Aij, opts, B);
     }
 
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::construct_and_partial_factor
+    (BLRMatrix<scalar_t>& B11, BLRMatrix<scalar_t>& B12, 
+     BLRMatrix<scalar_t>& B21, BLRMatrix<scalar_t>& B22,
+     std::vector<int>& piv,
+     const std::vector<std::size_t>& tiles1,
+     const std::vector<std::size_t>& tiles2,
+     const DenseMatrix<bool>& admissible,
+     const Opts_t& opts) {
+      piv.resize(B11.rows());
+      auto rb = B11.rowblocks();
+      auto rb2 = B21.rowblocks();
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+      auto lrb = rb+rb2;
+      // dummy for task synchronization
+      std::unique_ptr<int[]> B_(new int[lrb*lrb]()); auto B = B_.get();
+#pragma omp taskgroup
+#else
+      int* B = nullptr;
+#endif
+      {
+        for (std::size_t i=0; i<rb; i++) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+          std::size_t ii = i+lrb*i;
+#pragma omp task default(shared) firstprivate(i,ii) depend(inout:B[ii])
+#endif
+          {
+            auto tpiv = B11.tile(i, i).LU();
+            std::copy(tpiv.begin(), tpiv.end(), piv.begin()+B11.tileroff(i));
+          }
+          for (std::size_t j=i+1; j<rb; j++) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+            std::size_t ij = i+lrb*j;
+#pragma omp task default(shared) firstprivate(i,j,ij,ii)  \
+  depend(in:B[ii]) depend(inout:B[ij]) priority(rb-j)
+#endif
+            {
+              if (admissible(i, j)) B11.compress_tile(i, j, opts);
+              std::vector<int> tpiv
+                (piv.begin()+B11.tileroff(i), piv.begin()+B11.tileroff(i+1));
+              B11.tile(i, j).laswp(tpiv, true);
+              trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                  scalar_t(1.), B11.tile(i, i), B11.tile(i, j));
+            }
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+            std::size_t ji = j+lrb*i;
+#pragma omp task default(shared) firstprivate(i,j,ji,ii)        \
+  depend(in:B[ii]) depend(inout:B[ji]) priority(rb-j)
+#endif
+            {
+              if (admissible(j, i)) B11.compress_tile(j, i, opts);
+              trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+                  scalar_t(1.), B11.tile(i, i), B11.tile(j, i));
+            }
+          }
+          for (std::size_t j=0; j<rb2; j++) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+            std::size_t ij2 = i+lrb*(rb+j);
+#pragma omp task default(shared) firstprivate(i,j,ij2,ii)       \
+  depend(in:B[ii]) depend(inout:B[ij2])
+#endif
+            {
+              B12.compress_tile(i, j, opts);
+              std::vector<int> tpiv
+                (piv.begin()+B11.tileroff(i), piv.begin()+B11.tileroff(i+1));
+              B12.tile(i, j).laswp(tpiv, true);
+              trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                  scalar_t(1.), B11.tile(i, i), B12.tile(i, j));
+            }
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+            std::size_t j2i = (rb+j)+lrb*i;
+#pragma omp task default(shared) firstprivate(i,j,j2i,ii)       \
+  depend(in:B[ii]) depend(inout:B[j2i])
+#endif
+            {
+              B21.compress_tile(j, i, opts);
+              trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+                  scalar_t(1.), B11.tile(i, i), B21.tile(j, i));
+            }
+          }
+          for (std::size_t j=i+1; j<rb; j++)
+            for (std::size_t k=i+1; k<rb; k++) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+              std::size_t ij = i+lrb*j, ki = k+lrb*i, kj = k+lrb*j;
+#pragma omp task default(shared) firstprivate(i,j,k,ij,ki,kj)   \
+  depend(in:B[ij],B[ki]) depend(inout:B[kj]) priority(rb-j)
+#endif
+              {
+                gemm(Trans::N, Trans::N, scalar_t(-1.),
+                    B11.tile(k, i), B11.tile(i, j), scalar_t(1.), B11.tile_dense(k,j).D());
+              }
+            }
+          for (std::size_t k=i+1; k<rb; k++)
+            for (std::size_t j=0; j<rb2; j++) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+              std::size_t ki = k+lrb*i, ij2 = i+lrb*(rb+j), kj2 = k+lrb*(rb+j);
+#pragma omp task default(shared) firstprivate(i,k,j,ki,ij2,kj2) \
+  depend(in:B[ki],B[ij2]) depend(inout:B[kj2])
+#endif
+              {
+                gemm(Trans::N, Trans::N, scalar_t(-1.),
+                    B11.tile(k, i), B12.tile(i, j), scalar_t(1.), B12.tile_dense(k,j).D());
+              }
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+              std::size_t ik = i+lrb*k, j2i = (j+rb)+lrb*i, j2k = (rb+j)+lrb*k;
+#pragma omp task default(shared) firstprivate(i,k,j,ik,j2i,j2k)      \
+  depend(in:B[ik],B[j2i]) depend(inout:B[j2k])
+#endif
+              {
+                gemm(Trans::N, Trans::N, scalar_t(-1.),
+                    B21.tile(j, i), B11.tile(i, k), scalar_t(1.), B21.tile_dense(j,k).D());
+              }
+            }
+          for (std::size_t j=0; j<rb2; j++)
+            for (std::size_t k=0; k<rb2; k++) {
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+              std::size_t ij2 = i+lrb*(rb+j), k2i = (rb+k)+lrb*i, k2j2 = (rb+k)+lrb*(rb+j);
+#pragma omp task default(shared) firstprivate(i,j,k,ij2,k2i,k2j2)       \
+  depend(in:B[ij2],B[k2i]) depend(inout:B[k2j2])
+#endif
+              {
+                gemm(Trans::N, Trans::N, scalar_t(-1.),
+                    B21.tile(k, i), B12.tile(i, j), scalar_t(1.), B22.tile_dense(k,j).D());
+              }
+            }
+        }
+        for (std::size_t j=0; j<rb2; j++)
+          for (std::size_t k=0; k<rb2; k++){
+#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
+            std::size_t k2j2 = (rb+k)+lrb*(rb+j);
+#pragma omp task default(shared) firstprivate(j,k,k2j2)       \
+ depend(inout:B[k2j2])
+#endif
+            {
+              B22.compress_tile(k, j, opts);
+            }
+          }
+      }
+      for (std::size_t i=0; i<rb; i++)
+        for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
+          piv[l] += B11.tileroff(i);
+    }
 
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::construct_and_partial_factor

@@ -289,12 +289,6 @@ namespace strumpack {
         std::vector<std::vector<Trip_t>> s3buf(this->P());
         for (auto& e : e21) s3buf[upd_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
         auto r3buf = Comm().all_to_all_v(s3buf);
-        /*if (lchild_ || rchild_){
-          for (auto& ch : {lchild_.get(), rchild_.get()}) {
-            if (!visit(ch)) continue;
-            ch->upd_decompress();
-          }
-        }*/
         piv_ = BLRMPI_t::factor_col(F11blr_, F12blr_, F21blr_, F22blr_, 
                                   adm_, opts.BLR_options(), 
                                   [&](int i, bool part){this->build_front_cols(A, i, part, r1buf, r2buf, r3buf);});
@@ -308,12 +302,6 @@ namespace strumpack {
         for (auto& e : e11) sbuf[sep_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
         auto r1buf = Comm().all_to_all_v(sbuf);
         std::vector<Trip_t> r2buf, r3buf;
-        /*if (lchild_ || rchild_){
-          for (auto& ch : {lchild_.get(), rchild_.get()}) {
-            if (!visit(ch)) continue;
-            ch->upd_decompress();
-          }
-        }*/
         piv_ = F11blr_.factor_colwise(adm_, opts.BLR_options(), 
                                   [&](int i, bool part){build_front_cols(A, i, part, r1buf, r2buf, r3buf);});
       }
