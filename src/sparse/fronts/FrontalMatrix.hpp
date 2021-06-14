@@ -103,6 +103,7 @@ namespace strumpack {
 
     virtual void barrier_world() const { 
       MPI_Barrier(MPI_COMM_WORLD); 
+      std::cout << "peak memory after seq= " << double(strumpack::params::peak_memory) / 1.0e6 << " MB" << std::endl;
     }
 
     virtual void upd_decompress(){

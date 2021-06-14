@@ -249,14 +249,14 @@ namespace strumpack {
   FrontalMatrixBLRMPI<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
     if (visit(lchild_)){
-      lchild_->barrier_world();
       lchild_->multifrontal_factorization
         (A, opts, etree_level+1, task_depth);
+      lchild_->barrier_world();
     }
     if (visit(rchild_)){
-      rchild_->barrier_world();
       rchild_->multifrontal_factorization
         (A, opts, etree_level+1, task_depth);
+      rchild_->barrier_world();
     }
     TaskTimer t("FrontalMatrixBLRMPI_factor");
     if (/*etree_level == 0 && */opts.print_root_front_stats()) t.start();
