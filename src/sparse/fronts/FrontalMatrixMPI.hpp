@@ -133,6 +133,8 @@ namespace strumpack {
     int master(const F_t* ch) const;
     int master(const std::unique_ptr<F_t>& ch) const;
 
+    void barrier_world() const override {}
+
     MPIComm& Comm() { return grid()->Comm(); }
     const MPIComm& Comm() const { return grid()->Comm(); }
     BLACSGrid* grid() override { return &blacs_grid_; }

@@ -101,6 +101,10 @@ namespace strumpack {
                                            std::size_t& upd2sep) const;
     std::vector<std::size_t> upd_to_parent(const F_t* pa) const;
 
+    virtual void barrier_world() const { 
+      MPI_Barrier(MPI_COMM_WORLD); 
+    }
+
     virtual void upd_decompress(){
       std::cerr << "FrontalMatrix::upd_decompress"
                 << " not implemented for this front type: "
