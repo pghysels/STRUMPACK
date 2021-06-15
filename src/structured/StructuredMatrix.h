@@ -157,6 +157,132 @@ extern "C" {
 
 
   /**
+   * Return number of rows in the structured matrix.
+   * \return Number of rows of S.
+   */
+  int SP_s_struct_rows(const CSPStructMat S);
+  /**
+   * Return number of rows in the structured matrix.
+   * \return Number of rows of S.
+   */
+  int SP_d_struct_rows(const CSPStructMat S);
+  /**
+   * Return number of rows in the structured matrix.
+   * \return Number of rows of S.
+   */
+  int SP_c_struct_rows(const CSPStructMat S);
+  /**
+   * Return number of rows in the structured matrix.
+   * \return Number of rows of S.
+   */
+  int SP_z_struct_rows(const CSPStructMat S);
+
+
+  /**
+   * Return number of cols in the structured matrix.
+   * \return Number of cols of S.
+   */
+  int SP_s_struct_cols(const CSPStructMat S);
+  /**
+   * Return number of cols in the structured matrix.
+   * \return Number of cols of S.
+   */
+  int SP_d_struct_cols(const CSPStructMat S);
+  /**
+   * Return number of cols in the structured matrix.
+   * \return Number of cols of S.
+   */
+  int SP_c_struct_cols(const CSPStructMat S);
+  /**
+   * Return number of cols in the structured matrix.
+   * \return Number of cols of S.
+   */
+  int SP_z_struct_cols(const CSPStructMat S);
+
+
+  /**
+   * Return the total amount of memory used by this matrix, in
+   * bytes.
+   * \return Memory usage in bytes.
+   * \see nonzeros
+   */
+  long long int SP_s_struct_memory(const CSPStructMat S);
+  /**
+   * Return the total amount of memory used by this matrix, in
+   * bytes.
+   * \return Memory usage in bytes.
+   * \see nonzeros
+   */
+  long long int SP_d_struct_memory(const CSPStructMat S);
+  /**
+   * Return the total amount of memory used by this matrix, in
+   * bytes.
+   * \return Memory usage in bytes.
+   * \see nonzeros
+   */
+  long long int SP_c_struct_memory(const CSPStructMat S);
+  /**
+   * Return the total amount of memory used by this matrix, in
+   * bytes.
+   * \return Memory usage in bytes.
+   * \see nonzeros
+   */
+  long long int SP_z_struct_memory(const CSPStructMat S);
+
+
+  /**
+   * Return the total number of nonzeros stored by this matrix.
+   * \return Nonzeros in the matrix representation.
+   * \see memory
+   */
+  long long int SP_s_struct_nonzeros(const CSPStructMat S);
+  /**
+   * Return the total number of nonzeros stored by this matrix.
+   * \return Nonzeros in the matrix representation.
+   * \see memory
+   */
+  long long int SP_d_struct_nonzeros(const CSPStructMat S);
+  /**
+   * Return the total number of nonzeros stored by this matrix.
+   * \return Nonzeros in the matrix representation.
+   * \see memory
+   */
+  long long int SP_c_struct_nonzeros(const CSPStructMat S);
+  /**
+   * Return the total number of nonzeros stored by this matrix.
+   * \return Nonzeros in the matrix representation.
+   * \see memory
+   */
+  long long int SP_z_struct_nonzeros(const CSPStructMat S);
+
+
+  /**
+   * Return the maximum rank of this matrix over all low-rank
+   * compressed blocks.
+   * \return Maximum rank.
+   */
+  int SP_s_struct_rank(const CSPStructMat S);
+  /**
+   * Return the maximum rank of this matrix over all low-rank
+   * compressed blocks.
+   * \return Maximum rank.
+   */
+  int SP_d_struct_rank(const CSPStructMat S);
+  /**
+   * Return the maximum rank of this matrix over all low-rank
+   * compressed blocks.
+   * \return Maximum rank.
+   */
+  int SP_c_struct_rank(const CSPStructMat S);
+  /**
+   * Return the maximum rank of this matrix over all low-rank
+   * compressed blocks.
+   * \return Maximum rank.
+   */
+  int SP_z_struct_rank(const CSPStructMat S);
+
+
+  /**
    * Construct a structured matrix from a dense (column major)
    * matrix. Use this for single precision, real.
    *
@@ -587,6 +713,52 @@ extern "C" {
    */
   int SP_z_struct_solve(const CSPStructMat S, int nrhs,
                         double _Complex* B, int ldB);
+
+
+  /**
+   * Apply a shift to the diagonal of this matrix. Ie, S +=
+   * s*I, with I the identity matrix. If this is called after
+   * calling factor, then the factors are not updated. To solve a
+   * linear system with the shifted matrix, you need to call
+   * factor again.
+   *
+   * \param S structured matrix
+   * \param s Shift to be applied to the diagonal.
+   */
+  int SP_s_struct_shift(CSPStructMat S, float s);
+  /**
+   * Apply a shift to the diagonal of this matrix. Ie, S +=
+   * s*I, with I the identity matrix. If this is called after
+   * calling factor, then the factors are not updated. To solve a
+   * linear system with the shifted matrix, you need to call
+   * factor again.
+   *
+   * \param S structured matrix
+   * \param s Shift to be applied to the diagonal.
+   */
+  int SP_d_struct_shift(CSPStructMat S, double s);
+  /**
+   * Apply a shift to the diagonal of this matrix. Ie, S +=
+   * s*I, with I the identity matrix. If this is called after
+   * calling factor, then the factors are not updated. To solve a
+   * linear system with the shifted matrix, you need to call
+   * factor again.
+   *
+   * \param S structured matrix
+   * \param s Shift to be applied to the diagonal.
+   */
+  int SP_c_struct_shift(CSPStructMat S, float _Complex s);
+  /**
+   * Apply a shift to the diagonal of this matrix. Ie, S +=
+   * s*I, with I the identity matrix. If this is called after
+   * calling factor, then the factors are not updated. To solve a
+   * linear system with the shifted matrix, you need to call
+   * factor again.
+   *
+   * \param S structured matrix
+   * \param s Shift to be applied to the diagonal.
+   */
+  int SP_z_struct_shift(CSPStructMat S, double _Complex s);
 
 #ifdef __cplusplus
 }

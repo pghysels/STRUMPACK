@@ -396,6 +396,173 @@ extern "C" {
   }
 
 
+  int SP_s_struct_rows(const CSPStructMat S) {
+    try {
+      return get_mat<float>(S)->rows();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+    }
+    return -1;
+  }
+  int SP_d_struct_rows(const CSPStructMat S) {
+    try {
+      return get_mat<double>(S)->rows();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+    }
+    return -1;
+  }
+  int SP_c_struct_rows(const CSPStructMat S) {
+    try {
+      return get_mat<std::complex<float>>(S)->rows();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+    }
+    return -1;
+  }
+  int SP_z_struct_rows(const CSPStructMat S) {
+    try {
+      return get_mat<std::complex<double>>(S)->rows();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+    }
+    return -1;
+  }
+
+
+  int SP_s_struct_cols(const CSPStructMat S) {
+    try {
+      return get_mat<float>(S)->cols();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+    }
+    return -1;
+  }
+  int SP_d_struct_cols(const CSPStructMat S) {
+    try {
+      return get_mat<double>(S)->cols();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+    }
+    return -1;
+  }
+  int SP_c_struct_cols(const CSPStructMat S) {
+    try {
+      return get_mat<std::complex<float>>(S)->cols();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+    }
+    return -1;
+  }
+  int SP_z_struct_cols(const CSPStructMat S) {
+    try {
+      return get_mat<std::complex<double>>(S)->cols();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+    }
+    return -1;
+  }
+
+
+  long long int SP_s_struct_memory(const CSPStructMat S) {
+    try {
+      return get_mat<float>(S)->memory();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+    }
+    return -1;
+  }
+  long long int SP_d_struct_memory(const CSPStructMat S) {
+    try {
+      return get_mat<double>(S)->memory();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+    }
+    return -1;
+  }
+  long long int SP_c_struct_memory(const CSPStructMat S) {
+    try {
+      return get_mat<std::complex<float>>(S)->memory();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+    }
+    return -1;
+  }
+  long long int SP_z_struct_memory(const CSPStructMat S) {
+    try {
+      return get_mat<std::complex<double>>(S)->memory();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+    }
+    return -1;
+  }
+
+  long long int SP_s_struct_nonzeros(const CSPStructMat S) {
+    try {
+      return get_mat<float>(S)->nonzeros();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+    }
+    return -1;
+  }
+  long long int SP_d_struct_nonzeros(const CSPStructMat S) {
+    try {
+      return get_mat<double>(S)->nonzeros();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+    }
+    return -1;
+  }
+  long long int SP_c_struct_nonzeros(const CSPStructMat S) {
+    try {
+      return get_mat<std::complex<float>>(S)->nonzeros();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+    }
+    return -1;
+  }
+  long long int SP_z_struct_nonzeros(const CSPStructMat S) {
+    try {
+      return get_mat<std::complex<double>>(S)->nonzeros();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+    }
+    return -1;
+  }
+
+  int SP_s_struct_rank(const CSPStructMat S) {
+    try {
+      return get_mat<float>(S)->rank();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+    }
+    return -1;
+  }
+  int SP_d_struct_rank(const CSPStructMat S) {
+    try {
+      return get_mat<double>(S)->rank();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+    }
+    return -1;
+  }
+  int SP_c_struct_rank(const CSPStructMat S) {
+    try {
+      return get_mat<std::complex<float>>(S)->rank();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+    }
+    return -1;
+  }
+  int SP_z_struct_rank(const CSPStructMat S) {
+    try {
+      return get_mat<std::complex<double>>(S)->rank();
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+    }
+    return -1;
+  }
+
   int SP_s_struct_local_rows(const CSPStructMat S) {
     try {
       return get_mat<float>(S)->local_rows();
@@ -597,6 +764,45 @@ extern "C" {
     }
     return 0;
   }
+
+
+  int SP_s_struct_shift(CSPStructMat S, float s) {
+    try {
+      get_mat<float>(S)->shift(s);
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+      return 1;
+    }
+    return 0;
+  }
+  int SP_d_struct_shift(CSPStructMat S, double s) {
+    try {
+      get_mat<double>(S)->shift(s);
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+      return 1;
+    }
+    return 0;
+  }
+  int SP_c_struct_shift(CSPStructMat S, float _Complex s) {
+    try {
+      get_mat<std::complex<float>>(S)->shift(s);
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+      return 1;
+    }
+    return 0;
+  }
+  int SP_z_struct_shift(CSPStructMat S, double _Complex s) {
+    try {
+      get_mat<std::complex<double>>(S)->shift(s);
+    } catch (std::exception& e) {
+      std::cerr << "Operation failed: " << e.what() << std::endl;
+      return 1;
+    }
+    return 0;
+  }
+
 
 }
 
