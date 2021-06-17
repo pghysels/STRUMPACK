@@ -72,17 +72,6 @@ namespace strumpack {
     }
   };
 
-  template<typename T> struct FrontData {
-    FrontData() {}
-    FrontData(int n1_, int n2_, T* F11_, T* F12_,
-              T* F21_, T* F22_, std::int64_t* piv_)
-      : n1(n1_), n2(n2_), F11(F11_), F12(F12_),
-        F21(F21_), F22(F22_), piv(piv_) {}
-    int n1, n2;
-    T *F11, *F12, *F21, *F22;
-    std::int64_t* piv;
-  };
-
   uintptr_t round_to_8(uintptr_t p) { return (p + 7) & ~7; }
   uintptr_t round_to_8(void* p) {
     return round_to_8(reinterpret_cast<uintptr_t>(p));
@@ -116,10 +105,6 @@ namespace strumpack {
                    dpcpp::getrs_buffersize<scalar_t>
                    (q, Trans::N, dsep, dupd, dsep, dsep));
         getr_work_size += F->scratchpad_size_;
-        if (dsep <= 8)       N8++;
-        else if (dsep <= 16) N16++;
-        // else if (dsep <= 24) N24++;
-        // else if (dsep <= 32) N32++;
         if (A) {
           if (F->lchild_) Isize += F->lchild_->dim_upd();
           if (F->rchild_) Isize += F->rchild_->dim_upd();
@@ -131,8 +116,7 @@ namespace strumpack {
       factor_size = L_size + U_size;
       work_bytes =
         round_to_8(sizeof(scalar_t) * (Schur_size + getr_work_size)) +
-        round_to_8(sizeof(std::int64_t) * piv_size) +
-        round_to_8(sizeof(FrontData<scalar_t>) * (N8 + N16/* + N24 + N32*/));
+        round_to_8(sizeof(std::int64_t) * piv_size);
       ea_bytes =
         round_to_8(sizeof(AssembleData<scalar_t>) * f.size()) +
         round_to_8(sizeof(std::size_t) * Isize) +
@@ -142,8 +126,6 @@ namespace strumpack {
     void print_info(int l, int lvls) {
       std::cout << "#  level " << l << " of " << lvls
                 << " has " << f.size() << " nodes and "
-                << N8 << " <=8, " << N16 << " <=16, "
-                // << N24 << " <=24, " << N32 << " <=32, needs "
                 << factor_size * sizeof(scalar_t) / 1.e6
                 << " MB for factors, "
                 << Schur_size * sizeof(scalar_t) / 1.e6
@@ -205,24 +187,14 @@ namespace strumpack {
         F->piv_ = imem;
         imem += F->dim_sep();
       }
-      auto fdat = reinterpret_cast<FrontData<scalar_t>*>
-        (round_to_8(imem));
-      f8 = fdat;   fdat += N8;
-      f16 = fdat;  fdat += N16;
-      // f24 = fdat;  fdat += N24;
-      // f32 = fdat;  fdat += N32;
     }
 
     std::vector<FDPC_t*> f;
     std::size_t L_size = 0, U_size = 0, factor_size = 0,
                    Schur_size = 0, piv_size = 0, total_upd_size = 0,
-                   work_bytes = 0, N8 = 0, N16 = 0,
-                   Isize = 0, ea_bytes = 0,
+                   work_bytes = 0, Isize = 0, ea_bytes = 0,
                    elems11 = 0, elems12 = 0, elems21 = 0;
-    //, N24 = 0, N32 = 0;
     std::int64_t getr_work_size = 0;
-    FrontData<scalar_t> *f8 = nullptr, *f16 = nullptr;
-    //*f24 = nullptr, *f32 = nullptr;
   };
 
 
@@ -478,165 +450,40 @@ namespace strumpack {
     assemble(q, N, hasmbl, dasmbl);
   }
 
-  template<std::size_t B, typename T> struct PartialFactor {
-    FrontData<T>* fdata_;
-    PartialFactor(FrontData<T>* fdata) : fdata_(fdata) {}
-    void operator()(cl::sycl::nd_item<3> it) const {
-      auto& F = fdata_[it.get_group(0)];
-      int j = it.get_global_id(1), i = it.get_global_id(2);
-      int n = F.n1, n2 = F.n2;
-      auto A11 = F.F11;
-      // auto piv = reinterpret_cast<std::int64_t*>(F.piv);
-      for (int k=0; k<n; k++) {
-        if (i == 0 && j == 0)
-          F.piv[k] = k + 1;
-        // TODO make p and Amax global?
-        // auto p = k;
-        // auto Amax = abs(A11[k+k*n]);
-        // for (int l=k+1; l<n; l++) {
-        //   auto tmp = abs(A11[l+k*n]);
-        //   if (tmp > Amax) {
-        //     Amax = tmp;
-        //     p = l;
-        //   }
-        // }
-        // if (i == 0 && j == 0)
-        //   F.piv[k] = p + 1;
-        // it.barrier();
-        // if (Amax == T(0.)) {
-        //   // TODO
-        //   // if (info == 0)
-        //   //   info = k;
-        // } else {
-          // swap row k with the pivot row
-          // if (j < n && i == k && p != k) {
-          //   auto tmp = A11[k+j*n];
-          //   A11[k+j*n] = A11[p+j*n];
-          //   A11[p+j*n] = tmp;
-          // }
-          // it.barrier();
-          // divide by the pivot element
-          if (j == k && i > k && i < n)
-            A11[i+j*n] /= A11[k+k*n];
-          it.barrier();
-          // Schur update
-          if (j > k && i > k && j < n && i < n)
-            A11[i+j*n] -= A11[i+k*n] * A11[k+j*n];
-          it.barrier();
-        // }
-      }
-      auto A12 = F.F12;
-      for (int cb=0; cb<n2; cb+=B) {
-        int c = cb + j;
-        bool col = c < n2;
-        // L trsm (unit diag)
-        for (int k=0; k<n; k++) {
-          if (i > k && i < n && col)
-            A12[i+c*n] -= A11[i+k*n] * A12[k+c*n];
-          it.barrier();
-        }
-        // U trsm
-        for (int k=n-1; k>=0; k--) {
-          if (i == k && col)
-            A12[k+c*n] /= A11[k+k*n];
-          it.barrier();
-          if (i < k && col)
-            A12[i+c*n] -= A11[i+k*n] * A12[k+c*n];
-          it.barrier();
-        }
-      }
-      // Schur GEMM
-      auto A22 = F.F22, A21 = F.F21;
-      for (int c=j; c<n2; c+=B)
-        for (int r=i; r<n2; r+=B)
-          for (int k=0; k<n; k++)
-            A22[r+c*n2] -= A21[r+k*n2] * A12[k+c*n];
-    }
-  };
-
-  template<std::size_t B, typename T> void
-  factor_small_fronts_kernel(cl::sycl::queue& q, std::size_t nf,
-                             FrontData<T>* fdata) {
-    if (!nf) return;
-    cl::sycl::range<3> global{nf, B, B}, local{1, B, B};
-    q.parallel_for(cl::sycl::nd_range<3>{global, local},
-                   PartialFactor<B, T>(fdata));
-  }
-
-  template<typename scalar_t, typename integer_t> void
-  FrontDPCpp<scalar_t,integer_t>::factor_small_fronts
-  (cl::sycl::queue& q, LInfo_t& L, FrontData<scalar_t>* fdata,
-   const Opts_t& opts) {
-    if (L.N8 || L.N16 /* || L.N24 || L.N32*/) {
-      for (std::size_t n=0, n8=0, n16=L.N8;
-           //n24=n16+L.N16, n32=n24+L.N24;
-           n<L.f.size(); n++) {
-        auto& f = *(L.f[n]);
-        const auto dsep = f.dim_sep();
-        //if (dsep <= 32) {
-        if (dsep <= 16) {
-          FrontData<scalar_t>
-            t(dsep, f.dim_upd(), f.F11_.data(), f.F12_.data(),
-              f.F21_.data(), f.F22_.data(), f.piv_);
-          if (dsep <= 8)       fdata[n8++] = t;
-          else if (dsep <= 16) fdata[n16++] = t;
-          // else if (dsep <= 24) fdata[n24++] = t;
-          // else                 fdata[n32++] = t;
-        }
-      }
-      dpcpp::memcpy(q, L.f8, fdata, (L.N8+L.N16/*+L.N24+L.N32*/)).wait();
-      // auto replace = opts.replace_tiny_pivots();
-      // auto thresh = opts.pivot_threshold();
-      factor_small_fronts_kernel<8>(q, L.N8, L.f8);
-      factor_small_fronts_kernel<16>(q, L.N16, L.f16);
-      // factor_small_fronts_kernel<24>(q, L.N24, L.f24);
-      // factor_small_fronts_kernel<32>(q, L.N32, L.f32);
-    }
-  }
 
   template<typename scalar_t, typename integer_t> void
   FrontDPCpp<scalar_t,integer_t>::factor_large_fronts
   (cl::sycl::queue& q, LInfo_t& L, const Opts_t& opts) {
-#if 0
-    if (L.f.size() == L.N8 + L.N16)
-      return;
-    for (auto& front : L.f) {
-      auto& f = *front;
-      // if (f.dim_sep() > 32) {
-      if (f.dim_sep() > 16) {
-        auto e_getrf = dpcpp::getrf
-          (q, f.F11_, f.piv_, f.scratchpad_, f.scratchpad_size_);
-        if (opts.replace_tiny_pivots()) { } // TODO
-        if (f.dim_upd()) {
-          auto e_getrs = dpcpp::getrs
-            (q, Trans::N, f.F11_, f.piv_, f.F12_,
-             f.scratchpad_, f.scratchpad_size_, {e_getrf});
-          dpcpp::gemm
-            (q, Trans::N, Trans::N, scalar_t(-1.),
-             f.F21_, f.F12_, scalar_t(1.), f.F22_, {e_getrs});
-        }
-      }
-    }
-#else
-    std::int64_t nb = L.f.size();// - L.N8 - L.N16;
-    //if (!nb) return;
-    dpcpp::HostMemory<std::int64_t> vdu(nb, q), vds(nb, q);
-    dpcpp::HostMemory<const scalar_t*> cF12(nb, q), cF21(nb, q);
-    dpcpp::HostMemory<scalar_t*> F11(nb, q), F12(nb, q), F22(nb, q);
-    dpcpp::HostMemory<std::int64_t*> vpiv(nb, q);
+    std::int64_t nb = L.f.size();
+    dpcpp::HostMemory<char> w_(nb*(2*sizeof(std::int64_t)+6*sizeof(void*)), q);
+    auto vdu = w_.as<std::int64_t>();
+    auto vds = vdu + nb;
+    auto F11 = reinterpret_cast<scalar_t**>(vds + nb);
+    auto F12 = F11 + nb;
+    auto F22 = F12 + nb;
+    const scalar_t** cF12 = const_cast<const scalar_t**>(F22 + nb);
+    const scalar_t** cF21 = const_cast<const scalar_t**>(F22 + 2*nb);
+    auto vpiv = reinterpret_cast<std::int64_t**>(F22 + 3*nb);
     nb = 0;
+    float flops = 0, bytes = 0;
     for (auto& front : L.f) {
       auto& f = *front;
-      vdu[nb] = f.dim_upd();
-      vds[nb] = f.dim_sep();
+      auto du = f.dim_upd();
+      auto ds = f.dim_sep();
+      vdu[nb] = du;
+      vds[nb] = ds;
       vpiv[nb] = f.piv_;
       F11[nb] = f.F11_.data();
-      F12[nb] = f.F12_.data();
-      cF12[nb] = f.F12_.data();
+      cF12[nb] = F12[nb] = f.F12_.data();
       cF21[nb] = f.F21_.data();
       F22[nb] = f.F22_.data();
       nb++;
+      flops += blas::gemm_flops(du, du, ds, -1., 1.)
+	+ blas::getrs_flops(ds, du) + blas::getrf_flops(ds, ds);
+
     }
+    if (is_complex<scalar_t>()) flops *= 4;
+    STRUMPACK_FLOPS(flops);
     dpcpp::DeviceMemory<scalar_t> minus_one(nb, q), one(nb, q);
     dpcpp::DeviceMemory<oneapi::mkl::transpose> op(nb, q);
     dpcpp::DeviceMemory<std::int64_t> group_sizes(nb, q);
@@ -662,8 +509,6 @@ namespace strumpack {
     oneapi::mkl::blas::column_major::gemm_batch
       (q, op, op, vdu, vdu, vds, minus_one, cF21, vdu,
        cF12, vds, one, F22, vdu, nb, group_sizes).wait();
-    // TODO count flops!
-#endif
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -780,14 +625,10 @@ namespace strumpack {
 
     const int lvls = this->levels();
     std::vector<LInfo_t> ldata(lvls);
-    std::size_t max_small_fronts = 0;
     for (int l=lvls-1; l>=0; l--) {
       std::vector<F_t*> fp;
       this->get_level_fronts(fp, l);
-      auto& L = ldata[l];
-      L = LInfo_t(fp, q, &A);
-      max_small_fronts =
-        std::max(max_small_fronts, L.N8+L.N16/*+L.N24+L.N32*/);
+      ldata[l] = LInfo_t(fp, q, &A);
     }
 
     auto peak_dmem = peak_device_memory(ldata);
@@ -799,7 +640,6 @@ namespace strumpack {
       return;
     }
 
-    dpcpp::HostMemory<FrontData<scalar_t>> fdata(max_small_fronts, q);
     std::size_t peak_hea_mem = 0;
     for (int l=lvls-1; l>=0; l--)
       peak_hea_mem = std::max(peak_hea_mem, ldata[l].ea_bytes);
@@ -830,9 +670,8 @@ namespace strumpack {
         L.set_work_pointers(work_mem);
         front_assembly(q, A, L, hea_mem, dea_mem);
         old_work = work_mem;
-        //factor_small_fronts(q, L, fdata, opts);
         factor_large_fronts(q, L, opts);
-        STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
+	STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
         L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
         L.f[0]->pivot_mem_.resize(L.piv_size);
         q.wait_and_throw();

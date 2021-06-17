@@ -99,9 +99,6 @@ namespace strumpack {
 
     void front_assembly(cl::sycl::queue& q, const SpMat_t& A, LInfo_t& L,
                         char* hea_mem, char* dea_mem);
-    void factor_small_fronts(cl::sycl::queue& q, LInfo_t& L,
-                             FrontData<scalar_t>* fdata,
-                             const Opts_t& opts);
     void factor_large_fronts(cl::sycl::queue& q, LInfo_t& L,
                              const Opts_t& opts);
     void split_smaller(const SpMat_t& A, const SPOptions<scalar_t>& opts,
