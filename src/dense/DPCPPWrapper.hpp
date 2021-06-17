@@ -67,20 +67,6 @@ namespace strumpack {
          std::size_t count) {
       return q.fill(ptr, value, count);
     }
-    template<> inline cl::sycl::event fill<std::complex<float>>
-    (cl::sycl::queue& q, std::complex<float>* ptr,
-     std::complex<float> value, std::size_t count) {
-      // return q.fill(ptr, value, count);
-      std::cout << "fill<std::complex<float>>" << std::endl;
-      return cl::sycl::event();
-    }
-    template<> inline cl::sycl::event fill<std::complex<double>>
-    (cl::sycl::queue& q, std::complex<double>* ptr,
-     std::complex<double> value, std::size_t count) {
-      // return q.fill(ptr, value, count);
-      std::cout << "fill<std::complex<double>>" << std::endl;
-      return cl::sycl::event();
-    }
 
     // inline std::size_t available_memory() {
     //   std::size_t free_device_mem = 0, total_device_mem = 0;
@@ -131,6 +117,8 @@ namespace strumpack {
       ~DeviceMemory() { release(); }
       operator T*() { return data_; }
       operator const T*() const { return data_; }
+      T* get() { return data_; }
+      const T* get() const { return data_; }
       // operator void*() { return data_; }
       template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
       void release() {
@@ -185,6 +173,8 @@ namespace strumpack {
       ~HostMemory() { release(); }
       operator T*() { return data_; }
       operator const T*() const { return data_; }
+      T* get() { return data_; }
+      const T* get() const { return data_; }
       // operator void*() { return data_; }
       template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
       void release() {

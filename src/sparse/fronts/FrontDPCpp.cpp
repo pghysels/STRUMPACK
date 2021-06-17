@@ -597,6 +597,9 @@ namespace strumpack {
   template<typename scalar_t, typename integer_t> void
   FrontDPCpp<scalar_t,integer_t>::factor_large_fronts
   (cl::sycl::queue& q, LInfo_t& L, const Opts_t& opts) {
+#if 0
+    if (L.f.size() == L.N8 + L.N16)
+      return;
     for (auto& front : L.f) {
       auto& f = *front;
       // if (f.dim_sep() > 32) {
@@ -614,6 +617,53 @@ namespace strumpack {
         }
       }
     }
+#else
+    std::int64_t nb = L.f.size();// - L.N8 - L.N16;
+    //if (!nb) return;
+    dpcpp::HostMemory<std::int64_t> vdu(nb, q), vds(nb, q);
+    dpcpp::HostMemory<const scalar_t*> cF12(nb, q), cF21(nb, q);
+    dpcpp::HostMemory<scalar_t*> F11(nb, q), F12(nb, q), F22(nb, q);
+    dpcpp::HostMemory<std::int64_t*> vpiv(nb, q);
+    nb = 0;
+    for (auto& front : L.f) {
+      auto& f = *front;
+      vdu[nb] = f.dim_upd();
+      vds[nb] = f.dim_sep();
+      vpiv[nb] = f.piv_;
+      F11[nb] = f.F11_.data();
+      F12[nb] = f.F12_.data();
+      cF12[nb] = f.F12_.data();
+      cF21[nb] = f.F21_.data();
+      F22[nb] = f.F22_.data();
+      nb++;
+    }
+    dpcpp::DeviceMemory<scalar_t> minus_one(nb, q), one(nb, q);
+    dpcpp::DeviceMemory<oneapi::mkl::transpose> op(nb, q);
+    dpcpp::DeviceMemory<std::int64_t> group_sizes(nb, q);
+    dpcpp::fill(q, minus_one.get(), scalar_t(-1.), nb);
+    dpcpp::fill(q, one.get(), scalar_t(1.), nb);
+    dpcpp::fill(q, op.get(), oneapi::mkl::transpose::N, nb);
+    dpcpp::fill(q, group_sizes.get(), std::int64_t(1), nb);
+    q.wait_and_throw();
+    auto lwork =
+      std::max(oneapi::mkl::lapack::getrf_batch_scratchpad_size<scalar_t>
+	       (q, vds, vds, vds, nb, group_sizes),
+	       oneapi::mkl::lapack::getrs_batch_scratchpad_size<scalar_t>
+	       (q, op, vds, vdu, vds, vds, nb, group_sizes));
+    {
+      dpcpp::DeviceMemory<scalar_t> work(lwork, q);
+      oneapi::mkl::lapack::getrf_batch
+	(q, vds, vds, F11, vds, vpiv,
+	 nb, group_sizes, work, lwork).wait();
+      oneapi::mkl::lapack::getrs_batch
+	(q, op, vds, vdu, F11, vds, vpiv, F12, vds,
+	 nb, group_sizes, work, lwork).wait();
+    }
+    oneapi::mkl::blas::column_major::gemm_batch
+      (q, op, op, vdu, vdu, vds, minus_one, cF21, vdu,
+       cF12, vds, one, F22, vdu, nb, group_sizes).wait();
+    // TODO count flops!
+#endif
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -773,15 +823,14 @@ namespace strumpack {
           dev_factors = reinterpret_cast<scalar_t*>
             (dea_mem - round_to_8(L.factor_size * sizeof(scalar_t)));
         }
-        dpcpp::fill(q, reinterpret_cast<scalar_t*>(dev_factors),
-                    scalar_t(0.), L.factor_size);
+	dpcpp::fill(q, dev_factors, scalar_t(0.), L.factor_size);
         dpcpp::fill(q, reinterpret_cast<scalar_t*>(work_mem),
                     scalar_t(0.), L.Schur_size);
         L.set_factor_pointers(dev_factors);
         L.set_work_pointers(work_mem);
         front_assembly(q, A, L, hea_mem, dea_mem);
         old_work = work_mem;
-        factor_small_fronts(q, L, fdata, opts);
+        //factor_small_fronts(q, L, fdata, opts);
         factor_large_fronts(q, L, opts);
         STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
         L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
