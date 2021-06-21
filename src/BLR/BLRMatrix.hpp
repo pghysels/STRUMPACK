@@ -101,12 +101,16 @@ namespace strumpack {
         trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), *this, x, 0);
       }
 
+      std::size_t rg2t(std::size_t i) const;
+      std::size_t cg2t(std::size_t j) const;
       scalar_t operator()(std::size_t i, std::size_t j) const;
       scalar_t& operator()(std::size_t i, std::size_t j);
       DenseM_t extract(const std::vector<std::size_t>& I,
                        const std::vector<std::size_t>& J) const;
 
       void decompress();
+      void decompress_local_columns(int c_min, int c_max);
+      void remove_tiles_before_local_column(int c_min, int c_max);
 
       std::size_t rowblocks() const { return nbrows_; }
       std::size_t colblocks() const { return nbcols_; }
@@ -123,6 +127,7 @@ namespace strumpack {
 
       void compress_tile(std::size_t i, std::size_t j, const Opts_t& opts);
       void fill(scalar_t v);
+      void fill_col(scalar_t v, int k, bool part, std::size_t CP);
 
       static void
       construct_and_partial_factor(DenseM_t& A11, DenseM_t& A12,
@@ -146,6 +151,18 @@ namespace strumpack {
                                    const std::vector<std::size_t>& tiles2,
                                    const adm_t& admissible,
                                    const Opts_t& opts);
+
+      static void
+      construct_and_partial_factor_col(BLRMatrix<scalar_t>& B11, 
+                                   BLRMatrix<scalar_t>& B12,
+                                   BLRMatrix<scalar_t>& B21, 
+                                   BLRMatrix<scalar_t>& B22,
+                                   std::vector<int>& piv,
+                                   const std::vector<std::size_t>& tiles1,
+                                   const std::vector<std::size_t>& tiles2,
+                                   const adm_t& admissible,
+                                   const Opts_t& opts, 
+                                   const std::function<void(int, bool, std::size_t)>& blockcol);
 
       static void
       construct_and_partial_factor(std::size_t n1, std::size_t n2,

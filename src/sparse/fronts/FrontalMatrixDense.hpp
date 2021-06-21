@@ -67,6 +67,9 @@ namespace strumpack {
 
     void extend_add_to_blr(BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21, 
                            BLRM_t& paF22, const F_t* p, int task_depth) override;
+    void extend_add_to_blr_col(BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21, 
+                           BLRM_t& paF22, const F_t* p, integer_t begin_col, 
+                           integer_t end_col, int task_depth) override;
 
     void sample_CB(const SPOptions<scalar_t>& opts, const DenseM_t& R,
                    DenseM_t& Sr, DenseM_t& Sc, F_t* pa, int task_depth)

@@ -361,6 +361,17 @@ namespace strumpack {
       blocks_.clear(); blocks_.shrink_to_fit();
     }
 
+    template<typename scalar_t> std::size_t
+    BLRMatrix<scalar_t>::rg2t(std::size_t i) const {
+      return std::distance
+        (roff_.begin(), std::upper_bound(roff_.begin(), roff_.end(), i)) - 1;
+    }
+    template<typename scalar_t> std::size_t
+    BLRMatrix<scalar_t>::cg2t(std::size_t j) const {
+      return std::distance
+        (coff_.begin(), std::upper_bound(coff_.begin(), coff_.end(), j)) - 1;
+    }
+
     template<typename scalar_t> scalar_t
     BLRMatrix<scalar_t>::operator()(std::size_t i, std::size_t j) const {
       auto ti = std::distance
@@ -424,6 +435,23 @@ namespace strumpack {
           if (b && b->is_low_rank())
             b.reset(new DenseTile<scalar_t>(b->dense()));
         }
+    }
+
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::decompress_local_columns(int c_min, int c_max) {
+      for (std::size_t c=cg2t(c_min); c<=cg2t(c_max-1); c++)
+        for (std::size_t r=0; r<nbrows_; r++) {
+          auto& b = block(r, c);
+          if (b && b->is_low_rank())
+            b.reset(new DenseTile<scalar_t>(b->dense()));
+        }
+    }
+
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::remove_tiles_before_local_column(int c_min, int c_max) {
+      for (std::size_t c=cg2t(c_min); c<cg2t(c_max-1); c++)
+        for (std::size_t r=0; r<nbrows_; r++)
+          block(r, c) = nullptr;
     }
 
     template<typename scalar_t> BLRTile<scalar_t>&
@@ -600,6 +628,23 @@ namespace strumpack {
     BLRMatrix<scalar_t>::fill(scalar_t v) {
       for (std::size_t i=0; i<nbrows_; i++)
         for (std::size_t j=0; j<nbcols_; j++){
+            std::unique_ptr<DenseTile<scalar_t>> t
+              (new DenseTile<scalar_t>(tilerows(i), tilecols(j)));
+            t->D().fill(v);
+            block(i, j) = std::move(t);
+        }
+    }
+
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::fill_col(scalar_t v, int k, bool part, std::size_t CP) {
+      std::size_t j_end=0;
+      if (part){
+        j_end = std::min(std::size_t(k+CP), colblocks());
+      } else{
+        j_end = std::min(k+colblocks(), colblocks());
+      }
+      for (std::size_t i=0; i<nbrows_; i++)
+        for (std::size_t j=k; j<j_end; j++){
             std::unique_ptr<DenseTile<scalar_t>> t
               (new DenseTile<scalar_t>(tilerows(i), tilecols(j)));
             t->D().fill(v);
@@ -1293,6 +1338,105 @@ namespace strumpack {
               B22.compress_tile(k, j, opts);
             }
           }
+      }
+      for (std::size_t i=0; i<rb; i++)
+        for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
+          piv[l] += B11.tileroff(i);
+    }
+
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::construct_and_partial_factor_col
+    (BLRMatrix<scalar_t>& B11, BLRMatrix<scalar_t>& B12, 
+     BLRMatrix<scalar_t>& B21, BLRMatrix<scalar_t>& B22,
+     std::vector<int>& piv,
+     const std::vector<std::size_t>& tiles1,
+     const std::vector<std::size_t>& tiles2,
+     const DenseMatrix<bool>& admissible,
+     const Opts_t& opts, const std::function<void(int, bool, std::size_t)>& blockcol) {
+      piv.resize(B11.rows());
+      auto rb = B11.rowblocks();
+      auto rb2 = B21.rowblocks();
+      std::size_t CP = 3;//??
+      for (std::size_t i=0; i<rb; i+=CP) { //F11 and F21
+        blockcol(i, true, CP);
+        for (std::size_t k=0; k<i; k++){
+          for (std::size_t j=i; j<std::min(i+CP, rb); j++) {
+            if (admissible(k, j)) B11.compress_tile(k, j, opts);
+            std::vector<int> tpiv
+              (piv.begin()+B11.tileroff(k), piv.begin()+B11.tileroff(k+1));
+            B11.tile(k, j).laswp(tpiv, true);
+            trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                 scalar_t(1.), B11.tile(k, k), B11.tile(k, j));
+          }
+          for (std::size_t lk=k+1; lk<rb; lk++) {
+            for (std::size_t lj=i; lj<std::min(i+CP, rb); lj++) {
+              gemm(Trans::N, Trans::N, scalar_t(-1.), B11.tile(lk, k), 
+                   B11.tile(k, lj), scalar_t(1.), B11.tile_dense(lk, lj).D());
+            }
+          }
+          for (std::size_t lk=0; lk<rb2; lk++) {
+            for (std::size_t lj=i; lj<std::min(i+CP,rb); lj++) {
+              gemm(Trans::N, Trans::N, scalar_t(-1.), B21.tile(lk, k), 
+                   B11.tile(k, lj), scalar_t(1.), B21.tile_dense(lk, lj).D());
+            }
+          }
+        }
+        for (std::size_t c=i; c<std::min(i+CP,rb); c++) {
+          auto tpiv = B11.tile(c, c).LU();
+          std::copy(tpiv.begin(), tpiv.end(), piv.begin()+B11.tileroff(c));
+          for (std::size_t j=c+1; j<std::min(i+CP,rb); j++) {
+            if (admissible(c, j)) B11.compress_tile(c, j, opts);
+            std::vector<int> tpiv
+              (piv.begin()+B11.tileroff(c), piv.begin()+B11.tileroff(c+1));
+            B11.tile(c, j).laswp(tpiv, true);
+            trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                 scalar_t(1.), B11.tile(c, c), B11.tile(c, j));
+          }
+          for (std::size_t j=c+1; j<rb; j++) {
+            if (admissible(j, c)) B11.compress_tile(j, c, opts);
+            trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+                 scalar_t(1.), B11.tile(c, c), B11.tile(j, c));
+          }
+          for (std::size_t j=0; j<rb2; j++) {
+            B21.compress_tile(j, c, opts);
+            trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+                 scalar_t(1.), B11.tile(c, c), B21.tile(j, c));
+          }
+          for (std::size_t j=c+1; j<std::min(i+CP,rb); j++)
+            for (std::size_t k=c+1; k<rb; k++) {
+              gemm(Trans::N, Trans::N, scalar_t(-1.),
+                   B11.tile(k, c), B11.tile(c, j), scalar_t(1.), B11.tile_dense(k,j).D());
+            }
+          for (std::size_t j=c+1; j<std::min(i+CP,rb); j++)
+            for (std::size_t k=0; k<rb2; k++) {
+              gemm(Trans::N, Trans::N, scalar_t(-1.),
+                   B21.tile(k, c), B11.tile(c, j), scalar_t(1.), B21.tile_dense(k,j).D());
+            }
+        }
+      }
+      for (std::size_t i=0; i<rb2; i+=CP) { //F12 and F22
+        blockcol(i, false, CP);
+        for (std::size_t k=0; k<rb; k++){ 
+          for (std::size_t j=i; j<std::min(i+CP, rb2); j++) {
+            B12.compress_tile(k, j, opts);
+            std::vector<int> tpiv
+              (piv.begin()+B11.tileroff(k), piv.begin()+B11.tileroff(k+1)); //?? piv?
+            B12.tile(k, j).laswp(tpiv, true);
+            trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                 scalar_t(1.), B11.tile(k, k), B12.tile(k, j));
+          }
+          for (std::size_t lk=k+1; lk<rb; lk++) {
+            for (std::size_t lj=i; lj<std::min(i+CP, rb2); lj++) {
+              gemm(Trans::N, Trans::N, scalar_t(-1.), B11.tile(lk, k),
+                   B12.tile(k, lj), scalar_t(1.), B12.tile_dense(lk, lj).D());
+            }
+          }
+          for (std::size_t lk=0; lk<rb2; lk++)
+            for (std::size_t lj=i; lj<std::min(i+CP,rb2); lj++) {
+                gemm(Trans::N, Trans::N, scalar_t(-1.),
+                    B21.tile(lk, k), B12.tile(k, lj), scalar_t(1.), B22.tile_dense(lk,lj).D());
+            }
+        }
       }
       for (std::size_t i=0; i<rb; i++)
         for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)

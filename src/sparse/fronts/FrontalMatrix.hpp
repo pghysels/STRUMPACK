@@ -157,6 +157,11 @@ namespace strumpack {
                         BLRM_t& paF21, BLRM_t& paF22,
                         const FrontalMatrix<scalar_t,integer_t>* p,
                         int task_depth) {}
+    virtual void
+    extend_add_to_blr_col(BLRM_t& paF11, BLRM_t& paF12,
+                        BLRM_t& paF21, BLRM_t& paF22,
+                        const FrontalMatrix<scalar_t,integer_t>* p,
+                        integer_t begin_col, integer_t end_col, int task_depth) {}
 
     virtual int random_samples() const { return 0; }
 

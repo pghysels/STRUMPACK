@@ -318,7 +318,8 @@ namespace strumpack {
       if (Comm().is_root())
         std::cout << "#   - BLRMPI front: Nsep= " << dim_sep()
                   << ", Nupd= " << dim_upd()
-                  << " , time= " << time << " sec" << std::endl;
+                  << " , time= " << time << " sec" 
+                  << ", peak memory= " << double(strumpack::params::peak_memory) / 1.0e6 << " MB" << std::endl;
     }
   }
 

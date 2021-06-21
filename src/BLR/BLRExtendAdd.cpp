@@ -707,6 +707,7 @@ namespace strumpack {
           sbuf[pr[r]+pcc].push_back(CB(r,c));
       }
     }
+    
     template<typename scalar_t,typename integer_t> void
     BLRExtendAdd<scalar_t,integer_t>::blrseq_copy_to_buffers_col
     (const BLR_t& CB, VVS_t& sbuf, const FBLRMPI_t* pa, const F_t* ch, 
@@ -716,25 +717,35 @@ namespace strumpack {
       const std::size_t du = ch->dim_upd();
       const std::size_t ds = pa->dim_sep();
       const int nprows = pa->grid2d().nprows();
+      int c_min = 0, c_max = 0;
       std::unique_ptr<int[]> work(new int[CB.rows()+CB.cols()]);
       const auto pr = work.get();
       const auto pc = pr + CB.rows();
-      const_cast<BLR_t&>(CB).decompress();
       for (std::size_t i=0; i<u2s; i++) {
         auto Ii = I[i];
         pr[i] = pa->sep_rg2p(Ii); // can be optimized
-        if (Ii < std::size_t(begin_col) || Ii >= std::size_t(end_col))
+        if (Ii < std::size_t(begin_col)){
+          c_min = i+1;
           pc[i] = -1;
-        else
+        } else if (Ii >= std::size_t(end_col)){
+          c_max = i;
+          pc[i] = -1;
+        } else
           pc[i] = pa->sep_cg2p(Ii) * nprows;
       }
+      if (c_max == 0 && u2s == du-1) c_max = du;
       for (std::size_t i=u2s; i<du; i++) {
         auto Ii = I[i] - ds;
         pr[i] = pa->upd_rg2p(Ii);
-        if (Ii + ds < std::size_t(begin_col) || Ii + ds >= std::size_t(end_col))
+        if (Ii + ds < std::size_t(begin_col)){
+          c_min = i+1;
           pc[i] = -1;
-        else
+        } else if (Ii + ds >= std::size_t(end_col)){
+          c_max = i;
+          pc[i] = -1;
+        } else
           pc[i] = pa->upd_cg2p(Ii) * nprows;
+        if (i == du-1) c_max = du;
       }
       { // reserve space for the send buffers
         VI_t cnt(sbuf.size());
@@ -746,6 +757,7 @@ namespace strumpack {
         for (std::size_t p=0; p<sbuf.size(); p++)
           sbuf[p].reserve(sbuf[p].size()+cnt[p]);
       }
+      const_cast<BLR_t&>(CB).decompress_local_columns(c_min, c_max);
       for (std::size_t c=0; c<u2s; c++) { // F11
         if (pc[c] == -1) continue;
         for (std::size_t r=0, pcc=pc[c]; r<u2s; r++)
@@ -766,6 +778,7 @@ namespace strumpack {
         for (std::size_t r=u2s, pcc=pc[c]; r<du; r++)
           sbuf[pr[r]+pcc].push_back(CB(r,c));
       }
+      //const_cast<BLR_t&>(CB).remove_tiles_before_local_column(c_min, c_max);
     }
 
     template<typename scalar_t,typename integer_t> void
