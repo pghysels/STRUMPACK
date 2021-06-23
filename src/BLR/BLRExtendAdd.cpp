@@ -723,62 +723,76 @@ namespace strumpack {
       const auto pc = pr + CB.rows();
       for (std::size_t i=0; i<u2s; i++) {
         auto Ii = I[i];
-        pr[i] = pa->sep_rg2p(Ii); // can be optimized
-        if (Ii < std::size_t(begin_col)){
-          c_min = i+1;
-          pc[i] = -1;
-        } else if (Ii >= std::size_t(end_col)){
-          c_max = i;
-          pc[i] = -1;
-        } else
-          pc[i] = pa->sep_cg2p(Ii) * nprows;
+        pr[i] = pa->sep_rg2p(Ii);
       }
-      if (c_max == 0 && u2s == du-1) c_max = du;
       for (std::size_t i=u2s; i<du; i++) {
         auto Ii = I[i] - ds;
         pr[i] = pa->upd_rg2p(Ii);
+      }
+      for (std::size_t i=0; i<u2s; i++) {
+        auto Ii = I[i];
+        if (Ii < std::size_t(begin_col)){
+          c_min = i+1;
+          continue;
+        } 
+        if (Ii >= std::size_t(end_col)){
+          c_max = i;
+          break;
+        } 
+        pc[i] = pa->sep_cg2p(Ii) * nprows;
+      }
+      if (c_max == 0 && u2s == du) c_max = du;
+      for (std::size_t i=u2s; i<du; i++) {
+        auto Ii = I[i] - ds;
         if (Ii + ds < std::size_t(begin_col)){
           c_min = i+1;
-          pc[i] = -1;
-        } else if (Ii + ds >= std::size_t(end_col)){
-          c_max = i;
-          pc[i] = -1;
-        } else
-          pc[i] = pa->upd_cg2p(Ii) * nprows;
+          continue;
+        } 
+        if (Ii + ds >= std::size_t(end_col)){
+          if (c_max == 0) c_max = i;
+          break;
+        } 
+        pc[i] = pa->upd_cg2p(Ii) * nprows;
         if (i == du-1) c_max = du;
       }
       { // reserve space for the send buffers
         VI_t cnt(sbuf.size());
-        for (std::size_t c=0; c<du; c++){
-          if (pc[c] == -1) continue;
+        for (int c=c_min; c<c_max; c++){
           for (std::size_t r=0; r<du; r++)
             cnt[pr[r]+pc[c]]++;
         }
         for (std::size_t p=0; p<sbuf.size(); p++)
           sbuf[p].reserve(sbuf[p].size()+cnt[p]);
       }
-      const_cast<BLR_t&>(CB).decompress_local_columns(c_min, c_max);
-      for (std::size_t c=0; c<u2s; c++) { // F11
-        if (pc[c] == -1) continue;
-        for (std::size_t r=0, pcc=pc[c]; r<u2s; r++)
-          sbuf[pr[r]+pcc].push_back(CB(r,c));
-      }
-      for (std::size_t c=u2s; c<du; c++) { // F12
-        if (pc[c] == -1) continue;
-        for (std::size_t r=0, pcc=pc[c]; r<u2s; r++)
-          sbuf[pr[r]+pcc].push_back(CB(r,c));
-      }
-      for (std::size_t c=0; c<u2s; c++) { // F21
-        if (pc[c] == -1) continue;
-        for (std::size_t r=u2s, pcc=pc[c]; r<du; r++)
-          sbuf[pr[r]+pcc].push_back(CB(r,c));
-      }
-      for (std::size_t c=u2s; c<du; c++) { // F22
-        if (pc[c] == -1) continue;
-        for (std::size_t r=u2s, pcc=pc[c]; r<du; r++)
-          sbuf[pr[r]+pcc].push_back(CB(r,c));
-      }
-      //const_cast<BLR_t&>(CB).remove_tiles_before_local_column(c_min, c_max);
+      if (c_max > 0) const_cast<BLR_t&>(CB).decompress_local_columns(c_min, c_max);
+      if (u2s)
+        for (int c=c_min; c<c_max; c++) { // F11 and F12
+          auto pcc=pc[c];
+          auto lc = CB.cl2l_[c];
+          auto tc = CB.cg2t(c);
+          auto trmax = CB.nbrows_;
+          for (std::size_t tr=0, r=0; tr<trmax; tr++){
+            auto& tD = CB.tile_dense(tr, tc).D();
+            auto lrmax = std::min(u2s-r, tD.rows());
+            for (std::size_t lr=0; lr<lrmax; lr++)
+              sbuf[pr[r++]+pcc].push_back(tD(lr,lc));
+          }
+        }
+      if (u2s < du)
+        for (int c=c_min; c<c_max; c++) { // F21 and F22
+          auto pcc=pc[c];
+          auto lc = CB.cl2l_[c];
+          auto tc = CB.cg2t(c);
+          auto trmax = CB.nbrows_;
+          for (std::size_t tr=CB.rg2t(u2s), r=u2s; tr<trmax; tr++){
+            auto& tD = CB.tile_dense(tr, tc).D();
+            auto lrmin = CB.rl2l_[r];
+            auto lrmax = tD.rows();
+            for (std::size_t lr=lrmin; lr<lrmax; lr++)
+              sbuf[pr[r++]+pcc].push_back(tD(lr,lc));
+          }
+        }
+      const_cast<BLR_t&>(CB).remove_tiles_before_local_column(c_min, c_max);
     }
 
     template<typename scalar_t,typename integer_t> void

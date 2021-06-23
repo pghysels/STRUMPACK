@@ -305,7 +305,7 @@ namespace strumpack {
     const std::size_t dupd = dim_upd();
     std::size_t upd2sep;
     auto I = this->upd_to_parent(p, upd2sep);
-    F22blr_.decompress(); //?? change to colwise
+    //F22blr_.decompress(); // change to colwise
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop default(shared) grainsize(64)      \
   if(task_depth < params::task_recursion_cutoff_level)
@@ -339,7 +339,6 @@ namespace strumpack {
     std::size_t upd2sep;
     auto I = this->upd_to_parent(p, upd2sep);
     int c_min = 0, c_max = 0;
-    //F22blr_.decompress();
     for (std::size_t c=0; c<dupd; c++) {
       auto pc = I[c];
       if (c == dupd-1) c_max = dupd;

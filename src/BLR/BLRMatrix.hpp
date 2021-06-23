@@ -45,6 +45,7 @@ namespace strumpack {
 
     // forward declarations
     template<typename scalar> class BLRTile;
+    template<typename scalar_t,typename integer_t> class BLRExtendAdd;
 
 
     template<typename T>
@@ -124,6 +125,7 @@ namespace strumpack {
       std::unique_ptr<BLRTile<scalar_t>>& block(std::size_t i, std::size_t j);
       DenseMW_t tile(DenseM_t& A, std::size_t i, std::size_t j) const;
       DenseTile<scalar_t>& tile_dense(std::size_t i, std::size_t j);
+      const DenseTile<scalar_t>& tile_dense(std::size_t i, std::size_t j) const;
 
       void compress_tile(std::size_t i, std::size_t j, const Opts_t& opts);
       void fill(scalar_t v);
@@ -192,7 +194,7 @@ namespace strumpack {
 
     private:
       std::size_t m_ = 0, n_ = 0, nbrows_ = 0, nbcols_ = 0;
-      std::vector<std::size_t> roff_, coff_;
+      std::vector<std::size_t> roff_, coff_, cl2l_, rl2l_;
       std::vector<std::unique_ptr<BLRTile<scalar_t>>> blocks_;
 
       void create_dense_tile(std::size_t i, std::size_t j, DenseM_t& A);
@@ -229,6 +231,7 @@ namespace strumpack {
 
       template<typename T> friend
       void draw(const BLRMatrix<T>& H, const std::string& name);
+      template<typename T,typename I> friend class BLRExtendAdd;
     };
 
     template<typename scalar_t> void

@@ -266,10 +266,24 @@ namespace strumpack {
       nbcols_ = coltiles.size();
       roff_.resize(nbrows_+1);
       coff_.resize(nbcols_+1);
+      cl2l_.resize(n_);
+      rl2l_.resize(m_);
       for (std::size_t i=1; i<=nbrows_; i++)
         roff_[i] = roff_[i-1] + rowtiles[i-1];
       for (std::size_t j=1; j<=nbcols_; j++)
         coff_[j] = coff_[j-1] + coltiles[j-1];
+      for (std::size_t b=0, l=0; b<nbcols_; b++) {
+        for (std::size_t i=0; i<coff_[b+1]-coff_[b]; i++) {
+          cl2l_[l] = i;
+          l++;
+        }
+      }
+      for (std::size_t b=0, l=0; b<nbrows_; b++) {
+        for (std::size_t i=0; i<roff_[b+1]-roff_[b]; i++) {
+          rl2l_[l] = i;
+          l++;
+        }
+      }
       assert(roff_[nbrows_] == m_);
       assert(coff_[nbcols_] == n_);
       blocks_.resize(nbrows_ * nbcols_);
@@ -477,6 +491,14 @@ namespace strumpack {
 
     template<typename scalar_t> DenseTile<scalar_t>& 
     BLRMatrix<scalar_t>::tile_dense(std::size_t i, std::size_t j) {
+      assert(dynamic_cast<DenseTile<scalar_t>*>
+             (blocks_[i+j*rowblocks()].get()));
+      return *static_cast<DenseTile<scalar_t>*>
+                   (blocks_[i+j*rowblocks()].get());
+    }
+
+    template<typename scalar_t> const DenseTile<scalar_t>& 
+    BLRMatrix<scalar_t>::tile_dense(std::size_t i, std::size_t j) const {
       assert(dynamic_cast<DenseTile<scalar_t>*>
              (blocks_[i+j*rowblocks()].get()));
       return *static_cast<DenseTile<scalar_t>*>
@@ -1438,6 +1460,10 @@ namespace strumpack {
             }
         }
       }
+      for (std::size_t j=0; j<rb2; j++)
+        for (std::size_t k=0; k<rb2; k++){
+           B22.compress_tile(k, j, opts);
+        }
       for (std::size_t i=0; i<rb; i++)
         for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
           piv[l] += B11.tileroff(i);
