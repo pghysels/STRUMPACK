@@ -451,15 +451,15 @@ namespace strumpack {
     using LInfo_t = LevelInfo<scalar_t,integer_t>;
     BatchMetaData() {}
     BatchMetaData(const std::vector<LInfo_t>& L,
-		  cl::sycl::queue& q) {
+                  cl::sycl::queue& q) {
       for (auto& l : L) nb = std::max(nb, l.f.size());
       bytes_level =
-	round_to_8(nb * 2 * sizeof(std::int64_t)) +  // vds, vdu
-	round_to_8(nb * 5 * sizeof(void*));          // F11, F12, F21, F22, piv
+        round_to_8(nb * 2 * sizeof(std::int64_t)) +  // vds, vdu
+        round_to_8(nb * 5 * sizeof(void*));          // F11, F12, F21, F22, piv
       std::size_t bytes_fixed =
-	round_to_8(nb * 2 * sizeof(scalar_t)) +      // alpha, beta
-	round_to_8(nb * sizeof(std::int64_t)) +      // group_sizes
-	round_to_8(nb * sizeof(oneapi::mkl::transpose)); // op
+        round_to_8(nb * 2 * sizeof(scalar_t)) +      // alpha, beta
+        round_to_8(nb * sizeof(std::int64_t)) +      // group_sizes
+        round_to_8(nb * sizeof(oneapi::mkl::transpose)); // op
       hmem_ = dpcpp::HostMemory<char>(bytes_level, q);
       dmem_ = dpcpp::DeviceMemory<char>(bytes_level + bytes_fixed, q);
       vds = dmem_.as<std::int64_t>();
@@ -472,23 +472,23 @@ namespace strumpack {
       alpha = reinterpret_cast<scalar_t*>(round_to_8(piv + nb));
       beta = alpha + nb;
       group_sizes = reinterpret_cast<std::int64_t*>
-	(round_to_8(beta + nb));
+        (round_to_8(beta + nb));
       op = reinterpret_cast<oneapi::mkl::transpose*>
-	(round_to_8(group_sizes + nb));
+        (round_to_8(group_sizes + nb));
       dpcpp::fill(q, alpha, scalar_t(-1.), nb);
       dpcpp::fill(q, beta, scalar_t(1.), nb);
       dpcpp::fill(q, group_sizes, std::int64_t(1), nb);
       dpcpp::fill(q, op, oneapi::mkl::transpose::N, nb);
       for (auto& l : L) {
-	set_level(q, l);
-	lwork = std::max
-	  (lwork, 
-	   oneapi::mkl::lapack::getrf_batch_scratchpad_size<scalar_t>
-	   (q, vds, vds, vds, nb, group_sizes));
-	lwork = std::max
-	  (lwork,
-	   oneapi::mkl::lapack::getrs_batch_scratchpad_size<scalar_t>
-	   (q, op, vds, vdu, vds, vds, nb, group_sizes));
+        set_level(q, l);
+        lwork = std::max
+          (lwork,
+           oneapi::mkl::lapack::getrf_batch_scratchpad_size<scalar_t>
+           (q, vds, vds, vds, nb, group_sizes));
+        lwork = std::max
+          (lwork,
+           oneapi::mkl::lapack::getrs_batch_scratchpad_size<scalar_t>
+           (q, op, vds, vdu, vds, vds, nb, group_sizes));
       }
       scratchpad = dpcpp::DeviceMemory<scalar_t>(lwork, q);
     }
@@ -502,12 +502,12 @@ namespace strumpack {
       auto hpiv = reinterpret_cast<std::int64_t**>(round_to_8(hF22 + nb));
       std::size_t i = 0;
       for (auto& f : L.f) {
-      	hvds[i] = f->dim_sep();
-      	hvdu[i] = f->dim_upd();
-      	hF11[i] = f->F11_.data();  hF12[i] = f->F12_.data();
-      	hF21[i] = f->F21_.data();  hF22[i] = f->F22_.data();
-      	hpiv[i] = f->piv_;
-      	i++;
+        vds[i] = f->dim_sep();
+        hvdu[i] = f->dim_upd();
+        hF11[i] = f->F11_.data();  hF12[i] = f->F12_.data();
+        hF21[i] = f->F21_.data();  hF22[i] = f->F22_.data();
+        hpiv[i] = f->piv_;
+        i++;
       }
       dpcpp::memcpy(q, dmem_.get(), hmem_.get(), bytes_level);
       q.wait_and_throw();
@@ -522,11 +522,11 @@ namespace strumpack {
     std::int64_t* group_sizes = nullptr;
     oneapi::mkl::transpose* op = nullptr;
     dpcpp::DeviceMemory<scalar_t> scratchpad;
-  private: 
+  private:
     dpcpp::HostMemory<char> hmem_;
     dpcpp::DeviceMemory<char> dmem_;
   };
-  
+
 
   template<typename scalar_t, typename integer_t> void
   FrontDPCpp<scalar_t,integer_t>::factor_batch
@@ -702,7 +702,7 @@ namespace strumpack {
           dev_factors = reinterpret_cast<scalar_t*>
             (dea_mem - round_to_8(L.factor_size * sizeof(scalar_t)));
         }
-	dpcpp::fill(q, dev_factors, scalar_t(0.), L.factor_size);
+        dpcpp::fill(q, dev_factors, scalar_t(0.), L.factor_size);
         dpcpp::fill(q, reinterpret_cast<scalar_t*>(work_mem),
                     scalar_t(0.), L.Schur_size);
         L.set_factor_pointers(dev_factors);
@@ -710,8 +710,8 @@ namespace strumpack {
         front_assembly(q, A, L, hea_mem, dea_mem);
         old_work = work_mem;
         //factor_large_fronts(q, L, opts);
-	factor_batch(q, L, batch, opts);
-	STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
+        factor_batch(q, L, batch, opts);
+        STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
         L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
         L.f[0]->pivot_mem_.resize(L.piv_size);
         q.wait_and_throw();
