@@ -509,7 +509,8 @@ namespace strumpack {
       	hpiv[i] = f->piv_;
       	i++;
       }
-      dpcpp::memcpy(q, dmem_.get(), hmem_.get(), bytes_level).wait();
+      dpcpp::memcpy(q, dmem_.get(), hmem_.get(), bytes_level);
+      q.wait_and_throw();
     }
     std::size_t nb = 0, bytes_level = 0;
     std::int64_t lwork = 0;
