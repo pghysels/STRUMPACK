@@ -44,7 +44,9 @@
 #include "dense/HIPWrapper.hpp"
 #endif
 #endif
-
+#if defined(STRUMPACK_USE_DPCPP)
+#include "dense/DPCPPWrapper.hpp"
+#endif
 
 namespace strumpack {
 
@@ -55,6 +57,9 @@ namespace strumpack {
     (0, nullptr, verbose, root) {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
     gpu::init();
+#endif
+#if defined(STRUMPACK_USE_DPCPP)
+    dpcpp::init();
 #endif
   }
 

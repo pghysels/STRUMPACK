@@ -35,6 +35,7 @@
 namespace strumpack {
 
   template<typename scalar_t, typename integer_t> class LevelInfo;
+  template<typename scalar_t, typename integer_t> class BatchMetaData;
   template<typename scalar_t> struct FrontData;
 
   template<typename scalar_t,typename integer_t> class FrontDPCpp
@@ -44,6 +45,7 @@ namespace strumpack {
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using LInfo_t = LevelInfo<scalar_t,integer_t>;
+    using Batch_t = BatchMetaData<scalar_t,integer_t>;
     using Opts_t = SPOptions<scalar_t>;
 
   public:
@@ -99,8 +101,10 @@ namespace strumpack {
 
     void front_assembly(cl::sycl::queue& q, const SpMat_t& A, LInfo_t& L,
                         char* hea_mem, char* dea_mem);
-    void factor_large_fronts(cl::sycl::queue& q, LInfo_t& L,
-                             const Opts_t& opts);
+    // void factor_large_fronts(cl::sycl::queue& q, LInfo_t& L,
+    //                          const Opts_t& opts);
+    void factor_batch(cl::sycl::queue& q, const LInfo_t& L,
+		      Batch_t& batch, const Opts_t& opts);
     void split_smaller(const SpMat_t& A, const SPOptions<scalar_t>& opts,
                        int etree_level=0, int task_depth=0);
 
@@ -115,6 +119,7 @@ namespace strumpack {
     using F_t::dim_upd;
 
     template<typename T, typename I> friend class LevelInfo;
+    template<typename T, typename I> friend class BatchMetaData;
   };
 
 } // end namespace strumpack

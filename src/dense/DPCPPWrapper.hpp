@@ -44,9 +44,11 @@
 namespace strumpack {
   namespace dpcpp {
 
-    // inline void init() {
-    //   std::cout << "TODO DPC++ init" << std::endl;
-    // }
+    inline void init() {
+      std::cout << "# initializing DPC++/SYCL" << std::endl;
+      cl::sycl::queue q(cl::sycl::default_selector{});
+      cl::sycl::malloc_device<int>(0, q);
+    }
 
     template<typename T> cl::sycl::event
     memcpy(cl::sycl::queue& q, T* dest, const T* src,

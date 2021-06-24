@@ -350,43 +350,6 @@ namespace strumpack {
 
   template<typename T> T rnd(T a, T b) { return ((a + b - 1) / b) * b; }
 
-  template<typename T> void
-  assemble(cl::sycl::queue& q, std::size_t nf,
-           const AssembleData<T>* dat, AssembleData<T>* ddat) {
-    // const unsigned int MAX_BLOCKS_Y =
-    //   q.get_device().get_info<cl::sycl::info::device::max_work_group_size>();
-    // const unsigned int MAX_BLOCKS_Z = MAX_BLOCKS_Y;
-    { // front assembly from sparse matrix
-      std::size_t nt1 = 128, nt2 = 32;
-      std::size_t max1 = nt1, max2 = nt2;
-      for (std::size_t f=0; f<nf; f++) {
-        max1 = std::max(max1, dat[f].n11);
-        max2 = std::max(max2, std::max(dat[f].n12, dat[f].n21));
-      }
-      // TODO check if nf is larger than allowed max
-      cl::sycl::range<2> global{nf, rnd(max1, nt1)}, local{1, nt1};
-      q.parallel_for(cl::sycl::nd_range<2>{global, local},
-                     Assemble11<T>(ddat));
-      if (max2) {
-        cl::sycl::range<2> global{nf, rnd(max2, nt2)}, local{1, nt2};
-        q.parallel_for(cl::sycl::nd_range<2>{global, local},
-                       Assemble1221<T>(ddat));
-      }
-    }
-    q.wait_and_throw();
-    { // extend-add
-      std::size_t nt = 16;
-      std::size_t maxCB = nt;
-      for (std::size_t f=0; f<nf; f++)
-        maxCB = std::max(maxCB, std::max(dat[f].dCB1, dat[f].dCB2));
-      auto gCB = rnd(maxCB, nt);
-      cl::sycl::range<3> global{nf, gCB, gCB}, local{1, nt, nt};
-      q.parallel_for(cl::sycl::nd_range<3>{global, local}, EA1<T>(ddat));
-      q.wait_and_throw();
-      q.parallel_for(cl::sycl::nd_range<3>{global, local}, EA2<T>(ddat));
-      q.wait_and_throw();
-    }
-  }
 
   template<typename scalar_t, typename integer_t> void
   FrontDPCpp<scalar_t,integer_t>::front_assembly
@@ -447,68 +410,141 @@ namespace strumpack {
     }
     dpcpp::memcpy<char>(q, dea_mem, hea_mem, L.ea_bytes);
     q.wait_and_throw();
-    assemble(q, N, hasmbl, dasmbl);
+    // const unsigned int MAX_BLOCKS_Y =
+    //   q.get_device().get_info<cl::sycl::info::device::max_work_group_size>();
+    // const unsigned int MAX_BLOCKS_Z = MAX_BLOCKS_Y;
+    { // front assembly from sparse matrix
+      std::size_t nt1 = 128, nt2 = 32;
+      std::size_t max1 = nt1, max2 = nt2;
+      for (std::size_t f=0; f<N; f++) {
+        max1 = std::max(max1, hasmbl[f].n11);
+        max2 = std::max(max2, std::max(hasmbl[f].n12, hasmbl[f].n21));
+      }
+      // TODO check if N is larger than allowed max
+      cl::sycl::range<2> global{N, rnd(max1, nt1)}, local{1, nt1};
+      q.parallel_for(cl::sycl::nd_range<2>{global, local},
+                     Assemble11<scalar_t>(dasmbl));
+      if (max2) {
+        cl::sycl::range<2> global{N, rnd(max2, nt2)}, local{1, nt2};
+        q.parallel_for(cl::sycl::nd_range<2>{global, local},
+                       Assemble1221<scalar_t>(dasmbl));
+      }
+    }
+    q.wait_and_throw();
+    { // extend-add
+      std::size_t nt = 16;
+      std::size_t maxCB = nt;
+      for (std::size_t f=0; f<N; f++)
+        maxCB = std::max(maxCB, std::max(hasmbl[f].dCB1, hasmbl[f].dCB2));
+      auto gCB = rnd(maxCB, nt);
+      cl::sycl::range<3> global{N, gCB, gCB}, local{1, nt, nt};
+      q.parallel_for(cl::sycl::nd_range<3>{global, local}, EA1<scalar_t>(dasmbl));
+      q.wait_and_throw();
+      q.parallel_for(cl::sycl::nd_range<3>{global, local}, EA2<scalar_t>(dasmbl));
+      q.wait_and_throw();
+    }
   }
 
 
-  template<typename scalar_t, typename integer_t> void
-  FrontDPCpp<scalar_t,integer_t>::factor_large_fronts
-  (cl::sycl::queue& q, LInfo_t& L, const Opts_t& opts) {
-    std::int64_t nb = L.f.size();
-    dpcpp::HostMemory<char> w_(nb*(2*sizeof(std::int64_t)+6*sizeof(void*)), q);
-    auto vdu = w_.as<std::int64_t>();
-    auto vds = vdu + nb;
-    auto F11 = reinterpret_cast<scalar_t**>(vds + nb);
-    auto F12 = F11 + nb;
-    auto F22 = F12 + nb;
-    const scalar_t** cF12 = const_cast<const scalar_t**>(F22 + nb);
-    const scalar_t** cF21 = const_cast<const scalar_t**>(F22 + 2*nb);
-    auto vpiv = reinterpret_cast<std::int64_t**>(F22 + 3*nb);
-    nb = 0;
-    float flops = 0, bytes = 0;
-    for (auto& front : L.f) {
-      auto& f = *front;
-      auto du = f.dim_upd();
-      auto ds = f.dim_sep();
-      vdu[nb] = du;
-      vds[nb] = ds;
-      vpiv[nb] = f.piv_;
-      F11[nb] = f.F11_.data();
-      cF12[nb] = F12[nb] = f.F12_.data();
-      cF21[nb] = f.F21_.data();
-      F22[nb] = f.F22_.data();
-      nb++;
-      flops += blas::gemm_flops(du, du, ds, -1., 1.)
-	+ blas::getrs_flops(ds, du) + blas::getrf_flops(ds, ds);
+  template<typename scalar_t, typename integer_t>
+  struct BatchMetaData {
+    using LInfo_t = LevelInfo<scalar_t,integer_t>;
+    BatchMetaData() {}
+    BatchMetaData(const std::vector<LInfo_t>& L,
+		  cl::sycl::queue& q) {
+      for (auto& l : L) nb = std::max(nb, l.f.size());
+      bytes_level =
+	round_to_8(nb * 2 * sizeof(std::int64_t)) +  // vds, vdu
+	round_to_8(nb * 5 * sizeof(void*));          // F11, F12, F21, F22, piv
+      std::size_t bytes_fixed =
+	round_to_8(nb * 2 * sizeof(scalar_t)) +      // alpha, beta
+	round_to_8(nb * sizeof(std::int64_t)) +      // group_sizes
+	round_to_8(nb * sizeof(oneapi::mkl::transpose)); // op
+      hmem_ = dpcpp::HostMemory<char>(bytes_level, q);
+      dmem_ = dpcpp::DeviceMemory<char>(bytes_level + bytes_fixed, q);
+      vds = dmem_.as<std::int64_t>();
+      vdu = vds + nb;
+      F11 = reinterpret_cast<scalar_t**>(round_to_8(vdu + nb));
+      F12 = F11 + nb;
+      F21 = F12 + nb;
+      F22 = F21 + nb;
+      piv = reinterpret_cast<std::int64_t**>(round_to_8(F22 + nb));
+      alpha = reinterpret_cast<scalar_t*>(round_to_8(piv + nb));
+      beta = alpha + nb;
+      group_sizes = reinterpret_cast<std::int64_t*>
+	(round_to_8(beta + nb));
+      op = reinterpret_cast<oneapi::mkl::transpose*>
+	(round_to_8(group_sizes + nb));
+      dpcpp::fill(q, alpha, scalar_t(-1.), nb);
+      dpcpp::fill(q, beta, scalar_t(1.), nb);
+      dpcpp::fill(q, group_sizes, std::int64_t(1), nb);
+      dpcpp::fill(q, op, oneapi::mkl::transpose::N, nb);
+      for (auto& l : L) {
+	set_level(q, l);
+	lwork = std::max
+	  (lwork, 
+	   oneapi::mkl::lapack::getrf_batch_scratchpad_size<scalar_t>
+	   (q, vds, vds, vds, nb, group_sizes));
+	lwork = std::max
+	  (lwork,
+	   oneapi::mkl::lapack::getrs_batch_scratchpad_size<scalar_t>
+	   (q, op, vds, vdu, vds, vds, nb, group_sizes));
+      }
+      scratchpad = dpcpp::DeviceMemory<scalar_t>(lwork, q);
+    }
+    void set_level(cl::sycl::queue& q, const LInfo_t& L) {
+      auto hvds = hmem_.as<std::int64_t>();
+      auto hvdu = hvds + nb;
+      auto hF11 = reinterpret_cast<scalar_t**>(round_to_8(hvdu + nb));
+      auto hF12 = hF11 + nb;
+      auto hF21 = hF12 + nb;
+      auto hF22 = hF21 + nb;
+      auto hpiv = reinterpret_cast<std::int64_t**>(round_to_8(hF22 + nb));
+      std::size_t i = 0;
+      for (auto& f : L.f) {
+      	hvds[i] = f->dim_sep();
+      	hvdu[i] = f->dim_upd();
+      	hF11[i] = f->F11_.data();  hF12[i] = f->F12_.data();
+      	hF21[i] = f->F21_.data();  hF22[i] = f->F22_.data();
+      	hpiv[i] = f->piv_;
+      	i++;
+      }
+      dpcpp::memcpy(q, dmem_.get(), hmem_.get(), bytes_level).wait();
+    }
+    std::size_t nb = 0, bytes_level = 0;
+    std::int64_t lwork = 0;
+    std::int64_t *vds = nullptr, *vdu = nullptr;
+    scalar_t **F11 = nullptr, **F12 = nullptr;
+    scalar_t **F21 = nullptr, **F22 = nullptr;
+    std::int64_t** piv = nullptr;
+    scalar_t *alpha = nullptr, *beta = nullptr;
+    std::int64_t* group_sizes = nullptr;
+    oneapi::mkl::transpose* op = nullptr;
+    dpcpp::DeviceMemory<scalar_t> scratchpad;
+  private: 
+    dpcpp::HostMemory<char> hmem_;
+    dpcpp::DeviceMemory<char> dmem_;
+  };
+  
 
-    }
-    if (is_complex<scalar_t>()) flops *= 4;
-    STRUMPACK_FLOPS(flops);
-    dpcpp::DeviceMemory<scalar_t> minus_one(nb, q), one(nb, q);
-    dpcpp::DeviceMemory<oneapi::mkl::transpose> op(nb, q);
-    dpcpp::DeviceMemory<std::int64_t> group_sizes(nb, q);
-    dpcpp::fill(q, minus_one.get(), scalar_t(-1.), nb);
-    dpcpp::fill(q, one.get(), scalar_t(1.), nb);
-    dpcpp::fill(q, op.get(), oneapi::mkl::transpose::N, nb);
-    dpcpp::fill(q, group_sizes.get(), std::int64_t(1), nb);
-    q.wait_and_throw();
-    auto lwork =
-      std::max(oneapi::mkl::lapack::getrf_batch_scratchpad_size<scalar_t>
-	       (q, vds, vds, vds, nb, group_sizes),
-	       oneapi::mkl::lapack::getrs_batch_scratchpad_size<scalar_t>
-	       (q, op, vds, vdu, vds, vds, nb, group_sizes));
-    {
-      dpcpp::DeviceMemory<scalar_t> work(lwork, q);
-      oneapi::mkl::lapack::getrf_batch
-	(q, vds, vds, F11, vds, vpiv,
-	 nb, group_sizes, work, lwork).wait();
-      oneapi::mkl::lapack::getrs_batch
-	(q, op, vds, vdu, F11, vds, vpiv, F12, vds,
-	 nb, group_sizes, work, lwork).wait();
-    }
+  template<typename scalar_t, typename integer_t> void
+  FrontDPCpp<scalar_t,integer_t>::factor_batch
+  (cl::sycl::queue& q, const LInfo_t& L, Batch_t& batch,
+   const Opts_t& opts) {
+    auto nb = L.f.size();
+    batch.set_level(q, L);
+    oneapi::mkl::lapack::getrf_batch
+      (q, batch.vds, batch.vds, batch.F11, batch.vds, batch.piv,
+       nb, batch.group_sizes, batch.scratchpad.get(), batch.lwork).wait();
+    oneapi::mkl::lapack::getrs_batch
+      (q, batch.op, batch.vds, batch.vdu, batch.F11, batch.vds,
+       batch.piv, batch.F12, batch.vds,
+       nb, batch.group_sizes, batch.scratchpad.get(), batch.lwork).wait();
     oneapi::mkl::blas::column_major::gemm_batch
-      (q, op, op, vdu, vdu, vds, minus_one, cF21, vdu,
-       cF12, vds, one, F22, vdu, nb, group_sizes).wait();
+      (q, batch.op, batch.op, batch.vdu, batch.vdu, batch.vds,
+       batch.alpha, const_cast<const scalar_t**>(batch.F21), batch.vdu,
+       const_cast<const scalar_t**>(batch.F12), batch.vds,
+       batch.beta, batch.F22, batch.vdu, nb, batch.group_sizes).wait();
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -633,8 +669,10 @@ namespace strumpack {
 
     auto peak_dmem = peak_device_memory(ldata);
     dpcpp::DeviceMemory<char> all_dmem;
+    BatchMetaData<scalar_t,integer_t> batch;
     try {
       all_dmem = dpcpp::DeviceMemory<char>(peak_dmem, q, false);
+      batch = BatchMetaData<scalar_t,integer_t>(ldata, q);
     } catch (std::exception& e) {
       split_smaller(A, opts, etree_level, task_depth);
       return;
@@ -670,12 +708,13 @@ namespace strumpack {
         L.set_work_pointers(work_mem);
         front_assembly(q, A, L, hea_mem, dea_mem);
         old_work = work_mem;
-        factor_large_fronts(q, L, opts);
+        //factor_large_fronts(q, L, opts);
+	factor_batch(q, L, batch, opts);
 	STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
         L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
         L.f[0]->pivot_mem_.resize(L.piv_size);
         q.wait_and_throw();
-        dpcpp::memcpy
+       dpcpp::memcpy
           (q, L.f[0]->pivot_mem_.data(), L.f[0]->piv_, L.piv_size);
         dpcpp::memcpy<scalar_t>
           (q, L.f[0]->host_factors_.get(), dev_factors, L.factor_size);
@@ -687,6 +726,7 @@ namespace strumpack {
         abort();
       }
       auto level_flops = L.total_flops();
+      STRUMPACK_FLOPS(level_flops);
       STRUMPACK_FULL_RANK_FLOPS(level_flops);
       if (opts.verbose()) {
         auto level_time = tl.elapsed();
