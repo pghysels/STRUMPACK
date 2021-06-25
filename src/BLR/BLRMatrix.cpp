@@ -1349,7 +1349,7 @@ namespace strumpack {
               }
             }
         }
-        for (std::size_t j=0; j<rb2; j++)
+        /*for (std::size_t j=0; j<rb2; j++)
           for (std::size_t k=0; k<rb2; k++){
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
             std::size_t k2j2 = (rb+k)+lrb*(rb+j);
@@ -1359,7 +1359,7 @@ namespace strumpack {
             {
               B22.compress_tile(k, j, opts);
             }
-          }
+          }*/
       }
       for (std::size_t i=0; i<rb; i++)
         for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
@@ -1378,7 +1378,7 @@ namespace strumpack {
       piv.resize(B11.rows());
       auto rb = B11.rowblocks();
       auto rb2 = B21.rowblocks();
-      std::size_t CP = 3;//??
+      std::size_t CP = 1;//??
       for (std::size_t i=0; i<rb; i+=CP) { //F11 and F21
         blockcol(i, true, CP);
         for (std::size_t k=0; k<i; k++){
@@ -1460,10 +1460,10 @@ namespace strumpack {
             }
         }
       }
-      for (std::size_t j=0; j<rb2; j++)
+      /*for (std::size_t j=0; j<rb2; j++)
         for (std::size_t k=0; k<rb2; k++){
            B22.compress_tile(k, j, opts);
-        }
+        }*/
       for (std::size_t i=0; i<rb; i++)
         for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
           piv[l] += B11.tileroff(i);

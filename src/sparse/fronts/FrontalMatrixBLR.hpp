@@ -351,7 +351,7 @@ namespace strumpack {
         break;
       }
     }
-    F22blr_.decompress_local_columns(c_min, c_max);
+    //F22blr_.decompress_local_columns(c_min, c_max);
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop default(shared) grainsize(64)      \
   if(task_depth < params::task_recursion_cutoff_level)
