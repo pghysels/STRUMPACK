@@ -182,6 +182,9 @@ namespace strumpack {
   FrontalMatrixBLR<scalar_t,integer_t>::release_work_memory() {
     F22_.clear();
     F22blr_.clear();
+    admissibility_.clear();
+    sep_tiles_.clear();
+    upd_tiles_.clear();
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -715,6 +718,10 @@ namespace strumpack {
       auto sep_tree = g.recursive_bisection
         (opts.compression_leaf_size(1), 0,
          sorder+sep_begin_, nullptr, 0, 0, dim_sep());
+      std::vector<integer_t> siorder(dim_sep());
+      for (integer_t i=sep_begin_; i<sep_end_; i++)
+        siorder[sorder[i]] = i - sep_begin_;
+      g.permute(sorder+sep_begin_, siorder.data());
       for (integer_t i=sep_begin_; i<sep_end_; i++)
         sorder[i] = sorder[i] + sep_begin_;
       sep_tiles_ = sep_tree.template leaf_sizes<std::size_t>();
