@@ -1349,17 +1349,19 @@ namespace strumpack {
               }
             }
         }
-        /*for (std::size_t j=0; j<rb2; j++)
+        for (std::size_t j=0; j<rb2; j++)
           for (std::size_t k=0; k<rb2; k++){
+            if(j!=k){
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-            std::size_t k2j2 = (rb+k)+lrb*(rb+j);
+              std::size_t k2j2 = (rb+k)+lrb*(rb+j);
 #pragma omp task default(shared) firstprivate(j,k,k2j2)       \
  depend(inout:B[k2j2])
 #endif
-            {
-              B22.compress_tile(k, j, opts);
+              {
+                B22.compress_tile(k, j, opts);
+              }
             }
-          }*/
+          }
       }
       for (std::size_t i=0; i<rb; i++)
         for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
@@ -1442,7 +1444,7 @@ namespace strumpack {
           for (std::size_t j=i; j<std::min(i+CP, rb2); j++) {
             B12.compress_tile(k, j, opts);
             std::vector<int> tpiv
-              (piv.begin()+B11.tileroff(k), piv.begin()+B11.tileroff(k+1)); //?? piv?
+              (piv.begin()+B11.tileroff(k), piv.begin()+B11.tileroff(k+1));
             B12.tile(k, j).laswp(tpiv, true);
             trsm(Side::L, UpLo::L, Trans::N, Diag::U,
                  scalar_t(1.), B11.tile(k, k), B12.tile(k, j));
@@ -1459,11 +1461,13 @@ namespace strumpack {
                     B21.tile(lk, k), B12.tile(k, lj), scalar_t(1.), B22.tile_dense(lk,lj).D());
             }
         }
-      }
-      /*for (std::size_t j=0; j<rb2; j++)
         for (std::size_t k=0; k<rb2; k++){
-           B22.compress_tile(k, j, opts);
-        }*/
+          //for (std::size_t j=0; j<rb2; j++)
+          for (std::size_t j=i; j<std::min(i+CP, rb2); j++) {
+            if (j!=k) B22.compress_tile(k, j, opts);
+          }
+        }
+      }
       for (std::size_t i=0; i<rb; i++)
         for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
           piv[l] += B11.tileroff(i);
