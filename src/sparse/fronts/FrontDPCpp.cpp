@@ -452,17 +452,15 @@ namespace strumpack {
     BatchMetaData() {}
     BatchMetaData(const std::vector<LInfo_t>& L,
                   cl::sycl::queue& q) {
+      std::size_t nb = 0;
       for (auto& l : L) nb = std::max(nb, l.f.size());
-      bytes_level =
+      auto bytes =
 	round_to_8(nb * 2 * sizeof(std::int64_t)) +  // ds, du
-	round_to_8(nb * 5 * sizeof(void*));          // F11, F12, F21, F22, piv
-      std::size_t bytes_fixed =
+	round_to_8(nb * 5 * sizeof(void*)) +         // F11, F12, F21, F22, piv
 	round_to_8(nb * 2 * sizeof(scalar_t)) +      // alpha, beta
 	round_to_8(nb * sizeof(std::int64_t)) +      // group_sizes
 	round_to_8(nb * sizeof(oneapi::mkl::transpose)); // op
-      // hmem_ = dpcpp::HostMemory<char>(bytes_level, q);
-      // dmem_ = dpcpp::DeviceMemory<char>(bytes_level + bytes_fixed, q);
-      hmem_ = dpcpp::HostMemory<char>(bytes_level + bytes_fixed, q);
+      hmem_ = dpcpp::HostMemory<char>(bytes, q);
       ds = hmem_.as<std::int64_t>();
       du = ds + nb;
       F11 = reinterpret_cast<scalar_t**>(round_to_8(du + nb));
@@ -494,25 +492,6 @@ namespace strumpack {
       scratchpad = dpcpp::DeviceMemory<scalar_t>(lwork, q);
     }
     void set_level(cl::sycl::queue& q, const LInfo_t& L) {
-      // auto hds = hmem_.as<std::int64_t>();
-      // auto hdu = hds + nb;
-      // auto hF11 = reinterpret_cast<scalar_t**>(round_to_8(hdu + nb));
-      // auto hF12 = hF11 + nb;
-      // auto hF21 = hF12 + nb;
-      // auto hF22 = hF21 + nb;
-      // auto hpiv = reinterpret_cast<std::int64_t**>(round_to_8(hF22 + nb));
-      // std::size_t i = 0;
-      // for (auto& f : L.f) {
-      // 	hds[i] = f->dim_sep();
-      // 	hdu[i] = f->dim_upd();
-      // 	hF11[i] = f->F11_.data();  hF12[i] = f->F12_.data();
-      // 	hF21[i] = f->F21_.data();  hF22[i] = f->F22_.data();
-      // 	hpiv[i] = f->piv_;
-      // 	i++;
-      // }
-      // dpcpp::memcpy(q, dmem_.get(), hmem_.get(), bytes_level);
-      // q.wait_and_throw();
-
       std::size_t i = 0;
       for (auto& f : L.f) {
       	ds[i] = f->dim_sep();
@@ -523,19 +502,15 @@ namespace strumpack {
       	i++;
       }
     }
-    std::size_t nb = 0, bytes_level = 0;
-    std::int64_t lwork = 0;
-    std::int64_t *ds = nullptr, *du = nullptr;
-    scalar_t **F11 = nullptr, **F12 = nullptr;
-    scalar_t **F21 = nullptr, **F22 = nullptr;
-    std::int64_t** piv = nullptr;
-    scalar_t *alpha = nullptr, *beta = nullptr;
-    std::int64_t* group_sizes = nullptr;
+    std::int64_t lwork = 0, *ds = nullptr, *du = nullptr,
+      **piv = nullptr, *group_sizes = nullptr;
+    scalar_t *alpha = nullptr, *beta = nullptr,
+      **F11 = nullptr, **F12 = nullptr,
+      **F21 = nullptr, **F22 = nullptr;
     oneapi::mkl::transpose* op = nullptr;
     dpcpp::DeviceMemory<scalar_t> scratchpad;
   private:
     dpcpp::HostMemory<char> hmem_;
-    dpcpp::DeviceMemory<char> dmem_;
   };
 
 
