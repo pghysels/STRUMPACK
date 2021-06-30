@@ -455,11 +455,11 @@ namespace strumpack {
       std::size_t nb = 0;
       for (auto& l : L) nb = std::max(nb, l.f.size());
       auto bytes =
-	round_to_8(nb * 2 * sizeof(std::int64_t)) +  // ds, du
-	round_to_8(nb * 5 * sizeof(void*)) +         // F11, F12, F21, F22, piv
-	round_to_8(nb * 2 * sizeof(scalar_t)) +      // alpha, beta
-	round_to_8(nb * sizeof(std::int64_t)) +      // group_sizes
-	round_to_8(nb * sizeof(oneapi::mkl::transpose)); // op
+        round_to_8(nb * 2 * sizeof(std::int64_t)) +  // ds, du
+        round_to_8(nb * 5 * sizeof(void*)) +         // F11, F12, F21, F22, piv
+        round_to_8(nb * 2 * sizeof(scalar_t)) +      // alpha, beta
+        round_to_8(nb * sizeof(std::int64_t)) +      // group_sizes
+        round_to_8(nb * sizeof(oneapi::mkl::transpose)); // op
       hmem_ = dpcpp::HostMemory<char>(bytes, q);
       ds = hmem_.as<std::int64_t>();
       du = ds + nb;
@@ -494,12 +494,12 @@ namespace strumpack {
     void set_level(cl::sycl::queue& q, const LInfo_t& L) {
       std::size_t i = 0;
       for (auto& f : L.f) {
-      	ds[i] = f->dim_sep();
-      	du[i] = f->dim_upd();
-      	F11[i] = f->F11_.data();  F12[i] = f->F12_.data();
-      	F21[i] = f->F21_.data();  F22[i] = f->F22_.data();
-      	piv[i] = f->piv_;
-      	i++;
+        ds[i] = f->dim_sep();
+        du[i] = f->dim_upd();
+        F11[i] = f->F11_.data();  F12[i] = f->F12_.data();
+        F21[i] = f->F21_.data();  F22[i] = f->F22_.data();
+        piv[i] = f->piv_;
+        i++;
       }
     }
     std::int64_t lwork = 0, *ds = nullptr, *du = nullptr,
