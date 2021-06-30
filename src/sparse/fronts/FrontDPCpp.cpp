@@ -454,17 +454,18 @@ namespace strumpack {
 		  cl::sycl::queue& q) {
       for (auto& l : L) nb = std::max(nb, l.f.size());
       bytes_level =
-	round_to_8(nb * 2 * sizeof(std::int64_t)) +  // vds, vdu
+	round_to_8(nb * 2 * sizeof(std::int64_t)) +  // ds, du
 	round_to_8(nb * 5 * sizeof(void*));          // F11, F12, F21, F22, piv
       std::size_t bytes_fixed =
 	round_to_8(nb * 2 * sizeof(scalar_t)) +      // alpha, beta
 	round_to_8(nb * sizeof(std::int64_t)) +      // group_sizes
 	round_to_8(nb * sizeof(oneapi::mkl::transpose)); // op
-      hmem_ = dpcpp::HostMemory<char>(bytes_level, q);
-      dmem_ = dpcpp::DeviceMemory<char>(bytes_level + bytes_fixed, q);
-      vds = dmem_.as<std::int64_t>();
-      vdu = vds + nb;
-      F11 = reinterpret_cast<scalar_t**>(round_to_8(vdu + nb));
+      // hmem_ = dpcpp::HostMemory<char>(bytes_level, q);
+      // dmem_ = dpcpp::DeviceMemory<char>(bytes_level + bytes_fixed, q);
+      hmem_ = dpcpp::HostMemory<char>(bytes_level + bytes_fixed, q);
+      ds = hmem_.as<std::int64_t>();
+      du = ds + nb;
+      F11 = reinterpret_cast<scalar_t**>(round_to_8(du + nb));
       F12 = F11 + nb;
       F21 = F12 + nb;
       F22 = F21 + nb;
@@ -484,37 +485,47 @@ namespace strumpack {
 	lwork = std::max
 	  (lwork, 
 	   oneapi::mkl::lapack::getrf_batch_scratchpad_size<scalar_t>
-	   (q, vds, vds, vds, nb, group_sizes));
+	   (q, ds, ds, ds, nb, group_sizes));
 	lwork = std::max
 	  (lwork,
 	   oneapi::mkl::lapack::getrs_batch_scratchpad_size<scalar_t>
-	   (q, op, vds, vdu, vds, vds, nb, group_sizes));
+	   (q, op, ds, du, ds, ds, nb, group_sizes));
       }
       scratchpad = dpcpp::DeviceMemory<scalar_t>(lwork, q);
     }
     void set_level(cl::sycl::queue& q, const LInfo_t& L) {
-      auto hvds = hmem_.as<std::int64_t>();
-      auto hvdu = hvds + nb;
-      auto hF11 = reinterpret_cast<scalar_t**>(round_to_8(hvdu + nb));
-      auto hF12 = hF11 + nb;
-      auto hF21 = hF12 + nb;
-      auto hF22 = hF21 + nb;
-      auto hpiv = reinterpret_cast<std::int64_t**>(round_to_8(hF22 + nb));
+      // auto hds = hmem_.as<std::int64_t>();
+      // auto hdu = hds + nb;
+      // auto hF11 = reinterpret_cast<scalar_t**>(round_to_8(hdu + nb));
+      // auto hF12 = hF11 + nb;
+      // auto hF21 = hF12 + nb;
+      // auto hF22 = hF21 + nb;
+      // auto hpiv = reinterpret_cast<std::int64_t**>(round_to_8(hF22 + nb));
+      // std::size_t i = 0;
+      // for (auto& f : L.f) {
+      // 	hds[i] = f->dim_sep();
+      // 	hdu[i] = f->dim_upd();
+      // 	hF11[i] = f->F11_.data();  hF12[i] = f->F12_.data();
+      // 	hF21[i] = f->F21_.data();  hF22[i] = f->F22_.data();
+      // 	hpiv[i] = f->piv_;
+      // 	i++;
+      // }
+      // dpcpp::memcpy(q, dmem_.get(), hmem_.get(), bytes_level);
+      // q.wait_and_throw();
+
       std::size_t i = 0;
       for (auto& f : L.f) {
-      	hvds[i] = f->dim_sep();
-      	hvdu[i] = f->dim_upd();
-      	hF11[i] = f->F11_.data();  hF12[i] = f->F12_.data();
-      	hF21[i] = f->F21_.data();  hF22[i] = f->F22_.data();
-      	hpiv[i] = f->piv_;
+      	ds[i] = f->dim_sep();
+      	du[i] = f->dim_upd();
+      	F11[i] = f->F11_.data();  F12[i] = f->F12_.data();
+      	F21[i] = f->F21_.data();  F22[i] = f->F22_.data();
+      	piv[i] = f->piv_;
       	i++;
       }
-      dpcpp::memcpy(q, dmem_.get(), hmem_.get(), bytes_level);
-      q.wait_and_throw();
     }
     std::size_t nb = 0, bytes_level = 0;
     std::int64_t lwork = 0;
-    std::int64_t *vds = nullptr, *vdu = nullptr;
+    std::int64_t *ds = nullptr, *du = nullptr;
     scalar_t **F11 = nullptr, **F12 = nullptr;
     scalar_t **F21 = nullptr, **F22 = nullptr;
     std::int64_t** piv = nullptr;
@@ -535,17 +546,17 @@ namespace strumpack {
     auto nb = L.f.size();
     batch.set_level(q, L);
     oneapi::mkl::lapack::getrf_batch
-      (q, batch.vds, batch.vds, batch.F11, batch.vds, batch.piv,
+      (q, batch.ds, batch.ds, batch.F11, batch.ds, batch.piv,
        nb, batch.group_sizes, batch.scratchpad.get(), batch.lwork).wait();
     oneapi::mkl::lapack::getrs_batch
-      (q, batch.op, batch.vds, batch.vdu, batch.F11, batch.vds,
-       batch.piv, batch.F12, batch.vds,
+      (q, batch.op, batch.ds, batch.du, batch.F11, batch.ds,
+       batch.piv, batch.F12, batch.ds,
        nb, batch.group_sizes, batch.scratchpad.get(), batch.lwork).wait();
     oneapi::mkl::blas::column_major::gemm_batch
-      (q, batch.op, batch.op, batch.vdu, batch.vdu, batch.vds,
-       batch.alpha, const_cast<const scalar_t**>(batch.F21), batch.vdu,
-       const_cast<const scalar_t**>(batch.F12), batch.vds,
-       batch.beta, batch.F22, batch.vdu, nb, batch.group_sizes).wait();
+      (q, batch.op, batch.op, batch.du, batch.du, batch.ds,
+       batch.alpha, const_cast<const scalar_t**>(batch.F21), batch.du,
+       const_cast<const scalar_t**>(batch.F12), batch.ds,
+       batch.beta, batch.F22, batch.du, nb, batch.group_sizes).wait();
   }
 
   template<typename scalar_t,typename integer_t> void
