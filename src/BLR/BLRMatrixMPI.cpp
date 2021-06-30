@@ -79,10 +79,10 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    BLRMatrixMPI<scalar_t>::fill_col(scalar_t v, int k, bool part) {
+    BLRMatrixMPI<scalar_t>::fill_col(scalar_t v, int k, bool part, std::size_t CP) {
       std::size_t j_end=0;
       if (part){
-        j_end = std::min(std::size_t(k+grid_->npcols()), colblocks());
+        j_end = std::min(std::size_t(k+CP), colblocks());
       } else{
         j_end = std::min(k+colblocks(), colblocks());
       }
@@ -2537,15 +2537,15 @@ namespace strumpack {
 
 
     template<typename scalar_t> std::vector<int> 
-    BLRMatrixMPI<scalar_t>::factor_colwise(const adm_t& adm, const Opts_t& opts, const std::function<void(int, bool)>& blockcol){
+    BLRMatrixMPI<scalar_t>::factor_colwise(const adm_t& adm, const Opts_t& opts, const std::function<void(int, bool, std::size_t)>& blockcol){
       std::vector<int> piv, piv_tile;
       std::vector<std::vector<int> > piv_tile_global;
       DenseTile<scalar_t> Tcc;
       std::vector<DenseTile<scalar_t> > Tcc_vec;
-      auto CP = grid()->npcols();
+      auto CP = 2;//grid()->npcols();
       for (std::size_t i=0; i<colblocks(); i+=CP) {
         //construct the (i/CP+1) CP block-columns as dense tiles
-        blockcol(i, true);
+        blockcol(i, true, CP);
         for (std::size_t k=0; k<i; k++){
 #pragma omp parallel
           {
@@ -2611,7 +2611,7 @@ namespace strumpack {
                 if (grid()->is_local_col(c))
                   piv_tile=tile(c, c).LU();
                 else piv_tile.resize(tilerows(c));
-                grid()->row_comm().broadcast_from(piv_tile, c % CP);
+                grid()->row_comm().broadcast_from(piv_tile, c % grid()->npcols());
                 piv_tile_global.push_back(piv_tile);
                 int r0 = tileroff(c);
                 std::transform
@@ -2701,7 +2701,7 @@ namespace strumpack {
     template<typename scalar_t> std::vector<int>
     BLRMatrixMPI<scalar_t>::factor_col(BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22, 
                                        const adm_t& adm, const Opts_t& opts, 
-                                       const std::function<void(int, bool)>& blockcol){
+                                       const std::function<void(int, bool, std::size_t)>& blockcol){
       auto B1_r = F11.rowblocks();
       auto B1_c = F11.colblocks();
       auto B2_r = F22.rowblocks();
@@ -2712,10 +2712,10 @@ namespace strumpack {
       std::vector<int> piv_tile;
       DenseTile<scalar_t> Tcc;
       std::vector<DenseTile<scalar_t> > Tcc_vec;
-      auto CP = g->npcols();
+      auto CP = 2;//g->npcols();
       for (std::size_t i=0; i<B1_c; i+=CP) { //F11 and F21
         //construct the (i/CP+1) CP block-columns as dense tiles
-        blockcol(i, true);
+        blockcol(i, true, CP);
         for (std::size_t k=0; k<i; k++){
 #pragma omp parallel
           {
@@ -2795,7 +2795,7 @@ namespace strumpack {
                 else piv_tile.resize(F11.tilerows(c));
               }
               if (g->is_local_row(c)) {
-                g->row_comm().broadcast_from(piv_tile, c % CP);
+                g->row_comm().broadcast_from(piv_tile, c % g->npcols());
                 piv_tile_global.push_back(piv_tile);
                 int r0 = F11.tileroff(c);
                 std::transform
@@ -2908,7 +2908,7 @@ namespace strumpack {
       }
       for (std::size_t i=0; i<B2_c; i+=CP) { //F12 and F22
         //construct the B2_c CP block-columns as dense tiles
-        blockcol(i, false);
+        blockcol(i, false, CP);
         for (std::size_t k=0; k<B1_r; k++){
 #pragma omp parallel
           {

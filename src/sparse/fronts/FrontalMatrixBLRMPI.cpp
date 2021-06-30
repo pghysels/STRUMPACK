@@ -75,7 +75,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::extend_add_cols(std::size_t i, bool part) {
+  FrontalMatrixBLRMPI<scalar_t,integer_t>::extend_add_cols(std::size_t i, bool part, std::size_t CP) {
     if (!lchild_ && !rchild_) return;
     std::vector<std::vector<scalar_t>> sbuf(this->P());
     for (auto& ch : {lchild_.get(), rchild_.get()}) {
@@ -87,11 +87,11 @@ namespace strumpack {
       if (part){
         ch->extadd_blr_copy_to_buffers_col
           (sbuf, this, F11blr_.tilecoff(i), 
-           F11blr_.tilecoff(std::min(i+grid2d().npcols(),F11blr_.colblocks())));
+           F11blr_.tilecoff(std::min(i+CP,F11blr_.colblocks())));
       } else{
         ch->extadd_blr_copy_to_buffers_col
           (sbuf, this, F22blr_.tilecoff(i)+dim_sep(), 
-           F22blr_.tilecoff(std::min(i+grid2d().npcols(),F22blr_.colblocks()))
+           F22blr_.tilecoff(std::min(i+CP,F22blr_.colblocks()))
            +dim_sep());
       }
     }
@@ -105,14 +105,14 @@ namespace strumpack {
           (F11blr_, F12blr_, F21blr_, F22blr_,
            pbuf.data()+this->master(ch), this,
            F11blr_.tilecoff(i),
-           F11blr_.tilecoff(std::min(i+grid2d().npcols(),
+           F11blr_.tilecoff(std::min(i+CP,
                                      F11blr_.colblocks())));
       } else {
         ch->extadd_blr_copy_from_buffers_col
           (F11blr_, F12blr_, F21blr_, F22blr_,
            pbuf.data()+this->master(ch), this,
            F22blr_.tilecoff(i) + dim_sep(),
-           F22blr_.tilecoff(std::min(i+grid2d().npcols(), 
+           F22blr_.tilecoff(std::min(i+CP, 
                                      F22blr_.colblocks()))
            + dim_sep());
       }
@@ -209,40 +209,40 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLRMPI<scalar_t,integer_t>::build_front_cols
-  (const SpMat_t& A, std::size_t i, bool part, const std::vector<Triplet<scalar_t>>& r1buf, 
+  (const SpMat_t& A, std::size_t i, bool part, std::size_t CP, const std::vector<Triplet<scalar_t>>& r1buf, 
    const std::vector<Triplet<scalar_t>>& r2buf, const std::vector<Triplet<scalar_t>>& r3buf) {
     const auto dupd = dim_upd();
     const auto dsep = dim_sep();
     if (dsep) {
-      if (part) F11blr_.fill_col(0., i, true);
+      if (part) F11blr_.fill_col(0., i, true, CP);
       if (dupd) {
         if (!part) {
-          F12blr_.fill_col(0., i, false);
-        } else F21blr_.fill_col(0., i, true);
+          F12blr_.fill_col(0., i, false, CP);
+        } else F21blr_.fill_col(0., i, true, CP);
       }
     }
     if (dupd) {
-      if (!part) F22blr_.fill_col(0., i, false);
+      if (!part) F22blr_.fill_col(0., i, false, CP);
     }
     if (part){
       if (dsep) {
         for (auto& e : r1buf) 
-          if (F11blr_.cg2t(e.c) >= i && F11blr_.cg2t(e.c) < i+grid2d().npcols())
+          if (F11blr_.cg2t(e.c) >= i && F11blr_.cg2t(e.c) < i+CP)
             F11blr_.global(e.r, e.c) = e.v;
       }
       if (dupd) {
         for (auto& e : r3buf) 
-          if(F21blr_.cg2t(e.c) >= i && F21blr_.cg2t(e.c) < i+grid2d().npcols())
+          if(F21blr_.cg2t(e.c) >= i && F21blr_.cg2t(e.c) < i+CP)
             F21blr_.global(e.r, e.c) = e.v;
       }
     } else{
       if (dupd) {
         for (auto& e : r2buf) 
-          if (F12blr_.cg2t(e.c) >= i && F12blr_.cg2t(e.c) < i+grid2d().npcols())
+          if (F12blr_.cg2t(e.c) >= i && F12blr_.cg2t(e.c) < i+CP)
             F12blr_.global(e.r, e.c) = e.v;
       }
     }
-    extend_add_cols(i, part);
+    extend_add_cols(i, part, CP);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -295,7 +295,7 @@ namespace strumpack {
         auto r3buf = Comm().all_to_all_v(s3buf);
         piv_ = BLRMPI_t::factor_col(F11blr_, F12blr_, F21blr_, F22blr_, 
                                   adm_, opts.BLR_options(), 
-                                  [&](int i, bool part){this->build_front_cols(A, i, part, r1buf, r2buf, r3buf);});
+                                  [&](int i, bool part, std::size_t CP){this->build_front_cols(A, i, part, CP, r1buf, r2buf, r3buf);});
       } else{ 
         F11blr_ = BLRMPI_t(pgrid_, sep_tiles_, sep_tiles_);
         using Trip_t = Triplet<scalar_t>;
@@ -307,7 +307,7 @@ namespace strumpack {
         auto r1buf = Comm().all_to_all_v(sbuf);
         std::vector<Trip_t> r2buf, r3buf;
         piv_ = F11blr_.factor_colwise(adm_, opts.BLR_options(), 
-                                  [&](int i, bool part){build_front_cols(A, i, part, r1buf, r2buf, r3buf);});
+                                  [&](int i, bool part, std::size_t CP){build_front_cols(A, i, part, CP, r1buf, r2buf, r3buf);});
       }
     }
     if (lchild_) lchild_->release_work_memory();
