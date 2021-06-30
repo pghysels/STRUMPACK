@@ -2542,7 +2542,7 @@ namespace strumpack {
       std::vector<std::vector<int> > piv_tile_global;
       DenseTile<scalar_t> Tcc;
       std::vector<DenseTile<scalar_t> > Tcc_vec;
-      auto CP = 2;//grid()->npcols();
+      auto CP = grid()->npcols();
       for (std::size_t i=0; i<colblocks(); i+=CP) {
         //construct the (i/CP+1) CP block-columns as dense tiles
         blockcol(i, true);
@@ -2712,7 +2712,7 @@ namespace strumpack {
       std::vector<int> piv_tile;
       DenseTile<scalar_t> Tcc;
       std::vector<DenseTile<scalar_t> > Tcc_vec;
-      auto CP = 2;//= g->npcols();
+      auto CP = g->npcols();
       for (std::size_t i=0; i<B1_c; i+=CP) { //F11 and F21
         //construct the (i/CP+1) CP block-columns as dense tiles
         blockcol(i, true);
