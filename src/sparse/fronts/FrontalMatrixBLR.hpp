@@ -132,12 +132,12 @@ namespace strumpack {
     (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa, 
      integer_t begin_col, integer_t end_col)
       const override {
-      /*if (F22blr_.rows() == std::size_t(dim_upd()))
+      if (F22blr_.rows() == std::size_t(dim_upd()))
         abort(); //F22blr_.dense(F22_);
       BLR::BLRExtendAdd<scalar_t,integer_t>::
-        seq_copy_to_buffers_col(F22_, sbuf, pa, this, begin_col, end_col);*/
-      BLR::BLRExtendAdd<scalar_t,integer_t>::
-        blrseq_copy_to_buffers_col(F22blr_, sbuf, pa, this, begin_col, end_col);
+        seq_copy_to_buffers_col(F22_, sbuf, pa, this, begin_col, end_col);
+      /*BLR::BLRExtendAdd<scalar_t,integer_t>::
+        blrseq_copy_to_buffers_col(F22blr_, sbuf, pa, this, begin_col, end_col);*/
     }
 #endif
 
@@ -448,7 +448,7 @@ namespace strumpack {
     const auto dupd = dim_upd();
     if (opts.BLR_options().low_rank_algorithm() ==
         BLR::LowRankAlgorithm::RRQR) {
-#if 1 /* factor column-block-wise for memory reduction*/
+#if 0 /* factor column-block-wise for memory reduction*/
       if (dsep) {
         F11blr_ = BLRM_t(dsep, sep_tiles_, dsep, sep_tiles_);
         F12blr_ = BLRM_t(dsep, sep_tiles_, dupd, upd_tiles_);
@@ -475,7 +475,7 @@ namespace strumpack {
           (F11blr_, F12blr_, F21blr_, F22blr_, piv_, sep_tiles_, 
            upd_tiles_, admissibility_, opts.BLR_options());
       }
-#elif 0
+#elif 1
       DenseM_t F11(dsep, dsep), F12(dsep, dupd), F21(dupd, dsep);
       F11.zero(); F12.zero(); F21.zero();
       A.extract_front(F11, F12, F21, sep_begin_, sep_end_, this->upd_, task_depth);
