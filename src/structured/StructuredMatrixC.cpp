@@ -201,7 +201,8 @@ extern "C" {
       auto s = create_mat<std::complex<float>>();
       s->S = construct_from_elements<std::complex<float>>
         (rows, cols,
-         [&A](int i, int j) -> std::complex<float> { return A(i,j); },
+         [&A](int i, int j) -> std::complex<float> {
+          return static_cast<std::complex<float>>(A(i,j)); },
          get_options<std::complex<float>>(opts));
       *S = s;
     } catch (std::exception& e) {
@@ -217,7 +218,8 @@ extern "C" {
       auto s = create_mat<std::complex<double>>();
       s->S = construct_from_elements<std::complex<double>>
         (rows, cols,
-         [&A](int i, int j) -> std::complex<double> { return A(i,j); },
+         [&A](int i, int j) -> std::complex<double> {
+          return static_cast<std::complex<double>>(A(i,j)); },
          get_options<std::complex<double>>(opts));
       *S = s;
     } catch (std::exception& e) {
@@ -366,7 +368,8 @@ extern "C" {
       s->comm = MPIComm(comm);
       s->S = construct_from_elements<std::complex<float>>
         (s->comm, rows, cols,
-         [&A](int i, int j) -> std::complex<float> { return A(i,j); },
+         [&A](int i, int j) -> std::complex<float> {
+          return static_cast<std::complex<float>>(A(i,j)); },
          get_options<std::complex<float>>(opts));
       *S = s;
     } catch (std::exception& e) {
@@ -385,7 +388,8 @@ extern "C" {
       s->comm = MPIComm(comm);
       s->S = construct_from_elements<std::complex<double>>
         (s->comm, rows, cols,
-         [&A](int i, int j) -> std::complex<double> { return A(i,j); },
+         [&A](int i, int j) -> std::complex<double> {
+          return static_cast<std::complex<double>>(A(i,j)); },
          get_options<std::complex<double>>(opts));
       *S = s;
     } catch (std::exception& e) {
@@ -639,7 +643,6 @@ extern "C" {
                        const float* B, int ldB,
                        float* C, int ldC) {
     try {
-      //reinterpret_cast<CStructMat_<float>*>(S)->S->
       get_mat<float>(S)->mult(c2T(trans), m, B, ldB, C, ldC);
     } catch (std::exception& e) {
       std::cerr << "Operation failed: " << e.what() << std::endl;
@@ -786,7 +789,8 @@ extern "C" {
   }
   int SP_c_struct_shift(CSPStructMat S, float _Complex s) {
     try {
-      get_mat<std::complex<float>>(S)->shift(s);
+      get_mat<std::complex<float>>(S)->shift
+        (static_cast<std::complex<float>>(s));
     } catch (std::exception& e) {
       std::cerr << "Operation failed: " << e.what() << std::endl;
       return 1;
@@ -795,7 +799,8 @@ extern "C" {
   }
   int SP_z_struct_shift(CSPStructMat S, double _Complex s) {
     try {
-      get_mat<std::complex<double>>(S)->shift(s);
+      get_mat<std::complex<double>>(S)->shift
+        (static_cast<std::complex<double>>(s));
     } catch (std::exception& e) {
       std::cerr << "Operation failed: " << e.what() << std::endl;
       return 1;
