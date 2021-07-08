@@ -452,6 +452,10 @@ else()
   add_library(strumpack "")
 endif()
 
+# this is to fix a link issue for the fortran example when compiling
+# with clang
+set_property(TARGET strumpack PROPERTY POSITION_INDEPENDENT_CODE ON)
+
 add_subdirectory(src)
 
 target_sources(strumpack
