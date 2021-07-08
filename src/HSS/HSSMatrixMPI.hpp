@@ -135,9 +135,9 @@ namespace strumpack {
                     const opts_t& opts);
       void compress(const kernel::Kernel<real_t>& K, const opts_t& opts);
 
-      void factor();
+      void factor() override;
       void partial_factor();
-      void solve(DistM_t& b) const;
+      void solve(DistM_t& b) const override;
       void forward_solve(WorkSolveMPI<scalar_t>& w, const DistM_t& b,
                          bool partial) const override;
       void backward_solve(WorkSolveMPI<scalar_t>& w,

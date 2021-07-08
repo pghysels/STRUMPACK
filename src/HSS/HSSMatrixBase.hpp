@@ -288,7 +288,7 @@ namespace strumpack {
        *
        * \param sigma Shift to be applied to the diagonal.
        */
-      virtual void shift(scalar_t sigma) = 0;
+      virtual void shift(scalar_t sigma) override = 0;
 
       /**
        * Internal routine to draw this HSS matrix. Do not use this
