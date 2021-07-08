@@ -138,7 +138,7 @@ namespace strumpack {
        * this.rows()
        * \see mult
        */
-      void mult(Trans op, const DistM_t& X, DistM_t& Y) const;
+      void mult(Trans op, const DistM_t& X, DistM_t& Y) const override;
 
       void extract_add_elements(const VecVec_t& I, const VecVec_t& J,
                                 std::vector<DenseMW_t>& B);

@@ -279,7 +279,7 @@ namespace strumpack {
        * dist()[rank+1]==end_row()
        * \return 1D block row distribution
        */
-      const std::vector<int>& dist() const { return dist_; }
+      const std::vector<int>& dist() const override { return dist_; }
 
       /**
        * Return MPI communicator wrapper object.
@@ -440,7 +440,7 @@ namespace strumpack {
        *
        * \see solve, inv_mult
        */
-      void factor();
+      void factor() override;
 
       /**
        * Solve a system of linear equations A*X=B, with possibly
