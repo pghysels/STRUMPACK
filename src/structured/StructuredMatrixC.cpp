@@ -202,7 +202,8 @@ extern "C" {
       s->S = construct_from_elements<std::complex<float>>
         (rows, cols,
          [&A](int i, int j) -> std::complex<float> {
-          return static_cast<std::complex<float>>(A(i,j)); },
+          auto Aij = A(i,j);
+          return reinterpret_cast<std::complex<float>&>(Aij); },
          get_options<std::complex<float>>(opts));
       *S = s;
     } catch (std::exception& e) {
@@ -219,7 +220,8 @@ extern "C" {
       s->S = construct_from_elements<std::complex<double>>
         (rows, cols,
          [&A](int i, int j) -> std::complex<double> {
-          return static_cast<std::complex<double>>(A(i,j)); },
+          auto Aij = A(i,j);
+          return reinterpret_cast<std::complex<double>&>(Aij); },
          get_options<std::complex<double>>(opts));
       *S = s;
     } catch (std::exception& e) {
@@ -369,7 +371,8 @@ extern "C" {
       s->S = construct_from_elements<std::complex<float>>
         (s->comm, rows, cols,
          [&A](int i, int j) -> std::complex<float> {
-          return static_cast<std::complex<float>>(A(i,j)); },
+          auto aij = A(i, j);
+          return reinterpret_cast<std::complex<float>&>(aij); },
          get_options<std::complex<float>>(opts));
       *S = s;
     } catch (std::exception& e) {
@@ -389,7 +392,8 @@ extern "C" {
       s->S = construct_from_elements<std::complex<double>>
         (s->comm, rows, cols,
          [&A](int i, int j) -> std::complex<double> {
-          return static_cast<std::complex<double>>(A(i,j)); },
+          auto aij = A(i, j);
+          return reinterpret_cast<std::complex<double>&>(aij); },
          get_options<std::complex<double>>(opts));
       *S = s;
     } catch (std::exception& e) {
@@ -790,7 +794,7 @@ extern "C" {
   int SP_c_struct_shift(CSPStructMat S, float _Complex s) {
     try {
       get_mat<std::complex<float>>(S)->shift
-        (static_cast<std::complex<float>>(s));
+        (reinterpret_cast<std::complex<float>&>(s));
     } catch (std::exception& e) {
       std::cerr << "Operation failed: " << e.what() << std::endl;
       return 1;
@@ -800,7 +804,7 @@ extern "C" {
   int SP_z_struct_shift(CSPStructMat S, double _Complex s) {
     try {
       get_mat<std::complex<double>>(S)->shift
-        (static_cast<std::complex<double>>(s));
+        (reinterpret_cast<std::complex<double>&>(s));
     } catch (std::exception& e) {
       std::cerr << "Operation failed: " << e.what() << std::endl;
       return 1;
