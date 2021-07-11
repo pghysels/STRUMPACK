@@ -124,7 +124,7 @@ namespace strumpack {
 
       std::vector<int> factor(const Opts_t& opts);
       std::vector<int> factor(const adm_t& adm, const Opts_t& opts);
-      std::vector<int> factor_colwise(const adm_t& adm, const Opts_t& opts,
+      std::vector<int> factor_col(const adm_t& adm, const Opts_t& opts,
                                       const std::function<void(int, bool, std::size_t)>& blockcol);
 
       void laswp(const std::vector<int>& piv, bool fwd);
@@ -135,13 +135,11 @@ namespace strumpack {
                                       const adm_t& adm, const Opts_t& opts);
 
       static
-      std::vector<int> factor_col(BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, 
+      std::vector<int> partial_factor_col(BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, 
                                   BLRMPI_t& F22, const adm_t& adm, const Opts_t& opts, 
                                   const std::function<void(int, bool, std::size_t)>& blockcol);
 
       void compress(const Opts_t& opts);
-
-      void decompress();
 
       static
       BLRMPI_t from_ScaLAPACK(const DistM_t& A, const ProcessorGrid2D& g,
@@ -180,7 +178,6 @@ namespace strumpack {
       scalar_t operator()(std::size_t i, std::size_t j) const;
       scalar_t& operator()(std::size_t i, std::size_t j);
 
-      // scalar_t get_element_and_decompress_if_needed(std::size_t i, std::size_t j);
       scalar_t get_element_and_decompress_HODBF(int tr, int tc, int lr, int lc);
       void decompress_local_columns(int c_min, int c_max);
       void remove_tiles_before_local_column(int c_min, int c_max);

@@ -38,6 +38,9 @@
 
 namespace strumpack {
 
+  enum class BLRCB { COLWISE, DENSE, BLR };
+  std::string get_name(BLRCB a);
+
   /*! BLR namespace. */
   namespace BLR {
 
@@ -63,6 +66,11 @@ namespace strumpack {
     enum class BLRFactorAlgorithm { RL, LL, COMB, STAR };
     std::string get_name(BLRFactorAlgorithm a);
 
+    /*namespace BLR_wrapper {
+      enum class BLRCB { COLWISE, DENSE, BLR };
+      std::string get_name(BLRCB a);
+    }*/
+
     enum class CompressionKernel { HALF, FULL };
     std::string get_name(CompressionKernel a);
 
@@ -79,6 +87,8 @@ namespace strumpack {
       int BACA_blocksize_ = 4;
       Admissibility adm_ = Admissibility::STRONG;
       BLRFactorAlgorithm blr_algo_ = BLRFactorAlgorithm::STAR;
+      BLRCB blr_cb_ = BLRCB::DENSE;
+      bool BLRseqCBCompression_ = true;
       CompressionKernel crn_krnl_ = CompressionKernel::HALF;
 
 
@@ -111,6 +121,10 @@ namespace strumpack {
       void set_BLR_factor_algorithm(BLRFactorAlgorithm a) {
         blr_algo_ = a;
       }
+      void set_BLR_CB(BLRCB a) {
+        blr_cb_ = a;
+      }
+      void set_BLRseq_CB_Compression(bool a) { BLRseqCBCompression_ = a; }
       void set_compression_kernel(CompressionKernel a) {
         crn_krnl_ = a;
       }
@@ -124,6 +138,8 @@ namespace strumpack {
       bool verbose() const { return verbose_; }
       int BACA_blocksize() const { return BACA_blocksize_; }
       BLRFactorAlgorithm BLR_factor_algorithm() const { return blr_algo_; }
+      BLRCB BLR_CB() const { return blr_cb_; }
+      bool BLRseq_CB_Compression() const { return BLRseqCBCompression_; }
       CompressionKernel compression_kernel() const { return crn_krnl_; }
 
       void set_from_command_line(int argc, const char* const* cargv);

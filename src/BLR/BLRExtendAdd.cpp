@@ -711,7 +711,7 @@ namespace strumpack {
     template<typename scalar_t,typename integer_t> void
     BLRExtendAdd<scalar_t,integer_t>::blrseq_copy_to_buffers_col
     (const BLR_t& CB, VVS_t& sbuf, const FBLRMPI_t* pa, const F_t* ch, 
-     integer_t begin_col, integer_t end_col) {
+     integer_t begin_col, integer_t end_col, const BLROptions<scalar_t>& opts) {
       std::size_t u2s;
       const auto I = ch->upd_to_parent(static_cast<const F_t*>(pa), u2s);
       const std::size_t du = ch->dim_upd();
@@ -764,7 +764,7 @@ namespace strumpack {
         for (std::size_t p=0; p<sbuf.size(); p++)
           sbuf[p].reserve(sbuf[p].size()+cnt[p]);
       }
-      if (c_max > 0) const_cast<BLR_t&>(CB).decompress_local_columns(c_min, c_max);
+      if (c_max > 0 && opts.BLRseq_CB_Compression()) const_cast<BLR_t&>(CB).decompress_local_columns(c_min, c_max);
       if (u2s)
         for (int c=c_min; c<c_max; c++) { // F11 and F12
           auto pcc=pc[c];

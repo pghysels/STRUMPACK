@@ -86,7 +86,7 @@ namespace strumpack {
        integer_t begin_col, integer_t end_col);
        static void blrseq_copy_to_buffers_col
       (const BLR_t& CB, VVS_t& sbuf, const FBLRMPI_t* pa, const F_t* ch, 
-       integer_t begin_col, integer_t end_col);
+       integer_t begin_col, integer_t end_col, const BLROptions<scalar_t>& opts);
 
       static void seq_copy_from_buffers
       (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
