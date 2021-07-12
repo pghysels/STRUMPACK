@@ -130,12 +130,12 @@ namespace strumpack {
     (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa, 
      integer_t begin_col, integer_t end_col, const Opts_t& opts)
       const override {
-      if (opts.BLR_options().BLR_CB() == BLRCB::DENSE) {
+      if (opts.BLR_options().BLR_CB() == BLR::BLRCB::DENSE) {
         if (F22blr_.rows() == std::size_t(dim_upd()))
           abort(); //F22blr_.dense(F22_);
         BLR::BLRExtendAdd<scalar_t,integer_t>::
           seq_copy_to_buffers_col(F22_, sbuf, pa, this, begin_col, end_col);
-      } else if(opts.BLR_options().BLR_CB() == BLRCB::COLWISE || opts.BLR_options().BLR_CB() == BLRCB::BLR) {
+      } else if(opts.BLR_options().BLR_CB() == BLR::BLRCB::COLWISE || opts.BLR_options().BLR_CB() == BLR::BLRCB::BLR) {
         BLR::BLRExtendAdd<scalar_t,integer_t>::
           blrseq_copy_to_buffers_col(F22blr_, sbuf, pa, this, begin_col, end_col, opts.BLR_options());
       }
@@ -449,7 +449,7 @@ namespace strumpack {
     const auto dupd = dim_upd();
     if (opts.BLR_options().low_rank_algorithm() ==
         BLR::LowRankAlgorithm::RRQR) {
-      if(opts.BLR_options().BLR_CB() == BLRCB::COLWISE) {
+      if(opts.BLR_options().BLR_CB() == BLR::BLRCB::COLWISE) {
         /* factor column-block-wise for memory reduction*/
         if (dsep) {
           F11blr_ = BLRM_t(dsep, sep_tiles_, dsep, sep_tiles_);
@@ -466,7 +466,7 @@ namespace strumpack {
         }
         if (lchild_) lchild_->release_work_memory();
         if (rchild_) rchild_->release_work_memory();
-      } else if(opts.BLR_options().BLR_CB() == BLRCB::BLR) {
+      } else if(opts.BLR_options().BLR_CB() == BLR::BLRCB::BLR) {
         build_front(A);
         if (lchild_)
           lchild_->extend_add_to_blr(F11blr_, F12blr_, F21blr_, F22blr_, this, task_depth, opts);
@@ -477,7 +477,7 @@ namespace strumpack {
             (F11blr_, F12blr_, F21blr_, F22blr_, piv_, sep_tiles_, 
             upd_tiles_, admissibility_, opts.BLR_options());
         }
-      } else if(opts.BLR_options().BLR_CB() == BLRCB::DENSE) {
+      } else if(opts.BLR_options().BLR_CB() == BLR::BLRCB::DENSE) {
         DenseM_t F11(dsep, dsep), F12(dsep, dupd), F21(dupd, dsep);
         F11.zero(); F12.zero(); F21.zero();
         A.extract_front(F11, F12, F21, sep_begin_, sep_end_, this->upd_, task_depth);

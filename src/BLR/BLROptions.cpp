@@ -36,14 +36,7 @@
 #include "misc/Tools.hpp"
 
 namespace strumpack {
-  std::string get_name(BLRCB a) {
-    switch (a) {
-    case BLRCB::COLWISE: return "COLWISE"; break;
-    case BLRCB::DENSE: return "DENSE"; break;
-    case BLRCB::BLR: return "BLR"; break;
-    default: return "unknown";
-    }
-  }
+  
   namespace BLR {
 
     std::string get_name(LowRankAlgorithm a) {
@@ -73,14 +66,14 @@ namespace strumpack {
       }
     }
 
-/*     std::string get_name(BLRCB a) {
+    std::string get_name(BLRCB a) {
       switch (a) {
       case BLRCB::COLWISE: return "COLWISE"; break;
       case BLRCB::DENSE: return "DENSE"; break;
       case BLRCB::BLR: return "BLR"; break;
       default: return "unknown";
       }
-    } */
+    }
 
     std::string get_name(CompressionKernel a) {
       switch (a) {

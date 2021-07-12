@@ -38,8 +38,6 @@
 
 namespace strumpack {
 
-  enum class BLRCB { COLWISE, DENSE, BLR };
-  std::string get_name(BLRCB a);
 
   /*! BLR namespace. */
   namespace BLR {
@@ -66,10 +64,8 @@ namespace strumpack {
     enum class BLRFactorAlgorithm { RL, LL, COMB, STAR };
     std::string get_name(BLRFactorAlgorithm a);
 
-    /*namespace BLR_wrapper {
-      enum class BLRCB { COLWISE, DENSE, BLR };
-      std::string get_name(BLRCB a);
-    }*/
+    enum class BLRCB { COLWISE, DENSE, BLR };
+    std::string get_name(BLRCB a);
 
     enum class CompressionKernel { HALF, FULL };
     std::string get_name(CompressionKernel a);
