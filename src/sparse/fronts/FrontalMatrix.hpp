@@ -71,6 +71,7 @@ namespace strumpack {
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using Opts_t = SPOptions<scalar_t>;
+    using BLRM_t = BLR::BLRMatrix<scalar_t>;
 #if defined(STRUMPACK_USE_MPI)
     using DistM_t = DistributedMatrix<scalar_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
@@ -99,6 +100,11 @@ namespace strumpack {
     std::vector<std::size_t> upd_to_parent(const F_t* pa,
                                            std::size_t& upd2sep) const;
     std::vector<std::size_t> upd_to_parent(const F_t* pa) const;
+
+    virtual void barrier_world() const { 
+      MPI_Barrier(MPI_COMM_WORLD); 
+      std::cout << "peak memory after seq= " << double(strumpack::params::peak_memory) / 1.0e6 << " MB" << std::endl;
+    }
 
     virtual void release_work_memory() = 0;
 
@@ -137,6 +143,17 @@ namespace strumpack {
                         DenseM_t& paF21, DenseM_t& paF22,
                         const FrontalMatrix<scalar_t,integer_t>* p,
                         int task_depth) {}
+
+    virtual void
+    extend_add_to_blr(BLRM_t& paF11, BLRM_t& paF12,
+                        BLRM_t& paF21, BLRM_t& paF22,
+                        const FrontalMatrix<scalar_t,integer_t>* p,
+                        int task_depth, const Opts_t& opts) {}
+    virtual void
+    extend_add_to_blr_col(BLRM_t& paF11, BLRM_t& paF12,
+                        BLRM_t& paF21, BLRM_t& paF22,
+                        const FrontalMatrix<scalar_t,integer_t>* p,
+                        integer_t begin_col, integer_t end_col, int task_depth, const Opts_t& opts) {}
 
     virtual int random_samples() const { return 0; }
 
@@ -261,9 +278,21 @@ namespace strumpack {
                 << std::endl;
       abort();
     }
+    virtual void extadd_blr_copy_to_buffers_col
+    (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa, integer_t begin_col, integer_t end_col, const Opts_t& opts) const {
+      std::cerr << "FrontalMatrix::extadd_blr_copy_to_buffers_col"
+                << " not implemented for this front type: "
+                << typeid(*this).name()
+                << std::endl;
+      abort();
+    }
     virtual void extadd_blr_copy_from_buffers
     (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
      scalar_t** pbuf, const FBLRMPI_t* pa) const;
+
+    virtual void extadd_blr_copy_from_buffers_col
+    (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
+     scalar_t** pbuf, const FBLRMPI_t* pa, integer_t begin_col, integer_t end_col) const;
 
     virtual void extend_add_column_copy_to_buffers
     (const DistM_t& CB, const DenseM_t& seqCB,

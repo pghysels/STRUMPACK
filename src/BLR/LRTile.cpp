@@ -105,6 +105,7 @@ namespace strumpack {
         copy(V(), c, 0, 0);
       }
     }
+
     template<typename scalar_t> void LRTile<scalar_t>::left_multiply
     (const DenseTile<scalar_t>& a, DenseM_t& b, DenseM_t& c) const {
       // (a.D*U)*V

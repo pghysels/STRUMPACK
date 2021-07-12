@@ -36,6 +36,8 @@
 using namespace std;
 using namespace strumpack;
 
+#define ERROR_TOLERANCE 1e2
+
 void abort_MPI(MPI_Comm *c, int *error, ... ) {
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -123,12 +125,11 @@ int main(int argc, char* argv[]) {
 #endif
       cout << "# error = || LU(A) - LU(B) ||_F / || LU(A) ||_F = "
        << err << endl;
-      /*cout << "# B has max rank " << maxrank << " and takes "
-           << memfill << " MByte (compared to "
-           << (N*N*sizeof(double) / 1.e6)
-           << " MByte for dense storage)" << std::endl
-           << "# || LU(A) - LU(B) ||_F / || LU(A) ||_F = " << err
-           << endl;*/
+      if (err > ERROR_TOLERANCE
+          * max(opts.rel_tol(),opts.abs_tol())) {
+        cout << "ERROR: compression error too big!!" << endl;
+        return 1;
+      }
     }
   }
 

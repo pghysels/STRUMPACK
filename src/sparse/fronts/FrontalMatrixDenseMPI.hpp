@@ -75,9 +75,20 @@ namespace strumpack {
     extadd_blr_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
                                const FBLRMPI_t* pa) const override;
     void
+    extadd_blr_copy_to_buffers_col(std::vector<std::vector<scalar_t>>& sbuf,
+                               const FBLRMPI_t* pa, integer_t begin_col, 
+                               integer_t end_col, const SPOptions<scalar_t>& opts) const override;
+    void
     extadd_blr_copy_from_buffers(BLRMPI_t& F11, BLRMPI_t& F12,
                                  BLRMPI_t& F21, BLRMPI_t& F22,
                                  scalar_t** pbuf, const FBLRMPI_t* pa)
+      const override;
+    
+    void
+    extadd_blr_copy_from_buffers_col(BLRMPI_t& F11, BLRMPI_t& F12,
+                                 BLRMPI_t& F21, BLRMPI_t& F22,
+                                 scalar_t** pbuf, const FBLRMPI_t* pa, 
+                                 integer_t begin_col, integer_t end_col)
       const override;
 
     void sample_CB(const DistM_t& R, DistM_t& Sr,
