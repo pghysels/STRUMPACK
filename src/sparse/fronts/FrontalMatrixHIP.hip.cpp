@@ -26,7 +26,7 @@
  *             Division).
  *
  */
-
+#define STRUMPACK_NO_TRIPLET_MPI
 #include "FrontalMatrixGPUKernels.hpp"
 
 #include <hip/hip_runtime.h>
@@ -111,8 +111,8 @@ namespace strumpack {
     template<typename T> __device__ std::complex<T>
     operator*(const std::complex<T>& a, const std::complex<T>& b) {
       return std::complex<T>
-	(a.real() * b.real() - a.imag() * b.imag(),
-	 a.imag() * b.real() + a.real() * b.imag());
+        (a.real() * b.real() - a.imag() * b.imag(),
+         a.imag() * b.real() + a.real() * b.imag());
     }
     template<typename T> __device__ std::complex<T>
     operator+=(std::complex<T>& a, const std::complex<T>& b) {
@@ -128,8 +128,8 @@ namespace strumpack {
     operator/=(std::complex<T>& a, const std::complex<T>& b) {
       auto denom = b.real() * b.real() + b.imag() * b.imag();
       a = std::complex<T>
-	((a.real() * b.real() + a.imag() * b.imag()) / denom,
-	 (a.imag() * b.real() - a.real() * b.imag()) / denom);
+        ((a.real() * b.real() + a.imag() * b.imag()) / denom,
+         (a.imag() * b.real() - a.real() * b.imag()) / denom);
       return a;
     }
 #endif
