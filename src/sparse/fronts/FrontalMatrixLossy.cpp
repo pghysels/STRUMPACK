@@ -66,7 +66,8 @@ namespace strumpack {
     zfp_field* f = zfp_field_2d
       (static_cast<void*>(F.data()), get_zfp_type<T>(), rows_, cols_);
     zfp_stream* destream = zfp_stream_open(NULL);
-    zfp_stream_set_precision(destream, prec_);
+    if (prec_ <= 0) zfp_stream_set_reversible(destream);
+    else zfp_stream_set_precision(destream, prec_);
     bitstream* bstream = stream_open
       (static_cast<void*>
        (const_cast<uchar*>(buffer_.data())), buffer_.size());
