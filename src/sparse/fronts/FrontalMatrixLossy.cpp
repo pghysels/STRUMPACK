@@ -37,7 +37,7 @@ namespace strumpack {
   template<> inline zfp_type get_zfp_type<double>() { return zfp_type_double; }
 
   template<typename T> LossyMatrix<T>::LossyMatrix
-  (const DenseMatrix<T>& F, uint prec)
+  (const DenseMatrix<T>& F, int prec)
     : rows_(F.rows()), cols_(F.cols()), prec_(prec) {
     if (!rows_ || !cols_) return;
     zfp_field* f = zfp_field_2d
@@ -80,7 +80,7 @@ namespace strumpack {
   }
 
   template<typename T> LossyMatrix<std::complex<T>>::LossyMatrix
-  (const DenseMatrix<std::complex<T>>& F, uint prec) {
+  (const DenseMatrix<std::complex<T>>& F, int prec) {
     int rows = F.rows(), cols = F.cols();
     DenseMatrix<T> Freal(rows, cols), Fimag(rows, cols);
     for (int j=0; j<cols; j++)
@@ -124,7 +124,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixLossy<scalar_t,integer_t>::compress(const Opts_t& opts) {
-    uint prec = opts.lossy_precision();
+    int prec = opts.lossy_precision();
     F11c_ = LossyMatrix<scalar_t>(this->F11_, prec);
     F12c_ = LossyMatrix<scalar_t>(this->F12_, prec);
     F21c_ = LossyMatrix<scalar_t>(this->F21_, prec);

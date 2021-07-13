@@ -38,7 +38,7 @@ namespace strumpack {
     : public structured::StructuredMatrix<T> {
   public:
     LossyMatrix() {}
-    LossyMatrix(const DenseMatrix<T>& F, uint prec);
+    LossyMatrix(const DenseMatrix<T>& F, int prec);
     DenseMatrix<T> decompress() const {
       DenseMatrix<T> F(rows_, cols_);
       decompress(F);
@@ -53,7 +53,7 @@ namespace strumpack {
     std::size_t cols() const override { return cols_; }
   private:
     std::size_t rows_ = 0, cols_ = 0;
-    uint prec_ = 16;
+    int prec_ = 16;
     std::vector<unsigned char> buffer_;
   };
 
@@ -61,7 +61,7 @@ namespace strumpack {
     : public structured::StructuredMatrix<std::complex<T>> {
   public:
     LossyMatrix() {}
-    LossyMatrix(const DenseMatrix<std::complex<T>>& F, uint prec);
+    LossyMatrix(const DenseMatrix<std::complex<T>>& F, int prec);
     DenseMatrix<std::complex<T>> decompress() const {
       DenseMatrix<std::complex<T>> F(rows(), cols());
       decompress(F);
