@@ -38,6 +38,7 @@
 #include "misc/TaskTimer.hpp"
 #include "dense/DenseMatrix.hpp"
 #include "sparse/CompressedSparseMatrix.hpp"
+#include "BLR/BLRMatrix.hpp"
 #if defined(_OPENMP)
 #include "omp.h"
 #endif
@@ -101,9 +102,14 @@ namespace strumpack {
                                            std::size_t& upd2sep) const;
     std::vector<std::size_t> upd_to_parent(const F_t* pa) const;
 
-    virtual void barrier_world() const { 
-      MPI_Barrier(MPI_COMM_WORLD); 
-      std::cout << "peak memory after seq= " << double(strumpack::params::peak_memory) / 1.0e6 << " MB" << std::endl;
+    virtual void barrier_world() const {
+#if defined(STRUMPACK_USE_MPI)
+      MPIComm c;
+      c.barrier();
+      std::cout << "peak memory after sequential tree traversal: "
+                << double(strumpack::params::peak_memory) / 1.0e6
+                << " MB" << std::endl;
+#endif
     }
 
     virtual void release_work_memory() = 0;
@@ -146,20 +152,22 @@ namespace strumpack {
 
     virtual void
     extend_add_to_blr(BLRM_t& paF11, BLRM_t& paF12,
-                        BLRM_t& paF21, BLRM_t& paF22,
-                        const FrontalMatrix<scalar_t,integer_t>* p,
-                        int task_depth, const Opts_t& opts) {}
+                      BLRM_t& paF21, BLRM_t& paF22,
+                      const FrontalMatrix<scalar_t,integer_t>* p,
+                      int task_depth, const Opts_t& opts) {}
     virtual void
     extend_add_to_blr_col(BLRM_t& paF11, BLRM_t& paF12,
-                        BLRM_t& paF21, BLRM_t& paF22,
-                        const FrontalMatrix<scalar_t,integer_t>* p,
-                        integer_t begin_col, integer_t end_col, int task_depth, const Opts_t& opts) {}
+                          BLRM_t& paF21, BLRM_t& paF22,
+                          const FrontalMatrix<scalar_t,integer_t>* p,
+                          integer_t begin_col, integer_t end_col,
+                          int task_depth, const Opts_t& opts) {}
 
     virtual int random_samples() const { return 0; }
 
     // TODO why not const? HSS problem?
     virtual void
-    sample_CB(const Opts_t& opts, const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc,
+    sample_CB(const Opts_t& opts, const DenseM_t& R,
+              DenseM_t& Sr, DenseM_t& Sc,
               F_t* parent, int task_depth=0) { assert(false); }
     virtual void
     sample_CB(Trans op, const DenseM_t& R, DenseM_t& S, F_t* parent,
