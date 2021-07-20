@@ -393,6 +393,14 @@ namespace strumpack {
           std::cout << "#   - nr of BLR Frontal matrices = "
                     << number_format_with_commas(fc.BLR) << std::endl;
           break;
+        case CompressionType::ZFP_BLR_HODLR:
+          std::cout << "#   - nr of HODLR Frontal matrices = "
+                    << number_format_with_commas(fc.HODLR) << std::endl;
+          std::cout << "#   - nr of BLR Frontal matrices = "
+                    << number_format_with_commas(fc.BLR) << std::endl;
+          std::cout << "#   - nr of ZFP Frontal matrices = "
+                    << number_format_with_commas(fc.lossy) << std::endl;
+          break;
         case CompressionType::LOSSLESS:
         case CompressionType::LOSSY:
           std::cout << "#   - nr of lossy Frontal matrices = "
@@ -602,7 +610,22 @@ namespace strumpack {
                       << opts_.BLR_options().rel_tol() << std::endl;
             std::cout << "#   - absolute compression tolerance = "
                       << opts_.BLR_options().abs_tol() << std::endl;
+          } 
+#endif
+#if defined(STRUMPACK_USE_BPACK)
+#if defined(STRUMPACK_USE_ZFP)
+          if (opts_.compression() == CompressionType::ZFP_BLR_HODLR) {
+            std::cout << "#   - maximum HODLR rank = " << max_rank << std::endl;
+            std::cout << "#   - relative compression tolerance = "
+                      << opts_.HODLR_options().rel_tol() << std::endl;
+            std::cout << "#   - absolute compression tolerance = "
+                      << opts_.HODLR_options().abs_tol() << std::endl;
+            std::cout << "#   - relative compression tolerance = "
+                      << opts_.BLR_options().rel_tol() << std::endl;
+            std::cout << "#   - absolute compression tolerance = "
+                      << opts_.BLR_options().abs_tol() << std::endl;
           }
+#endif
 #endif
 #if defined(STRUMPACK_USE_ZFP)
           if (opts_.compression() == CompressionType::LOSSY)

@@ -71,6 +71,7 @@ namespace strumpack {
     case CompressionType::BLR: return "blr";
     case CompressionType::HODLR: return "hodlr";
     case CompressionType::BLR_HODLR: return "blr_hodlr";
+    case CompressionType::ZFP_BLR_HODLR: return "zfp_blr_hodlr";
     case CompressionType::LOSSY: return "lossy";
     case CompressionType::LOSSLESS: return "lossless";
     }
@@ -256,11 +257,12 @@ namespace strumpack {
         else if (s == "BLR") set_compression(CompressionType::BLR);
         else if (s == "HODLR") set_compression(CompressionType::HODLR);
         else if (s == "BLR_HODLR") set_compression(CompressionType::BLR_HODLR);
+        else if (s == "ZFP_BLR_HODLR") set_compression(CompressionType::ZFP_BLR_HODLR);
         else if (s == "LOSSY") set_compression(CompressionType::LOSSY);
         else if (s == "LOSSLESS") set_compression(CompressionType::LOSSLESS);
         else std::cerr << "# WARNING: compression type not"
                " recognized, use 'none', 'hss', 'blr', 'hodlr',"
-               " 'blr_hodlr', 'lossy' or 'lossless'" << std::endl;
+               " 'blr_hodlr', 'zfp_blr_hodlr', 'lossy' or 'lossless'" << std::endl;
       } break;
       case 21: {
         std::istringstream iss(optarg);
@@ -478,7 +480,7 @@ namespace strumpack {
     for (int i=0; i<7; i++)
       std::cout << "#      " << i << " " <<
         get_description(get_matching(i)) << std::endl;
-    std::cout << "#   --sp_compression [none|hss|blr|hodlr|lossy|blr_hodlr]" << std::endl
+    std::cout << "#   --sp_compression [none|hss|blr|hodlr|lossy|blr_hodlr|zfp_blr_hodlr]" << std::endl
               << "#          type of rank-structured compression to use"
               << std::endl;
     std::cout << "#   --sp_compression_min_sep_size (default "

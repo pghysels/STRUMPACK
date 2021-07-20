@@ -109,6 +109,25 @@ namespace strumpack {
         if (root) fc.BLR++;
       }
     } break;
+    case CompressionType::ZFP_BLR_HODLR: {
+      if (is_HODLR(dsep, dupd, compressed_parent, opts, 0)) {
+#if defined(STRUMPACK_USE_BPACK)
+        front.reset
+          (new FrontalMatrixHODLR<scalar_t,integer_t>(s, sbegin, send, upd));
+        if (root) fc.HODLR++;
+#endif
+      } else if (is_BLR(dsep, dupd, compressed_parent, opts, 1)) {
+        front.reset
+          (new FrontalMatrixBLR<scalar_t,integer_t>(s, sbegin, send, upd));
+        if (root) fc.BLR++;
+      } else if (is_lossy(dsep, dupd, compressed_parent, opts, 2)) {
+#if defined(STRUMPACK_USE_ZFP)
+        front.reset
+          (new FrontalMatrixLossy<scalar_t,integer_t>(s, sbegin, send, upd));
+        if (root) fc.lossy++;
+#endif
+      }
+    } break;
     case CompressionType::LOSSY: {
       if (is_lossy(dsep, dupd, compressed_parent, opts)) {
 #if defined(STRUMPACK_USE_ZFP)
@@ -233,6 +252,20 @@ namespace strumpack {
       }
     } break;
     case CompressionType::BLR_HODLR: {
+      if (is_HODLR(dsep, dupd, compressed_parent, opts, 0)) {
+#if defined(STRUMPACK_USE_BPACK)
+        front.reset
+          (new FrontalMatrixHODLRMPI<scalar_t,integer_t>(s, sbegin, send, upd, comm, P));
+        if (root) fc.HODLR++;
+#endif
+      } else if (is_BLR(dsep, dupd, compressed_parent, opts, 1)) {
+        front.reset
+          (new FrontalMatrixBLRMPI<scalar_t,integer_t>
+           (s, sbegin, send, upd, comm, P, opts.BLR_options().leaf_size()));
+        if (root) fc.BLR++;
+      }
+    } break;
+    case CompressionType::ZFP_BLR_HODLR: {
       if (is_HODLR(dsep, dupd, compressed_parent, opts, 0)) {
 #if defined(STRUMPACK_USE_BPACK)
         front.reset
