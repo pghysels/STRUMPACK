@@ -406,35 +406,21 @@ namespace strumpack {
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
     if (task_depth == 0) {
       // use tasking for children and for extend-add parallelism
-#pragma omp parallel if(!omp_in_parallel()) default(shared)
+#pragma omp parallel default(shared)
 #pragma omp single nowait
-      factor_node(A, opts, etree_level, task_depth);
+      factor_node(A, opts, etree_level, task_depth+1);
     } else factor_node(A, opts, etree_level, task_depth);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::factor_node
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
-    if (task_depth < params::task_recursion_cutoff_level) {
-      if (lchild_)
-#pragma omp task default(shared)                                        \
-  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        lchild_->multifrontal_factorization
-          (A, opts, etree_level+1, task_depth+1);
-      if (rchild_)
-#pragma omp task default(shared)                                        \
-  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        rchild_->multifrontal_factorization
-          (A, opts, etree_level+1, task_depth+1);
-#pragma omp taskwait
-    } else {
-      if (lchild_)
-        lchild_->multifrontal_factorization
-          (A, opts, etree_level+1, task_depth);
-      if (rchild_)
-        rchild_->multifrontal_factorization
-          (A, opts, etree_level+1, task_depth);
-    }
+    if (lchild_)
+      lchild_->multifrontal_factorization
+        (A, opts, etree_level+1, task_depth);
+    if (rchild_)
+      rchild_->multifrontal_factorization
+        (A, opts, etree_level+1, task_depth);
     TaskTimer t("");
 #if defined(STRUMPACK_COUNT_FLOPS)
     long long int f0 = 0, ftot = 0;
