@@ -75,7 +75,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_blr
-  (BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21, BLRM_t& paF22, 
+  (BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21, BLRM_t& paF22,
    const F_t* p, int task_depth, const SPOptions<scalar_t>& opts) {
      //extend_add from Dense to seq. BLR
     const std::size_t pdsep = paF11.rows();
@@ -516,7 +516,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
   (std::vector<std::vector<scalar_t>>& sbuf,
-   const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa, integer_t begin_col, 
+   const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa, integer_t begin_col,
    integer_t end_col, const SPOptions<scalar_t>& opts) const {
     BLR::BLRExtendAdd<scalar_t,integer_t>::
       seq_copy_to_buffers_col(F22_, sbuf, pa, this, begin_col, end_col);
