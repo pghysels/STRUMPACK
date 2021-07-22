@@ -331,6 +331,8 @@ namespace strumpack {
 
     virtual void synchronize() {}
     virtual void communicate_ordering() {}
+    virtual double peak_memory() const
+    { return double(params::peak_memory); }
 
     void papi_initialize();
     long long dense_factor_nonzeros() const;

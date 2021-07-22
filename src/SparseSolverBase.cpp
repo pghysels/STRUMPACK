@@ -550,6 +550,7 @@ namespace strumpack {
     if (opts_.verbose()) {
       auto fnnz = factor_nonzeros();
       auto max_rank = maximum_rank();
+      auto peak_mem = peak_memory();
       if (is_root_) {
         std::cout << "#   - factor time = " << t1.elapsed() << std::endl;
         std::cout << "#   - factor nonzeros = "
@@ -563,8 +564,9 @@ namespace strumpack {
         std::cout << "#   - factor flop rate = " << ftot_ / t1.elapsed() / 1e9
                   << " GFlop/s" << std::endl;
         std::cout << "#   - factor peak memory usage (estimate) = "
-                  << double(params::peak_memory) / 1.0e6
-                  << " MB" << std::endl;
+                  << peak_mem / 1.0e6 << " MB (max), "
+                  << double(params::peak_memory) / 1.0e6 << " MB (root)"
+                  << std::endl;
         std::cout << "#   - factor peak device memory usage (estimate) = "
                   << double(params::peak_device_memory)/1.e6
                   << " MB" << std::endl;
