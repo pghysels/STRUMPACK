@@ -53,9 +53,6 @@ namespace strumpack {
   (bool verbose, bool root)
     : SparseSolverBase<scalar_t,integer_t>
     (0, nullptr, verbose, root) {
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-    gpu::init();
-#endif
   }
 
   template<typename scalar_t,typename integer_t>
@@ -524,6 +521,10 @@ namespace strumpack {
       ReturnCode ierr = reorder();
       if (ierr != ReturnCode::SUCCESS) return ierr;
     }
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+    if (opts_.use_gpu())
+      gpu::init();
+#endif
     using real_t = typename RealType<scalar_t>::value_type;
     opts_.set_pivot_threshold
       (std::sqrt(blas::lamch<real_t>('E')) * matrix()->norm1());
