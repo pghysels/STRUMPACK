@@ -436,7 +436,6 @@ namespace strumpack {
     std::vector<std::unique_ptr<BLRTile<scalar_t>>>
     BLRMatrixMPI<scalar_t>::gather_row
     (std::size_t i0, std::size_t k, std::size_t j0, std::size_t j1) const {
-      std::cout << "gather_row " << std::endl;
       std::size_t msg_size = 0, nr_tiles=0;
       std::vector<std::int64_t> ranks;
       if (j0 > 0) {
@@ -852,7 +851,6 @@ namespace strumpack {
     std::vector<std::unique_ptr<BLRTile<scalar_t>>>
     BLRMatrixMPI<scalar_t>::gather_col
     (std::size_t i0, std::size_t i1, std::size_t j0, std::size_t k) const {
-      std::cout << "gather_col " << std::endl;
       std::size_t msg_size = 0, nr_tiles=0;
       std::vector<std::int64_t> ranks;
       if (i0 > 0) {
