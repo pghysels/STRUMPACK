@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.11)
 project(STRUMPACK VERSION 5.1.1 LANGUAGES CXX C Fortran)
 
+cmake_policy(SET CMP0074 NEW)
 
 option(STRUMPACK_USE_MPI     "Build with MPI support" ON)
 option(STRUMPACK_USE_OPENMP  "Use OpenMP for on-node threading tasking" ON)
@@ -141,12 +142,11 @@ if(STRUMPACK_USE_HIP)
 endif()
 
 if(STRUMPACK_USE_DPCPP)
+  message(STATUS "DPC++ enabled, looking for MKL")
+  list(APPEND CMAKE_PREFIX_PATH $ENV{MKLROOT} $ENV{TBBROOT})
+  # set(MKL_THREADING intel_thread)
   # set(CMAKE_CXX_COMPILER "dpcpp")
-  # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -std=c++17 -I${MKLROOT}/include")
-  # set(CMAKE_EXE_LINKER_FLAGS " ${CMAKE_EXE_LINKER_FLAGS}")
-  # set(CMAKE_EXE_LINKER_FLAGS " -fsycl -lmkl_sycl -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fsycl")
-  set(ONEAPI_LIBRARIES ${TPL_ONEAPI_LIBRARIES})
+  find_package(MKL REQUIRED)
 endif()
 
 
@@ -522,8 +522,11 @@ if(BLAS_FOUND)
   target_link_libraries(strumpack PUBLIC ${BLAS_LIBRARIES})
 endif()
 
-if(STRUMPACK_USE_DPCPP)
-  target_link_libraries(strumpack PUBLIC ${ONEAPI_LIBRARIES})
+if(MKL_FOUND)
+  # target_link_libraries(strumpack PUBLIC
+  #  $<LINK_ONLY:MKL::MKL> $<LINK_ONLY:MKL::MKL_DPCPP>)
+  target_link_libraries(strumpack PUBLIC MKL::MKL)
+  target_link_libraries(strumpack PUBLIC MKL::MKL_DPCPP)
 endif()
 
 # the order is important
