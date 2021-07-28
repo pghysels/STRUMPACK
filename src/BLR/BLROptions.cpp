@@ -104,7 +104,7 @@ namespace strumpack {
          {"blr_BACA_blocksize",        required_argument, 0, 7},
          {"blr_factor_algorithm",      required_argument, 0, 8},
          {"blr_compression_kernel",    required_argument, 0, 9},
-         {"blr_CB_compression",        required_argument, 0, 10},
+         {"blr_seq_CB_Compression", no_argument, 0, 10},
          {"blr_cb",                    required_argument, 0, 11},
          {"blr_verbose",               no_argument, 0, 'v'},
          {"blr_quiet",                 no_argument, 0, 'q'},
@@ -195,11 +195,7 @@ namespace strumpack {
                       << " recognized, use 'full' or 'half'."
                       << std::endl;
         } break;
-        case 10: {
-          std::istringstream iss(optarg);
-          iss >> BLRseqCBCompression_;
-          set_BLRseq_CB_Compression(BLRseqCBCompression_);
-        } break;
+        case 10: set_BLRseq_CB_Compression(true); break;
         case 11: {
           std::istringstream iss(optarg);
           std::string s; iss >> s;
