@@ -447,7 +447,12 @@ if(STRUMPACK_USE_HIP)
   set_source_files_properties(
     src/sparse/fronts/FrontalMatrixHIP.hip.cpp
     PROPERTIES HIP_SOURCE_PROPERTY_FORMAT 1)
-  hip_add_library(strumpack "src/sparse/fronts/FrontalMatrixHIP.hip.cpp")
+  if (BUILD_SHARED_LIBS)
+    set(STATIC_OR_SHARED SHARED)
+  else()
+    set(STATIC_OR_SHARED STATIC)
+  endif()
+  hip_add_library(strumpack "src/sparse/fronts/FrontalMatrixHIP.hip.cpp" ${STATIC_OR_SHARED})
 else()
   add_library(strumpack "")
 endif()
