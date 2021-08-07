@@ -135,6 +135,7 @@ install:
   - ls -alh /etc/alternatives/mpirun
   - ls -alh /etc/alternatives/mpiexec
   - update-alternatives --display mpi
+  - find /usr -iname "libscalapack*"
   - |
     cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
