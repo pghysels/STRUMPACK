@@ -6,7 +6,7 @@ compiler:
 
 os: linux
 
-dist: bionic
+dist: xenial
 
 sudo: required
 
