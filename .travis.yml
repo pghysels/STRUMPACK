@@ -52,10 +52,10 @@ before_install:
   - test -n $CXX && unset CXX
   # - update-alternatives --display mpi
   # - update-alternatives --display mpirun
-  # - sudo update-alternatives --set mpi /usr/include/mpich
-  # - sudo update-alternatives --set mpirun /usr/bin/mpirun.mpich
-  # - update-alternatives --display mpi
-  # - update-alternatives --display mpirun
+  - sudo update-alternatives --set mpi /usr/include/mpich
+  - sudo update-alternatives --set mpirun /usr/bin/mpirun.mpich
+  - update-alternatives --display mpi
+  - update-alternatives --display mpirun
 
 install:
   # - printf "Installing openmpi\n"
@@ -135,10 +135,10 @@ install:
   - ls -alh /etc/alternatives/mpirun
   - ls -alh /etc/alternatives/mpiexec
   - update-alternatives --display mpi
-  - find /usr -iname "libscalapack*"
+  # - find /usr -iname "libscalapack*"
   - |
     cmake .. \
-    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_BUILD_TYPE=Debug \
     -DCMAKE_INSTALL_PREFIX=. \
     -DCMAKE_CXX_COMPILER=mpic++ \
     -DCMAKE_C_COMPILER=mpicc \
