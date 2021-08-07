@@ -118,7 +118,7 @@ before_install:
   - |
    cmake ../ \
    -DCMAKE_INSTALL_PREFIX=../install
-    -DCMAKE_CXX_COMPILER=mpiCC \
+    -DCMAKE_CXX_COMPILER=mpic++ \
     -DCMAKE_C_COMPILER=mpicc \
     -DCMAKE_Fortran_COMPILER=mpif90
   - make
