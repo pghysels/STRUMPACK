@@ -79,8 +79,12 @@ before_install:
   - printf "Done installing openmpi\n"
 
   - printf "Installing scalapack, parmetis\n"
-  - sudo apt-get install libscalapack-openmpi-dev libparmetis-dev
-  - printf "Done installing scalapack, parmetis\n"
+  - sudo apt-get install libparmetis-dev
+  - printf "Done installing parmetis\n"
+
+  # - printf "Installing scalapack, parmetis\n"
+  # - sudo apt-get install libscalapack-openmpi-dev libparmetis-dev
+  # - printf "Done installing scalapack, parmetis\n"
 
   # - cd $TRAVIS_BUILD_DIR/installDir
   # - printf "Downloading mpich source."
@@ -103,24 +107,24 @@ before_install:
   # - $MPI_HOME/bin/mpicc -compile_info
   # - rm -rf mpich-3.3.2
 
-  # - printf "${BLUE} GC; Installing ScaLAPACK from source\n"
-  # - cd $TRAVIS_BUILD_DIR/installDir
-  # - wget http://www.netlib.org/scalapack/scalapack-2.1.0.tgz
-  # - tar -xf scalapack-2.1.0.tgz
-  # - cd scalapack-2.1.0
-  # - mkdir build
-  # - mkdir install
-  # - cd build
-  # - |
-  #  cmake ../ \
-  #  -DCMAKE_INSTALL_PREFIX=../install
-  #   -DCMAKE_CXX_COMPILER=mpiCC \
-  #   -DCMAKE_C_COMPILER=mpicc \
-  #   -DCMAKE_Fortran_COMPILER=mpif90
-  # - make
-  # - cd ../
-  # - export SCALAPACK_DIR=$PWD/install
-  # - printf "${BLUE} GC; Done installing ScaLAPACK from source\n"
+  - printf "${BLUE} GC; Installing ScaLAPACK from source\n"
+  - cd $TRAVIS_BUILD_DIR/installDir
+  - wget http://www.netlib.org/scalapack/scalapack-2.1.0.tgz
+  - tar -xf scalapack-2.1.0.tgz
+  - cd scalapack-2.1.0
+  - mkdir build
+  - mkdir install
+  - cd build
+  - |
+   cmake ../ \
+   -DCMAKE_INSTALL_PREFIX=../install
+    -DCMAKE_CXX_COMPILER=mpiCC \
+    -DCMAKE_C_COMPILER=mpicc \
+    -DCMAKE_Fortran_COMPILER=mpif90
+  - make
+  - cd ../
+  - export SCALAPACK_DIR=$PWD/install
+  - printf "${BLUE} GC; Done installing ScaLAPACK from source\n"
 
   - cd $TRAVIS_BUILD_DIR/installDir
   - wget --no-check-certificate https://gforge.inria.fr/frs/download.php/file/38352/scotch_6.1.0.tar.gz
@@ -160,8 +164,8 @@ install:
     -DCMAKE_INSTALL_PREFIX=. \
     -DCMAKE_CXX_COMPILER=mpic++ \
     -DCMAKE_C_COMPILER=mpicc \
-    -DCMAKE_Fortran_COMPILER=mpif90 \
-    -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
+    -DCMAKE_Fortran_COMPILER=mpif90
+  #-DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
   #-DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-mpich.so"
   - make VERBOSE=1
   - make install
