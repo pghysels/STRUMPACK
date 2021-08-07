@@ -27,7 +27,7 @@ env:
   - TEST_NUMBER=2 FILE="test_HSS_mpi"
   - TEST_NUMBER=3 FILE="test_sparse_seq"
   - TEST_NUMBER=4 FILE="test_sparse_mpi"
-  - TEST_NUMBER=5 FILE="test_sparse_mpi"
+  - TEST_NUMBER=5 FILE="test_structure_reuse_mpi"
 
 git:
   depth: 1
@@ -57,6 +57,22 @@ before_install:
   # - sudo update-alternatives --set mpirun /usr/bin/mpirun.mpich
   # - update-alternatives --display mpi
   # - update-alternatives --display mpirun
+
+  - printf  "${BLUE} GC; Installing gcc-9 via apt\n"
+  - sudo apt-get update
+  - sudo apt-get install build-essential software-properties-common -y
+  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+  - sudo apt-get update
+  - sudo apt-get install gcc-9 g++-9 -y
+  - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 --slave /usr/bin/g++ g++ /usr/bin/g++-9
+  - export CXX="g++-9"
+  - export CC="gcc-9"
+  - printf "${BLUE} GC; Done installing gcc-9 via apt\n"
+
+  - printf "${BLUE} GC; Installing gfortran via apt\n"
+  - sudo apt-get install gfortran-9 -y
+  - sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-9 60
+  - printf "${BLUE} GC; Done installing gfortran via apt\n"
 
   - printf "Installing openmpi\n"
   - sudo apt-get install openmpi-bin libopenmpi-dev
