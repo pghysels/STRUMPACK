@@ -551,7 +551,9 @@ namespace strumpack {
     if (opts_.verbose()) {
       auto fnnz = factor_nonzeros();
       auto max_rank = maximum_rank();
+#if defined(STRUMPACK_COUNT_FLOPS)
       auto peak_mem = peak_memory();
+#endif
       if (is_root_) {
         std::cout << "#   - factor time = " << t1.elapsed() << std::endl;
         std::cout << "#   - factor nonzeros = "
