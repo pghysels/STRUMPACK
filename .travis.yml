@@ -34,10 +34,12 @@ git:
 
 addons:
   apt:
+    sources:
+      - ubuntu-toolchain-r-test
     packages:
-      - g++
-      - gcc
-      - gfortran
+      - g++-9
+      - gcc-9
+      - gfortran-9
       - libblas-dev
       - liblapack-dev
       - libmetis-dev
@@ -49,8 +51,8 @@ addons:
 
 before_install:
   - mkdir installDir
-  - test -n $CC && unset CC
-  - test -n $CXX && unset CXX
+  # - test -n $CC && unset CC
+  # - test -n $CXX && unset CXX
   - update-alternatives --display mpi
   - update-alternatives --display mpirun
   - sudo update-alternatives --set mpi /usr/include/mpich
@@ -169,8 +171,8 @@ install:
   - cd $TRAVIS_BUILD_DIR
   - mkdir build
   - cd build
-  # - $CC --version
-  # - $CXX --version
+  - $CC --version
+  - $CXX --version
   # - clang --version
   # - clang++ --version
   # - which clang
@@ -180,7 +182,7 @@ install:
   - ls -alh /etc/alternatives/mpirun
   - ls -alh /etc/alternatives/mpiexec
   - update-alternatives --display mpi
-  # - find /usr -iname "libscalapack*"
+  - find /usr -iname "libscalapack*"
   - |
     cmake .. \
     -DCMAKE_BUILD_TYPE=Debug \
