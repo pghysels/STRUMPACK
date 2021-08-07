@@ -2,7 +2,7 @@ language: cpp
 
 compiler:
   - gcc
-  #- clang
+  - clang
 
 os: linux
 
@@ -34,21 +34,22 @@ git:
 addons:
   apt:
     packages:
-      # - g++
-      # - gcc
+      - g++
+      - gcc
       - gfortran
       - libblas-dev
       - liblapack-dev
       - libmetis-dev
-      # - mpich
-      # - libmpich-dev
-      # - libscalapack-mpich-dev
-      # - libparmetis-dev
-      # - libptscotch-dev
+      - mpich
+      - libmpich-dev
+      - libscalapack-mpich-dev
+      - libparmetis-dev
+      - libptscotch-dev
 
 before_install:
   - mkdir installDir
-  # - test -n $CC && unset CC
+  - test -n $CC && unset CC
+  - test -n $CXX && unset CXX
   # - update-alternatives --display mpi
   # - update-alternatives --display mpirun
   # - sudo update-alternatives --set mpi /usr/include/mpich
@@ -57,13 +58,13 @@ before_install:
   # - update-alternatives --display mpirun
 
 install:
-  - printf "Installing openmpi\n"
-  - sudo apt-get install openmpi-bin libopenmpi-dev
-  - printf "Done installing openmpi\n"
+  # - printf "Installing openmpi\n"
+  # - sudo apt-get install openmpi-bin libopenmpi-dev
+  # - printf "Done installing openmpi\n"
 
-  - printf "Installing scalapack, parmetis\n"
-  - sudo apt-get install libscalapack-openmpi-dev libparmetis-dev
-  - printf "Done installing scalapack, parmetis\n"
+  # - printf "Installing scalapack, parmetis\n"
+  # - sudo apt-get install libscalapack-openmpi-dev libparmetis-dev
+  # - printf "Done installing scalapack, parmetis\n"
 
   # - cd $TRAVIS_BUILD_DIR/installDir
   # - printf "Downloading mpich source."
@@ -105,40 +106,43 @@ install:
   # - export SCALAPACK_DIR=$PWD/install
   # - printf "${BLUE} GC; Done installing ScaLAPACK from source\n"
 
-  - cd $TRAVIS_BUILD_DIR/installDir
-  - wget --no-check-certificate https://gforge.inria.fr/frs/download.php/file/38352/scotch_6.1.0.tar.gz
-  - tar -xf scotch_6.1.0.tar.gz
-  - cd ./scotch_6.1.0
-  - export SCOTCH_DIR=`pwd`/install
-  - mkdir install
-  - cd ./src
-  - cp ./Make.inc/Makefile.inc.x86-64_pc_linux2 Makefile.inc
-  - sed -i "s/-DSCOTCH_PTHREAD//" Makefile.inc
-  - sed -i "s/CCD/#CCD/" Makefile.inc
-  - printf "CCD = mpicc\n" >> Makefile.inc
-  - cat Makefile.inc
-  - make ptscotch > make_scotch.log 2>&1
-  - make prefix=../install install > make_scotch_install.log 2>&1
+  # - cd $TRAVIS_BUILD_DIR/installDir
+  # - wget --no-check-certificate https://gforge.inria.fr/frs/download.php/file/38352/scotch_6.1.0.tar.gz
+  # - tar -xf scotch_6.1.0.tar.gz
+  # - cd ./scotch_6.1.0
+  # - export SCOTCH_DIR=`pwd`/install
+  # - mkdir install
+  # - cd ./src
+  # - cp ./Make.inc/Makefile.inc.x86-64_pc_linux2 Makefile.inc
+  # - sed -i "s/-DSCOTCH_PTHREAD//" Makefile.inc
+  # - sed -i "s/CCD/#CCD/" Makefile.inc
+  # - printf "CCD = mpicc\n" >> Makefile.inc
+  # - cat Makefile.inc
+  # - make ptscotch > make_scotch.log 2>&1
+  # - make prefix=../install install > make_scotch_install.log 2>&1
 
   - cd $TRAVIS_BUILD_DIR
   - mkdir build
   - cd build
-  - $CC --version
-  - $CXX --version
+  # - $CC --version
+  # - $CXX --version
   - clang --version
   - clang++ --version
   - which clang
   - which clang++
   - mpic++ --version
-  # - ls -alh /etc/alternatives/mpic++
-  # - ls -alh /etc/alternatives/mpirun
-  # - ls -alh /etc/alternatives/mpiexec
+  - ls -alh /etc/alternatives/mpic++
+  - ls -alh /etc/alternatives/mpirun
+  - ls -alh /etc/alternatives/mpiexec
   - update-alternatives --display mpi
   - |
     cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=. \
-    -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
+    -DCMAKE_CXX_COMPILER=mpic++ \
+    -DCMAKE_C_COMPILER=mpicc \
+    -DCMAKE_Fortran_COMPILER=mpif90
+   # -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
   - make VERBOSE=1
   - make install
   - make tests
