@@ -27,6 +27,7 @@ env:
   - TEST_NUMBER=2 FILE="test_HSS_mpi"
   - TEST_NUMBER=3 FILE="test_sparse_seq"
   - TEST_NUMBER=4 FILE="test_sparse_mpi"
+  - TEST_NUMBER=5 FILE="test_sparse_mpi"
 
 git:
   depth: 1
@@ -57,7 +58,6 @@ before_install:
   # - update-alternatives --display mpi
   # - update-alternatives --display mpirun
 
-install:
   - printf "Installing openmpi\n"
   - sudo apt-get install openmpi-bin libopenmpi-dev
   - printf "Done installing openmpi\n"
@@ -121,6 +121,8 @@ install:
   - make ptscotch > make_scotch.log 2>&1
   - make prefix=../install install > make_scotch_install.log 2>&1
 
+
+install:
   - cd $TRAVIS_BUILD_DIR
   - mkdir build
   - cd build
@@ -151,4 +153,5 @@ install:
 
 script:
   - cd $TRAVIS_BUILD_DIR
-  - ./.travis_tests.sh
+  - sudo sh ./.travis_tests.sh
+  #- ./.travis_tests.sh
