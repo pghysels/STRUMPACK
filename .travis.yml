@@ -43,7 +43,7 @@ addons:
       - libmetis-dev
       - mpich
       - libmpich-dev
-      - libscalapack-mpich-dev
+      - libscalapack-mpi-dev
       - libparmetis-dev
       # - libptscotch-dev
 
