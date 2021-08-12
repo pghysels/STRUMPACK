@@ -40,11 +40,14 @@
 #include <rocsolver.h>
 
 #include "DenseMatrix.hpp"
+#if defined(STRUMPACK_USE_MPI)
+#include "misc/MPIWrapper.hpp"
+#endif
 
 namespace strumpack {
   namespace gpu {
 
-#define gpu_check(err) {                                               \
+#define gpu_check(err) {                                              \
       strumpack::gpu::hip_assert((err), __FILE__, __LINE__);          \
     }
     void hip_assert(hipError_t code, const char *file, int line,
@@ -55,7 +58,14 @@ namespace strumpack {
                     bool abort=true);
 
     inline void init() {
-      std::cout << "# Initializing HIP" << std::endl;
+#if defined(STRUMPACK_USE_MPI)
+      int devs;
+      hipGetDeviceCount(&devs);
+      if (devs > 1) {
+        MPIComm c;
+        hipSetDevice(c.rank() % devs);
+      }
+#endif
       gpu_check(hipFree(0));
     }
 
