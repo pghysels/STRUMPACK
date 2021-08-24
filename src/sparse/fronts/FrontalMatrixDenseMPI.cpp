@@ -102,9 +102,10 @@ namespace strumpack {
     if (!lchild_ && !rchild_) return;
     std::vector<std::vector<scalar_t>> sbuf(this->P());
     for (auto& ch : {lchild_.get(), rchild_.get()}) {
-      if (ch && Comm().is_root()) {
+      if (ch) {
         STRUMPACK_FLOPS
-          (static_cast<long long int>(ch->dim_upd())*ch->dim_upd());
+          (static_cast<long long int>(ch->dim_upd())*ch->dim_upd()/
+           grid()->npactives());
       }
       if (!visit(ch)) continue;
       ch->extend_add_copy_to_buffers(sbuf, this);
@@ -202,7 +203,7 @@ namespace strumpack {
 #endif
                   << ", P=" << Comm().size() << ", T=" << params::num_threads
                   << ": " << time << " seconds, "
-                  << flops / 1.e9  << " GFLOPS, "
+                  << flops*F11_.npactives() / 1.e9  << " GFLOPS, "
                   << (float(flops) / time) / 1.e9 << " GFLOP/s, "
                   << " ds=" << this->dim_sep()
                   << ", du=" << this->dim_upd() << std::endl;

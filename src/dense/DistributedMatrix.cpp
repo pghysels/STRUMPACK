@@ -941,10 +941,7 @@ namespace strumpack {
          c.data(), c.I(), c.J(), c.desc())) {
       std::cerr << "# ERROR: Failure in PGETRS :(" << std::endl; abort();
     }
-    STRUMPACK_FLOPS
-      (is_master() ?
-       ((is_complex<scalar_t>() ? 4:1) *
-        blas::getrs_flops(c.rows(), c.cols())) : 0);
+    STRUMPACK_FLOPS(solve_flops(c));
     return c;
   }
 
