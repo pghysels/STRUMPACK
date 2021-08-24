@@ -141,7 +141,7 @@ namespace strumpack {
             }
           }
           if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::RL) {
-            for (std::size_t j=i+1; j<rb; j++){
+            for (std::size_t j=i+1; j<rb; j++) {
               for (std::size_t k=i+1; k<rb; k++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
               std::size_t ij = i+rb*j, ki = k+rb*i, kj = k+rb*j;
@@ -183,8 +183,8 @@ namespace strumpack {
                 }
               }
             }
-          } else{ //Comb or Star
-            for (std::size_t j=i+1; j<rb; j++){
+          } else { //Comb or Star
+            for (std::size_t j=i+1; j<rb; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
               std::size_t ij = (i+1)+rb*j, i1j=ij-rb*(j-i), ij1=ij-1;
 #pragma omp task default(shared) firstprivate(i,j,ij,i1j,ij1)   \
@@ -723,8 +723,8 @@ namespace strumpack {
                     scalar_t(1.), B11.tile(i, i), B21.tile(j, i));
               }
             }
-            if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::RL){
-              for (std::size_t j=i+1; j<rb; j++){
+            if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::RL) {
+              for (std::size_t j=i+1; j<rb; j++) {
                 for (std::size_t k=i+1; k<rb; k++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
                   std::size_t ij = i+lrb*j, ki = k+lrb*i, kj = k+lrb*j;
@@ -738,7 +738,7 @@ namespace strumpack {
                   }
                 }
               }
-              for (std::size_t k=i+1; k<rb; k++){
+              for (std::size_t k=i+1; k<rb; k++) {
                 for (std::size_t j=0; j<rb2; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
                   std::size_t ki = k+lrb*i, ij2 = i+lrb*(rb+j), kj2 = k+lrb*(rb+j);
@@ -762,7 +762,7 @@ namespace strumpack {
                   }
                 }
               }
-              for (std::size_t j=0; j<rb2; j++){
+              for (std::size_t j=0; j<rb2; j++) {
                 for (std::size_t k=0; k<rb2; k++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
                   std::size_t ij2 = i+lrb*(rb+j), k2i = (rb+k)+lrb*i, k2j2 = (rb+k)+lrb*(rb+j);
@@ -849,7 +849,7 @@ namespace strumpack {
                 }
               }
               if (i+1 < rb) {
-                for (std::size_t j=0; j<rb2; j++){
+                for (std::size_t j=0; j<rb2; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
                   std::size_t ij2 = (i+1)+lrb*(rb+j), i1j=ij2-lrb*(rb+j-i), ij1=ij2-1;
 #pragma omp task default(shared) firstprivate(i,j,ij2,i1j,ij1)  \
@@ -1193,7 +1193,7 @@ namespace strumpack {
                     scalar_t(1.), B11.tile(i, i), B21.tile(j, i));
               }
             }
-            for (std::size_t j=i+1; j<rb; j++)
+            for (std::size_t j=i+1; j<rb; j++) {
               for (std::size_t k=i+1; k<rb; k++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
                 std::size_t ij = i+lrb*j, ki = k+lrb*i, kj = k+lrb*j;
@@ -1206,7 +1206,8 @@ namespace strumpack {
                       B11.tile_dense(k,j).D());
                 }
               }
-            for (std::size_t k=i+1; k<rb; k++)
+            }
+            for (std::size_t k=i+1; k<rb; k++) {
               for (std::size_t j=0; j<rb2; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
                 std::size_t ki = k+lrb*i, ij2 = i+lrb*(rb+j), kj2 = k+lrb*(rb+j);
@@ -1229,7 +1230,8 @@ namespace strumpack {
                       B21.tile_dense(j,k).D());
                 }
               }
-            for (std::size_t j=0; j<rb2; j++)
+            }
+            for (std::size_t j=0; j<rb2; j++) {
               for (std::size_t k=0; k<rb2; k++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
                 std::size_t ij2 = i+lrb*(rb+j), k2i = (rb+k)+lrb*i,
@@ -1243,10 +1245,11 @@ namespace strumpack {
                       B22.tile_dense(k,j).D());
                 }
               }
+            }
           }
           if (opts.BLRseq_CB_Compression()) {
-            for (std::size_t j=0; j<rb2; j++)
-              for (std::size_t k=0; k<rb2; k++){
+            for (std::size_t j=0; j<rb2; j++) {
+              for (std::size_t k=0; k<rb2; k++) {
                 if(j!=k){
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
                   std::size_t k2j2 = (rb+k)+lrb*(rb+j);
@@ -1258,6 +1261,7 @@ namespace strumpack {
                   }
                 }
               }
+            }
           }
         }
       }

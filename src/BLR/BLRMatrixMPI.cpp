@@ -1525,28 +1525,26 @@ namespace strumpack {
           }
         }
 #pragma omp parallel
+#pragma omp single nowait
         {
-#pragma omp single
-          {
-            if (grid()->is_local_row(i)) {
-              for (std::size_t j=i+1; j<colblocks(); j++) {
-                if (grid()->is_local_col(j)) {
+          if (grid()->is_local_row(i)) {
+            for (std::size_t j=i+1; j<colblocks(); j++) {
+              if (grid()->is_local_col(j)) {
 #pragma omp task default(shared) firstprivate(i,j)
-                  {
-                    tile(i, j).laswp(piv_tile, true);
-                    trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-                        scalar_t(1.), Tii, tile(i, j));
-                  }
+                {
+                  tile(i, j).laswp(piv_tile, true);
+                  trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                      scalar_t(1.), Tii, tile(i, j));
                 }
               }
             }
-            if (grid()->is_local_col(i)) {
-              for (std::size_t j=i+1; j<rowblocks(); j++) {
-                if (grid()->is_local_row(j)) {
+          }
+          if (grid()->is_local_col(i)) {
+            for (std::size_t j=i+1; j<rowblocks(); j++) {
+              if (grid()->is_local_row(j)) {
 #pragma omp task default(shared) firstprivate(i,j)
-                  trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-                      scalar_t(1.), Tii, tile(j, i));
-                }
+                trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+                    scalar_t(1.), Tii, tile(j, i));
               }
             }
           }
@@ -1555,22 +1553,20 @@ namespace strumpack {
           auto Tij = bcast_row_of_tiles_along_cols(i, i+1, rowblocks());
           auto Tki = bcast_col_of_tiles_along_rows(i+1, rowblocks(), i);
 #pragma omp parallel
+#pragma omp single nowait
           {
-#pragma omp single
-            {
-              for (std::size_t k=i+1, lk=0; k<rowblocks(); k++) {
-                if (grid()->is_local_row(k)) {
-                  for (std::size_t j=i+1, lj=0; j<colblocks(); j++) {
-                    if (grid()->is_local_col(j)) {
+            for (std::size_t k=i+1, lk=0; k<rowblocks(); k++) {
+              if (grid()->is_local_row(k)) {
+                for (std::size_t j=i+1, lj=0; j<colblocks(); j++) {
+                  if (grid()->is_local_col(j)) {
 #pragma omp task default(shared) firstprivate(i,j,k,lk,lj)
-                      // this uses .D, assuming tile(k, j) is dense
-                      gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tki[lk]),
-                          *(Tij[lj]), scalar_t(1.), tile_dense(k, j).D());
-                      lj++;
-                    }
+                    // this uses .D, assuming tile(k, j) is dense
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tki[lk]),
+                        *(Tij[lj]), scalar_t(1.), tile_dense(k, j).D());
+                    lj++;
                   }
-                  lk++;
                 }
+                lk++;
               }
             }
           }
@@ -1581,30 +1577,28 @@ namespace strumpack {
                 auto Tik = gather_row(i+1, k, i+1, colblocks());
                 auto Tkj = gather_col(i+1, rowblocks(), i+1, k);
 #pragma omp parallel
+#pragma omp single nowait
                 {
-#pragma omp single
-                  {
-                    if (grid()->is_local_row(i+1)) {
-                      std::size_t lk=0;
-                      for (std::size_t j=i+1; j<rowblocks(); j++) {
-                        if (grid()->is_local_col(j)) {
+                  if (grid()->is_local_row(i+1)) {
+                    std::size_t lk=0;
+                    for (std::size_t j=i+1; j<rowblocks(); j++) {
+                      if (grid()->is_local_col(j)) {
 #pragma omp task default(shared) firstprivate(i,j,k,lk)
-                          gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[0]),
-                              *(Tik[lk]), scalar_t(1.), tile_dense(i+1, j).D());
-                          lk++;
-                        }
+                        gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[0]),
+                            *(Tik[lk]), scalar_t(1.), tile_dense(i+1, j).D());
+                        lk++;
                       }
                     }
-                    if (grid()->is_local_col(i+1)) {
-                      std::size_t lj=0;
-                      if (grid()->is_local_row(i+1)) lj=1;
-                      for (std::size_t j=i+2; j<rowblocks(); j++) {
-                        if (grid()->is_local_row(j)) {
+                  }
+                  if (grid()->is_local_col(i+1)) {
+                    std::size_t lj=0;
+                    if (grid()->is_local_row(i+1)) lj=1;
+                    for (std::size_t j=i+2; j<rowblocks(); j++) {
+                      if (grid()->is_local_row(j)) {
 #pragma omp task default(shared) firstprivate(i,j,k,lj)
-                          gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj]),
-                              *(Tik[0]), scalar_t(1.), tile_dense(j, i+1).D());
-                          lj++;
-                        }
+                        gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj]),
+                            *(Tik[0]), scalar_t(1.), tile_dense(j, i+1).D());
+                        lj++;
                       }
                     }
                   }
@@ -1614,28 +1608,26 @@ namespace strumpack {
               auto Tik = gather_rows(i+1, rowblocks(), i+1, colblocks());
               auto Tkj = gather_cols(i+1, rowblocks(), i+1, colblocks());
 #pragma omp parallel
+#pragma omp single nowait
               {
-#pragma omp single
-                {
-                  if (grid()->is_local_row(i+1)) {
-                    std::size_t lk=0;
-                    for (std::size_t j=i+1; j<rowblocks(); j++) {
-                      if (grid()->is_local_col(j)) {
+                if (grid()->is_local_row(i+1)) {
+                  std::size_t lk=0;
+                  for (std::size_t j=i+1; j<rowblocks(); j++) {
+                    if (grid()->is_local_col(j)) {
 #pragma omp task default(shared) firstprivate(i,j,lk)
-                        LUAR(i+1, lk, Tkj, Tik, tile_dense(i+1, j).D(), opts, 0); //on one MPI rank only
-                        lk+=i+1;
-                      }
+                      LUAR(i+1, lk, Tkj, Tik, tile_dense(i+1, j).D(), opts, 0); //on one MPI rank only
+                      lk+=i+1;
                     }
                   }
-                  if (grid()->is_local_col(i+1)) {
-                    std::size_t lj=0;
-                    if (grid()->is_local_row(i+1)) lj=i+1;
-                    for (std::size_t j=i+2; j<rowblocks(); j++) {
-                      if (grid()->is_local_row(j)) {
+                }
+                if (grid()->is_local_col(i+1)) {
+                  std::size_t lj=0;
+                  if (grid()->is_local_row(i+1)) lj=i+1;
+                  for (std::size_t j=i+2; j<rowblocks(); j++) {
+                    if (grid()->is_local_row(j)) {
 #pragma omp task default(shared) firstprivate(i,j,lj)
-                        LUAR(i+1, lj, Tik, Tkj, tile_dense(j, i+1).D(), opts, 1);
-                        lj+=i+1;
-                      }
+                      LUAR(i+1, lj, Tik, Tkj, tile_dense(j, i+1).D(), opts, 1);
+                      lj+=i+1;
                     }
                   }
                 }
@@ -1662,32 +1654,28 @@ namespace strumpack {
         blockcol(i, true, CP);
         for (std::size_t k=0; k<i; k++) {
 #pragma omp parallel
+#pragma omp single nowait
           {
-#pragma omp single
-            {
-              if (grid()->is_local_row(k)) {
-                for (std::size_t j=i; j<std::min(i+CP, colblocks()); j++) {
-                  if (grid()->is_local_col(j)) {
+            if (grid()->is_local_row(k)) {
+              for (std::size_t j=i; j<std::min(i+CP, colblocks()); j++) {
+                if (grid()->is_local_col(j)) {
 #pragma omp task default(shared) firstprivate(i,j,k)
-                    if (adm(k, j)) compress_tile(k, j, opts);
-                  }
+                  if (adm(k, j)) compress_tile(k, j, opts);
                 }
               }
             }
           }
 #pragma omp parallel
+#pragma omp single nowait
           {
-#pragma omp single
-            {
-              if (grid()->is_local_row(k)) {
-                for (std::size_t j=i; j<std::min(i+CP, colblocks()); j++) {
-                  if (grid()->is_local_col(j)) {
+            if (grid()->is_local_row(k)) {
+              for (std::size_t j=i; j<std::min(i+CP, colblocks()); j++) {
+                if (grid()->is_local_col(j)) {
 #pragma omp task default(shared) firstprivate(i,j,k)
-                    {
-                      tile(k, j).laswp(piv_tile_global[k/grid()->nprows()], true);
-                      trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-                           scalar_t(1.), Tcc_vec[k/grid()->nprows()], tile(k, j));
-                    }
+                  {
+                    tile(k, j).laswp(piv_tile_global[k/grid()->nprows()], true);
+                    trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                         scalar_t(1.), Tcc_vec[k/grid()->nprows()], tile(k, j));
                   }
                 }
               }
@@ -1696,21 +1684,19 @@ namespace strumpack {
           auto Tkc = bcast_col_of_tiles_along_rows(k+1, rowblocks(), k);
           auto Tcj = bcast_row_of_tiles_along_cols(k, i, std::min(i+CP, colblocks()));
 #pragma omp parallel
+#pragma omp single nowait
           {
-#pragma omp single
-            {
-              for (std::size_t lk=k+1, c=0; lk<rowblocks(); lk++) {
-                if (grid()->is_local_row(lk)) {
-                  for (std::size_t lj=i, r=0; lj<std::min(i+CP, colblocks()); lj++) {
-                    if (grid()->is_local_col(lj)) {
+            for (std::size_t lk=k+1, c=0; lk<rowblocks(); lk++) {
+              if (grid()->is_local_row(lk)) {
+                for (std::size_t lj=i, r=0; lj<std::min(i+CP, colblocks()); lj++) {
+                  if (grid()->is_local_col(lj)) {
 #pragma omp task default(shared) firstprivate(i,k,lk,lj,c,r)
-                      gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc[c]),
-                           *(Tcj[r]), scalar_t(1.), tile_dense(lk, lj).D());
-                      r++;
-                    }
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc[c]),
+                         *(Tcj[r]), scalar_t(1.), tile_dense(lk, lj).D());
+                    r++;
                   }
-                  c++;
                 }
+                c++;
               }
             }
           }
@@ -1758,28 +1744,26 @@ namespace strumpack {
             }
           }
 #pragma omp parallel
+#pragma omp single nowait
           {
-#pragma omp single
-            {
-              if (grid()->is_local_row(c)) {
-                for (std::size_t j=c+1; j<std::min(i+CP,colblocks()); j++) {
-                  if (grid()->is_local_col(j)) {
+            if (grid()->is_local_row(c)) {
+              for (std::size_t j=c+1; j<std::min(i+CP,colblocks()); j++) {
+                if (grid()->is_local_col(j)) {
 #pragma omp task default(shared) firstprivate(i,j,c)
-                    {
-                      tile(c, j).laswp(piv_tile, true);
-                      trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-                           scalar_t(1.), Tcc, tile(c, j));
-                    }
+                  {
+                    tile(c, j).laswp(piv_tile, true);
+                    trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                         scalar_t(1.), Tcc, tile(c, j));
                   }
                 }
               }
-              if (grid()->is_local_col(c)) {
-                for (std::size_t j=c+1; j<rowblocks(); j++) {
-                  if (grid()->is_local_row(j)) {
+            }
+            if (grid()->is_local_col(c)) {
+              for (std::size_t j=c+1; j<rowblocks(); j++) {
+                if (grid()->is_local_row(j)) {
 #pragma omp task default(shared) firstprivate(i,c,j)
-                    trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-                         scalar_t(1.), Tcc, tile(j, c));
-                  }
+                  trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+                       scalar_t(1.), Tcc, tile(j, c));
                 }
               }
             }
@@ -1788,21 +1772,19 @@ namespace strumpack {
             auto Tcj = bcast_row_of_tiles_along_cols(c, c+1, std::min(i+CP,colblocks()));
             auto Tkc = bcast_col_of_tiles_along_rows(c+1, rowblocks(), c);
 #pragma omp parallel
+#pragma omp single nowait
             {
-#pragma omp single
-              {
-                for (std::size_t j=c+1, lj=0; j<std::min(i+CP,colblocks()); j++) {
-                  if (grid()->is_local_col(j)) {
-                    for (std::size_t k=c+1, lk=0; k<rowblocks(); k++) {
-                      if (grid()->is_local_row(k)) {
+              for (std::size_t j=c+1, lj=0; j<std::min(i+CP,colblocks()); j++) {
+                if (grid()->is_local_col(j)) {
+                  for (std::size_t k=c+1, lk=0; k<rowblocks(); k++) {
+                    if (grid()->is_local_row(k)) {
 #pragma omp task default(shared) firstprivate(i,c,j,k,lk,lj)
-                        gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc[lk]),
-                             *(Tcj[lj]), scalar_t(1.), tile_dense(k, j).D());
-                        lk++;
-                      }
+                      gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc[lk]),
+                           *(Tcj[lj]), scalar_t(1.), tile_dense(k, j).D());
+                      lk++;
                     }
-                    lj++;
                   }
+                  lj++;
                 }
               }
             }
