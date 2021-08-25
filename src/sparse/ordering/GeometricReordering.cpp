@@ -81,7 +81,7 @@ namespace strumpack {
       tree[nbsep-1].pa = nbsep;
 
       // separator
-      part_begin[d] = n0[d] + dims[d]/2  - (width/2);
+      part_begin[d] = n0[d] + dims[d]/2 - (width/2);
       part_size[d] = width;
       integer_t sep_size = comps * part_size[0]*part_size[1]*part_size[2];
       for (integer_t z=part_begin[2]; z<part_begin[2]+part_size[2]; z++)

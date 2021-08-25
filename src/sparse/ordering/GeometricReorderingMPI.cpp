@@ -101,7 +101,7 @@ namespace strumpack {
         auto local_left_root_id = local_nbsep - 1;
 
         // part 2/right
-        part_begin[d] = n0[d] + dims[d]/2 + 1;
+        part_begin[d] = n0[d] + dims[d]/2 + width;
         part_size[d] = dims[d] - width - dims[d]/2;
         rec_nd(part_begin, part_size, 2*dsep_id+1, l+1);
         if (dsep && !dsep_leaf) {
@@ -114,7 +114,7 @@ namespace strumpack {
         }
 
         // separator
-        part_begin[d] = n0[d] + dims[d]/2  - (width/2);
+        part_begin[d] = n0[d] + dims[d]/2 - (width/2);
         part_size[d] = width;
         auto sep_size = components * part_size[0]*part_size[1]*part_size[2];
         for (integer_t z=part_begin[2]; z<part_begin[2]+part_size[2]; z++)
