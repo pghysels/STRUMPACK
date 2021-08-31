@@ -104,14 +104,14 @@ namespace strumpack {
     switch (info) {
     case 0: break;
     case 1: throw std::runtime_error
-	(std::string("matrix is structurally singular"));
+        (std::string("matrix is structurally singular"));
     case 2:
       std::cerr << "# WARNING: mc64 scaling produced"
                 << " large scaling factors which may cause overflow!"
                 << std::endl;
       break;
     default: throw std::runtime_error
-	(std::string("mc64 failed with info[0]=") + std::to_string(info));
+        (std::string("mc64 failed with info[0]=") + std::to_string(info));
     }
     if (apply) apply_matching(M);
     return M;
