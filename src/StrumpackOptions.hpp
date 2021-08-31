@@ -42,6 +42,17 @@
 namespace strumpack {
 
   /**
+   * Enumeration of strategies for proportional mapping of the
+   * multifrontal tree.
+   * \ingroup Enumerations
+   */
+  enum class ProportionalMapping {
+    FLOPS,          /*!< Balance flops, optimze runtime                 */
+    FACTOR_MEMORY,  /*!< Balance final memory for LU factors            */
+    PEAK_MEMORY     /*!< Balance peak memory usage during factorization */
+  };
+
+  /**
    * Enumeration of possible sparse fill-reducing orderings.
    * \ingroup Enumerations
    */
@@ -738,6 +749,11 @@ namespace strumpack {
     void set_print_root_front_stats(bool b) { print_root_front_stats_ = b; }
 
     /**
+     * Set the type of proportional mapping.
+     */
+    void set_proportional_mapping(ProportionalMapping pmap) { prop_map_ = pmap; }
+
+    /**
      * Check if verbose output is enabled.
      * \see set_verbose()
      */
@@ -1105,6 +1121,11 @@ namespace strumpack {
     bool print_root_front_stats() const { return print_root_front_stats_; }
 
     /**
+     * Get the type of proportional mapping to be used.
+     */
+    ProportionalMapping proportional_mapping() const { return prop_map_; }
+
+    /**
      * Get a (const) reference to an object holding various options
      * pertaining to the HSS code, and data structures.
      */
@@ -1194,6 +1215,7 @@ namespace strumpack {
     real_t pivot_ = std::sqrt(blas::lamch<real_t>('E'));
     bool write_root_front_ = false;
     bool print_root_front_stats_ = false;
+    ProportionalMapping prop_map_ = ProportionalMapping::FLOPS;
 
     /** GPU options */
     bool use_gpu_ = true;

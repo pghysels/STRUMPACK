@@ -103,6 +103,14 @@ namespace strumpack {
     return "UNKNOWN";
   }
 
+  std::string get_name(ProportionalMapping pmap) {
+    switch (pmap) {
+    case ProportionalMapping::FLOPS: return "FLOPS";
+    case ProportionalMapping::FACTOR_MEMORY: return "FACTOR_MEMORY";
+    case ProportionalMapping::PEAK_MEMORY: return "PEAK_MEMORY";
+    }
+    return "UNKNOWN";
+  }
 
   template<typename scalar_t> void SPOptions<scalar_t>::set_from_command_line
   (int argc, const char* const* cargv) {
@@ -163,6 +171,7 @@ namespace strumpack {
        {"sp_lossy_min_sep_size",        required_argument, 0, 46},
        {"sp_lossy_min_front_size",      required_argument, 0, 47},
        {"sp_nd_planar_levels",          required_argument, 0, 48},
+       {"sp_proportional_mapping",      required_argument, 0, 49},
        {"sp_verbose",                   no_argument, 0, 'v'},
        {"sp_quiet",                     no_argument, 0, 'q'},
        {"help",                         no_argument, 0, 'h'},
@@ -383,6 +392,16 @@ namespace strumpack {
         iss >> nd_planar_levels_;
         set_nd_planar_levels(nd_planar_levels_);
       } break;
+      case 49: {
+        std::string s; std::istringstream iss(optarg); iss >> s;
+        for (auto& c : s) c = std::toupper(c);
+        if (s == "FLOPS") set_proportional_mapping(ProportionalMapping::FLOPS);
+        else if (s == "FACTOR_MEMORY") set_proportional_mapping(ProportionalMapping::FACTOR_MEMORY);
+        else if (s == "PEAK_MEMORY") set_proportional_mapping(ProportionalMapping::PEAK_MEMORY);
+        else std::cerr << "# WARNING: proportional-mapping type not"
+               " recognized, use 'FLOPS', 'FACTOR_MEMORY', 'PEAK_MEMORY'"
+                       << std::endl;
+      }
       case 'h': { describe_options(); } break;
       case 'v': set_verbose(true); break;
       case 'q': set_verbose(false); break;
@@ -503,6 +522,9 @@ namespace strumpack {
     std::cout << "#   --sp_disable_replace_tiny_pivots" << std::endl;
     std::cout << "#   --sp_write_root_front" << std::endl;
     std::cout << "#   --sp_print_root_front_stats" << std::endl;
+    std::cout << "#   --sp_proportional_mapping [FLOPS|FACTOR_MEMORY|PEAK_MEMORY]" << std::endl
+              << "#          type of proportional mapping"
+              << std::endl;
     std::cout << "#   --sp_enable_gpu" << std::endl;
     std::cout << "#   --sp_disable_gpu" << std::endl;
     std::cout << "#   --sp_gpu_streams (default "
