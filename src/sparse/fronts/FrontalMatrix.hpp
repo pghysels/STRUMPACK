@@ -106,9 +106,13 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_MPI)
       MPIComm c;
       c.barrier();
-      std::cout << "peak memory after sequential tree traversal: "
-                << double(strumpack::params::peak_memory) / 1.0e6
-                << " MB" << std::endl;
+      auto pmax = c.reduce(double(strumpack::params::peak_memory) / 1.0e6, MPI_MAX);
+      auto pmin = c.reduce(double(strumpack::params::peak_memory) / 1.0e6, MPI_MIN);
+      if (c.is_root())
+        std::cout << "# peak memory after sequential tree traversal: "
+                  << " pmin: " << pmin << " pmax: " << pmax
+                  << " imbalance: " << pmax/pmin
+                  << std::endl;
 #endif
     }
 

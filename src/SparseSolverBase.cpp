@@ -552,7 +552,8 @@ namespace strumpack {
       auto fnnz = factor_nonzeros();
       auto max_rank = maximum_rank();
 #if defined(STRUMPACK_COUNT_FLOPS)
-      auto peak_mem = peak_memory();
+      auto peak_max = max_peak_memory();
+      auto peak_min = min_peak_memory();
 #endif
       if (is_root_) {
         std::cout << "#   - factor time = " << t1.elapsed() << std::endl;
@@ -567,8 +568,9 @@ namespace strumpack {
         std::cout << "#   - factor flop rate = " << ftot_ / t1.elapsed() / 1e9
                   << " GFlop/s" << std::endl;
         std::cout << "#   - factor peak memory usage (estimate) = "
-                  << peak_mem / 1.0e6 << " MB (max), "
-                  << double(params::peak_memory) / 1.0e6 << " MB (root)"
+                  << peak_max / 1.0e6 << " MB (max), "
+                  << peak_min / 1.0e6 << " MB (min), imbalance: "
+                  << (peak_max / peak_min)
                   << std::endl;
         std::cout << "#   - factor peak device memory usage (estimate) = "
                   << double(params::peak_device_memory)/1.e6
@@ -615,7 +617,7 @@ namespace strumpack {
                       << opts_.BLR_options().rel_tol() << std::endl;
             std::cout << "#   - absolute compression tolerance = "
                       << opts_.BLR_options().abs_tol() << std::endl;
-          } 
+          }
 #endif
 #if defined(STRUMPACK_USE_BPACK)
 #if defined(STRUMPACK_USE_ZFP)

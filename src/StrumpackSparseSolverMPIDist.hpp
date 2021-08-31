@@ -313,8 +313,11 @@ namespace strumpack {
     void synchronize() override { comm_.barrier(); }
     void reduce_flop_counters() const override;
 
-    double peak_memory() const override {
+    double max_peak_memory() const override {
       return comm_.reduce(double(params::peak_memory), MPI_MAX);
+    }
+    double min_peak_memory() const override {
+      return comm_.reduce(double(params::peak_memory), MPI_MIN);
     }
 
     void redistribute_values();
