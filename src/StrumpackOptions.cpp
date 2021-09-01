@@ -401,7 +401,7 @@ namespace strumpack {
         else std::cerr << "# WARNING: proportional-mapping type not"
                " recognized, use 'FLOPS', 'FACTOR_MEMORY', 'PEAK_MEMORY'"
                        << std::endl;
-      }
+      } break;
       case 'h': { describe_options(); } break;
       case 'v': set_verbose(true); break;
       case 'q': set_verbose(false); break;
