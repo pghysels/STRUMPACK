@@ -45,8 +45,8 @@ addons:
       - libmetis-dev
       - mpich
       - libmpich-dev
-      - libscalapack-mpi-dev
       - libparmetis-dev
+      # - libscalapack-mpi-dev
       # - libptscotch-dev
 
 before_install:
@@ -109,24 +109,26 @@ before_install:
   # - $MPI_HOME/bin/mpicc -compile_info
   # - rm -rf mpich-3.3.2
 
-  # - printf "${BLUE} GC; Installing ScaLAPACK from source\n"
-  # - cd $TRAVIS_BUILD_DIR/installDir
-  # - wget http://www.netlib.org/scalapack/scalapack-2.1.0.tgz
-  # - tar -xf scalapack-2.1.0.tgz
-  # - cd scalapack-2.1.0
-  # - mkdir build
-  # - mkdir install
-  # - cd build
-  # - |
-  #  cmake ../ \
-  #   -DCMAKE_INSTALL_PREFIX=../install \
-  #   -DCMAKE_CXX_COMPILER=mpic++ \
-  #   -DCMAKE_C_COMPILER=mpicc \
-  #   -DCMAKE_Fortran_COMPILER=mpif90
-  # - make
-  # - cd ../
+  - printf "${BLUE} GC; Installing ScaLAPACK from source\n"
+  - cd $TRAVIS_BUILD_DIR/installDir
+  - wget http://www.netlib.org/scalapack/scalapack-2.1.0.tgz
+  - tar -xf scalapack-2.1.0.tgz
+  - cd scalapack-2.1.0
+  - mkdir build
+  - mkdir install
+  - cd build
+  - |
+   cmake ../ \
+    -DCMAKE_INSTALL_PREFIX=../install \
+    -DCMAKE_CXX_COMPILER=mpic++ \
+    -DCMAKE_C_COMPILER=mpicc \
+    -DCMAKE_Fortran_COMPILER=mpif90
+  - make
+  - cd ../
   # - export SCALAPACK_DIR=$PWD/install
-  # - printf "${BLUE} GC; Done installing ScaLAPACK from source\n"
+  - export SCALAPACK_LIB="$TRAVIS_BUILD_DIR/installDir/scalapack-2.1.0/build/lib/libscalapack.so"
+  - echo ${SCALAPACK_LIB}
+  - printf "${BLUE} GC; Done installing ScaLAPACK from source\n"
 
   # - printf "${BLUE} GC; Installing ScaLAPACK from source\n"
   # - cd $TRAVIS_BUILD_DIR/installDir
@@ -190,7 +192,8 @@ install:
     -DCMAKE_CXX_COMPILER=mpic++ \
     -DCMAKE_C_COMPILER=mpicc \
     -DCMAKE_Fortran_COMPILER=mpif90 \
-    -DTPL_SCALAPACK_LIBRARIES="/usr/lib/libscalapack-openmpi.so"
+    -DTPL_SCALAPACK_LIBRARIES="${SCALAPACK_LIB}"
+  #-DTPL_SCALAPACK_LIBRARIES="/usr/lib/libscalapack-openmpi.so"
   #-DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-mpich.so"
   #-DTPL_SCALAPACK_LIBRARIES="$TRAVIS_BUILD_DIR/installDir/scalapack-2.0.2/build/lib/libscalapack.so"
   #-DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
