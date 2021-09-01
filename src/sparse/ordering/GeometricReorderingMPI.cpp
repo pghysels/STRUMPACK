@@ -92,17 +92,19 @@ namespace strumpack {
           local_nbsep++;
         }
       } else {
+        int dhalf = (n0[d] < ld[d]/2) ?
+          std::ceil(dims[d]/2.) : std::floor(dims[d]/2.);
+
         // part 1/left
-        std::array<integer_t,3> part_begin(n0);
-        std::array<integer_t,3> part_size(dims);
-        part_size[d] = dims[d]/2 - (width/2);
+        std::array<integer_t,3> part_begin(n0), part_size(dims);
+        part_size[d] = dhalf - (width/2);
         rec_nd(part_begin, part_size, 2*dsep_id, l+1);
         auto dist_left_root_id = dist_nbsep - 1;
         auto local_left_root_id = local_nbsep - 1;
 
         // part 2/right
-        part_begin[d] = n0[d] + dims[d]/2 + width;
-        part_size[d] = dims[d] - width - dims[d]/2;
+        part_begin[d] = n0[d] + dhalf + width;
+        part_size[d] = dims[d] - width - dhalf;
         rec_nd(part_begin, part_size, 2*dsep_id+1, l+1);
         if (dsep && !dsep_leaf) {
           dist_tree[dist_left_root_id].pa = dist_nbsep;
@@ -114,7 +116,7 @@ namespace strumpack {
         }
 
         // separator
-        part_begin[d] = n0[d] + dims[d]/2 - (width/2);
+        part_begin[d] = n0[d] + dhalf - (width/2);
         part_size[d] = width;
         auto sep_size = components * part_size[0]*part_size[1]*part_size[2];
         for (integer_t z=part_begin[2]; z<part_begin[2]+part_size[2]; z++)
