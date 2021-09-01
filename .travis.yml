@@ -190,7 +190,8 @@ install:
     -DCMAKE_CXX_COMPILER=mpic++ \
     -DCMAKE_C_COMPILER=mpicc \
     -DCMAKE_Fortran_COMPILER=mpif90 \
-    -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-mpich.so"
+    -DTPL_SCALAPACK_LIBRARIES="/usr/lib/libscalapack-openmpi.so"
+  #-DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-mpich.so"
   #-DTPL_SCALAPACK_LIBRARIES="$TRAVIS_BUILD_DIR/installDir/scalapack-2.0.2/build/lib/libscalapack.so"
   #-DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
   - make VERBOSE=1
