@@ -211,7 +211,7 @@ namespace strumpack {
     if (dupd) {
 #pragma omp critical
       CBstorage_ = workspace.get();
-      auto cap = CBstorage_.capacity();
+      integer_t cap = CBstorage_.capacity();
       if (dupd*dupd > cap) {
         STRUMPACK_ADD_MEMORY((dupd*dupd - cap)*sizeof(scalar_t));
       }
