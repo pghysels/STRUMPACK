@@ -66,7 +66,7 @@ before_install:
   # - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
   # - sudo apt-get update
   # - sudo apt-get install gcc-9 g++-9 -y
-  # - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 --slave /usr/bin/g++ g++ /usr/bin/g++-9
+  - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 --slave /usr/bin/g++ g++ /usr/bin/g++-9
   # - export CXX="g++-9"
   # - export CC="gcc-9"
   # - printf "${BLUE} GC; Done installing gcc-9 via apt\n"
@@ -124,10 +124,12 @@ before_install:
     -DCMAKE_C_COMPILER=mpicc \
     -DCMAKE_Fortran_COMPILER=mpif90
   - make
+  - make install
   - cd ../
   # - export SCALAPACK_DIR=$PWD/install
-  - export SCALAPACK_LIB="$TRAVIS_BUILD_DIR/installDir/scalapack-2.1.0/build/lib/libscalapack.so"
+  - export SCALAPACK_LIB="$TRAVIS_BUILD_DIR/installDir/scalapack-2.1.0/install/lib/libscalapack.so"
   - echo ${SCALAPACK_LIB}
+  - ls -alh ${SCALAPACK_LIB}
   - printf "${BLUE} GC; Done installing ScaLAPACK from source\n"
 
   # - printf "${BLUE} GC; Installing ScaLAPACK from source\n"
