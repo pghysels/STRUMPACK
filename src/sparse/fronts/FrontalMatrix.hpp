@@ -68,11 +68,13 @@ namespace strumpack {
 
   template<typename scalar_t> class CBWorkspace {
   public:
+#if defined(STRUMPACK_COUNT_FLOPS)
     ~CBWorkspace() {
       for (auto& v : data_) {
         STRUMPACK_SUB_MEMORY(v.capacity()*sizeof(scalar_t));
       }
     }
+#endif
     std::vector<scalar_t,NoInit<scalar_t>> get() {
       if (data_.empty())
         return std::vector<scalar_t,NoInit<scalar_t>>();
