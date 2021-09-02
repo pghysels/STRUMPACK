@@ -127,7 +127,7 @@ namespace strumpack {
           (F11blr_, F12blr_, F21blr_, F22blr_, this, F11blr_.tilecoff(i),
            F11blr_.tilecoff(std::min(i+CP,F11blr_.colblocks())),
            task_depth, opts);
-    } else{
+    } else {
       if (lchild_)
         lchild_->extend_add_to_blr_col
           (F11blr_, F12blr_, F21blr_, F22blr_, this, F22blr_.tilecoff(i)+dim_sep(),
@@ -225,11 +225,11 @@ namespace strumpack {
     for (std::size_t c=0; c<dupd; c++) {
       auto pc = I[c];
       if (c == dupd-1) c_max = dupd;
-      if (pc < std::size_t(begin_col)){
+      if (pc < std::size_t(begin_col)) {
         c_min = c+1;
         continue;
       }
-      if (pc >= std::size_t(end_col)){
+      if (pc >= std::size_t(end_col)) {
         c_max = c;
         break;
       }

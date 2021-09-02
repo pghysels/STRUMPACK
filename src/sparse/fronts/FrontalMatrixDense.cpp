@@ -43,6 +43,27 @@ namespace strumpack {
     : F_t(nullptr, nullptr, sep, sep_begin, sep_end, upd) {}
 
   template<typename scalar_t,typename integer_t> void
+  FrontalMatrixDense<scalar_t,integer_t>::release_work_memory() {
+    CBstorage_.clear();
+    F22_.clear();
+  }
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixDense<scalar_t,integer_t>::release_work_memory
+  (CBWorkspace<scalar_t>& workspace) {
+#pragma omp critical
+    workspace.restore(CBstorage_);
+    F22_.clear();
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_dense
+  (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
+   const F_t* p, int task_depth) {
+    CBWorkspace<scalar_t> workspace;
+    extend_add_to_dense(paF11, paF12, paF21, paF22, p, workspace, task_depth);
+  }
+
+  template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const F_t* p, CBWorkspace<scalar_t>& workspace, int task_depth) {
@@ -190,6 +211,10 @@ namespace strumpack {
     if (dupd) {
 #pragma omp critical
       CBstorage_ = workspace.get();
+      auto cap = CBstorage_.capacity();
+      if (dupd*dupd > cap) {
+        STRUMPACK_ADD_MEMORY((dupd*dupd - cap)*sizeof(scalar_t));
+      }
       CBstorage_.resize(dupd*dupd);
       F22_ = DenseMW_t(dupd, dupd, CBstorage_.data(), dupd);
       F22_.zero();

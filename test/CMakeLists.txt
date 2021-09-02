@@ -662,6 +662,201 @@ add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq rdb968/rdb968.
 set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
 
 
+
+set(test_name "SPARSE_seq_48")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq utm300/utm300.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+set(test_name "SPARSE_seq_49")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq utm300/utm300.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+set(test_name "SPARSE_seq_50")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq utm300/utm300.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "SPARSE_seq_51")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq utm300/utm300.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+set(test_name "SPARSE_seq_52")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq utm300/utm300.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+# set(test_name "SPARSE_seq_53")
+# add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq utm300/utm300.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+# set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "SPARSE_seq_54")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq mesh3e1/mesh3e1.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+set(test_name "SPARSE_seq_55")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq mesh3e1/mesh3e1.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+set(test_name "SPARSE_seq_56")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq mesh3e1/mesh3e1.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "SPARSE_seq_57")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq mesh3e1/mesh3e1.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+set(test_name "SPARSE_seq_58")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq mesh3e1/mesh3e1.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+set(test_name "SPARSE_seq_59")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq mesh3e1/mesh3e1.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+# set(test_name "SPARSE_seq_60")
+# add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq t2dal/t2dal.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+# set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+# set(test_name "SPARSE_seq_61")
+# add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq t2dal/t2dal.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+# set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+set(test_name "SPARSE_seq_62")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq t2dal/t2dal.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "SPARSE_seq_63")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq t2dal/t2dal.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+set(test_name "SPARSE_seq_64")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq t2dal/t2dal.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+set(test_name "SPARSE_seq_65")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq t2dal/t2dal.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "SPARSE_seq_66")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq bcsstk28/bcsstk28.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-4 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+# set(test_name "SPARSE_seq_67")
+# add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq bcsstk28/bcsstk28.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-4 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+# set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+# set(test_name "SPARSE_seq_68")
+# add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq bcsstk28/bcsstk28.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-4 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+# set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+# set(test_name "SPARSE_seq_69")
+# add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq bcsstk28/bcsstk28.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-4 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+# set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+# set(test_name "SPARSE_seq_70")
+# add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq bcsstk28/bcsstk28.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-4 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+# set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+# set(test_name "SPARSE_seq_71")
+# add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq bcsstk28/bcsstk28.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-4 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+# set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "SPARSE_seq_72")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq cavity16/cavity16.mtx --sp_compression BLR --sp_enable_replace_tiny_pivots --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+set(test_name "SPARSE_seq_73")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq cavity16/cavity16.mtx --sp_compression BLR --sp_enable_replace_tiny_pivots --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+set(test_name "SPARSE_seq_74")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq cavity16/cavity16.mtx --sp_compression BLR --sp_enable_replace_tiny_pivots --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "SPARSE_seq_75")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq cavity16/cavity16.mtx --sp_compression BLR --sp_enable_replace_tiny_pivots --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+set(test_name "SPARSE_seq_76")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq cavity16/cavity16.mtx --sp_compression BLR --sp_enable_replace_tiny_pivots --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+set(test_name "SPARSE_seq_77")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq cavity16/cavity16.mtx --sp_compression BLR --sp_enable_replace_tiny_pivots --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "SPARSE_seq_78")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq bcsstm08/bcsstm08.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+set(test_name "SPARSE_seq_79")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq bcsstm08/bcsstm08.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+set(test_name "SPARSE_seq_80")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq bcsstm08/bcsstm08.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "SPARSE_seq_81")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq bcsstm08/bcsstm08.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+set(test_name "SPARSE_seq_82")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq bcsstm08/bcsstm08.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+set(test_name "SPARSE_seq_83")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq bcsstm08/bcsstm08.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "SPARSE_seq_84")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq sherman4/sherman4.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+set(test_name "SPARSE_seq_85")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq sherman4/sherman4.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+set(test_name "SPARSE_seq_86")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq sherman4/sherman4.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "SPARSE_seq_87")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq sherman4/sherman4.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+set(test_name "SPARSE_seq_88")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq sherman4/sherman4.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+set(test_name "SPARSE_seq_89")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq sherman4/sherman4.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+# set(test_name "SPARSE_seq_90")
+# add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq rdb968/rdb968.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+# set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+# set(test_name "SPARSE_seq_91")
+# add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq rdb968/rdb968.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+# set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+# set(test_name "SPARSE_seq_92")
+# add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq rdb968/rdb968.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+# set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+set(test_name "SPARSE_seq_93")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq rdb968/rdb968.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+set(test_name "SPARSE_seq_94")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq rdb968/rdb968.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+set(test_name "SPARSE_seq_95")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq rdb968/rdb968.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+
+
 if(STRUMPACK_USE_MPI)
 
   set(test_name "SPARSE_mpi_1")

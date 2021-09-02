@@ -57,21 +57,16 @@ namespace strumpack {
     FrontalMatrixDense(integer_t sep, integer_t sep_begin, integer_t sep_end,
                        std::vector<integer_t>& upd);
 
-    void release_work_memory() override {
-      CBstorage_.clear();
-      F22_.clear();
-    }
-    void release_work_memory(CBWorkspace<scalar_t>& workspace) {
-#pragma omp critical
-      workspace.restore(CBstorage_);
-      F22_.clear();
-    }
+    void release_work_memory() override;
+    void release_work_memory(CBWorkspace<scalar_t>& workspace);
 
     void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                              DenseM_t& paF21, DenseM_t& paF22,
-                             const F_t* p,
-                             CBWorkspace<scalar_t>& workspace,
+                             const F_t* p, CBWorkspace<scalar_t>& workspace,
                              int task_depth) override;
+    void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
+                             DenseM_t& paF21, DenseM_t& paF22,
+                             const F_t* p, int task_depth) override;
 
     void extend_add_to_blr(BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21,
                            BLRM_t& paF22, const F_t* p, int task_depth,

@@ -68,6 +68,11 @@ namespace strumpack {
 
   template<typename scalar_t> class CBWorkspace {
   public:
+    ~CBWorkspace() {
+      for (auto& v : data_) {
+        STRUMPACK_SUB_MEMORY(v.capacity()*sizeof(scalar_t));
+      }
+    }
     std::vector<scalar_t,NoInit<scalar_t>> get() {
       if (data_.empty())
         return std::vector<scalar_t,NoInit<scalar_t>>();
@@ -80,7 +85,6 @@ namespace strumpack {
     void restore(std::vector<scalar_t,NoInit<scalar_t>>& v) {
       data_.push_back(std::move(v));
     }
-    // void clear() { data_.clear(); }
   private:
     std::vector<std::vector<scalar_t,NoInit<scalar_t>>> data_;
   };
@@ -178,7 +182,9 @@ namespace strumpack {
     extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                         DenseM_t& paF21, DenseM_t& paF22,
                         const FrontalMatrix<scalar_t,integer_t>* p,
-                        int task_depth) {}
+                        int task_depth) {
+      assert(false);
+    }
     virtual void
     extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                         DenseM_t& paF21, DenseM_t& paF22,
