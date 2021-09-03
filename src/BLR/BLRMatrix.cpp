@@ -1283,8 +1283,8 @@ namespace strumpack {
       auto rb = B11.rowblocks();
       auto rb2 = B21.rowblocks();
       std::size_t CP = 1;//??
-#pragma omp parallel if(!omp_in_parallel())
-#pragma omp single nowait
+//#pragma omp parallel if(!omp_in_parallel())
+//#pragma omp single nowait
       {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
         auto lrb = rb+rb2;
