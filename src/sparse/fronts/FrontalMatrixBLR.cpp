@@ -620,7 +620,15 @@ namespace strumpack {
       for (integer_t i=sep_begin_; i<sep_end_; i++)
         sorder[i] = sorder[i] + sep_begin_;
       sep_tiles_ = sep_tree.template leaf_sizes<std::size_t>();
-      admissibility_ = g.admissibility(sep_tiles_);
+      if (opts.BLR_options().admissibility() == BLR::Admissibility::STRONG)
+        admissibility_ = g.admissibility(sep_tiles_);
+      else {
+        auto nt = sep_tiles_.size();
+        admissibility_ = DenseMatrix<bool>(nt, nt);
+        admissibility_.fill(true);
+        for (std::size_t t=0; t<nt; t++)
+          admissibility_(t, t) = false;
+      }
     }
     if (dim_upd()) {
       auto leaf = opts.BLR_options().leaf_size();

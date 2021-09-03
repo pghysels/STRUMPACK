@@ -36,7 +36,7 @@
 #include "misc/Tools.hpp"
 
 namespace strumpack {
-  
+
   namespace BLR {
 
     std::string get_name(LowRankAlgorithm a) {
@@ -104,7 +104,7 @@ namespace strumpack {
          {"blr_BACA_blocksize",        required_argument, 0, 7},
          {"blr_factor_algorithm",      required_argument, 0, 8},
          {"blr_compression_kernel",    required_argument, 0, 9},
-         {"blr_seq_CB_Compression", no_argument, 0, 10},
+         {"blr_seq_CB_Compression",    no_argument, 0, 10},
          {"blr_cb",                    required_argument, 0, 11},
          {"blr_verbose",               no_argument, 0, 'v'},
          {"blr_quiet",                 no_argument, 0, 'q'},
