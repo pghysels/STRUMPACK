@@ -644,8 +644,8 @@ namespace strumpack {
       piv.resize(B11.rows());
       auto rb = B11.rowblocks();
       auto rb2 = B21.rowblocks();
-#pragma omp parallel if(!omp_in_parallel())
-#pragma omp single nowait
+//#pragma omp parallel if(!omp_in_parallel())
+//#pragma omp single nowait
       {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
         auto lrb = rb+rb2;
@@ -1124,8 +1124,8 @@ namespace strumpack {
       piv.resize(B11.rows());
       auto rb = B11.rowblocks();
       auto rb2 = B21.rowblocks();
-#pragma omp parallel if(!omp_in_parallel())
-#pragma omp single nowait
+//#pragma omp parallel if(!omp_in_parallel())
+//#pragma omp single nowait
       {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
         auto lrb = rb+rb2;
