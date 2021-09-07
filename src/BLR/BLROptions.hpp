@@ -137,7 +137,7 @@ namespace strumpack {
       bool verbose_ = true;
       LowRankAlgorithm lr_algo_ = LowRankAlgorithm::RRQR;
       int BACA_blocksize_ = 4;
-      Admissibility adm_ = Admissibility::STRONG;
+      Admissibility adm_ = Admissibility::WEAK;
       BLRFactorAlgorithm blr_algo_ = BLRFactorAlgorithm::STAR;
       CompressionKernel crn_krnl_ = CompressionKernel::HALF;
       BLRCB blr_cb_ = BLRCB::DENSE;
@@ -146,7 +146,7 @@ namespace strumpack {
       void set_defaults() {
         this->rel_tol_ = default_BLR_rel_tol<real_t>();
         this->abs_tol_ = default_BLR_abs_tol<real_t>();
-        this->leaf_size_ = 128;
+        this->leaf_size_ = 512;
         this->max_rank_ = 5000;
       }
 
