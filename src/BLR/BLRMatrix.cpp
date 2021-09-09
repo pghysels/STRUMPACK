@@ -443,7 +443,7 @@ namespace strumpack {
         (tilerows(i), tilecols(j), A, tileroff(i), tilecoff(j));
     }
 
-    template<typename scalar_t> DenseTile<scalar_t>& 
+    template<typename scalar_t> DenseTile<scalar_t>&
     BLRMatrix<scalar_t>::tile_dense(std::size_t i, std::size_t j) {
       assert(dynamic_cast<DenseTile<scalar_t>*>
              (blocks_[i+j*rowblocks()].get()));
@@ -451,7 +451,7 @@ namespace strumpack {
                    (blocks_[i+j*rowblocks()].get());
     }
 
-    template<typename scalar_t> const DenseTile<scalar_t>& 
+    template<typename scalar_t> const DenseTile<scalar_t>&
     BLRMatrix<scalar_t>::tile_dense(std::size_t i, std::size_t j) const {
       assert(dynamic_cast<DenseTile<scalar_t>*>
              (blocks_[i+j*rowblocks()].get()));
