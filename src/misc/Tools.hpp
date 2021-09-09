@@ -60,6 +60,10 @@ namespace strumpack {
       ::new(p) U(std::forward<Args>(args)...);
     }
   };
+  template <class T, class U> bool operator==
+  (const NoInit<T>&, const NoInit<U>&) { return true; }
+  template <class T, class U> bool operator!=
+  (const NoInit<T>&, const NoInit<U>&) { return false; }
 
 
   // this sorts both indices and values at the same time
