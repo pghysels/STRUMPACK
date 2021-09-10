@@ -1210,6 +1210,7 @@ namespace strumpack {
   template class CSRMatrix<std::complex<double>,long long int>;
 
 
+
   template<typename scalar_t, typename integer_t, typename cast_t>
   CSRMatrix<cast_t,integer_t>
   cast_matrix(const CSRMatrix<scalar_t,integer_t>& mat) {
@@ -1218,10 +1219,40 @@ namespace strumpack {
       (mat.size(), mat.ptr(), mat.ind(), new_val.data(), mat.symm_sparse());
   }
 
+  // explicit template instantiations
   template CSRMatrix<float,int>
   cast_matrix<double,int,float>(const CSRMatrix<double,int>& mat);
+  template CSRMatrix<double,int>
+  cast_matrix<float,int,double>(const CSRMatrix<float,int>& mat);
   template CSRMatrix<std::complex<float>,int>
   cast_matrix<std::complex<double>,int,std::complex<float>>
   (const CSRMatrix<std::complex<double>,int>& mat);
+  template CSRMatrix<std::complex<double>,int>
+  cast_matrix<std::complex<float>,int,std::complex<double>>
+  (const CSRMatrix<std::complex<float>,int>& mat);
+
+  template CSRMatrix<float,long int>
+  cast_matrix<double,long int,float>(const CSRMatrix<double,long int>& mat);
+  template CSRMatrix<double,long int>
+  cast_matrix<float,long int,double>(const CSRMatrix<float,long int>& mat);
+  template CSRMatrix<std::complex<float>,long int>
+  cast_matrix<std::complex<double>,long int,std::complex<float>>
+  (const CSRMatrix<std::complex<double>,long int>& mat);
+  template CSRMatrix<std::complex<double>,long int>
+  cast_matrix<std::complex<float>,long int,std::complex<double>>
+  (const CSRMatrix<std::complex<float>,long int>& mat);
+
+  template CSRMatrix<float,long long int>
+  cast_matrix<double,long long int,float>
+  (const CSRMatrix<double,long long int>& mat);
+  template CSRMatrix<double,long long int>
+  cast_matrix<float,long long int,double>
+  (const CSRMatrix<float,long long int>& mat);
+  template CSRMatrix<std::complex<float>,long long int>
+  cast_matrix<std::complex<double>,long long int,std::complex<float>>
+  (const CSRMatrix<std::complex<double>,long long int>& mat);
+  template CSRMatrix<std::complex<double>,long long int>
+  cast_matrix<std::complex<float>,long long int,std::complex<double>>
+  (const CSRMatrix<std::complex<float>,long long int>& mat);
 
 } // end namespace strumpack
