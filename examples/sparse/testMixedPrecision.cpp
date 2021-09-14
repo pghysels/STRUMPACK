@@ -28,6 +28,8 @@
  */
 #include <iostream>
 #include <type_traits>
+#include <random>
+#include <cmath>
 
 #include "StrumpackSparseSolver.hpp"
 #include "StrumpackSparseSolverMixedPrecision.hpp"
@@ -36,6 +38,25 @@
 using namespace strumpack;
 
 
+/**
+ * Test the STRUMPACK sparse solver, and the mixed precision sparse
+ * solver.
+ *
+ * For working_t == float, the mixed precision solver will
+ * compute the factorization in single precision, but do iterative
+ * refinement in double precision to give a more accurate results than
+ * the standard single precision solver.
+ *
+ * For working_t == double, the mixed precision solver will compute
+ * the factorization in single precision and perform the iterative
+ * refinement in double precision. If the problem is not too
+ * ill-conditioned, this should be about as accurate, and about twice
+ * as fast as the standard double precision solver. The speedup
+ * depends on the relative cost of the sparse triangular solver phase
+ * compared to the sparse LU factorization phase.
+ *
+ * TODO long double
+ */
 template<typename working_t>
 void test(CSRMatrix<working_t,int>& A,
           DenseMatrix<working_t>& b, DenseMatrix<working_t>& x_exact,
@@ -107,6 +128,11 @@ void test(CSRMatrix<working_t,int>& A,
 
 
 int main(int argc, char* argv[]) {
+
+  std::cout << "long double size in bytes: "
+            << sizeof(long double) << " "
+            << std::endl;
+
   std::string f;
   if (argc > 1) f = std::string(argv[1]);
 
@@ -116,16 +142,40 @@ int main(int argc, char* argv[]) {
 
   int N = A_d.size();
   int m = 1; // nr of RHSs
-  DenseMatrix<double> b_d(N, m), x_exact_d(N, m);
-  x_exact_d.random();
-  A_d.spmv(x_exact_d, b_d);
+  DenseMatrix<double> b_d(N, m), x_true_d(N, m);
 
-  DenseMatrix<float> b_f(N, m), x_exact_f(N, m);
-  copy(x_exact_d, x_exact_f);
+
+  // set the exact solution, see:
+  //   http://www.netlib.org/lapack/lawnspdf/lawn165.pdf
+  // page 20
+  auto tau_max = std::sqrt(24.0);
+  std::default_random_engine gen;
+  std::uniform_real_distribution<double> dist(0., tau_max);
+  for (int j=0; j<m; j++) {
+    // step 4, use a different tau for each RHS
+    double tau = dist(gen);
+    for (int i=0; i<N; i++)
+      // step 4c
+      x_true_d(i, j) = std::pow(tau, -double(i)/(N-1));
+  }
+
+  // step 6, but in double, not double-double
+  A_d.spmv(x_true_d, b_d);
+  {
+    // step 7, but in double, not double-double
+    SparseSolver<double,int> spss;
+    // SparseSolverMixedPrecision<double,long double,int> spss;
+    spss.set_matrix(A_d);
+    spss.solve(b_d, x_true_d);
+  }
+
+  // cast RHS and true solution to single precision
+  DenseMatrix<float> b_f(N, m), x_true_f(N, m);
+  copy(x_true_d, x_true_f);
   copy(b_d, b_f);
 
-  test<double>(A_d, b_d, x_exact_d, argc, argv);
-  test<float >(A_f, b_f, x_exact_f, argc, argv);
+  test<double>(A_d, b_d, x_true_d, argc, argv);
+  test<float >(A_f, b_f, x_true_f, argc, argv);
 
   return 0;
 }
