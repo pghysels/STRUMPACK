@@ -499,7 +499,9 @@ namespace strumpack {
     for (int i=0; i<7; i++)
       std::cout << "#      " << i << " " <<
         get_description(get_matching(i)) << std::endl;
-    std::cout << "#   --sp_compression [none|hss|blr|hodlr|lossy|blr_hodlr|zfp_blr_hodlr]" << std::endl
+    std::cout << "#   --sp_compression (default "
+              << get_name(comp_) << ")" << std::endl 
+              << "#          should be [none|hss|blr|hodlr|lossy|blr_hodlr|zfp_blr_hodlr]" << std::endl
               << "#          type of rank-structured compression to use"
               << std::endl;
     std::cout << "#   --sp_compression_min_sep_size (default "
@@ -522,7 +524,9 @@ namespace strumpack {
     std::cout << "#   --sp_disable_replace_tiny_pivots" << std::endl;
     std::cout << "#   --sp_write_root_front" << std::endl;
     std::cout << "#   --sp_print_root_front_stats" << std::endl;
-    std::cout << "#   --sp_proportional_mapping [FLOPS|FACTOR_MEMORY|PEAK_MEMORY]" << std::endl
+    std::cout << "#   --sp_proportional_mapping (default "
+              << get_name(prop_map_) << ")" << std::endl
+              << "#          should be [FLOPS|FACTOR_MEMORY|PEAK_MEMORY]" << std::endl
               << "#          type of proportional mapping"
               << std::endl;
     std::cout << "#   --sp_enable_gpu" << std::endl;
