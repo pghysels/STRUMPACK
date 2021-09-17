@@ -148,12 +148,11 @@ int main(int argc, char* argv[]) {
   // set the exact solution, see:
   //   http://www.netlib.org/lapack/lawnspdf/lawn165.pdf
   // page 20
-  auto tau_max = std::sqrt(24.0);
   std::default_random_engine gen;
-  std::uniform_real_distribution<double> dist(0., tau_max);
+  std::uniform_real_distribution<double> dist(0., std::sqrt(24.));
   for (int j=0; j<m; j++) {
     // step 4, use a different tau for each RHS
-    double tau = dist(gen);
+    double tau = std::pow(dist(gen), 2.);
     for (int i=0; i<N; i++)
       // step 4c
       x_true_d(i, j) = std::pow(tau, -double(i)/(N-1));
