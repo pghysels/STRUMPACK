@@ -3,7 +3,6 @@
 
 + \subpage algorithm "Algorithm Overview"
 + \subpage sparse_example_usage "Example Usage"
-+ \subpage GPU_Support "GPU Support"
 
 
 
