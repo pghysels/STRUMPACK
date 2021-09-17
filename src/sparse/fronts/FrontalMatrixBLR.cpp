@@ -113,7 +113,7 @@ namespace strumpack {
     } else {
       if (dupd)
         for (auto& e : e12)
-          if(F12blr_.cg2t(e.c) >= i && F12blr_.cg2t(e.c) < i+CP)
+          if (F12blr_.cg2t(e.c) >= i && F12blr_.cg2t(e.c) < i+CP)
             F12blr_(e.r, e.c) = e.v;
     }
     if (part) {
@@ -482,6 +482,10 @@ namespace strumpack {
                 << double(ftot) << std::endl;
 #endif
     }
+    // if (etree_level == 0)
+    //   BLR::draw(F11blr_, "F11root_"
+    //             + std::to_string(opts.BLR_options().leaf_size()) + "_"
+    //             + BLR::get_name(opts.BLR_options().admissibility()));
   }
 
   template<typename scalar_t,typename integer_t> void
