@@ -174,17 +174,18 @@ if [[ $(hostname -s) = "cs-it-7098760" ]]; then
     export slate_DIR=$HOME/local/spack_pghysels/opt/spack/linux-ubuntu20.04-zen2/gcc-10.2.0/slate-2020.10.00-utcue2tec7ly5kx27dy6rap6oxkglbbv
 
     cmake ../ \
-          -DCMAKE_BUILD_TYPE=Debug \
-          -DBUILD_SHARED_LIBS=ON \
+          -DCMAKE_BUILD_TYPE=Relase \
+          -DSTRUMPACK_USE_MPI=ON \
+          -DSTRUMPACK_USE_OPENMP=ON \
+          -DBUILD_SHARED_LIBS=OFF \
           -DCMAKE_INSTALL_PREFIX=../install \
           -DSTRUMPACK_COUNT_FLOPS=ON \
           -DSTRUMPACK_USE_CUDA=ON \
-          -DCMAKE_CUDA_FLAGS=-arch=sm_75 \
+          -DCMAKE_CUDA_ARCHITECTURES="75" \
           -DSTRUMPACK_USE_HIP=OFF \
           -DTPL_ENABLE_MAGMA=OFF \
           -DTPL_ENABLE_SLATE=OFF \
           -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
-#          -DTPL_SCALAPACK_LIBRARIES="/home/pieterg/local/dplasma/install/lib/libdplasma.so;/home/pieterg/local/dplasma/install/lib/libparsec.so;/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
 
 fi
 
@@ -207,7 +208,7 @@ if ! $found_host; then
     #  -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
 fi
 
-make install -j4
-make examples -j4
-make tests -j4
+make install -j8
+make examples -j8
+make tests -j8
 # make test
