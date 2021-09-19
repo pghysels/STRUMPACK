@@ -181,7 +181,7 @@ namespace strumpack {
   FrontalMatrixBLR<scalar_t,integer_t>::extend_add_to_blr
   (BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21, BLRM_t& paF22,
    const F_t* p, int task_depth, const Opts_t& opts) {
-    //extend_add from seq. BLR to seq. BLR
+    // extend_add from seq. BLR to seq. BLR
     const std::size_t pdsep = paF11.rows();
     const std::size_t dupd = dim_upd();
     std::size_t upd2sep;
@@ -216,7 +216,7 @@ namespace strumpack {
   (BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21, BLRM_t& paF22,
    const F_t* p, integer_t begin_col, integer_t end_col,
    int task_depth, const Opts_t& opts) {
-    //extend_add from seq. BLR to seq. BLR
+    // extend_add from seq. BLR to seq. BLR
     const std::size_t pdsep = paF11.rows();
     const std::size_t dupd = dim_upd();
     std::size_t upd2sep;
@@ -319,7 +319,7 @@ namespace strumpack {
 #if defined(STRUMPACK_COUNT_FLOPS)
     long long int f0 = 0, ftot = 0;
 #endif
-    if (etree_level == 0 && opts.print_root_front_stats()){
+    if (opts.print_compressed_front_stats()) {
 #if defined(STRUMPACK_COUNT_FLOPS)
       f0 = params::flops;
 #endif
@@ -330,7 +330,7 @@ namespace strumpack {
     if (opts.BLR_options().low_rank_algorithm() ==
         BLR::LowRankAlgorithm::RRQR) {
       if (opts.BLR_options().BLR_CB() == BLR::BLRCB::COLWISE) {
-        /* factor column-block-wise for memory reduction*/
+        /* factor column-block-wise for memory reduction */
         if (dsep) {
           F11blr_ = BLRM_t(dsep, sep_tiles_, dsep, sep_tiles_);
           F12blr_ = BLRM_t(dsep, sep_tiles_, dupd, upd_tiles_);
@@ -358,11 +358,10 @@ namespace strumpack {
         if (rchild_)
           rchild_->extend_add_to_blr
             (F11blr_, F12blr_, F21blr_, F22blr_, this, task_depth, opts);
-        if (dsep) {
+        if (dsep)
           BLRM_t::construct_and_partial_factor
             (F11blr_, F12blr_, F21blr_, F22blr_, piv_, sep_tiles_,
              upd_tiles_, admissibility_, opts.BLR_options());
-        }
       } else if (opts.BLR_options().BLR_CB() == BLR::BLRCB::DENSE) {
         DenseM_t F11(dsep, dsep), F12(dsep, dupd), F21(dupd, dsep);
         F11.zero(); F12.zero(); F21.zero();
@@ -376,11 +375,10 @@ namespace strumpack {
           lchild_->extend_add_to_dense(F11, F12, F21, F22_, this, task_depth);
         if (rchild_)
           rchild_->extend_add_to_dense(F11, F12, F21, F22_, this, task_depth);
-        if (dsep) {
+        if (dsep)
           BLRM_t::construct_and_partial_factor
             (F11, F12, F21, F22_, F11blr_, piv_, F12blr_, F21blr_,
              sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());
-        }
       }
 #if 0
       DenseM_t F11(dsep, dsep), F12(dsep, dupd), F21(dupd, dsep);
@@ -458,29 +456,40 @@ namespace strumpack {
       if (lchild_) lchild_->release_work_memory();
       if (rchild_) rchild_->release_work_memory();
     }
-    // TODO flops
-    // if (opts.print_root_front_stats()) {
-    //   std::cout << "#   - BLR front: N = " << dim_sep()
-    //             << " , N^2 = " << dim_sep() * dim_sep()
-    //             << ", peak memory: "
-    //             << double(strumpack::params::peak_memory) / 1.0e6
-    //             << " MB" << std::endl;
-    // }
-    if (etree_level == 0 && opts.print_root_front_stats()) {
+    if (opts.print_compressed_front_stats()) {
       auto time = t.elapsed();
       auto nnz = F11blr_.nonzeros();
-      std::cout << "#   - BLR root front: N = " << dim_sep()
-                << " , N^2 = " << dim_sep() * dim_sep()
-                << " , nnz = " << nnz
-                << " , " << float(nnz) / (dim_sep()*dim_sep()) * 100.
-                << " % compression, time = " << time
-                << " sec, "
-                << " maxrank= " << F11blr_.rank() << std::endl;
+      auto rank11 = F11blr_.rank();
+      std::cout << "#   - BLR front: Nsep= " << dim_sep()
+                << " , Nupd= " << dim_upd()
+                << "\n#       " << " nnz(F11)= " << nnz
+                << " rank(F11)= " << rank11;
+      if (dim_upd()) {
+        auto nnz12 = F12blr_.nonzeros();
+        auto nnz21 = F21blr_.nonzeros();
+        auto nnz22 = F22blr_.nonzeros();
+        nnz += nnz12 + nnz21 + nnz22;
+        std::cout << "        nnz(F12)= " << nnz12
+                  << " rank(F12)= " << F12blr_.rank()
+                  << "\n#       " << " nnz(F21)= " << nnz21
+                  << " rank(F12)= " << F12blr_.rank()
+                  << "        nnz(F22)= " << nnz22
+                  << " rank(F22)= " << F12blr_.rank();
+      }
+      std::cout << "\n#        " << (float(nnz)) /
+        (float(this->dim_blk())*this->dim_blk()) * 100.
+                << " %compression, time= " << time
+                << " sec";
 #if defined(STRUMPACK_COUNT_FLOPS)
       ftot = params::flops - f0;
-      std::cout << "#   - BLR root front: factor flops = "
-                << double(ftot) << std::endl;
+      std::cout << ", flops= " << double(ftot) << std::endl
+                << "#        total memory: "
+                << double(strumpack::params::memory) / 1.0e6 << " MB"
+                << ",   peak memory: "
+                << double(strumpack::params::peak_memory) / 1.0e6
+                << " MB";
 #endif
+      std::cout << std::endl;
     }
     // if (etree_level == 0)
     //   BLR::draw(F11blr_, "F11root_"

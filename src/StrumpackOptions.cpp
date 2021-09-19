@@ -157,7 +157,7 @@ namespace strumpack {
        {"sp_components",                required_argument, 0, 32},
        {"sp_separator_width",           required_argument, 0, 33},
        {"sp_write_root_front",          no_argument, 0, 34},
-       {"sp_print_root_front_stats",    no_argument, 0, 35},
+       {"sp_print_compressed_front_stats", no_argument, 0, 35},
        {"sp_enable_gpu",                no_argument, 0, 36},
        {"sp_disable_gpu",               no_argument, 0, 37},
        {"sp_gpu_streams",               required_argument, 0, 38},
@@ -326,7 +326,7 @@ namespace strumpack {
         set_separator_width(separator_width_);
       } break;
       case 34: set_write_root_front(true); break;
-      case 35: set_print_root_front_stats(true); break;
+      case 35: set_print_compressed_front_stats(true); break;
       case 36: enable_gpu(); break;
       case 37: disable_gpu(); break;
       case 38: {
@@ -523,7 +523,7 @@ namespace strumpack {
     std::cout << "#   --sp_enable_replace_tiny_pivots" << std::endl;
     std::cout << "#   --sp_disable_replace_tiny_pivots" << std::endl;
     std::cout << "#   --sp_write_root_front" << std::endl;
-    std::cout << "#   --sp_print_root_front_stats" << std::endl;
+    std::cout << "#   --sp_print_compressed_front_stats" << std::endl;
     std::cout << "#   --sp_proportional_mapping (default "
               << get_name(prop_map_) << ")" << std::endl
               << "#          should be [FLOPS|FACTOR_MEMORY|PEAK_MEMORY]" << std::endl

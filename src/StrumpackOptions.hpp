@@ -746,7 +746,7 @@ namespace strumpack {
      * Print statistics, about ranks, memory etc, for the root front
      * only.
      */
-    void set_print_root_front_stats(bool b) { print_root_front_stats_ = b; }
+    void set_print_compressed_front_stats(bool b) { print_comp_front_stats_ = b; }
 
     /**
      * Set the type of proportional mapping.
@@ -1118,7 +1118,7 @@ namespace strumpack {
      * Info about the stats of the root front will be printed to
      * std::cout
      */
-    bool print_root_front_stats() const { return print_root_front_stats_; }
+    bool print_compressed_front_stats() const { return print_comp_front_stats_; }
 
     /**
      * Get the type of proportional mapping to be used.
@@ -1214,7 +1214,7 @@ namespace strumpack {
     bool replace_tiny_pivots_ = false;
     real_t pivot_ = std::sqrt(blas::lamch<real_t>('E'));
     bool write_root_front_ = false;
-    bool print_root_front_stats_ = false;
+    bool print_comp_front_stats_ = false;
     ProportionalMapping prop_map_ = ProportionalMapping::FLOPS;
 
     /** GPU options */

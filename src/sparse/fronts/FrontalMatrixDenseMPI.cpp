@@ -232,8 +232,8 @@ namespace strumpack {
       lchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
     if (visit(rchild_))
       rchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
-    TaskTimer t("FrontalMatrixDenseMPI_factor");
-    if (etree_level == 0 && opts.print_root_front_stats()) t.start();
+    // TaskTimer t("FrontalMatrixDenseMPI_factor");
+    // if (etree_level == 0 && opts.print_root_front_stats()) t.start();
     build_front(A);
     if (etree_level == 0 && opts.write_root_front()) {
       //F11_.print_to_files("Froot");
@@ -254,12 +254,12 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_ZFP)
     compress(opts);
 #endif
-    if (etree_level == 0 && opts.print_root_front_stats()) {
-      auto time = t.elapsed();
-      if (Comm().is_root())
-        std::cout << "#   - DenseMPI root front: Nsep= " << this->dim_sep()
-                  << " , time= " << time << " sec" << std::endl;
-    }
+    // if (etree_level == 0 && opts.print_root_front_stats()) {
+    //   auto time = t.elapsed();
+    //   if (Comm().is_root())
+    //     std::cout << "#   - DenseMPI root front: Nsep= " << this->dim_sep()
+    //               << " , time= " << time << " sec" << std::endl;
+    // }
   }
 
 #if defined(STRUMPACK_USE_ZFP)

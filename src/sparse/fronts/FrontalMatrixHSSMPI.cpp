@@ -137,7 +137,7 @@ namespace strumpack {
     if (!dim_blk()) return;
 
     TaskTimer t("FrontalMatrixHSSMPI_factor");
-    if (/*etree_level == 0 && */opts.print_root_front_stats()) t.start();
+    if (opts.print_compressed_front_stats()) t.start();
     auto mult = [&](DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
       random_sampling(A, opts, R, Sr, Sc);
@@ -181,7 +181,7 @@ namespace strumpack {
         H_->factor();
       }
     }
-    if (/*etree_level == 0 && */opts.print_root_front_stats()) {
+    if (opts.print_compressed_front_stats()) {
       auto time = t.elapsed();
       auto rank = H_->max_rank();
       std::size_t nnzH = (H_ ? H_->total_nonzeros() : 0);
