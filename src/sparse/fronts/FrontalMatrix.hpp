@@ -71,7 +71,7 @@ namespace strumpack {
 #if defined(STRUMPACK_COUNT_FLOPS)
     ~CBWorkspace() {
       for (auto& v : data_) {
-        STRUMPACK_SUB_MEMORY(v.capacity()*sizeof(scalar_t));
+        STRUMPACK_SUB_MEMORY(v.size()*sizeof(scalar_t));
       }
     }
 #endif

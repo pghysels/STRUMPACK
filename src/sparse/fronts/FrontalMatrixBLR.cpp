@@ -259,7 +259,7 @@ namespace strumpack {
     STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
     STRUMPACK_FULL_RANK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
     F22blr_.remove_tiles_before_local_column(c_min, c_max);
-   }
+  }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::sample_CB
@@ -348,8 +348,6 @@ namespace strumpack {
                  (A, i, part, CP, e11, e12, e21, task_depth, opts);
              });
         }
-        if (lchild_) lchild_->release_work_memory();
-        if (rchild_) rchild_->release_work_memory();
       } else if (opts.BLR_options().BLR_CB() == BLR::BLRCB::BLR) {
         build_front(A);
         if (lchild_)
@@ -453,9 +451,9 @@ namespace strumpack {
         (dsep, dupd, F11elem, F12elem, F21elem, F22elem,
          F11blr_, piv_, F12blr_, F21blr_, F22blr_,
          sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());
-      if (lchild_) lchild_->release_work_memory();
-      if (rchild_) rchild_->release_work_memory();
     }
+    if (lchild_) lchild_->release_work_memory();
+    if (rchild_) rchild_->release_work_memory();
     if (opts.print_compressed_front_stats()) {
       auto time = t.elapsed();
       auto nnz = F11blr_.nonzeros();
@@ -467,19 +465,20 @@ namespace strumpack {
       if (dim_upd()) {
         auto nnz12 = F12blr_.nonzeros();
         auto nnz21 = F21blr_.nonzeros();
-        auto nnz22 = F22blr_.nonzeros();
-        nnz += nnz12 + nnz21 + nnz22;
+        auto nnz22blr = F22blr_.nonzeros();
+        auto nnz22dense = F22_.nonzeros();
+        nnz += nnz12 + nnz21 + nnz22blr + nnz22dense;
         std::cout << "        nnz(F12)= " << nnz12
                   << " rank(F12)= " << F12blr_.rank()
                   << "\n#       " << " nnz(F21)= " << nnz21
                   << " rank(F12)= " << F12blr_.rank()
-                  << "        nnz(F22)= " << nnz22
+                  << "        nnz(F22)= " << nnz22blr << " / " << nnz22dense
                   << " rank(F22)= " << F12blr_.rank();
       }
       std::cout << "\n#        " << (float(nnz)) /
         (float(this->dim_blk())*this->dim_blk()) * 100.
                 << " %compression, time= " << time
-                << " sec";
+                << " sec,   factor mem= " << nnz *sizeof(scalar_t) / 1.e6 << " MB";
 #if defined(STRUMPACK_COUNT_FLOPS)
       ftot = params::flops - f0;
       std::cout << ", flops= " << double(ftot) << std::endl

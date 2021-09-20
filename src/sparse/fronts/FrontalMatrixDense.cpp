@@ -44,6 +44,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::release_work_memory() {
+    STRUMPACK_SUB_MEMORY(CBstorage_.size()*sizeof(scalar_t));
     CBstorage_.clear();
     F22_.clear();
   }
@@ -211,9 +212,9 @@ namespace strumpack {
     if (dupd) {
 #pragma omp critical
       CBstorage_ = workspace.get();
-      integer_t cap = CBstorage_.capacity();
-      if (dupd*dupd > cap) {
-        STRUMPACK_ADD_MEMORY((dupd*dupd - cap)*sizeof(scalar_t));
+      integer_t old_size = CBstorage_.size();
+      if (dupd*dupd > old_size) {
+        STRUMPACK_ADD_MEMORY((dupd*dupd - old_size)*sizeof(scalar_t));
       }
       CBstorage_.resize(dupd*dupd);
       F22_ = DenseMW_t(dupd, dupd, CBstorage_.data(), dupd);
