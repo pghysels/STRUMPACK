@@ -184,11 +184,9 @@ namespace strumpack {
   (const SpMat_t& A, const Opts_t& opts, CBWorkspace<scalar_t>& workspace,
    int etree_level, int task_depth) {
     if (lchild_)
-      lchild_->multifrontal_factorization
-        (A, opts, workspace, etree_level+1, task_depth);
+      lchild_->factor(A, opts, workspace, etree_level+1, task_depth);
     if (rchild_)
-      rchild_->multifrontal_factorization
-        (A, opts, workspace, etree_level+1, task_depth);
+      rchild_->factor(A, opts, workspace, etree_level+1, task_depth);
     // TODO can we allocate the memory in one go??
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();
