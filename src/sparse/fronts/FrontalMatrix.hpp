@@ -66,6 +66,32 @@ namespace strumpack {
 #endif
 
 
+  template<typename scalar_t> class CBWorkspace {
+  public:
+#if defined(STRUMPACK_COUNT_FLOPS)
+    ~CBWorkspace() {
+      for (auto& v : data_) {
+        STRUMPACK_SUB_MEMORY(v.size()*sizeof(scalar_t));
+      }
+    }
+#endif
+    std::vector<scalar_t,NoInit<scalar_t>> get() {
+      if (data_.empty())
+        return std::vector<scalar_t,NoInit<scalar_t>>();
+      else {
+        auto v = std::move(data_.back());
+        data_.pop_back();
+        return v;
+      }
+    }
+    void restore(std::vector<scalar_t,NoInit<scalar_t>>& v) {
+      data_.push_back(std::move(v));
+    }
+  private:
+    std::vector<std::vector<scalar_t,NoInit<scalar_t>>> data_;
+  };
+
+
   template<typename scalar_t,typename integer_t> class FrontalMatrix {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
@@ -123,7 +149,7 @@ namespace strumpack {
                                int etree_level=0, int task_depth=0) = 0;
 
     virtual void factor(const SpMat_t& A, const Opts_t& opts,
-                        DenseWorkspace<scalar_t>& work,
+                        CBWorkspace<scalar_t>& workspace,
                         int etree_level=0, int task_depth=0) {
       multifrontal_factorization(A, opts, etree_level, task_depth);
     };
@@ -165,7 +191,7 @@ namespace strumpack {
     extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                         DenseM_t& paF21, DenseM_t& paF22,
                         const FrontalMatrix<scalar_t,integer_t>* p,
-                        DenseWorkspace<scalar_t>& work,
+                        CBWorkspace<scalar_t>& workspace,
                         int task_depth) {
       extend_add_to_dense(paF11, paF12, paF21, paF22, p, task_depth);
     }

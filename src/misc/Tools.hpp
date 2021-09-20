@@ -66,53 +66,6 @@ namespace strumpack {
   (const NoInit<T>&, const NoInit<U>&) { return false; }
 
 
-
-//   template<typename scalar_t> class CBWorkspace {
-//   public:
-// #if defined(STRUMPACK_COUNT_FLOPS)
-//     ~CBWorkspace() {
-//       for (auto& v : data_) {
-//         STRUMPACK_SUB_MEMORY(v.size()*sizeof(scalar_t));
-//       }
-//     }
-// #endif
-//     std::vector<scalar_t,NoInit<scalar_t>> get() {
-//       if (data_.empty())
-//         return std::vector<scalar_t,NoInit<scalar_t>>();
-//       else {
-//         auto v = std::move(data_.back());
-//         data_.pop_back();
-//         return v;
-//       }
-//     }
-//     void restore(std::vector<scalar_t,NoInit<scalar_t>>& v) {
-//       data_.push_back(std::move(v));
-//     }
-//   private:
-//     std::vector<std::vector<scalar_t,NoInit<scalar_t>>> data_;
-//   };
-
-  template<typename scalar_t> class DenseWorkspace {
-  public:
-    DenseMatrix<scalar_t> get() {
-      DenseMatrix<scalar_t> v;
-      if (!data_.empty())
-#pragma omp critical
-        {
-          v = std::move(data_.back());
-          data_.pop_back();
-        }
-      return v;
-    }
-    void restore(DenseMatrix<scalar_t>& v) {
-#pragma omp critical
-      data_.push_back(std::move(v));
-    }
-  private:
-    std::vector<DenseMatrix<scalar_t>> data_;
-  };
-
-
   // this sorts both indices and values at the same time
   template<typename scalar_t,typename integer_t>
   void sort_indices_values(integer_t *ind, scalar_t *val,
