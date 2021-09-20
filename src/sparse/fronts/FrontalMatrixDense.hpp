@@ -58,11 +58,11 @@ namespace strumpack {
                        std::vector<integer_t>& upd);
 
     void release_work_memory() override;
-    void release_work_memory(CBWorkspace<scalar_t>& workspace);
+    void release_work_memory(DenseWorkspace<scalar_t>& work);
 
     void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                              DenseM_t& paF21, DenseM_t& paF22,
-                             const F_t* p, CBWorkspace<scalar_t>& workspace,
+                             const F_t* p, DenseWorkspace<scalar_t>& work,
                              int task_depth) override;
     void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                              DenseM_t& paF21, DenseM_t& paF22,
@@ -94,11 +94,11 @@ namespace strumpack {
     virtual void
     multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
                                int etree_level=0, int task_depth=0) override {
-      CBWorkspace<scalar_t> workspace;
-      factor(A, opts, workspace, etree_level, task_depth);
+      DenseWorkspace<scalar_t> work;
+      factor(A, opts, work, etree_level, task_depth);
     }
     virtual void factor(const SpMat_t& A, const Opts_t& opts,
-                        CBWorkspace<scalar_t>& workspace,
+                        DenseWorkspace<scalar_t>& work,
                         int etree_level=0, int task_depth=0) override;
 
     void
@@ -135,16 +135,14 @@ namespace strumpack {
 #endif
 
   protected:
-    DenseM_t F11_, F12_, F21_;
-    DenseMW_t F22_;
-    std::vector<scalar_t,NoInit<scalar_t>> CBstorage_;
+    DenseM_t F11_, F12_, F21_, F22_;
     std::vector<int> piv; // regular int because it is passed to BLAS
 
     FrontalMatrixDense(const FrontalMatrixDense&) = delete;
     FrontalMatrixDense& operator=(FrontalMatrixDense const&) = delete;
 
     void factor_phase1(const SpMat_t& A, const Opts_t& opts,
-                       CBWorkspace<scalar_t>& workspace,
+                       DenseWorkspace<scalar_t>& work,
                        int etree_level, int task_depth);
     void factor_phase2(const SpMat_t& A, const Opts_t& opts,
                        int etree_level, int task_depth);
