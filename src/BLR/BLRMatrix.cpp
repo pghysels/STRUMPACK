@@ -290,13 +290,9 @@ namespace strumpack {
     (std::ostream& of, std::size_t roff, std::size_t coff) const {
       auto cb = colblocks();
       auto rb = rowblocks();
-#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
-#pragma omp taskloop collapse(2) default(shared)
-#endif
       for (std::size_t j=0; j<cb; j++)
-        for (std::size_t i=0; i<rb; i++) {
+        for (std::size_t i=0; i<rb; i++)
           tile(i, j).draw(of, roff+tileroff(i), coff+tilecoff(j));
-        }
     }
 
     template<typename scalar_t> void
