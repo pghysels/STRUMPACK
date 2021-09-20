@@ -174,7 +174,7 @@ if [[ $(hostname -s) = "cs-it-7098760" ]]; then
     export slate_DIR=$HOME/local/spack_pghysels/opt/spack/linux-ubuntu20.04-zen2/gcc-10.2.0/slate-2020.10.00-utcue2tec7ly5kx27dy6rap6oxkglbbv
 
     cmake ../ \
-          -DCMAKE_BUILD_TYPE=Relase \
+          -DCMAKE_BUILD_TYPE=Release \
           -DSTRUMPACK_USE_MPI=ON \
           -DSTRUMPACK_USE_OPENMP=ON \
           -DBUILD_SHARED_LIBS=OFF \
