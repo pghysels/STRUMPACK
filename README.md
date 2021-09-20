@@ -21,7 +21,6 @@ the U.S. Dept. of Energy).  All rights reserved.
  - Xiaoye S. Li - xsli@lbl.gov
  - Yang Liu - liuyangzhuan@lbl.gov
  - Lisa Claus - LClaus@lbl.gov
- - Michael Neuder - Harvard
 
 ## Past contributors
  - Lucy Guo
@@ -31,6 +30,8 @@ the U.S. Dept. of Energy).  All rights reserved.
  - Theo Mary - University of Manchester
  - Christopher Gorman - UC Santa Barbara
  - Jonas Actor - Rice University
+ - Michael Neuder - Harvard
+
 
 ## Overview
 
