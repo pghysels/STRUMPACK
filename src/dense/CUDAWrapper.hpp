@@ -40,6 +40,9 @@
 #include <cuda_runtime.h>
 
 #include "DenseMatrix.hpp"
+#if defined(STRUMPACK_USE_MPI)
+#include "misc/MPIWrapper.hpp"
+#endif
 
 
 namespace strumpack {
@@ -57,6 +60,14 @@ namespace strumpack {
                      bool abort=true);
 
     inline void init() {
+#if defined(STRUMPACK_USE_MPI)
+      int devs;
+      cudaGetDeviceCount(&devs);
+      if (devs > 1) {
+        MPIComm c;
+        cudaSetDevice(c.rank() % devs);
+      }
+#endif
       gpu_check(cudaFree(0));
     }
 

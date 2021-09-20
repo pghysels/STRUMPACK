@@ -354,7 +354,7 @@ namespace strumpack {
           (A, opts, etree_level+1, task_depth);
     }
     TaskTimer t("FrontalMatrixHSS_factor");
-    if (/*etree_level == 0 && */opts.print_root_front_stats()) t.start();
+    if (opts.print_compressed_front_stats()) t.start();
     H_.set_openmp_task_depth(task_depth);
     auto mult = [&](DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
@@ -405,7 +405,7 @@ namespace strumpack {
         TIMER_STOP(t_fact);
       }
     }
-    if (/*etree_level == 0 && */opts.print_root_front_stats()) {
+    if (opts.print_compressed_front_stats()) {
       auto time = t.elapsed();
       auto rank = H_.rank();
       std::size_t nnzH = H_.nonzeros();

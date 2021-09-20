@@ -333,7 +333,7 @@ namespace strumpack {
         (A, opts, etree_level+1, task_depth);
     if (!this->dim_blk()) return;
     TaskTimer t("");
-    if (/*etree_level == 0 && */opts.print_root_front_stats()) t.start();
+    if (opts.print_compressed_front_stats()) t.start();
     construct_hierarchy(A, opts, task_depth);
     switch (opts.HODLR_options().compression_algorithm()) {
     case HODLR::CompressionAlgorithm::RANDOM_SAMPLING:
@@ -357,7 +357,7 @@ namespace strumpack {
     if (F22_) HOD_mem += F22_->get_stat("Mem_Fill");
     STRUMPACK_ADD_MEMORY(HOD_mem*1.e6);
 #endif
-    if (/*etree_level == 0 && */opts.print_root_front_stats()) {
+    if (opts.print_compressed_front_stats()) {
       auto time = t.elapsed();
       float perbyte = 1.0e6 / sizeof(scalar_t);
       auto F11rank = F11_.get_stat("Rank_max");

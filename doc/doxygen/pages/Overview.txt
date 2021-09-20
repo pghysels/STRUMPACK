@@ -58,10 +58,10 @@ For comments, feature requests or bug reports, open an issue on github:
 # Table of Contents
 
 + \link installation Installation and Requirements \endlink
++ \link GPU_Support GPU Support \endlink
 + \link sparse Sparse Direct Solver \endlink
     - \link algorithm Algorithm Overview \endlink
     - \link sparse_example_usage Example Usage \endlink
-    - \link GPU_Support GPU Support \endlink
 + \link prec Precontioning \endlink
     - \link BLR_Preconditioning BLR Preconditioning \endlink
     - \link HOD_Preconditioning HODLR & HODBF Preconditioning \endlink

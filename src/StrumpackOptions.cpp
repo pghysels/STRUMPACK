@@ -103,6 +103,14 @@ namespace strumpack {
     return "UNKNOWN";
   }
 
+  std::string get_name(ProportionalMapping pmap) {
+    switch (pmap) {
+    case ProportionalMapping::FLOPS: return "FLOPS";
+    case ProportionalMapping::FACTOR_MEMORY: return "FACTOR_MEMORY";
+    case ProportionalMapping::PEAK_MEMORY: return "PEAK_MEMORY";
+    }
+    return "UNKNOWN";
+  }
 
   template<typename scalar_t> void SPOptions<scalar_t>::set_from_command_line
   (int argc, const char* const* cargv) {
@@ -149,7 +157,7 @@ namespace strumpack {
        {"sp_components",                required_argument, 0, 32},
        {"sp_separator_width",           required_argument, 0, 33},
        {"sp_write_root_front",          no_argument, 0, 34},
-       {"sp_print_root_front_stats",    no_argument, 0, 35},
+       {"sp_print_compressed_front_stats", no_argument, 0, 35},
        {"sp_enable_gpu",                no_argument, 0, 36},
        {"sp_disable_gpu",               no_argument, 0, 37},
        {"sp_gpu_streams",               required_argument, 0, 38},
@@ -163,6 +171,7 @@ namespace strumpack {
        {"sp_lossy_min_sep_size",        required_argument, 0, 46},
        {"sp_lossy_min_front_size",      required_argument, 0, 47},
        {"sp_nd_planar_levels",          required_argument, 0, 48},
+       {"sp_proportional_mapping",      required_argument, 0, 49},
        {"sp_verbose",                   no_argument, 0, 'v'},
        {"sp_quiet",                     no_argument, 0, 'q'},
        {"help",                         no_argument, 0, 'h'},
@@ -317,7 +326,7 @@ namespace strumpack {
         set_separator_width(separator_width_);
       } break;
       case 34: set_write_root_front(true); break;
-      case 35: set_print_root_front_stats(true); break;
+      case 35: set_print_compressed_front_stats(true); break;
       case 36: enable_gpu(); break;
       case 37: disable_gpu(); break;
       case 38: {
@@ -382,6 +391,16 @@ namespace strumpack {
         std::istringstream iss(optarg);
         iss >> nd_planar_levels_;
         set_nd_planar_levels(nd_planar_levels_);
+      } break;
+      case 49: {
+        std::string s; std::istringstream iss(optarg); iss >> s;
+        for (auto& c : s) c = std::toupper(c);
+        if (s == "FLOPS") set_proportional_mapping(ProportionalMapping::FLOPS);
+        else if (s == "FACTOR_MEMORY") set_proportional_mapping(ProportionalMapping::FACTOR_MEMORY);
+        else if (s == "PEAK_MEMORY") set_proportional_mapping(ProportionalMapping::PEAK_MEMORY);
+        else std::cerr << "# WARNING: proportional-mapping type not"
+               " recognized, use 'FLOPS', 'FACTOR_MEMORY', 'PEAK_MEMORY'"
+                       << std::endl;
       } break;
       case 'h': { describe_options(); } break;
       case 'v': set_verbose(true); break;
@@ -480,7 +499,9 @@ namespace strumpack {
     for (int i=0; i<7; i++)
       std::cout << "#      " << i << " " <<
         get_description(get_matching(i)) << std::endl;
-    std::cout << "#   --sp_compression [none|hss|blr|hodlr|lossy|blr_hodlr|zfp_blr_hodlr]" << std::endl
+    std::cout << "#   --sp_compression (default "
+              << get_name(comp_) << ")" << std::endl 
+              << "#          should be [none|hss|blr|hodlr|lossy|blr_hodlr|zfp_blr_hodlr]" << std::endl
               << "#          type of rank-structured compression to use"
               << std::endl;
     std::cout << "#   --sp_compression_min_sep_size (default "
@@ -502,7 +523,12 @@ namespace strumpack {
     std::cout << "#   --sp_enable_replace_tiny_pivots" << std::endl;
     std::cout << "#   --sp_disable_replace_tiny_pivots" << std::endl;
     std::cout << "#   --sp_write_root_front" << std::endl;
-    std::cout << "#   --sp_print_root_front_stats" << std::endl;
+    std::cout << "#   --sp_print_compressed_front_stats" << std::endl;
+    std::cout << "#   --sp_proportional_mapping (default "
+              << get_name(prop_map_) << ")" << std::endl
+              << "#          should be [FLOPS|FACTOR_MEMORY|PEAK_MEMORY]" << std::endl
+              << "#          type of proportional mapping"
+              << std::endl;
     std::cout << "#   --sp_enable_gpu" << std::endl;
     std::cout << "#   --sp_disable_gpu" << std::endl;
     std::cout << "#   --sp_gpu_streams (default "

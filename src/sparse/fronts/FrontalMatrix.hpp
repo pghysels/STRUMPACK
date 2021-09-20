@@ -66,6 +66,32 @@ namespace strumpack {
 #endif
 
 
+  template<typename scalar_t> class CBWorkspace {
+  public:
+#if defined(STRUMPACK_COUNT_FLOPS)
+    ~CBWorkspace() {
+      for (auto& v : data_) {
+        STRUMPACK_SUB_MEMORY(v.size()*sizeof(scalar_t));
+      }
+    }
+#endif
+    std::vector<scalar_t,NoInit<scalar_t>> get() {
+      if (data_.empty())
+        return std::vector<scalar_t,NoInit<scalar_t>>();
+      else {
+        auto v = std::move(data_.back());
+        data_.pop_back();
+        return v;
+      }
+    }
+    void restore(std::vector<scalar_t,NoInit<scalar_t>>& v) {
+      data_.push_back(std::move(v));
+    }
+  private:
+    std::vector<std::vector<scalar_t,NoInit<scalar_t>>> data_;
+  };
+
+
   template<typename scalar_t,typename integer_t> class FrontalMatrix {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
@@ -106,9 +132,13 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_MPI)
       MPIComm c;
       c.barrier();
-      std::cout << "peak memory after sequential tree traversal: "
-                << double(strumpack::params::peak_memory) / 1.0e6
-                << " MB" << std::endl;
+      auto pmax = c.reduce(double(strumpack::params::peak_memory) / 1.0e6, MPI_MAX);
+      auto pmin = c.reduce(double(strumpack::params::peak_memory) / 1.0e6, MPI_MIN);
+      if (c.is_root())
+        std::cout << "# peak memory after sequential tree traversal: "
+                  << " pmin: " << pmin << " pmax: " << pmax
+                  << " imbalance: " << pmax/pmin
+                  << std::endl;
 #endif
     }
 
@@ -117,6 +147,12 @@ namespace strumpack {
     virtual void
     multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
                                int etree_level=0, int task_depth=0) = 0;
+
+    virtual void factor(const SpMat_t& A, const Opts_t& opts,
+                        CBWorkspace<scalar_t>& workspace,
+                        int etree_level=0, int task_depth=0) {
+      multifrontal_factorization(A, opts, etree_level, task_depth);
+    };
 
     virtual std::unique_ptr<GPUFactors<scalar_t>> move_to_gpu() const
     { return nullptr; }
@@ -148,7 +184,17 @@ namespace strumpack {
     extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                         DenseM_t& paF21, DenseM_t& paF22,
                         const FrontalMatrix<scalar_t,integer_t>* p,
-                        int task_depth) {}
+                        int task_depth) {
+      assert(false);
+    }
+    virtual void
+    extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
+                        DenseM_t& paF21, DenseM_t& paF22,
+                        const FrontalMatrix<scalar_t,integer_t>* p,
+                        CBWorkspace<scalar_t>& workspace,
+                        int task_depth) {
+      extend_add_to_dense(paF11, paF12, paF21, paF22, p, task_depth);
+    }
 
     virtual void
     extend_add_to_blr(BLRM_t& paF11, BLRM_t& paF12,

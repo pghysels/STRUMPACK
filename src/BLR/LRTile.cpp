@@ -181,8 +181,8 @@ namespace strumpack {
     template<typename scalar_t> void LRTile<scalar_t>::draw
     (std::ostream& of, std::size_t roff, std::size_t coff) const {
       char prev = std::cout.fill('0');
-      int minmn = std::min(rows(), cols());
-      int red = std::floor(255.0 * rank() / minmn);
+      int maxrank = rows() * cols() / (rows() + cols());
+      int red = std::floor(255.0 * rank() / maxrank);
       int blue = 255 - red;
       of << "set obj rect from "
          << roff << ", " << coff << " to "

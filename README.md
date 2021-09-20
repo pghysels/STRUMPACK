@@ -4,7 +4,7 @@ Regents of the University of California, through Lawrence Berkeley
 National Laboratory (subject to receipt of any required approvals from
 the U.S. Dept. of Energy).  All rights reserved.
 
-[![Build Status](https://travis-ci.org/pghysels/STRUMPACK.svg?branch=master)](https://travis-ci.org/pghysels/STRUMPACK)
+[![Build Status](https://www.travis-ci.com/pghysels/STRUMPACK.svg?branch=master)](https://www.travis-ci.com/pghysels/STRUMPACK)
 
 ## Documentation & Installation instructions
    [http://portal.nersc.gov/project/sparse/strumpack/master/](http://portal.nersc.gov/project/sparse/strumpack/master/)
@@ -21,7 +21,6 @@ the U.S. Dept. of Energy).  All rights reserved.
  - Xiaoye S. Li - xsli@lbl.gov
  - Yang Liu - liuyangzhuan@lbl.gov
  - Lisa Claus - LClaus@lbl.gov
- - Michael Neuder - Harvard
 
 ## Past contributors
  - Lucy Guo
@@ -31,6 +30,8 @@ the U.S. Dept. of Energy).  All rights reserved.
  - Theo Mary - University of Manchester
  - Christopher Gorman - UC Santa Barbara
  - Jonas Actor - Rice University
+ - Michael Neuder - Harvard
+
 
 ## Overview
 
