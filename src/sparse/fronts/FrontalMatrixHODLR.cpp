@@ -382,8 +382,8 @@ namespace strumpack {
                 << " nnz(F22)= " << F22nnzH << " , rank(F22)= " << F22rank << " , "
                 << (float(F11nnzH + F11nnzFactors + F12nnzH + F21nnzH + F22nnzH)
                     / (float(dim_blk())*dim_blk()) * 100.)
-                << " %compression, time= " << time
-                << " sec" << std::endl;
+                << " %compression, time= " << time << " sec" 
+                << ", peak memory= " << double(strumpack::params::peak_memory) / 1.0e6 << " MB" << std::endl;
     }
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
