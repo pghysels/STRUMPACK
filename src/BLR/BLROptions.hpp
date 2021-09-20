@@ -116,7 +116,7 @@ namespace strumpack {
       void set_BLR_CB(BLRCB a) {
         blr_cb_ = a;
       }
-      void set_BLRseq_CB_Compression(bool a) { BLRseqCBCompression_ = a; }
+      void set_BLRseq_CB_Compression(bool a) { BLRseq_CB_Compression_ = a; }
       void set_compression_kernel(CompressionKernel a) {
         crn_krnl_ = a;
       }
@@ -126,7 +126,7 @@ namespace strumpack {
       int BACA_blocksize() const { return BACA_blocksize_; }
       BLRFactorAlgorithm BLR_factor_algorithm() const { return blr_algo_; }
       BLRCB BLR_CB() const { return blr_cb_; }
-      bool BLRseq_CB_Compression() const { return BLRseqCBCompression_; }
+      bool BLRseq_CB_Compression() const { return BLRseq_CB_Compression_; }
       CompressionKernel compression_kernel() const { return crn_krnl_; }
 
       void set_from_command_line(int argc, const char* const* cargv) override;
@@ -137,16 +137,16 @@ namespace strumpack {
       bool verbose_ = true;
       LowRankAlgorithm lr_algo_ = LowRankAlgorithm::RRQR;
       int BACA_blocksize_ = 4;
-      Admissibility adm_ = Admissibility::STRONG;
+      Admissibility adm_ = Admissibility::WEAK;
       BLRFactorAlgorithm blr_algo_ = BLRFactorAlgorithm::STAR;
       CompressionKernel crn_krnl_ = CompressionKernel::HALF;
       BLRCB blr_cb_ = BLRCB::DENSE;
-      bool BLRseqCBCompression_ = true;
+      bool BLRseq_CB_Compression_ = false;
 
       void set_defaults() {
         this->rel_tol_ = default_BLR_rel_tol<real_t>();
         this->abs_tol_ = default_BLR_abs_tol<real_t>();
-        this->leaf_size_ = 128;
+        this->leaf_size_ = 512;
         this->max_rank_ = 5000;
       }
 

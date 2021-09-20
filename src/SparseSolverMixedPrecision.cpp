@@ -138,6 +138,30 @@ namespace strumpack {
     return solve(*B, X, use_initial_guess);
   }
 
+
+  template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
+  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  solve(const DenseMatrix<factor_t>& b, DenseMatrix<factor_t>& x,
+        bool use_initial_guess) {
+    DenseMatrix<refine_t> cast_x(x.rows(), x.cols()),
+      cast_b(b.rows(), b.cols());
+    copy(b, cast_b);
+    if (use_initial_guess) copy(x, cast_x);
+    auto ret = solve(cast_b, cast_x, use_initial_guess);
+    copy(cast_x, x);
+    return ret;
+  }
+
+  template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
+  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  solve(const factor_t* b, factor_t* x, bool use_initial_guess) {
+    auto N = mat_.size();
+    auto B = ConstDenseMatrixWrapperPtr(N, 1, b, N);
+    DenseMatrixWrapper<factor_t> X(N, 1, x, N);
+    return solve(*B, X, use_initial_guess);
+  }
+
+
   template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
   SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
   factor() {
@@ -155,6 +179,13 @@ namespace strumpack {
   set_matrix(const CSRMatrix<refine_t,integer_t>& A) {
     mat_ = A;
     solver_.set_matrix(cast_matrix<refine_t,integer_t,factor_t>(A));
+  }
+
+  template<typename factor_t,typename refine_t,typename integer_t> void
+  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  set_matrix(const CSRMatrix<factor_t,integer_t>& A) {
+    mat_ = cast_matrix<factor_t,integer_t,refine_t>(A);
+    solver_.set_matrix(A);
   }
 
   // explicit template instantiations

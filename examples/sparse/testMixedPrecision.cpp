@@ -27,87 +27,154 @@
  *
  */
 #include <iostream>
+#include <type_traits>
+#include <random>
+#include <cmath>
+
 #include "StrumpackSparseSolver.hpp"
 #include "StrumpackSparseSolverMixedPrecision.hpp"
 #include "sparse/CSRMatrix.hpp"
 
 using namespace strumpack;
 
-int main(int argc, char* argv[]) {
-  int n = 30; // matrix size
-  int m = 1;  // number of right-hand sides
-  if (argc > 1) n = atoi(argv[1]); // get grid size
-  else std::cout << "# please provide grid size" << std::endl;
 
-  std::cout << "# Solving 3d " << n
-            <<"^3 Poisson problem, with " << m << " right hand sides"
+/**
+ * Test the STRUMPACK sparse solver, and the mixed precision sparse
+ * solver.
+ *
+ * For working_t == float, the mixed precision solver will
+ * compute the factorization in single precision, but do iterative
+ * refinement in double precision to give a more accurate results than
+ * the standard single precision solver.
+ *
+ * For working_t == double, the mixed precision solver will compute
+ * the factorization in single precision and perform the iterative
+ * refinement in double precision. If the problem is not too
+ * ill-conditioned, this should be about as accurate, and about twice
+ * as fast as the standard double precision solver. The speedup
+ * depends on the relative cost of the sparse triangular solver phase
+ * compared to the sparse LU factorization phase.
+ *
+ * TODO long double
+ */
+template<typename working_t>
+void test(CSRMatrix<working_t,int>& A,
+          DenseMatrix<working_t>& b, DenseMatrix<working_t>& x_exact,
+          int argc, char* argv[]) {
+  int m = b.cols();  // number of right-hand sides
+  auto N = A.size();
+  DenseMatrix<working_t> x(N, m);
+
+  std::cout << std::endl;
+  std::cout << "###############################################" << std::endl;
+  std::cout << "### Working precision: " <<
+    (std::is_same<float,working_t>::value ? "single" : "double")
+            << " #################" << std::endl;
+  std::cout << "###############################################" << std::endl;
+
+  {
+    std::cout << std::endl;
+    std::cout << "### MIXED Precision Solver ####################" << std::endl;
+
+    SparseSolverMixedPrecision<float,double,int> spss;
+    /** options for the outer solver */
+    spss.options().set_Krylov_solver(KrylovSolver::REFINE);
+    // spss.options().set_Krylov_solver(KrylovSolver::PREC_BICGSTAB);
+    // spss.options().set_Krylov_solver(KrylovSolver::PREC_GMRES);
+    spss.options().set_rel_tol(1e-14);
+    spss.options().set_from_command_line(argc, argv);
+
+    /** options for the inner solver */
+    spss.solver().options().set_Krylov_solver(KrylovSolver::DIRECT);
+    // spss.solver().options().set_matching(MatchingJob::NONE);
+    spss.solver().options().set_from_command_line(argc, argv);
+
+    spss.set_matrix(A);
+    spss.reorder();
+    spss.factor();
+    spss.solve(b, x);
+
+    std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
+              << A.max_scaled_residual(x.data(), b.data()) << std::endl;
+    strumpack::blas::axpy(N, -1., x_exact.data(), 1, x.data(), 1);
+    auto nrm_error = strumpack::blas::nrm2(N, x.data(), 1);
+    auto nrm_x_exact = strumpack::blas::nrm2(N, x_exact.data(), 1);
+    std::cout << "# RELATIVE ERROR = " << (nrm_error/nrm_x_exact) << std::endl;
+  }
+
+  {
+    std::cout << std::endl;
+    std::cout << "### STANDARD solver ###########################" << std::endl;
+
+    SparseSolver<working_t,int> spss;
+    // spss.options().set_matching(MatchingJob::NONE);
+    spss.options().set_from_command_line(argc, argv);
+
+    spss.set_matrix(A);
+    spss.reorder();
+    spss.factor();
+    spss.solve(b, x);
+
+    std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
+              << A.max_scaled_residual(x.data(), b.data()) << std::endl;
+    strumpack::blas::axpy(N, -1., x_exact.data(), 1, x.data(), 1);
+    auto nrm_error = strumpack::blas::nrm2(N, x.data(), 1);
+    auto nrm_x_exact = strumpack::blas::nrm2(N, x_exact.data(), 1);
+    std::cout << "# RELATIVE ERROR = " << (nrm_error/nrm_x_exact) << std::endl;
+  }
+
+  std::cout << std::endl << std::endl;
+}
+
+
+int main(int argc, char* argv[]) {
+
+  std::cout << "long double size in bytes: "
+            << sizeof(long double) << " "
             << std::endl;
 
-#if 1 /* mixed precision solver */
+  std::string f;
+  if (argc > 1) f = std::string(argv[1]);
 
-  SparseSolverMixedPrecision<float,double,int> spss;
-  /** options for the outer solver */
-  // spss.options().set_Krylov_solver(KrylovSolver::REFINE);
-  // spss.options().set_Krylov_solver(KrylovSolver::PREC_BICGSTAB);
-  spss.options().set_Krylov_solver(KrylovSolver::PREC_GMRES);
-  spss.options().set_from_command_line(argc, argv);
+  CSRMatrix<double,int> A_d;
+  A_d.read_matrix_market(f);
+  auto A_f = cast_matrix<double,int,float>(A_d);
 
-  /* options for the inner solver */
-  spss.solver().options().set_Krylov_solver(KrylovSolver::DIRECT);
-  spss.solver().options().set_matching(MatchingJob::NONE);
-  spss.solver().options().set_reordering_method(ReorderingStrategy::GEOMETRIC);
-  spss.solver().options().set_from_command_line(argc, argv);
+  int N = A_d.size();
+  int m = 1; // nr of RHSs
+  DenseMatrix<double> b_d(N, m), x_true_d(N, m);
 
-#else /* standard solver */
 
-  SparseSolver<double,int> spss;
-  spss.options().set_matching(MatchingJob::NONE);
-  spss.options().set_reordering_method(ReorderingStrategy::GEOMETRIC);
-  spss.options().set_from_command_line(argc, argv);
+  // set the exact solution, see:
+  //   http://www.netlib.org/lapack/lawnspdf/lawn165.pdf
+  // page 20
+  std::default_random_engine gen;
+  std::uniform_real_distribution<double> dist(0., std::sqrt(24.));
+  for (int j=0; j<m; j++) {
+    // step 4, use a different tau for each RHS
+    double tau = std::pow(dist(gen), 2.);
+    for (int i=0; i<N; i++)
+      // step 4c
+      x_true_d(i, j) = std::pow(tau, -double(i)/(N-1));
+  }
 
-#endif
+  // step 6, but in double, not double-double
+  A_d.spmv(x_true_d, b_d);
+  {
+    // step 7, but in double, not double-double
+    SparseSolver<double,int> spss;
+    // SparseSolverMixedPrecision<double,long double,int> spss;
+    spss.set_matrix(A_d);
+    spss.solve(b_d, x_true_d);
+  }
 
-  int n2 = n * n;
-  int N = n * n2;
-  int nnz = 7 * N - 6 * n2;
-  CSRMatrix<double,int> A(N, nnz);
-  auto cptr = A.ptr();
-  auto rind = A.ind();
-  auto val = A.val();
+  // cast RHS and true solution to single precision
+  DenseMatrix<float> b_f(N, m), x_true_f(N, m);
+  copy(x_true_d, x_true_f);
+  copy(b_d, b_f);
 
-  nnz = 0;
-  cptr[0] = 0;
-  for (int xdim=0; xdim<n; xdim++)
-    for (int ydim=0; ydim<n; ydim++)
-      for (int zdim=0; zdim<n; zdim++) {
-        int ind = zdim+ydim*n+xdim*n2;
-        val[nnz] = 6.0;
-        rind[nnz++] = ind;
-        if (zdim > 0)  { val[nnz] = -1.0; rind[nnz++] = ind-1; } // left
-        if (zdim < n-1){ val[nnz] = -1.0; rind[nnz++] = ind+1; } // right
-        if (ydim > 0)  { val[nnz] = -1.0; rind[nnz++] = ind-n; } // front
-        if (ydim < n-1){ val[nnz] = -1.0; rind[nnz++] = ind+n; } // back
-        if (xdim > 0)  { val[nnz] = -1.0; rind[nnz++] = ind-n2; } // up
-        if (xdim < n-1){ val[nnz] = -1.0; rind[nnz++] = ind+n2; } // down
-        cptr[ind+1] = nnz;
-      }
-  A.set_symm_sparse();
-
-  DenseMatrix<double> b(N, m), x(N, m), x_exact(N, m);
-
-  x_exact.random();
-  A.spmv(x_exact, b);
-
-  spss.set_matrix(A);
-  spss.reorder(n, n, n);
-  spss.factor();
-
-  // spss.move_to_gpu();
-  spss.solve(b, x);
-  // spss.remove_from_gpu();
-
-  std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
-            << A.max_scaled_residual(x.data(), b.data()) << std::endl;
+  test<double>(A_d, b_d, x_true_d, argc, argv);
+  test<float >(A_f, b_f, x_true_f, argc, argv);
 
   return 0;
 }

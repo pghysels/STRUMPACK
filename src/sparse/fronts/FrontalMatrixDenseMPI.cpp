@@ -102,9 +102,10 @@ namespace strumpack {
     if (!lchild_ && !rchild_) return;
     std::vector<std::vector<scalar_t>> sbuf(this->P());
     for (auto& ch : {lchild_.get(), rchild_.get()}) {
-      if (ch && Comm().is_root()) {
+      if (ch) {
         STRUMPACK_FLOPS
-          (static_cast<long long int>(ch->dim_upd())*ch->dim_upd());
+          (static_cast<long long int>(ch->dim_upd())*ch->dim_upd()/
+           grid()->npactives());
       }
       if (!visit(ch)) continue;
       ch->extend_add_copy_to_buffers(sbuf, this);
@@ -202,7 +203,7 @@ namespace strumpack {
 #endif
                   << ", P=" << Comm().size() << ", T=" << params::num_threads
                   << ": " << time << " seconds, "
-                  << flops / 1.e9  << " GFLOPS, "
+                  << flops*F11_.npactives() / 1.e9  << " GFLOPS, "
                   << (float(flops) / time) / 1.e9 << " GFLOP/s, "
                   << " ds=" << this->dim_sep()
                   << ", du=" << this->dim_upd() << std::endl;
@@ -231,8 +232,8 @@ namespace strumpack {
       lchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
     if (visit(rchild_))
       rchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
-    TaskTimer t("FrontalMatrixDenseMPI_factor");
-    if (etree_level == 0 && opts.print_root_front_stats()) t.start();
+    // TaskTimer t("FrontalMatrixDenseMPI_factor");
+    // if (etree_level == 0 && opts.print_root_front_stats()) t.start();
     build_front(A);
     if (etree_level == 0 && opts.write_root_front()) {
       //F11_.print_to_files("Froot");
@@ -253,12 +254,12 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_ZFP)
     compress(opts);
 #endif
-    if (etree_level == 0 && opts.print_root_front_stats()) {
-      auto time = t.elapsed();
-      if (Comm().is_root())
-        std::cout << "#   - DenseMPI root front: Nsep= " << this->dim_sep()
-                  << " , time= " << time << " sec" << std::endl;
-    }
+    // if (etree_level == 0 && opts.print_root_front_stats()) {
+    //   auto time = t.elapsed();
+    //   if (Comm().is_root())
+    //     std::cout << "#   - DenseMPI root front: Nsep= " << this->dim_sep()
+    //               << " , time= " << time << " sec" << std::endl;
+    // }
   }
 
 #if defined(STRUMPACK_USE_ZFP)

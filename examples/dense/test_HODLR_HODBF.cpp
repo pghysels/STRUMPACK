@@ -143,16 +143,14 @@ int main(int argc, char* argv[]) {
     // Print how much memory the dense (2D block cyclic) matrix
     // representation takes (for comparison).
     if (world.is_root())
-      cout << endl << endl
-           << "dense (2DBC) " << T2d.rows() << " x " << T2d.cols()
+      cout << "dense (2DBC) " << T2d.rows() << " x " << T2d.cols()
            << " matrix" << endl
            << "  - memory(T2d) = " << T2d.memory() / 1e6 << " MByte"
            << endl << endl;
 
 
     if (world.is_root())
-      cout << endl << endl
-           << " Compression from matrix elements" << endl;
+      cout << " Compression from matrix elements" << endl;
 
 
     // Construct a structured::StructuredMatrix from individual
@@ -191,9 +189,12 @@ int main(int argc, char* argv[]) {
       // same 2D processor grid as T2d.
       DistributedMatrix<double> B(T2d.grid(), H->rows(), nrhs),
         X(T2d.grid(), H->rows(), nrhs);
+      // Pick a random exact solution
+      X.random();
       // Compute the right-hand side as B=T2d*X (calls ScaLAPACK PDGEMM)
       gemm(Trans::N, Trans::N, 1., T2d, X, 0., B);
-      // H->factor(); // already called
+      // Compute a factorization of H. The factors are stored in H.
+      H->factor();
       // solve a linear system H*X=B, input is the right-hand side B,
       // which will be overwritten with the solution X.
       H->solve(B);

@@ -2,11 +2,11 @@ language: cpp
 
 compiler:
   - gcc
-  #- clang
+  # - clang
 
 os: linux
 
-dist: bionic
+dist: xenial
 
 sudo: required
 
@@ -27,43 +27,66 @@ env:
   - TEST_NUMBER=2 FILE="test_HSS_mpi"
   - TEST_NUMBER=3 FILE="test_sparse_seq"
   - TEST_NUMBER=4 FILE="test_sparse_mpi"
+  - TEST_NUMBER=5 FILE="test_structure_reuse_mpi"
 
 git:
   depth: 1
 
 addons:
   apt:
+    sources:
+      - ubuntu-toolchain-r-test
     packages:
-      # - g++
-      # - gcc
-      - gfortran
+      - g++-9
+      - gcc-9
+      - gfortran-9
       - libblas-dev
       - liblapack-dev
       - libmetis-dev
-      # - mpich
-      # - libmpich-dev
-      # - libscalapack-mpich-dev
-      # - libparmetis-dev
+      - mpich
+      - libmpich-dev
+      - libparmetis-dev
+      # - libscalapack-mpi-dev
       # - libptscotch-dev
 
 before_install:
   - mkdir installDir
   # - test -n $CC && unset CC
-  # - update-alternatives --display mpi
-  # - update-alternatives --display mpirun
-  # - sudo update-alternatives --set mpi /usr/include/mpich
-  # - sudo update-alternatives --set mpirun /usr/bin/mpirun.mpich
-  # - update-alternatives --display mpi
-  # - update-alternatives --display mpirun
+  # - test -n $CXX && unset CXX
+  - update-alternatives --display mpi
+  - update-alternatives --display mpirun
+  - sudo update-alternatives --set mpi /usr/include/mpich
+  - sudo update-alternatives --set mpirun /usr/bin/mpirun.mpich
+  - update-alternatives --display mpi
+  - update-alternatives --display mpirun
 
-install:
-  - printf "Installing openmpi\n"
-  - sudo apt-get install openmpi-bin libopenmpi-dev
-  - printf "Done installing openmpi\n"
+  # - printf  "${BLUE} GC; Installing gcc-9 via apt\n"
+  # - sudo apt-get update
+  # - sudo apt-get install build-essential software-properties-common -y
+  # - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+  # - sudo apt-get update
+  # - sudo apt-get install gcc-9 g++-9 -y
+  - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 --slave /usr/bin/g++ g++ /usr/bin/g++-9
+  # - export CXX="g++-9"
+  # - export CC="gcc-9"
+  # - printf "${BLUE} GC; Done installing gcc-9 via apt\n"
 
-  - printf "Installing scalapack, parmetis\n"
-  - sudo apt-get install libscalapack-openmpi-dev libparmetis-dev
-  - printf "Done installing scalapack, parmetis\n"
+  # - printf "${BLUE} GC; Installing gfortran via apt\n"
+  # - sudo apt-get install gfortran-9 -y
+  # - sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-9 60
+  # - printf "${BLUE} GC; Done installing gfortran via apt\n"
+
+  # - printf "Installing openmpi\n"
+  # - sudo apt-get install openmpi-bin libopenmpi-dev
+  # - printf "Done installing openmpi\n"
+
+  # - printf "Installing scalapack, parmetis\n"
+  # - sudo apt-get install libparmetis-dev
+  # - printf "Done installing parmetis\n"
+
+  # - printf "Installing scalapack, parmetis\n"
+  # - sudo apt-get install libscalapack-openmpi-dev libparmetis-dev
+  # - printf "Done installing scalapack, parmetis\n"
 
   # - cd $TRAVIS_BUILD_DIR/installDir
   # - printf "Downloading mpich source."
@@ -86,23 +109,53 @@ install:
   # - $MPI_HOME/bin/mpicc -compile_info
   # - rm -rf mpich-3.3.2
 
+  - printf "${BLUE} GC; Installing ScaLAPACK from source\n"
+  - cd $TRAVIS_BUILD_DIR/installDir
+  - wget http://www.netlib.org/scalapack/scalapack-2.0.2.tgz
+  - tar -xf scalapack-2.0.2.tgz
+  - cd scalapack-2.0.2
+  - mkdir build
+  - mkdir install
+  - cd build
+  - |
+   cmake ../ \
+    -DBUILD_SHARED_LIBS=ON \
+    -DCMAKE_INSTALL_PREFIX=../install \
+    -DCMAKE_CXX_COMPILER=mpic++ \
+    -DCMAKE_C_COMPILER=mpicc \
+    -DCMAKE_Fortran_COMPILER=mpif90 \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON
+  - make
+  - make install
+  - cd ../
+  # - export SCALAPACK_DIR=$PWD/install
+  - export SCALAPACK_LIB="$TRAVIS_BUILD_DIR/installDir/scalapack-2.0.2/install/lib/libscalapack.so"
+  - echo ${SCALAPACK_LIB}
+  - ls -alh ${SCALAPACK_LIB}
+  - printf "${BLUE} GC; Done installing ScaLAPACK from source\n"
+
   # - printf "${BLUE} GC; Installing ScaLAPACK from source\n"
   # - cd $TRAVIS_BUILD_DIR/installDir
-  # - wget http://www.netlib.org/scalapack/scalapack-2.1.0.tgz
-  # - tar -xf scalapack-2.1.0.tgz
-  # - cd scalapack-2.1.0
-  # - mkdir build
-  # - mkdir install
+  # - wget http://www.netlib.org/scalapack/scalapack-2.0.2.tgz
+  # - tar -xf scalapack-2.0.2.tgz
+  # - cd scalapack-2.0.2
+  # - rm -rf build
+  # - mkdir -p build
   # - cd build
   # - |
-  #  cmake ../ \
-  #  -DCMAKE_INSTALL_PREFIX=../install
-  #   -DCMAKE_CXX_COMPILER=mpiCC \
+  #   cmake .. \
+  #   -DBUILD_SHARED_LIBS=ON \
   #   -DCMAKE_C_COMPILER=mpicc \
-  #   -DCMAKE_Fortran_COMPILER=mpif90
+  #   -DCMAKE_Fortran_COMPILER=mpif90 \
+  #   -DCMAKE_INSTALL_PREFIX=. \
+  #   -DCMAKE_BUILD_TYPE=Release \
+  #   -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON \
+  #   -DCMAKE_Fortran_FLAGS="-fopenmp"
+  #   # -DTPL_BLAS_LIBRARIES="$BLAS_LIB" \
+  #   # -DTPL_LAPACK_LIBRARIES="$LAPACK_LIB"
   # - make
-  # - cd ../
-  # - export SCALAPACK_DIR=$PWD/install
+  # - export SCALAPACK_LIB="$TRAVIS_BUILD_DIR/installDir/scalapack-2.0.2/build/lib/libscalapack.so"
   # - printf "${BLUE} GC; Done installing ScaLAPACK from source\n"
 
   - cd $TRAVIS_BUILD_DIR/installDir
@@ -120,25 +173,35 @@ install:
   - make ptscotch > make_scotch.log 2>&1
   - make prefix=../install install > make_scotch_install.log 2>&1
 
+
+install:
   - cd $TRAVIS_BUILD_DIR
   - mkdir build
   - cd build
   - $CC --version
   - $CXX --version
-  - clang --version
-  - clang++ --version
-  - which clang
-  - which clang++
+  # - clang --version
+  # - clang++ --version
+  # - which clang
+  # - which clang++
   - mpic++ --version
-  # - ls -alh /etc/alternatives/mpic++
-  # - ls -alh /etc/alternatives/mpirun
-  # - ls -alh /etc/alternatives/mpiexec
+  - ls -alh /etc/alternatives/mpic++
+  - ls -alh /etc/alternatives/mpirun
+  - ls -alh /etc/alternatives/mpiexec
   - update-alternatives --display mpi
+  - find /usr -iname "libscalapack*"
   - |
     cmake .. \
-    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_BUILD_TYPE=Debug \
     -DCMAKE_INSTALL_PREFIX=. \
-    -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
+    -DCMAKE_CXX_COMPILER=mpic++ \
+    -DCMAKE_C_COMPILER=mpicc \
+    -DCMAKE_Fortran_COMPILER=mpif90 \
+    -DTPL_SCALAPACK_LIBRARIES="${SCALAPACK_LIB}"
+  #-DTPL_SCALAPACK_LIBRARIES="/usr/lib/libscalapack-openmpi.so"
+  #-DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-mpich.so"
+  #-DTPL_SCALAPACK_LIBRARIES="$TRAVIS_BUILD_DIR/installDir/scalapack-2.0.2/build/lib/libscalapack.so"
+  #-DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
   - make VERBOSE=1
   - make install
   - make tests

@@ -112,7 +112,7 @@ export METIS_DIR=`pwd`/install
 - __CUDA__, __cuBLAS__ and __cuSOLVER__ (optional) can be used to
   accelerate the sparse direct solver:
 \code {.bash}
- > cmake ../ -DSTRUMPACK_USE_CUDA=ON
+ > cmake ../ -DSTRUMPACK_USE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="75"
 \endcode
   which is enabled by default, and will look for the CUDA compiler and
   libraries in the default locations. Additionally, one can specify

@@ -48,9 +48,9 @@ namespace strumpack {
   /**
    * \class SparseSolverMixedPrecision
    *
-   * \brief SparseSolverMixedPrecision Allows to use lower
-   * precision (float) for the preconditioner, and higher (double) for
-   * the outer iterative solver.
+   * \brief SparseSolverMixedPrecision Allows to use lower precision
+   * (float) for the factorization/preconditioner, and higher (double)
+   * for the outer iterative solver. See also LAPACK's dsgesv.
    *
    * Mixed precision solver class. The input and output (sparse
    * matrix, right hand side, and the solution of the linear system)
@@ -109,13 +109,21 @@ namespace strumpack {
     ~SparseSolverMixedPrecision();
 
     void set_matrix(const CSRMatrix<refine_t,integer_t>& A);
+    void set_matrix(const CSRMatrix<factor_t,integer_t>& A);
 
     ReturnCode factor();
     ReturnCode reorder(int nx=1, int ny=1, int nz=1);
+
     ReturnCode solve(const DenseMatrix<refine_t>& b,
                      DenseMatrix<refine_t>& x,
                      bool use_initial_guess=false);
     ReturnCode solve(const refine_t* b, refine_t* x,
+                     bool use_initial_guess=false);
+
+    ReturnCode solve(const DenseMatrix<factor_t>& b,
+                     DenseMatrix<factor_t>& x,
+                     bool use_initial_guess=false);
+    ReturnCode solve(const factor_t* b, factor_t* x,
                      bool use_initial_guess=false);
 
     SPOptions<refine_t>& options() { return opts_; }

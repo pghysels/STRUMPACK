@@ -43,9 +43,31 @@ namespace strumpack {
     : F_t(nullptr, nullptr, sep, sep_begin, sep_end, upd) {}
 
   template<typename scalar_t,typename integer_t> void
+  FrontalMatrixDense<scalar_t,integer_t>::release_work_memory() {
+    STRUMPACK_SUB_MEMORY(CBstorage_.size()*sizeof(scalar_t));
+    CBstorage_.clear();
+    F22_.clear();
+  }
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixDense<scalar_t,integer_t>::release_work_memory
+  (CBWorkspace<scalar_t>& workspace) {
+#pragma omp critical
+    workspace.restore(CBstorage_);
+    F22_.clear();
+  }
+
+  template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const F_t* p, int task_depth) {
+    CBWorkspace<scalar_t> workspace;
+    extend_add_to_dense(paF11, paF12, paF21, paF22, p, workspace, task_depth);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_dense
+  (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
+   const F_t* p, CBWorkspace<scalar_t>& workspace, int task_depth) {
     const std::size_t pdsep = paF11.rows();
     const std::size_t dupd = dim_upd();
     std::size_t upd2sep;
@@ -70,14 +92,14 @@ namespace strumpack {
     }
     STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
     STRUMPACK_FULL_RANK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
-    release_work_memory();
+    release_work_memory(workspace);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_blr
-  (BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21, BLRM_t& paF22, 
-   const F_t* p, int task_depth, const SPOptions<scalar_t>& opts) {
-     //extend_add from Dense to seq. BLR
+  (BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21, BLRM_t& paF22,
+   const F_t* p, int task_depth, const Opts_t& opts) {
+    // extend_add from Dense to seq. BLR
     const std::size_t pdsep = paF11.rows();
     const std::size_t dupd = dim_upd();
     std::size_t upd2sep;
@@ -107,9 +129,10 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_blr_col
-  (BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21, BLRM_t& paF22, 
-   const F_t* p, integer_t begin_col, integer_t end_col, int task_depth, const SPOptions<scalar_t>& opts) {
-     //extend_add from Dense to seq. BLR
+  (BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21, BLRM_t& paF22,
+   const F_t* p, integer_t begin_col, integer_t end_col, int task_depth,
+   const Opts_t& opts) {
+    // extend_add from Dense to seq. BLR
     const std::size_t pdsep = paF11.rows();
     const std::size_t dupd = dim_upd();
     std::size_t upd2sep;
@@ -140,32 +163,32 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::multifrontal_factorization
-  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+  FrontalMatrixDense<scalar_t,integer_t>::factor
+  (const SpMat_t& A, const Opts_t& opts, CBWorkspace<scalar_t>& workspace,
    int etree_level, int task_depth) {
     if (task_depth == 0) {
 #pragma omp parallel default(shared)
 #pragma omp single nowait
       {
-        factor_phase1(A, opts, etree_level, task_depth+1);
+        factor_phase1(A, opts, workspace, etree_level, task_depth+1);
         factor_phase2(A, opts, etree_level, task_depth);
       }
     } else {
-      factor_phase1(A, opts, etree_level, task_depth);
+      factor_phase1(A, opts, workspace, etree_level, task_depth);
       factor_phase2(A, opts, etree_level, task_depth);
     }
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::factor_phase1
-  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+  (const SpMat_t& A, const Opts_t& opts, CBWorkspace<scalar_t>& workspace,
    int etree_level, int task_depth) {
     if (lchild_)
       lchild_->multifrontal_factorization
-        (A, opts, etree_level+1, task_depth);
+        (A, opts, workspace, etree_level+1, task_depth);
     if (rchild_)
       rchild_->multifrontal_factorization
-        (A, opts, etree_level+1, task_depth);
+        (A, opts, workspace, etree_level+1, task_depth);
     // TODO can we allocate the memory in one go??
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();
@@ -176,21 +199,28 @@ namespace strumpack {
       (F11_, F12_, F21_, this->sep_begin_, this->sep_end_,
        this->upd_, task_depth);
     if (dupd) {
-      F22_ = DenseM_t(dupd, dupd);
+#pragma omp critical
+      CBstorage_ = workspace.get();
+      integer_t old_size = CBstorage_.size();
+      if (dupd*dupd > old_size) {
+        STRUMPACK_ADD_MEMORY((dupd*dupd - old_size)*sizeof(scalar_t));
+      }
+      CBstorage_.resize(dupd*dupd);
+      F22_ = DenseMW_t(dupd, dupd, CBstorage_.data(), dupd);
       F22_.zero();
     }
     if (lchild_)
       lchild_->extend_add_to_dense
-        (F11_, F12_, F21_, F22_, this, task_depth);
+        (F11_, F12_, F21_, F22_, this, workspace, task_depth);
     if (rchild_)
       rchild_->extend_add_to_dense
-        (F11_, F12_, F21_, F22_, this, task_depth);
+        (F11_, F12_, F21_, F22_, this, workspace, task_depth);
     if (etree_level == 0 && opts.write_root_front()) F11_.write("Froot");
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::factor_phase2
-  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+  (const SpMat_t& A, const Opts_t& opts,
    int etree_level, int task_depth) {
     if (dim_sep()) {
       // TaskTimer t("FrontalMatrixDense_factor");
@@ -320,7 +350,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::sample_CB
-  (const SPOptions<scalar_t>& opts, const DenseM_t& R, DenseM_t& Sr,
+  (const Opts_t& opts, const DenseM_t& R, DenseM_t& Sr,
    DenseM_t& Sc, F_t* pa, int task_depth) {
     auto I = this->upd_to_parent(pa);
     auto cR = R.extract_rows(I);
@@ -370,7 +400,7 @@ namespace strumpack {
       for (std::size_t r=0; r<u2s; r++)
         cR(r,c) = R(Ir[r],c);
     DenseM_t cS(u2s, Rcols);
-    DenseMW_t CB11(u2s, u2s, const_cast<DenseM_t&>(F22_), 0, 0);
+    DenseMW_t CB11(u2s, u2s, const_cast<DenseMW_t&>(F22_), 0, 0);
     gemm(op, Trans::N, scalar_t(1.), CB11, cR, scalar_t(0.), cS, task_depth);
     for (std::size_t c=0; c<Rcols; c++)
       for (std::size_t r=0; r<u2s; r++)
@@ -387,7 +417,7 @@ namespace strumpack {
     auto Ir = this->upd_to_parent(pa, u2s);
     auto pds = pa->dim_sep();
     auto Rcols = R.cols();
-    DenseMW_t CB12(u2s, dupd-u2s, const_cast<DenseM_t&>(F22_), 0, u2s);
+    DenseMW_t CB12(u2s, dupd-u2s, const_cast<DenseMW_t&>(F22_), 0, u2s);
     if (op == Trans::N) {
       DenseM_t cR(dupd-u2s, Rcols);
       for (std::size_t c=0; c<Rcols; c++)
@@ -422,7 +452,7 @@ namespace strumpack {
     auto Ir = this->upd_to_parent(pa, u2s);
     auto Rcols = R.cols();
     auto pds = pa->dim_sep();
-    DenseMW_t CB21(dupd-u2s, u2s, const_cast<DenseM_t&>(F22_), u2s, 0);
+    DenseMW_t CB21(dupd-u2s, u2s, const_cast<DenseMW_t&>(F22_), u2s, 0);
     if (op == Trans::N) {
       DenseM_t cR(u2s, Rcols);
       for (std::size_t c=0; c<Rcols; c++)
@@ -462,7 +492,7 @@ namespace strumpack {
       for (std::size_t r=u2s; r<dupd; r++)
         cR(r-u2s,c) = R(Ir[r]-pds,c);
     DenseM_t cS(dupd-u2s, Rcols);
-    DenseMW_t CB22(dupd-u2s, dupd-u2s, const_cast<DenseM_t&>(F22_), u2s, u2s);
+    DenseMW_t CB22(dupd-u2s, dupd-u2s, const_cast<DenseMW_t&>(F22_), u2s, u2s);
     gemm(op, Trans::N, scalar_t(1.), CB22, cR, scalar_t(0.), cS, task_depth);
     for (std::size_t c=0; c<Rcols; c++)
       for (std::size_t r=u2s; r<dupd; r++)
@@ -477,7 +507,7 @@ namespace strumpack {
     F11_ = DenseM_t();
     F12_ = DenseM_t();
     F21_ = DenseM_t();
-    F22_ = DenseM_t();
+    F22_ = DenseMW_t();
     piv = std::vector<int>();
   }
 
@@ -501,8 +531,8 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
   (std::vector<std::vector<scalar_t>>& sbuf,
-   const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa, integer_t begin_col, 
-   integer_t end_col, const SPOptions<scalar_t>& opts) const {
+   const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa, integer_t begin_col,
+   integer_t end_col, const Opts_t& opts) const {
     BLR::BLRExtendAdd<scalar_t,integer_t>::
       seq_copy_to_buffers_col(F22_, sbuf, pa, this, begin_col, end_col);
   }

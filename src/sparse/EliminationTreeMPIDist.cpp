@@ -50,6 +50,7 @@ namespace strumpack {
 
     float dsep_work, dleaf_work;
     MPIComm::control_start("symbolic_factorization");
+    prop_map_ = opts.proportional_mapping();
     symbolic_factorization
       (lupd, ltree_work, dist_upd, dsep_work, dleaf_upd, dleaf_work);
     MPIComm::control_stop("symbolic_factorization");
@@ -355,27 +356,41 @@ namespace strumpack {
       x(sbuf[i].r-lo,sbuf[i].c) = sbuf[i].v;
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename integer_t, typename It>
+  void merge_if_larger(const It u0, const It u1,
+                       std::vector<integer_t>& out,
+                       integer_t s) {
+    auto b = std::lower_bound(u0, u1, s);
+    auto m = out.size();
+    std::copy(b, u1, std::back_inserter(out));
+    std::inplace_merge(out.begin(), out.begin() + m, out.end());
+    out.erase(std::unique(out.begin(), out.end()), out.end());
+  }
+
+  template<typename scalar_t,typename integer_t> float
   EliminationTreeMPIDist<scalar_t,integer_t>::symbolic_factorization_local
   (integer_t sep, std::vector<std::vector<integer_t>>& upd,
-   std::vector<float>& subtree_work, int depth) {
+   std::vector<float>& work, int depth) {
     auto chl = nd_.local_tree().lch(sep);
     auto chr = nd_.local_tree().rch(sep);
+    float fs = 0.;
     if (depth < params::task_recursion_cutoff_level) {
+      float fl = 0., fr = 0.;
       if (chl != -1)
 #pragma omp task untied default(shared)                                 \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        symbolic_factorization_local(chl, upd, subtree_work, depth+1);
+        fl = symbolic_factorization_local(chl, upd, work, depth+1);
       if (chr != -1)
 #pragma omp task untied default(shared)                                 \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        symbolic_factorization_local(chr, upd, subtree_work, depth+1);
+        fr = symbolic_factorization_local(chr, upd, work, depth+1);
 #pragma omp taskwait
+      fs += fl + fr;
     } else {
       if (chl != -1)
-        symbolic_factorization_local(chl, upd, subtree_work, depth);
+        fs += symbolic_factorization_local(chl, upd, work, depth);
       if (chr != -1)
-        symbolic_factorization_local(chr, upd, subtree_work, depth);
+        fs += symbolic_factorization_local(chr, upd, work, depth);
     }
     auto sep_begin = nd_.local_tree().sizes(sep) +
       nd_.sub_graph_range.first;
@@ -401,22 +416,32 @@ namespace strumpack {
       merge_if_larger(upd[chr].begin(), upd[chr].end(), upd[sep], sep_end);
     upd[sep].shrink_to_fit();
     float d1 = sep_end - sep_begin, d2 = upd[sep].size();
-    //                  getrf            + 2 * trsm     + gemm
-    subtree_work[sep] = 2.0/3.0*d1*d1*d1 + 2.0*d1*d1*d2 + 2.0*d2*d2*d1;
-    if (chl != -1) subtree_work[sep] += subtree_work[chl];
-    if (chr != -1) subtree_work[sep] += subtree_work[chr];
-  }
-
-  template<typename scalar_t,typename integer_t>
-  template<typename It> void
-  EliminationTreeMPIDist<scalar_t,integer_t>::merge_if_larger
-  (const It u0, const It u1, std::vector<integer_t>& out,
-   integer_t s) const {
-    auto b = std::lower_bound(u0, u1, s);
-    auto m = out.size();
-    std::copy(b, u1, std::back_inserter(out));
-    std::inplace_merge(out.begin(), out.begin() + m, out.end());
-    out.erase(std::unique(out.begin(), out.end()), out.end());
+    fs += d1*(d1 + 2.*d2); // factor size up to and including this node
+    switch (prop_map_) {
+    case ProportionalMapping::FLOPS: {
+      //          getrf            + 2 * trsm     + gemm
+      work[sep] = 2.0/3.0*d1*d1*d1 + 2.0*d1*d1*d2 + 2.0*d2*d2*d1;
+      if (chl != -1) work[sep] += work[chl];
+      if (chr != -1) work[sep] += work[chr];
+    } break;
+    case ProportionalMapping::FACTOR_MEMORY: {
+      work[sep] = fs;
+    } break;
+    case ProportionalMapping::PEAK_MEMORY: {
+      work[sep] = fs + d2*d2; // memory for F22
+      if (chl != -1) {
+        auto d2l = upd[chl].size();
+        work[sep] += d2l*d2l; // memory for F22 of left child
+      }
+      if (chr != -1) {
+        auto d2r = upd[chr].size();
+        work[sep] += d2r*d2r; // memory for F22 of right child
+      }
+      if (chl != -1) work[sep] = std::max(work[sep], work[chl]);
+      if (chr != -1) work[sep] = std::max(work[sep], work[chr]);
+    } break;
+    }
+    return fs;
   }
 
   /**
@@ -442,10 +467,11 @@ namespace strumpack {
    std::vector<integer_t>& dleaf_upd, float& dleaf_work) {
     nd_.my_sub_graph.sort_rows();
 
+    float fs = 0.;
     if (!nd_.local_tree().is_empty()) {
 #pragma omp parallel
 #pragma omp single
-      symbolic_factorization_local
+      fs = symbolic_factorization_local
         (nd_.local_tree().root(), local_upd, local_subtree_work, 0);
     }
 
@@ -459,7 +485,6 @@ namespace strumpack {
       if (nd_.tree().is_root(dsep)) continue; // skip the root separator
       auto pa = nd_.tree().pa(dsep);
       auto pa_rank = nd_.proc_dist_sep[pa];
-
       if (nd_.tree().is_leaf(dsep)) {
         // Leaf of distributed tree is local subgraph for process
         // proc_dist_sep[dsep], unless the local_tree is empty.
@@ -474,8 +499,19 @@ namespace strumpack {
               (nd_.my_sub_graph.ind() + nd_.my_sub_graph.ptr(r),
                nd_.my_sub_graph.ind() + nd_.my_sub_graph.ptr(r+1),
                dleaf_upd, sep_end);
-          float dim_blk = (sep_end - sep_begin) + dist_upd.size();
-          dleaf_work = std::pow(dim_blk, 3);
+          float d1 = sep_end - sep_begin, d2 = dist_upd.size();
+          fs = d1*(d1 + 2.0*d2);
+          switch (prop_map_) {
+          case ProportionalMapping::FLOPS: {
+            dsep_work = 2.0/3.0*d1*d1*d1 + 2.0*d1*d1*d2 + 2.0*d2*d2*d1;
+          } break;
+          case ProportionalMapping::FACTOR_MEMORY: {
+            dleaf_work = fs;
+          } break;
+          case ProportionalMapping::PEAK_MEMORY: {
+            dleaf_work = fs + d2*d2;
+          } break;
+          }
         }
         // do not send to parent if parent is root
         if (nd_.tree().is_root(pa)) continue;
@@ -483,6 +519,8 @@ namespace strumpack {
         comm_.isend(dleaf_upd, pa_rank, 1, &sreq.back());
         sreq.emplace_back();
         comm_.isend(dleaf_work, pa_rank, 2, &sreq.back());
+        sreq.emplace_back();
+        comm_.isend(fs, pa_rank, 3, &sreq.back());
       } else {
         auto sep_begin = nd_.dist_sep_range.first;
         auto sep_end = nd_.dist_sep_range.second;
@@ -491,31 +529,49 @@ namespace strumpack {
             (nd_.my_dist_sep.ind() + nd_.my_dist_sep.ptr(r),
              nd_.my_dist_sep.ind() + nd_.my_dist_sep.ptr(r+1),
              dist_upd, sep_end);
-
         int nr_children = (nd_.tree().is_leaf(dsep) &&
                            nd_.local_tree().is_empty()) ? 0 : 2;
+        std::vector<integer_t> d2ch(nr_children);
+        std::vector<float> wch(nr_children);
+        float fs = 0.;
         for (int i=0; i<nr_children; i++) {
           // receive dist_upd from left/right child,
           auto du = comm_.template recv_any_src<integer_t>(1);
+          d2ch[i] = du.second.size();
           // then merge elements larger than sep_end
           merge_if_larger
             (du.second.begin(), du.second.end(), dist_upd, sep_end);
-        }
-        if (!nd_.tree().is_root(pa)) { // do not send to root
-          sreq.emplace_back();     // send dist_upd to parent
-          comm_.isend(dist_upd, pa_rank, 1, &sreq.back());
+          wch[i] = comm_.template recv_one<float>(du.first, 2);
+          fs += comm_.template recv_one<float>(du.first, 3);
         }
         float d1 = sep_end - sep_begin, d2 = dist_upd.size();
-        //          getrf            + 2 * trsm     + gemm
-        dsep_work = 2.0/3.0*d1*d1*d1 + 2.0*d1*d1*d2 + 2.0*d2*d2*d1;
-        for (int i=0; i<nr_children; i++) {
-          // receive work estimates for left and right subtrees
-          auto w = comm_.template recv_any_src<float>(2);
-          dsep_work += w.second[0];
+        fs += d1*(d1 + 2.*d2);   // factor size up to and including this node
+        switch (prop_map_) {
+        case ProportionalMapping::FLOPS: {
+          //          getrf            + 2 * trsm     + gemm
+          dsep_work = 2.0/3.0*d1*d1*d1 + 2.0*d1*d1*d2 + 2.0*d2*d2*d1;
+          for (int i=0; i<nr_children; i++)
+            dsep_work += wch[i];
+        } break;
+        case ProportionalMapping::FACTOR_MEMORY: {
+          dsep_work = fs;
+        } break;
+        case ProportionalMapping::PEAK_MEMORY: {
+          dsep_work = fs + d2*d2;  // storage for F22
+          for (int i=0; i<nr_children; i++)
+            dsep_work += d2ch[i]*d2ch[i];  // memory for child F22
+          for (int i=0; i<nr_children; i++)
+            dsep_work = std::max(dsep_work, wch[i]); // mem peak at children
+        } break;
         }
         if (!nd_.tree().is_root(pa)) {
+          sreq.emplace_back();    // send dist_upd to parent
+          comm_.isend(dist_upd, pa_rank, 1, &sreq.back());
+          // TODO combine in a single message
           sreq.emplace_back();    // send work estimate to parent
           comm_.isend(dsep_work, pa_rank, 2, &sreq.back());
+          sreq.emplace_back();    // send current factor size to parent
+          comm_.isend(fs, pa_rank, 3, &sreq.back());
         }
       }
     }
