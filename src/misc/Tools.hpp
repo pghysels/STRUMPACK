@@ -77,9 +77,9 @@ namespace strumpack {
 #endif
     std::vector<scalar_t,NoInit<scalar_t>> get() {
       std::vector<scalar_t,NoInit<scalar_t>> v;
-      if (!data_.empty()) {
 #pragma omp critical
-        {
+      {
+        if (!data_.empty()) {
           v = std::move(data_.back());
           data_.pop_back();
         }
