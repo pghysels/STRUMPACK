@@ -374,7 +374,8 @@ namespace strumpack {
         F22nnzH = F22_->get_stat("Mem_Fill") * perbyte;
       }
       std::cout << "#   - HODLR front: Nsep= " << dim_sep()
-                << " Nupd= " << dim_upd() << "\n#       "
+                << " Nupd= " << dim_upd()
+                << " level= " << etree_level << "\n#       "
                 << " nnz(F11)= " << F11nnzH << " , nnz(factor(F11))= "
                 << F11nnzFactors << " , rank(F11)= " << F11rank << " ,\n#       "
                 << " nnz(F12)= " << F12nnzH << " , rank(F12)= " << F12rank << " , "
@@ -384,6 +385,13 @@ namespace strumpack {
                     / (float(dim_blk())*dim_blk()) * 100.)
                 << " %compression, time= " << time
                 << " sec" << std::endl;
+#if defined(STRUMPACK_COUNT_FLOPS)
+      std::cout << "#        total memory: "
+                << double(strumpack::params::memory) / 1.0e6 << " MB"
+                << ",   peak memory: "
+                << double(strumpack::params::peak_memory) / 1.0e6
+                << " MB" << std::endl;
+#endif
     }
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();

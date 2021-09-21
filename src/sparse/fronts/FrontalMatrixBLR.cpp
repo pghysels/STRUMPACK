@@ -120,24 +120,25 @@ namespace strumpack {
       if (lchild_)
         lchild_->extend_add_to_blr_col
           (F11blr_, F12blr_, F21blr_, F22blr_, this, F11blr_.tilecoff(i),
-           F11blr_.tilecoff(std::min(i+CP,F11blr_.colblocks())),
+           F11blr_.tilecoff(std::min(i + CP, F11blr_.colblocks())),
            task_depth, opts);
       if (rchild_)
         rchild_->extend_add_to_blr_col
           (F11blr_, F12blr_, F21blr_, F22blr_, this, F11blr_.tilecoff(i),
-           F11blr_.tilecoff(std::min(i+CP,F11blr_.colblocks())),
+           F11blr_.tilecoff(std::min(i + CP, F11blr_.colblocks())),
            task_depth, opts);
     } else {
       if (lchild_)
         lchild_->extend_add_to_blr_col
-          (F11blr_, F12blr_, F21blr_, F22blr_, this, F22blr_.tilecoff(i)+dim_sep(),
-           F22blr_.tilecoff(std::min(i+CP,F22blr_.colblocks()))+dim_sep(),
+          (F11blr_, F12blr_, F21blr_, F22blr_, this,
+           F22blr_.tilecoff(i) + dim_sep(),
+           F22blr_.tilecoff(std::min(i + CP, F22blr_.colblocks())) + dim_sep(),
            task_depth, opts);
       if (rchild_)
         rchild_->extend_add_to_blr_col
           (F11blr_, F12blr_, F21blr_, F22blr_, this,
-           F22blr_.tilecoff(i)+dim_sep(),
-           F22blr_.tilecoff(std::min(i+CP,F22blr_.colblocks()))+dim_sep(),
+           F22blr_.tilecoff(i) + dim_sep(),
+           F22blr_.tilecoff(std::min(i + CP,F22blr_.colblocks())) + dim_sep(),
            task_depth, opts);
     }
   }
@@ -446,6 +447,7 @@ namespace strumpack {
       auto rank11 = F11blr_.rank();
       std::cout << "#   - BLR front: Nsep= " << dim_sep()
                 << " , Nupd= " << dim_upd()
+                << " level= " << etree_level
                 << "\n#       " << " nnz(F11)= " << nnz
                 << " rank(F11)= " << rank11;
       if (dim_upd()) {

@@ -315,14 +315,40 @@ namespace strumpack {
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
 #endif
-    if (opts.print_compressed_front_stats()) {
+    if (opts.print_compressed_front_stats() && Comm().is_root()) {
       auto time = t.elapsed();
-      if (Comm().is_root())
-        std::cout << "#   - BLRMPI front: Nsep= " << dim_sep()
-                  << ", Nupd= " << dim_upd()
-                  << " , time= " << time << " sec"
-                  << ", peak memory= " <<
-          double(strumpack::params::peak_memory) / 1.0e6 << " MB" << std::endl;
+      auto nnz = F11blr_.nonzeros();
+      auto rank11 = F11blr_.rank();
+      std::cout << "#   - BLRMPI front: Nsep= " << dim_sep()
+                << " , Nupd= " << dim_upd()
+                << " level= " << etree_level
+                << "\n#       " << " nnz(F11)= " << nnz
+                << " rank(F11)= " << rank11;
+      if (dim_upd()) {
+        auto nnz12 = F12blr_.nonzeros();
+        auto nnz21 = F21blr_.nonzeros();
+        auto nnz22 = F22blr_.nonzeros();
+        nnz += nnz12 + nnz21 + nnz22;
+        std::cout << "        nnz(F12)= " << nnz12
+                  << " rank(F12)= " << F12blr_.rank()
+                  << "\n#       " << " nnz(F21)= " << nnz21
+                  << " rank(F12)= " << F12blr_.rank()
+                  << "        nnz(F22)= " << nnz22
+                  << " rank(F22)= " << F12blr_.rank();
+      }
+      std::cout << "\n#        " << (float(nnz)) /
+        (float(this->dim_blk())*this->dim_blk()) * 100.
+                << " %compression, time= " << time
+                << " sec,   factor mem= "
+                << nnz *sizeof(scalar_t) / 1.e6 << " MB" << std::endl;
+#if defined(STRUMPACK_COUNT_FLOPS)
+      std::cout << "#        total memory: "
+                << double(strumpack::params::memory) / 1.0e6 << " MB"
+                << ",   peak memory: "
+                << double(strumpack::params::peak_memory) / 1.0e6
+                << " MB";
+#endif
+      std::cout << std::endl;
     }
   }
 
