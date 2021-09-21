@@ -50,8 +50,7 @@ namespace strumpack {
   }
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::release_work_memory
-  (CBWorkspace<scalar_t>& workspace) {
-#pragma omp critical
+  (VectorPool<scalar_t>& workspace) {
     workspace.restore(CBstorage_);
     F22_.clear();
   }
@@ -60,14 +59,14 @@ namespace strumpack {
   FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const F_t* p, int task_depth) {
-    CBWorkspace<scalar_t> workspace;
+    VectorPool<scalar_t> workspace;
     extend_add_to_dense(paF11, paF12, paF21, paF22, p, workspace, task_depth);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
-   const F_t* p, CBWorkspace<scalar_t>& workspace, int task_depth) {
+   const F_t* p, VectorPool<scalar_t>& workspace, int task_depth) {
     const std::size_t pdsep = paF11.rows();
     const std::size_t dupd = dim_upd();
     std::size_t upd2sep;
@@ -164,7 +163,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::factor
-  (const SpMat_t& A, const Opts_t& opts, CBWorkspace<scalar_t>& workspace,
+  (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
    int etree_level, int task_depth) {
     if (task_depth == 0) {
       // use tasking for children and for extend-add parallelism
@@ -182,7 +181,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::factor_phase1
-  (const SpMat_t& A, const Opts_t& opts, CBWorkspace<scalar_t>& workspace,
+  (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
    int etree_level, int task_depth) {
     if (task_depth < params::task_recursion_cutoff_level) {
       if (lchild_)
@@ -210,7 +209,7 @@ namespace strumpack {
       (F11_, F12_, F21_, this->sep_begin_, this->sep_end_,
        this->upd_, task_depth);
     if (dupd) {
-#pragma omp critical
+      // #pragma omp critical
       CBstorage_ = workspace.get();
       integer_t old_size = CBstorage_.size();
       if (dupd*dupd > old_size) {
