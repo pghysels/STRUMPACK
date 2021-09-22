@@ -374,43 +374,36 @@ namespace strumpack {
           lchild_->extend_add_to_dense(F11, F12, F21, F22_, this, task_depth);
         if (rchild_)
           rchild_->extend_add_to_dense(F11, F12, F21, F22_, this, task_depth);
-        if (dsep)
-          BLRM_t::construct_and_partial_factor
-            (F11, F12, F21, F22_, F11blr_, piv_, F12blr_, F21blr_,
-             sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());
-      }
-#if 0
-      DenseM_t F11(dsep, dsep), F12(dsep, dupd), F21(dupd, dsep);
-      F11.zero(); F12.zero(); F21.zero();
-      A.extract_front
-        (F11, F12, F21, sep_begin_, sep_end_, this->upd_, task_depth);
-      if (dupd) {
-        F22_ = DenseM_t(dupd, dupd);
-        F22_.zero();
-      }
-      if (lchild_)
-        lchild_->extend_add_to_dense(F11, F12, F21, F22_, this, task_depth);
-      if (rchild_)
-        rchild_->extend_add_to_dense(F11, F12, F21, F22_, this, task_depth);
-      if (dsep) {
-        F11blr_ = BLRM_t
-          (F11, sep_tiles_, admissibility_, piv_, opts.BLR_options());
-        F11.clear();
-        if (dupd) {
-          F12.laswp(piv_, true);
-          trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-               scalar_t(1.), F11blr_, F12, task_depth);
-          F12blr_ = BLRM_t(F12, sep_tiles_, upd_tiles_, opts.BLR_options());
-          F12.clear();
-          trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-               scalar_t(1.), F11blr_, F21, task_depth);
-          F21blr_ = BLRM_t(F21, upd_tiles_, sep_tiles_, opts.BLR_options());
-          F21.clear();
-          gemm(Trans::N, Trans::N, scalar_t(-1.), F21blr_, F12blr_,
-               scalar_t(1.), F22_, task_depth);
+        if (dsep) {
+#if 1
+          if (opts.use_gpu())
+            BLRM_t::construct_and_partial_factor_gpu
+              (F11, F12, F21, F22_, F11blr_, piv_, F12blr_, F21blr_,
+               sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());
+          else
+            BLRM_t::construct_and_partial_factor
+              (F11, F12, F21, F22_, F11blr_, piv_, F12blr_, F21blr_,
+               sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());
+#else
+          F11blr_ = BLRM_t
+            (F11, sep_tiles_, admissibility_, piv_, opts.BLR_options());
+          F11.clear();
+          if (dupd) {
+            F12.laswp(piv_, true);
+            trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                 scalar_t(1.), F11blr_, F12, task_depth);
+            F12blr_ = BLRM_t(F12, sep_tiles_, upd_tiles_, opts.BLR_options());
+            F12.clear();
+            trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+                 scalar_t(1.), F11blr_, F21, task_depth);
+            F21blr_ = BLRM_t(F21, upd_tiles_, sep_tiles_, opts.BLR_options());
+            F21.clear();
+            gemm(Trans::N, Trans::N, scalar_t(-1.), F21blr_, F12blr_,
+                 scalar_t(1.), F22_, task_depth);
+          }
+#endif
         }
       }
-#endif
     } else { // ACA or BACA
       auto F11elem = [&](const std::vector<std::size_t>& lI,
                          const std::vector<std::size_t>& lJ, DenseM_t& B) {

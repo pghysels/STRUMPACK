@@ -173,6 +173,21 @@ namespace strumpack {
                                    const adm_t& admissible,
                                    const Opts_t& opts);
 
+      //#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_CUDA)
+      static void
+      construct_and_partial_factor_gpu(DenseM_t& A11, DenseM_t& A12,
+                                       DenseM_t& A21, DenseM_t& A22,
+                                       BLRMatrix<scalar_t>& B11,
+                                       std::vector<int>& piv,
+                                       BLRMatrix<scalar_t>& B12,
+                                       BLRMatrix<scalar_t>& B21,
+                                       const std::vector<std::size_t>& tiles1,
+                                       const std::vector<std::size_t>& tiles2,
+                                       const adm_t& admissible,
+                                       const Opts_t& opts);
+#endif
+
       static void
       construct_and_partial_factor(BLRMatrix<scalar_t>& B11,
                                    BLRMatrix<scalar_t>& B12,

@@ -11,6 +11,13 @@ target_sources(strumpack
   ${CMAKE_CURRENT_LIST_DIR}/LRTile.hpp
   ${CMAKE_CURRENT_LIST_DIR}/LRTile.cpp)
 
+#if(STRUMPACK_USE_CUDA OR STRUMPACK_USE_HIP)
+if(STRUMPACK_USE_CUDA)
+  target_sources(strumpack PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/BLRMatrix.GPU.cpp)
+endif()
+
+
 install(FILES
   BLRMatrix.hpp
   BLRMatrixMPI.hpp
