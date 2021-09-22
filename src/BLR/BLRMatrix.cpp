@@ -609,7 +609,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::fill_col
-    (scalar_t v, std::size_t k, bool part, std::size_t CP) {
+    (scalar_t v, std::size_t k, std::size_t CP) {
       std::size_t j_end = std::min(k + CP, colblocks());
       // (part ? (k + CP) : k + colblocks(), colblocks());
       for (std::size_t i=0; i<nbrows_; i++)

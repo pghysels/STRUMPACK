@@ -153,7 +153,7 @@ namespace strumpack {
       bool active() const { return grid_->active(); }
 
       void fill(scalar_t v);
-      void fill_col(scalar_t v, int k, bool part, std::size_t CP);
+      void fill_col(scalar_t v, std::size_t k, std::size_t CP);
 
       std::vector<int> factor(const Opts_t& opts);
       std::vector<int> factor(const adm_t& adm, const Opts_t& opts);

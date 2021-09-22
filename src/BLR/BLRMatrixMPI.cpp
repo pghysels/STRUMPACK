@@ -79,17 +79,14 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    BLRMatrixMPI<scalar_t>::fill_col(scalar_t v, int k, bool part, std::size_t CP) {
-      std::size_t j_end=0;
-      if (part) j_end = std::min(std::size_t(k+CP), colblocks());
-      else j_end = std::min(k+colblocks(), colblocks());
+    BLRMatrixMPI<scalar_t>::fill_col(scalar_t v, std::size_t k, std::size_t CP) {
+      std::size_t j_end = std::min(k + CP, colblocks());
       for (std::size_t i=0; i<brows_; i++)
         for (std::size_t j=k; j<j_end; j++)
           if (grid_->is_local(i, j)) {
-            std::unique_ptr<DenseTile<scalar_t>> t
+            block(i, j).reset
               (new DenseTile<scalar_t>(tilerows(i), tilecols(j)));
-            t->D().fill(v);
-            block(i, j) = std::move(t);
+            block(i, j)->D().fill(v);
           }
     }
 
