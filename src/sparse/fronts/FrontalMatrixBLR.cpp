@@ -93,14 +93,14 @@ namespace strumpack {
     const auto dupd = dim_upd();
     if (dsep) {
       if (part)
-        F11blr_.fill_col(0., i, true, CP);
+        F11blr_.fill_col(0., i, CP);
       if (dupd) {
-        if (!part) F12blr_.fill_col(0., i, false, CP);
-        else F21blr_.fill_col(0., i, true, CP);
+        if (!part) F12blr_.fill_col(0., i, CP);
+        else F21blr_.fill_col(0., i, CP);
       }
     }
     if (dupd && !part)
-      F22blr_.fill_col(0., i, false, CP);
+      F22blr_.fill_col(0., i, CP);
     if (part) {
       if (dsep)
         for (auto& e : e11)
