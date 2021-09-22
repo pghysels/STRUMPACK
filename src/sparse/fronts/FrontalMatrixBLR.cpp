@@ -91,16 +91,6 @@ namespace strumpack {
    int task_depth, const Opts_t& opts){
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();
-    if (dsep) {
-      if (part)
-        F11blr_.fill_col(0., i, CP);
-      if (dupd) {
-        if (!part) F12blr_.fill_col(0., i, CP);
-        else F21blr_.fill_col(0., i, CP);
-      }
-    }
-    if (dupd && !part)
-      F22blr_.fill_col(0., i, CP);
     if (part) {
       if (dsep)
         for (auto& e : e11)

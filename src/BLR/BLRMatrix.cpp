@@ -611,7 +611,6 @@ namespace strumpack {
     BLRMatrix<scalar_t>::fill_col
     (scalar_t v, std::size_t k, std::size_t CP) {
       std::size_t j_end = std::min(k + CP, colblocks());
-      // (part ? (k + CP) : k + colblocks(), colblocks());
       for (std::size_t i=0; i<nbrows_; i++)
         for (std::size_t j=k; j<j_end; j++) {
           block(i, j).reset
@@ -1312,6 +1311,8 @@ namespace strumpack {
   depend(out:B[ifirst:lrb])
 #endif
             {
+              B11.fill_col(0., i, CP);
+              B21.fill_col(0., i, CP);
               blockcol(i, true, CP);
             }
             for (std::size_t k=0; k<i; k++) {
@@ -1452,6 +1453,8 @@ namespace strumpack {
   depend(out:B[ifirst:lrb])
 #endif
             {
+              B12.fill_col(0., i, CP);
+              B22.fill_col(0., i, CP);
               blockcol(i, false, CP);
             }
             for (std::size_t k=0; k<rb; k++) {

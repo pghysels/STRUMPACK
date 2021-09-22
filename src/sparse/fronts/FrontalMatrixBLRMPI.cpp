@@ -209,16 +209,6 @@ namespace strumpack {
    const std::vector<Triplet<scalar_t>>& r3buf, const Opts_t& opts) {
     const auto dupd = dim_upd();
     const auto dsep = dim_sep();
-    if (dsep) {
-      if (part) F11blr_.fill_col(0., i, CP);
-      if (dupd) {
-        if (!part) {
-          F12blr_.fill_col(0., i, CP);
-        } else F21blr_.fill_col(0., i, CP);
-      }
-    }
-    if (dupd && !part)
-      F22blr_.fill_col(0., i, CP);
     if (part) {
       if (dsep)
         for (auto& e : r1buf)

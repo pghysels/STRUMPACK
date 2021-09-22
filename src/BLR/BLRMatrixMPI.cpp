@@ -1648,6 +1648,7 @@ namespace strumpack {
       auto CP = grid()->npcols();
       for (std::size_t i=0; i<colblocks(); i+=CP) {
         //construct the (i/CP+1) CP block-columns as dense tiles
+        fill_col(0., i, CP);
         blockcol(i, true, CP);
         for (std::size_t k=0; k<i; k++) {
 #pragma omp parallel
@@ -1809,6 +1810,8 @@ namespace strumpack {
       auto CP = g->npcols();
       for (std::size_t i=0; i<B1_c; i+=CP) { //F11 and F21
         //construct the (i/CP+1) CP block-columns as dense tiles
+        F11.fill_col(0., i, CP);
+        F21.fill_col(0., i, CP);
         blockcol(i, true, CP);
         for (std::size_t k=0; k<i; k++) {
 #pragma omp parallel
@@ -1990,8 +1993,10 @@ namespace strumpack {
           }
         }
       }
-      for (std::size_t i=0; i<B2_c; i+=CP) { //F12 and F22
-        //construct the B2_c CP block-columns as dense tiles
+      for (std::size_t i=0; i<B2_c; i+=CP) { // F12 and F22
+        // construct the B2_c CP block-columns as dense tiles
+        F12.fill_col(0., i, CP);
+        F22.fill_col(0., i, CP);
         blockcol(i, false, CP);
         for (std::size_t k=0; k<B1_r; k++) {
 #pragma omp parallel
