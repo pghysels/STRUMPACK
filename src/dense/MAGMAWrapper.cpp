@@ -26,28 +26,50 @@
  *             Division).
  *
  */
-#ifndef STRUMPACK_MAGMA_WRAPPER_HPP
-#define STRUMPACK_MAGMA_WRAPPER_HPP
-
-#include <cmath>
-#include <complex>
-#include <iostream>
-#include <cassert>
-#include <memory>
-
-#include "DenseMatrix.hpp"
-#include "CUDAWrapper.hpp"
-
-#include <magma_v2.h>
+#include "MAGMAWrapper.hpp"
 
 namespace strumpack {
   namespace gpu {
     namespace magma {
 
-      int getrf(DenseMatrix<float>& A, int* dpiv);
-      int getrf(DenseMatrix<double>& A, int* dpiv);
-      int getrf(DenseMatrix<std::complex<float>>& A, int* dpiv);
-      int getrf(DenseMatrix<std::complex<double>>& A, int* dpiv);
+      int getrf(DenseMatrix<float>& A, int* dpiv) {
+        std::vector<int> piv(A.rows());
+        int info = 0;
+        //magma_sgetrf_native
+        magma_sgetrf_gpu
+          (A.rows(), A.cols(), A.data(), A.ld(), piv.data(), &info);
+        gpu::copy_host_to_device(dpiv, piv.data(), A.rows());
+        return info;
+      }
+      int getrf(DenseMatrix<double>& A, int* dpiv) {
+        std::vector<int> piv(A.rows());
+        int info = 0;
+        //magma_dgetrf_native
+        magma_dgetrf_gpu
+          (A.rows(), A.cols(), A.data(), A.ld(), piv.data(), &info);
+        gpu::copy_host_to_device(dpiv, piv.data(), A.rows());
+        return info;
+      }
+      int getrf(DenseMatrix<std::complex<float>>& A, int* dpiv) {
+        std::vector<int> piv(A.rows());
+        int info = 0;
+        //magma_cgetrf_native
+        magma_cgetrf_gpu
+          (A.rows(), A.cols(), reinterpret_cast<magmaFloatComplex*>(A.data()),
+           A.ld(), piv.data(), &info);
+        gpu::copy_host_to_device(dpiv, piv.data(), A.rows());
+        return info;
+      }
+      int getrf(DenseMatrix<std::complex<double>>& A, int* dpiv) {
+        std::vector<int> piv(A.rows());
+        int info = 0;
+        //magma_zgetrf_native
+        magma_zgetrf_gpu
+          (A.rows(), A.cols(), reinterpret_cast<magmaDoubleComplex*>(A.data()),
+           A.ld(), piv.data(), &info);
+        gpu::copy_host_to_device(dpiv, piv.data(), A.rows());
+        return info;
+      }
 
       void gemm_vbatched(magma_trans_t transA, magma_trans_t transB,
                          magma_int_t * m, magma_int_t * n, magma_int_t * k,
@@ -55,14 +77,22 @@ namespace strumpack {
                          float const *const * dA_array, magma_int_t * ldda,
                          float const *const * dB_array, magma_int_t * lddb,
                          float beta, float ** dC_array, magma_int_t * lddc,
-                         magma_int_t batchCount, magma_queue_t queue);
+                         magma_int_t batchCount, magma_queue_t queue ) {
+        magmablas_sgemm_vbatched
+          (transA, transB, m, n, k, alpha, dA_array, ldda, dB_array, lddb,
+           beta, dC_array, lddc, batchCount, queue);
+      }
       void gemm_vbatched(magma_trans_t transA, magma_trans_t transB,
                          magma_int_t * m, magma_int_t * n, magma_int_t * k,
                          double alpha,
                          double const *const * dA_array, magma_int_t * ldda,
                          double const *const * dB_array, magma_int_t * lddb,
                          double beta, double ** dC_array, magma_int_t * lddc,
-                         magma_int_t batchCount, magma_queue_t queue);
+                         magma_int_t batchCount, magma_queue_t queue) {
+        magmablas_dgemm_vbatched
+          (transA, transB, m, n, k, alpha, dA_array, ldda, dB_array, lddb,
+           beta, dC_array, lddc, batchCount, queue);
+      }
       void gemm_vbatched(magma_trans_t transA, magma_trans_t transB,
                          magma_int_t * m, magma_int_t * n, magma_int_t * k,
                          std::complex<float> alpha,
@@ -70,7 +100,18 @@ namespace strumpack {
                          std::complex<float> const *const * dB_array, magma_int_t * lddb,
                          std::complex<float> beta,
                          std::complex<float> ** dC_array, magma_int_t * lddc,
-                         magma_int_t batchCount, magma_queue_t queue);
+                         magma_int_t batchCount, magma_queue_t queue) {
+        magmaFloatComplex m_alpha, m_beta;
+        memcpy(&m_alpha, &alpha, sizeof(magmaFloatComplex));
+        memcpy(&m_beta, &beta, sizeof(magmaFloatComplex));
+        magmablas_cgemm_vbatched
+          (transA, transB, m, n, k, m_alpha,
+           reinterpret_cast<const magmaFloatComplex* const*>(dA_array), ldda,
+           reinterpret_cast<const magmaFloatComplex* const*>(dB_array), lddb,
+           m_beta,
+           reinterpret_cast<magmaFloatComplex* *>(dC_array), lddc,
+           batchCount, queue);
+      }
       void gemm_vbatched(magma_trans_t transA, magma_trans_t transB,
                          magma_int_t * m, magma_int_t * n, magma_int_t * k,
                          std::complex<double> alpha,
@@ -78,10 +119,19 @@ namespace strumpack {
                          std::complex<double> const *const * dB_array, magma_int_t * lddb,
                          std::complex<double> beta,
                          std::complex<double> ** dC_array, magma_int_t * lddc,
-                         magma_int_t batchCount, magma_queue_t queue);
+                         magma_int_t batchCount, magma_queue_t queue) {
+        magmaDoubleComplex m_alpha, m_beta;
+        memcpy(&m_alpha, &alpha, sizeof(magmaDoubleComplex));
+        memcpy(&m_beta, &beta, sizeof(magmaDoubleComplex));
+        magmablas_zgemm_vbatched
+          (transA, transB, m, n, k, m_alpha,
+           reinterpret_cast<const magmaDoubleComplex* const*>(dA_array), ldda,
+           reinterpret_cast<const magmaDoubleComplex* const*>(dB_array), lddb,
+           m_beta,
+           reinterpret_cast<magmaDoubleComplex* *>(dC_array), lddc,
+           batchCount, queue);
+      }
 
     } // end namespace magma
   } // end namespace gpu
 } // end namespace strumpack
-
-#endif // STRUMPACK_CUDA_WRAPPER_HPP

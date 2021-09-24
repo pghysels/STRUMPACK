@@ -56,7 +56,8 @@ endif()
 
 if(STRUMPACK_USE_MAGMA)
   target_sources(strumpack PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/MAGMAWrapper.hpp)
+    ${CMAKE_CURRENT_LIST_DIR}/MAGMAWrapper.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/MAGMAWrapper.cpp)
   install(FILES MAGMAWrapper.hpp DESTINATION include/dense)
 endif()
 

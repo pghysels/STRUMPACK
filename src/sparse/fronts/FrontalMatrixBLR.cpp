@@ -376,11 +376,13 @@ namespace strumpack {
           rchild_->extend_add_to_dense(F11, F12, F21, F22_, this, task_depth);
         if (dsep) {
 #if 1
+#if defined(STRUMPACK_USE_MAGMA)
           if (opts.use_gpu())
             BLRM_t::construct_and_partial_factor_gpu
               (F11, F12, F21, F22_, F11blr_, piv_, F12blr_, F21blr_,
                sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());
           else
+#endif
             BLRM_t::construct_and_partial_factor
               (F11, F12, F21, F22_, F11blr_, piv_, F12blr_, F21blr_,
                sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());

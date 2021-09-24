@@ -12,7 +12,7 @@ target_sources(strumpack
   ${CMAKE_CURRENT_LIST_DIR}/LRTile.cpp)
 
 #if(STRUMPACK_USE_CUDA OR STRUMPACK_USE_HIP)
-if(STRUMPACK_USE_CUDA)
+if(STRUMPACK_USE_MAGMA)
   target_sources(strumpack PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/BLRMatrix.GPU.cpp)
 endif()
