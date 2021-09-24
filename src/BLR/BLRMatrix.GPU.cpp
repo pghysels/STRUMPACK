@@ -76,23 +76,10 @@ namespace strumpack {
         m_.push_back(0);  ldA_.push_back(0);
         n_.push_back(0);  ldB_.push_back(0);
         k_.push_back(0);  ldC_.push_back(0);
-
-        // gpu::magma::gemm_vbatched
-        //   (MagmaNoTrans, MagmaNoTrans, m_.data(), n_.data(), k_.data(),
-        //    alpha, A_.data(), ldA_.data(), B_.data(), ldB_.data(),
-        //    beta, C_.data(), ldC_.data(), batchcount, q);
-
-        gpu::Stream s;
-        gpu::BLASHandle h;
-        h.set_stream(s);
-        for (magma_int_t i=0; i<batchcount; i++) {
-          DenseMatrixWrapper<scalar_t>
-            A(m_[i], k_[i], A_[i], ldA_[i]),
-            B(k_[i], n_[i], B_[i], ldB_[i]),
-            C(m_[i], n_[i], C_[i], ldC_[i]);
-          gpu::gemm(h, Trans::N, Trans::N, alpha, A, B, beta, C);
-        }
-        gpu::synchronize();
+        gpu::magma::gemm_vbatched
+          (MagmaNoTrans, MagmaNoTrans, m_.data(), n_.data(), k_.data(),
+           alpha, A_.data(), ldA_.data(), B_.data(), ldB_.data(),
+           beta, C_.data(), ldC_.data(), batchcount, q);
       }
     private:
       std::vector<magma_int_t> m_, n_, k_, ldA_, ldB_, ldC_;
@@ -108,8 +95,7 @@ namespace strumpack {
      BLRMatrix<scalar_t>& B12, BLRMatrix<scalar_t>& B21,
      const std::vector<std::size_t>& tiles1,
      const std::vector<std::size_t>& tiles2,
-     const DenseMatrix<bool>& admissible,
-     const Opts_t& opts) {
+     const DenseMatrix<bool>& admissible, const Opts_t& opts) {
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       B11 = BLRMatrix<scalar_t>(A11.rows(), tiles1, A11.cols(), tiles1);
       B12 = BLRMatrix<scalar_t>(A12.rows(), tiles1, A12.cols(), tiles2);
@@ -180,9 +166,9 @@ namespace strumpack {
       A12.clear();
       A21.clear();
 
-      // magma_init();
+      magma_init();
       magma_queue_t q;
-      // magma_queue_create(0, &q);
+      magma_queue_create(0, &q);
 
       auto d2 = A22.rows();
       if (d2) {
@@ -216,13 +202,11 @@ namespace strumpack {
           }
           lwork = std::max(lwork, sU0[i]+sV0[i]+sU1[i]+sV1[i]+sVU[i]+sUVU[i]);
         }
-
         gpu::DeviceMemory<scalar_t> dmem(d2*d2 + lwork);
         DenseMW_t dA22(d2, d2, dmem, d2);
         gpu::copy_host_to_device(dA22, A22);
-
         for (std::size_t i=0; i<rb; i++) {
-          scalar_t *dU0 = dA22.data(), *dV0 = dU0 + sU0[i],
+          scalar_t *dU0 = dA22.end(), *dV0 = dU0 + sU0[i],
             *dU1 = dV0 + sV0[i], *dV1 = dU1 + sU1[i],
             *dVU = dV1 + sV1[i], *dUVU = dVU + sVU[i];
           for (std::size_t k=0; k<rb2; k++) {
@@ -240,7 +224,7 @@ namespace strumpack {
           VBatchedMeta<scalar_t> b1(rb2*rb2), b2(rb2*rb2), b3(rb2*rb2);
           for (std::size_t j=0; j<rb2; j++) {
             auto& Tj = B12.tile(i, j);
-            dU0 = dA22.data();
+            dU0 = dA22.end();
             dV0 = dU0 + sU0[i];
             for (std::size_t k=0; k<rb2; k++) {
               auto& Tk = B21.tile(k, i);
@@ -294,8 +278,7 @@ namespace strumpack {
           b3.run(scalar_t(-1.), scalar_t(1.), q);
         }
         gpu::copy_device_to_host(A22, dA22);
-
-        // magma_finalize();
+        magma_finalize();
       }
 
       for (std::size_t i=0; i<rb; i++)
