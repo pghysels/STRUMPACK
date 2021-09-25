@@ -30,6 +30,7 @@
 #include <memory>
 #include <functional>
 #include <algorithm>
+#include <cassert>
 
 #include "BLRMatrix.hpp"
 #include "BLRTileBLAS.hpp"
@@ -59,10 +60,15 @@ namespace strumpack {
         k_.reserve(B+1);  ldC_.reserve(B+1);  C_.reserve(B);
       }
       void add(int m, int n, int k,
-               scalar_t*& A, scalar_t*& B, scalar_t*& C) {
-        m_.push_back(m);  ldA_.push_back(m);  A_.push_back(A);
-        n_.push_back(n);  ldB_.push_back(k);  B_.push_back(B);
-        k_.push_back(k);  ldC_.push_back(m);  C_.push_back(C);
+               scalar_t* A, scalar_t* B, scalar_t* C) {
+        add(m, n, k, A, m, B, k, C, m);
+      }
+      void add(int m, int n, int k, scalar_t* A, int ldA,
+               scalar_t* B, int ldB, scalar_t* C, int ldC) {
+        assert(ldA >= m && ldB >= k && ldC >= m);
+        m_.push_back(m);  ldA_.push_back(ldA);  A_.push_back(A);
+        n_.push_back(n);  ldB_.push_back(ldB);  B_.push_back(B);
+        k_.push_back(k);  ldC_.push_back(ldC);  C_.push_back(C);
       }
       void clear() {
         m_.clear();  ldA_.clear();  A_.clear();
@@ -70,6 +76,7 @@ namespace strumpack {
         k_.clear();  ldC_.clear();  C_.clear();
       }
       std::size_t count() { return m_.size(); }
+#if defined(STRUMPACK_USE_MAGMA)
       void run(scalar_t alpha, scalar_t beta, magma_queue_t q) {
         magma_int_t batchcount = m_.size();
         if (!batchcount) return;
@@ -81,8 +88,28 @@ namespace strumpack {
            alpha, A_.data(), ldA_.data(), B_.data(), ldB_.data(),
            beta, C_.data(), ldC_.data(), batchcount, q);
       }
+#endif
+      void run(scalar_t alpha, scalar_t beta,
+               std::vector<gpu::BLASHandle>& h) {
+        std::size_t batchcount = m_.size();
+        if (!batchcount) return;
+        for (std::size_t i=0; i<batchcount; i++) {
+          DenseMatrixWrapper<scalar_t>
+            A(m_[i], k_[i], A_[i], ldA_[i]),
+            B(k_[i], n_[i], B_[i], ldB_[i]),
+            C(m_[i], n_[i], C_[i], ldC_[i]);
+          gpu::gemm(h[i % h.size()], Trans::N, Trans::N,
+                    alpha, A, B, beta, C);
+          // gemm(Trans::N, Trans::N, alpha, A, B, beta, C);
+        }
+        gpu::synchronize();
+      }
     private:
+#if defined(STRUMPACK_USE_MAGMA)
       std::vector<magma_int_t> m_, n_, k_, ldA_, ldB_, ldC_;
+#else
+      std::vector<int> m_, n_, k_, ldA_, ldB_, ldC_;
+#endif
       std::vector<scalar_t*> A_, B_, C_;
     };
 
@@ -166,9 +193,17 @@ namespace strumpack {
       A12.clear();
       A21.clear();
 
+#if defined(STRUMPACK_USE_MAGMA)
       magma_init();
       magma_queue_t q;
       magma_queue_create(0, &q);
+#else
+      int nr_streams = 1; // TODO get from options, only in sparse now
+      std::vector<gpu::Stream> s(4);
+      std::vector<gpu::BLASHandle> h(4);
+      for (int i=0; i<nr_streams; i++)
+        h[i].set_stream(s[i]);
+#endif
 
       auto d2 = A22.rows();
       if (d2) {
@@ -237,18 +272,25 @@ namespace strumpack {
                     // U0*(V0*U1)
                     b2.add(Tk.rows(), Tj.rank(), Tk.rank(), dU0, dVU, dUVU);
                     // A - (U0*(V0*U1))*V1
-                    b3.add(Tk.rows(), Tj.cols(), Tj.rank(), dUVU, dV1, dAkj);
+                    b3.add(Tk.rows(), Tj.cols(), Tj.rank(),
+                           dUVU, Tk.rows(), dV1, Tj.rank(), dAkj, d2);
+                    dUVU += Tk.rows() * Tj.rank();
                   } else {
                     // (V0*U1)*V1
                     b2.add(Tk.rank(), Tj.cols(), Tj.rank(), dVU, dV1, dUVU);
                     // A - U0*((V0*U1))*V1)
-                    b3.add(Tk.rows(), Tj.cols(), Tk.rank(), dU0, dUVU, dAkj);
+                    b3.add(Tk.rows(), Tj.cols(), Tk.rank(),
+                           dU0, Tk.rows(), dUVU, Tk.rank(), dAkj, d2);
+                    dUVU += Tk.rank() * Tj.cols();
                   }
+                  dVU += Tk.rank() * Tj.rank();
                 } else { // Tk low-rank, Tj dense
                   // V0*D1
                   b1.add(Tk.rank(), Tj.cols(), Tk.cols(), dV0, dU1, dVU);
                   // U0*(V0*D1)
-                  b3.add(Tk.rows(), Tj.cols(), Tk.rank(), dU0, dVU, dAkj);
+                  b3.add(Tk.rows(), Tj.cols(), Tk.rank(),
+                         dU0, Tk.rows(), dVU, Tk.rank(), dAkj, d2);
+                  dVU += Tk.rank() * Tj.cols();
                 }
                 dU0 += Tk.U().nonzeros();
                 dV0 += Tk.V().nonzeros();
@@ -257,9 +299,12 @@ namespace strumpack {
                   // D0*U1
                   b1.add(Tk.rows(), Tj.rank(), Tk.cols(), dU0, dU1, dVU);
                   // (D0*U1)*V1
-                  b3.add(Tk.rows(), Tj.cols(), Tj.rank(), dVU, dV1, dAkj);
+                  b3.add(Tk.rows(), Tj.cols(), Tj.rank(), dVU, Tk.rows(),
+                         dV1, Tj.rank(), dAkj, d2);
+                  dVU += Tk.rows(), Tj.rank();
                 } else // Tk and Tj are dense, D0*D1
-                  b3.add(Tk.rows(), Tj.cols(), Tk.cols(), dU0, dU1, dAkj);
+                  b3.add(Tk.rows(), Tj.cols(), Tk.cols(), dU0, Tk.rows(),
+                         dU1, Tk.cols(), dAkj, d2);
                 dU0 += Tk.D().nonzeros();
               }
             }
@@ -273,14 +318,21 @@ namespace strumpack {
               dU1 += Tj.D().nonzeros();
             }
           }
+#if defined(STRUMPACK_USE_MAGMA)
           b1.run(scalar_t(1.), scalar_t(0.), q);
           b2.run(scalar_t(1.), scalar_t(0.), q);
           b3.run(scalar_t(-1.), scalar_t(1.), q);
+#else
+          b1.run(scalar_t(1.), scalar_t(0.), h);
+          b2.run(scalar_t(1.), scalar_t(0.), h);
+          b3.run(scalar_t(-1.), scalar_t(1.), h);
+#endif
         }
         gpu::copy_device_to_host(A22, dA22);
+#if defined(STRUMPACK_USE_MAGMA)
         magma_finalize();
+#endif
       }
-
       for (std::size_t i=0; i<rb; i++)
         for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
           piv[l] += B11.tileroff(i);

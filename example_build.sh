@@ -167,7 +167,7 @@ if [[ $(hostname -s) = "cs-it-7098760" ]]; then
     export SCOTCH_DIR=$HOME/local/scotch_6.1.0
     export ButterflyPACK_DIR=$HOME/LBL/ButterflyPACK/install/
     export ZFP_DIR=$HOME/local/zfp/install/
-    export MAGMA_DIR=$HOME/local/magma-2.5.4/install/
+    export MAGMA_DIR=$HOME/local/magma-2.6.1/install/
 
     export blaspp_DIR=$HOME/local/spack_pghysels/opt/spack/linux-ubuntu20.04-zen2/gcc-10.2.0/blaspp-2020.10.02-tattjpyiyxzzgvasfk72auey3oawqs3i
     export lapackpp_DIR=$HOME/local/spack_pghysels/opt/spack/linux-ubuntu20.04-zen2/gcc-10.2.0/lapackpp-2020.10.02-mk2si37eqnft2da7yiv4o2cfyxawczlk
