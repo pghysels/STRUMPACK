@@ -50,10 +50,14 @@
 namespace strumpack {
   namespace BLR {
 
-    template<typename scalar_t> //typename integer_t=magma_int_t>
-    class VBatchedMeta {
+    uintptr_t round_to_8(uintptr_t p) { return (p + 7) & ~7; }
+    uintptr_t round_to_8(void* p) {
+      return round_to_8(reinterpret_cast<uintptr_t>(p));
+    }
+
+    template<typename scalar_t> class VBatchedGEMM {
     public:
-      VBatchedMeta(std::size_t B) { reserve(B); }
+      VBatchedGEMM(std::size_t B, char* dmem) : dmem_(dmem) { reserve(B); }
       void reserve(std::size_t B) {
         m_.reserve(B+1);  ldA_.reserve(B+1);  A_.reserve(B);
         n_.reserve(B+1);  ldB_.reserve(B+1);  B_.reserve(B);
@@ -76,17 +80,43 @@ namespace strumpack {
         k_.clear();  ldC_.clear();  C_.clear();
       }
       std::size_t count() { return m_.size(); }
+      static std::size_t dwork_bytes(int batchcount) {
+#if defined(STRUMPACK_USE_MAGMA)
+        return round_to_8((batchcount+1)*6*sizeof(magma_int_t)) +
+          round_to_8(batchcount*3*sizeof(scalar_t*));
+#else
+        return 0;
+#endif
+      }
 #if defined(STRUMPACK_USE_MAGMA)
       void run(scalar_t alpha, scalar_t beta, magma_queue_t q) {
-        magma_int_t batchcount = m_.size();
-        if (!batchcount) return;
-        m_.push_back(0);  ldA_.push_back(0);
-        n_.push_back(0);  ldB_.push_back(0);
-        k_.push_back(0);  ldC_.push_back(0);
+        magma_int_t B = m_.size();
+        if (!B) return;
+        auto dimem = reinterpret_cast<magma_int_t*>(dmem_);
+        auto dsmem = reinterpret_cast<scalar_t**>
+          (dmem_ + round_to_8((B+1)*6*sizeof(magma_int_t)));
+
+        std::vector<magma_int_t> imem((B+1)*6);
+        auto iptr = imem.begin();
+        std::copy(m_.begin(), m_.end(), iptr);   iptr += B+1;
+        std::copy(n_.begin(), n_.end(), iptr);   iptr += B+1;
+        std::copy(k_.begin(), k_.end(), iptr);   iptr += B+1;
+        std::copy(ldA_.begin(), ldA_.end(), iptr);   iptr += B+1;
+        std::copy(ldB_.begin(), ldB_.end(), iptr);   iptr += B+1;
+        std::copy(ldC_.begin(), ldC_.end(), iptr);   iptr += B+1;
+        gpu::copy_host_to_device(dimem, imem.data(), (B+1)*6);
+
+        std::vector<scalar_t*> smem(B*3);
+        auto sptr = smem.begin();
+        std::copy(A_.begin(), A_.end(), sptr);   sptr += B;
+        std::copy(B_.begin(), B_.end(), sptr);   sptr += B;
+        std::copy(C_.begin(), C_.end(), sptr);   sptr += B;
+        gpu::copy_host_to_device(dsmem, smem.data(), B*3);
+
         gpu::magma::gemm_vbatched
-          (MagmaNoTrans, MagmaNoTrans, m_.data(), n_.data(), k_.data(),
-           alpha, A_.data(), ldA_.data(), B_.data(), ldB_.data(),
-           beta, C_.data(), ldC_.data(), batchcount, q);
+          (MagmaNoTrans, MagmaNoTrans, dimem, dimem+(B+1), dimem+2*(B+1),
+           alpha, dsmem, dimem+3*(B+1), dsmem+B, dimem+4*(B+1),
+           beta, dsmem+2*B, dimem+5*(B+1), B, q);
       }
 #endif
       void run(scalar_t alpha, scalar_t beta,
@@ -100,7 +130,6 @@ namespace strumpack {
             C(m_[i], n_[i], C_[i], ldC_[i]);
           gpu::gemm(h[i % h.size()], Trans::N, Trans::N,
                     alpha, A, B, beta, C);
-          // gemm(Trans::N, Trans::N, alpha, A, B, beta, C);
         }
         gpu::synchronize();
       }
@@ -111,6 +140,7 @@ namespace strumpack {
       std::vector<int> m_, n_, k_, ldA_, ldB_, ldC_;
 #endif
       std::vector<scalar_t*> A_, B_, C_;
+      char* dmem_ = nullptr; // only needed for MAGMA
     };
 
 
@@ -193,16 +223,20 @@ namespace strumpack {
       A12.clear();
       A21.clear();
 
+      int nr_streams = 1; // TODO get from options, only in sparse now
+      std::vector<gpu::Stream> streams(nr_streams);
+      std::vector<gpu::BLASHandle> handles(nr_streams);
+      for (int i=0; i<nr_streams; i++)
+        handles[i].set_stream(streams[i]);
 #if defined(STRUMPACK_USE_MAGMA)
       magma_init();
       magma_queue_t q;
-      magma_queue_create(0, &q);
+#if defined(STRUMPACK_USE_CUDA)
+      magma_queue_create_from_cuda
+        (0, streams[0], handles[0], nullptr, &q);
 #else
-      int nr_streams = 1; // TODO get from options, only in sparse now
-      std::vector<gpu::Stream> s(4);
-      std::vector<gpu::BLASHandle> h(4);
-      for (int i=0; i<nr_streams; i++)
-        h[i].set_stream(s[i]);
+      magma_queue_create(0, &q);
+#endif
 #endif
 
       auto d2 = A22.rows();
@@ -210,6 +244,7 @@ namespace strumpack {
         std::vector<std::size_t> sU0(rb), sV0(rb),
           sU1(rb), sV1(rb), sVU(rb), sUVU(rb);
         std::size_t lwork = 0;
+        // count how much device memory will be required
         for (std::size_t i=0; i<rb; i++) {
           for (std::size_t k=0; k<rb2; k++) {
             auto& Tk = B21.tile(k, i);
@@ -237,26 +272,34 @@ namespace strumpack {
           }
           lwork = std::max(lwork, sU0[i]+sV0[i]+sU1[i]+sV1[i]+sVU[i]+sUVU[i]);
         }
-        gpu::DeviceMemory<scalar_t> dmem(d2*d2 + lwork);
+
+        auto bdwork = VBatchedGEMM<scalar_t>::dwork_bytes(rb2*rb2);
+        gpu::DeviceMemory<char> bdmem(bdwork*3 + (d2*d2+lwork)*sizeof(scalar_t));
+        scalar_t* dmem = reinterpret_cast<scalar_t*>(bdmem + bdwork*3);
+
         DenseMW_t dA22(d2, d2, dmem, d2);
-        gpu::copy_host_to_device(dA22, A22);
-        for (std::size_t i=0; i<rb; i++) {
+        gpu::copy_host_to_device_async(dA22, A22, streams[0]);
+        for (std::size_t i=0, s=1; i<rb; i++) {
           scalar_t *dU0 = dA22.end(), *dV0 = dU0 + sU0[i],
             *dU1 = dV0 + sV0[i], *dV1 = dU1 + sU1[i],
             *dVU = dV1 + sV1[i], *dUVU = dVU + sVU[i];
           for (std::size_t k=0; k<rb2; k++) {
             auto& Tk = B21.tile(k, i);
             if (Tk.is_low_rank()) {
-              gpu::copy_host_to_device(dU0, Tk.U());
-              gpu::copy_host_to_device(dV0, Tk.V());
+              gpu::copy_host_to_device_async
+                (dU0, Tk.U(), streams[s++ % nr_streams]);
+              gpu::copy_host_to_device_async
+                (dV0, Tk.V(), streams[s++ % nr_streams]);
               dU0 += Tk.U().nonzeros();
               dV0 += Tk.V().nonzeros();
             } else {
-              gpu::copy_host_to_device(dU0, Tk.D());
+              gpu::copy_host_to_device_async
+                (dU0, Tk.D(), streams[s++ % nr_streams]);
               dU0 += Tk.D().nonzeros();
             }
           }
-          VBatchedMeta<scalar_t> b1(rb2*rb2), b2(rb2*rb2), b3(rb2*rb2);
+          VBatchedGEMM<scalar_t> b1(rb2*rb2, bdmem),
+            b2(rb2*rb2, bdmem+bdwork), b3(rb2*rb2, bdmem+2*bdwork);
           for (std::size_t j=0; j<rb2; j++) {
             auto& Tj = B12.tile(i, j);
             dU0 = dA22.end();
@@ -309,27 +352,32 @@ namespace strumpack {
               }
             }
             if (Tj.is_low_rank()) {
-              gpu::copy_host_to_device(dU1, Tj.U());
-              gpu::copy_host_to_device(dV1, Tj.V());
+              gpu::copy_host_to_device_async
+                (dU1, Tj.U(), streams[s++ % nr_streams]);
+              gpu::copy_host_to_device_async
+                (dV1, Tj.V(), streams[s++ % nr_streams]);
               dU1 += Tj.U().nonzeros();
               dV1 += Tj.V().nonzeros();
             } else {
-              gpu::copy_host_to_device(dU1, Tj.D());
+              gpu::copy_host_to_device_async
+                (dU1, Tj.D(), streams[s++ % nr_streams]);
               dU1 += Tj.D().nonzeros();
             }
           }
+          gpu::synchronize();
 #if defined(STRUMPACK_USE_MAGMA)
           b1.run(scalar_t(1.), scalar_t(0.), q);
           b2.run(scalar_t(1.), scalar_t(0.), q);
           b3.run(scalar_t(-1.), scalar_t(1.), q);
 #else
-          b1.run(scalar_t(1.), scalar_t(0.), h);
-          b2.run(scalar_t(1.), scalar_t(0.), h);
-          b3.run(scalar_t(-1.), scalar_t(1.), h);
+          b1.run(scalar_t(1.), scalar_t(0.), handles);
+          b2.run(scalar_t(1.), scalar_t(0.), handles);
+          b3.run(scalar_t(-1.), scalar_t(1.), handles);
 #endif
         }
         gpu::copy_device_to_host(A22, dA22);
 #if defined(STRUMPACK_USE_MAGMA)
+        magma_queue_destroy(q);
         magma_finalize();
 #endif
       }

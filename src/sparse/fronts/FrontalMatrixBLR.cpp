@@ -331,7 +331,7 @@ namespace strumpack {
     if (opts.BLR_options().low_rank_algorithm() ==
         BLR::LowRankAlgorithm::RRQR) {
       if (opts.BLR_options().BLR_CB() == BLR::BLRCB::COLWISE) {
-        /* factor column-block-wise for memory reduction */
+        // factor column-block-wise for memory reduction
         if (dsep) {
           F11blr_ = BLRM_t(dsep, sep_tiles_, dsep, sep_tiles_);
           F12blr_ = BLRM_t(dsep, sep_tiles_, dupd, upd_tiles_);

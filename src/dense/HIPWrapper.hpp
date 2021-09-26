@@ -135,35 +135,54 @@ namespace strumpack {
 
     template<typename T> void copy_device_to_host
     (DenseMatrix<T>& h, const DenseMatrix<T>& d) {
+      if (!d.rows() || !d.cols()) return;
       assert(d.rows() == h.rows() && d.cols() == h.cols());
       assert(d.rows() == d.ld() && h.rows() == h.ld());
       copy_device_to_host(h.data(), d.data(), d.rows()*d.cols());
     }
     template<typename T> void copy_device_to_host
     (DenseMatrix<T>& h, const T* d) {
+      if (!h.rows() || !h.cols()) return;
       assert(h.rows() == h.ld());
       copy_device_to_host(h.data(), d, h.rows()*h.cols());
     }
     template<typename T> void copy_device_to_host
     (T* h, const DenseMatrix<T>& d) {
+      if (!d.rows() || !d.cols()) return;
       assert(d.rows() == d.ld());
       copy_device_to_host(h, d.data(), d.rows()*d.cols());
     }
     template<typename T> void copy_host_to_device
     (DenseMatrix<T>& d, const DenseMatrix<T>& h) {
+      if (!d.rows() || !d.cols()) return;
       assert(d.rows() == h.rows() && d.cols() == h.cols());
       assert(d.rows() == d.ld() && h.rows() == h.ld());
       copy_host_to_device(d.data(), h.data(), d.rows()*d.cols());
     }
+    template<typename T> void copy_host_to_device_async
+    (DenseMatrix<T>& d, const DenseMatrix<T>& h, const Stream& s) {
+      if (!d.rows() || !d.cols()) return;
+      assert(d.rows() == h.rows() && d.cols() == h.cols());
+      assert(d.rows() == d.ld() && h.rows() == h.ld());
+      copy_host_to_device_async(d.data(), h.data(), d.rows()*d.cols(), s);
+    }
     template<typename T> void copy_host_to_device
     (DenseMatrix<T>& d, const T* h) {
+      if (!d.rows() || !d.cols()) return;
       assert(d.rows() == d.ld());
       copy_host_to_device(d.data(), h, d.rows()*d.cols());
     }
     template<typename T> void copy_host_to_device
     (T* d, const DenseMatrix<T>& h) {
+      if (!h.rows() || !h.cols()) return;
       assert(h.rows() == h.ld());
       copy_host_to_device(d, h.data(), h.rows()*h.cols());
+    }
+    template<typename T> void copy_host_to_device_async
+    (T* d, const DenseMatrix<T>& h, const Stream& s) {
+      if (!h.rows() || !h.cols()) return;
+      assert(h.rows() == h.ld());
+      copy_host_to_device_async(d, h.data(), h.rows()*h.cols(), s);
     }
 
 
