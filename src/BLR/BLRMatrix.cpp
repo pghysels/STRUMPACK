@@ -1257,18 +1257,16 @@ namespace strumpack {
               }
             }
           }
-          if (opts.BLRseq_CB_Compression()) {
-            for (std::size_t j=0; j<rb2; j++) {
-              for (std::size_t k=0; k<rb2; k++) {
-                if(j!=k){
+          for (std::size_t j=0; j<rb2; j++) {
+            for (std::size_t k=0; k<rb2; k++) {
+              if(j!=k){
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                  std::size_t k2j2 = (rb+k)+lrb*(rb+j);
+                std::size_t k2j2 = (rb+k)+lrb*(rb+j);
 #pragma omp task default(shared) firstprivate(j,k,k2j2) \
   depend(inout:B[k2j2])
 #endif
-                  {
-                    B22.compress_tile(k, j, opts);
-                  }
+                {
+                  B22.compress_tile(k, j, opts);
                 }
               }
             }
@@ -1505,18 +1503,16 @@ namespace strumpack {
                 }
               }
             }
-            if (opts.BLRseq_CB_Compression()) {
-              for (std::size_t k=0; k<rb2; k++) {
-                for (std::size_t j=i; j<std::min(i+CP, rb2); j++) {
-                  if (j != k) {
+            for (std::size_t k=0; k<rb2; k++) {
+              for (std::size_t j=i; j<std::min(i+CP, rb2); j++) {
+                if (j != k) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                    std::size_t k2j2 = (rb+k)+lrb*(rb+j);
+                  std::size_t k2j2 = (rb+k)+lrb*(rb+j);
 #pragma omp task default(shared) firstprivate(i,k,j,k2j2)       \
   depend(inout:B[k2j2])
 #endif
-                    {
-                      B22.compress_tile(k, j, opts);
-                    }
+                  {
+                    B22.compress_tile(k, j, opts);
                   }
                 }
               }

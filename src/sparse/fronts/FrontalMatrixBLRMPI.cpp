@@ -271,7 +271,7 @@ namespace strumpack {
               this->build_front_cols
                 (A, i, part, CP, r1buf, r2buf, r3buf, opts);
             });
-        } else {
+        } else if (opts.BLR_options().BLR_CB() == BLR::BLRCB::DENSE) {
           F11blr_ = BLRMPI_t(pgrid_, sep_tiles_, sep_tiles_);
           using Trip_t = Triplet<scalar_t>;
           std::vector<Trip_t> e11, e12, e21;

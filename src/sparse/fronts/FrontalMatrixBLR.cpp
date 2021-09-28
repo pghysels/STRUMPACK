@@ -177,7 +177,7 @@ namespace strumpack {
     const std::size_t dupd = dim_upd();
     std::size_t upd2sep;
     auto I = this->upd_to_parent(p, upd2sep);
-    if (opts.BLR_options().BLRseq_CB_Compression())
+    if (opts.BLR_options().BLR_CB() == BLR::BLRCB::COLWISE)
       F22blr_.decompress(); // change to colwise
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop default(shared) grainsize(64)      \
@@ -225,7 +225,7 @@ namespace strumpack {
         break;
       }
     }
-    if (opts.BLR_options().BLRseq_CB_Compression())
+    if (opts.BLR_options().BLR_CB() == BLR::BLRCB::COLWISE)
       F22blr_.decompress_local_columns(c_min, c_max);
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop default(shared) grainsize(64)      \
@@ -339,18 +339,6 @@ namespace strumpack {
                  (A, i, part, CP, e11, e12, e21, task_depth, opts);
              });
         }
-      } else if (opts.BLR_options().BLR_CB() == BLR::BLRCB::BLR) {
-        build_front(A);
-        if (lchild_)
-          lchild_->extend_add_to_blr
-            (F11blr_, F12blr_, F21blr_, F22blr_, this, task_depth, opts);
-        if (rchild_)
-          rchild_->extend_add_to_blr
-            (F11blr_, F12blr_, F21blr_, F22blr_, this, task_depth, opts);
-        if (dsep)
-          BLRM_t::construct_and_partial_factor
-            (F11blr_, F12blr_, F21blr_, F22blr_, piv_, sep_tiles_,
-             upd_tiles_, admissibility_, opts.BLR_options());
       } else if (opts.BLR_options().BLR_CB() == BLR::BLRCB::DENSE) {
         DenseM_t F11(dsep, dsep), F12(dsep, dupd), F21(dupd, dsep);
         F11.zero(); F12.zero(); F21.zero();
@@ -369,6 +357,19 @@ namespace strumpack {
             (F11, F12, F21, F22_, F11blr_, piv_, F12blr_, F21blr_,
              sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());
       }
+#if 0
+      build_front(A);
+      if (lchild_)
+        lchild_->extend_add_to_blr
+          (F11blr_, F12blr_, F21blr_, F22blr_, this, task_depth, opts);
+      if (rchild_)
+        rchild_->extend_add_to_blr
+          (F11blr_, F12blr_, F21blr_, F22blr_, this, task_depth, opts);
+      if (dsep)
+        BLRM_t::construct_and_partial_factor
+          (F11blr_, F12blr_, F21blr_, F22blr_, piv_, sep_tiles_,
+           upd_tiles_, admissibility_, opts.BLR_options());
+#endif
 #if 0
       DenseM_t F11(dsep, dsep), F12(dsep, dupd), F21(dupd, dsep);
       F11.zero(); F12.zero(); F21.zero();
@@ -676,8 +677,7 @@ namespace strumpack {
         abort(); //F22blr_.dense(F22_);
       BLR::BLRExtendAdd<scalar_t,integer_t>::
         seq_copy_to_buffers_col(F22_, sbuf, pa, this, begin_col, end_col);
-    } else if (opts.BLR_options().BLR_CB() == BLR::BLRCB::COLWISE ||
-               opts.BLR_options().BLR_CB() == BLR::BLRCB::BLR) {
+    } else if (opts.BLR_options().BLR_CB() == BLR::BLRCB::COLWISE) {
       BLR::BLRExtendAdd<scalar_t,integer_t>::
         blrseq_copy_to_buffers_col
         (F22blr_, sbuf, pa, this, begin_col, end_col, opts.BLR_options());
