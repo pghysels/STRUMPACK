@@ -239,72 +239,72 @@ namespace strumpack {
         (A, opts, etree_level+1, task_depth);
     TaskTimer t("FrontalMatrixBLRMPI_factor");
     if (opts.print_compressed_front_stats()) t.start();
-#if 0
-    build_front(A);
-    extend_add();
-    if (lchild_) lchild_->release_work_memory();
-    if (rchild_) rchild_->release_work_memory();
-    if (dim_sep() && grid2d().active()) {
-      if (dim_upd())
-        piv_ = BLRMPI_t::partial_factor
-          (F11blr_, F12blr_, F21blr_, F22blr_, adm_, opts.BLR_options());
-      else piv_ = F11blr_.factor(adm_, opts.BLR_options());
-      // TODO flops?
-    }
-#else // factor column-block-wise for memory reduction
-    //if (dim_sep() && grid2d().active()) {
-    if (dim_sep()) {
-      if (dim_upd()) {
-        F11blr_ = BLRMPI_t(pgrid_, sep_tiles_, sep_tiles_);
-        F12blr_ = BLRMPI_t(pgrid_, sep_tiles_, upd_tiles_);
-        F21blr_ = BLRMPI_t(pgrid_, upd_tiles_, sep_tiles_);
-        F22blr_ = BLRMPI_t(pgrid_, upd_tiles_, upd_tiles_);
-        using Trip_t = Triplet<scalar_t>;
-        std::vector<Trip_t> e11, e12, e21;
-        A.push_front_elements
-          (sep_begin_, sep_end_, this->upd(), e11, e12, e21);
-        int npr = grid2d().nprows();
-        std::vector<std::vector<Trip_t>> s1buf(this->P());
-        for (auto& e : e11)
-          s1buf[sep_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
-        auto r1buf = Comm().all_to_all_v(s1buf);
-        std::vector<std::vector<Trip_t>> s2buf(this->P());
-        for (auto& e : e12)
-          s2buf[sep_rg2p(e.r)+upd_cg2p(e.c)*npr].push_back(e);
-        auto r2buf = Comm().all_to_all_v(s2buf);
-        std::vector<std::vector<Trip_t>> s3buf(this->P());
-        for (auto& e : e21)
-          s3buf[upd_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
-        auto r3buf = Comm().all_to_all_v(s3buf);
-        piv_ = BLRMPI_t::partial_factor_col
-          (F11blr_, F12blr_, F21blr_, F22blr_,
-           adm_, opts.BLR_options(),
-           [&](int i, bool part, std::size_t CP) {
-             this->build_front_cols
-               (A, i, part, CP, r1buf, r2buf, r3buf, opts);
-           });
-      } else {
-        F11blr_ = BLRMPI_t(pgrid_, sep_tiles_, sep_tiles_);
-        using Trip_t = Triplet<scalar_t>;
-        std::vector<Trip_t> e11, e12, e21;
-        A.push_front_elements
-          (sep_begin_, sep_end_, this->upd(), e11, e12, e21);
-        int npr = grid2d().nprows();
-        std::vector<std::vector<Trip_t>> sbuf(this->P());
-        for (auto& e : e11)
-          sbuf[sep_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
-        auto r1buf = Comm().all_to_all_v(sbuf);
-        std::vector<Trip_t> r2buf, r3buf;
-        piv_ = F11blr_.factor_col
-          (adm_, opts.BLR_options(),
-           [&](int i, bool part, std::size_t CP) {
-             build_front_cols(A, i, part, CP, r1buf, r2buf, r3buf, opts);
-           });
+    if (opts.BLR_options().BLR_CB() == BLR::BLRCB::COLWISE) { 
+      /* factor column-block-wise for memory reduction */
+      if (dim_sep()) {
+        if (dim_upd()) {
+          F11blr_ = BLRMPI_t(pgrid_, sep_tiles_, sep_tiles_);
+          F12blr_ = BLRMPI_t(pgrid_, sep_tiles_, upd_tiles_);
+          F21blr_ = BLRMPI_t(pgrid_, upd_tiles_, sep_tiles_);
+          F22blr_ = BLRMPI_t(pgrid_, upd_tiles_, upd_tiles_);
+          using Trip_t = Triplet<scalar_t>;
+          std::vector<Trip_t> e11, e12, e21;
+          A.push_front_elements
+            (sep_begin_, sep_end_, this->upd(), e11, e12, e21);
+          int npr = grid2d().nprows();
+          std::vector<std::vector<Trip_t>> s1buf(this->P());
+          for (auto& e : e11)
+            s1buf[sep_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
+          auto r1buf = Comm().all_to_all_v(s1buf);
+          std::vector<std::vector<Trip_t>> s2buf(this->P());
+          for (auto& e : e12)
+            s2buf[sep_rg2p(e.r)+upd_cg2p(e.c)*npr].push_back(e);
+          auto r2buf = Comm().all_to_all_v(s2buf);
+          std::vector<std::vector<Trip_t>> s3buf(this->P());
+          for (auto& e : e21)
+            s3buf[upd_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
+          auto r3buf = Comm().all_to_all_v(s3buf);
+          piv_ = BLRMPI_t::partial_factor_col
+            (F11blr_, F12blr_, F21blr_, F22blr_,
+            adm_, opts.BLR_options(),
+            [&](int i, bool part, std::size_t CP) {
+              this->build_front_cols
+                (A, i, part, CP, r1buf, r2buf, r3buf, opts);
+            });
+        } else {
+          F11blr_ = BLRMPI_t(pgrid_, sep_tiles_, sep_tiles_);
+          using Trip_t = Triplet<scalar_t>;
+          std::vector<Trip_t> e11, e12, e21;
+          A.push_front_elements
+            (sep_begin_, sep_end_, this->upd(), e11, e12, e21);
+          int npr = grid2d().nprows();
+          std::vector<std::vector<Trip_t>> sbuf(this->P());
+          for (auto& e : e11)
+            sbuf[sep_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
+          auto r1buf = Comm().all_to_all_v(sbuf);
+          std::vector<Trip_t> r2buf, r3buf;
+          piv_ = F11blr_.factor_col
+            (adm_, opts.BLR_options(),
+            [&](int i, bool part, std::size_t CP) {
+              build_front_cols(A, i, part, CP, r1buf, r2buf, r3buf, opts);
+            });
+        }
+      }
+      if (lchild_) lchild_->release_work_memory();
+      if (rchild_) rchild_->release_work_memory();
+    } else {
+      build_front(A);
+      extend_add();
+      if (lchild_) lchild_->release_work_memory();
+      if (rchild_) rchild_->release_work_memory();
+      if (dim_sep() && grid2d().active()) {
+        if (dim_upd())
+          piv_ = BLRMPI_t::partial_factor
+            (F11blr_, F12blr_, F21blr_, F22blr_, adm_, opts.BLR_options());
+        else piv_ = F11blr_.factor(adm_, opts.BLR_options());
+        // TODO flops?
       }
     }
-    if (lchild_) lchild_->release_work_memory();
-    if (rchild_) rchild_->release_work_memory();
-#endif
     if (opts.print_compressed_front_stats() && Comm().is_root()) {
       auto time = t.elapsed();
       auto nnz = F11blr_.nonzeros();
