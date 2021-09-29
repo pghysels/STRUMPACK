@@ -403,17 +403,21 @@ namespace strumpack {
 
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::decompress_local_columns(int c_min, int c_max) {
-      for (std::size_t c=cg2t(c_min); c<=cg2t(c_max-1); c++)
+      if (!c_max) return;
+      for (std::size_t c=cg2t(c_min);
+           c<=std::min(cg2t(c_max-1), nbcols_-1); c++) {
         for (std::size_t r=0; r<nbrows_; r++) {
           auto& b = block(r, c);
           if (b && b->is_low_rank())
             b.reset(new DenseTile<scalar_t>(b->dense()));
         }
+      }
     }
 
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::remove_tiles_before_local_column
     (int c_min, int c_max) {
+      if (!c_max) return;
       for (std::size_t c=cg2t(c_min); c<cg2t(c_max-1); c++)
         for (std::size_t r=0; r<nbrows_; r++)
           block(r, c) = nullptr;
