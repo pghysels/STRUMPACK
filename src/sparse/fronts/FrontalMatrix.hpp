@@ -307,7 +307,8 @@ namespace strumpack {
       abort();
     }
     virtual void extadd_blr_copy_to_buffers_col
-    (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa, integer_t begin_col, integer_t end_col, const Opts_t& opts) const {
+    (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa,
+     integer_t begin_col, integer_t end_col, const Opts_t& opts) const {
       std::cerr << "FrontalMatrix::extadd_blr_copy_to_buffers_col"
                 << " not implemented for this front type: "
                 << typeid(*this).name()

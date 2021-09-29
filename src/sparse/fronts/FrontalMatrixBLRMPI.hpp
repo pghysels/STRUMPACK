@@ -60,37 +60,41 @@ namespace strumpack {
     void build_front_cols(const SpMat_t& A, std::size_t i, bool part, std::size_t CP,
                           const std::vector<Triplet<scalar_t>>& r1buf,
                           const std::vector<Triplet<scalar_t>>& r2buf,
-                          const std::vector<Triplet<scalar_t>>& r3buf, const Opts_t& opts);
+                          const std::vector<Triplet<scalar_t>>& r3buf,
+                          const Opts_t& opts);
 
     void extend_add();
-    void extend_add_cols(std::size_t i, bool part, std::size_t CP, const Opts_t& opts);
-    void extend_add_copy_to_buffers
-    (std::vector<std::vector<scalar_t>>& sbuf,
-     const FMPI_t* pa) const override;
+    void extend_add_cols(std::size_t i, bool part, std::size_t CP,
+                         const Opts_t& opts);
+    void extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
+                                    const FMPI_t* pa) const override;
+    void extadd_blr_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
+                                    const FBLRMPI_t* pa) const override;
+    void extadd_blr_copy_to_buffers_col(std::vector<std::vector<scalar_t>>& sbuf,
+                                        const FBLRMPI_t* pa,
+                                        integer_t begin_col, integer_t end_col,
+                                        const Opts_t& opts)
+      const override;
+    void extadd_blr_copy_from_buffers(BLRMPI_t& F11, BLRMPI_t& F12,
+                                      BLRMPI_t& F21, BLRMPI_t& F22,
+                                      scalar_t** pbuf, const FBLRMPI_t* pa)
+      const override;
+    void extadd_blr_copy_from_buffers_col(BLRMPI_t& F11, BLRMPI_t& F12,
+                                          BLRMPI_t& F21, BLRMPI_t& F22,
+                                          scalar_t** pbuf, const FBLRMPI_t* pa,
+                                          integer_t begin_col, integer_t end_col)
+      const override;
 
-    void extadd_blr_copy_to_buffers
-    (std::vector<std::vector<scalar_t>>& sbuf,
-     const FBLRMPI_t* pa) const override;
-    void extadd_blr_copy_to_buffers_col
-    (std::vector<std::vector<scalar_t>>& sbuf,
-     const FBLRMPI_t* pa, integer_t begin_col, integer_t end_col, const Opts_t& opts) const override;
-    void extadd_blr_copy_from_buffers
-    (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
-     scalar_t** pbuf, const FBLRMPI_t* pa) const override;
-     void extadd_blr_copy_from_buffers_col
-    (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
-     scalar_t** pbuf, const FBLRMPI_t* pa, integer_t begin_col, integer_t end_col) const override;
+    void multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
+                                    int etree_level=0, int task_depth=0)
+      override;
 
-    void multifrontal_factorization
-    (const SpMat_t& A, const Opts_t& opts,
-     int etree_level=0, int task_depth=0) override;
-
-    void forward_multifrontal_solve
-    (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
-     int etree_level=0) const override;
-    void backward_multifrontal_solve
-    (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
-     int etree_level=0) const override;
+    void forward_multifrontal_solve(DenseM_t& bloc, DistM_t* bdist,
+                                    DistM_t& bupd, DenseM_t& seqbupd,
+                                    int etree_level=0) const override;
+    void backward_multifrontal_solve(DenseM_t& yloc, DistM_t* ydist,
+                                     DistM_t& yupd, DenseM_t& seqyupd,
+                                     int etree_level=0) const override;
 
     void sample_CB(const DistM_t& R, DistM_t& Sr, DistM_t& Sc,
                    F_t* pa) const override {

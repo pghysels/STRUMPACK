@@ -798,15 +798,6 @@ namespace strumpack {
               sbuf[pr[r++]+pcc].push_back(tD(lr,lc));
           }
         }
-      /*for (int c=c_min; c<c_max; c++) { // F11 and F12
-        for (std::size_t r=0, pcc=pc[c]; r<u2s; r++)
-          sbuf[pr[r]+pcc].push_back(CB(r,c));
-      }
-      for (int c=c_min; c<c_max; c++) { // F21 and F22
-        for (std::size_t r=u2s, pcc=pc[c]; r<du; r++)
-          sbuf[pr[r]+pcc].push_back(CB(r,c));
-      }*/
-
       const_cast<BLR_t&>(CB).remove_tiles_before_local_column(c_min, c_max);
     }
 

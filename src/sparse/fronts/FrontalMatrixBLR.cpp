@@ -144,7 +144,7 @@ namespace strumpack {
     // if ACA was used, a compressed version of the CB was constructed
     // in F22blr_, so we need to expand it first into F22_
     if (F22blr_.rows() == dupd)
-      F22blr_.dense(F22_);
+      F22_ = F22blr_.dense();
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop default(shared) grainsize(64)      \
   if(task_depth < params::task_recursion_cutoff_level)
@@ -653,35 +653,38 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
-    if (F22blr_.rows() == std::size_t(dim_upd()))
-      abort(); //F22blr_.dense(F22_);
-    ExtendAdd<scalar_t,integer_t>::
-      extend_add_seq_copy_to_buffers(F22_, sbuf, pa, this);
+    if (F22blr_.rows() == std::size_t(dim_upd())) {
+      auto F22 = F22blr_.dense();
+      ExtendAdd<scalar_t,integer_t>::
+        extend_add_seq_copy_to_buffers(F22, sbuf, pa, this);
+    } else
+      ExtendAdd<scalar_t,integer_t>::
+        extend_add_seq_copy_to_buffers(F22_, sbuf, pa, this);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::extadd_blr_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa) const {
-    if (F22blr_.rows() == std::size_t(dim_upd()))
-      abort(); //F22blr_.dense(F22_);
-    BLR::BLRExtendAdd<scalar_t,integer_t>::
-      seq_copy_to_buffers(F22_, sbuf, pa, this);
+    if (F22blr_.rows() == std::size_t(dim_upd())) {
+      auto F22 = F22blr_.dense();
+      BLR::BLRExtendAdd<scalar_t,integer_t>::
+        seq_copy_to_buffers(F22, sbuf, pa, this);
+    } else
+      BLR::BLRExtendAdd<scalar_t,integer_t>::
+        seq_copy_to_buffers(F22_, sbuf, pa, this);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
   (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa,
    integer_t begin_col, integer_t end_col, const Opts_t& opts) const {
-    if (opts.BLR_options().BLR_CB() == BLR::BLRCB::DENSE) {
-      if (F22blr_.rows() == std::size_t(dim_upd()))
-        abort(); //F22blr_.dense(F22_);
+    if (opts.BLR_options().BLR_CB() == BLR::BLRCB::DENSE)
       BLR::BLRExtendAdd<scalar_t,integer_t>::
         seq_copy_to_buffers_col(F22_, sbuf, pa, this, begin_col, end_col);
-    } else if (opts.BLR_options().BLR_CB() == BLR::BLRCB::COLWISE) {
+    else if (opts.BLR_options().BLR_CB() == BLR::BLRCB::COLWISE)
       BLR::BLRExtendAdd<scalar_t,integer_t>::
         blrseq_copy_to_buffers_col
         (F22blr_, sbuf, pa, this, begin_col, end_col, opts.BLR_options());
-    }
   }
 #endif
 
