@@ -138,12 +138,12 @@ namespace strumpack {
       Admissibility adm_ = Admissibility::WEAK;
       BLRFactorAlgorithm blr_algo_ = BLRFactorAlgorithm::STAR;
       CompressionKernel crn_krnl_ = CompressionKernel::HALF;
-      BLRCB blr_cb_ = BLRCB::COLWISE;
+      BLRCB blr_cb_ = BLRCB::DENSE;
 
       void set_defaults() {
         this->rel_tol_ = default_BLR_rel_tol<real_t>();
         this->abs_tol_ = default_BLR_abs_tol<real_t>();
-        this->leaf_size_ = 512;
+        this->leaf_size_ = 256;
         this->max_rank_ = 5000;
       }
 
