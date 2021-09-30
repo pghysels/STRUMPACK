@@ -118,7 +118,7 @@ export METIS_DIR=`pwd`/install
   libraries in the default locations. Additionally, one can specify
   the CUDAToolkit_ROOT path to the CUDA libraries:
 \code {.bash}
- > cmake ../ -DSTRUMPACK_USE_CUDA=ON  -DCUDAToolkit_ROOT=/some/path
+ > cmake ../ -DSTRUMPACK_USE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="75" -DCUDAToolkit_ROOT=/some/path
 \endcode
 or
 \code {.bash}
