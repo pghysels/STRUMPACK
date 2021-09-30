@@ -2,7 +2,7 @@
 
 
 We recommend to use the strumpack::structured::StructuredMatrix
-interface instead of directly using the HSS classes. See \link dense
+interface instead of directly using the HODLR classes. See \link dense
 Dense Solvers \endlink.
 
 

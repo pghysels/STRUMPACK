@@ -30,8 +30,8 @@ HODLR compression in the sparse solver can be turned on/off via the
 command line:
 
 \code {.bash}
---sp_compression hodlr
---sp_compression none    (disable compression)
+  --sp_compression hodlr
+  --sp_compression none    (disable compression)
 \endcode
 
 or via the C++ API as follows
@@ -46,7 +46,7 @@ In order to enable HODBF compression one should set the compression
 type to HODLR, and additionally set
 
 \code {.bash}
---hodlr_butterfly_levels l
+  --hodlr_butterfly_levels l
 \endcode
 
 where l is the number of levels in the HODLR hierarchy for which
@@ -68,7 +68,7 @@ considered a candidate for compression. The minimum dense matrix size
 for compression is set via the command line via
 
 \code {.bash}
---sp_compression_min_sep_size int
+  --sp_compression_min_sep_size int
 \endcode
 
 or via the C++ API as follows
@@ -100,17 +100,17 @@ __The compression tolerances can greatly impact performance.__ They
 can be set using:
 
 \code
-> --hodlr_rel_tol real (default 0.01)
-> --hodlr_abs_tol real (default 1e-08)
+  --hodlr_rel_tol real (default 0.01)
+  --hodlr_abs_tol real (default 1e-08)
 \endcode
 
 or via the C++ API
 
 \code
-> void strumpack::HODLR::HODLROptions<scalar>::set_rel_tol(real rel_tol);
-> void strumpack::HODLR::HODLROptions<scalar>::set_abs_tol(real abs_tol);
-> real strumpack::HODLR::HODLROptions<scalar>::rel_tol() const;              // get the current value
-> real strumpack::HODLR::HODLROptions<scalar>::abs_tol() const;
+void strumpack::HODLR::HODLROptions<scalar>::set_rel_tol(real rel_tol);
+void strumpack::HODLR::HODLROptions<scalar>::set_abs_tol(real abs_tol);
+real strumpack::HODLR::HODLROptions<scalar>::rel_tol() const;              // get the current value
+real strumpack::HODLR::HODLROptions<scalar>::abs_tol() const;
 \endcode
 ____
 
