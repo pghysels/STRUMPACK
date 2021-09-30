@@ -769,7 +769,7 @@ namespace strumpack {
         for (std::size_t p=0; p<sbuf.size(); p++)
           sbuf[p].reserve(sbuf[p].size()+cnt[p]);
       }
-      if (c_max > 0 && (opts.BLR_CB() == BLR::BLRCB::COLWISE)) 
+      if (c_max > 0 && (opts.CB_construction() == BLR::CBConstruction::COLWISE))
         const_cast<BLR_t&>(CB).decompress_local_columns(c_min, c_max);
       if (u2s)
         for (int c=c_min; c<c_max; c++) { // F11 and F12

@@ -239,8 +239,9 @@ namespace strumpack {
         (A, opts, etree_level+1, task_depth);
     TaskTimer t("FrontalMatrixBLRMPI_factor");
     if (opts.print_compressed_front_stats()) t.start();
-    if (opts.BLR_options().BLR_CB() == BLR::BLRCB::COLWISE) { 
-      /* factor column-block-wise for memory reduction */
+    if (opts.BLR_options().CB_construction() ==
+        BLR::CBConstruction::COLWISE) {
+      // factor column-block-wise for memory reduction
       if (dim_sep()) {
         if (dim_upd()) {
           F11blr_ = BLRMPI_t(pgrid_, sep_tiles_, sep_tiles_);
@@ -271,7 +272,8 @@ namespace strumpack {
               this->build_front_cols
                 (A, i, part, CP, r1buf, r2buf, r3buf, opts);
             });
-        } else if (opts.BLR_options().BLR_CB() == BLR::BLRCB::DENSE) {
+        } else if (opts.BLR_options().CB_construction() ==
+                   BLR::CBConstruction::DENSE) {
           F11blr_ = BLRMPI_t(pgrid_, sep_tiles_, sep_tiles_);
           using Trip_t = Triplet<scalar_t>;
           std::vector<Trip_t> e11, e12, e21;
