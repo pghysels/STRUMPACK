@@ -136,7 +136,7 @@ namespace strumpack {
       LowRankAlgorithm lr_algo_ = LowRankAlgorithm::RRQR;
       int BACA_blocksize_ = 4;
       Admissibility adm_ = Admissibility::WEAK;
-      BLRFactorAlgorithm blr_algo_ = BLRFactorAlgorithm::STAR;
+      BLRFactorAlgorithm blr_algo_ = BLRFactorAlgorithm::RL;
       CompressionKernel crn_krnl_ = CompressionKernel::HALF;
       CBConstruction cb_construction_ = CBConstruction::DENSE;
 
