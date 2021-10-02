@@ -4,8 +4,6 @@ Regents of the University of California, through Lawrence Berkeley
 National Laboratory (subject to receipt of any required approvals from
 the U.S. Dept. of Energy).  All rights reserved.
 
-[comment]: <> ([![Build Status](https://www.travis-ci.com/pghysels/STRUMPACK.svg?branch=master)](https://www.travis-ci.com/pghysels/STRUMPACK))
-
 ## Documentation & Installation instructions
    [http://portal.nersc.gov/project/sparse/strumpack/master/](http://portal.nersc.gov/project/sparse/strumpack/master/)
 
