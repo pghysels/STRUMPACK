@@ -272,8 +272,7 @@ namespace strumpack {
               this->build_front_cols
                 (A, i, part, CP, r1buf, r2buf, r3buf, opts);
             });
-        } else if (opts.BLR_options().CB_construction() ==
-                   BLR::CBConstruction::DENSE) {
+        } else {
           F11blr_ = BLRMPI_t(pgrid_, sep_tiles_, sep_tiles_);
           using Trip_t = Triplet<scalar_t>;
           std::vector<Trip_t> e11, e12, e21;
@@ -294,7 +293,8 @@ namespace strumpack {
       }
       if (lchild_) lchild_->release_work_memory();
       if (rchild_) rchild_->release_work_memory();
-    } else {
+    } else if (opts.BLR_options().CB_construction() ==
+                   BLR::CBConstruction::DENSE)  {
       build_front(A);
       extend_add();
       if (lchild_) lchild_->release_work_memory();
@@ -307,40 +307,46 @@ namespace strumpack {
         // TODO flops?
       }
     }
-    if (opts.print_compressed_front_stats() && Comm().is_root()) {
-      auto time = t.elapsed();
-      auto nnz = F11blr_.nonzeros();
-      auto rank11 = F11blr_.rank();
-      std::cout << "#   - BLRMPI front: Nsep= " << dim_sep()
-                << " , Nupd= " << dim_upd()
-                << " level= " << etree_level
-                << "\n#       " << " nnz(F11)= " << nnz
-                << " rank(F11)= " << rank11;
-      if (dim_upd()) {
-        auto nnz12 = F12blr_.nonzeros();
-        auto nnz21 = F21blr_.nonzeros();
-        auto nnz22 = F22blr_.nonzeros();
-        nnz += nnz12 + nnz21 + nnz22;
-        std::cout << "        nnz(F12)= " << nnz12
-                  << " rank(F12)= " << F12blr_.rank()
-                  << "\n#       " << " nnz(F21)= " << nnz21
-                  << " rank(F12)= " << F12blr_.rank()
-                  << "        nnz(F22)= " << nnz22
-                  << " rank(F22)= " << F12blr_.rank();
-      }
-      std::cout << "\n#        " << (float(nnz)) /
-        (float(this->dim_blk())*this->dim_blk()) * 100.
-                << " %compression, time= " << time
-                << " sec,   factor mem= "
-                << nnz *sizeof(scalar_t) / 1.e6 << " MB" << std::endl;
+    if (opts.print_compressed_front_stats()) {
+      float tmp[4];
+      float& F11nnz = tmp[0];
+      float& F12nnz = tmp[1];
+      float& F21nnz = tmp[2];
+      float& F22nnz = tmp[3];
+      F11nnz = F11blr_.nonzeros();
+      F12nnz = F12blr_.nonzeros();
+      F21nnz = F21blr_.nonzeros();
+      F22nnz = F22blr_.nonzeros();
+      Comm().reduce(tmp, 4, MPI_SUM);
+      if (Comm().is_root()) {
+        auto time = t.elapsed();
+        auto rank11 = F11blr_.rank();
+        std::cout << "#   - BLRMPI front: Nsep= " << dim_sep()
+                  << " , Nupd= " << dim_upd()
+                  << " level= " << etree_level
+                  << "\n#       " << " nnz(F11)= " << F11nnz
+                  << " rank(F11)= " << rank11;
+        if (dim_upd()) {
+          std::cout << "        nnz(F12)= " << F12nnz
+                    << " rank(F12)= " << F12blr_.rank()
+                    << "\n#       " << " nnz(F21)= " << F21nnz
+                    << " rank(F21)= " << F21blr_.rank()
+                    << "        nnz(F22)= " << F22nnz
+                    << " rank(F22)= " << F22blr_.rank();
+        }
+        std::cout << "\n#        " << (float(tmp[0]+tmp[1]+tmp[2]+tmp[3])) /
+          (float(this->dim_blk())*this->dim_blk()) * 100.
+                  << " %compression, time= " << time
+                  << " sec" << std::endl;
 #if defined(STRUMPACK_COUNT_FLOPS)
-      std::cout << "#        total memory: "
-                << double(strumpack::params::memory) / 1.0e6 << " MB"
-                << ",   peak memory: "
-                << double(strumpack::params::peak_memory) / 1.0e6
-                << " MB";
+        std::cout << "#        total memory: "
+                  << double(strumpack::params::memory) / 1.0e6 << " MB"
+                  << ",   peak memory: "
+                  << double(strumpack::params::peak_memory) / 1.0e6
+                  << " MB";
 #endif
-      std::cout << std::endl;
+        std::cout << std::endl;
+      }
     }
   }
 
