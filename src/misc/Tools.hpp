@@ -38,6 +38,14 @@
 #include "MPIWrapper.hpp"
 #endif
 
+#if defined(STRUMPACK_USE_CUDA)
+#include "dense/CUDAWrapper.hpp"
+#else
+#if defined(STRUMPACK_USE_HIP)
+#include "dense/HIPWrapper.hpp"
+#endif
+#endif
+
 namespace strumpack {
 
   inline bool mpi_root() {
@@ -68,6 +76,7 @@ namespace strumpack {
 
   template<typename scalar_t> class VectorPool {
   public:
+
 #if defined(STRUMPACK_COUNT_FLOPS)
     ~VectorPool() {
       for (auto& v : data_) {
@@ -75,13 +84,31 @@ namespace strumpack {
       }
     }
 #endif
-    std::vector<scalar_t,NoInit<scalar_t>> get() {
+
+    std::vector<scalar_t,NoInit<scalar_t>> get(std::size_t s=0) {
       std::vector<scalar_t,NoInit<scalar_t>> v;
 #pragma omp critical
       {
         if (!data_.empty()) {
-          v = std::move(data_.back());
-          data_.pop_back();
+          // find the vector with smallest capacity, but at least s
+          std::size_t pos = 0, vsize = data_[0].capacity();
+          for (std::size_t i=0; i<data_.size(); i++) {
+            auto c = data_[i].capacity();
+            if (c >= s && c < vsize) {
+              pos = i;
+              vsize = c;
+            }
+          }
+          v = std::move(data_[pos]);
+          auto os = v.size();
+          if (s != os) {
+            STRUMPACK_ADD_MEMORY((os-s)*sizeof(scalar_t));
+            v.resize(s);
+          }
+          data_.erase(data_.begin()+pos);
+        } else {
+          STRUMPACK_ADD_MEMORY(s*sizeof(scalar_t));
+          v.resize(s);
         }
       }
       return v;
@@ -90,8 +117,21 @@ namespace strumpack {
 #pragma omp critical
       data_.push_back(std::move(v));
     }
+
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+    gpu::DeviceMemory<scalar_t> get_gpu(std::size_t s=0) {
+      return gpu::DeviceMemory<scalar_t>(s);
+    }
+#endif
+    void restore(gpu::DeviceMemory<scalar_t>& m) {
+      auto tmp = std::move(m);
+    }
+
   private:
     std::vector<std::vector<scalar_t,NoInit<scalar_t>>> data_;
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+    // TODO keep a vector with GPU memory pools
+#endif
   };
 
 

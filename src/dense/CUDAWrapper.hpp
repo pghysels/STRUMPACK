@@ -225,7 +225,7 @@ namespace strumpack {
         }
       }
       DeviceMemory(const DeviceMemory&) = delete;
-      DeviceMemory(DeviceMemory<T>&& d) { *this = d;}
+      DeviceMemory(DeviceMemory<T>&& d) { *this = d; }
       DeviceMemory<T>& operator=(const DeviceMemory<T>&) = delete;
       DeviceMemory<T>& operator=(DeviceMemory<T>&& d) {
         if (this != &d) {

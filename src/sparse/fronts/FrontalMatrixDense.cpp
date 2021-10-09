@@ -209,13 +209,7 @@ namespace strumpack {
       (F11_, F12_, F21_, this->sep_begin_, this->sep_end_,
        this->upd_, task_depth);
     if (dupd) {
-      // #pragma omp critical
-      CBstorage_ = workspace.get();
-      integer_t old_size = CBstorage_.size();
-      if (dupd*dupd > old_size) {
-        STRUMPACK_ADD_MEMORY((dupd*dupd - old_size)*sizeof(scalar_t));
-      }
-      CBstorage_.resize(dupd*dupd);
+      CBstorage_ = workspace.get(dupd*dupd);
       F22_ = DenseMW_t(dupd, dupd, CBstorage_.data(), dupd);
       F22_.zero();
     }
