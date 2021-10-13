@@ -88,6 +88,10 @@ namespace strumpack {
     class BLASHandle {
     public:
       BLASHandle() { gpu_check(cublasCreate(&h_)); }
+      BLASHandle(Stream& s) {
+        gpu_check(cublasCreate(&h_));
+        set_stream(s);
+      }
       ~BLASHandle() { gpu_check(cublasDestroy(h_)); }
       void set_stream(Stream& s) { gpu_check(cublasSetStream(h_, s)); }
       operator cublasHandle_t&() { return h_; }
