@@ -1108,22 +1108,6 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    LUAR_B22(std::size_t i, std::size_t j, std::size_t kmax,
-             BLRMatrix<scalar_t>& B12, BLRMatrix<scalar_t>& B21,
-             DenseMatrix<scalar_t>& A22, const BLROptions<scalar_t>& opts,
-             int* B) {
-      DenseMatrixWrapper<scalar_t> Aij
-        (B21.tilerows(i), B12.tilecols(j), A22,
-         B21.tileroff(i), B12.tilecoff(j));
-      std::vector<BLRTile<scalar_t>*> Ti(kmax), Tj(kmax);
-      for (std::size_t k=0; k<kmax; k++) {
-        Ti[k] = &B21.tile(i, k);
-        Tj[k] = &B12.tile(k, j);
-      }
-      LUAR(Ti, Tj, Aij, opts, B);
-    }
-
-    template<typename scalar_t> void
     BLRMatrix<scalar_t>::construct_and_partial_factor
     (BLRMatrix<scalar_t>& B11, BLRMatrix<scalar_t>& B12,
      BLRMatrix<scalar_t>& B21, BLRMatrix<scalar_t>& B22,
@@ -1866,6 +1850,11 @@ namespace strumpack {
     template class BLRMatrix<double>;
     template class BLRMatrix<std::complex<float>>;
     template class BLRMatrix<std::complex<double>>;
+
+    template void LUAR(const std::vector<BLRTile<float>*>& Ti, const std::vector<BLRTile<float>*>& Tj, DenseMatrixWrapper<float>& tij, const BLROptions<float>& opts, int* B);
+    template void LUAR(const std::vector<BLRTile<double>*>& Ti, const std::vector<BLRTile<double>*>& Tj, DenseMatrixWrapper<double>& tij, const BLROptions<double>& opts, int* B);
+    template void LUAR(const std::vector<BLRTile<std::complex<float>>*>& Ti, const std::vector<BLRTile<std::complex<float>>*>& Tj, DenseMatrixWrapper<std::complex<float>>& tij, const BLROptions<std::complex<float>>& opts, int* B);
+    template void LUAR(const std::vector<BLRTile<std::complex<double>>*>& Ti, const std::vector<BLRTile<std::complex<double>>*>& Tj, DenseMatrixWrapper<std::complex<double>>& tij, const BLROptions<std::complex<double>>& opts, int* B);
 
     template void trsm(Side, UpLo, Trans, Diag, float, const BLRMatrix<float>&, DenseMatrix<float>&, int);
     template void trsm(Side, UpLo, Trans, Diag, double, const BLRMatrix<double>&, DenseMatrix<double>&, int);

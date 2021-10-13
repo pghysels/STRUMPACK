@@ -328,6 +328,28 @@ namespace strumpack {
       of.close();
     }
 
+    template<typename scalar_t> void
+    LUAR_B22(std::size_t i, std::size_t j, std::size_t kmax,
+             BLRMatrix<scalar_t>& B12, BLRMatrix<scalar_t>& B21,
+             DenseMatrix<scalar_t>& A22, const BLROptions<scalar_t>& opts,
+             int* B) {
+      DenseMatrixWrapper<scalar_t> Aij
+        (B21.tilerows(i), B12.tilecols(j), A22,
+         B21.tileroff(i), B12.tilecoff(j));
+      std::vector<BLRTile<scalar_t>*> Ti(kmax), Tj(kmax);
+      for (std::size_t k=0; k<kmax; k++) {
+        Ti[k] = &B21.tile(i, k);
+        Tj[k] = &B12.tile(k, j);
+      }
+      LUAR(Ti, Tj, Aij, opts, B);
+    }
+
+    template<typename scalar_t> void
+    LUAR(const std::vector<BLRTile<scalar_t>*>& Ti,
+         const std::vector<BLRTile<scalar_t>*>& Tj,
+         DenseMatrixWrapper<scalar_t>& tij,
+         const BLROptions<scalar_t>& opts, int* B);
+
   } // end namespace BLR
 } // end namespace strumpack
 
