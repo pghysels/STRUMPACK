@@ -342,6 +342,7 @@ namespace strumpack {
           }
           auto bdwork = VBatchedGEMM<scalar_t>::dwork_bytes(rb2*rb2);
           gpu::DeviceMemory<char> bdmem(bdwork*3 + (d2*d2+2*lwork)*sizeof(scalar_t));
+          gpu::HostMemory<scalar_t> hmem(lwork);
           DenseMW_t dA22
             (d2, d2, reinterpret_cast<scalar_t*>(bdmem + bdwork*3), d2);
           gpu::copy_host_to_device_async(dA22, A22, copy_stream);
@@ -350,18 +351,22 @@ namespace strumpack {
               *dV0 = dU0 + sU0[i],
               *dU1 = dV0 + sV0[i], *dV1 = dU1 + sU1[i],
               *dVU = dV1 + sV1[i], *dUVU = dVU + sVU[i];
+            scalar_t *hU0 = hmem, *hV0 = hU0 + sU0[i],
+              *hU1 = hV0 + sV0[i], *hV1 = hU1 + sU1[i];
             for (std::size_t k=0; k<rb2; k++) {
               auto& Tk = B21.tile(k, i);
               if (Tk.is_low_rank()) {
-                gpu::copy_host_to_device_async(dU0, Tk.U(), copy_stream);
-                gpu::copy_host_to_device_async(dV0, Tk.V(), copy_stream);
-                dU0 += Tk.U().nonzeros();
-                dV0 += Tk.V().nonzeros();
+                std::copy(Tk.U().data(), Tk.U().data()+Tk.U().nonzeros(), hU0);
+                std::copy(Tk.V().data(), Tk.V().data()+Tk.V().nonzeros(), hV0);
+                hU0 += Tk.U().nonzeros();
+                hV0 += Tk.V().nonzeros();
               } else {
-                gpu::copy_host_to_device_async(dU0, Tk.D(), copy_stream);
-                dU0 += Tk.D().nonzeros();
+                std::copy(Tk.D().data(), Tk.D().data()+Tk.D().nonzeros(), hU0);
+                hU0 += Tk.D().nonzeros();
               }
             }
+            hU0 = hmem;  hV0 = hU0 + sU0[i];
+            gpu::copy_host_to_device_async(dU0, hU0, sU0[i]+sV0[i], copy_stream);
             VBatchedGEMM<scalar_t> b1(rb2*rb2, bdmem),
               b2(rb2*rb2, bdmem+bdwork), b3(rb2*rb2, bdmem+2*bdwork);
             for (std::size_t j=0; j<rb2; j++) {
@@ -416,15 +421,22 @@ namespace strumpack {
                 }
               }
               if (Tj.is_low_rank()) {
-                gpu::copy_host_to_device_async(dU1, Tj.U(), copy_stream);
-                gpu::copy_host_to_device_async(dV1, Tj.V(), copy_stream);
                 dU1 += Tj.U().nonzeros();
                 dV1 += Tj.V().nonzeros();
+                std::copy(Tj.U().data(), Tj.U().data()+Tj.U().nonzeros(), hU1);
+                std::copy(Tj.V().data(), Tj.V().data()+Tj.V().nonzeros(), hV1);
+                hU1 += Tj.U().nonzeros();
+                hV1 += Tj.V().nonzeros();
               } else {
-                gpu::copy_host_to_device_async(dU1, Tj.D(), copy_stream);
                 dU1 += Tj.D().nonzeros();
+                std::copy(Tj.D().data(), Tj.D().data()+Tj.D().nonzeros(), hU1);
+                hU1 += Tj.D().nonzeros();
               }
             }
+            dU0 = dA22.end() + ((i % 2) ? 0 : lwork);  dV0 = dU0 + sU0[i];
+            dU1 = dV0 + sV0[i];  hU1 = hV0 + sV0[i];
+            gpu::copy_host_to_device_async(dU1, hU1, sU1[i]+sV1[i], copy_stream);
+
             // make sure all copies are done before starting GEMMs
             gpu::synchronize();
 #if defined(STRUMPACK_USE_MAGMA)
