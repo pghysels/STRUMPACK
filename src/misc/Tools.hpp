@@ -102,7 +102,7 @@ namespace strumpack {
           v = std::move(data_[pos]);
           auto os = v.size();
           if (s != os) {
-            STRUMPACK_ADD_MEMORY((os-s)*sizeof(scalar_t));
+            STRUMPACK_ADD_MEMORY((s-os)*sizeof(scalar_t));
             v.resize(s);
           }
           data_.erase(data_.begin()+pos);
