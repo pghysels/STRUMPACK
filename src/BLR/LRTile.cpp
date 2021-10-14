@@ -257,11 +257,19 @@ namespace strumpack {
       gemm(ta, tb, scalar_t(1.), ta==Trans::N ? a.V() : a.U(),
            tb==Trans::N ? U() : V(), scalar_t(0.), tmp1,
            params::task_recursion_cutoff_level);
-      DenseM_t tmp2(c.rows(), tmp1.cols());
-      gemm(ta, Trans::N, scalar_t(1.), ta==Trans::N ? a.U() : a.V(), tmp1,
-           scalar_t(0.), tmp2, params::task_recursion_cutoff_level);
-      gemm(Trans::N, tb, alpha, tmp2, tb==Trans::N ? V() : U(),
-           beta, c, params::task_recursion_cutoff_level);
+      if (rank() < a.rank()) {
+        DenseM_t tmp2(c.rows(), tmp1.cols());
+        gemm(ta, Trans::N, scalar_t(1.), ta==Trans::N ? a.U() : a.V(), tmp1,
+             scalar_t(0.), tmp2, params::task_recursion_cutoff_level);
+        gemm(Trans::N, tb, alpha, tmp2, tb==Trans::N ? V() : U(),
+             beta, c, params::task_recursion_cutoff_level);
+      } else {
+        DenseM_t tmp2(tmp1.rows(), c.cols());
+        gemm(ta, Trans::N, scalar_t(1.), tmp1, tb==Trans::N ? V() : U(),
+             scalar_t(0.), tmp2, params::task_recursion_cutoff_level);
+        gemm(Trans::N, tb, alpha, ta==Trans::N ? a.U() : a.V(), tmp2,
+             beta, c, params::task_recursion_cutoff_level);
+      }
     }
 
     template<typename scalar_t> void
