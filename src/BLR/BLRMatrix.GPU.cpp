@@ -294,8 +294,6 @@ namespace strumpack {
       if (d2) {
 #pragma omp critical
         {
-          // int nr_streams = 4; // TODO get from options, only in sparse now
-          // std::vector<gpu::Stream> copy_streams(nr_streams);
           gpu::Stream copy_stream, comp_stream;
           gpu::BLASHandle handle(comp_stream);
 #if defined(STRUMPACK_USE_MAGMA)
@@ -308,7 +306,6 @@ namespace strumpack {
           magma_queue_create(0, &q);
 #endif
 #endif
-
           std::vector<std::size_t> sU0(rb), sV0(rb),
             sU1(rb), sV1(rb), sVU(rb), sUVU(rb);
           std::size_t lwork = 0;
@@ -413,7 +410,7 @@ namespace strumpack {
                     // (D0*U1)*V1
                     b3.add(Tk.rows(), Tj.cols(), Tj.rank(), dVU, Tk.rows(),
                            dV1, Tj.rank(), dAkj, d2);
-                    dVU += Tk.rows(), Tj.rank();
+                    dVU += Tk.rows() * Tj.rank();
                   } else // Tk and Tj are dense, D0*D1
                     b3.add(Tk.rows(), Tj.cols(), Tk.cols(), dU0, Tk.rows(),
                            dU1, Tk.cols(), dAkj, d2);
