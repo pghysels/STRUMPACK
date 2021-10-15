@@ -337,19 +337,20 @@ namespace strumpack {
       MPI_Allgatherv
         (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, buf, rcnts, displs,
          mpi_type<T>(), comm_);
-    } 
+    }
 
     template<typename T>
     void gather(T* sbuf, int ssize, int* rbuf, int rsize, int root) const {
       MPI_Gather
-        (sbuf, ssize, mpi_type<T>(), rbuf, 
+        (sbuf, ssize, mpi_type<T>(), rbuf,
          rsize, mpi_type<T>(), root, comm_);
     }
 
     template<typename T>
-    void gather_v(T* sbuf, int scnts, T* rbuf, const int* rcnts, const int* displs, int root) const {
+    void gather_v(T* sbuf, int scnts, T* rbuf, const int* rcnts,
+                  const int* displs, int root) const {
       MPI_Gatherv
-        (sbuf, scnts, mpi_type<T>(), rbuf, rcnts, displs, 
+        (sbuf, scnts, mpi_type<T>(), rbuf, rcnts, displs,
          mpi_type<T>(), root, comm_);
     }
 

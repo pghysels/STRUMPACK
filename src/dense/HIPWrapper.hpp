@@ -61,7 +61,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_MPI)
       int devs;
       hipGetDeviceCount(&devs);
-      if (devs > 1) {
+      if (devs > 1 && MPIComm::initialized()) {
         MPIComm c;
         hipSetDevice(c.rank() % devs);
       }

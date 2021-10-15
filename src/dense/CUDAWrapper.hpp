@@ -63,7 +63,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_MPI)
       int devs;
       cudaGetDeviceCount(&devs);
-      if (devs > 1) {
+      if (devs > 1 && MPIComm::initialized()) {
         MPIComm c;
         cudaSetDevice(c.rank() % devs);
       }
