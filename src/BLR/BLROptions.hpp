@@ -65,8 +65,8 @@ namespace strumpack {
     enum class BLRFactorAlgorithm { RL, LL, COMB, STAR };
     std::string get_name(BLRFactorAlgorithm a);
 
-    enum class BLRCB { COLWISE, DENSE, BLR };
-    std::string get_name(BLRCB a);
+    enum class CBConstruction { COLWISE, DENSE };
+    std::string get_name(CBConstruction a);
 
     enum class CompressionKernel { HALF, FULL };
     std::string get_name(CompressionKernel a);
@@ -113,10 +113,9 @@ namespace strumpack {
       void set_BLR_factor_algorithm(BLRFactorAlgorithm a) {
         blr_algo_ = a;
       }
-      void set_BLR_CB(BLRCB a) {
-        blr_cb_ = a;
+      void set_CB_construction(CBConstruction a) {
+        cb_construction_ = a;
       }
-      void set_BLRseq_CB_Compression(bool a) { BLRseq_CB_Compression_ = a; }
       void set_compression_kernel(CompressionKernel a) {
         crn_krnl_ = a;
       }
@@ -125,8 +124,7 @@ namespace strumpack {
       Admissibility admissibility() const { return adm_; }
       int BACA_blocksize() const { return BACA_blocksize_; }
       BLRFactorAlgorithm BLR_factor_algorithm() const { return blr_algo_; }
-      BLRCB BLR_CB() const { return blr_cb_; }
-      bool BLRseq_CB_Compression() const { return BLRseq_CB_Compression_; }
+      CBConstruction CB_construction() const { return cb_construction_; }
       CompressionKernel compression_kernel() const { return crn_krnl_; }
 
       void set_from_command_line(int argc, const char* const* cargv) override;
@@ -138,15 +136,14 @@ namespace strumpack {
       LowRankAlgorithm lr_algo_ = LowRankAlgorithm::RRQR;
       int BACA_blocksize_ = 4;
       Admissibility adm_ = Admissibility::WEAK;
-      BLRFactorAlgorithm blr_algo_ = BLRFactorAlgorithm::STAR;
+      BLRFactorAlgorithm blr_algo_ = BLRFactorAlgorithm::RL;
       CompressionKernel crn_krnl_ = CompressionKernel::HALF;
-      BLRCB blr_cb_ = BLRCB::DENSE;
-      bool BLRseq_CB_Compression_ = false;
+      CBConstruction cb_construction_ = CBConstruction::DENSE;
 
       void set_defaults() {
         this->rel_tol_ = default_BLR_rel_tol<real_t>();
         this->abs_tol_ = default_BLR_abs_tol<real_t>();
-        this->leaf_size_ = 512;
+        this->leaf_size_ = 256;
         this->max_rank_ = 5000;
       }
 

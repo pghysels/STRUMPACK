@@ -64,7 +64,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
-  (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa, 
+  (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa,
   integer_t begin_col, integer_t end_col, const SPOptions<scalar_t>& opts) const {
     BLR::BLRExtendAdd<scalar_t,integer_t>::copy_to_buffers_col
       (F22_, sbuf, pa, this->upd_to_parent(pa), begin_col, end_col);
@@ -81,7 +81,8 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::extadd_blr_copy_from_buffers_col
   (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
-   scalar_t** pbuf, const FBLRMPI_t* pa, integer_t begin_col, integer_t end_col) const {
+   scalar_t** pbuf, const FBLRMPI_t* pa,
+   integer_t begin_col, integer_t end_col) const {
     BLR::BLRExtendAdd<scalar_t,integer_t>::copy_from_buffers_col
       (F11, F12, F21, F22, pbuf, pa, this, begin_col, end_col);
   }

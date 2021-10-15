@@ -1,3 +1,15 @@
+Version 6.0.0 Released September 2021
+=====================================
+- Block Low-Rank compression is now supported in the sparse
+  solver, resulting in an efficient, scalable and robust
+  precoditioner.
+- Improved GPU performance for the sparse direct solver
+- Add the StructuredMatrix class, for a general interface to
+  different rank structured formats. This also comes with a C and a
+  Fortran interface.
+- Several performance improvements
+
+
 Version 5.1.1 Released January 22, 2021
 =======================================
 - Small change in the build script for using HIP/ROCm. See

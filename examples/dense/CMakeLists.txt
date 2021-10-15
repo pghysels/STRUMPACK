@@ -2,6 +2,7 @@ add_executable(KernelRegression   EXCLUDE_FROM_ALL KernelRegression.cpp)
 add_executable(testStructured     EXCLUDE_FROM_ALL testStructured.cpp)
 add_executable(dstructured        EXCLUDE_FROM_ALL dstructured.c)
 add_executable(fstructured        EXCLUDE_FROM_ALL fstructured.f90)
+set_target_properties(fstructured PROPERTIES LINKER_LANGUAGE Fortran)
 
 target_link_libraries(KernelRegression strumpack)
 target_link_libraries(testStructured strumpack)
