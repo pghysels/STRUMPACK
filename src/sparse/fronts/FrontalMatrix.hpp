@@ -116,7 +116,13 @@ namespace strumpack {
 #endif
     }
 
-    virtual void release_work_memory() = 0;
+    virtual void release_work_memory() {
+      VectorPool<scalar_t> workspace;
+      release_work_memory(workspace);
+    }
+    virtual void release_work_memory(VectorPool<scalar_t>& workspace) {
+      release_work_memory();
+    }
 
     virtual void
     multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
@@ -174,6 +180,7 @@ namespace strumpack {
     extend_add_to_blr(BLRM_t& paF11, BLRM_t& paF12,
                       BLRM_t& paF21, BLRM_t& paF22,
                       const FrontalMatrix<scalar_t,integer_t>* p,
+                      VectorPool<scalar_t>& workspace,
                       int task_depth, const Opts_t& opts) {}
     virtual void
     extend_add_to_blr_col(BLRM_t& paF11, BLRM_t& paF12,

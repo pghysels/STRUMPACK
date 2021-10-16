@@ -81,6 +81,7 @@ namespace strumpack {
       ~Stream() { gpu_check(cudaStreamDestroy(s_)); }
       operator cudaStream_t&() { return s_; }
       operator const cudaStream_t&() const { return s_; }
+      void synchronize() { gpu_check(cudaStreamSynchronize(s_)); }
     private:
       cudaStream_t s_;
     };
@@ -229,7 +230,9 @@ namespace strumpack {
         }
       }
       DeviceMemory(const DeviceMemory&) = delete;
-      DeviceMemory(DeviceMemory<T>&& d) { *this = d; }
+      DeviceMemory(DeviceMemory<T>&& d) {
+        *this = std::forward<DeviceMemory<T>>(d);
+      }
       DeviceMemory<T>& operator=(const DeviceMemory<T>&) = delete;
       DeviceMemory<T>& operator=(DeviceMemory<T>&& d) {
         if (this != &d) {
@@ -247,6 +250,7 @@ namespace strumpack {
       operator const T*() const { return data_; }
       // operator void*() { return data_; }
       template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
+      std::size_t size() const { return size_; }
       void release() {
         if (data_) {
           if (is_managed_) {
@@ -287,7 +291,9 @@ namespace strumpack {
         }
       }
       HostMemory(const HostMemory&) = delete;
-      HostMemory(HostMemory<T>&& d) { *this = d; }
+      HostMemory(HostMemory<T>&& d) {
+        *this = std::forward<HostMemory<T>>(d);
+      }
       HostMemory<T>& operator=(const HostMemory<T>&) = delete;
       HostMemory<T>& operator=(HostMemory<T>&& d) {
         if (this != & d) {
@@ -305,6 +311,7 @@ namespace strumpack {
       operator const T*() const { return data_; }
       // operator void*() { return data_; }
       template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
+      std::size_t size() const { return size_; }
       void release() {
         if (data_) {
           STRUMPACK_SUB_MEMORY(size_*sizeof(T));

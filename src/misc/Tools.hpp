@@ -114,23 +114,57 @@ namespace strumpack {
       return v;
     }
     void restore(std::vector<scalar_t,NoInit<scalar_t>>& v) {
+      if (v.empty()) return;
 #pragma omp critical
       data_.push_back(std::move(v));
     }
 
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+    gpu::HostMemory<scalar_t> get_pinned(std::size_t s=0) {
+      if (pinned_data_.empty() || s == 0)
+        return gpu::HostMemory<scalar_t>(s);
+      gpu::HostMemory<scalar_t> pd;
+#pragma omp critical
+      {
+        int pos = -1;
+        std::size_t smin = 0;
+        for (std::size_t i=0; i<pinned_data_.size(); i++) {
+          auto ps = pinned_data_[i].size();
+          if (ps >= s && (ps < smin || pos == -1)) {
+            pos = i;
+            smin = ps;
+          }
+        }
+        if (pos == -1)
+          pd = gpu::HostMemory<scalar_t>(s);
+        else {
+          pd = std::move(pinned_data_[pos]);
+          pinned_data_.erase(pinned_data_.begin()+pos);
+        }
+      }
+      return pd;
+    }
     gpu::DeviceMemory<scalar_t> get_gpu(std::size_t s=0) {
+      // TODO
       return gpu::DeviceMemory<scalar_t>(s);
     }
-#endif
+    void restore(gpu::HostMemory<scalar_t>& m) {
+      if (m.size() == 0) return;
+#pragma omp critical
+      pinned_data_.push_back(std::move(m));
+    }
     void restore(gpu::DeviceMemory<scalar_t>& m) {
+      // TODO
       auto tmp = std::move(m);
     }
+#endif
 
   private:
     std::vector<std::vector<scalar_t,NoInit<scalar_t>>> data_;
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-    // TODO keep a vector with GPU memory pools
+    std::vector<gpu::DeviceMemory<scalar_t>> dev_data_;
+    std::vector<gpu::HostMemory<scalar_t>> pinned_data_;
+    // TODO keep streams? magma queues?
 #endif
   };
 

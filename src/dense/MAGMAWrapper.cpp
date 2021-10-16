@@ -77,10 +77,12 @@ namespace strumpack {
                          float const *const * dA_array, magma_int_t * ldda,
                          float const *const * dB_array, magma_int_t * lddb,
                          float beta, float ** dC_array, magma_int_t * lddc,
-                         magma_int_t batchCount, magma_queue_t queue ) {
-        magmablas_sgemm_vbatched
+                         magma_int_t batchCount,
+                         magma_int_t max_m, magma_int_t max_n, magma_int_t max_k,
+                         magma_queue_t queue ) {
+        magmablas_sgemm_vbatched_max_nocheck
           (transA, transB, m, n, k, alpha, dA_array, ldda, dB_array, lddb,
-           beta, dC_array, lddc, batchCount, queue);
+           beta, dC_array, lddc, batchCount, max_m, max_n, max_k, queue);
       }
       void gemm_vbatched(magma_trans_t transA, magma_trans_t transB,
                          magma_int_t * m, magma_int_t * n, magma_int_t * k,
@@ -88,7 +90,9 @@ namespace strumpack {
                          double const *const * dA_array, magma_int_t * ldda,
                          double const *const * dB_array, magma_int_t * lddb,
                          double beta, double ** dC_array, magma_int_t * lddc,
-                         magma_int_t batchCount, magma_queue_t queue) {
+                         magma_int_t batchCount,
+                         magma_int_t max_m, magma_int_t max_n, magma_int_t max_k,
+                         magma_queue_t queue) {
         magmablas_dgemm_vbatched
           (transA, transB, m, n, k, alpha, dA_array, ldda, dB_array, lddb,
            beta, dC_array, lddc, batchCount, queue);
@@ -100,7 +104,9 @@ namespace strumpack {
                          std::complex<float> const *const * dB_array, magma_int_t * lddb,
                          std::complex<float> beta,
                          std::complex<float> ** dC_array, magma_int_t * lddc,
-                         magma_int_t batchCount, magma_queue_t queue) {
+                         magma_int_t batchCount,
+                         magma_int_t max_m, magma_int_t max_n, magma_int_t max_k,
+                         magma_queue_t queue) {
         magmaFloatComplex m_alpha, m_beta;
         memcpy(&m_alpha, &alpha, sizeof(magmaFloatComplex));
         memcpy(&m_beta, &beta, sizeof(magmaFloatComplex));
@@ -119,7 +125,9 @@ namespace strumpack {
                          std::complex<double> const *const * dB_array, magma_int_t * lddb,
                          std::complex<double> beta,
                          std::complex<double> ** dC_array, magma_int_t * lddc,
-                         magma_int_t batchCount, magma_queue_t queue) {
+                         magma_int_t batchCount,
+                         magma_int_t max_m, magma_int_t max_n, magma_int_t max_k,
+                         magma_queue_t queue) {
         magmaDoubleComplex m_alpha, m_beta;
         memcpy(&m_alpha, &alpha, sizeof(magmaDoubleComplex));
         memcpy(&m_beta, &beta, sizeof(magmaDoubleComplex));

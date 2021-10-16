@@ -48,7 +48,12 @@ namespace strumpack {
     : F_t(nullptr, nullptr, sep, sep_begin, sep_end, upd) {}
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLR<scalar_t,integer_t>::release_work_memory() {
+  FrontalMatrixBLR<scalar_t,integer_t>::release_work_memory
+  (VectorPool<scalar_t>& workspace) {
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+    workspace.restore(CBpinned_);
+#endif
+    workspace.restore(CBstorage_);
     F22_.clear();
     F22blr_.clear();
     admissibility_.clear();
@@ -146,7 +151,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
-   const F_t* p, int task_depth) {
+   const F_t* p, VectorPool<scalar_t>& workspace, int task_depth) {
     const std::size_t pdsep = paF11.rows();
     const std::size_t dupd = dim_upd();
     std::size_t upd2sep;
@@ -175,13 +180,14 @@ namespace strumpack {
     }
     STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
     STRUMPACK_FULL_RANK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
-    release_work_memory();
+    release_work_memory(workspace);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::extend_add_to_blr
   (BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21, BLRM_t& paF22,
-   const F_t* p, int task_depth, const Opts_t& opts) {
+   const F_t* p, VectorPool<scalar_t>& workspace,
+   int task_depth, const Opts_t& opts) {
     // extend_add from seq. BLR to seq. BLR
     const std::size_t pdsep = paF11.rows();
     const std::size_t dupd = dim_upd();
@@ -209,7 +215,7 @@ namespace strumpack {
     }
     STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
     STRUMPACK_FULL_RANK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
-    release_work_memory();
+    release_work_memory(workspace);
    }
 
   template<typename scalar_t,typename integer_t> void
@@ -283,38 +289,36 @@ namespace strumpack {
 
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLR<scalar_t,integer_t>::multifrontal_factorization
-  (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
+  FrontalMatrixBLR<scalar_t,integer_t>::factor
+  (const SpMat_t& A, const Opts_t& opts,
+   VectorPool<scalar_t>& workspace, int etree_level, int task_depth) {
     if (task_depth == 0) {
       // use tasking for children and for extend-add parallelism
 #pragma omp parallel if(!omp_in_parallel()) default(shared)
 #pragma omp single nowait
-      factor_node(A, opts, etree_level, task_depth);
-    } else factor_node(A, opts, etree_level, task_depth);
+      factor_node(A, opts, workspace, etree_level, task_depth);
+    } else factor_node(A, opts, workspace, etree_level, task_depth);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::factor_node
-  (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
+  (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
+   int etree_level, int task_depth) {
     if (task_depth < params::task_recursion_cutoff_level) {
       if (lchild_)
 #pragma omp task default(shared)                                        \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        lchild_->multifrontal_factorization
-          (A, opts, etree_level+1, task_depth+1);
+        lchild_->factor(A, opts, workspace, etree_level+1, task_depth+1);
       if (rchild_)
 #pragma omp task default(shared)                                        \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        rchild_->multifrontal_factorization
-          (A, opts, etree_level+1, task_depth+1);
+        rchild_->factor(A, opts, workspace, etree_level+1, task_depth+1);
 #pragma omp taskwait
     } else {
       if (lchild_)
-        lchild_->multifrontal_factorization
-          (A, opts, etree_level+1, task_depth);
+        lchild_->factor(A, opts, workspace, etree_level+1, task_depth);
       if (rchild_)
-        rchild_->multifrontal_factorization
-          (A, opts, etree_level+1, task_depth);
+        rchild_->factor(A, opts, workspace, etree_level+1, task_depth);
     }
     TaskTimer t("");
 #if defined(STRUMPACK_COUNT_FLOPS)
@@ -353,58 +357,76 @@ namespace strumpack {
         build_front(A);
         if (lchild_)
           lchild_->extend_add_to_blr
-            (F11blr_, F12blr_, F21blr_, F22blr_, this, task_depth, opts);
+            (F11blr_, F12blr_, F21blr_, F22blr_, this,
+             workspace, task_depth, opts);
         if (rchild_)
           rchild_->extend_add_to_blr
-            (F11blr_, F12blr_, F21blr_, F22blr_, this, task_depth, opts);
+            (F11blr_, F12blr_, F21blr_, F22blr_, this,
+             workspace, task_depth, opts);
         if (dsep)
           BLRM_t::construct_and_partial_factor
             (F11blr_, F12blr_, F21blr_, F22blr_, piv_, sep_tiles_,
              upd_tiles_, admissibility_, opts.BLR_options());
       } else if (opts.BLR_options().BLR_CB() == BLR::BLRCB::DENSE) {
-        DenseM_t F11(dsep, dsep), F12(dsep, dupd), F21(dupd, dsep);
-        F11.zero(); F12.zero(); F21.zero();
-        A.extract_front
-          (F11, F12, F21, sep_begin_, sep_end_, this->upd_, task_depth);
-        if (dupd) {
-          F22_ = DenseM_t(dupd, dupd);
-          F22_.zero();
-        }
-        if (lchild_)
-          lchild_->extend_add_to_dense(F11, F12, F21, F22_, this, task_depth);
-        if (rchild_)
-          rchild_->extend_add_to_dense(F11, F12, F21, F22_, this, task_depth);
-        if (dsep) {
-#if 1
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-          if (opts.use_gpu())
-            BLRM_t::construct_and_partial_factor_gpu
-              (F11, F12, F21, F22_, F11blr_, piv_, F12blr_, F21blr_,
-               sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());
-          else
+        if (opts.use_gpu()) {
+          DenseM_t F11(dsep, dsep), F12(dsep, dupd), F21(dupd, dsep);
+          F11.zero(); F12.zero(); F21.zero();
+          A.extract_front
+            (F11, F12, F21, sep_begin_, sep_end_, this->upd_, task_depth);
+          CBpinned_ = workspace.get_pinned(dupd*dupd);
+          F22_ = DenseMW_t(dupd, dupd, CBpinned_, dupd);
+          F22_.zero();
+          if (lchild_)
+            lchild_->extend_add_to_dense
+              (F11, F12, F21, F22_, this, workspace, task_depth);
+          if (rchild_)
+            rchild_->extend_add_to_dense
+              (F11, F12, F21, F22_, this, workspace, task_depth);
+          if (dsep)
+              BLRM_t::construct_and_partial_factor_gpu
+                (F11, F12, F21, F22_, F11blr_, piv_, F12blr_, F21blr_,
+                 sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());
+        } else
 #endif
-            BLRM_t::construct_and_partial_factor
-              (F11, F12, F21, F22_, F11blr_, piv_, F12blr_, F21blr_,
-               sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());
+          {
+#if 1
+            DenseM_t F11(dsep, dsep), F12(dsep, dupd), F21(dupd, dsep);
+            F11.zero(); F12.zero(); F21.zero();
+            A.extract_front
+              (F11, F12, F21, sep_begin_, sep_end_, this->upd_, task_depth);
+            if (dupd) {
+              CBstorage_ = workspace.get(dupd*dupd);
+              F22_ = DenseMW_t(dupd, dupd, CBstorage_.data(), dupd);
+              F22_.zero();
+            }
+            if (lchild_)
+              lchild_->extend_add_to_dense(F11, F12, F21, F22_, this, task_depth);
+            if (rchild_)
+              rchild_->extend_add_to_dense(F11, F12, F21, F22_, this, task_depth);
+            if (dsep)
+              BLRM_t::construct_and_partial_factor
+                (F11, F12, F21, F22_, F11blr_, piv_, F12blr_, F21blr_,
+                 sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());
 #else
-          F11blr_ = BLRM_t
-            (F11, sep_tiles_, admissibility_, piv_, opts.BLR_options());
-          F11.clear();
-          if (dupd) {
-            F12.laswp(piv_, true);
-            trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-                 scalar_t(1.), F11blr_, F12, task_depth);
-            F12blr_ = BLRM_t(F12, sep_tiles_, upd_tiles_, opts.BLR_options());
-            F12.clear();
-            trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-                 scalar_t(1.), F11blr_, F21, task_depth);
-            F21blr_ = BLRM_t(F21, upd_tiles_, sep_tiles_, opts.BLR_options());
-            F21.clear();
-            gemm(Trans::N, Trans::N, scalar_t(-1.), F21blr_, F12blr_,
-                 scalar_t(1.), F22_, task_depth);
-          }
+            F11blr_ = BLRM_t
+              (F11, sep_tiles_, admissibility_, piv_, opts.BLR_options());
+            F11.clear();
+            if (dupd) {
+              F12.laswp(piv_, true);
+              trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                   scalar_t(1.), F11blr_, F12, task_depth);
+              F12blr_ = BLRM_t(F12, sep_tiles_, upd_tiles_, opts.BLR_options());
+              F12.clear();
+              trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+                   scalar_t(1.), F11blr_, F21, task_depth);
+              F21blr_ = BLRM_t(F21, upd_tiles_, sep_tiles_, opts.BLR_options());
+              F21.clear();
+              gemm(Trans::N, Trans::N, scalar_t(-1.), F21blr_, F12blr_,
+                   scalar_t(1.), F22_, task_depth);
+            }
 #endif
-        }
+          }
       }
     } else { // ACA or BACA
       auto F11elem = [&](const std::vector<std::size_t>& lI,
@@ -448,8 +470,8 @@ namespace strumpack {
          F11blr_, piv_, F12blr_, F21blr_, F22blr_,
          sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());
     }
-    if (lchild_) lchild_->release_work_memory();
-    if (rchild_) rchild_->release_work_memory();
+    if (lchild_) lchild_->release_work_memory(workspace);
+    if (rchild_) rchild_->release_work_memory(workspace);
     if (opts.print_compressed_front_stats()) {
       auto time = t.elapsed();
       auto nnz = F11blr_.nonzeros();

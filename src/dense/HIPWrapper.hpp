@@ -79,7 +79,8 @@ namespace strumpack {
       ~Stream() { gpu_check(hipStreamDestroy(s_)); }
       operator hipStream_t&() { return s_; }
       operator const hipStream_t&() const { return s_; }
-    private:
+      void synchronize() { gpu_check(hipStreamSynchronize(s_)); }
+      private:
       hipStream_t s_;
     };
 
@@ -243,6 +244,7 @@ namespace strumpack {
       operator const T*() const { return data_; }
       // operator void*() { return data_; }
       template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
+      std::size_t size() const { return size_; }
       void release() {
         if (data_) {
           if (is_managed_) {
@@ -301,6 +303,7 @@ namespace strumpack {
       operator const T*() const { return data_; }
       // operator void*() { return data_; }
       template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
+      std::size_t size() const { return size_; }
       void release() {
         if (data_) {
           STRUMPACK_SUB_MEMORY(size_*sizeof(T));
