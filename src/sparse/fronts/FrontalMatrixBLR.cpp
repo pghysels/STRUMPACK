@@ -468,9 +468,9 @@ namespace strumpack {
         std::cout << "        nnz(F12)= " << nnz12
                   << " rank(F12)= " << F12blr_.rank()
                   << "\n#       " << " nnz(F21)= " << nnz21
-                  << " rank(F12)= " << F12blr_.rank()
+                  << " rank(F21)= " << F21blr_.rank()
                   << "        nnz(F22)= " << nnz22blr << " / " << nnz22dense
-                  << " rank(F22)= " << F12blr_.rank();
+                  << " rank(F22)= " << F22blr_.rank();
       }
       std::cout << "\n#        " << (float(nnz)) /
         (float(this->dim_blk())*this->dim_blk()) * 100.
