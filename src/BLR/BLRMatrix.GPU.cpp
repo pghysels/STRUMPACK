@@ -34,6 +34,7 @@
 
 #include "BLRMatrix.hpp"
 #include "BLRTileBLAS.hpp"
+#include "misc/TaskTimer.hpp"
 
 #if defined(STRUMPACK_USE_CUDA)
 #include "dense/CUDAWrapper.hpp"
@@ -46,6 +47,9 @@
 #if defined(STRUMPACK_USE_MAGMA)
 #include "dense/MAGMAWrapper.hpp"
 #endif
+
+// #include "cuda_profiler_api.h"
+// #include "cudaProfiler.h"
 
 namespace strumpack {
   namespace BLR {
@@ -295,6 +299,11 @@ namespace strumpack {
 
       auto d2 = A22.rows();
       if (d2) {
+        TaskTimer t("BLR_Schur_GPU");
+        t.start();
+#if 0
+        // cudaProfilerStart();
+        // cuProfilerStart();
 #pragma omp critical
         {
           gpu::Stream h2d_stream, d2h_stream, comp_stream;
@@ -434,6 +443,172 @@ namespace strumpack {
           magma_finalize();
 #endif
         }
+        // cudaProfilerStop();
+        // cuProfilerStop();
+#else
+
+#if 1
+        int nr_streams = 4;
+        std::vector<gpu::Stream> streams(nr_streams);
+        std::vector<gpu::BLASHandle> handles(nr_streams);
+        for (int i=0; i<nr_streams; i++)
+          handles[i].set_stream(streams[i]);
+        std::size_t max_m = 0, max_n = 0;
+        for (std::size_t k=0; k<rb2; k++) {
+          max_m = std::max(max_m, B21.tilerows(k));
+          max_n = std::max(max_n, B12.tilecols(k));
+        }
+        std::size_t sU0 = 0, sV0 = 0, sU1 = 0, sV1 = 0;
+        // count how much device memory will be required
+        for (std::size_t i=0; i<rb; i++) {
+          for (std::size_t k=0; k<rb2; k++) {
+            auto& Tki = B21.tile(k, i);
+            if (Tki.is_low_rank()) {
+              sU0 += Tki.U().nonzeros();
+              sV0 += Tki.V().nonzeros();
+            } else sU0 += Tki.D().nonzeros();
+            auto& Tik = B12.tile(i, k);
+            if (Tik.is_low_rank()) {
+              sU1 += Tik.U().nonzeros();
+              sV1 += Tik.V().nonzeros();
+            } else sU1 += Tik.D().nonzeros();
+          }
+        }
+        gpu::DeviceMemory<scalar_t> dmemUV
+          (d2*d2+sU0+sV0+sU1+sV1+2*max_m*max_n);
+        DenseMW_t dA22(d2, d2, dmemUV, d2);
+        scalar_t* dU0 = dmemUV+d2*d2, *dV0 = dU0 + sU0,
+          *dU1 = dV0 + sV0, *dV1 = dU1 + sU1,
+          *dVU = dV1 + sV1, *dUVU = dVU + max_m*max_n;
+        for (std::size_t i=0, s=0; i<rb; i++) {
+          for (std::size_t k=0; k<rb2; k++) {
+            auto& Tki = B21.tile(k, i);
+            if (Tki.is_low_rank()) {
+              gpu::copy_host_to_device_async(dU0, Tki.U(), streams[s]);
+              gpu::copy_host_to_device_async(dV0, Tki.V(), streams[s]);
+              dU0 += Tki.U().nonzeros();
+              dV0 += Tki.V().nonzeros();
+            } else {
+              gpu::copy_host_to_device_async(dU0, Tki.D(), streams[s]);
+              dU0 += Tki.D().nonzeros();
+            }
+            auto& Tik = B12.tile(i, k);
+            if (Tik.is_low_rank()) {
+              gpu::copy_host_to_device_async(dU1, Tik.U(), streams[s]);
+              gpu::copy_host_to_device_async(dV1, Tik.V(), streams[s]);
+              dU1 += Tik.U().nonzeros();
+              dV1 += Tik.V().nonzeros();
+            } else {
+              gpu::copy_host_to_device_async(dU1, Tik.D(), streams[s]);
+              dU1 += Tik.D().nonzeros();
+            }
+            s = (s + 1) % nr_streams;
+          }
+        }
+        gpu::synchronize();
+        dU0 = dmemUV + d2*d2;  dV0 = dU0 + sU0;
+        dU1 = dV0 + sV0;       dV1 = dU1 + sU1;
+        for (std::size_t i=0, s=0; i<rb; i++) {
+          auto dU0i = dU0;
+          auto dV0i = dV0;
+          for (std::size_t j=0; j<rb2; j++) {
+            dU0 = dU0i;
+            dV0 = dV0i;
+            auto& Tij = B12.tile(i, j);
+            for (std::size_t k=0; k<rb2; k++) {
+              DenseMW_t dAkj(B21.tilerows(k), B12.tilecols(j), dA22,
+                             B21.tileroff(k), B12.tilecoff(j));
+              if (i == 0) {
+                DenseMW_t Akj(B21.tilerows(k), B12.tilecols(j), A22,
+                              B21.tileroff(k), B12.tilecoff(j));
+                gpu::copy_host_to_device_async(dAkj, Akj, streams[s]);
+              }
+              auto& Tki = B21.tile(k, i);
+              if (Tki.is_low_rank()) {
+                DenseMW_t U0(Tki.rows(), Tki.rank(), dU0, Tki.rows()),
+                  V0(Tki.rank(), Tki.cols(), dV0, Tki.rank());
+                if (Tij.is_low_rank()) {
+                  DenseMW_t U1(Tij.rows(), Tij.rank(), dU1, Tij.rows()),
+                    V1(Tij.rank(), Tij.cols(), dV1, Tij.rank()),
+                    VU(Tki.rank(), Tij.rank(), dVU, Tki.rank());
+                  gpu::gemm(handles[s], Trans::N, Trans::N,
+                            scalar_t(1.), V0, U1, scalar_t(0.), VU);
+                  if (Tij.rank() < Tki.rank()) {
+                    DenseMW_t UVU(Tki.rows(), Tij.rank(), dUVU, Tki.rows());
+                    gpu::gemm(handles[s], Trans::N, Trans::N,
+                              scalar_t(1.), U0, VU, scalar_t(0.), UVU);
+                    gpu::gemm(handles[s], Trans::N, Trans::N,
+                              scalar_t(-1.), UVU, V1, scalar_t(1.), dAkj);
+                  } else {
+                    DenseMW_t UVU(Tki.rank(), Tij.cols(), dUVU, Tki.rank());
+                    gpu::gemm(handles[s], Trans::N, Trans::N,
+                              scalar_t(1.), VU, V1, scalar_t(0.), UVU);
+                    gpu::gemm(handles[s], Trans::N, Trans::N,
+                              scalar_t(-1.), U0, UVU, scalar_t(1.), dAkj);
+                  }
+                } else { // Tij is dense
+                  DenseMW_t D1(Tij.rows(), Tij.cols(), dU1, Tij.rows()),
+                    VU(Tki.rank(), Tij.cols(), dVU, Tki.rank());
+                  gpu::gemm(handles[s], Trans::N, Trans::N,
+                            scalar_t(1.), V0, D1, scalar_t(0.), VU);
+                  gpu::gemm(handles[s], Trans::N, Trans::N,
+                            scalar_t(-1.), U0, VU, scalar_t(1.), dAkj);
+                }
+                dU0 += Tki.U().nonzeros();
+                dV0 += Tki.V().nonzeros();
+              } else { // Tki is dense
+                DenseMW_t D0(Tki.rows(), Tki.cols(), dU0, Tki.rows());
+                if (Tij.is_low_rank()) {
+                  DenseMW_t U1(Tij.rows(), Tij.rank(), dU1, Tij.rows()),
+                    V1(Tij.rank(), Tij.cols(), dV1, Tij.rank()),
+                    VU(Tki.rows(), Tij.rank(), dVU, Tki.rows());
+                  gpu::gemm(handles[s], Trans::N, Trans::N,
+                            scalar_t(1.), D0, U1, scalar_t(0.), VU);
+                  gpu::gemm(handles[s], Trans::N, Trans::N,
+                            scalar_t(-1.), VU, V1, scalar_t(1.), dAkj);
+                } else {
+                  DenseMW_t U1(Tij.rows(), Tij.cols(), dU1, Tij.rows());
+                  gpu::gemm(handles[s], Trans::N, Trans::N,
+                            scalar_t(-1.), D0, U1, scalar_t(1.), dAkj);
+                }
+                dU0 += Tki.D().nonzeros();
+              }
+              if (i == rb-1) {
+                DenseMW_t Akj(B21.tilerows(k), B12.tilecols(j), A22,
+                              B21.tileroff(k), B12.tilecoff(j));
+                gpu::copy_device_to_host_async(Akj, dAkj, streams[s]);
+              }
+              s = (s + 1) % nr_streams;
+            }
+            if (Tij.is_low_rank()) {
+              dU1 += Tij.U().nonzeros();
+              dV1 += Tij.V().nonzeros();
+            } else
+              dU1 += Tij.D().nonzeros();
+          }
+        }
+        gpu::synchronize();
+        // gpu::copy_device_to_host_async(A22, dA22, d2h_stream);
+        // gpu::synchronize();
+#else
+        for (std::size_t i=0; i<rb; i++) {
+#pragma omp taskloop collapse(2) grainsize(1) default(shared)
+          for (std::size_t j=0; j<rb2; j++) {
+            for (std::size_t k=0; k<rb2; k++) {
+              DenseMW_t Akj
+                (B21.tilerows(k), B12.tilecols(j), A22,
+                 B21.tileroff(k), B12.tilecoff(j));
+              gemm(Trans::N, Trans::N, scalar_t(-1.),
+                   B21.tile(k, i), B12.tile(i, j), scalar_t(1.), Akj);
+            }
+          }
+        }
+#endif
+
+#endif
+        auto time = t.elapsed();
+        std::cout << "#   BLR GPU Schur time = "
+                  << time << " sec" << std::endl;
       }
     }
 

@@ -376,6 +376,8 @@ namespace strumpack {
             (F11, F12, F21, sep_begin_, sep_end_, this->upd_, task_depth);
           CBpinned_ = workspace.get_pinned(dupd*dupd);
           F22_ = DenseMW_t(dupd, dupd, CBpinned_, dupd);
+          // CBstorage_ = workspace.get(dupd*dupd);
+          // F22_ = DenseMW_t(dupd, dupd, CBstorage_.data(), dupd);
           F22_.zero();
           if (lchild_)
             lchild_->extend_add_to_dense

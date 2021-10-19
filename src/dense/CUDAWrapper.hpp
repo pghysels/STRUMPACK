@@ -145,6 +145,17 @@ namespace strumpack {
       assert(d.rows() == d.ld() && h.rows() == h.ld());
       copy_device_to_host(h.data(), d.data(), d.rows()*d.cols());
     }
+    template<typename T> void copy_device_to_host_async
+    (DenseMatrix<T>& h, const DenseMatrix<T>& d, const Stream& s) {
+      if (!d.rows() || !d.cols()) return;
+      assert(d.rows() == h.rows() && d.cols() == h.cols());
+      if (d.rows() != d.ld() || h.rows() != h.ld()) {
+        gpu_check(cudaMemcpy2DAsync
+                  (h.data(), h.ld()*sizeof(T), d.data(), d.ld()*sizeof(T),
+                   h.rows()*sizeof(T), h.cols(), cudaMemcpyDeviceToHost, s));
+      } else
+        copy_device_to_host_async(h.data(), d.data(), d.rows()*d.cols(), s);
+    }
     template<typename T> void copy_device_to_host
     (DenseMatrix<T>& h, const T* d) {
       if (!h.rows() || !h.cols()) return;
@@ -168,8 +179,12 @@ namespace strumpack {
     (DenseMatrix<T>& d, const DenseMatrix<T>& h, const Stream& s) {
       if (!d.rows() || !d.cols()) return;
       assert(d.rows() == h.rows() && d.cols() == h.cols());
-      assert(d.rows() == d.ld() && h.rows() == h.ld());
-      copy_host_to_device_async(d.data(), h.data(), d.rows()*d.cols(), s);
+      if (d.rows() != d.ld() || h.rows() != h.ld()) {
+        gpu_check(cudaMemcpy2DAsync
+                  (d.data(), d.ld()*sizeof(T), h.data(), h.ld()*sizeof(T),
+                   h.rows()*sizeof(T), h.cols(), cudaMemcpyHostToDevice, s));
+      } else
+        copy_host_to_device_async(d.data(), h.data(), d.rows()*d.cols(), s);
     }
     template<typename T> void copy_host_to_device
     (DenseMatrix<T>& d, const T* h) {
