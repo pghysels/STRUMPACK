@@ -1,0 +1,44 @@
+image: gcc
+
+stages:
+  - build
+  - test
+
+build:
+  stage: build
+  before_script:
+    - apt update && apt -y install gcc-9 g++-9 gfortran-9 openmpi-bin libopenmpi-dev libmetis-dev libparmetis-dev libblas-dev liblapack-dev libscalapack-mpi-dev
+    - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 --slave /usr/bin/g++ g++ /usr/bin/g++-9
+    - update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-9 60
+
+  script:
+    - export BLAS_LIB=/usr/lib/x86_64-linux-gnu/libblas.so
+    - export LAPACK_LIB=/usr/lib/x86_64-linux-gnu/liblapack.so
+    - export SCALAPACK_LIB="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
+    - printf "${BLUE} PG; Installing STRUMPACK from source\n"
+    - pwd
+    - # cd $GITHUB_WORKSPACE
+    - rm -rf build
+    - mkdir -p build
+    - cd build
+    - cmake .. \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_C_COMPILER=mpicc \
+        -DCMAKE_CXX_COMPILER=mpic++ \
+        -DCMAKE_Fortran_COMPILER=mpif90 \
+        -DCMAKE_INSTALL_PREFIX=. \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DCMAKE_VERBOSE_MAKEFILE:BOOL=OFF \
+        -DTPL_BLAS_LIBRARIES="$BLAS_LIB" \
+        -DTPL_LAPACK_LIBRARIES="$LAPACK_LIB" \
+        -DTPL_SCALAPACK_LIBRARIES="$SCALAPACK_LIB"
+    - make
+    - make install
+    - make tests
+    - printf "${BLUE} PG; Done installing STRUMPACK from source\n"
+
+test:
+  stage: test
+  script:
+    - export TEST_NUMBER=${{ matrix.test }}
+    - sh ./.ci_test.sh
