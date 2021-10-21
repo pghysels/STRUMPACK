@@ -11,7 +11,8 @@ jobs:
       matrix:
         compiler:
           - gcc
-        test: [1,2,3,4,5]
+        # test: [1,2,3,4,5]
+        test: [0]
 
     steps:
       - name: Checkout code
@@ -56,34 +57,35 @@ jobs:
           export LAPACK_LIB=/usr/lib/x86_64-linux-gnu/liblapack.so
           printf "${BLUE} PG; Done installing LAPACK from apt\n"
 
-          printf "${BLUE} PG; Installing ScaLAPACK from source\n"
-          cd $GITHUB_WORKSPACE/installDir
-          wget http://www.netlib.org/scalapack/scalapack-2.1.0.tgz
-          tar -xf scalapack-2.1.0.tgz
-          cd scalapack-2.1.0
-          rm -rf build
-          mkdir -p build
-          cd build
-          cmake .. \
-            -DBUILD_SHARED_LIBS=ON \
-            -DCMAKE_C_COMPILER=mpicc \
-            -DCMAKE_Fortran_COMPILER=mpif90 \
-            -DCMAKE_INSTALL_PREFIX=./install \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_VERBOSE_MAKEFILE:BOOL=OFF \
-            -DBLAS_LIBRARIES="$BLAS_LIB" \
-            -DLAPACK_LIBRARIES="$LAPACK_LIB"
-          make
-          make install
-          export SCALAPACK_LIB="$GITHUB_WORKSPACE/installDir/scalapack-2.1.0/build/install/lib/libscalapack.so"  
-          printf "${BLUE} PG; Done installing ScaLAPACK from source\n"
+          # printf "${BLUE} PG; Installing ScaLAPACK from source\n"
+          # cd $GITHUB_WORKSPACE/installDir
+          # wget http://www.netlib.org/scalapack/scalapack-2.1.0.tgz
+          # tar -xf scalapack-2.1.0.tgz
+          # cd scalapack-2.1.0
+          # rm -rf build
+          # mkdir -p build
+          # cd build
+          # cmake .. \
+          #   -DBUILD_SHARED_LIBS=ON \
+          #   -DCMAKE_C_COMPILER=mpicc \
+          #   -DCMAKE_Fortran_COMPILER=mpif90 \
+          #   -DCMAKE_INSTALL_PREFIX=./install \
+          #   -DCMAKE_BUILD_TYPE=Release \
+          #   -DCMAKE_VERBOSE_MAKEFILE:BOOL=OFF \
+          #   -DBLAS_LIBRARIES="$BLAS_LIB" \
+          #   -DLAPACK_LIBRARIES="$LAPACK_LIB"
+          # make
+          # make install
+          # export SCALAPACK_LIB="$GITHUB_WORKSPACE/installDir/scalapack-2.1.0/build/install/lib/libscalapack.so"  
+          # printf "${BLUE} PG; Done installing ScaLAPACK from source\n"
 
       - name: Install package
         run: |
           export BLUE="\033[34;1m"
           export BLAS_LIB=/usr/lib/x86_64-linux-gnu/libblas.so
           export LAPACK_LIB=/usr/lib/x86_64-linux-gnu/liblapack.so
-          export SCALAPACK_LIB="$GITHUB_WORKSPACE/installDir/scalapack-2.1.0/build/install/lib/libscalapack.so"  
+          # export SCALAPACK_LIB="$GITHUB_WORKSPACE/installDir/scalapack-2.1.0/build/install/lib/libscalapack.so"
+          export SCALAPACK_LIB="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
           printf "${BLUE} PG; Installing STRUMPACK from source\n"
           cd $GITHUB_WORKSPACE
           rm -rf build
@@ -103,6 +105,7 @@ jobs:
             -DTPL_SCALAPACK_LIBRARIES="$SCALAPACK_LIB"
           make
           make install
+          make tests
           printf "${BLUE} PG; Done installing STRUMPACK from source\n"
 
       - name: Test

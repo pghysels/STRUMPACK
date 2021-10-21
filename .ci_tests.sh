@@ -72,6 +72,14 @@ then
         fi
 fi
 
+if [ $TEST_NUMBER -eq 0 ]
+then
+        printf "{GREEN} Running: basic tests"
+        OMP_NUM_THREADS=1 mpirun --oversubscribe -n 2 ./test_HSS_mpi T 100
+        OMP_NUM_THREADS=1 mpirun --oversubscribe -n 2 ./test_sparse_mpi $DATA_FOLDER/pde900.mtx
+        OMP_NUM_THREADS=1 mpirun --oversubscribe -n 2 ./test_structure_reuse_mpi $DATA_FOLDER/pde900.mtx
+fi
+
 if [ $TEST_NUMBER -eq 1 ]
 then
         printf "{GREEN} Running: test_HSS_seq"
