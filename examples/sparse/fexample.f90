@@ -29,7 +29,7 @@ program fexample
   use strumpack
   implicit none
 
-  integer :: k             ! grid dimension
+  integer(c_int) :: k      ! grid dimension
   integer, target :: n     ! matrix dimension
   integer :: nnz           ! matrix nonzeros
   integer :: r, c, i       ! row, column, index
