@@ -10,7 +10,7 @@ jobs:
     - name: Mirror and trigger CI job at https://gitlab.com
       uses: stenongithub/gitlab-mirror-and-ci-action@0.2.8
       with:
-        args: "https://gitlab.com/liuyangzhuan/ButterflyPACK.git"
+        args: "https://github.com/pghysels/STRUMPACK.git"
       env:
         GITLAB_HOSTNAME: "gitlab.com"
         GITLAB_USERNAME: "pghysels"
