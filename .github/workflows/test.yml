@@ -11,8 +11,7 @@ jobs:
       matrix:
         compiler:
           - gcc
-        # test: [1,2,3,4,5]
-        test: [0]
+        test: [0,1,2,3,4,5]
 
     steps:
       - name: Checkout code
