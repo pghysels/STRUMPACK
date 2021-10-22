@@ -8,6 +8,9 @@ cd $TESTS_FOLDER
 
 export GREEN="\033[32;1m"
 
+export OMPI_ALLOW_RUN_AS_ROOT=1
+export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+
 if [ $TEST_NUMBER -eq 3 ] || [ $TEST_NUMBER -eq 4 ] || [ $TEST_NUMBER -eq 5 ]
 then
         printf "${GREEN} ###GC: Downloading sparse test matrices\n\n\n"
