@@ -296,37 +296,101 @@ namespace strumpack {
 
     template<typename T> void
     broadcast(std::vector<T>& sbuf) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      if (is_root()){
+        STRUMPACK_MESSAGE_COUNTER(size()-1);
+      } else { 
+        auto typesize = sizeof(T);
+        STRUMPACK_MESSAGE_SIZE(sbuf.size()*typesize); 
+      }
+#endif
       MPI_Bcast(sbuf.data(), sbuf.size(), mpi_type<T>(), 0, comm_);
     }
     template<typename T> void
     broadcast_from(std::vector<T>& sbuf, int src) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      if (rank() == src){
+        STRUMPACK_MESSAGE_COUNTER(size()-1);
+      } else { 
+        auto typesize = sizeof(T);
+        STRUMPACK_MESSAGE_SIZE(sbuf.size()*typesize); 
+      }
+#endif
       MPI_Bcast(sbuf.data(), sbuf.size(), mpi_type<T>(), src, comm_);
     }
 
     template<typename T, std::size_t N> void
     broadcast(std::array<T,N>& sbuf) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      if (is_root()){
+        STRUMPACK_MESSAGE_COUNTER(size()-1);
+      } else { 
+        auto typesize = sizeof(T);
+        STRUMPACK_MESSAGE_SIZE(sbuf.size()*typesize); 
+      }
+#endif
       MPI_Bcast(sbuf.data(), sbuf.size(), mpi_type<T>(), 0, comm_);
     }
 
     template<typename T> void
     broadcast(T& data) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      if (is_root()){
+        STRUMPACK_MESSAGE_COUNTER(size()-1);
+      } else { 
+        auto typesize = sizeof(T);
+        STRUMPACK_MESSAGE_SIZE(typesize); 
+      }
+#endif
       MPI_Bcast(&data, 1, mpi_type<T>(), 0, comm_);
     }
     template<typename T> void
     broadcast_from(T& data, int src) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      if (rank() == src){
+        STRUMPACK_MESSAGE_COUNTER(size()-1);
+      } else { 
+        auto typesize = sizeof(T);
+        STRUMPACK_MESSAGE_SIZE(typesize); 
+      }
+#endif
       MPI_Bcast(&data, 1, mpi_type<T>(), src, comm_);
     }
     template<typename T> void
     broadcast(T* sbuf, std::size_t ssize) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      if (is_root()){
+        STRUMPACK_MESSAGE_COUNTER(size()-1);
+      } else { 
+        auto typesize = sizeof(T);
+        STRUMPACK_MESSAGE_SIZE(ssize*typesize); 
+      }
+#endif
       MPI_Bcast(sbuf, ssize, mpi_type<T>(), 0, comm_);
     }
     template<typename T> void
     broadcast_from(T* sbuf, std::size_t ssize, int src) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      if (rank() == src){
+        STRUMPACK_MESSAGE_COUNTER(size()-1);
+      } else { 
+        auto typesize = sizeof(T);
+        STRUMPACK_MESSAGE_SIZE(ssize*typesize); 
+      }
+#endif
       MPI_Bcast(sbuf, ssize, mpi_type<T>(), src, comm_);
     }
 
     template<typename T>
     void all_gather(T* buf, std::size_t rsize) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      if (is_root()){
+        STRUMPACK_MESSAGE_COUNTER(size()*2);
+      } else { 
+        auto typesize = sizeof(T);
+        STRUMPACK_MESSAGE_SIZE(rsize*typesize+rsize*typesize*size()); 
+      }
+#endif
       MPI_Allgather
         (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
          buf, rsize, mpi_type<T>(), comm_);
@@ -334,6 +398,17 @@ namespace strumpack {
 
     template<typename T>
     void all_gather_v(T* buf, const int* rcnts, const int* displs) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      if (is_root()){
+        STRUMPACK_MESSAGE_COUNTER(size()*2);
+        int sum_of_rcnts=0;
+        auto typesize = sizeof(T);
+        for (int i=0; i<size(); i++){
+          sum_of_rcnts += rcnts[i];
+        }
+        STRUMPACK_MESSAGE_SIZE(sum_of_rcnts*typesize+sum_of_rcnts*typesize*size()); 
+      }
+#endif
       MPI_Allgatherv
         (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, buf, rcnts, displs,
          mpi_type<T>(), comm_);
@@ -341,6 +416,14 @@ namespace strumpack {
 
     template<typename T>
     void gather(T* sbuf, int ssize, int* rbuf, int rsize, int root) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      if (is_root()){
+        STRUMPACK_MESSAGE_COUNTER(size()-1);
+      } else { 
+        auto typesize = sizeof(T);
+        STRUMPACK_MESSAGE_SIZE(ssize*typesize); 
+      }
+#endif
       MPI_Gather
         (sbuf, ssize, mpi_type<T>(), rbuf, 
          rsize, mpi_type<T>(), root, comm_);
@@ -348,6 +431,14 @@ namespace strumpack {
 
     template<typename T>
     void gather_v(T* sbuf, int scnts, T* rbuf, const int* rcnts, const int* displs, int root) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      if (is_root()){
+        STRUMPACK_MESSAGE_COUNTER(size()-1);
+      } else { 
+        auto typesize = sizeof(T);
+        STRUMPACK_MESSAGE_SIZE(scnts*typesize); 
+      }
+#endif
       MPI_Gatherv
         (sbuf, scnts, mpi_type<T>(), rbuf, rcnts, displs, 
          mpi_type<T>(), root, comm_);
@@ -369,6 +460,11 @@ namespace strumpack {
      */
     template<typename T>
     MPIRequest isend(const std::vector<T>& sbuf, int dest, int tag) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      STRUMPACK_MESSAGE_COUNTER(1);
+      auto typesize = sizeof(T);
+      STRUMPACK_MESSAGE_SIZE(sbuf.size()*typesize); 
+#endif
       MPIRequest req;
       // const_cast is necessary for ancient openmpi version used on Travis
       MPI_Isend(const_cast<T*>(sbuf.data()), sbuf.size(), mpi_type<T>(),
@@ -391,6 +487,11 @@ namespace strumpack {
     template<typename T>
     void isend(const std::vector<T>& sbuf, int dest, int tag,
                MPI_Request* req) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      STRUMPACK_MESSAGE_COUNTER(1);
+      auto typesize = sizeof(T);
+      STRUMPACK_MESSAGE_SIZE(sbuf.size()*typesize); 
+#endif
       // const_cast is necessary for ancient openmpi version used on Travis
       MPI_Isend(const_cast<T*>(sbuf.data()), sbuf.size(), mpi_type<T>(),
                 dest, tag, comm_, req);
@@ -399,18 +500,33 @@ namespace strumpack {
     template<typename T>
     void isend(const T* sbuf, std::size_t ssize, int dest,
                int tag, MPI_Request* req) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      STRUMPACK_MESSAGE_COUNTER(1);
+      auto typesize = sizeof(T);
+      STRUMPACK_MESSAGE_SIZE(ssize*typesize); 
+#endif
       // const_cast is necessary for ancient openmpi version used on Travis
       MPI_Isend(const_cast<T*>(sbuf), ssize, mpi_type<T>(),
                 dest, tag, comm_, req);
     }
     template<typename T>
     void send(const T* sbuf, std::size_t ssize, int dest, int tag) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      STRUMPACK_MESSAGE_COUNTER(1);
+      auto typesize = sizeof(T);
+      STRUMPACK_MESSAGE_SIZE(ssize*typesize); 
+#endif
       // const_cast is necessary for ancient openmpi version used on Travis
       MPI_Send(const_cast<T*>(sbuf), ssize, mpi_type<T>(), dest, tag, comm_);
     }
 
     template<typename T>
     void isend(const T& buf, int dest, int tag, MPI_Request* req) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      STRUMPACK_MESSAGE_COUNTER(1);
+      auto typesize = sizeof(T);
+      STRUMPACK_MESSAGE_SIZE(typesize); 
+#endif
       // const_cast is necessary for ancient openmpi version used on Travis
       MPI_Isend(const_cast<T*>(&buf), 1, mpi_type<T>(),
                 dest, tag, comm_, req);
@@ -431,6 +547,11 @@ namespace strumpack {
      */
     template<typename T>
     void send(const std::vector<T>& sbuf, int dest, int tag) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      STRUMPACK_MESSAGE_COUNTER(1);
+      auto typesize = sizeof(T);
+      STRUMPACK_MESSAGE_SIZE(sbuf.size()*typesize);
+#endif
       // const_cast is necessary for ancient openmpi version used on Travis
       MPI_Send(const_cast<T*>(sbuf.data()), sbuf.size(), mpi_type<T>(), dest, tag, comm_);
     }
@@ -508,6 +629,14 @@ namespace strumpack {
      * on each rank
      */
     template<typename T> T all_reduce(T t, MPI_Op op) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      if (is_root()){
+        STRUMPACK_MESSAGE_COUNTER(size()*2);
+      } else { 
+        auto typesize = sizeof(T);
+        STRUMPACK_MESSAGE_SIZE(typesize+typesize); 
+      }
+#endif
       MPI_Allreduce(MPI_IN_PLACE, &t, 1, mpi_type<T>(), op, comm_);
       return t;
     }
@@ -527,6 +656,14 @@ namespace strumpack {
      * only on the root process.
      */
     template<typename T> T reduce(T t, MPI_Op op) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      if (is_root()){
+        STRUMPACK_MESSAGE_COUNTER(size());
+      } else { 
+        auto typesize = sizeof(T);
+        STRUMPACK_MESSAGE_SIZE(typesize); 
+      }
+#endif
       if (is_root())
         MPI_Reduce(MPI_IN_PLACE, &t, 1, mpi_type<T>(), op, 0, comm_);
       else MPI_Reduce(&t, &t, 1, mpi_type<T>(), op, 0, comm_);
@@ -549,6 +686,14 @@ namespace strumpack {
      * \param op reduction operator
      */
     template<typename T> void all_reduce(T* t, int ssize, MPI_Op op) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      if (is_root()){
+        STRUMPACK_MESSAGE_COUNTER(size()*2);
+      } else { 
+        auto typesize = sizeof(T);
+        STRUMPACK_MESSAGE_SIZE(typesize*ssize*2); 
+      }
+#endif
       MPI_Allreduce(MPI_IN_PLACE, t, ssize, mpi_type<T>(), op, comm_);
     }
 
@@ -574,6 +719,14 @@ namespace strumpack {
      */
     template<typename T> void
     reduce(T* t, int ssize, MPI_Op op, int dest=0) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      if (is_root()){
+        STRUMPACK_MESSAGE_COUNTER(size());
+      } else { 
+        auto typesize = sizeof(T);
+        STRUMPACK_MESSAGE_SIZE(ssize*typesize); 
+      }
+#endif
       if (rank() == dest)
         MPI_Reduce(MPI_IN_PLACE, t, ssize, mpi_type<T>(), op, dest, comm_);
       else MPI_Reduce(t, t, ssize, mpi_type<T>(), op, dest, comm_);
@@ -581,6 +734,16 @@ namespace strumpack {
 
     template<typename T>
     void all_to_all(const T* sbuf, int scnt, T* rbuf) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      if (is_root()){
+        STRUMPACK_MESSAGE_COUNTER(size());
+        auto typesize = sizeof(T);
+        STRUMPACK_MESSAGE_SIZE(scnt*typesize); 
+      } else { 
+        auto typesize = sizeof(T);
+        STRUMPACK_MESSAGE_SIZE(scnt*typesize); 
+      }
+#endif
       MPI_Alltoall
         (sbuf, scnt, mpi_type<T>(), rbuf, scnt, mpi_type<T>(), comm_);
     }
@@ -588,6 +751,17 @@ namespace strumpack {
     template<typename T, typename A=std::allocator<T>> std::vector<T,A>
     all_to_allv(const T* sbuf, int* scnts, int* sdispls,
                 int* rcnts, int* rdispls) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      if (is_root()){
+        STRUMPACK_MESSAGE_COUNTER(size());
+        int sum_of_scnts=0;
+        auto typesize = sizeof(T);
+        for (int i=0; i<size(); i++){
+          sum_of_scnts += scnts[i];
+        }
+        STRUMPACK_MESSAGE_SIZE(sum_of_scnts*typesize); 
+      }
+#endif
       std::size_t rsize = 0;
       for (int p=0; p<size(); p++)
         rsize += rcnts[p];
@@ -601,6 +775,17 @@ namespace strumpack {
     template<typename T> void
     all_to_allv(const T* sbuf, int* scnts, int* sdispls,
                 T* rbuf, int* rcnts, int* rdispls) const {
+#if defined(STRUMPACK_COUNT_FLOPS)
+      if (is_root()){
+        STRUMPACK_MESSAGE_COUNTER(size());
+        int sum_of_scnts=0;
+        auto typesize = sizeof(T);
+        for (int i=0; i<size(); i++){
+          sum_of_scnts += scnts[i];
+        }
+        STRUMPACK_MESSAGE_SIZE(sum_of_scnts*typesize); 
+      }
+#endif
       MPI_Alltoallv
         (sbuf, scnts, sdispls, mpi_type<T>(),
          rbuf, rcnts, rdispls, mpi_type<T>(), comm_);
@@ -686,6 +871,14 @@ namespace strumpack {
         }
         ssizes[p] = sbuf[p].size();
       }
+#if defined(STRUMPACK_COUNT_FLOPS)
+      if (is_root()){
+        STRUMPACK_MESSAGE_COUNTER(size());
+      } else { 
+        auto typesize = sizeof(int);
+        STRUMPACK_MESSAGE_SIZE(typesize); 
+      }
+#endif
       MPI_Alltoall
         (ssizes, 1, mpi_type<int>(), rsizes, 1, mpi_type<int>(), comm_);
       std::size_t totssize = std::accumulate(ssizes, ssizes+P, std::size_t(0)),
@@ -708,9 +901,15 @@ namespace strumpack {
           MPI_Irecv(pbuf[p], rsizes[p], Ttype, p, 0, comm_, reqs.get()+p);
           displ += rsizes[p];
         }
-        for (int p=0; p<P; p++)
+        for (int p=0; p<P; p++) {
+#if defined(STRUMPACK_COUNT_FLOPS)
+          STRUMPACK_MESSAGE_COUNTER(1);
+          auto typesize = sizeof(Ttype);
+          STRUMPACK_MESSAGE_SIZE(typesize*ssizes[p]); 
+#endif
           MPI_Isend
             (sbuf[p].data(), ssizes[p], Ttype, p, 0, comm_, reqs.get()+P+p);
+        }
         MPI_Waitall(2*P, reqs.get(), MPI_STATUSES_IGNORE);
         std::vector<std::vector<T>>().swap(sbuf);
       } else {
@@ -725,6 +924,17 @@ namespace strumpack {
           std::copy(sbuf[p].begin(), sbuf[p].end(), sendbuf+sdispl[p]);
         std::vector<std::vector<T>>().swap(sbuf);
         rbuf.resize(totrsize);
+#if defined(STRUMPACK_COUNT_FLOPS)
+      if (is_root()){
+        STRUMPACK_MESSAGE_COUNTER(size());
+        int sum_of_ssizes=0;
+        auto typesize = sizeof(Ttype);
+        for (int i=0; i<size(); i++){
+          sum_of_ssizes += ssizes[i];
+        }
+        STRUMPACK_MESSAGE_SIZE(sum_of_ssizes*typesize); 
+      }
+#endif
         MPI_Alltoallv(sendbuf, ssizes, sdispl, Ttype,
                       rbuf.data(), rsizes, rdispl, Ttype, comm_);
         pbuf.resize(P);

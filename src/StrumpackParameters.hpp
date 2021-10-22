@@ -100,6 +100,9 @@ namespace strumpack { // these are all global variables
     extern std::atomic<long long int> invf11_mult_flops;
     extern std::atomic<long long int> f12_mult_flops;
 
+    extern std::atomic<long long int> message_counter;
+    extern std::atomic<long long int> message_size;
+
 #endif //DOXYGEN_SHOULD_SKIP_THIS
 
   } //end namespace params
@@ -177,6 +180,11 @@ namespace strumpack { // these are all global variables
 #define STRUMPACK_SUB_DEVICE_MEMORY(n)          \
   strumpack::params::device_memory -= n;
 
+#define STRUMPACK_MESSAGE_COUNTER(n)           \
+  strumpack::params::message_counter += n;
+#define STRUMPACK_MESSAGE_SIZE(n)           \
+  strumpack::params::message_size += n;
+
 #else
 
 #define STRUMPACK_FLOPS(n) void(0);
@@ -208,6 +216,9 @@ namespace strumpack { // these are all global variables
 #define STRUMPACK_SUB_MEMORY(n) void(0);
 #define STRUMPACK_ADD_DEVICE_MEMORY(n) void(0);
 #define STRUMPACK_SUB_DEVICE_MEMORY(n) void(0);
+
+#define STRUMPACK_MESSAGE_COUNTER(n) void(0);
+#define STRUMPACK_MESSAGE_SIZE(n) void(0);
 
 #endif
 #endif // DOXYGEN_SHOULD_SKIP_THIS
