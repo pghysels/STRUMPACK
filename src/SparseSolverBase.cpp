@@ -575,6 +575,9 @@ namespace strumpack {
         std::cout << "#   - factor peak device memory usage (estimate) = "
                   << double(params::peak_device_memory)/1.e6
                   << " MB" << std::endl;
+        std::cout << "#   - number of messages sent = "
+                  << double(params::message_counter)
+                  << ", overall message size = " << double(params::message_size) << std::endl;
 #endif
         if (opts_.compression() != CompressionType::NONE) {
           std::cout << "#   - compression = " << std::boolalpha

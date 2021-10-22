@@ -80,5 +80,8 @@ namespace strumpack {
     std::atomic<long long int> invf11_mult_flops(0);
     std::atomic<long long int> f12_mult_flops(0);
 
+    std::atomic<long long int> message_counter(0);
+    std::atomic<long long int> message_size(0);
+
   } // end namespace params
 } // end namespace strumpack
