@@ -11,9 +11,9 @@ build:
     - echo "deb http://http.us.debian.org/debian stable main contrib non-free" >> /etc/apt/sources.list
     - apt update
     - apt -y install gcc-9 g++-9 gfortran-9
+    - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 --slave /usr/bin/g++ g++ /usr/bin/g++-9
+    - update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-9 60
     - apt -y install openmpi-bin libopenmpi-dev libmetis-dev libparmetis-dev libblas-dev liblapack-dev libscalapack-mpi-dev
-    #- update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 --slave /usr/bin/g++ g++ /usr/bin/g++-9
-    #- update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-9 60
 
   script:
     - export BLAS_LIB=/usr/lib/x86_64-linux-gnu/libblas.so
