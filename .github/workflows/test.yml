@@ -46,15 +46,20 @@ jobs:
           sudo apt-get install libmetis-dev libparmetis-dev
           printf "${BLUE} PG; Done installing metis\n"
 
-          printf "${BLUE} PG; Installing BLAS from apt\n"
-          sudo apt-get install libblas-dev
-          export BLAS_LIB=/usr/lib/x86_64-linux-gnu/libblas.so
-          printf "${BLUE} PG; Done installing BLAS from apt\n"
+          # printf "${BLUE} PG; Installing BLAS from apt\n"
+          # sudo apt-get install libblas-dev
+          # export BLAS_LIB=/usr/lib/x86_64-linux-gnu/libblas.so
+          # printf "${BLUE} PG; Done installing BLAS from apt\n"
 
-          printf "${BLUE} PG; Installing LAPACK from apt\n"
-          sudo apt-get install liblapack-dev
-          export LAPACK_LIB=/usr/lib/x86_64-linux-gnu/liblapack.so
-          printf "${BLUE} PG; Done installing LAPACK from apt\n"
+          # printf "${BLUE} PG; Installing LAPACK from apt\n"
+          # sudo apt-get install liblapack-dev
+          # export LAPACK_LIB=/usr/lib/x86_64-linux-gnu/liblapack.so
+          # printf "${BLUE} PG; Done installing LAPACK from apt\n"
+
+          printf "${BLUE} PG; Installing OpenBLAS from apt\n"
+          sudo apt-get install libopenblas-openmp-dev
+          # export LAPACK_LIB=/usr/lib/x86_64-linux-gnu/liblapack.so
+          printf "${BLUE} PG; Done installing OpenBLAS from apt\n"
 
           printf "${BLUE} PG; Installing ScaLAPACK from apt\n"
           sudo apt-get install libscalapack-mpi-dev
@@ -64,8 +69,8 @@ jobs:
       - name: Install package
         run: |
           export BLUE="\033[34;1m"
-          export BLAS_LIB=/usr/lib/x86_64-linux-gnu/libblas.so
-          export LAPACK_LIB=/usr/lib/x86_64-linux-gnu/liblapack.so
+          # export BLAS_LIB=/usr/lib/x86_64-linux-gnu/libblas.so
+          # export LAPACK_LIB=/usr/lib/x86_64-linux-gnu/liblapack.so
           export SCALAPACK_LIB="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
           printf "${BLUE} PG; Installing STRUMPACK from source\n"
           cd $GITHUB_WORKSPACE
@@ -81,8 +86,6 @@ jobs:
             -DCMAKE_INSTALL_PREFIX=. \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DCMAKE_VERBOSE_MAKEFILE:BOOL=OFF \
-            -DTPL_BLAS_LIBRARIES="$BLAS_LIB" \
-            -DTPL_LAPACK_LIBRARIES="$LAPACK_LIB" \
             -DTPL_SCALAPACK_LIBRARIES="$SCALAPACK_LIB"
           make
           make install
