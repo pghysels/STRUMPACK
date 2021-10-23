@@ -100,8 +100,20 @@ namespace strumpack { // these are all global variables
     extern std::atomic<long long int> invf11_mult_flops;
     extern std::atomic<long long int> f12_mult_flops;
 
-    extern std::atomic<long long int> message_counter;
-    extern std::atomic<long long int> message_size;
+    extern std::atomic<long long int> broadcast_counter;
+    extern std::atomic<long long int> broadcast_size;
+    extern std::atomic<long long int> send_counter;
+    extern std::atomic<long long int> send_size;
+    extern std::atomic<long long int> gather_counter;
+    extern std::atomic<long long int> gather_size;
+    extern std::atomic<long long int> allgather_counter;
+    extern std::atomic<long long int> allgather_size;
+    extern std::atomic<long long int> alltoall_counter;
+    extern std::atomic<long long int> alltoall_size;
+    extern std::atomic<long long int> reduce_counter;
+    extern std::atomic<long long int> reduce_size;
+    extern std::atomic<long long int> allreduce_counter;
+    extern std::atomic<long long int> allreduce_size;
 
 #endif //DOXYGEN_SHOULD_SKIP_THIS
 
@@ -180,10 +192,34 @@ namespace strumpack { // these are all global variables
 #define STRUMPACK_SUB_DEVICE_MEMORY(n)          \
   strumpack::params::device_memory -= n;
 
-#define STRUMPACK_MESSAGE_COUNTER(n)           \
-  strumpack::params::message_counter += n;
-#define STRUMPACK_MESSAGE_SIZE(n)           \
-  strumpack::params::message_size += n;
+#define STRUMPACK_BROADCAST_COUNTER(n)           \
+  strumpack::params::broadcast_counter += n;
+#define STRUMPACK_BROADCAST_SIZE(n)           \
+  strumpack::params::broadcast_size += n;
+#define STRUMPACK_SEND_COUNTER(n)           \
+  strumpack::params::send_counter += n;
+#define STRUMPACK_SEND_SIZE(n)           \
+  strumpack::params::send_size += n;
+#define STRUMPACK_GATHER_COUNTER(n)           \
+  strumpack::params::gather_counter += n;
+#define STRUMPACK_GATHER_SIZE(n)           \
+  strumpack::params::gather_size += n;
+#define STRUMPACK_ALLGATHER_COUNTER(n)           \
+  strumpack::params::allgather_counter += n;
+#define STRUMPACK_ALLGATHER_SIZE(n)           \
+  strumpack::params::allgather_size += n;
+#define STRUMPACK_ALLTOALL_COUNTER(n)           \
+  strumpack::params::alltoall_counter += n;
+#define STRUMPACK_ALLTOALL_SIZE(n)           \
+  strumpack::params::alltoall_size += n;
+#define STRUMPACK_REDUCE_COUNTER(n)           \
+  strumpack::params::reduce_counter += n;
+#define STRUMPACK_REDUCE_SIZE(n)           \
+  strumpack::params::reduce_size += n;
+#define STRUMPACK_ALLREDUCE_COUNTER(n)           \
+  strumpack::params::allreduce_counter += n;
+#define STRUMPACK_ALLREDUCE_SIZE(n)           \
+  strumpack::params::allreduce_size += n;
 
 #else
 
@@ -217,8 +253,20 @@ namespace strumpack { // these are all global variables
 #define STRUMPACK_ADD_DEVICE_MEMORY(n) void(0);
 #define STRUMPACK_SUB_DEVICE_MEMORY(n) void(0);
 
-#define STRUMPACK_MESSAGE_COUNTER(n) void(0);
-#define STRUMPACK_MESSAGE_SIZE(n) void(0);
+#define STRUMPACK_BROADCAST_COUNTER(n) void(0);
+#define STRUMPACK_BROADCAST_SIZE(n) void(0);
+#define STRUMPACK_SEND_COUNTER(n) void(0);
+#define STRUMPACK_SEND_SIZE(n) void(0);
+#define STRUMPACK_GATHER_COUNTER(n) void(0);
+#define STRUMPACK_GATHER_SIZE(n) void(0);
+#define STRUMPACK_ALLGATHER_COUNTER(n) void(0);
+#define STRUMPACK_ALLGATHER_SIZE(n) void(0);
+#define STRUMPACK_ALLTOALL_COUNTER(n) void(0);
+#define STRUMPACK_ALLTOALL_SIZE(n) void(0);
+#define STRUMPACK_REDUCE_COUNTER(n) void(0);
+#define STRUMPACK_REDUCE_SIZE(n) void(0);
+#define STRUMPACK_ALLREDUCE_COUNTER(n) void(0);
+#define STRUMPACK_ALLREDUCE_SIZE(n) void(0);
 
 #endif
 #endif // DOXYGEN_SHOULD_SKIP_THIS

@@ -575,9 +575,27 @@ namespace strumpack {
         std::cout << "#   - factor peak device memory usage (estimate) = "
                   << double(params::peak_device_memory)/1.e6
                   << " MB" << std::endl;
-        std::cout << "#   - number of messages sent = "
-                  << double(params::message_counter)
-                  << ", overall message size = " << double(params::message_size) << std::endl;
+        std::cout << "#   - number of broadcasts = "
+                  << double(params::broadcast_counter)
+                  << ", broadcast size = " << double(params::broadcast_size) << std::endl;
+        std::cout << "#   - number of MPI sends = "
+                  << double(params::send_counter)
+                  << ", MPI send size = " << double(params::send_size) << std::endl;
+        std::cout << "#   - number of gather operations = "
+                  << double(params::gather_counter)
+                  << ", gather sizes = " << double(params::gather_size) << std::endl;
+        std::cout << "#   - number of all_gather operations = "
+                  << double(params::allgather_counter)
+                  << ", all_gather size = " << double(params::allgather_size) << std::endl;
+        std::cout << "#   - number of all_to_all operations = "
+                  << double(params::alltoall_counter)
+                  << ", all_to_all size = " << double(params::alltoall_size) << std::endl;
+        std::cout << "#   - number of reduce operations = "
+                  << double(params::reduce_counter)
+                  << ", reduce size = " << double(params::reduce_size) << std::endl;
+        std::cout << "#   - number of allreduce operations = "
+                  << double(params::allreduce_counter)
+                  << ", allreduce size = " << double(params::allreduce_size) << std::endl;
 #endif
         if (opts_.compression() != CompressionType::NONE) {
           std::cout << "#   - compression = " << std::boolalpha
