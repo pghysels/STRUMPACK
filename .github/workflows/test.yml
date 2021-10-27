@@ -89,7 +89,7 @@ jobs:
             -DTPL_SCALAPACK_LIBRARIES="$SCALAPACK_LIB"
           make
           make install
-          make tests
+          make examples
           printf "${BLUE} PG; Done installing STRUMPACK from source\n"
 
       - name: Test

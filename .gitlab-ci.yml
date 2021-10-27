@@ -24,7 +24,7 @@ build:
     - pwd
     - rm -rf build && mkdir -p build && cd build
     - cmake .. -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_COMPILER=mpicc -DCMAKE_CXX_COMPILER=mpic++ -DCMAKE_Fortran_COMPILER=mpif90 -DCMAKE_INSTALL_PREFIX=. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE:BOOL=OFF -DTPL_BLAS_LIBRARIES="$BLAS_LIB" -DTPL_LAPACK_LIBRARIES="$LAPACK_LIB" -DTPL_SCALAPACK_LIBRARIES="$SCALAPACK_LIB"
-    - make && make install && make tests
+    - make && make install && make examples
     - cd ../
     - printf "${BLUE} PG; Done installing STRUMPACK from source\n"
 
