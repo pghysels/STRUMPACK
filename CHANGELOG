@@ -1,3 +1,14 @@
+Version 6.1.0 Released October 2021
+===================================
+- Change default BLR blocksize, and in the BLR preconditioner use
+  right-looking algorithm as the default. This has higher peak
+  memory usage, but is much faster and more robust.
+- Fixes in printing of compression statistics.
+- Always build the test when doing 'make', you no longer have to
+  run 'make tests'.
+- Setup CI at github and gitlab, remove Travis testing.
+
+
 Version 6.0.0 Released September 2021
 =====================================
 - Block Low-Rank compression is now supported in the sparse

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.11)
-project(STRUMPACK VERSION 6.0.0 LANGUAGES CXX C Fortran)
+project(STRUMPACK VERSION 6.1.0 LANGUAGES CXX C Fortran)
 
 
 option(STRUMPACK_USE_MPI     "Build with MPI support" ON)
