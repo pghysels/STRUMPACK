@@ -19,7 +19,6 @@ option(TPL_ENABLE_MAGMA      "Build with support for MAGMA (requires CUDA)" ON)
 
 option(STRUMPACK_COUNT_FLOPS "Build with flop counters" OFF)
 option(STRUMPACK_TASK_TIMERS "Build with timers for internal routines" OFF)
-option(STRUMPACK_DEV_TESTING "Enable extensive testing" OFF)
 
 include(CheckLibraryExists)
 # include(CMakePushCheckState)
@@ -447,7 +446,7 @@ if(STRUMPACK_USE_HIP)
   set_source_files_properties(
     src/sparse/fronts/FrontalMatrixHIP.hip.cpp
     PROPERTIES HIP_SOURCE_PROPERTY_FORMAT 1)
-  if (BUILD_SHARED_LIBS)
+  if(BUILD_SHARED_LIBS)
     set(STATIC_OR_SHARED SHARED)
   else()
     set(STATIC_OR_SHARED STATIC)
