@@ -65,3 +65,9 @@ add_subdirectory(BLR)
 add_subdirectory(fortran)
 add_subdirectory(structured)
 add_subdirectory(iterative)
+
+# need this pattern matching because some compiler use all caps,
+# others lower case, etc, for the module name
+install(DIRECTORY ${CMAKE_BINARY_DIR}/
+  DESTINATION include
+  FILES_MATCHING PATTERN "*.mod")
