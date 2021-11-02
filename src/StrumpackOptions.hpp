@@ -1218,7 +1218,11 @@ namespace strumpack {
     ProportionalMapping prop_map_ = ProportionalMapping::FLOPS;
 
     /** GPU options */
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
     bool use_gpu_ = true;
+#else
+    bool use_gpu_ = false;
+#endif
     int gpu_streams_ = default_gpu_streams();
 
     /** compression options */
