@@ -122,7 +122,7 @@ namespace strumpack {
       case ReorderingStrategy::GEOMETRIC: {
         if (nx*ny*nz*components != A.size()) {
           nx = opts.nx();
-          ny = opts.nz();
+          ny = opts.ny();
           nz = opts.nz();
           components = opts.components();
           width = opts.separator_width();
