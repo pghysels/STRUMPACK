@@ -343,6 +343,13 @@ extern "C" {
   void STRUMPACK_set_abs_tol(STRUMPACK_SparseSolver S, double tol) { switch_precision(options().set_abs_tol(tol)); }
   void STRUMPACK_set_nd_param(STRUMPACK_SparseSolver S, int nd_param) { switch_precision(options().set_nd_param(nd_param)); }
   void STRUMPACK_set_reordering_method(STRUMPACK_SparseSolver S, STRUMPACK_REORDERING_STRATEGY m) { switch_precision(options().set_reordering_method(static_cast<ReorderingStrategy>(m))); }
+  void STRUMPACK_enable_METIS_NodeNDP(STRUMPACK_SparseSolver S) { switch_precision(options().enable_METIS_NodeNDP()); }
+  void STRUMPACK_disable_METIS_NodeNDP(STRUMPACK_SparseSolver S) { switch_precision(options().disable_METIS_NodeNDP()); }
+  void STRUMPACK_set_nx(STRUMPACK_SparseSolver S, int nx) { switch_precision(options().set_nx(nx)); }
+  void STRUMPACK_set_ny(STRUMPACK_SparseSolver S, int ny) { switch_precision(options().set_ny(ny)); }
+  void STRUMPACK_set_nz(STRUMPACK_SparseSolver S, int nz) { switch_precision(options().set_nz(nz)); }
+  void STRUMPACK_set_components(STRUMPACK_SparseSolver S, int nc) { switch_precision(options().set_components(nc)); }
+  void STRUMPACK_set_separator_width(STRUMPACK_SparseSolver S, int w) { switch_precision(options().set_separator_width(w)); }
   void STRUMPACK_set_GramSchmidt_type(STRUMPACK_SparseSolver S, STRUMPACK_GRAM_SCHMIDT_TYPE t) { switch_precision(options().set_GramSchmidt_type(static_cast<GramSchmidtType>(t))); }
   void STRUMPACK_set_matching(STRUMPACK_SparseSolver S, STRUMPACK_MATCHING_JOB job) { switch_precision(options().set_matching(static_cast<MatchingJob>(job))); }
   void STRUMPACK_set_Krylov_solver(STRUMPACK_SparseSolver S, STRUMPACK_KRYLOV_SOLVER solver_type) { switch_precision(options().set_Krylov_solver(static_cast<KrylovSolver>(solver_type))); }
@@ -367,6 +374,7 @@ extern "C" {
   double STRUMPACK_abs_tol(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().abs_tol(), double); }
   int STRUMPACK_nd_param(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().nd_param(), int); }
   STRUMPACK_REORDERING_STRATEGY STRUMPACK_reordering_method(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().reordering_method(), STRUMPACK_REORDERING_STRATEGY); }
+  int STRUMPACK_use_METIS_NodeNDP(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().use_METIS_NodeNDP(), int); }
   STRUMPACK_GRAM_SCHMIDT_TYPE STRUMPACK_GramSchmidt_type(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().GramSchmidt_type(), STRUMPACK_GRAM_SCHMIDT_TYPE); }
   STRUMPACK_MATCHING_JOB STRUMPACK_matching(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().matching(), STRUMPACK_MATCHING_JOB); }
   STRUMPACK_KRYLOV_SOLVER STRUMPACK_Krylov_solver(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().Krylov_solver(), STRUMPACK_KRYLOV_SOLVER); }

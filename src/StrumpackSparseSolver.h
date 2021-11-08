@@ -224,6 +224,13 @@ extern "C" {
   void STRUMPACK_set_abs_tol(STRUMPACK_SparseSolver S, double tol);
   void STRUMPACK_set_nd_param(STRUMPACK_SparseSolver S, int nd_param);
   void STRUMPACK_set_reordering_method(STRUMPACK_SparseSolver S, STRUMPACK_REORDERING_STRATEGY m);
+  void STRUMPACK_enable_METIS_NodeNDP(STRUMPACK_SparseSolver S);
+  void STRUMPACK_disable_METIS_NodeNDP(STRUMPACK_SparseSolver S);
+  void STRUMPACK_set_nx(STRUMPACK_SparseSolver S, int nx);
+  void STRUMPACK_set_ny(STRUMPACK_SparseSolver S, int ny);
+  void STRUMPACK_set_nz(STRUMPACK_SparseSolver S, int nz);
+  void STRUMPACK_set_components(STRUMPACK_SparseSolver S, int nc);
+  void STRUMPACK_set_separator_width(STRUMPACK_SparseSolver S, int w);
   void STRUMPACK_set_GramSchmidt_type(STRUMPACK_SparseSolver S, STRUMPACK_GRAM_SCHMIDT_TYPE t);
   void STRUMPACK_set_matching(STRUMPACK_SparseSolver S, STRUMPACK_MATCHING_JOB job);
   void STRUMPACK_set_Krylov_solver(STRUMPACK_SparseSolver S, STRUMPACK_KRYLOV_SOLVER solver_type);
