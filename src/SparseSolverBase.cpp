@@ -554,6 +554,8 @@ namespace strumpack {
 #if defined(STRUMPACK_COUNT_FLOPS)
       auto peak_max = max_peak_memory();
       auto peak_min = min_peak_memory();
+      auto send_counter = counter_MPI_send();
+      auto send_size = size_MPI_send();
 #endif
       if (is_root_) {
         std::cout << "#   - factor time = " << t1.elapsed() << std::endl;
@@ -578,9 +580,8 @@ namespace strumpack {
         std::cout << "#   - number of broadcasts = "
                   << double(params::broadcast_counter)
                   << ", broadcast size = " << double(params::broadcast_size) << std::endl;
-        std::cout << "#   - number of MPI sends = "
-                  << double(params::send_counter)
-                  << ", MPI send size = " << double(params::send_size) << std::endl;
+        std::cout << "#   - number of MPI sends = " << send_counter
+                  << ", MPI send size = " << send_size << std::endl;
         std::cout << "#   - number of gather operations = "
                   << double(params::gather_counter)
                   << ", gather sizes = " << double(params::gather_size) << std::endl;

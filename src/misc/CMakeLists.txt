@@ -17,6 +17,7 @@ install(FILES
 if(STRUMPACK_USE_MPI)
   target_sources(strumpack
     PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/MPIWrapper.cpp
     ${CMAKE_CURRENT_LIST_DIR}/MPIWrapper.hpp)
 
   install(FILES
