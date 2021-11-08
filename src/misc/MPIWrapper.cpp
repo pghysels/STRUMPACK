@@ -41,8 +41,11 @@ using namespace strumpack;
 
 MessageList Message::message_log_list = MessageList();
 
-Message::Message(MsgType msg_type)
-  : msg_size(0), mtype(msg_type) {}
+Message::Message(MsgType msg_type, int size)
+  : msg_size(size), mtype(msg_type) {
+   mid = message_log_list.list.size()+1;
+   message_log_list.list.push_back(*this);
+}
 
 Message::~Message() {}
 
@@ -62,13 +65,6 @@ void Message::print(std::ostream& os) {
   os << " = " << msg_size
      << ", mid = " << mid
      << " , rank: " << rank << "\n";
-}
-
-void Message::count(int size, MsgType type) {
-   msg_size = size;
-   mtype = type;
-   mid = message_log_list.list.size()+1;
-   message_log_list.list.push_back(*this);
 }
 
 MessageList::MessageList() : is_finalized(false) {}
