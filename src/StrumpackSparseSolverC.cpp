@@ -312,8 +312,9 @@ extern "C" {
   }
 
   STRUMPACK_RETURN_CODE STRUMPACK_reorder_regular(STRUMPACK_SparseSolver S,
-                                                  int nx, int ny, int nz) {
-    switch_precision_return_as(reorder(nx, ny, nz), STRUMPACK_RETURN_CODE);
+                                                  int nx, int ny, int nz,
+                                                  int components, int width) {
+    switch_precision_return_as(reorder(nx, ny, nz, components, width), STRUMPACK_RETURN_CODE);
   }
 
   STRUMPACK_RETURN_CODE STRUMPACK_factor(STRUMPACK_SparseSolver S) {

@@ -198,7 +198,7 @@ extern "C" {
   STRUMPACK_RETURN_CODE STRUMPACK_reorder(STRUMPACK_SparseSolver S);
 
   STRUMPACK_RETURN_CODE STRUMPACK_reorder_regular
-  (STRUMPACK_SparseSolver S, int nx, int ny, int nz);
+  (STRUMPACK_SparseSolver S, int nx, int ny, int nz, int components, int width);
 
   STRUMPACK_RETURN_CODE STRUMPACK_factor(STRUMPACK_SparseSolver S);
 

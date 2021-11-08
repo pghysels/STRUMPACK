@@ -129,8 +129,7 @@ namespace strumpack {
         }
         if (nx*ny*nz*components != A.size()) {
           std::cerr << "# ERROR: Geometric reordering failed. \n"
-            "# Geometric reordering only works"
-            "on a simple 3 point wide stencil\n"
+            "# Geometric reordering only works on a simple 3 point wide stencil\n"
             "# on a regular grid and you need to provide the mesh sizes."
                     << std::endl;
           return 1;
