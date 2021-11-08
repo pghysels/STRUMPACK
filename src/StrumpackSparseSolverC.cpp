@@ -375,8 +375,8 @@ extern "C" {
   int STRUMPACK_nd_param(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().nd_param(), int); }
   STRUMPACK_REORDERING_STRATEGY STRUMPACK_reordering_method(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().reordering_method(), STRUMPACK_REORDERING_STRATEGY); }
   int STRUMPACK_use_METIS_NodeNDP(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().use_METIS_NodeNDP(), int); }
-  STRUMPACK_GRAM_SCHMIDT_TYPE STRUMPACK_GramSchmidt_type(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().GramSchmidt_type(), STRUMPACK_GRAM_SCHMIDT_TYPE); }
   STRUMPACK_MATCHING_JOB STRUMPACK_matching(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().matching(), STRUMPACK_MATCHING_JOB); }
+  STRUMPACK_GRAM_SCHMIDT_TYPE STRUMPACK_GramSchmidt_type(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().GramSchmidt_type(), STRUMPACK_GRAM_SCHMIDT_TYPE); }
   STRUMPACK_KRYLOV_SOLVER STRUMPACK_Krylov_solver(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().Krylov_solver(), STRUMPACK_KRYLOV_SOLVER); }
   int STRUMPACK_use_gpu(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().use_gpu(), int); }
   STRUMPACK_COMPRESSION_TYPE STRUMPACK_compression(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().compression(), STRUMPACK_COMPRESSION_TYPE); }
