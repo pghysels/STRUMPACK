@@ -19,6 +19,8 @@ option(TPL_ENABLE_MAGMA      "Build with support for MAGMA (requires CUDA)" ON)
 
 option(STRUMPACK_COUNT_FLOPS "Build with flop counters" OFF)
 option(STRUMPACK_TASK_TIMERS "Build with timers for internal routines" OFF)
+option(STRUMPACK_MESSAGE_COUNTER "Build with counter for MPI messages" OFF)
+option(STRUMPACK_DEV_TESTING "Enable extensive testing" OFF)
 
 include(CheckLibraryExists)
 # include(CMakePushCheckState)
