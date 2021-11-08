@@ -41,8 +41,8 @@ using namespace strumpack;
 
 MessageList Message::message_log_list = MessageList();
 
-Message::Message(std::string name)
-  : msg_size(0) {}
+Message::Message(MsgType msg_type)
+  : msg_size(0), mtype(msg_type) {}
 
 Message::~Message() {}
 
@@ -50,28 +50,23 @@ void Message::print(std::ostream& os) {
   MPIComm c;
   int rank = c.rank();
   os <<  "#   - size of ";
-    if (msg_type == 1)
-        os << "broadcast"; 
-    else if (msg_type == 2) 
-        os << "all_gather";
-    else if (msg_type == 3) 
-        os << "gather";
-    else if (msg_type == 4) 
-        os << "send";
-    else if (msg_type == 5) 
-        os << "allreduce";
-    else if (msg_type == 6) 
-        os << "reduce";
-    else if (msg_type == 7) 
-        os << "alltoall";
+    switch (mtype) {
+    case MsgType::BROADCAST:       os << "broadcast"; break;
+    case MsgType::ALL_GATHER:      os << "all_gather"; break;
+    case MsgType::GATHER:          os << "gather"; break;
+    case MsgType::SEND:            os << "send"; break;
+    case MsgType::ALL_REDUCE:      os << "allreduce"; break;
+    case MsgType::REDUCE:          os << "reduce"; break;
+    case MsgType::ALLTOALL:        os << "alltoall"; break;
+    }
   os << " = " << msg_size
      << ", mid = " << mid
      << " , rank: " << rank << "\n";
 }
 
-void Message::count(int size, int type) {
+void Message::count(int size, MsgType type) {
    msg_size = size;
-   msg_type = type;
+   mtype = type;
    mid = message_log_list.list.size()+1;
    message_log_list.list.push_back(*this);
 }
