@@ -370,7 +370,7 @@ extern "C" {
   STRUMPACK_GRAM_SCHMIDT_TYPE STRUMPACK_GramSchmidt_type(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().GramSchmidt_type(), STRUMPACK_GRAM_SCHMIDT_TYPE); }
   STRUMPACK_MATCHING_JOB STRUMPACK_matching(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().matching(), STRUMPACK_MATCHING_JOB); }
   STRUMPACK_KRYLOV_SOLVER STRUMPACK_Krylov_solver(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().Krylov_solver(), STRUMPACK_KRYLOV_SOLVER); }
-  int STRUMPACK_use_GPU(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().use_gpu(), int); }
+  int STRUMPACK_use_gpu(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().use_gpu(), int); }
   STRUMPACK_COMPRESSION_TYPE STRUMPACK_compression(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().compression(), STRUMPACK_COMPRESSION_TYPE); }
   int STRUMPACK_compression_min_front_size(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().compression_min_front_size(), int); }
   int STRUMPACK_compression_min_sep_size(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().compression_min_sep_size(), int); }
