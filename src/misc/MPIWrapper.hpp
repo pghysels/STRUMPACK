@@ -176,26 +176,26 @@ namespace strumpack {
     MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
   }
 
-  enum class MsgType : int
-    {
-     BROADCAST=0, ALL_GATHER, GATHER, SEND, 
-     ALL_REDUCE, REDUCE, ALLTOALL
-    };
+  enum class MsgType : int {
+    BROADCAST=0, ALL_GATHER, GATHER, SEND,
+    ALL_REDUCE, REDUCE, ALLTOALL
+  };
 
   class MessageList;
 
   class Message {
   public:
-    Message(MsgType msg_type, int size);
+    Message(MsgType type, std::size_t size);
     ~Message();
 
     static MessageList message_log_list;
 
     void print(std::ostream& os);
 
-    int msg_size;
-    int mid;
-    MsgType mtype;
+  private:
+    std::size_t size_;
+    int id_;
+    MsgType type_;
   };
 
   class MessageList {
@@ -205,7 +205,6 @@ namespace strumpack {
     static void Finalize();
     void finalize();
     bool is_finalized;
-    //std::vector<std::list<Message>> list;//vector not needed, just one list
     std::list<Message> list;
   };
 

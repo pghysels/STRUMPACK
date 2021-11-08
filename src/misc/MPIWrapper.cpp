@@ -33,18 +33,16 @@
 #if defined(_OPENMP)
 #include <omp.h>
 #endif
-//#if defined(STRUMPACK_USE_MPI)
 #include "MPIWrapper.hpp"
-//#endif
 
 using namespace strumpack;
 
 MessageList Message::message_log_list = MessageList();
 
-Message::Message(MsgType msg_type, int size)
-  : msg_size(size), mtype(msg_type) {
-   mid = message_log_list.list.size()+1;
-   message_log_list.list.push_back(*this);
+Message::Message(MsgType type, std::size_t size)
+  : size_(size), type_(type) {
+  id_ = message_log_list.list.size()+1;
+  message_log_list.list.push_back(*this);
 }
 
 Message::~Message() {}
@@ -53,17 +51,17 @@ void Message::print(std::ostream& os) {
   MPIComm c;
   int rank = c.rank();
   os <<  "#   - size of ";
-    switch (mtype) {
-    case MsgType::BROADCAST:       os << "broadcast"; break;
-    case MsgType::ALL_GATHER:      os << "all_gather"; break;
-    case MsgType::GATHER:          os << "gather"; break;
-    case MsgType::SEND:            os << "send"; break;
-    case MsgType::ALL_REDUCE:      os << "allreduce"; break;
-    case MsgType::REDUCE:          os << "reduce"; break;
-    case MsgType::ALLTOALL:        os << "alltoall"; break;
-    }
-  os << " = " << msg_size
-     << ", mid = " << mid
+  switch (type_) {
+  case MsgType::BROADCAST:       os << "broadcast"; break;
+  case MsgType::ALL_GATHER:      os << "all_gather"; break;
+  case MsgType::GATHER:          os << "gather"; break;
+  case MsgType::SEND:            os << "send"; break;
+  case MsgType::ALL_REDUCE:      os << "allreduce"; break;
+  case MsgType::REDUCE:          os << "reduce"; break;
+  case MsgType::ALLTOALL:        os << "alltoall"; break;
+  }
+  os << " = " << size_
+     << ", id = " << id_
      << " , rank: " << rank << "\n";
 }
 
