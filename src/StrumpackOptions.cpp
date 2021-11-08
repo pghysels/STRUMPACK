@@ -442,8 +442,8 @@ namespace strumpack {
               << " stopping tolerance" << std::endl;
     std::cout << "#   --sp_Krylov_solver [auto|direct|refinement|pgmres|"
               << "gmres|pbicgstab|bicgstab]" << std::endl;
-    std::cout << "#          default: auto (refinement when no HSS, pgmres"
-              << " (preconditioned) with HSS compression)" << std::endl;
+    std::cout << "#          default: auto (refinement when using compression, pgmres"
+              << " (preconditioned) with compression)" << std::endl;
     std::cout << "#   --sp_gmres_restart int (default " << gmres_restart()
               << ")" << std::endl;
     std::cout << "#          gmres restart length" << std::endl;
