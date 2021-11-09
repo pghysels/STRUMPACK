@@ -151,6 +151,11 @@ namespace strumpack {
 
     DenseM_t get_dense_CB() const;
 
+#if defined(STRUMPACK_CLEAR_FACTORS)
+    std::size_t nnz_ = 0;
+    integer_t front_rank_ = 0;
+#endif
+
     using F_t::lchild_;
     using F_t::rchild_;
     using F_t::dim_sep;

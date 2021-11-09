@@ -44,9 +44,8 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::release_work_memory() {
-    STRUMPACK_SUB_MEMORY(CBstorage_.size()*sizeof(scalar_t));
-    CBstorage_.clear();
-    F22_.clear();
+    VectorPool<scalar_t> workspace;
+    release_work_memory(workspace);
   }
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::release_work_memory
@@ -263,6 +262,11 @@ namespace strumpack {
        gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.)) +
        trsm_flops(Side::L, scalar_t(1.), F11_, F12_) +
        trsm_flops(Side::R, scalar_t(1.), F11_, F21_));
+#if defined(STRUMPACK_CLEAR_FACTORS)
+    F11_.clear();
+    F12_.clear();
+    F21_.clear();
+#endif
   }
 
   template<typename scalar_t,typename integer_t> void

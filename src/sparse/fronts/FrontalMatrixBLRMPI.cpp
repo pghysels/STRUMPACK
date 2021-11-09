@@ -49,6 +49,9 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLRMPI<scalar_t,integer_t>::release_work_memory() {
     F22blr_ = BLRMPI_t(); // remove the update block
+    adm_.clear();
+    // sep_tiles_.clear();
+    // upd_tiles_.clear();
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -294,7 +297,7 @@ namespace strumpack {
       if (lchild_) lchild_->release_work_memory();
       if (rchild_) rchild_->release_work_memory();
     } else if (opts.BLR_options().CB_construction() ==
-                   BLR::CBConstruction::DENSE)  {
+               BLR::CBConstruction::DENSE) {
       build_front(A);
       extend_add();
       if (lchild_) lchild_->release_work_memory();
@@ -348,6 +351,12 @@ namespace strumpack {
         std::cout << std::endl;
       }
     }
+#if defined(STRUMPACK_CLEAR_FACTORS)
+    nnz_ = F11blr_.nonzeros() + F12blr_.nonzeros() + F21blr_.nonzeros();
+    F11blr_ = BLRMPI_t();
+    F12blr_ = BLRMPI_t();
+    F21blr_ = BLRMPI_t();
+#endif
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -429,7 +438,11 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> long long
   FrontalMatrixBLRMPI<scalar_t,integer_t>::node_factor_nonzeros() const {
+#if defined(STRUMPACK_CLEAR_FACTORS)
+    return nnz_;
+#else
     return F11blr_.nonzeros() + F12blr_.nonzeros() + F21blr_.nonzeros();
+#endif
   }
 
   template<typename scalar_t,typename integer_t> void

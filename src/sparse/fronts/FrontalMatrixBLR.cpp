@@ -283,6 +283,12 @@ namespace strumpack {
 #pragma omp single nowait
       factor_node(A, opts, etree_level, task_depth);
     } else factor_node(A, opts, etree_level, task_depth);
+#if defined(STRUMPACK_CLEAR_FACTORS)
+    nnz_ = F11blr_.nonzeros() + F12blr_.nonzeros() + F21blr_.nonzeros();
+    F11blr_.clear();
+    F12blr_.clear();
+    F21blr_.clear();
+#endif
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -609,7 +615,11 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> long long
   FrontalMatrixBLR<scalar_t,integer_t>::node_factor_nonzeros() const {
+#if defined(STRUMPACK_CLEAR_FACTORS)
+    return nnz_;
+#else
     return F11blr_.nonzeros() + F12blr_.nonzeros() + F21blr_.nonzeros();
+#endif
   }
 
   template<typename scalar_t,typename integer_t> void

@@ -214,6 +214,11 @@ namespace strumpack {
       STRUMPACK_FLOPS(flops);
 #endif
     }
+#if defined(STRUMPACK_CLEAR_FACTORS)
+    F11_.clear();
+    F12_.clear();
+    F21_.clear();
+#endif
   }
 
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)

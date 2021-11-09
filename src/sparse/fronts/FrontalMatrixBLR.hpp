@@ -129,6 +129,10 @@ namespace strumpack {
 
     long long node_factor_nonzeros() const override;
 
+#if defined(STRUMPACK_CLEAR_FACTORS)
+    std::size_t nnz_ = 0;
+#endif
+
     using F_t::lchild_;
     using F_t::rchild_;
     using F_t::dim_sep;

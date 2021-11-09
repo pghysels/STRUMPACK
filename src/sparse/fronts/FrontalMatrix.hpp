@@ -29,6 +29,8 @@
 #ifndef FRONTAL_MATRIX_HPP
 #define FRONTAL_MATRIX_HPP
 
+// #define STRUMPACK_CLEAR_FACTORS
+
 #include <iostream>
 #include <vector>
 #include <cmath>

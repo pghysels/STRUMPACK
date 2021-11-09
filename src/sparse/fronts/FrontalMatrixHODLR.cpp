@@ -395,6 +395,17 @@ namespace strumpack {
     }
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
+#if defined(STRUMPACK_CLEAR_FACTORS)
+    nnz_ = (F11_.get_stat("Mem_Fill") + F11_.get_stat("Mem_Factor")
+            + F12_.get_stat("Mem_Fill") + F21_.get_stat("Mem_Fill"))
+      * 1.0e6 / sizeof(scalar_t);
+    front_rank_ = std::max(F11_.get_stat("Rank_max"),
+                           std::max(F12_.get_stat("Rank_max"),
+                                    F21_.get_stat("Rank_max")));
+    F11_ = HODLR::HODLRMatrix<scalar_t>();
+    F12_ = HODLR::ButterflyMatrix<scalar_t>();
+    F21_ = HODLR::ButterflyMatrix<scalar_t>();
+#endif
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -842,9 +853,13 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> integer_t
   FrontalMatrixHODLR<scalar_t,integer_t>::front_rank(int task_depth) const {
+#if defined(STRUMPACK_CLEAR_FACTORS)
+    return front_rank_;
+#else
     return std::max(F11_.get_stat("Rank_max"),
                     std::max(F12_.get_stat("Rank_max"),
                              F21_.get_stat("Rank_max")));
+#endif
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -858,9 +873,13 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> long long
   FrontalMatrixHODLR<scalar_t,integer_t>::node_factor_nonzeros() const {
+#if defined(STRUMPACK_CLEAR_FACTORS)
+    return nnz_;
+#else
     return (F11_.get_stat("Mem_Fill") + F11_.get_stat("Mem_Factor")
             + F12_.get_stat("Mem_Fill") + F21_.get_stat("Mem_Fill"))
       * 1.0e6 / sizeof(scalar_t);
+#endif
   }
 
   template<typename scalar_t,typename integer_t> void

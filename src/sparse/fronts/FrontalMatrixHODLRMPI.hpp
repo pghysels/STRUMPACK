@@ -108,6 +108,11 @@ namespace strumpack {
     void compress_flops_F22();
     void compress_flops_Schur(long long int invf11_mult_flops);
 
+#if defined(STRUMPACK_CLEAR_FACTORS)
+    std::size_t nnz_ = 0;
+    integer_t front_rank_ = 0;
+#endif
+
     using F_t::lchild_;
     using F_t::rchild_;
     using F_t::sep_begin_;
