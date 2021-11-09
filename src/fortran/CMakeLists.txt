@@ -1,10 +1,5 @@
 target_sources(strumpack
   PRIVATE ${CMAKE_CURRENT_LIST_DIR}/strumpack.f90)
 
-if(FortranCInterface_MODULE_CASE STREQUAL "LOWER")
-  install(FILES ${CMAKE_BINARY_DIR}/strumpack.mod
-    DESTINATION include)
-else()
-  install(FILES ${CMAKE_BINARY_DIR}/STRUMPACK.mod
-    DESTINATION include)
-endif()
+install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  DESTINATION include FILES_MATCHING PATTERN *.mod)
