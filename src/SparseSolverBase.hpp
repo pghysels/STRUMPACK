@@ -376,10 +376,6 @@ namespace strumpack {
     { return double(params::peak_memory); }
     virtual double min_peak_memory() const
     { return double(params::peak_memory); }
-    virtual double counter_MPI_send() const
-    { return double(params::send_counter); }
-    virtual double size_MPI_send() const
-    { return double(params::send_size); }
 
     void papi_initialize();
     long long dense_factor_nonzeros() const;
