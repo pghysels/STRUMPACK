@@ -216,7 +216,7 @@ namespace strumpack {
      * needs to be factored. One can call factor() explicitly, or if
      * this was not yet done, this routine will call factor()
      * internally.
-     *
+     * 
      * \param b input, will not be modified. DenseMatrix containgin
      * the right-hand side vector/matrix. Should have N rows, with N
      * the dimension of the input matrix for SparseSolver and
@@ -236,6 +236,38 @@ namespace strumpack {
      * \see DenseMatrix, solve(), factor()
      */
     ReturnCode solve(const DenseM_t& b, DenseM_t& x,
+                     bool use_initial_guess=false);
+
+    /**
+     * Solve a linear system with a single or multiple right-hand
+     * sides. Before being able to solve a linear system, the matrix
+     * needs to be factored. One can call factor() explicitly, or if
+     * this was not yet done, this routine will call factor()
+     * internally.
+     *
+     * \param nrhs Number of right hand sides.
+     * \param b input, will not be modified. DenseMatrix containgin
+     * the right-hand side vector/matrix. Should have N rows, with N
+     * the dimension of the input matrix for SparseSolver and
+     * SparseSolverMPI. For SparseSolverMPIDist, the number or rows of
+     * b should be correspond to the partitioning of the block-row
+     * distributed input matrix.
+     * \param ldb leading dimension of b
+     * \param x Output, pointer to the solution vector.  Array should
+     * be lenght N, the dimension of the input matrix for SparseSolver
+     * and SparseSolverMPI. For SparseSolverMPIDist, the length of b
+     * should be correspond the partitioning of the block-row
+     * distributed input matrix.
+     * \param ldx leading dimension of x
+     * \param use_initial_guess set to true if x contains an intial
+     * guess to the solution.  This is mainly useful when using an
+     * iterative solver.  If set to false, x should not be set (but
+     * should be allocated).
+     * \return error code
+     * \see DenseMatrix, solve(), factor()
+     */
+    ReturnCode solve(int nrhs, const scalar_t* b, int ldb,
+                     scalar_t* x, int ldx,
                      bool use_initial_guess=false);
 
     /**
@@ -344,9 +376,9 @@ namespace strumpack {
     { return double(params::peak_memory); }
     virtual double min_peak_memory() const
     { return double(params::peak_memory); }
-    virtual double counter_MPI_send() const 
+    virtual double counter_MPI_send() const
     { return double(params::send_counter); }
-    virtual double size_MPI_send() const 
+    virtual double size_MPI_send() const
     { return double(params::send_size); }
 
     void papi_initialize();

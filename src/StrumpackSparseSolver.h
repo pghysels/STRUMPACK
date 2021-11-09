@@ -193,6 +193,10 @@ extern "C" {
   STRUMPACK_RETURN_CODE STRUMPACK_solve
   (STRUMPACK_SparseSolver S, const void* b, void* x, int use_initial_guess);
 
+  STRUMPACK_RETURN_CODE STRUMPACK_matsolve
+  (STRUMPACK_SparseSolver S, int nrhs, const void* b, int ldb,
+   void* x, int ldx, int use_initial_guess);
+
   void STRUMPACK_set_from_options(STRUMPACK_SparseSolver S);
 
   STRUMPACK_RETURN_CODE STRUMPACK_reorder(STRUMPACK_SparseSolver S);

@@ -303,6 +303,23 @@ extern "C" {
     return STRUMPACK_SUCCESS;
   }
 
+  STRUMPACK_RETURN_CODE
+  STRUMPACK_matsolve(STRUMPACK_SparseSolver S, int nrhs,
+                     const void* b, int ldb, void* x, int ldx,
+                     int use_initial_guess) {
+    switch (S.precision) {
+    case STRUMPACK_FLOAT:            return static_cast<STRUMPACK_RETURN_CODE>(CASTS(S.solver)->solve(nrhs, CRES(b), ldb, RES(x), ldx, use_initial_guess));   break;
+    case STRUMPACK_DOUBLE:           return static_cast<STRUMPACK_RETURN_CODE>(CASTD(S.solver)->solve(nrhs, CRED(b), ldb, RED(x), ldx, use_initial_guess));   break;
+    case STRUMPACK_FLOATCOMPLEX:     return static_cast<STRUMPACK_RETURN_CODE>(CASTC(S.solver)->solve(nrhs, CREC(b), ldb, REC(x), ldx, use_initial_guess));   break;
+    case STRUMPACK_DOUBLECOMPLEX:    return static_cast<STRUMPACK_RETURN_CODE>(CASTZ(S.solver)->solve(nrhs, CREZ(b), ldb, REZ(x), ldx, use_initial_guess));   break;
+    case STRUMPACK_FLOAT_64:         return static_cast<STRUMPACK_RETURN_CODE>(CASTS64(S.solver)->solve(nrhs, CRES(b), ldb, RES(x), ldx, use_initial_guess)); break;
+    case STRUMPACK_DOUBLE_64:        return static_cast<STRUMPACK_RETURN_CODE>(CASTD64(S.solver)->solve(nrhs, CRED(b), ldb, RED(x), ldx, use_initial_guess)); break;
+    case STRUMPACK_FLOATCOMPLEX_64:  return static_cast<STRUMPACK_RETURN_CODE>(CASTC64(S.solver)->solve(nrhs, CREC(b), ldb, REC(x), ldx, use_initial_guess)); break;
+    case STRUMPACK_DOUBLECOMPLEX_64: return static_cast<STRUMPACK_RETURN_CODE>(CASTZ64(S.solver)->solve(nrhs, CREZ(b), ldb, REZ(x), ldx, use_initial_guess)); break;
+    }
+    return STRUMPACK_SUCCESS;
+  }
+
   void STRUMPACK_set_from_options(STRUMPACK_SparseSolver S) {
     switch_precision(set_from_options());
   }

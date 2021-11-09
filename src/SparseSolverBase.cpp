@@ -708,6 +708,20 @@ namespace strumpack {
     return solve_internal(b, x, use_initial_guess);
   }
 
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverBase<scalar_t,integer_t>::solve
+  (int nrhs, const scalar_t* b, int ldb, scalar_t* x, int ldx,
+   bool use_initial_guess) {
+    if (!nrhs) return ReturnCode::SUCCESS;
+    auto N = matrix()->size();
+    assert(ldb >= N);
+    assert(ldx >= N);
+    assert(nrhs >= 1);
+    auto B = ConstDenseMatrixWrapperPtr(N, nrhs, b, ldb);
+    DenseMW_t X(N, nrhs, x, N);
+    return this->solve(*B, X, use_initial_guess);
+  }
+
   template<typename scalar_t,typename integer_t> void
   SparseSolverBase<scalar_t,integer_t>::delete_factors() {
     delete_factors_internal();
