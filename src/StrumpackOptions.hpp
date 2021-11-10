@@ -1237,8 +1237,8 @@ namespace strumpack {
 
     /** BLR options */
     BLR::BLROptions<scalar_t> blr_opts_;
-    int blr_min_front_size_ = 1000;
-    int blr_min_sep_size_ = 256;
+    int blr_min_front_size_ = 5000;
+    int blr_min_sep_size_ = 512;
 
     /** HODLR options */
     HODLR::HODLROptions<scalar_t> hodlr_opts_;
