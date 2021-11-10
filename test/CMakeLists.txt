@@ -590,6 +590,16 @@ if(STRUMPACK_USE_SCOTCH)
   set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
 endif()
 
+if(STRUMPACK_USE_ZFP)
+  set(test_name "SPARSE_seq_lossy")
+  add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq ${PROJECT_SOURCE_DIR}/examples/sparse/data/pde900.mtx --sp_compression LOSSY --sp_lossy_precision 16 --sp_maxit 10)
+  set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+  set(test_name "SPARSE_seq_lossless")
+  add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq ${PROJECT_SOURCE_DIR}/examples/sparse/data/pde900.mtx --sp_compression LOSSLESS --sp_maxit 1)
+  set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+endif()
+
 
 if(STRUMPACK_USE_MPI)
   set(test_name "SPARSE_mpi_1")
