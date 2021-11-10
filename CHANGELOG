@@ -5,7 +5,9 @@ Small bugfix release, but with some changes in the C interface.
   . Solve with multiple RHS
   . Specify grid dimensions, stencil, for geometric ordering
   . Fix typo in GPU enabling routine
+  . Set lossy precision
 - Bugfix in passing grid via options object
+- Bugfix in LOSSY/LOSSLESS compression using ZFP
 - Compilation fix for nvcc not finding MPI when the CXX/C
   compilers are set to the MPI wrappers
 - Fix Fortran module case in CMake when using CCE
