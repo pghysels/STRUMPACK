@@ -247,6 +247,7 @@ extern "C" {
   void STRUMPACK_set_compression_rel_tol(STRUMPACK_SparseSolver S, double rctol);
   void STRUMPACK_set_compression_abs_tol(STRUMPACK_SparseSolver S, double actol);
   void STRUMPACK_set_compression_butterfly_levels(STRUMPACK_SparseSolver S, int l);
+  void STRUMPACK_set_compression_lossy_precision(STRUMPACK_SparseSolver S, int p);
 
   /*************************************************************
    ** Get options **********************************************
@@ -270,6 +271,7 @@ extern "C" {
   double STRUMPACK_compression_rel_tol(STRUMPACK_SparseSolver S);
   double STRUMPACK_compression_abs_tol(STRUMPACK_SparseSolver S);
   int STRUMPACK_compression_butterfly_levels(STRUMPACK_SparseSolver S);
+  int STRUMPACK_compression_lossy_precision(STRUMPACK_SparseSolver S);
 
   /*************************************************************
    ** Get solve statistics *************************************

@@ -380,6 +380,7 @@ extern "C" {
   void STRUMPACK_set_compression_rel_tol(STRUMPACK_SparseSolver S, double rctol) { switch_precision(options().set_compression_rel_tol(rctol)); }
   void STRUMPACK_set_compression_abs_tol(STRUMPACK_SparseSolver S, double actol) { switch_precision(options().set_compression_abs_tol(actol)); }
   void STRUMPACK_set_compression_butterfly_levels(STRUMPACK_SparseSolver S, int l) { switch_precision(options().HODLR_options().set_butterfly_levels(l)); }
+  void STRUMPACK_set_compression_lossy_precision(STRUMPACK_SparseSolver S, int p) { switch_precision(options().set_lossy_precision(p)); }
 
 
   /*************************************************************
@@ -404,6 +405,7 @@ extern "C" {
   double STRUMPACK_compression_rel_tol(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().compression_rel_tol(), double); }
   double STRUMPACK_compression_abs_tol(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().compression_abs_tol(), double); }
   int STRUMPACK_compression_butterfly_levels(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().HODLR_options().butterfly_levels(), int); }
+  int STRUMPACK_compression_lossy_precision(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().lossy_precision(), int); }
 
 
   /*************************************************************
