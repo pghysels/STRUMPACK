@@ -143,9 +143,10 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixLossy<scalar_t,integer_t>::multifrontal_factorization
-  (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
-    FD_t::multifrontal_factorization(A, opts, etree_level, task_depth);
+  FrontalMatrixLossy<scalar_t,integer_t>::factor
+  (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
+   int etree_level, int task_depth) {
+    FD_t::factor(A, opts, workspace, etree_level, task_depth);
     compress(opts);
   }
 
@@ -154,7 +155,6 @@ namespace strumpack {
   (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
     DenseM_t F11, F12, F21;
     decompress(F11, F12, F21);
-    //FD_t::fwd_solve_phase2(b, bupd, etree_level, task_depth);
     if (this->dim_sep()) {
       DenseMW_t bloc(this->dim_sep(), b.cols(), b, this->sep_begin_, 0);
       bloc.laswp(this->piv, true);
@@ -178,7 +178,6 @@ namespace strumpack {
   (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const {
     DenseM_t F11, F12, F21;
     decompress(F11, F12, F21);
-    // FD_t::bwd_solve_phase1(y, yupd, etree_level, task_depth);
     if (this->dim_sep()) {
       DenseMW_t yloc(this->dim_sep(), y.cols(), y, this->sep_begin_, 0);
       if (y.cols() == 1) {
