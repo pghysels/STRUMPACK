@@ -425,6 +425,11 @@ namespace strumpack {
     ReturnCode solve_internal(const DenseM_t& b, DenseM_t& x,
                               bool use_initial_guess=false) = 0;
 
+    virtual
+    ReturnCode solve_internal(int nrhs, const scalar_t* b, int ldb,
+                              scalar_t* x, int ldx,
+                              bool use_initial_guess=false);
+
     virtual void delete_factors_internal() = 0;
   };
 

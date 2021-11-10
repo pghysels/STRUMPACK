@@ -690,6 +690,13 @@ namespace strumpack {
   SparseSolverBase<scalar_t,integer_t>::solve
   (int nrhs, const scalar_t* b, int ldb, scalar_t* x, int ldx,
    bool use_initial_guess) {
+    return solve_internal(nrhs, b, ldb, x, ldx, use_initial_guess);
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverBase<scalar_t,integer_t>::solve_internal
+  (int nrhs, const scalar_t* b, int ldb, scalar_t* x, int ldx,
+   bool use_initial_guess) {
     if (!nrhs) return ReturnCode::SUCCESS;
     auto N = matrix()->size();
     assert(ldb >= N);

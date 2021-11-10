@@ -213,6 +213,20 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> ReturnCode
   SparseSolverMPIDist<scalar_t,integer_t>::solve_internal
+  (int nrhs, const scalar_t* b, int ldb,
+   scalar_t* x, int ldx, bool use_initial_guess) {
+    if (!nrhs) return ReturnCode::SUCCESS;
+    auto N = mat_mpi_->local_rows();
+    assert(ldb >= N);
+    assert(ldx >= N);
+    assert(nrhs >= 1);
+    auto B = ConstDenseMatrixWrapperPtr(N, nrhs, b, ldb);
+    DenseMW_t X(N, nrhs, x, N);
+    return this->solve(*B, X, use_initial_guess);
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverMPIDist<scalar_t,integer_t>::solve_internal
   (const DenseM_t& b, DenseM_t& x, bool use_initial_guess) {
     using real_t = typename RealType<scalar_t>::value_type;
 
