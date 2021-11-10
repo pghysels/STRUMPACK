@@ -1,6 +1,6 @@
-Version 6.2.0 Released ..?
-==========================
-Small bugfix release, but with some changes in the C interface.
+Version 6.2.0 Released November 2021
+====================================
+Bugfix release, with some changes in the C interface.
 - Additions to the C interface for the sparse solver:
   . Solve with multiple RHS
   . Specify grid dimensions, stencil, for geometric ordering
