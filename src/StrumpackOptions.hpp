@@ -1112,7 +1112,10 @@ namespace strumpack {
     /**
      * Returns the precision for lossy compression.
      */
-    int lossy_precision() const { return lossy_precision_; }
+    int lossy_precision() const {
+      return (compression() == CompressionType::LOSSLESS) ?
+        -1 : lossy_precision_;
+    }
 
     /**
      * Info about the stats of the root front will be printed to

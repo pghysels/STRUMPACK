@@ -400,7 +400,7 @@ namespace strumpack {
           break;
         case CompressionType::LOSSLESS:
         case CompressionType::LOSSY:
-          std::cout << "#   - nr of lossy Frontal matrices = "
+          std::cout << "#   - nr of lossy/lossless Frontal matrices = "
                     << number_format_with_commas(fc.lossy) << std::endl;
           break;
         case CompressionType::NONE:
