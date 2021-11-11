@@ -80,20 +80,5 @@ namespace strumpack {
     std::atomic<long long int> invf11_mult_flops(0);
     std::atomic<long long int> f12_mult_flops(0);
 
-    std::atomic<long long int> broadcast_counter(0);
-    std::atomic<long long int> broadcast_size(0);
-    std::atomic<long long int> send_counter(0);
-    std::atomic<long long int> send_size(0);
-    std::atomic<long long int> gather_counter(0);
-    std::atomic<long long int> gather_size(0);
-    std::atomic<long long int> allgather_counter(0);
-    std::atomic<long long int> allgather_size(0);
-    std::atomic<long long int> alltoall_counter(0);
-    std::atomic<long long int> alltoall_size(0);
-    std::atomic<long long int> reduce_counter(0);
-    std::atomic<long long int> reduce_size(0);
-    std::atomic<long long int> allreduce_counter(0);
-    std::atomic<long long int> allreduce_size(0);
-
   } // end namespace params
 } // end namespace strumpack

@@ -89,6 +89,9 @@ CSRMatrix<std::complex<realt>,int> Helmholtz3D(int nx) {
 int main(int argc, char* argv[]) {
   using realt = double;
   using scalart = std::complex<realt>;
+#if defined(STRUMPACK_MESSAGE_COUNTER)
+  remove("message.log");
+#endif
 
   int thread_level;
   //MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_level);
@@ -135,8 +138,8 @@ int main(int argc, char* argv[]) {
     std::vector<scalart> x_exact(n_local, scalart(1.)/std::sqrt(N));
     A.spmv(x_exact.data(), b.data());
 #else
-    MPIComm c;
-    auto rank = c.rank();
+    /*MPIComm c;
+    auto rank = c.rank();*/
     // pick 2 sources in the domain
     long long int sources[2] =
       {nx/2 + nx * (nx/2) + nx*nx * (nx/3),
@@ -163,8 +166,12 @@ int main(int argc, char* argv[]) {
     //   std::cout << "# RELATIVE ERROR = "
     //             << (nrm_error/nrm_x_exact) << std::endl;
   }
+#if defined(STRUMPACK_TASK_TIMERS)
   TimerList::Finalize();
+#endif
+#if defined(STRUMPACK_MESSAGE_COUNTER)
   MessageList::Finalize();
+#endif
   scalapack::Cblacs_exit(1);
   MPI_Finalize();
   return 0;

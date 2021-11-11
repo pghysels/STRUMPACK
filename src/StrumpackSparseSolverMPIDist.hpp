@@ -319,12 +319,6 @@ namespace strumpack {
     double min_peak_memory() const override {
       return comm_.reduce(double(params::peak_memory), MPI_MIN);
     }
-    double counter_MPI_send() const {
-      return comm_.reduce(double(params::send_counter), MPI_SUM);
-    }
-    double size_MPI_send() const {
-      return comm_.reduce(double(params::send_size), MPI_SUM);
-    }
 
     void redistribute_values();
 
