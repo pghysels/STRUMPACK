@@ -479,7 +479,7 @@ namespace strumpack {
       dpcpp::fill(q, group_sizes, std::int64_t(1), nb);
       dpcpp::fill(q, op, oneapi::mkl::transpose::N, nb);
       for (auto& l : L) {
-        set_level(q, l);
+        set_level(q, l, false);
         lwork = std::max
           (lwork,
            oneapi::mkl::lapack::getrf_batch_scratchpad_size<scalar_t>
@@ -491,9 +491,11 @@ namespace strumpack {
       }
       scratchpad = dpcpp::DeviceMemory<scalar_t>(lwork, q);
     }
-    void set_level(cl::sycl::queue& q, const LInfo_t& L) {
+    std::size_t set_level(cl::sycl::queue& q, const LInfo_t& L, bool Schur) {
       std::size_t i = 0;
       for (auto& f : L.f) {
+	if (Schur && (f->dim_sep() == 0 || f->dim_upd() == 0))
+	  continue;
         ds[i] = f->dim_sep();
         du[i] = f->dim_upd();
         F11[i] = f->F11_.data();  F12[i] = f->F12_.data();
@@ -501,6 +503,7 @@ namespace strumpack {
         piv[i] = f->piv_;
         i++;
       }
+      return i;
     }
     std::int64_t lwork = 0, *ds = nullptr, *du = nullptr,
       **piv = nullptr, *group_sizes = nullptr;
@@ -518,11 +521,11 @@ namespace strumpack {
   FrontDPCpp<scalar_t,integer_t>::factor_batch
   (cl::sycl::queue& q, const LInfo_t& L, Batch_t& batch,
    const Opts_t& opts) {
-    auto nb = L.f.size();
-    batch.set_level(q, L);
+    auto nb = batch.set_level(q, L, false);
     oneapi::mkl::lapack::getrf_batch
       (q, batch.ds, batch.ds, batch.F11, batch.ds, batch.piv,
        nb, batch.group_sizes, batch.scratchpad.get(), batch.lwork).wait();
+    nb = batch.set_level(q, L, true);
     oneapi::mkl::lapack::getrs_batch
       (q, batch.op, batch.ds, batch.du, batch.F11, batch.ds,
        batch.piv, batch.F12, batch.ds,
