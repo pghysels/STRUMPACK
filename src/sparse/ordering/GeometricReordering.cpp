@@ -118,7 +118,7 @@ namespace strumpack {
     gd.stratpar = opts.nd_param();
     if (nx*ny*nz*components != A.size()) {
       nx = opts.nx();
-      ny = opts.nz();
+      ny = opts.ny();
       nz = opts.nz();
       gd.components = opts.components();
       gd.width = opts.separator_width();

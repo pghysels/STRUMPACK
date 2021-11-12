@@ -330,6 +330,10 @@ namespace strumpack {
     ReturnCode
     solve_internal(const DenseM_t& b, DenseM_t& x,
                    bool use_initial_guess=false) override;
+    ReturnCode
+    solve_internal(int nrhs, const scalar_t* b, int ldb,
+                   scalar_t* x, int ldx,
+                   bool use_initial_guess=false) override;
 
     std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>> mat_mpi_;
     std::unique_ptr<MatrixReorderingMPI<scalar_t,integer_t>> nd_mpi_;

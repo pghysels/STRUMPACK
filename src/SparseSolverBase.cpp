@@ -412,6 +412,26 @@ namespace strumpack {
     perf_counters_stop("symbolic factorization");
 
     if (opts_.compression() != CompressionType::NONE) {
+      if (is_root_) {
+#if !defined(STRUMPACK_USE_BPACK)
+        if (opts_.compression() == CompressionType::HODLR ||
+            opts_.compression() == CompressionType::BLR_HODLR ||
+            opts_.compression() == CompressionType::ZFP_BLR_HODLR) {
+          std::cerr << "WARNING: Compression type requires ButterflyPACK, "
+            "but STRUMPACK was not configured with ButterflyPACK support!"
+                    << std::endl;
+        }
+#endif
+#if !defined(STRUMPACK_USE_ZFP)
+        if (opts_.compression() == CompressionType::ZFP_BLR_HODLR ||
+            opts_.compression() == CompressionType::LOSSLESS ||
+            opts_.compression() == CompressionType::LOSSY) {
+          std::cerr << "WARNING: Compression type requires ZFP, "
+            "but STRUMPACK was not configured with ZFP support!"
+                    << std::endl;
+        }
+#endif
+      }
       perf_counters_start();
       // TODO also broadcast this?? is computed with metis
       TaskTimer t4("separator-reordering", [&](){ separator_reordering(); });
@@ -584,9 +604,9 @@ namespace strumpack {
                     << " % of multifrontal" << std::endl;
           if (opts_.compression() == CompressionType::HSS) {
             std::cout << "#   - maximum HSS rank = " << max_rank << std::endl;
-            std::cout << "#   - relative compression tolerance = "
+            std::cout << "#   - HSS relative compression tolerance = "
                       << opts_.HSS_options().rel_tol() << std::endl;
-            std::cout << "#   - absolute compression tolerance = "
+            std::cout << "#   - HSS absolute compression tolerance = "
                       << opts_.HSS_options().abs_tol() << std::endl;
             std::cout << "#   - "
                       << get_name(opts_.HSS_options().random_distribution())
@@ -595,9 +615,9 @@ namespace strumpack {
                       << " engine" << std::endl;
           }
           if (opts_.compression() == CompressionType::BLR) {
-            std::cout << "#   - relative compression tolerance = "
+            std::cout << "#   - BLR relative compression tolerance = "
                       << opts_.BLR_options().rel_tol() << std::endl;
-            std::cout << "#   - absolute compression tolerance = "
+            std::cout << "#   - BLR absolute compression tolerance = "
                       << opts_.BLR_options().abs_tol() << std::endl;
           }
 #if defined(STRUMPACK_USE_BPACK)
@@ -609,13 +629,13 @@ namespace strumpack {
                       << opts_.HODLR_options().abs_tol() << std::endl;
           } else if (opts_.compression() == CompressionType::BLR_HODLR) {
             std::cout << "#   - maximum HODLR rank = " << max_rank << std::endl;
-            std::cout << "#   - relative compression tolerance = "
+            std::cout << "#   - HODLR relative compression tolerance = "
                       << opts_.HODLR_options().rel_tol() << std::endl;
-            std::cout << "#   - absolute compression tolerance = "
+            std::cout << "#   - HODLR absolute compression tolerance = "
                       << opts_.HODLR_options().abs_tol() << std::endl;
-            std::cout << "#   - relative compression tolerance = "
+            std::cout << "#   - BLR relative compression tolerance = "
                       << opts_.BLR_options().rel_tol() << std::endl;
-            std::cout << "#   - absolute compression tolerance = "
+            std::cout << "#   - BLR absolute compression tolerance = "
                       << opts_.BLR_options().abs_tol() << std::endl;
           }
 #endif
@@ -623,13 +643,13 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_ZFP)
           if (opts_.compression() == CompressionType::ZFP_BLR_HODLR) {
             std::cout << "#   - maximum HODLR rank = " << max_rank << std::endl;
-            std::cout << "#   - relative compression tolerance = "
+            std::cout << "#   - HODLR relative compression tolerance = "
                       << opts_.HODLR_options().rel_tol() << std::endl;
-            std::cout << "#   - absolute compression tolerance = "
+            std::cout << "#   - HODLR absolute compression tolerance = "
                       << opts_.HODLR_options().abs_tol() << std::endl;
-            std::cout << "#   - relative compression tolerance = "
+            std::cout << "#   - BLR relative compression tolerance = "
                       << opts_.BLR_options().rel_tol() << std::endl;
-            std::cout << "#   - absolute compression tolerance = "
+            std::cout << "#   - BLR absolute compression tolerance = "
                       << opts_.BLR_options().abs_tol() << std::endl;
           }
 #endif
@@ -641,10 +661,12 @@ namespace strumpack {
 #endif
         }
       }
-      if (opts_.compression() == CompressionType::HSS)
-        print_flop_breakdown_HSS();
-      if (opts_.compression() == CompressionType::HODLR)
-        print_flop_breakdown_HODLR();
+      // #if defined(STRUMPACK_COUNT_FLOPS)
+      //       if (opts_.compression() == CompressionType::HSS)
+      //         print_flop_breakdown_HSS();
+      //       if (opts_.compression() == CompressionType::HODLR)
+      //         print_flop_breakdown_HODLR();
+      // #endif
     }
     if (rank_out_) tree()->print_rank_statistics(*rank_out_);
     factored_ = true;
@@ -662,6 +684,27 @@ namespace strumpack {
   SparseSolverBase<scalar_t,integer_t>::solve
   (const DenseM_t& b, DenseM_t& x, bool use_initial_guess) {
     return solve_internal(b, x, use_initial_guess);
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverBase<scalar_t,integer_t>::solve
+  (int nrhs, const scalar_t* b, int ldb, scalar_t* x, int ldx,
+   bool use_initial_guess) {
+    return solve_internal(nrhs, b, ldb, x, ldx, use_initial_guess);
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverBase<scalar_t,integer_t>::solve_internal
+  (int nrhs, const scalar_t* b, int ldb, scalar_t* x, int ldx,
+   bool use_initial_guess) {
+    if (!nrhs) return ReturnCode::SUCCESS;
+    auto N = matrix()->size();
+    assert(ldb >= N);
+    assert(ldx >= N);
+    assert(nrhs >= 1);
+    auto B = ConstDenseMatrixWrapperPtr(N, nrhs, b, ldb);
+    DenseMW_t X(N, nrhs, x, N);
+    return this->solve(*B, X, use_initial_guess);
   }
 
   template<typename scalar_t,typename integer_t> void

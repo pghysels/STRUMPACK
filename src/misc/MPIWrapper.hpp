@@ -33,6 +33,7 @@
 #ifndef STRUMPACK_MPI_WRAPPER_HPP
 #define STRUMPACK_MPI_WRAPPER_HPP
 
+#include <list>
 #include <vector>
 #include <complex>
 #include <cassert>
@@ -40,6 +41,7 @@
 #include <limits>
 #include <memory>
 #include <utility>
+#include "StrumpackConfig.hpp"
 
 #define OMPI_SKIP_MPICXX 1
 #include <mpi.h>
@@ -174,7 +176,6 @@ namespace strumpack {
     MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
   }
 
-
   /**
    * \class MPIComm
    * \brief Wrapper class around an MPI_Comm object.
@@ -298,6 +299,7 @@ namespace strumpack {
     broadcast(std::vector<T>& sbuf) const {
       MPI_Bcast(sbuf.data(), sbuf.size(), mpi_type<T>(), 0, comm_);
     }
+
     template<typename T> void
     broadcast_from(std::vector<T>& sbuf, int src) const {
       MPI_Bcast(sbuf.data(), sbuf.size(), mpi_type<T>(), src, comm_);
@@ -308,12 +310,10 @@ namespace strumpack {
       MPI_Bcast(sbuf.data(), sbuf.size(), mpi_type<T>(), 0, comm_);
     }
 
-    template<typename T> void
-    broadcast(T& data) const {
+    template<typename T> void broadcast(T& data) const {
       MPI_Bcast(&data, 1, mpi_type<T>(), 0, comm_);
     }
-    template<typename T> void
-    broadcast_from(T& data, int src) const {
+    template<typename T> void broadcast_from(T& data, int src) const {
       MPI_Bcast(&data, 1, mpi_type<T>(), src, comm_);
     }
     template<typename T> void
@@ -337,19 +337,20 @@ namespace strumpack {
       MPI_Allgatherv
         (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, buf, rcnts, displs,
          mpi_type<T>(), comm_);
-    } 
+    }
 
     template<typename T>
     void gather(T* sbuf, int ssize, int* rbuf, int rsize, int root) const {
       MPI_Gather
-        (sbuf, ssize, mpi_type<T>(), rbuf, 
+        (sbuf, ssize, mpi_type<T>(), rbuf,
          rsize, mpi_type<T>(), root, comm_);
     }
 
     template<typename T>
-    void gather_v(T* sbuf, int scnts, T* rbuf, const int* rcnts, const int* displs, int root) const {
+    void gather_v(T* sbuf, int scnts, T* rbuf, const int* rcnts,
+                  const int* displs, int root) const {
       MPI_Gatherv
-        (sbuf, scnts, mpi_type<T>(), rbuf, rcnts, displs, 
+        (sbuf, scnts, mpi_type<T>(), rbuf, rcnts, displs,
          mpi_type<T>(), root, comm_);
     }
 
@@ -432,7 +433,8 @@ namespace strumpack {
     template<typename T>
     void send(const std::vector<T>& sbuf, int dest, int tag) const {
       // const_cast is necessary for ancient openmpi version used on Travis
-      MPI_Send(const_cast<T*>(sbuf.data()), sbuf.size(), mpi_type<T>(), dest, tag, comm_);
+      MPI_Send(const_cast<T*>(sbuf.data()), sbuf.size(),
+               mpi_type<T>(), dest, tag, comm_);
     }
 
     /**

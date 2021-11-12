@@ -40,10 +40,6 @@
 #include <cuda_runtime.h>
 
 #include "DenseMatrix.hpp"
-#if defined(STRUMPACK_USE_MPI)
-#include "misc/MPIWrapper.hpp"
-#endif
-
 
 namespace strumpack {
 
@@ -59,17 +55,7 @@ namespace strumpack {
     void cuda_assert(cublasStatus_t code, const char *file, int line,
                      bool abort=true);
 
-    inline void init() {
-#if defined(STRUMPACK_USE_MPI)
-      int devs;
-      cudaGetDeviceCount(&devs);
-      if (devs > 1) {
-        MPIComm c;
-        cudaSetDevice(c.rank() % devs);
-      }
-#endif
-      gpu_check(cudaFree(0));
-    }
+    void init();
 
     inline void synchronize() {
       gpu_check(cudaDeviceSynchronize());

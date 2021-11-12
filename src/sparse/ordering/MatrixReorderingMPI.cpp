@@ -122,16 +122,15 @@ namespace strumpack {
       case ReorderingStrategy::GEOMETRIC: {
         if (nx*ny*nz*components != A.size()) {
           nx = opts.nx();
-          ny = opts.nz();
+          ny = opts.ny();
           nz = opts.nz();
           components = opts.components();
           width = opts.separator_width();
         }
         if (nx*ny*nz*components != A.size()) {
           std::cerr << "# ERROR: Geometric reordering failed. \n"
-            "# Geometric reordering only works"
-            "on a simple 3 point wide stencil\n"
-            "# on a regular grid and you need to provide the mesh sizes."
+            "# Geometric reordering only works on a regular grid "
+            "and you need to provide the mesh sizes."
                     << std::endl;
           return 1;
         }

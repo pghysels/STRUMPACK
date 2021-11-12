@@ -210,5 +210,4 @@ fi
 
 make install -j8
 make examples -j8
-make tests -j8
 # make test

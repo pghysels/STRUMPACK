@@ -40,9 +40,6 @@
 #include <rocsolver.h>
 
 #include "DenseMatrix.hpp"
-#if defined(STRUMPACK_USE_MPI)
-#include "misc/MPIWrapper.hpp"
-#endif
 
 namespace strumpack {
   namespace gpu {
@@ -57,17 +54,7 @@ namespace strumpack {
     void hip_assert(hipblasStatus_t code, const char *file, int line,
                     bool abort=true);
 
-    inline void init() {
-#if defined(STRUMPACK_USE_MPI)
-      int devs;
-      hipGetDeviceCount(&devs);
-      if (devs > 1) {
-        MPIComm c;
-        hipSetDevice(c.rank() % devs);
-      }
-#endif
-      gpu_check(hipFree(0));
-    }
+    void init();
 
     inline void synchronize() {
       gpu_check(hipDeviceSynchronize());
