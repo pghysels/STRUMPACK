@@ -84,8 +84,8 @@ namespace strumpack {
 
     int_t mc64_work_int(std::size_t n, std::size_t nnz) const {
       switch (job) {
-      case MatchingJob::MAX_SMALLEST_DIAGONAL: return 4*n; break;
-      case MatchingJob::MAX_SMALLEST_DIAGONAL_2: return 10*n + nnz; break;
+      case MatchingJob::MAX_SMALLEST_DIAGONAL: return 4*n;
+      case MatchingJob::MAX_SMALLEST_DIAGONAL_2: return 10*n + nnz;
       case MatchingJob::MAX_CARDINALITY:
       case MatchingJob::MAX_DIAGONAL_SUM:
       case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING:
@@ -95,12 +95,12 @@ namespace strumpack {
 
     int_t mc64_work_double(std::size_t n, std::size_t nnz) const {
       switch (job) {
-      case MatchingJob::MAX_CARDINALITY: return 0; break;
-      case MatchingJob::MAX_SMALLEST_DIAGONAL: return n; break;
-      case MatchingJob::MAX_SMALLEST_DIAGONAL_2: return nnz; break;
-      case MatchingJob::MAX_DIAGONAL_SUM: return 2*n + nnz; break;
+      case MatchingJob::MAX_CARDINALITY: return 0;
+      case MatchingJob::MAX_SMALLEST_DIAGONAL: return n;
+      case MatchingJob::MAX_SMALLEST_DIAGONAL_2: return nnz;
+      case MatchingJob::MAX_DIAGONAL_SUM: return 2*n + nnz;
       case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING:
-      default: return 3*n + nnz; break;
+      default: return 3*n + nnz;
       }
     }
   };

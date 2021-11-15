@@ -41,43 +41,43 @@ namespace strumpack {
 
     std::string get_name(LowRankAlgorithm a) {
       switch (a) {
-      case LowRankAlgorithm::RRQR: return "RRQR"; break;
-      case LowRankAlgorithm::ACA: return "ACA"; break;
-      case LowRankAlgorithm::BACA: return "BACA"; break;
+      case LowRankAlgorithm::RRQR: return "RRQR";
+      case LowRankAlgorithm::ACA: return "ACA";
+      case LowRankAlgorithm::BACA: return "BACA";
       default: return "unknown";
       }
     }
 
     std::string get_name(Admissibility a) {
       switch (a) {
-      case Admissibility::STRONG: return "strong"; break;
-      case Admissibility::WEAK: return "weak"; break;
+      case Admissibility::STRONG: return "strong";
+      case Admissibility::WEAK: return "weak";
       default: return "unknown";
       }
     }
 
     std::string get_name(BLRFactorAlgorithm a) {
       switch (a) {
-      case BLRFactorAlgorithm::RL: return "RL"; break;
-      case BLRFactorAlgorithm::LL: return "LL"; break;
-      case BLRFactorAlgorithm::COMB: return "Comb"; break;
-      case BLRFactorAlgorithm::STAR: return "Star"; break;
+      case BLRFactorAlgorithm::RL: return "RL";
+      case BLRFactorAlgorithm::LL: return "LL";
+      case BLRFactorAlgorithm::COMB: return "Comb";
+      case BLRFactorAlgorithm::STAR: return "Star";
       default: return "unknown";
       }
     }
 
     std::string get_name(CBConstruction a) {
       switch (a) {
-      case CBConstruction::COLWISE: return "COLWISE"; break;
-      case CBConstruction::DENSE: return "DENSE"; break;
+      case CBConstruction::COLWISE: return "COLWISE";
+      case CBConstruction::DENSE: return "DENSE";
       default: return "unknown";
       }
     }
 
     std::string get_name(CompressionKernel a) {
       switch (a) {
-      case CompressionKernel::FULL: return "full"; break;
-      case CompressionKernel::HALF: return "half"; break;
+      case CompressionKernel::FULL: return "full";
+      case CompressionKernel::HALF: return "half";
       default: return "unknown";
       }
     }
