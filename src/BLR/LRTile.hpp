@@ -54,7 +54,6 @@ namespace strumpack {
       LRTile(std::size_t m, std::size_t n, std::size_t r);
 
       LRTile(const DenseM_t& T, const Opts_t& opts);
-
       /**
        * .. by extracting individual elements
        */

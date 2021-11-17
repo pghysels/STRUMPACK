@@ -151,28 +151,28 @@ namespace strumpack {
 
     template<typename scalar_t> void BLRMatrix<scalar_t>::create_dense_gpu_tile
     (std::size_t i, std::size_t j, DenseM_t& A, gpu::DeviceMemory<scalar_t> dB) {
-      auto tmp_tile = DenseTile<scalar_t>(tile_gpu(A, i, j, db));
-      block(i, j) = std::unique_ptr<DenseTile<scalar_t>>(tmp_tile);
+      auto tmp_tile = DenseGPUTile<scalar_t>(i, i, dB, A);
+      block(i, j) = std::unique_ptr<DenseGPUTile<scalar_t>>(tmp_tile);
     }
 
-    template<typename scalar_t> DenseMatrixWrapper<scalar_t>
+    /*template<typename scalar_t> DenseMatrixWrapper<scalar_t>
     BLRMatrix<scalar_t>::tile_gpu(DenseM_t& A, std::size_t i, std::size_t j, gpu::DeviceMemory<scalar_t> dB) const {
       DenseMW_t test_tile(tilerows(i), tilecols(i), dB, tilerows(i));
       gpu::copy_host_to_device(test_tile, DenseMW_t
         (tilerows(i), tilecols(j), A, tileroff(i), tilecoff(j)));
       return test_tile
-    }
+    }*/
 
     template<typename scalar_t> void BLRMatrix<scalar_t>::create_LR_gpu_tile
     (std::size_t i, std::size_t j, DenseM_t& A, const Opts_t& opts,
      gpu::DeviceMemory<scalar_t> dB) {
-      //auto tmp_tile = LRGPUTile<scalar_t>(tile_gpu(A, i, j, db), opts);
+      auto tmp_tile = LRTile<scalar_t>(tile_gpu(A, i, j, db), opts);
       //gpu::getsvdj_buffersize<scalar_t>(handles[s], dB11.tile(i,j));
       //gpu::getsvdj<scalar_t>();
-      block(i, j) = std::unique_ptr<LRGPUTile<scalar_t>>(tmp_tile);
+      block(i, j) = std::unique_ptr<LRTile<scalar_t>>(tmp_tile);
       auto& t = tile(i, j);
       if (t.rank()*(t.rows() + t.cols()) > t.rows()*t.cols())
-        create_dense_tile(i, j, A);
+        create_dense_gpu_tile(i, j, A);
     }
 
     template<typename scalar_t> void
@@ -218,7 +218,7 @@ namespace strumpack {
         auto d0 = dmB11;
         for (std::size_t i=0, s=0; i<rb; i++) {
           B11.create_dense_gpu_tile(i, i, dA11, d0);
-          gpu::getrf(handles[s], B11.tile(i, i), dmB11 + max_tiles, 
+          B11.tile(i, i).getrf(handles[s], dmB11 + max_tiles, 
                      dpiv+B11.tileroff(i), dpiv+mem_piv);
           d0 += B11.tile(i,i).D().nonzeros();
           //off-diag compression

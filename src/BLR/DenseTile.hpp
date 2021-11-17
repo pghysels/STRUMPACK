@@ -96,6 +96,8 @@ namespace strumpack {
 
       void laswp(const std::vector<int>& piv, bool fwd) override;
 
+      void getrf(SOLVERHandle& s, scalar_t* Workspace, int* devIpiv, int* devInfo) override;
+
       void trsm_b(Side s, UpLo ul, Trans ta, Diag d,
                   scalar_t alpha, const DenseM_t& a) override;
 
@@ -176,6 +178,23 @@ namespace strumpack {
 
     private:
       DenseM_t D_;
+    };
+
+    template<typename scalar_t> class DenseGPUTile
+      : public BLRTile<scalar_t> {
+      using DenseM_t = DenseMatrix<scalar_t>;
+      using DMW_t = DenseMatrixWrapper<scalar_t>;
+      using BLRT_t = BLRTile<scalar_t>;
+      using Opts_t = BLROptions<scalar_t>;
+
+    public:
+      DenseGPUTile(std::size_t m, std::size_t n, gpu::DeviceMemory<scalar_t> dB, DenseM_t& A) {
+        D_(tilerows(m), tilecols(n), dB, tilerows(m));
+        gpu::copy_host_to_device(tile(A, m, n), D_);
+      }
+
+    private:
+      DenseMW_t D_;
     };
 
 
