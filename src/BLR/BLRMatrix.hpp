@@ -154,8 +154,6 @@ namespace strumpack {
       const BLRTile<scalar_t>& tile(std::size_t i, std::size_t j) const;
       std::unique_ptr<BLRTile<scalar_t>>& block(std::size_t i, std::size_t j);
       DenseMW_t tile(DenseM_t& A, std::size_t i, std::size_t j) const;
-      DenseMW_t tile_gpu(DenseM_t& A, std::size_t i, std::size_t j, 
-                         gpu::DeviceMemory<scalar_t> dB) const;
       DenseTile<scalar_t>& tile_dense(std::size_t i, std::size_t j);
       const DenseTile<scalar_t>& tile_dense(std::size_t i, std::size_t j) const;
 

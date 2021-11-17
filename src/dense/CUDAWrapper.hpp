@@ -357,15 +357,15 @@ namespace strumpack {
     getrs(SOLVERHandle& handle, Trans trans,
           const DenseMatrix<scalar_t>& A, const int* devIpiv,
           DenseMatrix<scalar_t>& B, int *devInfo);
-#if 0
+
     template<typename scalar_t>
-    int getsvdj_buffersize(SOLVERHandle& handle, int n);
+    int gesvdj_buffersize(SOLVERHandle& handle, int n);
 
     template<typename scalar_t> void
-    getsvdj(SOLVERHandle& handle, DenseMatrix<scalar_t>& A,
-            DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V, 
-            std::complex<double>* Workspace, int* devInfo);
-#endif
+    gesvdj(SOLVERHandle& handle, DenseMatrix<scalar_t>& A,
+           DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
+           scalar_t* Workspace, int* devInfo);
+
     template<typename scalar_t> void
     gemm(BLASHandle& handle, Trans ta, Trans tb,
          scalar_t alpha, const DenseMatrix<scalar_t>& a,

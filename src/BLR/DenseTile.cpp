@@ -38,13 +38,13 @@ namespace strumpack {
 
     template<typename scalar_t> std::unique_ptr<BLRTile<scalar_t>>
     DenseTile<scalar_t>::clone() const {
-      return std::unique_ptr<BLRTile<scalar_t>>(new DenseTile(D_));
+      return std::unique_ptr<BLRTile<scalar_t>>(new DenseTile(D()));
     }
 
     template<typename scalar_t> std::unique_ptr<LRTile<scalar_t>>
     DenseTile<scalar_t>::compress(const Opts_t& opts) const {
       return std::unique_ptr<LRTile<scalar_t>>
-        (new LRTile<scalar_t>(D_, opts));
+        (new LRTile<scalar_t>(D(), opts));
     }
 
     template<typename scalar_t> LRTile<scalar_t>
@@ -94,29 +94,29 @@ namespace strumpack {
     }
 
     template<typename scalar_t> std::vector<int> DenseTile<scalar_t>::LU() {
-      return D_.LU(params::task_recursion_cutoff_level);
+      return D().LU(params::task_recursion_cutoff_level);
     }
 
     template<typename scalar_t> void DenseTile<scalar_t>::laswp
     (const std::vector<int>& piv, bool fwd) {
-      D_.laswp(piv, fwd);
+      D().laswp(piv, fwd);
     }
 
-    template<typename scalar_t> void DenseTile<scalar_t>::getrf
-    (SOLVERHandle& s, scalar_t* Workspace, int* devIpiv, int* devInfo) {
-      gpu::getrf(s, D_, Workspace, devIpiv, devInfo);
-    }
+    // template<typename scalar_t> void DenseTile<scalar_t>::getrf
+    // (SOLVERHandle& s, scalar_t* Workspace, int* devIpiv, int* devInfo) {
+    //   gpu::getrf(s, D(), Workspace, devIpiv, devInfo);
+    // }
 
     template<typename scalar_t> void DenseTile<scalar_t>::trsm_b
     (Side s, UpLo ul, Trans ta, Diag d,
      scalar_t alpha, const DenseM_t& a) {
-      trsm(s, ul, ta, d, alpha, a, D_, params::task_recursion_cutoff_level);
+      trsm(s, ul, ta, d, alpha, a, D(), params::task_recursion_cutoff_level);
     }
 
     template<typename scalar_t> void DenseTile<scalar_t>::gemv_a
     (Trans ta, scalar_t alpha, const DenseM_t& x,
      scalar_t beta, DenseM_t& y) const {
-      gemv(ta, alpha, D_, x, beta, y,
+      gemv(ta, alpha, D(), x, beta, y,
            params::task_recursion_cutoff_level);
     }
 
@@ -130,7 +130,7 @@ namespace strumpack {
     (Trans ta, Trans tb, scalar_t alpha,
      const DenseM_t& b, scalar_t beta,
      DenseM_t& c, int task_depth) const {
-      gemm(ta, tb, alpha, D_, b, beta, c, task_depth);
+      gemm(ta, tb, alpha, D(), b, beta, c, task_depth);
     }
 
     template<typename scalar_t> void DenseTile<scalar_t>::gemm_b
@@ -138,7 +138,7 @@ namespace strumpack {
      const LRTile<scalar_t>& a, scalar_t beta,
      DenseM_t& c) const {
       DenseM_t tmp(a.rank(), tb==Trans::N ? cols() : rows());
-      gemm(ta, tb, scalar_t(1.), ta==Trans::N ? a.V() : a.U(), D_,
+      gemm(ta, tb, scalar_t(1.), ta==Trans::N ? a.V() : a.U(), D(),
            scalar_t(0.), tmp, params::task_recursion_cutoff_level);
       gemm(ta, Trans::N, alpha, ta==Trans::N ? a.U() : a.V(), tmp,
            beta, c, params::task_recursion_cutoff_level);
@@ -155,7 +155,7 @@ namespace strumpack {
     (Trans ta, Trans tb, scalar_t alpha,
      const DenseM_t& a, scalar_t beta,
      DenseM_t& c, int task_depth) const {
-      gemm(ta, tb, alpha, a, D_, beta, c, task_depth);
+      gemm(ta, tb, alpha, a, D(), beta, c, task_depth);
     }
 
     template<typename scalar_t> void DenseTile<scalar_t>::Schur_update_col_a
@@ -175,7 +175,7 @@ namespace strumpack {
     (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c,
      scalar_t* work) const {
       DMW_t temp(a.rank(), 1, work, a.rank());
-      gemv(Trans::N, scalar_t(1.), a.V(), D_.ptr(0, i), 1,
+      gemv(Trans::N, scalar_t(1.), a.V(), D().ptr(0, i), 1,
            scalar_t(0.), temp, params::task_recursion_cutoff_level);
       gemv(Trans::N, scalar_t(-1.), a.U(), temp,
            scalar_t(1.), c, 1, params::task_recursion_cutoff_level);
@@ -185,7 +185,7 @@ namespace strumpack {
     template<typename scalar_t> void DenseTile<scalar_t>::Schur_update_col_b
     (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c,
      scalar_t* work) const {
-      gemv(Trans::N, scalar_t(-1.), a.D(), D_.ptr(0, i), 1,
+      gemv(Trans::N, scalar_t(-1.), a.D(), D().ptr(0, i), 1,
            scalar_t(1.), c, 1, params::task_recursion_cutoff_level);
     }
 
@@ -197,7 +197,7 @@ namespace strumpack {
       gemv(Trans::C, scalar_t(1.), a.V(), a.U().ptr(i, 0), a.U().ld(),
            scalar_t(0.), temp.data(), temp.ld(),
            params::task_recursion_cutoff_level);
-      gemv(Trans::C, scalar_t(-1.), D_, temp.data(), temp.ld(),
+      gemv(Trans::C, scalar_t(-1.), D(), temp.data(), temp.ld(),
            scalar_t(1.), c, 1, params::task_recursion_cutoff_level);
     }
 
@@ -205,7 +205,7 @@ namespace strumpack {
     template<typename scalar_t> void DenseTile<scalar_t>::Schur_update_row_b
     (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c,
      scalar_t* work) const {
-      gemv(Trans::C, scalar_t(-1.), D_, a.D().ptr(i, 0), a.D().ld(),
+      gemv(Trans::C, scalar_t(-1.), D(), a.D().ptr(i, 0), a.D().ld(),
            scalar_t(1), c, 1, params::task_recursion_cutoff_level);
     }
 
@@ -226,7 +226,7 @@ namespace strumpack {
      DenseMatrix<scalar_t>& c, scalar_t* work) const {
       auto m = rows(); auto d = cols.size();
       DMW_t Dc(m, d, work, m), temp(a.rank(), d, Dc.end(), a.rank());
-      D_.extract_cols(cols, Dc);
+      D().extract_cols(cols, Dc);
       gemm(Trans::N, Trans::N, scalar_t(1.), a.V(), Dc,
            scalar_t(0.), temp, params::task_recursion_cutoff_level);
       gemm(Trans::N, Trans::N, scalar_t(-1.), a.U(), temp,
@@ -238,7 +238,7 @@ namespace strumpack {
      DenseMatrix<scalar_t>& c, scalar_t* work) const {
       auto d = cols.size(); auto m = rows();
       DMW_t Dc(m, d, work, m);
-      D_.extract_cols(cols, Dc);
+      D().extract_cols(cols, Dc);
       gemm(Trans::N, Trans::N, scalar_t(-1.), a.D(), Dc, scalar_t(1.), c,
            params::task_recursion_cutoff_level);
     }
@@ -251,7 +251,7 @@ namespace strumpack {
       a.U().extract_rows(rows, aUr);
       gemm(Trans::N, Trans::N, scalar_t(1.), aUr,
            a.V(), scalar_t(0.), temp, params::task_recursion_cutoff_level);
-      gemm(Trans::N, Trans::N, scalar_t(-1.), temp, D_,
+      gemm(Trans::N, Trans::N, scalar_t(-1.), temp, D(),
            scalar_t(1.), c, params::task_recursion_cutoff_level);
     }
 
@@ -261,7 +261,7 @@ namespace strumpack {
       auto d = rows.size();
       DMW_t aDr(d, a.cols(), work, d);
       a.D().extract_rows(rows, aDr);
-      gemm(Trans::N, Trans::N, scalar_t(-1.), aDr, D_, scalar_t(1), c,
+      gemm(Trans::N, Trans::N, scalar_t(-1.), aDr, D(), scalar_t(1), c,
            params::task_recursion_cutoff_level);
     }
 

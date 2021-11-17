@@ -330,6 +330,8 @@ namespace strumpack {
     template void getrs(SOLVERHandle&, Trans,
                         const DenseMatrix<std::complex<double>>&, const int*,
                         DenseMatrix<std::complex<double>>&, int*);
+
+
 #if 0
     void gesvdj_buffersize
     (SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m, int n, 
@@ -370,7 +372,7 @@ namespace strumpack {
                  reinterpret_cast<cuDoubleComplex*>(V), ldv, reinterpret_cast<cuDoubleComplex*>(Workspace),
                  lwork, info, params));
     }
-    
+
     template<typename scalar_t> void
     getsvdj(SOLVERHandle& handle, DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& U, 
             DenseMatrix<scalar_t>& V, scalar_t* Workspace, int* devInfo) {

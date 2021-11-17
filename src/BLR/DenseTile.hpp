@@ -46,20 +46,28 @@ namespace strumpack {
 
     public:
       DenseTile() {}
-      DenseTile(std::size_t m, std::size_t n) : D_(m, n) {}
-      DenseTile(const DenseM_t& D) : D_(D) {}
+      DenseTile(std::size_t m, std::size_t n) {
+        D_.reset(new DenseM_t(m, n));
+      }
+      DenseTile(const DenseM_t& D) {
+        D_.reset(new DenseM_t(D));
+      }
+      DenseTile(std::size_t m, std::size_t n,
+                scalar_t* dB, std::size_t ldB) {
+        D_.reset(new DMW_t(m, n, dB, ldB));
+      }
 
-      std::size_t rows() const override { return D_.rows(); }
-      std::size_t cols() const override { return D_.cols(); }
+      std::size_t rows() const override { return D_->rows(); }
+      std::size_t cols() const override { return D_->cols(); }
       std::size_t rank() const override { return std::min(rows(), cols()); }
 
-      std::size_t memory() const override { return D_.memory(); }
-      std::size_t nonzeros() const override { return D_.nonzeros(); }
+      std::size_t memory() const override { return D_->memory(); }
+      std::size_t nonzeros() const override { return D_->nonzeros(); }
       std::size_t maximum_rank() const override { return 0; }
       bool is_low_rank() const override { return false; };
 
-      void dense(DenseM_t& A) const override { A = D_; }
-      DenseM_t dense() const override { return D_; }
+      void dense(DenseM_t& A) const override { A = *D_; }
+      DenseM_t dense() const override { return *D_; }
 
       std::unique_ptr<BLRTile<scalar_t>> clone() const override;
 
@@ -69,13 +77,13 @@ namespace strumpack {
       void draw(std::ostream& of, std::size_t roff,
                 std::size_t coff) const override;
 
-      DenseM_t& D() override { return D_; }
-      const DenseM_t& D() const override { return D_; }
+      DenseM_t& D() override { return *D_; }
+      const DenseM_t& D() const override { return *D_; }
 
-      DenseM_t& U() override { assert(false); return D_; }
-      DenseM_t& V() override { assert(false); return D_; }
-      const DenseM_t& U() const override { assert(false); return D_; }
-      const DenseM_t& V() const override { assert(false); return D_; }
+      DenseM_t& U() override { assert(false); return *D_; }
+      DenseM_t& V() override { assert(false); return *D_; }
+      const DenseM_t& U() const override { assert(false); return *D_; }
+      const DenseM_t& V() const override { assert(false); return *D_; }
 
       LRTile<scalar_t> multiply(const BLRTile<scalar_t>& a) const override;
       LRTile<scalar_t> left_multiply(const LRTile<scalar_t>& a) const override;
@@ -89,14 +97,15 @@ namespace strumpack {
                          DenseM_t& b, DenseM_t& c) const override;
 
       scalar_t operator()(std::size_t i, std::size_t j) const override {
-        return D_(i, j);
+        return D_->operator()(i, j);
       }
 
       std::vector<int> LU() override;
 
       void laswp(const std::vector<int>& piv, bool fwd) override;
 
-      void getrf(SOLVERHandle& s, scalar_t* Workspace, int* devIpiv, int* devInfo) override;
+      // void getrf(SOLVERHandle& s, scalar_t* Workspace,
+      //            int* devIpiv, int* devInfo) override;
 
       void trsm_b(Side s, UpLo ul, Trans ta, Diag d,
                   scalar_t alpha, const DenseM_t& a) override;
@@ -177,25 +186,28 @@ namespace strumpack {
        DenseMatrix<scalar_t>& c, scalar_t* work) const override;
 
     private:
-      DenseM_t D_;
+      std::unique_ptr<DenseM_t> D_;
     };
 
-    template<typename scalar_t> class DenseGPUTile
-      : public BLRTile<scalar_t> {
-      using DenseM_t = DenseMatrix<scalar_t>;
-      using DMW_t = DenseMatrixWrapper<scalar_t>;
-      using BLRT_t = BLRTile<scalar_t>;
-      using Opts_t = BLROptions<scalar_t>;
+    // template<typename scalar_t> class DenseGPUTile
+    //   : public BLRTile<scalar_t> {
+    //   using DenseM_t = DenseMatrix<scalar_t>;
+    //   using DMW_t = DenseMatrixWrapper<scalar_t>;
+    //   using BLRT_t = BLRTile<scalar_t>;
+    //   using Opts_t = BLROptions<scalar_t>;
 
-    public:
-      DenseGPUTile(std::size_t m, std::size_t n, gpu::DeviceMemory<scalar_t> dB, DenseM_t& A) {
-        D_(tilerows(m), tilecols(n), dB, tilerows(m));
-        gpu::copy_host_to_device(tile(A, m, n), D_);
-      }
+    // public:
+    //   DenseGPUTile(std::size_t m, std::size_t n,
+    //                //gpu::DeviceMemory<scalar_t> dB,
+    //                scalar_t* dB, DenseM_t& A) {
+    //     // D_(tilerows(m), tilecols(n), dB, tilerows(m));
+    //     D_(m, n, dB, m);
+    //     gpu::copy_host_to_device(tile(A, m, n), D_);
+    //   }
 
-    private:
-      DenseMW_t D_;
-    };
+    // private:
+    //   DenseMW_t D_;
+    // };
 
 
   } // end namespace BLR
