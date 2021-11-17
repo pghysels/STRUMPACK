@@ -72,9 +72,9 @@ namespace strumpack {
     }
   };
 
-  uintptr_t round_to_8(uintptr_t p) { return (p + 7) & ~7; }
-  uintptr_t round_to_8(void* p) {
-    return round_to_8(reinterpret_cast<uintptr_t>(p));
+  uintptr_t round_to_16(uintptr_t p) { return (p + 15) & ~15; }
+  uintptr_t round_to_16(void* p) {
+    return round_to_16(reinterpret_cast<uintptr_t>(p));
   }
 
   template<typename scalar_t, typename integer_t> class LevelInfo {
@@ -115,12 +115,12 @@ namespace strumpack {
       }
       factor_size = L_size + U_size;
       work_bytes =
-        round_to_8(sizeof(scalar_t) * (Schur_size + getr_work_size)) +
-        round_to_8(sizeof(std::int64_t) * piv_size);
+        round_to_16(sizeof(scalar_t) * (Schur_size + getr_work_size)) +
+        round_to_16(sizeof(std::int64_t) * piv_size);
       ea_bytes =
-        round_to_8(sizeof(AssembleData<scalar_t>) * f.size()) +
-        round_to_8(sizeof(std::size_t) * Isize) +
-        round_to_8(sizeof(Triplet<scalar_t>) * (elems11 + elems12 + elems21));
+        round_to_16(sizeof(AssembleData<scalar_t>) * f.size()) +
+        round_to_16(sizeof(std::size_t) * Isize) +
+        round_to_16(sizeof(Triplet<scalar_t>) * (elems11 + elems12 + elems21));
     }
 
     void print_info(int l, int lvls) {
@@ -182,7 +182,7 @@ namespace strumpack {
         F->scratchpad_ = smem;
         smem += F->scratchpad_size_;
       }
-      auto imem = reinterpret_cast<std::int64_t*>(round_to_8(smem));
+      auto imem = reinterpret_cast<std::int64_t*>(round_to_16(smem));
       for (auto F : f) {
         F->piv_ = imem;
         imem += F->dim_sep();
@@ -270,7 +270,7 @@ namespace strumpack {
       // schur updates, pivot vectors, cuSOLVER work space,
       // assembly data (indices, sparse elements)
       std::size_t level_mem =
-        round_to_8(L.factor_size*sizeof(scalar_t))
+        round_to_16(L.factor_size*sizeof(scalar_t))
         + L.work_bytes + L.ea_bytes;
       // the contribution blocks of the previous level are still
       // needed for the extend-add
@@ -371,16 +371,16 @@ namespace strumpack {
     }
     ne[N] = std::array<std::size_t,3>{e11.size(), e12.size(), e21.size()};
     auto hasmbl = reinterpret_cast<AssembleData<scalar_t>*>(hea_mem);
-    auto Iptr = reinterpret_cast<std::size_t*>(round_to_8(hasmbl + N));
+    auto Iptr = reinterpret_cast<std::size_t*>(round_to_16(hasmbl + N));
     {
-      auto helems = reinterpret_cast<Trip_t*>(round_to_8(Iptr + L.Isize));
+      auto helems = reinterpret_cast<Trip_t*>(round_to_16(Iptr + L.Isize));
       std::copy(e11.begin(), e11.end(), helems);
       std::copy(e12.begin(), e12.end(), helems + e11.size());
       std::copy(e21.begin(), e21.end(), helems + e11.size() + e12.size());
     }
     auto dasmbl = reinterpret_cast<AssembleData<scalar_t>*>(dea_mem);
-    auto dIptr = reinterpret_cast<std::size_t*>(round_to_8(dasmbl + N));
-    auto delems = reinterpret_cast<Trip_t*>(round_to_8(dIptr + L.Isize));
+    auto dIptr = reinterpret_cast<std::size_t*>(round_to_16(dasmbl + N));
+    auto delems = reinterpret_cast<Trip_t*>(round_to_16(dIptr + L.Isize));
     auto de11 = delems;
     auto de12 = de11 + e11.size();
     auto de21 = de12 + e12.size();
@@ -455,25 +455,25 @@ namespace strumpack {
       std::size_t nb = 0;
       for (auto& l : L) nb = std::max(nb, l.f.size());
       auto bytes =
-        round_to_8(nb * 2 * sizeof(std::int64_t)) +  // ds, du
-        round_to_8(nb * 5 * sizeof(void*)) +         // F11, F12, F21, F22, piv
-        round_to_8(nb * 2 * sizeof(scalar_t)) +      // alpha, beta
-        round_to_8(nb * sizeof(std::int64_t)) +      // group_sizes
-        round_to_8(nb * sizeof(oneapi::mkl::transpose)); // op
+        round_to_16(nb * 2 * sizeof(std::int64_t)) +  // ds, du
+        round_to_16(nb * 5 * sizeof(void*)) +         // F11, F12, F21, F22, piv
+        round_to_16(nb * 2 * sizeof(scalar_t)) +      // alpha, beta
+        round_to_16(nb * sizeof(std::int64_t)) +      // group_sizes
+        round_to_16(nb * sizeof(oneapi::mkl::transpose)); // op
       hmem_ = dpcpp::HostMemory<char>(bytes, q);
       ds = hmem_.as<std::int64_t>();
       du = ds + nb;
-      F11 = reinterpret_cast<scalar_t**>(round_to_8(du + nb));
+      F11 = reinterpret_cast<scalar_t**>(round_to_16(du + nb));
       F12 = F11 + nb;
       F21 = F12 + nb;
       F22 = F21 + nb;
-      piv = reinterpret_cast<std::int64_t**>(round_to_8(F22 + nb));
-      alpha = reinterpret_cast<scalar_t*>(round_to_8(piv + nb));
+      piv = reinterpret_cast<std::int64_t**>(round_to_16(F22 + nb));
+      alpha = reinterpret_cast<scalar_t*>(round_to_16(piv + nb));
       beta = alpha + nb;
       group_sizes = reinterpret_cast<std::int64_t*>
-        (round_to_8(beta + nb));
+        (round_to_16(beta + nb));
       op = reinterpret_cast<oneapi::mkl::transpose*>
-        (round_to_8(group_sizes + nb));
+        (round_to_16(group_sizes + nb));
       dpcpp::fill(q, alpha, scalar_t(-1.), nb);
       dpcpp::fill(q, beta, scalar_t(1.), nb);
       dpcpp::fill(q, group_sizes, std::int64_t(1), nb);
@@ -689,7 +689,7 @@ namespace strumpack {
           work_mem = all_dmem + peak_dmem - L.work_bytes;
           dea_mem = work_mem - L.ea_bytes;
           dev_factors = reinterpret_cast<scalar_t*>
-            (dea_mem - round_to_8(L.factor_size * sizeof(scalar_t)));
+            (dea_mem - round_to_16(L.factor_size * sizeof(scalar_t)));
         }
         dpcpp::fill(q, dev_factors, scalar_t(0.), L.factor_size);
         dpcpp::fill(q, reinterpret_cast<scalar_t*>(work_mem),
