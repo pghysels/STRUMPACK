@@ -154,6 +154,8 @@ namespace strumpack {
       const BLRTile<scalar_t>& tile(std::size_t i, std::size_t j) const;
       std::unique_ptr<BLRTile<scalar_t>>& block(std::size_t i, std::size_t j);
       DenseMW_t tile(DenseM_t& A, std::size_t i, std::size_t j) const;
+      DenseMW_t tile_gpu(DenseM_t& A, std::size_t i, std::size_t j, 
+                         gpu::DeviceMemory<scalar_t> dB) const;
       DenseTile<scalar_t>& tile_dense(std::size_t i, std::size_t j);
       const DenseTile<scalar_t>& tile_dense(std::size_t i, std::size_t j) const;
 
@@ -246,6 +248,7 @@ namespace strumpack {
       void create_dense_tile(std::size_t i, std::size_t j, DenseM_t& A);
       void create_dense_tile(std::size_t i, std::size_t j,
                              const extract_t<scalar_t>& Aelem);
+      void create_dense_gpu_tile(std::size_t i, std::size_t j, DenseM_t& A, gpu::DeviceMemory<scalar_t> dB);
       void create_dense_tile_left_looking(std::size_t i, std::size_t j,
                                           const extract_t<scalar_t>& Aelem);
       void create_dense_tile_left_looking(std::size_t i, std::size_t j,
@@ -255,6 +258,9 @@ namespace strumpack {
                                           const BLRMatrix<scalar_t>& B12);
       void create_LR_tile(std::size_t i, std::size_t j,
                           DenseM_t& A, const Opts_t& opts);
+      void create_LR_gpu_tile(std::size_t i, std::size_t j, 
+                              DenseM_t& A, const Opts_t& opts,
+                              gpu::DeviceMemory<scalar_t> dB);
       void create_LR_tile_left_looking(std::size_t i, std::size_t j,
                                        const extract_t<scalar_t>& Aelem,
                                        const Opts_t& opts);
