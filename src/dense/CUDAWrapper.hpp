@@ -359,9 +359,9 @@ namespace strumpack {
           DenseMatrix<scalar_t>& B, int *devInfo);
 
     template<typename scalar_t> void
-    trsm(SOLVERHandle& handle, Trans trans,
-          const DenseMatrix<scalar_t>& A, const int* devIpiv,
-          DenseMatrix<scalar_t>& B, int *devInfo);
+    trsm(SOLVERHandle& handle, Side side, UpLo uplo,
+         Trans trans, Diag diag, const scalar_t* alpha,
+         const DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& B);
 
     template<typename scalar_t>
     int gesvdj_buffersize(SOLVERHandle& handle, int n);

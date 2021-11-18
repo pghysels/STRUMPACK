@@ -49,6 +49,15 @@ namespace strumpack {
       int getrf(DenseMatrix<std::complex<float>>& A, int* dpiv);
       int getrf(DenseMatrix<std::complex<double>>& A, int* dpiv);
 
+      void laswp(DenseMatrix<float>& A, int* dpiv, 
+                 magma_queue_t queue, int k1, int k2, int inci);
+      void laswp(DenseMatrix<double>& A, int* dpiv, 
+                 magma_queue_t queue, int k1, int k2, int inci);
+      void laswp(DenseMatrix<std::complex<float>>& A, int* dpiv, 
+                 magma_queue_t queue, int k1, int k2, int inci);
+      void laswp(DenseMatrix<std::complex<double>>& A, int* dpiv, 
+                 magma_queue_t queue, int k1, int k2, int inci);
+
       void gemm_vbatched(magma_trans_t transA, magma_trans_t transB,
                          magma_int_t * m, magma_int_t * n, magma_int_t * k,
                          float alpha,

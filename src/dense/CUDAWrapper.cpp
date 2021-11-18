@@ -69,7 +69,7 @@ namespace strumpack {
       case Diag::U: return CUBLAS_DIAG_UNIT;
       default:
         assert(false);
-        return CUBLAS_DIAG_NON_UNIT;
+        return CUBLAS_DIAG_UNIT;
     }
 
     void cuda_assert(cudaError_t code, const char *file, int line,
