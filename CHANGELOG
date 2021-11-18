@@ -1,3 +1,10 @@
+Version 6.2.1 Released November 2021
+====================================
+- HIP compilation fix
+- Change default minimum front size for compression to very large
+  values, use minimum separator size instead.
+
+
 Version 6.2.0 Released November 2021
 ====================================
 Bugfix release, with some changes in the C interface.
