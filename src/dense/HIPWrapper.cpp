@@ -30,6 +30,9 @@
 
 #include <hip/hip_runtime.h>
 #include "HIPWrapper.hpp"
+#if defined(STRUMPACK_USE_MPI)
+#include "misc/MPIWrapper.hpp"
+#endif
 
 namespace strumpack {
   namespace gpu {
