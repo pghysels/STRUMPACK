@@ -213,13 +213,13 @@ namespace strumpack {
               B11.create_LR_gpu_tile(i, j, A11, opts, d0);
               // laswp
               gpu::laswp(B11.tile(i, i).D(), dpiv+B11.tileroff(i));
-              gpu::trsm(... Side::L, UpLo::L, Trans::N, Diag::U,
+              gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                         scalar_t(1.), B11.tile(i, i).D(), B11.tile(i, j).U());
             } else {
               B11.create_dense_gpu_tile(i, j, dA11, d0);
               // laswp
               gpu::laswp(... B11.tile(i, i).D(), dpiv+B11.tileroff(i));
-              gpu::trsm(... Side::L, UpLo::L, Trans::N, Diag::U,
+              gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                         scalar_t(1.), B11.tile(i, i).D(), B11.tile(i, j).D());
             }
             d0 += B11.tile(i, j).nonzeros();
@@ -227,11 +227,11 @@ namespace strumpack {
           for (std::size_t j=i+1; j<rb; j++) {
             if (admissible(j, i)) {
               B11.create_LR_gpu_tile(j, i, A11, opts, d0);
-              gpu::trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+              gpu::trsm(handles[s], Side::R, UpLo::U, Trans::N, Diag::N,
                         scalar_t(1.), B11.tile(i, i).D(), B11.tile(j, i).V());
             } else {
               B11.create_dense_gpu_tile(j, i, dA11, d0);
-              gpu::trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+              gpu::trsm(handles[s], Side::R, UpLo::U, Trans::N, Diag::N,
                         scalar_t(1.), B11.tile(i, i).D(), B11.tile(j, i).D());
             }
             d0 += B11.tile(j, i).nonzeros();

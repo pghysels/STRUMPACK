@@ -44,6 +44,34 @@ namespace strumpack {
       }
     }
 
+    cublasSideMode_t S2cuOp(Side op) {
+      switch () {
+      case Side::L: return CUBLAS_SIDE_LEFT;
+      case Side::R: return CUBLAS_SIDE_RIGHT;
+      default:
+        assert(false);
+        return CUBLAS_SIDE_LEFT;
+      }
+    }
+
+    cublasFillMode_t U2cuOp(UpLo op) {
+      switch () {
+      case UpLo::L: return CUBLAS_FILL_MODE_LOWER;
+      case UpLo::U: return CUBLAS_FILL_MODE_UPPER;
+      default:
+        assert(false);
+        return CUBLAS_FILL_MODE_LOWER;
+    }
+
+    cublasDiagType_t D2cuOp(Diag op) {
+      switch () {
+      case Diag::N: return CUBLAS_DIAG_NON_UNIT;
+      case Diag::U: return CUBLAS_DIAG_UNIT;
+      default:
+        assert(false);
+        return CUBLAS_DIAG_NON_UNIT;
+    }
+
     void cuda_assert(cudaError_t code, const char *file, int line,
                      bool abrt) {
       if (code != cudaSuccess) {
@@ -331,7 +359,68 @@ namespace strumpack {
                         const DenseMatrix<std::complex<double>>&, const int*,
                         DenseMatrix<std::complex<double>>&, int*);
 
+    void trsm(SOLVERHandle& handle, cublasSideMode_t side, 
+              cublasFillMode_t uplo, cublasOperation_t trans,
+              cublasDiagType_t diag, int m, int n, const float* alpha,
+              const float* A, int lda, float* B, int ldb) {
+      //STRUMPACK_FLOPS();
+      gpu_check(cublasStrsm(handle, side, uplo, trans, diag, m, 
+                            n, alpha, A, lda, B, ldb));
+    }
 
+    void trsm(SOLVERHandle& handle, cublasSideMode_t side, 
+              cublasFillMode_t uplo, cublasOperation_t trans,
+              cublasDiagType_t diag, int m, int n, const double* alpha,
+              const double* A, int lda, double* B, int ldb) {
+      //STRUMPACK_FLOPS();
+      gpu_check(cublasDtrsm(handle, side, uplo, trans, diag, m, 
+                            n, alpha, A, lda, B, ldb));
+    }
+
+    void trsm(SOLVERHandle& handle, cublasSideMode_t side, 
+              cublasFillMode_t uplo, cublasOperation_t trans,
+              cublasDiagType_t diag, int m, int n, 
+              std::complex<float>* alpha, std::complex<float>* A, 
+              int lda, std::complex<float>* B, int ldb) {
+      //STRUMPACK_FLOPS();
+      gpu_check(cublasCtrsm(handle, side, uplo, trans, diag, m, n, 
+                            reinterpret_cast<const cuComplex*>(alpha), 
+                            reinterpret_cast<const cuComplex*>(A), lda, 
+                            reinterpret_cast<const cuComplex*>(B), ldb));
+    }
+
+    void trsm(SOLVERHandle& handle, cublasSideMode_t side, 
+              cublasFillMode_t uplo, cublasOperation_t trans,
+              cublasDiagType_t diag, int m, int n, 
+              std::complex<double>* alpha, std::complex<double>* A, 
+              int lda, std::complex<double>* B, int ldb) {
+      //STRUMPACK_FLOPS();
+      gpu_check(cublasZtrsm(handle, side, uplo, trans, diag, m, n, 
+                            reinterpret_cast<const cuDoubleComplex*>(alpha), 
+                            reinterpret_cast<const cuDoubleComplex*>(A), lda, 
+                            reinterpret_cast<const cuDoubleComplex*>(B), ldb));
+    }
+
+    template<typename scalar_t> void
+    trsm(SOLVERHandle& handle, Side side, UpLo uplo,
+         Trans trans, Diag diag, const scalar_t* alpha,
+          const DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& B) {
+      trsm(handle, S2cuOp(side), U2cuOp(uplo), T2cuOp(trans), Diag(diag), B.rows(), B.cols(), 
+           alpha, A.data(), A.ld(), B.data(), B.ld());
+    }
+
+    template void trsm(SOLVERHandle&, Side, UpLo, Trans, Diag, const float*,
+                       const DenseMatrix<float>&, DenseMatrix<float>&);
+    template void trsm(SOLVERHandle&, Side, UpLo, Trans, Diag, const double*,
+                       const DenseMatrix<double>&, DenseMatrix<double>&);
+    template void trsm(SOLVERHandle&, Side, UpLo, Trans, Diag, 
+                       const std::complex<float>*, 
+                       const DenseMatrix<std::complex<float>>&, 
+                       DenseMatrix<std::complex<float>>&);
+    template void trsm(SOLVERHandle&, Side, UpLo, Trans, Diag, 
+                       const std::complex<double>*,
+                       const DenseMatrix<std::complex<double>>&, 
+                       DenseMatrix<std::complex<double>>&);
 #if 0
     void gesvdj_buffersize
     (SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m, int n, 
