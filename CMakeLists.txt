@@ -591,7 +591,9 @@ endif()
 
 if(ButterflyPACK_FOUND)
   target_link_libraries(strumpack PUBLIC
+    ButterflyPACK::sbutterflypack
     ButterflyPACK::dbutterflypack
+    ButterflyPACK::cbutterflypack
     ButterflyPACK::zbutterflypack
     MPI::MPI_Fortran ${MPI_Fortran_LIBRARIES})
   ## for some reason just adding the MPI::MPI_Fortran target only
