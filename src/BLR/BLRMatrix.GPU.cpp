@@ -222,7 +222,7 @@ namespace strumpack {
             if (admissible(i, j)) {
               B11.create_LR_gpu_tile(i, j, A11, opts, d0);
 #if defined(STRUMPACK_USE_MAGMA)
-              gpu::magma::laswp(B11.tile(i, i).D(), dpiv+B11.tileroff(i), 
+              gpu::magma::laswp(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
                                 q, 1, B11.tilerows(i), 1);
               gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                         scalar_t(1.), B11.tile(i, i).D(), B11.tile(i, j).U());
@@ -233,7 +233,7 @@ namespace strumpack {
             } else {
               B11.create_dense_gpu_tile(i, j, dA11, d0);
 #if defined(STRUMPACK_USE_MAGMA)
-              gpu::magma::laswp(B11.tile(i, i).D(), dpiv+B11.tileroff(i), 
+              gpu::magma::laswp(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
                                 q, 1, B11.tilerows(i), 1);
               gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                         scalar_t(1.), B11.tile(i, i).D(), B11.tile(i, j).D());
