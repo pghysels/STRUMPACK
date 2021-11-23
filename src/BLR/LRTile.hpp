@@ -79,8 +79,9 @@ namespace strumpack {
                                       DenseMatrix<scalar_t>&)>& Tcol,
              const Opts_t& opts);
 
-      LRTile(std::size_t m, std::size_t n,
-                DenseM_t& dB, std::size_t ldB);
+      //TODO
+      LRTile(std::size_t m, std::size_t n, DenseM_t& A, DenseM_t& dBU, 
+             DenseM_t& dBV, gpu::BLASHandle& handle, std::size_t i, std::size_t j);
 
       std::size_t rows() const override { return U_.rows(); }
       std::size_t cols() const override { return V_.cols(); }
@@ -211,7 +212,7 @@ namespace strumpack {
                                scalar_t* work) const override;
 
     private:
-      DenseM_t U_, V_;
+      DenseM_t U_, V_;//ptr
     };
 
 

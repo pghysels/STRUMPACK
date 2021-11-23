@@ -52,14 +52,13 @@ namespace strumpack {
       DenseTile(const DenseM_t& D) {
         D_.reset(new DenseM_t(D));
       }
-      DenseTile(std::size_t m, std::size_t n,
-                scalar_t* dB, std::size_t ldB) {
-        D_.reset(new DMW_t(m, n, dB, ldB));
+      DenseTile(const DenseMW_t& D) {
+        D_.reset(new DenseMW_t(D));
       }
-      DenseTile(std::size_t m, std::size_t n, DenseM_t& dB, 
-                std::size_t i, std::size_t j) {
-        D_.reset(new DMW_t(m, n, dB, i, j));
-      }
+      // DenseTile(std::size_t m, std::size_t n,
+      //           scalar_t* dB, std::size_t ldB) {
+      //   D_.reset(new DMW_t(m, n, dB, ldB));
+      // }
 
       std::size_t rows() const override { return D_->rows(); }
       std::size_t cols() const override { return D_->cols(); }
