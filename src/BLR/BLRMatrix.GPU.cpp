@@ -190,10 +190,13 @@ namespace strumpack {
 #if 1 // B11 on GPU
         auto dsep = A11.rows();
         int nr_streams = 4;
-        std::vector<gpu::Stream> streams(nr_streams);
+        std::vector<gpu::Stream> streams(nr_streams), comp_stream;
+        std::vector<gpu::SOLVERHandle> solvehandles(nr_streams);
         std::vector<gpu::BLASHandle> handles(nr_streams);
-        for (int i=0; i<nr_streams; i++)
+        for (int i=0; i<nr_streams; i++) {
+          solvehandles[i].set_stream(streams[i]);
           handles[i].set_stream(streams[i]);
+        }
 #if defined(STRUMPACK_USE_MAGMA)
         magma_init();
         magma_queue_t q;
@@ -207,7 +210,7 @@ namespace strumpack {
         gpu::DeviceMemory<scalar_t> dmB11(dsep*dsep);
         gpu::DeviceMemory<scalar_t> getrf_work
           (gpu::getrf_buffersize<scalar_t>
-           (handles[s], *std::max_element(tiles1.begin(), tiles1.end())));
+           (solvehandles[0], *std::max_element(tiles1.begin(), tiles1.end())));
         gpu::DeviceMemory<int> dpiv(dsep+1);
         std::size_t max_m = 0, max_n = 0;
         for (std::size_t k=0; k<rb; k++) {
@@ -223,7 +226,7 @@ namespace strumpack {
                            B11.tileroff(i), B11.tilecoff(i));
             B11.create_dense_gpu_tile(i, i, A11, dAij);
           }
-          gpu::getrf(handles[s], B11.tile(i, i).D(), getrf_work,
+          gpu::getrf(solvehandles[s], B11.tile(i, i).D(), getrf_work,
                      dpiv+B11.tileroff(i), dpiv+dsep);
           for (std::size_t j=i+1; j<rb; j++) {
             if (admissible(i, j)) {
@@ -233,7 +236,7 @@ namespace strumpack {
                                 B11.tileroff(i), B11.tilecoff(j));
                 DenseMW_t dAijV(max_rank, B11.tilecols(j), dA11,
                                B11.tileroff(i), B11.tilecoff(j));
-                B11.create_LR_gpu_tile(i, j, A11, dAijU, dAijV, handles[s]);
+                B11.create_LR_gpu_tile(i, j, A11, dAijU, dAijV, solvehandles[s]);
               } else B11.tile(i,j).compress();
 #if defined(STRUMPACK_USE_MAGMA)
               gpu::magma::laswp(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
@@ -241,7 +244,7 @@ namespace strumpack {
               gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                         scalar_t(1.), B11.tile(i, i).D(), B11.tile(i, j).U());
 #else
-              gpu::getrs(handles[s], Trans::N, B11.tile(i, i).D(), 
+              gpu::getrs(solvehandles[s], Trans::N, B11.tile(i, i).D(), 
                          dpiv+B11.tileroff(i), B11.tile(i, j).U(), dpiv+dsep);
 #endif
             } else {
@@ -256,7 +259,7 @@ namespace strumpack {
               gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                         scalar_t(1.), B11.tile(i, i).D(), B11.tile(i, j).D());
 #else
-              gpu::getrs(handles[s], Trans::N, B11.tile(i, i).D(), 
+              gpu::getrs(solvehandles[s], Trans::N, B11.tile(i, i).D(), 
                          dpiv+B11.tileroff(i), B11.tile(i, j).D(), dpiv+dsep);
 #endif
             }
@@ -264,7 +267,12 @@ namespace strumpack {
           for (std::size_t j=i+1; j<rb; j++) {
             if (admissible(j, i)) {
               if (i == 0) { 
-                B11.create_LR_gpu_tile(j, i, A11, d0, handles[s]);
+                std::size_t max_rank = std::min(B11.tilerows(j), B11.tilecols(i));
+                DenseMW_t dAijU(B11.tilerows(j), max_rank, dA11,
+                                B11.tileroff(j), B11.tilecoff(i));
+                DenseMW_t dAijV(max_rank, B11.tilecols(i), dA11,
+                               B11.tileroff(j), B11.tilecoff(i));
+                B11.create_LR_gpu_tile(j, i, A11, dAijU, dAijV, solvehandles[s]);
               } else B11.tile(j,i).compress();
 #if defined(STRUMPACK_USE_MAGMA)
               gpu::trsm(handles[s], Side::R, UpLo::U, Trans::N, Diag::N,
