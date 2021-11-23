@@ -434,19 +434,52 @@ namespace strumpack {
 
     void gesvdj_buffersize
     (SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m, int n, 
-     std::complex<double>* A, int lda, double *S, std::complex<double>* U, 
-     int ldu, std::complex<double>* V, int ldv, int *lwork, 
+     const float* A, int lda, const float *S, const float* U, 
+     int ldu, const float* V, int ldv, int *lwork, 
      gesvdjInfo_t params) {
-      gpu_check(cusolverDnZgesvdj_bufferSize
+      gpu_check(cusolverDnSgesvdj_bufferSize
+                (handle, jobz, econ, m, n, A, lda, S,
+                 U, ldu, V, ldv, lwork, params));
+    }
+
+    void gesvdj_buffersize
+    (SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m, int n, 
+     const double* A, int lda, const double *S, const double* U, 
+     int ldu, const double* V, int ldv, int *lwork, 
+     gesvdjInfo_t params) {
+      gpu_check(cusolverDnDgesvdj_bufferSize
+                (handle, jobz, econ, m, n, A, lda, S,
+                 U, ldu, V, ldv, lwork, params));
+    }
+
+    void gesvdj_buffersize
+    (SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m, int n, 
+     const std::complex<float>* A, int lda, const float *S, const std::complex<float>* U, 
+     int ldu, const std::complex<float>* V, int ldv, int *lwork, 
+     gesvdjInfo_t params) {
+      gpu_check(cusolverDnCgesvdj_bufferSize
                 (handle, jobz, econ, m, n,
-                 reinterpret_cast<cuDoubleComplex*>(A), lda, S,
-                 reinterpret_cast<cuDoubleComplex*>(U), ldu,
-                 reinterpret_cast<cuDoubleComplex*>(V), ldv,
+                 reinterpret_cast<const cuComplex*>(A), lda, S,
+                 reinterpret_cast<const cuComplex*>(U), ldu,
+                 reinterpret_cast<const cuComplex*>(V), ldv,
                  lwork, params));
     }
 
-    template<typename scalar_t> int gesvdj_buffersize
-    (SOLVERHandle& handle, int m, int n, double& S, int Lwork, gesvdjInfo_t params) {
+    void gesvdj_buffersize
+    (SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m, int n, 
+     const std::complex<double>* A, int lda, const double *S, const std::complex<double>* U, 
+     int ldu, const std::complex<double>* V, int ldv, int *lwork, 
+     gesvdjInfo_t params) {
+      gpu_check(cusolverDnZgesvdj_bufferSize
+                (handle, jobz, econ, m, n,
+                 reinterpret_cast<const cuDoubleComplex*>(A), lda, S,
+                 reinterpret_cast<const cuDoubleComplex*>(U), ldu,
+                 reinterpret_cast<const cuDoubleComplex*>(V), ldv,
+                 lwork, params));
+    }
+
+    template<typename scalar_t, typename real_t> int gesvdj_buffersize
+    (SOLVERHandle& handle, int m, int n, real_t& S, int Lwork, gesvdjInfo_t params) {
       int econ = 1;
       cusolverEigMode_t jobz = CUSOLVER_EIG_MODE_VECTOR;
       //gesvdjInfo_t params = nullptr;
@@ -458,8 +491,50 @@ namespace strumpack {
       return Lwork;
     }
 
+    template int gesvdj_buffersize<float>
+      (SOLVERHandle&, int, int, float&, int, gesvdjInfo_t);
+      
+    template int gesvdj_buffersize<double>
+      (SOLVERHandle&, int, int, double&, int, gesvdjInfo_t);
+
+    template int gesvdj_buffersize<std::complex<float>>
+      (SOLVERHandle&, int, int, float&, int, gesvdjInfo_t);
+      
     template int gesvdj_buffersize<std::complex<double>>
       (SOLVERHandle&, int, int, double&, int, gesvdjInfo_t);
+    
+    void gesvdj(SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m, 
+                 int n, float* A, int lda, float* S, float* U, int ldu, 
+                 float* V, int ldv, float* Workspace, int lwork, 
+                 int *info, gesvdjInfo_t params) {
+      //STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
+      gpu_check(cusolverDnSgesvdj
+                (handle, jobz, econ, n, n, A, lda, S, U, ldu, V, ldv, 
+                 Workspace,lwork, info, params));
+    }
+    
+    void gesvdj(SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m, 
+                 int n, double* A, int lda, double* S, double* U, int ldu, 
+                 double* V, int ldv, double* Workspace, int lwork, 
+                 int *info, gesvdjInfo_t params) {
+      //STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
+      gpu_check(cusolverDnDgesvdj
+                (handle, jobz, econ, n, n, A, lda, S, U, ldu, V, ldv, 
+                 Workspace,lwork, info, params));
+    }
+    
+    void gesvdj(SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m, 
+                 int n, std::complex<float>* A, int lda, float* S, 
+                 std::complex<float>* U, int ldu, std::complex<float>* V, 
+                 int ldv, std::complex<float>* Workspace, int lwork, 
+                 int *info, gesvdjInfo_t params) {
+      //STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
+      gpu_check(cusolverDnCgesvdj
+                (handle, jobz, econ, n, n, reinterpret_cast<cuComplex*>(A), 
+                 lda, S, reinterpret_cast<cuComplex*>(U), ldu,
+                 reinterpret_cast<cuComplex*>(V), ldv, 
+                 reinterpret_cast<cuComplex*>(Workspace),lwork, info, params));
+    }
 
     void gesvdj(SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m, 
                  int n, std::complex<double>* A, int lda, double* S, 
@@ -474,8 +549,8 @@ namespace strumpack {
                  reinterpret_cast<cuDoubleComplex*>(Workspace),lwork, info, params));
     }
 
-    template<typename scalar_t> void
-    gesvdj(SOLVERHandle& handle, DenseMatrix<scalar_t>& A, double& d_S, 
+    template<typename scalar_t, typename real_t> void
+    gesvdj(SOLVERHandle& handle, DenseMatrix<scalar_t>& A, real_t& d_S, 
            DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V, 
            scalar_t* Workspace, int Lwork, int* devInfo, gesvdjInfo_t params) {
       int econ = 1;
@@ -484,6 +559,18 @@ namespace strumpack {
               V, A.cols(), Workspace, Lwork, devInfo, params);
     }
 
+    template void gesvdj(SOLVERHandle&, DenseMatrix<float>&, float&
+                         DenseMatrix<float>&, DenseMatrix<float>&, 
+                         float*, int, int*, gesvdjInfo_t);
+
+    template void gesvdj(SOLVERHandle&, DenseMatrix<double>&, double&
+                         DenseMatrix<double>&, DenseMatrix<double>&, 
+                         double*, int, int*, gesvdjInfo_t);
+    
+    template void gesvdj(SOLVERHandle&, DenseMatrix<std::complex<float>>&, float&
+                          DenseMatrix<std::complex<float>>&, DenseMatrix<std::complex<float>>&, 
+                          std::complex<float>*, int, int*, gesvdjInfo_t);
+    
     template void gesvdj(SOLVERHandle&, DenseMatrix<std::complex<double>>&, double&
                           DenseMatrix<std::complex<double>>&, DenseMatrix<std::complex<double>>&, 
                           std::complex<double>*, int, int*, gesvdjInfo_t);

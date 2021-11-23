@@ -187,7 +187,7 @@ namespace strumpack {
       auto rb = B11.rowblocks();
       auto rb2 = B21.rowblocks();
       {
-#if 1 // B11 on GPU
+#if 0 // B11 on GPU
         auto dsep = A11.rows();
         int nr_streams = 4;
         std::vector<gpu::Stream> streams(nr_streams), comp_stream;
