@@ -559,19 +559,19 @@ namespace strumpack {
               V, A.cols(), Workspace, Lwork, devInfo, params);
     }
 
-    template void gesvdj(SOLVERHandle&, DenseMatrix<float>&, float&
+    template void gesvdj(SOLVERHandle&, DenseMatrix<float>&, float&,
                          DenseMatrix<float>&, DenseMatrix<float>&, 
                          float*, int, int*, gesvdjInfo_t);
 
-    template void gesvdj(SOLVERHandle&, DenseMatrix<double>&, double&
+    template void gesvdj(SOLVERHandle&, DenseMatrix<double>&, double&,
                          DenseMatrix<double>&, DenseMatrix<double>&, 
                          double*, int, int*, gesvdjInfo_t);
     
-    template void gesvdj(SOLVERHandle&, DenseMatrix<std::complex<float>>&, float&
+    template void gesvdj(SOLVERHandle&, DenseMatrix<std::complex<float>>&, float&,
                           DenseMatrix<std::complex<float>>&, DenseMatrix<std::complex<float>>&, 
                           std::complex<float>*, int, int*, gesvdjInfo_t);
     
-    template void gesvdj(SOLVERHandle&, DenseMatrix<std::complex<double>>&, double&
+    template void gesvdj(SOLVERHandle&, DenseMatrix<std::complex<double>>&, double&,
                           DenseMatrix<std::complex<double>>&, DenseMatrix<std::complex<double>>&, 
                           std::complex<double>*, int, int*, gesvdjInfo_t);
 
