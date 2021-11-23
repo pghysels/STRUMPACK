@@ -66,6 +66,25 @@ namespace strumpack {
       }
     }
 
+    template<typename scalar_t> LRTile<scalar_t>::LRTile
+    (std::size_t m, std::size_t n, DenseM_t& A, DenseM_t& dBU, DenseM_t& dBV, 
+     gpu::BLASHandle& handle, std::size_t i, std::size_t j) {
+       if (m == 0 || n == 0) {
+        U_ = DMW_t(m, 0, dBU, i, j);
+        V_ = DMW_t(0, n, dBV, i, j);
+      } else {
+        gpu::DeviceMemory<double> d_S(minmn);
+        int Lwork = 0;
+        gesvdjInfo_t params = nullptr;
+        gpu::DeviceMemory<scalar_t> gesvd_work
+          (gpu::gesvdj_buffersize<scalar_t>
+           (handle, m, n, d_S, Lwork, params));
+        U_ = DMW_t(m, std::min(m,n), dBU, i, j);
+        V_ = DMW_t(std::min(m,n), n, dBV, i, j);
+        gpu::gesvdj<scalar_t>(handle, A, d_S, U_, V_, gesvd_work, Lwork, params);
+      }
+    }
+
     template<typename scalar_t> LRTile<scalar_t>
     LRTile<scalar_t>::multiply(const BLRTile<scalar_t>& a) const {
       return a.left_multiply(*this);

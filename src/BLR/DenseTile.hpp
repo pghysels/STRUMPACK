@@ -53,8 +53,12 @@ namespace strumpack {
         D_.reset(new DenseM_t(D));
       }
       DenseTile(std::size_t m, std::size_t n,
-                DenseM_t& dB, std::size_t ldB) {
+                scalar_t* dB, std::size_t ldB) {
         D_.reset(new DMW_t(m, n, dB, ldB));
+      }
+      DenseTile(std::size_t m, std::size_t n, DenseM_t& dB, 
+                std::size_t i, std::size_t j) {
+        D_.reset(new DMW_t(m, n, dB, i, j));
       }
 
       std::size_t rows() const override { return D_->rows(); }
@@ -188,27 +192,6 @@ namespace strumpack {
     private:
       std::unique_ptr<DenseM_t> D_;
     };
-
-    // template<typename scalar_t> class DenseGPUTile
-    //   : public BLRTile<scalar_t> {
-    //   using DenseM_t = DenseMatrix<scalar_t>;
-    //   using DMW_t = DenseMatrixWrapper<scalar_t>;
-    //   using BLRT_t = BLRTile<scalar_t>;
-    //   using Opts_t = BLROptions<scalar_t>;
-
-    // public:
-    //   DenseGPUTile(std::size_t m, std::size_t n,
-    //                //gpu::DeviceMemory<scalar_t> dB,
-    //                scalar_t* dB, DenseM_t& A) {
-    //     // D_(tilerows(m), tilecols(n), dB, tilerows(m));
-    //     D_(m, n, dB, m);
-    //     gpu::copy_host_to_device(tile(A, m, n), D_);
-    //   }
-
-    // private:
-    //   DenseMW_t D_;
-    // };
-
 
   } // end namespace BLR
 } // end namespace strumpack

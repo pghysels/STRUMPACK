@@ -79,6 +79,9 @@ namespace strumpack {
                                       DenseMatrix<scalar_t>&)>& Tcol,
              const Opts_t& opts);
 
+      LRTile(std::size_t m, std::size_t n,
+                DenseM_t& dB, std::size_t ldB);
+
       std::size_t rows() const override { return U_.rows(); }
       std::size_t cols() const override { return V_.cols(); }
       std::size_t rank() const override { return U_.cols(); }

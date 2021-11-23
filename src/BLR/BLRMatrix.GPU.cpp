@@ -152,7 +152,7 @@ namespace strumpack {
     template<typename scalar_t>
     void BLRMatrix<scalar_t>::create_dense_gpu_tile
     (std::size_t i, std::size_t j, DenseM_t& A, DenseM_t& dB) {
-      block(i, j) = std::unique_ptr<DenseGPUTile<scalar_t>>
+      block(i, j) = std::unique_ptr<DenseTile<scalar_t>>
         (new DenseTile<scalar_t>(tilerows(i), tilecols(j), dB, 
                                  tileroff(i), tilecoff(j)));
       gpu::copy_host_to_device(tile(i, j).D(), tile(A, i, j));
@@ -160,17 +160,14 @@ namespace strumpack {
 
     template<typename scalar_t>
     void BLRMatrix<scalar_t>::create_LR_gpu_tile
-    (std::size_t i, std::size_t j, DenseM_t& A,
-     const Opts_t& opts, scalar_t* dB) {
-      // TODO
-
-      // //gpu::gesvdj_buffersize<scalar_t>(handles[s], dB11.tile(i,j));
-      // //gpu::gesvdj<scalar_t>();
-      // auto tmp_tile = LRTile<scalar_t>(tile_gpu(A, i, j, db), opts);
-      // block(i, j) = std::unique_ptr<LRTile<scalar_t>>(tmp_tile);
-      // auto& t = tile(i, j);
-      // if (t.rank()*(t.rows() + t.cols()) > t.rows()*t.cols())
-      //   create_dense_gpu_tile(i, j, A);
+    (std::size_t i, std::size_t j, DenseM_t& A, DenseM_t& dBU, 
+     DenseM_t& dBV, gpu::BLASHandle& handle) {
+      block(i, j) = std::unique_ptr<LRTile<scalar_t>>
+        (new LRTile<scalar_t>(tilerows(i), tilecols(j), 
+         tile(A, i, j), dBU, dBV, handle, tileroff(i), tilecoff(j)));
+      auto& t = tile(i, j);
+      if (t.rank()*(t.rows() + t.cols()) > t.rows()*t.cols())
+        create_dense_gpu_tile(i, j, A, dB);
     }
 
     template<typename scalar_t> void
@@ -190,7 +187,7 @@ namespace strumpack {
       auto rb = B11.rowblocks();
       auto rb2 = B21.rowblocks();
       {
-#if 0 // B11 on GPU
+#if 1 // B11 on GPU
         auto dsep = A11.rows();
         int nr_streams = 4;
         std::vector<gpu::Stream> streams(nr_streams);
@@ -222,16 +219,21 @@ namespace strumpack {
         DenseMW_t dA11(dsep, dsep, dmB11, dsep);
         for (std::size_t i=0, s=0; i<rb; i++) {
           if (i == 0) {
-            DenseMW_t dAkj(B11.tilerows(i), B11.tilecols(i), dA11,
+            DenseMW_t dAij(B11.tilerows(i), B11.tilecols(i), dA11,
                            B11.tileroff(i), B11.tilecoff(i));
-            B11.create_dense_gpu_tile(i, i, A11, dAkj);
+            B11.create_dense_gpu_tile(i, i, A11, dAij);
           }
           gpu::getrf(handles[s], B11.tile(i, i).D(), getrf_work,
                      dpiv+B11.tileroff(i), dpiv+dsep);
           for (std::size_t j=i+1; j<rb; j++) {
             if (admissible(i, j)) {
               if (i == 0) { 
-                B11.create_LR_gpu_tile(i, j, A11, opts, d0);
+                std::size_t max_rank = std::min(B11.tilerows(i), B11.tilecols(j));
+                DenseMW_t dAijU(B11.tilerows(i), max_rank, dA11,
+                                B11.tileroff(i), B11.tilecoff(j));
+                DenseMW_t dAijV(max_rank, B11.tilecols(j), dA11,
+                               B11.tileroff(i), B11.tilecoff(j));
+                B11.create_LR_gpu_tile(i, j, A11, dAijU, dAijV, handles[s]);
               } else B11.tile(i,j).compress();
 #if defined(STRUMPACK_USE_MAGMA)
               gpu::magma::laswp(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
@@ -244,9 +246,9 @@ namespace strumpack {
 #endif
             } else {
               if (i == 0) {
-                DenseMW_t dAkj(B11.tilerows(i), B11.tilecols(j), dA11,
+                DenseMW_t dAij(B11.tilerows(i), B11.tilecols(j), dA11,
                                B11.tileroff(i), B11.tilecoff(j));
-                B11.create_dense_gpu_tile(i, j, A11, dAkj);
+                B11.create_dense_gpu_tile(i, j, A11, dAij);
               }
 #if defined(STRUMPACK_USE_MAGMA)
               gpu::magma::laswp(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
@@ -262,7 +264,7 @@ namespace strumpack {
           for (std::size_t j=i+1; j<rb; j++) {
             if (admissible(j, i)) {
               if (i == 0) { 
-                B11.create_LR_gpu_tile(j, i, A11, opts, d0);
+                B11.create_LR_gpu_tile(j, i, A11, d0, handles[s]);
               } else B11.tile(j,i).compress();
 #if defined(STRUMPACK_USE_MAGMA)
               gpu::trsm(handles[s], Side::R, UpLo::U, Trans::N, Diag::N,
@@ -270,9 +272,9 @@ namespace strumpack {
 #endif
             } else {
               if (i == 0) {
-                DenseMW_t dAkj(B11.tilerows(j), B11.tilecols(i), dA11,
+                DenseMW_t dAji(B11.tilerows(j), B11.tilecols(i), dA11,
                                B11.tileroff(j), B11.tilecoff(i));
-                B11.create_dense_gpu_tile(j, i, A11, dAkj);
+                B11.create_dense_gpu_tile(j, i, A11, dAji);
               }
 #if defined(STRUMPACK_USE_MAGMA)
               gpu::trsm(handles[s], Side::R, UpLo::U, Trans::N, Diag::N,

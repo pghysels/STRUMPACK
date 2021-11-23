@@ -405,8 +405,8 @@ namespace strumpack {
     trsm(SOLVERHandle& handle, Side side, UpLo uplo,
          Trans trans, Diag diag, const scalar_t* alpha,
           const DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& B) {
-      trsm(handle, S2cuOp(side), U2cuOp(uplo), T2cuOp(trans), Diag(diag), B.rows(), B.cols(), 
-           alpha, A.data(), A.ld(), B.data(), B.ld());
+      trsm(handle, S2cuOp(side), U2cuOp(uplo), T2cuOp(trans), Diag(diag), 
+           B.rows(), B.cols(), alpha, A.data(), A.ld(), B.data(), B.ld());
     }
 
     template void trsm(SOLVERHandle&, Side, UpLo, Trans, Diag, const float*,
@@ -421,7 +421,15 @@ namespace strumpack {
                        const std::complex<double>*,
                        const DenseMatrix<std::complex<double>>&, 
                        DenseMatrix<std::complex<double>>&);
-#if 0
+
+    void gesvdj_info_create(gesvdjInfo_t *info) {
+      gpu_check(cusolverDnCreateGesvdjInfo(info));
+    }
+
+    void gesvdj_info_destroy(gesvdjInfo_t& info) {
+      gpu_check(cusolverDnDestroyGesvdjInfo(info));
+    }
+
     void gesvdj_buffersize
     (SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m, int n, 
      std::complex<double>* A, int lda, double *S, std::complex<double>* U, 
@@ -435,48 +443,49 @@ namespace strumpack {
                  lwork, params));
     }
 
-    template<typename scalar_t> int getsvdj_buffersize
-    (SOLVERHandle& handle, int n) {
-      int Lwork, econ = 1;
+    template<typename scalar_t> int gesvdj_buffersize
+    (SOLVERHandle& handle, int m, int n, double& S, int Lwork, gesvdjInfo_t params) {
+      int econ = 1;
       cusolverEigMode_t jobz = CUSOLVER_EIG_MODE_VECTOR;
-      gesvdjInfo_t params;
-      double *S = nullptr;
-      getsvdj_buffersize
-        (handle, jobz, econ, n, n, static_cast<scalar_t*>(nullptr), n,
-         S, static_cast<scalar_t*>(nullptr), n,
+      //gesvdjInfo_t params = nullptr;
+      gesvdj_info_create(&params);
+      gesvdj_buffersize
+        (handle, jobz, econ, m, n, static_cast<scalar_t*>(nullptr), n,
+         S, static_cast<scalar_t*>(nullptr), m,
          static_cast<scalar_t*>(nullptr), n, &Lwork, params);
       return Lwork;
     }
 
-    template int getsvdj_buffersize<std::complex<double>>(SOLVERHandle&, int);
+    template int gesvdj_buffersize<std::complex<double>>
+      (SOLVERHandle&, int, int, double&, gesvdjInfo_t);
 
-    void getsvdj(SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m, int n, 
-                 std::complex<double>* A, int lda, double *S, std::complex<double>* U, 
-                 int ldu, std::complex<double>* V, int ldv, std::complex<double>* Workspace, 
-                 int lwork, int *info, gesvdjInfo_t params) {
+    void gesvdj(SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m, 
+                 int n, std::complex<double>* A, int lda, double& S, 
+                 std::complex<double>* U, int ldu, std::complex<double>* V, 
+                 int ldv, std::complex<double>* Workspace, int lwork, 
+                 int *info, gesvdjInfo_t params) {
       //STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
       gpu_check(cusolverDnZgesvdj
-                (handle, jobz, econ, n, n, reinterpret_cast<cuDoubleComplex*>(A), lda,
-                 S, reinterpret_cast<cuDoubleComplex*>(U), ldu,
-                 reinterpret_cast<cuDoubleComplex*>(V), ldv, reinterpret_cast<cuDoubleComplex*>(Workspace),
-                 lwork, info, params));
+                (handle, jobz, econ, n, n, reinterpret_cast<cuDoubleComplex*>(A), 
+                 lda, S, reinterpret_cast<cuDoubleComplex*>(U), ldu,
+                 reinterpret_cast<cuDoubleComplex*>(V), ldv, 
+                 reinterpret_cast<cuDoubleComplex*>(Workspace),lwork, info, params));
     }
 
     template<typename scalar_t> void
-    getsvdj(SOLVERHandle& handle, DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& U, 
-            DenseMatrix<scalar_t>& V, scalar_t* Workspace, int* devInfo) {
-      int Lwork, econ = 1;
+    gesvdj(SOLVERHandle& handle, DenseMatrix<scalar_t>& A, double& d_S, 
+           DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V, 
+           scalar_t* Workspace, int Lwork, int* devInfo, gesvdjInfo_t params) {
+      int econ = 1;
       cusolverEigMode_t jobz = CUSOLVER_EIG_MODE_VECTOR;
-      gesvdjInfo_t params;
-      double *S;
-      getsvdj(handle, jobz, econ, A.rows(), A.cols(), A.data(), A.ld(), S, U.data(), U.ld(),
-              V.data(), V.ld(), Workspace, Lwork, devInfo, params);
+      gesvdj(handle, jobz, econ, A.rows(), A.cols(), A.data(), A.ld(), d_S, U, A.ld(),
+              V, A.cols(), Workspace, Lwork, devInfo, params);
     }
 
-    template void getsvdj(SOLVERHandle&, DenseMatrix<std::complex<double>>&,
+    template void gesvdj(SOLVERHandle&, DenseMatrix<std::complex<double>>&,
                           DenseMatrix<std::complex<double>>&, DenseMatrix<std::complex<double>>&, 
-                          std::complex<double>*, int*);
-#endif
+                          std::complex<double>*, int, int*, gesvdjInfo_t);
+
     void gemv(BLASHandle& handle, cublasOperation_t transa,
               int m, int n, float alpha,
               const float* A, int lda, const float* B, int incb,
