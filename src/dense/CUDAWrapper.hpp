@@ -365,11 +365,11 @@ namespace strumpack {
 
     template<typename scalar_t, typename real_t= typename RealType<scalar_t>::value_type>
     int gesvdj_buffersize(SOLVERHandle& handle, int m, int n, 
-                          real_t& S, int Lwork,gesvdjInfo_t params);
+                          real_t* S, int Lwork, gesvdjInfo_t params);
 
     template<typename scalar_t, typename real_t= typename RealType<scalar_t>::value_type> void
     gesvdj(SOLVERHandle& handle, DenseMatrix<scalar_t>& A, 
-           real_t& d_S, DenseMatrix<scalar_t>& U, 
+           real_t* d_S, DenseMatrix<scalar_t>& U, 
            DenseMatrix<scalar_t>& V, scalar_t* Workspace,
            int Lwork, int* devInfo, gesvdjInfo_t params);
 

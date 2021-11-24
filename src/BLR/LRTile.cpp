@@ -66,11 +66,11 @@ namespace strumpack {
       }
     }
 
-    template<typename scalar_t> LRTile<scalar_t>::LRTile
+    /*template<typename scalar_t> LRTile<scalar_t>::LRTile
     (std::size_t m, std::size_t n, DenseM_t& A, DenseM_t& dBU, DenseM_t& dBV, 
      gpu::BLASHandle& handle, std::size_t i, std::size_t j) {
       //TODO
-      /*if (m == 0 || n == 0) {
+      if (m == 0 || n == 0) {
         U_ = DMW_t(m, 0, dBU, i, j);
         V_ = DMW_t(0, n, dBV, i, j);
       } else {
@@ -83,8 +83,8 @@ namespace strumpack {
         // U_ = DMW_t(m, std::min(m,n), dBU, i, j);
         // V_ = DMW_t(std::min(m,n), n, dBV, i, j);
         gpu::gesvdj<scalar_t>(handle, A, d_S, dBU, dBV, gesvd_work, Lwork, params);
-      }*/
-    }
+      }
+    }*/
 
     template<typename scalar_t> LRTile<scalar_t>
     LRTile<scalar_t>::multiply(const BLRTile<scalar_t>& a) const {

@@ -80,8 +80,8 @@ namespace strumpack {
              const Opts_t& opts);
 
       //TODO
-      LRTile(std::size_t m, std::size_t n, DenseM_t& A, DenseM_t& dBU, 
-             DenseM_t& dBV, gpu::BLASHandle& handle, std::size_t i, std::size_t j);
+      // LRTile(std::size_t m, std::size_t n, DenseM_t& A, DenseM_t& dBU, 
+      //        DenseM_t& dBV, gpu::BLASHandle& handle, std::size_t i, std::size_t j);
 
       std::size_t rows() const override { return U_.rows(); }
       std::size_t cols() const override { return V_.cols(); }
