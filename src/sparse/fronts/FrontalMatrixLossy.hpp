@@ -119,7 +119,6 @@ namespace strumpack {
     FrontalMatrixLossy& operator=(FrontalMatrixLossy const&) = delete;
   };
 
-
 } // end namespace strumpack
 
 #endif // FRONTAL_MATRIX_LOSSY_HPP

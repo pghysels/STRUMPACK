@@ -212,11 +212,6 @@ extern "C" {
 
   void STRUMPACK_delete_factors(STRUMPACK_SparseSolver S);
 
-  /*
-    TODO add
-    - routines to update the matrix values!!!!!
-    - solve with multiple rhs??!!!
-  */
 
   /*************************************************************
    ** Set options **********************************************

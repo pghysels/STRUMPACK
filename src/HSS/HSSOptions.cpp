@@ -41,9 +41,9 @@ namespace strumpack {
 
     std::string get_name(CompressionAlgorithm a) {
       switch (a) {
-      case CompressionAlgorithm::ORIGINAL: return "original"; break;
-      case CompressionAlgorithm::STABLE: return "stable"; break;
-      case CompressionAlgorithm::HARD_RESTART: return "hard_restart"; break;
+      case CompressionAlgorithm::ORIGINAL: return "original";
+      case CompressionAlgorithm::STABLE: return "stable";
+      case CompressionAlgorithm::HARD_RESTART: return "hard_restart";
       default: return "unknown";
       }
     }

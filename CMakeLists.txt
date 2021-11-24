@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.11)
-project(STRUMPACK VERSION 6.2.0 LANGUAGES CXX C Fortran)
+project(STRUMPACK VERSION 6.2.1 LANGUAGES CXX C Fortran)
 
 
 option(STRUMPACK_USE_MPI     "Build with MPI support" ON)
@@ -147,9 +147,15 @@ if(DEFINED TPL_BLAS_LIBRARIES)
   set(BLAS_LIBRARIES ${TPL_BLAS_LIBRARIES})
   set(BLAS_FOUND TRUE)
   set(_SCRATCH_DIR ${CMAKE_CURRENT_BINARY_DIR}/blas_compile_test)
-  try_compile(STRUMPACK_TPL_BLAS_WORKS ${_SCRATCH_DIR}
-    SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
-    LINK_LIBRARIES ${TPL_BLAS_LIBRARIES})
+  if(TARGET OpenMP::OpenMP_Fortran)
+    try_compile(STRUMPACK_TPL_BLAS_WORKS ${_SCRATCH_DIR}
+      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
+      LINK_LIBRARIES ${TPL_BLAS_LIBRARIES} OpenMP::OpenMP_Fortran)
+  else()
+    try_compile(STRUMPACK_TPL_BLAS_WORKS ${_SCRATCH_DIR}
+      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
+      LINK_LIBRARIES ${TPL_BLAS_LIBRARIES})
+  endif()
   if(STRUMPACK_TPL_BLAS_WORKS)
     message(STATUS
       "Using BLAS from TPL_BLAS_LIBRARIES (${TPL_BLAS_LIBRARIES})")
@@ -161,16 +167,25 @@ if(DEFINED TPL_BLAS_LIBRARIES)
     # missing a threading library? Just guessing. One more try with
     # threading (pthreads) linked in and then we give up.
     find_package(Threads)
-    try_compile(STRUMPACK_TPL_BLAS_WITH_THREADS_WORKS ${_SCRATCH_DIR}
-      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
-      LINK_LIBRARIES ${TPL_BLAS_LIBRARIES} Threads::Threads)
+    if(TARGET OpenMP::OpenMP_Fortran)
+      try_compile(STRUMPACK_TPL_BLAS_WITH_THREADS_WORKS ${_SCRATCH_DIR}
+        SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
+        LINK_LIBRARIES ${TPL_BLAS_LIBRARIES}
+        Threads::Threads OpenMP::OpenMP_Fortran)
+    else()
+      try_compile(STRUMPACK_TPL_BLAS_WITH_THREADS_WORKS ${_SCRATCH_DIR}
+        SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
+        LINK_LIBRARIES ${TPL_BLAS_LIBRARIES} Threads::Threads)
+    endif()
     if(STRUMPACK_TPL_BLAS_WITH_THREADS_WORKS)
       message(STATUS
         "Using BLAS (${TPL_BLAS_LIBRARIES}), with additional threading library.")
     else()
       message(FATAL_ERROR
-        "BLAS libraries defined in TPL_BLAS_LIBRARIES"
-        " (${TPL_BLAS_LIBRARIES}) cannot be used.")
+        "BLAS libraries defined in TPL_BLAS_LIBRARIES (${TPL_BLAS_LIBRARIES}) cannot be used. "
+        "If your BLAS library links to OpenMP, enable OpenMP with -DSTRUMPACK_USE_OPENMP=ON. "
+        "If that doesn't work, try running CMake with --debug-trycompile and check "
+        "the output in build/blas_compile_test/CMakeFiles/CMakeTmp/ .")
     endif()
   endif()
 else()
@@ -184,8 +199,16 @@ else()
       "A BLAS library could not be found on the system, "
       "checking if BLAS is implicitly linked by the compiler(wrapper).")
     set(_SCRATCH_DIR ${CMAKE_CURRENT_BINARY_DIR}/blas_compile_test)
-    try_compile(STRUMPACK_BLAS_JUST_WORKS ${_SCRATCH_DIR}
-      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90)
+    find_package(Threads)
+    if(TARGET OpenMP::OpenMP_Fortran)
+      try_compile(STRUMPACK_BLAS_JUST_WORKS ${_SCRATCH_DIR}
+        SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
+        LINK_LIBRARIES Threads::Threads OpenMP::OpenMP_Fortran)
+    else()
+      try_compile(STRUMPACK_BLAS_JUST_WORKS ${_SCRATCH_DIR}
+        SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
+        LINK_LIBRARIES Threads::Threads)
+    endif()
     if(NOT STRUMPACK_BLAS_JUST_WORKS)
       message(FATAL_ERROR
         "Could not find a BLAS library.\n"
@@ -202,9 +225,15 @@ if(DEFINED TPL_LAPACK_LIBRARIES)
   set(LAPACK_LIBRARIES ${TPL_LAPACK_LIBRARIES})
   set(LAPACK_FOUND TRUE)
   set(_SCRATCH_DIR ${CMAKE_CURRENT_BINARY_DIR}/lapack_compile_test)
-  try_compile(STRUMPACK_TPL_LAPACK_WORKS ${_SCRATCH_DIR}
-    SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
-    LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES})
+  if(TARGET OpenMP::OpenMP_Fortran)
+    try_compile(STRUMPACK_TPL_LAPACK_WORKS ${_SCRATCH_DIR}
+      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
+      LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES} OpenMP::OpenMP_Fortran)
+  else()
+    try_compile(STRUMPACK_TPL_LAPACK_WORKS ${_SCRATCH_DIR}
+      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
+      LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES})
+  endif()
   if(STRUMPACK_TPL_LAPACK_WORKS)
     message(STATUS
       "Using LAPACK from TPL_LAPACK_LIBRARIES (${TPL_LAPACK_LIBRARIES})")
@@ -216,17 +245,26 @@ if(DEFINED TPL_LAPACK_LIBRARIES)
     # missing a threading library? Just guessing. One more try with
     # threading (pthreads) linked in and then we give up.
     find_package(Threads)
-    try_compile(STRUMPACK_TPL_LAPACK_WITH_THREADS_WORKS ${_SCRATCH_DIR}
-      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
-      LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES} Threads::Threads)
+    if(TARGET OpenMP::OpenMP_Fortran)
+      try_compile(STRUMPACK_TPL_LAPACK_WITH_THREADS_WORKS ${_SCRATCH_DIR}
+        SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
+        LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES}
+        Threads::Threads OpenMP::OpenMP_Fortran)
+    else()
+      try_compile(STRUMPACK_TPL_LAPACK_WITH_THREADS_WORKS ${_SCRATCH_DIR}
+        SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
+        LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES} Threads::Threads)
+    endif()
     if(STRUMPACK_TPL_LAPACK_WITH_THREADS_WORKS)
       message(STATUS
         "Using LAPACK (${TPL_LAPACK_LIBRARIES}), "
         "with additional threading library.")
     else()
       message(FATAL_ERROR
-        "LAPACK libraries defined in TPL_LAPACK_LIBRARIES"
-        " (${TPL_LAPACK_LIBRARIES}) cannot be used.")
+        "LAPACK libraries defined in TPL_LAPACK_LIBRARIES (${TPL_LAPACK_LIBRARIES}) cannot be used. "
+        "If your LAPACK library links to OpenMP, enable OpenMP with -DSTRUMPACK_USE_OPENMP=ON. "
+        "If that doesn't work, try running CMake with --debug-trycompile and check "
+        "the output in build/lapack_compile_test/CMakeFiles/CMakeTmp/")
     endif()
   endif()
 else()
@@ -246,8 +284,16 @@ else()
       "A LAPACK library could not be found on the system, "
       "checking if LAPACK is implicitly linked by the compiler(wrapper).")
     set(_SCRATCH_DIR ${CMAKE_CURRENT_BINARY_DIR}/lapack_compile_test)
-    try_compile(STRUMPACK_LAPACK_JUST_WORKS ${_SCRATCH_DIR}
-      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90)
+    find_package(Threads)
+    if(TARGET OpenMP::OpenMP_Fortran)
+      try_compile(STRUMPACK_LAPACK_JUST_WORKS ${_SCRATCH_DIR}
+        SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
+        LINK_LIBRARIES Threads::Threads OpenMP::OpenMP_Fortran)
+    else()
+      try_compile(STRUMPACK_LAPACK_JUST_WORKS ${_SCRATCH_DIR}
+        SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
+        LINK_LIBRARIES Threads::Threads)
+    endif()
     if(NOT STRUMPACK_LAPACK_JUST_WORKS)
       message(FATAL_ERROR
         "Could not find a LAPACK library.\n"
@@ -545,7 +591,9 @@ endif()
 
 if(ButterflyPACK_FOUND)
   target_link_libraries(strumpack PUBLIC
+    ButterflyPACK::sbutterflypack
     ButterflyPACK::dbutterflypack
+    ButterflyPACK::cbutterflypack
     ButterflyPACK::zbutterflypack
     MPI::MPI_Fortran ${MPI_Fortran_LIBRARIES})
   ## for some reason just adding the MPI::MPI_Fortran target only

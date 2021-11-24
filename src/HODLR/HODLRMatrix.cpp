@@ -191,7 +191,7 @@ namespace strumpack {
         HODLR_set_I_option<scalar_t>(options_, "nogeo", 0);
         // pass the data points to the HODLR code, let the HODLR code
         // figure out the permutation etc
-        HODLR_construct_init<scalar_t>
+        HODLR_construct_init<scalar_t,real_t>
           (rows_, K.d(), K.data().data(), nullptr, lvls_-1, leafs_.data(),
            perm_.data(), lrows_, ho_bf_, options_, stats_, msh_,
            kerquant_, ptree_, nullptr, nullptr, nullptr);

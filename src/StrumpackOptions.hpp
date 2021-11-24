@@ -1112,7 +1112,10 @@ namespace strumpack {
     /**
      * Returns the precision for lossy compression.
      */
-    int lossy_precision() const { return lossy_precision_; }
+    int lossy_precision() const {
+      return (compression() == CompressionType::LOSSLESS) ?
+        -1 : lossy_precision_;
+    }
 
     /**
      * Info about the stats of the root front will be printed to
@@ -1229,7 +1232,7 @@ namespace strumpack {
     CompressionType comp_ = CompressionType::NONE;
 
     /** HSS options */
-    int hss_min_front_size_ = 5000;
+    int hss_min_front_size_ = 100000;
     int hss_min_sep_size_ = 1000;
     int sep_order_level_ = 1;
     bool indirect_sampling_ = false;
@@ -1237,16 +1240,16 @@ namespace strumpack {
 
     /** BLR options */
     BLR::BLROptions<scalar_t> blr_opts_;
-    int blr_min_front_size_ = 1000;
-    int blr_min_sep_size_ = 256;
+    int blr_min_front_size_ = 100000;
+    int blr_min_sep_size_ = 512;
 
     /** HODLR options */
     HODLR::HODLROptions<scalar_t> hodlr_opts_;
-    int hodlr_min_front_size_ = 10000;
+    int hodlr_min_front_size_ = 100000;
     int hodlr_min_sep_size_ = 5000;
 
     /** LOSSY/LOSSLESS options */
-    int lossy_min_front_size_ = 16;
+    int lossy_min_front_size_ = 100000;
     int lossy_min_sep_size_ = 8;
     int lossy_precision_ = 16;
 

@@ -64,11 +64,11 @@ namespace strumpack {
    */
   inline std::string get_name(ClusteringAlgorithm c) {
     switch (c) {
-    case ClusteringAlgorithm::NATURAL: return "natural"; break;
-    case ClusteringAlgorithm::TWO_MEANS: return "2means"; break;
-    case ClusteringAlgorithm::KD_TREE: return "kdtree"; break;
-    case ClusteringAlgorithm::PCA: return "PCA"; break;
-    case ClusteringAlgorithm::COBBLE: return "cobble"; break;
+    case ClusteringAlgorithm::NATURAL: return "natural";
+    case ClusteringAlgorithm::TWO_MEANS: return "2means";
+    case ClusteringAlgorithm::KD_TREE: return "kdtree";
+    case ClusteringAlgorithm::PCA: return "PCA";
+    case ClusteringAlgorithm::COBBLE: return "cobble";
     default: return "unknown";
     }
   }

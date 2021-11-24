@@ -128,6 +128,7 @@ namespace strumpack {
 #endif
       }
     } break;
+    case CompressionType::LOSSLESS:
     case CompressionType::LOSSY: {
       if (is_lossy(dsep, dupd, compressed_parent, opts)) {
 #if defined(STRUMPACK_USE_ZFP)
@@ -137,8 +138,6 @@ namespace strumpack {
 #endif
       }
     } break;
-    case CompressionType::LOSSLESS: // not implemented yet, use DenseMPI
-      break;
     };
     if (!front) {
       // fallback in case support for cublas/zfp/hodlr is missing
@@ -280,7 +279,7 @@ namespace strumpack {
       }
     } break;
     case CompressionType::LOSSY: // handled in DenseMPI
-    case CompressionType::LOSSLESS: // not implemented yet, use DenseMPI
+    case CompressionType::LOSSLESS: // handled in DenseMPI
     case CompressionType::NONE: break;
     };
     // (NONE, LOSSLESS, LOSSY or not compiled with HODLR)

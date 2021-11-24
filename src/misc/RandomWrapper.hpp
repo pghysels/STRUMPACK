@@ -61,8 +61,8 @@ namespace strumpack {
      */
     inline std::string get_name(RandomEngine e) {
       switch (e) {
-      case RandomEngine::LINEAR: return "minstd_rand"; break;
-      case RandomEngine::MERSENNE: return "mt19937"; break;
+      case RandomEngine::LINEAR: return "minstd_rand";
+      case RandomEngine::MERSENNE: return "mt19937";
       }
       return "unknown";
     }
@@ -85,8 +85,8 @@ namespace strumpack {
      */
     inline std::string get_name(RandomDistribution d) {
       switch (d) {
-      case RandomDistribution::NORMAL: return "normal(0,1)"; break;
-      case RandomDistribution::UNIFORM: return "uniform[0,1]"; break;
+      case RandomDistribution::NORMAL: return "normal(0,1)";
+      case RandomDistribution::UNIFORM: return "uniform[0,1]";
       }
       return "unknown";
     }

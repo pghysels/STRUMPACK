@@ -40,26 +40,26 @@ namespace strumpack {
 
   std::string get_name(ReorderingStrategy method) {
     switch (method) {
-    case ReorderingStrategy::NATURAL: return "Natural"; break;
-    case ReorderingStrategy::METIS: return "Metis"; break;
-    case ReorderingStrategy::SCOTCH: return "Scotch"; break;
-    case ReorderingStrategy::GEOMETRIC: return "Geometric"; break;
-    case ReorderingStrategy::PARMETIS: return "ParMetis"; break;
-    case ReorderingStrategy::PTSCOTCH: return "PTScotch"; break;
-    case ReorderingStrategy::RCM: return "RCM"; break;
+    case ReorderingStrategy::NATURAL: return "Natural";
+    case ReorderingStrategy::METIS: return "Metis";
+    case ReorderingStrategy::SCOTCH: return "Scotch";
+    case ReorderingStrategy::GEOMETRIC: return "Geometric";
+    case ReorderingStrategy::PARMETIS: return "ParMetis";
+    case ReorderingStrategy::PTSCOTCH: return "PTScotch";
+    case ReorderingStrategy::RCM: return "RCM";
     }
     return "UNKNOWN";
   }
 
   bool is_parallel(ReorderingStrategy method) {
     switch (method) {
-    case ReorderingStrategy::NATURAL: return false; break;
-    case ReorderingStrategy::METIS: return false; break;
-    case ReorderingStrategy::SCOTCH: return false; break;
-    case ReorderingStrategy::GEOMETRIC: return true; break;
-    case ReorderingStrategy::PARMETIS: return true; break;
-    case ReorderingStrategy::PTSCOTCH: return true; break;
-    case ReorderingStrategy::RCM: return false; break;
+    case ReorderingStrategy::NATURAL: return false;
+    case ReorderingStrategy::METIS: return false;
+    case ReorderingStrategy::SCOTCH: return false;
+    case ReorderingStrategy::GEOMETRIC: return true;
+    case ReorderingStrategy::PARMETIS: return true;
+    case ReorderingStrategy::PTSCOTCH: return true;
+    case ReorderingStrategy::RCM: return false;
     }
     return false;
   }
