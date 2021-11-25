@@ -202,7 +202,7 @@ namespace strumpack {
 
     template<typename scalar_t> scalar_t
     LRTile<scalar_t>::operator()(std::size_t i, std::size_t j) const {
-      return blas::dotu(rank(), U().ptr(i, 0), U_.ld(), V().ptr(0, j), 1);
+      return blas::dotu(rank(), U().ptr(i, 0), U().ld(), V().ptr(0, j), 1);
     }
 
     template<typename scalar_t> void

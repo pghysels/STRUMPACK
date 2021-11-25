@@ -197,6 +197,7 @@ namespace strumpack {
         gpu::copy_device_to_device(tile(i, j).U(), dU);
         gpu::copy_device_to_device(tile(i, j).V(), dV);
       }
+    }  
 
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::construct_and_partial_factor_gpu
