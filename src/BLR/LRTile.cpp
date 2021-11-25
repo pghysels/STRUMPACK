@@ -42,22 +42,22 @@ namespace strumpack {
 
     template<typename scalar_t> LRTile<scalar_t>::LRTile
     (std::size_t m, std::size_t n, std::size_t r) {
-      U_ = DenseM_t(m, r);
-      V_ = DenseM_t(r, n);
+      U_.reset(new DenseM_t(m, r));
+      V_.reset(new DenseM_t(r, n));
     }
 
     template<typename scalar_t> LRTile<scalar_t>::LRTile
     (const DenseM_t& T, const Opts_t& opts) {
       if (opts.low_rank_algorithm() == LowRankAlgorithm::RRQR) {
         if (T.rows() == 0 || T.cols() == 0) {
-          U_ = DenseM_t(T.rows(), 0);
-          V_ = DenseM_t(0, T.cols());
+          U_.reset(new DenseM_t(T.rows(), 0));
+          V_.reset(new DenseM_t(0, T.cols()));
         } else
-          T.low_rank(U_, V_, opts.rel_tol(), opts.abs_tol(), opts.max_rank(),
+          T.low_rank(U(), V(), opts.rel_tol(), opts.abs_tol(), opts.max_rank(),
                      params::task_recursion_cutoff_level);
       } else if (opts.low_rank_algorithm() == LowRankAlgorithm::ACA) {
         adaptive_cross_approximation<scalar_t>
-          (U_, V_, T.rows(), T.cols(),
+          (U(), V(), T.rows(), T.cols(),
            [&](std::size_t i, std::size_t j) -> scalar_t {
              assert(i < T.rows());
              assert(j < T.cols());
@@ -66,25 +66,11 @@ namespace strumpack {
       }
     }
 
-    /*template<typename scalar_t> LRTile<scalar_t>::LRTile
-    (std::size_t m, std::size_t n, DenseM_t& A, DenseM_t& dBU, DenseM_t& dBV, 
-     gpu::BLASHandle& handle, std::size_t i, std::size_t j) {
-      //TODO
-      if (m == 0 || n == 0) {
-        U_ = DMW_t(m, 0, dBU, i, j);
-        V_ = DMW_t(0, n, dBV, i, j);
-      } else {
-        gpu::DeviceMemory<double> d_S(minmn);
-        int Lwork = 0;
-        gesvdjInfo_t params = nullptr;
-        gpu::DeviceMemory<scalar_t> gesvd_work
-          (gpu::gesvdj_buffersize<scalar_t>
-           (handle, m, n, d_S, Lwork, params));
-        // U_ = DMW_t(m, std::min(m,n), dBU, i, j);
-        // V_ = DMW_t(std::min(m,n), n, dBV, i, j);
-        gpu::gesvdj<scalar_t>(handle, A, d_S, dBU, dBV, gesvd_work, Lwork, params);
-      }
-    }*/
+    template<typename scalar_t> LRTile<scalar_t>::LRTile
+    (DMW_t& dU, DMW_t& dV) {
+      U_.reset(new DMW_t(dU));
+      V_.reset(new DMW_t(dV));
+    }
 
     template<typename scalar_t> LRTile<scalar_t>
     LRTile<scalar_t>::multiply(const BLRTile<scalar_t>& a) const {
@@ -111,11 +97,11 @@ namespace strumpack {
     template<typename scalar_t> void LRTile<scalar_t>::left_multiply
     (const LRTile<scalar_t>& a, DenseM_t& b, DenseM_t& c) const {
       DenseM_t VU(a.rank(), rank());
-      gemm(Trans::N, Trans::N, scalar_t(1.), a.V(), U_, scalar_t(0.),
+      gemm(Trans::N, Trans::N, scalar_t(1.), a.V(), U(), scalar_t(0.),
            VU, params::task_recursion_cutoff_level);
       if (a.rank() < rank()) {
         // a.U*((a.V * U_)*V_)
-        gemm(Trans::N, Trans::N, scalar_t(1.), VU, V_, scalar_t(0.),
+        gemm(Trans::N, Trans::N, scalar_t(1.), VU, V(), scalar_t(0.),
              c, params::task_recursion_cutoff_level);
         copy(a.U(), b, 0, 0);
       } else {
@@ -143,7 +129,7 @@ namespace strumpack {
      const std::function<scalar_t(std::size_t,std::size_t)>& Telem,
      const Opts_t& opts) {
       adaptive_cross_approximation<scalar_t>
-        (U_, V_, m, n, Telem, opts.rel_tol(), opts.abs_tol(),
+        (U(), V(), m, n, Telem, opts.rel_tol(), opts.abs_tol(),
          opts.max_rank());
     }
 
@@ -156,7 +142,7 @@ namespace strumpack {
      const std::function<void(std::size_t,scalar_t*)>& Tcol,
      const Opts_t& opts) {
       adaptive_cross_approximation<scalar_t>
-        (U_, V_, m, n, Trow, Tcol, opts.rel_tol(), opts.abs_tol(),
+        (U(), V(), m, n, Trow, Tcol, opts.rel_tol(), opts.abs_tol(),
          opts.max_rank());
     }
 
@@ -173,7 +159,7 @@ namespace strumpack {
      const Opts_t& opts) {
       //blocked_adaptive_cross_approximation_nodups<scalar_t>
       blocked_adaptive_cross_approximation<scalar_t>
-        (U_, V_, m, n, Trow, Tcol, opts.BACA_blocksize(),
+        (U(), V(), m, n, Trow, Tcol, opts.BACA_blocksize(),
          opts.rel_tol(), opts.abs_tol(), opts.max_rank(),
          params::task_recursion_cutoff_level);
     }
@@ -182,7 +168,7 @@ namespace strumpack {
     template<typename scalar_t> void
     LRTile<scalar_t>::dense(DenseM_t& A) const {
       assert(A.rows() == rows() && A.cols() == cols());
-      gemm(Trans::N, Trans::N, scalar_t(1.), U_, V_, scalar_t(0.), A,
+      gemm(Trans::N, Trans::N, scalar_t(1.), U(), V(), scalar_t(0.), A,
            params::task_recursion_cutoff_level);
     }
 
@@ -195,7 +181,7 @@ namespace strumpack {
 
     template<typename scalar_t> std::unique_ptr<BLRTile<scalar_t>>
     LRTile<scalar_t>::clone() const {
-      return std::unique_ptr<BLRTile<scalar_t>>(new LRTile(*this));
+      //return std::unique_ptr<BLRTile<scalar_t>>(new LRTile(*this));
     }
 
     template<typename scalar_t> void LRTile<scalar_t>::draw
@@ -216,28 +202,28 @@ namespace strumpack {
 
     template<typename scalar_t> scalar_t
     LRTile<scalar_t>::operator()(std::size_t i, std::size_t j) const {
-      return blas::dotu(rank(), U_.ptr(i, 0), U_.ld(), V_.ptr(0, j), 1);
+      return blas::dotu(rank(), U().ptr(i, 0), U_.ld(), V().ptr(0, j), 1);
     }
 
     template<typename scalar_t> void
     LRTile<scalar_t>::extract(const std::vector<std::size_t>& I,
                               const std::vector<std::size_t>& J,
                               DenseM_t& B) const {
-      gemm(Trans::N, Trans::N, scalar_t(1.), U_.extract_rows(I),
-           V_.extract_cols(J), scalar_t(0.), B,
+      gemm(Trans::N, Trans::N, scalar_t(1.), U().extract_rows(I),
+           V().extract_cols(J), scalar_t(0.), B,
            params::task_recursion_cutoff_level);
     }
 
     template<typename scalar_t> void
     LRTile<scalar_t>::laswp(const std::vector<int>& piv, bool fwd) {
-      U_.laswp(piv, fwd);
+      U().laswp(piv, fwd);
     }
 
     template<typename scalar_t> void
     LRTile<scalar_t>::trsm_b(Side s, UpLo ul, Trans ta, Diag d,
                              scalar_t alpha, const DenseM_t& a) {
       strumpack::trsm
-        (s, ul, ta, d, alpha, a, (s == Side::L) ? U_ : V_,
+        (s, ul, ta, d, alpha, a, (s == Side::L) ? U() : V(),
          params::task_recursion_cutoff_level);
     }
 
@@ -332,7 +318,7 @@ namespace strumpack {
      scalar_t* work) const {
       DMW_t temp1(rows(), 1, work, rows()),
         temp2(a.rank(), 1, work+rows(), a.rank());
-      gemv(Trans::N, scalar_t(1.), U_, V_.ptr(0, i), 1,
+      gemv(Trans::N, scalar_t(1.), U(), V().ptr(0, i), 1,
            scalar_t(0.), temp1, params::task_recursion_cutoff_level);
       gemv(Trans::N, scalar_t(1.), a.V(), temp1, scalar_t(0.), temp2,
            params::task_recursion_cutoff_level);
@@ -346,7 +332,7 @@ namespace strumpack {
     (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c,
      scalar_t* work) const {
       DMW_t temp(rows(), 1, work, rows());
-      gemv(Trans::N, scalar_t(1.), U_, V_.ptr(0, i), 1,
+      gemv(Trans::N, scalar_t(1.), U(), V().ptr(0, i), 1,
            scalar_t(0.), temp, params::task_recursion_cutoff_level);
       gemv(Trans::N, scalar_t(-1.), a.D(), temp, scalar_t(1.), c, 1,
            params::task_recursion_cutoff_level);
@@ -362,10 +348,10 @@ namespace strumpack {
       gemv(Trans::C, scalar_t(1.), a.V(), a.U().ptr(i, 0), a.U().ld(),
            scalar_t(0.), temp1.data(), temp1.ld(),
            params::task_recursion_cutoff_level);
-      gemv(Trans::C, scalar_t(1.), U_, temp1.data(), temp1.ld(),
+      gemv(Trans::C, scalar_t(1.), U(), temp1.data(), temp1.ld(),
            scalar_t(0.), temp2.data(), temp2.ld(),
            params::task_recursion_cutoff_level);
-      gemv(Trans::C, scalar_t(-1.), V_, temp2.data(), temp2.ld(),
+      gemv(Trans::C, scalar_t(-1.), V(), temp2.data(), temp2.ld(),
            scalar_t(1.), c, 1, params::task_recursion_cutoff_level);
     }
 
@@ -406,8 +392,8 @@ namespace strumpack {
       DMW_t Vc(r, d, work, r),
         temp1(m, d, Vc.end(), m),
         temp2(a.rank(), d, temp1.end(), a.rank());
-      V_.extract_cols(cols, Vc);
-      gemm(Trans::N, Trans::N, scalar_t(1.), U_, Vc,
+      V().extract_cols(cols, Vc);
+      gemm(Trans::N, Trans::N, scalar_t(1.), U(), Vc,
            scalar_t(0.), temp1, params::task_recursion_cutoff_level);
       gemm(Trans::N, Trans::N, scalar_t(1.), a.V(), temp1, scalar_t(0.),
            temp2, params::task_recursion_cutoff_level);
@@ -423,8 +409,8 @@ namespace strumpack {
       auto d = cols.size();
       auto m = rows();
       DMW_t Vc(r, d, work, r), temp(m, d, Vc.end(), m);
-      V_.extract_cols(cols, Vc);
-      gemm(Trans::N, Trans::N, scalar_t(1.), U_, Vc,
+      V().extract_cols(cols, Vc);
+      gemm(Trans::N, Trans::N, scalar_t(1.), U(), Vc,
            scalar_t(0.), temp, params::task_recursion_cutoff_level);
       gemm(Trans::N, Trans::N, scalar_t(-1.), a.D(), temp, scalar_t(1.),
            c, params::task_recursion_cutoff_level);
@@ -441,9 +427,9 @@ namespace strumpack {
       a.U().extract_rows(rows, aUr);
       gemm(Trans::N, Trans::N, scalar_t(1.), aUr, a.V(),
            scalar_t(0.), temp1, params::task_recursion_cutoff_level);
-      gemm(Trans::N, Trans::N, scalar_t(1.), temp1, U_, scalar_t(0.),
+      gemm(Trans::N, Trans::N, scalar_t(1.), temp1, U(), scalar_t(0.),
            temp2, params::task_recursion_cutoff_level);
-      gemm(Trans::N, Trans::N, scalar_t(-1.), temp2, V_, scalar_t(1.),
+      gemm(Trans::N, Trans::N, scalar_t(-1.), temp2, V(), scalar_t(1.),
            c, params::task_recursion_cutoff_level);
     }
 

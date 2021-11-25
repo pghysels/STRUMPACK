@@ -205,6 +205,20 @@ namespace strumpack {
       copy_host_to_device_async(d, h.data(), h.rows()*h.cols(), s);
     }
 
+    template<typename T> void copy_device_to_device
+    (T* d1ptr, const T* d2ptr, std::size_t count) {
+      gpu_check(cudaMemcpy(d1ptr, d2ptr, count*sizeof(T),
+                           cudaMemcpyDeviceToDevice));
+    }
+
+    template<typename T> void copy_device_to_device
+    (DenseMatrix<T>& d1, const DenseMatrix<T>& d2) {
+      if (!d1.rows() || !d1.cols()) return;
+      assert(d1.rows() == d2.rows() && d1.cols() == d2.cols());
+      assert(d1.rows() == d1.ld() && d2.rows() == d2.ld());
+      copy_device_to_device(d1.data(), d2.data(), d1.rows()*d1.cols());
+    }
+
 
     inline std::size_t available_memory() {
       std::size_t free_device_mem, total_device_mem;

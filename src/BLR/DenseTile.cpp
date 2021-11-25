@@ -102,11 +102,6 @@ namespace strumpack {
       D().laswp(piv, fwd);
     }
 
-    // template<typename scalar_t> void DenseTile<scalar_t>::getrf
-    // (SOLVERHandle& s, scalar_t* Workspace, int* devIpiv, int* devInfo) {
-    //   gpu::getrf(s, D(), Workspace, devIpiv, devInfo);
-    // }
-
     template<typename scalar_t> void DenseTile<scalar_t>::trsm_b
     (Side s, UpLo ul, Trans ta, Diag d,
      scalar_t alpha, const DenseM_t& a) {

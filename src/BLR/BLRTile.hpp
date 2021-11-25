@@ -104,7 +104,6 @@ namespace strumpack {
 
       virtual std::vector<int> LU() { assert(false); return std::vector<int>(); };
       virtual void laswp(const std::vector<int>& piv, bool fwd) = 0;
-      // virtual void getrf(gpu::SOLVERHandle& s, scalar_t* Workspace, int* devIpiv, int* devInfo) = 0;
 
       virtual void trsm_b(Side s, UpLo ul, Trans ta, Diag d,
                           scalar_t alpha, const DenseM_t& a) = 0;

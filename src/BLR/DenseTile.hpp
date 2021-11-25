@@ -107,9 +107,6 @@ namespace strumpack {
 
       void laswp(const std::vector<int>& piv, bool fwd) override;
 
-      // void getrf(SOLVERHandle& s, scalar_t* Workspace,
-      //            int* devIpiv, int* devInfo) override;
-
       void trsm_b(Side s, UpLo ul, Trans ta, Diag d,
                   scalar_t alpha, const DenseM_t& a) override;
 

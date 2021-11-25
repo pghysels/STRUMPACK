@@ -79,18 +79,16 @@ namespace strumpack {
                                       DenseMatrix<scalar_t>&)>& Tcol,
              const Opts_t& opts);
 
-      //TODO
-      // LRTile(std::size_t m, std::size_t n, DenseM_t& A, DenseM_t& dBU, 
-      //        DenseM_t& dBV, gpu::BLASHandle& handle, std::size_t i, std::size_t j);
+      LRTile(DMW_t& dU, DMW_t& dV);
 
-      std::size_t rows() const override { return U_.rows(); }
-      std::size_t cols() const override { return V_.cols(); }
-      std::size_t rank() const override { return U_.cols(); }
+      std::size_t rows() const override { return U_->rows(); }
+      std::size_t cols() const override { return V_->cols(); }
+      std::size_t rank() const override { return U_->cols(); }
       bool is_low_rank() const override { return true; };
 
-      std::size_t memory() const override { return U_.memory() + V_.memory(); }
-      std::size_t nonzeros() const override { return U_.nonzeros() + V_.nonzeros(); }
-      std::size_t maximum_rank() const override { return U_.cols(); }
+      std::size_t memory() const override { return U_->memory() + V_->memory(); }
+      std::size_t nonzeros() const override { return U_->nonzeros() + V_->nonzeros(); }
+      std::size_t maximum_rank() const override { return U_->cols(); }
 
       void dense(DenseM_t& A) const override;
       DenseM_t dense() const override;
@@ -106,12 +104,12 @@ namespace strumpack {
       void draw(std::ostream& of, std::size_t roff,
                 std::size_t coff) const override;
 
-      DenseM_t& D() override { assert(false); return U_; }
-      DenseM_t& U() override { return U_; }
-      DenseM_t& V() override { return V_; }
-      const DenseM_t& D() const override { assert(false); return U_; }
-      const DenseM_t& U() const override { return U_; }
-      const DenseM_t& V() const override { return V_; }
+      DenseM_t& D() override { assert(false); return *U_; }
+      DenseM_t& U() override { return *U_; }
+      DenseM_t& V() override { return *V_; }
+      const DenseM_t& D() const override { assert(false); return *U_; }
+      const DenseM_t& U() const override { return *U_; }
+      const DenseM_t& V() const override { return *V_; }
 
       LRTile<scalar_t> multiply(const BLRTile<scalar_t>& a) const override;
       LRTile<scalar_t> left_multiply(const LRTile<scalar_t>& a) const override;
@@ -212,7 +210,7 @@ namespace strumpack {
                                scalar_t* work) const override;
 
     private:
-      DenseM_t U_, V_;//ptr
+      std::unique_ptr<DenseM_t> U_, V_;
     };
 
 
