@@ -67,6 +67,7 @@ namespace strumpack {
       ~Stream() { gpu_check(cudaStreamDestroy(s_)); }
       operator cudaStream_t&() { return s_; }
       operator const cudaStream_t&() const { return s_; }
+      void synchronize() { cudaStreamSynchronize(s_); }
     private:
       cudaStream_t s_;
     };

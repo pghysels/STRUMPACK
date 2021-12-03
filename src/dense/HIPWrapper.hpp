@@ -66,6 +66,7 @@ namespace strumpack {
       ~Stream() { gpu_check(hipStreamDestroy(s_)); }
       operator hipStream_t&() { return s_; }
       operator const hipStream_t&() const { return s_; }
+      void synchronize() { hipStreamSynchronize(s_); }
     private:
       hipStream_t s_;
     };
