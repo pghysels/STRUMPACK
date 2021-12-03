@@ -119,6 +119,12 @@ namespace strumpack {
                              std::vector<gpu::SOLVERHandle>& solver_handles,
                              std::vector<gpu::Stream>& streams,
                              const SPOptions<scalar_t>& opts);
+    void factor_largest_fronts(LInfo_t& L,
+                               std::vector<gpu::BLASHandle>& blas_handles,
+                               std::vector<gpu::SOLVERHandle>& solver_handles,
+                               std::vector<gpu::Stream>& streams,
+                               gpu::HostMemory<scalar_t>& pinned,
+                               const SPOptions<scalar_t>& opts);
 
     void split_smaller(const SpMat_t& A, const SPOptions<scalar_t>& opts,
                        int etree_level=0, int task_depth=0);
