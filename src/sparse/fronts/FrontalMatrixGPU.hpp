@@ -110,7 +110,8 @@ namespace strumpack {
     FrontalMatrixGPU& operator=(FrontalMatrixGPU const&) = delete;
 
     void front_assembly(const SpMat_t& A, LInfo_t& L,
-                        char* hea_mem, char* dea_mem);
+                        char* hea_mem, char* dea_mem,
+                        std::vector<gpu::Stream>& streams);
     void factor_small_fronts(LInfo_t& L, gpu::FrontData<scalar_t>* fdata,
                              const SPOptions<scalar_t>& opts);
     void factor_large_fronts(LInfo_t& L,

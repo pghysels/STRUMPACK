@@ -290,7 +290,8 @@ namespace strumpack {
 
   template<typename scalar_t, typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::front_assembly
-  (const SpMat_t& A, LInfo_t& L, char* hea_mem, char* dea_mem) {
+  (const SpMat_t& A, LInfo_t& L, char* hea_mem, char* dea_mem,
+   std::vector<gpu::Stream>& streams) {
     using Trip_t = Triplet<scalar_t>;
     auto N = L.f.size();
     std::vector<Trip_t> e11, e12, e21;
@@ -344,7 +345,7 @@ namespace strumpack {
       }
     }
     gpu::copy_host_to_device<char>(dea_mem, hea_mem, L.ea_bytes);
-    gpu::assemble(N, hasmbl, dasmbl);
+    gpu::assemble(N, hasmbl, dasmbl, streams);
     gpu::synchronize();
   }
 
@@ -567,7 +568,7 @@ namespace strumpack {
         gpu::memset<scalar_t>(dev_factors, 0, L.factor_size);
         L.set_factor_pointers(dev_factors);
         L.set_work_pointers(work_mem, max_streams);
-        front_assembly(A, L, hea_mem, dea_mem);
+        front_assembly(A, L, hea_mem, dea_mem, streams);
         old_work = work_mem;
         factor_small_fronts(L, fdata, opts);
         factor_large_fronts(L, blas_handles, solver_handles, streams, opts);

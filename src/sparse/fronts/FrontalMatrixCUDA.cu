@@ -156,7 +156,7 @@ namespace strumpack {
 
     template<typename T> void
     assemble(unsigned int nf, AssembleData<T>* dat,
-             AssembleData<T>* ddat) {
+             AssembleData<T>* ddat, std::vector<gpu::Stream>& streams) {
       { // front assembly from sparse matrix
         unsigned int nt1 = 128, nt2 = 32, nb1 = 0, nb2 = 0;
         for (int f=0; f<nf; f++) {
@@ -177,6 +177,9 @@ namespace strumpack {
             assemble_12_21_kernel<<<grid,nt2>>>(f, ddat);
           }
       }
+
+      // TODO merge assembly with extend-add?!
+
       cudaDeviceSynchronize();
       { // extend-add
         unsigned int nt = 16, nb = 0;
@@ -191,19 +194,18 @@ namespace strumpack {
         auto dat_ = reinterpret_cast<AssembleData<T_>*>(ddat);
         for (unsigned int b1=0; b1<nb; b1+=MAX_BLOCKS_Y) {
           int nb1 = std::min(nb-b1, MAX_BLOCKS_Y);
-          for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Z) {
-            dim3 grid(nb, nb1, std::min(nf-f, MAX_BLOCKS_Z));
-            extend_add_kernel_left<<<grid, block>>>(b1, dat_+f);
+          unsigned int bf =
+            std::max(std::size_t(1),
+                     std::min(std::size_t(MAX_BLOCKS_Z), nf / streams.size()));
+          for (unsigned int f=0, s=0; f<nf; f+=bf) {
+            dim3 grid(nb, nb1, std::min(nf-f, bf));
+            extend_add_kernel_left<<<grid, block, 0, streams[s]>>>(b1, dat_+f);
+            extend_add_kernel_right<<<grid, block, 0, streams[s]>>>(b1, dat_+f);
+            s = (s + 1) % streams.size();
           }
         }
+        // TODO is this necessarry?
         cudaDeviceSynchronize();
-        for (unsigned int b1=0; b1<nb; b1+=MAX_BLOCKS_Y) {
-          int nb1 = std::min(nb-b1, MAX_BLOCKS_Y);
-          for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Z) {
-            dim3 grid(nb, nb1, std::min(nf-f, MAX_BLOCKS_Z));
-            extend_add_kernel_right<<<grid, block>>>(b1, dat_+f);
-          }
-        }
       }
     }
 
@@ -800,10 +802,10 @@ namespace strumpack {
 
 
     // explicit template instantiations
-    template void assemble(unsigned int, AssembleData<float>*, AssembleData<float>*);
-    template void assemble(unsigned int, AssembleData<double>*, AssembleData<double>*);
-    template void assemble(unsigned int, AssembleData<std::complex<float>>*, AssembleData<std::complex<float>>*);
-    template void assemble(unsigned int, AssembleData<std::complex<double>>*, AssembleData<std::complex<double>>*);
+    template void assemble(unsigned int, AssembleData<float>*, AssembleData<float>*, std::vector<gpu::Stream>&);
+    template void assemble(unsigned int, AssembleData<double>*, AssembleData<double>*, std::vector<gpu::Stream>&);
+    template void assemble(unsigned int, AssembleData<std::complex<float>>*, AssembleData<std::complex<float>>*, std::vector<gpu::Stream>&);
+    template void assemble(unsigned int, AssembleData<std::complex<double>>*, AssembleData<std::complex<double>>*, std::vector<gpu::Stream>&);
 
     template void extend_add_rhs(int, unsigned int, AssembleData<float>*, AssembleData<float>*);
     template void extend_add_rhs(int, unsigned int, AssembleData<double>*, AssembleData<double>*);
