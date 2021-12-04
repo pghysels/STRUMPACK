@@ -430,6 +430,9 @@ namespace strumpack {
     for (auto& e : events)
       cudaEventCreate(&e);
 
+    scalar_t* host_factors = L.f[0]->host_factors_.get();
+    scalar_t* pin = pinned.template as<scalar_t>();
+
     for (std::size_t n=0; n<L.f.size(); n++) {
       auto& f = *(L.f[n]);
       const auto dsep = f.dim_sep();
@@ -450,21 +453,21 @@ namespace strumpack {
            scalar_t(-1.), f.F21_, f.F12_, scalar_t(1.), f.F22_);
       }
       cudaEventRecord(events[n], comp_stream);
-    }
-    scalar_t* host_factors = L.f[0]->host_factors_.get();
-    scalar_t* pin = pinned.template as<scalar_t>();
-    for (std::size_t n=0; n<L.f.size(); n++) {
-      auto& f = *(L.f[n]);
-      std::size_t size_front = f.dim_sep() * (f.dim_sep() + 2*f.dim_upd());
       cudaStreamWaitEvent(copy_stream, events[n]);
+      std::size_t size_front = dsep * (dsep + 2*dupd);
       // copy this front to the pinned buffer
       gpu::copy_device_to_host_async
         (pin, f.F11_.data(), size_front, copy_stream);
-      copy_stream.synchronize();
+      // copy_stream.synchronize();
       // copy from the pinned buffer to host memory
-      std::copy(pin, pin + size_front, host_factors);
+      // std::copy(pin, pin + size_front, host_factors);
+      cudaMemcpyAsync
+        (host_factors, pin, size_front*sizeof(scalar_t),
+         cudaMemcpyHostToHost, copy_stream);
       host_factors += size_front;
     }
+    copy_stream.synchronize();
+    comp_stream.synchronize();
     // gpu::synchronize();
 
     // clean up events
@@ -634,7 +637,7 @@ namespace strumpack {
         L.set_work_pointers(work_mem, max_streams);
         front_assembly(A, L, hea_mem, dea_mem, streams);
         old_work = work_mem;
-        if (L.f.size() > 64) {
+        if (L.f.size() > 512) {
           factor_small_fronts(L, fdata, opts);
           factor_large_fronts(L, blas_handles, solver_handles, streams, opts);
           STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
