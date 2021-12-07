@@ -162,42 +162,43 @@ namespace strumpack {
     ea_kernel_opt(int x0, int y, std::size_t d1, std::size_t d2, int dCB,
                   T* F11, T* F12, T* F21, T* F22,
                   T* CB, std::size_t* I) {
-      if (x0 >= dCB || y >= dCB) return;
       auto Iy = I[y];
-      CB += y;
+      typename primitive_type<T>::value_type rCB_[unroll];
+      T* rCB = reinterpret_cast<T*>(rCB_);
+#pragma unroll
+      for (int i=0; i<unroll; i++)
+        rCB[i] = CB[y+(x0+i)*dCB];
+      rCB -= x0;
       if (Iy < d1) {
         T* F[2] = {F11+Iy, F12+Iy-d1*d1};
-        for (int x=x0; x<min(dCB, x0+unroll); x++) {
+#pragma unroll
+        for (int x=x0; x<x0+unroll; x++) {
+          if (x > dCB) break;
           auto Ix = I[x];
-          F[Ix >= d1][Ix*d1] += CB[x*dCB];
+          F[Ix >= d1][Ix*d1] += rCB[x];
         }
       } else {
         T* F[2] = {F21+Iy-d1, F22+Iy-d1-d1*d2};
-        for (int x=x0; x<min(dCB, x0+unroll); x++) {
+#pragma unroll
+        for (int x=x0; x<x0+unroll; x++) {
+          if (x > dCB) break;
           auto Ix = I[x];
-          F[Ix >= d1][Ix*d2] += CB[x*dCB];
+          F[Ix >= d1][Ix*d2] += rCB[x];
         }
       }
     }
-    template<typename T, unsigned int unroll> __global__ void
-    extend_add_kernel_left_opt(unsigned int by0, AssembleData<T>* dat) {
+    template<typename T, unsigned int unroll>
+    __global__ void extend_add_kernel_opt
+    (unsigned int by0, AssembleData<T>* dat, bool left) {
       int x = blockIdx.x * unroll * blockDim.x + threadIdx.x,
         y = (blockIdx.y + by0) * blockDim.y + threadIdx.y;
       auto& F = dat[blockIdx.z];
-      if (F.CB1)
+      auto dCB = left ? F.dCB1 : F.dCB2;
+      auto FCB = left ? F.CB1 : F.CB2;
+      if (FCB && x < dCB && y < dCB)
         ea_kernel_opt<T,unroll>
-          (x, y, F.d1, F.d2, F.dCB1,
-           F.F11, F.F12, F.F21, F.F22, F.CB1, F.I1);
-    }
-    template<typename T, unsigned int unroll> __global__ void
-    extend_add_kernel_right_opt(unsigned int by0, AssembleData<T>* dat) {
-      int x = blockIdx.x * unroll * blockDim.x + threadIdx.x,
-        y = (blockIdx.y + by0) * blockDim.y + threadIdx.y;
-      auto& F = dat[blockIdx.z];
-      if (F.CB2)
-        ea_kernel_opt<T,unroll>
-          (x, y, F.d1, F.d2, F.dCB2,
-           F.F11, F.F12, F.F21, F.F22, F.CB2, F.I2);
+          (x, y, F.d1, F.d2, dCB, F.F11, F.F12, F.F21, F.F22,
+           FCB, left ? F.I1 : F.I2);
     }
 
     template<typename T> void
@@ -266,10 +267,10 @@ namespace strumpack {
             unsigned int ny = std::min(nby-y, MAX_BLOCKS_Y);
             for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Z) {
               dim3 grid(nbx, ny, std::min(nf-f, MAX_BLOCKS_Z));
-              extend_add_kernel_left_opt<T_,unroll>
-                <<<grid, block>>>(y, dat_+f);
-              extend_add_kernel_right_opt<T_,unroll>
-                <<<grid, block>>>(y, dat_+f);
+              extend_add_kernel_opt<T_,unroll>
+                <<<grid, block>>>(y, dat_+f, true);
+              extend_add_kernel_opt<T_,unroll>
+                <<<grid, block>>>(y, dat_+f, false);
             }
           }
         }
