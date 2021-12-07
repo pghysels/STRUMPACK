@@ -522,7 +522,7 @@ namespace strumpack {
             }
           }
         }
-      }
+      //}
       for (std::size_t i=0; i<rb; i++)
         for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
           piv[l] += B11.tileroff(i);
