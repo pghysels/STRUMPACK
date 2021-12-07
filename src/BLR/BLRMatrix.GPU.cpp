@@ -171,8 +171,8 @@ namespace strumpack {
       int Lwork = 0, rank = 0;
       const double tol = opts.rel_tol();
       gesvdjInfo_t params = nullptr;
-      cusolverDnCreateGesvdjInfo(&gesvdj_params);
-      cusolverDnXgesvdjSetTolerance(gesvdj_params, tol);
+      cusolverDnCreateGesvdjInfo(&params);
+      cusolverDnXgesvdjSetTolerance(params, tol);
       int gesvd_work_size = gpu::gesvdj_buffersize<scalar_t>
          (handle, tilerows(i), tilecols(j), dS, Lwork, params);
       gpu::DeviceMemory<scalar_t> gesvd_work(gesvd_work_size);
@@ -199,7 +199,7 @@ namespace strumpack {
         scalar_t* d_V_new = d_V;
         DenseMW_t dV_new(dV.rows(), dV.cols(), d_V_new, dV.rows());
         gpu::dgmm<scalar_t>(blashandle, Side::L, dV, dS, dV_new);
-        DenseMW_t dAijU(tilerows(i), rank, dA, tilerows(i);
+        DenseMW_t dAijU(tilerows(i), rank, dA, tilerows(i));
         dA += tilerows(i) * rank;
         DenseMW_t dAijV(tilecols(j), rank, dA, tilecols(j));
         dA += tilecols(j) * rank;
