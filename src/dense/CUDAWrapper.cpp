@@ -629,7 +629,7 @@ namespace strumpack {
                        const double*, DenseMatrix<double>&);
 
     template void dgmm(BLASHandle&, Side, const DenseMatrix<std::complex<float>>&, 
-                       const std::complex<float>*, DenseMatrix<std::complex<float>>);
+                       const std::complex<float>*, DenseMatrix<std::complex<float>>&);
 
     template void dgmm(BLASHandle&, Side, const DenseMatrix<std::complex<double>>&, 
                        const std::complex<double>*, DenseMatrix<std::complex<double>>&);
