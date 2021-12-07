@@ -157,17 +157,18 @@ namespace strumpack {
       gpu::copy_host_to_device(tile(i, j).D(), tile(A, i, j));
     }
 
-    template<typename scalar_t>
+    template<typename scalar_t, typename real_t= typename RealType<scalar_t>::value_type>
     void BLRMatrix<scalar_t>::create_LR_gpu_tile
     (gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle, std::size_t i, std::size_t j, DenseM_t& A, 
-     DenseM_t& dU, DenseM_t& dV, DenseM_t& dA, int* dpiv, const Opts_t& opts) {
+     DenseM_t& dU, DenseM_t& dV, scalar_t* dA, int* dpiv, const Opts_t& opts) {
       if (dU.rows() == 0 || dV.cols() == 0) {
         // TODO
       }
       std::size_t minmn = std::min(dU.rows(), dV.cols());
       gpu::DeviceMemory<scalar_t> d_S(minmn);
-      scalar_t* dS = d_S;
-      std::vector<scalar_t> S(minmn);
+      real_t* dS = d_S;
+      real_t* S;
+      //std::vector<real_t> S(minmn);
       int Lwork = 0, rank = 0;
       const double tol = opts.rel_tol();
       gesvdjInfo_t params = nullptr;
@@ -180,7 +181,7 @@ namespace strumpack {
       gpu::gesvdj<scalar_t>(handle, Aij, dS, dU, dV, 
                             reinterpret_cast<scalar_t*>(gesvd_work_size),
                             Lwork, dpiv, params);
-      gpu::copy_device_to_host(S, dS);
+      gpu::copy_device_to_host(S, dS, minmn);
       while(S[rank] >= tol){
         rank++;
       }

@@ -392,8 +392,8 @@ namespace strumpack {
            DenseMatrix<scalar_t>& V, scalar_t* Workspace,
            int Lwork, int* devInfo, gesvdjInfo_t params);
 
-    template<typename scalar_t> void
-    dgmm(BLASHandle& handle, Side side, const DenseMatrix<scalar_t>& A, scalar_t* x, 
+    template<typename scalar_t, typename real_t= typename RealType<scalar_t>::value_type> void
+    dgmm(BLASHandle& handle, Side side, const DenseMatrix<scalar_t>& A, real_t* x, 
          DenseMatrix<scalar_t>& C);
 
     template<typename scalar_t> void

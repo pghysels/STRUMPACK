@@ -596,7 +596,7 @@ namespace strumpack {
 
     void dgmm(BLASHandle& handle, cublasSideMode_t side, int m, int n,
               const std::complex<float>* A, int lda, 
-              const std::complex<float>* x, int incx, 
+              const float* x, int incx, 
               std::complex<float>* C, int ldc){
       gpu_check(cublasCdgmm(handle, side, m, n, 
                             reinterpret_cast<const cuComplex*>(A), lda, 
@@ -606,7 +606,7 @@ namespace strumpack {
 
     void dgmm(BLASHandle& handle, cublasSideMode_t side, int m, int n,
               const std::complex<double>* A, int lda, 
-              const std::complex<double>* x, int incx, 
+              const double* x, int incx, 
               std::complex<double>* C, int ldc){
       gpu_check(cublasZdgmm(handle, side, m, n, 
                             reinterpret_cast<const cuDoubleComplex*>(A), lda, 
@@ -614,9 +614,9 @@ namespace strumpack {
                             reinterpret_cast<cuDoubleComplex*>(C), ldc));
     }
     
-    template<typename scalar_t> void
+    template<typename scalar_t, typename real_t> void
     dgmm(BLASHandle& handle, Side side, const DenseMatrix<scalar_t>& A,
-         const scalar_t* x, DenseMatrix<scalar_t>& C){
+         const real_t* x, DenseMatrix<scalar_t>& C){
       int incx = 1;
       dgmm(handle, S2cuOp(side), A.rows(), A.cols(), A.data(), A.ld(), x, incx,
            C.data(), C.ld());
@@ -629,10 +629,10 @@ namespace strumpack {
                        const double*, DenseMatrix<double>&);
 
     template void dgmm(BLASHandle&, Side, const DenseMatrix<std::complex<float>>&, 
-                       const std::complex<float>*, DenseMatrix<std::complex<float>>&);
+                       const float*, DenseMatrix<std::complex<float>>&);
 
     template void dgmm(BLASHandle&, Side, const DenseMatrix<std::complex<double>>&, 
-                       const std::complex<double>*, DenseMatrix<std::complex<double>>&);
+                       const double*, DenseMatrix<std::complex<double>>&);
     
     void gemv(BLASHandle& handle, cublasOperation_t transa,
               int m, int n, float alpha,
