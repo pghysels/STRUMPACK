@@ -163,27 +163,30 @@ namespace strumpack {
                   T* F11, T* F12, T* F21, T* F22,
                   T* CB, std::size_t* I) {
       auto Iy = I[y];
-      typename primitive_type<T>::value_type rCB_[unroll];
-      T* rCB = reinterpret_cast<T*>(rCB_);
-#pragma unroll
-      for (int i=0; i<unroll; i++)
-        rCB[i] = CB[y+(x0+i)*dCB];
-      rCB -= x0;
+      CB += y;
+//       typename primitive_type<T>::value_type rCB_[unroll];
+//       T* rCB = reinterpret_cast<T*>(rCB_);
+// #pragma unroll
+//       for (int i=0; i<unroll; i++)
+//         rCB[i] = CB[(x0+i)*dCB];
+//       rCB -= x0;
       if (Iy < d1) {
         T* F[2] = {F11+Iy, F12+Iy-d1*d1};
 #pragma unroll
         for (int x=x0; x<x0+unroll; x++) {
-          if (x > dCB) break;
+          if (x >= dCB) break;
           auto Ix = I[x];
-          F[Ix >= d1][Ix*d1] += rCB[x];
+          //F[Ix >= d1][Ix*d1] += rCB[x];
+          F[Ix >= d1][Ix*d1] += CB[x*dCB];
         }
       } else {
         T* F[2] = {F21+Iy-d1, F22+Iy-d1-d1*d2};
 #pragma unroll
         for (int x=x0; x<x0+unroll; x++) {
-          if (x > dCB) break;
+          if (x >= dCB) break;
           auto Ix = I[x];
-          F[Ix >= d1][Ix*d2] += rCB[x];
+          //F[Ix >= d1][Ix*d2] += rCB[x];
+          F[Ix >= d1][Ix*d2] += CB[x*dCB];
         }
       }
     }
