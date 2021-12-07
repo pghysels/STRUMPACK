@@ -601,7 +601,7 @@ namespace strumpack {
       gpu_check(cublasCdgmm(handle, side, m, n, 
                             reinterpret_cast<const cuComplex*>(A), lda, 
                             reinterpret_cast<const cuComplex*>(x), incx, 
-                            reinterpret_cast<const cuComplex*>(C), ldc));
+                            reinterpret_cast<cuComplex*>(C), ldc));
     }
 
     void dgmm(BLASHandle& handle, cublasSideMode_t side, int m, int n,
@@ -611,7 +611,7 @@ namespace strumpack {
       gpu_check(cublasZdgmm(handle, side, m, n, 
                             reinterpret_cast<const cuDoubleComplex*>(A), lda, 
                             reinterpret_cast<const cuDoubleComplex*>(x), incx, 
-                            reinterpret_cast<const cuDoubleComplex*>(C), ldc));
+                            reinterpret_cast<cuDoubleComplex*>(C), ldc));
     }
     
     template<typename scalar_t> void
@@ -619,7 +619,7 @@ namespace strumpack {
          const scalar_t* x, DenseMatrix<scalar_t>& C){
       int incx = 1;
       dgmm(handle, S2cuOp(side), A.rows(), A.cols(), A.data(), A.ld(), x, incx,
-           C.data(), C.ld()));
+           C.data(), C.ld());
     }
 
     template void dgmm(BLASHandle&, Side, const DenseMatrix<float>&, 

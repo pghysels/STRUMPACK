@@ -393,8 +393,8 @@ namespace strumpack {
            int Lwork, int* devInfo, gesvdjInfo_t params);
 
     template<typename scalar_t> void
-    dgmm(BLASHandle& handle, Side side, scalar_t* A,
-         scalar_t* x, scalar_t* C);
+    dgmm(BLASHandle& handle, Side side, const DenseMatrix<scalar_t>& A, scalar_t* x, 
+         DenseMatrix<scalar_t>& C);
 
     template<typename scalar_t> void
     gemm(BLASHandle& handle, Trans ta, Trans tb,
