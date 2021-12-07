@@ -154,19 +154,64 @@ namespace strumpack {
     }
 
 
+    /**
+     * Single extend-add operation from one contribution block into
+     * the parent front. d1 is the size of F11, d2 is the size of F22.
+     */
+    template<typename T, unsigned int unroll> __device__ void
+    ea_kernel_opt(int x0, int y, std::size_t d1, std::size_t d2, int dCB,
+                  T* F11, T* F12, T* F21, T* F22,
+                  T* CB, std::size_t* I) {
+      if (x0 >= dCB || y >= dCB) return;
+      auto Iy = I[y];
+      CB += y;
+      if (Iy < d1) {
+        T* F[2] = {F11+Iy, F12+Iy-d1*d1};
+        for (int x=x0; x<min(dCB, x0+unroll); x++) {
+          auto Ix = I[x];
+          F[Ix >= d1][Ix*d1] += CB[x*dCB];
+        }
+      } else {
+        T* F[2] = {F21+Iy-d1, F22+Iy-d1-d1*d2};
+        for (int x=x0; x<min(dCB, x0+unroll); x++) {
+          auto Ix = I[x];
+          F[Ix >= d1][Ix*d2] += CB[x*dCB];
+        }
+      }
+    }
+    template<typename T, unsigned int unroll> __global__ void
+    extend_add_kernel_left_opt(unsigned int by0, AssembleData<T>* dat) {
+      int x = blockIdx.x * unroll * blockDim.x + threadIdx.x,
+        y = (blockIdx.y + by0) * blockDim.y + threadIdx.y;
+      auto& F = dat[blockIdx.z];
+      if (F.CB1)
+        ea_kernel_opt<T,unroll>
+          (x, y, F.d1, F.d2, F.dCB1,
+           F.F11, F.F12, F.F21, F.F22, F.CB1, F.I1);
+    }
+    template<typename T, unsigned int unroll> __global__ void
+    extend_add_kernel_right_opt(unsigned int by0, AssembleData<T>* dat) {
+      int x = blockIdx.x * unroll * blockDim.x + threadIdx.x,
+        y = (blockIdx.y + by0) * blockDim.y + threadIdx.y;
+      auto& F = dat[blockIdx.z];
+      if (F.CB2)
+        ea_kernel_opt<T,unroll>
+          (x, y, F.d1, F.d2, F.dCB2,
+           F.F11, F.F12, F.F21, F.F22, F.CB2, F.I2);
+    }
+
     template<typename T> void
     assemble(unsigned int nf, AssembleData<T>* dat,
              AssembleData<T>* ddat, std::vector<gpu::Stream>& streams) {
       { // front assembly from sparse matrix
-        unsigned int nt1 = 128, nt2 = 32, nb1 = 0, nb2 = 0;
-        for (int f=0; f<nf; f++) {
-          unsigned int b = dat[f].n11 / nt1 + (dat[f].n11 % nt1 != 0);
-          if (b > nb1) nb1 = b;
-          b = dat[f].n12 / nt2 + (dat[f].n12 % nt2 != 0);
-          if (b > nb2) nb2 = b;
-          b = dat[f].n21 / nt2 + (dat[f].n21 % nt2 != 0);
-          if (b > nb2) nb2 = b;
+        unsigned int nt1 = 128, nt2 = 32;
+        std::size_t nb1 = 0, nb2 = 0;
+        for (unsigned int f=0; f<nf; f++) {
+          nb1 = std::max(nb1, dat[f].n11);
+          nb2 = std::max(nb2, std::max(dat[f].n12, dat[f].n21));
         }
+        nb1 = (nb1 + nt1 - 1) / nt1;
+        nb2 = (nb2 + nt2 - 1) / nt2;
         for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Y) {
           dim3 grid(nb1, std::min(nf-f, MAX_BLOCKS_Y));
           assemble_11_kernel<<<grid,nt1>>>(f, ddat);
@@ -177,9 +222,8 @@ namespace strumpack {
             assemble_12_21_kernel<<<grid,nt2>>>(f, ddat);
           }
       }
-
+#if 0
       // TODO merge assembly with extend-add?!
-
       cudaDeviceSynchronize();
       { // extend-add
         unsigned int nt = 16, nb = 0;
@@ -204,9 +248,33 @@ namespace strumpack {
             s = (s + 1) % streams.size();
           }
         }
-        // TODO is this necessarry?
-        cudaDeviceSynchronize();
       }
+#else
+      { // extend-add
+        int du = 0;
+        for (unsigned int f=0; f<nf; f++)
+          du = std::max(du, std::max(dat[f].dCB1, dat[f].dCB2));
+        if (du) {
+          const unsigned int nt = 256;
+          const unsigned int unroll = 16;
+          unsigned int nby = (du + nt - 1) / nt;
+          unsigned int nbx = (du + unroll - 1) / unroll;
+          dim3 block(1, nt);
+          using T_ = typename cuda_type<T>::value_type;
+          auto dat_ = reinterpret_cast<AssembleData<T_>*>(ddat);
+          for (unsigned int y=0; y<nby; y+=MAX_BLOCKS_Y) {
+            unsigned int ny = std::min(nby-y, MAX_BLOCKS_Y);
+            for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Z) {
+              dim3 grid(nbx, ny, std::min(nf-f, MAX_BLOCKS_Z));
+              extend_add_kernel_left_opt<T_,unroll>
+                <<<grid, block>>>(y, dat_+f);
+              extend_add_kernel_right_opt<T_,unroll>
+                <<<grid, block>>>(y, dat_+f);
+            }
+          }
+        }
+      }
+#endif
     }
 
 
