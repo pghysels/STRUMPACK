@@ -268,9 +268,10 @@ namespace strumpack {
                                           const BLRMatrix<scalar_t>& B12);
       void create_LR_tile(std::size_t i, std::size_t j,
                           DenseM_t& A, const Opts_t& opts);
-      void create_LR_gpu_tile(gpu::SOLVERHandle& handle, std::size_t i, 
-                              std::size_t j, DenseM_t& A, DenseM_t& dU, 
-                              DenseM_t& dV, DenseM_t& dA, int* dpiv);
+      void create_LR_gpu_tile(gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle, 
+                              std::size_t i, std::size_t j, DenseM_t& A, 
+                              DenseM_t& dU, DenseM_t& dV, DenseM_t& dA, int* dpiv,
+                              const Opts_t& opts);
       void create_LR_tile_left_looking(std::size_t i, std::size_t j,
                                        const extract_t<scalar_t>& Aelem,
                                        const Opts_t& opts);

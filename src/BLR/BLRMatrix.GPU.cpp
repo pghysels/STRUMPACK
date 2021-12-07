@@ -159,15 +159,20 @@ namespace strumpack {
 
     template<typename scalar_t>
     void BLRMatrix<scalar_t>::create_LR_gpu_tile
-    (gpu::SOLVERHandle& handle, std::size_t i, std::size_t j, DenseM_t& A, 
-     DenseM_t& dU, DenseM_t& dV, DenseM_t& dA, int* dpiv) {
-      if (tile(A, i, j).rows() == 0 || tile(A, i, j).cols() == 0) {
+    (gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle, std::size_t i, std::size_t j, DenseM_t& A, 
+     DenseM_t& dU, DenseM_t& dV, DenseM_t& dA, int* dpiv, const Opts_t& opts) {
+      if (dU.rows() == 0 || dV.cols() == 0) {
         // TODO
       }
-      gpu::DeviceMemory<scalar_t> d_S(std::min(dU.rows(), dV.cols()));
+      std::size_t minmn = std::min(dU.rows(), dV.cols());
+      gpu::DeviceMemory<scalar_t> d_S(minmn);
       scalar_t* dS = d_S;
-      int Lwork = 0;
+      std::vector<scalar_t> S(minmn);
+      int Lwork = 0, rank = 0;
+      const double tol = opts.rel_tol();
       gesvdjInfo_t params = nullptr;
+      cusolverDnCreateGesvdjInfo(&gesvdj_params);
+      cusolverDnXgesvdjSetTolerance(gesvdj_params, tol);
       int gesvd_work_size = gpu::gesvdj_buffersize<scalar_t>
          (handle, tilerows(i), tilecols(j), dS, Lwork, params);
       gpu::DeviceMemory<scalar_t> gesvd_work(gesvd_work_size);
@@ -175,27 +180,33 @@ namespace strumpack {
       gpu::gesvdj<scalar_t>(handle, Aij, dS, dU, dV, 
                             reinterpret_cast<scalar_t*>(gesvd_work_size),
                             Lwork, dpiv, params);
-      //TODO: if always true?
-      if (dU.cols()*(dU.rows() + dV.cols()) > dU.rows()*dV.cols()) {
-        DenseMW_t dAij(tilerows(i), tilecols(j), dA,
-                       tileroff(i), tilecoff(j));
+      gpu::copy_device_to_host(S, dS);
+      while(S[rank] >= tol){
+        rank++;
+      }
+      if (rank*(dU.rows() + dV.cols()) > dU.rows()*dV.cols()) {
+        // DenseMW_t dAij(tilerows(i), tilecols(j), dA,
+        //                tileroff(i), tilecoff(j));
+        DenseMW_t dAij(tilerows(i), tilecols(j), dA, tilerows(i));
         create_dense_gpu_tile(i, j, A, dAij);
+        dA += tilerows(i) * tilecols(j);
       } else {
-        //if (tilerows(i) >= tilecols(j)) {
-          DenseMW_t dAijU(tilerows(i), dU.cols(), dA,
-                          tileroff(i), tilecoff(j));
-          DenseMW_t dAijV(tilecols(j), dV.rows(), dA,
-                          tileroff(i), tilecoff(j)+dU.cols());
-        /*} else{
-          DenseMW_t dAijU(dU.cols(), tilerows(i), dA,
-                          tileroff(i), tilecoff(j));
-          DenseMW_t dAijV(dV.rows(), tilecols(j), dA,
-                          tileroff(i)+dU.cols(), tilecoff(j));
-        }*/
+        /*DenseMW_t dAijU(tilerows(i), rank, dA,
+                        tileroff(i), tilecoff(j));
+        DenseMW_t dAijV(tilecols(j), rank, dA,
+                        tileroff(i), tilecoff(j)+dU.cols());*/
+        gpu::DeviceMemory<scalar_t> d_V(dV.rows()*dV.cols());
+        scalar_t* d_V_new = d_V;
+        DenseMW_t dV_new(dV.rows(), dV.cols(), d_V_new, dV.rows());
+        gpu::dgmm<scalar_t>(blashandle, Side::L, dV, dS, dV_new);
+        DenseMW_t dAijU(tilerows(i), rank, dA, tilerows(i);
+        dA += tilerows(i) * rank;
+        DenseMW_t dAijV(tilecols(j), rank, dA, tilecols(j));
+        dA += tilecols(j) * rank;
         block(i, j) = std::unique_ptr<LRTile<scalar_t>>
          (new LRTile<scalar_t>(dAijU, dAijV));
-        gpu::copy_device_to_device(tile(i, j).U(), dU);
-        gpu::copy_device_to_device(tile(i, j).V(), dV);
+        gpu::copy_device_to_device(tile(i, j).U(), dU, tilerows(i)*rank);
+        gpu::copy_device_to_device(tile(i, j).V(), dV_new, tilecols(j)*rank);
       }
     }  
 
@@ -215,7 +226,6 @@ namespace strumpack {
       piv.resize(B11.rows());
       auto rb = B11.rowblocks();
       auto rb2 = B21.rowblocks();
-      {
 #if 0 // B11 on GPU
         auto dsep = A11.rows();
         int nr_streams = 4;
@@ -248,25 +258,28 @@ namespace strumpack {
         }
         //gpu::DeviceMemory<scalar_t> dVU_tmp(2*max_m*max_n);
         //scalar_t* dVU = dVU_tmp, dUVU = dVU + max_m*max_n;
-        DenseMW_t dA11(dsep, dsep, dmB11, dsep);
+        //DenseMW_t dA11(dsep, dsep, dmB11, dsep);
+        scalar_t* dA11 = dmB11;
         gpu::DeviceMemory<scalar_t> d_U(max_m*max_n);
         gpu::DeviceMemory<scalar_t> d_V(max_m*max_n);
         scalar_t* dU = d_U, *dV = d_V;
         for (std::size_t i=0, s=0; i<rb; i++) {
           if (i == 0) {
-            DenseMW_t dAij(B11.tilerows(i), B11.tilecols(i), dA11,
-                           B11.tileroff(i), B11.tilecoff(i));
+            // DenseMW_t dAij(B11.tilerows(i), B11.tilecols(i), dA11,
+            //                B11.tileroff(i), B11.tilecoff(i));
+            DenseMW_t dAij(B11.tilerows(i), B11.tilecols(i), dA11, B11.tilerows(i));
             B11.create_dense_gpu_tile(i, i, A11, dAij);
+            dA11 += B11.tilerows(i) * B11.tilecols(i);
           }
           gpu::getrf(solvehandles[s], B11.tile(i, i).D(), reinterpret_cast<scalar_t*>(getrf_work_size),
                      dpiv+B11.tileroff(i), dpiv+dsep);
           for (std::size_t j=i+1; j<rb; j++) {
             if (admissible(i, j)) {
               if (i == 0) { 
-                std::size_t max_rank = std::min(B11.tilerows(i), B11.tilecols(j));
-                DenseMW_t dAijU(B11.tilerows(i), max_rank, dU, B11.tilerows(i));
-                DenseMW_t dAijV(B11.tilecols(j), max_rank, dV, B11.tilecols(j));
-                B11.create_LR_gpu_tile(solvehandles[s], i, j, A11, dAijU, dAijV, dA11, dpiv+dsep);
+                std::size_t minmn = std::min(B11.tilerows(i), B11.tilecols(j));
+                DenseMW_t dAijU(B11.tilerows(i), minmn, dU, B11.tilerows(i));
+                DenseMW_t dAijV(B11.tilecols(j), minmn, dV, B11.tilecols(j));
+                B11.create_LR_gpu_tile(solvehandles[s], handles[s], i, j, A11, dAijU, dAijV, dA11, dpiv+dsep, opts);
               }// else B11.tile(i,j).compress();
 #if defined(STRUMPACK_USE_MAGMA)
               gpu::magma::laswp(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
@@ -279,9 +292,11 @@ namespace strumpack {
 #endif
             } else {
               if (i == 0) {
-                DenseMW_t dAij(B11.tilerows(i), B11.tilecols(j), dA11,
-                               B11.tileroff(i), B11.tilecoff(j));
+                // DenseMW_t dAij(B11.tilerows(i), B11.tilecols(j), dA11,
+                //                B11.tileroff(i), B11.tilecoff(j));
+                DenseMW_t dAij(B11.tilerows(i), B11.tilecols(j), dA11, B11.tilerows(i));
                 B11.create_dense_gpu_tile(i, j, A11, dAij);
+                dA11 += B11.tilerows(i) * B11.tilecols(j);
               }
 #if defined(STRUMPACK_USE_MAGMA)
               gpu::magma::laswp(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
@@ -297,11 +312,11 @@ namespace strumpack {
           for (std::size_t j=i+1; j<rb; j++) {
             if (admissible(j, i)) {
               if (i == 0) { 
-                std::size_t max_rank = std::min(B11.tilerows(j), B11.tilecols(i));
-                DenseMW_t dAijU(B11.tilerows(j), max_rank, dU, B11.tilerows(j));
-                DenseMW_t dAijV(B11.tilecols(i), max_rank, dV, B11.tilecols(i));
-                B11.create_LR_gpu_tile(solvehandles[s], j, i, A11, dAijU, 
-                                       dAijV, dA11, dpiv+dsep);
+                std::size_t minmn = std::min(B11.tilerows(j), B11.tilecols(i));
+                DenseMW_t dAijU(B11.tilerows(j), minmn, dU, B11.tilerows(j));
+                DenseMW_t dAijV(B11.tilecols(i), minmn, dV, B11.tilecols(i));
+                B11.create_LR_gpu_tile(solvehandles[s], handles[s], j, i, A11, dAijU, 
+                                       dAijV, dA11, dpiv+dsep, opts);
               } //TODO else B11.tile(j,i).compress();
 #if defined(STRUMPACK_USE_MAGMA)
               gpu::trsm(handles[s], Side::R, UpLo::U, Trans::N, Diag::N,
@@ -309,9 +324,11 @@ namespace strumpack {
 #endif
             } else {
               if (i == 0) {
-                DenseMW_t dAji(B11.tilerows(j), B11.tilecols(i), dA11,
-                               B11.tileroff(j), B11.tilecoff(i));
+                // DenseMW_t dAji(B11.tilerows(j), B11.tilecols(i), dA11,
+                //                B11.tileroff(j), B11.tilecoff(i));
+                DenseMW_t dAij(B11.tilerows(j), B11.tilecols(i), dA11, B11.tilerows(j));
                 B11.create_dense_gpu_tile(j, i, A11, dAji);
+                dA11 += B11.tilerows(j) * B11.tilecols(i);
               }
 #if defined(STRUMPACK_USE_MAGMA)
               gpu::trsm(handles[s], Side::R, UpLo::U, Trans::N, Diag::N,
@@ -374,6 +391,8 @@ namespace strumpack {
                   //DenseMW_t U1(Tij.rows(), Tij.cols(), dTij, Tij.rows());
                   gpu::gemm(handles[s], Trans::N, Trans::N, scalar_t(-1.), 
                             Tki.D(), Tij.D(), scalar_t(1.), B11.tile_dense(k, j).D());
+                  //TODO
+                  //check tile_dense
                 }
               }
             }

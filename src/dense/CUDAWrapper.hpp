@@ -212,6 +212,11 @@ namespace strumpack {
     }
 
     template<typename T> void copy_device_to_device
+    (DenseMatrix<T>& d1, const DenseMatrix<T>& d2, std::size_t count) {
+      copy_device_to_device(d1.data(), d2.data(), count);
+    }
+
+    template<typename T> void copy_device_to_device
     (DenseMatrix<T>& d1, const DenseMatrix<T>& d2) {
       if (!d1.rows() || !d1.cols()) return;
       assert(d1.rows() == d2.rows() && d1.cols() == d2.cols());
@@ -386,6 +391,10 @@ namespace strumpack {
            real_t* d_S, DenseMatrix<scalar_t>& U, 
            DenseMatrix<scalar_t>& V, scalar_t* Workspace,
            int Lwork, int* devInfo, gesvdjInfo_t params);
+
+    template<typename scalar_t> void
+    dgmm(BLASHandle& handle, Side side, scalar_t* A,
+         scalar_t* x, scalar_t* C);
 
     template<typename scalar_t> void
     gemm(BLASHandle& handle, Trans ta, Trans tb,

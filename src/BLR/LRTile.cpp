@@ -67,7 +67,13 @@ namespace strumpack {
     }
 
     template<typename scalar_t> LRTile<scalar_t>::LRTile
-    (DMW_t& dU, DMW_t& dV) {
+    (const DenseM_t& U, const DenseM_t& V) {
+      U_.reset(new DenseM_t(U));
+      V_.reset(new DenseM_t(V));
+    }
+
+    template<typename scalar_t> LRTile<scalar_t>::LRTile
+    (const DMW_t& dU, const DMW_t& dV) {
       U_.reset(new DMW_t(dU));
       V_.reset(new DMW_t(dV));
     }
@@ -182,6 +188,7 @@ namespace strumpack {
     template<typename scalar_t> std::unique_ptr<BLRTile<scalar_t>>
     LRTile<scalar_t>::clone() const {
       //return std::unique_ptr<BLRTile<scalar_t>>(new LRTile(*this));
+      return std::unique_ptr<BLRTile<scalar_t>>(new LRTile(U(),V()));
     }
 
     template<typename scalar_t> void LRTile<scalar_t>::draw
