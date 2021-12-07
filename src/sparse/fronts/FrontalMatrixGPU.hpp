@@ -123,7 +123,7 @@ namespace strumpack {
                                std::vector<gpu::BLASHandle>& blas_handles,
                                std::vector<gpu::SOLVERHandle>& solver_handles,
                                std::vector<gpu::Stream>& streams,
-                               gpu::HostMemory<scalar_t>& pinned,
+                               std::vector<scalar_t*>& pin,
                                const SPOptions<scalar_t>& opts);
 
     void split_smaller(const SpMat_t& A, const SPOptions<scalar_t>& opts,

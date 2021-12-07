@@ -63,8 +63,16 @@ namespace strumpack {
 
     class Stream {
     public:
-      Stream() { gpu_check(cudaStreamCreate(&s_)); }
+      Stream() {
+        gpu_check(cudaStreamCreateWithFlags(&s_, cudaStreamNonBlocking));
+        // gpu_check(cudaStreamCreate(&s_));
+      }
       ~Stream() { gpu_check(cudaStreamDestroy(s_)); }
+      void set_priority(int priority) {
+        gpu_check(cudaStreamDestroy(s_));
+        gpu_check(cudaStreamCreateWithPriority
+                  (&s_, cudaStreamNonBlocking, priority));
+      }
       operator cudaStream_t&() { return s_; }
       operator const cudaStream_t&() const { return s_; }
       void synchronize() { cudaStreamSynchronize(s_); }
@@ -207,6 +215,7 @@ namespace strumpack {
         return *this;
       }
       ~DeviceMemory() { release(); }
+      std::size_t size() const { return size_; }
       operator T*() { return data_; }
       operator const T*() const { return data_; }
       // operator void*() { return data_; }
@@ -265,6 +274,7 @@ namespace strumpack {
         return *this;
       }
       ~HostMemory() { release(); }
+      std::size_t size() const { return size_; }
       operator T*() { return data_; }
       operator const T*() const { return data_; }
       // operator void*() { return data_; }
