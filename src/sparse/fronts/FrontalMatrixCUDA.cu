@@ -164,29 +164,28 @@ namespace strumpack {
                   T* CB, std::size_t* I) {
       auto Iy = I[y];
       CB += y;
-//       typename primitive_type<T>::value_type rCB_[unroll];
-//       T* rCB = reinterpret_cast<T*>(rCB_);
-// #pragma unroll
-//       for (int i=0; i<unroll; i++)
-//         rCB[i] = CB[(x0+i)*dCB];
-//       rCB -= x0;
+      using cuda_primitive_t = typename primitive_type<T>::value_type;
+      cuda_primitive_t rCB[unroll];
+#pragma unroll
+      for (int i=0; i<unroll; i++)
+        rCB[i] = *reinterpret_cast<cuda_primitive_t*>(&CB[(x0+i)*dCB]);
       if (Iy < d1) {
         T* F[2] = {F11+Iy, F12+Iy-d1*d1};
 #pragma unroll
-        for (int x=x0; x<x0+unroll; x++) {
+        for (int i=0; i<unroll; i++) {
+          int x = x0 + i;
           if (x >= dCB) break;
           auto Ix = I[x];
-          //F[Ix >= d1][Ix*d1] += rCB[x];
-          F[Ix >= d1][Ix*d1] += CB[x*dCB];
+          F[Ix >= d1][Ix*d1] += *reinterpret_cast<T*>(&rCB[i]);
         }
       } else {
         T* F[2] = {F21+Iy-d1, F22+Iy-d1-d1*d2};
 #pragma unroll
-        for (int x=x0; x<x0+unroll; x++) {
+        for (int i=0; i<unroll; i++) {
+          int x = x0 + i;
           if (x >= dCB) break;
           auto Ix = I[x];
-          //F[Ix >= d1][Ix*d2] += rCB[x];
-          F[Ix >= d1][Ix*d2] += CB[x*dCB];
+          F[Ix >= d1][Ix*d2] += *reinterpret_cast<T*>(&rCB[i]);
         }
       }
     }
