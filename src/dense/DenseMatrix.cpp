@@ -808,12 +808,12 @@ namespace strumpack {
     blas::geqp3tol
       (m, n, tmp.data(), tmp.ld(), ind.data(),
        tau.get(), rank, rel_tol, abs_tol, depth);
-    std::vector<int> piv(n);
+    //std::vector<int> piv(n);
     for (int i=1; i<=n; i++) {
       int j = ind[i-1];
       assert(j-1 >= 0 && j-1 < int(ind.size()));
       while (j < i) j = ind[j-1];
-      piv[i-1] = j;
+      //piv[i-1] = j;
     }
     V = DenseMatrix<scalar_t>(rank, cols(), tmp.ptr(0, 0), tmp.ld());
     for (int c=0; c<rank; c++)

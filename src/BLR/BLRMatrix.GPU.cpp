@@ -157,18 +157,18 @@ namespace strumpack {
       gpu::copy_host_to_device(tile(i, j).D(), tile(A, i, j));
     }
 
-    template<typename scalar_t, typename real_t= typename RealType<scalar_t>::value_type>
+    template<typename scalar_t>
     void BLRMatrix<scalar_t>::create_LR_gpu_tile
     (gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle, std::size_t i, std::size_t j, DenseM_t& A, 
-     DenseM_t& dU, DenseM_t& dV, scalar_t* dA, int* dpiv, const Opts_t& opts) {
+     DenseM_t& dU, DenseM_t& dV, scalar_t*& dA, int* dpiv, const Opts_t& opts) {
       if (dU.rows() == 0 || dV.cols() == 0) {
         // TODO
       }
+      using real_t = typename RealType<scalar_t>::value_type;
       std::size_t minmn = std::min(dU.rows(), dV.cols());
-      gpu::DeviceMemory<scalar_t> d_S(minmn);
+      gpu::DeviceMemory<real_t> d_S(minmn);
       real_t* dS = d_S;
-      real_t* S;
-      //std::vector<real_t> S(minmn);
+      real_t* S = nullptr;
       int Lwork = 0, rank = 0;
       const double tol = opts.rel_tol();
       gesvdjInfo_t params = nullptr;
@@ -186,20 +186,17 @@ namespace strumpack {
         rank++;
       }
       if (rank*(dU.rows() + dV.cols()) > dU.rows()*dV.cols()) {
-        // DenseMW_t dAij(tilerows(i), tilecols(j), dA,
-        //                tileroff(i), tilecoff(j));
         DenseMW_t dAij(tilerows(i), tilecols(j), dA, tilerows(i));
         create_dense_gpu_tile(i, j, A, dAij);
         dA += tilerows(i) * tilecols(j);
       } else {
-        /*DenseMW_t dAijU(tilerows(i), rank, dA,
-                        tileroff(i), tilecoff(j));
-        DenseMW_t dAijV(tilecols(j), rank, dA,
-                        tileroff(i), tilecoff(j)+dU.cols());*/
-        gpu::DeviceMemory<scalar_t> d_V(dV.rows()*dV.cols());
-        scalar_t* d_V_new = d_V;
-        DenseMW_t dV_new(dV.rows(), dV.cols(), d_V_new, dV.rows());
-        gpu::dgmm<scalar_t>(blashandle, Side::L, dV, dS, dV_new);
+        gpu::DeviceMemory<scalar_t> d_V(rank*dV.rows());
+        scalar_t* d_V_T = d_V;
+        DenseMW_t dV_T(rank, dV.rows(), d_V_T, dV.cols());
+        gpu::geam<scalar_t>(handle, Trans::C, Trans::N, 1, dV, 0, 
+                            DenseM_t::DenseMatrix(), dV_T);
+        //?? dgmm in-place
+        gpu::dgmm<scalar_t>(blashandle, Side::L, dV_T, reinterpret_cast<scalar_t*>(dS), &dV_T);
         DenseMW_t dAijU(tilerows(i), rank, dA, tilerows(i));
         dA += tilerows(i) * rank;
         DenseMW_t dAijV(tilecols(j), rank, dA, tilecols(j));
@@ -227,7 +224,7 @@ namespace strumpack {
       piv.resize(B11.rows());
       auto rb = B11.rowblocks();
       auto rb2 = B21.rowblocks();
-#if 0 // B11 on GPU
+#if 1 // B11 on GPU
         auto dsep = A11.rows();
         int nr_streams = 4;
         std::vector<gpu::Stream> streams(nr_streams), comp_stream;
@@ -266,8 +263,6 @@ namespace strumpack {
         scalar_t* dU = d_U, *dV = d_V;
         for (std::size_t i=0, s=0; i<rb; i++) {
           if (i == 0) {
-            // DenseMW_t dAij(B11.tilerows(i), B11.tilecols(i), dA11,
-            //                B11.tileroff(i), B11.tilecoff(i));
             DenseMW_t dAij(B11.tilerows(i), B11.tilecols(i), dA11, B11.tilerows(i));
             B11.create_dense_gpu_tile(i, i, A11, dAij);
             dA11 += B11.tilerows(i) * B11.tilecols(i);
@@ -293,8 +288,6 @@ namespace strumpack {
 #endif
             } else {
               if (i == 0) {
-                // DenseMW_t dAij(B11.tilerows(i), B11.tilecols(j), dA11,
-                //                B11.tileroff(i), B11.tilecoff(j));
                 DenseMW_t dAij(B11.tilerows(i), B11.tilecols(j), dA11, B11.tilerows(i));
                 B11.create_dense_gpu_tile(i, j, A11, dAij);
                 dA11 += B11.tilerows(i) * B11.tilecols(j);
@@ -325,8 +318,6 @@ namespace strumpack {
 #endif
             } else {
               if (i == 0) {
-                // DenseMW_t dAji(B11.tilerows(j), B11.tilecols(i), dA11,
-                //                B11.tileroff(j), B11.tilecoff(i));
                 DenseMW_t dAij(B11.tilerows(j), B11.tilecols(i), dA11, B11.tilerows(j));
                 B11.create_dense_gpu_tile(j, i, A11, dAji);
                 dA11 += B11.tilerows(j) * B11.tilecols(i);

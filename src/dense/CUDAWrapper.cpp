@@ -582,6 +582,74 @@ namespace strumpack {
                          DenseMatrix<std::complex<double>>&, 
                          std::complex<double>*, int, int*, gesvdjInfo_t);
 
+    void geam(BLASHandle& handle, cublasOperation_t transa, cublasOperation_t transb, 
+              int m, int n, const float* alpha, const float* A, int lda, 
+              const float* beta, const float* B, int ldb, float* C, int ldc){
+      gpu_check(cublasSgeam(handle, transa, transb, m, n, alpha, A, lda, beta, B, 
+                            ldb, C, ldc));
+    }
+
+    void geam(BLASHandle& handle, cublasOperation_t transa, cublasOperation_t transb, 
+              int m, int n, const double* alpha, const double* A, int lda, 
+              const double* beta, const double* B, int ldb, double* C, int ldc){
+      gpu_check(cublasDgeam(handle, transa, transb, m, n, alpha, A, lda, beta, B, 
+                            ldb, C, ldc));
+    }
+
+    void geam(BLASHandle& handle, cublasOperation_t transa, cublasOperation_t transb, 
+              int m, int n, const std::complex<float>* alpha, 
+              const std::complex<float>* A, int lda, 
+              const std::complex<float>* beta, const std::complex<float>* B, int ldb, 
+              std::complex<float>* C, int ldc){
+      gpu_check(cublasCgeam(handle, transa, transb, m, n, 
+                            reinterpret_cast<const cuComplex*>(alpha), 
+                            reinterpret_cast<const cuComplex*>(A), lda, 
+                            reinterpret_cast<const cuComplex*>(beta), 
+                            reinterpret_cast<const cuComplex*>(B), ldb, 
+                            reinterpret_cast<cuComplex*>(C), ldc));
+    }
+
+    void geam(BLASHandle& handle, cublasOperation_t transa, cublasOperation_t transb, 
+              int m, int n, const std::complex<double>* alpha, 
+              const std::complex<double>* A, int lda, 
+              const std::complex<double>* beta, const std::complex<double>* B, int ldb, 
+              std::complex<double>* C, int ldc){
+      gpu_check(cublasZgeam(handle, transa, transb, m, n, 
+                            reinterpret_cast<const cuDoubleComplex*>(alpha), 
+                            reinterpret_cast<const cuDoubleComplex*>(A), lda, 
+                            reinterpret_cast<const cuDoubleComplex*>(beta), 
+                            reinterpret_cast<const cuDoubleComplex*>(B), ldb, 
+                            reinterpret_cast<cuDoubleComplex*>(C), ldc));
+    }
+    
+    template<typename scalar_t> void
+    geam(BLASHandle& handle, Trans transa, Trans transb, const scalar_t* alpha,
+         const DenseMatrix<scalar_t>& A, const scalar_t* beta, 
+         const DenseMatrix<scalar_t>& B, DenseMatrix<scalar_t>& C){
+      geam(handle, T2cuOp(transa), T2cuOp(transb), C.rows(), C.cols(), alpha, 
+           A.data(), A.ld(), beta, B.data(), B.ld(), C.data(), C.ld());
+    }
+
+    template void geam(BLASHandle&, Trans, Trans, const float*, 
+                       const DenseMatrix<float>&, const float*, 
+                       const DenseMatrix<float>&, DenseMatrix<float>&);
+
+    template void geam(BLASHandle&, Trans, Trans, const double*, 
+                       const DenseMatrix<double>&, const double*, 
+                       const DenseMatrix<double>&, DenseMatrix<double>&);
+    
+    template void geam(BLASHandle&, Trans, Trans, const std::complex<float>*, 
+                       const DenseMatrix<std::complex<float>>&, 
+                       const std::complex<float>*, 
+                       const DenseMatrix<std::complex<float>>&, 
+                       DenseMatrix<std::complex<float>>&);
+
+    template void geam(BLASHandle&, Trans, Trans, const std::complex<double>*, 
+                       const DenseMatrix<std::complex<double>>&, 
+                       const std::complex<double>*, 
+                       const DenseMatrix<std::complex<double>>&, 
+                       DenseMatrix<std::complex<double>>&);
+    
     void dgmm(BLASHandle& handle, cublasSideMode_t side, int m, int n,
               const float* A, int lda, const float* x, int incx, float* C, 
               int ldc){
@@ -596,7 +664,7 @@ namespace strumpack {
 
     void dgmm(BLASHandle& handle, cublasSideMode_t side, int m, int n,
               const std::complex<float>* A, int lda, 
-              const float* x, int incx, 
+              const std::complex<float>* x, int incx, 
               std::complex<float>* C, int ldc){
       gpu_check(cublasCdgmm(handle, side, m, n, 
                             reinterpret_cast<const cuComplex*>(A), lda, 
@@ -606,7 +674,7 @@ namespace strumpack {
 
     void dgmm(BLASHandle& handle, cublasSideMode_t side, int m, int n,
               const std::complex<double>* A, int lda, 
-              const double* x, int incx, 
+              const std::complex<double>* x, int incx, 
               std::complex<double>* C, int ldc){
       gpu_check(cublasZdgmm(handle, side, m, n, 
                             reinterpret_cast<const cuDoubleComplex*>(A), lda, 
@@ -614,9 +682,9 @@ namespace strumpack {
                             reinterpret_cast<cuDoubleComplex*>(C), ldc));
     }
     
-    template<typename scalar_t, typename real_t> void
+    template<typename scalar_t> void
     dgmm(BLASHandle& handle, Side side, const DenseMatrix<scalar_t>& A,
-         const real_t* x, DenseMatrix<scalar_t>& C){
+         const scalar_t* x, DenseMatrix<scalar_t>& C){
       int incx = 1;
       dgmm(handle, S2cuOp(side), A.rows(), A.cols(), A.data(), A.ld(), x, incx,
            C.data(), C.ld());
@@ -629,10 +697,10 @@ namespace strumpack {
                        const double*, DenseMatrix<double>&);
 
     template void dgmm(BLASHandle&, Side, const DenseMatrix<std::complex<float>>&, 
-                       const float*, DenseMatrix<std::complex<float>>&);
+                       const std::complex<float>*, DenseMatrix<std::complex<float>>&);
 
     template void dgmm(BLASHandle&, Side, const DenseMatrix<std::complex<double>>&, 
-                       const double*, DenseMatrix<std::complex<double>>&);
+                       const std::complex<double>*, DenseMatrix<std::complex<double>>&);
     
     void gemv(BLASHandle& handle, cublasOperation_t transa,
               int m, int n, float alpha,

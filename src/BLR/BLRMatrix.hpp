@@ -270,7 +270,7 @@ namespace strumpack {
                           DenseM_t& A, const Opts_t& opts);
       void create_LR_gpu_tile(gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle, 
                               std::size_t i, std::size_t j, DenseM_t& A, 
-                              DenseM_t& dU, DenseM_t& dV, scalar_t* dA, int* dpiv,
+                              DenseM_t& dU, DenseM_t& dV, scalar_t*& dA, int* dpiv,
                               const Opts_t& opts);
       void create_LR_tile_left_looking(std::size_t i, std::size_t j,
                                        const extract_t<scalar_t>& Aelem,
