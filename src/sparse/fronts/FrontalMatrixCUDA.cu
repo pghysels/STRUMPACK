@@ -160,33 +160,38 @@ namespace strumpack {
      */
     template<typename T, unsigned int unroll> __device__ void
     ea_kernel_opt(int x0, int y, std::size_t d1, std::size_t d2, int dCB,
-                  T* F11, T* F12, T* F21, T* F22,
-                  T* CB, std::size_t* I) {
+                  T* F11, T* F12, T* F21, T* F22, T* CB, std::size_t* I) {
+//       __shared__ std::size_t lI[unroll];
+//       if (threadIdx.y == 0) // use multiple threads, but not all call this routine
+// #pragma unroll
+//         for (int i=0; i<unroll; i++)
+//           lI[i] = I[x0+i];
+//       __syncthreads();
       auto Iy = I[y];
-      CB += y;
+      CB += y + x0*dCB;
       using cuda_primitive_t = typename primitive_type<T>::value_type;
       cuda_primitive_t rCB[unroll];
 #pragma unroll
       for (int i=0; i<unroll; i++)
-        rCB[i] = *reinterpret_cast<cuda_primitive_t*>(&CB[(x0+i)*dCB]);
+        if (x0 + i < dCB)
+          rCB[i] = *reinterpret_cast<cuda_primitive_t*>(CB+i*dCB);
+      int ld;
+      T* F[2];
       if (Iy < d1) {
-        T* F[2] = {F11+Iy, F12+Iy-d1*d1};
-#pragma unroll
-        for (int i=0; i<unroll; i++) {
-          int x = x0 + i;
-          if (x >= dCB) break;
-          auto Ix = I[x];
-          F[Ix >= d1][Ix*d1] += *reinterpret_cast<T*>(&rCB[i]);
-        }
+        ld = d1;
+        F[0] = F11+Iy;
+        F[1] = F12+Iy-d1*d1;
       } else {
-        T* F[2] = {F21+Iy-d1, F22+Iy-d1-d1*d2};
+        ld = d2;
+        F[0] = F21+Iy-d1;
+        F[1] = F22+Iy-d1-d1*d2;
+      }
 #pragma unroll
-        for (int i=0; i<unroll; i++) {
-          int x = x0 + i;
-          if (x >= dCB) break;
-          auto Ix = I[x];
-          F[Ix >= d1][Ix*d2] += *reinterpret_cast<T*>(&rCB[i]);
-        }
+      for (int i=0; i<unroll; i++) {
+        int x = x0 + i;
+        if (x >= dCB) break;
+        auto Ix = I[x];
+        F[Ix >= d1][Ix*ld] += *reinterpret_cast<T*>(&rCB[i]);
       }
     }
     template<typename T, unsigned int unroll>
@@ -197,10 +202,10 @@ namespace strumpack {
       auto& F = dat[blockIdx.z];
       auto dCB = left ? F.dCB1 : F.dCB2;
       auto FCB = left ? F.CB1 : F.CB2;
-      if (FCB && x < dCB && y < dCB)
+      if (FCB && y < dCB && x < dCB)
         ea_kernel_opt<T,unroll>
-          (x, y, F.d1, F.d2, dCB, F.F11, F.F12, F.F21, F.F22,
-           FCB, left ? F.I1 : F.I2);
+          (x, y, F.d1, F.d2, left ? F.dCB1 : F.dCB2,
+           F.F11, F.F12, F.F21, F.F22, FCB, left ? F.I1 : F.I2);
     }
 
     template<typename T> void
