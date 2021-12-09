@@ -83,19 +83,22 @@ namespace strumpack {
       f.reserve(fronts.size());
       for (auto& F : fronts)
         f.push_back(dynamic_cast<FG_t*>(F));
-      int max_dsep = 0;
+      std::size_t max_dsep = 0;
       for (auto F : f) {
-        auto dsep = F->dim_sep();
-        auto dupd = F->dim_upd();
-        L_size += dsep*dsep + dsep*dupd;
+        const std::size_t dsep = F->dim_sep();
+        const std::size_t dupd = F->dim_upd();
+        L_size += dsep*(dsep + dupd);
         U_size += dsep*dupd;
         Schur_size += dupd*dupd;
         piv_size += dsep;
         total_upd_size += dupd;
-        if (dsep <= 8)       N8++;
-        else if (dsep <= 16) N16++;
-        else if (dsep <= 24) N24++;
-        else if (dsep <= 32) N32++;
+        if (dsep <= 32) {
+          factors_small += dsep*(dsep + 2*dupd);
+          if (dsep <= 8)       N8++;
+          else if (dsep <= 16) N16++;
+          else if (dsep <= 24) N24++;
+          else N32++;
+        }
         if (dsep > max_dsep) max_dsep = dsep;
         if (A) {
           if (F->lchild_) Isize += F->lchild_->dim_upd();
@@ -147,8 +150,8 @@ namespace strumpack {
      */
     void set_factor_pointers(scalar_t* factors) {
       for (auto F : f) {
-        const int dsep = F->dim_sep();
-        const int dupd = F->dim_upd();
+        const std::size_t dsep = F->dim_sep();
+        const std::size_t dupd = F->dim_upd();
         F->F11_ = DenseMW_t(dsep, dsep, factors, dsep); factors += dsep*dsep;
         F->F12_ = DenseMW_t(dsep, dupd, factors, dsep); factors += dsep*dupd;
         F->F21_ = DenseMW_t(dupd, dsep, factors, dupd); factors += dupd*dsep;
@@ -189,7 +192,7 @@ namespace strumpack {
     }
 
     std::vector<FG_t*> f;
-    std::size_t L_size = 0, U_size = 0, factor_size = 0,
+    std::size_t L_size = 0, U_size = 0, factor_size = 0, factors_small = 0,
       Schur_size = 0, piv_size = 0, total_upd_size = 0,
       work_bytes = 0, N8 = 0, N16 = 0, N24 = 0, N32 = 0,
       Isize = 0, elems11 = 0, elems12 = 0, elems21 = 0, ea_bytes = 0;
@@ -341,7 +344,7 @@ namespace strumpack {
       }
     }
     gpu::copy_host_to_device<char>(dea_mem, hea_mem, L.ea_bytes);
-    gpu::assemble(N, hasmbl, dasmbl, streams);
+    gpu::assemble(N, hasmbl, dasmbl);
   }
 
 
@@ -415,52 +418,47 @@ namespace strumpack {
   (LInfo_t& L, std::vector<gpu::BLASHandle>& blas_handles,
    std::vector<gpu::SOLVERHandle>& solver_handles,
    std::vector<gpu::Stream>& streams,
-   std::vector<scalar_t*>& pinned,
+   gpu::Stream& copy_stream, scalar_t* pin,
    const SPOptions<scalar_t>& opts) {
-    // use half of the streams for comp, the other half for comm
-    assert(streams.size() % 2 == 0);
-    const int nr_streams = streams.size() / 2;
     std::vector<gpu::Event> events(L.f.size());
     scalar_t* host_factors = L.f[0]->host_factors_.get();
     for (std::size_t n=0; n<L.f.size(); n++) {
       auto& f = *(L.f[n]);
-      int stream = n % nr_streams;
+      int s = n % streams.size();
       gpu::getrf
-        (solver_handles[stream], f.F11_,
-         L.dev_getrf_work + stream * L.getrf_work_size,
-         f.piv_, L.dev_getrf_err + stream);
+        (solver_handles[s], f.F11_,
+         L.dev_getrf_work + s * L.getrf_work_size,
+         f.piv_, L.dev_getrf_err + s);
       if (opts.replace_tiny_pivots())
         gpu::replace_pivots
           (f.dim_sep(), f.F11_.data(),
-           opts.pivot_threshold(), streams[stream]);
+           opts.pivot_threshold(), streams[s]);
       if (f.dim_upd()) {
         gpu::getrs
-          (solver_handles[stream], Trans::N, f.F11_, f.piv_,
-           f.F12_, L.dev_getrf_err + stream);
+          (solver_handles[s], Trans::N, f.F11_, f.piv_,
+           f.F12_, L.dev_getrf_err + s);
       }
     }
     for (std::size_t n=0; n<L.f.size(); n++) {
       auto& f = *(L.f[n]);
-      int stream = n % nr_streams;
+      int s = n % streams.size();
       gpu::gemm
-        (blas_handles[stream], Trans::N, Trans::N,
+        (blas_handles[s], Trans::N, Trans::N,
          scalar_t(-1.), f.F21_, f.F12_, scalar_t(1.), f.F22_);
-      events[n].record(streams[stream]);
+      events[n].record(streams[s]);
     }
     for (std::size_t n=0; n<L.f.size(); n++) {
       auto& f = *(L.f[n]);
       const std::size_t dsep = f.dim_sep();
       const std::size_t dupd = f.dim_upd();
-      int stream = n % nr_streams;
-      int copy_stream = stream + nr_streams;
-      events[n].wait(streams[copy_stream]);
+      events[n].wait(copy_stream);
       std::size_t size_front = dsep * (dsep + 2*dupd);
       gpu::copy_device_to_host_async
-        (pinned[stream], f.F11_.data(), size_front, streams[copy_stream]);
-      streams[copy_stream].synchronize();
+        (pin, f.F11_.data(), size_front, copy_stream);
+      copy_stream.synchronize();
 #pragma omp parallel for
       for (std::size_t i=0; i<size_front; i++)
-        host_factors[i] = pinned[stream][i];
+        host_factors[i] = pin[i];
       host_factors += size_front;
     }
   }
@@ -567,7 +565,6 @@ namespace strumpack {
     if (opts.replace_tiny_pivots())
       magma_init();
 #endif
-    // TODO just use 2 streams???
     const int max_streams = opts.gpu_streams();
     std::vector<gpu::SOLVERHandle> solver_handles(max_streams);
     const int lvls = this->levels();
@@ -584,6 +581,7 @@ namespace strumpack {
       return;
     }
     std::vector<gpu::Stream> streams(max_streams);
+    gpu::Stream copy_stream;
     std::vector<gpu::BLASHandle> blas_handles(max_streams);
     for (int i=0; i<max_streams; i++) {
       blas_handles[i].set_stream(streams[i]);
@@ -594,16 +592,14 @@ namespace strumpack {
       auto& L = ldata[l];
       max_small_fronts = std::max(max_small_fronts, L.N8+L.N16+L.N24+L.N32);
       for (auto& f : L.f) {
-        std::size_t size_front = f->dim_sep() * (f->dim_sep() + 2*f->dim_upd());
-        max_pinned = std::max(max_pinned, size_front);
+        const std::size_t dsep = f->dim_sep();
+        const std::size_t dupd = f->dim_upd();
+        std::size_t fs = dsep*(dsep + 2*dupd);
+        max_pinned = std::max(max_pinned, fs);
       }
+      max_pinned = std::max(max_pinned, L.factors_small);
     }
-    int comp_streams = std::max(1, max_streams / 2);
-    gpu::HostMemory<scalar_t> pinned(max_pinned * comp_streams);
-    std::vector<scalar_t*> pin(comp_streams);
-    pin[0] = pinned.template as<scalar_t>();
-    for (int s=1; s<comp_streams; s++)
-      pin[s] = pin[s-1] + max_pinned;
+    gpu::HostMemory<scalar_t> pinned(max_pinned);
     gpu::HostMemory<gpu::FrontData<scalar_t>> fdata(max_small_fronts);
     std::size_t peak_hea_mem = 0;
     for (int l=lvls-1; l>=0; l--)
@@ -629,43 +625,58 @@ namespace strumpack {
           dev_factors = reinterpret_cast<scalar_t*>
             (dea_mem - round_to_16(L.factor_size * sizeof(scalar_t)));
         }
-        // TODO async memset?
         gpu::memset<scalar_t>(work_mem, 0, L.Schur_size);
         gpu::memset<scalar_t>(dev_factors, 0, L.factor_size);
+        std::size_t small_fronts = L.N8 + L.N16 + L.N24 + L.N32;
+        std::partial_sort
+          (L.f.begin(), L.f.begin() + small_fronts, L.f.end(),
+           [](const FG_t* const& a, const FG_t* const & b) -> bool {
+             return a->dim_sep() < b->dim_sep(); });
         L.set_factor_pointers(dev_factors);
         L.set_work_pointers(work_mem, max_streams);
         front_assembly(A, L, hea_mem, dea_mem, streams);
         gpu::synchronize();
         old_work = work_mem;
-        if (L.f.size() > 256) {
-          // if (L.N8 || L.N16 || L.N24 || L.N32) {
+        if (small_fronts) {
+          // default stream
           factor_small_fronts(L, fdata, opts);
+          gpu::Event e;
+          e.record(); // record in default stream
+          e.wait(copy_stream);
+          gpu::copy_device_to_host_async<scalar_t>
+            (pinned, dev_factors, L.factors_small, copy_stream);
+          // multiple streams
           factor_large_fronts(L, blas_handles, solver_handles, streams, opts);
           STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
           L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
           L.f[0]->pivot_mem_.resize(L.piv_size);
-          gpu::synchronize();
-          if (L.factor_size <= pinned.size()) {
-            gpu::copy_device_to_host_async<scalar_t>
-              (pin[0], dev_factors, L.factor_size, streams[0]);
-            streams[0].synchronize();
+          copy_stream.synchronize();
 #pragma omp parallel for
-            for (std::size_t i=0; i<L.factor_size; i++)
-              L.f[0]->host_factors_[i] = pin[0][i];
+          for (std::size_t i=0; i<L.factors_small; i++)
+            L.f[0]->host_factors_[i] = pinned[i];
+          gpu::synchronize();
+          std::size_t factors_large = L.factor_size - L.factors_small;
+          auto dlarge = dev_factors + L.factors_small;
+          if (factors_large < pinned.size()) {
+            gpu::copy_device_to_host_async<scalar_t>
+              (pinned, dlarge, factors_large, copy_stream);
+            copy_stream.synchronize();
+#pragma omp parallel for
+            for (std::size_t i=0; i<factors_large; i++)
+              L.f[0]->host_factors_[i+L.factors_small] = pinned[i];
           } else {
-            gpu:: copy_device_to_host_async<scalar_t>
-              (L.f[0]->host_factors_.get(), dev_factors,
-               L.factor_size, streams[1 % streams.size()]);
+            gpu::copy_device_to_host<scalar_t>
+              (L.f[0]->host_factors_.get()+L.factors_small,
+               dlarge, factors_large);
           }
-          gpu::copy_device_to_host_async
-            (L.f[0]->pivot_mem_.data(), L.f[0]->piv_,
-             L.piv_size, streams[0]);
+          gpu::copy_device_to_host
+            (L.f[0]->pivot_mem_.data(), L.f[0]->piv_, L.piv_size);
           L.set_factor_pointers(L.f[0]->host_factors_.get());
           L.set_pivot_pointers(L.f[0]->pivot_mem_.data());
         } else {
           L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
           factor_largest_fronts
-            (L, blas_handles, solver_handles, streams, pin, opts);
+            (L, blas_handles, solver_handles, streams, copy_stream, pinned, opts);
           L.f[0]->pivot_mem_.resize(L.piv_size);
           gpu::synchronize();
           gpu::copy_device_to_host_async

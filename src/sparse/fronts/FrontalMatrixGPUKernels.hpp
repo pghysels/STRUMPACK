@@ -87,8 +87,7 @@ namespace strumpack {
     };
 
     template<typename T> void
-    assemble(unsigned int, AssembleData<T>*, AssembleData<T>*,
-             std::vector<gpu::Stream>& streams);
+    assemble(unsigned int, AssembleData<T>*, AssembleData<T>*);
 
     template<typename T, int NT=32,
              typename real_t = typename RealType<T>::value_type>

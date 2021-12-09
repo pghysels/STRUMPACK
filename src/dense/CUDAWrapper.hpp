@@ -109,6 +109,7 @@ namespace strumpack {
       Event() { gpu_check(cudaEventCreateWithFlags
                           (&e_, cudaEventDisableTiming)); }
       ~Event() { gpu_check(cudaEventDestroy(e_)); }
+      void record() { gpu_check(cudaEventRecord(e_)); }
       void record(Stream& s) { gpu_check(cudaEventRecord(e_, s)); }
       void wait(Stream& s) { gpu_check(cudaStreamWaitEvent(s, e_, 0)); }
     private:

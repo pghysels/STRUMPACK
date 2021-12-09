@@ -189,7 +189,7 @@ namespace strumpack {
   template<> inline float default_rel_tol() { return 1.e-4; }
   template<> inline float default_abs_tol() { return 1.e-6; }
 
-  inline int default_gpu_streams() { return 2; }
+  inline int default_gpu_streams() { return 8; }
 
   /**
    * \class SPOptions

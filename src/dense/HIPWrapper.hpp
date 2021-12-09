@@ -62,7 +62,10 @@ namespace strumpack {
 
     class Stream {
     public:
-      Stream() { gpu_check(hipStreamCreate(&s_)); }
+      Stream() {
+        gpu_check(cudaStreamCreateWithFlags(&s_, cudaStreamNonBlocking));
+        //gpu_check(hipStreamCreate(&s_));
+      }
       ~Stream() { gpu_check(hipStreamDestroy(s_)); }
       operator hipStream_t&() { return s_; }
       operator const hipStream_t&() const { return s_; }
@@ -99,6 +102,7 @@ namespace strumpack {
       Event() { gpu_check(hipEventCreateWithFlags
                           (&e_, hipEventDisableTiming)); }
       ~Event() { gpu_check(hipEventDestroy(e_)); }
+      void record() { gpu_check(hipEventRecord(e_)); }
       void record(Stream& s) { gpu_check(hipEventRecord(e_, s)); }
       void wait(Stream& s) { gpu_check(hipStreamWaitEvent(s, e_, 0)); }
     private:

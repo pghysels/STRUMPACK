@@ -156,7 +156,7 @@ namespace strumpack {
 
     template<typename T> void
     assemble(unsigned int nf, AssembleData<T>* dat,
-             AssembleData<T>* ddat, std::vector<gpu::Stream>& streams) {
+             AssembleData<T>* ddat) {
       { // front assembly from sparse matrix
         unsigned int nt1 = 128, nt2 = 32;
         std::size_t nb1 = 0, nb2 = 0;
@@ -798,10 +798,10 @@ namespace strumpack {
 
 
     // explicit template instantiations
-    template void assemble(unsigned int, AssembleData<float>*, AssembleData<float>*, std::vector<gpu::Stream>&);
-    template void assemble(unsigned int, AssembleData<double>*, AssembleData<double>*, std::vector<gpu::Stream>&);
-    template void assemble(unsigned int, AssembleData<std::complex<float>>*, AssembleData<std::complex<float>>*, std::vector<gpu::Stream>&);
-    template void assemble(unsigned int, AssembleData<std::complex<double>>*, AssembleData<std::complex<double>>*, std::vector<gpu::Stream>&);
+    template void assemble(unsigned int, AssembleData<float>*, AssembleData<float>*);
+    template void assemble(unsigned int, AssembleData<double>*, AssembleData<double>*);
+    template void assemble(unsigned int, AssembleData<std::complex<float>>*, AssembleData<std::complex<float>>*);
+    template void assemble(unsigned int, AssembleData<std::complex<double>>*, AssembleData<std::complex<double>>*);
 
     template void extend_add_rhs(int, unsigned int, AssembleData<float>*, AssembleData<float>*);
     template void extend_add_rhs(int, unsigned int, AssembleData<double>*, AssembleData<double>*);
