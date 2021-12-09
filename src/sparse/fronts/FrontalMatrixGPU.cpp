@@ -346,7 +346,6 @@ namespace strumpack {
     gpu::assemble(N, hasmbl, dasmbl);
   }
 
-
   template<typename scalar_t, typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::factor_small_fronts
   (LInfo_t& L, std::size_t small_fronts, gpu::FrontData<scalar_t>* fdata,
@@ -372,95 +371,6 @@ namespace strumpack {
     gpu::factor_block_batch<scalar_t,24>(L.N24, L.f24, replace, thresh);
     gpu::factor_block_batch<scalar_t,32>(L.N32, L.f32, replace, thresh);
   }
-
-
-//   template<typename scalar_t, typename integer_t> void
-//   FrontalMatrixGPU<scalar_t,integer_t>::factor_large_fronts
-//   (LInfo_t& L, std::vector<gpu::BLASHandle>& blas_handles,
-//    std::vector<gpu::SOLVERHandle>& solver_handles,
-//    std::vector<gpu::Stream>& streams,
-//    const SPOptions<scalar_t>& opts) {
-//     for (std::size_t n=0; n<L.f.size(); n++) {
-//       auto& f = *(L.f[n]);
-//       auto stream = n % solver_handles.size();
-//       const auto dsep = f.dim_sep();
-//       if (dsep > 32) {
-//         const auto dupd = f.dim_upd();
-// #if defined(STRUMPACK_USE_MAGMA)
-//         if (opts.replace_tiny_pivots())
-//           gpu::magma::getrf(f.F11_, f.piv_);
-//         else
-// #endif
-//         gpu::getrf
-//           (solver_handles[stream], f.F11_,
-//            L.dev_getrf_work + stream * L.getrf_work_size,
-//            f.piv_, L.dev_getrf_err + stream);
-//         if (opts.replace_tiny_pivots())
-//           gpu::replace_pivots
-//             (dsep, f.F11_.data(), opts.pivot_threshold(), streams[stream]);
-//         if (dupd) {
-//           gpu::getrs
-//             (solver_handles[stream], Trans::N, f.F11_, f.piv_,
-//              f.F12_, L.dev_getrf_err + stream);
-//           gpu::gemm
-//             (blas_handles[stream], Trans::N, Trans::N,
-//              scalar_t(-1.), f.F21_, f.F12_, scalar_t(1.), f.F22_);
-//         }
-//       }
-//     }
-//   }
-
-//   template<typename scalar_t, typename integer_t> void
-//   FrontalMatrixGPU<scalar_t,integer_t>::factor_largest_fronts
-//   (LInfo_t& L, std::size_t small_fronts,
-//    std::vector<gpu::BLASHandle>& blas_handles,
-//    std::vector<gpu::SOLVERHandle>& solver_handles,
-//    std::vector<gpu::Stream>& streams,
-//    gpu::Stream& copy_stream, scalar_t* pin,
-//    const SPOptions<scalar_t>& opts) {
-//     std::vector<gpu::Event> events(L.f.size());
-//     for (std::size_t n=small_fronts; n<L.f.size(); n++) {
-//       auto& f = *(L.f[n]);
-//       int s = n % streams.size();
-//       gpu::getrf
-//         (solver_handles[s], f.F11_,
-//          L.dev_getrf_work + s * L.getrf_work_size,
-//          f.piv_, L.dev_getrf_err + s);
-//       if (opts.replace_tiny_pivots())
-//         gpu::replace_pivots
-//           (f.dim_sep(), f.F11_.data(),
-//            opts.pivot_threshold(), streams[s]);
-//       if (f.dim_upd()) {
-//         gpu::getrs
-//           (solver_handles[s], Trans::N, f.F11_, f.piv_,
-//            f.F12_, L.dev_getrf_err + s);
-//       }
-//     }
-//     for (std::size_t n=small_fronts; n<L.f.size(); n++) {
-//       auto& f = *(L.f[n]);
-//       int s = n % streams.size();
-//       gpu::gemm
-//         (blas_handles[s], Trans::N, Trans::N,
-//          scalar_t(-1.), f.F21_, f.F12_, scalar_t(1.), f.F22_);
-//       events[n].record(streams[s]);
-//     }
-//     scalar_t* host_factors = L.f[0]->host_factors_.get() + L.factors_small;
-//     for (std::size_t n=small_fronts; n<L.f.size(); n++) {
-//       auto& f = *(L.f[n]);
-//       const std::size_t dsep = f.dim_sep();
-//       const std::size_t dupd = f.dim_upd();
-//       events[n].wait(copy_stream);
-//       std::size_t size_front = dsep * (dsep + 2*dupd);
-//       gpu::copy_device_to_host_async
-//         (pin, f.F11_.data(), size_front, copy_stream);
-//       copy_stream.synchronize();
-// #pragma omp parallel for
-//       for (std::size_t i=0; i<size_front; i++)
-//         host_factors[i] = pin[i];
-//       host_factors += size_front;
-//     }
-//   }
-
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::split_smaller
@@ -597,7 +507,7 @@ namespace strumpack {
       }
       max_pinned = std::max(max_pinned, L.factors_small);
     }
-    gpu::HostMemory<scalar_t> pinned(max_pinned);
+    gpu::HostMemory<scalar_t> pinned(2*max_pinned);
     gpu::HostMemory<gpu::FrontData<scalar_t>> fdata(max_small_fronts);
     std::size_t peak_hea_mem = 0;
     for (int l=lvls-1; l>=0; l--)
@@ -671,42 +581,10 @@ namespace strumpack {
             factors_chunk.push_back(fc);
           }
         }
-        for (std::size_t c=0, n=small_fronts; c<chunks.size(); c++) {
-          int s = c % streams.size();
-          for (std::size_t ci=0; ci<chunks[c]; ci++, n++) {
-            auto& f = *(L.f[n]);
-            gpu::getrf
-              (solver_handles[s], f.F11_,
-               L.dev_getrf_work + s * L.getrf_work_size,
-               f.piv_, L.dev_getrf_err + s);
-            if (opts.replace_tiny_pivots())
-              gpu::replace_pivots
-                (f.dim_sep(), f.F11_.data(),
-                 opts.pivot_threshold(), streams[s]);
-            if (f.dim_upd()) {
-              gpu::getrs
-                (solver_handles[s], Trans::N, f.F11_, f.piv_,
-                 f.F12_, L.dev_getrf_err + s);
-            }
-          }
-        }
 
         e_small.wait(copy_stream);
         gpu::copy_device_to_host_async<scalar_t>
           (pinned, dev_factors, L.factors_small, copy_stream);
-
-        std::vector<gpu::Event> events(chunks.size());
-        for (std::size_t c=0, n=small_fronts; c<chunks.size(); c++) {
-          int s = c % streams.size();
-          for (std::size_t ci=0; ci<chunks[c]; ci++, n++) {
-            auto& f = *(L.f[n]);
-            if (f.dim_upd())
-              gpu::gemm
-                (blas_handles[s], Trans::N, Trans::N,
-                 scalar_t(-1.), f.F21_, f.F12_, scalar_t(1.), f.F22_);
-          }
-          events[c].record(streams[s]);
-        }
 
         STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
         L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
@@ -717,17 +595,62 @@ namespace strumpack {
           host_factors[i] = pinned[i];
         host_factors += L.factors_small;
 
-        for (std::size_t c=0, n=small_fronts; c<chunks.size(); c++) {
-          events[c].wait(copy_stream);
-          auto& f = *(L.f[n]);
-          gpu::copy_device_to_host_async<scalar_t>
-            (pinned, f.F11_.data(), factors_chunk[c], copy_stream);
+        if (!chunks.empty()) {
+          scalar_t* pin[2] = {pinned.template as<scalar_t>(),
+            pinned.template as<scalar_t>() + max_pinned};
+          std::vector<gpu::Event> events(chunks.size());
+
+          for (std::size_t c=0, n=small_fronts; c<chunks.size(); c++) {
+            int s = c % streams.size();
+            int n0 = n;
+#pragma omp parallel
+#pragma omp single
+            {
+              if (c) {
+#pragma omp task
+                {
+                  copy_stream.synchronize();
+                  auto fc = factors_chunk[c-1];
+#pragma omp taskloop //num_tasks(omp_get_num_threads()-1)
+                  for (std::size_t i=0; i<fc; i++)
+                    host_factors[i] = pin[(c-1) % 2][i];
+                  host_factors += factors_chunk[c-1];
+                }
+              }
+#pragma omp task
+              {
+                for (std::size_t ci=0; ci<chunks[c]; ci++, n++) {
+                  auto& f = *(L.f[n]);
+                  gpu::getrf
+                    (solver_handles[s], f.F11_,
+                     L.dev_getrf_work + s * L.getrf_work_size,
+                     f.piv_, L.dev_getrf_err + s);
+                  if (opts.replace_tiny_pivots())
+                    gpu::replace_pivots
+                      (f.dim_sep(), f.F11_.data(),
+                       opts.pivot_threshold(), streams[s]);
+                  if (f.dim_upd()) {
+                    gpu::getrs
+                      (solver_handles[s], Trans::N, f.F11_, f.piv_,
+                       f.F12_, L.dev_getrf_err + s);
+                    gpu::gemm
+                      (blas_handles[s], Trans::N, Trans::N,
+                       scalar_t(-1.), f.F21_, f.F12_, scalar_t(1.), f.F22_);
+                  }
+                }
+                events[c].record(streams[s]);
+                events[c].wait(copy_stream);
+                auto& f = *(L.f[n0]);
+                gpu::copy_device_to_host_async<scalar_t>
+                  (pin[c % 2], f.F11_.data(), factors_chunk[c], copy_stream);
+              }
+            }
+          }
           copy_stream.synchronize();
+          auto fc = factors_chunk[chunks.size()-1];
 #pragma omp parallel for
-          for (std::size_t i=0; i<factors_chunk[c]; i++)
-            host_factors[i] = pinned[i];
-          host_factors += factors_chunk[c];
-          n += chunks[c];
+          for (std::size_t i=0; i<fc; i++)
+            host_factors[i] = pin[(chunks.size()-1) % 2][i];
         }
 
         L.f[0]->pivot_mem_.resize(L.piv_size);
