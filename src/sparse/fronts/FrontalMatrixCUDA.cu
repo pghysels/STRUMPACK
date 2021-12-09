@@ -114,98 +114,44 @@ namespace strumpack {
       }
     }
 
-
     /**
      * Single extend-add operation from one contribution block into
      * the parent front. d1 is the size of F11, d2 is the size of F22.
      */
-    template<typename T> __device__ void
-    ea_kernel(int x, int y, int d1, int d2, int dCB,
-              T* F11, T* F12, T* F21, T* F22,
-              T* CB, std::size_t* I) {
-      if (x >= dCB || y >= dCB) return;
-      auto Ix = I[x], Iy = I[y];
-      if (Ix < d1) {
-        if (Iy < d1) F11[Iy+Ix*d1] += CB[y+x*dCB];
-        else F21[Iy-d1+Ix*d2] += CB[y+x*dCB];
-      } else {
-        if (Iy < d1) F12[Iy+(Ix-d1)*d1] += CB[y+x*dCB];
-        else F22[Iy-d1+(Ix-d1)*d2] += CB[y+x*dCB];
-      }
-    }
-
-    template<typename T> __global__ void
-    extend_add_kernel_left(unsigned int by0, AssembleData<T>* dat) {
-      int x = blockIdx.x * blockDim.x + threadIdx.x,
-        y = (blockIdx.y + by0) * blockDim.y + threadIdx.y;
-      auto& F = dat[blockIdx.z];
-      if (F.CB1)
-        ea_kernel(x, y, F.d1, F.d2, F.dCB1,
-                  F.F11, F.F12, F.F21, F.F22, F.CB1, F.I1);
-    }
-    template<typename T> __global__ void
-    extend_add_kernel_right(unsigned int by0, AssembleData<T>* dat) {
-      int x = blockIdx.x * blockDim.x + threadIdx.x,
-        y = (blockIdx.y + by0) * blockDim.y + threadIdx.y;
-      auto& F = dat[blockIdx.z];
-      if (F.CB2)
-        ea_kernel(x, y, F.d1, F.d2, F.dCB2,
-                  F.F11, F.F12, F.F21, F.F22, F.CB2, F.I2);
-    }
-
-
-    /**
-     * Single extend-add operation from one contribution block into
-     * the parent front. d1 is the size of F11, d2 is the size of F22.
-     */
-    template<typename T, unsigned int unroll> __device__ void
-    ea_kernel_opt(int x0, int y, std::size_t d1, std::size_t d2, int dCB,
-                  T* F11, T* F12, T* F21, T* F22, T* CB, std::size_t* I) {
-//       __shared__ std::size_t lI[unroll];
-//       if (threadIdx.y == 0) // use multiple threads, but not all call this routine
-// #pragma unroll
-//         for (int i=0; i<unroll; i++)
-//           lI[i] = I[x0+i];
-//       __syncthreads();
+    template<typename T, unsigned int unroll>
+    __global__ void extend_add_kernel
+    (unsigned int by0, unsigned int nf, AssembleData<T>* dat, bool left) {
+      int y = blockIdx.x * blockDim.x + threadIdx.x,
+        x0 = (blockIdx.y + by0) * unroll,
+        z = blockIdx.z * blockDim.z + threadIdx.z;
+      if (z >= nf) return;
+      auto& f = dat[z];
+      auto CB = left ? f.CB1 : f.CB2;
+      if (!CB) return;
+      auto dCB = left ? f.dCB1 : f.dCB2;
+      if (y >= dCB) return;
+      auto I = left ? f.I1 : f.I2;
       auto Iy = I[y];
       CB += y + x0*dCB;
-      using cuda_primitive_t = typename primitive_type<T>::value_type;
-      cuda_primitive_t rCB[unroll];
-#pragma unroll
-      for (int i=0; i<unroll; i++)
-        if (x0 + i < dCB)
-          rCB[i] = *reinterpret_cast<cuda_primitive_t*>(CB+i*dCB);
+      int d1 = f.d1, d2 = f.d2;
       int ld;
       T* F[2];
       if (Iy < d1) {
         ld = d1;
-        F[0] = F11+Iy;
-        F[1] = F12+Iy-d1*d1;
+        F[0] = f.F11+Iy;
+        F[1] = f.F12+Iy-d1*d1;
       } else {
         ld = d2;
-        F[0] = F21+Iy-d1;
-        F[1] = F22+Iy-d1-d1*d2;
+        F[0] = f.F21+Iy-d1;
+        F[1] = f.F22+Iy-d1-d1*d2;
       }
 #pragma unroll
       for (int i=0; i<unroll; i++) {
         int x = x0 + i;
         if (x >= dCB) break;
         auto Ix = I[x];
-        F[Ix >= d1][Ix*ld] += *reinterpret_cast<T*>(&rCB[i]);
+        F[Ix >= d1][Ix*ld] += CB[i*dCB];
       }
-    }
-    template<typename T, unsigned int unroll>
-    __global__ void extend_add_kernel_opt
-    (unsigned int by0, AssembleData<T>* dat, bool left) {
-      int x = blockIdx.x * unroll * blockDim.x + threadIdx.x,
-        y = (blockIdx.y + by0) * blockDim.y + threadIdx.y;
-      auto& F = dat[blockIdx.z];
-      auto dCB = left ? F.dCB1 : F.dCB2;
-      auto FCB = left ? F.CB1 : F.CB2;
-      if (FCB && y < dCB && x < dCB)
-        ea_kernel_opt<T,unroll>
-          (x, y, F.d1, F.d2, left ? F.dCB1 : F.dCB2,
-           F.F11, F.F12, F.F21, F.F22, FCB, left ? F.I1 : F.I2);
     }
 
     template<typename T> void
@@ -230,59 +176,33 @@ namespace strumpack {
             assemble_12_21_kernel<<<grid,nt2>>>(f, ddat);
           }
       }
-#if 0
-      // TODO merge assembly with extend-add?!
-      cudaDeviceSynchronize();
-      { // extend-add
-        unsigned int nt = 16, nb = 0;
-        for (int f=0; f<nf; f++) {
-          int b = dat[f].dCB1 / nt + (dat[f].dCB1 % nt != 0);
-          if (b > nb) nb = b;
-          b = dat[f].dCB2 / nt + (dat[f].dCB2 % nt != 0);
-          if (b > nb) nb = b;
-        }
-        dim3 block(nt, nt);
-        using T_ = typename cuda_type<T>::value_type;
-        auto dat_ = reinterpret_cast<AssembleData<T_>*>(ddat);
-        for (unsigned int b1=0; b1<nb; b1+=MAX_BLOCKS_Y) {
-          int nb1 = std::min(nb-b1, MAX_BLOCKS_Y);
-          unsigned int bf =
-            std::max(std::size_t(1),
-                     std::min(std::size_t(MAX_BLOCKS_Z), nf / streams.size()));
-          for (unsigned int f=0, s=0; f<nf; f+=bf) {
-            dim3 grid(nb, nb1, std::min(nf-f, bf));
-            extend_add_kernel_left<<<grid, block, 0, streams[s]>>>(b1, dat_+f);
-            extend_add_kernel_right<<<grid, block, 0, streams[s]>>>(b1, dat_+f);
-            s = (s + 1) % streams.size();
-          }
-        }
-      }
-#else
       { // extend-add
         int du = 0;
         for (unsigned int f=0; f<nf; f++)
           du = std::max(du, std::max(dat[f].dCB1, dat[f].dCB2));
         if (du) {
-          const unsigned int nt = 256;
           const unsigned int unroll = 16;
-          unsigned int nby = (du + nt - 1) / nt;
-          unsigned int nbx = (du + unroll - 1) / unroll;
-          dim3 block(1, nt);
+          unsigned int nt = 512, ops = 1;
+          while (nt > du) {
+            nt /= 2;
+            ops *= 2;
+          }
+          unsigned int nbx = (du + nt - 1) / nt,
+            nby = (du + unroll - 1) / unroll,
+            nbf = (nf + ops - 1) / ops;
+          dim3 block(nt, 1, ops);
           using T_ = typename cuda_type<T>::value_type;
           auto dat_ = reinterpret_cast<AssembleData<T_>*>(ddat);
           for (unsigned int y=0; y<nby; y+=MAX_BLOCKS_Y) {
             unsigned int ny = std::min(nby-y, MAX_BLOCKS_Y);
-            for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Z) {
-              dim3 grid(nbx, ny, std::min(nf-f, MAX_BLOCKS_Z));
-              extend_add_kernel_opt<T_,unroll>
-                <<<grid, block>>>(y, dat_+f, true);
-              extend_add_kernel_opt<T_,unroll>
-                <<<grid, block>>>(y, dat_+f, false);
+            for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Z) {
+              dim3 grid(nbx, ny, std::min(nbf-f, MAX_BLOCKS_Z));
+              extend_add_kernel<T_,unroll><<<grid, block>>>(y, nf, dat_+f, true);
+              extend_add_kernel<T_,unroll><<<grid, block>>>(y, nf, dat_+f, false);
             }
           }
         }
       }
-#endif
     }
 
 
@@ -435,7 +355,7 @@ namespace strumpack {
       if (!n) return;
       using T_ = typename cuda_type<T>::value_type;
       int NT = 128;
-      replace_pivots_kernel<T_,real_t><<<(n+NT)/NT, NT, 0, s>>>
+      replace_pivots_kernel<T_,real_t><<<(n+NT-1)/NT, NT, 0, s>>>
         (n, reinterpret_cast<T_*>(A), thresh);
     }
 
