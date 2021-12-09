@@ -342,7 +342,6 @@ namespace strumpack {
     }
     gpu::copy_host_to_device<char>(dea_mem, hea_mem, L.ea_bytes);
     gpu::assemble(N, hasmbl, dasmbl, streams);
-    gpu::synchronize();
   }
 
 
@@ -421,9 +420,7 @@ namespace strumpack {
     // use half of the streams for comp, the other half for comm
     assert(streams.size() % 2 == 0);
     const int nr_streams = streams.size() / 2;
-    std::vector<cudaEvent_t> events(L.f.size());
-    for (auto& e : events)
-      cudaEventCreateWithFlags(&e, cudaEventDisableTiming);
+    std::vector<gpu::Event> events(L.f.size());
     scalar_t* host_factors = L.f[0]->host_factors_.get();
     for (std::size_t n=0; n<L.f.size(); n++) {
       auto& f = *(L.f[n]);
@@ -448,7 +445,7 @@ namespace strumpack {
       gpu::gemm
         (blas_handles[stream], Trans::N, Trans::N,
          scalar_t(-1.), f.F21_, f.F12_, scalar_t(1.), f.F22_);
-      cudaEventRecord(events[n], streams[stream]);
+      events[n].record(streams[stream]);
     }
     for (std::size_t n=0; n<L.f.size(); n++) {
       auto& f = *(L.f[n]);
@@ -456,7 +453,7 @@ namespace strumpack {
       const std::size_t dupd = f.dim_upd();
       int stream = n % nr_streams;
       int copy_stream = stream + nr_streams;
-      cudaStreamWaitEvent(streams[copy_stream], events[n]);
+      events[n].wait(streams[copy_stream]);
       std::size_t size_front = dsep * (dsep + 2*dupd);
       gpu::copy_device_to_host_async
         (pinned[stream], f.F11_.data(), size_front, streams[copy_stream]);
@@ -638,8 +635,10 @@ namespace strumpack {
         L.set_factor_pointers(dev_factors);
         L.set_work_pointers(work_mem, max_streams);
         front_assembly(A, L, hea_mem, dea_mem, streams);
+        gpu::synchronize();
         old_work = work_mem;
         if (L.f.size() > 256) {
+          // if (L.N8 || L.N16 || L.N24 || L.N32) {
           factor_small_fronts(L, fdata, opts);
           factor_large_fronts(L, blas_handles, solver_handles, streams, opts);
           STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
@@ -663,20 +662,19 @@ namespace strumpack {
              L.piv_size, streams[0]);
           L.set_factor_pointers(L.f[0]->host_factors_.get());
           L.set_pivot_pointers(L.f[0]->pivot_mem_.data());
-          gpu::synchronize();
         } else {
           L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
           factor_largest_fronts
             (L, blas_handles, solver_handles, streams, pin, opts);
-          gpu::synchronize();
           L.f[0]->pivot_mem_.resize(L.piv_size);
+          gpu::synchronize();
           gpu::copy_device_to_host_async
             (L.f[0]->pivot_mem_.data(), L.f[0]->piv_,
              L.piv_size, streams[0]);
           L.set_factor_pointers(L.f[0]->host_factors_.get());
           L.set_pivot_pointers(L.f[0]->pivot_mem_.data());
-          gpu::synchronize();
         }
+        gpu::synchronize();
       } catch (const std::bad_alloc& e) {
         std::cerr << "Out of memory" << std::endl;
         abort();
