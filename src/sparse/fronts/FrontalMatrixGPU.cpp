@@ -731,12 +731,11 @@ namespace strumpack {
         }
 
         L.f[0]->pivot_mem_.resize(L.piv_size);
-        gpu::synchronize();
+        copy_stream.synchronize();
         gpu::copy_device_to_host
           (L.f[0]->pivot_mem_.data(), L.f[0]->piv_, L.piv_size);
         L.set_factor_pointers(L.f[0]->host_factors_.get());
         L.set_pivot_pointers(L.f[0]->pivot_mem_.data());
-        gpu::synchronize();
       } catch (const std::bad_alloc& e) {
         std::cerr << "Out of memory" << std::endl;
         abort();
