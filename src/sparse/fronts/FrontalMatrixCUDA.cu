@@ -164,17 +164,20 @@ namespace strumpack {
           nb1 = std::max(nb1, dat[f].n11);
           nb2 = std::max(nb2, std::max(dat[f].n12, dat[f].n21));
         }
-        nb1 = (nb1 + nt1 - 1) / nt1;
-        nb2 = (nb2 + nt2 - 1) / nt2;
-        for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Y) {
-          dim3 grid(nb1, std::min(nf-f, MAX_BLOCKS_Y));
-          assemble_11_kernel<<<grid,nt1>>>(f, ddat);
+        if (nb1) {
+          nb1 = (nb1 + nt1 - 1) / nt1;
+          for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Y) {
+            dim3 grid(nb1, std::min(nf-f, MAX_BLOCKS_Y));
+            assemble_11_kernel<<<grid,nt1>>>(f, ddat);
+          }
         }
-        if (nb2)
+        if (nb2) {
+          nb2 = (nb2 + nt2 - 1) / nt2;
           for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Y) {
             dim3 grid(nb2, std::min(nf-f, MAX_BLOCKS_Y));
             assemble_12_21_kernel<<<grid,nt2>>>(f, ddat);
           }
+        }
       }
       { // extend-add
         int du = 0;
