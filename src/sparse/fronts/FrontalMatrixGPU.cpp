@@ -537,10 +537,9 @@ namespace strumpack {
         gpu::memset<scalar_t>(dev_factors, 0, L.factor_size);
         std::size_t small_fronts = L.N8 + L.N16 + L.N24 + L.N32;
         if (small_fronts != L.f.size())
-          std::partial_sort
-            (L.f.begin(), L.f.begin() + small_fronts, L.f.end(),
-             [](const FG_t* const& a, const FG_t* const & b) -> bool {
-               return a->dim_sep() < b->dim_sep(); });
+          std::partition
+            (L.f.begin(), L.f.end(), [](const FG_t* const& a) -> bool {
+              return a->dim_sep() <= 32; });
         L.set_factor_pointers(dev_factors);
         L.set_work_pointers(work_mem, max_streams);
         old_work = work_mem;
