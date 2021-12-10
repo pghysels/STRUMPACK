@@ -536,7 +536,7 @@ namespace strumpack {
         gpu::memset<scalar_t>(work_mem, 0, L.Schur_size);
         gpu::memset<scalar_t>(dev_factors, 0, L.factor_size);
         std::size_t small_fronts = L.N8 + L.N16 + L.N24 + L.N32;
-        if (small_fronts != L.f.size())
+        if (small_fronts && small_fronts != L.f.size())
           std::partition
             (L.f.begin(), L.f.end(), [](const FG_t* const& a) -> bool {
               return a->dim_sep() <= 32; });
