@@ -63,7 +63,7 @@ namespace strumpack {
     class Stream {
     public:
       Stream() {
-        gpu_check(cudaStreamCreateWithFlags(&s_, cudaStreamNonBlocking));
+        gpu_check(hipStreamCreateWithFlags(&s_, hipStreamNonBlocking));
         //gpu_check(hipStreamCreate(&s_));
       }
       ~Stream() { gpu_check(hipStreamDestroy(s_)); }
@@ -222,6 +222,7 @@ namespace strumpack {
         return *this;
       }
       ~DeviceMemory() { release(); }
+      std::size_t size() const { return size_; }
       operator T*() { return data_; }
       operator const T*() const { return data_; }
       // operator void*() { return data_; }
@@ -280,6 +281,7 @@ namespace strumpack {
         return *this;
       }
       ~HostMemory() { release(); }
+      std::size_t size() const { return size_; }
       operator T*() { return data_; }
       operator const T*() const { return data_; }
       // operator void*() { return data_; }

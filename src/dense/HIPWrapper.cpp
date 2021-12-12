@@ -96,6 +96,8 @@ namespace strumpack {
       }
 #endif
       gpu_check(hipFree(0));
+      gpu::BLASHandle hb;
+      gpu::SOLVERHandle hs;
     }
 
     void gemm(BLASHandle& handle, hipblasOperation_t transa,
