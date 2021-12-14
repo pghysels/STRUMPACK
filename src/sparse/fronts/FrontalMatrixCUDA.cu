@@ -190,6 +190,7 @@ namespace strumpack {
             nt /= 2;
             ops *= 2;
           }
+          ops = std::min(ops, nf);
           unsigned int nbx = (du + nt - 1) / nt,
             nby = (du + unroll - 1) / unroll,
             nbf = (nf + ops - 1) / ops;
