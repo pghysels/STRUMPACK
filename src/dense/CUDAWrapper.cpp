@@ -135,13 +135,13 @@ namespace strumpack {
     void init() {
 #if defined(STRUMPACK_USE_MPI)
       int devs;
-      hipGetDeviceCount(&devs);
+      cudaGetDeviceCount(&devs);
       if (devs > 1) {
         MPIComm c;
-        hipSetDevice(c.rank() % devs);
+        cudaSetDevice(c.rank() % devs);
       }
 #endif
-      gpu_check(hipFree(0));
+      gpu_check(cudaFree(0));
     }
 
     void gemm(BLASHandle& handle, cublasOperation_t transa,
