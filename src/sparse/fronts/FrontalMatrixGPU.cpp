@@ -84,6 +84,11 @@ namespace strumpack {
       for (auto& F : fronts)
         f.push_back(dynamic_cast<FG_t*>(F));
       std::size_t max_dsep = 0;
+#pragma omp parallel for                                               \
+  reduction(+:Isize,elems11,elems12,elems21)                           \
+  reduction(+:L_size,U_size,Schur_size,piv_size,total_upd_size)        \
+  reduction(+:N8,N16,N24,N32,factors_small)                            \
+  reduction(max:max_dsep)
       for (auto F : f) {
         const std::size_t dsep = F->dim_sep();
         const std::size_t dupd = F->dim_upd();
