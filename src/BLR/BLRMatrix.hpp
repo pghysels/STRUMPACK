@@ -170,7 +170,9 @@ namespace strumpack {
       const DenseTile<scalar_t>& tile_dense(std::size_t i, std::size_t j) const;
 
       void compress_tile(std::size_t i, std::size_t j, const Opts_t& opts);
-      void compress_tile_gpu();
+      void compress_tile_gpu(gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle,
+                             std::size_t i, std::size_t j, DenseM_t& A, DenseM_t& dU, 
+                             DenseM_t& dV, int* dpiv, const Opts_t& opts);
       void fill(scalar_t v);
       void fill_col(scalar_t v, std::size_t k, bool part, std::size_t CP);
 
