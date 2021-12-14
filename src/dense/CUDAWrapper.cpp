@@ -637,30 +637,30 @@ namespace strumpack {
     }
     
     template<typename scalar_t> void
-    geam(BLASHandle& handle, Trans transa, Trans transb, const scalar_t* alpha,
-         const DenseMatrix<scalar_t>& A, const scalar_t* beta, 
+    geam(BLASHandle& handle, Trans transa, Trans transb, const scalar_t alpha,
+         const DenseMatrix<scalar_t>& A, const scalar_t beta, 
          const DenseMatrix<scalar_t>& B, DenseMatrix<scalar_t>& C){
-      geam(handle, T2cuOp(transa), T2cuOp(transb), C.rows(), C.cols(), alpha, 
-           A.data(), A.ld(), beta, B.data(), B.ld(), C.data(), C.ld());
+      geam(handle, T2cuOp(transa), T2cuOp(transb), C.rows(), C.cols(), &alpha, 
+           A.data(), A.ld(), &beta, B.data(), B.ld(), C.data(), C.ld());
     }
 
-    template void geam(BLASHandle&, Trans, Trans, const float*, 
-                       const DenseMatrix<float>&, const float*, 
+    template void geam(BLASHandle&, Trans, Trans, const float, 
+                       const DenseMatrix<float>&, const float, 
                        const DenseMatrix<float>&, DenseMatrix<float>&);
 
-    template void geam(BLASHandle&, Trans, Trans, const double*, 
-                       const DenseMatrix<double>&, const double*, 
+    template void geam(BLASHandle&, Trans, Trans, const double, 
+                       const DenseMatrix<double>&, const double, 
                        const DenseMatrix<double>&, DenseMatrix<double>&);
     
-    template void geam(BLASHandle&, Trans, Trans, const std::complex<float>*, 
+    template void geam(BLASHandle&, Trans, Trans, const std::complex<float>, 
                        const DenseMatrix<std::complex<float>>&, 
-                       const std::complex<float>*, 
+                       const std::complex<float>, 
                        const DenseMatrix<std::complex<float>>&, 
                        DenseMatrix<std::complex<float>>&);
 
-    template void geam(BLASHandle&, Trans, Trans, const std::complex<double>*, 
+    template void geam(BLASHandle&, Trans, Trans, const std::complex<double>, 
                        const DenseMatrix<std::complex<double>>&, 
-                       const std::complex<double>*, 
+                       const std::complex<double>, 
                        const DenseMatrix<std::complex<double>>&, 
                        DenseMatrix<std::complex<double>>&);
     

@@ -194,9 +194,7 @@ namespace strumpack {
         gpu::DeviceMemory<scalar_t> d_V(rank*dV.rows());
         scalar_t* d_V_T = d_V;
         DenseMW_t dV_T(rank, dV.rows(), d_V_T, dV.cols());
-        scalar_t alf = 1;
-        scalar_t *alpha = &alf;
-        gpu::geam<scalar_t>(blashandle, Trans::C, Trans::N, alpha, dV, 0, 
+        gpu::geam<scalar_t>(blashandle, Trans::C, Trans::N, 1.0, dV, 0.0, 
                             DenseM_t(), dV_T);
         //?? dgmm in-place
         gpu::dgmm<scalar_t>(blashandle, Side::L, dV_T, 
@@ -244,9 +242,7 @@ namespace strumpack {
         gpu::DeviceMemory<scalar_t> d_V(rank*rows());
         scalar_t* d_V_T = d_V;
         DenseMW_t dV_T(rank, dU.rows(), d_V_T, dV.cols());
-        scalar_t alf = 1;
-        scalar_t *alpha = &alf;
-        gpu::geam<scalar_t>(blashandle, Trans::C, Trans::N, alpha, dV, 0, 
+        gpu::geam<scalar_t>(blashandle, Trans::C, Trans::N, 1.0, dV, 0.0, 
                             DenseM_t(), dV_T);
         gpu::dgmm<scalar_t>(blashandle, Side::L, dV_T, 
                             reinterpret_cast<scalar_t*>(dS), dV_T);
