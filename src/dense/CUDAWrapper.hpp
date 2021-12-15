@@ -380,8 +380,8 @@ namespace strumpack {
            int Lwork, int* devInfo, gesvdjInfo_t params);
 
     template<typename scalar_t> void
-    geam(BLASHandle& handle, Trans transa, Trans transb, const scalar_t* alpha,
-         const DenseMatrix<scalar_t>& A, const scalar_t* beta, const DenseMatrix<scalar_t>& B,
+    geam(BLASHandle& handle, Trans transa, Trans transb, const scalar_t alpha,
+         const DenseMatrix<scalar_t>& A, const scalar_t beta, const DenseMatrix<scalar_t>& B,
          DenseMatrix<scalar_t>& C);
     
     template<typename scalar_t> void
