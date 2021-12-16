@@ -71,48 +71,35 @@ namespace strumpack {
 
 
     /**
-     * Put elements of the sparse matrix in the F11 part of the front.
-     * The sparse elements are taken from F.e11, which is a list of
-     * triplets {r,c,v}. The front is assumed to be initialized to
-     * zero.
+     * Put elements of the sparse matrix in the F11, F12 and F21 parts
+     * of the front.  The sparse elements are taken from F.e11, F.e12,
+     * F.e21, which are lists of triplets {r,c,v}. The front is
+     * assumed to be initialized to zero.
      *
-     * Use this with a 1-dimensional grid, where the number of grid
-     * blocks in the x direction is the number of fronts, with f0
-     * being the first front pointed to by dat. The threadblock should
-     * also be 1d.
      */
-    template<typename T> __global__ void
-    assemble_11_kernel(unsigned int f0, AssembleData<T>* dat) {
-      int idx = blockIdx.x * blockDim.x + threadIdx.x;
-      auto& F = dat[blockIdx.y + f0];
-      if (idx >= F.n11) return;
-      auto& t = F.e11[idx];
-      F.F11[t.r + t.c*F.d1] = t.v;
-    }
-    /**
-     * Put elements of the sparse matrix in the F12 anf F21 parts of
-     * the front. These two are combined because F.n12 and F.n21 are
-     * (probably always?) equal, and to save on overhead of launching
-     * kernels/blocks.
-     *
-     * Use this with a 1-dimensional grid, where the number of grid
-     * blocks in the x direction is the number of fronts, with f0
-     * being the first front pointed to by dat. The threadblock should
-     * also be 1d.
-     */
-    template<typename T> __global__ void
-    assemble_12_21_kernel(unsigned int f0, AssembleData<T>* dat) {
-      int idx = blockIdx.x * blockDim.x + threadIdx.x;
-      auto& F = dat[blockIdx.y + f0];
-      if (idx < F.n12) {
-        auto& t = F.e12[idx];
+    template<typename T, int unroll> __global__ void
+    assemble_kernel(unsigned int f0, unsigned int nf, AssembleData<T>* dat) {
+      int idx = (blockIdx.x * blockDim.x) * unroll + threadIdx.x,
+        op = (blockIdx.y + f0) * blockDim.y + threadIdx.y;
+      if (op >= nf) return;
+      auto& F = dat[op];
+      for (int i=0, j=idx; i<unroll; i++, j+=blockDim.x) {
+        if (j >= F.n11) break;
+        auto& t = F.e11[j];
+        F.F11[t.r + t.c*F.d1] = t.v;
+      }
+      for (int i=0, j=idx; i<unroll; i++, j+=blockDim.x) {
+        if (j >= F.n12) break;
+        auto& t = F.e12[j];
         F.F12[t.r + t.c*F.d1] = t.v;
       }
-      if (idx < F.n21) {
-        auto& t = F.e21[idx];
+      for (int i=0, j=idx; i<unroll; i++, j+=blockDim.x) {
+        if (j >= F.n21) break;
+        auto& t = F.e21[j];
         F.F21[t.r + t.c*F.d2] = t.v;
       }
     }
+
 
     /**
      * Single extend-add operation from one contribution block into
@@ -158,24 +145,24 @@ namespace strumpack {
     assemble(unsigned int nf, AssembleData<T>* dat,
              AssembleData<T>* ddat) {
       { // front assembly from sparse matrix
-        unsigned int nt1 = 128, nt2 = 32;
-        std::size_t nb1 = 0, nb2 = 0;
-        for (unsigned int f=0; f<nf; f++) {
-          nb1 = std::max(nb1, dat[f].n11);
-          nb2 = std::max(nb2, std::max(dat[f].n12, dat[f].n21));
-        }
-        if (nb1) {
-          nb1 = (nb1 + nt1 - 1) / nt1;
-          for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Y) {
-            dim3 grid(nb1, std::min(nf-f, MAX_BLOCKS_Y));
-            assemble_11_kernel<<<grid,nt1>>>(f, ddat);
+        std::size_t nnz = 0;
+        for (unsigned int f=0; f<nf; f++)
+          nnz = std::max
+            (nnz, std::max(dat[f].n11, std::max(dat[f].n12, dat[f].n21)));
+        if (nnz) {
+          unsigned int nt = 512, ops = 1;
+          const int unroll = 8;
+          while (nt*unroll > nnz && nt > 8) {
+            nt /= 2;
+            ops *= 2;
           }
-        }
-        if (nb2) {
-          nb2 = (nb2 + nt2 - 1) / nt2;
-          for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Y) {
-            dim3 grid(nb2, std::min(nf-f, MAX_BLOCKS_Y));
-            assemble_12_21_kernel<<<grid,nt2>>>(f, ddat);
+          ops = std::min(ops, nf);
+          unsigned int nb = (nnz + nt*unroll - 1) / (nt*unroll),
+            nbf = (nf + ops - 1) / ops;
+          dim3 block(nt, ops);
+          for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Y) {
+            dim3 grid(nb, std::min(nbf-f, MAX_BLOCKS_Y));
+            assemble_kernel<T,unroll><<<grid,block>>>(f, nf, ddat+f*ops);
           }
         }
       }
@@ -201,8 +188,10 @@ namespace strumpack {
             unsigned int ny = std::min(nby-y, MAX_BLOCKS_Y);
             for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Z) {
               dim3 grid(nbx, ny, std::min(nbf-f, MAX_BLOCKS_Z));
-              extend_add_kernel<T_,unroll><<<grid, block>>>(y, nf, dat_+f, true);
-              extend_add_kernel<T_,unroll><<<grid, block>>>(y, nf, dat_+f, false);
+              extend_add_kernel<T_,unroll><<<grid, block>>>
+                (y, nf, dat_+f*ops, true);
+              extend_add_kernel<T_,unroll><<<grid, block>>>
+                (y, nf, dat_+f*ops, false);
             }
           }
         }
