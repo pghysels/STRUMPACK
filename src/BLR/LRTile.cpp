@@ -73,7 +73,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> LRTile<scalar_t>::LRTile
-    (const DMW_t& dU, const DMW_t& dV) {
+    (DMW_t& dU, DMW_t& dV) {
       U_.reset(new DMW_t(dU));
       V_.reset(new DMW_t(dV));
     }

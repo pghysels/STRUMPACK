@@ -1055,6 +1055,13 @@ namespace strumpack {
       assert(j+n <= D.cols());
     }
 
+    DenseMatrixWrapper(DenseMatrixWrapper<scalar_t>& D) {
+      this->data_ = &D(0,0); 
+      this->rows_ = D.rows(); 
+      this->cols_ = D.cols();
+      this->ld_ = D.ld();
+    }
+
     /**
      * Virtual destructor. Since a DenseMatrixWrapper does not
      * actually own it's memory, put just keeps a pointer, this will
