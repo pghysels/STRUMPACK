@@ -104,18 +104,10 @@ namespace strumpack {
     }
   }
 
-  template<typename scalar_t,typename integer_t> std::vector<std::size_t>
+  template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::upd_to_parent
-  (const F_t* pa) const {
-    std::size_t upd2sep;
-    return upd_to_parent(pa, upd2sep);
-  }
-
-  template<typename scalar_t,typename integer_t> std::vector<std::size_t>
-  FrontalMatrix<scalar_t,integer_t>::upd_to_parent
-  (const F_t* pa, std::size_t& upd2sep) const {
+  (const F_t* pa, std::size_t& upd2sep, std::size_t* I) const {
     integer_t r = 0, dupd = dim_upd(), pa_dsep = pa->dim_sep();
-    std::vector<std::size_t> I(dupd);
     for (; r<dupd; r++) {
       auto up = upd_[r];
       if (up >= pa->sep_end_) break;
@@ -127,6 +119,35 @@ namespace strumpack {
       while (pa->upd_[t] < up) t++;
       I[r] = t + pa_dsep;
     }
+  }
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrix<scalar_t,integer_t>::upd_to_parent
+  (const F_t* pa, std::size_t* I) const {
+    integer_t r = 0, dupd = dim_upd(), pa_dsep = pa->dim_sep();
+    for (; r<dupd; r++) {
+      auto up = upd_[r];
+      if (up >= pa->sep_end_) break;
+      I[r] = up - pa->sep_begin_;
+    }
+    for (integer_t t=0; r<dupd; r++) {
+      auto up = upd_[r];
+      while (pa->upd_[t] < up) t++;
+      I[r] = t + pa_dsep;
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> std::vector<std::size_t>
+  FrontalMatrix<scalar_t,integer_t>::upd_to_parent
+  (const F_t* pa) const {
+    std::size_t upd2sep;
+    return upd_to_parent(pa, upd2sep);
+  }
+
+  template<typename scalar_t,typename integer_t> std::vector<std::size_t>
+  FrontalMatrix<scalar_t,integer_t>::upd_to_parent
+  (const F_t* pa, std::size_t& upd2sep) const {
+    std::vector<std::size_t> I(dim_upd());
+    upd_to_parent(pa, upd2sep, I.data());
     return I;
   }
 
